@@ -1,0 +1,168 @@
+{
+  "contract_id": "f1.prepayment_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "8e51314dbd84c01f682bfbe7186c0196a76ee5b3eccc1c2a7670140b70fcd97d",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-f1-prepayment",
+    "html_store": {
+      "item_ids": [
+        "F1-rp-rows"
+      ],
+      "note": "F1 预付账款的结构化 Tab 行数据存成 checklist_responses 的 remark JSON 数组。本契约按 stable field + rowId 拆开。",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "phase5_prepayment",
+    "reviewed_basis": "openpyxl 逐格实测 F/F1 预付账款.xlsx + 前端 useF1*.ts 按值 grep"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "关联方及交易检查表F1-6",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "f16-managed",
+      "tables": [
+        {
+          "fields": [
+            {
+              "column": "A",
+              "header_text": "关联方名称",
+              "json_key": "partyName",
+              "mode": "editable",
+              "stable_field_key": "party_name",
+              "value_type": "text"
+            },
+            {
+              "column": "B",
+              "header_text": "关联关系",
+              "json_key": "relationship",
+              "mode": "editable",
+              "stable_field_key": "relationship",
+              "value_type": "text"
+            },
+            {
+              "column": "C",
+              "header_text": "期初余额",
+              "json_key": "priorBalance",
+              "mode": "editable",
+              "stable_field_key": "prior_balance",
+              "value_type": "amount"
+            },
+            {
+              "column": "D",
+              "header_text": "借方发生",
+              "json_key": "debit",
+              "mode": "editable",
+              "stable_field_key": "debit",
+              "value_type": "amount"
+            },
+            {
+              "column": "E",
+              "header_text": "贷方发生",
+              "json_key": "credit",
+              "mode": "editable",
+              "stable_field_key": "credit",
+              "value_type": "amount"
+            },
+            {
+              "column": "F",
+              "header_text": "期末余额",
+              "json_key": "endBalance",
+              "mode": "formula",
+              "stable_field_key": "end_balance",
+              "value_type": "amount"
+            },
+            {
+              "column": "G",
+              "header_text": "坏账准备",
+              "json_key": "badDebt",
+              "mode": "editable",
+              "stable_field_key": "bad_debt",
+              "value_type": "amount"
+            },
+            {
+              "column": "H",
+              "header_text": "账面价值",
+              "json_key": "bookValue",
+              "mode": "formula",
+              "stable_field_key": "book_value",
+              "value_type": "amount"
+            },
+            {
+              "column": "I",
+              "header_text": "发生时间及账龄",
+              "json_key": "agingDescription",
+              "mode": "editable",
+              "stable_field_key": "aging_description",
+              "value_type": "text"
+            },
+            {
+              "column": "J",
+              "header_text": "款项性质说明",
+              "json_key": "natureDescription",
+              "mode": "editable",
+              "stable_field_key": "nature_description",
+              "value_type": "text"
+            },
+            {
+              "column": "K",
+              "header_text": "期后结算",
+              "json_key": "postPeriodDelivery",
+              "mode": "editable",
+              "stable_field_key": "post_period_delivery",
+              "value_type": "amount"
+            },
+            {
+              "column": "L",
+              "header_text": "索引号",
+              "json_key": "indexRef",
+              "mode": "editable",
+              "stable_field_key": "index_ref",
+              "value_type": "text"
+            },
+            {
+              "column": "M",
+              "header_text": "备注",
+              "json_key": "remark",
+              "mode": "editable",
+              "stable_field_key": "remark",
+              "value_type": "text"
+            }
+          ],
+          "footer": {
+            "carries_total_formula": true,
+            "row_marker": "合计"
+          },
+          "formula_mask": [
+            "F7:F9",
+            "H7:H9"
+          ],
+          "row_identity": {
+            "column": "N",
+            "hidden": true,
+            "store_key": "rowId"
+          },
+          "table_key": "related_party_rows",
+          "table_name": "GT_F16_ROWS"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "f1457eb9334a3b97229643079b9c1fe0d1c277622d872d8f9f5afa8342ffc0a1",
+    "relative_path": "F/F1 预付账款.xlsx",
+    "template_sha256": "f30055cbebc7daedec6d073e983e7ada5375c3edf50b49880c7aa571846510dd"
+  },
+  "template_definition_sha256": "0cfe004fb8aae454d3574804c2d8682b68ec91fa0f8e2903193d031c265e8344"
+}

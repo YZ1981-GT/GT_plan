@@ -205,7 +205,7 @@ backend/app/routers/wp_sync_router.py  3102
 #     `excel_structure_parsers.py`，属独立任务。
 backend/app/services/excel_structure_fingerprint.py  993
 backend/app/services/word_sdt_fingerprint.py  874
-backend/app/services/workpaper_sync/adapters/registry.py  1494
+backend/app/services/workpaper_sync/adapters/registry.py  1830
 backend/app/services/workpaper_sync/artifacts.py  1493
 backend/app/services/workpaper_sync/callback_delivery.py  1837
 backend/app/services/workpaper_sync/close_intent.py  1008

@@ -553,20 +553,26 @@ class WorkpaperSyncAdapterRegistry:
         本方法自己不放宽任何准入判据：真正的注册仍由 :meth:`register` 执行（approved
         bundle / authority model 配对 / contract 双重漂移 / matcher 重叠一条不少），
         而 provider 侧的 `attach_*` 又必须先经 Task 75 的 published-identity 观测器读出
-        frozen identity。本方法只做三件事：按计划派发、把「为什么没注册」记成可读原因、
-        把结果汇总成可断言的 outcome。
+        frozen identity。本方法只做四件事：按计划派发、把「为什么没注册（供给不足）」记成
+        可读原因、把**注册失败（真故障）** 记成 typed failure、把结果汇总成可断言的 outcome。
 
-        ⚠️ **不吞异常**：provider 抛出的 `SyncDomainError`（含观测器的
-        `PublishedIdentityObserverError`）原样上抛 —— 「注册失败」与「供给不足」必须可
-        分辨，把前者降级成后者正是 AC 5.12 明令禁止的形态。
+        🔴 **按 entry 隔离**（本 spec 核心修复）：某个 entry 的 provider/register 抛
+        `SyncDomainError`（含 `ContractDriftError` / 观测器 `PublishedIdentityObserverError`
+        / `RegistryError` 全部子类）时，记成一条 :class:`RegistrationFailure`（真故障，与
+        「供给不足 reason」分型 —— AC 5.12）并**继续**下一个 entry，不让整批中断。非
+        `SyncDomainError`（DB 故障 / `AttributeError` 等）仍**上抛** —— 那是真 bug，不能被
+        当成 fail-visible 的注册失败吞掉。隔离前是「全有或全无」：一个 entry 抛错整批中断、
+        缓存不写 ⇒ **所有** entry 的 sync 端点都 422（本 spec 起因）。隔离后 blast radius 只
+        收敛到出错的那一个 entry；准入判据一条不放宽（`register()` RG-1~19 照跑）。
         """
         registered: list[str] = []
-        # 🔴 已注册的 entry_id **实录**，不再由 `planned - reasons` 反算：反算让
-        #    `len(registered) + len(reasons) == len(planned)` 变成恒真式（reasons ⊆ planned
-        #    时无论如何都成立），于是「有 entry 被静默跳过」这条判据测不出任何东西
-        #    —— 变异 M19（把 `reasons[...] = supply` 换成 `pass`）实测 GREEN 就是这个根因。
+        # 🔴 已注册的 entry_id **实录**，不再由 `planned - reasons - failures` 反算：反算让
+        #    记账等式变成恒真式（子集关系下无论如何都成立），于是「有 entry 被静默跳过」这条
+        #    判据测不出任何东西 —— 变异 M19（把 `reasons[...] = supply` 换成 `pass`）实测
+        #    GREEN 就是这个根因。三集合各有独立来源，跳过一个即三边之和少 1、立刻打红。
         registered_entries: list[str] = []
         reasons: dict[str, str] = {}
+        failures: dict[str, RegistrationFailure] = {}
         for item in self.registration_plan:
             if item.entry_id in self._by_entry_id:
                 registered.append(self._by_entry_id[item.entry_id].adapter_id)
@@ -579,8 +585,20 @@ class WorkpaperSyncAdapterRegistry:
             if supply is not None:
                 reasons[item.entry_id] = supply
                 continue
-            provider = _load_entry_provider(item)
-            ids = tuple(await provider(self, session=session))
+            # 🔴 只在这里隔离：只捕获 SyncDomainError（契约漂移 / 观测器 / 注册准入等
+            #    fail-visible 域异常），记成 typed failure 并继续下一个 entry。非域异常
+            #    （DB / AttributeError）仍上抛 —— 它是真 bug，不是「这个 entry 契约漂移」。
+            try:
+                provider = _load_entry_provider(item)
+                ids = tuple(await provider(self, session=session))
+            except SyncDomainError as exc:  # noqa: PERF203 - 隔离必须逐 entry
+                failures[item.entry_id] = RegistrationFailure(
+                    entry_id=item.entry_id,
+                    error_code=str(getattr(exc, "error_code", "") or type(exc).__name__),
+                    message=str(exc),
+                    exc_type=type(exc).__name__,
+                )
+                continue
             if not ids:
                 reasons[item.entry_id] = _describe_provider_block(item)
                 continue
@@ -591,6 +609,7 @@ class WorkpaperSyncAdapterRegistry:
             reasons=dict(sorted(reasons.items())),
             planned_entry_ids=tuple(item.entry_id for item in self.registration_plan),
             registered_entry_ids=tuple(sorted(set(registered_entries))),
+            failures=dict(sorted(failures.items())),
         )
 
     def registrations(self) -> tuple[AdapterRegistration, ...]:
@@ -1099,7 +1118,7 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
         "document_type": "xlsx",
         "authority_model": "projection_contract",
         "template_relative_path": "D/D1 应收票据.xlsx",
-        "adapter_registered": False,
+        "adapter_registered": True,
         "reason": (
             "G5-1 Phase 5 首个 canary。**不是第五个 pilot**：四个 pilot 是 "
             "`pilot_harness.PilotClass` 封闭枚举的代表，`xlsx/gt-d1-notes-receivable` 的 "
@@ -1254,6 +1273,237 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "归父 entry，不独立计数）。"
         ),
     },
+    # ── E1 货币资金 canary（spec: e1-sync-coverage-and-first-canary · Task 10）─────
+    {
+        "contract_id": "e1.monetary_fund_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_e1_monetary_fund",
+        "delivered_by_task": "E1-canary",
+        "pilot_class": "phase5_monetary_fund",
+        "entry_id": "xlsx/gt-e1-monetary-fund",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "E1 canary（spec e1-sync-coverage-and-first-canary）。选型守卫 assert_entry_selectable "
+            "核四条 manifest 事实（entry 存在 / independent=True / "
+            "profile==xlsx.editable.shared.single.room_service_wired.v1 / wp_code==['E1']）。"
+            "权威模板 E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx "
+            "（sha256 8317e2ba…）；受管 sheets= e12-managed(canary) / e14-managed / "
+            "e16-managed / e17-managed / e18-managed / e19-managed / e110-managed / "
+            "e111-managed(static_region)。HTML store 含 E1-cash-detail-rows / "
+            "E1-digital-rows / E1-reconciliation-rows / E1-cash-count-{rmb|fx|cert}-rows / "
+            "E1-account-list-rows + static E1-account-commit。行身份键统一为 `id`"
+            "（不是 D 类的 rowId）。"
+            "`adapter_registered=False`：与 D1/D3/D5/D6/D7 卡在同一平台级缺口"
+            "（umbrella BP-61-1：published representation 三表近空，186 个 planned "
+            "entry 一个都注册不上），供给就绪后真栈注册。"
+        ),
+    },
+    # ── F1 预付账款 canary（spec: f1-sync-coverage-and-first-canary · Task 9）─────
+    {
+        "contract_id": "f1.prepayment_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_f1_prepayment",
+        "delivered_by_task": "F1-canary",
+        "pilot_class": "phase5_prepayment",
+        "entry_id": "xlsx/gt-f1-prepayment",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "F/F1 预付账款.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "F1 canary（spec f1-sync-coverage-and-first-canary）。选型守卫 "
+            "assert_entry_selectable 核四条 manifest 事实（entry 存在 / "
+            "independent=True / profile==room_service_wired.v1 / "
+            "wp_code==['F1P']）+ 零回退（F1P find/any 均 None、父码 F1 落权威模板）。"
+            "权威模板 F/F1 预付账款.xlsx（sha256 f30055cb…）；canary 受管 sheet = "
+            "关联方及交易检查表F1-6（单级表头 / 3 行 / F/H 两列公式 / UUID N 列）。"
+            "HTML store = checklist_responses.item_id='F1-rp-rows'（前端 "
+            "useF1RelatedParty.ts 的 RelatedPartyRow 行数组）。"
+            "wp_code 裁决=['F1']（store 载荷 F1-det-rows 46,295 B 落在 "
+            "wp_code=F1 上；F1P 是 CamelCase 幻影码 finder 零命中）。"
+            "`adapter_registered=False`：与 D1/D3/D5/D6/D7/E1 卡在同一平台级缺口"
+            "（umbrella BP-61-1），供给就绪后真栈注册。"
+        ),
+    },
+    # ── F2 main（spec: f2-sync-coverage-four-entry-lanes · Task 7）──────
+    {
+        "contract_id": "f2.inventory_main",
+        "provider_module": "app.services.workpaper_sync.phase5_f2_inventory_main",
+        "delivered_by_task": "F2-main-canary",
+        "pilot_class": "phase5_f2_inventory_main",
+        "entry_id": "xlsx/gt-f2-inventory-main",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": (
+            "F/F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx"
+        ),
+        "adapter_registered": False,
+        "reason": (
+            "F2 main lane canary（spec f2-sync-coverage-four-entry-lanes）。"
+            "三个 F2I entry 共用幻影码，matcher 域靠 sheet_keys 互斥解 RG-3（F2-H1）。"
+            "canary 受管 sheet = 四、自制半成品明细表F2-6（F2-H4）。"
+            "权威模板 F/F2-1至F2-14（sha256 9e57efd2…）；"
+            "HTML store = checklist_responses.item_id='F2-6-rows'。"
+            "wp_code 裁决=['F2']（35 键全在父码 F2）。"
+            "`adapter_registered=False`：与 D/E/F1 卡在同一平台级缺口"
+            "（umbrella BP-61-1），供给就绪后真栈注册。"
+        ),
+    },
+    # ── F2 stocktake（spec: f2-sync-coverage-four-entry-lanes · Task 14）──────
+    {
+        "contract_id": "f2.stocktake_bundle",
+        "provider_module": "app.services.workpaper_sync.phase5_f2_stocktake_bundle",
+        "delivered_by_task": "F2-stocktake-canary",
+        "pilot_class": "phase5_f2_stocktake_bundle",
+        "entry_id": "xlsx/gt-f2-stocktake-bundle",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": (
+            "F/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx"
+        ),
+        "adapter_registered": False,
+        "reason": (
+            "F2 stocktake lane canary（spec f2-sync-coverage-four-entry-lanes）。"
+            "F2S 独占幻影码，无 RG-3 冲突。canary = F2-25 双区。"
+            "权威模板 F/F2-21至F2-26（sha256 bdfdcf8a…）。"
+            "wp_code 裁决=['F2']。"
+            "`adapter_registered=False`：BP-61-1。"
+        ),
+    },
+    # ── F2 valuation（spec: f2-sync-coverage-four-entry-lanes · Task 18）──────
+    {
+        "contract_id": "f2.inventory_valuation",
+        "provider_module": "app.services.workpaper_sync.phase5_f2_inventory_valuation",
+        "delivered_by_task": "F2-valuation-canary",
+        "pilot_class": "phase5_f2_inventory_valuation",
+        "entry_id": "xlsx/gt-f2-inventory-valuation",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": (
+            "F/F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx"
+        ),
+        "adapter_registered": False,
+        "reason": (
+            "F2 valuation lane canary（spec f2-sync-coverage-four-entry-lanes）。"
+            "F2I + sheet_keys 解 RG-3。canary = F2-48 dict 子数组。"
+            "F2-47 卡 FC-10（百分数换算），灰度关待 Task 20。"
+            "权威模板 F/F2-47至F2-49（sha256 bab0abc0…）。"
+            "`adapter_registered=False`：BP-61-1。"
+        ),
+    },
+    # ── F2 special（spec: f2-sync-coverage-four-entry-lanes · Task 22）──────
+    {
+        "contract_id": "f2.inventory_special",
+        "provider_module": "app.services.workpaper_sync.phase5_f2_inventory_special",
+        "delivered_by_task": "F2-special-canary",
+        "pilot_class": "phase5_f2_inventory_special",
+        "entry_id": "xlsx/gt-f2-inventory-special",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "F/F2-55至F2-58 合同履约成本.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "F2 special lane canary（spec f2-sync-coverage-four-entry-lanes）。"
+            "F2I + sheet_keys 解 RG-3。canary = F2-57 dict 子数组。"
+            "权威模板 F/F2-55至F2-58（sha256 b9ea2481…）。"
+            "`adapter_registered=False`：BP-61-1。"
+        ),
+    },
+    # ── F3 canary（spec: f3-sync-coverage-and-first-canary · Task 9）─────────
+    {
+        "contract_id": "f3.notes_payable_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_f3_notes_payable",
+        "delivered_by_task": "F3-canary",
+        "pilot_class": "phase5_notes_payable",
+        "entry_id": "xlsx/gt-f3-notes-payable",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "F/F3 应付票据.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "F3 canary（spec f3-sync-coverage-and-first-canary）。选型守卫 "
+            "assert_entry_selectable 照 D3 同签名（resolution 必填 / 无关闭开关）并对**真 "
+            "manifest 真调**（wp_code_patterns==['F3N'] 幻影码）+ 零回退（F3N 在 wp_index 与 "
+            "wp_templates/_index.json 均 0 命中，父码 F3 落权威模板）。"
+            "权威模板 F/F3 应付票据.xlsx（sha256 06de707b…，79,616 B，12 sheets）；"
+            "canary 受管 sheet = 逾期票据检查F3-5（两级表头 R5/R6 / 数据 R7-21 / "
+            "footer R22「合计」纯两字 / UUID 列 P / **数据区零公式** —— 10 个公式全在页眉与 footer）。"
+            "HTML store = checklist_responses.item_id='F3-5-rows'（真库 675 B / 2 行全带 rowId，"
+            "F3 唯一有载荷的键；🔴 实测是 2 行**空白行**，有意义数值的 roundtrip 仍需 seed）。"
+            "🔴 契约装配走框架层 spec_to_contract_sheet_payload（不手写 table payload）—— "
+            "F1 的手写版缺 anchor/header_rows/row_identity.json_pointer 等必填字段，parse_contract 直接抛。"
+            "I 列（票面利率）命中 FC-10（模板 0.00% × 前端存百分数）⇒ 暂不进 field_specs，"
+            "待 value_type=percent_points 换算落地（merge.py 现无任何 percent 换算）。"
+            "wp_code 裁决=['F3']（wp_index 4 行）。"
+            "`adapter_registered=False`：与 D1/D3/D5/D6/D7/E1/F1/F2 卡在同一平台级缺口"
+            "（umbrella BP-61-1：slice 实测 published_representation=null），供给就绪后真栈注册。"
+        ),
+    },
+    # ── F4 canary（spec: f4-sync-coverage-and-first-canary · Task 8）─────────
+    {
+        "contract_id": "f4.accounts_payable_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_f4_accounts_payable",
+        "delivered_by_task": "F4-canary",
+        "pilot_class": "phase5_accounts_payable",
+        "entry_id": "xlsx/gt-f4-accounts-payable",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "F/F4 应付账款.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "F4 canary（spec f4-sync-coverage-and-first-canary）。"
+            "🔴 **全 F 循环唯一「幻影码撞真码」**：manifest 的 wp_code_patterns==['F4A'] 与 "
+            "wp_code_overrides.json 的程序表路由码 F4A 字面相同（裁决 F4-H2：两侧都不改）。"
+            "四条隔离事实实测：wp_templates/_index.json 无 F4A（F 循环只有 F0~F5 六个真码）· "
+            "wp_index 无 F4A（真码 F4 有 5 行）· provisioner 用裁决真码 ['F4'] · "
+            "assert_no_implicit_template_fallback('F4A') 通过 ⇒ 幻影码只存在于路由表一处，"
+            "误当业务码用时得到空集而不是命中程序表。"
+            "权威模板 F/F4 应付账款.xlsx（sha256 e20e6272…，108,329 B，15 sheets）；"
+            "canary 受管 sheet = 关联方及交易检查表F4-6（单级表头 R6 / 数据 R7-11 / "
+            "footer R12「合计」/ UUID 列 M / formula_columns=('F',)）。"
+            "🔴 公式 F=C+E-D（**负债类**：期初+贷方−借方）与 F1-6 的 F=C+D-E（资产类）互为镜像 —— "
+            "同型不等于同式，逐格实测所得（FC-4）。"
+            "HTML store = checklist_responses.item_id='F4-6-rows'；真库 F4-2-rows 3,485 B / "
+            "4 行全带 rowId + F4-7-estimated-inbound-rows 1,211 B / 2 行（同一底稿）。"
+            "FC-10 **不命中**（F4-6 逐格实测零百分比格式格）—— 四个 F spec 里唯一无该阻塞的。"
+            "顺带发现并登记的模板缺陷：B8:B11 的数据验证 formula1=$N$7:$N$14 而 N 列全空"
+            "（悬空引用，仅 B7 的 DV 指向真实枚举源 $B$18:$B$25）—— 不改模板字节。"
+            "`adapter_registered=False`：同 BP-61-1。"
+        ),
+    },
+    # ── F5 canary（spec: f5-sync-coverage-and-first-canary · Task 9）─────────
+    {
+        "contract_id": "f5.cost_of_sales_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_f5_cost_of_sales",
+        "delivered_by_task": "F5-canary",
+        "pilot_class": "phase5_cost_of_sales",
+        "entry_id": "xlsx/gt-f5-cost-of-sales",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "F/F5 营业成本.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "F5 canary（spec f5-sync-coverage-and-first-canary）。选型守卫对真 manifest 真调"
+            "（wp_code_patterns==['F5C']）+ 零回退（F5C 在 wp_index 与 _index.json 均 0 命中）。"
+            "权威模板 F/F5 营业成本.xlsx（sha256 417e5ae7…，187,721 B，11 sheets）；"
+            "canary 受管 sheet = 重大调整核查表F5-8（两级表头 R12/R13 / 数据 R14-29 / "
+            "**无 footer 合计** ⇒ 锚行 R30 + footer_carries_total_formula=False，"
+            "🔴 marker 逐字是「三、审计说明：」**带全角冒号**（spec Task 8 漏了冒号，"
+            "assert_footer_anchor_stable 逐字匹配会失败）/ UUID 列 I —— "
+            "🔴 **超出模板 max_column(H)** ⇒ instrumentation 需扩列）。"
+            "🔴 行身份是 **`id`** 不是 rowId（F5-2/3/5/8 四张皆如此，与 D 类惯例相反）。"
+            "G 列不单独声明 —— 被 F 列的 F{r}:G{r} 逐行合并吞掉（表头区 F12:G13 跨两行两列）。"
+            "🔴 **真库完全无载荷**（全部 F5-% 键 0 行，F 循环唯一）⇒ wp_code 裁决条目的 "
+            "max_payload_bytes 如实记 0（不伪造），验收前必须先 seed（裁决 F5-H7 / Property 8），"
+            "否则空表往返会被判 store_mirrored 假绿。"
+            "BP-7 三处下标派生行身份（useF5MonthlyDetail:133 / useF5OtherCost:146 / "
+            "useF5Comparison:128）是 slice 明令的双向硬前置，已由 f5RowIdentity.ts 单点收敛并立即回写。"
+            "HTML-only 登记：F5-1 主营区（七列全是引 F5-2 的公式、零 editable ⇒ 受管会与 F5-2 双源，"
+            "裁决 F5-H3）· F5-4（FC-6 hub）· F5-6（244 公式三块，后置另立 spec）。"
+            "`adapter_registered=False`：同 BP-61-1。"
+        ),
+    },
 )
 
 
@@ -1284,32 +1534,63 @@ class ManifestRegistrationPlanItem:
 
 
 @dataclass(frozen=True)
+class RegistrationFailure:
+    """一个 entry 的**注册失败**（真故障，与「供给不足 reason」分型）。
+
+    起因是该 entry 的 provider attach / `register()` 抛了 `SyncDomainError`（如
+    `ContractDriftError`：契约声明的受管结构与已发布 representation 漂移）。它**不是**
+    「本项目无此数据」——AC 5.12 明令二者必须可分辨。请求解析到该 entry 时，端点据此把
+    **原始** error_code/message 透传成 422（不退化成泛化 `adapter_not_ready`）。
+    """
+
+    entry_id: str
+    error_code: str
+    message: str
+    exc_type: str
+
+
+@dataclass(frozen=True)
 class ManifestRegistrationOutcome:
     """一次 `register_from_manifest()` 的结果。
 
-    `reasons` 必须覆盖**全部**未注册的计划 entry，因此
-    ``len(registered_entry_ids) + len(reasons) == len(planned_entry_ids)`` 应当成立 ——
-    这条等式是「没有 entry 被静默跳过」的可断言形态（守卫据此打红）。
+    未注册的计划 entry 分两类，**必须可分辨**（AC 5.12）：
+      * ``reasons`` —— 供给不足（静态/数据原因，非故障：还没 approved bundle / published
+        representation 等）；
+      * ``failures`` —— 注册失败（真故障：provider/register 抛 `SyncDomainError`，如契约漂移）。
+
+    记账等式（守卫据此打红「没有 entry 被静默跳过」）：
+    ``len(registered_entry_ids) + len(reasons) + len(failures) == len(planned_entry_ids)``，
+    三集合的 entry_id **两两不相交**。
 
     🔴 ``registered_entry_ids`` 是 :meth:`WorkpaperSyncAdapterRegistry.register_from_manifest`
-    **实录**的字段，**不是** ``planned - reasons`` 反算出来的。反算过一版：那样写上面那条
-    等式在 ``reasons ⊆ planned`` 时**恒真**，于是「静默跳过一个 entry」既不进 reasons 也
-    不进 registered，等式照样成立 ⇒ 判据是装饰（变异 M19 实测 GREEN）。两个集合各有独立
-    来源之后，跳过一个 entry 会让两边之和少 1，等式立刻打红。
+    **实录**的字段，**不是** ``planned - reasons - failures`` 反算出来的。反算过一版：那样写
+    上面那条等式在子集关系下**恒真**，于是「静默跳过一个 entry」照样满足等式 ⇒ 判据是装饰
+    （变异 M19 实测 GREEN）。各集合独立来源之后，跳过一个 entry 会让三边之和少 1，立刻打红。
     """
 
     registered_adapter_ids: tuple[str, ...]
     reasons: Mapping[str, str]
     planned_entry_ids: tuple[str, ...]
     registered_entry_ids: tuple[str, ...]
+    #: 🔴 注册失败（真故障）—— 与 `reasons` 并列、不相交。默认空 dict 保持向后兼容
+    #: （历史构造 outcome 的测试无需改；隔离路径按 entry 填充）。
+    failures: Mapping[str, RegistrationFailure] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "registered_adapter_ids": list(self.registered_adapter_ids),
             "registered_entry_ids": list(self.registered_entry_ids),
             "planned_entry_count": len(self.planned_entry_ids),
-            "unregistered_entry_count": len(self.reasons),
+            "unregistered_entry_count": len(self.reasons) + len(self.failures),
             "reasons": dict(self.reasons),
+            "failures": {
+                eid: {
+                    "error_code": f.error_code,
+                    "message": f.message,
+                    "exc_type": f.exc_type,
+                }
+                for eid, f in self.failures.items()
+            },
         }
 
 
@@ -1328,6 +1609,19 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_d6_contract_assets",
         "app.services.workpaper_sync.phase5_d5_receivables_financing",
         "app.services.workpaper_sync.phase5_d4_revenue_detail",
+        # ── E1 canary（spec: e1-sync-coverage-and-first-canary）──────
+        "app.services.workpaper_sync.phase5_e1_monetary_fund",
+        # ── F1 canary（spec: f1-sync-coverage-and-first-canary）──────
+        "app.services.workpaper_sync.phase5_f1_prepayment",
+        # ── F2 四 lane（spec: f2-sync-coverage-four-entry-lanes）──────
+        "app.services.workpaper_sync.phase5_f2_inventory_main",
+        "app.services.workpaper_sync.phase5_f2_stocktake_bundle",
+        "app.services.workpaper_sync.phase5_f2_inventory_valuation",
+        "app.services.workpaper_sync.phase5_f2_inventory_special",
+        # ── F3 / F4 / F5 canary（spec: f{3,4,5}-sync-coverage-and-first-canary）──────
+        "app.services.workpaper_sync.phase5_f3_notes_payable",
+        "app.services.workpaper_sync.phase5_f4_accounts_payable",
+        "app.services.workpaper_sync.phase5_f5_cost_of_sales",
     }
 )
 
@@ -1525,6 +1819,6 @@ __all__ = [
     "WorkpaperSyncAdapterRegistry", "build_production_registry",
     "DELIVERED_ENGINE_ADAPTERS", "PENDING_ENGINE_ADAPTERS", "TASK13_ADAPTER_MODULES",
     "DELIVERED_PER_ENTRY_CONTRACTS",
-    "ManifestRegistrationPlanItem", "ManifestRegistrationOutcome",
+    "ManifestRegistrationPlanItem", "ManifestRegistrationOutcome", "RegistrationFailure",
     "build_manifest_registration_plan",
 ]

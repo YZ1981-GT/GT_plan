@@ -777,7 +777,7 @@
     {
       "wp_code": "F1",
       "wp_name": "预付账款附注披露信息（国企）",
-      "sheet": "附注披露信息（国企）",
+      "sheet": "附注披露信息(国企)",
       "account_codes": [
         "1123",
         "1231-04"
@@ -830,7 +830,7 @@
     {
       "wp_code": "F2",
       "wp_name": "存货审定表",
-      "sheet": "审定表F2-1",
+      "sheet": "存货审定表F2-1",
       "account_codes": [
         "1401~1499",
         "1416",
@@ -851,7 +851,7 @@
         },
         {
           "cell_ref": "上年审定数",
-          "formula": "=PREV('F2','审定表F2-1','审定数')",
+          "formula": "=PREV('F2','存货审定表F2-1','审定数')",
           "formula_type": "PREV",
           "description": "上年同底稿审定数"
         },
@@ -5408,8 +5408,8 @@
     },
     {
       "wp_code": "F2",
-      "wp_name": "XX分类3XX分类4超保质期明细",
-      "sheet": "XX分类3 XX分类4 超过保质期存货明细表F2-48",
+      "wp_name": "长库龄呆滞超保质期明细",
+      "sheet": "长库龄 呆滞 超过保质期存货明细表F2-48",
       "account_codes": [
         "1403"
       ],
@@ -7115,7 +7115,7 @@
     {
       "wp_code": "G13",
       "wp_name": "公允价值变动收益明细",
-      "sheet": "明细分析表G13-2",
+      "sheet": "明细表G13-2",
       "account_codes": [
         "6101"
       ],
@@ -7149,7 +7149,7 @@
     {
       "wp_code": "G14",
       "wp_name": "信用减值损失明细",
-      "sheet": "明细分析表G14-2",
+      "sheet": "明细表G14-2",
       "account_codes": [
         "6702"
       ],
@@ -9011,7 +9011,7 @@
       "account_codes": [
         "2201"
       ],
-      "items": [
+      "cells": [
         {
           "cell_ref": "披露期末合计",
           "formula": "=TB('2201','期末余额')",
@@ -9024,31 +9024,7 @@
           "formula_type": "WP",
           "description": "附注披露表期末数来源 = 审定表期末审定数"
         }
-      ],
-      "cells": []
-    },
-    {
-      "wp_code": "F3",
-      "wp_name": "应付票据附注披露信息（国企）",
-      "sheet": "附注披露信息（国企）",
-      "account_codes": [
-        "2201"
-      ],
-      "items": [
-        {
-          "cell_ref": "披露soe期末合计",
-          "formula": "=TB('2201','期末余额')",
-          "formula_type": "TB",
-          "description": "国企附注披露表期末合计核对数"
-        },
-        {
-          "cell_ref": "披露soe审定期末",
-          "formula": "=WP('F3','审定表F3-1','期末审定数')",
-          "formula_type": "WP",
-          "description": "国企附注披露表期末数来源 = 审定表期末审定数"
-        }
-      ],
-      "cells": []
+      ]
     },
     {
       "wp_code": "F4",
@@ -9057,7 +9033,7 @@
       "account_codes": [
         "2202"
       ],
-      "items": [
+      "cells": [
         {
           "cell_ref": "披露按性质合计",
           "formula": "=TB('2202','期末余额')",
@@ -9070,31 +9046,7 @@
           "formula_type": "WP",
           "description": "上市披露「账龄超过1年的重要应付账款」合计来源"
         }
-      ],
-      "cells": []
-    },
-    {
-      "wp_code": "F4",
-      "wp_name": "应付账款附注披露信息（国企）",
-      "sheet": "附注披露信息（国企）",
-      "account_codes": [
-        "2202"
-      ],
-      "items": [
-        {
-          "cell_ref": "披露soe期末合计",
-          "formula": "=TB('2202','期末余额')",
-          "formula_type": "TB",
-          "description": "国企披露按账龄主表合计核对数（= 报表行 BS-045）"
-        },
-        {
-          "cell_ref": "披露soe长期挂账合计",
-          "formula": "=WP('F4','长期挂账检查表F4-5','审定余额合计')",
-          "formula_type": "WP",
-          "description": "国企披露「账龄超过1年的重要应付账款」合计来源"
-        }
-      ],
-      "cells": []
+      ]
     },
     {
       "wp_code": "F5",
@@ -9103,7 +9055,7 @@
       "account_codes": [
         "6401~6499"
       ],
-      "items": [
+      "cells": [
         {
           "cell_ref": "本期发生额",
           "formula": "=TB_SUM('6401~6499','本期发生额')",
@@ -9172,7 +9124,7 @@
         },
         {
           "cell_ref": "上年审定数",
-          "formula": "=PREV('F5','审定表F5-1','审定数')",
+          "formula": "=PREV('F5','营业务成本审定表F5-1','审定数')",
           "formula_type": "PREV",
           "description": "上年同底稿审定数"
         },
@@ -9188,8 +9140,7 @@
           "formula_type": "WP",
           "description": "从应付职工薪酬底稿取生产人员薪酬"
         }
-      ],
-      "cells": []
+      ]
     },
     {
       "wp_code": "G10",
@@ -11722,7 +11673,7 @@
       "account_codes": [
         "2201"
       ],
-      "items": [
+      "cells": [
         {
           "cell_ref": "披露soe期末合计",
           "formula": "=TB('2201','期末余额')",
@@ -11735,8 +11686,7 @@
           "formula_type": "WP",
           "description": "国企附注披露表期末数来源 = 审定表期末审定数"
         }
-      ],
-      "cells": []
+      ]
     },
     {
       "wp_code": "F4",
@@ -11745,7 +11695,7 @@
       "account_codes": [
         "2202"
       ],
-      "items": [
+      "cells": [
         {
           "cell_ref": "披露soe期末合计",
           "formula": "=TB('2202','期末余额')",
@@ -11758,8 +11708,7 @@
           "formula_type": "WP",
           "description": "国企披露「账龄超过1年的重要应付账款」合计来源"
         }
-      ],
-      "cells": []
+      ]
     }
   ]
 }

@@ -314,6 +314,65 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         #    而非首列 `seq` —— 后者是 `auto_source` 序号，用它会把「只填了序号的空行」当真行留下。
         items=(StoreItemSpec(item_id="H1-8-rows", kind=StoreKind.rows),),
     ),
+    # ── F1 预付账款 canary（spec: f1-sync-coverage-and-first-canary）──────
+    #    同 E1 架构：薄转发框架层引擎，store item 清单取 all_store_item_ids() 单一口径。
+    #    canary F1-rp-rows（关联方检查表F1-6），灰度开关控后续 sheet。
+    "f1.prepayment_detail": StoreMergePlan(
+        adapter_id="f1.prepayment_detail",
+        provider_module="phase5_f1_prepayment",
+        items=(
+            StoreItemSpec(item_id="F1-rp-rows", kind=StoreKind.rows),
+        ),
+    ),
+    # ── F2 四 lane（spec: f2-sync-coverage-four-entry-lanes）──────
+    "f2.inventory_main": StoreMergePlan(
+        adapter_id="f2.inventory_main",
+        provider_module="phase5_f2_inventory_main",
+        items=(
+            StoreItemSpec(item_id="F2-6-rows", kind=StoreKind.rows),
+        ),
+    ),
+    "f2.stocktake_bundle": StoreMergePlan(
+        adapter_id="f2.stocktake_bundle",
+        provider_module="phase5_f2_stocktake_bundle",
+        items=(
+            StoreItemSpec(item_id="F2-25-rows", kind=StoreKind.rows),
+            StoreItemSpec(item_id="F2-25-floor-rows", kind=StoreKind.rows),
+        ),
+    ),
+    "f2.inventory_valuation": StoreMergePlan(
+        adapter_id="f2.inventory_valuation",
+        provider_module="phase5_f2_inventory_valuation",
+        items=(
+            StoreItemSpec(item_id="F2-48-rows", kind=StoreKind.dict),
+        ),
+    ),
+    "f2.inventory_special": StoreMergePlan(
+        adapter_id="f2.inventory_special",
+        provider_module="phase5_f2_inventory_special",
+        items=(
+            StoreItemSpec(item_id="F2-57-rows", kind=StoreKind.dict),
+        ),
+    ),
+    # ── F3 / F4 / F5 canary（spec: f{3,4,5}-sync-coverage-and-first-canary）──────
+    # 🔴 `items` 只登记**当前灰度开关打开**的受管区（各 provider 的
+    #    `all_store_item_ids()` 是单一口径）。其余 sheet 随灰度开关逐张打开时在此追加，
+    #    不预登记未受管的键 —— 预登记会让 `check_sheet_specs_fully_registered` 的分母失真。
+    "f3.notes_payable_detail": StoreMergePlan(
+        adapter_id="f3.notes_payable_detail",
+        provider_module="phase5_f3_notes_payable",
+        items=(StoreItemSpec(item_id="F3-5-rows", kind=StoreKind.rows),),
+    ),
+    "f4.accounts_payable_detail": StoreMergePlan(
+        adapter_id="f4.accounts_payable_detail",
+        provider_module="phase5_f4_accounts_payable",
+        items=(StoreItemSpec(item_id="F4-6-rows", kind=StoreKind.rows),),
+    ),
+    "f5.cost_of_sales_detail": StoreMergePlan(
+        adapter_id="f5.cost_of_sales_detail",
+        provider_module="phase5_f5_cost_of_sales",
+        items=(StoreItemSpec(item_id="F5-8-rows", kind=StoreKind.rows),),
+    ),
 }
 
 

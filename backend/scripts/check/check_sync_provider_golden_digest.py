@@ -63,22 +63,29 @@ _DIGEST_PATH = Path(__file__).resolve().parent / "_sync_provider_golden_digest.j
 #: (标签, 模块名, adapter_id 常量名, 是否有 build_store_projection, instrumentation 复数否)
 PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     ("b60", "pilot_simple_checklist", "PILOT_ADAPTER_ID", False, False),
-    ("d1", "phase5_d1_notes_receivable", "ADAPTER_ID", True, False),
+    # 🔴 D1/D3/D5/D6/D7 同 D2 切复数（2026-09-26）：这五家的
+    #    `instrumentation_definition_payload()` 已改走 `build_instrumentation_payload_for_sheets
+    #    (specs=instrumentation_specs())`，注册路径读的是**复数**。`plural_instr` 留 False 会
+    #    让本判据只核主 sheet 单 spec ⇒ 扩容面（行表 sibling + 审定表 static_sheets）对判据
+    #    完全不可见，正是 D2 注释警告的那种假绿：真实发布的 instrumentation 变了而门不红。
+    ("d1", "phase5_d1_notes_receivable", "ADAPTER_ID", True, True),
     # 🔴 D2 已切多 sheet 复数 instrumentation（d22 + 灰度控 d23 双区 + d21 静态区，spec
     #    workpaper-sync-registration-isolation-and-d2-republish）——`plural_instr=True` 才能
     #    让本判据核到真实注册路径用的 `instrumentation_specs()`（含 d21 static_sheets），
     #    否则只核 d22 单 spec，republish 后的扩容面对判据不可见（假绿）。
     ("d2", "pilot_d2_large_json", "PILOT_ADAPTER_ID", True, True),
-    ("d3", "phase5_d3_prepaid_receipts", "ADAPTER_ID", True, False),
+    ("d3", "phase5_d3_prepaid_receipts", "ADAPTER_ID", True, True),
     ("d4", "phase5_d4_revenue_detail", "ADAPTER_ID", True, True),
-    ("d5", "phase5_d5_receivables_financing", "ADAPTER_ID", True, False),
-    ("d6", "phase5_d6_contract_assets", "ADAPTER_ID", True, False),
-    ("d7", "phase5_d7_contract_liabilities", "ADAPTER_ID", True, False),
+    ("d5", "phase5_d5_receivables_financing", "ADAPTER_ID", True, True),
+    ("d6", "phase5_d6_contract_assets", "ADAPTER_ID", True, True),
+    ("d7", "phase5_d7_contract_liabilities", "ADAPTER_ID", True, True),
     # 🔴 E1（2026-09-26 纳入）：spec e1-sync-coverage-and-first-canary 交付的第 9 个 contract。
     #    它是**引擎落地后新建的第一个 entry** ⇒ 把它纳入零回归门，可在后续引擎改动时立刻发现
     #    「薄转发层」是否被破坏（它的投影/合并全是 ≤3 行转发，任何 digest 漂移都来自引擎本身）。
     #    instrumentation 取复数（两个受管 sheet：e12-managed / e14-managed）。
     ("e1", "phase5_e1_monetary_fund", "ADAPTER_ID", True, True),
+    # ── F1 canary（spec: f1-sync-coverage-and-first-canary）──────
+    ("f1", "phase5_f1_prepayment", "ADAPTER_ID", True, True),
 )
 
 

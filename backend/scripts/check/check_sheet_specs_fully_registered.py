@@ -55,6 +55,8 @@ EXPECTED_ADAPTER_IDS: tuple[str, ...] = (
     #    adapter 注册本身仍卡 umbrella BP-61-1 平台级缺口，但**契约与 plan 已就绪** ——
     #    本卡点守的正是「声明了却忘接注册表」，与 adapter 是否注册是两件事。
     "e1.monetary_fund_detail",
+    # ── F1 canary（spec: f1-sync-coverage-and-first-canary）──────
+    "f1.prepayment_detail",
 )
 
 

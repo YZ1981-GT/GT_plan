@@ -14,11 +14,24 @@
         />
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isF1SyncManagedSheet && syncBusy" size="small" type="info">同步中…</el-tag>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-f1-prepayment" />
       </div>
 
+      <!-- 在线编辑模式：受管 sheet 走 WorkpaperSyncEditorHost（真双向），非受管走 legacy GtOnlyOfficeSheet -->
+      <!-- F1 canary 受管 sheet 真双向路径（spec: f1-sync-coverage-and-first-canary · Task 10） -->
+      <div v-if="dualMode.currentMode.value === 'onlyoffice' && isF1SyncManagedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :bridge="syncBridge"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :readonly="isReadonly"
+        />
+      </div>
+      <!-- 非受管 sheet 保留 legacy GtOnlyOfficeSheet（假双向，如实登记） -->
       <GtOnlyOfficeSheet
-        v-if="dualMode.currentMode.value === 'onlyoffice'"
+        v-else-if="dualMode.currentMode.value === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -187,7 +200,7 @@
  *
  * 科目覆盖：1123 预付账款（借方科目/资产类）
  */
-import { ref, computed, onMounted, provide, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, inject, toRef, defineAsyncComponent } from 'vue'
 import { useF1FormData } from './composables/useF1FormData'
 import { useF1CrossSheet } from './composables/useF1CrossSheet'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
@@ -210,6 +223,12 @@ const F1TabDisclosureListed = defineAsyncComponent(() => import('./f1/F1TabDiscl
 const F1TabDisclosureSoe = defineAsyncComponent(() => import('./f1/F1TabDisclosureSoe.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+// ── F1 canary（spec: f1-sync-coverage-and-first-canary · Task 10）──────
+// 受管 sheet 走 syncBridge 真双向路径；非受管保留 legacy GtOnlyOfficeSheet。
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 
 const props = defineProps<{
   wpId: string
@@ -375,6 +394,41 @@ const dualMode = useF1DualMode({
   reloadAll: () => loadAll(),
 })
 
+// ── F1 canary sync bridge（spec: f1-sync-coverage-and-first-canary · Task 10）──────
+// 受管 sheet 集合从 provider 受管清单派生，不前端硬编码（需求 1.6）。
+const F1_SYNC_ENTRY_ID = 'xlsx/gt-f1-prepayment'
+/** 受管 sheet 编码 → syncBridge 的 sheet_key 映射（canary 只有 F1-6）。 */
+const F1_SHEET_KEY_BY_CODE: Record<string, string> = {
+  'F1-6': 'f16-managed',
+}
+/** 当前 sheet 是否走 syncBridge 真双向路径。 */
+const isF1SyncManagedSheet = computed(() =>
+  currentSheet.value != null && currentSheet.value in F1_SHEET_KEY_BY_CODE,
+)
+const syncSwitching = ref(false)
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const syncEntryId = ref(F1_SYNC_ENTRY_ID)
+const syncSheetKey = computed(() => F1_SHEET_KEY_BY_CODE[currentSheet.value] || 'f16-managed')
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(F1_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    flushPendingSave()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: F1_SYNC_ENTRY_ID,
+      sheetKey: syncSheetKey.value,
+    })
+    return snap
+  },
+  reloadHtml: () => loadAll(),
+})
+const syncBusy = computed(() => WP_BRIDGE_IN_FLIGHT_STATES.has(syncBridge.state.value))
+
 provide('reloadWorkpaperData', loadAll)
 
 // ─── 复核圆点 ─────────────────────────────────────────────────────────────────
@@ -430,5 +484,13 @@ onMounted(() => {
   padding: 8px 12px;
   background: #f5f7fa;
   border-radius: 6px;
+}
+
+/* 🔴 在线编辑区必须拿到视口相关的确定高度：WorkpaperSyncEditorHost 根元素是
+   height:100% + flex 列，父级为 auto 高度时编辑区被压扁（D4/E1 同款，
+   workpaperSyncEditorHostSizing 守卫覆盖）。 */
+.oo-container {
+  min-height: 600px;
+  height: calc(100vh - 200px);
 }
 </style>
