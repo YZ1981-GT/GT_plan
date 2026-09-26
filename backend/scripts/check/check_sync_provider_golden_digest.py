@@ -251,10 +251,14 @@ def run() -> dict[str, Any]:
         for (label, mod, const, hp, pl) in PROVIDERS
     ]
     # digest 总数：每家 contract + instrumentation（必有）+ projection（B60 无）
+    #   + 🔴 P1-4 sheet 粒度 digest（第二轮复盘问题 5 修复：此前 sheet_digests 字段已被
+    #     _compare 消费用于判定漂移，但从未计入 digest_count/--update 打印摘要，数字失真、
+    #     低估了本判据实际覆盖的判据面）。
     total = sum(
         1  # contract
         + 1  # instrumentation
         + (1 if e["store_projection_sha256"] is not None else 0)
+        + len(e.get("sheet_digests") or {})
         for e in entries
     )
     return {"digest_count": total, "providers": entries}

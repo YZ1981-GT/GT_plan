@@ -53,18 +53,19 @@ def test_all_delivered_providers_produce_three_sections() -> None:
 
 
 def test_digest_count_matches_provider_capabilities() -> None:
-    """digest 总数 = 每家 contract + instrumentation（必有）+ projection（B60 无该路径）。
+    """digest 总数 = 每家 contract + instrumentation（必有）+ projection（B60 无该路径）
+    + 🔴 sheet 粒度 digest（第二轮复盘问题 5 修复：此前 run() 的公式漏计 sheet_digests，
+    与 P1-4 加的 sheet 粒度判据面脱节，数字失真）。
 
-    🔴 断言从 PROVIDERS 表**现算**而非手抄数字（首版写死 23，E1 纳入后变 26 ⇒ 手抄必过期）。
-    B60 是 simple_checklist 形态、无 `build_store_projection` ⇒ 它的 projection 如实记 null，
-    不假造 digest（需求 4.5 的诚实边界）。
+    断言从 PROVIDERS 表 + 现算 report **两侧现算**而非手抄数字（首版写死 23，E1 纳入后
+    变 26，本次补 sheet 粒度后又变 ⇒ 手抄必过期）。B60 是 simple_checklist 形态、无
+    `build_store_projection` ⇒ 它的 projection 如实记 null，不假造 digest（需求 4.5）。
     """
     mod = _load_module()
     report = mod.run()
-    expected = sum(2 + (1 if has_proj else 0) for (_l, _m, _c, has_proj, _p) in mod.PROVIDERS)
-    assert report["digest_count"] == expected
-    # 当前实测：9 家 × 3 − B60 的 projection = 26
-    assert report["digest_count"] == 26
+    base_expected = sum(2 + (1 if has_proj else 0) for (_l, _m, _c, has_proj, _p) in mod.PROVIDERS)
+    sheet_expected = sum(len(p.get("sheet_digests") or {}) for p in report["providers"])
+    assert report["digest_count"] == base_expected + sheet_expected
 
 
 def test_current_matches_committed_baseline() -> None:
