@@ -332,3 +332,89 @@ def sheet_payload_d21() -> dict[str, Any]:
             }
         ],
     }
+
+#: D2-1 静态受管区的 workbook-scope defined name（照 D4-13 / D1-4 范式）。
+#: instrumentation 注入只写这一个 definedName（`region_kind=static`），不注入 Excel Table /
+#: UUID 列 / 隐藏 identity_row（那些是动态行表专有的载体）。
+GT_MANAGED_REGION_D21: Final[str] = f"GT_MANAGED_REGION_{TEMPLATE_ID_D21}"
+
+#: D2-1 的 6 个 editable 金额格所跨最小矩形（B10:D11），用作 region_boundary_locator.range。
+_STATIC_REGION_RANGE_D21: Final[str] = "$B$10:$D$11"
+
+
+def static_sheet_payload_d21() -> dict[str, Any]:
+    """D2-1 静态区寄生声明（挂到 d22 主 spec 的 `static_sheets`）。
+
+    spec: workpaper-sync-registration-isolation-and-d2-republish · Requirement 3.3
+
+    照 D4-13 范式：`region_boundary_locator` 的 `defined_name` 指向 workbook-scope
+    `GT_MANAGED_REGION_D21`，`region_kind=static`，`range` 覆盖 6 个 editable 金额格
+    所跨最小矩形。instrumentation 注入只写 definedName（不注 Table / UUID 列）。
+    """
+    return {
+        "sheet_key": SHEET_KEY_D21,
+        "excel_name": MANAGED_SHEET_D21,
+        "template_id": TEMPLATE_ID_D21,
+        "region_boundary_locator": {
+            "anchor": "defined_name_ref",
+            "defined_name": GT_MANAGED_REGION_D21,
+            "range": _STATIC_REGION_RANGE_D21,
+            "region_kind": "static",
+        },
+        "tables": [{"table_key": TABLE_KEY_D21}],
+    }
+
+
+def build_d21_store_projection(
+    payloads: Mapping[str, Any],
+    *,
+    contract: "SyncContract",
+) -> Any:
+    """D2-1 审定表静态区投影（per-cell 锚点，无 row_keys）。
+
+    spec: workpaper-sync-registration-isolation-and-d2-republish · AC 4.4
+
+    6 个 editable 金额格 → 6 个 FieldValue。store 键 = `D2-adj-{rowKey}-{field}`，
+    每个对应一条 `checklist_responses.item_id`。值从 remark 取：None/空串→None，
+    数字串→Decimal 文本（投影 value_type=amount）。
+    """
+    from decimal import Decimal, InvalidOperation
+
+    from app.services.workpaper_sync.adapters.base import FieldValue, Projection
+
+    values: dict[str, FieldValue] = {}
+    for _cell, column, _static_row, row_key, store_item_id, value_type, _header in EDITABLE_CELL_SPECS:
+        column_key = f"{row_key.replace('-', '_')}_{column.lower()}"
+        sk = stable_key_for_cell(column_key)
+        raw = payloads.get(store_item_id)
+        parsed: Any = None
+        if raw is not None and str(raw).strip():
+            text = str(raw).strip()
+            try:
+                parsed = str(Decimal(text))
+            except InvalidOperation:
+                parsed = text  # 非数字保留原文
+        spec = contract.field_by_stable_key(sk)
+        values[sk] = FieldValue(
+            stable_key=sk,
+            value=parsed,
+            value_type=spec.value_type if spec else value_type,
+            mode=spec.mode if spec else "editable",
+            row_key=row_key,
+        )
+    return Projection(
+        contract_id=contract.contract_id,
+        semantic_version=contract.semantic_version,
+        document_type=contract.document_type,
+        values=values,
+        row_keys={},
+    )
+
+
+#: D2-1 的 6 个 per-cell store item（**出方向**投影遍历用；与 EDITABLE_CELL_SPECS 逐字对齐）。
+#: 🔴 D2-1 是静态审定表：值在 HTML 侧录入，`build_combined_store_projection` 走出方向把它
+#:    物化进 Excel；**回方向（OO→HTML）不参与**（见 d2_bidirectional_bridge
+#:    .merge_projection_into_all_d2_stores 的 D2-1 注释）——故本模块只提供投影器，无 merge。
+STORE_ITEM_IDS_D21_CELLS: Final[tuple[str, ...]] = tuple(
+    sid for _cell, _col, _row, _rk, sid, _vt, _hdr in EDITABLE_CELL_SPECS
+)

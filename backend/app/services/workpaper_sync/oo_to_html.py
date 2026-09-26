@@ -2598,7 +2598,7 @@ class OoToHtmlCoordinator:
         if plan.dual_store_fn:
             # 多 store item 的整体镜像走 provider 专用门面（D4 的 _mirror_d4_dual_stores 同型）。
             await self._mirror_d4_dual_stores(
-                state, merged_projection=merged_projection, bridge=bridge
+                state, merged_projection=merged_projection, bridge=bridge, plan=plan
             )
             return
         store_item_id = bridge.STORE_ITEM_ID
@@ -2764,9 +2764,14 @@ class OoToHtmlCoordinator:
             await self._session.commit()
 
     async def _mirror_d4_dual_stores(
-        self, state: _ApplyState, *, merged_projection: Any, bridge: Any
+        self, state: _ApplyState, *, merged_projection: Any, bridge: Any, plan: Any = None
     ) -> None:
-        """D4-2-rows + D4-3-rows：按 table 前缀分别 merge 后写回各自 checklist item。"""
+        """多 store item 整体镜像：按 table 前缀分别 merge 后写回各自 checklist item。
+
+        🔴 泛化（spec workpaper-sync-registration-isolation）：`plan.merge_all_fn` 动态取
+        bridge 上的 merge 函数名，取代硬编码 `bridge.merge_projection_into_all_d4_stores`。
+        D4 行为逐字节不变（`merge_all_fn` 默认值就是 `merge_projection_into_all_d4_stores`）。
+        """
         import json
 
         # dict store（D4-9 {current,prior}+totals / D4-33 {bizTypes,months,priorYear} /
@@ -2827,7 +2832,10 @@ class OoToHtmlCoordinator:
                     base_payload = []
             base_by_item[item_id] = base_payload
 
-        updates = bridge.merge_projection_into_all_d4_stores(
+        # 🔴 泛化：按 plan.merge_all_fn 动态取 bridge 上的 merge 函数（D4 默认值不变）。
+        _merge_all_fn_name = getattr(plan, "merge_all_fn", "merge_projection_into_all_d4_stores") or "merge_projection_into_all_d4_stores"
+        _merge_all_fn = getattr(bridge, _merge_all_fn_name)
+        updates = _merge_all_fn(
             projection=merged_projection, base_by_item=base_by_item
         )
         wrote_any = False

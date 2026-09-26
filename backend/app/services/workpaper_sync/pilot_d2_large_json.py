@@ -186,6 +186,7 @@ from app.services.workpaper_sync.excel_instrumentation import (
     ExcelInstrumentationSpec,
     InstrumentationError,
     build_instrumentation_payload,
+    build_instrumentation_payload_for_sheets,
     build_template_payload,
     normalized_structure_hash,
 )
@@ -289,6 +290,11 @@ class StorePayloadError(SyncDomainError):
 #: 🔴 D2-3 坏账准备明细表 sibling sheet 接入开关（spec d2-sync-coverage Task 6/8）。
 #: True ⇒ build_contract_payload 的 sheets[] 追加 d23-managed（单 sheet 双区）。
 #: 契约声明 + parse_contract + projection/merge 恒接；真栈同 sheet 双区注入 e2e 待环境。
+#:
+#: ✅ 2026-09-26 重新打开（spec workpaper-sync-registration-isolation-and-d2-republish）：
+#:    前置条件已满足 —— instrumentation_specs() 复数 + sibling binding + 双向 store +
+#:    通用对齐守卫 + 注册隔离。重发布链由 generate_pilot_d2_large_json_contract.py --apply
+#:    + fix_task76_provision --apply + d2_rematerialize --apply 完成。
 _INCLUDE_D203_BAD_DEBT: Final[bool] = True
 
 
@@ -307,6 +313,7 @@ def _sheet_payload_d23() -> dict[str, Any]:
 #: True ⇒ build_contract_payload 的 sheets[] 追加 d21-managed（静态 cell 型，6 editable 金额格）。
 #: D2-1 store 是 per-cell 锚点（D2-adj-{rowKey}-{field}），走静态字段形态（照 D4-9 totals）。
 #: 逐格 mask + 固定 4 行；四态覆盖 UI 在前端 useD2Adjudication（真栈往返待 sibling 编排内核）。
+#: ✅ 2026-09-26 重新打开，原因与前置条件见 `_INCLUDE_D203_BAD_DEBT`。
 _INCLUDE_D201_ADJUDICATION: Final[bool] = True
 
 
@@ -441,6 +448,34 @@ STORE_ITEM_ID: Final[str] = "D2-detail-rows"
 #: 本 pilot 的根形态是行数组，因此空行集就是 `[]`（实测 `build_store_projection`
 #: 对它产出 values=0）。
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
+
+
+def all_store_item_ids() -> tuple[str, ...]:
+    """本 entry **全部** store item 的单一口径（出/回两方向同源，Requirement 3.3）。
+
+    spec: workpaper-sync-registration-isolation-and-d2-republish · AC 4.1
+    D2-2 恒在；D2-3 三键 + D2-1 六键按开关加入。
+    """
+    ids: list[str] = [STORE_ITEM_ID]
+    if _INCLUDE_D203_BAD_DEBT:
+        from app.services.workpaper_sync.phase5_d2_03_bad_debt import (
+            STORE_ITEM_ID_AGING,
+            STORE_ITEM_ID_CUSTOMER,
+            STORE_ITEM_ID_INDIVIDUAL,
+        )
+        ids.extend((STORE_ITEM_ID_INDIVIDUAL, STORE_ITEM_ID_AGING, STORE_ITEM_ID_CUSTOMER))
+    if _INCLUDE_D201_ADJUDICATION:
+        from app.services.workpaper_sync.phase5_d2_01_adjudication import (
+            EDITABLE_CELL_SPECS,
+        )
+        ids.extend(sid for _, _, _, _, sid, _, _ in EDITABLE_CELL_SPECS if sid not in ids)
+    return tuple(ids)
+
+
+#: 开关展开的多 store item 集合（供 `store_projection_response` 多 store 分派判断）。
+#: 🔴 必须在 import 时就 == `all_store_item_ids()`（灰度开关是 import 期常量），否则 `len>1`
+#:    分派判据恒 False ⇒ 开关全开也永远走单 store item 旧路径，D2-3/D2-1 出方向恒空。
+STORE_ITEM_IDS: tuple[str, ...] = all_store_item_ids()
 
 #: 载荷里每行自带的稳定行身份键（形如 `dr-mrgi0qg1-fwwmgum`）。
 ROW_IDENTITY_STORE_KEY: Final[str] = "rowId"
@@ -821,6 +856,55 @@ def instrumentation_spec() -> ExcelInstrumentationSpec:
     )
 
 
+def instrumentation_specs() -> tuple[ExcelInstrumentationSpec, ...]:
+    """本 entry 的**全部** instrumentation 声明（复数；含 d22 主 spec + 灰度控 D2-3/D2-1）。
+
+    spec: workpaper-sync-registration-isolation-and-d2-republish · Requirement 3.1
+
+    🔴 开关全关时 == `(instrumentation_spec(),)`，与改造前逐字节等价（`build_instrumentation_
+       payload_for_sheets([单spec])` == `build_instrumentation_payload(单spec)` 已由框架层
+       委托关系保证，digest 零回归）。
+
+    🔴 D2-1 静态区寄生在 d22 主 spec 的 `static_sheets` 上（照 D1-4/D4-13 范式）——该声明
+       由 Task 10 落地的 `static_sheet_payload_d21()` 提供，本函数只在开关开时挂载。
+    """
+    primary = instrumentation_spec()
+    extras: list[ExcelInstrumentationSpec] = []
+
+    if _INCLUDE_D201_ADJUDICATION:
+        # D2-1 静态区寄生在主 spec 的 static_sheets 上（Task 10 声明）——
+        # 修改 primary 把 static_sheets 挂上。
+        from app.services.workpaper_sync.phase5_d2_01_adjudication import (
+            static_sheet_payload_d21,
+        )
+        primary = ExcelInstrumentationSpec(
+            entry_id=primary.entry_id,
+            template_id=primary.template_id,
+            template_relative_path=primary.template_relative_path,
+            managed_sheet=primary.managed_sheet,
+            first_data_row=primary.first_data_row,
+            last_data_row=primary.last_data_row,
+            footer_row=primary.footer_row,
+            managed_last_col=primary.managed_last_col,
+            uuid_col=primary.uuid_col,
+            table_name=primary.table_name,
+            static_sheets=(static_sheet_payload_d21(),),
+        )
+
+    if _INCLUDE_D203_BAD_DEBT:
+        from app.services.workpaper_sync.phase5_d2_03_bad_debt import (
+            instrumentation_spec_d23,
+        )
+        extras.extend(
+            instrumentation_spec_d23(
+                entry_id=PILOT_ENTRY_ID,
+                template_relative_path=TEMPLATE_RELATIVE_PATH,
+            )
+        )
+
+    return (primary, *extras)
+
+
 def template_definition_payload() -> dict[str, Any]:
     """template definition 的 canonical payload（发布 DAG 第一段）。"""
     data = read_authoritative_template()
@@ -832,9 +916,14 @@ def template_definition_payload() -> dict[str, Any]:
 
 
 def instrumentation_definition_payload() -> dict[str, Any]:
-    """instrumentation definition 的 canonical payload（单向引用 template digest）。"""
-    return build_instrumentation_payload(
-        spec=instrumentation_spec(),
+    """instrumentation definition 的 canonical payload（单向引用 template digest）。
+
+    spec: workpaper-sync-registration-isolation-and-d2-republish · Requirement 3.2
+    🔴 改走 `build_instrumentation_payload_for_sheets`（复数），开关全关时 == 原单数路径
+       （framework 层已验证等价），digest 零回归。
+    """
+    return build_instrumentation_payload_for_sheets(
+        specs=instrumentation_specs(),
         template_definition_sha256=canonical_digest(template_definition_payload()),
         template_sha256=TEMPLATE_SHA256,
         gate=excel_carrier_gate(),
@@ -1178,6 +1267,65 @@ def build_store_projection(
         values=values,
         row_keys={ROWS_TABLE_KEY: tuple(row_keys)},
     )
+
+
+def build_combined_store_projection(
+    payloads: Mapping[str, Any],
+    *,
+    contract: SyncContract,
+    limits: Any | None = None,
+) -> Any:
+    """D2 多 store 合并投影（D2-2 + 开关控 D2-3 + D2-1）。
+
+    spec: workpaper-sync-registration-isolation-and-d2-republish · AC 4.1
+
+    与 D4 的 `build_combined_store_projection` 同型：`payloads` 是 `{store_item_id: remark_json}`，
+    合并所有 store 的字段到一个 `Projection`。`store_projection_response` 的多 store 分派
+    （`len(STORE_ITEM_IDS) > 1 and hasattr(provider, "build_combined_store_projection")`）
+    自动对 D2 生效。
+
+    开关全关时 payloads 只含 D2-2 一条 → 等价于 `build_store_projection(payloads[STORE_ITEM_ID])`。
+    """
+    from app.services.workpaper_sync.adapters.base import Projection
+
+    # ① D2-2 主区投影
+    d22_payload = payloads.get(STORE_ITEM_ID, "[]")
+    d22_proj = build_store_projection(d22_payload, contract=contract, limits=limits)
+    all_values = dict(d22_proj.values)
+    all_row_keys = dict(d22_proj.row_keys)
+
+    # ② D2-3 坏账准备（开关控）
+    if _INCLUDE_D203_BAD_DEBT:
+        from app.services.workpaper_sync.phase5_d2_03_bad_debt import (
+            build_d23_store_projection,
+        )
+        d23_proj = build_d23_store_projection(payloads, contract=contract, limits=limits)
+        all_values.update(d23_proj.values)
+        all_row_keys.update(d23_proj.row_keys)
+
+    # ③ D2-1 审定表（开关控）—— per-cell 静态区，无 row_keys
+    if _INCLUDE_D201_ADJUDICATION:
+        from app.services.workpaper_sync.phase5_d2_01_adjudication import (
+            build_d21_store_projection,
+        )
+        d21_proj = build_d21_store_projection(payloads, contract=contract)
+        all_values.update(d21_proj.values)
+        all_row_keys.update(getattr(d21_proj, "row_keys", {}) or {})
+
+    combined = Projection(
+        contract_id=contract.contract_id,
+        semantic_version=contract.semantic_version,
+        document_type=contract.document_type,
+        values=all_values,
+        row_keys=all_row_keys,
+    )
+    # 🔴 复制 D2-3 的 `_d23_combined_category` 信号（供 merge 分流回 aging/customer 键）。
+    if _INCLUDE_D203_BAD_DEBT and hasattr(d23_proj, "_d23_combined_category"):
+        try:
+            object.__setattr__(combined, "_d23_combined_category", d23_proj._d23_combined_category)
+        except Exception:
+            combined._d23_combined_category = d23_proj._d23_combined_category  # type: ignore[attr-defined]
+    return combined
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1545,6 +1693,21 @@ async def attach_pilot_adapters(
         session=session, representation=representation, contract=contract
     )
     definitions = observation.definitions
+
+    # 🔴 Requirement 3.4：开关打开时 D2-3/D2-1 各自需要 sibling binding（框架层
+    #    `attach_sibling_bindings` 与 publish 侧共享对齐规则）。开关全关时只有 d22 一张
+    #    受管 sheet，sibling_bindings 为空元组（与改造前行为一致）。
+    import app.services.workpaper_sync.pilot_d2_large_json as _self
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        attach_sibling_bindings,
+    )
+    sibling_bindings = attach_sibling_bindings(
+        provider=_self,
+        primary=observation.identity_binding,
+        contract=contract,
+        dynamic_bindings=observation.identity_binding.dynamic_column_columns,
+    ) if len(instrumentation_specs()) > 1 else ()
+
     register_pilot_adapter(
         registry,
         adapter=build_excel_adapter(
@@ -1554,6 +1717,7 @@ async def attach_pilot_adapters(
             #    binding 由 Task 75 的观测器与 definitions 一起产出（同一份冻结 instrumentation
             #    + 同一份物理列跨度派生），因此两者不可能互相脱钩。
             binding=observation.identity_binding,
+            sibling_bindings=sibling_bindings,
             direction="html_to_oo",
         ),
         bundle=bundle,

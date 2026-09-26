@@ -304,15 +304,18 @@ type D2RenderMode = 'html' | 'onlyoffice'
 const D2_SYNC_ENTRY_ID = 'xlsx/gt-d2-accounts-receivable'
 /**
  * D2 受管 sheet 集合：sheet 代号 → 后端 sheet_key（与 pilot_d2_large_json /
- * phase5_d2_03_bad_debt 契约声明一致）。spec d2-sync-coverage Task 16：受管清单
- * **从后端契约派生的常量集合**，不再前端硬编码单张字面量。
+ * phase5_d2_03_bad_debt / phase5_d2_01_adjudication 契约声明一致）。
+ * spec workpaper-sync-registration-isolation-and-d2-republish · Requirement 6.1：
+ * 受管清单跟随后端灰度开关（开关打开后三张均可切在线编辑）。
  * - D2-2 明细表 → d22-managed（双向，已接）
  * - D2-3 坏账准备 → d23-managed（双向，本 spec 扩容）
+ * - D2-1 审定表 → d21-managed（静态区，本 spec 扩容）
  * entryId 在 D2 内始终单值（一册一 entry），故各受管 sheet 共用 D2_SYNC_ENTRY_ID。
  */
 const D2_MANAGED_SHEET_KEYS: Record<string, string> = {
   'D2-2': 'd22-managed',
   'D2-3': 'd23-managed',
+  'D2-1': 'd21-managed',
 }
 /** 与后端 D2 默认 managed sheet_key / materialize 取证脚本一致（D2-2 明细表）。 */
 const D2_MANAGED_SHEET_KEY = 'd22-managed'
@@ -465,7 +468,7 @@ const syncUnavailableReason = computed(() => {
   if (!isD2SyncedSheet.value) {
     // 🔴 spec Task 16（裁决 E5）：非受管 sheet 保持直接禁用 + 显式中文原因，
     // 不得退化成静默无反应或落 legacy 假双向。
-    return '在线编辑仅开放 D2-2 明细表、D2-3 坏账准备明细表；当前底稿走结构化视图'
+    return '在线编辑仅开放 D2-2 明细表、D2-3 坏账准备明细表、D2-1 审定表；当前底稿走结构化视图'
   }
   const err = syncBridge.lastError.value
   return err ? `${err.errorCode}: ${err.message}` : ''

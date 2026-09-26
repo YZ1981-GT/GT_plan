@@ -150,7 +150,7 @@ class _FakeProjection:
 
 def _projection(*triples: tuple[str, str, Any, bool]) -> _FakeProjection:
     return _FakeProjection(
-        {f"明细表D2-2/{row}/{field}": _FakeFieldValue(row, value, protected) for row, field, value, protected in triples}
+        {f"{P.ROWS_TABLE_KEY}/{row}/{field}": _FakeFieldValue(row, value, protected) for row, field, value, protected in triples}
     )
 
 

@@ -807,7 +807,13 @@ def merge_projection_into_store_rows(
     applied = 0  # 真发生变化的字段数
     visited = 0  # 遍历到的可回写字段数（用于区分「没变」与「没读到」）
     touched_rows: set[str] = set()
+    # 🔴 AC 4.2（spec workpaper-sync-registration-isolation-and-d2-republish）：table 前缀过滤
+    # —— 只处理 D2-2 的 `receivable_detail_rows/` 前缀键，D2-3/D2-1 的键不会串进 D2-2 建幽灵行。
+    _d22_prefix = f"{P.ROWS_TABLE_KEY}/"
     for key in projection.stable_keys():
+        sk = str(key)
+        if not sk.startswith(_d22_prefix):
+            continue
         fv = projection.get(key)
         if fv is None or fv.is_protected:
             continue  # 公式/自动取数列不回写 store
@@ -1148,3 +1154,56 @@ def write_index_sheet_header(wb: Any, header: Mapping[str, Any]) -> int:
         ws[ref] = f"{label}{value}" if label else value
         written += 1
     return written
+
+
+def merge_projection_into_all_d2_stores(
+    *,
+    projection: Any,
+    base_by_item: Mapping[str, Any],
+) -> dict[str, tuple[list[dict[str, Any]], int, int, set[str]]]:
+    """D2 多 store 整体 merge（D2-2 + 开关控 D2-3）—— 与 D4 的同名函数同型。
+
+    spec: workpaper-sync-registration-isolation-and-d2-republish · AC 4.3
+
+    `base_by_item`: `{store_item_id: remark_json_or_list}`。
+    返回 `{store_item_id: (merged_rows, applied, visited, touched_rows)}`。
+    """
+    updates: dict[str, tuple[list[dict[str, Any]], int, int, set[str]]] = {}
+
+    # ① D2-2 主区
+    d22_base = base_by_item.get(P.STORE_ITEM_ID, [])
+    if isinstance(d22_base, str):
+        import json as _json
+        try:
+            d22_base = _json.loads(d22_base or "[]")
+        except ValueError:
+            d22_base = []
+    if not isinstance(d22_base, list):
+        d22_base = []
+    d22_result = merge_projection_into_store_rows(
+        projection=projection, base_rows=d22_base
+    )
+    updates[P.STORE_ITEM_ID] = d22_result
+
+    # ② D2-3 坏账准备（开关控）
+    if P._INCLUDE_D203_BAD_DEBT:
+        from app.services.workpaper_sync.phase5_d2_03_bad_debt import (
+            STORE_ITEM_ID_AGING,
+            STORE_ITEM_ID_CUSTOMER,
+            STORE_ITEM_ID_INDIVIDUAL,
+            merge_projection_into_d23_stores,
+        )
+        d23_base = {
+            sid: base_by_item.get(sid, "[]")
+            for sid in (STORE_ITEM_ID_INDIVIDUAL, STORE_ITEM_ID_AGING, STORE_ITEM_ID_CUSTOMER)
+        }
+        d23_merged, d23_applied, d23_visited, d23_touched = merge_projection_into_d23_stores(
+            projection=projection, base_states=d23_base
+        )
+        for sid, rows in d23_merged.items():
+            updates[sid] = (rows, d23_applied, d23_visited, d23_touched)
+
+    # ③ D2-1 审定表（per-cell 静态区）—— 不走 rows 循环，留给框架层 dedicated / 专用逻辑。
+    #    D2-1 的写回由前端 useD2Adjudication 直接写 checklist（不经 OO），此处不 merge。
+
+    return updates

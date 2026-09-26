@@ -51,10 +51,18 @@ import json
 from typing import Any, Final, Iterator, Mapping, Sequence
 
 from app.services.workpaper_sync.contracts import FieldSpec, SyncContract
+from app.services.workpaper_sync.models import SyncDomainError
 
 
-class StorePayloadError(ValueError):
-    """D2-3 store 载荷形态不合法（非数组、缺 row identity、重复 identity）。"""
+class StorePayloadError(SyncDomainError):
+    """D2-3 store 载荷形态不合法（非数组、缺 row identity、重复 identity）。
+
+    spec: workpaper-sync-registration-isolation-and-d2-republish · AC 5.4
+    🔴 原继承 `ValueError`（非 `SyncDomainError`）⇒ 在 apply 路径变 opaque 500。改为继承
+    `SyncDomainError` 使其在注册隔离路径被识别为 fail-visible 域异常。
+    """
+
+    error_code = "d23_store_payload_invalid"
 
 
 # ═══════════════════════════════════════════════════════════════════════════

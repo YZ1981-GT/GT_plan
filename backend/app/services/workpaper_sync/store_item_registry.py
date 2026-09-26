@@ -148,6 +148,10 @@ class StoreMergePlan:
     merge_rows_fn: str = "merge_projection_into_store_rows"
     merge_state_fn: str | None = None
     dual_store_fn: str | None = None
+    #: 多 store item 的**整体行 merge 函数**名（bridge 模块顶层导出）。
+    #: `_mirror_d4_dual_stores` 用 `getattr(bridge, merge_all_fn)` 取代硬编码。
+    #: D4 填 `merge_projection_into_all_d4_stores`，D2 填 `merge_projection_into_all_d2_stores`。
+    merge_all_fn: str = "merge_projection_into_all_d4_stores"
     dedicated_items: tuple[DedicatedStoreItem, ...] = ()
     #: 非空 ⇒ 该 adapter 的 provider **未提供** store 镜像门面（实测缺符号）。
     #: `resolve_store_merge_plan` 会抛可归因的 domain 错误，取代原先运行时 AttributeError。
@@ -208,6 +212,10 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         adapter_id="d2.receivable_detail",
         provider_module="d2_bidirectional_bridge",
         items=(StoreItemSpec(item_id="D2-detail-rows", kind=StoreKind.rows),),
+        # 🔴 spec workpaper-sync-registration-isolation · AC 4.3：开关打开后走多 store 镜像。
+        #    merge_all_fn 指向 bridge 上的 D2 版整体 merge 函数。
+        dual_store_fn="_mirror_d4_dual_stores",
+        merge_all_fn="merge_projection_into_all_d2_stores",
     ),
     "d3.prepaid_receipts_detail": StoreMergePlan(
         adapter_id="d3.prepaid_receipts_detail",
