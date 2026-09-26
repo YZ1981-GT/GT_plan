@@ -29,8 +29,15 @@
 > `governance-checks.yml` 并逐条本地复测通过；`test_sibling_table_ref_row_shift.py` 的
 > 判据 6 从硬编码 D4 改为按 provider 参数化（实施中抓到并修复一处真实的 spec 聚合重复计入
 > bug），变异反证证明其确能自动覆盖 D1-4 等尚在灰度中的新多区 sheet。
-> **尚未开工**：Task 15/16/17/18 本体的完整 provider 收敛（≤150/300 行上限）、Task 19
-> （B60/D4 真栈过门）、Task 27~34（D1 批次 2~6 灰度开启 + 真实接入 + 审定表迁移 + 验收）。
+> ✅ **Task 19（B60/D4 过门）+ Task 30（D1-6 可行性评估）已完成**（2026-09-26）：Task 19 的
+> **真栈段首次跑通** —— D4 整册 materialize+extract+verify 全绿（真库 gen=164，12.4s，
+> `equivalent=True`，受管 sheet 现算实测 30 与描述相符），脚本
+> `backend/scripts/e2e/verify_d4_full_book_real_stack.py` 可重跑；Task 30 判定 D1-6 的 4×3
+> QA 矩阵**两条路径都表达不了**（`static_region` 卡在 `contracts.py:_parse_field` 的
+> `row_from` 只收单行号这条 schema 硬约束），按需求 5.6 登记 `NOT_EXPRESSIBLE`。
+> **尚未开工**：Task 15/16/17/18 本体的完整 provider 收敛（≤150/300 行上限；其中 **Task 18
+> D2 已独立立项** `d2-sync-coverage-via-row-table-engine` 并由并发会话推进中，本 spec 不重复
+> 介入）、Task 27~29/31~34（D1 批次 2~6 灰度开启 + 真实接入 + 审定表迁移 + 验收）。
 > 下方复选框为唯一进度真源，本节仅摘要。
 
 顺序有意义：**阶段 0 是红判据与基线先行** —— 24 个 golden digest 此时必绿（它是基线不是判据），
@@ -238,7 +245,26 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
     真 materialize 并记录耗时，与任务 4 基线对比
   - _Requirements: 2.1, 2.2, 4.2, 8.1_
 
-- [ ] 19. B60 / D4 过门（不声明化，只验证兼容）
+- [x] 19. B60 / D4 过门（不声明化，只验证兼容）✅ 2026-09-26：**真栈段首次跑通**（此前
+  三次尝试均评估为"需完整环境、超出范围"而搁置，本轮找到可行路径）。
+  ① digest 子集零变化：golden digest 门禁现测 **75 个逐个不变**，B60/D4 均在其中且 per-sheet
+  粒度（B60 `store_projection_sha256=null` 如实记录不假造；D4 35 个 per-sheet digest）。
+  ② D4 整册真栈 materialize + extract + verify **全绿**（真库 generation=164 真实数据，
+  `project_id=0ec33ac9…` / `wp_id=b3ab3c46…`）：`materialize 5.7s + extract 1.8s +
+  verify 4.9s = 12.4s`，`verify equivalent=True`，四次连跑稳定复现、退出码 0。
+  受管 sheet 数**现算实测 30**（36 个 instrumentation spec 去重 `managed_sheet` 得 30，
+  差值 6 正是 Task 24 参数化覆盖的 5 张同 sheet 多区底稿）——与本任务描述逐字相符。
+  🔴 **两条走对了才有意义的路**（已固化进脚本 docstring）：必须走**隔离式 attach**
+  （共享 `register_from_manifest()` 会在轮到 D4 之前先炸在 D2 lane 在途的
+  `ContractDriftError`）；`before` 必须用**真实 substrate 字节**而非
+  `read_authoritative_template()`（164 代演化后模板与 representation 间有大量合法结构差异，
+  拿模板当 before 会把合法历史变化判成 drift）。
+  🔴 **如实登记三项限制**：本次 `row_shift=None` ⇒ **未**走通"多区插行→兄弟区 ref 位移"
+  路径（那条仍由离线 `test_sibling_table_ref_row_shift.py` 16 用例守）；extract 38 表 vs
+  projection 43 表的差值 5 是 HTML-only/dict-store item（设计内，非丢数据）；12.4s 远低于
+  历史注释值（42.8s/60.8s）是因走了单趟路径 + 缓存命中，**不得**据此断言性能问题已解决。
+  脚本：`backend/scripts/e2e/verify_d4_full_book_real_stack.py`（正式工具，需真库、
+  不需真后端进程，刻意不进 CI test 列表）。证据：`evidence/task19-b60-d4-gate.md`。
   - B60 是 simple_checklist、D4 有 26 个 per-sheet 模块 ⇒ 本 spec **不重构它们**（裁决/范围）
   - 只断言：它们的 24 digest 子集零变化 + D4 整册真 materialize 200 + verify 全绿（30 受管 sheet）
   - _Requirements: 2.5, 4.2, 4.3_
