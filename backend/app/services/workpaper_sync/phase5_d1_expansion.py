@@ -56,6 +56,12 @@ _INCLUDE_D104_BAD_DEBT: Final[bool] = False
 #: 批次 1 第二张的第三区：D1-4 票据种类小计（static_region，绝对坐标直写、绕开位移链）。
 _INCLUDE_D104_NOTETYPE_STATIC: Final[bool] = False
 
+#: 批次 2 第一张：D1-8 贴现明细（双区：贴现 R14-21 + 背书 R26-33）。
+_INCLUDE_D108_ENDORSEMENT: Final[bool] = False
+
+#: 批次 2 第二张：D1-16 核销检查（双区：转回 R12-14 + 核销 R18-20）。
+_INCLUDE_D116_WRITEOFF: Final[bool] = False
+
 
 def _managed_last_col_of(spec: Any) -> str:
     """从 RowTableSheetSpec 的 field_specs 取最后一个受管业务列（按列序）。"""
@@ -126,6 +132,14 @@ def managed_row_table_specs() -> tuple[Any, ...]:
         from app.services.workpaper_sync import phase5_d1_04_bad_debt as _d104
 
         specs.extend((_d104.SPEC_D104_INDIVIDUAL, _d104.SPEC_D104_PORTFOLIO))
+    if _INCLUDE_D108_ENDORSEMENT:
+        from app.services.workpaper_sync import phase5_d1_08_endorsement as _d108
+
+        specs.extend((_d108.SPEC_D108_DISCOUNT, _d108.SPEC_D108_TRANSFER))
+    if _INCLUDE_D116_WRITEOFF:
+        from app.services.workpaper_sync import phase5_d1_16_writeoff as _d116
+
+        specs.extend((_d116.SPEC_D116_REVERSAL, _d116.SPEC_D116_WRITEOFF))
     return tuple(specs)
 
 
