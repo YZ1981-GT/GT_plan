@@ -699,16 +699,30 @@ def merge_projection_into_d23_stores(
                 base_category[rid0] = str(row.get("category") or "")
 
     def _combined_target(rid: str) -> str:
-        """组合区回写归属：base 归属键 → base category → 投影 category → 兜底 aging。
+        """组合区回写归属：base 归属键 → base category → 投影 category。三者皆无 fail closed。
 
-        去掉了原「默认 aging 静默猜测」：优先用 base 已确定的归属键（rid_to_store），
-        再用 base/投影带出的 category 字段，只有三者都缺时才兜底 aging（真正的 OO 新增行
-        且前端未标 category 的极端情形，前端下次编辑会以正确 category 覆盖）。
+        🔴 第二轮复盘修复（问题 3/4）：此前无信号时兜底 `STORE_ITEM_ID_AGING` 并把
+        `category: "aging"` 永久写死进这行数据——下次 merge 时 `base_category` 会把这个
+        自造的标签当权威读回，行从此**永久锁死**在错误分类，且永远无法被后续编辑纠正
+        （因为 base 归属键从此有值，优先级最高）。这是「静默猜测自我加固成事实」，
+        与同文件其余分支的 fail-closed 风格（缺行身份/重复行身份均直接抛）不一致。
+
+        改为 fail closed：三条线索都缺时抛 `StorePayloadError`，不生成任何归属猜测，
+        不污染 base 数据。真实场景里这条路径几乎不可达——前端 `useD2BadDebt.addSubRow`
+        创建新行时总是显式传 `category`（见 `createEmptySubRow`），只有绕过前端直接摆
+        缺 category 的 payload 才会触发；触发时应该让调用方看到明确错误，而不是让平台
+        悄悄替它做了一个可能错的分类决定。
         """
         if rid in rid_to_store and rid_to_store[rid] in _CAT_TO_STORE.values():
             return rid_to_store[rid]
         cat = base_category.get(rid) or proj_category.get(rid) or ""
-        return _CAT_TO_STORE.get(cat, STORE_ITEM_ID_AGING)
+        target = _CAT_TO_STORE.get(cat)
+        if target is None:
+            raise StorePayloadError(
+                f"组合区行 {rid!r} 无法判定归属（aging/customer-type）—— base 与投影均未"
+                "带出 category 信号 —— 不得静默兜底猜测（会把猜测写死成事实、永久锁死错误分类）"
+            )
+        return target
 
     for key in projection.stable_keys():
         sk = str(key)

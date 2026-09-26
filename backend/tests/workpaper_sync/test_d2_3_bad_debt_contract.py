@@ -223,6 +223,26 @@ def test_new_combined_row_routes_by_category_not_default_aging(contract) -> None
     assert newc_row.get("category") == "customer-type"
 
 
+def test_new_combined_row_without_any_category_signal_fails_closed(contract) -> None:
+    """第二轮复盘修复（问题 3/4）：新行三条归属线索（base 归属键/base category/投影 category）
+    都缺时必须 fail closed，不得静默兜底 aging 并把猜测写死成事实。
+
+    构造：base_states 为空（无归属键、无 base category）+ 手工剥除投影的
+    `_d23_combined_category` 附加属性（模拟「投影也没带出信号」的极端场景）。
+    变异：把 fail closed 换回 `_CAT_TO_STORE.get(cat, STORE_ITEM_ID_AGING)` 兜底 ⇒ 本判据必红
+    （不再抛错，且合并结果里 newx 会落 aging 键）。
+    """
+    payloads = _stores([], [], [_sub("newx", "customer-type", priorUnadjusted=999)])
+    proj = m.build_d23_store_projection(payloads, contract=contract)
+    # 剥除投影上附加的 category 信号，模拟三线索全缺的极端情形。
+    try:
+        object.__setattr__(proj, "_d23_combined_category", {})
+    except Exception:
+        proj._d23_combined_category = {}
+    with pytest.raises(m.StorePayloadError, match="无法判定归属"):
+        m.merge_projection_into_d23_stores(projection=proj, base_states={})
+
+
 def test_mapping_digest_stable() -> None:
     assert m.assert_mapping_digest_d23() == m.EXPECTED_MAPPING_DIGEST_D23
 
