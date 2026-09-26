@@ -384,7 +384,22 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
     若 D1-14 十项 + D1-13 十五项 + D1-10 三项均走 `static_region`，终值会显著更高
   - _Requirements: 5.1, 5.5, 11.4, 11.5, 11.6_
 
-- [ ] 30.* 评估 D1-6 能否用 `TransposedSheetSpec` 表达
+- [x] 30.* 评估 D1-6 能否用 `TransposedSheetSpec` 表达 ✅ 2026-09-26：**两条路径都表达不了**
+  （比设计阶段猜想更严——不仅 `TransposedSheetSpec` 不匹配，深入核实后发现 `static_region`
+  也不行，方向性初判已修正）。openpyxl 直读确认矩阵绝对坐标 `B17:D20`（4 行×3 列，行 21/22
+  是硬编码引用矩阵的派生公式行，前端 `computed()` 同构不需单独管理）。
+  `TransposedSheetSpec`：动态多实体+异构字段类型假设（D4-12 先例：N 份合同列可扩列），
+  与 D1-6 固定 3×4 同类型枚举网格不匹配。`static_region`：深读 `contracts.py:_parse_field`
+  （第 908-934 行）发现 `cell.row_from` 只收 `"row_identity"` 或单个 `int>=1`，**无「行区间」
+  表达**——字段粒度恒为单格，排查全部现存先例（E1-11/D1-4 第三区）均为散列单格集合，
+  本引擎从未处理过矩阵形态。按需求 5.6 登记
+  `phase5_d1_06_business_mode.QA_MATRIX_NO_ROW_RANGE_CELL_MAPPING_NOT_EXPRESSIBLE`
+  （同 `pilot_h1` 范式，点名两条候选路径的具体约束来源+修法路径+owner），**未在框架层开
+  特例分支**（本模块只登记评估结论，不声明 `RowTableSheetSpec`/`TransposedSheetSpec`）。
+  9 用例判据全绿（矩阵几何实测 3 + schema 约束实证 2 + D4-12 对照 1 + 登记文案校验 3）。
+  证据：`.kiro/specs/d1-sync-row-table-engine-and-d1-coverage/evidence/
+  task30-d1-6-feasibility.md`。`D1-bm-basis-rows`（3 固定行）不受影响，接入路径由后续
+  批次任务决定，本任务不涉及。
   - D1-6 = 行表（`D1-bm-basis-rows` 3 固定行）+ **真二维矩阵**（`cells: QACell[][]` 4×3）
   - 矩阵部分形似转置表（一列一组合、一行一问题）⇒ 试 `header_field_key=None` /
     `nested_fields_key=None`（与 D4-12 同形）
