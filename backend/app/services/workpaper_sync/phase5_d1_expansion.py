@@ -62,6 +62,15 @@ _INCLUDE_D108_ENDORSEMENT: Final[bool] = False
 #: 批次 2 第二张：D1-16 核销检查（双区：转回 R12-14 + 核销 R18-20）。
 _INCLUDE_D116_WRITEOFF: Final[bool] = False
 
+#: 批次 3 第一张：D1-9 贴息检查（单区 R11-17，有数据区行级公式 H/J/L）。
+_INCLUDE_D109_INTEREST: Final[bool] = False
+
+#: 批次 3 第二张：D1-11 关联方检查（单区 R11-13，有数据区行级公式 F/H）。
+_INCLUDE_D111_RELATED_PARTY: Final[bool] = False
+
+#: 批次 3 第三张：D1-12 质押检查（单区 R12-17，无数据区公式）。
+_INCLUDE_D112_PLEDGE: Final[bool] = False
+
 
 def _managed_last_col_of(spec: Any) -> str:
     """从 RowTableSheetSpec 的 field_specs 取最后一个受管业务列（按列序）。"""
@@ -140,6 +149,18 @@ def managed_row_table_specs() -> tuple[Any, ...]:
         from app.services.workpaper_sync import phase5_d1_16_writeoff as _d116
 
         specs.extend((_d116.SPEC_D116_REVERSAL, _d116.SPEC_D116_WRITEOFF))
+    if _INCLUDE_D109_INTEREST:
+        from app.services.workpaper_sync import phase5_d1_09_interest as _d109
+
+        specs.append(_d109.SPEC_D109)
+    if _INCLUDE_D111_RELATED_PARTY:
+        from app.services.workpaper_sync import phase5_d1_11_related_party as _d111
+
+        specs.append(_d111.SPEC_D111)
+    if _INCLUDE_D112_PLEDGE:
+        from app.services.workpaper_sync import phase5_d1_12_pledge as _d112
+
+        specs.append(_d112.SPEC_D112)
     return tuple(specs)
 
 
