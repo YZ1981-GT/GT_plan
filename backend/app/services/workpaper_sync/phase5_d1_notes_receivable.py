@@ -468,6 +468,29 @@ def _rows_table_payload() -> dict[str, Any]:
     }
 
 
+def _expansion_sheet_payloads() -> list[dict[str, Any]]:
+    """从 expansion 模块的已启用 specs 自动派生 contract sheet payloads。
+
+    🔴 同一 sheet_key 下多个 table（如 D1-4 个别/组合两区、D1-8 贴现/背书两区）被合并
+    进同一个 sheet payload 的 `tables` 数组——契约 schema 要求 `sheet_key` 唯一。
+    """
+    from app.services.workpaper_sync.phase5_d1_expansion import managed_row_table_specs
+    from app.services.workpaper_sync.phase5_row_table_sheet import spec_to_contract_sheet_payload
+
+    by_sheet_key: dict[str, dict[str, Any]] = {}
+    for spec in managed_row_table_specs():
+        if spec.sheet_key == SHEET_KEY:
+            continue  # D1-3 already in the main sheets list
+        payload = spec_to_contract_sheet_payload(spec)
+        sk = payload["sheet_key"]
+        if sk in by_sheet_key:
+            # Same sheet, additional table (dual/triple region)
+            by_sheet_key[sk]["tables"].extend(payload["tables"])
+        else:
+            by_sheet_key[sk] = payload
+    return list(by_sheet_key.values())
+
+
 def build_contract_payload() -> dict[str, Any]:
     """本 entry 自己的 per-entry contract canonical payload（两个 digest 现算，单向引用）。"""
     from app.services.workpaper_sync.excel_extract import TABLE_SHEET_ANCHOR
@@ -500,7 +523,8 @@ def build_contract_payload() -> dict[str, Any]:
                 "excel_name": MANAGED_SHEET,
                 "locator": {"anchor": TABLE_SHEET_ANCHOR},
                 "tables": [_rows_table_payload()],
-            }
+            },
+            *_expansion_sheet_payloads(),
         ],
         "review": {
             "entry_id": ENTRY_ID,

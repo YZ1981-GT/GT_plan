@@ -142,6 +142,14 @@ class RowTableSheetSpec:
 
     # ── footer / 错误消息标签（零回归：各家保持既有措辞）────────────────────
     footer_marker: str = "合计"
+    #: footer 行是否携带合计/差异等公式（`contracts.FooterAnchorSpec.carries_total_formula`
+    #: 的声明层来源）。默认 True 与七家既有 provider 现状逐字等价（零回归——它们的 footer
+    #: 行全部真有公式，此前由 entry 模块各自硬编码 `"carries_total_formula": True`）。
+    #: 🔴 D3-4 段②（Task 8）是本引擎首次出现 footer 行**无**公式的场景（`差异合理性分析`
+    #: 纯文字说明行，R25 无 SUM/差异公式）——显式传 `False`，不得沿用默认值掩盖这个真实差异
+    #: （`excel_materialize._grow_managed_table_ref` 据此决定 footer 公式区间是否需要跟随
+    #: 插行重新归一化；无公式的 footer 行不该被当作"有公式待归一化"处理）。
+    footer_carries_total_formula: bool = True
     error_label: str = ""
 
     #: HTML-only item 子集（受管 sheet ≠ 全部 item 受管；D4-5 范式）。
@@ -248,6 +256,64 @@ class RowTableStorePayloadError(Exception):
 def stable_key_for(spec: RowTableSheetSpec, column_key: str, row_identity: str = "{row_uuid}") -> str:
     """`{table_key}/{row_identity}/{column_key}` 的唯一拼装处（七家逐字相同）。"""
     return f"{spec.table_key}/{row_identity}/{column_key}"
+
+
+def spec_to_contract_sheet_payload(spec: RowTableSheetSpec) -> dict:
+    """从 `RowTableSheetSpec` 自动派生 contract sheet payload（取代 per-provider 手写）。
+
+    产出结构与 D1/D4 各 per-sheet 模块手写的 `_rows_table_payload()` / `sheet_payload_*()`
+    逐字段一致——只是改为从 spec 数据类自动推导，消除手写漂移面。
+    """
+    from app.services.workpaper_sync.excel_extract import TABLE_SHEET_ANCHOR
+
+    specs = managed_field_specs(spec)
+    fields = []
+    for col_key, col, mode, vtype, json_key, hdr_text, group_cell in specs:
+        fields.append({
+            "stable_field_key": stable_key_for(spec, col_key),
+            "json_pointer": f"/rows/{{row_uuid}}/{json_key}",
+            "column_key": col_key,
+            "cell": {"column": col, "row_from": "row_identity"},
+            "mode": mode,
+            "value_type": vtype,
+            "source_ref": f"源xlsx!{spec.managed_sheet}!{col}{spec.first_data_row}",
+            "header_source_ref": f"源xlsx!{spec.managed_sheet}!{col}{spec.header_row or spec.header_leaf_row or spec.first_data_row - 1}",
+            "store_item_id": spec.store_item_id,
+            "header_text": hdr_text,
+        })
+
+    header_row_count = 1
+    if spec.header_group_row is not None and spec.header_leaf_row is not None:
+        header_row_count = spec.header_leaf_row - spec.header_group_row + 1
+
+    anchor_row = spec.header_row or spec.header_group_row or (spec.first_data_row - 1)
+
+    table_payload = {
+        "table_key": spec.table_key,
+        "anchor": f"A{anchor_row}",
+        "header_rows": header_row_count,
+        "row_identity": {
+            "kind": "field",
+            "json_pointer": f"/rows/*/{spec.row_identity_key}",
+        } if spec.row_identity_key else None,
+        "delete_policy": "tombstone",
+        "footer_anchor": {
+            "marker": spec.footer_marker,
+            "search_column": "A",
+            "carries_total_formula": spec.footer_carries_total_formula,
+        },
+        "formula_mask": list(spec.formula_mask),
+        "fields": fields,
+    }
+    if table_payload["row_identity"] is None:
+        del table_payload["row_identity"]
+
+    return {
+        "sheet_key": spec.sheet_key,
+        "excel_name": spec.managed_sheet,
+        "locator": {"anchor": TABLE_SHEET_ANCHOR},
+        "tables": [table_payload],
+    }
 
 
 def resolve_json_path(row: Mapping[str, object], json_path: str) -> object | None:
@@ -450,6 +516,68 @@ def attach_sibling_bindings(
         _static_region_bindings(provider=provider, metadata_sheet=GT_SYNC_SHEET_NAME)
     )
     return tuple(siblings)
+
+
+def provider_managed_sheet_keys(provider: Any) -> set[str]:
+    """provider 的 instrumentation 覆盖的**全部受管 sheet_key** 集合。
+
+    收敛三类形态（Requirement 2.2）：
+      * 复数 `instrumentation_specs()`（D4 / D2 改造后）—— 取每个 spec 的 `resolved_sheet_key`；
+      * 单数 `instrumentation_spec()`（B60 / D1 父 / D3 父 / D5 / D6 / D7）；
+      * 每个 spec 上寄生的 `static_sheets` / `transposed_sheets` 声明（静态区 / 转置表也是
+        受管 sheet，其 sheet_key 必须计入 —— 否则「契约声明了静态区但 spec 漏挂」这类漏接
+        绕过守卫）。
+    """
+    specs_fn = getattr(provider, "instrumentation_specs", None)
+    if callable(specs_fn):
+        specs = tuple(specs_fn())
+    else:
+        single = getattr(provider, "instrumentation_spec", None)
+        specs = (single(),) if callable(single) else ()
+    keys: set[str] = set()
+    for spec in specs:
+        rk = str(getattr(spec, "resolved_sheet_key", "") or "").strip()
+        if rk:
+            keys.add(rk)
+        for parasitic in (
+            *(getattr(spec, "static_sheets", ()) or ()),
+            *(getattr(spec, "transposed_sheets", ()) or ()),
+        ):
+            sk = str((parasitic or {}).get("sheet_key") or "").strip()
+            if sk:
+                keys.add(sk)
+    return keys
+
+
+def assert_provider_specs_align_with_contract(provider: Any, contract: Any) -> None:
+    """通用对齐守卫：provider instrumentation 覆盖的受管 sheet 集合 == 契约 `sheets[]` 集合。
+
+    spec: workpaper-sync-registration-isolation-and-d2-republish · Requirement 2
+
+    🔴 事故背书（D4-35）：契约加了 sheet（8 张）但漏了对应 instrumentation spec（7 个）⇒
+       attach 期 `_align_specs_to_sibling_tables` **fail-closed 打挂整个 entry**，而不是只挂
+       那一张。此前 D1/D3 各写一份同款守卫，D4/D2 没有 —— 本函数是**唯一**通用实现，覆盖所有
+       暴露 instrumentation 的 provider（含 D4）。不一致即抛并**精确报差集**。
+
+    与 `_align_specs_to_sibling_tables`（对齐 row table，运行期 binding）不同层：本函数在
+    **声明期**比 sheet 集合，让漏接在接入/发布时就红，而不是上线后整册 500。
+    """
+    # 懒导入避免与 projection_first_publication 成环（后者 import 本模块的 spec）。
+    from app.services.workpaper_sync.projection_first_publication import (
+        ProviderCapabilityError,
+    )
+
+    spec_keys = provider_managed_sheet_keys(provider)
+    contract_keys = {str(getattr(s, "sheet_key", "") or "") for s in contract.sheets}
+    contract_keys.discard("")
+    if spec_keys != contract_keys:
+        missing = sorted(contract_keys - spec_keys)
+        extra = sorted(spec_keys - contract_keys)
+        raise ProviderCapabilityError(
+            f"provider {getattr(provider, '__name__', provider)!r} 的 instrumentation 受管 "
+            f"sheet 集合与契约 sheets 不对齐 —— 契约有而 spec 缺: {missing}；spec 有而契约缺: "
+            f"{extra}。任一侧漏一张会让 attach fail-closed 打挂整个 entry（D4-35 事故形态）"
+        )
 
 
 def merge_projection_into_store_rows(

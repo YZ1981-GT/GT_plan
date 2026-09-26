@@ -195,55 +195,36 @@ class TestD116WriteoffSpec:
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestExpansionGrayScaleZeroRegression:
-    """开关 off ⇒ 与改动前逐字等价（只有 D1-3）。"""
+    """全部灰度开关已 ON（2026-09-26 D1 adapter 注册后全量开启）。"""
 
-    def test_switches_are_off_by_default(self) -> None:
-        assert D1E._INCLUDE_D108_ENDORSEMENT is False
-        assert D1E._INCLUDE_D116_WRITEOFF is False
+    def test_all_switches_are_on(self) -> None:
+        assert D1E._INCLUDE_D108_ENDORSEMENT is True
+        assert D1E._INCLUDE_D116_WRITEOFF is True
 
-    def test_instrumentation_specs_unchanged_with_switches_off(self) -> None:
+    def test_instrumentation_specs_count_with_all_on(self) -> None:
         specs = D1E.instrumentation_specs()
-        assert len(specs) == 1
-        assert str(specs[0].managed_sheet) == "原值明细表（按客户）D1-3"
+        assert len(specs) == 18  # D1-3 + 11 expansion sheets (some dual-region)
 
-    def test_store_item_ids_unchanged_with_switches_off(self) -> None:
+    def test_store_item_ids_count_with_all_on(self) -> None:
         items = D1E.all_store_item_ids()
-        assert items == ("D1-cust-rows",)
+        assert len(items) == 18
 
 
 class TestExpansionWithD108D116On:
-    """开关 on ⇒ 4 个新 spec 自动出现且几何正确。"""
+    """D1-8/D1-16 在全量开启下正确贡献 spec。"""
 
-    def test_instrumentation_grows_to_5_with_both_on(self) -> None:
-        original_d108 = D1E._INCLUDE_D108_ENDORSEMENT
-        original_d116 = D1E._INCLUDE_D116_WRITEOFF
-        try:
-            D1E._INCLUDE_D108_ENDORSEMENT = True
-            D1E._INCLUDE_D116_WRITEOFF = True
-            specs = D1E.instrumentation_specs()
-            assert len(specs) == 5
-            sheets = [str(s.managed_sheet) for s in specs]
-            assert sheets.count(D108.MANAGED_SHEET_D108) == 2  # 贴现+背书
-            assert sheets.count(D116.MANAGED_SHEET_D116) == 2  # 转回+核销
-        finally:
-            D1E._INCLUDE_D108_ENDORSEMENT = original_d108
-            D1E._INCLUDE_D116_WRITEOFF = original_d116
+    def test_d108_and_d116_present_in_full_expansion(self) -> None:
+        specs = D1E.instrumentation_specs()
+        sheets = [str(s.managed_sheet) for s in specs]
+        assert sheets.count(D108.MANAGED_SHEET_D108) == 2  # 贴现+背书
+        assert sheets.count(D116.MANAGED_SHEET_D116) == 2  # 转回+核销
 
-    def test_store_items_grow_to_5_with_both_on(self) -> None:
-        original_d108 = D1E._INCLUDE_D108_ENDORSEMENT
-        original_d116 = D1E._INCLUDE_D116_WRITEOFF
-        try:
-            D1E._INCLUDE_D108_ENDORSEMENT = True
-            D1E._INCLUDE_D116_WRITEOFF = True
-            items = D1E.all_store_item_ids()
-            assert len(items) == 5
-            assert "D1-endorse-discount-rows" in items
-            assert "D1-endorse-transfer-rows" in items
-            assert "D1-writeoff-reversal-rows" in items
-            assert "D1-writeoff-writeoff-rows" in items
-        finally:
-            D1E._INCLUDE_D108_ENDORSEMENT = original_d108
-            D1E._INCLUDE_D116_WRITEOFF = original_d116
+    def test_store_items_include_d108_d116(self) -> None:
+        items = D1E.all_store_item_ids()
+        assert "D1-endorse-discount-rows" in items
+        assert "D1-endorse-transfer-rows" in items
+        assert "D1-writeoff-reversal-rows" in items
+        assert "D1-writeoff-writeoff-rows" in items
 
     def test_d1_8_auto_enters_multi_region_parametrized_coverage(self) -> None:
         """Task 24 参数化判据的变异反证：D1-8 开关翻转后自动进入 `_multi_region_sheets()`。"""

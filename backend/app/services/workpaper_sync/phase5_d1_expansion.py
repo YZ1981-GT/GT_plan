@@ -45,43 +45,43 @@ __all__ = [
 
 
 #: 批次 1 第一张：D1-2 原值明细表（按类别）。3 固定票据种类行（稳定 key 固定行，D4-6 范式）。
-_INCLUDE_D102_CATEGORY: Final[bool] = False
+_INCLUDE_D102_CATEGORY: Final[bool] = True
 
 #: 批次 1 第二张：D1-4 坏账准备明细表**前两区**（个别计提 13-16 / 组合计提 18-21）。
 #: 🔴 第三区（票据种类小计 R23-24）在 footer R22 **之下** ⇒ 走 static_region 寄生声明，
 #:    不进本开关（`ExcelInstrumentationSpec.__post_init__` 强制 footer_row > last_data_row，
 #:    动态 spec 表达不了 footer 下的区域 —— 这正是它必须走静态路径的硬证据）。
-_INCLUDE_D104_BAD_DEBT: Final[bool] = False
+_INCLUDE_D104_BAD_DEBT: Final[bool] = True
 
 #: 批次 1 第二张的第三区：D1-4 票据种类小计（static_region，绝对坐标直写、绕开位移链）。
-_INCLUDE_D104_NOTETYPE_STATIC: Final[bool] = False
+_INCLUDE_D104_NOTETYPE_STATIC: Final[bool] = True
 
 #: 批次 2 第一张：D1-8 贴现明细（双区：贴现 R14-21 + 背书 R26-33）。
-_INCLUDE_D108_ENDORSEMENT: Final[bool] = False
+_INCLUDE_D108_ENDORSEMENT: Final[bool] = True
 
 #: 批次 2 第二张：D1-16 核销检查（双区：转回 R12-14 + 核销 R18-20）。
-_INCLUDE_D116_WRITEOFF: Final[bool] = False
+_INCLUDE_D116_WRITEOFF: Final[bool] = True
 
 #: 批次 3 第一张：D1-9 贴息检查（单区 R11-17，有数据区行级公式 H/J/L）。
-_INCLUDE_D109_INTEREST: Final[bool] = False
+_INCLUDE_D109_INTEREST: Final[bool] = True
 
 #: 批次 3 第二张：D1-11 关联方检查（单区 R11-13，有数据区行级公式 F/H）。
-_INCLUDE_D111_RELATED_PARTY: Final[bool] = False
+_INCLUDE_D111_RELATED_PARTY: Final[bool] = True
 
 #: 批次 3 第三张：D1-12 质押检查（单区 R12-17，无数据区公式）。
-_INCLUDE_D112_PLEDGE: Final[bool] = False
+_INCLUDE_D112_PLEDGE: Final[bool] = True
 
 #: 批次 3 第四张：D1-10 监盘表（单区 R14-20，核对区纯公式不受管）。
-_INCLUDE_D110_INVENTORY: Final[bool] = False
+_INCLUDE_D110_INVENTORY: Final[bool] = True
 
 #: 批次 3 第五张：D1-15 ECL 测算表（双区 单项R14-17 / 组合R22-24，行级乘法公式 D=B*C）。
-_INCLUDE_D115_ECL: Final[bool] = False
+_INCLUDE_D115_ECL: Final[bool] = True
 
 #: 批次 4 第一张：D1-13 抽凭检查（双区 增减R16-31 / 期后R37-44，17 列宽表）。
-_INCLUDE_D113_SAMPLING: Final[bool] = False
+_INCLUDE_D113_SAMPLING: Final[bool] = True
 
 #: 批次 4 第二张：D1-7 备查簿核对（双区 银行R13-17 / 商业R19-23，31 列宽表，dict store）。
-_INCLUDE_D107_MEMO: Final[bool] = False
+_INCLUDE_D107_MEMO: Final[bool] = True
 
 
 def _managed_last_col_of(spec: Any) -> str:

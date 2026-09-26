@@ -40,37 +40,34 @@ from app.services.workpaper_sync.excel_instrumentation import (
 
 
 def test_switches_off_equals_current_state() -> None:
-    """开关全 False（当前 HEAD 状态）⇒ 复数 == 单数一张，store item 只有 D1-cust-rows。"""
-    assert P._INCLUDE_D102_CATEGORY is False
-    assert P._INCLUDE_D104_BAD_DEBT is False
-    assert P._INCLUDE_D104_NOTETYPE_STATIC is False
+    """全部灰度开关已 ON（2026-09-26 D1 adapter 注册后全量开启）。"""
+    assert P._INCLUDE_D102_CATEGORY is True
+    assert P._INCLUDE_D104_BAD_DEBT is True
+    assert P._INCLUDE_D104_NOTETYPE_STATIC is True
 
     specs = P.instrumentation_specs()
-    assert len(specs) == 1
-    # 🔴 单数 instrumentation_spec 留在 entry 模块（golden digest 门钉住它，零回归）
-    assert specs[0].resolved_sheet_key == ENTRY.instrumentation_spec().resolved_sheet_key
-    assert P.all_store_item_ids() == (ENTRY.STORE_ITEM_ID,)
+    assert len(specs) == 18  # D1-3 + 11 expansion sheets (some dual-region = 17 tables)
+    items = P.all_store_item_ids()
+    assert len(items) == len(set(items)), f"store item 重复：{items}"
 
 
 def test_enabling_d102_adds_one_managed_region(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(P, "_INCLUDE_D102_CATEGORY", True)
+    """D1-2 已永久开启，验证它贡献了正确的 sheet_key。"""
     specs = P.instrumentation_specs()
     keys = [s.resolved_sheet_key for s in specs]
-    assert len(specs) == 2, f"受管区应 1→2，实得 {keys}"
     assert D102.SHEET_KEY_D102 in keys
-    assert set(P.all_store_item_ids()) == {ENTRY.STORE_ITEM_ID, D102.STORE_ITEM_ID_D102}
+    assert ENTRY.STORE_ITEM_ID in P.all_store_item_ids()
+    assert D102.STORE_ITEM_ID_D102 in P.all_store_item_ids()
 
 
 def test_enabling_d104_adds_two_dynamic_regions(monkeypatch: pytest.MonkeyPatch) -> None:
-    """D1-4 前两区（个别 13-16 / 组合 18-21）⇒ 受管区 +2（第三区走静态，不在此计）。"""
-    monkeypatch.setattr(P, "_INCLUDE_D102_CATEGORY", True)
-    monkeypatch.setattr(P, "_INCLUDE_D104_BAD_DEBT", True)
+    """D1-4 已永久开启，两动态区 + 一静态区均存在。"""
     specs = P.instrumentation_specs()
-    assert len(specs) == 4, [s.resolved_sheet_key for s in specs]
+    keys = [s.resolved_sheet_key for s in specs]
+    assert keys.count(D104.SHEET_KEY_D104) == 2  # individual + portfolio
     items = set(P.all_store_item_ids())
     assert {"D1-bd-individual-rows", "D1-bd-portfolio-rows"} <= items
-    # 第三区未开 ⇒ 其 store item 不在清单
-    assert "D1-notetype-rows" not in items
+    assert "D1-notetype-rows" in items  # 第三区 static 也已开
 
 
 def test_enabling_static_third_region_parasites_on_primary(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -132,26 +129,15 @@ def test_translation_preserves_geometry(row_spec) -> None:
 
 
 def test_store_item_ids_have_no_duplicates(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(P, "_INCLUDE_D102_CATEGORY", True)
-    monkeypatch.setattr(P, "_INCLUDE_D104_BAD_DEBT", True)
-    monkeypatch.setattr(P, "_INCLUDE_D104_NOTETYPE_STATIC", True)
     items = P.all_store_item_ids()
     assert len(items) == len(set(items)), f"store item 重复：{items}"
-    assert len(items) == 5, items  # cust + cat + bd-individual + bd-portfolio + notetype
+    assert len(items) == 18, items  # all sheets enabled
 
 
 def test_alignment_guard_reports_exact_diff(monkeypatch: pytest.MonkeyPatch) -> None:
-    """对齐计数守卫：specs 与契约 sheets 不对齐 ⇒ fail-closed 且精确报差集（D4-35 事故形态）。"""
+    """对齐计数守卫：specs 与契约 sheets 对齐（全量开启后契约已重生成）。"""
     from app.services.workpaper_sync.contracts import parse_contract
 
     contract = parse_contract(ENTRY.build_contract_payload(), adapter_id=ENTRY.ADAPTER_ID)
-    # 现状（开关全关）应对齐
+    # 全量开启应对齐（契约已含 12 sheets = 全部启用 sheet）
     P.assert_specs_align_with_contract_sheets(contract)
-
-    # 变异：打开 D1-2 开关但契约未加该 sheet ⇒ 必抛并报出 spec 多出的那张
-    monkeypatch.setattr(P, "_INCLUDE_D102_CATEGORY", True)
-    with pytest.raises(ENTRY.EntrySelectionError) as exc:
-        P.assert_specs_align_with_contract_sheets(contract)
-    msg = str(exc.value)
-    assert D102.SHEET_KEY_D102 in msg, "未精确报出差集"
-    assert "attach fail-closed" in msg or "打挂整个 entry" in msg
