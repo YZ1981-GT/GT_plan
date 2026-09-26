@@ -39,7 +39,7 @@ import json
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Final, Iterator, Mapping, Sequence
+from typing import Any, Final, Mapping, Sequence
 
 from app.services.workpaper_sync.adapters.registry import (
     AdapterRegistration,
@@ -48,7 +48,6 @@ from app.services.workpaper_sync.adapters.registry import (
 )
 from app.services.workpaper_sync.contracts import (
     CONTRACT_SCHEMA_VERSION,
-    FieldSpec,
     SyncContract,
     contract_path_for,
     load_contract,
@@ -406,9 +405,29 @@ def _src(cell: str) -> str:
     return f"源xlsx!{MANAGED_SHEET}!{cell}"
 
 
+def _spec_d103() -> Any:
+    """延迟取 D1-3 的 `RowTableSheetSpec` 声明（Task 15 收敛用）。
+
+    🔴 **必须延迟 import**：`phase5_d1_03_customer` 在模块级 `import phase5_d1_notes_receivable`
+    （它的几何数字全从本模块的冻结常量引用，避免两处各写一份而漂移）⇒ 本模块反向做模块级
+    import 会成环。函数内 import 是唯一解，且与 D5/D6/D7 收敛时的引擎 import 同款写法。
+    """
+    from app.services.workpaper_sync.phase5_d1_03_customer import SPEC_D103
+
+    return SPEC_D103
+
+
 def stable_key_for(column_key: str, row_identity: str = "{row_uuid}") -> str:
-    """`notes_receivable_detail_rows/{row_uuid}/{column_key}` 的唯一拼装处。"""
-    return f"{ROWS_TABLE_KEY}/{row_identity}/{column_key}"
+    """薄转发框架层同名函数（Task 15 声明化，逐字节等价）。
+
+    等价性：引擎返回 `f"{spec.table_key}/{row_identity}/{column_key}"`，而
+    `SPEC_D103.table_key` 就是本模块的 :data:`ROWS_TABLE_KEY` ⇒ 输出逐字符相同。
+    """
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        stable_key_for as _engine_stable_key_for,
+    )
+
+    return _engine_stable_key_for(_spec_d103(), column_key, row_identity)
 
 
 def _rows_table_payload() -> dict[str, Any]:
@@ -555,60 +574,11 @@ def assert_contract_file_matches_source() -> SyncContract:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def store_row_identity(row: Mapping[str, Any], *, ordinal: int) -> str:
-    """取一行的稳定行身份。空/非字符串即抛 —— **绝不**退回数组下标。"""
-    raw = row.get(ROW_IDENTITY_STORE_KEY)
-    if not isinstance(raw, str) or not raw.strip():
-        raise StorePayloadError(
-            f"{STORE_ITEM_ID} 第 {ordinal} 行缺少稳定行身份 "
-            f"{ROW_IDENTITY_STORE_KEY!r}（实得 {raw!r}）—— 不得退回数组下标作身份"
-            "（Requirement 6.5 / Property 23）"
-        )
-    return raw.strip()
-
-
-def iter_store_rows(
-    payload: str | bytes | Sequence[Any],
-) -> Iterator[tuple[str, Mapping[str, Any]]]:
-    """流式 yield `(row_identity, row)`；重复身份即抛。"""
-    if isinstance(payload, (str, bytes, bytearray)):
-        text = payload.decode("utf-8") if isinstance(payload, (bytes, bytearray)) else payload
-        try:
-            rows: Any = json.loads(text)
-        except ValueError as exc:
-            raise StorePayloadError(
-                f"{STORE_ITEM_ID} 的 remark 不是合法 JSON: {exc}"
-            ) from exc
-    else:
-        rows = payload
-    if not isinstance(rows, list):
-        raise StorePayloadError(
-            f"{STORE_ITEM_ID} 的载荷必须是行对象数组，实得 {type(rows).__name__} —— "
-            "整张表被存成别的形态时必须 fail closed，不得静默当成零行"
-        )
-    seen: set[str] = set()
-    for ordinal, row in enumerate(rows):
-        if not isinstance(row, Mapping):
-            raise StorePayloadError(
-                f"{STORE_ITEM_ID} 第 {ordinal} 项不是对象，实得 {type(row).__name__}"
-            )
-        identity = store_row_identity(row, ordinal=ordinal)
-        if identity in seen:
-            raise StorePayloadError(
-                f"{STORE_ITEM_ID} 出现重复行身份 {identity!r}（第 {ordinal} 项）—— "
-                "复制产生的重复 UUID 默认是结构冲突，不得静默合并成一行（Requirement 6.15）"
-            )
-        seen.add(identity)
-        yield identity, row
-
-
-def split_store_row(
-    row: Mapping[str, Any], *, row_identity: str, contract: SyncContract
-) -> Iterator[tuple[str, Any, FieldSpec]]:
-    """一行 → 15 条 `(stable_key, value, spec)`。`spec` 从 contract 取（未登记键即抛）。"""
-    for column_key, _column, _mode, _vt, json_key, _label in MANAGED_FIELD_SPECS:
-        spec = contract.field_by_stable_key(stable_key_for(column_key))
-        yield stable_key_for(column_key, row_identity), row.get(json_key), spec
+#: 🔴 Task 15 声明化：`store_row_identity` / `iter_store_rows` / `split_store_row` 三个
+#: **模块内部** helper 已收敛进框架层 `phase5_row_table_sheet`（收敛前已 grep 确认全仓零
+#: 模块外调用方，与 D5/D6/D7 同款处置）。`build_store_projection` /
+#: `merge_projection_into_store_rows` 保留同名薄转发（它们是 provider 的公开门面，
+#: `store_projection_response` / `oo_to_html` 按名调用）。
 
 
 def build_store_projection(
@@ -617,36 +587,27 @@ def build_store_projection(
     contract: SyncContract,
     limits: Any | None = None,
 ) -> Any:
-    """把 HTML store 的 JSON 载荷拆成按 stable field key 索引的 :class:`Projection`。"""
-    from app.services.workpaper_sync.adapters.base import FieldValue, Projection
-    from app.services.workpaper_sync.excel_extract import StreamingProjectionBudget
-    from app.services.workpaper_sync.limits import load_limits
+    """薄转发框架层 `build_store_projection(SPEC_D103, ...)`（逐字节等价）。
 
-    lim = limits or load_limits()
-    budget = StreamingProjectionBudget(lim)
-    values: dict[str, FieldValue] = {}
-    row_keys: list[str] = []
-    for identity, row in iter_store_rows(payload):
-        budget.add_row(ROWS_TABLE_KEY)
-        row_keys.append(identity)
-        for stable_key, value, spec in split_store_row(
-            row, row_identity=identity, contract=contract
-        ):
-            budget.add_field()
-            values[stable_key] = FieldValue(
-                stable_key=stable_key,
-                value=value,
-                value_type=spec.value_type,
-                mode=spec.mode,
-                row_key=identity,
-            )
-    return Projection(
-        contract_id=contract.contract_id,
-        semantic_version=contract.semantic_version,
-        document_type=contract.document_type,
-        values=values,
-        row_keys={ROWS_TABLE_KEY: tuple(row_keys)},
+    🔴 **必须转译引擎异常**：引擎抛 `RowTableStorePayloadError(Exception)` 非 domain 错误，
+    直接冒泡会被 `wp_sync_router` 当未知异常 ⇒ **opaque 500**；而本函数收敛前抛
+    `StorePayloadError(SyncDomainError)` 带 `error_code` ⇒ 映射 **4xx**。畸形 store 载荷是
+    用户侧数据问题（OCR/导入/手改都能写出非数组），必须保持 4xx。
+    D3/D5/D6/D7 在 Task 16/17 收敛时**漏了这一步**、四家一起从 4xx 退化成 500（2026-09-26
+    实测确认并修复），本家收敛一开始就带上转译，不重犯。
+    判据：`test_store_payload_error_stays_domain_error.py`（D1 在其正式参数化清单内）。
+    """
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        RowTableStorePayloadError,
+        build_store_projection as _engine_build_store_projection,
     )
+
+    try:
+        return _engine_build_store_projection(
+            _spec_d103(), payload, contract=contract, limits=limits
+        )
+    except RowTableStorePayloadError as exc:
+        raise StorePayloadError(str(exc)) from exc
 
 
 def merge_projection_into_store_rows(
@@ -665,56 +626,17 @@ def merge_projection_into_store_rows(
     契约首列）因从未在 Excel 里写入内容、根本不产出 FieldValue，永久停在空值——
     用户在结构化视图里看到的正是「有 rowId、没数据」的行。只对**本次新增**的
     identity 加这道门：已存在的行永不受影响（清空是合法编辑）。
+
+    🔴 Task 15 声明化：本体已收敛进框架层，此处只薄转发。幽灵行防护锚点取
+    `SPEC_D103.ghost_row_anchor_index`（默认 0 = `customer_name`，与收敛前的
+    `MANAGED_FIELD_SPECS[0][4]` 逐字同一列）—— D1 首列就是自由文本业务名称，
+    不需要 D5/D6 那样的非零锚点例外。
     """
-    field_to_store = {spec[0]: spec[4] for spec in MANAGED_FIELD_SPECS}
-    name_store_key = MANAGED_FIELD_SPECS[0][4]
-    by_id: dict[str, dict[str, Any]] = {}
-    order: list[str] = []
-    for row in base_rows:
-        rid = str(row.get(ROW_IDENTITY_STORE_KEY) or "").strip()
-        if not rid:
-            continue
-        by_id[rid] = dict(row)
-        order.append(rid)
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        merge_projection_into_store_rows as _engine_merge,
+    )
 
-    pre_existing_ids = set(by_id)
-    applied = 0
-    visited = 0
-    touched_rows: set[str] = set()
-    for key in projection.stable_keys():
-        fv = projection.get(key)
-        if fv is None or getattr(fv, "is_protected", False):
-            continue
-        rid = getattr(fv, "row_key", None)
-        if not rid:
-            continue
-        target = by_id.get(str(rid))
-        if target is None:
-            target = {ROW_IDENTITY_STORE_KEY: str(rid)}
-            by_id[str(rid)] = target
-            order.append(str(rid))
-        field_id = str(key).rsplit("/", 1)[-1]
-        store_key = field_to_store.get(field_id)
-        if not store_key:
-            continue
-        visited += 1
-        new_val = getattr(fv, "value", None)
-        if target.get(store_key) != new_val:
-            target[store_key] = new_val
-            applied += 1
-            touched_rows.add(str(rid))
-
-    ghost_ids = {
-        rid
-        for rid in order
-        if rid not in pre_existing_ids
-        and not str(by_id[rid].get(name_store_key) or "").strip()
-    }
-    if ghost_ids:
-        order = [rid for rid in order if rid not in ghost_ids]
-        touched_rows -= ghost_ids
-
-    return [by_id[rid] for rid in order], applied, visited, touched_rows
+    return _engine_merge(_spec_d103(), projection=projection, base_rows=base_rows)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -200,8 +200,32 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
 
 ### 阶段 3：六家 provider 声明化（一家一 commit，一家过一次门）
 
-- [ ]* 15. D1 声明化：`phase5_d1_notes_receivable` → ≤150 行（**部分完成**：D1-3 已拆出
-  `phase5_d1_03_customer.py` 薄声明，但循环层主模块仍 1059 行远超 ≤150 上限，entry 瘦身本体未完成）
+- [ ]* 15. D1 声明化：`phase5_d1_notes_receivable` → ≤150 行（**引擎函数层已收敛（2026-09-26），
+  ≤150 行上限仍未达成**：1060 → 983 行）
+  ✅ **本轮交付（引擎函数层收敛，与 D3/D6/D7/D5 同款处置）**：删 `store_row_identity` /
+  `iter_store_rows` / `split_store_row` 三个**模块内部** helper（收敛前已 grep 确认全仓零
+  模块外调用方）；`stable_key_for` / `build_store_projection` /
+  `merge_projection_into_store_rows` 改薄转发框架层，spec 取 `SPEC_D103`；清理
+  `Iterator` / `FieldSpec` 两个随之失效的 import。
+  🔴 **循环 import 的处置**：`phase5_d1_03_customer` 在模块级 import 本模块（它的几何数字
+  全从本模块冻结常量引用），故本模块**不能**模块级 import 它 ⇒ 新增 `_spec_d103()` 延迟
+  取值（函数内 import，与引擎 import 同款写法）。D5/D6/D7 不需要这层是因为它们的 SPEC
+  声明在自己模块内。
+  🔴 **本家收敛一开始就带错误转译**，不重犯 Task 16/17 的 4xx→500 回归（见任务 16b/17b）：
+  `build_store_projection` 用 try/except 把引擎的 `RowTableStorePayloadError` 转译回本家
+  `StorePayloadError`，实测保住 `error_code='sync_phase5_store_payload_invalid'`。
+  🔴 **既存判据按其自身指示改造**：`test_row_table_engine_core_equivalence.
+  test_fail_closed_behaviours_match` 尾部原有一条防空转断言，文案自写「D1 尚未声明化…若它也
+  收敛了，本判据需改为纯引擎断言」。按指示改造但**不退化成只测引擎**：对照面从「私有
+  helper」上移到「provider 公开门面 `build_store_projection`」（生产真正调用那层），断言它
+  对同三种畸形载荷仍 fail-closed 且抛 domain 错误 —— 该改造当即**抓出 D3 未修的同源回归**，
+  已用 `xfail(strict=True)` 钉住待 D3 lane 修。
+  零回归：golden digest 75 个逐个不变 + 146 用例全绿（2 xfailed 均为 D3 已登记缺口）+
+  D4 整册真栈闭环复跑仍 `equivalent=True`。
+  🔴 **未完成**：剩余 983 行主要是契约装配（`_rows_table_payload` / `build_contract_payload`）
+  与发布编排（`publish_definitions` / `attach_adapters` / `build_registration` 等），
+  它们是**生产入口**（registry 按名调用）、且 golden digest 不覆盖其行为 ⇒ 迁移需另立
+  批次并先补发布链判据，本轮不动。
   - 拆出 `phase5_d1_03_customer.py`（现受管 sheet D1-3 的 spec 声明）
   - 循环层只留 `ENTRY_ID` / `TEMPLATE_RELATIVE_PATH` / sheet 清单 / 开关 / 薄转发（≤3 行/个）
   - 门：24 digest 零变化 + D1 真 materialize/extract 往返 `managed_field_count` 不变

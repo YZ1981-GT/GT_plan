@@ -123,13 +123,41 @@ def test_merge_projection_into_store_rows_equals_provider(provider, spec_fn) -> 
     assert (eng_applied, eng_visited, eng_touched) == (orig_applied, orig_visited, orig_touched)
 
 
-@pytest.mark.parametrize("provider,spec_fn", [(D1, _spec_d1), (D3, _spec_d3)], ids=["d1", "d3"])
+@pytest.mark.parametrize(
+    "provider,spec_fn",
+    [
+        (D1, _spec_d1),
+        pytest.param(
+            D3,
+            _spec_d3,
+            marks=pytest.mark.xfail(
+                strict=True,
+                reason=(
+                    "D3 的 build_store_projection 薄转发**缺错误转译** ⇒ 畸形载荷抛引擎的 "
+                    "RowTableStorePayloadError（非 domain）而非 D3 自己的 StorePayloadError，"
+                    "生产上会变 opaque 500。该文件正被 d3-sync-coverage-via-row-table-engine "
+                    "并发会话改动，本轮不介入；修法与 D5/D6/D7 逐字相同（try/except 转译）。"
+                    "🔴 strict=True：D3 lane 修好后本条 XPASS 而红，届时删掉本 marks。"
+                    "同源判据见 test_store_payload_error_stays_domain_error.py。"
+                ),
+            ),
+        ),
+    ],
+    ids=["d1", "d3"],
+)
 def test_fail_closed_behaviours_match(provider, spec_fn) -> None:
     """三条 fail-closed 行为等价：非数组 / 缺行身份 / 重复行身份 —— 两侧都必须抛。
 
     🔴 **锚点自适应**（2026-09-26）：已声明化的 provider（如 D3，Task 16 已交付）不再导出
     私有 `iter_store_rows` —— 它改调引擎。故 provider 侧只在该符号仍存在时对照；
     引擎侧**始终**断言。这样判据既覆盖未收敛的家（真对照），也不会在收敛后假红。
+
+    🔴 **对照面迁移**（2026-09-26 Task 15）：D1 收敛后**全部** provider 都不再导出私有
+    `iter_store_rows`，原先那条「至少有一家仍在对照」的防空转断言（其文案自己写明
+    「若它也收敛了，本判据需改为纯引擎断言」）前提已消失。按它的指示改造，但**不退化成
+    只测引擎**：改为对照 provider 的**公开门面** `build_store_projection`（生产真正调用的
+    那一层），断言它对同样三种畸形载荷仍 fail-closed 且抛 domain 错误。这样对照面从
+    「私有 helper」上移到「公开门面」，判据不空转。
     """
     spec = spec_fn()
     idk = provider.ROW_IDENTITY_STORE_KEY
@@ -151,10 +179,22 @@ def test_fail_closed_behaviours_match(provider, spec_fn) -> None:
             with pytest.raises(provider_err):
                 list(provider_iter(payload))
 
-    # 至少要有一家仍在对照（否则本判据退化成只测引擎）
-    assert callable(getattr(D1, "iter_store_rows", None)), (
-        "D1 尚未声明化，应仍导出 iter_store_rows —— 若它也收敛了，本判据需改为纯引擎断言"
+    # 防空转：对照面上移到 provider **公开门面**（收敛后私有 helper 已不存在）。
+    # 门面必须 (a) 仍存在 (b) 对同样三种畸形载荷 fail-closed (c) 抛 domain 错误（4xx，
+    # 不是裸 Exception 冒泡成 500 —— 那是 Task 16/17 曾踩过并已修的回归）。
+    facade = getattr(provider, "build_store_projection", None)
+    assert callable(facade), (
+        f"{provider.__name__} 必须保留公开门面 build_store_projection —— "
+        "它是 store_projection_response / oo_to_html 按名调用的那一层"
     )
+    provider_domain_err = getattr(provider, "StorePayloadError", None)
+    assert provider_domain_err is not None, (
+        f"{provider.__name__} 应保留自己的 StorePayloadError（domain 错误，带 error_code）"
+    )
+    contract = provider.assert_contract_file_matches_source()
+    for payload in cases:
+        with pytest.raises(provider_domain_err):
+            facade(payload, contract=contract)
 
 
 def test_static_region_spec_rejects_row_projection() -> None:
