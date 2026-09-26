@@ -79,6 +79,11 @@ function emptyNotes(): DevCostNotePack {
   }
 }
 
+/** BP-7 修复：稳定行身份生成器。 */
+function generateF2RowId(): string {
+  return `f2-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+}
+
 function emptyRow(id: string): DevCostRow {
   return {
     id,
@@ -111,7 +116,8 @@ function emptyRow(id: string): DevCostRow {
 export function normalizeDevCostRow(
   partial: Partial<DevCostRow> & { id?: string },
 ): DevCostRow {
-  return { ...emptyRow(partial.id || '1'), ...partial, id: partial.id || '1' }
+  const resolvedId = partial.id || generateF2RowId()
+  return { ...emptyRow(resolvedId), ...partial, id: resolvedId }
 }
 
 export function enrichRow(r: DevCostRow): DevCostEnriched {
@@ -158,13 +164,13 @@ export function sumDevCostMovement(rows: Array<Partial<DevCostRow>>) {
 
 function loadRows(map: Map<string, ChecklistResponse>): DevCostRow[] {
   const raw = readRowJson(map.get(ROWS_KEY))
-  if (!raw) return [emptyRow('1')]
+  if (!raw) return [emptyRow(generateF2RowId())]
   try {
     const parsed = JSON.parse(raw) as Partial<DevCostRow>[]
-    if (!Array.isArray(parsed) || !parsed.length) return [emptyRow('1')]
-    return parsed.map((r, i) => normalizeDevCostRow({ ...r, id: r.id || String(i + 1) }))
+    if (!Array.isArray(parsed) || !parsed.length) return [emptyRow(generateF2RowId())]
+    return parsed.map((r) => normalizeDevCostRow({ ...r, id: r.id || generateF2RowId() }))
   } catch {
-    return [emptyRow('1')]
+    return [emptyRow(generateF2RowId())]
   }
 }
 
