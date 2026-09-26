@@ -80,6 +80,9 @@ _INCLUDE_D115_ECL: Final[bool] = False
 #: 批次 4 第一张：D1-13 抽凭检查（双区 增减R16-31 / 期后R37-44，17 列宽表）。
 _INCLUDE_D113_SAMPLING: Final[bool] = False
 
+#: 批次 4 第二张：D1-7 备查簿核对（双区 银行R13-17 / 商业R19-23，31 列宽表，dict store）。
+_INCLUDE_D107_MEMO: Final[bool] = False
+
 
 def _managed_last_col_of(spec: Any) -> str:
     """从 RowTableSheetSpec 的 field_specs 取最后一个受管业务列（按列序）。"""
@@ -182,6 +185,10 @@ def managed_row_table_specs() -> tuple[Any, ...]:
         from app.services.workpaper_sync import phase5_d1_13_sampling as _d113
 
         specs.extend((_d113.SPEC_D113_VOUCHING, _d113.SPEC_D113_SPECIFIC))
+    if _INCLUDE_D107_MEMO:
+        from app.services.workpaper_sync import phase5_d1_07_memo as _d107
+
+        specs.extend((_d107.SPEC_D107_BANK, _d107.SPEC_D107_COMMERCIAL))
     return tuple(specs)
 
 

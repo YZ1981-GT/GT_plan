@@ -195,6 +195,14 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         adapter_id="d1.notes_receivable_detail",
         provider_module="phase5_d1_notes_receivable",
         items=(StoreItemSpec(item_id="D1-cust-rows", kind=StoreKind.rows),),
+        dedicated_items=(
+            DedicatedStoreItem(
+                item_id_const="STORE_ITEM_ID_D107",
+                merge_fn="merge_d17_from_projection",
+                base_kind="dict",
+                provider_module="phase5_d1_07_memo",
+            ),
+        ),
     ),
     "d2.receivable_detail": StoreMergePlan(
         adapter_id="d2.receivable_detail",
