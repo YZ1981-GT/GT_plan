@@ -2015,8 +2015,8 @@
             "carries_total_formula": true
           },
           "formula_mask": [
-            "F11:F13",
-            "H11:H13"
+            "F11:F12",
+            "H11:H12"
           ],
           "fields": [
             {
