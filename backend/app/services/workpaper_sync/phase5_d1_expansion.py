@@ -71,6 +71,12 @@ _INCLUDE_D111_RELATED_PARTY: Final[bool] = False
 #: 批次 3 第三张：D1-12 质押检查（单区 R12-17，无数据区公式）。
 _INCLUDE_D112_PLEDGE: Final[bool] = False
 
+#: 批次 3 第四张：D1-10 监盘表（单区 R14-20，核对区纯公式不受管）。
+_INCLUDE_D110_INVENTORY: Final[bool] = False
+
+#: 批次 3 第五张：D1-15 ECL 测算表（双区 单项R14-17 / 组合R22-24，行级乘法公式 D=B*C）。
+_INCLUDE_D115_ECL: Final[bool] = False
+
 
 def _managed_last_col_of(spec: Any) -> str:
     """从 RowTableSheetSpec 的 field_specs 取最后一个受管业务列（按列序）。"""
@@ -161,6 +167,14 @@ def managed_row_table_specs() -> tuple[Any, ...]:
         from app.services.workpaper_sync import phase5_d1_12_pledge as _d112
 
         specs.append(_d112.SPEC_D112)
+    if _INCLUDE_D110_INVENTORY:
+        from app.services.workpaper_sync import phase5_d1_10_inventory as _d110
+
+        specs.append(_d110.SPEC_D110)
+    if _INCLUDE_D115_ECL:
+        from app.services.workpaper_sync import phase5_d1_15_ecl as _d115
+
+        specs.extend((_d115.SPEC_D115_INDIVIDUAL, _d115.SPEC_D115_PORTFOLIO))
     return tuple(specs)
 
 
