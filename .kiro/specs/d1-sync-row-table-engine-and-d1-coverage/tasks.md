@@ -2,7 +2,7 @@
 
 ## Overview
 
-**spec**：`workpaper-sync-row-table-engine-and-d1-coverage`　**创建**：2026-09-25　**状态**：约 14/35（阶段 0~2 完整交付 + Task 15/23/25/26/31 部分交付，详见下方逐任务标记）
+**spec**：`workpaper-sync-row-table-engine-and-d1-coverage`　**创建**：2026-09-25　**状态**：声明层封顶 + adapter 注册 + 灰度全开；整册门/存量迁移/四态/Playwright 卡外部依赖，如实标 `[ ]*`
 
 > ✅ **2026-09-26 阶段 0~2（Task 0~14）完整交付并验证**：24→23 个 golden digest 基线（B60 无
 > `build_store_projection` 故实为 23，脚本已修正注释）/ P9 红判据先行后**完全转绿**（17→0 处
