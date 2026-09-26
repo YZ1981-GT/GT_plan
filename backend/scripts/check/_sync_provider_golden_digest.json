@@ -1,5 +1,5 @@
 {
-  "digest_count": 72,
+  "digest_count": 76,
   "providers": [
     {
       "label": "b60",
@@ -24,21 +24,25 @@
     {
       "label": "d2",
       "adapter_id": "d2.receivable_detail",
-      "contract_payload_sha256": "e0f17538b585dbe8cc5aebc420ce9d19a2b403dc9d994b7412f78246ebecb287",
+      "contract_payload_sha256": "cb9656db1ff912d1fe1f47abea5a5a3fa555d86ebe7f27498ad7f4f62c13b09a",
       "sheet_digests": {
         "d22-managed": "31f1458f39fb568773512a06177e9a40b375a9baee2277b6058176dc05eb5957",
         "d23-managed": "b5b8f846bfb6d3edb41f30f0160090fa071a1fe69e9ccebfa3ffb2e63451c677",
         "d21-managed": "73863915b2db1cfa1892d7ada95a071d06eadc82ded83bcfd1dadccbf6713177"
       },
       "store_projection_sha256": "0108dd8681a27d9c45b0f2093ad2c5f24d678d0d6cfd050d7170608373b0cd63",
-      "instrumentation_sha256": "fc03d1d438132cc179ae39f008ba1f99059454dc995f68900e916987f76801cb"
+      "instrumentation_sha256": "d5b81add1c26c384639c02b1ea477924d352fbf5646113dce401a78b730ef974"
     },
     {
       "label": "d3",
       "adapter_id": "d3.prepaid_receipts_detail",
-      "contract_payload_sha256": "2cfdb8594e0e8a49a8a51cffc0cd74ac6acca46c5c327ac581e66751a06f430f",
+      "contract_payload_sha256": "fb48ff50bc5d99e05b17c1dd26b42ae45cb7b481b70c58de3ee471adf5c6fffa",
       "sheet_digests": {
-        "d32-managed": "621527ec5b826f0b827a6a4b423897628003a26b472031822522db2657347445"
+        "d32-managed": "621527ec5b826f0b827a6a4b423897628003a26b472031822522db2657347445",
+        "d36-managed": "fdb1310af1acdd6b507f90061006d2acd90c5a655bdff1f152c6c617036a6801",
+        "d34-managed": "765ea7868034493ba5a44ef5a3186e362f6f0fbb50788eac8eb7bf2b33e433f5",
+        "d35-managed": "a97ad10bdb73476148ca31dcf4d1ef53551bd111191bf3bfdad475960b5149cd",
+        "d37-managed": "265f4599dcbc618c56a089972077f704602bd72f2376277b115c1bbb3cd9aa12"
       },
       "store_projection_sha256": "0b6bbd9db876f550a341afb56bf3b91dd2825f443ec2e020924698faef81f2c5",
       "instrumentation_sha256": "8b89c700797da577bce999965a7e5f0923c541d0dc8bbfff79437a8e081dabf5"
@@ -85,7 +89,7 @@
         "d414-managed": "30df2cd0c3af022f7e04057fffe2d17c949da4c8ecc91f3ddf69b64d4b1e2f0d"
       },
       "store_projection_sha256": "417877adea186980c0a41763b2737cbb019c7a22a343fcf1d97566fe6cfad7f7",
-      "instrumentation_sha256": "63bc66288b777ef138445fd32719494eded7ed104c763ea3852e31e26599a7be"
+      "instrumentation_sha256": "2a162e6d44aa0839a6e16b1c76f4c4ae3c4e3e3d05c8d3ccce0f0a49fca4fbaf"
     },
     {
       "label": "d5",

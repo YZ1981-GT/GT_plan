@@ -40,18 +40,13 @@
       "document_type": "xlsx",
       "host": "GtD1NotesReceivable.vue",
       "host_path": "audit-platform/frontend/src/components/workpaper/GtD1NotesReceivable.vue",
-      "capability": null,
-      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability": "bidirectional",
+      "capability_verdict_stage": "adapter_registered_d1_coverage_spec_2026_09_26",
       "capability_target": "bidirectional",
-      "capability_target_blocked_by": [
-        "BP-1",
-        "BP-3",
-        "BP-4",
-        "BP-5"
-      ],
-      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + `capability_verdict_stage`，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
-      "migration_state": "legacy_fake_bidirectional",
-      "adapter_id": null,
+      "capability_target_blocked_by": [],
+      "capability_enum_note": "D1 声明层全 21 张 sheet 封顶（d1-sync-row-table-engine-and-d1-coverage spec），per-entry override 启用 bidirectional。",
+      "migration_state": "adapter_registered",
+      "adapter_id": "d1.notes_receivable_detail",
       "authority_model": null,
       "definition_bundle": null,
       "instrumentation_candidate": null,
@@ -143,7 +138,7 @@
         "delivered_by_task": "G5-1",
         "pilot_class": "phase5_notes_receivable",
         "provider_module": "app.services.workpaper_sync.phase5_d1_notes_receivable",
-        "adapter_registered": false,
+        "adapter_registered": true,
         "adapter_registered_source": "backend/app/services/workpaper_sync/adapters/registry.py#DELIVERED_PER_ENTRY_CONTRACTS[d1.notes_receivable_detail].adapter_registered"
       }
     },

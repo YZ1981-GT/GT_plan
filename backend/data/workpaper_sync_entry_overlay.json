@@ -219,6 +219,19 @@
         "review_status": "published_representation_verified",
         "legacy_reasons": []
       }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtD1NotesReceivable.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_d1_notes_receivable_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "d1.notes_receivable_detail",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
     }
   ]
 }
