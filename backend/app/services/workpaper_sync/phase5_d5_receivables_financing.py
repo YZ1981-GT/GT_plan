@@ -505,12 +505,28 @@ def build_store_projection(
     contract: SyncContract,
     limits: Any | None = None,
 ) -> Any:
-    """薄转发框架层 `build_store_projection(SPEC_D52, ...)`（逐字节等价）。"""
+    """薄转发框架层 `build_store_projection(SPEC_D52, ...)`（逐字节等价）。
+
+    🔴 **必须转译引擎异常**（2026-09-26 修 Task 17 遗留回归）：引擎抛
+    `RowTableStorePayloadError(Exception)`（非 domain 错误），若直接冒泡会被
+    `wp_sync_router` 当未知异常 ⇒ **opaque 500**；而收敛前本函数抛
+    `StorePayloadError(SyncDomainError)` 带 `error_code` ⇒ 映射 **4xx**。
+    畸形 store 载荷是**用户侧数据问题**（OCR/导入/手改可写出非数组），必须是 4xx。
+    框架层 docstring 原文已要求「provider 侧薄转发时按需转译」，Task 17 漏做了这一步。
+    golden digest 门禁只覆盖成功路径的三段产物，抓不到失败路径的错误分类漂移 ⇒
+    另立判据 `test_store_payload_error_stays_domain_error.py`。
+    """
     from app.services.workpaper_sync.phase5_row_table_sheet import (
+        RowTableStorePayloadError,
         build_store_projection as _engine_build_store_projection,
     )
 
-    return _engine_build_store_projection(SPEC_D52, payload, contract=contract, limits=limits)
+    try:
+        return _engine_build_store_projection(
+            SPEC_D52, payload, contract=contract, limits=limits
+        )
+    except RowTableStorePayloadError as exc:
+        raise StorePayloadError(str(exc)) from exc
 
 
 def merge_projection_into_store_rows(

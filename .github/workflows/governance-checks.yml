@@ -6104,6 +6104,14 @@ jobs:
           backend/tests/workpaper_sync/test_d1_sheet_specs.py
           backend/tests/workpaper_sync/test_d1_instrumentation_specs_expansion.py
           -q
+      # 🔴 收敛后的薄转发必须保住「畸形 store 载荷 = domain 错误(4xx)」这条分类
+      #    （Task 16/17 曾漏做错误转译，四家从 4xx 退化成 opaque 500；golden digest
+      #    只覆盖成功路径故抓不到 —— 这条判据是那个洞的专门补丁）。
+      - name: Store payload errors stay domain errors (4xx, not opaque 500)
+        run: >-
+          python -m pytest
+          backend/tests/workpaper_sync/test_store_payload_error_stays_domain_error.py
+          -q
 
   e1-sync-coverage-guards:
     # E1 货币资金 canary 声明层守卫

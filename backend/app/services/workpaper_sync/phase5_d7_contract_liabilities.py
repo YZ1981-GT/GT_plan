@@ -572,12 +572,25 @@ def build_store_projection(
     contract: SyncContract,
     limits: Any | None = None,
 ) -> Any:
-    """薄转发框架层 `build_store_projection(SPEC_D72, ...)`（逐字节等价）。"""
+    """薄转发框架层 `build_store_projection(SPEC_D72, ...)`（逐字节等价）。
+
+    🔴 **必须转译引擎异常**（2026-09-26 修 Task 16 遗留回归）：引擎抛
+    `RowTableStorePayloadError(Exception)` 非 domain 错误 ⇒ 直接冒泡是 **opaque 500**；
+    收敛前本函数抛带 `error_code` 的 `StorePayloadError(SyncDomainError)` ⇒ **4xx**。
+    畸形 store 载荷属用户侧数据问题，必须 4xx。判据见
+    `test_store_payload_error_stays_domain_error.py`。
+    """
     from app.services.workpaper_sync.phase5_row_table_sheet import (
+        RowTableStorePayloadError,
         build_store_projection as _engine_build_store_projection,
     )
 
-    return _engine_build_store_projection(SPEC_D72, payload, contract=contract, limits=limits)
+    try:
+        return _engine_build_store_projection(
+            SPEC_D72, payload, contract=contract, limits=limits
+        )
+    except RowTableStorePayloadError as exc:
+        raise StorePayloadError(str(exc)) from exc
 
 
 def merge_projection_into_store_rows(

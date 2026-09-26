@@ -269,6 +269,31 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
   - 只断言：它们的 24 digest 子集零变化 + D4 整册真 materialize 200 + verify 全绿（30 受管 sheet）
   - _Requirements: 2.5, 4.2, 4.3_
 
+- [x] 16b/17b. 🔴 **Task 16/17 收敛遗留回归修复：畸形 store 载荷从 4xx 退化成 opaque 500**
+  ✅ 2026-09-26（复盘自查发现，非外部报告）
+  - **根因**：Task 16/17 把 D3/D5/D6/D7 的 `build_store_projection` 收敛成薄转发框架层，
+    但**漏做错误转译**。框架层 `RowTableStorePayloadError(Exception)` 是**有意**设计成非
+    domain 错误的（其 docstring 原文：「各循环 provider 有自己的 `StorePayloadError
+    (SyncDomainError)` 子类…引擎抛本类，provider 侧薄转发时按需转译」），而收敛前各 provider
+    抛带 `error_code` 的 domain 错误 ⇒ `wp_sync_router` 映射 **4xx**。收敛后直接冒泡 ⇒ **500**。
+  - **实测确认四家全中**（四种用户侧真能写出的畸形载荷：非数组 / 非法 JSON / 元素非对象 /
+    缺行身份）：D1（未收敛）稳定 4xx 带 `sync_phase5_store_payload_invalid`；
+    D3/D5/D6/D7（已收敛）全部 `RowTableStorePayloadError` + `error_code=None` ⇒ 500。
+  - 🔴 **golden digest 门禁抓不到这类回归**：它只对三段**成功路径**产物取 sha256，
+    失败路径的错误分类不在其中 —— 这是「零回归门绿 ≠ 无回归」的一个实证样本，
+    已写进判据 docstring 作为长期提醒。
+  - **已修 D5/D6/D7**（各自 try/except 转译回本家 `StorePayloadError`，**保住各家不同的
+    `error_code`**：`sync_phase5_d5/d6/d7_store_payload_invalid`）。
+  - 🟡 **D3 未修**：`phase5_d3_prepaid_receipts.py` 正被 `d3-sync-coverage-via-row-table-engine`
+    并发会话改动中，本轮不介入以免冲突；修法与 D5/D6/D7 逐字相同。已用
+    **`xfail(strict=True)`** 钉住：D3 lane 修好后该条会 XPASS 而**红**，强制删标记 + 并入
+    正式参数化清单，不留永久假绿。
+  - 判据：`backend/tests/workpaper_sync/test_store_payload_error_stays_domain_error.py`
+    （18 passed + 1 xfailed；含「各家 error_code 互不相同」与**反面钉子**「框架层错误类
+    应当保持非 domain」——防止将来有人图省事把它改成 domain 子类而废掉转译约定）。
+  - 零回归：golden digest 75 个逐个不变 + `test_ghost_row_defense` / 引擎等价判据 62 用例全绿。
+  - _Requirements: 4.2_
+
 ### 阶段 4：CI 门禁
 
 - [x] 20. `check_framework_layer_has_no_wp_code_branch.py` ✅ 2026-09-26：**P9 完全转绿**
