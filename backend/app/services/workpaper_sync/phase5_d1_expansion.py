@@ -77,6 +77,9 @@ _INCLUDE_D110_INVENTORY: Final[bool] = False
 #: 批次 3 第五张：D1-15 ECL 测算表（双区 单项R14-17 / 组合R22-24，行级乘法公式 D=B*C）。
 _INCLUDE_D115_ECL: Final[bool] = False
 
+#: 批次 4 第一张：D1-13 抽凭检查（双区 增减R16-31 / 期后R37-44，17 列宽表）。
+_INCLUDE_D113_SAMPLING: Final[bool] = False
+
 
 def _managed_last_col_of(spec: Any) -> str:
     """从 RowTableSheetSpec 的 field_specs 取最后一个受管业务列（按列序）。"""
@@ -175,6 +178,10 @@ def managed_row_table_specs() -> tuple[Any, ...]:
         from app.services.workpaper_sync import phase5_d1_15_ecl as _d115
 
         specs.extend((_d115.SPEC_D115_INDIVIDUAL, _d115.SPEC_D115_PORTFOLIO))
+    if _INCLUDE_D113_SAMPLING:
+        from app.services.workpaper_sync import phase5_d1_13_sampling as _d113
+
+        specs.extend((_d113.SPEC_D113_VOUCHING, _d113.SPEC_D113_SPECIFIC))
     return tuple(specs)
 
 
@@ -234,13 +241,15 @@ def assert_specs_align_with_contract_sheets(contract: SyncContract) -> None:
        attach **fail-closed 打挂整个 entry**，而不是只挂那一张。本守卫让这类不对齐在接入时
        就红并**精确报差集**，而不是上线后整册 500。
     """
-    spec_keys = {s.resolved_sheet_key for s in instrumentation_specs()}
-    contract_keys = {s.sheet_key for s in contract.sheets}
-    if spec_keys != contract_keys:
-        missing = sorted(contract_keys - spec_keys)
-        extra = sorted(spec_keys - contract_keys)
-        raise EntrySelectionError(
-            f"instrumentation specs 与契约 sheets 不对齐 —— "
-            f"契约有而 spec 缺: {missing}；spec 有而契约缺: {extra}。"
-            "任一侧漏一张会让 attach fail-closed 打挂整个 entry（D4-35 事故形态）"
-        )
+    # 🔴 收敛到框架层唯一实现（spec workpaper-sync-registration-isolation Req 2.3）：
+    #    本模块的复数 `instrumentation_specs()` 已含 D1-3 主 spec（首项）+ 扩容 sheet + 静态区
+    #    寄生，正是通用守卫读的形态，故直接把**本扩容模块**当 provider 传入。不再各写一份
+    #    集合比较（两份必然漂移）。异常类型改为通用守卫的 `ProviderCapabilityError`（`EntrySelectionError`
+    #    仍导入保留供本模块其它路径用）。
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        assert_provider_specs_align_with_contract,
+    )
+
+    import sys as _sys
+
+    assert_provider_specs_align_with_contract(_sys.modules[__name__], contract)

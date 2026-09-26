@@ -450,7 +450,23 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
   - 门：整册 materialize + verify + 耗时登记（**受管区 5→9**：D1-8 +2 / D1-16 +2；D1-5 不计）
   - _Requirements: 5.1, 5.4, 5.5, 5.9, 5.10_
 
-- [ ] 28. 接入 D1-9 / D1-10 / D1-11 / D1-12 / D1-15
+- [ ] 28. 接入 D1-9 / D1-10 / D1-11 / D1-12 / D1-15 ✅ **声明层全部交付**（2026-09-26）
+  - `phase5_d1_09_interest.py`：单区 R11-17，**D1 首例数据区行级公式**（H=E-G / J=I/365*H*B /
+    L=J-K）声明为 formula，13 列 A-M，UUID=N，store `D1-interest-rows`，`rowId`
+  - `phase5_d1_10_inventory.py`：单区 R14-20（监盘表），15 列 A-O，UUID=P，store
+    `D1-inventory-rows`，`id`。🔴 倒轧表 R24-R25 全为公式格（零可编辑格）不受管；核对区
+    3 个标量文本键由 HTML 侧处理。🔴 前端 InventoryCountRow 列注释是 UI 展示顺序非 Excel
+    列字母（"收到日期"前端 C 位但模板 I 位），field_specs 按 openpyxl R13 逐字匹配
+  - `phase5_d1_11_related_party.py`：单区 R11-13，行级公式 F=C+D-E / H=F-G，13 列，UUID=N，
+    store `D1-rp-rows`，`id`
+  - `phase5_d1_12_pledge.py`：单区 R12-17，无数据区公式，16 列 A-P，UUID=Q，store
+    `D1-pledge-rows`，`id`
+  - `phase5_d1_15_ecl.py`：**双区**（单项 R14-17 / 组合 R22-24），**乘法公式** D=B*C +
+    E=B-D + F=D-E（引擎首次非加减派生，`mode=formula` 路径确认不依赖算式形态），8 列 A-H，
+    UUID=I/J，store `D1-ecl-individual-rows`/`D1-ecl-portfolio-rows`，`id`。footer marker
+    是「小计」（非「合计」）。`autoPulled` 不进 field_specs（UI 提示字段不映射 Excel 列）
+  - 全部 7 个新开关灰度关（`_INCLUDE_D109/D110/D111/D112/D115`=False），开关 off 输出不变，
+    开关 all-on 正确产出 11 specs / 11 items。golden digest 73 零回归 + P9/P10 绿
   - D1-10 带 3 个 recon 标量伴生（`StoreKind.fixed_text`）
   - 🔴 **D1-15 是双区**（复盘修正）：`D1-ecl-individual-rows` / `D1-ecl-portfolio-rows`
     （实测 `useD1EclCalc.ts:208-209` 的 dict 形式），首版按单区写 ⇒ 另一键的数据在 OO 里会
