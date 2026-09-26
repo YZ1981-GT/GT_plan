@@ -56,7 +56,7 @@ SPEC_D111: Final[RowTableSheetSpec] = RowTableSheetSpec(
     table_name=f"GT_{TEMPLATE_ID_D111}_ROWS",
     uuid_col="N",  # max_col=M=13, 注入列 N
     first_data_row=11,
-    last_data_row=13,
+    last_data_row=12,  # 🔴 R13 是「……」排版占位行，不是业务数据行（instrumentation gate 实测）
     footer_row=14,
     header_row=10,
     store_item_id="D1-rp-rows",

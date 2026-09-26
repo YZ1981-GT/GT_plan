@@ -125,14 +125,20 @@ def _static_sheet_declarations() -> tuple[dict[str, Any], ...]:
     from app.services.workpaper_sync import phase5_d1_04_bad_debt as _d104
 
     spec = _d104.SPEC_D104_NOTETYPE
+    managed_last = _managed_last_col_of(spec)
     return (
         {
             "sheet_key": spec.sheet_key,
             "managed_sheet": spec.managed_sheet,
+            "excel_name": spec.managed_sheet,
             "defined_name": spec.defined_name,
             "first_data_row": spec.first_data_row,
             "last_data_row": spec.last_data_row,
             "region_kind": "static",
+            "region_boundary_locator": {
+                "defined_name": spec.defined_name,
+                "range": f"$A${spec.first_data_row}:${managed_last}${spec.last_data_row}",
+            },
         },
     )
 
