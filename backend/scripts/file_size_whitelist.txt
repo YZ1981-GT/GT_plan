@@ -288,7 +288,11 @@ backend/app/services/workpaper_sync/oo_to_html.py  3860
 #     四个工具，约 166 行，对父模块零依赖）抽成 `opaque_lane_ast_scan.py` —— 单向无环，
 #     但会动到多处按源码断言函数位置的判据，属独立任务。
 backend/app/services/workpaper_sync/opaque_entry_gate.py  1538
-backend/app/services/workpaper_sync/pilot_d2_large_json.py  1613
+# pilot_d2_large_json 基线 1613→1777：D2 灰度开关重新打开（D2-3 坏账 + D2-1 审定表 sibling
+#   sheet 接入），新增 all_store_item_ids / build_combined_store_projection / instrumentation_specs
+#   复数 / attach sibling_bindings —— 即 whitelist 顶部注释预告的「1→3 张受管 sheet」预期增长。
+#   spec: workpaper-sync-registration-isolation-and-d2-republish（Wave B/C 重发布）
+backend/app/services/workpaper_sync/pilot_d2_large_json.py  1777
 backend/app/services/workpaper_sync/pilot_g7_two_level_dynamic.py  2450
 backend/app/services/workpaper_sync/pilot_h1_grouped_dynamic.py  1965
 backend/app/services/workpaper_sync/pilot_harness.py  1887
@@ -524,7 +528,11 @@ audit-platform/frontend/src/views/TrialBalance.vue  4491
 #     baseline 即改动前真实行数，不留膨胀空间。该文件确需按「push / pull / 观测」三段
 #     拆分（材料化与提取两条链各自 300+ 行），属独立打磨任务，不在本次缺陷修复范围。
 #     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure Task 41（2026-09-06 修复条目）
-backend/app/services/workpaper_sync/d2_bidirectional_bridge.py  1115
+#   d2_bidirectional_bridge 基线 1115→1209：D2 重发布补齐回方向多 store 门面
+#     （merge_projection_into_all_d2_stores：D2-2 + 开关控 D2-3 分流）+ merge_projection_into_
+#     store_rows 的 table 前缀过滤（AC 4.2，防 D2-3/D2-1 键串进 D2-2 建幽灵行）。
+#     spec: workpaper-sync-registration-isolation-and-d2-republish（AC 4.2/4.3）
+backend/app/services/workpaper_sync/d2_bidirectional_bridge.py  1209
 #   excel_row_shift.py —— **改动前即 2041 行已超限**（HEAD 现状）。本次净增 20 行，
 #     全部是同一个缺陷修复的必要部分：`sqref` 进 ROW_BEARING_STRUCTURES 清单 +
 #     `_handled("sqref", "text-a1-ranges")` 登记 + `_shift_element_text` 正则改为

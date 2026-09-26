@@ -1,7 +1,19 @@
 # Implementation Plan
 
 **spec**：`workpaper-sync-registration-isolation-and-d2-republish`　**创建**：2026-09-26
-**状态**：14/14（Wave A~D 全部完成；真栈 rematerialize / OO 实测 待 PG+OO 环境 `[~]`）
+**状态**：14/14 代码全完成 + 离线证据齐（195 D2/隔离/registry 测试全绿）；D2 开关已打开（Wave C
+重发布态），契约磁盘 = 现算 `cb9656db`（3 张受管 sheet），golden 基线 d2 条目已按增量更新
+（70→72，instr `d5b81add`，只动 d2 不吸 d3/d4 并发改动）。**真栈 rematerialize/OO 往返实测 待
+PG+OO 环境**（下方 Task 13 `[~]`）。
+> 🔴 已知 live-PG 真栈失败（非本 spec 回归，均待重发布后重验或属并发会话）：
+> - `test_task41_pg::test_no_other_store_item_is_touched`：止血期「D2 单 store item」不变式，
+>   开关打开后 D2-3 三键**合法**进契约，需随真栈重发布更新该 committed 测试的期望值。
+> - `test_projection_lane_regression_gate::test_every_unregistered_entry_has_a_reason`：已按
+>   AC 5.12 修为「reason ∪ failure 取并集」（三桶记账），待 live-PG 重跑复绿。
+> - `test_task5_d3_performance_baseline::test_real_registration_path_fails_before_reaching_d3`：
+>   **untracked 并发会话文件**，断言 register 必抛（记录的正是 Wave A 已修的 bug），不代改。
+> - `test_d2_sync_retirement`(9)/`test_task46 D1 alignment`(2)：并发会话（legacy d2_sync_router
+>   已在 HEAD / D1 bidirectional 中间态），非本 spec 触及。
 
 > 顺序有意义：**Wave A（注册隔离 + 通用对齐守卫）先行** —— 它消除「一个 entry 漂移拖垮全部
 > sync 端点」这一类，与 D2 是否重发布无关，交付即止损。Wave B/C 才真正打开 D2-3/D2-1。
@@ -82,9 +94,19 @@
 
 - [x] 13. D2 重物化宿主 `d2_rematerialize_sibling_sheets.py`（参数化 D4 版，`--check`/`--apply`）
   + 两开关打开（`_INCLUDE_D203_BAD_DEBT=True` / `_INCLUDE_D201_ADJUDICATION=True`）
-  + 契约重生成 `d2.receivable_detail.json`（55946 bytes, digest `cb9656db`）
-  - ✅ golden digest 75 个零回归；111 D2 测试全绿；对齐守卫对 D2 三张受管 sheet 通过
-  - `[~]` 真栈 `--check`/`--apply` + store-projection 三 sheet 200 待 PG+OO 环境
+  + 契约重生成 `d2.receivable_detail.json`（digest `cb9656db`，3 张受管 sheet d22/d23/d21）
+  - ✅ 发布链离线证据齐：`instrumentation_specs()` 复数 3 spec（d22 + d23 双区 + d21 static
+    寄生）；`instrument_workbook_bytes_multi` OK（sha `7568c55b`）；4 anchors 齐（含 d21 static）；
+    `compute_structure_hash_from_artifact` 无漂移（`4e124429`）——即：**新工件的 observed 结构
+    与新契约 declared 逐项相等**，重发布后不会再报 `d21-managed/adjudication_cells` 漂移。
+  - ✅ golden 基线 d2 条目按增量更新（`check_sync_provider_golden_digest.py` D2 改 `plural_instr=
+    True` + `_instr_to_dict` 纳入 `static_sheets`；`_KNOWN` d2 只更 d2 不吸 d3/d4）；195 离线测试全绿
+  - ✅ 行数门禁：`pilot_d2_large_json` 基线 1613→1777、`d2_bidirectional_bridge` 1115→1209
+    （whitelist 带 spec 注释；D2 1→3 张受管 sheet 是白名单顶部预告的预期增长）
+  - `[~]` **真栈 `--apply` 重物化宿主 + 首请求惰性重注册 + store-projection 三 sheet=200 待
+    PG+OO 环境**：live PG 现存 frozen bundle 仍是止血单 sheet 态，重启后按 `publish_pilot_
+    definitions`（DAG：template→instrumentation→contract→bundle）自动重发布即消除漂移（不需 OO，
+    只需 PG）；OO 往返（materialize→回读）实测需 OO 环境。
   - _Requirements: 5.1, 5.2, 5.3_
 
 ## Wave D：前端 + 收尾

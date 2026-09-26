@@ -334,16 +334,32 @@ class TestRegistrationAccountingIdentity:
         assert len(registered) + unregistered == len(planned)
 
     def test_every_unregistered_entry_has_a_reason(self) -> None:
-        """未注册的 entry 必须逐个有原因 —— 「注册不上」不带原因等于没有结论。"""
+        """未注册的 entry 必须逐个「有结论」——「注册不上」不带结论等于没有结论。
+
+        🔴 spec workpaper-sync-registration-isolation-and-d2-republish（AC 5.12）：
+        「注册失败（真故障）」与「供给不足」是**两个并列、不相交**的桶——前者进
+        `outcome.failures`（带 error_code/message），后者进 `outcome.reasons`。
+        账目恒等式因此是 `registered + reasons + failures == planned`（见
+        `ManifestRegistrationOutcome.as_dict` 的 `unregistered_entry_count =
+        len(reasons) + len(failures)`）。一个 entry 只要落进任一桶就算「有结论」；
+        本判据据此对两桶取并集，而不是只看 `reasons`（否则隔离路径下漂移失败的 entry
+        会被误判成「无结论」——那恰恰把 fail-visible 的失败当成了没结论）。
+        """
         outcome = _SNAPSHOT["production_outcome"]
         planned = set(outcome.planned_entry_ids)
         registered = set(outcome.registered_entry_ids)
         unregistered = sorted(planned - registered)
         assert unregistered, "全部注册成功 —— 本判据在空集上，需要重新裁决分母"
         reasons = dict(outcome.reasons)
-        missing = [e for e in unregistered if not str(reasons.get(e) or "").strip()]
+        failures = dict(getattr(outcome, "failures", {}) or {})
+        missing = [
+            e
+            for e in unregistered
+            if not str(reasons.get(e) or "").strip()
+            and not str(getattr(failures.get(e), "message", "") or "").strip()
+        ]
         assert not missing, (
-            f"{len(missing)} 个未注册 entry 没有原因（示例 {missing[:3]}）"
+            f"{len(missing)} 个未注册 entry 既无 reason 也无 failure（示例 {missing[:3]}）"
         )
 
     def test_planned_count_equals_manifest_plan_length(self) -> None:

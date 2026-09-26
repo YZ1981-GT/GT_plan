@@ -64,7 +64,11 @@ _DIGEST_PATH = Path(__file__).resolve().parent / "_sync_provider_golden_digest.j
 PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     ("b60", "pilot_simple_checklist", "PILOT_ADAPTER_ID", False, False),
     ("d1", "phase5_d1_notes_receivable", "ADAPTER_ID", True, False),
-    ("d2", "pilot_d2_large_json", "PILOT_ADAPTER_ID", True, False),
+    # 🔴 D2 已切多 sheet 复数 instrumentation（d22 + 灰度控 d23 双区 + d21 静态区，spec
+    #    workpaper-sync-registration-isolation-and-d2-republish）——`plural_instr=True` 才能
+    #    让本判据核到真实注册路径用的 `instrumentation_specs()`（含 d21 static_sheets），
+    #    否则只核 d22 单 spec，republish 后的扩容面对判据不可见（假绿）。
+    ("d2", "pilot_d2_large_json", "PILOT_ADAPTER_ID", True, True),
     ("d3", "phase5_d3_prepaid_receipts", "ADAPTER_ID", True, False),
     ("d4", "phase5_d4_revenue_detail", "ADAPTER_ID", True, True),
     ("d5", "phase5_d5_receivables_financing", "ADAPTER_ID", True, False),
@@ -236,11 +240,19 @@ def _instr_to_dict(spec: Any) -> dict[str, Any]:
         "entry_id", "template_id", "template_relative_path", "managed_sheet",
         "sheet_key", "table_key", "first_data_row", "last_data_row", "footer_row",
         "header_row", "managed_last_col", "uuid_col", "table_name",
+        # 🔴 静态区寄生声明（D2-1 的 `static_sheets`）也必须进 digest —— 否则 D2-1 扩容面
+        #    对判据不可见（假绿）。值本身是 list[dict]，canonical_sha256 会稳定序列化。
+        "static_sheets",
     )
     out: dict[str, Any] = {}
     for f in fields:
         if hasattr(spec, f):
             v = getattr(spec, f)
+            # static_sheets 是 tuple → 转 list 保证 JSON 稳定；None/() 一律省略保持向后兼容。
+            if f == "static_sheets":
+                if not v:
+                    continue
+                v = [dict(s) for s in v]
             out[f] = v
     return out
 
