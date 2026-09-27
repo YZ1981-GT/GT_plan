@@ -40,6 +40,7 @@ OWNED = (
     "sync/onlyOfficeHealth.ts",
     "composables/hSeedRowIdentity.ts",
     "composables/useH2Detail.ts",
+    "composables/useH3FormData.ts",
     "d4/composables/useD4SyncMode.ts",
 )
 
@@ -58,6 +59,7 @@ HOST_FILES: tuple[str, ...] = (
     "GtH8RightOfUseAssets.vue",
     "GtH4EngineeringMaterials.vue",
     "GtH2ConstructionInProgress.vue",
+    "GtH3InvestmentProperty.vue",
 )
 #: 🔴 逐宿主基线按**现算**填，不照抄别的宿主。
 #:
@@ -91,6 +93,8 @@ HOST_ERROR_BASELINE: dict[str, int] = {
     #: `GtH2ConstructionInProgress.vue(350,7) TS2322` 并打红 ⇒ 0 是「真检查过且干净」，
     #: 不是「文件没被编译的假绿」。
     "GtH2ConstructionInProgress.vue": 0,
+    #: H3 待现算回填。
+    "GtH3InvestmentProperty.vue": 0,
 }
 
 _ERR_RE = re.compile(r"^(?P<file>[^(]+)\((?P<line>\d+),\d+\): error (?P<code>TS\d+)")

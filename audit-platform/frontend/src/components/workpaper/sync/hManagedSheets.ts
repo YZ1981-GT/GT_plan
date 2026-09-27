@@ -15,7 +15,8 @@
  * ═══ 🔴 诚实边界：受管面 ≠ 已接桥面 ═══════════════════════════════════════════
  *
  * D3 实证过「契约受管 ≠ 已接 OO 直写宿主」（D3-4/5/6/7 受管但未接桥）。H 当前的真实状态：
- *   · 后端 provider 已落地 **H9 / H6 / H8 / H4 / H2** 五条 —— H3/H5/H7/H10 四条尚未；
+ *   · 后端 provider 已落地 **H9 / H6 / H8 / H4 / H2 / H3** 六条 —— H5/H7/H10 三条尚未
+ *     （H10 是结构性不匹配待裁决，H5/H7 的前端载体覆盖度远低于模板，见各自 spec）；
  *   · H1 是**同循环既有 pilot**（`pilot_h1_grouped_dynamic`），走 `pilot_*` 范式、
  *     adapter 已注册，**不属本轮受管面**，故不进本清单（避免把两套范式并进同一个布尔，
  *     D4-35/D4-13 踩过「切错桥 + 工具条叠加」）。
@@ -114,6 +115,32 @@ export const H_MANAGED_SHEETS: readonly HManagedSheet[] = Object.freeze([
     excelName: '明细表H2-2',
     storeItemId: 'H2-2-rows',
   },
+  {
+    // 🔴 **变体轴**（H 循环首条）：一个 entry 两张受管明细表 —— 成本模式与公允价值模式
+    //    各有独立持久化键。两张必须同批登记：只放一半，用户在
+    //    `useH3MeasurementModel` 里切模式就会切到一个没有桥的 sheet。
+    //    这与 E1-3 的 currency_variant 不同源（那是两张同尾码 sheet 共用一个键）。
+    //
+    // 🔴 短码带 `-cost` / `-fair` 后缀而不是都叫 `H3-2`：`BY_CODE` 以短码为主键且撞码即抛，
+    //    两张同尾码 sheet 必须在短码上就分开。宿主的 `currentSheet` 也按计量模式归一到
+    //    这两个短码（见 `GtH3InvestmentProperty.vue` 的 `h3SyncCode`）。
+    entryId: 'xlsx/gt-h3-investment-property',
+    code: 'H3-2-cost',
+    sheetKey: 'h302cost-managed',
+    kind: 'rows',
+    excelName: '明细表（成本模式）H3-2',
+    storeItemId: 'H3-2-cost-rows',
+  },
+  {
+    // 🔴 `H3-2-fair-rows` 在 **HC-8 冻结键**清册上：被 **G 循环**消费
+    //    （`g13SourceDetailPull.ts` / `gCycleSourceFv.ts`）⇒ 只补契约不动键名。
+    entryId: 'xlsx/gt-h3-investment-property',
+    code: 'H3-2-fair',
+    sheetKey: 'h302fair-managed',
+    kind: 'rows',
+    excelName: '明细表（公允价值模式）H3-2',
+    storeItemId: 'H3-2-fair-rows',
+  },
 ] as const)
 
 /**
@@ -131,6 +158,9 @@ export const H_OO_WIRED_ROWS_CODES: readonly string[] = Object.freeze([
   'H8-2',
   'H4-2',
   'H2-2',
+  // 变体轴两半必须同时在列：只放一半，切计量模式会切到没桥的那张。
+  'H3-2-cost',
+  'H3-2-fair',
 ])
 
 const BY_CODE: ReadonlyMap<string, HManagedSheet> = (() => {

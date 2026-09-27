@@ -320,11 +320,15 @@ class TestHfP3ConsumerCounts:
             "components/workpaper/h4/impairment/H4TabImpairment.vue",
             "components/workpaper/h4/impairment/H4TabRecoverable.vue",
         ], real
-        # 🔴 只在注释里提到它的三个文件：两个 `Follow useH4DualMode pattern` 的同族
-        #    composable + 本轮接桥后 H4 宿主里留下的「替代 useH4DualMode」说明。
+        # 🔴 只在注释里提到它的文件：`Follow useH4DualMode pattern` 的同族 composable
+        #    + 接桥后各宿主/各 composable 里留下的「替代 useH4DualMode」说明。
         #    如实登记，且上面的分类已保证它们**不是** importer。
+        #    这份清单**随接桥进度增长**是预期的（每接一条 entry，被停用的那个
+        #    `useH*DualMode` 都会写一段说明并提到同族）；判据的真正约束在上面的
+        #    `real ==` 那条，这里只保证「注释提及被穷举且不被读成依赖」。
         assert comment_only == [
             "components/workpaper/GtH4EngineeringMaterials.vue",
+            "components/workpaper/composables/useH3DualMode.ts",
             "components/workpaper/composables/useH6DualMode.ts",
             "components/workpaper/composables/useH8DualMode.ts",
         ], comment_only

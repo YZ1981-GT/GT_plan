@@ -9,6 +9,26 @@
  * - 切换前 autoSave
  * - localStorage 持久化 (per wpId)
  * - Follow useH1DualMode / useH2DualMode pattern
+ *
+ * ═══ 🔴 @deprecated 生产已停用（H3 接桥后）═══════════════════════════════════
+ *
+ * `GtH3InvestmentProperty.vue` 已改用 `composables/useHSyncMode.ts`（统一四分支保存
+ * 协议 + 真双向桥）。换掉本 composable 的两个理由与 H2/H4/H6/H8 同：
+ *   ① 它**不建桥** ⇒ OO 侧编辑回不到 HTML（假双向）；
+ *   ② 宿主原本用它的 `isOoAvailable` 做 `:disabled`，健康检查未就绪时整个切换器被锁死、
+ *      点击被彻底忽略（D4 已实证的 bug ③）。
+ *
+ * 🔴 H3 接桥还多做一件前几条没有的事：**变体轴归一**。`明细表（成本模式）H3-2` 与
+ * `明细表（公允价值模式）H3-2` 是两张各有独立持久化键的受管表，宿主用
+ * `h3SyncCode` 把 `currentSheet` 按计量模式归一到 `H3-2-cost` / `H3-2-fair`
+ * 两个短码 —— 本 composable 完全没有这个概念（它只认 wpId + sheetName）。
+ *
+ * 🔴 **本文件当前生产与测试消费均为 0，但先不删**（与 `useH2DualMode` / `useH6DualMode`
+ *    同一处置）：`test_h_foundation_hc_guards.py` 的 localStorage 判据把
+ *    `useH{2,3,4,6,8,9,10}DualMode.ts` 逐个列进「UI 偏好存储」清单，本文件的
+ *    `STORAGE_PREFIX` 在列 ⇒ 删了清单缺项；删除需要一次独立的收敛动作连同判据一起改。
+ *    「零消费」结论是按值 grep（`split_real_importers('useH3DualMode')`）现算的：
+ *    real=[]，命中只剩注释（宿主里那段说明 + `useH4DualMode.ts` 的 pattern 引用）。
  */
 import { ref, onMounted, type Ref } from 'vue'
 

@@ -7,13 +7,13 @@
     <template v-else>
       <!-- 顶部工具栏（双模式切换+计量模式切换）— 目录页隐藏 -->
       <div v-if="currentSheet !== 'H3'" class="h3-header-toolbar">
-        <el-segmented
-          :model-value="currentMode"
-          :options="modeOptions"
-          size="small"
-          :disabled="!isOoAvailable && currentMode === 'html'"
-          @change="onModeChange"
-        />
+        <!--
+          🔴 `v-model` 而非 `:model-value` + `@change`，且**不带 `:disabled`**：
+          原实现 `:disabled="!isOoAvailable && currentMode === 'html'"` 在健康检查
+          （mount 期异步）未就绪时把切换器锁死、点击被彻底吞掉 —— D4 已实证的 bug ③。
+          健康门禁移进 `useHSyncMode.switchMode`（await 兜底），切换器保持可点。
+        -->
+        <el-segmented v-model="currentMode" :options="modeOptions" size="small" />
         <!-- 计量模式切换 -->
         <el-segmented
           v-if="currentMode === 'html'"
@@ -23,17 +23,36 @@
           style="margin-left: 16px"
           @change="(val: string | number) => switchModel(val as 'cost' | 'fair_value')"
         />
+        <span
+          class="h3-oo-tag"
+          :class="`h3-oo-tag--${hSync.syncStateTag.value.type}`"
+        >
+          {{ hSync.syncStateTag.value.text }}
+        </span>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h3-investment-property" />
       </div>
 
-      <!-- OnlyOffice 模式 -->
+      <!--
+        受管 sheet（H3-2 两个计量模式各一张）的在线编辑 —— 统一双向宿主。
+        🔴 `.oo-container` 必须有**确定高度**（D4 踩过 height:100% 被压成一条）。
+      -->
+      <div v-if="currentMode === 'onlyoffice' && isH3SyncManagedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="hSync.descriptor.value"
+          :bridge="hSync.syncBridge"
+        />
+      </div>
+
+      <!-- 非受管 sheet 的 OnlyOffice 模式（legacy 只读视图，无双向回写） -->
       <GtOnlyOfficeSheet
-        v-if="currentMode === 'onlyoffice'"
+        v-else-if="currentMode === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
+        @fallback="onOoLoadFailed"
       />
 
       <!-- HTML 结构化视图 -->
@@ -307,7 +326,7 @@
  * measurementModel: 双计量模式(成本/公允价值)控制 H3-1/H3-2/H3-5/H3-7 的双版本显隐。
  * selfLoad: 当 htmlData prop 为 null 时自行调 render-config。
  * useVersionTrail: autoSnapshot on save。
- * useH3DualMode: HTML↔OnlyOffice切换+OO健康检查。
+ * useHSyncMode: HTML↔OnlyOffice 统一双向接桥（替代 useH3DualMode，见下方注释）。
  * useH3FormData: allResponses + save + TB取数。
  * useH3MeasurementModel: 计量模式持久化。
  *
@@ -318,7 +337,6 @@ import { ref, computed, onMounted, onUnmounted, provide, toRef, inject, defineAs
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
-import { useH3DualMode } from './composables/useH3DualMode'
 import { useH3FormData } from './composables/useH3FormData'
 import { useH3MeasurementModel } from './composables/useH3MeasurementModel'
 import { createH3RowNavigation, H3RowNavigationKey } from './composables/useH3RowNavigation'
@@ -326,6 +344,12 @@ import { createH3RowNavigation, H3RowNavigationKey } from './composables/useH3Ro
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { useHSyncMode } from './composables/useHSyncMode'
+
+/** H3 entry id（manifest 冻结值，与 `phase5_h3_investment_property.ENTRY_ID` 逐字一致）。 */
+const H3_SYNC_ENTRY_ID = 'xlsx/gt-h3-investment-property'
 // 版本 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载
 
 // core — H3TabIndex 非 lazy（底稿目录轻量，首屏必显）— 骨架阶段先 lazy
@@ -391,21 +415,56 @@ const effectiveHtmlData = computed(() => {
 /** 折旧分支选择器（仅成本模式 H3-7） */
 const depreciationBranch = ref<'noImpair' | 'withImpair'>('noImpair')
 
-// ─── useH3DualMode — HTML↔OO 切换 ──────────────────────────────────────────
-const {
-  currentMode,
-  isOoAvailable,
-  modeOptions,
-  onModeChange,
-} = useH3DualMode({
-  wpId: toRef(props, 'wpId') as any,
-  sheetName: toRef(props, 'sheetName') as any,
-  autoSave: async () => {
-    // flush all pending debounced saves before switching mode
-    await formData.saveBatch([])
+// ─── 双模式切换（统一接桥，替代 useH3DualMode）────────────────────────────────
+//
+// H3 是 H 循环**首条变体轴 entry**：`明细表（成本模式）H3-2` 与
+// `明细表（公允价值模式）H3-2` 两张都受管，各有独立持久化键
+// （`H3-2-cost-rows` / `H3-2-fair-rows`）⇒ 受管短码按计量模式归一到
+// `H3-2-cost` / `H3-2-fair` 两个不同的码（见 `sync/hManagedSheets.ts`）。
+// 其余 sheet 仍走 `GtOnlyOfficeSheet` 只读视图。
+//
+// 🔴 本 entry 的契约带**八条**声明缺口（模板四段「未审/期初调整/账项调整/审定」与前端
+//    四分「未审/AJE/RJE/审定」是正交维度）—— 接桥不改变这一点：回写只动两侧真正对齐的
+//    那些格（未审期初/期末、折旧与减值的计提转回、各块审定期末、抵押受限），
+//    调整段由 Excel 自己重算。详见契约 `review.declared_coverage_gaps`。
+const hSync = useHSyncMode({
+  entryId: H3_SYNC_ENTRY_ID,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  currentCode: computed(() => h3SyncCode.value),
+  isReadonly,
+  flushHtml: async () => {
+    // 🔴 必须先清防抖：`useH3FormData.debouncedSave` 有 2s 窗口，不 flush 就把最后
+    //    不到 2s 的编辑留在客户端，materialize 出来的 xlsx 会少这批改动（静默丢数据）。
+    //    H3 的防抖窗口是全 H 最长的 2s（H2/H9 是 800ms）⇒ 漏 flush 的代价也最大。
+    await formData.flushPendingSaves()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: H3_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: hSync.sheetKey.value,
+    }
   },
-  reloadAll: async () => { await selfLoad() },
+  reloadHtml: async () => { await selfLoad() },
 })
+
+/** 模板 `ref="syncEditorHostRef"` 的落点 —— 直接复用桥里的 ref。 */
+const syncEditorHostRef = hSync.syncHostRef
+const isH3SyncManagedSheet = computed(() => hSync.isManagedSheet.value)
+const modeOptions = hSync.modeOptions
+const currentMode = hSync.renderMode
+
+/**
+ * legacy OO 组件加载失败的兜底 —— 原 `useH3DualMode` 内部降级的替代。
+ * 只对**非受管** sheet 生效（受管 sheet 走桥，失败由 `hSync.lastNotice` 报）。
+ */
+function onOoLoadFailed(): void {
+  void hSync.switchMode('html')
+}
 
 // ─── useH3FormData — 数据加载/保存 ────────────────────────────────────────────
 const formData = useH3FormData({
@@ -444,6 +503,24 @@ const currentSheet = computed(() => {
   // 底稿目录 H3（无后缀）
   if (/底稿目录/.test(name) || (/\bH3\b/.test(name) && !/H3-/.test(name) && !/H3A/.test(name))) return 'H3'
   return ''
+})
+
+/**
+ * 受管判定用的 sheet 短码 —— **变体轴归一**。
+ *
+ * 🔴 为什么不能直接用 `currentSheet`：`currentSheet` 只从 sheetName 解析出 `H3-2`，
+ *    但模板里 `H3-2` 是**两张**表（成本模式 / 公允价值模式），各有独立持久化键与
+ *    独立 `sheet_key`。受管清单 `H_MANAGED_SHEETS` 以短码为主键且撞码即抛 ⇒ 两张必须
+ *    在短码上就分开（`H3-2-cost` / `H3-2-fair`）。这里按当前计量模式补后缀。
+ *
+ * 🔴 只对 `H3-2` 补后缀：`H3-1`/`H3-5`/`H3-7` 同样是双版本 sheet，但它们**尚未进受管面**
+ *    （归后续批次）。提前给它们编造带后缀的码会让 `isHManagedSheet` 查不到而白跑一趟，
+ *    更糟的是将来接线时短码口径可能与届时的清单不一致。
+ */
+const h3SyncCode = computed(() => {
+  const code = currentSheet.value
+  if (code !== 'H3-2') return code
+  return measurementModel.value === 'fair_value' ? 'H3-2-fair' : 'H3-2-cost'
 })
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────
@@ -546,6 +623,10 @@ onUnmounted(() => {
   if (_refreshTimer) clearTimeout(_refreshTimer)
   eventBus.off('substantive:adjudicated', _handleAdjudicatedRefresh)
   eventBus.off('trial-balance:updated', _handleAdjudicatedRefresh)
+  // 🔴 防抖窗口内那批编辑必须落库（H3 的窗口是 2s，全 H 最长）。
+  //    `useH3FormData` 自己的 `onScopeDispose` 也会 flush，这里是显式兜底 ——
+  //    宿主先卸载、composable 的 scope 后销毁时顺序不保证。flush 是幂等的。
+  void formData.flushPendingSaves()
 })
 </script>
 
@@ -562,9 +643,30 @@ onUnmounted(() => {
 .h3-header-toolbar {
   display: flex;
   align-items: center;
+  gap: 12px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--el-border-color-lighter);
   background: var(--el-fill-color-blank);
+}
+
+.h3-oo-tag {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.h3-oo-tag--success { color: #67c23a; background: #f0f9eb; }
+.h3-oo-tag--info { color: #909399; background: #f4f4f5; }
+.h3-oo-tag--warning { color: #e6a23c; background: #fdf6ec; }
+.h3-oo-tag--danger { color: #f56c6c; background: #fef0f0; }
+
+/*
+ * 🔴 `height: 100%` 会被父级压成一条（D4 踩过）：OnlyOffice iframe 需要
+ *    **确定**高度才撑得开，min-height 兜住父级无高度时的退化。
+ */
+.oo-container {
+  width: 100%;
+  min-height: 600px;
+  height: calc(100vh - 200px);
 }
 
 .h3-mode-hint {
