@@ -12,11 +12,25 @@
         />
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g8-other-equity-instruments" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
-        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value && !isG8SyncManagedSheet" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isG8SyncManagedSheet && syncBusy" size="small" type="info">同步中…</el-tag>
+        <el-tag v-if="syncSwitching" size="small" type="info">切换中…</el-tag>
       </div>
 
+      <!-- G8-2 明细表受管 sheet 走 WorkpaperSyncEditorHost 真双向 -->
+      <div v-if="isOoMode && isG8SyncManagedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          v-if="syncOoDescriptor"
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+        <div v-else class="oo-loading">正在打开 G8-2 同步编辑器…</div>
+      </div>
+
+      <!-- 非受管 sheet 保留 legacy GtOnlyOfficeSheet -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
+        v-else-if="isOoMode"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -165,7 +179,7 @@
  * GtG8OtherEquityInstruments — G8 其他权益工具投资底稿主入口
  * 对齐 G5/G6：formData + g8:save-items + 附注路由 + 双模式 reload
  */
-import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject } from 'vue'
+import { ref, computed, toRef, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject } from 'vue'
 import { useG8FormData } from './composables/useG8FormData'
 import { useG8DualMode } from './composables/useG8DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -174,6 +188,12 @@ import type { ChecklistResponse } from './composables/useF1FormData'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+// ── G8 sync bridge（spec: g-cycle-single-region-detail-lanes · Task 15）──
+import { isGSingleRegionManagedSheet, gSingleRegionSheetKeyOf } from './sync/gSingleRegionManagedSheets'
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 
 const G8TabProcedure = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabProcedure.vue'))
 const G8TabAdjudication = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabAdjudication.vue'))
@@ -275,6 +295,35 @@ async function handleG8SaveItems(e: Event): Promise<void> {
 async function reloadAll() {
   await formData.loadAll()
 }
+
+// ── G8 sync bridge 接线（Task 15 · Requirements 4.7）───────────────────────
+const G8_SYNC_ENTRY_ID = 'xlsx/gt-g8-other-equity-instruments'
+const isG8SyncManagedSheet = computed(() => isGSingleRegionManagedSheet(currentSheet.value))
+const isOoMode = computed(
+  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && dualMode.currentMode.value === 'onlyoffice',
+)
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const syncEntryId = ref(G8_SYNC_ENTRY_ID)
+const syncSheetKey = computed(() => gSingleRegionSheetKeyOf(currentSheet.value) ?? 'g802-managed')
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(G8_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    formData.flushPending()
+    return await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: G8_SYNC_ENTRY_ID,
+    })
+  },
+  reloadHtml: () => formData.loadAll(),
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(() => WP_BRIDGE_IN_FLIGHT_STATES.includes(syncBridge.state.value))
+const syncSwitching = ref(false)
 
 onMounted(async () => {
   window.addEventListener('g8:save-items', handleG8SaveItems)

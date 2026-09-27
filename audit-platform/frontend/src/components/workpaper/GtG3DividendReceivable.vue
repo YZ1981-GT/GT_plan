@@ -15,7 +15,9 @@
         <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
           📖 编制手册
         </el-button>
-        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value && !isG3SyncManagedSheet" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isG3SyncManagedSheet && syncBusy" size="small" type="info">同步中…</el-tag>
+        <el-tag v-if="syncSwitching" size="small" type="info">切换中…</el-tag>
       </div>
 
       <GtOnlyOfficeSheet
@@ -173,7 +175,7 @@
  * Spec: .kiro/specs/g3-dividend-receivable/ Task 1.1, 9.1~9.3
  * sheetName 分发到 G3 专属子组件（G3A + G3-1~G3-5 + 附注），未迁移走 OnlyOffice
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, toRef, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { useG3FormData } from './composables/useG3FormData'
 import { useG3DualMode } from './composables/useG3DualMode'
 import { buildDirectoryHtmlData } from './composables/gCycleIndexRouting'
@@ -185,6 +187,12 @@ import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThrea
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+// ── G3 sync bridge（spec: g-cycle-single-region-detail-lanes · Task 15）──
+import { isGSingleRegionManagedSheet, gSingleRegionSheetKeyOf } from './sync/gSingleRegionManagedSheets'
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const G3TabAdjudication = defineAsyncComponent(() => import('./g3-dividend-receivable/G3TabAdjudication.vue'))
@@ -342,6 +350,35 @@ function handleAdjudicated(d: {
     remark: null,
   })
 }
+
+// ── G3 sync bridge 接线（Task 15 · Requirements 4.7）───────────────────────
+const G3_SYNC_ENTRY_ID = 'xlsx/gt-g3-dividend-receivable'
+const isG3SyncManagedSheet = computed(() => isGSingleRegionManagedSheet(currentSheet.value))
+const isOoMode = computed(
+  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && dualMode.currentMode.value === 'onlyoffice',
+)
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const syncEntryId = ref(G3_SYNC_ENTRY_ID)
+const syncSheetKey = computed(() => gSingleRegionSheetKeyOf(currentSheet.value) ?? 'g302-managed')
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(G3_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    formData.flushPending()
+    return await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: G3_SYNC_ENTRY_ID,
+    })
+  },
+  reloadHtml: () => formData.loadAll(),
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(() => WP_BRIDGE_IN_FLIGHT_STATES.includes(syncBridge.state.value))
+const syncSwitching = ref(false)
 
 onMounted(async () => {
   eventBus.on('substantive:adjudicated', handleAdjudicated)

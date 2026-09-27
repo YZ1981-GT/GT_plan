@@ -12,7 +12,9 @@
         />
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g11-investment-income" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
-        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value && !isG11SyncManagedSheet" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isG11SyncManagedSheet && syncBusy" size="small" type="info">同步中…</el-tag>
+        <el-tag v-if="syncSwitching" size="small" type="info">切换中…</el-tag>
       </div>
 
       <el-alert
@@ -39,8 +41,20 @@
         </span>
       </el-alert>
 
+      <!-- G11-2 明细表受管 sheet 走 WorkpaperSyncEditorHost 真双向 -->
+      <div v-if="isOoMode && isG11SyncManagedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          v-if="syncOoDescriptor"
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+        <div v-else class="oo-loading">正在打开 G11-2 同步编辑器…</div>
+      </div>
+
+      <!-- 非受管 sheet 保留 legacy GtOnlyOfficeSheet -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
+        v-else-if="isOoMode"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -175,7 +189,7 @@
  * GtG11InvestmentIncome — G11 投资收益底稿主入口
  * sheetName v-if 分发（参照 D4/G14 精细模式）
  */
-import { ref, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject } from 'vue'
+import { ref, computed, toRef, watch, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject } from 'vue'
 import { useAuditCheckReport, type AuditCheckItemInput } from '@/composables/useAuditCheckReport'
 import { useG11FormData } from './composables/useG11FormData'
 import { useG11DualMode } from './composables/useG11DualMode'
@@ -189,6 +203,12 @@ import GtIndexChip from './GtIndexChip.vue'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+// ── G11 sync bridge（spec: g-cycle-single-region-detail-lanes · Task 15）──
+import { isGSingleRegionManagedSheet, gSingleRegionSheetKeyOf } from './sync/gSingleRegionManagedSheets'
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 
 const G11TabProcedure = defineAsyncComponent(() => import('./g11-investment-income/core/G11TabProcedure.vue'))
 const G11TabAdjudication = defineAsyncComponent(() => import('./g11-investment-income/core/G11TabAdjudication.vue'))
@@ -349,6 +369,35 @@ useWorkpaperEntryInjections({
   onJumpToSection: (sheetLabel) => emit('jump-to-section', sheetLabel),
   reloadFn: reloadAll,
 })
+
+// ── G11 sync bridge 接线（Task 15 · Requirements 4.7）───────────────────────
+const G11_SYNC_ENTRY_ID = 'xlsx/gt-g11-investment-income'
+const isG11SyncManagedSheet = computed(() => isGSingleRegionManagedSheet(currentSheet.value))
+const isOoMode = computed(
+  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && dualMode.currentMode.value === 'onlyoffice',
+)
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const syncEntryId = ref(G11_SYNC_ENTRY_ID)
+const syncSheetKey = computed(() => gSingleRegionSheetKeyOf(currentSheet.value) ?? 'g1102-managed')
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(G11_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    formData.flushPending()
+    return await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: G11_SYNC_ENTRY_ID,
+    })
+  },
+  reloadHtml: () => formData.loadAll(),
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(() => WP_BRIDGE_IN_FLIGHT_STATES.includes(syncBridge.state.value))
+const syncSwitching = ref(false)
 
 onMounted(async () => {
   window.addEventListener(G11_OFFER_DISCLOSURE_PULL_EVENT, handleG11OfferDisclosurePull)

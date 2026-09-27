@@ -12,11 +12,25 @@
         />
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g12-net-hedge-gains" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
-        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value && !isG12SyncManagedSheet" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isG12SyncManagedSheet && syncBusy" size="small" type="info">同步中…</el-tag>
+        <el-tag v-if="syncSwitching" size="small" type="info">切换中…</el-tag>
       </div>
 
+      <!-- G12-2 明细表受管 sheet 走 WorkpaperSyncEditorHost 真双向 -->
+      <div v-if="isOoMode && isG12SyncManagedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          v-if="syncOoDescriptor"
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+        <div v-else class="oo-loading">正在打开 G12-2 同步编辑器…</div>
+      </div>
+
+      <!-- 非受管 sheet 保留 legacy GtOnlyOfficeSheet -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
+        v-else-if="isOoMode"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -147,7 +161,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject } from 'vue'
+import { ref, computed, toRef, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject } from 'vue'
 import { useG12FormData } from './composables/useG12FormData'
 import { useG12DualMode } from './composables/useG12DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -156,6 +170,12 @@ import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInje
 import type { ChecklistResponse } from './composables/useF1FormData'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+// ── G12 sync bridge（spec: g-cycle-single-region-detail-lanes · Task 15）──
+import { isGSingleRegionManagedSheet, gSingleRegionSheetKeyOf } from './sync/gSingleRegionManagedSheets'
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 
 const G12TabProcedure = defineAsyncComponent(() => import('./g12-net-hedge-gains/core/G12TabProcedure.vue'))
 const G12TabAdjudication = defineAsyncComponent(() => import('./g12-net-hedge-gains/core/G12TabAdjudication.vue'))
@@ -263,6 +283,35 @@ useWorkpaperEntryInjections({
   onJumpToSection: (sheetLabel) => emit('jump-to-section', sheetLabel),
   reloadFn: reloadAll,
 })
+
+// ── G12 sync bridge 接线（Task 15 · Requirements 4.7）───────────────────────
+const G12_SYNC_ENTRY_ID = 'xlsx/gt-g12-net-hedge-gains'
+const isG12SyncManagedSheet = computed(() => isGSingleRegionManagedSheet(currentSheet.value))
+const isOoMode = computed(
+  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && dualMode.currentMode.value === 'onlyoffice',
+)
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const syncEntryId = ref(G12_SYNC_ENTRY_ID)
+const syncSheetKey = computed(() => gSingleRegionSheetKeyOf(currentSheet.value) ?? 'g1202-managed')
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(G12_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    formData.flushPending()
+    return await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: G12_SYNC_ENTRY_ID,
+    })
+  },
+  reloadHtml: () => formData.loadAll(),
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(() => WP_BRIDGE_IN_FLIGHT_STATES.includes(syncBridge.state.value))
+const syncSwitching = ref(false)
 
 onMounted(async () => {
 
