@@ -72,13 +72,15 @@ D4-29 `phase5_transposed_sheet.py` · F2 spec 裁决 F2-H1（`sheet_keys` 互斥
   - 🔴 `StoreMergePlan` 三条全带 `oo_crash_neutralization_fn`（G4 册 186 格裸 IF）
   - _Requirements: 1.1, 1.2, 5.3_
 
-- [ ] 8. `phase5_g4_07_sppi_inventory.py`（**本 spec 首条**，裁决 G46-H1）
+- [x] 8. `phase5_g4_07_sppi_inventory.py`（**本 spec 首条**，裁决 G46-H1）
+  - ✅ commit `2f88898ec`：零公式 + 表头起于 B 列 + 无合计 + entry 层 + 契约（digest fc3133e4）
   - `G4-7-items` / `id` / 表头 R13 起于 **B 列**（A 列空）/ 数据 R14-22 / **无合计** ⇒ `footer_row=23` +
     `footer_marker="三、审计说明"` + `footer_carries_total_formula=False` / `formula_columns=()`
   - payload `dual_write`（FD-1）；HTTP 客户端 `api`；P12 前半
   - _Requirements: 4.1, 4.4_
 
-- [ ] 9. `phase5_g4_02_main_detail.py`（两区）
+- [x] 9. `phase5_g4_02_main_detail.py`（两区）
+  - ✅ commit `890557d97`：34 列 × 11 公式列 × 两区（uuid AI/AJ）
   - 两区 R12-17 / R20-25，小计 R18/R26，合计 R27 `=SUM(G18,G26)`；两区各自 `field_specs`（P11）
   - `formula_columns=("J","L","O","S","T","U","V","X","AC","AF","AG")`；有效列 44(A-AR)
   - payload 走 `g4StorageContract.buildCanonicalPayload()`（conclusion 权威 + remark 镜像）
