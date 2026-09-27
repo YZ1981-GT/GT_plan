@@ -74,11 +74,34 @@ export function sumG9L3FormulaClosing(responses: Map<string, ChecklistResponse>)
   )
 }
 
+/**
+ * G9-2 明细中属**第三层次**的期末审定数合计。
+ *
+ * 🔴 **根治读错源**（spec `g-cycle-single-region-detail-lanes` C-3）：
+ * 改造前直接从 G9-2 读 `fairValueLevel` —— 而公允价值层次的**权威来源是
+ * `公允价值测试表G9-4`**，G9-2 按权威模板重构后（28 列 A..AB）**没有层次列**。
+ * 现改为：先从 G9-4 取 Level3 的资产名集合，再据此筛 G9-2 的行求和。
+ * 资产名匹配复用 `matchG9AssetKey`（与其余跨表勾稽同一口径）。
+ */
 export function sumG9DetailLevel3Closing(responses: Map<string, ChecklistResponse>): number {
+  const level3Keys = new Set(
+    parseJsonArray(responses.get(G9_FV_KEY)?.remark)
+      .filter((r) => isG9Level3(r.fairValueLevel))
+      .map((r) => matchG9AssetKey(String(r.assetName ?? '')))
+      .filter((k) => k),
+  )
+  if (!level3Keys.size) return 0
   return calcSubtotal(
     parseJsonArray(responses.get(G9_DETAIL_KEY)?.remark)
-      .filter((r) => isG9Level3(r.fairValueLevel))
-      .map((r) => parseNum(r.closingAdjusted) || parseNum(r.closingBalance)),
+      .filter((r) =>
+        level3Keys.has(matchG9AssetKey(String(r.investTarget ?? r.assetName ?? ''))),
+      )
+      .map((r) =>
+        // 🔴 期末审定公允价值 = 模板 W 列 `closingAuditedFairValue`；旧键留作存量回退
+        parseNum(r.closingAuditedFairValue)
+        || parseNum(r.closingAdjusted)
+        || parseNum(r.closingBalance),
+      ),
   )
 }
 

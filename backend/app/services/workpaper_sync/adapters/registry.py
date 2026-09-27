@@ -1555,6 +1555,62 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "人工审核契约 / approved bundle 三缺），供给就绪后真栈注册。"
         ),
     },
+    # ── G9（spec: g-cycle-single-region-detail-lanes · Task 8 / C-5）──────────
+    {
+        "contract_id": "g9.other_noncurrent_detail",
+        "provider_module": (
+            "app.services.workpaper_sync.phase5_g9_other_noncurrent"
+        ),
+        "delivered_by_task": "G1R-Task8",
+        "pilot_class": "phase5_other_noncurrent_financial",
+        "entry_id": "xlsx/gt-g9-other-noncurrent-financial",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "G/G9 其他非流动金融资产.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "spec `g-cycle-single-region-detail-lanes` 九条中的**首条**（lane 顺序由易到难 "
+            "G9→G10→G8→G14→G11→G13→G12→G3→G1）。范式照 G2 的 `phase5_*`，不照 G7 的 "
+            "`pilot_*`；唯一复用 G7 的是 `oo_crash_neutralization_fn`。"
+            "权威模板 G/G9 其他非流动金融资产.xlsx（sha256 264322c0…，88,636 B，10 sheets）；"
+            "受管 sheet = 明细表G9-2（**两级**表头 R9 组 / R10 叶子 / 有效内容列 28 即 A-AB / "
+            "0 个 definedName / 12 个公式列 E·H·I·J·L·P·Q·R·U·V·W·Y 共 156 格 / "
+            "合计 R30 是**枚举相加** =SUM(C17,C24,C29) 非 SUM 区间）。"
+            "🔴 **全库首个「一个 store 键 × 三个受管区」**：三区 R12-16 / R19-23 / R26-28 "
+            "（区标题行 R11·R18·R25 与小计行 R17·R24·R29 均不受管）的行都存在**同一个** "
+            "`G9-detail-rows` 数组里，区归属由行的 `section` 字段表达。既有多区范式 "
+            "`phase5_d3_04_analysis` 是「一区一个 store_item_id」（要求前端拆键）—— 这里"
+            "**不拆**：该键有真库载荷 605 B、被 8 个跨表消费方读取、且是 BP-10 登记键，"
+            "拆键波及面远大于在引擎加一层可选过滤。改为引擎 `row_section_field='section'` + "
+            "逐段 `row_section_value`（`iter_store_rows` 按它过滤、"
+            "`merge_projection_into_store_rows` 给新增行补它，两处成对）。"
+            "⇒ provider 的三个 store 门面按「遍历三段」组合：投影合并三段、回写顺序穿线、"
+            "iter 串联三段；`html_store.item_ids` 仍只有 **1** 条（不是 3）。"
+            "🔴 `template_id` 逐区不同（G92R1/R2/R3）而 `sheet_key` 共享（g902-managed）："
+            "instrumentation 的 definedName 按 template_id 命名（实测抛「多 sheet "
+            "instrumentation 的 template_id 必须唯一」），而契约层同 excel_name 两个 "
+            "sheet_key 会产出重复 sheet 条目。先例 `phase5_d3_04_analysis`（D34DEBIT/D34CREDIT）。"
+            "🔴 **前端根治在先**（用户拍板选项 C）：`useG9Detail.ts` 原 30 列里 15 列与权威模板"
+            "不符 —— `ociChange`/`ociCumulative`/`impairmentLoss`/`impairmentProvision` 属 "
+            "FVOCI 口径（G9 模板编制说明 A38-A43 五类全 **FVTPL**，CAS22 下不确认 OCI 与减值）、"
+            "`fairValueLevel`/`valuationMethod` 属 G9-4/G9-5 两张表、另 6 列模板没有。已按模板"
+            "列序 A..AB 重写为 28 字段「三分量 × 四阶段」模型（成本 + 累计公允价值变动 = 公允"
+            "价值；未审→账项调整→审定→重分类报表）并带迁移函数与丢弃计数。"
+            "🔴 顺带修掉 `g9FvCrossHelpers.pushG9FvToDetail`（G9-4 往 G9-2 回写那三列，"
+            "层次与方向都错 —— G9-2 无公允价值层次列）。"
+            "🔴 **GC-2**：G9 册裸 IF **42 格**（全在 审定表G9-1，受管表 明细表G9-2 零命中）"
+            "⇒ 仍按 per-file 保守策略挂中性化（点同册任一 sheet 的在线编辑都会触发整册加载）。"
+            "🔴 **FD-1**：HTML store = checklist_responses.item_id='G9-detail-rows'，"
+            "payload 落 **remark**（真库实证 remark 605 B / conclusion 0 B）⇒ 不 seed，"
+            "验收判据断言 roundtrip 行数 > 0 且来自真库。"
+            "wp_code 裁决：manifest 幻影码 ['G9O']（matcher 域），真码 **G9**（载荷所在）。"
+            "FC-9 红线：G9 已接显式发布门（useG9Adjudication.publishToTb），"
+            "本 provider 对 trial_balance 写次数为 0；审定表 审定表G9-1 归后置 spec "
+            "`g-cycle-adjudication-sheets-coverage`（GF-H5）。"
+            "`adapter_registered=False`：与 D1/D3/D5/D6/D7/E1/F1~F5/G2 卡在同一平台级缺口"
+            "（umbrella BP-61-1 = G slice 的 BP-1~BP-3），供给就绪后真栈注册。"
+        ),
+    },
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     {
         "contract_id": "h9.lease_liability_detail",

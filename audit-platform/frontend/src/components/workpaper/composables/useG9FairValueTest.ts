@@ -242,7 +242,12 @@ export function useG9FairValueTest(opts: {
   }))
 
   const detailClosingAdjustedTotal = computed(() =>
-    calcSubtotal(detailRows.value.map((r) => parseNum(r.closingAdjusted ?? r.closingBalance))),
+    // 🔴 C-3：期末审定公允价值 = 模板 W 列 `closingAuditedFairValue`；旧键留作存量回退
+    calcSubtotal(
+      detailRows.value.map((r) =>
+        parseNum(r.closingAuditedFairValue ?? r.closingAdjusted ?? r.closingBalance),
+      ),
+    ),
   )
 
   const crossRefVariance = computed(() =>
@@ -393,7 +398,10 @@ export function useG9FairValueTest(opts: {
 
   function syncFromDetail(): void {
     if (opts.isReadonly.value) return
-    const details = detailRows.value.filter((r) => String(r.assetName ?? '').trim())
+    // 🔴 C-3：投资项目 = 模板 B 列 `investTarget`；旧键 `assetName` 留作存量回退
+    const details = detailRows.value.filter((r) =>
+      String(r.investTarget ?? r.assetName ?? '').trim(),
+    )
     if (!details.length) {
       ElMessage.warning('G9-2 明细表暂无数据，请先编制明细')
       return
@@ -406,11 +414,15 @@ export function useG9FairValueTest(opts: {
     let updated = 0
 
     for (const d of details) {
-      const name = String(d.assetName ?? '')
+      const name = String(d.investTarget ?? d.assetName ?? '')
       const key = matchG9AssetKey(name)
-      const qty = parseNum(d.holdingQuantity)
-      const audited = parseNum(d.closingAdjusted ?? d.closingBalance)
-      const unadj = parseNum(d.closingBalance ?? d.closingAdjusted)
+      // 🔴 C-3：`holdingQuantity` 已从 G9-2 移除（权威源是本表 G9-4）⇒ 数量以本表已有值为准
+      const qty = parseNum(existing.get(key)?.closingAuditedQty ?? d.holdingQuantity)
+      // 审定 = 模板 W 列；未审 = 模板 R 列（旧键留作存量回退）
+      const audited = parseNum(
+        d.closingAuditedFairValue ?? d.closingAdjusted ?? d.closingBalance,
+      )
+      const unadj = parseNum(d.closingFairValue ?? d.closingBalance ?? d.closingAdjusted)
       const price = qty > 0 ? audited / qty : 0
       const patch: Partial<G9FairValueRow> = {
         assetName: name,
@@ -444,19 +456,21 @@ export function useG9FairValueTest(opts: {
     ElMessage.success(`已从 G9-2 同步：新增 ${added} 行，更新 ${updated} 行`)
   }
 
+  /**
+   * 🔴 **已停用**（spec `g-cycle-single-region-detail-lanes` C-3）：
+   * 原实现把 G9-4 的「层次 / 估值方法 / 持有数量」**回写进 G9-2**，方向是错的 ——
+   * 这三列的权威来源就是 G9-4，而 G9-2 按权威模板重构后（28 列 A..AB）**没有这三列**，
+   * 冗余存一份只会产生两个真源。
+   *
+   * 保留函数与按钮位（避免打断调用方），改为**只提示口径、不写 G9-2**。
+   * 需要按层次汇总时走 `g9CrossHelpers.sumG9DetailLevel3Closing`
+   * （已改为「从 G9-4 取 Level3 资产名 → 筛 G9-2 行求和」）。
+   */
   function pushToDetail(): number {
-    if (opts.isReadonly.value) return 0
-    if (!rows.value.length) {
-      ElMessage.warning('G9-4 暂无数据可回写')
-      return 0
-    }
-    const n = pushG9FvToDetail(opts.allResponses.value, opts.debouncedSave, rows.value)
-    if (!n) {
-      ElMessage.warning('未匹配到 G9-2 行，请先编制明细或核对资产名称')
-      return 0
-    }
-    ElMessage.success(`已回写 G9-2 ${n} 行（层次/估值方法/持有数量）`)
-    return n
+    ElMessage.info(
+      '公允价值层次与估值方法的权威来源就是本表（G9-4），G9-2 明细表按权威模板不含这些列，无需回写',
+    )
+    return 0
   }
 
   async function pushDiffToAdjustment(_forceAll = false): Promise<number> {

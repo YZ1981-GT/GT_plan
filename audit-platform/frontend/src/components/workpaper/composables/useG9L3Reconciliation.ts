@@ -316,38 +316,55 @@ export function useG9L3Reconciliation(opts: {
    * 从 G9-2 明细带入 fairValueLevel=Level3 行。
    * 映射：期初审定→期初FV；增加/减少→购入/处置；FV变动按分类拆 PL/OCI；利息/减值；期末审定→企业报告。
    */
+  /**
+   * 从 G9-2 明细带入 Level3 行。
+   *
+   * 🔴 C-3（spec `g-cycle-single-region-detail-lanes`）三处改动：
+   * ① **Level3 名单由 G9-4 定** —— G9-2 按权威模板重构后（28 列 A..AB）没有层次列；
+   * ② **没有「本期增加 / 本期减少」两列** —— 模板 M 列是净额（借方发生填正数）⇒
+   *    购入/处置拆不出来，留空由用户按凭证填（猜一个数会让本表滚动勾稽错）；
+   * ③ **G9 全 FVTPL，无 OCI、无减值** ⇒ `fvChangeOCI` / `impairmentLoss` 恒 0，
+   *    不再按 `classification` 猜 FVOCI 分支（那是改造前遗留的 FVOCI 口径残留）。
+   */
   function pullFromDetail(): void {
     if (opts.isReadonly.value) return
+    const level3Keys = new Set(
+      parseJsonRows(opts.allResponses.value.get(FV_TEST_ROWS_KEY)?.remark)
+        .filter((r) => isLevel3(r.fairValueLevel))
+        .map((r) => String(r.assetName ?? '').trim())
+        .filter((k) => k),
+    )
     const list = parseJsonRows(opts.allResponses.value.get(DETAIL_ROWS_KEY)?.remark)
-    const l3 = list.filter((r) => isLevel3(r.fairValueLevel))
+    const l3 = list.filter((r) => {
+      const name = String(r.investTarget ?? r.assetName ?? '').trim()
+      return name && level3Keys.has(name)
+    })
     if (!l3.length) {
-      ElMessage.info('G9-2 中暂无公允价值层次为 Level3 的项目')
+      ElMessage.info('G9-4 中暂无 Level3 项目，或 G9-2 里没有同名明细行')
       return
     }
     const mapped: G9L3Row[] = []
     for (const src of l3) {
-      const name = String(src.assetName ?? '').trim()
+      const name = String(src.investTarget ?? src.assetName ?? '').trim()
       if (!name) continue
-      const classification = String(src.classification ?? src.measurementAttribute ?? '')
-      const fv = parseNum(src.fvChangeAmount)
-      const oci = parseNum(src.ociChange)
-      const isFvtpl = /fvtpl|损益|交易/i.test(classification)
-      const isFvoci = /fvoci|oci|综合收益/i.test(classification)
-      const fvPl = isFvoci && !isFvtpl ? 0 : fv
-      const closing = parseNum(src.closingAdjusted) || parseNum(src.closingBalance)
+      // G9 全 FVTPL ⇒ 公允价值变动全部计入当期损益
+      const fvPl = parseNum(src.periodFvChange ?? src.fvChangeAmount)
+      const closing = parseNum(
+        src.closingAuditedFairValue ?? src.closingAdjusted ?? src.closingBalance,
+      )
       const stillHeld = Math.abs(closing) > 0.01
       mapped.push({
         ...emptyRow(name, mapped.length + 1, src.rowId ? `d2-${src.rowId}` : undefined),
-        openingFairValue: parseNum(src.openingAdjusted) || parseNum(src.openingBalance),
-        purchaseAmount: parseNum(src.increaseAmount),
-        disposalAmount: parseNum(src.decreaseAmount),
+        openingFairValue: parseNum(
+          src.openingAuditedFairValue ?? src.openingAdjusted ?? src.openingBalance,
+        ),
         fvChangePL: fvPl,
-        fvChangeOCI: isFvoci ? (oci || fv) : oci,
-        interestIncome: parseNum(src.interestIncome),
-        impairmentLoss: parseNum(src.impairmentLoss),
+        fvChangeOCI: 0,
+        interestIncome: parseNum(src.closingInterestReceivable ?? src.interestIncome),
+        impairmentLoss: 0,
         unrealizedHeld: stillHeld ? fvPl : 0,
         reportedClosing: closing,
-        remark: '自 G9-2 Level3 带入',
+        remark: '自 G9-2 带入（Level3 名单取自 G9-4）；购入/处置金额请按凭证填列',
       })
     }
     mergeByAssetName(mapped, 'G9-2')

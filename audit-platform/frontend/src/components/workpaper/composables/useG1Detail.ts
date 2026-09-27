@@ -22,6 +22,14 @@ import {
   calcSubtotal,
 } from './useG1TraFinFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
+// 🔴 Task 7（spec g-cycle-single-region-detail-lanes）：行身份铸造收口到单点，
+//    取代原「缺 id 时用数组下标」与「`row-${Date.now()}` 无随机后缀」两处旧写法。
+import {
+  createMintStats,
+  mintRowIdSuffix,
+  resolveStableRowIds,
+  type RowIdentityMintStats,
+} from './g1g3RowIdentity'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -430,21 +438,50 @@ export function enrichDetailRow(r: TradingDetailRow): TradingDetailRow {
   }
 }
 
-function loadRows(map: Map<string, ChecklistResponse>): TradingDetailRow[] {
+/**
+ * G1-2 明细行的行身份铸造点（本文件唯一）。
+ *
+ * 前缀 `g1d` **内联在此**而非放共享模块的常量表：行身份形态要能在声明 `id: string`
+ * 行模型的这个文件里逐字回源核对；随机性单点在 `mintRowIdSuffix`。
+ */
+function genRowId(): string {
+  return `g1d-${mintRowIdSuffix()}`
+}
+
+/**
+ * 载入并解析行，同时铸造稳定行身份。
+ *
+ * 🔴 Task 7（BP-7 + Req 1.3）：改造前两层病灶 ——
+ * ① `migrated.id ?? String(i + 1)` 用**数组下标**当身份（删中间一行后其后全部前移）；
+ * ② 空表兜底 `emptyRow('1', 1)` 让不同底稿的第一行 id 都是 `'1'`。
+ * 现统一走 `resolveStableRowIds(list, genRowId, stats)`：缺失 / 下标派生 / 同载荷内
+ * 重复才重铸；`` `row-${Date.now()}` `` 形态**不无条件重铸**（无条件重铸会让每次载入
+ * 身份都变，比原缺陷更糟）。铸造次数经 `stats.minted` 回传，调用方须立即回写。
+ */
+function loadRows(
+  map: Map<string, ChecklistResponse>,
+  stats?: RowIdentityMintStats,
+): TradingDetailRow[] {
   const raw = map.get(DATA_KEY)?.conclusion
-  if (!raw) return [enrichDetailRow(emptyRow('1', 1))]
+  const fallback = () => {
+    if (stats) stats.minted += 1
+    return [enrichDetailRow(emptyRow(genRowId(), 1))]
+  }
+  if (!raw) return fallback()
   try {
     const parsed = JSON.parse(raw) as Partial<TradingDetailRow>[]
-    if (!Array.isArray(parsed) || parsed.length === 0) return [enrichDetailRow(emptyRow('1', 1))]
-    return parsed.map((p, i) => {
-      const migrated = migratePartial(p)
-      return enrichDetailRow({
-        ...emptyRow(migrated.id ?? String(i + 1), migrated.seq ?? i + 1),
+    if (!Array.isArray(parsed) || parsed.length === 0) return fallback()
+    const migratedList = parsed.map((p) => migratePartial(p))
+    const ids = resolveStableRowIds(migratedList, genRowId, stats)
+    return migratedList.map((migrated, i) =>
+      enrichDetailRow({
+        ...emptyRow(ids[i], migrated.seq ?? i + 1),
         ...migrated,
-      })
-    })
+        id: ids[i],
+      }),
+    )
   } catch {
-    return [enrichDetailRow(emptyRow('1', 1))]
+    return fallback()
   }
 }
 
@@ -536,13 +573,29 @@ export function useG1Detail(opts: {
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   isReadonly: Ref<boolean>
 }) {
-  const rows = ref<TradingDetailRow[]>(loadRows(opts.allResponses.value))
+  // 🔴 Task 7 TDZ 坑：**不能**在 `ref(loadRows(...))` 的初始化表达式里调 `persistAll()`
+  //    （它读 `rows.value`，而 `rows` 尚未完成初始化）⇒ 先把铸造次数记账，
+  //    等 `persistAll` 定义之后再回写。
+  const initialMint = createMintStats()
+  const rows = ref<TradingDetailRow[]>(loadRows(opts.allResponses.value, initialMint))
   const auditConclusion = ref(opts.allResponses.value.get(CONCLUSION_KEY)?.conclusion ?? '')
   const gates = ref<G1DetailGates>(loadGates(opts.allResponses.value))
   const segment = ref<string>(G1_DETAIL_SEGMENTS[0].key)
 
+  /**
+   * 载入并在**铸造了新身份时立即回写**。
+   *
+   * 🔴 不回写则 store 里仍是旧 id，下次载入又铸一批新的 ⇒ 身份每次都变
+   * （F5 同族修复的教训）。
+   */
+  function loadRowsAndPersistIfMinted(): void {
+    const stats = createMintStats()
+    rows.value = loadRows(opts.allResponses.value, stats)
+    if (stats.minted > 0) persistAll()
+  }
+
   function loadAll() {
-    rows.value = loadRows(opts.allResponses.value)
+    loadRowsAndPersistIfMinted()
     auditConclusion.value = opts.allResponses.value.get(CONCLUSION_KEY)?.conclusion ?? ''
     gates.value = loadGates(opts.allResponses.value)
   }
@@ -550,7 +603,7 @@ export function useG1Detail(opts: {
   watch(
     () => opts.allResponses.value.get(DATA_KEY)?.conclusion,
     (raw) => {
-      if (raw) rows.value = loadRows(opts.allResponses.value)
+      if (raw) loadRowsAndPersistIfMinted()
     },
   )
   watch(
@@ -654,6 +707,9 @@ export function useG1Detail(opts: {
     }
   }
 
+  // 🔴 Task 7：首次载入（`ref` 初始化那次）若铸了身份，在此补回写（见 initialMint 注释）。
+  if (initialMint.minted > 0) persistAll()
+
   function persistGates() {
     if (!opts.isReadonly.value) {
       opts.debouncedSave(GATES_KEY, { conclusion: JSON.stringify(gates.value) })
@@ -701,7 +757,8 @@ export function useG1Detail(opts: {
       const seq = rows.value.length + 1
       rows.value = [
         ...rows.value,
-        enrichDetailRow({ ...emptyRow(`row-${Date.now()}`, seq), securityName: value }),
+        // 🔴 Task 7：原 `row-${Date.now()}` 无随机后缀 ⇒ 同毫秒连加两行会撞 id。
+        enrichDetailRow({ ...emptyRow(genRowId(), seq), securityName: value }),
       ]
       persistAll()
     } catch {

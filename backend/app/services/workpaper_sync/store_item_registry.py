@@ -394,6 +394,25 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="G2-2-detail-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── G9（spec: g-cycle-single-region-detail-lanes · Task 8 / C-5）────────
+    #
+    # 🔴 **一个 store item、三个受管区**（G 循环首例）：`明细表G9-2` 的三区
+    #    （R12-16 / R19-23 / R26-28）行都存在同一个 `G9-detail-rows` 数组里，
+    #    区归属由行的 `section` 字段表达。因此 `items` 只有**一条** ——
+    #    `item_ids` 长度 1 ⇒ 回方向走 `merge_rows_fn` 单 item 分派（不是 D4 的
+    #    `dual_store_fn` 多 item 路径）。三段的遍历在 provider 的
+    #    `merge_projection_into_store_rows` 里完成（顺序穿线），框架无需知道分段。
+    #
+    # 🔴 GC-2：G9 册裸 IF **42 格**（全在 `审定表G9-1`，受管表 `明细表G9-2` 零命中）。
+    #    per-file 保守策略 ⇒ 受管表干净也必须挂：点同册任一 sheet 的在线编辑都会
+    #    触发整册加载。中性化函数与 G7/G2/H9 **共用一个**（已被真 OO 栈验收过的
+    #    口径），不新造；也不得在 `adapters/excel.py` 加 `if adapter_id == "g9…"`。
+    "g9.other_noncurrent_detail": StoreMergePlan(
+        adapter_id="g9.other_noncurrent_detail",
+        provider_module="phase5_g9_other_noncurrent",
+        items=(StoreItemSpec(item_id="G9-detail-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     #
     # 🔴 **HC-12：H 循环 9 册全部命中 OO 加载期裸 `IF(`** ⇒ 同 G 的 per-file 保守策略，

@@ -101,6 +101,17 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     #    🔴 H9 是首个 `header_rows` 域扩容（3→4）之后落地的契约 —— 它本身是 2 级，
     #    但同循环的 H2/H4/H5/H7/H8 是 4 级；本门的 digest 会在扩容被回退时打红。
     ("h9", "phase5_h9_lease_liabilities", "ADAPTER_ID", True, True),
+    # ── G9（spec: g-cycle-single-region-detail-lanes · Task 8 / C-5）────────
+    #    🔴 全库**首个「一个 store 键 × 三个受管区」** provider：`明细表G9-2` 的
+    #    R12-16 / R19-23 / R26-28 三区行都存在同一个 `G9-detail-rows` 数组里，区归属由
+    #    行的 `section` 字段表达（引擎 `row_section_field`）。
+    #    `plural_instr=True` 是**硬要求**（不是像 G2 那样的前瞻性）：它的
+    #    `instrumentation_specs()` 恒返 3 条（逐区不同 `uuid_col` AC/AD/AE 与
+    #    `template_id` G92R1/R2/R3）；留 False 只核第一条 ⇒ 区②③的 definedName
+    #    与 UUID 列声明对本门完全不可见。
+    #    `has_projection=True`：`build_store_projection` 缺省合并三段（见 provider
+    #    docstring —— 只投区①会让 digest 算得出来却漏掉三分之二的行，假绿）。
+    ("g9", "phase5_g9_other_noncurrent", "ADAPTER_ID", True, True),
 )
 
 
@@ -141,7 +152,7 @@ def _field_specs_and_row_key(mod: Any) -> tuple[tuple, str]:
     """
     specs = getattr(mod, "MANAGED_FIELD_SPECS", None)
     if specs:
-        return tuple(specs), getattr(mod, "ROW_IDENTITY_STORE_KEY", "rowId")
+        return tuple(specs), getattr(mod, "ROW_IDENTITY_STORE_KEY", "rowId"), {}
 
     get_specs = getattr(mod, "managed_row_table_specs", None)
     if callable(get_specs):
@@ -155,7 +166,15 @@ def _field_specs_and_row_key(mod: Any) -> tuple[tuple, str]:
             spec = next(
                 (s for s in row_specs if s.store_item_id == target_item), row_specs[0]
             )
-            return managed_field_specs(spec), spec.row_identity_key
+            # 🔴 分段受管（`row_section_field`，G9 首例）：合成行必须带上段标记，否则
+            #    引擎的 `iter_store_rows` 会把每一行都当「不属本段」过滤掉 ⇒ projection
+            #    为空、digest 照样算得出来却什么都没覆盖到（本函数 docstring 警告的假绿
+            #    的另一种形态）。段值从 spec 现取，不按 provider 名硬编码。
+            stamp: dict[str, Any] = {}
+            section_field = getattr(spec, "row_section_field", "") or ""
+            if section_field:
+                stamp[section_field] = getattr(spec, "row_section_value", "")
+            return managed_field_specs(spec), spec.row_identity_key, stamp
 
     raise RuntimeError(
         f"{mod.__name__} 既无 MANAGED_FIELD_SPECS 也无 managed_row_table_specs() 受管清单 —— "
@@ -169,10 +188,10 @@ def _synthetic_rows(mod: Any) -> list[dict[str, Any]]:
     field_specs 第 4 列是 store json 键/路径（camelCase 或 nested `a/b`）。text/enum
     填字符串占位，amount/integer 填数值占位；nested 路径逐级建 dict。每行带稳定行身份。
     """
-    specs, row_key = _field_specs_and_row_key(mod)
+    specs, row_key, stamp = _field_specs_and_row_key(mod)
     rows: list[dict[str, Any]] = []
     for i in range(2):
-        row: dict[str, Any] = {row_key: f"synthetic-{i}"}
+        row: dict[str, Any] = {row_key: f"synthetic-{i}", **stamp}
         for spec in specs:
             # spec: (column_key, column, mode, value_type, json_key/path, header_text[, group])
             value_type = spec[3]

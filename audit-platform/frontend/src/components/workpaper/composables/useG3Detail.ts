@@ -32,6 +32,13 @@ import {
 } from './useG3DivRecFormulaEngine'
 import { G3_DETAIL_ROWS_KEY } from './g3Constants'
 import type { ChecklistResponse } from './useF1FormData'
+// 🔴 Task 7（spec g-cycle-single-region-detail-lanes）：行身份铸造收口到单点。
+import {
+  createMintStats,
+  mintRowIdSuffix,
+  resolveStableRowIds,
+  type RowIdentityMintStats,
+} from './g1g3RowIdentity'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -278,17 +285,41 @@ function enrich(r: DividendDetailRow): DividendDetailRow {
   }
 }
 
-function loadRows(map: Map<string, ChecklistResponse>): DividendDetailRow[] {
+/**
+ * G3-2 明细行的行身份铸造点（本文件唯一）。前缀 `g3d` 内联理由同 `useG1Detail.genRowId`。
+ */
+function genRowId(): string {
+  return `g3d-${mintRowIdSuffix()}`
+}
+
+/**
+ * 载入并解析行，同时铸造稳定行身份。
+ *
+ * 🔴 Task 7（BP-7 + Req 1.3）：改造前两层病灶（与 `useG1Detail.loadRows` 同型）——
+ * ① 原写法 `p.id ?? String(i + 1)` 用**数组下标**当身份（删中间一行后其后全部前移）；
+ * ② 空表兜底 `emptyRow('1', 1)` 让不同底稿的第一行 id 都是 `'1'`；
+ * ③ 新增行原写法 `` `row-${Date.now()}` `` 无随机后缀，同毫秒连加两行撞 id。
+ * 现统一走 `resolveStableRowIds(list, genRowId, stats)`；`row-<ts>` 形态**不无条件重铸**。
+ */
+function loadRows(
+  map: Map<string, ChecklistResponse>,
+  stats?: RowIdentityMintStats,
+): DividendDetailRow[] {
   const raw = map.get(DATA_KEY)?.conclusion
-  if (!raw) return [enrich(emptyRow('1', 1))]
+  const fallback = () => {
+    if (stats) stats.minted += 1
+    return [enrich(emptyRow(genRowId(), 1))]
+  }
+  if (!raw) return fallback()
   try {
     const parsed = JSON.parse(raw) as Partial<DividendDetailRow>[]
-    if (!Array.isArray(parsed) || parsed.length === 0) return [enrich(emptyRow('1', 1))]
+    if (!Array.isArray(parsed) || parsed.length === 0) return fallback()
+    const ids = resolveStableRowIds(parsed, genRowId, stats)
     return parsed.map((p, i) =>
-      enrich({ ...emptyRow(p.id ?? String(i + 1), p.seq ?? i + 1), ...p }),
+      enrich({ ...emptyRow(ids[i], p.seq ?? i + 1), ...p, id: ids[i] }),
     )
   } catch {
-    return [enrich(emptyRow('1', 1))]
+    return fallback()
   }
 }
 
@@ -312,19 +343,30 @@ export function useG3Detail(opts: {
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   isReadonly: Ref<boolean>
 }) {
-  const rows = ref<DividendDetailRow[]>(loadRows(opts.allResponses.value))
+  // 🔴 Task 7 TDZ 坑：不能在 ref 初始化表达式里调 persistAll（见 useG1Detail 同名注释）。
+  const initialMint = createMintStats()
+  const rows = ref<DividendDetailRow[]>(loadRows(opts.allResponses.value, initialMint))
   /** 当前区段 */
   const segment = ref<string>(G3_DETAIL_SEGMENTS[0].key)
 
+  /**
+   * 载入并在**铸造了新身份时立即回写**（理由同 `useG1Detail.loadRowsAndPersistIfMinted`）。
+   */
+  function loadRowsAndPersistIfMinted(): void {
+    const stats = createMintStats()
+    rows.value = loadRows(opts.allResponses.value, stats)
+    if (stats.minted > 0) persistAll()
+  }
+
   function loadAll() {
-    rows.value = loadRows(opts.allResponses.value)
+    loadRowsAndPersistIfMinted()
   }
 
   // allResponses 异步加载完成后回填
   watch(
     () => opts.allResponses.value.get(DATA_KEY)?.conclusion,
     (raw) => {
-      if (raw) rows.value = loadRows(opts.allResponses.value)
+      if (raw) loadRowsAndPersistIfMinted()
     },
   )
 
@@ -336,6 +378,9 @@ export function useG3Detail(opts: {
       opts.debouncedSave(DATA_KEY, { conclusion: JSON.stringify(rows.value) })
     }
   }
+
+  // 🔴 Task 7：首次载入若铸了身份，在此补回写（TDZ 坑同 useG1Detail 的 initialMint）。
+  if (initialMint.minted > 0) persistAll()
 
   function updateRow(id: string, patch: Partial<DividendDetailRow>) {
     if (opts.isReadonly.value) return
@@ -355,7 +400,8 @@ export function useG3Detail(opts: {
       const seq = rows.value.length + 1
       rows.value = [
         ...rows.value,
-        enrich({ ...emptyRow(`row-${Date.now()}`, seq), investeeName: value }),
+        // 🔴 Task 7：原 `row-${Date.now()}` 无随机后缀 ⇒ 同毫秒连加两行会撞 id。
+        enrich({ ...emptyRow(genRowId(), seq), investeeName: value }),
       ]
       persistAll()
     } catch {
