@@ -31,55 +31,59 @@
 
 ### 阶段 0：前置门 + 红判据
 
-- [ ] 0. 前置依赖核查
-  - `AdjudicationSheetSpec` 泛化状态（D1 spec 产物，当前在 HEAD 否）
-  - 模板覆盖层交付状态（G5-1!B35 修需要它）
-  - 13 张审定表的 TB 发布门逐张实测
+- [x] 0. 前置依赖核查
+  - 🔴 **实测结论（2026-09-27）：`AdjudicationSheetSpec` 未落地**（`git cat-file HEAD` 不存在 + import ModuleNotFoundError）——
+    它是 D1 spec `d1-sync-row-table-engine-and-d1-coverage` 的框架层产物，D1 spec 本身 0/35 未实施。
+    ⇒ **Task 2~11 全部阻塞**（13 张审定表无类型可依），本 spec 只能停在几何基线（Task 1）+ 前置登记。
+  - foundation 已确认 G2-1「本 spec 不交付其 AdjudicationSheetSpec」（`adjudication_spec()` 恒 None）——
+    与本结论一致：审定表逐格 mask 引擎归 D1 spec，G 循环各 lane spec 只交棒不实施。
+  - 13 张审定表几何基线已实测（见上表，合计 3357 公式格 / 686 裸 IF）。
+  - 模板覆盖层：G5-1!B35 越界缺陷待 Task 10（同样阻塞于 AdjudicationSheetSpec）。
   - _Requirements: 1.1, 3.1_
 
-- [ ] 1. 13 张几何逐格实测 + 红判据
-  - 逐张 `sections` / `row_mode` / 公式格列向 vs 逐格判定
-  - P1 断言 13 张公式总数 ≥ 3300（不写死精确值，GC-10）
-  - P2 断言 13 张全命中裸 IF（7~191，不写死具体数）
+- [ ]* 1. 13 张几何逐格实测 + 红判据（🔴 阻塞于 AdjudicationSheetSpec）
+  - ✅ 几何基线已实测（上表）
+  - P1 断言 13 张公式总数 ≥ 3300（不写死精确值，GC-10）—— 待引擎落地后写
+  - P2 断言 13 张全命中裸 IF（7~191，不写死具体数）—— 待引擎落地后写
   - _Requirements: 1.2, 1.3, 2.1, 4.1_
 
 ### 阶段 1：批① 三张最简（G12-1 / G13-1 / G14-1）
 
-- [ ] 2. G12-1 逐格 spec（38f / 7 IF —— 全 G 最简审定表）
+- [ ]* 2. G12-1 逐格 spec（38f / 7 IF —— 全 G 最简审定表）
   - _Requirements: 1.1, 1.3_
 
-- [ ] 3. G13-1 逐格 spec（78f / 11 IF）
+- [ ]* 3. G13-1 逐格 spec（78f / 11 IF）
   - _Requirements: 1.1_
 
-- [ ] 4. G14-1 逐格 spec（72f / 11 IF）
+- [ ]* 4. G14-1 逐格 spec（72f / 11 IF）
   - _Requirements: 1.1_
 
-- [ ] 5. 批① 发布链 + 零回归
+- [ ]* 5. 批① 发布链 + 零回归
   - 三张契约 + 登记 + P3 零回归
   - _Requirements: 3.3_
 
 ### 阶段 2：批② 五张中等（G2-1 / G3-1 / G8-1 / G10-1 / G11-1）
 
-- [ ] 6. G2-1 / G8-1 逐格 spec（132f / 100f）
+- [ ]* 6. G2-1 / G8-1 逐格 spec（132f / 100f）
   - _Requirements: 1.1_
 
-- [ ] 7. G3-1 / G10-1 / G11-1 逐格 spec（120f / 178f / 161f）
+- [ ]* 7. G3-1 / G10-1 / G11-1 逐格 spec（120f / 178f / 161f）
   - _Requirements: 1.1_
 
-- [ ] 8. 批② 发布链 + 零回归
+- [ ]* 8. 批② 发布链 + 零回归
   - _Requirements: 3.3_
 
 ### 阶段 3：批③ 五张复杂 + G5-1 越界修 + 收口
 
-- [ ] 9. G4-1 / G6-1 逐格 spec（176f / 340f）
+- [ ]* 9. G4-1 / G6-1 逐格 spec（176f / 340f）
   - 🔴 G4-1 / G6-1 的 TB 发布门缺口（GC-9 裁决）须同步立门
   - _Requirements: 1.1, 3.1, 3.2_
 
-- [ ] 10. G1-1 / G5-1 / G9-1 逐格 spec（504f / 501f / 390f —— 全 G 最复杂三张）
+- [ ]* 10. G1-1 / G5-1 / G9-1 逐格 spec（504f / 501f / 390f —— 全 G 最复杂三张）
   - 🔴 G5-1!B35 越界缺陷走模板覆盖层修
   - _Requirements: 1.1, 5.3_
 
-- [ ] 11. 批③ 发布链 + 收口
+- [ ]* 11. 批③ 发布链 + 收口
   - 全部 13 张零回归 + TB 红线 + materialize/verify
   - _Requirements: 3.3_
 
