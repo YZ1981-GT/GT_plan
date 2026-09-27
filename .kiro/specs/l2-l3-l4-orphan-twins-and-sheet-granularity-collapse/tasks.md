@@ -27,7 +27,7 @@
   - _Property: 引用 LF-P5, LC-14_
 
 - [x] 2.* BP-1 / BP-2 / BP-3 外部供给登记
-  - 标 `[ ]*`：approved authority model + per-entry contract + non-null bundle / Task 36 published representation / 真实 OnlyOffice 9.4 探针
+  - 守卫已加（断言全 null），外部供给本身未到位
   - _Property: 不宣称通过_
 
 ---
@@ -145,9 +145,10 @@
   - 🔴 本 spec **只引用基线不修模板**
   - _Property: 引用 LF-P32, LF-P33, LF-P41_
 
-- [x] 21.* 三条 entry 的端到端闭环
-  - 标 `[ ]*`：三条真库载荷均不足（L2 唯一非空载荷还是违例数据、L3/L4 全为 `'[]'` 或 `NULL`）⇒ 待造合规数据
-  - _Property: LA-P26（不宣称通过）_
+- [ ]* 21. 三条 entry 的端到端闭环
+  - seed 数据已注入 PG（L2/L3/L4 各 5 行），守卫验证 seed 存在
+  - 🔴 **端到端 roundtrip（HTML→发布门→TB→OO 读回）待 Playwright E2E 实测**
+  - _Property: LA-P26（seed 已注入，roundtrip 待实测）_
 
 - [x] 22. 本 spec 自检
   - 断言 LC-x 引用**只出现编号不出现复述**（扫本 spec 三文件）
