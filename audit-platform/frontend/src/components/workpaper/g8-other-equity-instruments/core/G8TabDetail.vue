@@ -3,17 +3,18 @@
     <details class="guidance-details" open>
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p><b>定位</b>：本表是科目 1503 其他权益工具投资（FVOCI）的被投资单位明细锚点，向上勾稽 G8-1 审定，向下供 G8-4 / G8-5 / G8-6 取数。</p>
-        <p><b>编制顺序</b>：①「辅助核算取数」或手工录入被投资单位 → ② 填滚动金额 → ③ 填指定 OCI 原因 → ④「FV→本期OCI」并校 OCI 滚动 → ⑤「回写 G8-1」→ 与 G8-4/G8-5 联动。</p>
-        <p><b>公式</b>：期初审定=期初+调整；期末余额=期初审定+增加−减少+FV变动；审定=期末+调整；OCI期末累计=期初累计+本期OCI−转入留存。持股数×每股公允可回填公允合计。</p>
-        <p><b>勾稽要点</b>：明细审定 ↔ G8-1；公允合计 ↔ 期末审定；本期OCI ↔ FV变动；OCI滚动自洽；层次/估值与 G8-4 一致。</p>
+        <p><b>定位</b>：本表是科目 1503 其他权益工具投资（<b>FVOCI</b>）的被投资单位明细锚点，向上勾稽 G8-1 审定，向下供 G8-4 / G8-5 / G8-6 取数。</p>
+        <p><b>编制顺序</b>：①「辅助核算取数」或手工录入被投资单位 → ②「期初余额」填成本与累计公允价值变动两分量 → ③「本期变动」填成本净额 / 公允价值变动 / 处置结转 / OCI 转留存 → ④ 填指定 OCI 原因 →「回写 G8-1」。</p>
+        <p><b>模板公式</b>（8 列自动重算，UI 只读）：期初合计 <code>E=C+D</code>；期初审定 <code>H=E+G</code>；本期变动合计 <code>M=I+J+K+L</code>；期末成本 <code>O=C+I</code>；期末累计公允价值变动 <code>P=D+J+K</code>；期末合计 <code>Q=O+P</code>；期末 OCI 累计 <code>R=F+J+L</code>；期末审定 <code>T=Q+S</code>。</p>
+        <p><b>口径要点</b>：本期变动的「成本」是<b>净额</b>列（增加为正、减少为负，模板无单独减少列）；FVOCI 下<b>本期公允价值变动就是本期 OCI</b>（不另设一列）；「本期确认的股利收入」是损益项，不进任何余额；层次 / 估值方法 / 持股数 / 每股公允价值在 <b>G8-4</b> 填报。</p>
+        <p><b>与 Excel 联动</b>：期末的「计入 OCI 的累计利得或损失」与「审定数」两列，权威模板在部分行漏写了公式，因此在 Excel 在线编辑里是<b>可填</b>的 —— 但回到本页会按恒等式 <code>R=F+J+L</code> / <code>T=Q+S</code> 重算覆盖。请在本页填写分量，不要在 Excel 侧直接改这两列。</p>
       </div>
     </details>
 
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：核实其他权益工具投资各被投资单位期末成本、公允价值及 OCI 累计变动明细的准确与完整，验证公允价值层次划分与指定恰当，为审定表 G8-1（科目1503）提供明细支撑。"
+      title="审计目标：核实其他权益工具投资各被投资单位期末成本、公允价值及 OCI 累计变动明细的准确与完整，验证指定为 FVOCI 恰当，为审定表 G8-1（科目1503）提供明细支撑。"
       class="objective-alert"
     />
 
@@ -33,30 +34,6 @@
           @click="onSeedAux"
         >
           辅助核算取数
-        </el-button>
-        <el-button
-          v-if="!isReadonly"
-          size="small"
-          data-testid="g8-detail-fill-oci"
-          @click="onFillOci"
-        >
-          FV→本期OCI
-        </el-button>
-        <el-button
-          v-if="!isReadonly"
-          size="small"
-          data-testid="g8-detail-sync-oci"
-          @click="onSyncOciRoll"
-        >
-          重算OCI累计
-        </el-button>
-        <el-button
-          v-if="!isReadonly"
-          size="small"
-          data-testid="g8-detail-sync-fv"
-          @click="onSyncFv"
-        >
-          数量×单价→公允合计
         </el-button>
         <el-button
           v-if="!isReadonly"
@@ -85,8 +62,9 @@
 
     <div v-if="detail.rows.value.length" class="summary-bar" data-testid="g8-detail-summary">
       <span>审定合计 {{ fmt(detail.totals.value.closingAdjusted) }}</span>
-      <span>公允合计 {{ fmt(detail.totals.value.fairValueTotal) }}</span>
-      <span>本期 OCI {{ fmt(detail.totals.value.ociCurrentChange) }}</span>
+      <span>期末未审 {{ fmt(detail.totals.value.closingTotal) }}</span>
+      <span>本期 OCI {{ fmt(detail.totals.value.movementFvChange) }}</span>
+      <span>期末 OCI 累计 {{ fmt(detail.totals.value.closingOciCumulative) }}</span>
       <span :class="detail.hasAdjCrossMismatch.value ? 'bad' : 'ok'">
         ↔ G8-1 {{ detail.hasAdjCrossMismatch.value ? '差异' : '一致' }}
       </span>
@@ -98,38 +76,27 @@
       :closable="false"
       show-icon
       class="cross-alert"
-      data-testid="g8-detail-adj-cross"
+      data-testid="g8-detail-adj-cross-alert"
     >
       <template #title>
-        <span>
-          明细审定合计 {{ fmt(detail.totals.value.closingAdjusted) }} 与 G8-1 审定合计
-          {{ fmt(detail.adjudicationClosingTotal.value ?? 0) }} 差异 {{ fmt(detail.adjCrossVariance.value ?? 0) }}
-        </span>
-        <el-button size="small" link type="primary" @click="goSheet('G8-1')">前往 G8-1</el-button>
+        明细审定合计 {{ fmt(detail.totals.value.closingAdjusted) }} 与 G8-1 审定合计
+        {{ fmt(detail.adjudicationClosingTotal.value ?? 0) }} 差异 {{ fmt(detail.adjCrossVariance.value ?? 0) }}
+        <el-button link type="primary" size="small" @click="goSheet('G8-1')">去 G8-1</el-button>
       </template>
     </el-alert>
-    <el-alert
-      v-if="detail.hasFvVsClosingMismatch.value"
-      type="warning"
-      :closable="false"
-      show-icon
-      class="cross-alert"
-      data-testid="g8-detail-fv-cross"
-      :title="`公允价值合计 ${fmt(detail.totals.value.fairValueTotal)} 与期末审定合计 ${fmt(detail.totals.value.closingAdjusted)} 差异 ${fmt(detail.fvVsClosingVariance.value)}`"
-    />
+
     <el-alert
       v-if="detail.integrityIssues.value.length"
       type="warning"
       :closable="false"
       show-icon
       class="cross-alert"
-      data-testid="g8-detail-integrity"
+      data-testid="g8-detail-integrity-alert"
       :title="integrityTitle"
     />
 
-    <div class="fine-checks" data-testid="g8-detail-fine-checks">
-      <el-tag size="small" :type="detail.hasAdjCrossMismatch.value ? 'warning' : 'success'">G8-CHK-02 ↔ G8-1</el-tag>
-      <el-tag size="small" :type="detail.hasFvVsClosingMismatch.value ? 'warning' : 'success'">公允合计 ↔ 审定</el-tag>
+    <div class="fine-checks">
+      <el-tag size="small" :type="detail.hasAdjCrossMismatch.value ? 'warning' : 'success'">G8-CHK 明细↔G8-1</el-tag>
       <el-tag size="small" :type="detail.missingDesignationCount.value ? 'warning' : 'success'">
         指定原因 {{ detail.missingDesignationCount.value ? `缺 ${detail.missingDesignationCount.value}` : '齐' }}
       </el-tag>
@@ -146,20 +113,21 @@
       :data="detail.rows.value"
       border
       size="small"
-      style="font-size:13px;margin-top:8px"
-      max-height="520"
+      style="width:100%;font-size:13px;margin-top:8px"
       highlight-current-row
       :current-row-key="currentRowKey"
       row-key="rowId"
-      empty-text="暂无明细。点击「新增行」按被投资单位录入，或先导入台账后再与 G8-1/G8-4 勾稽。"
       :row-class-name="rowClassName"
       @current-change="onRowChange"
     >
       <el-table-column prop="seq" label="#" width="44" align="center" fixed />
+
+      <!-- ── 基础信息：A / B + U / V / W（模板跨两行合并的单列）───────────── -->
       <template v-if="detail.activeTab.value === 'basic'">
         <el-table-column label="被投资单位" :render-header="th('被投资单位')" min-width="120" fixed>
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.investeeName" size="small" @update:model-value="(v: string) => detail.updateRow(row.rowId, { investeeName: v })" />
+            <el-input v-if="!isReadonly" :model-value="row.investeeName" size="small"
+              @update:model-value="(v: string) => detail.updateRow(row.rowId, { investeeName: v })" />
             <span v-else>{{ row.investeeName }}</span>
           </template>
         </el-table-column>
@@ -170,131 +138,39 @@
               :model-value="ratioPct(row.investmentRatio)"
               size="small"
               :controls="false"
-              :step="0.01"
               :precision="2"
               style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { investmentRatio: pctToRatio(v) })"
             />
-            <span v-else>{{ ratioPct(row.investmentRatio).toFixed(2) }}%</span>
+            <span v-else>{{ ratioPct(row.investmentRatio) }}%</span>
           </template>
         </el-table-column>
-        <el-table-column label="期初余额" :render-header="th('期初余额')" width="100" align="right">
+        <el-table-column label="期末审定数" :render-header="th('期末审定数')" width="110" align="right">
           <template #default="{ row }">
-            <WpAmountInput v-if="!isReadonly" :model-value="row.openingBalance" size="small" style="width:100%"
-              @update:model-value="(v: number) => detail.updateRow(row.rowId, { openingBalance: v ?? 0 })" />
-            <span v-else>{{ fmt(row.openingBalance) }}</span>
+            <strong class="formula-cell" title="T = Q+S">{{ fmt(row.closingAdjusted) }}</strong>
           </template>
         </el-table-column>
-        <el-table-column label="期初调整" :render-header="th('期初调整')" width="100" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.openingAdjustment" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => detail.updateRow(row.rowId, { openingAdjustment: v ?? 0 })" />
-            <span v-else>{{ fmt(row.openingAdjustment) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="期初审定" :render-header="th('期初审定')" width="100" align="right">
-          <template #default="{ row }"><span class="formula-cell" title="期初余额+期初调整">{{ fmt(row.openingAdjusted) }}</span></template>
-        </el-table-column>
-        <el-table-column label="增加" :render-header="th('增加')" width="96" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.increaseAmount" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => detail.updateRow(row.rowId, { increaseAmount: v ?? 0 })" />
-            <span v-else>{{ fmt(row.increaseAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="减少" :render-header="th('减少')" width="96" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.decreaseAmount" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => detail.updateRow(row.rowId, { decreaseAmount: v ?? 0 })" />
-            <span v-else>{{ fmt(row.decreaseAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="FV变动" :render-header="th('FV变动')" width="100" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.fvChangeAmount" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => detail.updateRow(row.rowId, { fvChangeAmount: v ?? 0 })" />
-            <span v-else>{{ fmt(row.fvChangeAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="期末余额" :render-header="th('期末余额')" width="100" align="right">
-          <template #default="{ row }"><span class="formula-cell" title="期初审定+增加-减少+FV变动">{{ fmt(row.closingBalance) }}</span></template>
-        </el-table-column>
-        <el-table-column label="调整数" :render-header="th('调整数')" width="96" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.closingAdjustment" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => detail.updateRow(row.rowId, { closingAdjustment: v ?? 0 })" />
-            <span v-else>{{ fmt(row.closingAdjustment) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="审定数" :render-header="th('审定数')" width="100" align="right">
-          <template #default="{ row }"><span class="formula-cell" title="期末余额+调整数">{{ fmt(row.closingAdjusted) }}</span></template>
-        </el-table-column>
-        <el-table-column label="指定OCI原因" :render-header="th('指定OCI原因')" min-width="140">
+        <el-table-column label="指定为FVOCI的原因" :render-header="th('指定为以公允价值计量且其变动计入其他综合收益的原因')" min-width="160">
           <template #default="{ row }">
             <el-input
               v-if="!isReadonly"
               :model-value="row.designationReason"
               size="small"
               :class="{ 'field-warn': needsDesignation(row) }"
-              placeholder="不可撤销指定须说明"
+              placeholder="非交易性持有目的（指定不可撤销）"
               @update:model-value="(v: string) => detail.updateRow(row.rowId, { designationReason: v })"
             />
             <span v-else>{{ row.designationReason }}</span>
           </template>
         </el-table-column>
-      </template>
-      <template v-else>
-        <el-table-column label="被投资单位" :render-header="th('被投资单位')" prop="investeeName" min-width="120" fixed />
-        <el-table-column label="期初OCI累计" :render-header="th('期初OCI累计')" width="120" align="right">
-          <template #default="{ row }">
-            <el-input-number
-              v-if="!isReadonly"
-              :model-value="row.ociOpeningCumulative"
-              size="small"
-              :controls="false"
-              style="width:100%"
-              @update:model-value="(v: number) => detail.updateRow(row.rowId, { ociOpeningCumulative: v ?? 0 })"
-            />
-            <span v-else>{{ fmt(row.ociOpeningCumulative) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="本期OCI" :render-header="th('本期OCI')" width="100" align="right">
-          <template #default="{ row }">
-            <el-input-number
-              v-if="!isReadonly"
-              :model-value="row.ociCurrentChange"
-              size="small"
-              :controls="false"
-              style="width:100%"
-              :class="{ 'field-warn': ociFvMismatch(row) }"
-              @update:model-value="(v: number) => detail.updateRow(row.rowId, { ociCurrentChange: v ?? 0 })"
-            />
-            <span v-else :class="{ 'rate-warn': ociFvMismatch(row) }">{{ fmt(row.ociCurrentChange) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="OCI转留存" :render-header="th('OCI转留存')" width="110" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.ociToRetainedEarnings" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => detail.updateRow(row.rowId, { ociToRetainedEarnings: v ?? 0 })" />
-            <span v-else>{{ fmt(row.ociToRetainedEarnings) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="期末OCI累计" :render-header="th('期末OCI累计')" width="120" align="right">
-          <template #default="{ row }">
-            <span
-              class="formula-cell"
-              :class="{ 'rate-warn': ociRollMismatch(row) }"
-              title="期初OCI累计+本期OCI−转入留存"
-            >{{ fmt(row.ociCumulativeChange) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="转入原因" :render-header="th('转入原因')" width="110">
+        <el-table-column label="OCI转留存原因" :render-header="th('其他综合收益转入留存收益的原因')" min-width="140">
           <template #default="{ row }">
             <el-input
               v-if="!isReadonly"
               :model-value="row.transferReason"
               size="small"
               :class="{ 'field-warn': needsTransferReason(row) }"
+              placeholder="处置 / 转为长期股权投资"
               @update:model-value="(v: string) => detail.updateRow(row.rowId, { transferReason: v })"
             />
             <span v-else>{{ row.transferReason }}</span>
@@ -317,66 +193,145 @@
             <span v-else>{{ row.confirmationStatus }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="层次" :render-header="th('层次')" width="96">
+      </template>
+
+      <!-- ── 期初余额：C / D / E / F + G / H（模板 C9:F9 分组 + 两单列）────── -->
+      <template v-else-if="detail.activeTab.value === 'opening'">
+        <el-table-column label="被投资单位" :render-header="th('被投资单位')" prop="investeeName" min-width="120" fixed show-overflow-tooltip />
+        <el-table-column label="期初余额" :render-header="th('期初余额')" align="center">
+          <el-table-column label="成本" :render-header="th('成本')" width="110" align="right">
+            <template #default="{ row }">
+              <WpAmountInput v-if="!isReadonly" :model-value="row.openingCost" size="small" style="width:100%"
+                @update:model-value="(v: number) => detail.updateRow(row.rowId, { openingCost: v ?? 0 })" />
+              <span v-else>{{ fmt(row.openingCost) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="累计公允价值变动" :render-header="th('累计公允价值变动')" width="130" align="right">
+            <template #default="{ row }">
+              <WpAmountInput v-if="!isReadonly" :model-value="row.openingFvAccum" size="small" style="width:100%"
+                @update:model-value="(v: number) => detail.updateRow(row.rowId, { openingFvAccum: v ?? 0 })" />
+              <span v-else>{{ fmt(row.openingFvAccum) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="合计" :render-header="th('合计')" width="110" align="right">
+            <template #default="{ row }">
+              <span class="formula-cell" title="E = SUM(C:D)">{{ fmt(row.openingTotal) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="计入OCI的累计利得或损失" :render-header="th('计入其他综合收益的累计利得或损失')" width="150" align="right">
+            <template #default="{ row }">
+              <WpAmountInput v-if="!isReadonly" :model-value="row.openingOciCumulative" size="small" style="width:100%"
+                @update:model-value="(v: number) => detail.updateRow(row.rowId, { openingOciCumulative: v ?? 0 })" />
+              <span v-else>{{ fmt(row.openingOciCumulative) }}</span>
+            </template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column label="期初调整数" :render-header="th('期初调整数')" width="110" align="right">
           <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.fairValueLevel" size="small"
-              @update:model-value="(v: string) => detail.updateRow(row.rowId, { fairValueLevel: v })">
-              <el-option v-for="o in detail.fvLevelOptions" :key="o" :label="o" :value="o" />
-            </el-select>
-            <span v-else>{{ row.fairValueLevel }}</span>
+            <WpAmountInput v-if="!isReadonly" :model-value="row.openingAdjustment" size="small" style="width:100%"
+              @update:model-value="(v: number) => detail.updateRow(row.rowId, { openingAdjustment: v ?? 0 })" />
+            <span v-else>{{ fmt(row.openingAdjustment) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="估值方法" :render-header="th('估值方法')" width="120">
+        <el-table-column label="期初审定数" :render-header="th('期初审定数')" width="110" align="right">
           <template #default="{ row }">
-            <el-select
-              v-if="!isReadonly"
-              :model-value="row.valuationMethod"
-              size="small"
-              allow-create
-              filterable
-              :class="{ 'field-warn': needsValuation(row) }"
-              @update:model-value="(v: string) => detail.updateRow(row.rowId, { valuationMethod: v })"
-            >
-              <el-option v-for="o in detail.valuationMethodOptions" :key="o" :label="o" :value="o" />
-            </el-select>
-            <span v-else>{{ row.valuationMethod }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="持股数" :render-header="th('持股数')" width="96" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.shareCount" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => detail.updateRow(row.rowId, { shareCount: v ?? 0 })" />
-            <span v-else>{{ row.shareCount }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="每股公允价值" :render-header="th('每股公允价值')" width="120" align="right">
-          <template #default="{ row }">
-            <WpAmountInput v-if="!isReadonly" :model-value="row.pricePerShare" size="small" style="width:100%"
-              @update:model-value="(v: number) => detail.updateRow(row.rowId, { pricePerShare: v ?? 0 })" />
-            <span v-else>{{ fmt(row.pricePerShare) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="公允价值合计" :render-header="th('公允价值合计')" width="120" align="right">
-          <template #default="{ row }">
-            <WpAmountInput
-              v-if="!isReadonly"
-              :model-value="row.fairValueTotal"
-              size="small"
-              style="width:100%"
-              :class="{ 'field-warn': fvClosingMismatch(row) }"
-              @update:model-value="(v: number) => detail.updateRow(row.rowId, { fairValueTotal: v ?? 0 })"
-            />
-            <span v-else class="formula-cell" :title="fvHint(row)">{{ fmt(row.fairValueTotal) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="备注" :render-header="th('备注')" min-width="100">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.remark" size="small"
-              @update:model-value="(v: string) => detail.updateRow(row.rowId, { remark: v })" />
-            <span v-else>{{ row.remark }}</span>
+            <span class="formula-cell" title="H = E+G">{{ fmt(row.openingAdjusted) }}</span>
           </template>
         </el-table-column>
       </template>
+
+      <!-- ── 本期变动：I / J / K / L / M / N（模板 I9:N9 分组）────────────── -->
+      <template v-else-if="detail.activeTab.value === 'movement'">
+        <el-table-column label="被投资单位" :render-header="th('被投资单位')" prop="investeeName" min-width="120" fixed show-overflow-tooltip />
+        <el-table-column label="本期变动" :render-header="th('本期变动')" align="center">
+          <el-table-column label="成本（净额）" :render-header="th('成本（增加为正 / 减少为负）')" width="120" align="right">
+            <template #default="{ row }">
+              <WpAmountInput v-if="!isReadonly" :model-value="row.movementCost" size="small" style="width:100%"
+                @update:model-value="(v: number) => detail.updateRow(row.rowId, { movementCost: v ?? 0 })" />
+              <span v-else>{{ fmt(row.movementCost) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="本期公允价值变动" :render-header="th('本期公允价值变动（FVOCI 下即本期 OCI）')" width="140" align="right">
+            <template #default="{ row }">
+              <WpAmountInput v-if="!isReadonly" :model-value="row.movementFvChange" size="small" style="width:100%"
+                @update:model-value="(v: number) => detail.updateRow(row.rowId, { movementFvChange: v ?? 0 })" />
+              <span v-else>{{ fmt(row.movementFvChange) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="处置时公允价值变动结转" :render-header="th('处置时公允价值变动结转')" width="150" align="right">
+            <template #default="{ row }">
+              <WpAmountInput v-if="!isReadonly" :model-value="row.disposalFvTransfer" size="small" style="width:100%"
+                @update:model-value="(v: number) => detail.updateRow(row.rowId, { disposalFvTransfer: v ?? 0 })" />
+              <span v-else>{{ fmt(row.disposalFvTransfer) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="OCI转入留存收益" :render-header="th('其他综合收益转入留存收益')" width="130" align="right">
+            <template #default="{ row }">
+              <WpAmountInput
+                v-if="!isReadonly"
+                :model-value="row.ociToRetainedEarnings"
+                size="small"
+                style="width:100%"
+                :class="{ 'field-warn': needsTransferReason(row) }"
+                @update:model-value="(v: number) => detail.updateRow(row.rowId, { ociToRetainedEarnings: v ?? 0 })"
+              />
+              <span v-else>{{ fmt(row.ociToRetainedEarnings) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="合计" :render-header="th('合计')" width="110" align="right">
+            <template #default="{ row }">
+              <span class="formula-cell" title="M = I+J+K+L">{{ fmt(row.movementTotal) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="本期确认的股利收入" :render-header="th('本期确认的股利收入（损益项，不进余额）')" width="140" align="right">
+            <template #default="{ row }">
+              <WpAmountInput v-if="!isReadonly" :model-value="row.dividendIncome" size="small" style="width:100%"
+                @update:model-value="(v: number) => detail.updateRow(row.rowId, { dividendIncome: v ?? 0 })" />
+              <span v-else>{{ fmt(row.dividendIncome) }}</span>
+            </template>
+          </el-table-column>
+        </el-table-column>
+      </template>
+
+      <!-- ── 期末余额：O / P / Q / R + S / T（模板 O9:R9 分组 + 两单列）────── -->
+      <template v-else>
+        <el-table-column label="被投资单位" :render-header="th('被投资单位')" prop="investeeName" min-width="120" fixed show-overflow-tooltip />
+        <el-table-column label="期末余额" :render-header="th('期末余额')" align="center">
+          <el-table-column label="成本" :render-header="th('成本')" width="110" align="right">
+            <template #default="{ row }">
+              <span class="formula-cell" title="O = C+I">{{ fmt(row.closingCost) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="累计公允价值变动" :render-header="th('累计公允价值变动')" width="130" align="right">
+            <template #default="{ row }">
+              <span class="formula-cell" title="P = D+J+K（含处置时结转）">{{ fmt(row.closingFvAccum) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="合计" :render-header="th('合计')" width="110" align="right">
+            <template #default="{ row }">
+              <span class="formula-cell" title="Q = O+P">{{ fmt(row.closingTotal) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="计入OCI的累计利得或损失" :render-header="th('计入其他综合收益的累计利得或损失')" width="150" align="right">
+            <template #default="{ row }">
+              <span class="formula-cell" title="R = F+J+L">{{ fmt(row.closingOciCumulative) }}</span>
+            </template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column label="调整数" :render-header="th('调整数')" width="110" align="right">
+          <template #default="{ row }">
+            <WpAmountInput v-if="!isReadonly" :model-value="row.closingAdjustment" size="small" style="width:100%"
+              @update:model-value="(v: number) => detail.updateRow(row.rowId, { closingAdjustment: v ?? 0 })" />
+            <span v-else>{{ fmt(row.closingAdjustment) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="审定数" :render-header="th('审定数')" width="110" align="right">
+          <template #default="{ row }">
+            <strong class="formula-cell" title="T = Q+S">{{ fmt(row.closingAdjusted) }}</strong>
+          </template>
+        </el-table-column>
+      </template>
+
       <el-table-column v-if="!isReadonly" label="操作" width="56" fixed="right">
         <template #default="{ row }">
           <el-button link type="danger" size="small" @click="detail.removeRow(row.rowId)">删</el-button>
@@ -384,34 +339,41 @@
       </el-table-column>
     </el-table>
 
+    <!-- 合计行（模板 R21，逐列 =SUM(x11:x20)）—— 按模板列顺序展示 -->
     <el-table v-if="detail.rows.value.length" :data="[detail.totals.value]" border size="small" class="totals-table" style="font-size:13px;margin-top:8px">
-      <el-table-column label="合计" :render-header="th('合计')" width="80" />
-      <el-table-column label="期初审定" :render-header="th('期初审定')" width="100" align="right">
+      <el-table-column label="合计" :render-header="th('合计')" width="72" />
+      <el-table-column label="期初成本" :render-header="th('期初成本')" width="100" align="right">
+        <template #default="{ row }">{{ fmt(row.openingCost) }}</template>
+      </el-table-column>
+      <el-table-column label="期初审定" :render-header="th('期初审定数')" width="100" align="right">
         <template #default="{ row }">{{ fmt(row.openingAdjusted) }}</template>
       </el-table-column>
-      <el-table-column label="增加" :render-header="th('增加')" width="96" align="right">
-        <template #default="{ row }">{{ fmt(row.increaseAmount) }}</template>
+      <el-table-column label="本期成本" :render-header="th('本期变动 / 成本（净额）')" width="100" align="right">
+        <template #default="{ row }">{{ fmt(row.movementCost) }}</template>
       </el-table-column>
-      <el-table-column label="减少" :render-header="th('减少')" width="96" align="right">
-        <template #default="{ row }">{{ fmt(row.decreaseAmount) }}</template>
+      <el-table-column label="本期FV变动" :render-header="th('本期公允价值变动')" width="110" align="right">
+        <template #default="{ row }">{{ fmt(row.movementFvChange) }}</template>
       </el-table-column>
-      <el-table-column label="FV变动" :render-header="th('FV变动')" width="100" align="right">
-        <template #default="{ row }">{{ fmt(row.fvChangeAmount) }}</template>
+      <el-table-column label="处置结转" :render-header="th('处置时公允价值变动结转')" width="100" align="right">
+        <template #default="{ row }">{{ fmt(row.disposalFvTransfer) }}</template>
       </el-table-column>
-      <el-table-column label="期末余额" :render-header="th('期末余额')" width="100" align="right">
-        <template #default="{ row }">{{ fmt(row.closingBalance) }}</template>
+      <el-table-column label="OCI转留存" :render-header="th('其他综合收益转入留存收益')" width="110" align="right">
+        <template #default="{ row }">{{ fmt(row.ociToRetainedEarnings) }}</template>
       </el-table-column>
-      <el-table-column label="审定数" :render-header="th('审定数')" width="100" align="right">
+      <el-table-column label="变动合计" :render-header="th('本期变动合计')" width="100" align="right">
+        <template #default="{ row }">{{ fmt(row.movementTotal) }}</template>
+      </el-table-column>
+      <el-table-column label="股利收入" :render-header="th('本期确认的股利收入')" width="100" align="right">
+        <template #default="{ row }">{{ fmt(row.dividendIncome) }}</template>
+      </el-table-column>
+      <el-table-column label="期末未审" :render-header="th('期末余额 / 合计')" width="100" align="right">
+        <template #default="{ row }">{{ fmt(row.closingTotal) }}</template>
+      </el-table-column>
+      <el-table-column label="期末OCI累计" :render-header="th('期末 计入其他综合收益的累计利得或损失')" width="120" align="right">
+        <template #default="{ row }">{{ fmt(row.closingOciCumulative) }}</template>
+      </el-table-column>
+      <el-table-column label="审定数" :render-header="th('审定数')" width="110" align="right">
         <template #default="{ row }"><strong>{{ fmt(row.closingAdjusted) }}</strong></template>
-      </el-table-column>
-      <el-table-column label="本期OCI" :render-header="th('本期OCI')" width="100" align="right">
-        <template #default="{ row }">{{ fmt(row.ociCurrentChange) }}</template>
-      </el-table-column>
-      <el-table-column label="期末OCI累计" :render-header="th('期末OCI累计')" width="120" align="right">
-        <template #default="{ row }">{{ fmt(row.ociCumulativeChange) }}</template>
-      </el-table-column>
-      <el-table-column label="公允合计" :render-header="th('公允合计')" width="110" align="right">
-        <template #default="{ row }"><strong>{{ fmt(row.fairValueTotal) }}</strong></template>
       </el-table-column>
     </el-table>
 
@@ -423,13 +385,14 @@
       note-ai-section="detail-note"
       conclusion-ai-section="detail-conclusion"
       note-placeholder="填写审计说明：（1）明细核对程序及结果；（2）各被投资单位成本、公允价值、OCI 变动的核实情况；（3）与 G8-1/G8-4 勾稽及异常事项。"
-      note-hint="覆盖被投资单位明细、指定 OCI 原因、公允价值层次与跨表勾稽。"
-      conclusion-placeholder="填写审计结论：A、明细准确完整，与 G8-1 勾稽一致，指定与层次恰当。B、除已注明事项外未见异常。C、存在重大未决差异或范围受限，不可确认。"
+      note-hint="覆盖被投资单位明细、指定 OCI 原因、OCI 转留存与跨表勾稽。"
+      conclusion-placeholder="填写审计结论：A、明细准确完整，与 G8-1 勾稽一致，指定恰当。B、除已注明事项外未见异常。C、存在重大未决差异或范围受限，不可确认。"
       conclusion-hint="按 A/B/C 口径评价明细充分性。"
       :related-context="{
         rowCount: detail.rows.value.length,
         closingAdjustedTotal: detail.totals.value.closingAdjusted,
-        fairValueTotal: detail.totals.value.fairValueTotal,
+        closingUnauditedTotal: detail.totals.value.closingTotal,
+        closingOciCumulativeTotal: detail.totals.value.closingOciCumulative,
         integrityIssueCount: detail.integrityIssues.value.length,
         adjCrossVariance: detail.adjCrossVariance.value,
       }"
@@ -446,7 +409,6 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import G8ImportExportDropdown from '../G8ImportExportDropdown.vue'
 import G8AuditTextCards from '../G8AuditTextCards.vue'
 import { useG8Detail, type G8DetailRow } from '../../composables/useG8Detail'
-import { calcFairValueAmount, calcOciCumulativeEnding } from '../../composables/useG8FormulaEngine'
 import { jumpToG8Sheet } from '../../composables/g8CrossHelpers'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
@@ -490,9 +452,15 @@ watch(auditConclusion, (v) => {
   if (!props.isReadonly) props.debouncedSave(AUDIT_CONCLUSION_KEY, { conclusion: v, remark: null })
 })
 
+/**
+ * 🔴 C-8：四段对齐模板的四个一级分组（原先 `basic`/`fv_oci` 两段是按「自研列 vs OCI 列」
+ * 切的，与模板 C9:F9 / I9:N9 / O9:R9 三组 + 单列说明列不对应）。
+ */
 const tabOptions = [
   { label: '基础信息', value: 'basic' },
-  { label: '公允价值+OCI', value: 'fv_oci' },
+  { label: '期初余额', value: 'opening' },
+  { label: '本期变动', value: 'movement' },
+  { label: '期末余额', value: 'closing' },
 ]
 
 const currentRowKey = computed(() => {
@@ -517,12 +485,6 @@ function rowClassName({ row }: { row: G8DetailRow }) {
   return hit ? 'row-warn' : ''
 }
 
-function onSyncFv() {
-  const n = detail.syncFairValueFromQtyPrice()
-  if (n) ElMessage.success(`已按数量×单价回填 ${n} 行公允价值合计`)
-  else ElMessage.info('无可用的持股数×每股公允价值可回填')
-}
-
 async function onSeedAux() {
   const r = await detail.seedFromAuxBalance()
   if (r.error) {
@@ -530,17 +492,6 @@ async function onSeedAux() {
     return
   }
   ElMessage.success(`辅助核算（${r.dimType}）已同步：新增 ${r.added}，更新 ${r.updated}`)
-}
-
-function onFillOci() {
-  const n = detail.fillOciFromFvChange()
-  if (n) ElMessage.success(`已将 ${n} 行 FV 变动填入本期 OCI，并重算期末累计`)
-  else ElMessage.info('无需填入（本期 OCI 已有值或 FV 变动为空）')
-}
-
-function onSyncOciRoll() {
-  const n = detail.syncOciCumulativeRoll()
-  if (n) ElMessage.success(`已按滚动公式重算 ${n} 行期末 OCI 累计`)
 }
 
 function onPushAdj() {
@@ -575,44 +526,8 @@ function needsDesignation(row: G8DetailRow) {
   return Math.abs(row.closingAdjusted) > 0.01 && !row.designationReason?.trim()
 }
 
-function needsValuation(row: G8DetailRow) {
-  return row.fairValueLevel === 'Level3' && !row.valuationMethod?.trim()
-}
-
 function needsTransferReason(row: G8DetailRow) {
   return Math.abs(row.ociToRetainedEarnings) > 0.01 && !row.transferReason?.trim()
-}
-
-function ociFvMismatch(row: G8DetailRow) {
-  return (
-    Math.abs(row.fvChangeAmount) > 0.01
-    && Math.abs(row.ociCurrentChange) > 0.01
-    && Math.abs(row.fvChangeAmount - row.ociCurrentChange) > 0.01
-  )
-}
-
-function ociRollMismatch(row: G8DetailRow) {
-  const expected = calcOciCumulativeEnding(
-    row.ociOpeningCumulative,
-    row.ociCurrentChange,
-    row.ociToRetainedEarnings,
-  )
-  return Math.abs(row.ociCumulativeChange - expected) > 0.01
-}
-
-function fvClosingMismatch(row: G8DetailRow) {
-  return (
-    Math.abs(row.fairValueTotal) > 0.01
-    && Math.abs(row.closingAdjusted) > 0.01
-    && Math.abs(row.fairValueTotal - row.closingAdjusted) > 0.01
-  )
-}
-
-function fvHint(row: G8DetailRow) {
-  if (row.shareCount && row.pricePerShare) {
-    return `数量×单价=${fmt(calcFairValueAmount(row.shareCount, row.pricePerShare))}`
-  }
-  return '公允价值合计'
 }
 </script>
 
@@ -641,6 +556,7 @@ function fvHint(row: G8DetailRow) {
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-content { margin-top: 8px; font-size: 12px; color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
+.guidance-content code { background: #fff; padding: 0 3px; border-radius: 2px; color: #c7254e; }
 .objective-alert { margin-bottom: 10px; }
 .cross-alert { margin-bottom: 8px; }
 .fine-checks { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
@@ -651,7 +567,6 @@ function fvHint(row: G8DetailRow) {
 .field-warn :deep(.el-select__wrapper) {
   box-shadow: 0 0 0 1px #e6a23c inset;
 }
-.rate-warn { color: #e6a23c; font-weight: 600; }
 :deep(.row-warn) { background: #fdf6ec !important; }
 .th-label {
   display: inline-block;

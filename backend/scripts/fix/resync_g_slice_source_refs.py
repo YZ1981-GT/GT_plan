@@ -58,12 +58,19 @@ TARGETS: dict[str, tuple[str, str, re.Pattern[str]]] = {
         "remark",
         re.compile(r"^\s*return `(g10d)-\$\{Date\.now\(\)"),
     ),
+    # C-8：G8 的列模型整体重写（23 列 A..W，FVOCI）⇒ 同样只有行号移位。
+    "xlsx/gt-g8-other-equity-instruments": (
+        "useG8Detail.ts",
+        "remark",
+        re.compile(r"^\s*return `(g8d)-\$\{Date\.now\(\)"),
+    ),
 }
 TABLE_TO_ENTRY = {
     "G1-detail-rows": "xlsx/gt-g1-trading-financial-assets",
     "G3-detail-rows": "xlsx/gt-g3-dividend-receivable",
     "G9-detail-rows": "xlsx/gt-g9-other-noncurrent-financial",
     "G10-detail-rows": "xlsx/gt-g10-trading-financial-liabilities",
+    "G8-detail-rows": "xlsx/gt-g8-other-equity-instruments",
 }
 
 _NULL_COL = re.compile(r"\b(remark|conclusion)\s*:\s*null\s*,?")

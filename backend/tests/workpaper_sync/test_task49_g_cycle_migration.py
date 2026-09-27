@@ -138,6 +138,7 @@ SLICE_DELIVERED_CONTRACTS: dict[str, str] = {
     "xlsx/gt-g2-interest-receivable": "g2.interest_receivable_detail.json",
     "xlsx/gt-g9-other-noncurrent-financial": "g9.other_noncurrent_detail.json",
     "xlsx/gt-g10-trading-financial-liabilities": "g10.trading_liabilities_detail.json",
+    "xlsx/gt-g8-other-equity-instruments": "g8.other_equity_detail.json",
 }
 
 #: 不可达旧桩（AC 1.7）——它的 independent_entry=false，不进 slice。
@@ -1622,15 +1623,14 @@ class TestProperty20And21NotClaimedPassingForThisSlice:
         🔴 形态从「不得出现本 slice 的 entry」改成「== 已登记交付面」（2026-09-27）：
         G2 canary 交付后它**应当**在 registry 里（否则 provider 注册不了）。
         但不能放宽成「出现也行」—— registry 里多出一条没过字段级判据的 entry 必须打红。
+
+        🔴 取数改**模块属性现读**：台账已抽到 `delivered_contracts_ledger.py`，源码正则失配成 0 条。
         """
-        source = REGISTRY.read_text(encoding="utf-8")
-        block = re.search(
-            r"DELIVERED_PER_ENTRY_CONTRACTS[^=]*=\s*\(([\s\S]*?)\n\)\n", source
-        )
-        assert block, "找不到 DELIVERED_PER_ENTRY_CONTRACTS 的声明 ⇒ 判据无分母"
-        declared = re.findall(r"\"entry_id\":\s*\"([^\"]+)\"", block.group(1))
+        from app.services.workpaper_sync.adapters import registry as _RG
+
+        declared = [str(row["entry_id"]) for row in _RG.DELIVERED_PER_ENTRY_CONTRACTS]
         assert len(declared) >= 4, (
-            f"登记表只解析出 {len(declared)} 条 entry_id ⇒ 正则失配，判据会恒真"
+            f"登记表只解析出 {len(declared)} 条 entry_id ⇒ 取数失配，判据会恒真"
         )
         slice_ids = {e["entry_id"] for e in manifest_slice["independent_entries"]}
         from_slice = sorted({e for e in declared if e in slice_ids})

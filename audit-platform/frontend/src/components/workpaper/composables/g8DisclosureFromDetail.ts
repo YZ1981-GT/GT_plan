@@ -43,13 +43,20 @@ function parseDetailRows(m: Map<string, ChecklistResponse>): G8DiscSourceRow[] {
     const arr = JSON.parse(raw)
     if (!Array.isArray(arr)) return []
     return arr
+      // 🔴 C-8（spec g-cycle-single-region-detail-lanes）：G8-2 改为权威模板 23 列 A..W。
+      //    * `openingBalance`/`closingBalance` 单值列已拆成三分量 ⇒ 未审合计取 E/Q 列
+      //      （`openingTotal`/`closingTotal`），审定数仍取 H/T（`openingAdjusted`/`closingAdjusted`）。
+      //    * `fairValueTotal` 回退链已删 —— 那列的权威源是 公允价值测试表G8-4，
+      //      本表的期末公允价值就是 Q 列（=O+P）。
+      //    * FVOCI 下「本期 OCI」就是模板 J 列 `movementFvChange` —— 原 `ociCurrentChange`
+      //      与它双源，已合并；`ociCumulativeChange` 改名为 R 列 `closingOciCumulative`。
       .map((r: Partial<G8DetailRow>) => ({
         investeeName: String(r.investeeName ?? '').trim(),
-        openingAdjusted: parseNum(r.openingAdjusted ?? r.openingBalance),
-        closingAdjusted: parseNum(r.closingAdjusted ?? r.closingBalance ?? r.fairValueTotal),
+        openingAdjusted: parseNum(r.openingAdjusted ?? r.openingTotal),
+        closingAdjusted: parseNum(r.closingAdjusted ?? r.closingTotal),
         designationReason: String(r.designationReason ?? '').trim(),
-        ociCurrentChange: parseNum(r.ociCurrentChange),
-        ociCumulativeChange: parseNum(r.ociCumulativeChange),
+        ociCurrentChange: parseNum(r.movementFvChange),
+        ociCumulativeChange: parseNum(r.closingOciCumulative),
         ociToRetainedEarnings: parseNum(r.ociToRetainedEarnings),
         transferReason: String(r.transferReason ?? '').trim(),
       }))

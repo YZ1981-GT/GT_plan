@@ -120,6 +120,12 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     #    留 False 会让本门按单 spec 口径现算，digest 与注册路径实际用的那份不同源
     #    （形态同 G2 —— 单 sheet 也走复数 API）。
     ("g10", "phase5_g10_trading_liabilities", "ADAPTER_ID", True, True),
+    # ── G8（spec: g-cycle-single-region-detail-lanes · Task 9b / C-8）────────
+    #    与 G10 同形（单区 + 复数 instrumentation API）⇒ 两个 True 同理。
+    #    🔴 本条的 digest 会在「R/T 两列被误改回 mode=formula」时变动 —— 那种改动会让
+    #    `excel_materialize` 在 R13-R20/R12 上抛 ProtectedRegionWriteError（模板那几格
+    #    没有公式），本门先一步把它拦在 digest 漂移上。
+    ("g8", "phase5_g8_other_equity", "ADAPTER_ID", True, True),
 )
 
 
