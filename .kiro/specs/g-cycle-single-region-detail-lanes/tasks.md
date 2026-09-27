@@ -292,11 +292,46 @@ FC-1~FC-13 · F3 spec 裁决 F3-H4（行级 mask）· F5 spec（布尔/错误值
     但会打乱 Task 9~14 的编号与 `_Requirements_` 对应 ⇒ **留待拍板**，本 Task 保持原序不动
   - _Requirements: 1.1, 2.1, 2.2, 3.2, 3.3, 3.5_
 
-- [ ] 9. G10 + G8（单区 + 行级 mask）
-  - G10：`G10-detail-rows` / `rowId` / R9/R10 / R11-20 / R21 / `formula_columns=("E","G","K","L","M","O")`
-  - G8：🔴 拆 `g802-r11`（单行）+ `g802-r12plus`（R12-20），按裁决 G1R-H3 的「并集取 formula、交集取 editable」
+- [x]🔴 9（C-7）. G10（**第二条**，单区）：`phase5_g10_trading_liabilities.py` + `phase5_g10_02_detail.py`
+  - 原 Task 9 是「G10 + G8」两条。**已拆**：G10 本条交付完毕，G8 另立 9b（行级 mask 是独立难点，
+    与 G10 无共享代码，绑在一条里会让 G10 的完成度无法诚实表达）
+  - 交付：`G10-detail-rows` / `rowId` / R9-R10 两级表头 / 单区 R11-20 / footer R21 /
+    `formula_columns=("E","G","K","L","M","O")`（与 Task 2 实测一致，逐格复核无偏差）
+  - 🔴 **前端根治在先**（选项 C）：`useG10Detail.ts` 原 35 列删 16 列、重写为模板列序 A..S 的 19 字段；
+    每条移除都指得出归属（`DROPPED_LEGACY_G10_FIELDS` 台账）—— OCI/减值四列属 FVOCI 口径
+    （CAS22 下 FVTPL 不确认）· 层次/估值属 G10-5/G10-6 · 衍生三列属 G10-8 ·
+    `currentDecrease` 与模板 H 净额列双源 · `closingBalance` 走审定线与模板 `M=K+L` 未审线冲突 ·
+    `confirmationStatus` 是资产侧函证（G10 是**负债**不对外发函）
+  - 🔴 **负债侧三处与 G9 不同**（照 G9 镜像会错一整列）：① 调整/审定都是**单列**（F/G、N/O 在 R9
+    无合并区），资产侧 G9 拆两分量（M/N→P/Q）② `L=D+I+J` **含利息 J**（利息计入财务费用同时增加
+    负债账面价值），改造前算 `D+I` 致审定数系统性偏小 ③ 本期变动是**净额列**，模板无「本期减少」
+  - 🔴 `uuid_col="T"` 取**有效内容列** 19 右移一列，**不是** `max_column+1=Y`（max_column=24 含空列 T..X）
+  - 🔴 `ghost_row_anchor_index=1` 指 B 列「项目」：A 列「类别」是枚举且模板 R11 有预填值「指定类」
+  - 跨表 4 处根治：`pushG10FvToDetail`/`pushG10DerivativeCheckToDetail` 停用恒返 0（保签名不打断
+    4 个调用方）· Level3 名单改由 G10-5 定 · `isG10DerivativeDetailRow` 只按 B 列名称判 ·
+    `g10CrossChecks` 审定数取模板 O 列并删 `closingBalance` 回退链
+  - 发布链：契约生成器 + `g10.trading_liabilities_detail.json`（写盘前过 `parse_contract`）+
+    `store_item_registry` plan（挂 `oo_crash_neutralization_fn`，册内裸 IF 现算 **28 格**全在
+    `审定表G10-1`、受管表零命中，仍按 per-file 保守策略挂）+ `adapters/registry` 交付登记行 +
+    零回归门 `("g10", …, plural_instr=True)` + `SLICE_DELIVERED_CONTRACTS` + slice 取证 resync
+  - 判据：`test_g10_column_isomorphism.py` **65 passed** 四层闭环（🔴 「是否分组列」按**该列是否落在
+    R9 横向合并区内**判，不按「R10 有叶子」判 —— G10 的 F/G 在 R10 有文本但 R9 无合并区，
+    照 G9 口径会假红）+ `useG10Detail.spec.ts` **36 passed** 五组（刻意**不**照 G9 补迁移判据：
+    G10 真库是 2 B 空数组，只做读取兼容，不为不存在的数据造迁移统计与回写）
+  - 零回归：六 lane 判据文件 24 failed → **22 failed**；前端 G9/G10/G13 共 19 文件 231 passed 0 failed；
+    vue-tsc 窄配置 26→25 error（新引入的 `g10CrossChecks` `closingBalance` 已修，余 25 全既存）
+  - commit：前端 `840663ecb`（18 文件）+ 后端 `cad12759c`（9 文件）；
+    🔴 `store_item_registry` 与 `adapters/registry` 两处台账**被并发会话的 H6 commit `09fc4339c` 带走**
+    （共享台账文件，它提交时暂存区含本会话条目）—— 已核 HEAD 内容完整，未重复提交
+  - 证据：`evidence/task9-c7-g10-rootfix.md`
+  - _Requirements: 2.1, 3.5_
+
+- [ ] 9b. G8（行级 mask，从原 Task 9 拆出）
+  - 🔴 拆 `g802-r11`（单行）+ `g802-r12plus`（R12-20），按裁决 G1R-H3 的「并集取 formula、交集取 editable」
     保守策略；判据证明 R13 的 R 列与 R12 的 T 列不被误标（P12）；
-    🔴 若保守策略让可编辑面缩到业务不可接受 ⇒ 改三 spec（`r11`/`r12`/`r13plus`）
+  - 🔴 若保守策略让可编辑面缩到业务不可接受 ⇒ 改三 spec（`r11`/`r12`/`r13plus`）
+  - 🔴 **G8 是 FVOCI**（其他权益工具投资）⇒ 它**有** OCI / 减值列，**不得**照 G9/G10 的
+    「删 OCI 四列」处置（C-6 evidence §1 已登记该反例）
   - _Requirements: 2.1, 3.5_
 
 - [ ] 10. G14（`rowKey` 固定行集 + 一处布尔列）
