@@ -1,0 +1,365 @@
+{
+  "contract_id": "k1.baddebt_reversal_writeoff_check",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "json_field_id",
+    "hidden_uuid_column"
+  ],
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "carrier": {
+      "read": "formdata_composable_bare_endpoint",
+      "tb_publish_gate": "useK1FormData.ts",
+      "write": "host_collected_emit_save"
+    },
+    "cross_sheet_read_fields": {
+      "K1-11-related-party": {
+        "access": "read_only",
+        "exact_literal_hits": 3,
+        "upstream_sheet": "关联方往来检查表K1-11",
+        "why": "🔴 核销检查表的「是否关联方往来」列取自 K1-11。本表**只读**。"
+      },
+      "K1-3-baddebt-rows": {
+        "access": "read_only",
+        "exact_literal_hits": 8,
+        "upstream_sheet": "坏账准备测算K1-8 / 明细表K1-2 的坏账准备行",
+        "why": "🔴 转回检查表要「原确定坏账准备的依据」与「转回前累计已计提金额」两列，数据来自坏账准备测算链。本表**只读**，不得回写上游。"
+      }
+    },
+    "derived_total_fields": {
+      "K1-9-reversal-total": {
+        "exact_literal_hits": 2,
+        "mode": "derived",
+        "produced_by": "computed",
+        "template_anchor": "E15",
+        "template_formula": "=SUM(E12:E14)",
+        "why_not_input": "🔴 **禁标 `mode:\"input\"`** —— 它由 `computed` 从 `tables.reversal[]` 的金额列汇总，且与模板 footer `E15` 一一对应。标 input 会让 roundtrip 把它当用户录入值写回，覆盖掉模板公式 ⇒ Property 24 的精确落点。"
+      },
+      "K1-9-writeoff-total": {
+        "exact_literal_hits": 2,
+        "mode": "derived",
+        "produced_by": "computed",
+        "template_anchor": "C21",
+        "template_formula": "=SUM(C18:C20)",
+        "why_not_input": "🔴 同上。🔴 **注意它落 C 列不是 E 列** —— 上半表（转回）的金额列是 E，下半表（核销）的金额列是 C。adapter 不能按同一列写两个合计。"
+      }
+    },
+    "draft_target_entry_id": "xlsx/gt-k1-other-receivables",
+    "entry_id": null,
+    "excluded_namespaces": {
+      "ai_section_id": {
+        "keys": [
+          "K1-9-writeoff-header"
+        ],
+        "why": "🔴 AI section-id（`GtReviewTrigger section-id=`），**不在 checklist 持久化路径**。它是子串口径比精确口径多出的 3 处之一 —— 另 2 处是 `K1-9-writeoff-total`（派生键）。design 说那 3 处都是 `-total`，现算不成立，成分已修正。"
+      },
+      "sheet_code": {
+        "keys": [
+          "K1-9"
+        ],
+        "live_hits_per_line": 12,
+        "live_hits_per_occurrence": 13,
+        "why": "🔴 裸 `'K1-9'` 是 **sheet 码**不是 item_id（宿主是 `k1SheetProgress.ts` / `useK1ImportExport.ts` / `useK1WriteoffImportExport.ts` / `K1TabIndex.vue` 等 sheet 级消费方）。\n🔴 **两个口径都对**：每处都计 **13**（design 用的）· 每行至多一次 **12**（slice 一处用的）· slice 另一处写的 **11** 不属任何口径，是唯一的错。差异全在 `K1TabIndex.vue`（一行里出现两次）。"
+      }
+    },
+    "five_hop_write_path": {
+      "adjudication": "must_be_adapter_borne",
+      "hop1": "useK1WriteoffCheck.ts :: buildSavePayload()",
+      "hop2": "K1TabWriteoffCheck.vue :: emit('save', …)",
+      "hop3": "GtK1OtherReceivables.vue :: handleChildSave()",
+      "hop4": "GtK1OtherReceivables.vue :: useChecklistPersistence 的 PUT",
+      "hop5": "backend/app/routers/checklist_responses.py :: @router.put(\"\")",
+      "is_client_only": false,
+      "🔴 why_not_single_onlyoffice": "🔴 「纯客户端」本身**不是**裁 `single_onlyoffice` 的理由 —— AC 12.8 的唯一判据是「**无 HTML 对端**」。本表的 HTML 对端存在（`K1TabWriteoffCheck.vue`），模板 sheet 也存在 ⇒ 必须 adapter 承载，不能降级成单 OO。且 hop5 的后端 PUT 处理器现算真实存在（非 404）⇒ `is_client_only == False`。"
+    },
+    "html_store": {
+      "item_ids": [
+        "K1-9-writeoff"
+      ],
+      "note": "🔴 一个 item_id 承载**两张子表**（`tables.reversal[]` + `tables.writeoff[]`）+ 两个派生合计。载荷经 `buildSavePayload()` 构造、`emit('save')` 上抛、宿主 `handleChildSave()` 收口、`useChecklistPersistence` 打 PUT。",
+      "payload_column": "remark",
+      "payload_column_mode": "remark_only",
+      "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useK1WriteoffCheck.ts —— buildSavePayload() 经 K1TabWriteoffCheck.vue 的 emit('save') 到宿主 GtK1OtherReceivables.vue 的 handleChildSave()",
+      "shape": "json_object_with_two_row_arrays",
+      "table": "checklist_responses"
+    },
+    "known_template_quirks": [
+      {
+        "affected_cells": {
+          "附注披露信息(上市公司）": {
+            "⑥ 按欠款方归集的其他应收款期末余额前五名单位情况": [
+              "A125",
+              "C125",
+              "D125",
+              "F125",
+              "A126",
+              "C126",
+              "D126",
+              "F126",
+              "A127",
+              "C127",
+              "D127",
+              "F127",
+              "A128",
+              "C128",
+              "D128",
+              "F128",
+              "A129",
+              "C129",
+              "D129",
+              "F129"
+            ],
+            "⑧ 应收政府补助情况（逐项披露）": [
+              "A138",
+              "B138",
+              "C138",
+              "D138",
+              "E138",
+              "A139",
+              "B139",
+              "C139",
+              "D139",
+              "E139",
+              "A140",
+              "B140",
+              "C140",
+              "D140",
+              "E140"
+            ]
+          },
+          "附注披露信息（国企）": {
+            "⑤ 按欠款方归集的期末余额前五名的其他应收款项情况": [
+              "A104",
+              "C104",
+              "D104",
+              "F104",
+              "A105",
+              "C105",
+              "D105",
+              "F105",
+              "A106",
+              "C106",
+              "D106",
+              "F106",
+              "A107",
+              "C107",
+              "D107",
+              "F107",
+              "A108",
+              "C108",
+              "D108",
+              "F108"
+            ],
+            "⑧ 涉及政府补助的应收款项": [
+              "A127",
+              "B127",
+              "C127",
+              "D127",
+              "E127",
+              "A128",
+              "B128",
+              "C128",
+              "D128",
+              "E128",
+              "A129",
+              "B129",
+              "C129",
+              "D129",
+              "E129"
+            ]
+          }
+        },
+        "arithmetic_self_check": "每表 4 列×5 行 20 + 5 列×3 行 15 == 35；两表 35×2 == 70",
+        "defect": "两张附注披露变体各 35 格公式为裸 `=#REF!`（合计 70 格 / 每表 8 行），引用源工作表已被删除。",
+        "defect_id": "KC-11",
+        "handling": "overlay_fixed",
+        "handling_note": "🔴 走**模板覆盖层**（FC-5 的**第 6 个**例外；前五个 F2-26!J9 / F5-7!G31 / G5-2 45 格 / G5-1!B35 / I3 明细表I3-2!AA23:AD23）。`backend/wp_templates/` 字节**一个都不动** —— 模板是审计准则产物，改字节会破坏与纸质底稿的对应关系，且 sha256 变了会让本册全部 source_ref 失效。覆盖层**只动这 70 格**：占比列 IF 公式（12 处）与合计行 SUM（6 处）一格不碰。",
+        "must_not_touch": {
+          "附注披露信息(上市公司）": [
+            "E125",
+            "E126",
+            "E127",
+            "E128",
+            "E129",
+            "E130",
+            "C130",
+            "F130",
+            "C141"
+          ],
+          "附注披露信息（国企）": [
+            "E104",
+            "E105",
+            "E106",
+            "E107",
+            "E108",
+            "E109",
+            "C109",
+            "F109",
+            "C130"
+          ]
+        },
+        "overlay_action": "clear_to_blank_input",
+        "overlay_formulas": {},
+        "propagation": {
+          "note": "🔴 合计行的 SUM **恒传播** `#REF!` ⇒ 覆盖层不修明细格就修不了合计。🔴 **两变体行号不同名**：`R130` 在上市是子区①合计（2 个 SUM）、在国企是子区②合计（1 个 SUM）⇒ 判据必须按变体分别断言，写成「R130 有两个 SUM」在国企会假红。",
+          "附注披露信息(上市公司）": {
+            "R130": [
+              "C130=SUM(C125:C129)",
+              "F130=SUM(F125:F129)"
+            ],
+            "R141": [
+              "C141=SUM(C138:C140)"
+            ]
+          },
+          "附注披露信息（国企）": {
+            "R109": [
+              "C109=SUM(C104:C108)",
+              "F109=SUM(F104:F108)"
+            ],
+            "R130": [
+              "C130=SUM(C127:C129)"
+            ]
+          }
+        },
+        "severity": "partial_break_not_whole_sheet",
+        "sheets": [
+          "附注披露信息(上市公司）",
+          "附注披露信息（国企）"
+        ],
+        "test_payload_requirement": "🔴 判据载荷 SHALL 是「**只有这两个子区有数、同表其他区为 0**」。用「全表都有数」的载荷 SHALL 打红（其他区的正确值会掩盖本区错误 ⇒ 假绿）；用「全表都是 0」SHALL 打红（恒真）。",
+        "why_clear_not_reconstruct": "🔴 **不重建跨表引用**：重建等于替审计师裁定「前五名从哪张表来」，是编造审计内容。清成空白输入格有**同 sheet 内的对照组**做依据 —— 同类「逐项披露」子表本就是空白手工录入格 + 合计 SUM（上市 `R117:R119` 实际核销 / `R147:R149` 金融资产转移；国企 `R99:R100` / `R112:R114`）⇒ 清空后这四个子区与同表其余子区形态**完全一致**，合计 SUM 由 `#REF!` 变 0，占比 IF 公式按 `C=0 ⇒ 0` 正常取值。",
+        "why_partial": "🔴 定性为**部分断链**而非整表失效：占比列的 IF 公式**活着**（上市 E125:E130 分母 `$B$18`、国企 E104:E109 分母 `$B$13`，各 6 处）⇒ 断链只在被引用的明细列，本表自身的派生链仍完好。"
+      }
+    ],
+    "known_template_quirks_note": "🔴 本册唯一一处模板真实缺陷：两张附注披露变体共 70 格 `=#REF!` ⇒ `overlay_fixed`（FC-5 第 **6** 个例外）。**一处缺陷一种处置**，不与 `registered_not_fixed` 混写。K1-9（本契约的回写面）**不受影响** —— 它的 9 个公式格里裸 IF 0、`#REF!` 0。",
+    "oo_counterpart_status": "absent",
+    "pilot_class": "k_cycle_writeoff_check",
+    "row_count_mismatch": {
+      "html_side": "dynamic（`useK1WriteoffCheck.ts` 有 addRow / removeRow）",
+      "overflow_strategy": "🔴 HTML 行数 > 3 时**扩行**：在合计行之前插入新行（转回块在 R15 之前、核销块在 R21 之前），并把合计行的 SUM 范围随之扩展（`=SUM(E12:E{lastReversalRow})` / `=SUM(C18:C{lastWriteoffRow})`）。🔴 扩行会推动后续行号 ⇒ 下半表的 R17/R18-20/R21 整体下移，adapter 须按**锚点重算**而不是按固定行号写。",
+      "template_fixed_rows": 3,
+      "underflow_strategy": "🔴 HTML 行数 < 3 时**留空**：多余的模板行保持空白，不删行（删行会让合计行上移、破坏「模板字节不变」的前提）。SUM 范围保持原样 —— 空行对 SUM 无影响。",
+      "why_explicit": "🔴 模板固定 3 行 vs HTML 动态行是**必然错配**不是偶发。不给策略的 adapter 会在第 4 行静默丢数据。"
+    },
+    "row_delete_api_kind": {
+      "arity": 2,
+      "call_site_literals": [
+        "reversal",
+        "writeoff"
+      ],
+      "host": "audit-platform/frontend/src/components/workpaper/k1/inspection/K1TabWriteoffCheck.vue",
+      "kind": "by_section_and_identity",
+      "owner": "audit-platform/frontend/src/components/workpaper/composables/useK1WriteoffCheck.ts",
+      "param_name_family": "section+id",
+      "param_order": [
+        "section",
+        "id"
+      ],
+      "signature": "removeRow(section: 'reversal' | 'writeoff', id: string)",
+      "why_arity_two": "🔴 一个 item_id 承载两张子表 ⇒ 删行必须先选 section 再按 id 定位。只传 id 会在两张表里撞同名行。"
+    },
+    "second_writer": null,
+    "sheet_geometry": {
+      "bare_if": 0,
+      "effective_columns": 8,
+      "formula_cells": 9,
+      "formula_composition": "7 个表头引用（A3/C3/E3/H3/A4/C4/E4 引 `底稿目录`）+ 2 个合计 SUM（E15/C21）",
+      "max_row": 25,
+      "merged_ranges": [
+        "A1:H1",
+        "A2:H2"
+      ],
+      "🔴 formula_count_caliber": "🔴 现算 **9**；design 写 **6**。9 的构成已逐格列出（7 表头 + 2 SUM）。两个数可能各自自洽，但**本契约用现算的 9**并写明构成，免得日后对不上账。"
+    },
+    "tb_publish_gate": "useK1FormData.ts",
+    "template_cell_lock_facts": {
+      "formula_without_locked": [],
+      "locked_columns": [],
+      "locked_without_formula": [],
+      "note": "sheet 级保护未启用 ⇒ locked 标志惰性。两个合计格（E15 / C21）有公式 ⇒ 须进 formula_mask，不得被 HTML 值覆盖。",
+      "sheet_protection_enabled": false
+    },
+    "uuid_column": "I",
+    "variant_axis": null,
+    "why_absent_not_missing": "🔴 权威模板里**有**对应 sheet「坏账准备转回（收回）、核销检查表K1-9」，但目前没有任何 adapter / contract 把传输键映射到该 sheet 的单元格 ⇒ 切 OnlyOffice 时 HTML 录入不进工作簿、切回也不回灌。这是 `absent`（缺映射），**不是**「无 HTML 对端」（缺组件）。两者语义不同，混用会把 BP-4 误裁成 AC 12.8。",
+    "why_candidate_not_reviewed": "🔴 BP-1 未交付：无 approved authority model / reviewed per-entry contract / non-null definition bundle。本文件是 **Task 12 的契约草案**，spec 明文标 `[ ]*` —— 只交付草案 + 判据，不发生产契约。BP-4 的 adapter 注册同样卡 BP-1/BP-2。",
+    "why_entry_id_is_null": "🔴 candidate 契约的 `review.entry_id` **必须为 null**（与 `_example.candidate.json` 及 k10/lane2 各草案同口径）—— `test_task53_k_cycle_migration.py` 的 `test_no_slice_entry_has_a_contract` / `test_no_pilot_contract_belongs_to_the_k_cycle` 按 `review.entry_id` 判归属且不区分 candidate/reviewed。目标 entry 记在 `draft_target_entry_id`。",
+    "why_uuid_column_is_new": "🔴 模板 `max_column = 8`（A..H）⇒ 第 9 列（I）**超出模板范围**，UUID 列是本契约要**新增**的隐藏列，不是模板里已有的。"
+  },
+  "review_status": "candidate",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "0.1.0-draft",
+  "sheets": [
+    {
+      "excel_name": "坏账准备转回（收回）、核销检查表K1-9",
+      "locator": {
+        "anchor": "sheet_name_exact_match"
+      },
+      "sheet_key": "k109-managed",
+      "tables": [
+        {
+          "anchor": "A11",
+          "delete_policy": "tombstone",
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "column": "E",
+            "marker": "合  计",
+            "row": 15,
+            "search_column": "A",
+            "template_formula": "=SUM(E12:E14)"
+          },
+          "formula_mask": [
+            "E15"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "family": "c",
+            "json_pointer": "/tables/reversal/*/id",
+            "kind": "field",
+            "pattern": "K1-2-r-{hex}",
+            "why_grandfather": "🔴 真库已落库 `K1-2-r-{hex}` 形态的 id ⇒ **grandfather 不重写**（见 lane 1 Task 15）。"
+          },
+          "row_span": [
+            12,
+            14
+          ],
+          "table_key": "reversal",
+          "uuid_col": "I"
+        },
+        {
+          "anchor": "A17",
+          "delete_policy": "tombstone",
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "column": "C",
+            "marker": "合  计",
+            "row": 21,
+            "search_column": "A",
+            "template_formula": "=SUM(C18:C20)"
+          },
+          "formula_mask": [
+            "C21"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "family": "c",
+            "json_pointer": "/tables/writeoff/*/id",
+            "kind": "field",
+            "pattern": "K1-2-r-{hex}",
+            "why_grandfather": "🔴 同上。"
+          },
+          "row_span": [
+            18,
+            20
+          ],
+          "table_key": "writeoff",
+          "uuid_col": "I"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "relative_path": "K/K1 其他应收款.xlsx",
+    "template_sha256": "4abf05902fe09f7f6bec947c991c648669d26f39187f2f285866392c1c633eab"
+  }
+}

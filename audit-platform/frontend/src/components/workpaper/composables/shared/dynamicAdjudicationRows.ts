@@ -645,3 +645,77 @@ export function resolveInitialRows(
   const migrated = migrateLegacyFixedRows(spec, responses)
   return { rows: migrated, migrated: migrated.length > 0 }
 }
+
+// ─── 孤儿 per-row 键扫描 ─────────────────────────────────────────────────────
+
+/**
+ * 孤儿 per-row 键扫描结果。
+ *
+ * 🔴 **为什么分两桶而不是一把删干净**：孤儿键既可能是「行被删掉但字段键没跟着清」
+ * 的残渣（值必为空，删掉零损失），也可能是「行清单被覆盖/迁移出错」导致**真金额
+ * 被孤立**。后者一旦静默删除就是不可逆的数据丢失，必须留给人工确认。
+ */
+export interface OrphanRowKeyScan {
+  /** 孤儿 **且值为空** ⇒ 可安全清理 */
+  prunable: string[]
+  /** 🔴 孤儿 **但有值** ⇒ 不得静默删除，交人工确认 */
+  retainedWithValue: string[]
+}
+
+/** 动态 rowId 形态（与 `nextRowId` 同源：`r-{base36}`） */
+const DYNAMIC_ROW_ID_RX = /^(r-[0-9a-z]+)-(.+)$/
+
+function _isBlank(v: unknown): boolean {
+  if (v === null || v === undefined) return true
+  if (typeof v === 'object') {
+    const remark = (v as { remark?: unknown }).remark
+    return remark === null || remark === undefined || String(remark).trim() === ''
+  }
+  return String(v).trim() === ''
+}
+
+/**
+ * 扫描 `responses` 里 rowId 已不在 `rows` 中的 per-row 键（KC-20 判据的实现）。
+ *
+ * 判据：**per-row 键的 rowId 集合 ⊆ 行清单 rowId 集合**。违反者即孤儿。
+ *
+ * 🔴 **只认可识别的行身份**（动态 `r-{base36}` 或 `spec.legacyRows` 里的固定行 key），
+ * 其余键（如 `{prefix}-audit-note` / `{prefix}-rows`）一律不碰 —— 宁可漏扫，
+ * 不可误伤同前缀的非行键。
+ */
+export function scanOrphanRowKeys(
+  spec: DynamicRowsSpec,
+  rows: readonly DynamicAdjRow[],
+  responses: Map<string, unknown> | null | undefined,
+): OrphanRowKeyScan {
+  const live = new Set((rows || []).map((r) => r.rowId))
+  const legacyKeys = (spec.legacyRows || []).map((r) => r.key)
+  const prefix = `${spec.prefix}-`
+  const rowsKey = rowsItemId(spec)
+  const prunable: string[] = []
+  const retainedWithValue: string[] = []
+
+  for (const key of responses?.keys() ?? []) {
+    if (typeof key !== 'string') continue
+    if (key === rowsKey || !key.startsWith(prefix)) continue
+    const rest = key.slice(prefix.length)
+
+    let rowId: string | null = null
+    const m = DYNAMIC_ROW_ID_RX.exec(rest)
+    if (m) {
+      rowId = m[1]
+    } else {
+      for (const k of legacyKeys) {
+        if (rest.startsWith(`${k}-`) && rest.length > k.length + 1) {
+          rowId = k
+          break
+        }
+      }
+    }
+    if (rowId === null || live.has(rowId)) continue
+
+    if (_isBlank(responses?.get(key))) prunable.push(key)
+    else retainedWithValue.push(key)
+  }
+  return { prunable: prunable.sort(), retainedWithValue: retainedWithValue.sort() }
+}

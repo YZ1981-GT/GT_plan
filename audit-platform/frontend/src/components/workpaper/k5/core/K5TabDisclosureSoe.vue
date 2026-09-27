@@ -240,6 +240,7 @@ import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildK5SyncPayload, K5_NOTE_SECTION } from '../../composables/k5NoteSectionMap'
+import { newRowIdentity } from '../../composables/shared/rowIdentity'
 
 const K5_ACCOUNT_CODE = '2701'
 
@@ -313,7 +314,7 @@ function initDefaultTable(): void {
   const categories = ['产品质量保证', '未决诉讼', '亏损合同', '重组义务', '弃置义务', '担保', '环保义务', '其他']
   provisionTable.value = [
     ...categories.map((cat, idx) => ({
-      id: `row-${idx}`,
+      id: newRowIdentity('row'),
       category: cat,
       beginBalance: 0,
       increase: 0,
@@ -376,7 +377,7 @@ function applyAutoFill(): void {
       contingentItems.value = rows
         .filter(r => r.lossLikelihood === 'possible' || r.recognition === 'disclose')
         .map((r, idx) => ({
-          id: `contingent-${idx}`,
+          id: newRowIdentity('contingent'),
           item: r.caseName || r.item || r.project || `事项${idx + 1}`,
           nature: r.nature || r.type || '待补充',
           financialImpact: Number(r.amount || r.estimatedLoss || 0),
@@ -537,7 +538,7 @@ function loadSubCategoryItems(): void {
       litigationDisclosureItems.value = rows
         .filter(r => r.lossLikelihood === 'very_likely' || r.lossLikelihood === 'possible')
         .map((r, idx) => ({
-          id: `lit-${idx}`,
+          id: newRowIdentity('lit'),
           caseName: r.caseName || `案件${idx + 1}`,
           amount: Number(r.amount || 0),
           stage: r.stage || '',
@@ -556,7 +557,7 @@ function loadSubCategoryItems(): void {
       decommissionDisclosureItems.value = rows
         .filter(r => Number(r.endBalance || 0) > 0)
         .map((r, idx) => ({
-          id: `dec-${idx}`,
+          id: newRowIdentity('dec'),
           assetName: r.assetName || `资产${idx + 1}`,
           futureExpense: Number(r.futureExpense || 0),
           discountRate: Number(r.discountRate || 0),

@@ -17,6 +17,7 @@ import { parseK13Payload, recalcStageClosing } from './useK1BadDebt'
 import { parseK1StageRowsFromMap, type K1StageRow } from './useK1StageCheck'
 import { buildK1BalanceMovementRows, migrateK1MovementRows } from './k1StageMovementRows'
 import { buildDisclosureAgingLabelMap } from './disclosureAgingLabels'
+import { newRowIdentity } from './shared/rowIdentity'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -469,7 +470,7 @@ function createStageBlockRows(stage: 1 | 2 | 3, portfolioLabels: string[]): K1St
   for (let i = 0; i < portfolioLabels.length; i++) {
     rows.push({
       rowId: uid('stg'),
-      rowKey: `portfolio-${i}`,
+      rowKey: newRowIdentity('portfolio'),
       label: portfolioLabels[i],
       kind: 'data',
       balance: 0,

@@ -13,6 +13,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-k6-held-for-sale" />
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value && !dualMode.checking.value" size="small" type="info">仅结构化视图</el-tag>
       </div>
 
@@ -192,6 +193,13 @@ import {
   type WorkpaperRuntimeContext,
 } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { fetchOnlyOfficeHealthy } from './sync/onlyOfficeHealth'
+import {
+  migrateWorkpaperSyncMode,
+  workpaperSyncModeKey,
+  type WorkpaperSyncStoredMode,
+} from './sync/workpaperSyncModeStorage'
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 
@@ -242,7 +250,19 @@ const tbData = ref({
 })
 
 // ─── 双模式 (OO 健康检查 + el-segmented + localStorage 持久化) ────────────────
-const DUAL_MODE_STORAGE_PREFIX = 'k6-dual-mode:'
+/** K6 的 entry_id（统一模式键的第一段）。 */
+const K6_ENTRY_ID = 'xlsx/gt-k6-held-for-sale'
+
+/** 本宿主模式 ↔ 统一真源值域（`'html' | 'oo'`）的双向映射。 */
+function toStoredMode(mode: 'html' | 'onlyoffice'): WorkpaperSyncStoredMode {
+  return mode === 'onlyoffice' ? 'oo' : 'html'
+}
+
+function fromStoredMode(stored: string | null): 'html' | 'onlyoffice' | null {
+  if (stored === 'oo') return 'onlyoffice'
+  if (stored === 'html') return 'html'
+  return null
+}
 
 const dualMode = (() => {
   const currentMode = ref<'html' | 'onlyoffice'>('html')
@@ -253,23 +273,41 @@ const dualMode = (() => {
     { label: '在线编辑', value: 'onlyoffice' },
   ]
 
+  /** 统一模式键（三段全需；sheetKey 缺省 `default`）。 */
+  function modeKey(): string {
+    return workpaperSyncModeKey({
+      entryId: K6_ENTRY_ID,
+      wpId: props.wpId,
+      sheetKey: currentSheet.value || undefined,
+    })
+  }
+
+  /**
+   * 迁移旧键 + 读回模式。
+   *
+   * 🔴 本宿主原有 legacy 前缀 `k6-dual-mode:` + wpId（与已删的 orphan 孪生**同值撞车**）。
+   * `migrateWorkpaperSyncMode` 按**键形态**扫旧键，读一次即归一到统一键并删旧键，幂等。
+   */
   function loadPersistedMode(): void {
     try {
-      const saved = localStorage.getItem(DUAL_MODE_STORAGE_PREFIX + props.wpId)
-      if (saved === 'html' || saved === 'onlyoffice') currentMode.value = saved
+      migrateWorkpaperSyncMode(
+        { entryId: K6_ENTRY_ID, wpId: props.wpId, sheetKey: currentSheet.value || undefined },
+        'dual',
+      )
+      const stored = fromStoredMode(localStorage.getItem(modeKey()))
+      if (stored) currentMode.value = stored
     } catch { /* ignore */ }
   }
 
   function persistMode(mode: 'html' | 'onlyoffice'): void {
     try {
-      localStorage.setItem(DUAL_MODE_STORAGE_PREFIX + props.wpId, mode)
+      localStorage.setItem(modeKey(), toStoredMode(mode))
     } catch { /* ignore */ }
   }
 
   async function checkOoHealth(): Promise<void> {
     try {
-      const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-      isOoAvailable.value = !!(res?.data?.data?.healthy ?? res?.data?.healthy)
+      isOoAvailable.value = await fetchOnlyOfficeHealthy()
     } catch {
       isOoAvailable.value = false
     } finally {

@@ -1,0 +1,268 @@
+{
+  "contract_id": "k10.other_income_adjustment",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_uuid_column"
+  ],
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "carrier": {
+      "read": "formdata_composable_bare_endpoint",
+      "tb_publish_gate": "useK10FormData.ts",
+      "write": "formdata_composable_bare_endpoint"
+    },
+    "derived_fields": [],
+    "effective_columns": 10,
+    "entry_id": null,
+    "draft_target_entry_id": "xlsx/gt-k10-other-income",
+    "why_entry_id_is_null": "🔴 candidate 契约的 `review.entry_id` **必须为 null**（与 `_example.candidate.json` 同口径）—— step 6 的判据是「review_status=candidate 不得注册生产 adapter」，而 `test_task53_k_cycle_migration.py` 的 `test_no_slice_entry_has_a_contract` / `test_no_pilot_contract_belongs_to_the_k_cycle` 两条判据按 `review.entry_id` 判归属，不区分 candidate/reviewed。草案的目标 entry 记在 `draft_target_entry_id`，转 reviewed 时再搬到 `entry_id`。",
+    "enum_fields": {
+      "type": [
+        "AJE",
+        "RJE"
+      ]
+    },
+    "excluded_namespaces": {
+      "ai_section_id": {
+        "keys": [
+          "K10-3-adjustment"
+        ],
+        "why": "🔴 AI section-id（用于 `GtReviewTrigger section-id=` 与 `POST /api/workpapers/{wpId}/ai/generate-text` 的 `section` 字段），**不在 checklist 持久化路径**。design.md 的 KC-5「三命名空间」表未登记这一类 —— 本契约补第四类。"
+      },
+      "publish_flag": {
+        "keys": [
+          "K10-3-published"
+        ],
+        "why": "发布标记，不是行数据。与 managed table 同 sheet 但语义不同。"
+      },
+      "review_session": {
+        "keys_pattern": "K10-review-session-{14位时间戳}",
+        "live_count": 6,
+        "why": "🔴 复核会话键属另一命名空间，**不纳入 managed table**（KC-5）。生成点在**后端** `review_prompt` 服务而非前端 ⇒ 排除清单无前端锚点可查。"
+      }
+    },
+    "html_store": {
+      "item_ids": [
+        "K10-3-entries"
+      ],
+      "note": "K10 其他收益调整分录的结构化 Tab 行数据存成 checklist_responses 的 **remark** JSON 数组。🔴 11 个落库字段里 `id` 是行身份、`type`(AJE/RJE) 是 store-only 分组维度（模板无列），其余 9 个映射模板列 A/B/C/D/E/G/H/I/J —— 模板 F 列表头是 `……`（占位列，HTML 无字段）。🔴 **本表无 footer SUM**：13 册「调整分录汇总」的 SUM 数现算全部为 0，7 个公式全是 R3/R4 引 `底稿目录` 的表头，数据区 R6:R22 纯空白待填 ⇒ `footer_anchor.carries_total_formula = false`，借贷合计由应用层 `currentBalance` computed 校验，不依赖模板公式。",
+      "payload_column": "remark",
+      "payload_column_mode": "remark_only",
+      "payload_column_source": "audit-platform/frontend/src/components/workpaper/k10/core/K10TabAdjustment.vue —— buildPayload 经宿主 onSave 写 { item_id: 'K10-3-entries', remark: JSON.stringify(entries) }",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "k_cycle_adjustment_summary",
+    "reviewed_basis": "openpyxl 逐格实测 K/K10 其他收益.xlsx 的 `调整分录汇总K10-3`（单级表头 R5 十列 A..J / 数据区 R6:R22 **纯空白待填** / R23 是 A23:J23 合并的提示文字 / 公式 7 个全在 R3/R4 引 `底稿目录` / **裸 IF 0** / **SUM 0** / merged 3 个 A1:J1·A2:J2·A23:J23 / max_column 10 / sheet 级保护未启用） + 前端 `K10TabAdjustment.vue` 按值 grep（AdjustmentEntry 11 字段 / id 生成 `entry-${Date.now()}-${Math.random().toString(36).slice(2,8)}` / useAdjustmentCentralSync 3 处是第二写入方 / currentBalance 借贷平衡 computed） + 真库现算（checklist_responses.item_id='K10-3-entries' 的 remark **199 B / 1 行**，行身份 `entry-1784790231509-wlnkon` 属**安全族** family_c）",
+    "second_writer": {
+      "sites": 3,
+      "symbol": "useAdjustmentCentralSync",
+      "why": "🔴 roundtrip 的写入方集合含它（`K10TabAdjustment.vue` 3 处）—— 只算 checklist 链会漏掉中央调整分录同步这条写路径。全 K 13 条各 3 处，形态一致。"
+    },
+    "store_only_fields": [
+      "type"
+    ],
+    "tb_publish_gate": "useK10FormData.ts",
+    "template_cell_lock_facts": {
+      "formula_without_locked": [],
+      "locked_columns": [],
+      "locked_without_formula": [],
+      "note": "sheet 级保护未启用（ws.protection.sheet=False）⇒ locked 标志惰性。数据区 R6:R22 无任何公式（纯空白待填）⇒ 无 formula_mask 需求。契约 mode 一律按「该格逐行有没有真公式」判，本表数据区全 editable。",
+      "sheet_protection_enabled": false
+    },
+    "template_only_columns": [
+      {
+        "column": "F",
+        "header_text": "……",
+        "why": "模板占位列（表头字面是省略号），HTML 侧无对应字段"
+      }
+    ],
+    "uuid_column": "K",
+    "variant_axis": null,
+    "why_candidate_not_reviewed": "🔴 BP-1 未交付：无 approved authority model / reviewed per-entry contract / non-null definition bundle。本文件是 **Task 22 的契约草案**，spec 明文标 `[ ]*` —— 只交付草案 + 判据，不发生产契约。转 reviewed 需 BP-1 供给到位后由 review 流程裁定。"
+  },
+  "review_status": "candidate",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "0.1.0-draft",
+  "sheets": [
+    {
+      "excel_name": "调整分录汇总K10-3",
+      "locator": {
+        "anchor": "sheet_name_exact_match"
+      },
+      "sheet_key": "k1003-managed",
+      "tables": [
+        {
+          "anchor": "A5",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "description",
+              "header_source_ref": "源xlsx!调整分录汇总K10-3!A5",
+              "header_text": "调整事项说明",
+              "json_pointer": "/rows/{row_uuid}/description",
+              "mode": "editable",
+              "source_ref": "源xlsx!调整分录汇总K10-3!A6",
+              "stable_field_key": "adjustment_summary_rows/{row_uuid}/description",
+              "store_item_id": "K10-3-entries",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "category",
+              "header_source_ref": "源xlsx!调整分录汇总K10-3!B5",
+              "header_text": "类别（报表调整/账项调整/其他）",
+              "json_pointer": "/rows/{row_uuid}/category",
+              "mode": "editable",
+              "source_ref": "源xlsx!调整分录汇总K10-3!B6",
+              "stable_field_key": "adjustment_summary_rows/{row_uuid}/category",
+              "store_item_id": "K10-3-entries",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "report_item",
+              "header_source_ref": "源xlsx!调整分录汇总K10-3!C5",
+              "header_text": "报表项目",
+              "json_pointer": "/rows/{row_uuid}/reportItem",
+              "mode": "editable",
+              "source_ref": "源xlsx!调整分录汇总K10-3!C6",
+              "stable_field_key": "adjustment_summary_rows/{row_uuid}/report_item",
+              "store_item_id": "K10-3-entries",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "account_name",
+              "header_source_ref": "源xlsx!调整分录汇总K10-3!D5",
+              "header_text": "科目名称",
+              "json_pointer": "/rows/{row_uuid}/accountName",
+              "mode": "editable",
+              "source_ref": "源xlsx!调整分录汇总K10-3!D6",
+              "stable_field_key": "adjustment_summary_rows/{row_uuid}/account_name",
+              "store_item_id": "K10-3-entries",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "note_item",
+              "header_source_ref": "源xlsx!调整分录汇总K10-3!E5",
+              "header_text": "附注项目",
+              "json_pointer": "/rows/{row_uuid}/noteItem",
+              "mode": "editable",
+              "source_ref": "源xlsx!调整分录汇总K10-3!E6",
+              "stable_field_key": "adjustment_summary_rows/{row_uuid}/note_item",
+              "store_item_id": "K10-3-entries",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "debit_amount",
+              "header_source_ref": "源xlsx!调整分录汇总K10-3!G5",
+              "header_text": "借方调整金额",
+              "json_pointer": "/rows/{row_uuid}/debitAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!调整分录汇总K10-3!G6",
+              "stable_field_key": "adjustment_summary_rows/{row_uuid}/debit_amount",
+              "store_item_id": "K10-3-entries",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "credit_amount",
+              "header_source_ref": "源xlsx!调整分录汇总K10-3!H5",
+              "header_text": "贷方调整金额",
+              "json_pointer": "/rows/{row_uuid}/creditAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!调整分录汇总K10-3!H6",
+              "stable_field_key": "adjustment_summary_rows/{row_uuid}/credit_amount",
+              "store_item_id": "K10-3-entries",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "ref_index",
+              "header_source_ref": "源xlsx!调整分录汇总K10-3!I5",
+              "header_text": "索引",
+              "json_pointer": "/rows/{row_uuid}/refIndex",
+              "mode": "editable",
+              "source_ref": "源xlsx!调整分录汇总K10-3!I6",
+              "stable_field_key": "adjustment_summary_rows/{row_uuid}/ref_index",
+              "store_item_id": "K10-3-entries",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "remark",
+              "header_source_ref": "源xlsx!调整分录汇总K10-3!J5",
+              "header_text": "备注",
+              "json_pointer": "/rows/{row_uuid}/remark",
+              "mode": "editable",
+              "source_ref": "源xlsx!调整分录汇总K10-3!J6",
+              "stable_field_key": "adjustment_summary_rows/{row_uuid}/remark",
+              "store_item_id": "K10-3-entries",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": null,
+            "search_column": null,
+            "why_no_footer": "🔴 本表**无 footer SUM** —— 13 册「调整分录汇总」的 SUM 数现算全部为 0。R23 是 A23:J23 合并的提示文字不是合计行。借贷合计由前端 `currentBalance` computed（`totalDebit - totalCredit`，容差 0.01）在应用层校验。⇒ 金额维度 roundtrip 判据按**行级**（每行 debit/credit 写入读回相等），**不能**按 footer 重算。"
+          },
+          "formula_mask": [],
+          "header_rows": 1,
+          "row_delete_api_kind": {
+            "arity": 1,
+            "kind": "by_identity",
+            "param_name_family": "id",
+            "param_order": [
+              "id"
+            ]
+          },
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field",
+            "pattern": "entry-{13位时间戳}-{6位base36}",
+            "family": "c",
+            "why_safe": "🔴 含 ENTROPY(`Date.now()` + `Math.random()`) ∧ 无 FALLBACK ⇒ 按 KC-6 判别式归 **family_c（安全族）**。K10 是零位置化缺陷 4 条 entry 之一 ⇒ canary **不必先修身份缺陷**（对比 I6 需 backfill、J1-6 需修 RD-5）。"
+          },
+          "table_key": "adjustment_summary_rows",
+          "uuid_col": "K"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "relative_path": "K/K10 其他收益.xlsx",
+    "template_sha256": "04996321e9ff9525b293ef3fd2bd0fffbc1249aae2e760ddd7c90aa836afbc0d"
+  }
+}

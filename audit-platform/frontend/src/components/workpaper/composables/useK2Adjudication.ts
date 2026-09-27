@@ -40,6 +40,7 @@ import {
   readRowFieldWithFallback,
   renameRowLabel,
   resolveInitialRows,
+  scanOrphanRowKeys,
   rowFieldItemId,
   rowsItemId,
   seedRowsFromPrefill,
@@ -112,6 +113,9 @@ export function useK2Adjudication(
   /** 动态行清单（唯一行集真源） */
   const rowDefs = ref<DynamicAdjRow[]>([])
 
+  /** 🔴 孤儿但**有值**的 per-row 键（不自动删，交人工确认） */
+  const orphanKeysWithValue = ref<string[]>([])
+
   // ─── 行清单加载 / 持久化 ───────────────────────────────────────────────────
 
   function persistRowDefs(): void {
@@ -132,11 +136,29 @@ export function useK2Adjudication(
     const stored = deserializeRows(readRaw(allResponses.value, ROWS_ITEM_ID))
     if (stored.length > 0) {
       rowDefs.value = stored
+      pruneOrphanRowKeys()
       return
     }
     const { rows, migrated } = resolveInitialRows(SPEC, allResponses.value)
     rowDefs.value = rows
     if (migrated) persistRowDefs()
+    pruneOrphanRowKeys()
+  }
+
+  /**
+   * 孤儿 per-row 键清理（KC-20）——「行已不在清单里，字段键却还留着」的残渣。
+   *
+   * 🔴 **只删值为空的**。孤儿但**有值**的键一律保留并记进 `orphanKeysWithValue`，
+   * 由调用方提示人工确认 —— 静默删除有值的键是不可逆的数据丢失。
+   *
+   * 幂等：清完再调恒为空。
+   */
+  function pruneOrphanRowKeys(): void {
+    const scan = scanOrphanRowKeys(SPEC, rowDefs.value, allResponses.value)
+    orphanKeysWithValue.value = scan.retainedWithValue
+    if (scan.prunable.length === 0) return
+    for (const id of scan.prunable) allResponses.value.delete(id)
+    options?.onRemove?.(scan.prunable)
   }
 
   // ─── 四表库预填 / 刷新取数（宁缺勿造：无科目 → 不建行、不塞「其他」兜底行） ──
@@ -437,5 +459,7 @@ export function useK2Adjudication(
     seedFromPrefill,
     previewSeedFromPrefill,
     loadRowDefs,
+    orphanKeysWithValue,
+    pruneOrphanRowKeys,
   }
 }

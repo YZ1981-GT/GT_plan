@@ -14,6 +14,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-k2-other-current-assets" />
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value && !dualMode.checking.value" size="small" type="info">仅结构化视图</el-tag>
       </div>
 
@@ -259,6 +260,13 @@ const tbQueryStandardCodes = computed(() =>
 
 // ─── 版本链 + 复核对话 provide（供子组件inject使用）────────────────────────
 import { provide } from 'vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { fetchOnlyOfficeHealthy } from './sync/onlyOfficeHealth'
+import {
+  migrateWorkpaperSyncMode,
+  workpaperSyncModeKey,
+  type WorkpaperSyncStoredMode,
+} from './sync/workpaperSyncModeStorage'
 
 const scheduleAutoSnapshot = () => runtime?.version?.scheduleAutoSnapshot?.()
 
@@ -275,6 +283,20 @@ provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)
 
 // ─── 双模式 (OO 健康检查 + el-segmented) ────────────────────────────────────
+/** K2 的 entry_id（统一模式键的第一段）。 */
+const K2_ENTRY_ID = 'xlsx/gt-k2-other-current-assets'
+
+/** 本宿主模式 ↔ 统一真源值域（`'html' | 'oo'`）的双向映射。 */
+function toStoredMode(mode: 'html' | 'onlyoffice'): WorkpaperSyncStoredMode {
+  return mode === 'onlyoffice' ? 'oo' : 'html'
+}
+
+function fromStoredMode(stored: string | null): 'html' | 'onlyoffice' | null {
+  if (stored === 'oo') return 'onlyoffice'
+  if (stored === 'html') return 'html'
+  return null
+}
+
 const dualMode = (() => {
   const currentMode = ref<'html' | 'onlyoffice'>('html')
   const isOoAvailable = ref(false)
@@ -284,10 +306,43 @@ const dualMode = (() => {
     { label: '在线编辑', value: 'onlyoffice' },
   ]
 
+  /** 统一模式键（三段全需；sheetKey 缺省 `default`）。 */
+  function modeKey(): string {
+    return workpaperSyncModeKey({
+      entryId: K2_ENTRY_ID,
+      wpId: props.wpId,
+      sheetKey: currentSheet.value || undefined,
+    })
+  }
+
+  /**
+   * 迁移旧键 + 读回模式。
+   *
+   * 🔴 本宿主**原先没有持久化** —— 模式每次刷新都回落 'html'。本轮统一目标态为
+   * 「都持久化」（与 K4/K5/K6 及 BP-6 组的 6 条一致）⇒ 这里是**新增**能力。
+   * `migrateWorkpaperSyncMode` 对本 entry 无旧键可迁，调用是幂等空操作，
+   * 留着是防御：用户浏览器里可能有更早版本遗留的键形态。
+   */
+  function loadPersistedMode(): void {
+    try {
+      migrateWorkpaperSyncMode(
+        { entryId: K2_ENTRY_ID, wpId: props.wpId, sheetKey: currentSheet.value || undefined },
+        'dual',
+      )
+      const stored = fromStoredMode(localStorage.getItem(modeKey()))
+      if (stored) currentMode.value = stored
+    } catch { /* ignore */ }
+  }
+
+  function persistMode(mode: 'html' | 'onlyoffice'): void {
+    try {
+      localStorage.setItem(modeKey(), toStoredMode(mode))
+    } catch { /* ignore */ }
+  }
+
   async function checkOoHealth(): Promise<void> {
     try {
-      const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-      isOoAvailable.value = !!(res?.data?.data?.healthy ?? res?.data?.healthy)
+      isOoAvailable.value = await fetchOnlyOfficeHealthy()
     } catch {
       isOoAvailable.value = false
     } finally {
@@ -297,9 +352,11 @@ const dualMode = (() => {
 
   function onModeChange(val: string | number): void {
     currentMode.value = val as 'html' | 'onlyoffice'
+    persistMode(currentMode.value)
   }
 
   // 启动时检查 OO 可用性
+  loadPersistedMode()
   checkOoHealth()
 
   return { currentMode, isOoAvailable, checking, modeOptions, onModeChange }

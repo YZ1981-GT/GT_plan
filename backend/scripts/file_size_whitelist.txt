@@ -1029,3 +1029,24 @@ backend/tests/workpaper_sync/test_task52_j_cycle_migration.py  3463
 #     （_is_thin_delegation / implementing_node / _is_docstring_stmt + _DELEGATION_TARGETS），
 #     把 4 条单层 AST 判据改为跟着委托链走。
 backend/tests/workpaper_sync/test_task75_published_identity_observer.py  2650
+
+#   k1DisclosureModel.ts —— K1 双变体披露模型（上市+国企两变体 section map + 8 个 computed builder），
+#     行数来自真实业务复杂度（上市 7 节+国企 6 节 × 每节 ~80 行构造函数）。
+#     BP-8 修复只加了 import { newRowIdentity }，不是膨胀来源。
+audit-platform/frontend/src/components/workpaper/composables/k1DisclosureModel.ts  1687
+
+#   test_k_foundation_p12 —— K 循环地基 spec 最后一个判据文件（空分母+移交边界+跨 spec 归因），
+#     30 个测试类覆盖 KC-19~KC-24 六条裁决 + 三方向前提校验。拆分会让「前提→结论」链跨文件。
+backend/tests/workpaper_sync/test_k_foundation_p12_empty_denominators_and_handoff.py  807
+
+#   test_k_lane2_p0 —— lane2 边界+端点判据（KB-P1~P8，含 5 条 entry 逐条端点扫描 + 变异反证），
+#     拆分应按 entry 切但 5 条 entry 共用同一套反向对照。
+backend/tests/workpaper_sync/test_k_lane2_p0_boundary_and_endpoints.py  1005
+
+#   test_k_lane2_p2 —— lane2 位置化身份判据（KB-P24~P32，含 family_c 真落库实证 + family_d 展示序号
+#     + grandfather 行为 + removeRow 下标族），原有判据密度高且双侧验。
+backend/tests/workpaper_sync/test_k_lane2_p2_positional_identity.py  1014
+
+#   test_k_lane2_p3 —— lane2 双变体+模板+写路径（KB-P33~P40，含 13 entry 真库载荷三分 + roundtrip
+#     + 5 条 contract 发布 + 复盘自检），单份 spec 最后的 closeout 文件不宜拆。
+backend/tests/workpaper_sync/test_k_lane2_p3_variants_template_writepaths.py  1059
