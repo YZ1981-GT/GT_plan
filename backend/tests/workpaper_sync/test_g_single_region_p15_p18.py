@@ -447,3 +447,73 @@ class TestG1rP18ZeroRegressionComputedNotHardcoded:
         assert two_byte == {"G8", "G10", "G11", "G12", "G13", "G14"}, (
             f"2 B 空数组的条实得 {sorted(two_byte)}"
         )
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# G1R-P13：九条 sync 路径对 trial_balance 写次数全部为 0
+#   Validates: Requirements 4.1, 4.2
+# ════════════════════════════════════════════════════════════════════════════
+class TestG1rP13TbRedLine:
+    """FC-9 红线：九条 sync provider 对 trial_balance 的写次数全部为 0。
+
+    TB 写入由审定表的 `publishToTb` 显式确认门承载（归后置 spec
+    `g-cycle-adjudication-sheets-coverage`），不在 sync 路径内。
+    """
+
+    def test_no_provider_source_contains_tb_write_logic(self) -> None:
+        """九条 provider 的源代码不含 trial_balance 写逻辑。
+
+        允许出现 "trial_balance 写次数为 0" 之类的文档注释（那正是声明），
+        但不允许出现 `INSERT INTO trial_balance` / `update.*trial_balance` / `publishToTb` 等写入形态。
+        """
+        import importlib
+        import inspect
+        import re
+
+        from app.services.workpaper_sync.store_item_registry import STORE_MERGE_REGISTRY
+
+        g_adapters = {
+            aid for aid in STORE_MERGE_REGISTRY
+            if aid.startswith("g") and aid != "g2.interest_receivable_detail"
+            and not aid.startswith("g7.")
+        }
+        assert len(g_adapters) == 9, f"预期九条 G adapter，实得 {g_adapters}"
+
+        for aid in sorted(g_adapters):
+            plan = STORE_MERGE_REGISTRY[aid]
+            mod_name = f"app.services.workpaper_sync.{plan.provider_module}"
+            mod = importlib.import_module(mod_name)
+            source = inspect.getsource(mod)
+            # 排除文档字符串（三引号区块）和单行注释
+            import ast as _ast
+            try:
+                tree = _ast.parse(source)
+            except SyntaxError:
+                continue
+            # 收集所有 docstring 的行号范围
+            doc_lines: set[int] = set()
+            for node in _ast.walk(tree):
+                if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef, _ast.ClassDef, _ast.Module)):
+                    body = getattr(node, "body", [])
+                    if body and isinstance(body[0], _ast.Expr) and isinstance(body[0].value, _ast.Constant):
+                        for ln in range(body[0].lineno, body[0].end_lineno + 1):
+                            doc_lines.add(ln)
+
+            lines = source.splitlines()
+            code_lines = []
+            for i, line in enumerate(lines, 1):
+                if i in doc_lines:
+                    continue
+                stripped = line.strip()
+                if stripped.startswith("#"):
+                    continue
+                code_lines.append(line)
+            code_text = "\n".join(code_lines)
+            # 不得有 TB 写入模式
+            tb_write = re.search(
+                r"(INSERT\s+INTO\s+trial_balance|UPDATE\s+trial_balance|publish_to_tb|publishToTb)",
+                code_text, re.I,
+            )
+            assert tb_write is None, (
+                f"{aid}: provider 含 TB 写入逻辑 {tb_write.group()!r}（FC-9 红线）"
+            )
