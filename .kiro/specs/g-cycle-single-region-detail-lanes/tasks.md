@@ -460,11 +460,33 @@ FC-1~FC-13 · F3 spec 裁决 F3-H4（行级 mask）· F5 spec（布尔/错误值
     口径 + 真库证据），`managed_*` 记受管载体 —— 互相覆盖会让真库证据判据与受管载体判据二者必红
   - _Requirements: 2.5, 3.1, 3.2_
 
-- [ ] 13. G12（无表头行 + 布尔列 + SUM 起点异常）
-  - `G12-hedge-detail-rows` / `rowId` / 🔴 **`header_row` 声明为「无」**（裁决 G1R-H2 方案①；
-    引擎不支持 ⇒ 登记框架层缺口 + G12 暂不受管，**不得伪造一行表头**）/ R9-13 / R14 /
-    `formula_columns=("G","I")`（**G 是布尔列** `=D9=SUM(E9:F9)`）
+- [x] 13. G12（~~无表头行~~ **两级表头 R7/R8** + 布尔列 + SUM 起点异常）
+  - `G12-hedge-detail-rows` / `rowId` / ~~🔴 **`header_row` 声明为「无」**（裁决 G1R-H2 方案①；
+    引擎不支持 ⇒ 登记框架层缺口 + G12 暂不受管，**不得伪造一行表头**）~~ ⇒ **前提不成立**，
+    实测 `header_group_row=7 / header_leaf_row=8 / first_data_row=9`，框架层无需改 /
+    R9-13 / R14 / ~~`formula_columns=("G","I")`~~ ⇒ 实测改为 **`()` 空**（**G 是布尔列**
+    `=D9=SUM(E9:F9)`，但只在 R9 一格有公式）
   - 🔴 与 `g4-g6` spec 对 G6-5「无表头行」的处置**同源**；P11 的 SUM 起点结论落地
+  - **已完成**（commit `72cb62721`，12 文件 + 三个共享台账被并发 commit `bb8c0eb70` 带走、
+    内容已核完整）。evidence `evidence/task13-c12-g12-rootfix.md`
+  - 🔴 **`formula_columns` 是空的（九条唯一）**：数据区 R9-R13 没有任何一列每行都有公式 ——
+    `G` 只在 R9 一格、`I` 只在 R9/R10 两格，其余八列零公式。列级 mode 表达不了「1 行有 +
+    4 行无」（判 formula 会在 `G10:G13` 四格与 `I11:I13` 三格抛）⇒ 两列判 `editable`
+  - 🔴 **G/I 由前端派生改为落库**：两列原本只活在 `rowCalcs` computed 里，按「派生校验 vs
+    第二真源」本该不声明；但那样 R11-R13 那两列在 Excel 里**永远是空格** ⇒ 新增
+    `fvCheck`/`netHedgePnl` 字段并落库，**单一真源仍是那两个纯函数**，`rowCalcs` 改为从行
+    模型读、对外字段名不变（消费方 `G12TabHedgeDetail.vue` 零改动）
+  - 🔴 **五处模板缺陷**（①`B14` 漏加 B10/B11 是**数值错** ②`I14` 起点越到表头行 R7
+    ③`G10:G13` 缺 fill-down ④`I11:I13` 缺 fill-down ⑤`H14` footer 漏 H 列合计）。①② 是
+    Task 2 的发现 G，③④⑤ 本轮新发现。逐字记原式、不改模板字节
+  - 🔴 **另两处结构事实**：footer `F14` 的 shared 组 ref=`F14:J14` 覆盖五列但被 `H14`（无公式）
+    与 `I14`（独立公式）**打断**，实际成员只有 `G14`/`J14` · 有效列 **10 < max_column=15**
+    （5 个空尾列）⇒ `uuid_col=K`（九条里第二家，另一家是 G8 的 23/24）
+  - 🔴 **修两条判据自身**：① P9 从写死「三处布尔列都 formula」改为**按模板公式覆盖率现算**
+    mode（每行都有 ⇒ formula / 部分行有 ⇒ editable 且必须登记覆盖缺陷台账）② P10 的 G12
+    docstring 判据首版只扫 entry 层 ⇒ 假红，改为扫 entry+sheet 两模块并集 + 结构化台账
+  - 🔴 **踩坑登记：resync 必须是前端改动的最后一步** —— `--apply` 之后又按模板列序挪了
+    `fvCheck` 的位置（+3 行），行号再次漂移打红 `test_payload_column_mode_*`，重跑才修好
   - _Requirements: 2.3, 3.2, 3.4_
 
 - [ ] 14. G3（三级表头 + 480 definedName）+ G1（三区 + 跨表 T 列，**最后一条**）
