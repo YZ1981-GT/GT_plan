@@ -1632,6 +1632,81 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "`adapter_registered=False` 同前七条：BP-1~BP-3 属平台缺口，不手改 manifest。"
         ),
     },
+    # ── H10 收口第九条（spec: h2-h6-h10-pilot-cross-reference-lanes）──────────
+    {
+        "contract_id": "h10.asset_disposal_income_adjustment",
+        "provider_module": (
+            "app.services.workpaper_sync.phase5_h10_asset_disposal_income"
+        ),
+        "delivered_by_task": "H10-closeout-adjustment-sheet",
+        "pilot_class": "phase5_asset_disposal_income_adjustment",
+        "entry_id": "xlsx/gt-h10-asset-disposal-income",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "H/H10 资产处置损益.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "H 循环**第九条也是最后一条** entry ⇒ H 循环九条 entry 全部有契约。"
+            "🔴 **本条对 slice 做了一处实测反驳（H 循环第 6 条）**：slice 的 `primary_table` "
+            "记的是 `明细表H10-2 ↔ H10-detail-rows`（依据只是 `A7='项目'`），"
+            "openpyxl + 前端双向实测证明该配对结构上不成立 ⇒ 改配 "
+            "`调整分录汇总H10-3 ↔ H10-adjustment-rows`。"
+            "反驳依据：①模板 `明细表H10-2` 的行是**被处置资产类别**（R8:R16 九类固定行，"
+            "标签逐字与前端 `H10_ADJUDICATION_ITEMS` 前 9 项一致，R17 合计 / R18 各月比例），"
+            "列是 **1月..12月**（B..M）+ `N=SUM(B:M)` + O 账项调整 + P 重分类调整 + "
+            "`Q=N+O+P` + U/V/W 上年三列；②前端 `H10-detail-rows` 是**逐单项资产台账**"
+            "（`H10DetailRow` **25 字段**、行可增删、身份 `id`、`generateId()` 带 h10d- 前缀），"
+            "行身份与「资产类别」不同类；③**前端全库零月度建模** —— 按值 grep "
+            "`1月|月度|monthly|month|各月` 在 workpaper/{h10/**, composables/*H10*, "
+            "composables/h10*} 下**零命中**。强行配对只能造两种静默错数："
+            "把逐资产金额塞进某个月（时点造假），或写进 `N` 毁掉 `=SUM(B:M)` 并被 Excel "
+            "按空月份重算成 0（静默清零）—— 与 H5 拒绝映 `V 折耗期末数` 同一条纪律。"
+            "🔴 **改配后映射率 6/10（60%）是全 H 最高档**（对照 H5 10/54、H7 公允 3/28）："
+            "A 调整事项说明↔summary · B 类别↔entryType · D 科目名称↔accountName · "
+            "G 借方调整金额↔debitAmount · H 贷方调整金额↔creditAmount · J 备注↔remark。"
+            "🔴 **`B 类别` 判 `auto_source` 不判 `editable`**：前端 "
+            "`useH10Adjustment.normalizeEntry` 逐字是 "
+            "`entryType: raw.entryType === 'RJE' ? 'RJE' : 'AJE'`（二值），"
+            "模板 B 列表头是三值「账项调整AJE/重分类调整RJE/**其他**」⇒ editable 会让 OO 侧"
+            "填的「其他」被**静默归一成 AJE 并回写覆盖**。auto_source 让该格在 OO 侧受保护"
+            "（值照写、不可编辑），缺陷无从触发；先例是 phase5_f3_05_overdue.term_days / "
+            "phase5_f1_05_long_term.audited_balance / phase5_g11_02_detail 两个占比列。"
+            "🔴 **四处不能照抄前八条**：①**单级表头 R5 是全 H 唯一**（其余 8 条两级/三级/"
+            "四级）⇒ 走 `header_row` 而非 group/leaf 一对，传了 group/leaf 会让 header_rows "
+            "算成 2、anchor 落进标题区（契约现算 header_rows=[1] 可验）；②**数据区零公式**"
+            "（R6:R18 实测 13 行全空）⇒ FORMULA_TEMPLATES 空字典（与 H7 两张同族，"
+            "但 H7 是「有公式列却一个都没进 field_specs」，H10 是「模板压根没有」）；"
+            "③**footer 不是全列 SUM** —— R19 只有 G19/H19 两格（本表只有两个金额列），"
+            "其余 8 列 footer 为空（见 review.footer_non_sum_cells）；④`wp_code_pattern` 是 "
+            "**`H10A` 真程序表码**、finder 解析到所属整册 ⇒ "
+            "`phantom_code_resolves_to_own_workbook=True`，与 H5 的幻影码 `H5O`（三路全空）相反。"
+            "四条缺口带停下报告点：H10-GAP-1（明细表H10-2 结构性不匹配，含「若只同步 "
+            "O/P/U/V/W 五列会让本期合计显示 0」的业务方拍板点）· H10-GAP-2（entryType 二值 vs "
+            "三值，降级单向）· H10-GAP-3（C 报表项目 / E 附注项目 / F 对方科目 / I 索引 无字段 —— "
+            "🔴 `F 对方科目` 前端自己带 TODO 注释 `counterAccountCode: ''` 自证缺失，"
+            "不得近似映 accountName）· H10-GAP-4（OO 侧改金额后向 H10-1 的再聚合链路，"
+            "本轮以按值守卫的 watch 收口）。"
+            "🔴 **派生聚合键 `H10-adj-overlay`**：`syncWriteback` 把本表行聚合成 "
+            "{currentAje, currentRje} 写它、并据此 patch `H10-adj-rows`（H10-1 审定表 store）⇒ "
+            "进 review.derived_total_keys，roundtrip 比对排除、重算责任方是前端。"
+            "🔴 **第三个客户端存储（全 slice 唯一）**：`useH10FormData.saveImmediate` 重试 3 次"
+            "失败后写 localStorage 草稿、`restoreDrafts()` 回灌 ⇒ "
+            "「HTML 侧内容 == checklist_responses」这个 roundtrip 前提在有未同步草稿时不成立，"
+            "已登记 review.extra_client_store。"
+            "几何：册 **42,334 B / 9 sheets 全 H 最小** / definedName 0 / Excel Table 0 / "
+            "含 IF 公式格 **46**（明细表H10-2 43 · H10-3 1 · 检查表H10-4 2）⇒ 中性化必挂 / "
+            "`GT_Custom` hidden sheet（与 H9 两册独有）/ 数据区**零合并域** / UUID 列 K = 10+1 / "
+            "R20-R21 未受管（借贷差额校验 + 提示）。"
+            "同册其余 8 sheet 的处置逐条登记在 provider 模块第 2 节；其中 `审定表H10-1` 与 "
+            "`附注披露信息（上市公司）` 是**整表派生**（A6..J14 逐格 `='明细表H10-2'!…` / "
+            "B9..C17 逐格 `='审定表H10-1'!E6..J14`）—— 写它们会毁跨 sheet 公式，"
+            "这也是「模板里账项调整/重分类调整的权威落格在 明细表H10-2 的 O/P 而不在 H10-1」"
+            "这一判断的来源。"
+            "HD-7：H10 **有** TB 发布门但挂在 H10-1 上（publishToTb，sheet_name='审定表H10-1'，"
+            "科目 6115 `amount_kind='occurrence'` 发生额口径）；sync 路径对 trial_balance 写 0 次。"
+            "`adapter_registered=False` 同前八条：BP-1~BP-3 属平台缺口，不手改 manifest。"
+        ),
+    },
     # ── I6 canary（spec: i-cycle-sync-foundation-and-first-canary · Task 22）──
     {
         "contract_id": "i6.research_development_expense_detail",

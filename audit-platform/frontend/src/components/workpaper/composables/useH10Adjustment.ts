@@ -180,9 +180,28 @@ export function useH10Adjustment(opts: {
     persist(rows.value.filter((r) => r.rowId !== rowId).map((r, i) => ({ ...r, seq: i + 1 })))
   }
 
+  /**
+   * 🔴 H10-GAP-4：`H10-adjustment-rows` 从**外部**变化后重跑一次聚合。
+   *
+   * 为什么需要：本表金额经 `syncWriteback` 聚合成 AJE/RJE 净额写进 `H10-adj-overlay`
+   * 并 patch `H10-adj-rows`（H10-1 审定表的 store）。原实现只在 HTML 侧 `persist()` 里
+   * 触发 ⇒ 审计师在 OnlyOffice 里改完 G/H 金额、切回结构化视图后，H10-3 的行是新的，
+   * 而 H10-1 审定数还是旧的（静默不一致）。
+   *
+   * 🔴 **按值守卫**而不是无条件重跑：先算出聚合结果，与 `H10-adj-overlay` 的现值比对，
+   * 相等就直接 no-op。这样
+   *   · HTML 侧编辑：`persist()` 已经写过 overlay ⇒ 值相等 ⇒ 不重复落库、不重复 emit
+   *     `adjustment:created`（重复 emit 对「累加型」下游消费方是真风险）；
+   *   · OO 侧带回新金额：值不同 ⇒ 恰好触发一次。
+   */
   watch(
     () => opts.allResponses.value.get(ITEM_ID_ROWS)?.remark,
-    () => { /* rows computed */ },
+    () => {
+      if (opts.isReadonly.value) return
+      const next = JSON.stringify(aggregateH10AdjustmentAjeRje(rows.value))
+      if (opts.allResponses.value.get(H10_ADJ_OVERLAY_ID)?.remark === next) return
+      syncWriteback()
+    },
     { immediate: true },
   )
 

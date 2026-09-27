@@ -1056,6 +1056,7 @@ _PROVIDERS_WITHOUT_PUBLISH_ORCHESTRATION: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_h3_investment_property",
         "app.services.workpaper_sync.phase5_h5_oil_gas_assets",
         "app.services.workpaper_sync.phase5_h7_biological_assets",
+        "app.services.workpaper_sync.phase5_h10_asset_disposal_income",
     }
 )
 

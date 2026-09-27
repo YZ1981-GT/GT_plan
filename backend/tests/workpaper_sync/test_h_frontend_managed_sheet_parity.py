@@ -41,6 +41,7 @@ from app.services.workpaper_sync import phase5_h7_biological_assets as h7
 from app.services.workpaper_sync import phase5_h6_asset_disposal_clearing as h6
 from app.services.workpaper_sync import phase5_h8_right_of_use_assets as h8
 from app.services.workpaper_sync import phase5_h9_lease_liabilities as h9
+from app.services.workpaper_sync import phase5_h10_asset_disposal_income as h10
 from app.services.workpaper_sync import store_item_registry as sir
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -116,7 +117,9 @@ def _parse_frontend_wired_codes() -> list[str]:
 #:      按 `managed_row_table_specs()` 展开，天然支持一对多，无需为它开特例。
 #: h5 = 映射率最低档单表（10/54）—— 🔴 store 键**拼接**而来，字面量在前端零命中
 #: h7 = 第二条变体轴，两张 sheet 的表头层数与数据区起始行**在 entry 内就不同**
-_PROVIDERS: tuple[Any, ...] = (h9, h6, h4, h8, h2, h3, h5, h7)
+#: h10 = 收口第九条，🔴 唯一一条受管 sheet **不是明细表**（改配调整分录汇总，见 H10-GAP-1）
+#:       且唯一一张**单级表头**（契约 header_rows=[1]）
+_PROVIDERS: tuple[Any, ...] = (h9, h6, h4, h8, h2, h3, h5, h7, h10)
 
 
 def _backend_managed_rows() -> list[dict[str, str]]:

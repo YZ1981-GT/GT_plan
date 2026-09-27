@@ -15,9 +15,10 @@
  * ═══ 🔴 诚实边界：受管面 ≠ 已接桥面 ═══════════════════════════════════════════
  *
  * D3 实证过「契约受管 ≠ 已接 OO 直写宿主」（D3-4/5/6/7 受管但未接桥）。H 当前的真实状态：
- *   · 后端 provider 已落地 **H9 / H6 / H8 / H4 / H2 / H3 / H5 / H7** 八条 ——
- *     只剩 H10（前端 `H10-detail-rows` 是逐资产处置台账、模板 `明细表H10-2` 是 9 类固定行
- *     × 12 月矩阵，**结构性不匹配**待裁决，见 `h2-h6-h10-pilot-cross-reference-lanes`）；
+ *   · 后端 provider 已落地 **九条全部**（H9 / H6 / H8 / H4 / H2 / H3 / H5 / H7 / H10）；
+ *   · 🔴 H10 的受管 sheet 是 **调整分录汇总H10-3**，不是模板里的 `明细表H10-2` ——
+ *     后者是 9 类固定行 × 12 月矩阵而前端零月度建模（**结构性不匹配**，实测反驳了 slice 的
+ *     配对），改配后映射率 6/10 是全 H 最高档。依据见契约 H10-GAP-1；
  *   · 🔴 H5/H7 的映射率极低（H5 10/54 · H7 成本 5/51 · H7 公允 3/28）是**两侧口径差**
  *     不是漏做：前端行模型远小于模板列数，缺口逐条登记在各自契约的
  *     `review.declared_coverage_gaps`，每条带停下报告点；
@@ -181,6 +182,19 @@ export const H_MANAGED_SHEETS: readonly HManagedSheet[] = Object.freeze([
     excelName: '明细表（公允价值模式）H7-2',
     storeItemId: 'H7-2-fair-rows',
   },
+  {
+    // 🔴 H 循环唯一一条**受管 sheet 不是明细表**的 entry：模板 `明细表H10-2` 是
+    //    9 类固定行 × 12 月的月度矩阵，而前端零月度建模（按值 grep `1月|月度|monthly|各月`
+    //    在全部 H10 组件/composable 下零命中）⇒ 结构性不匹配，改配调整分录汇总表。
+    //    依据逐条在后端契约 `review.declared_coverage_gaps` 的 H10-GAP-1。
+    // 🔴 也是唯一一张**单级表头**（R5）的受管 sheet。
+    entryId: 'xlsx/gt-h10-asset-disposal-income',
+    code: 'H10-3',
+    sheetKey: 'h1003-managed',
+    kind: 'rows',
+    excelName: '调整分录汇总H10-3',
+    storeItemId: 'H10-adjustment-rows',
+  },
 ] as const)
 
 /**
@@ -204,6 +218,7 @@ export const H_OO_WIRED_ROWS_CODES: readonly string[] = Object.freeze([
   'H5-2',
   'H7-2-cost',
   'H7-2-fair',
+  'H10-3',
 ])
 
 const BY_CODE: ReadonlyMap<string, HManagedSheet> = (() => {

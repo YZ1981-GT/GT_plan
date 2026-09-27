@@ -42,6 +42,8 @@ OWNED = (
     "composables/useH2Detail.ts",
     "composables/useH3FormData.ts",
     "composables/useH5FormData.ts",
+    "composables/useH10FormData.ts",
+    "composables/useH10Adjustment.ts",
     "sync/hPendingWrites.ts",
     "d4/composables/useD4SyncMode.ts",
 )
@@ -68,6 +70,7 @@ HOST_FILES: tuple[str, ...] = (
     #: ⇒ 接桥必须改它们（`trackHPendingWrite`）。纳入类型面，逐个现算基线。
     "H7TabDetailCost.vue",
     "H7TabDetailFair.vue",
+    "GtH10AssetDisposalIncome.vue",
 )
 #: 🔴 逐宿主基线按**现算**填，不照抄别的宿主。
 #:
@@ -108,6 +111,8 @@ HOST_ERROR_BASELINE: dict[str, int] = {
     "GtH7BiologicalAssets.vue": 0,
     "H7TabDetailCost.vue": 0,
     "H7TabDetailFair.vue": 0,
+    #: H10 —— 先填 0 跑一次现算再回填（同上）
+    "GtH10AssetDisposalIncome.vue": 0,
 }
 
 _ERR_RE = re.compile(r"^(?P<file>[^(]+)\((?P<line>\d+),\d+\): error (?P<code>TS\d+)")

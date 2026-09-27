@@ -48,6 +48,10 @@ _PROVIDERS: tuple[tuple[str, str], ...] = (
     #: 🔴 映射率最低档（前端行模型远小于模板列数，缺口逐条登记）。
     ("h5", "phase5_h5_oil_gas_assets"),
     ("h7", "phase5_h7_biological_assets"),
+    #: 🔴 受管 sheet 是 **H10-3 调整分录汇总**，不是 slice 声明的 明细表H10-2
+    #:    （后者是 9 类×12 月矩阵、前端零月度建模 ⇒ 结构性不匹配，见 H10-GAP-1）。
+    #:    映射率 6/10 是全 H 最高档；单级表头也是全 H 唯一。
+    ("h10", "phase5_h10_asset_disposal_income"),
 )
 
 
