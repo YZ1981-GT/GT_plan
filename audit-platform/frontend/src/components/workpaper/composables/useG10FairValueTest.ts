@@ -184,7 +184,8 @@ export function useG10FairValueTest(opts: {
   )
 
   const detailClosingAdjustedTotal = computed(() =>
-    calcSubtotal(detailRows.value.map((r) => parseNum(r.closingAdjusted ?? r.closingBalance))),
+    // 🔴 C-7：期末审定数 = 模板 O 列 `closingAdjusted`（legacy `closingBalance` 已移除）
+    calcSubtotal(detailRows.value.map((r) => parseNum(r.closingAdjusted))),
   )
 
   const crossRefVariance = computed(() =>
@@ -210,7 +211,7 @@ export function useG10FairValueTest(opts: {
       if (!hit) continue
       map.set(row.rowId, {
         detailRowId: hit.rowId,
-        variance: parseNum(hit.closingAdjusted ?? hit.closingBalance) - row.closingAuditedFV,
+        variance: parseNum(hit.closingAdjusted) - row.closingAuditedFV,
       })
     }
     return map
@@ -291,15 +292,19 @@ export function useG10FairValueTest(opts: {
     for (const d of details) {
       const name = String(d.liabilityName ?? '')
       const key = matchG10LiabilityKey(name)
-      const audited = parseNum(d.closingAdjusted ?? d.closingBalance)
-      const unadj = parseNum(d.closingBalance ?? d.closingAdjusted)
+      // 🔴 C-7：G10-2 已按权威模板重构（19 列 A..S）。
+      //    未审 FV 读模板 **M 列** `closingFairValue`（=K+L）、审定 FV 读 **O 列** `closingAdjusted`；
+      //    原先读的 `closingBalance` 是走审定线的 legacy 列，已移除。
+      //    `contractDate` 同样已移除 ⇒ 日期只剩模板 **P 列** `maturityDate`。
+      //    🔴 `fairValueLevel` / `valuationMethod` **不再从 G10-2 带入** —— 本表（G10-5）
+      //    才是这两列的权威源，从明细表带回来等于让下游反过来喂上游。
+      const audited = parseNum(d.closingAdjusted)
+      const unadj = parseNum(d.closingFairValue)
       const patch: Partial<G10FairValueRow> = {
         liabilityName: name,
-        initialDate: String(d.contractDate ?? d.maturityDate ?? ''),
+        initialDate: String(d.maturityDate ?? ''),
         closingUnadjustedFV: unadj,
         closingAuditedFV: audited,
-        fairValueLevel: String(d.fairValueLevel || 'Level2'),
-        valuationMethod: String(d.valuationMethod || ''),
       }
 
       if (existing.has(key)) {

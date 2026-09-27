@@ -66,12 +66,9 @@ function buildDerivativeDetailRow() {
     auxType: '项目',
     auxCode: 'SWAP-001',
   }, 1)
-  return enrichG10DetailRow({
-    ...seeded,
-    liabilityType: '衍生金融负债',
-    isDerivative: true,
-    hostContractDesc: '流动资金贷款',
-  }, 1)
+  // 🔴 C-7：`liabilityType` / `isDerivative` / `hostContractDesc` 三列权威源是 G10-8，
+  //    已从 `G10DetailRow` 移除（模板 19 列 A..S 无此三列）。衍生属性由 B 列名称体现。
+  return enrichG10DetailRow({ ...seeded, liabilityName: '利率互换' }, 1)
 }
 
 describe('G10 full-chain regression', () => {
@@ -137,19 +134,21 @@ describe('G10 full-chain regression', () => {
     expect(g10RowClosingAdjusted(store.book_derivative_liability ?? {})).toBe(260)
   })
 
-  it('G10-5 ↔ G10-2 层次同步 + G10-8 → G10-2/G10-3', () => {
+  // 🔴 C-7：两条「回写 G10-2」方向错，已停用（层次/估值方法权威源是 G10-5、
+  //    嵌入衍生判断权威源是 G10-8；G10-2 按权威模板重构后无这些列）。
+  //    全链路回归的正确形态是：**G10-2 不被回写**，而 G10-8 的问题仍能推进 G10-3 调整。
+  it('G10-5/G10-8 不再回写 G10-2（方向错已停用），但 G10-8 → G10-3 仍通', () => {
     const { responses, save } = createResponseHarness()
     const detailRow = buildDerivativeDetailRow()
-    save(G10_DETAIL_ROWS_KEY, { remark: JSON.stringify([detailRow]) })
+    const before = JSON.stringify([detailRow])
+    save(G10_DETAIL_ROWS_KEY, { remark: before })
 
     const fvSynced = pushG10FvToDetail(
       responses,
       save,
       [{ liabilityName: '利率互换', fairValueLevel: 'Level3', valuationMethod: '现金流折现' }],
     )
-    expect(fvSynced).toBe(1)
-    const afterFv = JSON.parse(String(responses.get(G10_DETAIL_ROWS_KEY)?.remark))
-    expect(afterFv[0].fairValueLevel).toBe('Level3')
+    expect(fvSynced).toBe(0)
 
     const derivSynced = pushG10DerivativeCheckToDetail(
       responses,
@@ -160,9 +159,9 @@ describe('G10 full-chain regression', () => {
         overallConclusion: '未见异常',
       },
     )
-    expect(derivSynced).toBe(1)
-    const afterDeriv = JSON.parse(String(responses.get(G10_DETAIL_ROWS_KEY)?.remark))
-    expect(afterDeriv[0].embeddedDerivativeJudgment).toContain('G10-8')
+    expect(derivSynced).toBe(0)
+    // G10-2 载荷逐字节未变
+    expect(responses.get(G10_DETAIL_ROWS_KEY)?.remark).toBe(before)
 
     pushG10DerivativeIssuesToAdjustment(
       responses,

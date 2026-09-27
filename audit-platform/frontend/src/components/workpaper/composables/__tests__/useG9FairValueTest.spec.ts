@@ -147,13 +147,17 @@ describe('跨表联动', () => {
     expect(skipped).toHaveLength(1)
   })
 
-  it('pushG9FvToDetail 按资产名回写层次', () => {
+  // 🔴 C-3（spec g-cycle-single-region-detail-lanes）：`pushG9FvToDetail` 已停用。
+  //    公允价值层次 / 估值方法 / 持有数量的**权威来源就是本表 G9-4**（第三层次另有 G9-5），
+  //    而 `明细表G9-2` 按权威模板重构后（28 列 A..AB）没有这三列 ⇒ 回写会造第二个真源。
+  it('pushG9FvToDetail 已停用：恒 0 且不写 store（方向错）', () => {
     const saves: Array<{ id: string; data: Partial<ChecklistResponse> }> = []
+    const before = JSON.stringify([{ rowId: 'd1', investTarget: '理财产品A' }])
     const map = new Map<string, ChecklistResponse>([
       ['G9-detail-rows', {
         item_id: 'G9-detail-rows',
         conclusion: null,
-        remark: JSON.stringify([{ rowId: 'd1', assetName: '理财产品A', fairValueLevel: 'Level1' }]),
+        remark: before,
       } as ChecklistResponse],
     ])
     const n = pushG9FvToDetail(
@@ -161,9 +165,9 @@ describe('跨表联动', () => {
       (id, d) => { saves.push({ id, data: d }) },
       [enrichG9FairValueRow(baseRow({ fairValueLevel: 'Level3' }))],
     )
-    expect(n).toBe(1)
-    const saved = JSON.parse(String(saves[0].data.remark))
-    expect(saved[0].fairValueLevel).toBe('Level3')
+    expect(n).toBe(0)
+    expect(saves).toEqual([])
+    expect(map.get('G9-detail-rows')?.remark).toBe(before)
   })
 
   it('pushG9FvDiffToAdjustment 写入借贷分录', () => {

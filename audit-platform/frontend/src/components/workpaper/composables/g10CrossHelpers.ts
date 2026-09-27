@@ -62,10 +62,13 @@ export function aggregateG10DetailBuckets(rows: G10DetailRow[]): Map<string, G10
   for (const row of rows) {
     const suffix = resolveG10LiabilitySuffix(row)
     if (suffix === 'trading_liability' || suffix === 'designated_fvtpl') continue
-    const openInit = parseNum(row.openingInitialAmount ?? row.initialAmount)
-    const closeInit = parseNum(row.closingInitialAmount ?? row.initialAmount)
-    const openBook = parseNum(row.openingFairValue ?? row.openingBalance)
-    const closeBook = parseNum(row.closingFairValue ?? row.closingBalance)
+    // 🔴 C-7：`initialAmount` / `openingBalance` / `closingBalance` 三个 legacy 单值键
+    //    已随权威模板重构从 `G10DetailRow` 移除（与模板 C/K、E、M 重复）。
+    //    这里直接读模板列，不再留回退（回退的目标字段已不存在）。
+    const openInit = parseNum(row.openingInitialAmount)
+    const closeInit = parseNum(row.closingInitialAmount)
+    const openBook = parseNum(row.openingFairValue)
+    const closeBook = parseNum(row.closingFairValue)
     const prev = map.get(suffix) ?? { ...emptyBucket(), suffix }
     prev.openingInit += openInit
     prev.closingInit += closeInit
@@ -314,11 +317,12 @@ export function seedG10DetailRowFromAux(
   existing?: G10DetailRow,
 ): G10DetailRow {
   const plug = Math.round((seed.closingBalance - seed.openingBalance) * 100) / 100
+  // 🔴 C-7：`currentDecrease` 已移除（模板 H 是净额列「增加+/减少—」）⇒ 判「是否已有变动」
+  //    只看模板的三个变动分量 H/I/J。
   const hasMovement = existing && (
     existing.movementInitialAmount
     || existing.movementFvChange
     || existing.interestExpense
-    || existing.currentDecrease
   )
   const name = seed.liabilityName
   return enrichG10DetailRow(
@@ -326,64 +330,40 @@ export function seedG10DetailRowFromAux(
       rowId: existing?.rowId ?? `g10d-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`,
       liabilityName: name,
       liabilityCategory: existing?.liabilityCategory ?? inferG10LiabilityCategory(name),
-      liabilityType: existing?.liabilityType ?? inferG10LiabilityTypeFromName(name),
       openingInitialAmount: seed.openingBalance,
       openingFvAccum: existing?.openingFvAccum ?? 0,
       movementInitialAmount: existing?.movementInitialAmount ?? 0,
       movementFvChange: hasMovement ? existing!.movementFvChange : plug,
       interestExpense: existing?.interestExpense ?? 0,
-      currentDecrease: existing?.currentDecrease ?? 0,
       closingAdjustment: existing?.closingAdjustment ?? 0,
-      fairValueLevel: existing?.fairValueLevel,
-      valuationMethod: existing?.valuationMethod ?? '',
-      remark: existing?.remark
+      // 🔴 C-7：`liabilityType`（→B 列文本）/`fairValueLevel`+`valuationMethod`（→G10-5）/
+      //    `remark`（模板无）已移除；辅助核算的取数说明改落 S 列「发行文件索引」。
+      issuanceDocIndex: existing?.issuanceDocIndex
         || `辅助核算(${seed.auxType})取数；增减轧差暂入本期 FV 变动，请按凭证拆分`,
     },
     seq,
   )
 }
 
-/** 回写 G10-2：层次 / 估值方法 */
+/**
+ * 🔴 **已停用**（spec `g-cycle-single-region-detail-lanes` C-7）。
+ *
+ * 原实现把 `公允价值测试表G10-5` 的「层次 / 估值方法」回写进 `明细表G10-2` ——
+ * 方向错：这两列的**权威来源就是 G10-5**（第三层次另有 G10-6 调节表），
+ * 而 G10-2 按权威模板重构后（19 列 A..S）没有这两列，回写只会造出第二个真源。
+ * 与 G9 的 `pushG9FvToDetail`（G9-4→G9-2）同族错误，同批处置。
+ *
+ * 需要按层次汇总 G10-2 的金额时走 `g10DisclosureCross.sumG10DetailLevel3Closing`
+ * （已改为「从 G10-5 取 Level3 项目名 → 筛 G10-2 行求和」）。
+ *
+ * 保留导出与签名以免打断调用方，**恒返 0 且不写任何 store**。
+ */
 export function pushG10FvToDetail(
-  responses: Map<string, ChecklistResponse>,
-  debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void,
-  fvRows: G10FvPushDetailSource[],
+  _responses: Map<string, ChecklistResponse>,
+  _debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void,
+  _fvRows: G10FvPushDetailSource[],
 ): number {
-  const raw = responses.get(G10_DETAIL_ROWS_KEY)?.remark
-  if (!raw) return 0
-  let details: Record<string, unknown>[]
-  try {
-    details = JSON.parse(raw)
-    if (!Array.isArray(details)) return 0
-  } catch {
-    return 0
-  }
-
-  const byKey = new Map(
-    fvRows
-      .filter((r) => r.liabilityName?.trim())
-      .map((r) => [matchG10LiabilityKey(r.liabilityName), r]),
-  )
-  let n = 0
-  const next = details.map((d) => {
-    const hit = byKey.get(matchG10LiabilityKey(String(d.liabilityName ?? '')))
-    if (!hit) return d
-    n += 1
-    return {
-      ...d,
-      fairValueLevel: hit.fairValueLevel || d.fairValueLevel,
-      valuationMethod: hit.valuationMethod || d.valuationMethod,
-    }
-  })
-  if (n) {
-    debouncedSave(G10_DETAIL_ROWS_KEY, { remark: JSON.stringify(next) })
-    try {
-      window.dispatchEvent(new CustomEvent('g10:detail-updated', {
-        detail: { source: 'G10-5→G10-2', timestamp: Date.now() },
-      }))
-    } catch { /* silent */ }
-  }
-  return n
+  return 0
 }
 
 export function parseG10DetailRows(json: string | null | undefined): G10DetailRow[] {
