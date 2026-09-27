@@ -1114,12 +1114,15 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_h8_right_of_use_assets",
         "app.services.workpaper_sync.phase5_h2_construction_in_progress",
         "app.services.workpaper_sync.phase5_h3_investment_property",
+        "app.services.workpaper_sync.phase5_h5_oil_gas_assets",
+        "app.services.workpaper_sync.phase5_h7_biological_assets",
         # ── G 循环 lane（spec: g4-g6-… / g5-… / g-cycle-single-region-…）────────
         #    🔴 **同上一段的补漏形态**：台账条目已登记但漏了白名单。
         "app.services.workpaper_sync.phase5_g8_other_equity",
         "app.services.workpaper_sync.phase5_g9_other_noncurrent",
         "app.services.workpaper_sync.phase5_g10_trading_liabilities",
         "app.services.workpaper_sync.phase5_g1_trading_financial_assets",
+        "app.services.workpaper_sync.phase5_g3_dividend_receivable",
         "app.services.workpaper_sync.phase5_g11_investment_income",
         "app.services.workpaper_sync.phase5_g12_net_hedge_gains",
         "app.services.workpaper_sync.phase5_g13_fair_value_changes",

@@ -163,6 +163,7 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     #    ③ `header_rows` 从 2 被改 ④ payload 列从 `conclusion` 被改成 `remark`
     #    ⑤ 新补的模板 `AA`（是否函证）列被删回去。
     ("g1", "phase5_g1_trading_financial_assets", "ADAPTER_ID", True, True),
+    ("g3", "phase5_g3_dividend_receivable", "ADAPTER_ID", True, True),
 )
 
 

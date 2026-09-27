@@ -1147,6 +1147,36 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "`adapter_registered=False`：与 D/E/F/G 系列同一平台级缺口（umbrella BP-61-1）。"
         ),
     },
+    # ── G3（spec: g-cycle-single-region-detail-lanes · Task 14 / C-13，方案 A 整表重建）──
+    {
+        "contract_id": "g3.dividend_receivable_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_g3_dividend_receivable",
+        "delivered_by_task": "G1R-Task14",
+        "pilot_class": "phase5_dividend_receivable_detail",
+        "entry_id": "xlsx/gt-g3-dividend-receivable",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "G/G3 应收股利.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "spec `g-cycle-single-region-detail-lanes` 九条中的**第九条**（最后一条交付的 lane，"
+            "方案 A 整表重建）。权威模板 sha256 02a57272…（480,411 B，**9 sheets**，**491 definedName**"
+            "）；受管 sheet = 明细表G3-2。"
+            "🔴 **三级表头 R9/R10/R11**（G 循环唯一）：R9 五个一级组（A 项目 / C 账面余额 / Q 减值"
+            "准备 / AE 账面价值 / AG 备注）/ R10 十一个二级组 / R11 逐列叶子行。"
+            "几何：两区（R12 账龄一年以内 / R22 一年以上）· 数据 R13-20（8 行）/ R23-28（6 行）· "
+            "小计 R21/R29 逐列 SUM · 合计 R30 `=C29+C21`。"
+            "有效列 **32**（A + C..AG，**B 列空** A9:B11 合并覆盖）· max_column=33 ⇒ uuid **AH/AI**。"
+            "公式列 **12** 个（F M N O P T AA AB AC AD AE AF），两区**完全相同**（不像 G1 有跨表差异）。"
+            "前端 `DividendDetailRow` 整表重建：旧 34 字段中 30 个不在模板里的保留为非受管"
+            "（@deprecated 移交 G3-4 测算及检查表 / G3-5 长期未收回款项检查表）。"
+            "payload 列 **conclusion**（`conclusion_only` 族）。行身份键 `id`，生成器 "
+            "`g3d-${mintRowIdSuffix()}`。`agingCategory` 字段标记区归属"
+            "（`within_one_year` / `over_one_year`）。"
+            "FC-9 红线：本 provider 对 trial_balance 写次数为 0。"
+            "`adapter_registered=False`：同系列平台级缺口（umbrella BP-61-1）。"
+        ),
+    },
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     {
         "contract_id": "h9.lease_liability_detail",
@@ -1492,6 +1522,114 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "sync 路径对 trial_balance 写 **0** 次 —— 发布门是用户显式动作不是回写副作用。"
             "幻影码 `H3I` 三条 finder 路径实测全空（程序表码是 `H3A`）。"
             "`adapter_registered=False` 同前五条：BP-1~BP-3 属平台缺口，不手改 manifest。"
+        ),
+    },
+    # ── H5 映射率最低档（spec: h3-h5-h7-variant-axis-and-dynamic-column-paradigm）──
+    {
+        "contract_id": "h5.oil_gas_assets_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_h5_oil_gas_assets",
+        "delivered_by_task": "H5-lowest-coverage",
+        "pilot_class": "phase5_oil_gas_assets_detail",
+        "entry_id": "xlsx/gt-h5-oil-gas-assets",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "H/H5 油气资产.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "H 循环**第七条** entry，单张受管 sheet `明细表H5-2`：**10 映射 / 54 有效列"
+            "（19%）**，对照 H8 58/58、H2 34/50、H3 成本 17/45。"
+            "🔴 **低不是漏做**：前端 `H5DetailRow` 只有 17 个字段，而模板 54 列（全 H 最宽）。"
+            "①前端**没有任何减值字段**（模板减值准备整块 AF..AT 共 15 列）；"
+            "②前端**没有任何审定字段**（模板三区块的期初调整/账项调整/审定数共 24 列 —— "
+            "H5 的审定数在 `useH5Adjudication` 的 H5-1 审定表，键是 H5-1-cost-rows / "
+            "H5-1-depletion-rows / H5-1-impairment-rows **三个**，那是另一张表不是本 sheet 的列)；"
+            "③三处算术不等不可映。映射的 10 格全部落在两个「未审数」段的**手敲格**上"
+            "（A 类别 / C 名称 / D 原值期初 / E 增加金额 / F 增加方式 / G 减少金额 / "
+            "H 减少方式 / I 原值期末 / Q 折耗期初 / R 本期计提）。"
+            "🔴 **`I` 是唯一可映的公式列**：模板 `=SUM(D:E)-G` 与前端 "
+            "`calcAssetEndBalance(begin,debit,credit)=begin+debit-credit` **逐项相等**。"
+            "而 `V 折耗期末数` 不能映 —— 模板 `=SUM(Q:S)-SUM(T:U)`，Excel 会按自己的 Q..U "
+            "重算（S/T/U 恒空 ⇒ V=Q+R），回写把**丢掉 reversal** 的值灌进 accDepletionEnd"
+            "（静默错数）；前端式是 `calcContraEndBalance(begin, reversal, provision)` = "
+            "begin+prov-rev。`AW 期末净值` 也不能映 —— 模板 `=I-V-AK` 含**减值期末**，"
+            "而前端 `calcNetValue(cost, depletion, **0**)` 的减值项是**字面 0**，"
+            "两者只在减值恒为 0 时相等。"
+            "🔴 三条缺口带停下报告点：H5-GAP-1（无减值+无审定，31 列）· "
+            "H5-GAP-2（`accDepletionReversal` 转回对应 `T 处置` 还是 `U 其他减少` 属审计口径，"
+            "连带 V 不可映）· H5-GAP-3（netValue 减值项写死 0，连带 AU/AV/AW/AX 不可映）。"
+            "🔴 **四处不能照抄前六条**：①**store 键是拼接的** —— `useH5Detail.ts` 用 "
+            "`${ITEM_PREFIX}-rows`（ITEM_PREFIX='H5-2'）⇒ 按值 grep 字面量 'H5-2-rows' "
+            "**零命中**（HC-4，slice 快照与实测不符的 5 处之一）；②**没有派生合计键** —— "
+            "H5 小计是 computed（subtotalRow），`_persist()` 只写 rows.value ⇒ "
+            "derived_total_keys 是**空元组**（H4 有 4 个、H3 有 3 个，照抄会去找不存在的键）；"
+            "③**footer 之下小计区行标签是字面量**（探明矿区权益 / 未探明矿区权益 / "
+            "井及相关设施 / … / …）不是 `=底稿目录!A9..A13` 引用 —— H3/H4/H7 都是引用，照抄假红；"
+            "④**有效列 54 = 全 H 最宽**，数据区 R13-R32 共 20 行。"
+            "几何：**四级**表头 R9-R12 共 71 合并域 / footer R33 全列 SUM 无行内派生 / "
+            "数据行公式列 19 个（映射侧仅 1 个）。"
+            "HD-7：H5 **有** TB 发布门（H 循环第三例）—— useH5Adjudication.ts#L273 publishToTb，"
+            "挂在 H5-1 审定表上；sync 路径对 trial_balance 写 0 次。"
+            "幻影码 `H5O` 三条 finder 路径实测全空（程序表码是 `H5A`）。"
+            "`adapter_registered=False` 同前六条：BP-1~BP-3 属平台缺口，不手改 manifest。"
+        ),
+    },
+    # ── H7 第二条变体轴（同 spec）────────────────────────────────────────────
+    {
+        "contract_id": "h7.biological_assets_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_h7_biological_assets",
+        "delivered_by_task": "H7-variant-axis-minimal-carrier",
+        "pilot_class": "phase5_biological_assets_detail",
+        "entry_id": "xlsx/gt-h7-biological-assets",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "H/H7 生产性生物资产.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "H 循环**第八条** entry，**第二条变体轴**（H3 是第一条）：成本模式 / 公允价值模式"
+            "两张并列明细表，各有独立持久化键（H7-2-cost-rows / H7-2-fair-rows）⇒ 两张都进"
+            "受管面、必须同批交付（只放一半，切计量模式就掉桥）。"
+            "🔴 **映射率全 H 最低**：成本 **5/51（10%）** · 公允 **3/28（11%）**。"
+            "根因是前端行模型最小 —— 成本 Tab 内联 `DetailRow` **11 个**业务字段、"
+            "公允 `FairDetailRow` **9 个**。映射的那几格恰是用户在该 Tab 里**手敲的全部格**"
+            "（类别 / 名称 / 期初原值 / 本期增加 / 本期减少；公允侧是 类别 / 名称 / 本年变动）。"
+            "🔴 **载体是 `per_tab_self_persisting`**：store 键与行模型都**内联在 Tab 组件里**"
+            "（H7TabDetailCost.vue#L257/#L275 与 H7TabDetailFair.vue#L230/#L248），不在 "
+            "composable。`useH7DetailCost.ts` / `useH7DetailFair.ts` 各只 **32 行**、只导出 "
+            "getNum/getString 两个读取器 —— **不是载体**，按文件名推演会把判据指错文件。"
+            "🔴 **两处硬映会静默毁数据**，故判 template-only："
+            "①`accDep` / `impairment` 是**单值期末余额**（Tab 列标签逐字是「累计折旧」"
+            "「减值准备」，净值 = 期末原值 − 累计折旧 − 减值准备），模板把每个备抵科目拆成 "
+            "期初 / 本期增加（计提·其他）/ 本期减少（处置·其他）/ 期末数，**且期末数是公式**"
+            "（V=SUM(Q:S)-SUM(T:U) / AK=SUM(AF:AH)-SUM(AI:AJ)）—— 映到期末数会被 Excel 按"
+            "恒空的分项**重算成 0**，回写把 0 灌回（静默清零）；映到期初数是语义错位。"
+            "②公允侧 `fvBegin` 是**含累计变动的公允总额**（Tab 标签「期初公允价值」），"
+            "模板把「原值 D..P」与「公允价值变动 Q..X」分两块、净值才是两者之和"
+            "（Y=M+V / Z=P+X）—— 映进原值列会让 Y 把公允变动**重复计一次**（同 H3F-GAP-1）。"
+            "🔴 **五处不能照抄前七条**：①载体族是 per_tab_self_persisting（见上）；"
+            "②**同一 entry 内两张 sheet 的表头层数不同** —— 成本**四级** R9-R12 / "
+            "公允**三级** R9-R11（H3 两张都是三级 ⇒ 判据不能按 entry 统一写）；"
+            "③**两张的数据区起始行不同**（成本 R13-R36 共 24 行 / 公允 R12-R36 共 25 行）；"
+            "④**两张的 FORMULA_TEMPLATES 都是空**（全 H 唯一）—— 19 / 11 个公式列一个都没进 "
+            "field_specs，判据若假设「每张受管表至少有一个公式列」会在此假红"
+            "（登记在 review.formula_templates_are_intentionally_empty）；"
+            "⑤**小计行在 rows 里**（DetailRow.isSubtotal?），与 H5 的 computed subtotalRow "
+            "相反 ⇒ isSubtotal 判 store-only，合计行由模板 footer R37 承担，不得当数据行写入。"
+            "五条缺口带停下报告点：H7C-GAP-1（11 字段对 51 列，无审定/无增减方式/"
+            "无期末原值 —— `I 期末数` 在 Tab 里是 `class-name=\"auto-calc-col\"` 的展示期计算"
+            "不落库，这也是本 sheet FORMULA_TEMPLATES 为空的原因；H5 有 originalCostEnd "
+            "字段所以能映 I）· H7C-GAP-2（单值余额 vs 三段，静默清零）· "
+            "H7F-GAP-1（公允总额口径）· H7F-GAP-2（无审定字段）· "
+            "H7F-GAP-3（AA/AB 权属抵押无字段，🔴 不得按名字近似映到 fvLevel 公允价值层级）。"
+            "几何：册 225,641 B / **26 sheets 全 H 最多** / 成本 68 合并域·有效列 51 即 A..AY·"
+            "尾部**只有一个**布尔列 AY 是否提足折旧（H5 有四个）· 公允 28 合并域·有效列 28 即 "
+            "A..AB / 两张 footer R37 全列 SUM / footer 之下 R38-R43 `其中：`+五行 SUMPRODUCT，"
+            "标签取 =底稿目录!A9..A13（H5 是字面量 ⇒ 判据不共用）。"
+            "覆盖闭合：成本 5+46==51 / 公允 3+25==28，两侧并集各自连续无缺口、无列重复。"
+            "HD-7：H7 **有** TB 发布门，且**两个计量模式各一个**"
+            "（H7TabAdjudicationCost#L401/#L418 与 H7TabAdjudicationFair#L273）—— "
+            "与 H3 只有成本侧相反；sync 路径对 trial_balance 写 0 次。"
+            "幻影码 `H7B` 三条 finder 路径实测全空（程序表码是 `H7A`）。"
+            "`adapter_registered=False` 同前七条：BP-1~BP-3 属平台缺口，不手改 manifest。"
         ),
     },
     # ── I6 canary（spec: i-cycle-sync-foundation-and-first-canary · Task 22）──

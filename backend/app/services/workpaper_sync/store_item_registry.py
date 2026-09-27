@@ -548,6 +548,12 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="G1-2-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    "g3.dividend_receivable_detail": StoreMergePlan(
+        adapter_id="g3.dividend_receivable_detail",
+        provider_module="phase5_g3_dividend_receivable",
+        items=(StoreItemSpec(item_id="G3-2-detail-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     #
     # 🔴 **HC-12：H 循环 9 册全部命中 OO 加载期裸 `IF(`** ⇒ 同 G 的 per-file 保守策略，
@@ -677,6 +683,36 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(
             StoreItemSpec(item_id="H3-2-cost-rows", kind=StoreKind.rows),
             StoreItemSpec(item_id="H3-2-fair-rows", kind=StoreKind.rows),
+        ),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── H5 映射率最低档（spec: h3-h5-h7-variant-axis-and-dynamic-column-paradigm）──
+    #
+    # 🔴 键是**拼接**出来的：`useH5Detail.ts` 用 `${ITEM_PREFIX}-rows`（ITEM_PREFIX='H5-2'）
+    #    ⇒ 按值 grep 字面量 'H5-2-rows' **零命中**（HC-4）。这里登记的是解析后的真键。
+    #
+    # 册 195,306 B / 24 sheets ⇒ 中性化必挂，函数与 G7/G2/H9/H6/H4/H8/H2/H3 共用。
+    "h5.oil_gas_assets_detail": StoreMergePlan(
+        adapter_id="h5.oil_gas_assets_detail",
+        provider_module="phase5_h5_oil_gas_assets",
+        items=(StoreItemSpec(item_id="H5-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── H7 第二条变体轴（同 spec）────────────────────────────────────────────
+    #
+    # 🔴 **两个** item，且两张 sheet 的形态**在 entry 内就不一致**：
+    #    表头层数 4 级（成本）vs 3 级（公允）、数据区起始行 R13 vs R12。
+    #    两张必须同批登记（切计量模式就掉桥）。
+    # 🔴 载体是 `per_tab_self_persisting`：键与行模型内联在 Tab 组件里，
+    #    `useH7DetailCost.ts` / `useH7DetailFair.ts` 只是 getNum/getString 读取器，不是载体。
+    #
+    # 册 225,641 B / 26 sheets（全 H 最多）⇒ 中性化必挂，函数共用不新造。
+    "h7.biological_assets_detail": StoreMergePlan(
+        adapter_id="h7.biological_assets_detail",
+        provider_module="phase5_h7_biological_assets",
+        items=(
+            StoreItemSpec(item_id="H7-2-cost-rows", kind=StoreKind.rows),
+            StoreItemSpec(item_id="H7-2-fair-rows", kind=StoreKind.rows),
         ),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),

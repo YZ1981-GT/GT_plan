@@ -140,6 +140,7 @@ SLICE_DELIVERED_CONTRACTS: dict[str, str] = {
     "xlsx/gt-g13-fair-value-changes": "g13.fair_value_changes_detail.json",
     "xlsx/gt-g12-net-hedge-gains": "g12.net_hedge_detail.json",
     "xlsx/gt-g1-trading-financial-assets": "g1.trading_financial_assets_detail.json",
+    "xlsx/gt-g3-dividend-receivable": "g3.dividend_receivable_detail.json",
 }
 
 #: 不可达旧桩（AC 1.7）——它的 independent_entry=false，不进 slice。

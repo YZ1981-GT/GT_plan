@@ -335,7 +335,7 @@
         "payload_column": "conclusion",
         "payload_column_mode": "conclusion_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 conclusion（remark 留给纯文本说明）",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG3Detail.ts#L378",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG3Detail.ts#L514",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
@@ -344,7 +344,7 @@
         "row_identity_key": "id",
         "row_identity_kind": "generated_timestamp_string",
         "row_identity_generator": "inline template literal",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG3Detail.ts#L292",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG3Detail.ts#L428",
         "row_identity_generator_form": "`g3d-${mintRowIdSuffix()}`",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
