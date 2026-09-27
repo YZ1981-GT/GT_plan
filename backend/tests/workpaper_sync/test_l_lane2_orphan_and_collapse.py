@@ -657,19 +657,16 @@ class TestExternalDependencyRegistration:
         # 真实清理需要 DBA 操作 + 业务确认
         pass  # 登记完成
 
-    def test_l2_l3_l4_insufficient_payload_for_roundtrip(self) -> None:
-        """Task 21*: 三条真库载荷不足——L2 唯一非空载荷是违例、L3/L4 全 NULL/[]。"""
+    def test_l2_l3_l4_have_seed_payload_for_roundtrip(self) -> None:
+        """Task 21*: 三条已有 E2E seed 数据（可做闭环）。"""
         if not _PG_AVAILABLE:
             pytest.skip("PG 不可用")
-        for code, expected_real in [("L2", 0), ("L3", 0), ("L4", 0)]:
+        for code in ("L2", "L3", "L4"):
             rows = _pg_query(
-                f"SELECT COUNT(*) AS n FROM checklist_responses cr "
-                f"JOIN working_paper wp ON cr.wp_id = wp.id "
-                f"JOIN wp_index wi ON wp.wp_index_id = wi.id "
-                f"WHERE cr.item_id ~ '^{code}-' AND wi.wp_code LIKE '{code}%' "
-                f"AND cr.remark IS NOT NULL AND cr.remark NOT IN ('[]', 'null', '')"
+                f"SELECT COUNT(*) AS n FROM checklist_responses "
+                f"WHERE item_id ~ '^{code}-adj-' AND remark IS NOT NULL AND remark != '' "
+                f"AND remark NOT IN ('[]', 'null')"
             )
-            real = rows[0]["n"]
-            assert real == expected_real, (
-                f"{code} 真库有效载荷应为 {expected_real}，实得 {real}"
+            assert rows[0]["n"] >= 4, (
+                f"{code} 应有 >= 4 行有效 seed 载荷，实得 {rows[0]['n']}"
             )

@@ -475,13 +475,13 @@ class TestTask29CanaryRealDb:
             f"行 2~4 应全为 '0'，实有非零: {[r['item_id'] for r in other_non_zero]}"
         )
 
-    def test_l6_l7_l8_zero_rows(self) -> None:
-        """L6/L7/L8 真库 0 行（结构性零）。"""
+    def test_l6_l7_l8_have_seed_rows(self) -> None:
+        """L6/L7/L8 有 E2E seed 行（已造数据）。"""
         for code in ("L6", "L7", "L8"):
             rows = _pg_query(
-                f"SELECT COUNT(*) AS n FROM checklist_responses WHERE item_id ~ '^{code}-'"
+                f"SELECT COUNT(*) AS n FROM checklist_responses WHERE item_id ~ '^{code}-adj-'"
             )
-            assert rows[0]["n"] == 0, f"{code} 真库应 0 行，实得 {rows[0]['n']}"
+            assert rows[0]["n"] >= 4, f"{code} 应有 >= 4 行 seed，实得 {rows[0]['n']}"
 
     def test_l_domain_conclusion_all_zero(self) -> None:
         """全 L 域 conclusion 非空 == 0。"""
