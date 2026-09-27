@@ -62,6 +62,40 @@ inclusion: always
 - **全局模块 7 spec + frontend-consistency-m1 = 8 个 active spec 全部 ✅ 完成（2026-06-01，121 任务全绿）**：A formula-engine-unification(20/20) / B retrieval-kernel-unification(12/12) / C doc-level-ai-chat(12/12) / D report-config-baseline(12/12) / E wp-ai-review-ux-fix(8/8) / F global-modules-cleanup(10/10) / G global-modules-p2-polish(11/11) / frontend-consistency-m1(36/36)；残留仅 Playwright E2E 待 start-dev.bat 环境
 - active 仅剩 `consol-note-three-level-drilldown`（stub 无 tasks.md，待真实合并数据）；**合并四阶段已归档 `_archive/09-consolidation-phases/`**
 
+### 底稿双向回写 spec 系列（F~M 九轮，2026-09-26 现扫；上游 = umbrella `workpaper-html-onlyoffice-bidirectional-writeback-closure`）
+- **目标**：把各循环底稿从 `legacy_fake_bidirectional` 接成**真双向**（HTML 侧 ↔ OnlyOffice 侧）。逐循环一轮：读该循环 slice → openpyxl 实测全部模板册 → 前后端 + 真库按值 grep → 裁决拆分/canary → 生成 spec 三件套。
+- **已交付 26 份 spec**（`.kiro/specs/`，全部已登记 INDEX.md；现扫 Active **47** / 目录 **50**）：F 5 份 · G 4 份 · H 4 份 · I 3 份 · **J 2 份（28/28 + 18/18 已实施完成）** · K 3 份 · L 3 份 · M 3 份 · **N 3 份（0/23 0/18 0/17，本轮新建）**
+- **共同裁决承接链**：FC-1~13 → GC-1~10 → HC-1~16 → IC-1~20 → JC-1~20 → KC-1~24 → LC-1~26 → MC-1~29 → **NC-1~37**。每轮**以上一轮为基准逐条重裁**（✅沿用 / ⚠️变形 / 🔁反转 / ❌不适用 / 本轮新增），**❌ 与 🔁 都必须显式声明**（N 轮 ✅10 ⚠️15 🔁5 ❌1 新增6 = 37，逐条数表格得出）。🔴 **不适用不是单向继承** —— M 轮判 ❌ 的 KC-17（prefill）在 N 侧分母 **76** 非空、**重新适用** ⇒ 每轮都要重算。lane spec **只引用编号不复述**。
+- **L 轮（筹资/债务）3 份**：`l-cycle-sync-foundation-and-first-canary`（L1，canary = `L1-adj-*` 键组 / `审定表L1-1`）· `l2-l3-l4-orphan-twins-and-sheet-granularity-collapse`（BP-5 孤儿 + BP-8 L4 粒度折叠）· `l5-l8-inert-switch-and-child-tab-carriers`（BP-4 死开关 + BP-6 探活）。切分按 slice 自身 `capability_target_blocked_by` 的**互斥集合**（L1~L4 含 BP-5 / L5~L8 含 BP-4+BP-6），**不按科目相邻**；1+3+4 = 8 ✓
+- 🔴 **L 轮抓到 slice 两处扫描盲区**（前七轮未见）：① 位置化行身份 —— slice 只扫 `rowKey:`/`rowId:` 赋值，**未扫 item_id 模板串里的 `row-${n}`/`row${i}` 段** ② 跨 entry 隔离 —— slice **只扫代码不查库**，真库已有 L2 命名空间的行落在 `wp_code='G8'` 底稿上
+- **M 轮（股东权益）3 份**：`m-cycle-sync-foundation-and-first-canary`（canary **M6**，46 task，MC-1~29 + MF-P1~76）· `m2-m3-m4-m7-m10-sheet-map-drift-and-collapse`（29 task）· `m1-m5-m8-m9-mode-value-and-carrier-exceptions`（27 task）。10 entry / **102** sheets / 公式格 **2937** / BP 12 条。切分按 **BP-4 主轴**（M 的 BP **交叉重叠**非 L 那种互斥二分；mode 枚举分界 M1~M4 与 item_id 命名分界 M1~M3 **不重合 ⇒ M4 两侧归属不同**）。🔴 **canary 判据显式偏离 K/L 硬标准**（M 真库仅 6 行、唯一非空 `remark` 是 AI 会话 ⇒ 硬标准无解，改用五条替代判据）——**该偏离是 M 域特有情形，N 轮已收回**，详见 INDEX.md。
+- 🔴 **M 轮三条独有平台级收口**：**MC-23** `M{n}_SHEET_MAP` declared 84 = hit 73 + missing **11**（危害长期不可见因 10 条 fallback 全命中真 sheet ⇒「错 tab 非空白」）· **MC-24** 历史 sheet 过滤两侧口径不一致（`wp_render_config.py` 无此过滤 ⇒ HTML 与 OO 两侧 sheet 集合不等）· **MC-28** `resolveProcedureSheetKey.ts` 的 M 段只 6 条**缺 M1/M3/M7/M8**（🔴 N 轮现读确认**此欠账仍未修**，N 段反倒已完备 5/5）。M 侧现算为 **0** 而 L 非零的反向差异：`#REF!` · 越界 · dangling · 倒挤链 · OCR · prefill · inert 开关 · **按行身份删（M 零正面样板）**。
+- **N 轮（税费）3 份**：`n-cycle-sync-foundation-and-first-canary`（canary **N4 税金及附加**，23 task，NC-1~37 + NF-P1~40）· `n1-n3-host-inline-router-and-shared-adoption`（18 task，NA-P1~22）· `n2-n5-json-table-identity-and-cross-entry-readonly`（17 task，NB-P1~22）。5 entry / **59** sheets（HTML child 45 + `html_program_console` 2 + OO 兜底 12）/ 公式格 **2185** / BP 12 条 / 守卫 `test_task56_n_cycle_migration.py` **2650 行 14 类 123 test**。🔴 **切分沿 slice 自身的路由分界**（`hosts_using_host_inline_regex: 2` == {N1,N3} == lane2；`hosts_using_shared_cycle_sheet_router: 3` == foundation + lane3），跨组区分项恰 **2** 条（BP-5 / BP-8）各只分 2 组；1+2+2 = 5 ✓
+- 🔴🔴 **N 轮最重发现 NC-32：wp_code 与 Excel A1 引用语法同形 ⇒ 一整类静默失效**（slice 完全未记录）。超列引用正确口径 **17** 必分三族：**族 A1 真缺陷 3**（`N4-2 E9 =B9+C9+N4` 反向分母 **9:1** · `N5-6-1 E12 =C12+N5` **37:1** · `N5-8 H12` **28:1**；三处**全是 `D` 列被换成本册 wp_code**、两处都在第 12 行、分属三册 ⇒ **系统性操作残留**；机理 = `N4`/`N5` 与 A1 引用（列 N 第 4/5 行）同形 ⇒ Excel 不报错、列 N 超 `max_column` ⇒ **恒空、静默吞掉第三分量**，`N5-8` r39 合计**连带错**）+ **族 A2 结构残留 11**（`N3-2 H11~H21` 全同形、**无反向分母** ⇒ 整列失效 H≡F，**不可与 A1 合并计数**）+ **族 B 合法 3**（SUM 区间终点）。🔴 错口径命中 **232 ⇒ 误报 215**，根因 sheet 名里 `N2-1` 被当列引用 ⇒ **必先剔引号段与中文 sheet 名 `!` 段**。
+- 🔴 **N 轮五条反转 M/L 结论**：**NC-34** `conclusion` 是 N 主载荷（真库 30 行中 `conclusion` 非空 **23** > `remark` 非空 **4**，且那 4 行里 **3 行是 AI 会话** `*-review-session-*` 各 261 B ⇒ **M/L 两轮「只映 remark」在 N 必错**，契约须双列映射；🔴 后缀规则有例外 —— `N1-5-rows` 实际在 `conclusion` ⇒ 采「实际非空列优先」）· **NC-6** 有正面样板可抄（`removeRow` by_index **18** : by_rowid **13**，M 是 50:0 ⇒ 目标是「改造成已有形态」非「从零自建」）· **NC-18** canary 判据**回归 K/L 硬标准**（`N4-1-rows` 真库 1665 B 且 `rowKey:"row-消费税"` 是**稳定语义键**）· **NC-28** N 段已完备无欠账 · **NC-37** prefill 重新适用。
+- 🔴 **N 轮其余独有**：**NC-30 transport_key**（owner 常量 6 处，N1 **双 owner** 全域唯一；🔴 **TK-2 恒假陷阱** —— `N1-1-adj-0`…`-6` 源码**一个都不存在**（运行时拼）⇒「字面量至少 1 命中」恒假，须改「模板串命中 + 展开数 == `N1_ADJUDICATION_CATEGORIES` 长度 7」；8 个不存在键各 0 而 `N4-1-rows-v2` 命中 1（orphan 自己）⇒ 「伪造键形态」≠「不存在的键」）· **NC-33 slice schema 校验器拒收诚实声明**（把 `forbidden_identity_kinds` 字面值当非法 ⇒ **越如实点名越通不过 = 反向激励藏缺陷**，M 轮走的就是「改含糊词」这条出路）· **NC-31 `parent_duplicate` 首次触发**（4 条全挂 N1，K/L/M 均 0）· **NC-19 G8 污染 4 条**（与 L 轮 LC-22 **同一宿主** ⇒ 平台级汇聚点；slice `cross_entry_isolation` **只扫代码不查库**，L/N 连续两轮漏检）· **NC-5 小写前缀陷阱**（抄 M 正则漏 **35** 文件，8 个 orphan 里 2 个在其中 ⇒ 会错报为 6）· **NC-2 载体三族四亚族**（`*EntryDualMode.ts` 现算 **0**，M/L 形态在 N 根本不存在）· **NC-35 超宽表 256 列**（幽灵 249/251，M 全域最宽 36）· **NC-36 footer 三形态**（与 M「全域统一」反向）。
+- **下一步逐循环顺序**：**S（专项）→ A（报表/调整）→ B（控制了解）→ C（控制测试）**。slice 已冻结在 `backend/data/workpaper_sync_{abcs}_cycle_manifest_slice.json`
+
+### 逐循环 spec 方法论铁律（十轮累积，下一轮必带）
+- **①slice 结论必重算**并区分「结构性零反驳」与「快照过期」（L 轮实测契约目录已从 11 增至 22，slice 冻结值过期）
+- **②计数类现算或标「现算值 + 禁写死」**；spec 判据禁写死行号（`.vue` 行号会漂），锚点用常量名 / 端点字面量 / 形态特征
+- **③「N 处」与列举项数必等**；④**扫描口径必复核覆盖面**（L 轮自查出 **5 处误报**：越界 60→0 · 断链 2→0 · 合计漏加 6→0 · OCR 169→15 · L 域文件集撞 **G 循环 Level-3 公允价值**命名）
+- **⑤判写路径/发布门用端点字面量且认反引号**，命中后**必须判注释/代码**（L 轮旧端点 8 处全是迁移注释，只数命中会误立 8 处违规）
+- **⑥含正则的核验一律写探针文件**，禁 `python -c`（shell 传参把 `\d` 变字面反斜杠）
+- **⑦PowerShell 行数与编码显示都不可信** ⇒ 文件校验一律 Python 读 bytes + decode
+- **⑧`MAX(LENGTH(COALESCE(x,'')))` = 0 分不清 NULL 与空串** ⇒ 必须分开查
+- **⑨先读 slice 的 `excluded_from_slice`**（里面有显式否决的捷径，如 L0 册不能靠「模板不存在」排除）
+- **⑩行数口径统一 `len(text.split("\n"))`**（`splitlines()` 恒少 1）
+- **⑪「契约已发」≠「adapter 已注册」** 两个分母分开算（manifest 无 `adapter_registered` 字段）
+- **⑫报 Active 数一律现扫 `.kiro/specs/*/tasks.md`，禁按增量推算**（L 轮现扫发现 J/K 共 5 份漏登 INDEX，按增量推算会得 40 而真值 41）
+- **⑬查已交付边界必须同时查 `_archive/` 下同循环的功能实现 spec**（不只查 `test_task{N}_*_migration.py`）。M 轮据此发现 M 有 **4 份已归档 spec**（190 task / 已完成 181），且 `m10-other-equity-instruments`（标 **31/31 ✅**）的**假绿遗留**正是 BP-4 的 M10 两处 + BP-12 的**共同根因**（把 sheet 名写成「附注披露信息（国有企业）」而真名是 `附注披露信息核对（国企）`，被前端 SHEET_MAP 与宿主判断串照抄），而**另一份已归档 spec 记对了名** ⇒ 两份结论不一致、代码采纳错的那份。发现途径 = 生产代码文件头注释里的 spec 名（`resolveProcedureSheetKey.ts` 提到 `M-equity-cycle M-F5 Task 2.4`）。🔴 **L 轮很可能有同类遗漏须回补**；且**已归档 spec 一律不回填修改**（append-only），勘误登记在新 spec
+- **PG 坑**：`checklist_responses` 列名 `wp_id`（非 workpaper_id）· 底稿主表 `working_paper`（**单数**）· 首条查询失败会使事务 aborted 连带后续全挂 ⇒ **每条独立事务**
+- **探针纪律**：一次性探针放 `backend/scripts/analyze/_{cycle}p_*.py` + 输出 `_{cycle}_*.txt`（`_` 前缀 = 用完即删；M 轮共 26 py + 34 txt/json），交付后 Task 6 清理；探针自己定位仓库根 `ROOT = Path(__file__).resolve().parents[3]`
+- **INDEX.md 是纯 CRLF** ⇒ 插入须 `read_bytes().decode('utf-8')` + `write_bytes()`，表格第三格内**禁裸 pipe**，校验用「每行恰 4 个未转义 pipe」
+- **⑭枚举成员/字段路径必现读实证，禁按命名习惯推**（N 轮两次踩：程序表 classification 实为 **`html_program_console`** 而非 `program_console` ⇒ 按后者扫得 0 且 `45+0+12≠59`；同一 `entry_id` 在 slice 内出现 **4 次**，按「字段最多」启发式取块会选中 `transport_key_resolution/declarations[1]` 而拿到全 null 几何 ⇒ **取块须按权威路径** `/independent_entries`）
+- **⑮识别正则须穷举变体写法**（N 轮漏两处：`ref(` 漏了**带泛型** `ref<'html' \| 'onlyoffice'>(`；mode 门控只扫 `currentMode|renderMode` 漏了 N1 的 `isOnlyOffice` 计算属性）；**结构性零一律配变异证明**（同一扫描器在非空场景须命中非零）；**「漏加小计」须双条件**（同段连续区间 + 同行跨列写法不一致，只做集合差集必误报，N 轮误报 8）；**「合计」标签定位用「首个非空列」非限 A 列**（N 轮有 1 处在 B 列）；**上游 plan/slice 的计数可能自相矛盾或写错**（N 轮 plan orphan 行数 1325 错、slice 1331 对；配对数 slice 内部两处不一致）⇒ 一律现算
+- **⑯交付前必查引用闭合性**（每条 NC / Property 至少被某份 tasks 引用一次）。N 轮自查抓到 **NC-15 与 NC-23 零引用**并补进 foundation task 5 / 23，复查 37/37 全闭合；**自己写的统计数也必须逐条数源表**（N 轮 design 判定分布先写错「✅7 ⚠️16 新增8」，逐条数后实为「✅10 ⚠️15 🔁5 ❌1 新增6」）
+
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
 
