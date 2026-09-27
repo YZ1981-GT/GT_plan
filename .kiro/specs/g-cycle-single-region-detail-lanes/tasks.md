@@ -326,12 +326,44 @@ FC-1~FC-13 · F3 spec 裁决 F3-H4（行级 mask）· F5 spec（布尔/错误值
   - 证据：`evidence/task9-c7-g10-rootfix.md`
   - _Requirements: 2.1, 3.5_
 
-- [ ] 9b. G8（行级 mask，从原 Task 9 拆出）
-  - 🔴 拆 `g802-r11`（单行）+ `g802-r12plus`（R12-20），按裁决 G1R-H3 的「并集取 formula、交集取 editable」
-    保守策略；判据证明 R13 的 R 列与 R12 的 T 列不被误标（P12）；
-  - 🔴 若保守策略让可编辑面缩到业务不可接受 ⇒ 改三 spec（`r11`/`r12`/`r13plus`）
-  - 🔴 **G8 是 FVOCI**（其他权益工具投资）⇒ 它**有** OCI / 减值列，**不得**照 G9/G10 的
-    「删 OCI 四列」处置（C-6 evidence §1 已登记该反例）
+- [x]🔴 9b（C-8）. G8（**第三条**，FVOCI + 行级 mask）：`phase5_g8_other_equity.py` + `phase5_g8_02_detail.py`
+  - 交付：`G8-detail-rows` / `rowId` / R9-R10 两级表头（R9 横向分组恰三个 C9:F9·I9:N9·O9:R9）/
+    单区 R11-R20 / footer R21 逐列 SUM / 有效列 **23** 即 A-W 且 X 空 ⇒ `uuid_col="X"` /
+    `formula_columns=("E","H","M","O","P","Q")`
+  - 🔴 **G8 是 FVOCI，与 G9/G10 反向**：受管表注释逐字「指定为以公允价值计量且其变动计入其他综合收益……
+    **该指定一经作出不得撤销**」⇒ OCI 三列（F 期初累计 / L 本期转留存 / R 期末累计）是 CAS22 要求的，
+    **绝不可照抄 G9/G10 的「删 OCI 四列」**。判据按值搜整册确认该注释仍在（模板若改口径，保留依据要重新论证）
+  - 🔴 **前端真重建**（八条里唯一与 G9 同量级）：24 → 23 字段 —— 拆 3+3 分量（openingBalance→C/D/E ·
+    closingBalance→O/P/Q）· 补 2 列（K 处置时公允价值变动结转 / N 本期确认的股利收入）· 合并 1 组
+    （increaseAmount+decreaseAmount→I 净额）· 改名对齐 2 列（→F openingOciCumulative / →R closingOciCumulative）·
+    删 8 列（五列公允价值测试族归 G8-4 / decreaseAmount 与 I 双源 / **ociCurrentChange 与模板 J 双源** ——
+    FVOCI 下本期 OCI 就是本期公允价值变动，改造前那条「两者应对等」的校验正是双源证据 / remark 模板无）
+  - 🔴 **模板四处行级公式缺陷**：M 在 R12-R20 漏加 L · P 在 R11+R13-R20 漏加 K ·
+    R 在 R13-R20 **整格无公式** · T 在 R12 **整格无公式**（R11 与 R12 各对一半）
+  - 🔴 **处置由框架层两条硬约束唯一确定**（不是风格选择）：① contracts **CS-13**（mode=formula 的列
+    必须落在 formula_mask 内）② excel_materialize 写受保护格要求 `view.has_formula`，否则抛
+    **ProtectedRegionWriteError** ⇒ M/P 每行都有公式可判 formula；**R/T 只能判 editable** ——
+    这正是 **P12** 要证明的「R13 的 R 列与 R12 的 T 列不被误标」，其技术根据就是第②条。
+    代价（R/T 双向同步后被前端按恒等式重算覆盖）已在 provider docstring / 台账 / 前端编制提示三处如实登记
+  - 🔴 **裁决 G1R-H3 两处措辞已修正**：①「拆 r11/r12plus 或三 spec」**不可行** —— 引擎只支持
+    `row_section_field`（按**字段值**过滤），G8 是连续 R11-R20 里逐行公式不同，前端数组没有也不该有
+    区归属字段（行的物理位置不是业务属性 ⇒ BP-11 同族问题），硬造三段会让区②③恒空；
+    ②「并集取 formula」按字面会撞 ProtectedRegionWriteError。⇒ 原判据
+    `test_g8_provider_declares_three_sheet_specs` 已按实测改写为
+    `test_g8_row_level_formula_mask_is_expressed_without_faking_sections`（前提被推翻但**不放宽**：
+    改断言单 spec + 不得伪造分段 + 逐行台账齐备 + P12 三条），改写理由逐条写在该判据 docstring
+  - 停用 `g8CrossHelpers.pushG8FvToDetail`（与 G9/G10 同名函数同族错误，三条同批处置）；
+    `pushG8FvToDesignation`（G8-4→G8-5 层次同步）方向对，未动
+  - 发布链：契约生成器 + `g8.other_equity_detail.json`（首版错形态被 `parse_contract` 拦在落盘前）+
+    plan（裸 IF **12 格**全 G 最少，全在 审定表G8-1）+ 交付登记行 + 零回归门 + SLICE_DELIVERED + slice 取证
+  - 判据：`test_g8_column_isomorphism.py` **95 passed** 五层闭环 + `useG8Detail.spec.ts` **46 passed**；
+    G8 全部 18 个前端 spec **212 passed 0 failed**；六 lane 判据 22→**19 failed**；
+    vue-tsc 窄配置 64→**14 error**（我改的三个文件零条）
+  - 顺带修：`test_task49` 的台账判据按 `registry.py` 源码正则读 —— 台账被并发会话抽到伴生模块
+    `delivered_contracts_ledger.py` 后失配成「0 条」⇒ 改**模块属性现读**，对搬文件免疫
+  - commit `8d241089a`（22 文件，含 Task 3~6 四个 lane 红判据文件首次入库）；
+    🔴 plan 与交付登记行**被并发会话的 H8 commit `8628c6cc7` 带走**（共享台账），已核 HEAD 内容完整
+  - 证据：`evidence/task9b-c8-g8-rootfix.md`
   - _Requirements: 2.1, 3.5_
 
 - [ ] 10. G14（`rowKey` 固定行集 + 一处布尔列）
