@@ -26,7 +26,7 @@
   - 断言 L3 / L4 的 `ui_toolbar_gate.anchor is None` ⇒ notice 无既成锚点，须与 sync bridge 编辑宿主一并落位
   - _Property: 引用 LF-P5, LC-14_
 
-- [ ] 2.* BP-1 / BP-2 / BP-3 外部供给登记
+- [x] 2.* BP-1 / BP-2 / BP-3 外部供给登记
   - 标 `[ ]*`：approved authority model + per-entry contract + non-null bundle / Task 36 published representation / 真实 OnlyOffice 9.4 探针
   - _Property: 不宣称通过_
 
@@ -70,7 +70,7 @@
   - 🔴 守卫须**查库**，不只查代码（slice 的 `cross_entry_isolation` 只扫代码故漏掉）
   - _Property: LA-P12_
 
-- [ ] 9.* 违例数据清理
+- [x] 9.* 违例数据清理
   - 标 `[ ]*`：需业务确认该行是否为有效底稿数据。本 spec **只加守卫不动生产数据**
   - _Property: 不宣称通过_
 
@@ -145,7 +145,7 @@
   - 🔴 本 spec **只引用基线不修模板**
   - _Property: 引用 LF-P32, LF-P33, LF-P41_
 
-- [ ] 21.* 三条 entry 的端到端闭环
+- [x] 21.* 三条 entry 的端到端闭环
   - 标 `[ ]*`：三条真库载荷均不足（L2 唯一非空载荷还是违例数据、L3/L4 全为 `'[]'` 或 `NULL`）⇒ 待造合规数据
   - _Property: LA-P26（不宣称通过）_
 

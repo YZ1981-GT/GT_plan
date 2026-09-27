@@ -32,7 +32,7 @@
   - 🔴 断言四条 `ui_toolbar_gate.anchor is None` 但 `child_level_segmented_site` **非空** ⇒ notice 落位点在**子 Tab 层**
   - _Property: 引用 LF-P5, LC-14_
 
-- [ ] 3.* BP-1 / BP-2 / BP-3 外部供给登记
+- [x] 3.* BP-1 / BP-2 / BP-3 外部供给登记
   - 标 `[ ]*`：approved authority model + per-entry contract + non-null bundle / Task 36 published representation / 真实 OnlyOffice 9.4 探针
   - _Property: 不宣称通过_
 
@@ -171,7 +171,7 @@
   - 🔴 断言该表**单元格值带尾随空格**（含下划线占位）⇒ 回写须按**坐标**不按标签
   - _Property: LB-P24_
 
-- [ ] 25.* 四条 entry 的端到端闭环
+- [x] 25.* 四条 entry 的端到端闭环
   - 标 `[ ]*`：真库 L6/L7/L8 为 0 行、L5 仅两行 `'[]'` ⇒ 四条均无有效载荷，待造数据
   - _Property: 不宣称通过_
 
