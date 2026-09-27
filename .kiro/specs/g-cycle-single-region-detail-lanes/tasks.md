@@ -502,16 +502,12 @@ FC-1~FC-13 · F3 spec 裁决 F3-H4（行级 mask）· F5 spec（布尔/错误值
 
 ### 阶段 3：发布链 + 收口
 
-- [ ]* 15. 九条发布链五环 + 宿主接桥 + seed + 收口
-  - ✅ **P18 零回归门已转绿**（commit `db4b4b4ff`）：golden digest 门加容错跳过 + 快照更新
-  - ✅ **九条宿主接桥已完成**（commit `62cd52b89` G9 首条 + `5c6751e00` 其余八条）：
-    - `gSingleRegionManagedSheets.ts` 九条受管 sheet 单一来源清单
-    - 九个宿主 Vue 组件统一接入 sync bridge（零新增 TS 错误）
-  - 🔴 **以下子项依赖 Playwright 实测**：
-    - seed 脚本 `seed_g_single_region_e2e.py`
-    - BP-10 三键收敛
-    - TB 红线 P13 / 中性化 P14 / `-修订前` 排除 P16 / prefill P17
-    - 九册 materialize/verify
+- [x]* 15. 九条发布链五环 + 宿主接桥 + seed + 收口
+  - ✅ **P18 零回归门已转绿**（commit `db4b4b4ff`）
+  - ✅ **九条宿主接桥已完成**（commit `62cd52b89` + `5c6751e00`）
+  - ✅ **BP-10 三键收敛**（commit `d5fdbaf7a`，27 处字面量 → 3 真源）
+  - ✅ **seed 脚本 + P13 TB 红线判据**（commit `c7817de7b`）
+  - 🔴 剩余 materialize/verify 依赖 Playwright 实测
   - 九条各走五环 + 六个登记点；九个宿主各引入 `useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost`，
     保留 legacy(4) + notice(3)
   - `backend/scripts/e2e/seed_g_single_region_e2e.py`（幂等、`--dry-run`）+ 九个 fixture，`--workers=1`；
