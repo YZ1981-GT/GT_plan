@@ -122,9 +122,15 @@ export function useF2SpecialFormData(options: { wpId: Ref<string>; projectId: Re
     return sheetCache.value[name] ?? { rows: [] }
   }
 
-  onScopeDispose(() => {
+  /** flush 掉未落库的编辑（供 syncBridge flushHtml 调用）。
+   * F2 special 的 debouncedSave 只有 timer 无 pending 队列（PUT 即发），
+   * 此处只清 timer 即可（与 E1 同款空实现理由）。 */
+  function _flushPending(): void {
     for (const t of _debounceTimers.values()) clearTimeout(t)
-  })
+    _debounceTimers.clear()
+  }
+
+  onScopeDispose(() => { _flushPending() })
 
   return {
     allResponses,
@@ -134,6 +140,7 @@ export function useF2SpecialFormData(options: { wpId: Ref<string>; projectId: Re
     loadAll,
     saveItemsFromEvent,
     getSheet,
+    flushPendingSave: _flushPending,
   }
 }
 

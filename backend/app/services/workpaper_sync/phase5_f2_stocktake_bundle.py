@@ -242,17 +242,18 @@ def _rows_table_payload(spec: Any) -> dict[str, Any]:
 
 def build_contract_payload() -> dict[str, Any]:
     from app.services.workpaper_sync.excel_extract import TABLE_SHEET_ANCHOR
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        spec_to_contract_sheet_payload,
+    )
     template_payload = template_definition_payload()
     row_specs = managed_row_table_specs()
     if not row_specs:
         raise EntrySelectionError("F2 stocktake 当前无受管 sheet")
     sheets: list[dict[str, Any]] = []
     for spec in row_specs:
-        sheets.append({
-            "sheet_key": spec.sheet_key, "excel_name": spec.managed_sheet,
-            "locator": {"anchor": TABLE_SHEET_ANCHOR},
-            "tables": [_rows_table_payload(spec)],
-        })
+        sheet_payload = spec_to_contract_sheet_payload(spec)
+        sheet_payload["locator"] = {"anchor": TABLE_SHEET_ANCHOR}
+        sheets.append(sheet_payload)
     return {
         "schema_version": CONTRACT_SCHEMA_VERSION, "contract_id": ADAPTER_ID,
         "semantic_version": "1.0.0", "review_status": "reviewed", "document_type": "xlsx",

@@ -229,3 +229,64 @@ async def attach_pilot_adapters(registry: WorkpaperSyncAdapterRegistry, *, sessi
     )
     registry.register(reg)
     return (ADAPTER_ID,)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 9. 契约构建（补建：原缺失，build_registration 调 load_contract 但磁盘无文件）
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def build_contract_payload() -> dict[str, Any]:
+    """从受管 spec 清单自动派生契约 payload（过 parse_contract 预检）。"""
+    from app.services.workpaper_sync.excel_extract import TABLE_SHEET_ANCHOR
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        spec_to_contract_sheet_payload,
+    )
+
+    template_payload = template_definition_payload()
+    row_specs = managed_row_table_specs()
+    if not row_specs:
+        raise EntrySelectionError("F2 valuation 当前无受管 sheet")
+    sheets: list[dict[str, Any]] = []
+    for spec in row_specs:
+        sheet_payload = spec_to_contract_sheet_payload(spec)
+        sheet_payload["locator"] = {"anchor": TABLE_SHEET_ANCHOR}
+        sheets.append(sheet_payload)
+    return {
+        "schema_version": CONTRACT_SCHEMA_VERSION,
+        "contract_id": ADAPTER_ID,
+        "semantic_version": "1.0.0",
+        "review_status": "reviewed",
+        "document_type": "xlsx",
+        "template_definition_sha256": canonical_digest(template_payload),
+        "instrumentation_definition_sha256": canonical_digest(
+            instrumentation_definition_payload()
+        ),
+        "template": {
+            "relative_path": TEMPLATE_RELATIVE_PATH,
+            "template_sha256": TEMPLATE_SHA256,
+            "normalized_structure_hash": template_payload["normalized_structure_hash"],
+        },
+        "identity_carriers": [
+            "hidden_sheet", "defined_name", "excel_table", "hidden_uuid_column",
+        ],
+        "sheets": sheets,
+        "review": {
+            "entry_id": ENTRY_ID,
+            "pilot_class": PHASE5_WAVE,
+            "authority_root": "backend/wp_templates",
+            "html_store": {
+                "table": "checklist_responses",
+                "item_ids": list(all_store_item_ids()),
+                "shape": "json_array_of_row_objects",
+            },
+        },
+    }
+
+
+def contract_file_path() -> Path:
+    return contract_path_for(ADAPTER_ID)
+
+
+def load_contract_from_disk() -> SyncContract:
+    return load_contract(ADAPTER_ID)

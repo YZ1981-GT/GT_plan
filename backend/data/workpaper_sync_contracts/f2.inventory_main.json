@@ -1,0 +1,326 @@
+{
+  "contract_id": "f2.inventory_main",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "802f931b1ac306d8aab4a841fb45493553e52d2edf2dfd6866343d643ee2c0fe",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-f2-inventory-main",
+    "html_store": {
+      "item_ids": [
+        "F2-6-rows"
+      ],
+      "note": "F2 main 册的明细表族行数据存成 checklist_responses 的 remark JSON 数组，键由 `${sheetCode}-rows` 模板化拼出。",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "phase5_f2_inventory_main",
+    "reviewed_basis": "openpyxl 逐格实测 F/F2-1至F2-14 + 前端 useF2DetailSheet.ts 按值 grep"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "四、自制半成品明细表F2-6",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "f26-managed",
+      "tables": [
+        {
+          "anchor": "A6",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "item_code",
+              "header_source_ref": "源xlsx!四、自制半成品明细表F2-6!A7",
+              "header_text": "存货编码",
+              "json_pointer": "/rows/{row_uuid}/itemCode",
+              "mode": "editable",
+              "source_ref": "源xlsx!四、自制半成品明细表F2-6!A9",
+              "stable_field_key": "detail_f26_rows/{row_uuid}/item_code",
+              "store_item_id": "F2-6-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!四、自制半成品明细表F2-6!B7",
+              "header_text": "存货名称",
+              "json_pointer": "/rows/{row_uuid}/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!四、自制半成品明细表F2-6!B9",
+              "stable_field_key": "detail_f26_rows/{row_uuid}/item_name",
+              "store_item_id": "F2-6-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "spec",
+              "header_source_ref": "源xlsx!四、自制半成品明细表F2-6!C7",
+              "header_text": "规格",
+              "json_pointer": "/rows/{row_uuid}/spec",
+              "mode": "editable",
+              "source_ref": "源xlsx!四、自制半成品明细表F2-6!C9",
+              "stable_field_key": "detail_f26_rows/{row_uuid}/spec",
+              "store_item_id": "F2-6-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "unit",
+              "header_source_ref": "源xlsx!四、自制半成品明细表F2-6!D7",
+              "header_text": "单位",
+              "json_pointer": "/rows/{row_uuid}/unit",
+              "mode": "editable",
+              "source_ref": "源xlsx!四、自制半成品明细表F2-6!D9",
+              "stable_field_key": "detail_f26_rows/{row_uuid}/unit",
+              "store_item_id": "F2-6-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "opening_qty",
+              "header_source_ref": "源xlsx!四、自制半成品明细表F2-6!E7",
+              "header_text": "数量",
+              "json_pointer": "/rows/{row_uuid}/openingQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!四、自制半成品明细表F2-6!E9",
+              "stable_field_key": "detail_f26_rows/{row_uuid}/opening_qty",
+              "store_item_id": "F2-6-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "opening_price",
+              "header_source_ref": "源xlsx!四、自制半成品明细表F2-6!F7",
+              "header_text": "单价",
+              "json_pointer": "/rows/{row_uuid}/openingUnitPrice",
+              "mode": "formula",
+              "source_ref": "源xlsx!四、自制半成品明细表F2-6!F9",
+              "stable_field_key": "detail_f26_rows/{row_uuid}/opening_price",
+              "store_item_id": "F2-6-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "opening_amt",
+              "header_source_ref": "源xlsx!四、自制半成品明细表F2-6!G7",
+              "header_text": "金额",
+              "json_pointer": "/rows/{row_uuid}/openingAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!四、自制半成品明细表F2-6!G9",
+              "stable_field_key": "detail_f26_rows/{row_uuid}/opening_amt",
+              "store_item_id": "F2-6-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "increase_qty",
+              "header_source_ref": "源xlsx!四、自制半成品明细表F2-6!H7",
+              "header_text": "数量",
+              "json_pointer": "/rows/{row_uuid}/increaseQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!四、自制半成品明细表F2-6!H9",
+              "stable_field_key": "detail_f26_rows/{row_uuid}/increase_qty",
+              "store_item_id": "F2-6-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "increase_price",
+              "header_source_ref": "源xlsx!四、自制半成品明细表F2-6!I7",
+              "header_text": "单价",
+              "json_pointer": "/rows/{row_uuid}/increaseUnitPrice",
+              "mode": "formula",
+              "source_ref": "源xlsx!四、自制半成品明细表F2-6!I9",
+              "stable_field_key": "detail_f26_rows/{row_uuid}/increase_price",
+              "store_item_id": "F2-6-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "increase_amt",
+              "header_source_ref": "源xlsx!四、自制半成品明细表F2-6!J7",
+              "header_text": "金额",
+              "json_pointer": "/rows/{row_uuid}/increaseAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!四、自制半成品明细表F2-6!J9",
+              "stable_field_key": "detail_f26_rows/{row_uuid}/increase_amt",
+              "store_item_id": "F2-6-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "decrease_qty",
+              "header_source_ref": "源xlsx!四、自制半成品明细表F2-6!K7",
+              "header_text": "数量",
+              "json_pointer": "/rows/{row_uuid}/decreaseQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!四、自制半成品明细表F2-6!K9",
+              "stable_field_key": "detail_f26_rows/{row_uuid}/decrease_qty",
+              "store_item_id": "F2-6-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "decrease_price",
+              "header_source_ref": "源xlsx!四、自制半成品明细表F2-6!L7",
+              "header_text": "单价",
+              "json_pointer": "/rows/{row_uuid}/decreaseUnitPrice",
+              "mode": "formula",
+              "source_ref": "源xlsx!四、自制半成品明细表F2-6!L9",
+              "stable_field_key": "detail_f26_rows/{row_uuid}/decrease_price",
+              "store_item_id": "F2-6-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "decrease_amt",
+              "header_source_ref": "源xlsx!四、自制半成品明细表F2-6!M7",
+              "header_text": "金额",
+              "json_pointer": "/rows/{row_uuid}/decreaseAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!四、自制半成品明细表F2-6!M9",
+              "stable_field_key": "detail_f26_rows/{row_uuid}/decrease_amt",
+              "store_item_id": "F2-6-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "closing_qty",
+              "header_source_ref": "源xlsx!四、自制半成品明细表F2-6!N7",
+              "header_text": "数量",
+              "json_pointer": "/rows/{row_uuid}/closingQty",
+              "mode": "formula",
+              "source_ref": "源xlsx!四、自制半成品明细表F2-6!N9",
+              "stable_field_key": "detail_f26_rows/{row_uuid}/closing_qty",
+              "store_item_id": "F2-6-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "closing_price",
+              "header_source_ref": "源xlsx!四、自制半成品明细表F2-6!O7",
+              "header_text": "单价",
+              "json_pointer": "/rows/{row_uuid}/unitPrice",
+              "mode": "formula",
+              "source_ref": "源xlsx!四、自制半成品明细表F2-6!O9",
+              "stable_field_key": "detail_f26_rows/{row_uuid}/closing_price",
+              "store_item_id": "F2-6-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              },
+              "column_key": "closing_amt",
+              "header_source_ref": "源xlsx!四、自制半成品明细表F2-6!P7",
+              "header_text": "金额",
+              "json_pointer": "/rows/{row_uuid}/closingAmt",
+              "mode": "formula",
+              "source_ref": "源xlsx!四、自制半成品明细表F2-6!P9",
+              "stable_field_key": "detail_f26_rows/{row_uuid}/closing_amt",
+              "store_item_id": "F2-6-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "U",
+                "row_from": "row_identity"
+              },
+              "column_key": "quality_status",
+              "header_source_ref": "源xlsx!四、自制半成品明细表F2-6!U7",
+              "header_text": "品质状况",
+              "json_pointer": "/rows/{row_uuid}/qualityStatus",
+              "mode": "editable",
+              "source_ref": "源xlsx!四、自制半成品明细表F2-6!U9",
+              "stable_field_key": "detail_f26_rows/{row_uuid}/quality_status",
+              "store_item_id": "F2-6-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "F9:F24",
+            "I9:I24",
+            "L9:L24",
+            "N9:N24",
+            "O9:O24",
+            "P9:P24"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "detail_f26_rows",
+          "uuid_col": "V"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "4a31280cf3517d1c216c40712c1c5549dababa01c3acd9108ae6b1b5e1f452da",
+    "relative_path": "F/F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+    "template_sha256": "9e57efd242b47171423e61f63a35be6ae5b46889baa14c246595ea95591fd0d8"
+  },
+  "template_definition_sha256": "8743dfb7c3db5576efb8a39d1a97ef3397dab9c0e4da0e2ef60564b3da20bf65"
+}

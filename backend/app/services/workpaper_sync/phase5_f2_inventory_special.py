@@ -20,7 +20,7 @@ from app.services.workpaper_sync.adapters.registry import (
     AdapterRegistration, EntryMatcher, WorkpaperSyncAdapterRegistry,
 )
 from app.services.workpaper_sync.contracts import (
-    SyncContract, load_contract,
+    CONTRACT_SCHEMA_VERSION, SyncContract, contract_path_for, load_contract,
 )
 from app.services.workpaper_sync.entry_profile import (
     Capability, DescriptorFacts, RoomFacts, capability_of,
@@ -115,6 +115,98 @@ def all_managed_sheet_keys() -> frozenset[str]:
 
 def _managed_last_col_of(spec: Any) -> str:
     return max((r[1] for r in spec.field_specs), key=col_index) if spec.field_specs else "A"
+
+def _instrumentation_of(spec: Any) -> ExcelInstrumentationSpec:
+    return ExcelInstrumentationSpec(
+        entry_id=ENTRY_ID, template_id=spec.template_id,
+        template_relative_path=TEMPLATE_RELATIVE_PATH,
+        managed_sheet=spec.managed_sheet,
+        first_data_row=spec.first_data_row, last_data_row=spec.last_data_row,
+        footer_row=spec.footer_row, managed_last_col=_managed_last_col_of(spec),
+        uuid_col=spec.uuid_col, table_name=spec.table_name,
+        sheet_key=spec.sheet_key,
+    )
+
+
+def instrumentation_specs() -> tuple[ExcelInstrumentationSpec, ...]:
+    return tuple(_instrumentation_of(s) for s in managed_row_table_specs())
+
+
+def template_definition_payload() -> dict[str, Any]:
+    data = read_authoritative_template()
+    specs = managed_row_table_specs()
+    if not specs:
+        raise EntrySelectionError("F2 special 当前无受管 sheet")
+    return build_template_payload(
+        spec=_instrumentation_of(specs[0]),
+        template_sha256=TEMPLATE_SHA256,
+        structure_hash=normalized_structure_hash(data),
+    )
+
+
+def instrumentation_definition_payload() -> dict[str, Any]:
+    return build_instrumentation_payload_for_sheets(
+        specs=instrumentation_specs(),
+        template_definition_sha256=canonical_digest(template_definition_payload()),
+        template_sha256=TEMPLATE_SHA256, gate=excel_carrier_gate(),
+    )
+
+
+def build_contract_payload() -> dict[str, Any]:
+    """从受管 spec 清单自动派生契约 payload。"""
+    from app.services.workpaper_sync.excel_extract import TABLE_SHEET_ANCHOR
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        spec_to_contract_sheet_payload,
+    )
+
+    template_payload = template_definition_payload()
+    row_specs = managed_row_table_specs()
+    if not row_specs:
+        raise EntrySelectionError("F2 special 当前无受管 sheet")
+    sheets: list[dict[str, Any]] = []
+    for spec in row_specs:
+        sheet_payload = spec_to_contract_sheet_payload(spec)
+        sheet_payload["locator"] = {"anchor": TABLE_SHEET_ANCHOR}
+        sheets.append(sheet_payload)
+    return {
+        "schema_version": CONTRACT_SCHEMA_VERSION,
+        "contract_id": ADAPTER_ID,
+        "semantic_version": "1.0.0",
+        "review_status": "reviewed",
+        "document_type": "xlsx",
+        "template_definition_sha256": canonical_digest(template_payload),
+        "instrumentation_definition_sha256": canonical_digest(
+            instrumentation_definition_payload()
+        ),
+        "template": {
+            "relative_path": TEMPLATE_RELATIVE_PATH,
+            "template_sha256": TEMPLATE_SHA256,
+            "normalized_structure_hash": template_payload["normalized_structure_hash"],
+        },
+        "identity_carriers": [
+            "hidden_sheet", "defined_name", "excel_table", "hidden_uuid_column",
+        ],
+        "sheets": sheets,
+        "review": {
+            "entry_id": ENTRY_ID,
+            "pilot_class": PHASE5_WAVE,
+            "authority_root": "backend/wp_templates",
+            "html_store": {
+                "table": "checklist_responses",
+                "item_ids": list(all_store_item_ids()),
+                "shape": "json_array_of_row_objects",
+            },
+        },
+    }
+
+
+def contract_file_path() -> Path:
+    return contract_path_for(ADAPTER_ID)
+
+
+def load_contract_from_disk() -> SyncContract:
+    return load_contract(ADAPTER_ID)
+
 
 def manifest_capability_enabled(*, manifest: Mapping[str, Any] | None = None) -> bool:
     try:
