@@ -15,16 +15,17 @@
  * ═══ 🔴 诚实边界：受管面 ≠ 已接桥面 ═══════════════════════════════════════════
  *
  * D3 实证过「契约受管 ≠ 已接 OO 直写宿主」（D3-4/5/6/7 受管但未接桥）。H 当前的真实状态：
- *   · 后端 provider 已落地 **九条全部**（H9 / H6 / H8 / H4 / H2 / H3 / H5 / H7 / H10）；
+ *   · 后端 provider 已落地 **九条全部**（H9 / H6 / H8 / H4 / H2 / H3 / H5 / H7 / H10），
+ *     **外加 H1 pilot** —— 共 10 条 entry / 11 张受管 sheet；
  *   · 🔴 H10 的受管 sheet 是 **调整分录汇总H10-3**，不是模板里的 `明细表H10-2` ——
  *     后者是 9 类固定行 × 12 月矩阵而前端零月度建模（**结构性不匹配**，实测反驳了 slice 的
  *     配对），改配后映射率 6/10 是全 H 最高档。依据见契约 H10-GAP-1；
  *   · 🔴 H5/H7 的映射率极低（H5 10/54 · H7 成本 5/51 · H7 公允 3/28）是**两侧口径差**
  *     不是漏做：前端行模型远小于模板列数，缺口逐条登记在各自契约的
  *     `review.declared_coverage_gaps`，每条带停下报告点；
- *   · H1 是**同循环既有 pilot**（`pilot_h1_grouped_dynamic`），走 `pilot_*` 范式、
- *     adapter 已注册，**不属本轮受管面**，故不进本清单（避免把两套范式并进同一个布尔，
- *     D4-35/D4-13 踩过「切错桥 + 工具条叠加」）。
+ *   · 🔴 H1 是**同循环既有 pilot**（`pilot_h1_grouped_dynamic`，`pilot_*` 范式、
+ *     **全 H 唯一 `adapter_registered=True`**）。它原先**不在**本清单里，理由写的是
+ *     「避免把两套范式并进同一个布尔」—— 该理由已被实测推翻并改正，逐条见 H1-8 那条的注释。
  * ⇒ 本清单只列 provider 已交付的 sheet。**不得**因「H 循环有 9 条 entry」就预先声明 9 条：
  *   那会让 `isHOoWiredRowsSheet` 对未接桥的 sheet 返 true，宿主据此渲染
  *   `WorkpaperSyncEditorHost` 而后端没有 adapter，用户点「在线编辑」直接失败。
@@ -195,6 +196,27 @@ export const H_MANAGED_SHEETS: readonly HManagedSheet[] = Object.freeze([
     excelName: '调整分录汇总H10-3',
     storeItemId: 'H10-adjustment-rows',
   },
+  {
+    // 🔴 H1 是**同循环既有 pilot**（后端 `pilot_h1_grouped_dynamic`，`pilot_*` 范式）。
+    //    本清单原先刻意不收它，理由写的是「避免把两套范式并进同一个布尔」。
+    //    **该理由经实测不成立、已推翻**：
+    //      · 范式差异只在**后端**（`pilot_*` vs `phase5_*`）；本清单的四个字段
+    //        （entryId / code / sheetKey / storeItemId）是范式无关的声明；
+    //      · 真正被引用的风险「切错桥 + 工具条叠加」来自**宿主同时挂两套桥**，
+    //        而 H1 宿主已改为只挂统一双向宿主（原 `usePilotBridgeAdapter` 整个删掉）；
+    //      · H1 反而是全 H **唯一** `adapter_registered=True` 的 entry ——
+    //        它是最该接真桥的那条，不是最不该的。
+    //    原宿主的 `usePilotBridgeAdapter` 是**空壳**：`switchMode()` 只置 `currentMode`
+    //    + 写 localStorage，**零 API 调用**；`isOoAvailable` 硬编码 `ref(true)`；
+    //    `ooConfig` 恒 `null`（其 docstring 自称「仅作兼容占位」）⇒ H1 此前**没有**
+    //    真双向：切 OO 看的是 legacy 只读视图，切回来只是重读 store。
+    entryId: 'xlsx/gt-h1-fixed-assets',
+    code: 'H1-8',
+    sheetKey: 'h18-managed',
+    kind: 'rows',
+    excelName: '减少检查表H1-8',
+    storeItemId: 'H1-8-rows',
+  },
 ] as const)
 
 /**
@@ -219,6 +241,8 @@ export const H_OO_WIRED_ROWS_CODES: readonly string[] = Object.freeze([
   'H7-2-cost',
   'H7-2-fair',
   'H10-3',
+  // 🔴 H1 pilot 改接真桥后进列（原 `usePilotBridgeAdapter` 是零 API 空壳）
+  'H1-8',
 ])
 
 const BY_CODE: ReadonlyMap<string, HManagedSheet> = (() => {

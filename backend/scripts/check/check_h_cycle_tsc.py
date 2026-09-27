@@ -71,6 +71,9 @@ HOST_FILES: tuple[str, ...] = (
     "H7TabDetailCost.vue",
     "H7TabDetailFair.vue",
     "GtH10AssetDisposalIncome.vue",
+    #: 🔴 H1 是**同循环既有 pilot**，原挂零 API 空壳 `usePilotBridgeAdapter`，
+    #:    本轮改接统一双向桥 ⇒ 纳入类型面。
+    "GtH1FixedAssets.vue",
 )
 #: 🔴 逐宿主基线按**现算**填，不照抄别的宿主。
 #:
@@ -113,6 +116,8 @@ HOST_ERROR_BASELINE: dict[str, int] = {
     "H7TabDetailFair.vue": 0,
     #: H10 —— 先填 0 跑一次现算再回填（同上）
     "GtH10AssetDisposalIncome.vue": 0,
+    #: H1 —— 同上，先 0 跑一次现算再回填
+    "GtH1FixedAssets.vue": 0,
 }
 
 _ERR_RE = re.compile(r"^(?P<file>[^(]+)\((?P<line>\d+),\d+\): error (?P<code>TS\d+)")

@@ -91,24 +91,20 @@ class ExcelAdapterIdentityError(AdapterProtocolError):
     error_code = "excel_adapter_contract_identity_mismatch"
 
 
-def _resolve_oo_crash_neutralization_fn(adapter_id: str):
-    """按注册表声明取该 adapter 的 OO 崩溃中性化函数（取代硬编码 adapter_id 字面量分支）。
-
-    spec: d1-sync-row-table-engine-and-d1-coverage · Task 13 · Requirements 3.1 / 7.1
-
-    未注册、或注册了但未声明 `oo_crash_neutralization_fn`、或声明的 provider 模块未真正
-    导出该函数名，一律返回 `None`（保持原字面量分支等价的软跳过语义——这不是新增校验，
-    原代码本就只对唯一一家 adapter 生效，其余家从不进这段逻辑）。
-    """
-    import importlib
-
-    from app.services.workpaper_sync.store_item_registry import STORE_MERGE_REGISTRY
-
-    plan = STORE_MERGE_REGISTRY.get(adapter_id)
-    if plan is None or not plan.oo_crash_neutralization_fn:
-        return None
-    module = importlib.import_module(f"app.services.workpaper_sync.{plan.provider_module}")
-    return getattr(module, plan.oo_crash_neutralization_fn, None)
+# ─── OO 加载期崩溃中性化：解析层已抽到伴生模块 ────────────────────────────────
+#
+# 🔴 原实现在本文件里只查 provider 模块并 `getattr(..., None)` **软跳过**，而中性化函数
+#    只定义在 `g7_oo_crash_if_neutralize`、只有 G7 的 provider re-export 了它 ⇒ 注册表
+#    21 条声明里 **20 条运行时解析恒 None**（G 11 + H 9），中性化从未执行，而所有门全绿。
+#    修法（两段解析 + fail-closed）与实测账落在
+#    `workpaper_sync/oo_crash_neutralization.py` 的模块 docstring。
+#
+# 抽出的另一个原因：本文件已在行数 whitelist 里（改动前 1027 行 > 800 上限），
+# 新增 80 行会顶破 +5% 容差 —— 按门禁「优先拆分或抽伴生模块」处置。
+from app.services.workpaper_sync.oo_crash_neutralization import (  # noqa: E402,F401
+    OoCrashNeutralizationFnUnresolvedError,
+    resolve_oo_crash_neutralization_fn as _resolve_oo_crash_neutralization_fn,
+)
 
 
 def _sheet_cumulative_shift(

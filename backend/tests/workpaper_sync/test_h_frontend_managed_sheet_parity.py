@@ -29,6 +29,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -42,6 +43,7 @@ from app.services.workpaper_sync import phase5_h6_asset_disposal_clearing as h6
 from app.services.workpaper_sync import phase5_h8_right_of_use_assets as h8
 from app.services.workpaper_sync import phase5_h9_lease_liabilities as h9
 from app.services.workpaper_sync import phase5_h10_asset_disposal_income as h10
+from app.services.workpaper_sync import pilot_h1_grouped_dynamic as h1pilot
 from app.services.workpaper_sync import store_item_registry as sir
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -119,7 +121,43 @@ def _parse_frontend_wired_codes() -> list[str]:
 #: h7 = 第二条变体轴，两张 sheet 的表头层数与数据区起始行**在 entry 内就不同**
 #: h10 = 收口第九条，🔴 唯一一条受管 sheet **不是明细表**（改配调整分录汇总，见 H10-GAP-1）
 #:       且唯一一张**单级表头**（契约 header_rows=[1]）
-_PROVIDERS: tuple[Any, ...] = (h9, h6, h4, h8, h2, h3, h5, h7, h10)
+
+
+class _PilotH1Facade:
+    """把 H1 pilot 的常量形态包装成与九条 `phase5_*` provider **同型**的四个访问点。
+
+    🔴 为什么包装而不是改生产代码：H1 走 `pilot_*` 范式，身份常量叫 `PILOT_ENTRY_ID` /
+    `PILOT_ADAPTER_ID`，受管 sheet 是 `MANAGED_SHEET` / `SHEET_KEY` / `STORE_ITEM_ID`
+    三个模块常量而**没有** `managed_row_table_specs()`。那套 API 形态是 Task 41/42 冻结的、
+    有自己一整套判据（`test_task42_h1_grouped_dynamic_pilot.py`）—— 为了让本文件的判据好写
+    去改它属于反向依赖。
+
+    🔴 为什么 H1 现在必须进 `_PROVIDERS`：H1 接了统一双向桥（原 `usePilotBridgeAdapter`
+    是零 API 空壳），`减少检查表H1-8` 进了前端受管清单 ⇒ 本文件的双向 parity 判据若不认
+    H1，会把它当成「前端自造了一张后端没有的受管 sheet」而打红。
+    """
+
+    ENTRY_ID = h1pilot.PILOT_ENTRY_ID
+    ADAPTER_ID = h1pilot.PILOT_ADAPTER_ID
+
+    @staticmethod
+    def managed_row_table_specs() -> tuple[Any, ...]:
+        return (
+            SimpleNamespace(
+                sheet_key=h1pilot.SHEET_KEY,
+                managed_sheet=h1pilot.MANAGED_SHEET,
+                store_item_id=h1pilot.STORE_ITEM_ID,
+            ),
+        )
+
+    @staticmethod
+    def all_managed_sheet_names() -> tuple[str, ...]:
+        return (h1pilot.MANAGED_SHEET,)
+
+
+#: h1 = 同循环既有 pilot（`pilot_*` 范式，全 H 唯一 `adapter_registered=True`），
+#:      接真桥后进受管清单 ⇒ 必须进本元组，否则双向 parity 会把它判成「前端自造」。
+_PROVIDERS: tuple[Any, ...] = (h9, h6, h4, h8, h2, h3, h5, h7, h10, _PilotH1Facade)
 
 
 def _backend_managed_rows() -> list[dict[str, str]]:

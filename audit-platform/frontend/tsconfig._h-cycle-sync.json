@@ -20,6 +20,7 @@
     "src/components/workpaper/GtH5OilGasAssets.vue",
     "src/components/workpaper/GtH7BiologicalAssets.vue",
     "src/components/workpaper/GtH10AssetDisposalIncome.vue",
+    "src/components/workpaper/GtH1FixedAssets.vue",
     "src/components/workpaper/h7/core/H7TabDetailCost.vue",
     "src/components/workpaper/h7/core/H7TabDetailFair.vue",
     "src/components/workpaper/composables/hSeedRowIdentity.ts",
