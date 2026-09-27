@@ -142,10 +142,28 @@ class TestHfP2CarrierFamilies:
 
     @pytest.mark.parametrize("code", sorted(F.H_HOSTS))
     def test_host_common_signals(self, code: str) -> None:
-        """9 宿主统一实测：bridge 0 / legacyOO 4 / notice 3 / ocr 0 / adjCentral 0 / localStorage 0。"""
+        """9 宿主统一实测：bridge 按接桥声明分派 / legacyOO≥4 / notice 3 / ocr 0 / adjCentral 0 / localStorage 0。
+
+        🔴 **基线已由本轮改动合法推翻**：原判据写死 `facts.bridge == 0`（「9 条全部尚未
+        接桥，legacy 假双向」）。canary H9-2 接入 `useHSyncMode` + `WorkpaperSyncEditorHost`
+        之后那条断言必然红 —— 那不是缺陷，是任务完成的正向证据。
+
+        改法**不是**放宽成 `>= 0`（会变成永真的假绿），而是按 `F.wired_entry_codes()`
+        分派：已声明接桥的必须真有桥、未声明的必须仍为 0。接桥面随 8 条 lane 增长时判据
+        自动跟随；哪天代码接了桥却忘了登记清单（或反之），这条立刻红。
+        """
         facts = F.host_facts(code)
-        assert facts.bridge == 0, "9 条全部尚未接桥（legacy 假双向）"
-        assert facts.legacy_oo == 4
+        wired = F.wired_entry_codes()
+        if code in wired:
+            assert facts.bridge >= 1, (
+                f"{code} 已在 H_OO_WIRED_ROWS_CODES 里声明接桥，但宿主里找不到"
+                "`useWorkpaperSyncBridge` / `WorkpaperSyncEditorHost`"
+            )
+            # 接桥后仍保留 legacy 分支：受管面只覆盖部分 sheet，其余仍走只读 OO 视图。
+            assert facts.legacy_oo >= 1, f"{code} 非受管 sheet 的 legacy OO 兜底不应被删"
+        else:
+            assert facts.bridge == 0, f"{code} 尚未接桥（legacy 假双向），却出现了桥符号"
+            assert facts.legacy_oo == 4
         assert facts.notice == 3
         # 🔴 FC-8 在 H **不适用**：9 宿主 OCR 实测命中 0（正向证据，不是"没查到"）
         assert facts.ocr == 0

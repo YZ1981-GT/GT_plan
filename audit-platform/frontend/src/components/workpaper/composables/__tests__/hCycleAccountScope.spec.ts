@@ -554,7 +554,11 @@ describe('旧错码不得作用户可见文案（H8/H9）', () => {
     expect(names).toContain('H8TabAdjudication.vue')
     expect(names).toContain('useH8Adjudication.ts')
     expect(names).toContain('h9LedgerPull.ts')
-    expect(names).toContain('useH9FormData.ts')
+    // 🔴 `useH9FormData.ts` 曾是这里的锚点，已在 H 循环双向回写实施中作为**零消费载体**删除
+    //    （零生产宿主引用，其 TB 字段符号也全仓零引用；H9 本就无 TB 发布门）。锚点改用
+    //    仍存在的 `useH9Detail.ts`（H9-2 受管明细的真实载体），保持「扫描面确实覆盖 H9
+    //    composable」这项自检不空转。
+    expect(names).toContain('useH9Detail.ts')
     // 宿主必须在扫描面内（漏了它 = 全局 TB 告警文案里的错码永远抓不到）
     for (const h of H_CYCLE_HOSTS) {
       expect(names, `宿主 ${h} 不在扫描面`).toContain(h)
@@ -575,16 +579,32 @@ describe('旧错码不得作用户可见文案（H8/H9）', () => {
     expect(banner![1], 'TB 告警文案仍写死科目码').not.toMatch(/\d{4}/)
   })
 
-  it('useH9FormData 的 TB 字段名不得内嵌科目码（改码后名字会过期）', () => {
-    const code = stripTs(
-      fs.readFileSync(path.join(FRONTEND_WP_DIR, 'composables/useH9FormData.ts'), 'utf-8'),
-    )
-    // 旧名把 2205（合同负债 D7 域）嵌在标识符里，`\b` 判据抓不到
-    for (const old of ['unadjusted2205', 'audited2205', 'ACCOUNT_CODE_2601']) {
-      expect(code, `仍在用内嵌科目码的标识符 ${old}`).not.toContain(old)
+  /**
+   * TB 字段名不得内嵌科目码 —— 判据从「单文件」**加宽到整个 H8/H9 扫描面**。
+   *
+   * 🔴 为什么改：原判据锁在 `composables/useH9FormData.ts` 一个文件上，而该文件已在
+   *    H 循环双向回写实施中作为零消费载体删除（零生产宿主引用；`unadjustedLeaseLiability`
+   *    / `ACCOUNT_CODE_LEASE_LIABILITY` 两个「好名字」删除后全仓零引用，说明它确实没有
+   *    下游）。文件一没，原用例直接 ENOENT 报红。
+   *
+   *    修法**不是**删掉这条用例了事 —— 那会让「TB 字段名不得内嵌科目码」这个已被编码的
+   *    不变量静默消失。改为断言整个 H8/H9 扫描面内不出现这三个内嵌科目码的标识符：
+   *    覆盖面比原来大（原来只看一个文件），且不再依赖某个具体文件存在。
+   *
+   *    正向断言（`toContain('unadjustedLeaseLiability')`）随载体一起去掉 —— 那两个符号
+   *    现在没有承载者，继续断言「必须出现」会变成要求恢复一个死文件。
+   */
+  it('TB 字段名不得内嵌科目码（全扫描面；原单文件判据已加宽）', () => {
+    // 旧名把 2205（合同负债 D7 域）嵌在标识符里，`\b` 判据抓不到 ⇒ 用 SimpleMatch
+    const banned = ['unadjusted2205', 'audited2205', 'ACCOUNT_CODE_2601']
+    const violations: string[] = []
+    for (const f of files()) {
+      const code = stripTs(fs.readFileSync(f, 'utf-8'))
+      for (const old of banned) {
+        if (code.includes(old)) violations.push(`${path.basename(f)}: ${old}`)
+      }
     }
-    expect(code).toContain('unadjustedLeaseLiability')
-    expect(code).toContain('ACCOUNT_CODE_LEASE_LIABILITY')
+    expect(violations.join(' | ')).toBe('')
   })
 
   it('剥注释后不得出现旧错码（含模板文案与标识符）', () => {

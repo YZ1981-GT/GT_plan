@@ -25,13 +25,26 @@
  * 形态（`views` 给几个 HTML 视图就有几个），后续可让 interview 组件迁到本 composable。
  */
 import { computed, ref, toRef, type Ref } from 'vue'
-import http from '@/utils/http'
 import {
   useWorkpaperSyncBridge,
   WP_BRIDGE_IN_FLIGHT_STATES,
   type WorkpaperSyncFlushResult,
 } from '../../sync/useWorkpaperSyncBridge'
 import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
+/**
+ * 🔴 健康探针实现已上提到 `sync/onlyOfficeHealth.ts`（全平台单一真源）。
+ *
+ * 搬家原因：留在本文件里时，别的循环要复用就得反向 import `d4/composables/…`，
+ * 实际结果是没人 import、各自再抄一遍（G4/L1/L3 仍有 5 处未走本实现）。提到 `sync/`
+ * 公共层后 H 循环等可平行引用。本文件**继续 re-export 这两个符号**，对外 API 一字未改
+ * （`useD4SyncMode.spec.ts` 仍从这里取它们，模块级缓存也仍是同一份实例）。
+ */
+export {
+  fetchOnlyOfficeHealthy,
+  __resetOoHealthCacheForTests,
+  OO_HEALTH_TTL_MS,
+} from '../../sync/onlyOfficeHealth'
+import { fetchOnlyOfficeHealthy } from '../../sync/onlyOfficeHealth'
 
 /** D4 全部 dedicated sync 底稿共享同一 entry（并入 phase5_d4_revenue_detail）。 */
 export const D4_SYNC_ENTRY_ID = 'xlsx/gt-d4-operating-revenue'
@@ -39,70 +52,6 @@ export const D4_SYNC_ENTRY_ID = 'xlsx/gt-d4-operating-revenue'
 /** 在线编辑视图标签（统一常量，避免各组件字面量漂移）。 */
 export const D4_ONLINE_EDIT_LABEL = '在线编辑'
 
-/**
- * OnlyOffice 健康检查的**唯一正确端点 + 唯一正确字段**。
- *
- * 🔴 单一真源：此前 5 处组件误用 `/api/onlyoffice/health`（404）并读 `status==='healthy'`。
- *    正确端点是 `/api/workpapers/onlyoffice/health`，返回 `{ data: { healthy: boolean } }`。
- *    所有 D4 sync 组件必须经本函数取健康，禁止各自再 http.get 一遍。
- */
-async function requestOnlyOfficeHealthy(): Promise<boolean> {
-  try {
-    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    return (res.data?.data?.healthy ?? res.data?.healthy ?? false) as boolean
-  } catch {
-    return false
-  }
-}
-
-/** 健康检查结果的存活时长——同一时段内多次切换底稿共用一份结果，不逐张重打。 */
-const OO_HEALTH_TTL_MS = 15_000
-
-/** 模块级共享缓存（跨组件实例）：{value, expiresAt} 或 null（未探测过/已过期）。 */
-let ooHealthCache: { value: boolean; expiresAt: number } | null = null
-/** 并发去重：多个组件几乎同时挂载时，只发一次真实请求，其余等这个 promise。 */
-let ooHealthInFlight: Promise<boolean> | null = null
-
-/**
- * OnlyOffice 健康检查 —— 带模块级共享 TTL 缓存。
- *
- * 🔴 2026-09-22 修复：此前每次 `useD4SyncMode()` 被调用（=== 每次切换 D4-N 底稿组件
- *    挂载，不论是否点了「在线编辑」）都会无条件 `void checkOoHealth()` 打一次这个端点
- *    （D4-1~36 全量 30 张底稿共用同一段 mount 逻辑）。切一次底稿多打一次探针，且后端
- *    该端点内部一度是同步阻塞 IO（已修，见 `onlyoffice_callback_service.py`），叠加起来
- *    是「切页面不丝滑」的真根因之一。改为 15s 内命中缓存直接返回、缓存过期才真正
- *    发请求，且并发去重（同一时刻多个组件挂载只触发一次网络请求）。
- *
- * `forceRefresh`：`switchMode` 里健康未就绪时的竞态兜底仍需要「当场探一次」而不是
- * 信一个可能刚好卡在缓存边界的旧值——传 `true` 绕过缓存直接发请求（仍写回缓存供后续
- * 命中，且仍走同一个 in-flight 去重，不会与并发调用打两次请求）。
- */
-export async function fetchOnlyOfficeHealthy(forceRefresh = false): Promise<boolean> {
-  const now = Date.now()
-  if (!forceRefresh && ooHealthCache && ooHealthCache.expiresAt > now) {
-    return ooHealthCache.value
-  }
-  if (ooHealthInFlight) return ooHealthInFlight
-  ooHealthInFlight = requestOnlyOfficeHealthy()
-    .then(value => {
-      ooHealthCache = { value, expiresAt: Date.now() + OO_HEALTH_TTL_MS }
-      return value
-    })
-    .finally(() => { ooHealthInFlight = null })
-  return ooHealthInFlight
-}
-
-/**
- * 仅供测试使用：清空模块级健康缓存/in-flight 去重状态。
- *
- * 各测试用例各自 mock 独立的 http 响应/延迟 resolve 时机，若不在每个用例开始前清空，
- * 前一个用例遗留的缓存值或悬挂中的 in-flight promise 会被下一个用例误复用，产生
- * 跨用例污染。生产代码路径不调用本函数——TTL 到期或强制刷新已足够。
- */
-export function __resetOoHealthCacheForTests(): void {
-  ooHealthCache = null
-  ooHealthInFlight = null
-}
 
 export interface UseD4SyncModeOptions {
   /** 本 sheet 的 sync sheet_key（如 `d424-managed`）。 */

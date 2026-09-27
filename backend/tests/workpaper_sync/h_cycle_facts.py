@@ -646,6 +646,38 @@ def host_facts(code: str) -> HostFacts:
     )
 
 
+#: 前端受管清单（接桥声明的唯一真源）。
+_H_MANAGED_TS: Final[Path] = (
+    WORKPAPER_DIR / "sync" / "hManagedSheets.ts"
+)
+
+
+def wired_entry_codes() -> frozenset[str]:
+    """现算**已接统一双向桥**的 entry 短码集合（如 `{"H9"}`）。
+
+    真源 = 前端 `sync/hManagedSheets.ts` 的 `H_OO_WIRED_ROWS_CODES`（sheet 短码，
+    如 `H9-2`），在此归一到 entry 短码（`H9`）。
+
+    🔴 **不写死**：接桥面会随 8 条 lane 逐条增长。守卫据本函数分派「该 entry 应有桥 /
+    应无桥」，清单一改判据自动跟随，不会出现「代码接了桥而守卫还断言 0」的假红，也不会
+    出现「守卫放宽成 >=0」的假绿。清单与后端 provider 的一致性另由
+    `test_h_frontend_managed_sheet_parity.py` 逐字守护。
+    """
+    if not _H_MANAGED_TS.exists():
+        return frozenset()
+    src = _H_MANAGED_TS.read_text(encoding="utf-8", errors="replace")
+    m = re.search(
+        r"H_OO_WIRED_ROWS_CODES:\s*readonly\s+string\[\]\s*=\s*Object\.freeze\(\[(.*?)\]\)",
+        src,
+        re.S,
+    )
+    if not m:
+        return frozenset()
+    codes = re.findall(r"'([^']+)'", m.group(1))
+    # `H9-2` → `H9`；`H10-detail` → `H10`
+    return frozenset(re.match(r"(H\d+)", c).group(1) for c in codes if re.match(r"(H\d+)", c))
+
+
 def publish_to_tb_sites() -> dict[str, tuple[str, ...]]:
     """现算 `publishToTb` 在 H2~H10 生产代码里的分布（HD-7 两族缺口的判据）。
 
