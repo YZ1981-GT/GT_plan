@@ -403,21 +403,47 @@ class TestBClassShiftConclusionsNotYetWiredIntoProviders:
             assert s.footer_carries_total_formula is True
 
     def test_g12_provider_records_the_template_defects_in_its_docstring(self) -> None:
-        """🔴 红：G12 provider 的模块 docstring 须逐字登记两处模板缺陷（覆盖层不改字节）。
+        """🔴 G12 provider 须逐字登记模板缺陷（不改模板字节，会计正确口径归前端）。
 
-        判据查 docstring 里同时出现两个公式字面量 —— 这是「缺陷已登记」的最小可执行证据。
-        🔴 与 G11 那条同理：docstring 要从 **sheet 层模块**取（entry 层不复述列模型）。
+        判据查两个公式字面量同时出现 —— 这是「缺陷已登记」的最小可执行证据。
+
+        🔴 首版只扫 entry 层模块 ⇒ Task 13 交付后假红：本 spec 九条一律「entry 层 + sheet 层」
+        两模块，**列模型细节（含缺陷台账）归 sheet 层**，entry 层只写摘要。改为扫两个模块的
+        docstring **并集** + 常量台账（同 G11 那条从 `vars(mod)` 改走公开接口的修法）。
+
+        另：Task 13 实测把缺陷从两处扩到**五处**（新增 `G` 列只填 R9 / `I` 列只填 R9/R10 /
+        `H14` footer 漏合计）⇒ 判据同时断言台账**至少**覆盖这五处（只增不减）。
         """
         import importlib
 
         try:
-            mod = importlib.import_module(
+            entry = importlib.import_module(
                 "app.services.workpaper_sync.phase5_g12_net_hedge_gains"
+            )
+            sheet = importlib.import_module(
+                "app.services.workpaper_sync.phase5_g12_02_detail"
             )
         except ModuleNotFoundError:
             pytest.fail("G12 provider 未交付（Task 13 转绿）")
-        doc = (mod.__doc__ or "") + "\n".join(
-            getattr(v, "__doc__", "") or "" for v in vars(mod).values()
+        parts: list[str] = []
+        for mod in (entry, sheet):
+            parts.append(mod.__doc__ or "")
+            parts.extend(
+                str(getattr(v, "__doc__", "") or "") for v in vars(mod).values()
+            )
+        # 缺陷台账（结构化常量）也算登记证据 —— docstring 与常量任一处写到即可
+        defects = getattr(sheet, "TEMPLATE_FORMULA_COVERAGE_DEFECTS_G1202", ())
+        parts.extend(str(x) for row in defects for x in row)
+        parts.extend(
+            f"{k}={v}"
+            for k, v in getattr(sheet, "TEMPLATE_FOOTER_FORMULAS_G1202", {}).items()
         )
+        doc = "\n".join(parts)
         assert "SUM(B9,B12,B13:B13)" in doc, "G12 provider 未登记 B 列漏加缺陷"
         assert "SUM(I7:I13)" in doc, "G12 provider 未登记 I 列起点越界缺陷"
+        # 🔴 五处缺陷全在台账里（编号 + 位置）
+        assert len(defects) >= 5, f"缺陷台账实得 {len(defects)} 条，Task 13 实测为 5 处"
+        located = {str(row[1]) for row in defects}
+        assert {"B14", "I14", "H14"} <= located, f"台账位置实得 {sorted(located)}"
+        assert any(x.startswith("G1") for x in located), "未登记 G 列的公式覆盖缺失"
+        assert any(x.startswith("I1") for x in located), "未登记 I 列的公式覆盖缺失"

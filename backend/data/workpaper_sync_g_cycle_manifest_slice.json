@@ -1831,7 +1831,7 @@
         "payload_column": "remark",
         "payload_column_mode": "remark_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 remark，conclusion 置 null",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG12HedgeDetail.ts#L138",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG12HedgeDetail.ts#L175",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
@@ -1840,7 +1840,7 @@
         "row_identity_key": "rowId",
         "row_identity_kind": "generated_prefixed_opaque_string",
         "row_identity_generator": "genId()",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG12HedgeDetail.ts#L40",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG12HedgeDetail.ts#L62",
         "row_identity_generator_form": "`g12h-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
@@ -2588,7 +2588,7 @@
         "row_identity": {
           "kind": "generated_prefixed_opaque_string",
           "identity_field": "rowId",
-          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useG12HedgeDetail.ts#L40"
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useG12HedgeDetail.ts#L62"
         }
       },
       {

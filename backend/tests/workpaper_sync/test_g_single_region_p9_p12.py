@@ -337,8 +337,22 @@ class TestBClassG8AndBooleanDeclarationsNotYetDelivered:
         )
 
     @pytest.mark.parametrize("code,col", [("G12", "G"), ("G13", "K"), ("G14", "L")])
-    def test_boolean_column_declared_as_formula_and_boolean_type(self, code: str, col: str) -> None:
-        """🔴 红：三处布尔列在 provider 的 `field_specs` 里须是 `mode=formula` + `value_type=boolean`。"""
+    def test_boolean_column_declared_as_boolean_with_mode_from_template_coverage(
+        self, code: str, col: str
+    ) -> None:
+        """🔴 三处布尔列必须 `value_type=boolean`；`mode` 按**模板公式覆盖率现算**。
+
+        首版写死「三处都必须 `mode=formula`」。Task 13 实测推翻其中一处：
+
+        * `G13!K` / `G14!L` —— 数据区**每行都有**公式 ⇒ `formula` 成立（受保护、不入 store）；
+        * 🔴 `G12!G` —— 模板公式**只在 R9 一格**，R10-R13 整格无公式。`mode=formula` 要求
+          `view.has_formula` 为真 ⇒ materialize 会在那四格抛 `ProtectedRegionWriteError`
+          ⇒ 只能 `editable`，并由前端把派生值（`calcFvAllocationCheck`）落库补齐。
+
+        ⇒ 期望值改为从**模板逐格实测**推出，不写死：每行都有公式 ⇒ 断言 `formula`；
+        部分行有 ⇒ 断言 `editable` **且 provider 必须登记覆盖缺陷台账**（不许悄悄降级）。
+        `value_type=boolean` 三条一律不变（数值族会重演 D2 的 BP-22）。
+        """
         import importlib
 
         mod_name = {
@@ -368,8 +382,62 @@ class TestBClassG8AndBooleanDeclarationsNotYetDelivered:
                 if len(fs) >= 4 and fs[1] == col:
                     found.append((fs[2], fs[3]))
         assert found, f"{code} 的 field_specs 里找不到列 {col}"
+
+        # 🔴 从模板逐格现算该列在数据区的公式覆盖率（openpyxl 会展开 shared 成员格，
+        #    这里只需知道「有没有公式」⇒ 用 openpyxl 足够，不必读 XML）
+        import openpyxl
+
+        spec = next(
+            s for s in specs
+            if getattr(s.__class__, "__name__", "") == "RowTableSheetSpec"
+            and any(len(fs) >= 2 and fs[1] == col for fs in getattr(s, "field_specs", ()))
+        )
+        tpl = TPL_G / mod.TEMPLATE_RELATIVE_PATH.split("/", 1)[1]
+        book = openpyxl.load_workbook(tpl, data_only=False)
+        try:
+            ws = book[spec.managed_sheet]
+            rows = range(spec.first_data_row, spec.last_data_row + 1)
+            with_formula = [
+                r for r in rows
+                if isinstance(ws[f"{col}{r}"].value, str)
+                and str(ws[f"{col}{r}"].value).startswith("=")
+            ]
+        finally:
+            book.close()
+        total = spec.last_data_row - spec.first_data_row + 1
+        fully_covered = len(with_formula) == total
+        want_mode = "formula" if fully_covered else "editable"
+
         for mode, vtype in found:
-            assert mode == "formula", f"{code}!{col} 的 mode 实得 {mode!r} —— 布尔列不得 editable"
+            assert mode == want_mode, (
+                f"{code}!{col} 的 mode 实得 {mode!r}，模板公式覆盖 {len(with_formula)}/{total} 行"
+                f"（有公式的行 {with_formula}）⇒ 应为 {want_mode!r}。"
+                + (
+                    "每行都有公式时判 editable 会让 TRUE/FALSE 进 store 并覆盖模板公式。"
+                    if fully_covered
+                    else "覆盖不全时判 formula 会让 materialize 在无公式的格抛 "
+                         "ProtectedRegionWriteError。"
+                )
+            )
             assert vtype == "boolean", (
                 f"{code}!{col} 的 value_type 实得 {vtype!r} —— 数值族会重演 D2 的 BP-22"
+            )
+
+        if not fully_covered:
+            # 🔴 降级成 editable 的那一条必须把「模板缺了哪几格」登记出来 —— 否则
+            #    「判据放宽」与「真实缺陷」就分不清了
+            sheet_mod = importlib.import_module(
+                f"app.services.workpaper_sync.phase5_{code.lower()}_02_detail"
+            )
+            defects = getattr(
+                sheet_mod, f"TEMPLATE_FORMULA_COVERAGE_DEFECTS_{code[0]}{code[1:]}02", None
+            )
+            assert defects, (
+                f"{code} 把布尔列降级成 editable 却没登记覆盖缺陷台账 "
+                f"（期望常量 TEMPLATE_FORMULA_COVERAGE_DEFECTS_{code[0]}{code[1:]}02）"
+            )
+            missing = [r for r in rows if r not in with_formula]
+            blob = " ".join(str(x) for row in defects for x in row)
+            assert col in blob and str(missing[0]) in blob, (
+                f"缺陷台账未写明 {col} 列缺公式的行（缺 {missing}）"
             )

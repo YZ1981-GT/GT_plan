@@ -146,6 +146,14 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     #    判 formula 会让 materialize 对其余 7 格抛 `ProtectedRegionWriteError`）
     #    ④ 行身份从 `rowKey` 改成 `rowId`。
     ("g13", "phase5_g13_fair_value_changes", "ADAPTER_ID", True, True),
+    # ── G12（spec: g-cycle-single-region-detail-lanes · Task 13 / C-12）───────
+    #    🔴 本条的 contract digest 会在五种误改上打红：① `header_rows` 从 **2** 被改回 0/1
+    #    （spec 原文的「无表头行」前提已被 Task 2 实测推翻 —— R7/R8 是两级表头）
+    #    ② `formula_mask` 从**空**变成非空（数据区没有任何一列每行都有公式：`G` 只 R9 一格、
+    #    `I` 只 R9/R10 两格 ⇒ 判 formula 会让 materialize 抛）③ `G` 从 `editable+boolean`
+    #    被改成 `formula` ④ `uuid_col` 从 **K** 变成 `P`（有效列 10 < max_column=15，
+    #    按有效列右移一列取；取 P 会把 5 个空尾列圈进受管区）⑤ 行身份从 `rowId` 改成 `rowKey`。
+    ("g12", "phase5_g12_net_hedge_gains", "ADAPTER_ID", True, True),
 )
 
 

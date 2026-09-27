@@ -88,6 +88,14 @@ TARGETS: dict[str, tuple[str, str, re.Pattern[str]]] = {
         "remark",
         re.compile(r"^\s*return `(g13d)-\$\{Date\.now\(\)"),
     ),
+    # 🔴 C-12：G12 的 `G`/`I` 两列改为落库（新增 `fvCheck`/`netHedgePnl` 字段 + 注释）
+    #    ⇒ 写入点与铸造点都下移。生成器后缀取 **3** 位（`slice(2, 5)`），与 G11/G13 的 4 位
+    #    不同 —— 正则按值写，不照抄。
+    "xlsx/gt-g12-net-hedge-gains": (
+        "useG12HedgeDetail.ts",
+        "remark",
+        re.compile(r"^\s*return `(g12h)-\$\{Date\.now\(\)"),
+    ),
 }
 #: `dynamic_row_identity.tables[].table_key` → entry_id。
 #:
@@ -103,6 +111,16 @@ TARGETS: dict[str, tuple[str, str, re.Pattern[str]]] = {
 TABLE_TO_ENTRY = {
     "G11-detail-rows": "xlsx/gt-g11-investment-income",
     "G13-detail-rows": "xlsx/gt-g13-fair-value-changes",
+}
+
+#: 🔴 第二口径：`source_ref` 指 **`return` 那一行**（而不是函数声明行）的 entry。
+#:
+#: 实测 G12 的冻结值 `#L40` 恰是改造前 `genId()` 的 `return` 行（声明行是 L39）⇒ 它与
+#: `TABLE_TO_ENTRY` 那组是**两种口径**，混在一起会把其中一组改错一行。
+#: G8/G9/G10/G14 的冻结值（`#L76`/`#L82`/`#L109`/`#L61`）两种口径都对不上（差 40~120 行，
+#: 指的不是生成器）⇒ 仍然排除，留给各自 lane 判定。
+TABLE_TO_ENTRY_RETURN_LINE = {
+    "G12-hedge-detail-rows": "xlsx/gt-g12-net-hedge-gains",
 }
 
 #: `html_counterpart_source_refs` 里有一项**镜像** `payload_column_source` 的 entry。
@@ -283,13 +301,18 @@ def main() -> int:
     for table in data.get("dynamic_row_identity", {}).get("tables", []):
         table_key = str(table.get("table_key") or table.get("store_key") or "")
         entry_id = TABLE_TO_ENTRY.get(table_key)
+        # 两种口径二选一：声明行（G11/G13）或 return 行（G12）
+        ref_key = "_decl_source"
+        if entry_id is None:
+            entry_id = TABLE_TO_ENTRY_RETURN_LINE.get(table_key)
+            ref_key = "row_identity_generator_source"
         if not entry_id:
             continue
         ident = table.get("row_identity", {})
         patch = resolved[entry_id]
         for slice_key, value in (
             ("generator_form", patch["row_identity_generator_form"]),
-            ("source_ref", patch["_decl_source"]),
+            ("source_ref", patch[ref_key]),
         ):
             if slice_key in ident and ident[slice_key] != value:
                 changed.append(f"{table_key}.{slice_key}: {ident[slice_key]!r} -> {value!r}")

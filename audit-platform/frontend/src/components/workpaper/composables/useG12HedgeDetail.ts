@@ -30,7 +30,28 @@ export interface G12HedgeDetailRow {
   instrumentFvCumulative: number
   salesPortion: number
   purchasePortion: number
+  /**
+   * G 列「校验」：`销售部分 + 采购部分 ≈ 套期工具累计公允价值变动`。
+   *
+   * 🔴 spec `g-cycle-single-region-detail-lanes` Task 13 起进入行模型并**落库**：
+   * 模板 `明细表G12-2` 的 `G` 列只在 **R9 一格**有公式（`=D9=SUM(E9:F9)`），R10-R13 是空格
+   * ⇒ 后端判 `formula` 会在那四格抛 `ProtectedRegionWriteError`，只能判 `editable`；
+   * 而 `editable` 要求前端有对应字段可回写。单一真源仍是 `calcFvAllocationCheck()`，
+   * 这里只是把它的结果放进行模型（`rowCalcs` 改为从本字段读，对外 API 不变）。
+   *
+   * 🔴 字段位置就是**模板列序**（G 在 H 之前）—— 判据
+   * `test_frontend_field_order_matches_excel_column_order` 逐位比对，挪动会打红。
+   */
+  fvCheck: boolean
   hedgeAdjAmortization: number
+  /**
+   * I 列「净敞口套期损益」：FV 分配行取销售部分、摊销行取套期调整摊销。
+   *
+   * 🔴 同 `fvCheck`：模板 `I` 列只在 **R9/R10 两格**有公式（`=E9+H9` / `=E10+H10`），
+   * R11-R13 空 ⇒ 判 `editable` + 落库，否则用户新增的第 3 行在 Excel 里看不到本列的数。
+   * 单一真源是 `calcNetHedgePnl()`。
+   */
+  netHedgePnl: number
   indexRef: string
   remark: string
 }
@@ -85,6 +106,18 @@ function defaultRows(): G12HedgeDetailRow[] {
 
 function enrich(raw: Partial<G12HedgeDetailRow> & { rowId: string }): G12HedgeDetailRow {
   const rowKind: G12NetHedgeDetailRowKind = raw.rowKind === 'amortization' ? 'amortization' : 'fv_allocation'
+  const instrumentFvCumulative = rowKind === 'fv_allocation' ? parseNum(raw.instrumentFvCumulative) : 0
+  const salesPortion = rowKind === 'fv_allocation' ? parseNum(raw.salesPortion) : 0
+  const purchasePortion = rowKind === 'fv_allocation' ? parseNum(raw.purchasePortion) : 0
+  const hedgeAdjAmortization = rowKind === 'amortization' ? parseNum(raw.hedgeAdjAmortization) : 0
+  // 🔴 G/I 两列由纯函数现算后进入行模型（Task 13：模板公式覆盖不全 ⇒ 判 editable 需要可回写字段）
+  const calcInput = {
+    rowKind,
+    instrumentFvCumulative,
+    salesPortion,
+    purchasePortion,
+    hedgeAdjAmortization,
+  }
   return {
     rowId: raw.rowId,
     seq: parseNum(raw.seq) || 0,
@@ -92,10 +125,14 @@ function enrich(raw: Partial<G12HedgeDetailRow> & { rowId: string }): G12HedgeDe
     netPosition: raw.netPosition ?? '',
     hedgingInstrument: raw.hedgingInstrument ?? '',
     rowKind,
-    instrumentFvCumulative: rowKind === 'fv_allocation' ? parseNum(raw.instrumentFvCumulative) : 0,
-    salesPortion: rowKind === 'fv_allocation' ? parseNum(raw.salesPortion) : 0,
-    purchasePortion: rowKind === 'fv_allocation' ? parseNum(raw.purchasePortion) : 0,
-    hedgeAdjAmortization: rowKind === 'amortization' ? parseNum(raw.hedgeAdjAmortization) : 0,
+    instrumentFvCumulative,
+    salesPortion,
+    purchasePortion,
+    // 摊销行没有 FV 三分量可校验 ⇒ 恒真（与改造前 `rowCalcs` 的口径逐字一致）
+    fvCheck: rowKind === 'amortization'
+      || calcFvAllocationCheck(instrumentFvCumulative, salesPortion, purchasePortion),
+    hedgeAdjAmortization,
+    netHedgePnl: calcNetHedgePnl(calcInput),
     indexRef: raw.indexRef ?? '',
     remark: raw.remark ?? '',
   }
@@ -140,7 +177,12 @@ export function useG12HedgeDetail(opts: {
         rowId: r.rowId, seq: r.seq, item: r.item, netPosition: r.netPosition,
         hedgingInstrument: r.hedgingInstrument, rowKind: r.rowKind,
         instrumentFvCumulative: r.instrumentFvCumulative, salesPortion: r.salesPortion,
-        purchasePortion: r.purchasePortion, hedgeAdjAmortization: r.hedgeAdjAmortization,
+        purchasePortion: r.purchasePortion,
+        // 🔴 G/I 两列落库（Task 13 受管面）—— 值由 enrich 现算，读回时会被重算覆盖，
+        //    因此它们是「快照」而非第二真源；模板 R11-R13 缺公式，靠这两格补齐。
+        //    顺序按模板列序 G→H→I。
+        fvCheck: r.fvCheck, hedgeAdjAmortization: r.hedgeAdjAmortization,
+        netHedgePnl: r.netHedgePnl,
         indexRef: r.indexRef, remark: r.remark,
       }))),
     })
@@ -181,12 +223,13 @@ export function useG12HedgeDetail(opts: {
     persist()
   }
 
+  // 🔴 改为从行模型读（`enrich` 已用同一批纯函数算好）—— 对外 API 与字段名不变，
+  //    消费方 `G12TabHedgeDetail.vue` 的 `rowCalcMap` 无需改动。
   const rowCalcs = computed(() =>
     rows.value.map((r) => ({
       rowId: r.rowId,
-      fvCheckOk: r.rowKind === 'amortization'
-        || calcFvAllocationCheck(r.instrumentFvCumulative, r.salesPortion, r.purchasePortion),
-      netHedgePnl: calcNetHedgePnl(r),
+      fvCheckOk: r.fvCheck,
+      netHedgePnl: r.netHedgePnl,
     })),
   )
 
