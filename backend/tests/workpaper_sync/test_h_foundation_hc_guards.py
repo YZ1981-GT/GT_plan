@@ -358,43 +358,10 @@ class TestHfP3ConsumerCounts:
 
 # ═══════════════════════════════════════════════════════════════════════════
 # HF-P4　HC-4 主表键必须解析模板拼接后再比对
+#
+# 🔴 已拆到 `test_h_foundation_hc4_key_resolution.py`（H5 接桥后这族判据长了一层
+#    「受管清单排除面 + 声明处计数」，把本文件顶过行数门禁基线）。拆文件而非上调基线。
 # ═══════════════════════════════════════════════════════════════════════════
-
-
-class TestHfP4PrimaryKeys:
-    """HC-4：键字面量守卫必须带拼接解析分支，否则 `H5-2-rows` 必假红。"""
-
-    @pytest.mark.parametrize("label,key", sorted(F.H_PRIMARY_KEYS.items()))
-    def test_every_primary_key_resolves(self, label: str, key: str) -> None:
-        hits = F.resolve_item_key_hits(key)
-        assert hits.resolved, f"{label} 的主表键 {key} 在生产源码里零命中"
-
-    def test_h5_primary_key_is_literal_absent_and_only_resolves_via_concat(self) -> None:
-        """🔴 实测不一致第 4 条：`H5-2-rows` 字面量**全仓零命中**，语义正确不是缺陷。"""
-        hits = F.resolve_item_key_hits("H5-2-rows")
-        assert hits.literal == (), f"H5-2-rows 字面量应为 0，实测 {hits.literal}"
-        assert hits.concatenated, "拼接解析分支必须命中"
-        assert any("useH5Detail.ts" in rel for rel in hits.concatenated), hits.concatenated
-
-    def test_h5_item_prefix_constant_value_is_h5_2(self) -> None:
-        """拼接来源是 `useH5Detail.ts` 的 `ITEM_PREFIX`，实值 `H5-2`（按值取，不推演）。"""
-        f = next(x for x in F.frontend_files() if x.rel.endswith("composables/useH5Detail.ts"))
-        resolved = F.template_concat_keys(f)
-        assert resolved.get("H5-2-rows") == "ITEM_PREFIX", resolved
-
-    def test_dropping_the_concat_branch_would_false_red(self) -> None:
-        """变异判据：只做字面量 grep ⇒ `H5-2-rows` 判零命中（正是 slice 的错法）。"""
-        literal_only = [
-            k for k in F.H_PRIMARY_KEYS.values() if not F.resolve_item_key_hits(k).literal
-        ]
-        assert literal_only == ["H5-2-rows"], literal_only
-
-    def test_h10_identity_field_is_id_not_row_id(self) -> None:
-        """HC-4 第 4 条：`H10-detail-rows` 身份字段是 `id`，且行可增删 ⇒ 非模板固定行族。"""
-        text = (F.COMPOSABLES / "useH10Detail.ts").read_text(encoding="utf-8", errors="replace")
-        assert "addRow" in text and "removeRow" in text
-        assert re.search(r"\bid\s*:\s*raw\.id\s*\?\?", text), "应是 `id: raw.id ?? generateId()`"
-        assert not re.search(r"rowId\s*:\s*raw\.rowId", text), "H10 不用 rowId 作身份"
 
 
 # ═══════════════════════════════════════════════════════════════════════════

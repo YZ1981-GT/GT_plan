@@ -28,6 +28,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Mapping, Sequence
 
+# 声明清单排除面（伴生模块，见其 docstring：为什么排除、为什么不是放宽、为什么单独一个文件）
+from tests.workpaper_sync.h_declaration_surfaces import (  # noqa: F401 —— 经本模块转出给判据侧
+    DECLARATION_ONLY_SURFACES,
+    assert_declaration_only_surface,
+)
+
 _REPO: Final[Path] = Path(__file__).resolve().parents[3]
 BACKEND: Final[Path] = _REPO / "backend"
 FRONTEND_SRC: Final[Path] = _REPO / "audit-platform" / "frontend" / "src"
@@ -253,11 +259,15 @@ def resolve_item_key_hits(key: str, *, include_tests: bool = False) -> KeyHits:
 
     🔴 变异「去掉 `concatenated` 分支」⇒ `H5-2-rows` 判为零命中 ⇒ 打红。
     这正是 slice 把 H5 主表键记成缺陷的原因：它只做了字面量 grep。
+
+    🔴 `DECLARATION_ONLY_SURFACES`（受管清单）被排除在生产命中之外 —— 见该常量的说明。
     """
     literal: list[str] = []
     concatenated: list[str] = []
     for f in frontend_files():
         if f.is_test and not include_tests:
+            continue
+        if f.rel in DECLARATION_ONLY_SURFACES:
             continue
         hits = f.count(key)
         if hits:
