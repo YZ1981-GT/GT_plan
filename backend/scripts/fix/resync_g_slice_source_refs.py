@@ -51,11 +51,19 @@ TARGETS: dict[str, tuple[str, str, re.Pattern[str]]] = {
         "remark",
         re.compile(r"^\s*return `(g9d)-\$\{Date\.now\(\)"),
     ),
+    # C-7：G10 的列模型整体重写（19 列 A..S）⇒ 写入点与 genId 行号都移位。
+    # 铸造形态**未**改（仍是 `g10d-${Date.now()}…` 内联），故正则同 G9 形态。
+    "xlsx/gt-g10-trading-financial-liabilities": (
+        "useG10Detail.ts",
+        "remark",
+        re.compile(r"^\s*return `(g10d)-\$\{Date\.now\(\)"),
+    ),
 }
 TABLE_TO_ENTRY = {
     "G1-detail-rows": "xlsx/gt-g1-trading-financial-assets",
     "G3-detail-rows": "xlsx/gt-g3-dividend-receivable",
     "G9-detail-rows": "xlsx/gt-g9-other-noncurrent-financial",
+    "G10-detail-rows": "xlsx/gt-g10-trading-financial-liabilities",
 }
 
 _NULL_COL = re.compile(r"\b(remark|conclusion)\s*:\s*null\s*,?")

@@ -112,6 +112,14 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     #    `has_projection=True`：`build_store_projection` 缺省合并三段（见 provider
     #    docstring —— 只投区①会让 digest 算得出来却漏掉三分之二的行，假绿）。
     ("g9", "phase5_g9_other_noncurrent", "ADAPTER_ID", True, True),
+    # ── G10（spec: g-cycle-single-region-detail-lanes · Task 9 / C-7）───────
+    #    单区（`明细表G10-2` R11-R20）⇒ `instrumentation_specs()` 恒返 1 条，但
+    #    `plural_instr=True` 仍是**必需**的：provider 的
+    #    `instrumentation_definition_payload()` 走
+    #    `build_instrumentation_payload_for_sheets(specs=…)`，注册路径读的是复数形态；
+    #    留 False 会让本门按单 spec 口径现算，digest 与注册路径实际用的那份不同源
+    #    （形态同 G2 —— 单 sheet 也走复数 API）。
+    ("g10", "phase5_g10_trading_liabilities", "ADAPTER_ID", True, True),
 )
 
 

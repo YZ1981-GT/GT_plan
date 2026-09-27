@@ -1583,7 +1583,7 @@
         "payload_column": "remark",
         "payload_column_mode": "remark_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 remark，conclusion 置 null",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG10Detail.ts#L382",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG10Detail.ts#L462",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
@@ -1592,7 +1592,7 @@
         "row_identity_key": "rowId",
         "row_identity_kind": "generated_prefixed_opaque_string",
         "row_identity_generator": "genId()",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG10Detail.ts#L109",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG10Detail.ts#L176",
         "row_identity_generator_form": "`g10d-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
