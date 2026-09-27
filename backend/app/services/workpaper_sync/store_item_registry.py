@@ -446,6 +446,13 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="G4-7-items", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── G6-sppi（spec: g4-g6-shared-workbook-three-entry-lanes · Task 14）──
+    "g6.other_bond_main": StoreMergePlan(
+        adapter_id="g6.other_bond_main",
+        provider_module="phase5_g6_other_bond",
+        items=(StoreItemSpec(item_id="G6-5-fair-value-data", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     #
     # 🔴 **HC-12：H 循环 9 册全部命中 OO 加载期裸 `IF(`** ⇒ 同 G 的 per-file 保守策略，
