@@ -494,6 +494,28 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="G11-detail-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── G13（spec: g-cycle-single-region-detail-lanes · Task 12 / C-11）───────
+    #
+    # 🔴 **item_id 是 `G13-detail-skeleton` 不是 `G13-detail-rows`** —— 本 lane 最易接错的
+    #    一处。模板 `明细表G13-2` R11-R20 是**固定 10 个损益表项目**，而 `G13-detail-rows`
+    #    存的是动态增删的**金融工具级明细**（`instrumentName` 用户自填）⇒ 两侧行模型不同构，
+    #    按序映射会把第 N 条工具写进第 N 个损益项目行（**产出错数**）。
+    #    前端原有 `buildG13CategorySkeleton()` 已按 10 个固定项目汇总出骨架但只是 `computed`
+    #    不落库 ⇒ 本轮持久化成独立 store item（`g13SkeletonStore.ts`），受管它；
+    #    工具明细保持 HTML-only 平台增强、**不进 items**（登记在
+    #    `phase5_g13_02_detail.LEGACY_INSTRUMENT_STORE_ITEM_ID_G1302`）。
+    #    🔴 手工覆盖优先：骨架落库行带 `manualOverride`，有标记的行不被汇总重算冲掉
+    #    （否则 OO 回流会被立刻覆盖 = 回流无效）。
+    #
+    # 🔴 **受管 sheet 零裸 IF**（整册 11 格全在别的 sheet）—— 与 G11 的 44 格相反。
+    #    中性化照挂：GC-2 要求 per-file 一律挂，本表零命中只意味着这一趟白跑，
+    #    而同册别的 sheet（审定表/附注）仍需要它。
+    "g13.fair_value_changes_detail": StoreMergePlan(
+        adapter_id="g13.fair_value_changes_detail",
+        provider_module="phase5_g13_fair_value_changes",
+        items=(StoreItemSpec(item_id="G13-detail-skeleton", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     #
     # 🔴 **HC-12：H 循环 9 册全部命中 OO 加载期裸 `IF(`** ⇒ 同 G 的 per-file 保守策略，

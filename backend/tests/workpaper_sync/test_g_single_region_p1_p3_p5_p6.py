@@ -137,8 +137,19 @@ EXPECTED.update({
         "adapter_id": "g13.fair_value_changes_detail",
         "workbook": "G13 公允价值变动收益.xlsx",
         "managed_sheet": "明细表G13-2",
+        # 🔴 `store_item_id`/`row_identity_key` 记的是**工具明细**（slice 冻结口径 + 真库载荷
+        #    证据的那个键），`managed_*` 记的是 **Task 12 裁决后真正受管的载体**。
+        #    两者指的是不同的事，不可互相覆盖：
+        #      · 模板 `明细表G13-2` R11-R20 是**固定 10 个损益表项目**；
+        #      · `G13-detail-rows` 存的是动态增删的金融工具级明细（`instrumentName` 自填）
+        #        ⇒ 两侧行模型不同构，按序映射会把第 N 条工具写进第 N 个损益项目行（产出错数）。
+        #    ⇒ 用户拍板选项 A：把前端原有的分类骨架（`buildG13CategorySkeleton()`，原为
+        #    `computed` 不落库）持久化成 `G13-detail-skeleton` 并受管它；工具明细保持
+        #    HTML-only 平台增强。骨架是固定行集 ⇒ 受管行身份是业务键 `rowKey`（同 G14）。
         "store_item_id": "G13-detail-rows",
         "row_identity_key": "rowId",
+        "managed_store_item_id": "G13-detail-skeleton",
+        "managed_row_identity_key": "rowKey",
         "payload_json_key": "remark",
         "header": (9, 10),
         # 🔴 发现 C：父行只有 R11/R14/R17（B/C 为公式）。R19/R20 是**无子行的顶层手填行**，
@@ -598,4 +609,30 @@ class TestBClassProvidersNotYetDelivered:
         assert plan.oo_crash_neutralization_fn == "neutralize_oo_crash_if_formulas", (
             f"{code}: 未挂 OO 崩溃中性化 ⇒ 开 OO 会 editor_error_-82（GC-2）"
         )
-        assert any(i.item_id == EXPECTED[code]["store_item_id"] for i in plan.items)
+        # 🔴 受管载体用 `managed_store_item_id`（只有 G13 与 `store_item_id` 不同 ——
+        #    它受管的是分类骨架，不是真库里那个工具明细键；其余八条两者重合）。
+        want = EXPECTED[code].get("managed_store_item_id", EXPECTED[code]["store_item_id"])
+        assert any(i.item_id == want for i in plan.items), (
+            f"{code}: plan.items={[i.item_id for i in plan.items]} 不含受管载体 {want!r}"
+        )
+
+    def test_only_g13_manages_a_different_store_item_than_its_legacy_table(self) -> None:
+        """🔴 钉住「受管载体 ≠ 真库工具明细键」这件事**只发生在 G13**。
+
+        别家若也出现分歧，说明有人照 G13 的样子接错了载体（或者那条也遇到了同类结构性
+        错配 —— 那就该像 Task 12 一样单独裁决，而不是静默跟随）。
+        """
+        divergent = {
+            c
+            for c, s in EXPECTED.items()
+            if s.get("managed_store_item_id", s["store_item_id"]) != s["store_item_id"]
+        }
+        assert divergent == {"G13"}, f"受管载体与工具明细键分歧的实得 {sorted(divergent)}"
+        assert EXPECTED["G13"]["managed_store_item_id"] == "G13-detail-skeleton"
+        assert EXPECTED["G13"]["managed_row_identity_key"] == "rowKey"
+        # provider 侧两个键都要登记出来（否则「为什么不受管工具明细」不可复核）
+        from app.services.workpaper_sync import phase5_g13_02_detail as m
+
+        assert m.STORE_ITEM_ID_G1302 == EXPECTED["G13"]["managed_store_item_id"]
+        assert m.LEGACY_INSTRUMENT_STORE_ITEM_ID_G1302 == EXPECTED["G13"]["store_item_id"]
+        assert m.SPEC_G1302.row_identity_key == EXPECTED["G13"]["managed_row_identity_key"]

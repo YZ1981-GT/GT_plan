@@ -119,6 +119,16 @@
       <el-button size="small" link type="primary" @click="clearCategoryFilter">清除筛选</el-button>
     </el-alert>
 
+    <el-alert
+      v-if="viewMode === 'category' && detail.skeletonOverrideCount.value"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="cross-alert"
+      data-testid="g13-detail-skeleton-override"
+      :title="`${detail.skeletonOverrideCount.value} 个分类行走「手工覆盖」（值来自底稿手填或 Excel 回写），不随工具明细汇总重算；可逐行撤销`"
+    />
+
     <el-segmented v-model="viewMode" :options="viewOptions" size="small" data-testid="g13-detail-view" style="margin-right:8px" />
     <el-segmented v-if="viewMode === 'instrument'" v-model="activeTab" :options="tabOptions" size="small" data-testid="g13-detail-tab" />
 
@@ -151,6 +161,14 @@
           <el-tag v-if="row.instrumentCount && row.rowKey !== 'total'" size="small" type="info" effect="plain" style="margin-left:6px">
             {{ row.instrumentCount }} 项 →
           </el-tag>
+          <el-tag
+            v-if="row.manualOverride"
+            size="small"
+            type="warning"
+            effect="plain"
+            style="margin-left:6px"
+            data-testid="g13-category-override-tag"
+          >手工值</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="本期数" align="center">
@@ -165,6 +183,13 @@
             <span :class="{ 'cell-error': !row.plReconciled }">{{ fmt(row.currentAudited) }}</span>
           </template>
         </el-table-column>
+      </el-table-column>
+      <!-- 🔴 模板 E 列「对应科目」（改造前 category 视图缺这一列，12 列只显示了 11 列） -->
+      <el-table-column label="对应科目" width="150" data-testid="g13-category-belong">
+        <template #default="{ row }">
+          <span v-if="row.rowKey === 'total'">—</span>
+          <span v-else>{{ row.belongLabel || '—' }}</span>
+        </template>
       </el-table-column>
       <el-table-column label="对应科目 — 公允价值变动" align="center">
         <el-table-column label="成本" width="96" align="right">
@@ -198,6 +223,20 @@
       <el-table-column label="索引号" width="100">
         <template #default="{ row }">
           <GtIndexChip v-if="row.sourceIndex" :value="row.sourceIndex" />
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="96" align="center">
+        <template #default="{ row }">
+          <el-button
+            v-if="row.manualOverride"
+            size="small"
+            link
+            type="primary"
+            :disabled="isReadonly"
+            data-testid="g13-category-reset-override"
+            @click.stop="detail.resetSkeletonRow(row.rowKey)"
+          >撤销覆盖</el-button>
+          <span v-else>—</span>
         </template>
       </el-table-column>
     </el-table>

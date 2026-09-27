@@ -1955,7 +1955,7 @@
         "payload_column": "remark",
         "payload_column_mode": "remark_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 remark，conclusion 置 null",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts#L185",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts#L212",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
@@ -1964,7 +1964,7 @@
         "row_identity_key": "rowId",
         "row_identity_kind": "generated_prefixed_opaque_string",
         "row_identity_generator": "generateRowId()",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts#L65",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts#L85",
         "row_identity_generator_form": "`g13d-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
@@ -1995,7 +1995,7 @@
         "audit-platform/frontend/src/components/workpaper/GtG13FairValueChanges.vue",
         "audit-platform/frontend/src/components/workpaper/composables/useG13FormData.ts",
         "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts",
-        "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts#L185",
+        "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts#L212",
         "backend/app/routers/checklist_responses.py#L84",
         "backend/app/routers/checklist_responses.py#L132",
         "backend/wp_templates/G/G13 公允价值变动收益.xlsx!明细表G13-2!A9 = '项目'"
@@ -2598,7 +2598,7 @@
         "row_identity": {
           "kind": "generated_prefixed_opaque_string",
           "identity_field": "rowId",
-          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts#L65"
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts#L84"
         }
       },
       {

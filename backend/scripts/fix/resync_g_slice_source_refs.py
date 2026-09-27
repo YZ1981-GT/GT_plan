@@ -76,16 +76,44 @@ TARGETS: dict[str, tuple[str, str, re.Pattern[str]]] = {
         "remark",
         re.compile(r"^\s*return `(g11d)-\$\{Date\.now\(\)"),
     ),
+    # 🔴 C-11：G13 的**受管载体换成了分类骨架** `G13-detail-skeleton`（Task 12 裁决），
+    #    但 slice 冻结的是**工具明细**形态（`G13-detail-rows` + `g13d-` 生成器）——
+    #    那是别人的裁决取证，**字节不改**，这里只重算被本轮改动移位的行号：
+    #    `useG13Detail.ts` 加了 ITEM_ID_SKELETON / skeletonStore watch / persistSkeleton /
+    #    setSkeletonCell 等 ⇒ 写入点与铸造点都下移。
+    #    ⚠️ `find_write_site` 取**第一个**命中的 `debouncedSave` ⇒ 仍是 `ITEM_ID_ROWS` 那处
+    #    （`persist()` 在 `persistSkeleton()` 之前），与 slice 的 `transport_key_shape` 一致。
+    "xlsx/gt-g13-fair-value-changes": (
+        "useG13Detail.ts",
+        "remark",
+        re.compile(r"^\s*return `(g13d)-\$\{Date\.now\(\)"),
+    ),
 }
+#: `dynamic_row_identity.tables[].table_key` → entry_id。
+#:
+#: 🔴 **只放口径已验证一致的两条**（G11 / G13），不是七条全放。实测依据：
+#:   该表的 `row_identity.source_ref` 冻结值在六条 lane 里**口径不统一** ——
+#:   G11 的 `#L71` 与 G13 改动前的 `#L65` 都是「生成器函数声明行」（与本脚本现算口径一致），
+#:   而 G8 `#L76` / G9 `#L82` / G10 `#L109` / G14 `#L61` 都是小行号、指的不是生成器
+#:   （更像行接口里 `rowId`/`rowKey` 字段的声明处）。把它们一并「同步」成生成器声明行
+#:   会改掉别人的取证口径 ⇒ 排除，留给各自 lane 判定。
+#:   G11 留在表里是**活证据**：它现算后逐字不变，证明本脚本的声明行口径没算错。
+#: 🔴 G13 的键仍是 `G13-detail-rows`（受管载体虽已换成 `G13-detail-skeleton`，但这张表
+#:   记的是「动态行身份」，骨架是固定行集、不属该表范围）。
 TABLE_TO_ENTRY = {
-    "G1-detail-rows": "xlsx/gt-g1-trading-financial-assets",
-    "G3-detail-rows": "xlsx/gt-g3-dividend-receivable",
-    "G9-detail-rows": "xlsx/gt-g9-other-noncurrent-financial",
-    "G10-detail-rows": "xlsx/gt-g10-trading-financial-liabilities",
-    "G8-detail-rows": "xlsx/gt-g8-other-equity-instruments",
-    "G14-detail-rows": "xlsx/gt-g14-credit-impairment-loss",
     "G11-detail-rows": "xlsx/gt-g11-investment-income",
+    "G13-detail-rows": "xlsx/gt-g13-fair-value-changes",
 }
+
+#: `html_counterpart_source_refs` 里有一项**镜像** `payload_column_source` 的 entry。
+#:
+#: 🔴 同样只列口径已验证一致的两条：G11 的该项冻结值 `#L233` 与 `payload_column_source`
+#:   逐字相同（镜像成立），G13 改动前的 `#L185` 亦然。而 G8 `#L400` / G9 `#L322` /
+#:   G10 `#L382` / G14 `#L199` 与各自写入点**不同值** ⇒ 那一项指的是别的取证点
+#:   （不是写入点的镜像），跟着改会改掉原意 ⇒ 排除。
+SOURCE_REFS_MIRROR_WRITE_SITE = frozenset(
+    {"xlsx/gt-g11-investment-income", "xlsx/gt-g13-fair-value-changes"}
+)
 
 _NULL_COL = re.compile(r"\b(remark|conclusion)\s*:\s*null\s*,?")
 
@@ -127,24 +155,53 @@ _FIXED_ROW_SET_FORM = (
 )
 
 
+#: 生成器**函数声明行**锚点（`dynamic_row_identity.source_ref` 用的是这一行，
+#: 与 `html_counterpart.row_identity_generator_source` 指的 `return` 行差一行 ——
+#: 🔴 两个字段口径不同，不能互相覆盖，见 `_resolve_decl_line` 的 docstring）。
+_FUNC_DECL = re.compile(r"^\s*(?:export\s+)?function\s+\w+")
+
+
+def _resolve_decl_line(lines: list[str], return_line: int) -> int:
+    """从 `return` 行往上找最近的 `function ...` 声明行（1-based）。
+
+    🔴 为什么要单独算：slice 里有两个指向生成器的引用，**口径不同**——
+      * `html_counterpart.row_identity_generator_source` → `return` 那一行
+        （逐字回源「身份形态」，判据要在这一行读到前缀与随机后缀）；
+      * `dynamic_row_identity.tables[].row_identity.source_ref` → **函数声明行**
+        （回源「哪个函数负责铸造」）。
+    实证：G11 的两处冻结值是 `#L72`（return）与 `#L71`（声明）—— 差一行。
+    早先 `dynamic_row_identity` 那段同步代码读的是 `table.get("store_key")`，而 slice
+    里的字段名是 `table_key` ⇒ 该段**从未生效**（六条 lane 的 `source_ref` 全是旧值）。
+    本轮修了字段名，同时按本函数现算声明行 —— 而不是把 `return` 行号灌进去改掉口径。
+    """
+    for idx in range(return_line - 1, 0, -1):
+        if _FUNC_DECL.match(lines[idx - 1]):
+            return idx
+    return return_line
+
+
 def find_mint_site(
     lines: list[str], pattern: re.Pattern[str] | None, *, fname: str = ""
-) -> tuple[int, str]:
-    """定位行身份铸造点。
+) -> tuple[int, str, int]:
+    """定位行身份铸造点，返回 `(return 行, 形态串, 函数声明行)`。
 
     `pattern=None` ⇒ 该 entry 是**固定行集**（G14），没有生成器：回到 composable 里的
     固定行集构造点 `createDefaultRows`，形态串写死为 `_FIXED_ROW_SET_FORM`
-    （与 slice 冻结值逐字一致）。
+    （与 slice 冻结值逐字一致）；此时两个口径重合（锚点本身就是声明行）。
     """
     if pattern is None:
         for idx, line in enumerate(lines):
             if _FIXED_ROW_SET_ANCHOR.match(line):
-                return idx + 1, _FIXED_ROW_SET_FORM
+                return idx + 1, _FIXED_ROW_SET_FORM, idx + 1
         raise SystemExit(f"找不到固定行集构造点 createDefaultRows（{fname}）")
     for idx, line in enumerate(lines):
         m = pattern.match(line)
         if m:
-            return idx + 1, line.strip().removeprefix("return ").strip()
+            return (
+                idx + 1,
+                line.strip().removeprefix("return ").strip(),
+                _resolve_decl_line(lines, idx + 1),
+            )
     raise SystemExit(f"找不到行身份铸造点 {pattern.pattern!r}")
 
 
@@ -178,13 +235,18 @@ def main() -> int:
     for entry_id, (fname, column, mint_pat) in TARGETS.items():
         lines = _strip_comment_lines((COMP / fname).read_text(encoding="utf-8"))
         write_line = find_write_site(lines, column)
-        mint_line, form = find_mint_site(lines, mint_pat, fname=fname)
+        mint_line, form, decl_line = find_mint_site(lines, mint_pat, fname=fname)
         resolved[entry_id] = {
             "payload_column_source": f"{COMP_REL}/{fname}#L{write_line}",
             "row_identity_generator_source": f"{COMP_REL}/{fname}#L{mint_line}",
             "row_identity_generator_form": form,
+            #: 🔴 `dynamic_row_identity` 专用口径：函数**声明行**（见 `_resolve_decl_line`）
+            "_decl_source": f"{COMP_REL}/{fname}#L{decl_line}",
         }
-        print(f"{entry_id}\n    写入点 L{write_line}（{column}）\n    铸造点 L{mint_line} {form}")
+        print(
+            f"{entry_id}\n    写入点 L{write_line}（{column}）"
+            f"\n    铸造点 L{mint_line}（声明行 L{decl_line}） {form}"
+        )
 
     changed: list[str] = []
     for entry in data["independent_entries"]:
@@ -193,23 +255,45 @@ def main() -> int:
             continue
         store = entry["html_counterpart"]
         for key, value in patch.items():
+            if key.startswith("_"):
+                continue  # 内部口径（`_decl_source`）不写进 html_counterpart
             if store.get(key) != value:
                 changed.append(f"{entry['entry_id']}.{key}: {store.get(key)!r} -> {value!r}")
                 store[key] = value
+        # 🔴 `html_counterpart_source_refs` 里**镜像写入点**的那一项也要跟着走。
+        #    同样只对口径已验证一致的两条生效（见 `SOURCE_REFS_MIRROR_WRITE_SITE`）。
+        if entry["entry_id"] in SOURCE_REFS_MIRROR_WRITE_SITE:
+            fname = TARGETS[entry["entry_id"]][0]
+            want = patch["payload_column_source"]
+            refs = entry.get("html_counterpart_source_refs") or []
+            for i, ref in enumerate(refs):
+                if not str(ref).startswith(f"{COMP_REL}/{fname}#L"):
+                    continue
+                if ref != want:
+                    changed.append(
+                        f"{entry['entry_id']}.html_counterpart_source_refs[{i}]: "
+                        f"{ref!r} -> {want!r}"
+                    )
+                    refs[i] = want
 
+    # 🔴 修：早先这里读 `table.get("store_key")`，而 slice 的字段名是 **`table_key`**
+    #    ⇒ 整段 for 从未命中、六条 lane 的 `source_ref` 一直是旧值（本轮实测发现）。
+    #    同时 `source_ref` 用**声明行**口径（`_decl_source`）而不是 `return` 行 ——
+    #    灌 return 行号会把这个字段的语义改掉（见 `_resolve_decl_line` docstring）。
     for table in data.get("dynamic_row_identity", {}).get("tables", []):
-        entry_id = TABLE_TO_ENTRY.get(table.get("store_key", ""))
+        table_key = str(table.get("table_key") or table.get("store_key") or "")
+        entry_id = TABLE_TO_ENTRY.get(table_key)
         if not entry_id:
             continue
         ident = table.get("row_identity", {})
         patch = resolved[entry_id]
-        for key, slice_key in (
-            ("row_identity_generator_form", "generator_form"),
-            ("row_identity_generator_source", "source_ref"),
+        for slice_key, value in (
+            ("generator_form", patch["row_identity_generator_form"]),
+            ("source_ref", patch["_decl_source"]),
         ):
-            if slice_key in ident and ident[slice_key] != patch[key]:
-                changed.append(f"{table['store_key']}.{slice_key}: {ident[slice_key]!r} -> {patch[key]!r}")
-                ident[slice_key] = patch[key]
+            if slice_key in ident and ident[slice_key] != value:
+                changed.append(f"{table_key}.{slice_key}: {ident[slice_key]!r} -> {value!r}")
+                ident[slice_key] = value
 
     for bp in data.get("blocking_practices", []):
         if bp.get("id") == "BP-7" and bp.get("fixed_note") != FIXED_NOTE:

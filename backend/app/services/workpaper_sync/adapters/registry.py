@@ -1119,6 +1119,7 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_g9_other_noncurrent",
         "app.services.workpaper_sync.phase5_g10_trading_liabilities",
         "app.services.workpaper_sync.phase5_g11_investment_income",
+        "app.services.workpaper_sync.phase5_g13_fair_value_changes",
         "app.services.workpaper_sync.phase5_g14_credit_impairment",
         # ── I 循环（spec: i-cycle-sync-… / i1-i3-… / i2-i4-i5-…）───────────────
         #    🔴 **6/6 全覆盖**。表头层级覆盖 1/2/3/4 四种

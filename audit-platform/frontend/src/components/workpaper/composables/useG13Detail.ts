@@ -20,6 +20,17 @@ import {
   buildG13CategoryTotalRow,
   aggregateDesignatedOfWhich,
 } from './g13CategorySkeleton'
+import {
+  buildSkeletonPersistPayload,
+  clearSkeletonOverride,
+  countSkeletonOverrides,
+  mergeSkeletonOverrides,
+  parseStoredSkeleton,
+  setSkeletonOverride,
+  templateBelongLabelOf,
+  type G13SkeletonOverridableField,
+  type G13SkeletonStoredRow,
+} from './g13SkeletonStore'
 import { fetchG13SourcePullSeeds, mergeG13SourceSeeds } from './g13SourceDetailPull'
 import type { ChecklistResponse } from './useF1FormData'
 
@@ -61,6 +72,14 @@ export interface G13DetailRow {
 }
 
 const ITEM_ID_ROWS = 'G13-detail-rows'
+/**
+ * 🔴 受管表的载体（spec `g-cycle-single-region-detail-lanes` Task 12）。
+ *
+ * 模板 `明细表G13-2` R11-R20 是**固定 10 个损益表项目**，`ITEM_ID_ROWS` 存的是动态的
+ * 金融工具级明细 ⇒ 两侧行模型不同构。分类骨架（按 10 个固定项目汇总）落进本 store item，
+ * 双向回写受管它；工具明细保持 HTML-only 平台增强。详见 `g13SkeletonStore.ts` 模块头。
+ */
+const ITEM_ID_SKELETON = 'G13-detail-skeleton'
 
 function generateRowId(): string {
   return `g13d-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
@@ -162,6 +181,14 @@ export function useG13Detail(options: UseG13DetailOptions) {
     { immediate: true },
   )
 
+  /** 🔴 受管骨架的落库态（手工覆盖优先，见 `g13SkeletonStore.ts`） */
+  const skeletonStore = ref<Map<string, G13SkeletonStoredRow>>(new Map())
+  watch(
+    () => options.allResponses.value.get(ITEM_ID_SKELETON)?.remark,
+    (json) => { skeletonStore.value = parseStoredSkeleton(json) },
+    { immediate: true },
+  )
+
   function persist(): void {
     const payload = rows.value.map((r) => ({
       rowId: r.rowId,
@@ -183,7 +210,20 @@ export function useG13Detail(options: UseG13DetailOptions) {
       remark: r.remark,
     }))
     options.debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(payload) })
+    persistSkeleton()
     window.dispatchEvent(new CustomEvent('g13:detail-updated'))
+  }
+
+  /**
+   * 骨架落库 —— 恒写 10 行（受管区 R11-R20 逐行对应）。
+   *
+   * 工具明细一变就重算并落库，让受管区始终有数；带 `manualOverride` 的行不被汇总冲掉
+   * （`mergeSkeletonOverrides` 负责这件事，本函数只把合并后的结果写下去）。
+   */
+  function persistSkeleton(): void {
+    options.debouncedSave(ITEM_ID_SKELETON, {
+      remark: JSON.stringify(buildSkeletonPersistPayload(categoryRows.value)),
+    })
   }
 
   function updateCell(rowId: string, field: keyof G13DetailRow, value: unknown): void {
@@ -370,9 +410,52 @@ export function useG13Detail(options: UseG13DetailOptions) {
     return acc
   }
 
-  const categoryRows = computed(() => buildG13CategorySkeleton(rows.value))
-  const categoryTotalRow = computed(() => buildG13CategoryTotalRow(categoryRows.value))
+  /** 🔴 汇总 ⊕ 手工覆盖（有 `manualOverride` 的行用存库值）—— 这就是受管区的 10 行 */
+  const categoryRows = computed(() =>
+    mergeSkeletonOverrides(buildG13CategorySkeleton(rows.value), skeletonStore.value),
+  )
+  const categoryTotalRow = computed(() => ({
+    ...buildG13CategoryTotalRow(categoryRows.value),
+    belongLabel: '',
+    manualOverride: false,
+  }))
   const categoryDisplayRows = computed(() => [...categoryRows.value, categoryTotalRow.value])
+  const skeletonOverrideCount = computed(() => countSkeletonOverrides(skeletonStore.value))
+
+  /** 手工改骨架某格 ⇒ 该行转手工覆盖，不再被工具明细汇总冲掉 */
+  function setSkeletonCell(
+    rowKey: string,
+    field: G13SkeletonOverridableField,
+    value: unknown,
+  ): void {
+    if (options.isReadonly.value) return
+    const seedRow = categoryRows.value.find((r) => r.rowKey === rowKey)
+    skeletonStore.value = setSkeletonOverride(
+      skeletonStore.value,
+      rowKey,
+      field,
+      value,
+      seedRow
+        ? {
+            currentUnadjusted: seedRow.currentUnadjusted,
+            adjustment: seedRow.adjustment,
+            belongLabel: seedRow.belongLabel ?? templateBelongLabelOf(rowKey),
+            cost: seedRow.cost,
+            periodFvChange: seedRow.periodFvChange,
+            cumulativeFvChange: seedRow.cumulativeFvChange,
+            sourceIndex: seedRow.sourceIndex,
+          }
+        : undefined,
+    )
+    persistSkeleton()
+  }
+
+  /** 撤销某行的手工覆盖 ⇒ 退回工具明细汇总口径 */
+  function resetSkeletonRow(rowKey: string): void {
+    if (options.isReadonly.value) return
+    skeletonStore.value = clearSkeletonOverride(skeletonStore.value, rowKey)
+    persistSkeleton()
+  }
 
   const designatedOfWhichAgg = computed(() => aggregateDesignatedOfWhich(rows.value))
 
@@ -469,6 +552,10 @@ export function useG13Detail(options: UseG13DetailOptions) {
     categoryRows,
     categoryTotalRow,
     categoryDisplayRows,
+    skeletonOverrideCount,
+    setSkeletonCell,
+    resetSkeletonRow,
+    persistSkeleton,
     designatedOfWhichAgg,
     syncDesignatedOfWhich,
     pullFromSourceDetails,
@@ -481,6 +568,7 @@ export function useG13Detail(options: UseG13DetailOptions) {
     persist,
     aggregateByAdjRowKey,
     ITEM_ID_ROWS,
+    ITEM_ID_SKELETON,
     G13_BELONG_ACCOUNTS,
   }
 }

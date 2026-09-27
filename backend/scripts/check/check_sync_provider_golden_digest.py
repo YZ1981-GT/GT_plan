@@ -138,6 +138,14 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     #    `formula`（受管表自带 44 格裸 IF，中性化后那两列无公式 ⇒ materialize 会抛
     #    `ProtectedRegionWriteError`，本门先一步拦在 digest 漂移上）③ 行身份从 `id` 改成 `rowId`。
     ("g11", "phase5_g11_investment_income", "ADAPTER_ID", True, True),
+    # ── G13（spec: g-cycle-single-region-detail-lanes · Task 12 / C-11）───────
+    #    🔴 本条的 contract digest 会在四种误改上打红：① store item 从
+    #    `G13-detail-skeleton` 被改回工具明细键 `G13-detail-rows`（接错载体 ⇒ 模板固定
+    #    10 行会按序吃到动态工具行，产出错数）② `header_rows` 从 **2** 被改成 1
+    #    ③ `B`/`C` 从 `editable` 被改成 `formula`（两列只有父行 R11/R14/R17 三格有公式，
+    #    判 formula 会让 materialize 对其余 7 格抛 `ProtectedRegionWriteError`）
+    #    ④ 行身份从 `rowKey` 改成 `rowId`。
+    ("g13", "phase5_g13_fair_value_changes", "ADAPTER_ID", True, True),
 )
 
 

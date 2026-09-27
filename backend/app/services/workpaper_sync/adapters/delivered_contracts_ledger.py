@@ -950,6 +950,75 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "平台级缺口（umbrella BP-61-1 = G slice 的 BP-1~BP-3），供给就绪后真栈注册。"
         ),
     },
+    # ── G13（spec: g-cycle-single-region-detail-lanes · Task 12 / C-11）───────
+    {
+        "contract_id": "g13.fair_value_changes_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_g13_fair_value_changes",
+        "delivered_by_task": "G1R-Task12",
+        "pilot_class": "phase5_fair_value_changes_detail",
+        "entry_id": "xlsx/gt-g13-fair-value-changes",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "G/G13 公允价值变动收益.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "spec `g-cycle-single-region-detail-lanes` 九条中的**第六条**。"
+            "权威模板 sha256 fd5e5e9e…（58,717 B，8 sheets）；受管 sheet = 明细表G13-2"
+            "（两级表头 R9/R10：横向组 B9:D9 本期数 · **F9:J9** 对应科目-公允价值变动"
+            "（🔴 含 J 列，而 J10=「计入损益」语义上不属该组 —— evidence §7.1 写 F9:I10 不准确）；"
+            "纵向合并 A9:A10 / E9:E10 / K9:K10 / L9:L10 / 数据区 R11-R20 **固定 10 行** / "
+            "footer R21 / 有效列 12 即 A-L 恰等于 max_column ⇒ uuid_col=M / 0 definedName）。"
+            "🔴 **一：受管载体是「分类骨架」不是工具明细**（用户拍板选项 A）。模板 R11-R20 是"
+            "固定 10 个损益表项目，而前端 `G13-detail-rows` 存动态增删的**金融工具级明细**"
+            "（`instrumentName` 自填、addRow/removeRow）⇒ 两侧行模型不同构，按序映射会把第 N "
+            "条工具写进第 N 个损益项目行（**产出错数**）。前端原有 `buildG13CategorySkeleton()` "
+            "已按 10 个固定项目汇总出骨架（`g13Constants.G13_ADJUDICATION_ITEMS` 的 rowKey/"
+            "label/kind/indent 与模板 R11-R20 逐行对应），但只是 `computed`、**不落库** ⇒ 双向"
+            "回写没有载体。本轮把它持久化成独立 store item **`G13-detail-skeleton`**"
+            "（新建 `g13SkeletonStore.ts`），受管它；工具明细保持 HTML-only 平台增强。"
+            "⇒ 🔴 这**推翻 Task 2「发现 I：前端无骨架无父子字段」**（那是扫 isParent/parentId/"
+            "children 等字段得出的，而骨架能力在另一个文件里）；也让 evidence §7.2 的「前端删 5 "
+            "个字段」建议失效 —— 工具明细整体不受管 ⇒ 它的 21 个字段一个都不用删"
+            "（`instrumentType`/`remark` 还是骨架分类的驱动字段，删了就分不出「其中：指定」"
+            "与「衍生」两类子行）。"
+            "🔴 **二：手工覆盖优先**（用户同批拍板）。骨架值默认来自工具明细汇总；OO 侧改动"
+            "回流后若被汇总无条件重算等于回流无效 ⇒ 落库行带 `manualOverride`，有标记的行用"
+            "存库值，前端 `resetSkeletonRow()` 退回汇总口径；覆盖行的公式列（D=B+C / I=F+H / "
+            "J=G）按模板口径重算，避免出现「未审+调整 ≠ 审定」的自相矛盾数。"
+            "🔴 **三：`B`/`C` 判 `editable` 不判 `formula`** —— 两列在数据区只有 **3 格**有公式"
+            "（父行 R11/R14/R17 汇总子行，逐行不同形：=B12+B13 / =B15+B16 / **=B18** 单子行），"
+            "其余 7 格空。框架层 mode 是**列级**的 ⇒ 判 formula 对 7 格抛、判 auto_source 对 3 格"
+            "抛、拆多 spec 因父行 {11,14,17} **非连续**要 7 份（footer 只有一行、归属不清）"
+            "⇒ 只能 editable。代价如实登记：**父行三格的模板公式在 materialize 后变成字面量**。"
+            "三条依据：① 逐格实测三格是**普通公式不是 shared 主格** ⇒ 不撞 "
+            "`SharedFormulaMasterWriteError`（excel_materialize 对非 formula/auto_source 只拦"
+            "共享公式主格）② 值仍正确 —— 前端骨架父行值 = 子行汇总，与模板公式同口径；丢的只是"
+            "「OO 内改子行后父行自动重算」，而 OO 改动必须回流才生效、回流后前端重算骨架 ⇒ "
+            "窗口极小 ③ 与 G8 的 R/T 裁决同型（判据 P12 的技术根据）。"
+            "⇒ 🔴 这**推翻 tasks.md Task 12 原写的 `formula_columns=(\"B\",\"C\",\"D\",\"I\",\"J\",\"K\")`**："
+            "实际是 `(\"D\",\"I\",\"J\",\"K\")`；父行三格公式落 `TEMPLATE_PARENT_FORMULAS_G1302` "
+            "由判据按行比对（照 G8 的 `TEMPLATE_ROW_FORMULAS_G802` 范式）。"
+            "🔴 **四：footer R21 三种约定混行** —— 枚举相加 3 格（B21=B11+B14+B17+B19+B20，加的是"
+            "五个**顶层**行；C21 是 shared 主格 ref=C21:D21、D21 是成员格）+ 纯 SUM 2 格（I21/J21）"
+            "+ 布尔 1 格（K21=J21=D21，裁决 G1R-H4 的第二个位点，主格在 K11）⇒ "
+            "`footer_carries_total_formula=True` 成立，但 roundtrip 判据**不得**假设全列同形态。"
+            "🔴 **五：受管 sheet 零裸 IF**（整册 11 格全在别的 sheet）—— 与 G11 的 44 格相反，"
+            "中性化不动本表 ⇒ D/I/J/K 判 formula 成立。per-file 中性化照挂（GC-2）。"
+            "另：D/I/J/K 的 shared 主格在 **R12** 不在 R11，两者逐行同形 ⇒ 四列都进 "
+            "formula_templates、判据可逐格比对（openpyxl 会展开成员格）。"
+            "🔴 **FD-1**：HTML store = checklist_responses.item_id='G13-detail-skeleton'，"
+            "payload 落 **remark**（真库实证该键与 G13-detail-rows 均 2 B 空数组 / conclusion 0 B "
+            "⇒ 骨架落库**零存量迁移风险**，这推翻 Task 2 方案②「需存量数据迁移」的代价判断；"
+            "同册 G13-disclosure-listed 940 B / G13-disclosure-soe 661 B 有真实载荷但属附注 sheet）。"
+            "行身份键 **`rowKey`**（业务键，同 G14），不是工具明细的 `rowId`。"
+            "wp_code 裁决：manifest 幻影码 ['G13F']（matcher 域），真码 **G13**（载荷所在）。"
+            "🔴 **TB 口径是本期发生额**：G13 是损益类（科目 **6101**）—— 不是余额。"
+            "FC-9 红线：本 provider 对 trial_balance 写次数为 0；审定表归后置 spec "
+            "`g-cycle-adjudication-sheets-coverage`（GF-H5）。"
+            "`adapter_registered=False`：与 D1/D3/D5/D6/D7/E1/F1~F5/G2/G8/G9/G10/G11/G14 卡在同一"
+            "平台级缺口（umbrella BP-61-1 = G slice 的 BP-1~BP-3），供给就绪后真栈注册。"
+        ),
+    },
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     {
         "contract_id": "h9.lease_liability_detail",
