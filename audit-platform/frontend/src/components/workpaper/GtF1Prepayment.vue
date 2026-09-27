@@ -7,10 +7,10 @@
     <template v-else>
       <div v-if="showHtmlToolbar" class="f1-header-toolbar">
         <el-segmented
-          :model-value="dualMode.currentMode.value"
+          v-model="renderMode"
           :options="dualMode.modeOptions"
           size="small"
-          @change="dualMode.onModeChange"
+          :disabled="isF1SyncManagedSheet && syncBusy"
         />
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
@@ -20,18 +20,16 @@
 
       <!-- 在线编辑模式：受管 sheet 走 WorkpaperSyncEditorHost（真双向），非受管走 legacy GtOnlyOfficeSheet -->
       <!-- F1 canary 受管 sheet 真双向路径（spec: f1-sync-coverage-and-first-canary · Task 10） -->
-      <div v-if="dualMode.currentMode.value === 'onlyoffice' && isF1SyncManagedSheet" class="oo-container">
+      <div v-if="renderMode === 'onlyoffice' && isF1SyncManagedSheet" class="oo-container">
         <WorkpaperSyncEditorHost
           ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
           :bridge="syncBridge"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :readonly="isReadonly"
         />
       </div>
       <!-- 非受管 sheet 保留 legacy GtOnlyOfficeSheet（假双向，如实登记） -->
       <GtOnlyOfficeSheet
-        v-else-if="dualMode.currentMode.value === 'onlyoffice'"
+        v-else-if="renderMode === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -349,15 +347,17 @@ const applicableStandards = useHostApplicableStandards({
   htmlData: () => props.htmlData,
 })
 
+const formData = useF1FormData({
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+})
+
 const {
   allResponses,
   loadAll,
   saveImmediate: rawSaveImmediate,
   debouncedSave,
-} = useF1FormData({
-  wpId: wpIdRef,
-  projectId: projectIdRef,
-})
+} = formData
 
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionToolbar = runtime?.version ?? {
@@ -416,18 +416,69 @@ const syncBridge = useWorkpaperSyncBridge({
   sheetKey: syncSheetKey,
   capability: capabilityForEntry(F1_SYNC_ENTRY_ID),
   flushHtml: async () => {
-    flushPendingSave()
+    // 🔴 修复缺陷①：原写 `flushPendingSave()` 裸调（useF1FormData 未导出该函数）⇒ ReferenceError。
+    // 现经 formData 前缀调用（useF1FormData 已补导出）。
+    formData.flushPendingSave()
     const snap = await readStoreProjection({
       projectId: props.projectId,
       wpId: props.wpId,
       entryId: F1_SYNC_ENTRY_ID,
-      sheetKey: syncSheetKey.value,
     })
-    return snap
+    // 🔴 修复缺陷③：原直接 `return snap`（StoreProjectionSnapshot 不含 sheetKey）。
+    // WorkpaperSyncFlushResult 需要 sheetKey，桥用 `flushed.sheetKey ?? sheetKey()` 兜底。
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: syncSheetKey.value,
+    }
   },
-  reloadHtml: () => loadAll(),
+  reloadHtml: async (_minimumRevision: number) => {
+    await formData.loadAll()
+  },
 })
-const syncBusy = computed(() => WP_BRIDGE_IN_FLIGHT_STATES.has(syncBridge.state.value))
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncSwitching2 = ref(false)
+const syncBusy = computed(() =>
+  syncSwitching.value || syncSwitching2.value
+  || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+
+// ─── 受管 sheet 的 4 分支保存协议（照 D3 switchRenderMode）───────────────────
+type F1RenderMode = 'html' | 'onlyoffice'
+
+const renderMode = computed({
+  get: (): F1RenderMode =>
+    isF1SyncManagedSheet.value
+      ? (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html')
+      : dualMode.currentMode.value,
+  set: (v: F1RenderMode) => {
+    if (isF1SyncManagedSheet.value) void switchRenderMode(v)
+    else void dualMode.switchMode(v)
+  },
+})
+
+async function switchRenderMode(target: F1RenderMode): Promise<void> {
+  if (target === renderMode.value) return
+  if (target === 'onlyoffice') {
+    if (!isF1SyncManagedSheet.value) return
+    syncSwitching2.value = true
+    try { await syncBridge.switchToOnlyOffice() } catch { /* 桥已记 lastError */ } finally { syncSwitching2.value = false }
+    return
+  }
+  if (syncBridge.mode.value !== 'oo') { syncBridge.persistMode('html'); return }
+  syncSwitching2.value = true
+  try {
+    if (String(syncBridge.state.value) === 'applied') {
+      await syncBridge.reloadAfterApplied()
+    } else if (syncBridge.mode.value === 'oo' && !syncBridge.dirty.value) {
+      await syncBridge.leaveWithoutSaving()
+    } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
+      await syncEditorHostRef.value.forceSave()
+    } else {
+      syncBridge.persistMode('html')
+    }
+  } catch { /* 保持 OO */ } finally { syncSwitching2.value = false }
+}
 
 provide('reloadWorkpaperData', loadAll)
 

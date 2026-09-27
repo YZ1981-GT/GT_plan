@@ -243,6 +243,11 @@ export function useF1FormData(options: UseF1FormDataOptions) {
     saveImmediate,
     saveBatch,
     debouncedSave,
+    // F1-6 canary：syncBridge 的 flushHtml 第一步须 flush 掉 2s debounce 未落库的行，
+    // 否则 readStoreProjection 读到旧快照，切到 OO 侧会用旧值覆盖 HTML 侧刚写的编辑。
+    // 🔴 原 return 漏导出（并发会话遗留缺陷），宿主 L419 调用 flushPendingSave() 直接
+    // ReferenceError ⇒ html→oo 切换必崩。
+    flushPendingSave: _flushPending,
   }
 }
 

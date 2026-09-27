@@ -34,127 +34,221 @@
       "sheet_key": "f16-managed",
       "tables": [
         {
+          "anchor": "A6",
+          "delete_policy": "tombstone",
           "fields": [
             {
-              "column": "A",
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "party_name",
+              "header_source_ref": "源xlsx!关联方及交易检查表F1-6!A6",
               "header_text": "关联方名称",
-              "json_key": "partyName",
+              "json_pointer": "/rows/{row_uuid}/partyName",
               "mode": "editable",
-              "stable_field_key": "party_name",
+              "source_ref": "源xlsx!关联方及交易检查表F1-6!A7",
+              "stable_field_key": "related_party_rows/{row_uuid}/party_name",
+              "store_item_id": "F1-rp-rows",
               "value_type": "text"
             },
             {
-              "column": "B",
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "relationship",
+              "header_source_ref": "源xlsx!关联方及交易检查表F1-6!B6",
               "header_text": "关联关系",
-              "json_key": "relationship",
+              "json_pointer": "/rows/{row_uuid}/relationship",
               "mode": "editable",
-              "stable_field_key": "relationship",
+              "source_ref": "源xlsx!关联方及交易检查表F1-6!B7",
+              "stable_field_key": "related_party_rows/{row_uuid}/relationship",
+              "store_item_id": "F1-rp-rows",
               "value_type": "text"
             },
             {
-              "column": "C",
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_balance",
+              "header_source_ref": "源xlsx!关联方及交易检查表F1-6!C6",
               "header_text": "期初余额",
-              "json_key": "priorBalance",
+              "json_pointer": "/rows/{row_uuid}/priorBalance",
               "mode": "editable",
-              "stable_field_key": "prior_balance",
+              "source_ref": "源xlsx!关联方及交易检查表F1-6!C7",
+              "stable_field_key": "related_party_rows/{row_uuid}/prior_balance",
+              "store_item_id": "F1-rp-rows",
               "value_type": "amount"
             },
             {
-              "column": "D",
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "debit",
+              "header_source_ref": "源xlsx!关联方及交易检查表F1-6!D6",
               "header_text": "借方发生",
-              "json_key": "debit",
+              "json_pointer": "/rows/{row_uuid}/debit",
               "mode": "editable",
-              "stable_field_key": "debit",
+              "source_ref": "源xlsx!关联方及交易检查表F1-6!D7",
+              "stable_field_key": "related_party_rows/{row_uuid}/debit",
+              "store_item_id": "F1-rp-rows",
               "value_type": "amount"
             },
             {
-              "column": "E",
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "credit",
+              "header_source_ref": "源xlsx!关联方及交易检查表F1-6!E6",
               "header_text": "贷方发生",
-              "json_key": "credit",
+              "json_pointer": "/rows/{row_uuid}/credit",
               "mode": "editable",
-              "stable_field_key": "credit",
+              "source_ref": "源xlsx!关联方及交易检查表F1-6!E7",
+              "stable_field_key": "related_party_rows/{row_uuid}/credit",
+              "store_item_id": "F1-rp-rows",
               "value_type": "amount"
             },
             {
-              "column": "F",
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_balance",
+              "header_source_ref": "源xlsx!关联方及交易检查表F1-6!F6",
               "header_text": "期末余额",
-              "json_key": "endBalance",
+              "json_pointer": "/rows/{row_uuid}/endBalance",
               "mode": "formula",
-              "stable_field_key": "end_balance",
+              "source_ref": "源xlsx!关联方及交易检查表F1-6!F7",
+              "stable_field_key": "related_party_rows/{row_uuid}/end_balance",
+              "store_item_id": "F1-rp-rows",
               "value_type": "amount"
             },
             {
-              "column": "G",
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "bad_debt",
+              "header_source_ref": "源xlsx!关联方及交易检查表F1-6!G6",
               "header_text": "坏账准备",
-              "json_key": "badDebt",
+              "json_pointer": "/rows/{row_uuid}/badDebt",
               "mode": "editable",
-              "stable_field_key": "bad_debt",
+              "source_ref": "源xlsx!关联方及交易检查表F1-6!G7",
+              "stable_field_key": "related_party_rows/{row_uuid}/bad_debt",
+              "store_item_id": "F1-rp-rows",
               "value_type": "amount"
             },
             {
-              "column": "H",
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "book_value",
+              "header_source_ref": "源xlsx!关联方及交易检查表F1-6!H6",
               "header_text": "账面价值",
-              "json_key": "bookValue",
+              "json_pointer": "/rows/{row_uuid}/bookValue",
               "mode": "formula",
-              "stable_field_key": "book_value",
+              "source_ref": "源xlsx!关联方及交易检查表F1-6!H7",
+              "stable_field_key": "related_party_rows/{row_uuid}/book_value",
+              "store_item_id": "F1-rp-rows",
               "value_type": "amount"
             },
             {
-              "column": "I",
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_description",
+              "header_source_ref": "源xlsx!关联方及交易检查表F1-6!I6",
               "header_text": "发生时间及账龄",
-              "json_key": "agingDescription",
+              "json_pointer": "/rows/{row_uuid}/agingDescription",
               "mode": "editable",
-              "stable_field_key": "aging_description",
+              "source_ref": "源xlsx!关联方及交易检查表F1-6!I7",
+              "stable_field_key": "related_party_rows/{row_uuid}/aging_description",
+              "store_item_id": "F1-rp-rows",
               "value_type": "text"
             },
             {
-              "column": "J",
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "nature_description",
+              "header_source_ref": "源xlsx!关联方及交易检查表F1-6!J6",
               "header_text": "款项性质说明",
-              "json_key": "natureDescription",
+              "json_pointer": "/rows/{row_uuid}/natureDescription",
               "mode": "editable",
-              "stable_field_key": "nature_description",
+              "source_ref": "源xlsx!关联方及交易检查表F1-6!J7",
+              "stable_field_key": "related_party_rows/{row_uuid}/nature_description",
+              "store_item_id": "F1-rp-rows",
               "value_type": "text"
             },
             {
-              "column": "K",
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "post_period_delivery",
+              "header_source_ref": "源xlsx!关联方及交易检查表F1-6!K6",
               "header_text": "期后结算",
-              "json_key": "postPeriodDelivery",
+              "json_pointer": "/rows/{row_uuid}/postPeriodDelivery",
               "mode": "editable",
-              "stable_field_key": "post_period_delivery",
+              "source_ref": "源xlsx!关联方及交易检查表F1-6!K7",
+              "stable_field_key": "related_party_rows/{row_uuid}/post_period_delivery",
+              "store_item_id": "F1-rp-rows",
               "value_type": "amount"
             },
             {
-              "column": "L",
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_ref",
+              "header_source_ref": "源xlsx!关联方及交易检查表F1-6!L6",
               "header_text": "索引号",
-              "json_key": "indexRef",
+              "json_pointer": "/rows/{row_uuid}/indexRef",
               "mode": "editable",
-              "stable_field_key": "index_ref",
+              "source_ref": "源xlsx!关联方及交易检查表F1-6!L7",
+              "stable_field_key": "related_party_rows/{row_uuid}/index_ref",
+              "store_item_id": "F1-rp-rows",
               "value_type": "text"
             },
             {
-              "column": "M",
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "remark",
+              "header_source_ref": "源xlsx!关联方及交易检查表F1-6!M6",
               "header_text": "备注",
-              "json_key": "remark",
+              "json_pointer": "/rows/{row_uuid}/remark",
               "mode": "editable",
-              "stable_field_key": "remark",
+              "source_ref": "源xlsx!关联方及交易检查表F1-6!M7",
+              "stable_field_key": "related_party_rows/{row_uuid}/remark",
+              "store_item_id": "F1-rp-rows",
               "value_type": "text"
             }
           ],
-          "footer": {
+          "footer_anchor": {
             "carries_total_formula": true,
-            "row_marker": "合计"
+            "marker": "合计",
+            "search_column": "A"
           },
           "formula_mask": [
             "F7:F9",
             "H7:H9"
           ],
+          "header_rows": 1,
           "row_identity": {
-            "column": "N",
-            "hidden": true,
-            "store_key": "rowId"
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
           },
           "table_key": "related_party_rows",
-          "table_name": "GT_F16_ROWS"
+          "uuid_col": "N"
         }
       ]
     }

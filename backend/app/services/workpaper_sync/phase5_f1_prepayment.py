@@ -346,36 +346,20 @@ _REVIEWED_BASIS: Final[str] = (
 
 
 def _rows_table_payload(spec: Any) -> dict[str, Any]:
-    """一个行表 spec → 契约 table payload。"""
+    """一个行表 spec → 契约 table payload。
+
+    🔴 修复：原手写 payload 缺 `anchor`/`header_rows`/`delete_policy` 等必填字段，
+    `parse_contract` 抛 `ContractSchemaError: table anchor 必须是 A1 单元格，实得 None`。
+    改为委托框架层 `spec_to_contract_sheet_payload`（与 F3/F4/F5 三个 provider 同构），
+    它从 `RowTableSheetSpec` 自动派生全部字段（含 anchor/header_rows/delete_policy/
+    字段的 cell/json_pointer/source_ref/header_source_ref/store_item_id）。
+    """
     from app.services.workpaper_sync.phase5_row_table_sheet import (
-        managed_field_specs,
+        spec_to_contract_sheet_payload,
     )
-    fields = managed_field_specs(spec)
-    return {
-        "table_key": spec.table_key,
-        "table_name": spec.table_name,
-        "row_identity": {
-            "store_key": spec.row_identity_key,
-            "column": spec.uuid_col,
-            "hidden": True,
-        },
-        "fields": [
-            {
-                "stable_field_key": f[0],
-                "column": f[1],
-                "mode": f[2],
-                "value_type": f[3],
-                "json_key": f[4],
-                "header_text": f[5],
-            }
-            for f in fields
-        ],
-        "formula_mask": list(spec.formula_mask),
-        "footer": {
-            "row_marker": spec.footer_marker,
-            "carries_total_formula": spec.footer_carries_total_formula,
-        },
-    }
+    sheet_payload = spec_to_contract_sheet_payload(spec)
+    # spec_to_contract_sheet_payload 返回整个 sheet（含 tables 数组），取第一个 table。
+    return sheet_payload["tables"][0]
 
 
 def build_contract_payload() -> dict[str, Any]:
