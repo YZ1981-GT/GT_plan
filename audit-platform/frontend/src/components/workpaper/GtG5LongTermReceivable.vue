@@ -24,11 +24,25 @@
         <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
           📖 编制手册
         </el-button>
-        <el-tag v-if="isHtmlSheet && !isOoAvailable" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isHtmlSheet && !isOoAvailable && !isG5SyncManagedSheet" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isG5SyncManagedSheet && syncBusy" size="small" type="info">同步中…</el-tag>
+        <el-tag v-if="syncSwitching" size="small" type="info">切换中…</el-tag>
       </div>
 
+      <!-- G5-2 受管 sheet 走 WorkpaperSyncEditorHost 真双向 -->
+      <div v-if="isOoMode && isG5SyncManagedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          v-if="syncOoDescriptor"
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+        <div v-else class="oo-loading">正在打开 G5-2 同步编辑器…</div>
+      </div>
+
+      <!-- 非受管 sheet 保留 legacy GtOnlyOfficeSheet -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && renderMode === 'onlyoffice'"
+        v-else-if="isOoMode"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -188,7 +202,7 @@
  * GtG5LongTermReceivable.vue — G5 长期应收款底稿主入口
  * 对齐 G2/G3/G4：formData + g5:save-items + 附注路由 + 双模式 reload
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, toRef, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useG5DualMode } from './composables/useG5DualMode'
 import { useG5LonRecFormData, G5FormDataKey } from './composables/useG5LonRecFormData'
@@ -200,6 +214,12 @@ import { extractG5SheetCode, resolveG5SheetLabel } from './composables/g5SheetLa
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+// ── G5 sync bridge（spec: g5-nested-sections-and-template-defects · Task 12）──
+import { isGSingleRegionManagedSheet, gSingleRegionSheetKeyOf } from './sync/gSingleRegionManagedSheets'
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const G5TabProcedure = defineAsyncComponent(() => import('./g5-long-term-receivable/core/G5TabProcedure.vue'))
@@ -407,6 +427,35 @@ async function retrySelfLoad(): Promise<void> {
   await selfLoad()
   isLoading.value = false
 }
+
+// ── G5 sync bridge 接线 ────────────────────────────────
+const G5_SYNC_ENTRY_ID = 'xlsx/gt-g5-long-term-receivable'
+const isG5SyncManagedSheet = computed(() => isGSingleRegionManagedSheet(currentSheet.value))
+const isOoMode = computed(
+  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && dualMode.currentMode.value === 'onlyoffice',
+)
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const syncEntryId = ref(G5_SYNC_ENTRY_ID)
+const syncSheetKey = computed(() => gSingleRegionSheetKeyOf(currentSheet.value) ?? 'g502-managed')
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(G5_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    formData.flushPending()
+    return await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: G5_SYNC_ENTRY_ID,
+    })
+  },
+  reloadHtml: () => formData.loadAll(),
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(() => WP_BRIDGE_IN_FLIGHT_STATES.includes(syncBridge.state.value))
+const syncSwitching = ref(false)
 
 onMounted(async () => {
   window.addEventListener('g5:save-items', handleG5SaveItems)

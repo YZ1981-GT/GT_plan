@@ -25,6 +25,7 @@ export interface GSingleRegionManagedSheet {
 export const G_SINGLE_REGION_MANAGED_SHEETS: readonly GSingleRegionManagedSheet[] = Object.freeze([
   { code: 'G1-2', sheetKey: 'g102-managed', excelName: '明细表G1-2', entryId: 'xlsx/gt-g1-trading-financial-assets' },
   { code: 'G3-2', sheetKey: 'g302-managed', excelName: '明细表G3-2', entryId: 'xlsx/gt-g3-dividend-receivable' },
+  { code: 'G5-2', sheetKey: 'g502-managed', excelName: '余额明细表G5-2', entryId: 'xlsx/gt-g5-long-term-receivable' },
   { code: 'G8-2', sheetKey: 'g802-managed', excelName: '明细表G8-2', entryId: 'xlsx/gt-g8-other-equity-instruments' },
   { code: 'G9-2', sheetKey: 'g902-managed', excelName: '明细表G9-2', entryId: 'xlsx/gt-g9-other-noncurrent-financial' },
   { code: 'G10-2', sheetKey: 'g1002-managed', excelName: '明细表G10-2', entryId: 'xlsx/gt-g10-trading-financial-liabilities' },
