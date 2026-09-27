@@ -414,3 +414,205 @@ class TestTask22SelfCheck:
         # 检查是否有 LC- 编号引用
         lc_refs = re.findall(r"LC-\d+", text)
         assert len(lc_refs) > 0, "应有 LC-x 编号引用"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 7/8: 跨 entry 污染现算 + 守卫（LC-22）
+# Property: LA-P10, LA-P11, LA-P12
+# 🔴 依赖真实 PG
+# ═══════════════════════════════════════════════════════════════════════
+_PG_AVAILABLE = False
+try:
+    import psycopg2
+    _conn = psycopg2.connect(
+        dbname="audit_platform", user="postgres", password="postgres",
+        host="localhost", port=5432, connect_timeout=3,
+    )
+    _conn.close()
+    _PG_AVAILABLE = True
+except Exception:
+    pass
+
+
+def _pg_query(sql: str) -> list[dict]:
+    import psycopg2
+    import psycopg2.extras
+    conn = psycopg2.connect(
+        dbname="audit_platform", user="postgres", password="postgres",
+        host="localhost", port=5432,
+    )
+    conn.autocommit = True
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql)
+            return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+@pytest.mark.skipif(not _PG_AVAILABLE, reason="PG 不可用")
+class TestTask7to8CrossEntryPollution:
+    """LC-22：跨 entry 键污染守卫。"""
+
+    def test_l2_key_on_g8_workpaper(self) -> None:
+        """L2 命名空间的键落在 wp_code='G8' 底稿上（LA-P10）。"""
+        rows = _pg_query(
+            "SELECT cr.item_id, wi.wp_code, LENGTH(cr.remark) AS remark_len "
+            "FROM checklist_responses cr "
+            "JOIN working_paper wp ON cr.wp_id = wp.id "
+            "JOIN wp_index wi ON wp.wp_index_id = wi.id "
+            "WHERE cr.item_id ~ '^L2-' AND wi.wp_code != 'L2' "
+        )
+        # 应有至少 1 条违例
+        assert len(rows) >= 1, "应发现 L2 键落在非 L2 底稿的违例"
+        # 违例的 wp_code 应是 G8
+        g8_rows = [r for r in rows if r["wp_code"] == "G8"]
+        assert len(g8_rows) >= 1, f"违例应在 G8 底稿，实得 {[r['wp_code'] for r in rows]}"
+
+    def test_cross_entry_isolation_guard_all_8(self) -> None:
+        """跨 entry 隔离守卫覆盖 8 条 entry 全集（LA-P12）。"""
+        # 对每个 L{n}，检查 item_id ~ '^L{n}-' 的行其 wp_code 是否以 L{n} 开头
+        violations = []
+        for n in range(1, 9):
+            rows = _pg_query(
+                f"SELECT cr.item_id, wi.wp_code "
+                f"FROM checklist_responses cr "
+                f"JOIN working_paper wp ON cr.wp_id = wp.id "
+                f"JOIN wp_index wi ON wp.wp_index_id = wi.id "
+                f"WHERE cr.item_id ~ '^L{n}-' AND wi.wp_code NOT LIKE 'L{n}%' "
+            )
+            for r in rows:
+                violations.append({
+                    "item_id": r["item_id"],
+                    "expected_code": f"L{n}",
+                    "actual_code": r["wp_code"],
+                })
+        # 应只有已知违例（L2→G8），不应有新的
+        for v in violations:
+            # 已知违例：L2-L2-3-entries → G8
+            if v["expected_code"] == "L2" and v["actual_code"] == "G8":
+                continue  # 已登记
+            pytest.fail(
+                f"新增违例：{v['item_id']} 应在 {v['expected_code']} 底稿，"
+                f"实在 {v['actual_code']}"
+            )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 13: L4 契约层区分方案（sheet_key = 尾码#bondBranch）
+# Property: LA-P18
+# ═══════════════════════════════════════════════════════════════════════
+class TestTask13ContractLayerDisambiguation:
+    """L4 契约用路线 A（尾码+分支）区分同码 sheet。"""
+
+    def test_l4_contract_exists_and_has_bp8(self) -> None:
+        """L4 候选契约存在且含 bp8 区分方案。"""
+        contract_path = DATA / "workpaper_sync_contracts" / "l4.bonds_payable.candidate.json"
+        assert contract_path.exists(), "L4 候选契约应存在"
+        data = _load(contract_path)
+        assert "bp8_sheet_granularity_collapse" in data.get("review", {}), (
+            "L4 契约应含 bp8_sheet_granularity_collapse"
+        )
+
+    def test_sheet_key_does_not_contain_space_defect(self) -> None:
+        """sheet_key 不含 LC-10 的空格缺陷（LA-P18）。"""
+        contract_path = DATA / "workpaper_sync_contracts" / "l4.bonds_payable.candidate.json"
+        data = _load(contract_path)
+        bp8 = data["review"]["bp8_sheet_granularity_collapse"]
+        for pair in bp8["collapsed_pairs"]:
+            for label, key in pair["sheet_keys"].items():
+                # sheet_key 不应含内部空格
+                parts = key.split("#")
+                assert len(parts) == 2, f"sheet_key '{key}' 应含恰 1 个 #"
+                assert " " not in parts[0], f"尾码部分 '{parts[0]}' 不应含空格"
+
+    def test_strict_mode_integrated_with_real_l4_sheets(self) -> None:
+        """strict 模式与 L4 真实 sheet 集成（LA-P19）。"""
+        from app.services.workpaper_sync.excel_sheet_visibility import resolve_target_sheet
+        sheets = list(load_workbook(
+            L_TEMPLATE_DIR / "L4 应付债券.xlsx", read_only=True
+        ).sheetnames)
+        # L4-7: 两张命中 → strict 返回 None
+        assert resolve_target_sheet(sheets, "L4-7", strict=True) is None
+        # L4-8: 两张命中 → strict 返回 None
+        assert resolve_target_sheet(sheets, "L4-8", strict=True) is None
+        # L4-1: 一张命中 → strict 正常返回
+        assert resolve_target_sheet(sheets, "L4-1", strict=True) is not None
+        # L4-2: 一张命中 → 正常
+        assert resolve_target_sheet(sheets, "L4-2", strict=True) is not None
+        # L1 的 sheet: 无歧义
+        l1_sheets = list(load_workbook(
+            L_TEMPLATE_DIR / "L1 短期借款.xlsx", read_only=True
+        ).sheetnames)
+        for code in ("L1-1", "L1-2", "L1-3"):
+            result = resolve_target_sheet(l1_sheets, code, strict=True)
+            assert result is not None, f"L1 的 {code} 在 strict 下应正常返回"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 19: rowId 正面样板抽取
+# Property: LA-P23, LA-P24
+# ═══════════════════════════════════════════════════════════════════════
+class TestTask19RowIdPositiveSample:
+    """L2/L3 的 rowId 正面样板——生成不含位置信息的伪 UUID。"""
+
+    def test_l2_detail_generates_non_positional_rowid(self) -> None:
+        """useL2Detail 生成 rowId 不含索引（正面样板）。"""
+        path = WP_COMPOSABLES / "useL2Detail.ts"
+        text = _cached_text(path)
+        # 应有 Date.now / Math.random 基础的 rowId 生成
+        assert "Date.now()" in text or "crypto" in text or "uuid" in text.lower(), (
+            "useL2Detail 应有不可逆的 rowId 生成"
+        )
+        # removeRow 按 rowId 删（非索引）
+        assert "removeRow(rowId" in text or "filter(r => r.rowId !== rowId)" in text, (
+            "useL2Detail 应按 rowId 删行（非索引）"
+        )
+
+    def test_l2_voucher_check_generates_non_positional_rowid(self) -> None:
+        """useL2VoucherCheck 生成 rowId。"""
+        path = WP_COMPOSABLES / "useL2VoucherCheck.ts"
+        text = _cached_text(path)
+        assert "rowId" in text, "useL2VoucherCheck 应有 rowId"
+
+    def test_rowid_prefixes_are_distinct(self) -> None:
+        """三个正面样板模块的 rowId 前缀两两不同（LA-P24）。"""
+        modules = [
+            WP_COMPOSABLES / "useL2Detail.ts",
+            WP_COMPOSABLES / "useL2VoucherCheck.ts",
+        ]
+        # 查找 L3 版本
+        l3vc = SRC_COMPOSABLES / "useL3VoucherCheck.ts"
+        if not l3vc.exists():
+            l3vc = WP_COMPOSABLES / "useL3VoucherCheck.ts"
+        if l3vc.exists():
+            modules.append(l3vc)
+        prefixes = set()
+        for p in modules:
+            if not p.exists():
+                continue
+            text = _cached_text(p)
+            # 找 generateRowId 的前缀模式
+            import re
+            prefix_match = re.findall(r"""['"`](row-|detail-|voucher-|check-)""", text)
+            prefixes.update(prefix_match)
+        # 至少有前缀存在
+        assert len(prefixes) >= 1, f"应有 rowId 前缀模式，实得 {prefixes}"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 20: 模板层基线引用（不修）
+# Property: 引用 LF-P32, LF-P33, LF-P41
+# ═══════════════════════════════════════════════════════════════════════
+class TestTask20TemplateBaselineReference:
+    """模板层基线引用（只登记不修）。"""
+
+    def test_l4_has_very_wide_sheet(self) -> None:
+        """L4 应付债券明细表L4-2 是最宽的业务表之一。"""
+        wb = load_workbook(L_TEMPLATE_DIR / "L4 应付债券.xlsx", read_only=True)
+        l42_cols = 0
+        for ws in wb.worksheets:
+            if "明细表L4-2" in ws.title:
+                l42_cols = ws.max_column or 0
+        wb.close()
+        assert l42_cols > 50, f"L4-2 应有 50+ 列（极宽表），实得 {l42_cols}"

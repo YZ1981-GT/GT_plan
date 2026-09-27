@@ -209,34 +209,20 @@ class TestTask6InertSwitchTripleCondition:
     """L5~L8 inert 三条件：segmented 有 / mode v-if 0 / GtOnlyOfficeSheet 0。"""
 
     @pytest.mark.parametrize("code", ["L5", "L6", "L7", "L8"])
-    def test_inert_triple_condition(self, code: str) -> None:
-        """三条必须同时成立。"""
+    def test_inert_switch_was_present_now_removed(self, code: str) -> None:
+        """BP-4 路线②已执行：inert 开关已从子 Tab 摘除，notice 已替代。"""
         tab = _adjudication_tab(code)
         assert tab.exists(), f"{tab} 不存在"
         raw = _cached_text(tab)
+        # el-segmented 绑 dualMode 的已删，notice 已替代
+        assert "GtEntrySyncCapabilityNotice" in raw, (
+            f"{code} TabAdjudication 应有 notice 替代 inert 开关"
+        )
+        # 不应再有 dualMode 引用
         clean = _strip_comments(raw)
-        template = _vue_template(clean)
-
-        # ① 剥注释后有 el-segmented
-        assert "el-segmented" in clean, f"{code} TabAdjudication 无 el-segmented"
-
-        # ② 以 mode 为条件的 v-if/v-else-if/v-show 现算 0
-        mode_gates = re.findall(
-            r'v-(?:if|else-if|show)="[^"]*(?:dualMode|mode)[^"]*"', template
+        assert "dualMode.mode" not in clean, (
+            f"{code} 不应再有 dualMode.mode 绑定"
         )
-        # 排除 v-model 绑定（不是门控条件）
-        mode_condition_gates = [
-            g
-            for g in mode_gates
-            if "v-model" not in g and ("=== " in g or "!== " in g or ".value" in g)
-        ]
-        assert len(mode_condition_gates) == 0, (
-            f"{code} 以 mode 为条件的 v-if 应为 0，实得 {mode_condition_gates}"
-        )
-
-        # ③ 文件内 GtOnlyOfficeSheet 命中 0
-        oo_hits = len(re.findall(r"GtOnlyOfficeSheet", clean))
-        assert oo_hits == 0, f"{code} GtOnlyOfficeSheet 应为 0，实得 {oo_hits}"
 
 
 # ═══════════════════════════════════════════════════════════════════════

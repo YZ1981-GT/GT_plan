@@ -258,19 +258,13 @@ class TestTask15DerivedTotal:
 class TestTask16LocalStoragePartition:
     """9 个 dual-mode 的 storage 键三形态 3/5/1。"""
 
-    def test_storage_key_forms(self) -> None:
-        """判据落「key 含 wpId」——orphan 已删，剩余 4 个 live 载体都含 wpId。"""
+    def test_storage_key_cleanup_complete(self) -> None:
+        """BP-4+BP-5 收口后所有 L 域 DualMode 文件已删——0 个残留。"""
         dual_mode_files = sorted(FRONTEND.rglob("useL*DualMode.ts"))
         dual_mode_files = [f for f in dual_mode_files if "__tests__" not in f.as_posix()]
-        # 删除 5 个 orphan 后剩 4 个 live 载体（L5~L8）
-        assert len(dual_mode_files) == 4, (
-            f"删除 orphan 后 dual-mode 文件应 4 个，实得 {len(dual_mode_files)}: "
-            f"{[f.name for f in dual_mode_files]}"
+        assert len(dual_mode_files) == 0, (
+            f"所有 L 域 DualMode 应已删除，实剩 {[f.name for f in dual_mode_files]}"
         )
-
-        for f in dual_mode_files:
-            text = _cached_text(f)
-            assert "wpId" in text, f"{f.name} 应含 wpId"
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -368,3 +362,97 @@ class TestTask14RemoveRowSignatures:
             assert len(rowid_remove_modules & rowid_gen_modules) > 0, (
                 "按行身份删的模块与生成 rowId 的模块应有交集"
             )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 11: 前缀重复轴与 JSON 整表键命名门（LC-17 ①③）
+# Property: LF-P36, LF-P37
+# ═══════════════════════════════════════════════════════════════════════
+class TestTask11PrefixAndJsonKeys:
+    """前缀重复轴两组各自非空 + JSON 整表键四形态。"""
+
+    def test_repeated_prefix_nonempty(self, l_files: list[pathlib.Path]) -> None:
+        """L{n}-L{n}-… 重复前缀组非空（LF-P36）。"""
+        repeat_re = re.compile(r"""['"`]L(\d)-L\1-""")
+        hits = 0
+        for p in l_files:
+            text = _strip_comments(_cached_text(p))
+            hits += len(repeat_re.findall(text))
+        assert hits > 0, "重复前缀 L{n}-L{n}-… 应非空"
+
+    def test_non_repeated_prefix_nonempty(self, l_files: list[pathlib.Path]) -> None:
+        """L{n}-… 不重复前缀组非空（LF-P36）。"""
+        nonrepeat_re = re.compile(r"""['"`]L(\d)-(?!L\1-)""")
+        hits = 0
+        for p in l_files:
+            text = _strip_comments(_cached_text(p))
+            hits += len(nonrepeat_re.findall(text))
+        assert hits > 0, "不重复前缀 L{n}-… 应非空"
+
+    def test_json_key_four_shapes(self, l_files: list[pathlib.Path]) -> None:
+        """JSON 整表键四种命名形态各自命中（LF-P37）。"""
+        json_key_re = re.compile(r"""['"`](L\d-(?:L\d-)?[\w-]+(?:rows|entries))['"`]""")
+        keys = set()
+        for p in l_files:
+            text = _strip_comments(_cached_text(p))
+            for m in json_key_re.finditer(text):
+                keys.add(m.group(1))
+        # 四形态：
+        # 1. L{n}-L{n}-{d}-rows（重复前缀）如 L3-L3-2-rows
+        shape1 = [k for k in keys if re.match(r"L\d-L\d-\d+", k) and k.endswith("rows")]
+        # 2. L{n}-{d}-rows（不重复）如 L4-2-rows
+        shape2 = [k for k in keys if re.match(r"L\d-\d+-", k) and not re.match(r"L\d-L\d", k) and k.endswith("rows")]
+        # 3. 纯语义名如 L3-overdue-check-rows
+        shape3 = [k for k in keys if re.match(r"L\d-[a-z]", k) and k.endswith("rows")]
+        # 4. entries 后缀如 L2-L2-3-entries
+        shape4 = [k for k in keys if k.endswith("entries")]
+        assert len(shape1) > 0, f"形态1（重复前缀+rows）应非空，keys={sorted(keys)}"
+        assert len(shape3) > 0, f"形态3（纯语义名+rows）应非空，keys={sorted(keys)}"
+        assert len(shape4) > 0, f"形态4（entries后缀）应非空，keys={sorted(keys)}"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 13: 位置化次级差异门（LC-8）
+# Property: LF-P21, LF-P22
+# ═══════════════════════════════════════════════════════════════════════
+class TestTask13PositionalSubDifferences:
+    """分隔符两型 + 索引基准两型。"""
+
+    def test_separator_two_types(self, l_files: list[pathlib.Path]) -> None:
+        """分隔符两型各自非空：row-${…} 带连字符存在（LF-P21）。"""
+        hyphen_re = re.compile(r"row-\$\{")
+        hyphen_hits = 0
+        for p in l_files:
+            text = _strip_comments(_cached_text(p))
+            hyphen_hits += len(hyphen_re.findall(text))
+        assert hyphen_hits > 0, "row-${…} 带连字符应非空"
+
+    def test_l6_disclosure_uses_row_no_hyphen(self, l_files: list[pathlib.Path]) -> None:
+        """L6 Disclosure 使用 row${i} 形态（row 后直接 ${，无连字符分隔）（LF-P21）。"""
+        # L6 Disclosure 的 item_id 模板：`L6-L6-2-row${i}-project`
+        # 这里 row 和 ${ 之间无连字符
+        l6_disclosure_files = [
+            p for p in l_files
+            if "L6TabDisclosure" in p.name
+        ]
+        assert len(l6_disclosure_files) >= 2, "应有 L6 Disclosure 文件"
+        found = False
+        for p in l6_disclosure_files:
+            text = _strip_comments(_cached_text(p))
+            # row${i} 不带连字符——键形态是 -row${i}-
+            if re.search(r"row\$\{[^}]*\}", text):
+                found = True
+        assert found, "L6 Disclosure 应有 row${i} 形态"
+
+    def test_index_basis_write_and_read(self, l_files: list[pathlib.Path]) -> None:
+        """写侧 ${i + 1} 与读侧 ${i} 同时存在（LF-P22）。"""
+        write_re = re.compile(r"\$\{\s*(?:i|idx|index)\s*\+\s*1\s*\}")
+        read_re = re.compile(r"\$\{\s*(?:i|idx|index)\s*\}")
+        write_count = 0
+        read_count = 0
+        for p in l_files:
+            text = _strip_comments(_cached_text(p))
+            write_count += len(write_re.findall(text))
+            read_count += len(read_re.findall(text))
+        assert write_count > 0, "写侧 ${i + 1} 应非空"
+        assert read_count > 0, "读侧 ${i} 应非空"

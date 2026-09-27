@@ -27,7 +27,7 @@
   - 🔴 断言四条的判据**不可照抄 foundation**
   - _Property: LB-P14_
 
-- [ ] 2. BP-9 / BP-7 引用门
+- [x] 2. BP-9 / BP-7 引用门
   - BP-9 引用 **LC-1**；BP-7 引用 **LC-14**，🔴 **不重新裁决**
   - 🔴 断言四条 `ui_toolbar_gate.anchor is None` 但 `child_level_segmented_site` **非空** ⇒ notice 落位点在**子 Tab 层**
   - _Property: 引用 LF-P5, LC-14_
@@ -55,19 +55,19 @@
   - 断言 `mode` 只作 `v-model` 双绑，无任何分支以它为条件
   - _Property: LB-P6_
 
-- [ ] 7. 🔴 收口路线裁定（本 task 的产物是裁定书）
+- [x] 7. 🔴 收口路线裁定（本 task 的产物是裁定书）
   - 在 ①**兑现**（补 OO 挂点 + mode 门控分支）与 ②**摘除**（删 segmented + 删载体）之间裁定，**写明理由**
   - 判断依据：BP-1/2/3 是否已到位（路线 ① 依赖它们供给 OO 侧权威定义）
   - 🔴 若选路线 ① ⇒ 后续实施 task 标 `[ ]*`；若选路线 ② ⇒ 走 Task 8
   - _Property: LB-P7 的前置_
 
-- [ ] 8. 路线 ② 执行（若被选）
+- [x] 8. 路线 ② 执行（若被选）
   - 删四个子 Tab 的 `el-segmented` + 删四个 `useL{n}DualMode.ts`
   - 🔴 **同 commit 一并删**（删 segmented 后载体消费边归零，留着就是新 orphan）
   - 删前 grep 消费方 → 删前后测试全绿 → 独立 commit
   - _Property: LB-P8_
 
-- [ ] 9. 收口后现算门 + 立场约束
+- [x] 9. 收口后现算门 + 立场约束
   - 断言 inert 计数 4 → **0**，`switch_is_redeemable` 不再有 `false`
   - 🔴 断言四册模板各有真实业务 sheet（现算 12 / 9 / 8 / 10）⇒ **不得借 inert 把 entry 裁成 `single_html`**（引用 slice 的 `not_single_html_because`）
   - _Property: LB-P7, LB-P9_
@@ -110,16 +110,16 @@
 
 ## 阶段 4：位置化收口（Task 15 ~ 19）
 
-- [ ] 15. 本 spec 位置化命中现算门
+- [x] 15. 本 spec 位置化命中现算门
   - 引用 **LC-8** 口径 ②，按模块列分布并现算总数
   - 断言本 spec 承担的份额是全 L 域最大的一块
   - _Property: LB-P16_
 
-- [ ] 16. 分隔符异常定位门
+- [x] 16. 分隔符异常定位门
   - 🔴 **两侧都验**：断言 `row${…}`（无连字符）**只**出现在两个 L6 Disclosure 组件；其余全是 `row-${…}`
   - _Property: LB-P17_
 
-- [ ] 17. 🔴 L6 读写键取证（取证前不得下结论）
+- [x] 17. 🔴 L6 读写键取证（取证前不得下结论）
   - 把写侧与读侧的 item_id 模板**各自展开成完整键模式集合**（field 名一并取出）
   - 求交集与差集：交集为空或部分缺失 ⇒ 判 **A 真缺陷**并单列修复项；field 名本就不同 ⇒ 如实登记为 **B 两套键并存**（不是 bug）
   - 🔴 **只看分隔符不同就判 bug 是误判**；结论必须由数据决定
@@ -131,7 +131,7 @@
   - 登记新旧键映射表，旧键保留只读兼容期；🔴 真库 L6/L7/L8 为 **0 行**（引用 **LC-24** 第 10 项）⇒ 迁移无存量数据风险
   - _Property: LB-P19_
 
-- [ ] 19. removeRow 变体收口
+- [x] 19. removeRow 变体收口
   - 引用 **LC-7** 四元组，枚举并处理本 spec 名下全部变体（含 L7 两个 Disclosure 的 `removeRow($index)`、L8 的 `removeRow(section, index)` 双参）
   - _Property: LB-P20_
 
@@ -139,7 +139,7 @@
 
 ## 阶段 5：模板层修复（Task 20 ~ 22）
 
-- [ ] 20. 倒挤减法链现算门（两个变体都扫）
+- [x] 20. 倒挤减法链现算门（两个变体都扫）
   - 引用 **LC-20**，断言两形态各自非空：L5「减本表已列项」· L6「减对方表明细行」
   - 🔴 **两侧都验**：断言只在「国企」版，上市公司版无（只扫一个变体会误判已修复）
   - _Property: LB-P21_

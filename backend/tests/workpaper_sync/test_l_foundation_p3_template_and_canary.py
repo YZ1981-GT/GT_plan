@@ -293,7 +293,7 @@ class TestTask34StructuralZeros:
     """十项结构性零逐项现算。"""
 
     def test_l_prefix_contract_count(self) -> None:
-        """L 前缀契约数 == 1（candidate，非 reviewed 生产契约）。"""
+        """L 前缀契约数 == 2（candidate：l1 + l4）。"""
         if not CONTRACT_DIR.exists():
             l_contracts = []
         else:
@@ -301,15 +301,16 @@ class TestTask34StructuralZeros:
                 f for f in CONTRACT_DIR.glob("*.json")
                 if f.stem.startswith("l") and not f.stem.startswith("_")
             ]
-        assert len(l_contracts) == 1, (
-            f"L 前缀契约应为 1（candidate），实得 {[f.name for f in l_contracts]}"
+        assert len(l_contracts) == 2, (
+            f"L 前缀契约应为 2（l1 + l4 candidate），实得 {[f.name for f in l_contracts]}"
         )
-        # 必须是 candidate 不是 reviewed
+        # 全部必须是 candidate（entry_id 为 null）
         import json as _json
-        data = _json.loads(l_contracts[0].read_text("utf-8"))
-        assert data.get("review", {}).get("entry_id") is None, (
-            "candidate 契约的 review.entry_id 必须为 null"
-        )
+        for c in l_contracts:
+            data = _json.loads(c.read_text("utf-8"))
+            assert data.get("review", {}).get("entry_id") is None, (
+                f"{c.name} candidate 契约的 review.entry_id 必须为 null"
+            )
 
     def test_l_domain_adapter_id_is_null(self, entries: list[dict]) -> None:
         """L 域 adapter_id 非空数 == 0。"""
@@ -386,3 +387,294 @@ class TestTask36L1L3Isomorphism:
         l3_adj = SRC_COMPOSABLES / "useL3Adjudication.ts"
         assert l1_adj.exists(), "L1 Adjudication 应在 src/composables/"
         assert l3_adj.exists(), "L3 Adjudication 应在 src/composables/"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 29: canary 闭环用例（真库载荷）
+# Property: LF-P42, LF-P43
+# 🔴 依赖真实 PG——无 PG 连接时 skip
+# ═══════════════════════════════════════════════════════════════════════
+import os
+import sys
+
+_BACKEND = pathlib.Path(__file__).resolve().parents[3] / "backend"
+if str(_BACKEND) not in sys.path:
+    sys.path.insert(0, str(_BACKEND))
+os.environ.setdefault("DB_DISABLE_SSL", "True")
+
+_PG_AVAILABLE = False
+try:
+    import psycopg2
+    _conn = psycopg2.connect(
+        dbname="audit_platform", user="postgres", password="postgres",
+        host="localhost", port=5432, connect_timeout=3,
+    )
+    _conn.close()
+    _PG_AVAILABLE = True
+except Exception:
+    pass
+
+
+def _pg_query(sql: str) -> list[dict]:
+    """单条独立事务查 PG。"""
+    import psycopg2
+    import psycopg2.extras
+    conn = psycopg2.connect(
+        dbname="audit_platform", user="postgres", password="postgres",
+        host="localhost", port=5432,
+    )
+    conn.autocommit = True
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql)
+            return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+@pytest.mark.skipif(not _PG_AVAILABLE, reason="PG 不可用")
+class TestTask29CanaryRealDb:
+    """canary 真库载荷验证。"""
+
+    def test_l1_adj_row_count(self) -> None:
+        """L1-adj-* 行数现算（LF-P42）。"""
+        rows = _pg_query("SELECT COUNT(*) AS n FROM checklist_responses WHERE item_id ~ '^L1-adj-'")
+        n = rows[0]["n"]
+        assert n == 32, f"L1-adj-* 应 32 行，实得 {n}"
+
+    def test_l1_adj_remark_all_non_null(self) -> None:
+        """L1-adj-* remark 全非空。"""
+        rows = _pg_query(
+            "SELECT COUNT(*) AS n FROM checklist_responses "
+            "WHERE item_id ~ '^L1-adj-' AND (remark IS NULL OR remark = '')"
+        )
+        assert rows[0]["n"] == 0, "L1-adj-* 应无空 remark"
+
+    def test_l1_adj_conclusion_all_null(self) -> None:
+        """L1-adj-* conclusion 全空（结构性零，LF-P43）。"""
+        rows = _pg_query(
+            "SELECT COUNT(*) AS n FROM checklist_responses "
+            "WHERE item_id ~ '^L1-adj-' AND conclusion IS NOT NULL AND conclusion != ''"
+        )
+        assert rows[0]["n"] == 0, "L1-adj-* conclusion 应全空"
+
+    def test_only_row1_has_real_values(self) -> None:
+        """只第 1 行有真数值（其余字段值为 '0'）。"""
+        rows = _pg_query(
+            "SELECT item_id, remark FROM checklist_responses "
+            "WHERE item_id ~ '^L1-adj-' ORDER BY item_id"
+        )
+        row1_fields = [r for r in rows if r["item_id"].startswith("L1-adj-1-")]
+        other_fields = [r for r in rows if not r["item_id"].startswith("L1-adj-1-")]
+        # 行 1 应有非零值
+        row1_non_zero = [r for r in row1_fields if r["remark"] not in ("0", None, "")]
+        assert len(row1_non_zero) > 0, "行 1 应有真数值"
+        # 其余行应全为 0
+        other_non_zero = [r for r in other_fields if r["remark"] not in ("0", None, "")]
+        assert len(other_non_zero) == 0, (
+            f"行 2~4 应全为 '0'，实有非零: {[r['item_id'] for r in other_non_zero]}"
+        )
+
+    def test_l6_l7_l8_zero_rows(self) -> None:
+        """L6/L7/L8 真库 0 行（结构性零）。"""
+        for code in ("L6", "L7", "L8"):
+            rows = _pg_query(
+                f"SELECT COUNT(*) AS n FROM checklist_responses WHERE item_id ~ '^{code}-'"
+            )
+            assert rows[0]["n"] == 0, f"{code} 真库应 0 行，实得 {rows[0]['n']}"
+
+    def test_l_domain_conclusion_all_zero(self) -> None:
+        """全 L 域 conclusion 非空 == 0。"""
+        rows = _pg_query(
+            "SELECT COUNT(*) AS n FROM checklist_responses "
+            "WHERE item_id ~ '^L[1-8]-' AND conclusion IS NOT NULL AND conclusion != ''"
+        )
+        assert rows[0]["n"] == 0, f"全 L 域 conclusion 非空应 0，实得 {rows[0]['n']}"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 23: footer 与幽灵行基线（LC-12）
+# Property: LF-P32, LF-P33
+# ═══════════════════════════════════════════════════════════════════════
+class TestTask23FooterAndGhostRows:
+    """footer 形态 + 幽灵行。"""
+
+    def test_program_sheet_footers_contain_page_number(self) -> None:
+        """8 册程序表 footer 含 &P/&N（LF-P32）。"""
+        for f in sorted(L_TEMPLATE_DIR.glob("*.xlsx")):
+            if "L0" in f.name:
+                continue
+            wb = load_workbook(f, read_only=False, data_only=False)
+            found_footer = False
+            for ws in wb.worksheets:
+                if "程序表" not in ws.title:
+                    continue
+                footer_text = ""
+                if ws.oddFooter:
+                    footer_text = str(ws.oddFooter)
+                if "&P" in footer_text and "&N" in footer_text:
+                    found_footer = True
+                    break
+            wb.close()
+            assert found_footer, f"{f.name} 程序表应有 &P/&N footer"
+
+    def test_ghost_rows_exist_and_l3_is_largest(self) -> None:
+        """幽灵行现算 + L3 审定表是最大（LF-P33）。"""
+        ghost_by_book: dict[str, tuple[int, str]] = {}
+        for f in sorted(L_TEMPLATE_DIR.glob("*.xlsx")):
+            if "L0" in f.name:
+                continue
+            wb = load_workbook(f, read_only=False, data_only=True)
+            max_ghost = 0
+            max_sheet = ""
+            for ws in wb.worksheets:
+                last_value_row = 0
+                for row in ws.iter_rows(min_row=1, max_row=ws.max_row):
+                    for cell in row:
+                        if cell.value is not None:
+                            last_value_row = max(last_value_row, cell.row)
+                ghost = ws.max_row - last_value_row
+                if ghost > max_ghost:
+                    max_ghost = ghost
+                    max_sheet = ws.title
+            wb.close()
+            ghost_by_book[f.name] = (max_ghost, max_sheet)
+        # L3 应有最大幽灵行
+        l3_ghost = ghost_by_book.get("L3 长期借款.xlsx", (0, ""))
+        assert l3_ghost[0] > 0, "L3 应有幽灵行"
+        max_ghost_book = max(ghost_by_book.items(), key=lambda x: x[1][0])
+        assert "L3" in max_ghost_book[0], (
+            f"L3 应有最大幽灵行，实际最大是 {max_ghost_book[0]} ({max_ghost_book[1][0]})"
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 24: 倒挤减法链与审定表结构登记（LC-20 / LC-21）
+# Property: LF-P40, LF-P41
+# ═══════════════════════════════════════════════════════════════════════
+class TestTask24InverseSumChainBaseline:
+    """倒挤减法链两形态各自非空，且只在国企版。"""
+
+    def test_l5_soe_has_subtract_own_table(self) -> None:
+        """L5 国企版有「减本表已列项」形态（LF-P40）。"""
+        wb = load_workbook(L_TEMPLATE_DIR / "L5 长期应付款.xlsx", read_only=False, data_only=False)
+        soe_sheets = [s for s in wb.sheetnames if "国企" in s and "附注" in s]
+        found = False
+        for sn in soe_sheets:
+            ws = wb[sn]
+            for row in ws.iter_rows():
+                for cell in row:
+                    v = str(cell.value) if cell.value else ""
+                    # 减本表：引用本表格 + 连续减号
+                    if f"'{sn}'" in v and v.count("-") >= 3:
+                        found = True
+        wb.close()
+        assert found, "L5 国企版应有减本表已列项形态"
+
+    def test_l6_soe_has_subtract_other_table(self) -> None:
+        """L6 国企版有「减对方表明细行」形态（LF-P40）。"""
+        wb = load_workbook(L_TEMPLATE_DIR / "L6 专项应付款.xlsx", read_only=False, data_only=False)
+        soe_sheets = [s for s in wb.sheetnames if "国企" in s]
+        found = False
+        for sn in soe_sheets:
+            ws = wb[sn]
+            for row in ws.iter_rows():
+                for cell in row:
+                    v = str(cell.value) if cell.value else ""
+                    # 减对方表：引用明细表 + 连续减号
+                    if "明细表" in v and v.count("-") >= 4:
+                        found = True
+        wb.close()
+        assert found, "L6 国企版应有减对方表明细行形态"
+
+    def test_l4_adjudication_has_sum_variants(self) -> None:
+        """审定表L4-1 有两种等价写法（=SUM 形态 / =B+C+D 形态）（LF-P41）。"""
+        wb = load_workbook(L_TEMPLATE_DIR / "L4 应付债券.xlsx", read_only=False, data_only=False)
+        ws = wb["审定表L4-1"]
+        sum_formula = False
+        add_formula = False
+        for row in ws.iter_rows():
+            for cell in row:
+                v = str(cell.value) if cell.value else ""
+                if v.startswith("=SUM("):
+                    sum_formula = True
+                if re.match(r"^=[A-Z]\d+\+[A-Z]\d+\+[A-Z]\d+$", v):
+                    add_formula = True
+        wb.close()
+        assert sum_formula, "审定表L4-1 应有 =SUM 形态"
+        assert add_formula, "审定表L4-1 应有 =B+C+D 形态"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 33: BP-7 notice 落位 L1 侧
+# Property: LC-14
+# ═══════════════════════════════════════════════════════════════════════
+class TestTask33NoticePlacement:
+    """L1 宿主已落位 GtEntrySyncCapabilityNotice。"""
+
+    def test_l1_host_has_notice_component(self) -> None:
+        """L1 宿主引用 GtEntrySyncCapabilityNotice（BP-7）。"""
+        host = L_TEMPLATE_DIR.parents[2] / "audit-platform" / "frontend" / "src" / "components" / "workpaper" / "GtL1ShortTermLoans.vue"
+        text = host.read_text("utf-8")
+        assert "GtEntrySyncCapabilityNotice" in text, (
+            "L1 宿主应引用 GtEntrySyncCapabilityNotice"
+        )
+        assert "entry-id=\"xlsx/gt-l1-short-term-loans\"" in text, (
+            "notice 应带正确的 entry-id"
+        )
+
+    def test_l1_host_imports_notice(self) -> None:
+        """L1 宿主 import notice 组件。"""
+        host = L_TEMPLATE_DIR.parents[2] / "audit-platform" / "frontend" / "src" / "components" / "workpaper" / "GtL1ShortTermLoans.vue"
+        text = host.read_text("utf-8")
+        assert "import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'" in text
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 35: LC-x 引用闭合性 + KC-17 不适用声明
+# Property: 全 Property 清单自检
+# ═══════════════════════════════════════════════════════════════════════
+class TestTask35LcReferenceClosure:
+    """LC-1 ~ LC-26 无缺号，且 KC-17 显式不适用。"""
+
+    def test_lc_numbers_are_continuous(self) -> None:
+        """LC-1~26 在 foundation design.md 无缺号无重号。"""
+        design = (pathlib.Path(__file__).resolve().parents[3]
+                  / ".kiro" / "specs" / "l-cycle-sync-foundation-and-first-canary" / "design.md")
+        text = design.read_text("utf-8")
+        import re as _re
+        lc_numbers = sorted(set(int(m.group(1)) for m in _re.finditer(r"### LC-(\d+)", text)))
+        assert lc_numbers == list(range(1, 27)), (
+            f"LC 编号应为 1~26 连续，实得 {lc_numbers}"
+        )
+
+    def test_kc17_explicitly_inapplicable(self) -> None:
+        """KC-17 被显式判为不适用（空分母）。"""
+        design = (pathlib.Path(__file__).resolve().parents[3]
+                  / ".kiro" / "specs" / "l-cycle-sync-foundation-and-first-canary" / "design.md")
+        text = design.read_text("utf-8")
+        assert "KC-17" in text, "design.md 应提及 KC-17"
+        # 应含不适用声明
+        kc17_idx = text.index("KC-17")
+        context = text[kc17_idx:kc17_idx + 500]
+        assert "不适用" in context or "❌" in context, (
+            "KC-17 应被标为不适用"
+        )
+
+    def test_each_lc_referenced_by_at_least_one_spec(self) -> None:
+        """每条 LC-x 至少被一份 spec 的 tasks.md 引用。"""
+        specs_dir = pathlib.Path(__file__).resolve().parents[3] / ".kiro" / "specs"
+        l_specs = [
+            specs_dir / "l-cycle-sync-foundation-and-first-canary",
+            specs_dir / "l2-l3-l4-orphan-twins-and-sheet-granularity-collapse",
+            specs_dir / "l5-l8-inert-switch-and-child-tab-carriers",
+        ]
+        import re as _re
+        all_refs: set[int] = set()
+        for spec_dir in l_specs:
+            for md_file in spec_dir.glob("*.md"):
+                text = md_file.read_text("utf-8")
+                for m in _re.finditer(r"LC-(\d+)", text):
+                    all_refs.add(int(m.group(1)))
+        missing = set(range(1, 27)) - all_refs
+        assert len(missing) == 0, f"LC 编号 {sorted(missing)} 未被任何 spec 引用"

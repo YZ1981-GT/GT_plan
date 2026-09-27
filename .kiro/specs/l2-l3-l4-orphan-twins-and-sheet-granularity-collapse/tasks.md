@@ -59,13 +59,13 @@
 
 ## 阶段 2：真库跨 entry 污染治理（Task 7 ~ 9）
 
-- [ ] 7. 污染现象现算与逐行登记
+- [x] 7. 污染现象现算与逐行登记
   - 按 **LC-22** 的判据形态查库：断言「任一 `item_id ~ '^L{n}-'` 的行，其 `wp_id` 对应 `wp_code` 以 `L{n}` 开头」
   - 逐行登记违例（`item_id` / 实际 `wp_code` / 项目 / 载荷长度），现算违例数与 `design.md` 等值
   - 🔴 **不断言成因**（测试残留 vs `wp_id` 解析错），只登记现象
   - _Property: LA-P10, LA-P11_
 
-- [ ] 8. 跨 entry 隔离守卫（覆盖 8 条全集）
+- [x] 8. 跨 entry 隔离守卫（覆盖 8 条全集）
   - 守卫覆盖 8 条 entry 而非只 L2，防同类复发
   - 🔴 守卫须**查库**，不只查代码（slice 的 `cross_entry_isolation` 只扫代码故漏掉）
   - _Property: LA-P12_
@@ -93,14 +93,14 @@
   - 引用 **LC-15** 断言它**不是**模式开关（须先剥注释）
   - _Property: LA-P17_
 
-- [ ] 13. 契约层区分方案（路线 A）
+- [x] 13. 契约层区分方案（路线 A）
   - `sheet_key = "{尾码}#{bondBranch 值}"`，契约登记两个分支的映射
   - 🔴 断言该键**不含** LC-10 的空格缺陷（路线 B 会把缺陷固化进契约，已排除）
   - 🔴 **模板改名明确排除**（会打断 render schema 与 prefill，须另立 spec）
   - 契约 `review.entry_id == 'xlsx/gt-l4-bonds-payable'`；🔴 不碰并发会话的 F3/F4/F5/H9 契约文件
   - _Property: LA-P18_
 
-- [ ] 14. 解析层 fail-closed 改造
+- [x] 14. 解析层 fail-closed 改造
   - 后端 sheet 解析在「多张同时 `endswith`」时**不再静默取第一个**，要求调用方带分支参数，否则返回明确错误
   - 🔴 **两侧都验**：歧义 entry 走新路径；无歧义 entry（L1/L2 等）**不受影响**
   - _Property: LA-P19_
@@ -134,13 +134,13 @@
 
 ## 阶段 5：正面样板与收尾（Task 19 ~ 22）
 
-- [ ] 19. rowId 正面样板抽取
+- [x] 19. rowId 正面样板抽取
   - 断言 `useL2Detail` / `useL2VoucherCheck` / `useL3VoucherCheck` 是全 L 域唯一按行身份删的模块（引用 **LC-6** 交叉验证）
   - 断言三个模块的 rowId 前缀**两两不同**（防串档）
   - 把其 rowId 生成形态抽为其余 entry 去位置化的**参考实现**，写入本 spec 产物
   - _Property: LA-P23, LA-P24_
 
-- [ ] 20. 模板层基线引用（不修）
+- [x] 20. 模板层基线引用（不修）
   - L2 两张附注披露的裸 IF 密度 / L2·L3·L4 程序表 footer 重复两次（引用 **LC-12**）/ L3 审定表幽灵行最大 / L4 宽表最宽 / L4 审定表结构（引用 **LC-21**）
   - 🔴 本 spec **只引用基线不修模板**
   - _Property: 引用 LF-P32, LF-P33, LF-P41_

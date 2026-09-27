@@ -10,12 +10,8 @@
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon> 带入调整
         </el-button>
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
+        <!-- BP-7 / AC 1.4：能力诚实披露（BP-4 inert 开关已摘除） -->
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-l7-other-noncurrent-liabilities" />
         <el-button size="small" @click="handleAI('adjudication')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -329,7 +325,7 @@ import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { useL7FormData } from '../../composables/useL7FormData'
-import { useL7DualMode } from '../../composables/useL7DualMode'
+import GtEntrySyncCapabilityNotice from '../../sync/GtEntrySyncCapabilityNotice.vue'
 import {
   useL7Adjudication,
   type L7AdjudicationRow,
@@ -379,12 +375,6 @@ const L7_SOURCE_HINTS: string[] = [
 const formData = useL7FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
-})
-
-// ─── DualMode ────────────────────────────────────────────────────────────────
-
-const dualMode = useL7DualMode({
-  wpId: computed(() => props.wpId),
 })
 
 // ─── 审定表行数据（5个项目行，对应xlsx row7~row11） ──────────────────────────
