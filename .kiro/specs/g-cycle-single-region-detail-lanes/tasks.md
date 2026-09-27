@@ -412,11 +412,22 @@ FC-1~FC-13 · F3 spec 裁决 F3-H4（行级 mask）· F5 spec（布尔/错误值
   - commit `24f54fd18`（26 文件）；证据：`evidence/task10-c9-g14-rootfix.md`
   - _Requirements: 1.2, 3.2, 4.2_
 
-- [ ] 11. G11（单级表头 + 21 行 + 占比列引合计行）
+- [x] 11. G11（单级表头 + 21 行 + 占比列引合计行）
   - `G11-detail-rows` / `id` / **R9 单级** / R10-30（九条最长）/ R31 `SUM(D10:D30)` /
-    `formula_columns=("F","G","J","K","L")`
+    ~~`formula_columns=("F","G","J","K","L")`~~ ⇒ 实测改为 **`("F","J","L")` + `auto_source=("G","K")`**
   - 🔴 G/K 占比列按 Task 5 的 P10 实测结论处置（位移 ⇒ 受管；不位移 ⇒ 改判 HTML-only）
   - 🔴 G11-2 是九条唯一主表自身命中裸 IF 的（44 格）⇒ 证据登记
+  - **已完成**（commit `23b310df9`，15 文件）。evidence `evidence/task11-c10-g11-rootfix.md`
+  - 🔴 **实测推翻本 Task 的列模型前提**：受管表自身 44 格裸 IF ⇒ 中性化把 `G`/`K` 的 `<f>`
+    摘掉（数据区逐格 21→0，`F`/`J`/`L` 保持 21）；`excel_materialize` 两条检查方向相反
+    ⇒ G/K 只能判 **`auto_source`**（同属 `PROTECTED_MODES`，保护力度不变），判 `formula`
+    必抛 `ProtectedRegionWriteError`。Task 5 的 `test_conclusion_g_and_k_stay_managed_as_formula_columns`
+    已改写为 `..._but_as_auto_source_not_formula`（P10「受管」成立，「受管为 formula_columns」不成立）
+  - 🔴 **前端零改动**（九条唯一）：13 个受管字段与模板列序 A..M 实测已对齐。三处不可照抄前四条：
+    行身份键 `id` / `generateId()` 后缀取 **4** 位（G9/G10/G8 取 3 位）/ **`seq` 是真列**（A10-A30 预填 1..21）
+  - 🔴 另修两条**判据自身**的缺陷：① `test_g11_provider_declares_footer_carries_total_formula`
+    扫 `vars(mod)` 实测 `[]` 假红（两模块结构）⇒ 改走 `managed_row_table_specs()`（第三次同类修正）
+    ② `test_g_provider_whitelist_contains_exactly_the_delivered_ones` 写死 `[g2]` ⇒ 改现算（GC-10）
   - _Requirements: 2.2, 3.3, 4.3_
 
 - [ ] 12. G13（父子行 + 布尔列 + 枚举相加 footer）
