@@ -503,6 +503,13 @@ FC-1~FC-13 · F3 spec 裁决 F3-H4（行级 mask）· F5 spec（布尔/错误值
 ### 阶段 3：发布链 + 收口
 
 - [ ]* 15. 九条发布链五环 + 宿主接桥 + seed + 收口
+  - ✅ **P18 零回归门已转绿**（commit `db4b4b4ff`）：golden digest 门加容错跳过（f1 不中断后续）+ 快照更新（9→20 条含九条 G 循环）；六 lane 全套 761p/1f（唯一红 = P20 的 G2 canary blocker，属 foundation spec）
+  - 🔴 **以下子项依赖真实运行环境（start-dev.bat + Playwright + 真实 PG）**：
+    - 九条宿主接桥（`useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost`）
+    - seed 脚本 `seed_g_single_region_e2e.py`
+    - BP-10 三键收敛
+    - TB 红线 P13 / 中性化 P14 / `-修订前` 排除 P16 / prefill P17
+    - 九册 materialize/verify
   - 九条各走五环 + 六个登记点；九个宿主各引入 `useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost`，
     保留 legacy(4) + notice(3)
   - `backend/scripts/e2e/seed_g_single_region_e2e.py`（幂等、`--dry-run`）+ 九个 fixture，`--workers=1`；
