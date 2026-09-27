@@ -463,6 +463,31 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="H6-2-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── H4 首个四级表头 + 三区块宽表（spec: h4-h8-sub-entry-lanes-…）──
+    #
+    # 🔴 与 H9/H6 的规模差异：**四级表头**（R8-R11）+ **49 有效列** + 三区块
+    #    （原值 E..AH / 减值准备 AI..AS / 期末净值 AT..AU）。H9 是 22 列单区块、
+    #    H6 是 16 列单区块。这是 `contracts.MAX_HEADER_ROWS` 从 3 扩到 4 之后的
+    #    首个真实消费者 —— schema 回退到 3 则本 entry 直接无法表达。
+    #
+    # 🔴 **18 个 template-only 列**（调整/审定块的数量列与单价列）：前端在那些位置
+    #    只有金额标量。映射闭合自检 = 31 映射 + 18 template-only == 49 有效列。
+    #    把金额标量映到数量列会把金额写进数量格，且单价公式 `=金额/数量` 立刻算出
+    #    荒谬单价 —— 该判定由 `useH4Detail.ts#L63` 注释 + `#L140` 算式定死，非命名推测。
+    #
+    # 🔴 **footer R28 之下还有不受管区域 R29-R34**（按类别 SUMPRODUCT 小计）——
+    #    H9/H6 的 footer 之下无内容；不显式登记，merge 可能把它们当数据行覆盖。
+    #
+    # 🔴 **2 条 `H4T` 子入口**（H4TabImpairment / H4TabRecoverable）按 AC 1.6 复用
+    #    本 adapter —— 不新建 adapter、不给子入口单独登记契约。
+    #
+    # 中性化函数与 G7/G2/H9/H6 共用一个，不新造、不加 adapter_id 字面量分支。
+    "h4.engineering_materials_detail": StoreMergePlan(
+        adapter_id="h4.engineering_materials_detail",
+        provider_module="phase5_h4_engineering_materials",
+        items=(StoreItemSpec(item_id="H4-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
 }
 
 

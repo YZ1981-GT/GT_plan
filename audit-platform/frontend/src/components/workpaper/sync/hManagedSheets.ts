@@ -83,6 +83,19 @@ export const H_MANAGED_SHEETS: readonly HManagedSheet[] = Object.freeze([
     excelName: '明细表H6-2',
     storeItemId: 'H6-2-rows',
   },
+  {
+    // 🔴 **受管但尚未接桥** —— 本条刻意只进 `H_MANAGED_SHEETS`，不进
+    //    `H_OO_WIRED_ROWS_CODES`。这正是这两个集合分开存在的理由：后端契约已交付
+    //    （四级表头 / 49 列 / 三区块），但宿主接桥是独立一步（H4 载体是
+    //    `formdata_composable`，flush 钩子要取 composable 的导出而非宿主内联函数）。
+    //    在接桥完成前声明「已接桥」会让用户点「在线编辑」时渲染 EditorHost 而桥未就绪。
+    entryId: 'xlsx/gt-h4-engineering-materials',
+    code: 'H4-2',
+    sheetKey: 'h402-managed',
+    kind: 'rows',
+    excelName: '明细表H4-2',
+    storeItemId: 'H4-2-rows',
+  },
 ] as const)
 
 /**

@@ -1776,6 +1776,54 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "`adapter_registered=False` 同 canary：BP-1~BP-3 属平台缺口，不手改 manifest。"
         ),
     },
+    # ── H4 首个四级表头 + 三区块宽表（spec: h4-h8-sub-entry-lanes-…）──
+    {
+        "contract_id": "h4.engineering_materials_detail",
+        "provider_module": (
+            "app.services.workpaper_sync.phase5_h4_engineering_materials"
+        ),
+        "delivered_by_task": "H4-four-level-header",
+        "pilot_class": "phase5_engineering_materials_detail",
+        "entry_id": "xlsx/gt-h4-engineering-materials",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "H/H4 工程物资.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "H 循环**第三条** entry，规模上是前两条的量级之外："
+            "🔴 **四级表头**（R8/R9/R10/R11）—— 这是 `contracts.MAX_HEADER_ROWS` 从 3 扩到 4 "
+            "之后的**首个真实消费者**（扩容见 commit 91933bd68，结清 Task 42 登记的 "
+            "UPSTREAM_DEBT_FOUR_LEVEL_HEADER_NOT_EXPRESSIBLE 欠账）；schema 回退到 3 "
+            "则本 entry 直接无法表达。H9/H6 都只是两级表头。"
+            "🔴 **49 有效内容列 + 三区块**（原值 E..AH / 减值准备 AI..AS / 期末净值 AT..AU），"
+            "对比 H9 的 22 列单区块与 H6 的 16 列单区块；max_column=67 是空列尾巴。"
+            "🔴 **18 个 template-only 列**，主体是**调整/审定块的数量列与单价列** —— "
+            "前端在那些位置只有金额标量。该映射**由代码定死不是命名推测**："
+            "`useH4Detail.ts#L63` 注释『调整（金额口径 AJE，对齐 Excel 核实情况）』+ "
+            "`#L140 auditedBegin = calcAuditedAmount(row.beginAmount, row.ajeBegin, 0)` "
+            "以金额为基。若把 `ajeBegin` 映到数量列 Q，回写会把金额写进数量格，"
+            "且单价公式 `=金额/数量` 立刻算出荒谬单价。"
+            "**覆盖闭合自检：31 映射 + 18 template-only == 49 有效列**，无重复无交叠"
+            "（落在契约 review.column_coverage_closure，判据可复算）。"
+            "🔴 **`ajeImpair` 是 store-only**：前端把减值调整压成一个字段，模板却是 "
+            "AM 期初调整 + AN 账项增加 + AO 账项减少三列且 AS 走 `=AP+AQ-AR`，"
+            "一对三无法确定分摊 ⇒ 不映射任何格，两侧口径差异写进 html_store_note。"
+            "🔴 **footer R28 之下还有不受管区域 R29-R34**（`A29='其中：'` + 5 行按类别 "
+            "SUMPRODUCT 小计，行标签取 =底稿目录!A9..A13）—— H9/H6 的 footer 之下无内容；"
+            "不显式登记（review.unmanaged_regions），merge 可能把它们当数据行覆盖，"
+            "一次就把分类小计整块写坏。"
+            "🔴 **2 条 `H4T` 子入口**（h4/impairment/H4TabImpairment.vue / H4TabRecoverable.vue）"
+            "按 AC 1.6 **复用本 entry 的 adapter** —— 不新建 adapter、不给子入口单独登记契约。"
+            "🔴 `H4-3-rows` 登记在 review.sibling_tables_not_managed：它是**另一张表**"
+            "（调整分录汇总 H4-3），不是本表的合计副本，也不在本轮受管面 —— "
+            "登记它是为了让后续批次不把它误当派生键跳过。"
+            "载体族：write/read 皆 `formdata_composable`（H9/H6 都是 host_inline）。"
+            "幻影码 `H4E` 是**真**幻影码（三条 finder 路径实测全空；程序表码是 `H4A` 不是 `H4E`），"
+            "与 `H6A`/`H10A` 那两个同时是真实程序表码的情形相反。"
+            "HD-7：H4 **无** TB 发布门（publishToTb 在 H4 链路 0 处；发布链首例是 H6）。"
+            "`adapter_registered=False` 同前两条：BP-1~BP-3 属平台缺口，不手改 manifest。"
+        ),
+    },
     # ── I6 canary（spec: i-cycle-sync-foundation-and-first-canary · Task 22）──
     {
         "contract_id": "i6.research_development_expense_detail",
@@ -1834,6 +1882,129 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "（BP-1~BP-3：instrumentation candidate / 人工审核契约 / approved bundle 三缺），"
             "供给就绪后真栈注册。🔴 capability 从 single_onlyoffice → bidirectional 只能由 "
             "`register_from_manifest()` 在注册成功后驱动，**禁止手改 manifest 文件**（IC-1）。"
+        ),
+    },
+    # ── I2（spec: i2-i4-i5-carrier-and-structure-exceptions · Task 17）────────
+    {
+        "contract_id": "i2.development_expenditure_detail",
+        "provider_module": (
+            "app.services.workpaper_sync.phase5_i2_development_expenditure"
+        ),
+        "delivered_by_task": "I2-lane2",
+        "pilot_class": "phase5_development_expenditure_detail",
+        "entry_id": "xlsx/gt-i2-development-expenditure",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "I/I2 开发支出.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "I 循环第二条（canary I6 之后）。选它先接的理由：**除 canary 外几何最简的单区表**"
+            "（单区无派生区 · 有效列 20 即 A..T · 数据 R13-22 十行 · footer R23）。"
+            "受管 sheet = `明细表I2-2`，🔴 **三级表头 R10/R11/R12**（header_rows=3，"
+            "各列 header_text 取该列最深非空标题 —— A/Q/S/T 在 R10 · B/G/H/I/L/M/P 在 R11 · "
+            "C/D/E/F/J/K/N/O 在 R12；照「统一取 leaf 行」会让 12 列取到 None）；"
+            "公式列 G·L·M·N·O·P·R（🔴 G 与 P 是**减两项**口径「期初+增加−计入资产−计入损益」，"
+            "抄成「期初+增加−减少」会漏一个减项）；UUID 列 U = 有效 20 + 1"
+            "（🔴 **不得放 62** —— max_column 61，有效与 max 之间 41 列全空，全 I 差距最大）。"
+            "🔴 **footer 非单一形态**：B..P 十四格纯 SUM，但 **R23 例外是 =P23-Q23** 套用行公式"
+            "（同 I3-2 R23 的 row_formula_applied，本表只此一格）⇒ roundtrip 判据不得对 footer "
+            "做统一形态假设。"
+            "🔴 **I2 是 I 循环唯一「双例外」entry**：①唯一**缺二级 UI 门控**"
+            "（宿主 isOoAvailable 与「仅结构化视图」tag 命中均 0 ⇒ OO 探测失败时切换按钮照样显示，"
+            "违反 AC 1.5；判据写「全 slice 都有二级门控」会在本条上静默恒真、恰好漏掉最严重那条）"
+            "②唯一**发布门不在 composable**（useI2Adjudication.ts 里 publishToTb **0 命中**，"
+            "门在 I2TabAdjudication.vue#L384 自建）⇒ 契约 gate_layer='host_tab'；"
+            "「I 循环 6/6 全有发布门」是 **entry 维度**成立的结论，判据按 composable 找门会假红。"
+            "🔴 **第三个例外：有第二写路径且是活代码** —— useI2FormData.ts（501 行）import "
+            "生产消费现算 **4**（宿主 + useI2Adjudication + useI2Impairment + "
+            "i2/core/I2TabAdjudication.vue）。对比 useI4FormData(394 行)/useI6FormData(448 行) "
+            "**双零消费**是死代码 ⇒ 三个文件名同型但只有 I2 那个是活的，一刀切「I 的 FormData "
+            "都是孤儿」会把 I2 的写路径删掉、保存静默失效。两条写路径打同一端点同一 item 形状 "
+            "{item_id, conclusion, remark}，注册 adapter 后不应分叉。"
+            "🔴 **主表键 I2-2-rows 是跨 lane 冻结键**：lane 1 的 useI1AdditionCheck.ts#L250-251 "
+            "读它且读法是 `?.remark ?? ?.conclusion` ⇒ ①不得改键名 ②不得在未通知 lane 1 的"
+            "情况下改 payload 列语义；i2ConsistencyModel.ts#L213 的前缀映射 "
+            "'I2-2-': ['I2-2-rows'] 也依赖它，改名会同时打断一致性检查前缀表。"
+            "🔴 **IC-12 全 I 最严重的 wp_index 问题落在本条**：真库 wp_index 里 `I2-1` "
+            "**一码两名两底稿** —— `商誉减值测试`（×1，业务上属 **I3**）与 `开发支出审定表`（×3）"
+            "指完全不同的底稿（比 H 的 H1-2 同底稿不同名严重）⇒ 契约 source_ref 只用 "
+            "{workbook_sha256, sheet_name}，**禁任何 wp_index 来源字段**。"
+            "🔴 **IC-5 两个 verdict 同属本 entry**：CD-5 主表无 impl 分类常量 ⇒ "
+            "NO_IMPL_CLASSIFICATION_BY_DESIGN/clean；CD-6 defaultPerCapitaPeers ⇒ "
+            "HARDCODED_SEED_ROW_COUNT_NO_SOURCE_REF/scanned_and_classified_not_a_defect"
+            "（不是缺陷 —— 「同业人均数」对照表的默认行数种子，模板本来就没有对应分类区间）。"
+            "status 维度上两者**不相加**。"
+            "🔴 **IC-6 在本 entry 命中 0** 且不是漏扫（8 个位置化 site 全在 lane 1 的 {I1,I3}）"
+            "⇒ 按 IC-20 断言「现算 0」但**不宣称该维度通过**。"
+            "**源模板真源断链登记不修**：明细表I2-2!A17 是字面「数据资源」（不是 =底稿目录!A18）"
+            "⇒ 改 A18 不传播；另 2 处同型在 I1 归 lane 1。不改模板字节。"
+            "IC-9 per-file 裸 IF **113**（I1 321 / I4 186 / I2 113 / I3 63 / I5 49 / I6 45，"
+            "总 777）⇒ 整册统一挂不行，最重与最轻差 7 倍。"
+            "真库 `I2-2-rows` **无行** ⇒ roundtrip 只能合成载荷。"
+            "`adapter_registered=False`：同 I6 卡 BP-1~BP-3 平台级缺口。"
+        ),
+    },
+    # ── I4（spec: i2-i4-i5-carrier-and-structure-exceptions · Task 17）────────
+    {
+        "contract_id": "i4.long_term_prepaid_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_i4_long_term_prepaid",
+        "delivered_by_task": "I4-lane2",
+        "pilot_class": "phase5_long_term_prepaid_detail",
+        "entry_id": "xlsx/gt-i4-long-term-prepaid",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "I/I4 长期待摊费用.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "I 循环第三条。受管 sheet = `明细表I4-2`，🔴 **三级表头 R8/R9/R10**（header_rows=3，"
+            "各列 header_text 取该列最深非空标题 —— A/B/C/D/E/T/U 在 R8 · F/G/J/K/L/O/P/S 在 R9 · "
+            "H/I/M/N/Q/R 在 R10）；数据 R11-22 十二行；footer R23 合计（E..S 各 =SUM(x11:x22)，"
+            "A/B/C/D/T/U 无合计）；公式列 J·O·P·Q·R·S（🔴 J 与 S 是**减两项**口径"
+            "「期初+增加−本期摊销−其他减少」）；UUID 列 W = 有效 22 + 1。"
+            "🔴 **双区（IC-19）**：第 2 区 `R24「其中：」+ R25-28` 四行是**派生区** —— A 列逐格 "
+            "`=底稿目录!A9`..`A12`、E..J 等列是 **ArrayFormula** 按 B 列类别回汇总第 1 区 ⇒ "
+            "标 `derived`、**不纳入业务行比对**（否则 roundtrip 会把「第 1 区改动引起的派生区重算」"
+            "判成用户编辑了派生区）；且 `editable_labels=false` —— 允许用户改标签会被下次 render "
+            "从 `底稿目录` 静默覆盖。"
+            "🔴 **本条与 I5 是 definedName「基线不增长」口径的唯一实证场**：本册 **476**"
+            "（全 I 最多；I5 334、其余四册 I1/I2/I3/I6 全 0，合计 810）⇒ 判据 SHALL 用"
+            "「登记基线 + 断言不增长」，**不得**照抄 H 循环 HC-14 的「断言全 0」—— 那在 "
+            "I1/I2/I3/I6 上恒真悄悄通过，**只有 I4/I5 会打红**。"
+            "🔴 **不删这 476 个**：是模板公式的命名引用，删了会让 max_column 内的公式整片失效；"
+            "只声明「同步时不新增、不改写」。"
+            "🔴 **BP-5 双零消费死代码禁接**：`useI4FormData.ts`（394 行）import 生产/测试消费"
+            "**双零**（按 import 路径字面量三形态现算，禁符号名 grep —— I 循环有 4 处注释链式"
+            "提及 dual-mode composable，符号名口径会把注释当消费边）。**对比 I2**："
+            "`useI2FormData.ts`（501 行）消费计数 **4** 是**活代码**（_doSave 内真 PUT = I2 的"
+            "第二写路径）—— 三个 FormData 文件名同型（i2/i4/i6）但**只有 I2 那个是活的**，"
+            "一刀切「I 的 FormData 都是孤儿」会把 I2 的写路径删掉、保存静默失效。"
+            "⇒ 契约 forbidden_carriers 禁接；🔴 **本轮不删文件**（跨 spec 清理动作，"
+            "与并发会话有冲突风险；禁接已足够防误用）。"
+            "🔴 **payload mode `dual_write` 未被真库证实**：slice 记 "
+            "dual_write_remark_and_conclusion_for_status_marker，但真库 I 循环 **7 行全部 "
+            "remark_only**（conclusion 全 NULL）⇒ 标 `unverified_in_live_db`，"
+            "**不得**把 slice 声明当已验证事实；落地时须断言写 conclusion 列**不破坏** "
+            "remark_only 读侧（I2 的第二写路径与 lane 1 的 useI1AdditionCheck 都读 conclusion 兜底）。"
+            "🔴 **CD-8 = BP-8②**：impl `CATEGORY_OPTIONS` **6 条** vs 源 `明细表I4-2!A11` 真读"
+            "**仅 1 条**（`使用权资产改良及维护支出`；A9/A10 空 + A12:A22 全空）⇒ verdict "
+            "PREFIX_MATCH_WITH_UNSOURCED_TAIL，无真源尾部 **3 条**（租入固定资产改良支出 / "
+            "固定资产大修理支出 / 开办费）。修法归**业务确认**（是否属长期待摊费用的合法分类是"
+            "会计判断）⇒ 本轮登记不修。"
+            "🔴 **删行 API 属 id 族**（`useI4Detail.ts#L672 removeRow(rowId: string)` 先 "
+            "findIndex 再 splice），与同 lane 的 I2 `removeRow(index: number)` 下标族不同 ⇒ "
+            "本 lane 是 **1:2 跨两族**，而 lane 1 两条 entry **100% 下标族** ⇒ 两个 lane "
+            "**不得复用同一个签名断言**，否则一边必然假红或假绿。"
+            "🔴 **IC-6 在本 entry 命中 0** 且不是漏扫（8 个位置化 site 全在 lane 1 的 {I1,I3}）；"
+            "**IC-18 derived_total_keys 现算 0** 且已裁非漏扫（I1 8 / I2 2 / I6 3 · I3/I4/I5 皆 0）"
+            "⇒ 两项均按 IC-20 空分母纪律断言「现算 0」但**不宣称该维度通过**。"
+            "**模板侧其他字段不进本契约**：`I4DetailRow` 的摊销政策族（amortizationMethod / "
+            "totalMonths / accAmortization / …）与基础族（occurDate / contractNo / startDate / …）"
+            "属 `摊销测算I4-6` 与 `摊销测算表I4-7（工作量法）` 两张后置 sheet"
+            "（🔴 后者禁 strip 括号）—— Requirement 6.1 禁止无来源自造字段。"
+            "IC-9 per-file 裸 IF **186**（全 I 第二重；I1 321 / I4 186 / I2 113 / I3 63 / "
+            "I5 49 / I6 45，总 777）⇒ 整册统一挂不行。"
+            "真库 `I4-2-rows` **无行** ⇒ roundtrip 只能合成载荷。"
+            "`adapter_registered=False`：同 I2/I6 卡 BP-1~BP-3 平台级缺口。"
         ),
     },
 )
