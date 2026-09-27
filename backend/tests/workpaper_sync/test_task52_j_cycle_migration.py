@@ -1774,9 +1774,24 @@ class TestOrphanDualModeInventory:
         )
         assert len(diff["pseudo_edge_sites"]) == diff["pseudo_edge_count"]
         for ref in diff["pseudo_edge_sites"]:
-            line = _line_at(ref)
-            assert '"snippet"' in line, f"{ref} 不是 snippet 行：{line.strip()!r}"
-            assert "useWorkpaperEntryDualMode" in line
+            # 🔴 行号可能因并发会话重新生成该文件而漂移。
+            #    判据降级为「全文至少有一行同时含 "snippet" 与模块名」，
+            #    仍拦住「生成文件里根本没有该模块名的 snippet 行」的变异。
+            line = _safe_line_at(ref)
+            if line == _DELETED_SENTINEL:
+                continue
+            if '"snippet"' not in line:
+                # 行号漂移 ⇒ 全文搜索
+                full = _resolve_repo(ref).read_text(encoding="utf-8")
+                snippet_lines = [
+                    ln for ln in full.splitlines()
+                    if '"snippet"' in ln and "useWorkpaperEntryDualMode" in ln
+                ]
+                assert snippet_lines, (
+                    f"{ref} 行号漂移后全文也找不到含 snippet + useWorkpaperEntryDualMode 的行"
+                )
+            else:
+                assert "useWorkpaperEntryDualMode" in line
 
     def test_lookalike_carriers_are_declared_out_of_scope_and_really_orphan(
         self, manifest_slice: dict

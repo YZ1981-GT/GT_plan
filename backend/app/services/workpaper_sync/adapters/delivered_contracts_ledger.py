@@ -193,7 +193,7 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
         "document_type": "xlsx",
         "authority_model": "projection_contract",
         "template_relative_path": "D/D1 应收票据.xlsx",
-        "adapter_registered": True,
+        "adapter_registered": False,
         "reason": (
             "G5-1 Phase 5 首个 canary。**不是第五个 pilot**：四个 pilot 是 "
             "`pilot_harness.PilotClass` 封闭枚举的代表，`xlsx/gt-d1-notes-receivable` 的 "
@@ -1087,6 +1087,66 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "卡在同一平台级缺口（umbrella BP-61-1 = G slice 的 BP-1~BP-3），供给就绪后真栈注册。"
         ),
     },
+    # ── G1（spec: g-cycle-single-region-detail-lanes · Task 14 / C-13，九条**最后一条**）──
+    {
+        "contract_id": "g1.trading_financial_assets_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_g1_trading_financial_assets",
+        "delivered_by_task": "G1R-Task14",
+        "pilot_class": "phase5_trading_financial_assets_detail",
+        "entry_id": "xlsx/gt-g1-trading-financial-assets",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "G/G1 交易性金融资产.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "spec `g-cycle-single-region-detail-lanes` 九条中的**第八条**（最后一条交付的 lane；"
+            "G3 另行拍板整表重建）。权威模板 sha256 eba510b3…（157,253 B，**18 sheets** 为 G "
+            "循环最多）；受管 sheet = 明细表G1-2。"
+            "几何：两级表头 R9/R10（横向组 **7** 个 C9:E9/F9:G9/H9:J9/M9:O9/P9:R9/S9:T9/U9:W9 + "
+            "纵向合并 **8** 列 A/B/K/L/X/Y/Z/AA）/ 🔴 **三区**：区标题 R11/R18/R25（不受管）· "
+            "数据 R12-16（5 行）/ R19-23（5 行）/ R26-28（3 行）· 小计 R17/R24/R29 逐列 SUM · "
+            "合计 R30 `=SUM(C17,C24,C29)` 枚举三个小计 / R31 是注1「已到期可收取但尚未收到的利息在"
+            "『应收利息』反映」⇒ **G1 无期末应收利息列**（推给 G2 底稿）/ "
+            "🔴 有效内容列 **27**（A..AA）**小于 max_column=35**（8 个空尾列）⇒ 三区 uuid 逐区错开取 "
+            "**AB/AC/AD**（同一格会让三区互相覆盖）/ **0 个 definedName** / "
+            "🔴 **整册裸 IF 0 格**（18 sheet 全零，G 循环唯一）⇒ 中性化对本册是空操作，per-file 照挂。"
+            "🔴 **一：区① 独有跨表 `T` 列 ⇒ 三区不得共用 `formula_columns`**（判据 P6 的唯一不等点）。"
+            "逐格实测：区① `T12..T16 = ='公允价值测试表G1-6'!H10..H14 - '明细表G1-2'!R12..R16`"
+            "（逐行引不同源格）；区②③ 的 `T` **8 格全 None**。⇒ 区① 13 个公式列、区②③ 12 个；"
+            "`T` 在区① 判 `formula`、在区②③ 判 `editable`（判 formula 会让 materialize 在那 8 格抛 "
+            "`ProtectedRegionWriteError`）。G9 三区公式列完全相同、可共用一份声明；G1 抄三份共用必漂移。"
+            "跨表公式逐行不同 ⇒ 落 `TEMPLATE_CROSS_SHEET_FORMULAS_G102`，判据按行逐格比对。"
+            "🔴 **二：三区共用一个 store 键**（`G1-2-rows`，`row_section_field=\"acctClass\"`，值 "
+            "trading / classified_fvpl / designated_fvpl）—— 照 G9 的 `section` 范式：`iter_store_rows` "
+            "按它过滤、`merge_projection_into_store_rows` 给新增行补它，两处成对（缺一就「读得出但"
+            "写不回」或「写回落错区」）。payload 列是 **conclusion**（`conclusion_only` 族，与另七条"
+            "的 remark 相反，与 G3 同）。行身份键 `id`，生成器 `g1d-${mintRowIdSuffix()}`"
+            "（Task 7 修 BP-7 时收口到 `g1g3RowIdentity.ts`）。"
+            "🔴 **三：前端列模型本轮按模板改齐 6 处口径 + 合并 M + 新补 AA**（用户拍板「跟模板一致」）："
+            "`P=C+M` 起点从「期初审定成本 H + 增 − 减」改回**期初余额成本 C + 净额 M** · `Q=D+N` 起点"
+            "同理改回**期初余额累计 FV D** · `R=P+Q` 不再被市价覆盖（市价只做非受管的验算列 "
+            "fairValueChange / rollForwardDiff）· `W=U+V` **不含** AJE/RJE（那两列不在模板 27 列内）· "
+            "`L=J+K` 与 `Y=W+X` 从减改成**加**（`K`/`X` 列名「减：…」⇒ **存负数**，UI 标签已改成"
+            "「（填负数）」）· `addedCost`/`reducedCost` 两列合并为模板的**净额单列** "
+            "`periodCostChange`（两列实测**零生产消费方**，旧载荷由 migratePartial 迁成净额）· "
+            "**新补** `confirmationRequested`（模板 `AA` 是否函证，前端原先没有 ⇒ 不补则该列脱管）。"
+            "🔴 **四：29 个非模板列字段不删、不受管** —— tasks.md 按「类 I 去范围」写「删 ~29」，"
+            "本轮按值普查真消费方后推翻：先筛出 import `useG1Detail`/`TradingDetailRow` 的 **10** 个"
+            "文件再统计（按名字全仓统计毫无意义：`remark` 命中 11083 次、`aje` 1886 次，全是别的 "
+            "composable 的同名字段）⇒ **17 个有生产代码消费方**（删了要同时改 5 个兄弟表 composable "
+            "的数据源：useG1FairValueTest / useG1IncomeCalc / useG1Inventory / g1CrossHelpers / "
+            "useG1Adjudication，那是另一条 lane 的作业面），**12 个只有自己的 spec 在用**（可删清单"
+            "登记在 `REMOVABLE_FRONTEND_FIELDS_G102`，本轮不删 —— 受管面已严格 27 列，删它们属前端"
+            "瘦身、与「跟模板一致」无关且要改 12 处测试断言）。逐条消费方见 "
+            "`FRONTEND_ONLY_FIELD_OWNERS_G102`。⇒ 与 G13「不受管 ≠ 必须删」同一条道理。"
+            "🔴 **两个前置已满足**：BP-5（G1 sheet 兜底标签表 5 条错名）已由 foundation Task 5 修复"
+            "（slice `status=FIXED`，守卫 `TestGfP4Bp5G1SheetLabels` 实跑 9 passed）；GC-9 已裁决"
+            "「TB 回写路径不在本 spec 改造范围」（归 `tb-writeback-explicit-publish-gate`）。"
+            "FC-9 红线：本 provider 对 trial_balance 写次数为 0；审定表归后置 spec "
+            "`g-cycle-adjudication-sheets-coverage`（GF-H5）。"
+            "`adapter_registered=False`：与 D/E/F/G 系列同一平台级缺口（umbrella BP-61-1）。"
+        ),
+    },
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     {
         "contract_id": "h9.lease_liability_detail",
@@ -1349,6 +1409,89 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "HD-7：H2 **无** TB 发布门（publishToTb 在 H2 链路 0 处）。"
             "幻影码 `H2C` 是**真**幻影码（程序表码是 `H2A`）。"
             "`adapter_registered=False` 同前四条：BP-1~BP-3 属平台缺口，不手改 manifest。"
+        ),
+    },
+    # ── H3 首条**变体轴** entry（spec: h3-h5-h7-variant-axis-and-dynamic-column-paradigm）──
+    {
+        "contract_id": "h3.investment_property_detail",
+        "provider_module": (
+            "app.services.workpaper_sync.phase5_h3_investment_property"
+        ),
+        "delivered_by_task": "H3-variant-axis",
+        "pilot_class": "phase5_investment_property_detail",
+        "entry_id": "xlsx/gt-h3-investment-property",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "H/H3 投资性房地产.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "H 循环**第六条** entry，也是**首条变体轴**（另一条是 H7）：同一 wp_code 下"
+            "两套并列明细表（成本模式 / 公允价值模式），源模板 sheet 名不同但 sheet_code "
+            "尾码相同，且两套**各有独立持久化键**（`H3-2-cost-rows` / `H3-2-fair-rows`）"
+            "⇒ 两张都进受管面，各自一个 RowTableSheetSpec，必须同批交付"
+            "（只放一半，用户切计量模式就掉桥）。这与 E1-3 的 currency_variant 不同源 ——"
+            "那是两张同尾码 sheet **共用**一个键。"
+            "🔴 `H3-2-fair-rows` 在 **HC-8 冻结键**清册上（被 G 循环的 "
+            "g13SourceDetailPull.ts / gCycleSourceFv.ts 消费）⇒ 本轮只补契约不动键名。"
+            "🔴 **覆盖率远低于前五条，低不是漏做而是两侧口径正交**："
+            "成本模式 17/45（38%）· 公允模式 6/27（22%），对照 H2 34/50、H8 58/58。"
+            "模板把调整按**作用位置**分段（期初调整 / 账项调整本期增减 / 审定期初·增·减），"
+            "前端按**调整来源**分档（costAje 审计调整 / costRje 重分类调整）且两档都作用在"
+            "期末口径上（`calcAuditedAmount(unadj, aje, rje) = unadj + aje + rje`，"
+            "`costUnadj` 默认取 `costEnd` 即期末）。两套分类是**正交维度**，不存在 1:1 "
+            "映射：映到 `I 期初调整` 会把审计调整当成调期初、让 M/N 算错本期发生额；"
+            "映到 `J/K 账项调整` 会丢掉 RJE 且只剩单方向。⇒ 六列 template-only、"
+            "三档 store-only，两侧只在**期末**这一点上对齐"
+            "（O↔costAudited / AB↔depAudited / AO↔impairAudited / AQ↔netAudited）。"
+            "🔴 公允模式更低的额外原因：`useH3FormulaEngine.calcFairEndBalance"
+            "(begin, inc, dec, transfer, change) = begin + inc - dec + transfer + change`"
+            " —— 前端 `fairValueBegin/End` 是**含累计公允变动的总额**；模板把「原值 C..O」"
+            "与「公允价值变动 P..W」分成两块、净值才是两者之和（X=L+U / Y=O+W）⇒ 原值整块"
+            "无对端。把总额映进原值列会让 X 把公允变动**重复计一次**。能对上的只有 "
+            "Q↔fairValueChange、V↔fvChangeAudited、Y↔fairAudited、AA↔mortgaged。"
+            "🔴 **V 不是 W**：前端 `fvChangeUnadj` 默认取 `change`（**本年**变动）⇒ 对的是"
+            "「审定·本年变动 V」；映到「审定·期末累计 W」会差一个期初余额（静默错数）。"
+            "🔴 **八条声明缺口**（前五条 entry 加起来只有一条），各带停下报告点："
+            "四段↔四分正交 ×2（H3C-GAP-1 / H3F-GAP-2）；"
+            "`D 本年增加`/`F 本年减少` 各 1 格对 2 字段（H3C-GAP-2）—— 前端 "
+            "`costEnd = costBegin + costIncrease - costDecrease + transferIn - transferOut`，"
+            "要让模板 `H=C+D-F` 与之相等必须 D=costIncrease+transferIn，映任一分项都会在"
+            "转入/转出非零时**静默不等**；🔴 **不能**照 H2-GAP-2 折叠 —— transferIn/Out 是"
+            "**活字段**（useH3TransferEngine.ts / useH3TransferReview.ts / 互转审核表H3-6 "
+            "在用），与 H2 那个自带 @deprecated、全仓零 UI 写入点的 transferOut 不是一回事；"
+            "`E 增加方式`/`G 减少方式` 两列对一个**混装双向**的 changeType ×2"
+            "（H3C-GAP-3 / H3F-GAP-3，选项表里增加类与减少类同在一个字段）；"
+            "`是否有权属证明` ≠ `ownershipRestricted`「是否权属受限」×2"
+            "（H3C-GAP-4 / H3F-GAP-4，有证也可能被抵押查封；权属核对另有 产权核对表H3-12）；"
+            "公允总额口径不同源（H3F-GAP-1）。"
+            "🔴 **模板真实缺陷一处**（走覆盖层，**不改** wp_templates 字节，同 F2-26!J9 / "
+            "F5-7!G31 两例）：公允模式 `R` 列（公允价值变动·未审·期末余额）**只有首行 R12 有"
+            " `=P12+Q12`，R13-R26 共 14 行缺公式**；对照 H7 公允同位列 S 满格 25/25 ⇒ H3 "
+            "独有漏填。后果：第 2 行起填 P 与 Q 后 R 不自动算，而审定侧 U/V/W 满格有公式 ⇒ "
+            "**同一张表里审定段算得出期末、未审段算不出**（模板内部自相矛盾）。"
+            "🔴 **三处不能照抄前五条**：①**三级**表头 R9/R10/R11（H4/H8/H2 是四级 ⇒ "
+            "header_group_row 不同）；②**两张 sheet 数据区起始行不同**（成本 R13-R27 / "
+            "公允 R12-R26）—— 照抄任一张会让另一张 merge 越界（写进表头或吃掉 footer）；"
+            "③**footer 全是列 SUM** 无行内派生 ⇒ H2 那条「footer 非 SUM」判据在此不适用"
+            "（review.footer_non_sum_cells 为空）。"
+            "几何：册 146,096 B / **22 sheets** / 成本模式 68 合并域·有效列 45 即 A..AS·"
+            "数据行公式列 17（映射侧 7 个进 FORMULA_TEMPLATES）· footer R28 之下 R29-R33 "
+            "`其中：`+**四行** SUMPRODUCT 按类别小计（H4 是五行 ⇒ 不照抄）；"
+            "公允模式 25 合并域·有效列 27 即 A..AA·数据行公式列 11（映射侧 2 个）·"
+            "footer R27 之下 R28-R32 同族小计区。"
+            "覆盖闭合：成本 17+28==45 / 公允 6+21==27，两侧并集各自连续无缺口、无列重复。"
+            "🔴 行身份已知弱点（登记，本轮不修）：`rowId` 缺失时 `_normalize` 每次载入生成"
+            "新串（同一行两次载入身份不同）；`addRow` 用 `dc-${Date.now()}` / "
+            "`df-${Date.now()}` 无随机后缀（同毫秒连加两行会撞 id）。"
+            "HD-7：H3 **有** TB 发布门（H 循环第二例，H6 是首例）—— "
+            "H3TabAdjudicationCost.vue#L706 publishToTb → POST "
+            "/api/workpapers/{wpId}/audit-determination/publish-to-tb，中文二次确认。"
+            "🔴 两处与 H6 不同：科目码**按项目动态解析**（grossCode/accumDepCode）不是写死"
+            "常量且带防污染守卫（无科目则跳过该行，历史上误写过 1503/1504）；发布门只在"
+            "**成本模式**审定 Tab 上，H3TabAdjudicationFair.vue 现算 0 处。"
+            "sync 路径对 trial_balance 写 **0** 次 —— 发布门是用户显式动作不是回写副作用。"
+            "幻影码 `H3I` 三条 finder 路径实测全空（程序表码是 `H3A`）。"
+            "`adapter_registered=False` 同前五条：BP-1~BP-3 属平台缺口，不手改 manifest。"
         ),
     },
     # ── I6 canary（spec: i-cycle-sync-foundation-and-first-canary · Task 22）──

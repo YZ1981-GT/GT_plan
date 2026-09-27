@@ -2250,8 +2250,19 @@ def _real_registration_ids() -> set[str]:
                 ).scalar_one()
                 registry = RG.build_production_registry()
                 outcome = await registry.register_from_manifest(session=session)
-                assert len(outcome.reasons) + len(outcome.registered_entry_ids) == len(
+                # 🔴 三集合（注册成功 + 拒绝理由 + 域异常失败）的 entry_id 互不相交且并集 == 计划
+                n_accounted = (
+                    len(outcome.reasons)
+                    + len(outcome.registered_entry_ids)
+                    + len(getattr(outcome, "failures", {}))
+                )
+                assert n_accounted == len(
                     outcome.planned_entry_ids
+                ), (
+                    f"注册结果不自洽：reasons({len(outcome.reasons)}) + "
+                    f"registered({len(outcome.registered_entry_ids)}) + "
+                    f"failures({len(getattr(outcome, 'failures', {}))}) = {n_accounted} "
+                    f"≠ planned({len(outcome.planned_entry_ids)})"
                 )
                 assert pointer_rows >= 0
                 return set(outcome.registered_adapter_ids)

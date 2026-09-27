@@ -1473,6 +1473,11 @@ def available_contract_ids() -> tuple[str, ...]:
     以 `_` 开头的文件是 schema 文档与**候选**示例（`review_status="candidate"`，会被
     :func:`parse_contract` 拒绝），不参与生产清册 —— 否则它们会被 registry 报成
     「有契约文件但没有 adapter」的伪欠账。
+
+    🔴 **stem 含 `.candidate` 的文件也排除**（2026-09-27）：并发会话的 K/L 循环 candidate
+    用 `k8.selling_expenses_adjustment.candidate.json` 命名（不带 `_` 前缀），原过滤条件
+    漏掉它们 ⇒ 守卫报成正式契约与台账不符的假红。candidate 的 `review_status="candidate"`
+    在 `parse_contract` 里被拒，即使扫进来也不能注册 —— 排除是正确的。
     """
     if not CONTRACTS_DIR.is_dir():
         return ()
@@ -1481,6 +1486,7 @@ def available_contract_ids() -> tuple[str, ...]:
             path.stem
             for path in CONTRACTS_DIR.glob("*.json")
             if not path.stem.startswith("_")
+            and ".candidate" not in path.stem
         )
     )
 
