@@ -1,0 +1,392 @@
+{
+  "contract_id": "i2.development_expenditure_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "db3a4c87338f1ffcf9fbee8983cd62554ed7a289d040c7fb7cf24ccd058b94a9",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "carrier": {
+      "force_component_type": "i2-development-expenditure",
+      "gate_layer": "host_tab",
+      "host_checklist_get_hits": 0,
+      "mounts": 2,
+      "read": "host_inline_render_config_refetch",
+      "tb_publish_gate": "i2/core/I2TabAdjudication.vue#L384",
+      "write": "host_inline",
+      "write_client": "http"
+    },
+    "classification": {
+      "impl_constant": null,
+      "status": "clean",
+      "verdict": "NO_IMPL_CLASSIFICATION_BY_DESIGN"
+    },
+    "classification_extra": {
+      "impl_constant": "defaultPerCapitaPeers",
+      "note": "「同业人均数」对照表的默认行数种子，模板里本来就没有对应分类区间 ⇒ 无真源是设计而非漏登记。🔴 与 CD-5 同属 I2 但是两个 verdict，status 维度不相加。",
+      "status": "scanned_and_classified_not_a_defect",
+      "verdict": "HARDCODED_SEED_ROW_COUNT_NO_SOURCE_REF"
+    },
+    "defined_name_baseline": 0,
+    "derived_total_keys": [
+      "I2-1-audited-total",
+      "I2-15-supplement-total"
+    ],
+    "effective_columns": 20,
+    "entry_id": "xlsx/gt-i2-development-expenditure",
+    "footer_shape_facts": {
+      "empty_columns": [
+        "D",
+        "Q",
+        "S",
+        "T"
+      ],
+      "note": "同一 footer 行两种约定：14 格纯 SUM + 1 格套用行公式（同 I3-2 R23 的 row_formula_applied 形态，但本表只有 R 一格）⇒ 按单一约定校验会有一格假红。",
+      "pure_sum_columns": [
+        "B",
+        "C",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I",
+        "J",
+        "K",
+        "L",
+        "M",
+        "N",
+        "O",
+        "P"
+      ],
+      "row_formula_applied_columns": [
+        "R"
+      ],
+      "row_formula_applied_detail": "R23 = =P23-Q23（套用行公式，非 SUM）"
+    },
+    "frozen_cross_ref": {
+      "I2-2-rows": [
+        "composables/useI1AdditionCheck.ts#L250-251（remark 优先 / conclusion 兜底，跨 entry）",
+        "composables/i2ConsistencyModel.ts#L213（前缀映射 'I2-2-': ['I2-2-rows']）"
+      ]
+    },
+    "frozen_key": true,
+    "frozen_reason": "lane 1 的 useI1AdditionCheck.ts#L250-251 跨 entry 读它（remark 优先 / conclusion 兜底）；i2ConsistencyModel.ts#L213 的前缀映射 'I2-2-': ['I2-2-rows'] 也依赖它 ⇒ 改键名会同时打断跨 lane 消费边与一致性检查前缀表。",
+    "gate_layer": "host_tab",
+    "gate_layer_note": "全 I 唯一发布门不在 composable：useI2Adjudication.ts 里 publishToTb 0 命中，门在 I2TabAdjudication.vue#L384 自建 ⇒ 判据按 composable 找门会让本条假红。「I 循环 6/6 全有发布门」是 entry 维度成立的结论。",
+    "html_store": {
+      "item_ids": [
+        "I2-2-rows"
+      ],
+      "note": "I2 开发支出的结构化 Tab 行数据存成 checklist_responses 的 **remark** JSON 数组。本契约按 stable field + 行身份 `rowId` 拆开。🔴 13 个受管字段；7 个公式列（G/L/M/N/O/P/R）在 `I2DetailRow` 里虽有同名字段（unadjEnding / auditedOpening / … / diffVsIA）但都是**前端按同一套公式重算的派生值**（行类型注释逐条标了「公式 G = B+C-E-F」）⇒ 只进 formula_columns 不进 field_specs，formula_mask 保证 OO 侧不被 HTML 的派生值覆盖。🔴 `I2DetailRow` 另有 40+ 个 @deprecated 别名与跨 sheet 兼容字段（capBeginAmount / transferToI1 / auditedEnd 等）—— 它们**不进契约**（既非模板列亦非受管语义）。🔴 本 entry 有**第二写路径** `useI2FormData.ts#L185`（活代码，消费计数 4），两条写路径打同一端点同一 item 形状 ⇒ 注册 adapter 后不应分叉。",
+      "payload_column": "remark",
+      "payload_column_mode": "remark_only",
+      "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useI2Detail.ts —— `_persist()` 经宿主 onSave 写 { item_id: 'I2-2-rows', remark: JSON.stringify(rows) }；🔴 另有第二写路径 useI2FormData.ts#L185 的 api.put（活代码，同端点同 item 形状）",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "max_column": 61,
+    "oo_flags": {
+      "http_import": 1,
+      "isOoAvailable": 0,
+      "legacyOO": 5,
+      "structured_only_switch": 0
+    },
+    "pilot_class": "phase5_development_expenditure_detail",
+    "positional_identity_note": "IC-6 在本 entry 现算 0 且不是漏扫（8 个 site 全在 lane 1 的 {I1, I3}）。按 IC-20 空分母纪律：断言「现算 0」但不宣称该维度通过。",
+    "positional_identity_sites": [],
+    "reviewed_basis": "openpyxl 逐格实测 I/I2 开发支出.xlsx 的 `明细表I2-2`（🔴 **三级**表头 R10/R11/R12 ⇒ header_rows=3；各列 header_text 取该列最深非空标题（A/Q/S/T 在 R10 · B/G/H/I/L/M/P 在 R11 · C/D/E/F/J/K/N/O 在 R12，照「统一取 leaf 行」会让 12 列取到 None）/ 数据 R13-22 十行 / footer R23 合计（B..P 各 =SUM(x13:x22) 但 🔴 **R23 例外是 =P23-Q23** 套用行公式）/ 公式列 G·L·M·N·O·P·R（G 与 P 是**减两项**口径 期初+增加−计入资产−计入损益，抄成「期初+增加−减少」会漏一个减项）/ 有效内容列 20 即 A..T / max_column 61（差 41 列全空，全 I 最大 ⇒ UUID 放 U 不放 62）/ 92 公式 / merged 21 / 裸 IF 113（findall 口径）/ 0 个 definedName / 无 Excel Table / ws.protection.sheet=False ⇒ 数据行 locked 全惰性） + 前端 `useI2Detail.ts` 按值 grep（ITEM_ID_ROWS='I2-2-rows' / 身份字段 rowId / removeRow(index: number) 属**下标族** / I2DetailRow 的核心 13 字段 + 40+ deprecated 别名） + 真库现算（checklist_responses.item_id='I2-2-rows' **无行** ⇒ roundtrip 只能合成载荷）",
+    "second_write_path": "composables/useI2FormData.ts#L185",
+    "second_write_path_note": "501 行、import 生产消费现算 4（宿主 + useI2Adjudication + useI2Impairment + i2/core/I2TabAdjudication.vue）⇒ **活代码**。对比 useI4FormData(394 行) 与 useI6FormData(448 行) 双零消费是死代码 —— 三个文件名同型但只有本条是活的，一刀切会把 I2 的写路径删掉、保存静默失效。两条写路径打同一端点同一 item 形状。",
+    "secondary_ui_gate": false,
+    "secondary_ui_gate_note": "全 I 唯一缺二级门控：宿主 isOoAvailable 与「仅结构化视图」tag 命中均 0 ⇒ OO 探测失败时切换按钮照样显示。判据写「全 slice 都有二级门控」会在本条上静默恒真。",
+    "store_only_fields": [],
+    "tb_publish_gate": "i2/core/I2TabAdjudication.vue#L384",
+    "template_cell_lock_facts": {
+      "note": "ws.protection.sheet=False ⇒ locked 标志惰性。契约 mode 一律按「该格逐行有没有真公式」判，merge._protection 只看契约 mode + formula_mask。",
+      "sheet_protection_enabled": false
+    },
+    "template_only_columns": [
+      {
+        "column": "G",
+        "header_text": "期末数（未审）"
+      },
+      {
+        "column": "L",
+        "header_text": "期初数（审定）"
+      },
+      {
+        "column": "M",
+        "header_text": "本期增加（审定）"
+      },
+      {
+        "column": "N",
+        "header_text": "计入无形资产/存货（审定减少）"
+      },
+      {
+        "column": "O",
+        "header_text": "计入当期损益（审定减少）"
+      },
+      {
+        "column": "P",
+        "header_text": "期末数（审定）"
+      },
+      {
+        "column": "R",
+        "header_text": "差异"
+      }
+    ],
+    "template_source_break": [
+      "明细表I2-2!A17 是字面「数据资源」（不是 =底稿目录!A18）⇒ 改 A18 不传播（不改模板字节）"
+    ],
+    "uuid_column": "U",
+    "uuid_column_note": "有效 20 + 1 = U。🔴 不得放 62 —— max_column 是 61，有效与 max 之间 41 列全空（全 I 差距最大），放 62 会让 OO 打开后列宽错位。",
+    "variant_axis": null,
+    "wp_index_hazard": "🔴 I2-1 一码两名两底稿：真库 wp_index 里同时对应 `商誉减值测试`（×1，业务上属 I3）与 `开发支出审定表`（×3）⇒ 契约 source_ref 只用 {workbook_sha256, sheet_name}，禁任何 wp_index 来源字段；变异「用 wp_index 的 I2-1 反查底稿」会取到 I3 的底稿。"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "明细表I2-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "i22-managed",
+      "tables": [
+        {
+          "anchor": "A10",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "project_name",
+              "header_source_ref": "源xlsx!明细表I2-2!A12",
+              "header_text": "研究开发项目名称",
+              "json_pointer": "/rows/{row_uuid}/projectName",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I2-2!A13",
+              "stable_field_key": "development_expenditure_rows/{row_uuid}/project_name",
+              "store_item_id": "I2-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "unadj_opening",
+              "header_source_ref": "源xlsx!明细表I2-2!B12",
+              "header_text": "期初数",
+              "json_pointer": "/rows/{row_uuid}/unadjOpening",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I2-2!B13",
+              "stable_field_key": "development_expenditure_rows/{row_uuid}/unadj_opening",
+              "store_item_id": "I2-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "unadj_increase",
+              "header_source_ref": "源xlsx!明细表I2-2!C12",
+              "header_text": "金额",
+              "json_pointer": "/rows/{row_uuid}/unadjIncrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I2-2!C13",
+              "stable_field_key": "development_expenditure_rows/{row_uuid}/unadj_increase",
+              "store_item_id": "I2-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "increase_method",
+              "header_source_ref": "源xlsx!明细表I2-2!D12",
+              "header_text": "增加方式",
+              "json_pointer": "/rows/{row_uuid}/increaseMethod",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I2-2!D13",
+              "stable_field_key": "development_expenditure_rows/{row_uuid}/increase_method",
+              "store_item_id": "I2-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "unadj_dec_to_ia",
+              "header_source_ref": "源xlsx!明细表I2-2!E12",
+              "header_text": "计入无形资产/存货",
+              "json_pointer": "/rows/{row_uuid}/unadjDecToIA",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I2-2!E13",
+              "stable_field_key": "development_expenditure_rows/{row_uuid}/unadj_dec_to_ia",
+              "store_item_id": "I2-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "unadj_dec_to_pl",
+              "header_source_ref": "源xlsx!明细表I2-2!F12",
+              "header_text": "计入当期损益",
+              "json_pointer": "/rows/{row_uuid}/unadjDecToPL",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I2-2!F13",
+              "stable_field_key": "development_expenditure_rows/{row_uuid}/unadj_dec_to_pl",
+              "store_item_id": "I2-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "opening_adj",
+              "header_source_ref": "源xlsx!明细表I2-2!H12",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/openingAdj",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I2-2!H13",
+              "stable_field_key": "development_expenditure_rows/{row_uuid}/opening_adj",
+              "store_item_id": "I2-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "aje_increase",
+              "header_source_ref": "源xlsx!明细表I2-2!I12",
+              "header_text": "本期增加",
+              "json_pointer": "/rows/{row_uuid}/ajeIncrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I2-2!I13",
+              "stable_field_key": "development_expenditure_rows/{row_uuid}/aje_increase",
+              "store_item_id": "I2-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "aje_dec_to_ia",
+              "header_source_ref": "源xlsx!明细表I2-2!J12",
+              "header_text": "计入无形资产/存货",
+              "json_pointer": "/rows/{row_uuid}/ajeDecToIA",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I2-2!J13",
+              "stable_field_key": "development_expenditure_rows/{row_uuid}/aje_dec_to_ia",
+              "store_item_id": "I2-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "aje_dec_to_pl",
+              "header_source_ref": "源xlsx!明细表I2-2!K12",
+              "header_text": "计入当期损益",
+              "json_pointer": "/rows/{row_uuid}/ajeDecToPL",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I2-2!K13",
+              "stable_field_key": "development_expenditure_rows/{row_uuid}/aje_dec_to_pl",
+              "store_item_id": "I2-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              },
+              "column_key": "related_ia_audited_end",
+              "header_source_ref": "源xlsx!明细表I2-2!Q12",
+              "header_text": "无形资产/存货科目记录期末审定数",
+              "json_pointer": "/rows/{row_uuid}/relatedIAAuditedEnd",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I2-2!Q13",
+              "stable_field_key": "development_expenditure_rows/{row_uuid}/related_ia_audited_end",
+              "store_item_id": "I2-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "S",
+                "row_from": "row_identity"
+              },
+              "column_key": "rd_progress",
+              "header_source_ref": "源xlsx!明细表I2-2!S12",
+              "header_text": "截至期末的研发进度",
+              "json_pointer": "/rows/{row_uuid}/rdProgress",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I2-2!S13",
+              "stable_field_key": "development_expenditure_rows/{row_uuid}/rd_progress",
+              "store_item_id": "I2-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "T",
+                "row_from": "row_identity"
+              },
+              "column_key": "remark",
+              "header_source_ref": "源xlsx!明细表I2-2!T12",
+              "header_text": "备注",
+              "json_pointer": "/rows/{row_uuid}/remark",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I2-2!T13",
+              "stable_field_key": "development_expenditure_rows/{row_uuid}/remark",
+              "store_item_id": "I2-2-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "G13:G22",
+            "L13:L22",
+            "M13:M22",
+            "N13:N22",
+            "O13:O22",
+            "P13:P22",
+            "R13:R22"
+          ],
+          "header_rows": 3,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "development_expenditure_rows",
+          "uuid_col": "U"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "c7cf2ac6989c5b771905c5fb3c7bb6c5acd78c431e6120121b50512446caa781",
+    "relative_path": "I/I2 开发支出.xlsx",
+    "template_sha256": "a93c298b1f4adfe28532ba899a9e44904459534c703158a5b4e6d92ca4d67178"
+  },
+  "template_definition_sha256": "70bad0f2af8107d54d34836091a79923c5141bf84e7b67bb3cec960fbb08fbd7"
+}

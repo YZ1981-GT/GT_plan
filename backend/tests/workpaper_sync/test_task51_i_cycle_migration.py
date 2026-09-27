@@ -116,6 +116,24 @@ SHARED_BASE = COMPOSABLES / "useWorkpaperEntryDualMode.ts"
 NOTE_TEMPLATE_SOE = DATA / "note_template_soe.json"
 NOTE_TEMPLATE_LISTED = DATA / "note_template_listed.json"
 
+def _delivered_contracts_by_entry_ids(entry_ids: set[str]) -> dict[str, str]:
+    """平台交付台账里 `entry_id ∈ entry_ids` 的 `{contract_id: entry_id}`。
+
+    🔴 台账是**唯一**可为「本 slice 已交付契约」开白名单的来源 ——
+    `test_task13_contract_registry` 对它双向锁死（每条须有真实 `provider_module`、
+    磁盘文件存在、entry 在 source-backed manifest 里），故白名单不可伪造。
+    """
+    from app.services.workpaper_sync.adapters.delivered_contracts_ledger import (
+        DELIVERED_PER_ENTRY_CONTRACTS,
+    )
+
+    return {
+        str(row["contract_id"]): str(row["entry_id"])
+        for row in DELIVERED_PER_ENTRY_CONTRACTS
+        if str(row.get("entry_id", "")) in entry_ids
+    }
+
+
 #: AC 1.3 的能力态枚举（真源在范式 JSON 的 adjudication_criteria.capability_enum）。
 CAPABILITY_ENUM = ("bidirectional", "single_html", "single_onlyoffice", "unreachable")
 #: step 3 的二值结论（真源在范式 JSON 的 anti_patterns[AP-1].allowed_verdict_values）。
@@ -1936,20 +1954,78 @@ class TestOrphanComposablesAndPseudoConsumers:
 # 判据七：Property 20 / 21 —— 分母为空，**不宣称通过**
 # ════════════════════════════════════════════════════════════════════════════
 class TestProperty20And21NotClaimed:
-    """只断言两件可复核的事：① 前提成立（本 slice contract 数 = 0）；② 承载者存在。
+    """① 前提（本 slice 的契约交付状态）；② 承载者存在。
 
-    🔴 前提一旦不成立（有人给 I entry 发了契约），这里立刻打红，要求在此补齐字段级判据。
+    🔴 **2026-09-27 前提已改变，按本类原定的指示补齐了字段级判据**：
+
+    原 docstring 写「前提一旦不成立（有人给 I entry 发了契约），这里立刻打红，
+    **要求在此补齐字段级判据**」。三份 I spec 的契约任务已交付 **6/6** 条 I 契约
+    （`i-cycle-sync-foundation-and-first-canary` Task 22 + 两份 lane spec 的契约任务）
+    ⇒ 本类照该指示从「断言零契约」改为**逐契约的字段级判据**。
+
+    🔴 **Property 20/21 仍然「不宣称通过」** —— 它们要的是 roundtrip 与人工审核
+    （卡 BP-1~BP-4：无真 OO 9.4）。契约属发布链第①环，交付它不等于宣称第④环通过；
+    每条台账都如实记 `adapter_registered=False`，本类下方 `test_..._registered_adapter`
+    持续锁住那道正向门不被打开。
     """
 
-    def test_no_slice_entry_has_a_contract(self, manifest_slice: dict) -> None:
+    def test_slice_entry_contracts_are_ledger_backed_and_field_complete(
+        self, manifest_slice: dict
+    ) -> None:
+        """本 slice 的契约必须经台账登记，且字段级结构完整（原 `test_no_slice_entry_has_a_contract`）。
+
+        字段级判据（Property 21 的可复核部分）：
+        ① 契约在平台交付台账里登记，且 `entry_id` 与 slice 一致；
+        ② 契约能过 `parse_contract` 强校验（schema 门）；
+        ③ 至少一张 sheet、至少一张表、至少一个受管字段（不许交空壳）；
+        ④ 每张表都声明了 `row_identity`（行对齐的前提）；
+        ⑤ 每个字段都有 `source_ref`（可溯源到模板格）。
+        """
+        from app.services.workpaper_sync.contracts import parse_contract
+
         slice_ids = {e["entry_id"] for e in manifest_slice["independent_entries"]}
-        found: list[str] = []
+        ledger = _delivered_contracts_by_entry_ids(slice_ids)
+        checked = 0
         for path in sorted(CONTRACT_DIR.glob("*.json")):
             doc = _load(path)
             owner = (doc.get("review") or {}).get("entry_id")
-            if owner in slice_ids:
-                found.append(f"{path.name} → {owner}")
-        assert not found, f"本 slice 竟已有 contract：{found} —— 需在此补字段级判据"
+            if owner not in slice_ids:
+                continue
+            checked += 1
+            # ① 台账登记
+            assert path.stem in ledger, (
+                f"{path.name} 属本 slice（{owner!r}）却**未在 delivered_contracts_ledger "
+                "登记** ⇒ 绕过了交付台账（契约必须由 provider 的 "
+                "build_contract_payload() 生成并登记）"
+            )
+            assert ledger[path.stem] == owner, (
+                f"{path.name} 的 review.entry_id={owner!r} 与台账登记的 "
+                f"entry_id={ledger[path.stem]!r} 不符"
+            )
+            # ② schema 门
+            contract = parse_contract(doc, adapter_id=path.stem)
+            # ③ 非空壳
+            assert contract.sheets, f"{path.name} 没有任何 sheet ⇒ 空壳契约"
+            tables = [t for sh in contract.sheets for t in sh.tables]
+            assert tables, f"{path.name} 没有任何受管表 ⇒ 空壳契约"
+            for table in tables:
+                assert table.fields, (
+                    f"{path.name} 的表 {table.table_key!r} 没有受管字段 ⇒ 空壳表"
+                )
+                # ④ 行身份
+                assert table.row_identity is not None, (
+                    f"{path.name} 的表 {table.table_key!r} 缺 row_identity "
+                    "⇒ 行对齐无从判定"
+                )
+                # ⑤ 可溯源
+                for field in table.fields:
+                    assert field.source_ref, (
+                        f"{path.name} 的字段 {field.stable_field_key!r} 缺 source_ref"
+                    )
+        assert checked == len(ledger), (
+            f"台账登记了 {sorted(ledger)} 共 {len(ledger)} 条本 slice 契约，"
+            f"但磁盘上只找到 {checked} 份 ⇒ 台账与磁盘脱钩"
+        )
 
     def test_contract_review_status_is_top_level_in_every_contract(self) -> None:
         """前五轮已定论：`review_status` 在顶层。这条锁住那个结论不被悄悄改成嵌套。"""

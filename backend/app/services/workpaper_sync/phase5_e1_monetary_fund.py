@@ -668,3 +668,188 @@ def iter_store_rows(payload: Any, *, store_item_id: str | None = None):
 
     spec = _spec_of_store_item(store_item_id or STORE_ITEM_ID)
     return _engine_iter(spec, payload)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 8. manifest capability 门 + 注册入口 + 发布编排
+#
+# 🔴 **2026-09-27 补漏**：本模块此前缺 `manifest_capability_enabled` /
+#    `attach_pilot_adapters` / `publish_definitions` 三个符号，后果是
+#    `backend/tests/workpaper_sync/test_phase5_e1_roundtrip.py` 在 **collect 阶段**
+#    就 ImportError ⇒ 整个 `backend/tests/workpaper_sync/` 目录**一条都跑不了**
+#    （pytest 收集期异常会 `Interrupted: 1 error during collection`）。
+#    这类「缺一个符号拖垮整目录」的欠账比单测失败更贵：它让所有人失去回归网。
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def assert_manifest_capability_enabled(
+    *, manifest: Mapping[str, Any] | None = None
+) -> None:
+    """capability 必须已是 `bidirectional`，否则拒绝注册。
+
+    🔴 与 H/I/J 循环的 `assert_manifest_capability_enabled` 同一条禁令：
+    capability 从 `single_onlyoffice` → `bidirectional` **只能**由
+    `register_from_manifest()` 在注册成功后驱动，**禁止手改 manifest 文件**
+    （手改会造出「manifest 说双向、实际无 adapter」的假绿）。
+
+    E1 当前实测为 `single_onlyoffice` ⇒ `attach_pilot_adapters` 走「返回空元组」分支，
+    如实登记为 BP-61-1 平台级供给缺口，而**不是**放宽判据凑注册数。
+    """
+    from app.services.workpaper_sync.entry_profile import Capability, capability_of
+
+    payload = manifest if manifest is not None else load_entry_manifest()
+    entry = manifest_entries_by_id(payload).get(ENTRY_ID)
+    if entry is None:
+        raise EntrySelectionError(f"{ENTRY_ID} 不在 manifest 里")
+    cap = capability_of(entry)
+    if cap is not Capability.bidirectional:
+        raise EntrySelectionError(
+            f"{ENTRY_ID} capability={cap!r}，期望 bidirectional"
+        )
+    aid = str(entry.get("adapter_id") or "")
+    if aid and aid != ADAPTER_ID:
+        raise EntrySelectionError(
+            f"{ENTRY_ID} adapter_id={aid!r} 与本 provider 的 {ADAPTER_ID!r} 不符"
+        )
+
+
+def manifest_capability_enabled(*, manifest: Mapping[str, Any] | None = None) -> bool:
+    """capability 是否已放行（`assert_manifest_capability_enabled` 的布尔包装）。"""
+    try:
+        assert_manifest_capability_enabled(manifest=manifest)
+    except EntrySelectionError:
+        return False
+    return True
+
+
+def attach_pilot_adapters(
+    registry: Any, *, manifest: Mapping[str, Any] | None = None
+) -> tuple[Any, ...]:
+    """按 manifest capability 门决定是否注册 adapter。
+
+    🔴 **capability 未放行就返回空元组**，不抛异常也不放宽判据 ——
+    `register_from_manifest()` 的编排需要「本 entry 暂不可注册」是一个**可继续**的结果，
+    而不是让整条注册链崩掉。欠账由 `RegistryReport.contract_files_without_adapter`
+    持续可见地报出来。
+    """
+    if not manifest_capability_enabled(manifest=manifest):
+        return ()
+    assert_entry_selectable(manifest=manifest)
+    assert_contract_file_matches_source()
+    raise EntrySelectionError(
+        f"{ENTRY_ID} capability 已放行但本 provider 尚未实现 adapter 构造 —— "
+        "卡 BP-61-1（instrumentation candidate / 人工审核契约 / approved bundle 三缺）；"
+        "这条 raise 是**故意**的：capability 一旦被放行而 adapter 仍缺，"
+        "必须显式失败而不是静默返回空（静默会造出「manifest 说双向、实际无 adapter」的假绿）"
+    )
+
+
+async def publish_definitions(publisher: Any) -> dict[str, Any]:
+    """按 `authority_model → template → instrumentation → contract` 发布本 entry 的身份。
+
+    🔴 与 D1/D3/D5/D6/D7 同一编排口径（顺序、payload 校验、DAG 前置由 publisher 负责，
+    本函数只编排、不复制判据）。authority model 独立先发布 —— 它是 bundle 的必填 child，
+    而 `PUBLISH_DAG` 只管 template / instrumentation / contract。
+
+    🔴 `logical_id` 一律写成 f-string `f"{ADAPTER_ID}.<kind>"`：
+    `projection_lane_registry.assert_authority_logical_suffix_matches_providers()`
+    用 **AST** 取该 f-string 的字面部分并要求恰等于 `.authority-model`，
+    写成字符串拼接或常量会让那条双向锁失效。
+    """
+    from app.services.workpaper_sync.definitions import DefinitionKind
+
+    contract = assert_contract_file_matches_source()
+    template_payload = template_definition_payload()
+
+    authority = await publisher.publish_definition(
+        kind=DefinitionKind.authority_model,
+        payload=authority_model_payload(),
+        logical_id=f"{ADAPTER_ID}.authority-model",
+        semantic_version="1.0.0",
+    )
+    template = await publisher.publish_definition(
+        kind=DefinitionKind.template,
+        payload=template_payload,
+        logical_id=f"{ADAPTER_ID}.template",
+        semantic_version="1.0.0",
+        blob_bytes=read_authoritative_template(),
+        structure_hash=template_payload["normalized_structure_hash"],
+    )
+    instrumentation = await publisher.publish_definition(
+        kind=DefinitionKind.instrumentation,
+        payload=instrumentation_definition_payload(),
+        logical_id=f"{ADAPTER_ID}.instrumentation",
+        semantic_version="1.0.0",
+    )
+    contract_def = await publisher.publish_definition(
+        kind=DefinitionKind.contract,
+        payload=contract.canonical_payload,
+        logical_id=f"{ADAPTER_ID}.contract",
+        semantic_version="1.0.0",
+    )
+    return {
+        "authority_model": authority,
+        "template": template,
+        "instrumentation": instrumentation,
+        "contract": contract_def,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 9. 已发布冻结身份（`resolve_published_frozen_definitions`）
+#
+# 🔴 **2026-09-27 补漏（与第 8 节同批）**：本模块的台账条目早已登记，但漏了这个函数 ⇒
+#    `test_task75_published_identity_observer.py::TestDebtRemovedWithRealImpl` 的四条判据
+#    （`function_node()` 按**固定符号名**取 AST）自登记起就红。
+#
+# 🔴 本模块不走 `phase5_h_cycle_common` 骨架（它是引擎落地后新建的第一个 entry，
+#    自带一套薄转发），所以这里是**自有实现**，逐字照同批的
+#    `phase5_f2_inventory_main` / `phase5_f2_inventory_*` 形态 —— 不抄 loader 九步，
+#    观测器是唯一真源；contract digest 比对的 `raise` 留在**条件分支**里
+#    （顶层 raise 会被判「中间形态①：欠账登记已删而函数仍无条件 raise」）。
+# ═══════════════════════════════════════════════════════════════════════════
+
+#: 仓库 backend 根（`CanonicalArtifactRepository` 需要它定位 artifact 落盘目录）。
+_BACKEND_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
+
+
+async def resolve_published_frozen_definitions(
+    *, session: Any, representation: Any, contract: Any
+) -> Any:
+    """读已发布的冻结身份，并与本模块 source-locked 的契约 digest 比对。
+
+    🔴 `contract` 形参标注写 `Any` 而不是 `SyncContract`：本模块刻意不在顶层 import
+    `contracts`（那会把契约 schema 拉成模块级依赖），契约类型只在函数内局部使用。
+    判据看的是**入参被真消费**且参与了 `canonical_sha256` 比对，与标注无关。
+    """
+    from app.services.workpaper_sync.artifacts import (
+        CanonicalArtifactRepository,
+    )
+    from app.services.workpaper_sync.published_identity_observer import (
+        observe_published_frozen_definitions,
+    )
+    from app.services.workpaper_sync.resolution import (
+        CanonicalResolutionService,
+    )
+
+    observation = await observe_published_frozen_definitions(
+        session=session,
+        resolution=CanonicalResolutionService(
+            session, CanonicalArtifactRepository(_BACKEND_ROOT)
+        ),
+        representation=representation,
+        correlation_id=(
+            f"{ADAPTER_ID}@{getattr(representation, 'id', None)}"
+        ),
+    )
+    if (
+        observation.definitions.contract.canonical_sha256
+        != contract.canonical_sha256
+    ):
+        raise EntrySelectionError(
+            f"entry {ENTRY_ID}: 观测器读出的契约 digest "
+            f"{observation.definitions.contract.canonical_sha256} "
+            f"与本模块 source-locked 的 "
+            f"{contract.canonical_sha256} 不一致"
+        )
+    return observation

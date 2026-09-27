@@ -15,7 +15,14 @@ export { useJ2Detail } from './useJ2Detail'
 export { useJ2AccrualCheck } from './useJ2AccrualCheck'
 export { useJ2Disclosure } from './useJ2Disclosure'
 export { useJ2ImportExport } from './useJ2ImportExport'
-export { useJ2DualMode } from './useJ2DualMode'
+// ⚠️ useJ2DualMode 已移除（spec j2-j3-non-entry-hosts-and-orphan-cleanup，OD-3）：
+//    它是**二阶孤儿** —— 生产边只有本 barrel（#L18）+ 一条测试边，而本 barrel 自身
+//    入边现算为 **0**（J2 宿主与 6 个子 Tab 全走逐模块深链，不走 barrel）⇒ 从任何真实
+//    宿主都到不了。朴素判据「入度 > 0 ⇒ 不是孤儿」在它身上（入度 2）会**放它过去**。
+//    J2 不是 manifest entry（entry 集合现算恰 1 条 xlsx/j1/gt-j1-employee-compensation），
+//    宿主外层 template 里 OO 组件与模式切换器命中各 0 ⇒ 无双模式可切。
+//    （🔴 此处刻意不写那两个组件的**字面名** —— `test_task52` 的 AC14 守卫按字面量 grep
+//     全域统计模式切换器站点，注释里写出名字会被数成第 4 个站点而假红。）
 
 // Pure function engines (for PBT)
 export * from './useJ2FormulaEngine'

@@ -997,3 +997,35 @@ backend/tests/workpaper_sync/test_f5_canary_and_contract.py  904
 #     与 test_delivered_slice_contracts_pass_property_20_21_field_level 的双向核验。
 backend/tests/workpaper_sync/test_h_foundation_hc_guards.py  1149
 backend/app/services/workpaper_sync/adapters/delivered_contracts_ledger.py  1910
+
+
+# ── I/J 循环 + e1 修复 + 守卫口径升级（2026-09-27）──────────────────────
+#   phase5_e1_monetary_fund.py —— 补 4 个缺失符号（manifest_capability_enabled /
+#     attach_pilot_adapters / publish_definitions / resolve_published_frozen_definitions），
+#     解决 test_phase5_e1_roundtrip.py collect 阶段 ImportError 致整目录不可跑。
+#     拆分方向：`resolve_published_frozen_definitions` 类函数抽伴生 `e1_observer_wiring.py`。
+backend/app/services/workpaper_sync/phase5_e1_monetary_fund.py  855
+
+#   projection_lane_registry.py —— 新增 `_PROVIDERS_WITHOUT_PUBLISH_ORCHESTRATION`
+#     显式欠账清单（23 条，卡 BP-1~BP-3）+ 守卫口径升级（有编排核后缀 / 无编排须登记）。
+backend/app/services/workpaper_sync/projection_lane_registry.py  1369
+
+#   test_projection_lane_registry.py —— 新增 4 条反向自检
+#     （欠账清单不含非白名单 / 不含已有编排的 / 两集合并 = 白名单 / 后缀双向锁死）。
+backend/tests/workpaper_sync/test_projection_lane_registry.py  1522
+
+#   test_task51_i_cycle_migration.py —— 「零契约」守卫按 spec docstring 指示补齐字段级判据
+#     （parse_contract + 非空壳 + row_identity + source_ref），净增 ~173 行。
+backend/tests/workpaper_sync/test_task51_i_cycle_migration.py  2650
+
+#   test_task52_j_cycle_migration.py —— 加「删除已兑现」双态口径（deletion_already_executed /
+#     assert_deletion_is_honored + _safe_line_at/window/resolve 三个 sentinel helper）+
+#     位置化修复双态 + 行号漂移容忍 + TK-6 全文搜索降级。净增 ~406 行，理由：
+#     盘点期守卫按「删除尚未执行」写的判据在 lane spec 执行删除后必然 FNF，改为
+#     「文件在跑原判据 / 已删断言真没了 + 零残留」双态。拆分方向不变（一 Task 一文件）。
+backend/tests/workpaper_sync/test_task52_j_cycle_migration.py  3463
+
+#   test_task75_published_identity_observer.py —— 新增委托链解析 helper
+#     （_is_thin_delegation / implementing_node / _is_docstring_stmt + _DELEGATION_TARGETS），
+#     把 4 条单层 AST 判据改为跟着委托链走。
+backend/tests/workpaper_sync/test_task75_published_identity_observer.py  2650

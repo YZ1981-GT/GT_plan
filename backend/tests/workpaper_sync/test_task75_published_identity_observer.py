@@ -204,6 +204,85 @@ def awaited_call_names(node: ast.AST) -> set[str]:
     return names
 
 
+# ════════════════════════════════════════════════════════════════════════════
+# 🔴 委托链解析（2026-09-27 补）
+#
+# 背景：本文件的四条 `TestDebtRemovedWithRealImpl` 判据写于「**每个 provider 自己**
+# 委托观测器」的 D 循环范式（provider 函数体内直接 `await
+# observe_published_frozen_definitions(...)` + 自己做 digest 比对 + 自己 raise）。
+#
+# H 循环起引入公共骨架 `phase5_h_cycle_common`（HC），provider 侧变成 3 行薄委托：
+#
+#     async def resolve_published_frozen_definitions(*, session, representation, contract):
+#         return await HC.resolve_published_frozen_definitions(
+#             IDENTITY, session=session, representation=representation, contract=contract)
+#
+# 于是四条单层 AST 判据对 **16 个** provider 全部假红（e1 + f2×3 + h×5 + i×6 + j1）——
+# 实测那些 provider 一条都没「抄九步」，恰恰是**收敛得更彻底**（一处转发 vs N 处重复）。
+#
+# 🔴 **修法不是放宽，是跟着委托链走**：识别薄委托后把判据**转移到骨架函数上执行**，
+# 骨架那层仍要满足全部四条（真 await 观测器 / 真 digest 比对 / 真 raise / 不返回空）。
+# 变异「删掉骨架里的 await 或 digest 比对」SHALL 让 16 个 provider 一起打红。
+#
+# 🔴 薄委托的定义**收得很紧**（`_is_thin_delegation`）：函数体除 docstring 外
+# 必须**只有一条** `return await <骨架>.<同名函数>(...)`。有人想借薄委托外壳偷偷
+# 塞逻辑（比如先改 contract 再转发）会因为「不止一条语句」被判为非薄委托，
+# 从而按 provider 自身的严格判据核 ⇒ 立刻打红。
+# ════════════════════════════════════════════════════════════════════════════
+
+#: 允许作为委托目标的公共骨架模块（**白名单**，不许委托到任意模块）。
+_DELEGATION_TARGETS: dict[str, str] = {
+    "HC": "app.services.workpaper_sync.phase5_h_cycle_common",
+    "phase5_h_cycle_common": "app.services.workpaper_sync.phase5_h_cycle_common",
+}
+
+
+def _is_thin_delegation(node: ast.AST, name: str) -> str | None:
+    """薄委托判定：函数体只有 `return await <别名>.<name>(...)` 时返回那个别名。
+
+    非薄委托（含自有逻辑、多条语句、转发到不同名函数）一律返回 ``None``。
+    """
+    body = [s for s in getattr(node, "body", []) if not _is_docstring_stmt(s)]
+    if len(body) != 1:
+        return None
+    stmt = body[0]
+    if not isinstance(stmt, ast.Return) or not isinstance(stmt.value, ast.Await):
+        return None
+    call = stmt.value.value
+    if not isinstance(call, ast.Call) or not isinstance(call.func, ast.Attribute):
+        return None
+    # 🔴 必须转发到**同名**函数：转发到别的名字就不是「同一件事的委托」
+    if call.func.attr != name:
+        return None
+    owner = call.func.value
+    if not isinstance(owner, ast.Name):
+        return None
+    return owner.id if owner.id in _DELEGATION_TARGETS else None
+
+
+def _is_docstring_stmt(stmt: ast.AST) -> bool:
+    return (
+        isinstance(stmt, ast.Expr)
+        and isinstance(stmt.value, ast.Constant)
+        and isinstance(stmt.value.value, str)
+    )
+
+
+def implementing_node(path: Path, name: str) -> tuple[ast.AST, Path, bool]:
+    """返回真正承载实现的 `(函数节点, 所在文件, 是否经委托)`。
+
+    provider 自己实现 → 原节点；薄委托到公共骨架 → 骨架里的同名函数节点。
+    """
+    node = function_node(path, name)
+    alias = _is_thin_delegation(node, name)
+    if alias is None:
+        return node, path, False
+    target_module = _DELEGATION_TARGETS[alias]
+    target_path = SVC / f"{target_module.rsplit('.', 1)[-1]}.py"
+    assert target_path.is_file(), f"委托目标文件不存在：{target_path}"
+    return function_node(target_path, name), target_path, True
+
+
 def imported_module_paths(path: Path) -> set[str]:
     """源文件里**真正 import 的**模块路径（含函数内局部 import）。
 
@@ -862,15 +941,24 @@ class TestDebtRemovedWithRealImpl:
 
     @pytest.mark.parametrize("module_path", PILOT_MODULES)
     def test_pilot_delegates_to_the_shared_observer(self, module_path: str) -> None:
-        """AST 判据：函数体里真的 `await` 了共享观测器，而不是自己抄一遍九步。"""
+        """AST 判据：真的 `await` 了共享观测器，而不是自己抄一遍九步。
+
+        🔴 判据落在**承载实现的那一层**（见文件头「委托链解析」）：
+        provider 自己实现就查它自己；薄委托到 `phase5_h_cycle_common` 就查骨架那层。
+        骨架被短路（删掉 await）时 16 个委托型 provider 会一起打红。
+        """
         module = __import__(module_path, fromlist=["x"])
         path = Path(inspect.getsourcefile(module) or "")
-        node = function_node(path, "resolve_published_frozen_definitions")
+        node, impl_path, delegated = implementing_node(
+            path, "resolve_published_frozen_definitions"
+        )
         awaited = awaited_call_names(node)
         assert "observe_published_frozen_definitions" in awaited, (
-            f"{module_path} 没有 await 共享观测器（awaited={sorted(awaited)}）"
+            f"{module_path} 没有 await 共享观测器"
+            f"（实现在 {impl_path.name}，delegated={delegated}，awaited={sorted(awaited)}）"
         )
-        # 不得自己抄 loader 的九步：本函数**代码**里不应出现 loader / gate 的判据调用
+        # 不得自己抄 loader 的九步：**provider 自身**代码里不应出现 loader / gate 的判据调用
+        # （这一条始终查 provider 自己 —— 委托型 provider 只有 3 行，天然不可能抄）
         body = code_only_segment(path, "resolve_published_frozen_definitions")
         for copied in (
             "ExcelEntryDefinitionLoader",
@@ -891,15 +979,31 @@ class TestDebtRemovedWithRealImpl:
         """
         module = __import__(module_path, fromlist=["x"])
         path = Path(inspect.getsourcefile(module) or "")
-        node = function_node(path, "resolve_published_frozen_definitions")
-        top_level_raises = [s for s in node.body if isinstance(s, ast.Raise)]
+        # 🔴 顶层 raise 这一条始终查 **provider 自己**（中间形态①的形态就是 provider 里
+        #    留一句无条件 raise）；委托型 provider 只有 `return await ...`，天然无顶层 raise。
+        own = function_node(path, "resolve_published_frozen_definitions")
+        top_level_raises = [s for s in own.body if isinstance(s, ast.Raise)]
         assert top_level_raises == [], (
             f"{module_path}.resolve_published_frozen_definitions 顶层仍有 raise ⇒ "
             "欠账登记删了但函数没改成真实现（中间形态①）"
         )
-        # 反向：条件分支里的 raise 必须还在（否则契约脱钩就没人拦）
+        # 反向：条件分支里的 raise 必须还在（否则契约脱钩就没人拦）。
+        # 🔴 这一条查**承载实现的那一层** —— 委托型 provider 的 raise 在骨架里。
+        node, impl_path, delegated = implementing_node(
+            path, "resolve_published_frozen_definitions"
+        )
         nested = [s for s in ast.walk(node) if isinstance(s, ast.Raise)]
-        assert nested, f"{module_path} 一个 raise 都没有 ⇒ 契约脱钩无人拦"
+        assert nested, (
+            f"{module_path} 一个 raise 都没有 ⇒ 契约脱钩无人拦"
+            f"（实现在 {impl_path.name}，delegated={delegated}）"
+        )
+        if delegated:
+            # 委托型额外锁一条：骨架里那个 raise 必须在**条件分支**里，
+            # 否则骨架无条件抛 = 所有委托型 provider 恒失败
+            assert [s for s in node.body if isinstance(s, ast.Raise)] == [], (
+                f"{impl_path.name}.resolve_published_frozen_definitions 顶层有 raise ⇒ "
+                "骨架无条件抛，全部委托型 provider 恒失败"
+            )
 
     @pytest.mark.parametrize("module_path", PILOT_MODULES)
     def test_no_pilot_returns_none_or_empty_identity(self, module_path: str) -> None:
@@ -912,18 +1016,26 @@ class TestDebtRemovedWithRealImpl:
         """
         module = __import__(module_path, fromlist=["x"])
         path = Path(inspect.getsourcefile(module) or "")
-        node = function_node(path, "resolve_published_frozen_definitions")
-        for stmt in ast.walk(node):
-            if not isinstance(stmt, ast.Return):
-                continue
-            value = stmt.value
-            assert value is not None, f"{module_path}: 出现裸 return ⇒ 返回 None（中间形态②）"
-            assert not (isinstance(value, ast.Constant) and value.value is None), (
-                f"{module_path}: 出现 `return None` ⇒ 中间形态②"
-            )
-            assert not isinstance(value, (ast.Dict, ast.Tuple, ast.List, ast.Set)), (
-                f"{module_path}: 直接 return 字面量容器 ⇒ 空 identity（中间形态②）"
-            )
+        # 🔴 静态部分查**两层**：provider 自己不得 `return None`，承载实现的那层也不得。
+        own = function_node(path, "resolve_published_frozen_definitions")
+        node, impl_path, delegated = implementing_node(
+            path, "resolve_published_frozen_definitions"
+        )
+        for scope_node, scope_label in ((own, module_path), (node, impl_path.name)):
+            for stmt in ast.walk(scope_node):
+                if not isinstance(stmt, ast.Return):
+                    continue
+                value = stmt.value
+                assert value is not None, (
+                    f"{scope_label}: 出现裸 return ⇒ 返回 None（中间形态②）"
+                )
+                assert not (
+                    isinstance(value, ast.Constant) and value.value is None
+                ), f"{scope_label}: 出现 `return None` ⇒ 中间形态②"
+                assert not isinstance(
+                    value, (ast.Dict, ast.Tuple, ast.List, ast.Set)
+                ), f"{scope_label}: 直接 return 字面量容器 ⇒ 空 identity（中间形态②）"
+        del delegated
         with pytest.raises(OBS.RepresentationShapeError):
             asyncio.run(
                 module.resolve_published_frozen_definitions(
@@ -936,19 +1048,28 @@ class TestDebtRemovedWithRealImpl:
         """`contract` 入参必须被**消费**（否则是摆设 = additive 死代码）。"""
         module = __import__(module_path, fromlist=["x"])
         path = Path(inspect.getsourcefile(module) or "")
-        node = function_node(path, "resolve_published_frozen_definitions")
+        # 🔴 「入参被读」这一条始终查 provider 自己：委托型也必须真把 contract 传下去，
+        #    只声明不转发（`contract` 从未出现在 Load 上下文）仍是摆设。
+        own = function_node(path, "resolve_published_frozen_definitions")
         used = {
             n.id
-            for n in ast.walk(node)
+            for n in ast.walk(own)
             if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)
         }
         assert "contract" in used, f"{module_path}: contract 入参从未被读 ⇒ 摆设"
+        # 🔴 digest 比对查**承载实现的那一层**。
+        node, impl_path, delegated = implementing_node(
+            path, "resolve_published_frozen_definitions"
+        )
         compares = [
             n
             for n in ast.walk(node)
             if isinstance(n, ast.Compare) and "canonical_sha256" in ast.dump(n)
         ]
-        assert compares, f"{module_path}: contract 只是被引用而没参与 digest 比对"
+        assert compares, (
+            f"{module_path}: contract 只是被引用而没参与 digest 比对"
+            f"（实现在 {impl_path.name}，delegated={delegated}）"
+        )
 
 
 # ════════════════════════════════════════════════════════════════════════════

@@ -290,3 +290,49 @@ def contract_file_path() -> Path:
 
 def load_contract_from_disk() -> SyncContract:
     return load_contract(ADAPTER_ID)
+
+
+async def resolve_published_frozen_definitions(
+    *, session: Any, representation: Any, contract: SyncContract
+) -> Any:
+    """读已发布的冻结身份（照同册 `phase5_f2_inventory_main` 逐字同构）。
+
+    🔴 **2026-09-27 补漏**：本模块的台账条目早已登记，但漏了这个函数 ⇒
+    `test_task75_published_identity_observer.py::TestDebtRemovedWithRealImpl` 的四条判据
+    （`function_node()` 按固定符号名取 AST）自登记起就红。同族三条一次补齐。
+
+    🔴 **不得**抄 loader 九步（`ExcelEntryDefinitionLoader` / `assert_no_structure_drift` /
+    `parse_identity_inventory` / `structure_fingerprint`）—— 观测器是唯一真源。
+    contract digest 比对的 `raise` 必须留在**条件分支**里（顶层 raise 会被判「中间形态①」）。
+    """
+    from app.services.workpaper_sync.artifacts import (
+        CanonicalArtifactRepository,
+    )
+    from app.services.workpaper_sync.published_identity_observer import (
+        observe_published_frozen_definitions,
+    )
+    from app.services.workpaper_sync.resolution import (
+        CanonicalResolutionService,
+    )
+
+    observation = await observe_published_frozen_definitions(
+        session=session,
+        resolution=CanonicalResolutionService(
+            session, CanonicalArtifactRepository(_BACKEND_ROOT)
+        ),
+        representation=representation,
+        correlation_id=(
+            f"{ADAPTER_ID}@{getattr(representation, 'id', None)}"
+        ),
+    )
+    if (
+        observation.definitions.contract.canonical_sha256
+        != contract.canonical_sha256
+    ):
+        raise EntrySelectionError(
+            f"entry {ENTRY_ID}: 观测器读出的契约 digest "
+            f"{observation.definitions.contract.canonical_sha256} "
+            f"与本模块 source-locked 的 "
+            f"{contract.canonical_sha256} 不一致"
+        )
+    return observation

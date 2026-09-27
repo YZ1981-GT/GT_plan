@@ -10,7 +10,11 @@ import { useJ2Adjudication } from '../useJ2Adjudication'
 import { useJ2AccrualCheck } from '../useJ2AccrualCheck'
 import { useJ2Detail } from '../useJ2Detail'
 import { useJ2Disclosure } from '../useJ2Disclosure'
-import { useJ2DualMode } from '../useJ2DualMode'
+// ⚠️ useJ2DualMode 的 import 与 describe 块已移除
+//    （spec j2-j3-non-entry-hosts-and-orphan-cleanup，OD-3）：
+//    该 composable 是二阶孤儿（生产边只有目录 barrel，barrel 入边现算 0）已删除。
+//    🔴 这条测试边正是「朴素入度判据会放它过去」的原因之一 —— 有测试在跑，
+//    但被测对象从任何真实宿主都到不了。删测试不等于降覆盖率：它覆盖的是不可达代码。
 
 // ═══════════════════════════════════════════════════════════════════
 // sheetName 分发逻辑测试
@@ -165,24 +169,6 @@ describe('useJ2Detail — DBO明细', () => {
     detail.recalcItem(item)
     // net = endBalance(10000) - planAssetFV(3000) = 7000
     expect(item.netLiability).toBe(7000)
-  })
-})
-
-// ═══════════════════════════════════════════════════════════════════
-// 双模式测试
-// ═══════════════════════════════════════════════════════════════════
-
-describe('useJ2DualMode', () => {
-  it('defaults to html mode', () => {
-    const dm = useJ2DualMode()
-    expect(dm.mode.value).toBe('html')
-    expect(dm.isHtmlMode.value).toBe(true)
-  })
-  it('toggles mode', () => {
-    const dm = useJ2DualMode()
-    dm.toggleMode()
-    expect(dm.mode.value).toBe('onlyoffice')
-    expect(dm.isOOMode.value).toBe(true)
   })
 })
 
