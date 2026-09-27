@@ -1124,6 +1124,7 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_g10_trading_liabilities",
         "app.services.workpaper_sync.phase5_g1_trading_financial_assets",
         "app.services.workpaper_sync.phase5_g3_dividend_receivable",
+        "app.services.workpaper_sync.phase5_g4_bond_investment",
         "app.services.workpaper_sync.phase5_g11_investment_income",
         "app.services.workpaper_sync.phase5_g12_net_hedge_gains",
         "app.services.workpaper_sync.phase5_g13_fair_value_changes",

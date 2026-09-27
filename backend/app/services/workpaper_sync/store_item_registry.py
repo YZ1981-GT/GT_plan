@@ -436,6 +436,16 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="G3-2-detail-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── G4-sppi（spec: g4-g6-shared-workbook-three-entry-lanes · Task 8）──
+    #
+    # 🔴 G4 一册三 entry 中的首条。零公式列、无合计、表头起于 B 列。
+    # 册裸 IF **186 格**（G 循环第二多），per-file 中性化照挂。
+    "g4.bond_main": StoreMergePlan(
+        adapter_id="g4.bond_main",
+        provider_module="phase5_g4_bond_investment",
+        items=(StoreItemSpec(item_id="G4-7-items", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     #
     # 🔴 **HC-12：H 循环 9 册全部命中 OO 加载期裸 `IF(`** ⇒ 同 G 的 per-file 保守策略，
