@@ -489,9 +489,9 @@ FC-1~FC-13 · F3 spec 裁决 F3-H4（行级 mask）· F5 spec（布尔/错误值
     `fvCheck` 的位置（+3 行），行号再次漂移打红 `test_payload_column_mode_*`，重跑才修好
   - _Requirements: 2.3, 3.2, 3.4_
 
-- [ ] 14. G3（三级表头 + 480 definedName）+ G1（三区 + 跨表 T 列，**最后一条**）
+- [x] 14. G3（三级表头 + 480 definedName）+ G1（三区 + 跨表 T 列，**最后一条**）
   - ✅ **G1 已交付**（commit `0a3133630`，14 文件）：三区 spec（27 列 × 13/12 公式列）+ 判据 80p + 6 处口径改齐 + M 合并 + AA 新补；证据 `evidence/task14-c13-g1-rootfix.md`
-  - 🔴 **G3 待整表重建**（方案 A：按模板 32 列矩阵重建前端 + 原 34 字段登记移交 G3-4/G3-5）
+  - ✅ **G3 已交付**（commit `e1c838228`，12 文件）：两区 spec（32 列 × 12 公式列 × 三级表头）+ DividendDetailRow 整表重建（方案 A）；证据 `evidence/task14-c13-g3-rootfix.md`
   - G3：`G3-2-detail-rows` / `id` / 🔴 **三级表头 R9/R10/R11**（G 循环唯一）/ 两区 R13-20 / R23-28 /
     小计 R21/R29 + 合计 R30 `=C29+C21`（枚举相加）/ payload **`conclusion`** /
     `formula_columns=("F","M","N","O","P","T","AA","AB","AC","AD","AE","AF")`；P15 definedName 不变
