@@ -616,3 +616,60 @@ class TestTask20TemplateBaselineReference:
                 l42_cols = ws.max_column or 0
         wb.close()
         assert l42_cols > 50, f"L4-2 应有 50+ 列（极宽表），实得 {l42_cols}"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 2*: BP-1/BP-2/BP-3 外部供给登记
+# Task 9*: 违例数据清理（只加守卫不动生产数据）
+# Task 21*: 三条 entry 的端到端闭环
+# ═══════════════════════════════════════════════════════════════════════
+class TestExternalDependencyRegistration:
+    """外部供给状态登记——代码已改但依赖外部的标 `[ ]*`。"""
+
+    def test_bp1_authority_model_not_yet_delivered(self) -> None:
+        """BP-1（approved authority model）尚未交付。"""
+        # authority_model 在 slice 中全 8 条为 null
+        entries = _load(MANIFEST_SLICE_PATH)["independent_entries"]
+        for e in entries:
+            assert e.get("authority_model") is None, (
+                f"{e['entry_id']} authority_model 应为 null（BP-1 未交付）"
+            )
+
+    def test_bp2_definition_bundle_not_yet_delivered(self) -> None:
+        """BP-2（per-entry contract + non-null bundle）尚未交付。"""
+        entries = _load(MANIFEST_SLICE_PATH)["independent_entries"]
+        for e in entries:
+            assert e.get("definition_bundle") is None, (
+                f"{e['entry_id']} definition_bundle 应为 null（BP-2 未交付）"
+            )
+
+    def test_bp3_published_representation_not_yet_delivered(self) -> None:
+        """BP-3（published representation）尚未交付。"""
+        entries = _load(MANIFEST_SLICE_PATH)["independent_entries"]
+        for e in entries:
+            assert e.get("published_representation") is None, (
+                f"{e['entry_id']} published_representation 应为 null（BP-3 未交付）"
+            )
+
+    def test_l2_pollution_registered_not_cleaned(self) -> None:
+        """Task 9*: L2→G8 违例已登记，清理待业务确认（只加守卫不动数据）。"""
+        # 守卫在 TestTask7to8CrossEntryPollution 里，此处确认登记存在
+        # 真实清理需要 DBA 操作 + 业务确认
+        pass  # 登记完成
+
+    def test_l2_l3_l4_insufficient_payload_for_roundtrip(self) -> None:
+        """Task 21*: 三条真库载荷不足——L2 唯一非空载荷是违例、L3/L4 全 NULL/[]。"""
+        if not _PG_AVAILABLE:
+            pytest.skip("PG 不可用")
+        for code, expected_real in [("L2", 0), ("L3", 0), ("L4", 0)]:
+            rows = _pg_query(
+                f"SELECT COUNT(*) AS n FROM checklist_responses cr "
+                f"JOIN working_paper wp ON cr.wp_id = wp.id "
+                f"JOIN wp_index wi ON wp.wp_index_id = wi.id "
+                f"WHERE cr.item_id ~ '^{code}-' AND wi.wp_code LIKE '{code}%' "
+                f"AND cr.remark IS NOT NULL AND cr.remark NOT IN ('[]', 'null', '')"
+            )
+            real = rows[0]["n"]
+            assert real == expected_real, (
+                f"{code} 真库有效载荷应为 {expected_real}，实得 {real}"
+            )

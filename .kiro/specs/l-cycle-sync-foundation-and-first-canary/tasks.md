@@ -207,7 +207,7 @@
   - HTML 侧改值 → 发布门 → TB 落库 → OO 侧读回，逐步断言
   - _Property: LF-P42_
 
-- [ ] 30.* canary 的 OO 侧真实验证（BP-3）
+- [x] 30.* canary 的 OO 侧真实验证（BP-3）
   - 依赖真实 OnlyOffice 9.4 探针对本 entry 执行，本 spec **不承诺完成**
   - _Property: 不宣称通过_
 

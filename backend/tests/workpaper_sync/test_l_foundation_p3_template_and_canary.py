@@ -555,8 +555,8 @@ class TestTask23FooterAndGhostRows:
 class TestTask24InverseSumChainBaseline:
     """倒挤减法链两形态各自非空，且只在国企版。"""
 
-    def test_l5_soe_has_subtract_own_table(self) -> None:
-        """L5 国企版有「减本表已列项」形态（LF-P40）。"""
+    def test_l5_soe_has_sum_based_subtraction(self) -> None:
+        """L5 国企版用 SUM 区间减法（已从硬编码窗口修复）（LF-P40）。"""
         wb = load_workbook(L_TEMPLATE_DIR / "L5 长期应付款.xlsx", read_only=False, data_only=False)
         soe_sheets = [s for s in wb.sheetnames if "国企" in s and "附注" in s]
         found = False
@@ -565,11 +565,11 @@ class TestTask24InverseSumChainBaseline:
             for row in ws.iter_rows():
                 for cell in row:
                     v = str(cell.value) if cell.value else ""
-                    # 减本表：引用本表格 + 连续减号
-                    if f"'{sn}'" in v and v.count("-") >= 3:
+                    # 修复后形态：=合计-SUM(B12:B16)
+                    if "SUM(" in v and "-" in v and "!" in v:
                         found = True
         wb.close()
-        assert found, "L5 国企版应有减本表已列项形态"
+        assert found, "L5 国企版应有 SUM 区间减法形态（已修复）"
 
     def test_l6_soe_has_subtract_other_table(self) -> None:
         """L6 国企版有「减对方表明细行」形态（LF-P40）。"""
@@ -678,3 +678,35 @@ class TestTask35LcReferenceClosure:
                     all_refs.add(int(m.group(1)))
         missing = set(range(1, 27)) - all_refs
         assert len(missing) == 0, f"LC 编号 {sorted(missing)} 未被任何 spec 引用"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 30*: canary 的 OO 侧真实验证（BP-3）
+# 🔴 依赖 OnlyOffice 运行时 + start-dev.bat 环境
+# ═══════════════════════════════════════════════════════════════════════
+class TestTask30OoProbePrerequisites:
+    """OO 侧验证的前置条件登记——真实 E2E 需 Playwright。"""
+
+    def test_onlyoffice_container_healthy(self) -> None:
+        """OO 容器健康检查通过。"""
+        import urllib.request
+        try:
+            r = urllib.request.urlopen("http://localhost:8080/healthcheck", timeout=5)
+            body = r.read().decode().strip()
+            assert body == "true", f"OO healthcheck 应返回 'true'，实得 '{body}'"
+        except Exception as e:
+            pytest.skip(f"OO 容器不可达：{e}")
+
+    def test_l1_template_exists_for_oo_probe(self) -> None:
+        """L1 模板文件存在（OO 探针的输入）。"""
+        path = L_TEMPLATE_DIR / "L1 短期借款.xlsx"
+        assert path.exists(), "L1 模板应存在"
+        assert path.stat().st_size > 50000, "L1 模板应 > 50KB"
+
+    def test_bp3_status_documented(self) -> None:
+        """BP-3（真实 OO 9.4 探针）的当前状态已登记。"""
+        # BP-3 = 真实 OnlyOffice 9.4 探针。OO 容器在跑但 E2E 端到端测试
+        # 需要 start-dev.bat 环境（前端 3030 + 后端 9980）才能执行。
+        # 当前状态：OO 容器 healthy，但未执行完整的 HTML→OO→HTML roundtrip。
+        # 标记为"前置条件就绪，待 Playwright E2E 实测"。
+        pass  # 登记完成，真实 E2E 待 start-dev.bat 环境

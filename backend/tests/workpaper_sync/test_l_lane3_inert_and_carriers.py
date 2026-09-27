@@ -676,3 +676,60 @@ class TestTask19RemoveRowVariants:
                 found = True
                 break
         assert found, "lane3 应有 removeRow"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 3*: BP-1/BP-2/BP-3 外部供给登记（Lane3 侧）
+# ═══════════════════════════════════════════════════════════════════════
+class TestTask3ExternalDependency:
+    """外部供给状态登记——与 Lane2 同口径。"""
+
+    def test_bp1_bp2_bp3_all_null_for_lane3(self, lane3_entries: list[dict]) -> None:
+        """BP-1/2/3 全 null ⇒ 外部供给均未到位。"""
+        for e in lane3_entries:
+            assert e.get("authority_model") is None
+            assert e.get("definition_bundle") is None
+            assert e.get("published_representation") is None
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 18: 去位置化——新旧键映射表
+# Property: LB-P19
+# ═══════════════════════════════════════════════════════════════════════
+class TestTask18KeyMappingTable:
+    """位置化键的新旧映射表已登记。"""
+
+    def test_mapping_file_exists(self) -> None:
+        mapping = DATA / "workpaper_sync_contracts" / "_l_cycle_positional_key_mapping.json"
+        assert mapping.exists(), "映射表文件应存在"
+        data = json.loads(mapping.read_text("utf-8"))
+        assert "L5" in data
+        assert "L6" in data
+        assert "L7" in data
+        assert "L8" in data
+
+    def test_l5_has_no_positional_keys(self) -> None:
+        mapping = json.loads((DATA / "workpaper_sync_contracts" / "_l_cycle_positional_key_mapping.json").read_text("utf-8"))
+        assert mapping["L5"]["status"] == "no_positional_keys"
+
+    def test_l6_has_most_entries(self) -> None:
+        mapping = json.loads((DATA / "workpaper_sync_contracts" / "_l_cycle_positional_key_mapping.json").read_text("utf-8"))
+        l6_count = len(mapping["L6"]["positional_keys"])
+        l7_count = len(mapping["L7"]["positional_keys"])
+        l8_count = len(mapping["L8"]["positional_keys"])
+        assert l6_count >= l7_count, f"L6 应有最多映射条目（L6={l6_count} L7={l7_count}）"
+        assert l6_count >= l8_count, f"L6 应有最多映射条目（L6={l6_count} L8={l8_count}）"
+
+    def test_l8_adjudication_already_stable(self) -> None:
+        mapping = json.loads((DATA / "workpaper_sync_contracts" / "_l_cycle_positional_key_mapping.json").read_text("utf-8"))
+        stable = mapping["L8"].get("already_stable", [])
+        assert len(stable) >= 1, "L8 Adjudication 应标为 already_stable"
+        assert "row.key" in stable[0]["pattern"]
+
+    def test_all_targets_use_rowid(self) -> None:
+        """所有 target 键都用 ${rowId} 而非位置索引。"""
+        mapping = json.loads((DATA / "workpaper_sync_contracts" / "_l_cycle_positional_key_mapping.json").read_text("utf-8"))
+        for code in ("L6", "L7", "L8"):
+            for entry in mapping[code].get("positional_keys", []):
+                target = entry.get("target", "")
+                assert "rowId" in target, f"{code} {entry['module']} target 应含 rowId"

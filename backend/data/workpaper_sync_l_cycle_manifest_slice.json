@@ -584,7 +584,7 @@
    "template_ref": {
     "workbook": "L5 长期应付款.xlsx",
     "root": "backend/wp_templates/L",
-    "sha256": "c8506f391262bf10fa818df22b9ddfe53ddc2ebe4d280af48776e39f8c8ac497",
+    "sha256": "09380626107dc1b975662eaa60fa99ec541901c0729bb0d2b35bbb60807a9b68",
     "sheet_count": 12,
     "in_runtime_index": true
    },
@@ -702,7 +702,7 @@
    "template_ref": {
     "workbook": "L6 专项应付款.xlsx",
     "root": "backend/wp_templates/L",
-    "sha256": "cf05ed3b9fa0afd6a05b73de5c79b7ee14a85b6c6f4a04e57ae2f09170d7b5d4",
+    "sha256": "08630e1cbc962fabbbf580f591374157a2d6705966c2f3c8ecba4a0705f59f62",
     "sheet_count": 9,
     "in_runtime_index": true
    },
