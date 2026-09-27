@@ -430,10 +430,34 @@ FC-1~FC-13 · F3 spec 裁决 F3-H4（行级 mask）· F5 spec（布尔/错误值
     ② `test_g_provider_whitelist_contains_exactly_the_delivered_ones` 写死 `[g2]` ⇒ 改现算（GC-10）
   - _Requirements: 2.2, 3.3, 4.3_
 
-- [ ] 12. G13（父子行 + 布尔列 + 枚举相加 footer）
-  - `G13-detail-rows` / `rowId` / R9/R10 / R11-20 / footer R21 `=B11+B14+B17+B19+B20`（**枚举相加**，
-    受管区不含该行）/ `formula_columns=("B","C","D","I","J","K")`（**K 是布尔列**）
+- [x] 12. G13（父子行 + 布尔列 + 枚举相加 footer）
+  - ~~`G13-detail-rows` / `rowId`~~ ⇒ **`G13-detail-skeleton` / `rowKey`**（用户拍板选项 A，见下）
+    / R9/R10 / R11-20 / footer R21 `=B11+B14+B17+B19+B20`（**枚举相加**，受管区不含该行）/
+    ~~`formula_columns=("B","C","D","I","J","K")`~~ ⇒ 实测改为 **`("D","I","J","K")`**（**K 是布尔列**）
   - 🔴 父行（R11/R14/R17/R19/R20）的 B/C/D 判 `mode=formula`；无父子字段时显式登记模板行号耦合（P8）
+  - **已完成**（commit `b3a6c5a6e`，17 文件）。evidence `evidence/task12-c11-g13-rootfix.md`
+  - 🔴 **用户拍板选项 A：受管载体是「分类骨架」不是工具明细**。模板 R11-R20 是固定 10 个损益表
+    项目，`G13-detail-rows` 存动态增删的金融工具级明细 ⇒ 不同构，按序映射会把第 N 条工具写进
+    第 N 个损益项目行（**产出错数**）。前端原有 `buildG13CategorySkeleton()` 已按 10 项汇总出骨架
+    但只是 `computed` 不落库 ⇒ 新建 `g13SkeletonStore.ts` 持久化成 `G13-detail-skeleton` 并受管它；
+    工具明细保持 HTML-only 增强。**手工覆盖优先**：落库行带 `manualOverride`，有标记的行不被汇总
+    重算冲掉（否则 OO 回流会被立刻覆盖 = 回流无效）
+  - 🔴 **B/C 判 `editable` 不判 `formula`**：两列只有父行 3 格有公式（逐行不同形，R17 是 `=B18`
+    单子行），其余 7 格空。列级 mode 对此无解（判 formula 对 7 格抛 / 判 auto_source 对 3 格抛 /
+    拆多 spec 因父行非连续要 7 份）⇒ 只能 editable，代价是父行三格公式 materialize 后变字面量。
+    三格是**普通公式非 shared 主格** ⇒ 不撞 `SharedFormulaMasterWriteError`
+  - 🔴 **三处推翻既有登记**：① Task 2「发现 I：前端无骨架无父子字段」**不成立**（骨架能力在
+    `g13CategorySkeleton.ts`/`g13Constants.ts`，父子由 `kind`+`indent` 表达，不需新加字段）
+    ② 真库该键 **2 B 空数组** ⇒ 方案②「需存量迁移」的代价不成立 ③ evidence §7.2「前端删 5 字段」
+    失效（工具明细整体不受管 ⇒ 21 字段一个都不用删）
+  - 🔴 **四处首版判据打红后的实测纠正**：E 列衍生子行分隔符是 **`/`** 不是 `-` · `K` 列 shared 组是
+    **`K13:K21` 跨 footer**（主格 K13，与 D/I/J 的 R12 起点不同形）· 横向组 **`F9:J9` 含 J 列**
+    （evidence §7.1 写 `F9:I10` 不准）· footer **三种约定混行**（枚举相加 3 + SUM 2 + 布尔 1）
+  - 🔴 顺带修 `resync_g_slice_source_refs.py` 一个**从未生效**的分支（读 `store_key` 而 slice 字段名
+    是 `table_key`），并把 `source_ref` 改按**函数声明行**现算；`TABLE_TO_ENTRY` 与
+    `SOURCE_REFS_MIRROR_WRITE_SITE` 只放 G11/G13（别家冻结值口径不同，一并同步会改掉别人的取证）
+  - 🔴 `EXPECTED` **加两个新键**而非改旧键：`store_item_id`/`row_identity_key` 记工具明细（slice
+    口径 + 真库证据），`managed_*` 记受管载体 —— 互相覆盖会让真库证据判据与受管载体判据二者必红
   - _Requirements: 2.5, 3.1, 3.2_
 
 - [ ] 13. G12（无表头行 + 布尔列 + SUM 起点异常）
