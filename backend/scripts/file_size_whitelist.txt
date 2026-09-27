@@ -983,7 +983,8 @@ backend/tests/workpaper_sync/test_f5_canary_and_contract.py  904
 #     🔴 **基线随交付面增长**：这是本 whitelist 里唯一「变大是设计意图」的条目 ——
 #     「打磨应让文件变小」对 append-only 台账不成立。每批交付追加条目后把基线同步到实测值
 #     （2026-09-27：1360 → 1637，G8/G14 + 并发会话 H 循环若干条；1637 → 1773，G11 一条
-#     66 行 + 并发会话 H9/I/J/K 若干条）。
+#     66 行 + 并发会话 H9/I/J/K 若干条；1773 → 1910，H2 一条 + 并发会话 G13/I/J/K 若干条，
+#     其中 H 循环五条 provider 已全部登记且 adapter_registered 一律 False）。
 #     🔴 **关于「能不能拆」——如实登记，不粉饰**：早期注释写过「不可再拆」，这句**站不住**。
 #     按循环切成 `_d.py`/`_efg.py`/`_h.py` 再在本文件 `+` 聚合，判据
 #     test_contract_directory_matches_the_delivery_ledger 拿到的仍是一张完整表 ⇒ 技术上
@@ -995,4 +996,4 @@ backend/tests/workpaper_sync/test_f5_canary_and_contract.py  904
 #     判据面不因此放松：新条目仍要过 test_contract_directory_matches_the_delivery_ledger
 #     与 test_delivered_slice_contracts_pass_property_20_21_field_level 的双向核验。
 backend/tests/workpaper_sync/test_h_foundation_hc_guards.py  1149
-backend/app/services/workpaper_sync/adapters/delivered_contracts_ledger.py  1773
+backend/app/services/workpaper_sync/adapters/delivered_contracts_ledger.py  1910

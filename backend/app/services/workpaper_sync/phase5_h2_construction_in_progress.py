@@ -11,12 +11,19 @@ H9/H6/H4/H8 的每个模板列要么有 store 字段、要么明确无对端。H
 | 缺口 | 列 | 性质 | 处置 |
 |---|---|---|---|
 | H2-GAP-1 | `L 增加` | 模板可输入 vs HTML 派生（权威方向相反） | L 判 template-only，5 分项 store-only |
-| H2-GAP-2 | `O 其他减少` | 1 格对 2 字段（`decrease + transferOut`） | O→decrease 主映射，transferOut legacy_folded |
+| ~~H2-GAP-2~~ | ~~`O 其他减少`~~ | ~~1 格对 2 字段~~ | **✅ 已根治** —— 见下 |
 
-两处都**不硬凑映射** —— 硬凑会造成静默错数（前者把 OO 的输入吞掉、后者漏掉
-`transferOut` 那部分金额）。宁可留**可见缺口**，不要**不可见错数**。
-两处各带停下报告点，需审计域裁决的部分不由接线方拍板，详见
+GAP-1 **不硬凑映射** —— 硬凑会把 OO 侧的输入吞掉。宁可留**可见缺口**，不要
+**不可见错数**；它带停下报告点（摊分规则属审计域裁决），详见
 `phase5_h2_02_detail.DECLARED_COVERAGE_GAPS_H202`。
+
+🔴 **GAP-2 没有按「登记 + 停下报告」结案，而是把根因做掉了**：
+`transferOut` 自带 `@deprecated 并入 decrease`、全仓**零 UI 写入点**、真库
+`H2-2-rows` **0 行**（全表该字段只命中 G1/H3 两处别 entry 的同名字段，值为 0 与空串）
+⇒ 在 `_normalizeRow` 载入期把它**一次性并进** `decrease` 并置 0（幂等，历史非零值
+被加进不是丢弃），`_otherDecrease` 改为单一字段。此后 `O ↔ decrease` 是 1:1，缺口消失。
+守卫 `h2TransferOutFold.spec.ts`（3 行为 + 4 源码级判据，三变异全杀）。
+历史记录在 `RESOLVED_COVERAGE_GAPS_H202`。
 
 覆盖闭合仍成立：**34 映射 + 16 template-only == 50 有效列**，并集连续 A..AX 无缺口。
 
@@ -99,8 +106,11 @@ _EXTRA_REVIEW: Final[dict[str, Any]] = {
     # 🔴 显式空元组：H2 的 footer 之下是「三、审计说明」不是小计区（H4/H8 都有）。
     #    声明空而不省略，免得复用 H4/H8 判据的人以为「忘写了」。
     "unmanaged_regions": [],
-    # 🔴 本 entry 的核心差异：两处声明出来的覆盖缺口（含停下报告点）
+    # 🔴 本 entry 的核心差异：**一处**声明出来的覆盖缺口（含停下报告点）
     "declared_coverage_gaps": [dict(g) for g in _h202.DECLARED_COVERAGE_GAPS_H202],
+    # ✅ 已根治的历史缺口（原 GAP-2）—— 留档避免 GAP 编号跳号看起来像丢东西
+    "resolved_coverage_gaps": [dict(g) for g in _h202.RESOLVED_COVERAGE_GAPS_H202],
+    # 空：原本登记 `transferOut`，该折叠已在载入期归并掉（见 resolved_coverage_gaps）
     "legacy_folded_fields": {
         k: dict(v) for k, v in _h202.LEGACY_FOLDED_FIELDS_H202.items()
     },
@@ -148,14 +158,18 @@ _HTML_STORE_NOTE: Final[str] = (
     "按 stable field + 行身份 `rowId` 拆开。"
     "🔴 模板 50 有效列中 **34 列**映射 store 字段、**16 列** template-only，"
     "两数相加恰等于 50（覆盖闭合，并集连续 A..AX 无缺口）。"
-    "🔴 **本 entry 有两处声明出来的覆盖缺口**（前四条都没有）："
-    "① `L 增加` —— 模板无公式是可输入格，HTML 的 `increaseTotal` 由 5 个分项在 "
-    "`_recalcFormulas` 派生且不落库 ⇒ 两侧权威方向相反，OO 改 L 回写无处可落、"
-    "HTML load 又会用分项覆盖 ⇒ L 判 template-only、5 分项判 store-only，本格不双向；"
-    "② `O 其他减少` —— `useH2Detail.ts#L254 _otherDecrease = decrease + transferOut` "
-    "是 1 格对 2 字段 ⇒ O 映 `decrease`（主字段），`transferOut` 判 store-only + "
-    "legacy_folded，非零时两侧差额恰等于它。两处各带停下报告点（见 review."
-    "declared_coverage_gaps），需审计域裁决的部分不由接线方拍板。"
+    "🔴 **本 entry 有一处声明出来的覆盖缺口**（前四条都没有）：`L 增加` —— "
+    "模板无公式是可输入格，HTML 的 `increaseTotal` 由 5 个分项在 `_recalcFormulas` "
+    "派生且不落库 ⇒ 两侧权威方向相反，OO 改 L 回写无处可落、HTML load 又会用分项覆盖 "
+    "⇒ L 判 template-only、5 分项判 store-only，本格不双向。带停下报告点"
+    "（见 review.declared_coverage_gaps）：摊分规则属审计域裁决，不由接线方拍板。"
+    "✅ 原第二处缺口（`O 其他减少` 1 格对 2 字段）**已从根上消除**而非登记结案："
+    "`transferOut` 自带 @deprecated『并入 decrease』、全仓零 UI 写入点、真库 "
+    "`H2-2-rows` 0 行（全表该字段只命中 G1/H3 两处别 entry 同名字段，值为 0 与空串）"
+    "⇒ `_normalizeRow` 载入期一次性并进 `decrease` 并置 0（幂等，历史非零值被加进"
+    "不是丢弃），`_otherDecrease` 改单一字段，此后 O ↔ decrease 是 1:1。"
+    "守卫 `h2TransferOutFold.spec.ts`（3 行为 + 4 源码级判据，三变异全杀）；"
+    "历史留档在 review.resolved_coverage_gaps。"
     "🔴 footer R21 **不是一律 SUM**：AA21/AC21/AG21/AH21 四格是行内派生"
     "（见 review.footer_non_sum_cells）—— 判据按「footer 全是 =SUM(列)」写会假红。"
     "🔴 H2 **无** footer 之下的小计区（R22 直接是审计说明），与 H4/H8 相反。"

@@ -63,21 +63,30 @@ OO 侧改 `L` ⇒ 回写无处可落（不知该摊给哪个分项）；HTML loa
 **停下报告点**：若审计侧要求 `L` 双向，需先裁决摊分规则（例如「差额全部计入
 `increaseOther`」）—— 那是审计域决定，不由接线方定。
 
-═══ 🔴 缺口②：`O 其他减少` 是 1 格对 2 字段 ═══
+═══ ✅ 原缺口②（`O 其他减少` 1 格对 2 字段）**已从根上消除** ═══
 
-`useH2Detail.ts#L254`：
+原状：`_otherDecrease = decrease + transferOut`，而模板只有 `O 其他减少` 一格 ⇒
+投影只能落一个字段，另一个的金额会静默消失在两侧差额里。
 
-```
-/** 其他减少口径：decrease + 旧字段 transferOut */
-function _otherDecrease(row) { return _getNum(row.decrease) + _getNum(row.transferOut) }
-```
+**没有按「登记缺口 + 停下报告」结案**，而是把根因做掉了 —— 三条按值取证的依据：
+① 字段自带 `@deprecated 并入 decrease`（代码自己已宣布要合并，只是迁移没做完）；
+② 全仓 grep **零 UI 写入点**（只在 `_normalizeRow` 读回、`_persist` 原样写出）；
+③ 真库现算 `H2-2-rows` **0 行**，全表 `remark LIKE '%transferOut%'` 只命中
+   `G1-note-listed-store` 与 `H3-disc-soe-rows-soe-cost` 两处**别 entry 的同名字段**
+   （值分别为 0 与空串）⇒ H2 上下文零数据。
 
-⇒ 映 `O → decrease` 是**主字段**映射；若 store 里 `transferOut` 非零，
-投影写进 O 的只有 `decrease`，HTML 侧显示的是两者之和 ⇒ **两侧静默差额 = transferOut**。
-⇒ `transferOut` 进 `STORE_ONLY_FIELDS` 并登记在 `LEGACY_FOLDED_FIELDS_H202`。
-**停下报告点**：真库 `H2-2-rows` **无行**，无法实证 `transferOut` 是否真出现过；
-接线前应先扫真库确认其恒零/恒缺，若真有非零值，正确做法是**先做一次数据迁移**
-把它并进 `decrease`，而不是带着已知差额上线。
+做法：`_normalizeRow` 载入期把 `transferOut` **一次性并进** `decrease` 并置 0
+（幂等；历史非零值被**加进**而不是丢弃 —— 等于把 evidence 里开的「先做数据迁移」
+做成了载入期归一化，任何环境都生效，不需要单独迁移脚本）。
+此后 `其他减少 == decrease`，模板 `O` ↔ `decrease` 是 1:1。
+
+守卫 `h2TransferOutFold.spec.ts`：3 条行为判据 + 4 条源码级判据。
+🔴 变异反证的诚实结果：三个变异里「删归并」直接杀掉；「删显式清零」与
+「口径改回累加」在纯行为层面是**等价变异**（归并已让字段恒 0），由源码级判据拦下 ——
+它们虽无行为差异，却是**意图回退**，留着会让下一个人以为双口径还活着。
+
+⇒ 本 entry 现在只剩**一处**声明缺口（GAP-1 的 `L 增加`）。
+历史记录留在 `RESOLVED_COVERAGE_GAPS_H202`，免得 GAP 编号从 1 跳到 3 时看起来像丢了东西。
 """
 from __future__ import annotations
 
@@ -98,6 +107,7 @@ __all__ = [
     "STORE_ONLY_FIELDS_H202",
     "TEMPLATE_ONLY_COLUMNS_H202",
     "DECLARED_COVERAGE_GAPS_H202",
+    "RESOLVED_COVERAGE_GAPS_H202",
     "LEGACY_FOLDED_FIELDS_H202",
     "SIBLING_TABLE_KEYS_H202",
     "EFFECTIVE_COLUMNS_H202",
@@ -161,7 +171,8 @@ STORE_ONLY_FIELDS_H202: Final[tuple[str, ...]] = (
     "increaseMachinery",
     "increaseInterest",
     "increaseOther",
-    # 缺口②：折叠进「其他减少」的旧字段
+    # 🔴 已根治的旧字段（原缺口②）：载入期并进 decrease 后**恒 0**，仍落库只为不破坏
+    #    可能存在的旧读取方。它与模板 `O 其他减少` 的双向回写无关 ⇒ store-only。
     "transferOut",
     # 前端派生列（`_recalcFormulas` 算出，不落库或落库但由客户端重算）
     "increaseTotal",
@@ -194,21 +205,26 @@ STORE_ONLY_FIELDS_H202: Final[tuple[str, ...]] = (
     "impairDecAud",
 )
 
-#: 🔴 **缺口②** 的登记：被前端折叠进另一列口径的旧字段。
-#: 非零时两侧会出现差额（差额恰等于本字段值）⇒ 接线前必须先扫真库确认恒零/恒缺。
-LEGACY_FOLDED_FIELDS_H202: Final[dict[str, dict[str, str]]] = {
-    "transferOut": {
-        "folded_into_column": "O",
-        "folded_into_field": "decrease",
-        "folding_site": "useH2Detail.ts#L254 `_otherDecrease`",
-        "divergence_if_nonzero": "模板 O 只得 decrease，HTML 显示 decrease + transferOut",
-        "stop_and_report": (
-            "真库 H2-2-rows 无行，无法实证本字段是否出现过。接线前先扫真库："
-            "若恒零/恒缺则缺口是理论性的；若真有非零值，先做一次数据迁移把它并进 "
-            "decrease，不得带着已知差额上线。"
-        ),
-    },
-}
+#: 🔴 **缺口② 已从根上消除（不是被文档绕开）** —— 本表现为空。
+#:
+#: 原状：`transferOut` 与 `decrease` 同时承载「其他减少」口径
+#: （`useH2Detail.ts#L254 _otherDecrease = decrease + transferOut`），而模板只有
+#: `O 其他减少` **一格** ⇒ 投影只能落一个字段，另一个的金额会静默消失在两侧差额里。
+#:
+#: 三条依据支持根治而非登记（都按值取证，非推测）：
+#:   ① 字段自带 `@deprecated 并入 decrease`，代码自己已宣布要合并；
+#:   ② 全仓 grep：**零 UI 写入点**（只在 `_normalizeRow` 读回、`_persist` 原样写出，
+#:      没有任何 v-model / 导入 / 预填给它赋值）；
+#:   ③ 真库现算：`H2-2-rows` **0 行**；全表 `remark LIKE '%transferOut%'` 只命中
+#:      `G1-note-listed-store` 与 `H3-disc-soe-rows-soe-cost` 两处**同名但属别 entry**
+#:      的字段（值分别为 0 与空串）⇒ H2 上下文零数据。
+#:
+#: 做法：`_normalizeRow` 载入期把 `transferOut` **一次性并进** `decrease` 并置 0
+#: （幂等；历史非零值被**加进**而不是丢弃），`_otherDecrease` 改为单一字段。
+#: 此后 `其他减少 == decrease`，模板 `O` 与 `decrease` 是 1:1 ⇒ 缺口消失。
+#: 守卫：`h2TransferOutFold.spec.ts`（3 行为判据 + 4 源码级判据；三个变异全部被杀，
+#: 其中两个是「行为等价但意图回退」的变异，由源码级判据拦下）。
+LEGACY_FOLDED_FIELDS_H202: Final[dict[str, dict[str, str]]] = {}
 
 #: 🔴 **声明出来的覆盖缺口** —— 两处两侧语义打架，硬凑映射会造成静默错数。
 #: 契约 `review` 原样带出，供 roundtrip 判据跳过这两处并在报告里显示原因。
@@ -233,18 +249,39 @@ DECLARED_COVERAGE_GAPS_H202: Final[tuple[dict[str, str], ...]] = (
             "属审计域决定，不由接线方定。"
         ),
     },
+)
+
+#: 🔴 **已根治、不再是缺口**的历史条目 —— 登记它是为了留下「为什么现在只剩一条缺口」
+#: 的可追溯记录，避免下一个人看到 GAP 编号从 1 跳到 3 时以为丢了东西。
+RESOLVED_COVERAGE_GAPS_H202: Final[tuple[dict[str, str], ...]] = (
     {
         "gap_id": "H2-GAP-2",
         "column": "O",
         "column_header": "其他减少（未审数·本期减少）",
         "kind": "one_cell_two_fields",
-        "detail": (
-            "useH2Detail.ts#L254 `_otherDecrease` = decrease + transferOut ⇒ 模板 O "
-            "对应两字段之和。映 O → decrease 是主字段映射，transferOut 非零时两侧"
-            "静默差额。"
+        "was": (
+            "`_otherDecrease = decrease + transferOut` ⇒ 模板 O 一格对两字段，"
+            "投影只能落一个，另一个的金额静默消失在两侧差额里。"
         ),
-        "resolution": "O → decrease（主字段）；transferOut 判 store-only + legacy_folded。",
-        "stop_and_report": "见 LEGACY_FOLDED_FIELDS_H202['transferOut'].stop_and_report。",
+        "root_caused_by": (
+            "字段自带 @deprecated『并入 decrease』但迁移从未做完，于是「读取期累加」"
+            "长期代偿；双向回写把这个代偿暴露成真实错数风险。"
+        ),
+        "fix": (
+            "`_normalizeRow` 载入期把 transferOut 一次性并进 decrease 并置 0（幂等，"
+            "历史非零值被加进不是丢弃）；`_otherDecrease` 改为单一字段。"
+            "此后 O ↔ decrease 是 1:1。"
+        ),
+        "evidence": (
+            "①字段 @deprecated 注释 ②全仓 grep 零 UI 写入点 "
+            "③真库 H2-2-rows 0 行 + 全表 transferOut 仅命中 G1/H3 两处别 entry 同名字段"
+            "（值 0 与空串）"
+        ),
+        "guard": (
+            "h2TransferOutFold.spec.ts —— 3 条行为判据（历史值不丢 / 幂等 / 恒 0）"
+            "+ 4 条源码级判据（口径不得再累加、必须显式清零、归并只发生一处、"
+            "不得再从 raw 读回）；三个变异全部被杀。"
+        ),
     },
 )
 

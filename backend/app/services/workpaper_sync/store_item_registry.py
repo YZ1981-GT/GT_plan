@@ -516,6 +516,21 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="G13-detail-skeleton", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── G12（spec: g-cycle-single-region-detail-lanes · Task 13 / C-12）───────
+    #
+    # 🔴 本条的受管面是「零公式列」形态：数据区 R9-R13 没有任何一列每行都有公式
+    #    （`G` 只 R9 一格、`I` 只 R9/R10 两格）⇒ `formula_columns=()`、10 列全 `editable`。
+    #    `G`/`I` 原本是前端派生量（`rowCalcs`），本轮改为落库（`fvCheck`/`netHedgePnl`）——
+    #    不落库的话 R11-R13 那两列在 Excel 里永远是空格（模板缺 fill-down、后端又不写）。
+    #
+    # 🔴 **受管 sheet 零裸 IF**（整册 7 格全在别的 sheet）。中性化照挂：GC-2 要求 per-file
+    #    一律挂，本表零命中只意味着这一趟白跑，同册别的 sheet（审定表/附注/G12-4）仍需要它。
+    "g12.net_hedge_detail": StoreMergePlan(
+        adapter_id="g12.net_hedge_detail",
+        provider_module="phase5_g12_net_hedge_gains",
+        items=(StoreItemSpec(item_id="G12-hedge-detail-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     #
     # 🔴 **HC-12：H 循环 9 册全部命中 OO 加载期裸 `IF(`** ⇒ 同 G 的 per-file 保守策略，

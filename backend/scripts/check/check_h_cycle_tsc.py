@@ -4,11 +4,13 @@ spec: `h-cycle-sync-foundation-and-first-canary`
 
 ═══ 为什么需要这个脚本，而不是直接看 `vue-tsc` 退出码 ═══════════════════════════
 
-本 spec 的类型面包含 **`GtH9LeaseLiabilities.vue` 宿主**。把 `.vue` 宿主纳入
+本 spec 的类型面包含 **H 循环各宿主 `.vue`**（见 `HOST_FILES`）。把 `.vue` 宿主纳入
 type-check 会把整个应用的传递依赖图一起拉进来（stores / eventBus / 其它循环的 Tab），
-而那张图**当前不是类型干净的**：现算 30 条错误，分布在 14 个文件，全部与本 spec 无关
-（`src/stores/project.ts` 的 eventBus 事件名、`noteDisclosureReverseJump.ts` 的变体类型、
-`GtAProgramConsole` 的 prop 名等）。
+而那张图**当前不是类型干净的**：总错误数三位数且**随并发会话漂移**（本轮现算 116），
+绝大多数与本 spec 无关（`src/stores/project.ts` 的 eventBus 事件名、
+`noteDisclosureReverseJump.ts` 的变体类型、`GtAProgramConsole` 的 prop 名等）。
+⇒ 总数**故意不设阈值**（设了就会被别人的改动打红，等于没门）；设阈值的只有
+  「本 spec 拥有的文件」和「逐宿主」两个面。
 
 仓库既有的 per-spec tsconfig 全都**只列 `.ts` 文件、不列 `.vue` 宿主**，正是为了绕开这个
 问题。但绕开的代价是宿主完全不被类型检查 —— 本轮实测代价具体化了：接桥时删掉宿主内联的
@@ -37,6 +39,7 @@ OWNED = (
     "sync/hManagedSheets.ts",
     "sync/onlyOfficeHealth.ts",
     "composables/hSeedRowIdentity.ts",
+    "composables/useH2Detail.ts",
     "d4/composables/useD4SyncMode.ts",
 )
 
@@ -54,6 +57,7 @@ HOST_FILES: tuple[str, ...] = (
     "GtH6AssetDisposalClearing.vue",
     "GtH8RightOfUseAssets.vue",
     "GtH4EngineeringMaterials.vue",
+    "GtH2ConstructionInProgress.vue",
 )
 #: 🔴 逐宿主基线按**现算**填，不照抄别的宿主。
 #:
@@ -79,6 +83,14 @@ HOST_ERROR_BASELINE: dict[str, int] = {
     #: 在本轮 diff hunk 之外。H4 没有 H8 那 7 条（其宿主不用 eventBus.on/off，
     #: 也没有 `inject(..., undefined)`）⇒ 逐宿主基线确实不能照抄。
     "GtH4EngineeringMaterials.vue": 1,
+    #: H2 **0** 条 —— 五个宿主里唯一的零基线，且是现算值不是乐观填的。
+    #: 没有 H9/H6/H4 那条 `sheet-code` 错误的原因是**结构性**的：H2 程序表走
+    #: `shared/CycleTabProcedure.vue`（其 prop 确实声明为 `sheetCode`），
+    #: 不是 `GtAProgramConsole`（声明的是 `sheetName`）。
+    #: 正向对照已做：在本宿主植入一条 `const x: number = 'y'`，门当场报
+    #: `GtH2ConstructionInProgress.vue(350,7) TS2322` 并打红 ⇒ 0 是「真检查过且干净」，
+    #: 不是「文件没被编译的假绿」。
+    "GtH2ConstructionInProgress.vue": 0,
 }
 
 _ERR_RE = re.compile(r"^(?P<file>[^(]+)\((?P<line>\d+),\d+\): error (?P<code>TS\d+)")

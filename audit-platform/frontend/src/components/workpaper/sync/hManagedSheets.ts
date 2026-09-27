@@ -15,13 +15,12 @@
  * ═══ 🔴 诚实边界：受管面 ≠ 已接桥面 ═══════════════════════════════════════════
  *
  * D3 实证过「契约受管 ≠ 已接 OO 直写宿主」（D3-4/5/6/7 受管但未接桥）。H 当前的真实状态：
- *   · 后端 provider **只有 H9**（`phase5_h9_lease_liabilities` / `h9.lease_liability_detail`）
- *     —— H2/H3/H4/H5/H6/H7/H8/H10 八条 lane 的 provider 尚未落地；
+ *   · 后端 provider 已落地 **H9 / H6 / H8 / H4 / H2** 五条 —— H3/H5/H7/H10 四条尚未；
  *   · H1 是**同循环既有 pilot**（`pilot_h1_grouped_dynamic`），走 `pilot_*` 范式、
  *     adapter 已注册，**不属本轮受管面**，故不进本清单（避免把两套范式并进同一个布尔，
  *     D4-35/D4-13 踩过「切错桥 + 工具条叠加」）。
- * ⇒ 本清单当前 1 条。**不得**因「H 循环有 9 条 entry」就预先声明 9 条：那会让
- *   `isHOoWiredRowsSheet` 对未接桥的 sheet 返 true，宿主据此渲染
+ * ⇒ 本清单只列 provider 已交付的 sheet。**不得**因「H 循环有 9 条 entry」就预先声明 9 条：
+ *   那会让 `isHOoWiredRowsSheet` 对未接桥的 sheet 返 true，宿主据此渲染
  *   `WorkpaperSyncEditorHost` 而后端没有 adapter，用户点「在线编辑」直接失败。
  *
  * ═══ 后端守护 ═══════════════════════════════════════════════════════════════
@@ -84,11 +83,8 @@ export const H_MANAGED_SHEETS: readonly HManagedSheet[] = Object.freeze([
     storeItemId: 'H6-2-rows',
   },
   {
-    // 🔴 **受管但尚未接桥** —— 本条刻意只进 `H_MANAGED_SHEETS`，不进
-    //    `H_OO_WIRED_ROWS_CODES`。这正是这两个集合分开存在的理由：后端契约已交付
-    //    （四级表头 / 49 列 / 三区块），但宿主接桥是独立一步（H4 载体是
-    //    `formdata_composable`，flush 钩子要取 composable 的导出而非宿主内联函数）。
-    //    在接桥完成前声明「已接桥」会让用户点「在线编辑」时渲染 EditorHost 而桥未就绪。
+    // 全 H 唯一的**四级表头 / 49 列 / 三区块**主表；载体是 `formdata_composable`，
+    // 故宿主 flush 钩子取的是 composable 导出而非宿主内联函数。已接桥。
     entryId: 'xlsx/gt-h4-engineering-materials',
     code: 'H4-2',
     sheetKey: 'h402-managed',
@@ -97,7 +93,7 @@ export const H_MANAGED_SHEETS: readonly HManagedSheet[] = Object.freeze([
     storeItemId: 'H4-2-rows',
   },
   {
-    // 受管但尚未接桥（同 H4-2 的理由）。H8 是全 H 唯一 58 列全 1:1 零 template-only 的主表。
+    // H8 是全 H 唯一 58 列全 1:1 零 template-only 的主表。已接桥。
     entryId: 'xlsx/gt-h8-right-of-use-assets',
     code: 'H8-2',
     sheetKey: 'h802-managed',
@@ -106,9 +102,11 @@ export const H_MANAGED_SHEETS: readonly HManagedSheet[] = Object.freeze([
     storeItemId: 'H8-2-rows',
   },
   {
-    // 受管但尚未接桥。H2 是首条带**声明覆盖缺口**的 entry（`L 增加` 不双向、
-    // `O 其他减少` 是 1 格对 2 字段），两处各带停下报告点 —— 接桥前应先看契约
-    // `review.declared_coverage_gaps`，尤其 transferOut 的真库扫描那条。
+    // H2 是唯一仍带**声明覆盖缺口**的 entry：契约 `review.declared_coverage_gaps`
+    // 留 GAP-1（`L 增加` 模板可输入 vs HTML `increaseTotal` 由 5 分项派生，摊分规则
+    // 属审计域，判 template-only）。原 GAP-2（`O 其他减少` 1 格对 2 字段）已根治
+    // —— `useH2Detail._normalizeRow` 载入期把 `transferOut` 并进 `decrease`，
+    // 见契约 `review.resolved_coverage_gaps`。已接桥。
     entryId: 'xlsx/gt-h2-construction-in-progress',
     code: 'H2-2',
     sheetKey: 'h202-managed',
@@ -122,15 +120,17 @@ export const H_MANAGED_SHEETS: readonly HManagedSheet[] = Object.freeze([
  * 当前**真正接了统一双向宿主（`WorkpaperSyncEditorHost` + `useWorkpaperSyncBridge`）**
  * 的受管行表短码。
  *
- * 当前受管 1 张、接桥 1 张 ⇒ 两集合相等。保留这层区分是因为受管面会先于接桥面增长
- * （8 条 lane provider 落地时先进 `H_MANAGED_SHEETS`，宿主接桥另做）—— 届时**不得**
- * 因「它是受管 sheet」就假称可切 OO。
+ * 保留这层区分是因为**受管面会先于接桥面增长**：provider 落地即进
+ * `H_MANAGED_SHEETS`，宿主接桥是独立一步。两集合此刻恰好相等，但**不得**据此
+ * 把判定改成「受管即已接桥」—— 下一条 provider 落地时就会再次分叉，届时若靠
+ * `H_MANAGED_SHEETS` 判定，用户点「在线编辑」会渲染 EditorHost 而桥未就绪。
  */
 export const H_OO_WIRED_ROWS_CODES: readonly string[] = Object.freeze([
   'H9-2',
   'H6-2',
   'H8-2',
   'H4-2',
+  'H2-2',
 ])
 
 const BY_CODE: ReadonlyMap<string, HManagedSheet> = (() => {

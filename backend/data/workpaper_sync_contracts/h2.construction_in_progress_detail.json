@@ -29,15 +29,6 @@
         "kind": "authority_direction_conflict",
         "resolution": "L 判 template-only，5 个分项判 store-only；本格不参与双向同步。",
         "stop_and_report": "若审计侧要求 L 双向，需先裁决摊分规则（如差额全部计入 increaseOther）——属审计域决定，不由接线方定。"
-      },
-      {
-        "column": "O",
-        "column_header": "其他减少（未审数·本期减少）",
-        "detail": "useH2Detail.ts#L254 `_otherDecrease` = decrease + transferOut ⇒ 模板 O 对应两字段之和。映 O → decrease 是主字段映射，transferOut 非零时两侧静默差额。",
-        "gap_id": "H2-GAP-2",
-        "kind": "one_cell_two_fields",
-        "resolution": "O → decrease（主字段）；transferOut 判 store-only + legacy_folded。",
-        "stop_and_report": "见 LEGACY_FOLDED_FIELDS_H202['transferOut'].stop_and_report。"
       }
     ],
     "derived_fields": [],
@@ -55,23 +46,28 @@
       "item_ids": [
         "H2-2-rows"
       ],
-      "note": "H2 在建工程的结构化 Tab 行数据存成 checklist_responses 的 **remark** JSON 数组，按 stable field + 行身份 `rowId` 拆开。🔴 模板 50 有效列中 **34 列**映射 store 字段、**16 列** template-only，两数相加恰等于 50（覆盖闭合，并集连续 A..AX 无缺口）。🔴 **本 entry 有两处声明出来的覆盖缺口**（前四条都没有）：① `L 增加` —— 模板无公式是可输入格，HTML 的 `increaseTotal` 由 5 个分项在 `_recalcFormulas` 派生且不落库 ⇒ 两侧权威方向相反，OO 改 L 回写无处可落、HTML load 又会用分项覆盖 ⇒ L 判 template-only、5 分项判 store-only，本格不双向；② `O 其他减少` —— `useH2Detail.ts#L254 _otherDecrease = decrease + transferOut` 是 1 格对 2 字段 ⇒ O 映 `decrease`（主字段），`transferOut` 判 store-only + legacy_folded，非零时两侧差额恰等于它。两处各带停下报告点（见 review.declared_coverage_gaps），需审计域裁决的部分不由接线方拍板。🔴 footer R21 **不是一律 SUM**：AA21/AC21/AG21/AH21 四格是行内派生（见 review.footer_non_sum_cells）—— 判据按「footer 全是 =SUM(列)」写会假红。🔴 H2 **无** footer 之下的小计区（R22 直接是审计说明），与 H4/H8 相反。",
+      "note": "H2 在建工程的结构化 Tab 行数据存成 checklist_responses 的 **remark** JSON 数组，按 stable field + 行身份 `rowId` 拆开。🔴 模板 50 有效列中 **34 列**映射 store 字段、**16 列** template-only，两数相加恰等于 50（覆盖闭合，并集连续 A..AX 无缺口）。🔴 **本 entry 有一处声明出来的覆盖缺口**（前四条都没有）：`L 增加` —— 模板无公式是可输入格，HTML 的 `increaseTotal` 由 5 个分项在 `_recalcFormulas` 派生且不落库 ⇒ 两侧权威方向相反，OO 改 L 回写无处可落、HTML load 又会用分项覆盖 ⇒ L 判 template-only、5 分项判 store-only，本格不双向。带停下报告点（见 review.declared_coverage_gaps）：摊分规则属审计域裁决，不由接线方拍板。✅ 原第二处缺口（`O 其他减少` 1 格对 2 字段）**已从根上消除**而非登记结案：`transferOut` 自带 @deprecated『并入 decrease』、全仓零 UI 写入点、真库 `H2-2-rows` 0 行（全表该字段只命中 G1/H3 两处别 entry 同名字段，值为 0 与空串）⇒ `_normalizeRow` 载入期一次性并进 `decrease` 并置 0（幂等，历史非零值被加进不是丢弃），`_otherDecrease` 改单一字段，此后 O ↔ decrease 是 1:1。守卫 `h2TransferOutFold.spec.ts`（3 行为 + 4 源码级判据，三变异全杀）；历史留档在 review.resolved_coverage_gaps。🔴 footer R21 **不是一律 SUM**：AA21/AC21/AG21/AH21 四格是行内派生（见 review.footer_non_sum_cells）—— 判据按「footer 全是 =SUM(列)」写会假红。🔴 H2 **无** footer 之下的小计区（R22 直接是审计说明），与 H4/H8 相反。",
       "payload_column": "remark",
       "payload_column_mode": "dual_write_remark_and_conclusion",
       "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useH2Detail.ts —— `_persist()` 经宿主 onSave 写 { item_id: 'H2-2-rows', remark: JSON.stringify(rows) }",
       "shape": "json_array_of_row_objects",
       "table": "checklist_responses"
     },
-    "legacy_folded_fields": {
-      "transferOut": {
-        "divergence_if_nonzero": "模板 O 只得 decrease，HTML 显示 decrease + transferOut",
-        "folded_into_column": "O",
-        "folded_into_field": "decrease",
-        "folding_site": "useH2Detail.ts#L254 `_otherDecrease`",
-        "stop_and_report": "真库 H2-2-rows 无行，无法实证本字段是否出现过。接线前先扫真库：若恒零/恒缺则缺口是理论性的；若真有非零值，先做一次数据迁移把它并进 decrease，不得带着已知差额上线。"
-      }
-    },
+    "legacy_folded_fields": {},
     "pilot_class": "phase5_construction_in_progress_detail",
+    "resolved_coverage_gaps": [
+      {
+        "column": "O",
+        "column_header": "其他减少（未审数·本期减少）",
+        "evidence": "①字段 @deprecated 注释 ②全仓 grep 零 UI 写入点 ③真库 H2-2-rows 0 行 + 全表 transferOut 仅命中 G1/H3 两处别 entry 同名字段（值 0 与空串）",
+        "fix": "`_normalizeRow` 载入期把 transferOut 一次性并进 decrease 并置 0（幂等，历史非零值被加进不是丢弃）；`_otherDecrease` 改为单一字段。此后 O ↔ decrease 是 1:1。",
+        "gap_id": "H2-GAP-2",
+        "guard": "h2TransferOutFold.spec.ts —— 3 条行为判据（历史值不丢 / 幂等 / 恒 0）+ 4 条源码级判据（口径不得再累加、必须显式清零、归并只发生一处、不得再从 raw 读回）；三个变异全部被杀。",
+        "kind": "one_cell_two_fields",
+        "root_caused_by": "字段自带 @deprecated『并入 decrease』但迁移从未做完，于是「读取期累加」长期代偿；双向回写把这个代偿暴露成真实错数风险。",
+        "was": "`_otherDecrease = decrease + transferOut` ⇒ 模板 O 一格对两字段，投影只能落一个，另一个的金额静默消失在两侧差额里。"
+      }
+    ],
     "reviewed_basis": "openpyxl 逐格实测 H/H2 在建工程.xlsx 的 `明细表H2-2`（四级表头 R9/R10/R11/R12 共 46 个合并域 / 数据 R13-R20 共 **8 行，全 H 最短** / footer R21 `合计`（AA·AC·AG·AH 四格为行内派生不是列 SUM）/ 有效内容列 50 即 A..AX / 数据行公式列 21 个（映射侧 10 个进 FORMULA_TEMPLATES）/ 分区 A..I 属性列 · 原值 J9:AH9（每组带「其中：」子列，H2 独有）· 减值准备 AI9:AS9 · **两对**净值 AT9:AU10 期初 + AV9:AW10 期末 · AX 是否抵押 / 册 21 sheets 全 H 最多 / footer 之下**无** SUMPRODUCT 小计区） + 前端 `useH2Detail.ts` 按值 grep（ROWS_KEY / H2DetailRow 78 字段 / _persist() 56 键 / #L254 `_otherDecrease = decrease + transferOut` 定死缺口② / #L351 `_recalcFormulas` 的 increaseTotal 由 5 分项派生定死缺口①） + 六项自检（34+16==50 闭合 / 并集连续无缺口 / 无列重复无交叠 / 10 个公式模板与 R13 逐字一致 / 34 个 header_text 与模板最下层表头逐字一致 / 两条缺口登记与实际映射一致） + 真库现算（`H2-2-rows` **无行** ⇒ 缺口② 的 `transferOut` 是否真出现过无法实证，已登记为停下报告点）",
     "sibling_tables_not_managed": [
       "H2-2-audit-note",

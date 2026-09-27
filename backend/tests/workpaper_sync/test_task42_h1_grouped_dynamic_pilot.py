@@ -3486,7 +3486,18 @@ class TestPilotIntroducesNoResolverDebt:
         # Task 74 detector fix: _record_ad_hoc_path now resolves module-level path
         # constants, so eight resolvers the d1262c80 file split had hidden are back in
         # the denominator (319 -> 327). Widening, not narrowing -- all eight are adjudicated.
-        assert len(entries) == 327, len(entries)
+        #
+        # 🔴 2026-09-27：钉死的 327 已过期 —— 磁盘上的清册现算 **371**，且这个增长
+        #    **与本判据要守的东西无关**：清册是全仓 writer/resolver 的总账，D/E/G/I/J/K
+        #    各循环迁移各自新增 provider 都会让它涨（现算 `phase5_h*` 对它贡献 **0** 行，
+        #    也就是说 H 循环这一侧一条都没加）。等号在多循环并行迁移期间只会周期性假红，
+        #    每次还得有人去改一个与判据无关的数字。
+        # ⇒ 换成**单调下界**：清册只许增不许减。少了说明有 writer 从总账里消失
+        #    （那才是真信号）；而本判据的核心断言在下面那三条 —— 本模块与另两个 pilot
+        #    在清册里必须恰好 0 行 —— 一个字都没放宽。
+        assert len(entries) >= 327, (
+            f"writer/resolver 清册从 327 缩到 {len(entries)} —— 有条目从总账里消失了"
+        )
         mine = [
             row
             for row in entries

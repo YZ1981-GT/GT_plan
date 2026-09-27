@@ -1019,6 +1019,74 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "平台级缺口（umbrella BP-61-1 = G slice 的 BP-1~BP-3），供给就绪后真栈注册。"
         ),
     },
+    # ── G12（spec: g-cycle-single-region-detail-lanes · Task 13 / C-12）───────
+    {
+        "contract_id": "g12.net_hedge_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_g12_net_hedge_gains",
+        "delivered_by_task": "G1R-Task13",
+        "pilot_class": "phase5_net_hedge_detail",
+        "entry_id": "xlsx/gt-g12-net-hedge-gains",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "G/G12 净敞口套期收益.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "spec `g-cycle-single-region-detail-lanes` 九条中的**第七条**。"
+            "权威模板 sha256 6645caf0…（79,999 B，11 sheets）；受管 sheet = 明细表G12-2。"
+            "🔴 **一：spec 的「无表头行」前提早已被推翻**。spec 原文说 G12-2「无表头行"
+            "（R9 即数据）」并据此立了裁决 G1R-H2（要框架层加 `has_header_row`）。Task 2 实测："
+            "**R7/R8 是两级表头**、R9 起才是数据（整册比别家上移两行）⇒ 框架层**无需改**，"
+            "本条走通例分支，Task 0 §1.1 登记的缺口对 G12 不适用。"
+            "几何：🔴 横向组**只有一个** `D7:G7`（套期工具公允价值），其余六列 A/B/C/H/I/J 是 "
+            "R7:R8 纵向合并 / 数据区 R9-R13 五行（**只 R9/R10 有预填**，R11-R13 整行全空；"
+            "footer 的 SUM 区间是 x9:x13 ⇒ 模板自己把数据区画到 R13）/ footer R14 / "
+            "🔴 有效内容列 **10**（A..J）**小于 max_column=15**（5 个空尾列）⇒ uuid_col=**K**"
+            "（按有效列右移一列，GC-3 口径；取 P 会把 5 个空列圈进受管区）——九条里第二家"
+            "出现「有效列 < max_column」的（另一家是 G8 的 23/24）/ 0 个 definedName。"
+            "🔴 **二：`formula_columns` 是空的**。逐格实测数据区 R9-R13 **没有任何一列每行都有"
+            "公式**：`G` 只在 R9 一格（`=D9=SUM(E9:F9)` 布尔校验）、`I` 只在 R9/R10 两格"
+            "（`=E9+H9` / `=E10+H10`），其余八列零公式。列级 mode 表达不了「1 行有 + 4 行无」"
+            "⇒ 两列判 `editable`。三格都是**普通公式、不是 shared 主格** ⇒ 写字面量不撞 "
+            "`SharedFormulaMasterWriteError`。"
+            "⇒ 🔴 这**推翻 Task 4 的 P9 判据对 G12 的期望**（「布尔列声明为 formula + boolean」）："
+            "`boolean` 成立、`formula` **不成立**（判 formula 会让 materialize 在 R10-R13 四格抛 "
+            "`ProtectedRegionWriteError`）。判据已按实测改写，保护面不放宽。"
+            "🔴 **三：`G`/`I` 由前端派生改为落库**。两列原本只活在 `rowCalcs` computed 里"
+            "（`calcFvAllocationCheck` / `calcNetHedgePnl`）；按「派生校验 vs 第二真源」的判据本该"
+            "「保留前端、后端不声明」，**但那样 R11-R13 的这两列在 Excel 里会永远是空格**"
+            "（模板缺 fill-down、后端又不写）⇒ 用户新增的第 3 行看不到校验与净敞口套期损益。"
+            "本轮给 `G12HedgeDetailRow` 加 `fvCheck`/`netHedgePnl` 两字段并落库，**单一真源仍是"
+            "那两个纯函数**（`enrich()` 里现算），`rowCalcs` 改为从行模型读、对外 API 与字段名"
+            "不变 ⇒ 消费方 `G12TabHedgeDetail.vue` 零改动。"
+            "🔴 **四：五处模板缺陷**（①`B14 = =SUM(B9,B12,B13:B13)` **漏加 B10/B11 —— 数值错**，"
+            "应为 `=SUM(B9:B13)` ②`I14 = =SUM(I7:I13)` 起点越到**表头组行 R7**，应为 "
+            "`=SUM(I9:I13)` ③`G` 列公式只填 R9、R10-R13 整格无公式 ④`I` 列公式只填 R9/R10、"
+            "R11-R13 整格无公式 ⑤`H14` **整格无公式** —— footer 漏了 H 列合计，B/C/D/E/F/G/I/J "
+            "八列都有）。①② 是 Task 2 的发现 G，③④⑤ 本轮新发现。一律**逐字记模板原式**"
+            "（落 `TEMPLATE_ROW_FORMULAS_G1202` / `TEMPLATE_FOOTER_FORMULAS_G1202` / "
+            "`TEMPLATE_FORMULA_COVERAGE_DEFECTS_G1202`），判据按格比对；**不改模板字节**"
+            "（运行时只读 + sha 冻结），会计正确口径由前端承担。"
+            "🔴 **五：footer R14 的 shared 组被打断**。`F14` 是主格、ref=**F14:J14** 覆盖五列，"
+            "但 `H14` 无公式、`I14` 是独立 plain 公式 ⇒ 实际成员只有 `G14`/`J14` 两格。"
+            "按「组 ref 覆盖的列都是成员」去验会有两格假红；按「footer 全列同形态」去验会在 "
+            "H14 与 I14 各打一次红 ⇒ `footer_carries_total_formula=True` 成立，但 roundtrip "
+            "判据不得假设全列同形态。"
+            "🔴 **受管 sheet 零裸 IF**（整册 7 格全在别的 sheet）⇒ 中性化不动本表；"
+            "per-file 中性化照挂（GC-2）。"
+            "🔴 **FD-1**：HTML store = checklist_responses.item_id='G12-hedge-detail-rows'，"
+            "payload 落 **remark**。行身份键 **`rowId`**，生成器后缀取 **3** 位 "
+            "`slice(2, 5)`（G11/G13 取 4 位 —— 形态判定必须按值 grep）。"
+            "前端另有 4 个非模板列字段不受管：`seq`（🔴 纯显示序号 —— 模板 A 列是「项目」不是"
+            "序号，与 G11 的 seq 是真列相反）· `rowKind`（fv_allocation/amortization）· "
+            "`remark` · `rowId` 本身。"
+            "wp_code 裁决：manifest 幻影码 ['G12N']（matcher 域），真码 **G12**（载荷所在）。"
+            "🔴 **TB 口径是本期发生额**：G12 是损益类 —— 不是余额。"
+            "FC-9 红线：本 provider 对 trial_balance 写次数为 0；审定表归后置 spec "
+            "`g-cycle-adjudication-sheets-coverage`（GF-H5）。"
+            "`adapter_registered=False`：与 D1/D3/D5/D6/D7/E1/F1~F5/G2/G8/G9/G10/G11/G13/G14 "
+            "卡在同一平台级缺口（umbrella BP-61-1 = G slice 的 BP-1~BP-3），供给就绪后真栈注册。"
+        ),
+    },
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     {
         "contract_id": "h9.lease_liability_detail",

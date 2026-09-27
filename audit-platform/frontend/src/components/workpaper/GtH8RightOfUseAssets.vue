@@ -784,7 +784,8 @@ onBeforeUnmount(() => {
   eventBus.off('substantive:adjudicated', _handleTbUpdated)
   eventBus.off('h9:liability-updated', _handleH9Updated)
   eventBus.off('h9:lease-payment-updated', _handleH9PaymentUpdated)
-  for (const t of _saveTimers.values()) clearTimeout(t)
+  // 🔴 同 H9：裸 `clearTimeout` 会丢掉防抖窗口内那批值，必须走 flush。
+  void flushPendingSaves()
 })
 </script>
 

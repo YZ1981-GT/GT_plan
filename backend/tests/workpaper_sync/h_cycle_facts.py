@@ -754,4 +754,8 @@ def available_contract_ids() -> tuple[str, ...]:
     return tuple(sorted(p.stem for p in CONTRACTS_DIR.glob("*.json")))
 
 
+# 迁移进度口径（已迁移 entry 集 / BP-8 删除账本 / 交付台账映射 / 冻结行号再定位）
+# 见伴生模块 `h_migration_progress.py` —— 本模块已到行数上限，且那是「进展」不是「事实」。
+
+
 __all__ = [n for n in dir() if not n.startswith("_")]

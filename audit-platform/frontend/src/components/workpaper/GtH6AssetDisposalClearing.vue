@@ -512,7 +512,9 @@ onBeforeUnmount(() => {
   window.removeEventListener('substantive:adjudicated', _handleTbUpdated)
   window.removeEventListener('h1:disposal-completed', _handleDisposalInitiated)
   window.removeEventListener('disposal:source-updated', _handleDisposalSourceUpdated)
-  for (const t of _saveTimers.values()) clearTimeout(t)
+  // 🔴 同 H9/H8：裸 `clearTimeout` 会丢掉防抖窗口内那批值。H6 的 flush 函数名是
+  //    `flushPending`（早于统一命名，接桥时沿用），语义一致：先清定时器再真落库。
+  void flushPending()
 })
 
 /**

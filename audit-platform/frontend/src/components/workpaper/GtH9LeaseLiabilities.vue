@@ -571,7 +571,10 @@ onBeforeUnmount(() => {
   eventBus.off('trial-balance:updated', _handleTbUpdated)
   window.removeEventListener('h8:lease-terminated', _handleH8LeaseTerminated)
   window.removeEventListener('h8:asset-updated', _handleH8Updated)
-  for (const t of _saveTimers.values()) clearTimeout(t)
+  // 🔴 `flushPendingSaves()` 而非裸 `clearTimeout` —— 裸清只清定时器、**丢掉**
+  //    防抖窗口内那批值（离开底稿前最后不到 800ms 的编辑静默消失）。
+  //    flush 同样会清干定时器（第一步就是），并把待落库项真发出去。
+  void flushPendingSaves()
 })
 </script>
 
