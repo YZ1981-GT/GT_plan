@@ -427,6 +427,26 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="G10-detail-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── G8（spec: g-cycle-single-region-detail-lanes · Task 9b / C-8）────────
+    #
+    # 几何同 G10（两级表头 + 单区 R11-R20 + footer R21）⇒ 薄转发，无伴生模块。
+    #
+    # 🔴 G8 是 **FVOCI**（其他权益工具投资）—— OCI 三列 F/L/R 是 CAS22 要求的，
+    #    与 G9/G10 的「删 OCI 四列」**反向**。照抄那两条的移除清单会删掉准则要求的列。
+    #
+    # 🔴 模板有**四处行级公式缺陷**（M 在 R12-20 漏 L · P 在 R11+R13-20 漏 K ·
+    #    R 在 R13-20 整格无公式 · T 在 R12 整格无公式）⇒ `R`/`T` 只能判 `editable`
+    #    （判 formula 会撞 `excel_materialize` 的 `ProtectedRegionWriteError`），
+    #    由前端按恒等式重算覆盖。逐格台账见 `phase5_g8_02_detail` 模块头。
+    #
+    # 🔴 GC-2：G8 册裸 IF **12 格**（全 G 循环最少，全在 `审定表G8-1`，受管表零命中）。
+    #    per-file 保守策略 ⇒ 受管表干净也必须挂；中性化函数与 G7/G2/G9/G10/H9 共用一个。
+    "g8.other_equity_detail": StoreMergePlan(
+        adapter_id="g8.other_equity_detail",
+        provider_module="phase5_g8_other_equity",
+        items=(StoreItemSpec(item_id="G8-detail-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     #
     # 🔴 **HC-12：H 循环 9 册全部命中 OO 加载期裸 `IF(`** ⇒ 同 G 的 per-file 保守策略，
@@ -486,6 +506,33 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         adapter_id="h4.engineering_materials_detail",
         provider_module="phase5_h4_engineering_materials",
         items=(StoreItemSpec(item_id="H4-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── H8 58 列全 1:1、零 template-only（spec: h4-h8-sub-entry-lanes-…）──
+    #
+    # 🔴 **全 H 唯一 `template_only_columns` 为空的主表**：前端 `H8DetailRow` 的
+    #    `cost*` / `dep*` / `impair*` 三族与模板三大区块逐列同构，连六个增减去向都对上。
+    #    闭合自检 = 58 映射 + 0 template-only == 58 有效列。
+    #
+    # 🔴 册 465,476 B 全 H 最大，裸 `IF(` 也最重（主来源
+    #    `使用权资产 租赁负债初始及后续计量（按月）H8-6`，361 行 × 16 列）⇒ 中性化必挂。
+    #    函数与 G7/G2/H9/H6/H4 共用一个，不新造。
+    #
+    # 🔴 三处"看着像、其实不同"（照抄会静默出错，已在 sheet 声明逐条钉住）：
+    #    ①原值块 3 增 3 减 vs 折旧/减值块 2 增 3 减 —— 照抄会多映一列整块右移；
+    #    ②未审期末 `K=SUM(D:G)-SUM(H:J)` 含期初 D，而 `AC=SUM(W:Y)-SUM(Z:AB)` 首格即期初；
+    #    ③`BE`/`BF` 是**审定**净值（`=S-AJ-BA` / `=V-AM-BD`），映 netBeginAud/netEndAud；
+    #      前端 netBeginUnadj/netEndUnadj 模板无列，按名字直觉映过去会把审定值写进未审字段。
+    #
+    # 🔴 `H8-2-rows` 的 12 个消费方**全在 entry 内**（不是跨 entry）⇒ 冻结力度比
+    #    H9/H6 更强，改名要同步改 12 个文件。
+    #
+    # 🔴 3 条 `H8T` 子入口（H8TabRecoverable / H8TabMeasurementAnnual /
+    #    H8TabMeasurementMonthly，按 manifest entry_id 现算）按 AC 1.6 复用本 adapter。
+    "h8.right_of_use_assets_detail": StoreMergePlan(
+        adapter_id="h8.right_of_use_assets_detail",
+        provider_module="phase5_h8_right_of_use_assets",
+        items=(StoreItemSpec(item_id="H8-2-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
 }

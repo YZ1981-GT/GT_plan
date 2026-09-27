@@ -939,7 +939,7 @@ backend/app/services/disclosure_engine.py  2654
 #
 #   registry.py —— 本 lane 在 DELIVERED_PER_ENTRY_CONTRACTS 追加 G2 一条 + _ALLOWED_PROVIDER_MODULES
 #     追加模块路径。基线 1830→1938（+108，含既有并发修改，本 lane 净增约 +20）。更新基线。
-backend/app/services/workpaper_sync/adapters/registry.py  2221
+backend/app/services/workpaper_sync/adapters/registry.py  1303
 #
 #   test_g_foundation_p10_p16_g2_canary.py —— G2 canary 判据：几何 / payload / 键收敛 /
 #     TB 红线（含变异 + 宿主侧）/ P15 真栈前置（8 条）/ P19 引擎层往返（4 条）。
@@ -976,4 +976,11 @@ backend/tests/workpaper_sync/test_f5_canary_and_contract.py  904
 #     宽表列 / 四干净点 / wp_index 规避 / footer 形态 16 类 —— 拆开会让「共性裁决 ↔ 判据」
 #     的分母核对跨文件，且四份 lane spec 各自引用的行号就变了）。
 #     spec: h-cycle-sync-foundation-and-first-canary
+#   delivered_contracts_ledger.py —— DELIVERED_PER_ENTRY_CONTRACTS 的纯数据台账，
+#     从 adapters/registry.py 抽出（曾占该文件 1172 行 / 47%，连续两次触发行数门禁）。
+#     按设计 append-only：每交付一份逐 entry 契约追加一条，单条 40~60 行（reason 记录
+#     该 entry 的形态差异与踩过的坑）。**不可再拆** —— 按循环切分会让「谁已交付」这件事
+#     散到十几个文件，而判据 test_contract_directory_matches_the_delivery_ledger 要的正是
+#     一张可双向比对的完整表。文件零函数零类，只有一个 Final tuple 字面量。
 backend/tests/workpaper_sync/test_h_foundation_hc_guards.py  1149
+backend/app/services/workpaper_sync/adapters/delivered_contracts_ledger.py  1360

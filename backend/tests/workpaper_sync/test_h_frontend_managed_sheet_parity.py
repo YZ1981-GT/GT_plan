@@ -35,6 +35,7 @@ import pytest
 
 from app.services.workpaper_sync import phase5_h4_engineering_materials as h4
 from app.services.workpaper_sync import phase5_h6_asset_disposal_clearing as h6
+from app.services.workpaper_sync import phase5_h8_right_of_use_assets as h8
 from app.services.workpaper_sync import phase5_h9_lease_liabilities as h9
 from app.services.workpaper_sync import store_item_registry as sir
 
@@ -104,7 +105,8 @@ def _parse_frontend_wired_codes() -> list[str]:
 #: h9 = canary（foundation spec）· h6 = 发布链首例（lane3）· h4 = 首个四级表头宽表（lane2）
 #: 🔴 h4 **受管但未接桥** —— `test_wired_codes_have_delivered_contract` 只覆盖已接桥的，
 #:    受管面的一致性由 excelName / sheetKey / storeItemId 三条双向判据覆盖。
-_PROVIDERS: tuple[Any, ...] = (h9, h6, h4)
+#: h8 = 58 列全 1:1 零 template-only（lane2），同样**受管但未接桥**
+_PROVIDERS: tuple[Any, ...] = (h9, h6, h4, h8)
 
 
 def _backend_managed_rows() -> list[dict[str, str]]:

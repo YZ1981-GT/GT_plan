@@ -2831,8 +2831,25 @@ class TestTask13ScopeBoundary:
                 f"{module} 登记的载体 gate 证据 {gate} 不存在 —— "
                 "「探针已过门」这句话必须有可核对的落点（Requirement 6.16）"
             )
+        # 🔴 `NON_CARRIER_COMPANION_MODULES` 是 `adapters/` 下**不实现任何 carrier
+        #    protocol** 的纯数据/纯声明文件（当前只有 `delivered_contracts_ledger.py`，
+        #    即 DELIVERED_PER_ENTRY_CONTRACTS 的台账，因按设计持续增长而从 registry.py
+        #    抽出）。它必须**逐个显式登记**，不是 glob 放宽 ——
+        #    真新增一个 carrier 仍会在这条判据上打红，保护力度不变。
+        #    下面两条附加断言把「非载体」这句话钉成可核对的事实。
+        for companion in RG.NON_CARRIER_COMPANION_MODULES:
+            path = adapters_dir / companion
+            assert path.is_file(), f"登记的非载体伴生模块 {path} 不存在"
+            text = path.read_text(encoding="utf-8")
+            assert "def " not in text and "class " not in text, (
+                f"{companion} 登记为**非载体**，但里面出现了函数/类定义 —— "
+                "它要么真的是载体（应走 engine 交付登记 + 载体 gate），"
+                "要么登记类别写错了"
+            )
         assert sorted(p.name for p in adapters_dir.glob("*.py")) == sorted(
-            set(RG.TASK13_ADAPTER_MODULES) | set(registered_names)
+            set(RG.TASK13_ADAPTER_MODULES)
+            | set(RG.NON_CARRIER_COMPANION_MODULES)
+            | set(registered_names)
         ), (
             "`adapters/` 的模块集合与 engine 交付登记不等值 —— 多出来的文件意味着有人"
             "绕过载体 gate，少掉的意味着登记表过期"

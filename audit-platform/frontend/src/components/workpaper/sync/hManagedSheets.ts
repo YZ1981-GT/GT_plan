@@ -96,6 +96,15 @@ export const H_MANAGED_SHEETS: readonly HManagedSheet[] = Object.freeze([
     excelName: '明细表H4-2',
     storeItemId: 'H4-2-rows',
   },
+  {
+    // 受管但尚未接桥（同 H4-2 的理由）。H8 是全 H 唯一 58 列全 1:1 零 template-only 的主表。
+    entryId: 'xlsx/gt-h8-right-of-use-assets',
+    code: 'H8-2',
+    sheetKey: 'h802-managed',
+    kind: 'rows',
+    excelName: '明细表H8-2',
+    storeItemId: 'H8-2-rows',
+  },
 ] as const)
 
 /**
