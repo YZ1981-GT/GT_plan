@@ -132,13 +132,13 @@ G7_ENTRY_IDS = frozenset(
 #:      `test_delivered_slice_contracts_pass_property_20_21_field_level` 逐字段核验。
 #: ⇒ 「悄悄交付一条没过字段级判据的契约」这条路被封死。
 #:
-#: 2026-09-27：spec `g-cycle-sync-foundation-and-first-canary`（Task 11~14）交付首条；
-#:   `g-cycle-single-region-detail-lanes` Task 8 交付 G9（首个「一键三受管区」）、Task 9 交付 G10（单区）。
+#: 2026-09-27：foundation spec 交付 G2 首条；`g-cycle-single-region-detail-lanes` Task 8/9/9b/10 依次交付 G9（一键三区）/G10/G8（FVOCI）/G14（固定行集+布尔列）。
 SLICE_DELIVERED_CONTRACTS: dict[str, str] = {
     "xlsx/gt-g2-interest-receivable": "g2.interest_receivable_detail.json",
     "xlsx/gt-g9-other-noncurrent-financial": "g9.other_noncurrent_detail.json",
     "xlsx/gt-g10-trading-financial-liabilities": "g10.trading_liabilities_detail.json",
     "xlsx/gt-g8-other-equity-instruments": "g8.other_equity_detail.json",
+    "xlsx/gt-g14-credit-impairment-loss": "g14.credit_impairment_detail.json",
 }
 
 #: 不可达旧桩（AC 1.7）——它的 independent_entry=false，不进 slice。

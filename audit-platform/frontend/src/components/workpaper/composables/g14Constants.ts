@@ -36,7 +36,8 @@ export const G14_LINE_ITEMS: G14LineDef[] = [
   },
   {
     rowKey: 'rfin',
-    label: '应收款项融资减值损失',
+    // 🔴 C-9：label 逐字对齐权威模板 A13「应收款项融资**坏账**损失」（原写「减值损失」）
+    label: '应收款项融资坏账损失',
     provisionAccount: '应收款项融资减值准备',
     counterpartKind: 'allowance',
     tbPrefixes: ['1231', '1124'],
@@ -75,14 +76,6 @@ export const G14_LINE_ITEMS: G14LineDef[] = [
     tbNameHints: ['长期应收'],
   },
   {
-    rowKey: 'ca',
-    label: '合同资产减值损失',
-    provisionAccount: '合同资产减值准备',
-    counterpartKind: 'allowance',
-    tbPrefixes: ['1142'],
-    tbNameHints: ['合同资产减值', '合同资产'],
-  },
-  {
     rowKey: 'guarantee',
     label: '财务担保预计损失',
     provisionAccount: '预计负债',
@@ -91,14 +84,40 @@ export const G14_LINE_ITEMS: G14LineDef[] = [
     tbNameHints: ['财务担保', '贷款承诺', '担保'],
   },
   {
+    // 🔴 C-9：模板 R19「其他」**兼作合同资产减值损失的落点** —— 权威模板 `明细表G14-2`
+    //    的固定行集只有 9 行，**没有**「合同资产减值损失」专行（原前端自研了第 10 行
+    //    `rowKey: 'ca'`，导致 10 行数据要落进 9 行模板区、会把 footer 挤下去）。
+    //    合同资产按 CAS22 确实适用 ECL 并计入 6702，所以口径不能丢 ⇒ 并入本行：
+    //    `tbPrefixes` 收 1142、`tbNameHints` 收「合同资产」，D6 的 ECL 事件也改指本行
+    //    （`gCycleSourceEcl.G14_SOURCE_TO_ROW_KEY.D6`）。
+    //    模板缺专行一事如实登记在 spec evidence `task10-c9-g14-rootfix.md`。
     rowKey: 'other',
     label: '其他',
-    provisionAccount: '',
-    counterpartKind: 'none',
-    tbPrefixes: [],
-    tbNameHints: [],
+    provisionAccount: '合同资产减值准备等',
+    counterpartKind: 'allowance',
+    tbPrefixes: ['1142'],
+    tbNameHints: ['合同资产减值', '合同资产'],
   },
 ]
+
+/**
+ * 🔴 权威模板 `明细表G14-2` R11-R19 的**固定行序**（逐字取自模板 A 列实测）。
+ *
+ * 受管行集必须逐项等于它 —— 行表引擎按**数组顺序**把 store 行映射到 R11-R19，
+ * 多一行就会扩行、把 footer R20 挤下去。判据
+ * `test_g14_column_isomorphism.py` 双向锁 `G14_LINE_ITEMS` 与本表。
+ */
+export const G14_TEMPLATE_ROW_LABELS = [
+  '应收票据坏账损失',
+  '应收账款坏账损失',
+  '应收款项融资坏账损失',
+  '其他应收款坏账损失',
+  '债权投资减值损失',
+  '其他债权投资减值损失',
+  '长期应收款坏账损失',
+  '财务担保预计损失',
+  '其他',
+] as const
 
 export const G14_ACCOUNT_CODE = '6702'
 /** 与 xlsx 编制说明一致：变动比例超过 30% 须说明主要原因 */
@@ -121,7 +140,7 @@ export const G14_PREP_HINTS = [
   '|变动率|>30% 或 |变动额|≥10万元 的行须填写「原因分析」；合计超阈值时审计说明须写明主要原因（负数为减少）。上期为 0 而本期有发生额时亦须说明。',
   '审定合计须与试算平衡表 6702 本期发生额一致（借方计提−贷方转回）；差异数≠0 须查明。',
   'G14-2：计入损益=计提−转回（转回正数）；期末=期初+计提−转回−转销+其他变动；核对列验证审定数=计入损益。',
-  '合同资产减值按 CAS 22 ECL 计入信用减值损失（6702），对应科目 1142 合同资产减值准备；可用「取数对账」与试算期末勾稽。',
+  '合同资产减值按 CAS 22 ECL 计入信用减值损失（6702），对应科目 1142 合同资产减值准备；🔴 权威模板固定行集无该专行，填在「其他」行（D6 的 ECL 亦挂该行），可用「取数对账」与试算期末勾稽。',
   '其他债权投资（FVOCI）减值对方科目为「其他综合收益-信用减值准备」，不是坏账准备贷方。',
   '资产负债表日按单项或组合计量预期信用损失（ECL）：差额确认损失或转回；企业可按内部核算设明细科目。',
   '「发布审定数」后经 EventBus 同步至附注披露；各减值来源与 D1/D2/D5/D6/F1/G4/G5 源科目 ECL 交叉核对。',
@@ -137,9 +156,9 @@ export const G14_ECL_CROSS_REF: Record<string, string> = {
   debt: 'wp:G4-1',
   othdebt: 'wp:G6-1',
   ltar: 'wp:G5-1',
-  ca: 'wp:D6-1',
   guarantee: '',
-  other: '',
+  // 🔴 C-9：模板无「合同资产减值损失」专行 ⇒ D6 的 ECL 交叉索引挂在「其他」行
+  other: 'wp:D6-1',
 }
 
 /** 附注披露（上市）— 复用 G14-2 明细 rowKey */
@@ -157,7 +176,9 @@ export const G14_DISCLOSURE_SOE_ROWS = [
  * 国企「坏账损失」= 应收类 + 合同资产等坏账/减值源行（不含财务担保）
  */
 export const G14_SOE_BAD_DEBT_SOURCES = [
-  'notes', 'ar', 'rfin', 'othar', 'ltar', 'ca',
+  // 🔴 C-9 删 'ca'：模板无该专行，合同资产已并入 `other`；而 `other` 在国企披露里本就
+  //    单独成行（`G14_DISCLOSURE_SOE_ROWS`），放进「坏账损失」会与它自己双算。
+  'notes', 'ar', 'rfin', 'othar', 'ltar',
 ] as const
 
 /** 国企「其他」行额外汇总源（财务担保预计损失等） */

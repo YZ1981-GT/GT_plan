@@ -49,8 +49,11 @@ describe('G14_NOTE_SECTION', () => {
 })
 
 describe('G14 SOE aggregation sources', () => {
-  it('坏账不含担保；含合同资产；担保并入其他', () => {
-    expect([...G14_SOE_BAD_DEBT_SOURCES]).toEqual(['notes', 'ar', 'rfin', 'othar', 'ltar', 'ca'])
+  // 🔴 C-9：合同资产无专行（模板固定 9 行），已并入 `other`；`other` 在国企披露单独成行
+  //    ⇒ 坏账来源不再含它，否则双算。
+  it('坏账不含担保、不含 other（合同资产已并入 other 并单独披露）；担保并入其他', () => {
+    expect([...G14_SOE_BAD_DEBT_SOURCES]).toEqual(['notes', 'ar', 'rfin', 'othar', 'ltar'])
+    expect([...G14_SOE_BAD_DEBT_SOURCES]).not.toContain('other')
     expect([...G14_SOE_OTHER_EXTRA_SOURCES]).toContain('guarantee')
   })
 })

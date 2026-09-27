@@ -126,6 +126,12 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     #    `excel_materialize` 在 R13-R20/R12 上抛 ProtectedRegionWriteError（模板那几格
     #    没有公式），本门先一步把它拦在 digest 漂移上。
     ("g8", "phase5_g8_other_equity", "ADAPTER_ID", True, True),
+    # ── G14（spec: g-cycle-single-region-detail-lanes · Task 10 / C-9）───────
+    #    与 G8/G10 同形（单区 + 复数 instrumentation API）⇒ 两个 True 同理。
+    #    🔴 本条的 projection digest 会在两种误改上打红：① 行身份被从 `rowKey` 改成
+    #    `rowId`（`_synthetic_rows` 现取 `spec.row_identity_key` 造行）② `L` 列的
+    #    `value_type` 被从 boolean 改回 amount（裁决 G1R-H4 的布尔列会退化成数值列）。
+    ("g14", "phase5_g14_credit_impairment", "ADAPTER_ID", True, True),
 )
 
 

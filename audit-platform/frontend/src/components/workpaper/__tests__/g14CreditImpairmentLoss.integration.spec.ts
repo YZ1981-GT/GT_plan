@@ -165,13 +165,27 @@ describe('G14 集成 — 调整分录借贷平衡', () => {
   })
 })
 
-describe('G14 集成 — 固定10类行', () => {
-  it('G14_LINE_ITEMS 含合同资产共 10 类', () => {
-    expect(G14_LINE_ITEMS).toHaveLength(10)
-    expect(G14_LINE_ITEMS.map((r) => r.label)).toContain('应收账款坏账损失')
-    expect(G14_LINE_ITEMS.map((r) => r.label)).toContain('合同资产减值损失')
-    expect(G14_LINE_ITEMS.map((r) => r.label)).toContain('财务担保预计损失')
+// 🔴 C-9（spec g-cycle-single-region-detail-lanes）：行集改为权威模板的固定 **9 行**。
+//    原第 10 行 `ca`（合同资产减值损失）是自研的 —— 模板 `明细表G14-2` R11-R19 没有该专行，
+//    10 行数据落进 9 行区会扩行、把 footer R20 挤下去。合同资产 ECL 已并入「其他」行。
+describe('G14 集成 — 固定 9 类行（对齐权威模板）', () => {
+  it('G14_LINE_ITEMS 逐项等于模板 A 列固定行序', async () => {
+    const { G14_TEMPLATE_ROW_LABELS } = await import('../composables/g14Constants')
+    expect(G14_LINE_ITEMS).toHaveLength(9)
+    expect(G14_LINE_ITEMS.map((r) => r.label)).toEqual([...G14_TEMPLATE_ROW_LABELS])
     expect(G14_LINE_ITEMS.find((r) => r.rowKey === 'othdebt')?.counterpartKind).toBe('oci')
+  })
+
+  it('🔴 无「合同资产减值损失」专行，其 1142 取数并入「其他」行', () => {
+    expect(G14_LINE_ITEMS.map((r) => r.rowKey)).not.toContain('ca')
+    expect(G14_LINE_ITEMS.map((r) => r.label)).not.toContain('合同资产减值损失')
+    const other = G14_LINE_ITEMS.find((r) => r.rowKey === 'other')!
+    expect(other.tbPrefixes).toContain('1142')
+    expect(other.tbNameHints.join('')).toContain('合同资产')
+  })
+
+  it('🔴 应收款项融资的 label 逐字取模板（坏账损失，不是减值损失）', () => {
+    expect(G14_LINE_ITEMS.find((r) => r.rowKey === 'rfin')?.label).toBe('应收款项融资坏账损失')
   })
 })
 
@@ -201,13 +215,18 @@ describe('G14 集成 — useG14Detail 持久化', () => {
     detail.updateCell('ar', 'currentReversal', 20)
     detail.updateCell('ar', 'openingProvision', 500)
     detail.updateCell('ar', 'currentWriteoff', 10)
-    detail.updateCell('ar', 'closingProvision', 570)
 
     const ar = detail.rows.value.find((r) => r.rowKey === 'ar')
     expect(ar?.profitLoss).toBe(80)
-    expect(ar?.rollForwardBalanced).toBe(true)
+    // 🔴 C-9：期末余额 J 是模板公式 =F+G-H-I，不再是录入列（原判据先 updateCell
+    //    写 570 再断言 rollForwardBalanced —— 那套「录入期末 vs 推算期末」是双源）
+    expect(ar?.closingProvision).toBe(570)
     expect(ar?.reconciled).toBe(ar?.currentAudited === ar?.profitLoss)
     expect(saved.some((s) => s.id === 'G14-detail-rows')).toBe(true)
+    // 公式列不入 store（由 enrichRow 重算）
+    const payload = JSON.parse(String(saved.at(-1)!.data.remark))
+    expect(Object.keys(payload[0])).not.toContain('closingProvision')
+    expect(Object.keys(payload[0])).not.toContain('profitLoss')
   })
 
   it('旧版负数转回自动迁移为正数', async () => {
@@ -221,7 +240,6 @@ describe('G14 集成 — useG14Detail 持久化', () => {
           currentReversal: -20,
           openingProvision: 500,
           currentWriteoff: 10,
-          closingProvision: 570,
         }]),
       }],
     ]))
@@ -233,10 +251,10 @@ describe('G14 集成 — useG14Detail 持久化', () => {
     const ar = detail.rows.value.find((r) => r.rowKey === 'ar')
     expect(ar?.currentReversal).toBe(20)
     expect(ar?.profitLoss).toBe(80)
-    expect(ar?.rollForwardBalanced).toBe(true)
+    expect(ar?.closingProvision).toBe(570)
   })
 
-  it('回填未审与推算期末', async () => {
+  it('回填未审（期末余额由模板公式恒算，不再有「推算期末」按钮）', async () => {
     const { useG14Detail } = await import('../composables/useG14Detail')
     const allResponses = ref(new Map())
     const detail = useG14Detail({
@@ -248,12 +266,35 @@ describe('G14 集成 — useG14Detail 持久化', () => {
     detail.updateCell('ar', 'currentReversal', 20)
     detail.updateCell('ar', 'openingProvision', 500)
     detail.updateCell('ar', 'currentWriteoff', 10)
-    detail.fillClosingFromRollForward()
     detail.fillUnauditedFromProfitLoss()
     const ar = detail.rows.value.find((r) => r.rowKey === 'ar')
     expect(ar?.closingProvision).toBe(570)
     expect(ar?.currentUnadjusted).toBe(80)
     expect(ar?.reconciled).toBe(true)
+    expect((detail as Record<string, unknown>).fillClosingFromRollForward).toBeUndefined()
+  })
+
+  it('🔴 按试算倒推期初：令 期末=试算期末（期初 = 试算 − 计提 + 转回 + 转销）', async () => {
+    const { useG14Detail } = await import('../composables/useG14Detail')
+    const allResponses = ref(new Map([
+      ['G14-detail-provision-tb', {
+        item_id: 'G14-detail-provision-tb',
+        remark: JSON.stringify({ ar: 600 }),
+      }],
+    ]))
+    const detail = useG14Detail({
+      allResponses,
+      isReadonly: ref(false),
+      debouncedSave: () => {},
+    })
+    detail.updateCell('ar', 'currentProvision', 100)
+    detail.updateCell('ar', 'currentReversal', 20)
+    detail.updateCell('ar', 'currentWriteoff', 10)
+    detail.applyTbClosingToOpening()
+    const ar = detail.rows.value.find((r) => r.rowKey === 'ar')
+    expect(ar?.openingProvision).toBe(530)
+    expect(ar?.closingProvision).toBe(600)
+    expect(ar?.tbClosingMatched).toBe(true)
   })
 })
 

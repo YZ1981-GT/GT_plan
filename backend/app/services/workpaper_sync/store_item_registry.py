@@ -447,6 +447,29 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="G8-detail-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── G14（spec: g-cycle-single-region-detail-lanes · Task 10 / C-9）───────
+    #
+    # 几何同 G8/G10（两级表头 + 单区 + footer）⇒ 薄转发，无伴生模块。
+    #
+    # 🔴 **固定 9 行** R11-R19（模板 A 列写死行名），行身份是 **`rowKey`**
+    #    （`stable_template_row_key`）—— 全 G 循环唯一一家不用生成式 id 的，GC-6 裁决它是
+    #    最稳的一族。照抄 F 循环的 `row_identity_key in ('rowId','id')` 白名单会判它违规。
+    #
+    # 🔴 `L` 列是**布尔**校验列 `=D=K`（裁决 G1R-H4）：`value_type=boolean` +
+    #    `mode=formula` ⇒ 不入 store（`PROTECTED_MODES`），TRUE/FALSE 不会落库。
+    #
+    # 🔴 模板缺陷：`K=G+H` 把「本期转回」当成增加损益，而同表 `J` 的 `-H` 要求 H 填正数
+    #    ⇒ 会计正确应为 `=G-H`。`formula_templates` 逐字记模板原式（判据比对模板），
+    #    前端按正确口径算 ⇒ 有转回时两侧相差 2×转回，如实登记为欠账。
+    #
+    # 🔴 GC-2：G14 册裸 IF **11 格**（全在 `审定表G14-1`，受管表零命中）。
+    #    per-file 保守策略 ⇒ 受管表干净也必须挂；中性化函数与 G7/G2/G9/G10/G8/H9 共用。
+    "g14.credit_impairment_detail": StoreMergePlan(
+        adapter_id="g14.credit_impairment_detail",
+        provider_module="phase5_g14_credit_impairment",
+        items=(StoreItemSpec(item_id="G14-detail-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     #
     # 🔴 **HC-12：H 循环 9 册全部命中 OO 加载期裸 `IF(`** ⇒ 同 G 的 per-file 保守策略，
@@ -533,6 +556,30 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         adapter_id="h8.right_of_use_assets_detail",
         provider_module="phase5_h8_right_of_use_assets",
         items=(StoreItemSpec(item_id="H8-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── H2 首条带**声明缺口**的 entry（spec: h2-h6-h10-pilot-cross-reference-lanes）──
+    #
+    # 🔴 前四条（H9/H6/H4/H8）每个模板列要么有 store 字段、要么明确无对端。
+    #    H2 有两处两侧**语义打架**，硬凑映射会造成静默错数，故留**可见缺口**：
+    #      · H2-GAP-1 `L 增加`：模板无公式是可输入格，而 HTML 的 increaseTotal 由 5 个
+    #        分项在 _recalcFormulas 派生且不落库 ⇒ 权威方向相反。L 判 template-only、
+    #        5 分项判 store-only，本格不参与双向。硬映会把 OO 的输入吞掉。
+    #      · H2-GAP-2 `O 其他减少`：useH2Detail#L254 `_otherDecrease = decrease +
+    #        transferOut` 是 1 格对 2 字段 ⇒ O 映 decrease（主字段），transferOut 判
+    #        store-only + legacy_folded。硬映会漏掉 transferOut 那部分金额。
+    #    两处各带停下报告点（契约 review.declared_coverage_gaps），需审计域裁决的
+    #    部分不由接线方拍板。覆盖闭合仍成立：34 映射 + 16 template-only == 50 有效列。
+    #
+    # 🔴 三处不能照抄前四条：①footer 之下**无** SUMPRODUCT 小计区（R22 是审计说明；
+    #    H4/H8 都有）②footer R21 **不是一律 SUM**（AA/AC/AG/AH 四格行内派生）
+    #    ③**两对**净值（期初 + 期末），H8 只有一对。
+    #
+    # 册 162,616 B / 21 sheets 全 H 最多 ⇒ 中性化必挂，函数与 G7/G2/H9/H6/H4/H8 共用。
+    "h2.construction_in_progress_detail": StoreMergePlan(
+        adapter_id="h2.construction_in_progress_detail",
+        provider_module="phase5_h2_construction_in_progress",
+        items=(StoreItemSpec(item_id="H2-2-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
 }

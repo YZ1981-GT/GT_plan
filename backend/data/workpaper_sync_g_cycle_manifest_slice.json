@@ -2078,7 +2078,7 @@
         "payload_column": "remark",
         "payload_column_mode": "remark_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 remark，conclusion 置 null",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L199",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L295",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
@@ -2087,7 +2087,7 @@
         "row_identity_key": "rowKey",
         "row_identity_kind": "stable_template_row_key",
         "row_identity_generator": "createDefaultRows() / G14_LINE_ITEMS",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L61",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L151",
         "row_identity_generator_form": "stable_template_row_key（行集由 G14_LINE_ITEMS 固定，rowKey 不生成也不派生自位置；合计行 rowKey='total'）",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [

@@ -64,6 +64,10 @@ TARGETS: dict[str, tuple[str, str, re.Pattern[str]]] = {
         "remark",
         re.compile(r"^\s*return `(g8d)-\$\{Date\.now\(\)"),
     ),
+    # 🔴 C-9：G14 的行身份是 `rowKey`（`stable_template_row_key`）—— **没有生成器**，
+    #    行集由 `G14_LINE_ITEMS` 固定。因此铸造点正则不适用，走 `mint_pat=None` 分支
+    #    （只重算 payload 写入点行号）。
+    "xlsx/gt-g14-credit-impairment-loss": ("useG14Detail.ts", "remark", None),
 }
 TABLE_TO_ENTRY = {
     "G1-detail-rows": "xlsx/gt-g1-trading-financial-assets",
@@ -71,6 +75,7 @@ TABLE_TO_ENTRY = {
     "G9-detail-rows": "xlsx/gt-g9-other-noncurrent-financial",
     "G10-detail-rows": "xlsx/gt-g10-trading-financial-liabilities",
     "G8-detail-rows": "xlsx/gt-g8-other-equity-instruments",
+    "G14-detail-rows": "xlsx/gt-g14-credit-impairment-loss",
 }
 
 _NULL_COL = re.compile(r"\b(remark|conclusion)\s*:\s*null\s*,?")
@@ -101,7 +106,32 @@ def find_write_site(lines: list[str], column: str) -> int:
     return hits[0]
 
 
-def find_mint_site(lines: list[str], pattern: re.Pattern[str]) -> tuple[int, str]:
+#: 🔴 固定行集（`stable_template_row_key`）没有铸造点 —— 行身份来自模板行集常量。
+#:   身份源仍指**消费方 composable** 里的固定行集构造点 `createDefaultRows`：
+#:   判据 `test_row_identity_key_and_generator_are_source_backed` 要在同一个文件里同时
+#:   回源「`rowKey: string` 的行模型声明」与「createDefaultRows 的构造点」，指向
+#:   `g14Constants.ts` 会让后者找不到（本轮实测踩过）。
+_FIXED_ROW_SET_ANCHOR = re.compile(r"^function createDefaultRows\b")
+_FIXED_ROW_SET_FORM = (
+    "stable_template_row_key（行集由 G14_LINE_ITEMS 固定，rowKey 不生成也不派生自位置；"
+    "合计行 rowKey='total'）"
+)
+
+
+def find_mint_site(
+    lines: list[str], pattern: re.Pattern[str] | None, *, fname: str = ""
+) -> tuple[int, str]:
+    """定位行身份铸造点。
+
+    `pattern=None` ⇒ 该 entry 是**固定行集**（G14），没有生成器：回到 composable 里的
+    固定行集构造点 `createDefaultRows`，形态串写死为 `_FIXED_ROW_SET_FORM`
+    （与 slice 冻结值逐字一致）。
+    """
+    if pattern is None:
+        for idx, line in enumerate(lines):
+            if _FIXED_ROW_SET_ANCHOR.match(line):
+                return idx + 1, _FIXED_ROW_SET_FORM
+        raise SystemExit(f"找不到固定行集构造点 createDefaultRows（{fname}）")
     for idx, line in enumerate(lines):
         m = pattern.match(line)
         if m:
@@ -139,7 +169,7 @@ def main() -> int:
     for entry_id, (fname, column, mint_pat) in TARGETS.items():
         lines = _strip_comment_lines((COMP / fname).read_text(encoding="utf-8"))
         write_line = find_write_site(lines, column)
-        mint_line, form = find_mint_site(lines, mint_pat)
+        mint_line, form = find_mint_site(lines, mint_pat, fname=fname)
         resolved[entry_id] = {
             "payload_column_source": f"{COMP_REL}/{fname}#L{write_line}",
             "row_identity_generator_source": f"{COMP_REL}/{fname}#L{mint_line}",

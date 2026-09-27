@@ -350,8 +350,17 @@ class TestBClassG8AndBooleanDeclarationsNotYetDelivered:
             mod = importlib.import_module(f"app.services.workpaper_sync.{mod_name}")
         except ModuleNotFoundError:
             pytest.fail(f"{code} provider 未交付（Task 10/12/13 转绿）")
+        # 🔴 取 spec 走 entry 层的**公开接口** `managed_row_table_specs()`，不扫 `vars(mod)`：
+        #    交付形态是「entry 层 + sheet 层」两个模块（G14 的 spec 在 `phase5_g14_02_detail`），
+        #    扫 entry 层的模块命名空间找不到 spec 对象 —— 原写法会在形态正确时假红。
+        specs = (
+            mod.managed_row_table_specs()
+            if hasattr(mod, "managed_row_table_specs")
+            else [s for s in vars(mod).values()
+                  if getattr(s.__class__, "__name__", "") == "RowTableSheetSpec"]
+        )
         found = []
-        for spec in vars(mod).values():
+        for spec in specs:
             if getattr(spec.__class__, "__name__", "") != "RowTableSheetSpec":
                 continue
             for fs in getattr(spec, "field_specs", ()):
