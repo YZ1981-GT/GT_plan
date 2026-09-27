@@ -575,12 +575,23 @@ class TestProperty21ContractFieldCompleteness:
         with pytest.raises(C.ContractSchemaError, match="重复"):
             C.parse_contract(payload)
 
-    @pytest.mark.parametrize("header_rows", [0, 4, "2", True])
+    @pytest.mark.parametrize("header_rows", [0, 5, "2", True])
     def test_header_rows_domain(self, header_rows: Any) -> None:
+        """域外值被拒。上界参数由 4 改为 5（H 循环四级表头扩容，`contracts.MAX_HEADER_ROWS` 3→4）。"""
         payload = xlsx_payload()
         first_table(payload)["header_rows"] = header_rows
         with pytest.raises(C.ContractSchemaError, match="header_rows"):
             C.parse_contract(payload)
+
+    def test_four_level_header_is_expressible(self) -> None:
+        """H 循环扩容判据：`header_rows == 4` 必须可解析且 `two_level_header` 为真。"""
+        assert C.MAX_HEADER_ROWS == 4
+        payload = xlsx_payload()
+        first_table(payload)["header_rows"] = 4
+        contract = C.parse_contract(payload)
+        table = contract.sheets[0].tables[0]
+        assert table.header_rows == 4
+        assert table.two_level_header is True
 
     def test_float_header_rows_is_rejected_earlier_by_cross_language_gate(self) -> None:
         """`2.0` 不是「域外整数」而是 float ⇒ 由更早的跨语言判据拦下（XL-6）。

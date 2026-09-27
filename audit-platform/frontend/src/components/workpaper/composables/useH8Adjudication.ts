@@ -569,7 +569,7 @@ export function useH8Adjudication(params: {
       const changeAmount = endNet - beginNet
       const changeRate = calcChangeRate(changeAmount, beginNet)
       return {
-        rowId: `h81-net-${cat}`,
+        rowId: `h81-net-${cat}-${Math.random().toString(36).slice(2, 7)}`,
         category: cat,
         beginNet,
         endNet,

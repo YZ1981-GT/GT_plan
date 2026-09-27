@@ -316,6 +316,7 @@ import useH2DualMode from './composables/useH2DualMode'
 import useH2ImportExport from './composables/useH2ImportExport'
 import { useH2C7Prerequisite } from './composables/useH2C7Prerequisite'
 import { useH2ApplicableStandards } from './composables/useH2ApplicableStandards'
+import { buildHSeedRowIds } from './composables/hSeedRowIdentity'
 import {
   H2_INTEREST_BRANCH_KEY,
   inactiveInterestCapResultKey,
@@ -612,8 +613,11 @@ function _seedDetailFromPrefill(): void {
   const prefill = props.htmlData?.detail_prefill
   if (!Array.isArray(prefill) || prefill.length === 0) return
 
+  const seedRowIds = buildHSeedRowIds(
+    prefill.map((p: any) => p?.accountCode ?? p?.account_code),
+  )
   const seedRows = prefill.map((p: any, i: number) => ({
-    rowId: `seed-${i}`,
+    rowId: seedRowIds[i],
     name: String(p.name || ''),
     cipBegin: Number(p.cipBegin) || 0,
     cipEnd: Number(p.cipEnd) || 0,

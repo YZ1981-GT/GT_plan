@@ -1421,8 +1421,11 @@ class TestContractIsGroundedInTheTemplate:
             assert_contract_declares_no_metadata_sheet(leaked)
 
     def test_mutated_contract_payload_is_rejected(self, contract_payload: Any) -> None:
+        """域外 header_rows 必须被拒（H 循环扩容后域外值从 4 变成 5）。"""
+        from app.services.workpaper_sync.contracts import MAX_HEADER_ROWS
+
         patched = json.loads(json.dumps(contract_payload))
-        patched["sheets"][0]["tables"][0]["header_rows"] = 4
+        patched["sheets"][0]["tables"][0]["header_rows"] = MAX_HEADER_ROWS + 1
         with pytest.raises(ContractError):
             parse_contract(patched, adapter_id=P.PILOT_ADAPTER_ID)
 

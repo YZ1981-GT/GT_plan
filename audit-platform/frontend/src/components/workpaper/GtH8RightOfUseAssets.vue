@@ -347,6 +347,7 @@ import { useH8CrossSheet } from './composables/useH8CrossSheet'
 import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
 import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 import { h8Scope } from './composables/hCycleAccountScope'
+import { buildHSeedRowIds } from './composables/hSeedRowIdentity'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -571,11 +572,13 @@ async function selfLoad(): Promise<void> {
       }
 
       // P1-⑥ 明细表种子预填（从 tb_balance 叶子子科目，仅 H8-2-rows 空时填入）
+      // 🔴 BP-5 修复：写入目标从 H8-2-detail-prefill → H8-2-rows（真实主键）
+      // 🔴 BP-6 修复：行身份从 seed-${idx}（数组下标）→ 稳定业务标识（科目编码）
       const dp = props.htmlData?.detail_prefill
       if (Array.isArray(dp) && dp.length > 0 && !map.has('H8-2-rows')) {
-        // 种子：按子科目名映射为 H8DetailRow 初始数据（不落库,仅内存态供 H8-2 加载时 seed）
+        const seedRowIds = buildHSeedRowIds(dp.map((item: any) => item?.account_code))
         const seedRows = dp.map((item: any, idx: number) => ({
-          rowId: `seed-${idx}`,
+          rowId: seedRowIds[idx],
           category: String(item.account_name || '').replace(/使用权资产[-—_·]?/, '').trim() || '未分类',
           contractNo: '',
           assetName: String(item.account_name || ''),
@@ -585,7 +588,7 @@ async function selfLoad(): Promise<void> {
           costDecreaseUnadj: Number(item.credit ?? 0),
           _source: item.source || `TB('${item.account_code}')`,
         }))
-        map.set('H8-2-detail-prefill', { item_id: 'H8-2-detail-prefill', remark: JSON.stringify(seedRows), conclusion: null })
+        map.set('H8-2-rows', { item_id: 'H8-2-rows', remark: JSON.stringify(seedRows), conclusion: null })
       }
 
       if (map.size > 0) allResponses.value = map

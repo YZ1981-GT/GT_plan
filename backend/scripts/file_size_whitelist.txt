@@ -970,3 +970,11 @@ backend/app/services/workpaper_sync/phase5_f5_cost_of_sales.py  826
 backend/scripts/fix/fix_f_cycle_prefill_presets.py  962
 backend/tests/workpaper_sync/test_f3_canary_and_contract.py  1199
 backend/tests/workpaper_sync/test_f5_canary_and_contract.py  904
+
+#   test_h_foundation_hc_guards.py —— H 循环 foundation spec 的 HC-1~HC-16 共性守卫
+#     （四份 lane spec 共用，覆盖 manifest 字段 / 载体族七分 / 消费方计数 / 拼接键解析 /
+#     变体轴三维 / 派生合计 / 行身份三族 / 跨引用冻结 / 猜键回退链 / 草稿归口 / 裸IF /
+#     宽表列 / 四干净点 / wp_index 规避 / footer 形态 16 类 —— 拆开会让「共性裁决 ↔ 判据」
+#     的分母核对跨文件，且四份 lane spec 各自引用的行号就变了）。
+#     spec: h-cycle-sync-foundation-and-first-canary
+backend/tests/workpaper_sync/test_h_foundation_hc_guards.py  1149

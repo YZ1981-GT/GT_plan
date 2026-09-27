@@ -1216,14 +1216,14 @@ class TestContractIsGroundedInTheTemplate:
     def test_header_rows_is_three_and_is_the_schema_upper_bound(
         self, contract: Any
     ) -> None:
-        """三级表头 ⇒ `header_rows = 3`，恰是 `contracts._parse_table` 的上界。"""
+        """三级表头 ⇒ `header_rows = 3`。上界已扩到 4（`contracts.MAX_HEADER_ROWS`），域外值改为 5。"""
         table = contract.sheets[0].tables[0]
         assert table.header_rows == 3 == P.HEADER_ROW_COUNT
         assert table.two_level_header is True
         assert table.anchor == f"A{P.GROUP_HEADER_ROW}"
-        # 上界确实是 3：4 必须被强校验拒绝（不是本模块"恰好没写 4"）。
+        # 强校验仍在：域外值（现为 5）必须被拒。
         payload = json.loads(json.dumps(P.build_contract_payload()))
-        payload["sheets"][0]["tables"][0]["header_rows"] = 4
+        payload["sheets"][0]["tables"][0]["header_rows"] = 5
         with pytest.raises(ContractError, match="header_rows"):
             parse_contract(payload, adapter_id=P.PILOT_ADAPTER_ID)
 
@@ -2871,7 +2871,7 @@ class TestUpstreamDebtsAreVisibleFacts:
     def test_four_level_header_debt_is_a_measured_schema_limit(
         self, workbook: Any
     ) -> None:
-        """三段链条：H1-2 表头物理 4 行 / schema 硬限 1..3 / Task 13 把 4 锁死为被拒。"""
+        """H1-2 表头物理 4 行是源侧事实；schema 上界欠账已由 H 循环结清。"""
         from openpyxl.utils import get_column_letter
 
         sheet = workbook["明细表H1-2"]
@@ -2894,19 +2894,17 @@ class TestUpstreamDebtsAreVisibleFacts:
         path = [str(sheet[covering(row, "E")].value) for row in rows]
         assert path == ["固定资产原值", "未审数", "本期增加", "金额"], path
         assert len(set(path)) == 4, "四级路径的四个层级必须互不相同，否则它其实不是四级"
-        # ② schema 硬限 1..3。
-        contracts_source = Path(
-            __import__(
-                "app.services.workpaper_sync.contracts", fromlist=["x"]
-            ).__file__
-        ).read_text(encoding="utf-8")
-        assert "not 1 <= header_rows <= 3" in contracts_source
-        # ③ Task 13 显式把 4 锁死为被拒。
+        # ② schema 上界已扩到 4（欠账结清）。
+        from app.services.workpaper_sync import contracts as _C
+
+        assert (_C.MIN_HEADER_ROWS, _C.MAX_HEADER_ROWS) == (1, 4)
+        # ③ Task 13 的域外判据随之改为「5 被拒 / 4 通过」。
         task13 = (
             Path(__file__).parent / "test_task13_contract_registry.py"
         ).read_text(encoding="utf-8")
-        assert '@pytest.mark.parametrize("header_rows", [0, 4, "2", True])' in task13
-        # ④ 欠账文案点名 owner 与修法。
+        assert '@pytest.mark.parametrize("header_rows", [0, 5, "2", True])' in task13
+        assert "def test_four_level_header_is_expressible" in task13
+        # ④ 欠账文案保持冻结（写进 H1 契约与 definition_store，改它会动 golden digest）。
         note = P.UPSTREAM_DEBT_FOUR_LEVEL_HEADER_NOT_EXPRESSIBLE
         assert "header_rows" in note and "明细表H1-2" in note and "owner" in note
 

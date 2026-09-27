@@ -1,0 +1,81 @@
+{
+  "measured_at": "2026-09-27",
+  "source": "真实 PG（audit_platform）· MCP postgres 只读查询 · checklist_responses",
+  "query": "SELECT item_id, count(*), sum(length(coalesce(remark,''))), sum(length(coalesce(conclusion,''))) FROM checklist_responses WHERE item_id IN (…9 条主表键 + 对照键…) GROUP BY item_id",
+  "primary_key_payload_bytes": {
+    "H2-2-rows": null,
+    "H3-2-cost-rows": null,
+    "H3-2-fair-rows": null,
+    "H4-2-rows": null,
+    "H5-2-rows": null,
+    "H6-2-rows": null,
+    "H7-2-cost-rows": null,
+    "H7-2-fair-rows": null,
+    "H8-2-rows": 2,
+    "H9-2-rows": 819,
+    "H10-detail-rows": 2
+  },
+  "note_on_nulls": "null = 真库**无该 item_id 的行**（不是空串）。2 = 字面 `[]` 空数组。",
+  "canary_selection": {
+    "entry": "xlsx/gt-h9-lease-liabilities",
+    "item_id": "H9-2-rows",
+    "remark_bytes": 819,
+    "conclusion_bytes": 0,
+    "row_count": 2,
+    "fields_per_row": 22,
+    "reason": "9 条主表键里**唯一**非空载荷（另两条命中的是字面 `[]`）⇒ roundtrip 可真库实证而非造数据"
+  },
+  "row_identities": [
+    "row-liab-H91-FILL-1784691549786",
+    "row-mrvjayxr-u0mc"
+  ],
+  "row_identity_family": "HC-7 族 A（带时间戳 / 随机后缀）⇒ canary 不含身份改造",
+  "field_names_in_order": [
+    "rowId",
+    "lessor",
+    "contractNo",
+    "assetDesc",
+    "ibrRate",
+    "leaseTerm",
+    "beginBalance",
+    "repayment",
+    "interestAccrued",
+    "beginAje",
+    "repayAje",
+    "interestAje",
+    "reclassification",
+    "dueWithin1Y",
+    "due1To2Y",
+    "due2To3Y",
+    "dueOver3Y",
+    "isRelatedParty",
+    "isConfirmed",
+    "isTerminated",
+    "terminationDate",
+    "terminatedFromH8"
+  ],
+  "chinese_enum_observed_values": {
+    "isRelatedParty": ["否"],
+    "isConfirmed": ["否"],
+    "isTerminated": ["否"]
+  },
+  "derived_cross_entry_flag": {
+    "terminatedFromH8": false
+  },
+  "formula_columns_not_persisted": [
+    "endBalance",
+    "auditedBegin",
+    "auditedRepay",
+    "auditedInterest",
+    "auditedEnd",
+    "finalAudited"
+  ],
+  "spec_discrepancy": "spec Requirement 5.3 写「23 字段」，但其自身枚举与真库现算均为 **22** ⇒ 按 22 为准。",
+  "other_h_payloads_for_context": {
+    "H5-1-cost-rows": 1059,
+    "H8-1-rows": 3656,
+    "H8-listed-categories": 137,
+    "H8-listed-movement": 2,
+    "H8-2-detail-prefill": null
+  }
+}

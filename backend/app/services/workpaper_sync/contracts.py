@@ -131,6 +131,26 @@ _STABLE_KEY_RE: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9][a-z0-9_.\-/{}]*$
 #: 动态列 identity 的**唯一**合法模板（Requirement 6.4 / 平台 H7 范式）。
 DYNAMIC_COLUMN_IDENTITY_TEMPLATE: Final[str] = "{slot}_{seq}"
 
+#: `tables[].header_rows` 的合法值域下界（单级表头）。
+MIN_HEADER_ROWS: Final[int] = 1
+
+#: `tables[].header_rows` 的合法值域**上界**。
+#:
+#: 🔴 **3 → 4 扩容（H 循环 · spec `h-cycle-sync-foundation-and-first-canary`）**
+#:
+#: Task 13 交付时上界取 3，依据是当时作业面上「分组最深三级」。H 循环（固定资产）
+#: 实测**五条 entry 的主受管表是四级表头**：
+#:   `H2 在建工程!明细表H2-2` R9/R10/R11/R12
+#:   `H4 工程物资!明细表H4-2` R8/R9/R10/R11
+#:   `H5 油气资产!明细表H5-2` R9/R10/R11/R12
+#:   `H7 生产性生物资产!明细表（成本模式）H7-2` R9/R10/R11/R12
+#:   `H8 使用权资产!明细表H8-2` R8/R9/R10/R11
+#:
+#: 上界停在 3 时这五条只能丢掉最外层分组（压扁列结构），或整条不接双向。
+#: 本次扩容结清 Task 42 登记的 `UPSTREAM_DEBT_FOUR_LEVEL_HEADER_NOT_EXPRESSIBLE` 欠账。
+#: H1 的契约 / adapter / golden digest **不随本次扩容改动**（HC-8）。
+MAX_HEADER_ROWS: Final[int] = 4
+
 #: 行身份占位符。field pointer 里出现且仅出现一次表示「该字段按行展开」。
 ROW_UUID_PLACEHOLDER: Final[str] = "{row_uuid}"
 
@@ -1079,10 +1099,15 @@ def _parse_table(
     if not isinstance(anchor, str) or not _A1_RANGE_RE.match(anchor.strip()):
         raise ContractSchemaError(f"{where}: table anchor 必须是 A1 单元格，实得 {anchor!r}")
     header_rows = raw.get("header_rows")
-    if not isinstance(header_rows, int) or isinstance(header_rows, bool) or not 1 <= header_rows <= 3:
+    if (
+        not isinstance(header_rows, int)
+        or isinstance(header_rows, bool)
+        or not MIN_HEADER_ROWS <= header_rows <= MAX_HEADER_ROWS
+    ):
         raise ContractSchemaError(
-            f"{where}: header_rows 必须是 1..3 的整数（两级表头 = 2），实得 {header_rows!r}"
-            "（Requirement 6.3）"
+            f"{where}: header_rows 必须是 {MIN_HEADER_ROWS}..{MAX_HEADER_ROWS} 的整数"
+            f"（两级表头 = 2），实得 {header_rows!r}"
+            "（Requirement 6.3；上界 3→4 见 `MAX_HEADER_ROWS` 的扩容理由）"
         )
     formula_mask = raw.get("formula_mask") or []
     if not isinstance(formula_mask, list):
@@ -1524,6 +1549,7 @@ __all__ = [
     # 路径与常量
     "CONTRACTS_DIR", "EXCEL_CARRIER_CONTRACT_PATH", "WORD_CARRIER_CONTRACT_PATH",
     "CONTRACT_SCHEMA_VERSION", "DOCUMENT_TYPES", "DYNAMIC_COLUMN_IDENTITY_TEMPLATE",
+    "MIN_HEADER_ROWS", "MAX_HEADER_ROWS",
     "ROW_UUID_PLACEHOLDER", "PROTECTED_MODES", "FORBIDDEN_ROW_IDENTITY_KINDS",
     # 枚举
     "ContractReviewStatus", "FieldMode", "ValueType", "RowIdentityKind",

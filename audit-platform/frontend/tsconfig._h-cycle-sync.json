@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", "module": "ESNext", "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true, "strict": true, "skipLibCheck": true,
+    "noEmit": true, "isolatedModules": true, "moduleDetection": "force",
+    "jsx": "preserve", "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "paths": { "@/*": ["./src/*"] }, "baseUrl": "."
+  },
+  "include": [
+    "src/components/workpaper/composables/hSeedRowIdentity.ts",
+    "src/components/workpaper/composables/h4DetailPrefill.ts",
+    "src/components/workpaper/composables/h8DisclosureSyncPayload.ts",
+    "src/components/workpaper/composables/h8ListedDisclosureModel.ts",
+    "src/components/workpaper/composables/useH9Detail.ts",
+    "src/components/workpaper/composables/h10RelatedH6Pull.ts",
+    "src/components/workpaper/composables/h6H10Pull.ts",
+    "src/components/workpaper/composables/h3MortgageReconcile.ts",
+    "src/components/workpaper/composables/useH2Adjudication.ts",
+    "src/components/workpaper/composables/useH3Adjustment.ts",
+    "src/components/workpaper/composables/useH3RentalIncome.ts",
+    "src/components/workpaper/composables/useH4Adjudication.ts",
+    "src/components/workpaper/composables/useH5Adjudication.ts",
+    "src/components/workpaper/composables/useH8Adjudication.ts",
+    "src/components/workpaper/composables/hRowIdentity.ts",
+    "src/env.d.ts"
+  ]
+}
