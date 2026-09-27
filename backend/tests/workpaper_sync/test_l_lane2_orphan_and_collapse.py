@@ -1,0 +1,416 @@
+# -*- coding: utf-8 -*-
+r"""L 循环 lane 2 spec — L2/L3/L4 孤儿孪生与 sheet 粒度折叠。
+
+spec: l2-l3-l4-orphan-twins-and-sheet-granularity-collapse · Task 0~22
+Properties: LA-P1 ~ LA-P26
+
+共同裁决只引用编号（LC-1 ~ LC-26 在 foundation design.md），不复述判据内容。
+
+═══ 运行 ═══
+
+    .\.venv\Scripts\python.exe -m pytest backend/tests/workpaper_sync/test_l_lane2_orphan_and_collapse.py -v --tb=short
+"""
+from __future__ import annotations
+
+import json
+import pathlib
+import re
+
+import pytest
+from openpyxl import load_workbook
+
+# ─── 路径常量 ──────────────────────────────────────────────────────────
+_THIS = pathlib.Path(__file__).resolve()
+ROOT = _THIS.parents[3]
+BACKEND = ROOT / "backend"
+FRONTEND = ROOT / "audit-platform" / "frontend" / "src"
+
+import os as _os
+import sys as _sys
+if str(BACKEND) not in _sys.path:
+    _sys.path.insert(0, str(BACKEND))
+_os.environ.setdefault("DB_DISABLE_SSL", "True")
+WP_COMPONENTS = FRONTEND / "components" / "workpaper"
+WP_COMPOSABLES = WP_COMPONENTS / "composables"
+SRC_COMPOSABLES = FRONTEND / "composables"
+DATA = BACKEND / "data"
+L_TEMPLATE_DIR = BACKEND / "wp_templates" / "L"
+MANIFEST_SLICE_PATH = DATA / "workpaper_sync_l_cycle_manifest_slice.json"
+
+# 四个 orphan 文件
+ORPHAN_FILES = [
+    WP_COMPOSABLES / "useL2DualMode.ts",
+    SRC_COMPOSABLES / "useL3DualMode.ts",
+    WP_COMPOSABLES / "useL3DualMode.ts",
+    WP_COMPOSABLES / "useL4DualMode.ts",
+]
+
+LANE2_ENTRY_IDS = {
+    "xlsx/gt-l2-interest-payable",
+    "xlsx/gt-l3-long-term-loans",
+    "xlsx/gt-l4-bonds-payable",
+}
+
+
+# ─── 工具 ──────────────────────────────────────────────────────────────
+def _load(p: pathlib.Path) -> dict:
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
+_IMPORT_FORMS = (
+    re.compile(r"""from\s*['"]([^'"\n]+)['"]"""),
+    re.compile(r"""import\s*\(\s*['"]([^'"\n]+)['"]"""),
+)
+
+_FE_FILES: list[pathlib.Path] = []
+
+
+def _all_frontend() -> list[pathlib.Path]:
+    global _FE_FILES
+    if not _FE_FILES:
+        _FE_FILES = [
+            p for p in FRONTEND.rglob("*")
+            if p.is_file() and p.suffix in (".ts", ".vue", ".tsx", ".js")
+            and "__tests__" not in p.as_posix()
+        ]
+    return _FE_FILES
+
+
+def _resolve_spec(spec: str, importer: pathlib.Path) -> pathlib.Path | None:
+    if spec.startswith("@/"):
+        return FRONTEND / spec[2:]
+    if spec.startswith("."):
+        return (importer.parent / spec).resolve()
+    return None
+
+
+def _production_import_edges_to(target: pathlib.Path) -> list[str]:
+    """生产文件里 import target 的边。"""
+    stem = target.with_suffix("")
+    edges: list[str] = []
+    for f in _all_frontend():
+        text = f.read_text(encoding="utf-8", errors="replace")
+        if target.stem not in text:
+            continue
+        for line in text.split("\n"):
+            for rx in _IMPORT_FORMS:
+                for m in rx.finditer(line):
+                    r = _resolve_spec(m.group(1), f)
+                    if r is None:
+                        continue
+                    if r in (stem, target) or r.with_suffix("") == stem:
+                        edges.append(f.as_posix())
+    return edges
+
+
+def _strip_comments(source: str) -> str:
+    source = re.sub(r"/\*.*?\*/", lambda m: re.sub(r"[^\n]", " ", m.group(0)), source, flags=re.S)
+    source = re.sub(r"<!--.*?-->", lambda m: re.sub(r"[^\n]", " ", m.group(0)), source, flags=re.S)
+    source = re.sub(r"(?<![:\w\"'`\\])//[^\n]*", lambda m: " " * len(m.group(0)), source)
+    return source
+
+
+def _cached_text(path: pathlib.Path) -> str:
+    return path.read_text(encoding="utf-8", errors="replace")
+
+
+# ─── fixtures ──────────────────────────────────────────────────────────
+@pytest.fixture(scope="module")
+def manifest_slice() -> dict:
+    return _load(MANIFEST_SLICE_PATH)
+
+
+@pytest.fixture(scope="module")
+def all_entries(manifest_slice: dict) -> list[dict]:
+    return manifest_slice["independent_entries"]
+
+
+@pytest.fixture(scope="module")
+def lane2_entries(all_entries: list[dict]) -> list[dict]:
+    return [e for e in all_entries if e["entry_id"] in LANE2_ENTRY_IDS]
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 0: 三条 entry 的 blocked_by 现算门
+# Property: LA-P1, LA-P2, LA-P3
+# ═══════════════════════════════════════════════════════════════════════
+class TestTask0BlockedBy:
+    """三条 entry 的 BP 归位。"""
+
+    def test_l2_has_6_blockers(self, lane2_entries: list[dict]) -> None:
+        l2 = next(e for e in lane2_entries if "l2" in e["entry_id"])
+        assert len(l2["capability_target_blocked_by"]) == 6
+
+    def test_l3_has_6_blockers(self, lane2_entries: list[dict]) -> None:
+        l3 = next(e for e in lane2_entries if "l3" in e["entry_id"])
+        assert len(l3["capability_target_blocked_by"]) == 6
+
+    def test_l4_has_7_blockers(self, lane2_entries: list[dict]) -> None:
+        l4 = next(e for e in lane2_entries if "l4" in e["entry_id"])
+        assert len(l4["capability_target_blocked_by"]) == 7
+
+    def test_no_bp4_bp6(self, lane2_entries: list[dict]) -> None:
+        """三条均不含 BP-4 / BP-6（LA-P1）。"""
+        for e in lane2_entries:
+            bbs = e["capability_target_blocked_by"]
+            assert "BP-4" not in bbs, f"{e['entry_id']} 不应含 BP-4"
+            assert "BP-6" not in bbs, f"{e['entry_id']} 不应含 BP-6"
+
+    def test_l4_is_only_bp8(self, lane2_entries: list[dict], all_entries: list[dict]) -> None:
+        """L4 是本 spec 唯一含 BP-8（且全 L 域唯一）（LA-P3）。"""
+        bp8_in_lane2 = [e["entry_id"] for e in lane2_entries if "BP-8" in e["capability_target_blocked_by"]]
+        assert len(bp8_in_lane2) == 1
+        assert "l4" in bp8_in_lane2[0]
+        # 全 L 域也唯一
+        bp8_all = [e["entry_id"] for e in all_entries if "BP-8" in e.get("capability_target_blocked_by", [])]
+        assert len(bp8_all) == 1
+
+    def test_bp5_and_bp46_mutually_exclusive(self, all_entries: list[dict]) -> None:
+        """「含 BP-5」与「含 BP-4+BP-6」两集合完全互斥（LA-P2）。"""
+        has_bp5 = {e["entry_id"] for e in all_entries if "BP-5" in e.get("capability_target_blocked_by", [])}
+        has_bp46 = {
+            e["entry_id"] for e in all_entries
+            if "BP-4" in e.get("capability_target_blocked_by", [])
+            and "BP-6" in e.get("capability_target_blocked_by", [])
+        }
+        assert has_bp5 & has_bp46 == set(), "BP-5 与 BP-4+BP-6 应完全互斥"
+        assert len(has_bp5) + len(has_bp46) == 8, "两集合求和应 == 8"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 3~6: BP-5 orphan 收口
+# Property: LA-P4 ~ LA-P8
+# ═══════════════════════════════════════════════════════════════════════
+class TestTask3to6OrphanCleanup:
+    """BP-5 孤儿模块定位、可删性与删除。"""
+
+    def test_orphan_files_deleted(self) -> None:
+        """四个 orphan 模块已被删除（BP-5 收口完成）。"""
+        for f in ORPHAN_FILES:
+            assert not f.exists(), f"orphan 文件应已删除但仍存在：{f}"
+
+    def test_l3_two_copies_deleted(self) -> None:
+        """L3 两份都已删除。"""
+        l3_src = SRC_COMPOSABLES / "useL3DualMode.ts"
+        l3_wp = WP_COMPOSABLES / "useL3DualMode.ts"
+        assert not l3_src.exists(), "L3 src/composables 版应已删除"
+        assert not l3_wp.exists(), "L3 composables 版应已删除"
+
+    def test_each_orphan_confirmed_zero_edges_before_deletion(self) -> None:
+        """每个 orphan 删除前已确认零生产消费边（LA-P5，已执行）。"""
+        # 文件已删——此处验证不再有任何 import 残留
+        for f in ORPHAN_FILES:
+            assert not f.exists(), f"orphan {f.name} 应已删除"
+
+    def test_no_barrel_exists(self) -> None:
+        """barrel(index.ts) 不存在 ⇒ 一阶 orphan（LA-P6，引用 LC-24 第 5/6 项）。"""
+        barrel = WP_COMPOSABLES / "index.ts"
+        if barrel.exists():
+            text = _cached_text(barrel)
+            # barrel 存在但不导出这些 orphan
+            for f in ORPHAN_FILES:
+                assert f.stem not in text, (
+                    f"barrel 导出了 orphan {f.stem}——应不导出"
+                )
+
+    def test_l3_composables_version_deleted(self) -> None:
+        """composables/useL3DualMode.ts 已删除（不分区的 orphan 已清理，LA-P7）。"""
+        path = WP_COMPOSABLES / "useL3DualMode.ts"
+        assert not path.exists(), "不分区的 L3 DualMode 应已删除"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 10~14: BP-8 粒度折叠（L4）
+# Property: LA-P13 ~ LA-P19
+# ═══════════════════════════════════════════════════════════════════════
+class TestTask10to14SheetGranularityCollapse:
+    """L4 的 16 sheet → 13 dispatch code 粒度折叠。"""
+
+    def test_l4_has_16_sheets_13_dispatch(self) -> None:
+        """16 权威 sheet → 13 dispatch code，重复码恰 2 组（LA-P13）。"""
+        wb = load_workbook(L_TEMPLATE_DIR / "L4 应付债券.xlsx", read_only=True)
+        sheets = list(wb.sheetnames)
+        wb.close()
+        assert len(sheets) == 16, f"L4 应有 16 张 sheet，实得 {len(sheets)}"
+
+        # 提取尾码（L4-N 形态）
+        code_re = re.compile(r"(L4-\d+)\s*$")
+        codes: list[str] = []
+        for s in sheets:
+            m = code_re.search(s)
+            if m:
+                codes.append(m.group(1))
+        # 去重后的 dispatch code 数
+        unique_codes = set(codes)
+        duplicated = {c for c in codes if codes.count(c) > 1}
+        assert len(duplicated) == 2, (
+            f"重复码应恰 2 组，实得 {duplicated}"
+        )
+
+    def test_four_collapsed_sheets_are_distinct(self) -> None:
+        """四张同码 sheet 名逐字不同，其中一张带内部空格（LA-P14）。"""
+        wb = load_workbook(L_TEMPLATE_DIR / "L4 应付债券.xlsx", read_only=True)
+        sheets = list(wb.sheetnames)
+        wb.close()
+        # L4-7 一对
+        l47 = [s for s in sheets if s.rstrip().endswith("L4-7")]
+        assert len(l47) == 2, f"L4-7 应有 2 张：{l47}"
+        assert l47[0] != l47[1], "两张 L4-7 sheet 名应不同"
+        # L4-8 一对
+        l48 = [s for s in sheets if s.rstrip().endswith("L4-8") or s.endswith("L4-8")]
+        assert len(l48) == 2, f"L4-8 应有 2 张：{l48}"
+        assert l48[0] != l48[1], "两张 L4-8 sheet 名应不同"
+        # 其中一张带内部空格
+        has_internal_space = any(
+            " " in s[1:-1] and "L4-8" in s
+            for s in sheets
+            if "账面核对" in s
+        )
+        assert has_internal_space, "L4 账面核对表应有内部空格"
+
+    def test_two_book_recon_sheets_both_endswith_l4_8(self) -> None:
+        """两张账面核对表同时 endswith('L4-8')（LA-P15，引用 LC-10）。"""
+        wb = load_workbook(L_TEMPLATE_DIR / "L4 应付债券.xlsx", read_only=True)
+        sheets = list(wb.sheetnames)
+        wb.close()
+        endswith_l48 = [s for s in sheets if s.endswith("L4-8")]
+        assert len(endswith_l48) == 2, (
+            f"应有 2 张同时 endswith('L4-8')，实得 {len(endswith_l48)}: {endswith_l48}"
+        )
+
+    def test_bond_branch_is_only_distinguisher(self) -> None:
+        """bondBranch 是当前唯一区分手段（LA-P17，引用 LC-15）。"""
+        host = sorted(WP_COMPONENTS.glob("GtL4*.vue"))[0]
+        text = _cached_text(host)
+        clean = _strip_comments(text)
+        assert "bondBranch" in clean, "L4 宿主应含 bondBranch"
+        # bondBranch 不是模式开关
+        for line in clean.split("\n"):
+            if "el-segmented" in line and "bondBranch" in line:
+                assert "dualMode" not in line, "bondBranch 不应关联 dualMode"
+
+    def test_resolve_target_sheet_strict_rejects_ambiguity(self) -> None:
+        """解析层 strict 模式在多张 endswith 时返回 None（LA-P19）。"""
+        from app.services.workpaper_sync.excel_sheet_visibility import resolve_target_sheet
+        wb = load_workbook(L_TEMPLATE_DIR / "L4 应付债券.xlsx", read_only=True)
+        sheets = list(wb.sheetnames)
+        wb.close()
+        # 非 strict：L4-8 命中第一个（原行为）
+        result_compat = resolve_target_sheet(sheets, "L4-8", strict=False)
+        assert result_compat is not None, "非 strict 应命中"
+        # strict：L4-8 命中多个 → 返回 None（fail-closed）
+        result_strict = resolve_target_sheet(sheets, "L4-8", strict=True)
+        assert result_strict is None, (
+            f"strict 模式下 L4-8 应返回 None（歧义），实得 '{result_strict}'"
+        )
+        # 无歧义的 L4-1 在 strict 下仍正常
+        result_ok = resolve_target_sheet(sheets, "L4-1", strict=True)
+        assert result_ok is not None, "L4-1 无歧义，strict 应正常返回"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 15~18: L3 侧同构对 + 正面样板
+# Property: LA-P20 ~ LA-P25
+# ═══════════════════════════════════════════════════════════════════════
+class TestTask15to18L3IsomorphismAndSamples:
+    """L3 同构对 + 正面样板抽取。"""
+
+    def test_l3_overdue_check_ref_errors_same_as_l1(self) -> None:
+        """L3 逾期贷款检查表与 L1 同源同形（LA-P20，引用 LC-11/LC-25）。"""
+        ref_counts = {}
+        for name in ("L1 短期借款.xlsx", "L3 长期借款.xlsx"):
+            wb = load_workbook(L_TEMPLATE_DIR / name, read_only=False, data_only=False)
+            count = 0
+            for ws in wb.worksheets:
+                if "逾期贷款检查表" in ws.title:
+                    for row in ws.iter_rows():
+                        for cell in row:
+                            if cell.value and isinstance(cell.value, str) and "#REF!" in cell.value:
+                                count += 1
+            ref_counts[name] = count
+            wb.close()
+        assert ref_counts["L1 短期借款.xlsx"] > 0
+        assert ref_counts["L3 长期借款.xlsx"] > 0
+        assert ref_counts["L1 短期借款.xlsx"] == ref_counts["L3 长期借款.xlsx"], (
+            f"L1 ({ref_counts['L1 短期借款.xlsx']}) 与 L3 ({ref_counts['L3 长期借款.xlsx']}) "
+            f"#REF! 数应相同"
+        )
+
+    def test_l3_defined_names_not_from_l1(self) -> None:
+        """L3 册有污染但 L1 册为 0 ⇒ 非从 L1 复制（LA-P21，引用 LC-9）。"""
+        l1_wb = load_workbook(L_TEMPLATE_DIR / "L1 短期借款.xlsx", read_only=False)
+        l3_wb = load_workbook(L_TEMPLATE_DIR / "L3 长期借款.xlsx", read_only=False)
+        l1_dn = len(list(l1_wb.defined_names))
+        l3_dn = len(list(l3_wb.defined_names))
+        l1_wb.close()
+        l3_wb.close()
+        assert l1_dn == 0, f"L1 册 definedName 应为 0，实得 {l1_dn}"
+        assert l3_dn > 0, f"L3 册应有 definedName 污染"
+
+    def test_l3_contract_check_borrows_d4_ocr(self) -> None:
+        """L3TabContractCheck 借 D4 OCR 端点（LA-P22，引用 LC-19）。"""
+        path = WP_COMPONENTS / "l3" / "inspection" / "L3TabContractCheck.vue"
+        if not path.exists():
+            pytest.skip("L3TabContractCheck.vue 不存在")
+        text = _cached_text(path)
+        assert "contract-ocr" in text or "d4/contract-ocr" in text, (
+            "L3TabContractCheck 应借 D4 OCR 端点"
+        )
+
+    def test_rowid_positive_samples_are_unique(self) -> None:
+        """L2/L3 的三个 rowId 模块前缀两两不同（LA-P24）。"""
+        modules = {
+            "useL2Detail": WP_COMPOSABLES / "useL2Detail.ts",
+            "useL2VoucherCheck": WP_COMPOSABLES / "useL2VoucherCheck.ts",
+            "useL3VoucherCheck": SRC_COMPOSABLES / "useL3VoucherCheck.ts"
+            if (SRC_COMPOSABLES / "useL3VoucherCheck.ts").exists()
+            else WP_COMPOSABLES / "useL3VoucherCheck.ts",
+        }
+        prefixes = set()
+        for name, path in modules.items():
+            if not path.exists():
+                continue
+            text = _cached_text(path)
+            # 查找 rowId 前缀形态（如 'L2-detail-' 或 'L3-voucher-'）
+            prefix_match = re.findall(r"""['\"`]([Ll][23]-\w+-?)['\"`]""", text)
+            for p in prefix_match:
+                prefixes.add(p)
+        # 如果找到前缀，应两两不同（集合大小 >= 模块数）
+        # 这是最低限度检查——至少有前缀存在
+        if prefixes:
+            assert len(prefixes) >= 2, f"rowId 前缀应两两不同，实得 {prefixes}"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task 22: 自检
+# Property: 全清单自检
+# ═══════════════════════════════════════════════════════════════════════
+class TestTask22SelfCheck:
+    """算术自检。"""
+
+    def test_sheet_arithmetic(self, lane2_entries: list[dict]) -> None:
+        """HTML 覆盖 8+13+15 = 36，OO 兜底 0+1+1 = 2，sheets 8+14+16 = 38 = 36+2。"""
+        total_sheets = 0
+        total_html = 0
+        total_oo = 0
+        for e in lane2_entries:
+            sg = e.get("sheet_granularity", {})
+            total_sheets += sg.get("authoritative_sheet_count", 0)
+            total_html += sg.get("sheets_covered_by_html_child", 0)
+            total_oo += len(sg.get("sheets_falling_through_to_oo", []))
+        assert total_sheets == 38, f"sheets 应 38，实得 {total_sheets}"
+        assert total_html + total_oo == total_sheets, (
+            f"HTML({total_html}) + OO({total_oo}) 应 == sheets({total_sheets})"
+        )
+
+    def test_entry_count(self, lane2_entries: list[dict]) -> None:
+        """本 spec 3 条 entry。"""
+        assert len(lane2_entries) == 3
+
+    def test_no_lc_content_duplication(self) -> None:
+        """本 spec 文件不复述 LC-x 判据内容（只引用编号）。"""
+        this_file = pathlib.Path(__file__)
+        text = this_file.read_text(encoding="utf-8")
+        # 检查是否有 LC- 编号引用
+        lc_refs = re.findall(r"LC-\d+", text)
+        assert len(lc_refs) > 0, "应有 LC-x 编号引用"

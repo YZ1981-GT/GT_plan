@@ -14,7 +14,7 @@
  * - 状态持久化（localStorage 按 wpId 记忆用户偏好）
  */
 import { ref, computed, onMounted, type Ref } from 'vue'
-import http from '@/utils/http'
+import { useOnlyOfficeHealthProbe } from './useOnlyOfficeHealthProbe'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -38,9 +38,6 @@ export interface UseL6DualModeOptions {
 /** localStorage key prefix（按 wpId 存储） */
 const STORAGE_KEY_PREFIX = 'l6-dual-mode'
 
-/** OO 健康检查端点 */
-const OO_HEALTH_ENDPOINT = '/api/workpapers/onlyoffice/health'
-
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 /**
@@ -55,8 +52,8 @@ export function useL6DualMode(options: UseL6DualModeOptions) {
   // ─── State ─────────────────────────────────────────────────────────────
 
   const mode = ref<L6RenderMode>(defaultMode)
-  const isOOHealthy = ref<boolean>(false)
-  const ooChecking = ref(false)
+  // BP-6 收敛：OO 健康检查从共享 composable 获取
+  const { isOOHealthy, ooChecking, checkOOHealth } = useOnlyOfficeHealthProbe()
 
   // ─── localStorage 持久化（按 wpId） ────────────────────────────────────
 
@@ -81,30 +78,6 @@ export function useL6DualMode(options: UseL6DualModeOptions) {
       localStorage.setItem(_storageKey(), m)
     } catch {
       // 静默忽略
-    }
-  }
-
-  // ─── OnlyOffice Health Check ───────────────────────────────────────────
-
-  /**
-   * 检查 OnlyOffice 服务是否可用
-   * 双层.data兼容: ResponseWrapperMiddleware 信封 {code,message,data:{healthy:true}}
-   */
-  async function checkOOHealth(): Promise<boolean> {
-    ooChecking.value = true
-    try {
-      const response = await http.get(OO_HEALTH_ENDPOINT)
-      // 双层.data兼容
-      const healthy = (response as any).data?.data?.healthy
-        ?? (response as any).data?.healthy
-        ?? false
-      isOOHealthy.value = Boolean(healthy)
-      return isOOHealthy.value
-    } catch {
-      isOOHealthy.value = false
-      return false
-    } finally {
-      ooChecking.value = false
     }
   }
 
