@@ -24,6 +24,7 @@ import { useG11DetailAnalysis } from './useG11DetailAnalysis'
 import type { ChecklistResponse } from './useF1FormData'
 import { api } from '@/services/apiProxy'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { G11_ITEM_IDS } from './g11StorageContract'
 
 export interface G11AdjudicationRow {
   rowKey: string
@@ -43,7 +44,7 @@ export interface G11AdjudicationRow {
   reasonRequired: boolean
 }
 
-const ITEM_ID_ROWS = 'G11-adj-rows'
+const ITEM_ID_ROWS = G11_ITEM_IDS.G11_ADJ_ROWS
 const ITEM_ID_TB = 'G11-adj-tb'
 const ITEM_ID_NOTE = 'G11-adj-note'
 const ITEM_ID_CONCLUSION = 'G11-adj-conclusion'

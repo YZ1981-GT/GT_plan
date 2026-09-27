@@ -5,9 +5,10 @@ import { parseNum } from './useG1TraFinFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import type { TradingDetailRow } from './useG1Detail'
 import { createEmptyG1AdjustmentRow, type G1AdjustmentRow } from './useG1Adjustment'
+import { G1_ITEM_IDS } from './g1StorageContract'
 import { G1_GROSS_FALLBACK_STANDARD } from './g1AccountScope'
 
-export const G1_DETAIL_KEY = 'G1-2-rows'
+export const G1_DETAIL_KEY = G1_ITEM_IDS.G1_2_ROWS
 export const G1_ADJ_KEY = 'G1-3-rows'
 
 /** 优先 code，其次 name；可选 id */

@@ -2,6 +2,7 @@
  * G11 附注披露行结构 — 对齐 Excel 上市/国企「投资收益」附注
  */
 import {
+import { G11_ITEM_IDS } from './g11StorageContract'
   G11_ADJUDICATION_ITEMS,
   G11_DISCLOSURE_LISTED_ROWS,
   G11_DISCLOSURE_SOE_ROWS,
@@ -30,7 +31,7 @@ export const G11_DISCLOSURE_COL_LABELS = {
 export const G11_DISCLOSURE_TOTAL_LABEL = '合  计'
 export const G11_CROSS_TOLERANCE = 0.01
 
-export const G11_ADJ_ROWS_KEY = 'G11-adj-rows'
+export const G11_ADJ_ROWS_KEY = G11_ITEM_IDS.G11_ADJ_ROWS
 export const G11_DETAIL_KEY = 'G11-detail-rows'
 export const G11_ADJUDICATED_KEY = 'G11-1-adjudicated-amount'
 export const G11_DISCLOSURE_LISTED_KEY = 'G11-disclosure-listed'

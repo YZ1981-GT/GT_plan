@@ -10,6 +10,7 @@ import { ref, computed, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { parseNum, calcCountDiff, calcSubtotal } from './useG1TraFinFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
+import { G1_ITEM_IDS } from './g1StorageContract'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -82,7 +83,7 @@ export const G1_SECURITIES_COUNT_COLUMNS: G1SecuritiesCountColumn[] = [
 const DATA_KEY = 'G1-11-rows'
 const HEADER_KEY = 'G1-11-header'
 const CONCLUSION_KEY = 'G1-11-conclusion'
-const DETAIL_KEY = 'G1-2-rows'
+const DETAIL_KEY = G1_ITEM_IDS.G1_2_ROWS
 const RECON_KEY = 'G1-12-rows'
 
 export function emptyHeader(): G1SecuritiesCountHeader {

@@ -45,6 +45,9 @@ _PROVIDERS: tuple[tuple[str, str], ...] = (
     ("h2", "phase5_h2_construction_in_progress"),
     #: 🔴 变体轴：一个 entry 两张受管 sheet（成本模式 / 公允价值模式）。
     ("h3", "phase5_h3_investment_property"),
+    #: 🔴 映射率最低档（前端行模型远小于模板列数，缺口逐条登记）。
+    ("h5", "phase5_h5_oil_gas_assets"),
+    ("h7", "phase5_h7_biological_assets"),
 )
 
 

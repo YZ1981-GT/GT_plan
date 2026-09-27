@@ -28,10 +28,11 @@ import {
 import { calcAdjustedAmount, calcSubtotal, parseNum } from './useG10FormulaEngine'
 import { enrichG10DetailRow, type G10DetailRow } from './useG10Detail'
 import type { ChecklistResponse } from './useF1FormData'
+import { G10_ITEM_IDS } from './g10StorageContract'
 
 export { G10_ADJ_ROWS_KEY }
 
-export const G10_DETAIL_ROWS_KEY = 'G10-detail-rows'
+export const G10_DETAIL_ROWS_KEY = G10_ITEM_IDS.G10_DETAIL_ROWS
 export const G10_ADJUDICATED_KEY = 'G10-1-adjudicated-amount'
 
 export interface G10DetailBucket {

@@ -1,5 +1,6 @@
 import type { GCycleIndexRowDef } from './g12SheetLabels'
 import { collectG10AProcedureMarks } from './g10FvCrossHelpers'
+import { G10_ITEM_IDS } from './g10StorageContract'
 
 export const G10_SHEET_LABEL_MAP: Record<string, string> = {
   G10: '底稿目录',
@@ -80,7 +81,7 @@ export function isG10SheetComplete(code: string, m: Map<string, any>): boolean {
     case 'G10-1':
       return m.has('G10-adj-rows') || m.has('G10-adj-tb')
     case 'G10-2':
-      return hasJsonRows(m, 'G10-detail-rows')
+      return hasJsonRows(m, G10_ITEM_IDS.G10_DETAIL_ROWS)
     case 'G10-3':
       return hasJsonRows(m, 'G10-aje-rows')
     case 'G10-4':

@@ -1008,7 +1008,15 @@ class TestHtmlCounterpartIsSourceBacked:
         ], "双计量模式 entry 数与摘要不符"
 
     def test_h7_second_write_path_is_real(self, manifest_slice: dict) -> None:
-        """H7 是全 slice 唯一双写路径双客户端 —— 两条都必须可复核，且客户端确实不同。"""
+        """H7 是全 slice 唯一双写路径双客户端 —— 两条都必须可复核，且客户端确实不同。
+
+        🔴 行号走 `_relocate_lines`：H7 接桥后两侧文件都插了内容（Tab 里加
+        `trackHPendingWrite` 的说明块、宿主里把防抖载荷显式留存以便 flush），冻结的
+        `#Lnn` 整体位移。位移不是语义漂移，slice 不回填（append-only）。位移分支拿到的是
+        **全部** put 站点，逐处都要求打在 `/checklist-responses` 上 —— 比原判据（只看冻结
+        那一行）严：任何一侧多出一个打别的端点的 PUT 都会被抓住。
+        """
+        migrated = _migrated_entry_ids()
         entry = next(
             e
             for e in manifest_slice["independent_entries"]
@@ -1020,12 +1028,24 @@ class TestHtmlCounterpartIsSourceBacked:
             path = _resolve_repo(item["path"])
             assert path.exists(), f"H7 second_write_path 文件不存在 {item['path']}"
             source = path.read_text(encoding="utf-8")
-            assert _client_probe(item["client"], "put")(source), (
-                f"H7 {item['path']} 里没有 {item['client']}.put(`...checklist-responses`)"
+            client = item["client"]
+            assert _client_probe(client, "put")(source), (
+                f"H7 {item['path']} 里没有 {client}.put(`...checklist-responses`)"
             )
-            line_no = _line_no_of(item["put_source"])
-            assert f"{item['client']}.put(" in source.splitlines()[line_no - 1]
-            clients.add(item["client"])
+            lines = source.splitlines()
+            for no in _relocate_lines(
+                entry_id=entry["entry_id"],
+                ref=item["put_source"],
+                predicate=lambda ln, c=client: f"{c}.put(" in ln,
+                what=f"{client}.put 站点",
+                migrated=migrated,
+            ):
+                window = "\n".join(lines[no - 1 : min(len(lines), no + 3)])
+                assert "checklist-responses" in window, (
+                    f"H7 {item['path']}:L{no} 的 {client}.put 不是打 "
+                    f"/checklist-responses（实际 {lines[no - 1].strip()[:90]!r}）"
+                )
+            clients.add(client)
         assert len(clients) == 2, f"H7 声明两个不同客户端，实际 {clients}"
 
     def test_h10_third_client_side_store_is_declared_and_unique(

@@ -26,6 +26,7 @@ import {
 import { useWorkpaperAuditYear, fetchTrialBalanceByPrefix } from './workpaperAuditYear'
 import type { ChecklistResponse } from './useF1FormData'
 import { api } from '@/services/apiProxy'
+import { G11_ITEM_IDS } from './g11StorageContract'
 
 export interface G11ReturnRateRow {
   id: string
@@ -62,7 +63,7 @@ export interface G11ReturnRateRow {
 export const ITEM_ID_RETURN_RATE_ROWS = 'G11-return-rate-rows'
 export const ITEM_ID_RETURN_RATE_CONCLUSION = 'G11-return-rate-conclusion'
 export const ITEM_ID_RETURN_RATE_NOTE = 'G11-return-rate-audit-note'
-const ITEM_ID_ADJ_ROWS = 'G11-adj-rows'
+const ITEM_ID_ADJ_ROWS = G11_ITEM_IDS.G11_ADJ_ROWS
 
 function generateId(): string {
   return `g11rr-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`

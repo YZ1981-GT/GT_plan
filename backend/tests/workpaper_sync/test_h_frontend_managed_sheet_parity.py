@@ -36,6 +36,8 @@ import pytest
 from app.services.workpaper_sync import phase5_h2_construction_in_progress as h2
 from app.services.workpaper_sync import phase5_h3_investment_property as h3
 from app.services.workpaper_sync import phase5_h4_engineering_materials as h4
+from app.services.workpaper_sync import phase5_h5_oil_gas_assets as h5
+from app.services.workpaper_sync import phase5_h7_biological_assets as h7
 from app.services.workpaper_sync import phase5_h6_asset_disposal_clearing as h6
 from app.services.workpaper_sync import phase5_h8_right_of_use_assets as h8
 from app.services.workpaper_sync import phase5_h9_lease_liabilities as h9
@@ -112,7 +114,9 @@ def _parse_frontend_wired_codes() -> list[str]:
 #: h3 = 首条**变体轴**（lane2）—— 🔴 唯一贡献**两条** managed row table 的 provider
 #:      （成本模式 / 公允价值模式各一张，各有独立持久化键）。`_backend_managed_rows()`
 #:      按 `managed_row_table_specs()` 展开，天然支持一对多，无需为它开特例。
-_PROVIDERS: tuple[Any, ...] = (h9, h6, h4, h8, h2, h3)
+#: h5 = 映射率最低档单表（10/54）—— 🔴 store 键**拼接**而来，字面量在前端零命中
+#: h7 = 第二条变体轴，两张 sheet 的表头层数与数据区起始行**在 entry 内就不同**
+_PROVIDERS: tuple[Any, ...] = (h9, h6, h4, h8, h2, h3, h5, h7)
 
 
 def _backend_managed_rows() -> list[dict[str, str]]:

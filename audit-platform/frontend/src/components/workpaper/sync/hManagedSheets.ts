@@ -15,8 +15,12 @@
  * ═══ 🔴 诚实边界：受管面 ≠ 已接桥面 ═══════════════════════════════════════════
  *
  * D3 实证过「契约受管 ≠ 已接 OO 直写宿主」（D3-4/5/6/7 受管但未接桥）。H 当前的真实状态：
- *   · 后端 provider 已落地 **H9 / H6 / H8 / H4 / H2 / H3** 六条 —— H5/H7/H10 三条尚未
- *     （H10 是结构性不匹配待裁决，H5/H7 的前端载体覆盖度远低于模板，见各自 spec）；
+ *   · 后端 provider 已落地 **H9 / H6 / H8 / H4 / H2 / H3 / H5 / H7** 八条 ——
+ *     只剩 H10（前端 `H10-detail-rows` 是逐资产处置台账、模板 `明细表H10-2` 是 9 类固定行
+ *     × 12 月矩阵，**结构性不匹配**待裁决，见 `h2-h6-h10-pilot-cross-reference-lanes`）；
+ *   · 🔴 H5/H7 的映射率极低（H5 10/54 · H7 成本 5/51 · H7 公允 3/28）是**两侧口径差**
+ *     不是漏做：前端行模型远小于模板列数，缺口逐条登记在各自契约的
+ *     `review.declared_coverage_gaps`，每条带停下报告点；
  *   · H1 是**同循环既有 pilot**（`pilot_h1_grouped_dynamic`），走 `pilot_*` 范式、
  *     adapter 已注册，**不属本轮受管面**，故不进本清单（避免把两套范式并进同一个布尔，
  *     D4-35/D4-13 踩过「切错桥 + 工具条叠加」）。
@@ -141,6 +145,42 @@ export const H_MANAGED_SHEETS: readonly HManagedSheet[] = Object.freeze([
     excelName: '明细表（公允价值模式）H3-2',
     storeItemId: 'H3-2-fair-rows',
   },
+  {
+    // 🔴 `storeItemId` 在**运行时载体**里是拼接出来的：`useH5Detail.ts` 用
+    //    `${ITEM_PREFIX}-rows`（`ITEM_PREFIX = 'H5-2'`）⇒ 按值 grep 该键的字面量在
+    //    composable / Tab 里**零命中**。下面这一行是解析后的真键，专供后端 parity 守护
+    //    逐字比对；它是**声明**不是第二个运行时来源（本文件零读写形态）。
+    //    🔴 本行是全仓该键字面量的**唯一**一处 —— 守卫断言恰 1 处，所以上面这段注释
+    //    刻意不复述键名（复述一次就变 2 处，判据会红）。
+    // 🔴 映射率 10/54（19%）—— 前端 `H5DetailRow` 只 17 字段、无减值也无审定口径。
+    //    缺口逐条在契约 `review.declared_coverage_gaps`。
+    entryId: 'xlsx/gt-h5-oil-gas-assets',
+    code: 'H5-2',
+    sheetKey: 'h502-managed',
+    kind: 'rows',
+    excelName: '明细表H5-2',
+    storeItemId: 'H5-2-rows',
+  },
+  {
+    // 🔴 变体轴第二条（H3 是第一条）。与 H3 不同的是：H7 两张 sheet 的**形态在 entry 内
+    //    就不一致** —— 成本模式四级表头、公允模式三级表头；数据区起始行 R13 vs R12。
+    // 🔴 载体是 `per_tab_self_persisting`：键与行模型内联在 Tab 组件里
+    //    （`h7/core/H7TabDetailCost.vue`），`useH7DetailCost.ts` 只是读取器不是载体。
+    entryId: 'xlsx/gt-h7-biological-assets',
+    code: 'H7-2-cost',
+    sheetKey: 'h702cost-managed',
+    kind: 'rows',
+    excelName: '明细表（成本模式）H7-2',
+    storeItemId: 'H7-2-cost-rows',
+  },
+  {
+    entryId: 'xlsx/gt-h7-biological-assets',
+    code: 'H7-2-fair',
+    sheetKey: 'h702fair-managed',
+    kind: 'rows',
+    excelName: '明细表（公允价值模式）H7-2',
+    storeItemId: 'H7-2-fair-rows',
+  },
 ] as const)
 
 /**
@@ -161,6 +201,9 @@ export const H_OO_WIRED_ROWS_CODES: readonly string[] = Object.freeze([
   // 变体轴两半必须同时在列：只放一半，切计量模式会切到没桥的那张。
   'H3-2-cost',
   'H3-2-fair',
+  'H5-2',
+  'H7-2-cost',
+  'H7-2-fair',
 ])
 
 const BY_CODE: ReadonlyMap<string, HManagedSheet> = (() => {

@@ -11,6 +11,7 @@
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
+import { G1_ITEM_IDS } from './g1StorageContract'
 import {
   parseNum,
   calcClosingQuantity,
@@ -270,7 +271,7 @@ export const G1_DETAIL_SEGMENTS: G1DetailSegment[] = [
   },
 ]
 
-const DATA_KEY = 'G1-2-rows'
+const DATA_KEY = G1_ITEM_IDS.G1_2_ROWS
 const CONCLUSION_KEY = 'G1-2-conclusion'
 const GATES_KEY = 'G1-2-gates'
 

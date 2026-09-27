@@ -151,6 +151,7 @@ import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 import { useH7DetailFair } from '../../composables/useH7DetailFair'
+import { trackHPendingWrite } from '../../sync/hPendingWrites'
 
 const props = defineProps<{
   wpId: string
@@ -234,14 +235,17 @@ async function loadOwn() {
   void getNum
 }
 
+/** 同成本模式 Tab：`trackHPendingWrite` 让宿主双向桥能 await 最后一次 PUT。 */
 async function persist(itemId: string, value: any) {
   const remark = value == null ? null : (typeof value === 'string' ? value : JSON.stringify(value))
   localResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark })
   try {
-    await api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion: null, remark }],
-    })
+    await trackHPendingWrite(
+      api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+        project_id: props.projectId,
+        items: [{ item_id: itemId, conclusion: null, remark }],
+      }),
+    )
   } catch { ElMessage.error('保存失败，请稍后重试') }
 }
 

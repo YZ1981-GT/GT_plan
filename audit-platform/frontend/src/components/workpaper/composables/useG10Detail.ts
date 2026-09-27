@@ -47,6 +47,7 @@ import {
   calcG10DetailClosingBalance,
 } from './useG10FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
+import { G10_ITEM_IDS } from './g10StorageContract'
 
 /**
  * G10-2 明细行 —— 字段顺序与模板列序 A..S **逐列对应**。
@@ -169,7 +170,7 @@ export interface G10DetailRowIssue {
   variance?: number
 }
 
-const ITEM_ID_ROWS = 'G10-detail-rows'
+const ITEM_ID_ROWS = G10_ITEM_IDS.G10_DETAIL_ROWS
 const DIFF_TOLERANCE = 0.01
 
 function genId(): string {

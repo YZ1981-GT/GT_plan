@@ -4,6 +4,8 @@
 import { api } from '@/services/apiProxy'
 import { parseNum } from './useG13FormulaEngine'
 import { G13_SOURCE_INDEX_BY_BELONG } from './g13Constants'
+import { G1_ITEM_IDS } from './g1StorageContract'
+import { G10_ITEM_IDS } from './g10StorageContract'
 
 export type G13SourceBelong = 'G1' | 'G8' | 'G9' | 'G10' | 'H3'
 
@@ -236,10 +238,10 @@ function mapH3(raw: Record<string, unknown>): G13SourcePullSeed | null {
 }
 
 export const G13_SOURCE_PULL_SPECS: SourceSpec[] = [
-  { wpCode: 'G1', itemId: 'G1-2-rows', storage: 'conclusion', map: mapG1 },
+  { wpCode: 'G1', itemId: G1_ITEM_IDS.G1_2_ROWS, storage: 'conclusion', map: mapG1 },
   { wpCode: 'G8', itemId: 'G8-detail-rows', storage: 'remark', map: mapG8 },
   { wpCode: 'G9', itemId: 'G9-detail-rows', storage: 'remark', map: mapG9 },
-  { wpCode: 'G10', itemId: 'G10-detail-rows', storage: 'remark', map: mapG10 },
+  { wpCode: 'G10', itemId: G10_ITEM_IDS.G10_DETAIL_ROWS, storage: 'remark', map: mapG10 },
   { wpCode: 'H3', itemId: 'H3-2-fair-rows', storage: 'either', map: mapH3 },
 ]
 

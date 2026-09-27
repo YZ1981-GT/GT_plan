@@ -41,6 +41,8 @@ OWNED = (
     "composables/hSeedRowIdentity.ts",
     "composables/useH2Detail.ts",
     "composables/useH3FormData.ts",
+    "composables/useH5FormData.ts",
+    "sync/hPendingWrites.ts",
     "d4/composables/useD4SyncMode.ts",
 )
 
@@ -60,6 +62,12 @@ HOST_FILES: tuple[str, ...] = (
     "GtH4EngineeringMaterials.vue",
     "GtH2ConstructionInProgress.vue",
     "GtH3InvestmentProperty.vue",
+    "GtH5OilGasAssets.vue",
+    "GtH7BiologicalAssets.vue",
+    #: H7 的两张受管明细表是 `per_tab_self_persisting` 载体，键与行模型内联在 Tab 里
+    #: ⇒ 接桥必须改它们（`trackHPendingWrite`）。纳入类型面，逐个现算基线。
+    "H7TabDetailCost.vue",
+    "H7TabDetailFair.vue",
 )
 #: 🔴 逐宿主基线按**现算**填，不照抄别的宿主。
 #:
@@ -93,8 +101,13 @@ HOST_ERROR_BASELINE: dict[str, int] = {
     #: `GtH2ConstructionInProgress.vue(350,7) TS2322` 并打红 ⇒ 0 是「真检查过且干净」，
     #: 不是「文件没被编译的假绿」。
     "GtH2ConstructionInProgress.vue": 0,
-    #: H3 待现算回填。
     "GtH3InvestmentProperty.vue": 0,
+    #: H5 / H7 及 H7 两张受管 Tab —— 先填 0 跑一次现算再回填（脚本对「低于基线」会
+    #: 打印下调提示，对「高于基线」直接打红 ⇒ 乐观填 0 不会静默放过真实新增错误）。
+    "GtH5OilGasAssets.vue": 0,
+    "GtH7BiologicalAssets.vue": 0,
+    "H7TabDetailCost.vue": 0,
+    "H7TabDetailFair.vue": 0,
 }
 
 _ERR_RE = re.compile(r"^(?P<file>[^(]+)\((?P<line>\d+),\d+\): error (?P<code>TS\d+)")

@@ -15,9 +15,10 @@ import {
 } from './g10SchemaRows'
 import { parseNum, calcAdjustedAmount, calcSubtotal } from './useG10FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
+import { G10_ITEM_IDS } from './g10StorageContract'
 
 export { G10_ADJ_ROWS_KEY }
-export const G10_DETAIL_KEY = 'G10-detail-rows'
+export const G10_DETAIL_KEY = G10_ITEM_IDS.G10_DETAIL_ROWS
 export const G10_ADJUDICATED_KEY = 'G10-1-adjudicated-amount'
 export const G10_CROSS_TOLERANCE = 0.01
 
