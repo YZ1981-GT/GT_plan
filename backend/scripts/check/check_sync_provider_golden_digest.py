@@ -86,6 +86,21 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     ("e1", "phase5_e1_monetary_fund", "ADAPTER_ID", True, True),
     # ── F1 canary（spec: f1-sync-coverage-and-first-canary）──────
     ("f1", "phase5_f1_prepayment", "ADAPTER_ID", True, True),
+    # ── G2 canary（spec: g-cycle-sync-foundation-and-first-canary · Task 14）──
+    #    🔴 G 循环**首条**纳入零回归门的 provider。`plural_instr=True`：它的
+    #    `instrumentation_definition_payload()` 走
+    #    `build_instrumentation_payload_for_sheets(specs=instrumentation_specs())`，
+    #    注册路径读的是**复数**。留 False 会让本判据只核主 sheet 单 spec ⇒
+    #    将来灰度开关打开 G2-3/G2-5/G2-6/G2-8 时扩容面对判据完全不可见（D2 注释警告过的假绿）。
+    ("g2", "phase5_g2_interest_receivable", "ADAPTER_ID", True, True),
+    # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
+    #    🔴 H 循环**首条**纳入零回归门的 provider。`plural_instr=True`：它的
+    #    `instrumentation_definition_payload()` 走 `build_instrumentation_payload_for_sheets`，
+    #    注册路径读的是**复数**。留 False 会让本判据只核主 sheet 单 spec ⇒
+    #    将来打开 H9-1/H9-3/H9-4 等灰度开关时扩容面对判据完全不可见（D2 注释警告过的假绿）。
+    #    🔴 H9 是首个 `header_rows` 域扩容（3→4）之后落地的契约 —— 它本身是 2 级，
+    #    但同循环的 H2/H4/H5/H7/H8 是 4 级；本门的 digest 会在扩容被回退时打红。
+    ("h9", "phase5_h9_lease_liabilities", "ADAPTER_ID", True, True),
 )
 
 

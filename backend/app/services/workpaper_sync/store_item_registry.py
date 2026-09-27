@@ -373,6 +373,47 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         provider_module="phase5_f5_cost_of_sales",
         items=(StoreItemSpec(item_id="F5-8-rows", kind=StoreKind.rows),),
     ),
+    # ── G2 canary（spec: g-cycle-sync-foundation-and-first-canary · Task 11/14）──
+    #
+    # 🔴 **GC-2：G 循环 13 册全部命中 OO 加载期裸 `IF(`** ⇒ per-file 保守策略，
+    #    每条 G plan 一律带 `oo_crash_neutralization_fn`，**无例外**。
+    #    G2 册按生产函数 `neutralize_oo_crash_if_formulas` 现算 **21 格**
+    #    （审定表G2-1 19 + 应收利息坏账准备测算G2-7 2）——
+    #    受管表 `明细表G2-2` 本身**零命中**，但中性化作用于整册 substrate 副本，
+    #    「受管表干净」不是豁免理由：用户在同一册里点任一 sheet 的在线编辑都会触发整册加载。
+    #    BP-4（真 OO 9.4 场景集）未交付前**不得**以「裸 IF 数少」推断某册不需要 ——
+    #    G7 的崩溃不是数量问题而是「参数在 OO 侧解析成 undefined」，只有真 OO 加载能判。
+    #
+    # 🔴 中性化函数与 G7 **共用一个**（`g7_oo_crash_if_neutralize.neutralize_oo_crash_if_formulas`，
+    #    已被真 OO 栈验收过的口径），**不新造**；也**不得**在 `adapters/excel.py` 加
+    #    `if adapter_id == "g2…"` 字面量分支（Task 13 已收敛掉两处，判据
+    #    `test_excel_adapter_has_no_adapter_id_literal_branch` 锁住不回退）。
+    "g2.interest_receivable_detail": StoreMergePlan(
+        adapter_id="g2.interest_receivable_detail",
+        provider_module="phase5_g2_interest_receivable",
+        items=(StoreItemSpec(item_id="G2-2-detail-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
+    #
+    # 🔴 **HC-12：H 循环 9 册全部命中 OO 加载期裸 `IF(`** ⇒ 同 G 的 per-file 保守策略，
+    #    每条 H plan 一律带 `oo_crash_neutralization_fn`，**无例外**。
+    #    逐册按生产函数正则现算的**格数**（不是 findall 出现次数）跨度极大：
+    #    最重的 H8 与最轻的 H6 差 **20 倍以上**（H8 的主来源是
+    #    `使用权资产 租赁负债初始及后续计量（按月）H8-6`，361 行 × 16 列）。
+    #    ⇒ 这正是「per-file 挂」而不是「整册统一挂」的依据：统一挂会在 H6 上白跑、
+    #    在 H8 上一次处理量过大。判据
+    #    `test_h_foundation_hc_guards.py::TestHfP12BareIfNeutralization` 现算逐册计数。
+    #    H9 册现算 **24 格**（全 H 次少，仅多于 H6）。
+    #
+    # 🔴 中性化函数与 G7 / G2 **共用一个**（已被真 OO 栈验收过的口径），**不新造**；
+    #    也**不得**在 `adapters/excel.py` 加 `if adapter_id == "h9…"` 字面量分支。
+    "h9.lease_liability_detail": StoreMergePlan(
+        adapter_id="h9.lease_liability_detail",
+        provider_module="phase5_h9_lease_liabilities",
+        items=(StoreItemSpec(item_id="H9-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
 }
 
 

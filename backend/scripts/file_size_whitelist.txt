@@ -930,3 +930,25 @@ backend/tests/workpaper_sync/test_sibling_table_ref_row_shift.py  1022
 #     （Step 7~9.5，约 200 行）抽为 `wp_render_config_finalize.py`，属独立打磨任务。
 #     spec: workpaper-page-formula-toolbar-closure Task 17
 backend/app/routers/wp_render_config.py  1053
+
+# ═══ G 循环 foundation spec 新增（2026-09-27）═══════════════════════════════
+#
+#   disclosure_engine.py —— 全平台披露引擎单文件（非本 lane 引入，长期超限）。
+#     原 2654 行是并发会话在飞的修改结果，本 lane 未碰此文件。
+#     按当前行数登记；降线属独立任务。
+backend/app/services/disclosure_engine.py  2654
+#
+#   registry.py —— 本 lane 在 DELIVERED_PER_ENTRY_CONTRACTS 追加 G2 一条 + _ALLOWED_PROVIDER_MODULES
+#     追加模块路径。基线 1830→1938（+108，含既有并发修改，本 lane 净增约 +20）。更新基线。
+backend/app/services/workpaper_sync/adapters/registry.py  1938
+#
+#   test_g_foundation_p10_p16_g2_canary.py —— G2 canary 判据：几何 / payload / 键收敛 /
+#     TB 红线（含变异 + 宿主侧）/ P15 真栈前置（8 条）/ P19 引擎层往返（4 条）。
+#     同一 entry 的正向断言 + 反向自检 + 变异对照臂必须同文件（同域先例见
+#     check_x3_deviation_registry / mutate_ie_lifecycle_guards）。
+backend/tests/workpaper_sync/test_g_foundation_p10_p16_g2_canary.py  892
+#
+#   test_g_foundation_p4_p8_p17_p18_red_baselines.py —— 四组红基线（BP-5 / 裸 IF / prefill / TB 缺口），
+#     每组含「现状必红断言 + 修复后转绿检查 + 反向自检」。拆分会让 BP-5 的 5 条错名
+#     与裸 IF 的 13 册计数分属两个文件——而 BP-5 的修复（Task 5）正好在裸 IF 的上游。
+backend/tests/workpaper_sync/test_g_foundation_p4_p8_p17_p18_red_baselines.py  847

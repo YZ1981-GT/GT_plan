@@ -1,10 +1,22 @@
 /** G1 交易性金融资产 — sheetName ↔ 内部分发编码 / OnlyOffice sheet 名 */
 
-/** 编码 → 默认 Excel sheet_name（无 availableSheets 时兜底） */
-/** 与 Excel / useGInvestmentCycleSheetGroups 一致：编码紧贴表名、无空格 */
+/**
+ * 编码 → 默认 Excel sheet_name（无 availableSheets 时兜底）。
+ *
+ * 🔴 18 条值必须**逐字**等于权威模板 `backend/wp_templates/G/G1 交易性金融资产.xlsx`
+ * 的 `wb.sheetnames`，**含空格**。判据：
+ * `backend/tests/workpaper_sync/test_g_foundation_p4_p8_p17_p18_red_baselines.py`
+ * 的 `TestGfP4Bp5G1SheetLabels`（spec `g-cycle-sync-foundation-and-first-canary` BP-5）。
+ *
+ * 原注释写「编码紧贴表名、**无空格**」—— 这条描述本身就是 BP-5 的成因：`G1A` 的真实 tab
+ * 名尾部**有一个空格**，按「无空格」写出来的值在模板里找不到。已按源模板事实改正。
+ * 本表 5 条错名（G1A / G1-8 / G1-10 / G1-12 / 附注国企）于 2026-09-27 修正，
+ * 逐条依据见 slice BP-5 正文与 `evidence/task5-bp5-g1-sheet-labels.md`。
+ */
 export const G1_SHEET_LABEL_MAP: Record<string, string> = {
   底稿目录: '底稿目录',
-  G1A: '交易性金融资产实质性程序表G1A',
+  // 🔴 尾部空格是源模板事实，不得 trim（模板 tab 逐字为 '…实质性程序表G1A '）
+  G1A: '交易性金融资产实质性程序表G1A ',
   'G1-1': '审定表G1-1',
   'G1-2': '明细表G1-2',
   'G1-3': '调整分录汇总G1-3',
@@ -12,15 +24,15 @@ export const G1_SHEET_LABEL_MAP: Record<string, string> = {
   'G1-5': '收益测算表G1-5',
   'G1-6': '公允价值测试表G1-6',
   'G1-7': '第三层次公允价值计量的调节表G1-7',
-  'G1-8': '业务模式评估问卷G1-8',
+  'G1-8': '业务模式分析G1-8',
   'G1-9': '分类的适当性检查表G1-9',
-  'G1-10': '合同现金流量特征测试表G1-10',
+  'G1-10': '合同现金流量特征分析G1-10',
   'G1-11': '有价证券监盘表G1-11',
-  'G1-12': '盘点倒轧表G1-12',
+  'G1-12': '有价证券盘点倒轧表G1-12',
   'G1-13': '检查表G1-13',
   'G1-14': '衍生金融工具核查表G1-14',
   附注上市: '附注披露信息（上市公司）',
-  附注国企: '附注披露信息（国有企业）',
+  附注国企: '附注披露信息（国企）',
 }
 
 /** sheetName → 内部分发编码 */

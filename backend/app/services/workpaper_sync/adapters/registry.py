@@ -1504,6 +1504,115 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "`adapter_registered=False`：同 BP-61-1。"
         ),
     },
+    # ── G2 canary（spec: g-cycle-sync-foundation-and-first-canary · Task 14）──
+    {
+        "contract_id": "g2.interest_receivable_detail",
+        "provider_module": (
+            "app.services.workpaper_sync.phase5_g2_interest_receivable"
+        ),
+        "delivered_by_task": "G2-canary",
+        "pilot_class": "phase5_interest_receivable",
+        "entry_id": "xlsx/gt-g2-interest-receivable",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "G/G2 应收利息.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "G 循环**首条** entry（spec g-cycle-sync-foundation-and-first-canary，"
+            "canary 裁决 GF-H1）。G 循环起点是 E1 级：17 条 entry 零 provider / 零契约 / "
+            "零 published representation，本条是第一个。"
+            "assert_entry_selectable 照 D3 同签名（resolution 必填 / 无关闭开关）并对"
+            "**真 manifest 真调**（wp_code_patterns==['G2I'] 幻影码）+ 零回退"
+            "（G2I 在 wp_index 实测 0 命中，真码 G2 有 4 行活行）。"
+            "权威模板 G/G2 应收利息.xlsx（sha256 c7563e85…，99,479 B，12 sheets）；"
+            "canary 受管 sheet = 明细表G2-2（**单级**表头 R9 / 数据 R10-15 / "
+            "footer R16「合计」/ 公式列 E·H·J 共 18 格：E=C+D · H=C+F-G · J=H+I / "
+            "有效内容列 13 即 A-M、N·O·P 全空 ⇒ UUID 列 N / 0 个 definedName）。"
+            "🔴 **范式裁决 GF-H3**：走 `phase5_*` 声明式范式，**不照** 同循环已迁移的 G7 "
+            "（G7 是 `pilot_g7_two_level_dynamic` 的 `pilot_*` 范式，形态早于行表引擎）；"
+            "唯一复用 G7 的是 `oo_crash_neutralization_fn`（范式无关的 per-file 缓解件）。"
+            "🔴 **GC-2**：G2 册裸 IF **21 格**（审定表G2-1 19 + 应收利息坏账准备测算G2-7 2，"
+            "受管表本身零命中）⇒ 仍按 per-file 保守策略挂中性化。"
+            "（spec RG-4 表记的 40 是 `findall` 出现次数不是格数，权威口径见 evidence/task0。）"
+            "🔴 **GC-5**：HTML store = checklist_responses.item_id='G2-2-detail-rows'，"
+            "payload 落 **remark**（`conclusion` 是字面 null 占位 —— FD-1 的 null 占位"
+            "子形态，**全 slice 仅 G2 一条**）。判 mode 必须先剔占位，否则会被误判 dual_write。"
+            "真库实测 remark **475 B** / conclusion 0 B ⇒ 裁决 GF-H2：**不 seed**，"
+            "但验收判据须断言 roundtrip 行数 > 0 且来自真库。"
+            "🔴 契约装配走框架层 `spec_to_contract_sheet_payload`（同 F3~F5 的做法）—— "
+            "本轮实测 F1 的手写版缺 anchor/header_rows/row_identity.json_pointer，"
+            "`parse_contract` 直接抛、`assert_contract_file_matches_source` 从来过不了；"
+            "G2 的生成器在写盘前先跑 parse_contract，形态错就不落盘。"
+            "BP-10 的 G2 份额已收敛：`G2-2-detail-rows` 原有 **5 处**声明"
+            "（g2CrossHelpers / useG2Detail / useG2DisclosureListed / useG2DisclosureSoe / "
+            "useG2InterestCalc）⇒ 新建 `g2StorageContract.G2_ITEM_IDS` 单一真源 + 派生别名"
+            "（范式照 BP-10 正面样本 g6CrossHelpers）。"
+            "wp_code 裁决=['G2']（真库 G2-2-detail-rows 载荷落 wp_code=G2）。"
+            "FC-9 红线：G2 已接显式发布门（科目 1132 余额口径，useG2Adjudication.publishToTb=3），"
+            "本 provider 对 trial_balance 写次数为 0。"
+            "`adapter_registered=False`：与 D1/D3/D5/D6/D7/E1/F1~F5 卡在同一平台级缺口"
+            "（umbrella BP-61-1 = G slice 的 BP-1~BP-3：instrumentation candidate / "
+            "人工审核契约 / approved bundle 三缺），供给就绪后真栈注册。"
+        ),
+    },
+    # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
+    {
+        "contract_id": "h9.lease_liability_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_h9_lease_liabilities",
+        "delivered_by_task": "H9-canary",
+        "pilot_class": "phase5_lease_liability_detail",
+        "entry_id": "xlsx/gt-h9-lease-liabilities",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "H/H9 租赁负债.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "H 循环**首条** entry（spec h-cycle-sync-foundation-and-first-canary，canary = H9）。"
+            "H 循环起点同 E1/G：9 条独立 entry 零 provider / 零契约 / 零 representation。"
+            "canary 选型硬依据：**真库唯一非空主表载荷** —— 现算 checklist_responses 的 remark，"
+            "9 条主表键只有 3 条命中（H8-2-rows=[] 2B · H10-detail-rows=[] 2B · "
+            "**H9-2-rows 819 B / 2 行真实数据**），其余 6 条无行；"
+            "几何最简族（两级表头 R7/R8 · 数据 R9-13 仅 5 行 · footer R14 纯 SUM · "
+            "22 有效列 · 54 公式 · 裸 IF 24 格全 H 次少）；无专属阻塞。"
+            "受管 sheet = `租赁负债明细表H9-2`，公式列 E·I·J·K·L·N（🔴 **负债贷方**口径 "
+            "E=B-C+D / L=I-J+K，抄成资产类会让审定期末反号）；UUID 列 W = 有效内容列 22 + 1。"
+            "🔴 **平台级前置**：本 entry 所在循环有五条主受管表是**四级表头**"
+            "（明细表H2-2 / H4-2 / H5-2 /（成本模式）H7-2 / H8-2）⇒ 本 spec 把 "
+            "`contracts._parse_table` 的 header_rows 上界从 3 扩到 **4**"
+            "（新增 `MIN_HEADER_ROWS` / `MAX_HEADER_ROWS`），结清 Task 42 登记的 "
+            "`pilot_h1_grouped_dynamic.UPSTREAM_DEBT_FOUR_LEVEL_HEADER_NOT_EXPRESSIBLE` 欠账。"
+            "🔴 H1 的契约 / adapter / golden digest **一字未改**（HC-8）——"
+            "h1.disposal_check.json 里那段欠账叙述是冻结的历史记录。"
+            "🔴 **范式裁决**：走 `phase5_*`，**不照**同循环已注册的 H1（`pilot_h1_grouped_dynamic` "
+            "的 `pilot_*` 范式早于行表引擎）；唯一复用 pilot 的是 `oo_crash_neutralization_fn`。"
+            "七段公共流程收进 `phase5_h_cycle_common`（H 要接 9 条，抄 9 份就是 9 个漂移面）。"
+            "🔴 **幻影码零回退口径在 H 必须改**：G2 的 assert_no_implicit_template_fallback 断言"
+            "「幻影码不得命中任何模板」，但实测 9 个幻影码里 `H6A` / `H10A` **同时是真实程序表码**"
+            "（固定资产清理实质性程序表H6A / 资产处置损益实质性程序表H10A）⇒ 照 G2 写这两条 provider "
+            "会在注册路径上直接抛。正确不变量 = 「不得命中**别的 entry** 的册子」；"
+            "本条的 `H9L` 是真幻影码（三条 finder 路径实测全空）。"
+            "🔴 **HD-7 缺口**：H9 `publishToTb` 全链路 **0 处** ⇒ 契约 "
+            "`review.tb_publish_gate=None` 是**声明**不是遗漏，本 canary **不覆盖发布链**；"
+            "发布链首例归 h2-h6-h10-pilot-cross-reference-lanes。"
+            "sync 路径对 trial_balance 写次数为 0。"
+            "🔴 **HC-11**：`isRelatedParty` / `isConfirmed` / `isTerminated` 是**中文枚举**"
+            "（值域 {是,否}，真库实测全为 '否'），**不得**声明为 boolean（回写会把 '否' 写成 "
+            "false、前端下拉失配）；`terminatedFromH8` 是 H8 终止租赁流程回传的**跨 entry 派生标记**，"
+            "OO 侧编辑必被覆盖 ⇒ 声明 derived。"
+            "口径差异如实登记：模板 `U 期后付款` / `V 备注` 有列但 HTML 无字段（不进 field_specs，"
+            "照 H1 对占位列 X 的处置）；`contractNo`/`assetDesc`/`ibrRate`/`leaseTerm`/"
+            "`isTerminated`/`terminationDate`/`terminatedFromH8` 七个 HTML 有字段但模板无列"
+            "（store-only，不映射格）；6 个公式列 json_key **不落库**（前端 load 时重算）。"
+            "模板缺陷登记（不改字节）：数据行 locked = E·I·J·K·L·**M**·N 七列，但 M（重分类）"
+            "**无公式**且 HTML 侧可编辑 ⇒ 模板少解锁 M，契约按语义声明 editable。"
+            "🔴 HC-8：`H9-2-rows` 被 `useH8CrossSheet.ts` / `useH8DisposalCheck.ts` 跨 entry 消费 "
+            "⇒ 键名冻结。"
+            "`adapter_registered=False`：与 D1/D3/D5/D6/D7/E1/F1~F5/G2 卡在同一平台级缺口"
+            "（BP-1~BP-3：instrumentation candidate / 人工审核契约 / approved bundle 三缺），"
+            "供给就绪后真栈注册。🔴 capability 从 single_onlyoffice → bidirectional 只能由 "
+            "`register_from_manifest()` 在注册成功后驱动，**禁止手改 manifest 文件**（HC-1）。"
+        ),
+    },
 )
 
 
@@ -1622,6 +1731,11 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_f3_notes_payable",
         "app.services.workpaper_sync.phase5_f4_accounts_payable",
         "app.services.workpaper_sync.phase5_f5_cost_of_sales",
+        # ── G2 canary（spec: g-cycle-sync-foundation-and-first-canary · Task 14）──
+        #    🔴 G 循环首条 `phase5_*` provider。同循环的 G7 走
+        #    `pilot_g7_two_level_dynamic`（上面 pilot 段已登记），两者并存是裁决 GF-H3
+        #    的直接结果：G7 是旧先导范式，新建的 17 条一律 `phase5_*`。
+        "app.services.workpaper_sync.phase5_g2_interest_receivable",
     }
 )
 
