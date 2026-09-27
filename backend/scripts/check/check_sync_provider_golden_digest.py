@@ -154,6 +154,15 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     #    被改成 `formula` ④ `uuid_col` 从 **K** 变成 `P`（有效列 10 < max_column=15，
     #    按有效列右移一列取；取 P 会把 5 个空尾列圈进受管区）⑤ 行身份从 `rowId` 改成 `rowKey`。
     ("g12", "phase5_g12_net_hedge_gains", "ADAPTER_ID", True, True),
+    # ── G1（spec: g-cycle-single-region-detail-lanes · Task 14 / C-13，九条最后一条）──
+    #    🔴 **三区**共用一个 store 键（`row_section_field="acctClass"`）⇒ 契约里三条
+    #    `tables[]`、instrumentation 三条。本条的 digest 会在五种误改上打红：
+    #    ① 三区共用一份 `formula_columns`（区① 多一个跨表 `T`，引 `公允价值测试表G1-6!H10..H14`；
+    #    区②③ 的 `T` 整格无公式 ⇒ 判 formula 会让 materialize 在那 8 格抛）—— 这正是判据 P6
+    #    要断言的「G1 ≠ G9」唯一不等点 ② 三区 `uuid_col` 撞同一格（AB/AC/AD 必须互不相同）
+    #    ③ `header_rows` 从 2 被改 ④ payload 列从 `conclusion` 被改成 `remark`
+    #    ⑤ 新补的模板 `AA`（是否函证）列被删回去。
+    ("g1", "phase5_g1_trading_financial_assets", "ADAPTER_ID", True, True),
 )
 
 

@@ -531,6 +531,23 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="G12-hedge-detail-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── G1（spec: g-cycle-single-region-detail-lanes · Task 14 / C-13，九条最后一条）──
+    #
+    # 🔴 **三区共用这一个 store 键**（`row_section_field="acctClass"`，值
+    #    trading / classified_fvpl / designated_fvpl）⇒ `items` 只有一条，但受管 spec 是 3 个。
+    #    区① 的 `formula_columns` 多一个跨表 `T`（引 `公允价值测试表G1-6!H10..H14`），
+    #    区②③ 的 `T` 整格无公式 ⇒ 三区**不共用**那份声明（判据 P6 的不等点）。
+    #    payload 列是 **conclusion**（`conclusion_only` 族，与另七条的 remark 相反）。
+    #
+    # 🔴 **整册裸 IF 0 格**（G1 册 18 sheet 全零，G 循环唯一）⇒ 中性化对本册是空操作。
+    #    仍照挂：GC-2 要求 per-file 一律挂，零命中只意味着这一趟白跑；将来模板改版引入裸 IF
+    #    时不需要再回来补这一行。
+    "g1.trading_financial_assets_detail": StoreMergePlan(
+        adapter_id="g1.trading_financial_assets_detail",
+        provider_module="phase5_g1_trading_financial_assets",
+        items=(StoreItemSpec(item_id="G1-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     #
     # 🔴 **HC-12：H 循环 9 册全部命中 OO 加载期裸 `IF(`** ⇒ 同 G 的 per-file 保守策略，
@@ -641,6 +658,26 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         adapter_id="h2.construction_in_progress_detail",
         provider_module="phase5_h2_construction_in_progress",
         items=(StoreItemSpec(item_id="H2-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── H3 首条**变体轴** entry（spec: h3-h5-h7-variant-axis-and-dynamic-column-paradigm）──
+    #
+    # 🔴 **两个** item：成本模式与公允价值模式各一张受管明细表，各有独立持久化键。
+    #    两张必须同批登记 —— 只放一半，用户在 `useH3MeasurementModel` 里切模式就掉桥。
+    #    这与 E1-3 的 currency_variant 不同源（那是两张同尾码 sheet **共用**一个键）。
+    #
+    # 🔴 `H3-2-fair-rows` 在 **HC-8 冻结键**清册上：被 **G 循环**消费
+    #    （g13SourceDetailPull.ts 的 `{ wpCode: 'H3', itemId: 'H3-2-fair-rows' }` 与
+    #    gCycleSourceFv.ts 的 `H3: 'H3-2-fair-rows'`）⇒ 只补契约不动键名。
+    #
+    # 册 146,096 B / 22 sheets ⇒ 中性化必挂，函数与 G7/G2/H9/H6/H4/H8/H2 共用。
+    "h3.investment_property_detail": StoreMergePlan(
+        adapter_id="h3.investment_property_detail",
+        provider_module="phase5_h3_investment_property",
+        items=(
+            StoreItemSpec(item_id="H3-2-cost-rows", kind=StoreKind.rows),
+            StoreItemSpec(item_id="H3-2-fair-rows", kind=StoreKind.rows),
+        ),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
 }

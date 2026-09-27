@@ -42,10 +42,10 @@ export type G1AcctClass = 'trading' | 'classified_fvpl' | 'designated_fvpl'
 export interface TradingDetailRow {
   id: string
   seq: number
-  // 准入 / 基础
+  // 准入 / 基础（🔴 受管子序列必须是模板列序 ⇒ acctClass=A 在 securityName=B 之前）
+  acctClass: G1AcctClass
   securityName: string
   securityCode: string
-  acctClass: G1AcctClass
   investType: G1InvestType
   market: string
   acquisitionDate: string
@@ -66,27 +66,35 @@ export interface TradingDetailRow {
   auditedOpeningCost: number
   auditedOpeningCumulativeFv: number
   auditedOpeningFvTotal: number
+  /** K 减：期初超过一年到期的部分 —— 🔴 模板 `L=J+K` ⇒ **存负数** */
   openingLtDeduction: number
   openingReported: number
   // 本期变动
-  addedCost: number
-  reducedCost: number
+  /**
+   * M 本期变动（增加为正数）- 成本 —— 🔴 **净额单列**（模板只有一列）。
+   *
+   * spec `g-cycle-single-region-detail-lanes` Task 14（用户拍板「跟模板一致」）：
+   * 改造前前端是 `addedCost` / `reducedCost` 两列，模板 `M` 是一列净额、`P=C+M`。
+   * 两列实测**零生产消费方**（只有自己的 spec 在用）⇒ 合并为本字段，语义 = 本期增加 − 本期减少。
+   */
+  periodCostChange: number
   periodFvChange: number
   dividendIncome: number
-  // 公允价值（市价辅助）
+  // 公允价值（市价辅助，均**不受管**）
   unitFairValue: number
-  closingFairValue: number
   fairValueSource: '1' | '2' | '3'
   fairValueChange: number
-  cumulativeFVChange: number // 期末累计公允变动（公式）
   quoteDate: string
-  // 期末双桶 + 审定
+  // 期末双桶 + 审定（🔴 P→Q→R 即模板列序，不得按业务分组打乱）
   closingCost: number
+  cumulativeFVChange: number // Q 期末累计公允价值变动（公式 = D+N）
+  closingFairValue: number // R 期末公允价值（公式 = P+Q）
   closingCostAdj: number
   closingFvAdj: number
   auditedClosingCost: number
   auditedClosingCumulativeFv: number
   auditedClosingFvTotal: number
+  /** X 减：超过一年到期的部分 —— 🔴 模板 `Y=W+X` ⇒ **存负数** */
   closingLtDeduction: number
   closingReported: number
   // 损益
@@ -105,7 +113,15 @@ export interface TradingDetailRow {
   rollForwardDiff: number // 账面勾稽差：期末账面FV − (期初审定FV + 本期成本净增 + 本期FV变动)
   indexRef: string
   // 披露标志
+  /** Z 变现是否存在限制 */
   realizationRestricted: boolean
+  /**
+   * AA 是否函证 —— 🔴 **本轮新补**（模板有这一列、前端原先没有）。
+   *
+   * spec `g-cycle-single-region-detail-lanes` Task 14：受管面严格对齐模板 27 列 A..AA，
+   * 缺这一列会让 `AA` 脱管（OO 侧改函证标记不回流）。
+   */
+  confirmationRequested: boolean
   pledged: boolean
 }
 
@@ -186,7 +202,8 @@ export const G1_DETAIL_SEGMENTS: G1DetailSegment[] = [
       { prop: 'auditedOpeningCost', label: '期初审定成本', width: 120, type: 'number', formula: true },
       { prop: 'auditedOpeningCumulativeFv', label: '期初审定累计FV', width: 130, type: 'number', formula: true },
       { prop: 'auditedOpeningFvTotal', label: '期初审定公允价值', width: 130, type: 'number', formula: true },
-      { prop: 'openingLtDeduction', label: '一年以上扣减', width: 120, type: 'number' },
+      // 🔴 模板 `L=J+K` ⇒ 本列**填负数**（模板列名就是「减：期初超过一年到期的部分」）
+      { prop: 'openingLtDeduction', label: '减：期初超一年到期（填负数）', width: 170, type: 'number' },
       { prop: 'openingReported', label: '期初报表数', width: 120, type: 'number', formula: true },
     ],
   },
@@ -199,8 +216,8 @@ export const G1_DETAIL_SEGMENTS: G1DetailSegment[] = [
       { prop: 'boughtQuantity', label: '本期买入', width: 100, type: 'number' },
       { prop: 'soldQuantity', label: '本期卖出', width: 100, type: 'number' },
       { prop: 'closingQuantity', label: '期末数量', width: 100, type: 'number', formula: true },
-      { prop: 'addedCost', label: '本期增加成本', width: 120, type: 'number' },
-      { prop: 'reducedCost', label: '本期减少成本', width: 120, type: 'number' },
+      // 🔴 模板 M 是**净额单列**（增加为正数）⇒ 合并原 addedCost/reducedCost 两列
+      { prop: 'periodCostChange', label: '本期变动成本（增加为正）', width: 150, type: 'number' },
       { prop: 'periodFvChange', label: '本期公允变动', width: 120, type: 'number' },
       { prop: 'dividendIncome', label: '利息/股利', width: 110, type: 'number' },
       { prop: 'unitFairValue', label: '期末单位公允', width: 120, type: 'number' },
@@ -224,7 +241,8 @@ export const G1_DETAIL_SEGMENTS: G1DetailSegment[] = [
       { prop: 'auditedClosingCost', label: '期末审定成本', width: 120, type: 'number', formula: true },
       { prop: 'auditedClosingCumulativeFv', label: '期末审定累计FV', width: 130, type: 'number', formula: true },
       { prop: 'auditedClosingFvTotal', label: '期末审定公允价值', width: 130, type: 'number', formula: true },
-      { prop: 'closingLtDeduction', label: '一年以上扣减', width: 120, type: 'number' },
+      // 🔴 模板 `Y=W+X` ⇒ 本列**填负数**
+      { prop: 'closingLtDeduction', label: '减：超一年到期（填负数）', width: 160, type: 'number' },
       { prop: 'closingReported', label: '期末报表数', width: 120, type: 'number', formula: true },
       { prop: 'rollForwardDiff', label: '滚动勾稽差', width: 110, type: 'number', formula: true },
       { prop: 'variance', label: '审定vs市价差', width: 120, type: 'number', formula: true },
@@ -237,6 +255,8 @@ export const G1_DETAIL_SEGMENTS: G1DetailSegment[] = [
     hint: '变现限制/质押；处置与投资收益（已到期应计利息进应收利息，不进本表）',
     columns: [
       { prop: 'realizationRestricted', label: '变现受限', width: 90, type: 'flag' },
+      // 🔴 模板 AA 列（本轮新补，受管）
+      { prop: 'confirmationRequested', label: '是否函证', width: 90, type: 'flag' },
       { prop: 'pledged', label: '是否质押', width: 90, type: 'flag' },
       { prop: 'disposalProceeds', label: '处置收入', width: 110, type: 'number' },
       { prop: 'disposalCost', label: '处置成本', width: 110, type: 'number' },
@@ -291,8 +311,7 @@ function emptyRow(id: string, seq: number): TradingDetailRow {
     auditedOpeningFvTotal: 0,
     openingLtDeduction: 0,
     openingReported: 0,
-    addedCost: 0,
-    reducedCost: 0,
+    periodCostChange: 0,
     periodFvChange: 0,
     dividendIncome: 0,
     unitFairValue: 0,
@@ -323,6 +342,7 @@ function emptyRow(id: string, seq: number): TradingDetailRow {
     rollForwardDiff: 0,
     indexRef: '',
     realizationRestricted: false,
+    confirmationRequested: false,
     pledged: false,
   }
 }
@@ -346,6 +366,18 @@ function migratePartial(p: Partial<TradingDetailRow>): Partial<TradingDetailRow>
   ) {
     next.periodFvChange = parseNum(next.fairValueChange)
   }
+  // 🔴 Task 14：旧版 `addedCost`/`reducedCost` 两列 → 模板的净额单列 `periodCostChange`
+  //    （模板 M 只有一列、`P=C+M`）。两列实测零生产消费方，只在旧载荷里可能存在。
+  const legacy = next as Partial<TradingDetailRow> & {
+    addedCost?: unknown
+    reducedCost?: unknown
+  }
+  if (
+    (next.periodCostChange === undefined || next.periodCostChange === null) &&
+    (legacy.addedCost != null || legacy.reducedCost != null)
+  ) {
+    next.periodCostChange = parseNum(legacy.addedCost) - parseNum(legacy.reducedCost)
+  }
   return next
 }
 
@@ -367,14 +399,16 @@ export function enrichDetailRow(r: TradingDetailRow): TradingDetailRow {
   const auditedOpeningCost = openingCost + parseNum(r.openingCostAdj)
   const auditedOpeningCumulativeFv = openingCumulativeFv + parseNum(r.openingFvAdj)
   const auditedOpeningFvTotal = auditedOpeningCost + auditedOpeningCumulativeFv
-  const openingReported = auditedOpeningFvTotal - parseNum(r.openingLtDeduction)
+  // 🔴 模板 `L12=J12+K12` —— **加**不是减（K 列名「减：期初超过一年到期的部分」⇒ 存负数）
+  const openingReported = auditedOpeningFvTotal + parseNum(r.openingLtDeduction)
 
   const closingQuantity = calcClosingQuantity(
     parseNum(r.openingQuantity),
     parseNum(r.boughtQuantity),
     parseNum(r.soldQuantity),
   )
-  const closingCost = calcEndAmount(auditedOpeningCost, parseNum(r.addedCost), parseNum(r.reducedCost))
+  // 🔴 模板 `P12=C12+M12` —— 起点是**期初余额成本 C**（未审），不是期初审定成本 H
+  const closingCost = openingCost + parseNum(r.periodCostChange)
 
   const unitFv = parseNum(r.unitFairValue)
   const marketClosingFv = unitFv !== 0 ? calcFairValue(closingQuantity, unitFv) : 0
@@ -385,30 +419,30 @@ export function enrichDetailRow(r: TradingDetailRow): TradingDetailRow {
     periodFvChange = calcFairValueChange(marketClosingFv, auditedOpeningFvTotal)
   }
 
-  const cumulativeFVChange = auditedOpeningCumulativeFv + periodFvChange
+  // 🔴 模板 `Q12=D12+N12` —— 起点是**期初余额累计 FV（D，未审）**，不是期初审定累计 FV
+  const cumulativeFVChange = openingCumulativeFv + periodFvChange
   const bookClosingFv = closingCost + cumulativeFVChange
-  const closingFairValue = marketClosingFv !== 0 ? marketClosingFv : bookClosingFv
+  // 🔴 模板 `R12=P12+Q12` —— 期末公允价值就是双桶合计；市价只做验算（见 fairValueChange /
+  //    rollForwardDiff 两个**非受管**派生列），不覆盖本列
+  const closingFairValue = bookClosingFv
   const fairValueChange = calcFairValueChange(closingFairValue, auditedOpeningFvTotal)
 
   const auditedClosingCost = closingCost + parseNum(r.closingCostAdj)
   const auditedClosingCumulativeFv = cumulativeFVChange + parseNum(r.closingFvAdj)
-  // AJE/RJE 落在公允价值合计（兼容旧列）
-  const auditedClosingFvTotal = calcAdjustedAmount(
-    auditedClosingCost + auditedClosingCumulativeFv,
-    parseNum(r.aje),
-    parseNum(r.rje),
-  )
-  const closingReported = auditedClosingFvTotal - parseNum(r.closingLtDeduction)
+  // 🔴 模板 `W12=U12+V12` —— 不含 AJE/RJE（那两个是平台自研列、不在模板 27 列内且不受管）
+  const auditedClosingFvTotal = auditedClosingCost + auditedClosingCumulativeFv
+  // 🔴 模板 `Y12=W12+X12` —— **加**不是减（X 存负数）
+  const closingReported = auditedClosingFvTotal + parseNum(r.closingLtDeduction)
 
   const realizedGain = calcRealizedGain(parseNum(r.disposalProceeds), parseNum(r.disposalCost))
   const totalIncome = realizedGain + parseNum(r.dividendIncome)
 
-  // 有市价时：账面双桶合计 vs 市价；无市价时滚动由公式恒等勾平
+  // 有市价时：账面双桶合计 vs 市价；无市价时恒 0（本列**不受管**，是市价验算用的派生量）
   const rollForwardDiff = marketClosingFv !== 0 ? bookClosingFv - marketClosingFv : 0
 
   const unadjusted = closingFairValue
   const adjusted = auditedClosingFvTotal
-  // variance = 审定 − 期末公允价值（市价或账面）
+  // variance = 审定 − 期末公允价值（本列**不受管**）
   const variance = auditedClosingFvTotal - closingFairValue
 
   return {
@@ -513,8 +547,8 @@ const SUM_FIELDS = [
   'auditedOpeningFvTotal',
   'openingLtDeduction',
   'openingReported',
-  'addedCost',
-  'reducedCost',
+  // 🔴 Task 14：原 addedCost/reducedCost 两列合并为模板的净额单列 M
+  'periodCostChange',
   'periodFvChange',
   'closingFairValue',
   'fairValueChange',

@@ -96,6 +96,14 @@ TARGETS: dict[str, tuple[str, str, re.Pattern[str]]] = {
         "remark",
         re.compile(r"^\s*return `(g12h)-\$\{Date\.now\(\)"),
     ),
+    # 🔴 C-13（九条最后一条）：G1 的列模型本轮按模板改齐 6 处口径 + 合并 M + 新补 AA
+    #    ⇒ 写入点与铸造点都移位。payload 列是 **conclusion**（不是 remark）；
+    #    铸造点形态是 `g1d-${mintRowIdSuffix()}`（Task 7 修 BP-7 时收口到 g1g3RowIdentity）。
+    "xlsx/gt-g1-trading-financial-assets": (
+        "useG1Detail.ts",
+        "conclusion",
+        re.compile(r"^\s*return `(g1d)-\$\{mintRowIdSuffix\(\)\}`"),
+    ),
 }
 #: `dynamic_row_identity.tables[].table_key` → entry_id。
 #:

@@ -440,7 +440,7 @@ backend/tests/workpaper_sync/test_task44_oo94_excel_pilot_gate.py  1741
 backend/tests/workpaper_sync/test_task46_d_cycle_migration.py  1849
 backend/tests/workpaper_sync/test_task47_e_cycle_migration.py  930
 backend/tests/workpaper_sync/test_task48_f_cycle_migration.py  2282
-backend/tests/workpaper_sync/test_task49_g_cycle_migration.py  3142
+backend/tests/workpaper_sync/test_task49_g_cycle_migration.py  3300
 backend/tests/workpaper_sync/test_task50_h_cycle_migration.py  2222
 backend/tests/workpaper_sync/test_task51_i_cycle_migration.py  2477
 backend/tests/workpaper_sync/test_task52_j_cycle_migration.py  3057
@@ -996,7 +996,7 @@ backend/tests/workpaper_sync/test_f5_canary_and_contract.py  904
 #     判据面不因此放松：新条目仍要过 test_contract_directory_matches_the_delivery_ledger
 #     与 test_delivered_slice_contracts_pass_property_20_21_field_level 的双向核验。
 backend/tests/workpaper_sync/test_h_foundation_hc_guards.py  1149
-backend/app/services/workpaper_sync/adapters/delivered_contracts_ledger.py  1910
+backend/app/services/workpaper_sync/adapters/delivered_contracts_ledger.py  2053
 
 
 # ── I/J 循环 + e1 修复 + 守卫口径升级（2026-09-27）──────────────────────
