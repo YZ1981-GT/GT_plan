@@ -124,21 +124,19 @@ G7_ENTRY_IDS = frozenset(
     }
 )
 #: 本 slice **已发布 per-entry contract** 的 entry → 契约文件名（`entry_id: filename`）。
-#:
-#: 🔴 这张表是 Property 20 / 21 字段级判据的**分母**，随 lane 推进增长。规矩两条：
-#:   ① 新交付一条契约，必须同时加进这里 —— 否则
-#:      `test_slice_contract_delivery_is_exactly_the_declared_set` 会红（磁盘有、登记无）；
-#:   ② 加进来的每一条都会被
-#:      `test_delivered_slice_contracts_pass_property_20_21_field_level` 逐字段核验。
-#: ⇒ 「悄悄交付一条没过字段级判据的契约」这条路被封死。
-#:
-#: 2026-09-27：foundation spec 交付 G2 首条；`g-cycle-single-region-detail-lanes` Task 8/9/9b/10 依次交付 G9（一键三区）/G10/G8（FVOCI）/G14（固定行集+布尔列）。
+#: 🔴 它是 Property 20 / 21 字段级判据的**分母**，随 lane 增长。两条规矩：① 新交付一条必须同时登记，
+#:   否则 `test_slice_contract_delivery_is_exactly_the_declared_set` 红（磁盘有、登记无）；② 每条都被
+#:   `test_delivered_slice_contracts_pass_property_20_21_field_level` 逐字段核验 ⇒ 「悄悄交付一条没过
+#:   字段级判据的契约」这条路被封死。
+#: 2026-09-27：foundation 交付 G2 首条；`g-cycle-single-region-detail-lanes` Task 8/9/9b/10/11 依次交付
+#:   G9（一键三区）/G10/G8（FVOCI）/G14（固定行集+布尔列）/G11（单级表头 + 两列 auto_source）。
 SLICE_DELIVERED_CONTRACTS: dict[str, str] = {
     "xlsx/gt-g2-interest-receivable": "g2.interest_receivable_detail.json",
     "xlsx/gt-g9-other-noncurrent-financial": "g9.other_noncurrent_detail.json",
     "xlsx/gt-g10-trading-financial-liabilities": "g10.trading_liabilities_detail.json",
     "xlsx/gt-g8-other-equity-instruments": "g8.other_equity_detail.json",
     "xlsx/gt-g14-credit-impairment-loss": "g14.credit_impairment_detail.json",
+    "xlsx/gt-g11-investment-income": "g11.investment_income_detail.json",
 }
 
 #: 不可达旧桩（AC 1.7）——它的 independent_entry=false，不进 slice。

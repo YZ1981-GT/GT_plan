@@ -978,14 +978,21 @@ backend/tests/workpaper_sync/test_f5_canary_and_contract.py  904
 #     spec: h-cycle-sync-foundation-and-first-canary
 #   delivered_contracts_ledger.py —— DELIVERED_PER_ENTRY_CONTRACTS 的纯数据台账，
 #     从 adapters/registry.py 抽出（曾占该文件 1172 行 / 47%，连续两次触发行数门禁）。
-#     按设计 append-only：每交付一份逐 entry 契约追加一条，单条 40~60 行（reason 记录
-#     该 entry 的形态差异与踩过的坑）。**不可再拆** —— 按循环切分会让「谁已交付」这件事
-#     散到十几个文件，而判据 test_contract_directory_matches_the_delivery_ledger 要的正是
-#     一张可双向比对的完整表。文件零函数零类，只有一个 Final tuple 字面量。
+#     按设计 append-only：每交付一份逐 entry 契约追加一条，单条 40~70 行（reason 记录
+#     该 entry 的形态差异与踩过的坑）。文件零函数零类，只有一个 Final tuple 字面量。
 #     🔴 **基线随交付面增长**：这是本 whitelist 里唯一「变大是设计意图」的条目 ——
 #     「打磨应让文件变小」对 append-only 台账不成立。每批交付追加条目后把基线同步到实测值
-#     （2026-09-27：1360 → 1637，G8/G14 两条 + 并发会话的 H 循环若干条）。
+#     （2026-09-27：1360 → 1637，G8/G14 + 并发会话 H 循环若干条；1637 → 1773，G11 一条
+#     66 行 + 并发会话 H9/I/J/K 若干条）。
+#     🔴 **关于「能不能拆」——如实登记，不粉饰**：早期注释写过「不可再拆」，这句**站不住**。
+#     按循环切成 `_d.py`/`_efg.py`/`_h.py` 再在本文件 `+` 聚合，判据
+#     test_contract_directory_matches_the_delivery_ledger 拿到的仍是一张完整表 ⇒ 技术上
+#     **可拆**。本轮不拆的真实理由只有两条：① 它是**并发会话共享**文件（G/H/I/J/K 五条线
+#     同时在追加条目），拆分会把每条线的 commit 都变成跨文件大范围冲突；② 拆分不在任何
+#     在途 lane 的作业面内，顺手拆等于无主改动。
+#     ⇒ **触发条件**：行数过 2400，或在途并发会话降到 1 条时，必须立项拆分（届时把本段
+#     替换成拆分后的结构说明，不要再提基线）。
 #     判据面不因此放松：新条目仍要过 test_contract_directory_matches_the_delivery_ledger
 #     与 test_delivered_slice_contracts_pass_property_20_21_field_level 的双向核验。
 backend/tests/workpaper_sync/test_h_foundation_hc_guards.py  1149
-backend/app/services/workpaper_sync/adapters/delivered_contracts_ledger.py  1637
+backend/app/services/workpaper_sync/adapters/delivered_contracts_ledger.py  1773

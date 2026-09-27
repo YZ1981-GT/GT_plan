@@ -1716,7 +1716,7 @@
         "row_identity_key": "id",
         "row_identity_kind": "generated_prefixed_opaque_string",
         "row_identity_generator": "generateId()",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG11DetailAnalysis.ts#L71",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG11DetailAnalysis.ts#L72",
         "row_identity_generator_form": "`g11d-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [

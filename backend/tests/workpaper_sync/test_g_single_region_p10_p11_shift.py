@@ -211,15 +211,58 @@ class TestG1rP10RatioColumnAbsoluteRefShifts:
         assert _formula_of(after, "F34") == "SUM(F10:F33)"
         assert _formula_of(after, "F31") == "D31+E31", "R31 位移后是新行，不是合计行"
 
-    def test_conclusion_g_and_k_stay_managed_as_formula_columns(self) -> None:
-        """🔴 结论落地：位移成立 ⇒ G/K 两列**受管**（留在 `formula_columns` 里）。
+    def test_conclusion_g_and_k_stay_managed_but_as_auto_source_not_formula(self) -> None:
+        """🔴 结论落地：位移成立 ⇒ G/K 两列**受管**；但受管形态是 `auto_source`，
+        **不是** `formula_columns` —— 首版判据的后半句已被 Task 11 逐格实测推翻。
 
-        若实测为「不位移」，本判据须改成「G/K 不在 formula_columns 且登记 HTML-only」。
-        两者互斥，改一处就必须改另一处 —— 这防止结论与声明脱钩。
+        三条实测依据（`test_g11_column_isomorphism.py` 逐条真跑，不是推演）：
+
+        1. `adapters/excel.py` 在 **materialize 之前**对 substrate 副本跑
+           `neutralize_oo_crash_if_formulas`，它把含词界 `IF(` 的 `<f>` **整个摘掉**。
+           G11-2 数据区实测 `G` 21→0 / `K` 21→0，而 `F`/`J`/`L`（不含 IF）保持 21。
+        2. `excel_materialize` 两条检查方向**相反**：`mode=formula` 要求
+           `view.has_formula` 为真、`mode=auto_source` 要求该格**不是**公式。
+           ⇒ 中性化之后，G/K 判 `formula` 必抛 `ProtectedRegionWriteError`。
+        3. `auto_source` 与 `formula` 同属 `contracts.PROTECTED_MODES` ⇒ 不入 store、
+           OO 侧改动不合并，**保护力度没有放宽**（这不是把判据改松）。
+
+        本判据保留的部分：`EXPECTED["G11"]["row_segments"]` 记的是**模板**公式列
+        （中性化前的模板事实，仍是 `{F,G,J,K,L}`），它必须等于 provider 两族之并 ——
+        既不许漏列、也不许把 G/K 挪出受管面去做 HTML-only。
         """
-        cols = {c for _n, _r, cs in EXPECTED["G11"]["row_segments"] for c in cs}
-        assert {"G", "K"} <= cols, "位移分支成立时 G/K 必须受管"
-        assert cols == {"F", "G", "J", "K", "L"}
+        import importlib
+
+        template_formula_cols = {
+            c for _n, _r, cs in EXPECTED["G11"]["row_segments"] for c in cs
+        }
+        assert template_formula_cols == {"F", "G", "J", "K", "L"}, "模板公式列集合变了"
+
+        try:
+            sheet = importlib.import_module(
+                "app.services.workpaper_sync.phase5_g11_02_detail"
+            )
+        except ModuleNotFoundError:
+            pytest.fail("G11-2 sheet 层未交付（Task 11 转绿）")
+
+        assert sheet.FORMULA_COLUMNS_G1102 == ("F", "J", "L"), (
+            "中性化后仍有公式的三列才进 formula_columns"
+        )
+        assert sheet.AUTO_SOURCE_COLUMNS_G1102 == ("G", "K"), (
+            "两列占比公式含裸 IF、会被中性化摘掉 ⇒ 只能判 auto_source"
+        )
+        # 受管面完整：两族之并 == 模板公式列，一列不漏
+        assert (
+            set(sheet.FORMULA_COLUMNS_G1102) | set(sheet.AUTO_SOURCE_COLUMNS_G1102)
+        ) == template_formula_cols
+        assert {f[1] for f in sheet.FIELD_SPECS_G1102} >= template_formula_cols, (
+            "G/K 必须留在 field_specs 里（受管），不得降级成 HTML-only"
+        )
+        # 保护力度不放宽
+        from app.services.workpaper_sync.contracts import PROTECTED_MODES, FieldMode
+
+        assert FieldMode.auto_source in PROTECTED_MODES
+        by_col = {f[1]: f for f in sheet.FIELD_SPECS_G1102}
+        assert {by_col["G"][2], by_col["K"][2]} == {"auto_source"}
 
     def test_no_static_inference_the_assertion_came_from_a_real_shift(self, g11_shift) -> None:
         """🔴 反「静态推断」自检：断言位移**确实改变了** XML（不是读了同一份字节）。"""
@@ -334,6 +377,12 @@ class TestBClassShiftConclusionsNotYetWiredIntoProviders:
         """🔴 红：G11 的 footer 带合计公式 ⇒ `footer_carries_total_formula=True`（默认值也算）。
 
         它决定 `_grow_managed_table_ref` 是否把 footer 区间归一化 —— P10 的位移结论要靠它落地。
+
+        🔴 首版判据扫 `vars(mod)` 找 `RowTableSheetSpec` —— Task 11 交付后实测 `[]`，**假红**。
+        根因：本 spec 的九条一律「entry 层 + sheet 层」两模块，spec 对象声明在 sheet 层
+        （`phase5_g11_02_detail.SPEC_G1102`），entry 层只通过 `managed_row_table_specs()`
+        动态汇总、不把它 import 进模块命名空间。同一坑在 Task 10 的 G14 布尔列判据上
+        踩过一次 ⇒ 判据一律走 **provider 公开接口**，不扫模块命名空间。
         """
         import importlib
 
@@ -343,11 +392,12 @@ class TestBClassShiftConclusionsNotYetWiredIntoProviders:
             )
         except ModuleNotFoundError:
             pytest.fail("G11 provider 未交付（Task 11 转绿）")
-        specs = [
-            s for s in vars(mod).values()
-            if getattr(s.__class__, "__name__", "") == "RowTableSheetSpec"
-        ]
-        assert specs, "G11 provider 未导出 RowTableSheetSpec"
+        assert hasattr(mod, "managed_row_table_specs"), (
+            "entry 层未暴露 managed_row_table_specs() —— 出/回两方向的单一口径丢了"
+        )
+        specs = list(mod.managed_row_table_specs())
+        assert specs, "managed_row_table_specs() 空 —— 受管 sheet 未接入"
+        assert [s.managed_sheet for s in specs] == ["明细分析表G11-2"]
         for s in specs:
             assert s.footer_row == 31
             assert s.footer_carries_total_formula is True
@@ -356,6 +406,7 @@ class TestBClassShiftConclusionsNotYetWiredIntoProviders:
         """🔴 红：G12 provider 的模块 docstring 须逐字登记两处模板缺陷（覆盖层不改字节）。
 
         判据查 docstring 里同时出现两个公式字面量 —— 这是「缺陷已登记」的最小可执行证据。
+        🔴 与 G11 那条同理：docstring 要从 **sheet 层模块**取（entry 层不复述列模型）。
         """
         import importlib
 

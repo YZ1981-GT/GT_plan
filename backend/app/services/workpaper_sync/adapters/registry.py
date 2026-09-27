@@ -1113,6 +1113,26 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_h4_engineering_materials",
         "app.services.workpaper_sync.phase5_h8_right_of_use_assets",
         "app.services.workpaper_sync.phase5_h2_construction_in_progress",
+        # ── G 循环 lane（spec: g4-g6-… / g5-… / g-cycle-single-region-…）────────
+        #    🔴 **同上一段的补漏形态**：台账条目已登记但漏了白名单。
+        "app.services.workpaper_sync.phase5_g8_other_equity",
+        "app.services.workpaper_sync.phase5_g9_other_noncurrent",
+        "app.services.workpaper_sync.phase5_g10_trading_liabilities",
+        "app.services.workpaper_sync.phase5_g11_investment_income",
+        "app.services.workpaper_sync.phase5_g14_credit_impairment",
+        # ── I 循环（spec: i-cycle-sync-… / i1-i3-… / i2-i4-i5-…）───────────────
+        #    🔴 **6/6 全覆盖**。表头层级覆盖 1/2/3/4 四种
+        #    （i6 单级 · i5 两级 · i2+i4 三级 · i1+i3 四级=平台上界）。
+        "app.services.workpaper_sync.phase5_i1_intangible_assets",
+        "app.services.workpaper_sync.phase5_i2_development_expenditure",
+        "app.services.workpaper_sync.phase5_i3_goodwill",
+        "app.services.workpaper_sync.phase5_i4_long_term_prepaid",
+        "app.services.workpaper_sync.phase5_i5_other_noncurrent_assets",
+        "app.services.workpaper_sync.phase5_i6_research_development_expense",
+        # ── J 循环（spec: j-cycle-sync-foundation-and-first-canary）────────────
+        #    🔴 manifest 里 J 只有 2 条 entry（1 独立 + 1 parent_duplicate）
+        #    ⇒ 本循环恒 1 条 provider。
+        "app.services.workpaper_sync.phase5_j1_employee_compensation",
     }
 )
 

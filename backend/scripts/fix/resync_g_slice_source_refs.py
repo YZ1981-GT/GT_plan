@@ -68,6 +68,14 @@ TARGETS: dict[str, tuple[str, str, re.Pattern[str]]] = {
     #    行集由 `G14_LINE_ITEMS` 固定。因此铸造点正则不适用，走 `mint_pat=None` 分支
     #    （只重算 payload 写入点行号）。
     "xlsx/gt-g14-credit-impairment-loss": ("useG14Detail.ts", "remark", None),
+    # 🔴 C-10：G11 的前端列模型**零改动**（13 列顺序本就对齐模板）⇒ 行号不变，
+    #    加进来是为了让这条也纳入「行号现算」的守护面（将来改了会自动同步）。
+    #    生成器随机后缀取 **4** 位 `slice(2, 6)`（G9/G10/G8 取 3 位）—— 正则按值写。
+    "xlsx/gt-g11-investment-income": (
+        "useG11DetailAnalysis.ts",
+        "remark",
+        re.compile(r"^\s*return `(g11d)-\$\{Date\.now\(\)"),
+    ),
 }
 TABLE_TO_ENTRY = {
     "G1-detail-rows": "xlsx/gt-g1-trading-financial-assets",
@@ -76,6 +84,7 @@ TABLE_TO_ENTRY = {
     "G10-detail-rows": "xlsx/gt-g10-trading-financial-liabilities",
     "G8-detail-rows": "xlsx/gt-g8-other-equity-instruments",
     "G14-detail-rows": "xlsx/gt-g14-credit-impairment-loss",
+    "G11-detail-rows": "xlsx/gt-g11-investment-income",
 }
 
 _NULL_COL = re.compile(r"\b(remark|conclusion)\s*:\s*null\s*,?")

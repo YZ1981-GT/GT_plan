@@ -881,6 +881,75 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "平台级缺口（umbrella BP-61-1 = G slice 的 BP-1~BP-3），供给就绪后真栈注册。"
         ),
     },
+    # ── G11（spec: g-cycle-single-region-detail-lanes · Task 11 / C-10）───────
+    {
+        "contract_id": "g11.investment_income_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_g11_investment_income",
+        "delivered_by_task": "G1R-Task11",
+        "pilot_class": "phase5_investment_income_detail",
+        "entry_id": "xlsx/gt-g11-investment-income",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "G/G11 投资收益.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "spec `g-cycle-single-region-detail-lanes` 九条中的**第五条**。"
+            "权威模板 sha256 a1b1d87f…（75,600 B，10 sheets）；受管 sheet = 明细分析表G11-2"
+            "（🔴 **单级表头 R9**（九条唯一 —— R8 是段标题「二、审计过程」只占 A8，不是表头行；"
+            "照前四条写两级会让 header_rows=2 把段标题当组行）/ 数据区 R10-R30 **21 行**"
+            "（九条最长）/ footer R31 七列 =SUM(x10:x30) / 🔴 R32「本年利润总额」是**手填分析行**"
+            "既非 footer 也不受管（另有独立 store 键 G11-detail-profit-total）/ 有效内容列 13 即 "
+            "A-M 恰等于 max_column（无空尾列）⇒ uuid_col=N / 0 个 definedName）。"
+            "🔴 **九条里唯一「受管表自身命中裸 IF」的一家**（44 格：G/K 两列占比公式 21×2 + "
+            "footer 的 shared 成员格 2；整册 95 格 = 受管表 44 + 收益率分析表G11-4 32 + "
+            "审定表G11-1 19，全 G 循环最多）。前四条 G9/G10/G8/G14 的受管表都零命中、中性化只动"
+            "审定表 —— 这条的中性化会**摘掉受管列自己的公式**。"
+            "`adapters/excel.py` 在 materialize **之前**跑 `neutralize_oo_crash_if_formulas`"
+            "（substrate 副本），它把含词界 IF( 的 <f> **整个摘掉**。逐格实测：数据区 R10-R30 "
+            "F 21/21→21/21 · **G 21/21→0/21** · J 21/21→21/21 · **K 21/21→0/21** · L 21/21→21/21。"
+            "而 `excel_materialize` 的两条检查方向**相反**（formula 要求 `view.has_formula`、"
+            "auto_source 要求该格**不是**公式）⇒ 只有一种声明能过：F/J/L 判 `formula` 并进 "
+            "formula_columns，**G/K 判 `auto_source`**（同属 PROTECTED_MODES，不入 store、"
+            "OO 改动不合并，保护力度与 formula 相同）。判 formula 会在 materialize 抛 "
+            "`ProtectedRegionWriteError`。先例：phase5_f1_05_long_term 的 J 列"
+            "（模板无公式 + 前端派生 + OO 不合并）。"
+            "🔴 **这推翻了 Task 5 判据 `test_conclusion_g_and_k_stay_managed_as_formula_columns` "
+            "的后半句**：P10 结论「G/K **受管**」成立（在 field_specs 里、OO 侧只读、不入 store），"
+            "但「受管为 **formula_columns**」不成立 —— 中性化后那两列没有公式可保护。判据已按实测"
+            "改写，保护力度不放宽。"
+            "🔴 **占比列引合计行**（裁决 G1R-H5）：G10 `=IF(F10=0,0,F10/$F$31)` 引 $F$31，"
+            "K10 引 **$J$31** —— 两个分母**不同**（spec 原文只说「引 F31」，Task 2 发现 K 引 J31）。"
+            "Task 5 真跑 `excel_row_shift.shift_sheet_rows` 实测：插 3 行后既有行主格 "
+            "$F$31→$F$34 / $J$31→$J$34 ⇒ **位移成立**，G/K 不改判 HTML-only。"
+            "🔴 同时登记框架层真实缺陷（Task 5 新发现，spec 未预见）：**新插入行**的 fill-down "
+            "公式绝对引用**不位移**（仍 $F$31，而 R31 位移后已是新行不再是合计行）—— 根因 "
+            "`excel_row_shift._build_inserted_row` 用 "
+            "`translate_formula_rows(freeze_absolute_rows=True)`（Excel 填充柄语义），造出的新行"
+            "公式随后没再经过插行位移；Excel 自己的顺序是「先插行再填充」⇒ 结果应是 $F$34。"
+            "本 spec 不修框架层（不在 lane 范围）⇒ **实践后果：G11-2 不要在数据区插行**"
+            "（21 行足够；真要扩行须先修框架层）。"
+            "🔴 footer 的 G31/K31 是 shared formula **成员格**（自闭合 `<f t=\"shared\" si=\"1\"/>`，"
+            "不带公式文本，主格在 G10）⇒ 判断占比列指向哪一行必须看**主格**，看成员格会得到 None "
+            "而误判（Task 5 首版判据踩过）。`footer_carries_total_formula=True`。"
+            "🔴 **前端零改动**（九条唯一）：`useG11DetailAnalysis.G11DetailRow` 的 13 个受管字段"
+            "与模板列序 A..M 逐列对应且**顺序已一致**。另 8 个字段是非模板列（rowKey 与 G11-1 对齐"
+            "的分项勾稽键 / group / tradingDisposeSubtype / changeRate 变动率（模板只有变动额 L）/ "
+            "changeRateHighlight / reasonRequired / isSkeleton 骨架行标记），不受管。"
+            "🔴 三处不可照抄前四条的细节：① 行身份键是 **`id`**（不是 rowId）② 生成器随机后缀取 "
+            "**4** 位 `slice(2, 6)`（G9/G10/G8 取 3 位）—— 形态判定必须按值 grep ③ **`seq`"
+            "（A 列「序号」）在 G11 是真列**（模板 A10-A30 预填 1..21）必须受管，而 G9/G10/G8 的"
+            "同名字段是纯显示序号不占模板列，照抄会漏掉 A 列。"
+            "🔴 **FD-1**：HTML store = checklist_responses.item_id='G11-detail-rows'，payload 落 "
+            "**remark**（真库实证 remark 2 B 即空数组 / conclusion 0 B ⇒ roundtrip 判据一律用合成行；"
+            "同册 G11-adj-rows 有 2480 B 真实载荷，但那属调整分录表 G11-3 不在本 sheet 受管面）。"
+            "wp_code 裁决：manifest 幻影码 ['G11I']（matcher 域），真码 **G11**（载荷所在）。"
+            "🔴 **TB 口径是本期发生额**：G11 是损益类（科目 **6111**）—— 不是余额。"
+            "FC-9 红线：本 provider 对 trial_balance 写次数为 0；审定表归后置 spec "
+            "`g-cycle-adjudication-sheets-coverage`（GF-H5）。"
+            "`adapter_registered=False`：与 D1/D3/D5/D6/D7/E1/F1~F5/G2/G8/G9/G10/G14 卡在同一"
+            "平台级缺口（umbrella BP-61-1 = G slice 的 BP-1~BP-3），供给就绪后真栈注册。"
+        ),
+    },
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     {
         "contract_id": "h9.lease_liability_detail",

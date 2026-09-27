@@ -132,6 +132,12 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     #    `rowId`（`_synthetic_rows` 现取 `spec.row_identity_key` 造行）② `L` 列的
     #    `value_type` 被从 boolean 改回 amount（裁决 G1R-H4 的布尔列会退化成数值列）。
     ("g14", "phase5_g14_credit_impairment", "ADAPTER_ID", True, True),
+    # ── G11（spec: g-cycle-single-region-detail-lanes · Task 11 / C-10）──────
+    #    🔴 本条的 contract digest 会在三种误改上打红：① `header_rows` 从 **1** 被改成 2
+    #    （G11 是九条唯一的单级表头，R8 是段标题不是组行）② `G`/`K` 从 `auto_source` 被改回
+    #    `formula`（受管表自带 44 格裸 IF，中性化后那两列无公式 ⇒ materialize 会抛
+    #    `ProtectedRegionWriteError`，本门先一步拦在 digest 漂移上）③ 行身份从 `id` 改成 `rowId`。
+    ("g11", "phase5_g11_investment_income", "ADAPTER_ID", True, True),
 )
 
 

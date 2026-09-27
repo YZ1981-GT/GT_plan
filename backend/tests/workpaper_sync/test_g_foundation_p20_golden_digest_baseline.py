@@ -119,20 +119,38 @@ class TestGfP20ZeroRegressionIsComputedNotHardcoded:
     def test_g_provider_whitelist_contains_exactly_the_delivered_ones(self) -> None:
         """登记点②：`_ALLOWED_PROVIDER_MODULES` 里的 `phase5_g*` 恰是**已交付**的那些。
 
-        🔴 本判据在 Task 14 之前断言「一个都没有」，按它自己留的指引改成「g2 在 + 其余不变」。
         白名单是**安全边界**（不得从登记表任意 import）⇒ 多一条都要有 provider 文件对应。
+
+        🔴 **改为现算**（GC-10「零回归基线一律现算不写死」）：期望值从
+        `DELIVERED_PER_ENTRY_CONTRACTS` 取，不再写死名单。首版写死
+        `["…phase5_g2_interest_receivable"]` 并留了「新增 G lane 时在此追加」的指引 ——
+        实际效果是 `g-cycle-single-region-detail-lanes` Task 8/9/9b/10/11 交付
+        G9/G10/G8/G14/G11 后本判据必红，而那五条都是合法交付。写死的是**分母**，
+        每条 lane 都得来手改一次，改的人还得判断「该不该改」⇒ 判据在教人放宽自己。
+        现算之后守的是真正要守的那件事：**白名单 ↔ 交付台账双向配平**
+        （白名单多一条而台账没登记、或台账登记了而白名单漏了，都红）。
+        `pilot_g7_two_level_dynamic` 走 pilot 段、不含 `phase5_g` ⇒ 天然不在此列
+        （裁决 GF-H3：G7 是旧先导范式）。
         """
         from app.services.workpaper_sync.adapters import registry  # type: ignore
 
         allowed = getattr(registry, "_ALLOWED_PROVIDER_MODULES", None)
         assert allowed is not None, "_ALLOWED_PROVIDER_MODULES 读不到 ⇒ 登记点判据无基础"
         g_mods = sorted(m for m in allowed if "phase5_g" in str(m))
-        assert g_mods == [
-            "app.services.workpaper_sync.phase5_g2_interest_receivable"
-        ], (
-            f"phase5_g* 白名单成员变了: {g_mods}\n"
-            "新增 G lane 时在此追加；`pilot_g7_two_level_dynamic` 走 pilot 段不在此列"
-            "（裁决 GF-H3：G7 是旧先导范式）"
+        delivered = sorted(
+            str(r["provider_module"])
+            for r in registry.DELIVERED_PER_ENTRY_CONTRACTS
+            if "phase5_g" in str(r.get("provider_module") or "")
+        )
+        assert g_mods == delivered, (
+            "白名单的 phase5_g* 与交付台账不配平。\n"
+            f"  白名单有而台账缺：{sorted(set(g_mods) - set(delivered))}\n"
+            f"  台账有而白名单缺：{sorted(set(delivered) - set(g_mods))}\n"
+            "追加台账条目时**必须同步白名单**，否则 provider 会在 "
+            "`build_manifest_registration_plan` 里被判「不得从登记表任意 import」而拒绝注册"
+        )
+        assert "app.services.workpaper_sync.phase5_g2_interest_receivable" in g_mods, (
+            "G2 canary 掉出白名单 ⇒ foundation 的交付面被回退了"
         )
         # 白名单条目必须真能 import（否则注册路径会在运行时炸）
         import importlib

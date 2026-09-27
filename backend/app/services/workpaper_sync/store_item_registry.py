@@ -470,6 +470,30 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="G14-detail-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── G11（spec: g-cycle-single-region-detail-lanes · Task 11 / C-10）──────
+    #
+    # 🔴 **九条里唯一「受管表自身命中裸 IF」的一家**（44 格：G/K 两列占比公式 21×2 +
+    #    footer 的 shared 成员格 2）。前四条 G9/G10/G8/G14 的受管表都是零命中，中性化
+    #    只动审定表 —— 这条的中性化会**摘掉受管列自己的公式**。
+    #
+    #    `adapters/excel.py` 在 materialize **之前**跑中性化（substrate 副本），逐格实测：
+    #      数据区 R10-R30：F 21/21→21/21 · G 21/21→**0/21** · J 21/21→21/21
+    #                      · K 21/21→**0/21** · L 21/21→21/21
+    #    而 `excel_materialize` 的两条检查方向**相反**：`formula` 要求 `view.has_formula`、
+    #    `auto_source` 要求该格**不是**公式 ⇒ 只有一种声明能过：
+    #      F/J/L → `mode=formula`（进 formula_columns）
+    #      G/K   → `mode=auto_source`（同属 PROTECTED_MODES，不入 store、OO 改动不合并）
+    #    判 formula 会在 materialize 阶段抛 `ProtectedRegionWriteError`。
+    #    先例：`phase5_f1_05_long_term` 的 J 列（模板无公式 + 前端派生 + OO 不合并）。
+    #
+    # 🔴 整册裸 IF **95 格**（受管表 44 + 收益率分析表G11-4 32 + 审定表G11-1 19）——
+    #    全 G 循环最多，per-file 挂中性化在这条上不是保守而是必需。
+    "g11.investment_income_detail": StoreMergePlan(
+        adapter_id="g11.investment_income_detail",
+        provider_module="phase5_g11_investment_income",
+        items=(StoreItemSpec(item_id="G11-detail-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     #
     # 🔴 **HC-12：H 循环 9 册全部命中 OO 加载期裸 `IF(`** ⇒ 同 G 的 per-file 保守策略，
