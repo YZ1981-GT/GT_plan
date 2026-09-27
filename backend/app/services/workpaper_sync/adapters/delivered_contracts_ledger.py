@@ -1092,6 +1092,59 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "册 465,476 B 全 H 最大。`adapter_registered=False` 同前三条：BP-1~BP-3 属平台缺口。"
         ),
     },
+    # ── H2 首条带**声明缺口**的 entry（spec: h2-h6-h10-pilot-cross-reference-lanes）──
+    {
+        "contract_id": "h2.construction_in_progress_detail",
+        "provider_module": (
+            "app.services.workpaper_sync.phase5_h2_construction_in_progress"
+        ),
+        "delivered_by_task": "H2-declared-coverage-gaps",
+        "pilot_class": "phase5_construction_in_progress_detail",
+        "entry_id": "xlsx/gt-h2-construction-in-progress",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "H/H2 在建工程.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "H 循环**第五条** entry，也是**首条带「声明出来的覆盖缺口」**的一条。"
+            "前四条（H9/H6/H4/H8）的每个模板列要么有 store 字段、要么明确无对端；"
+            "H2 有两处两侧**语义打架**，硬凑映射会造成**静默错数** ⇒ 按「宁可留可见缺口，"
+            "不要不可见错数」处理，两处各带停下报告点，需审计域裁决的部分不由接线方拍板。"
+            "🔴 **H2-GAP-1 `L 增加`（权威方向相反）**：模板 L **无公式、是可输入格**；"
+            "而前端 `increaseTotal` 由 5 个分项在 `useH2Detail.ts#L351 _recalcFormulas` "
+            "派生，且**不在 `_persist()` 的 56 键里**。OO 改 L ⇒ 回写无处可落"
+            "（不知该摊给哪个分项）；HTML load 又会用 5 个分项覆盖。"
+            "⇒ L 判 `template_only`、5 分项判 `store_only`，**本格不参与双向同步**。"
+            "硬映会把 OO 侧的输入吞掉。停下报告点：若审计侧要求 L 双向，需先裁决摊分规则"
+            "（如差额全部计入 increaseOther）—— 属审计域决定。"
+            "🔴 **H2-GAP-2 `O 其他减少`（1 格对 2 字段）**："
+            "`useH2Detail.ts#L254 _otherDecrease = decrease + transferOut` ⇒ 模板 O "
+            "对应两字段之和。O 映 `decrease`（主字段），`transferOut` 判 `store_only` + "
+            "`legacy_folded`；其非零时两侧**静默差额恰等于它**。硬映会漏掉那部分金额。"
+            "停下报告点：真库 `H2-2-rows` **无行**，无法实证 transferOut 是否真出现过 ⇒ "
+            "接线前先扫真库；若真有非零值，**先做一次数据迁移**把它并进 decrease，"
+            "不得带着已知差额上线。"
+            "覆盖闭合仍成立：**34 映射 + 16 template-only == 50 有效列**，"
+            "并集连续 A..AX 无缺口（落契约 review.column_coverage_closure）。"
+            "🔴 **三处不能照抄前四条**：①footer R21 之下**无** `其中：` SUMPRODUCT 小计区"
+            "（R22 直接是「三、审计说明：」）—— H4/H8 都有，照抄会把审计说明误登记成小计区，"
+            "守卫再去比对一个不存在的 SUMPRODUCT；②**footer 不是一律 SUM** —— "
+            "AA21=`=K21+T21` / AC21=`=M21+V21` / AG21=`=Z21+AB21-AD21-AE21` / "
+            "AH21=`=AA21+AC21-AF21` 四格是**行内派生**（登记在 review.footer_non_sum_cells），"
+            "按「footer 全是 =SUM(列)」写判据会假红；③**两对**净值"
+            "（期初 AT9:AU10 + 期末 AV9:AW10），H8 只有一对（BE8:BF9）⇒ 列位形态不同。"
+            "几何：四级表头 R9-R12（46 合并域）/ 数据 **R13-R20 共 8 行，全 H 最短**"
+            "（H8 20 / H4 16 / H9·H6 各 5 —— 受管区行数写死成别条的值会让 merge 越界写进 footer）/ "
+            "有效列 50 即 A..AX / 数据行公式列 21（映射侧 10 个进 FORMULA_TEMPLATES）/ "
+            "原值块每组带「其中：」资本化利息子列（H2 独有形态）/ 册 **21 sheets 全 H 最多**。"
+            "🔴 `gap_id` 而非 `id`：`definitions._assert_no_self_reference` 禁止 canonical "
+            "payload 出现 `id` 形态字段（Requirement 6.2），写成 `id` 时生成器在 "
+            "parse_contract 阶段直接 IdentityError（本轮实测踩过）。"
+            "HD-7：H2 **无** TB 发布门（publishToTb 在 H2 链路 0 处）。"
+            "幻影码 `H2C` 是**真**幻影码（程序表码是 `H2A`）。"
+            "`adapter_registered=False` 同前四条：BP-1~BP-3 属平台缺口，不手改 manifest。"
+        ),
+    },
     # ── I6 canary（spec: i-cycle-sync-foundation-and-first-canary · Task 22）──
     {
         "contract_id": "i6.research_development_expense_detail",
@@ -1549,9 +1602,23 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "import 命中**均为 0**）⇒ 判据 SHALL 按 entry 声明的 `write_client` 名字去找 "
             "`{client}.put(`，**不写死 `http`**。"
             "🔴 **JC-3 写路径按端点字面量判定，禁按函数名** —— 符号名 `publishToTb` 在全 J 域命中 "
-            "**0**，而端点 `publish-to-tb` 命中 **2**（同一文件 `j1/core/J1TabAdjudication.vue` "
-            "内两处）：「按函数名得 0、按端点得 1 个文件」是本条判据存在的**全部理由**。"
+            "**0**，而端点 `publish-to-tb` 命中 **2**，均在 `j1/core/J1TabAdjudication.vue`："
+            "「按函数名得 0、按端点得 1 个文件」是本条判据存在的**全部理由**。"
+            "🔴 **精度更正（2026-09-27 逐行实测）**：那 2 处命中里 **1 处是注释**（#L425 的 spec "
+            "溯源注释）、**1 处是真调用**（#L446 `api.post(...)`）⇒ 真实发布站点 **1 个**；"
+            "判据 SHALL **先剥注释再匹配**（平台守卫 `check_tb_publish_confirm_gate` 正是先 "
+            "`strip_comments` 再跑 `PUBLISH_CALL_RE`），否则把注释数成发布站点。"
+            "✅ **两道 CI 守卫现算通过 + 非空反证已做**：扫 5190 源文件 0 违规；J1 真调用 #L446 "
+            "被 `PUBLISH_CALL_RE` 覆盖、同文件 #L434 `ElMessageBox.confirm` 被 `CONFIRM_RE` 覆盖 "
+            "⇒ 判为 confirmed 而非空分母。"
             "⇒ **GC-9 在 J 是 1/1 有门**（推翻「J 无发布门」误判），canary **可以**覆盖发布链。"
+            "🔴 **诚实登记一处「看着像缺陷但无害」**：#L448 传 `sheet_name: '审定表J1-1'` "
+            "**缺尾部空格**（模板真名带空格），但端点只用 "
+            "`extract_determination_wp_code()` 按正则 `[D-N]\\d+-1` **提子码**、不做 sheet 名"
+            "精确匹配 ⇒ **不得报成缺陷**（虚报与漏报同罪），只登记为潜在风险。"
+            "🔴 **对照**：`prefill_formula_mapping.json` 里同样的 `sheet: '审定表J1-1'` **是真缺陷** "
+            "—— 那边守卫按 sheet 名**精确匹配模板**。同一字符串两处消费方式不同 ⇒ "
+            "判据必须看消费方，不能只看字面。"
             "四类端点现算：checklist-responses PUT **13 文件**（主写）· publish-to-tb POST **1** · "
             "disclosure-notes/sync POST **4**（写**另一张表**）· ai/generate-text POST **16**"
             "（AI 生成，**非持久化**，不得计入写路径）。"

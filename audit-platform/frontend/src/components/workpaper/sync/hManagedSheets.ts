@@ -105,6 +105,17 @@ export const H_MANAGED_SHEETS: readonly HManagedSheet[] = Object.freeze([
     excelName: '明细表H8-2',
     storeItemId: 'H8-2-rows',
   },
+  {
+    // 受管但尚未接桥。H2 是首条带**声明覆盖缺口**的 entry（`L 增加` 不双向、
+    // `O 其他减少` 是 1 格对 2 字段），两处各带停下报告点 —— 接桥前应先看契约
+    // `review.declared_coverage_gaps`，尤其 transferOut 的真库扫描那条。
+    entryId: 'xlsx/gt-h2-construction-in-progress',
+    code: 'H2-2',
+    sheetKey: 'h202-managed',
+    kind: 'rows',
+    excelName: '明细表H2-2',
+    storeItemId: 'H2-2-rows',
+  },
 ] as const)
 
 /**

@@ -42,6 +42,7 @@ _PROVIDERS: tuple[tuple[str, str], ...] = (
     ("h6", "phase5_h6_asset_disposal_clearing"),
     ("h4", "phase5_h4_engineering_materials"),
     ("h8", "phase5_h8_right_of_use_assets"),
+    ("h2", "phase5_h2_construction_in_progress"),
 )
 
 

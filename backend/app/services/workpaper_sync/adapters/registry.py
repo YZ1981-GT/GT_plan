@@ -1112,6 +1112,7 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_h6_asset_disposal_clearing",
         "app.services.workpaper_sync.phase5_h4_engineering_materials",
         "app.services.workpaper_sync.phase5_h8_right_of_use_assets",
+        "app.services.workpaper_sync.phase5_h2_construction_in_progress",
     }
 )
 
