@@ -170,3 +170,97 @@ approvalDoc / appraisalReport / contractRef / invoiceRef / linkageId` …
 | **需域裁决，不得猜** | **H10**（表不对应）、**H3 / H5 / H7**（四分口径不同） | 阻塞 |
 
 已落地：H9（canary，commit `d66b27b14`）· H6（发布链首例，commit `09fc4339c`）。
+
+---
+
+## 6. H8 全宽实测结果（已落地，commit `8628c6cc7`）
+
+`明细表H8-2`：四级表头 **R8-R11**（51 个合并域）· 数据 **R12-R31（20 行）**· footer **R32**
+`合计` · **有效内容列 58（A..BF，与 max_column 相等）**· 数据行公式列 **17** ·
+footer 之下 **R33-R38** 按 **A 列**类别 SUMPRODUCT 小计（不受管）。
+
+四区块：原值 `D8:V8` · 累计折旧 `W8:AM8` · 减值准备 `AN8:BD8` · 审定净值 `BE8:BF9`。
+
+**58 列全部 1:1 映射、零 template-only** —— 全 H 唯一。四项闭合自检全绿。
+三处易抄错（区块内增减去向数 3/3 vs 2/3 · 未审期末 SUM 端点 · BE/BF 是审定不是未审）
+已逐条写进 sheet 声明。
+
+## 7. H2 全宽实测 + 两处歧义的**代码级**结论
+
+### 几何
+
+`明细表H2-2`：四级表头 **R9-R12**（46 个合并域）· 数据 **R13-R20（8 行）**· footer **R21**
+`合计` · **有效内容列 50（A..AX）**· 数据行公式列 **21**。
+
+🔴 **与 H4/H8 的一处结构差异**：footer 之后**没有** `其中：` SUMPRODUCT 小计区
+（R22 直接是「三、审计说明：」）⇒ H2 无 `unmanaged_regions`。
+照 H4/H8 声明一个不受管区块会把「审计说明」误登记成小计区。
+
+分区：
+* **A..I 属性列**（皆 `R9:R12` 纵向合并）：A 工程项目名称 · B 预算金额 · C 资金来源 ·
+  D 工程累计投入占预算比例%（**公式** `=IF(AH13=0,0,AH13/B13)`）· E 预计完工时间 ·
+  F 工程进度 · G 完工日期 · H 批准文号 · I 利息资本化率
+* **原值 `J9:AH9`**：未审数 `J10:R10`（期初 J-K / 增加 L-M / 减少 N-P / 期末 Q-R）·
+  期初调整 `S10:T11` · 账项调整 `U10:Y10`（增加 U-V / 减少 W-Y）·
+  审定数 `Z10:AH10`（期初 Z-AA / 增加 AB-AC / 减少 AD-AF / 期末 AG-AH）
+  —— 每组都带「其中：累计资本化金额 / 本期利息资本化金额 / 利息资本化金额减少金额」子列
+* **减值准备 `AI9:AS9`**：未审 AI-AL · 期初调整 AM · 账项调整 AN-AO · 审定 AP-AS
+* **期初净值 `AT9:AU10`**（AT 未审 / AU 审定）· **期末净值 `AV9:AW10`**（AV 未审 / AW 审定）
+  🔴 H2 有**两对**净值（期初 + 期末），H8 只有一对（`BE8:BF9`，期初/期末各一列）——
+  两者列位形态不同，不能照抄。
+* **AX 是否抵押**（`AX9:AX12`）
+
+### 🔴 歧义①：`O 其他减少` 是 1 格对 2 字段，**不是**单字段映射
+
+`useH2Detail.ts#L254`：
+
+```ts
+/** 其他减少口径：decrease + 旧字段 transferOut */
+function _otherDecrease(row: Pick<H2DetailRow, 'decrease' | 'transferOut'>): number {
+  return _getNum(row.decrease) + _getNum(row.transferOut)
+}
+```
+
+⇒ 模板 `O` 对应的是 **`decrease + transferOut` 之和**，`transferOut` 是被折叠进来的旧字段。
+
+**不得**简单映 `O → decrease`：若 store 里 `transferOut` 非零，
+投影写进 O 的只有 `decrease`，而 HTML 侧显示 `decrease + transferOut` ⇒ **两侧静默不一致**。
+
+裁决（同 H4 `ajeImpair` 的一对三处理）：
+* `O → decrease`（主字段，mode editable）
+* `transferOut` 登记为 **store-only + legacy_folded**，并在契约 note 里写明
+  「非零时两侧会出现差额 = transferOut」
+* 🔴 **登记为停下报告点**：真库 `H2-2-rows` **无行**，无法实证 `transferOut` 是否真的出现过。
+  接线前应先跑一次真库扫描确认其恒零/恒缺；若真有非零值，正确做法是**先做一次数据迁移**
+  把 `transferOut` 并进 `decrease` 再接线，而不是带着已知差额上线。
+
+### 🔴 歧义②：`L 增加` 在模板可输入、在 HTML 是派生 ⇒ 方向性冲突
+
+`useH2Detail.ts#L351 _recalcFormulas`：
+
+```ts
+row.increaseTotal =
+  _getNum(row.increaseMaterial) + _getNum(row.increaseLabor) + ... (共 5 项)
+row.cipEnd = calcCipEndBalance(_getNum(row.cipBegin), row.increaseTotal, ..., _getNum(row.transferAmount))
+row.unadjustedEnd = row.cipEnd
+```
+
+⇒ `increaseTotal` **不落库**（不在 `toPersist` 的 56 键里），load 时由 5 个分项重算；
+而模板 `L 增加` **没有公式**，是可输入格。
+
+两侧权威方向相反：OO 侧改 `L` → 回写进 store 只能落到 `increaseTotal`（不落库）或某个分项
+（不知该摊给哪一项）；HTML 侧 load 又会用 5 个分项把它覆盖。
+
+裁决：**`L` 登记为 `template_only_columns`**，5 个分项（`increaseMaterial` / `increaseLabor`
+/ `increaseMachinery` / `increaseInterest` / `increaseOther`）登记为 store-only。
+即「原值·未审·本期增加」这一格**不参与双向同步**，是**声明出来的覆盖缺口**，
+不是靠猜一个摊分规则蒙过去。同理 `unadjustedEnd` / `cipEnd` / `remainingCip` 皆派生。
+
+🔴 **停下报告点**：若审计侧要求 `L` 必须双向，需先裁决摊分规则
+（例如「OO 改 L ⇒ 差额全部计入 increaseOther」），那是审计域决定，不由接线方定。
+
+### 结论
+
+H2 **可以接线**，但比 H4/H8 多两处**声明出来的覆盖缺口**（`L` 与 `transferOut`），
+且两处都带停下报告点。建议接线时把这两条写进契约 `review` 并配守卫，
+而不是为了「列覆盖闭合」硬凑映射。

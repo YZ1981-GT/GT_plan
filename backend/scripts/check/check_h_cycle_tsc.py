@@ -52,10 +52,28 @@ OWNED = (
 HOST_FILES: tuple[str, ...] = (
     "GtH9LeaseLiabilities.vue",
     "GtH6AssetDisposalClearing.vue",
+    "GtH8RightOfUseAssets.vue",
 )
+#: 🔴 逐宿主基线按**现算**填，不照抄别的宿主。
+#:
+#: * H9 / H6 各 **1** 条：`sheet-code="…"` 传 `GtAProgramConsole`（其必填 prop 是
+#:   `sheetName`）。该 pattern 全仓 `workpaper/Gt*.vue` 现算 36 处、跨 E1/F1/… 多循环，
+#:   属其它 spec 作业面，已上报未动。
+#: * H8 **8** 条 —— 首次纳入类型检查时现算，逐条核对过**都在本轮 diff hunk 之外**：
+#:     L89  `sheet-code` 传 GtAProgramConsole（同 H9/H6 那条）
+#:     L735 `inject<(id, label?) => void>('openReviewDialog', undefined)`
+#:          —— 默认值 `undefined` 不满足声明的函数类型
+#:     L776/778/779/783/785/786 共 6 条 `eventBus.on/off('tb:updated' /
+#:          'substantive:adjudicated' / 'h9:liability-updated' /
+#:          'h9:lease-payment-updated', …)` —— 这些事件名**未在 eventBus 的 `Events`
+#:          类型里声明**，与 `src/stores/project.ts` 的 `'sse:disconnect'` 同族缺陷。
+#:   🔴 基线填 8 不是放宽：本轮新增任何一条类型错误都会顶到 9 而打红。
+#:   这 8 条本身是**真实缺陷**（eventBus 事件名缺声明会让事件改名时无人报错），
+#:   但跨宿主/跨循环，登记上报不在本轮范围。
 HOST_ERROR_BASELINE: dict[str, int] = {
     "GtH9LeaseLiabilities.vue": 1,
     "GtH6AssetDisposalClearing.vue": 1,
+    "GtH8RightOfUseAssets.vue": 8,
 }
 
 _ERR_RE = re.compile(r"^(?P<file>[^(]+)\((?P<line>\d+),\d+\): error (?P<code>TS\d+)")

@@ -35,17 +35,36 @@
 
       <!-- 顶部工具栏（双模式切换）— 目录页隐藏 -->
       <div v-if="currentSheet !== 'H8'" class="h8-header-toolbar">
-        <el-segmented
-          :model-value="currentMode"
-          :options="modeOptions"
-          size="small"
-        />
+        <!--
+          🔴 原来只写了 `:model-value="currentMode"`，**没有任何 `@change` / v-model** ⇒
+             这个切换器点了根本不会改模式，H8 的双模式是**死的**。改 v-model 后 setter
+             走 `useHSyncMode.switchMode`，四分支保存协议在那里收口。
+        -->
+        <el-segmented v-model="currentMode" :options="modeOptions" size="small" />
+        <el-tag v-if="isH8SyncManagedSheet" size="small" :type="hSync.syncStateTag.value.type">
+          {{ hSync.syncStateTag.value.text }}
+        </el-tag>
+        <el-tag v-else-if="hSync.lastNotice.value" size="small" :type="hSync.lastNotice.value.type">
+          {{ hSync.lastNotice.value.text }}
+        </el-tag>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h8-right-of-use-assets" />
       </div>
 
-      <!-- OnlyOffice 模式 -->
+      <!--
+        受管 sheet（H8-2）的在线编辑 —— 统一双向宿主。
+        🔴 `.oo-container` 必须有**确定高度**（D4 踩过 height:100% 被压成一条）。
+      -->
+      <div v-if="currentMode === 'onlyoffice' && isH8SyncManagedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="hSync.descriptor.value"
+          :bridge="hSync.syncBridge"
+        />
+      </div>
+
+      <!-- 非受管 sheet 的 OnlyOffice 模式（legacy 只读视图，无双向回写） -->
       <GtOnlyOfficeSheet
-        v-if="currentMode === 'onlyoffice'"
+        v-else-if="currentMode === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -352,6 +371,12 @@ import { buildHSeedRowIds } from './composables/hSeedRowIdentity'
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { useHSyncMode } from './composables/useHSyncMode'
+
+/** H8 entry id（manifest 冻结值，与 `phase5_h8_right_of_use_assets.ENTRY_ID` 逐字一致）。 */
+const H8_SYNC_ENTRY_ID = 'xlsx/gt-h8-right-of-use-assets'
 const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtCycleAProgramRouter.vue'))
 
@@ -488,12 +513,43 @@ const hasTbReconcileWarning = computed(() =>
   tbReconcileDiff.value != null && Math.abs(tbReconcileDiff.value) > 1,
 )
 
-// ─── 双模式切换 ──────────────────────────────────────────────────────────────
-const currentMode = ref<'html' | 'onlyoffice'>('html')
-const modeOptions = [
-  { label: '结构化视图', value: 'html' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
+// ─── 双模式切换（统一接桥）────────────────────────────────────────────────────
+//
+// 🔴 原实现是**裸 ref + 静态数组**：`currentMode` 只改本地状态、`modeOptions` 连
+//    OnlyOffice 健康检查都没有 ⇒ ①OO 侧编辑回不到 HTML（假双向）②服务不可用时点进去
+//    才发现空白。两点都随 `useHSyncMode` 一并消除。
+//
+// H8-2（`明细表H8-2`）是受管表：受管 + 已接桥 ⇒ 渲染 `WorkpaperSyncEditorHost`，
+// OO 侧改动经 forcesave 回写 store。其余 sheet 仍走 `GtOnlyOfficeSheet` 只读视图
+// （受管面未覆盖，不得假称可双向，但**保留**可看 Excel）。
+const hSync = useHSyncMode({
+  entryId: H8_SYNC_ENTRY_ID,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  currentCode: computed(() => currentSheet.value),
+  isReadonly,
+  flushHtml: async () => {
+    await flushPendingSaves()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: H8_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: hSync.sheetKey.value,
+    }
+  },
+  // 打服务端而不是用 props.htmlData 快照 —— 快照是切 OO 之前的，会让 UI 假旧。
+  reloadHtml: async () => { await reloadFromServer() },
+})
+
+/** 模板 `ref="syncEditorHostRef"` 的落点 —— 直接复用桥里的 ref（见 H9 宿主同款说明）。 */
+const syncEditorHostRef = hSync.syncHostRef
+const isH8SyncManagedSheet = computed(() => hSync.isManagedSheet.value)
+const currentMode = hSync.renderMode
+const modeOptions = hSync.modeOptions
 
 // ─── 项目适用准则（供披露表判定变体） ────────────────────────────────────────
 // 适用准则：本 sheet html_data > runtime context（scaffold 从 render-config 顶层注入）；
@@ -615,6 +671,30 @@ async function reloadFromServer(): Promise<void> {
 // 子组件契约：emit('save', itemId, value)。value 为字符串或对象（对象序列化进 remark）。
 // 防抖 800ms 批量 PUT /checklist-responses，并乐观更新本地 Map 供 selfLoad/跨表读取。
 const _saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+/**
+ * 待落库项（itemId → 本次要 PUT 的值）。
+ *
+ * 🔴 存在理由与 H9 宿主同款：`flushPendingSaves()` 必须能在**防抖窗口内**把同一批值
+ *    立即写出去。原实现把值捕获在 `setTimeout` 闭包里，外部无从取用 ⇒ 切「在线编辑」时
+ *    最后不到 800ms 的编辑会留在客户端，materialize 出的 xlsx 少这批改动（静默丢数据）。
+ */
+const _pendingSaves = new Map<string, { conclusion: string | null; remark: string | null }>()
+
+/** 真正打端点（防抖到点与 flush 共用这一条路径，避免两处写法漂移）。 */
+async function _dispatchPendingSave(itemId: string): Promise<void> {
+  const payload = _pendingSaves.get(itemId)
+  if (!payload) return
+  _pendingSaves.delete(itemId)
+  try {
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items: [{ item_id: itemId, conclusion: payload.conclusion, remark: payload.remark }],
+    })
+  } catch (err: unknown) {
+    console.warn('[GtH8] persistResponse failed:', itemId, err)
+  }
+}
+
 function persistResponse(itemId: string, value: any): void {
   if (!itemId || !props.wpId) return
   const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
@@ -625,15 +705,28 @@ function persistResponse(itemId: string, value: any): void {
   next.set(itemId, updated)
   allResponses.value = next
   if (isReadonly.value) return
+  _pendingSaves.set(itemId, {
+    conclusion: updated.conclusion ?? null,
+    remark: updated.remark ?? null,
+  })
   const prev = _saveTimers.get(itemId)
   if (prev) clearTimeout(prev)
   _saveTimers.set(itemId, setTimeout(() => {
     _saveTimers.delete(itemId)
-    http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion: updated.conclusion ?? null, remark: updated.remark ?? null }],
-    }).catch((err: unknown) => console.warn('[GtH8] persistResponse failed:', itemId, err))
+    void _dispatchPendingSave(itemId)
   }, 800))
+}
+
+/**
+ * 清防抖 + 立即落库，**await 到真正写完**。切「在线编辑」前的必经一步。
+ *
+ * 已保存 ⇒ `_pendingSaves` 为空 ⇒ 本函数是零请求空转，切换耗时只剩桥的 materialize；
+ * 未保存才在这里付出一次 PUT（正是「切换时保存」）。
+ */
+async function flushPendingSaves(): Promise<void> {
+  for (const t of _saveTimers.values()) clearTimeout(t)
+  _saveTimers.clear()
+  await Promise.all([..._pendingSaves.keys()].map((id) => _dispatchPendingSave(id)))
 }
 
 // ─── provide for child components ────────────────────────────────────────────
@@ -729,6 +822,17 @@ onBeforeUnmount(() => {
   align-items: center;
   margin-bottom: 12px;
   gap: 12px;
+}
+
+/**
+ * 统一双向宿主的容器。
+ *
+ * 🔴 必须给**确定高度**，不能用 `height: 100%`：本组件根节点是 auto 高度，`100%` 解析成
+ *    父级内容高度（此刻为 0）⇒ 编辑器被压成一条，看起来像没加载。D4 踩过一次。
+ */
+.oo-container {
+  min-height: 600px;
+  height: calc(100vh - 200px);
 }
 
 .h8-branch-container {

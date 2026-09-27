@@ -115,7 +115,11 @@ export const H_MANAGED_SHEETS: readonly HManagedSheet[] = Object.freeze([
  * （8 条 lane provider 落地时先进 `H_MANAGED_SHEETS`，宿主接桥另做）—— 届时**不得**
  * 因「它是受管 sheet」就假称可切 OO。
  */
-export const H_OO_WIRED_ROWS_CODES: readonly string[] = Object.freeze(['H9-2', 'H6-2'])
+export const H_OO_WIRED_ROWS_CODES: readonly string[] = Object.freeze([
+  'H9-2',
+  'H6-2',
+  'H8-2',
+])
 
 const BY_CODE: ReadonlyMap<string, HManagedSheet> = (() => {
   const m = new Map<string, HManagedSheet>()
