@@ -53,6 +53,7 @@ HOST_FILES: tuple[str, ...] = (
     "GtH9LeaseLiabilities.vue",
     "GtH6AssetDisposalClearing.vue",
     "GtH8RightOfUseAssets.vue",
+    "GtH4EngineeringMaterials.vue",
 )
 #: 🔴 逐宿主基线按**现算**填，不照抄别的宿主。
 #:
@@ -74,6 +75,10 @@ HOST_ERROR_BASELINE: dict[str, int] = {
     "GtH9LeaseLiabilities.vue": 1,
     "GtH6AssetDisposalClearing.vue": 1,
     "GtH8RightOfUseAssets.vue": 8,
+    #: H4 **1** 条（现算）：L62 `sheet-code` 传 GtAProgramConsole —— 与 H9/H6 同一条，
+    #: 在本轮 diff hunk 之外。H4 没有 H8 那 7 条（其宿主不用 eventBus.on/off，
+    #: 也没有 `inject(..., undefined)`）⇒ 逐宿主基线确实不能照抄。
+    "GtH4EngineeringMaterials.vue": 1,
 }
 
 _ERR_RE = re.compile(r"^(?P<file>[^(]+)\((?P<line>\d+),\d+\): error (?P<code>TS\d+)")

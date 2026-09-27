@@ -119,6 +119,7 @@ export const H_OO_WIRED_ROWS_CODES: readonly string[] = Object.freeze([
   'H9-2',
   'H6-2',
   'H8-2',
+  'H4-2',
 ])
 
 const BY_CODE: ReadonlyMap<string, HManagedSheet> = (() => {

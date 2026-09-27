@@ -295,20 +295,54 @@ class TestHfP3ConsumerCounts:
         assert sites, "H7 必须有 TB 发布门"
         assert all("useH7FormData.ts" in s for s in sites), sites
 
-    def test_use_h4_dual_mode_is_chained_across_four_entries(self) -> None:
-        """改 `useH4DualMode` = 同时影响 H4 / H6 / H8 / H9 ⇒ 三方协调（本 spec 只立判据）。"""
-        c = F.count_consumers("useH4DualMode")
-        files = {x.split(":")[0] for x in c.production}
-        assert len(files) == 5, c.production
-        assert "components/workpaper/GtH4EngineeringMaterials.vue" in files
-        assert "components/workpaper/composables/useH6DualMode.ts" in files
-        assert "components/workpaper/composables/useH8DualMode.ts" in files
-        assert "components/workpaper/h4/impairment/H4TabImpairment.vue" in files
-        assert "components/workpaper/h4/impairment/H4TabRecoverable.vue" in files
-        # 链尾跨到 canary：useH8DualMode → useH9DualMode → GtH9
-        chain = {x.split(":")[0] for x in F.count_consumers("useH8DualMode").production}
-        assert "components/workpaper/composables/useH9DualMode.ts" in chain
-        assert "components/workpaper/h8/impairment/H8TabRecoverable.vue" in chain
+    def test_use_h4_dual_mode_real_importers_are_h4_only(self) -> None:
+        """`useH4DualMode` 的**真 import** 消费方只剩 H4 内两个减值 Tab。
+
+        🔴 **本判据推翻了它自己的前一版**。前一版叫
+        `test_use_h4_dual_mode_is_chained_across_four_entries`，断言「恰 5 个生产消费方」
+        并声称「改 `useH4DualMode` = 同时影响 H4/H6/H8/H9 ⇒ 三方协调」。
+
+        那条链**在代码里不存在**：`F.count_consumers` 按 `\\b词\\b` 现算，**注释也计数**，
+        而 `useH6DualMode.ts` / `useH8DualMode.ts` 里的 `useH4DualMode` 只出现在
+        文件头注释「Follow useH4DualMode pattern」—— 按值 grep
+        `^import .*useH4DualMode` / `from './useH4DualMode'` / `useH4DualMode(`
+        在这两个文件里**零命中**。前一版把注释提及当成了依赖，于是「跨四 entry 链式复用」
+        这个结论从一开始就是假的（它连带让上一轮「不删 useH6DualMode」的理由也写错了）。
+
+        新判据分两层，都按值取证：
+          ① **真 import 消费方**必须恰为 H4 内的两个减值 Tab
+             （`GtH4EngineeringMaterials.vue` 已在本轮改用 `useHSyncMode`，故退出）；
+          ② 另有 2 个文件只在注释里提到它 —— 如实登记，并断言它们**不是** importer，
+             防止有人再把注释提及读成依赖链。
+        """
+        real, comment_only = F.split_real_importers("useH4DualMode")
+        assert real == [
+            "components/workpaper/h4/impairment/H4TabImpairment.vue",
+            "components/workpaper/h4/impairment/H4TabRecoverable.vue",
+        ], real
+        # 🔴 只在注释里提到它的三个文件：两个 `Follow useH4DualMode pattern` 的同族
+        #    composable + 本轮接桥后 H4 宿主里留下的「替代 useH4DualMode」说明。
+        #    如实登记，且上面的分类已保证它们**不是** importer。
+        assert comment_only == [
+            "components/workpaper/GtH4EngineeringMaterials.vue",
+            "components/workpaper/composables/useH6DualMode.ts",
+            "components/workpaper/composables/useH8DualMode.ts",
+        ], comment_only
+
+    def test_use_h8_dual_mode_real_importers(self) -> None:
+        """`useH8DualMode` 的真 import 消费方只有一个 —— 「链尾跨到 canary」也是假的。
+
+        🔴 前一版判据断言 `useH8DualMode → useH9DualMode → GtH9` 这条链存在
+        （`assert "composables/useH9DualMode.ts" in chain`）。按 import 语句现算：
+        `useH9DualMode.ts` 里的 `useH8DualMode` **也只出现在注释里**，零真 import。
+        与 `useH4DualMode` 那条同源 —— `count_consumers` 的词频计数把注释当依赖，
+        于是凭空生出一条「跨四 entry 的链」。
+        """
+        real, comment_only = F.split_real_importers("useH8DualMode")
+        assert real == ["components/workpaper/h8/impairment/H8TabRecoverable.vue"], real
+        assert comment_only == ["components/workpaper/composables/useH9DualMode.ts"], (
+            comment_only
+        )
 
     def test_use_h2_form_data_does_not_exist_at_all(self) -> None:
         """HC-3 表末行：`useH2FormData` 定义 == 0（文件不存在），不是"零消费可删"。"""

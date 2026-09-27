@@ -678,6 +678,42 @@ def wired_entry_codes() -> frozenset[str]:
     return frozenset(re.match(r"(H\d+)", c).group(1) for c in codes if re.match(r"(H\d+)", c))
 
 
+def split_real_importers(symbol: str) -> tuple[list[str], list[str]]:
+    """把某符号的引用方分成「真 import / 调用」与「只在注释里提到」两类。
+
+    返回 `(real, comment_only)`，两者都已排序，且都**排除**该符号的定义文件与测试文件。
+
+    🔴 **必须逐行匹配**。第一版写成跨整个文件的
+    ``import\\s+\\{[^}]*\\bSYM\\b[^}]*\\}\\s+from``，而 ``[^}]`` 是否定字符类、**跨换行** ⇒
+    任何「文件开头有 ``import {``、中间某条注释提到 SYM、后面有 ``} from``」的文件都会被
+    误判成 importer。实测该写法把 `useH6DualMode.ts` / `useH8DualMode.ts` /
+    `GtH4EngineeringMaterials.vue` 三个**只在注释里提到**的文件全判成 import，
+    同时把两个真 importer（H4 的减值 Tab）判掉了。
+
+    ⇒ 逐行：非注释行里同时出现 `import` 与 `from`，或出现 `SYM(` 调用，才算真引用。
+    """
+    call_re = re.compile(rf"\b{re.escape(symbol)}\s*\(")
+    real: list[str] = []
+    comment_only: list[str] = []
+    for f in frontend_files():
+        if f.is_test or f.rel.endswith(f"composables/{symbol}.ts"):
+            continue
+        if symbol not in f.text:
+            continue
+        hit = False
+        for line in f.text.splitlines():
+            if symbol not in line:
+                continue
+            stripped = line.lstrip()
+            if stripped.startswith(("//", "*", "/*")):
+                continue  # 注释行不算
+            if ("import" in line and "from" in line) or call_re.search(line):
+                hit = True
+                break
+        (real if hit else comment_only).append(f.rel)
+    return sorted(real), sorted(comment_only)
+
+
 def publish_to_tb_sites() -> dict[str, tuple[str, ...]]:
     """现算 `publishToTb` 在 H2~H10 生产代码里的分布（HD-7 两族缺口的判据）。
 
