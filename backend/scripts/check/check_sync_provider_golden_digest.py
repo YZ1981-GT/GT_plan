@@ -166,6 +166,7 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     ("g3", "phase5_g3_dividend_receivable", "ADAPTER_ID", True, True),
     ("g4", "phase5_g4_bond_investment", "ADAPTER_ID", True, True),
     ("g6", "phase5_g6_other_bond", "ADAPTER_ID", True, True),
+    ("g5", "phase5_g5_long_term_receivable", "ADAPTER_ID", True, True),
 )
 
 

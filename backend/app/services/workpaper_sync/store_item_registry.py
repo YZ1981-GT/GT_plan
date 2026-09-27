@@ -195,6 +195,16 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         #    `set_json_path` / `resolve_json_path`；幽灵行判据用业务名称列 `asset_name`
         #    而非首列 `seq` —— 后者是 `auto_source` 序号，用它会把「只填了序号的空行」当真行留下。
         items=(StoreItemSpec(item_id="H1-8-rows", kind=StoreKind.rows),),
+        # 🔴 **本条原先缺失**（spec `h2-h6-h10-pilot-cross-reference-lanes` 收口时实测补）：
+        #    `H1 固定资产.xlsx` 全册含 IF 公式格 **496 个 —— 全 H 循环最多**
+        #    （逐 sheet：折旧测算（多次减值）181 · 折旧测算（含减值）180 · 折旧测算（不含减值）60 ·
+        #     减值测算表H1-14 25 · 审定表H1-1 24 · 运输设备权属H1-17 21 · 可收回金额H1-15 3 ·
+        #     增加检查表H1-7 1 · **受管表 减少检查表H1-8 1**），对照 H10 只有 46、H6 只有 12。
+        #    也就是说：**OO 加载崩溃风险最高的一册，恰恰是唯一连声明都没有的那条**。
+        #    中性化是 per-file（整册就地改写 substrate 副本）⇒ 点同册任一 sheet 的在线编辑
+        #    都会触发整册加载，受管表自己只有 1 格也必须挂。
+        #    函数与 G7/G2/H9…H10 共用，不新造。
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
     # ── F1 预付账款 canary（spec: f1-sync-coverage-and-first-canary）──────
     #    同 E1 架构：薄转发框架层引擎，store item 清单取 all_store_item_ids() 单一口径。
@@ -451,6 +461,13 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         adapter_id="g6.other_bond_main",
         provider_module="phase5_g6_other_bond",
         items=(StoreItemSpec(item_id="G6-5-fair-value-data", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── G5（spec: g5-nested-sections-and-template-defects · Task 8）──
+    "g5.long_term_receivable_detail": StoreMergePlan(
+        adapter_id="g5.long_term_receivable_detail",
+        provider_module="phase5_g5_long_term_receivable",
+        items=(StoreItemSpec(item_id="G5-2-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
