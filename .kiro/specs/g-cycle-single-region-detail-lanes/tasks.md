@@ -366,10 +366,50 @@ FC-1~FC-13 · F3 spec 裁决 F3-H4（行级 mask）· F5 spec（布尔/错误值
   - 证据：`evidence/task9b-c8-g8-rootfix.md`
   - _Requirements: 2.1, 3.5_
 
-- [ ] 10. G14（`rowKey` 固定行集 + 一处布尔列）
-  - `G14-detail-rows` / **`row_identity_key="rowKey"`** / 行集取 `useG14Detail.ts#L61` 的 `G14_LINE_ITEMS` /
-    R9/R10 / R11-19 / R20 `SUM(B11:B19)` / `formula_columns=("D","J","K","L")`（**L 是布尔列** `=D11=K11`）
-  - P1 / P9（L 列容错三判据）；TB 口径**本期发生额**（科目 6702）
+- [x]🔴 10（C-9）. G14（**第四条**，`rowKey` 固定行集 + 布尔列）：`phase5_g14_credit_impairment.py` + `phase5_g14_02_detail.py`
+  - 交付：`G14-detail-rows` / **`row_identity_key="rowKey"`**（`stable_template_row_key`，全 G 唯一，
+    GC-6 裁决最稳一族）/ R9-R10 两级表头（R9 横向分组两个 B9:D9·F9:K9）/ **固定 9 行** R11-R19 /
+    footer R20 逐列 `SUM(x11:x19)` 且 **L20 例外**是布尔 `=D20=K20` /
+    `formula_columns=("D","J","K","L")` / 有效列 13 = A..M
+  - 🔴 `uuid_col="N"`：G14 **无空尾列** ⇒ 有效列 13 恰等于 `max_column`，「有效列右移一列」与
+    「max_column+1」两口径**重合** —— 不构成 G10/G8（max_column 含空列）的反例，判据写明了这点
+  - 🔴 **前端固定行集原与模板不一致**（本轮实测才发现，Task 2 未登记）：前端 `G14_LINE_ITEMS` 有
+    **10 项**（自研第 10 行 `ca` 合同资产减值损失），模板只有 **9 行**；行表引擎按**数组顺序**映射
+    R11-R19，10 行会扩行、把 footer R20 挤下去。另 `rfin` 的 label 是「应收款项融资**减值**损失」，
+    模板逐字是「**坏账**损失」。⇒ GC-6「rowKey 源自模板固定行集」的前提本来就不成立
+  - 🔴 **用户拍板选项 A**（前端对齐模板 9 行；否决 B「走 `template_row_key` 固定行范式」—— 那条
+    虽更贴 GC-6 措辞且有 D4-23/D4-22 先例，但要手写 contract payload、薄转发用不上）。
+    合同资产的**五条链**全部改指模板 R19「其他」行，口径不丢、链不断：1142 试算取数 ·
+    `gCycleSourceEcl.D6`（跨循环 ECL）· `G14_ECL_CROSS_REF.other='wp:D6-1'` ·
+    `g14AdjStorage` 的 rowKey 推断 · 国企披露 `G14_SOE_BAD_DEBT_SOURCES` 删 'ca'（避免与单独成行的
+    `other` 双算）+ `g14DisclosureSyncPayload` 删 `ca` 键。
+    防回归：新增 `G14_TEMPLATE_ROW_LABELS` 与 provider 的 `TEMPLATE_ROW_LABELS_G1402` +
+    模板 A 列**三方**双向锁
+  - 🔴 **模板 `K=G+H` 是缺陷**（应 `=G-H`）：`J=F+G-H-I` 要求「本期转回」H 填**正数**，而同表
+    `K=G+H` 把转回当成**增加**损益 —— 两式对 H 的符号约定矛盾。判 K 错的三条依据：①会计口径
+    「信用减值损失 = 计提 − 转回」②J 与准则逐字一致 ③平台早已裁定转回填正数
+    （`migrateReversalToPositive`）。处置同 G8：K 每行都有公式 ⇒ 仍判 formula，`formula_templates`
+    **逐字记模板原式**（判据逐格比对，记成 =G-H 会必红），前端按正确口径算 ⇒ 有转回时 Excel 侧
+    比平台侧多 2×转回，三处如实登记；模板自带的 `L=D=K` 核对列会显示不平，用户看得见
+  - 🔴 **裁决 G1R-H4 首次落地**：`L=D=K` 求值 TRUE/FALSE ⇒ `value_type=boolean` + `mode=formula`
+    （`PROTECTED_MODES` 使其不入 store）
+  - 前端另删 4 个自研派生字段（`otherMovement` 模板 J 不含其他变动项 ⇒ 录入值会凭空消失 ·
+    `closingComputed`/`rollForwardVariance`/`rollForwardBalanced` 与模板 J 双源）；期末余额 J 由
+    录入列改**只读公式格**；删「推算期末」按钮；「写入期末」改「**按试算倒推期初**」（原按钮写 J
+    会被 enrichRow 立刻重算覆盖 = **无效按钮**）；落库只存可编辑列 B/C/F/G/H/I/M + 行身份
+  - 发布链：契约生成器 + `g14.credit_impairment_detail.json`（digest 362f0358…）+ plan（裸 IF
+    **11 格**全在 审定表G14-1）+ 交付登记行 + 零回归门 + SLICE_DELIVERED + slice 取证
+    （🔴 固定行集**无铸造点** ⇒ resync 走 `mint_pat=None` 分支回到 `createDefaultRows`；
+    踩过一次：改指 `g14Constants.ts` 会让判据 `test_row_identity_key_and_generator_are_source_backed`
+    找不到 `createDefaultRows`）
+  - 判据：`test_g14_column_isomorphism.py` **57 passed** 五层闭环；G14 前端 11 spec **92 passed**
+    （含改写的 11 条旧判据）；六 lane 判据 19→**16 failed**；vue-tsc 窄配置 15 error 全既存
+  - 顺带修：①`test_g_single_region_p9_p12` 的布尔列判据扫 `vars(entry_module)` 找 spec —— 交付形态是
+    entry+sheet 两模块 ⇒ **形态正确时假红**，改走 `managed_row_table_specs()` 公开接口；
+    ②`file_size_whitelist` 的 `delivered_contracts_ledger.py` 基线 1360→1637 并补注「本 whitelist
+    唯一『变大是设计意图』的条目」（append-only 台账）；③窄配置首次暴露的既存类型错
+    `migrateReversalToPositive(number|undefined)`
+  - commit `24f54fd18`（26 文件）；证据：`evidence/task10-c9-g14-rootfix.md`
   - _Requirements: 1.2, 3.2, 4.2_
 
 - [ ] 11. G11（单级表头 + 21 行 + 占比列引合计行）
