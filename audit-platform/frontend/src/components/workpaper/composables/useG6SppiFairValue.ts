@@ -125,7 +125,7 @@ function migrateLevel(raw: any): { unadj: FairValueLevel; audited: FairValueLeve
 
 export function migrateFairValueRow(raw: any, seq: number): FairValueItem {
   const levels = migrateLevel(raw)
-  const base = emptyRow(String(raw.id || `fv-${Date.now()}-${seq}`), seq, raw.investProject || '')
+  const base = emptyRow(String(raw.id || `fv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`), seq, raw.investProject || '')
   // 若旧数据只存了公允价值而无单价，尽量反推单价
   let unadjQty = parseNum(raw.unadjQty)
   let unadjPrice = parseNum(raw.unadjPrice)
