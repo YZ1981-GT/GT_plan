@@ -16,13 +16,13 @@
 
         <el-segmented
 
-          :model-value="dualMode.currentMode.value"
+          v-model="renderMode"
 
           :options="dualMode.modeOptions"
 
           size="small"
 
-          @change="dualMode.onModeChange"
+          :disabled="isF3SyncManagedSheet && syncBusy"
 
         />
 
@@ -30,16 +30,29 @@
 
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
 
+        <el-tag v-if="isF3SyncManagedSheet && syncBusy" size="small" type="info">同步中…</el-tag>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-f3-notes-payable" />
       </div>
 
 
 
-      <!-- OnlyOffice 模式 -->
+      <!-- 在线编辑模式：受管 sheet 走 WorkpaperSyncEditorHost（真双向），非受管走 legacy GtOnlyOfficeSheet -->
+      <!-- F3-5 canary 真双向路径（spec: f3-sync-coverage-and-first-canary） -->
+      <div
+        v-if="renderMode === 'onlyoffice' && isF3SyncManagedSheet"
+        class="oo-container"
+      >
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+      </div>
 
+      <!-- 非受管 sheet 保留 legacy GtOnlyOfficeSheet（假双向，如实登记） -->
       <GtOnlyOfficeSheet
 
-        v-if="dualMode.currentMode.value === 'onlyoffice'"
+        v-else-if="renderMode === 'onlyoffice'"
 
         :wp-id="props.wpId"
 
@@ -310,6 +323,11 @@ import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+// F3-5 canary 真双向（spec: f3-sync-coverage-and-first-canary）
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 
 
 
@@ -439,6 +457,126 @@ const currentSheet = computed(() => {
 
 
 
+// ─── F3-5 canary：useWorkpaperSyncBridge 真双向 ───────────────────────────────
+//
+// 🔴 只覆盖 F3-5「逾期应付票据检查表」（manifest entry 的受管 sheet = f35-managed）。
+// 其余 sheet 仍走 legacy GtOnlyOfficeSheet（假双向），如实登记不假装已接。
+// F3 是单册、一 entry ⇒ 所有受管 sheet 共用同一 entry_id（不随 sheet 变），
+// 具体是哪张 sheet 由 flushHtml 回传的 sheetKey 告知后端。
+const F3_SYNC_ENTRY_ID = 'xlsx/gt-f3-notes-payable'
+/** 受管 sheet 清单：wp sheet code → 契约 sheet_key（与 provider 受管清单一致）。 */
+const F3_SHEET_KEY_BY_CODE: Record<string, string> = {
+  'F3-5': 'f35-managed',
+}
+/** 当前 sheet 是否走 syncBridge 真双向路径。 */
+const isF3SyncManagedSheet = computed(() => currentSheet.value in F3_SHEET_KEY_BY_CODE)
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const syncEntryId = ref(F3_SYNC_ENTRY_ID)
+const syncSheetKey = computed(() => F3_SHEET_KEY_BY_CODE[currentSheet.value] || 'f35-managed')
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(F3_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    // 🔴 顺序不可换：先 flush 掉 2s debounce 未落库的行，再读 store projection。
+    // 否则读到的是旧快照，切到 OO 侧后会用旧值覆盖 HTML 侧刚写的编辑。
+    formData.flushPendingSave()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: F3_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: syncSheetKey.value,
+    }
+  },
+  reloadHtml: async (_minimumRevision: number) => {
+    await formData.loadAll()
+  },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncSwitching = ref(false)
+const syncBusy = computed(() =>
+  syncSwitching.value
+  || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+
+// ─── 🔴 受管 sheet 的模式切换协议（照 D3 switchRenderMode 4 分支）───────────
+//
+// dualMode.onModeChange 只翻 currentMode ref，**不走 syncBridge 的保存流程**。
+// 用户编辑后未保存直接切模式 ⇒ OO 侧编辑数据丢失（forceSave 没发、room 没关）。
+//
+// 正确做法：受管 sheet 的模式切换由 `renderMode` computed setter 拦截，走 syncBridge
+// 的 4 条精细分支（已保存 / 未改动 / 有改动可保存 / 兜底）。非受管仍走 dualMode 原路径。
+type F3RenderMode = 'html' | 'onlyoffice'
+
+const renderMode = computed({
+  get: (): F3RenderMode =>
+    isF3SyncManagedSheet.value
+      ? (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html')
+      : dualMode.currentMode.value,
+  set: (v: F3RenderMode) => {
+    if (isF3SyncManagedSheet.value) void switchRenderMode(v)
+    else void dualMode.switchMode(v)
+  },
+})
+
+/**
+ * 受管 sheet 的 4 分支保存协议（照 D3 switchRenderMode）。
+ *
+ *   html→oo：syncBridge.switchToOnlyOffice()（内部 flush + pending + materialize）
+ *   oo→html（已 applied）：syncBridge.reloadAfterApplied()
+ *   oo→html（未改动 dirty=false）：syncBridge.leaveWithoutSaving()（clean close，不发 forceSave）
+ *   oo→html（有改动 canForcesave）：syncEditorHostRef.forceSave()
+ *   兜底：syncBridge.persistMode('html')
+ *
+ * 🔴 铁律：用户已保存（点过保存按钮） ⇒ 切换丝滑（applied 分支无网络调用）；
+ *   用户未保存（dirty=true）⇒ 切换时自动 forceSave（等待 OO 确认，略慢是正常的）；
+ *   用户未编辑（dirty=false）⇒ clean close（零网络调用）。
+ */
+async function switchRenderMode(target: F3RenderMode): Promise<void> {
+  if (target === renderMode.value) return
+  if (target === 'onlyoffice') {
+    if (!isF3SyncManagedSheet.value) return
+    syncSwitching.value = true
+    try {
+      await syncBridge.switchToOnlyOffice()
+    } catch {
+      // lastError / feedback 已由桥写入；保持 html
+    } finally {
+      syncSwitching.value = false
+    }
+    return
+  }
+  // → html
+  if (syncBridge.mode.value !== 'oo') {
+    syncBridge.persistMode('html')
+    return
+  }
+  syncSwitching.value = true
+  try {
+    if (String(syncBridge.state.value) === 'applied') {
+      await syncBridge.reloadAfterApplied()
+    } else if (syncBridge.mode.value === 'oo' && !syncBridge.dirty.value) {
+      // 一个字都没改就切回结构化视图 ⇒ clean close，不发 forceSave。
+      await syncBridge.leaveWithoutSaving()
+    } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
+      // 🔴 有改动且 forceSave 可用 ⇒ 先保存再切（用户体验：切换略慢但不丢数据）。
+      await syncEditorHostRef.value.forceSave()
+    } else {
+      syncBridge.persistMode('html')
+    }
+  } catch {
+    // 保持 OO；错误在桥上
+  } finally {
+    syncSwitching.value = false
+  }
+}
+
 const showHtmlToolbar = computed(() => {
 
   const s = currentSheet.value
@@ -562,6 +700,12 @@ onBeforeUnmount(() => {
 
   padding: 12px;
 
+}
+
+/* F3-5 canary：WorkpaperSyncEditorHost 自身不带高度，容器须给足否则编辑器塌成 0 高 */
+.oo-container {
+  min-height: 600px;
+  height: calc(100vh - 200px);
 }
 
 .loading-container {

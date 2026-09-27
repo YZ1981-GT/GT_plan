@@ -4,10 +4,10 @@
     <template v-else>
       <div v-if="showHtmlToolbar" class="f4-accounts-payable-toolbar">
         <el-segmented
-          :model-value="dualMode.currentMode.value"
+          v-model="renderMode"
           :options="dualMode.modeOptions"
           size="small"
-          @change="dualMode.onModeChange"
+          :disabled="isF4SyncManagedSheet && syncBusy"
         />
         <CycleImportExportDropdown
           v-if="importExportCtx"
@@ -20,6 +20,7 @@
         />
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isF4SyncManagedSheet && syncBusy" size="small" type="info">同步中…</el-tag>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-f4-accounts-payable" />
       </div>
 
@@ -36,8 +37,22 @@
         </template>
       </el-alert>
 
+      <!-- 在线编辑模式：受管 sheet 走 WorkpaperSyncEditorHost（真双向），非受管走 legacy GtOnlyOfficeSheet -->
+      <!-- F4-6 canary 真双向路径（spec: f4-sync-coverage-and-first-canary） -->
+      <div
+        v-if="renderMode === 'onlyoffice' && isF4SyncManagedSheet"
+        class="oo-container"
+      >
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+      </div>
+
+      <!-- 非受管 sheet 保留 legacy GtOnlyOfficeSheet（假双向，如实登记） -->
       <GtOnlyOfficeSheet
-        v-if="dualMode.currentMode.value === 'onlyoffice'"
+        v-else-if="renderMode === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -185,6 +200,11 @@ import { isImportExportSheet, resolveImportExportSheet } from './shared/cycleImp
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+// F4-6 canary 真双向（spec: f4-sync-coverage-and-first-canary）
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 const F4TabAdjudication = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabAdjudication.vue'))
 const F4TabDetail = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabDetail.vue'))
 const F4TabAdjustment = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabAdjustment.vue'))
@@ -291,6 +311,91 @@ const showHtmlToolbar = computed(() => {
   return !!s && (s === 'F4A' || /^F4-\d+$/.test(s) || s.startsWith('附注'))
 })
 
+// ─── F4-6 canary：useWorkpaperSyncBridge 真双向 ───────────────────────────────
+//
+// 🔴 只覆盖 F4-6「关联方应付款项明细表」（manifest entry 的受管 sheet = f46-managed）。
+// 其余 sheet 仍走 legacy GtOnlyOfficeSheet（假双向），如实登记不假装已接。
+// F4 是单册、一 entry ⇒ 所有受管 sheet 共用同一 entry_id，具体 sheet 由 flushHtml 回传的
+// sheetKey 告知后端。
+const F4_SYNC_ENTRY_ID = 'xlsx/gt-f4-accounts-payable'
+/** 受管 sheet 清单：wp sheet code → 契约 sheet_key（与 provider 受管清单一致）。 */
+const F4_SHEET_KEY_BY_CODE: Record<string, string> = {
+  'F4-6': 'f46-managed',
+}
+/** 当前 sheet 是否走 syncBridge 真双向路径。 */
+const isF4SyncManagedSheet = computed(() => currentSheet.value in F4_SHEET_KEY_BY_CODE)
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const syncEntryId = ref(F4_SYNC_ENTRY_ID)
+const syncSheetKey = computed(() => F4_SHEET_KEY_BY_CODE[currentSheet.value] || 'f46-managed')
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: wpIdRef,
+  projectId: computed(() => props.projectId),
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(F4_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    // 🔴 顺序不可换：先 flush 掉 2s debounce 未落库的行，再读 store projection，
+    // 否则读到旧快照，切到 OO 侧会用旧值覆盖 HTML 侧刚写的编辑。
+    formData.flushPendingSave()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: F4_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: syncSheetKey.value,
+    }
+  },
+  reloadHtml: async (_minimumRevision: number) => {
+    await formData.loadAll()
+  },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncSwitching = ref(false)
+const syncBusy = computed(() =>
+  syncSwitching.value
+  || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+
+// ─── 受管 sheet 的 4 分支保存协议（照 D3 switchRenderMode）───────────────────
+type F4RenderMode = 'html' | 'onlyoffice'
+
+const renderMode = computed({
+  get: (): F4RenderMode =>
+    isF4SyncManagedSheet.value
+      ? (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html')
+      : dualMode.currentMode.value,
+  set: (v: F4RenderMode) => {
+    if (isF4SyncManagedSheet.value) void switchRenderMode(v)
+    else void dualMode.switchMode(v)
+  },
+})
+
+async function switchRenderMode(target: F4RenderMode): Promise<void> {
+  if (target === renderMode.value) return
+  if (target === 'onlyoffice') {
+    if (!isF4SyncManagedSheet.value) return
+    syncSwitching.value = true
+    try { await syncBridge.switchToOnlyOffice() } catch { /* 桥已记 lastError */ } finally { syncSwitching.value = false }
+    return
+  }
+  if (syncBridge.mode.value !== 'oo') { syncBridge.persistMode('html'); return }
+  syncSwitching.value = true
+  try {
+    if (String(syncBridge.state.value) === 'applied') {
+      await syncBridge.reloadAfterApplied()
+    } else if (syncBridge.mode.value === 'oo' && !syncBridge.dirty.value) {
+      await syncBridge.leaveWithoutSaving()
+    } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
+      await syncEditorHostRef.value.forceSave()
+    } else {
+      syncBridge.persistMode('html')
+    }
+  } catch { /* 保持 OO */ } finally { syncSwitching.value = false }
+}
+
 const dualMode = useF4DualMode({
   wpId: wpIdRef,
   sheetName: computed(() => props.sheetName || ''),
@@ -340,6 +445,8 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .f4-accounts-payable { padding: 12px; }
+/* F4-6 canary：WorkpaperSyncEditorHost 自身不带高度，容器须给足否则编辑器塌成 0 高 */
+.oo-container { min-height: 600px; height: calc(100vh - 200px); }
 .loading-container { padding: 24px; }
 .f4-accounts-payable-toolbar { margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
 </style>

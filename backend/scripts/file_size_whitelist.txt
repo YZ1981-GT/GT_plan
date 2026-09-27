@@ -952,3 +952,21 @@ backend/tests/workpaper_sync/test_g_foundation_p10_p16_g2_canary.py  892
 #     每组含「现状必红断言 + 修复后转绿检查 + 反向自检」。拆分会让 BP-5 的 5 条错名
 #     与裸 IF 的 13 册计数分属两个文件——而 BP-5 的修复（Task 5）正好在裸 IF 的上游。
 backend/tests/workpaper_sync/test_g_foundation_p4_p8_p17_p18_red_baselines.py  847
+
+#   F 循环 provider / 判据 / 工具链——结构上必须单文件的理由同上：
+#   phase5_f4_accounts_payable.py —— F4 provider（808 行），docstring + 常量声明 + 灰度开关 +
+#     build_contract_payload + 注册函数全在一个模块里（同 D3 prepaid_receipts 模式）。
+#     拆分方向：把灰度开关与 build_* 抽到 _f4_config.py。
+#   phase5_f5_cost_of_sales.py —— 同上（826 行），且 F5 受管面有 2 个 sheet（F5-8 + F5-1），
+#     日后 F5-2/3/5/7 开启会继续涨。
+#   fix_f_cycle_prefill_presets.py —— FC-11 修复工具链（962 行），含 validate + 数据迁移 +
+#     _KNOWN_CROSS_SPEC_DEBTS 登记，拆分会让校验与迁移分离。
+#   test_f3_canary_and_contract.py —— F3 全部判据（1199 行），含 canary + F3-6 + F3-7 三区
+#     27 个 test class；拆分方向按 sheet（canary / f306 / f307）分三文件。
+#   test_f5_canary_and_contract.py —— F5 全部判据（904 行），含 canary + F5-1 审定表 + TB 红线。
+#     spec: f3/f4/f5-sync-coverage-and-first-canary
+backend/app/services/workpaper_sync/phase5_f4_accounts_payable.py  808
+backend/app/services/workpaper_sync/phase5_f5_cost_of_sales.py  826
+backend/scripts/fix/fix_f_cycle_prefill_presets.py  962
+backend/tests/workpaper_sync/test_f3_canary_and_contract.py  1199
+backend/tests/workpaper_sync/test_f5_canary_and_contract.py  904

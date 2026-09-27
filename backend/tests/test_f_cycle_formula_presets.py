@@ -9,6 +9,13 @@
 
 spec: .kiro/specs/f-cycle-four-table-extraction-and-disclosure-completion/
       Requirements 5.1~5.8 / Property 8, 9
+
+🔴 FC-11（f3-sync-coverage-and-first-canary Task 17）：本文件原有 5 处
+`items_key = "items" if "items" in b else "cells"` 兼容读。运行时四个消费方
+（wp_template_init_service / preset_library / formula_reverse_index / linkage_graph_builder）
+**只读 `cells`**，兼容读会让「块的公式写在 items 里」这种死配置在守卫下也显绿。
+全库 `items` 键已清零（迁移脚本已跑），这里同步收口为只读 `cells` —— 再出现 items
+型块时本文件必红，而不是默默放行。
 """
 from __future__ import annotations
 
@@ -70,8 +77,7 @@ class TestFormulaSyntax:
     def test_all_f_cycle_formulas_have_valid_function(self, f_blocks):
         invalid = []
         for b in f_blocks:
-            items_key = "items" if "items" in b else "cells"
-            for cell in b.get(items_key, []):
+            for cell in b.get("cells") or []:
                 formula = cell.get("formula", "")
                 if not formula.startswith("="):
                     continue
@@ -103,8 +109,7 @@ class TestNoCircularReference:
             sheet = b.get("sheet", "")
             if "明细" not in sheet:
                 continue
-            items_key = "items" if "items" in b else "cells"
-            for cell in b.get(items_key, []):
+            for cell in b.get("cells") or []:
                 formula = cell.get("formula", "")
                 assert "WP(" not in formula, (
                     f"{wp_code}/{sheet}: 明细表禁 WP()（防成环）→ "
@@ -129,9 +134,8 @@ class TestSheetNameConsistency:
             sheet = b.get("sheet", "")
             if not sheet:
                 continue
-            # 只检查有 items 的块（空骨架块是遗留，不阻塞）
-            items_key = "items" if "items" in b else "cells"
-            if not b.get(items_key):
+            # 只检查有公式的块（空骨架块归各自循环 spec，不在本守卫阻塞面）
+            if not b.get("cells"):
                 continue
             assert sheet in xlsx_tabs, (
                 f"{wp_code}: 预设 sheet '{sheet}' 不在源 xlsx tab 名集合中。"
@@ -148,8 +152,7 @@ class TestNoFabricatedAux:
     def test_no_fabricated_aux_values(self, f_blocks):
         violations = []
         for b in f_blocks:
-            items_key = "items" if "items" in b else "cells"
-            for cell in b.get(items_key, []):
+            for cell in b.get("cells") or []:
                 formula = cell.get("formula", "")
                 for fab in FABRICATED_AUX_VALUES:
                     if f"'{fab}'" in formula:
@@ -173,8 +176,7 @@ class TestPLAccountNoBalance:
         for b in f_blocks:
             if b.get("wp_code") != "F5":
                 continue
-            items_key = "items" if "items" in b else "cells"
-            for cell in b.get(items_key, []):
+            for cell in b.get("cells") or []:
                 formula = cell.get("formula", "")
                 if "'期初余额'" in formula or "'期末余额'" in formula:
                     violations.append(
@@ -194,21 +196,29 @@ class TestReverseChecks:
         """F 类预设块非空（本守卫确实在检查东西）。"""
         assert len(f_blocks) >= 30, f"F 类块只有 {len(f_blocks)} 个，预期 ≥30"
 
-    def test_f345_have_items(self, f_blocks):
-        """F3/F4/F5 至少各有一个块含 items。"""
+    def test_f345_have_cells(self, f_blocks):
+        """F3/F4/F5 至少各有一个块含 `cells` 公式格。
+
+        🔴 FC-11：原判据读 `b.get("items", b.get("cells", []))` ⇒ 只有 items 的死配置
+           也算「预设已落地」。现只认 `cells`（运行时唯一被读的键）。
+        """
         for code in ("F3", "F4", "F5"):
             code_blocks = [b for b in f_blocks if b.get("wp_code") == code]
-            has_items = any(
-                len(b.get("items", b.get("cells", []))) > 0
-                for b in code_blocks
-            )
-            assert has_items, f"{code} 的所有块 items 为空，预设未落地"
+            has_cells = any(len(b.get("cells") or []) > 0 for b in code_blocks)
+            assert has_cells, f"{code} 的所有块 `cells` 为空，预设未落地（FC-11）"
 
     def test_fix_script_check_passes(self):
         """`fix_f_cycle_prefill_presets.py --check` exit 0。"""
         import subprocess
         result = subprocess.run(
             ["python", str(_BACKEND / "scripts" / "fix" / "fix_f_cycle_prefill_presets.py"), "--check"],
-            capture_output=True, text=True, cwd=str(_BACKEND.parent),
+            capture_output=True,
+            text=True,
+            # 🔴 Windows 下 text=True 默认用 gbk 解码子进程 stdout，脚本的中文输出
+            #    （含 `[KNOWN-DEBT]` 段落）会抛 UnicodeDecodeError ⇒ 断言拿不到
+            #    stdout、pytest 报 PytestUnhandledThreadExceptionWarning。显式 utf-8。
+            encoding="utf-8",
+            errors="replace",
+            cwd=str(_BACKEND.parent),
         )
         assert result.returncode == 0, f"--check 失败:\n{result.stdout}\n{result.stderr}"

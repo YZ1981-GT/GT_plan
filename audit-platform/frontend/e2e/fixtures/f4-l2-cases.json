@@ -1,0 +1,65 @@
+{
+  "description": "F4 应付账款 L2 (OO→HTML) e2e 用例集。canary 受管面只有关联方及交易检查表F4-6。",
+  "spec": "f4-sync-coverage-and-first-canary",
+  "task": "11",
+  "entry_id": "xlsx/gt-f4-accounts-payable",
+  "adapter_id": "f4.accounts_payable_detail",
+  "run_note": "必须 --workers=1：同一 wp 的 OO room 与 forcesave 是串行资源，并行会互相抢 revision。",
+  "seed_policy": {
+    "decision": "seed_required",
+    "rationale": "canary 选的 F4-6 在真库**零载荷** —— 实测全库只有 F4-2-rows(3485 B) 与 F4-7-estimated-inbound-rows(1211 B) 有数据，都不是 F4-6。空表往返会让三谓词全部成立（假绿），故必须 seed。",
+    "seed_script": "backend/scripts/e2e/seed_f345_canary_rows.py --entry f4",
+    "seed_safety": "脚本给每行打 _seed 标记；已有**非 seed** 载荷时拒绝覆盖（需 --force），purge 只删带标记的行 ⇒ 不会毁真实数据。",
+    "evidence_queried_at": "2026-09-27",
+    "evidence_sql": "SELECT length(remark), jsonb_array_length(remark::jsonb), remark::jsonb->0->>'_seed' FROM checklist_responses WHERE item_id='F4-6-rows'",
+    "evidence": {
+      "store_item_id": "F4-6-rows",
+      "remark_bytes": 381,
+      "row_count": 2,
+      "seed_tag": "f345-canary-e2e",
+      "wp_id": "e4f00fc1-de91-4f8b-89d8-a968268c250e",
+      "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+      "wp_code": "F4",
+      "wp_name": "应付账款"
+    }
+  },
+  "preconditions": {
+    "store_item_id": "F4-6-rows",
+    "min_row_count": 2,
+    "must_assert_before_skip": true,
+    "why": "先断言载荷非空，否则空表往返会把三谓词全判成 store_mirrored（什么都没验证）。载荷缺失说明 seed 没跑或跑错 wp_id。"
+  },
+  "cases": [
+    {
+      "id": "f4-6-related-party-basic",
+      "sheet_key": "f46-managed",
+      "sheet_name": "关联方及交易检查表F4-6",
+      "store_item_id": "F4-6-rows",
+      "description": "canary: 关联方及交易检查表F4-6 数据行编辑（12 字段；F 列 =C+E-D 负债类镜像，须由模板算出而非被投影覆盖）",
+      "header_row": 6,
+      "first_data_row": 7,
+      "last_data_row": 11,
+      "footer_row": 12,
+      "footer_marker": "合计",
+      "footer_carries_total_formula": true,
+      "uuid_col": "M",
+      "edit_cell": "B7",
+      "edit_value": "F4-E2E-关联方甲",
+      "expect_formula_columns": ["F"],
+      "expect_formula_mask": "F7:F11",
+      "expect_formula_template": "=C{r}+E{r}-D{r}",
+      "template_debt_note": "B8:B11 的数据验证 formula1=$N$7:$N$14 而 N 列全空（悬空引用）；仅 B7 的 DV 指向真实枚举源 $B$18:$B$25。已登记不改模板字节，e2e 不依赖 DV 下拉。",
+      "result_enum": "pending_adapter",
+      "pending_reason": "slice 五个供给位（published_representation 等）全为 null（BP-61-1 平台级欠账），manifest capability 未达 bidirectional ⇒ adapter 未注册。如实登记为 upstream_gap。"
+    }
+  ],
+  "result_enum_values": [
+    "pass",
+    "fail_confirm",
+    "fail_forcesave",
+    "fail_mirror",
+    "fail_marker",
+    "upstream_gap",
+    "pending_adapter"
+  ]
+}

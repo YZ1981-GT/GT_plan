@@ -14,6 +14,12 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
   /** 后端 render 提供的 project_context（含 tb_amount/bs_date/related_parties 等） */
   const projectContext = ref<Record<string, any>>({})
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  /**
+   * 待落库的 item（debounce 计时中、尚未 PUT）。
+   * 与 useD3FormData / useF3FormData / useF4FormData 同构：flush 时按 itemId 从
+   * `allResponses` 取**最新**值保存，而不是保存 timer 闭包里的旧快照。
+   */
+  const _pendingItems = new Set<string>()
   const itemPrefix = 'F5-'
 
   async function loadResponses() {
@@ -66,6 +72,14 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
   }
 
   async function saveImmediate(itemId: string, data: Partial<ChecklistResponse>) {
+    // 🔴 必须先撤销同 item 的 debounce 计时器：该计时器闭包捕获的是**旧** updated，
+    // 若不撤销，2s 后它会用旧值把这里刚写的新值覆盖回去（D3/F3/F4 三家同此处置）。
+    const timer = _debounceTimers.get(itemId)
+    if (timer) {
+      clearTimeout(timer)
+      _debounceTimers.delete(itemId)
+    }
+    _pendingItems.delete(itemId)
     const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
     const updated = { ...existing, ...data }
     allResponses.value.set(itemId, updated)
@@ -81,8 +95,10 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
     allResponses.value.set(itemId, updated)
     const prev = _debounceTimers.get(itemId)
     if (prev) clearTimeout(prev)
+    _pendingItems.add(itemId)
     _debounceTimers.set(itemId, setTimeout(() => {
       _debounceTimers.delete(itemId)
+      _pendingItems.delete(itemId)
       void saveImmediate(itemId, updated)
     }, 2000))
   }
@@ -110,7 +126,30 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
   // 改造后 TB 回写走显式发布门（F5TabAdjudication.publishToTb → publish-to-tb，发生额口径）。
   // 唯一消费方 GtF5CostOfSales.handleF5Writeback 已随监听器移除 ⇒ 此函数为零消费死代码。
 
-  onScopeDispose(() => { for (const t of _debounceTimers.values()) clearTimeout(t) })
+  /**
+   * flush 掉 2s debounce 未落库的编辑。
+   *
+   * 🔴 修复两处真缺陷（原实现 `onScopeDispose` 只 clearTimeout **不保存**）：
+   *   1. 卸载/切 sheet 时，debounce 窗口内的编辑被静默丢弃；
+   *   2. syncBridge 的 flushHtml 若不 flush，readStoreProjection 读到旧快照，
+   *      切到 OO 侧后会用旧值覆盖 HTML 侧刚写的编辑。
+   * 取值口径与 D3/F3/F4 一致：从 `allResponses` 取最新值，不用 timer 闭包的旧快照。
+   */
+  function _flushPending(): void {
+    for (const t of _debounceTimers.values()) clearTimeout(t)
+    _debounceTimers.clear()
+
+    if (_pendingItems.size > 0) {
+      const ids = Array.from(_pendingItems)
+      _pendingItems.clear()
+      const items = ids
+        .map((id) => allResponses.value.get(id))
+        .filter((r): r is ChecklistResponse => r != null)
+      if (items.length > 0) void saveBatch(items)
+    }
+  }
+
+  onScopeDispose(() => { _flushPending() })
 
   return {
     isLoading,
@@ -124,5 +163,7 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
     saveImmediate,
     debouncedSave,
     saveBatch,
+    // F5-8 canary：syncBridge 的 flushHtml 第一步须 flush 掉 2s debounce 未落库的编辑。
+    flushPendingSave: _flushPending,
   }
 }

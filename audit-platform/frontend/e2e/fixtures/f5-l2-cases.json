@@ -1,0 +1,93 @@
+{
+  "description": "F5 营业成本 L2 (OO→HTML) e2e 用例集。受管面两区：重大调整核查表F5-8（canary）+ 营业务成本审定表F5-1 其他业务区。",
+  "spec": "f5-sync-coverage-and-first-canary",
+  "task": "11 / 21",
+  "entry_id": "xlsx/gt-f5-cost-of-sales",
+  "adapter_id": "f5.cost_of_sales_detail",
+  "run_note": "必须 --workers=1：同一 wp 的 OO room 与 forcesave 是串行资源，并行会互相抢 revision。两个用例同属一个 wp，更要串行。",
+  "seed_policy": {
+    "decision": "seed_required",
+    "rationale": "F5 是**零载荷 entry** —— 实测全库无任何 F5-* 载荷。spec P8 明确：未 seed 时验收脚本 SHALL 显式失败，不得因空表往返判 store_mirrored。",
+    "seed_script": "backend/scripts/e2e/seed_f345_canary_rows.py --entry f5   （F5-1 用 --entry f5-1）",
+    "seed_safety": "脚本给每行打 _seed 标记；已有非 seed 载荷时拒绝覆盖（需 --force），purge 只删带标记的行。",
+    "evidence_queried_at": "2026-09-27",
+    "evidence_sql": "SELECT item_id, length(remark), jsonb_array_length(remark::jsonb), remark::jsonb->0->>'_seed' FROM checklist_responses WHERE item_id IN ('F5-8-rows','F5-1-adj-other-rows')",
+    "evidence": {
+      "wp_id": "b751f499-f005-4ffe-a939-99fd7544fe9a",
+      "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+      "wp_code": "F5",
+      "wp_name": "营业成本",
+      "items": [
+        { "store_item_id": "F5-8-rows", "remark_bytes": 236, "row_count": 1, "seed_tag": "f345-canary-e2e" },
+        { "store_item_id": "F5-1-adj-other-rows", "remark_bytes": 244, "row_count": 1, "seed_tag": "f345-canary-e2e" }
+      ]
+    }
+  },
+  "preconditions": {
+    "store_item_ids": ["F5-8-rows", "F5-1-adj-other-rows"],
+    "min_row_count": 1,
+    "must_assert_before_skip": true,
+    "why": "F5 是零载荷 entry，不 seed 就什么都验证不了。P8 要求未 seed 时显式失败而不是静默判绿。"
+  },
+  "cases": [
+    {
+      "id": "f5-8-major-adjustment-basic",
+      "sheet_key": "f58-managed",
+      "sheet_name": "重大调整核查表F5-8",
+      "store_item_id": "F5-8-rows",
+      "row_identity_key": "id",
+      "description": "canary: 重大调整核查表F5-8 数据行编辑（7 字段；数据区零公式；无 footer 合计 → 锚行处置）",
+      "header_group_row": 12,
+      "header_leaf_row": 13,
+      "first_data_row": 14,
+      "last_data_row": 29,
+      "footer_row": 30,
+      "footer_marker": "三、审计说明：",
+      "footer_carries_total_formula": false,
+      "footer_marker_note": "🔴 逐字带**全角冒号**。spec Task 8 写的「三、审计说明」漏了冒号，assert_footer_anchor_stable 是逐字匹配，用 spec 的值会定位失败。",
+      "uuid_col": "I",
+      "uuid_col_note": "超出模板 max_column(H) ⇒ instrumentation 需扩列；扩列后 print_area / page_setup 须与基线一致（需求 2.5 / Property 6）。",
+      "edit_cell": "C14",
+      "edit_value": "F5-E2E-重大调整事项",
+      "expect_formula_columns": [],
+      "expect_formula_mask_empty": true,
+      "result_enum": "pending_adapter",
+      "pending_reason": "slice 五个供给位（published_representation 等）全为 null（BP-61-1 平台级欠账）⇒ adapter 未注册。如实登记为 upstream_gap。"
+    },
+    {
+      "id": "f5-1-adjudication-other-zone",
+      "sheet_key": "f51-managed",
+      "sheet_name": "营业务成本审定表F5-1",
+      "store_item_id": "F5-1-adj-other-rows",
+      "row_identity_key": "rowKey",
+      "description": "审定表F5-1 其他业务成本区数据行编辑（8 字段；E/I 由模板算；🔴 行身份是 rowKey 不是 id）",
+      "header_group_row": 5,
+      "header_leaf_row": 6,
+      "first_data_row": 20,
+      "last_data_row": 25,
+      "footer_row": 26,
+      "footer_marker": "小计",
+      "footer_carries_total_formula": true,
+      "uuid_col": "K",
+      "uuid_col_note": "🔴 取 K 不是 J：spec design 记「J~N 全空」有误，J 有 2 格非空（J5:J6 合并的索引表头 + J3 页眉公式）。K 在 max_column(N) 内 ⇒ 无需扩列。",
+      "anchor_note": "区② 自己没有列表头行（R19 只有 A 列文字「其他业务成本」），复用表级两级表头 ⇒ anchor=A5，与受管数据区之间隔着主营区 R8-R17 与小计 R18（D3-4 双区先例允许此跨度）。",
+      "edit_cell": "A20",
+      "edit_value": "F5-E2E-其他业务成本项",
+      "expect_formula_columns": ["E", "I"],
+      "expect_formula_templates": { "E": "=B{r}+C{r}+D{r}", "I": "=F{r}+G{r}+H{r}" },
+      "unmanaged_zone_note": "🔴 主营区 R8-R17 **不可受管**：A~I 九列全是引用 F5-2 的模板公式（含 A 列项目名），零可编辑格 ⇒ 不进受管清单，e2e 不得往该区写值。",
+      "tb_red_line": "P20：本用例全程对 trial_balance 的写次数必须为 0；审定数入 TB 只能走 publish-to-tb 显式发布门（科目 6401、发生额口径）。",
+      "result_enum": "pending_adapter",
+      "pending_reason": "同上（BP-61-1）。"
+    }
+  ],
+  "result_enum_values": [
+    "pass",
+    "fail_confirm",
+    "fail_forcesave",
+    "fail_mirror",
+    "fail_marker",
+    "upstream_gap",
+    "pending_adapter"
+  ]
+}

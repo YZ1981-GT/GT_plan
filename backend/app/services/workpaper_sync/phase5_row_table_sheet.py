@@ -164,6 +164,22 @@ class RowTableSheetSpec:
     #: （那会改变 `managed_field_specs()` 的输出顺序，破坏零回归门）。
     ghost_row_anchor_index: int = 0
 
+    #: 🔴 **同一 store 键的行按字段值分到多个受管区**（spec `g-cycle-single-region-detail-lanes`
+    #: Task 8 / C-5）。为空 ⇒ 不过滤，既有 provider 行为**逐字不变**。
+    #:
+    #: 为什么需要它：G 循环的多区表（G9/G1 三区、G3 两区）在**同一张 sheet** 上有多个受管区
+    #: （区之间夹着小计行），而前端把三区的行存在**同一个 store 键**里、用一个业务字段
+    #: （如 G9 的 `section`）标记行属哪个区。平台既有的多区范式（`phase5_d3_04_analysis`
+    #: 双区）是「一区一个 `store_item_id`」—— 那要求前端拆键，而 G9 的 `G9-detail-rows`
+    #: 已有真库载荷、被 8 个跨表消费方读取、且是 BP-10 登记的键，拆键的波及面远大于
+    #: 在引擎里加一层显式过滤。
+    #:
+    #: 语义：`iter_store_rows` 只 yield `row[row_section_field] == row_section_value` 的行；
+    #: `merge_projection_into_store_rows` 给**新增行**补上该字段值（否则 OO 侧在区②插的行
+    #: 回到前端会落进默认区）。两处必须成对，缺一就会出现「读得出但写不回」或「写回落错区」。
+    row_section_field: str = ""
+    row_section_value: str = ""
+
     @property
     def formula_mask(self) -> tuple[str, ...]:
         """七家实测形态：全为列向区间 `{COL}{FIRST}:{COL}{LAST}`。取代 provider 侧手写 mask 字面量。
@@ -297,16 +313,25 @@ def spec_to_contract_sheet_payload(spec: RowTableSheetSpec) -> dict:
             "json_pointer": f"/rows/*/{spec.row_identity_key}",
         } if spec.row_identity_key else None,
         "delete_policy": "tombstone",
-        "footer_anchor": {
-            "marker": spec.footer_marker,
-            "search_column": "A",
-            "carries_total_formula": spec.footer_carries_total_formula,
-        },
         "formula_mask": list(spec.formula_mask),
         "fields": fields,
     }
+    # footer_anchor 只在有 marker 时声明（A 列无标记的 footer 行不声明，
+    # assert_footer_anchor_stable 对不含 footer_anchor 的 table 跳过校验）。
+    if spec.footer_marker:
+        table_payload["footer_anchor"] = {
+            "marker": spec.footer_marker,
+            "search_column": "A",
+            "carries_total_formula": spec.footer_carries_total_formula,
+        }
     if table_payload["row_identity"] is None:
         del table_payload["row_identity"]
+    # 🔴 同 sheet 双区配对键：`_table_for`（projection_first_publication）在同一
+    # sheet_key 下有多个 table 时，用 `uuid_col` 把 spec 与 table 一一配对。缺它
+    # → 匹配 0 张 → ProviderCapabilityError。D4 的手写 table 有此字段，自动派生
+    # 必须同样产出（不为空时）。
+    if spec.uuid_col:
+        table_payload["uuid_col"] = spec.uuid_col
 
     return {
         "sheet_key": spec.sheet_key,
@@ -320,33 +345,53 @@ def resolve_json_path(row: Mapping[str, object], json_path: str) -> object | Non
     """按 `agingPrior/within1` 这类路径取值；缺失返回 None（不猜、不造）。
 
     收敛 D2/D3/D7 三家的 `_resolve_json_path` 复制。flat 键（无 `/`）走单段，等价于直取。
+
+    🔴 **委托给 `json_path` 模块**（spec: f5-sync-coverage-and-first-canary · Task 0 补-1）：
+
+    本函数原是**第二份** json_path 实现，且只认 `Mapping` ⇒ `row["months"]` 是 list 时
+    直接返回 None，F5-2 的 `months/0`…`months/11` 十二个月度列投影恒空。
+    而 `app.services.workpaper_sync.json_path` 早已是数组感知的实现，其 docstring 明写
+    「**本模块是唯一允许的数组段实现真源**」，并已为 `months` 定了
+    `FIXED_ARRAY_LENGTHS = {"months": 12}` 的长度硬约束（D4 月度矩阵在用）。
+
+    ⇒ 不再自己实现，改为薄委托。**既有语义逐字保留**：真源在缺段/类型不符时 fail closed
+    抛错，而本函数的七家调用方依赖「字段缺失就是 None」（store 行常有用户没填的可选字段），
+    故这两类错误在此转为 None；数组越界 / 数组长度不符**不吞**（那是载荷真损坏，
+    正是该 fail closed 的场景，与 D4 既有判据一致）。
+
+    🔴 F5 spec 裁决 F5-H5 写的「引擎 `resolve_json_path` 支持，D4-2 / D3 账龄组同机制」
+       半对：D3/D7 账龄组是 nested **dict**（与数组无关），但 D4-2 月度矩阵确实走
+       `json_path` 模块的数组段 —— 真正的问题是框架层有两份实现、只有一份支持数组。
     """
-    cursor: object = row
-    for segment in json_path.split("/"):
-        if not isinstance(cursor, Mapping):
-            return None
-        cursor = cursor.get(segment)
-    return cursor
+    from app.services.workpaper_sync.json_path import (
+        JsonPathMissingSegmentError,
+        JsonPathTypeMismatchError,
+        resolve_json_path as _shared_resolve,
+    )
+
+    try:
+        return _shared_resolve(row, json_path)
+    except (JsonPathMissingSegmentError, JsonPathTypeMismatchError):
+        return None
 
 
 def set_json_path(row: dict, json_path: str, value: object) -> bool:
     """按 `agingPrior/within1` 写值，逐级建 dict；返回是否真的改了值。
 
     收敛四家的 `_set_json_path` 复制。flat 键（无 `/`）走单段顶层写。
+
+    🔴 **委托给 `json_path` 模块**（同 `resolve_json_path`）。本函数原实现的
+    `if not isinstance(nxt, dict): nxt = {}; cursor[seg] = nxt` 会把 `row["months"]`
+    （12 元素数组）**整个替换成 `{}`** ⇒ OO 回写一格就丢掉全部 12 个月的数据。
+
+    真源对 dict 路径的行为与原实现逐字等价（缺键或非 dict 就建 dict、写同值返 False），
+    额外多三条 fail-closed：①下一段是数组下标时当前段必须已是 list（不得改建成 dict）
+    ②数组下标越界抛 ③`months` 长度不等于 12 抛。写路径**不吞任何异常** —— 写入失败必须
+    可见，静默跳过等于用户在 OO 里的改动凭空消失。
     """
-    parts = json_path.split("/")
-    cursor: dict = row
-    for seg in parts[:-1]:
-        nxt = cursor.get(seg)
-        if not isinstance(nxt, dict):
-            nxt = {}
-            cursor[seg] = nxt
-        cursor = nxt
-    leaf = parts[-1]
-    if cursor.get(leaf) != value:
-        cursor[leaf] = value
-        return True
-    return False
+    from app.services.workpaper_sync.json_path import set_json_path as _shared_set
+
+    return _shared_set(row, json_path, value)
 
 
 def store_row_identity(
@@ -399,6 +444,12 @@ def iter_store_rows(spec: RowTableSheetSpec, payload):
             raise RowTableStorePayloadError(
                 f"{spec.store_item_id} 第 {ordinal} 项不是对象，实得 {type(row).__name__}"
             )
+        # 🔴 多区分段过滤（`row_section_field` 见字段注释）。放在 identity 校验**之前**：
+        #    不属本区的行不参与本区的重复身份判定 —— 否则三段读同一个数组时，
+        #    每段都会把另外两段的行算进 `seen`，第二段起必然误报「重复行身份」。
+        if spec.row_section_field:
+            if str(row.get(spec.row_section_field) or "") != spec.row_section_value:
+                continue
         identity = store_row_identity(spec, row, ordinal=ordinal)
         if identity in seen:
             raise RowTableStorePayloadError(
@@ -609,6 +660,12 @@ def merge_projection_into_store_rows(
         order.append(rid)
 
     pre_existing_ids = set(by_id)
+    # 🔴 多区分段：新增行必须带上区归属，否则 OO 侧在区②/区③ 插的行回到前端会落进默认区
+    #    （与 `iter_store_rows` 的过滤成对，缺一就「写回落错区」）。
+    #    注意 `base_rows` 传的是**整个** store 数组（含其它区的行）—— 本函数按 identity 索引，
+    #    不属本区的行既不在 projection 里、也不会被 touched，故原样保留。
+    section_field = spec.row_section_field
+    section_value = spec.row_section_value
     applied = 0
     visited = 0
     touched_rows: set[str] = set()
@@ -622,6 +679,8 @@ def merge_projection_into_store_rows(
         target = by_id.get(str(rid))
         if target is None:
             target = {identity_key: str(rid)}
+            if section_field:
+                target[section_field] = section_value
             by_id[str(rid)] = target
             order.append(str(rid))
         field_id = str(key).rsplit("/", 1)[-1]

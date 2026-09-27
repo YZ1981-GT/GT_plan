@@ -1,0 +1,65 @@
+{
+  "description": "F3 应付票据 L2 (OO→HTML) e2e 用例集。canary 受管面只有逾期票据检查F3-5。",
+  "spec": "f3-sync-coverage-and-first-canary",
+  "task": "12",
+  "entry_id": "xlsx/gt-f3-notes-payable",
+  "adapter_id": "f3.notes_payable_detail",
+  "run_note": "必须 --workers=1：同一 wp 的 OO room 与 forcesave 是串行资源，并行会互相抢 revision。",
+  "seed_policy": {
+    "decision": "no_seed",
+    "rationale": "真库 F3-5-rows 已有 2 行**真实行身份**（675 B）。seed 会覆盖真实行 id，而行身份是 roundtrip 的锚 —— 换 id 等于把 A 行的值并进 B 行。",
+    "honest_limitation": "这 2 行是**空白业务行**：仅 rowId/seq/attSlot 有值，金额等业务字段为空。故 roundtrip 验证的是「行身份与结构」而非「有意义数值的往返」。spec F3-H1 原写「可做真数据往返」已据此修正。",
+    "seed_script": "backend/scripts/e2e/seed_f345_canary_rows.py --entry f3 --fill-blank-values（默认拒绝执行：脚本两道安全线会挡住覆盖真实载荷）",
+    "evidence_queried_at": "2026-09-27",
+    "evidence_sql": "SELECT length(remark), jsonb_array_length(remark::jsonb) FROM checklist_responses WHERE item_id='F3-5-rows'",
+    "evidence": {
+      "store_item_id": "F3-5-rows",
+      "remark_bytes": 675,
+      "row_count": 2,
+      "seed_tag": null,
+      "wp_id": "5424b674-ce48-44d2-917e-2bd763fe827f",
+      "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+      "wp_code": "F3",
+      "wp_name": "应付票据"
+    }
+  },
+  "preconditions": {
+    "store_item_id": "F3-5-rows",
+    "min_row_count": 2,
+    "must_assert_before_skip": true,
+    "why": "不先断言「参与 roundtrip 的行数 > 0 且来自真库」，一张空表往返也会被三谓词判成 store_mirrored —— 出去 0 行、回来 0 行、镜像一致，全部成立而什么都没验证。"
+  },
+  "cases": [
+    {
+      "id": "f3-5-overdue-basic",
+      "sheet_key": "f35-managed",
+      "sheet_name": "逾期票据检查F3-5",
+      "store_item_id": "F3-5-rows",
+      "description": "canary: 逾期票据检查F3-5 数据行编辑（14 字段，数据区零公式）",
+      "header_group_row": 5,
+      "header_leaf_row": 6,
+      "first_data_row": 7,
+      "last_data_row": 21,
+      "footer_row": 22,
+      "footer_marker": "合计",
+      "footer_carries_total_formula": true,
+      "uuid_col": "P",
+      "edit_cell": "C7",
+      "edit_value": "F3-E2E-出票人甲",
+      "expect_formula_columns": [],
+      "expect_formula_mask_empty": true,
+      "fc10_note": "FC-10 只命中 I 列（比率语义 + 百分比格式 + 前端存 % 数值三条同时成立）；C/D/E 是「文本列套错 0.00% 格式」的模板治理债，不属 FC-10。",
+      "result_enum": "pending_adapter",
+      "pending_reason": "slice 五个供给位（published_representation 等）全为 null（BP-61-1 平台级欠账），manifest capability 未达 bidirectional ⇒ adapter 未注册，真栈三谓词跑不了。如实登记为 upstream_gap，不改 overlay 伪造。"
+    }
+  ],
+  "result_enum_values": [
+    "pass",
+    "fail_confirm",
+    "fail_forcesave",
+    "fail_mirror",
+    "fail_marker",
+    "upstream_gap",
+    "pending_adapter"
+  ]
+}
