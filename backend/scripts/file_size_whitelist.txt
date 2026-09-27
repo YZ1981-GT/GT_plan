@@ -205,7 +205,6 @@ backend/app/routers/wp_sync_router.py  3102
 #     `excel_structure_parsers.py`，属独立任务。
 backend/app/services/excel_structure_fingerprint.py  993
 backend/app/services/word_sdt_fingerprint.py  874
-backend/app/services/workpaper_sync/adapters/registry.py  1830
 backend/app/services/workpaper_sync/artifacts.py  1493
 backend/app/services/workpaper_sync/callback_delivery.py  1837
 backend/app/services/workpaper_sync/close_intent.py  1008
@@ -940,7 +939,7 @@ backend/app/services/disclosure_engine.py  2654
 #
 #   registry.py —— 本 lane 在 DELIVERED_PER_ENTRY_CONTRACTS 追加 G2 一条 + _ALLOWED_PROVIDER_MODULES
 #     追加模块路径。基线 1830→1938（+108，含既有并发修改，本 lane 净增约 +20）。更新基线。
-backend/app/services/workpaper_sync/adapters/registry.py  1938
+backend/app/services/workpaper_sync/adapters/registry.py  2221
 #
 #   test_g_foundation_p10_p16_g2_canary.py —— G2 canary 判据：几何 / payload / 键收敛 /
 #     TB 红线（含变异 + 宿主侧）/ P15 真栈前置（8 条）/ P19 引擎层往返（4 条）。

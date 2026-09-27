@@ -1611,6 +1611,64 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "（umbrella BP-61-1 = G slice 的 BP-1~BP-3），供给就绪后真栈注册。"
         ),
     },
+    # ── G10（spec: g-cycle-single-region-detail-lanes · Task 9 / C-7）─────────
+    {
+        "contract_id": "g10.trading_liabilities_detail",
+        "provider_module": (
+            "app.services.workpaper_sync.phase5_g10_trading_liabilities"
+        ),
+        "delivered_by_task": "G1R-Task9",
+        "pilot_class": "phase5_trading_financial_liabilities",
+        "entry_id": "xlsx/gt-g10-trading-financial-liabilities",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "G/G10 交易性金融负债.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "spec `g-cycle-single-region-detail-lanes` 九条中的**第二条**。范式照 G2/G9 的 "
+            "`phase5_*`；与首条 G9 的结构差别只在受管区数量 —— G10 是**单区** ⇒ 三个 store "
+            "门面各自 ≤3 行薄转发框架层引擎，不需要 G9 那样的「遍历三段」伴生模块。"
+            "权威模板 G/G10 交易性金融负债.xlsx（sha256 3afd5131…，99,458 B，12 sheets）；"
+            "受管 sheet = 明细表G10-2（**两级**表头 R9 组 / R10 叶子 / 单区 R11-R20 / "
+            "footer R21 逐列 =SUM(x11:x20) 且 **O21 例外**为 =M21+N21 / 6 个公式列 "
+            "E·G·K·L·M·O 共 60 格 / 0 个 definedName）。"
+            "🔴 **UUID 列取 T 不是 max_column+1**：`max_column=24` 含空列，有效内容列只有 "
+            "**19**（A..S，T..X 全空）⇒ 判据 GC-3 的口径是「有效列右移一列」。"
+            "🔴 **前端根治在先**（用户拍板选项 C）：`useG10Detail.ts` 原 35 列里 16 列与权威"
+            "模板不符 —— OCI/减值四列属 FVOCI 口径（CAS22 下 FVTPL 不确认 OCI 与减值）、"
+            "`fairValueLevel`/`valuationMethod` 属 G10-5/G10-6 两张表、`isDerivative` 属 "
+            "G10-8、另自研 `currentDecrease`/`closingBalance` 两列与模板口径冲突。已按模板"
+            "列序 A..S 重写为 19 字段模型。"
+            "🔴 **负债侧三处会计口径差异（不是 G9 的镜像）**：① `F`/`G`（期初调整/审定）与 "
+            "`N`/`O`（期末）在 R9 **无合并区** —— 负债侧调整与审定**都不拆分量**，资产侧 G9 "
+            "是拆的（M/N 两列调整 → P/Q 两列审定）；② `L=D+I+J` **含利息 J** —— 交易性金融"
+            "负债的利息计入财务费用**同时增加负债账面价值**，改造前前端算 D+I（漏 J）致审定数"
+            "系统性偏小；③ 本期变动是**净额列**（表头逐字「增加\"+\"/减少\"—\"」）⇒ 模板没有"
+            "「本期减少」列，改造前的自研 `currentDecrease` 与走审定线的 `closingBalance`"
+            "（=期初审定+变动−减少）两个字段都与模板不符，已移除。`K=C+H` 走未审线（同 G9 的 P=C+M）。"
+            "🔴 顺带停用两处方向错的回写：`pushG10FvToDetail`（公允价值层次应落 G10-5）与 "
+            "`pushG10DerivativeCheckToDetail`（衍生工具核查应落 G10-8）—— 保签名恒返 0 不写 "
+            "store，避免打断 4 个调用方；`sumG10DetailLevel3Closing` 与 "
+            "`useG10L3Reconciliation` 的 Level3 名单改由 **G10-5** 定，"
+            "`isG10DerivativeDetailRow` 只按 B 列项目名称判。"
+            "🔴 **GC-2**：G10 册裸 IF **28 格**（全在 审定表G10-1，受管表 明细表G10-2 零命中）"
+            "⇒ 仍按 per-file 保守策略挂中性化（点同册任一 sheet 的在线编辑都会触发整册加载）。"
+            "🔴 **FD-1**：HTML store = checklist_responses.item_id='G10-detail-rows'，"
+            "payload 落 **remark**（真库实证 remark **2 B 即空数组** / conclusion 0 B）⇒ "
+            "与 G9 的 605 B 不同，本条**没有**真实行数据可对，roundtrip 判据一律用合成行。"
+            "🔴 该键是 **BP-10 第二严重**的重复声明（6 处 `const … = 'G10-detail-rows'`，"
+            "仅次于 G1-2-rows 的 8 处）—— 收敛到 per-cycle storage contract 是未清欠账，"
+            "本条只在 provider 侧立单一口径（`all_store_item_ids()`）。"
+            "wp_code 裁决：manifest 幻影码 ['G10T']（matcher 域），真码 **G10**（载荷所在，"
+            "逐字见 workpaper_sync_entry_wp_code_adjudication.json 该节点，其 contract_id "
+            "就是本 provider 的 ADAPTER_ID）。"
+            "FC-9 红线：G10 已接显式发布门（useG10Adjudication.publishToTb），"
+            "本 provider 对 trial_balance 写次数为 0；审定表 审定表G10-1 归后置 spec "
+            "`g-cycle-adjudication-sheets-coverage`（GF-H5）。"
+            "`adapter_registered=False`：与 D1/D3/D5/D6/D7/E1/F1~F5/G2/G9 卡在同一平台级缺口"
+            "（umbrella BP-61-1 = G slice 的 BP-1~BP-3），供给就绪后真栈注册。"
+        ),
+    },
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     {
         "contract_id": "h9.lease_liability_detail",
@@ -1671,6 +1729,111 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "（BP-1~BP-3：instrumentation candidate / 人工审核契约 / approved bundle 三缺），"
             "供给就绪后真栈注册。🔴 capability 从 single_onlyoffice → bidirectional 只能由 "
             "`register_from_manifest()` 在注册成功后驱动，**禁止手改 manifest 文件**（HC-1）。"
+        ),
+    },
+    # ── H6 发布链首例（spec: h2-h6-h10-pilot-cross-reference-lanes）──
+    {
+        "contract_id": "h6.asset_disposal_clearing_detail",
+        "provider_module": (
+            "app.services.workpaper_sync.phase5_h6_asset_disposal_clearing"
+        ),
+        "delivered_by_task": "H6-publish-chain-first",
+        "pilot_class": "phase5_asset_disposal_clearing_detail",
+        "entry_id": "xlsx/gt-h6-asset-disposal-clearing",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "H/H6 固定资产清理.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "H 循环**第二条** entry，也是**发布链首例**：H6 的审定数经 "
+            "`H6TabAdjudication → useH6Adjudication.publishToTb` 走显式发布门"
+            "（POST audit-determination/publish-to-tb，科目 1606，中文二次确认）；"
+            "H8/H9 两条 `publishToTb` 全链路 0 处 ⇒ canary 覆盖不到发布链，由本条补上。"
+            "🔴 但 sync 路径对 trial_balance 的写次数仍为 **0** —— 发布是用户显式动作，"
+            "不是回写副作用；把 materialize/merge 接到 TB 上会绕过二次确认，"
+            "违反 tb-writeback-explicit-publish-gate 铁律。"
+            "🔴 **与 canary H9 的三处实质差异（照抄会静默出错）**："
+            "① `H6A` **不是幻影码** —— 它同时是真实程序表码（册内 sheet "
+            "`固定资产清理实质性程序表H6A`），解析到自己的册 ⇒ "
+            "`phantom_code_resolves_to_own_workbook=True`；照 G2 的「幻影码不得命中任何模板」"
+            "会让本 provider 注册时直接抛。"
+            "② 审定期末公式是**资产口径** `L=I+J-K`（H9 是负债口径 `L=I-J+K`）—— "
+            "直接复制 H9 的模板会让 H6 审定期末反号。"
+            "③ payload 列是 `dual_write_remark_and_conclusion`（H9 是 `remark_only`）。"
+            "🔴 **公式列部分落库**：E/I/L 的 json_key 落库、**J/K 不落库**"
+            "（前端 load 时 `applyH62BalanceFormulas` 重算）⇒ 回写比对不得按 H9 的"
+            "「公式列一律不落库」推演，否则把「store 里本来就没有」误报成「回写丢字段」。"
+            "🔴 **HC-6 派生合计 6 键**（H6-2-subtotal-gain-loss / -net-book-value / "
+            "-begin-unadjusted / -end-unadjusted / -begin-audited / -end-audited）"
+            "与主表同批写出，不参与 roundtrip 比对。"
+            "🔴 **HC-8 键名冻结**：`H6-2-rows` 被 h10RelatedH6Pull.ts / "
+            "h1SoeClearingH6Pull.ts / h6DisclosureModel.ts 三处跨 entry 消费 ⇒ 本轮只补契约不改键名。"
+            "🔴 **真库零载荷**：`H6-2-rows` 在 checklist_responses 无行 ⇒ roundtrip 真实证"
+            "需造数据，这正是 canary 选 H9 而非 H6 的原因（如实登记，不粉饰）。"
+            "模板 16 列**全部**有 store 字段 ⇒ `template_only_columns` 为空（与 H9 的 U/V 不同）；"
+            "反向 20 个 HTML 字段模板无列（含 accDepreciation/tax/netGainLoss/h1Reference/"
+            "h10Reference 五个兼容别名 + 派生列 endAdjustment）。"
+            "`adapter_registered=False` 同 canary：BP-1~BP-3 属平台缺口，不手改 manifest。"
+        ),
+    },
+    # ── I6 canary（spec: i-cycle-sync-foundation-and-first-canary · Task 22）──
+    {
+        "contract_id": "i6.research_development_expense_detail",
+        "provider_module": (
+            "app.services.workpaper_sync.phase5_i6_research_development_expense"
+        ),
+        "delivered_by_task": "I6-canary",
+        "pilot_class": "phase5_research_development_expense_detail",
+        "entry_id": "xlsx/gt-i6-research-development-expense",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "I/I6 研发费用.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "I 循环**首条** entry（spec i-cycle-sync-foundation-and-first-canary，canary = I6）。"
+            "I 循环起点：6 条独立 entry 零 provider / 零契约 / 零 representation、**无 pilot**"
+            "（四个 pilot 是 B60/D2/H1/G7，逐文件读 review.entry_id 无一条属 I）。"
+            "canary 选型硬依据：**真库有非空主表载荷** —— 现算 checklist_responses 的 remark，"
+            "I 前缀只 7 个 item_id 有行，6 条主表键里只有 2 条非空"
+            "（I5-2-rows 745 B 但 rowId 是 E2E 种子 e2e-i52-contract ⇒ 成色不如 I6 · "
+            "**I6-2-detail-rows 194 B / 2 行**），I1/I2/I3/I4 主表键 + I6-2-rows(legacy) 全零；"
+            "几何最简（**单级**表头 R8 全 I 最浅 · 数据 R9-18 十行 · 84 公式 · "
+            "裸 IF 45 格全 I 最少 · definedName 0 · merged 仅 2）；"
+            "🔴 **与 H10-2 / D4-2 高度同构**（12 月度列 B-M + 年度合计 N=SUM(B:M)）⇒ "
+            "months/0..months/11 数组路径复用 D4-2 已验通范式，json_path 是唯一数组段真源。"
+            "受管 sheet = `明细表I6-2`，公式列 N·Q·R·W（🔴 R 的分母是 footer 绝对引用 $Q$19，"
+            "抄成相对引用会让每行占比指向错误分母行）；UUID 列 AA = 有效内容列 26 + 1"
+            "（🔴 **不得放 66** —— max_column 是 65，有效与 max 之间 39 列全空，放 66 会让 "
+            "OO 打开后列宽错位）。"
+            "🔴 **双 footer**：R19 合计（B..Y 各 =SUM(x9:x18)）+ R20「各月比例」"
+            "（B..N 各 =IF($N$19=0,0,x19/$N$19)）。R20 是 R19 的**派生**不是第二个合计锚点 ⇒ "
+            "引擎 footer_row 只取 R19，契约 review.footer_rows=[19,20] 是**事实声明**"
+            "（供 roundtrip 判据知道 R20 不是业务行），两者不得混用。"
+            "🔴 **身份 backfill 是 canary 第一道前置**：真库那 2 行原本既无 id 也无 rowId，"
+            "useI6Detail.ts#L303 的 raw.id ?? raw.rowId ?? `row-${Date.now()}` 兜底会每次读都"
+            "生成新 id、roundtrip 恒判「全删全增」⇒ 已一次性 backfill 为 "
+            "i6-detail-bf01-zhptyd / i6-detail-bf02-xplcsy。"
+            "🔴 **键名冻结**（IC-17）：I6-2-detail-rows 有 5 个跨 entry 消费方，其中 "
+            "h1DepAllocCounterpartPull.ts 属 **H1 pilot**（adapter 已注册、golden 已锁）⇒ "
+            "本条任何改动完成后回归 H1 契约 golden digest，且**不得修改 H1 的契约/adapter/golden**。"
+            "另有 legacy alias I6-2-rows（LEGACY_STORAGE_KEY 真存在）⇒ 契约声明"
+            "「读认两键、写只写主键」，删它历史数据读不出。"
+            "🔴 **BP-5②禁接**：useI6FormData.ts（448 行）含完整 checklist GET/PUT + "
+            "trial-balance/writeback 管道，但 import 生产/测试消费**双零**（按 import 路径字面量"
+            "三形态现算，禁符号名 grep）⇒ 契约 forbidden_carriers 显式禁接。接到它上面会让宿主"
+            "行为一点不变而守卫因「文件确实被改了」全绿 = **假绿第①源**。"
+            "🔴 **范式裁决**：走 `phase5_*`；七段公共流程**直接复用** phase5_h_cycle_common"
+            "（实测零 H 硬编码，类名带 H 只是历史命名）⇒ I 不再造第二份骨架。"
+            "唯一复用 pilot 的是 `oo_crash_neutralization_fn`（IC-9，per-file 挂，本册 45 格；"
+            "整册统一挂不行 —— I1 的 321 与 I6 的 45 差 7 倍）。"
+            "🔴 **GC-9 在 I 反向**：I 循环 **6/6 全有 TB 发布门**（与 H 的 H8/H9 完全无门相反）⇒ "
+            "canary 直接覆盖发布链，不外移首例。I6 的门在 useI6Adjudication.ts（publishToTb ×3）"
+            "+ i6/core/I6TabAdjudication.vue（×2），只走 POST "
+            "/api/workpapers/{wpId}/audit-determination/publish-to-tb + 二次确认。"
+            "`adapter_registered=False`：与 D1/D3/D5/D6/D7/E1/F1~F5/G2/H9 卡在同一平台级缺口"
+            "（BP-1~BP-3：instrumentation candidate / 人工审核契约 / approved bundle 三缺），"
+            "供给就绪后真栈注册。🔴 capability 从 single_onlyoffice → bidirectional 只能由 "
+            "`register_from_manifest()` 在注册成功后驱动，**禁止手改 manifest 文件**（IC-1）。"
         ),
     },
 )

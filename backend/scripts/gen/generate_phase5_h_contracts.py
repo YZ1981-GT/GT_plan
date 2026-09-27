@@ -39,6 +39,7 @@ from app.services.workpaper_sync.definitions import canonical_digest  # noqa: E4
 #: `(标签, provider 模块名)` —— 新增 entry 只加一行。
 _PROVIDERS: tuple[tuple[str, str], ...] = (
     ("h9", "phase5_h9_lease_liabilities"),
+    ("h6", "phase5_h6_asset_disposal_clearing"),
 )
 
 

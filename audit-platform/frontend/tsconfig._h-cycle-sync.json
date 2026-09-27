@@ -11,6 +11,7 @@
     "src/components/workpaper/sync/hManagedSheets.ts",
     "src/components/workpaper/sync/onlyOfficeHealth.ts",
     "src/components/workpaper/GtH9LeaseLiabilities.vue",
+    "src/components/workpaper/GtH6AssetDisposalClearing.vue",
     "src/components/workpaper/composables/hSeedRowIdentity.ts",
     "src/components/workpaper/composables/h4DetailPrefill.ts",
     "src/components/workpaper/composables/h8DisclosureSyncPayload.ts",

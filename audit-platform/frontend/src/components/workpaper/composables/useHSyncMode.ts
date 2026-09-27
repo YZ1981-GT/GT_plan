@@ -155,11 +155,24 @@ export function useHSyncMode(options: UseHSyncModeOptions) {
   }
 
   /**
+   * 非受管 sheet 的模式（**不建桥**，只是本地切到 legacy 只读 OO 视图）。
+   *
+   * 🔴 为什么必须保留这条路：一册 8~9 个 sheet 里当前只有 1 张进受管面，其余（审定表 /
+   *    程序表 / 调整分录汇总 / 附注）用户原本就能切到 `GtOnlyOfficeSheet` 看 Excel 原貌。
+   *    若 `modeOptions` 对非受管 sheet 直接禁用「在线编辑」，那些 sheet 的 OO 视图就**被
+   *    接桥改动顺手拿掉了** —— 那是行为回归，不是收敛。受管面只决定「走桥还是走 legacy」，
+   *    不决定「能不能看 Excel」。
+   */
+  const legacyMode = ref<HRenderMode>('html')
+
+  /**
    * 工具栏选项。
    *
    * 🔴 **不用** `disabled: !ooHealthy`：健康检查是 mount 期异步，disabled 在未就绪时
    *    锁死切换器 → 点击被彻底忽略、`switchMode` 根本不触发（D4 bug ③）。健康门禁移进
    *    `switchMode`（await 兜底），切换器保持可点；OO 真不可用时由桥/后端 fail-visible。
+   *
+   * 🔴 也**不用** `disabled: !isManagedSheet`：见 `legacyMode` 的说明。
    */
   const modeOptions = computed(() => [
     {
@@ -170,13 +183,19 @@ export function useHSyncMode(options: UseHSyncModeOptions) {
     {
       label: H_ONLINE_EDIT_LABEL,
       value: 'onlyoffice' as HRenderMode,
-      disabled: busy.value || options.isReadonly.value || !isManagedSheet.value,
+      disabled: busy.value || options.isReadonly.value,
     },
   ])
 
-  /** 当前模式（桥为准）。`v-model` 直接绑它，setter 走 `switchMode`。 */
+  /**
+   * 当前模式。受管 sheet 以**桥**为准（桥是唯一真源，本地 ref 会与桥漂移）；
+   * 非受管 sheet 以 `legacyMode` 为准。`v-model` 直接绑它，setter 走 `switchMode`。
+   */
   const renderMode = computed<HRenderMode>({
-    get: () => (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html'),
+    get: () =>
+      isManagedSheet.value
+        ? (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html')
+        : legacyMode.value,
     set: (target: HRenderMode) => { void switchMode(target) },
   })
 
@@ -187,8 +206,6 @@ export function useHSyncMode(options: UseHSyncModeOptions) {
 
     if (target === 'onlyoffice') {
       if (options.isReadonly.value) return
-      if (!isManagedSheet.value) return
-      if (syncBridge.mode.value === 'oo') return
       // 竞态兜底：点击可能早于 mount 期健康响应到达，此时 ooHealthy 仍为初始 false。
       // 健康未就绪则**当场 await 一次**（绕过 TTL 取最新）再判定，绝不因「还没探到」
       // 静默吞掉用户这次真实点击。
@@ -197,6 +214,13 @@ export function useHSyncMode(options: UseHSyncModeOptions) {
         lastNotice.value = { text: 'OnlyOffice 服务不可用，暂时只能用结构化视图', type: 'warning' }
         return
       }
+      // 非受管 sheet：只切 legacy 只读视图，**不建桥**（后端无 adapter，建桥必失败）。
+      if (!isManagedSheet.value) {
+        legacyMode.value = 'onlyoffice'
+        lastNotice.value = null
+        return
+      }
+      if (syncBridge.mode.value === 'oo') return
       syncSwitching.value = true
       lastNotice.value = null
       try {
@@ -212,7 +236,14 @@ export function useHSyncMode(options: UseHSyncModeOptions) {
       return
     }
 
-    // ─── OO → HTML：四分支 ──────────────────────────────────────────────────
+    // ─── target === 'html' ───────────────────────────────────────────────────
+    // 非受管 sheet：本地切回即可（没有桥，也没有需要保存的 OO 侧改动 —— legacy 视图只读）。
+    if (!isManagedSheet.value) {
+      legacyMode.value = 'html'
+      lastNotice.value = null
+      return
+    }
+    // ─── 受管 sheet 的 OO → HTML：四分支 ────────────────────────────────────
     if (syncBridge.mode.value !== 'oo') {
       syncBridge.persistMode('html')
       return

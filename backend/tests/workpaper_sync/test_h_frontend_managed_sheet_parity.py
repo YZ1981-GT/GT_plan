@@ -33,6 +33,7 @@ from typing import Any
 
 import pytest
 
+from app.services.workpaper_sync import phase5_h6_asset_disposal_clearing as h6
 from app.services.workpaper_sync import phase5_h9_lease_liabilities as h9
 from app.services.workpaper_sync import store_item_registry as sir
 
@@ -64,12 +65,24 @@ _WIRED_RE = re.compile(
 )
 
 
+def _strip_line_comments(src: str) -> str:
+    """去掉 `//` 行注释。
+
+    🔴 必须先去注释再匹配：`_ENTRY_RE` 要求字段之间只有空白，而条目里写注释是**正常**的
+    （H6 那条就解释了「excelName 不带科目前缀，不按 H9 构词法推演」）。不去注释会让
+    「加了一行注释」表现成「该条目从清单里消失」—— 报错信息指向 parity 失配，排查方向
+    完全错。本函数只处理行注释：清单里不出现 `/* */`，也不出现含 `//` 的字符串字面量
+    （entryId 是 `xlsx/gt-…` 单斜杠）。
+    """
+    return "\n".join(re.sub(r"//.*$", "", ln) for ln in src.splitlines())
+
+
 def _parse_frontend_managed_sheets() -> list[dict[str, str]]:
     assert _MANAGED_TS.exists(), f"前端受管清单不存在：{_MANAGED_TS}"
     src = _MANAGED_TS.read_text(encoding="utf-8")
     # 只解析 H_MANAGED_SHEETS 的数组体，避免把 docstring 里的示例误抓
     start = src.index("export const H_MANAGED_SHEETS")
-    body = src[start:]
+    body = _strip_line_comments(src[start:])
     rows = [m.groupdict() for m in _ENTRY_RE.finditer(body)]
     assert rows, "未从 hManagedSheets.ts 解析出任何受管条目（正则与源形态失配？）"
     return rows
@@ -87,7 +100,8 @@ def _parse_frontend_wired_codes() -> list[str]:
 # ═══════════════════════════════════════════════════════════════════════════
 
 #: 本轮受管面的 provider（lane provider 落地后在此追加，parity 自动覆盖）。
-_PROVIDERS: tuple[Any, ...] = (h9,)
+#: h9 = canary（foundation spec）· h6 = 发布链首例（lane3 spec）
+_PROVIDERS: tuple[Any, ...] = (h9, h6)
 
 
 def _backend_managed_rows() -> list[dict[str, str]]:

@@ -20,19 +20,38 @@
 
       <!-- 顶部工具栏（双模式切换）— 目录页隐藏 -->
       <div v-if="currentSheet !== 'H6'" class="h6-header-toolbar">
-        <el-segmented
-          :model-value="currentMode"
-          :options="modeOptions"
-          size="small"
-          :disabled="!isOoAvailable && currentMode === 'html'"
-          @change="onModeChange"
-        />
+        <!--
+          v-model 而非 :model-value + @change：setter 走 useHSyncMode.switchMode，
+          四分支保存协议在那里收口。
+          🔴 也删掉了 `:disabled="!isOoAvailable && currentMode === 'html'"` ——
+             健康未就绪时那个条件恒真，整个切换器被锁死、点击被彻底忽略（D4 bug ③）。
+             健康门禁已移进 switchMode（await 兜底 + 不可用时明确告知）。
+        -->
+        <el-segmented v-model="currentMode" :options="modeOptions" size="small" />
+        <el-tag v-if="isH6SyncManagedSheet" size="small" :type="hSync.syncStateTag.value.type">
+          {{ hSync.syncStateTag.value.text }}
+        </el-tag>
+        <el-tag v-else-if="hSync.lastNotice.value" size="small" :type="hSync.lastNotice.value.type">
+          {{ hSync.lastNotice.value.text }}
+        </el-tag>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h6-asset-disposal-clearing" />
       </div>
 
-      <!-- OnlyOffice 模式 -->
+      <!--
+        受管 sheet（H6-2）的在线编辑 —— 统一双向宿主。
+        🔴 `.oo-container` 必须有**确定高度**（D4 踩过 height:100% 被压成一条）。
+      -->
+      <div v-if="currentMode === 'onlyoffice' && isH6SyncManagedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="hSync.descriptor.value"
+          :bridge="hSync.syncBridge"
+        />
+      </div>
+
+      <!-- 非受管 sheet 的 OnlyOffice 模式（legacy 只读视图，无双向回写） -->
       <GtOnlyOfficeSheet
-        v-if="currentMode === 'onlyoffice'"
+        v-else-if="currentMode === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -167,7 +186,7 @@ import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
-import { useH6DualMode } from './composables/useH6DualMode'
+import { useHSyncMode } from './composables/useHSyncMode'
 import { useH6CrossSheet } from './composables/useH6CrossSheet'
 import { useH6H10Pull } from './composables/h6H10Pull'
 import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
@@ -176,6 +195,11 @@ import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+
+/** H6 entry id（manifest 冻结值，与 `phase5_h6_asset_disposal_clearing.ENTRY_ID` 逐字一致）。 */
+const H6_SYNC_ENTRY_ID = 'xlsx/gt-h6-asset-disposal-clearing'
 // 版本 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtCycleAProgramRouter.vue'))
 
@@ -281,18 +305,43 @@ async function flushPending(): Promise<void> {
   })))
 }
 
-// ─── 双模式 HTML ↔ OnlyOffice（OO 健康检查 + 切换前保存 + 回切重载） ──────────
-const {
-  currentMode,
-  isOoAvailable,
-  modeOptions,
-  onModeChange,
-} = useH6DualMode({
+// ─── 双模式 HTML ↔ OnlyOffice（统一接桥，替代 useH6DualMode）────────────────
+//
+// H6-2（`明细表H6-2`）是 H 循环**发布链首例**的受管表：受管 + 已接桥 ⇒ 渲染
+// `WorkpaperSyncEditorHost`，OO 侧改动经 forcesave 回写 store。其余 sheet 仍走
+// `GtOnlyOfficeSheet` 只读视图（受管面未覆盖，不得假称可双向，但**保留**可看 Excel）。
+//
+// 🔴 换掉 `useH6DualMode` 的两个理由：① 它不建桥 ⇒ OO 侧编辑回不到 HTML（假双向）；
+//    ② 它的 `isOoAvailable` 被宿主用在 `:disabled` 上，健康未就绪时锁死切换器（D4 bug ③）。
+const hSync = useHSyncMode({
+  entryId: H6_SYNC_ENTRY_ID,
   wpId: toRef(props, 'wpId'),
-  sheetName: toRef(props, 'sheetName'),
-  autoSave: flushPending,
-  reloadAll: async () => { await selfLoad() },
+  projectId: toRef(props, 'projectId'),
+  currentCode: computed(() => currentSheet.value),
+  isReadonly,
+  flushHtml: async () => {
+    // 复用宿主既有的 `flushPending()`（清 800ms 防抖 + 立即 PUT + await 写完）——
+    // 不 flush 就把最后不到 800ms 的编辑留在客户端，materialize 出的 xlsx 少这批改动。
+    await flushPending()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: H6_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: hSync.sheetKey.value,
+    }
+  },
+  reloadHtml: async () => { await selfLoad() },
 })
+
+/** 模板 `ref="syncEditorHostRef"` 的落点 —— 直接复用桥里的 ref（见 H9 宿主同款说明）。 */
+const syncEditorHostRef = hSync.syncHostRef
+const isH6SyncManagedSheet = computed(() => hSync.isManagedSheet.value)
+const currentMode = hSync.renderMode
+const modeOptions = hSync.modeOptions
 
 /** 从 sheetName 提取编码 (H6/H6A/H6-1~H6-4/附注) */
 const currentSheet = computed(() => {

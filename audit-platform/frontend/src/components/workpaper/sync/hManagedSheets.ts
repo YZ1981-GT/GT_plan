@@ -72,6 +72,17 @@ export const H_MANAGED_SHEETS: readonly HManagedSheet[] = Object.freeze([
     excelName: '租赁负债明细表H9-2',
     storeItemId: 'H9-2-rows',
   },
+  {
+    // H 循环**发布链首例**（审定数经 useH6Adjudication.publishToTb 走显式发布门）。
+    // 🔴 excelName 是 `明细表H6-2` —— 不带科目前缀（H9 的是 `租赁负债明细表H9-2`），
+    //    逐字取模板 sheet 名，不按 H9 的构词法推演。
+    entryId: 'xlsx/gt-h6-asset-disposal-clearing',
+    code: 'H6-2',
+    sheetKey: 'h602-managed',
+    kind: 'rows',
+    excelName: '明细表H6-2',
+    storeItemId: 'H6-2-rows',
+  },
 ] as const)
 
 /**
@@ -82,7 +93,7 @@ export const H_MANAGED_SHEETS: readonly HManagedSheet[] = Object.freeze([
  * （8 条 lane provider 落地时先进 `H_MANAGED_SHEETS`，宿主接桥另做）—— 届时**不得**
  * 因「它是受管 sheet」就假称可切 OO。
  */
-export const H_OO_WIRED_ROWS_CODES: readonly string[] = Object.freeze(['H9-2'])
+export const H_OO_WIRED_ROWS_CODES: readonly string[] = Object.freeze(['H9-2', 'H6-2'])
 
 const BY_CODE: ReadonlyMap<string, HManagedSheet> = (() => {
   const m = new Map<string, HManagedSheet>()

@@ -413,6 +413,20 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="G9-detail-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── G10（spec: g-cycle-single-region-detail-lanes · Task 9 / C-7）───────
+    #
+    # 与首条 G9 的差别只在受管区数量：G10 是**单区**（`明细表G10-2` 的 R11-R20）⇒
+    # provider 的三个 store 门面各自 ≤3 行薄转发框架层引擎（照 G2），不需要 G9 那样的
+    # 「遍历三段」伴生模块。`items` 一条 ⇒ 回方向走 `merge_rows_fn` 单 item 分派。
+    #
+    # 🔴 GC-2：G10 册裸 IF **28 格**（全在 `审定表G10-1`，受管表 `明细表G10-2` 零命中）。
+    #    per-file 保守策略 ⇒ 受管表干净也必须挂；中性化函数与 G7/G2/G9/H9 **共用一个**。
+    "g10.trading_liabilities_detail": StoreMergePlan(
+        adapter_id="g10.trading_liabilities_detail",
+        provider_module="phase5_g10_trading_liabilities",
+        items=(StoreItemSpec(item_id="G10-detail-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     #
     # 🔴 **HC-12：H 循环 9 册全部命中 OO 加载期裸 `IF(`** ⇒ 同 G 的 per-file 保守策略，
@@ -431,6 +445,22 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         adapter_id="h9.lease_liability_detail",
         provider_module="phase5_h9_lease_liabilities",
         items=(StoreItemSpec(item_id="H9-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── H6 发布链首例（spec: h2-h6-h10-pilot-cross-reference-lanes）──
+    #
+    # 🔴 H6 册裸 `IF(` 现算 **12 格，全 H 最低** —— 仍必挂中性化：中性化是 **per-file**
+    #    （整册就地改写 substrate 副本），点同册任一 sheet 的在线编辑都会触发整册加载。
+    #    BP-4（真 OO 9.4 场景集）未交付前**不得**以「裸 IF 最少」推断本册不需要。
+    #    同上，中性化函数与 G7/G2/H9 **共用一个**，不新造、不加 adapter_id 字面量分支。
+    #
+    # 🔴 与 H9 的差异（照抄会静默出错）：`H6A` 不是幻影码（同时是真实程序表码，解析到
+    #    自己的册）；审定期末公式是**资产口径** `L=I+J-K`（H9 是负债口径 `L=I-J+K`）；
+    #    H6 **有** TB 发布门（H 循环首例，但发布是用户显式动作，sync 对 TB 写 0 次）。
+    "h6.asset_disposal_clearing_detail": StoreMergePlan(
+        adapter_id="h6.asset_disposal_clearing_detail",
+        provider_module="phase5_h6_asset_disposal_clearing",
+        items=(StoreItemSpec(item_id="H6-2-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
 }

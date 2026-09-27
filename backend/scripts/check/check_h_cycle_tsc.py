@@ -47,8 +47,16 @@ OWNED = (
 #: 🔴 **不是本轮引入**：`sheet-code="` 在 `workpaper/Gt*.vue` 里现算 36 处，跨 E1/F1/… 多个
 #:    循环，属其它 spec 的作业面（且可能是真实缺陷：prop 名不匹配，运行时靠 attrs 透传）。
 #:    已登记上报，本轮不动 —— 跨 36 处宿主的 prop 改名会与并发会话正面冲突。
-HOST_FILE = "GtH9LeaseLiabilities.vue"
-HOST_ERROR_BASELINE = 1
+#:
+#: H6 宿主同理：`sheet-code="H6A"` 传 `GtAProgramConsole` 同一形态 ⇒ 基线各 1。
+HOST_FILES: tuple[str, ...] = (
+    "GtH9LeaseLiabilities.vue",
+    "GtH6AssetDisposalClearing.vue",
+)
+HOST_ERROR_BASELINE: dict[str, int] = {
+    "GtH9LeaseLiabilities.vue": 1,
+    "GtH6AssetDisposalClearing.vue": 1,
+}
 
 _ERR_RE = re.compile(r"^(?P<file>[^(]+)\((?P<line>\d+),\d+\): error (?P<code>TS\d+)")
 
@@ -73,11 +81,9 @@ def main() -> int:
     errors = [m for m in (_ERR_RE.match(ln) for ln in raw.splitlines()) if m]
 
     owned_errs = [m.group(0) for m in errors if any(o in m.group("file") for o in OWNED)]
-    host_errs = [m.group(0) for m in errors if HOST_FILE in m.group("file")]
 
     print(f"vue-tsc 总错误数：{len(errors)}（含无关的传递依赖图）")
     print(f"本 spec 拥有文件错误数：{len(owned_errs)}（要求 0）")
-    print(f"宿主 {HOST_FILE} 错误数：{len(host_errs)}（基线 {HOST_ERROR_BASELINE}）")
 
     failed = False
     if owned_errs:
@@ -85,16 +91,21 @@ def main() -> int:
         print("\n🔴 本 spec 拥有的文件出现类型错误：")
         for e in owned_errs:
             print(f"   {e}")
-    if len(host_errs) > HOST_ERROR_BASELINE:
-        failed = True
-        print(f"\n🔴 宿主错误数超出基线（新增 {len(host_errs) - HOST_ERROR_BASELINE} 条）：")
-        for e in host_errs:
-            print(f"   {e}")
-    if len(host_errs) < HOST_ERROR_BASELINE:
-        print(
-            f"\n✅ 宿主错误数低于基线（{len(host_errs)} < {HOST_ERROR_BASELINE}）"
-            f" —— 请把 HOST_ERROR_BASELINE 下调到 {len(host_errs)}。"
-        )
+
+    for host in HOST_FILES:
+        host_errs = [m.group(0) for m in errors if host in m.group("file")]
+        baseline = HOST_ERROR_BASELINE[host]
+        print(f"宿主 {host} 错误数：{len(host_errs)}（基线 {baseline}）")
+        if len(host_errs) > baseline:
+            failed = True
+            print(f"\n🔴 {host} 错误数超出基线（新增 {len(host_errs) - baseline} 条）：")
+            for e in host_errs:
+                print(f"   {e}")
+        elif len(host_errs) < baseline:
+            print(
+                f"✅ {host} 低于基线（{len(host_errs)} < {baseline}）"
+                f" —— 请把 HOST_ERROR_BASELINE[{host!r}] 下调到 {len(host_errs)}。"
+            )
     return 1 if failed else 0
 
 

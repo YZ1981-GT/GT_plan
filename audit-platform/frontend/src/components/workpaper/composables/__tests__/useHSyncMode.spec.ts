@@ -141,15 +141,51 @@ describe('useHSyncMode', () => {
     scope.stop()
   })
 
-  it('④ 非受管 sheet 不得进 OO', async () => {
+  it('④ 非受管 sheet 不建桥（后端无 adapter，建桥必失败）', async () => {
     const scope = effectScope()
     const m = scope.run(() => makeMode('H9-9-不存在的受管表'))!
     expect(m.isManagedSheet.value).toBe(false)
-    const online = m.modeOptions.value.find((o) => o.label === H_ONLINE_EDIT_LABEL)!
-    expect(online.disabled).toBe(true)
     healthResolver({ data: { data: { healthy: true } } })
     await m.switchMode('onlyoffice')
     expect(switchToOnlyOffice).not.toHaveBeenCalled()
+    scope.stop()
+  })
+
+  /**
+   * 🔴 回归守卫：接桥**不得顺手拿掉**非受管 sheet 的 legacy OO 视图。
+   *
+   * 一册 8~9 个 sheet 里当前只有 1 张进受管面，其余（审定表 / 程序表 / 调整分录汇总 /
+   * 附注）用户原本就能切到 `GtOnlyOfficeSheet` 看 Excel 原貌。首版 `modeOptions` 写了
+   * `disabled: !isManagedSheet` ⇒ 那些 sheet 的 OO 视图被接桥改动静默移除，是行为回归。
+   * 受管面只决定「走桥还是走 legacy」，不决定「能不能看 Excel」。
+   */
+  it('④b 非受管 sheet 仍可切 legacy OO 只读视图（不因接桥被拿掉）', async () => {
+    const scope = effectScope()
+    const m = scope.run(() => makeMode('H9-1'))!
+    expect(m.isManagedSheet.value).toBe(false)
+    const online = m.modeOptions.value.find((o) => o.label === H_ONLINE_EDIT_LABEL)!
+    expect(online.disabled, '非受管 sheet 的「在线编辑」不得被禁用').toBe(false)
+    healthResolver({ data: { data: { healthy: true } } })
+    await m.switchMode('onlyoffice')
+    // 本地切到 legacy 视图（宿主据此渲染 GtOnlyOfficeSheet），但**不建桥**
+    expect(m.renderMode.value).toBe('onlyoffice')
+    expect(switchToOnlyOffice).not.toHaveBeenCalled()
+    // 切回也不走桥的四分支
+    await m.switchMode('html')
+    expect(m.renderMode.value).toBe('html')
+    expect(leaveWithoutSaving).not.toHaveBeenCalled()
+    expect(persistMode).not.toHaveBeenCalled()
+    scope.stop()
+  })
+
+  it('④c OO 不健康时切在线编辑 ⇒ 明确告知，不静默', async () => {
+    const scope = effectScope()
+    const m = scope.run(() => makeMode())!
+    const p = m.switchMode('onlyoffice')
+    healthResolver({ data: { data: { healthy: false } } })
+    await p
+    expect(switchToOnlyOffice).not.toHaveBeenCalled()
+    expect(m.lastNotice.value?.type).toBe('warning')
     scope.stop()
   })
 
