@@ -995,16 +995,37 @@ def overlay_store_on_baseline_projection(
         values[key] = _coerce_excel_numeric_text_field(field)
 
     row_keys: dict[str, tuple[str, ...]] = {}
+    # 🔴 store 的 row_keys 是 HTML 侧当前行集合的**权威来源**。当用户在结构化视图中
+    # 删除旧行并重新导入时，store 只包含新行；baseline（旧 substrate extract）仍持有
+    # 旧行 identity（包括旧数据行 + 模板脚手架 GTROW/L2MARK）。
+    #
+    # 若按并集合并，旧行全部被带回——materialize 写 33 行进只有 12 行数据区的模板，
+    # 产生大量空行 / 旧数据残留（2026-09-28 D4-2 实测 7→33 行事故形态）。
+    #
+    # 正确语义：store 有声明的 table → store 为准；store 没有的 table → baseline 原样。
+    # 模板脚手架行（GTROW/L2MARK）不在 store row_keys 中但可能在 baseline 中——它们
+    # 由 materialize 的 identity carrier 机制自动处理（写隐藏 UUID 列），不需要投影
+    # 层面保留。roundtrip 校验中 extract 读到但投影没有的 protected 字段会被豁免。
+    store_table_keys = set(store_projection.row_keys.keys())
     for table_key in {*baseline.row_keys, *store_projection.row_keys}:
-        merged: list[str] = []
-        for source in (
-            baseline.row_keys.get(table_key, ()),
-            store_projection.row_keys.get(table_key, ()),
-        ):
-            for key in source:
-                if key not in merged:
-                    merged.append(key)
-        row_keys[table_key] = tuple(merged)
+        if table_key in store_table_keys:
+            # store 有这张表 → store 的行集合是权威
+            row_keys[table_key] = store_projection.row_keys[table_key]
+        else:
+            # store 没有这张表（baseline-only）→ 保留 baseline
+            row_keys[table_key] = baseline.row_keys.get(table_key, ())
+
+    # 🔴 清理 values：baseline 中属于「不在最终 row_keys 中」的行的字段值不应保留。
+    # 仅在有 row_keys 声明时才清理——如果 baseline 和 store 都没有 row_keys（空 dict），
+    # 不做清理（兼容无行身份表的简单场景，如 store None 清空基线值）。
+    if row_keys:
+        final_row_id_set: set[str] = set()
+        for ids in row_keys.values():
+            final_row_id_set.update(ids)
+        values = {
+            key: val for key, val in values.items()
+            if not hasattr(val, 'row_key') or not val.row_key or val.row_key in final_row_id_set
+        }
 
     return Projection(
         contract_id=str(store_projection.contract_id),
