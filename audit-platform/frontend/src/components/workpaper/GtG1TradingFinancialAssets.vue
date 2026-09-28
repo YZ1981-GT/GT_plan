@@ -3,12 +3,16 @@
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
       <div v-if="currentSheet !== '底稿目录'" class="g1-toolbar">
+        <!--
+          🔴 原先 `@change` 直接 `dualMode.switchMode(v)`（legacy 本地 ref）⇒ 桥的 mode 永远
+          不动。现在统一走 `switchRenderMode`：受管 sheet（G1-2）经桥，非受管委派 legacy。
+        -->
         <el-segmented
           v-if="isHtmlSheet"
           :model-value="renderMode"
-          :options="renderModeOptions"
+          :options="syncModeOptions"
           size="small"
-          @change="(v: any) => dualMode.switchMode(v)"
+          @change="switchRenderMode"
         />
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g1-trading-financial-assets" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
@@ -33,8 +37,27 @@
         </template>
       </el-alert>
 
+      <!--
+        G1-2 明细表受管 sheet 走 WorkpaperSyncEditorHost 真双向。
+        🔴 本宿主原先**建了桥却既不挂 `WorkpaperSyncEditorHost` 也不调
+        `switchToOnlyOffice()`** —— `syncBridge` / `syncOoDescriptor` / `syncSwitching`
+        全是死代码，OO 模式一律渲染 legacy `GtOnlyOfficeSheet`（假双向）。这比「挂了却不
+        驱动」更隐蔽：`bridgeMaterializeDriven` 判据只扫「挂了 EditorHost 的宿主」，
+        本文件因为没挂而根本没进扫描面。
+      -->
+      <div v-if="isOoMode && isG1SyncManagedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          v-if="syncOoDescriptor"
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+        <div v-else class="oo-loading">正在打开 G1-2 同步编辑器…</div>
+      </div>
+
+      <!-- 非受管 sheet 保留 legacy GtOnlyOfficeSheet（假双向，如实登记） -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && currentSheet !== '底稿目录' && renderMode === 'onlyoffice'"
+        v-else-if="isOoMode"
         :key="ooSheetName"
         :wp-id="props.wpId"
         :project-id="props.projectId"
@@ -294,6 +317,7 @@ import G1PreparationHandbookDialog from './g1-trading-financial-assets/G1Prepara
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // ── G1 sync bridge（spec: g-cycle-single-region-detail-lanes · Task 15）──
 import { isGSingleRegionManagedSheet, gSingleRegionSheetKeyOf } from './sync/gSingleRegionManagedSheets'
+import { useGRenderModeSwitch } from './sync/useGRenderModeSwitch'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
@@ -444,14 +468,9 @@ const ooSheetName = computed(
   () => dualMode.resolveOoSheetName() || props.sheetName || 'G1-1',
 )
 
-const renderMode = computed({
-  get: () => dualMode.currentMode.value,
-  set: (v: G1RenderMode) => {
-    void dualMode.switchMode(v)
-  },
-})
-
-const renderModeOptions = computed(() => dualMode.modeOptions.value)
+// 🔴 原先这里有 `renderMode` computed（get/set 包 legacy `dualMode`）+ `renderModeOptions`，
+//    setter 直接 `dualMode.switchMode(v)` ⇒ 受管 sheet 也只翻 legacy 本地 ref，桥的 mode
+//    永远不动。两者现由下方 `useGRenderModeSwitch` 提供（受管以桥为真源）。
 
 function onOoFallback(): void {
   dualMode.onOoFallback()
@@ -541,9 +560,6 @@ defineExpose({
 // ── G1 sync bridge 接线（Task 15 · Requirements 4.7）───────────────────────
 const G1_SYNC_ENTRY_ID = 'xlsx/gt-g1-trading-financial-assets'
 const isG1SyncManagedSheet = computed(() => isGSingleRegionManagedSheet(currentSheet.value))
-const isOoMode = computed(
-  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && dualMode.currentMode.value === 'onlyoffice',
-)
 const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
 const syncEntryId = ref(G1_SYNC_ENTRY_ID)
 const syncSheetKey = computed(() => gSingleRegionSheetKeyOf(currentSheet.value) ?? 'g102-managed')
@@ -565,7 +581,23 @@ const syncBridge = useWorkpaperSyncBridge({
 })
 const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
 const syncBusy = computed(() => WP_BRIDGE_IN_FLIGHT_STATES.includes(syncBridge.state.value))
-const syncSwitching = ref(false)
+
+// 🔴 受管 sheet 必须经桥切换 —— 桥建好了但没人调 `switchToOnlyOffice()` 就是空壳。
+const {
+  renderMode,
+  modeOptions: syncModeOptions,
+  switching: syncSwitching,
+  switchRenderMode,
+} = useGRenderModeSwitch({
+  bridge: syncBridge,
+  legacy: dualMode,
+  isManagedSheet: isG1SyncManagedSheet,
+  editorHostRef: syncEditorHostRef,
+})
+
+const isOoMode = computed(
+  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && renderMode.value === 'onlyoffice',
+)
 
 onMounted(() => {
   // eventBus 订阅（crossWpEventBridge已双向桥接，优先mitt）
@@ -592,4 +624,11 @@ onBeforeUnmount(() => {
 .g1a-handbook-tip { flex: 1; min-width: 220px; margin-right: 4px; }
 .g-cycle-tab-index-page { padding: 0; }
 .g1-global-alert { margin-bottom: 8px; }
+
+/* ─── 同步编辑器容器 ─── */
+/* 🔴 必须带**视口相关的确定高度**：`WorkpaperSyncEditorHost` 根元素是 height:100% + flex 列，
+   父级 auto 高度会把编辑区（flex:1; min-height:0）压扁，OnlyOffice 在页面上只剩一条
+   （2026-09-22 D4 真栈实证）。模板里用了 `.oo-container` 却不定义它就是这个后果。 */
+.oo-container { min-height: 600px; height: calc(100vh - 280px); overflow: hidden; border-radius: 8px; }
+.oo-loading { padding: 40px 20px; text-align: center; color: #909399; font-size: 14px; }
 </style>

@@ -12,12 +12,17 @@
     </div>
     <template v-else>
       <div class="g6-other-bond-investment-main-toolbar">
+        <!--
+          🔴 原先绑 legacy `dualMode.currentMode` / `dualMode.onModeChange`（本地 ref）⇒ 桥的
+          mode 永远不动、descriptor 恒 null，受管 sheet 切「在线编辑」后永远停在「正在打开…」。
+          现在统一走 `switchRenderMode`：受管 sheet 经桥（四分支保存协议），非受管委派 legacy。
+        -->
         <el-segmented
           v-if="isHtmlSheet"
-          :model-value="dualMode.currentMode.value"
-          :options="dualMode.modeOptions"
+          :model-value="renderMode"
+          :options="syncModeOptions"
           size="small"
-          @change="dualMode.onModeChange"
+          @change="switchRenderMode"
         />
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g6-other-bond-main" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
@@ -172,7 +177,7 @@ import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThrea
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // ── G6_MAIN sync bridge（spec: g4-g6-shared-workbook-three-entry-lanes）──
-import { isGSingleRegionManagedSheet, gSingleRegionSheetKeyOf } from './sync/gSingleRegionManagedSheets'
+import { useGRenderModeSwitch } from './sync/useGRenderModeSwitch'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
@@ -412,13 +417,23 @@ async function retrySelfLoad(): Promise<void> {
 // ─── 生命周期 ───────────────────────────────────────────────────────────────
 // ── G6_MAIN sync bridge 接线 ────────────────────────────────
 const G6_MAIN_SYNC_ENTRY_ID = 'xlsx/gt-g6-other-bond-main'
-const isG6MainSyncManagedSheet = computed(() => isGSingleRegionManagedSheet(currentSheet.value))
-const isOoMode = computed(
-  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && dualMode.currentMode.value === 'onlyoffice',
-)
+/**
+ * 🔴 本宿主当前**没有受管 sheet** —— 恒 `false` 是如实登记，不是遗漏。
+ *
+ * G6 一册多 entry 共用 `phase5_g6_other_bond`，受管行表只有 `SPEC_G605`
+ * （`公允价值测试表G6-5`）且由 `GtG6OtherBondSppi` 渲染（正则 `G6-(5|…|10)`）。
+ * 本宿主覆盖 G6A/G6-1..G6-4（程序表 / 审定表 / 明细表 / 坏账 / 调整表），不在受管面内。
+ *
+ * 原实现写 `isGSingleRegionManagedSheet(currentSheet.value)`：那清单按**短码**建 map，
+ * 本宿主 `currentSheet` 返回**语义名**（`detail` / `badDebtDetail` …）⇒ 恒 `false`，
+ * 但伪装成「清单里查不到」。原 fallback 键 `g602-managed` 在后端**不存在**
+ * （G6 受管键只有 `g605-managed`）。
+ */
+const isG6MainSyncManagedSheet = computed(() => false)
 const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
 const syncEntryId = ref(G6_MAIN_SYNC_ENTRY_ID)
-const syncSheetKey = computed(() => gSingleRegionSheetKeyOf(currentSheet.value) ?? 'g602-managed')
+/** 桥当前不挂载（受管面为空），此键仅保持类型非空 —— 用共享册真键而非不存在的 `g602-managed`。 */
+const syncSheetKey = ref('g605-managed')
 const syncBridge = useWorkpaperSyncBridge({
   entryId: syncEntryId,
   wpId: toRef(props, 'wpId'),
@@ -437,7 +452,25 @@ const syncBridge = useWorkpaperSyncBridge({
 })
 const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
 const syncBusy = computed(() => WP_BRIDGE_IN_FLIGHT_STATES.includes(syncBridge.state.value))
-const syncSwitching = ref(false)
+
+// 🔴 受管 sheet 必须经桥切换 —— 桥建好了但没人调 `switchToOnlyOffice()` 就是空壳：
+//    `WorkpaperSyncEditorHost` 自己不 materialize，descriptor 只能由那个方法产出，
+//    于是用户切「在线编辑」后永远停在「正在打开…」，而所有静态门都是绿的。
+const {
+  renderMode,
+  modeOptions: syncModeOptions,
+  switching: syncSwitching,
+  switchRenderMode,
+} = useGRenderModeSwitch({
+  bridge: syncBridge,
+  legacy: dualMode,
+  isManagedSheet: isG6MainSyncManagedSheet,
+  editorHostRef: syncEditorHostRef,
+})
+
+const isOoMode = computed(
+  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && renderMode.value === 'onlyoffice',
+)
 
 onMounted(async () => {
   window.addEventListener('g6:save-items', handleG6SaveItems)
@@ -460,4 +493,11 @@ onBeforeUnmount(() => {
 .error-container { padding: 24px; }
 .g6-other-bond-investment-main-toolbar { margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
 .g6-index-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+
+/* ─── 同步编辑器容器 ─── */
+/* 🔴 必须带**视口相关的确定高度**：`WorkpaperSyncEditorHost` 根元素是 height:100% + flex 列，
+   父级 auto 高度会把编辑区（flex:1; min-height:0）压扁，OnlyOffice 在页面上只剩一条
+   （2026-09-22 D4 真栈实证）。模板里用了 `.oo-container` 却不定义它就是这个后果。 */
+.oo-container { min-height: 600px; height: calc(100vh - 280px); overflow: hidden; border-radius: 8px; }
+.oo-loading { padding: 40px 20px; text-align: center; color: #909399; font-size: 14px; }
 </style>

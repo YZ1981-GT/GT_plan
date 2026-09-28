@@ -334,37 +334,105 @@ def test_g7_merge_handles_none_base_state() -> None:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def test_b60_has_no_html_store_by_design() -> None:
-    """🔴 b60 的契约**无 `html_store` 段**、字段 `store_item_id` 全 None ⇒ 纯 Excel entry。
+def test_b60_html_store_is_declared_and_aligned_with_the_frontend() -> None:
+    """🔴 b60 的契约**有 `html_store` 段**，且 item_id / 行身份 / 字段名三方与前端对齐。
 
-    本判据钉住「它不是缺 merge 门面，而是压根不需要 store 镜像」这条事实，
-    修正了首版把三家一概标成「缺门面」的误判。
+    ═══ 本判据取代了什么 ═══
+
+    原判据是 `test_b60_has_no_html_store_by_design`：断言契约**无** html_store、
+    字段 `store_item_id` **全为 None**，理由「b60 是纯 Excel entry，HTML 宿主不读
+    checklist store ⇒ 不是缺 merge 门面，是压根不需要镜像」。
+
+    那个观察在当时是准确的 —— 但它描述的是**前端还没有 HTML 面**这个时点事实，
+    不是 entry 的固有形态。`b60/GtB60HourBudgetPanel.vue` 落地后同一句话就不成立了：
+    面板读写 `B60-1-hour-budget-rows`，而 OO→HTML 仍被 `NON_STORE_BACKED_ADAPTERS`
+    提前跳过 ⇒ 用户在 OnlyOffice 里改的行回不到结构化视图。
+
+    原判据的断言消息自己预告了这条路：「b60 契约若有 html_store 段，说明它确实需要镜像
+    ⇒ 本判据与归类都须重写」。这里就是那次重写。
+
+    ⇒ 判据方向反转但**力度不降**：现在断言的是三方对齐（契约 / provider 常量 / 前端源码
+      逐字一致），比原来「全是 None」更难蒙混 —— 任一侧改名都打红。
     """
     path = (
         _BACKEND / "data" / "workpaper_sync_contracts" / "b60.hour_budget.json"
     )
     payload = json.loads(path.read_text(encoding="utf-8"))
-    assert "html_store" not in payload.get("review", {}), (
-        "b60 契约若有 html_store 段，说明它确实需要镜像 ⇒ 本判据与归类都须重写"
-    )
-    item_ids = {
-        f.get("store_item_id")
+    html_store = payload.get("review", {}).get("html_store")
+    assert html_store, "b60 契约缺 html_store 段 ⇒ OO→HTML 方向无镜像目标"
+    assert html_store["table"] == "checklist_responses"
+    assert html_store["payload_column"] == "remark"
+    assert html_store["shape"] == "json_array_of_row_objects"
+    assert html_store["item_ids"] == ["B60-1-hour-budget-rows"]
+
+    # 行表字段全部声明载体；meta 表不声明（前端面板不读 meta，声明它就是造载体）。
+    by_table = {
+        table["table_key"]: {f.get("store_item_id") for f in table["fields"]}
         for sheet in payload["sheets"]
         for table in sheet["tables"]
-        for f in table["fields"]
     }
-    assert item_ids == {None}, f"b60 字段的 store_item_id 应全为 None，实得 {item_ids}"
+    assert by_table["hour_budget_rows"] == {"B60-1-hour-budget-rows"}
+    assert by_table["hour_budget_meta"] == {None}, (
+        "meta 表（单位名称/会计期间/编制人…）在 HTML 侧无载体 —— "
+        "GtB60HourBudgetPanel 只渲染行表；给它声明 store_item_id 就是造第二份事实"
+    )
+
+    # 🔴 三方对齐：契约行身份 ↔ provider 常量 ↔ 前端面板源码（逐字，不是同义）。
+    from app.services.workpaper_sync.pilot_simple_checklist import (
+        ROW_IDENTITY_STORE_KEY,
+        STORE_ITEM_ID,
+    )
+
+    assert STORE_ITEM_ID == "B60-1-hour-budget-rows"
+    row_identity = next(
+        t["row_identity"]
+        for sheet in payload["sheets"]
+        for t in sheet["tables"]
+        if t["table_key"] == "hour_budget_rows"
+    )
+    assert row_identity["json_pointer"] == f"/rows/*/{ROW_IDENTITY_STORE_KEY}"
+
+    panel = (
+        _BACKEND.parent
+        / "audit-platform" / "frontend" / "src" / "components" / "workpaper" / "b60"
+        / "GtB60HourBudgetPanel.vue"
+    ).read_text(encoding="utf-8")
+    assert f"STORE_ITEM_ID = '{STORE_ITEM_ID}'" in panel, (
+        "前端面板的 store item 与 provider 常量不一致 ⇒ 镜像会写到一个没人读的键上"
+    )
+    assert f"ROW_ID_KEY = '{ROW_IDENTITY_STORE_KEY}'" in panel, (
+        "前端行身份键与契约/provider 不一致 ⇒ 回写会按错的键匹配行，产生重复行"
+    )
 
 
-def test_b60_is_registered_as_non_store_backed() -> None:
-    """b60 走 `NON_STORE_BACKED_ADAPTERS` 直接跳过，不经 resolve（不抛错、不镜像）。"""
+def test_b60_is_now_genuinely_store_backed() -> None:
+    """b60 已从 `NON_STORE_BACKED_ADAPTERS` 转出，走真 rows 镜像。
+
+    🔴 原判据断言 `"b60.hour_budget" in NON_STORE_BACKED_ADAPTERS` 且
+    `store_merge_plan_or_skip(...) is None`。B60 长出 HTML 面之后，那两条断言
+    锁住的恰恰是「回写不通」这个缺陷本身。
+    """
+    import importlib
+
     from app.services.workpaper_sync.store_item_registry import (
         NON_STORE_BACKED_ADAPTERS,
         store_merge_plan_or_skip,
     )
 
-    assert "b60.hour_budget" in NON_STORE_BACKED_ADAPTERS
-    assert store_merge_plan_or_skip("b60.hour_budget") is None
+    assert "b60.hour_budget" not in NON_STORE_BACKED_ADAPTERS
+    plan = store_merge_plan_or_skip("b60.hour_budget")
+    assert plan is not None, "b60 现在是 store-backed ⇒ 不得再被提前跳过"
+    assert not plan.mirror_unavailable_reason
+    assert plan.item_ids == ("B60-1-hour-budget-rows",)
+
+    # provider 必须真有 `oo_to_html` 会 getattr 的那两个符号（否则运行时 AttributeError → 500）
+    bridge = importlib.import_module(
+        f"app.services.workpaper_sync.{plan.provider_module}"
+    )
+    assert hasattr(bridge, "STORE_ITEM_ID"), f"{plan.provider_module} 缺 STORE_ITEM_ID"
+    assert hasattr(bridge, plan.merge_rows_fn), (
+        f"{plan.provider_module} 缺 {plan.merge_rows_fn} —— 这正是 g7/h1 曾经的缺陷形态"
+    )
 
 
 def test_g7_and_h1_now_resolve_without_error() -> None:

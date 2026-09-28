@@ -27,7 +27,13 @@ CONTRACTS_DIR = _BACKEND / "data" / "workpaper_sync_contracts"
 # key = filename, value = sha256 前 16 位（足够唯一，全长见证据文件）
 GOLDEN_BASELINE: dict[str, str] = {
     "_example.candidate.json": "4e85a633550b8f60",
-    "b60.hour_budget.json": "91beaa2a284fd8d2",
+    # 🔴 2026-09-27 更新（`91beaa2a284fd8d2` → 本值）：B60 的契约新增了 `review.html_store`
+    #    段并给行表字段填了 `store_item_id`，把 OO→HTML 方向打通。
+    #    此前 B60 是 `NON_STORE_BACKED_ADAPTERS` 的唯一成员，理由「契约无 html_store ⇒
+    #    纯 Excel entry」—— 那描述的是「前端还没有 HTML 面」这个时点事实，
+    #    `b60/GtB60HourBudgetPanel.vue` 落地后不再成立。契约是**真的变了**，
+    #    不是度量漂移，故更新基线而非改判据形态。
+    "b60.hour_budget.json": "aadb548da7f60e11",
     "d1.notes_receivable_detail.json": "62b589551bd99050",
     "d2.receivable_detail.json": "078b04377a34054f",
     "d3.prepaid_receipts_detail.json": "4f5b71fd73c1c412",

@@ -12,12 +12,17 @@
     </div>
     <template v-else>
       <div class="g6-other-bond-investment-sppi-toolbar">
+        <!--
+          🔴 原先绑 legacy `dualMode.currentMode` / `dualMode.onModeChange`（本地 ref）⇒ 桥的
+          mode 永远不动、descriptor 恒 null，受管 sheet（G6-5 公允价值测试表）切「在线编辑」后
+          永远停在「正在打开…」。现在统一走 `switchRenderMode`。
+        -->
         <el-segmented
           v-if="isHtmlSheet"
-          :model-value="dualMode.currentMode.value"
-          :options="dualMode.modeOptions"
+          :model-value="renderMode"
+          :options="syncModeOptions"
           size="small"
-          @change="dualMode.onModeChange"
+          @change="switchRenderMode"
         />
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g6-other-bond-sppi" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
@@ -137,7 +142,11 @@ import { matchG6SaveItemsEvent } from './composables/g6CrossHelpers'
 import http from '@/utils/http'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // ── G6_SPPI sync bridge（spec: g4-g6-shared-workbook-three-entry-lanes）──
-import { isGSingleRegionManagedSheet, gSingleRegionSheetKeyOf } from './sync/gSingleRegionManagedSheets'
+import {
+  gSharedWorkbookSheetOf,
+  isGSharedWorkbookManagedSheet,
+} from './sync/gSharedWorkbookManagedSheets'
+import { useGRenderModeSwitch } from './sync/useGRenderModeSwitch'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
@@ -286,33 +295,69 @@ async function retrySelfLoad(): Promise<void> {
 
 // ─── 生命周期 ───────────────────────────────────────────────────────────────
 // ── G6_SPPI sync bridge 接线 ────────────────────────────────
-const G6_SPPI_SYNC_ENTRY_ID = 'xlsx/gt-g6-other-bond-sppi'
-const isG6SppiSyncManagedSheet = computed(() => isGSingleRegionManagedSheet(currentSheet.value))
-const isOoMode = computed(
-  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && dualMode.currentMode.value === 'onlyoffice',
+/** 本宿主自己的 entry（**不**拿去建桥，见下方 G6_BRIDGE_ENTRY_ID）。 */
+const G6_SPPI_HOST_ENTRY_ID = 'xlsx/gt-g6-other-bond-sppi'
+/**
+ * 🔴 建桥用的是**共享册 main 的 entry_id**，不是本宿主自己那个。
+ *
+ * 后端 `phase5_g6_other_bond.ENTRY_ID === 'xlsx/gt-g6-other-bond-main'`（一册多 entry，
+ * pointer 靠 entry_id 区分、matcher 用 sheet_keys 互斥，裁决 G46-H2），它唯一的受管行表
+ * spec 是 `SPEC_G605`（`公允价值测试表G6-5`，`g605-managed`）—— 那张表由**本宿主**渲染
+ * （`currentSheet` 正则 `G6-(5|6|7|8|9|10)`）。
+ *
+ * 原实现用 `…-sppi` 建桥：那条 entry 没有契约、`adapter_id=null`、受管面为空。
+ */
+const G6_BRIDGE_ENTRY_ID = 'xlsx/gt-g6-other-bond-main'
+/**
+ * 🔴 受管判定改用 (hostEntryId, 语义名) 二元组 —— 原先用按**短码**建 map 的
+ * `isGSingleRegionManagedSheet`，而本宿主 `currentSheet` 返回**语义名**
+ * （`fairValueTest` 等）⇒ 恒 `false`。且 G4-SPPI 与本宿主的语义名集合有交集
+ * （两边都有 `securitiesInventory`），单键 map 会串台。
+ */
+const isG6SppiSyncManagedSheet = computed(() =>
+  isGSharedWorkbookManagedSheet(G6_SPPI_HOST_ENTRY_ID, currentSheet.value),
 )
 const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
-const syncEntryId = ref(G6_SPPI_SYNC_ENTRY_ID)
-const syncSheetKey = computed(() => gSingleRegionSheetKeyOf(currentSheet.value) ?? 'g605-managed')
+const syncEntryId = ref(G6_BRIDGE_ENTRY_ID)
+const syncSheetKey = computed(
+  () =>
+    gSharedWorkbookSheetOf(G6_SPPI_HOST_ENTRY_ID, currentSheet.value)?.sheetKey ?? 'g605-managed',
+)
 const syncBridge = useWorkpaperSyncBridge({
   entryId: syncEntryId,
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   sheetKey: syncSheetKey,
-  capability: capabilityForEntry(G6_SPPI_SYNC_ENTRY_ID),
+  capability: capabilityForEntry(G6_BRIDGE_ENTRY_ID),
   flushHtml: async () => {
     formData.flushPending()
     return await readStoreProjection({
       projectId: props.projectId,
       wpId: props.wpId,
-      entryId: G6_SPPI_SYNC_ENTRY_ID,
+      entryId: G6_BRIDGE_ENTRY_ID,
     })
   },
   reloadHtml: () => formData.loadAll(),
 })
 const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
 const syncBusy = computed(() => WP_BRIDGE_IN_FLIGHT_STATES.includes(syncBridge.state.value))
-const syncSwitching = ref(false)
+
+// 🔴 受管 sheet 必须经桥切换 —— 桥建好了但没人调 `switchToOnlyOffice()` 就是空壳。
+const {
+  renderMode,
+  modeOptions: syncModeOptions,
+  switching: syncSwitching,
+  switchRenderMode,
+} = useGRenderModeSwitch({
+  bridge: syncBridge,
+  legacy: dualMode,
+  isManagedSheet: isG6SppiSyncManagedSheet,
+  editorHostRef: syncEditorHostRef,
+})
+
+const isOoMode = computed(
+  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && renderMode.value === 'onlyoffice',
+)
 
 onMounted(async () => {
   window.addEventListener('g6:save-items', handleG6SaveItems)
@@ -330,4 +375,11 @@ onBeforeUnmount(() => {
 .loading-container { padding: 24px; }
 .error-container { padding: 24px; }
 .g6-other-bond-investment-sppi-toolbar { margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
+
+/* ─── 同步编辑器容器 ─── */
+/* 🔴 必须带**视口相关的确定高度**：`WorkpaperSyncEditorHost` 根元素是 height:100% + flex 列，
+   父级 auto 高度会把编辑区（flex:1; min-height:0）压扁，OnlyOffice 在页面上只剩一条
+   （2026-09-22 D4 真栈实证）。模板里用了 `.oo-container` 却不定义它就是这个后果。 */
+.oo-container { min-height: 600px; height: calc(100vh - 280px); overflow: hidden; border-radius: 8px; }
+.oo-loading { padding: 40px 20px; text-align: center; color: #909399; font-size: 14px; }
 </style>

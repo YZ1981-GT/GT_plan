@@ -132,9 +132,31 @@ function mountingHosts(): string[] {
 }
 
 /**
+ * 现算「建了 `useWorkpaperSyncBridge` 却没人驱动」的相对路径。
+ *
+ * 比 `hollowHosts()` 的面更宽：那条要求先挂 `WorkpaperSyncEditorHost`，而 G1/G3 曾经
+ * 建了桥**连挂都没挂**（桥全套死代码），压根没进那条的扫描面。
+ */
+function bridgeBuiltNotDriven(): string[] {
+  const wrappers = [...drivingWrappers()]
+  const out: string[] = []
+  for (const rel of listVue(WP)) {
+    const src = stripComments(read(resolve(WP, rel)))
+    if (!/\buseWorkpaperSyncBridge\s*\(/.test(src)) continue
+    if (DRIVE_RE.test(src)) continue
+    if (wrappers.some((w) => new RegExp(`\\b${w}\\s*\\(`).test(src))) continue
+    out.push(rel)
+  }
+  return out.sort()
+}
+
+/**
  * 🔴 append-only 欠账清单，**不是豁免名单**（修好必须删，见文件头）。
  *
- * 13 个 G 循环宿主（挂 legacy `useG*DualMode`）+ 14 个 A 循环宿主（纯本地 mode ref）。
+ * 现存 14 个 A 循环宿主（纯本地 mode ref，连包装都没有）。
+ *
+ * 原先还有 13 个 G 循环宿主，已于 2026-09-27 全部接 `sync/useGRenderModeSwitch`
+ * （受管 sheet 经桥的四分支协议、非受管委派 legacy），逐个从本清单删除。
  */
 const KNOWN_HOLLOW: readonly string[] = Object.freeze([
   // ── A 循环：连包装都没有，`const mode = ref('结构化视图')` + v-model ──
@@ -152,20 +174,36 @@ const KNOWN_HOLLOW: readonly string[] = Object.freeze([
   'GtA271ItAuditMemo.vue',
   'GtA81OtherInfoRepresentation.vue',
   'GtA91DeficiencyLetter.vue',
-  // ── G 循环：挂 legacy `useG*DualMode`（对 bridge 一无所知）──
-  'GtG10TradingFinancialLiabilities.vue',
-  'GtG11InvestmentIncome.vue',
-  'GtG12NetHedgeGains.vue',
-  'GtG13FairValueChanges.vue',
-  'GtG14CreditImpairmentLoss.vue',
-  'GtG4BondInvestmentEcl.vue',
-  'GtG4BondInvestmentMain.vue',
-  'GtG4BondInvestmentSppi.vue',
-  'GtG5LongTermReceivable.vue',
-  'GtG6OtherBondMain.vue',
-  'GtG6OtherBondSppi.vue',
-  'GtG8OtherEquityInstruments.vue',
-  'GtG9OtherNoncurrentFinancial.vue',
+].sort())
+
+/**
+ * 🔴 「建了桥却没人驱动」的 append-only 欠账清单（**不是豁免名单**，修好必须删）。
+ *
+ * 现算 **17 个**，全在 A 循环 —— 比 `KNOWN_HOLLOW` 那 14 个多出
+ * `GtA112DualChecklist` / `GtA115DisclosureChecklist` / `GtA38GoodwillImpairment`
+ * 三个：它们建了桥但连 `WorkpaperSyncEditorHost` 都没挂，所以原判据的扫描面扫不到。
+ *
+ * 这 17 个不在本轮（G 循环 + B60）范围：A 循环连 `*ManagedSheets` 受管声明清单都还没有，
+ * 受管 sheet 身份无从派生。本清单只负责「锁住不恶化」并把欠账面记准。
+ */
+const KNOWN_BUILT_NOT_DRIVEN: readonly string[] = Object.freeze([
+  'GtA101GovernanceCommunication.vue',
+  'GtA111SubsequentEventsInquiry.vue',
+  'GtA112DualChecklist.vue',
+  'GtA115DisclosureChecklist.vue',
+  'GtA121LegalConfirmation.vue',
+  'GtA171AuditSummary.vue',
+  'GtA1721Kam.vue',
+  'GtA1731ConsultationExecution.vue',
+  'GtA173ConsultationRecord.vue',
+  'GtA174DisagreementRecord.vue',
+  'GtA176ClosingMeeting.vue',
+  'GtA177IndependenceDeclaration.vue',
+  'GtA182RegulatoryCommunication.vue',
+  'GtA271ItAuditMemo.vue',
+  'GtA38GoodwillImpairment.vue',
+  'GtA81OtherInfoRepresentation.vue',
+  'GtA91DeficiencyLetter.vue',
 ].sort())
 
 describe('挂了 WorkpaperSyncEditorHost 就必须有人驱动 materialize', () => {
@@ -203,15 +241,56 @@ describe('挂了 WorkpaperSyncEditorHost 就必须有人驱动 materialize', () 
     expect(fixed, `以下宿主已接真驱动，请从 KNOWN_HOLLOW 删掉：\n  ${fixed.join('\n  ')}`).toEqual([])
   })
 
-  it('正向对照：点名断言 G9 与 A91 确实被扫到（不是自证式相等）', () => {
-    expect(hollow).toContain('GtG9OtherNoncurrentFinancial.vue')
+  it('正向对照：点名断言 A91 与 A101 确实被扫到（不是自证式相等）', () => {
+    // 🔴 原来点名的是 G9 —— 它已接真桥，留着就是要求生产代码退回去。A 循环那 14 个
+    //    才是当前真实的欠账面（连 `*ManagedSheets` 声明清单都没有）。
     expect(hollow).toContain('GtA91DeficiencyLetter.vue')
+    expect(hollow).toContain('GtA101GovernanceCommunication.vue')
+    // 已修好的不得再出现在空壳面里（与基线那条互为正反）。
+    expect(hollow).not.toContain('GtG9OtherNoncurrentFinancial.vue')
+    expect(hollow).not.toContain('GtG13FairValueChanges.vue')
   })
 
   it('🔴 usePilotBridgeAdapter 不得被当成驱动方（它 docstring 提到但实现零 API）', () => {
     const adapter = stripComments(read(resolve(SYNC, 'usePilotBridgeAdapter.ts')))
     expect(DRIVE_RE.test(adapter)).toBe(false)
     expect(drivingWrappers().has('usePilotBridgeAdapter')).toBe(false)
+  })
+
+  /**
+   * 🔴 补这条是因为本文件原有判据有个**盲区**：它只扫「挂了 `WorkpaperSyncEditorHost`」
+   * 的宿主。而 `GtG1TradingFinancialAssets` / `GtG3DividendReceivable` 当时的形态是
+   * **建了 `useWorkpaperSyncBridge` 却既不挂 EditorHost 也不驱动** —— 桥连同
+   * `syncOoDescriptor` / `syncSwitching` 全是死代码，OO 模式一律走 legacy 假双向。
+   * 那比「挂了却不驱动」更隐蔽：压根没进本文件的扫描面，两条基线判据都抓不到。
+   *
+   * ⇒ 判据面从「挂了就要驱动」扩到「**建了桥**就要有人驱动」。
+   */
+  it('🔴 建了 useWorkpaperSyncBridge 的宿主必须有人驱动 materialize（不止挂了的）', () => {
+    const extra = bridgeBuiltNotDriven().filter((h) => !KNOWN_BUILT_NOT_DRIVEN.includes(h))
+    expect(
+      extra,
+      '以下宿主建了桥却没人驱动 materialize —— 桥、descriptor、switching 全是死代码，'
+        + '用户切「在线编辑」走的是 legacy 假双向路径：\n  '
+        + extra.join('\n  '),
+    ).toEqual([])
+  })
+
+  it('🔴 建桥基线里已修好的也必须从清单删掉（同样不许退化成豁免名单）', () => {
+    const built = bridgeBuiltNotDriven()
+    const fixed = KNOWN_BUILT_NOT_DRIVEN.filter((h) => !built.includes(h))
+    expect(
+      fixed,
+      `以下宿主已接真驱动，请从 KNOWN_BUILT_NOT_DRIVEN 删掉：\n  ${fixed.join('\n  ')}`,
+    ).toEqual([])
+  })
+
+  it('扫描器自检②：确实扫到了建桥的宿主（防上一条空集假绿）', () => {
+    const builders = listVue(WP).filter((rel) =>
+      /\buseWorkpaperSyncBridge\s*\(/.test(stripComments(read(resolve(WP, rel)))),
+    )
+    // 现算 30+ 个宿主直接建桥；下界远低于现值，只防「扫成空集」。
+    expect(builders.length).toBeGreaterThan(20)
   })
 
   it('反例锚点：G2 与 H 循环包装是真驱动（证明判据能区分真假）', () => {

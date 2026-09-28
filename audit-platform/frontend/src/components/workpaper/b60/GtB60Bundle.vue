@@ -170,12 +170,14 @@ async function switchMainMode(target: 'html' | 'onlyoffice'): Promise<void> {
 //    `bridge.switchToOnlyOffice()` 产出。「挂了宿主」≠「接了桥」，必须真调那个方法
 //    （基线由 `sync/__tests__/bridgeMaterializeDriven.spec.ts` 钉住）。
 //
-// ⚠️ 已知缺口（如实登记，不在本层假装通了）：`b60.hour_budget` 是
-//    `store_item_registry.NON_STORE_BACKED_ADAPTERS` 的成员 —— 契约 `review` 段无
-//    `html_store`、字段 `store_item_id` 全为 None ⇒ 后端 `store_merge_plan_or_skip()`
-//    对它返回 `None`，**OO→HTML 的 store 镜像会被跳过**。所以本处接通的是 HTML→OO
-//    方向（flush → materialize → 可编辑的 xlsx）与 OO 侧 durable artifact 落盘；
-//    OO 里改的行不会自动回到工时面板。补 `html_store` 属契约层改动，另立一笔。
+// ✅ 两个方向都已接通（2026-09-27）：
+//    · HTML→OO：`flushHtml` 先 await 面板落库再读投影 → materialize；
+//    · OO→HTML：后端 `oo_to_html` 按 `store_item_registry` 的 plan 取
+//      `pilot_simple_checklist.merge_projection_into_store_rows` 把受管格合并回
+//      `B60-1-hour-budget-rows`，`reloadHtml` 重读面板即可见。
+//    此前 `b60.hour_budget` 是 `NON_STORE_BACKED_ADAPTERS` 的唯一成员（契约无
+//    `html_store` ⇒ 回方向被提前跳过）—— 那条归类描述的是「前端还没有 HTML 面」
+//    这个时点事实，`GtB60HourBudgetPanel` 落地后已随契约一并改正。
 
 /** entry id（manifest 冻结值，与 `pilot_simple_checklist.PILOT_ENTRY_ID` 逐字一致）。 */
 const B60_SYNC_ENTRY_ID = 'xlsx/b60/gt-b60-bundle'

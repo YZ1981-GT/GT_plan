@@ -3,12 +3,17 @@
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
       <div v-if="currentSheet !== '底稿目录'" class="g9-toolbar">
+        <!--
+          🔴 原先绑 legacy `dualMode.currentMode` / `dualMode.onModeChange`（本地 ref）⇒ 桥的
+          mode 永远不动、descriptor 恒 null，受管 sheet 切「在线编辑」后永远停在「正在打开…」。
+          现在统一走 `switchRenderMode`：受管 sheet 经桥（四分支保存协议），非受管委派 legacy。
+        -->
         <el-segmented
           v-if="isHtmlSheet"
-          :model-value="dualMode.currentMode.value"
-          :options="dualMode.modeOptions"
+          :model-value="renderMode"
+          :options="syncModeOptions"
           size="small"
-          @change="dualMode.onModeChange"
+          @change="switchRenderMode"
         />
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g9-other-noncurrent-financial" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
@@ -183,6 +188,7 @@ import { useHostApplicableStandards } from './composables/hostApplicableStandard
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // ── G9 sync bridge（spec: g-cycle-single-region-detail-lanes · Task 15）──
 import { isGSingleRegionManagedSheet, gSingleRegionSheetKeyOf } from './sync/gSingleRegionManagedSheets'
+import { useGRenderModeSwitch } from './sync/useGRenderModeSwitch'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
@@ -285,9 +291,6 @@ async function reloadAll() {
 // ── G9 sync bridge 接线（Task 15 · Requirements 4.7）───────────────────────
 const G9_SYNC_ENTRY_ID = 'xlsx/gt-g9-other-noncurrent-financial'
 const isG9SyncManagedSheet = computed(() => isGSingleRegionManagedSheet(currentSheet.value))
-const isOoMode = computed(
-  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && dualMode.currentMode.value === 'onlyoffice',
-)
 const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
 const syncEntryId = ref(G9_SYNC_ENTRY_ID)
 const syncSheetKey = computed(() => gSingleRegionSheetKeyOf(currentSheet.value) ?? 'g902-managed')
@@ -309,7 +312,25 @@ const syncBridge = useWorkpaperSyncBridge({
 })
 const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
 const syncBusy = computed(() => WP_BRIDGE_IN_FLIGHT_STATES.includes(syncBridge.state.value))
-const syncSwitching = ref(false)
+
+// 🔴 受管 sheet 必须经桥切换 —— 桥建好了但没人调 `switchToOnlyOffice()` 就是空壳：
+//    `WorkpaperSyncEditorHost` 自己不 materialize，descriptor 只能由那个方法产出，
+//    于是用户切「在线编辑」后永远停在「正在打开…」，而所有静态门都是绿的。
+const {
+  renderMode,
+  modeOptions: syncModeOptions,
+  switching: syncSwitching,
+  switchRenderMode,
+} = useGRenderModeSwitch({
+  bridge: syncBridge,
+  legacy: dualMode,
+  isManagedSheet: isG9SyncManagedSheet,
+  editorHostRef: syncEditorHostRef,
+})
+
+const isOoMode = computed(
+  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && renderMode.value === 'onlyoffice',
+)
 
 onMounted(async () => {
   await formData.loadAll()
@@ -326,4 +347,11 @@ onBeforeUnmount(() => {
 .loading-container { padding: 24px; }
 .g9-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .g9-index-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+
+/* ─── 同步编辑器容器 ─── */
+/* 🔴 必须带**视口相关的确定高度**：`WorkpaperSyncEditorHost` 根元素是 height:100% + flex 列，
+   父级 auto 高度会把编辑区（flex:1; min-height:0）压扁，OnlyOffice 在页面上只剩一条
+   （2026-09-22 D4 真栈实证）。模板里用了 `.oo-container` 却不定义它就是这个后果。 */
+.oo-container { min-height: 600px; height: calc(100vh - 280px); overflow: hidden; border-radius: 8px; }
+.oo-loading { padding: 40px 20px; text-align: center; color: #909399; font-size: 14px; }
 </style>

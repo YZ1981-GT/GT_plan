@@ -3,12 +3,17 @@
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
       <div class="g3-dividend-receivable-toolbar">
+        <!--
+          🔴 原先绑 legacy `dualMode.currentMode` / `dualMode.onModeChange`（本地 ref）⇒ 桥的
+          mode 永远不动、descriptor 恒 null，受管 sheet 切「在线编辑」后永远停在「正在打开…」。
+          现在统一走 `switchRenderMode`：受管 sheet 经桥（四分支保存协议），非受管委派 legacy。
+        -->
         <el-segmented
           v-if="isHtmlSheet"
-          :model-value="dualMode.currentMode.value"
-          :options="dualMode.modeOptions.value"
+          :model-value="renderMode"
+          :options="syncModeOptions"
           size="small"
-          @change="dualMode.onModeChange"
+          @change="switchRenderMode"
         />
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g3-dividend-receivable" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
@@ -20,8 +25,26 @@
         <el-tag v-if="syncSwitching" size="small" type="info">切换中…</el-tag>
       </div>
 
+      <!--
+        G3-2 明细表受管 sheet 走 WorkpaperSyncEditorHost 真双向。
+        🔴 本宿主原先**建了桥却既不挂 `WorkpaperSyncEditorHost` 也不驱动它** ——
+        `syncBridge` / `syncOoDescriptor` 全是死代码，OO 模式一律渲染 legacy
+        `GtOnlyOfficeSheet`（假双向）。比「挂了却不驱动」更隐蔽：`bridgeMaterializeDriven`
+        判据只扫「挂了 EditorHost 的宿主」，本文件因为没挂而根本没进扫描面。
+      -->
+      <div v-if="isOoMode && isG3SyncManagedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          v-if="syncOoDescriptor"
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+        <div v-else class="oo-loading">正在打开 G3-2 同步编辑器…</div>
+      </div>
+
+      <!-- 非受管 sheet 保留 legacy GtOnlyOfficeSheet（假双向，如实登记） -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice' && dualMode.isOoAvailable.value"
+        v-else-if="isOoMode && dualMode.isOoAvailable.value"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -189,6 +212,7 @@ import type { ChecklistResponse } from './composables/useF1FormData'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // ── G3 sync bridge（spec: g-cycle-single-region-detail-lanes · Task 15）──
 import { isGSingleRegionManagedSheet, gSingleRegionSheetKeyOf } from './sync/gSingleRegionManagedSheets'
+import { useGRenderModeSwitch } from './sync/useGRenderModeSwitch'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
@@ -354,9 +378,6 @@ function handleAdjudicated(d: {
 // ── G3 sync bridge 接线（Task 15 · Requirements 4.7）───────────────────────
 const G3_SYNC_ENTRY_ID = 'xlsx/gt-g3-dividend-receivable'
 const isG3SyncManagedSheet = computed(() => isGSingleRegionManagedSheet(currentSheet.value))
-const isOoMode = computed(
-  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && dualMode.currentMode.value === 'onlyoffice',
-)
 const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
 const syncEntryId = ref(G3_SYNC_ENTRY_ID)
 const syncSheetKey = computed(() => gSingleRegionSheetKeyOf(currentSheet.value) ?? 'g302-managed')
@@ -378,7 +399,25 @@ const syncBridge = useWorkpaperSyncBridge({
 })
 const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
 const syncBusy = computed(() => WP_BRIDGE_IN_FLIGHT_STATES.includes(syncBridge.state.value))
-const syncSwitching = ref(false)
+
+// 🔴 受管 sheet 必须经桥切换 —— 桥建好了但没人调 `switchToOnlyOffice()` 就是空壳：
+//    `WorkpaperSyncEditorHost` 自己不 materialize，descriptor 只能由那个方法产出，
+//    于是用户切「在线编辑」后永远停在「正在打开…」，而所有静态门都是绿的。
+const {
+  renderMode,
+  modeOptions: syncModeOptions,
+  switching: syncSwitching,
+  switchRenderMode,
+} = useGRenderModeSwitch({
+  bridge: syncBridge,
+  legacy: dualMode,
+  isManagedSheet: isG3SyncManagedSheet,
+  editorHostRef: syncEditorHostRef,
+})
+
+const isOoMode = computed(
+  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && renderMode.value === 'onlyoffice',
+)
 
 onMounted(async () => {
   eventBus.on('substantive:adjudicated', handleAdjudicated)
@@ -401,4 +440,11 @@ onBeforeUnmount(() => {
 .g3-index-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 
 .g3-excel-fallback { padding: 48px 24px; text-align: center; }
+
+/* ─── 同步编辑器容器 ─── */
+/* 🔴 必须带**视口相关的确定高度**：`WorkpaperSyncEditorHost` 根元素是 height:100% + flex 列，
+   父级 auto 高度会把编辑区（flex:1; min-height:0）压扁，OnlyOffice 在页面上只剩一条
+   （2026-09-22 D4 真栈实证）。模板里用了 `.oo-container` 却不定义它就是这个后果。 */
+.oo-container { min-height: 600px; height: calc(100vh - 280px); overflow: hidden; border-radius: 8px; }
+.oo-loading { padding: 40px 20px; text-align: center; color: #909399; font-size: 14px; }
 </style>

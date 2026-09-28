@@ -12,12 +12,17 @@
     </div>
     <template v-else>
       <div class="g5-long-term-receivable-toolbar">
+        <!--
+          🔴 原先 `@change` 直接 `dualMode.switchMode(v)`（legacy 本地 ref）⇒ 桥的 mode 永远
+          不动、descriptor 恒 null，受管 sheet G5-2 切「在线编辑」后永远停在「正在打开…」。
+          顺带修掉 `:options="dualMode.modeOptions"` 漏 `.value`（把 ComputedRef 当数组传）。
+        -->
         <el-segmented
           v-if="isHtmlSheet"
           :model-value="renderMode"
-          :options="dualMode.modeOptions"
+          :options="syncModeOptions"
           size="small"
-          @change="(v: any) => dualMode.switchMode(v)"
+          @change="switchRenderMode"
         />
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g5-long-term-receivable" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
@@ -216,6 +221,7 @@ import { useHostApplicableStandards } from './composables/hostApplicableStandard
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // ── G5 sync bridge（spec: g5-nested-sections-and-template-defects · Task 12）──
 import { isGSingleRegionManagedSheet, gSingleRegionSheetKeyOf } from './sync/gSingleRegionManagedSheets'
+import { useGRenderModeSwitch } from './sync/useGRenderModeSwitch'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
@@ -325,11 +331,9 @@ const dualMode = useG5DualMode({
   reloadAll: () => formData.loadAll(),
 })
 
-/** 对齐 G1：computed getter/setter 安全包装 dualMode ref 避免模板嵌套 .value */
-const renderMode = computed({
-  get: () => dualMode.currentMode.value,
-  set: (v: string) => { void dualMode.switchMode(v as any) },
-})
+// 🔴 原先这里有个 `renderMode` computed（get/set 包 legacy `dualMode`），setter 直接
+//    `dualMode.switchMode(v)` ⇒ 受管 sheet 也只翻 legacy 本地 ref，桥的 mode 永远不动。
+//    现在 `renderMode` 由下方 `useGRenderModeSwitch` 提供（受管以桥为真源）。
 const isOoAvailable = computed(() => dualMode.isOoAvailable.value)
 
 const runtime = inject(WorkpaperRuntimeContextKey, null)
@@ -431,9 +435,6 @@ async function retrySelfLoad(): Promise<void> {
 // ── G5 sync bridge 接线 ────────────────────────────────
 const G5_SYNC_ENTRY_ID = 'xlsx/gt-g5-long-term-receivable'
 const isG5SyncManagedSheet = computed(() => isGSingleRegionManagedSheet(currentSheet.value))
-const isOoMode = computed(
-  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && dualMode.currentMode.value === 'onlyoffice',
-)
 const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
 const syncEntryId = ref(G5_SYNC_ENTRY_ID)
 const syncSheetKey = computed(() => gSingleRegionSheetKeyOf(currentSheet.value) ?? 'g502-managed')
@@ -455,7 +456,23 @@ const syncBridge = useWorkpaperSyncBridge({
 })
 const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
 const syncBusy = computed(() => WP_BRIDGE_IN_FLIGHT_STATES.includes(syncBridge.state.value))
-const syncSwitching = ref(false)
+
+// 🔴 受管 sheet 必须经桥切换 —— 桥建好了但没人调 `switchToOnlyOffice()` 就是空壳。
+const {
+  renderMode,
+  modeOptions: syncModeOptions,
+  switching: syncSwitching,
+  switchRenderMode,
+} = useGRenderModeSwitch({
+  bridge: syncBridge,
+  legacy: dualMode,
+  isManagedSheet: isG5SyncManagedSheet,
+  editorHostRef: syncEditorHostRef,
+})
+
+const isOoMode = computed(
+  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && renderMode.value === 'onlyoffice',
+)
 
 onMounted(async () => {
   window.addEventListener('g5:save-items', handleG5SaveItems)
@@ -477,4 +494,11 @@ onBeforeUnmount(() => {
 .error-container { padding: 24px; }
 .g5-long-term-receivable-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
 .g5-index-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+
+/* ─── 同步编辑器容器 ─── */
+/* 🔴 必须带**视口相关的确定高度**：`WorkpaperSyncEditorHost` 根元素是 height:100% + flex 列，
+   父级 auto 高度会把编辑区（flex:1; min-height:0）压扁，OnlyOffice 在页面上只剩一条
+   （2026-09-22 D4 真栈实证）。模板里用了 `.oo-container` 却不定义它就是这个后果。 */
+.oo-container { min-height: 600px; height: calc(100vh - 280px); overflow: hidden; border-radius: 8px; }
+.oo-loading { padding: 40px 20px; text-align: center; color: #909399; font-size: 14px; }
 </style>

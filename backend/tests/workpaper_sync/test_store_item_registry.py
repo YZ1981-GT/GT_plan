@@ -133,15 +133,45 @@ class TestProperty6ExplicitErrorNotSilentReturn:
             fn_name = getattr(plan, attr)
             assert fn_name and hasattr(bridge, fn_name), f"{plan.provider_module} 缺 {fn_name}"
 
-    def test_b60_is_non_store_backed_not_broken(self) -> None:
-        """b60 是**形态不同**（纯 Excel entry，契约无 html_store）而非缺陷 ⇒ 走跳过而非抛错。"""
-        from app.services.workpaper_sync.store_item_registry import (
-            NON_STORE_BACKED_ADAPTERS,
-            store_merge_plan_or_skip,
-        )
+    def test_non_store_backed_set_is_a_structural_claim_not_a_todo(self) -> None:
+        """`NON_STORE_BACKED_ADAPTERS` 的成员必须是**结构上**不可能有 HTML 载体的。
 
-        assert "b60.hour_budget" in NON_STORE_BACKED_ADAPTERS
-        assert store_merge_plan_or_skip("b60.hour_budget") is None
+        🔴 原判据是 `test_b60_is_non_store_backed_not_broken`：断言
+        `"b60.hour_budget" in NON_STORE_BACKED_ADAPTERS`。b60 当时确实没有 HTML 面，
+        但「现在还没有载体」和「结构上不可能有载体」是两回事 ——
+        `b60/GtB60HourBudgetPanel.vue` 一落地，那条断言锁住的就变成了「OO→HTML 回写
+        不通」这个缺陷本身（2026-09-27 已转为真 store-backed，本集合随之空了）。
+
+        ⇒ 改为断言这条**不变量**：集合里的每个成员都不得同时在 `STORE_MERGE_REGISTRY`
+          里有非空 `items`。两处都声明就是自相矛盾 —— 要么它有 store（该走镜像），
+          要么没有（该留在本集合），不能既登记 item 又声明不镜像。
+          空集合法：机制有效性由上面的合成 plan 判据保证，不依赖生产面恰好有成员。
+        """
+        import app.services.workpaper_sync.store_item_registry as REG
+
+        for adapter_id in REG.NON_STORE_BACKED_ADAPTERS:
+            plan = REG.STORE_MERGE_REGISTRY.get(adapter_id)
+            assert plan is None or not plan.items, (
+                f"{adapter_id} 同时登记了 store items {plan.items if plan else ()} 和"
+                "「不做 store 镜像」—— 自相矛盾。它要么有 HTML 载体（从本集合移出、走真镜像），"
+                "要么没有（从 STORE_MERGE_REGISTRY 的 items 里删掉）"
+            )
+
+    def test_b60_is_now_store_backed_after_frontend_panel_landed(self) -> None:
+        """b60 转为真 store-backed：plan 可 resolve、provider 两个符号齐备。"""
+        import importlib
+
+        import app.services.workpaper_sync.store_item_registry as REG
+
+        assert "b60.hour_budget" not in REG.NON_STORE_BACKED_ADAPTERS
+        plan = REG.store_merge_plan_or_skip("b60.hour_budget")
+        assert plan is not None and not plan.mirror_unavailable_reason
+        assert plan.item_ids == ("B60-1-hour-budget-rows",)
+        bridge = importlib.import_module(
+            f"app.services.workpaper_sync.{plan.provider_module}"
+        )
+        assert hasattr(bridge, "STORE_ITEM_ID")
+        assert hasattr(bridge, plan.merge_rows_fn)
 
     def test_the_eight_delivered_adapters_are_all_registered(self) -> None:
         """8 个已交付 contract 里，除三家 mirror 不可用外，其余 5 家（d1/d3/d4/d5/d6/d7 + d2）

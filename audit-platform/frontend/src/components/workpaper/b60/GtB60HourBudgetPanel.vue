@@ -3,14 +3,22 @@
  * B60-1 工时预算 HTML 面（G4-1 simple checklist canary）。
  * store item: B60-1-hour-budget-rows；行身份 rowUuid。
  *
- * ⚠️ 单向已通、反向未通（2026-09-27 实测，不要按「双向已成」理解本组件）：
- * `b60.hour_budget` 是 `store_item_registry.NON_STORE_BACKED_ADAPTERS` 的成员 ——
- * 契约 `b60.hour_budget.json` 的 `review` 段无 `html_store`、字段 `store_item_id` 全为
- * None ⇒ 后端 `store_merge_plan_or_skip()` 对它返回 `None`，**OO→HTML 的 store 镜像被
- * 跳过**。所以：
- *   · HTML → OO：通（宿主 `flushHtml` await 本组件 `flushPendingSave()` → materialize）
- *   · OO → HTML：**不通**，在 OO 里改的行不会自动回到本表
- * 补 `html_store` 属契约层改动，另立一笔。空态文案已按此如实改写。
+ * ═══ 双向都已接通（2026-09-27）═══
+ *
+ * · HTML → OO：宿主 `GtB60Bundle` 的 `flushHtml` 先 await 本组件 `flushPendingSave()`
+ *   再 `readStoreProjection` → materialize（防抖 600ms，不等它会丢最后一批编辑）。
+ * · OO → HTML：forcesave 后 `oo_to_html._mirror_store_backed_if_needed` 按
+ *   `store_item_registry` 的 plan 取 `pilot_simple_checklist.merge_projection_into_store_rows`
+ *   （实现在伴生模块 `pilot_b60_store_merge`），把受管格合并回本 store item。
+ *
+ * 🔴 三方身份必须逐字一致，改任何一处都要同改其余两处（有判据守着）：
+ *   · `STORE_ITEM_ID` ↔ `pilot_simple_checklist.STORE_ITEM_ID` ↔ 契约 `html_store.item_ids`
+ *   · `ROW_ID_KEY` ↔ `pilot_simple_checklist.ROW_IDENTITY_STORE_KEY` ↔ 契约
+ *     `row_identity.json_pointer`（`/rows/*/rowUuid`）
+ *   · 字段名扁平 snake_case ↔ 契约 `json_pointer` ↔ `MANAGED_FIELD_SPECS` 的 column_key
+ *
+ * ⚠️ F 列 `budget_cost`（=(C+D)*E）**不会**回写到这里：它是 Excel 侧公式，
+ * 固化进 HTML store 会造第二份事实（回方向按 mode 过滤掉）。本表也不显示该列。
  */
 import { ref, watch, onMounted } from 'vue'
 import http from '@/utils/http'
@@ -176,12 +184,15 @@ defineExpose({ flushPendingSave, reload: load })
         </tr>
         <tr v-if="rows.length === 0">
           <!--
-            🔴 原文案是「打开在线编辑并 forcesave 后将镜像至此」—— 那是一句不成立的承诺：
-            `b60.hour_budget` 属 NON_STORE_BACKED_ADAPTERS，OO→HTML 的 store 镜像被后端
-            跳过（见本文件头注释）。改成如实说明，不让用户等一个不会来的回填。
+            🔴 这句文案有过两次反转，都是跟着后端真实能力走的：
+            ① 最初写「打开在线编辑并 forcesave 后将镜像至此」—— 当时 b60 属
+               NON_STORE_BACKED_ADAPTERS，镜像被跳过，是一句不成立的承诺；
+            ② 随后改成「暂不会回写到这里」—— 如实，但那是缺口登记；
+            ③ 2026-09-27 契约补了 html_store、注册表转真 store-backed、merge 门面落地
+               （有 roundtrip 判据），承诺这才成立。
           -->
           <td colspan="8" class="b60-hour-budget__empty">
-            暂无行。本表可直接录入；在「在线编辑」里改的内容暂不会回写到这里（B60 无 html_store）
+            暂无行。本表可直接录入；在「在线编辑」里保存后也会回写到这里
           </td>
         </tr>
       </tbody>
