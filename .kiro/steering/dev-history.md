@@ -4628,3 +4628,280 @@ rows_unchanged       ✅ 恒定 756 行（明细行未受影响）
 - **✅ 同批追加①：抽凭科目字面量全清（2026-09-28，两守卫 36/36 全绿零保留红，回归 236 passed）**：上一条「刻意保留 2 条红」已清零。**🔴 更正上一条的结论「剩 39 处取值全部正确」** —— 接线前用探针把「真源兜底值」与「组件现值」逐个比对，抓到**第 26 处错码 G4**（组件 `1501` 实为持有至到期投资 → 真源 `1504` 债权投资，`report_config` 的 `BS-021 债权投资 = TB('1504','期末余额')` 佐证），且 `wp_account_mapping.json` 的 G4 同样错 ⇒ 该 json 累计 4 处错。**教训：不可按「值正确」机械替换，接线前必须逐个比对真源值**；若按上一条判断直接替换，G4 会被当成「值正确」漏掉。同批发现 **F1 在 `dCycleAccountScope` 未登记**（`dCycleScope('F1')` 返 `null` —— F1 属 F 循环采购与付款而非 D 循环，强行用会退化成空科目）。**产出**：新建 4 个缺位真源 `f1AccountScope`(预付账款 `1123`)/`m1AccountScope`(应付股利 `2232`)/`m2AccountScope`(实收资本 `4001`)/`n2AccountScope`(应交税费 `2221`)，均含 `account_chart` + `report_config` 实证表；接线 39 文件 41 挂载点（D1/D2/D3/D5/D6/D7 · G2/G3/G4 · F1 · H1×2/H2×2/H4×2/H6/H10 · I1×2/I3/I4 · J1 · K1/K3×3/K7/K8×3/K9/K13 · F3/F4/F5 · M1/M2/N2）；修 `F2ValuationTestSheet` 的「换地方硬编码」（`'1401,…,1411'.split(',')` → `F2_INVENTORY_ACCOUNT_CODES`，真源含 `1412` 覆盖更全）。**`m2AccountScope` 记录一处科目表歧义**：`account_chart` 的 `4001` 有**实收资本 14 条 / 生产成本 5 条**两种定义（2006 年前旧科目表用法），兜底取多数口径但在那 5 个项目里以 `4001` 抽凭会抽到生产成本凭证 —— 已写入文件头，这正是「运行态必须优先 `tb_source_codes`、兜底码只兜界面」的价值。**验证**：`@vue/compiler-sfc` 编译全部 **79** 个抽凭宿主 0 失败 / 0 残留静态字面量 / 0「绑定但缺声明」。
 
 - **✅ 同批追加②：`wp_account_mapping.json` 勘误就地处置（2026-09-28，37 项 / diff 37+37- / 后端零回归 + 前端 65 passed）**：**未另起 spec** —— 按「改动前先 spec 三件套」的三条阈值逐条判定（>500 行文件 / 3+ 组件 / 跨前后端）**均不触发**（单 json 文件、零组件、纯后端数据），按最小批次直接执行。**🔴 规模从登记的 4 处扩为 5 族 37 项**：登记的 4 条只是**主条目**，每族另有 `{code}-1`…`-n` 同族子条目沿用同一错码（G4 8 个 / H3 6 / H5 4 / K10 4 / K12 4），且**漏登了第 5 族 H3**（投资性房地产，与 G4 撞同一错码 `1501`；登记时逐 wp 对账只覆盖抽凭宿主涉及的底稿，H3 不在其中）；外加 `report_row` 连带 6 项 ⇒ 31 + 6 = 37。**修复值**：G4 `1501`→`1504` 债权投资 · H3 `1501`→`1521` 投资性房地产 · H5 `1606` 固定资产清理→`1631` 油气资产 · K10 `6301`(K12 的营业外收入)→`6117` 其他收益 · K12 `6001`(D4 的主营业务收入)→`6301` 营业外收入；`report_row` 6 项 = G4 `BS-030`→`BS-021` · H3+H3-1 `BS-026`→`BS-027` · K10 `None`→`IS-010` · K12 `None`→`IS-020` · **H5 `BS-031`→`None`**（`report_config` 无资产负债表「油气资产」行，与前端 `H5_ACCOUNT_DEF.reportRowCode = null` 一致 ⇒ **宁缺勿造，不编码**）。**🔴 H3 族的发现路径不是 grep 错码，而是产物 diff 的不对称**：改完 4 族主条目后重新生成 `note_template_bindings.json`，diff **只有新增、没有删除** ⇒ 旧码 `1501` 仍被别处引用 ⇒ 回查旧码才挖出 G4 的 8 个子条目与整个 H3 族。**「只增不删」是错码残留的可靠信号**，比逐条 grep 更早暴露问题。**🔴 零回归用差集法证**（本仓工作树有 **277 个预存失败**来自前序未完工作，直接看「有没有 failed」会被噪声淹没）：同一组 21 个测试文件 924 test 跑两遍（`git show HEAD:backend/data/wp_account_mapping.json` 取基线 vs 当前修复版），比较 failed **测试 ID 集合**的差集 —— 两版均 `277 failed / 647 passed` 且 **failed ID 逐条完全相同**（新增 0、修好 0）。前端抽凭真源 4 spec **65 passed**；`scripts/validate_seed_files.py` → `PASS`；`--check` 幂等复验 OK。**🔴 下游产物用隔离实验而非直接生成**：`note_template_bindings.json` 直接重新生成得 **3662+/7672-** 巨大 diff，但那绝大部分是**产物自身陈旧**（上游 json 多轮变更而产物未再生）与本次 37 项无关 ⇒ 改为基线 json / 修复版 json 各生成一份产物再互相 diff，测得本次真实影响仅 **54 行**（新增 `1504`×10 `1521`×10 `1631`×8 `6301`×4；删除 `1501`×10 `1606`×8 `6001`×4），全部为预期修正。**产物已 `git checkout --` 复原、未随本次提交**（拒绝把「产物陈旧」这笔无关历史欠账混进本次 diff，应另起独立提交）⇒ ⚠️ **运行态仍读旧产物，需重新生成 + 重启后端才生效**。**工具**：`backend/scripts/fix/fix_wp_account_mapping_wrong_codes.py` 保留供复验 —— 幂等（已是新值则 skip）· 现值既非期望原值也非期望新值时报 `[BAD]` 并以退出码 2 中止（**拒绝盲目覆盖**）· `assert` 保护 `wp_name`/`account_name` 不被改（5 族的名称字段本就正确，防「改错码时顺手把对的名字也改了」）。**顺带发现**：`WpAccountMappingEntry.report_row` 的 schema 类型是 `str | None` **无格式校验**（不拦 `BS-xxx` 形态错误）⇒ 种子校验通过不代表值对，这是本次错误能长期存活的原因之一；另 `test_note_report_row_code_alignment.py` 有 **6 个预存失败**（`note_template_{listed,soe}.json` 残留 95/23 处陈旧 `report_row_code`），基线同样红、与本次无关，属另一笔欠账（入口 `remap_note_report_row_codes.py --apply`）。
+---
+
+## 2026-09-28 · `disclosure-payload-authority-source` 实施 + 二轮复盘加固
+
+披露表 → 附注同步载荷的权威源归属裁定。**第一产出是方案裁定不是代码**。
+25/26（余 1 个 `[ ]*` Playwright 待 `start-dev.bat`）。
+
+### 四方案 ROI 结论
+
+| 方案 | 裁定 | 依据 |
+|---|---|---|
+| A 后端重建载荷 | **否决** | 要在后端重写 109 个构造器等价逻辑，双写必然漂移；该结论 `disclosure_stale_marker.py` 文件头已记录在案 |
+| B 载荷规则下沉为声明式配置 | **否决（技术不可行）** | 载荷是**计算**不是常量（含条件分支/聚合/按名合并补 0/`fmtPct` 比率换算/变体逐字列头/`_removed_table_keys`），声明式化 = 发明 DSL，表达力不足时必出逃逸钩子退化回双写 |
+| **C 前端主导 + 补齐可靠性与可见性** | **采纳** | 不迁移逻辑 ⇒ 零双写风险；守卫可全量扫描 + 双向变异 |
+| D 离屏批量重放 | **延后** | 技术可行（构造器是纯函数）但需 109 个签名适配 + 装载层解耦，且必须以 C 为前置，否则把未知缺陷放大 109 倍 |
+
+**方案 B 撤回依据**：B 是前序对话中我本人的建议。撤回理由 = 现读实证
+「章节映射能下沉恰恰因为它是**字面量常量**（正则可提取），而载荷是计算结果」。
+两者不同型，`gen_note_wp_sync_registry.py` 的成功模式**不能**外推到载荷结构。
+
+### 覆盖率基线数字（实施期现算）
+
+`disclosure_notes` 总 **1052** / `last_sync_at` 非空 **93**（8.8%）/ `is_stale` **225** / 从未同步 **959**。
+按 `source_template`：soe 858（同步 69 / stale 41）· listed 185（同步 15 / stale **181**）。
+规模基数：`buildXSyncPayload` **109** · `syncToDisclosureNotes` 宿主 **112** ·
+`useDisclosureAutoSync` 实现 **1** / 调用点 **144**。
+
+### 🔴 二轮复盘抓到的 3 个真实缺陷
+
+首版交付报「35 passed 全绿」，复盘发现其中 13 个测试是结构性/恒绿的，
+四条判据（Q6/Q7/Q8/Q10）与需求 3.4 实质未覆盖。逐项修复过程中抓到：
+
+**① 共享章节被重复计数**（覆盖率 service 实现 bug）
+现算 **8 个 `note_section` 被多 `wp_code` 共用**（`五、8` ← G2/G3/K1 · `五、22` ← H1/H6 ·
+`五、23` ← H2/H4 · `五、42` ← K3/M1/L2 · 各含 soe 对侧）。原实现按**职责行**计数（157 行），
+而这些章节在 `disclosure_notes` 里**只有一行** ⇒ 同一行被计 2~3 次。
+真库实测 `synced` service **17** vs 直接 SQL **13**（差 4）、`stale` **78** vs **73**（差 5）。
+验算闭合：157 职责行 − 145 去重章节 = 12 = Σ(owner 数 − 1) ✓
+修复 = 汇总按 `note_section` 去重 + 新增 `duty_rows` 字段保留职责行数供诊断。
+前端未同步列表同步去重（多 owner 合并展示 `G2/G3/K1`）。
+
+**② committed 注册表漂移**（补齐 Q10 守卫后立即抓到）
+committed 停在 **76** entries 而前端真源已 **78** —— 缺 `L2` 应付利息（五、42/八、42）
+与 `L4` 应付债券（五、46/八、50）⇒ 这两个底稿的附注章节**长期不在覆盖率视野内**。
+重跑 `--write` 修正后分母 143 → **145**、`stale` 73 → **74**（L4 章节确处过期态）。
+
+**③ 需求 5.1 / Q8 本身写错**（非实现 bug）
+源码明载 **2026-08-16 用户裁决**：「底稿不做准则门控，允许在国企项目编辑上市版披露
+（合并场景：集团国企含上市子公司），entity 冲突降级为 warning 放行，不再 hard block」。
+探针穷举 **162** 组 `(project_entity × requested)` 确认 `detect_standard_conflict`
+**恒返回 None** ⇒ `_guard_standard_matches_project` 的 `raise StandardMismatchError`
+是**死代码**。修正 = 如实断言「放行但必留 `cross-entity` WARNING」+ 同主体不得产警告 +
+`xfail(strict=True)` 钉住原始诉求（实现若收紧则 XPASS 报错，强制回来更新 spec）。
+
+### 口径勘误两条
+
+* **Q10「JSON 字节无 diff」不可能成立** —— 生成脚本写 `generated_at=datetime.now()`
+  ⇒ 整文件字节全等永不成立。可执行口径 = 除 `generated_at` 外 `entries` 逐值相等。
+* **章节号 10 字符截断是既有约定非缺陷** —— 7 个利润表科目走「三、」编号，其中 4 条
+  在括号处截断（`三、资产处置收益（损`）。核实：前端真源常量就这么写、真库
+  `note_section` 同样截到 10 字符 ⇒ 两侧口径一致匹配成功。**禁补全**。
+
+### 流程铁律（8 条，下轮必带）
+
+| # | 教训 |
+|---|---|
+| T1 | 写了 service 却**从未调用其主函数**的测试 = 假绿。判据涉及 DB 口径时，纯函数结构检查不算覆盖 |
+| T2 | `import subprocess` 却不调用、docstring 声称「重跑对比」= **docstring 撒谎**。声明的动作必须真的发生 |
+| T3 | 创建组件 ≠ 接入。死代码（仅出现在自动生成的 `components.d.ts`）不满足「前端可见」 |
+| T4 | 测试通不过时**先查是判据错还是实现错**，不要把断言降级成恒绿（Q8 首版即此错，改成「调用不抛就 pass」掩盖了需求与设计的冲突） |
+| T5 | 百分比阈值（如 ≥80%）是拍脑袋数字、允许静默退化；**例外一律逐条白名单**，并配「白名单无失效条目」检查 |
+| T6 | **SQLite 内存库测不出真库的数据分布问题** —— 共享章节重复计数只有真库对账才暴露。口径类判据必须拿真实项目逐值对账 |
+| T7 | 已有记载的坑仍会再踩：注释未剔除导致扫描器误报，`j1DisclosureSyncWiring.spec.ts` 文件头早已写明「首版守卫即因此误报」 |
+| T8 | 🔴 **工具「0 errors」先查是否崩溃** —— 全量 `vue-tsc` 在本仓库 4GB/8GB 堆均 OOM，stdout 里 `error TS` 计数为 0 但实为 `FATAL ERROR: heap out of memory`。差点报成「类型检查通过」。本仓库已有 `tsconfig._g-single-region.json` 先例，改单区域 tsconfig 后真跑通并配变异证明（注入 `number = string` → TS2322） |
+
+### 归因纪律
+
+跑既有回归时 `test_note_e1_structure.py` 报 **28 failed**。用 `git stash` 回滚本轮
+registry 改动后**同样 28 failed** ⇒ 与本轮无关（预存失败，根因 `note_template_*.json`
+缺「受限制的货币资金明细」表 + 残留章节号 `五、81`）。
+**不把他人的红算到自己头上，也不把自己的红推给别人。**
+registry 消费方（`note_readiness_service` / `disclosure_stale_marker` /
+`note_wp_mapping_service`）回归 **102 passed** 确认加 L2/L4 未破坏。
+
+### 交付物
+
+后端 `disclosure_sync_coverage_service.py`（注册表派生分母 + 去重汇总）·
+`routers/disclosure_sync_coverage.py`（`report.py` §104 注册）·
+前端 `DisclosureSyncCoveragePanel.vue`（接入 `DisclosureEditor.vue` 左树上方 +
+点未同步项经 ACNR 解析 `wp_id` 跳底稿）·
+守卫 `disclosureSyncWiringAll.spec.ts`（112 宿主动态扫描，两类缺陷现算命中 **0**
+—— 前几轮已修完，本轮价值在锁死防回退）·
+`test_disclosure_sync_coverage.py`（20 例，含 14 例真 ORM 落库对账）·
+`test_disclosure_sync_invariants.py`（32 例 + 1 xfail）·
+`DisclosureSyncCoveragePanel.spec.ts`（15 例，含 5 条接入守卫）。
+累计 **7 次变异注入**验证守卫非恒绿（红点数逐次精准命中）。
+
+---
+
+## 2026-09-28 · 项目级端点鉴权欠账清零（6 处 IDOR）
+
+承接 `disclosure-payload-authority-source` 第三轮复盘的触类旁通结果。
+**未建 spec，用户指示逐一修复。**
+
+### 缘起
+
+自查发现新写的 `disclosure-sync-coverage` 端点只挂 `Depends(get_db)` 零鉴权
+⇒ 任意 `project_id` 可未授权读项目数据（IDOR）。按「发现一处反模式立即 grep 全仓」
+纪律扫描「路径含 `{project_id}` 却无鉴权」，得真实欠账 **6** 处。
+
+### 逐处修复（对齐既有权限基准，不自造）
+
+| 端点 | 原状 | 修为 | 依据 |
+|---|---|---|---|
+| `formula_audit_log` `GET /{pid}/{year}` | 无鉴权，可读任意项目公式变更史（含 `old_formula`/`new_formula`） | `require_project_access("readonly")` | 与 `disclosure_notes` 全部只读端点同级 |
+| `formula_audit_log` `POST /{pid}/{year}` | 无鉴权 + `user_id` 写死全零 ⇒ **审计留痕可伪造** | `require_project_access("edit")` + `user_id=current_user.id` | 写的是该项目留痕 |
+| `formula_audit_log` `POST /{pid}/{year}/rollback` | 无鉴权 `UPDATE report_config SET formula` | `require_role(["admin","partner","manager"])` + 真实 `user_id` | `report_config` 是**全局表**（无 `project_id` 列），一次回滚影响全平台 ⇒ 项目级权限保护不了全局资源；对齐 `report_config.populate-formulas`（同改全局公式用 `require_role(["admin"])`） |
+| `t_accounts` `GET .../t-accounts` | 无鉴权 | `get_current_user` | 同文件另 **7** 个端点全有，只此一处漏 |
+| `metabase` `DELETE /cache/{pid}` | 无鉴权 | `get_current_user` | 该 router 内唯一有写副作用的端点；其余为读静态配置，本次不动 |
+| `disclosure_notes` `POST /{pid}/upload-history` | — | **归入桩端点豁免** | 🔴 第三轮**误判为欠账**：它恒返回 501，docstring 明确写「端点不声明 DB / 文件 / 后台任务依赖 —— 未实现的能力不应该占用连接池」⇒ 加鉴权反而违背有意设计 |
+
+🔴 `rollback_formula` 是**权限收紧**（此前任何人可调）。前端调用方 `FormulaHistoryTab.vue`
+的「一键回滚」带二次确认，纳入 manager 档保证日常可用。
+
+**改动前先查调用方**：前端 `formulaAuditLog.*` / `tAccounts.list` 都在 `apiPaths` 有登记
+（走 `api` 封装会带 token）；`upload-history` / `metabase cache` 前端零调用；
+既有测试用 `tests/_test_auth_helper.override_auth` 注入 **admin** 角色
+（`assert_project_permission` 对 admin 跳过项目检查）⇒ 加鉴权不打断。
+`test_formula_audit_log_get.py` 直调路由函数且不使用 `current_user`，同样不受影响。
+
+### 🔴 最讽刺的发现：我写的鉴权守卫自己漏报
+
+基线守卫首版用**文本 `in` 匹配** `_AUTH_TOKENS` 判断端点有无鉴权。
+逐处变异（摘掉鉴权依赖）实测：**6 处里 3 处仍全绿**（`coverage` / `rollback` / `metabase`）。
+
+根因：我在这些端点的 **docstring 里写了**「权限：`require_project_access("readonly")`
+—— 与其余只读端点同级」这类说明文字，被文本匹配数成真实鉴权 ⇒ **漏报**。
+
+这正是同一 spec 第三轮刚总结的 T7 教训（「注释未剔除导致扫描器误报」）的**反向形态**：
+上次是把注释数成缺陷（误报），这次是把注释数成合规（漏报）。**同一个坑正反各踩一次。**
+
+修法 = 改**纯 AST 分析**：
+* 签名 `defaults` / `kw_defaults` 里的 `Depends(X)` / `Depends(X(...))`
+* 函数体语句的 `Name` / `Attribute` 引用（docstring 是 `Expr(Constant)` 不产生 `Name`，
+  `#` 注释根本不进 AST ⇒ 两者天然被排除）
+* 同族命名走前缀匹配（`require_project_delegator` ∪ `require_project_delegator_pid`）
+
+改后 **6/6 变异全部命中**。并补 4 条扫描器自检：docstring-only 不算鉴权 ·
+函数体内显式调用算 · 前缀族匹配 · 无鉴权样本必命中。
+
+### 另一处口径缺陷（第三轮已记，此处闭环）
+
+`_AUTH_TOKENS` 首版只列 10 个 token，漏 `require_project_delegator` /
+`require_project_delegator_pid` / `require_wp_edit_permission` /
+`require_query_builder_access` / `dedicated_wp_gate` ⇒ 把 4 个**有鉴权的活端点**
+误判成欠账。正确清单由现算全仓 `Depends(...)` 被依赖名逐个甄别得出（18 个）。
+
+### 产出
+
+`backend/tests/test_project_endpoint_authorization_baseline.py`（18 例）：
+* `test_no_new_unauthorized_project_endpoint` —— 新增无鉴权端点即红
+* `test_known_gaps_is_empty` —— 欠账已清零且不得回填（回填须在 spec 登记）
+* `test_fixed_endpoint_stays_authorized[6 参数化]` —— 本轮 6 处逐个钉死防回退
+* `test_audit_log_writes_real_user_id` —— 禁回到写死全零 `user_id`（含剔注释自检）
+* `test_stub_endpoints_really_are_stubs` —— 桩端点豁免须真的只 raise 且不触达数据
+* `test_stub_list_has_no_stale_entries` —— 豁免名单无失效条目
+* 扫描器自检 5 例（含上述 docstring 漏报防回归）
+* `test_scanner_denominator_is_sane` —— 分母现算 ≥300（编写时 **381**）防扫描路径错
+
+回归：基线 18 · `t_accounts` + `formula_audit_log_get` 27 · `metabase_attachments` 44 ·
+覆盖率与不变量 108（含 1 xfail）全绿。
+
+### 教训
+
+| # | 教训 |
+|---|---|
+| T12 | **给代码写「这里有鉴权」的 docstring，会让文本匹配型守卫漏报自己** ⇒ 判断「代码是否真的做了 X」一律用 AST，不用文本 `in`。注释/docstring 正反两个方向都会骗过扫描器 |
+| T13 | **守卫写完必须逐处变异**（本轮 6 处逐个摘依赖），不能只跑一次全绿就收 —— 3 处漏报正是靠逐处变异才暴露 |
+| T14 | **「同文件其余 N 处都有、只此一处没有」是最高价值的缺陷信号** ⇒ 值得专门扫「同文件一致性断裂」（`t_accounts` 7:1、`metabase` 唯一写端点） |
+| T15 | **桩端点（501/410 且不触达数据）不该加鉴权** —— 给它加依赖会违背「未实现的能力不应占用连接池」的有意设计；正确处置是显式登记豁免 + 断言它真的是桩 |
+
+---
+
+## 2026-09-28 · 第四轮：跨项目隔离（发现上一轮"修复"本身是错的）
+
+### 🔴 上一轮的修复犯了方法论错误
+
+第三轮给 `t_accounts.list_t_accounts` 补 `get_current_user` 就当"修完"，
+理由是「**对齐同文件另 7 个端点**」。这个理由**本身是错的**：
+
+* `get_current_user` 只保证「登录了」，**不含项目维度**
+* 那 7 个端点本身全是跨项目 IDOR，**基准自己有缺陷**
+
+⇒ **把「对齐既有基准」当正确性依据 = 把缺陷正当化。基准必须先被验证。**
+
+### 真实缺陷：`project_id` 是装饰
+
+```python
+# router：project_id 在路径上
+async def get_t_account(project_id, t_account_id, ..., current_user = Depends(get_current_user)):
+    result = await svc.get_t_account(db, t_account_id)   # ← project_id 根本没传下去
+```
+
+`t_account_service` **5 个方法全不按 project_id 过滤**。后果：
+任何登录用户传任意 `t_account_id` 可读他人项目 T 型账户；
+`add_entry` 是**写路径**、同样不校验归属 ⇒ 可往他人项目塞分录（篡改审计数据）。
+
+这正是 `disclosure_notes.py` 注释早已警告的形态：
+「调用方可以传一个自己有权的项目，却对另一个项目的对象动手（门禁校验了无关对象）」。
+
+### RLS 覆盖率实测：4 / 217
+
+查到 `assert_project_permission` 里有 `set_rls_context` ⇒ 怀疑平台有 DB 层兜底。
+**必须先查清，否则会把有意设计当成 900 处漏洞误报。** 实测：
+
+| 事实 | 值 |
+|---|---|
+| `V005__enable_rls.sql` 覆盖表 | **4**（`working_paper` / `adjustments` / `tb_balance` / `review_records`） |
+| 真实 PG 确认启用 RLS 的表 | **4**（与迁移一致） |
+| 真实 PG 带 `project_id` 列的表 | **217** |
+| 其中受 RLS 保护 | **3**（第 4 张靠 `working_paper_id` 间接关联）≈ **1.8%** |
+
+RLS policy 是 `USING (project_id::text = current_setting('app.current_project_id', true))`
+⇒ 未 `set_rls_context` 时返回 NULL、比较结果非 true ⇒ **fail-closed**（读不到任何行），
+这一点设计是好的。但覆盖面只有 4 张表，`t_account` 不在内 ⇒ **无 DB 层兜底**。
+
+### 平台级现状量化（**非本轮引入，也非本轮修复目标**）
+
+| 维度 | 命中 / 总数 |
+|---|---|
+| 路径含 `{project_id}` 却**完全无鉴权** | 0 / 381（第三轮已清零） |
+| 路径含 `{project_id}` 但**仅登录不校项目** | **227 / 381（60%）** |
+| 路径只有对象 id、**无项目级鉴权** | **678 / 781（87%）** |
+
+900+ 端点 / 214 张无 RLS 保护的表 ⇒ 属**架构决策**范围（推 RLS 覆盖 vs 逐端点补门禁
+vs 收紧默认依赖，涉及性能与角色模型），不由单轮修复决定。
+本轮只**冻结棘轮**：`_IDENTITY_ONLY_BASELINE = 227`，不得增加，且基线虚高 >20 判红
+（只许向下）。
+
+### 本轮实际修复（我碰过的部分，两层同时补）
+
+`t_accounts` 8 个端点：
+* **门禁**：`get_current_user` → `require_project_access("readonly")` 读 / `("edit")` 写
+* **隔离**：service 5 个方法加 `project_id` 关键字参数做归属过滤，
+  router 全部显式传；归属不符按 **404** 处理（不透露他人对象存在性）
+* `add_entry` 写路径**先校验归属再写**，拒绝时**零写入**
+* `create_t_account` 顺带补上 `created_by=current_user.id`（原先丢了创建人）
+
+⚠️ 这是权限收紧：此前任何登录用户可读写任意项目的 T 型账户。
+
+### 前端同步（上一轮漏的）
+
+`rollback_formula` 收紧到 `require_role(["admin","partner","manager"])` 后，
+前端 `FormulaHistoryTab.vue` 的「一键回滚」按钮对无权角色**仍显示**，点了必 403
+——「能点但必失败」是坏体验且让用户以为系统坏了。已加 `ROLLBACK_ROLES` 角色门控，
+并写 `formulaHistoryRollbackGate.spec.ts` 守卫**前后端角色集合逐值一致**
+（任一侧改动令另一侧判红）。
+
+### 守卫口径收紧
+
+`test_project_endpoint_authorization_baseline.py` 把 token 分两档：
+* `_PROJECT_LEVEL_TOKENS`（14 个）—— 真能保证「该用户对该项目/对象有权」
+* `_IDENTITY_ONLY_TOKENS`（4 个）—— 仅身份/角色，**不算项目隔离**
+
+原先把 `get_current_user` 算作「有鉴权」⇒ 227 个只登录不校项目的端点全被判合规，
+口径过宽。现新增第二维度断言与 `t_accounts` 回归钉子。
+
+### 教训
+
+| # | 教训 |
+|---|---|
+| T16 | 🔴 **「对齐既有基准」不是正确性依据** —— 基准本身可能是缺陷（`t_accounts` 7 个端点全是 IDOR，我对齐了它们）。引用基准前必须先验证基准成立 |
+| T17 | **路径参数 ≠ 隔离** —— `project_id` 在路径上但 service 不用它，等于装饰；判「有无隔离」要看**数据层查询条件**，不是看签名 |
+| T18 | **怀疑「系统性缺陷」时先找兜底机制**（RLS / 中间件 / 网关），否则会把有意设计当漏洞误报。但兜底机制**要量化覆盖率**（本轮 4/217 ⇒ 兜底存在但几乎不覆盖） |
+| T19 | **规模超出单轮能力时冻结棘轮而非硬修** —— 记录现算基线 + 断言「不得增加」+ 断言「基线不得虚高」，既阻止恶化又不阻塞交付 |
+| T20 | **权限收紧必须同步前端** —— 否则按钮可见但必 403。且两侧角色集合要有守卫钉死，防单侧漂移 |
+| T21 | 取代码段的两个高频坑：`split(anchor)[0]` 取的是 anchor **之前**的内容（要 `[1]`）；含嵌套括号时 `split(")")` 会提前截断（要**括号配平**）。本轮各踩一次，都是守卫自己抓出来的 |
