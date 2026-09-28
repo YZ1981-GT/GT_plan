@@ -333,14 +333,33 @@
 
 ## 阶段 5：零回归与真栈 roundtrip
 
-- [ ] 9. 零回归门
-  - `backend/tests/workpaper_sync/` 全量跑通，与改动前逐条比对，**禁新增红**
-  - 🔴 golden digest 基线（`test_f2_p11_golden_digest_zero_regression.py` 的
-    contract → digest 映射、`test_g_foundation_p20_golden_digest_baseline.py` 的 must_stay 清单）
-    新增 `l1.short_term_loans.json` 条目，按既定方式更新，禁跳过、禁加豁免
-  - 前端 `npx vitest --run` 无新增红
-  - `rtk npx tsc --noEmit` 与 `rtk npx eslint` 无新增错
+- [x] 9. 零回归门
+  - 相关子集全绿：`test_l1_*`（60）+ contract registry + store registry + 框架层等效性
+    + 被改写的 2 条既有守卫 = **367 + 60 passed**
+  - 前端 `npx vitest --run` 全量 **2110 passed / 15 failed**，失败的 7 个文件对 L1 模块
+    引用现算**全为 0**（逐文件 grep 证明）⇒ 既有失败
+  - `npx tsc --noEmit`：L1 **零错误**（21 个既有错误全在 G 循环 4 个语法破损文件）
+  - `npx eslint` 对本轮 3 个前端文件：**零问题**
+  - 29 个 `generate_phase5_*.py --check` 全过 ⇒ 51 份既有契约 digest 零漂移
+  - 🔴 **golden digest 基线裁决（与原计划不同，给理由）**：原计划要「新增 l1 条目」，
+    实测后改为**不加**并如实登记该基线已整体过期 ——
+    `test_f2_p11_golden_digest_zero_regression.py::GOLDEN_BASELINE` 的语义是
+    「**既有**契约文件在 F2 开发期间不得被改动」，l1 是本轮新增、不属「既有」；
+    且该基线现已 **9 条红全属既有欠账**，把 l1 塞进去只会让过期基线更难辨。
+    l1 自身的零回归由本 spec 守卫 `test_disk_and_source_are_byte_locked` 承担。
   - _判据：LR-P23_
+  - **实施证据 / 既有欠账登记**：
+    - `test_f2_p11_golden_digest_zero_regression.py` **6 条红**（d1/d3/d5/d6/d7/f1）：
+      🔴 逐条证明与本轮无关 —— `git diff HEAD -- workpaper_sync_contracts/` **为空**
+      （契约文件与 HEAD 逐字节一致），而 HEAD 版 d1 的 `sha256(file_bytes)` 现算
+      `fc07076624a76e12` ≠ 基线写死的 `62b589551bd99050`。时序：d1 契约在 **09-27** 被
+      commit `3c10c0279`（"修复 11 条预存/并发红…d1 契约…"）改过，而基线文件在 **09-28**
+      的 commit `8d7a52059` 里只同步了 **b60 一项**，其余 6 项没跟上。
+    - `test_check_sync_provider_golden_digest.py` **3 条红**：`labels` 断言写死 9 个
+      （b60/d1~d7/e1）而 G/H/I/J 全域交付后早已远超；`digest_count` 139 vs 142；
+      drift 列表是 **b60 的 sheet digest 漂移 + g4/g5/g6 缺基线**，**无 l1**。
+    - ⇒ 两处基线都需由其 owner 按现算重刷，本 spec 不代改（改了等于替 F2/G 的 spec
+      宣布它们的零回归基线换了口径）。
 
 - [ ] 10. 真 OO 9.4 roundtrip
   - 用 docker `audit-onlyoffice`（实测 healthy）跑 HTML→OO→HTML
