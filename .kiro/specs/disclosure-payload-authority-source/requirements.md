@@ -14,8 +14,8 @@
   `sync_batch_from_workpaper` / `WpDisclosureSyncService.sync_from_html`
 - 国企/上市双模板权威源 `note_template_soe.json` / `note_template_listed.json`
 - 跨主体类型守卫 `_guard_standard_matches_project`（拒绝在国企项目写上市章节）
-- 前端载荷构造器 `buildXSyncPayload`（现算 109 个 export 定义）
-- 前端自动同步 `useDisclosureAutoSync`（单一实现，现算 146 个调用点）
+- 前端载荷构造器 `buildXSyncPayload`（现算 **69** 个 export 定义 / 67 个去重名字；🔴 原写 109 是错数，见设计 §十四）
+- 前端自动同步 `useDisclosureAutoSync`（单一实现；调用点数**持续漂移** 146 → 144 → 154，**禁写进判据**，见设计 §十四）
 - 同步就绪度信号 `GtWpDisclosureSyncBar.vue`
 
 真实库现查：`disclosure_notes` 共 **1052** 行，其中 `last_sync_at IS NOT NULL`
@@ -43,7 +43,7 @@
 - 不改国企/上市分流逻辑（`_guard_standard_matches_project` 与双模板已正确）
 - 不改附注侧写入语义（行级合并 / manual_override 保护 / 乐观锁均已实现）
 - 不做 ADJ 取数与调整分录确认门（另立 `adj-formula-repair-and-approval-gate-wiring`）
-- 不重构 109 个载荷构造器的**业务内容**（只可能改它们的**宿主位置**）
+- 不重构 69 个载荷构造器的**业务内容**（只可能改它们的**宿主位置**）
 
 ## 术语（Glossary）
 
@@ -76,7 +76,9 @@
 3. THE 评估 SHALL 现算规模基数：`buildXSyncPayload` export 定义数 ·
    `syncToDisclosureNotes` 宿主文件数 · `useDisclosureAutoSync` 调用点数。
    🔴 SHALL NOT 引用代码注释中的旧数字（`GtWpDisclosureSyncBar.vue` 文件头写
-   「46 个 buildXSyncPayload」，现算为 109，**注释已过期**）。
+   「46 个 buildXSyncPayload」，现算为 **69**，**注释已过期**）。
+   🔴 **勘误**：本条初版把现算值写成 109，经 120 种口径组合穷举确认无一命中，真值 69（见设计 §十四）。
+   ⇒ 本条判据的教训升级为：**「换掉过期数字」时，新数字同样必须可复现，且必须写明口径**。
 4. THE 裁定 SHALL 写成 ADR（设计 §七），含「为什么不选另两个」。
 5. IF 三方案均不可接受 THEN SHALL 提出方案 D 并同样完成 ROI 评估，
    SHALL NOT 默认选择改动量最小的那个。
@@ -105,7 +107,7 @@
    已知正确的宿主必须通过、故意注入缺陷的样本必须失败。
 5. WHEN 发现其他宿主存在同类缺陷 THEN 命中数 SHALL 现算登记，逐个修复；
    IF 现算为 0 THEN SHALL 提供变异证明说明扫描器非恒绿。
-6. THE 修复 SHALL NOT 改动 109 个载荷构造器的业务内容（只动调用时序与上下文获取）。
+6. THE 修复 SHALL NOT 改动 69 个载荷构造器的业务内容（只动调用时序与上下文获取）。
 
 ---
 

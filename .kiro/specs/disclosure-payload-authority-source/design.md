@@ -30,24 +30,27 @@
 
 ⇒ **不是「零同步」，是「低覆盖」**。`GtWpDisclosureSyncBar.vue` 文件头写的
 「46 个 buildXSyncPayload 就绪但生产零同步记录」两个数字**均已过期**
-（现算 109 个构造器 / 93 条同步记录）。本设计所有基数一律现算。
+（现算 **69** 个构造器 / 93 条同步记录）。本设计所有基数一律现算。
+> 🔴 **二次勘误（见 §十四）**：本行原写「109 个构造器」，该数字**同样不可复现**，真值 **69**。
+> 即本 spec 在纠正「注释里的 46 已过期」时，换上去的新数字自己也是错的。
 
 ### 规模基数（现算，交付时重算）
 
 | 指标 | 设计编写时 | 🔴 实施期现算（2026-09-28） |
 |---|---|---|
-| `buildXSyncPayload` export 定义数 | 109 | **109**（无偏差） |
-| `syncToDisclosureNotes` 定义文件数（宿主） | 117 | **112**（−5） |
+| `buildXSyncPayload` export 定义数 | ~~109~~（**错数**） | **69**（export 定义 69 / 去重名字 67）—— 原记 109 经 120 种口径组合穷举**无一命中**，见 §十四 |
+| `syncToDisclosureNotes` 定义文件数（宿主） | 117（**松口径**，含 5 个 `.spec`） | **112**（**生产宿主口径** = 守卫扫描域：`components/workpaper/` 下非测试文件的 `function` 形态）—— 两数**都对**，差的 5 个全是测试文件，非「减少」，见 §十四 |
 | `useDisclosureAutoSync` 实现文件数 | 1（单一真源） | **1**（无偏差） |
-| `useDisclosureAutoSync` 调用点数 | 146 | **144**（−2） |
+| `useDisclosureAutoSync` 调用点数 | 146 | **144**（交付时）→ 2026-09-28 复核 **154** ⇒ 该数随各循环 spec 增减宿主**持续漂移**，**禁写进判据**，见 §十四 |
 | 被调用但未见 export 定义的名字 | 1（`buildSyncPayload`） | **4 处调用**（F4 上市/国企各 1 处定义 + 1 处调用，均为组件内局部函数转发到 `buildF4*SyncPayload`；非缺陷） |
 | `DISCLOSURE_AUTO_SYNC_ENABLED` 真实引用处 | 3 | **3**（生产代码；另 4 处在测试文件，合计 7） |
 | 注册表 entries 数 | 未记 | **78**（实施期修正漂移，原 committed 仅 76，缺 L2/L4 —— 见 §十一 勘误） |
 | 注册表职责行 / 去重章节 | 未记 | **157 / 145**（8 章节跨循环共享，见 §十一） |
 
 > 🔴 偏差口径：上表右列为**交付时现算**，Task 0.1 要求「有偏差则更新设计」，
-> 此处即回写。宿主数 117→112 与调用点 146→144 的减少原因未逐一追查
-> （不影响方案选择：仍是「109 个构造器 / 112 个宿主 / 单一 autoSync 实现」的量级）。
+> 此处即回写。宿主数 117→112 的原因**已在 §十四 查清**（差的 5 个全是 `.spec` 文件、守卫刻意排除 ⇒ 口径不同但两个数都对，不是「宿主变少了」）；
+> 调用点 146→144→154 属持续漂移，已改为禁写死。
+> （不影响方案选择：仍是「**69** 个构造器 / 112 个生产宿主 / 单一 autoSync 实现」的量级）。
 > `buildSyncPayload` 从「1 个未见定义」修正为「4 处局部转发」——首版设计把它记成
 > 疑似悬空引用，现读确认是 F4 两个 composable 内的局部包装函数，属正常写法。
 
@@ -84,7 +87,7 @@ export function buildL1SyncPayload(opts: L1SyncPayloadOptions)
    既有测试可直接调用（`buildD1SyncPayload('listed', 'wp-1', null, snap())`）
    ⇒ **理论上可离屏批量调用**。
 2. 🔴 **签名形态不统一**：D1/D2 位置参数、L1 单 options 对象 ⇒
-   离屏批量调用需要一层**逐构造器的适配**，成本与构造器数量成正比（现算 109）。
+   离屏批量调用需要一层**逐构造器的适配**，成本与构造器数量成正比（现算 **69**，见 §十四 勘误）。
 
 3. 🔴 **snapshot 的装载仍耦合组件**：snapshot 来自各循环 composable 的行模型
    （如 `disc.dataRows.value`），而部分 composable 依赖 `useAuditContext()`
@@ -101,7 +104,7 @@ export function buildL1SyncPayload(opts: L1SyncPayloadOptions)
 
 | 维度 | 评估 |
 |---|---|
-| 改动量 | 在后端重写 109 个构造器的等价逻辑 |
+| 改动量 | 在后端重写 69 个构造器的等价逻辑 |
 | 双写风险 | **必然漂移**：前端改了后端不知道 |
 | 可自动化 | 否，逐个手写 |
 | 回归面 | 全部披露 Tab |
@@ -126,7 +129,7 @@ export function buildL1SyncPayload(opts: L1SyncPayloadOptions)
 | 内含逻辑 | 无 | 条件分支 · 聚合 · 按名称合并（缺失侧补 0）· 比率转百分数（`fmtPct` 口径）· 列头按变体逐字措辞差异 · `_removed_table_keys` 清历史表名 · `_note_texts` 只收非空子节 |
 
 载荷是**业务逻辑**而非配置。把它表达成声明式配置等于发明一门 DSL，
-再把 109 个构造器翻译进去 —— 成本高于方案 A，且 DSL 表达力不足时必然出现「逃逸钩子」，
+再把 69 个构造器翻译进去 —— 成本高于方案 A，且 DSL 表达力不足时必然出现「逃逸钩子」，
 退化回双写。
 
 **裁定：否决（技术不可行）。**
@@ -154,14 +157,14 @@ export function buildL1SyncPayload(opts: L1SyncPayloadOptions)
 | 维度 | 评估 |
 |---|---|
 | 可行性 | 载荷构造器是纯函数 ⇒ **可离屏调用**（§二.1） |
-| 阻碍 1 | 109 个构造器**签名不统一** ⇒ 需逐个适配层（§二.2） |
+| 阻碍 1 | 69 个构造器**签名不统一** ⇒ 需逐个适配层（§二.2） |
 | 阻碍 2 | snapshot **装载层耦合组件**（依赖 `useAuditContext` 等）⇒ 需先解耦（§二.3） |
 | 前置依赖 | **必须先完成方案 C** —— 否则批量重放会把现有缺陷放大到全部章节 |
 
 **裁定：不纳入本 spec，登记为后续路径（ADR-DPA-001 §后续）。**
 
 理由：在可靠性缺陷未修、覆盖率不可观测的前提下引入批量重放，
-等于在不知道当前哪里错的情况下把动作放大 109 倍。
+等于在不知道当前哪里错的情况下把动作放大 69 倍。
 方案 C 同时是 D 的前置条件与效果度量手段。
 
 ### 四方案对照
@@ -236,7 +239,7 @@ export function buildL1SyncPayload(opts: L1SyncPayloadOptions)
 > PBT 一律 `max_examples=5`。
 
 - **Q1 基数现算**：三方案评估引用的规模数字均由脚本现算，不引用代码注释旧值
-  （反例：`GtWpDisclosureSyncBar.vue` 的「46 个」现算为 109）。
+  （反例：`GtWpDisclosureSyncBar.vue` 的「46 个」现算为 **69**；🔴 本 spec 原写 109 也是错数，见 §十四 —— 该反模式连纠正者自己都踩了）。
 - **Q2 裁定有 ADR 且含否决理由**：A/B/D 三个未采纳方案各有明确否决/延后依据。
 - **Q3 setup 顶层上下文**：全部宿主的 `syncToDisclosureNotes` 体内无 `useAuditContext`。
 - **Q4 无自触发**：全部宿主的 `syncToDisclosureNotes` 体内无 `scheduleAutoSync(自身)`。
@@ -270,7 +273,7 @@ export function buildL1SyncPayload(opts: L1SyncPayloadOptions)
 **否决 B**：载荷是计算不是常量（§三 对照表），声明式化等于发明 DSL；
 章节映射能下沉恰因其为字面量。**此方案为前序对话中我本人的建议，据现读实证撤回。**
 
-**延后 D**：技术可行（构造器是纯函数）但需 109 个签名适配 + 装载层解耦，
+**延后 D**：技术可行（构造器是纯函数）但需 69 个签名适配 + 装载层解耦，
 且必须以方案 C 为前置，否则放大未知缺陷。
 
 **代价（诚实记录）**：方案 C **不解决**「用户没打开过披露 Tab 就不会同步」。
@@ -411,7 +414,7 @@ entity 冲突降级为 warning 放行。
 | T5 | 百分比阈值（如 ≥80%）是拍脑袋数字，允许静默退化；**例外一律逐条白名单** |
 | T6 | SQLite 内存库测不出真库的数据分布问题（共享章节重复计数只有真库对账才暴露） |
 | T7 | 已有记载的坑仍会再踩：注释未剔除导致的扫描器误报，`j1DisclosureSyncWiring.spec.ts` 文件头早已写明 |
-| T8 | 自己写的注释也会带过期数字（`.env.example` 曾写「146 个调用点」而现算 144）——本 spec 要纠正的正是这个反模式 |
+| T8 | 自己写的注释也会带过期数字（`.env.example` 曾写「146 个调用点」而现算 144）——本 spec 要纠正的正是这个反模式。🔴 **第四轮追加：本 spec 自己没躲过** —— Task 0.1 的核心产出「buildXSyncPayload 现算 109」经穷举复核是**错数**，真值 69，见 §十四 |
 
 ---
 
@@ -537,3 +540,72 @@ entity 冲突降级为 warning 放行。
 | T22 | **提交前不知道有行数门禁 ⇒ 挂载点选错做了返工**。碰大文件前先查 `check_file_size.py` 的 `HARD_CAPS` / whitelist，别等 pre-commit 拦 |
 | T23 | **`HARD_CAPS` 优先级高于 whitelist** —— 往 whitelist 登记对 hard cap 文件无效。读门禁实现再动手，别靠猜 |
 | T24 | **把逻辑内收进被挂载的组件**（而非宿主提供 handler）能让挂载点随时替换 —— 本轮换宿主只改了 2 行，正因为第 1 步先做了内收 |
+
+---
+
+## §十四 第四轮复盘：规模基数自身被勘误（2026-09-28，append-only）
+
+> 触发：把本 spec 从 `fix/disclosure-coverage-and-endpoint-authz` cherry-pick
+> 到主工作分支时做交付复核，重算 §一 的每一个基数。
+
+### 🔴 发现 6：`buildXSyncPayload = 109` 是错数，真值 69
+
+Task 0.1 的**全部目的**就是「禁引用注释里过期的 46，必须现算」。
+交付时记「现算 109（无偏差）」—— 这个 109 **不可复现**。
+
+穷举复核（口径矩阵 = 6 种范围 × 4 种前缀形态 × 5 种名字形态 = **120 种组合**）：
+
+| 口径 | total | unique |
+|---|---|---|
+| **`export function build*SyncPayload`（spec 原文措辞）** | **69** | **67** |
+| `export function build*Payload`（放宽名字） | 89 | 84 |
+| `function build*SyncPayload`（不要求 export） | 71 | 68 |
+| `function build*Payload`（两头都放宽） | 130 | 92 |
+| 大小写不敏感 `build*sync*payload` | 113 | 110 |
+| 落在 [100,120] 的全部口径 | 112 / 115 | 87 / 111 |
+
+⇒ **120 种组合中没有任何一种得出 109**；最接近的是 112 与 113，仍不等。
+回到 spec 写作那个 commit（`f784b864d`）上重算，同样是 **69**。
+
+**权威口径固定为**：`export function build\w*SyncPayload` 在
+`audit-platform/frontend/src/**/*.{ts,vue}` = **69 个定义 / 67 个去重名字**
+（2 个名字在 listed/soe 两个文件里同名重复定义）。
+
+**这不改变任何裁定**：ADR-DPA-001 否决 A / 否决 B / 延后 D 的依据是
+「载荷是计算不是常量」与「签名不统一」，与构造器是 69 个还是 109 个无关；
+69 个同样远超「可以手工在后端重写一遍」的量级。
+
+### 澄清 1：宿主 117 vs 112 不是「减少了 5 个」，是两个口径
+
+| 口径 | 值 | 定义 |
+|---|---|---|
+| 松口径（需求文档用的） | **117** | 全 `src/`、`function` ∪ `const` 形态、**含测试文件** |
+| 生产宿主口径（守卫用的） | **112** | `components/workpaper/` 下、排除 `__tests__` 与 `*.spec.*`、只认 `function` 形态 |
+
+差集逐个查清 = **5 个全是测试文件**：
+`__tests__/disclosureAutoSyncCoverage.spec.ts` ·
+`composables/__tests__/d4FourTableWiring.spec.ts` ·
+`composables/__tests__/e1SetupOrder.spec.ts` ·
+`composables/__tests__/l2l4DisclosureWiring.spec.ts` ·
+`g7-long-term-equity-main/disclosure/g7SoeDisclosureModel.spec.ts`
+
+⇒ **守卫 `disclosureSyncWiringAll.spec.ts` 没有覆盖缺口**，需求 2.3「覆盖全部宿主」
+达成。§一 原注「减少原因未逐一追查」的悬空结论到此销案。
+
+### 澄清 2：会漂移的数字与不会漂移的数字要分开写
+
+| 指标 | 性质 | 处置 |
+|---|---|---|
+| `buildXSyncPayload` 定义数 | 随 spec 增删缓慢变化 | 写明**口径 + 复算方式**，不当判据阈值 |
+| `useDisclosureAutoSync` 调用点 | **每轮循环 spec 都在变**（146→144→**154**） | **禁写进判据**；守卫只断言「实现数 == 1」 |
+| `disclosure_notes.is_stale` | 他轮改动即变（225→**378**） | 只作基线快照，不作断言 |
+| `disclosure_notes` 总数 / `last_sync_at` | 稳定（1052 / 93，两次复核一致） | 可作基线对账 |
+
+### 教训
+
+| # | 教训 |
+|---|---|
+| T25 | **「纠正过期数字」本身是高危动作** —— 换上去的新数字必须和被换掉的旧数字用同一套标准验证（可复现 + 写明口径）。本 spec 把注释里的 46 判为过期是对的，换上的 109 是错的，等于把一个错数换成另一个错数还标了「无偏差」 |
+| T26 | **口径不同 ≠ 有偏差**。117 vs 112 被记成「−5，原因未追查」，实际两个数都对。**凡「现算与设计不一致」，先比对两边的扫描口径，再判是不是真变化** —— 否则会留下假的悬空欠账 |
+| T27 | **穷举口径矩阵是廉价的判错手段**。120 种组合一次跑完 < 1 分钟，直接证明「没有任何合理口径得 109」；靠单个正则反复调只会陷入「是不是我的口径太窄」的自我怀疑 |
+| T28 | **跨分支交付要把「代码在哪个分支」当成状态的一部分**。本 spec 的 25/26 一度只在 `fix/disclosure-coverage-and-endpoint-authz` 上成立，主工作分支的 tasks.md 仍是 0/26 且三个真实缺陷（注册表漂移 L2/L4 缺失、`formula_audit_log` 三端点零鉴权、`t_accounts` 项目级越权）全都还活着 ⇒ **「任务标完成」必须绑定「代码已在目标分支」** |
