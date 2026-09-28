@@ -188,7 +188,7 @@
 
 ## 阶段 2.5：HTML 侧对齐（契约的前置，见 design §2.4）
 
-- [ ] 5b. `det` 表切 d6 式稳定行身份通道
+- [x] 5b. `det` 表切 d6 式稳定行身份通道
   - 现算确认真库 `L1-det-*` 为 **0 行 / 0 distinct item**（零迁移负担的前提，变了就停）
   - 给 `useL1FormData.ts` 的 `det` 表新增一条通道：单条 item `L1-2-rows`，
     载荷是整行数组 `JSON.stringify(rows)`，每行带稳定 `rowId`（对标 d6 的 `ROW_IDENTITY_STORE_KEY`）
@@ -203,6 +203,30 @@
     计算，且与模板 `K=H+I-J` 语义等价（增加=贷方 / 减少=借方）
   - 前端 vitest 覆盖：新增行→rowId 唯一、删中间行→其余行 rowId 不变（位置化缺陷的反例）
   - _判据：LR-P12 前置、LR-P17、LR-P24 前置_
+  - **实施证据**：前端 `l1DetailStableRowId.spec.ts`（**9 test 全绿**）
+    + 后端跨端对账 `TestHtmlStoreShapeAgreesWithProvider`（**6 test**，合计 60 passed）。
+    `DetailRow` 扩到 **28 个受管字段**（逐字段对齐模板 A..AB）+ `rowId` + 2 个 HTML-only
+    （`amount` / `currency`）；新增 `createEmptyDetailRow()` 工厂与导出常量
+    `DETAIL_ROWS_ITEM_ID = 'L1-2-rows'`；`_parseDetailRows` 改为读单条 item 的 JSON 数组
+    （坏载荷给空表不半解析、缺 `rowId` 当场补铸）；序列化改为只发一条 item，
+    空表落 `null`；`useL1Detail` 的 `_triggerSave`/`_triggerSaveAll` 换成整表 `_persist()`，
+    并新增 `removeRowById()`（排序/筛选后下标不可信时的正解）。
+  - 🔴 **复用既有 `newRowIdentity(prefix)`**（`composables/shared/rowIdentity.ts`），
+    不新造第 6 个同型铸号模块 —— 该文件头已登记平台上 5 个同型模块与「是否收敛」的技术债。
+  - 🔴 **只改 `det`**：`_parseDynamicRows` / `_serializeRows` 通用函数与 `int`/`cred`/`ovd`/`plg`
+    四表一行未动，并加**反向判据** `test_sibling_tables_keep_their_positional_channel`
+    钉住它们仍走位置化通道（哪天被改会红，提醒先核对 H2 对 `L1-int-*` 的消费）。
+  - 🔴 **死代码已删不留回落**：`DETAIL_FIELDS` 常量、`_serializeRows(items,'det',…)` 调用点
+    全部移除（真库 `L1-det-*` 现算 0 行 ⇒ 回落路径永不执行，留着就是死路径）。
+  - 🔴 **一处判据自纠**：首版用裸文本扫 `L1-det-` 判「旧通道已拆除」，结果命中**自己写的
+    注释**（两份文件都要解释旧形态为何被换掉）⇒ 改为剥 TS 注释后再扫，并补
+    `test_comment_stripper_is_not_vacuous` 变异证明（注释里的键被剥掉、代码里的留得住、
+    `https://` 的 `//` 不被当行注释）。与平台铁律「命中后必须判注释/代码」同源。
+  - 零回归：`npx tsc --noEmit` 对 L1 **零错误**（21 个既有错误全在 G 循环 4 个语法破损文件）；
+    前端 L1 既有测试 28 passed；全量 vitest 2110 passed / 15 failed，失败的 7 个文件
+    （C/G/D 循环 + 通用 PBT）对 L1 模块引用**现算全为 0** ⇒ 与本改动无关。
+  - 🔴 **未做**：`DETAIL_SEGMENTS` 的 UI 列展示只覆盖原 14 字段，新增 16 列尚未进分段
+    （纯展示层，需 Playwright 实测），登记为 task 5c。
 
 ## 阶段 3：adapter 注册
 

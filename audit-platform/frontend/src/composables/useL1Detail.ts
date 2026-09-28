@@ -17,6 +17,10 @@ import { ElMessageBox } from 'element-plus'
 import { calcLiabilityEndBalance, calcSubtotal } from '@/composables/useL1FormulaEngine'
 import type { useL1FormData } from '@/composables/useL1FormData'
 import type { DetailRow } from '@/composables/useL1FormData'
+import {
+  DETAIL_ROWS_ITEM_ID,
+  createEmptyDetailRow,
+} from '@/composables/useL1FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -155,38 +159,41 @@ export function useL1Detail(formData: ReturnType<typeof useL1FormData>) {
         },
       )
 
-      const newRow: DetailRow = {
-        bank: bankName?.trim() || '',
-        contractNo: '',
-        loanType: '',
-        amount: 0,
-        rate: 0,
-        startDate: '',
-        endDate: '',
-        purpose: '',
-        guarantee: '',
-        beginning: 0,
-        creditAmount: 0,
-        debitAmount: 0,
-        endBalance: 0,
-        currency: 'CNY',
-      }
+      // 🔴 用工厂建行：字段齐全（对齐模板 28 列）且自带稳定 `rowId`
+      const newRow: DetailRow = { ...createEmptyDetailRow(), bank: bankName?.trim() || '' }
+      newRow.seqNo = detailRows.value.length + 1
 
       detailRows.value.push(newRow)
-      _triggerSave(detailRows.value.length - 1)
+      _persist()
     } catch {
       // 用户取消
     }
   }
 
   /**
-   * 删除指定行
+   * 删除指定行（按下标 —— 供表格行内按钮用）。
+   *
+   * 🔴 删完**不再需要**「重建 item_id 序列」：整表存一条 `L1-2-rows`，
+   * 行身份是稳定 `rowId`，删中间行不会让后续行的身份漂移。
    */
   function removeRow(index: number): void {
     if (index < 0 || index >= detailRows.value.length) return
     detailRows.value.splice(index, 1)
-    // 全量保存（删除后重建 item_id 序列）
-    _triggerSaveAll()
+    _persist()
+  }
+
+  /**
+   * 按稳定身份删除（排序/筛选后下标不可信时用这个）。
+   *
+   * 这是稳定 `rowId` 的直接收益：`filteredRows` 排序过之后，视图下标与
+   * `detailRows` 下标已经不是同一个东西，按下标删会删错行。
+   */
+  function removeRowById(rowId: string): boolean {
+    const i = detailRows.value.findIndex((r) => r.rowId === rowId)
+    if (i < 0) return false
+    detailRows.value.splice(i, 1)
+    _persist()
+    return true
   }
 
   /**
@@ -202,30 +209,31 @@ export function useL1Detail(formData: ReturnType<typeof useL1FormData>) {
       row.endBalance = calcLiabilityEndBalance(row.beginning, row.creditAmount, row.debitAmount)
     }
 
-    _triggerSave(index)
+    _persist()
   }
 
   // ─── 5. 保存触发 ──────────────────────────────────────────────────────
 
-  function _triggerSave(rowIndex: number): void {
-    const row = detailRows.value[rowIndex]
-    if (!row) return
-    const n = rowIndex + 1
-    const fields = ['bank', 'contractNo', 'loanType', 'amount', 'rate',
-      'startDate', 'endDate', 'purpose', 'guarantee',
-      'beginning', 'creditAmount', 'debitAmount', 'endBalance', 'currency']
-    const items = fields.map(field => ({
-      item_id: `L1-det-${n}-${field}`,
-      conclusion: null,
-      remark: (row as any)[field] != null && (row as any)[field] !== 0 ? String((row as any)[field]) : null,
-    }))
-    debounceSave(items)
-  }
-
-  function _triggerSaveAll(): void {
-    for (let i = 0; i < detailRows.value.length; i++) {
-      _triggerSave(i)
-    }
+  /**
+   * 整表落一条 item（spec: l-cycle-true-adapter-registration · Task 5b）。
+   *
+   * 🔴 取代原先的 `_triggerSave(rowIndex)` / `_triggerSaveAll()`：那套按
+   * `L1-det-{rowIndex+1}-{field}` 逐字段拼 item_id，是**位置化行身份** ——
+   * `removeRow` 后重建整个序列，删中间行会让后续行的 item_id 全部错位，
+   * 用户填的值静默跟错行；契约 schema 也明令拒绝 index/ordinal 类身份。
+   *
+   * 🔴 只发一条 item，**不再按行拆**：行身份由载荷里的 `rowId` 承载，
+   * 后端 `phase5_l1_short_term_loans` 的 `build_store_projection` 按
+   * `stable_field_key` + `rowId` 拆成逐格投影。
+   */
+  function _persist(): void {
+    debounceSave([
+      {
+        item_id: DETAIL_ROWS_ITEM_ID,
+        conclusion: null,
+        remark: detailRows.value.length ? JSON.stringify(detailRows.value) : null,
+      },
+    ])
   }
 
   // ─── Return ────────────────────────────────────────────────────────────
@@ -251,6 +259,7 @@ export function useL1Detail(formData: ReturnType<typeof useL1FormData>) {
     // 行操作
     addRow,
     removeRow,
+    removeRowById,
     updateRow,
   }
 }

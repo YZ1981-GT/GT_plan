@@ -18,6 +18,9 @@ import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+// 🔴 复用既有值化行身份工厂，不新造第 6 个同型模块
+// （该文件头已登记平台上 5 个同型模块与「是否收敛」的技术债）。
+import { newRowIdentity } from '@/components/workpaper/composables/shared/rowIdentity'
 
 /** 审定表 sheet 名（含子码 L1-1，供后端 extract_determination_wp_code 解出） */
 const DETERMINATION_SHEET_NAME = '审定表L1-1'
@@ -59,22 +62,97 @@ export interface AdjudicationState {
   categories: AdjudicationCategory[]
 }
 
-/** 明细表行 */
+/**
+ * 明细表行（`明细表L1-2`）—— 逐字段对齐模板 28 列。
+ *
+ * spec: l-cycle-true-adapter-registration · Task 5b
+ *
+ * 🔴 `rowId` 是**稳定行身份**，取代原先的位置化 `L1-det-{rowIndex+1}-{field}`：
+ * 后者在 `removeRow()` 后靠 `_triggerSaveAll()` 重建整个序列，删中间行会让后续行的
+ * item_id 全部错位、用户填的值静默跟错行。契约 schema 的
+ * `FORBIDDEN_ROW_IDENTITY_KINDS` 也明含 `index`/`ordinal`/`position`/`array_index`。
+ *
+ * 🔴 字段顺序即 Excel 列序（A→AB）。`endBalance` / `auditedPrior` / `auditedIncrease` /
+ * `auditedDecrease` / `auditedEnd` 五个在模板里**是公式**（K/R/S/T/U），受契约
+ * `formula_mask` 保护，OO 侧不得被值覆盖；前端仍保留派生值用于展示与交叉校验。
+ *
+ * 🔴 `amount` / `currency` 模板**无对应列**，是 HTML-only 字段（契约
+ * `review.html_store.html_only_keys` 已登记），不参与 OO 往返。
+ */
 export interface DetailRow {
-  bank: string
-  contractNo: string
-  loanType: string
+  /** 稳定行身份（值化，不随位置漂移）。 */
+  rowId: string
+  seqNo: number               // A 序号
+  loanType: string            // B 借款种类
+  bank: string                // C 贷款单位
+  startDate: string           // D 起始日期
+  endDate: string             // E 讫止日期
+  rate: number                // F 年利率
+  rateKind: string            // G 固定/浮动利率
+  beginning: number           // H 未审-期初余额
+  creditAmount: number        // I 未审-本期增加
+  debitAmount: number         // J 未审-本期减少
+  endBalance: number          // K 未审-期末余额（模板公式 =H+I-J）
+  priorAje: number            // L 期初调整-账项调整
+  priorRje: number            // M 期初调整-重分类调整
+  ajeIncrease: number         // N 账项调整-本期增加
+  ajeDecrease: number         // O 账项调整-本期减少
+  rjeIncrease: number         // P 重分类调整-本期增加
+  rjeDecrease: number         // Q 重分类调整-本期减少
+  auditedPrior: number        // R 审定-期初余额（模板公式 =H+L+M）
+  auditedIncrease: number     // S 审定-本期增加（模板公式 =I+N+P）
+  auditedDecrease: number     // T 审定-本期减少（模板公式 =J+O+Q）
+  auditedEnd: number          // U 审定-期末余额（模板公式 =R+S-T）
+  purpose: string             // V 借款用途
+  guarantee: string           // W 保证人/抵押物/质押物
+  contractNo: string          // X 借款合同（索引）
+  isOverdue: string           // Y 是否逾期
+  confirmationRef: string     // Z 询证函（索引）
+  creditReportChecked: string // AA 与征信报告核对
+  remark: string              // AB 备注
+  /** ↓ HTML-only：模板无对应列，不入契约、不参与 OO 往返。 */
   amount: number
-  rate: number
-  startDate: string
-  endDate: string
-  purpose: string
-  guarantee: string
-  beginning: number
-  creditAmount: number
-  debitAmount: number
-  endBalance: number
   currency: string
+}
+
+/** 明细表的 store item（整表一条，载荷是 `DetailRow[]` 的 JSON）。 */
+export const DETAIL_ROWS_ITEM_ID = 'L1-2-rows'
+
+/** 新建一行明细（字段齐全 + 稳定身份）。 */
+export function createEmptyDetailRow(): DetailRow {
+  return {
+    rowId: newRowIdentity('l12'),
+    seqNo: 0,
+    loanType: '',
+    bank: '',
+    startDate: '',
+    endDate: '',
+    rate: 0,
+    rateKind: '',
+    beginning: 0,
+    creditAmount: 0,
+    debitAmount: 0,
+    endBalance: 0,
+    priorAje: 0,
+    priorRje: 0,
+    ajeIncrease: 0,
+    ajeDecrease: 0,
+    rjeIncrease: 0,
+    rjeDecrease: 0,
+    auditedPrior: 0,
+    auditedIncrease: 0,
+    auditedDecrease: 0,
+    auditedEnd: 0,
+    purpose: '',
+    guarantee: '',
+    contractNo: '',
+    isOverdue: '',
+    confirmationRef: '',
+    creditReportChecked: '',
+    remark: '',
+    amount: 0,
+    currency: 'CNY',
+  }
 }
 
 /** 利息测算行 */
@@ -271,11 +349,9 @@ export function useL1FormData(
     return rows
   }
 
-  const DETAIL_FIELDS = [
-    'bank', 'contractNo', 'loanType', 'amount', 'rate',
-    'startDate', 'endDate', 'purpose', 'guarantee',
-    'beginning', 'creditAmount', 'debitAmount', 'endBalance', 'currency',
-  ]
+  // 🔴 `DETAIL_FIELDS` 已删（spec: l-cycle-true-adapter-registration Task 5b）：
+  //    明细表改走单条 `L1-2-rows` JSON 载荷，不再按字段名逐个拼位置化 item_id。
+  //    其余四表的 *_FIELDS 保留 —— 它们仍走 `_parseDynamicRows` / `_serializeRows`。
 
   const INTEREST_FIELDS = [
     'bank', 'contractNo', 'loanStart', 'loanEnd', 'startDate', 'endDate',
@@ -297,11 +373,40 @@ export function useL1FormData(
     'pledgeRatio', 'ownershipVerified',
   ]
 
+  /**
+   * 明细表：整表一条 item（`L1-2-rows`）+ 稳定 `rowId`。
+   *
+   * spec: l-cycle-true-adapter-registration · Task 5b
+   *
+   * 🔴 **不再走 `_parseDynamicRows`**（那是位置化 `L1-det-{n}-{field}` 通道）。
+   * 真库 `L1-det-*` 现算 0 行 ⇒ 切换零迁移负担，故不保留回落读取
+   * （留回落等于留一条永不执行的死路径）。
+   * 🔴 其余四表（int / cred / ovd / plg）**仍走 `_parseDynamicRows`**，本 spec 不动 ——
+   * `int` 被 `h2L1LoanPull.ts` 跨循环消费（`L1-int-{n}-{field}`），改它会连带 H2。
+   */
   function _parseDetailRows(map: Map<string, ChecklistItem>): void {
-    detailRows.value = _parseDynamicRows(map, 'det', DETAIL_FIELDS, () => ({
-      bank: '', contractNo: '', loanType: '', amount: 0, rate: 0,
-      startDate: '', endDate: '', purpose: '', guarantee: '',
-      beginning: 0, creditAmount: 0, debitAmount: 0, endBalance: 0, currency: 'CNY',
+    const raw = map.get(DETAIL_ROWS_ITEM_ID)?.remark
+    if (!raw) {
+      detailRows.value = []
+      return
+    }
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      // 载荷坏了宁可给空表，不猜、不半解析（半解析会让用户以为数据只丢了一部分）
+      detailRows.value = []
+      return
+    }
+    if (!Array.isArray(parsed)) {
+      detailRows.value = []
+      return
+    }
+    detailRows.value = parsed.map((row) => ({
+      ...createEmptyDetailRow(),
+      ...(row as Partial<DetailRow>),
+      // 🔴 缺 rowId 的历史行当场补铸：身份缺失时按位置兜底会把位置化又带回来
+      rowId: (row as Partial<DetailRow>)?.rowId || newRowIdentity('l12'),
     }))
   }
 
@@ -466,8 +571,14 @@ export function useL1FormData(
       }
     }
 
-    // ─── Detail rows: L1-det-{n}-{field} ───
-    _serializeRows(items, 'det', detailRows.value, DETAIL_FIELDS)
+    // ─── Detail rows：整表一条 item（spec: l-cycle-true-adapter-registration Task 5b）───
+    // 🔴 从 `L1-det-{rowIndex+1}-{field}` 位置化多条 item 换成单条 `L1-2-rows` JSON 数组。
+    //    真库旧键现算 0 行 ⇒ 不写迁移、不留双写（双写会让两份载荷谁是真源说不清）。
+    items.push({
+      item_id: DETAIL_ROWS_ITEM_ID,
+      conclusion: null,
+      remark: detailRows.value.length ? JSON.stringify(detailRows.value) : null,
+    })
 
     // ─── Interest calc: L1-int-{n}-{field} ───
     _serializeRows(items, 'int', interestCalcRows.value, INTEREST_FIELDS)

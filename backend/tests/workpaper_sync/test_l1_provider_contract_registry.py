@@ -512,3 +512,122 @@ class TestAdapterRegistration:
                 provider.assert_manifest_capability_enabled()
             assert "bidirectional" in str(exc.value)
 
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# LR-P18 邻域：HTML 侧与 provider 的 store 形态对账（Task 5b）
+# ═══════════════════════════════════════════════════════════════════════════
+
+_FRONTEND_SRC = (
+    Path(__file__).resolve().parents[3] / "audit-platform" / "frontend" / "src"
+)
+_L1_FORM_DATA = _FRONTEND_SRC / "composables" / "useL1FormData.ts"
+_L1_DETAIL = _FRONTEND_SRC / "composables" / "useL1Detail.ts"
+#: 仍走位置化通道、本 spec **不动**的四张表（`int` 被 H2 跨循环消费）。
+_UNTOUCHED_POSITIONAL_PREFIXES = ("int", "cred", "ovd", "plg")
+
+
+def _strip_ts_comments(src: str) -> str:
+    """剥 TS 的块注释与行注释（只判存在性，不保留行号）。
+
+    `(?<!:)` 是为了不把 `https://` 的 `//` 当成行注释起点。
+    """
+    import re
+
+    out = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+    out = re.sub(r"(?<!:)//[^\n]*", "", out)
+    return out
+
+
+class TestHtmlStoreShapeAgreesWithProvider:
+    """**Feature: l-cycle-true-adapter-registration, Task 5b**
+
+    两侧 store 形态必须对得上：provider 声明 `L1-2-rows`，前端就得往那个 item 写。
+    只验后端不验前端，会出现「契约按 rows 拆、前端还在写位置化键」这种两侧各自自洽
+    但合不上的形态 —— 那正是 L 循环此前的病灶。
+    """
+
+    @pytest.fixture(scope="class")
+    def form_data_src(self) -> str:
+        assert _L1_FORM_DATA.is_file(), f"前端真源不存在：{_L1_FORM_DATA}"
+        return _L1_FORM_DATA.read_bytes().decode("utf-8")
+
+    @pytest.fixture(scope="class")
+    def detail_src(self) -> str:
+        assert _L1_DETAIL.is_file(), f"前端真源不存在：{_L1_DETAIL}"
+        return _L1_DETAIL.read_bytes().decode("utf-8")
+
+    def test_frontend_item_id_equals_provider_store_item_id(
+        self, provider, form_data_src: str
+    ) -> None:
+        """前端导出的 item id 常量与 provider 的 `STORE_ITEM_ID` 逐字相同。"""
+        assert f"DETAIL_ROWS_ITEM_ID = '{provider.STORE_ITEM_ID}'" in form_data_src, (
+            f"前端未声明 DETAIL_ROWS_ITEM_ID = '{provider.STORE_ITEM_ID}' ⇒ 两侧 store 键不一致"
+        )
+        assert provider.STORE_ITEM_ID == L1_STORE_ITEM_ID
+
+    def test_frontend_no_longer_builds_positional_detail_keys(
+        self, form_data_src: str, detail_src: str
+    ) -> None:
+        """🔴 `L1-det-` 拼接已从两个前端文件中彻底移除。
+
+        🔴 **必须剥注释再扫**（首版实测踩到）：两份文件的注释里都要解释「旧形态是
+        `L1-det-{rowIndex+1}-{field}`、为什么换掉」，裸文本扫描会命中这些解释文字
+        并把「已删除 + 已留档」误判成「仍在使用」。这与平台铁律
+        「命中后必须判注释/代码，只数命中会误报」同源。
+        """
+        for name, src in (("useL1FormData.ts", form_data_src), ("useL1Detail.ts", detail_src)):
+            code = _strip_ts_comments(src)
+            assert "L1-det-" not in code, (
+                f"{name} 仍在拼位置化键 `L1-det-` ⇒ 契约的 row_identity 会与实际载荷脱钩"
+            )
+            # 反向自检：剥注释器没把整份源码吃掉（否则判据恒真）
+            assert "DETAIL_ROWS_ITEM_ID" in code or "_persist" in code, (
+                f"{name} 剥注释后连关键符号都没了 ⇒ 剥注释器有问题，判据不可信"
+            )
+
+    def test_comment_stripper_is_not_vacuous(self) -> None:
+        """剥注释器变异证明：注释里的键被剥掉，代码里的键留得住。"""
+        assert _strip_ts_comments("// item_id: `L1-det-1-bank`\nconst a = 1") .strip() == (
+            "const a = 1"
+        )
+        assert "L1-det-" in _strip_ts_comments("const id = `L1-det-${n}-${f}`")
+        assert "L1-det-" not in _strip_ts_comments("/** 旧形态 `L1-det-{n}` 已删 */")
+        # URL 里的 `//` 不得被当成行注释起点
+        assert "https://x.y" in _strip_ts_comments("const u = 'https://x.y'")
+
+    def test_frontend_row_identity_is_the_contract_key(
+        self, provider, form_data_src: str
+    ) -> None:
+        """前端行身份字段名 == 契约 `row_identity` 指向的键（`rowId`）。"""
+        table = provider.build_contract_payload()["sheets"][0]["tables"][0]
+        key = table["row_identity"]["json_pointer"].rsplit("/", 1)[-1]
+        assert key == provider.ROW_IDENTITY_STORE_KEY == "rowId"
+        assert f"rowId: string" in form_data_src, "前端 DetailRow 未声明 rowId 字段"
+        assert "newRowIdentity" in form_data_src, (
+            "前端未复用共享的值化行身份工厂 ⇒ 可能又自造了一个铸号实现"
+        )
+
+    def test_sibling_tables_keep_their_positional_channel(self, form_data_src: str) -> None:
+        """🔴 反向判据：另外四张表**仍**走位置化通道（本 spec 明确不动它们）。
+
+        若哪天它们也被改了，本断言会红 —— 那时必须先确认 `h2L1LoanPull.ts`
+        对 `L1-int-{n}-{field}` 的消费已同步，否则会连带 H2。
+        """
+        for prefix in _UNTOUCHED_POSITIONAL_PREFIXES:
+            assert f"_serializeRows(items, '{prefix}'" in form_data_src, (
+                f"`{prefix}` 表的位置化序列化调用点消失 ⇒ 若是有意改动，"
+                "须先核对跨循环消费方（H2 读 L1-int-*）"
+            )
+
+    def test_managed_field_json_keys_exist_in_the_frontend_row_type(
+        self, provider, form_data_src: str
+    ) -> None:
+        """契约每个受管字段的 json 键都能在前端 `DetailRow` 里找到声明。"""
+        table = provider.build_contract_payload()["sheets"][0]["tables"][0]
+        keys = [f["json_pointer"].rsplit("/", 1)[-1] for f in table["fields"]]
+        assert len(keys) == 28
+        missing = [k for k in keys if f"  {k}:" not in form_data_src]
+        assert missing == [], (
+            f"契约声明了这些字段但前端 DetailRow 没有：{missing} ⇒ 往返时会静默丢值"
+        )
