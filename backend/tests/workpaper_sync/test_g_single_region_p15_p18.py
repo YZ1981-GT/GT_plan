@@ -472,12 +472,13 @@ class TestG1rP13TbRedLine:
 
         from app.services.workpaper_sync.store_item_registry import STORE_MERGE_REGISTRY
 
-        g_adapters = {
-            aid for aid in STORE_MERGE_REGISTRY
-            if aid.startswith("g") and aid != "g2.interest_receivable_detail"
-            and not aid.startswith("g7.")
-        }
-        assert len(g_adapters) == 9, f"预期九条 G adapter，实得 {g_adapters}"
+        # 🔴 GC-10 现算：本判据只覆盖 single-region 九条（从 EXPECTED 的 LANE_ORDER 取），
+        #    不写死数量。g4/g5/g6 有 TB 发布门（GC-9 三家 + G5），另由 g4-g6/g5 spec 各自守。
+        nine = {EXPECTED[c]["adapter_id"] for c in LANE_ORDER}
+        g_adapters = {aid for aid in STORE_MERGE_REGISTRY if aid in nine}
+        assert g_adapters == nine, (
+            f"single-region 九条 adapter 未全在 registry：缺 {nine - g_adapters}"
+        )
 
         for aid in sorted(g_adapters):
             plan = STORE_MERGE_REGISTRY[aid]

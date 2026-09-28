@@ -141,6 +141,10 @@ SLICE_DELIVERED_CONTRACTS: dict[str, str] = {
     "xlsx/gt-g12-net-hedge-gains": "g12.net_hedge_detail.json",
     "xlsx/gt-g1-trading-financial-assets": "g1.trading_financial_assets_detail.json",
     "xlsx/gt-g3-dividend-receivable": "g3.dividend_receivable_detail.json",
+    # 🔴 g4-g6 / g5 spec 的契约也落在同一 G 循环 slice 分母里（整个 G 循环共享一个 slice）
+    "xlsx/gt-g4-bond-investment-main": "g4.bond_main.json",
+    "xlsx/gt-g5-long-term-receivable": "g5.long_term_receivable_detail.json",
+    "xlsx/gt-g6-other-bond-main": "g6.other_bond_main.json",
 }
 
 #: 不可达旧桩（AC 1.7）——它的 independent_entry=false，不进 slice。
@@ -1331,18 +1335,20 @@ class TestHtmlCounterpartIsSourceBacked:
                     f"{entry['entry_id']} 声称位置化却没写 row_identity_positional_defect"
                 )
                 flagged.append(entry["entry_id"])
-        assert set(flagged) == {"xlsx/gt-g6-other-bond-sppi"}, (
-            f"位置化缺陷 entry 集合实测为 {sorted(flagged)}，与冻结结论不符"
+        # 🟢 BP-7 已修（g4-g6 spec Task 6，2026-09-27）：G6-sppi 的 id 回退加了随机后缀
+        #    ⇒ 不再是位置化缺陷。冻结结论从「唯一 positional = G6-sppi」翻成「无 positional」。
+        assert set(flagged) == set(), (
+            f"位置化缺陷 entry 集合实测为 {sorted(flagged)} —— BP-7 修复后应为空集"
         )
-        # 另一侧：该缺陷的载入路径逐字可复现
+        # 另一侧：该缺陷的载入路径已改为带随机后缀（BP-7 修复的逐字可复现）
         sppi = _strip_ts_comments(
             (COMPOSABLES / "useG6SppiFairValue.ts").read_text(encoding="utf-8")
         )
-        assert "data.rows.map((r, i) => migrateFairValueRow(r, i + 1))" in sppi, (
-            "BP-7 的载入路径已变 —— 若已修好请更新 slice 与本判据"
+        assert "Math.random().toString(36).slice(2, 4)" in sppi or "Math.random().toString(36).slice(2, 6)" in sppi or "Math.random().toString(36).slice(2, 5)" in sppi, (
+            "BP-7 修复的随机后缀表达式已变 —— G6-sppi 的 id 回退应带 Math.random() 后缀"
         )
-        assert "`fv-${Date.now()}-${seq}`" in sppi, (
-            "BP-7 的下标派生表达式已变 —— 若已修好请更新 slice 与本判据"
+        assert "`fv-${Date.now()}-${seq}`" not in sppi, (
+            "BP-7 的旧下标派生表达式 `fv-${Date.now()}-${seq}` 复活了 —— 修复被回退"
         )
 
     def test_primary_table_identity_cell_matches_the_authoritative_template(

@@ -1177,6 +1177,71 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "`adapter_registered=False`：同系列平台级缺口（umbrella BP-61-1）。"
         ),
     },
+    # ── G4 债权投资（spec: g4-g6-shared-workbook-three-entry-lanes · Task 7~9）──
+    {
+        "contract_id": "g4.bond_main",
+        "provider_module": "app.services.workpaper_sync.phase5_g4_bond_investment",
+        "delivered_by_task": "G46-Task8",
+        "pilot_class": "phase5_bond_investment",
+        "entry_id": "xlsx/gt-g4-bond-investment-main",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "G/G4 债权投资.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "spec `g4-g6-shared-workbook-three-entry-lanes`：G4 一册三 entry 中的首条交付。"
+            "权威模板 sha256 da3a3480…（19 sheets）。当前交付 G4-7 有价证券盘点表（零公式 + 表头起于 "
+            "B 列 + 无合计）+ G4-2 明细表（两区 × 34 列 × 11 公式列，uuid AI/AJ）。"
+            "G4-9 三阶段划分是转置表（16384 列，spec 已交付待接 entry 层）。"
+            "BP-8 pointer 隔离：三条 entry 共用 TEMPLATE_SHA256、pointer 靠 entry_id 区分。"
+            "FC-9 红线：sync 路径对 trial_balance 写 0 次（TB 门归 GC-9 裁决 + 审定表 spec）。"
+            "`adapter_registered=False`：同系列平台级缺口（umbrella BP-61-1）。"
+        ),
+    },
+    # ── G5 长期应收款（spec: g5-nested-sections-and-template-defects · Task 8~10）──
+    {
+        "contract_id": "g5.long_term_receivable_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_g5_long_term_receivable",
+        "delivered_by_task": "G5-Task8",
+        "pilot_class": "phase5_long_term_receivable",
+        "entry_id": "xlsx/gt-g5-long-term-receivable",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "G/G5 长期应收款.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "spec `g5-nested-sections-and-template-defects`：G5-2 余额明细表三段 × 四子区 = 12 个受管区。"
+            "权威模板 sha256 c59bba69…（16 sheets）。公式列 G/J/M，有效列 22（A..V），uuid W。"
+            "🔴 三处模板合计漏加小计（R40 漏 G32 / R72 漏 G64 / R104 漏 G96）已登记，待模板覆盖层修。"
+            "payload dual_write（remark + conclusion 逐字相同）。行身份键 id。"
+            "G5-9 三阶段划分是转置表（16384 列，spec 已交付待接 entry 层）。"
+            "G5-1!B35 越界缺陷交棒 g-cycle-adjudication-sheets-coverage 处置。"
+            "FC-9 红线：sync 路径对 trial_balance 写 0 次。"
+            "`adapter_registered=False`：同系列平台级缺口（umbrella BP-61-1）。"
+        ),
+    },
+    # ── G6 其他债权投资（spec: g4-g6-shared-workbook-three-entry-lanes · Task 12~14）──
+    {
+        "contract_id": "g6.other_bond_main",
+        "provider_module": "app.services.workpaper_sync.phase5_g6_other_bond",
+        "delivered_by_task": "G46-Task14",
+        "pilot_class": "phase5_other_bond",
+        "entry_id": "xlsx/gt-g6-other-bond-main",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "G/G6 其他债权投资.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "spec `g4-g6-shared-workbook-three-entry-lanes`：G6 一册三 entry。"
+            "权威模板 sha256 63bf38c7…（21 sheets）。当前交付 G6-5 公允价值测试表（单区 18 列 × 2 公式列 + "
+            "D 列行级 mask）+ G6-2 明细表（两区 × 33 列 × 10 公式列，uuid AH/AI）。"
+            "G6-11 三阶段划分是转置表（16384 列，spec 已交付待接 entry 层）。"
+            "BP-7 G6-sppi 行身份回退已修（加随机后缀防同毫秒撞 id）。"
+            "BP-8 pointer 隔离：三条 entry 共用 TEMPLATE_SHA256。"
+            "FC-9 红线：sync 路径对 trial_balance 写 0 次。"
+            "`adapter_registered=False`：同系列平台级缺口（umbrella BP-61-1）。"
+        ),
+    },
     # ── H9 canary（spec: h-cycle-sync-foundation-and-first-canary · Task 20）──
     {
         "contract_id": "h9.lease_liability_detail",
@@ -2261,6 +2326,27 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "`ws.protection.sheet=False` ⇒ locked 惰性，mode 按「该格逐行有没有真公式」判。"
             "`adapter_registered=False`：同 I 循环 6 条卡 BP-1~BP-3 平台级缺口"
             "（无真 OO 9.4 ⇒ roundtrip 与人工审核均未完成）。"
+        ),
+    },
+    # ── A 循环 canary（spec: a-cycle-sync-foundation-and-first-canary）──────────
+    {
+        "contract_id": "a51.cashflow_audit",
+        "provider_module": "app.services.workpaper_sync.phase5_a51_cashflow_audit",
+        "delivered_by_task": "a-cycle-foundation-task-13",
+        "pilot_class": "phase5_a51",
+        "entry_id": "xlsx/gt-a51-cashflow-audit",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "adapter_registered": False,
+        "reason": (
+            "A5-1 现金流量表审计——A 循环 canary（首条 A 类底稿双向回写）。"
+            "扁平键值对型契约（非行表型）：审定表 24 个 editable cell + 8 个公式保护 + "
+            "勾稽核对 7 个公式保护。持久化走 checklist_responses（AC-42 import 闭包）。"
+            "A 类底稿无 TB 发布门（AC-3 空分母裁定）。"
+            "canary 选型依据：零区分项（BP 仅 6 项 / 20 条中唯一）+ xlsx 权威册 + "
+            "GRP-01 + redeemable + literal_sheet_name。"
+            "adapter_registered=False：同其他循环卡 BP-1~BP-5 平台级缺口"
+            "（无真 OO 9.4 roundtrip 与人工审核均未完成）。"
         ),
     },
 )

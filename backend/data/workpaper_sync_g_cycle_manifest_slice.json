@@ -88,7 +88,7 @@
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
-        "transport_key_kind": "literal_item_id",
+        "transport_key_kind": "storage_contract_member_item_id",
         "transport_key_shape": "G1-2-rows",
         "row_identity_key": "id",
         "row_identity_kind": "generated_timestamp_string",
@@ -108,9 +108,9 @@
         "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 另有 G1-1（审定表 4 键）/ G1-3 调整分录 / G1-4 结存 / G1-5 收益测算（5 键）/ G1-6 公允价值测试 / G1-7 三层次 / G1-8 业务模式（6 键）/ G1-9 分类适当性 / G1-10 SPPI / G1-11 监盘 / G1-12 倒轧 / G1-13 凭证 / G1-14 衍生（7 键）与两份附注披露的各自键。逐字段 contract 属 step 6 的活，本次不伪造。",
         "primary_table": {
           "item_id": "G1-2-rows",
-          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts",
-          "owner_constant": "DATA_KEY",
-          "owner_declaration_kind": "module_constant",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/g1StorageContract.ts",
+          "owner_constant": "G1_ITEM_IDS.G1_2_ROWS",
+          "owner_declaration_kind": "storage_contract_member",
           "what_it_holds": "交易性金融资产明细（G1-2）整表 —— 类别/投资项目/期初余额三联（成本·累计公允价值变动·公允价值）/期初账项调整/本期变动/期末审定",
           "template_relative_path": "G/G1 交易性金融资产.xlsx",
           "template_sheet": "明细表G1-2",
@@ -1096,7 +1096,7 @@
         "row_identity_generator": "inline template literal",
         "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG6SppiFairValue.ts#L278",
         "row_identity_generator_form": "`fv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`",
-        "row_identity_is_positional": true,
+        "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
           "array_index",
           "ordinal",
@@ -1119,8 +1119,8 @@
           "identity_text": "投资项目"
         },
         "html_persistence_composable": "audit-platform/frontend/src/components/workpaper/composables/useG6SppiFormData.ts#L176(GET)/#L286(PUT)",
-        "row_identity_positional_defect": "🔴 载入路径 `useG6SppiFairValue.ts#L331` 写的是 `data.rows.map((r, i) => migrateFairValueRow(r, i + 1))`，而 `migrateFairValueRow`（#L128）在 `raw.id` 缺失时用 ``String(raw.id || `fv-${Date.now()}-${seq}`)`` —— seq 即**数组下标 i+1**，属 forbidden_row_identity_kinds 的 array_index。已登记 BP-7，本任务不改（改法会动既存持久化数据）。",
-        "payload_null_placeholder_columns": []
+        "payload_null_placeholder_columns": [],
+        "row_identity_bp7_fix_note": "🟢 BP-7 已修（g4-g6 spec Task 6，2026-09-27）：useG6SppiFairValue.ts#L128 的 id 回退从 `fv-${Date.now()}-${seq}` 改为 `fv-${Date.now()}-${Math.random().toString(36).slice(2,6)}`，不再用数组下标 seq 作身份 ⇒ 实测行身份构造表达式无位置化命中。"
       },
       "html_counterpart_source_refs": [
         "audit-platform/frontend/src/components/workpaper/GtG6OtherBondSppi.vue",
@@ -1587,7 +1587,7 @@
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
-        "transport_key_kind": "literal_item_id",
+        "transport_key_kind": "storage_contract_member_item_id",
         "transport_key_shape": "G10-detail-rows",
         "row_identity_key": "rowId",
         "row_identity_kind": "generated_prefixed_opaque_string",
@@ -1607,9 +1607,9 @@
         "table_keys_note": "这里只登记 primary managed table。本 entry 另有 G10-1 审定表（4 键 + G10-1-adjudicated-amount）/ G10-3 调整分录（G10-aje-rows + G10-adj-writeback overlay）/ G10-4 分类适当性 / G10-5 公允价值测试 / G10-6 三层次调节 / G10-7 凭证检查（3 键）/ G10-8 衍生工具核查（3 键）/ 8 个 G10A-*-complete 程序表标记键与两份附注披露键。逐字段 contract 属 step 6 的活，本次不伪造。",
         "primary_table": {
           "item_id": "G10-detail-rows",
-          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useG10Detail.ts",
-          "owner_constant": "ITEM_ID_ROWS",
-          "owner_declaration_kind": "module_constant",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/g10StorageContract.ts",
+          "owner_constant": "G10_ITEM_IDS.G10_DETAIL_ROWS",
+          "owner_declaration_kind": "storage_contract_member",
           "what_it_holds": "交易性金融负债明细（G10-2）整表 —— 类别/项目 + 期初余额（初始确认金额·累计公允价值变动·公允价值）/期初调整数/期初审定数与期末同构列",
           "template_relative_path": "G/G10 交易性金融负债.xlsx",
           "template_sheet": "明细表G10-2",
@@ -2847,9 +2847,9 @@
     "finalized_published_representations": 0,
     "entries_left_unverifiable": 17,
     "transport_key_kind_counts": {
-      "literal_item_id": 12,
+      "storage_contract_member_item_id": 5,
+      "literal_item_id": 10,
       "literal_item_id_duplicated_across_modules": 1,
-      "storage_contract_member_item_id": 3,
       "per_sheet_literal_declared_in_the_consuming_sfc": 1
     },
     "payload_column_mode_counts": {
@@ -2869,9 +2869,9 @@
       "generated_opaque_string_with_array_index_fallback": 1,
       "stable_template_row_key": 1
     },
-    "entries_with_positional_row_identity_defect": 1,
+    "entries_with_positional_row_identity_defect": 0,
     "templates_serving_multiple_entries": 2,
-    "duplicated_item_id_literals_in_g_cycle": 79,
+    "duplicated_item_id_literals_in_g_cycle": 81,
     "reason": "17 条 entry 逐条实测都有 HTML 对端（checklist_responses + 逐 entry 各自的 payload 列与传输键形态），按 AC 12.8 一条都不能标 single_onlyoffice；OO 侧有真实业务价值且入口可达（17 个 componentType 在 htmlRendererRegistry 有真实入边，manifest 的 inbound_reference_count 均为 1），故也不是 single_html / unreachable；AC 12.1 的六件前置一件未交付（G 循环唯一的生产契约 g7.soe_subsidiary_disclosure 属已排除的 G7），故不得标 bidirectional。四个枚举值当下都不成立 ⇒ capability 记 null 并如实计入 unadjudicated=17。**unadjudicated=17 不是欠账新增，而是「本 slice 有 17 条 entry 的 capability 终态尚未确定」的实况**：缺什么已逐条落在 blocking_preconditions（BP-1..BP-4 是共性前置，BP-5/BP-7/BP-8/BP-9/BP-10 是本次新查出的 G 循环形态缺陷，BP-6 与 D/F 同型）。",
     "slice_counters": {
       "unadjudicated": 17,

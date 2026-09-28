@@ -282,17 +282,19 @@ class TestGfP20PerProviderDigestComputable:
         assert not thin, f"登记理由过短或无归属: {thin}"
 
     def test_baseline_lacks_g2_until_blocker_cleared(self) -> None:
-        """现状锚点：baseline 里还没有 g2 —— 因为 `--update` 被 F1 卡住跑不了。
+        """现状锚点：baseline 已含 g2（`g-cycle-single-region-detail-lanes` Task 15 更新快照时
+        给 golden digest 门加了 F1 容错跳过 ⇒ `--update` 得以跑通，G 循环全部进 baseline）。
 
-        F1 修好后应跑 `--update`，那时本判据会打红，提示改成「g2 在 baseline 里」。
+        🔴 判据已按原指引反转：从「g2 不在 baseline」翻成「g2 在 baseline 内」。
+        注意 F1 的 `build_store_projection` 两位置参 bug 本身**未修**——是门加了 try/except
+        跳过它，故 KNOWN_PRE_EXISTING_BLOCKERS 仍保留（F1 修好后可移除）。
         """
         doc = json.loads(DIGEST_BASELINE.read_text(encoding="utf-8"))
         labels = [p["label"] for p in doc.get("providers", [])]
-        assert "g2" not in labels, (
-            "baseline 已含 g2 ⇒ 说明 `--update` 跑通了（F1 阻塞已清）；"
-            "请把本判据改成断言 g2 在 baseline 内，并移除 KNOWN_PRE_EXISTING_BLOCKERS"
+        assert "g2" in labels, (
+            "baseline 不含 g2 ⇒ golden digest 快照被回退了（Task 15 的 --update 成果丢失）"
         )
-        # 既有 9 家必须仍在（零回归：加 G2 不得把别人挤掉）
+        # 既有 9 家必须仍在（零回归：加 G 循环不得把别人挤掉）
         must_stay = {"b60", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "e1"}
         missing = sorted(must_stay - set(labels))
         assert not missing, f"baseline 里既有 provider 消失: {missing}"
