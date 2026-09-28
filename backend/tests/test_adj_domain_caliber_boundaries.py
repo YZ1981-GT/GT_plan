@@ -273,26 +273,76 @@ def test_formula_engine_execute_loads_adj_data():
 
     这是 `from_simple_map(adj_map=...)` 的**唯一生产调用链**。不取的话
     底稿里写 `ADJ()` 或 `TB(...,'AJE调整')` 恒 0 且无提示。
+
+    🔴 判据按**调用链**而非「源码含 adj_net_batch」——取数逻辑已抽到伴生模块
+    `tb_formula_context.load_adj_map_if_needed`（`formula_engine` 是 L1 内核，
+    不该内联 L2 取数）。首版按源码字面判，抽取后立刻误判成"未取数"。
     """
     from app.services.formula_engine import FormulaEngine
 
     src = inspect.getsource(FormulaEngine.execute)
-    assert "adj_net_batch" in src, "未取调整额 ⇒ 该路径 ADJ() 恒 0"
+    assert "load_adj_map_if_needed" in src, "未调 L2 取数口 ⇒ 该路径 ADJ() 恒 0"
     assert "adj_map=adj_map" in src, "取了但没传给 execute_formula"
     # 口径必须是第 2 行（底稿呈现：不排除 origin）
     assert "exclude_origins=frozenset()" in src, (
         "底稿用户自定义公式应用矩阵第 2 行口径（不排除 origin），"
         "与 prefill_engine 对齐；用第 4 行会让同一底稿两种 ADJ 得不同的数"
     )
+    # 且那个取数口真的走 adj_net_batch（一路查到底，不止看直接调用）
+    from app.services.tb_formula_context import load_adj_map_if_needed
+
+    loader_src = inspect.getsource(load_adj_map_if_needed)
+    assert "adj_net_batch" in loader_src, "取数口未走 adj_net_batch 单一真源"
 
 
 def test_formula_engine_execute_only_loads_when_needed():
-    """公式不含调整额 token 时不该触发取数。"""
-    from app.services.formula_engine import FormulaEngine
+    """公式不含调整额 token 时不该触发取数（预判在取数口内）。"""
+    from app.services.tb_formula_context import (
+        _ADJ_TOKENS,
+        load_adj_map_if_needed,
+    )
 
-    src = inspect.getsource(FormulaEngine.execute)
-    assert '"ADJ(" in formula_str' in src, "缺 ADJ token 预判"
-    assert "AJE调整" in src, "缺 TB(...,'AJE调整') 写法的预判"
+    assert set(_ADJ_TOKENS) == {"ADJ(", "AJE调整", "RJE调整"}, (
+        f"token 预判清单变了：{_ADJ_TOKENS} —— 漏一个写法即该写法恒 0"
+    )
+    src = inspect.getsource(load_adj_map_if_needed)
+    assert "_ADJ_TOKENS" in src, "取数口未做 token 预判 ⇒ 每条公式都触发取数"
+
+
+@pytest.mark.asyncio
+async def test_adj_loader_returns_none_without_adj_token(db_session):
+    """行为级：公式不含调整额 token → 返 None（不发查询）。"""
+    from app.services.tb_formula_context import load_adj_map_if_needed
+
+    r = await load_adj_map_if_needed(
+        db_session, project_id=_PID, year=_YEAR,
+        formula="TB('1521','期末余额')",
+        account_codes={_CODE}, exclude_origins=frozenset(),
+    )
+    assert r is None, "不含 ADJ token 却触发了取数"
+
+
+@pytest.mark.asyncio
+async def test_adj_loader_honours_caliber_parameter(db_session):
+    """🔴 取数口的 `exclude_origins` 必须真的生效（两种口径给两个值）。
+
+    该参数**无默认值**是刻意的：给默认值会让下一个调用方在不知道有两种口径的
+    情况下静默继承一个。
+    """
+    from app.services.tb_formula_context import load_adj_map_if_needed
+
+    kw = dict(
+        project_id=_PID, year=_YEAR,
+        formula=f"ADJ('{_CODE}','aje_net')", account_codes={_CODE},
+    )
+    inclusive = await load_adj_map_if_needed(
+        db_session, exclude_origins=frozenset(), **kw
+    )
+    exclusive = await load_adj_map_if_needed(
+        db_session, exclude_origins=frozenset({"workpaper"}), **kw
+    )
+    assert inclusive[_CODE]["aje_net"] == _MANUAL + _WORKPAPER
+    assert exclusive[_CODE]["aje_net"] == _MANUAL
 
 
 # ─── 欠账 4：合并域不传 adj_data 有显式说明 ────────────────────────────────
