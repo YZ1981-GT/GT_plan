@@ -609,3 +609,128 @@ Task 0.1 的**全部目的**就是「禁引用注释里过期的 46，必须现�
 | T26 | **口径不同 ≠ 有偏差**。117 vs 112 被记成「−5，原因未追查」，实际两个数都对。**凡「现算与设计不一致」，先比对两边的扫描口径，再判是不是真变化** —— 否则会留下假的悬空欠账 |
 | T27 | **穷举口径矩阵是廉价的判错手段**。120 种组合一次跑完 < 1 分钟，直接证明「没有任何合理口径得 109」；靠单个正则反复调只会陷入「是不是我的口径太窄」的自我怀疑 |
 | T28 | **跨分支交付要把「代码在哪个分支」当成状态的一部分**。本 spec 的 25/26 一度只在 `fix/disclosure-coverage-and-endpoint-authz` 上成立，主工作分支的 tasks.md 仍是 0/26 且三个真实缺陷（注册表漂移 L2/L4 缺失、`formula_audit_log` 三端点零鉴权、`t_accounts` 项目级越权）全都还活着 ⇒ **「任务标完成」必须绑定「代码已在目标分支」** |
+
+---
+
+## §十五 第五轮复盘：四处「守卫在但不生效」的修复（2026-09-28，append-only）
+
+> 触发：用户要求复盘是否还有可改进处。切入角度选的是**「本 spec 自己指出的问题是否真的修了」**
+> —— 这是最容易留假绿的地方。结果四条全部落空。
+
+### 🔴 发现 7（P0）：CI 的注册表漂移门禁**永远失败** ⇒ 形同不存在
+
+`.github/workflows/governance-checks.yml` 的 job `note-section-map-naming` 末步原为::
+
+    python backend/scripts/gen_note_wp_sync_registry.py --write
+    git diff --exit-code backend/data/note_workpaper_sync_registry.json
+
+而生成器每次 `--write` 都写 `generated_at = datetime.now(timezone.utc)`
+⇒ diff 必然非空 ⇒ **该步必然失败**。该 job 现算 `continue-on-error` **0 处**、
+`if:` **0 处**，触发条件是 `push: [master, main, 'work/**']` + `pull_request: [master, main]`
+⇒ 每次 push 与每个 PR 都在红。**红成常态 = 没人再看 = 门禁等于不存在。**
+
+这正是 §十一 发现 2 那个漂移（committed 76 entries vs 真源 78，缺 L2/L4）
+能长期存活的机制性原因：**有门禁、且门禁在报警，但报的是噪音。**
+
+**对照实验实证**（不是推断）：把 `HEAD` 版旧生成器取出来在同一棵树上跑 `--write`，
+文件确实变化、且变化**仅 `generated_at`** 一处 ⇒ `git diff --exit-code` 必失败。
+
+**修法 = 让输出确定性**：`build_payload()` 在 committed 的 `entries` 与 `_source`
+与本次生成结果逐值相等时**沿用原 `generated_at`**。语义上更准（该字段变成
+「entries 上次真正变化的时间」）。另加 `--check`：只读校验、漂移 exit 2 并点名差集，
+CI 不再需要可写工作树。CI 那步已换成 `--check`（项目本就广泛使用该约定，
+如 `fix_note_table_names.py --check` / `fix_note_k_report_row_codes.py --check`
+—— 这条注册表门禁是**唯一**的例外）。
+
+**触类旁通已做**：全仓扫「产物含时间戳 × 被整体/字节级比较」，
+28 个带顶层时间戳的 JSON 产物逐个查消费方，CI 内 `git diff --exit-code` 现算
+**仅剩本 spec 的注释行**，`--write` 后紧跟比较的 step **0 处** ⇒ 本类反模式**单次出现**，已清零。
+
+**新增守卫**（`test_disclosure_sync_invariants.py`，均配变异）：
+`test_generator_output_is_deterministic`（连续两次 `build_payload()` 逐字节相同）·
+`test_generator_write_is_idempotent_against_committed` ·
+`test_serialize_emits_lf_only` · `test_generator_check_mode_exists_and_passes` ·
+`test_mutation_check_mode_detects_drift`（删一条 entry 必 exit 2 且点名）·
+`test_ci_workflow_uses_check_mode_not_write_plus_gitdiff`（**直接读 workflow 文件**，
+禁退回 `--write` + `git diff` 组合）。
+
+🔴 **该守卫的两条断言各自做了变异**：反向 A 整步退回旧形态 → 断言 1 抓到；
+反向 B **保留 `--check` 的同时把旧那步也加回** → 只有断言 2 能抓到（断言 1 会被骗过）。
+只做反向 A 会让人误以为守卫够用。
+
+### 🔴 发现 8：本 spec 的 🔴 反例锚定「46 个」从头到尾没人去改
+
+`GtWpDisclosureSyncBar.vue` 文件头的「46 个 buildXSyncPayload 就绪但生产零同步记录」
+被 requirements / design / tasks **四处**标为「注释已过期」，但**注释本体一直没动**。
+即 spec 把它当反例引用了四遍，却没修它。
+
+且两个数字都错：不是「零同步」而是低覆盖（1052 行 / `last_sync_at` 非空 93），
+构造器数也不是 46（spec 给的 109 同样错，真值 69 —— §十四）。
+
+**修法按教训 T25**：**不换新数字**，改写成「口径 + 复算方式」
+（`export function build\w*SyncPayload` 于 `frontend/src/**/*.{ts,vue}`），
+并把「46 → 109 → 69」这段三跳记进注释当反面教材。
+`.env.example` 的「现算 144 个调用点」同样处理（146→144→154 逐轮漂移）。
+
+### 🔴 发现 9：全宿主守卫有两个静默脱管口
+
+`disclosureSyncWiringAll.spec.ts` 的 `collectHosts()` 有两条收窄，**都没有反向断言**：
+
+| 收窄 | 静默后果 |
+|---|---|
+| 只走 `components/workpaper/` 子树 | 宿主落在该目录外 ⇒ 三条不变量**全部通过**而该宿主从未被看过 |
+| 收集正则只认 `function\s+syncToDisclosureNotes` | 写成 `const syncToDisclosureNotes = async () => {}` ⇒ 整条跳过（`extractFunctionBody` 也取不到函数体） |
+
+两者现算均为 **0**，但「现在是 0」不等于「不会变成非 0」——
+**这正是「结构性零须配双向变异」适用的场景**。
+
+已补三条断言（扫描域①②③，③ 是两个扫描器口径一致性，防「改了一个忘了另一个」），
+并**真建两个违规文件**做变异：`src/composables/_mutationFakeDisclosureHost.ts`（域外）
+与 `components/workpaper/_mutationConstFormHost.ts`（const 形态）
+⇒ 扫描域① 与 ② **各自精准命中对应样本**（2 failed / 11 passed），验完即删。
+顺带删掉一个死变量 `SRC_ROOT = resolve(WORKPAPER_ROOT, '..')`（零消费且取值是
+`components/` 而非 `src/`，名不副实）。
+
+### 🔴 发现 10：同一 CI job 里还有一条**预存**红，把 job 一起拖住
+
+`noteSectionMapNamingCoverage.spec.ts` 现算红：`e1FxNoteSectionMap.ts` 与
+`restrictedAssetsNoteSectionMap.ts` 未登记 `SHARED_MAP_FILES`。
+
+**归因先做**：`git stash` 回滚本轮前端改动后复跑，**同样红** ⇒ 预存失败，
+来自 `2ee7929e3`（E 循环）与 `30c252f32`（受限资产）两个提交，与本轮无关。
+但它与发现 7 的门禁**同属 job `note-section-map-naming`** ⇒ 只修门禁、这条还红着，
+job 依然全红，发现 7 的修复拿不到收益。故一并修。
+
+**不是靠加豁免蒙绿** —— 两个文件**自身文件头已写明故意排除的理由**：
+`restrictedAssetsNoteSectionMap.ts` 原文「文件名不匹配 `WP_CODE_RE` 是**故意的**
+—— 共享表一个章节有多个 owner，不该进 section→wp 的 1:1 反查 registry」；
+`e1FxNoteSectionMap.ts` 有后端 `test_note_e1_structure.py` 明载「registry 仍不含外币章节」。
+作者写了理由但漏登记 allowlist，这正是该守卫存在的意义。
+
+**顺带把 allowlist 从「名字清单」升级为「可伪证声明」**：原 `Record<string,string>`
+只有理由文本，谁都能加一行让守卫变绿。改为 `{reason, inRegistry}` 两类语义
+（`true` = 由薄壳代表进 registry，M 循环形态；`false` = 多 owner 故意不进），
+并加断言逐条验声明与 registry 实际情况一致 + 「抽不到章节号字面量即判本条空转」。
+变异：把 `restrictedAssets` 的 `inRegistry` 翻成 `true` ⇒ 精准报
+「声明 inRegistry=true 但其章节 五、32/八、93 全不在 registry」。
+
+### 验证
+
+| 范围 | 结果 |
+|---|---|
+| 后端 7 文件（含注册表 / 覆盖率 / 鉴权基线 / stale marker / wp mapping） | **156 passed + 1 xfailed** |
+| 前端 7 文件（该 CI job 的全部前端判据 + 本 spec 三个守卫 + J1 基线） | **97 passed** |
+| `--check` 幂等复验 | 连跑两次均 `unchanged`，`git diff --exit-code` 退出 0 |
+| 变异注入 | 本轮累计 **7 次**（注册表 3 + CI 判据 2 + 扫描域 2 + allowlist 1，逐条精准命中） |
+
+### 教训
+
+| # | 教训 |
+|---|---|
+| T29 | **「有门禁」不等于「门禁生效」**。判据若包含非确定性输入（时间戳 / 随机 / 绝对路径 / 机器名），门禁会永远失败；而**永远失败的门禁 = 没有门禁**，比没有更糟（它消耗注意力并训练所有人忽略它）。新增 CI 判据必须回答：**它在「没有违规」时真的会绿吗？** |
+| T30 | **生成类产物必须输出确定性**。「重生成后无 diff」这类判据的前提是生成器幂等；时间戳字段要么在内容不变时沿用旧值，要么排除在判据之外。本仓库已有 `--check` 约定，新生成器一律照抄，别再写 `--write` + `git diff`。 |
+| T31 | **spec 反复引用的「已知过期注释」要真的去改**。本 spec 四处引用「46 个」当反例却没动注释本体 —— **引用不等于修复**。交付前应扫一遍「spec 里标为『已过期/待修』的外部锚点是否仍是原样」。 |
+| T32 | **扫描器的每条收窄都要配一条反向断言**。`collectHosts` 的两条收窄（目录 / 正则形态）各是一个静默脱管口：不变量全绿而宿主根本没被看过。收窄本身合理，缺的是「域外/异形不存在」的断言。 |
+| T33 | **修 CI job 要看 job 的全部 step**。本 spec 的门禁修好后 job 仍会全红，因为同 job 另一步有预存失败 ⇒ 收益为零。判断口径是「这个 job 能不能绿」，不是「我这一步能不能绿」。 |
+| T34 | **allowlist 必须是可伪证声明，不能只是名字清单**。只存理由文本的 allowlist 等于「加一行就变绿」的后门；给每条加上可被 registry 实际情况验证的字段（本轮 `inRegistry`），并对「判据抽不到值」单独断言防空转。 |
+| T35 | **归因先于修复**：见红先 `git stash` 回滚本轮改动复跑，确认是本轮引入还是预存。本轮那条红实测是预存（`2ee7929e3` / `30c252f32`），但因同 job 仍须一并修 —— **「不是我引入的」与「我不用管」是两件事**。 |

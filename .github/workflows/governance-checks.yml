@@ -1041,10 +1041,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Regenerate registry and assert no drift
-        run: |
-          python backend/scripts/gen_note_wp_sync_registry.py --write
-          git diff --exit-code backend/data/note_workpaper_sync_registry.json
+      # 🔴 2026-09-28 修：本步原为 `--write` + `git diff --exit-code`，而生成器当时
+      #    每次都写 generated_at=datetime.now() ⇒ diff 必然非空 ⇒ **本步永远失败**。
+      #    本 job 无 continue-on-error 也无 if:，即每次 push work/** 与每个 PR 都在红，
+      #    红成常态后无人再看 ⇒ 门禁形同不存在。实测后果：committed 停在 76 entries
+      #    而前端真源已 78（缺 L2 应付利息 / L4 应付债券），长期无人发现。
+      #    已让生成器输出幂等（entries 未变则沿用原 generated_at）并加 --check，
+      #    只读校验、漂移 exit 2，不需要可写工作树。
+      #    变异证明见 spec disclosure-payload-authority-source design §十四。
+      - name: Assert registry has no drift vs frontend source of truth
+        run: python backend/scripts/gen_note_wp_sync_registry.py --check
 
   note-report-row-code:
     # 平台级：附注 report_row_code 与 report_config 编号体系一致性守卫

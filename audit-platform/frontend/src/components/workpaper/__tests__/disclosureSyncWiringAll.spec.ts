@@ -22,7 +22,8 @@ import { resolve, relative, extname } from 'node:path'
 // ── 递归收集宿主 ─────────────────────────────────────────────────────────
 
 const WORKPAPER_ROOT = resolve(__dirname, '..')
-const SRC_ROOT = resolve(WORKPAPER_ROOT, '..')
+// 注：原此处还有一个未被任何代码消费的 `SRC_ROOT = resolve(WORKPAPER_ROOT, '..')`，
+// 取值是 components/ 而非 src/（名不副实）。已删除，真正的 src 根见下方 SRC_ROOT。
 
 interface HostFile {
   /** 相对于 workpaper/ 的路径 */
@@ -101,6 +102,52 @@ function collectHosts(): HostFile[] {
 
 const ALL_HOSTS = collectHosts()
 
+// ── 扫描域自身的完整性（2026-09-28 补，spec §十四）─────────────────────
+//
+// collectHosts() 有两条收窄：① 只走 WORKPAPER_ROOT 子树 ② 只认 `function` 形态。
+// 两条都是静默脱管口 —— 新宿主若落在 components/workpaper/ 外，或写成
+// `const syncToDisclosureNotes = async () => {}`，上面三条不变量会**全部通过**
+// 而那个宿主根本没被看过。故把两条收窄各配一条反向断言钉住。
+
+const SRC_ROOT = resolve(WORKPAPER_ROOT, '..', '..')
+
+interface RawDefinition {
+  rel: string
+  form: 'function' | 'const'
+  insideScanRoot: boolean
+}
+
+/** 全 src 扫描 syncToDisclosureNotes 的**任意**定义形态（排除测试文件） */
+function collectAllDefinitions(): RawDefinition[] {
+  const found: RawDefinition[] = []
+  function walk(dir: string): void {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = resolve(dir, entry.name)
+      if (entry.isDirectory()) {
+        if (entry.name === '__tests__' || entry.name === 'node_modules') continue
+        walk(full)
+        continue
+      }
+      const ext = extname(entry.name)
+      if (ext !== '.ts' && ext !== '.vue') continue
+      if (entry.name.includes('.spec.') || entry.name.includes('.test.')) continue
+      const raw = readFileSync(full, 'utf-8')
+      const hasFn = /function\s+syncToDisclosureNotes\b/.test(raw)
+      const hasConst = /const\s+syncToDisclosureNotes\b/.test(raw)
+      if (!hasFn && !hasConst) continue
+      found.push({
+        rel: relative(SRC_ROOT, full).replace(/\\/g, '/'),
+        form: hasFn ? 'function' : 'const',
+        insideScanRoot: full.startsWith(WORKPAPER_ROOT),
+      })
+    }
+  }
+  walk(SRC_ROOT)
+  return found
+}
+
+const ALL_DEFINITIONS = collectAllDefinitions()
+
 // ══════════════════════════════════════════════════════════════════════════
 
 describe('全宿主披露同步接线（动态扫描）', () => {
@@ -111,6 +158,39 @@ describe('全宿主披露同步接线（动态扫描）', () => {
       ALL_HOSTS.length,
       `宿主数 ${ALL_HOSTS.length} < 100，可能扫描路径错误`,
     ).toBeGreaterThanOrEqual(100)
+  })
+
+  // ── 扫描域完整性：两条收窄各配反向断言 ─────────────────────────────
+
+  it('扫描域①：不存在落在 components/workpaper/ 外的生产宿主', () => {
+    const outside = ALL_DEFINITIONS.filter((d) => !d.insideScanRoot).map((d) => d.rel)
+    expect(
+      outside,
+      `以下文件定义了 syncToDisclosureNotes 但在本守卫扫描域（components/workpaper/）之外，` +
+        `⇒ 上面的缺陷①②不变量对它们完全不生效（静默脱管）：\n${outside.join('\n')}\n` +
+        `处置：要么把宿主移进 components/workpaper/，要么扩大本守卫的 WORKPAPER_ROOT。`,
+    ).toEqual([])
+  })
+
+  it('扫描域②：不存在 const/箭头形态的 syncToDisclosureNotes 定义', () => {
+    // collectHosts() 的收集条件是 /function\s+syncToDisclosureNotes\b/，
+    // 写成 `const syncToDisclosureNotes = async () => {}` 会被整条跳过。
+    const constForm = ALL_DEFINITIONS.filter((d) => d.form === 'const').map((d) => d.rel)
+    expect(
+      constForm,
+      `以下宿主把 syncToDisclosureNotes 写成 const/箭头形态，本守卫的收集正则只认 ` +
+        `function 形态 ⇒ 这些宿主不在任何不变量的视野内：\n${constForm.join('\n')}\n` +
+        `处置：改回 function 声明（与既有 112 个宿主一致），或扩展 collectHosts 的正则与 ` +
+        `extractFunctionBody 的花括号配平起点。`,
+    ).toEqual([])
+  })
+
+  it('扫描域③：两个扫描器对「function 形态生产宿主」的口径一致', () => {
+    // 防「改了一个扫描器忘了另一个」——两套收集逻辑必须数出同一个集合。
+    const viaDefinitions = ALL_DEFINITIONS.filter(
+      (d) => d.insideScanRoot && d.form === 'function',
+    ).length
+    expect(viaDefinitions, '两个扫描器口径漂移，其中一个已失效').toBe(ALL_HOSTS.length)
   })
 
   it('自检：所有宿主均能提取 syncToDisclosureNotes 函数体', () => {
@@ -179,6 +259,33 @@ describe('全宿主披露同步接线（动态扫描）', () => {
       expect(
         /scheduleAutoSync\s*\(\s*syncToDisclosureNotes\s*\)/.test(mutated),
       ).toBe(true)
+    })
+
+    // ── 扫描域完整性判据的变异（证明「现算为 0」不是恒绿）────────────
+
+    it('反向③：域外宿主样本必须被判为 insideScanRoot=false', () => {
+      // 模拟一个落在 src/composables/ 的宿主路径，不建真文件
+      const fakeOutside = resolve(SRC_ROOT, 'composables', 'useFakeDisclosureHost.ts')
+      expect(fakeOutside.startsWith(WORKPAPER_ROOT)).toBe(false)
+      // 反证：真实宿主必须被判为域内
+      expect(
+        resolve(WORKPAPER_ROOT, 'e1', 'E1TabDisclosure.vue').startsWith(WORKPAPER_ROOT),
+      ).toBe(true)
+    })
+
+    it('反向④：const/箭头形态样本必须被 form 判别器识别为 const', () => {
+      const constSample = 'const syncToDisclosureNotes = async () => {\n  await post()\n}\n'
+      const fnSample = 'async function syncToDisclosureNotes() {\n  await post()\n}\n'
+      const hasFn = (s: string) => /function\s+syncToDisclosureNotes\b/.test(s)
+      const hasConst = (s: string) => /const\s+syncToDisclosureNotes\b/.test(s)
+      expect(hasFn(constSample), 'const 形态不应被 function 正则命中').toBe(false)
+      expect(hasConst(constSample)).toBe(true)
+      expect(hasFn(fnSample)).toBe(true)
+      // 🔴 关键：const 形态在 collectHosts 的收集条件下会被**整条跳过**
+      expect(hasFn(constSample)).toBe(false)
+      // 且 extractFunctionBody 对 const 形态取不到函数体 ⇒ 不变量无从施加
+      expect(extractFunctionBody(constSample, 'syncToDisclosureNotes')).toBeNull()
+      expect(extractFunctionBody(fnSample, 'syncToDisclosureNotes')).not.toBeNull()
     })
   })
 })

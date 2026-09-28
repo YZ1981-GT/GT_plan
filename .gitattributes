@@ -18,3 +18,9 @@
 # 于是任何一次 checkout / stash pop 之后该守卫就在 Windows 本机变红（CI 的 Linux 上看不见）。
 # index 里本就是 LF，故此规则不产生行尾 churn，只保证 checkout 后仍是 LF。
 backend/data/workpaper_sync_contracts/*.json text eol=lf
+# 附注同步注册表同样强制 LF（2026-09-28，spec disclosure-payload-authority-source §十四）。
+# 该文件由 `backend/scripts/gen_note_wp_sync_registry.py --write` 生成，输出恒为 LF，
+# 而 CI 门禁判据是「重生成后 git diff 为空」。index 里本就是 LF，加这条只是让 Windows
+# checkout 后磁盘也保持 LF，避免后人写字节级断言时踩同款「本机红、CI 绿」的坑
+# （本轮就是先写成 read_bytes() 比较才发现的）。不产生行尾 churn。
+backend/data/note_workpaper_sync_registry.json text eol=lf

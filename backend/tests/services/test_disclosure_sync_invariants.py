@@ -571,3 +571,128 @@ class TestRegistryConsistency:
         assert "勿手工编辑" in source or "手工" in source, (
             "_source 字段应包含手工编辑警告"
         )
+
+    # ── 生成器输出必须幂等（2026-09-28 补，见 spec design §十四）─────────
+
+    def test_generator_output_is_deterministic(self):
+        """🔴 ``build_payload()`` 连续两次调用必须逐字节相同。
+
+        为什么这条是 P0：``.github/workflows/governance-checks.yml`` 的
+        ``note-section-map-naming`` job 用的是::
+
+            python backend/scripts/gen_note_wp_sync_registry.py --write
+            git diff --exit-code backend/data/note_workpaper_sync_registry.json
+
+        原实现每次都写 ``generated_at = datetime.now()`` ⇒ diff 必然非空 ⇒
+        **该步永远失败**。job 无 continue-on-error 也无 if: ⇒ 每次 push 到
+        ``work/**`` 与每个 PR 都在红，红成常态后无人再看 ⇒ 门禁形同不存在。
+        实测后果：committed 停在 76 entries 而真源已 78（缺 L2/L4）却无人发现。
+
+        修法是让输出确定性（entries 与 _source 未变则沿用原 generated_at）。
+        本条把该性质钉死 —— 一旦有人把 generated_at 改回无条件 now()，这里先红。
+        """
+        mod = self._load_generator()
+        first = mod._serialize(mod.build_payload())
+        second = mod._serialize(mod.build_payload())
+        assert first == second, (
+            "🔴 生成器输出非确定性 ⇒ CI 的 `git diff --exit-code` 门禁会永远失败。"
+            "请勿把 generated_at 改成无条件 datetime.now()。"
+        )
+
+    def test_generator_write_is_idempotent_against_committed(self):
+        """幂等性落到真文件上：committed 内容已是最新时，``--write`` 不得改动文件。
+
+        🔴 判据必须**行尾无关**，不能比较 ``read_bytes()``：
+        本仓库 ``core.autocrlf=true``，git blob 里是 LF 而 Windows checkout 后磁盘是
+        CRLF（本条首版按字节比较，在 Windows 本机立刻红 —— 那是 checkout 产物，
+        不是生成器缺陷）。``read_text()`` 走 universal newlines 会归一化，
+        与 ``_serialize()`` 的 LF 输出可比，且在 Linux CI 上同样成立。
+        同源先例见 ``.gitattributes`` 里 workpaper_sync_contracts/*.json 那条注释。
+        """
+        mod = self._load_generator()
+        before = self._REGISTRY.read_text(encoding="utf-8")
+        fresh = mod._serialize(mod.build_payload())
+        assert fresh == before, (
+            "🔴 重新生成的内容与 committed 不等 ⇒ `git diff --exit-code` 会失败。"
+            "若 entries 确有变化请重跑 --write 提交；若只有 generated_at 变化则是幂等性回退。"
+        )
+
+    def test_serialize_emits_lf_only(self):
+        """``_serialize()`` 的输出本身必须是纯 LF（磁盘 CRLF 由 checkout 造成，与此无关）。
+
+        钉住这条是为了让上一条的「行尾无关」判据有明确依据：
+        生成侧恒定 LF ⇒ Linux CI 上磁盘与 blob 同为 LF ⇒ `git diff --exit-code` 可用。
+        """
+        mod = self._load_generator()
+        blob = mod._serialize(mod.build_payload())
+        assert "\r" not in blob, "_serialize 产出含 CR ⇒ 会在 Linux CI 上制造行尾 diff"
+        assert blob.endswith("\n"), "_serialize 产出应以换行收尾"
+
+    def test_generator_check_mode_exists_and_passes(self):
+        """``--check`` 模式存在且在当前树上 exit 0（CI 改用它，无需可写工作树）。"""
+        proc = subprocess.run(
+            [sys.executable, str(self._SCRIPT), "--check"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            cwd=str(self._SCRIPT.resolve().parents[2]),
+        )
+        assert proc.returncode == 0, (
+            f"--check 未通过 (exit {proc.returncode})：\n{proc.stdout}\n{proc.stderr}"
+        )
+
+    def test_mutation_check_mode_detects_drift(self):
+        """双向变异：临时把 committed 改坏，``--check`` 必须 exit 2 并点名；随后复原。
+
+        证明上面三条「现算通过」不是恒绿。
+        """
+        backup = self._REGISTRY.read_bytes()
+        try:
+            doc = json.loads(backup.decode("utf-8"))
+            removed = doc["entries"].pop()
+            self._REGISTRY.write_text(
+                json.dumps(doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
+            proc = subprocess.run(
+                [sys.executable, str(self._SCRIPT), "--check"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                cwd=str(self._SCRIPT.resolve().parents[2]),
+            )
+            assert proc.returncode == 2, (
+                f"删掉一条 entry 后 --check 仍 exit {proc.returncode} ⇒ 守卫恒绿"
+            )
+            assert removed["wp_code"] in proc.stdout, (
+                f"--check 未点名被删的 {removed['wp_code']}：{proc.stdout!r}"
+            )
+        finally:
+            self._REGISTRY.write_bytes(backup)
+            assert self._REGISTRY.read_bytes() == backup, "注册表未复原"
+
+    def test_ci_workflow_uses_check_mode_not_write_plus_gitdiff(self):
+        """🔴 CI 判据本身要被守卫：那一步不得退回 ``--write`` + ``git diff``。
+
+        退回即重新变成「永假门禁」。本条直接读 workflow 文件断言。
+        """
+        wf = (
+            Path(__file__).resolve().parents[3]
+            / ".github"
+            / "workflows"
+            / "governance-checks.yml"
+        )
+        assert wf.exists(), f"workflow 不存在: {wf}"
+        text = wf.read_text(encoding="utf-8")
+        assert "gen_note_wp_sync_registry.py --check" in text, (
+            "CI 未使用 --check 模式校验注册表漂移"
+        )
+        # 关键：不得存在「--write 紧跟 git diff --exit-code 注册表」的组合
+        bad = re.search(
+            r"gen_note_wp_sync_registry\.py\s+--write\s*\n\s*git diff --exit-code[^\n]*"
+            r"note_workpaper_sync_registry\.json",
+            text,
+        )
+        assert bad is None, (
+            "🔴 CI 又退回 `--write` + `git diff --exit-code`：generated_at 会让该步永远失败，"
+            "门禁形同不存在。改用 `--check`。"
+        )
