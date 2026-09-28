@@ -180,8 +180,18 @@ DECLARED_COVERAGE_GAPS_H702_FAIR: Final[tuple[dict[str, Any], ...]] = (
             "（H7 的审定数在 H7TabAdjudicationFair / H7-1 审定表，是另一张表）。"
             "模板的期初调整 / 账项调整 / 本期变动调整五列因此全无对端。"
         ),
-        "stop_and_report": "随 H7F-GAP-1 一并解决（补字段时一起补审定四档）。",
-        "owner": "同 H7F-GAP-1",
+        "resolution_verdict": "reject_widening_this_sheet",
+        "stop_and_report": (
+            "🔴 **审定四档不要补进本 sheet** —— 与 H5-GAP-1 / H7C-GAP-1 同一条否决："
+            "公允侧审定数**前端已经有了**，在 `H7TabAdjudicationFair.vue`（键前缀 `H7-1-fair-`，"
+            "带独立 TB 发布门）。往明细表再存一份 = 同一个量两处可改。"
+            "⇒ 正解是让 `审定表（公允价值模式）H7-1` 进受管面；前置门 = 审定表引擎尚不存在"
+            "（见 H7C-GAP-1 与 `test_deferred_imports_resolve.py` 的欠账清单）。"
+            "🔴 本条**不与 H7F-GAP-1 同批**：GAP-1 是口径拆分（且拆分基准年的累计公允变动"
+            "无从追溯，属存量数据信息丢失），本条只是「数据在另一张表」。混在一起会让"
+            "可做的那半被不可做的那半拖住。"
+        ),
+        "owner": "框架层：审定表引擎 spec（承载 H7-1 公允侧）",
     },
     {
         "gap_id": "H7F-GAP-3",

@@ -240,12 +240,30 @@ DECLARED_COVERAGE_GAPS_H502: Final[tuple[dict[str, Any], ...]] = (
             "39 列里没有一列有 store 对端 ⇒ 全判 template-only（OO 侧照旧可编辑，"
             "Excel 自己算自己的；只是不回写 HTML）。"
         ),
+        "resolution_verdict": "reject_widening_this_sheet",
         "stop_and_report": (
-            "要让这 31 列双向，需要给 `H5DetailRow` 补减值三项 + 三块审定四项"
-            "（共约 19 个字段）并改 H5-2 的表格 UI ⇒ 属前端模型扩张 + 审计域确认"
-            "（减值在明细表逐资产列示 vs 只在 H5-14 减值测算表汇总，是编制口径问题）。"
+            "🔴 **不要靠给 `H5DetailRow` 补字段来关这条缺口** —— 该方向已按实测否决，三条理由："
+            "①**会造第二份事实**：减值准备与审定四档数据**前端已经有了**，在 H5-1 审定表载体里 —— "
+            "`useH5Adjudication.ts` 现算有 `costRows` / `depletionRows` / **`impairmentRows`** 三块，"
+            "键 `H5-1-cost-rows` / `H5-1-depletion-rows` / `H5-1-impairment-rows`，"
+            "且 `netValueAudited = calcNetValue(cost.audited, depletion.audited, impairment.audited)`。"
+            "往明细表再存一份 = 同一个量两处可改、可不一致（平台反复吃过的多源问题）。"
+            "②**模板自己就是这么分工的**：审定表才是承载审定数的地方，明细表里的审定段是**冗余镜像**；"
+            "同族已实证 —— H10 的 `审定表H10-1` 整表逐格是 `='明细表H10-2'!…` 派生。"
+            "③**UI 不可用**：本 sheet 已 54 有效列，补 31 列 → 85 列，浏览器里的可编辑表格到这个"
+            "宽度不是难用而是不能用。"
+            "⇒ **正解是让 `审定表H5-1` 进受管面**，不是加宽本 sheet。该正解的前置门是"
+            "**审定表引擎尚不存在**：`AdjudicationSheetSpec` 数据类有（6 个声明实例），但"
+            "①契约 payload 生成器 `static_sheet_payload_for_adjudication` 未落地"
+            "（`phase5_d{5,6,7}_expansion` 三处延迟 import 指向空气，由 "
+            "`test_deferred_imports_resolve.py` 的欠账清单钉着）；"
+            "②没有消费它的 store 投影 / merge 引擎（行表侧对位物是 "
+            "`phase5_row_table_sheet.build_store_projection`）。属框架层 spec。"
+            "本条缺口的**审计域裁决**只剩一件：减值是否需要在明细表**逐资产**列示"
+            "（而不是只在 H5-14 减值测算表汇总）—— 若答案为「不需要」，本条缺口就不是缺陷，"
+            "而是模板冗余段的正常留空。"
         ),
-        "owner": "审计业务方 / spec h3-h5-h7-variant-axis-and-dynamic-column-paradigm 后续任务",
+        "owner": "框架层：审定表引擎 spec（承载 H5-1）/ 审计业务方：逐资产减值列示口径",
     },
     {
         "gap_id": "H5-GAP-2",

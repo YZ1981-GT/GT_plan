@@ -30,9 +30,10 @@
     "declared_coverage_gaps": [
       {
         "gap_id": "H7C-GAP-1",
-        "owner": "审计业务方 / spec h3-h5-h7-variant-axis-and-dynamic-column-paradigm 后续任务",
+        "owner": "框架层：审定表引擎 spec（承载 H7-1 两侧）/ 审计业务方：逐资产审定列示口径",
+        "resolution_verdict": "reject_widening_this_sheet",
         "sheet": "明细表（成本模式）H7-2",
-        "stop_and_report": "要接通这 33 列需要给 Tab 内联的行模型补约 20 个字段 + 改表格 UI，并先决定 H7 的审定数究竟在明细表逐资产列示还是只在 H7-1 审定表汇总（编制口径问题）⇒ 属前端模型扩张 + 审计域确认。",
+        "stop_and_report": "🔴 **不要靠给 Tab 内联行模型补字段来关这条缺口** —— 已按实测否决，同 H5-GAP-1 三条理由：①**会造第二份事实**：审定四档与累计折旧/减值数据**前端已经有了**，在 H7-1 审定表里 —— `H7TabAdjudicationCost.vue` 现算有 `origRow` / `depRow`（累计折旧）/ `impRow`（减值准备）三行，各带 `unadjusted` / `aje` / `rje` / `begin` / `debit` / `credit`，`auditedOf(r) = unadjusted + aje + rje`，键 `H7-1-cost-orig` / `H7-1-cost-dep` / `H7-1-cost-imp`，且带 TB 发布门（科目 1621，`amount_kind='balance'`）。②**模板自己就是这么分工的**：审定表承载审定数，明细表审定段是冗余镜像（同族实证：H10 的 `审定表H10-1` 整表逐格 `='明细表H10-2'!…` 派生）。③**UI 不可用**：本 sheet 已 51 有效列，补 33 列 → 84 列。⇒ **正解是让 `审定表（成本模式）H7-1` 进受管面**。前置门 = 审定表引擎尚不存在（payload 生成器 `static_sheet_payload_for_adjudication` 未落地 + 无 store 投影/merge 引擎），属框架层 spec，由 `test_deferred_imports_resolve.py` 的欠账清单钉着。本条剩下的**审计域裁决**只有一件：审定数是否需要在明细表逐资产列示。",
         "store_fields": [],
         "template_columns": [
           "F",
@@ -74,9 +75,9 @@
       },
       {
         "gap_id": "H7C-GAP-2",
-        "owner": "审计业务方",
+        "owner": "审计业务方（逐资产折旧三段的归属表）",
         "sheet": "明细表（成本模式）H7-2",
-        "stop_and_report": "要接通需把单值拆成「期初 + 本期计提 + 本期减少」三个字段（并决定减少额落处置还是其他减少）⇒ 前端模型变更 + 审计口径裁决，与 H5-GAP-2 同族。",
+        "stop_and_report": "要接通需把单值拆成「期初 + 本期计提 + 本期减少」三个字段（并决定减少额落处置还是其他减少）⇒ 前端模型变更 + 审计口径裁决，与 H5-GAP-2 同族。🔴 **注意与 H7C-GAP-1 的区别**：GAP-1 的数据在 H7-1 审定表里已存在（正解是接审定表），本条的「期初 / 本期计提 / 本期减少」三段在**前端任何载体里都不存在** —— `H7TabAdjudicationCost` 的 `depRow` / `impRow` 虽有 `begin` / `debit` / `credit`，但那是**按资产大类**的汇总行，不是本 sheet 的**逐资产**三段。所以本条确实需要前端补字段，但补在哪张表要先定：逐资产折旧三段的自然归属是 `折旧测算表H7-11`（已有前端 Tab），不一定是明细表。",
         "store_fields": [
           "accDep",
           "impairment"
@@ -131,9 +132,10 @@
       },
       {
         "gap_id": "H7F-GAP-2",
-        "owner": "同 H7F-GAP-1",
+        "owner": "框架层：审定表引擎 spec（承载 H7-1 公允侧）",
+        "resolution_verdict": "reject_widening_this_sheet",
         "sheet": "明细表（公允价值模式）H7-2",
-        "stop_and_report": "随 H7F-GAP-1 一并解决（补字段时一起补审定四档）。",
+        "stop_and_report": "🔴 **审定四档不要补进本 sheet** —— 与 H5-GAP-1 / H7C-GAP-1 同一条否决：公允侧审定数**前端已经有了**，在 `H7TabAdjudicationFair.vue`（键前缀 `H7-1-fair-`，带独立 TB 发布门）。往明细表再存一份 = 同一个量两处可改。⇒ 正解是让 `审定表（公允价值模式）H7-1` 进受管面；前置门 = 审定表引擎尚不存在（见 H7C-GAP-1 与 `test_deferred_imports_resolve.py` 的欠账清单）。🔴 本条**不与 H7F-GAP-1 同批**：GAP-1 是口径拆分（且拆分基准年的累计公允变动无从追溯，属存量数据信息丢失），本条只是「数据在另一张表」。混在一起会让可做的那半被不可做的那半拖住。",
         "store_fields": [],
         "template_columns": [
           "J",
