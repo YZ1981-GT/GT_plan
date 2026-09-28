@@ -736,10 +736,15 @@ class TrialBalanceService:
             if formula:
                 # 有公式：用统一公式引擎执行（L1 内核，ctx 由上方 L2 预载）
                 # row_cache 每行都在变（ROW/SUM_ROW 引用已算出的行），故每次新建
-                # FormulaContext 但复用同一份 tb_data（只读，不拷贝）。
+                # FormulaContext 但复用同一份 tb_data / adj_data（只读，不拷贝）。
+                #
+                # `adj_data` 直接就是 `adj_net_batch` 的返回值（键名逐一对应
+                # `ADJ()` 的第二参归一结果 + `_net` 后缀），**禁**在此做键名转换。
+                # spec: tb-adjustment-column-formula-closure Phase 1 Task 1.8
                 _ctx = FormulaContext(
                     tb_data=formula_ctx_base,
                     row_cache={k: Decimal(str(v)) for k, v in row_values.items()},
+                    adj_data=adj_data,
                 )
                 unadj = fe_execute(formula, _ctx).value
                 # 公式涉及的科目的调整也要汇总

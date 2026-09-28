@@ -37,31 +37,31 @@
 
 ## Phase 1 — 统一内核（需求 2+3）
 
-- [ ] 1.1 `FormulaContext` 新增 `adj_data: dict[str, dict[str, Decimal]]`
+- [x] 1.1 `FormulaContext` 新增 `adj_data: dict[str, dict[str, Decimal]]`
       （`field(default_factory=dict)`，与既有 5 个数据源字段同构）
-- [ ] 1.2 实现 `_handle_adj(args, ctx, trace)`：纯同步查 `ctx.adj_data`；
+- [x] 1.2 实现 `_handle_adj(args, ctx, trace)`：纯同步查 `ctx.adj_data`；
       `adj_type` 归一**复用** `adjustment_amount_source.normalize_adj_type`，禁另写
-- [ ] 1.3 `_REGISTRY.register("ADJ", _handle_adj, arity=2, ...)`，category="取数"
-- [ ] 1.4 P6 守卫：`_handle_adj` 非 coroutine + 源码内无 `await` + 无 DB import
-- [ ] 1.5 验证 `formula_state` 白名单自动生效（它派生于 `_REGISTRY`）：
+- [x] 1.3 `_REGISTRY.register("ADJ", _handle_adj, arity=2, ...)`，category="取数"
+- [x] 1.4 P6 守卫：`_handle_adj` 非 coroutine + 源码内无 `await` + 无 DB import
+- [x] 1.5 验证 `formula_state` 白名单自动生效（它派生于 `_REGISTRY`）：
       `validate_formula("ADJ('6001','aje_net')")` 返 `[]`，且 `_classify` 不判 BLOCKED。
       **双向变异**：`NOSUCHFUNC()` 仍被拒
-- [ ] 1.6 🔴 删除 `test_k1_formula_presets._KNOWN_ADJ_EXEMPT` 豁免，改正向断言（P9）。
+- [x] 1.6 🔴 删除 `test_k1_formula_presets._KNOWN_ADJ_EXEMPT` 豁免，改正向断言（P9）。
       删前后各跑一次，确认不是靠豁免掩盖问题
-- [ ] 1.7 `formula_grammar` 加 `ADJ_PATTERN`（现有 9 个 pattern 的单一真源，
+- [x] 1.7 `formula_grammar` 加 `ADJ_PATTERN`（现有 9 个 pattern 的单一真源，
       保持风格一致）。⚠️ 加了 pattern 后必须检查 `report_engine` 的预替换循环
       **不要**把 ADJ 加进 `PREV/NOTE/WP/AUX` 那个"一律替换成 0"的列表
-- [ ] 1.8 三个 L2 填充 `adj_data`：`trial_balance_service`（P5 的一侧）、
+- [x] 1.8 三个 L2 填充 `adj_data`：`trial_balance_service`（P5 的一侧）、
       `report_engine`、`adjudication_writeback`。统一经 `adj_net_batch`
-- [ ] 1.9 `from_simple_map` 补 `AJE调整`/`RJE调整` 键——⚠️ 需求 3.4：既有 3 键的值与语义
+- [x] 1.9 `from_simple_map` 补 `AJE调整`/`RJE调整` 键——⚠️ 需求 3.4：既有 3 键的值与语义
       **不得变**，只增不改。加参数 `adj_map: dict | None = None`，缺省时不产这两键
       （保持既有调用方零回归）
-- [ ] 1.10 P5 守卫：同一公式跨域等值（报表路径 vs 试算平衡表路径）。
+- [x] 1.10 P5 守卫：同一公式跨域等值（报表路径 vs 试算平衡表路径）。
       覆盖 `TB(code,'AJE调整')` 与 `ADJ(code,'aje_net')` 两种写法
-- [ ] 1.11 需求 3.3：持久化列与实时值不一致时的可观测信号。
+- [x] 1.11 需求 3.3：持久化列与实时值不一致时的可观测信号。
       实现为 health/诊断端点或 service 层 warning，**不做**自动 recalc。
       真库现状（持久化全 0、实时非 0）必须能被这个信号发现
-- [ ] 1.12 文档：在 `adjustment_amount_source` 文件头的口径表补第 4 行
+- [x] 1.12 文档：在 `adjustment_amount_source` 文件头的口径表补第 4 行
       （试算平衡表调整列），并说明 `TB(code,'AJE调整')`（取持久化快照）与
       `ADJ(code,'aje_net')`（取实时汇总）的语义差异
 

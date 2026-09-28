@@ -544,6 +544,11 @@ class ReportFormulaParser:
         # A1/A2：可注入金额解析器。None → 默认走内部 trial_balance 取数（单体行为 100% 不变，R1）；
         # 注入 ConsolTrialResolver 时 TB()/SUM_TB() 改走 consol_trial.consol_amount（合并）。
         self.resolver = resolver
+        # ADJ() 的调整额实时汇总缓存（Phase 1 Task 1.8）。
+        # `None` = 尚未加载；加载后为 dict（**可能为空 dict**，表示"查过且无调整"）。
+        # 🔴 必须缓存：`evaluate_formula` 是**逐行**调用的（每个 report_config 行一次），
+        # 不缓存会让 `adj_net_batch` 按行数重复执行 —— 而它存在的理由正是避免 N+1。
+        self._adj_data: dict[str, dict[str, Decimal]] | None = None
 
     async def _get_tb_row(self, account_code: str) -> TrialBalance | None:
         """从缓存或数据库获取试算表行"""
@@ -684,7 +689,67 @@ class ReportFormulaParser:
         if not formula or not formula.strip():
             return Decimal("0")
 
-        return await evaluate_formula(formula, resolver=self, row_cache=row_cache)
+        adj_data = None
+        if "ADJ(" in formula:
+            # 只在公式真的用 ADJ 时才取数（绝大多数报表公式不用），
+            # 取到后按实例缓存供后续行复用。
+            adj_data = await self._get_adj_data()
+
+        return await evaluate_formula(
+            formula, resolver=self, row_cache=row_cache, adj_data=adj_data
+        )
+
+    async def _get_adj_data(self) -> dict[str, dict[str, Decimal]]:
+        """惰性批量载入调整额实时汇总（供 ``ADJ()``），按实例缓存。
+
+        spec: tb-adjustment-column-formula-closure Phase 1 Task 1.8
+
+        口径与试算平衡表调整列一致（口径矩阵第 4 行）：仅 approved + 排除
+        workpaper 来源。fail-open —— 取数失败返空 dict（``ADJ()`` 得 0）并留 warning。
+
+        🔴 ``account_codes`` 取本项目年度 ``trial_balance`` 的**全部**标准科目码，
+        不按公式预测。理由两条：① 报表公式可能引用区间（``SUM_TB('6001~6099')``），
+        按行预测科目集不可靠 ② ``adj_net_batch`` 对空集合**直接返回 ``{}`` 不发查询**
+        （其 docstring 明载），传 ``None`` 会让 ``ADJ()`` 静默恒 0 —— 我第一版就是
+        这么写的，实证后修正。
+        """
+        if self._adj_data is not None:
+            return self._adj_data
+
+        try:
+            from app.services.adjustment_amount_source import (
+                DEFAULT_INCLUDE_STATUSES,
+                adj_net_batch,
+            )
+
+            codes_result = await self.db.execute(
+                sa.select(TrialBalance.standard_account_code)
+                .where(
+                    TrialBalance.project_id == self.project_id,
+                    TrialBalance.year == self.year,
+                    TrialBalance.is_deleted == sa.false(),
+                )
+                .distinct()
+            )
+            all_codes = {c for (c,) in codes_result.all() if c}
+
+            self._adj_data = await adj_net_batch(
+                self.db,
+                project_id=self.project_id,
+                year=self.year,
+                account_codes=all_codes,
+                include_statuses=DEFAULT_INCLUDE_STATUSES,
+                exclude_origins=frozenset({"workpaper"}),
+            )
+        except Exception:
+            logger.warning(
+                "报表引擎：调整额实时汇总失败（project=%s year=%s），ADJ() 将返 0",
+                self.project_id,
+                self.year,
+                exc_info=True,
+            )
+            self._adj_data = {}
+        return self._adj_data
 
     def extract_account_codes(self, formula: str | None) -> list[str]:
         """从公式中提取所有引用的科目代码"""
@@ -712,10 +777,19 @@ async def evaluate_formula(
     *,
     resolver: AmountResolver,
     row_cache: dict[str, Decimal] | None = None,
+    adj_data: dict[str, dict[str, Decimal]] | None = None,
 ) -> Decimal:
     """L2 编排层：预载数据 → 构建 FormulaContext → 委托 L1 内核 execute → 返回 Decimal。
 
     签名向后兼容（reports + consol 调用方零改）。
+
+    ``adj_data``（Phase 1 Task 1.8 新增，可选）：`adj_net_batch` 的返回值，供
+    ``ADJ()`` 取实时调整额。**不传 = 空 dict ⇒ ``ADJ()`` 返 0**，与既有
+    PREV/NOTE/WP/AUX 在报表域被置 0 的行为一致，故既有调用方零回归。
+
+    🔴 ADJ **不走**上方的「预替换成 0」列表：那个列表的语义是"该数据源在报表路径
+    不可用"，而 ADJ 的数据由本参数按需注入 ⇒ 若把它加进去，即使调用方传了
+    ``adj_data`` 也会被替换成 0，且无 error 无 trace（tasks 1.7 的显式警告）。
     单体注入 TrialBalanceResolver，合并注入 ConsolTrialResolver，
     解析与求值路径对两种 resolver 完全一致，仅取数值不同（关联属性 Q1）。
 
@@ -755,10 +829,16 @@ async def evaluate_formula(
             expression = expression.replace(match.group(0), "0", 1)
 
     # Step 2: 构建 FormulaContext（ROW 数据；TB/SUM_TB 已预替换为数值无需再入 ctx）
+    #
+    # `adj_data` 不预替换而是入 ctx，由 L1 的 `_handle_adj` 消费 —— 理由：
+    # 预替换需要 async 取数，而 `AmountResolver` 协议只有单点 `resolve_tb`/
+    # `resolve_sum` 两个方法，为 ADJ 加第三个方法要改全部 5 个实现类，
+    # 且会把批量取数（`adj_net_batch` 一次查全部科目）退化成 N+1。
     ctx = FormulaContext(
         tb_data={},
         row_cache={k: Decimal(str(v)) for k, v in row_values.items()},
         prior_tb_data={},
+        adj_data=adj_data or {},
     )
 
     # Step 3: 委托 L1 内核求值（expression 中只剩 ROW/SUM_ROW/REPORT + 算术 + 内置函数）
@@ -2195,9 +2275,29 @@ class ReportEngine:
             logger.warning("on_trial_balance_updated: missing year, skipping")
             return
 
-        await self.regenerate_affected(
-            payload.project_id, year, payload.account_codes,
+        # spec chain-closure-phase1 R3：必须传项目**真实**准则。
+        # 🔴 原实现只传 3 个参数，`applicable_standard` 走默认值 "enterprise"，
+        # 而 `report_config` 实测只有 listed_standalone / listed_consolidated /
+        # soe_standalone / soe_consolidated / project:{uuid} 五种取值（无 enterprise）
+        # ⇒ `_load_report_configs` 恒返回 0 行 ⇒ affected_codes 空 ⇒ 零行重算，
+        # 且**返回成功、无异常、issues=[]**（静默零）。真实项目的报表因此长期停在旧快照。
+        # 修法照抄同类 `_build_unadjusted_bundle` 已有的正确用法，不新增抽象。
+        from app.services.report_config_service import ReportConfigService
+
+        applicable_standard = await ReportConfigService.resolve_applicable_standard(
+            self.db, payload.project_id,
         )
+        regenerated = await self.regenerate_affected(
+            payload.project_id, year, payload.account_codes,
+            applicable_standard=applicable_standard,
+        )
+        # Req 3.5：零重算必须**可见**。此前「准则零命中」与「确实无行需重算」不可区分。
+        if regenerated == 0:
+            logger.warning(
+                "on_trial_balance_updated: 零行重算 (project=%s year=%s standard=%r "
+                "accounts=%s) —— 请核对该准则在 report_config 中是否有配置行",
+                payload.project_id, year, applicable_standard, payload.account_codes,
+            )
         # Req 15.5：增量重算中探测到的悬空 ROW() 引用汇报（不阻断，已继续重算其余行）。
         if self.last_regenerate_issues:
             logger.warning(

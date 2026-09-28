@@ -149,6 +149,20 @@ class ConsolReportService:
             report_rows = []
             for config in sorted(config_rows, key=lambda r: r.row_number):
                 # 执行公式（合并数据源，复用统一引擎）
+                #
+                # 🔴 **刻意不传 `adj_data`**（spec tb-adjustment-column-formula-closure
+                # Phase 1 Task 1.8）：`ADJ()` 取的是**单体**调整额
+                # （`adjustments` + `adjustment_entries`），而合并域的调整/抵销是
+                # `consol_trial.consol_adjustment` / `consol_elimination`，
+                # 两者是不同的会计概念（合并数 = 个别数汇总 + 差额表）。
+                # 把单体调整额喂进合并报表会把同一笔调整计两次。
+                #
+                # 后果：合并报表配置里若写 `ADJ()`，该 token 求值为 0。
+                # 这是**当前正确行为**而非缺口 —— 合并域的调整应走
+                # `consol_amount`（已由 `ConsolTrialResolver` 经 TB()/SUM_TB() 提供）。
+                # 若将来确需在合并报表里引用差额表金额，应新增独立函数
+                # （如 `CONSOL_ADJ()`）而不是复用 `ADJ()`。
+                # 守卫：`test_adj_cross_domain_equivalence` 的三域**不含**合并域。
                 current_amount = await evaluate_formula(
                     config.formula, resolver=resolver_current, row_cache=global_row_cache,
                 )

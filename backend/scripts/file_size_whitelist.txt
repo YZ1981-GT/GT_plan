@@ -1095,3 +1095,16 @@ backend/app/routers/attachments.py  821
 audit-platform/frontend/src/views/LedgerPenetration.vue  4213
 backend/app/routers/ledger_penetration.py  1634
 backend/app/services/ledger_penetration_service.py  942
+#
+# report_engine.py / consol_report_service.py —— 报表求值编排层历史大文件。
+#   两者在 spec tb-adjustment-column-formula-closure Phase 1 之前**已分别达
+#   2226 / 1008 行**（远超默认 800）却从未登记：门禁只扫暂存文件，而它们此前
+#   若干次提交未触发（或曾 --no-verify）。本轮因给 ADJ() 接线而进入暂存区，
+#   门禁首次报出。
+#   🔴 baseline 填的是**改动前的 HEAD 行数**而非当前行数 —— 不把本轮增量
+#   固化进基线，本轮增量由 +5% 容差吸收；下次再加功能会立刻顶到上限，
+#   届时必须先拆分。
+#   登记为待办：report_engine 的 ReportFormulaParser（取数缓存 + 列名映射）
+#   与模块级 evaluate_formula（L2 编排）是两个关注点，可按此切分。
+backend/app/services/report_engine.py  2226
+backend/app/services/consol_report_service.py  1008
