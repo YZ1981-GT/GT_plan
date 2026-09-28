@@ -389,8 +389,14 @@ class AdjustmentService:
         entry_group_id: UUID,
         change: ReviewStatusChange,
         reviewer_id: UUID,
-    ) -> None:
-        """复核状态机转换"""
+    ) -> dict[str, Any]:
+        """复核状态机转换。
+
+        adj-formula-repair-and-approval-gate-wiring 复盘修正：
+        返回受影响的 `{year, account_codes}`，供 router 在 commit 后发布
+        ADJUSTMENT_APPROVED 事件时使用 —— 原实现让 router 调 `_get_group_rows`
+        私有方法并在 commit 后二次查库，既破坏封装又多一次往返。
+        """
         adj_rows = await self._get_group_rows(project_id, entry_group_id)
         if not adj_rows:
             raise ValueError("调整分录不存在")
@@ -421,6 +427,12 @@ class AdjustmentService:
                 row.rejection_reason = None
 
         await self.db.flush()
+
+        # 在 flush 前已加载的 ORM 行上取值（不再查库），供 router 发事件
+        return {
+            "year": adj_rows[0].year,
+            "account_codes": sorted({r.account_code for r in adj_rows if r.account_code}),
+        }
 
     # ------------------------------------------------------------------
     # 13.4 get_summary

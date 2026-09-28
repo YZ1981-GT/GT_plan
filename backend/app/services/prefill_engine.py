@@ -188,7 +188,7 @@ async def _resolve_ledger_formula(
     from app.models.audit_platform_models import TbLedger
     from app.services.dataset_query import get_active_filter
 
-    active_filter = await get_active_filter(db, TbLedger, project_id, year)
+    active_filter = await get_active_filter(db, TbLedger.__table__, project_id, year)
     col = TbLedger.debit_amount if direction.lower() in ("debit", "借") else TbLedger.credit_amount
     q = sa.select(sa.func.coalesce(sa.func.sum(col), 0)).where(
         active_filter,
@@ -210,10 +210,10 @@ async def _resolve_aux_formula(
     if len(args) < 4:
         return None
     account_code, aux_type, aux_code, column = args[0], args[1], args[2], args[3]
-    from app.models.dataset_models import TbAuxBalance
+    from app.models.audit_platform_models import TbAuxBalance
     from app.services.dataset_query import get_active_filter
 
-    active_filter = await get_active_filter(db, TbAuxBalance, project_id, year)
+    active_filter = await get_active_filter(db, TbAuxBalance.__table__, project_id, year)
     # 映射列名到 ORM 字段
     col_map = {
         "期末余额": TbAuxBalance.closing_balance,
@@ -259,43 +259,31 @@ async def _resolve_prev_formula(
 async def _resolve_adj_formula(
     db: AsyncSession, project_id: UUID, year: int, args: list[str]
 ) -> Decimal | None:
-    """=ADJ('code', 'type') → 从 adjustments 表取调整金额。
+    """=ADJ('code', 'type') → 委托 adjustment_amount_source.adj_net 取调整金额。
 
-    v2 符号约定（ledger-sign-convention-unify）：返回值按 direction_resolver 归一到
-    科目自然方向（贷方类取反），与 trial_balance.aje_adjustment/rje_adjustment 及
-    CrossCheckService._get_adj_value 同口径，避免贷方类预填反号。
+    adj-formula-repair-and-approval-gate-wiring 任务 2.2:
+    改调统一取数函数 adj_net，不再自行构建查询。
+    口径：不排除 origin（ADR-ADJ-002，底稿呈现要看到全部调整来源）。
+    include_statuses 使用默认值（仅 approved，ADR-ADJ-003）。
+
+    v2 符号约定：adj_net 内部已按 direction_resolver 归一（贷方类取反）。
     """
     if len(args) < 2:
         return None
     account_code, adj_type = args[0], args[1]
-    from app.models.phase10_models import Adjustment, AdjustmentEntry
-    from app.services.ledger_import.direction_resolver import resolve_account_direction
+    from app.services.adjustment_amount_source import adj_net
 
-    # adj_type: AJE / RJE
-    q = sa.select(
-        sa.func.coalesce(
-            sa.func.sum(AdjustmentEntry.debit_amount - AdjustmentEntry.credit_amount), 0
-        ),
-        sa.func.max(AdjustmentEntry.account_name),
-    ).join(Adjustment, AdjustmentEntry.adjustment_id == Adjustment.id).where(
-        Adjustment.project_id == project_id,
-        Adjustment.year == year,
-        Adjustment.is_deleted == False,  # noqa: E712
-        AdjustmentEntry.standard_account_code == account_code,
+    # ADR-ADJ-002: 公式取数不排除 origin（显式传空集）
+    # 与 TB 列口径不同：TB 列传 exclude_origins={"workpaper"} 防 V124 双计，
+    # 而 ADJ() 是信息呈现，审计师要看到全部调整（含底稿汇聚来源）。
+    return await adj_net(
+        db,
+        project_id=project_id,
+        year=year,
+        account_code=account_code,
+        adj_type=adj_type,
+        exclude_origins=frozenset(),  # ADR-ADJ-002: 不排除
     )
-    if adj_type.upper() in ("AJE", "审计调整"):
-        q = q.where(Adjustment.adjustment_type == "aje")
-    elif adj_type.upper() in ("RJE", "重分类"):
-        q = q.where(Adjustment.adjustment_type == "rje")
-    result = await db.execute(q)
-    row = result.first()
-    if row is None or row[0] is None:
-        return Decimal("0")
-    raw_net = Decimal(str(row[0]))
-    account_name = row[1] or ""
-    direction, _src = resolve_account_direction(account_code, account_name)
-    sign = Decimal("-1") if direction == "credit" else Decimal("1")
-    return sign * raw_net
 
 
 async def _resolve_note_formula(
@@ -384,7 +372,7 @@ async def _resolve_ledger_detail_formula(
     from app.models.audit_platform_models import TbLedger
     from app.services.dataset_query import get_active_filter
 
-    active_filter = await get_active_filter(db, TbLedger, project_id, year)
+    active_filter = await get_active_filter(db, TbLedger.__table__, project_id, year)
     q = sa.select(
         TbLedger.voucher_date,
         TbLedger.voucher_no,
@@ -467,7 +455,7 @@ async def _resolve_count_ledger_formula(
     from app.models.audit_platform_models import TbLedger
     from app.services.dataset_query import get_active_filter
 
-    active_filter = await get_active_filter(db, TbLedger, project_id, year)
+    active_filter = await get_active_filter(db, TbLedger.__table__, project_id, year)
     q = sa.select(sa.func.count()).select_from(TbLedger).where(active_filter)
     if "%" in account_code:
         q = q.where(TbLedger.account_code.like(account_code))
@@ -508,10 +496,10 @@ async def _resolve_tb_aux(
 
     返回 [{aux_code, aux_name, value}, ...] 列表。
     """
-    from app.models.dataset_models import TbAuxBalance
+    from app.models.audit_platform_models import TbAuxBalance
     from app.services.dataset_query import get_active_filter
 
-    active_filter = await get_active_filter(db, TbAuxBalance, project_id, year)
+    active_filter = await get_active_filter(db, TbAuxBalance.__table__, project_id, year)
 
     # 映射列名到 ORM 字段
     col_map = {
@@ -1469,7 +1457,7 @@ async def fill_header_cells(
     from datetime import datetime, timezone
 
     # 1. 加载底稿 + wp_index + 元数据
-    from app.models.audit_platform_models import WpIndex
+    from app.models.workpaper_models import WpIndex
     from app.models.wp_optimization_models import WpTemplateMetadata
     from app.models.core import Project
 

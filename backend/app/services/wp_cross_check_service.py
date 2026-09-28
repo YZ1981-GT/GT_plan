@@ -478,43 +478,26 @@ class CrossCheckService:
     async def _get_adj_value(
         self, project_id: UUID, year: int, account_code: str, adj_type: str
     ) -> Decimal | None:
-        """从调整分录取值。
+        """从调整分录取值——委托 adjustment_amount_source.adj_net。
 
-        v2 符号约定（ledger-sign-convention-unify）：返回值须与
-        trial_balance.aje_adjustment/rje_adjustment 口径一致——即按科目自然方向归一
-        （借方类用 debit-credit，贷方类取反 credit-debit），与
-        trial_balance_service.recalc_adjustments 使用同一 direction_resolver。
-        否则贷方类（负债/权益/收入）的 ADJ() 取值会与审定数推导反号。
+        adj-formula-repair-and-approval-gate-wiring 任务 2.3:
+        改调统一取数函数，与 ADJ() 公式同口径（ADR-ADJ-002: 不排除 origin）。
+        底稿显示与交叉核对同源，才能核对得上。
+
+        v2 符号约定：adj_net 内部已按 direction_resolver 归一（贷方类取反）。
         """
-        from app.services.ledger_import.direction_resolver import (
-            resolve_account_direction,
-        )
-
         try:
-            adj_type_filter = "aje" if adj_type == "aje_net" else "rje"
-            q = sa.text("""
-                SELECT COALESCE(SUM(ae.debit_amount - ae.credit_amount), 0),
-                       MAX(ae.account_name)
-                FROM adjustment_entries ae
-                JOIN adjustments a ON a.id = ae.adjustment_id
-                WHERE a.project_id = :pid AND a.year = :year
-                  AND ae.standard_account_code = :code
-                  AND a.adjustment_type = :atype
-                  AND a.review_status != 'rejected'
-            """)
-            result = await self.db.execute(q, {
-                "pid": str(project_id), "year": year, "code": account_code,
-                "atype": adj_type_filter,
-            })
-            row = result.first()
-            if row and row[0] is not None:
-                raw_net = Decimal(str(row[0]))
-                account_name = row[1] or ""
-                # 按科目自然方向归一（与 recalc_adjustments 口径一致）
-                direction, _src = resolve_account_direction(account_code, account_name)
-                sign = Decimal("-1") if direction == "credit" else Decimal("1")
-                return sign * raw_net
-            return Decimal("0")
+            from app.services.adjustment_amount_source import adj_net
+
+            # 口径与 ADJ() 一致：不排除 origin，include_statuses 用默认（仅 approved）
+            return await adj_net(
+                self.db,
+                project_id=project_id,
+                year=year,
+                account_code=account_code,
+                adj_type=adj_type,
+                exclude_origins=frozenset(),
+            )
         except Exception as e:
             logger.debug(f"[CROSS_CHECK] ADJ value error: {account_code}/{adj_type}: {e}")
             return Decimal("0")
