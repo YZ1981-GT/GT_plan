@@ -23,7 +23,7 @@
 #     容纳 D2-3/D2-1 扩容，净增有限（本 spec 不拆分——该文件属 Task 41 umbrella spec 所有，
 #     拆分决策应由其 owner 按关注点分（契约接地/载荷拆分/选型/预算）四份而非本 spec 代做）。
 #     登记为待办：若后续再有 spec 往 D2 扩容需碰这个文件，应先拆分再改，不再滚雪球加基线。
-backend/app/services/workpaper_sync/projection_first_publication.py  1362
+backend/app/services/workpaper_sync/projection_first_publication.py  1527
 backend/scripts/check/check_x3_deviation_registry.py  2474
 backend/scripts/diagnose/mutate_ie_lifecycle_guards.py  1290
 
@@ -234,12 +234,12 @@ backend/app/services/workpaper_sync/definitions.py  892
 backend/app/services/workpaper_sync/endpoint_guard.py  1119
 backend/app/services/workpaper_sync/entry_source_facts.py  1096
 backend/app/services/workpaper_sync/evidence.py  1252
-backend/app/services/workpaper_sync/excel_entry_gate.py  1317
+backend/app/services/workpaper_sync/excel_entry_gate.py  1390
 #   excel_extract.py —— 基线 3900 → 4159（+259）。D4 同 sheet 多区累积归一化几轮修复累积
 #     （unextend_total_formula_chain 接线等）。拆分方向见本表顶部第 1 条。
 #     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure（同 sheet 多区）
 backend/app/services/workpaper_sync/excel_extract.py  4159
-backend/app/services/workpaper_sync/excel_instrumentation.py  2200
+backend/app/services/workpaper_sync/excel_instrumentation.py  2639
 #   excel_materialize.py —— 基线 3120 → 3660（+540）。D4 同 sheet 多区兄弟 Table ref 位移
 #     （_sheet_table_parts / _shift_sibling_table_refs / footer 同 sheet 放行）+ _GT_SYNC
 #     重冻结几轮修复累积。spec: workpaper-html-onlyoffice-bidirectional-writeback-closure
@@ -301,7 +301,7 @@ backend/app/services/workpaper_sync/projection_provisioning.py  1249
 #     非本次造成）。2026-09-20 spec workpaper-sync-materialize-large-table-performance Wave 5
 #     +14 行（collect_workbook_structure 的 fingerprint/sync_pairs 共享：1 次预读 + 透传 + 根因注释），
 #     用于消除「每 anchor 重算全簿指纹」致 D4 entry materialize 138.7s 超 120s 生产软上限。→ 1426。
-backend/app/services/workpaper_sync/published_identity_observer.py  1500
+backend/app/services/workpaper_sync/published_identity_observer.py  1649
 #   repository.py —— 基线 3124 早已 stale（本次改动前 HEAD 实测 3264，那 140 行欠账**非本次
 #     造成**）。2026-09-22 spec oo-single-pass-materialize-and-room-leave 的前置修复 +45 行：
 #     `_frozen_base_adapter_build_digest()`（close-capture 的代码身份从 leader confirmation 的
@@ -996,7 +996,7 @@ backend/tests/workpaper_sync/test_f5_canary_and_contract.py  904
 #     判据面不因此放松：新条目仍要过 test_contract_directory_matches_the_delivery_ledger
 #     与 test_delivered_slice_contracts_pass_property_20_21_field_level 的双向核验。
 backend/tests/workpaper_sync/test_h_foundation_hc_guards.py  1149
-backend/app/services/workpaper_sync/adapters/delivered_contracts_ledger.py  2352
+backend/app/services/workpaper_sync/adapters/delivered_contracts_ledger.py  2473
 
 
 # ── I/J 循环 + e1 修复 + 守卫口径升级（2026-09-27）──────────────────────
@@ -1083,3 +1083,49 @@ backend/app/routers/adjustments.py  1763
 # 附件端点（本次仅修 4 处 Attachment lazy import 错路径；
 # HEAD 版 1701 行即已超限，工作树另有前序重构使其降至 821 行）
 backend/app/routers/attachments.py  821
+# ═══════════════════════════════════════════════════════════════════════════
+# spec: workpaper-sync-pure-static-lane-and-combined-workbook-resolution（2026-09-28 入库）
+#
+# 本批 5 条新增登记 + 上方 5 条基线抬升（projection_first_publication / excel_entry_gate /
+# excel_instrumentation / published_identity_observer / delivered_contracts_ledger），
+# 全部按本表惯例「baseline 取当前真实行数，门禁继续拦膨胀 >5%」。
+#
+# 抬升侧的增量是 Lane A 纯静态 instrumentation 通道（平台此前没有「不带行表 spec」的
+# instrumentation 入口，纯静态 entry 走到 stage_instrumented_substrate 的无条件 else
+# 分支即抛裸 AttributeError）。五处增量都是**纯加法**（唯一的 -2 行是 else: 改
+# elif callable(spec_fn):），不含对既有动态通道的任何放宽。
+#
+# 🔴 为什么不在本 spec 内拆分这五个模块：Lane A 的验收判据是一条 digest 不变式
+#   （build_static_only_instrumentation_payload 的产出与契约字段、
+#   CANARY_INSTRUMENTATION_DEFINITION_SHA256 三方同值）。拆分会同时移动注入器、
+#   payload 构建器与形态函数三者的归属，而守卫里有按模块与函数名钉位置的 AST 判据 ⇒
+#   与一次通道新增同批做，diff 会被搬迁噪声淹没且判据需一起改写。
+#   拆分方向：excel_instrumentation.py 把「静态区声明 + 静态注入器 + 静态 payload 构建」
+#   一组（约 470 行，对动态行表零依赖）下沉为 excel_static_instrumentation.py，单向无环，
+#   属独立任务。
+#
+# ── 本 spec 自有的两份守卫测试 ──
+#   test_static_only_instrumentation_lane.py —— Lane A 的全部离线守卫（Property 4/5/6/7/12
+#     + digest 不变式三方相等 + definedName 漂移四态 + 静态 identity binding 臂
+#     + 三入口偏移序）。一个 lane 一个文件是本 spec 的归属边界；按 Property 拆会让
+#     「同一 Property 的正向判据与它的变异证明」跨文件，而变异证明正是这些判据不空转的
+#     唯一依据。拆分方向：待 Lane A 打磨完成后按 Property 族拆三份，属独立任务。
+#   test_combined_workbook_wp_code_resolution.py —— Lane B 的全部离线守卫（Property 8/9/10/11/13
+#     + 全域穷举差集恰三码 + 多合册确定性 + 对照组 tripwire + AST 顺序）。同上。
+#
+# ── 随本提交带上的 3 个文件（非本 spec 作者，应由 A 循环 owner 接手）──
+#   A 循环 foundation 的交付物在 git 里从未被提交过，本 spec 的实现与守卫长在其中，
+#   不带上就无法形成可运行的提交。这三条登记同样是债务登记而非豁免：
+#   phase5_a51_cashflow_audit.py —— A5-1 现金流量表审计的 provider。本 spec 把它收缩为
+#     委派门面（形态与差异点全部由平台表达）。拆分方向：把 template_definition_payload
+#     与 sheet 声明一组外移，属 A 循环 owner 的任务。
+#   test_a_cycle_foundation_canary.py / test_a_entry_connection_blockers.py —— A 域 foundation
+#     与阻塞台账守卫。本 spec 在后者里整段重写了 §6（原「阻塞成立 + 解除信号」改为
+#     「对照组 + 正向判据」），在前者里反转了一处建立在假事实上的断言。
+#     拆分方向：按 A 域 lane 拆，属 A 循环 owner 的任务。
+# ═══════════════════════════════════════════════════════════════════════════
+backend/app/services/workpaper_sync/phase5_a51_cashflow_audit.py  891
+backend/tests/workpaper_sync/test_a_cycle_foundation_canary.py  1120
+backend/tests/workpaper_sync/test_a_entry_connection_blockers.py  1166
+backend/tests/workpaper_sync/test_combined_workbook_wp_code_resolution.py  841
+backend/tests/workpaper_sync/test_static_only_instrumentation_lane.py  1777

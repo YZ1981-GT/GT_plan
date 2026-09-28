@@ -396,6 +396,39 @@ def stage_instrumented_substrate(
         source_bytes = provider.read_authoritative_template()
         gate = provider.excel_carrier_gate()
         specs_fn = getattr(provider, "instrumentation_specs", None)
+        spec_fn = getattr(provider, "instrumentation_spec", None)
+        static_only_fn = getattr(provider, "static_only_instrumentation_spec", None)
+
+        # ── DEC-3 结构化守卫：**先于**分派，判据是「有 static_only 即不得有行表 spec」──
+        #
+        # 🔴 放在分派**之前**而不是「进第三臂时才查」：一个同时暴露 static_only 与
+        #    `instrumentation_specs` 的 provider 会先命中第一臂，那样就永远查不到它 ——
+        #    而「给纯静态 entry 造了行表 spec」正是 DEC-3 明禁的形态（注退化动态表当载体）。
+        #
+        # 🔴 判据是**单向蕴含**，**不是**「三者恰暴露其一」：现算既有 provider 中存在
+        #    同时暴露 `instrumentation_spec` 与 `instrumentation_specs` 的双入口回落形态
+        #    （`_dynamic_column_bindings` / `_static_region_bindings` 都写了「specs 不可用
+        #    时回落 spec」的逻辑），用统一断言会把既有 entry 打红。
+        if callable(static_only_fn):
+            row_spec_entries = [
+                name
+                for name, fn in (("instrumentation_spec", spec_fn),
+                                 ("instrumentation_specs", specs_fn))
+                if callable(fn)
+            ]
+            if row_spec_entries:
+                from app.services.workpaper_sync.excel_instrumentation import (
+                    InstrumentationError,
+                )
+
+                raise InstrumentationError(
+                    f"provider 同时暴露 `static_only_instrumentation_spec` 与 "
+                    f"{row_spec_entries!r} —— 纯静态 entry 不得有行表 spec"
+                    "（归档 spec workpaper-sync-static-cell-sheet-writeback 的 DEC-3 明禁"
+                    "「给纯静态 sheet 注退化动态表当载体」）。删掉行表 spec，"
+                    "或者本 entry 其实不是纯静态、应走前两臂。"
+                )
+
         if callable(specs_fn):
             from app.services.workpaper_sync.excel_instrumentation import (
                 instrument_workbook_bytes_multi,
@@ -404,7 +437,7 @@ def stage_instrumented_substrate(
             instrumented = instrument_workbook_bytes_multi(
                 source_bytes, specs_fn(), gate=gate
             )
-        else:
+        elif callable(spec_fn):
             from app.services.workpaper_sync.excel_instrumentation import (
                 instrument_workbook_bytes,
             )
@@ -413,6 +446,37 @@ def stage_instrumented_substrate(
                 source_bytes,
                 provider.instrumentation_spec(),
                 gate=gate,
+            )
+        else:
+            # ── 第三臂（追加在既有两臂**之后**）：纯静态 entry ──────────────
+            #
+            # 既有两臂的判据与先后逐条不变 ⇒ 任何带行表 spec 的 provider 在进入本臂
+            # **之前**即命中原臂。改造前这里是无条件 `else: provider.instrumentation_spec()`，
+            # 对没有行表 spec 的 provider 抛裸 `AttributeError`；现在它落进本臂。
+            from app.services.workpaper_sync.excel_instrumentation import (
+                InstrumentationError,
+                instrument_workbook_bytes_static_only,
+            )
+
+            if not callable(static_only_fn):
+                raise InstrumentationError(
+                    f"provider 三个 instrumentation 入口一个都没有暴露 —— "
+                    "需要 `instrumentation_specs()` / `instrumentation_spec()` / "
+                    "`static_only_instrumentation_spec()` 之一"
+                )
+            # 载体清单从 provider 的显式常量取，**不从** `gate.allowed_carriers` 推导：
+            # gate 的真源是 Task 5 探针门（放行集是上界），按它推导即语义过度声明。
+            identity_carriers = getattr(provider, "IDENTITY_CARRIERS", None)
+            if not identity_carriers:
+                raise InstrumentationError(
+                    "纯静态 provider 必须显式声明 `IDENTITY_CARRIERS` —— "
+                    "载体清单不得从 gate.allowed_carriers 推导"
+                )
+            instrumented = instrument_workbook_bytes_static_only(
+                source_bytes,
+                static_only_fn(),
+                gate=gate,
+                identity_carriers=tuple(identity_carriers),
             )
     except Exception as exc:
         raise SubstrateStagingError(
@@ -1018,13 +1082,55 @@ def overlay_store_on_baseline_projection(
     # 🔴 清理 values：baseline 中属于「不在最终 row_keys 中」的行的字段值不应保留。
     # 仅在有 row_keys 声明时才清理——如果 baseline 和 store 都没有 row_keys（空 dict），
     # 不做清理（兼容无行身份表的简单场景，如 store None 清空基线值）。
+    #
+    # ═══ 判据是**逐 table** 的，不是全集（spec workpaper-sync-managed-row-convergence F1）═══
+    #
+    # 首版按「身份在 row_keys **全集**里」过滤，对同 sheet 多受管区底稿不足：
+    # D4-1 有 main / other 两个受管区（uuid 列分别是 W / X，区间 R8~R22 / R25~R36）。
+    # 实测 substrate 的 **W22**（main 区末行）被写入了 other 段身份
+    # `xsheet-other-g5d43680692`，于是 extract 用 **main 表的 specs** 实例化它，
+    # 产出 `adjudication_main_rows/xsheet-other-g5d43680692/{label,current_unadjusted,...}`。
+    # 该身份确实在 `adjudication_other_rows` 的 row_keys 里 ⇒ 全集判据放它过 ⇒
+    # 错位的 `main_rows/` 前缀字段被带进 intended ⇒ materialize 在 main 区找不到它的
+    # 物理行 ⇒ 反读缺失 ⇒ `roundtrip_projection_mismatch: 反读后缺少受管字段`。
+    #
+    # 且这是**自我强化**的：错位 key 进 intended ⇒ materialize 按 main 表把它当 orphan
+    # 插进 main 区 ⇒ 下次 extract 又读出来。全集判据无法打破这个循环。
+    #
+    # ⇒ 改为逐 table 判：字段 key 的 table 段必须与该身份**在 row_keys 里的实际归属**一致。
+    #   store 是行归属的权威（它的 `sectionKey` 明确说该行属 other 区），所以 baseline 侧
+    #   任何「把 A 表的身份挂在 B 表前缀下」的字段一律丢弃。
+    #
+    # 🔴 只在能判定归属时才丢：key 不含 table 段、或该身份不在任何 row_keys 里（后者已被
+    #   下方全集判据拦掉），都不走本分支 —— 少做而非多做。
     if row_keys:
         final_row_id_set: set[str] = set()
         for ids in row_keys.values():
             final_row_id_set.update(ids)
+        #: 身份 → 它在最终 row_keys 里归属的 table 集合（正常恰一个；
+        #: 同一身份出现在多个 table 时不收窄，保持既有行为）。
+        owner_tables: dict[str, set[str]] = {}
+        for table_key, ids in row_keys.items():
+            for rid in ids or ():
+                owner_tables.setdefault(str(rid), set()).add(str(table_key))
+
+        def _table_segment_agrees(key: str, row_key: str) -> bool:
+            owners = owner_tables.get(str(row_key))
+            if not owners:
+                return True  # 归属未知 ⇒ 交给下方全集判据，本判据不表态
+            segment = str(key).split("/", 1)[0]
+            if segment == str(key):
+                return True  # key 不含 table 段（静态字段等）⇒ 不适用
+            return segment in owners
+
         values = {
             key: val for key, val in values.items()
-            if not hasattr(val, 'row_key') or not val.row_key or val.row_key in final_row_id_set
+            if not hasattr(val, 'row_key')
+            or not val.row_key
+            or (
+                val.row_key in final_row_id_set
+                and _table_segment_agrees(key, val.row_key)
+            )
         }
 
     return Projection(

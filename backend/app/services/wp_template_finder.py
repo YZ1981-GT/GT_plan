@@ -209,6 +209,104 @@ def find_whole_workbook_template(wp_code: str) -> Path | None:
     return candidates[0] if candidates else None
 
 
+# ---------------------------------------------------------------------------
+# 合册声明码索引（spec workpaper-sync-pure-static-lane-and-combined-workbook-resolution）
+# ---------------------------------------------------------------------------
+#
+# 解决的是「一个文件装多个 wp_code」时**第二个码找不到自己所在的册**：
+# `A/A3-7内部往来核对表、A3-8商誉减值测试.xlsx` 里的 `A3-8` 在两路入口上
+# `find_template_file_any` 返回 `None`（可见失败），`find_template_file` 返回**错的册**
+# （父程序表 `A3 合并流程程序表.xlsx`，静默错答，更坏）。
+#
+# 根因两层叠加：
+#   ① **前缀而非包含** —— `_wp_code_filename_prefix_ok(合册名, "A3-8")` 为 `False`
+#      （真名以 `A3-7` 起头），且 `_index.json` 给该册挂的 `wp_code` 是 `"A3"`；
+#   ② **A-only 子码正则** `_LEGACY_A_ONLY_SUB_CODE_RE` 命中 ⇒ 走
+#      `find_template_file_any` 的「A 子码严格分支」，该分支两次同名前缀尝试都不中就
+#      `return None`，到不了通用链的「至」范围回退。
+#
+# 🔴 **三条捷径已显式否决，不要再试**：
+#   * **禁**重新生成或手改 `wp_templates/_index.json` —— A 子码分支用的是
+#     `_match_filename_prefix(e["filename"], wp_code)`（按**文件名**前缀），**不是**
+#     `e["wp_code"] == wp_code`；而 `_match_filename_prefix(该合册名, "A3-8")` 恒 `False`
+#     ⇒ 给索引补一条记录对该分支**毫无作用**。且该文件是生成物，手改会漂。
+#   * **禁**用 `app/data/wp_code_overrides.json` 修 —— 那张表的值是 componentType 而不是
+#     模板路径，且本模块根本不读它。
+#   * **禁**改 `_LEGACY_A_ONLY_SUB_CODE_RE` 成字母类无关 —— 那会让 `D2-2` / `E1-3` 这类
+#     Excel 子表也走子码分支，而它们的真实载体是范围式父文件，子码分支的同名前缀判据
+#     匹配不到 ⇒ 实测数百个 wp_code 变 `None`（D/E/F 十九本范围册**零缺陷**正是因为这条
+#     A-only 正则放它们走通用链）。
+
+#: 范围式命名标记。含这些字符的文件名**不**由本节的合册逻辑处理 ——
+#: 范围式由既有「{主码}-N至{主码}-M」回退负责，两者分工不重叠。
+_RANGE_MARKERS: tuple[str, ...] = ("至", "~", "～")
+
+#: 文件名里的 wp_code 字面形态（`A3-8` / `D4-33` / `A17-2-1`）。
+_FILENAME_CODE_RE = re.compile(r"[A-Z]+\d+(?:-\d+)*")
+
+
+def _literal_wp_codes_in_filename(filename: str) -> frozenset[str]:
+    """文件名里**字面列举**的 wp_code 集合（不做范围展开）。
+
+    纯函数：不读磁盘、无副作用、对同一输入恒等输出。
+
+    对范围式命名返回**空集**（fail-closed）：`D4-1至D4-4` 字面只有 `D4-1` / `D4-4`，
+    当成「声明集」用会漏掉 `D4-2` / `D4-3` ⇒ 宁可不答，不给错答案。
+
+    **为什么不实现范围展开**：A 域现算**零本**范围式合册（多码册里 A 的两本全是顿号形态，
+    「至」形态全在 D/E/F），而 D/E/F 的范围式已由既有回退处理且零缺陷。实现一个当前无
+    调用场景的展开器属于「需要存在吗」的第一道否决。扩展点就留在本函数的 fail-closed 上：
+    将来真出现 A 域范围册时，它返回空集 ⇒ 表现为「**不认**」而不是「认错」。
+    """
+    stem = filename.rsplit(".", 1)[0] if "." in filename else filename
+    if any(marker in stem for marker in _RANGE_MARKERS):
+        return frozenset()
+    return frozenset(_FILENAME_CODE_RE.findall(stem))
+
+
+def _combined_book_covers(filename: str, wp_code: str) -> bool:
+    """该合册是否承载 ``wp_code``（本人被字面声明，或其**祖先码**被声明）。
+
+    祖先规则解决「册内有 sheet 但文件名未声明」：`A3-8-1可收回金额测试` 这张 sheet 在册里，
+    而文件名只写到 `A3-8` ⇒ `"A3-8-1".startswith("A3-8" + "-")` 成立。
+
+    🔴 用 `+ "-"` 而**不是**裸 `startswith`：裸前缀会让声明码 `A3-8` 误命中请求码 `A3-80`
+    （那是**另一个码**，不是它的子码）。
+    """
+    declared = _literal_wp_codes_in_filename(filename)
+    if len(declared) < 2:
+        # 只声明一个码的册不是合册，不参与本节逻辑 —— 少了这条收窄，几乎每个
+        # `{码} {中文名}.xlsx` 都会被当成「承载自己的合册」，把大量码的解析走向改掉。
+        return False
+    return wp_code in declared or any(
+        wp_code.startswith(code + "-") for code in declared
+    )
+
+
+def _find_combined_workbook_declaring(wp_code: str) -> Path | None:
+    """承载 ``wp_code`` 的合册（**纯路径**解析，全程不读 xlsx 字节）。
+
+    确定性排序 `(名字长度, 名字)`，与 :func:`find_whole_workbook_templates` 同惯例 ——
+    不依赖 `iterdir()` 的枚举顺序。同一 wp_code 被两本及以上合册声明时取排序首个；
+    该情形现算 **0** 例，判据的意义是「将来真出现时可记录、可复现」。
+    """
+    if not wp_code:
+        return None
+    subdir = TEMPLATES_DIR / wp_code[0]
+    if not subdir.exists():
+        return None
+    hits = sorted(
+        (
+            f
+            for f in subdir.iterdir()
+            if f.suffix.lower() in (".xlsx", ".xlsm")
+            and _combined_book_covers(f.name, wp_code)
+        ),
+        key=lambda p: (len(p.name), p.name),
+    )
+    return hits[0] if hits else None
+
+
 #: 主模板优先级阶梯（**按序**，前一级命中即不看后一级）。
 #:
 #: 🔴 「审定」必须**严格高于**「常规程序」，不能像原来那样 `or` 成同一级：
@@ -345,6 +443,18 @@ def find_template_file(wp_code: str) -> Path | None:
                     elif not range_match:
                         # 无法解析范围但文件名匹配模式，保守返回
                         return f
+
+            # ── 合册声明码（spec workpaper-sync-pure-static-lane-…）────────────
+            #
+            # 插在范围回退**之后**、终极回退**之前**，纯加法：
+            # `D2-2` / `E1-5` / `F2-40` 现算在**范围回退**命中（三者的同名前缀判据均
+            # `False`，靠「至」范围匹配），位置在本步骤之前 ⇒ 它们完全不进这里；
+            # 只有原本会掉进「终极回退抢父程序表」的码（如 `A3-8` 曾拿到
+            # `A3 合并流程程序表.xlsx` 这个**错册**）才进本步骤。
+            combined = _find_combined_workbook_declaring(wp_code)
+            if combined is not None:
+                return combined
+
             # 终极回退：用主表
             for f in sorted(template_subdir.iterdir()):
                 if f.name.startswith(primary + " ") and f.suffix.lower() in (".xlsx", ".xlsm"):
@@ -516,6 +626,15 @@ def find_template_file_any(wp_code: str) -> Path | None:
             for f in sorted(subdir.iterdir()):
                 if f.suffix.lower() in (".xlsx", ".xlsm") and _match_filename_prefix(f.name, wp_code):
                     return f
+
+        # ── 合册声明码（spec workpaper-sync-pure-static-lane-…）─────────────────
+        #
+        # 插在两次同名前缀尝试（索引 + 磁盘）**之后**、`return None` **之前**，纯加法：
+        # 当前能解析的 A 子码（如 `A3-7`，现算命中合册本身）在更早的步骤已返回 ⇒ 行为不变；
+        # 只有当前返回 `None` 的码才进本步骤。
+        combined = _find_combined_workbook_declaring(wp_code)
+        if combined is not None:
+            return combined
         return None
 
     # 主程序表：xlsx 优先

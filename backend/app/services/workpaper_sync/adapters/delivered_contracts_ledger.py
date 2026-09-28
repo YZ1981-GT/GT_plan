@@ -2347,6 +2347,17 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "GRP-01 + redeemable + literal_sheet_name。"
             "adapter_registered=False：同其他循环卡 BP-1~BP-5 平台级缺口"
             "（无真 OO 9.4 roundtrip 与人工审核均未完成）。"
+            "🔴 **2026-09 更新（spec workpaper-sync-pure-static-lane-and-combined-"
+            "workbook-resolution）**：纯静态 instrumentation 通道已上提为平台一等通道 —— "
+            "6 处平台阻塞全部处置（3 处旁路 + 3 处加分派臂，放宽既有校验 0 处），"
+            "静态注入器 / 静态 payload 构建器 / substrate 第三臂 / 身份 binding 静态臂 / "
+            "观测清册静态形态均已落地，digest 不变式逐位成立。"
+            "⇒ 本字段**仍保持 False**，唯一未完成的前置是**真栈往返**"
+            "（后端 9980 + 前端 3030 + `audit-onlyoffice` healthy + Playwright MCP 四项齐备，"
+            "HTML 改→同步 OO→OO 改→回读 HTML 四步缺一不可）。"
+            "现算环境：后端 9980 与 `audit-onlyoffice` 在位，**前端 3030 未起** ⇒ "
+            "往返「待环境」，措辞按项目铁律记作「代码已改但未实测」。"
+            "**禁**先翻本字段再补实测（那是假绿）。"
         ),
     },
     # ── C 循环 canary（spec: c-cycle-sync-foundation-and-first-canary · Task 22/23）──

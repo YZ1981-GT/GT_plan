@@ -163,9 +163,13 @@ __all__ = [
     "assert_candidate_is_non_current",
     "build_instrumentation_payload",
     "build_instrumentation_payload_for_sheets",
+    "build_static_only_instrumentation_payload",
     "build_template_payload",
     "instrument_workbook_bytes",
     "instrument_workbook_bytes_multi",
+    "instrument_workbook_bytes_static_only",
+    "StaticRegionSpec",
+    "ExcelStaticOnlyInstrumentationSpec",
     "verify_visible_equivalence",
     "read_back_identity",
     "normalized_structure_hash",
@@ -608,6 +612,19 @@ def _xml_escape(text: str) -> str:
     )
 
 
+def _xml_unescape(text: str) -> str:
+    """:func:`_xml_escape` 的逆 —— 把 `workbook.xml` 里读到的 sheet 名还原成真实名。
+
+    顺序与 escape **相反**（`&amp;` 最后还原），否则 `&amp;lt;` 会被错还原成 `<`。
+    """
+    return (
+        text.replace("&quot;", '"')
+        .replace("&gt;", ">")
+        .replace("&lt;", "<")
+        .replace("&amp;", "&")
+    )
+
+
 @dataclass(frozen=True)
 class ExcelInstrumentationSpec:
     """一个 entry 的 instrumentation 声明。
@@ -701,6 +718,121 @@ class ExcelInstrumentationSpec:
     def row_uuid(self, row: int) -> str:
         """预生成字面量（Requirement 6.14：不得用可重算公式）。"""
         return f"GTROW-{self.template_id}-{row:04d}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 3b. 纯静态 entry 的 instrumentation 声明（spec workpaper-sync-pure-static-lane…）
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 🔴 与 :class:`ExcelInstrumentationSpec` 是**兄弟**而不是子类。既有类的字段集合与
+#    `__post_init__` 校验一条都不放宽 —— 寄生静态区 entry 与全部动态 entry 都靠那些
+#    校验；给既有类加可选字段 / 把行表几何改成可选，等于全域失去保护。
+#
+# 缺口只影响「整个 entry 无动态行表」这一形态：既有静态区**全部寄生**在同 entry 的
+# 动态 primary spec 的 `static_sheets` 上，故本节纯加法、零回归。
+
+#: 合法 OOXML defined name 的字符集判据。
+_DEFINED_NAME_CHARSET_RE: Final[re.Pattern[str]] = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*")
+#: 「形如 A1 引用」的 defined name 被 Excel 拒收（`A1` / `$A$1` / `AB12` / `R1C1`）。
+_DEFINED_NAME_LOOKS_LIKE_REF_RE: Final[re.Pattern[str]] = re.compile(
+    r"(?:[A-Za-z]{1,3}\d+|[Rr]\d+[Cc]\d+)", re.ASCII
+)
+#: 静态受管区的绝对矩形 ref（与 `_collect_static_region_physical` 反读的 A1 形态对齐）。
+_ABSOLUTE_RECT_RE: Final[re.Pattern[str]] = re.compile(
+    r"^\$([A-Z]{1,3})\$(\d+):\$([A-Z]{1,3})\$(\d+)$"
+)
+
+
+@dataclass(frozen=True)
+class StaticRegionSpec:
+    """一张纯静态受管 sheet 的注入声明 —— **零行表几何**。
+
+    字段集合刻意**不含** `first_data_row` / `last_data_row` / `footer_row` /
+    `uuid_col` / `managed_last_col` / `table_name` 任何一个：纯静态区没有行身份，
+    声明这些等于宣称一套本 entry 根本不写的几何。
+    """
+
+    #: 契约 `sheet_key`（逻辑身份，如 `"a511-audit"`）。
+    sheet_key: str
+    #: 注入时刻的**物理** sheet 名。语义是**构建期选择器**而非运行时锚点 ——
+    #: 运行时定位一律走 definedName（Requirement 6.14 禁按展示名定位）。
+    excel_name: str
+    #: 模板内部 id（如 `"A511"`）。
+    template_id: str
+    #: workbook-scope definedName（如 `"GT_MANAGED_REGION_A511"`）。
+    defined_name: str
+    #: 绝对 A1 矩形（如 `"$D$8:$H$15"`）。
+    managed_ref: str
+    #: 契约 `table_key`。
+    table_key: str
+
+
+@dataclass(frozen=True)
+class ExcelStaticOnlyInstrumentationSpec:
+    """整个 entry 无动态行表时的 instrumentation 声明。
+
+    校验面**限定**为静态语义项（空 entry_id / 空 static_regions / defined name 合法性 /
+    绝对矩形合法性 / 三键区内唯一）。行区间、footer 行、UUID 列位置三类判据
+    **不属于**本校验面 —— 纯静态无此概念。
+    """
+
+    entry_id: str
+    template_id: str
+    #: `backend/wp_templates/` 下的相对路径（也接受带 `backend/wp_templates/` 前缀）
+    template_relative_path: str
+    static_regions: tuple[StaticRegionSpec, ...]
+    semantic_version: str = "1.0.0"
+
+    def __post_init__(self) -> None:
+        if not self.entry_id.strip():
+            raise InstrumentationError("entry_id 不得为空")
+        if not self.static_regions:
+            raise InstrumentationError(
+                "static_regions 不得为空 —— 纯静态 entry 至少一张静态受管区，"
+                "否则它没有任何受管面（与「拒空 specs」同性质，分母是静态区而非行表）"
+            )
+        # 循环不变式：进入第 i 轮时「已检查的区均合法，且其三键未与更早的区冲突」。
+        seen_sheet_keys: set[str] = set()
+        seen_defined_names: set[str] = set()
+        seen_table_keys: set[str] = set()
+        for index, region in enumerate(self.static_regions):
+            where = f"static_regions[{index}]"
+            name = region.defined_name or ""
+            if not _DEFINED_NAME_CHARSET_RE.fullmatch(name):
+                raise InstrumentationError(
+                    f"{where}.defined_name 非法: {name!r}"
+                    "（OOXML 要求以字母/下划线开头，其后只含字母/数字/下划线/点）"
+                )
+            if _DEFINED_NAME_LOOKS_LIKE_REF_RE.fullmatch(name):
+                raise InstrumentationError(
+                    f"{where}.defined_name 非法: {name!r}"
+                    "（形如 A1 / R1C1 单元格引用的名字被 Excel 拒收）"
+                )
+            rect = _ABSOLUTE_RECT_RE.match(region.managed_ref or "")
+            if rect is None:
+                raise InstrumentationError(
+                    f"{where}.managed_ref 非法: {region.managed_ref!r}"
+                    "（要求绝对矩形形如 `$D$8:$H$15`）"
+                )
+            col1, row1, col2, row2 = rect.group(1), int(rect.group(2)), rect.group(3), int(rect.group(4))
+            if _col_index(col2) < _col_index(col1) or row2 < row1:
+                raise InstrumentationError(
+                    f"{where}.managed_ref 右下角未同时 ≥ 左上角: {region.managed_ref!r}"
+                    f"（左上 {col1}{row1} / 右下 {col2}{row2}）"
+                )
+            for value, seen, field in (
+                (region.sheet_key, seen_sheet_keys, "sheet_key"),
+                (name, seen_defined_names, "defined_name"),
+                (region.table_key, seen_table_keys, "table_key"),
+            ):
+                if value in seen:
+                    # 把 `_collect_static_region_physical` 在命中 >1 时的 ValueError
+                    # 提前到**构造期** —— 重名会让锚点解析命中多个受管区。
+                    raise InstrumentationError(
+                        f"{where}.{field} 在 static_regions 内重复: {value!r}"
+                        "（三键 sheet_key / defined_name / table_key 必须区内唯一）"
+                    )
+                seen.add(value)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -913,6 +1045,154 @@ def build_instrumentation_payload(
         gate=gate,
         identity_anchors=identity_anchors,
     )
+
+
+#: 纯静态形态的 `cell_geometry.note`。
+#:
+#: 🔴 **这段文字是冻结值，改一个字就改 digest。** 首个纯静态 entry（A5-1）的
+#: instrumentation definition 已 `approved` 落库，其 canonical digest 同时出现在三处：
+#: 契约 `a51.cashflow_audit.json` 的 `instrumentation_definition_sha256`、守卫常量
+#: `CANARY_INSTRUMENTATION_DEFINITION_SHA256`、真库 artifact 行。把 provider 里那份
+#: 自组装上提到平台**必须是纯重构** ⇒ 本常量逐字沿用 provider 原文（含其中的 `A5-1`
+#: 字样）。
+#:
+#: 🔴 接入**第二个**纯静态 entry 时不得悄悄改写这段话去「通用化」—— 那会让 A5-1 的
+#: digest 漂移、三处引用一起对不上。正确做法是**升 `INSTRUMENTATION_SCHEMA_VERSION`**
+#: 并为新版本另给一段 note，旧版本按本常量原样重放。
+_STATIC_CELL_GEOMETRY_NOTE: Final[str] = (
+    "仅描述注入时刻的几何以便复现 instrumentation；运行时定位一律走 "
+    "identity_anchors，不得按坐标猜。A5-1 纯静态：无 Excel Table（无 "
+    "table_ref）、无 footer 锚点（无 footer_row），受管矩形由各静态区的 "
+    "managed_range 给出。"
+)
+
+
+def _static_sheet_payload_entry(region: StaticRegionSpec) -> dict[str, Any]:
+    """单张纯静态受管区在 instrumentation payload 里的声明。
+
+    `region_kind="static"` 是引擎侧的**分派键**：`published_identity_observer.
+    _frozen_sheet_anchors` 读到它才走 `_collect_static_region_physical`（绝对坐标），
+    缺省会被当成 D4-29 那种「列=entity」的转置表。
+    """
+    return {
+        "sheet_key": region.sheet_key,
+        "excel_name": region.excel_name,
+        "template_id": region.template_id,
+        "region_boundary_locator": {
+            "anchor": "defined_name_ref",
+            "defined_name": region.defined_name,
+            "range": region.managed_ref,
+            "region_kind": "static",
+        },
+        "tables": [{"table_key": region.table_key}],
+    }
+
+
+def build_static_only_instrumentation_payload(
+    *,
+    spec: ExcelStaticOnlyInstrumentationSpec,
+    template_definition_sha256: str,
+    template_sha256: str,
+    gate: ExcelIdentityCarrierGate,
+    identity_carriers: Sequence[str],
+    identity_anchors: Sequence[str],
+) -> dict[str, Any]:
+    """纯静态 entry 的 instrumentation definition canonical payload。
+
+    ═══ 与 `build_instrumentation_payload_for_sheets` 的差异点（逐条） ═══
+
+    * `identity_carriers` **从入参取，不从 `gate.allowed_carriers` 推导**。
+      gate 的真源是 Task 5 探针门（放行 4 个载体），而纯静态 entry 只**写** 2 个
+      （`defined_name` 承区域锚点、`hidden_sheet` 承 `_GT_SYNC`）。按 gate 推导 =
+      宣称一套本 entry 根本不写的载体，是语义过度声明而不是「gate 拒绝」。
+    * `identity_anchors` 同样显式传入：静态区只用 `defined_name_ref`，
+      `excel_table_sheet_association` 是动态表专用。
+    * `managed_sheets` 恒 `[]`，受管面全在 `static_sheets` —— 空的**不是**缺声明。
+    * **不写** `row_uuid_disposition`：那四类处置全是行 UUID 语义（空/重复/删列/复用），
+      纯静态区没有行身份，写一份等于宣称一套不存在的规则。
+    * **不写** `transposed_sheets`。
+    * `cell_geometry` 是静态形态专属几何块（无 `table_ref` / 无 `footer_row`）。
+    * `hidden_metadata_sheet.keys` **原样复用** `REQUIRED_GT_SYNC_KEYS`，不新建静态子集。
+
+    ═══ digest 不变式（本 lane 最强约束） ═══
+
+    `canonical_digest(本函数输出)` 必须**逐位等于** canary provider 改造前那份自组装
+    输出的 digest。不相等时只能修本函数 —— **禁**改契约 / **禁**改守卫常量 /
+    **禁**改真库 artifact 去迁就。
+    """
+    if not spec.static_regions:  # pragma: no cover — 构造期已拒空
+        raise InstrumentationError(
+            "build_static_only_instrumentation_payload: static_regions 不得为空"
+        )
+    if not identity_carriers:
+        raise InstrumentationError(
+            "build_static_only_instrumentation_payload: identity_carriers 不得为空 —— "
+            "载体清单由调用方显式给出，不从 gate.allowed_carriers 推导"
+        )
+    if not identity_anchors:
+        raise InstrumentationError(
+            "build_static_only_instrumentation_payload: identity_anchors 不得为空"
+        )
+    for carrier in identity_carriers:
+        gate.assert_carrier_allowed(carrier)
+    for anchor in identity_anchors:
+        gate.assert_anchor_allowed(anchor)
+    if not is_digest(template_definition_sha256):
+        raise InstrumentationError(
+            f"template_definition_sha256 非法: {template_definition_sha256!r}"
+        )
+    if not is_digest(template_sha256):
+        raise InstrumentationError(f"template_sha256 非法: {template_sha256!r}")
+
+    static_sheets = [_static_sheet_payload_entry(r) for r in spec.static_regions]
+    # definedName 登记形态与平台多 sheet 构建器逐字一致（`"{managed_sheet}!" + range`）。
+    # `{managed_sheet}` 是**记录用占位**不是定位符：真正注入时 ref 由注入器从本区的
+    # `excel_name` 现取。
+    defined_names = {
+        str(sheet["region_boundary_locator"]["defined_name"]): (
+            "{managed_sheet}!" + str(sheet["region_boundary_locator"]["range"])
+        )
+        for sheet in static_sheets
+    }
+
+    payload: dict[str, Any] = {
+        "schema_version": INSTRUMENTATION_SCHEMA_VERSION,
+        "entry_id": spec.entry_id,
+        "template_id": spec.template_id,
+        # 单向引用：已发布 template definition 的 digest + 模板 blob 的内容身份
+        "template_definition_sha256": template_definition_sha256,
+        "template_sha256": template_sha256,
+        "instrumentation_version": INSTRUMENTATION_VERSION,
+        "identity_schema_version": IDENTITY_SCHEMA_VERSION,
+        "identity_carriers": list(identity_carriers),
+        "identity_anchors": list(identity_anchors),
+        "forbidden_anchors": sorted(gate.forbidden_anchors),
+        "managed_sheets": [],
+        "static_sheets": static_sheets,
+        "defined_names": defined_names,
+        "hidden_metadata_sheet": {
+            "sheet_name": GT_SYNC_SHEET_NAME,
+            "keys": list(REQUIRED_GT_SYNC_KEYS),
+            "runtime_binding_keys_written_at_finalize_only": list(RUNTIME_BINDING_KEYS),
+        },
+        "visible_equivalence_policy": "strict",
+        "ignored_by_business_sheet_enumerators": [GT_SYNC_SHEET_NAME],
+        "cell_geometry": {
+            "anchor_role": "none",
+            "note": _STATIC_CELL_GEOMETRY_NOTE,
+            "sheets": [
+                {
+                    "sheet_key": str(sheet["sheet_key"]),
+                    "managed_range": str(sheet["region_boundary_locator"]["range"]),
+                    "region_kind": "static",
+                }
+                for sheet in static_sheets
+            ],
+        },
+    }
+    validate_instrumentation_payload(payload)
+    _assert_no_forbidden_anchor_declared(payload, gate=gate)
+    return payload
 
 
 def _iter_anchor_declarations(node: Any) -> Iterable[str]:
@@ -1553,6 +1833,199 @@ def instrument_workbook_bytes(
     （Requirement 9.9「不得在运行时临时写回模板库」）。
     """
     return instrument_workbook_bytes_multi(source, (spec,), gate=gate)
+
+
+def instrument_workbook_bytes_static_only(
+    source: bytes,
+    spec: ExcelStaticOnlyInstrumentationSpec,
+    *,
+    gate: ExcelIdentityCarrierGate,
+    identity_carriers: Sequence[str],
+) -> InstrumentedWorkbook:
+    """把纯静态 identity 载体注入干净 workbook 副本：**只**写 `_GT_SYNC` + definedNames。
+
+    ═══ 为什么另起一个函数而不是放宽 `instrument_workbook_bytes_multi` ═══
+
+    那个函数第一行就是 `if not specs: raise`，且 `_GT_SYNC` 段**硬取** primary 的六项
+    行表几何（`footer_row` / `uuid_col` / `table_name` / `table_ref` / `first_data_row` /
+    `last_data_row`）。放宽它等于让 19 本寄生静态区 + 全部动态 entry 一起失去那些校验。
+    本函数是**旁路**，原函数一字不改。
+
+    ═══ DEC-3 由类型边界保证，不由自觉保证 ═══
+
+    归档 spec `workpaper-sync-static-cell-sheet-writeback` 的 DEC-3 明禁「给纯静态 sheet
+    注一个退化动态表（1 行 Table + 隐藏 UUID 列）当载体」。本函数的签名**只**接受
+    `source` / `spec` / `gate` / `identity_carriers` 四项 —— 「写 Excel Table」与「写隐藏
+    UUID 列」在结构上**无从表达**：没有 `table_name`、没有 `uuid_col`，也没有任何开关。
+
+    ═══ 「静态注入正确」是三条同时成立 ═══
+
+    1. `_GT_SYNC` 的 `GT_ROW_UUID_COLUMN == ""`（显式「无 UUID 列」哨兵）；
+    2. 产物内 `xl/tables/` 部件数与 `source` 相等（零新增 Table 部件）；
+    3. 每张受管 sheet 的列集合与 `source` 内同名 sheet 逐列相等（零新增隐藏列）。
+
+    只验第 1 条就判通过 = 不合格 —— 那会退化成「声明了一个空的列」这种含糊态。
+    本函数**不改任何 sheet 部件的字节**，故第 2、3 条在构造上成立。
+    """
+    if not identity_carriers:
+        raise InstrumentationError(
+            "instrument_workbook_bytes_static_only: identity_carriers 不得为空 —— "
+            "载体清单由调用方显式给出（不从 gate.allowed_carriers 推导，"
+            "按 gate 推导会声明本 entry 根本不写的载体）"
+        )
+    for carrier in identity_carriers:
+        gate.assert_carrier_allowed(carrier)
+
+    template_sha = _sha256_bytes(source)
+    try:
+        with zipfile.ZipFile(io.BytesIO(source)) as zf:
+            entries: dict[str, bytes] = {name: zf.read(name) for name in zf.namelist()}
+    except zipfile.BadZipFile as exc:
+        raise InstrumentationError(f"源 artifact 不是合法 xlsx zip: {exc}") from exc
+
+    for required in ("xl/workbook.xml", "xl/_rels/workbook.xml.rels", "[Content_Types].xml"):
+        if required not in entries:
+            raise InstrumentationError(f"源 artifact 缺 OOXML 必需部件: {required}")
+    already = [
+        name
+        for name in entries
+        if name == _GT_SYNC_SHEET_PART
+        or name == _GT_TABLE_PART
+        or name.startswith("xl/tables/tableGtRowId")
+    ]
+    if already:
+        raise InstrumentationError(
+            "源 artifact 已含 instrumentation 部件 —— 重复注入会产生第二套 identity；"
+            "存量 instrumented artifact 应走 definition 升级而不是再注入一次"
+            f"（命中: {already[:3]}）"
+        )
+
+    workbook_xml = entries["xl/workbook.xml"].decode("utf-8")
+    wb_rels_xml = entries["xl/_rels/workbook.xml.rels"].decode("utf-8")
+    content_types = entries["[Content_Types].xml"].decode("utf-8")
+
+    # ── 先核 sheet 存在性：缺 sheet 的消息必须同时给出缺失名与源册现有名清单 ──
+    present = [
+        _xml_unescape(name)
+        for name in re.findall(r'<sheet [^>]*name="([^"]+)"', workbook_xml)
+    ]
+    for index, region in enumerate(spec.static_regions):
+        if region.excel_name not in present:
+            raise InstrumentationError(
+                f"静态受管区 static_regions[{index}] 的 excel_name "
+                f"{region.excel_name!r} 在源 workbook 内不存在 —— "
+                f"源册现有 sheet: {present!r}"
+            )
+
+    primary = spec.static_regions[0]
+    # 🔴 保留但**降级**：Task 5 已证伪 sheetId 作为运行时锚点（OO 每次保存重编号）。
+    #    这里照实写 definedName 所指 sheet 的真实 sheetId，只作审计线索。
+    primary_sheet_id = _sheet_id_for(workbook_xml, primary.excel_name)
+
+    # ── 载体 1：hidden `_GT_SYNC` metadata sheet（一次）────────────────
+    pairs: list[tuple[str, str]] = [
+        ("GT_SYNC_SCHEMA_VERSION", "1"),
+        ("GT_IDENTITY_SCHEMA_VERSION", IDENTITY_SCHEMA_VERSION),
+        ("GT_INSTRUMENTATION_VERSION", INSTRUMENTATION_VERSION),
+        ("GT_TEMPLATE_ID", spec.template_id),
+        ("GT_TEMPLATE_SHA256", template_sha),
+        ("GT_ENTRY_ID", spec.entry_id),
+        ("GT_MANAGED_SHEET_ID", primary_sheet_id),
+        ("GT_MANAGED_SHEET_NAME_AT_INSTRUMENTATION", primary.excel_name),
+        ("GT_MANAGED_RANGE", primary.managed_ref),
+        # 🔴 空串是**显式哨兵**而不是「忘了填」：纯静态区没有行身份 ⇒ 没有 UUID 列。
+        #    该键在 `REQUIRED_GT_SYNC_KEYS` 里，不能省；写一个列标才是假声明。
+        #    判据见本函数 docstring 的三条（哨兵 + 零 Table 部件 + 列集合相等）。
+        ("GT_ROW_UUID_COLUMN", ""),
+        # 静态专属审计线索（**不是**行表语义键）：受管区的逻辑键与 definedName。
+        ("GT_STATIC_REGION_KEYS", ",".join(r.sheet_key for r in spec.static_regions)),
+        ("GT_STATIC_REGION_DEFINED_NAMES",
+         ",".join(r.defined_name for r in spec.static_regions)),
+    ]
+    pair_map = dict(pairs)
+    missing_required = [k for k in REQUIRED_GT_SYNC_KEYS if k not in pair_map]
+    if missing_required:
+        raise InstrumentationError(
+            f"`_GT_SYNC` 缺 Task 5 契约声明的必备键 {missing_required}"
+        )
+    assert_no_runtime_binding(pair_map)
+    entries[_GT_SYNC_SHEET_PART] = _gt_sync_sheet_xml(pairs)
+
+    existing_ids = [int(m) for m in re.findall(r'<sheet [^>]*sheetId="(\d+)"', workbook_xml)]
+    _root_end = workbook_xml.find(">", workbook_xml.find("<workbook"))
+    _root_tag = workbook_xml[: _root_end + 1] if _root_end > 0 else workbook_xml
+    _rel_ns_decl = "" if 'xmlns:r="' in _root_tag else f' xmlns:r="{_REL_NS}"'
+    workbook_xml = _insert_before(
+        workbook_xml,
+        "</sheets>",
+        f"<sheet{_rel_ns_decl} name=\"{GT_SYNC_SHEET_NAME}\" "
+        f'sheetId="{(max(existing_ids) + 1) if existing_ids else 1}" '
+        f'state="hidden" r:id="{_GT_SYNC_REL_ID}"/>',
+        what="hidden _GT_SYNC sheet 声明",
+    )
+    wb_rels_xml = _insert_before(
+        wb_rels_xml,
+        "</Relationships>",
+        f'<Relationship Id="{_GT_SYNC_REL_ID}" Type="{_REL_NS}/worksheet" '
+        'Target="worksheets/sheetGtSync.xml"/>',
+        what="_GT_SYNC 关系",
+    )
+    content_types = _insert_before(
+        content_types,
+        "</Types>",
+        f'<Override PartName="/{_GT_SYNC_SHEET_PART}" ContentType="application/'
+        'vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
+        what="_GT_SYNC content type",
+    )
+    entries["xl/_rels/workbook.xml.rels"] = wb_rels_xml.encode("utf-8")
+
+    # ── 载体 2：workbook-scope definedName（每区一个，形态与既有静态支逐字一致）──
+    #
+    # 循环不变式：「已注入的 definedName 互不重名且都指向本 workbook 内真实 sheet」
+    # 保持为真 —— sheet 存在性已在上面一次性核过，重名由下面的 ET 查重挡住。
+    from xml.etree import ElementTree as ET
+
+    all_refs: dict[str, str] = {}
+    for region in spec.static_regions:
+        name = region.defined_name
+        root = ET.fromstring(workbook_xml)
+        if any(
+            n.get("name", "").lower() == name.lower()
+            for n in root.findall("{*}definedNames/{*}definedName")
+        ):
+            raise InstrumentationError(f"Duplicate static definedName: {name}")
+        ref = _quote_sheet_name(region.excel_name) + "!" + region.managed_ref
+        node = f'<definedName name="{name}">{_xml_escape(ref)}</definedName>'
+        if "</definedNames>" in workbook_xml:
+            workbook_xml = _insert_before(
+                workbook_xml, "</definedNames>", node, what="static region anchor"
+            )
+        else:
+            workbook_xml = _insert_after_sheets_defined_names(workbook_xml, node)
+        all_refs[name] = ref
+
+    entries["xl/workbook.xml"] = workbook_xml.encode("utf-8")
+    entries["[Content_Types].xml"] = content_types.encode("utf-8")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as out:
+        for name in entries:
+            out.writestr(name, entries[name])
+    result = buf.getvalue()
+
+    return InstrumentedWorkbook(
+        source_sha256=template_sha,
+        instrumented_bytes=result,
+        instrumented_sha256=_sha256_bytes(result),
+        managed_sheet_name_at_instrumentation=primary.excel_name,
+        managed_sheet_id_at_instrumentation=primary_sheet_id,
+        # 纯静态：无行身份 ⇒ 空映射；**不是**「算不出来」，是结构上没有。
+        row_uuids={},
+        gt_sync_pairs=pair_map,
+        defined_name_refs=all_refs,
+        # 纯静态：无 Excel Table ⇒ 空串（与 `GT_ROW_UUID_COLUMN` 的哨兵同性质）。
+        table_ref="",
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════

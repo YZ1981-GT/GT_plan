@@ -1328,22 +1328,64 @@ class TestHtmlCounterpartIsSourceBacked:
             "entries_with_runtime_sheet_name_expression"]
 
     def test_template_resolution_uses_the_real_impl_resolver(self, manifest_slice: dict) -> None:
-        """🔴 三边锁第三边：声明的册必须与 impl resolver 现算一致。"""
+        """🔴 三边锁第三边：声明的册必须与 impl resolver 现算一致。
+
+        🔴 **新增第三分支（spec workpaper-sync-pure-static-lane-and-combined-workbook-
+        resolution）**：存在 `workbook` 已钉住、但 `sheet_name_literal` **不是**裸 wp_code
+        的 entry（现算 a38：字面量是中文 sheet 名 `A3-8商誉减值测试`）。
+
+        这类 entry 的两步状态**不同**，三边锁必须分开表达，否则会把「第一步已修」误判成
+        「声明与 impl 不一致」：
+        * **第一步（解析层，已修）**：按 `wp_code_patterns` 里的**裸 wp_code** 解析，
+          必须等于声明的 `workbook`；
+        * **第二步（宿主层，未做，登记为后继）**：按中文字面 sheet 名解析仍为 `None`
+          —— 宿主还没改成传 wp_code。
+
+        少了这条分支，要么把 a38 的 `workbook` 退回假事实 `null`，要么把整条判据删掉；
+        两者都是弱化。
+        """
         finder = _load_module("_t57_finder", TEMPLATE_FINDER)
+        bare_code = re.compile(r"^[A-Z]+\d+(?:-\d+)*$")
+        two_step_pending: list[str] = []
         for e in manifest_slice["independent_entries"]:
             tr = e["template_ref"]
             if tr["resolution_kind"] != "literal_sheet_name":
                 continue
-            got = finder.find_template_file_any(tr["sheet_name_literal"])
+            literal = str(tr["sheet_name_literal"])
             expected = tr.get("workbook")
+            got = finder.find_template_file_any(literal)
             if expected is None:
                 assert got is None, (
                     f"{e['entry_id']}: 声明解析为 None，impl 现算得到 {got}")
-            else:
-                assert got is not None, f"{e['entry_id']}: impl 现算为 None"
-                assert got.relative_to(TEMPLATE_DIR).as_posix() == expected, (
-                    f"{e['entry_id']}: 声明 {expected} != impl 现算 "
-                    f"{got.relative_to(TEMPLATE_DIR).as_posix()}")
+                continue
+            if not bare_code.match(literal):
+                # 第二步未做：字面量不是 wp_code ⇒ 按它解析必为 None
+                assert got is None, (
+                    f"{e['entry_id']}: 字面量 {literal!r} 不是裸 wp_code 却解析到 {got} "
+                    f"⇒ 宿主层第二步的状态判断失效，请复核")
+                # 第一步已修：按裸 wp_code 解析必等于声明的册
+                codes = [c for c in (e.get("wp_code_patterns") or [])
+                         if bare_code.match(str(c))]
+                assert codes, f"{e['entry_id']}: 没有裸 wp_code 可用于第一步核验"
+                resolved = [finder.find_template_file_any(c) for c in codes]
+                hits = [p for p in resolved if p is not None]
+                assert hits, (
+                    f"{e['entry_id']}: 全部裸 wp_code {codes} 都解析不到册 ⇒ "
+                    f"解析层（第一步）可能被回退")
+                assert any(
+                    p.relative_to(TEMPLATE_DIR).as_posix() == expected for p in hits
+                ), (
+                    f"{e['entry_id']}: 声明 {expected} 不在裸 wp_code 的解析结果里 "
+                    f"{[p.relative_to(TEMPLATE_DIR).as_posix() for p in hits]}")
+                two_step_pending.append(e["entry_id"])
+                continue
+            assert got is not None, f"{e['entry_id']}: impl 现算为 None"
+            assert got.relative_to(TEMPLATE_DIR).as_posix() == expected, (
+                f"{e['entry_id']}: 声明 {expected} != impl 现算 "
+                f"{got.relative_to(TEMPLATE_DIR).as_posix()}")
+        # 分母登记（现算，禁写死）：这些 entry 的第二步是后继任务
+        assert two_step_pending == ["xlsx/gt-a38-goodwill-impairment"], (
+            f"「第一步已修、第二步未做」的成员集漂移: {two_step_pending}")
 
     def test_authoritative_template_enumeration_matches_disk(self, manifest_slice: dict) -> None:
         tpl = manifest_slice["authoritative_templates"]
