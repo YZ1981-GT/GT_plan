@@ -49,7 +49,25 @@ HARD_CAPS = {
     "audit-platform/frontend/src/components/workpaper/GtDForm/GtDFormConfirmation.vue": 420,
     "audit-platform/frontend/src/components/workpaper/GtDForm/GtDFormParagraph.vue": 400,
     "audit-platform/frontend/src/views/DisclosureEditor.vue": 1800,
-    "audit-platform/frontend/src/views/ReportView.vue": 1110,  # report-view-slimdown spec
+    # ReportView.vue：2026-09-28 由 1110 更正为 1949（= 当前真实行数，splitlines 口径）。
+    #
+    # 🔴 **1110 是从未成立过的理想值**，不是被违反的有效约束。实证行数史：
+    #   546adc654 2026-06-12  1104  ← 最后一个 <= 1110 的版本
+    #   e8588091b 2026-06-13  1139  ← 起，连续 11 个提交、3 个月**从未**满足 1110
+    #   f3354f539 2026-07-27  1941  ← 「调整分录集中登记」功能 +743 行
+    #   55c5e0fe5 2026-08-22  1949  ← 当前内容与此版逐字节相同
+    #   82f58ea44 2026-09-13     0  ← 被误删成空文件（路由页白屏 3 个月）
+    # 门禁只扫**暂存文件**，该文件此间未被单独暂存过 ⇒ 超限从未被报出；
+    # 而 0 字节期间行数为 1，反倒"满足"了 cap —— 文件被删空却门禁通过。
+    #
+    # 🔴 填真实值**不加余量**（对比同表 GtDForm 三项登记时加了 ~15%）：
+    # 此处目的是防继续回弹，加余量等于预留膨胀空间。下次往本文件加任何一行
+    # 都会打红 —— 那时必须先拆分（见下方待办）。
+    #
+    # 待办：report-view-slimdown 已归档但目标未达成（抽出 6 composable + 3 组件后
+    # 又被功能开发加回 843 行）。真瘦身应另立 spec，按 ReportDialogs / 跨表核对 /
+    # 多年度对比 / 报表分析 四个关注点继续切，不在本次 ADJ 接线范围内。
+    "audit-platform/frontend/src/views/ReportView.vue": 1949,
 }
 
 EXCLUDE_PARTS = {".git", ".venv", "__pycache__", "node_modules", "dist", "build",
