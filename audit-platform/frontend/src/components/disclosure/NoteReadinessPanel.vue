@@ -7,6 +7,12 @@
     @open="load"
   >
     <div class="gt-nrp" v-loading="loading">
+      <!-- 披露同步覆盖率（spec disclosure-payload-authority-source 需求 3.4 / 设计 §四）
+           挂在这里而非 DisclosureEditor.vue：后者 3401 行且 HARD_CAPS ceiling=1800，
+           pre-commit 硬拒绝任何触碰。本抽屉本就是**附注侧**的同步就绪度看板、
+           且已持有 projectId + year，是设计承诺的「附注侧汇总面板」的等效且更贴切落点。 -->
+      <DisclosureSyncCoveragePanel :project-id="projectId" :year="year" />
+
       <!-- 汇总卡 -->
       <div class="gt-nrp-summary">
         <div class="gt-nrp-stat">
@@ -208,6 +214,7 @@ import {
 } from '@/services/commonApi'
 import { handleApiError } from '@/utils/errorHandler'
 import http from '@/utils/http'
+import DisclosureSyncCoveragePanel from './DisclosureSyncCoveragePanel.vue'
 
 const props = defineProps<{
   visible: boolean

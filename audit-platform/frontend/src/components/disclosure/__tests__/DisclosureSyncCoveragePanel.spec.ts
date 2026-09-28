@@ -202,6 +202,20 @@ describe('DisclosureSyncCoveragePanel', () => {
 //    首版组件是死代码（未被任何页面 import）⇒ 本组锁死接入不被回退。
 // ══════════════════════════════════════════════════════════════════════════
 
+/**
+ * 去注释，防注释里的组件名被数成真实接入（j1 守卫同款坑）。
+ *
+ * 🔴 提到模块作用域供底稿侧 / 附注侧两个 describe 共用 —— 原先定义在前一个
+ * describe 内部，附注侧那组引用它会 `ReferenceError`（本轮实测踩到）。
+ * 复制第二份也不行：两份口径会各自漂移，一处修好另一处仍漏。
+ */
+function stripComments(code: string): string {
+  return code
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1')
+}
+
 describe('覆盖率面板已接入宿主（需求 3.4）', () => {
   /**
    * 宿主 = `GtWpDisclosureSyncBar.vue`（设计 §四 指定的「既有展示位」）。
@@ -211,18 +225,10 @@ describe('覆盖率面板已接入宿主（需求 3.4）', () => {
    * （既有瘦身欠账，非本轮造成）⇒ pre-commit 门禁对任何触碰硬拒绝，
    * 且 `HARD_CAPS` 优先级高于 whitelist，无法登记放行。
    * 本状态条已一处接入 `GtWpRenderer`、覆盖全部循环披露 sheet，是等效落点。
-   * 附注侧入口留作遗留项（spec design.md §十三）。
+   * 附注侧汇总面板已于 2026-09-28 改挂 `NoteReadinessPanel.vue`（见本文件末组）。
    */
   const HOST = resolve(__dirname, '../../workpaper/GtWpDisclosureSyncBar.vue')
   const hostSrc = readFileSync(HOST, 'utf-8')
-
-  /** 去注释，防注释里的组件名被数成真实接入（j1 守卫同款坑） */
-  function stripComments(code: string): string {
-    return code
-      .replace(/<!--[\s\S]*?-->/g, '')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/(^|[^:])\/\/.*$/gm, '$1')
-  }
 
   const clean = stripComments(hostSrc)
 
@@ -268,5 +274,75 @@ describe('覆盖率面板已接入宿主（需求 3.4）', () => {
     // 注释里的引用应被剥掉：构造一个含注释的样本
     expect(stripComments('<!-- DisclosureSyncCoveragePanel -->\nconst a = 1'))
       .not.toContain('DisclosureSyncCoveragePanel')
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════
+// 附注侧汇总面板（设计 §四 承诺，2026-09-28 补齐 —— 原记为遗留项）
+// ══════════════════════════════════════════════════════════════════════════
+
+describe('覆盖率面板已接入附注侧（设计 §四「附注侧汇总面板」）', () => {
+  /**
+   * 附注侧宿主 = `NoteReadinessPanel.vue`（「附注就绪度（披露同步 / 校验）」抽屉）。
+   *
+   * 🔴 为什么不是 `DisclosureEditor.vue`：它 3401 行而 `check_file_size.py` 的
+   * `HARD_CAPS` 给它登记 ceiling **1800**，pre-commit 对任何触碰硬拒绝，且
+   * `HARD_CAPS` 优先级高于 whitelist 无法登记放行。要挂进去须先移出 ~1600 行
+   * （行数史实证：2026-06-06/07 确实瘦到 1758~1793，`696bb1e55` 起越过 1800 后
+   * 单调涨到 3401 ⇒ 该 cap 是**被违反的有效约束**，不是 ReportView 那种
+   * 「从未成立过的理想值」，故不得用「更正 cap」绕开）。
+   *
+   * `NoteReadinessPanel.vue` 是等效且更贴切的落点：它本就是**附注侧**的同步/校验
+   * 就绪度看板、已持有 `projectId` + `year` 两个面板所需 props、且 400 行无 cap 压力。
+   */
+  const NOTE_HOST = resolve(__dirname, '../NoteReadinessPanel.vue')
+  let noteSrc = ''
+  let noteClean = ''
+
+  beforeEach(() => {
+    noteSrc = readFileSync(NOTE_HOST, 'utf-8')
+    noteClean = stripComments(noteSrc)
+  })
+
+  it('附注侧宿主显式 import 了覆盖率面板', () => {
+    expect(noteClean).toMatch(
+      /import\s+DisclosureSyncCoveragePanel\s+from\s+['"][^'"]*DisclosureSyncCoveragePanel\.vue['"]/,
+    )
+  })
+
+  it('附注侧宿主在模板中真实渲染（不是只 import 的死代码）', () => {
+    expect(noteClean).toMatch(/<DisclosureSyncCoveragePanel[\s>]/)
+  })
+
+  it('传入 project-id 与 year（缺任一则面板拿不到分母）', () => {
+    const tag = noteClean.match(/<DisclosureSyncCoveragePanel[\s\S]*?\/>/)?.[0] ?? ''
+    expect(tag, '未找到面板标签').not.toBe('')
+    expect(tag).toMatch(/:project-id=/)
+    expect(tag).toMatch(/:year=/)
+  })
+
+  it('自检：stripComments 未把附注侧宿主的真实代码剥掉', () => {
+    // 正向：真实 import 在 clean 后仍在
+    expect(noteClean).toContain('DisclosureSyncCoveragePanel')
+    // 反向：注释里的同名引用必须被剥掉（否则上面三条可能被注释骗过）
+    expect(
+      stripComments('<!-- <DisclosureSyncCoveragePanel :project-id="x" /> -->\nconst a = 1'),
+    ).not.toContain('DisclosureSyncCoveragePanel')
+  })
+
+  it('🔴 DisclosureEditor.vue 仍未被触碰（HARD_CAPS 硬拒绝，换挂点不等于可以改它）', () => {
+    const editor = readFileSync(
+      resolve(__dirname, '../../../views/DisclosureEditor.vue'), 'utf-8',
+    )
+    expect(editor.includes('DisclosureSyncCoveragePanel')).toBe(false)
+  })
+
+  it('🔴 附注侧宿主自身不得超出默认行数上限（1500，防把欠账搬个地方）', () => {
+    const lines = noteSrc.split('\n').length
+    expect(
+      lines,
+      `NoteReadinessPanel.vue ${lines} 行 —— 接入覆盖率面板不应把它撑成下一个大文件；`
+      + '超限请把面板逻辑继续内收或另抽子组件',
+    ).toBeLessThanOrEqual(1500)
   })
 })
