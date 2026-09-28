@@ -5,165 +5,165 @@
 
 ## 阶段 1：守卫先行（允许初始红，红即待修清单）
 
-- [ ] 1.1 新增 `samplingAccountCodeSource.spec.ts`：扫描全部 `GtVoucherSamplingEngine` 挂载点
+- [x] 1.1 新增 `samplingAccountCodeSource.spec.ts`：扫描全部 `GtVoucherSamplingEngine` 挂载点
     - 收集静态 `account-code="数字"` 与动态 `:account-code="标识符"` 两类，现算基线应为 70 / 17
     - 静态类：内联数字字面量即违规，报错列出文件名 + 该循环应使用的真源导出名
     - **先剔注释**（`<!-- -->` / `/* */` / `//`）再判，并为剔除器写自检（剔后仍能取到 `K5_FALLBACK_STANDARD` 这类代码标识）
     - 配反向自检：构造 `account-code="2701"` 样本必须被判违规
     - _需求: R6.1, R6.2, R6.3_
 
-- [ ] 1.2 守卫扩展：动态挂载点的标识符溯源（防「换地方硬编码」）
+- [x] 1.2 守卫扩展：动态挂载点的标识符溯源（防「换地方硬编码」）
     - 对 `:account-code="X"`，要求 `X` 或来自 `*AccountScope` 的 import，或其赋值右侧非数字字面量
     - 两条件皆不满足即违规（如 `const X_ACCOUNT_CODE = '1717'`）
     - 配反向自检：构造该形态必须被抓到
     - _需求: R6.6_
 
-- [ ] 1.3 守卫：`pullSamplesForWorkpaper` 的 `accountPrefixes` 实参不得为数组字面量
+- [x] 1.3 守卫：`pullSamplesForWorkpaper` 的 `accountPrefixes` 实参不得为数组字面量
     - 现算该函数全仓 3 处命中（定义 + `E1TabLargeCheck` + 无第三方调用）
     - _需求: R6.4_
 
-- [ ] 1.4 守卫：`pullSamplesForWorkpaper` 内不得出现「筛空回退取全部」形态
+- [x] 1.4 守卫：`pullSamplesForWorkpaper` 内不得出现「筛空回退取全部」形态
     - 判据：`picked.length === 0` 之后把 `lines` 整体赋给 `picked`
     - 配反向自检
     - _需求: R6.5_
 
-- [ ] 1.5 真源值断言测试：锁死 25 处涉及的真源常量具体值
+- [x] 1.5 真源值断言测试：锁死 25 处涉及的真源常量具体值
     - `K5_FALLBACK_STANDARD==='2801'` · `G1_GROSS_FALLBACK_STANDARD==='1101'` · `I2_GROSS_FALLBACK_STANDARD==='1704'` · `I6_GROSS_FALLBACK_STANDARD==='6604'` · `K10_FALLBACK_STANDARD==='6117'` · `K12_FALLBACK_STANDARD==='6301'`
     - `I5_GROSS_FALLBACK_STANDARD===''` 与 `K4_FALLBACK_STANDARD===''`（宁缺勿造，不得被填上臆造码）
     - 每条附「该码实为什么」的注释，防后人改回
     - _需求: R1.4, R2.3_
 
-- [ ] 1.6 契约测试：真源导出存在性
+- [x] 1.6 契约测试：真源导出存在性
     - 断言各 `*AccountScope.ts` 的 `{x}QueryCodes` / `{X}_FALLBACK_STANDARD` 可 import
     - 防真源改名导致宿主静默退回硬编码
     - _需求: R1.1, R1.2_
 
 ## 阶段 2：值已正确的接线（运行时逐字节不变，作为模式样板）
 
-- [ ] 2.1 K10 / K12 接真源
+- [x] 2.1 K10 / K12 接真源
     - `K10TabOtherIncomeCheck`（`6117`）、`K12TabNonOperatingCheck`（`6301`）改引用 `k10AccountScope` / `k12AccountScope`
     - 值不变 ⇒ 运行时行为逐字节不变，仅消除字面量
     - _需求: R1.1, R1.5, R7.2_
 
-- [ ] 2.2 H5 两处接 `hCycleAccountScope`
+- [x] 2.2 H5 两处接 `hCycleAccountScope`
     - `H5TabAdditionCheck` / `H5TabDisposalCheck`（`1631` 油气资产）改引用 `H5_ACCOUNT_DEF` / `h5Scope`
     - 🔴 注意 `wp_account_mapping.json` 的 H5 值（`1606` 固定资产清理）是错的，**以前端真源为准**
     - _需求: R1.1, R1.5, R5.4_
 
-- [ ] 2.3 E1 的 `accountPrefixes` 接真源
+- [x] 2.3 E1 的 `accountPrefixes` 接真源
     - `E1TabLargeCheck.MF_ACCOUNT_PREFIXES` 数组字面量 → 真源导出（E1 无独立 `e1AccountScope.ts` 时先建，含裁决依据注释）
     - 现算该字面量值与权威一致 ⇒ 行为不变
     - _需求: R4.1, R4.2, R4.3, R1.3_
 
-- [ ] 2.4 固化接线模式为可复用范式
+- [x] 2.4 固化接线模式为可复用范式
     - 把 2.1~2.3 的写法（`computed` + `QueryCodes` 优先 + `FALLBACK` 降级 + `join(',')`）整理成注释范式，供阶段 3 照用
     - `join(',')` 依据：`useVoucherSampling.buildDefaultConfig()` 现算对 `accountCode` 做 `split(',')`，多码拼接是既有契约
     - _需求: R1.2_
 
 ## 阶段 3：值错误的接线（抽样总体会真实变化）
 
-- [ ] 3.1 G1 两处：`1501`（持有至到期投资，属 G4）→ `g1AccountScope`
+- [x] 3.1 G1 两处：`1501`（持有至到期投资，属 G4）→ `g1AccountScope`
     - `G1TabDerivativeCheck` / `G1TabVoucherCheck`
     - 注意该真源另有 `G1_DERIVATIVE_FALLBACK_STANDARD='1102'`，衍生品页应判断用哪个
     - _需求: R1.1, R1.4_
 
-- [ ] 3.2 I2 七处：`1717`（真实库无此码）→ `i2AccountScope`（`1704` 开发支出）
+- [x] 3.2 I2 七处：`1717`（真实库无此码）→ `i2AccountScope`（`1704` 开发支出）
     - `I2TabCutoffBackward` / `I2TabCutoffForward` / `I2TabMaterialCheck` / `I2TabOutsourceCheck` / `I2TabStaffCheck` / `I2TabTargetedCheck` / `I2TabWorkHourCheck`
     - 其中 Cutoff 两个文件各含 2 处挂载点
     - _需求: R1.1, R1.4_
 
-- [ ] 3.3 I6 五处：`6602`（管理费用，属 K9）→ `i6AccountScope`（`6604`）
+- [x] 3.3 I6 五处：`6602`（管理费用，属 K9）→ `i6AccountScope`（`6604`）
     - `I6TabCutoffBackward`(×2) / `I6TabCutoffForward`(×2) / `I6TabTargetedCheck`
     - _需求: R1.1, R1.4_
 
-- [ ] 3.4 F2 一处：`1410`（真实库无此码）→ `F2_INVENTORY_ACCOUNT_CODES`
+- [x] 3.4 F2 一处：`1410`（真实库无此码）→ `F2_INVENTORY_ACCOUNT_CODES`
     - `F2TabContractCostCheck`；该常量现算在 `f2NoteSectionMap.ts`，为 `readonly string[]`
     - _需求: R1.1, R1.4_
 
-- [ ] 3.5 逐循环验证抽样总体非空
+- [x] 3.5 逐循环验证抽样总体非空
     - 对 3.1~3.4 每个循环，用真实库确认修正后的科目在 `tb_ledger` 有数据（至少 1 个项目）
     - 若某科目全库为零命中，如实记录并说明（可能是该循环本项目无业务，非接线错误）
     - _需求: R7.1_
 
-- [ ] 3.6 交付说明：历史批次不追溯
+- [x] 3.6 交付说明：历史批次不追溯
     - `workpaper_extraction_log` 是 append-only 审计轨迹；本 spec 不回填基于错科目的历史抽样批次
     - 修正只影响新发起的抽样，须在交付说明与 `#dev-history` 明示
     - _需求: R7.1_
 
 ## 阶段 4：宁缺勿造的降级（I5 / K4）
 
-- [ ] 4.1 抽凭入口禁用态
+- [x] 4.1 抽凭入口禁用态
     - 真源 `FALLBACK_STANDARD` 为空且 `tbSourceCodes` 解析不出 ⇒ 禁用抽凭按钮
     - 提示「本项目无「{底稿名}」对应科目，请手工录入或先在报表配置中映射」
     - 三态可区分：禁用（无科目）/ 加载中 / 只读
     - _需求: R2.1, R2.4_
 
-- [ ] 4.2 不发请求
+- [x] 4.2 不发请求
     - 该态下不调 `POST /voucher-extract`（避免空/错科目查全库）
     - 单测断言：空码场景下 http mock 零调用
     - _需求: R2.2_
 
-- [ ] 4.3 有解析值时正常可用
+- [x] 4.3 有解析值时正常可用
     - `tbSourceCodes` 能解析出码时，即使 `FALLBACK` 为空也不禁用
     - 单测覆盖「空兜底 + 有解析值」组合
     - _需求: R2.3_
 
-- [ ] 4.4 应用到 I5 / K4 两处挂载点
+- [x] 4.4 应用到 I5 / K4 两处挂载点
     - `I5TabTargetedCheck`（原 `1911`）、`K4TabCheck`（原 `2245` 持有待售负债）
     - _需求: R1.4, R2.1_
 
 ## 阶段 5：路径 B 筛选优先级收口
 
-- [ ] 5.1 `pullSamplesForWorkpaper` 三级筛选
+- [x] 5.1 `pullSamplesForWorkpaper` 三级筛选
     - ① 命中底稿科目前缀 → ② 命中 `rec.account_code`（挂凭意图）→ ③ 判「挂错底稿」
     - 删除 `if (picked.length === 0) picked = lines`
     - _需求: R3.1, R3.2_
 
-- [ ] 5.2 ② 级命中的标注
+- [x] 5.2 ② 级命中的标注
     - 样本 `remark` 标注「按挂凭时选定科目 {code} 取分录，未命中本底稿科目范围，请核对」
     - 与本轮已有的 `dateAmbiguous` 标注共存不冲突
     - _需求: R3.3_
 
-- [ ] 5.3 ③ 级「挂错底稿」汇总提示
+- [x] 5.3 ③ 级「挂错底稿」汇总提示
     - 返回结构新增 `misattached: Array<{voucherNo, voucherDate, actualAccounts: string[]}>`
     - 不产生样本行；导入结束后可关闭提示列出凭证号 + 其实际科目
     - _需求: R3.4, R3.5_
 
-- [ ] 5.4 穿透失败与业务错挂在提示上区分
+- [x] 5.4 穿透失败与业务错挂在提示上区分
     - `lines` 为空（技术失败）→ 保留占位样本（现有行为）
     - `lines` 非空但三级全空（业务错挂）→ 进 `misattached`
     - _需求: R3.6_
 
-- [ ] 5.5 E1 消费端接入新返回结构
+- [x] 5.5 E1 消费端接入新返回结构
     - `importFromAttached` 消费 `misattached` 并呈现
     - 现算 E1 是唯一消费端，改动面收敛
     - _需求: R3.4_
 
-- [ ] 5.6 单测覆盖四情形
+- [x] 5.6 单测覆盖四情形
     - ①正常 / ②挂凭意图命中 / ③挂错底稿 / 穿透失败；每种断言样本数与提示内容
     - _需求: R3.1~R3.6_
 
 ## 阶段 6：勘误登记与收尾
 
-- [ ] 6.1 登记 `wp_account_mapping.json` 三处错误
+- [x] 6.1 登记 `wp_account_mapping.json` 三处错误
     - K10（`6301`→应 `6117`）、K12（`6001`→应 `6301`）、H5（`1606`→应 `1631`）
     - 写入 `docs/` 勘误记录，标明「待独立 spec 处置」及其消费面（附注模板绑定生成 / 地址库 V1 wp 域 / 附注账龄分桶 / 种子校验）
     - 🔴 本 spec 不修该文件
     - _需求: R5.1, R5.2, R5.3_
 
-- [ ] 6.2 `#dev-history` 留痕
+- [x] 6.2 `#dev-history` 留痕
     - 记录本轮发现链：凭证号不唯一 → 挂凭去重/消歧 → K5 抽凭错科目 → 25 处同类 → 两个已完成 spec 的缝隙
     - _需求: R5.3_
 
-- [ ] 6.3 判据引用闭合性核对
+- [x] 6.3 判据引用闭合性核对
     - 脚本核对「每条 AC 至少被某任务引用一次」，而非只数编号连续
     - 补齐零引用的 AC
     - _需求: 全部_
 
-- [ ] 6.4 清理一次性探针
+- [x] 6.4 清理一次性探针
     - 删 `backend/scripts/analyze/_*.py` 与 `_*.txt`（本 spec 调研期产物已随手清理，交付前复核）
 
-- [ ] 6.5 全量回归
+- [x] 6.5 全量回归
     - 前端：`samplingHostMethodologyCoverage`(42) + `k5AccountCodeNoHardcode`(9) + K5 系列(187) + `kCycleAccountScope*` + 本 spec 新增守卫
     - 后端：`test_sampled_voucher_scope_and_date`(17) + `test_sampling_registry_service` + `test_drilldown` + `test_ledger_penetration_extra_fields`
     - 现算已知预存失败 5 个前端 suite（`useK1DualMode.ts` 缺失等），与本 spec 零引用，如实标注不计入
@@ -172,7 +172,7 @@
     - **R7.4 核对**：零数据库改动（`git diff` 不含 `backend/migrations/` 与 ORM 模型文件）
     - _需求: R7.1, R7.2, R7.3, R7.4, R7.5_
 
-- [ ] 6.6* Playwright 实测（外部依赖：需 `start-dev.bat` 环境）
+- [ ]* 6.6 Playwright 实测（外部依赖：需 `start-dev.bat` 环境）
     - 抽凭弹窗标题显示正确科目；I5/K4 禁用态与 tooltip；挂错底稿提示
     - **降级方案**：环境不可用时标 `[ ]*` 并写明「代码已改但未实测」，不假绿
     - _需求: R2.4, R3.5_
@@ -404,3 +404,141 @@ diff。产物重新生成应另起独立提交。⚠️ **在此之前运行态�
 3. **`note_template_bindings.json` 产物重新生成**（独立提交，diff 全是陈旧欠账）
 4. **6.6 Playwright 未实测**（需 `start-dev.bat` 环境）
 5. `note_template_{listed,soe}.json` 的 118 处陈旧 `report_row_code`（预存欠账，非本 spec 引入）
+
+---
+
+## 追加批次 3：推送与门禁处置（2026-09-28，同日追加）
+
+前两个追加批次的代码已落盘但**未提交**。本批次做提交与推送，过程中因 pre-commit 门禁
+产生了一处**实质代码改动**（抽伴生模块），故单独成节而非只记一句「已推送」。
+
+### 交付物
+
+| 项 | 值 |
+|---|---|
+| commit | `78b9c1ee5`（单 commit，**102 文件 / +4808 / -204**） |
+| 分支 | `work/2026-09-28-voucher-sampling-account-scope` |
+| PR | **#10**，base = `fix/adj-formula-repair-and-approval-gate-wiring`（非 main，见下） |
+
+PR 的 base 不是 `main`：本分支从 `fix/adj-formula-...` 分叉，以 main 为 base 时 PR 会显示
+**1594 文件 / +304327**（把前序 161 个 commit 全带进来）⇒ 改 base 后精确为 102 文件，
+PR diff 与本 spec 的实际产出一致。
+
+### 🔴 pre-commit 行数门禁拦下一次，按其优先顺序处置而非绕过
+
+三个 ledger-penetration 文件超 `check_file_size.py` 门禁。先算清增量再定处置：
+
+| 文件 | HEAD | 本次 | delta | HEAD+5% | 判定 |
+|---|---|---|---|---|---|
+| `views/LedgerPenetration.vue` | 4213 | 4259 | +46 (+1.09%) | 4423 | 过 |
+| `routers/ledger_penetration.py` | 1634 | 1727 | **+93 (+5.69%)** | 1715 | **超阈值** |
+| `services/ledger_penetration_service.py` | 942 | 961 | +19 (+2.02%) | 989 | 过 |
+
+三者在 HEAD 版即已超默认上限（上限的 2.8x / 2.0x / 1.2x）⇒ 确属历史大文件。
+但 `ledger_penetration.py` 的 +93 行**确实触发了「膨胀 >5%」**，这正是门禁要拦的情形。
+
+处置按门禁提示的优先顺序「拆分文件或抽伴生模块（优先），确有必要再更新 whitelist 基线」，
+且仓库有 **6 处先例**明确写「不加 `file_size_whitelist` —— 白名单表头写明仅历史大文件，
+新增文件套用属滥用」⇒ 不走「直接加基线」的捷径：
+
+1. **抽伴生模块** `backend/app/routers/_voucher_date.py`（28 行）：把 `_parse_iso_date`
+   连同 `from datetime import date as _date` 一起搬出（该别名只服务这一个函数）。
+   它是零依赖纯函数、与 HTTP 无关，放在 router 里本就不是它的位置。改后 **1712 ≤ 1715**。
+2. **whitelist 登记 3 条，baseline 一律填 HEAD 真实行数**（4213 / 1634 / 942）而非改动后
+   行数 —— **不给本次增量预留膨胀空间**，且在条目上方写明「下次再往这三个文件加功能应
+   先拆分再改，不再滚雪球加基线」。
+
+🔴 **抽取后做了真 import 验证，而非只看 AST**：`ast.parse` 过不代表运行期名字可解析
+（memory 铁律：搬移代码必须查名字在新作用域的可见性）。实跑
+`from app.routers._voucher_date import parse_iso_date` + `import app.routers.ledger_penetration`
+确认 28 个端点正常、`parse_iso_date` 可见，四个边界值（正常 / 带时间后缀 / 非法 / None）行为符合预期。
+
+### 🔴 提交边界是逐文件核验的，不是 `git add -A`
+
+工作树有 **200+ tracked 变更 + 307 untracked**，多数属并发会话的 A/B/C 轮 spec 工作。
+用语义标记法分桶后逐个看：**79 个 tracked 属本 spec**、196 个零标记排除、
+**20 个 untracked 属本 spec**、287 个排除（并发 spec / 临时垃圾 `_tsc.txt` `_vt*.json` / 探针）。
+暂存后核对「意外多出 0 / 缺失 0 / 敏感文件命中 0」才提交。
+
+两个共享文件特殊处理：
+
+- **`.kiro/specs/INDEX.md` 做部分暂存**：其 diff 同时含并发会话三处改动（Active 62→63 /
+  第十四次现扫段 / `pure-static-lane` 0/52→50/52）。构造只含本 spec 那一行的 patch 用
+  `git apply --cached --unidiff-zero`，暂存时点验证过并发那三处未进 index。
+  🔴 **但该隔离最终失效了 —— 见下方「更正」节，commit `78b9c1ee5` 实际带上了那三处改动。**
+- **`.kiro/steering/dev-history.md` 整体暂存**：其 6 行 diff 经逐行核验全属本会话链
+  （3 条 entry + 3 个空行）。
+- **`c-cycle-sync-foundation-and-first-canary/tasks.md` 排除**：hit=1 miss=268，属并发 C 轮 spec。
+
+### 并发会话两次干扰（如实记录，非本 spec 缺陷）
+
+工作树与 git 状态是共享的，期间另一条会话两次改动共享状态：
+
+1. 在我 `git add` 之后把 8 个 `chain-closure-phase1` 文件 add 进了 index ⇒ 已
+   `git restore --staged` 移出（只动 index 不动工作树），复验回到精确 102。
+2. 在我 commit 之后把分支切走，并把 `work/2026-09-28-voucher-sampling-account-scope`
+   指针回退到 `99100078b`（前序 adj commit）⇒ **第一次 push 推上去的是错的 commit**。
+   我的 commit 未丢（在并发分支上作为祖先）；确认 `78b9c1ee5^ == 99100078b == 远端当前`
+   后用显式 refspec 做 **fast-forward** 推送（`git merge-base --is-ancestor` 返回 0 验证），
+   **未用 `--force`**。远端复验 = `78b9c1ee5`。
+
+### 本批次复验（不沿用前序数据）
+
+| 项 | 结果 |
+|---|---|
+| 抽凭真源 5 个 spec | **107 passed**（`samplingAccountCodeSource` 26 + `attachedVouchersAccountScope` 10 = 两守卫 **36/36** 属实；`samplingHostMethodologyCoverage` 42 + `pullSamplesForWorkpaper` 15 + `useSamplingAccountGate` 14） |
+| `test_sampled_voucher_scope_and_date.py`（抽伴生模块后） | **17 passed** |
+| `check_file_size.py` 对 4 个目标文件 | rc=0 全过 |
+| 任务 6.4 探针清理现查 | `_vsa_*` / `_wam_*` / `_push_*` 全部 0 个 |
+
+⚠️ **「追加-6 回归 236 passed」是追加批次 1 当时的数据，本批次未重跑那 9 个 suite** ——
+本批次改动（`wp_account_mapping.json` + 抽伴生模块）不触及前端抽凭组件，
+故只复验了上表 5 个核心 spec。如需完整口径应重跑那 9 个 suite。
+
+### 任务勾选
+
+- [x] 追加3-1 逐文件核验提交边界（79 tracked + 20 untracked，零意外零缺失零敏感）
+- [x] 追加3-2 共享文件 `INDEX.md` 部分暂存（patch 法，验证并发改动未进 index）
+- [x] 追加3-3 pre-commit 门禁处置：抽伴生模块 `_voucher_date.py` + whitelist 登记 HEAD 基线
+- [x] 追加3-4 抽取后真 import 验证（非仅 AST）+ 17 passed
+- [x] 追加3-5 commit `78b9c1ee5` + fast-forward 推送（并发干扰后修正，未用 force）
+- [x] 追加3-6 PR #10 创建并修正 base（1594 文件 → 102 文件）
+
+### 全 spec 遗留（现状口径）
+
+1. ~~39 处字面量~~ → 已清零
+2. ~~`wp_account_mapping.json` 4 处错~~ → 已修 5 族 37 项
+3. **`note_template_bindings.json` 产物重新生成**（独立提交；⚠️ 在此之前**运行态仍读旧产物**，
+   需 `generate_note_template_bindings.py` + 重启后端才生效）
+4. **6.6 Playwright 未实测**（`[ ]*`，需 `start-dev.bat` 环境 —— 本批次仍未执行）
+5. `note_template_{listed,soe}.json` 的 118 处陈旧 `report_row_code`（预存欠账，基线同样红）
+6. 三个 ledger-penetration 文件的**整体瘦身**（已登记 whitelist 待办，下次碰它们应先拆分）
+
+### 🔴 更正（追加批次 3 自查，2026-09-28）：INDEX.md 的隔离最终失效，我的记录是假陈述
+
+上文写「构造只含本 spec 那一行的 patch…并验证 staged 版本里并发那三处确实未进 index」。
+**该结论在提交时点已不成立。** 现算 commit `78b9c1ee5` 的 `INDEX.md`：
+
+| 检查项 | 我原先声称 | 现算实际 |
+|---|---|---|
+| 本 spec 那行（`31/32 + 追加 12`） | 应在 | ✅ 在 |
+| 并发改动 `Active **63**` | **不应在** | 🔴 **在** |
+| 并发改动 `pure-static-lane **50/52**` | **不应在** | 🔴 **在** |
+
+（对照 `HEAD~1` 三项全为 False，可确认这三处是被我的 commit 带进去的。）
+
+**失效机理**：patch 精确暂存做在**第一次 commit 尝试之前**。那次被 pre-commit 行数门禁
+拦下后，我又做了抽伴生模块 + whitelist 登记，再 `git add` 3 个文件。**并发会话在这个窗口里
+也对 `INDEX.md` 执行了 `git add`**（同一动作把 8 个 `chain-closure-phase1` 文件塞进 index），
+这会把 `INDEX.md` 的**完整工作树版本**放进 index，**覆盖掉我此前的精确 patch**。
+
+**我的核验漏洞**：提交前的审计脚本只比对**文件名集合**（「意外多出 / 缺失」），
+`INDEX.md` 本就在预期清单内 ⇒ 集合检查全绿、内容被换掉却查不出来。
+⇒ **共享文件做部分暂存后，若中途有任何其它 `git add`，必须在 commit 前重新核验 staged 的「内容」而非只核验文件名。**
+
+**处置裁决：不 force push 纠正。** 理由：① 那三处改动本身是并发会话真实完成的工作
+（`pure-static-lane` 确已实施 50/52、Active 63 是现扫统计），留在历史里不产生错误信息，
+只是归属混了；② 改写已推送的 commit 需 force push，而并发分支
+`work/2026-09-28-chain-closure-phase1` 以它为祖先，风险高于收益。
+⇒ 如实登记归属混入，不掩盖。
+
