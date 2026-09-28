@@ -1725,10 +1725,32 @@ class TestProperty20AndProperty3:
     """Property 20 的前提方向（非空分母）+ Property 3 的否定方向。"""
 
     def test_no_slice_entry_has_a_contract(self, manifest_slice: dict) -> None:
+        """🔴 2026-09-28 按新事实重写（spec `l-cycle-true-adapter-registration` Task 5）。
+
+        原判据是「本 slice 的 8 条 entry **没有任何一条**有 contract」—— 那登记的是
+        「L 域零生产契约」这个现状。L1 已交付 reviewed 生产契约，故判据从「零期望」
+        改为「**恰 1 条且具名**」：l1 可以有，其余 7 条仍不得有。
+        **不是删断言也不是加豁免** —— 反方向（L2~L8 冒出 contract）照样打红。
+        """
         ids = {e["entry_id"] for e in manifest_slice["independent_entries"]}
+        #: 已按本 spec 接线、允许拥有生产契约的 entry。L2~L8 接线时逐条追加。
+        migrated = {"xlsx/gt-l1-short-term-loans"}
+        assert migrated <= ids, (
+            f"已迁移清单 {sorted(migrated)} 不在本 slice 的 entry 集合里 ⇒ 清单写错了"
+        )
+        owned_in_slice: dict[str, str] = {}
         for f in sorted(CONTRACT_DIR.glob("*.json")):
+            if f.stem.startswith("_"):
+                # README：`_*.json` 是 schema 文档与候选示例，不参与生产清册。
+                continue
             eid = (_load(f).get("review") or {}).get("entry_id")
-            assert eid not in ids, f"{f.name} 的 review.entry_id 属本 slice"
+            if eid in ids:
+                owned_in_slice[str(eid)] = f.name
+        assert set(owned_in_slice) == migrated, (
+            f"L slice 内持有生产契约的 entry 实得 {owned_in_slice}，"
+            f"期望恰 {sorted(migrated)} —— 多出的未走本 spec 的五环发布链，少了的说明回退"
+        )
+        assert owned_in_slice["xlsx/gt-l1-short-term-loans"] == "l1.short_term_loans.json"
 
     def test_pilot_contracts_still_own_what_they_owned(self) -> None:
         owners = {

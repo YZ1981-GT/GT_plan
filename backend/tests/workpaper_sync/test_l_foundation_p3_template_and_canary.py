@@ -293,24 +293,53 @@ class TestTask34StructuralZeros:
     """十项结构性零逐项现算。"""
 
     def test_l_prefix_contract_count(self) -> None:
-        """L 前缀契约数 == 2（candidate：l1 + l4）。"""
-        if not CONTRACT_DIR.exists():
-            l_contracts = []
-        else:
-            l_contracts = [
-                f for f in CONTRACT_DIR.glob("*.json")
-                if f.stem.startswith("l") and not f.stem.startswith("_")
-            ]
-        assert len(l_contracts) == 2, (
-            f"L 前缀契约应为 2（l1 + l4 candidate），实得 {[f.name for f in l_contracts]}"
-        )
-        # 全部必须是 candidate（entry_id 为 null）
+        """L 前缀契约数 == 2，但**不再全是 candidate**。
+
+        🔴 2026-09-28 按新事实重写（spec `l-cycle-true-adapter-registration` Task 5）：
+        原判据是「L 前缀契约 2 条且**全部** candidate（entry_id 为 null）」—— 那是
+        「L 域零生产契约」这个**现状**的登记，不是目标态。L1 已交付 reviewed 生产契约
+        `l1.short_term_loans.json`（`review.entry_id = xlsx/gt-l1-short-term-loans`），
+        原 candidate 草案已删（README：`{adapter_id}.json` 才是生产契约，两份同源会让
+        `review_status` 门失效）。
+
+        判据从「零期望」改为「逐条具名」——**不是删断言也不是加豁免**：
+        总数仍锁 2、l4 仍必须是 candidate 且 entry_id 为 null、l1 必须是 reviewed 且
+        entry_id 恰为本 entry。L2/L3/L5~L8 接线时在此逐条追加。
+        """
         import json as _json
-        for c in l_contracts:
-            data = _json.loads(c.read_text("utf-8"))
-            assert data.get("review", {}).get("entry_id") is None, (
-                f"{c.name} candidate 契约的 review.entry_id 必须为 null"
-            )
+
+        assert CONTRACT_DIR.exists(), "契约目录不存在 ⇒ 判据无对象"
+        l_contracts = sorted(
+            f
+            for f in CONTRACT_DIR.glob("*.json")
+            if f.stem.startswith("l") and not f.stem.startswith("_")
+        )
+        by_name = {f.name: _json.loads(f.read_text("utf-8")) for f in l_contracts}
+        assert len(l_contracts) == 2, (
+            f"L 前缀契约应为 2（l1 reviewed + l4 candidate），实得 {sorted(by_name)}"
+        )
+
+        l1 = by_name.get("l1.short_term_loans.json")
+        assert l1 is not None, (
+            "l1 生产契约缺失 —— 若尚未交付请用 "
+            "`generate_phase5_l_contracts.py --apply` 生成"
+        )
+        assert str(l1.get("review_status")) == "reviewed", (
+            f"l1 契约 review_status={l1.get('review_status')!r} ⇒ 只有 reviewed 可注册 adapter"
+        )
+        assert (l1.get("review") or {}).get("entry_id") == "xlsx/gt-l1-short-term-loans", (
+            "l1 生产契约的 review.entry_id 必须指向本 entry（candidate 才为 null）"
+        )
+        assert not (CONTRACT_DIR / "l1.short_term_loans.candidate.json").exists(), (
+            "l1 的 candidate 草案仍在 ⇒ 与 reviewed 生产契约构成双源"
+        )
+
+        l4 = by_name.get("l4.bonds_payable.candidate.json")
+        assert l4 is not None, "l4 candidate 契约不该消失（L4 尚未接线）"
+        assert str(l4.get("review_status")) == "candidate"
+        assert (l4.get("review") or {}).get("entry_id") is None, (
+            "l4 仍是 candidate ⇒ review.entry_id 必须为 null"
+        )
 
     def test_l_domain_adapter_id_is_null(self, entries: list[dict]) -> None:
         """L 域 adapter_id 非空数 == 0。"""

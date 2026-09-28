@@ -64,18 +64,27 @@ from app.services.workpaper_sync.store_item_specs import (  # noqa: F401
 # ═══════════════════════════════════════════════════════════════════════════
 
 STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
-    # 🔴 b60 保留一条 plan 仅为「已登记」可查（`check_sheet_specs_fully_registered` 的分母是
-    #    8 家已交付 contract）。它的**实际路径**走 `NON_STORE_BACKED_ADAPTERS` 直接跳过 ——
-    #    契约无 html_store 段、15 字段 store_item_id 全 None ⇒ 纯 Excel entry，不做 store 镜像。
+    # ── B60 工时预算（2026-09-27：从 NON_STORE_BACKED 转为真 store-backed）────────
+    #
+    # 🔴 归类变更的依据是**前端长出了载体**，不是重新解读旧事实：
+    #    此前 b60 是 `NON_STORE_BACKED_ADAPTERS` 的唯一成员，理由「契约无 html_store 段、
+    #    15 字段 store_item_id 全 None ⇒ HTML 宿主不读 checklist store」。那描述的是
+    #    「当时前端没有 HTML 面」。`b60/GtB60HourBudgetPanel.vue` 落地后，B60-1 工时表在
+    #    HTML 侧读写 `B60-1-hour-budget-rows`（remark 存 JSON 行数组、行身份 `rowUuid`）
+    #    ⇒ 不镜像就是「OO 里改的行回不到结构化视图」，面板空态那句
+    #    「forcesave 后将镜像至此」成了不成立的承诺。
+    #
+    # 🔴 `merge_rows_fn` 用默认名，实现在伴生模块 `pilot_b60_store_merge`
+    #    （主模块 1007 行，行数门措辞是「打磨应让文件变小不变大」），主模块 re-export。
+    #    与 G7/H1 两个伴生门面同一边界。
+    #
+    # 🔴 meta 表（`hour_budget_meta`：单位名称 / 会计期间 / 编制人…）**不进 items** ——
+    #    前端面板只渲染行表、不读 meta，声明它有 store 就是造第二份事实。
+    #    merge 门面里对无 `row_key` 的字段显式跳过（不是靠巧合漏掉）。
     "b60.hour_budget": StoreMergePlan(
         adapter_id="b60.hour_budget",
         provider_module="pilot_simple_checklist",
-        mirror_unavailable_reason=(
-            "B60 是纯 Excel entry：契约 review 段无 html_store、15 个字段 store_item_id 全为 "
-            "None（2026-09-26 契约逐项实测）⇒ 它的 HTML 宿主不读 checklist store，"
-            "本来就不需要镜像。实际路径由 NON_STORE_BACKED_ADAPTERS 提前跳过，"
-            "本 reason 只在有人绕过该集合直接 resolve 时兜底报错"
-        ),
+        items=(StoreItemSpec(item_id="B60-1-hour-budget-rows", kind=StoreKind.rows),),
     ),
     "d1.notes_receivable_detail": StoreMergePlan(
         adapter_id="d1.notes_receivable_detail",
@@ -650,6 +659,35 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="H10-adjustment-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── L1（spec: l-cycle-true-adapter-registration · Task 6）──────────────────
+    #
+    # L 循环首条真双向 entry。受管 sheet = `明细表L1-2`（数据源头），**不是**前序 spec
+    # 选的 `审定表L1-1` —— 后者 R7~R11 无一个可输入格（B/C/D/F/G/H 全是 SUMIF 引用本表、
+    # E/I/J/L 是加总、K 是裸 IF、R11 是 SUM），写它会毁掉整册取数联动，已在契约里
+    # 登记为 `review.derived_readonly_sheet` 只读投影。
+    #
+    # 🔴 `items` 只登记本轮**真受管**的一条。L1 另有四张位置化表（`L1-int-*` /
+    #    `L1-cred-*` / `L1-ovd-*` / `L1-plg-*`）本 spec 不动 —— `int` 被
+    #    `h2L1LoanPull.ts` 跨循环消费，改它会连带 H2；预登记它们会让
+    #    `check_sheet_specs_fully_registered` 的分母失真。
+    #
+    # 🔴 旧 store 形态 `L1-det-{rowIndex+1}-{field}` 是位置化行身份（`removeRow` 后
+    #    `_triggerSaveAll` 重建整个序列 ⇒ 删中间行让后续行 item_id 全错位），
+    #    `FORBIDDEN_ROW_IDENTITY_KINDS` 明含 `index`/`ordinal`/`position`/`array_index`
+    #    ⇒ 换成 d6 式单条 item + 稳定 `rowId`。真库 `L1-det-*` 现算 0 行，零迁移负担。
+    #
+    # 🔴 GC-2：L1 册裸 IF **112 格**（审定表L1-1 34 / 附注上市 28 / 附注国企 20 /
+    #    利息测算表L1-5 22 / 逾期贷款检查表L1-7 8），**受管表 `明细表L1-2` 零命中**。
+    #    per-file 保守策略 ⇒ 受管表干净也必须挂：点同册任一 sheet 的在线编辑都会触发
+    #    整册加载。中性化函数与 G7/G2/G9/G10/G8/G14/H9/H6/H4/H8/H10 **共用一个**
+    #    （已被真 OO 栈验收过的口径），不新造；也不得在 `adapters/excel.py` 加
+    #    `if adapter_id == "l1…"` 字面量分支（会打红 P9 框架层零 wp_code 分支判据）。
+    "l1.short_term_loans": StoreMergePlan(
+        adapter_id="l1.short_term_loans",
+        provider_module="phase5_l1_short_term_loans",
+        items=(StoreItemSpec(item_id="L1-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
 }
 
 
@@ -660,18 +698,21 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
 #:    一模一样 —— 那正是 D4-35 恒空 / D4-13 写不进 OO 两个 bug 能活下来的原因。登记在此
 #:    集合里的是后者；前者会在 `resolve_store_merge_plan` 显式打红。
 #:
-#: 🔴 **b60 实测属此类**（2026-09-26 契约逐项核实）：`b60.hour_budget.json` 的 `review` 段
-#:    **无 `html_store`**（只有 authority_root / entry_id / pilot_class / reviewed_basis），
-#:    且 15 个字段的 `store_item_id` **全为 None** ⇒ B60 是**纯 Excel entry**，
-#:    它的 HTML 宿主不读 checklist store，本来就不需要镜像。
+#: 🔴 **当前为空集** —— 曾经的唯一成员 `b60.hour_budget` 已于 2026-09-27 转为真
+#:    store-backed（见 `STORE_MERGE_REGISTRY` 里那条的注释）。
 #:
-#:    ⚠️ 本条修正了一次**我方误判**：首版把 b60 与 g7/h1 一起标成
-#:    「provider 缺 merge 门面」。实际三家情况不同 —— g7/h1 有完整 store 声明与投影链、
-#:    确实只缺 merge（已于本轮补齐），而 b60 **压根没有 store** ⇒ 它不是缺陷，
-#:    是形态不同。判据 `test_b60_has_no_html_store_by_design` 钉住这条事实。
-NON_STORE_BACKED_ADAPTERS: Final[frozenset[str]] = frozenset({
-    "b60.hour_budget",
-})
+#:    历史脉络值得留着，因为它示范了一条容易走错的路：b60 最初被归进本集合，理由是
+#:    「契约 `review` 段无 `html_store`、15 字段 `store_item_id` 全 None ⇒ 纯 Excel entry，
+#:    HTML 宿主不读 checklist store」。那个观察**当时是准确的**，但它描述的其实是
+#:    「前端还没有 HTML 面」这个时点事实，而不是 entry 的固有形态。
+#:    `b60/GtB60HourBudgetPanel.vue` 一落地，同一句话就不再成立。
+#:
+#:    ⇒ 往本集合里加成员时，判据得是「该 entry 的 HTML 侧**结构上**不可能有 store 载体」，
+#:      而不是「现在还没有载体」。后者会随前端交付而过期，并让「回写不通」伪装成设计。
+#:
+#:    空集是**合法状态**：`store_merge_plan_or_skip` 只是不会命中提前 return 分支，
+#:    仍由 `looks_like_adapter_id` 兜住「传进来的其实是 entry_id」那一类。
+NON_STORE_BACKED_ADAPTERS: Final[frozenset[str]] = frozenset()
 
 
 #: 真实 adapter_id 的形态（== contract_id == 契约文件名，如 `d4.revenue_detail` /

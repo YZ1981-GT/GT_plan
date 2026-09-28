@@ -1,5 +1,5 @@
 {
-  "adjudication_digest": "7e4c6d67ad56d034e0935cf1a1d1eb348267fa4cb3d4b330eee95c5f5f77f825",
+  "adjudication_digest": "05f13ef12aee700ebef991fa0209d8b65d10f32dbcf5ec6ccfc8b347b1c1dc5f",
   "adjudication_digest_algorithm": "sha256(json.dumps(adjudications, sort_keys=True, ensure_ascii=False, separators=(',',':')).encode('utf-8')).hexdigest()",
   "adjudication_digest_note": "🔴 2026-09-04：原 digest 的算法全仓无处记载（只有它自己出现一次），无法复算 ⇒ 改文件后留着它就是把错值当基线锁死。已换成算法自带的形态，见 `adjudication_digest_algorithm`。原值 c8b2bc2031e4041b143e6df973ee3d87ef641a23c28a5289b0da799ab3606125",
   "adjudications": [
@@ -1076,6 +1076,32 @@
       },
       "wp_codes": [
         "F5"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 L1S 在 wp_index 里 0 命中（GtL1ShortTermLoans → L1S 是幻影码）",
+        "heuristic_would_say": [
+          "L1S"
+        ],
+        "managed_excel_name": "明细表L1-2",
+        "template_relative_path": "L/L1 短期借款.xlsx",
+        "wp_index_evidence": "wp_code=L1「短期借款」4 项目各 1 行未删除，且 file_path 是**真路径**（`storage/projects/{project_id}/workpapers/L/L1.xlsx`，即整册 13 sheet 的工作簿）。🔴 `L1-2`「短期借款明细表」虽也有 4 行未删除，但其 file_path 全是**空字符串 `''`**（不是 NULL）⇒ 索引行非真底稿文件。同理 L1-1 / L1-3~L1-6 各 2 行亦为空串索引行。🔴 **判据陷阱**：`count(wp.file_path)` 只排除 NULL **不排除空串**，按它判会误认为 `L1-2` 也有文件、从而把目标码定到一个没有工作簿的索引行上（本条裁决首版即踩过，改用 `file_path <> ''` 复算后纠正）。受管 sheet `明细表L1-2` 只是 `L1.xlsx` 里的一张 sheet，不是独立文件 ⇒ 目标码取持有整册文件的 `L1`。`L1S` 是 CamelCase 幻影码（GtL1ShortTermLoans → L1S），wp_index 零命中（与 D1/D3/D6/D7 的 D1N/D3P/D6C/D7C 同型）。"
+      },
+      "contract_id": "l1.short_term_loans",
+      "entry_id": "xlsx/gt-l1-short-term-loans",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-09-28",
+        "store_item_id": "L1-2-rows",
+        "why_null": "`L1-2-rows` 全库 0 行（明细表从未录入，同 H1-8-rows / D3-det-rows / D6-2-rows 空表单是合法业务事实）⇒ 目标 item 无法定码，本条以 file_path 证据定 `L1`。🔴 旧位置化键 `L1-det-*`（`L1-det-{rowIndex+1}-{field}`）现算亦为 **0 行**，故切稳定 rowId 形态零迁移负担。全库 L1 载荷只有 `L1-adj-*` 32 行 + `L1-chk-conclusion` 1 行，它们属 `审定表L1-1` —— 该表 R7~R11 全是 SUMIF/加总/裸 IF、无一可输入格，已在契约里登记为 `review.derived_readonly_sheet` 只读投影，不受管。",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      },
+      "wp_codes": [
+        "L1"
       ]
     }
   ],

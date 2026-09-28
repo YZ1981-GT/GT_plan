@@ -150,6 +150,16 @@ class RowTableSheetSpec:
     #: （`excel_materialize._grow_managed_table_ref` 据此决定 footer 公式区间是否需要跟随
     #: 插行重新归一化；无公式的 footer 行不该被当作"有公式待归一化"处理）。
     footer_carries_total_formula: bool = True
+    #: footer marker 所在列。默认 `"A"` —— 既有七家 provider 逐字如此，零回归。
+    #:
+    #: 🔴 L1（spec `l-cycle-true-adapter-registration`）是本引擎首个 footer 标签**不在 A 列**
+    #: 的场景：`明细表L1-2` 的 `A26` 为空、标签落在 `C26 = '合计'`。此前本函数把
+    #: `search_column` 硬编码成 `"A"`，自动派生出的契约会让 `excel_materialize.
+    #: _find_marker_row` 在 A 列一处都找不到 marker ⇒ `FooterAnchorDriftError`
+    #: （`phase5_d3_05_long_term` 已踩过同一个坑，当时是改模板绕开）。
+    #: contract schema 本身支持任意列（`contracts.FooterAnchorSpec.search_column` +
+    #: `_A1_COLUMN_RE`），缺的只是声明层的表达能力，故此处补一个带默认值的字段。
+    footer_search_column: str = "A"
     error_label: str = ""
 
     #: HTML-only item 子集（受管 sheet ≠ 全部 item 受管；D4-5 范式）。
@@ -321,7 +331,9 @@ def spec_to_contract_sheet_payload(spec: RowTableSheetSpec) -> dict:
     if spec.footer_marker:
         table_payload["footer_anchor"] = {
             "marker": spec.footer_marker,
-            "search_column": "A",
+            # 🔴 取声明值而非硬编码 "A"：默认仍是 "A"（既有七家零回归），
+            # footer 标签不在 A 列的表（如 L1 的 C26）才传别的列。
+            "search_column": spec.footer_search_column,
             "carries_total_formula": spec.footer_carries_total_formula,
         }
     if table_payload["row_identity"] is None:

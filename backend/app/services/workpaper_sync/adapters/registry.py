@@ -1144,6 +1144,18 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         #    🔴 manifest 里 J 只有 2 条 entry（1 独立 + 1 parent_duplicate）
         #    ⇒ 本循环恒 1 条 provider。
         "app.services.workpaper_sync.phase5_j1_employee_compensation",
+        # ── A 循环 canary（spec: a-cycle-sync-foundation-and-first-canary）────
+        "app.services.workpaper_sync.phase5_a51_cashflow_audit",
+        # ── C 循环 canary（spec: c-cycle-sync-foundation-and-first-canary · Task 22）──
+        #    🔴 C 域 store 是 per-field 标量行（非 JSON 数组），行身份用 B 列控制编号
+        #    业务键（位置化槽 `m` 不进契约）—— 详见 provider docstring 与台账 reason。
+        "app.services.workpaper_sync.phase5_c_control_test",
+        # ── L 循环首条（spec: l-cycle-true-adapter-registration · Task 6/7）──────
+        #    🔴 受管 sheet 是 `明细表L1-2`（数据源头）而**不是**前序 spec 选的
+        #    `审定表L1-1` —— 后者 R7~R11 全是 SUMIF/加总/裸 IF，无一可输入格，
+        #    写它会毁掉整册取数联动，已降级为契约里的只读投影声明。
+        #    🔴 本条与台账条目**必须成对**（`len(白名单) == len(台账)` 是判据）。
+        "app.services.workpaper_sync.phase5_l1_short_term_loans",
     }
 )
 

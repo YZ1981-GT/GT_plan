@@ -2349,4 +2349,114 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "（无真 OO 9.4 roundtrip 与人工审核均未完成）。"
         ),
     },
+    # ── C 循环 canary（spec: c-cycle-sync-foundation-and-first-canary · Task 22/23）──
+    {
+        "contract_id": "c2.control_test_summary",
+        "provider_module": "app.services.workpaper_sync.phase5_c_control_test",
+        "delivered_by_task": "c-cycle-foundation-task-22",
+        "pilot_class": "phase5_c_control_test_summary",
+        "entry_id": "xlsx/gt-c-control-test",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "C/C2 销售循环控制测试.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "C 循环 canary（控制测试汇总表）。受管 sheet = `C2控制测试汇总表`，"
+            "15 列 A~O 与前端 `SummaryRow` 15 字段一一对应。"
+            "🔴 **C 域与 D~N 有三处结构性差异，照抄 D4 会错**："
+            "①**store 形态是 per-field 标量行**（`C{n}-sum-{m}-{field}`，15 行/控制点），"
+            "不是 D4/J1 的「一个 item_id 存整表 JSON 数组」⇒ `build_store_projection` 要按 "
+            "item_id 分组重建行，不是 `json.loads` 一个数组。"
+            "②🔴 **位置化存储槽 `m` 不得作为声明的行身份** —— 序列化处 `const m = i + 1`"
+            "（`useCControlTestData.ts`）是**数组下标**，而引擎 `RowIdentityKind` 只接受 "
+            "`field`/`template_row_key`，`FORBIDDEN_ROW_IDENTITY_KINDS` 明含 "
+            "`index`/`ordinal`/`position`/`array_index` ⇒ 声明的行身份取 **B 列「控制编号」"
+            "`controlId`**（审计业务键），`m` 降级为 provider 内部存储槽**不进契约**；"
+            "merge 时按 `controlId` 定位目标行、回写它当前占用的槽 ⇒ HTML 侧重排行不再错位"
+            "（守卫 `test_reorder_does_not_misplace_rows` 钉住）。"
+            "③🔴 **一 entry 覆盖 28 个 wp_code / 14 本同构主册**（CC-61）—— 契约只能声明一本册，"
+            "本 canary 声明 **C2 册**为权威样本；C3~C15 的 13 本已实证与 C2 六项指标逐值一致"
+            "（公式格 12 / 裸 IF 0 / definedName 0-0 / 超列 0 / max_col 18 / 表头逐字相同），"
+            "按同一 sheet_payload 扩；14 本 `-2` 偏差册另有 definedName 232/broken 181 污染"
+            "（同模板复制 14 份，须改源模板一次再重分发 ⇒ 外部依赖，登记不修）。"
+            "🔴 **几何（openpyxl 逐格实测）**：r1/r2 标题 merged A1:O1 / A2:O2 · r3/r4 页眉 6 个"
+            "跨 sheet 引用公式 · **r5 是「下拉选择」提示行，非表头非数据** · **r6 表头 15 列** · "
+            "**数据区 r7~r21（15 行，模板内全空）** · **r22 = `提示1：与控制相关的风险`** 是静态"
+            "说明区首行 ⇒ footer 边界（引擎要求 footer_row > last_data_row）· "
+            "🔴 **数据区零公式**（全册 6 个公式全在 r3/r4）⇒ `formula_mask` 为空，"
+            "写成显式常量而非省略，让「为什么是空」可追溯 · max_column=15(O) 且 last_value_col=15 "
+            "⇒ UUID 放 **P** · 无 Excel Table · `ws.protection.sheet=False` ⇒ locked 惰性 · "
+            "数据区 r7~r21 **无 merged**（merged 全在标题与 r23+ 提示区）。"
+            "🔴 **槽位映射**：枚举类 6 字段（assertion/attribute/frequency/relatedRisk/"
+            "testMethod/hasDeviation）+ `sampleSize` 存 `conclusion` 槽，其余 8 字段存 `remark` 槽"
+            "（与前端序列化逐值对齐，守卫 `test_conclusion_vs_remark_slot_split`）。"
+            "🔴 **fail-closed 两条**：`controlId` 为空或重复即抛 `StorePayloadError` —— "
+            "行身份不可靠时宁可拒绝投影，**禁用下标兜底**（那会把位置化身份偷偷带回来）。"
+            "`adapter_registered=False`：同其余循环卡 BP-1~BP-5 / BP-7 平台级供给缺口 —— "
+            "manifest 现算 `capability=single_onlyoffice`（`reasonCodes` 含 `missing_adapter`），"
+            "须先由 reviewed overlay 裁决 bidirectional 并重生成 manifest，"
+            "且 `working_paper_sync_entry_state` / `working_paper_content_representation` / "
+            "`…_definition_bundle` 三表须有该 entry 的行（真库供给）。"
+            "前端已按 `capabilityForEntry` 门控接线（裁决后自动启用真双向，前端无需再改）。"
+        ),
+    },
+    # ── L 循环首条（spec: l-cycle-true-adapter-registration · Task 5）──────────────
+    {
+        "contract_id": "l1.short_term_loans",
+        "provider_module": "app.services.workpaper_sync.phase5_l1_short_term_loans",
+        "delivered_by_task": "l-cycle-true-adapter-registration-task-5",
+        "pilot_class": "l_cycle_short_term_loans",
+        "entry_id": "xlsx/gt-l1-short-term-loans",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "L/L1 短期借款.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "L 循环首条真双向 entry。🔴 **前序三份 L spec（`l-cycle-sync-foundation-and-"
+            "first-canary` 及两份 lane）标 37/37 + 22/23 + 26/27「完成」，但 manifest 一条"
+            "未翻** —— 它们 36 条任务里动生产代码的只有两条（删 orphan `useL1DualMode.ts`、"
+            "notice 落位），其余全是判据。本条目是真改线的登记。"
+            "🔴 **canary 改选**：前序选 `审定表L1-1` + `L1-adj-*` 键组（理由是真库 33 行"
+            "非空），但该表 R7~R11 **无一个可输入格** —— B/C/D/F/G/H 全是 SUMIF 引用"
+            "`明细表L1-2`、E/I/J/L 是加总、K 是裸 IF、R11 是 SUM ⇒ 按它接线会写掉 SUMIF、"
+            "毁掉整册取数联动。改选**数据源头** `明细表L1-2`，审定表降级为 formula_mask "
+            "全覆盖的只读投影（契约 `review.derived_readonly_sheet` 显式登记）。"
+            "🔴 **candidate 契约两处实质错误**（已随本次交付纠正）：①字段名与真库键名"
+            "不匹配 —— 声明 `beginUnadjusted`/`beginAje`/… 而真库是 `beginning`/"
+            "`unadjusted`/`aje`/`rje`/`audited`/`debitAmount`/`creditAmount`/`endBalance`"
+            "（4 分类 × 8 字段 + conclusion = 33 行）②把 SUMIF 公式格声明成可写 number。"
+            "**几何（openpyxl 逐格实测）**：两级表头 r8 组标题 + r9 叶子 ⇒ header_rows=2 · "
+            "数据区 r10~r25 · footer r26 · 30 列 A-AD（有效业务列到 AB，28 个受管字段）· "
+            "五个公式列逐行 K=H+I-J / R=H+L+M / S=I+N+P / T=J+O+Q / U=R+S-T（负债口径"
+            "「期初+增加−减少」，与前端 `calcLiabilityEndBalance` 语义一致）· "
+            "🔴 **footer 标签在 C26「合计」而非 A 列**（A26 为空，也不是 d6 的 3 半角空格"
+            "形态）—— 框架层 `spec_to_contract_sheet_payload` 原把 `search_column` 硬编码成 "
+            "`\"A\"`，会让 `excel_materialize._find_marker_row` 一处都找不到 marker 并抛 "
+            "`FooterAnchorDriftError`（`phase5_d3_05_long_term` 踩过同一坑，当时改模板绕开）"
+            "⇒ 本次给 `RowTableSheetSpec` 补 `footer_search_column` 声明位，默认仍 `\"A\"`，"
+            "29 个生成器 `--check` 全过、51 份既有契约 digest 零漂移 · "
+            "footer H26~U26 连续 14 列全 `=SUM(X10:X25)` · 册内**零 Excel Table、零 "
+            "definedName** ⇒ `GT_L12_ROWS` 为本契约新建、UUID 列取 max_column+1 = AE · "
+            "整册裸 IF 112 格（审定表 34 / 附注上市 28 / 附注国企 20 / 利息测算 22 / "
+            "逾期贷款 8），**受管表零命中**（per-file 策略仍须挂中性化）。"
+            "🔴 **store 形态换轨**：旧形态 `L1-det-{rowIndex+1}-{field}` 是**位置化行身份**"
+            "（`removeRow` 后 `_triggerSaveAll` 重建整个序列 ⇒ 删中间行会让后续行 item_id "
+            "全部错位），而 `FORBIDDEN_ROW_IDENTITY_KINDS` 明含 `index`/`ordinal`/"
+            "`position`/`array_index` ⇒ 切 d6 式单条 item `L1-2-rows` + 稳定 `rowId`。"
+            "真库 `L1-det-*` 现算 **0 行 / 0 distinct item** ⇒ 零迁移负担。"
+            "只改 `det` 一表：`int`/`cred`/`ovd`/`plg` 四表仍位置化、本 spec 不动 —— "
+            "`int` 被 `h2L1LoanPull.ts` 跨循环消费（`L1-int-{n}-{field}`），改它会连带 H2。"
+            "前端 `DetailRow` 的 `amount`/`currency` 模板无对应列 ⇒ 登记为 "
+            "`html_only_keys` 不入契约。"
+            "`adapter_registered=False` 是**顺序**：五环发布链的④bundle 与⑤representation "
+            "尚未跑（Task 7），manifest 也未重生成翻 capability（Task 8）。"
+            "🔴 但 **BP-61-1「三表近空、186 个 planned entry 一个都注册不上」的前提已被真库"
+            "推翻**：`working_paper_sync_entry_state` / `working_paper_content_version` / "
+            "`working_paper_content_representation` 现算 **12 / 267 / 274** 行，且 "
+            "`entry_state` 覆盖 **11 个 entry**（b60/d1~d7/g7/h1 + 1 opaque）—— 解除理由是"
+            "**entry 覆盖面**而非「表非空」；D3/D5/D6/D7 有 published representation 却仍标 "
+            "`legacy_fake_bidirectional` ⇒ 剩余差距在「manifest 重生成 + capability 裁决」"
+            "这个治理动作，不在平台供给。"
+        ),
+    },
 )

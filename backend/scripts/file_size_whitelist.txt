@@ -445,7 +445,7 @@ backend/tests/workpaper_sync/test_task50_h_cycle_migration.py  2222
 backend/tests/workpaper_sync/test_task51_i_cycle_migration.py  2477
 backend/tests/workpaper_sync/test_task52_j_cycle_migration.py  3057
 backend/tests/workpaper_sync/test_task53_k_cycle_migration.py  2404
-backend/tests/workpaper_sync/test_task54_l_cycle_migration.py  2368
+backend/tests/workpaper_sync/test_task54_l_cycle_migration.py  2527
 backend/tests/workpaper_sync/test_task55_m_cycle_migration.py  2732
 backend/tests/workpaper_sync/test_task56_n_cycle_migration.py  2555
 backend/tests/workpaper_sync/test_task57_abcs_and_shared_migration.py  2418

@@ -383,14 +383,26 @@ async def _read_store_payload(
     return _empty_store_payload_for(provider, entry_id=entry_id)
 
 
-def _build_plan_rows() -> list[Mapping[str, Any]]:
-    """从 `DELIVERED_PER_ENTRY_CONTRACTS` × provider 常量现算目标清单。"""
+def _build_plan_rows(*, only_entry: str | None = None) -> list[Mapping[str, Any]]:
+    """从 `DELIVERED_PER_ENTRY_CONTRACTS` × provider 常量现算目标清单。
+
+    🔴 `only_entry` **必须在这里生效，不能只在调用方事后 filter**
+    （spec `l-cycle-true-adapter-registration` Task 7 实测）：本函数对每条 entry 调
+    `_adjudicated_wp_codes()`，而它是 fail-closed 的 —— 任何一条 entry 缺 wp_code 裁决
+    就整体抛 `HostError`。过滤留在调用方时，`--entry xlsx/gt-l1-short-term-loans` 会因
+    **另一条无关 entry**（实测 `xlsx/gt-e1-monetary-fund` 在交付登记表里但不在裁决表里）
+    而连只读预演都跑不起来。语义上 `--entry` 就是「只处理这条」，在此前移完全等价，
+    且不再让单 entry 操作被他人的缺口连坐。
+    """
     import importlib
 
     from app.services.workpaper_sync.adapters import registry as registry_module
 
     rows: list[Mapping[str, Any]] = []
     for row in registry_module.DELIVERED_PER_ENTRY_CONTRACTS:
+        entry_id = str(row["entry_id"])
+        if only_entry and entry_id != only_entry:
+            continue
         module_path = str(row["provider_module"])
         if module_path not in registry_module._ALLOWED_PROVIDER_MODULES:
             raise HostError(
@@ -398,7 +410,6 @@ def _build_plan_rows() -> list[Mapping[str, Any]]:
                 "宿主不放宽该判据"
             )
         provider = importlib.import_module(module_path)
-        entry_id = str(row["entry_id"])
         rows.append(
             {
                 "entry_id": entry_id,
@@ -492,7 +503,7 @@ async def run_check(
     results: list[EntrySettlement] = []
 
     try:
-        for row in _build_plan_rows():
+        for row in _build_plan_rows(only_entry=only_entry):
             entry_id = row["entry_id"]
             if only_entry and entry_id != only_entry:
                 continue
@@ -736,7 +747,7 @@ async def run_apply(*, only_entry: str | None = None) -> list[EntrySettlement]:
     results: list[EntrySettlement] = []
 
     try:
-        for row in _build_plan_rows():
+        for row in _build_plan_rows(only_entry=only_entry):
             entry_id = row["entry_id"]
             if only_entry and entry_id != only_entry:
                 continue
