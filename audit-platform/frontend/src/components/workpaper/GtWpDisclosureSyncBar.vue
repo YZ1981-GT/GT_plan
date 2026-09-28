@@ -14,6 +14,22 @@
     </span>
     <el-button size="small" link type="primary" @click="goNote">查看附注章节</el-button>
     <el-button size="small" link @click="load">刷新状态</el-button>
+    <!--
+      项目级覆盖率（spec disclosure-payload-authority-source / ADR-DPA-002）：
+      本状态条是**单页视角**（只说这一页同步没同步），覆盖率面板补**全项目视角**
+      （还有哪些披露章节从未同步）。挂这里是因为设计 §四 指定「复用既有
+      GtWpDisclosureSyncBar 展示位」，且本组件已一处接入 GtWpRenderer、
+      覆盖全部循环的披露 sheet。
+      🔴 附注侧（DisclosureEditor）入口本轮未挂：该宿主 3401 行、HARD_CAPS 登记
+      ceiling 1800（既有瘦身欠账），pre-commit 门禁硬拒绝任何触碰。
+      见 spec design.md §十三。
+    -->
+    <el-popover placement="bottom-end" :width="380" trigger="click">
+      <template #reference>
+        <el-button size="small" link>项目覆盖率</el-button>
+      </template>
+      <DisclosureSyncCoveragePanel :project-id="projectId" :year="year" />
+    </el-popover>
   </div>
 </template>
 
@@ -32,6 +48,7 @@ import { useRouter } from 'vue-router'
 import http from '@/utils/http'
 import { disclosureNotes as P_dn } from '@/services/apiPaths/report'
 import { resolveDisclosureVariantFromSheet } from './composables/disclosureSyncBar'
+import DisclosureSyncCoveragePanel from '../disclosure/DisclosureSyncCoveragePanel.vue'
 
 const props = defineProps<{
   projectId?: string
