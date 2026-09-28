@@ -253,7 +253,7 @@
     <!-- ═══ 抽凭引擎 Dialog ═══ -->
     <el-dialog
       v-model="showSamplingDialog"
-      title="⚡ 抽凭引擎（科目 6711 营业外支出 — 检查表）"
+      title="⚡ 抽凭引擎（科目 ${samplingAccountCode} 营业外支出 — 检查表）"
       width="720px"
       :close-on-click-modal="false"
       destroy-on-close
@@ -262,7 +262,7 @@
         v-if="showSamplingDialog && props.wpId && props.projectId"
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
-        account-code="6711"
+        :account-code="samplingAccountCode"
         phase="final"
         :year="currentYear"
         @filled="handleVoucherFilled"
@@ -336,6 +336,17 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { generateK13AiText } from '../../composables/useK13AiText'
+
+/**
+ * 抽凭科目码取自单一真源 `k13AccountScope`（K13 营业外支出）。原为模板内字面量；
+ * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
+ * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ */
+import { k13QueryCodes } from '../../composables/k13AccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = k13QueryCodes().join(',')
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 const GtReviewTrigger = defineAsyncComponent(() => import('../../GtReviewTrigger.vue'))
@@ -684,7 +695,7 @@ function handleVoucherFilled(payload: any): void {
   }
 }
 
-// ─── 行级OCR（📎附件列 → POST /d4/contract-ocr → ElMessageBox确认 → merge） ─
+// ─── 行级OCR（📎附件列 → POST /api/workpapers/{wpId}/d4/contract-ocr → ElMessageBox确认 → merge） ─
 
 const ocrFileInput = ref<HTMLInputElement | null>(null)
 let currentOcrRowKey = ''
@@ -705,7 +716,7 @@ async function handleOcrFileSelected(event: Event): Promise<void> {
     formData.append('file', file)
 
     ElMessage.info('正在OCR识别...')
-    const res = await http.post('/api/d4/contract-ocr', formData, {
+    const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     const ocrData = res.data?.data || res.data || {}

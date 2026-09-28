@@ -77,7 +77,7 @@
     <!-- ═══ useCutoffAutoSampling 面板 ═══ -->
     <GtCutoffAutoSampling
       v-if="showCutoffPanel"
-      account-code="6601"
+      :account-code="samplingAccountCode"
       cutoff-direction="pre_cutoff"
       :default-conditions="{ daysBefore: criteria.sampleDays || 5, daysAfter: criteria.sampleDays || 5 }"
       :workpaper-id="props.wpId"
@@ -87,12 +87,12 @@
     />
 
     <!-- ═══ 抽凭引擎 Dialog ═══ -->
-    <el-dialog v-model="showSamplingDialog" title="⚡ 抽凭引擎（科目 6601 销售费用-截止S2V）" width="720px" :close-on-click-modal="false" destroy-on-close>
+    <el-dialog v-model="showSamplingDialog" title="⚡ 抽凭引擎（科目 ${samplingAccountCode} 销售费用-截止S2V）" width="720px" :close-on-click-modal="false" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && props.wpId && props.projectId"
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
-        account-code="6601"
+        :account-code="samplingAccountCode"
         phase="final"
         :year="currentYear"
         @filled="handleVoucherFilled"
@@ -144,6 +144,17 @@ import { useK8Cutoff } from '@/components/workpaper/composables/useK8Cutoff'
 import { useK8AiGenerate } from '@/components/workpaper/composables/useK8AiGenerate'
 import type { Ref } from 'vue'
 import type { ExtractedVoucher, FillMode } from '@/components/workpaper/composables/useCutoffAutoSampling'
+
+/**
+ * 抽凭科目码取自单一真源 `k8AccountScope`（K8 销售费用）。原为模板内字面量；
+ * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
+ * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ */
+import { k8QueryCodes } from '../../composables/k8AccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = k8QueryCodes().join(',')
 
 const GtCutoffAutoSampling = defineAsyncComponent(() => import('../../cutoff/GtCutoffAutoSampling.vue'))
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))

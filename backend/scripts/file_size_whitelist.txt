@@ -1083,3 +1083,15 @@ backend/app/routers/adjustments.py  1763
 # 附件端点（本次仅修 4 处 Attachment lazy import 错路径；
 # HEAD 版 1701 行即已超限，工作树另有前序重构使其降至 821 行）
 backend/app/routers/attachments.py  821
+
+# ledger-penetration 凭证穿透 / 挂凭链路 —— V166 凭证日期消歧
+# （spec voucher-sampling-account-scope-and-attach-closure）。
+# 三者在 HEAD 版即已超限（4213 / 1634 / 942 = 上限的 2.8x / 2.0x / 1.2x），属历史大文件。
+# 🔴 baseline 一律填 **HEAD 真实行数**而非本次改动后的行数 —— 不给本次增量预留膨胀空间。
+#    本次 delta = +46 / +78 / +19，全部落在 baseline+5%（4423 / 1715 / 989）之内。
+#    其中 ledger_penetration.py 原始 delta 是 +93（+5.69% 已超阈值），按门禁提示的优先顺序
+#    「抽伴生模块（优先）」把 parse_iso_date 抽到 routers/_voucher_date.py（28 行）后降至 1712。
+# 登记为待办：三者都该整体瘦身。下次再往这三个文件加功能应**先拆分再改**，不再滚雪球加基线。
+audit-platform/frontend/src/views/LedgerPenetration.vue  4213
+backend/app/routers/ledger_penetration.py  1634
+backend/app/services/ledger_penetration_service.py  942

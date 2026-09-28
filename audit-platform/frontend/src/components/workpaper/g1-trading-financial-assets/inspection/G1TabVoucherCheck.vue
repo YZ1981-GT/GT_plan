@@ -118,9 +118,9 @@
 
     <!-- 抽凭引擎 -->
     <el-collapse v-if="wpId && projectId && !isReadonly" class="sampling-collapse">
-      <el-collapse-item title="⚡ 自动抽凭（科目 1501）— 填入当前区段" name="sampling">
+      <el-collapse-item :title="`⚡ 自动抽凭（科目 ${samplingAccountCode}）— 填入当前区段`" name="sampling">
         <GtVoucherSamplingEngine
-          account-code="1501"
+          :account-code="samplingAccountCode"
           phase="final"
           default-method="random"
           :workpaper-id="wpId"
@@ -373,6 +373,14 @@ import type { SampledVoucher, FillMode, Phase } from '../../composables/useSampl
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
+/**
+ * 科目码单一真源。🔴 原硬编码 `"1501"` —— `account_chart` 实证 `1501` 是
+ * **持有至到期投资**（G4 循环的科目），而本底稿是「交易性金融资产」（`wp_index` 实证），
+ * 真源与 `report_config` 的 `BS-003 = TB('1101','期末余额')` 一致为 `1101`。
+ * 抽错科目 ⇒ 抽回来的凭证属另一个循环，回填即错误样本。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.4
+ */
+import { g1GrossQueryCodes } from '../../composables/g1AccountScope'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 
 const props = defineProps<{
@@ -385,6 +393,14 @@ const props = defineProps<{
 }>()
 
 const wpId = computed(() => props.wpId ?? '')
+
+/**
+ * 抽凭科目码（真源，原硬编码 `"1501"` 持有至到期投资=G4 的科目）。
+ * 本组件无 `tbSourceCodes` prop ⇒ `g1GrossQueryCodes()` 走兜底 `1101`。
+ * 多码用逗号拼接（`useVoucherSampling` 会 `split(',')`）。
+ */
+const samplingAccountCode = g1GrossQueryCodes().join(',')
+
 const emit = defineEmits<{ imported: [] }>()
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 

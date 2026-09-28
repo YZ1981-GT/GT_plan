@@ -262,12 +262,12 @@
     </details>
 
     <!-- 抽凭引擎 dialog -->
-    <el-dialog v-model="showSamplingDialog" title="⚡ 抽几引擎（科目 2241 其他应付款）" width="720px" :close-on-click-modal="false" destroy-on-close>
+    <el-dialog v-model="showSamplingDialog" title="⚡ 抽几引擎（科目 ${samplingAccountCode} 其他应付款）" width="720px" :close-on-click-modal="false" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && props.wpId && props.projectId"
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
-        account-code="2241"
+        :account-code="samplingAccountCode"
         phase="final"
         :year="year"
         @filled="onSampleFilled"
@@ -289,6 +289,17 @@ import { useK3Checks, type K3RelatedPartyRow, type ComplianceState } from '../..
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 import http from '@/utils/http'
+
+/**
+ * 抽凭科目码取自单一真源 `k3AccountScope`（K3 其他应付款）。原为模板内字面量；
+ * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
+ * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ */
+import { k3QueryCodes } from '../../composables/k3AccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = k3QueryCodes().join(',')
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

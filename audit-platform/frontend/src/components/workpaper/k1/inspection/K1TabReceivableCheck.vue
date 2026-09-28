@@ -581,7 +581,7 @@
     <el-dialog v-model="samplingVisible" title="抽凭引擎 — 其他应收款(1221)" width="90%" top="5vh" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="samplingVisible"
-        account-code="1221"
+        :account-code="samplingAccountCode"
         :phase="samplingTarget === 'occurrence' ? 'current' : 'post'"
         :workpaper-id="props.wpId"
         :project-id="props.projectId"
@@ -622,6 +622,17 @@ import { useK1AiGenerate } from '../../composables/useK1AiGenerate'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
+
+/**
+ * 抽凭科目码取自单一真源 `k1AccountScope`（K1 其他应收款）。原为模板内字面量；
+ * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
+ * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ */
+import { k1GrossQueryCodes } from '../../composables/k1AccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = k1GrossQueryCodes().join(',')
 
 const K1_12_ADJ_SOURCE = 'k1-12-voucher'
 

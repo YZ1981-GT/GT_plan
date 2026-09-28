@@ -51,6 +51,17 @@ import { useD1AiGenerate } from '../composables/useD1AiGenerate'
 import type { VirtualColumn } from '@/composables/useVirtualTable'
 import http from '@/utils/http'
 
+/**
+ * 抽凭科目码取自单一真源 `dCycleAccountScope`（D1 应收票据）。
+ * 原为模板内字面量；接真源后科目口径与该循环的取数/回写共用同一定义，
+ * 避免各处独立硬编码而漂移。本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2
+ */
+import { dCycleScope } from '../composables/dCycleAccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = dCycleScope('D1')?.queryCodes().join(',') ?? ''
+
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 const props = defineProps<{
@@ -687,7 +698,7 @@ const SAMPLING_METHOD_TEXTS = [
       <!-- ═══ 抽凭引擎 Dialog（P0-4 联动，科目 1121 应收票据）═══ -->
       <el-dialog
         v-model="samplingVisible"
-        title="⚡ 抽凭引擎（科目 1121 应收票据）"
+        title="⚡ 抽凭引擎（科目 ${samplingAccountCode} 应收票据）"
         width="90%"
         top="5vh"
         :close-on-click-modal="false"
@@ -695,7 +706,7 @@ const SAMPLING_METHOD_TEXTS = [
       >
         <GtVoucherSamplingEngine
           v-if="samplingVisible && wpId && projectId"
-          account-code="1121"
+          :account-code="samplingAccountCode"
           phase="final"
           :workpaper-id="wpId"
           :project-id="projectId"
