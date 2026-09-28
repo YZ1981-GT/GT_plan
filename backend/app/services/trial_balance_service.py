@@ -327,30 +327,49 @@ class TrialBalanceService:
         company_code: str = "001",
         account_codes: list[str] | None = None,
     ) -> None:
-        """按 adjustment_type 分组汇总 adjustments 表到 rje/aje 列（批量操作）"""
-        adj = Adjustment.__table__
+        """按 adjustment_type 分组汇总到 rje/aje 列（批量操作）。
 
+        adj-formula-repair-and-approval-gate-wiring 任务 2.4:
+        科目列改为 adjustment_entries.standard_account_code + JOIN adjustments
+        （ADR-ADJ-001，与 adj_net / ADJ() / cross_check 同口径）。
+        origin 排除保留 V124 防双计约定（exclude workpaper）。
+        review_status 仅 approved（ADR-ADJ-003，与 adj_net DEFAULT_INCLUDE_STATUSES 同口径）。
+
+        口径差异说明（ADR-ADJ-002）：
+        - 本函数传 exclude_origins={"workpaper"}（TB 列参与审定数计算，排除防双计）
+        - ADJ() / cross_check 传 exclude_origins=frozenset()（底稿呈现，不排除）
+        两者差异是语义差异而非缺陷。
+        """
+        from app.models.audit_platform_models import AdjustmentEntry
+
+        adj = Adjustment.__table__
+        ae = AdjustmentEntry.__table__
+
+        # ADR-ADJ-001: 统一走 adjustment_entries.standard_account_code + JOIN
         agg_q = (
             sa.select(
-                adj.c.account_code,
+                ae.c.standard_account_code.label("account_code"),
                 adj.c.adjustment_type,
-                (sa.func.coalesce(sa.func.sum(adj.c.debit_amount), 0)
-                 - sa.func.coalesce(sa.func.sum(adj.c.credit_amount), 0)).label("net"),
+                (sa.func.coalesce(sa.func.sum(ae.c.debit_amount), 0)
+                 - sa.func.coalesce(sa.func.sum(ae.c.credit_amount), 0)).label("net"),
             )
+            .select_from(ae.join(adj, ae.c.adjustment_id == adj.c.id))
             .where(
                 adj.c.project_id == project_id,
                 adj.c.year == year,
                 adj.c.is_deleted == sa.false(),
+                # ADR-ADJ-003: 只纳入已审批的分录（与 adj_net DEFAULT_INCLUDE_STATUSES 同口径）
+                adj.c.review_status == "approved",
                 # V124 / workpaper-adjustment-centralization Req4.2：
-                # 仅计入 manual（含历史 NULL）来源，排除 workpaper 来源——底稿调整已由
-                # 审定表 writeback 体现于 audited_amount，若此处再计入 aje_adjustment 会双计。
+                # 排除 workpaper 来源——底稿调整已由审定表 writeback 体现于
+                # audited_amount，若此处再计入 aje_adjustment 会双计（ADR-ADJ-002）。
                 sa.or_(adj.c.origin.is_(None), adj.c.origin != "workpaper"),
             )
-            .group_by(adj.c.account_code, adj.c.adjustment_type)
+            .group_by(ae.c.standard_account_code, adj.c.adjustment_type)
         )
 
         if account_codes:
-            agg_q = agg_q.where(adj.c.account_code.in_(account_codes))
+            agg_q = agg_q.where(ae.c.standard_account_code.in_(account_codes))
 
         result = await self.db.execute(agg_q)
 

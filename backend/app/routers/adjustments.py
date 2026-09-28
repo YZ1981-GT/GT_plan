@@ -76,7 +76,7 @@ async def _notify_affected_wp_assignees(
     """
     import json
     from pathlib import Path
-    from app.models.core import WorkingPaper, WpIndex
+    from app.models.workpaper_models import WorkingPaper, WpIndex
     from app.services.notification_service import NotificationService
 
     # 1. 加载科目→wp_code 映射（复用 procedure_trim_account_map + wp_account_mapping）
@@ -228,7 +228,7 @@ async def _writeback_to_source_workpaper(
     json_str = json.dumps(rows, ensure_ascii=False)
 
     # 查找底稿项目 ID
-    from app.models.core import WorkingPaper
+    from app.models.workpaper_models import WorkingPaper
     wp_row = (await db.execute(
         sa.select(WorkingPaper.project_id).where(WorkingPaper.id == wp_id)
     )).scalar_one_or_none()
@@ -787,10 +787,34 @@ async def review_adjustment(
     """变更复核状态（需复核权限）"""
     svc = AdjustmentService(db)
     try:
-        await svc.change_review_status(
+        affected = await svc.change_review_status(
             project_id, entry_group_id, change, user.id
         )
         await db.commit()
+
+        # adj-formula-repair-and-approval-gate-wiring 任务 3.2:
+        # 转 approved 时发布 ADJUSTMENT_APPROVED 事件（commit 之后）。
+        # 触发下游：TB 重算 + 附注 stale + 底稿 stale + 报表 stale + SSE。
+        # 失败记 warning 不阻断审批本身（EH3 约定）。
+        # 受影响科目/年度由 service 返回（不调私有方法、不二次查库）。
+        if change.status == "approved":
+            try:
+                from app.models.audit_platform_schemas import EventPayload, EventType
+                from app.services.event_bus import event_bus
+
+                await event_bus.publish(EventPayload(
+                    event_type=EventType.ADJUSTMENT_APPROVED,
+                    project_id=project_id,
+                    year=affected.get("year"),
+                    account_codes=affected.get("account_codes") or [],
+                    entry_group_id=entry_group_id,
+                ))
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "[adj-approved] 事件发布失败（审批已落库）: %s", e
+                )
+
         # P0-4: 复核状态变更后 SSE 广播，让底稿侧实时回流 + 大厅其他用户感知
         try:
             from app.core.event_bus import event_bus
@@ -1698,7 +1722,7 @@ async def get_adjustment_related_workpapers(
     current_user: User = Depends(get_current_user),
 ):
     """R10 Spec B / F8：根据调整分录组中所有 line_items 的科目反查关联底稿。"""
-    from app.models.adjustment_models import Adjustment, AdjustmentEntry
+    from app.models.audit_platform_models import Adjustment, AdjustmentEntry
     from app.services.workpaper_query import find_workpapers_by_account_codes
 
     # 找该 group_id 的所有分录行

@@ -51,7 +51,7 @@ async def _execute_aggregation(project_id: UUID, year: int) -> None:
 
     在 debounce 延迟后调用，使用独立 DB session。
     """
-    from app.core.database import async_session_factory
+    from app.core.database import async_session as async_session_factory
     from app.services.auto_data_resolvers import resolve_auto_data_source
     from app.services.event_bus import event_bus
 
