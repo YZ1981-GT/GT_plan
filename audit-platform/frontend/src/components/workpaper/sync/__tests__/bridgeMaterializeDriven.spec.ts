@@ -71,10 +71,38 @@ function listTs(dir: string): string[] {
   return out
 }
 
-/** 现算「真正驱动桥」的包装模块名（如 `useHSyncMode`）。 */
+/**
+ * 递归列出全部 `.vue`（相对 `workpaper/` 的 posix 路径）。
+ *
+ * 🔴 必须递归：首版只扫顶层 `Gt*.vue`，而子目录里实测还有 **33 个** d4 子 Tab 挂了
+ * `<WorkpaperSyncEditorHost>`。那 33 个现算全是真驱动（由 `d4/composables/useD4SyncMode`
+ * 驱动），但扫描面停在顶层就意味着「将来子目录里新增一个空壳」判据抓不到 —— 那正是
+ * 本判据要防的事。
+ */
+function listVue(dir: string, prefix = ''): string[] {
+  const out: string[] = []
+  for (const name of readdirSync(dir, { withFileTypes: true })) {
+    if (name.isDirectory()) {
+      if (name.name === '__tests__') continue
+      out.push(...listVue(resolve(dir, name.name), `${prefix}${name.name}/`))
+    } else if (name.name.endsWith('.vue')) {
+      out.push(`${prefix}${name.name}`)
+    }
+  }
+  return out
+}
+
+/**
+ * 现算「真正驱动桥」的包装模块名（如 `useHSyncMode`）。
+ *
+ * 🔴 两侧扫描面必须**同时**递归，否则判据自相矛盾：宿主侧递归到 `d4/**` 但驱动侧只扫
+ * `composables/` + `sync/` 两个顶层目录时，33 个 d4 子 Tab 的驱动方
+ * （`d4/composables/useD4SyncMode.ts`）扫不到 ⇒ 33 个真驱动被误报成空壳（本判据首次
+ * 改递归时就是这么假红的）。
+ */
 function drivingWrappers(): Set<string> {
   const out = new Set<string>()
-  for (const file of [...listTs(COMPOSABLES), ...listTs(SYNC)]) {
+  for (const file of listTs(WP)) {
     const stem = file.replace(/\\/g, '/').split('/').pop()!.replace(/\.ts$/, '')
     if (stem === DEFINER) continue
     if (DRIVE_RE.test(stripComments(read(file)))) out.add(stem)
@@ -82,23 +110,25 @@ function drivingWrappers(): Set<string> {
   return out
 }
 
-/** 现算「挂了宿主却从不驱动」的宿主文件名。 */
+/** 现算「挂了宿主却从不驱动」的相对路径（**全仓递归**，含子目录）。 */
 function hollowHosts(): string[] {
   const wrappers = [...drivingWrappers()]
   const out: string[] = []
-  for (const name of readdirSync(WP)) {
-    if (!name.startsWith('Gt') || !name.endsWith('.vue')) continue
-    const raw = read(resolve(WP, name))
+  for (const rel of listVue(WP)) {
+    const raw = read(resolve(WP, rel))
     if (!MOUNT_RE.test(raw)) continue
     const src = stripComments(raw)
     if (DRIVE_RE.test(src)) continue
-    const viaWrapper = wrappers.some((w) =>
-      new RegExp(`\\b${w}\\s*\\(`).test(src),
-    )
+    const viaWrapper = wrappers.some((w) => new RegExp(`\\b${w}\\s*\\(`).test(src))
     if (viaWrapper) continue
-    out.push(name)
+    out.push(rel)
   }
   return out.sort()
+}
+
+/** 现算挂了宿主的全部文件（真驱动 + 空壳）。 */
+function mountingHosts(): string[] {
+  return listVue(WP).filter((rel) => MOUNT_RE.test(read(resolve(WP, rel)))).sort()
 }
 
 /**
@@ -144,11 +174,23 @@ describe('挂了 WorkpaperSyncEditorHost 就必须有人驱动 materialize', () 
   it('扫描器自检：确实扫到了宿主与驱动方（防空集假绿）', () => {
     const wrappers = drivingWrappers()
     expect(wrappers.has('useHSyncMode')).toBe(true)
+    // 🔴 顶层 `composables/` 与**子目录** `d4/composables/` 都要扫到，两侧扫描面才同口径。
+    expect(wrappers.has('useD4SyncMode')).toBe(true)
     expect(wrappers.has(DEFINER)).toBe(false)
-    const mounted = readdirSync(WP).filter(
-      (n) => n.startsWith('Gt') && n.endsWith('.vue') && MOUNT_RE.test(read(resolve(WP, n))),
-    )
-    expect(mounted.length).toBeGreaterThan(40)
+    // 现算 92 个宿主挂了 EditorHost（含子目录）；下界远低于现值，只防「扫成空集」。
+    expect(mountingHosts().length).toBeGreaterThan(80)
+  })
+
+  it('🔴 子目录里的空壳必须保持为 0（递归扫描面的存在性证明）', () => {
+    const inSubdir = hollow.filter((h) => h.includes('/'))
+    expect(
+      inSubdir,
+      `子目录宿主挂了 EditorHost 却无人驱动 materialize：\n  ${inSubdir.join('\n  ')}`,
+    ).toEqual([])
+    // 🔴 光断言「子目录空壳=0」会被「递归根本没走进子目录」冒充通过。
+    // 现算子目录里有 33 个宿主（d4 子 Tab 为主）且全是真驱动 —— 必须先证明扫到了它们。
+    const subdirMounted = mountingHosts().filter((h) => h.includes('/'))
+    expect(subdirMounted.length).toBeGreaterThan(20)
   })
 
   it('🔴 不得新增「挂了却从不驱动」的宿主', () => {

@@ -125,6 +125,54 @@ class TestProperty47LegacyDeleted:
         source = re.sub(r"/\*.*?\*/", "", source, flags=re.DOTALL)
         return re.sub(r"^\s*//.*$", "", source, flags=re.MULTILINE)
 
+    @classmethod
+    def _drives_bridge_via_wrapper(cls, host: pathlib.Path, code: str) -> str | None:
+        """宿主经**相对 import 的包装模块**调 `useWorkpaperSyncBridge` 时返回该模块名。
+
+        🔴 为什么必须认这一形态：`useHSyncMode` / `useD4SyncMode` / `useA51SyncMode` 都是
+        「宿主挂 EditorHost、bridge 调用收在包装模块里」，而且 `sync/hManagedSheets.ts`
+        把「受管 sheet 身份**不得**内联回宿主」当成正确做法。只认「宿主文件里直接出现
+        `useWorkpaperSyncBridge`」等于逼 H1 这类宿主把包装拆回宿主。
+
+        判据没有放松：这里**真的去读**被 import 的 `.ts` 文件，确认里面有
+        `useWorkpaperSyncBridge(` 调用；只 import 一个名字对不上的模块不算。
+        """
+        for spec in re.findall(r"""from\s+['"](\.[^'"]+)['"]""", code):
+            base = (host.parent / spec).resolve()
+            for cand in (base.with_suffix(".ts"), base / "index.ts", base):
+                if cand.suffix == ".ts" and cand.is_file():
+                    if re.search(r"\buseWorkpaperSyncBridge\s*\(", cand.read_text(encoding="utf-8")):
+                        return cand.stem
+        return None
+
+    @staticmethod
+    def _manifest_says_no_managed_surface(host: pathlib.Path) -> str | None:
+        """manifest 实证「本宿主无受管面」时返回理由，否则 None。
+
+        🔴 实证只认 manifest 字段，**不认宿主注释** —— 否则任何宿主写一句「我没有受管面」
+        就能把门喂饱。合法形态两种（逐条来自 `workpaper_sync_entry_manifest.json`）：
+
+        * `migration_state == "parent_duplicate"`：登记它只为盘清 OO 挂载点，
+          持久化身份归父 entry（`GtB60DocxPane` 即此类，`parent_entry_id` 指向 bundle）；
+        * `independent_entry is False` 且 `adapter_id is None`：非独立且无 adapter
+          ⇒ 没有可 materialize 的受管 sheet。
+        """
+        manifest = json.loads(
+            (_BACKEND_DATA / "workpaper_sync_entry_manifest.json").read_text(encoding="utf-8")
+        )
+        entries = manifest["entries"] if isinstance(manifest, dict) else manifest
+        rel = host.relative_to(_REPO).as_posix()
+        for entry in entries:
+            if str(entry.get("host_path") or "") != rel:
+                continue
+            state = entry.get("migration_state")
+            if state == "parent_duplicate":
+                return f"{entry.get('entry_id')} migration_state=parent_duplicate"
+            if entry.get("independent_entry") is False and entry.get("adapter_id") is None:
+                return f"{entry.get('entry_id')} independent_entry=False + adapter_id=None"
+            return None
+        return None
+
     @pytest.mark.parametrize("host", PILOT_HOSTS, ids=lambda p: p.name)
     def test_host_is_on_the_unified_sync_path(self, host: pathlib.Path) -> None:
         """宿主必须在统一 sync 路径上：过渡态 adapter **或**终态 editor host + bridge。
@@ -143,23 +191,37 @@ class TestProperty47LegacyDeleted:
 
         Task 45 真正要守的是 AC 11.1「不存在与 sync bridge 并行的第二条路径」。它由两条
         判据共同承担：`test_host_does_not_import_deleted_composable` 断死 legacy 侧，
-        本条断活统一侧。故本条按「在统一路径上」表达，两种合法形态都接受：
+        本条断活统一侧。故本条按「在统一路径上」表达，四种合法形态都接受：
 
-        * 过渡态：`usePilotBridgeAdapter`（G7 / H1 / B60×2 现状）
-        * 终态：渲染 `WorkpaperSyncEditorHost` **且** 调 `useWorkpaperSyncBridge`（D2 现状）
+        * 过渡态：`usePilotBridgeAdapter`（**现已无生产消费方**，留着只为不倒逼回退）
+        * 终态 A：宿主渲染 `WorkpaperSyncEditorHost` **且**自己调 `useWorkpaperSyncBridge`
+          （D2 / G7 / B60Bundle 现状）
+        * 终态 B：宿主渲染 `WorkpaperSyncEditorHost`，bridge 调用收在**相对 import 的包装
+          模块**里（H1 → `useHSyncMode`；同族还有 `useD4SyncMode` / `useA51SyncMode`）
+        * 不适用：manifest 实证该宿主**无受管面**（`GtB60DocxPane` 的 entry 是
+          `parent_duplicate`，`adapter_id=None` 且无契约 ⇒ 没有可 materialize 的 sheet）
 
-        终态要求**两者同时在场**，比原判据更严：只写组件名不接 bridge 不算。两形态皆无
-        即红 —— 宿主掉出统一路径这件事仍然打红，判据的力度没有降。
+        🔴 三处都比原判据**更严**而不是更松：
+        * 终态 A 要求 EditorHost 与 bridge 同时在场（只写组件名不接桥不算）；
+        * 终态 B 会**真的去读**被 import 的 `.ts`，确认里面有 `useWorkpaperSyncBridge(`；
+        * 「不适用」只认 manifest 字段，宿主注释里写一句「我没有受管面」不作数。
+
+        两形态皆无且 manifest 也不认，仍然打红 —— 宿主掉出统一路径这件事没被放行。
         散文不算数：先剥注释再判，否则 D2 那句「`useD2SyncBridge` 仍保留至
         ONLYOFFICE_VERIFIED」之类的说明会把门喂饱。
         """
         code = self._code_only(host.read_text(encoding="utf-8"))
         transitional = "usePilotBridgeAdapter" in code
-        terminal = "WorkpaperSyncEditorHost" in code and "useWorkpaperSyncBridge" in code
-        assert transitional or terminal, (
-            f"{host.name} 既未用过渡态 usePilotBridgeAdapter，也未走终态 "
-            "WorkpaperSyncEditorHost + useWorkpaperSyncBridge —— "
-            "删除 legacy 后宿主必须留在统一 sync 路径上（AC 11.1）"
+        mounts_host = "WorkpaperSyncEditorHost" in code
+        terminal_direct = mounts_host and "useWorkpaperSyncBridge" in code
+        wrapper = self._drives_bridge_via_wrapper(host, code) if mounts_host else None
+        exempt = self._manifest_says_no_managed_surface(host)
+        assert transitional or terminal_direct or wrapper or exempt, (
+            f"{host.name} 不在统一 sync 路径上：既无过渡态 usePilotBridgeAdapter，"
+            "也没有 WorkpaperSyncEditorHost + useWorkpaperSyncBridge（宿主内或包装模块内），"
+            "且 manifest 未把它登记为无受管面（parent_duplicate / "
+            "independent_entry=False+adapter_id=None）—— 删除 legacy 后宿主必须留在统一 "
+            "sync 路径上（AC 11.1）"
         )
 
 
@@ -179,14 +241,38 @@ class TestProperty48NoLegacySuccessMessages:
 
     PILOT_ADAPTER = _SYNC / "usePilotBridgeAdapter.ts"
 
+    #: 禁止出现在**代码**里的成功文案标记（注释里引用不算，见下条 docstring）。
+    SUCCESS_TOAST_MARKERS = ("ElMessage", "ElNotification", "message.success", "拉取成功")
+
     def test_adapter_has_no_success_toast(self) -> None:
-        """adapter 不得包含 ElMessage / ElNotification 成功提示。"""
-        source = self.PILOT_ADAPTER.read_text(encoding="utf-8")
-        for pattern in ("ElMessage", "ElNotification", "message.success", "拉取成功"):
-            assert pattern not in source, (
-                f"usePilotBridgeAdapter 包含 {pattern!r} —— "
+        """adapter 的**代码**里不得包含 ElMessage / ElNotification 成功提示。
+
+        🔴 本条原先在**未剥注释**的全文上判，与同文件
+        `test_pilot_bridge_adapter_does_not_call_config_endpoint`（先剥注释再判）口径不一致，
+        后果是「在注释里说明这个缺陷」也被当成缺陷：本适配器 `isOoAvailable` 硬编码
+        `ref(true)` 导致宿主那面「OnlyOffice 拉取成功」的 tag 无条件亮起，把这句写进
+        docstring 警告后人时，判据就红了 —— 逼人删掉真话。
+
+        改为剥注释后再判。力度没降：真要弹 toast 必须写在代码里，一写就被抓
+        （下条 `test_marker_in_code_is_still_caught` 用变异样本证明这一点）。
+        """
+        code = TestProperty47LegacyDeleted._code_only(
+            self.PILOT_ADAPTER.read_text(encoding="utf-8")
+        )
+        for pattern in self.SUCCESS_TOAST_MARKERS:
+            assert pattern not in code, (
+                f"usePilotBridgeAdapter 的代码里包含 {pattern!r} —— "
                 "成功文案必须由 bridge feedback 管理（Property 48）"
             )
+
+    def test_marker_in_code_is_still_caught(self) -> None:
+        """反向自检：剥注释不得变成逃逸通道 —— 写在代码里的 toast 必须仍被抓到。"""
+        strip = TestProperty47LegacyDeleted._code_only
+        for marker in self.SUCCESS_TOAST_MARKERS:
+            in_comment = f"// 曾经这里会 {marker}\n/* 或 {marker} */\nconst a = 1\n"
+            assert marker not in strip(in_comment), f"{marker!r} 在注释里应被剥掉"
+            in_code = f"import {{ ElMessage }} from 'element-plus'\nvoid '{marker}'\n"
+            assert marker in strip(in_code), f"{marker!r} 写在代码里却被剥掉了 —— 判据失效"
 
     def test_adapter_has_no_switching_success_message(self) -> None:
         """适配器不得在切换后显示独立成功消息。"""
@@ -491,15 +577,33 @@ class TestPilotAdapterFieldContract:
     `PilotBridgeAdapter` 接口里真实存在。
     """
 
-    def test_scan_surface_is_not_empty(self) -> None:
-        """扫描面自检：宿主数与字段访问数都不能为 0（防判据空转恒绿）。"""
+    def test_scan_surface_is_zero_or_self_consistent(self) -> None:
+        """扫描面自检（双向）：adapter 生产消费方要么归零、要么抽取器真能抽出字段。
+
+        🔴 原判据是 `len(hosts) >= 4`（「Task 45 至少迁了四类 pilot，扫描器可能失效」）。
+        那把**过渡态的现状**写成了永久不变量：四个 pilot 每迁完一个这条就更靠近红，
+        迁完全部必红 —— 而全零恰恰是 `usePilotBridgeAdapter.ts` 自述的删除条件达成。
+        照原样留着，唯一的「修法」是把宿主退回 adapter，让判据逼生产代码倒退。
+
+        本条要守的真正东西是「抽取器不许空转恒绿」。两侧都锁：
+
+        * **归零** ⇒ 断言 adapter 文件仍在（删文件是独立一笔，见该文件的删除条件），
+          抽取器有效性由本类 `test_judgment_catches_wrong_field_names` 的三个**内置样本**
+          证明 —— 它不依赖生产面非空，所以归零不会让本类整体空转。
+        * **非零** ⇒ 抽取器必须真能从这些宿主抽出字段（>0），否则就是扫描器失效。
+        """
         hosts = _adapter_consumer_hosts()
-        assert len(hosts) >= 4, (
-            f"只扫到 {len(hosts)} 个 adapter 宿主 —— Task 45 至少迁了四类 pilot，"
-            "扫描器可能失效"
-        )
+        if not hosts:
+            assert (_SYNC / "usePilotBridgeAdapter.ts").is_file(), (
+                "adapter 生产消费方已归零且文件也删了 —— 本类整类都在校验 adapter 的字段"
+                "契约，请随文件一并删除（连同 test_task46/48/49 的 "
+                "test_bridge_adapter_supports_entry_id）"
+            )
+            return
         total = sum(len(_adapter_field_accesses(h.read_text(encoding="utf-8"))) for h in hosts)
-        assert total > 0, "宿主字段访问抽取总数为 0 —— 抽取器失效，判据恒绿"
+        assert total > 0, (
+            f"扫到 {len(hosts)} 个 adapter 宿主但字段访问抽取总数为 0 —— 抽取器失效，判据恒绿"
+        )
 
     @pytest.mark.parametrize(
         "host", _adapter_consumer_hosts(), ids=lambda p: p.name

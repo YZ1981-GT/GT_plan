@@ -2,6 +2,15 @@
 /**
  * B60-1 工时预算 HTML 面（G4-1 simple checklist canary）。
  * store item: B60-1-hour-budget-rows；行身份 rowUuid。
+ *
+ * ⚠️ 单向已通、反向未通（2026-09-27 实测，不要按「双向已成」理解本组件）：
+ * `b60.hour_budget` 是 `store_item_registry.NON_STORE_BACKED_ADAPTERS` 的成员 ——
+ * 契约 `b60.hour_budget.json` 的 `review` 段无 `html_store`、字段 `store_item_id` 全为
+ * None ⇒ 后端 `store_merge_plan_or_skip()` 对它返回 `None`，**OO→HTML 的 store 镜像被
+ * 跳过**。所以：
+ *   · HTML → OO：通（宿主 `flushHtml` await 本组件 `flushPendingSave()` → materialize）
+ *   · OO → HTML：**不通**，在 OO 里改的行不会自动回到本表
+ * 补 `html_store` 属契约层改动，另立一笔。空态文案已按此如实改写。
  */
 import { ref, watch, onMounted } from 'vue'
 import http from '@/utils/http'
@@ -166,7 +175,14 @@ defineExpose({ flushPendingSave, reload: load })
           </td>
         </tr>
         <tr v-if="rows.length === 0">
-          <td colspan="8" class="b60-hour-budget__empty">暂无行（打开在线编辑并 forcesave 后将镜像至此）</td>
+          <!--
+            🔴 原文案是「打开在线编辑并 forcesave 后将镜像至此」—— 那是一句不成立的承诺：
+            `b60.hour_budget` 属 NON_STORE_BACKED_ADAPTERS，OO→HTML 的 store 镜像被后端
+            跳过（见本文件头注释）。改成如实说明，不让用户等一个不会来的回填。
+          -->
+          <td colspan="8" class="b60-hour-budget__empty">
+            暂无行。本表可直接录入；在「在线编辑」里改的内容暂不会回写到这里（B60 无 html_store）
+          </td>
         </tr>
       </tbody>
     </table>
