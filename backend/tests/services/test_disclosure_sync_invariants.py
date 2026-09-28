@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import subprocess
 import sys
@@ -447,17 +448,46 @@ class TestRegistryConsistency:
         spec.loader.exec_module(mod)
         return mod
 
+    @classmethod
+    def _run_script(cls, *args: str) -> subprocess.CompletedProcess[str]:
+        """跑生成脚本并**可靠地**拿到 stdout（唯一入口，禁各测试各写一遍 subprocess）。
+
+        🔴 Windows 上子进程 piped stdout 的默认编码是 **gbk**（实测子进程
+        ``sys.stdout.encoding == 'gbk'``），而本脚本的失败信息是中文 ⇒ 用
+        ``encoding='utf-8'`` 解码会在 subprocess 的 **reader 线程**里抛
+        ``UnicodeDecodeError``。
+
+        关键陷阱：该异常**不会让 subprocess.run 失败** —— 它只让
+        ``proc.stdout`` 变成 ``None``，并留下一条
+        ``PytestUnhandledThreadExceptionWarning``。于是「assert returncode == 0」
+        照样通过 = **假绿**。本轮实测踩到：
+        ``test_generator_check_mode_exists_and_passes`` 曾因此从未真正读到输出
+        （它只看 returncode），而断言了 stdout 内容的
+        ``test_mutation_check_mode_detects_drift`` 才把问题暴露出来。
+
+        故：强制子进程以 UTF-8 输出（``PYTHONIOENCODING``），``errors='replace'``
+        兜底，并**断言 stdout 非空** —— 让「解码失败被吞」无法再静默通过。
+        """
+        proc = subprocess.run(
+            [sys.executable, str(cls._SCRIPT), *args],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            cwd=str(cls._SCRIPT.resolve().parents[2]),
+            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+        )
+        assert proc.stdout, (
+            "子进程 stdout 为空/None ⇒ 解码在 reader 线程里失败被吞，"
+            "本判据将空转（见本方法 docstring）"
+        )
+        return proc
+
     # ── 通路 1：subprocess 真跑脚本（证明脚本可执行、不崩） ──────────────
 
     def test_generator_script_runs_successfully(self):
         """🔴 真跑脚本（不带 --write），exit 0 且打印的 entries 数与 committed 一致。"""
-        proc = subprocess.run(
-            [sys.executable, str(self._SCRIPT)],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            cwd=str(self._SCRIPT.resolve().parents[2]),
-        )
+        proc = self._run_script()
         assert proc.returncode == 0, (
             f"生成脚本执行失败 (exit {proc.returncode})：\n"
             f"stdout={proc.stdout}\nstderr={proc.stderr}"
@@ -629,16 +659,18 @@ class TestRegistryConsistency:
         assert blob.endswith("\n"), "_serialize 产出应以换行收尾"
 
     def test_generator_check_mode_exists_and_passes(self):
-        """``--check`` 模式存在且在当前树上 exit 0（CI 改用它，无需可写工作树）。"""
-        proc = subprocess.run(
-            [sys.executable, str(self._SCRIPT), "--check"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            cwd=str(self._SCRIPT.resolve().parents[2]),
-        )
+        """``--check`` 模式存在且在当前树上 exit 0（CI 改用它，无需可写工作树）。
+
+        🔴 本条首版只断言 ``returncode == 0`` ⇒ 子进程输出解码失败时照样通过
+        （见 ``_run_script`` docstring）。现在**必须真读到成功文案**，
+        否则「判据空转」无处藏身。
+        """
+        proc = self._run_script("--check")
         assert proc.returncode == 0, (
             f"--check 未通过 (exit {proc.returncode})：\n{proc.stdout}\n{proc.stderr}"
+        )
+        assert "无漂移" in proc.stdout, (
+            f"--check 成功但未读到预期文案 ⇒ 判据可能空转：{proc.stdout!r}"
         )
 
     def test_mutation_check_mode_detects_drift(self):
@@ -653,13 +685,7 @@ class TestRegistryConsistency:
             self._REGISTRY.write_text(
                 json.dumps(doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
             )
-            proc = subprocess.run(
-                [sys.executable, str(self._SCRIPT), "--check"],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                cwd=str(self._SCRIPT.resolve().parents[2]),
-            )
+            proc = self._run_script("--check")
             assert proc.returncode == 2, (
                 f"删掉一条 entry 后 --check 仍 exit {proc.returncode} ⇒ 守卫恒绿"
             )
