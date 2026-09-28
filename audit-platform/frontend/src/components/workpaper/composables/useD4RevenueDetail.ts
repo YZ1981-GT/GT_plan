@@ -15,7 +15,7 @@
  *
  * Requirements: 3.1-3.10
  */
-import { ref, computed, watch, onBeforeUnmount, inject, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, inject, type Ref, type ComputedRef } from 'vue'
 import {
   parseNum,
   calcMonthlyTotal,
@@ -346,11 +346,30 @@ export function useD4RevenueDetail(options: UseD4BaseOptions) {
     } catch { /* silent */ }
   }
 
+  /** 宿主 flushPendingSave 发来 d4:flush-pending 时，立即冲掉 debounce 确保数据落库。 */
+  function flushPendingSave(): void {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
+    }
+    flushSave()
+  }
+
+  function onHostFlushPending(): void {
+    flushPendingSave()
+  }
+
   // ─── Lifecycle ───────────────────────────────────────────────────────
+
+  onMounted(() => {
+    window.addEventListener('d4:flush-pending', onHostFlushPending)
+  })
 
   // 切到 OO 时本 composable 会卸载；若这里 flush 旧 HTML 行，会与 OO→HTML apply
   // 竞态并盖掉镜像结果。未落库的编辑改由宿主 flushPendingSave / 显式 persist 负责。
+  // 但监听器必须移除，防止泄漏。
   onBeforeUnmount(() => {
+    window.removeEventListener('d4:flush-pending', onHostFlushPending)
     if (debounceTimer) {
       clearTimeout(debounceTimer)
       debounceTimer = null

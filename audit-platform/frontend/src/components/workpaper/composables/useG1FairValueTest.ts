@@ -16,8 +16,8 @@ import {
 } from './useG1TraFinFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import type { TradingDetailRow } from './useG1Detail'
-import {
 import { G1_ITEM_IDS } from './g1StorageContract'
+import {
   matchSecurityKey,
   findBySecurityKeys,
   loadDetailPartials,

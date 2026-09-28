@@ -1,8 +1,8 @@
 /**
  * G11 附注披露行结构 — 对齐 Excel 上市/国企「投资收益」附注
  */
-import {
 import { G11_ITEM_IDS } from './g11StorageContract'
+import {
   G11_ADJUDICATION_ITEMS,
   G11_DISCLOSURE_LISTED_ROWS,
   G11_DISCLOSURE_SOE_ROWS,

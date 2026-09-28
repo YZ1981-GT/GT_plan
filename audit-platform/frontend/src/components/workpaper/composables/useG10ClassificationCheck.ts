@@ -25,8 +25,8 @@ import {
   G10_CLASSIFICATION_DRAFT_REVIEWED_EVENT,
 } from './g10ClassificationCross'
 import { commitG10AdjustmentWritebackFromRows } from './g10CrossHelpers'
-import {
 import { G10_ITEM_IDS } from './g10StorageContract'
+import {
   buildG10ClassificationProcedureSummary,
   G10A_CLASSIFICATION_MARK_KEY,
   G10A_CLASSIFICATION_PROGRAM_NOS,
