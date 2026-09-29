@@ -1108,3 +1108,19 @@ backend/app/services/ledger_penetration_service.py  942
 #   与模块级 evaluate_formula（L2 编排）是两个关注点，可按此切分。
 backend/app/services/report_engine.py  2226
 backend/app/services/consol_report_service.py  1008
+#
+# seed_fix_projects.py —— E2E FIX 夹具 seed/verify 的单一 CLI 宿主，
+#   **改动前即 854 行已超默认 800**（门禁只扫暂存文件，此前该文件未进过暂存区
+#   故从未报出）。本轮 +17 行：把 Windows 控制台 UTF-8 重绑从**模块级**移进
+#   `main()` 并加根因注释 —— 模块级重绑会替换 pytest 的 capture 对象，
+#   使任何 import 本模块的测试会话在 teardown 撞
+#   `ValueError: I/O operation on closed file`；正因为「不能 import」，
+#   `tests/scripts/test_seed_fix_f2_e2e.py` 当初只能手抄一份 F2_E2E_WP_CODES，
+#   权威源后来加了 F2-29 而手抄那份没跟 => 该测试恒红。
+#   🔴 baseline 填的是**改动前的 HEAD 行数**（854）而非当前 871 ——
+#   不把本轮增量固化进基线，本轮增量由 +5% 容差吸收（854 x 1.05 = 896）；
+#   下次再往这个文件加东西会立刻顶到上限，届时必须先拆分。
+#   拆分方向：6 个 FixtureSpec 的 `_process_fixture` 分支（A/B/INT/RP/F/I6，
+#   约 420 行）按夹具下沉为 `seed_fix_fixtures/` 子包，`main()` 只留编排。
+#   spec: completion-phase-infra e2e-matrix.md E-FIX（本轮为 tests/scripts 红清零顺带修复）
+backend/scripts/e2e/seed_fix_projects.py  854

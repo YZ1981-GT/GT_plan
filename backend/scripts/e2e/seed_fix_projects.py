@@ -27,9 +27,25 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+def _force_utf8_console() -> None:
+    """Windows 控制台按 UTF-8 输出（CLI 专用）。
+
+    🔴 2026-09-28 修：这段原先在**模块级**执行。它会把 `sys.stdout` 换成新的
+    `TextIOWrapper`，import 本模块的 pytest 进程随后 `readouterr()` 时原 capture
+    tmpfile 已被接管/关闭 ⇒ `ValueError: I/O operation on closed file`，整个测试
+    会话崩在 teardown。副作用因此使本模块**无法被安全 import**，
+    `tests/scripts/test_seed_fix_f2_e2e.py` 才不得不手抄一份 wp_code 清单，
+    进而漂移成恒红。移进 `main()` 后 CLI 行为不变（唯一入口就是 main，
+    重绑之前没有任何输出），模块也可被 import 取常量。
+    """
+    if sys.platform == "win32":
+        sys.stdout = io.TextIOWrapper(
+            sys.stdout.buffer, encoding="utf-8", errors="replace"
+        )
+        sys.stderr = io.TextIOWrapper(
+            sys.stderr.buffer, encoding="utf-8", errors="replace"
+        )
+
 
 _BACKEND = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_BACKEND))
@@ -788,6 +804,7 @@ def _build_manifest(results: list[FixtureResult]) -> dict:
 
 
 async def main() -> int:
+    _force_utf8_console()
     parser = argparse.ArgumentParser(description="E2E FIX 夹具项目 seed/verify")
     parser.add_argument("--fix", action="store_true", help="补齐 metadata / 缺失底稿 / 样例数据")
     parser.add_argument("--year", type=int, default=DEFAULT_YEAR)

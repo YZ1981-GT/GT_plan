@@ -9,9 +9,14 @@
 
 from __future__ import annotations
 
+import ast
+import inspect
 import json
+import os
+import re
 import subprocess
 import sys
+import textwrap
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -109,14 +114,94 @@ class TestBaselineFiles:
         assert isinstance(data["files"], dict)
 
 
+def _run_script(*args: str, timeout: int = 60) -> subprocess.CompletedProcess[str]:
+    """跑仓库内检查脚本并安全拿到文本输出。
+
+    🔴 2026-09-28 修：原先 4 处 `subprocess.run(..., encoding="utf-8")` **没带
+    `errors=` 也没给子进程定编码**。Windows 上 `capture_output=True` 时子进程按
+    locale（cp936/GBK）写管道，父进程按 UTF-8 解码 ⇒ 撞
+    `UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc1`。异常发生在
+    `subprocess._readerthread` 里，pytest 只报一条
+    `PytestUnhandledThreadExceptionWarning`、**测试照样"通过"**，但那一次的
+    `result.stdout` 已经丢了 —— 所有基于 stdout 的断言都变成空转。
+
+    做法照抄本目录 `test_wp_template_deref.py::_run` 的现成样板：
+    子进程侧 `PYTHONIOENCODING=utf-8` 定写出编码，父进程侧 `errors="replace"` 兜底。
+    """
+    return subprocess.run(
+        [sys.executable, *args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=timeout,
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+    )
+
+
 class TestScriptInterfaces:
     """检查脚本 CLI 接口兼容性。"""
 
+    def test_script_runner_survives_non_utf8_child_output(self):
+        """变异证明：子进程吐出**非 UTF-8 字节**时，读取不得抛异常。
+
+        这是 `_run_script` 里 `errors="replace"` 的存在理由，而且**不依赖本机环境**：
+        子进程被显式要求按 GBK 写 `stdout.buffer`，父进程按 UTF-8 解码必然撞到非法
+        字节。去掉 `errors="replace"` 这条立刻 `UnicodeDecodeError`（该异常发生在
+        `subprocess._readerthread` 内，pytest 只会记一条
+        `PytestUnhandledThreadExceptionWarning` 而测试照样"通过"，stdout 却已丢失
+        —— 这正是原先 4 处调用的实际状态）。
+        """
+        child = (
+            "import sys; "
+            "sys.stdout.buffer.write('拒绝执行：GBK 探针'.encode('gbk')); "
+            "sys.stdout.buffer.flush()"
+        )
+        result = _run_script("-c", child, timeout=30)
+        assert result.returncode == 0
+        # 非法字节被替换而非抛异常；读到的内容非空即证明通路没断
+        assert result.stdout, repr(result.stdout)
+
+    def test_script_runner_pins_child_output_encoding(self):
+        """`_run_script` 必须显式钉住子进程编码与解码兜底。
+
+        `PYTHONIOENCODING` 那一项在"本机恰好已设 PYTHONIOENCODING=utf-8"时**测不出
+        运行时差异**，所以用契约断言守住：删掉它这条立刻红。
+
+        🔴 断言**走 AST 读真实关键字参数**，不是 `'errors="replace"' in source` 的
+        字符串搜。后者会命中本函数 docstring 与 `_run_script` 自己的注释 ——
+        实测把 `errors="replace"` 从调用里删掉后那种写法**仍然绿**（假绿）。
+        """
+        tree = ast.parse(textwrap.dedent(inspect.getsource(_run_script)))
+        calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "run"
+        ]
+        assert len(calls) == 1, f"预期恰好一处 subprocess.run，实得 {len(calls)}"
+        kwargs = {kw.arg: kw.value for kw in calls[0].keywords if kw.arg}
+
+        assert isinstance(kwargs.get("errors"), ast.Constant)
+        assert kwargs["errors"].value == "replace"
+        assert isinstance(kwargs.get("encoding"), ast.Constant)
+        assert kwargs["encoding"].value == "utf-8"
+
+        env = kwargs.get("env")
+        assert isinstance(env, ast.Dict), "必须显式传 env 以钉住子进程编码"
+        env_literals = {
+            k.value: v.value
+            for k, v in zip(env.keys, env.values)
+            if isinstance(k, ast.Constant) and isinstance(v, ast.Constant)
+        }
+        assert env_literals.get("PYTHONIOENCODING") == "utf-8"
+
     def test_snapshot_scale_json_output(self):
         """snapshot_scale.py 输出有效 JSON。"""
-        result = subprocess.run(
-            [sys.executable, str(ROOT / "backend" / "scripts" / "analyze" / "snapshot_scale.py")],
-            capture_output=True, text=True, encoding="utf-8", timeout=30,
+        result = _run_script(
+            str(ROOT / "backend" / "scripts" / "analyze" / "snapshot_scale.py"),
+            timeout=30,
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -126,29 +211,27 @@ class TestScriptInterfaces:
 
     def test_hotspot_baseline_mode(self):
         """check_hotspot_files.py --check-baseline 可执行。"""
-        result = subprocess.run(
-            [sys.executable, str(ROOT / "backend" / "scripts" / "check" / "check_hotspot_files.py"),
-             "--check-baseline"],
-            capture_output=True, text=True, encoding="utf-8", timeout=30,
+        result = _run_script(
+            str(ROOT / "backend" / "scripts" / "check" / "check_hotspot_files.py"),
+            "--check-baseline",
+            timeout=30,
         )
         # 退出码 0 或 1 都正常（0=无新增，1=有新增超标）
         assert result.returncode in (0, 1)
 
     def test_sql_contract_report_mode(self):
         """check_sql_column_contract.py report 模式 exit 0。"""
-        result = subprocess.run(
-            [sys.executable, str(ROOT / "backend" / "scripts" / "check" / "check_sql_column_contract.py")],
-            capture_output=True, text=True, encoding="utf-8", timeout=60,
+        result = _run_script(
+            str(ROOT / "backend" / "scripts" / "check" / "check_sql_column_contract.py"),
         )
         # report 模式始终 exit 0
         assert result.returncode == 0
 
     def test_sql_contract_strict_mode(self):
         """check_sql_column_contract.py --strict 可执行（0 或 1）。"""
-        result = subprocess.run(
-            [sys.executable, str(ROOT / "backend" / "scripts" / "check" / "check_sql_column_contract.py"),
-             "--strict"],
-            capture_output=True, text=True, encoding="utf-8", timeout=60,
+        result = _run_script(
+            str(ROOT / "backend" / "scripts" / "check" / "check_sql_column_contract.py"),
+            "--strict",
         )
         # strict 模式：有违规=1，无违规=0
         assert result.returncode in (0, 1)
@@ -204,3 +287,51 @@ class TestDocTemplates:
         assert "Redis" in content
         assert "文件存储" in content
         assert "OnlyOffice" in content
+
+    #: spec 三件套的**泛指名**——文中写 `tasks.md` 指的是各 spec 目录下的三件套，
+    #: 不是 `docs/operations/` 里的同名文件。不排除会产生 4 个假阳（现算）。
+    _GENERIC_DOC_NAMES = frozenset({"design.md", "requirements.md", "tasks.md"})
+
+    def test_operations_docs_have_no_broken_sibling_references(self):
+        """docs/operations 内部互引不得断链。
+
+        🔴 这条守卫是本次（2026-09-28）误删的**检出机制**：
+        `capacity-planning-template.md` / `backup-drill-record-template.md` 在
+        `5e31c0c0d` 被连同一份一次性 todo 清单一起删掉，而留存的
+        `dependency-recovery-steps.md` 第 4 行仍写着「配合
+        `backup-drill-record-template.md` 使用」⇒ 形成断链却无人发觉，
+        只有两条"模板必须存在"的测试恒红（红了也没修）。
+
+        🔴 分母如实声明：现算真实同目录互引仅 **1** 条（排除三件套泛指名后）。
+        分母小不是不加的理由——它正是"删文档"这类操作唯一的自动检出点。
+        """
+        ops = ROOT / "docs" / "operations"
+        backtick_md = re.compile(r"`([\w.-]+\.md)`")
+        link_md = re.compile(r"\]\(\s*(?:\./)?([\w.-]+\.md)\s*\)")
+
+        checked = 0
+        broken: list[str] = []
+        for path in sorted(ops.glob("*.md")):
+            text = path.read_text(encoding="utf-8")
+            refs = set(backtick_md.findall(text)) | set(link_md.findall(text))
+            refs -= {path.name} | self._GENERIC_DOC_NAMES
+            for ref in sorted(refs):
+                checked += 1
+                if not (ops / ref).is_file():
+                    broken.append(f"{path.name} -> {ref}")
+
+        assert broken == [], f"docs/operations 内部引用断链: {broken}"
+        # 结构性零守卫：扫描器必须真的扫到了引用（否则"零断链"可能是扫不到）
+        assert checked >= 1, "未扫到任何同目录 md 引用 —— 扫描口径可能失效"
+
+    def test_generic_doc_name_exclusion_is_justified(self):
+        """反向断言：被排除的三件套泛指名**真的不是** docs/operations 的同目录文件。
+
+        若哪天真在该目录放了 `tasks.md`，排除项就会掩盖它的断链 ⇒ 立即打红。
+        """
+        ops = ROOT / "docs" / "operations"
+        for name in self._GENERIC_DOC_NAMES:
+            assert not (ops / name).is_file(), (
+                f"docs/operations/{name} 现已是真实文件 ⇒ 请从 "
+                "_GENERIC_DOC_NAMES 排除名单中移除"
+            )

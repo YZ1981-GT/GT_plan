@@ -31,6 +31,25 @@ MANIFEST_OUTPUT_PATH = (
 )
 
 _CONTEXT_STRATEGIES = {"standard", "custom", "form-type", "none"}
+
+#: 已注册但**故意不接任何 wp_code** 的专属 componentType（兼容期保留）。
+#:
+#: 🔴 这不是"放宽阈值"，而是把一条既有裁决显式化：
+#: `b22bDeficiencyEvaluation.spec.ts` 里记着**方案 A** —— `B22B` 的 wp_code 改指
+#: 向控制矩阵登记册 `b22b-control-matrix`（致同源模板 B22B 的真实结构就是登记册），
+#: 缺陷评价组件的文件与注册表条目**保留**（兼容期，历史底稿可能还在引用），但
+#: `B22B` 不再路由它。于是它必然 0 个 wp_code 映射。
+#:
+#: 每条必须写明"为什么不接"。名单配**反向断言**（见
+#: `tests/scripts/test_workpaper_component_manifest.py::
+#: test_unrouted_allowlist_has_no_stale_entries`）：一旦某条真的接上了 wp_code，
+#: 名单项即失效并打红，逼迫删除——避免名单变成藏缺陷的地方。
+INTENTIONALLY_UNROUTED_COMPONENT_TYPES: dict[str, str] = {
+    "b22b-deficiency-evaluation": (
+        "方案 A：B22B wp_code 改指向 b22b-control-matrix（控制矩阵登记册），"
+        "缺陷评价组件兼容期保留但不再被任何 wp_code 路由"
+    ),
+}
 _LAZY_CONST_RE = re.compile(
     r"\bconst\s+(\w+)\s*=\s*defineAsyncComponent\s*\(\s*\(\)\s*=>\s*"
     r"import\s*\(\s*['\"]([^'\"]+)['\"]\s*\)\s*\)",
@@ -57,6 +76,12 @@ def _resolve_import_path(registry_path: Path, import_path: str) -> Path:
     return (registry_path.parent / import_path).resolve()
 
 
+_SPREAD_RE = re.compile(r"\.\.\.\s*(\w+)\s*,")
+_ENTRY_IMPORT_RE = re.compile(
+    r"import\s*\{\s*(\w+)\s*\}\s*from\s*['\"]([^'\"]+)['\"]"
+)
+
+
 def _registry_list_source(source: str) -> str:
     """Return only REGISTRY_LIST, excluding type declarations and examples."""
     start = source.find("const REGISTRY_LIST")
@@ -64,6 +89,57 @@ def _registry_list_source(source: str) -> str:
     if start < 0 or end <= start:
         raise ValueError("cannot locate htmlRendererRegistry REGISTRY_LIST")
     return source[start:end]
+
+
+def _collect_registry_sources(path: Path) -> list[tuple[Path, str, str]]:
+    """Return ``(file, full_source, entry_region)`` for every file holding entries.
+
+    🔴 2026-09-28 修：注册表条目已按渲染器家族拆到
+    ``./registry/entries/*.ts``，``REGISTRY_LIST`` 只剩 spread 装配::
+
+        const REGISTRY_LIST: HtmlRendererEntry[] = [
+          ...coreEntries, ...formsEntries, ...programsEntries,
+          ...confirmationsEntries, ...reportsEntries, ...specializedEntries,
+        ]
+
+    原实现只读 ``const REGISTRY_LIST`` 到 ``export const HTML_RENDERER_REGISTRY``
+    之间那 15 行 ⇒ 解析出 **0 条** entry，于是 91 个专属 componentType 全部被报成
+    ``missingRegistryEntries``、``entryFile`` 全为 ``None``、``GtWpRenderer: 0``。
+    `tests/scripts/test_workpaper_component_manifest.py` 4 条因此一直红
+    —— 是**扫描器没跟上拆分**，不是真的注册漂移。
+
+    这里**跟随 spread 名字解析 import 来源**而不是写死 6 个文件名：
+    以后新增/改名家族会自动纳入；若某个 spread 找不到对应 import 或文件缺失，
+    立即抛错（fail-closed），避免又回到"静默少扫一族"。
+    """
+    source = path.read_text(encoding="utf-8")
+    list_source = _registry_list_source(source)
+    spreads = _SPREAD_RE.findall(list_source)
+    if not spreads:
+        # 未拆分形态（条目直接内联在 REGISTRY_LIST 里）—— 兼容旧结构
+        return [(path, source, list_source)]
+
+    imports = {symbol: rel for symbol, rel in _ENTRY_IMPORT_RE.findall(source)}
+    out: list[tuple[Path, str, str]] = []
+    for symbol in spreads:
+        rel = imports.get(symbol)
+        if not rel:
+            raise ValueError(
+                f"REGISTRY_LIST 里 spread 了 {symbol!r} 但找不到对应 import ——"
+                " 扫描器会静默少扫一族，请修正注册表或本扫描器"
+            )
+        candidate = _resolve_import_path(path, rel)
+        entry_file = next(
+            (p for p in (candidate, candidate.with_suffix(".ts"), candidate / "index.ts")
+             if p.is_file()),
+            None,
+        )
+        if entry_file is None:
+            raise ValueError(f"{symbol}: 解析不到 entries 文件（{rel}）")
+        entry_source = entry_file.read_text(encoding="utf-8")
+        # 分域文件整篇就是 entries 数组，符号常量与条目同处一文件
+        out.append((entry_file, entry_source, entry_source))
+    return out
 
 
 def parse_html_renderer_registry(path: Path = REGISTRY_PATH) -> dict[str, dict[str, str]]:
@@ -74,44 +150,52 @@ def parse_html_renderer_registry(path: Path = REGISTRY_PATH) -> dict[str, dict[s
     ``component: defineAsyncComponent(...)``.  Dynamic entries are ignored;
     dedicated componentTypes are required to use literal registrations.
     """
-    source = path.read_text(encoding="utf-8")
-    registry_source = _registry_list_source(source)
-    symbol_imports = {
-        symbol: import_path for symbol, import_path in _LAZY_CONST_RE.findall(source)
-    }
-    matches = list(_COMPONENT_TYPE_RE.finditer(registry_source))
     entries: dict[str, dict[str, str]] = {}
 
-    for index, match in enumerate(matches):
-        component_type = match.group(1)
-        segment_end = (
-            matches[index + 1].start() if index + 1 < len(matches) else len(registry_source)
-        )
-        segment = registry_source[match.start():segment_end]
-
-        inline = _INLINE_IMPORT_RE.search(segment)
-        if inline:
-            import_path = inline.group(1)
-        else:
-            symbol_match = _COMPONENT_SYMBOL_RE.search(segment)
-            import_path = symbol_imports.get(symbol_match.group(1), "") if symbol_match else ""
-
-        context_match = _CONTEXT_RE.search(segment)
-        context_strategy = context_match.group(1) if context_match else "none"
-        if context_strategy not in _CONTEXT_STRATEGIES:
-            raise ValueError(
-                f"{component_type}: unknown contextProps strategy {context_strategy!r}"
-            )
-        if component_type in entries:
-            raise ValueError(f"duplicate htmlRendererRegistry entry: {component_type}")
-
-        entry_file = (
-            _repo_relative(_resolve_import_path(path, import_path)) if import_path else ""
-        )
-        entries[component_type] = {
-            "entryFile": entry_file,
-            "contextStrategy": context_strategy,
+    for source_file, full_source, registry_source in _collect_registry_sources(path):
+        symbol_imports = {
+            symbol: import_path
+            for symbol, import_path in _LAZY_CONST_RE.findall(full_source)
         }
+        matches = list(_COMPONENT_TYPE_RE.finditer(registry_source))
+
+        for index, match in enumerate(matches):
+            component_type = match.group(1)
+            segment_end = (
+                matches[index + 1].start()
+                if index + 1 < len(matches)
+                else len(registry_source)
+            )
+            segment = registry_source[match.start():segment_end]
+
+            inline = _INLINE_IMPORT_RE.search(segment)
+            if inline:
+                import_path = inline.group(1)
+            else:
+                symbol_match = _COMPONENT_SYMBOL_RE.search(segment)
+                import_path = (
+                    symbol_imports.get(symbol_match.group(1), "") if symbol_match else ""
+                )
+
+            context_match = _CONTEXT_RE.search(segment)
+            context_strategy = context_match.group(1) if context_match else "none"
+            if context_strategy not in _CONTEXT_STRATEGIES:
+                raise ValueError(
+                    f"{component_type}: unknown contextProps strategy {context_strategy!r}"
+                )
+            if component_type in entries:
+                raise ValueError(f"duplicate htmlRendererRegistry entry: {component_type}")
+
+            # 相对 import 以**条目所在文件**为基准解析（分域后不再是注册表文件）
+            entry_file = (
+                _repo_relative(_resolve_import_path(source_file, import_path))
+                if import_path
+                else ""
+            )
+            entries[component_type] = {
+                "entryFile": entry_file,
+                "contextStrategy": context_strategy,
+            }
 
     return entries
 
@@ -171,7 +255,7 @@ def generate_component_manifest(
 
         if registry_entry is None:
             missing_registry.append(component_type)
-        if not wp_codes:
+        if not wp_codes and component_type not in INTENTIONALLY_UNROUTED_COMPONENT_TYPES:
             missing_wp_codes.append(component_type)
         if entry_file and not (PROJECT_ROOT / entry_file).is_file():
             missing_entry_files.append(component_type)
@@ -191,6 +275,12 @@ def generate_component_manifest(
         "missingWpCodeMappings": missing_wp_codes,
         "missingEntryFiles": missing_entry_files,
     }
+    # 豁免项显式写进产物，避免"名单静默吞掉缺陷"
+    intentionally_unrouted = {
+        name: reason
+        for name, reason in sorted(INTENTIONALLY_UNROUTED_COMPONENT_TYPES.items())
+        if name in dedicated_types
+    }
     return {
         "schemaVersion": 1,
         "generatedAt": generated_at
@@ -202,6 +292,7 @@ def generate_component_manifest(
         },
         "entries": entries,
         "diagnostics": diagnostics,
+        "intentionallyUnrouted": intentionally_unrouted,
         "isComplete": not any(diagnostics.values()),
     }
 
@@ -221,6 +312,8 @@ def print_component_manifest_summary(manifest: dict[str, Any]) -> None:
     print(f"  GtWpRenderer: {sum(e['viaGtWpRenderer'] for e in entries.values())}")
     print(f"  context=standard: {sum(e['contextStrategy'] == 'standard' for e in entries.values())}")
     print(f"  wp_code 映射: {sum(len(e['wpCodes']) for e in entries.values())}")
+    for name, reason in manifest.get("intentionallyUnrouted", {}).items():
+        print(f"  [豁免-无 wp_code] {name}: {reason}")
     for name, values in diagnostics.items():
         if values:
             print(f"  [WARN] {name}: {', '.join(values)}")
