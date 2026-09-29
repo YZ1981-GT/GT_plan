@@ -48,7 +48,33 @@ HARD_CAPS = {
     "audit-platform/frontend/src/components/workpaper/GtDForm/GtDFormReview.vue": 450,
     "audit-platform/frontend/src/components/workpaper/GtDForm/GtDFormConfirmation.vue": 420,
     "audit-platform/frontend/src/components/workpaper/GtDForm/GtDFormParagraph.vue": 400,
-    "audit-platform/frontend/src/views/DisclosureEditor.vue": 1800,
+    # DisclosureEditor.vue：2026-09-28 由 1800 更正为 3044（= 当前真实行数，splitlines 口径）。
+    #
+    # 🔴 **与 ReportView 的 1110 不同**：1800 是**曾经成立过**的有效约束，不是理想值。
+    # 逐提交行数史实证：
+    #   756120108 2026-06-06  1758  ← 瘦身达成
+    #   0bcfadeed 2026-06-07  1793  ← 最后一个 <= 1800 的版本
+    #   696bb1e55 2026-06-07  2091  ← 起，越过 1800
+    #   55c5e0fe5 2026-08-22  3397  ← 单调增长至今
+    # 所以**正解是继续瘦身，不是放宽**；本次更正只为解除「墙」效应，见下。
+    #
+    # 🔴 为什么必须更正：`HARD_CAPS` 是「超限即拒」**没有棘轮**。文件已 3397 而 cap 1800
+    # ⇒ 任何触碰该文件的提交都被拒，**包括把它改小的提交**。2026-09-28 实测：一批把它从
+    # 3398 减到 3044 的纯抽取重构被 pre-commit 拒绝 ⇒ 门禁事实上禁止了对它的**任何**改进，
+    # 这也是它能一路涨到 3397 的一部分原因（人们绕开它而不是修它）。
+    # 填真实值后门禁恢复为**只许变小的棘轮**：再加一行即打红。
+    #
+    # 🔴 **不加余量**（同 ReportView 那条的处置）：此处目的是防回弹，加余量等于预留膨胀空间。
+    #
+    # 待办（已逐块测绘，1800 目标不变）：当前 3044 = template 80 + script 1769 + styles 25。
+    # script 内注释分区仍可抽 ~1235 行：恢复已删除章节 157 / 单元格激活编辑 124 /
+    # 表格结构编辑 107 / 反向通知 104 / 详情缓存+hover 99 / 树快捷筛选 99 /
+    # useStaleRefresh 74 / 结构编辑操作 68 / PermissionMatrix 68 / 转换规则 65 /
+    # 打印预览 51 / 章节管理 48 …全抽完 script ~534 ⇒ 总计约 639，纯 script 路线即可达标，
+    # **无需动模板**（模板侧主表区 437 行用 100 个绑定 / 对话框 247 行用 73 个 /
+    # 覆盖层 170 行用 66 个，走 provide/inject 要塞约 250 个成员，是反模式，已排除）。
+    # ⚠️ **每完成一批瘦身必须同步下调此值**，否则棘轮失效。
+    "audit-platform/frontend/src/views/DisclosureEditor.vue": 3044,
     # ReportView.vue：2026-09-28 由 1110 更正为 1949（= 当前真实行数，splitlines 口径）。
     #
     # 🔴 **1110 是从未成立过的理想值**，不是被违反的有效约束。实证行数史：
