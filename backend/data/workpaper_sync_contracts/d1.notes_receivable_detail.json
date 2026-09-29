@@ -499,7 +499,7 @@
               "column_key": "item",
               "header_source_ref": "源xlsx!坏账准备明细表D1-4!A11",
               "header_text": "项目",
-              "json_pointer": "/rows/{row_uuid}/item",
+              "json_pointer": "/rows/{row_uuid}/label",
               "mode": "editable",
               "source_ref": "源xlsx!坏账准备明细表D1-4!A13",
               "stable_field_key": "bad_debt_individual_rows/{row_uuid}/item",
@@ -574,7 +574,7 @@
               "column_key": "provision",
               "header_source_ref": "源xlsx!坏账准备明细表D1-4!F11",
               "header_text": "计提",
-              "json_pointer": "/rows/{row_uuid}/provision",
+              "json_pointer": "/rows/{row_uuid}/currentProvision",
               "mode": "editable",
               "source_ref": "源xlsx!坏账准备明细表D1-4!F13",
               "stable_field_key": "bad_debt_individual_rows/{row_uuid}/provision",
@@ -589,7 +589,7 @@
               "column_key": "other_increase",
               "header_source_ref": "源xlsx!坏账准备明细表D1-4!G11",
               "header_text": "其他增加",
-              "json_pointer": "/rows/{row_uuid}/otherIncrease",
+              "json_pointer": "/rows/{row_uuid}/currentRecovery",
               "mode": "editable",
               "source_ref": "源xlsx!坏账准备明细表D1-4!G13",
               "stable_field_key": "bad_debt_individual_rows/{row_uuid}/other_increase",
@@ -604,7 +604,7 @@
               "column_key": "reversal",
               "header_source_ref": "源xlsx!坏账准备明细表D1-4!H11",
               "header_text": "转回",
-              "json_pointer": "/rows/{row_uuid}/reversal",
+              "json_pointer": "/rows/{row_uuid}/currentReversal",
               "mode": "editable",
               "source_ref": "源xlsx!坏账准备明细表D1-4!H13",
               "stable_field_key": "bad_debt_individual_rows/{row_uuid}/reversal",
@@ -619,7 +619,7 @@
               "column_key": "write_off",
               "header_source_ref": "源xlsx!坏账准备明细表D1-4!I11",
               "header_text": "核销",
-              "json_pointer": "/rows/{row_uuid}/writeOff",
+              "json_pointer": "/rows/{row_uuid}/currentWriteOff",
               "mode": "editable",
               "source_ref": "源xlsx!坏账准备明细表D1-4!I13",
               "stable_field_key": "bad_debt_individual_rows/{row_uuid}/write_off",
@@ -634,7 +634,7 @@
               "column_key": "other_decrease",
               "header_source_ref": "源xlsx!坏账准备明细表D1-4!J11",
               "header_text": "其他减少",
-              "json_pointer": "/rows/{row_uuid}/otherDecrease",
+              "json_pointer": "/rows/{row_uuid}/currentOther",
               "mode": "editable",
               "source_ref": "源xlsx!坏账准备明细表D1-4!J13",
               "stable_field_key": "bad_debt_individual_rows/{row_uuid}/other_decrease",
@@ -732,7 +732,7 @@
               "column_key": "item",
               "header_source_ref": "源xlsx!坏账准备明细表D1-4!A11",
               "header_text": "项目",
-              "json_pointer": "/rows/{row_uuid}/item",
+              "json_pointer": "/rows/{row_uuid}/label",
               "mode": "editable",
               "source_ref": "源xlsx!坏账准备明细表D1-4!A18",
               "stable_field_key": "bad_debt_portfolio_rows/{row_uuid}/item",
@@ -807,7 +807,7 @@
               "column_key": "provision",
               "header_source_ref": "源xlsx!坏账准备明细表D1-4!F11",
               "header_text": "计提",
-              "json_pointer": "/rows/{row_uuid}/provision",
+              "json_pointer": "/rows/{row_uuid}/currentProvision",
               "mode": "editable",
               "source_ref": "源xlsx!坏账准备明细表D1-4!F18",
               "stable_field_key": "bad_debt_portfolio_rows/{row_uuid}/provision",
@@ -822,7 +822,7 @@
               "column_key": "other_increase",
               "header_source_ref": "源xlsx!坏账准备明细表D1-4!G11",
               "header_text": "其他增加",
-              "json_pointer": "/rows/{row_uuid}/otherIncrease",
+              "json_pointer": "/rows/{row_uuid}/currentRecovery",
               "mode": "editable",
               "source_ref": "源xlsx!坏账准备明细表D1-4!G18",
               "stable_field_key": "bad_debt_portfolio_rows/{row_uuid}/other_increase",
@@ -837,7 +837,7 @@
               "column_key": "reversal",
               "header_source_ref": "源xlsx!坏账准备明细表D1-4!H11",
               "header_text": "转回",
-              "json_pointer": "/rows/{row_uuid}/reversal",
+              "json_pointer": "/rows/{row_uuid}/currentReversal",
               "mode": "editable",
               "source_ref": "源xlsx!坏账准备明细表D1-4!H18",
               "stable_field_key": "bad_debt_portfolio_rows/{row_uuid}/reversal",
@@ -852,7 +852,7 @@
               "column_key": "write_off",
               "header_source_ref": "源xlsx!坏账准备明细表D1-4!I11",
               "header_text": "核销",
-              "json_pointer": "/rows/{row_uuid}/writeOff",
+              "json_pointer": "/rows/{row_uuid}/currentWriteOff",
               "mode": "editable",
               "source_ref": "源xlsx!坏账准备明细表D1-4!I18",
               "stable_field_key": "bad_debt_portfolio_rows/{row_uuid}/write_off",
@@ -867,7 +867,7 @@
               "column_key": "other_decrease",
               "header_source_ref": "源xlsx!坏账准备明细表D1-4!J11",
               "header_text": "其他减少",
-              "json_pointer": "/rows/{row_uuid}/otherDecrease",
+              "json_pointer": "/rows/{row_uuid}/currentOther",
               "mode": "editable",
               "source_ref": "源xlsx!坏账准备明细表D1-4!J18",
               "stable_field_key": "bad_debt_portfolio_rows/{row_uuid}/other_decrease",
@@ -1212,12 +1212,7 @@
             "marker": "合计",
             "search_column": "A"
           },
-          "formula_mask": [
-            "E14:E21",
-            "F14:F21",
-            "L14:L21",
-            "M14:M21"
-          ],
+          "formula_mask": [],
           "header_rows": 2,
           "row_identity": {
             "json_pointer": "/rows/*/rowId",
@@ -1476,9 +1471,7 @@
             "marker": "合计",
             "search_column": "A"
           },
-          "formula_mask": [
-            "E26:E33"
-          ],
+          "formula_mask": [],
           "header_rows": 2,
           "row_identity": {
             "json_pointer": "/rows/*/rowId",
@@ -1626,10 +1619,7 @@
             "marker": "合计",
             "search_column": "A"
           },
-          "formula_mask": [
-            "E12:E14",
-            "F12:F14"
-          ],
+          "formula_mask": [],
           "header_rows": 1,
           "row_identity": {
             "json_pointer": "/rows/*/id",
@@ -1768,9 +1758,7 @@
             "marker": "合计",
             "search_column": "A"
           },
-          "formula_mask": [
-            "C18:C20"
-          ],
+          "formula_mask": [],
           "header_rows": 1,
           "row_identity": {
             "json_pointer": "/rows/*/id",
@@ -2491,10 +2479,7 @@
             "marker": "合计",
             "search_column": "A"
           },
-          "formula_mask": [
-            "H12:H17",
-            "J12:J17"
-          ],
+          "formula_mask": [],
           "header_rows": 1,
           "row_identity": {
             "json_pointer": "/rows/*/id",
@@ -2747,9 +2732,7 @@
             "marker": "合计",
             "search_column": "A"
           },
-          "formula_mask": [
-            "H14:H20"
-          ],
+          "formula_mask": [],
           "header_rows": 2,
           "row_identity": {
             "json_pointer": "/rows/*/id",
@@ -3327,10 +3310,7 @@
             "marker": "合计",
             "search_column": "A"
           },
-          "formula_mask": [
-            "G16:G31",
-            "H16:H31"
-          ],
+          "formula_mask": [],
           "header_rows": 2,
           "row_identity": {
             "json_pointer": "/rows/*/id",
@@ -3589,9 +3569,7 @@
             "marker": "合计",
             "search_column": "A"
           },
-          "formula_mask": [
-            "G37:G44"
-          ],
+          "formula_mask": [],
           "header_rows": 2,
           "row_identity": {
             "json_pointer": "/rows/*/id",

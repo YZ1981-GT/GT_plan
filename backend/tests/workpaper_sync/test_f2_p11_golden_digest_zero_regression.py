@@ -34,7 +34,22 @@ GOLDEN_BASELINE: dict[str, str] = {
     #    `b60/GtB60HourBudgetPanel.vue` 落地后不再成立。契约是**真的变了**，
     #    不是度量漂移，故更新基线而非改判据形态。
     "b60.hour_budget.json": "aadb548da7f60e11",
-    "d1.notes_receivable_detail.json": "62b589551bd99050",
+    # 🔴 2026-09-28 更新（`62b589551bd99050` → 本值）：D1-4 三区的 `json_key` 与前端
+    #    实际持久化键**不一致**（实测 13 列），契约里的 `json_pointer` 因此全是死指针
+    #    —— materialize 取不到值会把 Excel 格写成 `0`/清空，extract 把值写进前端从不读
+    #    的键。按裁决 B1（spec 对齐前端，前端是写入方且真库已有数据）改 spec 后重生契约。
+    #    契约是**真的变了**，不是度量漂移，故更新基线而非改判据形态（同上方 b60 先例）。
+    #    详见 `.kiro/specs/d1-sync-row-table-engine-and-d1-coverage/tasks.md` K 节
+    #    与 `test_d1_json_key_matches_frontend_store.py`。
+    # 🔴 2026-09-28 二次更新（`5cf83e3fcdfd9ea5` → 本值）：D1-4 第三区（票据种类小计
+    #    R23-24）的**静态受管区**已进契约 —— `d14-managed` 多出第三个 table
+    #    `bad_debt_notetype_rows`（2 固定行 × 9 列 = 18 field，无 `row_identity`
+    #    ⇒ `has_dynamic_rows=False` ⇒ 归入 `static_tables`）。
+    #    此前契约的 `static_tables` **全空**，该 item 没有任何 stable field key 可投影。
+    #    🔴 **T7 裁决 A（2026-09-28）把静态 table 撤回**，契约从 19 table 回到 18 table
+    #    （与 D4 `phase5_d4_policy_check_sheet` 相同处置，待 marker-relative content 字段落地后再扩），
+    #    digest 回到 L 节改名后、O 节加静态 table 前的值。详见 tasks.md T7 节。
+    "d1.notes_receivable_detail.json": "5cf83e3fcdfd9ea5",
     "d2.receivable_detail.json": "078b04377a34054f",
     "d3.prepaid_receipts_detail.json": "4f5b71fd73c1c412",
     "d4.revenue_detail.json": "5bd890211ac8f897",
