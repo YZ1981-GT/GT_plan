@@ -2960,6 +2960,76 @@ Gate 6 那条变异的 victim 换过两次，两次都是被实测打脸：
    verify 0.6s equivalent=True；总计 5.9s）
 * 逐任务证据 `verify_d1_task_gate_evidence.py` EXIT=0
 
+#### X5-f. ✅ 整册门 ⑤c 的跨 lane 前置依赖（如实登记，不算本 lane 假绿）
+
+X5-d 在干净检出上跑通了 6 道 Gate + 7 份自测，但**整册门**（真栈 E2E）没在那里验过 ——
+它依赖运行时 `backend/storage/` 里的已发布 artifact。两次尝试都走不通：
+
+* worktree 根下 junction `storage` ⇒ 路径不对（真实根是 `backend/storage`）；
+* `backend/storage` 的 junction ⇒ 被平台的路径逃逸防护挡住：
+  `ArtifactPathError: artifact 路径被拒（outside_storage_base）` —— junction 解析后的
+  真实路径 `D:\GT_plan\backend\storage\...` 不在 worktree 的 `backend` 内。
+  **这是正确的安全设计，不绕过。**
+
+改用等效做法：在主仓库把 `excel_materialize.py` / `content_mutation.py`
+临时换成 HEAD 版（本 lane 在这两个文件里的 hunk 已全部入库，剩下的是别 lane 的），
+跑整册门，再无条件还原。
+
+##### 结果：⑤c 红，根因不在本 lane
+
+```
+[①~⑤b] 全部正常：受管区 18 / sheet 12 / store item 17
+        materialize OK 4.9s size=136386 / extract OK 0.6s 360 值 18 表 / 反读覆盖 18/18
+[⑤c] ❌ RoundtripEquivalenceError: staged representation 反读出未提交的受管字段
+     ['bad_debt_individual_rows/GTROW-D14INDIVIDUAL-0013/item',
+      'bad_debt_portfolio_rows/GTROW-D14PORTFOLIO-0018/item',
+      'category_detail_rows/GTROW-D12-0011/note_type', ...]（共 18 个）
+```
+
+根因：D1 模板在受管区内**自带非空业务值**（与 D4 同型 —— D4 权威模板 466 个 editable
+非空字段），而 store 只声明「有业务数据的行」⇒ 模板骨架行不在 `intended.row_keys` 里
+是常态 ⇒ extract 反读出模板自带的值，它们恒为 `extra`。
+
+豁免逻辑现读确认归属**别 lane**：`contracts.is_template_skeleton_identity`
+（HEAD 里**不存在**，工作树里有）+ `content_mutation` 的合取放行
+（「① 身份是模板骨架 ∧ ② store 本次 projection 完全没声明这一行」），
+代码注释明写 `spec workpaper-sync-managed-row-convergence E3`。
+
+⇒ **不替别 lane 提交**（不是本 spec 的产物，也没验证过他们的完整改动）。
+  如实登记为跨 lane 前置依赖。
+
+##### 口径修正
+
+前面几处「整册门 EXIT=0」一律是**工作树口径**。准确表述：
+
+| 范围 | 结论 |
+|---|---|
+| CI 层面（6 道 Gate + 7 份自测） | 干净检出上**全绿**，本 lane 完全自洽 |
+| 整册门（本地真栈 E2E，**不在 CI 内**，需真 PG + storage） | 工作树 EXIT=0；纯 HEAD 上 ⑤c 红，卡在 managed-row-convergence 的 E3 未入库 |
+
+##### 判据
+
+`backend/tests/workpaper_sync/test_d1_full_book_cross_lane_prerequisite.py`（4 条）：
+
+* 依赖在 ⇒ 过；不在 ⇒ **skip 并把那个难读的 `RoundtripEquivalenceError` 翻译成结论**
+  （哪一步红、18 个字段长什么样、根因归谁、为什么不构成 CI 红），省得后来者对着它猜；
+* 依赖在时校验豁免**没被弱化成无条件放行** —— 必须是合取：只留 ① 会放过「store 声明了
+  骨架行却缺字段」，只留 ② 会放过 `d4r-*` / `xsheet-*` / `GTROW-MINTED-*` 这些真孤儿；
+* 检测器本身做**双向变异**（内联样本，不改真文件）：只在注释/docstring/字符串里出现符号名
+  ⇒ 必须判「没调用」；裸调用与属性调用两种形态都要认出来。
+
+🔴 第三条是本轮教训的直接产物：这一轮已经用 `'--staged' in text` 判断 hook 装好了没、
+结果命中自己写的注释（X5-b）。同一个坑不留第二次机会。
+
+##### 还原机制（上一轮事故的后续纪律）
+
+临时换文件前先 `Copy-Item` 到 `%TEMP%\gtbk\` 并**校验哈希**，换回后再校验一次。
+还原走**双保险**：脚本 `try/finally` + 外层无条件再拷一次。
+
+🔴 这次 `^C` 真的打断了两次（一次在跑门时、一次在脚本执行时），两次都靠哈希校验确认
+还原成功。上一轮事故正是「`^C` 打在 PowerShell 层 ⇒ finally 没执行 ⇒ 三处平台改动被
+静默丢掉」—— 双保险不是多余的。
+
 #### X6. ✅ T7-A 余波：两条写死 18 个 store item 的判据
 
 `test_check_store_item_two_way_parity.py` 有两条判据在 T7 裁决 A 撤回静态第三区后陈旧：
