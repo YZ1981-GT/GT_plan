@@ -2203,3 +2203,176 @@ after 末行 27）在新口径下仍命中且同值 25 —— 两个场景**互�
    （变异脚本 `_mut.py` 就是这么写的，最后打印「已还原=True」）。
 3. 被打断的探针 = **可疑的工作树**。看到 `^C` 之后第一件事是校验自己的改动还在不在
    （`grep` 关键标识符），不是接着跑下一条命令。
+
+### X. ✅ 三笔遗留账清零 + 抽伴生模块（2026-09-28）
+
+W5/W6 收口时留了三笔账，本节逐一销掉。
+
+#### X1. ✅ 两处平台修复已落地（只暂存我的 hunk，不代别人提交）
+
+`excel_materialize.py`（`_apply_workbook_propagation` 单次扫描）与
+`content_mutation.py`（G1 报错补字段名）此前未提交 —— 那两个文件同时带着
+ref_collision 那条 lane 的在飞改动（12 / 3 个 hunk 里只有 2 / 1 个是我的）。
+
+🔴 **注意这不只是「整洁问题」**：整册门当时的绿依赖这两处**未提交**的改动，
+别人拉 HEAD 是跑不通的。
+
+做法：取完整 `git diff` 按 hunk 切分，用**内容锚点**（不是行号 —— 行号会随别的 lane
+漂移）筛出我的 3 个 hunk，重组 patch 后 `git apply --cached`，工作树不动。
+暂存后逐项核验：`夹带别 lane 标识 = 无`（现算 `CellWriteKind` / `MaterializePlan` /
+`_grow_managed_table_ref` / `_cell_xml` / `plan_managed_writes` 等标识零命中），
+我的标识（`单次扫描` / `pattern.sub` / `点名字段` / `equal = values_equal`）全在。
+
+#### X2. ✅ 模板索引判据从「两个标量计数」改成逐份具名登记
+
+原判据锁 `一致==451 && 漂移==23`。**问题不是不够严，而是激励反了**：任何 lane 改一份
+权威模板都会让它翻红，而修红最省事的做法就是把两个数字改成现算值 —— 那会把**别人**的
+漂移一起静默吸收，下一个人再也看不出哪些是新增的。
+
+逐份归因（现算 31 份漂移，每份查 `git diff HEAD`）：
+
+| 类别 | 份数 | 说明 |
+|---|---|---|
+| 已提交但索引从未重算 | 29 | HEAD 字节 == 磁盘字节 ≠ 索引声明，历史遗留 |
+| 别的 lane 工作树临时态 | 1 | `M/M10 其他权益工具.xlsx` |
+| **我的** | 1 | `D/D1 应收票据.xlsx`（模板数字格式修复） |
+
+处置：**只改我那一条** —— `_index.json` 里 D1 的 `size_kb` 134.8 → 117.3
+（`git diff --stat` 证实只动 2 行），没有重算整份索引。其余 30 份逐份具名登记进
+`_INDEX_SIZE_DRIFTED_FILES`，配**反向断言**（清单里的条目不再漂移 = 失效条目，
+会被点名要求移除）。一致份数改为「索引条目 − 具名漂移 − 已知缺失」**现算**，
+不再是写死的 451。
+
+同款处置也用在 `test_authoritative_directory_has_no_uncommitted_changes`：它本意是
+「**本 spec** 不改权威模板」，却读整个工作树 ⇒ 别的 lane 一改就红且归因不到人。
+改成 `_KNOWN_DIRTY_AUTHORITATIVE_PATHS` 具名登记（现 2 条：别的 lane 删的
+`D4收入底稿.xlsx` 与改的 `M10`）+ 反向断言。我的 `_index.json` **不在登记里** ——
+它提交后自然消失，不靠登记绕开。
+
+#### X3. ✅ 抽伴生模块（欠账已销，不是抬基线）
+
+W 节把 whitelist 基线从 1040 记账到 1364 时明确写了「这是记账不是豁免」。本节销账：
+
+`build_combined_store_projection` + `merge_projection_into_all_d1_stores` +
+`_projection_slice_for` 共 162 行抽到 **`phase5_d1_combined_store.py`**（222 行）。
+三者是同一个概念（**多 store item 的组合投影与回写分派**），与 entry 模块剩下的职责
+（常量声明 / 契约装配 / instrumentation 声明 / 发布编排）正交。
+entry 模块保留同名薄转发 ⇒ registry、判据与外部调用方的引用路径**一个都没改**。
+
+`phase5_d1_notes_receivable.py` **1364 → 1239**，whitelist 基线同步降到 1239。
+剩余行数是 entry 特有的身份声明，再抽会把「一个 entry 是什么」打散。
+
+🔴 **抽模块踩的四个坑，都是「按习惯推而不读真源」的同一族**：
+1. **块结束边界漏了装饰器行** —— 只认 `def `/`class `/`# ═` 会把下一个块的
+   `@dataclass(frozen=True)` 当成本块内容带走 ⇒ 新模块 `SyntaxError`、
+   宿主的 `class Phase5Definitions` 丢了装饰器。11 个 collection error。
+2. **薄转发签名凭推测写** —— 真实签名是全关键字 `(*, projection, base_by_item)`，
+   我写成 `(projection, base_payloads, *, contract)` ⇒ 20 条判据以
+   `TypeError: unexpected keyword argument 'base_by_item'` 打红。
+3. **搬走的代码引用宿主模块级私有函数** —— `_static_region_projection_builders` /
+   `_static_region_merge_handlers` 留在 entry（与那边的灰度开关同源同生灭），
+   需在新模块的调用点做函数内 import（避循环导入）。
+4. **异常类不能两边各定义一份** —— 判据按 `ENTRY.StorePayloadError` 捕获，
+   两份类会让 `pytest.raises` 捕不到。改为新模块从 entry 取同一个类
+   （entry 那份带 `error_code`，是真源）。
+
+另有一处**判据需要跟着真源走**：`test_mutation_without_projection_slice_rows_bleed_across_regions`
+是变异反证，它 monkeypatch `_projection_slice_for`。实现搬走后 patch 宿主属性会
+`AttributeError` —— **那是正确的红**（说明变异没打在真正被调用的那份代码上），
+改成 patch 伴生模块，而**不是**用 `raising=False` 糊过去（那会让本条变异反证恒绿）。
+
+#### X4. 验证
+
+* D1 判据全集 **271 passed / 42 skipped / 0 failed**
+* 整册门 `verify_d1_full_book_real_stack.py` **EXIT=0**
+* 逐任务证据 `verify_d1_task_gate_evidence.py` **EXIT=0**
+* 七门禁 **全 exit 0**
+* 行数门对 entry 模块与新伴生模块 **exit 0**
+* 两个模块 **0 diagnostics**
+
+#### X5. ✅ 顺带修掉行数门的一处口径不自洽（`--staged`）
+
+抽完伴生模块后 `excel_materialize.py` 仍被判「膨胀」，查出来是**门本身的口径问题**：
+
+pre-commit hook 用 `git diff --cached --name-only` 选**暂存文件**（= 你提交了什么），
+却让 `check_file_size.py` 去读**工作树内容**（= 工作树有什么）—— 两者不自洽。
+
+实测：本 spec 对该文件只提交 +31 行（暂存 3691，在基线 3660 +5% = 3843 之内），
+但同一文件里 ref_collision 那条 lane 有 ~258 行**未提交**改动 ⇒ 门按工作树 3948 判膨胀。
+这会逼人二选一，**两条都是错的**：
+
+* 把基线抬到 3948 —— 替那条 lane 预留额度，并把**别人**的膨胀记到自己账上；
+* `git commit --no-verify` —— 门直接失效。
+
+修法：给门加 `--staged`（读 `git show :<path>`），hook 传上。工作树模式**默认不变**，
+手动跑脚本的行为逐字相同。取不到暂存内容时**抛**而不是静默回落工作树 ——
+回落会让「门量的是暂存内容」变成一句空话。
+
+判据 `backend/tests/scripts/test_check_file_size_staged_mode.py`（4 条）+ **3 处变异全红**
+（`--staged` 退回读工作树 / 取不到暂存时静默回落 / CLI 不把 flag 接到 `_STAGED_MODE`）。
+
+🔴 **第二条判据是补出来的**：首版只断言「CLI 接受 `--staged` 不报错」，
+把那三行接线改成 `if False:` 之后**其余判据全绿**（M3 漏报）。补了
+`test_cli_staged_flag_actually_switches_the_mode`（造一个暂存 1 行 / 工作树 1200 行的
+真实探针文件，要求两口径给出**不同** rc）才打红。
+这是「只验接线不验语义」的又一个实例。
+
+🔴 变异脚本本身也踩了两层坑，记下来：锚点里的换行在脚本源码里是**字面反斜杠 + n**
+（写字符串时被转义），要先 `unicode_escape` 解回真换行；解出的 LF 还要按目标文件的
+**CRLF** 归一化。两层漏一层就是「锚点 0 命中 —— 不算证明」。
+
+#### X5-b. ✅ 「脚本支持 `--staged`」≠「hook 真的传了 `--staged`」
+
+X5 改完、5 条判据全绿、手动 `--staged` rc=0，**但 `git commit` 仍被拦下**，
+报 `excel_materialize.py` 4213 行膨胀 —— 4213 是**工作树**口径（暂存 3691）。
+
+根因：hook 有两份，我只改了源。
+
+* `.git-hooks/pre-commit` —— 版本控制里的源（我改的，第 75 行带 `--staged`）
+* `.git/hooks/pre-commit` —— git 实际执行的那份，需 `install.ps1` 复制过去
+  （当时仍是旧版第 55 行，无 flag）
+
+⇒ 门的修复对本地 commit **完全无效**。
+
+🔴 而我当时是用 `'--staged' in text` 判断「已装好」，得到 `True` —— 命中的是自己
+写的**注释**。这与铁律㉖（判断代码是否真做了 X 用 AST、别用文本 `in`）同型；shell
+没有 AST，所以判据改成「剔掉 `#` 开头行后再匹配调用行」，并配变异证明该剔除真的生效。
+
+补 3 条判据（`test_check_file_size_staged_mode.py` 现 7 条）：
+
+* `test_hook_source_passes_staged_flag` —— 源的非注释调用行必须带 flag
+* `test_comment_only_staged_mention_does_not_count` —— 去掉调用行 flag、注释里留字样
+  ⇒ 必红（钉住扫描器本身；若退回全文 `in` 匹配，这条假绿）
+* `test_installed_hook_matches_source_or_tells_you_to_install` —— 已装 hook 与源
+  的调用行不一致即红并给出 `install.ps1` 指引；`.git/hooks/` 不在版本控制里，
+  CI 上缺失时 skip 而不是 fail
+
+第三条**先是红的**（真抓住了本次的坑），跑 `install.ps1` 后转绿 —— 红→绿的因果链
+是它有效性的证明，不是「写完就绿」。
+
+#### X6. ✅ T7-A 余波：两条写死 18 个 store item 的判据
+
+`test_check_store_item_two_way_parity.py` 有两条判据在 T7 裁决 A 撤回静态第三区后陈旧：
+
+* `test_d1_is_fully_wired_in_both_directions` 写死 `len(STORE_ITEM_IDS) == 18`，
+  撤回后现算 17 ⇒ 假红。改为**按开关派生**（写死 17 又会在开关翻回时假绿）。
+* `test_d1_static_region_without_contract_table_is_registered` 的二分法
+  （「要么在断口名单、要么已进契约」）**漏了第三态**：整个区被撤回 ⇒ 两头都不落。
+  补第三态分支，并在撤回态下加**更强**的断言 —— store item 必须彻底不存在、
+  契约里不得有该 table、断口名单必须为空（这三条禁止「开关关了但 item 还挂着」
+  的半撤回状态）。
+
+两条都是 T7-A 当时漏同步的判据，本轮一并清掉。
+
+#### X7. 验证
+
+* D1 + 模板覆盖 + 行数门 + 两方向对等 全集：**403 passed / 43 skipped / 1 failed**
+  （提交前观测。唯一的红 `test_authoritative_directory_has_no_uncommitted_changes`
+  指着本轮**待提交**的 `backend/wp_templates/_index.json` —— 该判据的语义就是
+  「权威目录不得有未登记的未提交改动」，所以提交动作本身就是它的绿。
+  **不靠登记绕开**；提交后已复跑确认转绿，见下。）
+* 三个门禁自测（行数门 `--staged` 7 条 / 两方向对等 / formula_columns 一致性）
+  单独跑：**34 passed / 1 skipped**
+* 整册门 `verify_d1_full_book_real_stack.py` **EXIT=0**
+* 逐任务证据 `verify_d1_task_gate_evidence.py` **EXIT=0**
+* 七门禁 **全 exit 0**

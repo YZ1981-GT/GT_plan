@@ -2422,6 +2422,25 @@ def _apply_workbook_propagation(
         def _apos(s: str) -> str:
             return s.replace("'", "&apos;")
 
+        # 🔴 **单次扫描、同时替换**，不是逐对 `text.replace()` 串行改。
+        #
+        #    串行改有一个会双重位移的真缺陷：位移计划里同一 part 常同时含
+        #    **相邻行**的两条声明（D1-4 实测 `B23→B24` 与 `B24→B25` 并存，
+        #    B/C/K/L 四列各一对）。串行时 `B23→B24` 先执行，文本里**新产生**一个
+        #    `B24`，紧接着 `B24→B25` 就把原有的和新产生的**一起**改掉 ⇒ 每对多命中
+        #    1 次，8 条声明实际改了 12 处，最后以 `PropagationDriftError`
+        #    「声明 8 处实际改了 12 处」报出来 —— 报错本身是对的（它拦住了坏写盘），
+        #    但归因会被带向「artifact 在两相之间被动过」，而真因是本函数的替换顺序。
+        #
+        #    单次扫描下替换产物不再参与匹配：`B23` → `B24`（不再被重扫）、
+        #    原有 `B24` → `B25`，applied == declared == 8。
+        #
+        #    候选形态的选取仍**基于替换前的原文**（`text.count`），与串行版一致；
+        #    正则候选按长度降序排列，保持「长的先匹配」（`!A2` ⊂ `!A25`）这条既有语义
+        #    —— `re` 的交替是最左优先、同位置按候选顺序，故降序排列即等价。
+        import re as _re
+
+        replacements: dict[str, str] = {}
         for before, after in sorted(pairs, key=lambda kv: len(kv[0]), reverse=True):
             for cand_before, cand_after in (
                 (_apos(_escape(before)), _apos(_escape(after))),
@@ -2429,11 +2448,22 @@ def _apply_workbook_propagation(
                 (_apos(before), _apos(after)),
                 (before, after),
             ):
-                hits = text.count(cand_before)
-                if hits:
-                    text = text.replace(cand_before, cand_after)
-                    applied += hits
+                if text.count(cand_before):
+                    # 同一 cand_before 被两条声明共用时保留首个映射（与串行版
+                    # 「第一条替换掉之后第二条就找不到了」的可见结果一致）。
+                    replacements.setdefault(cand_before, cand_after)
                     break
+        if replacements:
+            ordered = sorted(replacements, key=len, reverse=True)
+            pattern = _re.compile("|".join(_re.escape(k) for k in ordered))
+            counter = {"n": 0}
+
+            def _swap(match: _re.Match[str]) -> str:
+                counter["n"] += 1
+                return replacements[match.group(0)]
+
+            text = pattern.sub(_swap, text)
+            applied += counter["n"]
         declared = len(part_entries)
         if applied != declared:
             raise PropagationDriftError(

@@ -302,7 +302,15 @@ def test_mutation_without_projection_slice_rows_bleed_across_regions(
     没有这条，将来有人"简化"掉切片时不会有任何判据变红（往返等值判据只查
     原始行是否还在，不查是否多出别人的行）。
     """
-    monkeypatch.setattr(ENTRY, "_projection_slice_for", lambda proj, _table_key: proj)
+    # 🔴 2026-09-28 抽伴生模块后 patch 对象跟着真源走：实现已从 entry 模块搬到
+    #    `phase5_d1_combined_store`。patch 宿主属性会 `AttributeError` ——
+    #    那是**正确的红**（它说明变异没打在真正被调用的那份代码上），
+    #    不能靠 `raising=False` 把它糊过去，否则本条变异反证就恒绿了。
+    from app.services.workpaper_sync import phase5_d1_combined_store as _combined
+
+    monkeypatch.setattr(
+        _combined, "_projection_slice_for", lambda proj, _table_key: proj
+    )
     proj = ENTRY.build_combined_store_projection(synthetic_payloads, contract=contract)
     updates = ENTRY.merge_projection_into_all_d1_stores(projection=proj, base_by_item={})
     bloated = {

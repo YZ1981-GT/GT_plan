@@ -807,73 +807,34 @@ def build_combined_store_projection(
     contract: SyncContract,
     limits: Any | None = None,
 ) -> Any:
-    """把**全部**受管 store item 的载荷合成一个 Projection（materialize overlay 用）。
+    """把**全部**受管 store item 的载荷合成一个 Projection —— 薄转发伴生模块。
 
-    🔴 与 D4 的同名函数不同型：D4 是逐 item 手写清单（历史演化），本家**按 spec 泛化** ——
-    遍历伴生模块的 `managed_row_table_specs()`，`rows` 形态走框架层引擎、`dict` 形态走
-    D1-7 专用门面。新接一张 sheet 不需要改本函数（这正是行表引擎要的收敛）。
-
-    🔴 **三条通路**（对应契约里三类 table）：
-    * `rows` 动态区 → 框架层行表引擎 `build_store_projection`；
-    * `dict` 动态区（D1-7 备查簿 `{bankRows, commercialRows}`）→ 专用门面；
-    * **静态受管区** → 各自模块的专用投影函数（行表引擎会拒静态 spec，
-      `store_row_identity()` 对 `row_identity_key == ""` 直接抛）。
+    真源与「三条通路（rows / dict / 静态受管区）」的完整说明在
+    `phase5_d1_combined_store`，本处不复制第二份。
     """
-    from app.services.workpaper_sync import phase5_d1_07_memo as _d107
-    from app.services.workpaper_sync import phase5_d1_expansion as _exp
-    from app.services.workpaper_sync.adapters.base import Projection
-    from app.services.workpaper_sync.phase5_row_table_sheet import (
-        RowTableStorePayloadError,
-        StoreKind,
-        build_store_projection as _engine_build,
+    from app.services.workpaper_sync.phase5_d1_combined_store import (
+        build_combined_store_projection as _impl,
     )
 
-    values: dict[str, Any] = {}
-    row_keys: dict[str, tuple[str, ...]] = {}
-    dict_item_ids: set[str] = set()
+    return _impl(payloads, contract=contract, limits=limits)
 
-    for spec in _exp.managed_row_table_specs():
-        if spec.store_kind is StoreKind.dict:
-            # dict 形态（D1-7 备查簿 `{bankRows, commercialRows}`）由专用门面整体投影，
-            # 两个区共用同一 store item ⇒ 只跑一次。
-            dict_item_ids.add(spec.store_item_id)
-            continue
-        raw = payloads.get(spec.store_item_id, spec.empty_payload)
-        try:
-            proj = _engine_build(spec, raw, contract=contract, limits=limits)
-        except RowTableStorePayloadError as exc:
-            # 保持 4xx（同 build_store_projection 的转译约定），并点明是哪个 item。
-            raise StorePayloadError(f"{spec.store_item_id}: {exc}") from exc
-        values.update(proj.values)
-        row_keys.update(dict(proj.row_keys))
 
-    for item_id in sorted(dict_item_ids):
-        try:
-            proj = _d107.build_d17_store_projection(
-                payloads.get(item_id, "{}"), contract=contract, limits=limits
-            )
-        except _d107.D17StorePayloadError as exc:
-            raise StorePayloadError(f"{item_id}: {exc}") from exc
-        values.update(proj.values)
-        row_keys.update(dict(proj.row_keys))
+def merge_projection_into_all_d1_stores(
+    *,
+    projection: Any,
+    base_by_item: Mapping[str, Any],
+) -> dict[str, tuple[list[dict[str, Any]], int, int, set[str]]]:
+    """把反读回来的 Projection 分派回各 store item —— 薄转发伴生模块。
 
-    # ── 静态受管区（第三条通路）────────────────────────────────────────
-    for item_id, build_fn in _static_region_projection_builders():
-        try:
-            proj = build_fn(payloads.get(item_id, "[]"), contract=contract)
-        except ValueError as exc:
-            raise StorePayloadError(f"{item_id}: {exc}") from exc
-        values.update(proj.values)
-        row_keys.update(dict(proj.row_keys))
-
-    return Projection(
-        contract_id=contract.contract_id,
-        semantic_version=contract.semantic_version,
-        document_type=contract.document_type,
-        values=values,
-        row_keys=row_keys,
+    真源在 `phase5_d1_combined_store`。签名（全关键字参数）与返回形态逐项照抄真源，
+    **不按命名习惯推** —— 首版我把 `base_by_item` 写成了 `base_payloads` 并多加了
+    `contract`，20 条判据当场以 `TypeError: unexpected keyword argument` 打红。
+    """
+    from app.services.workpaper_sync.phase5_d1_combined_store import (
+        merge_projection_into_all_d1_stores as _impl,
     )
 
+    return _impl(projection=projection, base_by_item=base_by_item)
 
 def merge_projection_into_store_rows(
     *,
@@ -907,93 +868,6 @@ def merge_projection_into_store_rows(
 # ═══════════════════════════════════════════════════════════════════════════
 # 7. 发布（顺序由 Task 12 的 publisher 强制）
 # ═══════════════════════════════════════════════════════════════════════════
-
-
-def merge_projection_into_all_d1_stores(
-    *,
-    projection: Any,
-    base_by_item: Mapping[str, Any],
-) -> dict[str, tuple[list[dict[str, Any]], int, int, set[str]]]:
-    """回方向整体镜像：把 merged projection 按 store item 分别合回各自的行数组。
-
-    由 `store_mirror._mirror_dual_stores` 经 `plan.merge_all_fn` 按名调用
-    （注册表 `dual_store_fn` 非空才会走那条多 item 路径 —— 本 entry 2026-09-28 起注册）。
-
-    🔴 与 D4 的 `merge_projection_into_all_d4_stores` 不同型：D4 是逐 item 手写清单，
-    本家**按 spec 泛化** —— 遍历伴生模块 `managed_row_table_specs()` 的 `rows` 形态 spec，
-    逐个调框架层 `merge_projection_into_store_rows(spec, ...)`。接一张新 sheet 不改本函数。
-
-    🔴 **不返回** `StoreKind.dict`（D1-7 备查簿）—— 它走注册表 `dedicated_items` 的
-    `merge_d17_from_projection`（`_mirror_dedicated_dict_stores` 负责），
-    在这里返回会与它重复写库。
-
-    🔴 **静态受管区**（D1-4 第三区）走自己的 merge 函数（行表引擎会拒静态 spec），
-    但**照常返回** —— 它有契约 table、投影里有它的 stable key，与动态区同样需要回写。
-
-    `base_by_item` 的值可能是 list（rows-store）或 dict（调用方对 dict-store 的透传），
-    本函数只接受 list；非 list 一律当空基线（与 D4 同款容差，不抛 —— 抛会让整个回写失败）。
-    """
-    from app.services.workpaper_sync import phase5_d1_expansion as _exp
-    from app.services.workpaper_sync.phase5_row_table_sheet import (
-        StoreKind,
-        merge_projection_into_store_rows as _engine_merge,
-    )
-
-    out: dict[str, tuple[list[dict[str, Any]], int, int, set[str]]] = {}
-    for spec in _exp.managed_row_table_specs():
-        item_id = spec.store_item_id
-        if not item_id or spec.store_kind is StoreKind.dict:
-            continue
-        base = base_by_item.get(item_id)
-        base_rows = list(base) if isinstance(base, list) else []
-        out[item_id] = _engine_merge(
-            spec,
-            projection=_projection_slice_for(projection, spec.table_key),
-            base_rows=base_rows,
-        )
-
-    # ── 静态受管区（专用 merge，签名与框架层一致）────────────────────────
-    from app.services.workpaper_sync import phase5_d1_04_bad_debt as _d104
-
-    for item_id, merge_fn in _static_region_merge_handlers():
-        base = base_by_item.get(item_id)
-        base_rows = list(base) if isinstance(base, list) else []
-        out[item_id] = merge_fn(
-            projection=_projection_slice_for(
-                projection, _d104.SPEC_D104_NOTETYPE.table_key
-            ),
-            base_rows=base_rows,
-        )
-    return out
-
-
-def _projection_slice_for(projection: Any, table_key: str) -> Any:
-    """取 merged projection 里**只属于该受管区**的切片。
-
-    🔴 **必须切**，不能把整份 combined projection 直接喂给框架层
-    `merge_projection_into_store_rows` —— 它遍历 `projection.stable_keys()` 并按
-    `row_key` 建行，只用 `field_to_path.get(field_id)` 做过滤。而**不同区的列名会重名**
-    （D1-2 与 D1-8 都有 `note_type`/`bill_amount` 等）⇒ 过滤挡不住，别区的行会被合进本区数组。
-
-    实测（2026-09-28，本文件配套判据 `test_merge_all_covers_every_rows_form_item` 抓到）：
-    不切片时 `D1-cat-rows` 合出 **16 行**（把 endorse/writeoff/pledge… 各区的合成行全吞了），
-    而它只该有 2 行。框架层那个函数的隐含前提是「projection 只含本区数据」——单区 provider
-    成立，多区 combined 不成立。D4 的同名 merge_all 也是「按 table 前缀分别 merge」。
-
-    切片只按 `stable_key` 的首段（`{table_key}/…`）过滤，不改框架层（那会牵动全部 adapter）。
-    """
-    from app.services.workpaper_sync.adapters.base import Projection
-
-    prefix = f"{table_key}/"
-    return Projection(
-        contract_id=projection.contract_id,
-        semantic_version=projection.semantic_version,
-        document_type=projection.document_type,
-        values={
-            k: v for k, v in dict(projection.values).items() if str(k).startswith(prefix)
-        },
-        row_keys={table_key: tuple(dict(projection.row_keys).get(table_key, ()))},
-    )
 
 
 @dataclass(frozen=True)

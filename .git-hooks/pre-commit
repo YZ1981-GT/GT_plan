@@ -64,7 +64,15 @@ done < <(git diff --cached --name-only --diff-filter=ACM)
 
 if [ ${#SIZE_ARGS[@]} -eq 0 ]; then
     echo "[pre-commit] ✅ 文件行数门禁通过（无匹配暂存文件）"
-elif ! "$PY" backend/scripts/check/check_file_size.py "${SIZE_ARGS[@]}"; then
+# 🔴 `--staged`（2026-09-28）：按**暂存内容**计数，而不是工作树内容。
+#
+# 上面选文件用的是 `git diff --cached`（= 你提交了什么），而脚本原先去读工作树
+# （= 工作树有什么）—— 两者不自洽。并发 lane 在同一文件里的**未提交**改动会被算到
+# 你头上：实测 `excel_materialize.py` 某次提交只 +31 行（暂存 3691，在基线之内），
+# 却因另一条 lane 的 ~258 行未提交改动被按 3948 判「膨胀」。
+# 那会逼人二选一：抬基线（替别人预留额度 + 把别人的膨胀记到自己账上）或 `--no-verify`
+# （门直接失效）。两条都是错的，所以改成量暂存内容。
+elif ! "$PY" backend/scripts/check/check_file_size.py --staged "${SIZE_ARGS[@]}"; then
     echo ""
     echo "[pre-commit] ❌ 文件行数超限/膨胀（见上方明细）"
     echo "          请拆分文件或抽伴生模块（优先），确有必要再更新 whitelist 基线"

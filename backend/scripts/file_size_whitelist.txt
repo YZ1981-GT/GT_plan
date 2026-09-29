@@ -607,17 +607,15 @@ backend/scripts/gen/generate_component_capability_manifest.py  852
 #   **单文件可逐条复核**（契约 digest 冻结在库里的 published definition 上，重构风险高
 #   于收益）。若后续 canary 数量继续增长（>8 个），再统一抽 `phase5_canary_base`。
 #   完整交付事实见 evidence/g5-1-canary-feasibility-and-wave-census.md §6–§11。
-# 🔴 2026-09-28 基线 1040 → 1364（spec d1-sync-row-table-engine-and-d1-coverage）。
-#   增量构成：整册门根因修复 ~90 行（复数 instrumentation 薄转发 + payload 改复数入口 +
-#   attach 补 sibling_bindings，均带长注释说明根因）+ 本 lane 早先的功能实现 ~270 行
-#   （build_store_projection +161 / merge_projection_into_store_rows +87 /
-#   _expansion_sheet_payloads +23）。
-#   🔴 **这是记账不是豁免**：门的首选处置是抽伴生模块，已登记为欠账 —— 把
-#   `build_store_projection` 与 `merge_projection_into_store_rows` 抽到
-#   `phase5_d1_store_projection.py`（entry 模块保留薄转发以维持 registry 与判据引用），
-#   预计可回落到 ~1100 行。该重构是 250 行量级的独立改动，不与本次根因修复混做。
-#   见两份 tasks.md 的 V8.5 节。
-backend/app/services/workpaper_sync/phase5_d1_notes_receivable.py  1364
+# 🔴 2026-09-28 基线 1040 → 1239（spec d1-sync-row-table-engine-and-d1-coverage）。
+#   曾一度记账到 1364（整册门根因修复 ~90 行 + 本 lane 早先的功能实现 ~270 行），
+#   当时明确写了「这是记账不是豁免，欠账是抽伴生模块」。**该欠账已销**：
+#   `build_combined_store_projection` / `merge_projection_into_all_d1_stores` /
+#   `_projection_slice_for` 共 162 行已抽到 `phase5_d1_combined_store.py`（222 行），
+#   entry 模块保留同名薄转发 ⇒ registry、判据与外部调用方的引用路径一个都没改。
+#   1364 → 1239。剩余行数是 entry 特有的常量声明 / 契约装配 / instrumentation 声明 /
+#   发布编排，与伴生模块正交，再抽就会把「一个 entry 的身份」打散。
+backend/app/services/workpaper_sync/phase5_d1_notes_receivable.py  1239
 backend/app/services/workpaper_sync/phase5_d3_prepaid_receipts.py  967
 backend/app/services/workpaper_sync/phase5_d5_receivables_financing.py  888
 backend/app/services/workpaper_sync/phase5_d6_contract_assets.py  964

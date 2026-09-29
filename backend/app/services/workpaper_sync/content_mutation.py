@@ -1879,7 +1879,20 @@ class ContentMutationService:
             # 视为等值；只要有一侧非空就仍走严格 `values_equal`（不会放过真实漂移）。
             if _is_roundtrip_empty(mine.value) and _is_roundtrip_empty(theirs.value):
                 continue
-            if not values_equal(mine.value, theirs.value, mine.value_type):
+            # 🔴 归一化失败必须**点名字段**。`normalize_value` 抛的
+            #    `ValueNormalizationError` 只说「amount 字段收到 time
+            #    datetime.time(0, 0)」，不说是哪个 stable_field_key ——
+            #    18 张表 360 个值的 entry 上这等于无法定位（本仓库已登记过
+            #    同族教训：平台报错不点名会把排查带向错误方向）。
+            #    这里只补上下文再原样抛出，不改判定语义。
+            try:
+                equal = values_equal(mine.value, theirs.value, mine.value_type)
+            except Exception as exc:  # noqa: BLE001 —— 补上下文后原样抛
+                raise type(exc)(
+                    f"受管字段 {key} 归一化失败（value_type={mine.value_type.value}，"
+                    f"提交 {mine.value!r} → 反读 {theirs.value!r}）：{exc}"
+                ) from exc
+            if not equal:
                 raise RoundtripEquivalenceError(
                     f"受管字段 {key} 反读不等值：提交 {mine.value!r} → 反读 {theirs.value!r}"
                     f"（value_type={mine.value_type.value}）—— Property 65 要求 projection "

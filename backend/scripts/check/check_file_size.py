@@ -125,6 +125,22 @@ def load_whitelist() -> dict[str, int]:
     return result
 
 
+#: `--staged` 模式：按**暂存内容**而不是工作树内容计数。
+#:
+#: 🔴 为什么需要它（2026-09-28，spec d1-sync-row-table-engine-and-d1-coverage · X1）：
+#:    pre-commit hook 用 `git diff --cached --name-only` 选**暂存文件**，却让本脚本去读
+#:    **工作树内容** —— 选的是「你提交了什么」，量的是「工作树有什么」，内部不自洽。
+#:
+#:    实测后果：`excel_materialize.py` 我只提交了 +31 行（暂存 3691，在基线 3660+5%
+#:    之内），但同一文件里另一条 lane 有 ~258 行**未提交**改动 ⇒ 门按工作树 3948 判我膨胀。
+#:    这会逼人做两件错事之一：把基线抬到 3948（替别人预留额度 + 把别人的膨胀记到自己账上），
+#:    或者 `--no-verify` 绕过（门直接失效）。
+#:
+#:    `--staged` 让「门量的东西」== 「commit 里真正是什么」。工作树模式保持默认，
+#:    手动跑脚本时的行为逐字不变。
+_STAGED_MODE = False
+
+
 def count_lines(p: Path) -> int:
     """行数。🔴 **读不出来时抛，不返 0** —— 返 0 会让 `0 > limit` 恒假 ⇒ 门禁静默放行。
 
@@ -132,7 +148,23 @@ def count_lines(p: Path) -> int:
     `except Exception: return 0`，配合 `main()` 对相对路径按**仓库根**解析，导致在
     `cwd=backend` 下传 `tests/…/x.py`（或任何拼错/不存在的路径）都 **exit=0 假通过** ——
     一个 1055 行的文件曾因此被报成「通过」。
+
+    `--staged` 模式下读 `git show :<path>`（暂存内容）。取不到暂存内容时**抛**而不是
+    静默回落工作树 —— 回落会让「我以为门量的是暂存」变成一句空话。
     """
+    if _STAGED_MODE:
+        import subprocess
+
+        rel = str(p.relative_to(ROOT)).replace("\\", "/")
+        proc = subprocess.run(
+            ["git", "show", f":{rel}"], cwd=str(ROOT), capture_output=True
+        )
+        if proc.returncode != 0:
+            raise OSError(
+                f"--staged 模式下取不到 {rel} 的暂存内容（git show :{rel} "
+                f"exit={proc.returncode}）—— 该文件未暂存？拒绝回落工作树"
+            )
+        return len(proc.stdout.decode("utf-8", "replace").splitlines())
     return len(p.read_text(encoding="utf-8").splitlines())
 
 
@@ -218,7 +250,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("files", nargs="*", help="检查文件路径（pre-commit 传入）")
     parser.add_argument("--print-current-violations", action="store_true",
                         help="输出当前所有超限文件，用于生成 whitelist 基线")
+    parser.add_argument(
+        "--staged", action="store_true",
+        help="按**暂存内容**计数（pre-commit 用）。默认读工作树。见 `_STAGED_MODE` 的说明："
+             "hook 选的是暂存文件，量的却是工作树，并发 lane 的未提交改动会误判到你头上。",
+    )
     args = parser.parse_args(argv)
+    if args.staged:
+        global _STAGED_MODE
+        _STAGED_MODE = True
 
     whitelist = load_whitelist()
 
