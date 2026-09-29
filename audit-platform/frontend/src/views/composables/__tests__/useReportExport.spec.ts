@@ -94,9 +94,31 @@ describe('useReportExport — onExportAllExcel', () => {
     onExportAllExcel()
     await flushPromises()
 
+    // 🔴 2026-09-28 修：文件名由 `全部报表_2025.xlsx` 更正为 `全部报表_已审_2025.xlsx`。
+    // 实现里已审/未审是**成对**的两个导出（未审走 `?mode=unadjusted`、名为 `全部报表_未审_`），
+    // 文件名带口径标记是有意设计 —— 审计交付物混淆已审/未审后果严重。
+    // 旧期望缺 `已审_`，该条一直红。
     expect(mockDownloadFileAsBlob).toHaveBeenCalledWith(
       '/api/reports/proj-1/2025/export',
-      '全部报表_2025.xlsx',
+      '全部报表_已审_2025.xlsx',
+    )
+  })
+
+  // 原测试只覆盖了已审一半 ⇒ 补未审路径，并钉死「两者 URL 与文件名都不得混」
+  it('未审导出走 mode=unadjusted 且文件名带「未审」（与已审成对，不得混淆）', async () => {
+    const options = createOptions()
+    const { onExportAllUnadjusted } = useReportExport(options) as any
+    if (typeof onExportAllUnadjusted !== 'function') {
+      // 该导出若改名/下线，本条应显式失败而不是静默跳过
+      throw new Error('useReportExport 未暴露未审全量导出方法，请更新本判据')
+    }
+
+    onExportAllUnadjusted()
+    await flushPromises()
+
+    expect(mockDownloadFileAsBlob).toHaveBeenCalledWith(
+      '/api/reports/proj-1/2025/export?mode=unadjusted',
+      '全部报表_未审_2025.xlsx',
     )
   })
 })
