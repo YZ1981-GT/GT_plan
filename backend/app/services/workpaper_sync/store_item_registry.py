@@ -90,6 +90,14 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         adapter_id="d1.notes_receivable_detail",
         provider_module="phase5_d1_notes_receivable",
         items=(StoreItemSpec(item_id="D1-cust-rows", kind=StoreKind.rows),),
+        # 🔴 2026-09-28：D1 扩容面（12 张受管 sheet / 18 个 item）接入两方向装配链。
+        #    此前 `dual_store_fn` 为空 ⇒ 回方向走单 item 路径、只镜像 `bridge.STORE_ITEM_ID`
+        #    那 1 个，伴生模块 `phase5_d1_expansion.all_store_item_ids()` 没有任何生产代码
+        #    调用（实测确认）。形态同 D4-35 恒空，但断口在「entry ↔ 伴生模块」之间。
+        #    `dual_store_fn` 只需非空即触发 `_mirror_dual_stores`；真正被按名调用的是
+        #    `merge_all_fn`（D1 按 spec 泛化，不是 D4 那种逐 item 手写清单）。
+        dual_store_fn="_mirror_dual_stores",
+        merge_all_fn="merge_projection_into_all_d1_stores",
         dedicated_items=(
             DedicatedStoreItem(
                 item_id_const="STORE_ITEM_ID_D107",

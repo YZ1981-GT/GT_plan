@@ -226,9 +226,22 @@ def _visible_to_inbound(module, plan) -> tuple[str, ...]:
     return tuple(inbound)
 
 
-def _declared_全集(entry_module: str) -> tuple[str, ...]:
-    """provider 声明的全部 item（entry ∪ 伴生模块的 `all_store_item_ids()`）。"""
+def _declared_全集(entry_module: str) -> tuple[tuple[str, ...], str | None]:
+    """provider 声明的全部 item（entry ∪ 伴生模块的 `all_store_item_ids()`）。
+
+    返回 `(items, unresolvable_reason)`。
+
+    🔴 第二个返回值是 2026-09-28 加的：`importlib.import_module` 成功**不代表**
+    `all_store_item_ids()` 能跑。D3/D5/D6/D7 的 expansion 模块在**函数体内** lazy import
+    自己的 sheet 子模块（`from ... import phase5_d3_06_related_party as _d306`），
+    那些子模块属别 lane 且**尚未入库** ⇒ 顶层 import 一切正常，一调用就 ImportError。
+    纯 HEAD 检出上本门因此直接崩（traceback 退出），CI 上就是一个无从判读的红。
+
+    静默 `continue` 也不行：那会让「声明 0 个 item」看起来像合规，把断口变成假绿。
+    所以把原因带回去，由 `run()` 记为 `unresolvable` 单列并按棘轮登记。
+    """
     out: list[str] = []
+    reason: str | None = None
     for name in (entry_module, _companion_of(entry_module)):
         if not name:
             continue
@@ -238,7 +251,12 @@ def _declared_全集(entry_module: str) -> tuple[str, ...]:
             continue
         fn = getattr(mod, "all_store_item_ids", None)
         if callable(fn):
-            for i in fn():
+            try:
+                items = list(fn())
+            except Exception as exc:  # noqa: BLE001
+                reason = f"{name}.all_store_item_ids(): {type(exc).__name__}: {exc}"
+                continue
+            for i in items:
                 if i not in out:
                     out.append(str(i))
         else:
@@ -248,7 +266,7 @@ def _declared_全集(entry_module: str) -> tuple[str, ...]:
             single = getattr(mod, "STORE_ITEM_ID", None)
             if isinstance(single, str) and single and single not in out:
                 out.append(single)
-    return tuple(out)
+    return tuple(out), reason
 
 
 def run() -> dict[str, Any]:
@@ -260,6 +278,7 @@ def run() -> dict[str, Any]:
 
     unwired: list[dict[str, Any]] = []
     known_hit: list[dict[str, Any]] = []
+    unresolvable: list[dict[str, Any]] = []
     checked = 0
     for adapter_id, plan in sorted(STORE_MERGE_REGISTRY.items()):
         entry_module = str(getattr(plan, "provider_module", "") or "")
@@ -269,7 +288,23 @@ def run() -> dict[str, Any]:
             entry = importlib.import_module(
                 f"app.services.workpaper_sync.{entry_module}"
             )
+        except ModuleNotFoundError as exc:
+            # 🔴 entry 模块**在当前检出里不存在**（别 lane 的 provider 尚未入库：实测
+            #    HEAD 上 g7/h1 的 `pilot_*_store_merge.py` 与 d5/d6/d7 的 provider 都是
+            #    这种状态，而 registry 已提交对它们的引用）。这是检出状态而非接线缺陷，
+            #    与「函数体内 lazy import 崩」同类，一并归入 unresolvable：
+            #    不崩、不判红（除非是 `d1.*`）、也**不算**棘轮失效。
+            unresolvable.append(
+                {
+                    "adapter_id": adapter_id,
+                    "entry_module": entry_module,
+                    "companion": _companion_of(entry_module),
+                    "reason": f"entry 模块导入失败 {type(exc).__name__}: {exc}",
+                }
+            )
+            continue
         except Exception as exc:  # noqa: BLE001
+            # 模块存在但 import 时抛别的错 —— 那是真缺陷，照旧判红。
             unwired.append(
                 {
                     "adapter_id": adapter_id,
@@ -285,7 +320,20 @@ def run() -> dict[str, Any]:
         outbound = set(_visible_to_outbound(entry))
         inbound = set(_visible_to_inbound(entry, plan))
         inbound_error = None
-        declared = set(_declared_全集(entry_module))
+        declared_tuple, declared_unresolvable = _declared_全集(entry_module)
+        if declared_unresolvable is not None:
+            # 🔴 声明层在当前检出不可解析（别 lane 的 sheet 子模块未入库）。
+            #    既不崩也不静默跳过 —— 单列出来，由棘轮登记决定是否阻塞。
+            unresolvable.append(
+                {
+                    "adapter_id": adapter_id,
+                    "entry_module": entry_module,
+                    "companion": _companion_of(entry_module),
+                    "reason": declared_unresolvable,
+                }
+            )
+            continue
+        declared = set(declared_tuple)
         invisible_out = sorted(declared - outbound)
         invisible_in = sorted(declared - inbound)
         if not invisible_out and not invisible_in:
@@ -311,14 +359,29 @@ def run() -> dict[str, Any]:
             unwired.append(row)
 
     hit_ids = {r["adapter_id"] for r in known_hit}
-    stale = sorted(a for a in KNOWN_UNWIRED if a not in hit_ids)
+    unresolvable_ids = {r["adapter_id"] for r in unresolvable}
+    # 🔴 声明层不可解析的 adapter 不能算「已失效」—— 它根本没被判定过。
+    #    否则纯 HEAD 检出会要求删掉一批**仍然有效**的登记，删完等别 lane 入库就成漏报。
+    stale = sorted(
+        a for a in KNOWN_UNWIRED if a not in hit_ids and a not in unresolvable_ids
+    )
+
+    # 🔴 本 spec 自己的 provider **必须**永远可解析：它不可解析就是本 lane 漏提交了
+    #    子模块（2026-09-28 实测过一次：6 个 D1 子模块漏提交，靠干净检出才发现）。
+    #    别 lane 的不可解析只打印不判红 —— 那是他们的入库节奏，不该阻塞本门。
+    own_unresolvable = sorted(
+        r["adapter_id"] for r in unresolvable if r["adapter_id"].startswith("d1.")
+    )
 
     return {
-        "ok": not unwired and not stale,
+        "ok": not unwired and not stale and not own_unresolvable,
         "adapters_checked": checked,
         "new_unwired": sorted(unwired, key=lambda r: r["adapter_id"]),
         "known_unwired_hit": sorted(known_hit, key=lambda r: r["adapter_id"]),
         "stale_known_unwired": stale,
+        # 声明层在当前检出不可解析（函数体内 lazy import 的子模块未入库）。
+        "unresolvable_declarations": sorted(unresolvable, key=lambda r: r["adapter_id"]),
+        "own_lane_unresolvable": own_unresolvable,
     }
 
 
@@ -350,7 +413,27 @@ def main() -> int:
                 f"⇒ 出方向看不到 {r['invisible_count']} 个"
                 + ("（两方向不等）" if not r["two_way_equal"] else "")
             )
+        for r in report["unresolvable_declarations"]:
+            print(
+                f"   [声明层不可解析] {r['adapter_id']}（{r['entry_module']}）："
+                f"{r['reason']}"
+            )
+        if report["unresolvable_declarations"]:
+            print(
+                "   （以上 provider 的 `all_store_item_ids()` 在**函数体内** lazy import"
+                " 了尚未入库的 sheet 子模块 —— 属别 lane 的入库节奏，本门不判红但如实列出；"
+                "若其中出现 `d1.*` 则一定是本 lane 漏提交，会判红）"
+            )
         return 0
+
+    if report["own_lane_unresolvable"]:
+        print(
+            f"❌ 本 lane（`d1.*`）有 {len(report['own_lane_unresolvable'])} 个 provider 的"
+            f"声明层在当前检出**不可解析** —— 几乎一定是漏提交了 sheet 子模块："
+        )
+        for r in report["unresolvable_declarations"]:
+            if r["adapter_id"] in report["own_lane_unresolvable"]:
+                print(f"   [不可解析] {r['adapter_id']}：{r['reason']}")
 
     if report["stale_known_unwired"]:
         print(
@@ -359,6 +442,9 @@ def main() -> int:
         )
         for a in report["stale_known_unwired"]:
             print(f"   [失效] {a}")
+
+    if not report["new_unwired"]:
+        return 1
 
     for r in report["new_unwired"]:
         if r.get("error"):

@@ -187,8 +187,16 @@ def run() -> dict[str, Any]:
             violations.append(v)
 
     # 反向断言：白名单里已经合规的条目必须删掉（防失效条目长期占位）。
+    #
+    # 🔴 但「已合规」与「在当前检出里根本不存在」必须分开（2026-09-28 实测）：
+    #    E1-6 的 provider `phase5_e1_06_reconciliation.py` 是**别 lane 尚未入库**的文件。
+    #    在开发者工作树上它存在且仍违规（白名单正确），在纯 HEAD 检出上它不存在 ⇒
+    #    旧口径 `k not in hit_keys` 会把它判成「已失效，请删白名单」—— 于是 CI 上
+    #    要求删掉一条**其实仍然有效**的登记，删了之后等那条 lane 提交，门就变成漏报。
+    #    正确口径：只有受管区**确实被扫到**且不再违规，才算失效。
     hit_keys = {(v["managed_sheet"], v["table_key"]) for v in known_hit}
-    stale_gaps = [k for k in KNOWN_GAPS if k not in hit_keys]
+    stale_gaps = [k for k in KNOWN_GAPS if k in specs and k not in hit_keys]
+    absent_gaps = [k for k in KNOWN_GAPS if k not in specs]
 
     return {
         "ok": not violations and not stale_gaps,
@@ -200,6 +208,9 @@ def run() -> dict[str, Any]:
         "violations": sorted(violations, key=lambda v: (v["managed_sheet"], v["table_key"])),
         "known_gaps_hit": sorted(known_hit, key=lambda v: (v["managed_sheet"], v["table_key"])),
         "stale_known_gaps": sorted(f"{s} / {t}" for s, t in stale_gaps),
+        # 不判红，但必须打印 —— 它意味着「该登记项所属 provider 模块在当前检出里
+        # 不存在」（通常是别 lane 未入库）。不打印就会变成第二种遮羞布。
+        "absent_known_gaps": sorted(f"{s} / {t}" for s, t in absent_gaps),
     }
 
 
@@ -224,6 +235,11 @@ def main() -> int:
             print(
                 f"   [已登记] {v['managed_sheet']} / {v['table_key']}："
                 f"{v['masked_editable_fields']}"
+            )
+        for s in report["absent_known_gaps"]:
+            print(
+                f"   [登记项不在本检出] {s} —— 其 provider 模块在当前检出里不存在"
+                "（通常是别 lane 未入库）。登记保留，等该模块入库后本门会重新校验它。"
             )
         if report["skipped_modules"]:
             print(f"   （{len(report['skipped_modules'])} 个模块导入失败，已跳过，不影响判定）")
