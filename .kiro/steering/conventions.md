@@ -544,7 +544,7 @@ WHERE l.project_id = :pid AND l.year = :yr
 - **🔴 fast-check `fc.float({ noNaN: true })` 仍会生成 ±Infinity（金额域必须显式给上下界）**：2026-07-30 实测 seed `1139061718` 命中 `calcChangeRate(-Infinity, 0)` → `Infinity / -Infinity` = NaN → `toBeCloseTo(NaN)` 必失败；同形状还有 `calcSubtotal([+Inf, -Inf])`、`calcNetValue(Inf, Inf)`。**这类红是生成器越界而非公式缺陷，但随机 seed 让它成为定时炸弹**（D1 两个 spec 文件潜伏至今才炸）。规矩：①金额类生成器统一 `{ min: -1e9, max: 1e9, noNaN: true }`（抽成文件级 `AMOUNT` 常量）②若必须无界，则在 predicate 里 `Number.isFinite(v) ? v : 0` 归一（G10/G11/H10 已是此写法，故一直安全）③配套把 `parseNum` 类入口从 `isNaN(n)` 改为 `Number.isFinite(n)` —— `parseFloat('Infinity')` / `parseFloat('1e400')` 都能过 `isNaN` 检查，漏进公式会让整表变 NaN
 
 ### pytest 输出与运行
-- **pytest 输出捕获铁律**：①PowerShell `2>&1 | Tee-Object` 在长时输出 + 并发情况下会出现"文件被锁"+ 静默丢失输出；正确方法 = `cmd /c "python -m pytest ... > _log 2>&1"` 然后 `Get-Content _log -Tail N` 分两步 ②本仓库未装 `pytest-timeout` 插件（`--timeout=60` 报错 unrecognized arguments）③测试代码用 `Path("backend/data")` 相对路径时必须从仓库根 cwd 跑（不能在 backend/ cwd 跑）
+- **pytest 输出捕获铁律**：①PowerShell `2>&1 | Tee-Object` 在长时输出 + 并发情况下会出现"文件被锁"+ 静默丢失输出；正确方法 = `cmd /c "python -m pytest ... > _log 2>&1"` 然后 `Get-Content _log -Tail N` 分两步 ②本仓库未装 `pytest-timeout` 插件（`--timeout=60` 报错 unrecognized arguments）③测试代码用 `Path("backend/data")` 相对路径时必须从仓库根 cwd 跑（不能在 backend/ cwd 跑） ④🔴 **本仓库亦未装 `pytest-randomly`**（`pip show` 报 not found、`--randomly-seed` 是 unrecognized argument；2026-09-29 实测）⇒ **不存在随机执行序**，「测试顺序随机导致偶发失败」这个假说在本仓库**不成立**，别再据它排查；同理**不得声称**做过「随机顺序复跑」——要那条证据须先装插件
 
 ### 跨 spec ref_id 铁律
 - **跨 spec 引擎复用 term 参数标准模式**（H→I 落地）：H-F11 折旧引擎 `_calc_*(*, term: Literal['depreciation','amortization'] = 'depreciation')` 默认值保持向后兼容；I-F2 摊销引擎调用时显式传 `term='amortization'`；schedule 输出字段名按 term 切换；写回时直接读取 `s["amortization"]` 不需手动改名兼容

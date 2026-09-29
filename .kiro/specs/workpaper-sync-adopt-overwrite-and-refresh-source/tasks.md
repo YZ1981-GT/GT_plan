@@ -1540,6 +1540,66 @@ URL 路径**（`_guard` 直接从 path 取 `entry_id`）。方案 C 要成立，
       表格第三格内禁裸 pipe；校验「每行恰 4 个未转义 pipe」
     - _Requirements: 7.4_
 
+## 🔴 复盘后按用户「逐一修复」指示补做的 6 项（2026-09-29 末轮）
+
+1. **`check_file_size.py` 门禁不可再被静默绕过**（本轮最高价值修复）。原有**两层**静默放行：
+   ① `main()` 里 `if not f.exists(): continue` —— **显式传入**的路径不存在时静默跳过，而相对路径
+   按**仓库根**解析，故 `cwd=backend` 下传 `tests/…` 必然拼不到文件；② `count_lines` 的
+   `except Exception: return 0` —— 读不出来当 0 行，`0 > limit` 恒假。两层叠加使「传错路径」与
+   「文件读不出来」都表现为 **exit=0 通过**（一个 **1055** 行文件曾因此被报成合规）。
+   修复 = 显式路径不存在 ⇒ **exit=2 + 点名 + 用法提示**；`count_lines` **抛**不再返 0；
+   另立容错版 `count_lines_or_none` 给全仓批量扫描用；`check_file` 把「读不出来」报成
+   **违规**而非 traceback。🔴 **新建守卫** `backend/tests/test_check_file_size_gate_cannot_be_bypassed.py`
+   （**10 passed**），并**逐层做过变异证明**：回退层①⇒ 2 红；回退层②⇒ 3 红；还原后 10 绿。
+   🔴 **CI 安全性已验**：`ci.yml` 无参调用走全仓扫描（不触发新判据）· pre-commit 传的是
+   **仓库根相对**的暂存文件路径（可解析）⇒ 两种既有调用方式均不受影响。
+2. **CI 的 `file-size-guard` job 此前长期红**（iron law ㉗ 的实例，且正是缺陷 1 能长期无人
+   发现的土壤）：它无参调用 ⇒ 全仓扫描 ⇒ 现存 **141** 个超限/膨胀文件 ⇒ 必然非零退出，而 job
+   既无 `continue-on-error` 也无 `if:`。已转为 **informational**（`continue-on-error: true`）
+   并在 yaml 注释里写明真实数字、真正的阻断在 pre-commit 的增量口径、以及**待决策**两条路
+   （整改/登记 141 个存量文件后恢复阻断，或改成对 base ref 的增量扫描）。YAML 已解析校验。
+3. **`INDEX.md` 5 行畸形表格已修**（行 416~420：`进度` 与 `一句话` 被并进一格 ⇒ 只有 3 个 pipe）。
+   按各行第一处 `）。` 切分还原三列；主 spec 表块（行 381~442，62 行）现**未转义 pipe 恒为 4**、
+   0 处畸形。🔴 **过程中抓到我自己的判据 bug**：先前那条「全文 123 处 pipe != 4」与「行 386/400/411/422
+   有裸 pipe」**全是误报** —— 我的计数器没有排除 `\|` 转义，而那 4 行本就正确转义
+   （`clear\|delete` / `rmb\|fx\|cert` 等）。差一步就去「修」4 行正确的数据。
+   ⇒ 判据用 `(?<!\\)\|` 现算；且「每行恰 4 个 pipe」**只对三列 spec 表成立**，全文 26 个表块里
+   有合法的二列表，不能一刀切。
+4. **`check_git_sync_state.py`（pre-push 的 6 维核查）此前在 Windows 上必崩**：
+   `UnicodeEncodeError: 'gbk' codec can't encode character '\u274c'`（❌）—— 崩在
+   `print(format_report(result))`，**在输出任何结论之前**。后果：`single` 模式把这个**崩溃**的
+   非零退出当成「6 维核查有项不达标」只警告（= 长期显示一条与 git 状态**无关**的假警告，
+   我上一轮 push 时就见到它并放过了）；`multi` 模式对同一崩溃 `exit 1` ⇒ **硬阻断每次 push**。
+   修复 = 入口 `sys.stdout/stderr.reconfigure(encoding='utf-8', errors='replace')`。
+   修后三种调用（`--for-push` / `--quiet` / 无参）均正常，且首次给出**真实**结论：
+   HEAD/ahead/behind 三维 ✅，真正不达标的是工作树 **766** 文件 + untracked **473**
+   （并发会话产物，非本 spec）。
+5. **`conventions.md` 补事实：本仓库未装 `pytest-randomly`**（`pip show` not found、
+   `--randomly-seed` unrecognized）⇒ **不存在随机执行序**，「顺序随机导致偶发失败」这个假说
+   在本仓库不成立（我曾据它排查一个 `NameError` 而浪费一轮），且**不得声称**做过随机顺序复跑。
+   写在既有「未装 `pytest-timeout`」同一条铁律旁（`memory.md` 已 199/200 行，放不下）。
+6. **Property 7 已按域重述**（design §Correctness Properties）：原文「三清单均为空」**只在
+   `declared` 为空时成立**，两个独立原因 —— ①幽灵行必然重回 `rows_added`；②🔴 `rows_updated`
+   与幽灵**无关**地恒非空（它是 `declared ∩ store_ids`，收敛后恒等于 `declared − ghost`）。
+   新文本 = 不动点三条（`rows_deleted` 空 · `rows_added` 恰等于上轮 ghost · `rows_updated`
+   恰等于 `declared − ghost`）+ 第三次重算与第二次逐值相等。定位不变（仍抓「计数虚报 / 清单与
+   落库脱钩」），只动表述不动意图。
+
+### 🔴 经评估**刻意不做**的两项（附理由，避免下轮当成漏项）
+
+- **不拆 `test_aos_plan_digest_mutants.py`（现 800/800，零余量）**：现算确认**无可回收空白**
+  （超 PEP8 的 3+ 空行 **0** 处、行尾空白 **0** 行），即它是真的写满；而该文件已**交付完成且全绿**，
+  内含 31 例紧耦合变异反证 + 经**顶层模块名** import 共享的累计器 `_P46_MUTANT_REDS`，
+  再切一刀会引入第三个模块实例的风险。⇒ 为「未来余量」去动一个完成且通过的文件是有实际风险的
+  churn。**改为登记约束**：下一个要往这里加判据的任务**必须先抽伴生件**。
+  其余紧余量同此处置：`adopt_substrate_response.py` 783/800（余 17）·
+  `adopt_overwrite_plan.py` 780/800（余 20）· `adopt_row_reader.py` 767/800（余 33）·
+  `GtWpRenderer.vue` 1469/1500（余 31）· `wp_sync_router.py` 3199 vs 膨胀上限 3257（余 58）。
+- **不把 `syncEntryId` 铺到其余 ~60 个业务组件**：那是**功能铺开**不是缺陷修复，且每个组件的
+  `_SYNC_ENTRY_ID` 常量名/位置不一（现算 `defineExpose` present/absent 都有），逐个改需按域评估。
+  当前 canary（D4）已足以验证全路径；其余底稿走 10.3 的禁用态（**正确行为**，不是缺陷）。
+  ⇒ 留作独立任务，需用户就「铺开范围」拍板。
+
 - [x] 15. Final checkpoint — Ensure all tests pass
   - **后端 28 文件定向回归 `771 passed / 0 failed / 0 xfailed`**（两次调用合计：25 文件 641 +
     3 文件 130；`-rfxX` 确认无 XPASS）

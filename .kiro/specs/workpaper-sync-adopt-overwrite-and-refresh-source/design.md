@@ -761,8 +761,26 @@ SMOKE）：**prework 初算 11，写作时把 5.3 也判为 property 后为 12**
 ### Property 7: 应用计划后重算计划为空（收敛）
 
 *For any* `(substrate projection, store 载荷)`，按 Overwrite_Plan 应用一次之后，以同一 substrate
-projection 对新载荷重算 Overwrite_Plan，其 `rows_added` / `rows_deleted` / `rows_updated`
-三个清单均为空。
+projection 对新载荷重算 Overwrite_Plan，应满足**不动点**三条：
+`rows_deleted` 为空 · `rows_added` **恰等于**上一轮登记的 `rows_ghost_dropped` ·
+`rows_updated` **恰等于** `declared − rows_ghost_dropped`；且第三次重算与第二次逐值相等。
+
+🔴 **原文「三个清单均为空」已按域重述（Task 6.6 实测证伪）**。逐字文本**只在 `declared` 为空时成立**，
+有两个各自独立的原因：
+1. **幽灵行**：被幽灵行门剔除的身份 —— substrate 声明了它、store 侧始终没有 —— 重算时必然**再次**
+   落进 `rows_added`；
+2. 🔴 **`rows_updated` 与幽灵无关地恒非空**：它的定义是 `declared ∩ store_ids`（两侧都有 ⇒ 字段以
+   substrate 为权威更新），而「收敛」的含义恰是两侧行集一致 ⇒ 收敛后
+   `rows_updated == declared − ghost`。**这一条与幽灵行无关**，即便零幽灵也成立。
+
+⇒ 「三清单均为空」等价于 `declared` 为空，照它写判据必然落进**平凡输入**（Task 6.6 的
+`TestLiteralTextApplicabilityDomain` 把这件事做成了可执行断言：7 条语料里只有 2 条满足逐字文本，
+且其中 1 条并不平凡）。本重述与 Property 1 已采用的「减去幽灵剔除集」是**同一条**处置 ——
+上面「P1 与 P3 不合并」那一格早已写明「不改 P1 表述就会得到两条互相矛盾的 property」，
+Property 7 此前正处于那个状态。
+
+🔴 **定位不变**：P4/P7 与 P1/P7 两格给 Property 7 的职责（抓「计数虚报 / 清单与落库脱钩」）
+**完全成立且已兑现** —— 重述只动表述、不动意图。
 
 **Validates: Requirements 3.8**
 

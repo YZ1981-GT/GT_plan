@@ -126,10 +126,28 @@ def load_whitelist() -> dict[str, int]:
 
 
 def count_lines(p: Path) -> int:
+    """行数。🔴 **读不出来时抛，不返 0** —— 返 0 会让 `0 > limit` 恒假 ⇒ 门禁静默放行。
+
+    历史缺陷（spec workpaper-sync-adopt-overwrite-and-refresh-source 复盘）：原实现是
+    `except Exception: return 0`，配合 `main()` 对相对路径按**仓库根**解析，导致在
+    `cwd=backend` 下传 `tests/…/x.py`（或任何拼错/不存在的路径）都 **exit=0 假通过** ——
+    一个 1055 行的文件曾因此被报成「通过」。
+    """
+    return len(p.read_text(encoding="utf-8").splitlines())
+
+
+def count_lines_or_none(p: Path) -> int | None:
+    """给 `--print-current-violations` 这类**批量扫描**用：读不出来返回 None 并跳过。
+
+    与 :func:`count_lines` 的分工：批量扫描面对整个仓库，个别文件编码异常不该中断扫描；
+    而**显式传入**的路径读不出来是调用方的错，必须 fail visible（见 `main()`）。
+    """
     try:
-        return sum(1 for _ in p.read_text(encoding="utf-8").splitlines())
-    except Exception:
-        return 0
+        return count_lines(p)
+    except OSError:
+        return None
+    except UnicodeDecodeError:
+        return None
 
 
 def check_file(rel_path: str, abs_path: Path, whitelist: dict[str, int]) -> tuple[int, str]:
@@ -140,7 +158,15 @@ def check_file(rel_path: str, abs_path: Path, whitelist: dict[str, int]) -> tupl
         return 0, ""
     if rel_path.endswith(GENERATED_SUFFIXES):
         return 0, ""
-    lines = count_lines(abs_path)
+    # 🔴 读不出来 = **违规**，既不是「通过」也不该抛栈：把它报成一条可读的失败。
+    #    （历史缺陷是把它当 0 行 ⇒ 静默通过；直接让异常冒泡又会变成难读的 traceback。）
+    try:
+        lines = count_lines(abs_path)
+    except (OSError, UnicodeDecodeError) as exc:
+        return 1, (
+            f"❌ [读取失败] {rel_path}: {type(exc).__name__} —— 无法按 UTF-8 读取，"
+            "行数判据无从成立（**不视为通过**）"
+        )
 
     # hard cap 优先：已瘦身文件登记的显式 ceiling，防退化
     if rel_path in HARD_CAPS:
@@ -201,18 +227,39 @@ def main(argv: list[str] | None = None) -> int:
         for f in scan_default():
             rel = str(f.relative_to(ROOT)).replace("\\", "/")
             limit = LIMITS.get(f.suffix, 99999)
-            lines = count_lines(f)
-            if lines > limit:
+            lines = count_lines_or_none(f)
+            if lines is not None and lines > limit:
                 print(f"{rel} {lines}")
         return 0
 
-    if args.files:
+    explicit = bool(args.files)
+    if explicit:
         files = [ROOT / Path(f) for f in args.files]
     else:
         files = scan_default()
 
     exit_code = 0
     messages: list[str] = []
+
+    # 🔴 **显式传入**的路径必须存在：原实现 `if not f.exists(): continue` 会把「路径拼错」
+    #    静默变成「检查通过」。相对路径一律按**仓库根**解析（见下方 usage 提示），
+    #    所以在 `cwd=backend` 下传 `tests/…` 是最常见的踩法。
+    if explicit:
+        missing = [str(f) for f in files if not f.exists() or not f.is_file()]
+        if missing:
+            print(
+                "❌ [路径不存在] 以下显式传入的路径解析不到文件（相对路径按**仓库根**解析）：",
+                file=sys.stderr,
+            )
+            for m in missing:
+                print(f"    {m}", file=sys.stderr)
+            print(
+                "  提示：从仓库根传 `backend/xxx.py` / `audit-platform/frontend/src/xxx.vue`；"
+                "在 backend/ 目录下传 `tests/...` 会拼成 <repo>/tests/... 而不存在。",
+                file=sys.stderr,
+            )
+            return 2
+
     for f in files:
         if not f.exists() or not f.is_file():
             continue
