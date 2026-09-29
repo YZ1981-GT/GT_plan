@@ -68,6 +68,27 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
     }
 
     // 渲染时合并续表：表名以"续"开头 或 含"（续："的表，把其列合并到同名主表
+    //
+    // 🔴 必须先深拷贝再合并（2026-09-28 修，原实现是真实缺陷）：
+    // 原码 `merged.push(t)` 推的是**源对象引用**，随后 `prev.headers = [...]` /
+    // `prev.rows = prevRows` 直接写在 `currentNote.table_data._tables` 上。
+    // 后果 = computed 改写自己的响应式依赖 ⇒ 每次重算把续表列再追加一遍。
+    // 实测（探针）：首次求值后源 headers 由 ['项目','期末余额'] 变成
+    // ['项目','期末余额','期初余额']；第二次求值再变成 [... ,'期初余额','期初余额']。
+    // 触发路径：有续表的章节里改一次单元格 → 依赖变化 → 重算 → 列重复。
+    // 故这里对参与合并的表做**逐层拷贝**（表壳 + headers 数组 + 每行 + 每行 values），
+    // 合并只发生在副本上，源数据只读。
+    const cloneTable = (t: any) => ({
+      ...t,
+      headers: Array.isArray(t?.headers) ? [...t.headers] : t?.headers,
+      rows: Array.isArray(t?.rows)
+        ? t.rows.map((r: any) => ({
+            ...r,
+            values: Array.isArray(r?.values) ? [...r.values] : r?.values,
+          }))
+        : t?.rows,
+    })
+
     const merged: any[] = []
     for (let i = 0; i < rawTables.length; i++) {
       const t = rawTables[i]
@@ -77,7 +98,7 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
       if (isContinuation && merged.length > 0) {
         // 有独立列定义（_column_groups 或 columns）的续表不合并——它是完整独立子表
         if (t._column_groups || (t.columns && Array.isArray(t.columns) && t.columns.length > 0)) {
-          merged.push(t)
+          merged.push(cloneTable(t))
           continue
         }
         // 找到对应主表（续表名通常含主表名前缀）
@@ -89,7 +110,7 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
           if (matchIdx >= 0) prevIdx = matchIdx
           else {
             // 找不到对应主表，作为独立 tab 保留不合并
-            merged.push(t)
+            merged.push(cloneTable(t))
             continue
           }
         }
@@ -116,7 +137,7 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
         }
         prev.rows = prevRows
       } else {
-        merged.push(t)
+        merged.push(cloneTable(t))
       }
     }
     return merged
