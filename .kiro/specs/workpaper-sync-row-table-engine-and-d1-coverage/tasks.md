@@ -2810,6 +2810,44 @@ X5 改完、5 条判据全绿、手动 `--staged` rc=0，**但 `git commit` 仍�
 第三条**先是红的**（真抓住了本次的坑），跑 `install.ps1` 后转绿 —— 红→绿的因果链
 是它有效性的证明，不是「写完就绿」。
 
+#### X5-c. ✅ 「门禁脚本存在」≠「CI 真的跑它」（同型第三次）
+
+补提交时发现：`check_row_table_formula_columns_consistency.py`（Gate 5）与
+`check_store_item_two_way_parity.py`（Gate 6）**从未提交过**（`git log` 对这 2 个门禁
++ 2 个自测零记录），把它们接进 `governance-checks.yml` 的那段 yml 改动**也没提交**。
+
+于是形成一个双向都看不见的空洞：
+
+* 只看本地 → 门禁在、手动跑 exit 0、自测全绿，一切正常；
+* 只看 HEAD → workflow 不引用它们，CI 也不会红。
+
+⇒ 本 spec C-2 写的「`formula_columns ∩ {editable 列} == ∅` 立成 CI 卡点」，
+在仓库里**没有任何对应物**。已连同 4 个文件 + yml 接线一并入库。
+
+🔴 这是本轮同型的**第三次**，形状一致 ——「声明层已完备，接入层是空的」：
+
+| # | 声明层 | 接入层实际 | 骗过我的东西 |
+|---|--------|-----------|-------------|
+| X5-b | 脚本支持 `--staged` | `.git/hooks/` 仍是旧版 | 用 `'--staged' in text` 判断，命中的是注释 |
+| X5-b | 判据断言 CLI 接受 flag | flag 没接到 `_STAGED_MODE` | 只验接线不验语义（M3 漏报） |
+| X5-c | 门禁脚本写好且自测全绿 | 文件未入库 + CI 未引用 | 「本地能跑」当成了「已生效」 |
+
+⇒ 新增判据 `backend/tests/scripts/test_ci_declared_gates_exist.py`（7 条）把**接入层**
+钉住：两个 workflow 里出现的每个 `backend/(scripts|tests)/**.py` 都必须存在
+**且被 `git ls-files` 认得**（存在但未跟踪同样判红 —— 那正是本次的形态）。
+这条判据自己也接进了 CI 的自测清单（否则同一个坑再踩一遍）。3 处变异全打红。
+
+🔴 **它一上手就抓到一处他 lane 既存欠账**：`ci.yml` 的 `audit-xlsx-drift` job 引用
+`backend/scripts/audit_a7_a15_xlsx.py`，而该脚本磁盘上不存在。该 job 标着
+`continue-on-error: true` 所以 CI 整体不红 —— 代价是它宣称的「验证 xlsx 审计未脱节」
+**从来没生效过**，而注释还写着「观察 2 周后移除改 hard fail」。
+
+不属本 spec 范围，按棘轮登记（`_KNOWN_MISSING` 一条）并配**三条反向断言**防它烂成
+遮羞布：①登记项必须真的仍然缺失（补回来就得删登记）②所在 job 必须**仍然**是
+`continue-on-error`（有人改 hard fail 而脚本没补回 ⇒ 立刻红）③白名单只许变短。
+第②条按 **YAML 解析取 job 级字段**而不是文本匹配 `continue-on-error` ——
+后者分不清是哪个 job 的（还是铁律㉖那条纪律）。
+
 #### X6. ✅ T7-A 余波：两条写死 18 个 store item 的判据
 
 `test_check_store_item_two_way_parity.py` 有两条判据在 T7 裁决 A 撤回静态第三区后陈旧：

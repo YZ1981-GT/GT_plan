@@ -6041,8 +6041,10 @@ jobs:
 
 
   row-table-engine-and-registry-guards:
-    # 行表引擎 + store 形态注册表四道卡点
-    # （spec d1-sync-row-table-engine-and-d1-coverage Tasks 20/21/22 · Requirements 7.1~7.5）
+    # 行表引擎 + store 形态注册表**六道**卡点
+    # （spec d1-sync-row-table-engine-and-d1-coverage Tasks 20/21/22 · Requirements 7.1~7.5；
+    #   第 5 道 = 2026-09-28 实测缺陷② 防复发 · Requirements 1.2 / 6.6；
+    #   第 6 道 = 缺陷③ 两方向 parity 棘轮基线 · Requirements 3.1 / 3.3 / 7.3）
     #
     # 🔴 为什么四道都进 CI 而不只放 pytest：`tests/workpaper_sync/` 有大量与本 spec 无关的
     #    既存失败（另有 tests/scripts 10 项已 stash 验证与本 spec 零交集），在那个分母上
@@ -6088,16 +6090,48 @@ jobs:
         run: python backend/scripts/check/check_sheet_specs_fully_registered.py
       - name: Gate 4 — registry lookup is O(1) dict (linear probe counter-proof)
         run: python backend/scripts/check/check_sync_registry_lookup_is_o1.py
+      # 🔴 Gate 5（2026-09-28 新增）—— formula_columns 不得覆盖任何 editable 字段的列。
+      #    实测缺陷：D1 有 8 个受管区把「只在 footer 出现的 SUM 列」填进 formula_columns，
+      #    而 formula_mask 现算为 {col}{first_data_row}:{col}{last_data_row}（覆盖数据区、
+      #    覆盖不到 footer）⇒ 14 个 editable 字段的整个数据区被 merge._protection 判
+      #    read_only_masked_cell，OO 改动写不回 store（需求 1.5 在后端不可达，与 D4-1 修前同型）。
+      #    对保护 footer 毫无作用，纯误伤。
+      #    规则刻意是「交集为空」而非「恰等于 mode=formula 列集」：后者在本仓库有 10 处假阳
+      #    （TEMPLATE_ONLY_FORMULA_COLUMNS_* 形态 —— 模板有列、store 侧前端重算、不进
+      #    field_specs，只进 mask 让 OO 只读，完全正当）。自测含**双向**变异反证。
+      - name: Gate 5 — formula_columns must not mask any editable column
+        run: python backend/scripts/check/check_row_table_formula_columns_consistency.py
+      # 🔴 Gate 6（2026-09-28 新增）—— 出/回两方向能取到的 store item 集合 == provider 声明全集。
+      #    需求 3.3 的精确落点。既有 Gate（check_store_item_ids_fully_wired）只覆盖 D4 一家，
+      #    D1 的 18 个 item 零覆盖。实测：42 个 adapter 里 14 个「声明了 N 个、装配链只看得到
+      #    1 个」，合计 48 个 item 不可见（D1 最大：18 声明 / 1 可见 / 缺口 17）。
+      #    根因是两方向的取法与「声明放在哪」不匹配：出方向门槛是 len(STORE_ITEM_IDS)>1
+      #    （复数常量），回方向分派点是 plan.dual_store_fn；而 D1/D3/D5/D6/D7 的扩容声明全在
+      #    伴生模块 phase5_*_expansion 里，两方向都不读它 ⇒ 伴生模块的 all_store_item_ids()
+      #    没有任何生产代码调用。棘轮基线 KNOWN_UNWIRED 冻结这 14 家（**只许变短**），
+      #    新增立即红；基线项修好后不删也会红（失效条目检查）。
+      - name: Gate 6 — store item two-way parity (ratchet baseline, shrink only)
+        run: python backend/scripts/check/check_store_item_two_way_parity.py
       # 卡点自身的变异反证自测（stdlib + pytest，不依赖 tests/workpaper_sync 既存失败分母）
       - name: Install guard self-test dependency
         run: python -m pip install pytest==8.4.2
-      - name: Run the four guards' self-tests (with mutation counter-proofs)
+      # 🔴 接入层对账（2026-09-28 新增）——「workflow 声明的每个 backend/*.py 都必须
+      #    在版本控制里」。本轮实测：Gate 5/6 的 2 个门禁 + 2 个自测本地全绿、tasks.md
+      #    也登记了「立成 CI 卡点」，但四个文件**从未提交**，接线的 yml 改动也没提交
+      #    ⇒ 只看本地一切正常、只看 HEAD 则 CI 压根不引用，「卡点已建立」在仓库里
+      #    没有任何对应物。这条判据自己就是防这个的，所以必须自己进 CI。
+      #    附带抓到一处他 lane 既存欠账（ci.yml 的 audit-xlsx-drift 引用的脚本不存在），
+      #    已按棘轮登记 + 三条反向断言（仍缺失 / 所在 job 仍 continue-on-error / 只许变短）。
+      - name: Run the seven guards' self-tests (with mutation counter-proofs)
         run: >-
           python -m pytest
           backend/tests/scripts/test_check_sync_provider_golden_digest.py
           backend/tests/scripts/test_check_framework_layer_has_no_wp_code_branch.py
           backend/tests/scripts/test_check_sheet_specs_fully_registered.py
           backend/tests/scripts/test_check_sync_registry_lookup_is_o1.py
+          backend/tests/scripts/test_check_row_table_formula_columns_consistency.py
+          backend/tests/scripts/test_check_store_item_two_way_parity.py
+          backend/tests/scripts/test_ci_declared_gates_exist.py
           -q
       # 引擎与声明层等价判据（框架层 ≡ 七家 provider 原实现，逐元组/逐字段）
       - name: Run row-table engine equivalence & declaration guards
@@ -6109,6 +6143,7 @@ jobs:
           backend/tests/workpaper_sync/test_adjudication_sheet_spec.py
           backend/tests/workpaper_sync/test_d1_sheet_specs.py
           backend/tests/workpaper_sync/test_d1_instrumentation_specs_expansion.py
+          backend/tests/workpaper_sync/test_d1_multi_store_wiring.py
           -q
       # 🔴 收敛后的薄转发必须保住「畸形 store 载荷 = domain 错误(4xx)」这条分类
       #    （Task 16/17 曾漏做错误转译，四家从 4xx 退化成 opaque 500；golden digest
