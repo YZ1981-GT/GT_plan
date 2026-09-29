@@ -83,7 +83,14 @@ OO 路径**依赖** base 权威语义：OO 会话期间 HTML 侧可能新增了�
 - **OO_Callback_Path**：`oo_to_html.OoToHtmlCoordinator` 调 Store_Mirror 的那条链路。
 - **Provider_Merge**：各 provider 暴露的 `merge_projection_into_*` 门面
   （现算：`merge_projection_into_store_rows` 定义 **36** 个，`all_store_item_ids`
-  定义 **46** 个；🔴 现算值，禁写死 —— 交付时须重算）。
+  定义 **47** 个；🔴 两者均为现算值，禁写死 —— 交付时须重算）。
+  🔴 `all_store_item_ids` 的 **47** 属**高度波动值**，分解 = 已跟踪 HEAD 树 43
+  + 未跟踪新 provider 3 + 已跟踪文件未提交改动 1 = 47；口径 = AST 扫
+  `backend/app/services/workpaper_sync/**.py` **全量**（含 `adapters/` 与 `pilot_*`）。
+  🔴 旧记 **46** 已作废：它静默排除了 `pilot_d2_large_json.py`
+  （「排除 pilot」或「只取 `phase5_*`」两种口径都恰得 46）；上游 spec 的 47
+  在本口径下**可复现** ⇒ 不存在「上游记 47、本轮修正为 46」这回事，
+  后续任务**不得**再把该值改回 46。
 - **Overwrite_Plan**：一次 adopt 的**声明式计划**：逐 store item 的
   待追加 / 待删除 / 待更新行身份清单 + 计数 + 稳定指纹。
 - **plan_digest**：Overwrite_Plan 的稳定 sha256 摘要，用于「用户确认的就是将执行的」绑定。
@@ -91,8 +98,17 @@ OO 路径**依赖** base 权威语义：OO 会话期间 HTML 侧可能新增了�
   🔴 「不在键集合里」与「在键集合里但值为空元组」是**两种不同语义**
   （前者不碰，后者清空），不得混用 —— 与 overlay 侧 `in` vs `get` 的既有裁决同源。
 - **row_section**：多个分区共用同一个 store 载荷数组时的分区归属字段
-  （引擎 `RowTableSheetSpec.row_section_field` / `row_section_value`；
-  现算赋非空字面量 **7 处 / 6 文件**）。
+  （引擎 `RowTableSheetSpec.row_section_field` / `row_section_value`）。
+  🔴 真实分母是 **6 个 store item**（`phase5_g{1,3,4,5,6,9}_02_*`），**不是旧记的 7**：
+  旧记「现算赋非空字面量 7 处 / 6 文件」已被证伪 —— 复现旧正则确实得**恰 7 处 / 6 文件
+  且文件名逐个相同**（⇒ 差异归因于口径而非树变化），但那 7 处经 `tokenize` 判别
+  **无一处是可执行代码**（5 处在 docstring / 散文字符串，2 处在 `#` 注释）
+  ⇒ 非空**字面量**真值为 **0 处**。6 处真声明的 value 是 `ast.Name`
+  （`ROW_SECTION_FIELD_G*`）**不是字面量** ⇒ 任何「只认字面量」的口径都会把全部真声明漏掉。
+  这 6 个 item 的分区字段名**不统一**（共 5 种取值：`acctClass` / `agingCategory` /
+  `maturityCategory`（g4 与 g6 共用）/ `sectionKey` / `section`）
+  ⇒ 取值必须读 `RowTableSheetSpec.row_section_field`，**禁硬编码字段名**（含 `"section"`）。
+  🔴 现算值，禁写死 —— 交付时须重算。
 - **幽灵行门**：Provider_Merge 里「仅对本次新增身份、若锚点业务名列为空则剔除」的既有判据。
 - **Refresh_Source_Dialog**：本 spec 新增的「刷新取数来源选择」弹窗。
 - **Workpaper_Renderer**：`audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue`。
@@ -250,9 +266,12 @@ OO 路径**依赖** base 权威语义：OO 会话期间 HTML 侧可能新增了�
 - `Adopt_Endpoint` 经 `Depends(_services)`，而 `_services` 依赖 `get_db` 与
   `get_current_user`（router docstring 明写后者是**唯一** 401 产生点）
 - `adopt_substrate` 已登记进 `_WRITE_ACTIONS`（未登记则 `_action_authorizer` 恒 403）
-- 后端对 `adopt-substrate` 的既有测试引用现算 **2 处**，均在
-  `test_task28_sync_router.py` 的「路由清单 / handler 分母」守卫内
-  ⇒ **无任何端点级行为测试**（这是本 spec 必须补的）
+- 后端对 `adopt-substrate` 的既有测试引用现算 **4 处 / 3 文件**，其中经 `tokenize`
+  判注释后**可执行代码仅 1 处**（`test_task28_sync_router.py` 里「路由清单 / handler 分母」
+  守卫内的路由清单字面量 `("POST", "/adopt-substrate")`）；其余 3 处**全是注释**
+  （`test_task28_sync_router.py` 1 处 + `test_d2_store_value_equivalence.py` 1 处
+  + `test_d4_mirror_shape_invariants.py` 1 处）
+  ⇒ **无任何端点级行为测试**（这是本 spec 必须补的）。🔴 现算值，禁写死 —— 交付时须重算
 
 #### Acceptance Criteria
 

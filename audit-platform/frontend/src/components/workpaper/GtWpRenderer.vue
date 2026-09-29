@@ -141,7 +141,7 @@
             size="small"
             :disabled="!runtimeProjectId || !runtimeWpCode || loading || readonly"
             :loading="alignmentRefreshing"
-            @click="onRowNameAlignmentRefresh"
+            @click="onOpenRefreshSourceDialog"
           >
             <el-icon><Refresh /></el-icon> 刷新取数
           </el-button>
@@ -305,6 +305,16 @@
          由「刷新取数」检测到 unmatched/ambiguous 行时经 eventBus 打开。 -->
     <GtRowNameAlignmentDialog />
 
+    <!-- 刷新取数来源选择弹窗（adopt-overwrite-and-refresh-source Task 10/11 方案 D）-->
+    <RefreshSourceDialog
+      v-model="refreshSourceDialogVisible"
+      :wp-id="wpId"
+      :project-id="runtimeProjectId ?? ''"
+      :entry-id="(activeComponentRef as any)?.syncEntryId ?? null"
+      :upstream-refresh="onRowNameAlignmentRefresh"
+      :reload="reload"
+    />
+
     <!-- 批量刷新弹窗（batch-refresh-workpaper-data spec Task 4） -->
     <BatchRefreshDialog
       v-model:visible="batchRefreshVisible"
@@ -368,6 +378,7 @@ import GtWpPreparationHeader from '@/components/workpaper/GtWpPreparationHeader.
 import GtWorkpaperRuntimeHosts from '@/components/workpaper/GtWorkpaperRuntimeHosts.vue'
 import GtRowNameAlignmentDialog from '@/components/formula/GtRowNameAlignmentDialog.vue'
 import BatchRefreshDialog from '@/components/workpaper/shared/BatchRefreshDialog.vue'
+import RefreshSourceDialog from '@/components/workpaper/shared/RefreshSourceDialog.vue'
 import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
 import { useProjectStore } from '@/stores/project'
 import { subscribeInvalidation } from '@/services/acnr'
@@ -1207,6 +1218,11 @@ function openPageFormulaManager() {
 
 // ─── 行名对齐刷新（formula-row-name-alignment-confirmation Task 11）───────────
 const alignmentRefreshing = ref(false)
+/** 刷新取数来源选择弹窗（Task 10/11 方案 D）。 */
+const refreshSourceDialogVisible = ref(false)
+function onOpenRefreshSourceDialog(): void {
+  refreshSourceDialogVisible.value = true
+}
 
 // ─── 批量刷新弹窗 ──────────────────────────────────────────────────────
 const batchRefreshVisible = ref(false)
