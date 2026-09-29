@@ -2913,6 +2913,53 @@ Gate 6 这三处新分支在开发者工作树上**根本走不到**（工作树
 
 不改原文件是上一轮「整文件替换 + `^C` 打断 ⇒ 三处平台改动被静默丢掉」的事故教训。
 
+##### 「门禁 exit 0」≠「CI 绿」：自测也必须一起跑
+
+6 道 Gate 在干净检出上全 exit 0 之后，又把 workflow 里那 **7 份自测**也在干净检出上
+跑了一遍 —— **4 条红**。而 workflow 真正跑的就是这些自测。
+
+| 红 | 性质 |
+|---|------|
+| `test_check_sync_provider_golden_digest.py` 2 条（`assert 139 == (71+71)` / labels 写死 9 家） | **第三处漏提交**（见下） |
+| `test_registered_gap_is_still_really_violating`（Gate 5） | 我改了门的分类、没同步改自测 —— 自测各自做独立判定，E1-6 被门归入 `absent` 而自测仍按旧口径要求它在 `known_gaps_hit` 里 |
+| `test_mutation_new_unwired_adapter_is_detected`（Gate 6） | victim 写死 D6，而 D6 在 HEAD 上声明面只有 1 ⇒ 摘掉基线后并不违规 ⇒ **变异不打红，反证静默失效** |
+
+##### 第三处漏提交：`test_check_sync_provider_golden_digest.py`
+
+2 个 hunk 都属本 lane：
+
+* `SKIPPED_PROVIDER_LABELS = {"f1"}` —— f1 的
+  `build_store_projection(store_item_id, payload, *, contract)` 是**两个位置参数**，
+  而本门按单参调用 ⇒ TypeError ⇒ 整家被 `[SKIP]`，它的三段 digest **全部不在零回归
+  门内**。此前没有任何地方登记这个事实。
+* labels 断言从写死 9 家改为「`PROVIDERS` 现算 − SKIPPED」+「核心 9 家必须 ⊆ labels」。
+  🔴 计数公式按全表求和、report 里少了被 SKIP 的那家 ⇒ 恒差 3（正是 f1 的
+  contract+instr+projection）。**若只把期望数字改大改小，「有一家根本没进门」这个事实
+  就被永久掩盖了** —— 与「不许把断言降级成恒绿」是同一条。
+
+⇒ 本轮共补提交 **3 处**漏掉的本 lane 文件：6 个 provider（缺陷② 本体）/
+`store_item_registry.py` 的两方向接线（缺陷③ 本体）/ 这份自测。全部靠干净检出发现。
+
+##### 变异源与期望值一样不能写死
+
+Gate 6 那条变异的 victim 换过两次，两次都是被实测打脸：
+写死 D1（D1 接通后出列 ⇒ 变异源消失）→ 写死 D6（多 lane 检出下声明面缩水 ⇒ 不再违规）。
+⇒ 改为**运行期**从 report 里挑「已登记且确有断口」的 adapter，一个都挑不到时 skip 并
+说明失去覆盖面（不假装通过）。这与「期望值按开关派生」（X6）是同一条纪律的两面。
+
+##### 最终数据
+
+* 干净 HEAD 检出：6 道 Gate 全 exit 0；7 份自测 **65 passed / 2 skipped**
+  （2 skipped 正是那两条「只在开发者工作树上有判定力」的：E1-6 absent +
+  `BASIS_FROM_UNCOMMITTED` 依据缺失）
+* 工作树全集（D1 全部判据 + 模板 + 行位移 + 整个 `tests/scripts/`）：
+  **721 passed / 45 skipped / 0 failed**
+* 整册门 `verify_d1_full_book_real_stack.py` EXIT=0
+  （受管区 18 / sheet 12 / store item 17；materialize 4.7s size 136386；
+   extract 0.6s 360 值/18 表；反读覆盖 18/18；G1 roundtrip OK；
+   verify 0.6s equivalent=True；总计 5.9s）
+* 逐任务证据 `verify_d1_task_gate_evidence.py` EXIT=0
+
 #### X6. ✅ T7-A 余波：两条写死 18 个 store item 的判据
 
 `test_check_store_item_two_way_parity.py` 有两条判据在 T7 裁决 A 撤回静态第三区后陈旧：
