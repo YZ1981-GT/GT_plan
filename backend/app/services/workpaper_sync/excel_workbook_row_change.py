@@ -95,6 +95,7 @@ __all__ = [
     "apply_workbook_row_change_to_path",
     # ── 验证侧归一化（Requirement 5）────────────────────────────
     "normalise_propagated_part",
+    "net_propagation_pairs",
     "assert_propagation_declared_exactly",
     # ── 结构判据入口 ────────────────────────────────────────────
     "assert_carrier_tables_consistent",
@@ -2024,10 +2025,7 @@ def normalise_propagated_part(
     # 改为「按出现次数计量」之后，判据反而**更强**：它不只要求「这段文本出现过」，
     # 还要求它出现的**次数**恰好等于声明的条目数。少一处 = 有条目没做；多一处 =
     # 有未声明的改动被写成了与声明相同的形态。
-    pairs: dict[tuple[str, str], int] = {}
-    for entry in entries:
-        key = (entry.ref_after, entry.ref_before)
-        pairs[key] = pairs.get(key, 0) + 1
+    pairs = net_propagation_pairs(plan, part=part)
 
     out = text
     reverted = 0
@@ -2041,37 +2039,25 @@ def normalise_propagated_part(
     def _apos(s: str) -> str:
         return s.replace("'", "&apos;")
 
-    # 🔴 **链式声明必须从链尾往前还原**（同 sheet 多趟插行才会出现）。
+    # 🔴 **单次扫描、同时替换**（与 apply 侧 `_apply_workbook_propagation` 对称）。
     #
-    # 同一处引用被**多趟**各改一次时，合并后的声明是一条链：
-    #   主营那趟：`…!$A$18` → `…!$A$25`（+7）
-    #   其他那趟：`…!$A$25` → `…!$A$31`（+6）
-    # 产物里是 `$A$31`。逆替换必须先用后发生的那条（`$A$31`→`$A$25`），再用前一条
-    # （`$A$25`→`$A$18`）。若顺序反了：先试 `$A$25`→`$A$18` 在产物里找不到（产物是
-    # `$A$31`）⇒ 跳过；再把 `$A$31` 还原成 `$A$25` ⇒ **停在中间态**，与 before 的
-    # `$A$18` 不等 ⇒ `workbook_and_styles` 被误判 `adapter_unmanaged_region_drift`
-    # （D4-1 主营 7 行 + 其他 6 行真栈复现）。
+    # 逐对串行 `str.replace()` 在「同一 part 上多个引用处于链的不同位置」时**不可判定**。
+    # D1 真栈形态：`审定表D1-1` 的 B12 引用 `D1-4!B23`、B13 引用 `D1-4!B24`，
+    # D1-4 有两张行表、两趟各插 1 行 ⇒ 产物里成了 B25 / B26。
+    # 合并后的声明含 `B23→B24`、`B24→B25`（两趟各一条）、`B25→B26`。串行逆替换：
+    #   ① `B26→B25` ⇒ B13 变 B25，此刻 **B12 与 B13 都是 B25**（信息已丢）
+    #   ② `B25→B24` ⇒ 两个一起变 B24
+    #   ③ `B24→B23` ⇒ 两个一起变 B23 ⇒ B13 错成 B23（应为 B24）
+    # 归一化结果与 before 不等 ⇒ `other_sheet_parts` 被误判漂移。
     #
-    # 链深度 = 沿「本条的 ref_before 正是另一条的 ref_after」往前能走的步数；深度大的
-    # （越靠链尾、越晚发生）先还原。无链时全部深度 0 ⇒ 退化成原来的「长的先替换」，
-    # 单趟 / 单 sheet 路径逐字节行为不变。
-    by_after: dict[str, str] = {after: before for after, before in pairs}
-
-    def _chain_depth(after: str) -> int:
-        depth = 0
-        cursor = by_after.get(after)
-        seen = {after}
-        while cursor is not None and cursor in by_after and cursor not in seen:
-            seen.add(cursor)
-            depth += 1
-            cursor = by_after.get(cursor)
-        return depth
-
-    # 次级键仍是「长的先替换」：短的 ref_after 可能是长的子串（`!A2` ⊂ `!A25`），
-    # 先替短的会切坏长的。
-    for after, before in sorted(
-        pairs, key=lambda kv: (_chain_depth(kv[0]), len(kv[0])), reverse=True
-    ):
+    # 正解是先按 `locator` + 引用形状把每一处引用**自己的**链合成净映射（见
+    # :func:`net_propagation_pairs`），再单次同时替换：产物 B25→B23、B26→B24 一次完成，
+    # 替换产物不参与匹配，两处互不干扰。
+    #
+    # 候选形态的选取仍基于**替换前的原文**（`out.count`），与串行版一致；
+    # 正则候选按长度降序保持「长的先匹配」（`!A2` ⊂ `!A25`）这条既有语义。
+    replacements: dict[str, str] = {}
+    for after, before in sorted(pairs, key=lambda kv: len(kv[0]), reverse=True):
         # 各文本形态各试一次：产物里可能是转义后的、保留原始实体写法、或单引号 &apos; 形态
         for candidate_after, candidate_before in (
             (_apos(_escape(after)), _apos(_escape(before))),
@@ -2079,13 +2065,45 @@ def normalise_propagated_part(
             (_apos(after), _apos(before)),
             (after, before),
         ):
-            hits = out.count(candidate_after)
-            if hits:
-                out = out.replace(candidate_after, candidate_before)
-                reverted += hits
+            if out.count(candidate_after):
+                prior = replacements.get(candidate_after)
+                if prior is not None and prior != candidate_before:
+                    raise PropagationDriftError(
+                        f"{part}：同一段改后文本 {candidate_after!r} 被两条净声明要求还原成"
+                        f"不同的改前文本（{prior!r} 与 {candidate_before!r}）—— "
+                        "纯文本逆替换无法区分，声明不自洽"
+                    )
+                replacements[candidate_after] = candidate_before
                 break
+    if replacements:
+        ordered = sorted(replacements, key=len, reverse=True)
+        pattern = re.compile("|".join(re.escape(k) for k in ordered))
+        counter = {"n": 0}
+
+        def _swap(match: "re.Match[str]") -> str:
+            counter["n"] += 1
+            return replacements[match.group(0)]
+
+        out = pattern.sub(_swap, out)
+        reverted = counter["n"]
     return out, reverted
 
+
+def net_propagation_pairs(
+    plan: WorkbookRowChangePlan, *, part: str
+) -> dict[tuple[str, str], int]:
+    """把一个 part 的传播声明合成**净映射** —— 薄转发伴生模块。
+
+    真源在 `excel_propagation_net_mapping`（「多趟累积效果合成一处引用的净位移」
+    是与本模块「声明 / 应用 / 逆归一化」三段流程正交的独立概念，且抽出去让本模块
+    回落到行数门基线之下）。分组键为什么必须是 `(locator, 引用形状)` 两维、
+    以及 fail-closed 的理由，都在那边的 docstring 里，本处不复制第二份。
+    """
+    from app.services.workpaper_sync.excel_propagation_net_mapping import (
+        net_propagation_pairs as _impl,
+    )
+
+    return _impl(plan, part=part)
 
 def assert_propagation_declared_exactly(
     before_text: str, after_text: str, plan: WorkbookRowChangePlan, *, part: str
@@ -2096,10 +2114,16 @@ def assert_propagation_declared_exactly(
     把声明的改动逆替换回去之后，剩下的任何差异都是**未声明的改动** ⇒ 漂移。
     """
     normalised, reverted = normalise_propagated_part(after_text, plan, part=part)
-    declared = len([e for e in plan.propagations if e.part == part])
+    # 🔴 对账基准是**净映射覆盖的引用处数**，不是原始条目数。
+    #    多趟合并后同一处引用会留下一条链（N 条条目 ⇒ 1 处引用），按条目数对账必然
+    #    「声明 16 条实际 8 处」地假红。单趟时每分组一步 ⇒ 两者相等，行为不变。
+    net_pairs = net_propagation_pairs(plan, part=part)
+    declared = sum(net_pairs.values())
+    raw_entries = len([e for e in plan.propagations if e.part == part])
     if reverted != declared:
         raise PropagationDriftError(
-            f"{part}：声明了 {declared} 条传播条目，但产物里只找到 {reverted} 条 —— "
+            f"{part}：净声明覆盖 {declared} 处引用（由 {raw_entries} 条条目合成），"
+            f"但产物里只找到 {reverted} 处 —— "
             "缺失的那些声明改动没有真的发生（或产物里的文本形态与声明不符）"
         )
     if normalised != before_text:

@@ -394,7 +394,7 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
   零回归 + P9/P10/O(1) 三门禁复测全绿。
   - _Requirements: 5.4_
 
-- [ ]* 25. 接入 D1-2 `原值明细表（按类别）D1-2`（**声明已交付，灰度未开**：`phase5_d1_02_category.py`
+- [x] 25. 接入 D1-2 `原值明细表（按类别）D1-2`（**声明已交付，灰度未开**：`phase5_d1_02_category.py`
   含 openpyxl 实测几何 + 5 用例判据全绿；`_INCLUDE_D102_CATEGORY=False`，真实接入/整册 materialize
   验收未做）
   - `phase5_d1_02_category.py` 声明（固定 2 行 + 动态行；派生列
@@ -402,6 +402,10 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
   - 🔴 派生列声明 `mode=formula`，公式文本以 xlsx 为准、materialize 不覆盖公式格由 OO 重算
     （D1-3 契约已立此纪律：前端算式与 xlsx 公式数值等价但**以 xlsx 为准**）
   - 门：整册 materialize 200 + verify 全绿 + **受管区 1→2** + 实测耗时登记
+  - ✅ **门已过（2026-09-28 实测）**：整册 materialize + extract + G1 + verify 全绿
+    （`verify_d1_full_book_real_stack.py` EXIT=0）。本任务贡献受管区 **1 个**
+    （`category_detail_rows`），逐条落在 `adapter._all_bindings()` 内 ——
+    `verify_d1_task_gate_evidence.py` EXIT=0 出证。
   - ✅ **原 `ObservedIdentityDriftError` 阻塞已解除（2026-09-28，详见 V 节）**：真因不是
     「冻结值过期」这个表象，而是 entry 模块 `phase5_d1_notes_receivable` **只暴露单数**
     `instrumentation_spec` ⇒ staged substrate 里 18 张声明表只注出 1 张 ⇒ 观测面天然少于
@@ -420,7 +424,7 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
        重发**，需用户裁决，未擅自改。
   - _Requirements: 5.1, 5.2, 5.5_
 
-- [ ]* 26. 接入 D1-4 `坏账准备明细表D1-4`（**三区**，D1 首次同 sheet 多区）（**声明已交付，
+- [x] 26. 接入 D1-4 `坏账准备明细表D1-4`（**三区**，D1 首次同 sheet 多区）（**声明已交付，
   灰度未开**：`phase5_d1_04_bad_debt.py` 三区正确处理 UUID 列不冲突 + 第三区 static_region +
   第三写入方定序登记，9 用例判据全绿；`_INCLUDE_D104_BAD_DEBT`/`_INCLUDE_D104_NOTETYPE_STATIC`
   全 False，真实接入/位移链实证未做）
@@ -446,6 +450,12 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
     ⇒ D1-4 是全仓唯一「接 sync 的 store 键同时被另一 sheet 回写」的情形。该结论登记在
     D2 spec 需求 1.7
   - 门：P11（整册 materialize 200 + verify 全绿）+ P12（自动进位移判据清单）+ P17 + P18 +
+  - ✅ **门已过（2026-09-28 实测）**：P11 整册 materialize + verify 全绿
+    （`verify_d1_full_book_real_stack.py` EXIT=0）；P12 位移链由 `per_table_shift`
+    13 张表各自声明并经 verify 归一化对账；P17 / P18 见 S / U 节。本任务贡献受管区
+    **2 个**（`bad_debt_individual_rows` / `bad_debt_portfolio_rows`，D1 首例同 sheet
+    双区，verify 侧合成 `CompositeRowShift` 逆序还原）。第三区按 T7 裁决 A 撤回，
+    不在受管面（排除态判据 `test_d104_static_region_excluded.py`）。
   - ✅ **原 `ObservedIdentityDriftError` 阻塞已解除（2026-09-28，详见 V 节）**：真因不是
     「冻结值过期」这个表象，而是 entry 模块 `phase5_d1_notes_receivable` **只暴露单数**
     `instrumentation_spec` ⇒ staged substrate 里 18 张声明表只注出 1 张 ⇒ 观测面天然少于
@@ -467,7 +477,7 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
 
 ### 阶段 6：D1 批次 2~3
 
-- [ ] 27. 接入 D1-8（双区）+ D1-16（双区）；**D1-5 先做可行性核再裁决**
+- [x] 27. 接入 D1-8（双区）+ D1-16（双区）；**D1-5 先做可行性核再裁决**
   ✅ **D1-5 可行性核子目标已完成**（2026-09-26）：裁决 **`single_html`**，维持默认倾向，
   四条判据逐条独立实证（未偷懒类推 D4-4）。openpyxl 直读 `调整分录汇总表D1-5`（A1:J25，
   表头行 5 十列 A-J，数据区 6-20 **逐格实测零内容零公式**，行 21 使用提示）：
@@ -495,6 +505,11 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
     hub store。本任务只产出**裁决 + 证据 JSON**（照 `T08-d44-single-html-adjudication.json`
     范式），默认倾向 `single_html`；若核出「有行身份列 + 无同步链冲突」才可改判并另起接入任务
   - 门：整册 materialize + verify + 耗时登记（**受管区 5→9**：D1-8 +2 / D1-16 +2；D1-5 不计）
+  - ✅ **门已过（2026-09-28 实测）**：本任务贡献受管区 **4 个**
+    （D1-8 `endorse_discount_rows` / `endorse_transfer_rows` +
+    D1-16 `writeoff_reversal_rows` / `writeoff_writeoff_rows`），两张 sheet 各自
+    双区、各自插行，verify 侧 `CompositeRowShift` 逐 sheet 合成。D1-5 按可行性核
+    裁决 `single_html`，不计受管区（维持原裁决）。
   - ✅ **原 `ObservedIdentityDriftError` 阻塞已解除（2026-09-28，详见 V 节）**：真因不是
     「冻结值过期」这个表象，而是 entry 模块 `phase5_d1_notes_receivable` **只暴露单数**
     `instrumentation_spec` ⇒ staged substrate 里 18 张声明表只注出 1 张 ⇒ 观测面天然少于
@@ -513,7 +528,7 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
        重发**，需用户裁决，未擅自改。
   - _Requirements: 5.1, 5.4, 5.5, 5.9, 5.10_
 
-- [ ] 28. 接入 D1-9 / D1-10 / D1-11 / D1-12 / D1-15 ✅ **声明层全部交付**（2026-09-26）
+- [x] 28. 接入 D1-9 / D1-10 / D1-11 / D1-12 / D1-15 ✅ **声明层全部交付**（2026-09-26）
   - `phase5_d1_09_interest.py`：单区 R11-17，**D1 首例数据区行级公式**（H=E-G / J=I/365*H*B /
     L=J-K）声明为 formula，13 列 A-M，UUID=N，store `D1-interest-rows`，`rowId`
   - `phase5_d1_10_inventory.py`：单区 R14-20（监盘表），15 列 A-O，UUID=P，store
@@ -539,6 +554,13 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
   - D1-15 的 `autoPulled: boolean` 归一到 `source='tb'`（P16）；其取数源是 D1-4 ⇒ P18 的下游
     联动判据须覆盖「D1-4 三区被 OO 回写后 D1-15 的 `parseD1_4Rows` 仍正确重算」
   - 门：同上（**受管区 9→15**：D1-9/10/11/12 各 +1，D1-15 **+2**）
+  - ✅ **门已过（2026-09-28 实测）**：本任务贡献受管区 **6 个**
+    （D1-9 `interest_check_rows` / D1-10 `inventory_count_rows` /
+    D1-11 `related_party_rows` / D1-12 `pledge_check_rows` +
+    D1-15 `ecl_individual_rows` / `ecl_portfolio_rows`）。
+    🔴 **D1-11 正是暴露平台缺陷 ② 的那张 sheet**：它的 footer `SUM(C11:C13)` 在
+    插行后成为 `SUM(C11:C14)`（纯位移），旧的扩张还原逻辑会多减一次 ⇒ 整册门
+    `managed_sheet_unmanaged_cells` 永远判漂移。详见 W 节。
   - ✅ **原 `ObservedIdentityDriftError` 阻塞已解除（2026-09-28，详见 V 节）**：真因不是
     「冻结值过期」这个表象，而是 entry 模块 `phase5_d1_notes_receivable` **只暴露单数**
     `instrumentation_spec` ⇒ staged substrate 里 18 张声明表只注出 1 张 ⇒ 观测面天然少于
@@ -559,7 +581,7 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
 
 ### 阶段 7：D1 批次 4~5
 
-- [ ] 29. 接入 D1-7（嵌套 dict）+ D1-14（**static_region 候选**）+ D1-13（双区 + 标量）
+- [x] 29. 接入 D1-7（嵌套 dict）+ D1-14（**static_region 候选**）+ D1-13（双区 + 标量）
   ✅ **声明层全部交付**（2026-09-26）：
   - `phase5_d1_07_memo.py`：**D1 唯一 `StoreKind.dict` 形态**（`{bankRows, commercialRows}` 嵌套
     双数组），双区银行承兑 R13-17 / 商业承兑 R19-23，31 列宽表，UUID=Y/Z，provider 专用
@@ -574,6 +596,20 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
     **不准确**（static_region 要求绝对坐标锚点，D1-14 连映射目标格都没有）。现状维持 HTML-only。
   - 🔴 **D1-14 实测纠正了设计阶段的误判**：不是"10 个标量该走 static_region 还是 HTML-only"
     的问题，而是"它根本不是标量"——它是无结构的纯文本段落区，Excel 侧无几何可表达。
+  - ✅ **门已过（2026-09-28 实测）**：本任务贡献受管区 **4 个**
+    （D1-7 `memo_bank_rows` / `memo_commercial_rows` —— D1 唯一 `StoreKind.dict`
+    形态；D1-13 `sampling_vouching_rows` / `sampling_specific_samples`）。
+    🔴 D1-7 的 N 列「贴现息」正是模板数字格式修复的落点（见 V8 节）——
+    没有它 G1 roundtrip 门拒收整册 materialize。
+    D1-14 为 static_region 候选（实测 `NOT_EXPRESSIBLE`），不计受管区。
+
+  - 📊 **整册门实测总账（25~29 五条任务的共同门，2026-09-28）**：受管区 **18**
+    （主表 1 + 25~29 增量 17，双射检查确认无遗漏无多余）/ 去重 sheet **12** /
+    store item **17**；substrate 134071 → materialize **4.8s** size 136386 →
+    extract **0.7s** 360 值 / **18 表** → 反读面覆盖输入面 **18/18** →
+    G1 roundtrip 等值门 OK → verify **0.7s** `equivalent=True`；总计 **6.2s**。
+    证据脚本：`backend/scripts/e2e/verify_d1_full_book_real_stack.py` +
+    `backend/scripts/e2e/verify_d1_task_gate_evidence.py`（两者 EXIT=0）。
   - _Requirements: 5.1, 5.5, 11.4, 11.5, 11.6_
 
 - [x] 30.* 评估 D1-6 能否用 `TransposedSheetSpec` 表达 ✅ 2026-09-26：**两条路径都表达不了**
@@ -2055,3 +2091,115 @@ materialize OK 4.8s size=136386   extract OK 0.7s values=360 表数=18
 另有大批 `test_task54_l_cycle_migration`（Property69/70、DeletionPlan 系列）看形态属
 **L 循环 lane 的预存红**，但**未做单文件 HEAD 往返对照**，因此不下结论 —— 下一轮必须
 按 V7 的归因纪律逐条实证，不得凭「看起来像别人的」放过。
+
+### W. ✅ 整册门全绿，Tasks 25~29 收口（2026-09-28）
+
+V/V8 两节把门从「结构上不可能成功」推到「G1 过、⑥ verify 卡」。本节修掉最后两处
+**平台级**缺陷，门 EXIT=0，25~29 逐条出证勾完。
+
+#### W1. 🔴 先否掉一个会导致误判的「参照」
+
+排查时很自然会想「D4 有 39 个 binding 且整册门全绿 ⇒ 平台已支持多 binding」。
+**实测否掉了这个参照**：D4 整册门通过那一轮 `row_shift=None` —— 它根本没插行。
+所以 D4 从未走过「多 binding + sibling sheet 上有行位移」这条路径，
+**D1 是平台上第一个触发它的 entry**。拿 D4 全绿背书会直接把下面两个缺陷判成
+「D1 特有的数据问题」。
+
+#### W2. ✅ 缺陷 ①：多趟传播声明的逆归一化会串台
+
+`normalise_propagated_part` 原本逐对串行 `str.replace()`。合并多趟声明后，
+**同一处**引用会留下一条链；而链里的中间态同时可能是**另一处**引用的起点，
+纯文本串行替换无法区分：
+
+    审定表D1-1：B12 引用 `D1-4!B23`、B13 引用 `D1-4!B24`
+    D1-4 两张行表各插 1 行 ⇒ 产物 B25 / B26
+    合并声明：B23→B24、B24→B25（两趟各一条）、B25→B26
+
+    串行逆替换：① B26→B25 ⇒ B13 变 B25（此刻与 B12 同值，信息已丢）
+                ② B25→B24 ⇒ 两个一起变  ③ B24→B23 ⇒ B13 错成 B23
+
+修法：新增 `net_propagation_pairs`，按 **`(locator, 引用形状)`** 分组把每一处引用
+自己的链合成**净映射**，再**单次同时替换**；计数对账改按净映射覆盖的引用处数。
+
+🔴 **分组键两维都必要，各自补对方的盲区**（这一条是实测逼出来的，不是设计洁癖）：
+* 只用 `locator`：workbook-scope defined name 的 locator 对**所有 sheet** 是同一个
+  —— 实测 `_xlnm.Print_Area#0` 一个 locator 底下 13 条，分属 D1-3/D1-4/D1-9/D1-10/
+  D1-15/D1-16 各自的打印区 ⇒ 串不成单链、fail-closed 打红。
+* 只用「形状」：B12 与 B13 都引用 `D1-4!B{行}`，形状完全相同却是两处独立引用
+  ⇒ 被错并成一条 4 步链。
+
+#### W3. ✅ 缺陷 ②：合计区间扩张的还原条件用了 remap **之后**的末行
+
+`_rewrite_formula_refs` 的 `extend_end_at` 判据原本比较 `new_tail`（remap 后）。
+正向（`remap=plan.shift`，`extend_end_at=insert_at-1`）**巧合**正确 —— `shift` 对
+`< insert_at` 的行是恒等映射；逆向（`remap=plan.unshift`）就不然：
+
+    D1-11 关联方检查表（insert_at=13 count=1）
+      before footer `SUM(C11:C13)`
+      after  footer `SUM(C11:C14)`   ← R13 落在区间内，这是**纯位移**不是扩张
+      旧逻辑：unshift(14)=13 恰等于 13-1+1=13 ⇒ 再减 1 ⇒ `SUM(C11:C12)` ✗
+              ⇒ `managed_sheet_unmanaged_cells` 判漂移，门永远过不去
+
+修法：判据与算术都改用 **remap 前**的末行。K11 原始场景（insert_at=26 count=2，
+after 末行 27）在新口径下仍命中且同值 25 —— 两个场景**互相甄别**，判据里成对存在。
+
+#### W4. 判据与变异证明
+
+新判据 `backend/tests/workpaper_sync/test_multi_trip_row_shift_normalisation.py`
+**17 条全绿**，**6 处变异全部打红**：
+
+| 变异 | 打红 |
+|---|---|
+| M1 扩张判据退回 remap 后末行 | ✅ |
+| M2 逆归一化退回逐对串行替换 | ✅ |
+| M3 分组只用 locator | ✅ |
+| M4 分组只用形状 | ✅ |
+| M5 断链不再 fail-closed | ✅ |
+| M6 计数对账退回按原始条目数 | ✅ |
+
+🔴 **M2 第一版漏报，机理值得单独记**：我在**净映射**上做串行替换恰好不碰撞
+（净映射的输出不在键集里）。真正必须单次扫描的形态是「**同一趟内**多处独立映射
+首尾相接」，而且**是否出错取决于声明顺序**（升序恰好对、降序必错）。
+补了 `test_result_is_independent_of_declaration_order`（刻意按行号降序声明）
+才打红 ⇒ **只测一种顺序会漏掉整个缺陷**。
+
+#### W5. 零回归与门的实测数
+
+* 相关判据全集（`-k row_shift or propagation or workbook_row_change or materialize
+  or roundtrip or total_formula`）：**35 failed / 9 文件**，与 HEAD 基线**逐文件相同**；
+  passed 1287 → 1304，多出的 17 正是新判据文件 ⇒ **零新增回归**。
+  （`test_workbook_propagation_ref_collision.py` 仍红属 ref_collision 那条 lane 的
+  在飞工作，HEAD 同样红。）
+* D1 判据全集：**270 passed / 42 skipped / 0 failed**。
+* 七门禁：**全 exit 0**。
+* 整册门：受管区 **18** / sheet **12** / store item **17**；materialize **4.8s**
+  size 136386 → extract **0.7s** 360 值 **18 表** → 反读覆盖 **18/18** →
+  G1 等值门 OK → verify **0.7s** `equivalent=True`；总计 **6.2s**。
+
+#### W6. 逐任务出证（不用「总和对了」冒充「每项都对了」）
+
+新增 `backend/scripts/e2e/verify_d1_task_gate_evidence.py`（EXIT=0）：把 25~29 每条
+任务声明的 `table_key` 逐条对账「在 `adapter._all_bindings()` 内」，并做**双射检查**
+（任务清单 ↔ 受管行表，无遗漏无多余）。实测 25(1) + 26(2) + 27(4) + 28(6) + 29(4)
+= **17 个增量 + 1 主表 = 18**，与整册门的受管区数一致。
+
+🔴 为什么要这份脚本：25~29 每条门写的是**增量**（「受管区 1→2」「5→9」「9→15」…），
+拿整册一个总数去勾 5 条任务，等于用「总和对了」冒充「每一项都对了」。
+
+🔴 顺带修正一处**按命名习惯推**的错：D1-13 第二区的 table_key 真源是
+`sampling_specific_samples` 而非 `..._rows`，被双射检查当场点名。
+
+#### W7. 🔴 本轮自己造成的一次事故，必须记
+
+做归因时我写了个「整文件替换 HEAD ↔ 当前」的探针。它第二次运行时被 `^C` 打断在
+**已写入 HEAD、尚未 restore** 的窗口 ⇒ `finally` 没执行 ⇒ 我的三处平台改动被
+**静默丢掉**；随后第三次运行捕获的 "mine" 已经是 HEAD，于是那次
+「HEAD 37 红 → MINE 35 红」的对照**完全无意义**，连
+`test_workbook_row_change_verification.py` 的「16 passed」也是 HEAD 跑出来的。
+
+教训三条，已固化进做法：
+1. **归因不要用整文件替换**。改为「只跑判据、不动文件」+ 与已完整测得的基线比对。
+2. 必须替换时，先把改动**另存备份**，并在脚本末尾**重新校验文件已还原**
+   （变异脚本 `_mut.py` 就是这么写的，最后打印「已还原=True」）。
+3. 被打断的探针 = **可疑的工作树**。看到 `^C` 之后第一件事是校验自己的改动还在不在
+   （`grep` 关键标识符），不是接着跑下一条命令。
