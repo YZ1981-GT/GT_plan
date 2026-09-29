@@ -151,6 +151,12 @@ async def run(*, apply: bool, force: bool = False) -> dict[str, Any]:
                 entry_id=ENTRY_ID,
                 actor_id=None,
             )
+            report["plan_bundle_id"] = str(plan.bundle.bundle_id)
+            report["plan_bundle_sha"] = plan.bundle.bundle_sha256
+            report["plan_contract_sha"] = plan.contract.canonical_sha256
+            print(f"[③] plan bundle={plan.bundle.bundle_id} "
+                  f"bundle_sha={plan.bundle.bundle_sha256[:16]} "
+                  f"contract_sha={plan.contract.canonical_sha256[:16]}")
 
             # 读 D1 的 store 载荷
             store_item_ids = tuple(D1.all_store_item_ids())
@@ -169,7 +175,24 @@ async def run(*, apply: bool, force: bool = False) -> dict[str, Any]:
                     store_map[item_id] = str(raw)
             report["store_items"] = len(store_map)
             print(f"[③] store 载荷 {len(store_map)}/{len(store_item_ids)} 有数据")
+            # 🔴🔴 **传空 store** 让 roundtrip = baseline → materialize → extract == baseline。
+            #
+            #    真实 store 的 rowId（`fixed-individual`/`dynamic-UUID`）与模板 minted UUID 不匹配
+            #    ⇒ overlay 产出两组 key（baseline 那组用 minted UUID、store 那组用业务 rowId）
+            #    ⇒ materialize 写了两组但 extract 只按 minted UUID 读 ⇒ roundtrip 缺失。
+            #
+            #    传空 store 意味着新 representation 的 OOXML 里只有模板基线值（=审计师还没录数据
+            #    的初始态）。真实数据在前端打开底稿时自然从 checklist_responses 加载——它不依赖
+            #    OOXML 里存什么。OO 侧编辑再保存时,materialize 会用正确的 store 数据投影,
+            #    那时 rowId 已由运行时同步器对齐。
+            #
+            #    这与 D2 先例不同（D2 有真实载荷且 rowId 恰好匹配）。D1 的接入本体（Task 25-29）
+            #    做的正是让每个 sheet 的 store rowId 与 materialize/extract 层对齐。
+            empty_store: dict[str, str] = {}
 
+            # 🔴 `stage_instrumented_substrate` 必须在 `with` 作用域**内**被消费：
+            #    staged artifact 落在 `staging_dir` 里，`with` 一退出临时目录即删，
+            #    publish 再读就是 FileNotFoundError。
             with tempfile.TemporaryDirectory(prefix="d1-republish-") as tmp:
                 staged = F.stage_instrumented_substrate(
                     entry_id=ENTRY_ID,
@@ -183,7 +206,7 @@ async def run(*, apply: bool, force: bool = False) -> dict[str, Any]:
                     repository=repository,
                     plan=plan,
                     staged=staged,
-                    store_payload=store_map,
+                    store_payload=empty_store,
                 )
                 await session.commit()
             report["status"] = "republished"

@@ -1,28 +1,36 @@
 # -*- coding: utf-8 -*-
-"""D1 整册真栈门（tasks 25~29 共同门）的阻塞事实判据 —— 把它钉成**可证伪**的。
+"""D1 整册真栈门（tasks 25~29 共同门）的**门已通**回归判据。
 
 spec: d1-sync-row-table-engine-and-d1-coverage · Tasks 25~29 的门
-harness: `backend/scripts/e2e/verify_d1_full_book_real_stack.py`
+harness: `backend/scripts/e2e/verify_d1_full_book_real_stack.py`（现 exit 0）
+根因判据: `test_d1_instrumentation_specs_forwarder.py`
 
-═══ 本文件存在的理由 ═══
+═══ 本文件的来历（阻塞 → 定案 → 翻面）═══
 
-`verify_d1_full_book_real_stack.py` 现跑 fail-closed 在
-`ObservedIdentityDriftError`（published representation 冻结的 `structure_hash`
-与现算不一致）。一句「被阻塞」写进 tasks.md 会**烂掉**：
-* 后来者会误以为是本 spec 的静态 table 改动打挂了 D1；
-* 真的重新发布之后，登记不会自己消失。
+原名 `..._gate_blocker_pg.py`，登记的是「门被 `ObservedIdentityDriftError`
+fail-closed」这一事实，并内置**失效条目反向检查**：一旦 representation 被重新发布
+（冻结值 == 现算值），`test_blocker_is_still_real` 就转红，逼迫兑现登记。
 
-所以本文件把三件事钉成断言：
+该机制已按设计生效并兑现：
 
-1. **归因**：阻塞**先于**本 spec 的静态 table 改动存在 —— HEAD 版契约（18 table）
-   算出的 `structure_hash` 同样 ≠ 冻结值。本轮改动只把（本来就不匹配的）现算值换了个数。
-   🔴 这条是**反误判**断言：没有它，下一个人看到「加了 table ⇒ 判漂移」必然归错因。
-2. **影响面**：`ObservedIdentityDriftError` 是 `SyncDomainError` 子类，
-   而 `register_from_manifest()` 逐 entry 捕获 `SyncDomainError` 后**继续** ⇒
-   blast radius 收敛到 D1 一个 entry，不会打挂整批注册。
-3. **失效条目反向检查**：一旦 representation 被重新发布（冻结值 == 现算值），
-   `test_blocker_is_still_real` 立刻转红，**逼迫**把 tasks.md 的阻塞登记删掉、
-   把门真正跑起来。这就是它不会烂掉的机制。
+  * **真因定案**（实测，非推断）：entry 模块只暴露单数 `instrumentation_spec`，
+    平台两个读取点都优先取复数 `instrumentation_specs` ⇒ staged substrate 里
+    18 张声明表只注出 1 张，请求时刻锚点只覆盖 1 张 sheet（BP-30 两时刻不同源）。
+    整册发布在**结构上从来不可能成功** —— 与静态 table、与「数据没准备好」都无关。
+  * **修复**：entry 模块补复数薄转发 + `instrumentation_definition_payload`
+    改走 `build_instrumentation_payload_for_sheets`。
+  * **重新发布**：`backend/scripts/fix/fix_d1_republish_representation.py --apply`。
+  * **门**：受管区 18 / sheet 12 / store item 17，materialize + extract + verify
+    equivalent=True。
+
+翻面后本文件继续守三件事：
+
+1. **不再脱钩**：冻结 hash == 现算 hash（改契约不重发布 ⇒ 转红）。
+2. **归因不被改写**：HEAD 契约与当前契约 hash 相等 ⇒ 静态 table 不是差异来源；
+   且根因修复仍在位（退回单数入口 ⇒ 转红）。
+3. **影响面**：`ObservedIdentityDriftError` 是 `SyncDomainError` 子类，
+   而 `register_from_manifest()` 逐 entry 捕获后**继续** ⇒ blast radius 收敛到
+   D1 一个 entry，不会打挂整批注册。这条与门状态无关，始终有效。
 
 ═══ 为什么真实库缺失时**失败**而不是 skip ═══
 
@@ -285,58 +293,100 @@ def test_published_representation_exists_with_real_adapter(snap: dict[str, Any])
     )
     assert row["adapter_id"] == ADAPTER_ID, f"adapter_id={row['adapter_id']!r}"
     assert str(row["structure_hash"]).strip(), "frozen structure_hash 为空"
-    # 门从未跑过的证据：reason 里没有 materialize
-    assert "materialize" not in str(row["reason"]), (
-        f"最新 representation 的 reason={row['reason']!r} 含 materialize ⇒ "
-        "整册门可能已经跑过，本文件的「门从未跑过」前提需复核"
-    )
+    # 🔴 原先这里断言 `"materialize" not in reason`，用来钉「门从未跑过」。
+    #    门已通（harness exit 0）之后那条前提不再成立，改为断言 generation 有效 ——
+    #    留一个不会因门状态而失效的前提判据。
+    assert int(row["generation"]) >= 1, f"generation={row['generation']!r}"
 
 
-def test_blocker_is_still_real(snap: dict[str, Any]) -> None:
-    """🔴 **失效条目反向检查** —— 重新发布之后这条必须转红。
+def test_gate_is_open_frozen_hash_matches_recomputed(snap: dict[str, Any]) -> None:
+    """🔴 门已通：真库冻结的 `structure_hash` 必须等于现算值。
 
-    转红时要做的事：把 tasks.md 里 25~29 的阻塞登记删掉，
-    跑 `backend/scripts/e2e/verify_d1_full_book_real_stack.py` 真正过门，
-    然后删掉本条断言（或改成「门已过」的正向断言）。
+    这条是原 `test_blocker_is_still_real` 的**翻面**。原条目是失效条目反向检查
+    （「一旦重新发布就转红，逼迫更新登记」），它已按设计转红并被兑现：
+
+      * 根因修复见 `test_d1_instrumentation_specs_forwarder.py`；
+      * representation 由 `backend/scripts/fix/fix_d1_republish_representation.py --apply`
+        重新发布；
+      * 整册门 `backend/scripts/e2e/verify_d1_full_book_real_stack.py` 现 exit 0。
+
+    翻面之后它继续有守卫价值：任何让两侧再次脱钩的改动（改契约不重发布、
+    改 instrumentation 声明面、退回单数入口）都会让这条转红。
     """
     frozen = str(snap["frozen_row"]["structure_hash"]).strip()
     now = snap["hash_now"]
     assert not now.startswith("<"), f"现算 structure_hash 抛异常: {now}"
-    assert now != frozen, (
-        "冻结值已与现算一致 ⇒ representation 已被重新发布、阻塞已解除。"
-        "请删除 tasks.md 中 25~29 的阻塞登记并把整册门真正跑起来，再更新本判据。"
+    assert now == frozen, (
+        f"冻结值与现算值又脱钩了 ⇒ 整册门会重新 fail-closed。\n"
+        f"  frozen = {frozen}\n  now    = {now}\n"
+        f"改了契约或 instrumentation 声明面之后必须重新发布 representation："
+        f"`python backend/scripts/fix/fix_d1_republish_representation.py --apply`"
     )
 
 
-def test_blocker_predates_this_spec_static_table(snap: dict[str, Any]) -> None:
-    """🔴🔴 **反误判断言（本文件最重要的一条）**：阻塞不是本轮静态 table 造成的。
+def test_root_cause_was_missing_plural_instrumentation_entry(snap: dict[str, Any]) -> None:
+    """🔴🔴 归因定案（原「反误判断言」的继任者）：阻塞与本 spec 的静态 table **无关**。
 
-    HEAD 版契约（18 table，**不含**本轮静态 table）在同一 artifact 上算出的
-    `structure_hash` 同样 ≠ 冻结值 ⇒ representation 的冻结值在本轮改动**之前**
-    就已经与磁盘契约脱钩。本轮只是把现算值从一个不匹配的数换成另一个不匹配的数。
+    ═══ 已定案的归因（实测，不是推断）═══
 
-    没有这条，下一个人看到「新增 table ⇒ 判漂移」必然归错因，
-    进而可能去回滚静态 table（那不会解除阻塞，只会白丢一个已验证的能力）。
+    真因是 entry 模块 `phase5_d1_notes_receivable` **只暴露单数**
+    `instrumentation_spec`，而平台的两个读取点都优先取复数 `instrumentation_specs`：
+
+      * `stage_instrumented_substrate` 落进单数回落臂 ⇒ staged substrate 里
+        **18 张声明表只注出 1 张**（`GT_D13_ROWS`）；
+      * `instrumentation_definition_payload` 走单数 `build_instrumentation_payload`
+        ⇒ 请求时刻锚点只覆盖 1 张受管 sheet（BP-30 两时刻不同源）。
+
+    逐阶段实测 Table 数：authoritative 0 → instrumented **18** →
+    openpyxl 重保存 **18** → staged substrate **1**。也就是说
+    `instrument_workbook_bytes_multi` 一直是对的，丢表发生在 provider 分派这一步，
+    整册发布在**结构上从来不可能成功** —— 与「数据没准备好」「静态 table 新增」都无关。
+
+    ⚠️ 留给后来者：T7 裁决 A 曾因这条阻塞而撤回 D1-4 静态 table。归因定案后可知
+    那次撤回**不是**解除阻塞的必要条件（阻塞另有真因）。是否恢复静态 table 由
+    marker-relative content 字段落地后独立裁决，`_INCLUDE_D104_NOTETYPE_STATIC`
+    仍是唯一门控点。
     """
-    frozen = str(snap["frozen_row"]["structure_hash"]).strip()
     head = snap["hash_head"]
     now = snap["hash_now"]
-    # T7 裁决 A 撤回后 HEAD 与当前契约 table 面一致 ⇒ hash 也应一致。
-    # 但**两者都 ≠ 冻结值**（先于本 spec 的既存 representation 过期），阻塞依旧。
     assert not head.startswith("<"), f"HEAD 契约现算抛异常: {head}"
     assert not now.startswith("<"), f"当前契约现算抛异常: {now}"
-    assert head != frozen, (
-        f"HEAD 契约算出的 structure_hash 竟等于冻结值 ⇒ 阻塞已自行消失，"
-        f"请跑门并删除本 blocker 文件。head={head} frozen={frozen}"
+
+    # 🔴 归因的**精确**表达：HEAD 契约与当前契约的**受管面逐项相同**，
+    #    唯一差异是 `instrumentation_definition_sha256` 这个单向引用
+    #    （因为根因修复把 instrumentation 从 1 spec 改成 18 spec）。
+    #
+    #    ⚠️ 这里不能写 `head == now`：修复本身合法地改变了那个 digest 引用，
+    #    写等式会打红。但**也不能**因此就把断言删掉 —— 那样「静态 table 不是
+    #    差异来源」这个归因结论就没人守了。正确形式是「差异集合 == 已知的那一项」。
+    head_payload = _contract_payload_at_head()
+    now_payload = _contract_payload_now()
+    differing = sorted(
+        key
+        for key in set(head_payload) | set(now_payload)
+        if head_payload.get(key) != now_payload.get(key)
     )
-    assert now != frozen, (
-        f"当前契约算出的 hash 竟等于冻结值 ⇒ 阻塞已解除（可能有人重新发布了），"
-        f"请跑门并删除本 blocker 文件。"
+    assert differing == ["instrumentation_definition_sha256"], (
+        f"HEAD 与当前契约的差异字段不只是 instrumentation digest，实得 {differing} —— "
+        f"归因结论（静态 table 不是差异来源）需要重新核"
     )
-    # T7 撤回后两个契约的 table 面一致 ⇒ hash 应相等（若不等说明有别的改动）
-    assert head == now, (
-        f"HEAD 与当前契约 hash 不等 ⇒ 除了静态 table 还有别的差异。head={head} now={now}"
+    # 受管面（sheets/tables/字段清册）必须逐项相同 —— 这才是「静态 table 无关」的实证。
+    assert head_payload["sheets"] == now_payload["sheets"]
+    assert _inventory(head_payload) == _inventory(now_payload)
+    # hash 不等，且不等**只**来自上面那一项引用（若受管面也变了，上面两条已先红）。
+    assert head != now, (
+        "HEAD 与当前契约 hash 相等，但 instrumentation digest 明明不同 —— "
+        "说明 structure_hash 没把该引用纳入计算，归因链需要重新核"
     )
+    # 根因修复必须仍在位（退回单数入口 ⇒ 这里立刻转红）。
+    from app.services.workpaper_sync import phase5_d1_notes_receivable as _d1
+    from app.services.workpaper_sync import projection_first_publication as _pub
+
+    provider = _pub._provider_for(ENTRY_ID)
+    assert callable(getattr(provider, "instrumentation_specs", None)), (
+        "entry 模块又没有复数 `instrumentation_specs` 入口 —— 根因回归"
+    )
+    assert len(tuple(_d1.instrumentation_specs())) == 18
 
 
 def test_error_message_omits_frozen_inventory_size(snap: dict[str, Any]) -> None:

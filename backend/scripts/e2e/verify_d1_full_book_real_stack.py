@@ -269,6 +269,55 @@ async def run() -> int:
                 f"表数={len(extracted.row_keys)}"
             )
 
+            # ── ⑤b 反读面必须覆盖输入面（本脚本此前的**假绿点**）────────────
+            #
+            # 🔴 只 print 不断言会给出「✅ 整册闭环全绿」而实际只往返了 1 张表。
+            #    实测过的退化形态：输入 18 表 / 231 值，extract 回来 1 表 / 52 值，
+            #    而下面第 ⑥ 步的 `verify_unmanaged_regions` 照样 `equivalent=True`
+            #    —— 它只管未受管区有没有被动，对受管字段是否往返成功不发一言。
+            #    真因是 adapter 构造时漏传 `sibling_bindings`，`_all_bindings()` 恒 1 条，
+            #    materialize 与 extract 两个方向一起静默退化成单表。
+            missing_tables = sorted(set(projection.row_keys) - set(extracted.row_keys))
+            if missing_tables:
+                print(
+                    f"[⑤b] 🔴 反读缺 {len(missing_tables)}/{len(projection.row_keys)} 张表："
+                    f"{missing_tables[:6]}{' …' if len(missing_tables) > 6 else ''}"
+                )
+                print(
+                    "     多受管 sheet entry 的 adapter 必须带 sibling_bindings —— "
+                    "检查 provider 的 attach 是否调了 `attach_sibling_bindings()` "
+                    "并把结果传进 `build_excel_adapter(sibling_bindings=...)`"
+                )
+                return 1
+            print(
+                f"[⑤b] 反读面覆盖输入面 OK：表 {len(extracted.row_keys)}/"
+                f"{len(projection.row_keys)}"
+            )
+
+            # ── ⑤c G1 roundtrip 等值门（`_assert_roundtrip_equivalent`）──────
+            #
+            # 🔴 本脚本此前 G1/G2/G3 三道 roundtrip 门**一道都没跑**，只跑了未受管区域门。
+            #    G1 是生产链路 `ContentMutationService._stage_and_verify` 里 materialize
+            #    之后紧跟的那一道，语义是「反读出来的受管 projection 与要提交的逐字段等值」，
+            #    双向集合判等（missing 与 extra 都 fail-closed）。
+            #    以 `self=None` 调用是既有先例（`scripts/analyze/measure_d4_materialize_baseline.py`）。
+            from app.services.workpaper_sync.content_mutation import (
+                ContentMutationService,
+            )
+
+            t1b = time.perf_counter()
+            try:
+                ContentMutationService._assert_roundtrip_equivalent(
+                    None,  # type: ignore[arg-type]
+                    intended=projection,
+                    extracted=extracted,
+                    contract=contract,
+                )
+            except Exception as exc:  # noqa: BLE001 —— 真栈探测须如实报告
+                print(f"[⑤c] ❌ G1 roundtrip 等值门失败: {type(exc).__name__}: {exc}")
+                return 1
+            print(f"[⑤c] G1 roundtrip 等值门 OK {time.perf_counter() - t1b:.1f}s")
+
             # ── ⑥ verify_unmanaged_regions（before = 真实 substrate）────
             t2 = time.perf_counter()
             try:

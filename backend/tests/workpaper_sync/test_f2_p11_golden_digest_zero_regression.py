@@ -49,7 +49,16 @@ GOLDEN_BASELINE: dict[str, str] = {
     #    🔴 **T7 裁决 A（2026-09-28）把静态 table 撤回**，契约从 19 table 回到 18 table
     #    （与 D4 `phase5_d4_policy_check_sheet` 相同处置，待 marker-relative content 字段落地后再扩），
     #    digest 回到 L 节改名后、O 节加静态 table 前的值。详见 tasks.md T7 节。
-    "d1.notes_receivable_detail.json": "5cf83e3fcdfd9ea5",
+    # 🔴 2026-09-28 三次更新（`5cf83e3fcdfd9ea5` → 本值）：整册门根因修复。
+    #    entry 模块 `phase5_d1_notes_receivable` 补出复数 `instrumentation_specs()`
+    #    薄转发，并把 `instrumentation_definition_payload` 改走
+    #    `build_instrumentation_payload_for_sheets`（18 组 spec，原先只投 1 组）。
+    #    契约里 **只有** `instrumentation_definition_sha256` 这一个单向引用变了，
+    #    `sheets` 与结构清册（248 项）逐项不变 —— 由
+    #    `test_d1_full_book_gate_open_pg.py::test_root_cause_was_missing_plural_instrumentation_entry`
+    #    以「差异字段集合 == 恰好这一项」的形式钉死，不是靠这里的注释自证。
+    #    根因与变异证明详见 `test_d1_instrumentation_specs_forwarder.py`。
+    "d1.notes_receivable_detail.json": "247f1b1b9358227a",
     "d2.receivable_detail.json": "078b04377a34054f",
     "d3.prepaid_receipts_detail.json": "4f5b71fd73c1c412",
     "d4.revenue_detail.json": "5bd890211ac8f897",
