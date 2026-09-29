@@ -257,9 +257,40 @@ def test_stale_known_gap_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_registered_gap_is_still_really_violating() -> None:
-    """E1-6 必须**真的仍在违规** —— 若它已被 E1 lane 修好，白名单该删。"""
+    """E1-6 必须**真的仍在违规** —— 若它已被 E1 lane 修好，白名单该删。
+
+    🔴 「已修好」与「本检出里没有这个受管区」必须分开（2026-09-28 实测）：
+    E1-6 的 provider `phase5_e1_06_reconciliation.py` 是别 lane **尚未入库**的文件。
+    开发者工作树上它在且仍违规（登记正确）；纯 HEAD 检出上它不存在，门把它归入
+    `absent_known_gaps`。此时要求删白名单是错的 —— 删完等那条 lane 入库就成漏报。
+    """
+    key = ("银行存款余额调节表E1-6", "reconciliation_rows")
     report = _load_module().run()
     hit_keys = {(v["managed_sheet"], v["table_key"]) for v in report["known_gaps_hit"]}
-    assert ("银行存款余额调节表E1-6", "reconciliation_rows") in hit_keys, (
+    if key in hit_keys:
+        return
+    absent = set(report.get("absent_known_gaps") or ())
+    if f"{key[0]} / {key[1]}" in absent:
+        pytest.skip(
+            "E1-6 的 provider 模块不在本检出（CI 上正常）—— 本条只在开发者工作树上"
+            "有判定力；门已把它归入 absent_known_gaps 而不是判红"
+        )
+    raise AssertionError(
         "E1-6 已合规 ⇒ 请从 KNOWN_GAPS 删除该条（本判据同时保证白名单不含失效项）"
     )
+
+
+def test_absent_gap_is_not_reported_as_stale() -> None:
+    """门必须把 `absent_known_gaps` 与 `stale_known_gaps` 分开，且 absent 不判红。
+
+    没有这条分离，纯 HEAD 检出会要求删掉一批**仍然有效**的登记。
+    """
+    report = _load_module().run()
+    assert "absent_known_gaps" in report, "报告缺少 absent_known_gaps 分类"
+    overlap = set(report["absent_known_gaps"]) & set(report["stale_known_gaps"])
+    assert not overlap, f"同一条目同时被判 absent 与 stale：{sorted(overlap)}"
+    if report["absent_known_gaps"] and not report["violations"]:
+        assert report["ok"], (
+            "仅有 absent 条目时不得判红 —— 那是别 lane 未入库，不是本门的缺陷："
+            f"{report['absent_known_gaps']}"
+        )

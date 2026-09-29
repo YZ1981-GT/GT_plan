@@ -36,13 +36,40 @@ def _load_module():
     return mod
 
 
+#: 🔴 因 provider 签名与本门禁不兼容而被 `[SKIP]` 的 provider（**必须显式登记**）。
+#:
+#:  * `f1.prepayment_detail`：`build_store_projection(store_item_id, payload, *, contract)`
+#:    是**两个位置参数**（多 item provider 按 item 分派），而本门禁按单参调用
+#:    `mod.build_store_projection(rows, contract=contract)` ⇒ TypeError ⇒ 整家被 SKIP。
+#:    后果：F1 的三段 digest 全部**不在零回归门内**。归 f1 lane 决定是脚本适配还是 provider
+#:    统一签名。
+#:
+#: 🔴 为什么要有这张表：2026-09-28 实测发现 `test_digest_count_matches_provider_capabilities`
+#:    的公式按 `PROVIDERS` 全表求和，而 report 里少了被 SKIP 的那家 ⇒ 数字恒对不上
+#:    （实测 139 vs 142，差 3 正是 f1 的 contract+instr+projection）。若只把期望数字改大改小，
+#:    「有一家根本没进门」这个事实就被永久掩盖了。
+SKIPPED_PROVIDER_LABELS: frozenset[str] = frozenset({"f1"})
+
+#: 9 家「已交付核心 contract」—— 无论 PROVIDERS 怎么增长，这 9 家必须一直在门内。
+_CORE_LABELS: frozenset[str] = frozenset(
+    {"b60", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "e1"}
+)
+
+
 def test_all_delivered_providers_produce_three_sections() -> None:
     mod = _load_module()
     report = mod.run()
     labels = {p["label"] for p in report["providers"]}
-    # 🔴 2026-09-26：E1 纳入（spec e1-sync-coverage-and-first-canary 交付的第 9 个 contract，
-    #    也是引擎落地后新建的第一个 entry ⇒ 它的 digest 能钉住「薄转发层」不被引擎改动破坏）
-    assert labels == {"b60", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "e1"}
+    declared = {row[0] for row in mod.PROVIDERS}
+    # 🔴 labels 从 PROVIDERS 现算，**不手抄**（本文件另一条判据早就立了这条纪律，
+    #    而这里首版写死 9 家，并发 lane 把 PROVIDERS 加到 23 家后必然过期 —— 2026-09-28 实测）。
+    assert labels == declared - SKIPPED_PROVIDER_LABELS, (
+        f"门内 provider 与 PROVIDERS 表不符：只在表里={sorted(declared - labels)}、"
+        f"只在报告里={sorted(labels - declared)}。前者若是新的签名不兼容，"
+        f"请登记进 SKIPPED_PROVIDER_LABELS 并写明归属 lane，不要改这条断言。"
+    )
+    # 已交付核心 9 家是底线，任何时候都不得掉出门内。
+    assert _CORE_LABELS <= labels, f"核心 contract 掉出零回归门：{sorted(_CORE_LABELS - labels)}"
     for p in report["providers"]:
         assert p["contract_payload_sha256"], f"{p['label']} contract digest 空"
         assert p["instrumentation_sha256"], f"{p['label']} instrumentation digest 空"
@@ -63,9 +90,35 @@ def test_digest_count_matches_provider_capabilities() -> None:
     """
     mod = _load_module()
     report = mod.run()
-    base_expected = sum(2 + (1 if has_proj else 0) for (_l, _m, _c, has_proj, _p) in mod.PROVIDERS)
+    # 🔴 只对**实际进了门**的 provider 求和 —— 被 SKIP 的那家（签名不兼容，见
+    #    SKIPPED_PROVIDER_LABELS）不产出 digest，把它算进分母会让公式恒对不上，
+    #    而人多半会去改数字而不是追问「为什么有一家没进门」。
+    in_门 = {p["label"] for p in report["providers"]}
+    base_expected = sum(
+        2 + (1 if has_proj else 0)
+        for (label, _m, _c, has_proj, _p) in mod.PROVIDERS
+        if label in in_门
+    )
     sheet_expected = sum(len(p.get("sheet_digests") or {}) for p in report["providers"])
     assert report["digest_count"] == base_expected + sheet_expected
+
+
+def test_skipped_providers_are_really_skipped_and_registered() -> None:
+    """反向断言：`SKIPPED_PROVIDER_LABELS` 里的每一家**真的**不在门内，且真的在 PROVIDERS 表里。
+
+    两侧都要查：
+      * 若某家已被修好（进门了）⇒ 必须从 SKIPPED 里删，否则名单会躺着失效项；
+      * 若某家压根不在 PROVIDERS 表里 ⇒ 说明名单抄错了 label。
+    """
+    mod = _load_module()
+    report = mod.run()
+    in_门 = {p["label"] for p in report["providers"]}
+    declared = {row[0] for row in mod.PROVIDERS}
+    for label in SKIPPED_PROVIDER_LABELS:
+        assert label in declared, f"{label} 不在 PROVIDERS 表里 —— SKIPPED 名单抄错了"
+        assert label not in in_门, (
+            f"{label} 现已进入零回归门 ⇒ 请从 SKIPPED_PROVIDER_LABELS 删除该条"
+        )
 
 
 def test_current_matches_committed_baseline() -> None:

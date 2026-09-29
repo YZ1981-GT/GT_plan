@@ -76,17 +76,34 @@ def test_current_state_passes_with_nonempty_denominator() -> None:
 
 
 def test_mutation_new_unwired_adapter_is_detected(monkeypatch: pytest.MonkeyPatch) -> None:
-    """变异反证：把 D6 从基线里摘掉 ⇒ 它必须变成「新增断口」而打红。
+    """变异反证：把一条已登记的断口从基线里摘掉 ⇒ 它必须变成「新增断口」而打红。
 
-    🔴 原来用 D1 做变异源，2026-09-28 D1 已接通、从基线出列 ⇒ 换成仍在基线里、
-    缺口最大的 D6（声明 8 / 可见 1）。
+    🔴 victim 换过两次，都是被实测打脸换的，值得记：
+      1. 原本写死 D1 —— 2026-09-28 D1 接通后从基线出列 ⇒ 变异源不存在；
+      2. 改写死 D6 —— 在纯 HEAD 检出上 D6 声明面只有 1（伴生模块
+         `phase5_d6_expansion.py` 属别 lane 未入库）⇒ 摘掉基线后它**并不违规**
+         ⇒ 变异不打红，这条反证在 CI 上静默失效。
+
+    ⇒ victim 必须**运行期从当前 report 里挑**「已登记且确有断口」的那些，
+      任何检出上都成立。写死的期望值在多 lane 仓库里迟早过期。
     """
     mod = _load_module()
-    victim = "d6.contract_assets_detail"
+    baseline_report = mod.run()
+    candidates = [
+        r["adapter_id"]
+        for r in baseline_report["known_unwired_hit"]
+        if r["invisible_count"] > 0
+    ]
+    if not candidates:
+        pytest.skip(
+            "当前检出里没有「已登记且确有断口」的 adapter —— 本条变异失去覆盖面"
+            "（不假装通过）"
+        )
+    victim = sorted(candidates)[0]
     without = {k: v for k, v in mod.KNOWN_UNWIRED.items() if k != victim}
     monkeypatch.setattr(mod, "KNOWN_UNWIRED", without)
     report = mod.run()
-    assert not report["ok"], "基线漏登记时必须打红"
+    assert not report["ok"], f"基线漏登记 {victim} 时必须打红"
     ids = [r["adapter_id"] for r in report["new_unwired"]]
     assert victim in ids, ids
 
