@@ -200,6 +200,29 @@ def parse_html_renderer_registry(path: Path = REGISTRY_PATH) -> dict[str, dict[s
     return entries
 
 
+def parse_registry_component_types(path: Path = REGISTRY_PATH) -> frozenset[str]:
+    """前端注册表里登记的全部 componentType（**唯一解析入口**）。
+
+    🔴 2026-09-28 加：仓库里曾有 **4 份**手抄的 "找 `const REGISTRY_LIST` 到
+    `export const HTML_RENDERER_REGISTRY` 之间的切片再正则 componentType" 副本
+    （test_dedicated_component_registry_contract / test_k10_contract /
+    test_k12_contract / test_k13_registration_contract）。注册表按渲染器家族拆到
+    `registry/entries/*.ts` 之后，那个切片只剩 6 个 spread ⇒ 4 份副本**同时**解析出
+    0 条，把"解析失败"表现成"91 个 componentType 全没注册"，全部恒红。
+
+    任何需要这份集合的地方都必须调本函数，不要再手写切片解析
+    （`tests/scripts/test_workpaper_component_manifest.py::
+    test_no_handwritten_registry_slice_parser_remains` 会拦第五份副本）。
+    """
+    entries = parse_html_renderer_registry(path)
+    if not entries:
+        raise ValueError(
+            f"{_repo_relative(path)} 解析出 0 个 componentType —— 这是解析失败，"
+            "不是注册表为空；注册表结构可能又变了"
+        )
+    return frozenset(entries)
+
+
 def load_wp_code_overrides(path: Path = OVERRIDES_PATH) -> dict[str, str]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict) or not all(
