@@ -366,18 +366,42 @@ def test_root_cause_was_missing_plural_instrumentation_entry(snap: dict[str, Any
         for key in set(head_payload) | set(now_payload)
         if head_payload.get(key) != now_payload.get(key)
     )
-    assert differing == ["instrumentation_definition_sha256"], (
-        f"HEAD 与当前契约的差异字段不只是 instrumentation digest，实得 {differing} —— "
+    # 🔴 差异集合分两批，都**不是**静态 table：
+    #    ① `instrumentation_definition_sha256` —— 根因修复把 instrumentation 从
+    #       1 spec 改成 18 spec（V1）；
+    #    ② `template` / `template_definition_sha256` —— D1-7「贴现息」列数字格式修复
+    #       改了权威模板字节（V8），契约对模板的单向引用随之变（sha256
+    #       `e6e8dcf2…` → `efa8e23d…`）。
+    #    受管面（sheets / 结构清册）仍逐项不变 —— 下面两条断言才是「静态 table 无关」
+    #    的实证，本条只负责「差异字段不出这三项之外」。
+    #    🔴 断言写成**子集**而不是等式：改动提交之后 HEAD 就是当前契约，差异集合
+    #    会变成空集；只在改动未提交时才看得到那三项。写等式会让本条在「已提交」
+    #    与「未提交」之间来回打红 —— 那是判据对工作树状态敏感，不是真缺陷。
+    allowed = {
+        "instrumentation_definition_sha256",
+        "template",
+        "template_definition_sha256",
+    }
+    assert set(differing) <= allowed, (
+        f"HEAD 与当前契约的差异字段超出 instrumentation digest + 模板引用，"
+        f"实得 {sorted(set(differing) - allowed)} —— "
         f"归因结论（静态 table 不是差异来源）需要重新核"
     )
     # 受管面（sheets/tables/字段清册）必须逐项相同 —— 这才是「静态 table 无关」的实证。
     assert head_payload["sheets"] == now_payload["sheets"]
     assert _inventory(head_payload) == _inventory(now_payload)
-    # hash 不等，且不等**只**来自上面那一项引用（若受管面也变了，上面两条已先红）。
-    assert head != now, (
-        "HEAD 与当前契约 hash 相等，但 instrumentation digest 明明不同 —— "
-        "说明 structure_hash 没把该引用纳入计算，归因链需要重新核"
-    )
+    # hash 与 payload 差异必须**同步**：payload 有差异 ⇒ hash 必不等；payload 无差异
+    # （改动已提交，HEAD == 当前）⇒ hash 必相等。
+    # 🔴 不能写死 `head != now`：那只在「改动未提交」时成立，提交后立刻假红。
+    if differing:
+        assert head != now, (
+            f"契约 payload 有差异 {differing} 但两侧 structure_hash 相等 —— "
+            "说明 structure_hash 没把这些引用纳入计算，归因链需要重新核"
+        )
+    else:
+        assert head == now, (
+            "契约 payload 逐字段相同却算出不同 structure_hash —— hash 不是纯函数"
+        )
     # 根因修复必须仍在位（退回单数入口 ⇒ 这里立刻转红）。
     from app.services.workpaper_sync import phase5_d1_notes_receivable as _d1
     from app.services.workpaper_sync import projection_first_publication as _pub
