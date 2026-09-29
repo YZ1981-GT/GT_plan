@@ -74,6 +74,31 @@ for _stream in (sys.stdout, sys.stderr):
 _REPO = Path(__file__).resolve().parents[3]
 _BACKEND = _REPO / "backend"
 
+#: 🔴 其断口**依据**来自尚未入库的伴生模块的登记项（2026-09-28）。
+#:
+#: 这三条记的断口是「声明 8/7/2 个、装配链只看得到 1 个」，而「声明 N 个」出自
+#: `phase5_d{5,6,7}_expansion.py` —— 别 lane 尚未入库。于是：
+#:   * 开发者工作树：伴生模块在，declared = 8/7/2，断口成立，登记正确；
+#:   * 纯 HEAD 检出：伴生模块不在，declared = 1 = 两方向可见数，**看起来接通了**，
+#:     棘轮的失效检查会要求删登记 —— 删掉就是漏报（声明面缩小 ≠ 断口消失）。
+#:
+#: 🔴 为什么是显式名单而不是启发式：运行期无法区分「本来就只声明 1 个」与「声明面被
+#:    缩小到 1」。我的第一版启发式（声明面 ≤1 且无伴生模块）当场被既存判据
+#:    `test_stale_baseline_entry_is_reported` 打红 —— 它拿 `f1.prepayment_detail`
+#:    （天然单 item、天然无伴生模块）做反证，两个条件对它同时成立 ⇒ 真失效项被放行。
+#:    区分二者的信息只存在于基线作者的意图里，所以必须写下来。
+#:
+#: 纪律：本名单只在「伴生模块入库后断口仍然存在」这个前提下有效。
+#: `test_basis_from_uncommitted_entries_have_real_gap_in_worktree` 在开发者工作树上
+#: 断言每条**真的**声明 >1 个 item；入库后若断口消失，失效检查会照常报出来。
+BASIS_FROM_UNCOMMITTED: frozenset[str] = frozenset(
+    {
+        "d5.receivables_financing_detail",
+        "d6.contract_assets_detail",
+        "d7.contract_liabilities_detail",
+    }
+)
+
 #: 🔴 棘轮基线：已知「声明了但装配链看不到」的 adapter（只许变短）。
 #:
 #: 每条写明**归属 lane** 与**缺口规模**。修好后必须从本表删除 —— 脚本会把失效项报红
@@ -247,7 +272,14 @@ def _declared_全集(entry_module: str) -> tuple[tuple[str, ...], str | None]:
             continue
         try:
             mod = importlib.import_module(f"app.services.workpaper_sync.{name}")
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            # 🔴 这里原来是静默 `continue`，同一函数里我第一版只修了 `fn()` 调用那处
+            #    （commit 24f33e57f），漏了 import 这半边 —— 后果立刻在 HEAD 检出上现形：
+            #    d5/d6/d7 的伴生模块 `phase5_d{5,6,7}_expansion.py` 未入库 ⇒ 声明面从
+            #    8/7/2 缩到 1，于是 declared == outbound == inbound == 1 **看起来接通了**，
+            #    棘轮反向断言反过来报「这 3 条登记已失效，请删除」。
+            #    删掉就成漏报 —— 声明面缩小从来不等于断口消失。
+            reason = f"{name}: import 失败 {type(exc).__name__}: {exc}"
             continue
         fn = getattr(mod, "all_store_item_ids", None)
         if callable(fn):
@@ -279,6 +311,7 @@ def run() -> dict[str, Any]:
     unwired: list[dict[str, Any]] = []
     known_hit: list[dict[str, Any]] = []
     unresolvable: list[dict[str, Any]] = []
+    resolved_declared: dict[str, int] = {}
     checked = 0
     for adapter_id, plan in sorted(STORE_MERGE_REGISTRY.items()):
         entry_module = str(getattr(plan, "provider_module", "") or "")
@@ -334,6 +367,9 @@ def run() -> dict[str, Any]:
             )
             continue
         declared = set(declared_tuple)
+        # 记下每个成功判定的 adapter 的声明面大小 —— 棘轮失效判断要用它区分
+        # 「真的接通了」与「扩容声明本身还没入库」（见下方 absent_basis）。
+        resolved_declared[adapter_id] = len(declared)
         invisible_out = sorted(declared - outbound)
         invisible_in = sorted(declared - inbound)
         if not invisible_out and not invisible_in:
@@ -362,9 +398,25 @@ def run() -> dict[str, Any]:
     unresolvable_ids = {r["adapter_id"] for r in unresolvable}
     # 🔴 声明层不可解析的 adapter 不能算「已失效」—— 它根本没被判定过。
     #    否则纯 HEAD 检出会要求删掉一批**仍然有效**的登记，删完等别 lane 入库就成漏报。
-    stale = sorted(
+    #
+    # 🔴 还要再分一层（2026-09-28 实测，HEAD 检出上 d5/d6/d7 各报一条「已失效」）：
+    #    这三条登记记的断口是「声明 8/7/2 个、装配链只看得到 1 个」，而那个「声明 N 个」
+    #    来自伴生模块 `phase5_d{5,6,7}_expansion.py` —— 别 lane 尚未入库。HEAD 上
+    #    `_companion_of()` 返回 None、entry 自己只声明 1 个 ⇒ declared == outbound ==
+    #    inbound == 1，**看起来接通了**。删掉登记就是漏报：声明面缩小从来不等于断口消失。
+    #
+    #    🔴 处置用**显式名单**（`BASIS_FROM_UNCOMMITTED`）而不是启发式。
+    #    我的第一版启发式是「声明面 ≤1 且伴生模块文件不存在」，当场被既存判据
+    #    `test_stale_baseline_entry_is_reported` 打红：它拿 `f1.prepayment_detail`
+    #    （本来就只有 1 个 item、本来就没有伴生模块）做失效反证，而那两个条件对它
+    #    **同时成立** ⇒ 启发式把真正的失效登记也放行了。
+    #    「本来就只声明 1 个」与「声明面被缩小到 1」在运行期根本无法区分 ——
+    #    区分它们的信息只存在于基线作者的意图里，所以必须显式写下来。
+    _pending = [
         a for a in KNOWN_UNWIRED if a not in hit_ids and a not in unresolvable_ids
-    )
+    ]
+    absent_basis = sorted(a for a in _pending if a in BASIS_FROM_UNCOMMITTED)
+    stale = sorted(a for a in _pending if a not in BASIS_FROM_UNCOMMITTED)
 
     # 🔴 本 spec 自己的 provider **必须**永远可解析：它不可解析就是本 lane 漏提交了
     #    子模块（2026-09-28 实测过一次：6 个 D1 子模块漏提交，靠干净检出才发现）。
@@ -382,6 +434,8 @@ def run() -> dict[str, Any]:
         # 声明层在当前检出不可解析（函数体内 lazy import 的子模块未入库）。
         "unresolvable_declarations": sorted(unresolvable, key=lambda r: r["adapter_id"]),
         "own_lane_unresolvable": own_unresolvable,
+        # 登记依据（伴生扩容模块）不在本检出 —— 不判红，但必须打印。
+        "known_unwired_basis_absent": absent_basis,
     }
 
 
@@ -423,6 +477,12 @@ def main() -> int:
                 "   （以上 provider 的 `all_store_item_ids()` 在**函数体内** lazy import"
                 " 了尚未入库的 sheet 子模块 —— 属别 lane 的入库节奏，本门不判红但如实列出；"
                 "若其中出现 `d1.*` 则一定是本 lane 漏提交，会判红）"
+            )
+        for a in report["known_unwired_basis_absent"]:
+            print(
+                f"   [登记依据不在本检出] {a}：伴生扩容模块尚未入库 ⇒ 本检出里它只声明"
+                " ≤1 个 item、两方向自然相等。登记**保留**（声明面缩小不等于断口消失），"
+                "等该模块入库后本门会重新判定它。"
             )
         return 0
 

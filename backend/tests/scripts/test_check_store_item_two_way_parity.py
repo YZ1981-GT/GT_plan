@@ -356,3 +356,180 @@ def test_outbound_replica_threshold_is_plural_constant_length() -> None:
     assert mod._visible_to_outbound(_HasFnButNoPlural) == ("Y-single",), (
         "没有复数常量时出方向只能看到单数那一个 —— 即使 all_store_item_ids() 存在"
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 🔴 检出不完整时的态度（2026-09-28 补）
+#
+# 本门第一次接进 CI 后，在 `git worktree add --detach HEAD` 起的干净检出上连续暴露
+# 三种错误反应，全部是「工作树上永远看不到」的类型：
+#
+#   ① **直接崩**：`phase5_d3_expansion.all_store_item_ids()` 在**函数体内** lazy import
+#      别 lane 未入库的 `phase5_d3_06_related_party` ⇒ 顶层 import 正常、一调用就
+#      ImportError，门 traceback 退出，CI 上是个无从判读的红。
+#   ② **误判失效**：`ModuleNotFoundError` 那条路径绕过了 KNOWN_UNWIRED 判定，于是
+#      g7/h1/d5/d6/d7 同时被算进 `new_unwired` 和 `stale` —— 一边说「新增断口」一边说
+#      「登记已失效」，自相矛盾。
+#   ③ **声明面缩小被当成接通**：d5/d6/d7 的断口是「声明 8/7/2 个、装配链只看得到 1 个」，
+#      而「声明 N 个」来自尚未入库的伴生模块。HEAD 上 declared==outbound==inbound==1
+#      ⇒ 看起来接通了，棘轮反过来要求删登记。删掉就是漏报。
+#
+# 三条判据 + 变异反证把这三种反应钉死。静默 `continue` 一律不算合格答案 ——
+# 那会把断口变成假绿。
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_declared_collection_reports_reason_instead_of_swallowing() -> None:
+    """`_declared_全集` 必须返回 `(items, reason)`，且 `fn()` 抛错时 reason 非空。
+
+    🔴 不允许静默跳过：跳过会让「声明 0 个 item」看起来像合规。
+    """
+    mod = _load_module()
+    result = mod._declared_全集("phase5_definitely_not_a_module_xyz")
+    assert isinstance(result, tuple) and len(result) == 2, (
+        "签名必须是 (items, reason) 二元组 —— 单返回值版本无法把不可解析的原因带出去"
+    )
+    items, reason = result
+    assert items == ()
+    # 模块名不存在 ⇒ import 失败 ⇒ reason 必须说出来（这半边曾被漏掉）
+    assert reason and "import" in reason.lower(), (
+        f"entry 模块 import 失败必须回报原因，实得 {reason!r}"
+    )
+
+
+def test_lazy_import_failure_inside_all_store_item_ids_is_reported() -> None:
+    """`all_store_item_ids()` 内部抛异常时必须回报，不得让异常逃出去把门打崩。
+
+    这是形态 ① 的判据：模块能 import、函数一调用就炸。
+    """
+    mod = _load_module()
+    import sys
+    import types
+
+    fake = types.ModuleType("app.services.workpaper_sync.phase5_zz_probe")
+
+    def _boom():
+        raise ImportError("cannot import name 'phase5_zz_06_detail'")
+
+    fake.all_store_item_ids = _boom
+    sys.modules["app.services.workpaper_sync.phase5_zz_probe"] = fake
+    try:
+        items, reason = mod._declared_全集("phase5_zz_probe")
+    finally:
+        sys.modules.pop("app.services.workpaper_sync.phase5_zz_probe", None)
+    assert items == (), "调用失败时不应产出任何 item"
+    assert reason and "all_store_item_ids" in reason, (
+        f"必须指出是 all_store_item_ids() 调用失败，实得 {reason!r}"
+    )
+    assert "ImportError" in reason, "原因里要带异常类型，便于判读是哪条 lane 没入库"
+
+
+def test_report_separates_unresolvable_from_unwired_and_stale() -> None:
+    """报告必须把三类分开，且本 lane 的不可解析单独成键。"""
+    mod = _load_module()
+    report = mod.run()
+    for key in (
+        "new_unwired",
+        "stale_known_unwired",
+        "unresolvable_declarations",
+        "own_lane_unresolvable",
+        "known_unwired_basis_absent",
+    ):
+        assert key in report, f"报告缺少 {key} —— 三类混在一起就无法判读 CI 的红"
+    # `ok` 的定义必须包含「本 lane 不可解析」，否则漏提交自己的子模块不会被拦
+    assert report["ok"] == (
+        not report["new_unwired"]
+        and not report["stale_known_unwired"]
+        and not report["own_lane_unresolvable"]
+    ), "ok 的构成变了 —— 必须同时看新增断口、失效登记、本 lane 不可解析"
+
+
+_GATE_SRC = (
+    _REPO / "backend" / "scripts" / "check" / "check_store_item_two_way_parity.py"
+)
+
+
+def test_own_lane_unresolvable_is_derived_by_prefix_not_hardcoded() -> None:
+    """`own_lane_unresolvable` 按 `d1.` 前缀派生。
+
+    写死 adapter 名单会在 D1 新增 adapter 时静默漏掉；而完全不区分 lane 又会让别 lane
+    的入库节奏把本门堵死。
+    """
+    src = _GATE_SRC.read_text(encoding="utf-8")
+    assert 'startswith("d1.")' in src, (
+        "本 lane 判定应按 adapter_id 前缀派生 —— 找不到前缀判断，可能退回了写死名单"
+    )
+
+
+def test_basis_from_uncommitted_is_an_explicit_list_not_a_heuristic() -> None:
+    """「登记依据不在本检出」必须是显式名单，不得退回启发式。
+
+    🔴 这条是踩出来的：第一版用「声明面 ≤1 且伴生模块文件不存在」做启发式，
+    当场被 `test_stale_baseline_entry_is_reported` 打红 —— 它拿
+    `f1.prepayment_detail`（天然单 item、天然无伴生模块）做失效反证，两个条件对它
+    同时成立 ⇒ 真正的失效登记被放行。「本来就只声明 1 个」与「声明面被缩小到 1」
+    在运行期无法区分，只能显式写下来。
+    """
+    mod = _load_module()
+    assert isinstance(getattr(mod, "BASIS_FROM_UNCOMMITTED", None), frozenset), (
+        "应有显式名单 BASIS_FROM_UNCOMMITTED（frozenset）"
+    )
+    src = _GATE_SRC.read_text(encoding="utf-8")
+    assert "def _basis_absent" not in src, (
+        "启发式函数 _basis_absent 又回来了 —— 它会把真失效项误放行"
+    )
+    # 名单只能是 KNOWN_UNWIRED 的子集：给不在基线里的 adapter 开豁免毫无意义
+    assert mod.BASIS_FROM_UNCOMMITTED <= set(mod.KNOWN_UNWIRED), (
+        "名单里有不在 KNOWN_UNWIRED 中的条目：" 
+        f"{sorted(mod.BASIS_FROM_UNCOMMITTED - set(mod.KNOWN_UNWIRED))}"
+    )
+
+
+def test_basis_from_uncommitted_entries_have_real_gap_in_worktree() -> None:
+    """名单的有效前提：在**开发者工作树**上这些条目真的声明 >1 个 item。
+
+    伴生模块入库后若断口消失，本条与失效检查会一起把它报出来 —— 名单不会变成永久豁免。
+    CI 上伴生模块不存在（declared == 1），此时跳过而不是假红。
+    """
+    mod = _load_module()
+    from pathlib import Path as _P
+
+    sync = _P(mod._BACKEND) / "app" / "services" / "workpaper_sync"
+    for adapter_id in sorted(mod.BASIS_FROM_UNCOMMITTED):
+        plan = None
+        try:
+            import sys as _sys
+
+            if str(mod._BACKEND) not in _sys.path:
+                _sys.path.insert(0, str(mod._BACKEND))
+            from app.services.workpaper_sync.store_item_registry import (  # noqa: PLC0415
+                STORE_MERGE_REGISTRY,
+            )
+
+            plan = STORE_MERGE_REGISTRY.get(adapter_id)
+        except Exception as exc:  # pragma: no cover
+            pytest.skip(f"registry 不可用：{exc}")
+        assert plan is not None, f"{adapter_id} 不在 STORE_MERGE_REGISTRY 里"
+        entry_module = str(getattr(plan, "provider_module", "") or "")
+        companion = mod._companion_of(entry_module)
+        if companion is None or not (sync / f"{companion}.py").exists():
+            pytest.skip(
+                f"{adapter_id} 的伴生模块在本检出不存在（CI 正常）—— "
+                "本条只在开发者工作树上有判定力"
+            )
+        declared, reason = mod._declared_全集(entry_module)
+        assert reason is None, f"{adapter_id} 声明层不可解析：{reason}"
+        assert len(declared) > 1, (
+            f"{adapter_id} 在工作树上只声明 {len(declared)} 个 item —— "
+            "断口依据不成立，请从 BASIS_FROM_UNCOMMITTED 移除"
+        )
+
+
+def test_gate_is_green_on_current_checkout() -> None:
+    """现状必须绿 —— 本门是棘轮，任何新增断口都该在提交前被拦下。"""
+    report = _load_module().run()
+    assert report["ok"], (
+        f"新增断口 {[r['adapter_id'] for r in report['new_unwired']]} / "
+        f"失效登记 {report['stale_known_unwired']} / "
+        f"本 lane 不可解析 {report['own_lane_unresolvable']}"
+    )
