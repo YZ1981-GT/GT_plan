@@ -54,9 +54,9 @@ inclusion: always
 - **✅ 预存 worksheet 测试失败已修（commit `ce898e83`）**：`test_consol_worksheet.py` 2 红根因 = seeded_db fixture 抵销用 `review_status=draft`，但 Phase1 引擎改为**只消费 APPROVED**（ADR-CONSOL-102）→ 抵销不生效；**引擎本身正确**（差额表中间节点 consolidated=Σ子节点 consolidated + 本级抵销/调整，不含本级个别数，非"丢本体"bug）；修复=fixture 改 approved；**教训：先读设计文档确认是引擎错还是 fixture 过时，不预设引擎会计 bug**
 - **四阶段三件套已归档 `_archive/09-consolidation-phases/`**（work commit `375edd8d`，封板①②完成后归档，非空归档）；**tasks.md 残留未勾项全是外部依赖**（真实集团数据 UAT `*` 卡 PG 0 consolidated + Playwright 待环境 + B6/B7 CAS20 审计专业复核），代码+测试层面已封板
 
-### git 当前状态（2026-06-01）
-- 当前分支 `main`，已 push origin/main（HEAD `732ddbbd`）；已 merge `origin/work/2026-05-30-wp-specs`（bb7ea6cf，含 B/C/E/F/G 全量实施）
-- 工作树干净，本地=远程完全同步
+### 公式推送引擎 `chain-closure-phase2-formula-push-engine`（2026-09-30，17/18，已提交，工作分支 `work/2026-09-28-voucher-sampling-account-scope`）
+- 链条：四表入库 / 调整审批 → `TRIAL_BALANCE_UPDATED` → `formula_push.engine.run` → E1 明细 / 审定表 / 披露表 → 附注（上市 五、1 / 国企 八、1）；规则 `backend/data/formula_push_rules.json`；公式管理「📤 公式推送」页；**余 T17 真实「立即推送」待用户同意写库**（面板 / 试跑 / 附注数值已真浏览器验过）
+- 🔴 教训：**写入方取数一律 `strict`**（fail-open 会 rollback 撤销已 flush 写入且零失败痕迹）· **试算表取数按标准码前缀**（与报表 `ReportFormulaParser` 同口径）· **改带自动保存/自动同步页面的源码前浏览器先停 `about:blank`**（HMR 重挂载即真实写库，已踩：重药 五、49）· 真库待决：3 个唯一索引含重复键（C24 / editing_locks / review_threads）、和平药房_2025 试算表 1012 父子双计多 414 万
 
 ### 已完成 spec 总览
 - **全局模块 7 spec + frontend-consistency-m1 = 8 个 active spec 全部 ✅ 完成（2026-06-01，121 任务全绿）**：A formula-engine-unification(20/20) / B retrieval-kernel-unification(12/12) / C doc-level-ai-chat(12/12) / D report-config-baseline(12/12) / E wp-ai-review-ux-fix(8/8) / F global-modules-cleanup(10/10) / G global-modules-p2-polish(11/11) / frontend-consistency-m1(36/36)；残留仅 Playwright E2E 待 start-dev.bat 环境
@@ -132,8 +132,21 @@ inclusion: always
 - 🔴 **五轮复盘再抓 4 处「守卫在但不生效」（design §十五，T29~T35）** —— ①**P0：CI 注册表漂移门禁永假** `governance-checks.yml` 的 `note-section-map-naming` 末步是 `--write` + `git diff --exit-code`，而生成器每次写 `generated_at=datetime.now()` ⇒ diff 必非空 ⇒ 该步**必然失败**；job 无 continue-on-error/if:、触发 `push work/**` + PR ⇒ 长期全红 ⇒ **红成常态=没人看=门禁不存在**，这正是 76/78 漂移能活下来的机制（对照实验实证：旧生成器 --write 必改文件且只改 generated_at）⇒ 修法 = **输出幂等**（entries+_source 未变则沿用原时间戳）+ 加 `--check`（漂移 exit 2 并点名），CI 换用 `--check`（项目本有此约定，这条是唯一例外）；触类旁通扫 28 个带时间戳产物 + CI 全部 `--write`-后比较 step ⇒ **本类单次出现已清零** ②spec 四处引用「46 个」当反例却**从没改注释本体**（引用≠修复）⇒ 按 T25 改成写口径不写数 ③全宿主守卫两个静默脱管口（只扫 `components/workpaper/` · 只认 `function` 形态）⇒ 补 3 断言 + 真建 2 个违规文件变异 ④同 job 另有**预存**红（`e1Fx`/`restrictedAssets` 漏登 allowlist，`git stash` 归因证实非本轮）⇒ 只修门禁 job 仍全红故一并修，且**不是加豁免蒙绿**（两文件头自带「故意排除」理由），顺带把 allowlist 从名字清单升级为可伪证声明（加 `inRegistry` 字段+一致性断言）
 - 教训已固化为方法论铁律 **㉓㉔㉕㉖㉗**；完整复盘见 `#dev-history` 2026-09-28 节与 spec `design.md` §十一~§十五
 
+### 「已交付」与「在库」是两件事（2026-09-30，一天内抓到 4 类共 30 处）
+- 🔴 **已提交代码引用未提交模块**：干净检出（CI / 新 clone / 容器）在 import 期就挂，本地全绿。实测 20 处横跨 8 个 spec，其中 `store_mirror.py`（518 行）被 `oo_to_html.py` 依赖、spec 标「✅ 已交付」、薄壳转发也入库了，**只有被转发的模块没入库**。已全部补提交。守卫 `test_committed_code_imports_only_committed_modules.py`：**AST import ∪ 字符串式动态引用**两种形态（registry 用字符串常量 + `importlib.import_module` 登记 provider ⇒ 只扫 AST 得**假的 0**，实测漏 2 个真缺口）；口径须限**直接子文件**（`git ls-files` 会返 `adapters/base.py`，其 stem 与顶层 glob 混比造出 4 个假差集）。
+- 🔴 **spec 标 100% 但产物未入库**：上一条的盲区是**无引用方**的交付物（`phase5_d3_01_adjudication.py` 同族 5 兄弟全已入库、只它漏了，无人 import 故只有按「spec 完成度」的判据能抓）。但抓到的要分两类且处置相反：①忘了提交 ⇒ `git add`；②**spec 的 tasks.md 假绿**（d3 标 17/17 而 8 份验收判据实测仍红）⇒ **不能**入库，CI 的 `backend-tests` 是 `pytest backend/tests/ -x` 全量带 `-x`，一条红就整个 job 中断。⇒ 棘轮登记 + 每条写明实测失败形态 + 反向判据（入库后必须删该条）。
+- 🔴 **门禁对某一家静默失效**：`check_sync_provider_golden_digest` 对 f1 打 `[SKIP]` 后**继续 exit 0** ⇒ f1 **整家从未进基线**（登记 24 家 / 基线 23 家）。根因是它的 `build_store_projection` 把 `store_item_id` 做成**首位位置参数**（24 家里唯一）。修法=按参数 **kind** 分派（按「名字在不在」判会给 15 家 KEYWORD_ONLY 的多传位置参数、当场打红 8 家 —— 把一个洞换成八个洞）+ `run()` 把 skip 当数据返回 + `main()` 判 skip 为失败 + 加「已登记 provider 必须在基线里有条目」。**这行 `[SKIP]` 我们的 pre-push 每次都在打印**。
+- 🔴 **tasks.md 假红**（与假绿对偶）：交付物早在库、清单没勾。实测 H 系列 9 个 provider 全已跟踪（h9 还在 golden 门内），而 4 个 h spec 的 tasks 是 0/24、0/20、0/18、0/18；`workpaper-sync-managed-row-convergence` 的 Task 11/12/13 声称要做的事现算全部已存在（`stale_rows`/`stale_cleared`/`stale_deleted` 各 17/12/26 次命中）。⇒ 只登记勘误**不代勾**（勾选要跑它自己的全部 AC）。
+- 🔴 **脏工作树 + 多会话并发下的两个新坑**：①`--amend` 前必须核对 HEAD 仍是自己那一个 —— 我 amend 时并发会话已提交，结果改掉了**别人的提交**（已用 `git reset --soft <他们的 sha>` 原样复原，SHA 与树均不变）②**现算会在动手过程中过期** —— 我算出 d567 `2/23` / 16 模块未跟踪，`git add` 时它们已「不是未跟踪」（并发会话把 d567 做到 23/23 并推送），一度误判成 gitignore 排除，查 `check-ignore` 才发现是 HEAD 前移。
+
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
+
+### 知识库链路（2026-09-29 真栈实测，上传/删除已修）
+- **原生请求 token 只许走 `utils/authToken`**（getAuthHeaders/getAuthToken）：auth store 已迁 sessionStorage 并删 localStorage 副本，自读 localStorage 恒 401（知识库上传即此）；守卫 `authTokenSingleSource.spec.ts`，仅登记 2 处 Univer xlsx 回写（修即启用覆盖底稿文件，待用户拍板）
+- 🔴 **commit 前的「吞异常非阻塞钩子」必须包 `begin_nested()`**：PG 语句失败使事务 aborted，COMMIT 等价 ROLLBACK ⇒ 接口 200 但未落库（知识库删文档即此；真库测试 `test_knowledge_delete_hook_isolation_pg.py` 含反向对照）
+- **V168 补 knowledge_doc 枚举**：V042 以**空文件**被登记（checksum=sha256("")）从未生效；`detect_checksum_drift` 现有 7 条漂移（V042/046/105/128/143/151/163）未排查且生产无调用方；enum 漂移检测两个盲区（类名推断漏 30/63 个枚举 + 跨 schema 取并集被 tmp_* 残留掩盖）⇒ 另有 2 个真缺值：confirmation_risk_level_enum 缺 pass、workpaper_task_status_enum 缺 4 值
+- 🔴 **下游 RAG 全部看不到知识文档**（待 spec + 用户决策）：索引写路径 5 断点（ON CONFLICT 无唯一约束 / 无 pgvector 时 embedding_vec 列不存在 ⇒ 任何 `select(KnowledgeIndex)` 抛错且毒化调用方 session / 哨兵项目 FK / 流水线 joinedload(folder) AttributeError / 同步钩子要求 project_ids 非空）+ embedding 8101 返 502；按 doc_id/folder_id 直查的入口（文档级对话宿主正文、@引用、全文搜索）可用
 
 ### 待修 bug（2026-06-01 grep 实证，与已修 render-config 同源：查 users 不存在的 display_name 列）
 - 🔴 `project_wizard.py:207` `select(UserModel.display_name)` — User ORM 无此字段 → AttributeError，项目向导仪表盘聚合崩（user_ids 非空时）；修 → username
@@ -141,30 +154,9 @@ inclusion: always
 - 系统性防御建议：加 CI「SQL 列引用 ⊆ 真实 schema」契约检查，一次兜住整类「查不存在列」bug（render-config/prefill/wizard/qc 已 4 处同源）
 
 
-### 全局 7 模块改进 7 spec 全部完成（2026-06-01）
-- 据盘点文档生成 6 个 active spec（全 Design-First/bugfix，三件套齐全 0 diagnostics）：**A `formula-engine-unification`**（feature，4套求值器→单内核+审计收口哈希链，4阶段19任务）/ **B `retrieval-kernel-unification`**（feature，检索3套→单内核+pgvector+知识文件入网，3阶段12任务）/ **C `doc-level-ai-chat`**（feature，文档级LLM对话，**依赖B**，4阶段12任务）/ **D `report-config-baseline`**（feature，报表主模板回填+克隆stale通知，3阶段11任务）/ **E `wp-ai-review-ux-fix`**（bugfix，复核显底稿编号+接useCellLocate，8任务）/ **F `global-modules-cleanup`**（bugfix，地址库澄清+33MB死文件+模板JSON→registry+懒建表，10任务）
-- 用户拍板**全部 7 个按梯队顺序 A→B→C→D→E→F→G 实施**；依赖链仅 B→C；**全部 7 spec 已实施完成（2026-06-01）**
-- **✅ A `formula-engine-unification` 已实施完成（2026-06-01）**：19 任务全绿；核心产出=L1 单内核(formula_engine.py 递归下降 AST+FunctionRegistry 14 函数)+L2 编排(report_engine 委托) PBT 全绿
-- **✅ B `retrieval-kernel-unification` 已实施完成（2026-06-01，110 测试全绿 R1~R4 PBT + 零回归）**：阶段1 删 B（KnowledgeService deprecated 限期 2026-07-01）+ 阶段2 IndexSource 注册表+KnowledgeDocSource+semantic_search scope/user+CRUD 联动钩子+reference_doc_service 改调 + 阶段3 VectorStore Protocol+PgVectorStore(pgvector ivfflat)+feature flag(`VECTOR_STORE_BACKEND=pgtext|pgvector`)+ADR-RETRIEVAL-001
-- **✅ C `doc-level-ai-chat` 已实施+UAT 通过（2026-05-31）**
-- **✅ D `report-config-baseline` 已实施完成（2026-06-01）**：11 任务全绿；核心产出=V040 迁移(report_config_baseline 表+is_stale 列)+ORM+4 service 方法(suggest_to_master/review_candidate/diff_vs_master/apply_master_update)+EventBus REPORT_CONFIG_MASTER_UPDATED+_mark_cloned_configs_stale handler+覆盖率 CI 脚本+6 API 端点+前端 ReportConfigBaselineTab+ADR-REPORT-CONFIG-001；E1~E4 PBT 全绿；**修复联动断裂③**
-- **✅ E `wp-ai-review-ux-fix` 已实施完成（2026-05-31）**：C1 卡片底稿编号 el-tag + C2 useCellLocate 接线 + C3 复核按钮底稿名；36 vitest 全绿
-- **✅ F global-modules-cleanup 已实施完成（2026-06-01，35 测试全绿）**：删 33MB L1 死文件 + V1/V2 命名澄清 + sync_registry_from_json 联动 + 枚举注释修正 + V040 迁移
-- **✅ G global-modules-p2-polish 已实施完成（2026-06-01，57 测试全绿）**
-- **UAT 修复**：`services/apiProxy.ts` 缺 `apiProxy` named export 致前端白屏（5 个组件 import `{ apiProxy }` from services 路径）→ 已加兼容别名 `export const apiProxy = api`
-- **7 spec 跨 spec 一致性复盘修正 2 偏差（2026-05-31）**：①🔴 spec G content_text 提取工具引用错——`wp_document_recognizer` 实为 LLM 结构化凭证字段提取(DocType.VOUCHER 返结构化字段)**不产全文**，改为 `mineru_service.recognize_for_ocr`(返 `{"text":全文}`)/`unified_ocr_service.recognize` ②🔴 spec D 审计 event_type 歧义——"复用 formula-engine 哈希链收口"被误读会把报表配置变更记成公式变更，澄清为复用 `append_audit_log` 机制但用**独立 event_type `report_config_changed`**(非 A 的 formula_changed)；跨 spec 协调点核查通过=B↔C semantic_search 签名一致 / A↔G FormulaManagerDialog 改不同部分且 G 在 A 后 / E↔C useCellLocate 签名统一；**教训：单 spec 复盘抓不到跨 spec 问题，必须查"工具真实产出物"+"schema 复用边界"**
-- **6 spec 三件套复盘实证（2026-05-31，承重锚点全属实，修正 4 处偏差）**：✅ formula_engine.execute/FormulaContext/FormulaResult + amount_resolver Protocol + report_engine.evaluate_formula + knowledge_index_service + report_config_service + GroupNoteTemplateBaseline + useCellLocate + 两懒建表 全 readCode 实证存在；🔴 修正 = ①spec B `incremental_update` 真实参 `source_id`(非doc_id) + `KnowledgeSourceType` 枚举无 `knowledge_doc` 需先加成员 ②spec B `semantic_search(project_id,query,top_k)` 无 scope/user 需新增 + "6类"实为"11类"业务数据 ③spec E `useCellLocate` 真实签名 snake_case `{wp_code,sheet_name,cell_ref,component_type}` 且 component_type 必传(非camelCase) ④spec F 死文件/模板 JSON 真实路径 `backend/data/`(非 backend/app/data/)
-- **6 spec 覆盖度核查（2026-05-31，两轮复盘）**：完整覆盖文档 P0+P1 核心（单源/联动/澄清）；**P1-7「公式管理覆盖合并+底稿」已补进 spec A 需求8+task17b**——实证发现 `FormulaManagerScope` 现已有 6 scope（note/consol_note/consol_worksheet/consol_report/report/tb，**合并部分已由 consol Phase2 ADR-205 完成**），仅剩"底稿 workpaper scope"半条（需 readCode 定底稿公式语法域归内核 or cell_formula_evaluator）；**第二轮发现文档优先级自相矛盾**（地址库 Redis 缓存 §一标 P1 但 §九 路线图标 P2）→ 已修正 §一 对齐 P2；**未纳入 6 spec 的全是 P2 体验性能（地址库 Redis/公式时间线 UI/高级查询缓存/note_template DB 化/枚举扩展）+ P3 + 外部依赖（diff 去 mock）+ 已属既存 spec（生成链路 populate_parsed_data 归 wp-generation-pipeline）**，非遗漏；文档 §二十四 固化覆盖度对照表 + 建议 P2 批次另起 `global-modules-p2-polish` spec
-
-### 全局 7 模块盘点 + 多源治理（2026-05-31，文档 `docs/proposals/global-modules-status-and-improvement-2026-05-31.md` 六轮代码实证复盘）
-- **7 横切支撑模块**=地址库/公式管理/高级查询/枚举字典/底稿模板库/报告模板库/知识库；ROI 高于合并模块（天天用不卡真实数据）
-- **必须单源（删旧代码）**：①公式求值 3 套报表 DSL（formula_engine+report_engine+formula_parser，formula_engine 升级为唯一内核，其余委托/删求值器）②审计留痕 3 处（formula_audit_log 懒建表+core.Log+哈希链 → 只写哈希链）③知识库旧 KnowledgeService（仅 1 处降级调用，删）
-- **多源但正交（不合并只澄清）**：地址库 V1(公式编辑目录)/V2(stale 影响图) 正交；formula_unified 实际是底稿 Cell 公式（Excel 语法非报表 DSL，改名 cell_formula_evaluator 保持独立）；note_formula_engine 是 validator 非 evaluator（排除收敛）
-- **🔴 3 处联动断裂必修**：①~~知识文件→向量索引~~（✅ 已修 spec B：CRUD 钩子 incremental_update）②底稿模板 JSON→registry（scan 不写 wp_template_registry 表，✅ 已修 spec F）③报表主模板→已克隆项目（update_config 不通知 project:{pid} 克隆，待 spec D）；正解=单一权威源+EventBus 单向派生（平台已有 stale 传播骨架）
-- **删旧代码铁律**：删前 grep 0 调用方 + 删前后测试全绿 + 独立 commit+tag 防回滚 + deprecated 超 1 sprint 必删
-- **向量存储选型裁定 pgvector**（同库事务一致+零运维+数据量数千条；ChromaDB 现仅 health check 闲置，留 Plan B）；三大内核统一（公式/检索/审计）各立 Design-First spec
-- **底稿 AI 复核弹窗 UX 缺陷已修（spec E `wp-ai-review-ux-fix`）**：C1 底稿编号 tag + C2 useCellLocate 接线 + C3 复核按钮底稿名；**已知阻塞：render-config 端点 500（所有底稿均如此，预存后端问题）**→ 待排查修复后可 E2E 实测
-
+### 全局 7 横切模块（2026-05/06，7 spec 全部 ✅ 完成 —— 历史已压缩）
+- 7 模块=地址库/公式管理/高级查询/枚举字典/底稿模板库/报告模板库/知识库；A~G 七个 spec 全完成（121 任务）。完整盘点+多源治理裁定（含三大内核统一、单源/联动断裂三处、向量存储选型 pgvector）见 `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`（六轮复盘）；逐 spec 产出见 `.kiro/specs/INDEX.md`。**被压掉的 24 行原文**：`git show 51f6987be:.kiro/steering/memory.md`。
+- 🔴 保留的教训（压缩时刻意不丢）：①**删旧代码铁律**=删前 grep 0 调用方 + 删前后测试全绿 + 独立 commit/tag + deprecated 超 1 sprint 必删 ②**单 spec 复盘抓不到跨 spec 问题**，必查「工具真实产出物」+「schema 复用边界」（曾误把 `wp_document_recognizer` 当全文提取、把审计 event_type 串用）③`services/apiProxy.ts` 缺 `apiProxy` named export 会全站白屏（5 组件 import 它）
 ## 操作铁律（标题级，详见 #conventions）
 
 - **三层一致校验**：DB 迁移 + ORM `Mapped[]` + service 方法，任一缺失即伪绿

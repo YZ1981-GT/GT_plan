@@ -549,3 +549,137 @@ class TestEndToEndTwoPasses:
         # 累计位移回落 2
         pairs = _binding_pairs(second)
         assert pairs["GT_LAST_SHIFT"].split("|")[-1] == "-2", pairs["GT_LAST_SHIFT"]
+
+
+class TestInsertSideGlobalKeysStayUnconditional:
+    """🔴 补一条**此前只存在于注释里**的判据（2026-09-30）。
+
+    `_refresh_gt_sync_runtime_binding` 的注释写着：
+
+        ⚠ 插行分支**逐字不变**（零回归按定义成立）；插行侧的同款无条件重写属**既有**形态，
+          本 spec 不改它（改了会动插行的冻结字节），只在此登记：见判据
+          `test_insert_side_global_keys_stay_unconditional`。
+
+    全仓 grep 该名字 **0 命中** —— 那是一条**断言性注释**（声称有判据守着，其实没有）。
+    本轮补齐。它与本 spec 早先抓到的「注释说依赖全在方法体内、实测缺 2 个模块别名」
+    是同一形态：注释里的声明不会被任何东西验证，除非把它写成判据。
+
+    ═══ 锁的是什么 ═══
+
+    删行侧对四个 **workbook 全局**键（`GT_ROW_UUID_LAST_ROW` / `GT_MANAGED_RANGE` /
+    `GT_MANAGED_TABLE_REF` / `GT_FOOTER_ROW`）按 `is_primary_trip` 门控 —— 理由是删行
+    方向会让 primary 的坐标被非 primary 趟凭空缩掉（注释里有 D1-8 删首行把 D1-3 末行
+    从 20 缩到 19 的实测例）。
+
+    插行侧**没有**这个门控，且**刻意不加**：插行时 primary 的行号更小
+    （`old_last_row >= shift.insert_at - 1` 恒不成立）⇒ 算术根本碰不到它，加门控不改变
+    行为却会动插行的冻结字节 ⇒ Property 28 零回归基线要整册重取。
+
+    ⇒ 本判据把「插行侧保持无条件、删行侧保持门控」这个**不对称**钉成事实：
+    哪天有人为了「对称好看」给插行也加门控，或把删行的门控删掉，它都会红。
+    """
+
+    def _source(self) -> str:
+        import inspect
+
+        from app.services.workpaper_sync import excel_materialize as M
+
+        return inspect.getsource(M._refresh_gt_sync_runtime_binding)
+
+    #: 四个 workbook 全局键里，删行侧带 `is_primary_trip` 门控的那三组分支。
+    #: （`GT_FOOTER_ROW` 用的是 `if is_primary_trip:` 正向写法，单独一条。）
+    GATED_BY_DELETING = (
+        "GT_ROW_UUID_LAST_ROW",
+        'key in ("GT_MANAGED_RANGE", "GT_MANAGED_TABLE_REF")',
+    )
+
+    def test_delete_side_gates_global_keys_by_primary_trip(self) -> None:
+        """删行侧：三处 `deleting and not is_primary_trip` 门控必须都在。"""
+        src = self._source()
+        n = src.count("deleting and not is_primary_trip")
+        assert n >= 2, (
+            f"`deleting and not is_primary_trip` 只出现 {n} 次 —— "
+            "删行侧对 workbook 全局键的门控被拆掉了，"
+            "非 primary 趟删行会把 primary sheet 的坐标凭空缩掉"
+        )
+        assert "if is_primary_trip:" in src, (
+            "`GT_FOOTER_ROW` 的 primary 门控（正向写法）不见了"
+        )
+
+    def test_insert_side_global_keys_stay_unconditional(self) -> None:
+        """🔴 插行侧保持**无条件**重写 —— 不得为了对称而加门控。
+
+        判据形态：`GT_ROW_UUID_LAST_ROW` 的 `else`（插行）分支里出现
+        `old_last_row >= shift.insert_at - 1` 这个算式，且该算式**不在**任何
+        `is_primary_trip` 条件之下。
+
+        用 AST 而不是文本：文本匹配分不清「算式在 if 里」还是「在 else 里」。
+        """
+        import ast
+        import textwrap
+
+        tree = ast.parse(textwrap.dedent(self._source()))
+        fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef))
+
+        # 找到 `key == "GT_ROW_UUID_LAST_ROW"` 那个分支
+        target: ast.If | None = None
+        for node in ast.walk(fn):
+            if not isinstance(node, ast.If):
+                continue
+            test_src = ast.unparse(node.test)
+            if "GT_ROW_UUID_LAST_ROW" in test_src and "key ==" in test_src:
+                target = node
+                break
+        assert target is not None, "找不到 GT_ROW_UUID_LAST_ROW 的分支"
+
+        # 🔴 取分支的方式踩过两次，记下来免得第三次：
+        #    ① 顺着 `orelse[0].orelse` 一路走 ⇒ 跨出本 if、落到**整个 key 分派链**末尾的
+        #       兜底 `new_value = value`；
+        #    ② 取 `target.orelse` ⇒ 那是整条 `elif` 链的**后续键**（`GT_FOOTER_ROW` /
+        #       `GT_FOOTER_ROW_*` …），与本键无关。
+        #    正确的是 `target.body` —— `key == "GT_ROW_UUID_LAST_ROW"` 成立时执行的那一段，
+        #    里面才是「deleting 两支 + 插行一支」。
+        inner = [
+            ast.unparse(s)
+            for node in target.body
+            for s in ast.walk(node)
+            if isinstance(s, (ast.Assign, ast.AnnAssign))
+        ]
+        insert_branch = "\n".join(inner)
+        # 🔴 必须同时收 `ast.If` 与 `ast.IfExp`（三元表达式）的 test。
+        #    变异反证抓到过：只收 `ast.If` 时，把门控写成
+        #    `old_last_row + shift.count if is_primary_trip and … else old_last_row`
+        #    （插行分支本来就是个三元表达式）**完全不会被发现** —— 判据当场绿着放过。
+        inner_tests = [
+            ast.unparse(s.test)
+            for node in target.body
+            for s in ast.walk(node)
+            if isinstance(s, (ast.If, ast.IfExp))
+        ]
+
+        assert "insert_at" in insert_branch, (
+            f"该键分支里没有 `insert_at` 算式（插行侧算术不见了），取到的是："
+            f"{insert_branch[:200]!r}"
+        )
+        # 🔴 该键分支内部只允许出现 `deleting …` 门控；`is_primary_trip` 只能与
+        #    `deleting` 合取（`deleting and not is_primary_trip`），不得单独出现
+        #    —— 单独出现就意味着它也管到了插行那一支。
+        solo_primary = [
+            t for t in inner_tests if "is_primary_trip" in t and "deleting" not in t
+        ]
+        assert not solo_primary, (
+            f"`GT_ROW_UUID_LAST_ROW` 分支里出现了不与 `deleting` 合取的 primary 门控："
+            f"{solo_primary} —— 那会管到插行那一支，改动插行的冻结字节，"
+            "Property 28 零回归基线要整册重取。插行时 primary 行号更小、算术碰不到它，"
+            "加门控不改变行为却有代价，故刻意保持无条件（见该函数注释）。"
+        )
+
+    def test_the_asymmetry_is_documented_in_the_source(self) -> None:
+        """🔴 这个不对称必须在源码里写明理由，否则下一个人会当成疏漏去「修正」。"""
+        src = self._source()
+        assert "插行分支" in src and "逐字不变" in src, (
+            "源码里不再说明「插行分支逐字不变」⇒ 不对称失去依据"
+        )
+        assert "test_insert_side_global_keys_stay_unconditional" in src, (
+            "源码注释不再指向本判据 —— 指向丢了之后，注释就又变成没人验证的声明"
+        )
