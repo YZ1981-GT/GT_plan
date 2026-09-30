@@ -923,6 +923,33 @@ def register_event_handlers() -> None:
                         context={"project_id": str(project_id), "year": year},
                     )
 
+                # 标记财务报表数据 stale
+                # spec chain-closure-phase1 R4：上面那段标的是 `AuditReport`
+                # （审计报告文本，真库单项目仅 1 行），而财务报表**真数据**在
+                # `financial_report`（单项目 258 行）此前**从未被标** ⇒ 调整分录审批后
+                # 报表值已过期却显示 is_stale=False，属静默陈旧。两张表都要标：
+                # AuditReport 供 AuditReportService.on_reports_updated 消费，不能删。
+                try:
+                    from app.models.report_models import FinancialReport
+
+                    await session.execute(
+                        _sa.update(FinancialReport)
+                        .where(
+                            FinancialReport.project_id == project_id,
+                            FinancialReport.year == year,
+                            FinancialReport.is_deleted == False,  # noqa: E712
+                        )
+                        .values(is_stale=True)
+                    )
+                except Exception as e:
+                    from app.services.stale_degraded_logger import log_stale_degraded
+                    log_stale_degraded(
+                        source=f"adjustment:{payload.event_type.value}",
+                        target=f"FinancialReport:project={project_id},year={year}",
+                        error=f"FinancialReport is_stale 更新失败: {type(e).__name__}: {e}",
+                        context={"project_id": str(project_id), "year": year},
+                    )
+
                 # 标记附注 stale
                 await session.execute(
                     _sa.update(DisclosureNote)
