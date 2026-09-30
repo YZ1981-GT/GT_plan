@@ -7,6 +7,21 @@
 #   - 🔴 baseline 必须填**当前真实行数**，不得虚高 —— 虚高等于预留膨胀空间
 #
 # 登记理由：
+#   workpaper_sync 的 contracts / excel_extract / excel_materialize /
+#     excel_workbook_row_change 四件 —— 2026-09-29 基线上调（+140 / +238 / +1140 / +693）。
+#     spec: workpaper-sync-row-deletion-multi-region-propagation（删物理行的多区位移联动）。
+#     增量来源是八条欠账的对偶实现：删行门面 + 公共扫描 + 兄弟表 ref 收缩 + definedName
+#     位移 + 跨 sheet 传播 + 裸引用平移 + verify 侧归一化 + 结构块平移（A8）。
+#     🔴 本轮**没有**抽伴生模块，理由是判据侧成本：`plan_managed_writes` /
+#     `_stage_cpu_segment_scoped` 上挂着多条 **AST 结构锁**（断言「依次调用哪几个动作」），
+#     把代码搬出去会让那些锁只看一层、变成空转而不是打红（本轮已在
+#     `_assert_roundtrip_equivalent` 搬移上实测到这个形态，见 design 勘误 E.10.4）。
+#     ⇒ 拆分必须与「让结构锁跟随间接层」同一批做，属独立重构，不塞进本 spec。
+#     将来的切分轴（按职责，不按行数）：
+#       excel_materialize → 计划期（plan_managed_writes 及其 6.x 步）/ 应用期（_apply_*）
+#       excel_workbook_row_change → 扫描（scan/find_*）/ 计划（build_*_plan）/ 执行（apply_*）
+#       excel_extract → 反读（extract_*）/ 校验门（verify_*）
+#       contracts → schema 解析 / 规则表（CS-*）
 #   check_x3_deviation_registry.py —— Deviation_Registry 十一组活探针 + 自我失效机制，
 #     每组探针含「判据 + 反空转对照组 + 可复算 method」三段，拆分会让「一组的判据
 #     与它的对照组」跨文件，反空转关系不可见。spec: x3-adjustment-entry-import-export 任务 1.7
@@ -229,7 +244,7 @@ backend/app/services/workpaper_sync/content_mutation.py  2293
 #     `formula_mask` 的 A1 语义解析层（与 `column_in_ranges`/`parse_a1_range` 同源），
 #     `merge._protection` 只是消费方。拆分方向：A1 解析工具（约 90 行）可下沉 `contracts_a1.py`。
 #     spec: d4-html-to-oo-store-contract-alignment（真栈②覆盖往返修复）
-backend/app/services/workpaper_sync/contracts.py  1546
+backend/app/services/workpaper_sync/contracts.py  1686
 backend/app/services/workpaper_sync/definitions.py  892
 backend/app/services/workpaper_sync/endpoint_guard.py  1119
 backend/app/services/workpaper_sync/entry_source_facts.py  1096
@@ -238,12 +253,21 @@ backend/app/services/workpaper_sync/excel_entry_gate.py  1317
 #   excel_extract.py —— 基线 3900 → 4159（+259）。D4 同 sheet 多区累积归一化几轮修复累积
 #     （unextend_total_formula_chain 接线等）。拆分方向见本表顶部第 1 条。
 #     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure（同 sheet 多区）
-backend/app/services/workpaper_sync/excel_extract.py  4159
+backend/app/services/workpaper_sync/excel_extract.py  4397
 backend/app/services/workpaper_sync/excel_instrumentation.py  2200
 #   excel_materialize.py —— 基线 3120 → 3660（+540）。D4 同 sheet 多区兄弟 Table ref 位移
 #     （_sheet_table_parts / _shift_sibling_table_refs / footer 同 sheet 放行）+ _GT_SYNC
 #     重冻结几轮修复累积。spec: workpaper-html-onlyoffice-bidirectional-writeback-closure
-backend/app/services/workpaper_sync/excel_materialize.py  3660
+#   🔴 2026-09-28 基线 3660 → 3691（+31，spec d1-sync-row-table-engine-and-d1-coverage）：
+#     `_apply_workbook_propagation` 改**单次扫描同时替换**（原逐对串行 `str.replace()` 在
+#     「多处引用处于位移链不同位置」时会互吃命中，D1-4 实测 8 条声明改出 12 处 ⇒
+#     `PropagationDriftError`）。3691 = 本 spec 提交后的真实行数（`git show :<path>` 口径）。
+#
+#     ⚠️ **工作树可能显示更大**（实测 3949）：ref_collision 那条 lane 在同一文件里有
+#     ~258 行未提交改动（`CellWriteKind` / `MaterializePlan` / `plan_managed_writes` /
+#     `_grow_managed_table_ref` 等 10 个 hunk）。本行**不抬到 3949** —— 那等于替那条 lane
+#     预留额度、并把它的膨胀记到本 spec 账上。该 lane 提交时应由它自己上调本值。
+backend/app/services/workpaper_sync/excel_materialize.py  4831
 #   materialize_coordinator.py —— 基线 2936 早已 stale（本次改动前 HEAD 实测 3017）。
 #     2026-09-22 僵死 lease 的治本分流（+134 行）：按「这一代是否**真正接管过内容**」分两支 ——
 #     ① 从未接管（room 停在 opening / descriptor 确认从未到达 / 序列为 0 / 无 application）
@@ -572,7 +596,7 @@ backend/tests/workpaper_sync/test_workbook_row_change_delete.py  888
 #     行数。该文件把「行变更计划 + apply 补丁 + verify 逆归一化对称判据」内聚在一处，拆分会让
 #     apply↔verify 的候选形态对称性失联（本次 bug 正是两侧候选不对称）。后续应抽 apply/verify
 #     伴生模块使其变小；技术债登记，不留膨胀空间。
-backend/app/services/workpaper_sync/excel_workbook_row_change.py  2328
+backend/app/services/workpaper_sync/excel_workbook_row_change.py  3021
 
 # ═══════════════════════════════════════════════════════════════════════════
 # spec: platform-architecture-convergence（2026-09-08 归档入库）
@@ -1116,3 +1140,14 @@ backend/app/services/ledger_penetration_service.py  942
 #   与模块级 evaluate_formula（L2 编排）是两个关注点，可按此切分。
 backend/app/services/report_engine.py  2226
 backend/app/services/consol_report_service.py  1008
+
+# ── 2026-09-28 spec d1-sync-row-table-engine-and-d1-coverage · X2 ────────────
+#   test_template_override_resolution.py —— **HEAD 就已 889 行超 800 上限且不在册**
+#   （历史遗留，非本 spec 造成）。本 spec 把它的两条判据从「两个标量计数」改成
+#   **逐份具名登记 + 反向断言**：原口径锁 `一致==451 && 漂移==23`，任何 lane 改一份
+#   权威模板都会翻红，而修红最省事就是把数字改成现算值 ⇒ 静默吸收别人的漂移。
+#   🔴 已按门的首选处置抽伴生模块：两张具名清单（30 + 2 条）连归因注释共 57 行抽到
+#   `_template_index_drift_registry.py`（101 行），宿主 1003 → 946。
+#   剩余 57 行增量是两条判据的具名对账逻辑 + 失效条目反向断言，属判据本体不可再抽。
+#   baseline 946 = 当前真实行数，不留膨胀空间。
+backend/tests/workpaper_sync/test_template_override_resolution.py  946

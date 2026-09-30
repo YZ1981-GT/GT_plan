@@ -44,7 +44,7 @@ from collections import Counter
 from dataclasses import dataclass, field as dataclass_field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Final, Iterable, Mapping
+from typing import Any, Callable, Final, Iterable, Mapping, Sequence
 
 from app.services.workpaper_sync.excel_row_shift import (
     QualifiedReference,
@@ -71,6 +71,9 @@ __all__ = [
     "WorkbookRowChangePlan",
     "MaterializeWorkbookChangeSet",
     "merge_workbook_row_change_propagations",
+    # ── 删行侧的位移载体与声明（spec workpaper-sync-row-deletion-…-propagation）──
+    "RowDeletionShift",
+    "RowDeletionChangeSet",
     "PropagationReport",
     "CARRIER_COUNTER_NAMES",
     # ── 扫描 ────────────────────────────────────────────────────
@@ -82,10 +85,13 @@ __all__ = [
     "build_insert_plan",
     "build_delete_plan",
     "plan_workbook_row_change_for_insert",
+    "plan_workbook_row_change_for_delete",
     # ── 删行侧 ──────────────────────────────────────────────────
     "DanglingSite",
     "find_undeletable_rows",
     "find_dangling_sites",
+    "find_bare_dangling_rows",
+    "classify_bare_row_roles",
     "resolve_deleted_row_keys",
     "shrink_sheet_rows",
     # ── 应用（insert / delete 两分支）───────────────────────────
@@ -812,6 +818,274 @@ def merge_workbook_row_change_propagations(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# 4b. 删行侧的位移载体与传播声明（spec workpaper-sync-row-deletion-…-propagation）
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 🔴 **为什么删行不能复用 `WorkbookRowChangePlan`。**
+#
+# 6.8b 产出的 stale 行是 `dict[int, str]`（行号 → 身份），**不是一个连续区间**；而
+# `WorkbookRowChangePlan` 的 `at`/`count` 是单区间语义，且 `_validate_propagations` 断言
+# 「每条 `entry.delta == -count`」。非连续删除下各条目的 delta 逐条不同，强塞只有两条出路：
+# 改弱那条 fail-closed 校验，或把 delta 抹平成谎报值。两条都不可接受。
+#
+# 正确的合成映射是「上方被删几行就上移几行」：
+#
+#     row in deleted            → None            （被删行没有「删后行号」）
+#     otherwise                 → row - |{d in deleted : d < row}|
+#
+# 这与归档 spec `multi-sheet-materialize-defined-name-shift-normalization` 遇到的是同一个
+# 形状（多 sheet 各有自己的 at/count，单一标量无法诚实表达），它的解法是只暴露
+# `propagations` 的 :class:`MaterializeWorkbookChangeSet`；本节沿用该形状。
+
+
+@dataclass(frozen=True)
+class RowDeletionShift:
+    """删行的位移载体。与 `RowShiftPlan` / `CompositeRowShift` **鸭子兼容**。
+
+    verify 侧（`excel_extract._normalise_cell_ref` / `_normalise_structure_element` /
+    `_is_total_row`）只消费 `unshift` / `inserted_rows`，`unextend_total_formula` 另读
+    `insert_at` / `count` —— 四个成员齐备即可让那边**一行都不改**。
+
+    ═══ 🔴 `inserted_rows` 恒为空集合，而这一条必须被**显式断言** ═══
+
+    `_normalise_cell_ref` 里有一条 `if row in inserted: return ""` 的分支。删行路径上
+    `inserted` 恒空 ⇒ 该分支不可达。不显式断言的话，「恒空集」会让这条不可达性成为一个
+    没人察觉的事实：将来有人给删行载体填了非空 `inserted_rows`（比如误把被删行填进去），
+    症状是 after 侧的格被静默跳过 ⇒ 真实漂移被抹平（假绿）。
+
+    ═══ 为什么 `shift` 返回 `int | None` ═══
+
+    与 `WorkbookRowChangePlan.shift` 同一条纪律：被删行没有「删后行号」可言。返回它自己
+    会说谎（那个行号已被别的行占用），返回 0 / -1 会被当成有效行号继续参与计算。
+    `None` 逼调用方显式处置。
+
+    Args:
+        deleted_rows: 被删行号，**位移前**口径。构造器会去重并升序（入参顺序不作语义）。
+        region_first_row / region_last_row: 受管区边界（**位移前**口径），供诊断与
+            「合计区间钳到删后受管末行」用。
+    """
+
+    deleted_rows: tuple[int, ...]
+    region_first_row: int
+    region_last_row: int
+
+    def __post_init__(self) -> None:
+        # 零副作用面实测：与 WorkbookRowChangePlan / MaterializeWorkbookChangeSet 同一条纪律。
+        from app.services.workpaper_sync.adapters.base import (
+            assert_no_mutation_surface,
+        )
+
+        assert_no_mutation_surface(self, label="RowDeletionShift")
+        if not self.deleted_rows:
+            raise RowChangeKindError(
+                "RowDeletionShift.deleted_rows 不得为空 —— 「没有删行」应表达为 `None`，"
+                "空序列会让归一化静默变成恒等映射而看不出来"
+            )
+        normalised = tuple(sorted(set(int(r) for r in self.deleted_rows)))
+        if normalised != tuple(self.deleted_rows):
+            # frozen dataclass：用 object.__setattr__ 做规范化，构造后仍不可变。
+            object.__setattr__(self, "deleted_rows", normalised)
+        if any(r < 1 for r in self.deleted_rows):
+            raise RowChangeKindError(
+                f"被删行号必须 >= 1（Excel 行号从 1 起），实得 {list(self.deleted_rows)}"
+            )
+        if self.region_last_row < self.region_first_row:
+            raise RowChangeOutOfRegionError(
+                f"受管区 {self.region_first_row}..{self.region_last_row} 首尾颠倒"
+            )
+        outside = [
+            r
+            for r in self.deleted_rows
+            if not (self.region_first_row <= r <= self.region_last_row)
+        ]
+        if outside:
+            raise RowChangeOutOfRegionError(
+                f"被删行 {outside} 落在受管区 {self.region_first_row}.."
+                f"{self.region_last_row} 之外 —— 收敛只删受管区内的物理身份行，"
+                "区外的行不属本次收敛的判据范围"
+            )
+
+    # ── 与 RowShiftPlan / CompositeRowShift 鸭子兼容的四个成员 ────────────
+
+    @property
+    def inserted_rows(self) -> frozenset[int]:
+        """恒为空集合 —— 删行不造新行（见类 docstring 的显式断言理由）。"""
+        return frozenset()
+
+    @property
+    def count(self) -> int:
+        """被删行数。`unextend_total_formula` 与诊断都读它。"""
+        return len(self.deleted_rows)
+
+    @property
+    def insert_at(self) -> int:
+        """最小被删行号。
+
+        🔴 语义上删行**没有**「插入点」。这个属性只为鸭子兼容
+        （`unextend_total_formula` 会读 `plan.insert_at`）而存在，且本 spec 实证
+        **删行侧不需要** `unextend_total_formula`（design 勘误节 E.3）⇒ 它实际不参与
+        任何位移算术。给最小被删行号是最不容易误导的取值。
+        """
+        return self.deleted_rows[0]
+
+    def is_deleted_row(self, row: int) -> bool:
+        return row in self.deleted_rows
+
+    def shift(self, row: int) -> int | None:
+        """删前行号 → 删后行号。**被删行返回 `None`**。"""
+        if row in self.deleted_rows:
+            return None
+        return row - sum(1 for d in self.deleted_rows if d < row)
+
+    def shift_range_start(self, row: int) -> int:
+        """区间**起点**的位移：被删行**向下**塌到下一存活行的删后位置。
+
+        `row - |{d : d < row}|` —— 与存活行的公式同形（存活行上两者相等）。
+
+        推导：起点被删时，区间实际从「它下面第一个存活行」开始，而那一行的删后行号
+        恰好等于 `row - |{d < row}|`（它上方的被删行数 = 原起点上方的被删行数 +
+        起点到它之间那一段被删行数，两项合起来正是 `|{d ≤ 原起点及其后连续被删段}|`）。
+        实测三例：`B7:B25` 删 7 ⇒ 起点仍 7；删 7,8 ⇒ 起点仍 7；删 20 ⇒ 起点 7 不变。
+        """
+        return row - sum(1 for d in self.deleted_rows if d < row)
+
+    def shift_range_end(self, row: int) -> int:
+        """区间**终点**的位移：被删行**向上**塌到上一存活行的删后位置。
+
+        `row - |{d : d <= row}|` —— 注意是 `<=`，与 :meth:`shift_range_start` 的 `<`
+        只差一个等号，而那个等号是**方向**。
+
+        ═══ 🔴 为什么起点与终点塌陷方向相反，以及搞错的代价 ═══
+
+        Excel 对区间与单格的删行语义本就不同（见「§ 8. 删行侧」的表）：
+        `$AI$13:$AI$25` 删第 25 行 ⇒ 收缩成 `$AI$13:$AI$24`，**仍有效**；
+        单格 `AC26` 删第 26 行 ⇒ `#REF!`，真的坏了。
+
+        终点若用起点的公式（`<` 而不是 `<=`）：`SUM(B7:B25)` 在删第 25 行后仍写
+        `B7:B25`，而 footer 已从 26 上移到 25 ⇒ **合计把 footer 自己算进去** ⇒
+        Excel 循环引用，或（更糟）静默多算一行。这正是 design「§ 七条欠账逐条」A5
+        点名的那个错值，所以本方法与 :meth:`shift_range_start` **必须是两个方法**。
+
+        ⚠ 两者在**存活行**上恒相等（`|{d<row}| == |{d<=row}|`）⇒ 只有端点落在被删行上
+        时才分道。判据必须显式含那个边界样本，否则这个区分在常见形态上恒真空转。
+        """
+        return row - sum(1 for d in self.deleted_rows if d <= row)
+
+    def unshift(self, row: int) -> int:
+        """删后行号 → 删前行号（verify 归一化用）。
+
+        🔴 这是 `shift` 在**存活行**上的精确逆运算。实现不是 `row + count`：非连续删除下
+        一个删后行号上方有几个被删行取决于它自己的位置。逐个升序试加才正确 ——
+        `d <= before` 时该被删行确实在它上方，`before += 1`。
+        """
+        before = row
+        for d in self.deleted_rows:  # 已升序
+            if d <= before:
+                before += 1
+        return before
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "kind": "delete",
+            "deleted_rows": list(self.deleted_rows),
+            "count": self.count,
+            "region_first_row": self.region_first_row,
+            "region_last_row": self.region_last_row,
+        }
+
+
+@dataclass(frozen=True)
+class RowDeletionChangeSet:
+    """删行的工作簿级传播声明。**只暴露 `propagations`**，鸭子兼容 verify。
+
+    与 :class:`MaterializeWorkbookChangeSet` 同形（verify 与 apply 都只读
+    `.propagations`），另带两个**只作审计留痕**的字段：
+
+    * `deleted_row_keys` —— `resolve_deleted_row_keys` 产出的业务键，删除是不可逆的
+      数据丢失，没有留痕就无从审计；
+    * `shift` —— 产出本声明的位移载体，供「声明与载体同源」判据逐条对账。
+
+    🔴 **刻意不声明 `at` / `count` 标量。** 非连续删除下它们无法诚实表达（见本节顶部
+    注释）；留一个会说谎的标量比不留更危险。
+    """
+
+    propagations: tuple[PropagationEntry, ...]
+    shift: RowDeletionShift
+    deleted_row_keys: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        from app.services.workpaper_sync.adapters.base import (
+            assert_no_mutation_surface,
+        )
+
+        assert_no_mutation_surface(self, label="RowDeletionChangeSet")
+        seen: set[tuple[str, str, str, str]] = set()
+        for entry in self.propagations:
+            key = (entry.part, entry.locator, entry.ref_before, entry.ref_after)
+            if key in seen:
+                raise PropagationDriftError(
+                    f"RowDeletionChangeSet 含重复条目 {key} —— 构造器必须先去重"
+                )
+            seen.add(key)
+            # 🔴 方向必须与 kind 一致：删行的 delta 恒为负。方向错了等于把数据指到反方向。
+            if entry.delta >= 0:
+                raise PropagationDriftError(
+                    f"删行声明里出现非负 delta：{entry.locator} "
+                    f"{entry.row_before}→{entry.row_after}（delta={entry.delta}）—— "
+                    "删行只会让行号上移，正向 delta 说明位移量算错了方向"
+                )
+            # 🔴 每条 delta 必须由**同一载体**给出 —— 声明与载体同源。
+            #
+            #    ⚠ 区间引用的两个端点塌陷方向相反（见 `shift_range_start` /
+            #    `shift_range_end`），而 `PropagationEntry` 只记「第一个真的位移的端点」
+            #    这一个代表值，构造后已分辨不出它是 head 还是 tail ⇒ 本层只能断言
+            #    「等于两个端点公式之一」。**逐端点**的强判据在
+            #    `test_row_deletion_declaration.TestProperty3…` 里做（那里能从
+            #    `ref_before`/`ref_after` 的文本把首尾拆出来）。
+            #
+            #    单格引用无此歧义 ⇒ 必须逐值等于 `shift`。
+            if ":" in entry.ref_before:
+                candidates = {
+                    self.shift.shift_range_start(entry.row_before),
+                    self.shift.shift_range_end(entry.row_before),
+                }
+            else:
+                candidates = {self.shift.shift(entry.row_before)}  # type: ignore[arg-type]
+            if entry.row_after not in candidates:
+                raise PropagationDriftError(
+                    f"声明与位移载体不同源：{entry.locator} 声明 "
+                    f"{entry.row_before}→{entry.row_after}，而载体给 "
+                    f"{entry.row_before}→{sorted(c for c in candidates if c is not None)}"
+                )
+
+    @property
+    def count(self) -> int:
+        """被删行数（诊断用；传播算术一律走 `shift`）。"""
+        return self.shift.count
+
+    def propagation_counts(self) -> dict[str, int]:
+        """按载体统计声明的引用处数（与 `WorkbookRowChangePlan` 同名同形）。"""
+        counts = {carrier: 0 for carrier in sorted(PROPAGATION_CARRIERS)}
+        for entry in self.propagations:
+            counts[entry.carrier] += 1
+        return counts
+
+    @property
+    def touched_parts(self) -> tuple[str, ...]:
+        return tuple(sorted({entry.part for entry in self.propagations}))
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "kind": "delete",
+            "shift": self.shift.as_dict(),
+            "propagations": [entry.as_dict() for entry in self.propagations],
+            "propagation_counts": self.propagation_counts(),
+            "deleted_row_keys": list(self.deleted_row_keys),
+            "touched_parts": list(self.touched_parts),
+        }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # 5. 实测报告（与计划的声明值对账）
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -1011,6 +1285,17 @@ _DV_BLOCK_RE: Final[re.Pattern[str]] = re.compile(
 _ATTR_RE_CACHE: dict[str, re.Pattern[str]] = {}
 
 
+#: 一格的切片：`/>` 自闭合 与 `>`+body+`</c>` 两种形态的**互斥交替**。
+#:
+#: 🔴 **不用可选组** `(?:(?P<body>.*?)</c>)?`：那个形态在**自闭合**格上会从 `/>` 之后
+#: 一路吞到下一格的 `</c>`，被吞掉的那格于是读不出来（本 spec 的探针实测踩过，
+#: 症状是「注入的公式读回 `None`」，差点被写成「公式已被平移」这个相反结论）。
+#: 互斥交替下 `[^>]*?` 不跨 `>`，自闭合格恰好止于 `/>`。
+_CELL_WITH_BODY_RE: Final[re.Pattern[str]] = re.compile(
+    r"<c\b(?P<attrs>[^>]*?)(?:/>|>(?P<body>.*?)</c>)", re.S
+)
+
+
 def _attr(attrs: str, name: str) -> str | None:
     pattern = _ATTR_RE_CACHE.get(name)
     if pattern is None:
@@ -1172,24 +1457,7 @@ def plan_workbook_row_change_for_insert(
         计划；若工作簿里**没有**任何跨 sheet 引用指向受管 sheet 则返回 `None`
         ⇒ 调用方据此保持「与本 spec 之前逐字节相同」的零传播路径。
     """
-    from app.services.excel_structure_fingerprint import (
-        _normalise_part,
-        _parse_workbook_xml,
-    )
-
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w") as out:
-        for name, payload in entries.items():
-            out.writestr(name, payload)
-    with zipfile.ZipFile(io.BytesIO(buffer.getvalue())) as zf:
-        sheets, defined = _parse_workbook_xml(zf)
-        sheet_parts = {s["name"]: _normalise_part(s["rel_target"]) for s in sheets}
-        scan = scan_reference_carriers(
-            zf,
-            target_sheet=managed_sheet_name,
-            sheet_parts=sheet_parts,
-            defined_names=defined,
-        )
+    scan = _scan_from_entries(entries, managed_sheet_name=managed_sheet_name)
     if not scan.sites:
         return None
     plan = build_insert_plan(
@@ -1206,6 +1474,378 @@ def plan_workbook_row_change_for_insert(
         # 有引用但一条都不需要改（全在插入点之上）⇒ 同样走零传播路径。
         return None
     return plan
+
+
+def _scan_from_entries(
+    entries: Mapping[str, bytes], *, managed_sheet_name: str
+) -> ReferenceScan:
+    """`entries` → 内存 zip → `_parse_workbook_xml` → :func:`scan_reference_carriers`。
+
+    ═══ 🔴 为什么这是**一个**私有函数而不是两份 ═══
+
+    插行与删行两个门面都要做这四步。抄第二份就是本模块 docstring 明令禁止的
+    「另写一份扫描逻辑」—— 而扫描口径一旦漂移，症状是「声明里少了一类载体」，
+    apply 与 verify 都按那份缺失的声明工作 ⇒ 静默指向错行。
+
+    判据用 AST 断言两个门面都调本函数、且模块内不存在第二份
+    `scan_reference_carriers` 的调用序列。
+    """
+    from app.services.excel_structure_fingerprint import (
+        _normalise_part,
+        _parse_workbook_xml,
+    )
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as out:
+        for name, payload in entries.items():
+            out.writestr(name, payload)
+    with zipfile.ZipFile(io.BytesIO(buffer.getvalue())) as zf:
+        sheets, defined = _parse_workbook_xml(zf)
+        sheet_parts = {s["name"]: _normalise_part(s["rel_target"]) for s in sheets}
+        return scan_reference_carriers(
+            zf,
+            target_sheet=managed_sheet_name,
+            sheet_parts=sheet_parts,
+            defined_names=defined,
+        )
+
+
+def _maximal_runs(rows: Sequence[int]) -> tuple[tuple[int, int], ...]:
+    """升序行号 → 极大连续段 `[(起, 长度), …]`。
+
+    删行的悬空引用检测必须**逐极大连续段**做：`find_dangling_sites(delete_at=, count=)`
+    的语义是「删一个连续区间」，而 stale 行集非连续。逐单行调用会漏掉
+    `range_emptied` —— 一个覆盖 13..14 的区间，删 13 与删 14 各自看都只是「收缩」，
+    合起来才是「删光」。按极大连续段调用则 13..14 会作为一段被识别。
+    """
+    if not rows:
+        return ()
+    ordered = sorted(set(int(r) for r in rows))
+    runs: list[tuple[int, int]] = []
+    start = prev = ordered[0]
+    for row in ordered[1:]:
+        if row == prev + 1:
+            prev = row
+            continue
+        runs.append((start, prev - start + 1))
+        start = prev = row
+    runs.append((start, prev - start + 1))
+    return tuple(runs)
+
+
+def find_bare_dangling_rows(
+    managed_sheet_xml: str, *, deleted_rows: Sequence[int]
+) -> tuple[tuple[str, str, int], ...]:
+    """受管 sheet 上**裸单格**引用指向被删行的处数（Requirement 1.8 的裸引用那一半）。
+
+    ═══ 🔴 为什么 `find_dangling_sites` 覆盖不到这一类 ═══
+
+    :func:`scan_reference_carriers` 只产**限定**引用（`build_propagation_entry` 要求
+    `ref.kind == "sheet"`，:func:`propagate_reference_side` 是 `qualified_only=True`）
+    ⇒ 裸 `A20` 从不进 `scan.sites`，于是 :func:`find_dangling_sites` 对它无能为力。
+
+    而 Requirement 1.8 说的是「**任一**引用会因删行变成 `#REF!`」。受管 sheet 自己的
+    footer 上写着 `=B20*2` 这种裸单格引用是常态；删掉第 20 行后它必然 `#REF!`。
+    不拦就是 fail-open —— 而本模块的整个论点是「静默指向错行比报错贵得多」。
+
+    ⚠ 裸**区间**引用（`SUM(B7:B25)`）只被删掉部分行属**正确收缩**，不算坏
+    （与 :func:`find_dangling_sites` 的三态表同一条判据）；只有区间被删光才坏，
+    而那要求整个受管区被删空 —— 6.8b 的容量分级已把那种情形改走清空分支。
+
+    ⚠ 公式格**自己所在的行**也被删时整格跳过：它随行消失，不会留下 `#REF!`。
+    受管行上的「行内自算」公式（`W16 = U16+V16`）全属此类，不跳过就会把受管区里
+    每一行都判成不可删（见函数体内注释与 `TestBareDanglingSameRowIsNotDangling`）。
+
+    Returns:
+        `[(坐标, 公式文本, 坏在第几行), …]`，按坐标排序。空元组 = 无坏点。
+    """
+    deleted = set(int(r) for r in deleted_rows)
+    if not deleted:
+        return ()
+    found: list[tuple[str, str, int]] = []
+    for match in _CELL_WITH_BODY_RE.finditer(managed_sheet_xml):
+        attrs = match.group("attrs") or ""
+        body = match.group("body")
+        if body is None or "<f" not in body:
+            continue
+        coord_match = re.search(r'\br="(?P<coord>[A-Z]+\d+)"', attrs)
+        if coord_match is None:
+            continue
+        # 🔴 公式格**自己那一行**也在被删之列 ⇒ 这个格连同它的公式一起消失，
+        #    不可能留下 `#REF!` ⇒ 整格跳过。
+        #
+        #    没有这一条会造出一个巨大的假阳类：受管行上「行内自算」的公式是常态
+        #    （实测 G1-2 `W16 = U16+V16`、D1-7 `Q17 = IF(YEAR(C17)=…,H17,0)`），
+        #    它们引用的就是**同一行**的列。按「引用了被删行」直接判悬空的话，
+        #    受管区里**每一行**都会被判不可删 —— 删行功能在这些底稿上等于不存在，
+        #    而症状是「一个看起来很严谨的 fail-closed 把正常操作全拒了」。
+        #    A1 覆盖面普查（18 组）当场打红 3 组，才把这条挖出来。
+        own_row = int(re.sub(r"[^0-9]", "", coord_match.group("coord")))
+        if own_row in deleted:
+            continue
+        for formula_match in re.finditer(r"<f\b[^>]*>(?P<text>.*?)</f>", body, re.S):
+            text = _unescape(formula_match.group("text") or "")
+            if not text.strip():
+                continue
+            for row, is_range in _bare_a1_rows(text):
+                if is_range or row not in deleted:
+                    continue
+                found.append((coord_match.group("coord"), text, row))
+    return tuple(sorted(set(found)))
+
+
+#: 裸区间的**形态**（只用于判「这个行号是 head 还是 tail」，不参与改写）。
+#:
+#: 🔴 它**不是**第二个 A1 识别器：哪些行号算「裸 A1 行号」由
+#: :func:`_bare_a1_rows` 经 `remap_a1_rows` 的记录型 remap 取得（与执行口径恒等），
+#: 本正则只在那批行号**内部**再分 head/tail。分不出角色的行号一律 fail-closed。
+_BARE_RANGE_FORM_RE: Final[re.Pattern[str]] = re.compile(
+    r"\$?[A-Z]{1,3}\$?(?P<a>\d+)\s*:\s*\$?[A-Z]{1,3}\$?(?P<b>\d+)"
+)
+
+
+def classify_bare_row_roles(
+    text: str,
+) -> tuple[frozenset[int], frozenset[int], frozenset[int]]:
+    """公式文本里**裸** A1 行号的 `(全部, 区间起点, 区间终点)`。
+
+    ═══ 为什么需要角色 ═══
+
+    删行时区间**起点与终点塌陷方向相反**（见 `RowDeletionShift.shift_range_end`），
+    而 `_rewrite_formula_refs` 对一段文本只收一个 `remap`。所以受管 sheet 的裸引用平移
+    必须先知道「这个行号是 head 还是 tail」，才能决定要不要给它一个方向修正。
+
+    ⚠ 一个行号可能**同时**是某个区间的 head 与另一个区间的 tail（`A5:A9+A1:A5`）。
+    那时它落在两个集合里，调用方须按「角色不唯一」fail-closed —— 不得挑一个。
+    """
+    rows = frozenset(row for row, _is_range in _bare_a1_rows(text))
+    heads: set[int] = set()
+    tails: set[int] = set()
+    for match in _BARE_RANGE_FORM_RE.finditer(text):
+        head, tail = int(match.group("a")), int(match.group("b"))
+        # 只认「两个端点都被改写器判为裸行号」的区间 —— 限定引用的端点不在 `rows` 里。
+        if head in rows and tail in rows:
+            heads.add(head)
+            tails.add(tail)
+    return rows, frozenset(heads), frozenset(tails)
+
+
+def _bare_a1_rows(text: str) -> tuple[tuple[int, bool], ...]:
+    """公式文本里**裸** A1 引用的 `(行号, 是否区间端点)`。
+
+    🔴 复用 `excel_row_shift.remap_a1_rows` 的**同一个**改写器来取行号，而不是另写一份
+    A1 正则：那会变成本仓库第二个 A1 识别入口，四类误命中防线（跨 sheet 表名 /
+    跨 sheet 目标格 / 带数字函数名 / 字符串字面量）就要各维护两份。
+
+    取法是「喂一个记录型 remap」：改写器把每个**它认为是裸 A1 行号**的数字交给 remap，
+    我们原样返回并记下来。于是识别口径与执行口径**恒等**。
+    """
+    from app.services.workpaper_sync.excel_row_shift import remap_a1_rows
+
+    seen: list[int] = []
+
+    def _record(row: int) -> int:
+        seen.append(row)
+        return row
+
+    remap_a1_rows(text, remap=_record)
+    if not seen:
+        return ()
+    # 区间端点判定：`A1:A9` 形态里冒号两侧的行号都是端点。用同一份文本上的冒号位置判断
+    # 会重新引入第二份解析 ⇒ 改用「该行号在某个 `数字:字母数字` 或 `字母数字:字母数字`
+    # 片段内」这个**形态**判据，与改写器无关、也不需要它暴露内部结构。
+    range_rows: set[int] = set()
+    for run in re.finditer(r"\$?[A-Z]{1,3}\$?(?P<a>\d+)\s*:\s*\$?[A-Z]{1,3}\$?(?P<b>\d+)", text):
+        range_rows.add(int(run.group("a")))
+        range_rows.add(int(run.group("b")))
+    return tuple((row, row in range_rows) for row in seen)
+
+
+def plan_workbook_row_change_for_delete(
+    entries: Mapping[str, bytes],
+    *,
+    managed_sheet_name: str,
+    managed_sheet_part: str,
+    deleted_rows: Sequence[int],
+    region_first_row: int,
+    region_last_row: int,
+    row_uuids: Mapping[int, str] | None = None,
+    stable_ordinals: Mapping[int, str] | None = None,
+    allow_ref_errors: bool = False,
+) -> RowDeletionChangeSet | None:
+    """删行的工作簿级位移声明 —— 与插行门面平行的第二个公开入口。
+
+    spec: workpaper-sync-row-deletion-multi-region-propagation（Requirement 1）
+
+    ═══ 为什么返回 :class:`RowDeletionChangeSet` 而不是 `WorkbookRowChangePlan` ═══
+
+    `deleted_rows` 是**非连续集合**（6.8b 的 stale 行是 `dict[int, str]`），各条目的
+    行号增量逐条不同；而 `WorkbookRowChangePlan._validate_propagations` 断言
+    「每条 `entry.delta == -count`」。强塞只能改弱那条 fail-closed 校验或谎报 delta。
+    详见「§ 4b」顶部注释。
+
+    ═══ 三处 fail-closed 都在**计划期**，写盘之前 ═══
+
+    1. **限定引用**的悬空检测 —— 逐极大连续段调 :func:`find_dangling_sites`；
+    2. **裸引用**的悬空检测 —— :func:`find_bare_dangling_rows`（`scan` 覆盖不到这一类，
+       见该函数 docstring）；
+    3. **业务键留痕** —— :func:`resolve_deleted_row_keys`，两者皆缺即抛。
+
+    🔴 **不整体调 `build_delete_plan`**：那会顺带构造一个 `at`/`count` 计划，而非连续
+    删除下那个计划不成立。本门面只借用它内部那三个判据函数。
+
+    🔴 `allow_ref_errors` 默认 `False` 且**不得**由调用方常开：静默写 `#REF!` 会让底稿
+    在用户打开时才暴露损坏，而那时已无从追溯是哪次同步造成的。
+
+    Returns:
+        声明；`None` = **零传播路径**（工作簿里没有任何指向受管 sheet 的引用，或全部
+        这类引用都位于被删行之上）⇒ 调用方据此产出与不产声明时逐字节相同的字节。
+        🔴 `None` **不代表没做检查**：三处 fail-closed 在返回 `None` 之前就已执行完。
+    """
+    shift = RowDeletionShift(
+        deleted_rows=tuple(deleted_rows),
+        region_first_row=region_first_row,
+        region_last_row=region_last_row,
+    )
+    scan = _scan_from_entries(entries, managed_sheet_name=managed_sheet_name)
+
+    # ── ① 限定引用：逐极大连续段做悬空检测 ──────────────────────────────
+    dangling: list[DanglingSite] = []
+    seen_sites: set[int] = set()
+    for at, count in _maximal_runs(shift.deleted_rows):
+        for site in find_dangling_sites(scan, delete_at=at, count=count):
+            if id(site.site) in seen_sites:
+                continue
+            seen_sites.add(id(site.site))
+            dangling.append(site)
+    if dangling and not allow_ref_errors:
+        detail = "; ".join(
+            f"{d.site.part.rsplit('/', 1)[-1]}!{d.site.locator} "
+            f"{d.site.reference.raw}（{d.reason}，坏在第 {list(d.broken_rows)} 行）"
+            for d in dangling[:12]
+        )
+        raise DanglingReferenceError(
+            f"删除第 {list(shift.deleted_rows)} 行会让 {len(dangling)} 处限定引用变成 "
+            f"#REF!：{detail}" + ("…" if len(dangling) > 12 else "")
+            + " —— 删行拒绝执行（Requirement 1.8）。若确需写 #REF!，"
+            "须在契约里显式声明后传 allow_ref_errors=True"
+        )
+
+    # ── ② 裸引用：受管 sheet 自己的公式（`scan` 覆盖不到）────────────────
+    managed_xml_raw = entries.get(managed_sheet_part)
+    if managed_xml_raw is None:
+        raise PropagationDriftError(
+            f"受管 sheet part {managed_sheet_part!r} 不在 entries 里 —— "
+            "裸引用的悬空检测无从执行，不得带着查不全的声明写盘"
+        )
+    bare = find_bare_dangling_rows(
+        managed_xml_raw.decode("utf-8", errors="replace"),
+        deleted_rows=shift.deleted_rows,
+    )
+    if bare and not allow_ref_errors:
+        detail = "; ".join(f"{coord}={text!r}（坏在第 {row} 行）" for coord, text, row in bare[:12])
+        raise DanglingReferenceError(
+            f"删除第 {list(shift.deleted_rows)} 行会让受管 sheet 上 {len(bare)} 处"
+            f"**裸单格**引用变成 #REF!：{detail}"
+            + ("…" if len(bare) > 12 else "")
+            + " —— 这一类不在 scan_reference_carriers 的覆盖面内"
+            "（它只产限定引用），须由本门面单独拦（Requirement 1.8）"
+        )
+
+    # ── ③ 业务键留痕（本门面是 `resolve_deleted_row_keys` 的第二个生产入口）──
+    keys = resolve_deleted_row_keys(
+        shift.deleted_rows, row_uuids=row_uuids, stable_ordinals=stable_ordinals
+    )
+
+    if not scan.sites:
+        return None
+
+    # ── ④ 传播条目：与 apply 同一个改写入口（`build_propagation_entry`）────
+    dangling_ids = {id(d.site) for d in dangling}
+    propagations = [
+        entry
+        for entry in (
+            build_propagation_entry(site, remap=_range_aware_remap(site, shift))
+            for site in scan.sites
+            # 被删光的区间与被删的单格不进传播清单 —— 它们不是「改行号」而是「坏了」
+            if id(site) not in dangling_ids
+        )
+        if entry is not None
+    ]
+    # ── ⑤ fail-closed：受管 sheet 上的**自限定**引用没人执行 ────────────────
+    #
+    # `_apply_workbook_propagation` 刻意跳过 `plan.sheet_part`（插行侧那半由
+    # `shift_sheet_rows` 的自限定分支处理）。删行侧 `shrink_sheet_rows` 不碰公式，
+    # A5 走 `remap_a1_rows`（`current_sheet=None`）对**限定**引用逐字不动
+    # ⇒ 自限定引用（`'本表'!A20` 写在本表上）声明了却没人改 = fail-open。
+    #
+    # 现算：40 份含 `_GT_SYNC` 的 artifact / 783 个受管 sheet / 4477 处指向受管 sheet 的
+    # 引用里，自限定 **0** 处（变异证明：合成一条自限定引用，同一扫描器命中 1）。
+    # ⇒ 这是**结构性零**，不为它写未经真实语料检验的改写分支；真出现就在写盘之前停。
+    self_qualified = [e for e in propagations if e.part == managed_sheet_part]
+    if self_qualified:
+        detail = "; ".join(f"{e.locator} {e.ref_before}" for e in self_qualified[:6])
+        raise UnpropagatedCarrierError(
+            f"受管 sheet 上有 {len(self_qualified)} 处**自限定**引用（{detail}）—— "
+            "删行路径没有执行它们的相：`_apply_workbook_propagation` 跳过受管 sheet part，"
+            "而 A5 的裸引用平移对限定引用逐字不动。这类引用在现算语料里为 0，"
+            "真出现时必须先补执行相，不得让声明与执行不一致地写盘"
+        )
+    if not propagations:
+        # 有引用但一条都不需要改（全在被删行之上）⇒ 零传播路径。
+        return None
+    return RowDeletionChangeSet(
+        propagations=tuple(propagations),
+        shift=shift,
+        deleted_row_keys=keys,
+    )
+
+
+def _range_aware_remap(
+    site: CarrierSite, shift: RowDeletionShift
+) -> Callable[[int], int]:
+    """给**这一处**引用挑对的 remap —— 按端点位置分派，不是一个公式套全部。
+
+    ═══ 🔴 为什么必须按端点分派 ═══
+
+    一处区间引用的两个端点在删行下塌陷**方向相反**
+    （:meth:`RowDeletionShift.shift_range_start` / `shift_range_end`）。而
+    `_rewrite_formula_refs` 对一个 token 的两个端点用**同一个** `remap` 回调，
+    且它的 `extend_end_at` 钩子只作用于**裸**引用分支（`qualified_only=True` 时那条
+    分支整段跳过）⇒ 拿不到「这是 head 还是 tail」的上下文。
+
+    出路是把上下文放进 remap **自己**：本函数按 `site.reference.rows` 的首尾行号建一张
+    两项查表，`_rewrite_formula_refs` 调到哪个端点就返回哪个方向的结果。这样
+    **零改动** `_rewrite_formula_refs`（Requirement 10.1）也**不**新增第二个改写入口。
+
+    三种退化都安全：
+    * 单格引用（`rows` 只有一项）⇒ 走 `shift`；它指向被删行的情形已在门面①②拦下，
+      走到这里 `shift` 不会返回 `None`（真返回了就抛，不静默改写）；
+    * `A5:A5` 这种首尾同行的区间 ⇒ 若该行被删则区间已被判 `range_emptied` 并拦下，
+      否则两个公式在存活行上恒相等，取哪个都对；
+    * 区间内部的行不会被 remap 调到（`_rewrite_formula_refs` 只改端点）。
+    """
+    rows = site.reference.rows
+    is_range = ":" in (site.reference.token or "") and len(rows) >= 2
+    head_row, tail_row = (rows[0], rows[-1]) if is_range else (None, None)
+
+    def _remap(row: int) -> int:
+        if is_range:
+            if row == tail_row:
+                return shift.shift_range_end(row)
+            if row == head_row:
+                return shift.shift_range_start(row)
+            # 端点之外的行号不该被调到；真被调到时按起点口径（保守：不越过存活边界）。
+            return shift.shift_range_start(row)
+        got = shift.shift(row)
+        if got is None:  # pragma: no cover - 门面①② 已拦下
+            raise DanglingReferenceError(
+                f"单格引用 {site.locator} 指向被删行 {row}，却走到了传播构造 —— "
+                "悬空检测漏了这一处，不得静默改写"
+            )
+        return got
+
+    return _remap
 
 
 def scan_reference_carriers(

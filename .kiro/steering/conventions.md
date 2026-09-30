@@ -1864,3 +1864,92 @@ sheet_name 须含审定表子码，形如 审定表D2-1，即 D 到 N 字母加�
 3. 多科目在单次 writeback_rows 原子发布，不拆成多次请求。
 4. 必须配 gate 单测：确认后命中 publish-to-tb、取消无副作用、只读无请求、不调旧端点、发布后仍 emit substantive:adjudicated。
 5. getDiagnostics 与 ESLint 全绿不足以证明运行时正确，须组件级 mount 或真实点击验证。本 spec 的 G7 return 孤儿 export 导致模块加载即 ReferenceError、G5 只读判定对 Ref 恒真导致发布门永久失效，两个致命 bug 纯静态检查全绿，只有 vue-test-utils mount 真实点击才暴露。
+
+## 判据可信度：删行 spec（2026-09-29）复盘补充的四条
+
+> 这四条都是**同一轮**里实测踩出来的，症状各不相同但根因同类：
+> **判据看起来在检查 X，实际检查的是别的东西**。
+
+### 一、首次接触的接口，先打印签名再动笔（㉑ 的代码接口版）
+
+同一轮内踩 **4 次**：
+
+| 我写的 | 真值 | 症状 |
+|---|---|---|
+| `plan_workbook_row_change_for_delete(row_identity_by_row=)` | `row_uuids=` | `TypeError`，当场发现 |
+| `stored["templates"]` | `stored["per_template"]` | 🔴 **两个集合都读成空、差集恒空 ⇒ 判据恒绿**，而基线真有 17 处差异 |
+| `_CellView.value` / `.cell_type` | 只有 `body` / `attrs`（值要从 body 正则取） | `AttributeError` |
+| `_shrink_sibling_table_refs` 返 `int` | 返 `tuple[dict[str, bytes], int]` | monkeypatch 后调用方 unpack 抛 `TypeError` ⇒ **变异反证红在 TypeError 上，测的不是症状链** |
+
+四次里三次立即暴露，**一次造成恒绿** —— 而恒绿那次正是最贵的：它让一条守卫在真有 17 处
+漂移时报「已对齐」。
+
+**做法**：写第一行调用之前跑一次
+`inspect.signature(fn)` / `dataclasses.fields(Cls)` / `sorted(payload)`。成本 3 秒。
+
+### 二、统计类正则禁用 `\s`（它包含换行）
+
+`re.findall(r"^\s+- \[([ x])\]", text, re.M)` 统计 tasks.md 的叶子任务时得 **74**，
+而正确口径 `^[ \t]+` 得 **52**。原因：`\s` 匹配 `\n`，于是 `\s+` 从上一行行尾一路吃到
+下一行的缩进，把**顶层**任务也算成叶子。
+
+发现途径是两次统计自相矛盾（先前用别的写法得 52）。**单独跑一次不会发现**。
+
+**做法**：凡「按行统计/按行分类」的正则，字符类一律写 `[ \t]`，禁 `\s`。
+
+### 三、「每行恰 N 个分隔符」必须数**未转义**的
+
+`INDEX.md` 的表格行里有 `clear\|delete` 这种 Markdown **转义** pipe。
+`row.count("|")` 得 5，而表格结构其实正常（4 个未转义 + 1 个转义）⇒ 脚本误判
+「表格行结构变了」并中止。
+
+**做法**：`UNESCAPED = re.compile(r"(?<!\\)\|")`，用它 `findall` 计数、`split` 切格。
+顺带现算：`INDEX.md` 全表有 **118** 行未转义 pipe ≠ 4（表头分隔行等既有形态），
+所以这条校验只能对**被改的那一行**做，不能对全表做。
+
+### 四、变异反证必须确认「红的形态就是预期的那一种」
+
+变异反证的逻辑是「把修复摘掉 ⇒ 判据必须打红」。但**打红不等于因为预期的原因打红**。
+同一轮两次：
+
+1. **门控改恒真 ⇒ 字节基线打红**：K11 实测红在 `DanglingReferenceError` 上 ——
+   计划期就被悬空引用拦住，**根本没走到字节比对**。那条变异证明因此没有证明
+   「字节口径在观测门控」。补了可删靶子（D1-8）的字节级变异才算数，并把 K11 那条形态
+   单独立成判据如实登记。
+2. **`pytest.raises` 裹了两个调用**：`extract_projection` 与 `materialize_projection`
+   放在同一个 `with` 里，**哪个抛都算通过**。而本意是验证物化那一层的 footer 门在叫。
+   ⇒ 一律只裹被观测的那一个调用，并对错误文案加断言。
+
+**做法**：变异反证写完追问一句 ——「它红的那个 traceback，是我想验证的那条路径吗？」
+`pytest.raises` 的 `with` 块里**只放一个**被观测调用。
+
+### 五、判据要跟随间接层（正面经验）
+
+把 A5/A8 的重复代码收敛成共用函数 `remap_bare_a1_for_deletion` 之后，
+原来「A5 必须调 `_rewrite_formula_refs`」的结构锁当场打红 —— 因为它只看**一层**被调集合。
+
+收敛重复代码是正事，判据不该因此打红。**做法**：结构锁收集被调集合时，
+若命中已知的共用间接层，就把那一层的被调集合也并进来（本轮实现为两级 AST 闭包）。
+
+### 六、Windows 上 `Path.write_text` **永远**改行尾 —— 与目标文件是什么行尾无关
+
+同一轮里，同一个坑，正反两面各踩一次：
+
+1. 先踩「以为不会改」：给 `conventions.md`（纯 CRLF）追加内容，用 `write_text` 会把
+   1867 行全改成 LF ⇒ 改用 `read_bytes` / `write_bytes`。**这条判断是对的。**
+2. 再踩「以为对 LF 文件就安全」：给 `design.md`（纯 LF）追加内容，我在脚本 docstring 里
+   写下「该文件是纯 LF，所以用 write_text 是对的」—— 结果 `write_text` 把 1090 行**全变成
+   CRLF**（Windows 文本模式默认 `newline=None` ⇒ `\n` 一律译成 `\r\n`）。
+
+⇒ 正确规则**不是**「先查行尾再决定用哪个 API」，而是：
+
+* **写一律 `write_bytes`**（或 `open(..., newline="")`）；
+* 查行尾是为了知道**该写什么**（拼 `\r\n` 还是 `\n`），不是为了决定能不能用
+  `write_text`。
+
+自检：写完立刻 `read_bytes()` 数一次 `\r\n` 与裸 `\n`，和写之前的数对一遍。
+`git diff --numstat` 出现「删除行数 ≈ 全文行数」就是踩了这个坑。
+
+顺带一条同源的：**PowerShell 的 `>` 重定向写的是 UTF-16LE + BOM**，不是 utf-8。
+把工具的 `--json` 输出重定向到文件再用 Python `read_text(encoding="utf-8")` 读，
+会在第一个字节就抛 `UnicodeDecodeError: 0xff`。要么让工具自己写文件，要么读时按 BOM 判编码。

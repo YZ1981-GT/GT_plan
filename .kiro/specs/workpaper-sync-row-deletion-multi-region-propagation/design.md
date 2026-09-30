@@ -837,3 +837,382 @@ apply 期重扫 = 两个真源；verify 按观测差异反推 = 让被检查对�
 * 定向跑（整目录 >15 分钟超时），按符号反查测试文件。
 * 每个实现任务开始前**先重新现读**相关函数（有并发会话在改 `excel_materialize.py`）。
 * 零改动判据用「会话基线 sha256 + 本 spec 符号命中」，**不用** `git diff == 0`（脏工作树上不成立）。
+
+---
+
+## 勘误节（实施期 Task 1.1~1.4 现算/实证，append-only，不改上面的历史结论）
+
+> 本节由实施期追加。上面各节保持写作时的原样 —— 结论若被本节推翻，**以本节为准**，
+> 但不回填修改上面的文字（append-only 审计轨迹）。
+
+### E.1 B1~B12 复算（Task 1.1）
+
+探针：`_bdelp_b1_b7_ast.py`（AST 口径）+ `_bdelp_b6_b12.py`。
+
+| # | design 记载 | 现算 | 判定 |
+|---|---|---|---|
+| B1 | 0 / 0 / 0 | **0 定义 / 0 生产 / 0 测试** | ✅ 逐值命中 |
+| B2 | 2（`excel_materialize.plan_managed_writes` · `d2_bidirectional_bridge`） | **2**，逐个同名 | ✅ |
+| B3 | 2 | **2**（`apply_plan_zip_with_report` · `apply_workbook_row_change`） | ✅ |
+| B4 | 0 / 1 / 1 / 1，那 1 处全在 `build_delete_plan` 体内 | **0 / 1 / 1 / 1**，三处 enclosing 函数均为 `build_delete_plan` | ✅ |
+| B5 | 1（`apply_workbook_row_change_to_path`） | **1**，同名 | ✅ |
+| B6 | 8 键 / 重写 7 / 只读 1 | AST 取到 **9** 个唯一 `GT_*` 常量，其中 `GT_FOOTER_ROW_`（`startswith` 前缀判断）与 `GT_FOOTER_ROW_{…}`（f-string）**是同一键族的两种写法** ⇒ 去重后 **8**，重写 7、只读 `GT_ROW_UUID_COLUMN` | ✅（口径已写明） |
+| B7 | insert-only | 现读 `shift = plan.row_shift` + `assert shift is not None` | ✅ |
+| B8 | 18 组（17 双区 + 1 三区）/ 47 单区 + 37 多区 = 84 | **18 组（17 + 1）/ 47 + 37 = 84** | ✅ 逐值命中 |
+| B9 | 1907 sheet / 237 artifact | **1943 sheet / 240 artifact**（含 `_GT_SYNC` 的 artifact 944，design 记 931） | ⚠ **快照漂移**（`storage/` 在增长），不是偏差；结论不变 |
+| B10 | 712,536 / 109,159 / 16,069 / 29,431 | **713,295 / 113,293 / 16,184 / 29,704** | ⚠ 快照漂移；另「带行分量」design 未写口径，本轮口径 = `definedName` body 内含 `\$?\d+` |
+| B11 | tombstone 139 / reject 2 / 未声明 12（153 table / 62 文件） | **逐值命中** | ✅ |
+| B12 | 351 / 182 / 144,154 / 72,825 / 0 / 2,908 | **逐值命中**（`EXPECTED_DENOMINATORS` 现读） | ✅ |
+
+**`.py` 分母是两个口径，不是偏差**：design B1 取法写「AST 扫 6867 个 `.py`」，
+现算仓库根（排除 `.venv`/`node_modules`/`.git`/`.hypothesis`/`__pycache__`）**6976**、
+仅 `backend/` **6092**、含 `.venv` 全部 **28,863**。6867 与 6976 的差是快照漂移；
+B1~B5 的结论在三个口径下都成立（这些符号只在 `backend/app/services/workpaper_sync/` 内）。
+
+**B8 两条口径纪律均已履行**：
+* 变异证明 —— 合成双区 zip 上同一扫描器命中 **2** 个 `GT_*` table ✅；
+* 错 population 对照 —— `wp_templates/` 上得 **351 模板 / 2722 worksheet / 挂 ≥2 Table 的 sheet 0 / 解析失败 0**，与 design 逐值命中；
+* 解析失败显式统计 —— `storage/` 扫 2117 份 xlsx，**`BadZipFile` 28 份**（与 design 记载一致），未被当成「没有 `_GT_SYNC`」。
+
+B8 的 18 组按 `displayName` 前缀归循环，与 design 清单逐条对上：
+D1 六组（`D113`/`D115`/`D116`/`D14`/`D17`/`D18`）· D2 一组（`D23`）· D3 两组（`D34`/`D37`）·
+D4 五组（`D41`/`D420`**三区**/`D434`/`D436`/`D49`）· D6 两组（`D66`/`D69`）· D7 两组（`D74`/`D77`）。
+
+### E.2 R1 —— ✅ **成立**（Task 1.2）
+
+探针：`_bdelp_r1_r2_v2.py`，靶子是真实权威模板 K11（受管区 7..25、合计行 26 上是裸
+`SUM(B7:B25)` 共享公式主格）。
+
+* 删 r=20 后：合计公式文本 `['G26-D26', 'SUM(B7:B25)']` → `['G26-D26', 'SUM(B7:B25)']` **逐字不变**；
+  另注入的裸单格 `B22*2` 同样**逐字不变**；
+* **变异对照**：坐标属性确实上移（注入格 `K38`→`K37` 存在）⇒ 删行真的生效，判据非空转。
+
+⇒ `shrink_sheet_rows` 只改 `<row r=>` / `<c r=>` / `<dimension>`，公式文本一个字不动。
+**A5 是真欠账**，Requirement 5 不降级。
+
+**同时勘误** `apply_workbook_row_change` 的 docstring 表格：
+`| 受管 sheet | shift_sheet_rows（上游，复用） | shrink_sheet_rows | **位移** |` ——
+最后一列的「位移」对 **insert 半成立**（`shift_sheet_rows` 确实平移裸引用），
+对 **delete 半不成立**。该表把两半共用一列，读者会以为删行侧也位移。
+
+**探针自身两处缺陷（记录不抹掉）**：
+1. 首版 `_formulas_of` 用 `<c ...>(.*?)</c>` 正则，被**自闭合** `<c r="X"/>` 过度匹配 ——
+   `(?:(?P<body>.*?)</c>)?` 这个**可选**组会从自闭合格的 `/>` 之后一路吞到下一格的 `</c>`，
+   于是被吞掉的那格读出 `None`，差点把「读不出来」写成「已平移」。改用 `ElementTree`
+   （与生产 `_managed_sheet_cell_digest` 的 `iterparse` 同口径）从形态上消除这一类。
+   需要正则时用**互斥交替** `(?:/>|>(?P<body>.*?)</c>)`，不用可选组。
+2. 首版把 R1 的结论与这个假象合取，一度打印「🔴 证伪」。
+
+### E.3 R2 —— **不需要**删行对偶，但 A6 的欠账比 design 描述的**多一类**（Task 1.3）
+
+探针：`_bdelp_r2_cells.py`（逐格元组对账）+ `_bdelp_r2_verdict.py`（四态定论）。
+
+首版探针只看 `unmanaged_region_digest` 的成败，结果**变异证明（合计行不带公式）也打红**
+⇒ 按纪律「结构性结论必配变异证明」判定结论不可信，改成复刻 `_managed_sheet_cell_digest`
+的逐格元组（`ref`/`t`/`s`/`formula`/`value`，先归一化再判 `managed`）逐条点名。
+🔴 首版还踩了一次口径错：**先判 `managed` 再归一化**，与生产相反，于是「消失的格」清单里
+混进 `C26`/`H26`/`J26` 三个假条目。
+
+删行侧的打红源精确分三类（K11、删 r=20、region 7..25、footer 26）：
+
+| # | 打红源 | 实测 | `unshift` 能否表达 |
+|---|---|---|---|
+| ① | **被删行上的未管理格整体消失** | 7 个：`A20`/`B20`/`D20`/`E20`/`F20`/`G20`/`I20`（其中 5 个还带跨 sheet 公式 `'明细表K11-2'!…`） | 🔴 **不能** —— 格没了，不是行号变了 |
+| ② | 受管 sheet 上未管理格里的**裸引用**没平移 | 3 处：`B28`=`B26-B27` / `C28`=`C26-C27` / `H26`=`G26-D26` | 由 **A5** 解决 |
+| ③ | 合计区间 | `B26`=`SUM(B7:B25)` | 由 **A5** 解决 |
+
+🔴 **① 是 design「§ 七条欠账逐条」A6 未描述的独立打红源。** A6 原文只说「未管理的格
+行号变了」，而删物理行会把那一行上的未管理格**整体删掉**；`unshift` 是行号映射，
+表达不了「这些格不存在了」。
+**处置**：沿用既有的 `extra_managed_coords` —— 它在 `verify_unmanaged_regions` 里对
+**before 与 after 两侧都生效**（现读确认两处调用都传），把被删行的坐标并进受管集合即可
+两侧对称排除。这不是「只对 after 归一化」的例外（Requirement 6.3 说的是归一化），
+而是受管集合的定义。
+
+**② ③ 全部由 A5 解决**，四态实测（`_bdelp_r2_verdict.py`）：
+
+| 态 | 结果 |
+|---|---|
+| A5 全做（裸引用平移 + 合计收缩） | ✅ 逐格等价 |
+| A5 只平移、不单独收缩合计 | ✅ **也等价** |
+| 反向变异：不做 A5 | ✅ **打红**（仅 before 4 / 仅 after 4，恰是②③的 4 处）⇒ 判据有区分力 |
+| 变异证明：合计行不带公式 + A5 全做 | ✅ **仍绿** |
+
+⇒ **R2 定论：不需要 `unextend_total_formula` 的删行对偶。**
+理由不是「合计不重要」，而是**方向相反**：插行侧的扩张让区间末行落在 `insert_at-1+count`，
+而 `unshift` 在该区间上是恒等映射 ⇒ 还原不回去，必须有 `unextend`；删行侧区间末行在
+删除点**下方**，`unshift` 恰好是精确逆运算（实测 `SUM(B7:B24)` --unshift--> `SUM(B7:B25)`）。
+Requirement 6.4 因此**由 `unshift` 自动满足**，不新增函数。
+
+### E.4 R2 衍生的两处范围澄清（实施必带）
+
+1. **合计区间「收缩」在删行侧不是独立动作。** 裸引用平移天然覆盖它
+   （末行 25 在删除点 20 下方 ⇒ 上移到 24；footer 自身从 26 上移到 25 ⇒ 区间不覆盖 footer，
+   Requirement 5.6 自动成立）。Requirement 5.4 仍需要，但**只为覆盖一个边界**：
+   **区间末行本身就是被删行**时（`shift(d)` 返回 `None`），须钳到「删后受管区末行」。
+   判据因此要显式含这个边界样本，否则 5.4 在常见形态上恒真空转。
+2. **`find_dangling_sites` 覆盖不到受管 sheet 上的裸引用。** 现读 `scan_reference_carriers`
+   只产**限定**引用（`build_propagation_entry` 要求 `ref.kind == "sheet"`，
+   `propagate_reference_side` 是 `qualified_only=True`）⇒ 裸 `A20` 从不进 `scan.sites`。
+   按 Requirement 1.8 的「**任一**引用会因删行变成 `#REF!`」与本模块 fail-closed 纪律，
+   A5 需要**自己的**计划期悬空检测：受管 sheet 上的裸**单格**引用指向被删行 ⇒ 抛
+   `DanglingReferenceError`（裸**区间**引用只被删部分行属正确收缩，不算坏）。
+
+### E.5 R4 —— 🔴 靶子**已消失**（Task 1.4）
+
+探针：`_bdelp_r4.py`（真库 + 真 artifact）。
+
+* live D4 entry `xlsx/gt-d4-operating-revenue` → representation generation **166**
+  → artifact `…/000000166-d7d15bc324af.xlsx`（260,880 B，磁盘存在，解析失败 0）；
+* 物理 `GTROW` 身份 **357**，其中模板骨架（**生产口径** `contracts.is_template_skeleton_identity`）
+  **357**、运行期 mint（`GTROW-MINTED-`）**0** ⇒ **非骨架 0**；
+* store（`checklist_responses` wp_id `b3ab3c46…`，54 项）声明 72 个 `GTROW` row key；
+* **stale 候选（物理非骨架 ∧ store 未声明）= 0**。
+
+⇒ 上游第十一轮收敛后靶子确已归零。**Task 23.2 的真实链路验收改用合成 artifact +
+显式构造 stale**，并在结论里如实写明「真实 live stale 靶子已不存在」。
+（探针口径说明：store 行集用 `remark` 里的 `GTROW` 词元抽取，不是 `store_item_registry`
+的正式解析；但本判定只依赖**物理非骨架 = 0** 这一侧，与 store 口径无关 ⇒ 结论不受影响。）
+
+### E.6 🔴 **推翻 E.3 的一半**：区间端点塌陷**不可逆**（Task 13 实测）
+
+E.3 写的是「删行侧**不需要** `unextend_total_formula` 的对偶，因为 `unshift` 恰好是精确逆
+运算」。这个结论**只在区内行上成立** —— E.3 的探针只删了 K11 的 r=20（受管区 7..25），
+是一个**区内**样本，**缺边界样本**。
+
+Task 13 用 D1-8（区 14..21）补上边界样本后当场推翻：
+
+前向映射在区间**终点**上是 `shift_range_end(row) = row - |{d ≤ row}|`。取 D={21}：
+
+```
+shift_range_end(21) = 21 - 1 = 20      ← 被删的端点
+shift_range_end(20) = 20 - 0 = 20      ← 它上面那个存活行
+```
+
+两个不同的前像映到**同一个**后像 ⇒ 前向**非单射** ⇒ **不存在逆映射**。`unshift` 也好、
+任何别的行号重映射也好，都还原不回去：给定 after 侧的 `20`，它的前像有两个候选。
+
+**这是数学事实，不是实现欠账。** 所以这一类只能做**两侧对称排除**：
+
+* 单元格公式那一类 —— 用既有 `extra_managed_coords`（`collapsed_total_formula_coordinates`），
+  两侧都传；
+* 结构块那一类 —— 新增 `excel_extract.COLLAPSED_ENDPOINT_SENTINEL` +
+  `deletion_collapse_rows(carrier)`，before 侧只收排除集合（`structure_collapse_rows`）、
+  after 侧由载体自己导出。
+
+🔴 排除集**必须取并集** `D ∪ {shift_range_end(d) for d in D}`，不能只取 `D`：
+只取 `D` 时 before 侧的 `A14:A20`（20 ∉ D）会被保留，而它的 after 像
+`shift_range_end(20) = 20` 落在像集合里被排除 ⇒ **一侧排一侧不排 ⇒ 判漂移（假红）**。
+取并集后集合只由载体导出、两侧逐值相同 ⇒ 对称性由构造保证。
+
+🔴 排除必须配**补偿控制**，否则就是白排：A7 的合计覆盖门新增了一条**删行侧独有的上界**
+（区间终点仍等于删行**前**的受管末行 ⇒ A5 没收缩 ⇒ 抛）。判据
+`test_row_deletion_footer_gates::test_skipping_the_bare_ref_shift_makes_the_total_gate_red`
+用 monkeypatch 短路 A5 证明它真的会打红。
+
+该上界故意**只认「终点恰等于老末行」**：合计区间是受管区**超集**的形态真实存在
+（H1 模板 `SUM(I13:I27)` 而受管区到 26，已在 `pilot_h1_grouped_dynamic` 里登记），
+宽口径（`last > effective_last`）会把一整类合法模板判死。成对判据见同文件
+`test_superset_total_range_is_not_flagged` / `test_unshrunk_range_is_flagged_on_the_same_synthetic_sheet`。
+
+### E.7 🔴 **第八条欠账 A8**：受管 sheet 的结构块删行侧完全没平移（Task 13 实测）
+
+design「七条欠账逐条」列了 A1~A7。实测发现**第八条**：`shrink_sheet_rows` 只改
+`<row r=>` / `<c r=>` / `<dimension>`，而插行侧的 `shift_sheet_rows` 另有阶段 C/D 处理
+`mergeCell@ref` / `dataValidation@sqref` / `conditionalFormatting@sqref` / `hyperlink@ref` /
+`autoFilter@ref` / `brk@id` / `formula1|formula2|sqref` 文本 —— **删行侧一个都没有**。
+
+实测（D1-8，删 r=16 或 r=21）：`mergeCells` 的 `N24:N25` 与 `dataValidations` 的
+`sqref="A14:A21 A26:A33"` 逐字未变 ⇒ `verify_unmanaged_regions` 的
+`managed_sheet_structure` 当场判漂移（Requirement 6.2 过不去）。产物侧的真实后果是
+**合并块错位一行、下拉框落在错误的行上**。
+
+落法：新增 `excel_materialize._shift_managed_sheet_structures`，走 `excel_row_shift` 从
+`ROW_BEARING_STRUCTURES` **派生**的三张表（`STRUCTURE_ROW_BEARING_ATTRS` /
+`STRUCTURE_BARE_ROW_ATTRS` / `STRUCTURE_ROW_BEARING_TEXT_TAGS`）—— 与 verifier 归一化用
+的是**同一批表**，加新结构时只改清单一处、两侧同时生效。
+
+🔴 但派生表只是**「哪些属性携带行号」**的单一真源，**不是「谁负责改它」**的：
+`dimension@ref` 同时落在派生表与 `shrink_sheet_rows` 的改写范围里，A8 照表无脑遍历
+⇒ 同一属性被**收缩两次**（D1-8 `A1:AD38` → 37 → **36**），verify 侧 `unshift` 只能还原
+一次 ⇒ 判漂移，而产物 `<dimension>` 比实际行数少一行。属主另有一方的项登记在
+`excel_materialize.STRUCTURE_ATTRS_OWNED_BY_SHRINK`，判据
+`test_row_deletion_verify_normalisation::TestStructureAttrOwnership` 正反两向钉死
+（正向证 `shrink_sheet_rows` 真的改它、反向证 A8 真的不碰它且同次调用里 `mergeCell` 真被改）。
+
+### E.8 🔴 G2 症状链的**尾巴今天被更早的门抢先**（Task 21 实测）
+
+G2 原叙事（写在 `excel_materialize` 6.8b 那段注释里）的链条是：
+
+```
+只补了自己的 Table ref 收缩（未补兄弟 ref）
+  → other 区出现 uuid 空行
+  → 反读时 `_scan_row_identities` 按 tombstone 策略重新 mint 身份
+  → 新身份不在 intended
+  → 又一轮 extra（`roundtrip_projection_mismatch` 500）
+```
+
+Task 21 在 D4-1 真实双区上把「修复前」态造出来（进程内 monkeypatch 短路
+`_shrink_sibling_table_refs`）后实测：反读 other 区**抛**
+`IdentityRetentionError: OO 往返后丢失 1 个 row identity 'GTROW-D41OTHER-0014'`。
+
+也就是说环③④ 的**原始形态不可达** —— `assert_identity_inventory_retained`
+（Property 23/66，G2 之后才加的）在 mint 之前就拦住了「身份清册少了一个」。
+
+处置（如实登记，不假装四环都按原形态红了）：
+* 把异常也当成一种观测值收进沿链取样，不让它打断取样；
+* 四环红的**实测形态**是「①没缩 ②尾行 UUID 空 ③④ 被保留门抢先」；
+* 单独立 `test_the_retention_gate_preempts_the_mint_tail` 钉死这件事 ——
+  保留门哪天改动（或该形态变成可反读）就当场打红，逼迫重判 G2 尾巴停在哪里，
+  而不是让一段过时的叙事继续留在测试注释里。
+
+⚠ 为什么不把它写成「环③④ 也红了」就完事：那会让人以为 mint/extra 两条判据在「修复前」态
+被**执行过**。实际是**没执行到**（反读根本没返回）。这个区别必须留在案上。
+
+### E.9 Task 23.2 真实链路验收的实际范围（如实登记）
+
+按 E.5 的结论，live 靶子已消失 ⇒ 验收改走**权威模板现场 instrument** 出来的 D4-1 双区
+（不是 live 数据，也不造假业务数据 —— 那一行的业务值就是模板自带的）。
+
+已验收的四条（`test_row_deletion_realchain_acceptance.py`，走**完整**
+`materialize_projection` 而不只是 `plan` + `apply`）：
+① materialize 成功 **且** 计划里真的带删行声明（「没抛错」不够：契约门控没生效时走清空
+分支照样成功）② 被删行物理消失，且**被删行之上行号逐个不变、之下逐个 −1**（不是「总数对了
+就行」）③ 兄弟区身份集合逐值不变、`minted_by_row == {}` ④ **第二趟**物化不抛
+`FooterAnchorDriftError`，且不再删任何行（收敛不反复删）。
+另配变异反证：把第一趟产物里的 `GT_FOOTER_ROW_*` 还原成删行前的值 ⇒ 第二趟必抛
+（证明判据④ 不是因为 footer 门在第二趟没跑而绿）。
+
+🔴 **未覆盖**：HTTP「点在线编辑」那一跳（需 `start-dev.bat` 起 9980 + 3030 + OnlyOffice
+容器）。判据④ 覆盖了那一跳最常见的故障形态（第一次删成功、第二次点开 500，因为冻结元数据
+没同步），但「离线四条全绿」**不等于**端到端已验收 —— 这一点由
+`test_http_hop_is_not_covered_here` 承载为一条显式判据，而不是写在注释里。
+
+### E.10 复盘后修复（2026-09-29，spec 交付之后追加）
+
+本节记的不是需求变更，是**交付后复盘**抓到的四件事及其处置。全部有代码 + 判据 + 变异反证。
+
+#### E.10.1 🔴 「G3-2 整表零可删」这条结论**不可直接引用** —— 两个口径
+
+复盘时提出的改进项之一是「给 `明细表G3-2` 的契约显式写 `row_convergence: "clear"` 并
+注明理由（14 行全锁）」。落地前用新建的体检工具复核，发现**依据不成立**：
+
+| 口径 | 受管区从哪来 | G3-2 实测 | 全局 |
+|---|---|---|---|
+| spec 期普查 | **已插桩**工作簿的 `GT_*_ROWS` 运行时区 | 14 行、**全锁** | 17 sheet / 207 行 / 可删 185 |
+| 体检工具 | **原始模板**的 `anchor` → `footer_anchor.marker` 现搜 | 12 行、可删 **4** | 128 表 / 1608 行 / 可删 1442（89.7%） |
+
+差异来源两条：① 区间边界不同（插桩会把 footer 冻结成 `GT_FOOTER_ROW_*`，与模板里按
+marker 搜到的那一行不总是同一行）；② 插桩工作簿多出 `_GT_SYNC` 等载体，跨 sheet 引用面
+更大 ⇒ 锁死更多。
+
+**处置**：不做那个契约改动（按契约区口径它有 4 行可删，写「整表零可删」是错的），改为
+把口径差写进工具 docstring 与报告的 `measured` 字段。**两个数不可互相「纠正」**
+（铁律㉗）—— 它们量的不是同一件事。
+
+🔴 顺带纠正一处容易误读的巧合：`89.7%` 与普查的 `89%` 几乎相等，但那是两个**不同分母**
+（1608 vs 207）上的比例撞在一起，不构成互相印证。
+
+#### E.10.2 新增开表准入工具 `backend/scripts/check/check_row_deletion_readiness.py`
+
+全库 62 份契约里声明 `row_convergence=delete` 的是 **0** 张 ⇒ 删行链路目前生产零消费方。
+要给某张表开表，先得知道它有多少行现在就删得下去、卡住的卡在什么上。反例是「先改契约
+再看会不会炸」——`delete` 打开后删行是**不可逆的数据丢失**，而 fail-closed 会在用户点保存
+时才报错。
+
+口径：分母三层全部现算（契约层 / 有 `row_identity` 的表 / 受管区逐行），可删性一律问生产的
+`find_undeletable_rows` / `find_dangling_sites`，**不复刻任何判定逻辑**。
+
+实测（`--count 1`）：128 表体检 / 4 受阻（footer marker 找不到）/ 1608 受管行 /
+可删 1442 / 锁死 166；锁死原因 `single_cell` 1417、`range_emptied` 1；整表可删 **95** 张。
+`--count` 有真实区分度：1 → 89.7%、2 → 89.5%、5 → 87.8%（count=5 时出现 1 张整表零可删），
+单调性成立。
+
+守卫 `backend/tests/scripts/test_check_row_deletion_readiness.py`（16 例），逐条变异反证四条
+全部打红 —— 其中一条**我预期错了打红的类**（以为是逐行账，实测是「已体检数对账」＋「空模板根
+必须 exit 2」；受阻表 `managed_rows=0` 所以逐行账照样闭合）。
+
+🔴 顺带修掉工具自身一个真缺陷：`table_key` **跨契约不唯一**（`related_party_rows` 在 3 份
+契约里各有一张，`bad_debt_individual_rows` / `adjudication_other_rows` 各 2 张）⇒ 清单改用
+`契约::sheet::table` 限定键，否则报告里出现重复项且无从定位。
+
+#### E.10.3 `stale_clear_reason` 补上外部消费方
+
+现算：该字段全仓 6 处引用**全在 `excel_materialize` 自己**（字段定义 / `as_dict` / 三处赋值 /
+一处传参）⇒ 生产零外部消费方。而它的存在理由恰恰是「降级必须可观测」（见字段 docstring）——
+只写进 dataclass 与不写没有区别，用户看到的是「行删不掉但没人说为什么」。
+
+处置：在降级决策点发 `logger.warning`（本包既有约定，14 处 `getLogger(__name__)`），带上
+`table_key` / `sheet_key` / stale 行数 / 原因。**刻意不**加字段到 `MaterializeResult` /
+`ContentCommitReceipt` —— 那两个是跨 adapter 的域契约，为一条可观测信息扩契约不划算。
+
+判据两条（`TestDegradationReasonHasAnExternalConsumer`）：降级时必须有带 token 的 WARNING；
+**未**降级时不许发（否则日志变噪声）。变异反证：把 `if stale_clear_reason:` 改成 `if False:`
+⇒ 正向判据打红、反向判据仍绿（两条互相独立）。
+
+#### E.10.4 `_assert_roundtrip_equivalent` 抽成模块级纯函数
+
+判据侧需要用**生产口径**算 `extra`（受管字段过滤 + 骨架行豁免都在里面），此前唯一办法是
+unbound 调这个私有方法并传 `self=None`，依赖「函数体一个 `self` 都没用到」这个前提。
+该前提此前只由一个**脚本**里的自检守着（`measure_d4_materialize_baseline._replica_fidelity`），
+测试侧无保护 —— 有人加一行 `self.xxx`，判据就崩在 `AttributeError: 'NoneType' ...` 上，
+traceback 与被测症状链毫无关系。
+
+处置：实现搬到模块级 `assert_roundtrip_equivalent`，方法保留为**薄壳**转发（不动任何调用点，
+现算引用面 8 个测试文件 + 3 个脚本）。
+
+🔴 这个搬移**咬到了两把结构锁**，它们只看一层：
+
+1. `test_managed_row_convergence.py::test_production_filter_shape_matches` —— `getsource`
+   那个方法后断言三个 marker。搬移后薄壳里三条**全部落空** ⇒ 锁**空转**（不是打红）。
+2. `measure_d4_materialize_baseline._replica_fidelity` —— 同理会恒得 `uses_self=False`，
+   自检从「会亮的灯」退化成永绿装饰。
+
+两处都改成把薄壳与被转发函数的源码**并起来**看（跟随间接层）。反证：三个 marker 在薄壳
+单独看时全 `False`、并集全 `True`。
+
+🔴 修第 2 处时**我自己引入了一个误报**：薄壳 docstring 里写了 `` `self.xxx` `` 这个反例字样，
+`"self." in src` 当场命中 ⇒ 自检误报「开始消费 self 了」。按铁律㉖改成 AST（docstring 是
+`Expr(Constant)`、`#` 注释不进 AST，天然不会被骗），并配**双向变异**：现状不报 +
+真加 `self.limits` 会报。
+
+#### E.10.5 未做的两项（依据不足 / 需拍板）
+
+* **canary 真开一张表**（把某张表的契约改成 `row_convergence: "delete"`）—— 体检工具已给出
+  95 张整表可删的候选面（含 `endorse_discount_rows` 10/10、`adjudication_main_rows`）。
+  但这是**生产行为变更**：打开后 stale 行会被**物理删除**，不可逆。**需用户拍板**，不擅自做。
+  且工具只量了**原始模板**，上线前还须在**插桩后的真实工作簿**上复跑一遍（见 E.10.1 的口径差）。
+* 上游 `excel-workbook-wide-row-change-propagation/design.md` 的分母表勘误（记 352/2902、
+  现算 351/2643）—— 跨 spec 工单，且**本轮之前就不一致**，不在本 spec 范围内改动他人交付物。
+
+#### E.10.6 交付后出现的**跨 lane** 预存红（2026-09-30 11:05，非本轮引入）
+
+复盘修复跑最终验证时，`test_row_deletion_g2_symptom_chain.py`（8 errors）、
+`test_row_deletion_convergence_dispatch.py::TestWhyK11CannotBeTheDeletionTarget`（2 failed）
+等**全部**红在同一行上：
+
+```
+ProbeEvidenceStaleError: fingerprint_module digest 漂移：
+  基线 5a40a1a3d98b… ≠ 实测 4b743abf8b22…
+  （backend/app/services/excel_structure_fingerprint.py）
+```
+
+归因（现算，不凭印象）：
+
+* `excel_structure_fingerprint.py` 的 mtime 是 **11:05:47**，本轮最后一次编辑是 **10:57:28**；
+  该文件 `git diff --numstat` 为 **18 增 / 8 删**，本轮一行都没碰过它。
+* 探针 Tier-A 的 `files` 覆盖面**只有两项**：`carrier_contract`（✅ 未漂）与
+  `fingerprint_module`（🔴 漂移）。本轮改的 5 个文件（`excel_materialize` /
+  `content_mutation` / `excel_extract` / `excel_workbook_row_change` / `contracts`）
+  **一个都不在**这道门的覆盖面里。
+* 同一批测试在 10:57 时是 **26 passed 全绿**（含本轮新增的两条日志判据），
+  11:05 之后才转红 ⇒ 时间线与文件 mtime 一致。
+
+**不修，理由**：门要求「必须重跑探针并重新裁决 `probe_verdict`，不得沿用旧裁决」。
+只把基线 digest 改成新值＝把一道正在工作的门降级成恒绿，正是本仓反复登记的反模式。
+重跑探针与重新裁决属改动 `excel_structure_fingerprint.py` 那条 lane 的职责。
+
+本轮改动在**不经过这道门**的引用面上全绿：`test_check_row_deletion_readiness`（16）＋
+`test_ci_declared_gates_exist` ＋ `test_managed_row_convergence` ＋
+`test_task15_content_mutation` ＋ `test_task26_oo_to_html` ＋
+`test_row_deletion_contract_gate` = **290 passed**。
