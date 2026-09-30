@@ -2080,8 +2080,39 @@ spec Task 13 预期 `d4LegacyOoBlocked.spec.ts` 的「推导 legacy 命中集」
 **测试**：后端相关面 **71 + 55 passed**；前端 D4 接桥面 **98 passed**。
 `A9-1 mode switch` 那条红经 `git stash` 归因为**预存失败**（与本轮无关）。
 
-### ⑫ 环境门（`UNVERIFIABLE`，不假绿）
+### ⑫ 环境门 —— **2026-09-30 已全部在真栈跑通（原 `UNVERIFIABLE` 清零）**
 
-Task 10*（发布链 provision + rematerialize）需 **live PG**；
-Task 14*（L1 验收）/ 15*（L2 seed）/ 16*（L2 真 OO canvas 往返）需 **start-dev.bat 全栈 + OO 容器**。
-按全组既有标准列为 env 门，**不得用 L1 通过冒充 L2**，也不得用「代码已改」冒充已验。
+原记录：Task 10*（发布链）需 live PG；14*（L1）/ 15*（L2 seed）/ 16*（L2 真 OO canvas
+往返）需 start-dev.bat 全栈 + OO 容器，按全组既有标准列为 env 门。
+**2026-09-30 全栈起齐后逐项跑完，5 项全 ✅**（D4 是全组第一张把 L2 真 OO canvas
+往返做到 application `applied` + 真库逐值对账的底稿）：
+
+| # | 结果 | 关键证据 |
+|---|---|---|
+| 10* | ✅ | gen 166→167→**168** / revision 188；途中修一处 footer marker 全等匹配真缺陷 |
+| 15* | ✅ | `seed_d4_4_adjustment_l2.py`（幂等 4 模式），3 行借贷各 168000 平衡；substrate R21~R23 十列全对、footer 正确下移 R24 |
+| 14* | ✅ | L1 `1 passed / 1.8m`，`D4-4.json`：`d2_sync_hits=0` / `console_errors=0` / `http_errors=0` / `oo_iframe_count=1` |
+| 16* | ✅ | L2 `1 passed / 1.2m`，OO 写 `J21` → `cs_error=0`/`cs_outcome=accepted`（非 `4=no_changes`）→ operation `oo_to_html` `applied` → application gen169 `applied`/rev 190/conflict 0 → 真库 `D4-4-rows` 第 1 行 `remark` 变 marker、另 2 行逐字未动 |
+
+三条可复用的结论（对后续各循环 L1/L2 都成立，非 D4-4 专属）：
+
+1. **`doc_editor_called` 不是有效判据**：现算 **36 张 L1 证据全部为 `false`**，无一例
+   `true` ⇒ 该 init-script 猴补在本平台从未触发，是全 fleet 一致的探针失效。OO 挂载应由
+   `oo_iframe_count=1` + `sync_host_mounted=true` + `materialize_ok=true` 三项承担。
+   （一个在所有样本上取同一值的字段没有判别力，写成判据等于永假门。）
+2. **点「在线编辑」前必须等切换器解除 `disabled`**：`useD4SyncMode.switchMode` 首行
+   `if (busy.value && ...) return` 会**静默吞掉** busy 期的点击，报错却落在 3 分钟后的
+   materialize 轮询上。且 D4 是整册 37 sheet materialize，**轮询要 300s 不是 180s**
+   （实测超时后 18 秒才出现 `applied` operation）。
+3. **forcesave 的 `cs_error` 必须从 `await waitForResponse()` 的 Response 直接
+   `await res.json()` 取**：`page.on('response')` 里 `void res.json().then(...)` 异步塞的
+   变量在 `waitForResponse` resolve 时常还是 `null`（它只等响应头）⇒ 把一次
+   `cs_error=0` 的真实成功误判成失败。证据自相矛盾时（`cellTextAfterSave` 已是 marker、
+   forcesave 已是 202，却报失败）应先怀疑取值时序，别先怀疑被测对象。
+
+另：本轮顺带发现 `audit-platform/frontend/playwright.config.ts` 自身 IPv4/IPv6 口径
+不一致 —— `use.baseURL` 写死 `127.0.0.1:3030` 而 `webServer.url` 用 `localhost:3030`，
+本机 Vite 现算**只监听 IPv6**（`netstat` 仅 `TCP [::1]:3030 LISTENING`）⇒ webServer
+探活能过、所有相对 `page.goto` 必 `ECONNREFUSED`，**本机任何 e2e 都跑不起来**，与 D4-4
+无关。Playwright 1.60.0 无 `--base-url` CLI 选项，本轮用一次性 `playwright._d44.config.ts`
+只覆盖 baseURL 绕过（不改共享配置，避免影响并发会话），根因登记为遗留项。
