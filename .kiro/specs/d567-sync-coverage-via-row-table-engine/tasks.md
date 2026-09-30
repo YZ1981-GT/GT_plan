@@ -2,15 +2,27 @@
 
 ## Overview
 
-**spec**：`d567-sync-coverage-via-row-table-engine`　**创建**：2026-09-25　**状态**：**20/22**
-（Task 0~21 完成；Task 22 部分（宿主受管集合已扩，capability/flushHtml Ref 化与变异清单未做）；
-真栈全段 `[ ]*` 卡 adapter 未注册）
+**spec**：`d567-sync-coverage-via-row-table-engine`　**创建**：2026-09-25　**状态**：**22/23**
+（Task 0~21 全部完成；Task 22 部分交付）
+
+全 spec 剩余**硬欠账仅 1 条** = Task 22 的 **Property 15**（受管集合从 provider 派生），
+它卡的是「provider 受管清单如何下发前端」这一跨前后端设计裁决，不是工作量。
+其余残留全部是 `[ ]*` 外部依赖：真栈三段 / Property 4 位移链（卡三家 `adapter_registered=False`，
+属 umbrella Task 36/77）· Playwright 交互实测（待 `start-dev.bat`）· D6-1 的 A 列镜像公式
+是否该 mask（与框架不变量冲突，待框架层裁决）。
 
 > ✅ **2026-09-30 Task 20 交付**：Property 7（模板锚定逐格 mask，20 passed）+ Property 8
 > 四态状态机三家 composable 全线接入 + 共享徽标 UI 接入 7 个派生列位（判据 59 + 15 条）。
 > 🔴 该轮抓到并修掉**后端 fail-closed 真缺陷**：D7-1 区1 误锁 36 格、D6-1 区1+区2 误锁 60 格
 > 手工录入格（声明注释称有 SUMIF 公式，模板实测为空）⇒ 审计师在 OO 里改不了，D4-1 同型。
 > 7 处变异逐一验证判据承重。详见 Task 20 条目。
+>
+> ✅ **2026-09-30 第二批**：Task 8 / 11 / 13 / 17 的 `[ ]` 欠账清零（Property 5 复核 + 立门、
+> Property 9 四组、裁决 G2 两路径对照），Task 22 的证据目录项纠正为已建并追加本轮证据。
+> 🔴 又抓到一个**前端真缺陷**：**D7 期后结转联动在打开底稿时根本不生效**（`D7-7-post-rows`
+> 的 immediate watch 在 rows 加载前就跑完、之后源不变永不重跑）—— 详见 Task 17 条目。
+> 变异累计 **13 处（A~M）**逐条验证承重。证据：
+> `docs/operations/evidence/d567-sync-coverage/task20-property7-8-9-delivery.md`
 
 > ✅ **2026-09-26 声明层全量交付**：16 个 sheet 声明文件 + 3 个 expansion 模块 + 三家契约接线。
 > 三家受管区：**D5 1→3**（d52+d54+d51-adj）· **D6 1→11 table**（d62+d63+d65+d68+d66×2+d69×2+d61-adj×3）
@@ -210,13 +222,19 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
   - `sections`/`row_mode` 取 Task 2 实测值；逐格 mask（18r×12c/52f）
   - _Requirements: 1.2_
 
-- [~] 8. D5 接入验收（受管区 1→3）—— 声明+契约绿，Property 8/9 与真栈未做
+- [x] 8. D5 接入验收（受管区 1→3）✅ 2026-09-30（Property 8/9 齐；余真栈 [ ]* 卡 adapter）
   ✅ 受管区 **1→3**（d52 + d54 + d51-adj），契约重生成通过 `assert_contract_file_matches_source()`；
   Property 2 的 D5 部分转绿；Property 6（审定表形态实测）由 Task 7 的几何断言覆盖。
-  `[ ]` **Property 8 四态**（反证式 + 跑同步器）：前端 `useD5Adjudication.ts` 现仍是
-  `crossSheetCurrent !== 0 ? cross : manual` 二选一，**未接** `resolveCellState`/
-  `displayValueForCellState`（D3-1 已接，D5 未接）⇒ 四态状态机在 D5 侧未实施。
-  `[ ]` **Property 9**（`D5-4-rows` 下游 `useD5CrossSheet`/`useD5FairValue` 回写后重算）未写判据。
+  ✅ **Property 8 四态已交付（2026-09-30，Task 20 同批）**：`useD5Adjudication.ts` 的
+  `cross !== 0 ? cross : manual` 二选一已替换为逐格四态，接共享
+  `resolvePerCellDerivedState`（含 `snap === null` 降级）；三个派生格（notes/acc ← D5-2 聚合、
+  oci ← D5-4 公允价值）+ 共享徽标 UI 已接 D5 Tab 的期末未审列。
+  判据 `d5CellOverrideRender.spec.ts`（16 条）+ 变异 A/B 验证承重。详见 Task 20 条目。
+  ✅ **Property 9 已交付（2026-09-30）**：`d567Property9DownstreamRecompute.spec.ts` 的 ① 组 ——
+  `D5-4-rows` 回写 ⇒ `fairValueRows → fairValueTotal(Σ row.fairValue) → ociChange(小计 − 公允价值合计)
+  → adjudicationForDisclosure` **三层**全部跟随。判据形态是**两轮回写**（A→B→C 逐轮断言），
+  只测一轮会漏掉「首读正确、之后不再跟随」的一次性快照（`ref` 误用的典型症状）；另含
+  「回写成空数组 ⇒ 合计归零而非留旧值」。
   `[ ]*` **Property 13 整册 materialize** 真栈不可测（卡 adapter 未注册，见 Overview 卡点①）。
   - Property 2 的 D5 部分转绿；Property 6（审定表形态实测）/ Property 7（逐格 mask 下 editable）绿
   - Property 8 四态：反证式判据 + **跑同步器**的判据（上游纯函数判据全绿而生产坏掉的教训）
@@ -246,12 +264,27 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
     误用会让整个受管区投影恒空）；48r×15c/58f 主列 D21 F21
   - _Requirements: 2.4_
 
-- [~] 11. D6 单区验收（受管区 1→2→3→4）—— 声明+契约绿，Property 5/9 与真栈未做
+- [x] 11. D6 单区验收（受管区 1→2→3→4）✅ 2026-09-30（Property 5 复核+立门 / Property 9 齐；余真栈 [ ]*）
   ✅ 受管区 **1→4**（d62+d63+d65+d68），Property 2 的 D6 单区部分转绿，契约锁死通过。
-  `[ ]` **Property 5**（flat 键派生 ≡ 原写法，变异走 nested 必红）：三张 D6 新 sheet 实测
-  `aging_layout=None`（sheet 自身无账龄组）⇒ **本判据在本轮无分母**；flat 路径仍只由已接的 D6-2
-  承载（上游 D1 spec 的 `TestProperty3ManagedFieldSpecsD6Flat` 已覆盖）。如实登记而非假绿。
-  `[ ]` **Property 9**（`useD6CrossSheet`/`useD6EclCalculation` 回写后重算）未写判据。
+  ✅ **Property 5「无分母」已转为现算复核 + 附带立门（2026-09-30）**：
+  `backend/tests/workpaper_sync/test_d567_task11_layout_groups_invariant.py`（12 passed）。
+  原登记（三张新 sheet `aging_layout=None` ⇒ 本判据无分母；flat 路径由已接的 D6-2 承载，
+  上游 `TestProperty3ManagedFieldSpecsD6Flat` 已覆盖）**现算复核全部成立**，且已把
+  「上游那个覆盖类真实存在」也写成判据（防引用过期当挡箭牌）。
+  🔴 **复核过程中发现一个静默面并就地立门**：`aging_groups` 为空时 `aging_layout` **完全惰性**
+  —— 把 `SPEC_D603` 的 layout 翻成 `flat`/`nested` 都**不报错**、`expand_aging_fields()` 返 0 条、
+  `managed_field_specs()` 输出**逐项相同**（两分支都是 `for group in spec.aging_groups`，空序列零次迭代）。
+  后果：有账龄列的 sheet 声了 layout 却**忘给 `aging_groups`**，会**静默丢掉全部账龄列**、零报错。
+  🔴 这不是假想风险：**本任务 Task 9 的原始 bullet 写的就是「`D6-3-rows`/`D6-5-rows`；`aging_layout=flat`」**
+  （见上方 Task 9 最后一条 bullet），而交付事实是 `None`（Task 9 的 narrative 行记对了）。当时若照
+  bullet 把代码改成 `flat` 而没补 `aging_groups`，产出会**一模一样、零报错** —— 这条声明矛盾
+  至今无害靠的是运气而非设计。故冻结不变量：`aging_layout is not None` ⟺ `aging_groups` 非空。
+  全仓现算基线（2026-09-30）：**124** 个 `RowTableSheetSpec`，layout 分布 `None=120 / nested=3 / flat=1`
+  （印证「flat 唯一样本 = D6-2」），两类违规**均为 0**；变异 L（真给 `SPEC_D62` 摘掉 layout）
+  → 3 红并精确点名。
+  ✅ **Property 9 已交付（2026-09-30）**：② 组 —— `D6-8-single-rows` 回写 ⇒
+  `eclReferenceValues.single(Σ r.expectedProvision) → .total → eclVsImpairmentDiff / eclForDisclosure`
+  三层跟随（两轮回写）。
   `[ ]*` Property 13 真栈同卡点①。
   - Property 2 的 D6 单区部分转绿；Property 5（flat 键派生 ≡ 原写法，变异走 nested ⇒ 必红）
   - Property 9：`useD6CrossSheet` / `D6TabWriteoffCheck` / `useD6EclCalculation` 在回写后正确重算
@@ -271,11 +304,28 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
   - 📌 D7-5 与 D3-5 同型（同为「账龄1年以上…检查表」、几何逐项相同）⇒ 声明骨架可复制
   - _Requirements: 3.2, 3.3, 3.7_
 
-- [~] 13. D7 单区验收 + 两条账龄路径对照 —— 声明+契约绿，对照与真栈未做
+- [x] 13. D7 单区验收 + 两条账龄路径对照 ✅ 2026-09-30（裁决 G2 对照已交付；余真栈 [ ]*）
   ✅ 受管区 **1→3**（d72+d75+d76），Property 2 的 D7 单区部分转绿。
-  `[ ]` **两条账龄路径对照**（裁决 G2 的落点）：D7-5/D7-6 实测 `aging_layout=None`（sheet 自身无账龄组）
-  ⇒ **本轮无 nested/flat 对照分母**；两条路径仍只由已接的 D6-2(flat)/D7-2(nested) 承载。
-  如实登记而非假绿 —— 裁决 G2 的对照价值在本轮新增 sheet 上不成立。
+  ✅ **两条账龄路径对照已交付（2026-09-30）**：
+  `backend/tests/workpaper_sync/test_d567_task13_aging_layout_path_comparison.py`（14 passed）。
+  原登记的事实部分**现算复核成立**（D7-5/D7-6 的 `aging_layout=None`、`aging_groups==()`、
+  `expand_aging_fields()` 恒空 ⇒ 新增 sheet 上确无对照分母）。但**结论那半句需要补一层**：
+  裁决 G2 的对照价值并未消失 —— 两条路径由**已接入**的 D6-2(flat)/D7-2(nested) 承载，
+  对照完全可离线做，而且做得出比「没有分母」更硬的结论：
+    · 现算差异表：`segments` 元组数 **3 vs 2** / `leaf_labels` **空 vs 非空** /
+      `json_prefix` **空串 vs agingPrior** / json_key **无 `/` vs 有 `/`**；
+      **展开条数相同（各 8 = 2 组 × 4 段）** ⇒ 数量维度不受 layout 影响、命名维度完全由它决定，
+      这正是「差异必须能归因到 `aging_layout` 而非别处」的精确表述。
+    · 🔴 **归因的决定性证据**：只翻 `aging_layout` **两个方向都响亮失败** ——
+      flat→nested 抛 `ValueError: 账龄组 有 4 段，但 leaf_labels 有 0 个`；
+      nested→flat 抛 `ValueError: not enough values to unpack (expected 3, got 2)`。
+      layout 与 `aging_groups` 在**三处同时**耦合 ⇒ 不存在「layout 写错但键照样产出」的静默路径，
+      **形态错配根本走不到产键那一步**。
+    · nested 规则跨 entry 一致（D3-2 与 D7-2 的 key 集合**完全相同**、只有列不同）⇒ 是规则不是特例；
+      两路径键空间**不相交** ⇒ 同一 store 不会互相顶掉。
+    · 三分支（flat/nested/None）都有已接入承载 entry ⇒ 引擎 if 无脱离回归门的分支。
+  🔴 与 Task 11 新立的门是**两侧不同的面**：本条钉「形态错配会响亮抛错」，Task 11 钉
+  「`groups` 为空时 layout 惰性、静默」。两者不可互相替代。
   `[ ]*` Property 13 真栈同卡点①。
   - Property 5 的 nested 侧；🔴 **与 Task 11 的 flat 侧对照**：两路径输出差异须能归因到
     `aging_layout` 参数而非别处（裁决 G2 的落点）
@@ -313,7 +363,7 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
   - 🔴 **不得**用聚合键 `D7-4-rows` / `D7-7-rows`（零写入点）
   - _Requirements: 3.1, 3.4_
 
-- [~] 17. 四组双区验收（位移链逐组实证）—— Property 3 转绿，Property 4/9 与真栈未做
+- [x] 17. 四组双区验收（位移链逐组实证）✅ 2026-09-30（Property 9 齐；余 Property 4 位移链与真栈 [ ]* 卡 adapter）
   ✅ **Property 3 转绿**：D6 受管区 4→8（d66×2 + d69×2）、D7 3→7（d74×2 + d77×2），
   `test_d567_property3_12` 的四条 `*_dual_zone_now_present` 全绿。
   🔴 **三处实测修复**（首版必错，被引擎校验打红后改）：
@@ -325,7 +375,17 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
   `[ ]*` **Property 4 位移链**（上区插行 ⇒ 下区 Table ref 下移 + `_GT_SYNC` footer 重冻结 +
   累积归一化）：接入后 D7-4/D7-7 自动进 `test_sibling_table_ref_row_shift` 参数化清单，
   **2 条红** —— 需真实 instrumentation 注入（Excel Table 实体）才能过，同卡点①。
-  `[ ]` Property 9（`useD7CrossSheet`/`useD7Detail` 对 `D7-7-post-rows` 回写后重算）未写判据。
+  ✅ **Property 9 已交付（2026-09-30）**：③④ 组（`d567Property9DownstreamRecompute.spec.ts`）。
+  ③ `D7-7-post-rows` 回写 ⇒ `useD7CrossSheet.voucherPostTransferTotal`(Σ `r.creditAmount`) 跟随；
+  ④ 同键 ⇒ `useD7Detail` 的 **watch** 按 `customerName` 聚合 → 写 `postTransfer` 到 `companyName`
+  匹配行 → `persistRows()` 落库（另含「无匹配客户名不得误写」的反向判据）。
+  🔴🔴 **④ 组首跑即抓到真缺陷并修掉**：**D7 期后结转联动在打开底稿时根本不生效**。
+  根因 = `D7-7-post-rows` 的 watch 是 `immediate: true`，在 setup **当场**跑一次，而那一刻 `rows`
+  还是空数组（rows 的 watch 被 `if (!segments.value.length) return` 挡着，账龄段是**异步** fetch）；
+  等 rows 真加载好，post-rows watch 的源（remark）**没变** ⇒ **永不重跑** ⇒ `postTransfer` 停在 0，
+  **只有事后再改一次 D7-7 才会补上**。修法：watch 源加 `() => rows.value.length`
+  （**不能**直接用 `rows`：回调内 `rows.value = rows.value.map(...)` 每次产生新引用会自触发死循环；
+  `map` 不改变长度故用长度当源安全）。变异 M（退回单源）→ 精确复现 `expected +0 to be 300`。
   - Property 3 转绿（D6 3→5、5→6 后 6→8；D7 3→5 后 5→7）
   - 🔴 **Property 4 逐组实证**：上区插行后下区 Table ref 随之下移 + `_GT_SYNC` footer 坐标重冻结
     + verify 累积归一化通过（照 D4-9/D4-20 范式）；依赖前置 D（上游任务 24）
@@ -449,17 +509,34 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
     另立 `d-cycle-adjustment-sheets-single-html-adjudication`；IF 已立 THEN 本任务降级为引用其结论
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 22.* 前端接线 + 变异检验 + 真栈 + 证据 —— **本轮零交付**
-  🔴 **本轮改动被并发会话覆盖丢失**：曾把三家宿主的 `isD*DetailSheet` 从 `currentSheet === 'D*-2'`
+- [~] 22.* 前端接线 + 变异检验 + 真栈 + 证据 —— **部分交付**
+  （2026-09-26 首轮零交付；2026-09-30 补：证据目录纠正+追加本轮证据、变异 13 处、
+  另有三家审定表 UI 接线已随 Task 20 落地。余 Property 15 卡设计裁决、真栈卡 adapter。）
+  🔴 **2026-09-26 那轮改动被并发会话覆盖丢失**：曾把三家宿主的 `isD*DetailSheet` 从 `currentSheet === 'D*-2'`
   改为 `SET.has(currentSheet)` + `D*_SHEET_KEY_MAP` 映射表，交付前 `git status` 复核发现三个 Vue
   文件**无 diff** ⇒ 改动已被覆盖。**未重做**（前端工作量不大但需与后端受管清单下发机制一并设计，
   见未完成清单 #2）。三家现状仍是单张写死。
-  `[ ]` **Property 15**：受管集合从 provider 派生 + `capability`/`flushHtml` 读 `Ref` —— 未做。
-  `[ ]` **Property 1~15 逐条变异**（需求 8.1）—— 未做。
+  `[ ]` **Property 15**：受管集合从 provider 派生 + `capability`/`flushHtml` 读 `Ref` —— **仍未做**。
+  🔴 这条**不是纯工作量**：需先裁决「provider 的受管 sheet 清单如何下发前端」（render-config 加字段？
+  新端点？），否则前端只能继续写死。属未完成清单 #2，跨前后端需独立设计，**本轮不硬凑**。
+  `[~]` **Property 1~15 逐条变异**（需求 8.1）—— **部分完成（2026-09-30）**，累计 **13 处（A~M）**，
+  逐条形态见 `docs/operations/evidence/d567-sync-coverage/task20-property7-8-9-delivery.md` §六：
+    · 已有变异覆盖：**Property 5**（K/L）· **Property 7**（H/I）· **Property 8**（A/B/C/D/E/F/G/J）
+      · **Property 9**（M）
+    · 仍无变异覆盖：Property 1/2/3/4/6/10/11/12/13/14/15
+      （其中 4/13 卡 adapter 未注册、15 卡上面那条设计裁决；1/2/3/6/12 的正向判据已在案但未做变异）
+  🔴 **本轮变异的一条诚实登记**：变异 F 下 `d6CellOverrideRender.spec.ts` 的「①空串」「③同步器落库后」
+  两条**仍绿** —— 同步器（未被变异）会先把空串/旧值规范成派生值、掩盖读侧问题 ⇒ 已把这两条
+  定性改为「结果级回归守卫」而非「反证」，并补一条直接断言空串→`null` 的鉴别判据（①b）。
   `[ ]*` **真栈三段**（切在线编辑 → OO canvas 逐值 → 改一格 → forcesave → 回读等值）：
   卡 adapter 未注册（Overview 卡点①）。本轮尝试过手工翻 manifest capability + 离线跑发布链，
   撞 `sync_contract_structure_drift` 后**已回滚 manifest**，如实登记为 `upstream_gap` 而非 failed。
-  `[ ]` 证据目录 `docs/operations/evidence/d567-sync-coverage/` 未建（本轮证据落 spec `evidence/`）。
+  ✅ 证据目录 —— 🔴 **原登记「未建」已过期**：现扫 `docs/operations/evidence/d567-sync-coverage/`
+  **2026-09-26 就已建立且 git 已跟踪**（`task0-preflight-gate.md` +
+  `retrospective-2026-09-26{,-part2,-part3,-part4}.md` 共 5 个文件）。2026-09-30 追加本轮证据
+  `task20-property7-8-9-delivery.md`（8 节：Property 7 模板对账 / Property 8 三家反模式 /
+  Task 13 两路径对照 / Task 11 不变量基线 / Property 9 四组链路 / 变异清单 13 处 /
+  可复现命令（已实测） / 未解除外部依赖）。
   - 前端三家宿主（现状均单张写死 `isD*DetailSheet = currentSheet === 'D*-2'`）：受管 sheet 集合
     **从 provider 受管清单派生**、`capability` 与 `flushHtml` 改读 `Ref`；非受管 sheet 保持现状
     + 中文原因，**不得**落 legacy 假双向。Property 15 钉住
@@ -516,10 +593,12 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
 |---|---|---|---|
 | ~~1~~ | ~~三家四态状态机接前端~~ | 20 | ✅ **2026-09-30 已交付**：三家 composable + 共享徽标 UI 7 个派生列位；判据 59 + 15 条；7 处变异全部承重 |
 | ~~4~~ | ~~Property 7 逐格 mask 判据~~ | 20 | ✅ **2026-09-30 已交付**，但**没照 D3 抄**：D3 口径在 D5/D6 会产 30 个假阳，改为锚定模板册三向判据；顺带修掉 D6/D7 共 **96 格** fail-closed 误锁 |
-| 2 | **前端宿主受管集合接线**（三家 `isD*DetailSheet` 仍单张写死；Property 15 要求从 provider 派生 + `capability`/`flushHtml` 改 `Ref`） | 22 | 本轮改动被并发覆盖已丢；需先定「provider 受管清单如何下发前端」（render-config 加字段？新端点？） |
+| 2 | **前端宿主受管集合接线**（三家 `isD*DetailSheet` 仍单张写死；Property 15 要求从 provider 派生 + `capability`/`flushHtml` 改 `Ref`） | 22 | **本 spec 唯一剩余硬欠账**。本轮改动被并发覆盖已丢；需先定「provider 受管清单如何下发前端」（render-config 加字段？新端点？）—— 跨前后端设计裁决，非工作量 |
 | 3 | **多 item store-projection 注册**（`STORE_ITEM_IDS` + `build_combined_store_projection` + `merge_combined_projection`） | — | 首轮做过但被并发重构覆盖；需裁决它与 `build_orchestration` 配置驱动架构如何共存 |
-| 5 | **Property 9 下游重算判据**（各 store 键的 computed 消费方） | 8/11/13/17 | 无阻塞，需逐键写 vitest |
-| 6 | **Property 1~15 逐条变异** | 22 | 部分完成：Property 7/8 的变异已做（7 处，见 Task 20）；其余 Property 待逐条 |
+| ~~5~~ | ~~Property 9 下游重算判据~~ | 8/11/17 | ✅ **2026-09-30 已交付**：四组链路（D5-4-rows / D6-8-single-rows / D7-7-post-rows ×2），判据用**两轮回写**形态；首跑即抓到 D7 期后结转联动在打开底稿时不生效的真缺陷并修掉 |
+| 6 | **Property 1~15 逐条变异** | 22 | 部分完成：累计 **13 处（A~M）**覆盖 Property 5/7/8/9；未覆盖 1/2/3/4/6/10~15（其中 4/13 卡 adapter、15 卡 #2 的设计裁决） |
+| ~~11~~ | ~~裁决 G2 两条账龄路径对照~~ | 13 | ✅ **2026-09-30 已交付**：原「无对照分母」的事实成立但结论需补一层 —— 对照由已接入的 D6-2(flat)/D7-2(nested) 承载，且「只翻 layout 两方向都抛 ValueError」是比输出对比更硬的归因证据 |
+| ~~12~~ | ~~Property 5 flat 键派生（三张 D6 新 sheet）~~ | 11 | ✅ **2026-09-30 已交付**：「无分母」现算复核成立，并顺带发现「`groups` 为空时 layout 完全惰性」的静默面，冻结全仓不变量（124 specs，两类违规均 0） |
 | 7 | **Property 4 位移链 2 红** | 17 | 卡 adapter 注册（真实 instrumentation 注入） |
 | 8 | **真栈三段** | 22 | 卡 adapter 注册（reviewed overlay + 发布链，属 umbrella Task 36/77） |
 | 9 | **Playwright 实测三家徽标/恢复取数交互** | 20 | 待 `start-dev.bat` 环境（代码已改并有 74 条单测，但未真实浏览器实测） |
