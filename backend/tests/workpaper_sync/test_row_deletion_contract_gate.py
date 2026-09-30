@@ -251,6 +251,33 @@ KNOWN_UNPARSEABLE_REASONS: dict[str, str] = {
 }
 
 
+#: 已**授权开启物理删行**的表 → 开表依据。
+#:
+#: 🔴 这张表的存在方式本身就是判据：开表要么出现在这里、要么打红。它**不是**豁免名单
+#: （豁免名单只需要一个名字就能变绿），而是「可伪证声明」—— 每条都要带得出
+#: 「凭什么认为这张表删得动」的实测依据，且上面三条判据会两个方向对齐：
+#:
+#:   * 契约 payload 里显式声明该键的表集合 == 本表的键集合（多一张或少一张都红）；
+#:   * `modes["delete"]` 的计数 == 本表条数；
+#:   * 两处 dataclass 默认值仍是 `clear`（否则全平台被一次开表而本表照样绿）。
+#:
+#: 🔴 删行**不可逆**。开表前必须先跑
+#: `backend/scripts/check/check_row_deletion_readiness.py --table <table_key>`
+#: 并把现算结论写进理由里。
+OPENED_TABLES: dict[str, str] = {
+    "endorse_discount_rows": (
+        "D1-8 应收票据贴现/背书明细表·贴现区（受管数据区 14..21）。"
+        "2026-09-30 用户授权的**第一张** canary。"
+        "开表准入体检现算：8 行受管、`--count 1` 与 `--count 3` 均 8/8 可删、0 锁死 "
+        "⇒ 无跨 sheet 单格引用指着这些行，门面不会 fail-closed。"
+        "选它还因为本 sheet 是双区（兄弟区 `endorse_transfer_rows` 26..33 刻意仍为 clear）"
+        "⇒ 删行会真实触发「兄弟 Table ref 收缩」这条 G2 症状链第一环，"
+        "而不是在退化的单区表上验空壳；同 sheet 保留 clear 对照便于逐字节比对。"
+        "CS-21 两个前提本就齐备：row_identity=field(/rows/*/rowId) + delete_policy=tombstone。"
+    ),
+}
+
+
 def _census() -> dict[str, Any]:
     files = sorted(C.CONTRACTS_DIR.glob("*.json"))
     modes: Counter[str] = Counter()
@@ -303,23 +330,73 @@ class TestCoverageCensusAllExistingContractsAreClear:
         )
         assert live > 40, f"契约文件只有 {live} 个 ⇒ 分母异常，普查可能指错了目录"
 
-    def test_every_parseable_table_is_clear(self, census: dict[str, Any]) -> None:
-        """🔴 主判据：可解析契约的**每一张表**都是 `clear`。"""
+    def test_only_whitelisted_tables_are_open(self, census: dict[str, Any]) -> None:
+        """🔴 主判据：除**已登记开表**的那几张，其余每一张表都是 `clear`。
+
+        原判据是「每一张表都是 clear」。2026-09-30 用户授权开了第一张 canary
+        （D1-8 贴现区），那条判据于是必须改 —— 但**不是**放宽成「允许有表不是 clear」，
+        而是改成「开表必须在 :data:`OPENED_TABLES` 里登记且带理由」。
+        差别在于：前者之后任何人开表都不会被看见，后者每开一张都要改这个文件。
+        """
         assert census["tables"] > 100, f"表总数 {census['tables']} ⇒ 分母异常"
-        assert dict(census["modes"]) == {"clear": census["tables"]}, (
-            f"有表不是 clear：{dict(census['modes'])} —— "
-            "本 spec 落地时不得有任何既有表被默认开启删行"
+        modes = dict(census["modes"])
+        opened = modes.get("delete", 0)
+        assert opened == len(OPENED_TABLES), (
+            f"现算 {opened} 张表开着删行，而登记清单有 {len(OPENED_TABLES)} 条 —— "
+            f"两侧必须逐张对齐；现算 modes={modes}，清单={sorted(OPENED_TABLES)}"
+        )
+        assert modes.get("clear", 0) == census["tables"] - opened, (
+            f"clear + delete != 表总数：{modes} / 总 {census['tables']} —— "
+            "出现了第三种收敛方式"
         )
 
-    def test_no_existing_payload_declares_the_key_yet(self, census: dict[str, Any]) -> None:
-        """🔴 没有任何既有 payload 显式写过这个键 ⇒ 上一条的 `clear` 全部来自**默认值**。
+    def test_opened_tables_are_declared_explicitly_with_a_reason(
+        self, census: dict[str, Any]
+    ) -> None:
+        """🔴 开表必须是**显式声明**的，且每条登记都带得出理由。
 
-        少了这条，上一条可能是因为「每份契约都显式写了 clear」而绿 ——
-        那样默认值就没被测到。
+        两个方向一起锁：
+
+        * 磁盘 payload 里**显式写过**该键的表集合，必须恰等于登记清单 ——
+          「默认恰好是 clear」与「经判断选择 delete」不是一回事，后者必须在 JSON 里看得见；
+        * 登记清单里每条都要有非空理由。只留一个表名等于没有依据。
         """
-        assert census["declared"] == [], (
-            f"已有 payload 显式声明 row_convergence：{census['declared']} —— "
-            "开启某张表时请同步更新本判据（改成允许该表出现在清单里）"
+        declared_keys = {entry.split(":", 1)[-1] for entry in census["declared"]}
+        assert declared_keys == set(OPENED_TABLES), (
+            f"磁盘显式声明 {sorted(declared_keys)} ≠ 登记清单 {sorted(OPENED_TABLES)} —— "
+            "要么有表被开了却没登记（最危险），要么登记了却没真写进契约（假开表）"
+        )
+        for table_key, reason in OPENED_TABLES.items():
+            assert reason and len(reason) > 20, (
+                f"{table_key} 的开表理由太短或为空：{reason!r} —— "
+                "删行不可逆，理由必须写得下「凭什么认为这张表删得动」"
+            )
+
+    def test_no_table_is_open_by_default(self) -> None:
+        """🔴 反向：两处 dataclass 默认值必须仍是 `clear`。
+
+        这条是「开表逐张显式」的地基：默认值一旦被改成 `delete`，全平台在一次部署里
+        同时开始删物理行，而上面两条判据**照样绿**（它们比的是契约 payload，
+        而默认值不写进 payload）。
+        """
+        import dataclasses
+
+        from app.services.workpaper_sync.phase5_row_table_sheet import RowTableSheetSpec
+
+        table_default = next(
+            f.default for f in dataclasses.fields(C.TableSpec) if f.name == "row_convergence"
+        )
+        assert table_default is C.RowConvergenceMode.clear, (
+            f"contracts.TableSpec.row_convergence 默认值变成了 {table_default!r}"
+        )
+        spec_default = next(
+            f.default
+            for f in dataclasses.fields(RowTableSheetSpec)
+            if f.name == "row_convergence"
+        )
+        assert spec_default == "clear", (
+            f"RowTableSheetSpec.row_convergence 默认值变成了 {spec_default!r} —— "
+            "这一处才是「一改就全平台开表」的那个开关"
         )
 
     def test_unparseable_files_are_classified_not_skipped(

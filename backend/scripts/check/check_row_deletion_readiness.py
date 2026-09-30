@@ -242,10 +242,15 @@ def audit_table(
         region_last_row=0,
     )
 
-    first = _anchor_first_row(getattr(table, "anchor", None))
-    if first is None:
+    anchor_row = _anchor_first_row(getattr(table, "anchor", None))
+    if anchor_row is None:
         result.blocked_by = f"bad_anchor: {getattr(table, 'anchor', None)!r} 不是 A1 引用"
         return result
+    # 🔴 `anchor` 指的是**表头**起始行，不是第一个数据行：受管数据区从
+    #    `anchor + header_rows` 开始（D1-8 实测 anchor=A12 / header_rows=2 ⇒ 数据行 14..21，
+    #    而不是 12..21）。把表头行算进去会让本工具去问「能不能删表头行」——
+    #    那不是一个真问题，而且会把分母整体抬高 `header_rows` 行。
+    first = anchor_row + int(getattr(table, "header_rows", 0) or 0)
 
     path = TEMPLATE_ROOT / template_rel
     if not path.is_file():
@@ -266,7 +271,7 @@ def audit_table(
                 zf,
                 part=target,
                 footer=getattr(table, "footer_anchor", None),
-                from_row=first,
+                from_row=anchor_row,
             )
             if footer_row is None:
                 marker = getattr(
@@ -275,7 +280,7 @@ def audit_table(
                 result.blocked_by = (
                     f"footer_marker_not_found: marker={marker!r} 在 "
                     f"{getattr(getattr(table, 'footer_anchor', None), 'search_column', '?')} 列 "
-                    f"第 {first} 行之下找不到"
+                    f"第 {anchor_row} 行之下找不到"
                 )
                 return result
             # footer 那一行不是受管行：受管区止于 footer 上一行。

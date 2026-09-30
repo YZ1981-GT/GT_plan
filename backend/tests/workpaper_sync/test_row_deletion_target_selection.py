@@ -27,9 +27,12 @@ if str(_BACKEND) not in sys.path:  # pragma: no cover - import 环境自举
     sys.path.insert(0, str(_BACKEND))
 os.environ.setdefault("DB_DISABLE_SSL", "True")
 
-# 🔴 本文件**不从原文件 import 任何固件**：这两条判据的依赖（`excel_extract` /
-#    `excel_workbook_row_change` / `test_clear_path_byte_zero_regression`）
-#    全部在方法体内按需 import，搬过来后逐字不变。
+# 🔴 拆分时我在这里写过「依赖全部在方法体内按需 import」—— 那是**凭印象写的假事实**，
+#    AST 现算缺 `C` 与 `M` 两个模块别名（`NameError: name 'C' is not defined`）。
+#    其余依赖（`excel_extract` / `excel_workbook_row_change` /
+#    `test_clear_path_byte_zero_regression`）确实都在方法体内 import，搬过来后逐字不变。
+from app.services.workpaper_sync import contracts as C  # noqa: E402
+from app.services.workpaper_sync import excel_materialize as M  # noqa: E402
 
 
 

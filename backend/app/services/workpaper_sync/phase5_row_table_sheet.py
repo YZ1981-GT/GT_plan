@@ -190,6 +190,21 @@ class RowTableSheetSpec:
     row_section_field: str = ""
     row_section_value: str = ""
 
+    #: 受管行收敛方式 —— `"clear"`（默认）只清 editable 字面值格，`"delete"` 删物理行。
+    #:
+    #: spec: workpaper-sync-row-deletion-multi-region-propagation（契约逐表 opt-in，CS-21）
+    #:
+    #: 🔴 默认值不得改成 `"delete"`：那会让**全部**走本引擎的 spec 在一次部署里同时开始
+    #: 删物理行，而删行是**不可逆的数据丢失**。开表一律逐表显式声明，并且开表前必须先跑
+    #: `backend/scripts/check/check_row_deletion_readiness.py --table <table_key>`
+    #: 确认该表受管区的可删行比例与锁死原因（悬空引用会让门面 fail-closed，
+    #: 症状是用户点保存报错而不是静默）。
+    #:
+    #: 🔴 只在 **非默认**时才写进契约 payload（见 `spec_to_contract_sheet_payload`）——
+    #: 无条件写会让全部既有契约 JSON 的 content-address 一起变，把「一张表开表」变成
+    #: 「62 份契约全体变更」，golden digest 门禁届时无法区分「谁真的改了」。
+    row_convergence: str = "clear"
+
     @property
     def formula_mask(self) -> tuple[str, ...]:
         """七家实测形态：全为列向区间 `{COL}{FIRST}:{COL}{LAST}`。取代 provider 侧手写 mask 字面量。
@@ -326,6 +341,11 @@ def spec_to_contract_sheet_payload(spec: RowTableSheetSpec) -> dict:
         "formula_mask": list(spec.formula_mask),
         "fields": fields,
     }
+    # 🔴 `row_convergence` **只在非默认时**写进 payload（Requirement 8.1/8.2 的
+    #    「未声明即 clear」）。无条件写会让 62 份既有契约的 canonical payload 同时变化 ⇒
+    #    golden digest 门禁一次报 62 家全红，届时分不出「谁真的改了收敛方式」。
+    if spec.row_convergence != "clear":
+        table_payload["row_convergence"] = spec.row_convergence
     # footer_anchor 只在有 marker 时声明（A 列无标记的 footer 行不声明，
     # assert_footer_anchor_stable 对不含 footer_anchor 的 table 跳过校验）。
     if spec.footer_marker:

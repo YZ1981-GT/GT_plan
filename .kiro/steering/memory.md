@@ -168,7 +168,7 @@ inclusion: always
 ## 操作铁律（标题级，详见 #conventions）
 
 - **三层一致校验**：DB 迁移 + ORM `Mapped[]` + service 方法，任一缺失即伪绿
-- **TB 回写只走显式发布门**：审定数入 trial_balance 只能走 POST /api/workpapers/{wpId}/audit-determination/publish-to-tb，必经二次确认；禁在 watch/onMounted/debounce 回调内发布（数据变化只 emit）；旧端点 PUT trial-balance/writeback 及 G6 变体已删；2 道 CI 守卫卡点（check_tb_writeback_no_direct_call / check_tb_publish_confirm_gate）——详 #conventions
+- **TB 回写只走显式发布门**：审定数入 trial_balance 只能走 POST /api/workpapers/{wpId}/audit-determination/publish-to-tb，必经二次确认；禁在 watch/onMounted/debounce 回调内发布（数据变化只 emit）；旧端点 PUT trial-balance/writeback 及 G6 变体已删；2 道 CI 守卫卡点（check_tb_writeback_no_direct_call / check_tb_publish_confirm_gate）——详 #conventions。**删物理行只走契约逐表 opt-in**：`row_convergence: clear|delete` **默认 clear**，两处 dataclass 默认值（`contracts.TableSpec` / `RowTableSheetSpec`）一改就是全平台同时开始不可逆删行。开表必须①先跑 `backend/scripts/check/check_row_deletion_readiness.py --table <key>` 现算可删比例与锁死原因 ②改 **provider spec** 不能手改契约 JSON（契约由 provider 生成，golden digest 比 disk vs source）③`spec_to_contract_sheet_payload` 只在非默认时写该键（无条件写会让 62 份契约 canonical payload 同时变、门禁一次报全红）④在 `test_row_deletion_contract_gate.OPENED_TABLES` 登记并写明依据。**已开表：仅 `endorse_discount_rows`（D1-8 贴现区，2026-09-30 用户授权）**，同 sheet 兄弟区 `endorse_transfer_rows` 刻意保持 clear 作对照
 - **router_registry 必查**：新建 router 必在 `backend/app/router_registry/{group}.py` 注册，否则前端 404；FastAPI 不热加载 router（改后需 start-dev.bat 重启）
 - **service 只 flush 不 commit**：跨 service 编排的 router 端点各 service 只 flush，router 统一 commit 保原子
 - **PG 运维**：SET 不支持绑定参数（用 set_config）/ ALTER TYPE ADD VALUE 不可事务内即用 / PG-only SQL（jsonb cast/advisory lock/set_config）必加 SQLite dialect 检测

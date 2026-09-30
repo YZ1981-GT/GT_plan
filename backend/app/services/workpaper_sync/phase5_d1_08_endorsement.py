@@ -151,6 +151,31 @@ SPEC_D108_DISCOUNT: Final[RowTableSheetSpec] = RowTableSheetSpec(
     formula_templates=_FORMULA_TEMPLATES_DISCOUNT,
     footer_marker=FOOTER_MARKER_D108,
     error_label="D1-8 贴现明细",
+    # ═══ 🔴 canary：全平台**第一张**开启「删物理行」的表 ═══════════════════
+    #
+    # spec: workpaper-sync-row-deletion-multi-region-propagation（契约逐表 opt-in / CS-21）
+    # 用户 2026-09-30 明确授权开表。
+    #
+    # 语义变化：store 已不认领的受管行，此前是「只清 editable 字面值格、物理行留着」，
+    # 现在是**物理删除该行**并联动全工作簿的位移（兄弟表 ref 收缩 / definedName /
+    # 跨 sheet 公式 / 裸引用 / 结构块）。**不可逆**。
+    #
+    # 为什么选这张（开表准入体检 `check_row_deletion_readiness.py` 现算）：
+    #   * 受管数据区 14..21 共 8 行，`--count 1` 与 `--count 3` 均 **8/8 可删、0 锁死**
+    #     ⇒ 没有跨 sheet 单格引用指着这些行，门面不会 fail-closed；
+    #   * 本 sheet 是**双区**（贴现 14..21 / 背书 26..33，`SPEC_D108_TRANSFER`）
+    #     ⇒ 删行会真实触发「兄弟 Table ref 收缩」这条 G2 症状链的第一环，
+    #     而不是在一个退化的单区表上验一个空壳；
+    #   * CS-21 的两个前提本就齐备：`row_identity_key="rowId"` + `delete_policy=tombstone`。
+    #
+    # 🔴 兄弟区 `SPEC_D108_TRANSFER` **刻意不开**：一次只开一张，且保留同 sheet 的
+    #    `clear` 对照 —— 判据可以在同一张 sheet 上同时观测「开了的区删行」与
+    #    「没开的区逐字节不变」，这比在两张不同 sheet 上比对强。
+    #
+    # 🔴 体检工具量的是**原始模板**。插桩后的工作簿引用面更大（多出 `_GT_SYNC` 等载体），
+    #    故真实链路验收另走 `test_row_deletion_convergence_dispatch` 的
+    #    `TestRealChainDispatchFlipsWithTheContract`（在插桩字节上跑）。
+    row_convergence="delete",
 )
 
 SPEC_D108_TRANSFER: Final[RowTableSheetSpec] = RowTableSheetSpec(

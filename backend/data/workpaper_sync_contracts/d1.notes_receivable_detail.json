@@ -1214,6 +1214,7 @@
           },
           "formula_mask": [],
           "header_rows": 2,
+          "row_convergence": "delete",
           "row_identity": {
             "json_pointer": "/rows/*/rowId",
             "kind": "field"

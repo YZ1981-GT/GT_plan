@@ -1216,3 +1216,110 @@ ProbeEvidenceStaleError: fingerprint_module digest 漂移：
 `test_ci_declared_gates_exist` ＋ `test_managed_row_convergence` ＋
 `test_task15_content_mutation` ＋ `test_task26_oo_to_html` ＋
 `test_row_deletion_contract_gate` = **290 passed**。
+
+### E.11 canary 开表已完成（2026-09-30，用户授权）
+
+E.10.5 把「canary 真开一张表」列为**需用户拍板**的未做项。用户当日授权，本节记实施与验收。
+
+#### E.11.1 开的是哪张、凭什么
+
+**`endorse_discount_rows`** —— D1-8《应收票据贴现、票据已背书未到期明细表》的**贴现区**
+（受管数据区 14..21，共 8 行）。契约 `d1.notes_receivable_detail`。
+
+三条依据：
+
+1. 开表准入体检现算：`--count 1` 与 `--count 3` 均 **8/8 可删、0 锁死** ⇒ 没有跨 sheet 单格
+   引用指着这些行，门面不会 fail-closed；
+2. 本 sheet 是**双区**（兄弟区 `endorse_transfer_rows` 26..33）⇒ 删行会真实触发「兄弟
+   Table ref 收缩」这条 G2 症状链第一环，而不是在退化的单区表上验空壳。**兄弟区刻意不开**，
+   同 sheet 保留 `clear` 对照，判据可在一张 sheet 上同时观测两种收敛；
+3. CS-21 两个前提本就齐备：`row_identity=field(/rows/*/rowId)` + `delete_policy=tombstone`。
+
+#### E.11.2 改动路径：不是手改契约 JSON
+
+契约是**由 provider 生成**的（`check_sync_provider_golden_digest.py` 比 `disk vs source`），
+手改 JSON 会立刻与 source 不一致。正确路径三步：
+
+1. 框架层 `RowTableSheetSpec` 加字段 `row_convergence: str = "clear"`；
+2. `spec_to_contract_sheet_payload` **只在非默认时**写这个键 —— 无条件写会让 62 份既有契约的
+   canonical payload 同时变化，golden digest 一次报 62 家全红，届时分不出「谁真的改了」；
+3. `SPEC_D108_DISCOUNT` 声明 `row_convergence="delete"`，重生成该份契约 JSON
+   （canonical 字节格式照 A51 范式：`indent=2, sort_keys=True` + LF + `write_bytes`）。
+
+隔离性实测：**40 份契约的 source 与磁盘逐字节相同，仅 D1 那份变（+39 字节 = 那一个键）**。
+更强的一条是 AST 全仓扫：`row_convergence` 的字面量声明**恰 1 处**，两处 dataclass 默认值
+都仍是 `clear`（扫描器首版有两处假阳 —— `contracts.py` 里 `row_convergence=row_convergence`
+是变量透传、另一处是第二个 dataclass 的默认值；口径收紧为「只认字面量」+「默认值点数 == 2」）。
+
+#### E.11.3 验收：机制判据测不出「开关是否真打开」
+
+既有那批真实链路判据全部经 `_plan_with_convergence(world, "delete"|"clear"|None)` 在**测试期**
+覆盖契约 —— 它们验证的是「分流会跟着契约翻」。**契约文件里少写那一个键，它们照样全绿**。
+
+⇒ 新增 `test_row_deletion_canary_d18.py`（10 例），一个字都不覆盖，直接吃磁盘已提交的契约。
+四组判据：开关真开 / 计划落删行分支且双声明齐备 / 字节侧物理行真少 / 兄弟区行数守恒。
+
+实测（插桩后的真实工作簿，不是原始模板）：
+
+| 观测点 | 结果 |
+|---|---|
+| 磁盘契约 | 贴现区 `delete` / 兄弟区 `clear` |
+| 计划 | `stale_deleted=(19,)` · `stale_cleared=()` · 两份位移载体齐 · 无降级原因 |
+| 受管 sheet 行数 | 35 → 34（最大行号 38 → 37） |
+| 本表 ref | `A14:Q21` → `A14:Q20`（收缩） |
+| **兄弟表 ref** | `A26:R33` → **`A25:R32`**（整体上移 1）|
+| 兄弟区受管行 | 8 行 → 8 行，行号整体 −1 |
+
+变异反证（摘掉 `row_convergence="delete"` 并同步回退契约）：
+
+* canary 验收 10 passed → **7 failed**（打红）；
+* 机制判据 24 passed → **24 passed**（对它完全盲，正是新判据存在的理由）；
+* 契约门普查 25 passed → **2 failed**（登记清单与现算不再对齐）。
+
+#### E.11.4 契约门普查判据的改法：登记而非放宽
+
+开表后原判据 `test_every_parseable_table_is_clear`（每一张表都是 clear）与
+`test_no_existing_payload_declares_the_key_yet`（没有 payload 声明过该键）按设计打红。
+
+改法**不是**放宽成「允许有表不是 clear」（那之后任何人开表都不会被看见），而是换成
+`OPENED_TABLES` 登记表 + 三条对齐判据：
+
+* `modes["delete"]` 计数 == 登记条数；
+* 磁盘**显式声明**该键的表集合 == 登记键集合（多一张少一张都红 —— 前者是「被开了却没登记」，
+  最危险；后者是「登记了却没真写进契约」，假开表）；
+* 每条登记的理由长度 > 20 字符（只留表名等于没有依据）；
+* 新增第三条 `test_no_table_is_open_by_default`：两处 dataclass 默认值必须仍是 `clear` ——
+  这是地基，默认值一旦被改成 `delete` 就是全平台同时开表，而上面两条**照样绿**
+  （它们比的是契约 payload，默认值不写进 payload）。
+
+#### E.11.5 验收过程中抓到的两个**未提交文件**缺口
+
+验证必须在临时 worktree 里做（主工作树的 Tier-A 探针门因 E.10.6 那条跨 lane 改动而红，
+连 `build_contract_payload()` 都跑不起来）。worktree 检出纯 HEAD 之后立刻暴露两件事：
+
+1. 🔴 **我自己上一个提交漏了文件**：`test_clear_path_byte_zero_regression.py`（本 spec Task 18，
+   597 行）与它的冻结基线 `data/clear_path_byte_baseline.json` **未被提交**，而**三个已提交**
+   的测试文件 import 它 ⇒ CI 干净检出时那三个必挂在 `ModuleNotFoundError`。
+   根因是我手列提交清单时按文件名模式（`test_row_deletion_*`）枚举，而它不匹配那个模式。
+   ⇒ 本轮已补提交。**正确口径不是按名字猜**，而是「已提交文件 import 了、但那个模块不在 git
+   里」的反向闭合性扫描。
+2. 🔴 **同型缺口在 `app/` 下有 13 处，属其它 lane**：已提交代码 import 了未提交模块 ——
+   `phase5_d3_expansion.py` → `phase5_d3_0{4,5,6,7}_*`（4 个）· `phase5_i{1..6}_*.py` →
+   `phase5_i{n}_02_detail`（6 个）· `pilot_g7/h1` → `*_store_merge`（2 个）· 🔴
+   **`oo_to_html.py` 与 `adopt_substrate_response.py` → `store_mirror`**（核心生产路径）。
+   ⇒ 分支 HEAD 自身不自洽，干净检出会在 import 期就挂。本轮为验证 canary 临时把这 13 个
+   复制进 worktree（用完即删，**未**提交），并如实登记：验证环境是「HEAD + 13 个未提交模块」
+   而不是纯 HEAD。修它属那些 lane 的职责。
+
+#### E.11.6 顺带修掉体检工具一个真缺陷：表头行被算进受管行
+
+开表前复核体检数字时发现：工具用契约 `anchor` 当受管区起点，而 `anchor` 指的是**表头**起始行
+（D1-8 实测 `anchor=A12` / `header_rows=2` ⇒ 数据行是 14..21）。于是工具在问「能不能删表头行」
+—— 那不是一个真问题，还把分母整体抬高 `header_rows` 行。
+
+修法：`first = anchor_row + header_rows`。修后 D1-8 得 **8/8**，与 spec 的
+`first_data_row=14 / last_data_row=21` 恰好吻合（这是修对了的独立印证）。
+全局随之从 1608 行 / 89.7% 变为 **1374 行 / 88.0%**，锁死原因只剩 `single_cell`
+（原先多出的那 1 处 `range_emptied` 落在表头行上）。
+
+🔴 这条也是「口径必须现算并写明」的又一例：89.7% 与 88.0% 都对，量的是不同的行集合。
