@@ -9,6 +9,7 @@ sheet 名归一化 / 历史遗留 sheet 过滤工具。
 from __future__ import annotations
 
 import functools
+import hashlib
 import json
 import logging
 import re
@@ -20,8 +21,9 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 TEMPLATES_DIR = BACKEND_DIR / "wp_templates"
 INDEX_FILE = TEMPLATES_DIR / "_index.json"
 
-# 缓存模板索引
+# 缓存模板索引（`_index_fingerprint` 是缓存对应的 `_index.json` 内容 sha256）
 _index_cache: list[dict] | None = None
+_index_fingerprint: str | None = None
 
 # Sheet 级独立模板：优先于「F2-21至F2-26」等包内近空 sheet。
 # F2-22/F2-23 在线编辑应对齐通用底稿 G2-6-2 / G2-6-1（Word）。
@@ -91,17 +93,49 @@ def _should_skip_historical_sheet(name: str) -> bool:
 
 
 def _load_index() -> list[dict]:
-    """加载模板索引（带缓存）"""
-    global _index_cache
-    if _index_cache is not None:
-        return _index_cache
+    """加载模板索引（按**内容指纹**缓存，返回调用方私有副本）。
+
+    🔴 **失效判据必须是内容指纹，不能是 (size, mtime)**：索引由
+    `scripts/ops/setup_wp_templates_dir.py` 用「临时文件 + `os.replace`」原子替换，
+    替换后的文件**可以大小相同**（例如只换了个同长度的文件名），而 mtime 也可能被
+    工具回拨。这时基于 stat 的缓存不会失效，finder 会一直拿着旧索引跑，表现为
+    「明明改了索引却不生效」且无任何报错。判据
+    `test_finder_cache_reloads_same_size_atomic_replace_and_returns_copies`
+    就是构造这个场景（同字节数 + `os.utime` 把 mtime 设回原值）。
+    实测读 124,633 字节 + sha256 每次 0.094 ms，比它要防的那类排查便宜得多。
+
+    🔴 **返回副本**：缓存是进程级共享的 `list[dict]`，直接交出去等于把可变内部状态
+    暴露给每个调用方 —— 任何一处顺手改一个 `filename`，此后**全进程**的模板解析都跟着
+    错，且改动点与故障点隔得很远。条目按构造是扁平标量（`build_index` 只写
+    str/float），故逐条 `dict()` 浅拷贝即足够（实测 0.031 ms，比 deepcopy 快 30 倍）。
+    """
+    global _index_cache, _index_fingerprint
     if not INDEX_FILE.exists():
         logger.warning("模板索引文件不存在: %s", INDEX_FILE)
         return []
-    with open(INDEX_FILE, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    _index_cache = data.get("files", [])
-    return _index_cache
+    raw = INDEX_FILE.read_bytes()
+    fingerprint = hashlib.sha256(raw).hexdigest()
+    if _index_cache is None or fingerprint != _index_fingerprint:
+        data = json.loads(raw.decode("utf-8"))
+        _index_cache = data.get("files", [])
+        _index_fingerprint = fingerprint
+    return [dict(entry) for entry in _index_cache]
+
+
+#: 索引条目的**角色**：有角色的条目不是该 wp_code 的普通候选，需按角色分流。
+#: `whole_workbook` = 整册合并本；`dedicated_subtemplate` = 专用子模板。
+_ROLE_WHOLE_WORKBOOK = "whole_workbook"
+
+
+def _is_bundle_entry(entry: dict) -> bool:
+    """是否为**普通**（无角色）条目 —— 只有这类算该 wp_code 的常规候选。
+
+    没有这道过滤，`find_all_template_files("F2")` 会把整册合并本与专用 docx 一起返回，
+    调用方按「多文件底稿」逐个渲染，整册本就被当成一份普通拆分包重复渲染一遍。
+    真库 476 条现在**一条 role 都没有**（现算）⇒ 本过滤对存量数据是恒等变换，
+    只在登记了角色之后才生效。
+    """
+    return not str(entry.get("role") or "")
 
 
 def _wp_code_filename_prefix_ok(filename: str, wp_code: str) -> bool:
@@ -184,6 +218,19 @@ def find_whole_workbook_templates(wp_code: str) -> tuple[Path, ...]:
     """
     if not wp_code:
         return ()
+    # 🔴 索引里**显式登记**了 `role="whole_workbook"` 时以索引为准（单一真源）：
+    #    整册本的身份是人裁决的，不该由文件名正则去猜。真库 476 条一条 role 都没有
+    #    （现算）⇒ 下面的目录扫描仍是现行唯一路径；登记之后才切到索引口径。
+    declared = [
+        TEMPLATES_DIR / str(e.get("relative_path") or "")
+        for e in _load_index()
+        if e.get("wp_code") == wp_code
+        and str(e.get("role") or "") == _ROLE_WHOLE_WORKBOOK
+    ]
+    declared = [p for p in declared if p.is_file()]
+    if declared:
+        declared.sort(key=lambda p: (len(p.name), p.name))
+        return tuple(declared)
     subdir = TEMPLATES_DIR / wp_code[0]
     if not subdir.exists():
         return ()
@@ -423,7 +470,9 @@ def find_all_template_files(wp_code: str) -> list[Path]:
     index = _load_index()
     candidates = [
         e for e in index
-        if e["wp_code"] == wp_code and e["format"] in ("xlsx", "xlsm", "docx")
+        if e["wp_code"] == wp_code
+        and e["format"] in ("xlsx", "xlsm", "docx")
+        and _is_bundle_entry(e)
     ]
     results = []
     for c in candidates:
@@ -536,8 +585,12 @@ def find_template_file_any(wp_code: str) -> Path | None:
 
 
 def list_available_templates() -> list[dict]:
-    """列出所有可用模板（供前端选择）"""
-    index = _load_index()
+    """列出所有可用模板（供前端选择）。
+
+    带角色的条目（整册合并本 / 专用子模板）不进这张表 —— 它们不是"可选的主模板"，
+    由各自的专用入口取（`find_whole_workbook_template*` 等）。
+    """
+    index = [e for e in _load_index() if _is_bundle_entry(e)]
     # 按 wp_code 去重，只返回主文件
     seen = set()
     result = []
