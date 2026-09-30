@@ -6195,3 +6195,47 @@ jobs:
           backend/tests/workpaper_sync/test_e1_04_e1_11_specs.py
           backend/tests/workpaper_sync/test_e1_provider_and_expansion.py
           -q
+  lazy-import-resolvability:
+    # 函数体内 lazy import 可解析性（全仓级，不属任何单一 lane）
+    #
+    # 🔴 这个守卫 2026-09 就写好并提交了，但**两个 workflow 引用它 0 次** —— 从来没在
+    #    HEAD 上跑过，只在开发者工作树上跑。而它守的恰恰是「模块加载期与静态检查都发现
+    #    不了、每次调用必抛 ImportError」那一类：`prefill_engine._resolve_adj_formula`
+    #    的 `from app.models.phase10_models import Adjustment` 就是原始事故。
+    #
+    # 接进 CI 的直接收益（2026-09-28 实测）：在 `git worktree add --detach HEAD` 的干净
+    # 检出上一跑就报「新增 7 处」，其中 4 处是 `phase5_d3_expansion.py` 函数体内 lazy
+    # import 四个**未入库**的 sheet 子模块 —— 正是同日 Gate 6 在干净检出上 traceback
+    # 崩掉的根因。当时是靠手工起 worktree 才发现的；本 job 让它在 CI 上直接可见。
+    #
+    # 守卫内部分三类，第三类是接 CI 时新建的：
+    #   ① `_FLAG_GATED_PLACEHOLDERS` —— flag=False 的未实现占位（不是缺陷）
+    #   ② `_KNOWN_UNRESOLVED_BASELINE` —— 待修工单（任何检出上都是真缺陷）
+    #   ③ `_CHECKOUT_DEPENDENT_UNRESOLVED` —— **检出相关**：import 侧已提交、定义侧没提交
+    #      ⇒ 工作树可解析 / HEAD 不可解析，两种检出表现**恰好相反**，单张清单表达不了。
+    # ③ 豁免僵尸检查，但配两条独立反向断言（按 `git show HEAD:` 静态判定，脱离当前检出）：
+    #   * 每条在 HEAD 版代码里必须**真的**取不到 ⇒ 定义侧一入库立刻要求移除登记；
+    #   * import 侧文件必须**已提交** ⇒ 否则该 import 在 HEAD 上不存在，登记纯噪音。
+    # 另外僵尸检查本身加了「源文件不在本检出」豁免 —— 实测 `phase5_d{5,6,7}_expansion.py`
+    # 在 HEAD 上不存在，旧口径会要求删掉 3 条**仍然有效**的工单。
+    #
+    # 4 处变异全打红（M1/M2 必须在纯 HEAD 检出上做 —— ③ 的条目在工作树上本来就可解析，
+    # 在工作树上清空清单也不会红，这正是它需要单独成类的原因）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 🔴 需要完整历史：反向断言用 `git show HEAD:<path>` 读定义侧的 HEAD 版内容
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run lazy import resolvability guard
+        run: python -m pytest backend/tests/test_lazy_import_resolvability.py -q
