@@ -503,28 +503,38 @@ export function useH6Check(params: {
 
   // ─── Summary ───────────────────────────────────────────────────────────────
 
-  /** 尝试从 H10 相关 checklist 取处置损益合计 */
+  /**
+   * 从 H10 明细取处置损益合计（**单一权威键**，不做猜键回退）。
+   *
+   * 🔴 **HC-9 / BP-12 修复**：原实现按 `['H10-2-rows','H10-rows','H10-1-gain-loss-total',
+   * 'H10-detail-rows']` 顺序试。现算实证：前 3 个键在全仓生产代码里的唯一出现处就是
+   * 这条回退链自己（H10 侧从未写过），只有 `H10-detail-rows` 是真键
+   * （写入方 `useH10Detail` / `useH10FormData`）。更糟的是**三个假键排在真键前面** ——
+   * 一旦有人按这些名字建了 item，读到的值会**抢在权威键之前**生效。
+   *
+   * 字段级兜底（`disposalGainLoss` / `gainLoss` / …）保留：那是**行内字段名**的兼容，
+   * 与「猜 item_id」不是一回事；口径与 `useH10CrossSheet` 的 `disposalGainLoss ?? disposalIncome` 同源。
+   */
+  const H10_DETAIL_ROWS_KEY = 'H10-detail-rows'
+
   function _calcH10GainLoss(): number | null {
-    const keys = ['H10-2-rows', 'H10-rows', 'H10-1-gain-loss-total', 'H10-detail-rows']
-    for (const key of keys) {
-      const raw = _getItemRaw(key)
-      if (raw == null) continue
-      if (typeof raw === 'number') return raw
-      if (typeof raw === 'string' && raw && !Number.isNaN(Number(raw))) return Number(raw)
-      if (Array.isArray(raw)) {
-        let sum = 0
-        let hit = false
-        for (const r of raw) {
-          const v = r.gainLoss ?? r.disposalGainLoss ?? r.netGainLoss ?? r.amount
-          if (v != null && v !== '') {
-            sum += _num(v)
-            hit = true
-          }
+    const raw = _getItemRaw(H10_DETAIL_ROWS_KEY)
+    if (raw == null) return null
+    if (typeof raw === 'number') return raw
+    if (typeof raw === 'string' && raw && !Number.isNaN(Number(raw))) return Number(raw)
+    if (Array.isArray(raw)) {
+      let sum = 0
+      let hit = false
+      for (const r of raw) {
+        const v = r.disposalGainLoss ?? r.gainLoss ?? r.netGainLoss ?? r.disposalIncome ?? r.amount
+        if (v != null && v !== '') {
+          sum += _num(v)
+          hit = true
         }
-        if (hit) return sum
       }
-      if (typeof raw === 'object' && raw.totalGainLoss != null) return _num(raw.totalGainLoss)
+      return hit ? sum : null
     }
+    if (typeof raw === 'object' && raw.totalGainLoss != null) return _num(raw.totalGainLoss)
     return null
   }
 
