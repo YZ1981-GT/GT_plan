@@ -1181,3 +1181,26 @@ backend/app/services/workpaper_sync/phase5_c_control_test.py  825
 #     该 spec 收尾时应连带把本条删掉。
 #     spec: note-parent-company-chapter（本轮为回退 soe 章标题而重新暂存）
 backend/scripts/fix/fix_note_parent_company_chapter.py  2344
+
+#   test_note_parent_company_chapter.py —— **改动前即 2823 行已远超 800 上限**（HEAD 现状，
+#     且此前从未登记 ⇒ 门禁对它事实上一直没生效，只在本次重新暂存时才第一次报出来）。
+#     本次 +30 行是两处**判据**修复（+34/-4），不是膨胀来源：
+#       · `test_soe_table1_and_table2_rows_untouched_by_task5` 的局部 `_norm` 原来只去空白、
+#         不认平台 `<br/>` 两行表头写法 ⇒ 对「模板 `减值准备<br/>期末余额` vs 源 docx
+#         `减值准备 期末余额`」这种**纯排版记号差异**恒打红，并把它报成「Task 5 越界改了
+#         headers」。实测两份模板表头共 **129 处** `<br/>`、源 docx 侧 0 处 ⇒ 归一属于判据
+#         （删那一格会让它与其余 128 处不一致）。与
+#         `fix_note_parent_company_chapter._norm_header` 同口径，防 apply/guard 判据漂移。
+#       · `PARENT_TABLE_CENSUS` 两条登记错值（listed/其他应收款 21→18、soe/应收账款 13→11）
+#         及其依据注释。12 条里只有这 2 条漂移，源 docx 与 `check_isomorphic` 双向印证
+#         18/11 才是现状，原注释把「替换前/后」两个数抄反了。
+#     不拆分的理由：沿用本表「守卫测试」一类的既定归属边界 —— 一个 Task 一个文件是该 spec
+#     的判据归属方式（逐字节锁与辐射面判据按文件归属计算）；且本文件属
+#     `note-parent-company-chapter` spec 的工作面，为一次判据修复去拆别人的守卫，
+#     等于把风险转移给那条 lane 而收益只是「我的提交能过」。
+#     baseline 取当前真实行数（`splitlines` 口径，与 check_file_size.py 一致），
+#     门禁从此刻起对本文件生效（拦膨胀 >5%）。
+#     拆分方向（按 Property 分组，不按行数）：源 docx 事实基线与 fixtures / 表名唯一性与普查 /
+#     同构对齐与 Task 6 / 列元数据与 Task 7 四组，属该 spec 独立任务。
+#     spec: note-parent-company-chapter（本轮为清理陈旧登记而重新暂存）
+backend/tests/test_note_parent_company_chapter.py  2853
