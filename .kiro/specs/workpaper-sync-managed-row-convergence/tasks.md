@@ -396,3 +396,47 @@ run-all 类编排**不得**据顶部 `[ ]` 重新执行。
   - 前置欠账：兄弟 Table ref 收缩 / footer 重冻结 / definedName 与跨 sheet 公式传播。
   - 缺其一就会让 other 区出现 uuid 空行、并被 `_scan_row_identities` 重新 mint 身份，
     触发新一轮 `extra`（§第十一轮 G2 实测）。
+
+
+## 🔴 外部勘误（2026-09-30，由 `workpaper-sync-row-deletion-multi-region-propagation` 那条 lane 追加）
+
+**本节不改任何勾选框** —— 勾 completed 要跑本 spec 自己的全部 AC，追加者没跑过。
+这里只登记「实现已存在」这个可复核的事实，勾不勾由本 spec 的 owner 决定。
+
+### 事实一：Task 11 / 12 / 13 声称要做的事**已经存在**
+
+现算（`backend/app/services/workpaper_sync/excel_materialize.py`）：
+
+| 本 spec 任务 | 声称要做 | 现算命中 |
+|---|---|---|
+| Task 11 | 收敛判据：store 声明的 table 才收缩 | `stale_rows` **17** 次 |
+| Task 12 | 收敛动作：默认清空业务格（非删行） | `stale_cleared` **12** 次 |
+| Task 13 | 删物理行路径（接 `build_delete_plan`） | `stale_deleted` **26** 次 |
+
+另外：删行门面 `plan_workbook_row_change_for_delete` 已有生产调用方；契约逐表 opt-in
+`row_convergence` 已落地为 **CS-21**；**canary 已真开一张表**
+（`endorse_discount_rows` = D1-8 贴现区，2026-09-30 用户授权，全平台第一张）。
+
+这些是下游 spec `workpaper-sync-row-deletion-multi-region-propagation`
+（现算 **74/74 全完成**）交付的 —— 本 spec 第十一轮 G2 裁决把删行判成「保留但刻意不启用」
+并转出为 B 线，B 线现已闭环。
+
+### 事实二：Task 1~9（A 线）已由另一条转出 spec 完成
+
+A 线转出为 `workpaper-sync-adopt-overwrite-and-refresh-source`，现算 **43/43 ✅**。
+
+### 事实三：因此 memory.md 里那句已过期
+
+> ⏸ C 的收敛实现（Task 11/12+13）一行未写，D4 的 500 仍未解除
+
+前半句已不成立（见事实一）。后半句「D4 的 500」需要本 spec owner 在真实链路上复验 ——
+下游只在 **D1-8** 上做了 canary，D4 那个 entry 没动过。
+
+### 事实四：本 spec 的一个交付物此前从未入库
+
+`store_mirror.py`（518 行）在本 spec 记录里标着「✅ 已交付的独立重构」，
+`oo_to_html.py` 的薄壳转发也确实入库了，但**被转发的那 518 行模块从未 `git add`** ——
+干净检出连 `oo_to_html` 都 import 不了。已于 2026-09-30 由下游 lane 补提交
+（commit `4e3478686`，连带另 19 个同型缺口），并新建守卫
+`backend/tests/scripts/test_committed_code_imports_only_committed_modules.py`
+（已提交代码不得引用未提交模块，覆盖 AST import 与字符串式动态引用两种形态）。

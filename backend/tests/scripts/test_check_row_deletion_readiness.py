@@ -242,3 +242,91 @@ class TestRendererDoesNotLie:
         payload = json.loads(capsys.readouterr().out)
         assert payload["tool"] == "check_row_deletion_readiness"
         assert payload["tables"], "--json 模式输出了空 tables"
+
+
+class TestZeroDeletablePatternIsClassifiedNotJustListed:
+    """🔴 「整表零可删」必须给出**结构性归类**，不能只丢一串表名。
+
+    缘起：修掉「表头行被算进受管行」的口径缺陷后，浮出 **9 张**整表零可删的表
+    （修之前是 0 张）。只报表名的话，读者要从 96 张候选里反推「为什么这几张不行」。
+    实测这 9 张的锁死原因**全部**是 `single_cell` ⇒ 它们是**一个**结构性问题
+    （`-2` 明细页的行被跨 sheet 单格引用指着）的 9 个实例，要做的判断是一次性的。
+
+    🔴 归类维度是**锁死原因**而不是 sheet 名：首版按 sheet 名形态切，得 4 族
+    （`明细表G#-#` / `H#-#` / `I#-#` / `租赁负债明细表H#-#`），而那 4 族的原因完全相同
+    —— 把一个问题报成 4 个，读者会以为要做 4 次判断。下面 `test_reason_axis_...`
+    这条用同一批数据两种切法的**族数差**把这个选择钉住。
+    """
+
+    def test_pattern_block_is_present_and_consistent(self, report: dict) -> None:
+        pat = report["zero_deletable_pattern"]
+        assert pat["table_count"] == len(report["zero_deletable_tables"]), (
+            f"归类里 {pat['table_count']} 张、清单里 "
+            f"{len(report['zero_deletable_tables'])} 张 —— 两侧必须同分母"
+        )
+        assert sum(f["table_count"] for f in pat["families"]) == pat["table_count"], (
+            "各族表数之和 != 总数 —— 有表在归类时丢了"
+        )
+
+    def test_every_family_has_a_single_reason_or_is_flagged(self, report: dict) -> None:
+        """🔴 每族必须能说出**共同原因**；说不出就要显式标为「归类失败」。
+
+        少了这条，一个原因混杂的族会被当成「归类结果」端给读者。
+        """
+        pat = report["zero_deletable_pattern"]
+        for fam in pat["families"]:
+            if len(fam["lock_reasons"]) != 1:
+                key = ",".join(fam["lock_reasons"])
+                assert key in pat["mixed_reason_families"], (
+                    f"族 {fam['lock_reasons']} 原因不唯一却没被标进 mixed_reason_families"
+                )
+
+    def test_reason_axis_gives_fewer_families_than_sheet_name_axis(
+        self, report: dict
+    ) -> None:
+        """🔴 反向对照：同一批数据按 sheet 名切会得到**更多**族。
+
+        这条证明「按原因归类」不是随手选的维度 —— 若两种切法族数相同，
+        本条会红，届时应重新判断哪个维度才是决策依据。
+        """
+        import re
+
+        rows = [
+            t
+            for t in report["tables"]
+            if t["blocked_by"] is None and t["managed_rows"] and not t["deletable_count"]
+        ]
+        if not rows:
+            pytest.skip("当前没有整表零可删的表 ⇒ 本条对照空转")
+        by_reason = {",".join(sorted(t["lock_reasons"])) for t in rows}
+        by_sheet = {re.sub(r"\d+", "#", t["excel_name"]) for t in rows}
+        assert len(by_reason) < len(by_sheet), (
+            f"按原因切得 {len(by_reason)} 族、按 sheet 名切得 {len(by_sheet)} 族 —— "
+            "两者不再有区分度，归类维度的选择需要重新论证"
+        )
+
+    def test_verdict_matches_the_family_count(self, report: dict) -> None:
+        pat = report["zero_deletable_pattern"]
+        n = len(pat["families"])
+        expected = (
+            "none"
+            if n == 0
+            else ("single_structural_pattern" if n == 1 and not pat["mixed_reason_families"] else "multiple_patterns")
+        )
+        assert pat["verdict"] == expected, (
+            f"verdict={pat['verdict']!r} 与族数 {n} / mixed="
+            f"{pat['mixed_reason_families']} 不符"
+        )
+
+    def test_renderer_surfaces_the_pattern_not_just_names(self, report: dict) -> None:
+        """🔴 文本渲染必须把归类讲出来（JSON 里有、人看的那份没有 = 等于没做）。"""
+        pat = report["zero_deletable_pattern"]
+        text = T._render(report)
+        if not pat["table_count"]:
+            assert "整表零可删（禁开表）：（无）" in text
+            return
+        assert "禁开表" in text
+        assert str(pat["table_count"]) in text
+        for fam in pat["families"]:
+            for reason in fam["lock_reasons"]:
+                assert reason in text, f"族原因 {reason} 没出现在文本报告里"

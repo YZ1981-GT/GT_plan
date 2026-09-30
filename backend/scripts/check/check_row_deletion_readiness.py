@@ -408,7 +408,73 @@ def run_audit(*, table_filter: str | None = None, count: int = 1) -> dict[str, A
             for r in audited
             if r.managed_rows and not r.deletable
         ),
+        # 🔴 整表零可删的**结构性归类**（2026-09-30 加）：
+        #    实测 9 张全部落在同一个形态上 —— sheet 名形如「明细表X-2」、锁死原因全是
+        #    `single_cell`。那是**一个模式**（`-2` 明细页的行被跨 sheet 单格引用指着），
+        #    不是 9 个孤立案例。不做这个归类，读者得从 96 张候选里反推「为什么这几张不行」。
+        "zero_deletable_pattern": _classify_zero_deletable(
+            [r for r in audited if r.managed_rows and not r.deletable]
+        ),
         "tables": [r.as_dict() for r in rows],
+    }
+
+
+def _classify_zero_deletable(rows: list[TableReadiness]) -> dict[str, Any]:
+    """把「整表零可删」归类，而不是丢一串表名让人自己找规律。
+
+    归类维度取自实测：sheet 名形态 + 锁死原因集合。两者都一致时，这些表是**同一个
+    结构性问题**的多个实例 —— 对它们要做的判断是一次性的（「这类表能不能开表」），
+    而不是逐张判断。
+
+    🔴 判据侧要求：`families` 里每一族都要给出**共同原因**。若某一族的原因集合不唯一，
+    就不能声称它是一族 —— 那时 `mixed_reason_families` 非空，调用方应当把它当成
+    「归类失败」而不是「归类结果」。
+    """
+    import re as _re
+
+    # 🔴 归类维度是**锁死原因**，不是 sheet 名。
+    #    首版按 sheet 名形态切，得 4 族（`明细表G#-#` / `H#-#` / `I#-#` / `租赁负债明细表H#-#`）
+    #    —— 但那 4 族的锁死原因**完全相同**（全是 `single_cell`）。按 sheet 名切等于把
+    #    「一个结构性问题」报成 4 个，读者会以为要做 4 次判断。
+    #    原因才是「要不要开表」这个决定的依据；sheet 名形态降级为族内的附加描述。
+    families: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        key = ",".join(sorted(r.lock_reasons)) or "<无原因>"
+        fam = families.setdefault(
+            key, {"tables": [], "shapes": set(), "rows": 0, "reasons": set()}
+        )
+        fam["tables"].append(r.table_key)
+        fam["shapes"].add(_re.sub(r"\d+", "#", r.excel_name))
+        fam["reasons"] |= set(r.lock_reasons)
+        fam["rows"] += r.managed_rows
+
+    out_families = []
+    mixed: list[str] = []
+    for key, fam in sorted(families.items()):
+        reasons = sorted(fam["reasons"])
+        if len(reasons) != 1:
+            mixed.append(key)
+        out_families.append(
+            {
+                "lock_reasons": reasons,
+                "table_count": len(fam["tables"]),
+                "managed_rows": fam["rows"],
+                "sheet_shapes": sorted(fam["shapes"]),
+                "tables": sorted(fam["tables"]),
+            }
+        )
+
+    all_reasons = sorted({x for f in families.values() for x in f["reasons"]})
+    return {
+        "table_count": len(rows),
+        "families": out_families,
+        "shared_lock_reasons": all_reasons if len(all_reasons) == 1 else [],
+        "mixed_reason_families": mixed,
+        "verdict": (
+            "single_structural_pattern"
+            if len(out_families) == 1 and not mixed
+            else ("multiple_patterns" if out_families else "none")
+        ),
     }
 
 
@@ -457,9 +523,29 @@ def _render(report: dict[str, Any]) -> str:
     lines.append(
         f"整表可删（候选 canary）：{report['fully_deletable_tables'] or '（无）'}"
     )
-    lines.append(
-        f"整表零可删（禁开表）：{report['zero_deletable_tables'] or '（无）'}"
-    )
+    pat = report.get("zero_deletable_pattern") or {}
+    n_zero = pat.get("table_count", 0)
+    if not n_zero:
+        lines.append("整表零可删（禁开表）：（无）")
+    else:
+        lines.append(f"🔴 整表零可删（**禁开表**）：{n_zero} 张")
+        if pat.get("verdict") == "single_structural_pattern":
+            lines.append(
+                f"    ⇒ 它们是**同一个结构性问题**的 {n_zero} 个实例，不是 {n_zero} 个"
+                f"孤立案例：锁死原因全为 {pat['shared_lock_reasons']}。"
+                "对这一类要做的是一次性判断（这类表能不能开表），而不是逐张判断。"
+            )
+        elif pat.get("mixed_reason_families"):
+            lines.append(
+                f"    ⚠ 归类失败（某族原因集合不唯一）：{pat['mixed_reason_families']} "
+                "—— 不要当成一族处理"
+            )
+        for fam in pat.get("families", []):
+            lines.append(
+                f"    原因 {fam['lock_reasons']}：{fam['table_count']} 张 / "
+                f"{fam['managed_rows']} 行 / sheet 形态 {fam['sheet_shapes']}"
+            )
+            lines.append(f"        {fam['tables']}")
     return "\n".join(lines)
 
 
