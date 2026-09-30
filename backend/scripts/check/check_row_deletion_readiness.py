@@ -216,7 +216,15 @@ def _footer_row_by_marker(
             text = "".join(t.text or "" for t in cell.iter(f"{ns}t"))
         elif value_node is not None:
             text = value_node.text or ""
-        if text.strip() == marker:
+        cell_text = text.strip()
+        if cell_text == marker:
+            return row
+        # 🔴 模板里的 footer 标签常带尾随冒号而契约 marker 不带（实测 G4-7：模板
+        #    `三、审计说明：`（全角冒号）vs 契约 `三、审计说明`）⇒ 精确 `==` 搜不到，
+        #    该表被误报成 `footer_marker_not_found`。
+        #    只放宽**尾随标点**这一种差异，不做模糊匹配 —— 模糊匹配会让「合计」命中
+        #    「合计（不含税）」之类的别的行，那是静默错答，比找不到更坏。
+        if cell_text.rstrip("：:、。 ") == marker.rstrip("：:、。 "):
             return row
     return None
 
@@ -267,20 +275,39 @@ def audit_table(
                     f"（模板有 {len(parts)} 个 sheet）"
                 )
                 return result
-            footer_row = _footer_row_by_marker(
-                zf,
-                part=target,
-                footer=getattr(table, "footer_anchor", None),
-                from_row=anchor_row,
-            )
-            if footer_row is None:
-                marker = getattr(
-                    getattr(table, "footer_anchor", None), "marker", None
+            footer = getattr(table, "footer_anchor", None)
+            # 🔴 `footer_anchor` 为 None 是**合法形态**，不是缺陷：引擎的
+            #    `assert_footer_anchor_stable` 对不含 footer_anchor 的 table 直接跳过。
+            #    实测 3 张这样的表（D4-29 客户信息检查表 / D4-12 合同检查表 /
+            #    J1-6 计提情况检查表）。它们的受管区末行契约里没有，得另找来源：
+            #    用 `dynamic_columns` 或末行推断都不可靠 ⇒ 老实登记为「本工具口径覆盖不到」，
+            #    并写清它**不等于**「不可删」。
+            #
+            #    🔴 D4-29 / D4-12 的 `table_key` 带 `_transposed` 后缀且 A 列是**字段名**
+            #    （实测 A11 `统一社会信用代码` / A12 `注册地址` …）—— 它们是**转置表**：
+            #    一「行」是一个字段，一「列」是一个业务对象。对转置表谈「删物理行」本身
+            #    就不成立（删的应该是列）⇒ 这类表的正确处置是**不进本体检的分母**，
+            #    而不是想办法给它凑一个区间。
+            if footer is None:
+                kind = (
+                    "transposed_table_row_deletion_not_applicable"
+                    if "transposed" in (result.table_key or "")
+                    else "no_footer_anchor_region_unknown"
                 )
                 result.blocked_by = (
-                    f"footer_marker_not_found: marker={marker!r} 在 "
-                    f"{getattr(getattr(table, 'footer_anchor', None), 'search_column', '?')} 列 "
-                    f"第 {anchor_row} 行之下找不到"
+                    f"{kind}: 契约未声明 footer_anchor（合法形态，引擎对它跳过 footer 校验）"
+                    "⇒ 本工具取不到受管区末行。**不等于「不可删」**"
+                )
+                return result
+            footer_row = _footer_row_by_marker(
+                zf, part=target, footer=footer, from_row=anchor_row
+            )
+            if footer_row is None:
+                result.blocked_by = (
+                    f"footer_marker_not_found: marker="
+                    f"{getattr(footer, 'marker', None)!r} 在 "
+                    f"{getattr(footer, 'search_column', '?')} 列第 {anchor_row} 行之下找不到"
+                    "（已放宽尾随标点差异后仍找不到）"
                 )
                 return result
             # footer 那一行不是受管行：受管区止于 footer 上一行。

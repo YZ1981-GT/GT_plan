@@ -330,3 +330,115 @@ class TestZeroDeletablePatternIsClassifiedNotJustListed:
         for fam in pat["families"]:
             for reason in fam["lock_reasons"]:
                 assert reason in text, f"族原因 {reason} 没出现在文本报告里"
+
+
+class TestBlockedTablesAreClassifiedByShapeNotLumped:
+    """🔴 「未能体检」必须按形态分类，且分类本身要能被伪证。
+
+    修之前 4 张表都报同一个 `footer_marker_not_found`，把三种不同的事混在一起：
+
+    ============================================  ========================================
+    真实形态                                        正确处置
+    ============================================  ========================================
+    契约 marker 与模板差一个**尾随冒号**              放宽尾随标点后能搜到 ⇒ 应进体检
+    （实测 G4-7：模板 `三、审计说明：` vs 契约 `三、审计说明`）
+    `footer_anchor` 为 **None**（合法形态，           登记为「本工具取不到区间」，
+    引擎对它跳过 footer 校验）                        并写明**不等于「不可删」**
+    **转置表**（一行一个字段、一列一个业务对象）        删「行」本身不成立 ⇒ 单独一类
+    ============================================  ========================================
+
+    只放宽**尾随标点**、不做模糊匹配：模糊匹配会让 `合计` 命中 `合计（不含税）` 之类的
+    别的行 —— 那是**静默错答**，比找不到更坏。下面有一条专门钉这件事。
+    """
+
+    def test_every_blocked_reason_is_a_known_class(self, report: dict) -> None:
+        known = (
+            "transposed_table_row_deletion_not_applicable",
+            "no_footer_anchor_region_unknown",
+            "footer_marker_not_found",
+            "template_missing",
+            "sheet_not_in_template",
+            "bad_anchor",
+            "empty_region",
+        )
+        for b in report["tables_blocked"]:
+            assert b["blocked_by"].split(":")[0] in known, (
+                f"{b['table_key']} 的受阻原因 {b['blocked_by'][:60]!r} 不属已知类 —— "
+                "出现新形态时应显式归类，不要塞进现有类"
+            )
+
+    def test_transposed_tables_are_a_separate_class(self, report: dict) -> None:
+        """🔴 转置表单独一类：对它们谈「删物理行」不成立（删的应该是列）。
+
+        分类依据是 `table_key` 含 `transposed`。这条同时防两个方向：
+        含该后缀的必须归入转置类；转置类里不得混入不含该后缀的表。
+        """
+        blocked = {b["table_key"]: b["blocked_by"] for b in report["tables_blocked"]}
+        transposed_class = {
+            k for k, v in blocked.items() if v.startswith("transposed_table")
+        }
+        for key, reason in blocked.items():
+            if "transposed" in key:
+                assert key in transposed_class, (
+                    f"{key} 带 transposed 后缀却归入 {reason.split(':')[0]!r}"
+                )
+        for key in transposed_class:
+            assert "transposed" in key, (
+                f"{key} 被归入转置类但 table_key 里没有 transposed —— 分类依据被放宽了"
+            )
+
+    def test_no_footer_anchor_reason_says_it_is_not_undeletable(
+        self, report: dict
+    ) -> None:
+        """🔴 「取不到区间」的文案必须澄清它**不等于「不可删」**。
+
+        少了这句，读者会把这几张表当成「禁开表」而不是「本工具没覆盖」——
+        两者的后续动作完全不同。
+        """
+        for b in report["tables_blocked"]:
+            if b["blocked_by"].startswith(("no_footer_anchor", "transposed_table")):
+                assert "不等于" in b["blocked_by"], (
+                    f"{b['table_key']} 的文案没澄清「取不到区间 ≠ 不可删」："
+                    f"{b['blocked_by'][:80]}"
+                )
+
+    def test_marker_match_tolerates_only_trailing_punctuation(self) -> None:
+        """🔴 变异反证：尾随标点放宽了，**别的**差异一律不放宽。
+
+        模糊匹配的危害是静默错答（`合计` 命中 `合计（不含税）` ⇒ 区间末行取错，
+        算出来的可删行数是错的但看起来很正常）。本条用一组正反样本钉住边界。
+        """
+        import io
+        import zipfile
+
+        NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+
+        def probe(cell_text: str, marker: str) -> int | None:
+            xml = (
+                f'<worksheet xmlns="{NS}"><sheetData>'
+                f'<row r="5"><c r="A5" t="inlineStr"><is><t>{cell_text}</t></is></c></row>'
+                f"</sheetData></worksheet>"
+            )
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w") as zf:
+                zf.writestr("xl/worksheets/sheet1.xml", xml)
+            footer = type("F", (), {"marker": marker, "search_column": "A"})()
+            with zipfile.ZipFile(io.BytesIO(buf.getvalue())) as zf:
+                return T._footer_row_by_marker(
+                    zf, part="xl/worksheets/sheet1.xml", footer=footer, from_row=1
+                )
+
+        # 应命中：只差尾随标点（G4-7 的真实形态）
+        assert probe("三、审计说明：", "三、审计说明") == 5, "尾随全角冒号没被放宽"
+        assert probe("合计", "合计") == 5, "完全相同却没命中"
+        assert probe("合计:", "合计") == 5, "尾随半角冒号没被放宽"
+
+        # 不应命中：内容真的不同（放宽成模糊匹配就会在这里出错答）
+        assert probe("合计（不含税）", "合计") is None, (
+            "`合计（不含税）` 命中了 `合计` —— 匹配被放宽成模糊匹配，"
+            "会静默取错区间末行"
+        )
+        assert probe("小计", "合计") is None, "`小计` 命中了 `合计`"
+        assert probe("本年合计", "合计") is None, (
+            "`本年合计` 命中了 `合计` —— 前缀差异不该被放宽"
+        )
