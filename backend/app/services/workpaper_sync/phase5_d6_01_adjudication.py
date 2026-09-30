@@ -87,9 +87,15 @@ _FIELD_SPECS_D601: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] =
 
 def _build_cell_mask() -> tuple[str, ...]:
     cells: list[str] = []
-    # 区1 原值 R8-R12 数据行：B-K 公式（SUMIF cross_sheet）
+    # 区1 原值 R8-R12 数据行：**只有 E/I/J/K 是公式**（E=B+C+D / I=F+G+H / J=I-E / K=IF）。
+    #
+    # 🔴 修正（spec d567-sync-coverage Task 20）：原声明按 `B-K` 整行 mask，注释写
+    #    「B-K 公式（SUMIF cross_sheet）」——**模板实测该前提不成立**：`审定表D6-1` 的
+    #    R8-R12 里 B/C/D/F/G/H **全部为空**（无任何公式）。整行 mask 把手工录入格锁死
+    #    = D4-1 踩过的 fail-closed 缺陷同型。对照：区3（净值 R26-R30）模板里 B-I 确实
+    #    全是 `=B8-B17` 这类派生公式 ⇒ 那里整行 mask 是**对的**，保持不动。
     for row in range(8, 13):
-        for col in "BCDEFGHIJK":
+        for col in ("E", "I", "J", "K"):
             cells.append(f"{col}{row}")
     # 区1 小计 R13 + 减项 R14(仅 E/I/J/K) + 合计 R15
     for col in "BCDEFGHIJK":
@@ -99,9 +105,10 @@ def _build_cell_mask() -> tuple[str, ...]:
     for col in "BCDEFGHIJK":
         cells.append(f"{col}15")
 
-    # 区2 坏账 R17-R21：B-K / 小计 R22 / 减项 R23(E/I/J/K) / 合计 R24
+    # 区2 坏账 R17-R21：同区1 —— 模板里**只有 E/I/J/K 是公式**，B/C/D/F/G/H 为空（手工录入）。
+    # 小计 R22 / 减项 R23(E/I/J/K) / 合计 R24 保持不动（模板确有公式或属 computed 列）。
     for row in range(17, 22):
-        for col in "BCDEFGHIJK":
+        for col in ("E", "I", "J", "K"):
             cells.append(f"{col}{row}")
     for col in "BCDEFGHIJK":
         cells.append(f"{col}22")

@@ -2,9 +2,15 @@
 
 ## Overview
 
-**spec**：`d567-sync-coverage-via-row-table-engine`　**创建**：2026-09-25　**状态**：**19/22 声明层交付**
-（Task 0~19 + 21 完成；Task 20 部分（后端声明+判据齐，前端四态 UI 未做）；Task 22 部分（宿主受管集合已扩，
-capability/flushHtml Ref 化与变异清单未做）；真栈全段 `[ ]*` 卡 adapter 未注册）
+**spec**：`d567-sync-coverage-via-row-table-engine`　**创建**：2026-09-25　**状态**：**20/22**
+（Task 0~21 完成；Task 22 部分（宿主受管集合已扩，capability/flushHtml Ref 化与变异清单未做）；
+真栈全段 `[ ]*` 卡 adapter 未注册）
+
+> ✅ **2026-09-30 Task 20 交付**：Property 7（模板锚定逐格 mask，20 passed）+ Property 8
+> 四态状态机三家 composable 全线接入 + 共享徽标 UI 接入 7 个派生列位（判据 59 + 15 条）。
+> 🔴 该轮抓到并修掉**后端 fail-closed 真缺陷**：D7-1 区1 误锁 36 格、D6-1 区1+区2 误锁 60 格
+> 手工录入格（声明注释称有 SUMIF 公式，模板实测为空）⇒ 审计师在 OO 里改不了，D4-1 同型。
+> 7 处变异逐一验证判据承重。详见 Task 20 条目。
 
 > ✅ **2026-09-26 声明层全量交付**：16 个 sheet 声明文件 + 3 个 expansion 模块 + 三家契约接线。
 > 三家受管区：**D5 1→3**（d52+d54+d51-adj）· **D6 1→11 table**（d62+d63+d65+d68+d66×2+d69×2+d61-adj×3）
@@ -352,21 +358,65 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
   - 逐格 mask（32r×12c/84f）；`sections`/`row_mode` 实测
   - _Requirements: 3.5_
 
-- [~] 20. 两张审定表验收 + 四态状态机 —— **后端声明齐，前端四态 UI 未做**
+- [x] 20. 两张审定表验收 + 四态状态机 ✅ 2026-09-30（Property 7/8 齐 + 三家 UI 接线；余 2 项 `[ ]*` 外部依赖）
   ✅ 受管区：D6 8→**11 table**（d61-adj 3 sections）、D7 7→**9 table**（d71-adj 2 sections）；
   三张审定表契约全部接入并通过 `assert_contract_file_matches_source()`。
   ✅ Property 6（形态实测）由 Task 7/18/19 的几何断言覆盖（区块数/section_key/行号逐条钉死）。
   🔴 **契约解析器要求每 table ≥1 field** ⇒ 审定表 table 给每 section 一个 `item_name` 锚点 field
   （per-cell 值不走行表 field 路径，走 `checklist_responses` 逐格存取）。
-  `[ ]` **Property 7**（逐格 mask 下受管金额字段仍判 editable）：三张审定表**未写**格级判据
-  （D3-1 已有 `test_d3_01_coverage_and_property7.py`，D5/D6/D7 未做）。
-  `[ ]` **Property 8 四态状态机未接前端** —— 这是本任务最大欠账：
-    · `useD5Adjudication.ts` 仍 `crossSheetCurrent !== 0 ? cross : manual` 二选一
-    · `useD6Adjudication.ts` 仍 `hasManualCurrent` 判断
-    · `useD7Adjudication.ts` 仍 `isFromCrossSheet` 判断
-    三家都**未** import `resolveCellState`/`displayValueForCellState`（只有 D3-1 接了）。
-    ⇒ S2「已人工覆盖」标记 / S4 三值并呈 / 逐格「恢复取数」**三项 UI 全未实施**。
-  `[ ]*` 整册 materialize 真栈同卡点①。
+  ✅ **Property 7 已交付（2026-09-30）**：`backend/tests/workpaper_sync/test_d567_property7_cell_mask_vs_template.py`
+  （20 passed + 1 skipped）。🔴 **判据口径与 D3-1 不同，且这是必须的**：D3-1 那套
+  「`value_source == manual` 且 `value_type == amount` ⇒ 不得 mask」**直接搬过来会产生 30 个假阳**
+  （D5-1 main 10 格 + D6-1 block3 20 格 —— 那些格在模板里**真有公式**）。故改为**锚定模板册**
+  （`backend/wp_templates/D/*.xlsx`）三向判据：①模板有公式 ⇒ 必须 mask ②模板无公式且字段非
+  `computed` ⇒ 必须不 mask（P7 本体）③模板无公式且 `computed` ⇒ 允许 mask（保守）。
+  该口径与 D3-1 的**实际状态**自洽（D3-1 区2 的 F 是 `cross_sheet` 却未 mask —— 「派生不可 OO 直写」
+  由 `is_oo_writable()` **独立机制**保证，与 mask 是两套机制，不可混为一谈）。
+  🔴🔴 **该判据首次运行即抓到并修掉真缺陷（fail-closed，D4-1 同型）**：
+    · `D7-1` 区1（nature R8-R13）原声明整行 mask `B-K`，注释称「性质区有 SUMIF cross_sheet 公式」
+      —— **模板实测该前提不成立**（B/C/D/F/G/H 全为空），**36 格**手工录入格被锁死；
+      表内自证：**同一张表**区2（aging R20-R23）模板形态完全一致，声明却只 mask E/I/J/K。
+    · `D6-1` 区1（R8-R12）+ 区2（R17-R21）同型，**60 格**被锁死；
+      区3（净值 R26-R30）模板里 B–I 确是 `=B8-B17` 派生公式 ⇒ 整行 mask **正确**，保持不动。
+    · `D5-1` 声明与模板**逐格完全一致**（46 == 46，对称差 0）⇒ 无需改动；其「手工金额格」
+      分母为 **0**（模板全是 SUMIF），**如实登记空分母**，不硬凑三家口径一致。
+    修复后对称差：D5-1 = 0 / D7-1 = 0 / D6-1 只剩 ③ 类允许项 11 格。
+    变异验证：H（D7 退回整行 mask）→ 精确点名 36 格红；I（D5 漏掉 B9）→ 精确点名 B9 红。
+    登记豁免：D6-1 的 `A17-A21`/`A26-A30` 模板是 `=A8` 镜像公式却未 mask（与框架不变量
+    `assert_data_cells_not_masked()`「禁 mask 数据行 editable 列」直接冲突）⇒ 用**可伪证**豁免
+    （验证真在 A 列 + 真在数据行 + 真是同列自引用镜像 + 名单无失效条目），不是「写个理由就放行」。
+  ✅ **Property 8 四态状态机已接前端（2026-09-30）**，三家 composable + UI 全线贯通：
+    · `useD5Adjudication.ts`：3 个派生格（notes/acc ← D5-2 聚合、oci ← D5-4），
+      原 `cross !== 0 ? cross : manual` 已替换
+    · `useD7Adjudication.ts`：双区 × 两列 = 4 组；修掉两处反模式 ——
+      nature 的 `agg ? agg.X : manual`（聚合对象一存在就**无条件**盖掉手工值，三家最激进）
+      与 aging 的 `isFromCrossSheet = crossCurrent !== 0 || crossPrior !== 0`（**一个标志管两列**，
+      期末一有值就把期初手工值切成 0）
+    · `useD6Adjudication.ts`：block1/block2 × 两列；修掉 `map.has(prefix-currentUnadjusted)`
+      的**三重**缺陷（空串 remark 也为 true 就掐断上游 / 只看 current 键却决定 prior /
+      **与同步器根本不兼容** —— 同步器把派生值落进 stored 后 `has` 恒真 ⇒ 上游取数被自己永久关掉）。
+      🔴 block3（净值）**不接**状态机：它是 `block1 − block2` 纯公式区，消费的已是两区**显示值**
+      ⇒ 覆盖自动透传（已加判据钉死透传）。
+    · 🔴 **降级逻辑上提到共享层**：`shared/dynamicAdjudicationRows.ts` 新增
+      `resolvePerCellDerivedState(stored, snap, derived)`，三家共用一份。理由：`snap === null`
+      （迁移前存过值的格 / 同步器没跑过）**不能**直接丢给 `resolveCellState` ——
+      `resolveCellState(0, null, 100)` 判 S4 ⇒ 显示 stored=0，**上游 100 被吞**；且 per-cell 形态下
+      同步器判 S2/S4 会**跳过写 snap** ⇒ snap 永远 null ⇒ 该格**永久**显示 0 且永久标已覆盖、
+      **不可自愈**（D1 实测同形回归）。读侧与写侧**必须都走**这个入口，手写第二份谓词两个方向都错。
+    · UI：新增**共享**徽标 `shared/DerivedCellOverrideBadge.vue`（S2 黄「已人工覆盖」/ S4 红
+      「覆盖·上游已变」+ tooltip 三值并呈 + 「恢复取数」），接入三家 Tab 共 **1+2+4 = 7** 个派生列位。
+      不复制 D4 的内联块（9 个列位会复制九份必漂移）；组件只依赖 `cellOverrides[field]` 契约，
+      不感知区块/行键语义。
+    判据：`d5/d6/d7CellOverrideRender.spec.ts` **59 条** + `d567AdjCellOverrideUi.spec.ts` **15 条**。
+    变异验证 7 处全部承重：A 摘降级→2 红 · B/E 不冻结 snap→6 红 · C nature 退回→5 红 ·
+    D aging 一标志管两列→3 红 · F 退回 `map.has`→8 红 · G 摘 snap 清理→1 红 · J 摘一个徽标→1 红。
+    🔴 **诚实记录**：F 变异下「空串」「同步器落库后」两条**仍绿** —— 同步器会先把空串/旧值规范成
+    派生值，掩盖读侧问题 ⇒ 已把这两条定性改为「结果级守卫」而非「反证」，并补一条直接断言
+    空串→null 的鉴别判据。鉴别力实在「覆盖检出组」。
+    🔴 **顺带修掉一个我自己会引入的缺陷**：`removeDynamicRow` 原不清 `-snap` 键 ⇒ 孤儿快照，
+    同名类别日后重现时 `stored=null, snap=旧值, derived=新值` ⇒ 判 S4 显示 0（变异 G 守护）。
+  `[ ]*` 整册 materialize 真栈同卡点①（adapter 未注册，代码已改但未真栈实测）。
+  `[ ]*` Playwright 实测三家徽标与「恢复取数」的真实交互（待 `start-dev.bat` 环境）。
   - Property 6（形态实测，变异改成 D1-1 的 3 区 ⇒ 必红）/ Property 7（逐格 mask 下 editable）
   - Property 8：反证式 + **跑同步器**的判据；复用 `shared/dynamicAdjudicationRows`，
     **不得**在 D6/D7 侧另写一套
@@ -459,16 +509,21 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
 
 ### 🔴 本轮未完成清单（下一轮必做，按优先级）
 
+> 🔄 **2026-09-30 更新**：原清单 #1（四态接前端）与 #4（Property 7 判据）**已交付**，见 Task 20 条目。
+> 其余各项状态与阻塞原因逐条重核如下。
+
 | # | 欠账 | 归属 Task | 阻塞原因 |
 |---|---|---|---|
-| 1 | **三家四态状态机接前端**（`resolveCellState`/`displayValueForCellState` + S2 标记 + S4 三值 + 逐格恢复取数） | 20 | 无阻塞，纯前端工作量；D3-1 有现成范式可抄 |
+| ~~1~~ | ~~三家四态状态机接前端~~ | 20 | ✅ **2026-09-30 已交付**：三家 composable + 共享徽标 UI 7 个派生列位；判据 59 + 15 条；7 处变异全部承重 |
+| ~~4~~ | ~~Property 7 逐格 mask 判据~~ | 20 | ✅ **2026-09-30 已交付**，但**没照 D3 抄**：D3 口径在 D5/D6 会产 30 个假阳，改为锚定模板册三向判据；顺带修掉 D6/D7 共 **96 格** fail-closed 误锁 |
 | 2 | **前端宿主受管集合接线**（三家 `isD*DetailSheet` 仍单张写死；Property 15 要求从 provider 派生 + `capability`/`flushHtml` 改 `Ref`） | 22 | 本轮改动被并发覆盖已丢；需先定「provider 受管清单如何下发前端」（render-config 加字段？新端点？） |
 | 3 | **多 item store-projection 注册**（`STORE_ITEM_IDS` + `build_combined_store_projection` + `merge_combined_projection`） | — | 首轮做过但被并发重构覆盖；需裁决它与 `build_orchestration` 配置驱动架构如何共存 |
-| 4 | **Property 7 逐格 mask 判据**（三张审定表） | 20 | 无阻塞，照 `test_d3_01_coverage_and_property7.py` 抄 |
 | 5 | **Property 9 下游重算判据**（各 store 键的 computed 消费方） | 8/11/13/17 | 无阻塞，需逐键写 vitest |
-| 6 | **Property 1~15 逐条变异** | 22 | 无阻塞 |
+| 6 | **Property 1~15 逐条变异** | 22 | 部分完成：Property 7/8 的变异已做（7 处，见 Task 20）；其余 Property 待逐条 |
 | 7 | **Property 4 位移链 2 红** | 17 | 卡 adapter 注册（真实 instrumentation 注入） |
 | 8 | **真栈三段** | 22 | 卡 adapter 注册（reviewed overlay + 发布链，属 umbrella Task 36/77） |
+| 9 | **Playwright 实测三家徽标/恢复取数交互** | 20 | 待 `start-dev.bat` 环境（代码已改并有 74 条单测，但未真实浏览器实测） |
+| 10 | **D6-1 的 A 列镜像公式未 mask**（`A17-A21`/`A26-A30` 模板是 `=A8` 却未 mask） | 20 | 与框架不变量 `assert_data_cells_not_masked()`「禁 mask 数据行 editable 列」**直接冲突**，改任一侧都会动别的判据面 ⇒ 本轮显式登记为**可伪证豁免**，留待框架层裁决 |
 
 ### 已裁决（详见 design §关键裁决）
 

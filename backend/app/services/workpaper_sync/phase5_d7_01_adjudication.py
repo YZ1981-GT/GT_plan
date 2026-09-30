@@ -68,9 +68,18 @@ _FIELD_SPECS_D701: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] =
 
 def _build_cell_mask() -> tuple[str, ...]:
     cells: list[str] = []
-    # 区1 数据行 R8-R13：B-K（性质区有 SUMIF cross_sheet 公式）
+    # 区1 数据行 R8-R13：**只有 E/I/J/K 是公式**（E=B+C+D / I=F+G+H / J=I-E / K=IF）。
+    #
+    # 🔴 修正（spec d567-sync-coverage Task 20）：原声明按 `B-K` 整行 mask，注释写「性质区有
+    #    SUMIF cross_sheet 公式」——**模板实测该前提不成立**：`审定表D7-1` 的 R8-R13 里
+    #    B/C/D/F/G/H **全部为空**（无任何公式），SUMIF 只存在于 D5-1 那种表。整行 mask
+    #    把审计师手工录入的期初未审/AJE/RJE/期末 AJE/RJE **锁死 36 格**（OO 里改不了）
+    #    = D4-1 踩过的「列向区间把受管金额字段整列误判只读」同型 fail-closed 缺陷。
+    #
+    # 🔴 表内自证：**同一张表**的区2（账龄 R20-R23）模板形态与区1 完全一致，声明却只 mask
+    #    E/I/J/K —— 两区声明自相矛盾，坐实区1 是错的一侧。
     for row in range(8, 14):
-        for col in "BCDEFGHIJK":
+        for col in ("E", "I", "J", "K"):
             cells.append(f"{col}{row}")
     # 区1 小计 R14
     for col in "BCDEFGHIJK":
