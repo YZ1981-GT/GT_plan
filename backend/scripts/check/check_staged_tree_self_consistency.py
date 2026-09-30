@@ -170,7 +170,34 @@ def _run_gate(tree: Path, gate_rel: str) -> tuple[int, str]:
     return proc.returncode, ((proc.stdout or "") + (proc.stderr or ""))[-2500:]
 
 
+def _force_utf8_stdout() -> None:
+    """让本门的输出在 GBK 控制台上也不会崩。
+
+    🔴 2026-09-30 修一个**只在失败路径上触发**的缺陷：成功分支打的 `✅`(U+2705) 恰好能被
+    GBK 编码，失败分支打的 `❌`(U+274C) 不能 ⇒ 门一旦判失败就
+    `UnicodeEncodeError: 'gbk' codec can't encode character '\\u274c'`，
+    在**打印失败原因的那一行**崩掉。后果不是「少看到一个图标」，而是
+    **整份诊断信息全没了**：pre-push 只剩一句「暂存树自洽检查失败」，
+    到底哪道门、哪个 provider、基线与现算差多少，一个字都看不到
+    （我本轮就是靠 `PYTHONIOENCODING=utf-8` 重跑才拿到诊断）。
+
+    失败路径比成功路径更需要能说话 —— 这类「门能判红但说不出红在哪」等于半个门。
+
+    用**就地** `reconfigure`（不新建 TextIOWrapper、不夺走 buffer 所有权，
+    因此不会像 `scripts/ops/setup_wp_templates_dir.py` 那样把 pytest capture 的底层
+    buffer 关掉）；再配 `errors="replace"`，即便目标编码仍装不下也只是替换字符、不抛。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):  # pragma: no cover - 已被替换的流可能不支持
+                pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _force_utf8_stdout()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--json", type=str, default=None)
     parser.add_argument("--keep", action="store_true", help="保留导出树（排查用）")

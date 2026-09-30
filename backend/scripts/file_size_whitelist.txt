@@ -1161,3 +1161,23 @@ backend/app/services/consol_report_service.py  1008
 backend/tests/workpaper_sync/test_template_override_resolution.py  946
 backend/app/services/workpaper_sync/phase5_a51_cashflow_audit.py  891
 backend/app/services/workpaper_sync/phase5_c_control_test.py  825
+
+#   fix_note_parent_company_chapter.py —— **改动前即 2291 行已远超 800 上限**（HEAD 现状，
+#     且此前从未登记 ⇒ 门禁对它事实上一直没生效，只在本次重新暂存时才第一次报出来）。
+#     本次 +53 行是两处判据修复，不是膨胀来源：
+#       · `_norm_header`/`_headers_correspond` —— 表头比较容 `<br/>` 与空白差异。原逐字
+#         `!=` 让 `soe/长期股权投资` 表[1] 因一个展示层 `<br/>` 判不符 ⇒ 该表恒缺 columns
+#         ⇒ `_checks` 恒留欠账 ⇒ 写盘条件含 `not errs` ⇒ **两个变体 82 处变更全部写不进去**，
+#         `--apply` 静默不落盘（母公司章因此长期停在错误态）。
+#       · round-trip 自检放行「仅尾部换行」差异（listed 现值尾部缺 1 个 `\n`，正文逐字相同），
+#         其余任何差异仍 exit 2。
+#     不拆分的理由：本文件是 `note-parent-company-chapter` spec 的产物，Task 3~7 + 11 的
+#     「apply 动作 ↔ 同名 check 判据」成对定义，拆开会让每个 Task 的两侧跨文件；且它属
+#     另一条 lane 的工作面，为一次 bugfix 去拆别人的脚本等于把风险转移给那条 lane，
+#     而收益只是「我的提交能过」（沿用本表 phase5_a51/phase5_c 两条的同一理由）。
+#     baseline 取当前真实行数，门禁从此刻起对本文件生效（拦膨胀 >5%）。
+#     拆分方向（按 Task 边界，不按行数）：长期股权投资/投资收益的列定义常量（`_listed_lte_*`
+#     / `_soe_lte_*` / `_G_*` 约 300 行）是纯数据，可下沉 `_note_parent_company_columns.py`；
+#     该 spec 收尾时应连带把本条删掉。
+#     spec: note-parent-company-chapter（本轮为回退 soe 章标题而重新暂存）
+backend/scripts/fix/fix_note_parent_company_chapter.py  2344

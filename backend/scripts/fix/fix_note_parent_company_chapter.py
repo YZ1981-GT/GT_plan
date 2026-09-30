@@ -682,6 +682,42 @@ def _norm_ws(s: str) -> str:
     return re.sub(r"[\s\u3000]+", "", s)
 
 
+#: 表头单元格里的**换行标记** —— 源 docx 的两行表头单元格导出成 ``减值准备<br/>期末余额``。
+#: 容 ``<br>`` / ``<br/>`` / ``<br />`` 及大小写。
+_BR_RE = re.compile(r"<\s*br\s*/?\s*>", re.IGNORECASE)
+
+
+def _norm_header(s: str) -> str:
+    """表头单元格归一：``<br/>`` 视作空白后再去空白。
+
+    🔴 2026-09-30 修一个**把整章修订全卡住**的判据过严问题。``_apply_own_table`` 在
+    ``rebuild_headers=False`` 分支用 ``headers != headers_of(columns)`` 逐字比较，而
+    ``soe/长期股权投资`` 表[1] 的第 7 格现值是 ``'减值准备<br/>期末余额'``，目标列标签是
+    ``'减值准备期末余额'`` —— 只差一个 ``<br/>``：
+
+        现有: [..., '本期计提减值准备', '减值准备<br/>期末余额']
+        目标: [..., '本期计提减值准备', '减值准备期末余额']
+
+    连带后果远大于「一张表少两个字段」：该分支告警跳过 ⇒ 这张表始终缺
+    ``columns``/``guidance`` ⇒ ``_checks`` 恒留 2 条欠账 ⇒ 而写盘条件是
+    ``changes and not dry_run and not errs`` ⇒ **两个变体合计 82 处已算好的变更一个都写不进去**，
+    ``--apply`` 跑完静默不落盘。母公司章（含 soe 章标题）因此长期停在错误态。
+
+    ``<br/>`` 是**展示层换行**、不是语义内容：``headers`` 按 ``rebuild_headers=False`` 的契约
+    要逐字保留源 docx 形态，``columns.label`` 承载语义键名，两者「对应」即可，不必逐字节相等。
+    这与本文件已有的 ``_norm_ws``（把全角空格差异视作等同）是同一类归一，只是多了一种
+    排版记号。故在**比较**时归一，**写入时不动 headers**。
+    """
+    return _norm_ws(_BR_RE.sub(" ", str(s)))
+
+
+def _headers_correspond(actual: list[Any], want: list[str]) -> bool:
+    """现有 headers 与目标列标签是否**逐格对应**（容 ``<br/>`` 与空白差异）。"""
+    if len(actual) != len(want):
+        return False
+    return all(_norm_header(a) == _norm_header(w) for a, w in zip(actual, want))
+
+
 def _is_header_leak(name: str, tbl: dict[str, Any]) -> bool:
     """表名是否是「表头首格泄漏」（md 重建把 headers[0] 当表名）。
 
@@ -936,7 +972,8 @@ def _apply_own_table(
         if dropped:
             changes.append(f"{where} 删除 {dropped} 行 header_label（压扁的第二行表头残留）")
     else:
-        if list(tbl.get("headers") or []) != want_headers:
+        # 逐格**对应**即可（``<br/>``/空白差异归一，见 ``_norm_header``）；headers 本身不动。
+        if not _headers_correspond(list(tbl.get("headers") or []), want_headers):
             warnings.append(
                 f"{where} headers 与目标 columns 不符 → 跳过（不写入与 headers 不一致的 columns）\n"
                 f"      现有: {tbl.get('headers')}\n      目标: {want_headers}"
@@ -2234,13 +2271,29 @@ def process(variant: str, dry_run: bool, check: bool) -> tuple[list[str], list[s
     errs = _checks(doc)
 
     if changes and not dry_run and not errs:
-        # round-trip 自检：仅当「未改动时能逐字复现原文」才敢写盘（防全文件重排 / 覆盖并发改动）
-        if _dump(json.loads(raw)) != raw:
+        # round-trip 自检：仅当「未改动时能复现原文」才敢写盘（防全文件重排 / 覆盖并发改动）
+        rt = _dump(json.loads(raw))
+        if rt != raw:
+            # 🔴 2026-09-30：**尾换行**差异单独放行。实测 listed 现值尾部缺一个 `\n`
+            # （`raw` 尾 `'}\n  ]\n}'` vs `_dump` 尾 `'}\n  ]\n}\n'`，len 差恰为 1，
+            # 正文 671698 字符逐字相同）⇒ 原判据一刀切 `!=` 把它当成「全文件重排」而
+            # exit 2，于是**两个变体合计 82 处变更全部写不进去**（soe 侧自身 round-trip
+            # 是相等的，却被 listed 的这 1 个字节连坐）。
+            #
+            # 该判据要防的是「序列化形态不一致 ⇒ 写回会重排整个文件」；尾换行不属于重排，
+            # 正文逐字相同即可证明。故只放行「去掉尾部换行后逐字相等」这一种情形，
+            # 其余任何差异仍然 exit 2。
+            if rt.rstrip("\n") != raw.rstrip("\n"):
+                print(
+                    "[ERR] round-trip 自检失败：json.dumps 无法逐字复现原文，"
+                    f"拒绝写入 {path.name}（防全文件重排）"
+                )
+                raise SystemExit(2)
             print(
-                "[ERR] round-trip 自检失败：json.dumps 无法逐字复现原文，"
-                f"拒绝写入 {path.name}（防全文件重排）"
+                f"[note] {path.name} 原文尾部缺换行，本次写入按 _dump() 规范补 1 个 "
+                "'\\n'（正文逐字未重排；与另一模板及 fix_note_m_equity_structure.py "
+                "的写盘形态一致）"
             )
-            raise SystemExit(2)
         chapter = _find_parent_chapter(doc.get("sections") or [], variant)
         if chapter is not None:
             stamp(chapter, ALIGNED_BY)  # kit 的 stamp 作用于 section，不是整个 doc

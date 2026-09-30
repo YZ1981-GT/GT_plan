@@ -5003,3 +5003,169 @@ vs 收紧默认依赖，涉及性能与角色模型），不由单轮修复决�
   headers/columns/rows/guidance 未对齐，含 soe `八、94 一般风险准备` 整章缺失）。那是 M 循环
   spec 的工作面，且一次改写两份运行时权威模板的 11 个章节，blast radius 需拍板。
 * `test_x3_column_alignment` / `test_note_text_hygiene` 等其余预存红同属上述模板结构欠账。
+
+## 2026-09-30 母公司附注章回退 + M 循环 92 项欠账清零 + 两条脚本级安全缺陷
+
+lane `work/2026-09-28-voucher-sampling-account-scope`。承接上一轮「本轮**未**做（需决策）」
+三条：soe 缺整章 / 93 项欠账 / `--dry-run` 写盘。**三条全部收口**，另修一条顺手发现的
+GBK 崩溃。
+
+### 一、soe「母公司财务报表的主要项目附注」不是缺内容，是改名覆盖的回归
+
+用户问「这章是不是只有合并附注才有」。**确认：是合并口径专属**，但 soe 侧的问题不是缺内容
+—— 是 `56acf363d`（feat(g-foundation)）把这一章**改名覆盖**了：
+
+| | `section_title` | `section_id` |
+|---|---|---|
+| `56acf363d^` | 母公司财务报表的主要项目附注 | `chapter-12-mu-gong-si-...-fu-zhu` |
+| `56acf363d`~HEAD | 股份支付 | `chapter-12-gu-fen-zhi-fu` |
+
+判定为「覆盖」而非「本来没有」的三方证据：① soe 章数前后均 14，被移除标题恰
+`['母公司财务报表的主要项目附注']`、新增恰 `['股份支付']`；② 该章 6 个子节是
+应收账款/其他应收款/长期股权投资/营业收入与营业成本/投资收益/现金流量表补充资料
+（全 `scope=consolidated_only`）—— 与「股份支付」毫无关系；③ soe 另有两处**真**股份支付
+（`四、股份支付` 政策章、`八、83` 带 3 张表），章十二 `tables=0` 是第三个重名空壳。
+listed 侧被该提交零改动，结构本就正确（`十六` 母公司章 + 6 子节）。
+
+⇒ 用既有专用脚本 `fix_note_parent_company_chapter.py --apply` 回退（Task 3 正是此事），
+**没有另写脚本**。结果：标题/`account_name`/`section_id` 复原、旧 slug 进 `legacy_aliases`、
+6 子节归属同步、补源 docx 章首 5 段说明，悬空引用 0，`sort_index` 仍 12。
+
+🔴 **`scope` 一律未动**：该 spec 需求 2.5 明令不动。我原打算把两侧母公司章
+`scope: both → consolidated_only`（依据 `parent_company_note_sections.py:177` 的注释），
+**已撤回** —— 那是推翻既有裁决，且属超出回退的行为变更。**留作待决**（见第五节）。
+
+### 二、一个 `<br/>` 卡住整章 82 处变更（真正的堵点）
+
+`--apply` 跑完**静默不落盘**。根因链条比表面深两层：
+
+`soe/长期股权投资` 表[1] 第 7 格现值 `'减值准备<br/>期末余额'`，目标列标签
+`'减值准备期末余额'` ⇒ `_apply_own_table` 在 `rebuild_headers=False` 分支用逐字 `!=`
+比较 ⇒ 告警跳过 ⇒ 该表恒缺 `columns`/`guidance` ⇒ `_checks` 恒留 2 条欠账 ⇒
+而写盘条件是 `changes and not dry_run and **not errs**` ⇒ **两个变体合计 82 处已算好的
+变更一个都写不进去**。
+
+`<br/>` 是展示层换行、不是语义内容（`rebuild_headers=False` 的契约就是 headers 逐字保留、
+`columns.label` 承载语义），故在**比较时**归一（`_norm_header` / `_headers_correspond`），
+**写入时不动 headers**。这与该文件已有的 `_norm_ws`（容全角空格）是同一类归一。
+
+第二个堵点：round-trip 自检 `_dump(json.loads(raw)) != raw` 对 listed exit 2。现算差异
+**恰 1 字节**——listed 尾部缺一个 `\n`（正文 671698 字符逐字相同）。尾换行不是「全文件重排」，
+故只放行「去掉尾换行后逐字相等」这一种情形，其余任何差异仍 exit 2，并打印 `[note]` 说明。
+
+### 三、M 循环 92 项欠账清零
+
+`fix_note_m_equity_structure.py` 无标记执行：**61 处变更 / 0 问题**，含 soe `八、94
+一般风险准备` **整章补建**（源模板有、模板 JSON 整张缺失）。`--check` 从 92 → **0**，
+且幂等复跑 0 变更、sha256 不变。覆盖 listed+soe 全 11 个键（用户明确「国企和上市都要修」）。
+
+### 四、两条脚本级安全缺陷（本轮顺手，均配变异证明）
+
+**① `--dry-run` 真写盘**（承接上轮 T24）：实测有**两处**写盘只判了 `not check`
+—— `_ensure_soe_m8_section()`（新建整章）与 header_label 假行删除。改为
+`writable = not check and not dry_run`，干跑改打印意图。验证：dry-run 后两模板 sha256 未变。
+
+**② 门判红时崩在打印诊断那一行**：`check_staged_tree_self_consistency.py` 成功分支的
+`✅`(U+2705) 恰好能被 GBK 编码、失败分支的 `❌`(U+274C) 不能 ⇒
+`UnicodeEncodeError: 'gbk' codec can't encode character '\u274c'`。后果不是少个图标，而是
+**整份诊断全丢**，pre-push 只剩一句失败。修法用**就地** `reconfigure(encoding='utf-8',
+errors='replace')` —— 不新建 `TextIOWrapper`（那会夺 `buffer` 所有权、回收时关底层 buffer，
+正是 `setup_wp_templates_dir.py` 让 pytest 崩在 teardown 的同一个坑）。
+
+**③ 顺带咬出一个假绿**：`test_note_m_equity_structure.py::test_check_exit_zero` 用
+`capture_output=True, text=True`（不指定 encoding）⇒ 子进程中文 stdout 按 GBK 解码失败 ⇒
+读取线程抛 `UnicodeDecodeError`，但**这不会让 `subprocess.run()` 失败**，只把 `result.stdout`
+变 `None` + 留一条 `PytestUnhandledThreadExceptionWarning`。该测试只断言 `returncode`
+⇒ stdout 从没被真正读到，且 `--check` 真报欠账时打的是 `None`。已按三件套修
+（`env` 传 `PYTHONIOENCODING` + 显式 `encoding/errors` + **断言 stdout 有预期内容**）。
+
+新守卫 `backend/tests/test_script_dry_run_and_console_safety.py`（6 例），每条都配**反向断言**：
+写盘路径真的可达（否则「没写盘」是空转）、不调修复时真的崩（否则「修好了」无从证明）。
+逐处变异 **2/2 KILLED**。
+
+### 五、归因与残留
+
+全量对照（所有读这两份模板 JSON 的测试文件，HEAD 基线 vs 改后）：
+
+| | HEAD | 改后 |
+|---|---|---|
+| failed | 790 | 661 |
+| passed | 1917 | 2052 |
+| errors | 17 | 11 |
+
+**修好 130 / 新破 1 / 仍红 659**。659 条是别 spec 的预存模板结构欠账（d1 89 / d2 93 /
+i-cycle 91 …），与本轮无关。
+
+🔴 **唯一那 1 条新红是真阳性，且不是内容回退**，两条证据：
+① 测试侧 `PARENT_CHAPTER_SID['soe']` 写的是**正确**新 slug，而 HEAD 模板还是旧 slug ⇒
+`_children()` 返回 `[]` ⇒ `test_all_parent_tables_have_columns[soe]` 在**空集**上断言 = 空分母假绿；
+② 逐值实测 `columns` 数量：HEAD 0/31、现在 0/35，母公司章与**合并章**两侧都是 0
+⇒ 没有把「本来有 columns 的表」换成没有的（Task 6 是按合并章复制，合并章本身就缺）。
+真因 = **合并章 `五、4/5/8/62`、`八、5/9/64` 缺 `columns`**，且该判据**按设计不可豁免**
+（`upstream_exempt` 只豁免 flat/group 并存，`columns 缺失` 明文不豁免）。
+
+### 本轮**未**做（需决策，非遗漏）
+
+* **合并章 columns 欠账**（上述真因）：要为两侧约 90 张表按源 docx 补列元数据，属独立 spec
+  工作面，需审计口径裁决。它同时是 `test_columns_present_and_explicit` 7 例与
+  `test_every_parent_table_has_columns_and_guidance` 2 例的共同根因。
+* **两侧母公司章 `scope` 是否改 `consolidated_only`**：现值 `both` 而 6 个子节全
+  `consolidated_only` ⇒ 单体报告会渲染**空章标题**。改它与该 spec 需求 2.5 冲突，须用户拍板。
+* `test_census_matches_registered_baseline` 2 例 / `test_upstream_conflict_registry_still_reproduces`
+  / `test_soe_table1_and_table2_rows_untouched_by_task5`：同属该 spec 未完成任务的既有基线，
+  本轮只修堵点未动其基线（**不代改别 spec 的登记值**）。
+* `.kiro/steering/memory.md` 工作树改动属别 lane（formula-push / 知识库），**未代提交**。
+
+### 本轮教训（接上轮 T26）
+
+| # | 教训 |
+|---|---|
+| T27 | 🔴 **「脚本跑了」≠「脚本写了」** —— `--apply` exit 0 也可能因内部门控静默不落盘。判「改没改」一律**前后 sha256**，别看退出码 |
+| T28 | 🔴 **一个展示层字符能卡住整批变更** —— `<br/>` 让 1 张表缺 columns，再经「有欠账就不写盘」放大成 82 处全不落盘。凡「全有或全无」的写盘门，排障要先找**那一条**残留欠账，而不是怀疑整批逻辑 |
+| T29 | **round-trip/哈希类自检要区分「重排」与「1 字节尾换行」** —— 一刀切 `!=` 会把无害差异判成灾难并拒写；放行也必须**只放行那一种**，其余仍 exit 2 |
+| T30 | 🔴 **green→red 先问「HEAD 那个绿是不是空分母」** —— 本轮 `[soe]` 从绿变红，真相是测试按正确 slug 找章、HEAD 模板还是旧 slug ⇒ 一直在空集上断言。判据修对了反而会新增红，这类红是**资产不是负债**，但必须逐值证明「不是内容回退」（我用 columns 0/31 vs 0/35 两侧对照证明） |
+| T31 | **`subprocess` 解码失败不会让 `run()` 失败** —— 只让 `stdout` 变 `None` + 一条 `PytestUnhandledThreadExceptionWarning`。只断言 `returncode` 的测试必假绿；验证手段 `-W error::pytest.PytestUnhandledThreadExceptionWarning` 复跑 |
+| T32 | **PowerShell 的 `>` 重定向写 UTF-16** —— 我用它存 `--check` 输出，再按 utf-8 解析得「欠账 0 条」的错结论。捕获脚本输出一律走 Python `subprocess` + 显式解码 |
+| T33 | **逐字节变异脚本必须处理 CRLF** —— 模式里写 `\n` 在 CRLF 文件上「找不到片段」，会被误当成「代码不是这样写的」而放弃变异 |
+
+### 六、补记两项（收尾阶段新发现）
+
+**① `八、94` 建章时挂错父节 —— 三个字段全是错的硬编码值**
+
+上面第三节建出 `八、94` 后复核悬空引用，发现全模板**唯一一条**悬空正是它。
+`_ensure_soe_m8_section()` 把三个字段写死，与同级 93 个节全部不符：
+
+| 字段 | `八、93`（同级真值） | 原写死值 |
+|---|---|---|
+| `parent_section_id` | `chapter-08-cai-wu-bao-biao-**zhu-yao-**xiang-mu-zhu-shi` | 少了 `zhu-yao-` ⇒ **悬空** |
+| `section_id` 前缀 | 父 slug + 尾段 | 同上，前缀错 |
+| `sort_order` | 892（紧接 891 递增） | **594** ⇒ 排到第 8 章中段 |
+
+⇒ 改为**全部从现有数据推导**（父章按 `section_number=='八'` + `level==1` 现场解析，
+`sort_order`/`sort_index` 取 `八、93` +1），找不到父章则硬失败而不是写出悬空引用；
+并让函数**幂等自愈**（原实现「已存在就 return」会让上一版写出的错值永远留在模板里）。
+复核：悬空 0，`八、94` 的 parent/sort_order(893)/sort_index(93) 与同级完全一致。
+
+🔴 这条差点漏掉：`--check` 全绿（0 欠账）、`八、94 存在=True`，**两个既有判据都说没问题**
+—— 悬空引用不在任何一条判据的视野里。是我在复核时顺手多算了一次「全模板悬空 parent 数」
+才撞出来。**「脚本自己的 --check 绿」不等于「写出的数据是对的」**。
+
+**② 并发 lane 在同一分支上清掉了我未提交的工作树改动**
+
+收尾 `git add` 时发现 3 个文件「与 HEAD 字节相同」—— 两份模板 JSON 的落盘结果与
+`fix_note_parent_company_chapter.py` 的改动**全部消失**。`git reflog` 显示 HEAD 已从
+我开工时的 `6dd1002be` 前移三个提交到 `e019b5a88`（另一 lane 并发提交），
+且 HEAD 侧模板字节数也变了（soe 569169 → 553422）⇒ 是别的 lane 在动工作树。
+
+已提交进 index 的 5 个文件毫发无损，丢的恰好是**只在工作树里的那 3 个**。
+两项均可复现（改动重打一遍 + 重跑两个脚本），重跑后 82 / 61 处变更逐值一致。
+
+教训：**在共享分支上做「生成物落盘」类改动，产出一批就立刻提交**，不要攒到一轮结束；
+以及**`git status` 报某路径干净时，先怀疑「是不是被别人revert了」而不是「我是不是没改」**。
+
+| # | 教训 |
+|---|---|
+| T34 | 🔴 **「脚本 --check 绿」≠「写出的数据结构正确」** —— 判据只看它自己声明的那几项。新建节/新建行这类**结构性写入**，必须额外校验通用不变量（悬空外键 / 排序序列连续 / 与同级节字段约定一致），这些通常不在任何单个 spec 的判据里 |
+| T35 | **写死 slug 是复发源** —— 本会话恰好亲历 slug 漂移（并发 lane 改写模板），写死的 `chapter-08-...` 当场变悬空。凡引用另一条记录的标识，一律**现场解析 + 找不到就硬失败** |
+| T36 | 🔴 **共享分支上未提交的工作树改动会被并发 lane 清掉** —— index 里的活下来了，只在工作树的全丢。产出一批立刻提交；`git status` 说干净先查 `reflog` 是否 HEAD 变动，别以为是自己没改 |
+| T37 | **幂等必须含「自愈」** —— 「已存在就 return」会把上一版写出的错值永久固化。幂等的正确含义是「收敛到目标态」，不是「不重复动作」 |
