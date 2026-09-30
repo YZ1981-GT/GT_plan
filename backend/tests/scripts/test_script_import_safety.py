@@ -12,9 +12,23 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="repla
 `F2_E2E_WP_CODES`；权威源后来加了 `F2-29`，手抄那份没跟 ⇒ 恒红。
 根因修复 = 把控制台重绑移进 `main()`，同时立本守卫防复发。
 
-分母如实声明（现算）：`backend/tests/**` 里被 import 的 `scripts.*` 模块 33 个，
-`backend/scripts/**` 里模块级重绑 stdout/stderr 的脚本 10 个，两者交集当前为 **0**。
-交集为零不等于判据没用——它守的正是"把某个 CLI 脚本拿来 import"这一步。
+🔴 2026-09-30 补盲区（原判据漏掉了唯一真实的违例）：本文件原先只按**点号形态**
+（`from scripts.x import` / `import scripts.x`）找"被测试 import 的脚本"，据此宣称
+"两者交集当前为 **0**"。实际交集不是 0 —— `tests/test_wp_template_index_lifecycle.py`
+用**路径式动态加载**取脚本：
+
+```python
+spec = importlib.util.spec_from_file_location("...", BACKEND_ROOT / "scripts" / "ops" / "setup_wp_templates_dir.py")
+```
+
+点号正则看不见它，于是 `scripts/ops/setup_wp_templates_dir.py` 的模块级重绑一直在
+判据视野之外。后果与立此判据时一模一样：那个测试文件的 7 个用例**从来没真正跑过**
+（现象是 `EEEEEFF` 后崩在 `_pytest/capture.py`，不是失败）。
+
+⇒ 本次把扫描口径扩成「点号 ∪ 路径式」，并为 `setup_wp_templates_dir` 补一条与
+`seed_fix_projects` 同形的正面回归。**「交集为 0」这句话本身就是盲区的产物** ——
+所以下面额外加了一条判据，要求路径式识别器在本仓至少命中 1 个真实站点，
+免得口径再次悄悄失效。
 """
 from __future__ import annotations
 
@@ -29,6 +43,13 @@ _SCRIPTS = _BACKEND / "scripts"
 _TESTS = _BACKEND / "tests"
 
 _IMPORT_RE = re.compile(r"(?:from|import)\s+(scripts(?:\.[\w.]+)?)")
+
+#: 路径式动态加载：`"scripts" / "ops" / "setup_wp_templates_dir.py"` 这类由目录片段
+#: 拼出来的脚本路径。取其**文件名主干**（脚本名），与磁盘脚本按 stem 匹配。
+#: 不写成「解析整条 Path 表达式」——那要跑常量折叠，且各处基准目录变量名不一样
+#: （`BACKEND_ROOT` / `_BACKEND` / `REPO`）；按 stem 匹配足够且不会漏。
+_PATH_LOAD_RE = re.compile(r'"scripts"\s*(?:/\s*"[\w.\-]+"\s*)+')
+_PY_STEM_RE = re.compile(r'"([\w\-]+)\.py"')
 
 
 def _module_level_stdout_rebinds(source: str) -> list[int]:
@@ -69,6 +90,16 @@ def _modules_imported_by_tests() -> set[str]:
     return found
 
 
+def _script_stems_path_loaded_by_tests() -> set[str]:
+    """被测试**按路径**动态加载的脚本文件名主干集合（点号正则看不见的那一类）。"""
+    found: set[str] = set()
+    for path in _TESTS.rglob("test_*.py"):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for frag in _PATH_LOAD_RE.findall(text):
+            found.update(_PY_STEM_RE.findall(frag))
+    return found
+
+
 def _dotted(path: Path) -> str:
     rel = path.relative_to(_SCRIPTS).with_suffix("")
     return "scripts." + rel.as_posix().replace("/", ".")
@@ -87,13 +118,29 @@ def test_tests_actually_import_some_scripts_modules():
         assert anchor in imported, f"{anchor} 未被识别 —— import 扫描口径失效"
 
 
+def test_path_based_script_loading_is_detected():
+    """结构性零守卫（针对新补的路径式口径）：它必须真的在本仓命中站点。
+
+    🔴 这条是为了防「口径再次悄悄失效」而立：原判据的点号正则对
+    `spec_from_file_location(... "scripts" / "ops" / "xxx.py")` 恒不命中，
+    于是「零违规」其实是「没看见」。若将来有人改动测试写法使本识别器归零，
+    这里会打红，逼着更新识别器而不是静默失去覆盖。
+    """
+    stems = _script_stems_path_loaded_by_tests()
+    assert "setup_wp_templates_dir" in stems, (
+        "路径式加载识别器抓不到 test_wp_template_index_lifecycle.py 里的 "
+        f"setup_wp_templates_dir（现命中 {sorted(stems)}）⇒ 口径失效"
+    )
+
+
 def test_no_test_imported_script_rebinds_stdout_at_module_level():
     imported = _modules_imported_by_tests()
+    path_loaded_stems = _script_stems_path_loaded_by_tests()
     offenders: list[str] = []
     scanned = 0
     for path in sorted(_SCRIPTS.rglob("*.py")):
         dotted = _dotted(path)
-        if dotted not in imported:
+        if dotted not in imported and path.stem not in path_loaded_stems:
             continue
         scanned += 1
         try:
@@ -127,6 +174,50 @@ def test_seed_fix_projects_is_import_safe_and_exposes_constants():
     # 重绑逻辑必须仍然存在（只是搬进函数）——否则 CLI 在 GBK 终端会乱码
     assert "_force_utf8_console" in source
     assert "sys.stdout = io.TextIOWrapper" in source
+
+
+def _calls_inside(source: str, func_name: str) -> set[str]:
+    """`func_name` 函数体内**实际调用**的名字集合（AST，不看注释/docstring）。"""
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == func_name:
+            return {
+                sub.func.id
+                for sub in ast.walk(node)
+                if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Name)
+            }
+    return set()
+
+
+def test_setup_wp_templates_dir_is_import_safe_and_still_forces_utf8():
+    """回归：`setup_wp_templates_dir.py` 被路径式加载，重绑必须在函数里**且真被调用**。
+
+    🔴 2026-09-30 根因修复的正面判据。它原先在模块级重绑 `sys.stdout`，而
+    `tests/test_wp_template_index_lifecycle.py` 在**模块导入期**按路径加载它
+    ⇒ pytest capture 被换掉、会话 teardown 崩 ⇒ 那 7 个用例从来没跑过。
+
+    🔴 「搬进函数」有个配套陷阱：搬完**忘了在 `main()` 里调**。那样 import 安全了，
+    但 CLI 在 GBK 终端重新乱码，且没有任何判据会红 —— 我本轮就先犯了一次。
+    所以这里用 **AST** 断言 `main()` 体内真的有 `_force_utf8_console()` 调用
+    （文本匹配会被 docstring 里提到函数名骗过去）。
+    """
+    source = (_SCRIPTS / "ops" / "setup_wp_templates_dir.py").read_text(encoding="utf-8")
+    assert _module_level_stdout_rebinds(source) == [], "模块级重绑又回来了"
+    assert "sys.stdout = io.TextIOWrapper" in source, (
+        "重绑逻辑被整段删掉 ⇒ CLI 在 GBK 终端会乱码"
+    )
+    assert "_force_utf8_console" in _calls_inside(source, "main"), (
+        "`_force_utf8_console` 定义了但 `main()` 没调用 ⇒ CLI 丢 UTF-8 输出"
+    )
+
+
+def test_seed_fix_projects_also_calls_its_console_helper():
+    """同款反向锚点：2026-09-28 那次搬迁也必须真的在 `main()` 里调。
+
+    两条一起立，`_calls_inside` 就有两个真实正样本 —— 免得它某天因 AST 口径变化
+    恒返回空集而两条判据一起假绿。
+    """
+    source = (_SCRIPTS / "e2e" / "seed_fix_projects.py").read_text(encoding="utf-8")
+    assert "_force_utf8_console" in _calls_inside(source, "main")
 
 
 @pytest.mark.parametrize(

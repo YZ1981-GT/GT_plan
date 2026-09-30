@@ -12,7 +12,30 @@ import shutil
 import sys
 from pathlib import Path
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+def _force_utf8_console() -> None:
+    """Windows 控制台按 UTF-8 输出（CLI 专用）。
+
+    🔴 2026-09-30 修：这段原先在**模块级**执行，与 `scripts/e2e/seed_fix_projects.py`
+    2026-09-28 修掉的是同一个缺陷 —— 它把 `sys.stdout` 换成一个**接管了
+    `sys.stdout.buffer` 所有权**的新 `TextIOWrapper`，该 wrapper 被回收时会关掉底层
+    buffer。于是 import 本模块的 pytest 进程在 teardown `readouterr()` 时撞
+    `ValueError: I/O operation on closed file`，**整个测试会话崩在收尾**，
+    报错位置还在 `_pytest/capture.py`，完全看不出是哪个模块干的。
+
+    实测后果：`tests/test_wp_template_index_lifecycle.py` 经
+    `importlib.util.spec_from_file_location` 在**模块导入期**加载本文件，于是该测试
+    文件的 7 个用例**从来没有真正跑过**（现象是 `EEEEEFF` + 崩溃，不是失败）。
+    守卫 `tests/scripts/test_script_import_safety.py` 本该拦住这类事，但它按
+    `from scripts.x import` 的**点号形态**正则找被 import 的脚本，识别不到
+    路径式动态加载 ⇒ 本文件一直在它的视野之外（该盲区已随本次修复补上）。
+
+    搬进函数后 CLI 行为不变：唯一入口是 `main()`，重绑之前没有任何输出。
+    """
+    if sys.platform == "win32":
+        sys.stdout = io.TextIOWrapper(
+            sys.stdout.buffer, encoding="utf-8", errors="replace"
+        )
+
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 SOURCE_BASE = REPO_ROOT / "致同通用审计程序及底稿模板（2025年修订）" / "1.致同审计程序及底稿模板（2025年）"
@@ -40,6 +63,7 @@ def parse_wp_code(filename: str) -> str:
 
 
 def main():
+    _force_utf8_console()   # 必须在第一次 print 之前；守卫 test_script_import_safety 钉住这一行
     print("=" * 60)
     print("设置底稿模板目录: backend/wp_templates/")
     print("=" * 60)

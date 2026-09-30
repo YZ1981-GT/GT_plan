@@ -60,14 +60,46 @@ def test_the_defect_being_fixed_primary_template_is_only_a_subset() -> None:
     assert "境外销售收入检查D4-26" not in names
 
 
-def test_the_defect_being_fixed_unsanitized_twin_carries_external_links() -> None:
-    """D4 目录有净化前后两份整册本；未净化那份带外部引用，不能给 OO 开。"""
-    unsanitized = _require(_TEMPLATES / "D" / "D4收入底稿.xlsx")
-    sanitized = _require(_TEMPLATES / "D" / "D4 收入底稿.xlsx")
-    assert _has_external_references(unsanitized) is True
+def test_the_unsanitized_d4_twin_is_gone() -> None:
+    """未净化的 ``D4收入底稿.xlsx`` 已从模板库删除，只留已净化那份。
+
+    🔴 2026-09-30 判据改写（D4 重复文件删除）。原判据
+    ``test_the_defect_being_fixed_unsanitized_twin_carries_external_links``
+    断言「D4 目录有净化前后两份」，用户核实两者是同一份底稿的重复入库后删掉了
+    未净化那份 ⇒ 原判据的前提不存在了。
+
+    🔴 更要紧的是：原判据用 ``_require()``，而它在文件缺失时 **pytest.skip** ——
+    删文件后这条不是打红而是**静默跳过**，等于判据凭空消失。改为显式断言
+    「不该在的不在、该在的在」。
+    """
+    unsanitized = _TEMPLATES / "D" / "D4收入底稿.xlsx"
+    sanitized = _TEMPLATES / "D" / "D4 收入底稿.xlsx"
+    assert not unsanitized.exists(), (
+        f"未净化的 D4 整册重复本又出现了：{unsanitized}（352,950 B，36 个 "
+        "externalLink 部件）。它与已净化那份 sheet 名序列逐字相同，只差净化，"
+        "两份并存会让「D4 整册是哪一份」重新产生歧义"
+    )
+    assert sanitized.is_file(), f"已净化的 D4 整册本缺失：{sanitized}"
     assert _has_external_references(sanitized) is False
-    # 两份 sheet 名序列相同 ⇒ 差别只在净化，不在内容范围
-    assert _sheets(unsanitized) == _sheets(sanitized)
+    assert len(_sheets(sanitized)) == 46
+
+
+def test_external_reference_probe_is_not_vacuous() -> None:
+    """反向断言：``_has_external_references`` 必须能对真·带外链的册子返回 True。
+
+    🔴 没有这一条，上面与下面所有 ``is False`` 的断言都可能是「探针恒 False」
+    的假绿 —— 而唯一那个已知为 True 的样本（未净化的 D4 双胞胎）刚被删掉了。
+    改用库内**其它**未净化模板当正样本（现算 158 份带 externalLink 部件）。
+    """
+    positives = [
+        p
+        for p in sorted(_TEMPLATES.rglob("*.xlsx"))
+        if not p.name.startswith("~$") and _has_external_references(p)
+    ]
+    assert positives, (
+        "模板库里一份带外部引用的 xlsx 都没有 ⇒ _has_external_references 的 True "
+        "分支无真实样本，所有 `is False` 断言都可能是恒真空转"
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -84,12 +116,28 @@ def test_d4_whole_tab_resolves_to_the_merged_workbook() -> None:
     assert _has_external_references(picked) is False
 
 
-def test_sanitized_candidate_wins_over_unsanitized() -> None:
-    """候选里同时有净化前后两份时，必须选净化那份（否则一打开就是刷新提示 + #REF!）。"""
+def test_whole_workbook_candidates_are_all_sanitized() -> None:
+    """D4 整册候选全部已净化，且解析结果就在候选里。
+
+    🔴 2026-09-30 判据改写（D4 重复文件删除）。原判据
+    ``test_sanitized_candidate_wins_over_unsanitized`` 要求候选 ``>= 2`` 且其中
+    至少一个未净化，据此验证「有两份时选净化那份」。删掉未净化的重复本后 D4 只剩
+    **1** 个候选，原判据必然打红（它自己的断言消息写的就是「判据会空转」）。
+
+    「选净化那份」这条排序语义**并未删除**，只是 D4 这个域里再没有可用样本了 ——
+    它现在由两处承担：本条断言「候选里没有未净化的」（不变式方向），
+    ``test_external_reference_probe_is_not_vacuous`` 断言探针对真·带外链册子为 True
+    （防恒假）。若将来又有人往库里放未净化重复本，本条立刻打红。
+    """
     candidates = finder.find_whole_workbook_templates("D4")
-    assert len(candidates) >= 2, f"D4 整册候选只有 {[c.name for c in candidates]}，判据会空转"
-    assert any(_has_external_references(c) for c in candidates), "没有未净化候选 ⇒ 判据空转"
+    assert candidates, "D4 一个整册候选都没解析到 —— 判据会空转"
+    unsanitized = [c.name for c in candidates if _has_external_references(c)]
+    assert not unsanitized, (
+        f"D4 整册候选里有未净化的册子 {unsanitized} —— 给 OnlyOffice 打开会是"
+        "「是否更新链接」提示 + #REF!"
+    )
     picked = _require(_resolve_whole_workbook_template("D4"))
+    assert picked in candidates
     assert _has_external_references(picked) is False
 
 

@@ -39,9 +39,42 @@ _REPO = Path(__file__).resolve().parents[2]
 _TEMPLATES = _REPO / "backend" / "wp_templates"
 _SNAPSHOT = Path(__file__).resolve().parent / "_snapshots" / "wp_templates_baseline.json"
 
-#: 2026-08-12 实测基线（迁移后）—— 这三个数与快照双向锁死
+#: 实测基线 —— 这两个数与快照双向锁死。
+#:
+#: 🔴 2026-09-30 重算（D4 重复本删除 + 补齐早已提交但从未回填的净化改动）。
+#: 上一版常量写的是 `50_343_134`，而当时快照文件逐份加总只有 `50_325_282`
+#: —— **常量与快照本就互相矛盾 17,852 B**，两条断言分别对着两个不同的事实，
+#: 谁都说不清哪个是真的。本次两者一起重算，逐份归因如下（合计 −902,367 B）：
+#:
+#:   + `D/D4 收入底稿.xlsx`      199,176 B  基线之后才入库（`d3b3d80d9` 2026-09-14）
+#:   - `D/D4收入底稿.xlsx`      −352,950 B  与上面那份是同一底稿的重复入库，
+#:                                          **本次删除**（未净化，36 个 externalLink 部件）
+#:   ~ `D/D3 预收账款.xlsx`      −58,714 B  ┐
+#:   ~ `D/D5 应收款项融资.xlsx`  −59,476 B  │ 净化（去外部链接）后**早已提交**，
+#:   ~ `D/D6 合同资产.xlsx`     −296,101 B  │ 只是基线一直没回填：
+#:   ~ `D/D7 合同负债.xlsx`     −290,774 B  │ D 循环 `1a0b55651`（2026-09-12）
+#:   ~ `L/L5 长期应付款.xlsx`    −25,740 B  │ L 循环 `3036967ea`（2026-09-27）
+#:   ~ `L/L6 专项应付款.xlsx`    −17,788 B  ┘ 现算六份 externalLink 部件均为 0
+#:
+#: 数量不变（删 1 份、基线补记 1 份）。
 EXPECTED_XLSX_COUNT = 351
-EXPECTED_TOTAL_BYTES = 50_343_134
+EXPECTED_TOTAL_BYTES = 49_422_915
+
+#: 允许与基线不符的**未提交工作树改动**（不是永久豁免）。
+#:
+#: 基线描述的是**已提交状态**；别条 lane 在工作树里改了模板但还没提交时，本守卫会把
+#: 那份差异报成「内容被改」。直接豁免文件名等于开后门，所以每条都必须**可伪证**：
+#: `test_worktree_drift_allowlist_entries_are_really_uncommitted` 会去查 `git status`，
+#: 一旦该 lane 提交了（或撤销了）改动，条目立刻失效并打红，逼着回来重算基线。
+#:
+#: `M/M10 其他权益工具.xlsx`：M 循环 lane 的 openpyxl 往返改写（139,234 → 115,677 B）。
+#: 实测它**丢部件**——`xl/printerSettings/*.bin`（11 个）、`xl/calcChain.xml`、
+#: `xl/sharedStrings.xml`、8 个 worksheet `_rels`；comments 从 `xl/comments1.xml`
+#: 迁到 `xl/comments/comment1.xml`、`vmlDrawing` 迁到 `commentsDrawing`。
+#: 属有损改写，**本轮不代它提交**、也不把它固化进基线。
+WORKTREE_DRIFT_ALLOWLIST: dict[str, str] = {
+    "M/M10 其他权益工具.xlsx": "M 循环 lane 未提交的 openpyxl 往返改写（丢 printerSettings/calcChain）",
+}
 
 
 def _sha256(path: Path) -> str:
@@ -73,9 +106,64 @@ def current() -> dict[str, dict[str, object]]:
     return _snapshot()
 
 
+def _uncommitted_template_paths() -> set[str]:
+    """`wp_templates/` 下**未提交**（工作树或暂存区与 HEAD 不同）的模板相对路径。"""
+    import subprocess
+
+    out = subprocess.run(
+        ["git", "status", "--porcelain", "--", "backend/wp_templates"],
+        cwd=str(_REPO), capture_output=True,
+    ).stdout.decode("utf-8", "replace")
+    paths: set[str] = set()
+    for line in out.splitlines():
+        if len(line) < 4:
+            continue
+        p = line[3:].strip().strip('"')
+        # 重命名形如 `old -> new`，取新名
+        if " -> " in p:
+            p = p.split(" -> ", 1)[1]
+        prefix = "backend/wp_templates/"
+        if p.startswith(prefix):
+            paths.add(p[len(prefix):])
+    return paths
+
+
+def test_worktree_drift_allowlist_entries_are_really_uncommitted() -> None:
+    """🔴 白名单必须可伪证：每条都得**真的**是未提交改动，否则条目失效即打红。
+
+    没有这一条，白名单就是「写上名字就变绿」的后门 —— 别的 lane 一提交（或撤销），
+    基线与磁盘就重新自洽，而那条豁免会继续静默吞掉此后**任何**对该文件的改动。
+    """
+    if not WORKTREE_DRIFT_ALLOWLIST:
+        pytest.skip("白名单为空 —— 无条目需要核验（这是期望的终态）")
+    uncommitted = _uncommitted_template_paths()
+    stale = sorted(set(WORKTREE_DRIFT_ALLOWLIST) - uncommitted)
+    assert not stale, (
+        f"白名单里这些条目已经不是未提交改动了：{stale}\n"
+        "→ 对应 lane 已提交或已撤销 ⇒ 请从 WORKTREE_DRIFT_ALLOWLIST 删掉该条，"
+        "并重算 EXPECTED_TOTAL_BYTES 与快照基线（提交了就该进基线）"
+    )
+
+
 def test_template_count_and_size_match_baseline(current) -> None:  # noqa: ANN001
-    """文件数与总字节钉死 —— 改基线文件时这条会一起打红。"""
+    """文件数与总字节钉死 —— 改基线文件时这条会一起打红。
+
+    总字节按**提交态**比对：白名单里的未提交改动按其 HEAD 字节折算回去，
+    否则别 lane 的在途改写会让这条常年红（而常年红等于没有门）。
+    """
+    import subprocess
+
     total = sum(int(v["size"]) for v in current.values())
+    for rel in WORKTREE_DRIFT_ALLOWLIST:
+        path = _TEMPLATES / rel
+        if not path.is_file():
+            continue
+        head = subprocess.run(
+            ["git", "show", f"HEAD:backend/wp_templates/{rel}"],
+            cwd=str(_REPO), capture_output=True,
+        )
+        if head.returncode == 0:
+            total += len(head.stdout) - path.stat().st_size
     assert len(current) == EXPECTED_XLSX_COUNT, (
         f"模板库 xlsx 数量从 {EXPECTED_XLSX_COUNT} 变成 {len(current)}\n"
         "→ 新增/删除模板属有意变更时，请同时更新 EXPECTED_XLSX_COUNT 与快照基线，"
@@ -116,6 +204,8 @@ def test_snapshot_matches_baseline(current) -> None:  # noqa: ANN001
         rel
         for rel in set(current) & set(baseline)
         if current[rel]["sha256"] != baseline[rel]["sha256"]
+        # 白名单条目的「真的没提交」由上面那条独立断言看守，这里只做减法
+        and rel not in WORKTREE_DRIFT_ALLOWLIST
     )
 
     problems: list[str] = []

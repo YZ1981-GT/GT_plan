@@ -620,8 +620,12 @@
   "size": 357051
  },
  "D/D3 预收账款.xlsx": {
-  "sha256": "8a27614bd761c1a8a2d3c6bb2a6f1264138881f86bfd59a99309207cf8d1e5ae",
-  "size": 133116
+  "sha256": "699a9be0e7da639f3e5cd3a2d3bfdf38f7e777b330f9ec6959f5cc390fb6c2d2",
+  "size": 74402
+ },
+ "D/D4 收入底稿.xlsx": {
+  "sha256": "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f",
+  "size": 199176
  },
  "D/D4-12 营业收入-合同检查（Leap-常规程序）.xlsx": {
   "sha256": "9189b3a9dfcf9535a39cdf7ad33d2d4d332dcc590ac22174697e01ff096ca136",
@@ -655,21 +659,17 @@
   "sha256": "ff279a8b06691ac1ebc33be13f7387987dc6afc79e64a5daccebf424c8983158",
   "size": 49772
  },
- "D/D4收入底稿.xlsx": {
-  "sha256": "ecac5d56775e10b0285a0b82b5541037bfeada4513f9a09c0d8a74a6c9d2a155",
-  "size": 352950
- },
  "D/D5 应收款项融资.xlsx": {
-  "sha256": "53cd7518f45072b405e0c96cf5508749299db0b90e94b77a2c20dbcc9a25f70e",
-  "size": 113287
+  "sha256": "92c5f7f2d2d54340c29bef6094b24a9360edcfa730fcfd406aeb071d4d138ac4",
+  "size": 53811
  },
  "D/D6 合同资产.xlsx": {
-  "sha256": "591d4c682a420820e80d6597c75dc0ddf6a82b4f3bce184ebc76fd4cbef7f996",
-  "size": 421708
+  "sha256": "88125e42d79d72813c5d460be2d925adb623d85f881a177dcb4eb7c9ec1e218c",
+  "size": 125607
  },
  "D/D7 合同负债.xlsx": {
-  "sha256": "d522ac9fc60d12fb665335f4df9518cc4edf4886bb4c3b46819e08a177e221df",
-  "size": 379551
+  "sha256": "0facd3fe2297dbf72804d513d54ca08c55d6a26a41bf1d5c59fc3d7ea1c76a9a",
+  "size": 88777
  },
  "E/E0 货币资金 - 函证（Leap应对措施-函证）.xlsx": {
   "sha256": "9073e46f0761f87d7744d11193126a94d73d7840c1755a96e701a247e3f0b738",
@@ -972,12 +972,12 @@
   "size": 122085
  },
  "L/L5 长期应付款.xlsx": {
-  "sha256": "c8506f391262bf10fa818df22b9ddfe53ddc2ebe4d280af48776e39f8c8ac497",
-  "size": 93254
+  "sha256": "09380626107dc1b975662eaa60fa99ec541901c0729bb0d2b35bbb60807a9b68",
+  "size": 67514
  },
  "L/L6 专项应付款.xlsx": {
-  "sha256": "cf05ed3b9fa0afd6a05b73de5c79b7ee14a85b6c6f4a04e57ae2f09170d7b5d4",
-  "size": 55523
+  "sha256": "08630e1cbc962fabbbf580f591374157a2d6705966c2f3c8ecba4a0705f59f62",
+  "size": 37735
  },
  "L/L7 其他非流动负债.xlsx": {
   "sha256": "9fe09748148a6f0692eef85e0c0cf3e24f22ea7e5d011c029dfa3e71bb04daea",

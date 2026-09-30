@@ -49,9 +49,17 @@ def test_wp_code_prefix_no_collision() -> None:
 
 
 def test_whole_excel_d4_income_pack() -> None:
+    """D4 整册本解析到**带空格**的已净化那份。
+
+    🔴 2026-09-30（D4 重复文件删除）：D 目录曾并存两份只差一个空格的整册本 ——
+    ``D4收入底稿.xlsx``（352,950 B，带 36 个 externalLink 部件，未净化）与
+    ``D4 收入底稿.xlsx``（199,176 B，已净化）。用户核实是同一份底稿的重复入库，
+    **删掉了未净化的不带空格那份**。本判据原先断言解析结果是不带空格那份，
+    删文件后必然打红；现改为断言留下来的那份。
+    """
     path = finder.find_whole_workbook_template("D4")
     assert path is not None
-    assert path.name == "D4收入底稿.xlsx"
+    assert path.name == "D4 收入底稿.xlsx"
     assert finder._is_whole_excel_template_name(path.name)
     assert not finder._is_whole_excel_template_name(
         "D4-1至D4-4 营业收入 - 审定表明细表.xlsx"

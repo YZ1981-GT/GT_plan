@@ -136,11 +136,14 @@ INDEX_SIZE_DRIFTED_FILES = frozenset(INDEX_DRIFT_LEDGER)
 #: 反向断言会在它们提交/回滚后点名要求移除本登记。
 KNOWN_DIRTY_AUTHORITATIVE_PATHS = frozenset(
     {
-        # 别的 lane（D4 收入底稿系列）在工作树里删掉了这份模板，尚未提交。
-        # 本 spec 不代它提交、也不恢复它。
-        "backend/wp_templates/D/D4收入底稿.xlsx",
         # 别的 lane（M 循环）在工作树里改了这份模板，尚未提交。
         # 它同时是 `INDEX_DRIFT_LEDGER` 里唯一 `nature="worktree"` 的那一条。
         "backend/wp_templates/M/M10 其他权益工具.xlsx",
+        #
+        # 🔴 2026-09-30 移除 `backend/wp_templates/D/D4收入底稿.xlsx`：
+        #    那份未提交的删除**已经提交**（D4 重复本清理 —— 它与
+        #    `D/D4 收入底稿.xlsx` 是同一底稿的重复入库，352,950 B 未净化那份删掉，
+        #    留 199,176 B 已净化那份）。登记表的反向断言 `stale` 本就会点名要求
+        #    移除失效条目，这里按它的要求删。
     }
 )
