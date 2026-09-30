@@ -4905,3 +4905,101 @@ vs 收紧默认依赖，涉及性能与角色模型），不由单轮修复决�
 | T19 | **规模超出单轮能力时冻结棘轮而非硬修** —— 记录现算基线 + 断言「不得增加」+ 断言「基线不得虚高」，既阻止恶化又不阻塞交付 |
 | T20 | **权限收紧必须同步前端** —— 否则按钮可见但必 403。且两侧角色集合要有守卫钉死，防单侧漂移 |
 | T21 | 取代码段的两个高频坑：`split(anchor)[0]` 取的是 anchor **之前**的内容（要 `[1]`）；含嵌套括号时 `split(")")` 会提前截断（要**括号配平**）。本轮各踩一次，都是守卫自己抓出来的 |
+
+---
+
+## 2026-09-30 无主欠账清理三连（模板库去重 / 索引生命周期 / 附注 report_row_code 纠错）
+
+三个 commit，都不属任何 active spec —— 是「测试已入库、实现或数据从未跟上」的存量欠账。
+分支 `work/2026-09-28-voucher-sampling-account-scope`。
+
+| commit | 内容 |
+|---|---|
+| `54e431fc3` | 删 D4 整册重复本（352,950 B 未净化那份）+ 把仍以它为权威的 6 处记录逐处改正 |
+| `ba30b6940` | 补齐 `_index.json` 生命周期实现，`test_wp_template_index_lifecycle.py` 7 条从未跑过的判据转绿 |
+| （本轮） | 附注模板 129 行 `report_row_code` 纠错 + 裁决表 + allowlist 可伪证化 |
+
+### 一、模板库 D4 重复本
+
+`D4收入底稿.xlsx`（无空格 352,950 B，36 个 externalLink 部件）与 `D4 收入底稿.xlsx`
+（带空格 199,176 B，已净化）sheet 名序列逐字相同，是同一底稿重复入库。按用户裁定删未净化那份。
+
+`EXPECTED_TOTAL_BYTES` 与快照文件**本就互相矛盾 17,852 B**（常量 50,343,134 / 快照逐份加总
+50,325,282），两条断言各自对着一个不同的事实。重算后 −902,367 B 逐份归因：D4 去重 −153,774
+＋ D3/D5/D6/D7/L5/L6 净化 −748,593（后者在 `1a0b55651` / `3036967ea` **早已提交**，只是基线
+一直没回填）。新增 `WORKTREE_DRIFT_ALLOWLIST` + 可伪证判据（查 `git status`，条目一旦不再是
+未提交改动就打红），M10 那份别 lane 的 openpyxl 有损往返改写**不代提交也不固化进基线**。
+
+### 二、`_index.json` 生命周期
+
+`test_wp_template_index_lifecycle.py`（`d3b3d80d9` 2026-09-14 入库）断言的
+`SPECIAL_ENTRY_ROLES` / `render_index` / `build_index` / `validate_index` / `main(argv)`
+在 `setup_wp_templates_dir.py` 里**从来不存在**（该文件 152 行、顶层函数只有 3 个，
+最后一次改动 `3979f46cc` 2026-05-29）—— 测试先于实现入库、实现一直没来。
+
+🔴 补实现顺带修掉一个**会静默毁掉运行时权威**的缺陷：原 `main()` 只有一个模式（从致同源目录
+拷文件），且**只为「本次真的拷过去的文件」追加索引条目**，最后无条件覆盖写 `_index.json`。
+第二次运行时所有文件都命中 `if target_path.exists(): skipped; continue` ⇒ 条目为空 ⇒ 把 476 条
+索引**整体写成 0 条**。这正是 `generated-artifact-drift.md` 里那句「**绝不能跑**」的由来；
+现在默认只检查不落盘，拷贝要显式 `--sync-from-source`。
+
+实现按仓库**已有**的变异驱动 `mutate_wp_template_index_lifecycle_guards.py` 的锚点写
+（`unexpected = set(disk) - set(indexed)` / `remaining_by_stem` + `_stem_identity` /
+`_is_bundle_entry` / `fingerprint = hashlib.sha256(raw).hexdigest()`），锚点 4/4、变异 4/4 KILLED
+—— 不是另起一套再去改驱动（那等于把验证工具改成迁就实现）。
+
+### 三、附注 `report_row_code`：118 行陈旧 + 8 处确定错绑定
+
+`remap_note_report_row_codes.py --apply` 先修 118 行陈旧编号（95 listed + 23 soe）。
+随后逐条对照候选集，发现**更严重的一类**：
+
+🔴 原实现对「标签映射到多个编号」一律判 `ambiguous` 并原样保留，却**从不检查现绑定是否在
+候选集里**。实测两份模板全部待人工条目：**8 条现绑定连候选都不是**，而「候选内的真歧义」**0 条**：
+
+| 章节 | 标签 | 原绑定（实际含义） | 纠为 |
+|---|---|---|---|
+| listed 三、… | 资本公积 | BS-052 = 一年内到期的非流动负债 | BS-083 |
+| soe 八、18 | 其他综合收益 | BS-053 = 其他流动负债 | BS-085 |
+| soe 八、53 | 长期应付款 | BS-044 = 应付票据 | BS-064 |
+| soe 八、81 / 91 / 92 | 短期借款 | BS-031 = 使用权资产 | BS-041 |
+| soe 八、91 | 其他应付款 | BS-037 = 其他非流动资产 | BS-050 |
+| soe 八、93 | 存货 | BS-008 = 预付款项 | BS-010 |
+
+其中 5 条**登记在 allowlist 里**，理由写着「ambiguous：BS-041/BS-055 两码同名『短期借款』」
+—— 这句话描述的是**标签**的歧义，是真的；但键里那个 `BS-031` 根本不在那两个候选里。
+守卫看到「有理由、已登记」就放过，于是一个把「短期借款」绑到「使用权资产」的错绑定被合法化了
+半年。`soe 八、93 存货` 还是**回归**：restricted-assets spec 当年已按公式实证选过 BS-010。
+
+裁决依据是结构性的、可复核：`report_config` 同名两码中，行号小且落在本段语义位置内的是主表行；
+行号大的那个一律位于某个 `is_total_row` 合计行**之后**、与 `△`/`▲` 金融企业专用行相邻，属扩展块。
+
+修法：`AMBIGUOUS_ADJUDICATION` 裁决表（逐条带结构证据）＋ `ambiguous` 拆成
+`ambiguous`（现绑定在候选集内，安全）/ `foreign`（不在候选集内 ⇒ 确定错），`--check` 对 `foreign`
+也失败。共 129 行改写（96 listed + 33 soe），改后每条绑定的目标行名与标签一致。
+
+防复发：新增 `test_allowlist_codes_are_real_candidates` —— 每条 ambiguous 型 allowlist 条目的编号
+**必须在候选集内**，把「有理由就放过」换成可伪证断言；`test_adjudication_table_targets_are_valid_candidates`
+防裁错码。另把既有反向自检 `test_resolve_doc_ambiguous_and_not_found_unchanged` 拆成三分类
+—— 🔴 **那个自检自己就在为混淆背书**：它的 fixture「多义行」现绑定 `BS-999` 不在候选集
+`['BS-001','BS-002']` 内（即 `foreign` 样本），却断言成 `ambiguous`。真实数据里 8 条错绑定
+能藏半年，与这里的口径是同一个根。变异 4/4 打红（allowlist 塞非候选 / `foreign` 退回
+`ambiguous` / 数据改回错码 / 错码＋清空裁决表）。
+
+### 教训
+
+| # | 教训 |
+|---|---|
+| T22 | 🔴 **allowlist 的理由句必须是对"那个具体值"的断言，不能是对"这类情形"的描述** —— 「两码同名」是真的，但它不证明你登记的那个码是对的。可伪证化的做法：断言登记值 ∈ 候选集，而不是要求写一段话 |
+| T23 | 🔴 **反向自检的 fixture 也要按新口径重审** —— 本轮那 8 条错绑定之所以能长期不被发现，是因为「反向自检」用的样本本身就是错绑定形态却被断言成安全态。加强分类时，先看既有自检的 fixture 落在新分类的哪一格 |
+| T24 | **`--dry-run` 必须真的不写盘** —— `fix_note_m_equity_structure.py` 的 `--dry-run` 会执行 `_ensure_soe_m8_section()` 真写文件（它只在 `--check` 下跳过）。我按「干跑安全」的预期跑了一次，模板就被改了 |
+| T25 | **大批红先做 HEAD 基线再下结论** —— note 套件 109 文件 679 红看着像灾难，取 10 文件对照得 HEAD 147 红 / 改后 141 红（修 6 破 0），绝大多数是预存模板结构欠账 |
+| T26 | **改动前先查文件归属** —— `errata.md`（记着这 9 条红的台账）与 `pure-static` spec 目录整体是 `??` 未跟踪 = 别 lane 在写，不能代改；完成记录改落 `dev-history.md`（clean、且是指定的 append-only 归档处） |
+
+### 本轮**未**做（需决策，非遗漏）
+
+* **soe 附注缺整章「母公司财务报表的主要项目附注」** —— soe 模板 14 个 level-1 章节里没有它，
+  致 `test_variant_matrix.py` 6 条 fixture 直接 error。建整章＋其 level-2 子节属审计内容，不能凭空编。
+* **`fix_note_m_equity_structure.py --check` 现算 93 项欠账**（11 个 M 循环章节的
+  headers/columns/rows/guidance 未对齐，含 soe `八、94 一般风险准备` 整章缺失）。那是 M 循环
+  spec 的工作面，且一次改写两份运行时权威模板的 11 个章节，blast radius 需拍板。
+* `test_x3_column_alignment` / `test_note_text_hygiene` 等其余预存红同属上述模板结构欠账。
