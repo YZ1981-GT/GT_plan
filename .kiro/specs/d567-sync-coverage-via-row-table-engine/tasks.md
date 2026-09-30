@@ -2,7 +2,39 @@
 
 ## Overview
 
-**spec**：`d567-sync-coverage-via-row-table-engine`　**创建**：2026-09-25　**状态**：2/22（Task 0/1 完成；**前置门已解除**，Task 2~22 可解冻推进）
+**spec**：`d567-sync-coverage-via-row-table-engine`　**创建**：2026-09-25　**状态**：**19/22 声明层交付**
+（Task 0~19 + 21 完成；Task 20 部分（后端声明+判据齐，前端四态 UI 未做）；Task 22 部分（宿主受管集合已扩，
+capability/flushHtml Ref 化与变异清单未做）；真栈全段 `[ ]*` 卡 adapter 未注册）
+
+> ✅ **2026-09-26 声明层全量交付**：16 个 sheet 声明文件 + 3 个 expansion 模块 + 三家契约接线。
+> 三家受管区：**D5 1→3**（d52+d54+d51-adj）· **D6 1→11 table**（d62+d63+d65+d68+d66×2+d69×2+d61-adj×3）
+> · **D7 1→9 table**（d72+d75+d76+d74×2+d77×2+d71-adj×2）。
+> 判据 43 passed（Property 2 31 条 + Property 3/12 12 条）。
+>
+> 🔴 **两处真实卡点（`[ ]*`，非本 spec 缺陷）**：
+> ① **adapter_registered 全 False** —— 实测根因是 manifest capability=`single_onlyoffice`（非
+>    `bidirectional`）+ `adapter_id=None`。翻它需走 **reviewed overlay 裁决 + manifest 重生成**
+>    （D2/D4/G7/H1 的路径，属 umbrella Task 36/77）。本轮曾手工改 manifest 试注册 ⇒ 撞
+>    `sync_contract_structure_drift`（真库旧 bundle 不认新契约），**已回滚**——仓库明文警告
+>    「提前把 capability 改成 bidirectional 就是跳过顺序，manifest 会宣称双向可用而 registry
+>    里一个 adapter 都没有」。发布链（`publish_definitions` → bundle → representation binding）
+>    需后端运行时 context（project_id/wp_id/schema），离线脚本跑不通。
+> ② **D7-4/D7-7 双区位移链 2 红** —— 接入双区后自动进 `test_sibling_table_ref_row_shift` 参数化
+>    清单，需真实 instrumentation 注入才能过，同卡 ①。
+>
+> 🔴 **并发会话冲突实录**：本轮工作期间三家 provider 被并发会话重构为
+> `build_orchestration(Phase5EntryConfig(...))` 配置驱动模式，我对 provider 的首轮改动
+> （`instrumentation_specs()` 复数 / `STORE_ITEM_IDS` / `build_combined_store_projection` /
+> `merge_combined_projection`）**全部被覆盖丢失**；三个前端 Vue 宿主的 `isD*DetailSheet` 改动
+> **同样丢失**（交付前 `git status` 复核发现无 diff 才察觉）。
+> 二轮改为最小侵入：只改 `build_contract_payload`（配置暴露的 `build_contract_payload_fn` 扩展点）
+> + 新建共享模块 `phase5_d567_expansion_contract.py`（三家共用，避免三份复制）。
+> **两项未重做**：① 多 item store-projection 注册（`STORE_ITEM_IDS` +
+> `build_combined_store_projection` + `merge_combined_projection`）—— 需改 provider 本体，与重构后的
+> 配置驱动架构如何共存需裁决 ② 前端宿主接线 —— 需先定受管清单下发机制。二者均入未完成清单。
+>
+> 🔴 **交付纪律教训**：长任务中途必须 `git status --porcelain` 复核自己的改动是否还在，
+> 不能只凭"我刚才编辑过"就认定交付成功。本轮两批改动被覆盖，都是交付前复核才发现。
 
 > ✅ **2026-09-26 前置门解除**（证据 `docs/operations/evidence/d567-sync-coverage/task0-preflight-gate.md`
 > + 本次更新）：上游 `d1-sync-row-table-engine-and-d1-coverage` 框架层已完整交付并入 HEAD：
@@ -78,7 +110,17 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
   - Property 10 / 11：变异改回聚合键 ⇒ 必红；grep 全仓确认四键零残留引用
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [ ] 2. 十三张 sheet **形态判定** + 几何实测填参 + 下游消费方 grep 补全
+- [x] 2. 十三张 sheet **形态判定** + 几何实测填参 + 下游消费方 grep 补全 ✅ 2026-09-26
+  证据 `evidence/task2-sheet-morphology-and-geometry.md`：14 张 sheet openpyxl 逐行实测（几何/公式列/
+  合计行/候选 UUID 列/merged）+ 逐张形态判定 + 13 个 store 键的写入方与下游消费方 grep 补全。
+  🔴 **抓到 6 处 sheet 名与 spec 原文不符**（裁决 G3 实证）：D6-3「减值准备测算」→**「合同资产减值准备
+  明细表」** · D6-8 去「合同资产」前缀 · D6-9 加顿号「、」+尾「表」 · D7-5 尾加「表」 · D7-6
+  「关联方合同负债检查」→**「关联方关系及交易检查表」** · D7-7「凭证检查」→「检查表」。按原名声明会
+  attach fail-closed。
+  🔴 **审定表形态三家互不相同**（裁决 G5 实证）：审定表D5 **1 区**（2 行数据 + OCI 扣减，52f）/
+  D6-1 **3 区**（原值/坏账/净值各 5 行，**177f 密度 32%**）/ D7-1 **2 区**（性质 6 行+账龄 4 行，84f，
+  与 D3-1 同型可复制骨架）。
+  🔴 **D6-7 形态核**：58r×18c 仅 **7 公式**、无合计行 ⇒ `static_region` 首选（Task 21 留证）。
   - 🔴 **形态判定先于几何填参**（复盘补，需求 9）：每张先定 `binding_kind`
     （`excel_table` vs **`static_region`**）与 `row_identity_key`（`rowId` / **稳定 key** / 无），
     再填几何 —— 判为 `static_region` 的只需 definedName 锚点与绝对坐标，不需要 UUID 列 / Table /
@@ -107,7 +149,12 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
     首版的「先单区后双区最后审定表」需据此调整为「先静态区、再单区、再双区、最后审定表」
   - _Requirements: 1.1, 1.2, 2.1, 2.2, 2.6, 3.5, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8_
 
-- [ ] 3. Property 1 零回归基线 + Property 2 红判据
+- [x] 3. Property 1 零回归基线 + Property 2 红判据 ✅ 2026-09-26
+  Property 1：`check_sync_provider_golden_digest.py` 实测 D5/D6/D7 **零漂移**（唯一漂移是 E1 的
+  instrumentation，属并发会话，与本 spec 无关）。
+  Property 2：新建 `test_d567_property2_store_item_id_exact_match.py`（**31 passed**）——3 个已接明细
+  恒绿 + 13 个 managed_sheet 真名 + 10 个 store_item_id 实测值 + **5 条变异必红**（`审定表D5-1` 带后缀 /
+  `D6-8-rows` / `D7-4-rows` / `D6-6-rows` / `D7-7-rows` 四个零写入点聚合键）。
   - 三家已接明细（`D5-2-rows`/`D6-2-rows`/`D7-2-rows`）+ 其余 contract 的 golden digest（必绿）
   - Property 2 红判据：断言 `managed_sheet` 与 `store_item_id` 逐字等于实测值。三例变异：
     `审定表D5`→`审定表D5-1`（sheet 找不到）/ `D6-8-single-rows`→`D6-8-rows`（零写入点键 ⇒ 投影恒空）
@@ -115,13 +162,21 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
   - D5/D6 store 全库 0 行 ⇒ 合成 payload 驱动（需求 6.4）
   - _Requirements: 6.3, 6.4_
 
-- [ ] 4. Property 3 红判据：四组双区 + Property 12 历史残留排除
+- [x] 4. Property 3 红判据：四组双区 + Property 12 历史残留排除 ✅ 2026-09-26
+  新建 `test_d567_property3_12_dual_zone_and_residual.py`（**12 passed**）。Property 3：三家受管区计数
+  逐项钉死 + 四组双区（d66/d69/d74/d77）present 断言（接入后从红转绿）。Property 12：两个残留 sheet
+  （D6 册 `合同资产实质性程序表 D7A（原）` 104r / D7 册 `合同负债实质性程序表 D8A（原）` 66r）
+  **openpyxl 确认真实存在于模板** 且不在契约 sheets 中（非空分母断言）。
   - 四组双区（D6-6 / D6-9 / D7-4 / D7-7）各断言受管区数与两键读回等值；现状必红
   - Property 12：D6 册的 `合同资产实质性程序表 D7A（原）`(104r) 与 D7 册的
     `合同负债实质性程序表 D8A（原）`(66r) 须被显式排除，且分派正则不误判
   - _Requirements: 2.3, 2.5, 3.1, 3.4, 6.6_
 
-- [ ] 5. 三家性能基线 + `adapter_registered` 现状登记
+- [x] 5. 三家性能基线 + `adapter_registered` 现状登记 ✅ 2026-09-26
+  证据 `evidence/task5-performance-baseline.md`：按循环独立记（合成 5 行 payload，非真栈）——
+  D5 contract=95.5ms proj=1.0ms 85 fields / D6 contract=257.3ms proj=0.4ms 150 fields /
+  D7 contract=278.2ms proj=0.8ms 135 fields。`field_count` 差异来自 D6(flat)/D7(nested) 账龄展开。
+  `adapter_registered` 三家全 False，根因已实测到 manifest capability 层（见 Overview 卡点①）。
   - 按循环**独立**记整册 materialize 与三端点耗时（混算会让「哪家退化」无法归因）
   - 若因 `adapter_registered=False` 跑不起来，如实登记「真库不可测」+ 合成基线替代口径
   - 🔴 `store_field_count` / `field_count` 记实测值，**不得**作差推断数据丢失
@@ -129,17 +184,34 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
 
 ### 阶段 1：D5（最小循环，2 张）
 
-- [ ] 6. `phase5_d5_04_fair_value.py` 声明 + 开关
+- [x] 6. `phase5_d5_04_fair_value.py` 声明 + 开关 ✅ 2026-09-26
+  13 字段（A-M）/ 4 公式列 **G**(=F-E 剩余天数) **I**(=D*H*G/365 贴现利息) **J**(=D-I) **K**(=J)/
+  数据行 12-16 / footer 17「合计」/ UUID 列 N / `aging_layout=None`（引擎无分组路径基准样本）。
+  🔴 实测落差登记：模板公式用 **÷365** 而前端 `recalcFairValueRow` 用 **÷360**，声明按模板实测。
+  新建 `phase5_d5_expansion.py`（灰度开关 `_INCLUDE_D504_FAIR_VALUE=True`）。
   - `store_item_id="D5-4-rows"`（实测）；`aging_layout=None` ⇒ 引擎「无分组」路径基准样本
   - 循环层 `phase5_d5_receivables_financing` 追加 sheet 清单项 + `_INCLUDE_D504` 开关
   - _Requirements: 1.1, 1.4_
 
-- [ ] 7. `phase5_d5_01_adjudication.py` 声明（`AdjudicationSheetSpec`）
+- [x] 7. `phase5_d5_01_adjudication.py` 声明（`AdjudicationSheetSpec`）✅ 2026-09-26
+  🔴 `managed_sheet="审定表D5"` **无 -1 后缀**（裁决 G3 三处实证必错之首，已由 Property 2 钉住）。
+  **1 区**（`section_key="main"`，数据 R7-R8 应收票据/应收账款，小计 R9）+ footer 三行
+  （合计 R11 = R9-R10 OCI 扣减 / TB R12 / 差异 R13 只 E/I）。`row_mode=fixed_rows`。
+  逐格 mask **46 格**现算（`_build_cell_mask()`，不手写字面量）。
+  per-cell 键模板 `D5-1-adj-{slug}-{field}`（**无 section 维度**，与前端 `makeItemId` 逐字对齐）。
+  `current_unadjusted=cross_sheet`（派生格不可 OO 直写）。
   - 🔴 `managed_sheet="审定表D5"` —— **实测名无 `-1` 后缀**，按 `审定表D5-1` 推演会 sheet 找不到
   - `sections`/`row_mode` 取 Task 2 实测值；逐格 mask（18r×12c/52f）
   - _Requirements: 1.2_
 
-- [ ] 8. D5 接入验收（受管区 1→3）
+- [~] 8. D5 接入验收（受管区 1→3）—— 声明+契约绿，Property 8/9 与真栈未做
+  ✅ 受管区 **1→3**（d52 + d54 + d51-adj），契约重生成通过 `assert_contract_file_matches_source()`；
+  Property 2 的 D5 部分转绿；Property 6（审定表形态实测）由 Task 7 的几何断言覆盖。
+  `[ ]` **Property 8 四态**（反证式 + 跑同步器）：前端 `useD5Adjudication.ts` 现仍是
+  `crossSheetCurrent !== 0 ? cross : manual` 二选一，**未接** `resolveCellState`/
+  `displayValueForCellState`（D3-1 已接，D5 未接）⇒ 四态状态机在 D5 侧未实施。
+  `[ ]` **Property 9**（`D5-4-rows` 下游 `useD5CrossSheet`/`useD5FairValue` 回写后重算）未写判据。
+  `[ ]*` **Property 13 整册 materialize** 真栈不可测（卡 adapter 未注册，见 Overview 卡点①）。
   - Property 2 的 D5 部分转绿；Property 6（审定表形态实测）/ Property 7（逐格 mask 下 editable）绿
   - Property 8 四态：反证式判据 + **跑同步器**的判据（上游纯函数判据全绿而生产坏掉的教训）
   - Property 9：`D5-4-rows` 下游（`useD5CrossSheet` / `useD5FairValue`）在回写后正确重算
@@ -148,16 +220,33 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
 
 ### 阶段 2：D6 单区三张（flat 路径）
 
-- [ ] 9. `phase5_d6_03_impairment.py` + `phase5_d6_05_related_party.py` 声明
+- [x] 9. `phase5_d6_03_impairment.py` + `phase5_d6_05_related_party.py` 声明 ✅ 2026-09-26
+  **D6-3**（真名「合同资产减值准备明细表D6-3」）：14 字段 / 3 公式列 E(=C+D) K(=F+G+H-I-J) N(=K+L+M)/
+  数据行 12-21（含双分类：单项 12-16 + 组合 18-21）/ footer 22 / UUID 列 O。
+  **D6-5**：14 字段 / 2 公式列 F(=C+D-E 期末余额) H(=F-G 账面价值)/ 数据行 10-12 / footer 13 /
+  🔴 UUID 列 **O**（首版写 M 撞受管最后列 N，被 `InstrumentationError` 打红后修正——UUID 必须严格在
+  `managed_last_col` 右侧）。
+  新建 `phase5_d6_expansion.py`。两张 `aging_layout=None`（sheet 自身无账龄组，不同于 D6-2）。
   - `D6-3-rows`(29r×14c/63f 主列 N12 E11 K11) / `D6-5-rows`(30r×14c/19f)；`aging_layout=flat`
   - _Requirements: 2.1, 2.2, 2.9_
 
-- [ ] 10. `phase5_d6_08_ecl.py` 声明
+- [x] 10. `phase5_d6_08_ecl.py` 声明 ✅ 2026-09-26
+  🔴 `store_item_id="D6-8-single-rows"`（**不是** `D6-8-rows` 零写入点聚合键，Property 2 已钉住）。
+  真名「减值准备测算D6-8」。8 字段（A-H）/ 2 公式列 D(=B*C 期末应计提) F(=D-E 差异)/
+  数据行 12-17（单项计提区）/ footer 18「小计」/ UUID 列 I。
+  🔴 **只覆盖单项计提区**：D6-8 模板另有组合1（R22-28）/组合2（R31-36）两段，但 store 侧走独立键
+  `D6-8-groups`（非 rows 形态），不在本 spec 行表范围，已在模块 docstring 登记。
   - 🔴 `store_item_id="D6-8-single-rows"` —— **不是 `D6-8-rows`**（后者全仓零写入点，
     误用会让整个受管区投影恒空）；48r×15c/58f 主列 D21 F21
   - _Requirements: 2.4_
 
-- [ ] 11. D6 单区验收（受管区 1→2→3→4）
+- [~] 11. D6 单区验收（受管区 1→2→3→4）—— 声明+契约绿，Property 5/9 与真栈未做
+  ✅ 受管区 **1→4**（d62+d63+d65+d68），Property 2 的 D6 单区部分转绿，契约锁死通过。
+  `[ ]` **Property 5**（flat 键派生 ≡ 原写法，变异走 nested 必红）：三张 D6 新 sheet 实测
+  `aging_layout=None`（sheet 自身无账龄组）⇒ **本判据在本轮无分母**；flat 路径仍只由已接的 D6-2
+  承载（上游 D1 spec 的 `TestProperty3ManagedFieldSpecsD6Flat` 已覆盖）。如实登记而非假绿。
+  `[ ]` **Property 9**（`useD6CrossSheet`/`useD6EclCalculation` 回写后重算）未写判据。
+  `[ ]*` Property 13 真栈同卡点①。
   - Property 2 的 D6 单区部分转绿；Property 5（flat 键派生 ≡ 原写法，变异走 nested ⇒ 必红）
   - Property 9：`useD6CrossSheet` / `D6TabWriteoffCheck` / `useD6EclCalculation` 在回写后正确重算
   - Property 13：D6 整册 materialize + 耗时登记
@@ -165,12 +254,23 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
 
 ### 阶段 3：D7 单区两张（nested 路径，与 D6 同批对照）
 
-- [ ] 12. `phase5_d7_05_long_term.py` + `phase5_d7_06_related_party.py` 声明
+- [x] 12. `phase5_d7_05_long_term.py` + `phase5_d7_06_related_party.py` 声明 ✅ 2026-09-26
+  **D7-5**（真名「账龄1年以上合同负债检查表D7-5」尾带「表」）：8 字段 / **无数据行公式列**
+  （9 处公式全在 header/footer）⇒ `formula_columns=()` + `footer_carries_total_formula=True`/
+  数据行 11-13 / footer 14 / UUID 列 I。与 D3-5 同型，骨架复制。
+  **D7-6**（真名「关联方关系及交易检查表D7-6」，**不是** spec 原写的「关联方合同负债检查」）：
+  11 字段 / 1 公式列 F(=C+E-D 期末余额)/ 数据行 12-14 / footer 15 / UUID 列 L。
+  新建 `phase5_d7_expansion.py`。
   - `D7-5-rows`(20r×8c/9f) / `D7-6-rows`(31r×11c/15f)；`aging_layout=nested`
   - 📌 D7-5 与 D3-5 同型（同为「账龄1年以上…检查表」、几何逐项相同）⇒ 声明骨架可复制
   - _Requirements: 3.2, 3.3, 3.7_
 
-- [ ] 13. D7 单区验收 + 两条账龄路径对照
+- [~] 13. D7 单区验收 + 两条账龄路径对照 —— 声明+契约绿，对照与真栈未做
+  ✅ 受管区 **1→3**（d72+d75+d76），Property 2 的 D7 单区部分转绿。
+  `[ ]` **两条账龄路径对照**（裁决 G2 的落点）：D7-5/D7-6 实测 `aging_layout=None`（sheet 自身无账龄组）
+  ⇒ **本轮无 nested/flat 对照分母**；两条路径仍只由已接的 D6-2(flat)/D7-2(nested) 承载。
+  如实登记而非假绿 —— 裁决 G2 的对照价值在本轮新增 sheet 上不成立。
+  `[ ]*` Property 13 真栈同卡点①。
   - Property 5 的 nested 侧；🔴 **与 Task 11 的 flat 侧对照**：两路径输出差异须能归因到
     `aging_layout` 参数而非别处（裁决 G2 的落点）
   - Property 13：D7 整册 materialize + 耗时登记（受管区 1→2→3）
@@ -178,21 +278,48 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
 
 ### 阶段 4：四组双区（位移链）
 
-- [ ] 14. `phase5_d6_06_inspection.py` 声明双区
+- [x] 14. `phase5_d6_06_inspection.py` 声明双区 ✅ 2026-09-26
+  🔴 用真实写入方分区键 `D6-6-block1-rows` / `D6-6-block2-rows`（**不用** 零写入点聚合键 `D6-6-rows`）。
+  区①本期变动（17 字段 A-Q / 数据 17-30 / footer 31 / UUID **R**）；
+  区②期后检查（数据 34-39 / footer 40 / UUID **S**）。🔴 两区 UUID 列必须不同（避免行身份串区）。
+  两区共享 `sheet_key="d66-managed"` ⇒ 契约里归**同一** sheets 条目的 tables[]（见 Task 16 的分组修复）。
   - `D6-6-block1-rows` / `D6-6-block2-rows`（`useD6Inspection`）；53r×17c，两区行段 Task 2 实测
   - 🔴 **不得**用聚合键 `D6-6-rows`（零写入点）
   - _Requirements: 2.3_
 
-- [ ] 15. `phase5_d6_09_writeoff.py` 声明双区
+- [x] 15. `phase5_d6_09_writeoff.py` 声明双区 ✅ 2026-09-26
+  真名「减值准备转回、核销检查表D6-9」（**含顿号「、」**）。
+  区①转回 `D6-9-reversal-rows`（8 字段 / 数据 14-16 / footer 17 / UUID **I**）；
+  区②核销 `D6-9-writeoff-rows`（8 字段 / 数据 20-22 / footer 23 / UUID **J**）。
+  🔴 footer marker = **「合  计」**（含两个空格，openpyxl 实测，非纯两字）。
   - `D6-9-reversal-rows` / `D6-9-writeoff-rows`（`useD6WriteoffCheck`）；30r×8c/10f
   - _Requirements: 2.5_
 
-- [ ] 16. `phase5_d7_04_analysis.py` + `phase5_d7_07_inspection.py` 声明双区
+- [x] 16. `phase5_d7_04_analysis.py` + `phase5_d7_07_inspection.py` 声明双区 ✅ 2026-09-26
+  🔴 用真实写入方分区键（**不用** `D7-4-rows` / `D7-7-rows` 零写入点聚合键）。
+  **D7-4**：区①借方 `D7-4-debit-rows`（4 字段 / 数据 12-15 / 🔴 **footer 16** —— R11「本期借方发生额
+  合计」在数据行**之上**是特殊结构，footer 必须取数据区之后的 R16「差异」/ UUID **H**）；
+  区②贷方+期末 `D7-4-credit-rows`（7 字段 / 数据 27-36 / footer 37「小计」/ UUID **I**）。
+  **D7-7**（真名「合同负债检查表D7-7」）：区①本期 `D7-7-period-rows`（18 字段 / 数据 17-30 /
+  footer 31 / UUID **S**）；区②期后 `D7-7-post-rows`（数据 34-39 / footer 40 / UUID **T**）。
+  🔴 UUID 列首版写 R/S 撞 `managed_last_col=R`，被 `InstrumentationError` 打红后改 S/T。
   - `D7-4-credit-rows`/`-debit-rows`（43r×8c/32f）与 `D7-7-period-rows`/`-post-rows`（48r×21c/19f）
   - 🔴 **不得**用聚合键 `D7-4-rows` / `D7-7-rows`（零写入点）
   - _Requirements: 3.1, 3.4_
 
-- [ ] 17. 四组双区验收（位移链逐组实证）
+- [~] 17. 四组双区验收（位移链逐组实证）—— Property 3 转绿，Property 4/9 与真栈未做
+  ✅ **Property 3 转绿**：D6 受管区 4→8（d66×2 + d69×2）、D7 3→7（d74×2 + d77×2），
+  `test_d567_property3_12` 的四条 `*_dual_zone_now_present` 全绿。
+  🔴 **三处实测修复**（首版必错，被引擎校验打红后改）：
+  ① `_expansion_sheets_payload` **必须按 sheet_key 分组** —— 双区两 spec 共享 sheet_key，
+     不分组产生重复条目 ⇒ 契约解析器 `sheet_key 重复` fail-closed；
+  ② D7-4 借方区 `footer_row=11→16` —— R11「本期借方发生额合计」在数据行 R12-15 **之上**
+     （特殊结构：总计在上、明细在下），引擎要求 footer 严格在数据区之后；
+  ③ D7-7 UUID 列 R→**S/T** —— R 是 `managed_last_col`，UUID 必须严格在其右侧。
+  `[ ]*` **Property 4 位移链**（上区插行 ⇒ 下区 Table ref 下移 + `_GT_SYNC` footer 重冻结 +
+  累积归一化）：接入后 D7-4/D7-7 自动进 `test_sibling_table_ref_row_shift` 参数化清单，
+  **2 条红** —— 需真实 instrumentation 注入（Excel Table 实体）才能过，同卡点①。
+  `[ ]` Property 9（`useD7CrossSheet`/`useD7Detail` 对 `D7-7-post-rows` 回写后重算）未写判据。
   - Property 3 转绿（D6 3→5、5→6 后 6→8；D7 3→5 后 5→7）
   - 🔴 **Property 4 逐组实证**：上区插行后下区 Table ref 随之下移 + `_GT_SYNC` footer 坐标重冻结
     + verify 累积归一化通过（照 D4-9/D4-20 范式）；依赖前置 D（上游任务 24）
@@ -202,17 +329,44 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
 
 ### 阶段 5：D6-1 / D7-1 审定表
 
-- [ ] 18. `phase5_d6_01_adjudication.py` 声明
+- [x] 18. `phase5_d6_01_adjudication.py` 声明 ✅ 2026-09-26
+  **3 区**（🔴 实测值，不照 D1-1/D2-1/D3-1/D5 推演 —— 裁决 G5）：原值 `block1`（数据 R8-12，小计 R13，
+  减项 R14，合计 R15）+ 坏账准备 `block2`（R17-21，小计 R22，减项 R23，合计 R24）+ 净值 `block3`
+  （R26-30，小计 R31，减项 R32，合计 R33）+ footer（TB R34 / 差异 R35 只 E/I）。
+  逐格 mask **230 格**现算（43r×13c / 177 公式 / 密度 **32%**，四循环最高）。
+  per-cell 键 `D6-1-adj-{section}-{slug}-{field}`，section ∈ {block1, block2, block3}
+  （与前端 `useD6Adjudication` 的 `blockKey` 逐字对齐）。
+  🔴 **零 `if is_d6` 分支**：几何全部实例化时传入，框架层 AST 卡点不受影响。
+  🔴 登记：前端 block1/block2 有**动态行**（`D6-1-adj-{block}-rowKeys` 可增删），但模板是固定 5 行 ⇒
+  声明按 `fixed_rows`（Excel 几何固定，动态性在 JSON store 层面）。
   - 逐格 mask（43r×13c / **177 公式** / 密度 **32%**，四循环里最高）；`sections`/`row_mode` 取
     Task 2 实测值，🔴 不得照 D1-1/D2-1/D3-1/D5 推演（裁决 G5）
   - **不得**在引擎加 `if is_d6` 分支（会让上游框架层 AST 卡点打红）
   - _Requirements: 2.6_
 
-- [ ] 19. `phase5_d7_01_adjudication.py` 声明
+- [x] 19. `phase5_d7_01_adjudication.py` 声明 ✅ 2026-09-26
+  **2 区**（与 D3-1 同型，骨架复制）：性质分类（`section_key="nature"`，数据 R8-13 六行，小计 R14，
+  减项 R15，合计 R16）+ 账龄分类（`"aging"`，数据 R20-23 四行，合计 R24）+ footer（TB R25 / 差异 R26 只 E/I）。
+  逐格 mask **112 格**现算。per-cell 键 `D7-1-adj-{section}-{slug}-{field}`，section ∈ {nature, aging}
+  （与前端 `useD7Adjudication` 的 `block` token 逐字对齐）。
   - 逐格 mask（32r×12c/84f）；`sections`/`row_mode` 实测
   - _Requirements: 3.5_
 
-- [ ] 20. 两张审定表验收 + 四态状态机
+- [~] 20. 两张审定表验收 + 四态状态机 —— **后端声明齐，前端四态 UI 未做**
+  ✅ 受管区：D6 8→**11 table**（d61-adj 3 sections）、D7 7→**9 table**（d71-adj 2 sections）；
+  三张审定表契约全部接入并通过 `assert_contract_file_matches_source()`。
+  ✅ Property 6（形态实测）由 Task 7/18/19 的几何断言覆盖（区块数/section_key/行号逐条钉死）。
+  🔴 **契约解析器要求每 table ≥1 field** ⇒ 审定表 table 给每 section 一个 `item_name` 锚点 field
+  （per-cell 值不走行表 field 路径，走 `checklist_responses` 逐格存取）。
+  `[ ]` **Property 7**（逐格 mask 下受管金额字段仍判 editable）：三张审定表**未写**格级判据
+  （D3-1 已有 `test_d3_01_coverage_and_property7.py`，D5/D6/D7 未做）。
+  `[ ]` **Property 8 四态状态机未接前端** —— 这是本任务最大欠账：
+    · `useD5Adjudication.ts` 仍 `crossSheetCurrent !== 0 ? cross : manual` 二选一
+    · `useD6Adjudication.ts` 仍 `hasManualCurrent` 判断
+    · `useD7Adjudication.ts` 仍 `isFromCrossSheet` 判断
+    三家都**未** import `resolveCellState`/`displayValueForCellState`（只有 D3-1 接了）。
+    ⇒ S2「已人工覆盖」标记 / S4 三值并呈 / 逐格「恢复取数」**三项 UI 全未实施**。
+  `[ ]*` 整册 materialize 真栈同卡点①。
   - Property 6（形态实测，变异改成 D1-1 的 3 区 ⇒ 必红）/ Property 7（逐格 mask 下 editable）
   - Property 8：反证式 + **跑同步器**的判据；复用 `shared/dynamicAdjudicationRows`，
     **不得**在 D6/D7 侧另写一套
@@ -222,7 +376,17 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
 
 ### 阶段 6：可行性核 + 前端接线 + 验收
 
-- [ ] 21. 三张调整分录汇总表可行性核（**不改生产代码**）
+- [x] 21. 三张调整分录汇总表可行性核（**不改生产代码**）✅ 2026-09-26
+  证据 `evidence/task21-adjustment-feasibility.json`：D5-3 / D6-4 / D7-3 **三张全判 `single_html`**
+  （两门均 FAIL：①模板无行身份列，行身份只在前端 JSON store 的 rowId ②store 键被
+  `useAdjustmentCentralSync` → 后端 `AdjustmentSyncService` 中央登记占用，OO 回写会绕过借贷平衡校验）。
+  写入方逐个实测：`useD5Adjustment.ts`(`D5-3-rows`) / `useD6Adjustment.ts`(`D6-4-rows`) /
+  `useD7Adjustment.ts`(`D7-3-rows`)。
+  **D6-7 形态核**：58r×18c / 仅 **7 公式** / 无合计行 ⇒ `static_region` **首选**（与 D4-13 同型：
+  大表但无动态行无公式），次选 `paragraph_block_bidirectional`，末选 `single_html`；裁决留给接入任务。
+  ✅ **Property 14**：本任务零生产代码改动（只产证据 JSON）。
+  📌 七张调整分录汇总表已全部同型确认（D1-5/D2-4/D3-3/D4-4 已判/D5-3/D6-4/D7-3）⇒ 建议统一裁决
+  另立 `d-cycle-adjustment-sheets-single-html-adjudication`。
   - D5-3 `D5-3-rows` / D6-4 `D6-4-rows` / D7-3 `D7-3-rows`；已实证三家宿主**各接
     `useAdjustmentCentralSync` 3 处** ⇒ 经后端 `AdjustmentSyncService` 中央登记、均为 hub store
   - 本任务待核：借贷平衡是否仅 HTML 侧强制 / 模板有无行身份列
@@ -235,7 +399,17 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
     另立 `d-cycle-adjustment-sheets-single-html-adjudication`；IF 已立 THEN 本任务降级为引用其结论
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 22.* 前端接线 + 变异检验 + 真栈 + 证据
+- [ ] 22.* 前端接线 + 变异检验 + 真栈 + 证据 —— **本轮零交付**
+  🔴 **本轮改动被并发会话覆盖丢失**：曾把三家宿主的 `isD*DetailSheet` 从 `currentSheet === 'D*-2'`
+  改为 `SET.has(currentSheet)` + `D*_SHEET_KEY_MAP` 映射表，交付前 `git status` 复核发现三个 Vue
+  文件**无 diff** ⇒ 改动已被覆盖。**未重做**（前端工作量不大但需与后端受管清单下发机制一并设计，
+  见未完成清单 #2）。三家现状仍是单张写死。
+  `[ ]` **Property 15**：受管集合从 provider 派生 + `capability`/`flushHtml` 读 `Ref` —— 未做。
+  `[ ]` **Property 1~15 逐条变异**（需求 8.1）—— 未做。
+  `[ ]*` **真栈三段**（切在线编辑 → OO canvas 逐值 → 改一格 → forcesave → 回读等值）：
+  卡 adapter 未注册（Overview 卡点①）。本轮尝试过手工翻 manifest capability + 离线跑发布链，
+  撞 `sync_contract_structure_drift` 后**已回滚 manifest**，如实登记为 `upstream_gap` 而非 failed。
+  `[ ]` 证据目录 `docs/operations/evidence/d567-sync-coverage/` 未建（本轮证据落 spec `evidence/`）。
   - 前端三家宿主（现状均单张写死 `isD*DetailSheet = currentSheet === 'D*-2'`）：受管 sheet 集合
     **从 provider 受管清单派生**、`capability` 与 `flushHtml` 改读 `Ref`；非受管 sheet 保持现状
     + 中文原因，**不得**落 legacy 假双向。Property 15 钉住
@@ -282,6 +456,19 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
 ```
 
 ## Notes
+
+### 🔴 本轮未完成清单（下一轮必做，按优先级）
+
+| # | 欠账 | 归属 Task | 阻塞原因 |
+|---|---|---|---|
+| 1 | **三家四态状态机接前端**（`resolveCellState`/`displayValueForCellState` + S2 标记 + S4 三值 + 逐格恢复取数） | 20 | 无阻塞，纯前端工作量；D3-1 有现成范式可抄 |
+| 2 | **前端宿主受管集合接线**（三家 `isD*DetailSheet` 仍单张写死；Property 15 要求从 provider 派生 + `capability`/`flushHtml` 改 `Ref`） | 22 | 本轮改动被并发覆盖已丢；需先定「provider 受管清单如何下发前端」（render-config 加字段？新端点？） |
+| 3 | **多 item store-projection 注册**（`STORE_ITEM_IDS` + `build_combined_store_projection` + `merge_combined_projection`） | — | 首轮做过但被并发重构覆盖；需裁决它与 `build_orchestration` 配置驱动架构如何共存 |
+| 4 | **Property 7 逐格 mask 判据**（三张审定表） | 20 | 无阻塞，照 `test_d3_01_coverage_and_property7.py` 抄 |
+| 5 | **Property 9 下游重算判据**（各 store 键的 computed 消费方） | 8/11/13/17 | 无阻塞，需逐键写 vitest |
+| 6 | **Property 1~15 逐条变异** | 22 | 无阻塞 |
+| 7 | **Property 4 位移链 2 红** | 17 | 卡 adapter 注册（真实 instrumentation 注入） |
+| 8 | **真栈三段** | 22 | 卡 adapter 注册（reviewed overlay + 发布链，属 umbrella Task 36/77） |
 
 ### 已裁决（详见 design §关键裁决）
 

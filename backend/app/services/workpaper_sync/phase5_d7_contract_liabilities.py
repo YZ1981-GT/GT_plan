@@ -475,6 +475,23 @@ _REVIEWED_BASIS: Final[str] = (
 )
 
 
+def _d567_expansion_sheets() -> list[dict[str, Any]]:
+    """D7 扩容面 sheets（D7-5/D7-6 单区 + D7-4/D7-7 双区 + 审定表D7-1）。
+
+    spec: d567-sync-coverage-via-row-table-engine · Task 12/16/19
+    """
+    from app.services.workpaper_sync import phase5_d7_expansion as _exp
+    from app.services.workpaper_sync.phase5_d567_expansion_contract import (
+        build_adjudication_sheet, build_expansion_sheets,
+    )
+
+    sheets = build_expansion_sheets(_exp.managed_row_table_specs())
+    if getattr(_exp, "_INCLUDE_D701_ADJUDICATION", False):
+        from app.services.workpaper_sync.phase5_d7_01_adjudication import SPEC_D701
+        sheets.extend(build_adjudication_sheet(SPEC_D701, key_prefix="d7_adj"))
+    return sheets
+
+
 def build_contract_payload() -> dict[str, Any]:
     from app.services.workpaper_sync.excel_extract import TABLE_SHEET_ANCHOR
 
@@ -506,7 +523,8 @@ def build_contract_payload() -> dict[str, Any]:
                 "excel_name": MANAGED_SHEET,
                 "locator": {"anchor": TABLE_SHEET_ANCHOR},
                 "tables": [_rows_table_payload()],
-            }
+            },
+            *_d567_expansion_sheets(),
         ],
         "review": {
             "entry_id": ENTRY_ID,
