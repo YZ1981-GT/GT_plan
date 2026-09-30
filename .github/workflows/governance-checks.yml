@@ -5934,6 +5934,12 @@ jobs:
         run: python backend/scripts/gen/generate_workpaper_sync_program_milestones.py --check
       - name: Program milestone guards (DAG, digests, evidence, live read-only DB)
         run: python -m pytest backend/tests/workpaper_sync/test_workpaper_sync_program_milestones.py -q --tb=short
+      # 受管 sheet 清单前端投影（d567-sync-coverage Property 15）。
+      # 🔴 用 `--check` 而非 `--apply` + `git diff`：本仓已有该约定，且 apply-后比较那种写法
+      #    只要产物含时间戳就变成**永假门**（见 disclosure-payload 五轮复盘 T29）。
+      #    本生成器输出幂等（无时间戳/随机量），--check 无违规时必绿。
+      - name: Recompute and byte-check managed-sheet projection
+        run: python backend/scripts/gen/generate_workpaper_sync_managed_sheets.py --check
 
   tb-writeback-no-direct-call:
     # TB 回写直调门禁（tb-writeback-explicit-publish-gate Task 18 / Req 9.1, 9.2）

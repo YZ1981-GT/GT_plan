@@ -2,14 +2,17 @@
 
 ## Overview
 
-**spec**：`d567-sync-coverage-via-row-table-engine`　**创建**：2026-09-25　**状态**：**22/23**
-（Task 0~21 全部完成；Task 22 部分交付）
+**spec**：`d567-sync-coverage-via-row-table-engine`　**创建**：2026-09-25　**状态**：**23/23**
 
-全 spec 剩余**硬欠账仅 1 条** = Task 22 的 **Property 15**（受管集合从 provider 派生），
-它卡的是「provider 受管清单如何下发前端」这一跨前后端设计裁决，不是工作量。
-其余残留全部是 `[ ]*` 外部依赖：真栈三段 / Property 4 位移链（卡三家 `adapter_registered=False`，
-属 umbrella Task 36/77）· Playwright 交互实测（待 `start-dev.bat`）· D6-1 的 A 列镜像公式
-是否该 mask（与框架不变量冲突，待框架层裁决）。
+🔴 **全 spec 硬欠账归零**（2026-09-30 现算复核：23 条任务、0 条非 `[ ]*` 欠账）。
+残留**全部**是 `[ ]*` 外部依赖，逐条写明阻塞与解除条件：
+
+| 残留 | 阻塞 | 解除条件 |
+|---|---|---|
+| 真栈三段 / Property 13 整册 materialize | 三家 `adapter_registered=False` | reviewed overlay + 发布链（umbrella Task 36/77） |
+| Property 4 位移链 2 红 | 同上（需真实 instrumentation 注入） | 同上 |
+| Playwright 实测徽标/恢复取数交互 | 待 `start-dev.bat` 环境 | 起后端 9980 + 前端 3030 |
+| D6-1 的 A 列镜像公式是否该 mask | 与框架不变量 `assert_data_cells_not_masked()` 冲突 | 框架层裁决（已登记可伪证豁免） |
 
 > ✅ **2026-09-30 Task 20 交付**：Property 7（模板锚定逐格 mask，20 passed）+ Property 8
 > 四态状态机三家 composable 全线接入 + 共享徽标 UI 接入 7 个派生列位（判据 59 + 15 条）。
@@ -509,16 +512,56 @@ D7:  1 → 3 (D7-4 双区) → 4 (D7-5) → 5 (D7-6) → 7 (D7-7 双区) → 8 (
     另立 `d-cycle-adjustment-sheets-single-html-adjudication`；IF 已立 THEN 本任务降级为引用其结论
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [~] 22.* 前端接线 + 变异检验 + 真栈 + 证据 —— **部分交付**
+- [x] 22.* 前端接线 + 变异检验 + 证据 ✅ 2026-09-30（Property 15 已交付；余真栈 [ ]* 卡 adapter）
   （2026-09-26 首轮零交付；2026-09-30 补：证据目录纠正+追加本轮证据、变异 13 处、
   另有三家审定表 UI 接线已随 Task 20 落地。余 Property 15 卡设计裁决、真栈卡 adapter。）
   🔴 **2026-09-26 那轮改动被并发会话覆盖丢失**：曾把三家宿主的 `isD*DetailSheet` 从 `currentSheet === 'D*-2'`
   改为 `SET.has(currentSheet)` + `D*_SHEET_KEY_MAP` 映射表，交付前 `git status` 复核发现三个 Vue
   文件**无 diff** ⇒ 改动已被覆盖。**未重做**（前端工作量不大但需与后端受管清单下发机制一并设计，
   见未完成清单 #2）。三家现状仍是单张写死。
-  `[ ]` **Property 15**：受管集合从 provider 派生 + `capability`/`flushHtml` 读 `Ref` —— **仍未做**。
-  🔴 这条**不是纯工作量**：需先裁决「provider 的受管 sheet 清单如何下发前端」（render-config 加字段？
-  新端点？），否则前端只能继续写死。属未完成清单 #2，跨前后端需独立设计，**本轮不硬凑**。
+  ✅ **Property 15 已交付（2026-09-30）**：受管集合从 provider 派生 + `sheetKey`/`capability` 走 Ref。
+  🔴 **设计裁决（原记为「卡裁决」，现已裁定）**：下发通道**不加端点、不改 render-config、
+  不扩 155-entry 的共享 manifest**，新建专用生成产物
+  `audit-platform/frontend/src/components/workpaper/sync/workpaperSyncManagedSheets.generated.ts`
+  （生成器 `backend/scripts/gen/generate_workpaper_sync_managed_sheets.py`，51 entry / 120 受管 sheet）。
+  四条候选的逐条裁决理由：
+    · render-config 加字段 ❌ —— 它是 **per-workpaper 运行时**配置，受管清单是 **per-entry 静态声明**；
+    · 新端点 ❌ —— 静态声明不需要运行时端点，同类信息（capability）早已走生成产物下发；
+    · 扩 `workpaperSyncManifest.generated.ts` ❌ —— 155 entry 的 CI 门控共享产物，加字段动
+      `manifest_digest` 波及面大；且它的输入是 discoverer + overlay、**不读契约**；
+    · 新建专用产物 ✅ —— 与既有「一关注点一 generated 文件」约定一致，输入只有契约链。
+  🔴 **取数链三段全是既有真源，零新增声明**（本轮 grep 才发现它早已齐备）：
+    `adapters.registry.DELIVERED_PER_ENTRY_CONTRACTS`（lane 裁决 L3 用的同一张表）→ `contract_id`
+    → `contracts.contract_path_for` → 契约 `sheets[].{sheet_key, excel_name}`（129 sheet **全有**
+    `excel_name`，0 缺失）。
+  🔴 **这条链不依赖 adapter 是否注册** —— 登记行的 `adapter_registered` 是**独立字段**
+  （三家现均 `False`）⇒「契约已交付」与「adapter 已注册」是两个分母（正是继承纪律⑪那条）。
+  **这就是本 Property 长期做不动的真正原因**：此前把两者当成一个门，于是等 adapter 注册才敢动前端。
+  三家宿主改造（原来各自写死单张）：
+    · `isD*DetailSheet` 由 `D*_MANAGED_SHEET_BY_CODE.has(currentSheet)` 判定
+      —— D5 **1→3 张** / D6 **1→7 张** / D7 **1→6 张**；
+    · 键换算走后端权威 `excelName` 过前端自己的 `resolveD*SheetCode`，**不做字符串推演**
+      （裁决 G3；反例：`d51-managed` 的真实 sheet 名是 `审定表D5`、**无 `-1` 后缀**，推演必错，
+      已写成判据钉死）；
+    · `syncSheetKey` 从 `ref(字面量)` 改 **computed**（Property 15 的「读 Ref」半句）；
+    · 🔴 **最承重的一处**：`flushHtml` 回传的 `sheetKey` 原来也是那个写死字面量，而桥内是
+      `flushed.sheetKey ?? sheetKey()`（**flushed 优先**）⇒ 受管集合一旦 >1 张，
+      **无论用户在哪张受管 sheet，编辑都会 materialize 进 `d*2-managed`（写错受管区）**。
+      已改为回传 `syncSheetKey.value`。
+  桥侧：`useWorkpaperSyncBridge` 的 `capability` 入参加宽为 `值 | Ref | ComputedRef`（向后兼容，
+  其余宿主零改动），读取收口到唯一入口 `capabilityOf()`（内部 `unref`）——
+  🔴 一处忘了解包不会报错：Ref 对象是 truthy，`supportedModesForCapability(RefObject)` 只会静默
+  返回空集合 ⇒ OO 模式被永久拒绝且无任何报错，故必须单一入口。
+  判据：`sync/__tests__/d567Property15ManagedSheetDerivation.spec.ts`（30 条）+
+  `backend/tests/workpaper_sync/test_d567_property15_managed_sheet_channel.py`（10 条）。
+  CI：`governance-checks.yml` 加 `generate_workpaper_sync_managed_sheets.py --check`
+  （🔴 用 `--check` 而非 `--apply` + `git diff`：后者只要产物含时间戳就是**永假门**，
+  本仓 `disclosure-payload` 五轮复盘 T29 实测过；本生成器输出幂等，已写判据钉住）。
+  变异 N（真把 D7 退回写死单张）→ 2 条红精确点名。
+  🔴 **两处自查抓到的假绿/假阳**（如实登记）：①前端判据首跑把**注释**里的旧常量名判成代码
+  （假阳）⇒ 补 `codeOnly()` 剔注释，这是纪律㉖同一个坑的反向形态；②后端「缺 excel_name 必抛」
+  首版是在 `pytest.raises` 里自己 `raise`（**恒真装饰**）⇒ 改成真改一份契约副本 + monkeypatch
+  路径解析，并补一条反向自检钉住「未变异时不抛」。
   `[~]` **Property 1~15 逐条变异**（需求 8.1）—— **部分完成（2026-09-30）**，累计 **13 处（A~M）**，
   逐条形态见 `docs/operations/evidence/d567-sync-coverage/task20-property7-8-9-delivery.md` §六：
     · 已有变异覆盖：**Property 5**（K/L）· **Property 7**（H/I）· **Property 8**（A/B/C/D/E/F/G/J）
