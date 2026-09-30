@@ -38,17 +38,30 @@ def _load_module():
 
 #: 🔴 因 provider 签名与本门禁不兼容而被 `[SKIP]` 的 provider（**必须显式登记**）。
 #:
-#:  * `f1.prepayment_detail`：`build_store_projection(store_item_id, payload, *, contract)`
-#:    是**两个位置参数**（多 item provider 按 item 分派），而本门禁按单参调用
-#:    `mod.build_store_projection(rows, contract=contract)` ⇒ TypeError ⇒ 整家被 SKIP。
-#:    后果：F1 的三段 digest 全部**不在零回归门内**。归 f1 lane 决定是脚本适配还是 provider
-#:    统一签名。
+#: ✅ **2026-09-30 已清空**。此前唯一在册的是 `f1`：
+#:    `build_store_projection(store_item_id, payload, *, contract)` 把 `store_item_id`
+#:    做成**首位位置参数**，而本门禁按 `mod.build_store_projection(rows, contract=contract)`
+#:    调用 ⇒ TypeError ⇒ 整家被 SKIP ⇒ F1 的三段 digest 全部不在零回归门内。
+#:    原注释把处置留给 f1 lane「决定是脚本适配还是 provider 统一签名」——
+#:    本轮选**脚本适配**（照本门既有的「provider 命名差异照实处理、不强行统一」原则，
+#:    与 D2 用 `PILOT_ADAPTER_ID`、D4 取复数 instrumentation 同型），f1 的公开签名一字未改。
+#:
+#: 🔴 适配的分派条件必须看参数 **kind**：现算 24 家里 **15 家**把 `store_item_id` 声明为
+#:    `KEYWORD_ONLY`，只有 f1 把它放在首位位置。首版按 `"store_item_id" in parameters`
+#:    判（只看名字在不在）⇒ 给那 15 家多传一个位置参数，当场把 8 家打成 TypeError。
 #:
 #: 🔴 为什么要有这张表：2026-09-28 实测发现 `test_digest_count_matches_provider_capabilities`
 #:    的公式按 `PROVIDERS` 全表求和，而 report 里少了被 SKIP 的那家 ⇒ 数字恒对不上
 #:    （实测 139 vs 142，差 3 正是 f1 的 contract+instr+projection）。若只把期望数字改大改小，
 #:    「有一家根本没进门」这个事实就被永久掩盖了。
-SKIPPED_PROVIDER_LABELS: frozenset[str] = frozenset({"f1"})
+#:
+#: 🔴 保留这张**空**表而不删掉它：下面两条判据（正向「门内 == 登记 − 本表」＋ 反向
+#:    「本表每一条都真的不在门内」）构成一对，空表时它们退化为「门必须覆盖全部登记 provider」，
+#:    仍在起作用；将来又出现签名不兼容时，登记处现成。
+#:    ⚠ 往里加条目前先想清楚：门禁本身现在已经把 skip 判为**失败**
+#:    （`check_sync_provider_golden_digest.main()` 的覆盖面判据），
+#:    所以再往这里加一条并不能让门变绿 —— 正确处置是修调用或关掉那一段的开关。
+SKIPPED_PROVIDER_LABELS: frozenset[str] = frozenset()
 
 #: 9 家「已交付核心 contract」—— 无论 PROVIDERS 怎么增长，这 9 家必须一直在门内。
 _CORE_LABELS: frozenset[str] = frozenset(
@@ -164,3 +177,118 @@ def test_synthetic_payload_drives_projection_for_zero_row_provider() -> None:
     # 合成两行须各带稳定 rowId 且账龄 nested 路径已建 dict
     assert all(r.get("rowId") for r in rows)
     assert isinstance(rows[0].get("agingPrior"), dict), "nested 账龄路径应被逐级建 dict"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🔴 覆盖面判据的自测（2026-09-30 新增）
+#
+# `main()` 新加了两道覆盖面判据（skip 判失败 / 已登记 provider 必须在基线里有条目）。
+# 那两道判据本身也需要被验 —— 否则它们就是「又一个没人验的门」，
+# 而这一整轮排查的起点恰恰是「门在但对某一家不生效」。
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_run_reports_skipped_as_data_not_only_stderr() -> None:
+    """🔴 `run()` 必须把 skip 带进返回值。
+
+    原实现只 `print("[SKIP] …", file=sys.stderr)` 然后 `continue` ⇒ 调用方（含 `main()`
+    与 pre-push）拿不到这个事实，只能靠人读 stderr。实测后果：f1 整家从未进基线而门照样
+    exit 0，持续多轮无人发现。
+    """
+    mod = _load_module()
+    report = mod.run()
+    assert "skipped" in report, (
+        "run() 的返回值里没有 `skipped` 键 —— skip 又回到了「只打 stderr」的状态，"
+        "main() 的覆盖面判据会拿不到数据而恒绿"
+    )
+    assert report["skipped"] == [], f"当前有 provider 被跳过：{report['skipped']}"
+
+
+def test_main_fails_when_a_provider_is_skipped(monkeypatch) -> None:
+    """🔴 变异反证①：注入一个 skip ⇒ `main()` 必须返回非 0。
+
+    这条把「skip 会被判为失败」变成会打红的事实。少了它，有人把 `return 1` 改回
+    `continue` 时没有任何判据会响。
+    """
+    mod = _load_module()
+    real_run = mod.run
+
+    def _with_fake_skip() -> dict:
+        report = real_run()
+        report = dict(report)
+        report["skipped"] = [{"label": "zz", "error": "TypeError: 合成的 skip"}]
+        return report
+
+    monkeypatch.setattr(mod, "run", _with_fake_skip)
+    monkeypatch.setattr(sys, "argv", ["check_sync_provider_golden_digest.py"])
+    assert mod.main() != 0, (
+        "注入 skip 后 main() 仍返回 0 —— 「skip 判失败」这条判据没生效"
+    )
+
+
+def test_main_fails_when_a_registered_provider_has_no_baseline_entry(monkeypatch) -> None:
+    """🔴 变异反证②：基线里抽掉一家的条目 ⇒ `main()` 必须返回非 0。
+
+    这条覆盖的正是 f1 那个真实形态：provider 已登记、能算出 digest，但**基线里没有它**
+    ⇒ `_compare` 遍历不到它的基线条目 ⇒ 它的任何漂移永远不会被发现。
+    """
+    mod = _load_module()
+    baseline = mod._load_baseline()
+    assert baseline is not None
+
+    victim = "d1"
+    stripped = {
+        "digest_count": baseline["digest_count"],
+        "providers": [p for p in baseline["providers"] if p["label"] != victim],
+    }
+    assert len(stripped["providers"]) == len(baseline["providers"]) - 1, "没抽掉任何条目"
+
+    monkeypatch.setattr(mod, "_load_baseline", lambda: stripped)
+    monkeypatch.setattr(sys, "argv", ["check_sync_provider_golden_digest.py"])
+    assert mod.main() != 0, (
+        f"基线里抽掉 {victim} 后 main() 仍返回 0 —— "
+        "「已登记 provider 必须在基线里有条目」这条判据没生效"
+    )
+
+
+def test_store_item_id_dispatch_keys_on_parameter_kind_not_name() -> None:
+    """🔴 变异反证③：`store_item_id` 的分派必须按参数 **kind**，不能只看名字在不在。
+
+    现算 24 家里 **15 家**把 `store_item_id` 声明为 `KEYWORD_ONLY`，只有 f1 把它放在
+    首位位置。按「名字在不在」分派会给那 15 家多传一个位置参数 —— 实测当场把 8 家
+    打成 TypeError（而在旧实现下它们会被静默 SKIP，等于把一个洞换成八个洞）。
+
+    本判据不复刻分派逻辑，而是锁住**分组事实**：两类都非空，且首位位置参数是
+    `store_item_id` 的恰好只有 f1。分组一变（比如有人把 f1 的签名统一了）本条会红，
+    届时应连带简化门里的分派分支。
+    """
+    import importlib
+    import inspect
+
+    mod = _load_module()
+    positional_first: list[str] = []
+    keyword_only: list[str] = []
+    for label, module_name, _const, has_projection, _plural in mod.PROVIDERS:
+        if not has_projection:
+            continue
+        provider = importlib.import_module(f"app.services.workpaper_sync.{module_name}")
+        params = inspect.signature(provider.build_store_projection).parameters
+        positional = [
+            n
+            for n, p in params.items()
+            if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+        ]
+        if positional[:1] == ["store_item_id"]:
+            positional_first.append(label)
+        elif "store_item_id" in params:
+            keyword_only.append(label)
+
+    assert positional_first == ["f1"], (
+        f"首位位置参数是 store_item_id 的不再只有 f1，而是 {positional_first} —— "
+        "门里的分派分支需要跟着重判"
+    )
+    assert len(keyword_only) >= 10, (
+        f"把 store_item_id 声明为 KEYWORD_ONLY 的只有 {len(keyword_only)} 家 "
+        f"（{keyword_only}）—— 这一类若为空，「按名字分派」与「按 kind 分派」"
+        "就没有区分力，本条反证会退化成空转"
+    )

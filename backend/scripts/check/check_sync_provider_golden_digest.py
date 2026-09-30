@@ -42,6 +42,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import importlib
+import inspect
 import json
 import os
 import sys
@@ -287,7 +288,30 @@ def _digests_for(label: str, module_name: str, adapter_const: str,
 
         contract = parse_contract(contract_payload, adapter_id=adapter_id)
         rows = _synthetic_rows(mod)
-        projection = mod.build_store_projection(rows, contract=contract)
+        # 🔴 f1 的签名多一个**首位位置参数** `store_item_id`。此前门按其余家的形态调它
+        #    ⇒ TypeError ⇒ 被 `run()` 的 except 吞成 `[SKIP] f1`，而 `[SKIP]` 只打到 stderr
+        #    且**不影响退出码** ⇒ **f1 整家从未进过基线**（2026-09-30 现算：登记 24 家 /
+        #    基线 23 家，f1 的 contract、sheet、instrumentation 三段全缺）。
+        #    照本门既有的「provider 命名差异照实处理、不强行统一」原则（D2 用
+        #    `PILOT_ADAPTER_ID`、D4 取复数 instrumentation），按签名分派而不是改 f1 的公开签名。
+        #
+        # 🔴 分派条件必须看参数的 **kind**，不能只看名字在不在：现算 24 家里有 **15 家**
+        #    把 `store_item_id` 声明为 **KEYWORD_ONLY**（`(payload, *, contract, limits,
+        #    store_item_id)`），它们本来就该按 `(rows, contract=…)` 调。首版用
+        #    `"store_item_id" in parameters` 判 ⇒ 给那 15 家多传了一个位置参数，
+        #    当场把 8 家打成 TypeError。**f1 是唯一**把它放在首位位置的那一家。
+        _params = inspect.signature(mod.build_store_projection).parameters
+        _positional = [
+            n
+            for n, p in _params.items()
+            if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+        ]
+        if _positional[:1] == ["store_item_id"]:
+            projection = mod.build_store_projection(
+                mod.STORE_ITEM_ID, rows, contract=contract
+            )
+        else:
+            projection = mod.build_store_projection(rows, contract=contract)
         # Projection 的 canonical 形态：按 stable_key 排序的 (key, value, value_type, mode, row_key)
         proj_canonical = {
             "contract_id": projection.contract_id,
@@ -355,12 +379,20 @@ def _instr_to_dict(spec: Any) -> dict[str, Any]:
 
 def run() -> dict[str, Any]:
     entries: list[dict[str, Any]] = []
+    skipped: list[dict[str, str]] = []
     for (label, mod, const, hp, pl) in PROVIDERS:
         try:
             entries.append(_digests_for(label, mod, const, hp, pl))
         except Exception as exc:  # noqa: BLE001
+            # 🔴 skip 不再只打 stderr 就算完（2026-09-30 修）：原来 `print("[SKIP] …")` + `continue`
+            #    让 f1 **整家**从基线里消失了，而门照样 exit 0 —— `_compare` 只遍历
+            #    `current["providers"]`，某家缺失时它的基线条目根本不会被比对，
+            #    「登记了 24 家」与「实际核了 23 家」的差被吞掉。
+            #    现在把 skip 带进结果，由 `main()` 判为**失败**（见那里的理由）。
             import sys
+
             print(f"[SKIP] {label}: {exc}", file=sys.stderr)
+            skipped.append({"label": label, "error": f"{type(exc).__name__}: {exc}"})
             continue
     # digest 总数：每家 contract + instrumentation（必有）+ projection（B60 无）
     #   + 🔴 P1-4 sheet 粒度 digest（第二轮复盘问题 5 修复：此前 sheet_digests 字段已被
@@ -373,7 +405,7 @@ def run() -> dict[str, Any]:
         + len(e.get("sheet_digests") or {})
         for e in entries
     )
-    return {"digest_count": total, "providers": entries}
+    return {"digest_count": total, "providers": entries, "skipped": skipped}
 
 
 def _load_baseline() -> dict[str, Any] | None:
@@ -439,9 +471,50 @@ def main() -> int:
         print("❌ 未找到基线文件 —— 请先 --update 取抽取前基线")
         return 1
 
+    # ── 🔴 两道「覆盖面」判据（2026-09-30 新增）──────────────────────────────
+    #
+    # 缘起：`[SKIP] f1` 长期打在 stderr 上而**不影响退出码** ⇒ f1 整家从未进过基线
+    #（现算当时：登记 24 家 / 基线 23 家 / f1 的 contract、sheet、instrumentation 三段全缺）。
+    # `_compare` 只遍历 `current["providers"]`，某家缺失时它的基线条目根本不会被比对，
+    # 于是「门是绿的」与「门在核 24 家」是两回事 —— 这正是本仓反复登记的
+    #「门在但对某一家不生效」。下面两条把覆盖面本身变成会打红的事实。
+    #
+    # 刻意**不设** skip 白名单：白名单只需要加一行就能让下一个签名漂移的 provider 隐身。
+    # provider 真的不适用某一段时，正确做法是在 `PROVIDERS` 里把那一段的开关关掉
+    #（`has_projection=False`，B60 就是这么处理的），而不是让它整家抛异常然后被跳过。
+    if current.get("skipped"):
+        print("❌ 有 provider 被跳过 —— 它们的 digest **一个都没核**（门对它们不生效）：")
+        for s in current["skipped"]:
+            print(f"   [{s['label']}] {s['error']}")
+        print(
+            "\n处置：修调用/签名让它能跑；若某一段真的不适用，"
+            "在 PROVIDERS 里关掉那一段的开关（如 has_projection=False），不要让它整家抛异常。"
+        )
+        return 1
+
+    registered = {p[0] for p in PROVIDERS}
+    measured = {e["label"] for e in current["providers"]}
+    in_baseline = {p["label"] for p in baseline.get("providers", [])}
+    if registered != measured:
+        print(
+            f"❌ 登记 {len(registered)} 家、实际算出 {len(measured)} 家 —— "
+            f"差集 {sorted(registered ^ measured)}"
+        )
+        return 1
+    if not registered <= in_baseline:
+        print(
+            f"❌ 以下已登记 provider 在**基线里没有条目** ⇒ 它们的漂移永远不会被发现："
+            f"{sorted(registered - in_baseline)}\n"
+            "   处置：确认它们现在能算出 digest 后 `--update` 补进基线。"
+        )
+        return 1
+
     drift = _compare(current, baseline)
     if not drift:
-        print(f"✅ golden digest 零回归：{current['digest_count']} 个 digest 逐个不变")
+        print(
+            f"✅ golden digest 零回归：{current['digest_count']} 个 digest 逐个不变"
+            f"（覆盖 {len(measured)} 家，零跳过）"
+        )
         return 0
 
     print("❌ golden digest 发生漂移（引擎抽取改变了已交付 contract 的行为，"

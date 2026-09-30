@@ -1,5 +1,5 @@
 {
-  "digest_count": 139,
+  "digest_count": 143,
   "providers": [
     {
       "label": "b60",
@@ -138,6 +138,16 @@
       },
       "store_projection_sha256": "26c5ef52db4667a543078885768612a554bf4e24558cf5fdb6767b753b5fd0cd",
       "instrumentation_sha256": "8735a14b2d5021673766b11f5156915895535a57e02dded507f35e7c2fac1327"
+    },
+    {
+      "label": "f1",
+      "adapter_id": "f1.prepayment_detail",
+      "contract_payload_sha256": "db8ccd1b5695fbc7446f2f455ec3475afd8048a430beb6aa6f1e3d5269989f10",
+      "sheet_digests": {
+        "f16-managed": "f4da0e2703bcb12759da7e98c9c0958fbd650f9c4fa70417e6a786839405cfd4"
+      },
+      "store_projection_sha256": "9377429bbc14be64e9cc547379dd68bc0a51fe417fe2ed9050c1fea749d802dd",
+      "instrumentation_sha256": "2c1357915f0bb8c5b5ffd39a1e46e9d51838b123b77db613a28707579107eeb4"
     },
     {
       "label": "g2",
