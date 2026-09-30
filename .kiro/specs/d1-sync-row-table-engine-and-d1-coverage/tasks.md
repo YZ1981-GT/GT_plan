@@ -2570,6 +2570,154 @@ X5-d 在干净检出上跑通了 6 道 Gate + 7 份自测，但**整册门**（�
 还原成功。上一轮事故正是「`^C` 打在 PowerShell 层 ⇒ finally 没执行 ⇒ 三处平台改动被
 静默丢掉」—— 双保险不是多余的。
 
+#### X5-g. ✅ lazy import 守卫接进 CI（新建「检出相关」第三类）
+
+`backend/tests/test_lazy_import_resolvability.py` 2026-09 就写好并提交了，376 行，
+专扫 `app/` 下函数体内 `from app.* import Name` 的目标是否可解析 —— 但**两个 workflow
+引用它 0 次**，从来没在 HEAD 上跑过。
+
+接进 CI（新 job `lazy-import-resolvability`，`fetch-depth: 0`）当场的收益：在干净检出上
+一跑就报**新增 7 处**，其中 4 处是 `phase5_d3_expansion.py` 函数体内 lazy import 四个
+**未入库**的 sheet 子模块 —— 正是同日 Gate 6 在干净检出上 traceback 崩掉的根因。
+当时是靠手工起 worktree 才发现的。
+
+新建第三类 `_CHECKOUT_DEPENDENT_UNRESOLVED`（7 条）：import 侧已提交、定义侧没提交
+⇒ 工作树可解析 / HEAD 不可解析，**两种检出表现恰好相反**，单张清单表达不了。
+豁免僵尸检查，但配两条按 `git show HEAD:` **静态**判定的反向断言（脱离当前检出，
+工作树与 CI 同一结论）：每条在 HEAD 版里必须真的取不到 · import 侧必须已提交。
+僵尸检查本身也加了「源文件不在本检出」豁免（HEAD 上 `phase5_d{5,6,7}_expansion.py`
+不存在，旧口径会要求删掉 3 条**仍然有效**的工单）。
+
+4 处变异全打红。🔴 M1/M2 必须在纯 HEAD 检出上做 —— 第三类的条目在工作树上本来就
+可解析，在工作树上清空清单也不会红。
+
+🔴 M1 第一版变异写成 `frozenset({}) or frozenset({...})` —— 空集 falsy、`or` 短路取了
+后面的完整集合 ⇒ **锚点命中了但语义没变**，靠变异脚本的「期望文案」检查抓到。
+这是「锚点 0 命中不算证明」的进阶形态：**锚点命中也未必算证明**。
+
+#### X5-h. ✅ 预存失败清册棘轮（8 条）
+
+上一节为 9 条红做归因，最后靠 `git diff --name-only <起点>..HEAD` 的 29 个文件不含
+它们的实现与测试才敢下结论。下一个人会完整重做一遍。
+
+⇒ `backend/scripts/check/check_known_failing_registry.py`：nodeid + 归属 lane +
+首见 commit + 原因摘要。用法是「拿到一批红先跑它」，exit 0 即「都不是你引入的」。
+
+口径**显式**（`tests/workpaper_sync/ + tests/scripts/` 加 `-k "d1 or template_override
+or multi_trip or row_shift or check_"`，270 秒级），写死在代码里、可 `--k` 覆盖。
+换口径要改代码 —— 有意的摩擦。明确不声称覆盖全量（全量约 14700 个用例）。
+
+🔴 **本门不进 CI**：清册语义是「开发者工作树上的预存失败」，成因正是别 lane 的未提交
+改动；CI 检出 HEAD，失败集完全不同 ⇒ 接进 CI 会永远红。进 CI 的是它的自测。
+
+两个实测坑：① pytest `-q` 把非 ASCII 参数化 id 转成 `\uXXXX`（`[余额明细表G5-2]` →
+`[\u4f59...]`）⇒ 同一条既判「新增」又判「僵尸」；清册写真中文、解析时还原，
+并配**反向变异**（不含 `\uXXXX` 的输入必须原样返回 —— 无条件 `unicode_escape` 会把
+真中文变 mojibake 而「还原那条」仍绿）。② 自测第一版就把我写的「同上」（2 字符）
+打红 —— 原因摘要过短不足以判读；处置是把原因写全，**不是**把阈值降到 2。
+
+#### X5-i. ✅ 暂存树自洽门（接进 pre-push）
+
+本轮三处漏提交的共同形态是「**工作树绿 ≠ 提交后绿**」，而现有机制一个都拦不住：
+pre-commit 各门读工作树永远绿 · CI 要等 push 之后（那 6 个 provider 从没进过任何
+commit，CI 从来没机会看到）· 只有手工起 worktree 才能发现。
+
+⇒ 把手工动作自动化：`git checkout-index` 把 index 物化到临时目录跑门。
+检查对象恰好是「这次 commit / push 之后仓库会是什么样」。不用 worktree（要检出整个
+工作树含 60MB 模板，且 worktree 是分支级的、表达不了「暂存区」这个中间状态）。
+
+🔴 **两次收窄物化范围，两次被实测打脸**：
+① 只导 `.py/.json/.yaml`（理由「golden digest 不读 xlsx 模板」）⇒ 报十余条
+   `[SKIP] g10/g8/...: 探针覆盖的权威模板缺失 → wp_templates/...xlsx`；
+② 改成只导 `backend/` ⇒ 又报 `[SKIP] d4: ... .kiro/specs/.../evidence/*.json` 不存在。
+两次都是「我以为它只读代码」这个推演。⇒ 全仓物化（21499 文件 / 456 MB / 9.8 秒）。
+
+更要紧的后果：**门对缺资源的 provider 走 `[SKIP]` 却照常 exit 0** ⇒ 我差点收下这个
+假绿。加 `unexpected_skips()`：非预期 SKIP 即失败，无论门自己返回什么；预期 SKIP
+**按门登记**（只 `f1`，golden digest 自己 `SKIPPED_PROVIDER_LABELS` 里那条）+ 反向断言
+「它真的仍在 SKIP」+ 自测反证「f1 豁免不泄漏到另一道门」。解析不出标签的 SKIP 行一律
+算非预期 —— 宁可误报，不回到「跑不满也算过」。
+
+接进 **pre-push**（push 前 index == HEAD，实质是验「即将推送的代码自洽」，~40 秒）；
+pre-commit 不接（会拖慢每次提交）。
+
+端到端变异用 git 自己的 `GIT_INDEX_FILE` 机制：指向 `.git/index` 的副本，把
+`phase5_d1_12_pledge.py` 在副本里换成本轮修复**之前**（8273f3ec4）的 blob ⇒ 门报
+digest 漂移、rc=1；真实 index 全程 clean。
+
+🔴 自测比对逐字节先假红了：`checkout-index` 会应用 `.gitattributes` 行尾转换（CRLF），
+而 `git show :<path>` 返回 blob 原始内容（LF），第一个换行处就不等 —— 内容其实完全一致。
+加行尾归一 + 在挑样本时筛掉「仅行尾差异」的文件。与「PowerShell 行数/编码显示不可信」
+同族：**先排除表示层差异再下结论**。
+
+#### X5-j. ✅ 模板索引漂移：具名清单 → 可查台账 + 现算对账
+
+原先 30 条是一个 frozenset、数值写在注释里。两个问题：注释里的 `索引 KB / 磁盘 KB`
+**会过期**（判据只看「在不在集合里」，过期完全不可见）；没有归属字段 ⇒ 30 条平铺着
+没法按 lane 推动，实际上一直躺着。
+
+改成 `INDEX_DRIFT_LEDGER`（dict，带 `cycle` / `index_kb` / `disk_kb` / `nature`），
+`INDEX_SIZE_DRIFTED_FILES` 由它**派生**（既有判据零改动，两张表不可能各走各的；
+自测断言源码里就是派生表达式而非手写字面量）。
+配 `check_template_index_drift_ledger.py`：按循环分组 + 声明值与现算值对账。
+
+    30 份（已提交漂移 29 / 工作树临时态 1）
+    {'A': 4, 'B': 10, 'D': 4, 'G': 4, 'H': 5, 'L': 2, 'M': 1}
+    最极端 H\H3 投资性房地产.xlsx 索引 712.3KB / 磁盘 142.7KB (-80.0%)
+    唯一磁盘更大的 G\G7 长期股权投资.xlsx (+5.2%)
+
+🔴 `cycle` 按模板所在**目录**记而不按 spec 名（同一循环常有多份 spec，A 轮就有 3 份），
+字段叫 `cycle` 而不是 `owner` 是刻意的 —— 这是**推定**归属，没逐条向对应 lane 确认，
+不假装它是确认过的责任人。
+
+🔴 又踩一次字段路径：首版按 `templates[*].path` 解析，30 条全报「索引缺失」。
+现读实证是 `files[*].relative_path`（且本来就是反斜杠形式）。分组视图明明是对的，
+所以一眼能判断是解析错而非数据错。已加判据钉住（解析出 >400 条 + 账本每条都能找到）。
+
+#### X5-k. ✅ 跨 lane 依赖的升级提醒（四象限全测）
+
+X5-f 那条判据在依赖缺失时 `pytest.skip` —— 对的，但有长期风险：
+`managed-row-convergence` 的 E3 入库后 skip 分支会变成永远走不到的死代码，
+而判据仍写着「不在就 skip」，下一个人读它会以为依赖还悬着。
+
+⇒ 加 `upgrade_verdict(landed, has_skip)` 纯函数 + 元判据：
+**按 HEAD 口径**判依赖是否已入库（不能按工作树 —— 工作树上依赖一直在，那样从第一天起
+就要求升级，升完 CI 立刻红 = 把两个 lane 的节奏绑死），已入库则要求删掉 skip 分支；
+未入库则要求 skip 分支**还在**（防提前升级）。
+
+抽成纯函数是为了把**四象限**全测一遍 —— 写在 test 函数体里就只能测到当前那一个象限，
+另三个永远不执行，依赖入库那天才发现提示写错就失去了提醒的意义。
+另断言提示文案可操作（点名要改什么），不是一句「不匹配」。
+
+🔴 元判据首版用 `src[i:i+900]` 取函数体，窗口越界到下一个函数，把那里正当的
+`Path(__file__).read_text()`（读本判据文件自己）当成了「读工作树」⇒ 假红。
+改用 `ast.get_source_segment`。与「取代码段用括号配平而非 split」同一条教训。
+
+#### X5-l. 📌 病因登记：单工作树混多 lane（流程级，未擅自改工作流）
+
+本轮几乎所有痛点都是同一个病因的症状。数据（2026-09-28 实测）：
+
+| 观测 | 数值 |
+|---|---|
+| `git status --porcelain` 条目 | **806** |
+| 权威模板索引漂移 | 30 份 / 7 个循环 |
+| 单文件未提交差异（`excel_workbook_row_change.py`） | 工作树 3022 行 vs HEAD 2382 行，**640 行** |
+| 同一文件里我的 hunk 占比（`excel_materialize.py` / `content_mutation.py`） | 2/12 与 1/3 |
+| HEAD 上函数体内 lazy import 断裂 | 7 处（定义侧未入库） |
+| HEAD 上顶层 import 断裂的 phase5 模块 | 6 个（I 循环 i1~i6） |
+| 同一条测试 1 小时内红→绿 | 1 例（`test_propagation_follows_row_shift`，期间别 lane 改了实现） |
+
+由它派生出的具体麻烦：行数门口径不自洽（选暂存、读工作树）· 按**内容锚点**筛 hunk
+（行号会随别 lane 漂移）· 干净检出与工作树结论不一致（三处漏提交）· 门禁被「检出不
+完整」骗三次（崩 / 自相矛盾 / 声明面缩小当成接通）· 变异必须挑检出才能走到分支 ·
+「某条测试是否红」成了**时间的函数**。
+
+⇒ per-lane worktree 或至少及时提交能从根上消掉这一整类。但那是**工作流变更**，
+可能有跨 lane 联调的正当理由，**不擅自改**。本节只把账算清楚，决策权留给使用者。
+
+本轮的补偿性处置（都已落地）：X5-i 让「提交后是否自洽」可自动验 · X5-h 让「这条红是谁
+的」不必重复甄别 · X5-g 让「引用了未入库文件」在 CI 上可见 · X5-j 让模板欠账可按循环分派。
+
 #### X6. ✅ T7-A 余波：两条写死 18 个 store item 的判据
 
 `test_check_store_item_two_way_parity.py` 有两条判据在 T7 裁决 A 撤回静态第三区后陈旧：

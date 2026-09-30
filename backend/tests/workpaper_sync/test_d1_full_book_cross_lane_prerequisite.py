@@ -162,3 +162,114 @@ def test_detector_finds_real_calls_in_both_forms() -> None:
     assert calls_symbol(bare), "裸调用没认出来"
     assert calls_symbol(attr), "属性调用没认出来（真源就是 `from ... import` 后裸调用，"
     "但别人改成模块前缀调用时不能漏）"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 🔴 元判据：依赖状态与判据强度必须匹配（X5-k，2026-09-28）
+#
+# 上面第一条在依赖缺失时 `pytest.skip`，这是对的 —— 那不是本 lane 的缺陷。
+# 但它有个长期风险：`workpaper-sync-managed-row-convergence` 的 E3 入库之后，
+# skip 分支会变成**永远走不到的死代码**，而判据依然写着「不在就 skip」——
+# 下一个人读它会以为这条依赖还悬着。
+#
+# 本节把「该升级了」这件事做成可执行的提醒：**按 HEAD 口径**判依赖是否已入库
+# （不能按工作树 —— 工作树上依赖一直在，那样从第一天起就要求升级），
+# 已入库则要求源码里不再有 skip 分支。
+# ─────────────────────────────────────────────────────────────────────────────
+
+import subprocess  # noqa: E402  （放在此节，与上面的纯 AST 判定分开）
+
+
+def _head_source(repo_rel: str) -> str | None:
+    proc = subprocess.run(
+        ["git", "show", f"HEAD:{repo_rel}"],
+        cwd=str(_REPO), capture_output=True,
+    )
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.decode("utf-8", "replace")
+
+
+def _dependency_is_on_head() -> bool:
+    """跨 lane 依赖在 **HEAD 版**里是否已入库（定义 + 调用两端都在）。"""
+    contracts_src = _head_source("backend/app/services/workpaper_sync/contracts.py")
+    mutation_src = _head_source(
+        "backend/app/services/workpaper_sync/content_mutation.py"
+    )
+    if contracts_src is None or mutation_src is None:
+        return False
+    defined = any(
+        isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == _SYMBOL
+        for n in ast.parse(contracts_src).body
+    )
+    return defined and calls_symbol(mutation_src)
+
+
+def upgrade_verdict(landed: bool, has_skip: bool) -> str | None:
+    """判定「依赖状态 × 判据强度」是否匹配；返回 None 表示匹配。
+
+    抽成纯函数是为了能把**四个象限**全测一遍（见下方变异判据）——
+    把判定写在 test 函数体里就只能测到当前那一个象限，另三个永远不执行。
+    """
+    if landed and has_skip:
+        return (
+            "跨 lane 依赖（managed-row-convergence E3：contracts."
+            f"{_SYMBOL} + content_mutation 的合取放行）**已入库到 HEAD** ⇒ "
+            "请把本文件第一条从 skip 升级为强断言，并更新 X5-f 里「依赖不在」那一支的"
+            "描述；整册门 ⑤c 现在应该能在纯 HEAD 上跑通了。"
+        )
+    if not landed and not has_skip:
+        return (
+            "跨 lane 依赖尚未入库到 HEAD，但本文件已经没有 skip 分支 —— "
+            "CI/干净检出上会因别 lane 的入库节奏而红。先把 skip 分支留着。"
+        )
+    return None
+
+
+def test_skip_branch_must_be_removed_once_the_dependency_lands() -> None:
+    """依赖已入库 ⇒ 不得再有 skip；未入库 ⇒ skip 必须还在。
+
+    两个方向都断言，所以它既提醒升级、也防止提前升级。
+    """
+    src = Path(__file__).read_text(encoding="utf-8")
+    problem = upgrade_verdict(_dependency_is_on_head(), "pytest.skip(" in src)
+    assert problem is None, problem
+
+
+def test_upgrade_verdict_covers_all_four_quadrants() -> None:
+    """变异：四象限逐个验，两个「不匹配」象限必须给出非空提示。
+
+    🔴 只测当前象限的判据在另一半永远是死代码 —— 依赖入库那天才发现提示写错，
+    就失去了提醒的意义。
+    """
+    assert upgrade_verdict(True, True), "依赖已入库 + 仍有 skip ⇒ 必须提示升级"
+    assert upgrade_verdict(False, False), "依赖未入库 + 已删 skip ⇒ 必须提示回退"
+    assert upgrade_verdict(True, False) is None, "依赖已入库 + 已升级 ⇒ 匹配，不该报"
+    assert upgrade_verdict(False, True) is None, "依赖未入库 + 保留 skip ⇒ 匹配，不该报"
+    # 提示文案必须可操作（点名要改什么），不是一句「不匹配」
+    assert "升级为强断言" in (upgrade_verdict(True, True) or "")
+    assert "skip 分支留着" in (upgrade_verdict(False, False) or "")
+
+
+def test_meta_assertion_uses_head_not_worktree() -> None:
+    """🔴 钉住口径：升级提醒必须按 HEAD 判，不能按工作树。
+
+    工作树上这条依赖一直在（别 lane 的未提交改动里），按工作树判会从第一天起就要求
+    升级，而升级之后 CI 立刻红 —— 那是把两个 lane 的节奏绑死。
+    """
+    src = Path(__file__).read_text(encoding="utf-8")
+    # 🔴 用 AST 精确取函数体，不用字符窗口：首版取 `src[i:i+900]` 越界到了下一个函数，
+    #    把那里正当的 `Path(__file__).read_text()`（读本判据文件自己）当成了「读工作树」。
+    #    与「取代码段用括号配平而非 split」是同一条教训。
+    target = None
+    for node in ast.walk(ast.parse(src)):
+        if isinstance(node, ast.FunctionDef) and node.name == "_dependency_is_on_head":
+            target = node
+            break
+    assert target is not None, "找不到 _dependency_is_on_head"
+    body = ast.get_source_segment(src, target) or ""
+    assert body, "取不到函数体源码"
+    assert "_head_source" in body, "升级提醒没走 HEAD 口径"
+    assert "read_text" not in body, "升级提醒里出现了直接读工作树文件的痕迹"
+    # 现状：依赖确实还没入库（若某天入库，上一条会要求升级，本条仍然成立）
+    assert isinstance(_dependency_is_on_head(), bool)
