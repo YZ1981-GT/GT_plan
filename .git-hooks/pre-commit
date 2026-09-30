@@ -123,4 +123,13 @@ sys.exit(0)
 else
     echo "[pre-commit] ✅ UTF-8 完整性检查通过（无匹配暂存文件）"
 fi
+
+# ── 4. 附注模板「陈旧副本整体覆盖」棘轮（2026-09-30 事故后新增）──
+# 只在暂存了 note_template_*.json 时才有开销；判的是暂存内容而非工作树。
+if [ -n "$PY" ]; then
+    if ! "$PY" backend/scripts/check/check_note_template_ratchet.py; then
+        echo "          紧急救急：git commit --no-verify"
+        exit 1
+    fi
+fi
 exit 0

@@ -986,6 +986,25 @@ jobs:
       - name: Run bold-marker hygiene tests
         run: python -m pytest backend/tests/test_note_bold_marker_hygiene.py -q
 
+  note-template-stale-overwrite-guard:
+    # 平台级：附注模板「陈旧副本整体覆盖」防复发（2026-09-30 事故）
+    # 背景：`56acf363d`（G 循环 spec，与附注无关）把两份附注模板整体换成了 7 月下旬的
+    # 陈旧副本：带 columns 的表 listed 411→11 / soe 260→3，另删整章、改名覆盖母公司章。
+    # 各循环的 note 结构守卫当场全红，但红了三天没人被拦住，期间还有修复把守卫往陈旧
+    # 数据上凑。本守卫只锁不可能是有意改动的宏观棘轮（columns/guidance 覆盖率只增不减、
+    # 表头 `<br/>` 为 0、零悬空 parent），纯 JSON 读 < 1 秒，信号强误报近零。
+    # 恢复工具：backend/scripts/fix/restore_note_templates_from_stale_overwrite.py
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 hypothesis==6.112.1
+      - name: Run stale-overwrite guard
+        run: python -m pytest backend/tests/test_note_template_stale_overwrite_guard.py -q
+
   h-cycle-ai-wiring:
     # H 循环披露 Tab 的 AI / 复核接线守卫
     # （h-cycle-legacy-cleanup-and-platform-hygiene R2 / R3）

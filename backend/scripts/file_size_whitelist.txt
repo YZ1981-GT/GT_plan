@@ -1163,44 +1163,27 @@ backend/app/services/workpaper_sync/phase5_a51_cashflow_audit.py  891
 backend/app/services/workpaper_sync/phase5_c_control_test.py  825
 
 #   fix_note_parent_company_chapter.py —— **改动前即 2291 行已远超 800 上限**（HEAD 现状，
-#     且此前从未登记 ⇒ 门禁对它事实上一直没生效，只在本次重新暂存时才第一次报出来）。
-#     本次 +53 行是两处判据修复，不是膨胀来源：
-#       · `_norm_header`/`_headers_correspond` —— 表头比较容 `<br/>` 与空白差异。原逐字
-#         `!=` 让 `soe/长期股权投资` 表[1] 因一个展示层 `<br/>` 判不符 ⇒ 该表恒缺 columns
-#         ⇒ `_checks` 恒留欠账 ⇒ 写盘条件含 `not errs` ⇒ **两个变体 82 处变更全部写不进去**，
-#         `--apply` 静默不落盘（母公司章因此长期停在错误态）。
-#       · round-trip 自检放行「仅尾部换行」差异（listed 现值尾部缺 1 个 `\n`，正文逐字相同），
-#         其余任何差异仍 exit 2。
+#     此前从未登记 ⇒ 门禁对它一直没生效，重新暂存时才第一次报出来）。
+#     2026-09-30 净增 +17 行：round-trip 自检放行「仅尾部换行」差异（其余差异仍 exit 2）。
+#     🔴 更正：此前同条登记描述的 `_norm_header`/`_headers_correspond`（表头比较容 `<br/>`）
+#     **已撤回** —— 那是在给 `56acf363d` 陈旧覆盖带回的 `<br/>` 打补丁（覆盖前两份模板表头
+#     `<br/>` 为 0），根因修复见 `restore_note_templates_from_stale_overwrite.py`。
 #     不拆分的理由：本文件是 `note-parent-company-chapter` spec 的产物，Task 3~7 + 11 的
 #     「apply 动作 ↔ 同名 check 判据」成对定义，拆开会让每个 Task 的两侧跨文件；且它属
-#     另一条 lane 的工作面，为一次 bugfix 去拆别人的脚本等于把风险转移给那条 lane，
-#     而收益只是「我的提交能过」（沿用本表 phase5_a51/phase5_c 两条的同一理由）。
-#     baseline 取当前真实行数，门禁从此刻起对本文件生效（拦膨胀 >5%）。
-#     拆分方向（按 Task 边界，不按行数）：长期股权投资/投资收益的列定义常量（`_listed_lte_*`
-#     / `_soe_lte_*` / `_G_*` 约 300 行）是纯数据，可下沉 `_note_parent_company_columns.py`；
-#     该 spec 收尾时应连带把本条删掉。
-#     spec: note-parent-company-chapter（本轮为回退 soe 章标题而重新暂存）
-backend/scripts/fix/fix_note_parent_company_chapter.py  2344
+#     另一条 lane 的工作面（沿用本表 phase5_a51/phase5_c 两条的同一理由）。
+#     baseline 取当前真实行数，门禁对本文件生效（拦膨胀 >5%）。
+#     拆分方向：列定义常量（`_listed_lte_*` / `_soe_lte_*` / `_G_*` 约 300 行）是纯数据，
+#     可下沉 `_note_parent_company_columns.py`；该 spec 收尾时应连带把本条删掉。
+backend/scripts/fix/fix_note_parent_company_chapter.py  2308
 
 #   test_note_parent_company_chapter.py —— **改动前即 2823 行已远超 800 上限**（HEAD 现状，
-#     且此前从未登记 ⇒ 门禁对它事实上一直没生效，只在本次重新暂存时才第一次报出来）。
-#     本次 +30 行是两处**判据**修复（+34/-4），不是膨胀来源：
-#       · `test_soe_table1_and_table2_rows_untouched_by_task5` 的局部 `_norm` 原来只去空白、
-#         不认平台 `<br/>` 两行表头写法 ⇒ 对「模板 `减值准备<br/>期末余额` vs 源 docx
-#         `减值准备 期末余额`」这种**纯排版记号差异**恒打红，并把它报成「Task 5 越界改了
-#         headers」。实测两份模板表头共 **129 处** `<br/>`、源 docx 侧 0 处 ⇒ 归一属于判据
-#         （删那一格会让它与其余 128 处不一致）。与
-#         `fix_note_parent_company_chapter._norm_header` 同口径，防 apply/guard 判据漂移。
-#       · `PARENT_TABLE_CENSUS` 两条登记错值（listed/其他应收款 21→18、soe/应收账款 13→11）
-#         及其依据注释。12 条里只有这 2 条漂移，源 docx 与 `check_isomorphic` 双向印证
-#         18/11 才是现状，原注释把「替换前/后」两个数抄反了。
-#     不拆分的理由：沿用本表「守卫测试」一类的既定归属边界 —— 一个 Task 一个文件是该 spec
-#     的判据归属方式（逐字节锁与辐射面判据按文件归属计算）；且本文件属
-#     `note-parent-company-chapter` spec 的工作面，为一次判据修复去拆别人的守卫，
-#     等于把风险转移给那条 lane 而收益只是「我的提交能过」。
-#     baseline 取当前真实行数（`splitlines` 口径，与 check_file_size.py 一致），
-#     门禁从此刻起对本文件生效（拦膨胀 >5%）。
-#     拆分方向（按 Property 分组，不按行数）：源 docx 事实基线与 fixtures / 表名唯一性与普查 /
+#     此前从未登记 ⇒ 门禁对它一直没生效）。
+#     🔴 更正：此前同条登记描述的两处改动（`_norm` 容 `<br/>`、`PARENT_TABLE_CENSUS`
+#     21→18 / 13→11）**已全部撤回**，本文件逐字回到 cace65a9f 的内容。两处都是把守卫往
+#     `56acf363d` 的陈旧覆盖上凑：覆盖前模板表头 `<br/>` 为 0、普查值正是 21 / 13
+#     ⇒ 原判据与原登记值都是对的，错的是被覆盖的数据。
+#     不拆分沿用本表「守卫测试」一类的既定归属边界（一个 Task 一个文件是该 spec 的判据
+#     归属方式）；baseline 取当前真实行数，门禁生效（拦膨胀 >5%）。
+#     拆分方向（按 Property 分组）：源 docx 事实基线与 fixtures / 表名唯一性与普查 /
 #     同构对齐与 Task 6 / 列元数据与 Task 7 四组，属该 spec 独立任务。
-#     spec: note-parent-company-chapter（本轮为清理陈旧登记而重新暂存）
-backend/tests/test_note_parent_company_chapter.py  2853
+backend/tests/test_note_parent_company_chapter.py  2823
