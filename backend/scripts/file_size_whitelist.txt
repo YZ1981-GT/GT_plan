@@ -7,6 +7,14 @@
 #   - 🔴 baseline 必须填**当前真实行数**，不得虚高 —— 虚高等于预留膨胀空间
 #
 # 登记理由：
+#   phase5_a51_cashflow_audit.py / phase5_c_control_test.py —— 2026-09-30 入册。
+#     🔴 这两个不是本轮作者的代码：它们是 `a-cycle-sync-foundation-and-first-canary`
+#     （A5-1 现金流量表审计）与 `c-cycle-sync-foundation-and-first-canary`（C 控制测试）
+#     的生产模块，此前**从未提交**，而 adapters/registry.py 与
+#     adapters/delivered_contracts_ledger.py 用**字符串常量**登记并动态加载它们
+#     ⇒ 干净检出在 import 期就挂。本轮为恢复分支自洽把它们补入库（见 commit 说明）。
+#     入册而不拆分的理由：拆别人的生产代码等于把风险转移给那两条 lane 而收益只是
+#     「我的提交能过」。拆分责任归各自 lane；届时应连带把本表条目删掉。
 #   workpaper_sync 的 contracts / excel_extract / excel_materialize /
 #     excel_workbook_row_change 四件 —— 2026-09-29 基线上调（+140 / +238 / +1140 / +693）。
 #     spec: workpaper-sync-row-deletion-multi-region-propagation（删物理行的多区位移联动）。
@@ -1151,3 +1159,5 @@ backend/app/services/consol_report_service.py  1008
 #   剩余 57 行增量是两条判据的具名对账逻辑 + 失效条目反向断言，属判据本体不可再抽。
 #   baseline 946 = 当前真实行数，不留膨胀空间。
 backend/tests/workpaper_sync/test_template_override_resolution.py  946
+backend/app/services/workpaper_sync/phase5_a51_cashflow_audit.py  891
+backend/app/services/workpaper_sync/phase5_c_control_test.py  825
