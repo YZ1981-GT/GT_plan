@@ -187,6 +187,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--k", default=_DEFAULT_K, help="pytest -k 表达式（默认用声明口径）")
     parser.add_argument("--no-k", action="store_true", help="不加 -k，跑全量（很慢）")
     parser.add_argument("--json", type=str, default=None)
+    # 🔴 与 `check_template_index_drift_ledger.py` 的接口保持一致：实测发现本门没有
+    #    `--quiet` 时 argparse 直接返回 **2**，而调用方按 0/1 判断 ⇒ 看起来像「门失败」，
+    #    实际是参数不认识。两个同族门禁的 flag 必须一致，自测里有一条钉住这点。
+    parser.add_argument(
+        "--quiet", action="store_true", help="只给结论，不逐条列出清册"
+    )
     args = parser.parse_args(argv)
 
     k = None if args.no_k else args.k
@@ -214,9 +220,10 @@ def main(argv: list[str] | None = None) -> int:
             f"✅ 预存失败清册一致：本口径下失败 {len(failed)} 条，"
             f"与清册（{len(registry)} 条）逐条相符，无新增、无僵尸"
         )
-        for nodeid in sorted(failed):
-            lane, since, why = KNOWN_FAILING[nodeid]
-            print(f"   [{lane}] {nodeid.split('::')[-1]} —— {why}（首见 {since}）")
+        if not args.quiet:
+            for nodeid in sorted(failed):
+                lane, since, why = KNOWN_FAILING[nodeid]
+                print(f"   [{lane}] {nodeid.split('::')[-1]} —— {why}（首见 {since}）")
         return 0
 
     if newly:

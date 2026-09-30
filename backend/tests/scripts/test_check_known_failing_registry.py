@@ -67,6 +67,38 @@ def test_registry_nodeids_are_inside_the_declared_caliber() -> None:
     )
 
 
+def test_cli_flags_match_the_sibling_ledger_gate(monkeypatch, capsys) -> None:
+    """🔴 与同族门禁 `check_template_index_drift_ledger.py` 的 flag 必须一致。
+
+    实测踩到：本门原先没有 `--quiet`，调用时带上 ⇒ argparse 直接返回 **2**，
+    而调用方按 0/1 判断，看起来像「门失败」，实际只是参数不认识。
+    同族脚本 flag 不一致就会出这种误判。
+    """
+    mod = _load()
+    registry = set(mod.KNOWN_FAILING)
+    monkeypatch.setattr(mod, "_run_pytest", lambda *a, **k: (registry, ""))
+
+    # --quiet 必须被接受且返回 0（不是 argparse 的 2）
+    assert mod.main(["--quiet"]) == 0
+    quiet_out = capsys.readouterr().out
+    assert mod.main([]) == 0
+    verbose_out = capsys.readouterr().out
+    # quiet 只给结论，不逐条列
+    assert "预存失败清册一致" in quiet_out
+    assert len(quiet_out) < len(verbose_out), (
+        "--quiet 没有真的减少输出 —— flag 被接受了但没接到行为上"
+    )
+
+    sibling = (
+        _REPO / "backend" / "scripts" / "check" / "check_template_index_drift_ledger.py"
+    )
+    if sibling.exists():
+        sib_src = sibling.read_text(encoding="utf-8")
+        for flag in ('"--json"', '"--quiet"'):
+            assert flag in sib_src, f"同族门禁缺 {flag}"
+            assert flag in _CHECK.read_text(encoding="utf-8"), f"本门缺 {flag}"
+
+
 def test_caliber_is_explicit_and_not_empty() -> None:
     """口径必须显式写死（换口径要改代码，制造有意的摩擦）。"""
     mod = _load()
