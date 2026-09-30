@@ -14,12 +14,12 @@
     {
       "label": "d1",
       "adapter_id": "d1.notes_receivable_detail",
-      "contract_payload_sha256": "159e0676ed72e6387e40b08fcaedd36b463b568187ff4198dc16290e2b2765c6",
+      "contract_payload_sha256": "615c848a963693e788926065338c12e547dd693beb9941d9e65f2f763fdc6b19",
       "sheet_digests": {
         "d13-managed": "5ae1032ee1b1a481be926665aeae0d720a825cc5bf5c7ae23e030d921bcd3281",
         "d12-managed": "603270b6fa6c4b8780955471b429080f86c8ab88ab79d1556f56edccc53d5db4",
         "d14-managed": "7196e9cecb4758928a9d80ab7efaf531197686b343ea8363b5f9cc68089a8120",
-        "d18-managed": "9d0e30abe2ac781833061d91ac0b261931bb79508a5d89439bc83d1cfe9eab61",
+        "d18-managed": "e63b5b2fa492c956af2bf422454862eb5a4e38261f2c98dff63f829401fe43e8",
         "d116-managed": "ad542458227e0ecfba1b25748f5058c12b3cfb699858ae5aed5039fa65da9060",
         "d19-managed": "aa57dab3fdda34e17fc284b8d99fa117991d74b30d18bb5fdf6c5cec63c15051",
         "d111-managed": "050b910b83fa4a6299e8e9dc7d81cef7abc9c8dd4d89f149b488f54b3f3e412a",
