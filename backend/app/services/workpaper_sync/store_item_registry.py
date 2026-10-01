@@ -792,6 +792,24 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="L2-L2-4-voucher-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── L7（spec l7-true-bidirectional）：受管 明细表L7-2（整册唯一数据录入源）；
+    #    sibling L7-L7-2-rows / -row-N-end_balance 不预登记。受管表零裸 IF，整册裸 IF 仅
+    #    审定表L7-1 6 格 ⇒ per-file 中性化照挂 ──
+    "l7.other_noncurrent_liabilities": StoreMergePlan(
+        adapter_id="l7.other_noncurrent_liabilities",
+        provider_module="phase5_l7_other_noncurrent_liabilities",
+        items=(StoreItemSpec(item_id="L7-L7-2-full-data", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── N 循环首条 canary（spec: n-cycle-sync-foundation-and-first-canary · N4）──
+    # 🔴 GC-2：受管表 税金及附加明细表N4-2 零裸 IF，但同册派生表 税金及附加审定表N4-1
+    #    有 20 格（K/M 列变动率）⇒ per-file 策略照挂，与 G7/H9/L1 共用同一个中性化函数。
+    "n4.taxes_and_surcharges": StoreMergePlan(
+        adapter_id="n4.taxes_and_surcharges",
+        provider_module="phase5_n4_taxes_and_surcharges",
+        items=(StoreItemSpec(item_id="N4-2-detail-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
 }
 
 

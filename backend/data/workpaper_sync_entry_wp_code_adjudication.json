@@ -1,5 +1,5 @@
 {
-  "adjudication_digest": "5e52ede8f2d8f640fff4b219fcb05caf17bb33609f3afe4c25407c9193aab1bc",
+  "adjudication_digest": "77a3f5e1f33190a446d9bf64e81a4398a4e36ea244a30792e9159ada21590e7d",
   "adjudication_digest_algorithm": "sha256(json.dumps(adjudications, sort_keys=True, ensure_ascii=False, separators=(',',':')).encode('utf-8')).hexdigest()",
   "adjudication_digest_note": "🔴 2026-09-04：原 digest 的算法全仓无处记载（只有它自己出现一次），无法复算 ⇒ 改文件后留着它就是把错值当基线锁死。已换成算法自带的形态，见 `adjudication_digest_algorithm`。原值 c8b2bc2031e4041b143e6df973ee3d87ef641a23c28a5289b0da799ab3606125",
   "adjudications": [
@@ -1544,6 +1544,58 @@
       },
       "wp_codes": [
         "L2"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 N4T 在 wp_index 里 0 命中（GtN4TaxesAndSurcharges → N4T 是幻影码）",
+        "heuristic_would_say": [
+          "N4T"
+        ],
+        "managed_excel_name": "税金及附加明细表N4-2",
+        "template_relative_path": "N/N4 税金及附加.xlsx",
+        "wp_index_evidence": "2026-10-01 现算：wp_code=N4「税金及附加」5 份未删除底稿且 file_path **全部非空真路径**（`storage/projects/{project_id}/workpapers/...`，整册 9 sheet 工作簿；首目标 wp 4e5fdd29-9dc3-45c5-abad-640d522af188 / project 14fb8c10）。N4-1 / N4-2 子码在 wp_index 有行但**无对应 working_paper 文件**。受管 sheet `税金及附加明细表N4-2` 只是 `N4.xlsx` 里的一张 sheet，不是独立文件 ⇒ 目标码取持有整册文件的 `N4`。`N4T` 是 CamelCase 幻影码（GtN4TaxesAndSurcharges → N4T），wp_index 零命中（与 L1/D1 的 L1S/D1N 同型）。判据用 `COALESCE(file_path,'') <> ''`（L1 裁决记过的空串陷阱）。"
+      },
+      "contract_id": "n4.taxes_and_surcharges",
+      "entry_id": "xlsx/gt-n4-taxes-and-surcharges",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-01",
+        "store_item_id": "N4-2-detail-rows",
+        "why_null": "`N4-2-detail-rows` 全库 0 行（明细表从未录入，同 L1-2-rows / H1-8-rows 空表单是合法业务事实）⇒ 目标 item 无法定码，本条以 file_path 证据定 `N4`。零迁移负担。行身份是熵键 rowKey（同税种可多行），不切语义键。全库 N 载荷只有 3 行且全在 N2 宿主（n_cycle_facts.LIVE_DB_N_ROWS），不属 N4 受管表。",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      },
+      "wp_codes": [
+        "N4"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 幻影码 L7O 经 wp_template_finder 单册与 sheet 级均零命中（GtL7OtherNoncurrentLiabilities → L7O 是幻影码）",
+        "heuristic_would_say": [
+          "L7O"
+        ],
+        "managed_excel_name": "明细表L7-2",
+        "template_relative_path": "L/L7 其他非流动负债.xlsx",
+        "wp_index_evidence": "受管 明细表L7-2 是整册 8 sheet 工作簿里的一张（L7 整册唯一的数据录入源，审定表 L7-1 / 两张附注 / 检查表 L7-4 全部跨 sheet 引用它），不是独立文件 ⇒ 目标码取持有整册文件的 L7；判据用 `COALESCE(file_path,'') <> ''`（L1 空串陷阱）。"
+      },
+      "contract_id": "l7.other_noncurrent_liabilities",
+      "entry_id": "xlsx/gt-l7-other-noncurrent-liabilities",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-01",
+        "store_item_id": "L7-L7-2-full-data",
+        "why_null": "本 item 真库 `L7-L7-2-%` 现算 0 行（明细表从未录入，空表单是合法业务事实）；旧 full-data 用过的 key 字段已收敛到稳定 rowId（newRowIdentity('l72det')），零迁移负担。真库 L7 载荷仅 5 行 `l-cycle-canary-e2e` 夹具（L7-adj-* / L7-chk-conclusion），键属 审定表L7-1 相关，不属受管表 L7-2。",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      },
+      "wp_codes": [
+        "L7"
       ]
     }
   ],

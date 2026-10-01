@@ -27,14 +27,15 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { calcDetailEndBalance, calcAuditedAmount, calcSubtotal } from './useL7FormulaEngine'
+import { newRowIdentity } from './shared/rowIdentity'
 import type { useL7FormData } from './useL7FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /** L7-2 明细表行数据 */
 export interface L7DetailRow {
-  /** 行唯一标识（多区段共享） */
-  key: string
+  /** 行稳定身份（值化 rowId，对齐 L1/L3/L4 范式与契约 rows 行身份 json_pointer；多区段共享） */
+  rowId: string
   /** 项目名称（A列） */
   itemName: string
   /** 期初未审数（B列） */
@@ -180,9 +181,9 @@ export function useL7Detail(
         },
       )
 
-      const key = `l7-detail-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const rowId = newRowIdentity('l72det')
       const newRow: L7DetailRow = {
-        key,
+        rowId,
         itemName: itemName?.trim() || '',
         beginUnadjusted: 0,
         beginAje: 0,
@@ -240,7 +241,7 @@ export function useL7Detail(
     // CrossSheet 勾稽键（仅需 endAudited）
     debouncedSave('L7-L7-2-rows', {
       remark: JSON.stringify(detailRows.value.map((r, i) => ({
-        key: r.key,
+        rowId: r.rowId,
         itemName: r.itemName,
         endAudited: computedRows.value[i]?.endAudited ?? 0,
       }))),
@@ -263,7 +264,7 @@ export function useL7Detail(
     })
     debouncedSave('L7-L7-2-rows', {
       remark: JSON.stringify(detailRows.value.map((r, i) => ({
-        key: r.key,
+        rowId: r.rowId,
         itemName: r.itemName,
         endAudited: computedRows.value[i]?.endAudited ?? 0,
       }))),

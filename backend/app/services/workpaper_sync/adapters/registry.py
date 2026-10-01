@@ -1162,6 +1162,8 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_l3_long_term_loans",
         # ── L 循环第二条（task 12，与台账条目成对）：受管 L4-3，走 phase5_l_cycle_common 骨架 ──
         "app.services.workpaper_sync.phase5_l4_bonds_payable",
+        # ── L 循环第五条（spec l7-true-bidirectional，与台账条目成对）：受管 L7-2，走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l7_other_noncurrent_liabilities",
         # ── K 循环 K1-9 双区 + 调整分录汇总六条（与台账条目成对）──
         "app.services.workpaper_sync.phase5_k1_baddebt_reversal_writeoff",
         "app.services.workpaper_sync.phase5_k8_selling_expenses",
@@ -1170,6 +1172,9 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_k11_asset_impairment_loss",
         "app.services.workpaper_sync.phase5_k12_non_operating_income",
         "app.services.workpaper_sync.phase5_k13_non_operating_expense",
+        # ── N 循环首条 canary（spec n-cycle-sync-foundation-and-first-canary · N4，
+        #    与台账条目成对）：受管 税金及附加明细表N4-2，走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_n4_taxes_and_surcharges",
     }
 )
 
