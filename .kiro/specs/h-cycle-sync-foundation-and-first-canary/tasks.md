@@ -293,7 +293,11 @@ BP-7 notice 接入 16 个宿主、mode 载体收敛、`SHEET_MAP` 错位修复�
 | ⑤ | `check_sync_provider_golden_digest` **覆盖**且零漂移 | 🔴 **只覆盖 1/9（仅 h9）** |
 | ⑥ | 宿主已改线（`WorkpaperSyncEditorHost` + syncBridge） | ✅ **9/9**（`migrated_entry_ids()`） |
 
-### 🔴 第⑤项：8 家 H provider **从未进过 golden 基线**
+### 🔴 第⑤项：8 家 H provider 从未进过 golden 基线 —— 而且**缺口远不止 H**
+
+> ⚠️ **本节标题里的「8 家」是我的局部视角**。把台账整个拉出来比之后，真实缺口是
+> **24 个 family / 27 条契约**（台账 48 个 family，登记表只有 24 个）—— 见本节末尾
+> 「触类旁通」小节。H 的 8 家只是其中一部分。
 
 `check_sync_provider_golden_digest.py` 跑出来是绿的：
 「✅ golden digest 零回归：161 个 digest 逐个不变（覆盖 24 家，**零跳过**）」。
@@ -317,6 +321,44 @@ f1 是「登记了但跑挂被跳过」（已修，现在 skip 会判失败）�
 （`("h2", "phase5_h2_construction_in_progress", "ADAPTER_ID", True, True)` 这种形态，
 `plural_instr=True` —— H2/H4/H5/H7/H8 是四级表头、`instrumentation_specs()` 走复数），
 再把这 8 条的 digest **逐条**补进基线。
+
+#### 触类旁通：把台账整个拉出来比，缺口是 **24 个 family**（一半）
+
+发现一处反模式就全仓找同类。现算 `DELIVERED_PER_ENTRY_CONTRACTS`（51 条 / **48 个
+family**）对 `PROVIDERS`（**24 家**）：
+
+| | family |
+|---|---|
+| **已 bidirectional 却不在门内** | 🔴 **`g7` · `h1`** —— 两条都是 `pilot_*` 命名的早期 pilot，当初按 `phase5_*` 收录时漏了 |
+| 其余 22 家（契约+provider 已交付，capability 仍 `single_onlyoffice`） | `a51` `c2` `f2`(4 条契约) `f3` `f4` `f5` · `h2` `h3` `h4` `h5` `h6` `h7` `h8` `h10` · `i1` `i2` `i3` `i4` `i5` `i6` · `j1` `l1` |
+
+⇒ 那句「覆盖 24 家，零跳过」读起来像全覆盖，实际是 **24/48**。
+更要紧的是 `g7` / `h1` ——**用户正在用的两条双向底稿**不在零回归门内。
+
+#### 已落地的处置：把缺口做成会打红的事实（棘轮）
+
+补齐要在干净树上取基线（见下），但「洞是看不见的」这件事可以**现在就修**。新增
+`backend/tests/workpaper_sync/test_golden_digest_coverage_ratchet.py`（**5 passed**）：
+
+* **记账等式**：`len(登记) + len(缺口) == len(台账 family)` —— 不设「覆盖率 ≥ X%」阈值
+  （阈值允许静默退化，而且 X 是拍脑袋数字）；
+* **双向棘轮**：缺口集合必须**恰好等于**登记的 24 家。只查一个方向都会 fail-open ——
+  只查「缺口 ⊆ 棘轮」则新交付一家忘登记不会红；只查「棘轮 ⊆ 缺口」则补齐后忘删不会红；
+* 🔴 **真正要守的不变量**：`capability=bidirectional` ⟹ 该 family 在门内。
+  现状两个历史违反（`g7`/`h1`）被钉死，**第三个立刻打红** —— 这就是把前置第⑤项从
+  spec 文字变成机制：**任何 entry 想翻 bidirectional，必须先进 golden 门**；
+* 豁免是**可伪证声明**而非理由文本：去台账核实 `g7`/`h1` 的 `provider_module` 真的是
+  `pilot_*`；哪天改名成 `phase5_*`，豁免理由不成立，判据就红。
+
+**变异反证（两处都真打红后还原）**：① 从棘轮里删掉 `h2`
+⇒ `test_coverage_gap_matches_the_ratchet_exactly` 红；② 把 `g2` 从 `PROVIDERS` 注释掉
+（`g2` 是 bidirectional）⇒ **两条**同时红，其中
+`test_no_bidirectional_entry_escapes_the_golden_gate_beyond_the_two_pilots` 正是
+「带着覆盖缺口上线」这个场景 —— 也就是说将来谁把 H 某条翻成 bidirectional 而没先进门，
+红的就是这一条。
+
+判据对「工作树 vs HEAD」稳定：两种状态下违反集合都恰好是 `{g7, h1}`
+（工作树新增的 13 条 G 全都已在门内）。
 
 ### 🔴 为什么本轮**不**执行：共享引擎正处于半程重构（未提交）
 
@@ -355,7 +397,11 @@ golden digest 的三段里有两段（`instrumentation_spec(s)()` 与 `build_sto
 
 1. 等 `excel_instrumentation.py` / `oo_to_html.py` 那次重构**提交入库**（判据：
    `git status` 对 `backend/app/services/workpaper_sync/` 干净）；
-2. 8 家加进 `PROVIDERS`，逐条拼接基线（不 `--update`），复跑门确认「覆盖 32 家 / 零跳过」；
+2. 8 家 H 加进 `PROVIDERS`，逐条拼接基线（**不** `--update`），复跑门确认「覆盖 32 家 /
+   零跳过」，**并同步从棘轮 `_UNCOVERED_BY_GOLDEN_GATE` 删掉这 8 行**
+   （棘轮只许变短；忘删会被 `stale_entries` 那条判据打红）；
+   🔴 顺手把 `g7` / `h1` 一起补进去 —— 它们是**已上线的双向底稿**却不在门内，
+   优先级其实高于尚未翻门的 H；补完同步收缩 `_BIDIRECTIONAL_BUT_UNCOVERED` 到空集；
 3. overlay 加 9 条 H override（`capability=bidirectional` / `adapter_id=<contract_id>` /
    `migration_state=adapter_registered` / `canonical_resolver=workpaper_sync_published_representation`
    + 六项前置现算值写进 `reason`，照 G 条目同形）；
