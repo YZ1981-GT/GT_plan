@@ -1172,9 +1172,6 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_k11_asset_impairment_loss",
         "app.services.workpaper_sync.phase5_k12_non_operating_income",
         "app.services.workpaper_sync.phase5_k13_non_operating_expense",
-        # ── N 循环首条 canary（spec n-cycle-sync-foundation-and-first-canary · N4，
-        #    与台账条目成对）：受管 税金及附加明细表N4-2，走 phase5_l_cycle_common 骨架 ──
-        "app.services.workpaper_sync.phase5_n4_taxes_and_surcharges",
     }
 )
 

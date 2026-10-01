@@ -2694,33 +2694,4 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "`adapter_registered=False` 是顺序：五环发布后再翻 manifest。"
         ),
     },
-    # ── N 循环首条 canary（spec: n-cycle-sync-foundation-and-first-canary · N4）──────
-    {
-        "contract_id": "n4.taxes_and_surcharges",
-        "provider_module": "app.services.workpaper_sync.phase5_n4_taxes_and_surcharges",
-        "delivered_by_task": "n-cycle-sync-foundation-and-first-canary-n4",
-        "pilot_class": "n_cycle_taxes_and_surcharges",
-        "entry_id": "xlsx/gt-n4-taxes-and-surcharges",
-        "document_type": "xlsx",
-        "authority_model": "projection_contract",
-        "template_relative_path": "N/N4 税金及附加.xlsx",
-        "adapter_registered": True,
-        "reason": (
-            "N 循环首条真双向 canary（spec n-cycle-sync-foundation-and-first-canary）。选型守卫 "
-            "assert_entry_selectable 对真 manifest 核四条事实（entry 存在 / independent=True / "
-            "profile==xlsx.editable.shared.single.room_service_wired.v1 / wp_code==['N4T'] 幻影码）"
-            "+ 零回退（N4T find/any 均 None、父码 N4 落净化后权威模板）。受管 sheet = "
-            "税金及附加明细表N4-2（**单级表头** r8 / 11 列 A-K / 数据区 r9-18（r9~r16 预印 8 税种名）/ "
-            "footer A19「合计」/ 三公式列 E=B+C+D、I=F+G+H、K=E-J / UUID 列 L）。"
-            "🔴 canary 不选 审定表N4-1：该表 r7~r15 无一个可输入格（全跨表引用 N4-2 + 加总 + 裸 IF "
-            "变动率）。整册裸 IF 20 格全在 N4-1，受管表零命中（per-file 中性化仍挂）。"
-            "模板已净化（Task 7a 删 2 外链部件 + 中性化隐藏「原底稿」册 5 个外部引用公式，留 "
-            ".preclean.bak；受管 sheet 逐格 0 diff，净化后 sha256 2005eada）。模板既知缺陷 "
-            "E9=`=B9+C9+N4`（NC-32 A1 族）与 D19=`=SUM(D4:N18)` 记录型锁定不改。"
-            "HTML store = checklist_responses.item_id='N4-2-detail-rows'（熵键 rowKey，同税种可多行）；"
-            "真库 0 行，零迁移负担。wp_code 裁决=['N4']（真底稿码，file_path 非空）。"
-            "`adapter_registered=True`：五环发布（approved bundle + current published representation + "
-            "entry_state）与 manifest 翻 bidirectional 走完后，register_from_manifest 真注册本 adapter。"
-        ),
-    },
 )
