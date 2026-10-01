@@ -34,7 +34,12 @@ ADAPTER_ID: Final[str] = "l7.other_noncurrent_liabilities"
 WP_CODES: Final[frozenset[str]] = frozenset({"L7O"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "L/L7 其他非流动负债.xlsx"
-TEMPLATE_SHA256: Final[str] = "9fe09748148a6f0692eef85e0c0cf3e24f22ea7e5d011c029dfa3e71bb04daea"
+#: 🔴 净化后 sha（sanitize_l7_template_external_links.py 把受管 sheet 的 3 个共享公式组展开为
+#: 逐格显式公式，受管 sheet openpyxl 逐格 0 diff，仅去 OOXML 共享组结构）。
+#: 净化前原始值见 PRE_SANITIZE_TEMPLATE_SHA256（真 OO 往返 materialize 对横向共享组 M12:N16
+#: 抛 excel_row_shift_shared_formula_orientation_unsupported，故净化在五环发布前执行）。
+TEMPLATE_SHA256: Final[str] = "35e47cf951e4ec008525d9f65008b3fc48852d59b1f25ac0089b5426394b9436"
+PRE_SANITIZE_TEMPLATE_SHA256: Final[str] = "9fe09748148a6f0692eef85e0c0cf3e24f22ea7e5d011c029dfa3e71bb04daea"
 MANAGED_SHEET: Final[str] = "明细表L7-2"
 TEMPLATE_ID: Final[str] = "L72"
 SHEET_KEY: Final[str] = f"{TEMPLATE_ID.lower()}-managed"

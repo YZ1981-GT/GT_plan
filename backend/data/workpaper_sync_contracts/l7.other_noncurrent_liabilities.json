@@ -6,7 +6,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "8ffe06ce63f5231b164fa935062ff0f19d6c38464a2401835faea6338d5790c6",
+  "instrumentation_definition_sha256": "654c2f559c130e32486ce10ef26d4709b2e3b6cdb8db481d35c31e838388cc32",
   "review": {
     "authority_root": "backend/wp_templates",
     "derived_readonly_sheet": {
@@ -345,7 +345,7 @@
   "template": {
     "normalized_structure_hash": "6259f2b8f52c30e5052e82784c6f0e447207ed7de03b64d042bf585b3488017d",
     "relative_path": "L/L7 其他非流动负债.xlsx",
-    "template_sha256": "9fe09748148a6f0692eef85e0c0cf3e24f22ea7e5d011c029dfa3e71bb04daea"
+    "template_sha256": "35e47cf951e4ec008525d9f65008b3fc48852d59b1f25ac0089b5426394b9436"
   },
-  "template_definition_sha256": "e884806bac9f1e50ea5c9ef371c5b869b64cb24198ef33815fa14ca88189f269"
+  "template_definition_sha256": "9a50cfeb6cef65d398d38484c3fa760c84300a257fbbde51a9f247a092dc1478"
 }

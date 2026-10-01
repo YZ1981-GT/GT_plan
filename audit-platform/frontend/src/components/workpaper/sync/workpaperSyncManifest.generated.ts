@@ -40,20 +40,20 @@ export interface WorkpaperSyncManifestEntry {
   hasBrowserEvidence: boolean
 }
 
-export const WORKPAPER_SYNC_MANIFEST_DIGEST = "8a14cd518d9b2fdaef579337283c8ae1044423812e6616eb841667bf0c1ec800"
+export const WORKPAPER_SYNC_MANIFEST_DIGEST = "1cf5e73932305d28a71f0590a0e10db6caf1db941ce4ea8fabf906dc4c50d80b"
 
-export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "530adae36067be3d110f020d6781fc002e5493937e8b9f59d72ac854b9cc6a79"
+export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "3923c9ebc54d5d5a59b8c44e1b9208d0ff3c34cbf59f4c7aceeba518d4d02a92"
 
 export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "by_component": {
-    "GtOnlyOfficeSheet": 240,
+    "GtOnlyOfficeSheet": 241,
     "OnlyOfficeWordDialog": 2,
     "WorkpaperWordEditor": 4
   },
   "capability_counts": {
-    "bidirectional": 16,
+    "bidirectional": 17,
     "single_html": 5,
-    "single_onlyoffice": 133,
+    "single_onlyoffice": 132,
     "unreachable": 1
   },
   "dispatcher_count": 1,
@@ -64,8 +64,8 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "entry_count": 155,
   "host_count": 154,
   "independent_entry_count": 142,
-  "legacy_fake_bidirectional_count": 125,
-  "mount_count": 246,
+  "legacy_fake_bidirectional_count": 124,
+  "mount_count": 247,
   "parent_duplicate_count": 12,
   "room_model_counts": {
     "exclusive": 6,
@@ -80,7 +80,7 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
     "xlsx.editable.shared.single.room_service_wired.v1": 147,
     "xlsx.unreachable.none.single.room_service_wired.v1": 1
   },
-  "unadjudicated_count": 120,
+  "unadjudicated_count": 119,
   "unreachable_count": 1
 } as const
 
@@ -3635,7 +3635,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-l7-other-noncurrent-liabilities",
@@ -3643,19 +3643,16 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtL7OtherNoncurrentLiabilities.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
+        ":sheet-name=\"props.sheetName || 'L7A'\"",
         ":sheet-name=\"props.sheetName\""
       ],
       "sheet_literals": [],
