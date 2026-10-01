@@ -4,8 +4,10 @@
 spec: d1-sync-row-table-engine-and-d1-coverage · Task 1 · Requirements 4.1 / 4.2 / 4.5
 
 覆盖：
-  1. 8 家 provider 全部可 import 并产出三段（含 B60 无 projection 的诚实 null）。
-  2. digest 总数 = 23（8 contract + 8 instrumentation + 7 projection；B60 无 projection）。
+  1. `PROVIDERS` 登记的每一家都可 import 并产出应有的段（projection 为 null 的那几家
+     须在 `_NO_PROJECTION_LABELS` 里登记理由，并与开关双向对账）。
+  2. digest 总数由 `PROVIDERS` + 现算 report **两侧现算**（禁手抄数字：23 → 26 → 含
+     sheet 粒度后再变，手抄必过期）。
   3. 现状 digest ≡ 已入库基线（零回归门本身此时必绿）。
   4. 变异反证：篡改一家的 contract digest ⇒ _compare 必须报漂移（门不是永绿装饰）。
   5. 合成 payload 确实驱动了 build_store_projection（D3 真库 0 行仍被覆盖，Req 4.5）。
@@ -68,6 +70,27 @@ _CORE_LABELS: frozenset[str] = frozenset(
     {"b60", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "e1"}
 )
 
+#: 🔴 **如实记 projection=None** 的 provider 登记表（label → 理由）。
+#:
+#: 2026-10-01 从写死的 `if p["label"] == "b60"` 改成这张表。原断言的形态是
+#: 「除 b60 外每家 projection 必须非空」—— g7 作为 `has_projection=False` 纳入门内后
+#: 当场打红，而它的 null **是设计如实**（见下），不是缺陷。
+#:
+#: 为什么不是「加一行就变绿的后门」（本仓反复登记的 allowlist 失效形态）：
+#: 下面 `test_no_projection_registry_matches_providers_table` 把本表与 `PROVIDERS`
+#: 的 `has_projection` 开关做**双向**对账 —— 往这里加一家而不同时在 `PROVIDERS` 里
+#: 把开关关掉，本表就会被判为失效条目；反过来在 `PROVIDERS` 里悄悄关掉某家的开关
+#: 而不登记理由，也会打红。即「豁免必须可被实际情况伪证」。
+_NO_PROJECTION_LABELS: dict[str, str] = {
+    "b60": "simple_checklist 形态，模块无 build_store_projection，如实记 null（需求 4.5）",
+    "g7": (
+        "两级动态 pilot：既无 MANAGED_FIELD_SPECS 也无 managed_row_table_specs() 受管清单，"
+        "门里的 _synthetic_rows() 无法合成受管行 ⇒ 按本门既定原则「某一段真不适用就关那一段"
+        "开关，不要让它整家抛异常被跳过」，置 has_projection=False。"
+        "代价须如实记账：g7 只覆盖 contract + instrumentation 两段（2/3）。"
+    ),
+}
+
 
 def test_all_delivered_providers_produce_three_sections() -> None:
     mod = _load_module()
@@ -86,10 +109,42 @@ def test_all_delivered_providers_produce_three_sections() -> None:
     for p in report["providers"]:
         assert p["contract_payload_sha256"], f"{p['label']} contract digest 空"
         assert p["instrumentation_sha256"], f"{p['label']} instrumentation digest 空"
-        if p["label"] == "b60":
-            assert p["store_projection_sha256"] is None, "B60 是 simple_checklist，projection 应为 null"
+        if p["label"] in _NO_PROJECTION_LABELS:
+            assert p["store_projection_sha256"] is None, (
+                f"{p['label']} 已登记为「如实记 null」，却算出了 projection digest "
+                f"⇒ 它的 has_projection 开关应改回 True 并从 _NO_PROJECTION_LABELS 删除"
+            )
         else:
-            assert p["store_projection_sha256"], f"{p['label']} projection digest 空"
+            assert p["store_projection_sha256"], (
+                f"{p['label']} projection digest 空 —— 若该 provider 真的没有这一段，"
+                f"请在 PROVIDERS 里置 has_projection=False **并**登记进 "
+                f"_NO_PROJECTION_LABELS 写明理由，不要改这条断言"
+            )
+
+
+def test_no_projection_registry_matches_providers_table() -> None:
+    """🔴 反向断言：`_NO_PROJECTION_LABELS` 与 `PROVIDERS.has_projection` 双向对账。
+
+    只存理由文本的豁免名单 = 加一行就变绿的后门（本仓已多轮登记这个失效形态）。
+    这里把名单钉在一个**可被实际情况伪证**的事实上：
+
+      * 名单里的每一家，`PROVIDERS` 里的 `has_projection` 必须真的是 False
+        （否则是躺着失效的条目 —— 它已经有 projection 了）；
+      * `PROVIDERS` 里每个 `has_projection=False` 的 label 必须在名单里有理由
+        （否则有人悄悄关掉一段开关、少掉的覆盖面无人知晓）；
+      * 名单非空且理由非空白 —— 空转的名单退化成装饰。
+    """
+    mod = _load_module()
+    switched_off = {label for (label, _m, _c, hp, _p) in mod.PROVIDERS if not hp}
+    assert set(_NO_PROJECTION_LABELS) == switched_off, (
+        f"登记表与 PROVIDERS 开关不符：只在登记表={sorted(set(_NO_PROJECTION_LABELS) - switched_off)}"
+        f"（已有 projection 的失效条目，应删）、"
+        f"只在 PROVIDERS={sorted(switched_off - set(_NO_PROJECTION_LABELS))}"
+        f"（开关被关掉但没写理由，应登记）"
+    )
+    assert _NO_PROJECTION_LABELS, "登记表为空时本条退化为空转，应与 PROVIDERS 一起重判"
+    for label, reason in _NO_PROJECTION_LABELS.items():
+        assert reason and reason.strip(), f"{label} 的豁免理由为空"
 
 
 def test_digest_count_matches_provider_capabilities() -> None:

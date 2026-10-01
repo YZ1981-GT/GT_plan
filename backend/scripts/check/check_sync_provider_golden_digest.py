@@ -102,6 +102,39 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     #    🔴 H9 是首个 `header_rows` 域扩容（3→4）之后落地的契约 —— 它本身是 2 级，
     #    但同循环的 H2/H4/H5/H7/H8 是 4 级；本门的 digest 会在扩容被回退时打红。
     ("h9", "phase5_h9_lease_liabilities", "ADAPTER_ID", True, True),
+    # ── 覆盖面补齐（2026-09-30，spec h-cycle-sync-foundation-and-first-canary）──────
+    #    🔴 缘起：翻 H 的 capability 前置第⑤项「golden digest 覆盖且零漂移」现算只覆盖
+    #    h9 一家。把台账（51 条 / 48 family）与本表（当时 24 家）对一遍，发现**24 个
+    #    family 从未进过基线** —— 门对它们恒绿，因为没有东西可比。这与 f1 曾被 `[SKIP]`
+    #    吞掉是同类不同机制：f1 是「登记了但跑挂被跳过」，这些是「**压根没登记**」，
+    #    连 stderr 都不会有一行。详见 `test_golden_digest_coverage_ratchet.py`。
+    #
+    #    🔴 本批先补 **已上线 bidirectional 却在门外**的两家 + H 循环 8 家：
+    #    `g7` / `h1` 是早期 pilot（`pilot_*` 命名），当初按 `phase5_*` 收录时漏掉，
+    #    而它们**正在被用户使用**，优先级高于尚未翻门的 H。
+    #
+    #    五元组按**现场 introspect** 定，不照抄不靠猜（`inspect.signature` 实打实看过）：
+    #      · `g7`/`h1` 用 `PILOT_ADAPTER_ID`，且只有 `instrumentation_spec`（单数）
+    #        ⇒ `plural_instr=False`；
+    #      · H 八家用 `ADAPTER_ID`，都有 `instrumentation_specs`（复数）⇒ `True`
+    #        （H2/H4/H5/H7/H8 是四级表头，留 False 会让扩容面对本门不可见）。
+    #
+    #    🔴 `g7` 的 `has_projection=False` 是**照脚本自己的处置说明**关掉那一段，不是偷懒：
+    #    `pilot_g7_two_level_dynamic` 既无 `MANAGED_FIELD_SPECS` 也无
+    #    `managed_row_table_specs()`，`_synthetic_rows()` 造不出合成 payload 而**直接抛**
+    #    RuntimeError（它刻意不返回空清单 —— 空清单会让 digest 算得出来却什么都没覆盖到）。
+    #    文件头注释写明：真不适用某一段就关那一段的开关（B60 同样处理），
+    #    不要让它整家抛异常然后被跳过。g7 仍核 contract + instrumentation 两段。
+    ("g7", "pilot_g7_two_level_dynamic", "PILOT_ADAPTER_ID", False, False),
+    ("h1", "pilot_h1_grouped_dynamic", "PILOT_ADAPTER_ID", True, False),
+    ("h2", "phase5_h2_construction_in_progress", "ADAPTER_ID", True, True),
+    ("h3", "phase5_h3_investment_property", "ADAPTER_ID", True, True),
+    ("h4", "phase5_h4_engineering_materials", "ADAPTER_ID", True, True),
+    ("h5", "phase5_h5_oil_gas_assets", "ADAPTER_ID", True, True),
+    ("h6", "phase5_h6_asset_disposal_clearing", "ADAPTER_ID", True, True),
+    ("h7", "phase5_h7_biological_assets", "ADAPTER_ID", True, True),
+    ("h8", "phase5_h8_right_of_use_assets", "ADAPTER_ID", True, True),
+    ("h10", "phase5_h10_asset_disposal_income", "ADAPTER_ID", True, True),
     # ── G9（spec: g-cycle-single-region-detail-lanes · Task 8 / C-5）────────
     #    🔴 全库**首个「一个 store 键 × 三个受管区」** provider：`明细表G9-2` 的
     #    R12-16 / R19-23 / R26-28 三区行都存在同一个 `G9-detail-rows` 数组里，区归属由
