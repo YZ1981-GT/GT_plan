@@ -168,6 +168,12 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     ("g4", "phase5_g4_bond_investment", "ADAPTER_ID", True, True),
     ("g6", "phase5_g6_other_bond", "ADAPTER_ID", True, True),
     ("g5", "phase5_g5_long_term_receivable", "ADAPTER_ID", True, True),
+    # ── L1 / J1（manifest 已翻 bidirectional ⇒ `test_golden_digest_coverage_ratchet` 要求必须在门内）──
+    #    两家都单受管 sheet，但 instrumentation 走复数 API（`instrumentation_specs()`），同 G10 口径。
+    ("l1", "phase5_l1_short_term_loans", "ADAPTER_ID", True, True),
+    #    🔴 J1 行身份 = 模板骨架行身份 `GTROW-J16S-*`（修行翻倍）；本门 digest 会在
+    #    `row_identity_key` / `uuid_col` / 骨架行区间被误改时打红。
+    ("j1", "phase5_j1_employee_compensation", "ADAPTER_ID", True, True),
 )
 
 
