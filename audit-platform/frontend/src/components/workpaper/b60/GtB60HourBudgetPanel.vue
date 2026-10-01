@@ -14,7 +14,7 @@
  * 🔴 三方身份必须逐字一致，改任何一处都要同改其余两处（有判据守着）：
  *   · `STORE_ITEM_ID` ↔ `pilot_simple_checklist.STORE_ITEM_ID` ↔ 契约 `html_store.item_ids`
  *   · `ROW_ID_KEY` ↔ `pilot_simple_checklist.ROW_IDENTITY_STORE_KEY` ↔ 契约
- *     `row_identity.json_pointer`（`/rows/*/rowUuid`）
+ *     `row_identity.json_pointer`（`/rows/*\/rowUuid`；`*\/` 是转义，原样的星号斜杠会提前闭合本注释）
  *   · 字段名扁平 snake_case ↔ 契约 `json_pointer` ↔ `MANAGED_FIELD_SPECS` 的 column_key
  *
  * ⚠️ F 列 `budget_cost`（=(C+D)*E）**不会**回写到这里：它是 Excel 侧公式，
