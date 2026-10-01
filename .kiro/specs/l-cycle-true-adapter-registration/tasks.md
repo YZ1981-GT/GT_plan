@@ -460,8 +460,8 @@
   - 禁 8 份 provider 各复制一遍；L1 落成后回迁到基类，回迁前后 contract payload 逐字节不变
   - _判据：LR-P11 邻域_
 
-- [ ] 12. L4 → L3 → L2 逐条接线
-  - **L4 已完成（2026-10-01，待本 task 后续 L3/L2）**：
+- [x] 12. L4 → L3 → L2 逐条接线
+  - **L4 已完成（2026-10-01）**：
     - **选型**：逐张排除后选 `划分为金融负债的其他金融工具明细表L4-3`（单段数据 r13~r17、
       footer A18「合计」、10 公式列、尾码唯一无 BP-8）；否决 L4-1（140 公式，派生汇总）、
       L4-2（89 列且普通/可转换两段各带小计，单段引擎装不下）、L4-7/L4-8（BP-8 同尾码且为
@@ -485,7 +485,69 @@
     - **manifest**：在干净 HEAD worktree 上生成 L4 override 产物（第 7 条 adapter_registered，legacy
       135→134）；主树同时有 K/I/J 会话改同五个生成物，故未覆盖主树，提交时用 index blob 只纳入
       HEAD+L4 产物，避免吞他人未提交改动。
-    - **余项**：L3 → L2 尚未开始，故 task 12 保持 `[ ]`，不假绿。
+    - **L4 host procedureDualMode 补注（commit `8f8574bd4` / 收口 `f2600080e`，本轮补注）**：
+      lane2 轮已接 L4-3 受管表，但 L4 host `GtL4BondsPayable.vue` 的程序表 mount 条件被
+      `single_onlyoffice` 正则误判放行 ⇒ 补 `procedureDualMode`（照 L1 范式的
+      `<el-segmented>` + 双模式挂载块，line 11/12/23 三条 evidence），**消除 segmented
+      正则误判放行**。commit `8f8574bd4`（1 file，+39/-1）；收口 commit `f2600080e` 在干净
+      HEAD worktree 重算 baseline/manifest/overlay 的 `evidence`/`source_sha256`
+      （L4 host `source_sha256` `63d7f8be…`→`834bd783…`、evidence 1→3 条、mount 1→2），
+      mount-diff 零能力损失（155 entry capability 零翻转，唯一净增 +1 = L4 双模式挂载块）。
+      真 OO 往返回归 9 步全绿；task73 干净 worktree **80 passed / 0 failed**。
+
+  - **L3 已完成（2026-10-01）**：
+    - **选型**：受管表 `长期借款检查表 L3-9`（零公式列，L1 模板层+代码层双重同构 LC-25）；
+      provider `phase5_l3_long_term_loans.py` 走 task 11 公共骨架，`ROWS_TABLE_KEY=long_term_loan_voucher_rows`。
+    - **host 切换器（commit `dcbc26de6`）**：`GtL3LongTermLoans.vue` 补 HTML/OnlyOffice 模式
+      切换器（照抄 L1 范式，+40/-1）；限定范围 vue-tsc 自检 0 新错 + 变异证明（见
+      `.agents/tasks/l3-dual-mode-2026-10-01/code-notes.md`）。
+    - **五环发布 + manifest 翻转收口（commit `c917b65d2`）**：overlay 新增 L3 一条 override
+      （`capability=bidirectional` / `adapter_id=l3.long_term_loans` /
+      `migration_state=adapter_registered` / `html_store=checklist_responses_l3_voucher_rows` /
+      resolver `workpaper_sync_published_representation`），manifest 由生成器在干净 HEAD worktree
+      `--apply` 产出（未手改 JSON），baseline 翻转后重算（`single_with_switch` 119）。
+    - **adapter 注册测试**：`test_l3_adapter_registration.py` **现跑 18 passed**。
+    - **真 OO ConvertService 往返**：翻转后 **9 步全绿**（attach=`('l3.long_term_loans',)`、
+      gen 1、`L3-L3-9-voucher-rows` 往返逐字段相等 2 行×17 键 rowId 稳定、受管行 A..P 16 列
+      零公式残留如期（L3-9 `FORMULA_COLUMNS=()`，脚本未照抄 L4 公式幸存断言）、L3 载荷 11 行
+      不变不写库）。证据 `.agents/tasks/l3-dual-mode-2026-10-01/verify.md`。
+    - **manifest 现算（硬口径）**：`xlsx/gt-l3-long-term-loans` =
+      `capability=bidirectional` / `adapter_id=l3.long_term_loans` /
+      `migration_state=adapter_registered`。真库 `working_paper_sync_entry_state` 现算
+      **representation `14da1fe9…` / generation 1**（wp `33cfc857`，project `005a6f2d`）。
+
+  - **L2 已完成（2026-10-01，收口 commit `cf839b7143`）**：
+    - **选型**：受管表 `应付利息检查表 L2-4`（L3-9 孪生，**零公式**）；provider
+      `phase5_l2_interest_payable.py` 走公共骨架，`store_item_id=L2-L2-4-voucher-rows`；
+      🔴 已先核对归属 —— L2 的既知污染（LC-22，其载荷曾落 `wp_code='G8'`），wp_code 裁决表
+      现算 `wp_codes=["L2"]`（目标码取持有整册的 L2），未把 G8 的行当 L2 的。
+    - **五环发布（环① task76 provision + 环② first_publication）**：approved bundle
+      `2e869821-bb3d-41d3-ae0f-004fc08c8bde`（state=approved，sha `b11fe781…`），
+      首版 representation `57e3fe7a-5782-43d4-935d-ab861d09f071`（generation 1）；
+      DB 三表交叉一致（entry_state 指针 → representation gen 1 → approved bundle）。
+      证据 `.agents/tasks/l2-dual-mode-2026-10-01/publish-report.md`。
+    - **补 GtEntrySyncCapabilityNotice + manifest 翻 bidirectional + 真 OO 往返**（收口
+      commit `cf839b7143`，改 `GtL2InterestPayable.vue` + overlay + manifest + baseline +
+      `verify_l2_oo94_roundtrip.py`）。
+    - **adapter 注册测试**：`test_l2_adapter_registration.py` **现跑 18 passed**。
+    - **manifest 现算（硬口径）**：`xlsx/gt-l2-interest-payable` =
+      `capability=bidirectional` / `adapter_id=l2.interest_payable` /
+      `migration_state=adapter_registered`。真库 `working_paper_sync_entry_state` 现算
+      **representation `57e3fe7a…` / generation 1**（与发布报告一致）。
+
+  - 🔴 **manifest 四条翻转现算汇总（硬口径，本次 L2/L3/L4 落档时现扫 manifest JSON）**：
+    L1 `l1.short_term_loans` / L2 `l2.interest_payable` / L3 `l3.long_term_loans` /
+    L4 `l4.bonds_payable` 四条全部 `capability=bidirectional` / `migration_state=adapter_registered`；
+    L5~L8 仍 `single_onlyoffice` / `legacy_fake_bidirectional`（adapter_id=None）。manifest
+    `entries` 总数 155。L1~L4 真库 representation generation 均为 1
+    （`baff7afc` / `57e3fe7a` / `14da1fe9` / `68e1e1f6`）。
+
+  - 🔴 **如实留白（四轮共同）**：真浏览器 Playwright 端到端验证四轮均因 dev server（3030）
+    未起**未实测**，标「代码已改但未实测（环境待 start-dev.bat）」。四条真 OO 往返是
+    docker `audit-onlyoffice` 的 `ConvertService` 引擎（证「OO 不改坏受管区/公式/隐藏 UUID 列」），
+    **不等于**用户在 OO 浏览器内人工改值后 forcesave 回流（后者需 Playwright，同 lane spec 的
+    `[ ]*` 端到端）。
+
   - 顺序依据：L4 已有 candidate contract（起点最高）；L3 与 L1 模板层+代码层双重同构
     （LC-25，改一不改二 = 半修 ⇒ 必须交叉引用 L1 的 contract 改动）；L2 有 8 行真库载荷
   - 🔴 每条 entry 的受管表选型**重做 §2.1 那套裁决**，禁假设「都选明细表」——
@@ -504,7 +566,7 @@
 
 ## 阶段 7：收尾
 
-- [ ] 14. 清理与登记
+- [x] 14. 清理与登记
   - 删除本 spec 期间产生的 `_` 前缀一次性探针
   - 在 `.kiro/specs/INDEX.md` 登记本 spec（现扫 `.kiro/specs/*/tasks.md` 重算 Active 数，
     禁按增量推算）
@@ -512,3 +574,30 @@
     并登记同类待查：G/I/J/C 四轮同样标完成而 manifest 未翻，需同法复核
   - 移交登记：`审定表L1-1` 的 `L1-adj-*` 33 行载荷归「审定表引擎」统一处置，本 spec 未动
   - _判据：全判据闭合性自检 —— 断言 LR-P1~LR-P24 每条至少被一个任务引用_
+  - **实施证据（2026-10-01 落档）**：
+    - 🔴 **`_` 前缀探针清理**：删除本 spec 的 4 个一次性输出文件
+      `_l3rt.txt` / `_l3rt.err.txt` / `_l4rt.txt` / `_l4rt.err.txt`（内容现查确认是 L3/L4
+      OO 往返脚本 stdout/stderr，归属本 spec）。**只删本 spec 自己的** —— `git status`
+      现算无其他 `_l1/_l2/_l3/_l4` 残留；并发会话 K/J/N/I 的 `_*.py`/`_*.txt` 一律未碰。
+      L3/L4 两份报告（`.agents/tasks/*/`）各自声明其 worktree 临时文件已随 worktree 删除。
+    - **INDEX.md 登记**：本 spec 已在 `.kiro/specs/INDEX.md`（CRLF 文件，用 Python
+      `read_bytes()/write_bytes()` 维护），本次把完成度 `7/17`（HEAD 前进后的旧读数）
+      现算更新为 **`16/17`**（现扫本 tasks.md 顶层任务：14→16 条已勾，task 12 + task 14 本次
+      勾选，仅 task 13* L5~L8 真外部依赖留白）。本 spec 本就在 Active 清单内，勾选子项不改变
+      Active 计数（故 Active 总数维持上次现扫值，未按增量改动顶部统计段）。表格该行未转义
+      pipe 数维持 4（校验通过）。
+    - 🔴 **复盘「前序三份 L spec 标 100% 但 manifest 未翻」**：L 域前序三份 spec（判据体系交付）
+      标完成却**一条 manifest 未翻**，真双向落在本 spec。结构性成因 = **「契约/provider 已交付」
+      与「adapter 已注册（manifest 翻转）」是两个分母**（memory 铁律⑪），前序 spec 的「完成」
+      只覆盖前者。本 spec 走 overlay `overrides` 追加 + 生成器在干净 HEAD worktree `--apply`
+      才真翻（L1~L4 已翻、L5~L8 待 task 13）。
+    - 🔴 **同类待查登记（G/I/J/C 四轮）**：G/I/J/C 同样「标完成而 manifest 可能未翻」，需同法
+      现算核复（逐条查 manifest JSON 的 `capability` / `adapter_id` / `migration_state`，
+      **不接受 tasks.md 勾选作为翻转证据**）。本 spec 不代核，仅登记待查。
+      （注：J1 据 memory 已有真库首版 representation + manifest 翻 bidirectional，属已部分核过；
+      G/I/C 待逐条现扫。）
+    - **移交登记**：`审定表L1-1` 的 `L1-adj-*`（真库现算 32 行，task 10 快照）归「审定表引擎」
+      统一处置，本 spec 的 OO 往返脚本只做只读快照对账（前后 digest 不变），**未动** 该区数据。
+    - 🔴 **如实留白**：本收尾项中「INDEX.md 顶部 Active 统计段重算」未重跑全目录现扫
+      （本次只更新本 spec 行的完成度数字，未动统计段 —— 因勾选子项不改变 spec 的 active 归属，
+      按铁律⑫「禁按增量推算」则统计段应由做增删 spec 的任务现扫维护，本次无增删）。
