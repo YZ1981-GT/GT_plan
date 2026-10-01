@@ -436,7 +436,25 @@
 
 ## 阶段 6：L2~L8 推进（L1 闭环后开工）
 
-- [ ] 11. 抽 `phase5_l_cycle_common.py`
+- [x] 11. 抽 `phase5_l_cycle_common.py`
+  - **实施证据（2026-10-01）**：新建 `backend/app/services/workpaper_sync/phase5_l_cycle_common.py`，
+    L1 回迁后 provider 748 → 约 480 行，只剩声明（`IDENTITY` + `SPECS`）与 L1 独有选型判据。
+    - 🔴 **委派而不复制 H 骨架**：探针现算 H 骨架的 template / instrumentation / sheets 三段在 L1 上
+      **逐字节**复现 L1 既有产出（H 给 instrumentation 填 `sheet_key`、L1 原留 None，**不进 payload**）
+      ⇒ 这三段直接委派 `phase5_h_cycle_common`，L 骨架只拥有真不同的部分：契约 `review` 形态
+      （单 item + `row_identity_key` + `html_only_keys` + `derived_readonly_sheet`）、按 entry 声明的
+      `identity_carriers`（L1 3 载体 vs H 固定 4）、更严的 manifest 门（adapter_id 空串不放行）、
+      L 自己的错误类型、五环 `publish_definitions`（H 骨架无此段，从 L1 上提）。
+    - **回迁零漂移三重证据**：契约 canonical digest 仍 `0567f010…`（守卫钉死）· 生成器 `--check` 过 ·
+      🔴 **真库**：task76 `--check` 对 L1 得 `would_create_total=0` / `reused_current` —— 回迁后算出的
+      四段 digest 与已发布 definition 完全相同；真 OO 往返脚本经新 `attach_l_entry_adapter` 仍全绿。
+    - 守卫 `test_l_cycle_common.py`（9 test）：回迁零漂移 · L1 关键函数体必须引用 `_L.`（防被悄悄撤回成复制）·
+      骨架代码 AST 级零业务字面量（配变异证明：同口径扫 L1 provider 必命中）· 委派段与 H 逐字节等价 ·
+      manifest 门拒空 adapter_id · `extra_review` 不得覆盖既有键 · 模板字节漂移 fail closed。
+    - 错误码 `sync_phase5_l1_selection_invalid` 并入 `sync_phase5_l_selection_invalid`（全仓现算零消费方）。
+    - 回归：L/registry/contract 相关 327 passed；唯一红 `test_contract_directory_matches_the_delivery_ledger`
+      （a51/c2 登记无文件）HEAD 上同样红，非本任务引入。`check_sheet_specs_fully_registered` 现报 49 adapter
+      （并发会话期间从 42 涨到 49，非本任务所致）。
   - 🔴 L 域出现第二条 entry 时**必须先抽共性基类**，对标既有 `phase5_h_cycle_common.py`
     的 `instrumentation_specs_for(IDENTITY, specs)` / `template_definition_payload(identity, specs)`
   - 禁 8 份 provider 各复制一遍；L1 落成后回迁到基类，回迁前后 contract payload 逐字节不变
