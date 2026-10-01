@@ -5336,3 +5336,107 @@ row-code allowlist 在恢复后的模板上逐条重导（移出 3 条陈旧副�
 > `test_shared_base_consumer_counts_are_recomputed_both_ways` 报「窄口径现算 26 != 期望 27」
 > （共享基类消费方计数）。两条在 committed HEAD 上同样是红的，与本次恢复无关；
 > 它们在 `56acf363d^` 上是绿的，只是因为那时前端代码与测试文件都还是旧版。未代改。
+
+## 2026-10-01 H 循环 capability 正向门打开 + golden 门补齐 10 家 + 修好一条堵了三天的 P0
+
+本轮 4 个 commit：`88397deb5`（golden 门 24→34 家）· `4209a7897`（b60 块注释 P0）·
+`33e2a049b`（H 九条翻门 + 两组产物重算）· `9d9385495`（11 条判据翻面）。
+
+### 一、找到并修掉一条「把整条重算链堵了三天」的 P0
+`GtB60HourBudgetPanel.vue` 的 `<script setup>` 文件头注释里写了 `` `/rows/*/rowUuid` ``，
+其中 `*/` **提前闭合块注释**。esbuild 两版对跑（有区分力）：HEAD 版 exit 1
+（`Expected ";" but found "json_pointer"` at 18:47）· 修复版 exit 0 ⇒ 该底稿面在 HEAD 上
+**编译不过**。连带后果才是大头：discoverer 对它报 `Vue AST parse failed` 后**整个 mount
+discovery [FAIL]** ⇒ `generate_workpaper_sync_manifest.py --check/--apply` 自 2026-09-28
+（`8d7a52059`）起一次都跑不了、manifest 无法回灌，`test_workpaper_sync_manifest_contract.py`
+在 HEAD 上是 **6 errors**（全部 ERROR at setup，同一条 discovery 失败），而 CI 的
+backend-tests 是 `pytest backend/tests/ -x` ⇒ 整个 job 从这里断。
+期间 **16 个 commit / 45 个宿主文件**的接桥改动因此全部灌不进 manifest（累计 171 条 mount 落后）。
+
+### 二、golden 零回归门：24 家 → 34 家
+翻 H capability 的前置第⑤项要「golden digest 覆盖且零漂移」，现算只覆盖 **h9 一家**。
+把台账（51 条 / 48 family）与 `PROVIDERS`（24 家）对一遍 ⇒ **24 个 family 从未进过基线**，
+门对它们恒绿（没有东西可比）。这与 f1 曾被 `[SKIP]` 吞掉是同类不同机制：f1 是「登记了但
+跑挂被跳过」，这些是「**压根没登记**」，连 stderr 都没有一行。
+本批补 10 家：`g7`/`h1`（**已 bidirectional 上线、正在被用户使用却在门外**，pilot_* 命名
+当初按 phase5_* 收录时漏掉）+ H 八家。五元组按 `inspect.signature` 现场 introspect 定。
+`g7` 置 `has_projection=False` 是照脚本文件头自己的处置说明关掉那一段
+（`_synthetic_rows()` 对它直接抛 RuntimeError），代价如实记账：g7 只覆盖 2/3 段。
+自测里写死的 `if p["label"] == "b60"` 改成可伪证的 `_NO_PROJECTION_LABELS` 登记表 +
+与 `PROVIDERS.has_projection` **双向对账**的反向判据。
+
+🔴 基线取自 **HEAD 纯净 worktree**，不是本地脏树：工作树有并发会话未提交的
+`phase5_d3/d4/d567`，在脏树 `--update` 会把 d3 的 `d34~d37-managed` 与 d4 的
+`d44-managed` 写进基线 —— 那是给未入库代码背书，clean checkout / CI 上必打红且无人能解释。
+实测纯净树 198 digest / 34 家 / 零跳过 / 自测 11 passed；主脏树自测 10 passed + 1 failed，
+唯一的红就是 `[d4] sheet[d44-managed]`，归因于并发会话那个 +16 行。
+另记门语义：`_compare` **不比** `contract_payload_sha256`，只比 projection /
+instrumentation / 基线里**已有**的 sheet 粒度 digest（新增 sheet 是 additive）。
+
+### 三、H 九条 capability 翻门（h1 + 本轮九条 = H 十条全在门内）
+六项前置逐条现算 9/9（证据写进每条 override 的 `reason`）；宿主改线另算 9/9，
+反向对照 `GtI1IntangibleAssets.vue` 三项全 0 ⇒ 扫描器有区分力。
+`html_store` 按口径机械推导（`checklist_responses_` + 契约 `review.html_store.item_ids`
+逐个小写、`-`→`_`），已翻 7 家逐条验证符合；**h3/h7 各有两个 item_id**（成本/公允两段）
+⇒ 得到 `checklist_responses_h3_2_cost_rows__h3_2_fair_rows` 这种双段名，全仓首例。
+`approved_source_digest` `b6291b9f…`→`c2d6926a…` 的 mount diff 已**逐文件**归因：
+86 失 / 85 得 共 45 个宿主，`git log -1` 查下来全部落在已入库 commit，零未提交代码参与。
+
+**顺带修好 16 条预存红**（纯净 worktree 串行归因）：S1（仅 b60 修复）18 红 → S2 2 红，
+新引入 0；修好的是 manifest_contract 6 + legacy_baseline 1 + task73_entry_profile 9。
+重做 S2 幂等（digest 两次均 `bbd486f5…`）。
+
+### 四、🔴 本轮最值得记的三条教训
+1. **归因脚本不能与别的探针并发跑同一棵 worktree**。第一版把归因脚本和另一个还在跑的
+   探针并行启动，两者都在同一个 worktree 里 `git checkout`，结果归因脚本保存的「S2 产物」
+   其实是 HEAD 内容 ⇒ 跑出来的「新引入 0」是**拿 HEAD 跟 HEAD 比**，不构成证据。
+   改成单进程串行，并加两条自检断言（「S1 必须只有 h1 一条 bidirectional」「S2' 必须与
+   S2 digest 相同」）—— 判据自己要能发现自己被污染。
+2. **归因的覆盖面本身要先核**。只在 4 个文件上做 S1→S2 得「新引入 0」，换成 broad 子集
+   立刻抓出 **11 条真的新红**（H 的 canary 与 foundation 守卫都在
+   `tests/workpaper_sync/` 下，而那 4 个文件一个都不含）。那 4 个文件不是「抽样」，
+   是**漏掉了判据主场**。
+3. **pytest 的「绿」与「没跑」在摘要里长得一样**。`-k "h_ or manifest or …"` 把
+   `test_hosts_do_not_claim_bidirectional_writeback` 整条过滤掉了（名字里没有任何关键词），
+   于是它在两轮 broad 跑里都显示「S1 绿」；整文件跑才看清它在 S1 **就是红的**。
+   这是「结构性零须配变异证明」的测试选择器版本。
+
+### 五、🔴 如实记账：capability 门开了，但 runtime 注册仍 0/9
+`register_from_manifest()` 真 session 实证：九条 H **注册成功 0/9**。
+`blocked_reason` 已全 `None`（capability 门确实开了），卡在下一环 `_describe_entry_supply`：
+「该 entry 还没有 current published representation（`working_paper_sync_entry_state` 无行）」
+—— 要 `ContentMutationService.commit(...)` 产出首版 content version，属真实录入。
+更要紧的是**已翻门的 5 条（d1/d2/d4/g7/h1）同样注册不上**，报
+`entry_source_fact_unavailable: 挂载组件不唯一 ['GtOnlyOfficeSheet','WorkpaperSyncEditorHost']`
+⇒ 平台级预存缺陷，正是并发会话 spec `sync-editor-host-discovery-contract-closure` 在修的。
+⇒ 四份 H spec 仍 **72/80**，8 条 `[ ]*` 全是外部依赖，但欠账描述已从「BP-1~BP-3 门关着」
+更新为上面这两条更精确的卡点。
+
+接口勘误（三份 lane spec 的 AC 都写错，以现读为准、不回填 AC 正文）：
+`register_from_manifest` 不是自由函数而是 `WorkpaperSyncAdapterRegistry` 的 **async 方法**
+且需 `session=`（生产构造点 `build_production_registry()`）· `frozen_key` / `frozen_reason`
+字段**在实现里不存在**，实际机制是生产者侧 `review.frozen_cross_ref`（h6 的 `H6-2-rows`
+→ 3 个消费方、h9 的 `H9-2-rows` → 2 个消费方）· `forbidden_keys` 两份契约里都没有 ·
+`migrated_entry_ids()` 在 `backend/tests/workpaper_sync/h_migration_progress.py` 而不在 app 下。
+按猜的路径跑前置六项得「0/9」—— **一个全假的红**。
+
+### 六、并发写同一批文件的提交手法
+并发会话在我核验期间重生成了主树 overlay/manifest（entries 138→189、overrides 20→30、
+`approved_source_digest` `c2d6926a…`→`24a1b89a…`）。直接 `git add` 会提交他们**未提交**的
+那一版。故用 `git hash-object -w` + `git update-index --cacheinfo` **只把纯净 worktree 的
+5 件产物放进索引、不动工作树文件**：入库的是自洽快照，他们的工作树原样保留，且他们的重生成
+**已把这 9 条 override 吃进去**（现算 9/9 在册、reason 是本轮写的那段、`review_basis` 的链
+从 `c2d6926a…` 接上去）⇒ 后续他们提交时这 9 条不会丢。
+
+### 七、登记的预存欠账（不属本轮作业面）
+`test_task46_d_cycle_migration.py` 整文件 S1/S2 逐条相同的 **4 条**预存红：
+`test_hosts_do_not_claim_bidirectional_writeback`（`GtD4OperatingRevenue.vue` tooltip 写
+「本表尚未接入双向同步」，守卫禁 `双向同步` 子串而**分不清否定句**，是守卫侧假阳）·
+`test_no_d_entry_has_a_registered_adapter_and_pilot_evidence_exists` ·
+`test_authoritative_templates_digests_recompute` ·
+`test_every_entry_template_ref_is_registered_with_digest`。
+另：`test_workpaper_writer_inventory.py` 2 条（inventory source digest 过期，S1 就红）。
+另：台账 `adapter_registered` 字段**整体滞后** —— 全台账 `True` 只有 4 条（d2/d4/g7/h1），
+而 live manifest 已 bidirectional 18→28 条。平台级字段失修，已做成「登记 flag=True 的
+**集合**（不写条数）+ 双向对账 + flag 不得跑在 manifest 前面」的判据，不照它对齐
+（铁律㉗：对齐缺陷 = 把缺陷正当化）。

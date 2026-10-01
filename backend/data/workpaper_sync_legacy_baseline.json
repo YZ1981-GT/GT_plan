@@ -1,5 +1,5 @@
 {
-  "baseline_digest": "37a0a187d64447e7068dc68428d1e3944aaeaa6710fc16137b30bcc3a2054425",
+  "baseline_digest": "15f1acdde31182ee3b7a0fff6855ab85f3ad7e4ecf9240dbd532ad044c7bf39e",
   "entries": [
     {
       "capability": "single_html",
@@ -3872,27 +3872,25 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-h10-asset-disposal-income",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": true,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
         "html_reload_only",
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -3900,7 +3898,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue": "e6a3afbee5d899cdd288cdaeae247fc7e21e371b18d28a1b68b75fc49a2222e0",
+        "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue": "187c7d1ff8636f55d33d9bd930816343d0f59a9402967f94c496d9eeeb5eea5c",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -3920,7 +3918,7 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 35,
+            "line": 50,
             "snippet": "v-else-if=\"isHtmlSheet && currentSheet !== '底稿目录' && currentMode === 'onlyoffice'\""
           }
         ],
@@ -3928,26 +3926,24 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-h2-construction-in-progress",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -3983,26 +3979,24 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-h3-investment-property",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtH3InvestmentProperty.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -4038,26 +4032,24 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-h4-engineering-materials",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtH4EngineeringMaterials.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -4093,26 +4085,24 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-h5-oil-gas-assets",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -4148,26 +4138,24 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-h6-asset-disposal-clearing",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -4203,26 +4191,24 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-h7-biological-assets",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -4258,26 +4244,24 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-h8-right-of-use-assets",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -4313,26 +4297,24 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-h9-lease-liabilities",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -5413,24 +5395,26 @@
       }
     },
     {
-      "capability": "bidirectional",
+      "capability": "single_onlyoffice",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-l1-short-term-loans",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": false,
+        "missing_adapter": true,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": false,
+        "single_mode_switch_visible": true,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtL1ShortTermLoans.vue",
       "independent_entry": true,
-      "migration_state": "adapter_registered",
+      "migration_state": "legacy_fake_bidirectional",
       "reason_codes": [
+        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
+        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -6761,24 +6745,26 @@
       }
     },
     {
-      "capability": "bidirectional",
+      "capability": "single_onlyoffice",
       "document_type": "xlsx",
       "entry_id": "xlsx/j1/gt-j1-employee-compensation",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": false,
+        "missing_adapter": true,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": false,
+        "single_mode_switch_visible": true,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue",
       "independent_entry": true,
-      "migration_state": "adapter_registered",
+      "migration_state": "legacy_fake_bidirectional",
       "reason_codes": [
+        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
+        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -6787,26 +6773,26 @@
       ],
       "source_sha256": {
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a",
-        "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue": "cfa221073e995e7c22965934d5e82c669175c6528458e8afcf8ecfad80278565"
+        "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue": "22784d24a47522ee51d3ddac64f669f2e23157d7396f167cd7c89b7505f388c1"
       },
       "ui_characterization": {
         "evidence": [
           {
             "file": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue",
             "kind": "dual_mode_state",
-            "line": 11,
-            "snippet": "<el-segmented v-if=\"dualMode.ooAvailable.value\" :model-value=\"dualMode.mode.value === 'html' ? 'HTML' : 'OnlyOffice'\" @change=\"(v: any) => dualMode.switchMode(v === 'HTML' ? 'html'"
+            "line": 10,
+            "snippet": "<el-segmented :model-value=\"dualMode.mode.value === 'html' ? 'HTML' : 'OnlyOffice'\" @change=\"(v: any) => dualMode.switchMode(v === 'HTML' ? 'html' : 'onlyoffice')\" :options=\"['HTML"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue",
             "kind": "segmented_mode_switch",
-            "line": 11,
-            "snippet": "<el-segmented v-if=\"dualMode.ooAvailable.value\" :model-value=\"dualMode.mode.value === 'html' ? 'HTML' : 'OnlyOffice'\" @change=\"(v: any) => dualMode.switchMode(v === 'HTML' ? 'html'"
+            "line": 10,
+            "snippet": "<el-segmented :model-value=\"dualMode.mode.value === 'html' ? 'HTML' : 'OnlyOffice'\" @change=\"(v: any) => dualMode.switchMode(v === 'HTML' ? 'html' : 'onlyoffice')\" :options=\"['HTML"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 21,
+            "line": 17,
             "snippet": "v-if=\"!isLoading && isHtmlSheet && dualMode.mode.value === 'onlyoffice'\""
           }
         ],
@@ -7610,18 +7596,18 @@
       }
     }
   ],
-  "manifest_digest": "47d23dcc4ecf403877a56132deeaa49bfbbd37395fe9393b143496b8feab4a4d",
+  "manifest_digest": "bbd486f597d7a18e2934c88e0a144214e772c0668443d617e282af6022ba2c41",
   "schema_version": 1,
-  "source_digest": "0db41b28a7d108344fec2db5d3d7973bdbadb1b1037defb42dd613ae8c2ed5fd",
+  "source_digest": "704b705355c78059e4a246c953abd7f4159322eb3bdb0e27ffc17dbb7cc07d96",
   "stats": {
     "claimed_bidirectional_without_adapter_count": 0,
     "entry_count": 155,
     "html_reload_only_count": 15,
     "independent_entry_count": 142,
-    "missing_adapter_count": 135,
+    "missing_adapter_count": 128,
     "no_durable_forcesave_ack_count": 142,
     "no_forcesave_command_count": 124,
-    "single_mode_switch_visible_count": 125,
+    "single_mode_switch_visible_count": 118,
     "template_only_open_count": 109
   }
 }

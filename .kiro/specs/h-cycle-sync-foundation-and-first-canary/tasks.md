@@ -412,3 +412,117 @@ golden digest 的三段里有两段（`instrumentation_spec(s)()` 与 `build_sto
    为「已翻的 9 条必须 `adapter_registered` 且 `adapter_id` 非空」，并对剩余未翻 entry 保持原判据；
 6. 发布链（provision + rematerialize）+ 真栈 L1/L2 验收，H9 用真库载荷（canary 真库非空），
    H3/H5/H7/H4 主表键真库零载荷 ⇒ 只能标合成场景或等真实录入，**不造数据当实证**。
+
+---
+
+## 2026-10-01 capability 正向门已打开（commit `33e2a049b`），但 runtime 注册仍 0/9
+
+### 做了什么
+H 十条 entry（h1 pilot + 本轮 h2~h10 九条）现在全部是
+`capability=bidirectional` · `adapter_id=<台账 contract_id>` ·
+`migration_state=adapter_registered` ·
+`canonical_resolver=workpaper_sync_published_representation` · `html_store` 已裁决。
+入口是 overlay 的 9 条 override（`backend/data/workpaper_sync_entry_overlay.json`），
+产物是 manifest / legacy baseline 两组共 5 个文件。
+
+### 六项前置逐条现算 9/9（证据落在每条 override 的 `reason` 里）
+| # | 判据 | 现算 |
+|---|---|---|
+| ① | 正式契约 `review.review_status == 'reviewed'` | 9/9 |
+| ② | `STORE_MERGE_REGISTRY` 已注册该 `contract_id` | 9/9（H 域 10 个键齐） |
+| ③ | `DELIVERED_PER_ENTRY_CONTRACTS` 登记 + provider 可 import | 9/9 |
+| ④ | `build_manifest_registration_plan(entries)` `blocked_reason=None`，且 `provider_module ∈ _ALLOWED_PROVIDER_MODULES` | 9/9 |
+| ⑤ | `check_sync_provider_golden_digest` 覆盖该 family 且零漂移 | 9/9（commit `88397deb5` 把 PROVIDERS 24→34，此前只覆盖 h9） |
+| ⑥ | `h_migration_progress.migrated_entry_ids()` 含该 entry | 9/9 |
+
+🔴 ④ 与 ⑥ 的接口路径**第一版全猜错了**：④ 不在 `manifest_registration_plan` 模块而在
+`adapters/registry.py`，且签名是 `entries: Mapping[entry_id, entry]` 而不是 id 列表；
+⑥ 不在 app 下而在 `backend/tests/workpaper_sync/h_migration_progress.py`。按猜的路径跑
+出来是「六项全通过 **0/9**」——**一个全假的红**。改成现读后才是 9/9。（方法论㉑）
+
+宿主改线另行现算（不看注释、不抽样）：模板有 `<WorkpaperSyncEditorHost` 挂点 +
+`:bridge="hSync.syncBridge"` 绑定 + script 有该组件 import，九条 **9/9**；
+反向对照 `GtI1IntangibleAssets.vue` 三项全 **0** ⇒ 扫描器有区分力，不是恒真。
+
+### 🔴 `register_from_manifest()` 真 session 实证：九条 H 注册成功 **0/9**
+capability 门确已打开（`blocked_reason` 9/9 为 `None`），但卡在**下一环** `_describe_entry_supply`：
+
+> 该 entry 还没有 current published representation（`working_paper_sync_entry_state` 无行）
+> —— 它由 `ContentMutationService.commit(...)` 产出首版 content version
+
+即需要**真实底稿内容提交**，属真实录入，与 Task 20a* 的「不得造数据当实证」同源。
+
+更要紧的是：**已翻门的 5 条（d1 / d2 / d4 / g7 / h1）同样注册不上**，报
+`entry_source_fact_unavailable: 挂载组件不唯一 ['GtOnlyOfficeSheet','WorkpaperSyncEditorHost']`
+—— 平台级预存缺陷，正是并发会话 spec `sync-editor-host-discovery-contract-closure`
+在修的东西（`entry_source_facts.py` 此刻有其未提交改动）。本轮不碰。
+
+⇒ **Task 20a* / 20b* 保持 `[]*`**，但欠账描述从「BP-1~BP-3 门关着」更新为：
+门已开，卡 ① published representation 供给（真实录入）② 上述平台级 `挂载组件不唯一`。
+
+🔴 接口勘误（三份 lane spec 的 AC 都写错了）：`register_from_manifest` **不是自由函数**，
+是 `WorkpaperSyncAdapterRegistry` 的 **async 方法**且要 `session=`；生产构造点是
+`build_production_registry()`（它自己 bind 计划，直接 `bind_registration_plan()` 会缺
+`plan` 位置参数）。另 AC 里的 `frozen_key` / `frozen_reason` 字段**在实现里不存在**，
+实际机制是生产者侧契约的 `review.frozen_cross_ref`（现算 h6 的 `H6-2-rows` → 3 个消费方、
+h9 的 `H9-2-rows` → 2 个消费方）。
+
+### 顺带修好 16 条预存红（纯净 worktree 串行归因）
+| 状态 | 红 |
+|---|---|
+| S1 = `4209a7897`（仅 b60 注释修复） | **18**（12 failed + 6 errors） |
+| S2 = S1 + 本轮翻门 + 两组产物重算 | **2** |
+
+新引入 **0**；修好 **16** = `test_workpaper_sync_manifest_contract` 6 +
+`test_workpaper_sync_legacy_baseline` 1 + `test_task73_entry_profile_manifest` 9。
+余 2 条（`test_workpaper_writer_inventory` 的 inventory source digest 过期）S1 就红，
+与本轮无关。重做 S2 幂等（manifest digest 两次均 `bbd486f5…`）。
+
+根因链：`GtB60HourBudgetPanel.vue` 的 `<script setup>` 文件头注释里写了
+`` `/rows/*/rowUuid` ``，`*/` 提前闭合块注释 ⇒ esbuild exit 1 ⇒ discoverer 报
+`Vue AST parse failed` ⇒ **整个 mount discovery [FAIL]** ⇒ 自 2026-09-28（`8d7a52059`）起
+`--check/--apply` 一次都跑不了、manifest 无法回灌。修复见 commit `4209a7897`。
+
+🔴 **归因方法踩过一次坑并已改正**：第一版把归因脚本与另一个仍在跑的探针并行启动，
+两者都在同一个 worktree 里 `git checkout`，结果脚本保存的「S2 产物」其实是 HEAD 内容
+⇒ 跑出来的「新引入 0」是拿 HEAD 跟 HEAD 比，**不构成证据**。改成单进程串行重做，
+并加「S1 必须只有 h1 一条 bidirectional」「S2' 必须与 S2 digest 相同」两条自检断言。
+
+### 判据翻面三处（原判据变成「要求成果不许存在」）
+`test_h_cycle_migration_progress_state.py`
+* `test_no_slice_entry_has_a_registered_adapter` →
+  `test_slice_entries_now_have_registered_adapters_in_the_source_manifest`：
+  slice 侧仍断言 `adapter_id is None`（规划期冻结快照，append-only 不回填），
+  live manifest 侧断言四项齐备，且 `adapter_id` 必须与台账 `contract_id` **逐字相等**。
+* 台账 `adapter_registered` 那条由 `is False` 改为不再硬判：现算全台账 `True` 只有 **4** 条
+  （d2/d4/g7/h1），而 live `bidirectional` 已 18→28 条 ⇒ 这个字段**整体滞后**，是平台级
+  字段失修、不属本 spec 作业面。照它「对齐」会把滞后正当化（铁律㉗），直接改 True 又会
+  造出第二套口径。改为只认 manifest 这个运行时真源，并新增
+  `test_ledger_adapter_registered_lag_is_a_ratchet`：登记 flag=True 的**集合**
+  （不写条数 —— 条数在不同检出状态下不同，写死必各错一次）+ 双向对账 +
+  「flag 不得跑在 manifest 前面」+ 「H 域 live bidirectional 恰 10 条」。
+
+`test_task50_h_cycle_migration.py`
+* `test_manifest_mirror_divergence_is_registered_not_silently_equal`：mirror 侧断言它仍是
+  规划期三个值（`single_onlyoffice` / `unresolved` / 非空 `legacy_reasons`），live 侧断言
+  已前进到迁移后的值，BP-9 那条登记原样保留。
+* `test_registered_entry_ids_agree_with_the_slice`：对账另一侧由冻结 slice 换成 live
+  manifest（前端 TS 投影 vs 后端 JSON 是同一事实的两个投影）。
+
+两文件合计 **101 passed**。
+
+### approved_source_digest 复核（`b6291b9f…` → `c2d6926a…`）
+mounts 245→244 / hosts 154。86 失 / 85 得 共涉 **45** 个宿主文件，逐文件 `git log -1`
+查下来**全部落在已入库 commit**（`8d7a52059` G 循环 15 个 / `9c325aea4` K lane1 7 个 /
+`7e23512bf` F2 四 entry / `4591f9bb7` H2·H6·H8·H9 等共 16 个 commit），零未提交代码参与。
+85 组「失 2 得 2」是接桥造成的行号位移 re-hash。唯一净减 1 条是 `GtWpRenderer.vue` 的
+`mount_d4b8a91cbb8386a448b3` —— 上一版复核已登记过的同一个度量口径差，Word 能力零损失。
+
+### 提交方式（并发会话同时在改同一批文件）
+并发会话在我核验期间重生成了主树 overlay/manifest（entries 138→189、overrides 20→30、
+`approved_source_digest` `c2d6926a…`→`24a1b89a…`，其 spec 让发现器纳入
+`WorkpaperSyncEditorHost`、新增 96 挂点 / 51 宿主）。故本 commit 用
+`git hash-object -w` + `git update-index --cacheinfo` **只把纯净 worktree 的 5 件产物放进
+索引、不动工作树文件**：入库的是自洽快照（clean checkout 上判据全绿），他们的工作树原样
+保留，且他们的重生成**已把这 9 条 override 吃进去**（现算 9/9 在册、`reason` 是本轮写的
+那段、`review_basis` 的链从 `c2d6926a…` 接上去）⇒ 后续他们提交时这 9 条不会丢。

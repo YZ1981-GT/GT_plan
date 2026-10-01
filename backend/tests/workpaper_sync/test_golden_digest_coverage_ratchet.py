@@ -60,24 +60,24 @@ def _delivered_families() -> dict[str, tuple[str, ...]]:
     return {k: tuple(sorted(v)) for k, v in out.items()}
 
 
-#: 🔴 **只许变短的棘轮**：已交付但尚未纳入 golden 零回归门的 family（2026-09-30 现算 24 个）。
+#: 🔴 **只许变短的棘轮**：已交付但尚未纳入 golden 零回归门的 family。
 #:
+#: 轨迹：2026-09-30 首测 **24 个** → 同日补齐 10 家（`g7`/`h1` + H 循环 8 家）后 **14 个**。
 #: 每补齐一家就从这里删一行；**新增一行必须写明理由**，而且下面那条
 #: `bidirectional` 不变量会独立把「带着缺口上线」拦下来。
 _UNCOVERED_BY_GOLDEN_GATE: frozenset[str] = frozenset({
-    # ── 已 bidirectional 却不在门内（见 test_no_bidirectional_entry_escapes…）──
-    "g7",   # pilot_g7_two_level_dynamic —— pilot_* 命名，当初按 phase5_* 收录时漏了
-    "h1",   # pilot_h1_grouped_dynamic  —— 同上
-    # ── 其余 22 家：契约与 provider 已交付，capability 仍 single_onlyoffice ──
+    # ── 尚未纳入：契约与 provider 已交付，capability 仍 single_onlyoffice ──
     "a51", "c2",
     "f2", "f3", "f4", "f5",
-    "h2", "h3", "h4", "h5", "h6", "h7", "h8", "h10",
     "i1", "i2", "i3", "i4", "i5", "i6",
 })
 
-#: 🔴 当前**违反**「bidirectional ⟹ 在门内」的 family。两条都是早期 pilot。
-#: 这个集合**只许变空**：任何新 entry 翻 bidirectional 之前必须先进 golden 门。
-_BIDIRECTIONAL_BUT_UNCOVERED: frozenset[str] = frozenset({"g7", "h1"})
+#: 🔴 **违反**「bidirectional ⟹ 在门内」的 family。**已清空**（2026-09-30）。
+#:
+#: 原有两条 `g7` / `h1` 是早期 pilot（`pilot_*` 命名，当初按 `phase5_*` 收录时漏掉），
+#: 而它们**正在被用户使用** —— 优先级高于尚未翻门的 H，故与 H 八家同批补进 golden 门。
+#: 这个集合**必须保持为空**：任何 entry 翻 bidirectional 之前必须先进门。
+_BIDIRECTIONAL_BUT_UNCOVERED: frozenset[str] = frozenset()
 
 
 @pytest.fixture(scope="module")
@@ -177,16 +177,22 @@ def test_no_bidirectional_entry_escapes_the_golden_gate_beyond_the_two_pilots(
     )
 
 
-def test_the_two_known_violations_really_are_pilot_named_modules() -> None:
+def test_every_remaining_violation_has_a_falsifiable_exemption_reason() -> None:
     """豁免必须是**可伪证的声明**，不能只留一句理由文本。
 
-    棘轮里给 `g7` / `h1` 写的理由是「`pilot_*` 命名，按 `phase5_*` 收录时漏了」——
-    这里就去台账里核实它们的 `provider_module` 真的是 `pilot_*`。
-    理由若不成立（比如哪天改名成 `phase5_*` 了），这条判据会红，豁免也就该重新评估。
+    集合现在是空的，所以这条判据当下是**空分母**。保留它而不是删掉，是为了「哪天有人
+    往 `_BIDIRECTIONAL_BUT_UNCOVERED` 加回一条」时，必须同时交出可核实的理由 ——
+    当初给 `g7`/`h1` 写的理由是「`pilot_*` 命名、按 `phase5_*` 收录时漏了」，
+    那条就是去台账核实 `provider_module` 真的以 `pilot_` 开头。
+
+    🔴 空分母要显式声明，不能让它看起来像「检查过且都合规」。
     """
     from app.services.workpaper_sync.adapters.delivered_contracts_ledger import (
         DELIVERED_PER_ENTRY_CONTRACTS,
     )
+
+    if not _BIDIRECTIONAL_BUT_UNCOVERED:
+        pytest.skip("违反集合已清空（g7/h1 已于 2026-09-30 纳入 golden 门）—— 本判据空分母")
 
     by_family = {
         str(r["contract_id"]).split(".", 1)[0]: str(r.get("provider_module") or "")
@@ -196,6 +202,16 @@ def test_the_two_known_violations_really_are_pilot_named_modules() -> None:
         mod = by_family.get(fam, "")
         assert mod, f"{fam} 不在台账里，豁免理由无从核实"
         assert ".pilot_" in mod, (
-            f"{fam} 的 provider_module 是 {mod!r}，已不是 pilot_* 命名 ⇒ "
-            "「当初按 phase5_* 收录时漏了」这条豁免理由不再成立，请纳入 golden 门"
+            f"{fam} 的 provider_module 是 {mod!r} —— 豁免理由不再成立，请纳入 golden 门"
+        )
+
+
+def test_the_two_pilots_are_now_inside_the_gate(registered: tuple[str, ...]) -> None:
+    """正向锁：`g7` / `h1` 既然已补进门，就不许再退出去。
+
+    它们是**已上线的双向底稿**，退出门 = 用户在用的东西失去零回归保护。
+    """
+    for fam in ("g7", "h1"):
+        assert fam in registered, (
+            f"{fam} 从 golden 门里消失了 —— 它是已上线的 bidirectional 底稿，不得退出"
         )

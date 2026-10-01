@@ -1,5 +1,5 @@
 {
-  "digest_count": 165,
+  "digest_count": 198,
   "providers": [
     {
       "label": "b60",
@@ -184,6 +184,108 @@
       "instrumentation_sha256": "59f629166b75264c0055917e01605d2d157d9c97385089eda68839ce3dfe670b"
     },
     {
+      "label": "g7",
+      "adapter_id": "g7.soe_subsidiary_disclosure",
+      "contract_payload_sha256": "aa2caa887fd7c3d6413d5a2becce90f2189dbdaf66f9a0c64b2e338985a0567f",
+      "sheet_digests": {
+        "g7n-managed": "9efedb366722d8e7484eb33fbea5e7fba4e3aa249d9268b5d384b028dbc4e6f9"
+      },
+      "store_projection_sha256": null,
+      "instrumentation_sha256": "212365d19c29fefa20179bdc69c608f62c7730d8de1e8ea75e2e1531e43b9d6d"
+    },
+    {
+      "label": "h1",
+      "adapter_id": "h1.disposal_check",
+      "contract_payload_sha256": "064b11a66d371e283f1c08fc10ad6693c7015024f12268cf14fec0c91474fcd2",
+      "sheet_digests": {
+        "h18-managed": "2e2bf219dc0d8978c68b6b35ec12ca6db0b99e9f403718fbeb5a9cffece70e28"
+      },
+      "store_projection_sha256": "ee044ecdb5599e8c299164f607e06b1663e2e4f966dc98b03fca03a51f9fa3df",
+      "instrumentation_sha256": "8421b204ce3b288b413edddbe899cc89436f5e734f1b73f64f96e29109b9e647"
+    },
+    {
+      "label": "h2",
+      "adapter_id": "h2.construction_in_progress_detail",
+      "contract_payload_sha256": "54ac71557e8f4e41724ca9a926e754dbf7b4259ff1cfefcd456c4cccf1790e72",
+      "sheet_digests": {
+        "h202-managed": "d373c5511d2a0f77b011d961ae9f0acfd35b19f380ba70ce75c1f96c75a947fb"
+      },
+      "store_projection_sha256": "d52e63a76072feafc9b66e3cfabf45d26ad42f9f15767885f443b0b1f20c3b9d",
+      "instrumentation_sha256": "a5b0cd0628718b220781fbd71becdf64faf93493e8e141d1495477645c607ee6"
+    },
+    {
+      "label": "h3",
+      "adapter_id": "h3.investment_property_detail",
+      "contract_payload_sha256": "3a0e652fda62fb0d2903672d5edb1b61f98f2cc808fc7cc01e818cb0eebd9d1b",
+      "sheet_digests": {
+        "h302cost-managed": "396399d5464682aa6e2d35e1085b197830686cbe1e9fc1b7cff722d117eff624",
+        "h302fair-managed": "36b3ec2d1cce26433b47df595f4766d5e9b36962ff854dd30f5b92c2121d7037"
+      },
+      "store_projection_sha256": "bded0e8cd0b65f0521eb9c6cdcdb79dc35909cf69cab574a04c1ae3b34a0b0ed",
+      "instrumentation_sha256": "dbad4071580c41128e59e648223c660c7518f3fe34fbb6598fc095d53f7e66d7"
+    },
+    {
+      "label": "h4",
+      "adapter_id": "h4.engineering_materials_detail",
+      "contract_payload_sha256": "ca09e704d3fcc6339a66e305922f763bfd85f40663559684e175170095b1e266",
+      "sheet_digests": {
+        "h402-managed": "1015c876c8f81c2a68a2764f3d06150887606b4de07190dc97bdfd5a61671159"
+      },
+      "store_projection_sha256": "2027288a1e9319ea3ab161fe72242efc4b29ce0a1a419bf55a7984f396162425",
+      "instrumentation_sha256": "a002dc287b94d16b33daab2a0c35b4820d36976dce5c8bae10934c7d9ab55192"
+    },
+    {
+      "label": "h5",
+      "adapter_id": "h5.oil_gas_assets_detail",
+      "contract_payload_sha256": "dd12e2f233f108b62efa056a1010e32efcda2051224e9a461dbdf9e60479c7e3",
+      "sheet_digests": {
+        "h502-managed": "0a747bfa1b19d3e2bc77b1f117674e402187057c0adfee4d8578cc271302e80b"
+      },
+      "store_projection_sha256": "c57131ae80a222161ce30a3dfe023430ecd32b0bf3091825d026971939c3856e",
+      "instrumentation_sha256": "43765385107f8b1233f4dedb79208e8101584242657a07e7c924e3ae73804397"
+    },
+    {
+      "label": "h6",
+      "adapter_id": "h6.asset_disposal_clearing_detail",
+      "contract_payload_sha256": "ede38ed733bcf3d50d21245c6ca04e852c1e844e79b116482479a467ceda7062",
+      "sheet_digests": {
+        "h602-managed": "dd462ff6cfca6fe23e7833eaf87161b84f8df986f84b2147ec579d7d4f939545"
+      },
+      "store_projection_sha256": "4f1b0bb7e4559d109b5656d6d0a6c19cea80e8e7b086390ceda5f33c4e6229b2",
+      "instrumentation_sha256": "31227f6ead32834c119477e8504764e7a1eec67f7c476f7d73295f8a84753ed7"
+    },
+    {
+      "label": "h7",
+      "adapter_id": "h7.biological_assets_detail",
+      "contract_payload_sha256": "1ef80d96a8e1640d564c74efcb94aec8a3e54aba115ef8f8f7de10c415f2c169",
+      "sheet_digests": {
+        "h702cost-managed": "0030c0fc6e0d6e731221a7a060d42d828f449d46dde45f43b969812080b6f823",
+        "h702fair-managed": "f7ea4faf5dddff3fea866e64b1969b09443a1f6d065a914477f724ea1ef6a6ac"
+      },
+      "store_projection_sha256": "4d6b037972d079810458f022543d30e66c32b64b7fce7a40d8ed2a1cf0d55243",
+      "instrumentation_sha256": "ce59ba473a88090776f336f15695aa01603f572468333e0df5ab4aaa0e62909d"
+    },
+    {
+      "label": "h8",
+      "adapter_id": "h8.right_of_use_assets_detail",
+      "contract_payload_sha256": "6b4ac7008e86b8223eb9902f7ee023e810e9fa6d85da9fd1c54fa15ac56f5e7a",
+      "sheet_digests": {
+        "h802-managed": "20f388279ec2b03c7f599db935c3b33b75af33f2f0e07ce3c2c433abaeb1d9bc"
+      },
+      "store_projection_sha256": "138e47e0befd6b6cda71c3cd25177a75cfb839fb1ab2917cf73463f967beb68b",
+      "instrumentation_sha256": "b527accc30494e2fe524d191cac271da5928942e40a026eef8c3bb492cdb34ff"
+    },
+    {
+      "label": "h10",
+      "adapter_id": "h10.asset_disposal_income_adjustment",
+      "contract_payload_sha256": "83cb076c1c982855609edd6b8f566a26aaa115e9344a267921c3ce86684a6d8b",
+      "sheet_digests": {
+        "h1003-managed": "4e9c8fd8373b2b15f3777f2b8bf3ffe35fee4562f3d0abc934c2fc85a9212f46"
+      },
+      "store_projection_sha256": "ad6a7f5deeab478648125fb187cf30e5152e6b3626d59738dcbc4e027527ef9a",
+      "instrumentation_sha256": "870a59ba84d9814acf1c53c523f20400a03758330fbef5ab65ab71907378294f"
+    },
+    {
       "label": "g9",
       "adapter_id": "g9.other_noncurrent_detail",
       "contract_payload_sha256": "95a6ae0ca66cbf7bb33c185034502b8aa05b40fdfb7cc92eba16aa2fafbedef1",
@@ -302,26 +404,6 @@
       },
       "store_projection_sha256": "fb8c6a1393ca241d5ec330dbc2eda2b5937151a095e48a715bfd1e5295d97093",
       "instrumentation_sha256": "abef2d5b0405eb541dd9ec54cc26e6bdca0a8de94f7913f0f930e497acf3379f"
-    },
-    {
-      "label": "l1",
-      "adapter_id": "l1.short_term_loans",
-      "contract_payload_sha256": "0567f0106127c6e97781fc8ecd8e66984c67bed3d26ce76d0249da858bdc7952",
-      "sheet_digests": {
-        "l12-managed": "c2fabda3d0d7150c534fd98e5cb3523165b5ec1917ace0822f18be746c89a0f9"
-      },
-      "store_projection_sha256": "53e8f7ab9accd13110d32477edf4fefe16d8ed6a5f4fa0ba690354b964a2a090",
-      "instrumentation_sha256": "e96bea047ef1594d83a6539f049e5d35126b7ddc2306270cf91a9c245cf61112"
-    },
-    {
-      "label": "j1",
-      "adapter_id": "j1.accrual_check_short_term",
-      "contract_payload_sha256": "11fb8d3d8e026592b1bfdc8af5b60d64c2ad23bf0c26f1dcfe672042ff8ad4bc",
-      "sheet_digests": {
-        "j16-short-term-managed": "3d77ae2ccd68d40a4b0847cfc6d1aea2464086e7201c66e03ae085b46474ee65"
-      },
-      "store_projection_sha256": "5ec7d832e18fe0850398165b2a7f140d98f19f764c366578f6a15d5a2d61b2f8",
-      "instrumentation_sha256": "9ca2e9e57cba19a9135fe736cb6c85609668d2f4384d17ab405a3ec4e00e4da4"
     }
   ],
   "skipped": []
