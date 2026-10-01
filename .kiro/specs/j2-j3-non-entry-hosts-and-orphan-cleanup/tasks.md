@@ -116,6 +116,13 @@ HC-1~HC-16 · IC-1~IC-20。
     删它等于**额外宣称那 4 个也死** ⇒ 违反本 spec Task 6 的「不得过度宣称」，
     也超出 deletion plan 精确只列 4 条的授权范围；`j3/index.ts` 同理还挂着 5 个未授权处置的
     orphan。⇒ 只摘掉指向已删模块的 re-export 并在 barrel 内留判定依据注释，剩余归下一轮。
+  - 🔴 **2026-10-01 复核仍维持「barrel 不删」，并补两条新事实**（探针现算 import 边，排除测试）：
+    ① `j2/` 下 **8 个**模块的生产入边**全部只来自 `j2/index.ts`**（或经它再转一跳），barrel 自身入边 0
+    ⇒ 整个 J2 composable 层不可达；`j3/` 下除 `useJ3ImportExport`（`J3TabDetail.vue` 深链）外 **5 个**同型
+    ② `components/workpaper/__tests__/ieOrphanBaseline.spec.ts` 把 `j2/index.ts` 当作「孤儿链」**活样本**
+    断言其存在且零消费方 —— 单删 barrel 会打红该守卫且让 8+5 个模块失去唯一入边。
+    ⇒ 正确处置是**整层孤儿清理**（约 13 模块 + 其测试 + 改 ieOrphanBaseline 基线），属删除范围扩大，
+    超出 deletion plan 只列 4 条的授权，**需用户确认后另起一轮**，本 Task 维持 `[ ]*`
   - 🔴 **按已有 `workpaper_sync_j_cycle_deletion_plan.json` 执行，不另起计划**
   - 删除范围：OD-1 ~ OD-4 四个 orphan dual-mode + 两个 orphan barrel +
     `useJ3FormData` 簇（含评估 `useJ3Detail` / `useJ3Integration` 是否同批）

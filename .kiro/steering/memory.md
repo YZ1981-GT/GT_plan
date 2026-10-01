@@ -132,6 +132,21 @@ inclusion: always
 - 🔴 **五轮复盘再抓 4 处「守卫在但不生效」（design §十五，T29~T35）** —— ①**P0：CI 注册表漂移门禁永假** `governance-checks.yml` 的 `note-section-map-naming` 末步是 `--write` + `git diff --exit-code`，而生成器每次写 `generated_at=datetime.now()` ⇒ diff 必非空 ⇒ 该步**必然失败**；job 无 continue-on-error/if:、触发 `push work/**` + PR ⇒ 长期全红 ⇒ **红成常态=没人看=门禁不存在**，这正是 76/78 漂移能活下来的机制（对照实验实证：旧生成器 --write 必改文件且只改 generated_at）⇒ 修法 = **输出幂等**（entries+_source 未变则沿用原时间戳）+ 加 `--check`（漂移 exit 2 并点名），CI 换用 `--check`（项目本有此约定，这条是唯一例外）；触类旁通扫 28 个带时间戳产物 + CI 全部 `--write`-后比较 step ⇒ **本类单次出现已清零** ②spec 四处引用「46 个」当反例却**从没改注释本体**（引用≠修复）⇒ 按 T25 改成写口径不写数 ③全宿主守卫两个静默脱管口（只扫 `components/workpaper/` · 只认 `function` 形态）⇒ 补 3 断言 + 真建 2 个违规文件变异 ④同 job 另有**预存**红（`e1Fx`/`restrictedAssets` 漏登 allowlist，`git stash` 归因证实非本轮）⇒ 只修门禁 job 仍全红故一并修，且**不是加豁免蒙绿**（两文件头自带「故意排除」理由），顺带把 allowlist 从名字清单升级为可伪证声明（加 `inRegistry` 字段+一致性断言）
 - 教训已固化为方法论铁律 **㉓㉔㉕㉖㉗**；完整复盘见 `#dev-history` 2026-09-28 节与 spec `design.md` §十一~§十五
 
+### J 循环真双向改线（2026-10-01，未提交）
+- J1 provider 补 store 门面 + 修错签名 `build_registration/register_adapter` + 补五环发布别名；`STORE_MERGE_REGISTRY` 加 `j1.accrual_check_short_term`（43 adapter）；裁决表加 J1→`J1`（工具 `fix_j_cycle_wp_code_adjudication.py`）；task76/first_publication `--check` 通过、止步缺 approved bundle；Task 23 notice+二级门控已做并 Playwright 两态实测
+- 🔴 **H 系 phase5 provider 同样缺 `publish_pilot_definitions`/`PILOT_WP_CODES`** ⇒ 走 task76 必判「provider 是空壳」，接线前须补
+- 🔴 共享基类 `useWorkpaperEntryDualMode` 的成员是 `ooAvailable`（无 `isOoAvailable`，那是 I/L 自有 composable 的名字）
+- 🔴 **真库 2026-10-01 疑被重置**：checklist_responses 仅 122 行（J 前缀 0）、content_representation 仅 1 行 ⇒ 历史 spec 的真库证据（canary 载荷等）需重新取证
+- J1 已真库首版发布（representation generation 1，wp c5f12dfd）；途中 J1 模板按 D3~D7 范式净化外链（`sanitize_j1_template_external_links.py`，哨兵 6830eda6）；provider 补 `instrumentation_spec()` 单数 + `ROWS_TABLE_KEY/UUID_COL`
+- ✅ **J1 = 真双向**（分支 `work/2026-10-01-j-cycle-true-bidirectional`）：真 OO 往返曾抓到行翻倍（模板带标签骨架行盖 `GTROW-J16S-*`，HTML 自铸 `acr-*` 不相交 ⇒ 插骨架后 38 行）⇒ 前端骨架行身份改用模板行身份（`j1/inspection/j1AccrualRowIdentity.ts`），两轮往返全绿 + `J1_RT_LEGACY_IDS=1` 变异仍红；🔴 **凡模板预置带标签行的受管表，接线前先核 HTML 骨架行身份 == instrumentation 模板行身份**（L1 能过只因骨架行只有序号）
+- 🔴 ConvertService xlsx→xlsx 不重算公式 ⇒ 往返判公式禁读缓存值；PowerShell `$env:` + Start-Process 注入子进程不可靠，变异用 `cmd /c set X=1&&` 显式注入
+- 🔴 overlay/manifest 是多会话热点：翻转一律在干净 HEAD worktree 只叠加本 spec 改动生成、走独立分支提交；主工作树 overlay 里有 K 会话未提交的 override
+- 待用户拍板：J2/J3 整层孤儿清理（j2 8 + j3 5 模块只经零入边 barrel，`ieOrphanBaseline.spec` 拿 j2/index.ts 当活样本）
+
+### N 循环三份 sync spec（2026-10-01，**未提交**；22/23 · 17/18 · 16/17，余项均 `[ ]*` 平台级）
+- 口径 `scripts/analyze/n_cycle_scanner.py` + 基线/分歧表 `tests/workpaper_sync/n_cycle_facts.py`；新平台件 `shared/stableRowIdentity.ts` · `shared/checklistPayload.ts`（`remark ?? conclusion` 遇 remark 空串丢整表）· `sync/onlyOfficeSheetConfig.ts`；真库 N 域仅 3 行 ⇒ canary 真库往返空分母；🔴 待决：`n4TaxTypes.ts` 成二阶 orphan（接线还是删）
+- 🔴 教训：按下标寻址先查是否渲染**过滤/分组子表**（`$index`≠全量下标，N5-5/N5-6-1 真缺陷）· `watch(immediate)` 早于所引 `const` 注册 = TDZ 崩 · 终端 >30s 发 ^C ⇒ 长跑用 `Start-Process -RedirectStandardOutput` 轮询 · 冻结改线前贡献值须把 HEAD 内容换进**真实路径**再量
+
 ### 「已交付」与「在库」是两件事（2026-09-30，一天内抓到 4 类共 30 处）
 - 🔴 **已提交代码引用未提交模块**：干净检出（CI / 新 clone / 容器）在 import 期就挂，本地全绿。实测 20 处横跨 8 个 spec，其中 `store_mirror.py`（518 行）被 `oo_to_html.py` 依赖、spec 标「✅ 已交付」、薄壳转发也入库了，**只有被转发的模块没入库**。已全部补提交。守卫 `test_committed_code_imports_only_committed_modules.py`：**AST import ∪ 字符串式动态引用**两种形态（registry 用字符串常量 + `importlib.import_module` 登记 provider ⇒ 只扫 AST 得**假的 0**，实测漏 2 个真缺口）；口径须限**直接子文件**（`git ls-files` 会返 `adapters/base.py`，其 stem 与顶层 glob 混比造出 4 个假差集）。
 - 🔴 **spec 标 100% 但产物未入库**：上一条的盲区是**无引用方**的交付物（`phase5_d3_01_adjudication.py` 同族 5 兄弟全已入库、只它漏了，无人 import 故只有按「spec 完成度」的判据能抓）。但抓到的要分两类且处置相反：①忘了提交 ⇒ `git add`；②**spec 的 tasks.md 假绿**（d3 标 17/17 而 8 份验收判据实测仍红）⇒ **不能**入库，CI 的 `backend-tests` 是 `pytest backend/tests/ -x` 全量带 `-x`，一条红就整个 job 中断。⇒ 棘轮登记 + 每条写明实测失败形态 + 反向判据（入库后必须删该条）。

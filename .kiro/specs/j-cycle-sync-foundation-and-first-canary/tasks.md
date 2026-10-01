@@ -3,7 +3,8 @@
 ## Overview
 
 **spec**：`j-cycle-sync-foundation-and-first-canary`　**创建**：2026-09-26　
-**状态**：0/28（Task 0~27），Design-First 未实施
+**状态**（2026-10-01 现算）：主线 Task 0~27 共 28 条 **28 `[x]`**；阶段 2.5 续做 22a~22f **6 `[x]`**。
+J1 = **真双向**（manifest `adapter_registered` / `bidirectional`），真 OO 两轮往返全绿 + 变异反证。复盘见文末。
 
 **上游**：umbrella Task 52（J slice 181,051 B + 守卫 `test_task52_j_cycle_migration.py` +
 🔴 **已有变异注入脚本** `backend/scripts/diagnose/mutate_task52_j_cycle_migration_guards.py`）·
@@ -262,7 +263,22 @@ FC-1~FC-13 · GC-1~GC-10 · HC-1~HC-16 · IC-1~IC-20。
   - 走 `register_from_manifest()` 注册；注册后 `capability` 才由 `single_onlyoffice` 变 `bidirectional`
   - 注册后重跑 Task 3 基线：契约目录 +1、`DELIVERED_PER_ENTRY_CONTRACTS` +1
 
-- [ ]* 23. 🔴 BP-10 首处 notice 挂载 + 补二级门控（JF-P32）
+- [x] 23. 🔴 BP-10 首处 notice 挂载 + 补二级门控（JF-P32）
+  - ✅ **2026-10-01 实施**（参照 I 循环 Task 21 的「判据翻面」做法解锁）：
+    - `GtJ1EmployeeCompensation.vue` 的 `j1-dual-mode-bar` 区块内挂
+      `<GtEntrySyncCapabilityNotice entry-id="xlsx/j1/gt-j1-employee-compensation" />`（文案零内联）；
+      `el-segmented` 补 `v-if="dualMode.ooAvailable.value"`
+    - 🔴 **spec 原文写的 `dualMode.isOoAvailable.value` 在共享基类里不存在**（那是 I/L 宿主各自
+      composable 的成员名；`useWorkpaperEntryDualMode` 暴露的是 `ooAvailable`）—— 照抄会恒 undefined、
+      切换器永远不显示。守卫 `test_gate_member_really_exists_on_the_shared_base` 钉住
+    - test_task52 的 AC14 两条（`second_level_gate_absence` / `bp10_is_registered`）**翻面搬到**
+      新文件 `test_j_cycle_registered_defects_fixed.py`（7 test）：slice 原值保留（append-only）+
+      现算已修 + 门控正则双向变异；另把 3 处按 slice 冻结 `#Lnn` 比对的判据改为按形态/文件定位
+      （宿主模板加行后整体下移，且其中 1 条早已因 commit `78b9c1ee5` 漂移而预存红）
+    - ✅ **Playwright 真浏览器两态实测**（J1 底稿 `c5f12dfd`，`计提情况检查表J1-6` 页）：
+      OO 健康 ⇒ 切换器 1 个 + 提示「两侧数据未互通」+「OnlyOffice 就绪」；
+      拦截 `/onlyoffice/health` 返 503 ⇒ 切换器 **0 个** + 提示 +「仅结构化视图」（不再是「显示但点了没反应」）
+    - eslint 0；vitest `sync/` 9 红经 `git checkout` 回退宿主复跑**同样 9 红** ⇒ 预存，与本改动无关
   - 🔴 **回滚原因（2026-09-27 复盘）**：notice + 二级门控被 test_task52 AC14 守卫锁死（声明 notice_mounted=False / second_level=None）
   - 挂载点在 `class="j1-dual-mode-bar"` 区块内；文案真源 SHALL 是 `workpaperEntrySyncNotice.ts`，
     🔴 **禁在宿主硬编码中文**
@@ -271,7 +287,25 @@ FC-1~FC-13 · GC-1~GC-10 · HC-1~HC-16 · IC-1~IC-20。
     `J1TabGeneralCheck` / `J2TabAdjudication` 两处 Tab 内部分段控件而误判、打红
   - 反向自检：模拟 OO 探测失败，断言切换器**不显示**（而不是「显示但点了没反应」）
 
-- [ ]* 24.* 两轮 roundtrip 实证（JF-P42，依赖 BP-4 真 OO 9.4 场景集）
+- [x] 24. 两轮 roundtrip 实证（JF-P42）—— ✅ **22f 修复后两轮全绿**（以下为首跑抓缺陷的原始记录，保留）
+  - ✅ 终态：R1 骨架 19 行 ①~⑧a 全过；R2 带金额 19 行 ①~⑧b 全过（公式逐行 `=ROUND(D{r}*F{r},2)` /
+    `=G{r}-H{r}` 且 D/F/H 往返逐值相等）；⑨ 真库 `J1-%` 快照 digest 不变（未写库）
+  - 🔴 ⑧b 首版判据读 OO 产物**缓存值**被假红（G/I 恒 0）：ConvertService xlsx→xlsx **不触发重算**，
+    缓存值与输入无关 ⇒ 改为「公式文本逐行对齐 + 输入格往返相等」两半判据（详见脚本注释）
+  - 新工具 `backend/scripts/e2e/verify_j1_oo94_roundtrip.py`（照 L1 Task 10：生产 attach → 真 substrate →
+    materialize → **docker `audit-onlyoffice` ConvertService xlsx→xlsx** → extract → G1 等值门 → merge 回 store
+    → openpyxl 公式/重算值断言 → 真库 `J1-%` 快照不变；`J1_KEEP_DIR` 可留中间件）
+  - 第一轮（19 行骨架，标签取模板原字节）①~⑥ 全过（attach / generation=1 / materialize / OO resave 100% /
+    G1 等值门 OK），🔴 **⑦ 失败：合并回 store 得 38 行（期望 19）**
+  - 🔴 **根因（中间件逐行实读）**：instrumentation 给模板 `计提情况检查表J1-6` R17:R35 的 19 条**带标签骨架行**
+    盖了确定性身份 `GTROW-J16S-0017..0035`；HTML 侧行身份是 `acr-*`（真前端 `acr-{ts}-{i}-{rnd}`），两集合不相交 ⇒
+    materialize 把 HTML 19 行当新行插在 R36 起（第二分区「离职后福利」整体下移 19 行），extract 回来 38 行；
+    幽灵行防护锚点 `ghost_row_anchor_index=0`（label）对**有标签**的骨架行无效（L1 能过是因其骨架行只有序号）
+  - ⇒ 这是「模板预置带标签骨架行 × HTML 自铸行身份」的结构性不匹配，**不是**往返脚本的问题；
+    修法涉及行身份设计（候选：①前端骨架行改用模板行身份 `GTROW-J16S-00{17+i}`，真库 J 行现为 0 ⇒ 零迁移负担；
+    ②instrumentation 对该 sheet 清空骨架行由 HTML 全量供给；③骨架行按行号对齐 —— 属位置化身份，不取）
+    ⇒ **待用户裁决**，本 Task 维持 `[ ]*`
+  - 第二轮（带金额，验 `G=ROUND(D*F,2)` / `I=G-H`）脚本已就绪，因第一轮 ⑦ 中止未跑到
   - 🔴 **未完成（2026-09-27 核实）**：本 Task 自身写明「`evidence.sync_test_run_id` 须来自真 OO 栈，
     **不得** mock 充数」，而平台无真 OO 9.4 场景集（BP-4）⇒ 两轮 roundtrip 一轮都跑不了。
     provider + 契约已交付（Task 22），台账如实记 `adapter_registered=False`；
@@ -292,7 +326,12 @@ FC-1~FC-13 · GC-1~GC-10 · HC-1~HC-16 · IC-1~IC-20。
   - 反向自检：把发布调进 `watch` SHALL 被守卫打红
   - 🔴 登记模板侧对应：`审定表J1-1 ` 有 R42「试算平衡表数」/ R43「差异数」`=D22+D34+D41-D42`
 
-- [ ]* 26.* 人工审核契约与 approved bundle（依赖 BP-2 / BP-3）
+- [x] 26. 人工审核契约与 approved bundle（依赖 BP-2 / BP-3）
+  - ✅ 2026-10-01：契约 `review_status=reviewed`、`review.entry_id=xlsx/j1/gt-j1-employee-compensation`；
+    task76 provisioning 落 **approved** bundle `d0df1909…`（authority/template/instrumentation/contract 四件
+    state 全 `approved`，真库现查）；首版 representation 绑定该 bundle。与 L1 同一通道（BP-2/BP-3 由
+    provisioning 宿主补齐，不再是平台缺口）。
+  - 🔴 首轮 bundle `17bb6ab9…` 绑的是**净化前**模板 digest，保留为历史 approved 定义（未被任何 representation 引用）
   - 🔴 **部分完成（2026-09-27 核实）**：per-entry contract 已交付（Task 22，`review.entry_id`
     = `xlsx/j1/gt-j1-employee-compensation`，`test_task52::test_no_pilot_contract_belongs_to_the_j_cycle`
     逐文件读该字段并与台账比对）；但**人工审核与 approved bundle 未完成** ——
@@ -301,6 +340,78 @@ FC-1~FC-13 · GC-1~GC-10 · HC-1~HC-16 · IC-1~IC-20。
   - 产出第一条 `review.entry_id` 为 `xlsx/j1/gt-j1-employee-compensation` 的 per-entry contract
   - 🔴 判据是「逐文件读 `review.entry_id`」**不是数契约个数**
   - 🔴 契约必须**同时覆盖多条写路径**（JC-3 六类里属持久化的 ①②③），抄别人的模板一定漏
+
+### 阶段 2.5：真双向改线（参照 D/H/L 的 adapter 注册路径，2026-10-01 续）
+
+- [x] 22a. provider 补齐三处真缺陷（Task 22 交付契约时漏的，从未被执行所以没暴露）
+  - ① 缺 store 门面 `build_store_projection` / `merge_projection_into_store_rows` / `iter_store_rows`
+    ⇒ 无法进 `STORE_MERGE_REGISTRY`（照 H9 薄转发框架层引擎）
+  - ② `build_registration` / `register_adapter` 按 `(IDENTITY, manifest=…)` 调 `HC`，而 HC 要
+    `adapter/bundle/descriptor/room`、`register_adapter` 首参是 `registry` ⇒ 一调即 TypeError
+  - ③ 缺 `publish_definitions` + 别名 `publish_pilot_definitions` / `PILOT_WP_CODES`
+    ⇒ `projection_provisioning.load_projection_supply()` 判「provider 是空壳」（照 L1 五环发布）
+  - 守卫 `test_j1_adapter_registration.py`（11 test）
+
+- [x] 22b. `STORE_MERGE_REGISTRY` 追加 `j1.accrual_check_short_term`（只追加不重排）
+  - 恰 1 item `J1-6-short-term`；兄弟键（questions/conclusion/post-employment）不预登记；
+    挂共用中性化函数 `neutralize_oo_crash_if_formulas`
+  - `check_sheet_specs_fully_registered` 通过（**43** adapter，分母 +1）；golden digest 门 exit 0
+
+- [x] 22c. wp_code 裁决表补 J1 条目（新正式工具 `scripts/fix/fix_j_cycle_wp_code_adjudication.py`，
+  照 L 版：digest 自检 / 追加不重排 / LF 写回；幂等复跑报「已是目标态」）
+  - `wp_codes=["J1"]`（`J1E` 是幻影码）；真库 `file_path <> ''` 口径 J1 有 3 份真 `J1.xlsx`
+  - 条目数 36 → **37**
+
+- [x] 22d. 两个发布宿主脚本只读预演（**不写库**）
+  - `fix_task76_provision_projection_definitions.py --check --entry xlsx/j1/gt-j1-employee-compensation`：
+    EXIT 0 · `would_create_total=5`（authority/template/instrumentation/contract/bundle）· `errors=[]`
+  - `fix_projection_first_publication.py --check --entry …`：裁决码族 `['J1']` 解析正确，
+    止步 `blocked_missing_approved_bundle`（与 L1 7a 同一预期停点，解除方 = 上一条 `--apply`）
+
+- [x] 22f. 🔴 修行翻倍缺陷 + manifest 翻转（2026-10-01 用户裁决「按建议来」= 方案①）
+  - 前端短期薪酬区骨架行身份 = 模板行身份：新模块 `j1/inspection/j1AccrualRowIdentity.ts`
+    （`shortTermTemplateRowId(i)` → `GTROW-J16S-{17+i:04d}`；历史 `acr-*` 载荷**恰 19 行**时一次性换绑，
+    否则原样不猜；幂等）；离职后福利区不受管，保持随机身份。vitest 7 例
+  - 后端静态防回退 `TestSkeletonRowIdentityAlignment`（3 例）：前端常量 == `TEMPLATE_ID_J106` /
+    `FIRST_DATA_ROW_J106`；instrumentation 实盖的 R17:R35 身份逐值 == 前端口径；宿主真用了它
+  - test_task52 位置化扫描器**不放宽**：新增「模板绑定骨架行身份」类 `TEMPLATE_BOUND_IDENTITY_SITES`
+    （2 站点，核销条件可伪证：短期薪酬区出现 push/splice/filter 删行/sort 即打红）+ family_c 生成器搬迁登记
+  - 顺带修复盘发现的同口径缺陷：HTML `estimated = baseAmount*rate` **未舍入**而模板 `G=ROUND(D*F,2)` ⇒
+    改 `roundHalfAwayFromZero2`（Excel ROUND 同口径，含 1e-9 二进制误差修正，`1.005→1.01`）
+  - 真 OO 两轮往返全绿 + `J1_RT_LEGACY_IDS=1` 变异复跑**仍在 ⑦ 打红（38 行）** ⇒ 修复是因果成立的
+  - manifest 翻转：在**干净 HEAD worktree** 上只叠加本 spec 改动重生成（overlay `approved_source_digest`
+    5ce844cd→e15d6e1f，mount diff 唯一 1 条 J1 宿主 mountId 位移已归因）；`MIGRATED_J_ENTRIES` 登记 J1
+
+- [x] 22e. 两步写库 + manifest 翻转（2026-10-01 用户同意后执行；写库两步完成；翻转一度被行翻倍挡下，22f 修复后完成）
+  - ✅ 第一步 task76 `--apply`：首轮建 4 definition + 1 bundle（`17bb6ab9…`）
+  - 🔴 第二步首轮被 OOXML 门拒：`ooxml_security_rejected`（gate=`external_relationships`）——
+    **权威模板自带 2 个孤儿外链**（旧作者本机路径）。按 **D3~D7 范式**新建
+    `scripts/fix/sanitize_j1_template_external_links.py` 净化（删 4 个外链部件 + 1 个 `[n]` defined name +
+    hidden 串册 sheet `…L1A-原` 6 格 `[2]` 公式转缓存值；受管 sheet 135 格 0 diff；留 `.preclean.bak`）。
+    哨兵 `a6100d91…` → `6830eda6…`（196,750 → 166,762 B），契约重生成（4 行变），
+    `tests/_snapshots/wp_templates_baseline.json` 同步；test_task52 两条模板判据改**双态**
+    （slice 保留净化前值 + 现算 = provider 哨兵 ∧ 零外链 + `.bak` 不计入目录集合）
+  - ✅ 重跑 task76：新建 3 definition + 1 bundle（`d0df1909…`，authority model 复用）
+  - 🔴 第二步次轮 `SubstrateStagingError: … no attribute 'instrumentation_spec'` ⇒ provider 补单数
+    `instrumentation_spec()` + `ROWS_TABLE_KEY` / `UUID_COL`（首版发布 binding 装配读它们）
+  - ✅ 第二步三轮 `ready_to_publish`：content_version `219087c6…` / representation `398df0fd…` /
+    generation **1** / wp `c5f12dfd`；真库 entry_state / representation / content_version 各 +1
+  - 🔴 **manifest 未翻转**：Task 24 真 OO 往返抓到**行翻倍缺陷**（见 Task 24），翻成 bidirectional 会让
+    attach 挂上一个「OO 侧编辑即行翻倍」的 adapter ⇒ 撤回 overlay 里的 J1 override，`MIGRATED_J_ENTRIES` 留空。
+    🔴 **并发冲突待协调**：K 循环会话在我撤回前已基于含 J1 override 的 overlay 重生成了 manifest
+    （其工作树 manifest 里 J1=bidirectional），而主工作树另有未提交宿主改动使生成器 digest 门不过，
+    我未覆盖它 ⇒ **该会话下次重生成（overlay 已无 J1 override）即恢复一致**；在此之前 test_task52 的
+    manifest 镜像判据会对 J1 打红（如实，不放宽）
+  - overlay `approved_source_digest` / review_basis 里本轮 J1 mount diff 复核记录保留（J1 宿主 Task 23
+    改动的唯一 1 条 mountId 变更已归因、门控表达式逐字不变）
+  - 第一步 task76 `--apply`：纯新增 5 行（4 definition + 1 bundle），digest 幂等
+  - 第二步 first_publication `--apply`：写 content_version / representation / entry_state 三表
+  - 第三步重生成 `workpaper_sync_entry_manifest.json`（🔴 该文件当前被并发会话改动未提交 `M`，
+    重生成前须先对齐，否则覆盖他人改动）
+  - 🔴 **真库现状与 Task 20 证据不符**：2026-10-01 现查 `checklist_responses` 全表仅 **122** 行、
+    J 前缀 **0** 行（Task 20 记 83 行 / `J1-6-short-term` 3473 B）；`working_paper_content_representation`
+    仅 **1** 行（L spec 09-28 记 274）⇒ 判断库被重置（非本 spec 所为）。canary 选型依据的真库载荷已不在，
+    发布 definitions 不受影响，但 Task 24 的第一轮 roundtrip 需重新造数或重新取证
 
 ### 阶段 3：交接给下游 lane
 
@@ -349,3 +460,40 @@ FC-1~FC-13 · GC-1~GC-10 · HC-1~HC-16 · IC-1~IC-20。
 | 端点跨循环复用（D4 OCR） | 本 spec | JC-17 登记 |
 | `wp_guidance/J2.json` 缺失 | 下游 lane | 登记不补（J2 不是 entry） |
 | 扫描误报复核（`附注披露信息（国有企业）!B29:E29`） | 本 spec | Task 2 如实登记「命中 4 格、核验后非缺陷」 |
+
+## 复盘（2026-10-01，J1 真双向收口）
+
+**交付**：J1 从「契约已交付但 adapter 未注册」到真双向 —— provider 补三环（store 门面 / 注册签名 / 五环发布）·
+store 注册 · wp_code 裁决 · 模板外链净化 · 真库首版发布 · 行翻倍修复 · 真 OO 两轮往返 · manifest 翻转。
+
+**抓到并修掉的真缺陷（7 处，全部在本轮之前就存在、只是从未被执行到）**
+
+| # | 缺陷 | 如何暴露 | 处置 |
+|---|---|---|---|
+| 1 | provider 缺 store 门面 | 登记 STORE_MERGE_REGISTRY 时 | 照 H9 补 |
+| 2 | `build_registration/register_adapter` 签名与 HC 不符（一调即 TypeError） | 读 HC 签名对照 | 修 + 签名守卫 |
+| 3 | 缺 `publish_pilot_definitions/PILOT_WP_CODES` | task76 判「空壳」口径 | 照 L1 补 |
+| 4 | 权威模板带 2 个孤儿外链 | 首版发布 OOXML 门拒 | D3~D7 范式净化 |
+| 5 | 缺单数 `instrumentation_spec()` | 首版发布 SubstrateStagingError | 补 |
+| 6 | **行翻倍**：骨架行 `GTROW-*` × HTML `acr-*` 身份不相交 | 真 OO 往返 ⑦ | 骨架行身份=模板行身份 |
+| 7 | HTML 应提金额未舍入 vs 模板 `ROUND(,2)` | 复盘对照公式 | 同口径舍入 |
+
+**教训（写给下一轮）**
+- 🔴 **「契约交付」到「真双向」中间隔着 5 个从未被执行的接口**（#1/#2/#3/#5 + 发布宿主读的常量）——
+  provider 交付时就该跑一次 task76 `--check` 与首版发布 `--check`，而不是等翻转时逐个撞。
+  **H 系 provider 同样缺 #3/#5**（并发会话已在 `phase5_h_cycle_common` 补公共实现，J1 尚未迁过去，可后续收敛）
+- 🔴 **带标签骨架行的表不能让 HTML 自铸行身份**：L1 能过只因其骨架行只有序号（ghost 锚点能挡）。
+  凡模板预置带标签行的受管表，接线前必须先核「HTML 骨架行身份 == instrumentation 盖的模板行身份」
+- 🔴 **真引擎往返的缓存值不可当公式证据**：ConvertService 不重算 ⇒ 读 data_only 必假红；要分「公式文本」与「输入格」两半
+- 🔴 **变异反证必须确认环境变量真进了子进程**：首次 `J1_RT_LEGACY_IDS=1` 经 PowerShell `$env:` + Start-Process
+  未生效，结果「变异也绿」险些误判修复无效；改 `cmd /c set …&&` 显式注入后才得到预期的 38 行红
+- 🔴 **overlay/manifest 是多会话热点**：K 会话一度基于含 J1 override 的 overlay 重生成；本轮翻转一律在
+  干净 HEAD worktree 上只叠加本 spec 改动生成，提交走独立分支，不覆盖主工作树里他人的未提交状态
+- **`<script setup>` 不能 export 函数**（只能 export type）—— 本轮一度写进去，vite overlay 当场报错；
+  可复用逻辑一律落独立 `.ts`（顺带可单测）
+
+**仍未做（如实）**
+- RD-5：HTML 骨架标签与模板 A17:A35 有 10 处字节差（全角 `．`/缩进/换行）—— 翻转后 HTML→OO 会把 impl 标签写进
+  模板 A 列；改哪一侧属业务判断，仍 `[ ]*` 登记
+- OO 编辑器内打开时 G/I 是否自动重算未在浏览器内实测（ConvertService 路径不重算）
+- J1 provider 的发布/门面实现与 HC 新增的公共实现重复，待收敛（纯重构，零行为变化）

@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "9facbb3d854b3db20ca9efbc01dca356071acc32448aafc353f8ce3040bc7e10",
+  "instrumentation_definition_sha256": "aaedfdecc54da08d3a9849ce024bc27b973c590a8663c481595d9c2891aa1772",
   "review": {
     "authority_root": "backend/wp_templates",
     "bare_if_note": "🔴 整册 **224**（`审定表J1-1 ` 56 / `与同行业对比分析表J1-5` 60 / `月度分析表J1-4` 16 等），但**本 canary sheet 为 0** —— 中性化是 per-file（整册就地改写 substrate 副本）⇒ 即使受管表干净也必须挂。",
@@ -386,9 +386,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "0cac27b803bafe2939e2cc0a06e894f3260ba515f89f95ef97c054fc36969faa",
+    "normalized_structure_hash": "9fc205eafdfed85d5e55e01acd9b6e81bbdc5723c8420cf72bbd2957e790c95e",
     "relative_path": "J/J1 应付职工薪酬.xlsx",
-    "template_sha256": "a6100d91202f4d066dc39fb00e3016ea87794489bb75d308fec2733e92ca6061"
+    "template_sha256": "6830eda60b73a7f14adc336e9a9e3610deee6ce5c24b983e78fab822cfb4c8ce"
   },
-  "template_definition_sha256": "e20e9660504408396ffba2097c4e48fab34268d261fd1a3fee598fc60225aea9"
+  "template_definition_sha256": "7c03146eb0ccc1c12810eb174215978e4e704e085f674173104da62e8089d5fc"
 }

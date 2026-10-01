@@ -1,5 +1,5 @@
 {
-  "baseline_digest": "35f20268ab449bd34c0ae4320ec4f6ff45b772725496671b7a58b98855d0f5f1",
+  "baseline_digest": "37a0a187d64447e7068dc68428d1e3944aaeaa6710fc16137b30bcc3a2054425",
   "entries": [
     {
       "capability": "single_html",
@@ -6761,26 +6761,24 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/j1/gt-j1-employee-compensation",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -6789,26 +6787,26 @@
       ],
       "source_sha256": {
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a",
-        "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue": "22784d24a47522ee51d3ddac64f669f2e23157d7396f167cd7c89b7505f388c1"
+        "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue": "cfa221073e995e7c22965934d5e82c669175c6528458e8afcf8ecfad80278565"
       },
       "ui_characterization": {
         "evidence": [
           {
             "file": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue",
             "kind": "dual_mode_state",
-            "line": 10,
-            "snippet": "<el-segmented :model-value=\"dualMode.mode.value === 'html' ? 'HTML' : 'OnlyOffice'\" @change=\"(v: any) => dualMode.switchMode(v === 'HTML' ? 'html' : 'onlyoffice')\" :options=\"['HTML"
+            "line": 11,
+            "snippet": "<el-segmented v-if=\"dualMode.ooAvailable.value\" :model-value=\"dualMode.mode.value === 'html' ? 'HTML' : 'OnlyOffice'\" @change=\"(v: any) => dualMode.switchMode(v === 'HTML' ? 'html'"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue",
             "kind": "segmented_mode_switch",
-            "line": 10,
-            "snippet": "<el-segmented :model-value=\"dualMode.mode.value === 'html' ? 'HTML' : 'OnlyOffice'\" @change=\"(v: any) => dualMode.switchMode(v === 'HTML' ? 'html' : 'onlyoffice')\" :options=\"['HTML"
+            "line": 11,
+            "snippet": "<el-segmented v-if=\"dualMode.ooAvailable.value\" :model-value=\"dualMode.mode.value === 'html' ? 'HTML' : 'OnlyOffice'\" @change=\"(v: any) => dualMode.switchMode(v === 'HTML' ? 'html'"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 17,
+            "line": 21,
             "snippet": "v-if=\"!isLoading && isHtmlSheet && dualMode.mode.value === 'onlyoffice'\""
           }
         ],
@@ -7612,18 +7610,18 @@
       }
     }
   ],
-  "manifest_digest": "02e749339398565a6a7ebf3733dbb6ac530fc0b5db13493fda3ed6a47ad4db71",
+  "manifest_digest": "47d23dcc4ecf403877a56132deeaa49bfbbd37395fe9393b143496b8feab4a4d",
   "schema_version": 1,
-  "source_digest": "45c5432a7bbc2bd157a9a43869d811c91e5f2c4c3633df84e16ec770926798c3",
+  "source_digest": "0db41b28a7d108344fec2db5d3d7973bdbadb1b1037defb42dd613ae8c2ed5fd",
   "stats": {
     "claimed_bidirectional_without_adapter_count": 0,
     "entry_count": 155,
     "html_reload_only_count": 15,
     "independent_entry_count": 142,
-    "missing_adapter_count": 136,
+    "missing_adapter_count": 135,
     "no_durable_forcesave_ack_count": 142,
     "no_forcesave_command_count": 124,
-    "single_mode_switch_visible_count": 126,
+    "single_mode_switch_visible_count": 125,
     "template_only_open_count": 109
   }
 }

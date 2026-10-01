@@ -22965,26 +22965,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "j1.accrual_check_short_term",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/j1/gt-j1-employee-compensation",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_j1_accrual_short_term_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mounts": [
         {
           "attributes": [
@@ -23032,17 +23028,17 @@
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_5768342ec366b0dee907",
+          "mountId": "mount_1bb28c2e0016a542b532",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"dualMode.resolveOoSheetName()\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 114,
-            "endLine": 18,
+            "endLine": 22,
             "startColumn": 5,
-            "startLine": 17
+            "startLine": 21
           },
-          "templateNodeOrdinal": 9,
+          "templateNodeOrdinal": 10,
           "wpExpression": ":wp-id=\"wpId\""
         }
       ],
@@ -23056,7 +23052,7 @@
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
-          "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L17",
+          "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L21",
           "backend/app/routers/wp_onlyoffice_router.py#L736"
         ]
       },
@@ -25724,11 +25720,11 @@
       }
     }
   ],
-  "manifest_digest": "02e749339398565a6a7ebf3733dbb6ac530fc0b5db13493fda3ed6a47ad4db71",
-  "overlay_digest": "5c34c27297a4794fdb829fa12b390f37a1d250eac53a05fb60b9736222566dd5",
-  "profile_source_digest": "0fbeceee8b064d0edfeb82168b7a766322483ff421b3aa8c72d818858c887b29",
+  "manifest_digest": "47d23dcc4ecf403877a56132deeaa49bfbbd37395fe9393b143496b8feab4a4d",
+  "overlay_digest": "fb289cdd1477d330c03016e359cd835d0476d52b7e9ab3656f011e775e6d7d8b",
+  "profile_source_digest": "b38744894f8c7ee78756942d2bbddc30addb1518f053696edfdd351733769bfe",
   "schema_version": 1,
-  "source_digest": "5ce844cd60bf65877ef2e447c6e1ce906a54b20a3147bf792925b35961a08702",
+  "source_digest": "e15d6e1fcd650b4550a85ad3a958ce163b97534be48492f897d4d17f0e33906d",
   "stats": {
     "by_component": {
       "GtOnlyOfficeSheet": 238,
@@ -25736,9 +25732,9 @@
       "WorkpaperWordEditor": 4
     },
     "capability_counts": {
-      "bidirectional": 6,
+      "bidirectional": 7,
       "single_html": 5,
-      "single_onlyoffice": 143,
+      "single_onlyoffice": 142,
       "unreachable": 1
     },
     "dispatcher_count": 1,
@@ -25749,7 +25745,7 @@
     "entry_count": 155,
     "host_count": 154,
     "independent_entry_count": 142,
-    "legacy_fake_bidirectional_count": 135,
+    "legacy_fake_bidirectional_count": 134,
     "mount_count": 244,
     "parent_duplicate_count": 12,
     "room_model_counts": {
@@ -25765,7 +25761,7 @@
       "xlsx.editable.shared.single.room_service_wired.v1": 147,
       "xlsx.unreachable.none.single.room_service_wired.v1": 1
     },
-    "unadjudicated_count": 130,
+    "unadjudicated_count": 129,
     "unreachable_count": 1
   }
 }

@@ -1,5 +1,5 @@
 {
-  "adjudication_digest": "05f13ef12aee700ebef991fa0209d8b65d10f32dbcf5ec6ccfc8b347b1c1dc5f",
+  "adjudication_digest": "4a8bf0a2784e2a73dc0dd72d3c3b75515876ed7d882580b78cfd35d66c08a0d5",
   "adjudication_digest_algorithm": "sha256(json.dumps(adjudications, sort_keys=True, ensure_ascii=False, separators=(',',':')).encode('utf-8')).hexdigest()",
   "adjudication_digest_note": "🔴 2026-09-04：原 digest 的算法全仓无处记载（只有它自己出现一次），无法复算 ⇒ 改文件后留着它就是把错值当基线锁死。已换成算法自带的形态，见 `adjudication_digest_algorithm`。原值 c8b2bc2031e4041b143e6df973ee3d87ef641a23c28a5289b0da799ab3606125",
   "adjudications": [
@@ -1102,6 +1102,32 @@
       },
       "wp_codes": [
         "L1"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 J1E 在 wp_index 里 0 命中（GtJ1EmployeeCompensation → J1E 是幻影码）",
+        "heuristic_would_say": [
+          "J1E"
+        ],
+        "managed_excel_name": "计提情况检查表J1-6",
+        "template_relative_path": "J/J1 应付职工薪酬.xlsx",
+        "wp_index_evidence": "2026-10-01 真库现查（`file_path <> ''` 口径，不用 `count(file_path)` —— 它不排除空串）：wp_code=J1「应付职工薪酬」3 行且 3 行都有真路径 `storage/projects/{pid}/workpapers/J/J1.xlsx`（整册 23 sheet 的工作簿）；另有 J1「应付职工薪酬审定表」2 行指向 `wp_storage/` 下 uuid 文件名。`J1-2`「应付职工薪酬明细表」2 行有独立 `J1-2.xlsx`，1 行无文件。受管 sheet `计提情况检查表J1-6` 是 `J1.xlsx` 里的一张 sheet（wp_index 无 `J1-6` 行）⇒ 目标码取持有整册文件的 `J1`。`J1E` 是 CamelCase 幻影码，wp_index 零命中。"
+      },
+      "contract_id": "j1.accrual_check_short_term",
+      "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-01",
+        "store_item_id": "J1-6-short-term",
+        "why_null": "🔴 2026-10-01 现查 `checklist_responses` 全表仅 **122** 行、`item_id ~ '^J[0-9]'` **0** 行 —— spec Task 20 记录的 `J1-6-short-term` 3473 B 载荷在当前真库**已不存在**（同时 `working_paper_content_representation` 由 L spec 记录的 274 行降为 1 行，判断为库被重置，非本脚本所为）⇒ 目标 item 无法按载荷定码，本条以 file_path 证据定 `J1`。",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      },
+      "wp_codes": [
+        "J1"
       ]
     }
   ],

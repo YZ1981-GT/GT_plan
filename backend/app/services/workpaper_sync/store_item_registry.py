@@ -696,6 +696,24 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="L1-2-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── J1（spec: j-cycle-sync-foundation-and-first-canary · 参照 D/H/L 真双向注册）──
+    #
+    # 受管 sheet = `计提情况检查表J1-6` 短期薪酬区（R17:R35，19 行），canary 键
+    # `J1-6-short-term`（真库 3473 B，全 J 最大）。行身份字段是 **`id`**（不是 `rowId`）。
+    #
+    # 🔴 `items` 只登记本轮真受管的一条：同 Tab 兄弟键 `J1-6-post-employment`
+    #    （structured_row_array）/ `J1-6-questions`（free_text_array）/
+    #    `J1-6-conclusion`（free_text_scalar）**不预登记**；primary table
+    #    `J1-2-detail-*` 三键真库全空，归后续批次。
+    #
+    # 🔴 GC-2：J1 册裸 IF **224 格**，**受管表零命中** ⇒ per-file 保守策略照挂，
+    #    中性化函数与 G7/H9/L1 **共用一个**，不新造、不加 adapter_id 字面量分支。
+    "j1.accrual_check_short_term": StoreMergePlan(
+        adapter_id="j1.accrual_check_short_term",
+        provider_module="phase5_j1_employee_compensation",
+        items=(StoreItemSpec(item_id="J1-6-short-term", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
 }
 
 
