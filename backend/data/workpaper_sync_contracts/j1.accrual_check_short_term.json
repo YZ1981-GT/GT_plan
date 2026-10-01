@@ -123,7 +123,7 @@
       "reserved_row_evidence": "R36 只有 G36=`=ROUND(D36*F36,2)` 与 I36=`=G36-H36` 两个公式，**A36 无标签**；R37 已是第二分区标题 `（2）离职后福利中设定提存计划、其他长期福利中符合设定提存条件的负债`⇒ R36 是**模板预留的第 20 行**不是 footer。"
     },
     "pilot_class": "phase5_accrual_check_short_term",
-    "positional_identity_note": "本 canary sheet 的行身份是 `AccrualRow.id`（`acr-{ts}-{i}-{rnd}` 属安全族）。🔴 J 循环的 family_a（纯序号真落库）唯一一处是 `J2TabAdjustment` 的 `id: i + 1` → `J2-3-entries`（真库 171 B 载荷里 `\"id\":1` **已确证落库**）⇒ 归下游 lane。🔴 披露层另有 **49 个硬编码序号 id**（SOE 25 + Listed 24）—— **登记但不判为位置化缺陷**（id 与 label 写在**同一个对象字面量**里，绑定静态不随数组顺序变；报成位置化会造 49 个假缺陷）。",
+    "positional_identity_note": "本 canary sheet 的固定 19 行骨架身份是模板绑定 `GTROW-J16S-{row:04d}`（R17:R35），前端与 instrumentation 共用同一身份；旧 `acr-*` 仅在恰 19 行时一次性按位置换绑。🔴 J 循环的 family_a（纯序号真落库）唯一一处是 `J2TabAdjustment` 的 `id: i + 1` → `J2-3-entries`（真库 171 B 载荷里 `\"id\":1` **已确证落库**）⇒ 归下游 lane。🔴 披露层另有 **49 个硬编码序号 id**（SOE 25 + Listed 24）—— **登记但不判为位置化缺陷**（id 与 label 写在**同一个对象字面量**里，绑定静态不随数组顺序变；报成位置化会造 49 个假缺陷）。",
     "positional_identity_sites": [],
     "prefill_defects": [
       "🔴 `sheet: '审定表J1-1'` **缺尾部空格**（模板真名 `审定表J1-1 `）⇒ 按名定位必失配",
@@ -153,33 +153,22 @@
       "source_declarations_files": 4
     },
     "rd5_diff_facts": {
-      "content_mismatch_count": 10,
-      "diff_classes": {
-        "indent_prefix": {
-          "count": 9,
-          "detail": "模板带 **3 个全角空格 `\\u3000`**（如 `\\u3000\\u3000\\u30002．奖金`）/ impl 无前缀（靠 `indent: 1` 字段表达）"
-        },
-        "newline_in_cell": {
-          "count": 1,
-          "detail": "🔴 模板 `八、辞退福利\\n（因解除劳动关系给予的补偿）` **含换行符** / impl 写成一行 `八、辞退福利（因解除劳动关系给予的补偿）`"
-        },
-        "separator_fullwidth_vs_halfwidth": {
-          "count": 9,
-          "detail": "模板**全角 `．`**（U+FF0E）/ impl **半角 `.`**"
-        }
-      },
-      "fix_blocked_by": "business_confirmation",
-      "fix_blocked_note": "改哪一侧是业务判断（模板是审计准则产物 / impl 是用户可见文案）⇒ 本轮只登记差异清单，**不**把错标签固化进契约 —— `header_text` 取**模板原字节**。",
-      "forbidden_shortcut": "🔴 **禁标点归一化** —— `NFKC` 会同时洗掉 RD-2 的 5 处与本条的 9 处 ⇒ 逐格**字节**比对。",
-      "impl_constant": "j1/inspection/J1TabAccrualCheck.vue#SHORT_TERM_DEFAULTS",
-      "impl_count": 19,
-      "row_count_match": true,
-      "source_count": 19,
-      "source_ref": "计提情况检查表J1-6!A17:A35"
+      "assertion": "前端骨架 JSON 的 labels 必须与模板 A17:A35 逐项逐字节相等；禁 NFKC/strip/换行折叠。",
+      "authority": "template_original_bytes",
+      "content_mismatch_count": 0,
+      "frontend_source": "j1/inspection/j1AccrualSkeleton.json",
+      "preserved_forms": [
+        "fullwidth_dot",
+        "three_ideographic_spaces",
+        "embedded_newline"
+      ],
+      "row_count": 19,
+      "source_ref": "计提情况检查表J1-6!A17:A35",
+      "status": "resolved"
     },
     "retired_sheets_all_hidden": true,
     "retired_sheets_count": 7,
-    "reviewed_basis": "openpyxl 逐格实测 J/J1 应付职工薪酬.xlsx 的 `计提情况检查表J1-6`（🔴 **两级**表头 R15/R16 ⇒ header_rows=**2**（R15 是 项目/计提基数/计提比例/应提金额/实际计提数/差异/差异原因/结论，R16 只有 C=名称 / D=金额 / E=索引 三个「计提基数」子列）/ 分区标题行 R14 `（1）短期薪酬` / 数据 **R17-R35（19 行）** / 🔴 **`footer_rows: []` 本 sheet 无 footer 合计行** —— R36 只有 G36=`=ROUND(D36*F36,2)` 与 I36=`=G36-H36` 两个公式但 **A36 无标签**，R37 已是第二分区标题 `（2）离职后福利中设定提存计划…` ⇒ R36 是**模板预留的第 20 行**；引擎 dataclass 必填 footer_row ⇒ 给 36 并在契约显式声明 footer_rows=[] + footer_carries_total_formula=False，判据 SHALL 断言该行无 `合计` 标签 / 🔴 判业务行按 **A 列非空**，**不得**套 `明细表J1-2 ` 的「B 列 + 三 footer」口径 / **2 个公式列** G·I（全 19 行同形 `=ROUND(D{r}*F{r},2)` / `=G{r}-H{r}`）/ 有效内容列 **11 即 A..K** 且 max_column **也是 11**（两者相等）⇒ UUID 放 L / 63 公式 / merged 17 / definedName **0** / 🔴 **本 sheet 裸 IF 为 0**（整册 J1 是 **224** —— `审定表J1-1 ` 56 / `与同行业对比分析表J1-5` 60 / `月度分析表J1-4` 16 等；中性化是 per-file 就地改写 substrate 副本 ⇒ 即使受管表干净也必须挂）/ 无 Excel Table / ws.protection.sheet=False ⇒ locked 全惰性） + 前端 `j1/inspection/J1TabAccrualCheck.vue` 按值 grep（item_id 四值 J1-6-short-term / -post-employment / -questions / -conclusion；`AccrualRow` = id/label/indent + baseName/baseAmount/baseIndex + rate/estimated/actual + diff/diffReason/conclusion；身份字段 **`id`** 形态 `acr-{ts}-{i}-{rnd}` 属安全族） + 🔴 **RD-5 本轮新登记**（`SHORT_TERM_DEFAULTS` **19 项** vs 模板 `A17:A35` **19 格**：行数一致但**内容 10 处不等**，三类分开记 —— ①序号分隔符 **9 处**（模板全角 `．` U+FF0E / impl 半角 `.`）②缩进前缀 **9 处**（模板带 3 个全角空格 `\\u3000` / impl 靠 `indent: 1` 字段表达）③🔴 **单元格内换行符 1 处**（模板 `八、辞退福利\\n（因解除劳动关系给予的补偿）` / impl 写成一行）；🔴 **禁标点归一化** —— `NFKC` 会同时洗掉 RD-2 的 5 处与本条的 9 处 ⇒ 逐格**字节**比对；修哪一侧属业务判断 ⇒ 登记不修，`header_text` 取**模板原字节**） + 🔴 **canary 硬标准改口径**（D~I 的「primary managed table 真库有非空载荷」在 J **不成立** —— `J1-2-detail-{shortTerm,postEmployment,severance}` 三键 + `J1-1-rows` + `J1-3-adjustment-rows` 真库**全部无行** ⇒ 改「真库有非空载荷 + 在 entry 内 + 非 parent_duplicate + 单 sheet 单键组」四项；`J1-6-short-term` 真库 **3473 B 全 J 最大**且满足其余三项） + 🔴 **三条逆风如实登记**（①3473 B 载荷的**金额字段全 0**（baseAmount/rate/estimated/actual/diff 全 0，baseName/baseIndex/diffReason/conclusion 全空串）= 「骨架已落库、业务未填」⇒ roundtrip 第一轮只验结构、第二轮须合成带金额载荷验两个公式 ②RD-5 三边校验缺口须在 canary 内先补 ③同 Tab `J1-6-questions` 901 B 是自由文本 shape） + 🔴 **JC-3 非空反证**（符号名 `publishToTb` 全 J 域命中 **0**，端点 `publish-to-tb` 命中 **2**（同一文件 `j1/core/J1TabAdjudication.vue` 内两处）⇒ **GC-9 在 J 是 1/1 有门**，推翻「J 无发布门」误判，canary 可覆盖发布链） + 🔴 **BP-11 键真源实际 4 文件 5 处**（slice 只记两份）⇒ 判据五处同时比对 + 🔴 **JC-17 J 循环完全自闭**（两侧都验：J 键无一个被非 J 路径消费 ∧ J 文件里无非 J 键）⇒ HC-8/IC-17 的跨循环键冻结在 J **不命中**；🔴 **但端点跨循环复用 1 处** —— `useJ1VoucherOcr.ts` 调 **D4 的** `POST /api/workpapers/{wpId}/d4/contract-ocr` ⇒ 冻结对象从「键」换成「**端点**」，且 **FC-8 在 J 命中**（宿主层 ocr=0 成立但 composable 层有真调用）",
+    "reviewed_basis": "openpyxl 逐格实测 J/J1 应付职工薪酬.xlsx 的 `计提情况检查表J1-6`（🔴 **两级**表头 R15/R16 ⇒ header_rows=**2**（R15 是 项目/计提基数/计提比例/应提金额/实际计提数/差异/差异原因/结论，R16 只有 C=名称 / D=金额 / E=索引 三个「计提基数」子列）/ 分区标题行 R14 `（1）短期薪酬` / 数据 **R17-R35（19 行）** / 🔴 **`footer_rows: []` 本 sheet 无 footer 合计行** —— R36 只有 G36=`=ROUND(D36*F36,2)` 与 I36=`=G36-H36` 两个公式但 **A36 无标签**，R37 已是第二分区标题 `（2）离职后福利中设定提存计划…` ⇒ R36 是**模板预留的第 20 行**；引擎 dataclass 必填 footer_row ⇒ 给 36 并在契约显式声明 footer_rows=[] + footer_carries_total_formula=False，判据 SHALL 断言该行无 `合计` 标签 / 🔴 判业务行按 **A 列非空**，**不得**套 `明细表J1-2 ` 的「B 列 + 三 footer」口径 / **2 个公式列** G·I（全 19 行同形 `=ROUND(D{r}*F{r},2)` / `=G{r}-H{r}`）/ 有效内容列 **11 即 A..K** 且 max_column **也是 11**（两者相等）⇒ UUID 放 L / 63 公式 / merged 17 / definedName **0** / 🔴 **本 sheet 裸 IF 为 0**（整册 J1 是 **224** —— `审定表J1-1 ` 56 / `与同行业对比分析表J1-5` 60 / `月度分析表J1-4` 16 等；中性化是 per-file 就地改写 substrate 副本 ⇒ 即使受管表干净也必须挂）/ 无 Excel Table / ws.protection.sheet=False ⇒ locked 全惰性） + 前端 `j1/inspection/J1TabAccrualCheck.vue` 按值 grep（item_id 四值 J1-6-short-term / -post-employment / -questions / -conclusion；`AccrualRow` = id/label/indent + baseName/baseAmount/baseIndex + rate/estimated/actual + diff/diffReason/conclusion；短期薪酬固定骨架身份 **`GTROW-J16S-0017..0035`**；标签取前后端共读 `j1AccrualSkeleton.json`，逐字节等于模板 A17:A35） + ✅ **RD-5 已收口**（模板 `A17:A35` 的 19 个标签原字节成为前后端共读 `j1AccrualSkeleton.json`：保留全角 `．`、3 个全角空格与辞退福利单元格换行；HTML 展示/持久化/OO 写入不再用半角副本覆盖模板） + 🔴 **canary 硬标准改口径**（D~I 的「primary managed table 真库有非空载荷」在 J **不成立** —— `J1-2-detail-{shortTerm,postEmployment,severance}` 三键 + `J1-1-rows` + `J1-3-adjustment-rows` 真库**全部无行** ⇒ 改「真库有非空载荷 + 在 entry 内 + 非 parent_duplicate + 单 sheet 单键组」四项；`J1-6-short-term` 真库 **3473 B 全 J 最大**且满足其余三项） + 🔴 **三条逆风如实登记**（①3473 B 载荷的**金额字段全 0**（baseAmount/rate/estimated/actual/diff 全 0，baseName/baseIndex/diffReason/conclusion 全空串）= 「骨架已落库、业务未填」⇒ roundtrip 第一轮只验结构、第二轮须合成带金额载荷验两个公式 ②RD-5 三边校验缺口须在 canary 内先补 ③同 Tab `J1-6-questions` 901 B 是自由文本 shape） + 🔴 **JC-3 非空反证**（符号名 `publishToTb` 全 J 域命中 **0**，端点 `publish-to-tb` 命中 **2**（同一文件 `j1/core/J1TabAdjudication.vue` 内两处）⇒ **GC-9 在 J 是 1/1 有门**，推翻「J 无发布门」误判，canary 可覆盖发布链） + 🔴 **BP-11 键真源实际 4 文件 5 处**（slice 只记两份）⇒ 判据五处同时比对 + 🔴 **JC-17 J 循环完全自闭**（两侧都验：J 键无一个被非 J 路径消费 ∧ J 文件里无非 J 键）⇒ HC-8/IC-17 的跨循环键冻结在 J **不命中**；🔴 **但端点跨循环复用 1 处** —— `useJ1VoucherOcr.ts` 调 **D4 的** `POST /api/workpapers/{wpId}/d4/contract-ocr` ⇒ 冻结对象从「键」换成「**端点**」，且 **FC-8 在 J 命中**（宿主层 ocr=0 成立但 composable 层有真调用）",
     "sheet_count_check": "23 = 业务 15 + retired 7 + GT_Custom 1（四向等值比对）",
     "sheet_name_arg_missing_trailing_space": {
       "contrast": "🔴 对照：`prefill_formula_mapping.json` 里同样的 `sheet: '审定表J1-1'` **是真缺陷** —— 那边的守卫（如 `test_i_cycle_formula_presets.py` 同族）按 sheet 名**精确匹配模板**。同一个字符串在两处消费方式不同 ⇒ 判据必须看消费方，不能只看字面。",

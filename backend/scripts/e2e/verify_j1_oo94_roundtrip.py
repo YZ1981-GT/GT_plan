@@ -29,6 +29,7 @@ spec: j-cycle-sync-foundation-and-first-canary · Task 24 · JF-P42
 """
 from __future__ import annotations
 
+import argparse
 import asyncio
 import functools
 import hashlib
@@ -36,11 +37,14 @@ import http.server
 import json
 import os
 import socket
+import subprocess
 import sys
 import tempfile
 import threading
 import urllib.request
 import uuid
+import zipfile
+from datetime import datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any
@@ -66,21 +70,56 @@ MANAGED_SHEET = "计提情况检查表J1-6"
 FIRST_ROW, LAST_ROW = 17, 35
 TEMPLATE_ID = "J16S"
 FORMULA_COLS = ("G", "I")
+EVIDENCE_SOURCE_FILES = (
+    "backend/app/services/workpaper_sync/phase5_j1_employee_compensation.py",
+    "backend/app/services/workpaper_sync/phase5_j1_06_accrual_check.py",
+    "backend/data/workpaper_sync_contracts/j1.accrual_check_short_term.json",
+    "backend/wp_templates/J/J1 应付职工薪酬.xlsx",
+    "audit-platform/frontend/src/components/workpaper/j1/inspection/j1AccrualSkeleton.json",
+    "audit-platform/frontend/src/components/workpaper/j1/inspection/j1AccrualRowIdentity.ts",
+    "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabAccrualCheck.vue",
+)
 
 
-def _template_labels() -> list[str]:
-    """骨架标签取**模板原字节**（RD-5：禁归一化，impl 侧标签与模板 10 处不等，不得用 impl 的）。"""
+def _source_digest() -> str:
+    h = hashlib.sha256()
+    for rel in EVIDENCE_SOURCE_FILES:
+        h.update(rel.encode("utf-8"))
+        h.update(b"\0")
+        h.update((_REPO / rel).read_bytes())
+        h.update(b"\0")
+    return h.hexdigest()
+
+
+def _frontend_skeleton() -> list[dict[str, Any]]:
+    """真实前端骨架单一来源；同时逐字节对账权威模板，禁止测试从模板自造必等输入。"""
     import openpyxl
 
     from app.services.workpaper_sync import phase5_j1_employee_compensation as J1
 
+    source = _REPO / (
+        "audit-platform/frontend/src/components/workpaper/j1/inspection/j1AccrualSkeleton.json"
+    )
+    doc = json.loads(source.read_text(encoding="utf-8"))
+    if doc.get("templateId") != TEMPLATE_ID or int(doc.get("firstRow", -1)) != FIRST_ROW:
+        raise RuntimeError(f"前端骨架 identity 元数据漂移: {doc.get('templateId')}/{doc.get('firstRow')}")
+    rows = list(doc.get("rows") or [])
     ws = openpyxl.load_workbook(J1.authoritative_template_path(), data_only=False)[MANAGED_SHEET]
-    return [str(ws[f"A{r}"].value) for r in range(FIRST_ROW, LAST_ROW + 1)]
+    template_labels = [ws[f"A{r}"].value for r in range(FIRST_ROW, LAST_ROW + 1)]
+    frontend_labels = [r.get("label") for r in rows]
+    if frontend_labels != template_labels:
+        diffs = [
+            f"R{FIRST_ROW + i}: frontend={a!r} template={b!r}"
+            for i, (a, b) in enumerate(zip(frontend_labels, template_labels)) if a != b
+        ]
+        raise RuntimeError(f"前端骨架标签不是模板原字节: {diffs[:5]}")
+    return rows
 
 
-def _rows(labels: list[str], *, with_amounts: bool) -> list[dict[str, Any]]:
+def _rows(defaults: list[dict[str, Any]], *, with_amounts: bool) -> list[dict[str, Any]]:
     rows = []
-    for i, label in enumerate(labels, 1):
+    for i, default in enumerate(defaults, 1):
+        label = str(default["label"])
         row: dict[str, Any] = {
             # 🔴 与前端 `j1AccrualRowIdentity.shortTermTemplateRowId` 同口径：骨架行身份 = 模板行身份。
             #    首轮用 `acr-*` 时实测行翻倍（38 行），那就是本脚本抓到的缺陷。
@@ -91,6 +130,7 @@ def _rows(labels: list[str], *, with_amounts: bool) -> list[dict[str, Any]]:
                 else f"GTROW-{TEMPLATE_ID}-{FIRST_ROW + i - 1:04d}"
             ),
             "label": label,
+            "indent": int(default["indent"]),
             "baseName": f"计提基数{i}" if with_amounts else "",
             "baseAmount": 100000 + i * 1234.5 if with_amounts else 0,
             "baseIndex": f"J1-6-{i}" if with_amounts else "",
@@ -261,7 +301,96 @@ async def _one_round(name: str, rows: list[dict[str, Any]], ctx: dict[str, Any])
     return None
 
 
-async def run() -> int:
+def _onlyoffice_version() -> dict[str, Any]:
+    """记录真实引擎版本；HTTP info 受部署策略 403 时，以容器包版本为权威。"""
+    try:
+        req = urllib.request.Request(f"{OO_URL}/info/info.json", headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            server = resp.headers.get("Server")
+        version = data.get("version") or data.get("buildVersion") or data.get("buildNumber")
+        if version:
+            return {"version": str(version), "source": "info/info.json", "server": server}
+    except Exception:
+        pass
+    container = os.environ.get("J1_OO_CONTAINER", "audit-onlyoffice")
+    proc = subprocess.run(
+        ["docker", "exec", container, "dpkg-query", "-W", "-f=${Version}", "onlyoffice-documentserver"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30,
+    )
+    version = proc.stdout.strip()
+    if proc.returncode != 0 or not version:
+        raise RuntimeError(f"无法取得 OnlyOffice 版本: rc={proc.returncode} stderr={proc.stderr[:200]!r}")
+    return {"version": version, "source": f"docker:{container}/dpkg-query"}
+
+
+def _git_commit() -> str:
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=_REPO, check=True,
+        capture_output=True, text=True, encoding="utf-8",
+    ).stdout.strip()
+
+
+def _zip_external_links(path: Path) -> list[str]:
+    with zipfile.ZipFile(path) as zf:
+        return sorted(
+            n for n in zf.namelist()
+            if n.startswith("xl/externalLinks/") or (
+                n.endswith(".rels") and b'TargetMode="External"' in zf.read(n)
+            )
+        )
+
+
+async def _active_definition_evidence(session: Any, resolution: Any, contract: Any) -> dict[str, Any]:
+    """current representation → approved bundle → 四 child digest → active template bytes。"""
+    from app.models.workpaper_sync_models import WorkpaperArtifact, WorkpaperSyncDefinitionArtifact
+    from app.services.workpaper_sync import phase5_j1_employee_compensation as J1
+    from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
+    from app.services.workpaper_sync.definitions import canonical_digest
+    from app.services.workpaper_sync.models import BundleSlot
+
+    expected = {
+        "authority_model": canonical_digest(J1.authority_model_payload()),
+        "template": contract.template_definition_sha256,
+        "instrumentation": contract.instrumentation_definition_sha256,
+        "contract": contract.canonical_sha256,
+    }
+    actual = {
+        "authority_model": resolution.bundle.authority_model_definition_sha256,
+        **{slot.value: resolution.bundle.slots[slot].slot_digest for slot in BundleSlot},
+    }
+    if actual != expected:
+        raise RuntimeError(f"active bundle digest 与 provider 当前定义不一致: actual={actual} expected={expected}")
+
+    template_ref = resolution.bundle.slots[BundleSlot.template].slot_ref
+    template_id = uuid.UUID(str(template_ref).removeprefix("definition:"))
+    row = (
+        await session.execute(
+            sa.select(WorkpaperSyncDefinitionArtifact, WorkpaperArtifact)
+            .join(WorkpaperArtifact, WorkpaperArtifact.id == WorkpaperSyncDefinitionArtifact.blob_artifact_id)
+            .where(WorkpaperSyncDefinitionArtifact.id == template_id)
+        )
+    ).one()
+    definition, artifact = row
+    path = CanonicalArtifactRepository(_BACKEND).resolve_relative_path(artifact.relative_path)
+    external = _zip_external_links(path)
+    authority_external = _zip_external_links(J1.authoritative_template_path())
+    if external or authority_external:
+        raise RuntimeError(f"模板仍有外链: active={external} authority={authority_external}")
+    return {
+        "representation_id": str(resolution.representation_id),
+        "generation": resolution.representation_generation,
+        "bundle_id": str(resolution.bundle.bundle_id),
+        "bundle_sha256": resolution.bundle.bundle_sha256,
+        "digests": actual,
+        "template_definition_source_commit": definition.source_commit,
+        "active_template_artifact": artifact.relative_path,
+        "active_template_sha256": artifact.sha256,
+        "external_links": [],
+    }
+
+
+async def run(*, project_id: uuid.UUID, wp_id: uuid.UUID, evidence_path: Path) -> int:
     from app.core.database import async_session
     from app.services.workpaper_sync import phase5_j1_employee_compensation as J1
     from app.services.workpaper_sync.adapters.registry import WorkpaperSyncAdapterRegistry
@@ -273,17 +402,24 @@ async def run() -> int:
     )
 
     async with async_session() as session:
-        target = (
+        targets = (
             await session.execute(
                 sa.text(
-                    "SELECT es.wp_id, wp.project_id FROM working_paper_sync_entry_state es "
-                    "JOIN working_paper wp ON wp.id = es.wp_id WHERE es.entry_id = :e"
+                    "SELECT es.wp_id, wp.project_id, wi.wp_code FROM working_paper_sync_entry_state es "
+                    "JOIN working_paper wp ON wp.id = es.wp_id "
+                    "JOIN wp_index wi ON wi.id = wp.wp_index_id "
+                    "WHERE es.entry_id = :e AND es.wp_id = CAST(:w AS uuid) "
+                    "AND wp.project_id = CAST(:p AS uuid)"
                 ),
-                {"e": ENTRY_ID},
+                {"e": ENTRY_ID, "w": str(wp_id), "p": str(project_id)},
             )
-        ).first()
-        if target is None:
-            print("[0] ❌ entry_state 无 J1 行 —— 先完成 22e 首版发布")
+        ).all()
+        if len(targets) != 1:
+            print(f"[0] ❌ 指定 project/wp 必须精确命中 1 条 J1 entry_state，实际 {len(targets)}")
+            return 1
+        target = targets[0]
+        if target.wp_code != "J1":
+            print(f"[0] ❌ 指定底稿 wp_code={target.wp_code!r}，不是 J1")
             return 1
         before = await _j_digest(session)
         print(f"[0] wp={str(target.wp_id)[:8]} project={str(target.project_id)[:8]} J1-% 快照={before[0]} 行")
@@ -300,20 +436,25 @@ async def run() -> int:
             intent=ResolutionIntent.extract, project_id=target.project_id,
             wp_id=target.wp_id, entry_id=ENTRY_ID,
         )
-        print(f"[②] generation={resolution.representation_generation} substrate={resolution.artifact_path.name}")
+        active = await _active_definition_evidence(session, resolution, registry.resolve_for_entry(ENTRY_ID).contract)
+        oo_info = _onlyoffice_version()
+        print(
+            f"[②] generation={resolution.representation_generation} substrate={resolution.artifact_path.name} "
+            f"bundle={str(resolution.bundle.bundle_id)[:8]} OO={oo_info['version']}"
+        )
         ctx = {
             "registration": registry.resolve_for_entry(ENTRY_ID), "resolver": resolver,
             "project_id": target.project_id, "wp_id": target.wp_id,
             "substrate": resolution.artifact_path,
         }
-        labels = _template_labels()
-        print("[第一轮] 骨架（金额全 0，只验结构）")
-        err = await _one_round("R1", _rows(labels, with_amounts=False), {**ctx, "check_values": False})
+        defaults = _frontend_skeleton()
+        print("[第一轮] 前端真实骨架（金额全 0，只验结构）")
+        err = await _one_round("R1", _rows(defaults, with_amounts=False), {**ctx, "check_values": False})
         if err:
             print(f"[R1] ❌ {err}")
             return 1
         print("[第二轮] 合成带金额载荷（验 G=ROUND(D*F,2) 与 I=G-H）")
-        err = await _one_round("R2", _rows(labels, with_amounts=True), {**ctx, "check_values": True})
+        err = await _one_round("R2", _rows(defaults, with_amounts=True), {**ctx, "check_values": True})
         if err:
             print(f"[R2] ❌ {err}")
             return 1
@@ -324,9 +465,51 @@ async def run() -> int:
             return 1
         print(f"[⑨] J1-% {after[0]} 行快照 digest 不变（本脚本未写库）")
 
+        db_fingerprint = (
+            await session.execute(
+                sa.text(
+                    "SELECT current_database(), current_setting('server_version'), "
+                    "pg_postmaster_start_time()::text"
+                )
+            )
+        ).one()
+        evidence = {
+            "schema_version": "j1-oo94-evidence:v1",
+            "status": "passed",
+            "source_commit": _git_commit(),
+            "source_digest": _source_digest(),
+            "source_files": list(EVIDENCE_SOURCE_FILES),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "database": {
+                "name": db_fingerprint[0],
+                "server_version": db_fingerprint[1],
+                "postmaster_started_at": db_fingerprint[2],
+            },
+            "project_id": str(project_id),
+            "wp_id": str(wp_id),
+            "wp_code": "J1",
+            "entry_id": ENTRY_ID,
+            "active": active,
+            "onlyoffice": oo_info,
+            "rounds": ["frontend_skeleton_19_rows", "frontend_payload_with_amounts_19_rows"],
+            "store_snapshot": {"row_count": after[0], "sha256": after[1], "unchanged": True},
+            "legacy_identity_mutation_enabled": os.environ.get("J1_RT_LEGACY_IDS") == "1",
+        }
+        evidence_path.parent.mkdir(parents=True, exist_ok=True)
+        evidence_path.write_bytes((json.dumps(evidence, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8"))
+        print(f"[evidence] {evidence_path}")
+
     print("✅ J1 真 OO 引擎两轮往返全绿（HTML→OO→HTML）")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(asyncio.run(run()))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--project-id", required=True, type=uuid.UUID)
+    parser.add_argument("--wp-id", required=True, type=uuid.UUID)
+    parser.add_argument(
+        "--evidence",
+        default=str(_REPO / ".kiro/specs/j1-post-publish-semantic-and-evidence-closure/evidence/oo94.json"),
+    )
+    args = parser.parse_args()
+    raise SystemExit(asyncio.run(run(project_id=args.project_id, wp_id=args.wp_id, evidence_path=Path(args.evidence))))

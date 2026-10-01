@@ -40,9 +40,9 @@ export interface WorkpaperSyncManifestEntry {
   hasBrowserEvidence: boolean
 }
 
-export const WORKPAPER_SYNC_MANIFEST_DIGEST = "bbd486f597d7a18e2934c88e0a144214e772c0668443d617e282af6022ba2c41"
+export const WORKPAPER_SYNC_MANIFEST_DIGEST = "a1901beca17241c8d08c12240ff6d88c4cff9ee694b6be362a8b5c256deea35d"
 
-export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "2ee66440ae962d2784a1ebcb8d5541ad8eccf35c618be9127e4521f6400a8b75"
+export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "0f13fd74a8b4a2e9e1cc356db8bad6e4e01d7317616bcd54777c8c230ea64447"
 
 export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "by_component": {
@@ -51,9 +51,9 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
     "WorkpaperWordEditor": 4
   },
   "capability_counts": {
-    "bidirectional": 14,
+    "bidirectional": 15,
     "single_html": 5,
-    "single_onlyoffice": 135,
+    "single_onlyoffice": 134,
     "unreachable": 1
   },
   "dispatcher_count": 1,
@@ -64,7 +64,7 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "entry_count": 155,
   "host_count": 154,
   "independent_entry_count": 142,
-  "legacy_fake_bidirectional_count": 127,
+  "legacy_fake_bidirectional_count": 126,
   "mount_count": 244,
   "parent_duplicate_count": 12,
   "room_model_counts": {
@@ -80,7 +80,7 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
     "xlsx.editable.shared.single.room_service_wired.v1": 147,
     "xlsx.unreachable.none.single.room_service_wired.v1": 1
   },
-  "unadjudicated_count": 122,
+  "unadjudicated_count": 121,
   "unreachable_count": 1
 } as const
 
@@ -4360,7 +4360,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/j1/gt-j1-employee-compensation",
@@ -4368,13 +4368,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",

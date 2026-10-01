@@ -77,7 +77,7 @@ from app.services.workpaper_sync.excel_instrumentation import (
     build_template_payload,
     normalized_structure_hash,
 )
-from app.services.workpaper_sync.models import SyncDomainError
+from app.services.workpaper_sync.models import AuthorityModel, BundleSlot, DefinitionKind, SyncDomainError
 from app.services.workpaper_sync.sheet_geometry import col_index
 
 __all__ = [
@@ -105,6 +105,13 @@ __all__ = [
     "assert_manifest_capability_enabled",
     "resolve_published_frozen_definitions",
     "attach_h_entry_adapter",
+    "Phase5Definitions",
+    "primary_instrumentation_spec",
+    "build_store_projection_for",
+    "merge_projection_into_store_rows_for",
+    "iter_store_rows_for",
+    "authority_model_payload_for",
+    "publish_definitions_for",
 ]
 
 
@@ -665,3 +672,197 @@ async def attach_h_entry_adapter(
         sheet_keys=sheet_keys,
     )
     return (identity.adapter_id,)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 通用 store / 五环发布 facade（J1 post-publish closure）
+#
+# 不含任何循环码、sheet、item 字面量；H/I/J 使用同一套“怎么做”。
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@dataclass(frozen=True)
+class Phase5Definitions:
+    authority_model_definition_id: Any
+    authority_model_definition_sha256: str
+    template_definition_id: Any
+    template_definition_sha256: str
+    instrumentation_definition_id: Any
+    instrumentation_definition_sha256: str
+    contract_definition_id: Any
+    contract_definition_sha256: str
+    bundle_id: Any
+    bundle_sha256: str
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "authority_model_definition_id": str(self.authority_model_definition_id),
+            "authority_model_definition_sha256": self.authority_model_definition_sha256,
+            "template_definition_id": str(self.template_definition_id),
+            "template_definition_sha256": self.template_definition_sha256,
+            "instrumentation_definition_id": str(self.instrumentation_definition_id),
+            "instrumentation_definition_sha256": self.instrumentation_definition_sha256,
+            "contract_definition_id": str(self.contract_definition_id),
+            "contract_definition_sha256": self.contract_definition_sha256,
+            "definition_bundle_id": str(self.bundle_id),
+            "definition_bundle_sha256": self.bundle_sha256,
+        }
+
+
+def primary_instrumentation_spec(
+    identity: HEntryIdentity, specs: Sequence[Any]
+) -> ExcelInstrumentationSpec:
+    resolved = instrumentation_specs_for(identity, specs)
+    if len(resolved) != 1:
+        raise HEntrySelectionError(
+            f"entry {identity.entry_id} 的单数 instrumentation 要求恰 1 条，实际 {len(resolved)}"
+        )
+    return resolved[0]
+
+
+def _spec_for_store_item(
+    identity: HEntryIdentity, specs: Sequence[Any], store_item_id: str | None
+) -> Any:
+    wanted = store_item_id or identity.primary_store_item_id
+    hits = [s for s in specs if s.store_item_id == wanted]
+    if len(hits) != 1:
+        raise HEntrySelectionError(
+            f"entry {identity.entry_id}: store item {wanted!r} 对应 {len(hits)} 张受管表；"
+            f"单表 facade 只接受恰 1 张"
+        )
+    return hits[0]
+
+
+def build_store_projection_for(
+    identity: HEntryIdentity,
+    specs: Sequence[Any],
+    payload: Any,
+    *,
+    contract: SyncContract,
+    limits: Any | None = None,
+    store_item_id: str | None = None,
+) -> Any:
+    from app.services.workpaper_sync.phase5_row_table_sheet import build_store_projection
+
+    return build_store_projection(
+        _spec_for_store_item(identity, specs, store_item_id),
+        payload,
+        contract=contract,
+        limits=limits,
+    )
+
+
+def merge_projection_into_store_rows_for(
+    identity: HEntryIdentity,
+    specs: Sequence[Any],
+    *,
+    projection: Any,
+    base_rows: list[Mapping[str, Any]],
+    store_item_id: str | None = None,
+) -> tuple[list[dict[str, Any]], int, int, set[str]]:
+    from app.services.workpaper_sync.phase5_row_table_sheet import merge_projection_into_store_rows
+
+    return merge_projection_into_store_rows(
+        _spec_for_store_item(identity, specs, store_item_id),
+        projection=projection,
+        base_rows=base_rows,
+    )
+
+
+def iter_store_rows_for(
+    identity: HEntryIdentity,
+    specs: Sequence[Any],
+    payload: Any,
+    *,
+    store_item_id: str | None = None,
+) -> Any:
+    from app.services.workpaper_sync.phase5_row_table_sheet import iter_store_rows
+
+    return iter_store_rows(_spec_for_store_item(identity, specs, store_item_id), payload)
+
+
+def authority_model_payload_for(identity: HEntryIdentity) -> dict[str, Any]:
+    return {
+        "schema_version": "authority-model-definition:v1",
+        "authority_model": AuthorityModel.projection_contract.value,
+        "content_authority": "structured_projection",
+        "merge_model": "stable_field_three_way",
+        "required_slots": [
+            BundleSlot.template.value,
+            BundleSlot.instrumentation.value,
+            BundleSlot.contract.value,
+        ],
+        "entry_id": identity.entry_id,
+        "pilot_class": identity.phase5_wave,
+    }
+
+
+async def publish_definitions_for(
+    identity: HEntryIdentity,
+    specs: Sequence[Any],
+    publisher: Any,
+    *,
+    contract_payload_builder: Any,
+) -> Phase5Definitions:
+    contract = assert_contract_file_matches_source(identity, contract_payload_builder())
+    authority = await publisher.publish_definition(
+        kind=DefinitionKind.authority_model,
+        payload=authority_model_payload_for(identity),
+        logical_id=f"{identity.adapter_id}.authority-model",
+        semantic_version="1.0.0",
+    )
+    template_payload = template_definition_payload(identity, specs)
+    template = await publisher.publish_definition(
+        kind=DefinitionKind.template,
+        payload=template_payload,
+        logical_id=f"{identity.adapter_id}.template",
+        semantic_version="1.0.0",
+        blob_bytes=read_authoritative_template(identity),
+        structure_hash=template_payload["normalized_structure_hash"],
+    )
+    instrumentation = await publisher.publish_definition(
+        kind=DefinitionKind.instrumentation,
+        payload=instrumentation_definition_payload(identity, specs),
+        logical_id=f"{identity.adapter_id}.instrumentation",
+        semantic_version="1.0.0",
+    )
+    contract_definition = await publisher.publish_definition(
+        kind=DefinitionKind.contract,
+        payload=dict(contract.canonical_payload),
+        logical_id=identity.adapter_id,
+        semantic_version=contract.semantic_version,
+    )
+    if template.sha256 != contract.template_definition_sha256:
+        raise HEntrySelectionError("已发布 template digest 与契约声明不一致")
+    if instrumentation.sha256 != contract.instrumentation_definition_sha256:
+        raise HEntrySelectionError("已发布 instrumentation digest 与契约声明不一致")
+
+    def slot(definition: Any) -> dict[str, str]:
+        return {
+            "type": "definition",
+            "ref": f"definition:{definition.definition_id}",
+            "digest": definition.sha256,
+        }
+
+    bundle = await publisher.publish_bundle(
+        authority_model_definition_id=authority.definition_id,
+        authority_model=AuthorityModel.projection_contract,
+        authority_model_definition_sha256=authority.sha256,
+        slots={
+            BundleSlot.template: slot(template),
+            BundleSlot.instrumentation: slot(instrumentation),
+            BundleSlot.contract: slot(contract_definition),
+        },
+    )
+    return Phase5Definitions(
+        authority_model_definition_id=authority.definition_id,
+        authority_model_definition_sha256=authority.sha256,
+        template_definition_id=template.definition_id,
+        template_definition_sha256=template.sha256,
+        instrumentation_definition_id=instrumentation.definition_id,
+        instrumentation_definition_sha256=instrumentation.sha256,
+        contract_definition_id=contract_definition.definition_id,
+        contract_definition_sha256=contract_definition.sha256,
+        bundle_id=bundle.bundle_id,
+        bundle_sha256=bundle.canonical_sha256,
+    )

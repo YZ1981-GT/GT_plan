@@ -58,6 +58,22 @@ def _strip_workbook(xml: str) -> str:
 
 
 def sanitize_bytes(src: bytes) -> tuple[bytes, dict[str, int]]:
+    # 已净化输入必须**逐字节幂等**：无可处理对象时直接返回原字节，禁重压 ZIP 造成假漂移。
+    probe = zipfile.ZipFile(io.BytesIO(src))
+    names = probe.namelist()
+    has_parts = any(_EXT_LINK_PART_RE.match(n) or _EXT_LINK_RELS_RE.match(n) for n in names)
+    has_formula = any(
+        _EXT_FORMULA_RE.search(probe.read(n).decode("utf-8", "replace"))
+        for n in names if n.startswith("xl/worksheets/sheet") and n.endswith(".xml")
+    )
+    workbook_xml = probe.read("xl/workbook.xml").decode("utf-8", "replace")
+    has_workbook_refs = "<externalReferences>" in workbook_xml or bool(
+        re.search(r"<definedName [^>]*>.*?\[\d+\].*?</definedName>", workbook_xml, flags=re.S)
+    )
+    probe.close()
+    if not (has_parts or has_formula or has_workbook_refs):
+        return src, {"dropped_parts": 0, "neutralized_formulas": 0}
+
     zin = zipfile.ZipFile(io.BytesIO(src))
     out = io.BytesIO()
     zout = zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED)
@@ -129,18 +145,23 @@ def main() -> int:
     print(f"managed cells before={len(before_snap)} after={len(after_snap)} diffs={len(diffs)} {diffs[:10]}")
     print(f"managed merged same={before_merged == after_merged}")
 
+    already_clean = ext_before == 0
     ok = (
-        ext_before > 0
-        and ext_after == 0
+        ext_after == 0
         and not diffs
         and before_merged == after_merged
-        and stats["dropped_parts"] == 4
-        and stats["neutralized_formulas"] == 6
+        and (
+            (already_clean and out == src and stats == {"dropped_parts": 0, "neutralized_formulas": 0})
+            or (not already_clean and stats["dropped_parts"] == 4 and stats["neutralized_formulas"] == 6)
+        )
     )
     if not ok:
         print("[FAIL] 判据不满足（门 / 受管 sheet diff / merge / 现算计数 4·6 不符）—— 不写盘")
         return 1
     if apply:
+        if already_clean:
+            print("[apply] 已是净化态，逐字节幂等；未写盘")
+            return 0
         bak = TEMPLATE.with_suffix(TEMPLATE.suffix + ".preclean.bak")
         if not bak.exists():
             shutil.copy2(TEMPLATE, bak)

@@ -106,7 +106,8 @@ import { useJ1ImportExport } from '@/composables/workpaper/j1/useJ1ImportExport'
 import http from '@/utils/http'
 import {
   bindShortTermTemplateIds,
-  roundHalfAwayFromZero2,
+  calculateAccrualAmounts,
+  SHORT_TERM_SKELETON_ROWS,
   shortTermTemplateRowId,
 } from './j1AccrualRowIdentity'
 
@@ -132,29 +133,13 @@ export interface AccrualRow {
 
 function recalcRow(r: AccrualRow): AccrualRow {
   // 🔴 与模板公式同口径：G=ROUND(D*F,2) / I=G-H（原先 estimated 不舍入，HTML 与 OO 两侧显示值会差分位）
-  const estimated = roundHalfAwayFromZero2(r.baseAmount * r.rate)
-  const diff = roundHalfAwayFromZero2(r.actual - estimated)
+  const { estimated, diff } = calculateAccrualAmounts(r.baseAmount, r.rate, r.actual)
   return { ...r, estimated, diff }
 }
 
 // ─── 默认行 ─────────────────────────────────────────────────────────────
-const SHORT_TERM_DEFAULTS = [
-  { label: '一、工资、奖金、津贴和补贴', indent: 0 },
-  { label: '其中：1.工资', indent: 1 }, { label: '2.奖金', indent: 1 },
-  { label: '3.津贴', indent: 1 }, { label: '4.补贴', indent: 1 },
-  { label: '二、职工福利费', indent: 0 },
-  { label: '三、社会保险费', indent: 0 },
-  { label: '其中：1.医疗保险费', indent: 1 }, { label: '2.年金缴费', indent: 1 },
-  { label: '3.工伤保险费', indent: 1 }, { label: '4.生育保险费', indent: 1 },
-  { label: '四、住房公积金', indent: 0 },
-  { label: '五、工会经费', indent: 0 },
-  { label: '六、职工教育经费', indent: 0 },
-  { label: '七、非货币性福利', indent: 0 },
-  { label: '八、辞退福利（因解除劳动关系给予的补偿）', indent: 0 },
-  { label: '九、职工奖励及福利基金（外资）', indent: 0 },
-  { label: '十、以现金结算的股份支付', indent: 0 },
-  { label: '十一、其他', indent: 0 },
-]
+// 模板 A17:A35 原字节是固定业务字典；显示/持久化/OO 写入共用这一份，不再维护半角副本。
+const SHORT_TERM_DEFAULTS = SHORT_TERM_SKELETON_ROWS
 
 const POST_EMPLOYMENT_DEFAULTS = [
   { label: '一、离职后福利', indent: 0 },

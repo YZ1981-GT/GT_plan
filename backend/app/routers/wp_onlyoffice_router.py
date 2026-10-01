@@ -25,7 +25,7 @@ import sqlalchemy as sa
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import authorize_wp_read, get_current_user
 from app.models.core import User
 from app.models.workpaper_models import WpIndex, WorkingPaper
 from app.services.wp_visibility import editor_security as _editor_security
@@ -652,7 +652,7 @@ async def get_sheet_onlyoffice_config(
     request: Request,
     whole_workbook: bool = False,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
+    current_user: User = Depends(get_current_user),
 ):
     """返回 OnlyOffice 编辑器配置（doc_key / download_url / callback_url / JWT token）
 
@@ -661,9 +661,16 @@ async def get_sheet_onlyoffice_config(
     whole_workbook=True（完整Excel 页签）：不加 actionLink，OnlyOffice 打开整本 xlsx
     原生显示全部 sheet tab，供组员直接编辑。
     """
+    # 0. 按**目标 wp_id 反查项目并授权**。原门 `require_project_access` 从 query 的 project_id
+    #    取权限，而本函数随后忽略该参数、按 wp_id 加载底稿：攻击者可传有权项目 A + 他项目 wp B。
+    #    authorize_wp_read 在数据层以 wp_id 反查真实 project，非成员 fail-closed。
+    authorized_project_id = await authorize_wp_read(db, current_user, wp_id)
+
     # 1. 查询底稿 + wp_code + 项目软删守卫
     wp, wp_code = await _load_wp_or_404(db, wp_id)
     project_id = wp.project_id
+    if project_id != authorized_project_id:
+        raise HTTPException(status_code=403, detail="底稿项目授权上下文不一致")
 
     # 1.5 统一门授权（Req 8.8/8.9）：editor.config 读入口。
     gate_ctx = await _gate_editor(

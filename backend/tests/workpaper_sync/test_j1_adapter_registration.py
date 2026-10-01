@@ -80,9 +80,10 @@ class TestSkeletonRowIdentityAlignment:
         from app.services.workpaper_sync import phase5_j1_06_accrual_check as S
 
         ts = (self.FRONT / "j1AccrualRowIdentity.ts").read_text(encoding="utf-8")
-        assert f"SHORT_TERM_TEMPLATE_ID = '{S.TEMPLATE_ID_J106}'" in ts
-        assert f"SHORT_TERM_TEMPLATE_FIRST_ROW = {S.FIRST_DATA_ROW_J106}" in ts
-        assert "TEMPLATE_ROW_ID_PREFIX = 'GTROW-'" in ts
+        skeleton = json.loads((self.FRONT / "j1AccrualSkeleton.json").read_text(encoding="utf-8"))
+        assert skeleton["templateId"] == S.TEMPLATE_ID_J106
+        assert skeleton["firstRow"] == S.FIRST_DATA_ROW_J106
+        assert "TEMPLATE_ROW_ID_PREFIX = `GTROW-${SHORT_TERM_TEMPLATE_ID}-`" in ts
 
     def test_instrumented_template_stamps_the_same_ids(self) -> None:
         import io
@@ -155,3 +156,51 @@ class TestManifestGate:
         child = next(e for e in manifest["entries"] if e["entry_id"] == "xlsx/j1/inspection/j1-tab-general-check")
         assert child["migration_state"] == "parent_duplicate"
         assert child["adapter_id"] is None
+
+
+class TestPostPublishSemanticClosure:
+    def test_frontend_skeleton_labels_equal_template_bytes(self) -> None:
+        import openpyxl
+
+        source = BACKEND.parent / (
+            "audit-platform/frontend/src/components/workpaper/j1/inspection/j1AccrualSkeleton.json"
+        )
+        doc = json.loads(source.read_text(encoding="utf-8"))
+        ws = openpyxl.load_workbook(J1.authoritative_template_path(), data_only=False)[
+            "计提情况检查表J1-6"
+        ]
+        expected = [ws[f"A{r}"].value for r in range(17, 36)]
+        assert [r["label"] for r in doc["rows"]] == expected
+        assert doc["rows"][1]["label"] == "其中：1．工资"
+        assert doc["rows"][2]["label"].startswith("\u3000\u3000\u3000")
+        assert "\n" in doc["rows"][15]["label"]
+
+    def test_sanitizer_is_byte_idempotent_on_authoritative_template(self) -> None:
+        from scripts.fix.sanitize_j1_template_external_links import sanitize_bytes
+
+        raw = J1.authoritative_template_path().read_bytes()
+        once, stats = sanitize_bytes(raw)
+        twice, stats2 = sanitize_bytes(once)
+        assert once == raw == twice
+        assert stats == stats2 == {"dropped_parts": 0, "neutralized_formulas": 0}
+
+    def test_authoritative_template_has_no_external_relationship(self) -> None:
+        import zipfile
+
+        with zipfile.ZipFile(J1.authoritative_template_path()) as zf:
+            bad = [n for n in zf.namelist() if n.startswith("xl/externalLinks/")]
+            external_rels = [
+                n for n in zf.namelist()
+                if n.endswith(".rels") and b'TargetMode="External"' in zf.read(n)
+            ]
+        assert bad == []
+        assert external_rels == []
+
+    def test_e2e_requires_explicit_scope_and_uses_frontend_source(self) -> None:
+        source = (BACKEND / "scripts/e2e/verify_j1_oo94_roundtrip.py").read_text(encoding="utf-8")
+        assert 'parser.add_argument("--project-id", required=True' in source
+        assert 'parser.add_argument("--wp-id", required=True' in source
+        assert "j1AccrualSkeleton.json" in source
+        assert ".first()" not in source
+        assert "_active_definition_evidence" in source
+        assert "schema_version\": \"j1-oo94-evidence:v1" in source

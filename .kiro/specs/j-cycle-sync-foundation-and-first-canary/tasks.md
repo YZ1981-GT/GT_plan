@@ -4,7 +4,11 @@
 
 **spec**：`j-cycle-sync-foundation-and-first-canary`　**创建**：2026-09-26　
 **状态**（2026-10-01 现算）：主线 Task 0~27 共 28 条 **28 `[x]`**；阶段 2.5 续做 22a~22f **6 `[x]`**。
-J1 = **真双向**（manifest `adapter_registered` / `bidirectional`），真 OO 两轮往返全绿 + 变异反证。复盘见文末。
+J1 = **真双向**（manifest `adapter_registered` / `bidirectional`），真 OO 两轮往返全绿 + 变异反证。
+
+> **证据优先级（2026-10-01 follow-up）**：Task 24/26 当前证据以
+> `evidence/task24-26-completed-supersession.md` + follow-up `evidence/oo94.json` 为准；
+> `evidence/task24-26-blocked.md` 及下文“未完成/待裁决”段落是 2026-09-27 历史快照，保留但已 superseded。
 
 **上游**：umbrella Task 52（J slice 181,051 B + 守卫 `test_task52_j_cycle_migration.py` +
 🔴 **已有变异注入脚本** `backend/scripts/diagnose/mutate_task52_j_cycle_migration_guards.py`）·
@@ -326,7 +330,7 @@ FC-1~FC-13 · GC-1~GC-10 · HC-1~HC-16 · IC-1~IC-20。
   - 反向自检：把发布调进 `watch` SHALL 被守卫打红
   - 🔴 登记模板侧对应：`审定表J1-1 ` 有 R42「试算平衡表数」/ R43「差异数」`=D22+D34+D41-D42`
 
-- [x] 26. 人工审核契约与 approved bundle（依赖 BP-2 / BP-3）
+- [x] 26. reviewed contract 与 approved bundle（自动 provisioning，不冒充人工签字审核）
   - ✅ 2026-10-01：契约 `review_status=reviewed`、`review.entry_id=xlsx/j1/gt-j1-employee-compensation`；
     task76 provisioning 落 **approved** bundle `d0df1909…`（authority/template/instrumentation/contract 四件
     state 全 `approved`，真库现查）；首版 representation 绑定该 bundle。与 L1 同一通道（BP-2/BP-3 由

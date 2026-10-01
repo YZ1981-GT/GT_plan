@@ -99,8 +99,6 @@ R36 是模板预留的第 20 行（只有 G/I 公式、A36 无标签），R37 �
 """
 from __future__ import annotations
 
-import uuid
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final, Mapping, Sequence
 
@@ -114,7 +112,7 @@ from app.services.workpaper_sync.adapters.registry import (
 from app.services.workpaper_sync.contracts import SyncContract
 from app.services.workpaper_sync.entry_profile import DescriptorFacts, RoomFacts
 from app.services.workpaper_sync.excel_instrumentation import ExcelInstrumentationSpec
-from app.services.workpaper_sync.models import AuthorityModel, BundleSlot, DefinitionKind
+from app.services.workpaper_sync.models import AuthorityModel
 
 PHASE5_WAVE: Final[str] = "phase5_accrual_check_short_term"
 ENTRY_ID: Final[str] = "xlsx/j1/gt-j1-employee-compensation"
@@ -377,7 +375,8 @@ _EXTRA_REVIEW: Final[dict[str, Any]] = {
     ),
     "positional_identity_sites": [],
     "positional_identity_note": (
-        "本 canary sheet 的行身份是 `AccrualRow.id`（`acr-{ts}-{i}-{rnd}` 属安全族）。"
+        "本 canary sheet 的固定 19 行骨架身份是模板绑定 `GTROW-J16S-{row:04d}`（R17:R35），"
+        "前端与 instrumentation 共用同一身份；旧 `acr-*` 仅在恰 19 行时一次性按位置换绑。"
         "🔴 J 循环的 family_a（纯序号真落库）唯一一处是 `J2TabAdjustment` 的 `id: i + 1` → "
         "`J2-3-entries`（真库 171 B 载荷里 `\"id\":1` **已确证落库**）⇒ 归下游 lane。"
         "🔴 披露层另有 **49 个硬编码序号 id**（SOE 25 + Listed 24）—— **登记但不判为位置化缺陷**"
@@ -451,13 +450,11 @@ _REVIEWED_BASIS: Final[str] = (
     " + 前端 `j1/inspection/J1TabAccrualCheck.vue` 按值 grep"
     "（item_id 四值 J1-6-short-term / -post-employment / -questions / -conclusion；"
     "`AccrualRow` = id/label/indent + baseName/baseAmount/baseIndex + rate/estimated/actual"
-    " + diff/diffReason/conclusion；身份字段 **`id`** 形态 `acr-{ts}-{i}-{rnd}` 属安全族）"
-    " + 🔴 **RD-5 本轮新登记**（`SHORT_TERM_DEFAULTS` **19 项** vs 模板 `A17:A35` **19 格**："
-    "行数一致但**内容 10 处不等**，三类分开记 —— ①序号分隔符 **9 处**（模板全角 `．` U+FF0E / "
-    "impl 半角 `.`）②缩进前缀 **9 处**（模板带 3 个全角空格 `\\u3000` / impl 靠 `indent: 1` "
-    "字段表达）③🔴 **单元格内换行符 1 处**（模板 `八、辞退福利\\n（因解除劳动关系给予的补偿）` / "
-    "impl 写成一行）；🔴 **禁标点归一化** —— `NFKC` 会同时洗掉 RD-2 的 5 处与本条的 9 处 ⇒ "
-    "逐格**字节**比对；修哪一侧属业务判断 ⇒ 登记不修，`header_text` 取**模板原字节**）"
+    " + diff/diffReason/conclusion；短期薪酬固定骨架身份 **`GTROW-J16S-0017..0035`**；"
+    "标签取前后端共读 `j1AccrualSkeleton.json`，逐字节等于模板 A17:A35）"
+    " + ✅ **RD-5 已收口**（模板 `A17:A35` 的 19 个标签原字节成为前后端共读 "
+    "`j1AccrualSkeleton.json`：保留全角 `．`、3 个全角空格与辞退福利单元格换行；"
+    "HTML 展示/持久化/OO 写入不再用半角副本覆盖模板）"
     " + 🔴 **canary 硬标准改口径**（D~I 的「primary managed table 真库有非空载荷」在 J **不成立** "
     "—— `J1-2-detail-{shortTerm,postEmployment,severance}` 三键 + `J1-1-rows` + "
     "`J1-3-adjustment-rows` 真库**全部无行** ⇒ 改「真库有非空载荷 + 在 entry 内 + "
@@ -511,16 +508,7 @@ def instrumentation_specs() -> tuple[ExcelInstrumentationSpec, ...]:
 
 
 def instrumentation_spec() -> ExcelInstrumentationSpec:
-    """单数形态（首版发布的 identity inventory / binding 装配读它）。
-
-    🔴 2026-10-01 补：`projection_first_publication` 在 identity inventory 与主 binding 处
-    调 `provider.instrumentation_spec()`（单数），缺它即 `SubstrateStagingError: … has no
-    attribute 'instrumentation_spec'`（真库 `--apply` 实测踩到）。本 entry 单受管 sheet ⇒ 取唯一一条。
-    """
-    specs = instrumentation_specs()
-    if len(specs) != 1:
-        raise HC.HEntrySelectionError(f"J1 受管 spec 应恰 1 条，实际 {len(specs)}")
-    return specs[0]
+    return HC.primary_instrumentation_spec(IDENTITY, managed_row_table_specs())
 
 
 #: 首版发布 binding 装配读的三个 provider 常量（与 L1 同名；契约派生值与之双向锁死）。
@@ -600,64 +588,16 @@ def assert_contract_file_matches_source() -> SyncContract:
     return HC.assert_contract_file_matches_source(IDENTITY, build_contract_payload())
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# store 投影 / 合并（**薄转发**框架层，照 H9 同构）
-#
-# 🔴 2026-10-01 补：Task 22 交付契约时缺了这一段 ⇒ `STORE_MERGE_REGISTRY` 无法登记
-#    （`resolve_store_merge_plan` 按 provider 模块取 merge 门面）。
-# ═══════════════════════════════════════════════════════════════════════════
+# store 投影 / 合并（公共 HC facade 薄委托）
 
+def build_store_projection(payload: str | bytes | Sequence[Any], *, contract: SyncContract, limits: Any | None = None, store_item_id: str | None = None) -> Any:
+    return HC.build_store_projection_for(IDENTITY, managed_row_table_specs(), payload, contract=contract, limits=limits, store_item_id=store_item_id)
 
-def _spec_of_store_item(store_item_id: str) -> Any:
-    """store item → 受管 spec。未登记即抛（不静默跳过）。"""
-    for spec in managed_row_table_specs():
-        if spec.store_item_id == store_item_id:
-            return spec
-    raise HC.HEntrySelectionError(
-        f"store item {store_item_id!r} 不在 J1 受管清单里；"
-        f"已受管：{sorted(all_store_item_ids())}"
-    )
-
-
-def build_store_projection(
-    payload: str | bytes | Sequence[Any],
-    *,
-    contract: SyncContract,
-    limits: Any | None = None,
-    store_item_id: str | None = None,
-) -> Any:
-    """HTML store 载荷 → `Projection`。🔴 `payload` 必须是首位位置参数（golden digest 门按此调用）。"""
-    from app.services.workpaper_sync.phase5_row_table_sheet import (
-        build_store_projection as _engine,
-    )
-
-    spec = _spec_of_store_item(store_item_id or STORE_ITEM_ID)
-    return _engine(spec, payload, contract=contract, limits=limits)
-
-
-def merge_projection_into_store_rows(
-    *,
-    projection: Any,
-    base_rows: list[Mapping[str, Any]],
-    store_item_id: str | None = None,
-) -> tuple[list[dict[str, Any]], int, int, set[str]]:
-    """projection → HTML store 行（薄转发框架层引擎，含幽灵行防护）。"""
-    from app.services.workpaper_sync.phase5_row_table_sheet import (
-        merge_projection_into_store_rows as _engine_merge,
-    )
-
-    spec = _spec_of_store_item(store_item_id or STORE_ITEM_ID)
-    return _engine_merge(spec, projection=projection, base_rows=base_rows)
-
+def merge_projection_into_store_rows(*, projection: Any, base_rows: list[Mapping[str, Any]], store_item_id: str | None = None) -> tuple[list[dict[str, Any]], int, int, set[str]]:
+    return HC.merge_projection_into_store_rows_for(IDENTITY, managed_row_table_specs(), projection=projection, base_rows=base_rows, store_item_id=store_item_id)
 
 def iter_store_rows(payload: Any, *, store_item_id: str | None = None):
-    """流式 `(row_identity, row)`（薄转发框架层引擎）。"""
-    from app.services.workpaper_sync.phase5_row_table_sheet import (
-        iter_store_rows as _engine_iter,
-    )
-
-    spec = _spec_of_store_item(store_item_id or STORE_ITEM_ID)
-    return _engine_iter(spec, payload)
+    return HC.iter_store_rows_for(IDENTITY, managed_row_table_specs(), payload, store_item_id=store_item_id)
 
 
 def manifest_capability_enabled(*, manifest: Mapping[str, Any] | None = None) -> bool:
@@ -735,142 +675,17 @@ async def attach_pilot_adapters(
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# 五环发布（参照 L1 / D 系 phase5_* 同构）
-#
-# 🔴 2026-10-01 补：`projection_provisioning.load_projection_supply()` 只认
-#    `publish_pilot_definitions` + `assert_contract_file_matches_source`，缺任一即抛
-#    `ProviderModuleNotAllowedError: provider 是空壳` ⇒ 没有这段 J1 连 task76 的
-#    `--check` 预演都跑不起来（H 系 provider 同样缺，本 spec 不代补）。
-# ═══════════════════════════════════════════════════════════════════════════
+# 五环发布（公共 HC facade 薄委托）
 
 AUTHORITY_MODEL: Final[AuthorityModel] = AuthorityModel.projection_contract
-
+Phase5Definitions = HC.Phase5Definitions
 
 def authority_model_payload() -> dict[str, Any]:
-    return {
-        "schema_version": "authority-model-definition:v1",
-        "authority_model": AUTHORITY_MODEL.value,
-        "content_authority": "structured_projection",
-        "merge_model": "stable_field_three_way",
-        "required_slots": [
-            BundleSlot.template.value,
-            BundleSlot.instrumentation.value,
-            BundleSlot.contract.value,
-        ],
-        "entry_id": ENTRY_ID,
-        "pilot_class": PHASE5_WAVE,
-    }
-
-
-@dataclass(frozen=True)
-class Phase5Definitions:
-    authority_model_definition_id: uuid.UUID
-    authority_model_definition_sha256: str
-    template_definition_id: uuid.UUID
-    template_definition_sha256: str
-    instrumentation_definition_id: uuid.UUID
-    instrumentation_definition_sha256: str
-    contract_definition_id: uuid.UUID
-    contract_definition_sha256: str
-    bundle_id: uuid.UUID
-    bundle_sha256: str
-
-    def as_dict(self) -> dict[str, Any]:
-        return {
-            "entry_id": ENTRY_ID,
-            "adapter_id": ADAPTER_ID,
-            "authority_model": AUTHORITY_MODEL.value,
-            "authority_model_definition_id": str(self.authority_model_definition_id),
-            "authority_model_definition_sha256": self.authority_model_definition_sha256,
-            "template_definition_id": str(self.template_definition_id),
-            "template_definition_sha256": self.template_definition_sha256,
-            "instrumentation_definition_id": str(self.instrumentation_definition_id),
-            "instrumentation_definition_sha256": self.instrumentation_definition_sha256,
-            "contract_definition_id": str(self.contract_definition_id),
-            "contract_definition_sha256": self.contract_definition_sha256,
-            "definition_bundle_id": str(self.bundle_id),
-            "definition_bundle_sha256": self.bundle_sha256,
-        }
-
+    return HC.authority_model_payload_for(IDENTITY)
 
 async def publish_definitions(publisher: Any) -> Phase5Definitions:
-    """authority → template → instrumentation → contract → bundle（顺序不可颠倒）。"""
-    contract = assert_contract_file_matches_source()
-    authority = await publisher.publish_definition(
-        kind=DefinitionKind.authority_model,
-        payload=authority_model_payload(),
-        logical_id=f"{ADAPTER_ID}.authority-model",
-        semantic_version="1.0.0",
-    )
-    template_payload = template_definition_payload()
-    template = await publisher.publish_definition(
-        kind=DefinitionKind.template,
-        payload=template_payload,
-        logical_id=f"{ADAPTER_ID}.template",
-        semantic_version="1.0.0",
-        blob_bytes=read_authoritative_template(),
-        structure_hash=template_payload["normalized_structure_hash"],
-    )
-    instrumentation = await publisher.publish_definition(
-        kind=DefinitionKind.instrumentation,
-        payload=instrumentation_definition_payload(),
-        logical_id=f"{ADAPTER_ID}.instrumentation",
-        semantic_version="1.0.0",
-    )
-    contract_definition = await publisher.publish_definition(
-        kind=DefinitionKind.contract,
-        payload=dict(contract.canonical_payload),
-        logical_id=ADAPTER_ID,
-        semantic_version=contract.semantic_version,
-    )
-    if template.sha256 != contract.template_definition_sha256:
-        raise EntrySelectionError(
-            f"已发布 template digest {template.sha256} 与契约声明 "
-            f"{contract.template_definition_sha256} 不一致 —— 单向引用断裂"
-        )
-    if instrumentation.sha256 != contract.instrumentation_definition_sha256:
-        raise EntrySelectionError(
-            f"已发布 instrumentation digest {instrumentation.sha256} 与契约声明 "
-            f"{contract.instrumentation_definition_sha256} 不一致 —— 单向引用断裂"
-        )
-    bundle = await publisher.publish_bundle(
-        authority_model_definition_id=authority.definition_id,
-        authority_model=AUTHORITY_MODEL,
-        authority_model_definition_sha256=authority.sha256,
-        slots={
-            BundleSlot.template: {
-                "type": "definition",
-                "ref": f"definition:{template.definition_id}",
-                "digest": template.sha256,
-            },
-            BundleSlot.instrumentation: {
-                "type": "definition",
-                "ref": f"definition:{instrumentation.definition_id}",
-                "digest": instrumentation.sha256,
-            },
-            BundleSlot.contract: {
-                "type": "definition",
-                "ref": f"definition:{contract_definition.definition_id}",
-                "digest": contract_definition.sha256,
-            },
-        },
-    )
-    return Phase5Definitions(
-        authority_model_definition_id=authority.definition_id,
-        authority_model_definition_sha256=authority.sha256,
-        template_definition_id=template.definition_id,
-        template_definition_sha256=template.sha256,
-        instrumentation_definition_id=instrumentation.definition_id,
-        instrumentation_definition_sha256=instrumentation.sha256,
-        contract_definition_id=contract_definition.definition_id,
-        contract_definition_sha256=contract_definition.sha256,
-        bundle_id=bundle.bundle_id,
-        bundle_sha256=bundle.canonical_sha256,
-    )
+    return await HC.publish_definitions_for(IDENTITY, managed_row_table_specs(), publisher, contract_payload_builder=build_contract_payload)
 
-
-#: provisioning 白名单接口别名（硬前置，见上方注释）。
 publish_pilot_definitions = publish_definitions
 PILOT_WP_CODES = WP_CODES
 
