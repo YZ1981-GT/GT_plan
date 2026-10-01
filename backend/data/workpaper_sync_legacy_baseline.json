@@ -1,5 +1,5 @@
 {
-  "baseline_digest": "8dbe2c3a592ca515fcce6b16e829265a58185911813a7f53666f5767014c1fe1",
+  "baseline_digest": "35f20268ab449bd34c0ae4320ec4f6ff45b772725496671b7a58b98855d0f5f1",
   "entries": [
     {
       "capability": "single_html",
@@ -236,7 +236,7 @@
         "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue": "1bed1e36814a8aea8e046dde89c7da9e90a83695eea128449e25ac895be6b893",
+        "audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue": "aab706d024b591d65df7a9a204a4416cf034ca2a2017bfbe72e42ded3c69afa4",
         "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue": "599fbef331e8bbc4a0e7b719e4d2b571e8c4ec88cd5e151a8599b90bb6b79f5e"
       },
       "ui_characterization": {
@@ -347,22 +347,21 @@
       "entry_id": "xlsx/b60/gt-b60-bundle",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
-        "html_reload_only": false,
+        "html_reload_only": true,
         "missing_adapter": true,
         "no_durable_forcesave_ack": true,
-        "no_forcesave_command": true,
+        "no_forcesave_command": false,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/b60/GtB60Bundle.vue",
       "independent_entry": true,
       "migration_state": "legacy_fake_bidirectional",
       "reason_codes": [
+        "html_reload_only",
         "missing_adapter",
         "no_durable_forcesave_ack",
-        "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -370,21 +369,15 @@
       ],
       "source_sha256": {
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a",
-        "audit-platform/frontend/src/components/workpaper/b60/GtB60Bundle.vue": "45f5a5bf5d2b3f28afb73ca6143db8f3085eb8b39f489f7dca4fecf9204f8505"
+        "audit-platform/frontend/src/components/workpaper/b60/GtB60Bundle.vue": "d82bd693feb455e67174bf7d771f3450c034f61569473d7e71b0cfa0fa36e674"
       },
       "ui_characterization": {
         "evidence": [
           {
             "file": "audit-platform/frontend/src/components/workpaper/b60/GtB60Bundle.vue",
             "kind": "segmented_mode_switch",
-            "line": 334,
+            "line": 464,
             "snippet": "<el-segmented"
-          },
-          {
-            "file": "audit-platform/frontend/src/components/workpaper/b60/GtB60Bundle.vue",
-            "kind": "dual_mode_state",
-            "line": 335,
-            "snippet": ":model-value=\"mainDual.currentMode.value\""
           }
         ],
         "mode_switch_visible": true
@@ -413,20 +406,20 @@
       ],
       "source_sha256": {
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a",
-        "audit-platform/frontend/src/components/workpaper/b60/GtB60DocxPane.vue": "cadf292ebc0bc00f7a71d28371a0aa99b739d32b7b61df05d8b8ec32f30def49"
+        "audit-platform/frontend/src/components/workpaper/b60/GtB60DocxPane.vue": "0e4017d5779cf8107d6bc49554e05efe594c1d294079cb37949aa26ac53c8cb8"
       },
       "ui_characterization": {
         "evidence": [
           {
             "file": "audit-platform/frontend/src/components/workpaper/b60/GtB60DocxPane.vue",
             "kind": "dual_mode_state",
-            "line": 38,
-            "snippet": "currentMode,"
+            "line": 54,
+            "snippet": "const currentMode = computed<'html' | 'onlyoffice'>(() =>"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/b60/GtB60DocxPane.vue",
             "kind": "segmented_mode_switch",
-            "line": 70,
+            "line": 83,
             "snippet": "<el-segmented"
           }
         ],
@@ -1956,25 +1949,23 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-d1-notes-receivable",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": false,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtD1NotesReceivable.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
-        "no_durable_forcesave_ack",
-        "single_mode_switch_visible"
+        "no_durable_forcesave_ack"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtD1NotesReceivable.vue",
@@ -2032,7 +2023,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue": "6cb816ea1232b139ea20302597e9eb6c5b657e5e61c70d55c60d9aaedb89c53c",
+        "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue": "2d5158f6ee67a1af29100106b47623abc28eaa6e703062b8d39e09e72b8552e1",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -2136,7 +2127,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue": "b211cd3542673d89069ddbb443ec3a53c387e8e5291dfaebdfe5d386314eb753",
+        "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue": "6d54703186f50e1d0eb420b7632043b385e5b6cff747d66a8d194571faa5febe",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -2156,8 +2147,8 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 29,
-            "snippet": "v-else-if=\"renderMode === 'onlyoffice' && !isD4DedicatedSyncSheet && currentSheet !== 'D4-5'\""
+            "line": 35,
+            "snippet": "v-else-if=\"renderMode === 'onlyoffice' && !isD4DedicatedSyncSheet && !isLegacyOoBlocked\""
           }
         ],
         "mode_switch_visible": true
@@ -2189,7 +2180,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtD5ReceivablesFinancing.vue": "a803c71074d437b27e7b85dda45c8751c5c274be88e8d88ed69d3bf45db73aed",
+        "audit-platform/frontend/src/components/workpaper/GtD5ReceivablesFinancing.vue": "3a9fb1092e51ff4cb3d4454a6be4942e4569f8cce82ff09a05e00afbad11b442",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -2242,7 +2233,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtD6ContractAssets.vue": "f74a40e9a6a88da1c78bae7bcb060c4312c88ec88635e0a97ff92831255514dc",
+        "audit-platform/frontend/src/components/workpaper/GtD6ContractAssets.vue": "d76fc38fed8ff60014d3d7fb2d61539d0baf5d95aadcd89687010fe162dd484a",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -2295,7 +2286,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtD7ContractLiabilities.vue": "724f1269e1c4978eb2e610a7473e0291e53ea406c4e6166ef6cc227b78b8dc76",
+        "audit-platform/frontend/src/components/workpaper/GtD7ContractLiabilities.vue": "769680bf5dde41905518d1d365dadc736ae2e2c6c02809c448714e2e048fe67b",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -2386,9 +2377,9 @@
         "html_reload_only": false,
         "missing_adapter": true,
         "no_durable_forcesave_ack": true,
-        "no_forcesave_command": true,
+        "no_forcesave_command": false,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtF1Prepayment.vue",
       "independent_entry": true,
@@ -2396,16 +2387,14 @@
       "reason_codes": [
         "missing_adapter",
         "no_durable_forcesave_ack",
-        "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtF1Prepayment.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtF1Prepayment.vue": "e7a32b32b0ec94b010910ec31502aa1a62462d6f9ed5a5663e2811dc6343ef3a",
+        "audit-platform/frontend/src/components/workpaper/GtF1Prepayment.vue": "ec165ce45b7f8f3bc28ce19c6c2e2391d71b5bbdf1ea0eb905f69d751caf29c5",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -2420,13 +2409,13 @@
             "file": "audit-platform/frontend/src/components/workpaper/GtF1Prepayment.vue",
             "kind": "dual_mode_state",
             "line": 10,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
+            "snippet": "v-model=\"renderMode\""
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtF1Prepayment.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 20,
-            "snippet": "v-if=\"dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 31,
+            "snippet": "v-else-if=\"renderMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -2441,9 +2430,9 @@
         "html_reload_only": false,
         "missing_adapter": true,
         "no_durable_forcesave_ack": true,
-        "no_forcesave_command": true,
+        "no_forcesave_command": false,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtF2InventoryMain.vue",
       "independent_entry": true,
@@ -2451,16 +2440,14 @@
       "reason_codes": [
         "missing_adapter",
         "no_durable_forcesave_ack",
-        "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtF2InventoryMain.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtF2InventoryMain.vue": "22f20ac2e40dd4e3b46f14fb897c8b6ceb56c33b5f3a1a6f9d3c5e95113b02e0",
+        "audit-platform/frontend/src/components/workpaper/GtF2InventoryMain.vue": "ce6fd87767f6a33d68858c8efba2d4245083381be7aca35cdb01d4f17af9850f",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -2475,13 +2462,13 @@
             "file": "audit-platform/frontend/src/components/workpaper/GtF2InventoryMain.vue",
             "kind": "dual_mode_state",
             "line": 7,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
+            "snippet": "v-model=\"renderMode\""
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtF2InventoryMain.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 17,
-            "snippet": "v-if=\"dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 23,
+            "snippet": "v-else-if=\"renderMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -2496,9 +2483,9 @@
         "html_reload_only": false,
         "missing_adapter": true,
         "no_durable_forcesave_ack": true,
-        "no_forcesave_command": true,
+        "no_forcesave_command": false,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtF2InventorySpecial.vue",
       "independent_entry": true,
@@ -2506,37 +2493,35 @@
       "reason_codes": [
         "missing_adapter",
         "no_durable_forcesave_ack",
-        "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtF2InventorySpecial.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtF2InventorySpecial.vue": "aefe1658729f0a725600f7b85bf8e8cf43846ce1f1215fde521dd00c9f142e72",
+        "audit-platform/frontend/src/components/workpaper/GtF2InventorySpecial.vue": "43dddf2dec05ca240ba06706b5b3a695d55c274f7328eb6a3fc940fb86dd5dc8",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
         "evidence": [
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtF2InventorySpecial.vue",
-            "kind": "segmented_mode_switch",
+            "kind": "dual_mode_state",
             "line": 6,
-            "snippet": "<el-segmented"
+            "snippet": "<el-segmented v-model=\"renderMode\" :options=\"dualMode.modeOptions\" size=\"small\" :disabled=\"isF2SSyncManagedSheet && syncBusy\""
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtF2InventorySpecial.vue",
-            "kind": "dual_mode_state",
-            "line": 7,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
+            "kind": "segmented_mode_switch",
+            "line": 6,
+            "snippet": "<el-segmented v-model=\"renderMode\" :options=\"dualMode.modeOptions\" size=\"small\" :disabled=\"isF2SSyncManagedSheet && syncBusy\""
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtF2InventorySpecial.vue",
             "kind": "mount_condition_mode_gate",
             "line": 27,
-            "snippet": "v-if=\"dualMode.currentMode.value === 'onlyoffice'\""
+            "snippet": "v-else-if=\"renderMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -2551,9 +2536,9 @@
         "html_reload_only": false,
         "missing_adapter": true,
         "no_durable_forcesave_ack": true,
-        "no_forcesave_command": true,
+        "no_forcesave_command": false,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtF2InventoryValuation.vue",
       "independent_entry": true,
@@ -2561,37 +2546,35 @@
       "reason_codes": [
         "missing_adapter",
         "no_durable_forcesave_ack",
-        "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtF2InventoryValuation.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtF2InventoryValuation.vue": "c9b47ef31311d1d521a2982422380a552bb69e94915e386e3d4a706efb524d5e",
+        "audit-platform/frontend/src/components/workpaper/GtF2InventoryValuation.vue": "95c180fd046ca5c3c954cb233e3a510f4ffe13cb3615b5ccf81c5d0956e3442c",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
         "evidence": [
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtF2InventoryValuation.vue",
-            "kind": "segmented_mode_switch",
+            "kind": "dual_mode_state",
             "line": 6,
-            "snippet": "<el-segmented"
+            "snippet": "<el-segmented v-model=\"renderMode\" :options=\"dualMode.modeOptions\" size=\"small\" :disabled=\"isF2VSyncManagedSheet && syncBusy\""
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtF2InventoryValuation.vue",
-            "kind": "dual_mode_state",
-            "line": 7,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
+            "kind": "segmented_mode_switch",
+            "line": 6,
+            "snippet": "<el-segmented v-model=\"renderMode\" :options=\"dualMode.modeOptions\" size=\"small\" :disabled=\"isF2VSyncManagedSheet && syncBusy\""
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtF2InventoryValuation.vue",
             "kind": "mount_condition_mode_gate",
             "line": 17,
-            "snippet": "v-if=\"dualMode.currentMode.value === 'onlyoffice'\""
+            "snippet": "v-else-if=\"renderMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -2606,9 +2589,9 @@
         "html_reload_only": false,
         "missing_adapter": true,
         "no_durable_forcesave_ack": true,
-        "no_forcesave_command": true,
+        "no_forcesave_command": false,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue",
       "independent_entry": true,
@@ -2616,37 +2599,35 @@
       "reason_codes": [
         "missing_adapter",
         "no_durable_forcesave_ack",
-        "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue": "13e0b7e1c138c2848986e18386a30790016b62592a024a7d7bd7e3c6b444e2fa",
+        "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue": "28a4501ffe469bf10fb69ec92a256989d69728cca3da582fe199586abee9270c",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
         "evidence": [
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue",
-            "kind": "segmented_mode_switch",
+            "kind": "dual_mode_state",
             "line": 6,
-            "snippet": "<el-segmented"
+            "snippet": "<el-segmented v-model=\"renderMode\" :options=\"dualMode.modeOptions\" size=\"small\" :disabled=\"syncBusy\""
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue",
-            "kind": "dual_mode_state",
-            "line": 7,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
+            "kind": "segmented_mode_switch",
+            "line": 6,
+            "snippet": "<el-segmented v-model=\"renderMode\" :options=\"dualMode.modeOptions\" size=\"small\" :disabled=\"syncBusy\""
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 24,
-            "snippet": "v-if=\"dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 22,
+            "snippet": "v-else-if=\"renderMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -2661,9 +2642,9 @@
         "html_reload_only": false,
         "missing_adapter": true,
         "no_durable_forcesave_ack": true,
-        "no_forcesave_command": true,
+        "no_forcesave_command": false,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtF3NotesPayable.vue",
       "independent_entry": true,
@@ -2671,16 +2652,14 @@
       "reason_codes": [
         "missing_adapter",
         "no_durable_forcesave_ack",
-        "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtF3NotesPayable.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtF3NotesPayable.vue": "8ec6daca84dc17c6146c2e188179e0ce2bb78c2eab4ab4410de7f421e83ee040",
+        "audit-platform/frontend/src/components/workpaper/GtF3NotesPayable.vue": "4bdbdb39ffa73f13a8e06ed9bd4604cabeb5ff578f06b56b4ee1aec9c1a54f0e",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -2695,13 +2674,13 @@
             "file": "audit-platform/frontend/src/components/workpaper/GtF3NotesPayable.vue",
             "kind": "dual_mode_state",
             "line": 19,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
+            "snippet": "v-model=\"renderMode\""
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtF3NotesPayable.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 40,
-            "snippet": "v-if=\"dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 53,
+            "snippet": "v-else-if=\"renderMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -2716,9 +2695,9 @@
         "html_reload_only": false,
         "missing_adapter": true,
         "no_durable_forcesave_ack": true,
-        "no_forcesave_command": true,
+        "no_forcesave_command": false,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtF4AccountsPayable.vue",
       "independent_entry": true,
@@ -2726,16 +2705,14 @@
       "reason_codes": [
         "missing_adapter",
         "no_durable_forcesave_ack",
-        "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtF4AccountsPayable.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtF4AccountsPayable.vue": "522b87747dbb0b0545c2107bb0d717b91411f15e1401cf85039fa0ffaf5a0805",
+        "audit-platform/frontend/src/components/workpaper/GtF4AccountsPayable.vue": "3b18534126be7a9aebc729f74bb1ba9c0d48bcd78f40ff598dde5d5dc1bb5776",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -2750,13 +2727,13 @@
             "file": "audit-platform/frontend/src/components/workpaper/GtF4AccountsPayable.vue",
             "kind": "dual_mode_state",
             "line": 7,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
+            "snippet": "v-model=\"renderMode\""
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtF4AccountsPayable.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 39,
-            "snippet": "v-if=\"dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 54,
+            "snippet": "v-else-if=\"renderMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -2771,9 +2748,9 @@
         "html_reload_only": false,
         "missing_adapter": true,
         "no_durable_forcesave_ack": true,
-        "no_forcesave_command": true,
+        "no_forcesave_command": false,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtF5CostOfSales.vue",
       "independent_entry": true,
@@ -2781,16 +2758,14 @@
       "reason_codes": [
         "missing_adapter",
         "no_durable_forcesave_ack",
-        "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtF5CostOfSales.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtF5CostOfSales.vue": "a763545b1c52eab9996627f3a5be7a4f66b73949f485c613ad0adfbb60960fea",
+        "audit-platform/frontend/src/components/workpaper/GtF5CostOfSales.vue": "dba591449de70472cf14a5c558e9815abc5aa0e9df5d5da5e83b6034e64bb4cd",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -2805,13 +2780,13 @@
             "file": "audit-platform/frontend/src/components/workpaper/GtF5CostOfSales.vue",
             "kind": "dual_mode_state",
             "line": 19,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
+            "snippet": "v-model=\"renderMode\""
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtF5CostOfSales.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 30,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 44,
+            "snippet": "v-else-if=\"isHtmlSheet && renderMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -2828,7 +2803,7 @@
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue",
       "independent_entry": true,
@@ -2837,15 +2812,14 @@
         "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue": "b72e63082e9d313d2a51bf70439c4237a47e0074e60738fbbcdae86e6c72b68d",
+        "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue": "fce24032384d3a152b74ce88040b02d274b13074d647dbfb5a2d73ff1f33c763",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -2853,20 +2827,14 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue",
             "kind": "segmented_mode_switch",
-            "line": 6,
+            "line": 10,
             "snippet": "<el-segmented"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue",
             "kind": "dual_mode_state",
-            "line": 8,
+            "line": 12,
             "snippet": ":model-value=\"renderMode\""
-          },
-          {
-            "file": "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue",
-            "kind": "mount_condition_mode_gate",
-            "line": 36,
-            "snippet": "v-if=\"isHtmlSheet && currentSheet !== '底稿目录' && renderMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -2883,7 +2851,7 @@
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG10TradingFinancialLiabilities.vue",
       "independent_entry": true,
@@ -2893,15 +2861,14 @@
         "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtG10TradingFinancialLiabilities.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtG10TradingFinancialLiabilities.vue": "c223b0c0e9299ad9bffcd48e2576d152aab862981194f4e57348f4d6a4e0458f",
+        "audit-platform/frontend/src/components/workpaper/GtG10TradingFinancialLiabilities.vue": "3a8987999e6236dfcc0c202048667742073e12019717769f7633785e85b02841",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -2909,20 +2876,14 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG10TradingFinancialLiabilities.vue",
             "kind": "segmented_mode_switch",
-            "line": 6,
+            "line": 11,
             "snippet": "<el-segmented"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG10TradingFinancialLiabilities.vue",
             "kind": "dual_mode_state",
-            "line": 8,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
-          },
-          {
-            "file": "audit-platform/frontend/src/components/workpaper/GtG10TradingFinancialLiabilities.vue",
-            "kind": "mount_condition_mode_gate",
-            "line": 18,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 13,
+            "snippet": ":model-value=\"renderMode\""
           }
         ],
         "mode_switch_visible": true
@@ -2939,7 +2900,7 @@
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG11InvestmentIncome.vue",
       "independent_entry": true,
@@ -2949,15 +2910,14 @@
         "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtG11InvestmentIncome.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtG11InvestmentIncome.vue": "3660971e4b9cb71281211a8355d1580dd8206421b6c4832abeb9aece3c485e26",
+        "audit-platform/frontend/src/components/workpaper/GtG11InvestmentIncome.vue": "930dfa33b30e1054e8a7004f9564eed1c71641968dc5b87fbd53348233a9cfa7",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -2965,20 +2925,14 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG11InvestmentIncome.vue",
             "kind": "segmented_mode_switch",
-            "line": 6,
+            "line": 11,
             "snippet": "<el-segmented"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG11InvestmentIncome.vue",
             "kind": "dual_mode_state",
-            "line": 8,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
-          },
-          {
-            "file": "audit-platform/frontend/src/components/workpaper/GtG11InvestmentIncome.vue",
-            "kind": "mount_condition_mode_gate",
-            "line": 42,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 13,
+            "snippet": ":model-value=\"renderMode\""
           }
         ],
         "mode_switch_visible": true
@@ -2995,7 +2949,7 @@
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG12NetHedgeGains.vue",
       "independent_entry": true,
@@ -3005,15 +2959,14 @@
         "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtG12NetHedgeGains.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtG12NetHedgeGains.vue": "08b434aa458846c977e976c1bb56a06a57f45fc7ff8b64bc547d662f418e1434",
+        "audit-platform/frontend/src/components/workpaper/GtG12NetHedgeGains.vue": "340e5b097be25892d23321b68bc35c58e4e5aa68876ca7fd9b2c601643fda7ca",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -3021,20 +2974,14 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG12NetHedgeGains.vue",
             "kind": "segmented_mode_switch",
-            "line": 6,
+            "line": 11,
             "snippet": "<el-segmented"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG12NetHedgeGains.vue",
             "kind": "dual_mode_state",
-            "line": 8,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
-          },
-          {
-            "file": "audit-platform/frontend/src/components/workpaper/GtG12NetHedgeGains.vue",
-            "kind": "mount_condition_mode_gate",
-            "line": 18,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 13,
+            "snippet": ":model-value=\"renderMode\""
           }
         ],
         "mode_switch_visible": true
@@ -3051,7 +2998,7 @@
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG13FairValueChanges.vue",
       "independent_entry": true,
@@ -3061,15 +3008,14 @@
         "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtG13FairValueChanges.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtG13FairValueChanges.vue": "39960cf4fbd683eed79cb39a4276b0a59434f006691c36bd88f49a81ce157fd8",
+        "audit-platform/frontend/src/components/workpaper/GtG13FairValueChanges.vue": "4d9e150a2bf7e0b958bac9613c3587a36fc868f2928bc119dda58b9ccafa7591",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -3077,20 +3023,14 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG13FairValueChanges.vue",
             "kind": "segmented_mode_switch",
-            "line": 6,
+            "line": 13,
             "snippet": "<el-segmented"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG13FairValueChanges.vue",
             "kind": "dual_mode_state",
-            "line": 8,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
-          },
-          {
-            "file": "audit-platform/frontend/src/components/workpaper/GtG13FairValueChanges.vue",
-            "kind": "mount_condition_mode_gate",
-            "line": 18,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 15,
+            "snippet": ":model-value=\"renderMode\""
           }
         ],
         "mode_switch_visible": true
@@ -3107,7 +3047,7 @@
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG14CreditImpairmentLoss.vue",
       "independent_entry": true,
@@ -3117,15 +3057,14 @@
         "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtG14CreditImpairmentLoss.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtG14CreditImpairmentLoss.vue": "6fcf5cc8b1bf346e8012aced449b55a282e03dbff0b477b144a8091397741f9b",
+        "audit-platform/frontend/src/components/workpaper/GtG14CreditImpairmentLoss.vue": "9d1c88946ef4180aebd52945dc80c27a16e81b3612c8790608fbf09c2bcabf83",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -3133,20 +3072,14 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG14CreditImpairmentLoss.vue",
             "kind": "segmented_mode_switch",
-            "line": 6,
+            "line": 11,
             "snippet": "<el-segmented"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG14CreditImpairmentLoss.vue",
             "kind": "dual_mode_state",
-            "line": 8,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
-          },
-          {
-            "file": "audit-platform/frontend/src/components/workpaper/GtG14CreditImpairmentLoss.vue",
-            "kind": "mount_condition_mode_gate",
-            "line": 18,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 13,
+            "snippet": ":model-value=\"renderMode\""
           }
         ],
         "mode_switch_visible": true
@@ -3161,9 +3094,9 @@
         "html_reload_only": false,
         "missing_adapter": true,
         "no_durable_forcesave_ack": true,
-        "no_forcesave_command": true,
+        "no_forcesave_command": false,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG2InterestReceivable.vue",
       "independent_entry": true,
@@ -3171,16 +3104,14 @@
       "reason_codes": [
         "missing_adapter",
         "no_durable_forcesave_ack",
-        "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtG2InterestReceivable.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtG2InterestReceivable.vue": "92d1a7f21ea10bc35684f4bec8e7fab6f0974c4e2b5a7671ece4a03411399016",
+        "audit-platform/frontend/src/components/workpaper/GtG2InterestReceivable.vue": "c49e4153b589d7640db162880c69e149c5b9e3bedff6bedf40a5538f715f4190",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -3196,12 +3127,6 @@
             "kind": "dual_mode_state",
             "line": 8,
             "snippet": ":model-value=\"renderMode\""
-          },
-          {
-            "file": "audit-platform/frontend/src/components/workpaper/GtG2InterestReceivable.vue",
-            "kind": "mount_condition_mode_gate",
-            "line": 22,
-            "snippet": "v-if=\"isHtmlSheet && currentSheet !== '底稿目录' && renderMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -3218,7 +3143,7 @@
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG3DividendReceivable.vue",
       "independent_entry": true,
@@ -3227,15 +3152,14 @@
         "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtG3DividendReceivable.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtG3DividendReceivable.vue": "ef60d24ab976f667f78dfeec651bbd26a936a0537be4d84413b543621646c8cf",
+        "audit-platform/frontend/src/components/workpaper/GtG3DividendReceivable.vue": "f376f5d31584de7d1d43e279101087a1b74c489834dc5190ec2f2916aa773d8e",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -3243,20 +3167,20 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG3DividendReceivable.vue",
             "kind": "segmented_mode_switch",
-            "line": 6,
+            "line": 11,
             "snippet": "<el-segmented"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG3DividendReceivable.vue",
             "kind": "dual_mode_state",
-            "line": 8,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
+            "line": 13,
+            "snippet": ":model-value=\"renderMode\""
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG3DividendReceivable.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 21,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice' && dualMode.isOoAvailable.value\""
+            "line": 46,
+            "snippet": "v-else-if=\"isOoMode && dualMode.isOoAvailable.value\""
           }
         ],
         "mode_switch_visible": true
@@ -3273,7 +3197,7 @@
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentEcl.vue",
       "independent_entry": true,
@@ -3282,15 +3206,14 @@
         "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentEcl.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentEcl.vue": "cfece0af2a458f7bca5eaa2d688d746caca053855d4c2aa1c5ff6c91be9f156e",
+        "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentEcl.vue": "d0bf9f26c9fe5b96b5e0f5b99912c95e823a11b1784ce9f2cd7e5249608fd761",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -3298,20 +3221,14 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentEcl.vue",
             "kind": "segmented_mode_switch",
-            "line": 15,
+            "line": 20,
             "snippet": "<el-segmented"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentEcl.vue",
             "kind": "dual_mode_state",
-            "line": 17,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
-          },
-          {
-            "file": "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentEcl.vue",
-            "kind": "mount_condition_mode_gate",
-            "line": 28,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 22,
+            "snippet": ":model-value=\"renderMode\""
           }
         ],
         "mode_switch_visible": true
@@ -3328,7 +3245,7 @@
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentMain.vue",
       "independent_entry": true,
@@ -3337,15 +3254,14 @@
         "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentMain.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentMain.vue": "a79d9bb954c12d8f33b477888dd064df7c18f470e216913b27ac3f00d8ac842d",
+        "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentMain.vue": "b3fc6653926e301861b36701c51cafb3db8fd0e66de5f0a2209036c994f6e24c",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -3353,20 +3269,14 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentMain.vue",
             "kind": "segmented_mode_switch",
-            "line": 15,
+            "line": 20,
             "snippet": "<el-segmented"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentMain.vue",
             "kind": "dual_mode_state",
-            "line": 17,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
-          },
-          {
-            "file": "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentMain.vue",
-            "kind": "mount_condition_mode_gate",
-            "line": 27,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 22,
+            "snippet": ":model-value=\"renderMode\""
           }
         ],
         "mode_switch_visible": true
@@ -3383,7 +3293,7 @@
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentSppi.vue",
       "independent_entry": true,
@@ -3392,15 +3302,14 @@
         "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentSppi.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentSppi.vue": "b8fe374c7f0c54f37a058a35355437dbe21c095db748605fc4344c873a5e659c",
+        "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentSppi.vue": "40544714e77425a00832f4eacbce7522f47f39e0f0608cea15ea1e315b63a863",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -3408,20 +3317,14 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentSppi.vue",
             "kind": "segmented_mode_switch",
-            "line": 15,
+            "line": 20,
             "snippet": "<el-segmented"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentSppi.vue",
             "kind": "dual_mode_state",
-            "line": 17,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
-          },
-          {
-            "file": "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentSppi.vue",
-            "kind": "mount_condition_mode_gate",
-            "line": 27,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 22,
+            "snippet": ":model-value=\"renderMode\""
           }
         ],
         "mode_switch_visible": true
@@ -3438,7 +3341,7 @@
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG5LongTermReceivable.vue",
       "independent_entry": true,
@@ -3447,15 +3350,14 @@
         "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtG5LongTermReceivable.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtG5LongTermReceivable.vue": "858252ff69b01c0896c341fb13c7afcb9bdb5ac7e6c1c9d7094709a4684e2ce1",
+        "audit-platform/frontend/src/components/workpaper/GtG5LongTermReceivable.vue": "643da9b09e587f3ab52bc3c8dc2c0fe37be9a791ddf2cd9e6dfac3683bce4b5a",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -3463,20 +3365,14 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG5LongTermReceivable.vue",
             "kind": "segmented_mode_switch",
-            "line": 15,
+            "line": 20,
             "snippet": "<el-segmented"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG5LongTermReceivable.vue",
             "kind": "dual_mode_state",
-            "line": 17,
+            "line": 22,
             "snippet": ":model-value=\"renderMode\""
-          },
-          {
-            "file": "audit-platform/frontend/src/components/workpaper/GtG5LongTermReceivable.vue",
-            "kind": "mount_condition_mode_gate",
-            "line": 30,
-            "snippet": "v-if=\"isHtmlSheet && renderMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -3578,7 +3474,7 @@
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondMain.vue",
       "independent_entry": true,
@@ -3587,15 +3483,14 @@
         "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtG6OtherBondMain.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtG6OtherBondMain.vue": "2628cdbcc2984e7cd18f0337f58c25eab994dca2acca49c30e43900839bf55b9",
+        "audit-platform/frontend/src/components/workpaper/GtG6OtherBondMain.vue": "32a36efb353264c86cce2f9a78b0e6017fea02d26ce8c55c29c5ea7a65c9723e",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -3603,20 +3498,14 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondMain.vue",
             "kind": "segmented_mode_switch",
-            "line": 15,
+            "line": 20,
             "snippet": "<el-segmented"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondMain.vue",
             "kind": "dual_mode_state",
-            "line": 17,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
-          },
-          {
-            "file": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondMain.vue",
-            "kind": "mount_condition_mode_gate",
-            "line": 28,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 22,
+            "snippet": ":model-value=\"renderMode\""
           }
         ],
         "mode_switch_visible": true
@@ -3633,7 +3522,7 @@
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondSppi.vue",
       "independent_entry": true,
@@ -3642,15 +3531,14 @@
         "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtG6OtherBondSppi.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtG6OtherBondSppi.vue": "009d3f44b560d48725250a6df5a24f2767fca4aaaff1006b2905431f8fee9143",
+        "audit-platform/frontend/src/components/workpaper/GtG6OtherBondSppi.vue": "1d4a3e033eca6cb6320f68785cd2c4e9fda8704ba4b6079aa33b8f5e954690bf",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -3658,20 +3546,14 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondSppi.vue",
             "kind": "segmented_mode_switch",
-            "line": 15,
+            "line": 20,
             "snippet": "<el-segmented"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondSppi.vue",
             "kind": "dual_mode_state",
-            "line": 17,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
-          },
-          {
-            "file": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondSppi.vue",
-            "kind": "mount_condition_mode_gate",
-            "line": 28,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 22,
+            "snippet": ":model-value=\"renderMode\""
           }
         ],
         "mode_switch_visible": true
@@ -3796,24 +3678,22 @@
         "html_reload_only": false,
         "missing_adapter": false,
         "no_durable_forcesave_ack": true,
-        "no_forcesave_command": true,
+        "no_forcesave_command": false,
         "single_mode_switch_visible": false,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG7LongTermEquityMain.vue",
       "independent_entry": true,
       "migration_state": "adapter_registered",
       "reason_codes": [
-        "no_durable_forcesave_ack",
-        "no_forcesave_command",
-        "template_only_open"
+        "no_durable_forcesave_ack"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtG7LongTermEquityMain.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtG7LongTermEquityMain.vue": "7f9ed904197e6d2a7c52076dd22e9f772a999593e40fbc6f8de94a1b857f89d8",
+        "audit-platform/frontend/src/components/workpaper/GtG7LongTermEquityMain.vue": "36b93e2b136244cb388b6edc969df934f4a1a56a93e58588ea9b35d5f61ad32a",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -3821,20 +3701,20 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG7LongTermEquityMain.vue",
             "kind": "segmented_mode_switch",
-            "line": 15,
+            "line": 19,
             "snippet": "<el-segmented"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG7LongTermEquityMain.vue",
             "kind": "dual_mode_state",
-            "line": 17,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
+            "line": 21,
+            "snippet": ":model-value=\"currentMode\""
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG7LongTermEquityMain.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 41,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 64,
+            "snippet": "v-else-if=\"isHtmlSheet && currentMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -3851,7 +3731,7 @@
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG8OtherEquityInstruments.vue",
       "independent_entry": true,
@@ -3861,15 +3741,14 @@
         "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtG8OtherEquityInstruments.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtG8OtherEquityInstruments.vue": "6f39c7b30c65467fd96a85f6ce0445d64665a50f658a055d4b9e9a178f42fb07",
+        "audit-platform/frontend/src/components/workpaper/GtG8OtherEquityInstruments.vue": "6d257a15de4659623d8178d72a159e811f2bca87036898951ea46df2300cec00",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -3877,20 +3756,14 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG8OtherEquityInstruments.vue",
             "kind": "segmented_mode_switch",
-            "line": 6,
+            "line": 11,
             "snippet": "<el-segmented"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG8OtherEquityInstruments.vue",
             "kind": "dual_mode_state",
-            "line": 8,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
-          },
-          {
-            "file": "audit-platform/frontend/src/components/workpaper/GtG8OtherEquityInstruments.vue",
-            "kind": "mount_condition_mode_gate",
-            "line": 18,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 13,
+            "snippet": ":model-value=\"renderMode\""
           }
         ],
         "mode_switch_visible": true
@@ -3907,7 +3780,7 @@
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
         "single_mode_switch_visible": true,
-        "template_only_open": true
+        "template_only_open": false
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG9OtherNoncurrentFinancial.vue",
       "independent_entry": true,
@@ -3917,15 +3790,14 @@
         "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
-        "template_only_open"
+        "single_mode_switch_visible"
       ],
       "source_paths": [
         "audit-platform/frontend/src/components/workpaper/GtG9OtherNoncurrentFinancial.vue",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtG9OtherNoncurrentFinancial.vue": "b43ff04eb74aa2567955d087448510f7133fc2bc17b55b0ed7fe022fbec86424",
+        "audit-platform/frontend/src/components/workpaper/GtG9OtherNoncurrentFinancial.vue": "63b1b814bd9a582a9b6d3eee8d36ddf6e31834f6d373501636bc6e48268a279c",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -3933,20 +3805,14 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG9OtherNoncurrentFinancial.vue",
             "kind": "segmented_mode_switch",
-            "line": 6,
+            "line": 11,
             "snippet": "<el-segmented"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtG9OtherNoncurrentFinancial.vue",
             "kind": "dual_mode_state",
-            "line": 8,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
-          },
-          {
-            "file": "audit-platform/frontend/src/components/workpaper/GtG9OtherNoncurrentFinancial.vue",
-            "kind": "mount_condition_mode_gate",
-            "line": 18,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 13,
+            "snippet": ":model-value=\"renderMode\""
           }
         ],
         "mode_switch_visible": true
@@ -3978,28 +3844,28 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtH1FixedAssets.vue": "d3410b115b7dc47bae600ba8ca49ad2e912da98c42aec10f644db1765cb2f3aa",
+        "audit-platform/frontend/src/components/workpaper/GtH1FixedAssets.vue": "90766c9a9ec5f445adc5528f7b538a12646c20df811024318bd4ed1131b52852",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
         "evidence": [
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH1FixedAssets.vue",
-            "kind": "segmented_mode_switch",
-            "line": 10,
-            "snippet": "<el-segmented"
+            "kind": "dual_mode_state",
+            "line": 14,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH1FixedAssets.vue",
-            "kind": "dual_mode_state",
-            "line": 11,
-            "snippet": ":model-value=\"currentMode\""
+            "kind": "segmented_mode_switch",
+            "line": 14,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH1FixedAssets.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 21,
-            "snippet": "v-if=\"currentMode === 'onlyoffice'\""
+            "line": 33,
+            "snippet": "v-else-if=\"currentMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -4034,28 +3900,28 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue": "06560e12a5ae9ef36fb02424ec4966caf6a58a586bebef4dd7ef0ff92a7291a5",
+        "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue": "e6a3afbee5d899cdd288cdaeae247fc7e21e371b18d28a1b68b75fc49a2222e0",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
         "evidence": [
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue",
-            "kind": "segmented_mode_switch",
-            "line": 6,
-            "snippet": "<el-segmented"
+            "kind": "dual_mode_state",
+            "line": 11,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue",
-            "kind": "dual_mode_state",
-            "line": 7,
-            "snippet": ":model-value=\"dualMode.currentMode.value\""
+            "kind": "segmented_mode_switch",
+            "line": 11,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 19,
-            "snippet": "v-if=\"isHtmlSheet && currentSheet !== '底稿目录' && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 35,
+            "snippet": "v-else-if=\"isHtmlSheet && currentSheet !== '底稿目录' && currentMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -4089,28 +3955,28 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue": "91ab43c4b0d2a02b2f3835355b6cd882acbea340f340adc9881c613a9a9cd0d0",
+        "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue": "d6108176f33d0434414df0aeb59bd95a68199fbb66b70bffbf3e6415fbdf1634",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
         "evidence": [
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue",
-            "kind": "segmented_mode_switch",
-            "line": 10,
-            "snippet": "<el-segmented"
+            "kind": "dual_mode_state",
+            "line": 15,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue",
-            "kind": "dual_mode_state",
-            "line": 11,
-            "snippet": ":model-value=\"currentMode\""
+            "kind": "segmented_mode_switch",
+            "line": 15,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 23,
-            "snippet": "v-if=\"currentMode === 'onlyoffice'\""
+            "line": 38,
+            "snippet": "v-else-if=\"currentMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -4144,28 +4010,28 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtH3InvestmentProperty.vue": "5303aa8f4abb6228cd435dad0e28b346467c27f4b73ffa05cdbc456b2864d2a4",
+        "audit-platform/frontend/src/components/workpaper/GtH3InvestmentProperty.vue": "1cb2b22b79fc83ea251b69dfb19a1d070ab124bf871ba07adf9556a0b96d512e",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
         "evidence": [
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH3InvestmentProperty.vue",
-            "kind": "segmented_mode_switch",
-            "line": 10,
-            "snippet": "<el-segmented"
+            "kind": "dual_mode_state",
+            "line": 16,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH3InvestmentProperty.vue",
-            "kind": "dual_mode_state",
-            "line": 11,
-            "snippet": ":model-value=\"currentMode\""
+            "kind": "segmented_mode_switch",
+            "line": 16,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH3InvestmentProperty.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 30,
-            "snippet": "v-if=\"currentMode === 'onlyoffice'\""
+            "line": 48,
+            "snippet": "v-else-if=\"currentMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -4199,28 +4065,28 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtH4EngineeringMaterials.vue": "7202038df0f10f5893c1fae96da88b79316ff12c2d09194aec01b0074b0f7c53",
+        "audit-platform/frontend/src/components/workpaper/GtH4EngineeringMaterials.vue": "e94ebdb609990615943eee95330ce45883e26a2d3a90b706c7ae0c6606ccfb9c",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
         "evidence": [
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH4EngineeringMaterials.vue",
-            "kind": "segmented_mode_switch",
-            "line": 10,
-            "snippet": "<el-segmented"
+            "kind": "dual_mode_state",
+            "line": 17,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH4EngineeringMaterials.vue",
-            "kind": "dual_mode_state",
-            "line": 11,
-            "snippet": ":model-value=\"currentMode\""
+            "kind": "segmented_mode_switch",
+            "line": 17,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH4EngineeringMaterials.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 21,
-            "snippet": "v-if=\"currentMode === 'onlyoffice'\""
+            "line": 40,
+            "snippet": "v-else-if=\"currentMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -4254,28 +4120,28 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue": "739e357850d2454f7f23c73c55c7d1b283a360aee8218a351e0fbb16da60ecf1",
+        "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue": "368a8a6bda756104cebce05160b217c226e5670245ac45776f68f8e151f6ebe4",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
         "evidence": [
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue",
-            "kind": "segmented_mode_switch",
-            "line": 16,
-            "snippet": "<el-segmented"
+            "kind": "dual_mode_state",
+            "line": 22,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue",
-            "kind": "dual_mode_state",
-            "line": 17,
-            "snippet": ":model-value=\"currentMode\""
+            "kind": "segmented_mode_switch",
+            "line": 22,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 29,
-            "snippet": "v-if=\"currentMode === 'onlyoffice'\""
+            "line": 42,
+            "snippet": "v-else-if=\"currentMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -4309,28 +4175,28 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue": "1a6f5a29e39ef25d0d6755a03419fa8600061c6debdd3e124df44d2026d6229d",
+        "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue": "fe65a13d077f72034c99c1dfde6ebe5df37f6356ccf7cecf0714a4fd9a50213a",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
         "evidence": [
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue",
-            "kind": "segmented_mode_switch",
-            "line": 23,
-            "snippet": "<el-segmented"
+            "kind": "dual_mode_state",
+            "line": 30,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue",
-            "kind": "dual_mode_state",
-            "line": 24,
-            "snippet": ":model-value=\"currentMode\""
+            "kind": "segmented_mode_switch",
+            "line": 30,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 34,
-            "snippet": "v-if=\"currentMode === 'onlyoffice'\""
+            "line": 53,
+            "snippet": "v-else-if=\"currentMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -4364,28 +4230,28 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue": "c8903e0a1db719754bcb50251527b7ef8bf330696b737c1a69833e947e6bfd11",
+        "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue": "51eeb02ff25209a896e664b508b7db0cec4d35d878e553ab18a4205987e2c5c8",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
         "evidence": [
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue",
-            "kind": "segmented_mode_switch",
-            "line": 16,
-            "snippet": "<el-segmented"
+            "kind": "dual_mode_state",
+            "line": 21,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue",
-            "kind": "dual_mode_state",
-            "line": 17,
-            "snippet": ":model-value=\"currentMode\""
+            "kind": "segmented_mode_switch",
+            "line": 21,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 35,
-            "snippet": "v-if=\"currentMode === 'onlyoffice'\""
+            "line": 50,
+            "snippet": "v-else-if=\"currentMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -4419,28 +4285,28 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue": "5bd28534fb6ae370f70ff30cdef48d2d82c7e6b62c5d5c4024fc18658020b078",
+        "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue": "4b8c5675e07d227d833044797ee71d9d8442199e86b95a261ac946f6c7799515",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
         "evidence": [
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue",
-            "kind": "segmented_mode_switch",
-            "line": 38,
-            "snippet": "<el-segmented"
+            "kind": "dual_mode_state",
+            "line": 43,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue",
-            "kind": "dual_mode_state",
-            "line": 39,
-            "snippet": ":model-value=\"currentMode\""
+            "kind": "segmented_mode_switch",
+            "line": 43,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 47,
-            "snippet": "v-if=\"currentMode === 'onlyoffice'\""
+            "line": 66,
+            "snippet": "v-else-if=\"currentMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -4474,28 +4340,28 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue": "deaf92a4518e6c81b51c2357050f25d893600edca50864b457809fa4c17e3c85",
+        "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue": "ac2c30d6f06c4a3e55dfe2e9974c0d94408abdc5386e5c67d09c6c2cafc1d9a4",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
         "evidence": [
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue",
-            "kind": "segmented_mode_switch",
-            "line": 23,
-            "snippet": "<el-segmented"
+            "kind": "dual_mode_state",
+            "line": 27,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue",
-            "kind": "dual_mode_state",
-            "line": 24,
-            "snippet": ":model-value=\"currentMode\""
+            "kind": "segmented_mode_switch",
+            "line": 27,
+            "snippet": "<el-segmented v-model=\"currentMode\" :options=\"modeOptions\" size=\"small\" />"
           },
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 36,
-            "snippet": "v-if=\"currentMode === 'onlyoffice'\""
+            "line": 56,
+            "snippet": "v-else-if=\"currentMode === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -4859,7 +4725,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue": "049b3854b50b2cf3d960159d69f7a223274dde03835857b557de1b230dfeda1f",
+        "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue": "56a993c6bc6699dab43e60fdab6b49475829d10e171c8ad901f17cfc1506115b",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -4879,7 +4745,7 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 21,
+            "line": 22,
             "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
           }
         ],
@@ -5134,7 +5000,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue": "655f7a8dffae111dfdeb5b4de59a3391ce16f37c3c39acb65c087c8de8672401",
+        "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue": "0b528f946356912091a852eb701c1dae747beb9ee7ecc63bbe728e56c7738599",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -5154,7 +5020,7 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 21,
+            "line": 22,
             "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
           }
         ],
@@ -5189,7 +5055,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue": "b6ee4bd15c0283be06e0cd4226277ed156464de430973ec44b091c807c0fac26",
+        "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue": "223521c58082f7d284cef83697abd0bef3485bcda0041ca7a7f1cec4eab5ed37",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -5209,7 +5075,7 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 20,
+            "line": 21,
             "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
           }
         ],
@@ -5244,7 +5110,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue": "3800e918ceba64ba8aec4d065300c5caff9bda75edd75b2ea763e89257020454",
+        "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue": "071441116ab0d40df4437688b54f3021f33a8a106b657333e28e926d10c397e3",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -5264,7 +5130,7 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 20,
+            "line": 21,
             "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
           }
         ],
@@ -5299,7 +5165,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue": "d8b045e92d8c881cec59aedbd7964407e6b61e067c3ab6a73ec10c10c6692ab4",
+        "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue": "2778099f898725c1be4d142fe8da9d1687f05f2f5992ada9c8a3da6b215a5346",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -5319,7 +5185,7 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 20,
+            "line": 21,
             "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
           }
         ],
@@ -5354,7 +5220,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue": "ad47b7ea5196d48ed4624ea1a29afda258841210e82e297a75b3aa6a2b3256d3",
+        "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue": "f5670571609c09f44b3815e00a52709f26366c30f508c42a1b7f3a207a438a8d",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -5374,7 +5240,7 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 20,
+            "line": 21,
             "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
           }
         ],
@@ -5409,7 +5275,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue": "9754238c4d3b6b0dddf08f69acad9e1f37b2f7a127cbc86e208a509f5bdd23d5",
+        "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue": "6ad739967e99fd1c8c88b9847efc2fc886888fc34274a02247741c1fe38c8bc5",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -5429,7 +5295,7 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 20,
+            "line": 21,
             "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
           }
         ],
@@ -5547,26 +5413,24 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-l1-short-term-loans",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtL1ShortTermLoans.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -5574,7 +5438,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtL1ShortTermLoans.vue": "f7558548d5436359488da63c4dfd518bb22e177003974eccd4f59f45746f48ff",
+        "audit-platform/frontend/src/components/workpaper/GtL1ShortTermLoans.vue": "fe6f2c8f3486b28c4d88fc5eb86114ef4cc7a314ec33ac7daafcbc14d847b343",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -5594,7 +5458,7 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtL1ShortTermLoans.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 20,
+            "line": 23,
             "snippet": "v-if=\"isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'\""
           }
         ],
@@ -6655,7 +6519,7 @@
       ],
       "source_sha256": {
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a",
-        "audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue": "1bed1e36814a8aea8e046dde89c7da9e90a83695eea128449e25ac895be6b893"
+        "audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue": "aab706d024b591d65df7a9a204a4416cf034ca2a2017bfbe72e42ded3c69afa4"
       },
       "ui_characterization": {
         "evidence": [
@@ -6974,7 +6838,7 @@
       ],
       "source_sha256": {
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a",
-        "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue": "77f17a885a99e79ec7d08f77468572be22d10c8ade6daedc8038dbfca90c6c3b"
+        "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue": "044e6ae20ed5fefec838af17117a44817ee594d91ad0d775f7b83042180ff54e"
       },
       "ui_characterization": {
         "evidence": [
@@ -7748,18 +7612,18 @@
       }
     }
   ],
-  "manifest_digest": "afdffafdba8861d9522c9387394f9f9378e27b7ab78706fbc6228d812e7edc60",
+  "manifest_digest": "02e749339398565a6a7ebf3733dbb6ac530fc0b5db13493fda3ed6a47ad4db71",
   "schema_version": 1,
-  "source_digest": "7032f6f067bd058d3d1ad33995dd3c43bc601b546663ecbd3e9450e7261cc730",
+  "source_digest": "45c5432a7bbc2bd157a9a43869d811c91e5f2c4c3633df84e16ec770926798c3",
   "stats": {
     "claimed_bidirectional_without_adapter_count": 0,
     "entry_count": 155,
-    "html_reload_only_count": 14,
+    "html_reload_only_count": 15,
     "independent_entry_count": 142,
-    "missing_adapter_count": 138,
+    "missing_adapter_count": 136,
     "no_durable_forcesave_ack_count": 142,
-    "no_forcesave_command_count": 135,
-    "single_mode_switch_visible_count": 128,
-    "template_only_open_count": 135
+    "no_forcesave_command_count": 124,
+    "single_mode_switch_visible_count": 126,
+    "template_only_open_count": 109
   }
 }

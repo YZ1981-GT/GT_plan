@@ -295,7 +295,7 @@
       契约的两条单向引用判据（template/instrumentation digest 必须等于契约声明）真跑过了。
     - 守卫回归：309 test 全绿（含 contract registry 与 store registry）。
 
-- [ ]* 7b. 执行两步写库（**待用户拍板**）
+- [x] 7b. 执行两步写库
   - 第一步 `fix_task76_provision_projection_definitions.py --apply --entry xlsx/gt-l1-short-term-loans`
     —— 预演已明确：**纯新增 5 行**（4 definition + 1 bundle），逐 entry 独立事务，
     digest 幂等（重跑走 `reused` 不重建），**不碰** content_version / representation / entry_state
@@ -310,15 +310,62 @@
   - 断言真库 `working_paper_sync_entry_state` 出现 `xlsx/gt-l1-short-term-loans` 行、
     `working_paper_content_representation` 行数 +1（动作前后各拍快照）
   - _判据：LR-P21_
+  - **实施证据（2026-10-01）**：
+    - 🔴 **目标底稿与 7a 预演不同**：7a 记的是 wp `c65dc760`（项目 `2aa00f57`），本轮现算
+      `wp_code=L1` 有效底稿是 wp `a028104d`（项目 `005a6f2d`，`storage/projects/.../L/L1.xlsx`）——
+      脚本按 `(wp_code, created_at, id)` 确定性取第一条，库里底稿集合变了结果就变，不是脚本错。
+    - 🔴 **本地 PG 出现非整库回退**：动手前三表 `entry_state / content_version / representation`
+      **全为 0**（09-28 登记 12 / 267 / 274），`checklist_responses` 只剩 42 行、L 域 0 行；
+      `projects` 139 / `working_paper` 997 仍在 ⇒ 不是重建库。成因未查明，只登记现象
+      （`l1_adapter_facts.MEASURED_SUPPLY_2026_10_01`）。
+    - 第一步 `--apply --entry …`：`created_total=5`、`reused=[]`、`errors=[]`；
+      `definition_artifact` 36 → 40、`definition_bundle` 9 → 10；四段 digest 与 7a 预演**逐字相同**
+      （contract `0567f010…` / bundle `5efd6233…`）。blob 落 `backend/definition_store/` 5 个文件。
+    - 第二步先 `--check` 得 `ready_to_publish`、**10/10 阶段**通过，再 `--apply`：
+      `revision=1`、`representation_generation=1`、`representation_id=baff7afc…`。
 
-- [ ]* 7c. 发布后查数据验证（依赖 7b）
+- [x] 7c. 发布后查数据验证（依赖 7b）
+  - **实施证据**：查库（非看退出码）`working_paper_sync_entry_state` 现有
+    `(xlsx/gt-l1-short-term-loans, wp a028104d, current_representation_id baff7afc…, generation 1)`；
+    `content_version` 0 → 1、`representation` 0 → 1。守卫
+    `TestBP611PremiseInvalidated::test_entry_state_covers_registered_entries` 钉住 L1 必须在库。
+  - 原 task 7c 正文：
   - 🔴 断言真库 `working_paper_sync_entry_state` 出现 `xlsx/gt-l1-short-term-loans` 行，
     且 `current_representation_id` 非空、`representation_generation >= 1`
   - 断言 `working_paper_content_representation` 行数比动作前 +1（前后各拍一次快照）
   - 🔴 失败时不得降级为「合成 publisher」冒充通过 —— 真实失败要写出 error_code
   - _判据：LR-P21_
 
-- [ ] 8. manifest 重生成与 capability 翻转
+- [x] 8. manifest 重生成与 capability 翻转
+  - **实施证据（2026-10-01）**：
+    - 翻转走 **overlay `overrides` 末尾追加一条**（`GtL1ShortTermLoans.vue × GtOnlyOfficeSheet` →
+      `adapter_registered` / `bidirectional` / `adapter_id=l1.short_term_loans` /
+      `html_store=checklist_responses_l1_detail_rows` / resolver `workpaper_sync_published_representation`），
+      与 D1/D2/D4/G7/H1 五条既有翻转同形；manifest 由生成器 `--apply` 产出，**未手改 JSON**。
+    - 现算：L1 条目四字段全中；`legacy_fake_bidirectional` **136 → 135**；
+      `stats` 段与 `entries` 段**逐值一致**（capability_counts 与 legacy 计数双向现算相等）——
+      原文「stats 自报 137 实扫 135」的滞后在本次重生成后不复现。
+    - 🔴 **原文判据两处需改口径**：①「135 → 134」是 09-28 读数；本轮前 manifest 实为 136（期间并发会话
+      有 entry 进出），按「减 1」判成立。②`capability_target_blocked_by` **不是 manifest 字段**
+      （manifest 无此键，它在 `workpaper_sync_l_cycle_manifest_slice.json` 里）；slice 是冻结快照、
+      不随本次翻转改写，故 BP-1/2/3 的解除落在守卫
+      `test_task54_l_cycle_migration.py::MIGRATED_L_ENTRIES` —— 已迁移 entry 断言 manifest 必须是真裁决，
+      其余 7 条仍断言「与 overlay 默认值不一致且登记 BP-9」，**判据未放宽**。
+    - 🔴 **两个使生成链跑不起来的预存阻塞，本轮修掉**：
+      ① `b60/GtB60HourBudgetPanel.vue` 块注释里写了 `/rows/` + `*` + `/rowUuid`，`*/` 提前截断注释 ⇒
+      该文件 `Vue AST parse failed`，discoverer 与前端构建双双炸；全仓 7475 个前端源文件同型扫描
+      另 1 处命中（`find-missing-v-permission.mjs` 的 `**//*` 自行闭合，非破损）。
+      ② overlay `approved_source_digest` 落后于已提交的宿主接桥工作（G 15 宿主 / g-single-region /
+      K lane1）：mounts 244=244、hosts 154=154、byComponent 逐值不变、0 个 (file,component) 对数变化，
+      **83 条 mountId 变更全有归因**（49 仅 ordinal 位移 + 34 ordinal 位移且门控改写），复核写进
+      overlay `review_basis`。
+    - 🔴 **digest 在干净 HEAD worktree 上算**：主工作树混着并发会话未提交的 I/K/N 宿主改动，
+      在主树上算出的 digest 动手过程中连漂两次，提交后干净检出必 fail closed。故在
+      `git worktree add --detach HEAD` 上只叠加本 spec 改动后跑生成器，再拷回生成物。
+      ⇒ **主工作树上 `generate_workpaper_sync_manifest.py --check` 会因并发在途改动 fail**，
+      那是对方提交时需自行重做的复核，不是本 spec 的回归。
+    - 联动重生成 `workpaper_sync_legacy_baseline.json`（+ 前端 `.generated.ts`），否则
+      `check_workpaper_sync_closure.py` 报 `legacy characterization is stale`。
   - 用 manifest 生成器重生成 `backend/data/workpaper_sync_entry_manifest.json`
     （先现算确认生成器入口与 `source_digest` fail-closed 机制，禁手改 JSON）
   - 🔴 断言 L1 条目现算得 `migration_state == "adapter_registered"` /
@@ -361,7 +408,24 @@
     - ⇒ 两处基线都需由其 owner 按现算重刷，本 spec 不代改（改了等于替 F2/G 的 spec
       宣布它们的零回归基线换了口径）。
 
-- [ ] 10. 真 OO 9.4 roundtrip
+- [x] 10. 真 OO 9.4 roundtrip
+  - **实施证据（2026-10-01）**：`backend/scripts/e2e/verify_l1_oo94_roundtrip.py` **EXIT 0**，
+    全链生产代码无合成替身：生产 `attach_adapters` → 真 representation substrate（gen 1）→
+    2 行 HTML 载荷 → materialize → **docker `audit-onlyoffice` 的 `ConvertService.ashx` xlsx→xlsx
+    真引擎重存**（容器经 `host.docker.internal` 拉临时 HTTP 文件）→ extract → G1 等值门 →
+    merge 回 store。
+    - `L1-2-rows` 往返**逐字段相等**（2 行 × 24 键，rowId 稳定）；合并回 store 恰 2 行 ⇒
+      substrate 里模板 R10~R25 的 16 条预印行（只有序号）被 ghost-row 锚点挡住，未成幽灵行
+    - OO 重存后受管行 K/R/S/T/U **10 格全部仍是公式**（formula_mask 真生效）
+    - `审定表L1-1` R7~R11×B..L 55 格：**OO 引擎改写 0 格**；materialize 中性化裸 IF 5 格
+      （K7~K11 变动率公式 → 常量，task 6 有意挂的 per-file OO 崩溃中性化，GC-2 平台策略）
+    - 真库 `L1-adj-*` 32 行快照 digest 前后不变（本脚本不写库）
+  - 🔴 **如实登记两点**：①验证用 ConvertService（OO 自己的电子表格引擎解析+重写 OOXML），
+    不是浏览器里人工编辑后 forcesave —— 能证「OO 不改坏受管区/公式/隐藏 UUID 列」，
+    不能证「用户在 OO 里改值后回流」；后者需 Playwright 真浏览器，与 lane spec 的 `[ ]*` 端到端同属一件事。
+    ②中性化让 OO 视图里 `审定表L1-1` K 列变动率**失去公式联动**（显示为常量），这是平台级取舍，
+    不是 L1 的缺陷，但用户在 OO 里看到的变动率不随明细变化，需知情。
+  - 原 task 10 正文：
   - 用 docker `audit-onlyoffice`（实测 healthy）跑 HTML→OO→HTML
   - 断言受管表往返后 `L1-2-rows` 载荷逐字节不变；断言 K/R/S/T/U 五列公式**往返后仍是公式**
     （不被值替换 —— 这是 formula_mask 真生效的唯一硬证据）

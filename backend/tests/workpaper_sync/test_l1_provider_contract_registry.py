@@ -298,14 +298,17 @@ class TestContractDelivery:
 # LR-P16：契约归属 —— 接过既有守卫里因并发会话而整体过期的那部分实质判据
 # ═══════════════════════════════════════════════════════════════════════════
 
-#: 🔴 并发会话（分支 `work/2026-09-27-k-lane1-template-orphan-keys`）留下的已知中间态。
-#: 本 spec **不代改**它们的文件，如实登记，待其 owner 收口后从本集合移除。
+#: 🔴 并发会话留下的已知中间态。本 spec **不代改**它们的文件，如实登记，
+#: 待其 owner 收口后从本集合移除（反向断言 `stale` 会逼着移除，见下方判据）。
 #: 平台既有范式见 `test_registration_isolation_and_alignment.py::_KNOWN_MISALIGNED`。
-KNOWN_CONCURRENT_GAPS: Mapping[str, str] = {
-    "a51.cashflow_audit.json": (
-        "review_status=reviewed 但缺 review.entry_id（未跟踪新文件，并发会话在途）"
-    ),
-}
+#:
+#: 2026-10-01 清空：原唯一条目 `a51.cashflow_audit.json` 已**从磁盘消失**
+#: （它当时是并发会话的未跟踪新文件 `??`，未被提交；现算 `workpaper_sync_contracts/` 下
+#: 60 份契约里无此名，`generate_workpaper_sync_managed_sheets.py --check` 也因
+#: 「登记表有 a51 而磁盘无文件」报错 ⇒ 那条缺口的**对象本身不在了**）。
+#: 🔴 措辞上不写「已修好」—— 它不是被补上 `review.entry_id`，而是整份契约没落库；
+#: a51 的收口归 `published-representation-production-path-and-lane-adjudication` 一侧。
+KNOWN_CONCURRENT_GAPS: Mapping[str, str] = {}
 
 
 class TestContractOwnershipInLDomain:

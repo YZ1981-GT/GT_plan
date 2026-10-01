@@ -119,6 +119,11 @@ PILOT_CONTRACT_OWNERS = {
 }
 
 L_CODES = ("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8")
+
+#: 已按 spec `l-cycle-true-adapter-registration` 走完五环发布链、manifest 已翻成
+#: `adapter_registered` 的 entry。L2~L8 接线时**逐条**追加（禁批量）。
+#: 依据：真库 `working_paper_sync_entry_state` 有该 entry 行 + overlay overrides 有对应条目。
+MIGRATED_L_ENTRIES: frozenset[str] = frozenset({"xlsx/gt-l1-short-term-loans"})
 #: 承载 inert 开关的四条 entry（L 循环特有形态；见模块 docstring 第 2 条）。
 INERT_CODES = ("L5", "L6", "L7", "L8")
 #: 开关**可兑现**的对照组 —— 用来证明 inert 扫描器不是恒 0。
@@ -964,6 +969,15 @@ class TestAdjudicationLegality:
         for e in manifest_slice["independent_entries"]:
             m = by_id[e["entry_id"]]
             mirror = e["manifest_mirror"]
+            if e["entry_id"] in MIGRATED_L_ENTRIES:
+                # 🔴 已走完五环发布链（spec l-cycle-true-adapter-registration task 7b/8）：
+                # slice 冻结的是**迁移前**的 manifest 镜像，manifest 现值已由 overlay override
+                # 翻成真裁决 ⇒ 断言方向反过来：manifest 必须是 adapter_registered/bidirectional，
+                # 且镜像必须仍是旧默认值（证明翻转来自 override 而非镜像被改写）。
+                assert m["migration_state"] == "adapter_registered", e["entry_id"]
+                assert m["capability"] == "bidirectional", e["entry_id"]
+                assert mirror["capability"] == defaults["capability"]
+                continue
             assert mirror["capability"] == m["capability"], (
                 f"{e['entry_id']}: manifest_mirror.capability 与 manifest 现值不符 ⇒ 镜像抄错"
             )
@@ -976,7 +990,7 @@ class TestAdjudicationLegality:
             )
             assert "BP-9" in str(mirror["why_not_adopted"])
             diverged += 1
-        assert diverged == len(L_CODES)
+        assert diverged == len(L_CODES) - len(MIGRATED_L_ENTRIES)
         assert any(b["id"] == "BP-9" for b in manifest_slice["blocking_preconditions"])
 
     def test_ac15_is_declared_not_applicable_and_ac14_is_the_live_one(
@@ -1129,8 +1143,13 @@ class TestHtmlCounterpartIsSourceBacked:
             assert e["mount_count"] == len(m["mounts"]), f"{e['entry_id']}: mount_count 抄错"
             assert e["editability"] == m["editability"]
             assert e["room_model"] == m["room_model"]
-            assert e["canonical_resolver"] == m["canonical_resolver"]
-            assert e["migration_state"] == m["migration_state"]
+            if e["entry_id"] in MIGRATED_L_ENTRIES:
+                # slice 冻结迁移前值；manifest 现值必须是五环发布后的真裁决
+                assert m["canonical_resolver"] == "workpaper_sync_published_representation"
+                assert m["migration_state"] == "adapter_registered"
+            else:
+                assert e["canonical_resolver"] == m["canonical_resolver"]
+                assert e["migration_state"] == m["migration_state"]
             assert e["wp_code_pattern"] == m["wp_match"]["wp_code_patterns"][0]
             assert e["host_path"] == m["host_path"]
 
@@ -1733,8 +1752,7 @@ class TestProperty20AndProperty3:
         **不是删断言也不是加豁免** —— 反方向（L2~L8 冒出 contract）照样打红。
         """
         ids = {e["entry_id"] for e in manifest_slice["independent_entries"]}
-        #: 已按本 spec 接线、允许拥有生产契约的 entry。L2~L8 接线时逐条追加。
-        migrated = {"xlsx/gt-l1-short-term-loans"}
+        migrated = set(MIGRATED_L_ENTRIES)
         assert migrated <= ids, (
             f"已迁移清单 {sorted(migrated)} 不在本 slice 的 entry 集合里 ⇒ 清单写错了"
         )
