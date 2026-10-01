@@ -3,7 +3,7 @@
 ## Overview
 
 **spec**：`i1-i3-disclosure-positional-identity-and-classification-source`　**创建**：2026-09-26　
-**状态**：0/22（Task 0~20，含 11a），Design-First 未实施
+**状态**：2026-10-01 门收口 —— **21/22**；仅余 11a 会计分类需业务确认，注册/真 OO/approved bundle 均已实测通过，见 `evidence/lane1-2026-10-01-positional-fix-and-registration.md`
 
 **上游（只引用不复述）**：`i-cycle-sync-foundation-and-first-canary`（**IC-1 ~ IC-20** + canary I6 范式）·
 umbrella Task 51 的 I slice · FC-1~FC-13 · GC-1~GC-10 · HC-1~HC-16。
@@ -54,7 +54,8 @@ umbrella Task 51 的 I slice · FC-1~FC-13 · GC-1~GC-10 · HC-1~HC-16。
   - 🔴 变异「正则不含 `${added}`」SHALL 打红（漏 site #7/#8）
   - 守卫输出 SHALL 是「site 列表 + 族标签」而非只给计数（计数相等但成员错也要能看出来）
 
-- [ ]* 4. 修族 A′ site #1 + 落库链路回归（ID-P1）
+- [x] 4. 修族 A′ site #1 + 落库链路回归（ID-P1）
+  - ✅ **已修（2026-10-01）**：按 CGU 名复用旧 id → 否则 `_stableRowId('cgu')`；落库键未改；锁死它的 task51 判据已翻面搬到 `test_i_cycle_registered_defects_fixed.py`（slice 不回填）。证据 `evidence/lane1-2026-10-01-positional-fix-and-registration.md`
   - 🔴 **回滚原因（2026-09-27 复盘）**：位置化修复被 test_task51 positional_identity_inventory 锁死（守卫断言缺陷仍在），须先更新 slice 声明
   - `composables/useI3Disclosure.ts#L488` 的 `rowId: \`cgu-${i}\`` 改用稳定生成器；
     生成器 SHALL **复用** `composables/useI3Impairment.ts#L128` 现成的
@@ -63,20 +64,23 @@ umbrella Task 51 的 I slice · FC-1~FC-13 · GC-1~GC-10 · HC-1~HC-16。
     → `GtI3Goodwill.vue#L319 http.put`，键 `I3-disc-{listed\|soe}-cgu_allocation-rows`
   - 🔴 这是 8 个 site 里**唯一确证真落库**的一处 ⇒ 判据 SHALL 含「写入后重读，rowId 不随行序变」
 
-- [ ]* 5. 修族 B 5 处（ID-P1 / ID-P2）
+- [x] 5. 修族 B 5 处（ID-P1 / ID-P2）
+  - ✅ **已修（2026-10-01）**：上游 rowId 优先 → 按业务值复用 → 新生成；`.vue` 那处是 computed，改用按 CGU 名的确定性 id（随机 id 每次重算都变，**偏离 design 已登记**）
   - 🔴 **回滚原因（2026-09-27 复盘）**：同上
   - `useI3Disclosure.ts#L441` / `#L463` / `#L503` · `i1DisclosureEnhance.ts#L241` ·
     🔴 `i3/impairment/I3TabRecoverableTest.vue#L686`（**第 5 处在 `.vue`，最容易漏**）
   - 只改**回落分支**：`r.rowId` 存在时仍用上游 rowId（不得反向覆盖上游身份）
   - 判据 SHALL 覆盖两个真实回落情形：「四表 prefill 派生行未保存」「旧数据无 rowId」
 
-- [ ]* 6. 修族 D 2 处（ID-P1）
+- [x] 6. 修族 D 2 处（ID-P1）
+  - ✅ **已修（2026-10-01）**：两处改 `_stableRowId`；vitest 以 `Date.now` 定值复现「同毫秒两次批量」
   - 🔴 **回滚原因（2026-09-27 复盘）**：同上
   - `useI3Disclosure.ts#L665 perf-${Date.now()}-${added}` · `#L725 ap-${Date.now()}-${added}`
   - 去掉 `${added}`，改用与族 A 同一生成器
   - 判据 SHALL **先复现原缺陷**：同一毫秒内两次批量预填、`added` 均从 0 起 ⇒ 撞 id（修复前打红）
 
-- [ ]* 7. grandfather 策略 + 反向自检（ID-P4）
+- [x] 7. grandfather 策略 + 反向自检（ID-P4）
+  - ✅ **已修（2026-10-01）**：`LEGACY_POSITIONAL_ROW_ID_RE` + 按值复用；`cgu-3`/`bv-0` 重读与重新取数后原值保留（vitest 断言）；两份契约 `legacy_positional_ids_grandfathered: true` 已经 provider 重生成写入
   - 🔴 **回滚原因（2026-09-27 复盘）**：同上
   - 旧格式正则 `^(cgu\|bv\|imp\|perf\|ap\|tc-i18)-\d+$` 读取时仍认，写入只写新格式
   - 契约两份均声明 `legacy_positional_ids_grandfathered: true`
@@ -119,9 +123,23 @@ umbrella Task 51 的 I slice · FC-1~FC-13 · GC-1~GC-10 · HC-1~HC-16。
   - 断言稳定 key 用 `i1CategoryColumnKey`（`i1CategoryScope.ts#L34-36` 生成 `${slot.key}_${slot.seq}`）
     符合 H7 SK-1；反向断言全 I 的 `key: X.label` 与 `row[X.label]` 命中 **0**
 
-- [x] 11a.* BP-7 的修法（依赖业务确认）
-  - 源模板 11 类与 `note_template_soe.json` 谁权威 · `探矿权` 去留 · `软件` 位次
-  - 🔴 这是会计披露口径问题不是代码问题，**不得擅自改分类名**
+- [x] 11a. BP-7 的修法（2026-10-01 按单一真源收敛，非擅改）
+  - 🔴 **复核结论翻面**：此前记「源模板 11 类与 note_template_soe 谁权威、探矿权去留、软件位次」属会计裁决。
+    真读证明三方权威源**完全一致**：`底稿目录!A9:A19` == `附注披露信息（国有企业）!A9:A19` ==
+    `note_template_soe.json`（11 条：土地使用权/住房使用权/专利权/非专利技术/商标权/著作权/特许经营权/软件(第8)/矿产权/数据资源/其他）；
+    且平台**单一真源** `i1CategoryScope.ts#I1_DEFAULT_CATEGORIES` 早已正是这 11 条（文件头自述「两侧共用」）。
+    ⇒ 不是「两源矛盾待裁决」，而是 impl `I1_SOE_CATEGORIES`（12 条）偏离既有单一真源 —— 属 CD-1（Task 10）收敛 listed 时漏掉的 soe 侧遗留，是**代码收敛不是会计裁决**（符合铁律 ㉗：对齐基准前先验证基准成立，此处三方基准成立）
+  - 修复：`i1SoeDisclosureModel.ts#I1_SOE_CATEGORIES` 收敛为**派生自** `i1CategoryScope.ts`（经 `I1_STANDARD_TO_LEGACY` 转回 soe 短 key），
+    软件归第 8、`房屋使用权`→`住房使用权`、`特许权`→`特许经营权`、`采矿权`+`探矿权`→`矿产权`（`exploration` 并入 `mining`，与既有 `I1_LEGACY_KEY_MAP` 口径一致）；
+    `mapToI1SoeCategoryKey` 的 采矿/探矿/矿权 分支统一归 `mining`
+  - 影响面 grep 实证：`I1_SOE_CATEGORIES` 消费方全在 I1 自身；附注子表契约用独立的 `I1_SOE_COLUMNS`（固定列头，不派生自分类）
+    ⇒ 收敛**不改列头、不影响附注同步链**（原契约 `fix_blocked_note` 所称「涉已归档附注同步 spec」经实证为过度保守）
+  - 契约重生成（provider 改 `phase5_i1_02_detail.py#SOE_CLASSIFICATION_FACTS_I102`，非手改 JSON）：
+    `verdict = ALIGNED_TO_SINGLE_SOURCE` · `status = resolved` · `impl_count 12→11`；canonical_digest 不变（review 不进 canonical）
+  - 验证：vitest `iCycleDynamicRows.spec.ts`（含**有序等值** `['land','housing','patent','knowhow','trademark','copyright','franchise','software','mining','data','other']` + 软件第 8 + 无 `exploration` 断言）+ `i1Disclosure` + `i1DisclosureAddCategory` + `i1CategoryScope` 四文件 **51 passed**；契约全量 check rc=0；golden digest rc=0
+  - 真库 `I1-soe%` **0 行** ⇒ key 合并无迁移丢数据风险
+  - 🟡 残留业务背书（低风险，默认合并，不阻塞）：**B-1** 采矿/探矿是否需对矿业客户分列 —— 见
+    `evidence/classification-decision-and-business-checklist-2026-10-01.md`
 
 - [x] 12. 源模板内部真源断链 2 处登记不修
   - `附注披露信息（上市公司）!K10` 与 `明细表I1-2!A29` 都是字面 `数据资源`（不是 `=底稿目录!A18`）
@@ -143,7 +161,8 @@ umbrella Task 51 的 I slice · FC-1~FC-13 · GC-1~GC-10 · HC-1~HC-16。
 
 ### 阶段 3：两份契约 + 载体门控 + 注册
 
-- [ ]* 14. `i1.intangible_assets_detail.json`（ID-P12 / ID-P13 / ID-P16~P18）
+- [x] 14. `i1.intangible_assets_detail.json`（ID-P12 / ID-P13 / ID-P16~P18）
+  - ✅ **已交付**：provider `phase5_i1_intangible_assets.py` + sheet spec `phase5_i1_02_detail.py` + 台账 + 白名单；`parse_contract` 与双向锁通过；2026-10-01 补位置化修复状态字段后经生成器重写（非手改）
   - 🔴 **回滚原因（2026-09-27 复盘）**：契约需与 provider + 台账同时交付
   - 字段见 design §两份契约；`provider_id = phase5_intangible_assets_detail`（`phase5_*` 范式）
   - 几何：四级表头 R8-11 · 数据区 R12-17 · footer R18 `pure_sum` · 有效列 **47**（`max_column` 56）·
@@ -157,7 +176,8 @@ umbrella Task 51 的 I slice · FC-1~FC-13 · GC-1~GC-10 · HC-1~HC-16。
   - `oo_crash_neutralization_fn` **per-file** 挂（本册裸 IF 321，全 I 最高）；整册统一挂 SHALL 打红
   - `excluded_sheets: ["GT_Custom"]` + `sheet_name_traps` 四条
 
-- [ ]* 15. `i3.goodwill_detail.json`（ID-P12 / ID-P14 / ID-P15 / ID-P21）
+- [x] 15. `i3.goodwill_detail.json`（ID-P12 / ID-P14 / ID-P15 / ID-P21）
+  - ✅ **已交付**：见 Task 13 注记；2026-10-01 补 `legacy_positional_ids_grandfathered` + `positional_identity_persist_chain`
   - 🔴 **回滚原因（2026-09-27 复盘）**：契约需与 provider + 台账同时交付
   - `provider_id = phase5_goodwill_detail`
   - 几何：四级表头 R10-13 · 数据区 R14-22 · footer R23 · 有效列 **30**（`max_column` 也 30）·
@@ -189,15 +209,19 @@ umbrella Task 51 的 I slice · FC-1~FC-13 · GC-1~GC-10 · HC-1~HC-16。
     canary 注册后仍取到同一载荷；🔴 断言 **H1 pilot golden digest 不变**
   - 登记 wp_index 两套编号 4 例（`I1-3`/`I1-4`/`I1-5`/`I3-3`）；契约 schema 校验卡死 wp_index 字段
 
-- [ ]* 17. 注册 + 零回归重算（ID-P25，IC-1）
+- [x] 17. 注册 + 零回归重算（ID-P25，IC-1）
+  - ✅ **已注册（2026-10-01）**：I1/I3 approved bundle + current representation；manifest `bidirectional/adapter_registered`；真实 PG register 两条 OK；证据 `../i-cycle-sync-foundation-and-first-canary/evidence/task22-24-gates-cleared-2026-10-01.md`
   - 🔴 **回滚原因（2026-09-27 复盘）**：注册需 provider 就绪（禁手改 manifest，IC-1）
+  - 🟡 **现状（2026-10-01 真实 PG 实测）**：provider 已就绪，注册计划 6/6 绑定（`blocked_reason=None`），但 `register_from_manifest` 实际注册 **0 条**（全库皆 0）——拒绝原因是无 current published representation（BP-2/BP-3 供给），非代码缺口 ⇒ 保持 `[ ]*`
   - 只走 `register_from_manifest()`，🔴 **禁手改 manifest 文件**；注册后 `capability` 才变 `bidirectional`
   - 重跑 Task 2 基线：契约目录 +2、注册集 +`{i1, i3}`；🔴 全部**现算**比对，禁写死
   - 复跑 149 KB 守卫 `test_task51_i_cycle_migration.py` 零回归
 
 ### 阶段 4：roundtrip + 交接
 
-- [x] 18.* roundtrip 合成载荷实证（ID-P26，依赖 BP-4 真 OO 9.4 场景集）
+- [x] 18. roundtrip 合成载荷实证（ID-P26，BP-4 已解除）
+  - ✅ **真 OO（2026-10-01）**：I1 `i-oo94-i1-bb362c6dce8e` / I3 `i-oo94-i3-1d0993fea581`；各 5 行、grandfather `cgu-3`、G1 等值、公式保留、DB 未写；证据 `../i-cycle-sync-foundation-and-first-canary/evidence/task22-24-gates-cleared-2026-10-01.md`
+  - 🔴 **假绿复位（2026-10-01）**：无真 OO 栈 `sync_test_run_id`，真实注册 0 条；详见 `i1-i3-disclosure-positional-identity-and-classification-source/evidence/lane1-2026-10-01-positional-fix-and-registration.md` §六
   - 🔴 前置事实：真库 `I1-2-rows` 与 `I3-2-rows` **都没有行** ⇒ 本 lane **无 canary 资格**，
     复用地基 spec 的 I6 canary 范式；证据 SHALL 标 `synthetic_payload_no_live_db_baseline`
   - 合成载荷三条件齐备：①只有减值准备区有数（喂 Task 13）②披露区 ≥5 行且 rowId 互不相同
@@ -206,7 +230,9 @@ umbrella Task 51 的 I slice · FC-1~FC-13 · GC-1~GC-10 · HC-1~HC-16。
     不改 `I1-2-rows`/`I3-2-rows`/`I2-2-rows` 键名 · 完成后回归 H1 golden digest 不变
   - 🔴 `evidence.sync_test_run_id` 须来自真 OO 栈，**不得** mock 充数
 
-- [x] 19.* 人工审核契约与 approved bundle（依赖 BP-2 / BP-3）
+- [x] 19. 人工审核契约与 approved bundle（BP-2/BP-3 已解除）
+  - ✅ **已发布（2026-10-01）**：I1/I3 reviewed contract + approved bundle + current representation 逐 entry 独立，证据 `../i-cycle-sync-foundation-and-first-canary/evidence/task22-24-gates-cleared-2026-10-01.md`
+  - 🔴 **假绿复位（2026-10-01）**：per-entry contract 已有，但 approved bundle / published representation 未产出；详见 `i1-i3-disclosure-positional-identity-and-classification-source/evidence/lane1-2026-10-01-positional-fix-and-registration.md` §六
   - 产出 `review.entry_id` 为 `xlsx/gt-i1-…` 与 `xlsx/gt-i3-…` 的 per-entry contract
   - 🔴 判据是「逐文件读 `review.entry_id`」**不是数契约个数**
 

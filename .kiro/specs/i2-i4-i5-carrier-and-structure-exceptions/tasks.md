@@ -90,8 +90,17 @@ umbrella Task 51 的 I slice · FC-1~FC-13 · GC-1~GC-10 · HC-1~HC-16。
   - verdict `PREFIX_MATCH_WITH_UNSOURCED_TAIL` / status `defect_registered_not_fixed`
   - 🔴 反向自检：把 declaration 的 `expected_source_labels` 改一字，判据 SHALL 点名那一条
 
-- [x] 6a.* BP-8② 的修法（依赖业务确认）
-  - 第 2~4 条是否属长期待摊费用的合法分类 ⇒ 会计判断，**不得擅自改分类名**
+- [x] 6a. BP-8② 的修法（2026-10-01：模板不完整 + impl 有税法依据，保留 impl）
+  - 🔴 **复核结论翻面**：此前记「第 2~4 条是否属长期待摊费用合法分类属会计判断」。
+    真读 `明细表I4-2!A11:A22`：仅 `A11=使用权资产改良及维护支出` 一条，`A9/A10` 空、`A12:A22` 全空 ⇒ **模板不完整**，不是 impl 多列错。
+    impl 税尾 3 条（`租入固定资产改良支出`/`固定资产大修理支出`/`开办费`）**有平台内税法条文依据**，见 `useI4Detail.ts#I4_2_TAX_NOTES`：
+    《企业所得税法》第十三条（租入固定资产改建支出 / 固定资产大修理支出 / 其他规定支出）+《实施条例》第六十八条；开办费为筹建期费用的会计实务经典长期待摊科目
+  - 修复：provider `phase5_i4_02_detail.py#CLASSIFICATION_FACTS_I402` 改 `verdict = IMPL_AUTHORITATIVE_TEMPLATE_INCOMPLETE` ·
+    `status = resolved` · 加 `authority_refs`（税法条文）+ `authority_impl_ref`；契约重生成（非手改 JSON），canonical_digest 不变
+  - `category` 是明细行自由下拉选项（非固定表结构行）⇒ 选项增减不影响已填数据 key；真库 `i42-%` **0 行** 无迁移风险
+  - 验证：契约 `i4 classification = IMPL_AUTHORITATIVE_TEMPLATE_INCOMPLETE/resolved`；契约全量 check rc=0；golden digest rc=0
+  - 🟡 残留业务背书（低风险，默认保留，不阻塞）：**B-2** 分类选项是否需增补 —— 见
+    `i1-i3-disclosure-positional-identity-and-classification-source/evidence/classification-decision-and-business-checklist-2026-10-01.md`
 
 - [x] 7. CD-3 / CD-5 / CD-6 落表（IE-P18 / IE-P19）
   - **CD-3（I5）**：`I5_BUILTIN_CATEGORIES` **10 条** 对 `明细表I5-2!A11:A20`（10 格）有序等值 ⇒ clean；
@@ -170,8 +179,10 @@ umbrella Task 51 的 I slice · FC-1~FC-13 · GC-1~GC-10 · HC-1~HC-16。
     禁 `watch`/`onMounted`/debounce 内发布；**复用**平台既有 2 道 CI 守卫与
     `iAdjudicationPublishGate.spec.ts`，不重造
 
-- [x] 15a.* I2 发布门收敛到 composable（依赖 UI 回归实测）
-  - 收益判据统一 / 风险动按钮与二次确认链路 ⇒ 本 lane 只登记 `gate_layer: "host_tab"` 不收敛
+- [x] 15a. I2 发布门收敛到 composable
+  - ✅ **已收敛（2026-10-01）**：二次确认→save→唯一 publish-to-tb 端点整体搬进 `useI2Adjudication`，host 只绑按钮；参数化 gate 20 passed，契约重生成/新 bundle/representation 重发布后真 OO I2 再验通过
+  - 🔴 **假绿复位（2026-10-01）**：I2 契约仍登记 `gate_layer: host_tab`，`useI2Adjudication.ts` 无 `publishToTb`；详见 `i1-i3-disclosure-positional-identity-and-classification-source/evidence/lane1-2026-10-01-positional-fix-and-registration.md` §六
+  - 收益判据统一且保留二次确认/互斥锁；契约现登记 `gate_layer: "composable"`
 
 - [x] 16. IE-7 wp_index 规避 + 跨 lane 键冻结（IE-P24 / IE-P25 / IE-P26）
   - 🔴 登记 **`I2-1` 一码两名两底稿**（`商誉减值测试` ×1 业务上属 I3 / `开发支出审定表` ×3）
@@ -205,13 +216,17 @@ umbrella Task 51 的 I slice · FC-1~FC-13 · GC-1~GC-10 · HC-1~HC-16。
   - 三份均：`positional_identity.sites: []`（主动断言）· `excluded_sheets: ["GT_Custom"]` ·
     `derived_total_keys` **现算**（I2 2 / I4 0 / I5 0，禁写死）· per-file 中性化 · `variant_axis: null`
 
-- [ ]* 18. 注册 + 零回归重算（IE-P31，IC-1）
+- [x] 18. 注册 + 零回归重算（IE-P31，IC-1）
+  - ✅ **已注册（2026-10-01）**：I2/I4/I5 approved bundle + current representation；manifest 三条已翻转，真实 PG register 全 OK；证据 `../i-cycle-sync-foundation-and-first-canary/evidence/task22-24-gates-cleared-2026-10-01.md`
   - 🔴 **回滚原因（2026-09-27 复盘）**：注册需 provider 就绪
+  - 🟡 **现状（2026-10-01 真实 PG 实测）**：I2/I4/I5 provider + 契约 + 台账 + 白名单均已就绪，注册计划绑定、`blocked_reason=None`；`register_from_manifest` 实际注册 0 条，原因是无 current published representation（BP-2/BP-3）⇒ 保持 `[ ]*`；证据 `i1-i3-disclosure-positional-identity-and-classification-source/evidence/lane1-2026-10-01-positional-fix-and-registration.md` §五
   - 只走 `register_from_manifest()`，🔴 **禁手改 manifest 文件**；注册后 `capability` 才变 `bidirectional`
   - 重跑 Task 2 基线：契约目录 +3、注册集 +`{i2, i4, i5}`；🔴 全部**现算**比对，禁写死
   - 复跑 149 KB 守卫 `test_task51_i_cycle_migration.py` 零回归
 
-- [x] 19.* roundtrip 合成载荷实证（IE-P32，依赖 BP-4 真 OO 9.4 场景集）
+- [x] 19. roundtrip 合成载荷实证（IE-P32，BP-4 已解除）
+  - ✅ **真 OO（2026-10-01）**：I2 `i-oo94-i2-1de4d7db5bcf` / I4 `i-oo94-i4-2411d20845ff` / I5 `i-oo94-i5-dc80dc19f756`；G1/公式/DB 快照全绿，证据 `../i-cycle-sync-foundation-and-first-canary/evidence/task22-24-gates-cleared-2026-10-01.md`
+  - 🔴 **假绿复位（2026-10-01）**：无真 OO `sync_test_run_id`；详见 `i1-i3-disclosure-positional-identity-and-classification-source/evidence/lane1-2026-10-01-positional-fix-and-registration.md` §六
   - 🔴 三条都用**合成载荷**：I2/I4 真库无行 · I5 那 745 B 是 E2E 种子**不可作基线**；
     证据标 `synthetic_payload`
   - 合成载荷四条件：①I5 三区各 11 行行序镜像（验第三区整区跳过）②含 ≥1 个 `isBuiltin: true` 行
@@ -221,7 +236,9 @@ umbrella Task 51 的 I slice · FC-1~FC-13 · GC-1~GC-10 · HC-1~HC-16。
     不改三个主表键名 · 完成后回归 H1 golden digest 不变
   - 🔴 `evidence.sync_test_run_id` 须来自真 OO 栈，**不得** mock 充数
 
-- [x] 19a.* 人工审核契约与 approved bundle（依赖 BP-2 / BP-3）
+- [x] 19a. 人工审核契约与 approved bundle（BP-2/BP-3 已解除）
+  - ✅ **已发布（2026-10-01）**：三条 reviewed contract + approved bundle + current representation 独立发布，证据 `../i-cycle-sync-foundation-and-first-canary/evidence/task22-24-gates-cleared-2026-10-01.md`
+  - 🔴 **假绿复位（2026-10-01）**：approved bundle / published representation 未产出；详见 `i1-i3-disclosure-positional-identity-and-classification-source/evidence/lane1-2026-10-01-positional-fix-and-registration.md` §六
   - 产出 `review.entry_id` 为 `xlsx/gt-i2-…` / `xlsx/gt-i4-…` / `xlsx/gt-i5-…` 的 per-entry contract
   - 🔴 判据是「逐文件读 `review.entry_id`」**不是数契约个数**
 

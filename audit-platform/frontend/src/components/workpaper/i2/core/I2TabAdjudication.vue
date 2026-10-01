@@ -366,7 +366,6 @@ async function handleLoadTb(silent = false): Promise<void> {
 //   (b) 应并入统一显式发布门：现移除 onAfterSave 自动回写，改为用户显式二次确认 →
 //       走统一 `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（与其余 I 循环一致）。
 // 开发支出为资产类科目（render 下发优先 → 兜底 1704），口径 balance。
-const publishing = ref(false)
 
 const {
   rows, auditNote, auditConclusion, summary,
@@ -381,51 +380,7 @@ const {
   // 普通保存不再自动回写 TB（Req 1）；TB 回写走显式发布门 publishToTb
 })
 
-async function publishToTb() {
-  if (publishing.value) return
-
-  try {
-    await ElMessageBox.confirm(
-      '发布后将把开发支出审定数写入试算表（trial_balance），'
-      + '并触发报表/错报评价等下游重算。确认发布？',
-      '发布到试算表确认',
-      { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
-    )
-  } catch {
-    return // 用户取消 → 无任何副作用
-  }
-
-  if (!props.wpId) {
-    ElMessage.error('缺少底稿标识，无法发布')
-    return
-  }
-  // 🔴 回写科目码必须走单一真源（render 下发优先 → 兜底 1704）。宁缺勿造，避免污染 trial_balance。
-  const accountCode = i2AccountCode.value
-  if (!accountCode) {
-    ElMessage.warning('未解析到开发支出科目码，无法发布')
-    return
-  }
-
-  // 先保存明细（普通保存，不写 TB；save() 内已 emit substantive:adjudicated）
-  await save()
-
-  publishing.value = true
-  try {
-    const { api } = await import('@/services/apiProxy')
-    const resp: any = await api.post(`/api/workpapers/${props.wpId}/audit-determination/publish-to-tb`, {
-      // sheet 名固定含审定表子码 I2-1，后端 extract_determination_wp_code 据此解出 I2-1
-      sheet_name: '审定表I2-1',
-      writeback_rows: [
-        { account_code: accountCode, audited_amount: summary.value.endAudited, amount_kind: 'balance' },
-      ],
-    })
-    ElMessage.success(resp?.message || '已发布到试算表')
-  } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
-  } finally {
-    publishing.value = false
-  }
-}
+// 发布实现已收敛到 useI2Adjudication；宿主只绑定按钮。
 
 const displayRows = computed(() => [
   ...rows.value.map((r) => ({ ...r, _footer: false })),

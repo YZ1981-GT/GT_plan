@@ -3,6 +3,8 @@
  * 对齐源表期初/期末「未审·调整·审定」+ TB差异 + I2-2/I2-3 取数 + 事件发布
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { api } from '@/services/apiProxy'
 import {
   type I2AdjudicationRow,
   type I2AdjudicationSummary,
@@ -28,10 +30,15 @@ export { formatChangeRate }
 export function useI2Adjudication(params: {
   allResponses: Ref<Map<string, any>>
   tbData: Ref<I2TbData>
+  wpId: Ref<string>
+  accountCode: Ref<string>
   saveResponses: (sheetCode: string, data: Record<string, any>) => Promise<void>
   onAfterSave?: (summary: I2AdjudicationSummary) => void | Promise<void>
 }) {
-  const { allResponses, tbData, saveResponses, onAfterSave } = params
+  const { allResponses, tbData, wpId, accountCode, saveResponses, onAfterSave } = params
+
+  /** 显式 TB 发布门的互斥锁；普通 save 永不写 TB。 */
+  const publishing = ref(false)
 
   const rows = ref<I2AdjudicationRow[]>([])
   const auditNote = ref('')
@@ -201,6 +208,49 @@ export function useI2Adjudication(params: {
     }
   }
 
+  /**
+   * I2 显式发布门：二次确认 → 先保存 → 唯一合法端点 publish-to-tb。
+   *
+   * 🔴 必须住在 composable（与 I1/I3~I6 同层）：Vue host 只绑按钮；否则同一业务门在
+   * 六个 entry 里有两种责任层，复用/守卫都要写 I2 特例。watch/onMounted/debounce 禁调用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value) return
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把开发支出审定数写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用
+    }
+    if (!wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+    if (!accountCode.value) {
+      ElMessage.warning('未解析到开发支出科目码，无法发布')
+      return
+    }
+    await save() // 普通保存，不写 TB
+    publishing.value = true
+    try {
+      const resp: any = await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
+        sheet_name: '审定表I2-1',
+        writeback_rows: [
+          { account_code: accountCode.value, audited_amount: summary.value.endAudited, amount_kind: 'balance' },
+        ],
+      })
+      ElMessage.success(resp?.message || '已发布到试算表')
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
+  }
+
   async function saveAuditField(kind: 'note' | 'conclusion', val: string) {
     if (kind === 'note') {
       auditNote.value = val
@@ -223,6 +273,8 @@ export function useI2Adjudication(params: {
     displayDiffEndAudited,
     hasTbDiff,
     hasAjeApprox,
+    publishing,
+    publishToTb,
     addRow,
     removeRow,
     updateRow,

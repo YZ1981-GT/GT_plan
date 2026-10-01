@@ -25,21 +25,25 @@ export interface I1SoeCategoryDef {
   shortLabel: string
 }
 
-/** 国企固定分类（对齐源模板「其中」+ note_template） */
-export const I1_SOE_CATEGORIES: readonly I1SoeCategoryDef[] = [
-  { key: 'software', label: '其中：软件', shortLabel: '软件' },
-  { key: 'land', label: '土地使用权', shortLabel: '土地使用权' },
-  { key: 'housing', label: '房屋使用权', shortLabel: '房屋使用权' },
-  { key: 'patent', label: '专利权', shortLabel: '专利权' },
-  { key: 'knowhow', label: '非专利技术', shortLabel: '非专利技术' },
-  { key: 'trademark', label: '商标权', shortLabel: '商标权' },
-  { key: 'copyright', label: '著作权', shortLabel: '著作权' },
-  { key: 'franchise', label: '特许权', shortLabel: '特许权' },
-  { key: 'mining', label: '采矿权', shortLabel: '采矿权' },
-  { key: 'exploration', label: '探矿权', shortLabel: '探矿权' },
-  { key: 'data', label: '数据资源', shortLabel: '数据资源' },
-  { key: 'other', label: '其他', shortLabel: '其他' },
-] as const
+// 🔴 BP-7 收敛（2026-10-01，Task 11a）：
+// 国企披露分类此前是本文件独立写死的 12 条（software 在第 1 位且 label 带「其中：」、
+// `房屋使用权`/`特许权`、`采矿权`+`探矿权` 分列），与**单一真源** `i1CategoryScope.ts`
+// 的 `I1_DEFAULT_CATEGORIES`（11 条，与源模板 `底稿目录!A9:A19` / `附注披露信息（国有企业）!A9:A19`
+// 及准则映射 `note_template_soe.json` 三方一致）长期分叉。这是 CD-1（Task 10）收敛 listed 侧
+// 双定义时漏掉的 soe 侧遗留 —— 不是会计裁决问题，而是 impl 偏离既有单一真源。
+// 现把 `I1_SOE_CATEGORIES` 派生自单一真源：标准 key 经 `I1_STANDARD_TO_LEGACY` 转回 soe 短 key
+// （保持已持久化数据的 key 语义不变 + 向后兼容），得正确的 11 条、软件在第 8 位、
+// `住房使用权`/`特许经营权`、`采矿权`+`探矿权` 并入 `矿产权`（短 key 仍 `mining`，与
+// `I1_LEGACY_KEY_MAP.exploration → mining_right` 的既有合并口径一致）。
+import { I1_DEFAULT_CATEGORIES, I1_STANDARD_TO_LEGACY } from './i1CategoryScope'
+
+/** 国企固定分类（派生自单一真源 `i1CategoryScope.ts#I1_DEFAULT_CATEGORIES`） */
+export const I1_SOE_CATEGORIES: readonly I1SoeCategoryDef[] = I1_DEFAULT_CATEGORIES.map((c) => ({
+  // 标准 key → soe 短 key（兜底：无映射时用标准 key，不编造）
+  key: I1_STANDARD_TO_LEGACY[c.key] ?? c.key,
+  label: c.label,
+  shortLabel: c.label,
+})) as readonly I1SoeCategoryDef[]
 
 export type I1SoeLayer = 'cost' | 'amort' | 'impair' | 'carrying'
 
@@ -60,7 +64,7 @@ export interface I1SoeMoveAmounts {
 export interface I1SoeCategoryMove extends I1SoeMoveAmounts {
   key: string
   /**
-   * 自定义类别的中文名（默认 12 类不带，label 取自 `I1_SOE_CATEGORIES`）。
+   * 自定义类别的中文名（默认分类不带，label 取自 `I1_SOE_CATEGORIES`）。
    * 🔴 源模板四层末各一个 `……` 可扩位（原价/累计摊销/减值/账面价值），
    * 审计师增行时把名字存在这里，随 layers 数据一起持久化 —— 类别集因此
    * 从数据派生而非写死常量，稳定 key 不复用已删序号（Task 13 / Property 21·23）。
@@ -112,7 +116,7 @@ export function recomputeI1SoeDerivedLayers(layers: I1SoeLayerBlock[]): I1SoeLay
   const impair = byLayer.get('impair')
   if (!cost || !amort) return layers
 
-  // 类别集从数据派生（默认 12 类 + 自定义），使自定义类别在账面价值层也联动
+  // 类别集从数据派生（默认分类 + 自定义），使自定义类别在账面价值层也联动
   const effectiveCats = resolveI1SoeCategories(layers)
   const carryingCats: I1SoeCategoryMove[] = effectiveCats.map((c) => {
     const cc = cost.categories.find((x) => x.key === c.key) || emptyMove(c.key)
@@ -199,9 +203,8 @@ export function mapToI1SoeCategoryKey(categoryOrName: string): string {
   if (/商标/.test(s)) return 'trademark'
   if (/著作|版权/.test(s)) return 'copyright'
   if (/特许/.test(s)) return 'franchise'
-  if (/采矿/.test(s)) return 'mining'
-  if (/探矿/.test(s)) return 'exploration'
-  if (/探矿权\/采矿权|矿权/.test(s)) return 'mining'
+  // 🔴 BP-7 收敛：采矿权/探矿权统一归 `mining`（矿产权），与单一真源合并口径一致
+  if (/采矿|探矿|矿权/.test(s)) return 'mining'
   if (/数据资源|数据资产/.test(s)) return 'data'
   return 'other'
 }
@@ -232,7 +235,7 @@ export interface I1SoeSyncSnapshot {
 //
 // 🔴 源模板国企披露 sheet 每层（原价/累计摊销/减值/账面价值）末尾各有一个 `……`
 // 可扩位。国企版类别是「跨四层共享」的（同一类别在四层都出现），故自定义类别
-// 通过 `I1SoeCategoryMove.label` 随数据携带（default 12 类的 label 仍取自
+// 通过 `I1SoeCategoryMove.label` 随数据携带（默认分类的 label 仍取自
 // `I1_SOE_CATEGORIES` 常量，自定义类别的 label 存在数据里）。
 //
 // key 用单调计数器 `soe_custom_${seq}`，**不复用已删序号**（撞键会让旧数据串台，
@@ -245,7 +248,7 @@ const _SOE_CUSTOM_KEY_RE = /^soe_custom_(\d+)$/
 const _SOE_DEFAULT_LABEL = new Map(I1_SOE_CATEGORIES.map((c) => [c.key, c.label]))
 
 /**
- * 从 layers 数据派生「有效类别序列」= 默认 12 类 + 数据里出现的自定义类别（按 seq 升序）。
+ * 从 layers 数据派生「有效类别序列」= 默认分类 + 数据里出现的自定义类别（按 seq 升序）。
  *
  * 自定义类别的 label 取自任一层该 key 的 move.label（首个非空）。渲染 / flatten /
  * recompute 全部改用本函数，不再直接遍历 `I1_SOE_CATEGORIES`，这样自定义类别一处新增

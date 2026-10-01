@@ -180,7 +180,8 @@ HC-1~HC-16（`h-cycle-sync-foundation-and-first-canary/design.md`）·
     🔴 **禁手改 manifest 文件**
   - 注册后重跑 Task 3 的零回归基线：契约目录个数 +1、注册集从 `{d2,d4,g7,h1}` 变 `+i6`
 
-- [ ]* 21. BP-10 第一处 notice 挂载（IF-P15，🔴 从零补）
+- [x] 21. BP-10 第一处 notice 挂载（IF-P15，🔴 从零补）
+  - ✅ **已挂（2026-10-01）**：`GtI6ResearchDevelopmentExpense.vue` 的 `i6-header-toolbar` 内挂 `<GtEntrySyncCapabilityNotice entry-id="xlsx/gt-i6-research-development-expense" />`，文案只来自 `workpaperEntrySyncNotice.ts`；锁死它的 task51 判据已翻面搬到 `test_i_cycle_registered_defects_fixed.py`（I6 三要素在 toolbar 内 / 宿主不内联文案 / 其余 5 宿主仍 0 挂载 / slice BP-10 登记不回填）
   - 🔴 **回滚原因（2026-09-27 复盘）**：notice 挂载被 test_task51 守卫 notice_mounted=False 锁死，须先走 slice 声明更新流程
   - 前置断言：6 宿主 `GtEntrySyncCapabilityNotice` 与 `workpaperEntrySyncNotice` 命中**均为 0**
     ⇒ 本 Task 是 I 循环第一处挂载（**与 H 的「已有待改」相反**）
@@ -188,7 +189,9 @@ HC-1~HC-16（`h-cycle-sync-foundation-and-first-canary/design.md`）·
   - 挂载点 SHALL 在 `i6-header-toolbar` 区块内（与 IC-16 门控判据同一 toolbar class 定位口径）
   - 作为两份 lane spec 复制的范式；变异「把文案内联进 `GtI6ResearchDevelopmentExpense.vue`」SHALL 打红
 
-- [x] 22.* roundtrip 实证（依赖 BP-4 真 OO 9.4 场景集）
+- [x] 22. roundtrip 实证（BP-4 已解除）
+  - ✅ **门已清（2026-10-01）**：Docker `audit-onlyoffice` ConvertService 真引擎；I6 `sync_test_run_id=i-oo94-i6-3ba8b090c097`，6/6 I entry 同轮全绿；证据 `evidence/task22-24-gates-cleared-2026-10-01.md`
+  - 🔴 **假绿复位（2026-10-01）**：本目录 `evidence/task22-roundtrip-blocked.md` 自述阻塞，无真 OO `sync_test_run_id`；详见 `i1-i3-disclosure-positional-identity-and-classification-source/evidence/lane1-2026-10-01-positional-fix-and-registration.md` §六
   - 六条前置断言逐条落成（design §roundtrip 前置断言）：
     ① 真库缺身份行数现算 == 0（Task 19 backfill 后）
     ② roundtrip 期间**冻结** `useAdjustmentCentralSync`（`i6/core/I6TabAdjustment.vue` 3 处），
@@ -211,7 +214,9 @@ HC-1~HC-16（`h-cycle-sync-foundation-and-first-canary/design.md`）·
   - 🔴 登记例外：`useI2Adjudication.ts` 无 `publishToTb`（IC-16 门控例外的同一条 entry）⇒
     lane 2 须单独裁 I2 的发布路径，**本 canary 不代它结论**
 
-- [x] 24.* 人工审核契约与 approved bundle 发布（依赖 BP-2 / BP-3）
+- [x] 24. 人工审核契约与 approved bundle 发布（BP-2/BP-3 已解除）
+  - ✅ **门已清（2026-10-01）**：6 份 reviewed per-entry contract + 6 个 approved bundle + 6 条 current representation；真实 `register_from_manifest` 全部 OK，详见 `evidence/task22-24-gates-cleared-2026-10-01.md`
+  - 🔴 **假绿复位（2026-10-01）**：本目录 `evidence/task24-human-review-blocked.md` 自述阻塞；真实注册 0 条；详见 `i1-i3-disclosure-positional-identity-and-classification-source/evidence/lane1-2026-10-01-positional-fix-and-registration.md` §六
   - BP-2：产出第一条 `review.entry_id` 以 `xlsx/gt-i` 开头的 per-entry contract
     （现算 17 份契约无一条命中 ⇒ 这是 I 循环第一条）
   - BP-3：approved authority model + non-null approved definition bundle

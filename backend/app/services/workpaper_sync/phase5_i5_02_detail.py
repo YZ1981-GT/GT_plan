@@ -91,6 +91,10 @@ from app.services.workpaper_sync.phase5_row_table_sheet import (
 MANAGED_SHEET_I502: Final[str] = "明细表I5-2"
 TEMPLATE_ID_I502: Final[str] = "I52"
 UUID_COL_I502: Final[str] = "R"
+#: 🔴 第 2 区（减值准备）必须用**另一列**作 UUID（D1-4 / D4-9 / D3-4 / D3-7 同款教训：同 sheet
+#: 双区共用一列 ⇒ 首版发布 `_align_specs_to_sibling_tables` 无法按 UUID 列配对 sibling binding，
+#: 2026-10-01 实测 OO 往返后减值区 10 个 row identity 全丢）。S 列 R1~R49 openpyxl 实测全空、无合并。
+UUID_COL_IMPAIRMENT_I502: Final[str] = "S"
 HEADER_GROUP_ROW_I502: Final[int] = 8
 HEADER_LEAF_ROW_I502: Final[int] = 9
 EFFECTIVE_COLUMNS_I502: Final[int] = 17
@@ -243,7 +247,11 @@ SPEC_I502_GROSS: Final[RowTableSheetSpec] = RowTableSheetSpec(
     table_name=f"GT_{TEMPLATE_ID_I502}G_ROWS",
     uuid_col=UUID_COL_I502,
     first_data_row=11,
-    last_data_row=21,
+    #: 🔴 BP-21（2026-10-01 首版发布实测）：R21 `A21='……'` 是中文模板数据区末尾的续行省略号
+    #: 排版占位行，不是第 11 条业务数据。声明 21 时 `instrument_workbook_bytes_multi` 被
+    #: `assert_last_data_row_is_not_typography_placeholder` 拦截（与 D3-4 / D7-4 同款）。
+    #: 受管区收到 R11-R20，footer R22 不动（其 `=SUM(x11:x21)` 覆盖占位行，占位行恒空不影响合计）。
+    last_data_row=20,
     footer_row=22,
     header_group_row=HEADER_GROUP_ROW_I502,
     header_leaf_row=HEADER_LEAF_ROW_I502,
@@ -267,9 +275,11 @@ SPEC_I502_IMPAIRMENT: Final[RowTableSheetSpec] = RowTableSheetSpec(
     table_key=ROWS_TABLE_KEY_IMPAIRMENT_I502,
     template_id=f"{TEMPLATE_ID_I502}I",
     table_name=f"GT_{TEMPLATE_ID_I502}I_ROWS",
-    uuid_col=UUID_COL_I502,
+    uuid_col=UUID_COL_IMPAIRMENT_I502,
     first_data_row=24,
-    last_data_row=34,
+    #: 🔴 与第 1 区按行序镜像：R34 `=A21` 镜像的正是 R21 排版占位行 ⇒ 同步收到 R24-R33
+    #: （两区行数必须相等，否则 `=A{mirror_r}` 的行对应关系错位）。
+    last_data_row=33,
     footer_row=35,
     header_group_row=HEADER_GROUP_ROW_I502,
     header_leaf_row=HEADER_LEAF_ROW_I502,

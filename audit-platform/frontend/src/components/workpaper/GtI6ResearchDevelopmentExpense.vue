@@ -13,6 +13,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-i6-research-development-expense" />
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value && !dualMode.checking.value" size="small" type="info">仅结构化视图</el-tag>
       </div>
 
@@ -195,6 +196,9 @@ import { useI6CrossSheet } from './composables/useI6CrossSheet'
 import { resolveI6DisclosureVisibility } from './composables/i6ApplicableSheets'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
+// AC 1.4 / BP-10：I 循环第一处挂载（spec i-cycle-sync-foundation-and-first-canary · Task 21）。
+// 文案唯一真源是 sync/workpaperEntrySyncNotice.ts —— 宿主里**不得**内联任何提示中文。
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
