@@ -1466,22 +1466,49 @@ class TestAc14HonestModeVisibility:
             checked += 1
         assert checked == 7, f"只校验到 {checked} 个宿主，应为 7 —— 分母缩水"
 
-    def test_registered_entry_ids_agree_with_the_slice(self, manifest_slice: dict) -> None:
-        """双向锁：slice 的 adapter_id 与前端登记表必须互相印证。"""
+    def test_registered_entry_ids_agree_with_the_live_manifest(
+        self, manifest_slice: dict
+    ) -> None:
+        """双向锁：前端登记表与 **live manifest** 的 adapter_id 必须互相印证。
+
+        🔴 **2026-10-01 换对账对象**（原名 `..._agree_with_the_slice`）。原实现拿冻结的
+        D slice 的 `adapter_id` 当对账另一侧，而 slice 是规划期快照、`d1` 那条恒为 None。
+        `d1` 早已由别的 spec 翻成 `bidirectional`（live manifest 里 `adapter_id =
+        d1.notes_receivable_detail`），于是本判据**本该在那时就红** —— 它当时没红，是因为
+        已入库的 `workpaperSyncManifest.generated.ts` 是**过期**的：
+        `GtB60HourBudgetPanel.vue` 的块注释从 2026-09-28 起让 mount discovery 整体
+        `[FAIL]`（见 commit `4209a7897`），没人能重算前端投影 ⇒ 登记表停在 d1 翻门之前。
+        本轮重算投影后真相暴露，这条才红。
+
+        ⇒ 对账两侧改为**同一事实的两个投影**：后端 `workpaper_sync_entry_manifest.json`
+        的 `adapter_id` ↔ 前端 `workpaperSyncManifest.generated.ts` 过滤出的已注册集合。
+        slice 侧只保留「规划期快照仍是 None」这条冻结断言（append-only，不回填）。
+        """
         registered = set(_registered_entry_ids())
         assert registered, "已注册集合为空 ⇒ 「已注册 ⇒ 不挂通知」分支没有真实分母"
         assert all("/" in rid for rid in registered), f"集合里有不像 entry_id 的项：{registered}"
+        live = {e["entry_id"]: e for e in _load(FULL_MANIFEST_PATH)["entries"]}
+        checked = 0
         for entry in manifest_slice["independent_entries"]:
-            if entry.get("adapter_id") is None:
-                assert entry["entry_id"] not in registered, (
-                    f"{entry['entry_id']} 在 slice 里没有 adapter，却被前端登记为已注册 ⇒ "
+            eid = entry["entry_id"]
+            # 🔴 **不**在这里断言「slice 的 adapter_id 恒为 None」：D slice 与 H slice 形态
+            #    不同 —— 现算 D slice 里 `xlsx/gt-d2-accounts-receivable` 的 adapter_id 已是
+            #    `d2.receivable_detail`（D 的 spec 更新过它），而 H slice 是全 None 的规划期
+            #    快照。我第一版照 H 的形态加了这条断言，当场被 d2 打红。
+            #    ⇒ slice 的冻结程度是**逐 slice 的事实**，不是可以跨循环套用的假设。
+            has_adapter = live[eid].get("adapter_id") is not None
+            checked += 1
+            if not has_adapter:
+                assert eid not in registered, (
+                    f"{eid} 在 live manifest 里没有 adapter，却被前端登记为已注册 ⇒ "
                     "界面会以「已双向」呈现"
                 )
             else:
-                assert entry["entry_id"] in registered, (
-                    f"{entry['entry_id']} 在 slice 里已有 adapter，前端登记表却没跟上 ⇒ "
-                    "界面会继续挂假警告"
+                assert eid in registered, (
+                    f"{eid} 在 live manifest 里已有 adapter，前端登记表却没跟上 ⇒ "
+                    "界面会继续挂假警告（多半是只重算了后端一侧）"
                 )
+        assert checked, "slice 分母为空"
 
     def test_hosts_do_not_claim_bidirectional_writeback(self, manifest_slice: dict) -> None:
         """AC 1.4 前半句：宿主不得出现「可双向回写」「同步成功」之类的成功态宣称。
