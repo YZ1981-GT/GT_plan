@@ -18705,6 +18705,72 @@
           "attributes": [
             {
               "argument": null,
+              "expression": "isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'",
+              "kind": "directive",
+              "name": "if",
+              "raw": "v-if=\"isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'\""
+            },
+            {
+              "argument": "wp-id",
+              "expression": "props.wpId",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":wp-id=\"props.wpId\""
+            },
+            {
+              "argument": "project-id",
+              "expression": "props.projectId",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":project-id=\"props.projectId\""
+            },
+            {
+              "argument": "sheet-name",
+              "expression": "props.sheetName || 'L4A'",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":sheet-name=\"props.sheetName || 'L4A'\""
+            },
+            {
+              "argument": "readonly",
+              "expression": "isReadonly",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":readonly=\"isReadonly\""
+            },
+            {
+              "argument": null,
+              "expression": "height: calc(100vh - 180px)",
+              "kind": "attribute",
+              "name": "style",
+              "raw": "style=\"height: calc(100vh - 180px)\""
+            }
+          ],
+          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
+          "component": "GtOnlyOfficeSheet",
+          "condition": "v-if=\"isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'\"",
+          "documentType": "xlsx",
+          "file": "audit-platform/frontend/src/components/workpaper/GtL4BondsPayable.vue",
+          "importKind": "dynamic",
+          "localName": "GtOnlyOfficeSheet",
+          "loop": null,
+          "mountId": "mount_8a8d4f72480c9f30477c",
+          "runtimeCardinality": "single",
+          "sheetExpression": ":sheet-name=\"props.sheetName || 'L4A'\"",
+          "sourceKind": "template_ast",
+          "sourceSpan": {
+            "endColumn": 9,
+            "endLine": 30,
+            "startColumn": 7,
+            "startLine": 23
+          },
+          "templateNodeOrdinal": 9,
+          "wpExpression": ":wp-id=\"props.wpId\""
+        },
+        {
+          "attributes": [
+            {
+              "argument": null,
               "expression": null,
               "kind": "directive",
               "name": "else",
@@ -18740,29 +18806,30 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_6d71b42fc1ea989a54e8",
+          "mountId": "mount_d0e36dbbf3d7b83809f6",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 135,
+            "endLine": 157,
             "startColumn": 7,
-            "startLine": 130
+            "startLine": 152
           },
-          "templateNodeOrdinal": 20,
+          "templateNodeOrdinal": 25,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
       "parent_entry_id": null,
       "profile_source": {
-        "editability_fact": "component_readonly_prop_defaults_editable",
+        "editability_fact": "host_forwards_runtime_readonly_flag",
         "inbound_reference_count": 1,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
+          "audit-platform/frontend/src/components/workpaper/GtL4BondsPayable.vue#L23",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L736"
         ]
@@ -18776,9 +18843,9 @@
         "editability": "editable",
         "host_reachable": true,
         "mount_cardinality": "single",
-        "mount_count": 1,
+        "mount_count": 2,
         "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
-        "readonly_binding": "absent",
+        "readonly_binding": "runtime_expression",
         "room_model": "shared",
         "room_service_state": "room_service_wired",
         "schema_version": 1
@@ -18786,6 +18853,7 @@
       "wp_match": {
         "component_types": [],
         "sheet_expressions": [
+          ":sheet-name=\"props.sheetName || 'L4A'\"",
           ":sheet-name=\"props.sheetName\""
         ],
         "sheet_literals": [],
@@ -25765,14 +25833,14 @@
       }
     }
   ],
-  "manifest_digest": "19b9de121406a94f4e42174a6ae96f34c9f6ea71cfb509c3cc056aa45dde29c5",
-  "overlay_digest": "53884e8ea71d5a8a46818a542f2bd03923208f3feb32e70182e6920dd8d883cd",
-  "profile_source_digest": "6bc417e4c832e56619fd31fd61f07d58adbe56ba72c1b4d516bc9d3485555205",
+  "manifest_digest": "8a14cd518d9b2fdaef579337283c8ae1044423812e6616eb841667bf0c1ec800",
+  "overlay_digest": "f1e7d2659243fab5f41b120efdccf4585e13b12117ee6e429e54b23374d3cc0b",
+  "profile_source_digest": "530adae36067be3d110f020d6781fc002e5493937e8b9f59d72ac854b9cc6a79",
   "schema_version": 1,
-  "source_digest": "6f2ecb722814518a5ce32fd6c5df4cc7b6817c0dd8fb5c59bb2b6762937c1a92",
+  "source_digest": "d648767136c78a98fbef4acd845f58e6ccc281899196726496df4a6a96d65c39",
   "stats": {
     "by_component": {
-      "GtOnlyOfficeSheet": 239,
+      "GtOnlyOfficeSheet": 240,
       "OnlyOfficeWordDialog": 2,
       "WorkpaperWordEditor": 4
     },
@@ -25791,7 +25859,7 @@
     "host_count": 154,
     "independent_entry_count": 142,
     "legacy_fake_bidirectional_count": 125,
-    "mount_count": 245,
+    "mount_count": 246,
     "parent_duplicate_count": 12,
     "room_model_counts": {
       "exclusive": 6,

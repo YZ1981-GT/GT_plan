@@ -40,13 +40,13 @@ export interface WorkpaperSyncManifestEntry {
   hasBrowserEvidence: boolean
 }
 
-export const WORKPAPER_SYNC_MANIFEST_DIGEST = "19b9de121406a94f4e42174a6ae96f34c9f6ea71cfb509c3cc056aa45dde29c5"
+export const WORKPAPER_SYNC_MANIFEST_DIGEST = "8a14cd518d9b2fdaef579337283c8ae1044423812e6616eb841667bf0c1ec800"
 
-export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "6bc417e4c832e56619fd31fd61f07d58adbe56ba72c1b4d516bc9d3485555205"
+export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "530adae36067be3d110f020d6781fc002e5493937e8b9f59d72ac854b9cc6a79"
 
 export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "by_component": {
-    "GtOnlyOfficeSheet": 239,
+    "GtOnlyOfficeSheet": 240,
     "OnlyOfficeWordDialog": 2,
     "WorkpaperWordEditor": 4
   },
@@ -65,7 +65,7 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "host_count": 154,
   "independent_entry_count": 142,
   "legacy_fake_bidirectional_count": 125,
-  "mount_count": 245,
+  "mount_count": 246,
   "parent_duplicate_count": 12,
   "room_model_counts": {
     "exclusive": 6,
@@ -3562,6 +3562,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
+        ":sheet-name=\"props.sheetName || 'L4A'\"",
         ":sheet-name=\"props.sheetName\""
       ],
       "sheet_literals": [],
