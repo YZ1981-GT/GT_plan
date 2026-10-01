@@ -461,6 +461,31 @@
   - _判据：LR-P11 邻域_
 
 - [ ] 12. L4 → L3 → L2 逐条接线
+  - **L4 已完成（2026-10-01，待本 task 后续 L3/L2）**：
+    - **选型**：逐张排除后选 `划分为金融负债的其他金融工具明细表L4-3`（单段数据 r13~r17、
+      footer A18「合计」、10 公式列、尾码唯一无 BP-8）；否决 L4-1（140 公式，派生汇总）、
+      L4-2（89 列且普通/可转换两段各带小计，单段引擎装不下）、L4-7/L4-8（BP-8 同尾码且为
+      计算排程）、L4-4（与调整分录模块重复且两载体位置化）。
+    - **前端真实修复**：lane2 task 18 虽标 `[x]`，现读仍是位置化 `L4-3-row-${n}-data` +
+      removeRow($index) + 无 hydration（假绿）；现改 `L4-3-rows` 单 item JSON 数组 + 稳定 rowId，
+      38 个模板字段全部进入行模型，6 个模板无对应旧字段明确为 HTML-only。vitest **9 passed**；
+      Playwright 真浏览器打开 wp `8e0f6ad0` → L4-3，完整列头（含审定数期末）可见、0 console error，
+      未新增/保存行（不污染真库）。
+    - **provider/contract**：`phase5_l4_{sheets,bonds_payable}.py` 直接走 task 11 公共骨架；三级表头
+      r10/r11/r12、38 字段、formula_mask R/S/AF~AM、UUID AO；candidate 无 sheet/field，已由 reviewed
+      `l4.bonds_payable.json` 取代；BP-8 route A 的完整 `collapsed_pairs` 裁决原样继承。
+    - **两次真栈门抓真缺陷并修**：①首版发布被 L4-5 一个外部 hyperlink 的 OOXML 安全门拒；
+      `sanitize_l4_template_external_links.py` 复用 I/J/D 净化内核，单元格文字保留、受管 sheet 0 diff。
+      ②真 OO 插行被 L4-3 横向共享公式组（R13:S18）拒；同脚本把受管表 **74 格共享公式展开为
+      显式公式**，openpyxl 逐格 0 diff、shared 残留 0。净化后模板 sha `b4ba30cf…` / 105,661 B。
+    - **真库**：五环首发后因模板二次净化又按 D1 先例走通 `fix_l_cycle_republish_representation.py`
+      （单 store 参数形态首版传错 dict 被门咬出，修为传 raw `[]`）；current revision 2 / generation 1 /
+      representation `68e1e1f6…`。真 OO `ConvertService` 往返：2 行×29 键逐字段相等、rowId 稳定、
+      无幽灵行、20 个公式格仍是公式、L4 真库 6 行载荷前后不变。
+    - **manifest**：在干净 HEAD worktree 上生成 L4 override 产物（第 7 条 adapter_registered，legacy
+      135→134）；主树同时有 K/I/J 会话改同五个生成物，故未覆盖主树，提交时用 index blob 只纳入
+      HEAD+L4 产物，避免吞他人未提交改动。
+    - **余项**：L3 → L2 尚未开始，故 task 12 保持 `[ ]`，不假绿。
   - 顺序依据：L4 已有 candidate contract（起点最高）；L3 与 L1 模板层+代码层双重同构
     （LC-25，改一不改二 = 半修 ⇒ 必须交叉引用 L1 的 contract 改动）；L2 有 8 行真库载荷
   - 🔴 每条 entry 的受管表选型**重做 §2.1 那套裁决**，禁假设「都选明细表」——

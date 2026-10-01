@@ -58,7 +58,19 @@ _SNAPSHOT = Path(__file__).resolve().parent / "_snapshots" / "wp_templates_basel
 #:
 #: 数量不变（删 1 份、基线补记 1 份）。
 EXPECTED_XLSX_COUNT = 351
-EXPECTED_TOTAL_BYTES = 49_422_915
+#: 🔴 2026-10-01 I 循环净化（`sanitize_i_cycle_template_external_links.py`，过首版发布 OOXML 门）合计 -558,371 B：
+#:   ~ `I/I2 开发支出.xlsx` -18,865 B
+#:   ~ `I/I3 商誉.xlsx` -36,617 B
+#:   ~ `I/I4 长期待摊费用.xlsx` -252,048 B
+#:   ~ `I/I5 其他非流动资产.xlsx` -250,841 B
+#: 数量不变；四份 `.preclean.bak` 不是 `*.xlsx`，不进本快照。
+#: 🔴 2026-10-01 L4 净化（`sanitize_l4_template_external_links.py`，spec l-cycle-true-adapter-registration
+#:    task 12，删 L4-5 一个外部 hyperlink + 把 L4-3 的 74 格共享公式展开）：
+#:    `L/L4 应付债券.xlsx` 122,085 → 105,661 B（-16,424 B）。
+#: 🔴 同日主工作树现算受并发 I/J 模板净化影响会得到 48.8M，**不能**拿来更新本分支基线。
+#:    在「HEAD + 仅 L4 改动」的临时 staged worktree 中，逐文件快照之和是 **49,406,491**；
+#:    与提交态常量 49,422,915 的差恰为 L4 -16,424。故本值按隔离 staged tree 取证。
+EXPECTED_TOTAL_BYTES = 49_406_491
 
 #: 允许与基线不符的**未提交工作树改动**（不是永久豁免）。
 #:
@@ -67,14 +79,9 @@ EXPECTED_TOTAL_BYTES = 49_422_915
 #: `test_worktree_drift_allowlist_entries_are_really_uncommitted` 会去查 `git status`，
 #: 一旦该 lane 提交了（或撤销了）改动，条目立刻失效并打红，逼着回来重算基线。
 #:
-#: `M/M10 其他权益工具.xlsx`：M 循环 lane 的 openpyxl 往返改写（139,234 → 115,677 B）。
-#: 实测它**丢部件**——`xl/printerSettings/*.bin`（11 个）、`xl/calcChain.xml`、
-#: `xl/sharedStrings.xml`、8 个 worksheet `_rels`；comments 从 `xl/comments1.xml`
-#: 迁到 `xl/comments/comment1.xml`、`vmlDrawing` 迁到 `commentsDrawing`。
-#: 属有损改写，**本轮不代它提交**、也不把它固化进基线。
-WORKTREE_DRIFT_ALLOWLIST: dict[str, str] = {
-    "M/M10 其他权益工具.xlsx": "M 循环 lane 未提交的 openpyxl 往返改写（丢 printerSettings/calcChain）",
-}
+#: 2026-10-01：原唯一条目 `M/M10 其他权益工具.xlsx` 已不是未提交改动（反向断言打红），
+#: 且逐文件快照已与磁盘逐值一致 ⇒ 删除 stale allowlist。终态为空，任何新模板改动都会直接打红。
+WORKTREE_DRIFT_ALLOWLIST: dict[str, str] = {}
 
 
 def _sha256(path: Path) -> str:

@@ -696,6 +696,18 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="L1-2-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── L4（spec: l-cycle-true-adapter-registration · Task 12）──
+    #
+    # 受管 sheet = `划分为金融负债的其他金融工具明细表L4-3`，store = `L4-3-rows`
+    # （行身份 `rowId`）。只登记这一条：L4-2/L4-5/L4-6 等 JSON 键属后续批次，不预登记。
+    # 🔴 GC-2：受管表零裸 IF，但同册其他 sheet 有（现算见 test_l4_adapter_registration）
+    #    ⇒ per-file 策略照挂，与 G7/H9/L1 共用同一个中性化函数。
+    "l4.bonds_payable": StoreMergePlan(
+        adapter_id="l4.bonds_payable",
+        provider_module="phase5_l4_bonds_payable",
+        items=(StoreItemSpec(item_id="L4-3-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
 }
 
 

@@ -1,5 +1,5 @@
 {
-  "baseline_digest": "35f20268ab449bd34c0ae4320ec4f6ff45b772725496671b7a58b98855d0f5f1",
+  "baseline_digest": "c4df593a94f3f745a5f2299d120d35678d8ccb4250df7806ef55f43cde8783d6",
   "entries": [
     {
       "capability": "single_html",
@@ -5556,26 +5556,24 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-l4-bonds-payable",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtL4BondsPayable.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -7612,7 +7610,7 @@
       }
     }
   ],
-  "manifest_digest": "02e749339398565a6a7ebf3733dbb6ac530fc0b5db13493fda3ed6a47ad4db71",
+  "manifest_digest": "8408fb57314694e3ab9ab53e64b3b7276f21aab4c180106a9386d4c0fffa5594",
   "schema_version": 1,
   "source_digest": "45c5432a7bbc2bd157a9a43869d811c91e5f2c4c3633df84e16ec770926798c3",
   "stats": {
@@ -7620,10 +7618,10 @@
     "entry_count": 155,
     "html_reload_only_count": 15,
     "independent_entry_count": 142,
-    "missing_adapter_count": 136,
+    "missing_adapter_count": 135,
     "no_durable_forcesave_ack_count": 142,
     "no_forcesave_command_count": 124,
-    "single_mode_switch_visible_count": 126,
+    "single_mode_switch_visible_count": 125,
     "template_only_open_count": 109
   }
 }

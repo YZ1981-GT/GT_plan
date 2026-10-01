@@ -331,16 +331,23 @@ class TestContractOwnershipInLDomain:
             out[f.name] = json.loads(f.read_bytes().decode("utf-8"))
         return out
 
+    #: 已接线的 L 域生产契约（逐条具名追加，禁通配）。2026-10-01 task 12 追加 l4。
+    _L_PRODUCTION: dict[str, str] = {
+        L1_CONTRACT_FILE: L1_ENTRY_ID,
+        "l4.bonds_payable.json": "xlsx/gt-l4-bonds-payable",
+    }
+
     def test_l_domain_has_exactly_one_production_contract(
         self, contracts: dict[str, dict[str, Any]]
     ) -> None:
+        """名字保留（历史引用）；判据为「L 域生产契约恰为已具名登记的集合」。"""
         l_prod = {
             name: doc
             for name, doc in contracts.items()
             if name.startswith("l") and str(doc.get("review_status")) == "reviewed"
         }
-        assert sorted(l_prod) == [L1_CONTRACT_FILE], (
-            f"L 域生产契约实得 {sorted(l_prod)}，期望恰 {[L1_CONTRACT_FILE]}"
+        assert sorted(l_prod) == sorted(self._L_PRODUCTION), (
+            f"L 域生产契约实得 {sorted(l_prod)}，期望恰 {sorted(self._L_PRODUCTION)}"
         )
 
     def test_every_production_contract_declares_its_owner(
@@ -378,15 +385,15 @@ class TestContractOwnershipInLDomain:
     def test_no_other_l_entry_sneaks_in_a_contract(
         self, contracts: dict[str, dict[str, Any]]
     ) -> None:
-        """L2~L8 尚未接线 ⇒ 不得出现它们的生产契约（反方向也要红）。"""
+        """未接线的 L entry 不得出现生产契约（反方向也要红）。"""
         owners = {
             str((doc.get("review") or {}).get("entry_id"))
             for doc in contracts.values()
             if str(doc.get("review_status")) == "reviewed"
         }
         l_owners = {o for o in owners if "-l" in o and o.startswith("xlsx/gt-l")}
-        assert l_owners == {L1_ENTRY_ID}, (
-            f"L 域生产契约归属实得 {sorted(l_owners)}，期望恰 {[L1_ENTRY_ID]}"
+        assert l_owners == set(self._L_PRODUCTION.values()), (
+            f"L 域生产契约归属实得 {sorted(l_owners)}，期望恰 {sorted(self._L_PRODUCTION.values())}"
         )
 
     def test_candidate_contracts_keep_entry_id_null(

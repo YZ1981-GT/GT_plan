@@ -544,10 +544,19 @@ class TestTask7to8CrossEntryPollution:
 class TestTask13ContractLayerDisambiguation:
     """L4 契约用路线 A（尾码+分支）区分同码 sheet。"""
 
+    #: 🔴 2026-10-01：L4 已由 spec `l-cycle-true-adapter-registration` task 12 交付 reviewed
+    #: 生产契约，candidate 草案按「两份同源契约会让 review_status 门失效」删除；
+    #: route A 裁决逐字继承进生产契约的 `review.bp8_sheet_granularity_collapse`。
+    #: 判据对象换成生产契约，断言内容不变（不删断言、不加豁免）。
+    _L4_CONTRACT = DATA / "workpaper_sync_contracts" / "l4.bonds_payable.json"
+
     def test_l4_contract_exists_and_has_bp8(self) -> None:
-        """L4 候选契约存在且含 bp8 区分方案。"""
-        contract_path = DATA / "workpaper_sync_contracts" / "l4.bonds_payable.candidate.json"
-        assert contract_path.exists(), "L4 候选契约应存在"
+        """L4 契约存在且含 bp8 区分方案；candidate 草案不得与生产契约并存。"""
+        contract_path = self._L4_CONTRACT
+        assert contract_path.exists(), "L4 生产契约应存在"
+        assert not contract_path.with_name("l4.bonds_payable.candidate.json").exists(), (
+            "L4 candidate 草案仍在 ⇒ 与 reviewed 生产契约构成双源"
+        )
         data = _load(contract_path)
         assert "bp8_sheet_granularity_collapse" in data.get("review", {}), (
             "L4 契约应含 bp8_sheet_granularity_collapse"
@@ -555,7 +564,7 @@ class TestTask13ContractLayerDisambiguation:
 
     def test_sheet_key_does_not_contain_space_defect(self) -> None:
         """sheet_key 不含 LC-10 的空格缺陷（LA-P18）。"""
-        contract_path = DATA / "workpaper_sync_contracts" / "l4.bonds_payable.candidate.json"
+        contract_path = self._L4_CONTRACT
         data = _load(contract_path)
         bp8 = data["review"]["bp8_sheet_granularity_collapse"]
         for pair in bp8["collapsed_pairs"]:

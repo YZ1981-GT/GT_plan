@@ -262,6 +262,19 @@
         "review_status": "published_representation_verified",
         "legacy_reasons": []
       }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtL4BondsPayable.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_l4_fin_liab_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "l4.bonds_payable",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
     }
   ]
 }

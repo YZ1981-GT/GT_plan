@@ -77,6 +77,40 @@ _ROWS: tuple[dict[str, Any], ...] = (
             "wp_count_with_payload": 0,
         },
     },
+    {
+        "entry_id": "xlsx/gt-l4-bonds-payable",
+        "contract_id": "l4.bonds_payable",
+        "wp_codes": ["L4"],
+        "resolvable_for_provisioning": True,
+        "matcher_domain_conflict": None,
+        "basis": {
+            "heuristic_is_wrong_because": (
+                "manifest 从宿主 Vue 文件名 CamelCase 抽出的 L4B 经 wp_template_finder "
+                "单册与 sheet 级解析均零命中（GtL4BondsPayable → L4B 是幻影码）"
+            ),
+            "heuristic_would_say": ["L4B"],
+            "managed_excel_name": "划分为金融负债的其他金融工具明细表L4-3",
+            "template_relative_path": "L/L4 应付债券.xlsx",
+            "wp_index_evidence": (
+                "2026-10-01 现算：wp_code=L4 有 3 份未删除底稿且 file_path 非空"
+                "（`storage/projects/005a6f2d…/workpapers/L/L4.xlsx` 等）；受管 sheet 是整册 "
+                "16 sheet 工作簿里的一张，不是独立文件 ⇒ 目标码取持有整册文件的 `L4`。"
+                "判据用 `COALESCE(file_path,'') <> ''`（L1 裁决记过的空串陷阱）。"
+            ),
+        },
+        "store_payload_evidence": {
+            "max_payload_bytes": 0,
+            "measured_at": "2026-10-01",
+            "store_item_id": "L4-3-rows",
+            "why_null": (
+                "`L4-3-rows` 是本 spec 新建的键，全库 0 行；旧位置化键 `L4-3-row-*` 亦 0 行 "
+                "⇒ 零迁移负担。真库 L4 现有 6 行均为 `l-cycle-canary-e2e` 夹具"
+                "（L4-adj-1-* / L4-chk-conclusion / L4-3-note），不属受管表。"
+            ),
+            "wp_code_with_payload": None,
+            "wp_count_with_payload": 0,
+        },
+    },
 )
 
 

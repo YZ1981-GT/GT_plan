@@ -123,7 +123,36 @@ L_CODES = ("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8")
 #: 已按 spec `l-cycle-true-adapter-registration` 走完五环发布链、manifest 已翻成
 #: `adapter_registered` 的 entry。L2~L8 接线时**逐条**追加（禁批量）。
 #: 依据：真库 `working_paper_sync_entry_state` 有该 entry 行 + overlay overrides 有对应条目。
-MIGRATED_L_ENTRIES: frozenset[str] = frozenset({"xlsx/gt-l1-short-term-loans"})
+MIGRATED_L_ENTRIES: frozenset[str] = frozenset(
+    {
+        "xlsx/gt-l1-short-term-loans",
+        #: 2026-10-01 task 12：受管 L4-3，真库 entry_state 已有 representation（gen 1）。
+        "xlsx/gt-l4-bonds-payable",
+    }
+)
+
+#: 🔴 slice 是 append-only 审计快照：模板合法净化后，slice 保留 pre 值，现算取 provider post 值。
+SANITIZED_L_TEMPLATES: dict[str, dict[str, str | int]] = {
+    "L4 应付债券.xlsx": {
+        "pre_sha256": "9df73e02d7af61f287732102cc6367011df09d2e52863c9c80432216ee1c562b",
+        "pre_size": 122085,
+        "post_sha256": "b4ba30cfde3d929908ab4989363c04944ed1134b9c25813370307db54443c255",
+        "provider_module": "app.services.workpaper_sync.phase5_l4_bonds_payable",
+        "script": "backend/scripts/fix/sanitize_l4_template_external_links.py",
+    },
+    #: 这两册已在 commit `3036967ea` 净化（memory 现算：externalLink 部件均为 0），
+    #: 但 task54 slice 保留净化前值；此前守卫未做双态，长期假红。
+    "L5 长期应付款.xlsx": {
+        "pre_sha256": "c8506f391262bf10fa818df22b9ddfe53ddc2ebe4d280af48776e39f8c8ac497",
+        "pre_size": 93254,
+        "post_sha256": "09380626107dc1b975662eaa60fa99ec541901c0729bb0d2b35bbb60807a9b68",
+    },
+    "L6 专项应付款.xlsx": {
+        "pre_sha256": "cf05ed3b9fa0afd6a05b73de5c79b7ee14a85b6c6f4a04e57ae2f09170d7b5d4",
+        "pre_size": 55523,
+        "post_sha256": "08630e1cbc962fabbbf580f591374157a2d6705966c2f3c8ecba4a0705f59f62",
+    },
+}
 #: 承载 inert 开关的四条 entry（L 循环特有形态；见模块 docstring 第 2 条）。
 INERT_CODES = ("L5", "L6", "L7", "L8")
 #: 开关**可兑现**的对照组 —— 用来证明 inert 扫描器不是恒 0。
@@ -1126,7 +1155,26 @@ class TestHtmlCounterpartIsSourceBacked:
             ref = e["template_ref"]
             p = ROOT / ref["root"] / ref["workbook"]
             assert p.exists(), f"{e['entry_id']}: 权威模板不存在 {p}"
-            assert _sha256_of(p) == ref["sha256"], f"{e['entry_id']}: 模板 sha256 漂移"
+            actual_sha = _sha256_of(p)
+            sanitized = SANITIZED_L_TEMPLATES.get(ref["workbook"])
+            if sanitized:
+                import importlib
+
+                provider_module = sanitized.get("provider_module")
+                if provider_module:
+                    provider = importlib.import_module(str(provider_module))
+                    post_sha = provider.TEMPLATE_SHA256
+                else:
+                    post_sha = sanitized["post_sha256"]
+                if ref["sha256"] == sanitized["pre_sha256"]:
+                    # append-only authoritative snapshot / 旧 entry snapshot
+                    assert actual_sha == post_sha
+                else:
+                    # L5/L6 的 per-entry template_ref 已同步净化后值（与 authoritative 列表口径不同）
+                    assert ref["sha256"] == post_sha
+                    assert actual_sha == ref["sha256"]
+            else:
+                assert actual_sha == ref["sha256"], f"{e['entry_id']}: 模板 sha256 漂移"
             assert len(_sheet_names(p)) == ref["sheet_count"]
             assert (f"L/{ref['workbook']}" in indexed) == ref["in_runtime_index"]
 
@@ -1866,16 +1914,44 @@ class TestProperty20AndProperty3:
 class TestProperty28DefinitionDriftFailClosed:
     """Requirement 6.10：模板层分母非空全验；bundle 层分母为空只验前提。"""
 
+    #: 🔴 双态（照 J 轮 `SANITIZED_J_TEMPLATES`）：按 D3~D7/I/J 范式净化过外部关系的权威模板。
+    #:    slice 冻结净化前 digest（append-only）；现算须等于 provider 净化后哨兵。
+    _SANITIZED = SANITIZED_L_TEMPLATES
+
     def test_authoritative_template_digests_recompute(self, manifest_slice: dict) -> None:
+        import importlib
+        import zipfile
+
         for f in manifest_slice["authoritative_templates"]["files"]:
             p = L_TEMPLATE_DIR / f["name"]
             assert p.exists(), f"权威模板不存在：{p}"
+            sanitized = self._SANITIZED.get(f["name"])
+            if sanitized is not None:
+                assert f["sha256"] == sanitized["pre_sha256"], "slice 的净化前 digest 被回填"
+                assert f["size"] == sanitized["pre_size"]
+                provider_module = sanitized.get("provider_module")
+                if provider_module:
+                    provider = importlib.import_module(str(provider_module))
+                    post_sha = provider.TEMPLATE_SHA256
+                else:
+                    post_sha = sanitized["post_sha256"]
+                assert _sha256_of(p) == post_sha, f"{f['name']}: 现算 ≠ 净化后哨兵"
+                assert post_sha != sanitized["pre_sha256"]
+                with zipfile.ZipFile(p) as zf:
+                    ext = [n for n in zf.namelist() if n.endswith(".rels")
+                           and b'TargetMode="External"' in zf.read(n)]
+                assert ext == [], f"{f['name']}: 净化后仍有外部关系 {ext}"
+                script = sanitized.get("script")
+                if script:
+                    assert (ROOT / str(script)).is_file()
+                continue
             assert p.stat().st_size == f["size"], f"{f['name']}: size 漂移"
             assert _sha256_of(p) == f["sha256"], f"{f['name']}: sha256 漂移（fail closed）"
 
     def test_registered_file_set_equals_the_disk_set(self, manifest_slice: dict) -> None:
+        #: `.preclean.bak` 是净化脚本留的本机门负例（gitignore `*.bak`），机器相关 ⇒ 不计入
         disk = {p.name for p in L_TEMPLATE_DIR.iterdir()
-                if p.is_file() and not p.name.startswith("~$")}
+                if p.is_file() and not p.name.startswith("~$") and not p.name.endswith(".bak")}
         declared = {f["name"] for f in manifest_slice["authoritative_templates"]["files"]}
         assert disk == declared, f"多写 {sorted(declared - disk)}，漏写 {sorted(disk - declared)}"
 

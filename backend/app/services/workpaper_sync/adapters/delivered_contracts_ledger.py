@@ -2459,4 +2459,30 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "这个治理动作，不在平台供给。"
         ),
     },
+    # ── L 循环第二条（spec: l-cycle-true-adapter-registration · Task 12）────────────
+    {
+        "contract_id": "l4.bonds_payable",
+        "provider_module": "app.services.workpaper_sync.phase5_l4_bonds_payable",
+        "delivered_by_task": "l-cycle-true-adapter-registration-task-12",
+        "pilot_class": "l_cycle_bonds_payable",
+        "entry_id": "xlsx/gt-l4-bonds-payable",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "L/L4 应付债券.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "L 循环第二条真双向 entry，首条走 `phase5_l_cycle_common` 骨架（task 11）。"
+            "受管表 = `划分为金融负债的其他金融工具明细表L4-3`（选型逐张排除见 "
+            "`phase5_l4_sheets` docstring：L4-1 派生汇总 / L4-2 双段带小计需多段引擎 / "
+            "L4-7·L4-8 BP-8 同尾码且为计算排程 / L4-4 与调整分录模块重复）。"
+            "几何：三级表头 r10/r11/r12（header_rows=3）· 数据 r13~r17 · footer **A18**「合计」· "
+            "38 字段（10 标量 + 14 对数量/金额）· R/S/AF~AM 十列逐行公式进 formula_mask · "
+            "UUID 列 AO（max_column=40 +1）· 册内零 definedName、零 Excel Table。"
+            "store = `L4-3-rows`（remark JSON 行数组，稳定 `rowId`），🔴 取代位置化旧键 "
+            "`L4-3-row-{index+1}-data`（lane spec task 18 标 [x] 而未改）；真库旧键 0 行。"
+            "旧候选契约 `l4.bonds_payable.candidate.json` 无任何 sheet/field，已由本 reviewed "
+            "契约取代并删除；其 BP-8 route A 裁决原样继承进 `review.bp8_sheet_granularity_collapse`。"
+            "`adapter_registered=False` 是**顺序**：五环发布与 manifest 翻转随后执行。"
+        ),
+    },
 )
