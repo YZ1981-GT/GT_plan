@@ -2459,6 +2459,146 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "这个治理动作，不在平台供给。"
         ),
     },
+    # ── K1-9 坏账准备转回/核销同 sheet 双区（lane 1 Task 12）──────────
+    {
+        "contract_id": "k1.baddebt_reversal_writeoff_check",
+        "provider_module": "app.services.workpaper_sync.phase5_k1_baddebt_reversal_writeoff",
+        "delivered_by_task": "k1-k7-inlined-iife-hosts-and-orphan-cleanup-task-12",
+        "pilot_class": "k1_baddebt_reversal_writeoff_check",
+        "entry_id": "xlsx/gt-k1-other-receivables",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "K/K1 其他应收款.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "K1-9 的 `K1-9-writeoff` 是 dict store：`tables.reversal` / `tables.writeoff` 两个动态区"
+            "共用同一 sheet；两区字段与金额列不同，分别声明 spec，并以 I/J 独立 UUID 列驱动兄弟区位移。"
+            "OO→HTML 走 dedicated merge，保留 auditProcedures/auditNote/conclusion/conclusionOption。"
+            "adapter_registered 仅在首版 representation 真发布并翻 overlay 后改 True。"
+        ),
+    },
+    # ── K 循环调整分录汇总六条（spec: k-cycle-sync-foundation-and-first-canary ·
+    #    k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub）──────────
+    {
+        "contract_id": "k8.selling_expenses_adjustment",
+        "provider_module": "app.services.workpaper_sync.phase5_k8_selling_expenses",
+        "delivered_by_task": "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub-task-18",
+        "pilot_class": "k8_adjustment_summary",
+        "entry_id": "xlsx/gt-k8-selling-expenses",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "K/K8 销售费用.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "K 循环「调整分录汇总K8-3」真双向。受管表 = `调整分录汇总K8-3`，store = "
+            "`K8-3-adj-entries`（remark JSON 行数组，行身份 `id`）。六册模板层同构（单级表头 R5 十列 A..J、"
+            "数据区纯空白、footer 为合并「提示：」文字不承载 SUM、UUID 载体取现成空列 K），"
+            "共享内核 `phase5_k_adjustment_summary`，本模块只持身份常量。"
+            "`adapter_registered=False` 是**顺序**：发布链 definitions/bundle 与首版 "
+            "representation 由 `fix_task76_provision_projection_definitions.py` / "
+            "`fix_projection_first_publication.py` 写库，再由 reviewed overlay 翻 capability。"
+        ),
+    },
+    {
+        "contract_id": "k9.admin_expenses_adjustment",
+        "provider_module": "app.services.workpaper_sync.phase5_k9_admin_expenses",
+        "delivered_by_task": "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub-task-18",
+        "pilot_class": "k9_adjustment_summary",
+        "entry_id": "xlsx/gt-k9-admin-expenses",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "K/K9 管理费用.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "K 循环「调整分录汇总K9-3」真双向。受管表 = `调整分录汇总K9-3`，store = "
+            "`K9-3-adj-entries`（remark JSON 行数组，行身份 `id`）。六册模板层同构（单级表头 R5 十列 A..J、"
+            "数据区纯空白、footer 为合并「提示：」文字不承载 SUM、UUID 载体取现成空列 K），"
+            "共享内核 `phase5_k_adjustment_summary`，本模块只持身份常量。"
+            "`adapter_registered=False` 是**顺序**：发布链 definitions/bundle 与首版 "
+            "representation 由 `fix_task76_provision_projection_definitions.py` / "
+            "`fix_projection_first_publication.py` 写库，再由 reviewed overlay 翻 capability。"
+        ),
+    },
+    {
+        "contract_id": "k10.other_income_adjustment",
+        "provider_module": "app.services.workpaper_sync.phase5_k10_other_income",
+        "delivered_by_task": "k-cycle-sync-foundation-and-first-canary-task-22",
+        "pilot_class": "k10_adjustment_summary",
+        "entry_id": "xlsx/gt-k10-other-income",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "K/K10 其他收益.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "K 循环「调整分录汇总K10-3」真双向。受管表 = `调整分录汇总K10-3`，store = "
+            "`K10-3-entries`（remark JSON 行数组，行身份 `id`）。六册模板层同构（单级表头 R5 十列 A..J、"
+            "数据区纯空白、footer 为合并「提示：」文字不承载 SUM、UUID 载体取现成空列 K），"
+            "共享内核 `phase5_k_adjustment_summary`，本模块只持身份常量。"
+            "`adapter_registered=False` 是**顺序**：发布链 definitions/bundle 与首版 "
+            "representation 由 `fix_task76_provision_projection_definitions.py` / "
+            "`fix_projection_first_publication.py` 写库，再由 reviewed overlay 翻 capability。"
+        ),
+    },
+    {
+        "contract_id": "k11.asset_impairment_loss_adjustment",
+        "provider_module": "app.services.workpaper_sync.phase5_k11_asset_impairment_loss",
+        "delivered_by_task": "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub-task-18",
+        "pilot_class": "k11_adjustment_summary",
+        "entry_id": "xlsx/gt-k11-asset-impairment-loss",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "K/K11 资产减值损失.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "K 循环「调整分录汇总K11-3」真双向。受管表 = `调整分录汇总K11-3`，store = "
+            "`K11-3-adj-entries`（remark JSON 行数组，行身份 `id`）。六册模板层同构（单级表头 R5 十列 A..J、"
+            "数据区纯空白、footer 为合并「提示：」文字不承载 SUM、UUID 载体取现成空列 K），"
+            "共享内核 `phase5_k_adjustment_summary`，本模块只持身份常量。"
+            "`adapter_registered=False` 是**顺序**：发布链 definitions/bundle 与首版 "
+            "representation 由 `fix_task76_provision_projection_definitions.py` / "
+            "`fix_projection_first_publication.py` 写库，再由 reviewed overlay 翻 capability。"
+        ),
+    },
+    {
+        "contract_id": "k12.non_operating_income_adjustment",
+        "provider_module": "app.services.workpaper_sync.phase5_k12_non_operating_income",
+        "delivered_by_task": "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub-task-18",
+        "pilot_class": "k12_adjustment_summary",
+        "entry_id": "xlsx/gt-k12-non-operating-income",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "K/K12 营业外收入.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "K 循环「调整分录汇总K12-3」真双向。受管表 = `调整分录汇总K12-3`，store = "
+            "`K12-3-rows`（remark JSON 行数组，行身份 `id`）。六册模板层同构（单级表头 R5 十列 A..J、"
+            "数据区纯空白、footer 为合并「提示：」文字不承载 SUM、UUID 载体取现成空列 K），"
+            "共享内核 `phase5_k_adjustment_summary`，本模块只持身份常量。"
+            "`adapter_registered=False` 是**顺序**：发布链 definitions/bundle 与首版 "
+            "representation 由 `fix_task76_provision_projection_definitions.py` / "
+            "`fix_projection_first_publication.py` 写库，再由 reviewed overlay 翻 capability。"
+        ),
+    },
+    {
+        "contract_id": "k13.non_operating_expense_adjustment",
+        "provider_module": "app.services.workpaper_sync.phase5_k13_non_operating_expense",
+        "delivered_by_task": "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub-task-18",
+        "pilot_class": "k13_adjustment_summary",
+        "entry_id": "xlsx/gt-k13-non-operating-expense",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "K/K13 营业外支出.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "K 循环「调整分录汇总K13-3」真双向。受管表 = `调整分录汇总K13-3`，store = "
+            "`K13-3-adj-entries`（remark JSON 行数组，行身份 `id`）。六册模板层同构（单级表头 R5 十列 A..J、"
+            "数据区纯空白、footer 为合并「提示：」文字不承载 SUM、UUID 载体取现成空列 K），"
+            "共享内核 `phase5_k_adjustment_summary`，本模块只持身份常量。"
+            "`adapter_registered=False` 是**顺序**：发布链 definitions/bundle 与首版 "
+            "representation 由 `fix_task76_provision_projection_definitions.py` / "
+            "`fix_projection_first_publication.py` 写库，再由 reviewed overlay 翻 capability。"
+        ),
+    },
     # ── L 循环第二条（spec: l-cycle-true-adapter-registration · Task 12）────────────
     {
         "contract_id": "l4.bonds_payable",
@@ -2483,6 +2623,26 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "旧候选契约 `l4.bonds_payable.candidate.json` 无任何 sheet/field，已由本 reviewed "
             "契约取代并删除；其 BP-8 route A 裁决原样继承进 `review.bp8_sheet_granularity_collapse`。"
             "`adapter_registered=False` 是**顺序**：五环发布与 manifest 翻转随后执行。"
+        ),
+    },
+    # ── L 循环第三条（spec: l-cycle-true-adapter-registration · Task 12）────────────
+    {
+        "contract_id": "l3.long_term_loans",
+        "provider_module": "app.services.workpaper_sync.phase5_l3_long_term_loans",
+        "delivered_by_task": "l-cycle-true-adapter-registration-task-12",
+        "pilot_class": "l_cycle_long_term_loans",
+        "entry_id": "xlsx/gt-l3-long-term-loans",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "L/L3 长期借款.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "L 循环第三条，受管 `长期借款检查表L3-9`：前端/模板字段 16/16 对齐、数据 r12~r20、"
+            "footer A21、数据区零公式、UUID AI；store `L3-L3-9-voucher-rows` 已是稳定 rowId JSON。"
+            "只把私有生成器收敛到共享 newRowIdentity，criteria/note/conclusion 不预登记。"
+            "L3-1 派生汇总、L3-2 分组复杂、L3-7 有 4 个 #REF! 均不选。"
+            "册内 38 definedName（31 broken）与 L3-7 的 4 个 #REF! 只登记不改。"
+            "`adapter_registered=False` 是顺序：五环发布后再翻 manifest。"
         ),
     },
 )

@@ -111,6 +111,34 @@ _ROWS: tuple[dict[str, Any], ...] = (
             "wp_count_with_payload": 0,
         },
     },
+    {
+        "entry_id": "xlsx/gt-l3-long-term-loans",
+        "contract_id": "l3.long_term_loans",
+        "wp_codes": ["L3"],
+        "resolvable_for_provisioning": True,
+        "matcher_domain_conflict": None,
+        "basis": {
+            "heuristic_is_wrong_because": "manifest 幻影码 L3L 经 wp_template_finder 单册与 sheet 级均零命中",
+            "heuristic_would_say": ["L3L"],
+            "managed_excel_name": "长期借款检查表L3-9",
+            "template_relative_path": "L/L3 长期借款.xlsx",
+            "wp_index_evidence": (
+                "2026-10-01 现算 wp_code=L3 有 4 份未删除底稿，最早目标 wp=33cfc857；"
+                "无 L3-* 子码 working paper，受管 L3-9 是整册内 sheet ⇒ 目标码取 L3。"
+            ),
+        },
+        "store_payload_evidence": {
+            "max_payload_bytes": 0,
+            "measured_at": "2026-10-01",
+            "store_item_id": "L3-L3-9-voucher-rows",
+            "why_null": (
+                "本 item 真库 0 行；现有 11 条 L3 行 11/11 均为 `l-cycle-canary-e2e` 夹具，"
+                "且键属于 adj/blank/note，不属受管表 ⇒ 零迁移负担。"
+            ),
+            "wp_code_with_payload": None,
+            "wp_count_with_payload": 0,
+        },
+    },
 )
 
 

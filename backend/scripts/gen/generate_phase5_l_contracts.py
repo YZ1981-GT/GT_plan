@@ -23,6 +23,7 @@ sys.path.insert(0, str(_BACKEND))
 
 from app.services.workpaper_sync import (  # noqa: E402
     phase5_l1_short_term_loans as _l1,
+    phase5_l3_long_term_loans as _l3,
     phase5_l4_bonds_payable as _l4,
 )
 from app.services.workpaper_sync.definitions import canonical_digest  # noqa: E402
@@ -30,6 +31,7 @@ from app.services.workpaper_sync.definitions import canonical_digest  # noqa: E4
 #: adapter_id → provider 模块。L2~L8 接线时在此追加。
 _PROVIDERS = {
     _l1.ADAPTER_ID: _l1,
+    _l3.ADAPTER_ID: _l3,
     _l4.ADAPTER_ID: _l4,
 }
 

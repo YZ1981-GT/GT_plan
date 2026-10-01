@@ -696,6 +696,75 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="L1-2-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── J1（spec: j-cycle-sync-foundation-and-first-canary · 参照 D/H/L 真双向注册）──
+    #
+    # 受管 sheet = `计提情况检查表J1-6` 短期薪酬区（R17:R35，19 行），canary 键
+    # `J1-6-short-term`（真库 3473 B，全 J 最大）。行身份字段是 **`id`**（不是 `rowId`）。
+    #
+    # 🔴 `items` 只登记本轮真受管的一条：同 Tab 兄弟键 `J1-6-post-employment`
+    #    （structured_row_array）/ `J1-6-questions`（free_text_array）/
+    #    `J1-6-conclusion`（free_text_scalar）**不预登记**；primary table
+    #    `J1-2-detail-*` 三键真库全空，归后续批次。
+    #
+    # 🔴 GC-2：J1 册裸 IF **224 格**，**受管表零命中** ⇒ per-file 保守策略照挂，
+    #    中性化函数与 G7/H9/L1 **共用一个**，不新造、不加 adapter_id 字面量分支。
+    "j1.accrual_check_short_term": StoreMergePlan(
+        adapter_id="j1.accrual_check_short_term",
+        provider_module="phase5_j1_employee_compensation",
+        items=(StoreItemSpec(item_id="J1-6-short-term", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── K1-9 单 dict item / 同 sheet 双区（专用 merge，保留未受管标量）──
+    "k1.baddebt_reversal_writeoff_check": StoreMergePlan(
+        adapter_id="k1.baddebt_reversal_writeoff_check",
+        provider_module="phase5_k1_baddebt_reversal_writeoff",
+        items=(),
+        dedicated_items=(
+            DedicatedStoreItem(
+                item_id_const="STORE_ITEM_ID",
+                merge_fn="merge_k1_from_projection",
+                base_kind="dict",
+                provider_module="phase5_k1_baddebt_reversal_writeoff",
+            ),
+        ),
+    ),
+    # ── K 循环调整分录汇总六条（per-file 中性化同 G7/H9/L1，共用一个函数）──
+    "k8.selling_expenses_adjustment": StoreMergePlan(
+        adapter_id="k8.selling_expenses_adjustment",
+        provider_module="phase5_k8_selling_expenses",
+        items=(StoreItemSpec(item_id="K8-3-adj-entries", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "k9.admin_expenses_adjustment": StoreMergePlan(
+        adapter_id="k9.admin_expenses_adjustment",
+        provider_module="phase5_k9_admin_expenses",
+        items=(StoreItemSpec(item_id="K9-3-adj-entries", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "k10.other_income_adjustment": StoreMergePlan(
+        adapter_id="k10.other_income_adjustment",
+        provider_module="phase5_k10_other_income",
+        items=(StoreItemSpec(item_id="K10-3-entries", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "k11.asset_impairment_loss_adjustment": StoreMergePlan(
+        adapter_id="k11.asset_impairment_loss_adjustment",
+        provider_module="phase5_k11_asset_impairment_loss",
+        items=(StoreItemSpec(item_id="K11-3-adj-entries", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "k12.non_operating_income_adjustment": StoreMergePlan(
+        adapter_id="k12.non_operating_income_adjustment",
+        provider_module="phase5_k12_non_operating_income",
+        items=(StoreItemSpec(item_id="K12-3-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "k13.non_operating_expense_adjustment": StoreMergePlan(
+        adapter_id="k13.non_operating_expense_adjustment",
+        provider_module="phase5_k13_non_operating_expense",
+        items=(StoreItemSpec(item_id="K13-3-adj-entries", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
     # ── L4（spec: l-cycle-true-adapter-registration · Task 12）──
     #
     # 受管 sheet = `划分为金融负债的其他金融工具明细表L4-3`，store = `L4-3-rows`
@@ -706,6 +775,13 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         adapter_id="l4.bonds_payable",
         provider_module="phase5_l4_bonds_payable",
         items=(StoreItemSpec(item_id="L4-3-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── L3（task 12）：受管 L3-9；criteria/note/conclusion 不预登记 ──
+    "l3.long_term_loans": StoreMergePlan(
+        adapter_id="l3.long_term_loans",
+        provider_module="phase5_l3_long_term_loans",
+        items=(StoreItemSpec(item_id="L3-L3-9-voucher-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
 }
