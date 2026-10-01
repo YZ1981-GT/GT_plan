@@ -48,7 +48,14 @@ from tests.workpaper_sync.k_foundation_facts import (  # noqa: E402
 )
 
 CONTRACT_DIR = DATA / "workpaper_sync_contracts"
-DRAFT_PATH = CONTRACT_DIR / "k10.other_income_adjustment.candidate.json"
+#: 🔴 2026-10-01 草案已被 reviewed 生产契约取代（K8/K9/K11/K12/K13 已真双向发布）。
+#:    草案本体作为 Task 18/22「草案阶段」的交付证据归档在 spec evidence 目录，本文件的
+#:    草案判据改读归档（历史事实不变）；生产契约的判据见 `test_k_cycle_reviewed_contracts.py`。
+DRAFT_ARCHIVE_DIR = (
+    ROOT / ".kiro" / "specs" / "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub"
+    / "evidence" / "superseded-candidate-contracts"
+)
+DRAFT_PATH = DRAFT_ARCHIVE_DIR / "k10.other_income_adjustment.candidate.json"
 K_TEMPLATE_DIR = ROOT / "backend" / "wp_templates" / "K"
 CANARY_WORKBOOK = "K10 其他收益.xlsx"
 CANARY_SHEET = "调整分录汇总K10-3"
@@ -115,31 +122,36 @@ class TestDraftIsNotAProductionContract:
         assert why.strip(), "缺 why_candidate_not_reviewed"
         assert "BP-1" in why, "未指明卡 BP-1"
 
-    def test_no_production_contract_belongs_to_k_cycle(self) -> None:
-        """🔴 生产契约（reviewed）里仍无 K 循环 entry。"""
-        k_owners: list[str] = []
-        for p in sorted(CONTRACT_DIR.glob("*.json")):
-            doc = json.loads(p.read_text(encoding="utf-8"))
-            if doc.get("review_status") != "reviewed":
-                continue
-            owner = (doc.get("review") or {}).get("entry_id") or ""
-            if re.match(r"^xlsx/gt-k(1[0-3]|[1-9])(?![0-9])-", owner):
-                k_owners.append(f"{p.name}:{owner}")
-        assert k_owners == [], (
-            f"有 reviewed 契约属 K 循环：{k_owners}"
-            " ⇒ 「K 循环 0 生产契约」的空分母登记须更新"
+    def test_production_contracts_are_exactly_the_promotion_ledger(self) -> None:
+        """🔴 晋级后：K 循环 reviewed 生产契约 **恰等于** 晋级账本（多一条少一条都红）。
+
+        原判据是「K 循环 0 生产契约」（晋级前的空分母登记）。2026-10-01 六册调整分录汇总
+        发了 reviewed 契约 ⇒ 判据翻面为「现算 == `K_REVIEWED_CONTRACTS`」，而不是删掉 ——
+        删掉就无从发现「有人顺手又给 K 发了一份未登记的契约」。
+        """
+        from tests.workpaper_sync.k_foundation_facts import (
+            K_REVIEWED_CONTRACTS,
+            k_reviewed_contract_owners,
         )
 
-    def test_draft_is_counted_as_candidate_not_reviewed(self) -> None:
-        """契约目录的 candidate 计数含本草案。"""
-        candidates = [
-            p.name for p in sorted(CONTRACT_DIR.glob("*.json"))
-            if json.loads(p.read_text(encoding="utf-8")).get("review_status")
-            == "candidate"
-        ]
-        assert DRAFT_PATH.name in candidates, (
-            f"草案不在 candidate 清单里：{candidates}"
+        live = k_reviewed_contract_owners()
+        expected = {f"{cid}.json" for cid in K_REVIEWED_CONTRACTS.values()}
+        assert set(live) == expected, (
+            f"K reviewed 契约现算 {sorted(live)} ≠ 账本 {sorted(expected)}"
         )
+        for n, cid in K_REVIEWED_CONTRACTS.items():
+            assert live[f"{cid}.json"].startswith(f"xlsx/gt-k{n}-"), (
+                f"{cid} 归属 {live[f'{cid}.json']} 与序号 K{n} 不符"
+            )
+
+    def test_draft_is_superseded_not_left_beside_the_reviewed_contract(self) -> None:
+        """🔴 草案已归档，契约目录里**不得**再有同 adapter 的 candidate（双源会让门失效）。"""
+        assert DRAFT_PATH.exists(), "草案归档缺失 ⇒ 草案阶段交付证据丢了"
+        live_candidate = CONTRACT_DIR / DRAFT_PATH.name
+        assert not live_candidate.exists(), (
+            f"{live_candidate.name} 仍在契约目录 ⇒ 与 reviewed 契约双源"
+        )
+        assert (CONTRACT_DIR / "k10.other_income_adjustment.json").exists()
 
     def test_entry_id_must_be_null_for_candidate(self, draft: dict) -> None:
         """🔴 candidate 的 `review.entry_id` **必须为 null**。
@@ -169,27 +181,23 @@ class TestDraftIsNotAProductionContract:
             "参考 candidate 的 entry_id 非 null ⇒ 口径依据变了"
         )
 
-    def test_task53_guards_still_hold(self) -> None:
-        """🔴 零回归门：草案不得让 test_task53 的契约判据打红。
+    def test_only_ledger_contracts_claim_k_entries(self) -> None:
+        """🔴 契约目录里声明 K entry 归属的，恰是晋级账本那 6 份（不论 status）。"""
+        from tests.workpaper_sync.k_foundation_facts import K_REVIEWED_CONTRACTS
 
-        逐条复算它们的判据逻辑（不跑那个文件，避免循环依赖）。
-        """
         slice_doc = json.loads(
             (DATA / "workpaper_sync_k_cycle_manifest_slice.json").read_text(
                 encoding="utf-8"
             )
         )
         k_ids = {e["entry_id"] for e in slice_doc["independent_entries"]}
-        offenders: list[str] = []
+        owners: set[str] = set()
         for p in sorted(CONTRACT_DIR.glob("*.json")):
             doc = json.loads(p.read_text(encoding="utf-8"))
             owner = (doc.get("review") or {}).get("entry_id")
             if owner in k_ids:
-                offenders.append(f"{p.name}:{owner}")
-        assert offenders == [], (
-            f"有契约的 review.entry_id 属 K 循环：{offenders}"
-            " ⇒ test_task53 的两条判据会打红"
-        )
+                owners.add(p.name)
+        assert owners == {f"{cid}.json" for cid in K_REVIEWED_CONTRACTS.values()}, owners
 
 
 # ════════════════════════════════════════════════════════════════════════════

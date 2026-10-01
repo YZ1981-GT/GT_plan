@@ -137,6 +137,7 @@ import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { K11_NOTE_SECTION, buildK11SyncPayload } from '../../composables/k11NoteSectionMap'
+import { newRowIdentity } from '../../composables/shared/rowIdentity'
 
 const ABNORMAL_THRESHOLD = 0.3
 
@@ -205,7 +206,7 @@ const DEFAULT_CATEGORIES_SOE = [
 
 function initDefaultRows(): void {
   disclosureRows.value = DEFAULT_CATEGORIES_SOE.map((item, idx) => ({
-    id: `row-${idx}`,
+    id: newRowIdentity('row'),
     category: item.name,
     currentProvision: 0,
     currentReversal: 0,
@@ -257,7 +258,7 @@ function buildRowsFromK11(): DisclosureRow[] {
           r.audited ?? (Number(r.currentOccurrence || 0) + Number(r.aje || 0) + Number(r.rje || 0)),
         )
         return {
-          id: `row-${idx}`,
+          id: newRowIdentity('row'),
           category: String(r.projectName),
           currentProvision: audited,
           currentReversal: 0,

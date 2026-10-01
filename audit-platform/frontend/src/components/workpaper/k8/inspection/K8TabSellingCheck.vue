@@ -416,7 +416,7 @@ async function handleOcrFile(event: Event): Promise<void> {
     const formData = new FormData()
     formData.append('file', file)
     ElMessage.info('正在OCR识别...')
-    const res = await http.post('/api/d4/contract-ocr', formData, {
+    const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     const ocrText = res.data?.data?.text || res.data?.text || ''

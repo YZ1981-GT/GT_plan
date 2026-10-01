@@ -179,19 +179,22 @@ class TestRoundtripSkeletonBoundary:
     """🔴 完整 roundtrip 需已注册 adapter；K 循环 13 条全 null ⇒ 不宣称通过。"""
 
     def test_no_k_entry_has_a_registered_adapter(self) -> None:
-        manifest = json.loads(FULL_MANIFEST_PATH.read_text(encoding="utf-8"))
-        k_with_adapter = [
-            e["entry_id"] for e in manifest["entries"]
-            if e.get("adapter_id")
-            and any(
-                str(p).startswith("K")
-                for p in ((e.get("wp_match") or {}).get("wp_code_patterns") or [])
-            )
-        ]
-        assert k_with_adapter == [], (
-            f"K 循环有 entry 已注册 adapter：{k_with_adapter}"
-            " ⇒ roundtrip 可真跑，本条边界登记须撤"
+        """🔴 2026-10-01 晋级后：注册 adapter 的 K entry **恰好**是晋级账本那 5 条。
+
+        canary K10 不在其中（首版发布被 OOXML 安全门拒绝，见 `K_PUBLISH_BLOCKED`）
+        ⇒ canary 的 roundtrip 边界登记仍成立。
+        """
+        from tests.workpaper_sync.k_foundation_facts import (
+            K_ENTRY_ID_BY_INDEX,
+            K_PUBLISH_BLOCKED,
+            k_expected_manifest_adapters,
+            k_manifest_adapters,
         )
+
+        manifest = json.loads(FULL_MANIFEST_PATH.read_text(encoding="utf-8"))
+        assert k_manifest_adapters(manifest) == k_expected_manifest_adapters()
+        for n in K_PUBLISH_BLOCKED:
+            assert K_ENTRY_ID_BY_INDEX[n] not in k_manifest_adapters(manifest)
 
     def test_roundtrip_is_blocked_by_bp1_and_bp2(
         self, manifest_slice: dict

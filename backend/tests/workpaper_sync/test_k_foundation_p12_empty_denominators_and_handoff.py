@@ -32,8 +32,10 @@ from tests.workpaper_sync.k_foundation_facts import (  # noqa: E402
     DATA,
     FRONTEND,
     K_INDEXES,
+    NON_CONTRACT_FILES_IN_CONTRACT_DIR,
     ROOT,
     cached_text,
+    contract_dir_split,
     derived_total_keys,
     k_domain_files,
     strip_comments,
@@ -134,7 +136,12 @@ class TestKFP53Property20EmptyContractDenominator:
             owner = (doc.get("review") or {}).get("entry_id") or ""
             if re.match(r"^xlsx/gt-k(1[0-3]|[1-9])(?![0-9])-", owner):
                 k_owned.append(p.name)
-        assert k_owned == [], f"K 循环有生产契约：{k_owned}"
+        # 🔴 2026-10-01 晋级后：K 生产契约**恰好**是晋级账本的 6 份（不再是 0）。
+        from tests.workpaper_sync.k_foundation_facts import K_REVIEWED_CONTRACTS
+
+        assert sorted(k_owned) == sorted(
+            f"{cid}.json" for cid in K_REVIEWED_CONTRACTS.values()
+        ), f"K 循环生产契约与晋级账本不符：{k_owned}"
 
     def test_the_empty_part_is_explicitly_not_claimed(
         self, manifest_slice: dict
@@ -147,18 +154,26 @@ class TestKFP53Property20EmptyContractDenominator:
         assert "分母为空" in pd["k_cycle_denominator"]
 
     def test_premise_direction_1_contract_ownership_read_per_file(self) -> None:
-        """前提方向①：契约归属逐文件读 `review.entry_id`（不按文件名猜）。"""
-        files = sorted(CONTRACT_DIR.glob("*.json"))
-        assert files, "契约目录为空 ⇒ 判据空跑"
-        for p in files:
-            doc = json.loads(p.read_text(encoding="utf-8"))
+        """前提方向①：契约归属逐文件读 `review.entry_id`（不按文件名猜）。
+
+        🔴 口径勘误（与 p8 `test_contract_directory_counts` 同源）：遍历范围是
+        **契约文件**而不是目录下所有 `*.json` —— 该目录另有一张 L 循环的键映射表
+        （无 `review_status`），按「全是契约」遍历会要求它也带 `review.entry_id`，
+        红的原因与 K 循环无关。白名单的可伪证性由 p8 的两条判据守住。
+        """
+        contracts, others = contract_dir_split()
+        assert contracts, "契约目录为空 ⇒ 判据空跑"
+        assert set(others) == set(NON_CONTRACT_FILES_IN_CONTRACT_DIR), (
+            f"非契约文件集变了：{sorted(others)}"
+        )
+        for name, doc in contracts.items():
             if doc.get("review_status") == "candidate":
                 assert (doc.get("review") or {}).get("entry_id") is None, (
-                    f"{p.name} 是 candidate 却带 entry_id"
+                    f"{name} 是 candidate 却带 entry_id"
                 )
                 continue
             owner = (doc.get("review") or {}).get("entry_id")
-            assert owner, f"{p.name} 的 review.entry_id 缺失"
+            assert owner, f"{name} 的 review.entry_id 缺失"
 
     def test_premise_direction_2_registry_has_zero_k_adapter(self) -> None:
         """前提方向②：registry 里 K adapter 数 == 0。"""
@@ -240,12 +255,15 @@ class TestKFP54Property24TwoDenominators:
         🔴 canary 的数据区无公式 ⇒ `formula_mask` 为空、无 derived_fields。
         这不是「Property 24 通过」，是「canary 上没有派生格这个对象」。
         """
-        draft_path = CONTRACT_DIR / "k10.other_income_adjustment.candidate.json"
+        # 🔴 2026-10-01：canary 草案已晋级为 reviewed 生产契约（草案归档到 spec evidence）
+        #    ⇒ 判据落点改读生产契约；reviewed 契约的 review 块不再带 derived_fields 键。
+        draft_path = CONTRACT_DIR / "k10.other_income_adjustment.json"
         assert draft_path.exists()
         draft = json.loads(draft_path.read_text(encoding="utf-8"))
+        assert draft["review_status"] == "reviewed"
         table = draft["sheets"][0]["tables"][0]
         assert table["formula_mask"] == []
-        assert draft["review"]["derived_fields"] == []
+        assert not draft["review"].get("derived_fields")
         modes = {f["mode"] for f in table["fields"]}
         assert modes == {"editable"}, (
             f"canary 字段 mode 集合 {sorted(modes)} ⇒ 有派生格须验保护"
@@ -453,7 +471,12 @@ class TestKFP57ContractAdapterDenominatorsSeparate:
             == "candidate"
         ]
         assert candidates, "candidate 分母为空 ⇒ 「不得进生产」判据无对象"
-        assert "k10.other_income_adjustment.candidate.json" in candidates
+        # 🔴 K10 草案已晋级（不得再以 candidate 身份留在目录里）；K 循环剩余 candidate
+        #    只有 K2 一份未晋级草案。
+        assert "k10.other_income_adjustment.candidate.json" not in candidates
+        assert {c for c in candidates if c.startswith("k")} == {
+            "k2.adjudication_derived.candidate.json",
+        }
 
 
 # ════════════════════════════════════════════════════════════════════════════

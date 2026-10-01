@@ -1,5 +1,5 @@
 {
-  "baseline_digest": "c4df593a94f3f745a5f2299d120d35678d8ccb4250df7806ef55f43cde8783d6",
+  "baseline_digest": "87bd227670c9d9a76f541174b24fbb836c6bb6c73c60199816ee7cee8aa50728",
   "entries": [
     {
       "capability": "single_html",
@@ -4698,26 +4698,24 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-k1-other-receivables",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -4725,7 +4723,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue": "56a993c6bc6699dab43e60fdab6b49475829d10e171c8ad901f17cfc1506115b",
+        "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue": "865a397ab2293c04b8c75e1948f0d3528c1f67f1398e168e731fbb230ef4f92c",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -4746,7 +4744,7 @@
             "file": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue",
             "kind": "mount_condition_mode_gate",
             "line": 22,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "snippet": "v-if=\"isHtmlSheet && !isSyncManagedSheet && dualMode.currentMode.value === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -4808,26 +4806,24 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-k11-asset-impairment-loss",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -4835,7 +4831,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue": "3e8ab08dd0ea1d6b920a32552ba58f539a12bd54160e37626e843189c4e6337f",
+        "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue": "167aaa9dd9c5ff653f01e75b34079cc32732dbd42f7448b29c96e5933d178006",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -4855,34 +4851,32 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 29,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 33,
+            "snippet": "v-if=\"isHtmlSheet && !isSyncManagedSheet && dualMode.currentMode.value === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-k12-non-operating-income",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -4890,7 +4884,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue": "0fb248c26a83b4c609b190b61257f8987b8927d29c08b1069ea8bb817ce49c61",
+        "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue": "de50df6f07a1b8d9b2133a3258bb92761db4a9497238cd77d0719bc74f705d01",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -4910,34 +4904,32 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 29,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 33,
+            "snippet": "v-if=\"isHtmlSheet && !isSyncManagedSheet && dualMode.currentMode.value === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-k13-non-operating-expense",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -4945,7 +4937,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue": "da4055381cf3478cb58902a00efd7214ec797a0a4f4b29ad21f878e344695821",
+        "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue": "0fef168808df3ccb5d4d2d4ac75c77951867b1399276b39c8ab7fca925cd3386",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -4965,8 +4957,8 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 29,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 33,
+            "snippet": "v-if=\"isHtmlSheet && !isSyncManagedSheet && dualMode.currentMode.value === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -5303,26 +5295,24 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-k8-selling-expenses",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -5330,7 +5320,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue": "3e765c9957c03b6244da0145d5ffeeec3ead45ab958b94e7fe4e78deb72a9e34",
+        "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue": "5d59662a2a56453799034cc1e1b7e1eca189e4ad382d1a0a120711c0f68ef6b2",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -5350,34 +5340,32 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 46,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 50,
+            "snippet": "v-if=\"isHtmlSheet && !isSyncManagedSheet && dualMode.currentMode.value === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-k9-admin-expenses",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -5385,7 +5373,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue": "6793294a90c4e10cc60b6bb4bf5e46454ef9cb3b5633f2fcd918db88f0676ec0",
+        "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue": "52d815925ac65125193121e1475a0172c4d4e88b8b36dac7516dd4e682724b0f",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -5405,8 +5393,8 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 24,
-            "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+            "line": 28,
+            "snippet": "v-if=\"isHtmlSheet && !isSyncManagedSheet && dualMode.currentMode.value === 'onlyoffice'\""
           }
         ],
         "mode_switch_visible": true
@@ -6240,7 +6228,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtN1DeferredTaxAssets.vue": "11575d6eb3cdcf61bf22f873efb317da52581ac208a552aa5254e2e3be09b50c",
+        "audit-platform/frontend/src/components/workpaper/GtN1DeferredTaxAssets.vue": "da85286f79ae0cdd4cdebf7ede5e0caf484a58dd2f376dab3b4bb90e49929124",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -6350,7 +6338,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue": "ae2f8786d3db971a2a3706d24602955d658a2678f6d381a47c5bf8e0208f0bc3",
+        "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue": "bcfd0d14b380bd15cf16b92f2355587707e7af92d4bcdbf2015dbbdf830f13ec",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -6405,7 +6393,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue": "c7a563deea263bf17b24ead2655ba780452beba256cfb84fc24e4b044467b9ec",
+        "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue": "881275a9418ca99b5aac91f1a797c8d6dce5d1975d41688576e8799c6a1b93ca",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -6425,7 +6413,7 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 16,
+            "line": 22,
             "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
           }
         ],
@@ -6460,7 +6448,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue": "21c3f10fda98111ecf0dc91dd3d8750b999c22655e95281db00b12693a97e988",
+        "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue": "8e60cd4898382da3cb086dec1e349278eba4e37d92a5e066943f61684226e7a0",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -6480,7 +6468,7 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 16,
+            "line": 21,
             "snippet": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
           }
         ],
@@ -7610,18 +7598,18 @@
       }
     }
   ],
-  "manifest_digest": "8408fb57314694e3ab9ab53e64b3b7276f21aab4c180106a9386d4c0fffa5594",
+  "manifest_digest": "bb7958f35351c23402c33e8eacd834284bb7f292ecd17e2396127c7b07a3e332",
   "schema_version": 1,
-  "source_digest": "45c5432a7bbc2bd157a9a43869d811c91e5f2c4c3633df84e16ec770926798c3",
+  "source_digest": "62df81f8ed4572b0bce32df7819b08c666c038accf78dcfbcc3913e97f8ed174",
   "stats": {
     "claimed_bidirectional_without_adapter_count": 0,
     "entry_count": 155,
     "html_reload_only_count": 15,
     "independent_entry_count": 142,
-    "missing_adapter_count": 135,
+    "missing_adapter_count": 129,
     "no_durable_forcesave_ack_count": 142,
     "no_forcesave_command_count": 124,
-    "single_mode_switch_visible_count": 125,
+    "single_mode_switch_visible_count": 119,
     "template_only_open_count": 109
   }
 }

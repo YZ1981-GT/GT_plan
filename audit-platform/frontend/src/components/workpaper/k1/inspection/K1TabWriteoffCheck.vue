@@ -6,6 +6,22 @@
 -->
 <template>
   <div class="k1-audit-sheet">
+    <div class="k-sync-bar">
+      <el-segmented v-model="kEditorMode" :options="kModeOptions" size="small" />
+      <el-tag size="small" :type="kSyncStateTag.type">{{ kSyncStateTag.text }}</el-tag>
+    </div>
+    <template v-if="kEditorMode === K1_ONLINE_EDIT_LABEL">
+      <div class="k-oo-container">
+        <WorkpaperSyncEditorHost
+          v-if="kSyncDescriptor"
+          ref="kSyncHostRef"
+          :descriptor="kSyncDescriptor"
+          :bridge="kSyncBridge"
+        />
+        <div v-else class="k-oo-loading">正在打开 K1-9 同步编辑器…</div>
+      </div>
+    </template>
+    <template v-else>
     <div class="section-head">
       <h3 class="sheet-title">K1-9 坏账准备转回（收回）、核销检查表</h3>
       <div class="head-actions">
@@ -359,6 +375,7 @@
         <li>关联方往来核销须与 K1-11 交叉核对；已核销重新收回须检查会计处理</li>
       </ul>
     </details>
+    </template>
   </div>
 </template>
 
@@ -381,6 +398,8 @@ import { useK1VoucherOcr } from '../../composables/useK1VoucherOcr'
 import http from '@/utils/http'
 import GtReviewDot from '../../GtReviewDot.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import { useK1WriteoffSync, K1_ONLINE_EDIT_LABEL } from '../../composables/k1WriteoffSync'
 
 const props = defineProps<{
   wpId: string
@@ -458,6 +477,22 @@ async function reloadFromServer() {
     load()
   }
 }
+
+const {
+  syncBridge: kSyncBridge,
+  descriptor: kSyncDescriptor,
+  editorMode: kEditorMode,
+  modeOptions: kModeOptions,
+  syncStateTag: kSyncStateTag,
+  syncHostRef: kSyncHostRef,
+} = useK1WriteoffSync({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  isReadonly: toRef(props, 'isReadonly'),
+  snapshotRemark: () => buildSavePayload().remark,
+  onReloaded: reloadFromServer,
+})
+void kSyncHostRef
 
 function onExportTemplate() { exportTemplate('K1-9') }
 function onExportData() { exportData('K1-9') }
@@ -576,6 +611,9 @@ function writeoffRowClass({ row }: { row: K1WriteoffRow }) {
 </script>
 
 <style scoped>
+.k-sync-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.k-oo-container { min-height: 600px; height: calc(100vh - 280px); }
+.k-oo-loading { padding: 24px; color: var(--el-text-color-secondary); }
 .k1-audit-sheet { padding: 12px 14px; font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .sheet-title { font-size: 15px; font-weight: 600; margin: 0; }

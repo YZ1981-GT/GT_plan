@@ -78,15 +78,17 @@ LANE1_BASELINE_FAMILY_B = 5
 LANE1_FAMILY_C_HOST = "K6TabImpairmentTest.vue"
 LANE1_FAMILY_C_SHAPE = re.compile(r"`row-\$\{\s*Date\.now\(\)\s*\}-\$\{\s*i\s*\}`")
 
-#: Task 15 触及的 13 个文件（现算清册）
+#: Task 15 触及的文件（现算清册）。
+#: 🔴 2026-10-01 勘误：原清册 13 个，其中 `k1AdjK11Writeback.ts` /
+#: `k1AdjudicationModel.ts` / `K5TabAdjudication.vue` 三处是**固定槽位持久化键**
+#: （rowKey 是 item_id 的一段），被值化后造成存量读不回 / 读写键分叉，已撤回为
+#: 确定性槽位号 ⇒ 移出本清册，改由 `TestFixedSlotKeysAreDeterministic` 反向守住。
+#: 依据与逐条证据见 `k_foundation_facts.FIXED_SLOT_PERSISTED_KEY_SITES`。
 FIXED_FILES = (
-    "k1AdjK11Writeback.ts",
-    "k1AdjudicationModel.ts",
     "k1DisclosureModel.ts",
     "useK3Checks.ts",
     "useK6NoteBlocks.ts",
     "useK7Adjudication.ts",
-    "K5TabAdjudication.vue",
     "K5TabDisclosureListed.vue",
     "K5TabDisclosureSoe.vue",
     "K6TabDisclosureListed.vue",
@@ -685,3 +687,62 @@ class TestInsertedImportsAreSyntacticallyPlaced:
         assert consumers >= ROW_IDENTITY_CONSUMER_FLOOR, (
             f"K 域 rowIdentity 消费方现算 {consumers} ⇒ 本条判据空跑"
         )
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 🔴 反向守卫：固定槽位持久化键必须保持确定性（2026-10-01 回归修复）
+# ════════════════════════════════════════════════════════════════════════════
+class TestFixedSlotKeysAreDeterministic:
+    """🔴 Task 15 曾把 3 处**固定槽位**的 rowKey 也换成 `newRowIdentity()`。
+
+    这些 rowKey 是持久化 item_id 的一段（`K1-1-aging-gross-a0-unadj` 等），
+    行集合由常量 / 配置派生且条数固定 —— 下标就是槽位号。值化后：
+      · K1 账龄档每次渲染换一套 key ⇒ 存量 AJE/RJE 读不回
+      · K1-4→K1-1 回写写 `${rowKey}` 键、同函数读 `r${i}` 键 ⇒ 读写分叉
+      · K5「从专项表带入」写进孤儿键 ⇒ 界面不显示
+    本组判据守住「不要再修一次」，并要求每条豁免都可伪证。
+    """
+
+    def test_each_site_is_deterministic_and_not_factory_minted(self) -> None:
+        from tests.workpaper_sync.k_foundation_facts import (
+            FIXED_SLOT_PERSISTED_KEY_SITES,
+            k_domain_files,
+        )
+
+        by_name = {p.name: p for p in k_domain_files()}
+        for fname, value, _flow in FIXED_SLOT_PERSISTED_KEY_SITES:
+            src = strip_comments(cached_text(by_name[fname]))
+            assert re.search(rf"rowKey:\s*{re.escape(value)}", src), (
+                f"{fname}: 找不到确定性槽位号 rowKey: {value} ⇒ 豁免条目已失效"
+            )
+            assert ROW_IDENTITY_FACTORY not in src, (
+                f"{fname}: 又出现 {ROW_IDENTITY_FACTORY} ⇒ 固定槽位键被重新随机化"
+            )
+
+    def test_each_exemption_is_falsifiable_by_its_item_id_flow(self) -> None:
+        """🔴 每条豁免必须给出「该值流入哪个 item_id」，且该证据在代码里真实存在。
+
+        K1 账龄档的证据在模型文件注释里（`a{index}` 的历史 itemId 形态），
+        其余两处的证据是同文件里的 item_id 模板串。
+        """
+        from tests.workpaper_sync.k_foundation_facts import (
+            FIXED_SLOT_PERSISTED_KEY_SITES,
+            k_domain_files,
+        )
+
+        by_name = {p.name: p for p in k_domain_files()}
+        for fname, _value, flow in FIXED_SLOT_PERSISTED_KEY_SITES:
+            raw = cached_text(by_name[fname])
+            assert flow in raw, f"{fname}: 豁免依据 {flow!r} 在代码里不存在 ⇒ 名单须删"
+
+    def test_k1_writeback_read_and_write_keys_agree(self) -> None:
+        """🔴 读写分叉的正向判据：回写模块写入的槽位号 == 它读权重用的槽位号。"""
+        src = strip_comments(
+            cached_text(
+                next(p for p in __import__(
+                    "tests.workpaper_sync.k_foundation_facts", fromlist=["x"]
+                ).k_domain_files() if p.name == "k1AdjK11Writeback.ts")
+            )
+        )
+        assert "rowKey: `r${i}`" in src
+        assert "`K1-1-${block}-r${i}-unadj`" in src, "读侧槽位号形态变了 ⇒ 须重新对账"

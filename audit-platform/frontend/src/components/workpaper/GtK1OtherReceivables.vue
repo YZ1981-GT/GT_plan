@@ -6,7 +6,7 @@
 
     <template v-else>
       <!-- 目录页(currentSheet==='K1')不显示 AI复核/双模式工具栏（无复核对象+不需双模式） -->
-      <div v-if="isHtmlSheet && currentSheet !== 'K1'" class="k1-header-toolbar">
+      <div v-if="isHtmlSheet && currentSheet !== 'K1' && !isSyncManagedSheet" class="k1-header-toolbar">
         <el-segmented
           v-if="dualMode.isOoAvailable.value"
           :model-value="dualMode.currentMode.value"
@@ -20,7 +20,7 @@
 
       <!-- OnlyOffice 模式 -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
+        v-if="isHtmlSheet && !isSyncManagedSheet && dualMode.currentMode.value === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -29,7 +29,7 @@
       />
 
       <!-- HTML 结构化视图 -->
-      <template v-else-if="dualMode.currentMode.value === 'html'">
+      <template v-else-if="isSyncManagedSheet || dualMode.currentMode.value === 'html'">
         <!-- 底稿目录 -->
         <K1TabIndex
           v-if="currentSheet === 'K1'"
@@ -427,9 +427,15 @@ const dualMode = (() => {
    */
   function loadPersistedMode(): void {
     try {
+        // 🔴 capability 传 `'bidirectional'`：表达的是「本宿主的视图开关两侧都能开」
+        //    （结构化视图 = 本地渲染 / OO = 在线编辑），与 entry 的写回 capability
+        //    （`single_onlyoffice`）不是一回事。传后者会让 migrate 把存量 'html' 偏好
+        //    回落成 'oo' 并落盘 ⇒ 老用户下次打开被强推进 OO。
+        //    🔴 曾误传 `'dual'`（不在封闭域里）⇒ migrate 抛 mode_capability_unknown，
+        //    被外层 catch 吞掉，连带下面读统一键那两行从未执行 ⇒ 偏好恢复整体失效。
       migrateWorkpaperSyncMode(
         { entryId: K1_ENTRY_ID, wpId: props.wpId, sheetKey: currentSheet.value || undefined },
-        'dual',
+        'bidirectional',
       )
       const stored = fromStoredMode(localStorage.getItem(modeKey()))
       if (stored) currentMode.value = stored
@@ -466,6 +472,9 @@ const dualMode = (() => {
 
 /** 当前 sheet 是否为 HTML 可渲染（有匹配子组件） */
 const isHtmlSheet = computed(() => currentSheet.value !== '')
+
+/** K1-9 已注册真双向 adapter：宿主 legacy OO 切换让位给 Tab 内 sync bridge。 */
+const isSyncManagedSheet = computed(() => currentSheet.value === 'K1-9')
 
 /**
  * 从 sheetName 提取编码 (K1/K1A/K1-1~K1-12/附注)

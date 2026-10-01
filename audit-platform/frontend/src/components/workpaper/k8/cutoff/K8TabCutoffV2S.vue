@@ -89,7 +89,7 @@
     />
 
     <!-- ═══ 抽凭引擎 Dialog ═══ -->
-    <el-dialog v-model="showSamplingDialog" title="⚡ 抽凭引擎（科目 ${samplingAccountCode} 销售费用-截止V2S）" width="720px" :close-on-click-modal="false" destroy-on-close>
+    <el-dialog v-model="showSamplingDialog" :title="`⚡ 抽凭引擎（科目 ${samplingAccountCode} 销售费用-截止V2S）`" width="720px" :close-on-click-modal="false" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && props.wpId && props.projectId"
         :project-id="props.projectId"

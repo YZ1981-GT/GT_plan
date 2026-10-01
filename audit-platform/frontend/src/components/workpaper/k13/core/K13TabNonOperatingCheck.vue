@@ -253,7 +253,7 @@
     <!-- ═══ 抽凭引擎 Dialog ═══ -->
     <el-dialog
       v-model="showSamplingDialog"
-      title="⚡ 抽凭引擎（科目 ${samplingAccountCode} 营业外支出 — 检查表）"
+      :title="`⚡ 抽凭引擎（科目 ${samplingAccountCode} 营业外支出 — 检查表）`"
       width="720px"
       :close-on-click-modal="false"
       destroy-on-close

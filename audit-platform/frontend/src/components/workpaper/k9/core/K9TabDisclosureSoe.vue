@@ -109,6 +109,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { K9_FEE_NATURES_SOE } from '../../composables/k9FeeNatures'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildK9SyncPayload } from '../../composables/k9NoteSectionMap'
+import { newRowIdentity } from '../../composables/shared/rowIdentity'
 
 const K9_ACCOUNT_CODE = '6602'
 const ABNORMAL_THRESHOLD = 0.3
@@ -166,7 +167,7 @@ const DEFAULT_PROJECTS_SOE = K9_FEE_NATURES_SOE
 
 function initDefaultRows(): void {
   disclosureRows.value = DEFAULT_PROJECTS_SOE.map((name, idx) => ({
-    id: `row-${idx}`,
+    id: newRowIdentity('row'),
     project: name,
     currentAmount: 0,
     priorAmount: 0,
