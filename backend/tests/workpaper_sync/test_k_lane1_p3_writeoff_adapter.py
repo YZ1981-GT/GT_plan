@@ -64,7 +64,7 @@ K1_CONTRACT_ID = "k1.baddebt_reversal_writeoff_check"
 
 #: 🔴 五个传输键的**精确**字面量命中（现算）
 FIVE_KEYS_EXACT = {
-    "K1-9-writeoff": 9,
+    "K1-9-writeoff": 10,
     "K1-9-reversal-total": 2,
     "K1-9-writeoff-total": 2,
     "K1-3-baddebt-rows": 8,
@@ -87,8 +87,8 @@ GUESSED_KEYS = (
 )
 
 #: 裸 `'K1-9'` 的两个口径
-BARE_K1_9_PER_OCCURRENCE = 13
-BARE_K1_9_PER_LINE = 12
+BARE_K1_9_PER_OCCURRENCE = 14
+BARE_K1_9_PER_LINE = 13
 BARE_K1_9_FILES = 6
 #: slice 里那个**错**的数
 BARE_K1_9_SLICE_WRONG = 11
@@ -285,11 +285,16 @@ class TestKAP18SubstringCounterexample:
     def test_writeoff_substring_is_three_more(
         self, k_files: list[pathlib.Path]
     ) -> None:
+        """🔴 晋级后：真双向接桥新增 1 处精确 `'K1-9-writeoff'`（`k1WriteoffSync.ts` 的
+        store 键常量），精确 9→**10**、子串 12→**13**，**差仍为 3**（新增那处既进精确也进子串）。
+        不变式「子串比精确多 3」才是本判据要守的东西，不是那两个绝对数。"""
         ex = exact_literal_hits(k_files, "K1-9-writeoff")
         sub = substring_literal_hits(k_files, "K1-9-writeoff")
-        assert len(ex) == 9
-        assert len(sub) == 12
+        assert len(ex) == 10
+        assert len(sub) == 13
         assert len(sub) - len(ex) == 3
+        # 新增那处精确命中确来自真双向接桥（排除「数字对但来源错」）。
+        assert any("k1WriteoffSync.ts" in h for h in ex)
 
     def test_the_three_extra_hits_composition_is_registered(
         self, k_files: list[pathlib.Path]
@@ -359,12 +364,15 @@ class TestKAP20BareK19IsASheetCode:
     """🔴 裸 `'K1-9'` 是 **sheet 码**不是 item_id；两个口径都对。"""
 
     def test_both_calibers_recompute(self) -> None:
+        """🔴 晋级后：宿主 `GtK1OtherReceivables.vue` 新增 `isSyncManagedSheet === 'K1-9'`
+        让 legacy OO 在受管页让位，`K1TabWriteoffCheck.vue` 新增受管页门控 ⇒ 每处口径
+        13→**14**、每行口径 12→**13**（增量全落在 `K1TabWriteoffCheck.vue`：3→4）。"""
         per_occ, per_line, detail = _bare_k1_9_counts()
-        assert per_occ == BARE_K1_9_PER_OCCURRENCE == 13, (
-            f"每处都计口径期望 13，实得 {per_occ}（{detail}）"
+        assert per_occ == BARE_K1_9_PER_OCCURRENCE == 14, (
+            f"每处都计口径期望 14，实得 {per_occ}（{detail}）"
         )
-        assert per_line == BARE_K1_9_PER_LINE == 12, (
-            f"每行至多一次口径期望 12，实得 {per_line}"
+        assert per_line == BARE_K1_9_PER_LINE == 13, (
+            f"每行至多一次口径期望 13，实得 {per_line}"
         )
         assert len(detail) == BARE_K1_9_FILES == 6, f"文件数 {sorted(detail)}"
 
@@ -380,7 +388,7 @@ class TestKAP20BareK19IsASheetCode:
         assert BARE_K1_9_SLICE_WRONG not in (per_occ, per_line), (
             "11 竟对应上某个口径 ⇒ 本裁定须撤"
         )
-        assert {per_occ, per_line} == {13, 12}
+        assert {per_occ, per_line} == {BARE_K1_9_PER_OCCURRENCE, BARE_K1_9_PER_LINE}
 
     def test_the_two_calibers_differ_only_on_one_file(self) -> None:
         """🔴 差异全在 `K1TabIndex.vue`（一行里出现两次）。"""
@@ -389,7 +397,7 @@ class TestKAP20BareK19IsASheetCode:
             f"K1TabIndex.vue 每处都计期望 3，实得 {detail['K1TabIndex.vue']}"
         )
         others = {k: v for k, v in detail.items() if k != "K1TabIndex.vue"}
-        assert sum(others.values()) == 10, others
+        assert sum(others.values()) == 11, others
 
     def test_the_hosts_are_sheet_level_consumers(
         self, k_files: list[pathlib.Path]
@@ -423,8 +431,8 @@ class TestKAP21OoCounterpartIsAbsentNotMissing:
         wb.close()
         assert K1_SHEET in names
 
-    def test_no_adapter_or_contract_maps_the_keys(self) -> None:
-        """🔴 现算：没有任何 reviewed 契约把这些键映射到该 sheet。"""
+    def test_reviewed_contract_maps_the_keys(self) -> None:
+        """🔴 晋级后，恰好一份 reviewed 契约映射 K1-9（多/少都会红）。"""
         mapped: list[str] = []
         for p in CONTRACT_DIR.glob("*.json"):
             doc = json.loads(p.read_text(encoding="utf-8"))
@@ -433,9 +441,7 @@ class TestKAP21OoCounterpartIsAbsentNotMissing:
             blob = json.dumps(doc, ensure_ascii=False)
             if "K1-9-writeoff" in blob or K1_SHEET in blob:
                 mapped.append(p.name)
-        assert mapped == [], (
-            f"已有 reviewed 契约映射了 K1-9：{mapped} ⇒ BP-4 可解除"
-        )
+        assert mapped == [f"{K1_CONTRACT_ID}.json"]
 
     def test_absent_is_distinguished_from_no_html_counterpart(
         self, slice_doc: dict
@@ -562,20 +568,20 @@ class TestKAP23RowCountMismatchStrategy:
 
     def test_contract_declares_both_overflow_and_underflow_strategy(self) -> None:
         """🔴 契约必须给「超出 3 行」与「少于 3 行」两个策略（缺一即不完整）。"""
-        p = CONTRACT_DIR / f"{K1_CONTRACT_ID}.candidate.json"
-        assert p.exists(), f"契约草案不存在：{p}"
+        p = CONTRACT_DIR / f"{K1_CONTRACT_ID}.json"
+        assert p.exists(), f"生产契约不存在：{p}"
         doc = json.loads(p.read_text(encoding="utf-8"))
         rm = doc["review"]["row_count_mismatch"]
         assert rm["template_fixed_rows"] == 3
         assert rm["overflow_strategy"].strip(), "缺「超出 3 行」策略"
         assert rm["underflow_strategy"].strip(), "缺「少于 3 行」策略"
         assert "扩行" in rm["overflow_strategy"]
-        assert "留空" in rm["underflow_strategy"]
+        assert "留空" in rm["underflow_strategy"] or "保留模板空行" in rm["underflow_strategy"]
 
     def test_overflow_must_shift_the_total_row(self) -> None:
         """🔴 扩行会推动合计行 ⇒ 策略必须说明 SUM 范围随之调整。"""
         doc = json.loads(
-            (CONTRACT_DIR / f"{K1_CONTRACT_ID}.candidate.json").read_text(
+            (CONTRACT_DIR / f"{K1_CONTRACT_ID}.json").read_text(
                 encoding="utf-8"
             )
         )
@@ -585,27 +591,31 @@ class TestKAP23RowCountMismatchStrategy:
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# Task 12 / KA-P24：K1 per-entry contract 草案
+# Task 12 / KA-P24：K1 per-entry reviewed contract + provider
 # ════════════════════════════════════════════════════════════════════════════
-class TestKAP24K1ContractDraft:
-    """🔴 `[ ]*` 依赖 BP-1 ⇒ 只交付 candidate 草案。"""
+class TestKAP24K1ReviewedContract:
+    """Task 12 已晋级：生产契约与 provider source 必须逐 digest 一致。"""
 
     @pytest.fixture(scope="class")
     def contract(self) -> dict:
-        p = CONTRACT_DIR / f"{K1_CONTRACT_ID}.candidate.json"
-        assert p.exists(), f"契约草案不存在：{p}"
+        p = CONTRACT_DIR / f"{K1_CONTRACT_ID}.json"
+        assert p.exists(), f"生产契约不存在：{p}"
         return json.loads(p.read_text(encoding="utf-8"))
 
-    def test_is_candidate_with_null_entry_id(self, contract: dict) -> None:
-        assert contract["review_status"] == "candidate"
-        assert contract["review"]["entry_id"] is None
-        assert contract["review"]["draft_target_entry_id"] == K1_ENTRY_ID
-        assert "test_task53" in contract["review"]["why_entry_id_is_null"]
+    def test_is_reviewed_with_k1_entry_id(self, contract: dict) -> None:
+        assert contract["review_status"] == "reviewed"
+        assert contract["semantic_version"] == "1.0.0"
+        assert contract["review"]["entry_id"] == K1_ENTRY_ID
+        assert contract["review"]["pilot_class"] == "k1_baddebt_reversal_writeoff_check"
 
     def test_managed_table_binds_key_to_sheet(self, contract: dict) -> None:
         """managed table = `K1-9-writeoff` ↔ `坏账准备转回（收回）、核销检查表K1-9`。"""
-        assert contract["review"]["html_store"]["item_ids"] == ["K1-9-writeoff"]
+        assert contract["review"]["html_store"]["item_id"] == "K1-9-writeoff"
+        assert contract["review"]["html_store"]["shape"] == "json_object_with_two_row_arrays"
         assert contract["sheets"][0]["excel_name"] == K1_SHEET
+        tables = contract["sheets"][0]["tables"]
+        assert [t["table_key"] for t in tables] == ["reversal", "writeoff"]
+        assert [t["uuid_col"] for t in tables] == ["I", "J"]
 
     def test_derived_totals_are_not_input_mode(self, contract: dict) -> None:
         """🔴 两个 `derived_total` 键**禁标** `mode:"input"`。"""
@@ -667,15 +677,61 @@ class TestKAP24K1ContractDraft:
             book.read_bytes()
         ).hexdigest()
 
-    def test_why_candidate_cites_bp1(self, contract: dict) -> None:
-        why = contract["review"]["why_candidate_not_reviewed"]
-        assert "BP-1" in why
-        assert "[ ]*" in why
+    def test_source_locked_provider_matches_disk(self, contract: dict) -> None:
+        from app.services.workpaper_sync import phase5_k1_baddebt_reversal_writeoff as provider
+        from app.services.workpaper_sync.definitions import canonical_digest
 
-    def test_no_reviewed_contract_claims_k1(self) -> None:
-        """两侧都验：全仓无 reviewed 契约把 entry_id 指向 K1。"""
+        assert canonical_digest(contract) == canonical_digest(provider.build_contract_payload())
+        assert provider.assert_contract_file_matches_source().contract_id == K1_CONTRACT_ID
+
+    def test_exactly_one_reviewed_contract_claims_k1(self) -> None:
+        """两侧都验：恰好本生产契约把 entry_id 指向 K1。"""
+        owners = []
         for p in CONTRACT_DIR.glob("*.json"):
             doc = json.loads(p.read_text(encoding="utf-8"))
-            assert (doc.get("review") or {}).get("entry_id") != K1_ENTRY_ID, (
-                f"{p.name} 已把 entry_id 指向 K1 ⇒ 越界发了生产契约"
-            )
+            if (doc.get("review") or {}).get("entry_id") == K1_ENTRY_ID:
+                owners.append(p.name)
+        assert owners == [f"{K1_CONTRACT_ID}.json"]
+
+
+class TestKAP25K1DictStoreRoundtrip:
+    """K1-9 主代码最小往返：双区独立字段映射 + 未受管标量保留。"""
+
+    def test_two_regions_project_and_merge_without_cross_mapping(self) -> None:
+        from app.services.workpaper_sync import phase5_k1_baddebt_reversal_writeoff as p
+
+        contract = p.load_contract_from_disk()
+        payload = {
+            "tables": {
+                "reversal": [{"id": "same-id", "unit": "甲", "amount": 100, "method": "现金"}],
+                "writeoff": [{"id": "same-id", "unit": "乙", "amount": 200, "nature": "押金"}],
+            },
+            "auditProcedures": "保留程序", "auditNote": "保留说明",
+            "conclusion": "保留结论", "conclusionOption": "无异常",
+        }
+        projection = p.build_store_projection(payload, contract=contract)
+        assert projection.row_keys == {"reversal": ("same-id",), "writeoff": ("same-id",)}
+        merged, applied, visited, touched = p.merge_projection_into_k1_store(
+            projection=projection,
+            base_state={
+                **payload,
+                "tables": {
+                    "reversal": [{"id": "same-id", "unit": "旧甲", "amount": 0}],
+                    "writeoff": [{"id": "same-id", "unit": "旧乙", "amount": 0}],
+                },
+            },
+        )
+        assert applied > 0 and visited == len(projection.values)
+        assert touched == {"reversal:same-id", "writeoff:same-id"}
+        assert merged["tables"]["reversal"][0]["method"] == "现金"
+        assert merged["tables"]["writeoff"][0]["nature"] == "押金"
+        for key in ("auditProcedures", "auditNote", "conclusion", "conclusionOption"):
+            assert merged[key] == payload[key]
+
+    def test_duplicate_identity_is_rejected_within_each_region(self) -> None:
+        from app.services.workpaper_sync import phase5_k1_baddebt_reversal_writeoff as p
+
+        contract = p.load_contract_from_disk()
+        bad = {"tables": {"reversal": [{"id": "x"}, {"id": "x"}], "writeoff": []}}
+        with pytest.raises(p.K1StorePayloadError, match="重复 id"):
+            p.build_store_projection(bad, contract=contract)

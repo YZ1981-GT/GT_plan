@@ -424,7 +424,7 @@ async function handleOcrFileSelected(event: Event): Promise<void> {
     formData.append('file', file)
 
     ElMessage.info('正在OCR识别...')
-    const res = await http.post('/api/d4/contract-ocr', formData, {
+    const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     const ocrData = res.data?.data || res.data || {}
