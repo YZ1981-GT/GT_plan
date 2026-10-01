@@ -25,6 +25,7 @@ import { computed, ref, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import { calcSubtotal } from './useK13FormulaEngine'
 import type { useK13FormData } from './useK13FormData'
+import { newRowIdentity } from './shared/rowIdentity'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -34,9 +35,19 @@ export type K13AdjustmentType = 'AJE' | 'RJE'
 /** 调整分录类别 */
 export type K13AdjustmentCategory = '报表调整' | '账项调整' | '其他'
 
-/** 调整分录行 */
+/**
+ * 调整分录行
+ *
+ * 🔴 `id` 是稳定行身份（K 循环真双向，后端 `phase5_k13_non_operating_expense` 的
+ *    `row_identity_key="id"`）。原形态无身份字段、靠数组下标 —— 同 K12。
+ *    `placeholder` 是模板 F 列「……」，HTML 未出列但随行保留（OO 侧可填）。
+ */
 export interface K13AdjustmentEntry {
-  /** 序号 */
+  /** 稳定行身份 */
+  id: string
+  /** 模板 F 列「……」占位列 */
+  placeholder?: string
+  /** 序号（展示用，family_d，不是身份） */
   index: number
   /** AJE or RJE */
   type: K13AdjustmentType
@@ -83,7 +94,9 @@ const WP_CODE = 'K13'
 /** item_id 前缀（legacy verbose 迁移用） */
 const ITEM_PREFIX = 'K13-3'
 /** 单一 JSON 持久化键（与后端 _k13_import_export._K13_SPECS["K13-3"].item_id 一致） */
-const ITEM_KEY = 'K13-3-adj-entries'
+/** 本表 store 键（单一真源；K13-3 真双向接桥与持久化共用）。 */
+export const K13_ADJ_ITEM_KEY = 'K13-3-adj-entries'
+const ITEM_KEY = K13_ADJ_ITEM_KEY
 /** K13-1 审定表 AJE/RJE 汇总回写键（K13-1 reconcile 消费） */
 const K13_1_AJE_TOTAL = 'K13-1-aje-total'
 const K13_1_RJE_TOTAL = 'K13-1-rje-total'
@@ -177,6 +190,7 @@ export function useK13Adjustment(formData: ReturnType<typeof useK13FormData>) {
   function addEntry(type?: K13AdjustmentType): void {
     const t = type || activeType.value
     const newEntry: K13AdjustmentEntry = {
+      id: newRowIdentity('entry'),
       index: entries.value.length + 1,
       type: t,
       category: '',
@@ -287,6 +301,8 @@ export function useK13Adjustment(formData: ReturnType<typeof useK13FormData>) {
   /** 序列化分录为纯对象数组（剥离响应式代理，供持久化/事件载荷） */
   function _serializeEntries(): K13AdjustmentEntry[] {
     return entries.value.map((e, i) => ({
+      id: e.id,
+      placeholder: e.placeholder ?? '',
       index: i + 1,
       type: e.type,
       category: e.category,
@@ -339,6 +355,9 @@ export function useK13Adjustment(formData: ReturnType<typeof useK13FormData>) {
   /** 归一化导入/加载的原始对象为 K13AdjustmentEntry */
   function _normalizeEntry(e: any, i: number): K13AdjustmentEntry {
     return {
+      // grandfather：已落库 id 优先，缺失（旧载荷 / 导入）才铸新身份。
+      id: typeof e?.id === 'string' && e.id ? e.id : newRowIdentity('entry'),
+      placeholder: String(e?.placeholder ?? ''),
       index: i + 1,
       type: (e?.type === 'RJE' ? 'RJE' : 'AJE') as K13AdjustmentType,
       category: (e?.category || '') as K13AdjustmentCategory | '',
@@ -380,6 +399,7 @@ export function useK13Adjustment(formData: ReturnType<typeof useK13FormData>) {
       if (!typeVal) continue // 跳过无效条目
 
       entries.value.push({
+        id: newRowIdentity('entry'),
         index: i,
         type: (typeVal === 'RJE' ? 'RJE' : 'AJE') as K13AdjustmentType,
         category: (getVal(`${prefix}${i}-category`) || '') as K13AdjustmentCategory | '',

@@ -14,6 +14,10 @@
           size="small"
           @change="dualMode.onModeChange"
         />
+        <!-- BP-7 / AC 1.4：能力诚实披露。文案真源在 sync/workpaperEntrySyncNotice.ts，
+             宿主里**不得**内联任何提示中文；已注册 bidirectional 的 entry
+             由组件自己返 null 不渲染 ⇒ 无需本地 v-if。 -->
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-k10-other-income" />
         <!-- OnlyOffice 状态：检测中 / 拉取成功（就绪）/ 仅结构化 -->
         <el-tag v-if="dualMode.checking.value" size="small" type="warning">OnlyOffice 检测中…</el-tag>
         <el-tag
@@ -174,6 +178,7 @@ import {
 } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useK10DualMode } from './composables/useK10DualMode'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 
