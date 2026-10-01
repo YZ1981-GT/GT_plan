@@ -136,10 +136,10 @@
   - _Requirements: 1, 9_
   - _NC/NB-P: NC-1 · NC-11 · NC-25_
 
-- [ ] 17.* 平台级欠账（不在本 spec 闭合）
-  - BP-1 / BP-2 / BP-3（approved 权威模型与 contract/bundle · published 表示层 · 真 OnlyOffice 9.4 探针）
-  - G8 污染清理（须跨循环统一方案，N 侧单独清理无效）
-  - 阻塞理由：跨循环 / 平台层，单 lane spec 无法闭合
+- [ ]* 17. 平台级欠账（NC-19 已查实闭合，BP-1/2/3 另批次）
+  - [x] G8 污染（NC-19）：正确 join 现查真库 N2/N5 命名空间**0 条跨循环污染**；旧 slice 报「落 G8」是用了会返 NULL 的坏 join `wp_index.id = cr.wp_id`。检测脚本 `backend/scripts/analyze/detect_cross_cycle_namespace_pollution.py`（只查不删），统一记录见 foundation spec 的「平台级欠账实施记录」。真库无污染 ⇒ 无删除决策。
+  - [ ]* BP-1 / BP-2 / BP-3（approved 权威模型与 contract/bundle · published 表示层 · 真 OnlyOffice 9.4 探针）—— 按 L1/L3/L4 范式逐条接真双向，另批次做
+  - 阻塞理由：BP-1/2/3 须改共享 registry/manifest/契约目录，单独批次
   - _Requirements: 8_
   - _NC/NB-P: NC-19_
 

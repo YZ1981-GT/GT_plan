@@ -161,10 +161,10 @@
   - _NC/NF-P: NC-28 · NF-P32_
 
 - [ ] 22.* 平台级欠账登记（不在本 spec 闭合）
-  - BP-1 approved 权威模型与 contract / bundle · BP-2 published 表示层 · BP-3 真 OnlyOffice 9.4 探针
-  - NC-33 `validate_slice_against_schema` 把 `forbidden_identity_kinds` 字面值当非法声明拒收（反向激励藏缺陷）⇒ 正解是区分「声明存在」与「实际使用」两语义，归平台层
-  - NC-19 G8 跨循环污染汇聚点清理（须跨循环统一方案，N 侧单独清理无效）
-  - 阻塞理由：均需跨循环 / 平台层方案，单循环 spec 无法闭合
+  - [x] NC-33 `validate_slice_against_schema` 区分「声明存在」与「实际使用」—— 已修复（2026-10-01，见下「平台级欠账实施记录」）
+  - [x] NC-19 G8 跨循环污染 —— 已查实真库 0 条 + 根因（旧 slice 用错 join）+ 检测脚本（2026-10-01，见下）
+  - [ ]* BP-1 approved 权威模型与 contract / bundle · BP-2 published 表示层 · BP-3 真 OnlyOffice 9.4 探针（进行中，另批次做）
+  - 阻塞理由：BP-1/2/3 须按 L1/L3/L4 范式逐条接真双向（provider + 契约 + bundle + 五环发布 + manifest 翻转 + 真 OO 往返），改共享 registry/manifest/契约目录，单独一批次做
   - _Requirements: 6, 12, 16_
   - _NC/NF-P: NC-19 · NC-33 · NF-P18 · NF-P40_
 
@@ -208,3 +208,27 @@
 - N4-1：工具栏与 AC 1.4 常显 notice 真渲染；HTML → OnlyOffice 后 `.gt-onlyoffice-sheet` 真挂载、表格退出 DOM；切回 HTML 后 21 行恢复，console 0 error。
 - 🔴 Playwright 抓到并修复：N4→N2 原调用**后端不存在**的 `/api/projects/{pid}/wp-index/by-code/N2`（恒 404 被 catch 吞掉）⇒ 改用平台约定 `/api/custom-query/wp-id-by-code`，网络实测 200 并继续 GET N2 checklist；同时修「N2 无行时每次打开 N4-1 无条件 PUT `{}` 覆盖历史计提额」，复测打开页面 PUT=0，实测误写行已精确删除恢复。
 - 二阶 orphan `n4TaxTypes.ts` 已裁决删除：其唯一消费方是已删 V2 孪生；声称解决的税种别名问题已由 live `useN4CrossSheet._normalizeTaxName` 覆盖，另一潜在调用 `useN4Detail.updateN2Accruals` 全仓 0 调用方，接线无对象。
+
+
+---
+
+## 平台级欠账实施记录（2026-10-01，append-only）—— T22 的 NC-33 / NC-19 两件
+
+### NC-33 已修复：校验器区分「声明存在」与「实际使用」
+- 文件 `backend/tests/workpaper_sync/test_migration_paradigm_contract.py` 的 `validate_slice_against_schema`。
+- 旧判据只有裸相等 `if kind in forbidden`。它的真问题不是误伤（裸相等本就放行描述性复合词），而是**只堵了一半**：既不强制 DEFECT 表如实点名所违反的禁用值，也不校验点名的值是否真实存在 ⇒「把缺陷藏进含糊干净词」这条出路对校验器完全无感（N1-1 的 `why_kind_is_compound` 正是作者被逼出来的现实选择）。
+- 正解按三条正交语义：(a) `kind` **恰等于**禁用字面值 → 拒（反向自检变异钉住）；(c) `verdict=DEFECT` 却缺 `violates_forbidden_identity_kind` → 拒（堵死藏缺陷出路）；(d) `violates_forbidden_identity_kind` 若出现，必须是 `forbidden_identity_kinds` 里真实存在的值。
+- 🔴 **不**按「kind 含 forbidden 子串」判——F/G/H/I/J 多张 CLEAN 表的 kind 本就含 `array_index`/`position` 作 fallback 描述，按子串判会误伤（实测会多报 10 条，把一个洞换成十个洞）。
+- 新增 4 条可伪证反向自检 `TestNC33ForbiddenIdentityDisclosure`（honest 复合词放行 / 裸禁用值拒 / DEFECT 不点名拒 / 点名假禁用值拒），真实分母是 N slice 的 DEFECT 动态行表（n1/n2/n5）。
+- **验证**：全部 12 份 slice 过校验器；校验器相关守卫全集（migration_paradigm_contract / slice_schema_validator_coverage / task48 F / task49 G / task51 I / task52 J / task56 N / n_cycle_foundation）本轮改动引入的红 = 0。剩余 4 条红（task48 F 的 positional-defects 与 Property21 契约计数、task51 I 的 frozen-label）经 `git stash` 回退本轮改动后仍红 ⇒ 确认预存、与本轮无关。
+
+### NC-19 已查实：真库 0 污染，根因是旧 slice 用错 join
+- 用**正确** join 链现查真库：`checklist_responses.wp_id → working_paper.id → working_paper.wp_index_id → wp_index.id → wp_index.wp_code`。N/L 命名空间 83 行，跨循环污染（item_id 命名空间字母 ≠ 宿主 wp_code 字母）**0 条**——每条 N 行在 N 底稿、每条 L 行在 L 底稿。
+- 🔴 旧 slice 报「4 条全落 G8」的根因 = 它用的 join 是 `wp_index.id = cr.wp_id`，对所有行返回 NULL（实测验证），误报由坏 join 产生。
+- 前端写路径逐一核过：N1~N5 的 `-3-entries` 全部绑定各自 `props.wpId`，`useAdjustmentCentralSync` 也带自己的 `wp_id` ⇒ **无可复现的跨循环写入 bug**。
+- 交付可复用检测脚本 `backend/scripts/analyze/detect_cross_cycle_namespace_pollution.py`（🔴 **只查不删**；正确 join；有污染 exit 2 / 无污染 exit 0 / 连不上库 exit 3 不静默成 0）；真库现跑 exit 0「无跨循环污染」。
+- 既有守卫 `test_n_cycle_foundation_canary.py::TestCrossEntryPollution::test_live_db_cross_entry_pollution` 已用正确 join 锁死 0 污染（NF-P18）。
+- 真库无污染行 ⇒ 无需删除决策。
+
+### BP-1/2/3（真双向发布 + 真 OO）
+- 仍 `[ ]*`，另起一批次按 L1/L3/L4 范式逐条做（canary N4 先端到端）。本次只推 NC-33 + NC-19 两件（纯代码 + 脚本 + 本记录），不动共享 registry/manifest/契约目录。
