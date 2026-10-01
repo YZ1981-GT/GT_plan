@@ -1,5 +1,5 @@
 {
-  "baseline_digest": "8b285efedd04847cd209cfa1e0e38b40f44bd51a1c03e4e31a670493b86b7faa",
+  "baseline_digest": "ee204abcdadea9d77ff38fcbe845a73a7da3e77532c143671459719bad59bcba",
   "entries": [
     {
       "capability": "single_html",
@@ -5454,26 +5454,24 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-l2-interest-payable",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -5481,7 +5479,7 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue": "8b477e68b27580eee24e5b9bd11869c1c2090ee021e0f25af31183c95cc392c6",
+        "audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue": "e30a67bb347a1bdaa17ea967dd1fa1bb811a79a1541b58607384a1e5c7532539",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
@@ -5501,7 +5499,7 @@
           {
             "file": "audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue",
             "kind": "mount_condition_mode_gate",
-            "line": 20,
+            "line": 23,
             "snippet": "v-if=\"isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'\""
           }
         ],
@@ -6384,26 +6382,24 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-n4-taxes-and-surcharges",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
-        "single_mode_switch_visible": true,
+        "single_mode_switch_visible": false,
         "template_only_open": true
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
-        "single_mode_switch_visible",
         "template_only_open"
       ],
       "source_paths": [
@@ -7616,18 +7612,18 @@
       }
     }
   ],
-  "manifest_digest": "63fab2b6030a9c0946ef1d239f177e65b6fb2b655b8a0b2c4e47368e459c67b0",
+  "manifest_digest": "19b9de121406a94f4e42174a6ae96f34c9f6ea71cfb509c3cc056aa45dde29c5",
   "schema_version": 1,
-  "source_digest": "8ec4135121a1c10a86178ad122293d6b5c9fcf438c5fc6dccb2d60050d7528ed",
+  "source_digest": "111c0f913eed4ff77a493c19bdb40a74bd9b3ea5ab3c123bc155ecfe2c1c205c",
   "stats": {
     "claimed_bidirectional_without_adapter_count": 0,
     "entry_count": 155,
     "html_reload_only_count": 15,
     "independent_entry_count": 142,
-    "missing_adapter_count": 128,
+    "missing_adapter_count": 126,
     "no_durable_forcesave_ack_count": 142,
     "no_forcesave_command_count": 124,
-    "single_mode_switch_visible_count": 119,
+    "single_mode_switch_visible_count": 117,
     "template_only_open_count": 109
   }
 }

@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "review_status": "reviewed",
-  "approved_source_digest": "5fffe95a6f9063d05b6b2061a96fce183870e7a149a1f52eb8d1440a44146465",
-  "review_basis": "2026-10-01 L3 长期借款真双向 adapter_registered 翻转（新增 1 条 L3 override：GtL3LongTermLoans.vue→l3.long_term_loans，bidirectional/adapter_registered）。approved_source_digest 在干净 HEAD worktree(72a15b232) 重算得 5fffe95a…；mount-diff 零能力损失复核：mount_count 244→245(+1) 全部来自 L3 host 双模式新增的 procedure-sheet OnlyOffice 挂载块（sheet-name=props.sheetName||'L3A'），host_count 154 不变、byComponent 仅 GtOnlyOfficeSheet 238→239(+1)、OnlyOfficeWordDialog/WorkpaperWordEditor 不变；K10/I6 的 mount-id churn 为已提交并发会话源改动的内容哈希刷新（各自 mount 数不变）。前 K 轮的 approved digest 92a0b96… 已因 K10(72a15b232)/I6/L3 host 等已提交 .vue 改动预存失配，本次一并对齐。",
+  "approved_source_digest": "6f2ecb722814518a5ce32fd6c5df4cc7b6817c0dd8fb5c59bb2b6762937c1a92",
+  "review_basis": "2026-10-01 L2 应付利息真双向 adapter_registered 翻转（新增 1 条 L2 override：GtL2InterestPayable.vue→l2.interest_payable，bidirectional/adapter_registered；同步在 L2 host 补挂 GtEntrySyncCapabilityNotice entry-id=xlsx/gt-l2-interest-payable 作 BP-7/AC 1.4 能力诚实披露，翻转后 adapter 已注册故 notice 自动返 null 不渲染，与 L1/L3 一致）。approved_source_digest 在干净 HEAD worktree(c917b65d2) 重算得 6f2ecb72…（旧值 5fffe95a… 为 L3 轮）；mount-diff 零能力损失复核：mount_count 245→245 不变（补挂 Notice 不产生新的 OnlyOffice/dispatcher mount，仅刷新 source_digest 内容哈希），host_count 154 不变、byComponent GtOnlyOfficeSheet 239/OnlyOfficeWordDialog 2/WorkpaperWordEditor 4 全不变、entry 集合零增减；capability 范围校验：唯一变化为 xlsx/gt-l2-interest-payable（single_onlyoffice→bidirectional、legacy_fake_bidirectional→adapter_registered、adapter_id None→l2.interest_payable），legacy_fake_bidirectional_count 126→125、bidirectional 15→16、single_onlyoffice 134→133，其它所有 entry（含 L1/L3/L4 保持 bidirectional、L5~L8 保持 single_onlyoffice、全部非 L entry）零变化。",
   "entry_id_strategy": "document_type_plus_semantic_source_path_v1",
   "wp_match_strategy": "source_sheet_literals_and_component_code_v1",
   "defaults_by_component": {
@@ -373,6 +373,19 @@
       "html_store": "checklist_responses_n4_detail_rows",
       "canonical_resolver": "workpaper_sync_published_representation",
       "adapter_id": "n4.taxes_and_surcharges",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_l2_interest_payable_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "l2.interest_payable",
       "capability": "bidirectional",
       "migration_state": "adapter_registered",
       "evidence_patch": {

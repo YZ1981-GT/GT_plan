@@ -40,9 +40,9 @@ export interface WorkpaperSyncManifestEntry {
   hasBrowserEvidence: boolean
 }
 
-export const WORKPAPER_SYNC_MANIFEST_DIGEST = "63fab2b6030a9c0946ef1d239f177e65b6fb2b655b8a0b2c4e47368e459c67b0"
+export const WORKPAPER_SYNC_MANIFEST_DIGEST = "19b9de121406a94f4e42174a6ae96f34c9f6ea71cfb509c3cc056aa45dde29c5"
 
-export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "c7d73b76d2daf0eb8288401a66aca2831a1ab42b7227f66ef79de688fbc95f67"
+export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "6bc417e4c832e56619fd31fd61f07d58adbe56ba72c1b4d516bc9d3485555205"
 
 export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "by_component": {
@@ -51,9 +51,9 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
     "WorkpaperWordEditor": 4
   },
   "capability_counts": {
-    "bidirectional": 14,
+    "bidirectional": 16,
     "single_html": 5,
-    "single_onlyoffice": 135,
+    "single_onlyoffice": 133,
     "unreachable": 1
   },
   "dispatcher_count": 1,
@@ -64,7 +64,7 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "entry_count": 155,
   "host_count": 154,
   "independent_entry_count": 142,
-  "legacy_fake_bidirectional_count": 127,
+  "legacy_fake_bidirectional_count": 125,
   "mount_count": 245,
   "parent_duplicate_count": 12,
   "room_model_counts": {
@@ -80,7 +80,7 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
     "xlsx.editable.shared.single.room_service_wired.v1": 147,
     "xlsx.unreachable.none.single.room_service_wired.v1": 1
   },
-  "unadjudicated_count": 122,
+  "unadjudicated_count": 120,
   "unreachable_count": 1
 } as const
 
@@ -3489,7 +3489,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-l2-interest-payable",
@@ -3497,13 +3497,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -4112,7 +4108,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-n4-taxes-and-surcharges",
@@ -4120,13 +4116,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",

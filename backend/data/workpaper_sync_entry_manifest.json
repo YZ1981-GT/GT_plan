@@ -18324,26 +18324,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "l2.interest_payable",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-l2-interest-payable",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_l2_interest_payable_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mounts": [
         {
           "attributes": [
@@ -18398,17 +18394,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_f9a234e756e493d50999",
+          "mountId": "mount_5a9c7c262e58e42971b5",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || 'L2A'\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 27,
+            "endLine": 30,
             "startColumn": 7,
-            "startLine": 20
+            "startLine": 23
           },
-          "templateNodeOrdinal": 8,
+          "templateNodeOrdinal": 9,
           "wpExpression": ":wp-id=\"props.wpId\""
         },
         {
@@ -18450,17 +18446,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_8ef0536650d2ee3b1be3",
+          "mountId": "mount_32654a6f3e4a0c06c6c0",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 93,
+            "endLine": 96,
             "startColumn": 7,
-            "startLine": 88
+            "startLine": 91
           },
-          "templateNodeOrdinal": 17,
+          "templateNodeOrdinal": 18,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
@@ -18473,7 +18469,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue#L20",
+          "audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue#L23",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L736"
         ]
@@ -25769,11 +25765,11 @@
       }
     }
   ],
-  "manifest_digest": "b52386e69897d14ee736b7c2a1803a0c3eb485507fe5b5edc1ed5f54b4ed8b73",
-  "overlay_digest": "a716b8338d56be87ffc57399fc1d840f3bca5954a348a4769b05aeedb5f4b7c6",
-  "profile_source_digest": "c7d73b76d2daf0eb8288401a66aca2831a1ab42b7227f66ef79de688fbc95f67",
+  "manifest_digest": "19b9de121406a94f4e42174a6ae96f34c9f6ea71cfb509c3cc056aa45dde29c5",
+  "overlay_digest": "53884e8ea71d5a8a46818a542f2bd03923208f3feb32e70182e6920dd8d883cd",
+  "profile_source_digest": "6bc417e4c832e56619fd31fd61f07d58adbe56ba72c1b4d516bc9d3485555205",
   "schema_version": 1,
-  "source_digest": "5fffe95a6f9063d05b6b2061a96fce183870e7a149a1f52eb8d1440a44146465",
+  "source_digest": "6f2ecb722814518a5ce32fd6c5df4cc7b6817c0dd8fb5c59bb2b6762937c1a92",
   "stats": {
     "by_component": {
       "GtOnlyOfficeSheet": 239,
@@ -25781,9 +25777,9 @@
       "WorkpaperWordEditor": 4
     },
     "capability_counts": {
-      "bidirectional": 15,
+      "bidirectional": 16,
       "single_html": 5,
-      "single_onlyoffice": 134,
+      "single_onlyoffice": 133,
       "unreachable": 1
     },
     "dispatcher_count": 1,
@@ -25794,7 +25790,7 @@
     "entry_count": 155,
     "host_count": 154,
     "independent_entry_count": 142,
-    "legacy_fake_bidirectional_count": 126,
+    "legacy_fake_bidirectional_count": 125,
     "mount_count": 245,
     "parent_duplicate_count": 12,
     "room_model_counts": {
@@ -25810,7 +25806,7 @@
       "xlsx.editable.shared.single.room_service_wired.v1": 147,
       "xlsx.unreachable.none.single.room_service_wired.v1": 1
     },
-    "unadjudicated_count": 121,
+    "unadjudicated_count": 120,
     "unreachable_count": 1
   }
 }
