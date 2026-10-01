@@ -359,3 +359,40 @@ Task 19* 的 roundtrip + 发布链实证还额外要 BP-4 真 OO 场景集。
 **结论不变**：H2/H6/H10 三条仍是 `single_onlyoffice` / `adapter_id=None`，正向门仍关着。
 翻门的前置六项审计与「本轮为何不翻」见 foundation spec 文末
 「capability 正向门的前置六项审计 + 数字勘误」节（第⑤项 golden digest 只覆盖 h9 一家）。
+
+---
+
+## 2026-10-01 Task 18* 欠账更新：capability 门已开，但 runtime 注册仍 0/9
+
+H2 / H6 / H10 的 manifest 现算已是 `capability=bidirectional` ·
+`adapter_id=h2.construction_in_progress_detail` / `h6.asset_disposal_clearing_detail` /
+`h10.asset_disposal_income_adjustment` · `migration_state=adapter_registered` ·
+`canonical_resolver=workpaper_sync_published_representation`，
+`html_store` 分别裁决为 `checklist_responses_h2_2_rows` / `..._h6_2_rows` /
+`..._h10_adjustment_rows`（commit `33e2a049b`）。六项前置逐条 9/9，详见 foundation spec
+文末「capability 正向门已打开」节。
+
+**Task 18* 仍保持 `[ ]*`**，但欠账理由从「BP-1~BP-3 门关着」更新为两条更精确的卡点：
+
+1. **`register_from_manifest()` 真 session 实证：注册成功 0/9**。`blocked_reason` 已全为
+   `None`（capability 门确实开了），卡在下一环 `_describe_entry_supply`：
+   「该 entry 还没有 current published representation（`working_paper_sync_entry_state` 无行）」
+   —— 要 `ContentMutationService.commit(...)` 产出首版 content version，属真实录入。
+2. **已翻门的 5 条（d1/d2/d4/g7/h1）同样注册不上**，报
+   `entry_source_fact_unavailable: 挂载组件不唯一 ['GtOnlyOfficeSheet','WorkpaperSyncEditorHost']`
+   —— 平台级预存缺陷，归并发会话 spec `sync-editor-host-discovery-contract-closure`。
+
+### 🔴 本 Task 的 AC 有两处接口/字段写错（以现读为准，不回填改 AC 正文）
+* AC 写「走 `register_from_manifest()` 注册」—— 它**不是自由函数**，是
+  `WorkpaperSyncAdapterRegistry` 的 **async 方法**且需 `session=`；生产构造点是
+  `build_production_registry()`（自己 bind 计划；直接 `bind_registration_plan()` 缺
+  `plan` 位置参数）。
+* AC 写「三份 `primary_table` 全部带 `frozen_key: true` + `frozen_reason`（HC-8）」——
+  这两个字段在实现里**不存在**（全仓 `rg frozen_key|frozen_reason` 在 h6 provider 与
+  `contracts.py` 里均 0 命中），契约也没有 `primary_table` 标记。实际落地的冻结机制是
+  生产者侧 `review.frozen_cross_ref`：现算 **h6** 的 `H6-2-rows` → `h10RelatedH6Pull.ts` /
+  `h1SoeClearingH6Pull.ts` / `h6DisclosureModel.ts` 三个消费方。h2 / h10 契约**无**该字段。
+
+### HX-P2（发布后重跑 H1 golden digest 断言不变）：**成立**
+`check_sync_provider_golden_digest` 现跑唯一漂移是 `[d4] sheet[d44-managed]`
+（并发会话未提交的 `phase5_d4_adjustment_sheet.py` 所致），**h1 零漂移** ⇒ 该条达标。

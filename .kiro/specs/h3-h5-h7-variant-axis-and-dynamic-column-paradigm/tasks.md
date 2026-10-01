@@ -254,3 +254,41 @@ Task 17* 另需 BP-4 真 OO 场景集，且**三条主表键真库零载荷** �
 
 **结论不变**：H3/H5/H7 三条仍 `single_onlyoffice`。翻门前置六项的逐条审计（⑤ golden digest
 只覆盖 h9 一家 ⇒ 本轮不翻）见 foundation spec 文末对应节。
+
+---
+
+## 2026-10-01 Task 16* 欠账更新：capability 门已开，但 runtime 注册仍 0/9
+
+H3 / H5 / H7 的 manifest 现算已是 `capability=bidirectional` ·
+`adapter_id=h3.investment_property_detail` / `h5.oil_gas_assets_detail` /
+`h7.biological_assets_detail` · `migration_state=adapter_registered` ·
+`canonical_resolver=workpaper_sync_published_representation`（commit `33e2a049b`）。
+六项前置逐条 9/9，详见 foundation spec 文末「capability 正向门已打开」节。
+
+### 🔴 H3 / H7 是全平台首例「一个 entry 两个 store item_id」的 html_store 命名
+`html_store` 取值按既有口径机械推导（`checklist_responses_` + 契约
+`review.html_store.item_ids` 逐个小写、`-`→`_`），已翻 7 家（g3/g4/g5/g6/g9/g13/g14）
+逐条验证符合此口径。H3 / H7 各有**两个** item_id（成本模式 / 公允价值模式两段）：
+| entry | 契约 item_ids | 裁决的 html_store |
+|---|---|---|
+| H3 | `H3-2-cost-rows` / `H3-2-fair-rows` | `checklist_responses_h3_2_cost_rows__h3_2_fair_rows` |
+| H5 | `H5-2-rows` | `checklist_responses_h5_2_rows` |
+| H7 | `H7-2-cost-rows` / `H7-2-fair-rows` | `checklist_responses_h7_2_cost_rows__h7_2_fair_rows` |
+双段用 `__` 连 —— 本仓此前 20 个已裁决 `html_store` 全是单段，这是首例，故在此记明口径。
+（`h1` 的 `H1-8-rows → ..._h1_disposal_rows` 与 `g7` 是既存**语义命名**例外，不回填改名。）
+
+**Task 16* 仍保持 `[ ]*`**，欠账理由更新为：
+1. `register_from_manifest()` 真 session 实证**注册成功 0/9** —— `blocked_reason` 已全
+   `None`，卡在 `_describe_entry_supply` 的「无 current published representation
+   （`working_paper_sync_entry_state` 无行）」，要真实底稿内容提交；
+2. 已翻门的 5 条（d1/d2/d4/g7/h1）同样注册不上，报
+   `entry_source_fact_unavailable: 挂载组件不唯一` ⇒ 平台级预存缺陷，归并发会话
+   spec `sync-editor-host-discovery-contract-closure`。
+
+Task 17* 的额外前置（三条主表键真库零载荷 ⇒ 不得造数据当实证）**不变**，
+现算仍然成立：`H3-2-cost-rows` / `H3-2-fair-rows` / `H5-2-rows` / `H7-2-cost-rows`
+在真库一条都没有。
+
+🔴 AC 接口勘误：`register_from_manifest` 不是自由函数，是
+`WorkpaperSyncAdapterRegistry` 的 async 方法且需 `session=`；生产构造点
+`build_production_registry()`。以现读为准，不回填改 AC 正文。

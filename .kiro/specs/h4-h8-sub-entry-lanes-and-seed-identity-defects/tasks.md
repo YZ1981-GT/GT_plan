@@ -274,3 +274,44 @@ Task 17* 另需 BP-4，且 H4 真库零载荷、`H8-2-rows` 是 `[]` ⇒ **不�
 **结论不变**：H4/H8 两条及 5 条子入口仍 `single_onlyoffice`。翻门前置六项逐条审计
 （⑤ golden digest 只覆盖 h9 一家 ⇒ 本轮不翻，共享引擎正处于未提交的半程重构）
 见 foundation spec 文末对应节。
+
+---
+
+## 2026-10-01 Task 16* 欠账更新：capability 门已开，但 runtime 注册仍 0/9
+
+H4 / H8 的 manifest 现算已是 `capability=bidirectional` ·
+`adapter_id=h4.engineering_materials_detail` / `h8.right_of_use_assets_detail` ·
+`migration_state=adapter_registered` ·
+`canonical_resolver=workpaper_sync_published_representation` ·
+`html_store=checklist_responses_h4_2_rows` / `..._h8_2_rows`（commit `33e2a049b`）。
+六项前置逐条 9/9，详见 foundation spec 文末「capability 正向门已打开」节。
+
+**Task 16* 仍保持 `[ ]*`**，欠账理由更新为两条更精确的卡点：
+1. `register_from_manifest()` 真 session 实证**注册成功 0/9** —— `blocked_reason` 已全
+   `None`（capability 门确实开了），卡在下一环 `_describe_entry_supply`：
+   「该 entry 还没有 current published representation（`working_paper_sync_entry_state`
+   无行）」，要 `ContentMutationService.commit(...)` 产出首版 content version；
+2. 已翻门的 5 条（d1/d2/d4/g7/h1）同样注册不上，报
+   `entry_source_fact_unavailable: 挂载组件不唯一 ['GtOnlyOfficeSheet','WorkpaperSyncEditorHost']`
+   ⇒ 平台级预存缺陷，归并发会话 spec `sync-editor-host-discovery-contract-closure`。
+
+### 🔴 AC 的 `forbidden_keys` / `frozen_cross_ref` 字段归属与 AC 写的不一致
+AC 写「`h8.right_of_use_asset_detail.json`（含 `forbidden_keys: ["H8-2-detail-prefill"]` ·
+`frozen_cross_ref: ["H9-2-rows"]`）」。现读契约：
+* **`forbidden_keys` 在两份契约里都不存在**（h4 / h8 的 `review` 与顶层均无该键）。
+  BP-5 的实际落地形态是「可执行语句里 `H8-2-detail-prefill` 命中 0，仅注释保留 1 处」
+  （已由 Task 7 的守卫覆盖），不是契约字段。
+* **`frozen_cross_ref` 在 h9 契约上、不在 h8 上**，且结构是 `{产出键: [消费方文件]}` 而非
+  字符串数组：现算 h9 的 `review.frozen_cross_ref = {"H9-2-rows": ["useH8CrossSheet.ts",
+  "useH8DisposalCheck.ts"]}`。即冻结声明记在**生产者**侧（H9 产出该键），H8 作为消费方
+  出现在值里 —— 语义等价于 AC 的意图，但字段位置相反。
+以现读为准，不回填改 AC 正文；本节即勘误登记。
+
+### 5 条子入口的 representation pointer（GC-1）
+5 条子入口的 `migration_state` / `capability` / `adapter_id` 三项由
+`test_h_lane2_sub_entries_and_carriers.py` 既有判据逐条锁住；本轮翻门后它们随父 entry
+一并前进，该守卫现算仍 **24 passed**（与翻门前同数，无回归）。
+
+🔴 AC 接口勘误：`register_from_manifest` 不是自由函数，是
+`WorkpaperSyncAdapterRegistry` 的 async 方法且需 `session=`；生产构造点
+`build_production_registry()`（直接 `bind_registration_plan()` 会缺 `plan` 位置参数）。
