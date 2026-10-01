@@ -784,6 +784,14 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="L3-L3-9-voucher-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── L2（task 12 最后一条）：受管 L2-4 应付利息检查表（L3-9 孪生）；
+    #    criteria/note/conclusion 不预登记 ──
+    "l2.interest_payable": StoreMergePlan(
+        adapter_id="l2.interest_payable",
+        provider_module="phase5_l2_interest_payable",
+        items=(StoreItemSpec(item_id="L2-L2-4-voucher-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
 }
 
 

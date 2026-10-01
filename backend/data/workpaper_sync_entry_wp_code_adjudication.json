@@ -1,5 +1,5 @@
 {
-  "adjudication_digest": "ddf5167da0c28129a96a800df17093a5a9265eedd1cb10c50cdeb5acdaf3c377",
+  "adjudication_digest": "5e52ede8f2d8f640fff4b219fcb05caf17bb33609f3afe4c25407c9193aab1bc",
   "adjudication_digest_algorithm": "sha256(json.dumps(adjudications, sort_keys=True, ensure_ascii=False, separators=(',',':')).encode('utf-8')).hexdigest()",
   "adjudication_digest_note": "🔴 2026-09-04：原 digest 的算法全仓无处记载（只有它自己出现一次），无法复算 ⇒ 改文件后留着它就是把错值当基线锁死。已换成算法自带的形态，见 `adjudication_digest_algorithm`。原值 c8b2bc2031e4041b143e6df973ee3d87ef641a23c28a5289b0da799ab3606125",
   "adjudications": [
@@ -1518,6 +1518,32 @@
       },
       "wp_codes": [
         "L3"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 幻影码 L2I 经 wp_template_finder 单册与 sheet 级均零命中",
+        "heuristic_would_say": [
+          "L2I"
+        ],
+        "managed_excel_name": "应付利息检查表L2-4",
+        "template_relative_path": "L/L2 应付利息.xlsx",
+        "wp_index_evidence": "受管 L2-4 是整册 8 sheet 工作簿里的一张，不是独立文件 ⇒ 目标码取持有整册的 L2；判据用 `COALESCE(file_path,'') <> ''`（L1 空串陷阱）。"
+      },
+      "contract_id": "l2.interest_payable",
+      "entry_id": "xlsx/gt-l2-interest-payable",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-01",
+        "store_item_id": "L2-L2-4-voucher-rows",
+        "why_null": "本 item 真库 0 行；现有 L2 行均为 `l-cycle-canary-e2e` 夹具（adj/note），不属受管表 ⇒ 零迁移负担。",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      },
+      "wp_codes": [
+        "L2"
       ]
     }
   ],

@@ -2645,4 +2645,27 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "`adapter_registered=False` 是顺序：五环发布后再翻 manifest。"
         ),
     },
+    # ── L 循环第四条（spec: l-cycle-true-adapter-registration · Task 12 最后一条）──
+    {
+        "contract_id": "l2.interest_payable",
+        "provider_module": "app.services.workpaper_sync.phase5_l2_interest_payable",
+        "delivered_by_task": "l-cycle-true-adapter-registration-task-12",
+        "pilot_class": "l_cycle_interest_payable",
+        "entry_id": "xlsx/gt-l2-interest-payable",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "L/L2 应付利息.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "L 循环第四条（task 12 最后一条），受管 `应付利息检查表L2-4`：L3-9 的孪生凭证检查表。"
+            "前端/模板字段 16/16 对齐、两级表头 r10/r11、数据 r12~r23（12 行，比 L3-9 多 3 行）、"
+            "footer A24、数据区零公式、UUID T（有效列 P / 物理 max_column S）；"
+            "r25/r26 是引用 L2-2 的本期发生额/检查比例派生行，声明只读、不入受管区。"
+            "store `L2-L2-4-voucher-rows` 已是稳定 rowId JSON，只把私有 vc- 生成器收敛到"
+            "共享 newRowIdentity('l24vc')；criteria/note/conclusion 不预登记。"
+            "审定表 L2-1 派生汇总、明细表 L2-2 被检查比例跨 sheet 引用、调整分录 L2-3 与调整分录"
+            "模块重复，均不选。册内 0 definedName / 0 external rels / 112 裸 IF（受管表零命中，"
+            "per-file 中性化仍挂）。`adapter_registered=False` 是顺序：五环发布后再翻 manifest。"
+        ),
+    },
 )

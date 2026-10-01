@@ -139,6 +139,34 @@ _ROWS: tuple[dict[str, Any], ...] = (
             "wp_count_with_payload": 0,
         },
     },
+    {
+        "entry_id": "xlsx/gt-l2-interest-payable",
+        "contract_id": "l2.interest_payable",
+        "wp_codes": ["L2"],
+        "resolvable_for_provisioning": True,
+        "matcher_domain_conflict": None,
+        "basis": {
+            "heuristic_is_wrong_because": "manifest 幻影码 L2I 经 wp_template_finder 单册与 sheet 级均零命中",
+            "heuristic_would_say": ["L2I"],
+            "managed_excel_name": "应付利息检查表L2-4",
+            "template_relative_path": "L/L2 应付利息.xlsx",
+            "wp_index_evidence": (
+                "受管 L2-4 是整册 8 sheet 工作簿里的一张，不是独立文件 ⇒ 目标码取持有整册的 L2；"
+                "判据用 `COALESCE(file_path,'') <> ''`（L1 空串陷阱）。"
+            ),
+        },
+        "store_payload_evidence": {
+            "max_payload_bytes": 0,
+            "measured_at": "2026-10-01",
+            "store_item_id": "L2-L2-4-voucher-rows",
+            "why_null": (
+                "本 item 真库 0 行；现有 L2 行均为 `l-cycle-canary-e2e` 夹具（adj/note），"
+                "不属受管表 ⇒ 零迁移负担。"
+            ),
+            "wp_code_with_payload": None,
+            "wp_count_with_payload": 0,
+        },
+    },
 )
 
 
