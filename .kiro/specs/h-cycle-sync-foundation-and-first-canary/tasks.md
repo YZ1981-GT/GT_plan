@@ -238,3 +238,131 @@ BP-7 notice 接入 16 个宿主、mode 载体收敛、`SHEET_MAP` 错位修复�
 
 ⇒ 两条都是同一条纪律的实例：**判据形态未知时先读代码再定口径**，keyword 计数只能用来
 「找候选」，不能用来「下结论」。
+
+---
+
+## 2026-09-30 追加：capability 正向门的前置六项审计 + 数字勘误
+
+用户授权「像 D4-4 T10* 那样把阻塞项都解决」。按 G 循环已翻 13 条时留下的可复核先例，
+翻 `capability` 的前置是**六项同时成立**（口径逐字取自 overlay 里 G 条目的 `reason`）。
+逐条现算结果如下 —— **五项全过，第⑤项只覆盖 1/9，因此本轮不翻**。
+
+### 🔴 数字勘误（先纠正我自己写进 spec 的两个过期值）
+
+🔴 **这个数必须连「在哪个状态」一起报**（方法论㉖的第 4 条）：manifest 现在
+**工作树与 HEAD 不同**，而且 **HEAD 自己的 `stats` 与自己的 `entries` 还不一致**。
+
+| 状态 | entries | `stats.capability_counts.bidirectional` | **逐条扫 entries 得到的真值** |
+|---|---|---|---|
+| **HEAD（已入库）** | **155** | **4** | **5** —— `d1` / `d2` / `d4` / `g7` / `h1` 🔴 stats 与 entries 自相矛盾 |
+| **工作树（未提交，并发会话）** | **138** | **18** | **18**（自洽） |
+
+工作树比 HEAD 多出的 13 条**全是 G 循环**（`g1,g2,g3,g4,g5,g6,g8,g9,g10,g11,g12,g13,g14`）
+—— 即 overlay 里早已裁决、等着 manifest 重生成的那 13 条；并发会话已改 overlay 并跑了
+`--apply`，但**还没提交**（`git status` 对这三个生成产物显示 M）。
+
+| 我写错的位置 | 原写 | 更正 |
+|---|---|---|
+| 本文件 Task 2 判据 · design §现状 | manifest **155 entries** | HEAD 155 / **工作树 138** |
+| 三份 lane spec 的 16*/18* 说明 + lane1 证据 | `bidirectional` **仅 4 条**（d2/d4/g7/h1） | HEAD 真值 **5**（stats 写 4 是 HEAD 自身的陈旧字段）/ 工作树 **18** |
+
+成因两层：① 我读的是**前端 generated.ts 的 `stats` 字段**，而那个字段在 HEAD 上本身就比
+自己的 entries 旧（少算了 d1）；② 读数之后、复核之前并发会话重生成了 manifest。
+
+口径（可复现）：读 `backend/data/workpaper_sync_entry_manifest.json`，**逐条扫 `entries`
+的 `capability` 字段**而不是读 `stats`（stats 会漂）；工作树侧
+后端 `manifest_digest` 与前端 `WORKPAPER_SYNC_MANIFEST_DIGEST` 同为 `c17ad880…`、
+`generate_workpaper_sync_manifest.py --check` **exit 0**（自洽）；HEAD 侧 digest 是
+`afdffafd…`。
+
+⇒ 附带结论：**`stats` 不可作判据真源**，要数就逐条扫 `entries`。我这次正是栽在 stats 上。
+
+⚠️ 原始 Task 2 / design 正文**不回填改写**（append-only 审计轨迹），勘误登记在此。
+下次引用那条判据时按 138 现算，不要照抄 155。
+🔴 这正是方法论㉖的实例：**过期数字换新数字时，新数字必须同标准验证并写明口径**，
+否则只是把一个错数换成另一个错数。
+
+### 前置六项逐条现算（H 九条 entry）
+
+| # | 前置 | 现算 |
+|---|---|---|
+| ① | 正式契约 `review_status == reviewed` | ✅ **9/9**（与已翻的 d2/d4/g7/h1 同级） |
+| ② | `STORE_MERGE_REGISTRY` 已注册 | ✅ **9/9**（全表 42 条，H 域 10 条全覆盖） |
+| ③ | `DELIVERED_PER_ENTRY_CONTRACTS` 台账登记 | ✅ **9/9**，`provider_module` 全部 import OK |
+| ④ | `build_manifest_registration_plan` 判可注册 | ✅ **9/9** `blocked_reason=None`（plan 138 条） |
+| ⑤ | `check_sync_provider_golden_digest` **覆盖**且零漂移 | 🔴 **只覆盖 1/9（仅 h9）** |
+| ⑥ | 宿主已改线（`WorkpaperSyncEditorHost` + syncBridge） | ✅ **9/9**（`migrated_entry_ids()`） |
+
+### 🔴 第⑤项：8 家 H provider **从未进过 golden 基线**
+
+`check_sync_provider_golden_digest.py` 跑出来是绿的：
+「✅ golden digest 零回归：161 个 digest 逐个不变（覆盖 24 家，**零跳过**）」。
+但现算基线文件 `backend/scripts/check/_sync_provider_golden_digest.json`：
+
+```
+h9.lease_liability_detail            命中 1
+h2 / h3 / h4 / h5 / h6 / h7 / h8 / h10   命中 0
+```
+
+⇒ 门之所以绿，是因为那 8 家**压根不在 `PROVIDERS` 登记表里**，没有东西可比。
+这与本仓登记过的「f1 被 `[SKIP]` 吞掉」是**同一缺陷类、不同机制**：
+f1 是「登记了但跑挂被跳过」（已修，现在 skip 会判失败）；
+这 8 家是「**从未登记**」—— 覆盖面缺口在登记表那一层，`skipped` 判据管不到它。
+
+脚本自己的注释已经写明了这条纪律：「刻意**不设** skip 白名单 …… provider 真的不适用某一段时，
+正确做法是在 `PROVIDERS` 里把那一段的开关关掉，而不是让它整家抛异常然后被跳过」——
+而「整家没登记」比「整家被跳过」更隐蔽，因为连 stderr 都不会有一行。
+
+**正确修法（已确定，本轮不执行，理由见下）**：把 8 家按 h9 同形加进 `PROVIDERS`
+（`("h2", "phase5_h2_construction_in_progress", "ADAPTER_ID", True, True)` 这种形态，
+`plural_instr=True` —— H2/H4/H5/H7/H8 是四级表头、`instrumentation_specs()` 走复数），
+再把这 8 条的 digest **逐条**补进基线。
+
+### 🔴 为什么本轮**不**执行：共享引擎正处于半程重构（未提交）
+
+现算工作树 `backend/app/services/workpaper_sync/` 有 **11 个文件被并发会话改动但未提交**：
+
+```
+excel_instrumentation.py        +473
+oo_to_html.py                   -477      ← 两者合看是一次「把代码从 A 搬到 B」的进行中重构
+published_identity_observer.py  +148
+projection_first_publication.py +110
+entry_source_facts.py            +63
+phase5_d3_prepaid_receipts.py    +37      phase5_entry_orchestration.py +25
+excel_entry_gate.py              +29      phase5_d4_adjustment_sheet.py +16
+phase5_d567_expansion_contract.py +13     adapters/delivered_contracts_ledger.py +11
+合计 925 insertions / 477 deletions
+```
+
+golden digest 的三段里有两段（`instrumentation_spec(s)()` 与 `build_store_projection()`）
+**直接依赖 `excel_instrumentation.py` 与引擎层**。此刻为 8 家取基线，等于把**别人没写完的
+引擎状态**冻进基线：那个会话落地最终形态（或回退）时，这 8 条基线会悄悄变成错的，
+而它们看上去是「已验证」。
+
+⇒ 这正是我自己这两轮反复在修的「假绿」形态，只是载体从测试判据换成了 golden 基线。
+**不在脏树上冻结基线**，也因此**不翻 capability** —— 六项前置的意义就在于**同时**成立。
+
+另两条次级理由，一并记明：
+
+* `--update` 是**全量**重写（24 家一起重算），本仓已有「拒绝 `--update`、只改 d4 一行」的
+  先例正是为了避开这个；本轮即便要补，也只能逐条拼接 8 条，不能全量。
+* 真正让用户看到双向，除 capability 外还需每条 entry 有 **published representation +
+  approved bundle**（`register()` 的供给门）。那一步是 D4-4 T10* 那套发布链，
+  需要真实项目里有 H 底稿的 wp —— 与 capability 翻转是两件事，不能只翻 capability
+  就宣布「阻塞已解」。
+
+### 下一步（待引擎重构落地后，一次做完）
+
+1. 等 `excel_instrumentation.py` / `oo_to_html.py` 那次重构**提交入库**（判据：
+   `git status` 对 `backend/app/services/workpaper_sync/` 干净）；
+2. 8 家加进 `PROVIDERS`，逐条拼接基线（不 `--update`），复跑门确认「覆盖 32 家 / 零跳过」；
+3. overlay 加 9 条 H override（`capability=bidirectional` / `adapter_id=<contract_id>` /
+   `migration_state=adapter_registered` / `canonical_resolver=workpaper_sync_published_representation`
+   + 六项前置现算值写进 `reason`，照 G 条目同形）；
+4. `generate_workpaper_sync_manifest.py --apply`（注意它有
+   `approved_source_digest == discovery.sourceDigest` 这道门：前端挂点一变就必须先复核
+   mount diff 再更新 `approved_source_digest`）；
+5. 同步把 `test_h_cycle_migration_progress_state` 那条「正向门必须关着」的判据**翻面**
+   为「已翻的 9 条必须 `adapter_registered` 且 `adapter_id` 非空」，并对剩余未翻 entry 保持原判据；
+6. 发布链（provision + rematerialize）+ 真栈 L1/L2 验收，H9 用真库载荷（canary 真库非空），
+   H3/H5/H7/H4 主表键真库零载荷 ⇒ 只能标合成场景或等真实录入，**不造数据当实证**。

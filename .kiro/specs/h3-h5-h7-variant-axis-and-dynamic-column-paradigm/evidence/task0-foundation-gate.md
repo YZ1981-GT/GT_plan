@@ -47,7 +47,23 @@ h_cycle_facts.py / h_declaration_surfaces.py / h_migration_progress.py（事实�
 
 ## 四、🔴 仍关着的正向门（与本 spec Task 16*/17* 对应）
 
-manifest 里三条 entry 的 `capability` 现算仍是 `single_onlyoffice`、`adapter_id=None`；
-全平台 `capability=bidirectional` 现算**只有 4 条**（d2 / d4 / g7 / h1）。
-这是 BP-1~BP-3 的 approved-bundle 门，按设计关着 —— `test_h_cycle_migration_progress_state`
-正是在断言它关着。**不在本 spec 权限内放开**。
+manifest 里三条 entry 的 `capability` 现算仍是 `single_onlyoffice`、`adapter_id=None`。
+
+🔴 **数字勘误（同日稍后复核）**：本文件初版写「全平台 `capability=bidirectional` 现算
+**只有 4 条**（d2 / d4 / g7 / h1）」，那是**过期值** —— 读数之后、复核之前，并发会话把
+manifest 重生成了（G 循环 13 条 + D1 的 overlay 裁决落到 manifest）。
+
+🔴 更正要连「在哪个状态」一起说，且**逐条扫 `entries` 而不是读 `stats`**
+（我初版就是读了前端 generated.ts 的 `stats`，而那个字段在 HEAD 上比自己的 entries 还旧）：
+
+| 状态 | entries | stats 写的 | 逐条扫 entries 真值 |
+|---|---|---|---|
+| HEAD（已入库） | 155 | 4 | **5**（`d1`/`d2`/`d4`/`g7`/`h1`）🔴 stats 与 entries 自相矛盾 |
+| 工作树（未提交） | 138 | 18 | **18**（多出 13 条全是 G 循环） |
+
+工作树侧后端 `manifest_digest` 与前端 `WORKPAPER_SYNC_MANIFEST_DIGEST` 同为 `c17ad880…`
+（自洽），`generate_workpaper_sync_manifest.py --check` exit 0；HEAD 侧 digest `afdffafd…`。
+并发会话已改 overlay 并跑过 `--apply`，但三个生成产物**尚未提交**。
+
+**结论不变**：H 的 9 条仍全是 `single_onlyoffice` / `adapter_id=None`，正向门仍关着，
+`test_h_cycle_migration_progress_state` 仍在断言它关着。变的只是「分母」。

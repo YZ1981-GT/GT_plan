@@ -258,8 +258,19 @@ H8 无 TB 发布门（HS-P15）。守卫不写成「某个文件里没有」—�
 
 两份契约与 provider 早已在库并注册台账（`phase5_h4_engineering_materials` /
 `phase5_h8_right_of_use_assets` import 全 OK），但 manifest `capability` 仍是
-`single_onlyoffice`（全平台 `bidirectional` 现算仅 4 条）⇒ BP-1~BP-3 门按设计关着。
+`single_onlyoffice`（全平台 `bidirectional` 现算 **18 条**，见文末「数字勘误」）⇒ BP-1~BP-3 门按设计关着。
 Task 17* 另需 BP-4，且 H4 真库零载荷、`H8-2-rows` 是 `[]` ⇒ **不得造数据当实证**。
 
 ⚠️ Task 16* 写的 provider 名（`phase5_engineering_material_detail` /
 `phase5_right_of_use_asset_detail`）与实际交付名**不一致**，以台账现算为准。
+
+### 数字勘误（2026-09-30 同日复核）
+
+初稿写「全平台 `bidirectional` 现算**仅 4 条**」已过期（并发会话重生成了 manifest）。
+同口径重算（🔴 逐条扫 `entries`，不读 `stats` —— `stats` 会漂）：
+**HEAD** entries 155 / stats 写 4 / 真值 **5**；**工作树（未提交）** entries 138 / **18**
+（多出 13 条全是 G 循环，overlay 早已裁决、并发会话刚 `--apply` 但未提交）。
+
+**结论不变**：H4/H8 两条及 5 条子入口仍 `single_onlyoffice`。翻门前置六项逐条审计
+（⑤ golden digest 只覆盖 h9 一家 ⇒ 本轮不翻，共享引擎正处于未提交的半程重构）
+见 foundation spec 文末对应节。

@@ -235,10 +235,22 @@ spec 原文要求「**必须带旧身份迁移映射**」。实现没有建映�
 三份契约与 provider **早已在库并注册台账**（`phase5_h3_investment_property` /
 `phase5_h5_oil_gas_assets` / `phase5_h7_biological_assets` 三者 import 全 OK、契约文件在盘、
 `migrated_entry_ids()` 含这三条），但 manifest 的 `capability` 仍是 `single_onlyoffice`
-（全平台 `bidirectional` 现算只有 4 条）⇒ BP-1~BP-3 的 approved-bundle 门按设计关着。
+（全平台 `bidirectional` 现算 **18 条**，见文末「数字勘误」）⇒ BP-1~BP-3 的 approved-bundle 门按设计关着。
 Task 17* 另需 BP-4 真 OO 场景集，且**三条主表键真库零载荷** ⇒ 即便门开了也得先有真实录入，
 **不得造数据当实证**。
 
 ⚠️ Task 16* 里写的 provider 名（`phase5_investment_property_detail` /
 `phase5_oil_gas_asset_detail` / `phase5_biological_asset_detail`）与实际交付名**不一致**，
 以台账现算为准；`phase5_*` 前缀这条约束满足。
+
+### 数字勘误（2026-09-30 同日复核）
+
+初稿写「全平台 `bidirectional` 现算**只有 4 条**」已过期（并发会话重生成了 manifest）。
+同口径重算（🔴 逐条扫 `entries` 而不是读 `stats` —— `stats` 会漂，我这次就栽在它上面）：
+**HEAD** entries 155 / stats 写 4 / 真值 **5**（`d1`/`d2`/`d4`/`g7`/`h1`）；
+**工作树（未提交）** entries 138 / **18**（多出 13 条全是 G 循环）。
+工作树侧两侧 digest 同为 `c17ad880…`、生成器 `--check` exit 0。详见
+`evidence/task0-foundation-gate.md` 与 foundation spec 文末的勘误段。
+
+**结论不变**：H3/H5/H7 三条仍 `single_onlyoffice`。翻门前置六项的逐条审计（⑤ golden digest
+只覆盖 h9 一家 ⇒ 本轮不翻）见 foundation spec 文末对应节。

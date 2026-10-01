@@ -319,7 +319,7 @@ Task 3 原本只点了 `h10RelatedH6Pull.ts` + `useH10CrossSheet.ts`。按 AC �
 
 三条 entry 的契约与 provider **早已在库并注册台账**（现算 `h2/h6/h10` 三条 `provider_module`
 import 全 OK、契约文件在盘），但 manifest 的 `capability` 仍是 `single_onlyoffice`
-（全平台 `bidirectional` 现算仅 4 条）⇒ 正向门按设计仍关着，BP-1~BP-3 未解除；
+（全平台 `bidirectional` 现算 **18 条**，见文末「数字勘误」）⇒ 正向门按设计仍关着，BP-1~BP-3 未解除；
 Task 19* 的 roundtrip + 发布链实证还额外要 BP-4 真 OO 场景集。
 ⚠️ Task 18* 里写的 provider 名（`phase5_construction_in_progress_detail` 等）与实际交付名
 （`phase5_h2_construction_in_progress` 等）**不一致**，以台账现算为准；`phase5_*` 前缀这条
@@ -339,3 +339,23 @@ Task 19* 的 roundtrip + 发布链实证还额外要 BP-4 真 OO 场景集。
   的判据变更；
 * 搬前后测试数**逐个对齐**：两文件合计仍 **170 passed**，全 H 套件仍 **364 passed**
   （9 个测试文件），确认没有用例在搬运中丢失。
+
+### 数字勘误（2026-09-30 同日复核）
+
+我本轮初稿写「全平台 `bidirectional` 现算**仅 4 条**」，那是**过期值**：读数之后、复核之前
+并发会话重生成了 manifest（overlay 里早已裁决的 G 循环 13 条 + D1 落了地）。
+
+🔴 这个数必须连「在哪个状态」一起报 —— 现在**工作树与 HEAD 不同**，且 **HEAD 自己的
+`stats` 与自己的 `entries` 还不一致**（逐条扫 `entries` 才是真值，`stats` 会漂）：
+
+| 状态 | entries | stats 写的 | 逐条扫 entries 的真值 |
+|---|---|---|---|
+| HEAD（已入库） | 155 | 4 | **5**（`d1`/`d2`/`d4`/`g7`/`h1`） |
+| 工作树（未提交） | 138 | 18 | **18**（多出的 13 条全是 G 循环） |
+
+工作树侧两侧 digest 同为 `c17ad880…`、生成器 `--check` exit 0（自洽）；HEAD 侧是 `afdffafd…`。
+并发会话已改 overlay 并 `--apply`，但三个生成产物**尚未提交**。
+
+**结论不变**：H2/H6/H10 三条仍是 `single_onlyoffice` / `adapter_id=None`，正向门仍关着。
+翻门的前置六项审计与「本轮为何不翻」见 foundation spec 文末
+「capability 正向门的前置六项审计 + 数字勘误」节（第⑤项 golden digest 只覆盖 h9 一家）。
