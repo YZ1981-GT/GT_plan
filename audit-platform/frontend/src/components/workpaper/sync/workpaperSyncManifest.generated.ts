@@ -40,20 +40,20 @@ export interface WorkpaperSyncManifestEntry {
   hasBrowserEvidence: boolean
 }
 
-export const WORKPAPER_SYNC_MANIFEST_DIGEST = "bb7958f35351c23402c33e8eacd834284bb7f292ecd17e2396127c7b07a3e332"
+export const WORKPAPER_SYNC_MANIFEST_DIGEST = "63fab2b6030a9c0946ef1d239f177e65b6fb2b655b8a0b2c4e47368e459c67b0"
 
-export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "c3553a18968f4e5246527eddd11cd3018e90d8e476e7b5d95afd43cd8f9f4b1c"
+export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "c7d73b76d2daf0eb8288401a66aca2831a1ab42b7227f66ef79de688fbc95f67"
 
 export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "by_component": {
-    "GtOnlyOfficeSheet": 238,
+    "GtOnlyOfficeSheet": 239,
     "OnlyOfficeWordDialog": 2,
     "WorkpaperWordEditor": 4
   },
   "capability_counts": {
-    "bidirectional": 13,
+    "bidirectional": 14,
     "single_html": 5,
-    "single_onlyoffice": 136,
+    "single_onlyoffice": 135,
     "unreachable": 1
   },
   "dispatcher_count": 1,
@@ -64,8 +64,8 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "entry_count": 155,
   "host_count": 154,
   "independent_entry_count": 142,
-  "legacy_fake_bidirectional_count": 128,
-  "mount_count": 244,
+  "legacy_fake_bidirectional_count": 127,
+  "mount_count": 245,
   "parent_duplicate_count": 12,
   "room_model_counts": {
     "exclusive": 6,
@@ -80,7 +80,7 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
     "xlsx.editable.shared.single.room_service_wired.v1": 147,
     "xlsx.unreachable.none.single.room_service_wired.v1": 1
   },
-  "unadjudicated_count": 123,
+  "unadjudicated_count": 122,
   "unreachable_count": 1
 } as const
 
@@ -3521,7 +3521,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-l3-long-term-loans",
@@ -3529,19 +3529,16 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtL3LongTermLoans.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
+        ":sheet-name=\"props.sheetName || 'L3A'\"",
         ":sheet-name=\"props.sheetName\""
       ],
       "sheet_literals": [],

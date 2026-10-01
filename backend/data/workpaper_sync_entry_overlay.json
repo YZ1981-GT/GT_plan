@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "review_status": "reviewed",
-  "approved_source_digest": "92a0b96d77c6f3c55f6fa1a0ef1dec487b4a1ba2f75579cd1f1c5ddf9868f570",
-  "review_basis": "2026-10-01 K 循环真双向 adapter_registered 翻转（仅 K1/K8/K9/K11/K12/K13，6 条 override）；I/L/J 并发会话的 override 不进本提交。approved_source_digest 由 generator --apply 在干净 HEAD worktree + 仅 K 前端改动上重算。",
+  "approved_source_digest": "5fffe95a6f9063d05b6b2061a96fce183870e7a149a1f52eb8d1440a44146465",
+  "review_basis": "2026-10-01 L3 长期借款真双向 adapter_registered 翻转（新增 1 条 L3 override：GtL3LongTermLoans.vue→l3.long_term_loans，bidirectional/adapter_registered）。approved_source_digest 在干净 HEAD worktree(72a15b232) 重算得 5fffe95a…；mount-diff 零能力损失复核：mount_count 244→245(+1) 全部来自 L3 host 双模式新增的 procedure-sheet OnlyOffice 挂载块（sheet-name=props.sheetName||'L3A'），host_count 154 不变、byComponent 仅 GtOnlyOfficeSheet 238→239(+1)、OnlyOfficeWordDialog/WorkpaperWordEditor 不变；K10/I6 的 mount-id churn 为已提交并发会话源改动的内容哈希刷新（各自 mount 数不变）。前 K 轮的 approved digest 92a0b96… 已因 K10(72a15b232)/I6/L3 host 等已提交 .vue 改动预存失配，本次一并对齐。",
   "entry_id_strategy": "document_type_plus_semantic_source_path_v1",
   "wp_match_strategy": "source_sheet_literals_and_component_code_v1",
   "defaults_by_component": {
@@ -277,6 +277,19 @@
       }
     },
     {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtL3LongTermLoans.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_l3_voucher_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "l3.long_term_loans",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
       "file_glob": "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue",
       "component": "GtOnlyOfficeSheet",
       "html_store": "checklist_responses_k8_adjustment_entries",
@@ -347,6 +360,19 @@
       "html_store": "checklist_responses_k1_writeoff_dict",
       "canonical_resolver": "workpaper_sync_published_representation",
       "adapter_id": "k1.baddebt_reversal_writeoff_check",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_n4_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "n4.taxes_and_surcharges",
       "capability": "bidirectional",
       "migration_state": "adapter_registered",
       "evidence_patch": {
