@@ -171,6 +171,17 @@ test.describe('D4 双向回写逐张 L1 验收', () => {
       // 点「在线编辑」（el-segmented / el-radio 两种形态都覆盖）
       const ooItem = page.locator('.el-segmented__item, label').filter({ hasText: '在线编辑' }).first()
       await expect(ooItem, '在线编辑选项应可见').toBeVisible({ timeout: 20_000 })
+      // 🔴 **已知脆弱点（2026-09-30 实测，未修，归本 spec owner）**：本判据假设「进来时
+      //    一定在表格视图」，但模式是**持久化**的。同一 wp 上先跑过 L2（停在 OO 模式）后，
+      //    再跑本用例时 `renderMode` 已是 `onlyoffice`，`switchMode` 的
+      //    `if (target === renderMode.value) return` 把这次点击当成 no-op ⇒ 一个
+      //    `/sync/` 请求都不发，判据1 卡 30s 超时，**表象酷似「接桥坏了」**。
+      //    真栈快照特征：`radio "在线编辑" [active]` + 状态标签「已同步」+ **无** disabled
+      //    —— 与「busy 期点击被吞」（两个 radio 同时 disabled + 「同步中…」）是不同的两种
+      //    假失败，先看快照再归因。
+      //    ⚠️ 试过「先点回表格视图」的修法但**未奏效**（`input[type=radio]` 的 `isChecked()`
+      //    在 el-segmented 下取不到选中态，分支没进），已撤回以免在共享用例里留半成品。
+      //    正解需要先确认 el-segmented 的选中态真源（aria 属性或 class），再据此判起始模式。
       await ooItem.click()
 
       // 判据1：出现 sync 请求
