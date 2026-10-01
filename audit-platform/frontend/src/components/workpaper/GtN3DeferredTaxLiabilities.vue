@@ -122,6 +122,9 @@ import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './comp
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
+import { ElMessage } from 'element-plus'
+import { fetchOnlyOfficeHealthy } from './sync/onlyOfficeHealth'
+import { isN3HtmlSheet, normalizeN3SheetName } from './composables/n3SheetRouting'
 // ─── defineAsyncComponent lazy 加载子组件 ────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const N3TabIndex = defineAsyncComponent(() => import('./n3/core/N3TabIndex.vue'))
@@ -174,20 +177,31 @@ const modeOptions = computed(() => [
   { label: 'OnlyOffice', value: 'onlyoffice', disabled: !ooHealthy.value },
 ])
 
-async function checkOoHealth(): Promise<void> {
+/**
+ * 🔴 BP-4：原先在这里直调 `http.get('/api/workpapers/onlyoffice/health')`（N 域唯一的宿主直调）。
+ * 收敛到平台统一能力层 `sync/onlyOfficeHealth.ts`（TTL 缓存 + 并发去重，唯一端点/字段口径）。
+ * spec: n1-n3-host-inline-router-and-shared-adoption Task 4
+ */
+async function checkOoHealth(forceRefresh = false): Promise<void> {
   ooChecking.value = true
   try {
-    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = res.data?.data?.healthy ?? res.data?.healthy ?? false
-  } catch {
-    ooHealthy.value = false
+    ooHealthy.value = await fetchOnlyOfficeHealthy(forceRefresh)
   } finally {
     ooChecking.value = false
   }
 }
 
-function onModeChange(val: string | number | boolean): void {
-  if (val === 'onlyoffice' && !ooHealthy.value) return
+async function onModeChange(val: string | number | boolean): Promise<void> {
+  if (val === 'onlyoffice' && !ooHealthy.value) {
+    // 🔴 Task 5：原先这里静默 return（点了没反应、无任何提示）。
+    //    先强刷一次（避免被卡在过期边界的旧值挡住真实点击），仍不可用则显式告知并保持 HTML。
+    await checkOoHealth(true)
+    if (!ooHealthy.value) {
+      renderMode.value = 'html'
+      ElMessage.warning('OnlyOffice 服务当前不可用，已保持 HTML 模式')
+      return
+    }
+  }
   renderMode.value = val as 'html' | 'onlyoffice'
   if (val === 'html') {
     selfLoad()
@@ -195,24 +209,14 @@ function onModeChange(val: string | number | boolean): void {
 }
 
 // ─── sheetName 正则提取编码 ──────────────────────────────────────────────────
-const currentSheet = computed(() => {
-  const name = props.sheetName || props.wpCode || ''
-  // 匹配 N3A, N3-1~N3-3, N3
-  const m = name.match(/(N3A|N3-\d+|N3)/)
-  if (m) return m[1]
-  if (name.includes('底稿目录')) return '底稿目录'
-  // 🔴 **不认「附注」/「披露」**：N3 源模板无披露 sheet（披露与 N1 共节 五、30 / 八、31），
-  //    `N3TabDisclosure.vue` 已删除。原先这里返回 `'附注'` 且 `isHtmlSheet` 也认它 →
-  //    该 sheet 一旦出现（如手工加 tab / 分类表脏数据）就渲染出一个空白 Tab。
-  //    现落到 OnlyOffice 兜底，至少能看到原始内容。
-  return name
-})
+// 判定实现收敛到共享路由（BP-10，与 N2/N4/N5 同形），见 composables/n3SheetRouting.ts。
+// 🔴 **不认「附注」/「披露」**：N3 源模板无披露 sheet（披露与 N1 共节 五、30 / 八、31），
+//    `N3TabDisclosure.vue` 已删除；该类 sheet 一旦出现（手工加 tab / 分类表脏数据）落 OnlyOffice
+//    兜底而不是渲染空白 Tab —— 此例外在 `isN3HtmlSheet` 内实现。
+const currentSheet = computed(() => normalizeN3SheetName(props.sheetName, props.wpCode))
 
-/** N3-1~N3-3 为 HTML 专属组件渲染的 sheet（支持双模式切换）；N3A 与其他走 OnlyOffice */
-const isHtmlSheet = computed(() => {
-  const s = currentSheet.value
-  return /^N3-\d+$/.test(s) || s === 'N3' || s === '底稿目录'
-})
+/** N3-1~N3-3 + 目录为 HTML 专属组件渲染的 sheet；N3A 与其他走 OnlyOffice */
+const isHtmlSheet = computed(() => isN3HtmlSheet(currentSheet.value))
 
 // ─── selfLoad（bundle内嵌场景 htmlData 为 null 时自加载） ─────────────────────
 /**

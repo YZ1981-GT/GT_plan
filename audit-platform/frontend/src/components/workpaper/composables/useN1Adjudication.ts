@@ -117,6 +117,37 @@ export const N1_ADJUDICATION_CATEGORIES: N1AdjudicationCategory[] = [
 
 const ITEM_PREFIX = 'N1-1-adj'
 
+/**
+ * 7 类 → 源模板行号（A7~A13）。持久化键 = `N1-1-adj-A7` … `N1-1-adj-A13`。
+ *
+ * 🔴 BP-8 / AC 6.5：原持久化键是 `${ITEM_PREFIX}-${数组下标}`。7 类今天恰好是源模板
+ * A7~A13 的固定骨架所以「暂时」稳定，但源模板一旦增删一类，全部历史数据整体错位且无守卫会红。
+ * 改用**模板行 key**（与类目一一绑定，不随数组顺序变化）。
+ * spec: n1-n3-host-inline-router-and-shared-adoption Task 8
+ */
+export const N1_ADJUDICATION_TEMPLATE_ROW: Record<N1AdjudicationCategory, string> = {
+  '资产减值准备': 'A7',
+  '可抵扣亏损': 'A8',
+  '内部交易未实现利润': 'A9',
+  '公允价值变动': 'A10',
+  '租赁负债': 'A11',
+  '购入摊销年限小于税法规定的资产': 'A12',
+  '其他': 'A13',
+}
+
+/** 稳定持久化键（写只走这里） */
+export function n1AdjudicationItemId(category: N1AdjudicationCategory): string {
+  return `${ITEM_PREFIX}-${N1_ADJUDICATION_TEMPLATE_ROW[category]}`
+}
+
+/**
+ * 旧版位置键 —— **只读兼容**（迁移前已落库的数据），SHALL NOT 用于写入。
+ * 首次编辑后该类即以新键落库，此后不再读旧键。
+ */
+function legacyPositionalItemId(position: number): string {
+  return ITEM_PREFIX + '-' + String(position)
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useN1Adjudication(options: UseN1AdjudicationOptions) {
@@ -127,8 +158,8 @@ export function useN1Adjudication(options: UseN1AdjudicationOptions) {
   const rows = ref<N1AdjudicationRow[]>(_initRows())
 
   function _initRows(): N1AdjudicationRow[] {
-    return N1_ADJUDICATION_CATEGORIES.map((cat, i) => {
-      const stored = allResponses.value.get(`${ITEM_PREFIX}-${i}`)
+    return N1_ADJUDICATION_CATEGORIES.map((cat, position) => {
+      const stored = _storedFor(cat, position)
       if (stored?.conclusion) {
         try {
           return { category: cat, ...JSON.parse(stored.conclusion) }
@@ -136,6 +167,12 @@ export function useN1Adjudication(options: UseN1AdjudicationOptions) {
       }
       return _emptyRow(cat)
     })
+  }
+
+  /** 新键优先；新键不存在时才回退旧位置键（只读兼容） */
+  function _storedFor(category: N1AdjudicationCategory, position: number): any {
+    return allResponses.value.get(n1AdjudicationItemId(category))
+      ?? allResponses.value.get(legacyPositionalItemId(position))
   }
 
   function _emptyRow(category: N1AdjudicationCategory): N1AdjudicationRow {
@@ -158,24 +195,13 @@ export function useN1Adjudication(options: UseN1AdjudicationOptions) {
   let _hydrated = false
 
   function _hasStoredRows(): boolean {
-    for (let i = 0; i < N1_ADJUDICATION_CATEGORIES.length; i++) {
-      if (allResponses.value.get(`${ITEM_PREFIX}-${i}`)?.conclusion) return true
-    }
-    return false
+    return N1_ADJUDICATION_CATEGORIES.some((cat, position) => !!_storedFor(cat, position)?.conclusion)
   }
 
-  watch(
-    allResponses,
-    () => {
-      if (_hydrated) return
-      if (!_hasStoredRows()) return
-      rows.value = _initRows()
-      _hydrated = true
-      // hydrate 后同步一次合计（供 crossSheet / 下游 N5 读取）
-      _syncTotals()
-    },
-    { immediate: true },
-  )
+  // hydrate watch 在 `totals` 声明之后注册（见 §6 末尾）：
+  // 🔴 原先注册在这里且 `immediate: true` —— allResponses 在 setup 时**已有**数据（宿主走
+  //    htmlData 路径）时回调立即执行 `_syncTotals()`，而 `totals` 尚在暂时性死区 ⇒
+  //    ReferenceError，整个审定表 Tab 挂掉。异步加载路径首轮为空所以一直没暴露。
 
   // ─── 2. 计算属性：公式列自动计算 ──────────────────────────────────────────
 
@@ -372,9 +398,10 @@ export function useN1Adjudication(options: UseN1AdjudicationOptions) {
     _persistRow(index)
   }
 
-  /** 添加调整（aje/rje 累加到对应期） */
-  function addAdjustment(index: number, period: 'begin' | 'end', type: 'aje' | 'rje', amount: number): void {
-    if (index < 0 || index >= rows.value.length) return
+  /** 添加调整（aje/rje 累加到对应期）—— 按类目寻址 */
+  function addAdjustment(category: N1AdjudicationCategory, period: 'begin' | 'end', type: 'aje' | 'rje', amount: number): void {
+    const index = rows.value.findIndex(r => r.category === category)
+    if (index < 0) return
     const field = period === 'begin'
       ? (type === 'aje' ? 'beginAje' : 'beginRje')
       : (type === 'aje' ? 'endAje' : 'endRje')
@@ -382,9 +409,10 @@ export function useN1Adjudication(options: UseN1AdjudicationOptions) {
     _persistRow(index)
   }
 
-  /** 移除调整（对应字段归零） */
-  function removeAdjustment(index: number, period: 'begin' | 'end', type: 'aje' | 'rje'): void {
-    if (index < 0 || index >= rows.value.length) return
+  /** 移除调整（对应字段归零）—— 按类目寻址 */
+  function removeAdjustment(category: N1AdjudicationCategory, period: 'begin' | 'end', type: 'aje' | 'rje'): void {
+    const index = rows.value.findIndex(r => r.category === category)
+    if (index < 0) return
     const field = period === 'begin'
       ? (type === 'aje' ? 'beginAje' : 'beginRje')
       : (type === 'aje' ? 'endAje' : 'endRje')
@@ -416,8 +444,10 @@ export function useN1Adjudication(options: UseN1AdjudicationOptions) {
 
   function _persistRow(index: number): void {
     const row = rows.value[index]
-    const { category: _cat, ...data } = row
-    formData.debouncedSave(`${ITEM_PREFIX}-${index}`, {
+    if (!row) return
+    const { category, ...data } = row
+    // 🔴 写入键按类目（模板行 key），不按数组下标
+    formData.debouncedSave(n1AdjudicationItemId(category), {
       conclusion: JSON.stringify(data),
     })
   }
@@ -435,6 +465,19 @@ export function useN1Adjudication(options: UseN1AdjudicationOptions) {
   }
 
   watch(rows, () => _syncTotals(), { deep: true })
+
+  watch(
+    allResponses,
+    () => {
+      if (_hydrated) return
+      if (!_hasStoredRows()) return
+      rows.value = _initRows()
+      _hydrated = true
+      // hydrate 后同步一次合计（供 crossSheet / 下游 N5 读取）
+      _syncTotals()
+    },
+    { immediate: true },
+  )
 
   // ─── 7. 审定数变化 → 仅同步合计（不写 TB） ─────────────────────────────
 
