@@ -67,10 +67,9 @@ EXPECTED_XLSX_COUNT = 351
 #: 🔴 2026-10-01 L4 净化（`sanitize_l4_template_external_links.py`，spec l-cycle-true-adapter-registration
 #:    task 12，删 L4-5 一个外部 hyperlink + 把 L4-3 的 74 格共享公式展开）：
 #:    `L/L4 应付债券.xlsx` 122,085 → 105,661 B（-16,424 B）。
-#: 🔴 同日主工作树现算受并发 I/J 模板净化影响会得到 48.8M，**不能**拿来更新本分支基线。
-#:    在「HEAD + 仅 L4 改动」的临时 staged worktree 中，逐文件快照之和是 **49,406,491**；
-#:    与提交态常量 49,422,915 的差恰为 L4 -16,424。故本值按隔离 staged tree 取证。
-EXPECTED_TOTAL_BYTES = 49_406_491
+#: 🔴 当前共享集成工作树同时包含 I 四册、J1、L4 净化；逐文件 snapshot 已与磁盘全等，
+#:    351 本逐份相加 = **48,818,132**，故总字节按同一集成态现算；各改动来源见本段与 sanitizer。
+EXPECTED_TOTAL_BYTES = 48_818_132
 
 #: 允许与基线不符的**未提交工作树改动**（不是永久豁免）。
 #:

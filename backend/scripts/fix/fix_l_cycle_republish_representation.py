@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""L 循环 entry 重新发布 representation：用当前磁盘契约 provision 新 bundle + 发新 generation。
+"""L / I 循环 entry 重新发布 representation：用当前磁盘契约 provision 新 bundle + 发新 generation。
 
 spec: l-cycle-true-adapter-registration · Task 12
 
@@ -63,8 +63,11 @@ def _provider_for(entry_id: str) -> Any:
     if len(rows) != 1:
         raise SystemExit(f"交付登记表里 entry {entry_id!r} 命中 {len(rows)} 条（须恰 1）")
     module = rows[0]["provider_module"]
-    if ".phase5_l" not in module:
-        raise SystemExit(f"{entry_id} 的 provider {module} 不是 L 循环 —— 本脚本只服务 L 域")
+    if not any(tag in module for tag in (".phase5_l", ".phase5_i")):
+        raise SystemExit(
+            f"{entry_id} 的 provider {module} 不是 L/I 循环 phase5 provider —— "
+            "本脚本仅服务声明式 row-table projection 域"
+        )
     return importlib.import_module(module)
 
 

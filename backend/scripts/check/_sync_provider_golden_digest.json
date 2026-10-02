@@ -1,5 +1,5 @@
 {
-  "digest_count": 143,
+  "digest_count": 146,
   "providers": [
     {
       "label": "b60",
@@ -288,6 +288,16 @@
       },
       "store_projection_sha256": "fb8c6a1393ca241d5ec330dbc2eda2b5937151a095e48a715bfd1e5295d97093",
       "instrumentation_sha256": "abef2d5b0405eb541dd9ec54cc26e6bdca0a8de94f7913f0f930e497acf3379f"
+    },
+    {
+      "label": "n4",
+      "adapter_id": "n4.taxes_and_surcharges",
+      "contract_payload_sha256": "e44e3a7c4e47c8363cd3e1731f7b83fc6212c43ded3e74a36a80870aa822118d",
+      "sheet_digests": {
+        "n42-managed": "d68acdfd1f678733959764d332e0d9514b5cd580978699f9353629a019f48b80"
+      },
+      "store_projection_sha256": "e8a0610458bb9de056ca64c646a9e346a2e48e91fb53c44768f75c0bd96151a0",
+      "instrumentation_sha256": "08455bf9752365bcd216dc5b5a78af08f949e1eb041de02fc34a9476f40b5942"
     }
   ]
 }

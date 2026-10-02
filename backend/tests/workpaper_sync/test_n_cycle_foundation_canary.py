@@ -91,8 +91,16 @@ class TestAaaTemplateGateFirst:
             f"磁盘册名集合 {sorted(on_disk)} ≠ slice 声明 {sorted(declared)}"
         )
         for name, path in sorted(on_disk.items()):
-            _eq(f"{name} sha256", S.sha256_of(path), declared[name]["sha256"])
-            _eq(f"{name} size", path.stat().st_size, declared[name]["size"])
+            # 🔴 N4 canary 的权威模板已 OOXML 净化（spec N4 Task 7a：删 2 外链部件 +
+            #    中性化隐藏「原底稿」册 5 个外部引用公式，受管 sheet 税金及附加明细表N4-2 逐格
+            #    0 diff）⇒ sha/size 相对 slice 冻结值**有意变更**，仅 N4 用净化后现算值比对，
+            #    其余四册仍逐值等于 slice。
+            if name in F.SANITIZED_TEMPLATE_WORKBOOKS:
+                _eq(f"{name} sha256(净化后)", S.sha256_of(path), F.N4_SANITIZED_TEMPLATE_FACTS["sha256"])
+                _eq(f"{name} size(净化后)", path.stat().st_size, F.N4_SANITIZED_TEMPLATE_FACTS["size"])
+            else:
+                _eq(f"{name} sha256", S.sha256_of(path), declared[name]["sha256"])
+                _eq(f"{name} size", path.stat().st_size, declared[name]["size"])
 
     def test_lock_files_are_skipped(self) -> None:
         """枚举跳 `~$` 锁文件；本轮现算锁文件 0 个（反向：枚举器真的在过滤）。"""
@@ -217,10 +225,19 @@ class TestEntryBaselineAndArithmetic:
             per_wb[f.workbook] = per_wb.get(f.workbook, 0) + f.formula_cells
             if f.formula_cells:
                 with_fx[f.workbook] = with_fx.get(f.workbook, 0) + 1
-        _eq("逐册公式格", per_wb, F.WORKBOOK_FORMULA_CELLS)
-        _eq("逐册带 fx sheet", with_fx, F.WORKBOOK_SHEETS_WITH_FORMULA)
-        _eq("公式格合计", sum(per_wb.values()), F.TOTAL_FORMULA_CELLS)
-        _eq("带 fx sheet 合计", sum(with_fx.values()), F.TOTAL_SHEETS_WITH_FORMULA)
+        # 🔴 N4 canary 的权威模板已 OOXML 净化（spec N4 Task 7a）⇒ 隐藏「原底稿」册的 5 个
+        #    外部引用公式被中性化，N4 逐册公式格 236→231、带 fx sheet 7→6（受管 sheet
+        #    税金及附加明细表N4-2 零受影响）。仅 N4 用净化后现算值比对基线。
+        _n4_wb = "N4 税金及附加.xlsx"
+        _expect_cells = dict(F.WORKBOOK_FORMULA_CELLS)
+        _expect_withfx = dict(F.WORKBOOK_SHEETS_WITH_FORMULA)
+        if _n4_wb in F.SANITIZED_TEMPLATE_WORKBOOKS:
+            _expect_cells[_n4_wb] = F.N4_SANITIZED_TEMPLATE_FACTS["formula_cells"]
+            _expect_withfx[_n4_wb] = F.N4_SANITIZED_TEMPLATE_FACTS["sheets_with_formula"]
+        _eq("逐册公式格", per_wb, _expect_cells)
+        _eq("逐册带 fx sheet", with_fx, _expect_withfx)
+        _eq("公式格合计", sum(per_wb.values()), sum(_expect_cells.values()))
+        _eq("带 fx sheet 合计", sum(with_fx.values()), sum(_expect_withfx.values()))
         for p in S.iter_template_files():
             _eq(f"{p.name} data_only=True 反证", S.formula_cells_with_data_only(p), 0)
 
@@ -789,13 +806,28 @@ class TestContractFieldMapping:
         _eq("item_id 集合", tuple(sorted(r["item_id"] for r in rows)), F.LIVE_DB_N_ITEM_IDS)
 
     def test_contract_directory_has_no_n_entry(self) -> None:
-        """NF-P38：契约归属逐文件读 `review.entry_id`，N 域 0。"""
-        owners = []
+        """NF-P38：契约归属逐文件读 `review.entry_id`，除 N4 canary 外 N 域 0。
+
+        🔴 N4 已交付 reviewed 生产契约（spec N4 真改线）⇒ 其 review.entry_id = N4 是**真改线**，
+        仅豁免 N4（n_cycle_facts.DELIVERED_CONTRACT_ADAPTER_IDS），其余 N 仍必须零归属。
+        """
+        n_owners = []
         for p in sorted(S.CONTRACT_DIR.glob("*.json")):
             d = S.load_json(p)
-            owners.append(((d.get("review") or {}).get("entry_id")) or "")
-        assert owners, "契约目录为空 ⇒ 判据空跑"
-        _eq("N 域契约", [o for o in owners if o.startswith("xlsx/gt-n")], [])
+            owner = ((d.get("review") or {}).get("entry_id")) or ""
+            if not owner.startswith("xlsx/gt-n"):
+                continue
+            if d.get("contract_id") in F.DELIVERED_CONTRACT_ADAPTER_IDS:
+                continue  # N4 canary 已交付契约，豁免
+            n_owners.append(owner)
+        _eq("除 N4 外 N 域契约", n_owners, [])
+        # 反向：N4 的契约确实在目录里（豁免不是空转）。
+        _n4 = [
+            ((S.load_json(p).get("review") or {}).get("entry_id")) or ""
+            for p in S.CONTRACT_DIR.glob("*.json")
+            if S.load_json(p).get("contract_id") in F.DELIVERED_CONTRACT_ADAPTER_IDS
+        ]
+        assert "xlsx/gt-n4-taxes-and-surcharges" in _n4, "N4 契约未在目录里 ⇒ 豁免空转"
 
 
 class TestCanaryN4Closure:
@@ -1024,7 +1056,11 @@ class TestZzzDeliverySelfCheck:
         """交付后模板 sha256 仍 5/5；本轮新增/改动的源码无 U+FFFD。"""
         declared = {f["name"]: f["sha256"] for f in slice_doc["authoritative_templates"]["files"]}
         for p in S.iter_template_files():
-            _eq(p.name, S.sha256_of(p), declared[p.name])
+            # 🔴 N4 canary 模板已 OOXML 净化（spec N4 Task 7a），sha 为净化后值；其余 4 册未动。
+            if p.name in F.SANITIZED_TEMPLATE_WORKBOOKS:
+                _eq(f"{p.name}(净化后)", S.sha256_of(p), F.N4_SANITIZED_TEMPLATE_FACTS["sha256"])
+            else:
+                _eq(p.name, S.sha256_of(p), declared[p.name])
         touched = [
             S.WP_COMPONENTS / "GtN4TaxesAndSurcharges.vue",
             S.WP_COMPONENTS / "GtN5IncomeTaxExpense.vue",

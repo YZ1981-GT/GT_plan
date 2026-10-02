@@ -168,6 +168,17 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     ("g4", "phase5_g4_bond_investment", "ADAPTER_ID", True, True),
     ("g6", "phase5_g6_other_bond", "ADAPTER_ID", True, True),
     ("g5", "phase5_g5_long_term_receivable", "ADAPTER_ID", True, True),
+    # ── N4 canary（spec: n-cycle-sync-foundation-and-first-canary · Task 7）──
+    #    🔴 N 循环**首条**纳入零回归门的 provider。`plural_instr=True`：它的
+    #    `instrumentation_definition_payload()` 走 phase5_l_cycle_common 的
+    #    `build_instrumentation_payload_for_sheets(specs=instrumentation_specs())`，
+    #    注册路径读的是**复数**。留 False 会让本门只核单 spec ⇒ 将来打开 N4-1/N4-3
+    #    等灰度开关时扩容面对判据完全不可见（D2 注释警告过的假绿）。
+    #    `has_projection=True`：薄转发框架层 `build_store_projection`，任何 digest 漂移
+    #    都来自引擎本身。本条的 contract digest 会在误改上打红：① `header_rows` 从 **1**
+    #    被改成 2（N4-2 是单级表头）② `formula_mask` 的 E/I/K 三列被改 ③ 行身份从
+    #    `rowKey` 改成 `rowId`（同税种可多行，熵键是本 entry 的有意选择）。
+    ("n4", "phase5_n4_taxes_and_surcharges", "ADAPTER_ID", True, True),
 )
 
 

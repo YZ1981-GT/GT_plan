@@ -736,7 +736,11 @@ class TestSliceScopeIsRecomputable:
         n_index = [it for it in idx["files"]
                    if str(it.get("relative_path", "")).replace("\\", "/").startswith("N/")]
         assert {it["wp_code"] for it in n_index} == set(N_CODES), n_index
-        on_disk = {p.name for p in N_TEMPLATE_DIR.iterdir() if not p.name.startswith("~$")}
+        # 🔴 排除 OOXML 净化负例备份 `*.preclean.bak`（Task 7a 产物，非模板册）。
+        on_disk = {
+            p.name for p in N_TEMPLATE_DIR.iterdir()
+            if not p.name.startswith("~$") and not p.name.endswith(".preclean.bak")
+        }
         assert {it["filename"] for it in n_index} == on_disk
 
     def test_parent_duplicate_children_recompute_and_the_section_is_present(
@@ -856,21 +860,55 @@ class TestSliceScopeIsRecomputable:
             "candidate 契约的 review.entry_id 应为 null（反例分母，不得要求非空）"
         )
         assert _load(CONTRACT_DIR / CANDIDATE_CONTRACT_FILE)["review_status"] == "candidate"
-        assert not (set(owners.values()) & ids)
+        # 🔴 N4 canary 已交付 reviewed 生产契约（spec n-cycle-sync-foundation-and-first-canary）
+        #    ⇒ 其 review.entry_id 落在本 slice 的 ids 里是**真改线的信号**，不是违规。
+        #    仅豁免 N4（n_cycle_facts.DELIVERED_CONTRACT_ADAPTER_IDS），其余 N entry 仍一份不许有。
+        _facts = _post_slice_facts()
+        _n4_contract_owners = {
+            k for k, v in owners.items()
+            if _load(CONTRACT_DIR / k).get("contract_id") in _facts.DELIVERED_CONTRACT_ADAPTER_IDS
+        }
+        _non_n4_owner_entry_ids = {
+            v for k, v in owners.items() if k not in _n4_contract_owners
+        }
+        assert not (_non_n4_owner_entry_ids & ids), (
+            "除 N4 canary 外，仍有 N slice entry 的契约归属 ⇒ 违规"
+        )
         assert manifest_slice["slice_scope"]["excluded_pilot_entry_count"] == 0
+        # slice 冻结时点 pilot_contract_published==0（描述 2026-08-16 的 slice 态，非当前库态）。
         assert manifest_slice["honest_adjudication_summary"]["pilot_contract_published"] == 0
 
     def test_no_n_adapter_is_registered(self, manifest_slice: dict) -> None:
-        """**Validates: Requirements 1.4, 12.1** —— Property 3 的否定方向之一。"""
+        """**Validates: Requirements 1.4, 12.1** —— Property 3 的否定方向之一。
+
+        🔴 N4 canary 已真注册 adapter（spec n-cycle-sync-foundation-and-first-canary）：
+        registry 交付台账里有 `xlsx/gt-n4-...` 字面量、manifest 里 N4 已 bidirectional。
+        仅豁免 N4，其余 N entry（N1/N2/N3/N5）仍必须零注册、零 bidirectional。
+        """
+        _facts = _post_slice_facts()
         registry = _cached_text(REGISTRY)
-        assert not re.search(r"xlsx/gt-n\d", registry), "registry 里出现了 N adapter"
+        # 除 N4 外，registry 不得出现任何 N adapter 字面量。
+        other_n_hits = [
+            m.group(0) for m in re.finditer(r"xlsx/gt-n\d[\w-]*", registry)
+            if m.group(0) not in _facts.REGISTERED_ADAPTER_ENTRY_IDS
+        ]
+        assert not other_n_hits, f"registry 里出现了非 N4 的 N adapter：{other_n_hits}"
         for entry in manifest_slice["independent_entries"]:
-            assert entry["adapter_id"] is None
-        # 反向：全量 manifest 里确实已有非 N 的 bidirectional entry ⇒ 「N 仍未注册」不是空跑。
+            if entry["entry_id"] in _facts.REGISTERED_ADAPTER_ENTRY_IDS:
+                continue  # N4 已注册，adapter_id 非空是真改线
+            assert entry["adapter_id"] is None, entry["entry_id"]
+        # 反向：全量 manifest 里确实已有非 N 的 bidirectional entry ⇒ 「其余 N 仍未注册」不是空跑。
         manifest_entries = _load(FULL_MANIFEST).get("entries", [])
         bidirectional = [e for e in manifest_entries if e.get("capability") == "bidirectional"]
         assert bidirectional, "全量 manifest 无任何 bidirectional entry ⇒ 反向分母为空"
-        assert all(not str(e.get("entry_id", "")).startswith("xlsx/gt-n") for e in bidirectional)
+        # 🔴 其余 N entry 仍不得 bidirectional（N4 已豁免）。
+        n_bidi = {
+            e["entry_id"] for e in bidirectional
+            if str(e.get("entry_id", "")).startswith("xlsx/gt-n")
+        }
+        assert n_bidi == set(_facts.REGISTERED_ADAPTER_ENTRY_IDS), (
+            f"N 域 bidirectional 集合 {n_bidi} 与登记 {set(_facts.REGISTERED_ADAPTER_ENTRY_IDS)} 不符"
+        )
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -994,15 +1032,28 @@ class TestAdjudicationLegality:
         bp_ids = {b["id"] for b in manifest_slice["blocking_preconditions"]}
         assert "BP-9" in bp_ids
         src = {e["entry_id"]: e for e in full_manifest["entries"]}
+        _facts = _post_slice_facts()
         for e in manifest_slice["independent_entries"]:
             mirror = e["manifest_mirror"]
             upstream = src[e["entry_id"]]
-            assert mirror["capability"] == upstream["capability"] == "single_onlyoffice"
-            assert mirror["html_store"] == upstream["html_store"] == "unresolved"
+            # mirror 是 slice 冻结快照（2026-08-16），恒为 single_onlyoffice / unresolved。
+            assert mirror["capability"] == "single_onlyoffice"
+            assert mirror["html_store"] == "unresolved"
             assert e["capability"] != mirror["capability"], (
                 f"{e['entry_id']} 的 slice 裁决与 mirror 相同 ⇒ 分歧判据失效"
             )
             assert "BP-9" in mirror["why_not_adopted"]
+            if e["entry_id"] in _facts.MANIFEST_FLIPPED_ENTRIES:
+                # 🔴 N4 canary 已真改线：live manifest 的 upstream 已翻 bidirectional，
+                #    与 slice mirror 产生**真实分歧**（这正是真双向的信号，不是违规）。
+                assert upstream["capability"] == "bidirectional", (
+                    f"{e['entry_id']} 已登记为翻转 entry，但 live manifest 仍是 "
+                    f"{upstream['capability']} ⇒ 翻转未落实"
+                )
+            else:
+                # 其余 N entry：live manifest 仍与 slice mirror 一致（未改线）。
+                assert upstream["capability"] == "single_onlyoffice", e["entry_id"]
+                assert upstream["html_store"] == "unresolved", e["entry_id"]
 
     def test_ac15_is_declared_not_applicable_and_ac14_is_the_live_one(
         self, manifest_slice: dict
@@ -1246,18 +1297,31 @@ class TestHtmlCounterpartIsSourceBacked:
     def test_template_ref_resolves_and_digests_recompute(self, manifest_slice: dict) -> None:
         """**Validates: Requirements 6.10, 12.8**"""
         idx = {it["filename"]: it for it in _load(TEMPLATE_INDEX)["files"]}
+        _facts = _post_slice_facts()
         for e in manifest_slice["independent_entries"]:
             ref = e["template_ref"]
             path = N_TEMPLATE_DIR / ref["workbook"]
             assert path.is_file(), path
             raw = path.read_bytes()
-            assert len(raw) == ref["size"], (ref["workbook"], len(raw), ref["size"])
-            assert hashlib.sha256(raw).hexdigest() == ref["sha256"], ref["workbook"]
-            names = _sheet_names(path)
-            assert len(names) == ref["sheet_count"]
-            counts = _formula_counts(path)
-            assert sum(counts.values()) == ref["formula_cells"], ref["workbook"]
-            assert len([1 for v in counts.values() if v]) == ref["sheets_with_formula"]
+            # 🔴 N4 canary 的权威模板已 OOXML 净化（Task 7a：删 2 外链部件 + 中性化隐藏
+            #    「原底稿」册的 5 个外部引用公式）⇒ 字节/sha/公式格数相对 slice 冻结值**有意变更**，
+            #    受管 sheet 税金及附加明细表N4-2 逐格 0 diff。仅 N4 用净化后现算值比对，其余 N 册
+            #    仍逐值等于 slice 冻结 template_ref。
+            if ref["workbook"] in _facts.SANITIZED_TEMPLATE_WORKBOOKS:
+                sf = _facts.N4_SANITIZED_TEMPLATE_FACTS
+                assert len(raw) == sf["size"], (ref["workbook"], len(raw), sf["size"])
+                assert hashlib.sha256(raw).hexdigest() == sf["sha256"], ref["workbook"]
+                assert len(_sheet_names(path)) == sf["sheet_count"]
+                counts = _formula_counts(path)
+                assert sum(counts.values()) == sf["formula_cells"], ref["workbook"]
+                assert len([1 for v in counts.values() if v]) == sf["sheets_with_formula"]
+            else:
+                assert len(raw) == ref["size"], (ref["workbook"], len(raw), ref["size"])
+                assert hashlib.sha256(raw).hexdigest() == ref["sha256"], ref["workbook"]
+                assert len(_sheet_names(path)) == ref["sheet_count"]
+                counts = _formula_counts(path)
+                assert sum(counts.values()) == ref["formula_cells"], ref["workbook"]
+                assert len([1 for v in counts.values() if v]) == ref["sheets_with_formula"]
             assert ref["in_runtime_index"] is True
             assert idx[ref["workbook"]]["wp_code"] == ref["index_wp_code"]
 
@@ -2576,11 +2640,15 @@ class TestProperty70CrossEntryIsolation:
         # slice 是冻结快照：当时的生产/candidate 契约必须仍存在；后续循环新增契约允许增长。
         assert set(ce["production_contract_files"]) <= current_files
         assert set(ce["candidate_contract_files"]) <= current_files
-        # 当前目录逐文件读 review.entry_id，仍不得有任何 N entry（核心隔离不变量）。
+        # 当前目录逐文件读 review.entry_id，除 N4 canary 外不得有任何 N entry（核心隔离不变量）。
+        # 🔴 N4 已交付 reviewed 生产契约（真改线），其 review.entry_id ∈ n_ids 是合法的；
+        #    仅豁免 N4（n_cycle_facts.DELIVERED_CONTRACT_ADAPTER_IDS），其余 N 仍零归属。
+        _facts = _post_slice_facts()
         n_ids = {e["entry_id"] for e in manifest_slice["independent_entries"]}
         current_owners = {
             (_load(p).get("review") or {}).get("entry_id")
             for p in CONTRACT_DIR.glob("*.json")
+            if _load(p).get("contract_id") not in _facts.DELIVERED_CONTRACT_ADAPTER_IDS
         }
         assert not (current_owners & n_ids), current_owners & n_ids
         assert CANDIDATE_CONTRACT_FILE in ce["candidate_contract_files"]
@@ -2593,7 +2661,11 @@ class TestProperty70CrossEntryIsolation:
         assert None not in owners
         assert len(set(owners)) == len(owners) == len(ids)
         assert set(owners) == ids
-        on_disk = {p.name for p in N_TEMPLATE_DIR.iterdir() if not p.name.startswith("~$")}
+        # 🔴 排除 OOXML 净化负例备份 `*.preclean.bak`（Task 7a 产物，门负例，非模板册）。
+        on_disk = {
+            p.name for p in N_TEMPLATE_DIR.iterdir()
+            if not p.name.startswith("~$") and not p.name.endswith(".preclean.bak")
+        }
         assert {f["name"] for f in files} == on_disk
         assert [p.name for p in N_TEMPLATE_DIR.iterdir() if p.name.startswith("~$")] == []
         assert manifest_slice["authoritative_templates"]["reference_copy_status"] == (

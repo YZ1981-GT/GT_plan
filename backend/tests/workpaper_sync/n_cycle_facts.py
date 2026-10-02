@@ -575,3 +575,41 @@ REDEEMED_SWITCH_ENTRIES: frozenset[str] = frozenset({N4, N5})
 
 #: 已挂 `GtEntrySyncCapabilityNotice` 的 entry（BP-7 收口进度）
 NOTICE_MOUNTED_ENTRIES: frozenset[str] = frozenset({N4, N5})
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# N4 canary 真双向改线（spec n-cycle-sync-foundation-and-first-canary · N4）
+# ═══════════════════════════════════════════════════════════════════════════
+#: 🔴 N4 已走完五环发布（真 PG：content_version/representation/entry_state 新行，
+#:    representation_generation=1）+ manifest 翻 bidirectional/adapter_registered +
+#:    overlay 追加 N4 override + reviewed 契约 `n4.taxes_and_surcharges.json` 落盘 +
+#:    adapter 注册（STORE_MERGE_REGISTRY / 白名单 / 交付台账各加 N4 一条）。
+#:
+#: 🔴 **仅 N4** —— N1/N2/N3/N5 仍 legacy_fake_bidirectional / capability single_onlyoffice /
+#:    adapter 未注册 / 契约目录零归属。task56 原本锁「N 域无 adapter 注册 / 全 N 仍 legacy /
+#:    契约目录零 N 归属 / manifest_mirror 分歧」的那几条判据，对 **N4** 必然打红（这正是真
+#:    改线的信号），处置是**仅为 N4 开豁免**（不删判据、不翻其余四条）：未登记的 N entry
+#:    仍逐值走旧判据，N4 走翻转后判据。
+MANIFEST_FLIPPED_ENTRIES: frozenset[str] = frozenset({N4})
+#: N4 已交付 reviewed 生产契约的 adapter_id（契约目录归属豁免，仅此一条）。
+DELIVERED_CONTRACT_ADAPTER_IDS: frozenset[str] = frozenset({"n4.taxes_and_surcharges"})
+#: N4 已注册 adapter 的 entry_id（registry 字面量 / bidirectional 豁免，仅此一条）。
+REGISTERED_ADAPTER_ENTRY_IDS: frozenset[str] = frozenset({N4})
+#: N4 权威模板已净化（Task 7a：删 2 外链部件 + 中性化隐藏「原底稿」册 5 个外部引用公式）。
+#:    ⇒ 模板字节已变，sha256 从净化前变为净化后值；task56 的「模板 digest 现算等值」
+#:    对 N4 必然打红（这是**有意**的字节变更，受管 sheet 税金及附加明细表N4-2 逐格 0 diff）。
+#:    仅 N4 的模板允许「现算 != slice 冻结值」，其余 N 册仍逐值相等。
+SANITIZED_TEMPLATE_WORKBOOKS: frozenset[str] = frozenset({"N4 税金及附加.xlsx"})
+N4_SANITIZED_TEMPLATE_SHA256 = (
+    "2005eada32506e9e2b1b6f68c704ca4f6626b8a78e9e2a3a221ca00602cad638"
+)
+#: 净化后 N4 模板的现算事实（size 55903→46325；5 个外部引用公式在隐藏「原底稿」册被
+#:    中性化 ⇒ formula_cells 236→231、sheets_with_formula 7→6；sheet_count 9 不变；
+#:    受管 sheet 税金及附加明细表N4-2 逐格 0 diff）。
+N4_SANITIZED_TEMPLATE_FACTS: dict[str, int | str] = {
+    "size": 46325,
+    "sha256": N4_SANITIZED_TEMPLATE_SHA256,
+    "sheet_count": 9,
+    "formula_cells": 231,
+    "sheets_with_formula": 6,
+}

@@ -163,8 +163,12 @@
 - [ ] 22.* 平台级欠账登记（不在本 spec 闭合）
   - [x] NC-33 `validate_slice_against_schema` 区分「声明存在」与「实际使用」—— 已修复（2026-10-01，见下「平台级欠账实施记录」）
   - [x] NC-19 G8 跨循环污染 —— 已查实真库 0 条 + 根因（旧 slice 用错 join）+ 检测脚本（2026-10-01，见下）
-  - [ ]* BP-1 approved 权威模型与 contract / bundle · BP-2 published 表示层 · BP-3 真 OnlyOffice 9.4 探针（进行中，另批次做）
-  - 阻塞理由：BP-1/2/3 须按 L1/L3/L4 范式逐条接真双向（provider + 契约 + bundle + 五环发布 + manifest 翻转 + 真 OO 往返），改共享 registry/manifest/契约目录，单独一批次做
+  - [x] BP-1 / BP-2 / BP-3 **仅 N4 canary 已关闭**（2026-10-01，端到端真双向，见下「N4 真双向实施记录」）：
+        BP-1 approved 权威模型 + contract + bundle 已发布（真 PG definition_artifact 138→142 / bundle 42→43）·
+        BP-2 published 表示层已落库（content_version/representation 18→19、entry_state current_representation_id 非空、generation=1）·
+        BP-3 真 OnlyOffice 9.4 往返 exit 0（`verify_n4_oo94_roundtrip.py`，受管 E/I/K 往返仍公式、派生表 OO 改写 0 格、反向变异 exit 1）
+  - [ ]* BP-1 / BP-2 / BP-3 对 **N1 / N2 / N3 / N5** 仍未关闭（各按 L1/L3/L4 范式逐条接真双向，另批次做）
+  - 阻塞理由：N1/N2/N3/N5 的 BP-1/2/3 须逐条接真双向（provider + 契约 + bundle + 五环发布 + manifest 翻转 + 真 OO 往返），改共享 registry/manifest/契约目录，单独一批次做
   - _Requirements: 6, 12, 16_
   - _NC/NF-P: NC-19 · NC-33 · NF-P18 · NF-P40_
 
@@ -232,3 +236,29 @@
 
 ### BP-1/2/3（真双向发布 + 真 OO）
 - 仍 `[ ]*`，另起一批次按 L1/L3/L4 范式逐条做（canary N4 先端到端）。本次只推 NC-33 + NC-19 两件（纯代码 + 脚本 + 本记录），不动共享 registry/manifest/契约目录。
+
+---
+
+## N4 真双向实施记录（2026-10-01，append-only）—— canary 端到端关闭 BP-1/2/3（仅 N4）
+
+> 照 L1 playbook 逐环，**仅 N4**（N1/N2/N3/N5 的 BP-1/2/3 仍 `[ ]*`）。完整证据见
+> `evidence/n4-true-bidirectional/n4-true-bidirectional-evidence.md`。判成败一律查数据不看退出码。
+
+**交付物**（仅 N4 范围）：
+- provider `backend/app/services/workpaper_sync/phase5_n4_taxes_and_surcharges.py`（委派 L 公共骨架 + 三别名 `publish_pilot_definitions`/`attach_pilot_adapters`/`PILOT_WP_CODES`）
+- sheets 常量 `phase5_n4_sheets.py`（受管 `税金及附加明细表N4-2`、单级表头 r8、11 列、数据区 r9~r18、footer A19、UUID 列 L、公式列 E/I/K；几何全 openpyxl 现算断言）
+- reviewed 契约 `backend/data/workpaper_sync_contracts/n4.taxes_and_surcharges.json`（`review_status=reviewed`、`row_identity.json_pointer=/rows/*/rowKey`、`formula_mask=[E9:E18,I9:I18,K9:K18]`、derived_readonly_sheet 声明）+ 生成器 `generate_phase5_n_contracts.py`
+- OOXML 净化 `sanitize_n4_template_external_links.py`（删 2 外链部件 + 中性化隐藏「原底稿」册 5 外部引用公式，留 `.preclean.bak`；受管 sheet 逐格 0 diff；净化后 sha256 `2005eada…`）
+- wp_code 裁决 `fix_n_cycle_wp_code_adjudication.py`（N4→`['N4']`）
+- 真 OO 往返 `verify_n4_oo94_roundtrip.py`（exit 0；反向变异 exit 1）
+- 守卫 `test_n4_adapter_registration.py`（33 passed, 1 skipped）
+- 🔴 Task 7b（J1 预印行防护）**在后端往返层证实**（真 OO 往返 ⑦：8 预印行以 `GTROW-N42-*` 身份保留、2 合成行自带 rowKey、无翻倍）；**未新建前端 `n4DetailRowIdentity.ts`** —— 它落 `composables/` 会被 orphan 扫描判孤儿，而让 `useN4Detail` 消费它必移动行号、连锁打红 slice 冻结的 `n4_detail_rows.source_ref` 与 Property 23 位置化计数。前端预印行采用 `GTROW-N42-*` 身份属 useN4Detail 的独立改线（会动 slice 冻结锚点），留后续批次
+- registry/门接线各**追加 N4 一条**：`delivered_contracts_ledger.py` / `store_item_registry.py` / `registry.py` 白名单 / golden digest 基线 / overlay override / manifest N4 条目翻转 / 裁决表
+
+**五环发布（真 PG，查数据）**：definition_artifact 138→142、bundle 42→43、content_version/representation 18→19、entry_state 新增 N4 行（current_representation_id=`22a3e9bd-…`、generation=1）。真库 `N4-2-detail-rows` 现算 **0 行** ⇒ store 分母如实声明为空。
+
+**manifest/overlay 翻转（仅 N4）**：overlay 追加 N4 override、manifest N4 翻 bidirectional/adapter_registered，`overlay_digest`/`manifest_digest` 用生成器同一算法重算，其余 185 条 entry 逐字节不动。🔴 **未走 generator --apply**（干净 HEAD worktree 缺 node_modules 跑不了 mount discovery；live overlay 已被并发 K/L 会话改脏且 L3 override 尚未反映进 manifest，跑生成器会把 L3 翻转一并烘入）⇒ 只改 N4 一条。并发注记：实施期间并发 L 会话把 L3 翻成 adapter_registered（非本轮、已保留不覆盖）。
+
+**门与回归**：golden digest 含 N4 无 SKIP（仅追加一条，d4~d7 既存漂移非本轮引入、不烘入）· sheet-specs 已注册 · task56 123 passed / foundation canary 90 passed（N4-only 豁免，用 `n_cycle_facts` post-slice 模式，不删判据、不翻其余四条）· `import app.main` OK。
+
+**🔴 落点待主会话处理**：本轮**未 commit / 未 push**（按裁决，分支落点由主会话定）。当前检出分支为 `work/2026-10-01-i-cycle-classification-convergence`（含 N 分支 tip `3a99d873` 全部内容），N4 文件需主会话 cherry-pick 到 `work/2026-10-01-n-cycle-sync-three-specs`。

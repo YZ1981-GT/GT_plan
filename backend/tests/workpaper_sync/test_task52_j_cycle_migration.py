@@ -180,6 +180,68 @@ _DELIVERED_J_CONTRACTS = _delivered_contracts_by_cycle_prefix("xlsx/j")
 J1_ENTRY = "xlsx/j1/gt-j1-employee-compensation"
 #: parent_duplicate 子入口。
 J1_CHILD_ENTRY = "xlsx/j1/inspection/j1-tab-general-check"
+
+#: 🔴 双态（2026-10-01，foundation spec 22e 五环发布 + manifest 翻转后）：slice 是**盘点期快照**
+#:    （append-only，不改），已真双向改线的 entry 改按「slice 仍是旧值 ∧ manifest 现读是新值」验，
+#:    与 L 循环 task54 的 `MIGRATED_L_ENTRIES` 同款。新值是 overlay override + 真库 published
+#:    representation 的产物，不是手改 manifest。
+#:    前提：真 OO 两轮往返全绿（`scripts/e2e/verify_j1_oo94_roundtrip.py`；首轮曾抓到行翻倍，
+#:    已改为骨架行身份 = 模板行身份 `GTROW-J16S-*` 后修复）。
+MIGRATED_J_ENTRIES: dict[str, dict[str, str]] = {
+    J1_ENTRY: {
+        "capability": "bidirectional",
+        "migration_state": "adapter_registered",
+        "adapter_id": "j1.accrual_check_short_term",
+        "html_store": "checklist_responses_j1_accrual_short_term_rows",
+        "canonical_resolver": "workpaper_sync_published_representation",
+    },
+}
+
+#: 🔴 **模板绑定骨架行身份**（2026-10-01，修 J1-6 行翻倍）：身份由下标派生但**绑定模板固定行**，
+#:    不是位置化缺陷 —— 前提全部可伪证：①该区无增删/排序（宿主不含对短期薪酬行的 push/splice/
+#:    filter 删行/sort）②生成结果 = instrumentation 给模板 R17:R35 盖的 `GTROW-J16S-*`（后端
+#:    `test_j1_adapter_registration::TestSkeletonRowIdentityAlignment` 实测对齐）。任一前提不成立即打红。
+TEMPLATE_BOUND_IDENTITY_SITES: tuple[tuple[str, str], ...] = (
+    (
+        "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabAccrualCheck.vue",
+        "idOf(i)",
+    ),
+    (
+        "audit-platform/frontend/src/components/workpaper/j1/inspection/j1AccrualRowIdentity.ts",
+        "shortTermTemplateRowId(i)",
+    ),
+)
+#: family_c 生成器搬迁登记（file → 新的具名函数）：原 `id:` 赋值处不再命中。
+RELOCATED_FAMILY_C_SITES: dict[str, str] = {
+    "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabAccrualCheck.vue": (
+        "randomAccrualId"
+    ),
+}
+
+
+def _is_reviewed_template_bound_site(rel: str, expr: str) -> bool:
+    for site_rel, form in TEMPLATE_BOUND_IDENTITY_SITES:
+        if rel == site_rel and form in expr:
+            host = (ROOT / TEMPLATE_BOUND_IDENTITY_SITES[0][0]).read_text(encoding="utf-8")
+            # 前提①：短期薪酬区无增删/排序（出现即说明骨架不再固定，下标绑定失效）
+            for forbidden in ("shortTermRows.value.push", "shortTermRows.value.splice",
+                              "shortTermRows.value = shortTermRows.value.filter",
+                              "shortTermRows.value.sort"):
+                assert forbidden not in host, f"短期薪酬区出现 {forbidden} ⇒ 模板绑定身份前提失效"
+            return True
+    return False
+
+
+#: 🔴 双态：按 D3~D7 范式净化过外链的权威模板（`.preclean.bak` 是 gitignore 的本机备份，不计入目录集合）。
+#:    slice 冻结的是净化前 digest（append-only）；现算须等于净化后哨兵（provider 常量为真源）。
+SANITIZED_J_TEMPLATES: dict[str, dict[str, Any]] = {
+    "J1 应付职工薪酬.xlsx": {
+        "pre_sha256": "a6100d91202f4d066dc39fb00e3016ea87794489bb75d308fec2733e92ca6061",
+        "pre_size": 196750,
+        "provider_module": "app.services.workpaper_sync.phase5_j1_employee_compensation",
+        "script": "backend/scripts/fix/sanitize_j1_template_external_links.py",
+    },
+}
 #: 三个宿主（J1 是 entry，J2/J3 不是）。
 J_HOSTS = {
     "j1": WP_COMPONENTS / "j1" / "GtJ1EmployeeCompensation.vue",
@@ -1267,6 +1329,19 @@ class TestAdjudicationLegality:
         for entry in manifest_slice["independent_entries"]:
             mirror = entry["manifest_mirror"]
             source = by_id[entry["entry_id"]]
+            migrated = MIGRATED_J_ENTRIES.get(entry["entry_id"])
+            if migrated is not None:
+                # 双态：slice 镜像仍是改线前的 overlay 默认值；manifest 现读是改线后的值。
+                assert mirror["capability"] == defaults["capability"]
+                assert mirror["html_store"] == defaults["html_store"]
+                for key, value in migrated.items():
+                    assert source.get(key) == value, (
+                        f"{entry['entry_id']}: 已改线但 manifest {key}={source.get(key)!r} != {value!r}"
+                    )
+                assert mirror["capability"] != source.get("capability"), (
+                    "已改线 entry 的 slice 镜像竟与 manifest 相等 ⇒ 有人回填了 slice"
+                )
+                continue
             assert mirror["capability"] == source.get("capability")
             assert mirror["html_store"] == source.get("html_store")
             assert mirror["legacy_reasons"] == list(
@@ -1359,10 +1434,12 @@ class TestHtmlCounterpartIsSourceBacked:
         for entry in manifest_slice["independent_entries"]:
             counterpart = entry["html_counterpart"]
             assert counterpart["write_carrier"] == "shared_platform_persistence_adapter"
-            consumed_at = _line_at(counterpart["write_carrier_consumed_at"])
-            assert "useChecklistPersistence" in consumed_at, (
-                f"宿主消费点行不对：{consumed_at.strip()!r}"
-            )
+            # 🔴 2026-10-01：按形态定位消费点（slice 冻结的 `#Lnn` 会随宿主改动漂移）。
+            consumer_file = _resolve_repo(counterpart["write_carrier_consumed_at"])
+            consumer_code = _strip_ts_comments(consumer_file.read_text(encoding="utf-8"))
+            assert re.search(
+                r"from\s+'@/composables/workpaper/useChecklistPersistence'", consumer_code
+            ), f"宿主 {consumer_file.name} 不再 import useChecklistPersistence"
 
     def test_second_write_path_sites_are_all_real(self, manifest_slice: dict) -> None:
         """JD-3 的第二写路径：8 个站点逐条现读，并两侧核计数。"""
@@ -1377,10 +1454,28 @@ class TestHtmlCounterpartIsSourceBacked:
         assert len(files) == diff["second_write_path_file_count"], (
             f"文件数现算 {len(files)} != 声明 {diff['second_write_path_file_count']}"
         )
+        # 🔴 2026-10-01 改：原按 slice 冻结的 `path#Lnn` 逐行读，`J1TabGeneralCheck.vue`
+        #    被 commit 78b9c1ee5（抽凭科目接线）插行后整体漂移 ⇒ 假红。按本 spec Task 1
+        #    「判据禁写死行号，按形态定位」改为**逐文件按形态现算站点数**，与 slice 声明的
+        #    每文件站点数等值比对（数量与文件集合仍两侧锁死，只放掉行号）。
+        declared_per_file: dict[str, int] = {}
         for ref in sites:
-            window = _line_window(ref, span=3)
-            assert "http.put" in window, f"{ref} 不是 http.put 站点：{window!r}"
-            assert "checklist-responses" in window, f"{ref} 的 URL 不是 checklist-responses"
+            rel = ref.split("#")[0]
+            declared_per_file[rel] = declared_per_file.get(rel, 0) + 1
+        actual_per_file: dict[str, int] = {}
+        for rel in sorted(files):
+            lines = (ROOT / rel).read_text(encoding="utf-8").split("\n")
+            hits = 0
+            for i, line in enumerate(lines):
+                if "http.put" not in line:
+                    continue
+                if "checklist-responses" in "\n".join(lines[i : i + 3]):
+                    hits += 1
+            actual_per_file[rel] = hits
+        assert actual_per_file == declared_per_file, (
+            f"逐文件 http.put→checklist-responses 站点数现算 {actual_per_file} "
+            f"!= 声明 {declared_per_file}"
+        )
         # 🔴 client 取得形态分两族（4 静态 / 3 动态）—— 两侧逐文件等值。
         forms = diff["second_write_path_client_forms"]
         static_re = re.compile(forms["static_import_pattern"])
@@ -1399,12 +1494,13 @@ class TestHtmlCounterpartIsSourceBacked:
                 static_actual[rel] = static_hits[0]
             else:
                 dynamic_actual[rel] = dynamic_hits
-        assert static_actual == forms["static_import"], (
-            f"静态族现扫 {static_actual} != 声明 {forms['static_import']}"
+        # 🔴 同上：只锁「哪些文件属哪一族 + 每文件命中个数」，不锁行号。
+        assert set(static_actual) == set(forms["static_import"]), (
+            f"静态族文件现扫 {sorted(static_actual)} != 声明 {sorted(forms['static_import'])}"
         )
-        assert dynamic_actual == forms["dynamic_import"], (
-            f"动态族现扫 {dynamic_actual} != 声明 {forms['dynamic_import']}"
-        )
+        assert {k: len(v) for k, v in dynamic_actual.items()} == {
+            k: len(v) for k, v in forms["dynamic_import"].items()
+        }, f"动态族现扫 {dynamic_actual} != 声明 {forms['dynamic_import']}"
         assert len(static_actual) == forms["static_import_file_count"]
         assert len(dynamic_actual) == forms["dynamic_import_file_count"]
         assert set(static_actual) | set(dynamic_actual) == files
@@ -1498,8 +1594,15 @@ class TestHtmlCounterpartIsSourceBacked:
             assert entry["scenario_profile_id"] == source["scenario_profile"]["profile_id"]
             assert entry["editability"] == source["editability"]
             assert entry["room_model"] == source["room_model"]
-            assert entry["canonical_resolver"] == source["canonical_resolver"]
-            assert entry["migration_state"] == source["migration_state"]
+            migrated = MIGRATED_J_ENTRIES.get(entry["entry_id"])
+            if migrated is not None:
+                # 双态：slice 保留改线前值；manifest 现读必须是改线后值（且确实不同）。
+                for key in ("canonical_resolver", "migration_state"):
+                    assert source[key] == migrated[key]
+                    assert entry[key] != source[key], f"slice 的 {key} 被回填"
+            else:
+                assert entry["canonical_resolver"] == source["canonical_resolver"]
+                assert entry["migration_state"] == source["migration_state"]
             assert entry["host_path"] == source["host_path"]
             assert entry["wp_code_pattern"] in (source.get("wp_match") or {}).get(
                 "wp_code_patterns", []
@@ -1745,7 +1848,11 @@ class TestOrphanDualModeInventory:
             if deletion_already_executed(ref):
                 assert_deletion_is_honored(ref)
                 continue
-            assert ref in statement, f"J 循环消费点 {ref} 不在窄口径边集里"
+            # 🔴 2026-10-01：按**文件**比对，不比行号（Task 23 在 J1 宿主模板加行后
+            #    script 段整体下移 4 行，slice 冻结的 `#Lnn` 漂移；判据禁写死行号）。
+            assert ref.split("#")[0] in {e.split("#")[0] for e in statement}, (
+                f"J 循环消费点 {ref} 所在文件不在窄口径边集里"
+            )
         assert (
             shared["statement_position_consumers"] - shared["j_cycle_contribution"]
             == shared["remaining_after_j_cycle_work"]
@@ -2303,9 +2410,12 @@ class TestRowModelDerivation:
         decl = next(d for d in self._declarations(manifest_slice) if d["id"] == "RD-4")
         div = decl["cross_impl_divergence"]
         for side in ("site_a", "site_b"):
-            line = _line_at(div[side]["ref"])
-            assert div[side]["label"] in line, (
-                f"RD-4 {side} 的标签不在声明行里：{line.strip()!r}"
+            # 🔴 2026-10-01：按**文件内恰 1 处**定位标签，不比冻结行号（J1TabAccrualCheck 加骨架行身份
+            #    注释/导入后整体下移；判据禁写死行号）。
+            source = _resolve_repo(div[side]["ref"]).read_text(encoding="utf-8")
+            label_hits = [ln for ln in source.split("\n") if f"'{div[side]['label']}'" in ln]
+            assert len(label_hits) == 1, (
+                f"RD-4 {side} 的标签 {div[side]['label']!r} 在文件内应恰 1 处，实测 {len(label_hits)}"
             )
             has_fee = "费" in div[side]["label"]
             assert has_fee == div[side]["has_fee_char"], f"RD-4 {side} 的 has_fee_char 声明错"
@@ -2429,7 +2539,17 @@ class TestProperty22And23StaticStructure:
         """🔴 五族划分：现扫命中集合必须与 family_a + family_b + family_c 的并集**等值**。"""
         inventory = manifest_slice["dynamic_row_identity"]["positional_identity_inventory"]
         hits = _positional_identity_hits(j_files)
-        actual = {(rel, no) for rel, no, _key, _expr in hits}
+        # 🔴 2026-10-01：**模板绑定骨架行身份**单独成类，不并入任何位置化族，也不放宽扫描器 ——
+        #    命中仍被扫出来，再逐条按 TEMPLATE_BOUND_IDENTITY_SITES 的可伪证条件核销。
+        template_bound = {
+            (rel, no)
+            for rel, no, _key, expr in hits
+            if _is_reviewed_template_bound_site(rel, expr)
+        }
+        assert len(template_bound) == len(TEMPLATE_BOUND_IDENTITY_SITES), (
+            f"模板绑定站点现扫 {sorted(template_bound)} 与登记 {len(TEMPLATE_BOUND_IDENTITY_SITES)} 条不符"
+        )
+        actual = {(rel, no) for rel, no, _key, _expr in hits} - template_bound
         # 🔴 双态（2026-09-27）：lane spec Task 11/12 修了 5 处位置化行身份（改用 mintJRowId/withJRowIds），
         #    修复后那 5 处不再匹配 `id: <var> + 1` / `id: <expr> ?? <var> + 1` 模式 ⇒ 命中数减少。
         #    slice 声明值 10 是盘点期快照。期望值 = 声明 − 已修个数（按 family 计）。
@@ -2451,7 +2571,12 @@ class TestProperty22And23StaticStructure:
                     source = _resolve_repo(ref).read_text(encoding="utf-8")
                     if "mintJRowId" in source or "withJRowIds" in source:
                         repaired_sites.add(pair)
-        expected_hits = inventory["total_hits"] - len(repaired_sites)
+        relocated_c = sum(
+            1
+            for site in inventory["family_c_generated_opaque_with_random_must_not_be_flagged"]["sites"]
+            if site.split(" ", 1)[0].split("#L")[0] in RELOCATED_FAMILY_C_SITES
+        )
+        expected_hits = inventory["total_hits"] - len(repaired_sites) - relocated_c
         assert len(actual) == expected_hits, (
             f"现扫 {len(actual)} 处位置化命中 != 期望 {expected_hits}"
             f"（盘点期声明 {inventory['total_hits']} − 已修 {len(repaired_sites)} 处）\n"
@@ -2469,6 +2594,16 @@ class TestProperty22And23StaticStructure:
         for site in family_c["sites"]:
             ref = site.split(" ", 1)[0]
             rel, no = ref.split("#L")
+            relocated = RELOCATED_FAMILY_C_SITES.get(rel)
+            if relocated is not None:
+                # 双态：该 family_c 生成器已从 `id:` 赋值处搬进具名函数（仍含随机串、仍是安全族），
+                #    扫描器只扫 `id:` 赋值 ⇒ 原站点不再命中。核销条件可伪证：函数真在、真含两段熵。
+                src = (ROOT / rel).read_text(encoding="utf-8")
+                fn_line = next((ln for ln in src.split("\n") if f"const {relocated} =" in ln), "")
+                assert "Math.random()" in fn_line and "Date.now()" in fn_line, (
+                    f"{rel}: 声明已搬迁到 {relocated}，但该函数不存在或不含随机串"
+                )
+                continue
             declared.add((rel, int(no)))
         # 🔴 双态：已修站点从 declared 里排除（它们不再命中位置化模式）
         declared_after_repair = declared - repaired_sites
@@ -2734,6 +2869,21 @@ class TestProperty28DefinitionDriftFailClosed:
         for record in templates["files"]:
             path = root / record["name"]
             assert path.is_file(), f"缺权威模板 {path}"
+            sanitized = SANITIZED_J_TEMPLATES.get(record["name"])
+            if sanitized is not None:
+                # 双态：slice 冻结净化前值（append-only）；现算 = provider 净化后哨兵 ∧ 零外链。
+                import importlib
+                import zipfile
+
+                assert record["sha256"] == sanitized["pre_sha256"], "slice 的净化前 digest 被回填"
+                assert record["size"] == sanitized["pre_size"]
+                provider = importlib.import_module(sanitized["provider_module"])
+                assert _sha256_of(path) == provider.TEMPLATE_SHA256, f"{record['name']}: 现算 ≠ 净化后哨兵"
+                assert provider.TEMPLATE_SHA256 != sanitized["pre_sha256"]
+                with zipfile.ZipFile(path) as zf:
+                    assert not [n for n in zf.namelist() if n.startswith("xl/externalLinks/")]
+                assert (ROOT / sanitized["script"]).is_file()
+                continue
             assert path.stat().st_size == record["size"], (
                 f"{record['name']}: size 现算 {path.stat().st_size} != 冻结 {record['size']}"
             )
@@ -2742,7 +2892,12 @@ class TestProperty28DefinitionDriftFailClosed:
     def test_registered_file_set_equals_the_disk_set(self, manifest_slice: dict) -> None:
         templates = manifest_slice["authoritative_templates"]
         root = ROOT / templates["root"]
-        on_disk = {p.name for p in root.iterdir() if p.is_file() and not p.name.startswith("~$")}
+        # 🔴 `.preclean.bak` 是净化脚本留的本机门负例（gitignore `*.bak`），机器相关 ⇒ 不计入
+        on_disk = {
+            p.name
+            for p in root.iterdir()
+            if p.is_file() and not p.name.startswith("~$") and not p.name.endswith(".bak")
+        }
         declared = {f["name"] for f in templates["files"]}
         assert on_disk == declared, f"目录集合 {sorted(on_disk)} != 登记 {sorted(declared)}"
 
@@ -3092,21 +3247,11 @@ class TestAc14HonestModeVisibility:
         assert "isHtmlSheet" in gate_line, "工具栏门控表达式变了 ⇒ 声明需更新"
         assert "el-segmented" in block
 
-    def test_second_level_gate_absence_matches_the_declaration(self, the_entry: dict) -> None:
-        """🔴 不得写死「全 slice 都有二级门控」—— J1 没有，那正是 BP-10 的核心。"""
-        template = _vue_template(J_HOSTS["j1"].read_text(encoding="utf-8"))
-        block = _toolbar_block(template, the_entry["ui_toolbar_gate"])
-        segmented_line = next(ln for ln in block.splitlines() if "el-segmented" in ln)
-        has_gate = "v-if" in segmented_line
-        declared = the_entry["ui_toolbar_gate_second_level"]
-        assert (declared is not None) == has_gate, (
-            f"声明 second_level={declared!r} 但模板实测 has_gate={has_gate}"
-            f"（切换器那一行：{segmented_line.strip()!r}）"
-        )
-        assert declared is None, (
-            "J1 现在有二级门控了 ⇒ BP-10 的一半已兑现，登记与判据都要更新"
-        )
-        assert "仅结构化视图" in block, "OO 不可用时的兜底 tag 不见了 ⇒ 现状描述需更新"
+    # 🔴 `test_second_level_gate_absence_matches_the_declaration` 与
+    #    `test_bp10_is_registered_because_no_host_mounts_the_notice` 已**翻面**搬到
+    #    `test_j_cycle_registered_defects_fixed.py`（foundation Task 23 修复 BP-10，
+    #    与 I 循环 `test_i_cycle_registered_defects_fixed.py` 同款）。slice 原值保留
+    #    （append-only），那边断言「slice 仍是修复前快照 + 现算已修 + 修法真在源码里」。
 
     def test_runtime_fallback_in_the_shared_base_is_real(self) -> None:
         """BP-10 的「点了没反应」结论要有源码依据。"""
@@ -3127,7 +3272,11 @@ class TestAc14HonestModeVisibility:
                 no = source[: match.start()].count("\n") + 1
                 found.append(f"{path.relative_to(ROOT).as_posix()}#L{no}")
         declared_extra = set(the_entry["extra_unrelated_segmented_sites"])
-        host_site = f"{J_HOSTS['j1'].relative_to(ROOT).as_posix()}#L10"
+        # 🔴 2026-10-01：宿主站点行号**现算**（Task 23 在工具栏加了注释行，原写死 #L10 漂移）。
+        host_rel = J_HOSTS["j1"].relative_to(ROOT).as_posix()
+        host_sites = [s for s in found if s.startswith(host_rel + "#")]
+        assert len(host_sites) == 1, f"宿主 el-segmented 站点应恰 1 处：{host_sites}"
+        host_site = host_sites[0]
         assert set(found) == declared_extra | {host_site}, (
             f"el-segmented 现扫 {sorted(found)} != 声明 {sorted(declared_extra | {host_site})}"
         )
@@ -3139,26 +3288,6 @@ class TestAc14HonestModeVisibility:
             assert not ref.startswith(J_HOSTS["j1"].relative_to(ROOT).as_posix()), (
                 "宿主自身的站点不该列在 extra_unrelated 里"
             )
-
-    def test_bp10_is_registered_because_no_host_mounts_the_notice(
-        self, manifest_slice: dict, the_entry: dict
-    ) -> None:
-        """两侧都验：现状确实没挂（BP-10 成立）；挂上了就必须打红提醒解除登记。"""
-        host = J_HOSTS["j1"].read_text(encoding="utf-8")
-        mounted = NOTICE_COMPONENT_NAME in host
-        assert mounted == bool(the_entry["notice_mounted"]), (
-            f"声明 notice_mounted={the_entry['notice_mounted']} 但宿主实测 {mounted}"
-        )
-        assert mounted is False, (
-            "🔴 宿主已挂 GtEntrySyncCapabilityNotice ⇒ 可以解除 BP-10 了，"
-            "slice 的 notice_mounted / BP-10.status 必须同步更新"
-        )
-        bp10 = next(bp for bp in manifest_slice["blocking_preconditions"] if bp["id"] == "BP-10")
-        assert bp10["status"] == "REGISTERED_NOT_FIXED"
-        assert bp10["blocks"] == "ui_honesty"
-        assert any("1.4" in str(x) for x in bp10["observable_consequences"]) or "AC 1.4" in bp10[
-            "what"
-        ]
 
     def test_j2_and_j3_hosts_have_no_mode_switcher_at_all(self, deletion_plan: dict) -> None:
         """AC 1.5 的「事实效果」—— 但不作为本任务的裁决兑现来宣称。"""

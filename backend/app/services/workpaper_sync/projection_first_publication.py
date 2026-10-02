@@ -1208,10 +1208,28 @@ def _align_specs_to_sibling_tables(
 
     def _sheet_for(spec: Any) -> Any:
         managed = str(getattr(spec, "managed_sheet", "") or "")
-        resolved = str(getattr(spec, "resolved_sheet_key", "") or "")
+        resolved = str(
+            getattr(spec, "resolved_sheet_key", "") or getattr(spec, "sheet_key", "") or ""
+        )
+        # 🔴 先按 sheet_key 精确配（且 excel_name 必须一致）：一张 Excel sheet 可以在契约里
+        #    拆成**多个契约 sheet**（I5-2 原值区 `i52-gross-managed` / 减值区
+        #    `i52-impairment-managed` 同为 `明细表I5-2`）。原实现按 excel_name 先命中第一个，
+        #    两个 spec 都配到原值区 ⇒ `spec↔table 必须是双射` 打红、首版发布回滚
+        #    （2026-10-01 I5 实测）。sheet_key 配不上时才回落 excel_name，保持既有 entry 行为。
+        if resolved:
+            for sheet in sheets:
+                if sheet.sheet_key == resolved and (not managed or sheet.excel_name == managed):
+                    return sheet
+        by_name = [s for s in sheets if managed and s.excel_name == managed]
+        if len(by_name) > 1:
+            raise ProviderCapabilityError(
+                f"provider {provider_name!r} 的 spec（managed_sheet={managed!r} / "
+                f"sheet_key={resolved!r}）按 excel_name 命中 {len(by_name)} 个契约 sheet "
+                f"{[s.sheet_key for s in by_name]} —— 同名多契约 sheet 必须用 sheet_key 区分"
+            )
+        if by_name:
+            return by_name[0]
         for sheet in sheets:
-            if managed and sheet.excel_name == managed:
-                return sheet
             if resolved and sheet.sheet_key == resolved:
                 return sheet
         raise ProviderCapabilityError(

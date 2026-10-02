@@ -45,7 +45,7 @@ sheet 级零回退在 9 条上全部成立，本模块一并断言。
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass, field as dc_field
+from dataclasses import dataclass, field as dc_field, replace as dc_replace
 from pathlib import Path
 from typing import Any, Final, Mapping, Sequence
 
@@ -617,6 +617,7 @@ async def attach_h_entry_adapter(
     from app.models.workpaper_sync_models import WorkpaperContentRepresentation
     from app.services.workpaper_sync import entry_source_facts as facts
     from app.services.workpaper_sync.adapters.excel import build_excel_adapter
+    from app.services.workpaper_sync.excel_extract import ExcelIdentityBinding
     from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
     from app.services.workpaper_sync.projection_target_resolution import (
         resolve_visible_current_representation_id,
@@ -650,6 +651,29 @@ async def attach_h_entry_adapter(
     observation = await resolve_published_frozen_definitions(
         identity, session=session, representation=representation, contract=contract
     )
+    # 🔴 runtime attach 必须与首版发布 adapter 一样带全 workbook sibling bindings。
+    # 原实现只传 `observation.identity_binding`（主表），I5 同 sheet 双区因而只读写 gross，
+    # impairment 区 45 个受管字段在真 OO roundtrip 后全部消失。按 contract table_key
+    # 与 instrumentation spec 一一组装；主表去重，其余逐表各自保留 UUID 列。
+    primary_key = str(observation.identity_binding.table_key)
+    sibling_bindings: list[ExcelIdentityBinding] = []
+    specs_fn = getattr(__import__(contract_payload_builder.__module__, fromlist=["managed_row_table_specs"]), "managed_row_table_specs", None)
+    if callable(specs_fn):
+        for spec in specs_fn():
+            table_key = str(getattr(spec, "table_key", "") or "")
+            if not table_key or table_key == primary_key:
+                continue
+            sibling_bindings.append(
+                ExcelIdentityBinding(
+                    table_name=str(spec.table_name),
+                    uuid_column=str(spec.uuid_col),
+                    table_key=table_key,
+                    metadata_sheet=observation.identity_binding.metadata_sheet,
+                    defined_name_prefix=str(getattr(spec, "defined_name_prefix", None) or "GT_"),
+                    tombstoned_row_keys=(),
+                    dynamic_column_columns={},
+                )
+            )
     register_adapter(
         registry,
         identity,
@@ -657,6 +681,7 @@ async def attach_h_entry_adapter(
             definitions=observation.definitions,
             binding=observation.identity_binding,
             direction="html_to_oo",
+            sibling_bindings=tuple(sibling_bindings),
         ),
         bundle=bundle,
         descriptor=descriptor,
@@ -665,3 +690,349 @@ async def attach_h_entry_adapter(
         sheet_keys=sheet_keys,
     )
     return (identity.adapter_id,)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 五环发布面（2026-10-01 补，spec: i-cycle-* 三份）
+#
+# 🔴 为什么放在公共骨架而不是每家复制：`projection_provisioning.load_projection_supply()`
+#    只认 `publish_pilot_definitions` + `assert_contract_file_matches_source`，
+#    `projection_first_publication` 另要 `instrumentation_spec()`（单数，主表）与
+#    `build_store_projection(payload, contract=…)`。H 骨架此前只有 attach 一侧，
+#    于是 15 家骨架 provider（H9 条 + I 6 条）连 task76 的 `--check` 都跑不起来。
+#    J1 / L1 各自抄了一份同形实现；这里收成一份，per-entry 只写别名。
+#    纯新增，不改既有函数签名（H 九家行为不变）。
+# ═══════════════════════════════════════════════════════════════════════════
+
+import uuid as _uuid  # noqa: E402
+
+from app.services.workpaper_sync.models import (  # noqa: E402
+    AuthorityModel as _AuthorityModel,
+    BundleSlot as _BundleSlot,
+    DefinitionKind as _DefinitionKind,
+)
+
+H_ENTRY_AUTHORITY_MODEL: Final[_AuthorityModel] = _AuthorityModel.projection_contract
+
+
+def primary_instrumentation_spec(
+    identity: HEntryIdentity, specs: Sequence[Any]
+) -> ExcelInstrumentationSpec:
+    """首版发布 binding 用的**主表** instrumentation（多表时取第一条，其余走 sibling）。"""
+    all_specs = instrumentation_specs_for(identity, specs)
+    if not all_specs:
+        raise HEntrySelectionError(f"entry {identity.entry_id} 没有受管 instrumentation spec")
+    return all_specs[0]
+
+
+def spec_of_store_item(
+    identity: HEntryIdentity, specs: Sequence[Any], store_item_id: str | None
+) -> Any:
+    """按 store item 取**唯一**行表 spec；同一 store 映射多表时 fail closed（禁静默取第一张）。"""
+    wanted = store_item_id or identity.primary_store_item_id
+    hits = [s for s in specs if s.store_item_id == wanted]
+    if len(hits) != 1:
+        raise HStorePayloadError(
+            f"entry {identity.entry_id}: store item {wanted!r} 对应 {len(hits)} 张受管表 "
+            f"{[getattr(s, 'table_key', None) for s in hits]} —— 单表投影口径只接受恰 1 张"
+        )
+    return hits[0]
+
+
+def build_store_projection_for(
+    identity: HEntryIdentity,
+    specs: Sequence[Any],
+    payload: Any,
+    *,
+    contract: SyncContract,
+    limits: Any | None = None,
+    store_item_id: str | None = None,
+) -> Any:
+    from app.services.workpaper_sync.adapters.base import Projection
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        build_store_projection as _engine,
+    )
+
+    hits = _specs_sharing_store_item(identity, specs, store_item_id)
+    if len(hits) == 1:
+        return _engine(hits[0], payload, contract=contract, limits=limits)
+    # 🔴 一个 store 映射多张受管表（I5：原值区 / 减值区共用 `I5-2-rows`，同一行同时在两区，
+    #    字段走嵌套路径 `gross/*` 与 `impairment/*`）⇒ 逐表跑引擎再取并集（与
+    #    `phase5_d1_combined_store` 同口径）。stable key 首段是 table_key，两表不会撞键。
+    values: dict[str, Any] = {}
+    row_keys: dict[str, tuple[str, ...]] = {}
+    for index, spec in enumerate(hits):
+        proj = _engine(spec, payload, contract=contract, limits=limits)
+        # 同 store 多物理区的 HTML 行只有一个 rowId；Excel 每个区却必须有自己的 UUID 载体。
+        # sibling 用可逆后缀命名空间，避免两张表争用同一物理 identity（I5 真 OO 实测：
+        # 不分域时减值区 45 个字段全部在 extract 后消失）。回写时下方 merge 会去后缀。
+        if index:
+            proj = _namespace_projection_rows(proj, spec.table_key, encode=True)
+        values.update(proj.values)
+        row_keys.update(dict(proj.row_keys))
+    return Projection(
+        contract_id=contract.contract_id,
+        semantic_version=contract.semantic_version,
+        document_type=contract.document_type,
+        values=values,
+        row_keys=row_keys,
+    )
+
+
+def _specs_sharing_store_item(
+    identity: HEntryIdentity, specs: Sequence[Any], store_item_id: str | None
+) -> list[Any]:
+    wanted = store_item_id or identity.primary_store_item_id
+    hits = [s for s in specs if s.store_item_id == wanted]
+    if not hits:
+        raise HStorePayloadError(
+            f"entry {identity.entry_id}: store item {wanted!r} 不对应任何受管表"
+        )
+    return hits
+
+
+def _projection_slice_for(projection: Any, table_key: str) -> Any:
+    """只属于该受管表的切片（多表合回时必须切，否则别表的列会被合进本表）。"""
+    from app.services.workpaper_sync.adapters.base import Projection
+
+    prefix = f"{table_key}/"
+    return Projection(
+        contract_id=projection.contract_id,
+        semantic_version=projection.semantic_version,
+        document_type=projection.document_type,
+        values={k: v for k, v in dict(projection.values).items() if str(k).startswith(prefix)},
+        row_keys={table_key: tuple(dict(projection.row_keys).get(table_key, ()))},
+    )
+
+
+def _namespace_projection_rows(projection: Any, table_key: str, *, encode: bool) -> Any:
+    """同 store sibling 表的物理 rowId 加/去可逆命名空间。
+
+    stable key 形态固定 `{table_key}/{row_id}/{field_id}`。后缀不含 `/`，所以不改变层级。
+    解码只接受本 table 自己的精确后缀；遇到没后缀的 identity fail closed（不能猜归属）。
+    """
+    from app.services.workpaper_sync.adapters.base import Projection
+
+    suffix = f"~gt:{table_key}"
+    prefix = f"{table_key}/"
+
+    def map_id(rid: str) -> str:
+        if encode:
+            return rid if rid.endswith(suffix) else rid + suffix
+        if not rid.endswith(suffix):
+            # 预置 substrate 骨架身份不是由 store 投影产生，保持原值交给 ghost-row anchor
+            # 过滤（金额锚点全空即丢）；运行期 identity 缺后缀仍 fail closed。
+            if rid.startswith("GTROW-") and not rid.startswith("GTROW-MINTED-"):
+                return rid
+            raise HStorePayloadError(
+                f"table {table_key!r} 的 sibling identity {rid!r} 缺命名空间后缀 {suffix!r}"
+            )
+        return rid[: -len(suffix)]
+
+    values: dict[str, Any] = {}
+    for key, value in dict(projection.values).items():
+        text = str(key)
+        if not text.startswith(prefix):
+            values[text] = value
+            continue
+        rest = text[len(prefix):]
+        rid, sep, field_id = rest.partition("/")
+        if not sep:
+            raise HStorePayloadError(f"stable key {text!r} 缺 field_id 段")
+        mapped = map_id(rid)
+        values[f"{prefix}{mapped}/{field_id}"] = (
+            dc_replace(value, row_key=mapped)
+            if getattr(value, "row_key", None) is not None
+            else value
+        )
+    rows = tuple(map_id(str(r)) for r in dict(projection.row_keys).get(table_key, ()))
+    return Projection(
+        contract_id=projection.contract_id,
+        semantic_version=projection.semantic_version,
+        document_type=projection.document_type,
+        values=values,
+        row_keys={table_key: rows},
+    )
+
+
+def merge_projection_into_store_rows_for(
+    identity: HEntryIdentity,
+    specs: Sequence[Any],
+    *,
+    projection: Any,
+    base_rows: list[Mapping[str, Any]],
+    store_item_id: str | None = None,
+) -> Any:
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        merge_projection_into_store_rows as _engine,
+    )
+
+    hits = _specs_sharing_store_item(identity, specs, store_item_id)
+    if len(hits) == 1:
+        return _engine(hits[0], projection=projection, base_rows=base_rows)
+    # 多表共用一个 store：按表切片后**依次**合进同一组行（两区共享行身份，
+    # 后一张表在前一张的结果上补自己那组嵌套字段）。计数取并集口径。
+    rows: list = list(base_rows)
+    added = removed = 0
+    touched: set[str] = set()
+    for index, spec in enumerate(hits):
+        sliced = _projection_slice_for(projection, spec.table_key)
+        if index:
+            sliced = _namespace_projection_rows(sliced, spec.table_key, encode=False)
+        rows, a, r, t = _engine(
+            spec, projection=sliced, base_rows=rows
+        )
+        added, removed = max(added, a), max(removed, r)
+        touched |= set(t)
+    return rows, added, removed, touched
+
+
+def iter_store_rows_for(
+    identity: HEntryIdentity, specs: Sequence[Any], payload: Any, *, store_item_id: str | None = None
+) -> Any:
+    from app.services.workpaper_sync.phase5_row_table_sheet import iter_store_rows as _engine
+
+    # 多表共用 store 时行集合相同（同一行同时在各区），取第一张表的口径遍历即可
+    return _engine(_specs_sharing_store_item(identity, specs, store_item_id)[0], payload)
+
+
+def authority_model_payload(identity: HEntryIdentity) -> dict[str, Any]:
+    return {
+        "schema_version": "authority-model-definition:v1",
+        "authority_model": H_ENTRY_AUTHORITY_MODEL.value,
+        "content_authority": "structured_projection",
+        "merge_model": "stable_field_three_way",
+        "required_slots": [
+            _BundleSlot.template.value,
+            _BundleSlot.instrumentation.value,
+            _BundleSlot.contract.value,
+        ],
+        "entry_id": identity.entry_id,
+        "pilot_class": identity.phase5_wave,
+    }
+
+
+@dataclass(frozen=True)
+class HEntryDefinitions:
+    entry_id: str
+    adapter_id: str
+    authority_model_definition_id: _uuid.UUID
+    authority_model_definition_sha256: str
+    template_definition_id: _uuid.UUID
+    template_definition_sha256: str
+    instrumentation_definition_id: _uuid.UUID
+    instrumentation_definition_sha256: str
+    contract_definition_id: _uuid.UUID
+    contract_definition_sha256: str
+    bundle_id: _uuid.UUID
+    bundle_sha256: str
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "entry_id": self.entry_id,
+            "adapter_id": self.adapter_id,
+            "authority_model": H_ENTRY_AUTHORITY_MODEL.value,
+            "authority_model_definition_id": str(self.authority_model_definition_id),
+            "authority_model_definition_sha256": self.authority_model_definition_sha256,
+            "template_definition_id": str(self.template_definition_id),
+            "template_definition_sha256": self.template_definition_sha256,
+            "instrumentation_definition_id": str(self.instrumentation_definition_id),
+            "instrumentation_definition_sha256": self.instrumentation_definition_sha256,
+            "contract_definition_id": str(self.contract_definition_id),
+            "contract_definition_sha256": self.contract_definition_sha256,
+            "definition_bundle_id": str(self.bundle_id),
+            "definition_bundle_sha256": self.bundle_sha256,
+        }
+
+
+async def publish_h_entry_definitions(
+    identity: HEntryIdentity,
+    specs: Sequence[Any],
+    *,
+    publisher: Any,
+    contract_payload_builder: Any,
+) -> HEntryDefinitions:
+    """authority → template → instrumentation → contract → bundle（顺序不可颠倒）。
+
+    🔴 契约先过 source 双向锁再发布；template / instrumentation 的已发布 digest 必须
+    等于契约声明（单向引用），不等即抛 —— 不得绑上一个两边各自自洽而合起来不一致的 bundle。
+    """
+    contract = assert_contract_file_matches_source(identity, contract_payload_builder())
+    authority = await publisher.publish_definition(
+        kind=_DefinitionKind.authority_model,
+        payload=authority_model_payload(identity),
+        logical_id=f"{identity.adapter_id}.authority-model",
+        semantic_version="1.0.0",
+    )
+    template_payload = template_definition_payload(identity, specs)
+    template = await publisher.publish_definition(
+        kind=_DefinitionKind.template,
+        payload=template_payload,
+        logical_id=f"{identity.adapter_id}.template",
+        semantic_version="1.0.0",
+        blob_bytes=read_authoritative_template(identity),
+        structure_hash=template_payload["normalized_structure_hash"],
+    )
+    instrumentation = await publisher.publish_definition(
+        kind=_DefinitionKind.instrumentation,
+        payload=instrumentation_definition_payload(identity, specs),
+        logical_id=f"{identity.adapter_id}.instrumentation",
+        semantic_version="1.0.0",
+    )
+    contract_definition = await publisher.publish_definition(
+        kind=_DefinitionKind.contract,
+        payload=dict(contract.canonical_payload),
+        logical_id=identity.adapter_id,
+        semantic_version=contract.semantic_version,
+    )
+    if template.sha256 != contract.template_definition_sha256:
+        raise HEntrySelectionError(
+            f"{identity.entry_id}: 已发布 template digest {template.sha256} 与契约声明 "
+            f"{contract.template_definition_sha256} 不一致 —— 单向引用断裂"
+        )
+    if instrumentation.sha256 != contract.instrumentation_definition_sha256:
+        raise HEntrySelectionError(
+            f"{identity.entry_id}: 已发布 instrumentation digest {instrumentation.sha256} "
+            f"与契约声明 {contract.instrumentation_definition_sha256} 不一致 —— 单向引用断裂"
+        )
+
+    def _slot(defn: Any) -> dict[str, Any]:
+        return {"type": "definition", "ref": f"definition:{defn.definition_id}", "digest": defn.sha256}
+
+    bundle = await publisher.publish_bundle(
+        authority_model_definition_id=authority.definition_id,
+        authority_model=H_ENTRY_AUTHORITY_MODEL,
+        authority_model_definition_sha256=authority.sha256,
+        slots={
+            _BundleSlot.template: _slot(template),
+            _BundleSlot.instrumentation: _slot(instrumentation),
+            _BundleSlot.contract: _slot(contract_definition),
+        },
+    )
+    return HEntryDefinitions(
+        entry_id=identity.entry_id,
+        adapter_id=identity.adapter_id,
+        authority_model_definition_id=authority.definition_id,
+        authority_model_definition_sha256=authority.sha256,
+        template_definition_id=template.definition_id,
+        template_definition_sha256=template.sha256,
+        instrumentation_definition_id=instrumentation.definition_id,
+        instrumentation_definition_sha256=instrumentation.sha256,
+        contract_definition_id=contract_definition.definition_id,
+        contract_definition_sha256=contract_definition.sha256,
+        bundle_id=bundle.bundle_id,
+        bundle_sha256=bundle.canonical_sha256,
+    )
+
+
+__all__ += [
+    "H_ENTRY_AUTHORITY_MODEL",
+    "HEntryDefinitions",
+    "primary_instrumentation_spec",
+    "spec_of_store_item",
+    "build_store_projection_for",
+    "merge_projection_into_store_rows_for",
+    "iter_store_rows_for",
+    "authority_model_payload",
+    "publish_h_entry_definitions",
+]
