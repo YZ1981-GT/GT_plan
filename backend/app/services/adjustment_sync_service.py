@@ -1,6 +1,6 @@
 """底稿调整分录 → 集中式登记 汇聚服务
 
-spec: workpaper-adjustment-centralization
+spec: workpaper-adjustment-centralization + chain-closure-phase3-push-rollout Task 5
 
 把各循环底稿调整分录 tab（存 checklist_responses JSON）的一组分录，汇聚为集中式
 `adjustments`/`adjustment_entry` 记录（`origin='workpaper'`），供 Adjustments.vue 集中
@@ -8,6 +8,10 @@ spec: workpaper-adjustment-centralization
 
 关键约束：
 - **幂等** by `source_ref = {wp_id}:{item_id}`：重存更新、删除清理、approved 锁定。
+- **内容签名去重**（ADR-P3-008）：同一 source_ref 再次同步时，先比内容签名
+  （类型+摘要+逐行科目/名称/报表行/借/贷）。相同 → 不写库、不换编号、原样返回；
+  不同 → 原地更新（保组号与编号，软删旧行写新行），pending_review/rejected 回 draft；
+  approved → APPROVED_LOCKED 拒绝。
 - **不发 ADJUSTMENT_CREATED 事件**：workpaper origin 调整已由审定表 writeback 体现在
   `trial_balance.audited_amount`，不再经 recalc 路径写 `aje_adjustment`（Req4 消除双计）。
 - **零回归**：只新增汇聚通道，既有底稿→审定表→TB 链路一行不改。
@@ -15,6 +19,7 @@ spec: workpaper-adjustment-centralization
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -59,6 +64,60 @@ class AdjustmentSyncService:
         return f"{wp_id}:{item_id}"
 
     # ------------------------------------------------------------------
+    # 内容签名（ADR-P3-008）
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _compute_content_signature(
+        adjustment_type: "AdjustmentType",
+        description: str | None,
+        resolved_codes: list[str],
+        line_items: list,
+    ) -> str:
+        """内容签名 = sha256(类型 + 摘要 + 逐行：科目/名称/报表行/借/贷)。
+
+        用于判断底稿分录内容是否有变化。签名相同 → 不写库；不同 → 原地更新。
+        """
+        parts: list[str] = [
+            str(adjustment_type.value if hasattr(adjustment_type, "value") else adjustment_type),
+            description or "",
+        ]
+        for code, li in zip(resolved_codes, line_items):
+            parts.append("|".join([
+                code,
+                (li.account_name or "").strip(),
+                (li.report_line_code or "").strip(),
+                str(li.debit_amount or 0),
+                str(li.credit_amount or 0),
+            ]))
+        raw = "\n".join(parts)
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
+
+    @staticmethod
+    def _compute_existing_signature(
+        adj_rows: list["Adjustment"],
+        entry_rows: list["AdjustmentEntry"],
+    ) -> str:
+        """从已存在的 ORM 行计算内容签名（与请求签名同口径）。"""
+        if not adj_rows:
+            return ""
+        head = adj_rows[0]
+        parts: list[str] = [
+            str(head.adjustment_type.value if hasattr(head.adjustment_type, "value") else head.adjustment_type),
+            head.description or "",
+        ]
+        # entry_rows 已按 line_no 排序
+        for e in entry_rows:
+            parts.append("|".join([
+                e.standard_account_code or "",
+                (e.account_name or "").strip(),
+                (e.report_line_code or "").strip(),
+                str(e.debit_amount or 0),
+                str(e.credit_amount or 0),
+            ]))
+        raw = "\n".join(parts)
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
+
+    # ------------------------------------------------------------------
     # sync_from_workpaper
     # ------------------------------------------------------------------
     async def sync_from_workpaper(
@@ -67,7 +126,14 @@ class AdjustmentSyncService:
         data: AdjustmentSyncRequest,
         user_id: UUID,
     ) -> AdjustmentGroupResponse:
-        """底稿分录组 → 集中登记（幂等 by source_ref）。"""
+        """底稿分录组 → 集中登记（幂等 by source_ref + 内容签名去重）。
+
+        ADR-P3-008：
+        - 相同内容 → 不写库、不换编号、原样返回
+        - 不同内容 → 原地更新（保 entry_group_id 与 adjustment_no），
+          pending_review/rejected 回 draft 并清复核信息；approved → APPROVED_LOCKED
+        - 新建 → 正常建组
+        """
         source_ref = self.build_source_ref(data.wp_id, data.item_id)
 
         # 1. 借贷平衡校验
@@ -89,42 +155,97 @@ class AdjustmentSyncService:
                 detail={"unresolved": unresolved},
             )
 
-        # 3. 幂等：查 source_ref 活跃分录组
+        # 3. 计算请求的内容签名
+        new_sig = self._compute_content_signature(
+            data.adjustment_type, data.description, resolved, data.line_items,
+        )
+
+        # 4. 幂等：查 source_ref 活跃分录组
         existing_rows = await self._get_active_rows_by_source_ref(project_id, source_ref)
         if existing_rows:
             status = existing_rows[0].review_status
+            group_id = existing_rows[0].entry_group_id
+            adj_no = existing_rows[0].adjustment_no
+
+            # approved → 拒绝
             if status == ReviewStatus.approved:
                 raise AdjustmentSyncError(
                     "APPROVED_LOCKED",
                     "该底稿调整已在集中登记复核通过，需先撤回复核方可重新同步。",
-                    detail={"entry_group_id": str(existing_rows[0].entry_group_id)},
+                    detail={"entry_group_id": str(group_id)},
                 )
-            # 协作锁（adjustment-collaboration-and-propagation）：活跃协作期间禁止 re-sync 覆盖协作补充。
-            # 懒导入避免与 collaboration_service 的循环依赖；无协作时逐位零回归。
+
+            # 协作锁（adjustment-collaboration-and-propagation）
             from app.services.adjustment_collaboration_service import (
                 has_active_collaboration,
             )
-            if await has_active_collaboration(
-                self.db, project_id, existing_rows[0].entry_group_id
-            ):
+            if await has_active_collaboration(self.db, project_id, group_id):
                 raise AdjustmentSyncError(
                     "COLLABORATION_LOCKED",
                     "该分录组存在进行中的协作补充，需待协作确认/退回后方可重新同步。",
-                    detail={"entry_group_id": str(existing_rows[0].entry_group_id)},
+                    detail={"entry_group_id": str(group_id)},
                 )
-            # 软删旧组（Adjustment 行 + AdjustmentEntry 行）
-            group_id = existing_rows[0].entry_group_id
+
+            # 比较内容签名 —— 相同则不写库、不换编号
+            old_entries = await self._adj._get_entry_rows(group_id)
+            old_sig = self._compute_existing_signature(existing_rows, old_entries)
+            if new_sig == old_sig:
+                return self._adj._build_group_response(
+                    group_id, adj_no, existing_rows[0].adjustment_type,
+                    existing_rows[0].description, status,
+                    existing_rows, old_entries,
+                    existing_rows[0].created_by,
+                )
+
+            # 内容变化 → 原地更新（保组号与编号，软删旧行写新行）
+            # pending_review / rejected 回 draft 并清复核信息
             for row in existing_rows:
                 row.soft_delete()
-            for e in await self._adj._get_entry_rows(group_id):
+            for e in old_entries:
                 e.soft_delete()
             await self.db.flush()
 
-        # 4. 写入新分录组（origin='workpaper', source_ref, review_status=draft）
+            # 写入新行（复用组号 + 编号）
+            return await self._write_group_rows(
+                project_id=project_id,
+                data=data,
+                resolved=resolved,
+                source_ref=source_ref,
+                user_id=user_id,
+                entry_group_id=group_id,
+                adjustment_no=adj_no,
+            )
+
+        # 5. 新建分录组
         adjustment_no = await self._adj._next_adjustment_no(
             project_id, data.year, data.adjustment_type
         )
         entry_group_id = uuid.uuid4()
+        return await self._write_group_rows(
+            project_id=project_id,
+            data=data,
+            resolved=resolved,
+            source_ref=source_ref,
+            user_id=user_id,
+            entry_group_id=entry_group_id,
+            adjustment_no=adjustment_no,
+        )
+
+    # ------------------------------------------------------------------
+    # _write_group_rows（内部：写入一组 Adjustment + AdjustmentEntry 行）
+    # ------------------------------------------------------------------
+    async def _write_group_rows(
+        self,
+        *,
+        project_id: UUID,
+        data: AdjustmentSyncRequest,
+        resolved: list[str],
+        source_ref: str,
+        user_id: UUID,
+        entry_group_id: UUID,
+        adjustment_no: str,
+    ) -> AdjustmentGroupResponse:
+        """写入新分录组行。抽取自 sync_from_workpaper 以消除新建/更新的代码重复。"""
         adj_rows: list[Adjustment] = []
         entry_rows: list[AdjustmentEntry] = []
         for idx, (li, code) in enumerate(zip(data.line_items, resolved), start=1):
@@ -163,8 +284,6 @@ class AdjustmentSyncService:
             entry_rows.append(entry)
 
         await self.db.flush()
-
-        # 注意：**不发布 ADJUSTMENT_CREATED**（Req4.2：workpaper origin 不进 recalc）。
 
         return self._adj._build_group_response(
             entry_group_id, adjustment_no, data.adjustment_type,

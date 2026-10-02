@@ -879,10 +879,14 @@ class AdjustmentService:
         adj_type: AdjustmentType,
     ) -> str:
         """生成下一个编号 AJE-001 / RJE-001（使用 pg_advisory_xact_lock 防并发竞争）"""
+        import hashlib
         from sqlalchemy import text as sa_text
         prefix = "AJE" if adj_type == AdjustmentType.aje else "RJE"
-        # 使用 advisory lock 防止并发竞争产生重复编号
-        lock_key = hash(f"{project_id}:{year}:{prefix}") % (2**31)
+        # 稳定摘要 —— 跨进程 / 跨重启一致（ADR-P3-005 / ADR-P3-008）
+        raw = f"{project_id}:{year}:{prefix}"
+        lock_key = int.from_bytes(
+            hashlib.sha256(raw.encode("utf-8")).digest()[:4], "big", signed=False,
+        ) % (2**31)
         # SQLite 测试 dialect 没有 pg_advisory_xact_lock，跳过（单进程测试隔离即可）
         bind = self.db.get_bind()
         if bind is None or bind.dialect.name != "sqlite":
