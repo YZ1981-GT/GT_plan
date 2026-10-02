@@ -332,7 +332,7 @@ entry 数 155→138 后它们与 manifest 的对账不再闭合。**处置 = 只
 
 ### 阶段 0：前置门 + 几何补测 + 红判据
 
-- [ ] 0. 前置依赖核查（`git show HEAD:`）
+- [x] 0. 前置依赖核查（`git show HEAD:`）
   - `RowTableSheetSpec`（12 子区依赖）· `phase5_transposed_sheet.TransposedSheetSpec`（G5-9 依赖）·
     `StoreMergePlan.oo_crash_neutralization_fn`（GC-2）· **模板覆盖层交付状态**（Req 2 的默认①依赖它）
   - foundation 的 GC-1~GC-10 交付状态；`g4-g6` spec 的 16384 裁决是否已定（Req 4.2 须同源）
@@ -390,7 +390,7 @@ entry 数 155→138 后它们与 manifest 的对账不再闭合。**处置 = 只
 
 ### 阶段 2：主受管表 G5-2 三段接入
 
-- [ ] 8. `phase5_g5_long_term_receivable.py` entry 层从零建
+- [x] 8. `phase5_g5_long_term_receivable.py` entry 层从零建
   - `ENTRY_ID="xlsx/gt-g5-long-term-receivable"` / `ADAPTER_ID="g5.long_term_receivable_detail"` /
     `WP_CODES={"G5L"}`（幻影码）/ `TEMPLATE_RELATIVE_PATH="G/G5 长期应收款.xlsx"` /
     `TEMPLATE_SHA256="c59bba69789eba3f…"`（Task 1 逐字补全 64 位）
@@ -399,7 +399,7 @@ entry 数 155→138 后它们与 manifest 的对账不再闭合。**处置 = 只
     但中性化是 per-file 故仍挂」）；HTTP 客户端 `api`（FD-2）
   - _Requirements: 5.3_
 
-- [ ] 9. `phase5_g5_02_balance_detail.py` 段（一）四子区（首批，验通嵌套声明）
+- [x] 9. `phase5_g5_02_balance_detail.py` 段（一）四子区（首批，验通嵌套声明）
   - `g502-s1r1`~`s1r4`：R13-17 / R20-24 / R27-31 / R34-38，各自 footer 指本子区小计（R18/R25/R32/R39）
   - 共享 `store_item_id="G5-2-rows"`；行身份 `id`(uuid)；`formula_columns=("G","J","M")`
     （`G=D+E+F` · `J=D+H-I` · `M=J+K+L`）；表头 R10/R11（R11 是 N-R 账龄段）
@@ -412,7 +412,7 @@ entry 数 155→138 后它们与 manifest 的对账不再闭合。**处置 = 只
   - 段（三）行号取 Task 2 逐格补测结果（**不用推断值**），小计 R82/R89/R96/R103
   - _Requirements: 1.2, 1.4_
 
-- [ ]* 11. G5-9 转置声明（16384 策略与 g4-g6 同源）
+- [x]* 11. G5-9 转置声明（16384 策略与 g4-g6 同源）
   - `phase5_g5_09_ecl_stage.py`：`TransposedSheetSpec`，实体列/三块锚行取 Task 2 实测值
   - 🔴 UUID 放**有效内容列 +1**，与 `g4-g6` 裁决 G46-H3 **引用同一条规则**（P10）
   - `TransposedSheetSpec` 未入 HEAD ⇒ 登记 HTML-only + 解锁条件
@@ -420,7 +420,7 @@ entry 数 155→138 后它们与 manifest 的对账不再闭合。**处置 = 只
 
 ### 阶段 3：发布链 + 核 + 收口
 
-- [ ]* 12. 契约发布链五环 + 六登记点 + 宿主接桥 + 真栈验收（**不 seed**）
+- [x]* 12. 契约发布链五环 + 六登记点 + 宿主接桥 + 真栈验收（**不 seed**）
   - `generate_phase5_g5_contract.py --apply` → `g5.long_term_receivable_detail.json` → 五环
   - `GtG5LongTermReceivable.vue` 引入 `useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost`，保留 legacy(4) + notice(3)
   - `e2e/fixtures/g5-l2-cases.json`，`--workers=1`；🔴 真库已有 572+572 B ⇒ **不交付 seed**，

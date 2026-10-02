@@ -141,7 +141,7 @@ A 类退网宿主 **17/17 未提交**，批准等于把签名落在可能从未�
 
 ### 阶段 2：G4 三条 lane
 
-- [ ] 7. `phase5_g4_bond_investment.py` entry 层从零建（三条共用模块、三个 `ADAPTER_ID`）
+- [x] 7. `phase5_g4_bond_investment.py` entry 层从零建（三条共用模块、三个 `ADAPTER_ID`）
   - `g4.bond_main` / `g4.sppi_inventory` / `g4.ecl_stage`；三条**共用** `TEMPLATE_SHA256="da3a3480d37a4b95…"`
     （裁决 G46-H2：契约钉同一份字节，pointer 靠 `entry_id` 区分）
   - 三个 `build_matcher()` 各带互斥 `sheet_keys`（G4A/G4-1~4 · G4-5~8 · G4-9~13）+ `document_type="xlsx"`
@@ -165,7 +165,7 @@ A 类退网宿主 **17/17 未提交**，批准等于把签名落在可能从未�
     （G 循环唯一模板自带插行声明）
   - _Requirements: 4.1, 4.3_
 
-- [ ]* 10. G4-ecl 转置声明 + 16384 列裁决落地
+- [x]* 10. G4-ecl 转置声明 + 16384 列裁决落地
   - `phase5_g4_09_ecl_stage.py`：`TransposedSheetSpec` / `G4-9-rows` / `id`(uuid) / 表头 R9 /
     实体列 `投资1：`~`投资X：` / 三块锚行 R24/R32/R46（`footer_carries_total_formula=False`）/ `formula_columns=()`
   - 🔴 16384 列按裁决 G46-H3 取①：UUID 放**有效内容列 11 + 1 = 第 12 列**；P6 转绿
@@ -173,7 +173,7 @@ A 类退网宿主 **17/17 未提交**，批准等于把签名落在可能从未�
   - P4 / P5 / P7 转绿
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ]* 11. G4 三条发布链 + 宿主接桥 + pointer 隔离真验
+- [x]* 11. G4 三条发布链 + 宿主接桥 + pointer 隔离真验
   - 三条各走五环；🔴 **第三条发布时 P1 必须仍绿**（证明 pointer 不互顶，这是 BP-8 的真验收点）
   - 三个宿主（`GtG4BondInvestmentMain/Sppi/Ecl.vue`）各引入 `useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost`，
     保留 legacy 与 `GtEntrySyncCapabilityNotice`
@@ -182,31 +182,31 @@ A 类退网宿主 **17/17 未提交**，批准等于把签名落在可能从未�
 
 ### 阶段 3：G6 三条 lane
 
-- [ ] 12. `phase5_g6_other_bond.py` entry 层从零建（同 G4 范式）
+- [x] 12. `phase5_g6_other_bond.py` entry 层从零建（同 G4 范式）
   - `g6.other_bond_main` / `g6.sppi_fair_value` / `g6.ecl_stage`；共用 `TEMPLATE_SHA256="63bf38c797d4612e…"`
   - 三条互斥 `sheet_keys`（G6A/G6-1~4 · G6-5~10 · G6-11~15）；🔴 三条挂中性化（G6 册 192 格裸 IF）
   - 🔴 三条的 HTTP 客户端全是 **`http`**（FD-2）⇒ 守卫探针按登记名拼（P10）
   - _Requirements: 1.1, 1.2, 4.2, 5.3_
 
-- [ ] 13. `phase5_g6_02_main_detail.py`（多区，几何取 Task 2 补测结果）
+- [x] 13. `phase5_g6_02_main_detail.py`（多区，几何取 Task 2 补测结果）
   - `G6-2-rows` / `id` / R9/R10 两级表头 / 多区 + 多小计 /
     `formula_columns=("J","O","Q","U","V","W","X","Y","AD","AF")` / payload `dual_write`
   - 🔴 真库 `G6-2-rows` 是六条里唯一有行的（remark 0 / conclusion 2 = 空数组只落 conclusion）⇒
     判据 SHALL 覆盖「空数组落 conclusion」这一形态，不得假设 remark 非空
   - _Requirements: 4.1, 4.6_
 
-- [ ] 14. `phase5_g6_05_sppi_fair_value.py`（无表头行 + 行级 mask，依赖 Task 6 的 BP-7 已修）
+- [x] 14. `phase5_g6_05_sppi_fair_value.py`（无表头行 + 行级 mask，依赖 Task 6 的 BP-7 已修）
   - `G6-5-fair-value-data` / `id` / **无独立表头行**（R9 即数据）/ R9-18 / footer R19 `SUM(D9:D18)` /
     payload **`conclusion_only`**（写死 remark 会指向恒空列）
   - 🔴 行级 mask（B6）：`D` 列仅 R9/R10 有公式 ⇒ 按 F3-H4 行级处置，必要时拆两个 spec；P12 后半
   - _Requirements: 4.1, 4.5_
 
-- [ ]* 15. G6-ecl 转置声明（同 G4-ecl，注意区标题差异）
+- [x]* 15. G6-ecl 转置声明（同 G4-ecl，注意区标题差异）
   - `phase5_g6_11_ecl_stage.py`：表头 **R10**（🔴 R9 是区标题「（一）信用风险是否显著增加」，不得当表头）/
     三块锚行 R25/R33/R47 / UUID 第 12 列 / `formula_columns=()`
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ]* 16. G6 三条发布链 + 宿主接桥 + seed + 真栈验收
+- [x]* 16. G6 三条发布链 + 宿主接桥 + seed + 真栈验收
   - `backend/scripts/e2e/seed_g4_g6_publish_e2e.py`（幂等、`--dry-run` 可离线验）+
     `e2e/fixtures/g4-l2-cases.json` / `g6-l2-cases.json` + 两个 spec.ts，`--workers=1`
   - 🔴 六条主表真库全零或仅空数组 ⇒ **全部真栈用例前置 seed**；未 seed 时验收脚本显式失败（P17）
