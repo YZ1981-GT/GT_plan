@@ -40,20 +40,20 @@ export interface WorkpaperSyncManifestEntry {
   hasBrowserEvidence: boolean
 }
 
-export const WORKPAPER_SYNC_MANIFEST_DIGEST = "1cf5e73932305d28a71f0590a0e10db6caf1db941ce4ea8fabf906dc4c50d80b"
+export const WORKPAPER_SYNC_MANIFEST_DIGEST = "cbc6397b43f8d5e59ce8db24801460fdb2b1ab3f74b2556d01ff0863d823adf5"
 
-export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "3923c9ebc54d5d5a59b8c44e1b9208d0ff3c34cbf59f4c7aceeba518d4d02a92"
+export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "3f6de34b69d5ab21e2cd2b651c5a86a8a9e8900abf8d3e47a26bfb15416a6f05"
 
 export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "by_component": {
-    "GtOnlyOfficeSheet": 241,
+    "GtOnlyOfficeSheet": 242,
     "OnlyOfficeWordDialog": 2,
     "WorkpaperWordEditor": 4
   },
   "capability_counts": {
-    "bidirectional": 17,
+    "bidirectional": 18,
     "single_html": 5,
-    "single_onlyoffice": 132,
+    "single_onlyoffice": 131,
     "unreachable": 1
   },
   "dispatcher_count": 1,
@@ -64,8 +64,8 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "entry_count": 155,
   "host_count": 154,
   "independent_entry_count": 142,
-  "legacy_fake_bidirectional_count": 124,
-  "mount_count": 247,
+  "legacy_fake_bidirectional_count": 123,
+  "mount_count": 248,
   "parent_duplicate_count": 12,
   "room_model_counts": {
     "exclusive": 6,
@@ -80,7 +80,7 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
     "xlsx.editable.shared.single.room_service_wired.v1": 147,
     "xlsx.unreachable.none.single.room_service_wired.v1": 1
   },
-  "unadjudicated_count": 119,
+  "unadjudicated_count": 118,
   "unreachable_count": 1
 } as const
 
@@ -3604,7 +3604,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-l6-special-payables",
@@ -3612,19 +3612,16 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtL6SpecialPayables.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
+        ":sheet-name=\"props.sheetName || 'L6A'\"",
         ":sheet-name=\"props.sheetName\""
       ],
       "sheet_literals": [],

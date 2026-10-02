@@ -27,6 +27,7 @@ from app.services.workpaper_sync import (  # noqa: E402
     phase5_l3_long_term_loans as _l3,
     phase5_l4_bonds_payable as _l4,
     phase5_l7_other_noncurrent_liabilities as _l7,
+    phase5_l6_special_payables as _l6,
 )
 from app.services.workpaper_sync.definitions import canonical_digest  # noqa: E402
 
@@ -37,6 +38,7 @@ _PROVIDERS = {
     _l3.ADAPTER_ID: _l3,
     _l4.ADAPTER_ID: _l4,
     _l7.ADAPTER_ID: _l7,
+    _l6.ADAPTER_ID: _l6,
 }
 
 

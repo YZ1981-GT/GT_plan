@@ -801,6 +801,15 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="L7-L7-2-full-data", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── L6（spec l6-true-bidirectional）：受管 明细表L6-2（科目 2711，整册唯一数据录入源）；
+    #    store 单键 `L6-L6-2-rows`（非 L7 的 -full-data）；sibling L6-L6-2-row-N-end_balance
+    #    不预登记。受管表零裸 IF，整册裸 IF 仅 审定表L6-1 11 格 ⇒ per-file 中性化照挂 ──
+    "l6.special_payables": StoreMergePlan(
+        adapter_id="l6.special_payables",
+        provider_module="phase5_l6_special_payables",
+        items=(StoreItemSpec(item_id="L6-L6-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
 }
 
 

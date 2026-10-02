@@ -198,6 +198,37 @@ _ROWS: tuple[dict[str, Any], ...] = (
             "wp_count_with_payload": 0,
         },
     },
+    {
+        "entry_id": "xlsx/gt-l6-special-payables",
+        "contract_id": "l6.special_payables",
+        "wp_codes": ["L6"],
+        "resolvable_for_provisioning": True,
+        "matcher_domain_conflict": None,
+        "basis": {
+            "heuristic_is_wrong_because": "manifest 幻影码 L6S 经 wp_template_finder 单册与 sheet 级均零命中（GtL6SpecialPayables → L6S 是幻影码）",
+            "heuristic_would_say": ["L6S"],
+            "managed_excel_name": "明细表L6-2",
+            "template_relative_path": "L/L6 专项应付款.xlsx",
+            "wp_index_evidence": (
+                "受管 明细表L6-2 是整册 9 sheet 工作簿里的一张（L6 整册唯一的数据录入源，"
+                "审定表 L6-1 / 两张附注 / 检查表 L6-4 全部跨 sheet 引用它），不是独立文件 ⇒ "
+                "目标码取持有整册文件（科目 2711 专项应付款）的 L6；判据用 `COALESCE(file_path,'') <> ''`（L1 空串陷阱）。"
+            ),
+        },
+        "store_payload_evidence": {
+            "max_payload_bytes": 0,
+            "measured_at": "2026-10-01",
+            "store_item_id": "L6-L6-2-rows",
+            "why_null": (
+                "本 item 真库 `L6-L6-2-%` 现算 0 行（明细表从未录入，空表单是合法业务事实）；"
+                "旧 L6-L6-2-rows 用过的 key 字段已收敛到稳定 rowId（newRowIdentity('l62det')），"
+                "零迁移负担。真库 L6 载荷仅 5 行 `l-cycle-canary-e2e` 夹具（L6-adj-* / "
+                "L6-chk-conclusion），键属 审定表L6-1 相关，不属受管表 L6-2。"
+            ),
+            "wp_code_with_payload": None,
+            "wp_count_with_payload": 0,
+        },
+    },
 )
 
 

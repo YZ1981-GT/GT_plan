@@ -1,5 +1,5 @@
 {
-  "adjudication_digest": "16667da56c94fb1b8d4c02aa26e7b2f0ed403de96dae241da8934731a11b317f",
+  "adjudication_digest": "f335bbc053924e026cbacb94236440baf2a4da25df305ad9bf70aacce5693915",
   "adjudication_digest_algorithm": "sha256(json.dumps(adjudications, sort_keys=True, ensure_ascii=False, separators=(',',':')).encode('utf-8')).hexdigest()",
   "adjudication_digest_note": "🔴 2026-09-04：原 digest 的算法全仓无处记载（只有它自己出现一次），无法复算 ⇒ 改文件后留着它就是把错值当基线锁死。已换成算法自带的形态，见 `adjudication_digest_algorithm`。原值 c8b2bc2031e4041b143e6df973ee3d87ef641a23c28a5289b0da799ab3606125",
   "adjudications": [
@@ -1570,6 +1570,32 @@
       },
       "wp_codes": [
         "L7"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 幻影码 L6S 经 wp_template_finder 单册与 sheet 级均零命中（GtL6SpecialPayables → L6S 是幻影码）",
+        "heuristic_would_say": [
+          "L6S"
+        ],
+        "managed_excel_name": "明细表L6-2",
+        "template_relative_path": "L/L6 专项应付款.xlsx",
+        "wp_index_evidence": "受管 明细表L6-2 是整册 9 sheet 工作簿里的一张（L6 整册唯一的数据录入源，审定表 L6-1 / 两张附注 / 检查表 L6-4 全部跨 sheet 引用它），不是独立文件 ⇒ 目标码取持有整册文件（科目 2711 专项应付款）的 L6；判据用 `COALESCE(file_path,'') <> ''`（L1 空串陷阱）。"
+      },
+      "contract_id": "l6.special_payables",
+      "entry_id": "xlsx/gt-l6-special-payables",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-01",
+        "store_item_id": "L6-L6-2-rows",
+        "why_null": "本 item 真库 `L6-L6-2-%` 现算 0 行（明细表从未录入，空表单是合法业务事实）；旧 L6-L6-2-rows 用过的 key 字段已收敛到稳定 rowId（newRowIdentity('l62det')），零迁移负担。真库 L6 载荷仅 5 行 `l-cycle-canary-e2e` 夹具（L6-adj-* / L6-chk-conclusion），键属 审定表L6-1 相关，不属受管表 L6-2。",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      },
+      "wp_codes": [
+        "L6"
       ]
     }
   ],

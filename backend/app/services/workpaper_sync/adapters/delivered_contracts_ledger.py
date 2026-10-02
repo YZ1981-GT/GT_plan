@@ -2694,4 +2694,33 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "`adapter_registered=False` 是顺序：五环发布后再翻 manifest。"
         ),
     },
+    # ── L 循环第六条（spec: l6-true-bidirectional-2026-10-01）────────────────────────
+    {
+        "contract_id": "l6.special_payables",
+        "provider_module": "app.services.workpaper_sync.phase5_l6_special_payables",
+        "delivered_by_task": "l6-true-bidirectional-2026-10-01-task-3",
+        "pilot_class": "l_cycle_special_payables",
+        "entry_id": "xlsx/gt-l6-special-payables",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "L/L6 专项应付款.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "L 循环第六条（spec l6-true-bidirectional），受管 `明细表L6-2`（科目 2711 专项应付款）："
+            "L6 整册唯一的数据录入源（审定表 L6-1 / 两张附注 / 检查表 L6-4 全部跨 sheet 引用它），"
+            "HTML 子组件 L6TabDetail.vue 是其忠实渲染（24 有效业务列 A~X 语义逐列对齐、行动态、"
+            "公式一致、持久化已是单 item JSON 数组 `L6-L6-2-rows`，非 L7 的 -full-data）。两级表头 "
+            "r8/r9、数据区 r10~r19（10 行，A 列预置 1~10 整数序号骨架）、footer A20「合计」"
+            "（C20~T20 连续 =SUM）、A..X 24 字段按列位置与前端 L6DetailRow 对齐（fundSource/"
+            "approvalNo/purpose 三字段 HTML-only 不入契约）；六个公式列 G=C+D-E-F / P=C+H+I / "
+            "Q=D+J+M / R=E+K+N / S=F+L+O / T=P+Q-R-S（负债口径），OO 侧不得被值覆盖；UUID 列 AH"
+            "（物理 max_column=AG(33)，Y..AG 全空，取右侧首个空列，避开 M~X 打印/业务区）。"
+            "store 已改稳定 rowId（私有 Date.now+Math.random 生成器收敛到共享 "
+            "newRowIdentity('l62det')，已有 rowId 优先不重铸）；sibling L6-L6-2-row-N-end_balance "
+            "不预登记。审定表 L6-1 是 R7~R16 全跨 sheet 公式的下游视图（非录入表），不选 canary。"
+            "受管表零裸 IF / 零 #REF!，整册裸 IF 仅 审定表L6-1 11 格（per-file 中性化照挂）。"
+            "sanitize 非必需（受管 sheet 共享公式组 0、整册无 external/OLE）。真库 `L6-L6-2-%` "
+            "现算 0 行，零迁移负担。`adapter_registered=False` 是顺序：五环发布后再翻 manifest。"
+        ),
+    },
 )
