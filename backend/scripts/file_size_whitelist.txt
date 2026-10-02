@@ -1207,3 +1207,4 @@ backend/tests/test_adjustments.py  1024
 backend/tests/test_batch_project_service.py  1113
 backend/tests/test_disclosure_row_level_merge.py  803
 backend/tests/test_doc_ai_context_builder.py  1221
+backend/app/services/knowledge_index_service.py  1307

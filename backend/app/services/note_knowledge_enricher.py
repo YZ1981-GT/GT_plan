@@ -110,10 +110,32 @@ class NoteKnowledgeEnricher:
     # ------------------------------------------------------------------
     @staticmethod
     def _normalize_doc_filter(doc_filter: list[UUID] | list[str] | None) -> set[str] | None:
-        """把 doc_filter 归一为 str 集合；None/空 → None（不过滤）。"""
+        """把 doc_filter 归一为 str 集合（UUID 统一为小写规范形）；None/空 → None（不过滤）。"""
         if not doc_filter:
             return None
-        return {str(d).strip() for d in doc_filter if d is not None and str(d).strip()} or None
+        out: set[str] = set()
+        for d in doc_filter:
+            if d is None or not str(d).strip():
+                continue
+            raw = str(d).strip()
+            try:
+                out.add(str(UUID(raw)))
+            except (ValueError, TypeError, AttributeError):
+                out.add(raw)
+        return out or None
+
+    @staticmethod
+    def _restrict_ids(filter_set: set[str] | None) -> list[UUID]:
+        """doc_filter 中可解析为 UUID 的部分（按字符串排序，确定性）。"""
+        if not filter_set:
+            return []
+        ids: list[UUID] = []
+        for raw in sorted(filter_set):
+            try:
+                ids.append(UUID(raw))
+            except (ValueError, TypeError, AttributeError):
+                continue
+        return ids
 
     async def retrieve(
         self,
@@ -129,23 +151,32 @@ class NoteKnowledgeEnricher:
         """复用 semantic_search(scope='knowledge_doc'，含 project + Global_KB) 检索。
 
         - **Fail-Open**：异常/空命中 → 返回 []（Req1.3/6.1）。
-        - **doc_filter 后置过滤**（semantic_search 本身无 document/folder 参数）：
-          在 enricher 层按 `source_id ∈ doc_filter` 或 folder_path 匹配过滤（Req4.1/Property 9）。
+        - **doc_filter 下推**（spec knowledge-base-retrieval-and-authz-closure 5.5 / design §十 C5）：
+          可解析为 UUID 的文档/文件夹 ID 作为 ``restrict_to`` 交给检索内核，**在截断 top_k 之前**
+          生效（旧实现先取 top_k 再后置过滤，用户选中的文档只要排名靠后就被丢掉）。
+          内核之后再做一道后置校验：``source_id ∈ doc_filter`` 或 ``folder_ancestor_ids`` 与
+          doc_filter 有交集（按 ID 匹配，不再按易重名的文件夹名字符串）。
         - **权限透传**：`user` 交给 semantic_search 的权限过滤（Req4.4/Property 10），不越权跨客户项目。
         - 片段正文读结果 dict 的 `content` 键（已核实：非 content_text）；透传 is_stale/document_name/folder_path。
         """
         k = int(top_k or self._top_k)
+        filter_set = self._normalize_doc_filter(doc_filter)
+        restrict_to = self._restrict_ids(filter_set)
+        if filter_set is not None and not restrict_to:
+            # 过滤条件全是无法解析的值：不做「全库检索再过滤」，直接返回空（不静默扩大范围）
+            return []
+        kwargs: dict[str, Any] = {
+            "top_k": k,
+            "scope": "knowledge_doc",
+            "user": user,
+            "account_code": account_code,
+            "audit_area": audit_area,
+        }
+        if restrict_to:
+            kwargs["restrict_to"] = restrict_to
         try:
             svc = self._get_knowledge_service()
-            raw = await svc.semantic_search(
-                project_id,
-                query,
-                top_k=k,
-                scope="knowledge_doc",
-                user=user,
-                account_code=account_code,
-                audit_area=audit_area,
-            )
+            raw = await svc.semantic_search(project_id, query, **kwargs)
         except Exception as e:  # fail-open
             logger.warning("附注 RAG 检索失败，fail-open 返回空：%s", e)
             return []
@@ -153,17 +184,16 @@ class NoteKnowledgeEnricher:
         if not raw:
             return []
 
-        filter_set = self._normalize_doc_filter(doc_filter)
         citations: list[Citation] = []
         for r in raw:
             if not isinstance(r, dict):
                 continue
             source_id = str(r.get("source_id") or "").strip()
             folder_path = r.get("folder_path")
-            # doc_filter 后置过滤：source_id 命中，或 folder_path 命中
+            # 后置校验（纵深防御）：source_id 命中，或文档所在文件夹链上任一文件夹被点名
             if filter_set is not None:
-                fp = str(folder_path).strip() if folder_path else ""
-                if source_id not in filter_set and (not fp or fp not in filter_set):
+                ancestors = {str(a).strip() for a in (r.get("folder_ancestor_ids") or []) if a}
+                if source_id not in filter_set and not (ancestors & filter_set):
                     continue
             content = str(r.get("content") or "")  # ← content 键（已核实，非 content_text）
             snippet = content[:_SNIPPET_CHAR_CAP]
