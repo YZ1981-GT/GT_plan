@@ -8,7 +8,7 @@
           :model-value="renderMode"
           :options="renderModeOptions"
           size="small"
-          @change="(v: any) => dualMode.switchMode(v)"
+          @change="switchRenderMode"
         />
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g2-interest-receivable" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
@@ -231,7 +231,7 @@ import {
 import { useG2IntRecFormData } from './composables/useG2IntRecFormData'
 // 🔴 P14：`useG2DualMode` 是**共享基座** `useWorkpaperEntryDualMode` 的 G2 包装（59 行）。
 //    接桥 SHALL 保留它、**不内联展开** —— 基座被 30 个循环共同消费，删它会打断多个循环。
-import { useG2DualMode, type G2RenderMode } from './composables/useG2DualMode'
+import { useG2DualMode } from './composables/useG2DualMode'
 import { extractG2SheetCode, buildG2FallbackSheets } from './composables/g2SheetLabels'
 import { buildDirectoryHtmlData } from './composables/gCycleIndexRouting'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -244,6 +244,7 @@ import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // ── G2 canary 真双向（spec: g-cycle-sync-foundation-and-first-canary · Task 15）──
 // 受管 sheet（G2-2 明细表）走 syncBridge；非受管保留 legacy GtOnlyOfficeSheet（假双向，如实登记）。
 import { g2SheetKeyOf, isG2OoWiredRowsSheet } from './sync/g2ManagedSheets'
+import { useGRenderModeSwitch } from './sync/useGRenderModeSwitch'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
@@ -341,92 +342,23 @@ const ooSheetName = computed(
   () => dualMode.resolveOoSheetName() || props.sheetName || '应收利息实质性程序表G2A',
 )
 
-const renderMode = computed({
-  get: (): G2RenderMode => {
-    // 受管 sheet 的模式由 syncBridge 表达，不读 legacy dualMode ref
-    // （与 D4 的 isD4DetailSheet 分支同口径）。
-    return isG2SyncManagedSheet.value
-      ? (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html')
-      : dualMode.currentMode.value
-  },
-  set: (v: G2RenderMode) => {
-    // 受管 sheet 走 switchRenderMode（含 flush + forceSave），非受管走 legacy
-    if (isG2SyncManagedSheet.value) void switchRenderMode(v)
-    else void dualMode.switchMode(v)
-  },
+// 🔴 2026-09-30 迁移：手写的 renderMode/renderModeOptions/switchRenderMode/syncSwitching（~50 行）
+//    替换为共享 `useGRenderModeSwitch`。G2 是 foundation canary，交付时该 composable 还不存在；
+//    其余 14 个宿主已全部用它。13 份同构代码只有一份 = 改一处全修、漏一处全漏。
+const {
+  renderMode,
+  modeOptions: renderModeOptions,
+  switching: syncSwitching,
+  switchRenderMode,
+} = useGRenderModeSwitch({
+  bridge: syncBridge,
+  legacy: dualMode,
+  isManagedSheet: isG2SyncManagedSheet,
+  editorHostRef: syncEditorHostRef,
 })
-
-const renderModeOptions = computed(() => [
-  { label: '结构化视图', value: 'html' as const },
-  {
-    label: '在线编辑',
-    value: 'onlyoffice' as const,
-    // 受管 sheet：切换中 or 只读时禁用；非受管：OO 不可用时禁用
-    disabled: isG2SyncManagedSheet.value
-      ? (isReadonly.value || syncSwitching.value)
-      : !dualMode.isOoAvailable.value,
-  },
-])
 
 function onOoFallback(): void {
   dualMode.onOoFallback()
-}
-
-// ─── 受管 sheet 的模式切换编排（照 D4 `switchRenderMode` 三分支）───────────
-//
-// 🔴 为什么不直接 dualMode.switchMode：legacy 双模式对 syncBridge 一无所知。
-//    受管 sheet 必须经过桥：HTML → OO 走 `switchToOnlyOffice`（先 flush HTML 编辑
-//    → pending mutation → materialize → descriptor），OO → HTML 走 forceSave / clean close。
-//    跳过这一层会绕开 dirty 检查、descriptor 身份验证与 revision 保护。
-//
-// 三分支（与 D4 逐条同构）：
-//   1. 切到 OO：调 bridge.switchToOnlyOffice()（它内部先 flushHtml）
-//   2. 切回 HTML（有改动）：forceSave → 等 callback → reload
-//   3. 切回 HTML（无改动）：clean close，不发 forceSave 命令
-//      （否则 Command Service 返 no_changes → 界面一条红字、人还留在 OO）
-const syncSwitching = ref(false)
-
-async function switchRenderMode(target: G2RenderMode): Promise<void> {
-  if (target === renderMode.value) return
-  if (target === 'onlyoffice') {
-    if (!isG2SyncManagedSheet.value) return
-    syncSwitching.value = true
-    try {
-      await syncBridge.switchToOnlyOffice()
-    } catch {
-      // lastError / feedback 已由桥写入；保持 html
-    } finally {
-      syncSwitching.value = false
-    }
-    return
-  }
-  // OO → HTML
-  if (syncBridge.mode.value !== 'oo') {
-    syncBridge.persistMode('html')
-    return
-  }
-  syncSwitching.value = true
-  try {
-    if (String(syncBridge.state.value) === 'applied') {
-      // 上一轮 forceSave 已 applied → 直接 reload（不再重复保存）
-      await syncBridge.reloadAfterApplied()
-    } else if (syncBridge.mode.value === 'oo' && !syncBridge.dirty.value) {
-      // 🔴 一个字都没改就点「结构化视图」→ clean close，不发 forceSave 命令。
-      //    D4 真栈实证：不走这条 → CS 返 no_changes(码 4) → forcesave_frozen →
-      //    界面红字「文档没有检测到改动」+ 人留在 OO（永久卡住直到用户关页面重来）。
-      await syncBridge.leaveWithoutSaving()
-    } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
-      // 有改动 → forceSave（bridge 内部等 callback 再 reload）
-      await syncEditorHostRef.value.forceSave()
-    } else {
-      // 兜底：既不能保存也没改动，直接回 html（桥会清理 descriptor）
-      syncBridge.persistMode('html')
-    }
-  } catch {
-    // 保持 OO；错误已在桥上可见
-  } finally {
-    syncSwitching.value = false
-  }
 }
 
 // ─── G2 canary sync bridge（Task 15 · Requirements 4.7）─────────────────────────
