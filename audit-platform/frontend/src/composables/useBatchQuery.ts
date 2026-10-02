@@ -9,7 +9,7 @@
  */
 
 import { ref } from 'vue'
-import axios from 'axios'
+import { api } from '@/services/apiProxy'
 import { customQuery } from '@/services/apiPaths'
 
 export interface BatchQueryParams {
@@ -102,8 +102,10 @@ export function useBatchQuery() {
             requestBody.filters.sheet_name = sheetName
           }
 
-          const resp = await axios.post(customQuery.execute, requestBody)
-          return { wpCode, data: resp.data }
+          // 🔴 经 apiProxy（附 Authorization + 解信封）：旧实现用 axios 默认实例 ⇒ 恒 401；
+          //    且未解 {code,message,data} 信封，成功时拿到的是外层对象而非业务数据
+          const data = await api.post<BatchResultItem>(customQuery.execute, requestBody)
+          return { wpCode, data }
         }
       })
 

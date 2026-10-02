@@ -159,6 +159,38 @@ describe('useEditorSave — onSave 主要行为', () => {
     expect(eventBus.emit).toHaveBeenCalledWith('workpaper:saved', { projectId: 'proj-1', wpId: 'wp-1' })
   })
 
+  it('onSave 不导出 xlsx、不向 template-file/upload-xlsx 发任何请求（休眠覆盖回写已删除）', async () => {
+    // 即便 Univer 提供导出能力，保存也只能走 univerSave：导出 xlsx 覆盖服务端原模板是有损且不可回滚的
+    const exportXLSXBySnapshotAsync = vi.fn().mockResolvedValue(new Blob(['x']))
+    const exportWorkbookToXLSX = vi.fn().mockResolvedValue(new Blob(['x']))
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true })
+    const origFetch = globalThis.fetch
+    globalThis.fetch = fetchSpy as any
+    try {
+      const opts = makeOptions({
+        univerAPI: ref({
+          exportXLSXBySnapshotAsync,
+          exportWorkbookToXLSX,
+          getActiveWorkbook: () => ({
+            getSnapshot: () => ({ id: 'wb1', sheets: { s1: {} } }),
+            getActiveSheet: () => ({ getSheetName: () => 'Sheet1' }),
+          }),
+        }),
+        // 旧签名的调用方若还传这两个选项也不得重新激活回写
+        ...({ loadedFromXlsx: ref(true), fileOpenedAt: ref(1) } as any),
+      })
+      const success = await useEditorSave(opts).onSave()
+      expect(success).toBe(true)
+      expect(exportXLSXBySnapshotAsync).not.toHaveBeenCalled()
+      expect(exportWorkbookToXLSX).not.toHaveBeenCalled()
+      expect(fetchSpy).not.toHaveBeenCalled()
+      const urls = vi.mocked(httpApi.post).mock.calls.map((c) => String(c[0]))
+      expect(urls).toEqual(['/api/projects/proj-1/workpapers/wp-1/univer/save'])
+    } finally {
+      globalThis.fetch = origFetch
+    }
+  })
+
   it('onSave 在 univerAPI 为 null 时返回 false 且不调用 httpApi', async () => {
     const opts = makeOptions({ univerAPI: ref(null) })
     const result = useEditorSave(opts)

@@ -51,9 +51,15 @@ backend/scripts/check/check_x3_deviation_registry.py  2474
 backend/scripts/diagnose/mutate_ie_lifecycle_guards.py  1290
 
 audit-platform/frontend/src/components/workpaper/g4-bond-investment-ecl/impairment/G4TabEclMeasurement.vue  1700
-audit-platform/frontend/src/components/workpaper/e1/E1TabDisclosure.vue
+#   E1TabDisclosure.vue / g7SoeDisclosureModel.ts —— 2026-09-30 补基线数字（= 当前真实行数，splitlines 口径）。
+#     🔴 两条自 5bb3142f6（2026-08-16）登记起**只有路径没有数字**，`load_whitelist` 按
+#     「非两段即跳过」静默丢弃 ⇒ 登记意图从未生效，两份文件一直按 1500 上限判超限（门变成「墙」：
+#     连把文件改小的提交也被拒）。同批登记的 G7TabDisclosureSOE.vue 已于 7b65c77b9 补过数字，这两条漏了。
+#     E1 取 2012 = chain-closure-phase2-formula-push-engine 把主表取数抽到 e1DisclosureMainRows.ts 后的
+#     行数（HEAD 2063 → 2012）。守卫：test_check_file_size_gate_cannot_be_bypassed.py 层 3。
+audit-platform/frontend/src/components/workpaper/e1/E1TabDisclosure.vue  2012
 audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclosure/G7TabDisclosureSOE.vue  1667
-audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclosure/g7SoeDisclosureModel.ts
+audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclosure/g7SoeDisclosureModel.ts  1670
 
 #   G7TabAdjudication.vue —— **改动前即 1647 行已超 1500 上限**（HEAD 现状）。
 #     tb-writeback-explicit-publish-gate Task 12（G 循环）把 TB 回写从「保存即
@@ -812,7 +818,7 @@ backend/scripts/diagnose/diagnose_guidance_source_ref_localization.py  860
 #   补齐专用 parser（_parse_d4_17/18/19_row + _parse_d4_20_return_row/_20_provision_row）+ import
 #   分发分支 + export 行构造分支 + D4-20 子表键错位修复（item_id 映射，DEC-2）；同批删裸 D4-20
 #   死配置 header（DEC-1）。与既有 _parse_d4_XX 同构、内聚同一 IO 模块，拆分方向不变（独立瘦身 spec）。
-backend/app/routers/wp_render_strategies/_d4_import_export.py  3655
+backend/app/routers/wp_render_strategies/_d4_import_export.py  4101
 
 # spec: d4-dual-mode-formula-governance（P0 阻塞修复，2026-09-14 入库）
 #   三个文件均为**改动前即大文件**，本次为 P0 必要修改净增，非从零造超限：
@@ -831,7 +837,7 @@ backend/app/routers/wp_render_strategies/_d4_import_export.py  3655
 #     该文件的瘦身属独立 spec（whitelist 已有登记说明），不与 P0 安全修复同批。
 #     spec: d4-dual-mode-formula-governance P0-项4/项5
 backend/app/services/formula_engine.py  1964
-backend/tests/test_cycle_linkage_handlers_integration.py  1096
+backend/tests/test_cycle_linkage_handlers_integration.py  1205
 
 # spec: tb-writeback-explicit-publish-gate（Task 13 I 循环入库，2026）
 #   I1TabAdjudication.vue —— 改动前即 1596 行已超 1500 上限（HEAD splitlines 口径）。
@@ -1111,13 +1117,13 @@ backend/tests/workpaper_sync/test_k_lane2_p3_variants_template_writepaths.py  10
 # AJE/RJE 分录 CRUD + 状态机 + 错报转换
 backend/app/services/adjustment_service.py  980
 # 全平台 EventBus handler 注册中心
-backend/app/services/event_handlers/_impl.py  2088
+backend/app/services/event_handlers/_impl.py  2315
 # OCR 流水线（本次仅修 1 处 lazy import 错名）
 backend/app/services/ocr_service_v2.py  854
 # prefill 公式 resolver 注册表 + 9 个 resolver
 backend/app/services/prefill_engine.py  1646
 # 试算表四列重算链
-backend/app/services/trial_balance_service.py  1065
+backend/app/services/trial_balance_service.py  1159
 # 分录大厅全部端点
 backend/app/routers/adjustments.py  1763
 # 附件端点（本次仅修 4 处 Attachment lazy import 错路径；
@@ -1187,3 +1193,17 @@ backend/scripts/fix/fix_note_parent_company_chapter.py  2308
 #     拆分方向（按 Property 分组）：源 docx 事实基线与 fixtures / 表名唯一性与普查 /
 #     同构对齐与 Task 6 / 列元数据与 Task 7 四组，属该 spec 独立任务。
 backend/tests/test_note_parent_company_chapter.py  2823
+
+# --- batch-1 platform push: existing large files, baseline = current lines ---
+audit-platform/frontend/src/services/commonApi.ts  2243
+backend/app/core/migration_runner.py  1115
+backend/app/routers/doc_ai_chat.py  1324
+backend/app/routers/template_library_mgmt.py  1069
+backend/app/routers/wp_bulk_router.py  888
+backend/app/routers/wp_html_save.py  875
+backend/app/security/coverage_guard.py  1000
+backend/scripts/gen/generate_workpaper_sync_manifest.py  899
+backend/tests/test_adjustments.py  1024
+backend/tests/test_batch_project_service.py  1113
+backend/tests/test_disclosure_row_level_merge.py  803
+backend/tests/test_doc_ai_context_builder.py  1221

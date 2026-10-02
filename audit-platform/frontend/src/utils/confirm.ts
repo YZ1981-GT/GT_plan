@@ -385,3 +385,23 @@ export async function confirmSign(
     customClass: 'gt-confirm-sign',
   })
 }
+
+/**
+ * 驳回原因输入框（原因可空；取消时 reject）
+ * @param target 被驳回对象描述，如 "分录 CE-001"
+ * @returns 用户填写的原因（去空白）
+ */
+export async function promptRejectReason(target: string): Promise<string> {
+  const { value } = await ElMessageBox.prompt(
+    `驳回${escapeHtml(target)}，可填写驳回原因（将附在分录说明后）：`,
+    '驳回确认',
+    {
+      confirmButtonText: '确认驳回',
+      cancelButtonText: '取消',
+      type: 'warning',
+      inputPlaceholder: '驳回原因（选填）',
+      inputValidator: (v: string) => (v ?? '').length <= 200 || '原因不超过 200 个字',
+    },
+  )
+  return (value ?? '').trim()
+}

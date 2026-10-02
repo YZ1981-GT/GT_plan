@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import json
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-unit-tests")
@@ -28,7 +29,7 @@ from app.services.custom_query.snapshot_writer import (
     _parse_cell_ref,
     snapshot_writer,
 )
-from app.services.custom_query.addressing_service import ResolvedTarget
+from app.services.tb_audited_writer import PublishRowResult, PublishRowsResult
 
 
 # ─── addr_id resolve mock helper (Task 15.3) ─────────────────────────────────
@@ -458,7 +459,14 @@ class TestProperty5WritePermissionEnforcement:
             stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
             if "SELECT" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = ("tb-001", now)
+                mock_result.first.return_value = (
+                    "tb-001",
+                    "test-project-id",
+                    2025,
+                    "1001",
+                    100,
+                    now,
+                )
                 return mock_result
             return MagicMock()
 
@@ -689,7 +697,14 @@ class TestProperty26CrossModuleWriteRouting:
             written_sql.append(stmt_str)
             if "SELECT" in stmt_str and "trial_balance" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = ("tb-001", now)
+                mock_result.first.return_value = (
+                    "tb-001",
+                    "test-project-id",
+                    2025,
+                    "1001",
+                    100,
+                    now,
+                )
                 return mock_result
             return MagicMock()
 

@@ -83,6 +83,7 @@ ALL_GATE_NAMES: frozenset[str] = ROUTE_DEP_GATE_NAMES | HANDLER_GATE_CALL_NAMES
 NATIVE_AUTHZ_DEP_NAMES: frozenset[str] = frozenset(
     {
         "require_project_access",
+        "require_project_permission",
         "require_project_delegator",
         "require_project_delegator_pid",
         "require_role",
@@ -97,6 +98,7 @@ NATIVE_AUTHZ_DEP_NAMES: frozenset[str] = frozenset(
 NATIVE_AUTHZ_CALL_NAMES: frozenset[str] = frozenset(
     {
         "require_project_access",
+        "require_project_permission",
         "require_project_delegator",
         "require_project_delegator_pid",
         "require_role",

@@ -1,0 +1,72 @@
+{
+  "mode": "apply",
+  "entries": [
+    {
+      "target": {
+        "entry_id": "xlsx/gt-h3-investment-property",
+        "contract_id": "h3.investment_property_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_h3_investment_property",
+        "wp_codes": [
+          "H3"
+        ],
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "899bf861-c6fd-4ec2-93fc-8e75ea6c8dc9",
+        "wp_code": "H3",
+        "store_bytes": 0,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "outcome": {
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "899bf861-c6fd-4ec2-93fc-8e75ea6c8dc9",
+        "entry_id": "xlsx/gt-h3-investment-property",
+        "contract_id": "h3.investment_property_detail",
+        "authority_model": "projection_contract",
+        "authority_model_definition_id": "f15eb89a-8967-499a-b439-5315e50ecfb7",
+        "authority_model_definition_sha256": "efc26e6d85b893ea3d73b6e8127ec923ecf8d87eaa745e6636ba2461a5745cd4",
+        "template_definition_id": "bc80704a-5a33-4de7-8c8d-2a47768ef433",
+        "template_definition_sha256": "90ff75ab7dc97e5641313e7947a3761acd3404c2f0966a54f64e3b92ebc68144",
+        "instrumentation_definition_id": "f59e94e5-1cd7-481a-b07e-d7c8fa083a23",
+        "instrumentation_definition_sha256": "868f045f9ce18da18a58e449089d4d86eb9744587d7faa42803359c0a72b04cf",
+        "contract_definition_id": "cca6ef40-071e-4228-9f62-a0c53bdee98f",
+        "contract_definition_sha256": "938ae6721096419c9c208a214fa5cb2c44ab891a060da6becb9eac70045db1fe",
+        "definition_bundle_id": "2c8cdc08-89b9-4402-b575-77e18723188c",
+        "definition_bundle_sha256": "bd4e3fc078a0c24ee1dfd0819597a31985a2611e64d3c416fd90f6baebf926bc",
+        "created_stages": [
+          "template",
+          "instrumentation",
+          "contract",
+          "bundle"
+        ],
+        "reused_stages": [
+          "authority_model"
+        ],
+        "representation_settlement": "blocked",
+        "representation_reason": "entry xlsx/gt-h3-investment-property 没有 `state=awaiting_contract` 的 representation upgrade candidate 可绑定。approved bundle 已就位，缺的是**表示**侧供给：①该 entry 若还没有任何 content version/representation，首版只能由 `ContentMutationService.commit(...)`（唯一能推进 content_revision 的业务事务）产生；②已有 representation 时，纯 definitions 升级须先由 Task 17 的 instrumentation upgrader 登记 non-current candidate。本 provisioner **不**自建第三条 representation 写入路径（会伪造业务 projection 并绕过 `assert_candidate_finalizable`，Property 4 / 67 双打红）",
+        "attached_candidate_id": null,
+        "attach": null,
+        "content_revision_before": 0,
+        "content_revision_after": 0,
+        "revision_unchanged": true,
+        "entry_pointer_before": null,
+        "entry_pointer_after": null,
+        "created_anything": true
+      }
+    }
+  ],
+  "errors": [],
+  "supply_rows_before": {
+    "working_paper_sync_definition_artifact": 236,
+    "working_paper_sync_definition_bundle": 104,
+    "working_paper_representation_upgrade_candidate": 1,
+    "working_paper_content_representation": 283
+  },
+  "supply_rows_after": {
+    "working_paper_sync_definition_artifact": 239,
+    "working_paper_sync_definition_bundle": 105,
+    "working_paper_representation_upgrade_candidate": 1,
+    "working_paper_content_representation": 283
+  },
+  "created_total": 4
+}

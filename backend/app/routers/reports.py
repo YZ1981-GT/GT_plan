@@ -5,7 +5,7 @@
 - GET  /api/reports/{project_id}/{year}/consistency-check — 跨报表一致性校验
 - GET  /api/reports/{project_id}/{year}/{report_type} — 获取指定报表数据
 - GET  /api/reports/{project_id}/{year}/{report_type}/drilldown/{row_code} — 穿透查询
-- GET  /api/reports/{project_id}/{year}/{report_type}/export-excel — 导出Excel
+- GET  /api/reports/{project_id}/{year}/{report_type}/export-excel — 导出单张报表Excel
 - GET  /api/projects/{pid}/reports/line-composition?line_code={line_code} — 报表行构成科目
 
 Validates: Requirements 2.1-2.10, F1.2

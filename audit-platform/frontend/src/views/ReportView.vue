@@ -1024,7 +1024,7 @@ const aiHost = computed(() =>
 
 // ─── AI 文档对话采纳 ─────────────────────────────────────────────────────────
 function onDocAiAdopt(_payload: { content: string; messageId: string }) {
-  // 采纳事件由 DocAiChatPanel 内部调用 adoptContent API（走确认流）
+  // 采纳事件由 PlatformAiChatPanel 内部调用 adoptContent API（走确认流）
   // D4: AI 内容已经过 wrap_ai_output_with_log → pending 状态，不直接写入
   // 报表视图在确认流完成后刷新数据
   fetchReport()

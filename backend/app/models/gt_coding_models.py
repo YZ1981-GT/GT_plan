@@ -38,8 +38,12 @@ class GTWpCoding(Base):
     code_prefix: Mapped[str] = mapped_column(String, nullable=False)
     code_range: Mapped[str] = mapped_column(String, nullable=False)
     cycle_name: Mapped[str] = mapped_column(String, nullable=False)
+    # 🔴 非原生枚举：真库该列是 varchar，public 下没有 gt_wp_type 类型。原先声明原生枚举时 asyncpg 按
+    #    ``$1::gt_wp_type`` 绑定参数，按 wp_type 的任何查询 / 插入都抛 UndefinedObjectError（种子加载、
+    #    按类型筛选恒 500）。取值校验仍由 GTWpType 与 gt_coding_service 保证
+    #    （spec migration-integrity-and-enum-drift-closure Requirement 5.1）。
     wp_type: Mapped[GTWpType] = mapped_column(
-        sa.Enum(GTWpType, name="gt_wp_type", create_type=False),
+        sa.Enum(GTWpType, name="gt_wp_type", native_enum=False, create_constraint=False, length=50),
         nullable=False,
     )
     description: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -554,6 +554,25 @@
       <el-button size="small" type="primary" @click="staleRefresh.refresh()">刷新数据</el-button>
     </div>
 
+    <!-- 断点 2：入库后自动科目映射未成功（失败 / 空映射 / 映射率不足）——此前只进服务器日志 -->
+    <el-alert
+      v-if="!loading && autoMapNeedsAttention"
+      class="gt-tb-automap-alert"
+      :type="autoMapOutcome?.status === 'low_coverage' ? 'warning' : 'error'"
+      :closable="false"
+      show-icon
+      style="margin-bottom: 12px"
+    >
+      <template #title>
+        <span>{{ autoMapOutcome?.message }}</span>
+      </template>
+      <div class="gt-tb-automap-alert__actions">
+        <el-button size="small" type="primary" :loading="autoMappingLoading" @click="onAutoMapping">
+          重新自动映射并生成试算表
+        </el-button>
+      </div>
+    </el-alert>
+
     <!-- 空数据引导：只在 setup-guide 前简要说明（不重复步骤） -->
     <el-alert
       v-if="!loading && rows.length === 0 && !dataState.hasBalance"
@@ -1317,6 +1336,7 @@ import {
   type TrialBalanceRow, type ConsistencyResult,
 } from '@/services/auditPlatformApi'
 import { getAllWpMappings, listWorkpapers, type WpAccountMapping, type WorkpaperDetail } from '@/services/workpaperApi'
+import { getActiveLedgerDataset, type AutoMapOutcome } from '@/services/ledgerImportApi'
 import { useProjectStore } from '@/stores/project'
 import { setupPasteListener, pasteToSelection } from '@/composables/useCopyPaste'
 import { withLoading } from '@/composables/useLoading'
@@ -2081,6 +2101,25 @@ const setupStepStatus = computed(() =>
   ) as ('wait' | 'process' | 'finish')[]
 )
 
+/**
+ * 入库后自动科目映射的结果（断点 2）。
+ * 后端在账套激活后自动跑科目映射，结果写入数据集；此前失败只进服务器日志，
+ * 用户看到的是「导入成功 + 空试算表」。这里读出来：非 ok 时在页面顶部提示并给一键修复。
+ */
+const autoMapOutcome = ref<AutoMapOutcome | null>(null)
+const autoMapNeedsAttention = computed(
+  () => !!autoMapOutcome.value && autoMapOutcome.value.status !== 'ok',
+)
+
+async function loadAutoMapOutcome() {
+  try {
+    const ds = await getActiveLedgerDataset(projectId.value, selectedYear.value)
+    autoMapOutcome.value = ds?.auto_map ?? null
+  } catch {
+    autoMapOutcome.value = null
+  }
+}
+
 /** 检测当前数据状态（用于自动推进步骤） */
 async function detectDataState() {
   try {
@@ -2094,6 +2133,7 @@ async function detectDataState() {
       hasTb: rows.value.length > 0,
     }
   } catch { /* ignore */ }
+  await loadAutoMapOutcome()
 }
 
 const showSetupGuide = computed(() => rows.value.length === 0)
@@ -2119,7 +2159,6 @@ watch(tbImportVisible, async (visible) => {
     const balanceRows = balance ?? []
     if (balanceRows.length > 0) {
       // 有数据，获取数据集信息
-      const { getActiveLedgerDataset } = await import('@/services/ledgerImportApi')
       const ds = await getActiveLedgerDataset(projectId.value, selectedYear.value)
       existingDataSummary.value = {
         year: selectedYear.value,
@@ -4118,6 +4157,11 @@ async function onTbSumImportFile(e: Event) {
 .gt-ucell-ctx-divider { height: 1px; background: var(--gt-color-border-light); margin: 4px 8px; }
 .gt-tb-detached-icon { font-size: var(--gt-font-size-xs); margin-right: 2px; opacity: 0.7; }
 :deep(.gt-tb-sum-detached td) { background: var(--gt-color-wheat-light) !important; border-left: 2px solid var(--gt-color-wheat) !important; }
+
+/* 断点 2：自动科目映射未成功提示 */
+.gt-tb-automap-alert__actions {
+  margin-top: 6px;
+}
 
 /* 步骤引导 */
 .gt-setup-guide {

@@ -324,6 +324,10 @@
       :wp-code="formulaContext?.wpCode"
       :sheet-name="formulaContext?.sheetName"
       :host-sheet-codes="formulaContext?.sheetCodes"
+      :template-type="formulaContext?.templateType"
+      :note-section="formulaContext?.noteSection"
+      :note-section-title="formulaContext?.noteSectionTitle"
+      :initial-report-type="formulaContext?.initialReportType"
       @saved="onFormulaSaved"
       @applied="onFormulaApplied"
     />
@@ -897,7 +901,8 @@ watch(() => route.params.projectId, (newId) => {
 
 // 监听子组件打开公式管理的自定义事件
 function onOpenFormulaEvent(payload?: OpenFormulaManagerPayload) {
-  formulaContext.value = payload?.wpId ? { ...payload } : undefined
+  // 合并模块是项目级能力、没有普通 wpId；任何显式 payload 都必须保留，否则 scope/project/year 会静默退成报表域/路由年度
+  formulaContext.value = payload ? { ...payload } : undefined
   sessionStorage.removeItem('gt-formula-target-node')
   // Task 6: EventBus remains a thin adapter; nodeKey is migration metadata only.
   // Page entry must open FormulaManagerDialog (never FormulaEditDialog).

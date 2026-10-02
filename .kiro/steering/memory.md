@@ -33,6 +33,7 @@ inclusion: always
 - Python 3.12（仓库根 `.venv`）/ Docker / PG 16 / Redis 6379；后端 9980 / 前端 3030 / vLLM 8100；DB 名 `audit_platform`；测试用户 admin/admin123
 - **venv 路径**：backend cwd 用 `..\.venv\Scripts\python.exe`；仓库根 cwd 用 `.venv\Scripts\python.exe`（勿混）
 - Docker 容器：`audit-postgres`(5432) / `audit-redis`(6379→6379) / `audit-metabase`(3000)；health 端点 `/api/health`
+- 🔴 **Docker Desktop 重启后宿主端口转发可能陈旧**（vpnkit 仍转发到容器旧 IP）：容器 healthy、容器网内 `redis-cli ping` 通，宿主连 6379 却连上即断 ⇒ health 503 + **登录 500**（`auth_service` 的 login / refresh / logout 对 Redis=None 无降级，待修）。确认：`$env:LOCALAPPDATA/Docker/log/host/com.docker.backend.exe.log` 里有 `unable to connect … tcp forward … connection refused`；处置 `docker restart <容器>`（数据卷保留；2026-10-01 实测 DBSIZE 前后一致）
 - **前端唯一路径**：`audit-platform/frontend/`（仓库根无 `frontend/`）；views/components/composables 在其 `src/` 下
 - Playwright MCP 已装（workspace `.kiro/settings/mcp.json`）；新增依赖见 #dev-history（locust/marked+dompurify/decimal.js/python-docx/PyYAML/fast-check/Jinja2/jsonpatch + 外部 LibreOffice）
 - **scripts 规约**：`_` 前缀=一次性用完即删，无前缀=正式工具；`backend/scripts/` 分 8 子目录（check/seed/gen/analyze/ops/fix/migrate/e2e）；仓库根 `scripts/run.py` 统一入口
@@ -58,6 +59,11 @@ inclusion: always
 - 链条：四表入库 / 调整审批 → `TRIAL_BALANCE_UPDATED` → `formula_push.engine.run` → E1 明细 / 审定表 / 披露表 → 附注（上市 五、1 / 国企 八、1）；规则 `backend/data/formula_push_rules.json`；公式管理「📤 公式推送」页；**余 T17 真实「立即推送」待用户同意写库**（面板 / 试跑 / 附注数值已真浏览器验过）
 - 🔴 教训：**写入方取数一律 `strict`**（fail-open 会 rollback 撤销已 flush 写入且零失败痕迹）· **试算表取数按标准码前缀**（与报表 `ReportFormulaParser` 同口径）· **改带自动保存/自动同步页面的源码前浏览器先停 `about:blank`**（HMR 重挂载即真实写库，已踩：重药 五、49）· 真库待决：3 个唯一索引含重复键（C24 / editing_locks / review_threads）、和平药房_2025 试算表 1012 父子双计多 414 万
 
+### 全链打通阶段三（2026-10-01 体检，待用户拍板后立 spec）
+- 现状：四表→TB 未审数 / 审批→TB 调整列 / →报表审定数 / 大厅 = 绿；底稿明细·审定·披露 + 附注只有 E1 由 `formula_push` 后端推，其余 77 个 wp_code 靠「打开页面时种一次」+ 前端 `buildXSyncPayload` 防抖推附注（261 个附注章节标底稿来源却从未同步）
+- 🔴 待拍板 4 件：①TB 审定数两个写入方（发布门直写 `audited_amount` 会被 `recalc_audited` 覆盖；真库仅测试项目 9 行漂移）②附注权威源（ADR-DPA-001「留前端」与「经公式管理自动推」冲突，建议按章节交接 + 前后端对拍守卫）③「确认」= 大厅 approved（approved 无撤回出口）④TB 未审数保持映射聚合，只在公式管理只读可见
+- 已证未修：`/api/report-config/batch-update` 给 ReportConfig 写 ORM 与真库都没有的 `current_period_amount` ⇒ 假成功 · 单体 `financial_report.is_stale` 只标不清（report_engine 无清除）· prefill 路径 B 把 `FormulaEngine.execute` 返回的 dict 写进单元格（真库 0 张 univer_snapshot，当前零影响）
+- 🔴 **归档新判据：HEAD 干净检出跑守卫**（临时 `git worktree`）—— 4 组工作树全绿的 spec 在 HEAD 上红（修复只在工作树）；09-28 那批 12 个归档 11 个只做了磁盘移动未入库（旧路径仍被跟踪）；phase1 已归 `06-engineering-governance`（同样未提交）
 ### 已完成 spec 总览
 - **全局模块 7 spec + frontend-consistency-m1 = 8 个 active spec 全部 ✅ 完成（2026-06-01，121 任务全绿）**：A formula-engine-unification(20/20) / B retrieval-kernel-unification(12/12) / C doc-level-ai-chat(12/12) / D report-config-baseline(12/12) / E wp-ai-review-ux-fix(8/8) / F global-modules-cleanup(10/10) / G global-modules-p2-polish(11/11) / frontend-consistency-m1(36/36)；残留仅 Playwright E2E 待 start-dev.bat 环境
 - active 仅剩 `consol-note-three-level-drilldown`（stub 无 tasks.md，待真实合并数据）；**合并四阶段已归档 `_archive/09-consolidation-phases/`**
@@ -142,11 +148,13 @@ inclusion: always
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
 
-### 知识库链路（2026-09-29 真栈实测，上传/删除已修）
-- **原生请求 token 只许走 `utils/authToken`**（getAuthHeaders/getAuthToken）：auth store 已迁 sessionStorage 并删 localStorage 副本，自读 localStorage 恒 401（知识库上传即此）；守卫 `authTokenSingleSource.spec.ts`，仅登记 2 处 Univer xlsx 回写（修即启用覆盖底稿文件，待用户拍板）
-- 🔴 **commit 前的「吞异常非阻塞钩子」必须包 `begin_nested()`**：PG 语句失败使事务 aborted，COMMIT 等价 ROLLBACK ⇒ 接口 200 但未落库（知识库删文档即此；真库测试 `test_knowledge_delete_hook_isolation_pg.py` 含反向对照）
-- **V168 补 knowledge_doc 枚举**：V042 以**空文件**被登记（checksum=sha256("")）从未生效；`detect_checksum_drift` 现有 7 条漂移（V042/046/105/128/143/151/163）未排查且生产无调用方；enum 漂移检测两个盲区（类名推断漏 30/63 个枚举 + 跨 schema 取并集被 tmp_* 残留掩盖）⇒ 另有 2 个真缺值：confirmation_risk_level_enum 缺 pass、workpaper_task_status_enum 缺 4 值
-- 🔴 **下游 RAG 全部看不到知识文档**（待 spec + 用户决策）：索引写路径 5 断点（ON CONFLICT 无唯一约束 / 无 pgvector 时 embedding_vec 列不存在 ⇒ 任何 `select(KnowledgeIndex)` 抛错且毒化调用方 session / 哨兵项目 FK / 流水线 joinedload(folder) AttributeError / 同步钩子要求 project_ids 非空）+ embedding 8101 返 502；按 doc_id/folder_id 直查的入口（文档级对话宿主正文、@引用、全文搜索）可用
+### 知识库链路（2026-10-01：两份 spec 随单一提交入库）
+- **交付边界**：`knowledge-base-retrieval-and-authz-closure`（55/58）+ `knowledge-upload-robustness-and-consumer-wiring`（10/10）同一提交；`GtA173ConsultationRecord.vue` 仅纳入上传端点/鉴权头/回执处理，排除并发 sync-bridge；`components.d.ts` 仅删 `DocAiChatPanel`，排除 `_head_*.vue` 临时登记
+- **知识库原生上传统一走 `utils/authToken`**（getAuthHeaders/getAuthToken；`authToken.spec.ts` 守护读取顺序）· 🔴 **commit 前吞异常的非阻塞钩子必须包 `begin_nested()`**（PG 语句失败使事务 aborted、COMMIT 等价 ROLLBACK ⇒ 接口 200 但未落库；真库守卫 `test_knowledge_delete_hook_isolation_pg.py`）
+- **V168 补 knowledge_doc 枚举**（V042 以空文件登记、从未生效）；checksum 漂移 7 条已由 `migration-integrity-and-enum-drift-closure`（21/21 ✅）逐条登记；🔴 旧记「`confirmation_risk_level_enum` 缺 pass、`workpaper_task_status_enum` 缺 4 值」经核验为**误报**（旧实现比较 `.value`，public 标签正是成员名）
+- **上传写路径**（`knowledge_folders._store_uploaded_files`）：每文件一个 SAVEPOINT（`_insert_document_isolated`），单文件失败只回滚自己 + 删已落盘文件 + 回 `failed[{filename, reason}]` 中文原因；NUL 由 ORM `@validates` 统一剔（PG text/varchar/jsonb 都拒 NUL，覆盖 7 条写入方）；txt/md/csv 走 `decode_text_bytes`（BOM → UTF-16 启发式（比例且 ≥4 个 0 字节）→ 严格 UTF-8 → GB18030）；列表 `has_text` 与回执 `text_extracted` 同口径（去空白后非空）；后端只有 PDF 会走 OCR ⇒ 前端「需开启 OCR」只对 PDF 说
+- **消费方**：下游 RAG 走 `knowledge_documents.content_text` 带权限词法检索（方案 A；`knowledge_index` 0 行、仅可选加速层；方案 B 修索引写路径 5 断点仍暂缓）· 附注续写 / 改写只传 `knowledge_doc_ids`（≤5），后端 `load_documents` 逐篇判权注入并回 `knowledge_count`（不收前端拼的正文）· 审计报告「📚 知识库」标开发中 · DSH `kb_search` 只走向量（dsh Property 16），embedding 8101 不可达（`audit-vllm-embed` 已停 3 个月）⇒ 恒 `semantic_unavailable` · 镜像 `pgvector/pgvector:pg16` 带 vector 扩展但库内未 CREATE（`pg_extension` 仅 citext/plpgsql）· `MINERU_ENABLED=False` ⇒ 扫描件无正文
+- 待办：修复向量/扩展（`audit-vllm-embed` + pgvector）· 收口其余 10 组重复路由 · MinerU · 旧 `knowledge_base.py` 路由与 `KnowledgeBasePanel` 零挂载死链（登记于 `test_frontend_knowledge_paths_exist._KNOWN_DEAD_PATHS`）
 
 ### 待修 bug（2026-06-01 grep 实证，与已修 render-config 同源：查 users 不存在的 display_name 列）
 - 🔴 `project_wizard.py:207` `select(UserModel.display_name)` — User ORM 无此字段 → AttributeError，项目向导仪表盘聚合崩（user_ids 非空时）；修 → username
@@ -173,6 +181,8 @@ inclusion: always
 - **merge 跨阶段签名变更必 grep 调用方**：sync↔async 改 / 删公开方法时全仓 grep 调用点同步改（单阶段 mock 测试全绿不代表跨阶段不断裂）
 - **改动后必 Playwright 实测**（运行时 bug 单测/getDiagnostics 抓不到，如包装体解包/CSS 样式孤儿）；改动前后 6 维 git 核查
 - **hypothesis PBT 调速**：max_examples 5（用户 2026-06 明确要求降速，禁默认 100）
+- **守卫的故障注入不得替换被测生产函数本身**：换成测试里的拷贝 ⇒ 守卫验证的是拷贝（知识库上传真库守卫删掉生产 `begin_nested` 仍全绿，变异才抓到）⇒ 故障注在被测函数的**下一层**，并断言「现行路径 is 生产函数」
+- **前端两坑**：①vitest `beforeEach(() => spy.mockReset())` 表达式体把 spy 当返回值交给 vitest，被当作 teardown 每例后再调一次 ⇒ 一律写花括号 ②在渲染上下文外调用 `h()`（`ElNotification` / `ElMessageBox` 的 message）生成的 VNode 不带本组件 scopeId、又挂在 body 下 ⇒ `<style scoped>` 永远匹配不到，必须内联样式
 - 详细规约（UI 视觉 17 条 / ESLint AST / 测试 fixture / 启动 lifecycle / CI 卡点 / EventBus / 中间件 等）→ `#conventions` + `#dev-history`
 
 ## 关键引用指南

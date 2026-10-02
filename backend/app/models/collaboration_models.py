@@ -473,8 +473,11 @@ class WorkpaperReviewRecord(Base):
     workpaper_type: Mapped[str] = mapped_column(String(100), nullable=False)
     reviewer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     review_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    review_status: Mapped[ApprovalStatus] = mapped_column(
-        Enum(ApprovalStatus, name="review_status_enum"), nullable=False
+    # 🔴 review_status_enum 是与 risk_assessments 共享的 PG 类型（draft/pending_review/approved/rejected），
+    #    必须用同一个 ReviewStatus。原先映射 ApprovalStatus(pending/…) 时写入 pending 抛
+    #    InvalidTextRepresentation（spec migration-integrity-and-enum-drift-closure Requirement 5.2）。
+    review_status: Mapped[ReviewStatus] = mapped_column(
+        Enum(ReviewStatus, name="review_status_enum"), nullable=False
     )
     comments: Mapped[str | None] = mapped_column(Text, nullable=True)
     issues_found: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

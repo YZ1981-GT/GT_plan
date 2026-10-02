@@ -1,0 +1,71 @@
+{
+  "mode": "apply",
+  "entries": [
+    {
+      "target": {
+        "entry_id": "xlsx/gt-h6-asset-disposal-clearing",
+        "contract_id": "h6.asset_disposal_clearing_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_h6_asset_disposal_clearing",
+        "wp_codes": [
+          "H6"
+        ],
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "a555164c-4fb1-4614-8506-2ea95fd20e40",
+        "wp_code": "H6",
+        "store_bytes": 0,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "outcome": {
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "a555164c-4fb1-4614-8506-2ea95fd20e40",
+        "entry_id": "xlsx/gt-h6-asset-disposal-clearing",
+        "contract_id": "h6.asset_disposal_clearing_detail",
+        "authority_model": "projection_contract",
+        "authority_model_definition_id": "a445e489-bfd2-4f64-a915-32b058b42213",
+        "authority_model_definition_sha256": "13308ee2806e850d08129fdaf590cea7aadb0a7755da2385ca2a99168de6cfd3",
+        "template_definition_id": "5a211dff-37a7-4702-977e-3ef6d4ca2dfb",
+        "template_definition_sha256": "7f4d8be94c50ce77aeac6a044fd11f5bf172a5cbfe01df9ee4d5ef91c54a9dcf",
+        "instrumentation_definition_id": "e2bf289c-ef94-42d6-aed7-42dd440104c8",
+        "instrumentation_definition_sha256": "f3172f4c2c27fcf74be70dddeb3171d0e4e9467f809f16e4cb1e5ede25cf7b27",
+        "contract_definition_id": "a9f790a6-ce47-4d85-b216-bdd7d6b2f1a2",
+        "contract_definition_sha256": "ede38ed733bcf3d50d21245c6ca04e852c1e844e79b116482479a467ceda7062",
+        "definition_bundle_id": "93de42b2-afef-4a26-a238-9df0f35c8206",
+        "definition_bundle_sha256": "aa910a0b77501128f80ef54f989fbf5e40fc6432a3789a66db143cb16983d4b4",
+        "created_stages": [],
+        "reused_stages": [
+          "authority_model",
+          "template",
+          "instrumentation",
+          "contract",
+          "bundle"
+        ],
+        "representation_settlement": "blocked",
+        "representation_reason": "entry xlsx/gt-h6-asset-disposal-clearing 没有 `state=awaiting_contract` 的 representation upgrade candidate 可绑定。approved bundle 已就位，缺的是**表示**侧供给：①该 entry 若还没有任何 content version/representation，首版只能由 `ContentMutationService.commit(...)`（唯一能推进 content_revision 的业务事务）产生；②已有 representation 时，纯 definitions 升级须先由 Task 17 的 instrumentation upgrader 登记 non-current candidate。本 provisioner **不**自建第三条 representation 写入路径（会伪造业务 projection 并绕过 `assert_candidate_finalizable`，Property 4 / 67 双打红）",
+        "attached_candidate_id": null,
+        "attach": null,
+        "content_revision_before": 0,
+        "content_revision_after": 0,
+        "revision_unchanged": true,
+        "entry_pointer_before": null,
+        "entry_pointer_after": null,
+        "created_anything": false
+      }
+    }
+  ],
+  "errors": [],
+  "supply_rows_before": {
+    "working_paper_sync_definition_artifact": 245,
+    "working_paper_sync_definition_bundle": 107,
+    "working_paper_representation_upgrade_candidate": 1,
+    "working_paper_content_representation": 283
+  },
+  "supply_rows_after": {
+    "working_paper_sync_definition_artifact": 245,
+    "working_paper_sync_definition_bundle": 107,
+    "working_paper_representation_upgrade_candidate": 1,
+    "working_paper_content_representation": 283
+  },
+  "created_total": 0
+}

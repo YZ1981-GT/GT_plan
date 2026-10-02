@@ -136,7 +136,10 @@ async def resolve_targets(
 ) -> list[ProvisionTarget]:
     """按交付登记表 × 真实底稿现算 provisioning 目标（缺目标时给显式原因）。"""
     from app.services.workpaper_sync.adapters import registry as registry_module
-    from app.services.workpaper_sync.projection_provisioning import load_projection_supply
+    from app.services.workpaper_sync.projection_provisioning import (
+        ProviderModuleNotAllowedError,
+        load_projection_supply,
+    )
 
     adjudication = load_wp_code_adjudication()
 
@@ -145,7 +148,34 @@ async def resolve_targets(
         entry_id = str(row.get("entry_id") or "").strip()
         if entry_filter and entry_id != entry_filter:
             continue
-        supply = load_projection_supply(entry_id)
+        # 🔴 2026-10-01：`load_projection_supply()` 对「provider 没有
+        #    `publish_pilot_definitions` / `PILOT_WP_CODES`」抛 `ProviderModuleNotAllowedError`。
+        #    原来这里**不捕获** ⇒ 整个 `resolve_targets()` 在**第一个**缺口上就退出，
+        #    连 `--check`（只读、设计用途就是「现算哪些 entry 有可 provision 的目标」）
+        #    都跑不完。实测：第一个缺口是 `xlsx/gt-e1-monetary-fund`，而当时台账 51 条里有
+        #    **36 条**缺这两个名字 ⇒ 这个诊断入口**平台级不可用**，谁都看不到自己家的供给状况。
+        #
+        #    本脚本自己的 docstring 写的是「查不到目标时给**显式原因**并计入 `unresolved`，
+        #    不静默跳过」—— 那正是这里该做的：把「provider 缺发布侧接口」当成一种 unresolved
+        #    原因逐条记下来，而不是让它中断全表。
+        #    ⚠️ 这**不是**放宽 `--apply`：`--apply` 只处理 `unresolved_reason is None` 的目标，
+        #    缺口 entry 仍然一行都不写，且会出现在报告的 unresolved 清单里。
+        try:
+            supply = load_projection_supply(entry_id)
+        except ProviderModuleNotAllowedError as exc:
+            target = ProvisionTarget(
+                entry_id=entry_id,
+                contract_id=str(row.get("contract_id") or ""),
+                provider_module=str(row.get("provider_module") or ""),
+                wp_codes=(),
+            )
+            target.unresolved_reason = (
+                f"provider 发布侧接口缺失，无法 provision：{exc} —— "
+                "处置是给该 provider 补 `publish_pilot_definitions` 与 `PILOT_WP_CODES`"
+                "（H 九条于 2026-10-01 按此补齐，实现复用各循环 common 层的 publish 骨架）"
+            )
+            targets.append(target)
+            continue
         # 🔴 宿主解析**不读** `PILOT_WP_CODES`：那是 manifest 从宿主 Vue 文件名 CamelCase 抽出来的
         #    启发式产物，实测产出 `D2A` / `G7L` / `H1F` 三个在 `wp_index` 里 0 命中的幻影码，
         #    于是四份契约全部 unresolved 且 `unresolved_reason` 说的原因（「没有承载它的业务底稿」）

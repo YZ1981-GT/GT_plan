@@ -228,3 +228,30 @@ async def test_generate_chapter_draft_exception_handling():
 
     assert "error" in result
     assert "失败" in result["error"]
+
+
+# ---------------------------------------------------------------------------
+# RAG 片段标题（spec knowledge-base-retrieval-and-authz-closure Req 5.2）
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_rag_context_uses_document_name_as_title():
+    """检索内核结果的标题键是 ``document_name``；旧实现读 ``title``/``file_name`` 恒为空。"""
+    from app.services.a17_llm_service import _retrieve_rag_context
+
+    hits = [
+        {"source_type": "knowledge_doc", "document_name": "重大事项沟通指引.md",
+         "content": "项目组应当就重大事项与治理层沟通", "score": 0.8},
+        {"source_type": "knowledge_doc", "document_name": None, "content": "无名片段", "score": 0.5},
+    ]
+    with patch(
+        "app.services.knowledge_index_service.KnowledgeIndexService.semantic_search",
+        new_callable=AsyncMock,
+        return_value=hits,
+    ) as mock_search:
+        ctx = await _retrieve_rag_context(AsyncMock(), uuid4(), "重大事项", top_k=5)
+
+    assert mock_search.await_args.kwargs["scope"] == "knowledge_doc"
+    assert "【重大事项沟通指引.md】项目组应当就重大事项与治理层沟通" in ctx
+    assert "无名片段" in ctx and "【】" not in ctx

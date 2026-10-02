@@ -907,16 +907,21 @@ export async function noteAiGenerateAnalysis(projectId: string, params: {
   return data
 }
 
+/**
+ * 附注 AI 改写 / 续写。
+ * `knowledge_doc_ids`：「📚 知识库」选中的文档 ID（≤5）—— 后端逐篇判权后读正文注入 LLM，
+ * 响应的 `knowledge_count` 是实际注入的篇数（不可见 / 已删除 / 无正文者不计）。
+ */
 export async function noteAiRewrite(projectId: string, params: {
-  text: string; instruction?: string; section_number?: string; year?: number; knowledge_context?: string
-}): Promise<{ original: string; rewritten: string; error?: string }> {
+  text: string; instruction?: string; section_number?: string; year?: number; knowledge_doc_ids?: string[]
+}): Promise<{ original: string; rewritten: string; error?: string; knowledge_count?: number }> {
   const { data } = await http.post(P_dn.ai.rewrite(projectId), params)
   return data
 }
 
 export async function noteAiContinueWrite(projectId: string, params: {
-  text: string; section_number?: string; year?: number; knowledge_context?: string
-}): Promise<{ result: string; appended: string; error?: string }> {
+  text: string; section_number?: string; year?: number; knowledge_doc_ids?: string[]
+}): Promise<{ result: string; appended: string; error?: string; knowledge_count?: number }> {
   const { data } = await http.post(P_dn.ai.complete(projectId), params)
   return data
 }
@@ -1042,32 +1047,13 @@ export async function emptyRecycleBin(): Promise<any> {
 }
 
 // ── 知识库 ──
-
-export async function listKnowledgeDocuments(category: string, params?: Record<string, any>): Promise<any[]> {
-  const { data } = await http.get(P_kb.category(category), { params })
-  return Array.isArray(data) ? data : data?.documents || []
-}
-
-export async function uploadKnowledgeDocument(category: string, formData: FormData): Promise<any> {
-  const { data } = await http.post(P_kb.upload(category), formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
-  return data
-}
-
-export async function deleteKnowledgeDocument(category: string, docId: string): Promise<void> {
-  await http.delete(P_kb.doc(category, docId))
-}
-
-export async function searchKnowledge(query: string): Promise<any[]> {
-  const { data } = await http.get(P_kb.search, { params: { q: query } })
-  return Array.isArray(data) ? data : data?.results || []
-}
-
-export async function listProjectKnowledge(projectId: string): Promise<any[]> {
-  const { data } = await http.get(P_proj.knowledge(projectId))
-  return Array.isArray(data) ? data : data?.documents || []
-}
+// 知识库调用统一走 `apiPaths.knowledgeLibrary`（/api/knowledge-library/*）：
+//   页面 KnowledgeBase.vue、选择器 useKnowledge、A17-3 附件上传。
+// 2026-09-30 删除 5 个零调用方、且指向后端**不存在**路由的旧函数（spec
+// knowledge-upload-robustness-and-consumer-wiring R7.2）：listKnowledgeDocuments / uploadKnowledgeDocument /
+// deleteKnowledgeDocument / searchKnowledge（/api/knowledge/{分类}… 与 /api/knowledge/search）、
+// listProjectKnowledge（/api/projects/{id}/knowledge）—— 留着就是下一个调用方踩进 404 的坑
+// （useKnowledge 就是这么坏的）。
 
 // ── 性能监控 ──
 

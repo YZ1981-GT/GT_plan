@@ -40,8 +40,11 @@ mutation，由 Task 25 的 coordinator 调 `ContentMutationService.commit(...)` 
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
@@ -634,6 +637,104 @@ class PublishToTbResponse(BaseModel):
     message: str
 
 
+def _canonical_token_amount(value: Any) -> str | None:
+    """将金额规范化为与进程和 JSON 浮点表示无关的字符串。"""
+    if value is None:
+        return None
+    try:
+        amount = Decimal(str(value)).quantize(Decimal("0.01"))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValueError(f"发布 token 金额无法规范化: {value!r}") from exc
+    if amount == 0:
+        amount = Decimal("0.00")
+    return format(amount, "f")
+
+
+def _build_publish_token(
+    *,
+    project_id: UUID,
+    year: int,
+    wp_code: str,
+    rows: list[dict[str, Any]],
+    current_audited_amounts: dict[str, list[Any]],
+) -> str:
+    """构造跨进程稳定的显式发布 token。
+
+    摘要同时绑定发布载荷和发布前目标行状态。这样同一批内容重复提交仍幂等，
+    但目标行在中间被改动后再发布相同内容不会复用旧 token。
+    """
+    normalized_rows = [
+        {
+            "account_code": str(row["account_code"]).strip(),
+            "audited_amount": _canonical_token_amount(row["audited_amount"]),
+        }
+        for row in rows
+    ]
+    normalized_rows.sort(
+        key=lambda row: (row["account_code"], row["audited_amount"] or "")
+    )
+
+    target_state = []
+    for account_code in sorted({row["account_code"] for row in normalized_rows}):
+        values = current_audited_amounts.get(account_code)
+        if values is None:
+            values = [None]
+        normalized_values = sorted(
+            (_canonical_token_amount(value) for value in values),
+            key=lambda value: value or "",
+        )
+        target_state.append(
+            {
+                "account_code": account_code,
+                "audited_amounts": normalized_values,
+            }
+        )
+
+    canonical = json.dumps(
+        {
+            "project_id": str(project_id),
+            "year": year,
+            "wp_code": wp_code,
+            "rows": normalized_rows,
+            "target_state": target_state,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:24]
+
+
+async def _load_current_audited_amounts(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    account_codes: list[str],
+) -> dict[str, list[Any]]:
+    """读取发布前目标行的审定数，供 token 绑定真实目标状态。"""
+    from app.models.audit_platform_models import TrialBalance
+
+    codes = sorted({code for code in account_codes if code})
+    if not codes:
+        return {}
+
+    result = await db.execute(
+        sa.select(TrialBalance)
+        .where(
+            TrialBalance.project_id == project_id,
+            TrialBalance.year == year,
+            TrialBalance.standard_account_code.in_(codes),
+            TrialBalance.is_deleted.is_(False),
+        )
+    )
+    current = {}
+    for row in result.scalars().all():
+        current.setdefault(str(row.standard_account_code), []).append(
+            row.audited_amount
+        )
+    return current
+
+
 @router.post("/{wp_id}/audit-determination/publish-to-tb", response_model=PublishToTbResponse)
 async def publish_determination_to_tb(
     wp_id: UUID,
@@ -726,10 +827,23 @@ async def publish_determination_to_tb(
     if not year:
         raise HTTPException(400, "项目未设置审计年度，无法定位 trial_balance")
 
-    # ④ 幂等 token：缺省用 project/year/wp_code + 内容摘要合成（同一批数据重复点击共用 token）
-    token = body.publish_token or (
-        f"{project_id}:{year}:{det_code}:{abs(hash(str(sorted((r['account_code'], r['audited_amount']) for r in writeback_rows))))}"
-    )
+    # ④ 幂等 token：显式传入时原样透传；否则绑定规范化发布行和发布前目标状态。
+    if body.publish_token:
+        token = body.publish_token
+    else:
+        current_audited_amounts = await _load_current_audited_amounts(
+            db,
+            project_id,
+            year,
+            [row["account_code"] for row in writeback_rows],
+        )
+        token = _build_publish_token(
+            project_id=project_id,
+            year=year,
+            wp_code=det_code,
+            rows=writeback_rows,
+            current_audited_amounts=current_audited_amounts,
+        )
 
     # ⑤ 发布**带确认信号**的 WORKPAPER_SAVED → handler 回写 TB（服务端再校验发布者权限 + 幂等）
     await event_bus.publish(EventPayload(

@@ -155,6 +155,39 @@ function downloadBlob(blob: Blob, filename: string): void {
 }
 
 /**
+ * blob 下载失败时的错误提取：错误体同样是 Blob（responseType: 'blob'），
+ * 同步的 `extractError` 读不到里面的 `{code, message}`，只能拿到 axios 的英文
+ * `Request failed with status code …`。这里先解析 blob 里的中文原因（如「密码保护不可用」），
+ * 解析不到再退回同步版。
+ */
+async function extractBlobError(err: unknown, fallback: string): Promise<string> {
+  // 两个导出请求带 `_silent`（见下），拦截器不再为它们弹超时 / 断网提示 ⇒ 这里补中文原因。
+  // 加 `_silent` 的理由：① 4xx 拦截器会用同一句再弹一次，与 composable 的提示重复；
+  // ② 5xx 拦截器会把整次导出（超时 5 分钟）自动重跑两遍 —— 加密不可用、零 Tab、
+  // 密码违规这类确定性错误重跑毫无意义，只是让用户多等十分钟。
+  const e = err as { code?: string; response?: { data?: unknown } }
+  if (e?.code === 'ECONNABORTED') {
+    return '导出超时（已等待 5 分钟）。请缩小导出范围（减少循环）或稍后重试。'
+  }
+  if (!e?.response && typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return '网络已断开，导出未完成。恢复网络后请重试。'
+  }
+
+  const data = e?.response?.data
+  if (data instanceof Blob) {
+    try {
+      const parsed = JSON.parse(await data.text())
+      const detail = parsed?.detail ?? parsed?.message
+      if (typeof detail === 'string' && detail) return detail
+    } catch {
+      // 非 JSON 错误体（网关 HTML 等）：不把原始字节甩给用户
+    }
+    return fallback
+  }
+  return extractError(err, fallback)
+}
+
+/**
  * 从 axios 错误提取 detail 信息
  */
 function extractError(err: unknown, fallback: string): string {
@@ -185,8 +218,10 @@ export function useBulkTabImportExport(projectId: Ref<string>) {
    * 导出全部模板 ZIP
    * POST /api/projects/{project_id}/bulk-tab/export-templates
    * @param cycles 可选循环筛选（如 ['D'] 或 ['D','K']），空则导出全部
+   * @param password ZIP 密码保护（可选）。🔴 对话框对模板导出同样显示密码框，
+   *   漏传即「设了密码却拿到明文 ZIP」（后端 ExportTemplatesRequest 早已支持该字段）
    */
-  async function exportTemplates(cycles?: string[]): Promise<void> {
+  async function exportTemplates(cycles?: string[], password?: string): Promise<void> {
     loading.value = true
     error.value = null
     downloadProgress.value = 0
@@ -194,9 +229,11 @@ export function useBulkTabImportExport(projectId: Ref<string>) {
       const paths = buildPaths(projectId.value)
       const response = await http.post(
         paths.exportTemplates,
-        { cycles: cycles || null },
+        { cycles: cycles || null, password: password || null },
         {
           responseType: 'blob',
+          // 错误提示单一出口（Req 8.6）：不与全局拦截器重复弹、5xx 不自动重跑
+          _silent: true,
           timeout: 300000,  // 5 min timeout for large exports
           onDownloadProgress: (evt: any) => {
             if (evt.total) {
@@ -210,7 +247,7 @@ export function useBulkTabImportExport(projectId: Ref<string>) {
       downloadBlob(response.data as Blob, filename)
       ElMessage.success('模板 ZIP 已导出')
     } catch (e: unknown) {
-      const msg = extractError(e, '导出模板失败')
+      const msg = await extractBlobError(e, '导出模板失败')
       error.value = msg
       ElMessage.error(msg)
       throw e
@@ -251,6 +288,8 @@ export function useBulkTabImportExport(projectId: Ref<string>) {
         },
         {
           responseType: 'blob',
+          // 错误提示单一出口（Req 8.6）：不与全局拦截器重复弹、5xx 不自动重跑
+          _silent: true,
           timeout: 300000,  // 5 min timeout for large exports
           onDownloadProgress: (evt: any) => {
             if (evt.total) {
@@ -264,7 +303,7 @@ export function useBulkTabImportExport(projectId: Ref<string>) {
       downloadBlob(response.data as Blob, filename)
       ElMessage.success('数据 ZIP 已导出')
     } catch (e: unknown) {
-      const msg = extractError(e, '导出数据失败')
+      const msg = await extractBlobError(e, '导出数据失败')
       error.value = msg
       ElMessage.error(msg)
       throw e

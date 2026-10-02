@@ -42,8 +42,6 @@ export interface UseEditorUniverReturn {
   loadErrorState: Ref<'no_file' | 'no_index' | 'invalid_id' | 'error' | null>
   loadErrorMessage: Ref<string>
   dirty: Ref<boolean>
-  loadedFromXlsx: Ref<boolean>
-  fileOpenedAt: Ref<number>
   initUniver: () => Promise<void>
   dispose: () => void
 }
@@ -55,8 +53,6 @@ export function useEditorUniver(opts: UseEditorUniverOptions): UseEditorUniverRe
   const loadErrorState = ref<'no_file' | 'no_index' | 'invalid_id' | 'error' | null>(null)
   const loadErrorMessage = ref('')
   const dirty = ref(false)
-  const loadedFromXlsx = ref(false)
-  const fileOpenedAt = ref(0)
 
   // 内部 Univer 实例引用（用于 dispose）
   let univerInstance: any = null
@@ -102,15 +98,12 @@ export function useEditorUniver(opts: UseEditorUniverOptions): UseEditorUniverRe
     // 2. 从后端加载工作簿数据（xlsx-to-json 优先，降级到 univerData）
     loadingHint.value = '加载工作簿数据'
     let workbookData: any = null
-    loadedFromXlsx.value = false
     try {
       const jsonData = await httpApi.get(
         `/api/projects/${opts.projectId.value}/workpapers/${opts.wpId.value}/template-file/xlsx-to-json`,
       )
       if (jsonData && jsonData.sheets && Object.keys(jsonData.sheets).length > 0) {
         workbookData = jsonData
-        loadedFromXlsx.value = true
-        fileOpenedAt.value = Date.now() / 1000
         logger.log(`[useEditorUniver] xlsx-to-json loaded: ${Object.keys(jsonData.sheets).length} sheets`)
       }
     } catch (e: any) {
@@ -218,8 +211,6 @@ export function useEditorUniver(opts: UseEditorUniverOptions): UseEditorUniverRe
     loadErrorState,
     loadErrorMessage,
     dirty,
-    loadedFromXlsx,
-    fileOpenedAt,
     initUniver,
     dispose,
   }

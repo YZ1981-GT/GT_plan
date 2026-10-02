@@ -66,12 +66,16 @@ async def get_active_dataset(
     from sqlalchemy import select
     from app.models.dataset_models import LedgerDataset
     result = await db.execute(
-        select(LedgerDataset.source_summary).where(LedgerDataset.id == dataset_id)
+        select(LedgerDataset.source_summary, LedgerDataset.validation_summary)
+        .where(LedgerDataset.id == dataset_id)
     )
-    source_summary = result.scalar_one_or_none()
+    source_summary, validation_summary = result.one()
     return {
         "active_dataset_id": str(dataset_id),
         "source_summary": source_summary or {},
+        # 入库后自动科目映射的结果（_auto_map_on_dataset_activated 写入）；
+        # 前端试算表页据此在 failed / empty / low_coverage 时提示并给一键修复。
+        "auto_map": (validation_summary or {}).get("auto_map"),
     }
 
 

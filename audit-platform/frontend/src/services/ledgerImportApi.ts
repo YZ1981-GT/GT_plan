@@ -66,7 +66,23 @@ export async function listLedgerDatasets(projectId: string, year: number): Promi
   return data ?? []
 }
 
-export async function getActiveLedgerDataset(projectId: string, year: number): Promise<{ active_dataset_id: string | null; source_summary?: Record<string, any> }> {
+/** 入库后自动科目映射结果（后端 classify_auto_map_outcome 产出，存于数据集 validation_summary.auto_map） */
+export interface AutoMapOutcome {
+  status: 'ok' | 'low_coverage' | 'empty' | 'failed'
+  message: string
+  saved_count?: number
+  total_client?: number
+  unmatched_count?: number
+  completion_rate?: number
+  year?: number
+  at?: string
+}
+
+export async function getActiveLedgerDataset(projectId: string, year: number): Promise<{
+  active_dataset_id: string | null
+  source_summary?: Record<string, any>
+  auto_map?: AutoMapOutcome | null
+}> {
   const data = await api.get(`${base(projectId)}/datasets/active`, { params: { year } })
   return data ?? { active_dataset_id: null }
 }

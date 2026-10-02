@@ -86,11 +86,13 @@ from __future__ import annotations
 import logging
 import re
 import uuid
+from decimal import Decimal, InvalidOperation
 
 from app.core.database import async_session as async_session_factory
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.services.event_bus import event_bus
 from app.services.procedure_table_auto_service import invalidate_auto_cache
+from app.services.tb_audited_writer import publish_rows
 
 logger = logging.getLogger(__name__)
 
@@ -467,9 +469,6 @@ async def _on_d_audit_determination_saved(payload: EventPayload) -> None:
 
     async with async_session_factory() as session:
         try:
-            from decimal import Decimal
-            from sqlalchemy import update as _update
-            from app.models.audit_platform_models import TrialBalance
             import sqlalchemy as sa
 
             # ① 服务端校验发布者权限（confirmed_by 须具 WORKPAPER_WRITE；缺 confirmed_by 视为不可验证 → 拒）。
@@ -508,51 +507,54 @@ async def _on_d_audit_determination_saved(payload: EventPayload) -> None:
                 )
                 return
 
-            updated_count = 0
-            for row in rows:
-                account_code = row.get("account_code") or row.get("standard_account_code")
-                audited = row.get("audited_amount")
-                if account_code and audited is not None:
-                    try:
-                        audited_val = Decimal(str(audited))
-                    except Exception:
-                        continue
+            try:
+                publish_report = await publish_rows(
+                    session,
+                    project_id,
+                    year,
+                    rows,
+                    source=f"d_audit_determination:{wp_code}",
+                )
+            except (InvalidOperation, TypeError, ValueError) as exc:
+                logger.warning(
+                    "[%s→TB] 发布载荷含非法金额，整批回滚 project=%s: %s",
+                    wp_code[0] if wp_code else "?", project_id, exc,
+                )
+                raise
 
-                    stmt = (
-                        _update(TrialBalance)
-                        .where(
-                            TrialBalance.project_id == project_id,
-                            TrialBalance.year == year,
-                            TrialBalance.standard_account_code == account_code,
-                        )
-                        .values(audited_amount=audited_val)
+            if publish_report.skipped:
+                for skipped in publish_report.skipped:
+                    logger.warning(
+                        "[%s→TB] 科目 %s 未发布：%s",
+                        wp_code[0] if wp_code else "?",
+                        skipped.account_code,
+                        skipped.reason,
                     )
-                    result = await session.execute(stmt)
-                    if result.rowcount > 0:
-                        updated_count += 1
 
             # 回填本次实际更新数到 ack（审计用）
             await session.execute(
                 sa.text(
                     "UPDATE tb_publish_ack SET accounts_updated = :n WHERE publish_token = :token"
                 ),
-                {"n": updated_count, "token": publish_token},
+                {"n": publish_report.updated_count, "token": publish_token},
             )
 
             await session.commit()
-            if updated_count:
-                logger.info("[%s→TB] Published audited_amount for %d accounts from %s project=%s year=%s by=%s",
-                            wp_code[0], updated_count, wp_code, project_id, year, confirmed_by)
+            if publish_report.updated_count:
+                logger.info(
+                    "[%s→TB] Published audited_amount for %d accounts from %s project=%s year=%s by=%s",
+                    wp_code[0], publish_report.updated_count, wp_code, project_id, year, confirmed_by,
+                )
                 await event_bus.publish_immediate(EventPayload(
                     event_type=EventType.TRIAL_BALANCE_UPDATED,
                     project_id=project_id,
                     year=year,
-                    account_codes=payload.account_codes,
+                    account_codes=publish_report.updated_account_codes,
                     extra={"source": f"d_audit_determination:{wp_code}", "publish_token": publish_token},
                 ))
         except Exception:
             await session.rollback()
-            logger.warning("[%s→TB] Failed to write back audited_amount for %s project=%s",
+            logger.warning("[%s→TB] Failed to publish audited_amount for %s project=%s",
                            wp_code[0] if wp_code else "?", wp_code, project_id, exc_info=True)
 
 

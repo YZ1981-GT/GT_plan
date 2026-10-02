@@ -3596,8 +3596,18 @@ jobs:
         run: python -m pytest backend/tests/test_variant_matrix_null_audit.py -q
       - name: Parent company chapter idempotent check
         run: python backend/scripts/fix/fix_note_parent_company_chapter.py --check
+      # 🔴 2026-09-30：单体报告**没有**母公司章 —— 但 4 个一级章（listed 十六 / soe 七 /
+      #    soe 十二 / listed 十七）是迁移脚本合成的、硬编码 scope="both"，而 scope 过滤逐节
+      #    扁平不继承父章 ⇒ 章自身放行。判据真源是 Word 权威册（单体册有没有这个 Heading 1），
+      #    脚本每次 --check 都重读 docx，登记表过期即红。
+      - name: Chapter scope aligned with Word authority (standalone has no parent chapter)
+        run: python backend/scripts/fix/fix_note_chapter_scope.py --check
+      - name: Standalone must not carry consolidated-only chapters (write/read/cleanup)
+        run: python -m pytest backend/tests/test_note_standalone_consolidated_only_scope.py -q
       - name: Mutation check (every guard must go red, then restore)
         run: python backend/scripts/diagnose/mutate_parent_company_note_guards.py
+      - name: Mutation check (standalone scope guards; 15 mutations must all die)
+        run: python backend/scripts/diagnose/mutate_note_standalone_scope_guards.py
       # 真实库验收：无合并项目时诚实输出「无法验收」并 exit 0（禁 fixture 冒充）。
       # CI 无 DB ⇒ 脚本连不上库返 2，故用 || true 只作烟测；真实验收在本地/预发跑。
       - name: Live verification (honest report; DB-less in CI)

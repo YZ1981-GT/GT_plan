@@ -385,7 +385,10 @@ def _scan_identity_only() -> list[tuple[str, str]]:
 
 
 #: 🔴 **平台级现状**（2026-09-28 现算 **227 / 381**，约 60%；
-#: 本轮把 t_accounts 的 7 个端点从「仅登录」升级为项目级后由 234 降至 227）：
+#: 本轮把 t_accounts 的 7 个端点从「仅登录」升级为项目级后由 234 降至 227）。
+#: 2026-09-30 降至 **224**（spec knowledge-upload-robustness-and-consumer-wiring）：
+#: 删掉被遮蔽的重复 `note_ai.ai_complete`（query 版），续写 / 改写升级为
+#: `require_project_access("readonly")`（它们要按用户判定知识文档可见性）。
 #: 挂了 `get_current_user` / `require_role` 但无项目级鉴权的端点 ——
 #: 任何登录用户可用于访问任意项目。
 #:
@@ -395,7 +398,7 @@ def _scan_identity_only() -> list[tuple[str, str]]:
 #:
 #: 本断言只**冻结上限**：不得比现状更差。
 #: 🔴 阈值是现算值而非拍脑袋 —— 降到更低后应同步下调（棘轮只许向下）。
-_IDENTITY_ONLY_BASELINE = 227
+_IDENTITY_ONLY_BASELINE = 224
 
 
 def test_identity_only_endpoints_do_not_grow():
