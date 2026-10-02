@@ -40,20 +40,20 @@ export interface WorkpaperSyncManifestEntry {
   hasBrowserEvidence: boolean
 }
 
-export const WORKPAPER_SYNC_MANIFEST_DIGEST = "cbc6397b43f8d5e59ce8db24801460fdb2b1ab3f74b2556d01ff0863d823adf5"
+export const WORKPAPER_SYNC_MANIFEST_DIGEST = "cf778b6619b53320d0300035e33d27ae274b08475e9788ddcca073287a2065ce"
 
-export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "3f6de34b69d5ab21e2cd2b651c5a86a8a9e8900abf8d3e47a26bfb15416a6f05"
+export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "5cc1f1abf5583dc535171edff07508be72d46bb5fa0919e2a3cdf8a21ba25fdc"
 
 export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "by_component": {
-    "GtOnlyOfficeSheet": 242,
+    "GtOnlyOfficeSheet": 243,
     "OnlyOfficeWordDialog": 2,
     "WorkpaperWordEditor": 4
   },
   "capability_counts": {
-    "bidirectional": 18,
+    "bidirectional": 19,
     "single_html": 5,
-    "single_onlyoffice": 131,
+    "single_onlyoffice": 130,
     "unreachable": 1
   },
   "dispatcher_count": 1,
@@ -64,8 +64,8 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "entry_count": 155,
   "host_count": 154,
   "independent_entry_count": 142,
-  "legacy_fake_bidirectional_count": 123,
-  "mount_count": 248,
+  "legacy_fake_bidirectional_count": 122,
+  "mount_count": 249,
   "parent_duplicate_count": 12,
   "room_model_counts": {
     "exclusive": 6,
@@ -80,7 +80,7 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
     "xlsx.editable.shared.single.room_service_wired.v1": 147,
     "xlsx.unreachable.none.single.room_service_wired.v1": 1
   },
-  "unadjudicated_count": 118,
+  "unadjudicated_count": 117,
   "unreachable_count": 1
 } as const
 
@@ -3660,7 +3660,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-l8-financial-expenses",
@@ -3668,19 +3668,16 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtL8FinancialExpenses.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
+        ":sheet-name=\"props.sheetName || 'L8A'\"",
         ":sheet-name=\"props.sheetName\""
       ],
       "sheet_literals": [],

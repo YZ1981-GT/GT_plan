@@ -1,5 +1,5 @@
 {
-  "baseline_digest": "2ba162cbc96566fd5817ad74a2205aa0b4fd770373861e584bce65ca7e50770f",
+  "baseline_digest": "205593f09859a81c33f4546adfaa1f8fc6c63e6cc2bf8f33fb066091e474660e",
   "entries": [
     {
       "capability": "single_html",
@@ -5754,13 +5754,13 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-l8-financial-expenses",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
         "single_mode_switch_visible": false,
@@ -5768,9 +5768,8 @@
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtL8FinancialExpenses.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
         "template_only_open"
@@ -5780,12 +5779,31 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtL8FinancialExpenses.vue": "7bd80afa7371dc56ef511be5b651d77728fee8f7b45a4363881c152013c0b490",
+        "audit-platform/frontend/src/components/workpaper/GtL8FinancialExpenses.vue": "5be0dfc48bd3fab9265e966bcb693b2e0c66545aa25b6dfba845a24735346edf",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
-        "evidence": [],
-        "mode_switch_visible": false
+        "evidence": [
+          {
+            "file": "audit-platform/frontend/src/components/workpaper/GtL8FinancialExpenses.vue",
+            "kind": "segmented_mode_switch",
+            "line": 12,
+            "snippet": "<el-segmented"
+          },
+          {
+            "file": "audit-platform/frontend/src/components/workpaper/GtL8FinancialExpenses.vue",
+            "kind": "dual_mode_state",
+            "line": 13,
+            "snippet": ":model-value=\"procedureDualMode.currentMode.value\""
+          },
+          {
+            "file": "audit-platform/frontend/src/components/workpaper/GtL8FinancialExpenses.vue",
+            "kind": "mount_condition_mode_gate",
+            "line": 24,
+            "snippet": "v-if=\"isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'\""
+          }
+        ],
+        "mode_switch_visible": true
       }
     },
     {
@@ -7660,15 +7678,15 @@
       }
     }
   ],
-  "manifest_digest": "cbc6397b43f8d5e59ce8db24801460fdb2b1ab3f74b2556d01ff0863d823adf5",
+  "manifest_digest": "cf778b6619b53320d0300035e33d27ae274b08475e9788ddcca073287a2065ce",
   "schema_version": 1,
-  "source_digest": "2d07acff24cacbec5036716dd0ef360245a2226ae1a1b5585bffb282b50c19a2",
+  "source_digest": "86a21603b225b58b3141f3c5cddfbde6fddf0aac929c6a8fbe07d7f71bd0b0f1",
   "stats": {
     "claimed_bidirectional_without_adapter_count": 0,
     "entry_count": 155,
     "html_reload_only_count": 15,
     "independent_entry_count": 142,
-    "missing_adapter_count": 124,
+    "missing_adapter_count": 123,
     "no_durable_forcesave_ack_count": 142,
     "no_forcesave_command_count": 124,
     "single_mode_switch_visible_count": 117,
