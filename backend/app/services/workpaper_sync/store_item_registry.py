@@ -810,6 +810,16 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="L6-L6-2-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── L8（spec l8-true-bidirectional）：受管 明细表L8-2（科目 6603 财务费用，损益类，整册唯一数据录入源）；
+    #    store 单键 `L8-2-full-data`（🔴 单前缀 L8-2- 非 L5/L6/L7 双前缀）；身份字段 key（非 rowId）。
+    #    sibling L8-2-row-N-data / -row-N-audited / -netFinExpense 不预登记。受管 sheet 自身 28 裸 IF
+    #    （R 列占比 + R23 各月比例，与 L1~L7「受管表零裸 IF」相反）⇒ per-file 中性化照挂 ──
+    "l8.financial_expenses": StoreMergePlan(
+        adapter_id="l8.financial_expenses",
+        provider_module="phase5_l8_financial_expenses",
+        items=(StoreItemSpec(item_id="L8-2-full-data", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
 }
 
 

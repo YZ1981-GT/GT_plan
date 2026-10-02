@@ -1166,6 +1166,8 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_l7_other_noncurrent_liabilities",
         # ── L 循环第六条（spec l6-true-bidirectional，与台账条目成对）：受管 L6-2（科目 2711），走 phase5_l_cycle_common 骨架 ──
         "app.services.workpaper_sync.phase5_l6_special_payables",
+        # ── L 循环第七条（spec l8-true-bidirectional，与台账条目成对）：受管 L8-2（科目 6603 损益类），走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l8_financial_expenses",
         # ── K 循环 K1-9 双区 + 调整分录汇总六条（与台账条目成对）──
         "app.services.workpaper_sync.phase5_k1_baddebt_reversal_writeoff",
         "app.services.workpaper_sync.phase5_k8_selling_expenses",

@@ -2723,4 +2723,40 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "现算 0 行，零迁移负担。`adapter_registered=False` 是顺序：五环发布后再翻 manifest。"
         ),
     },
+    # ── L 循环第七条（spec: l8-true-bidirectional-2026-10-01）────────────────────────
+    {
+        "contract_id": "l8.financial_expenses",
+        "provider_module": "app.services.workpaper_sync.phase5_l8_financial_expenses",
+        "delivered_by_task": "l8-true-bidirectional-2026-10-01-task-3",
+        "pilot_class": "l_cycle_financial_expenses",
+        "entry_id": "xlsx/gt-l8-financial-expenses",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "L/L8 财务费用.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "L 循环第七条（spec l8-true-bidirectional），受管 `明细表L8-2`（科目 6603 财务费用，"
+            "损益类）：L8 整册唯一的数据录入源（审定表 L8-1 / 两张附注 / 检查表 L8-6 全部跨 sheet "
+            "引用它），HTML 子组件 L8TabDetail.vue 是其忠实渲染（23 列语义逐列对齐、行动态、公式一致、"
+            "持久化已是单 item JSON 数组 `L8-2-full-data`，🔴 单前缀 `L8-2-` 非 L5/L6/L7 双前缀）。"
+            "单级表头 r8、数据区 R9~R21（13 行）、footer A22「合计」（B22~Q22 签名小计 "
+            "=B13+B14-B15+B16+B20+B21）、R23「各月比例」作模板静态行（footer 之下不受管）、A..W 23 字段"
+            "与前端 L8DetailRow 对齐（月度列 B~M 对应 monthly[0..11] 数组，json_key monthly/0..11）；"
+            "formula 列 N=SUM(B:M) / Q=N+O+P / W=T+U+V（本行算术往返幸存）+ R=IF(Q=0,0,Q/$Q$22)"
+            "（占比裸 IF，被 neutralize_oo_crash_if_formulas 摘 <f> 成纯值 ⇒ 不做公式幸存断言，"
+            "NEUTRALIZED_COLUMNS=('R',)）；🔴 B~M 列为 editable（不进 formula_columns）：跨行派生行 "
+            "R11=R9-R10 / R13=R11-R12 / R20=R17-R18-R19 的 B~M 预置公式作模板预置格幸存（HTML 12 项"
+            "缺 R20 汇兑净损失，往返按稳定 key 对齐）；受管 sheet 自身 28 裸 IF（与 L1~L7「受管表零"
+            "裸 IF」相反）；UUID 列 X（物理 max_column=W(23)，X/Y/Z 右侧全空）。"
+            "🔴 损益类取数=本期发生额、兜底 tb_balance.debit_amount 本身（非 debit−credit，含年末结转"
+            "损益全年账上恒 0），回写 amount_kind='occurrence'；受管改线不碰回写逻辑，L8-2 本身不直接"
+            "回写 TB（回写在下游 L8-1 发布门取 L8-2 合计 Q22）。报表行次 IS-007（上市）/IS-025（国企）。"
+            "身份字段 `key`（非 L6/L7 rowId，私有 Date.now+Math.random 生成器收敛到共享 "
+            "newRowIdentity('l82det')，已有 key 优先不重铸）。审定表 L8-1 是 R7~R16 全跨 sheet SUMIF "
+            "聚合的下游视图（非录入表），不选 canary。sanitize 必需（受管 sheet 111 个共享公式成员含"
+            "横向组，materialize 行位移对横向组 fail-closed ⇒ 已 sanitize_l8_template_external_links.py "
+            "展开为逐格显式公式，受管 sheet 逐格 0 diff；整册无 external/OLE）。真库 `L8-2-%` 现算 0 行，"
+            "零迁移负担。`adapter_registered=False` 是顺序：五环发布后再翻 manifest。"
+        ),
+    },
 )

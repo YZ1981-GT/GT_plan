@@ -229,6 +229,40 @@ _ROWS: tuple[dict[str, Any], ...] = (
             "wp_count_with_payload": 0,
         },
     },
+    {
+        "entry_id": "xlsx/gt-l8-financial-expenses",
+        "contract_id": "l8.financial_expenses",
+        "wp_codes": ["L8"],
+        "resolvable_for_provisioning": True,
+        "matcher_domain_conflict": None,
+        "basis": {
+            "heuristic_is_wrong_because": "manifest 幻影码 L8F 经 wp_template_finder 单册与 sheet 级均零命中（GtL8FinancialExpenses → L8F 是幻影码）",
+            "heuristic_would_say": ["L8F"],
+            "managed_excel_name": "明细表L8-2",
+            "template_relative_path": "L/L8 财务费用.xlsx",
+            "wp_index_evidence": (
+                "受管 明细表L8-2 是整册 10 sheet 工作簿里的一张（L8 整册唯一的数据录入源，"
+                "审定表 L8-1 / 两张附注 / 检查表 L8-6 全部跨 sheet 引用它），不是独立文件 ⇒ "
+                "目标码取持有整册文件（科目 6603 财务费用，损益类）的 L8；判据用 "
+                "`COALESCE(file_path,'') <> ''`（L1 空串陷阱）。🔴 wp_codes 用整册底稿码 L8"
+                "（不是科目码 6603，照 L1~L7 一律用底稿码）。"
+            ),
+        },
+        "store_payload_evidence": {
+            "max_payload_bytes": 0,
+            "measured_at": "2026-10-01",
+            "store_item_id": "L8-2-full-data",
+            "why_null": (
+                "本 item 真库 `L8-2-%` 现算 0 行（明细表从未录入，空表单是合法业务事实）；"
+                "身份字段 key 已收敛到稳定 rowId（newRowIdentity('l82det')，已有不重铸），"
+                "旧位置化键 `L8-2-row-%` 亦 0 行 ⇒ 零迁移负担。真库 L8 载荷仅 5 行 "
+                "`l-cycle-canary-e2e` 夹具（L8-adj-* / L8-chk-conclusion），键属 审定表L8-1 "
+                "相关，不属受管表 L8-2。"
+            ),
+            "wp_code_with_payload": None,
+            "wp_count_with_payload": 0,
+        },
+    },
 )
 
 

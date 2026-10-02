@@ -39,6 +39,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping
 
+from app.services.workpaper_sync.contracts import is_template_skeleton_identity
 from app.services.workpaper_sync.excel_extract import BindingKind
 from app.services.workpaper_sync.sheet_geometry import col_index, snake
 
@@ -710,6 +711,15 @@ def merge_projection_into_store_rows(
             continue
         target = by_id.get(str(rid))
         if target is None:
+            # 🔴 模板骨架行「不在 store 的 row_keys 里」是常态（spec workpaper-sync-managed-row-
+            #    convergence · contracts.is_template_skeleton_identity）：HTML 侧有意不管理的
+            #    模板预置行（如 L8-2 的派生行 R11/R13/R20，值由模板跨行公式算），extract 仍会把它们
+            #    的 editable 列（B~M 缓存值）读回来 —— 但它们**不该被 fabricate 成 store 新行**，
+            #    否则 ①merge 新建的 `{key}` 无 monthly list ⇒ set_json_path 'monthly/0' fail-closed，
+            #    ②即便过了也会把模板行塞进 HTML 载荷。与删除路径用同一真源对称跳过。
+            #    只跳过「本次 base_rows 没发、且是模板骨架身份」的行；用户真新增行（minted/自铸）照常建。
+            if is_template_skeleton_identity(str(rid)):
+                continue
             target = {identity_key: str(rid)}
             if section_field:
                 target[section_field] = section_value
