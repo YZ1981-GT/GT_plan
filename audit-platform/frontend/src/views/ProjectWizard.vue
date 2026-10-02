@@ -38,7 +38,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElNotification } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { useWizardStore } from '@/stores/wizard'
 import BasicInfoStep from '@/components/wizard/BasicInfoStep.vue'
@@ -92,7 +92,20 @@ async function validateAndPersistCurrentStep(): Promise<Record<string, unknown> 
   } else {
     await wizardStore.saveStep('basic_info', data)
   }
+  showGroupNotices()
   return data
+}
+
+/** 后端对集团关系做的补齐/同步要告诉用户（需求 1.8：说明同步了哪个项目） */
+function showGroupNotices() {
+  const notices = wizardStore.lastNotices
+  if (!notices.length) return
+  ElNotification({
+    title: '集团关系',
+    message: notices.join('；'),
+    type: 'info',
+    duration: 8000,
+  })
 }
 
 async function handleSave() {

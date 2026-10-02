@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "ef0e27ca9a36bb5067034775a7a6cf0635474fddea149e23c04dcec4d72c4454",
+  "instrumentation_definition_sha256": "3f6d778765d0384d1435e98f3e28b1205c82a17dff0ca5ae3cf8b8e7035fd14a",
   "review": {
     "authority_root": "backend/wp_templates",
     "carrier": {
@@ -732,9 +732,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "15f530571527da67d6770cb838536866840ca329d59427ce0995542afa04ebdb",
+    "normalized_structure_hash": "1dbc781b8c39df96057af436e594e8f8765be0bf86c4b6f2e4d884a6ff0cc52f",
     "relative_path": "H/H2 在建工程.xlsx",
-    "template_sha256": "de9426a33e8d51e9351c8dd2393fe8502433d2cf810f30318f254a474ec480fe"
+    "template_sha256": "e6b1ce14cb90c2f2383ddd0cc39467b0896b260716e04527e988d56f70c3023d"
   },
-  "template_definition_sha256": "16bf58e9288a9aabc0c878d736eb0bc0ab28c7fc52f1b017e294a2d7bde2d632"
+  "template_definition_sha256": "252cc4e93504ee157e85a7ef154608bef7d5341605e8c94abe82fdd91eb8f8cb"
 }

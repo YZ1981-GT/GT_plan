@@ -16,6 +16,7 @@
         :options="modeOptions"
         size="small"
       />
+      <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a174-disagreement-record" />
       <span class="gt-a174__save-status">
         <template v-if="saveStatus === 'saving'">
           <el-icon class="is-loading"><Loading /></el-icon> 保存中...
@@ -195,19 +196,15 @@
     </div>
 
     <!-- Online Edit Mode -->
-    <GtOnlyOfficeSheet
-      v-else
-      :wp-id="props.wpId"
-      sheet-name="A17-4"
-      :project-id="props.projectId"
-      class="gt-a174__oo"
-      @fallback="handleOOFallback"
-    />
+    <template v-else>
+      <WorkpaperSyncEditorHost v-if="syncOoDescriptor" :descriptor="syncOoDescriptor" :bridge="syncBridge" class="a174disagreementrecord__oo" />
+      <div v-else style="display:flex;align-items:center;justify-content:center;height:400px;color:#909399">正在打开同步编辑器…</div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, defineAsyncComponent, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, defineAsyncComponent, computed, toRef } from 'vue'
 import { Loading, Plus, Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useA174DisagreementRecord } from './composables/useA174DisagreementRecord'
@@ -216,6 +213,13 @@ const GtOnlyOfficeSheet = defineAsyncComponent(
   () => import('./GtOnlyOfficeSheet.vue'),
 )
 
+import { useWorkpaperSyncBridge } from './sync/useWorkpaperSyncBridge'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+
+const WorkpaperSyncEditorHost = defineAsyncComponent(() => import('./sync/WorkpaperSyncEditorHost.vue'))
 defineOptions({ name: 'GtA174DisagreementRecord' })
 
 const props = withDefaults(defineProps<{
@@ -313,6 +317,33 @@ function handleOOFallback() {
 }
 
 // ─── Lifecycle ───
+
+// ─── sync bridge（替代 legacy mode + GtOnlyOfficeSheet）───
+const _ENTRY_ID = 'xlsx/gt-a174-disagreement-record'
+const _SHEET_KEY = 'a174disagreementrecord-managed'
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: ref(_ENTRY_ID),
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: ref(_SHEET_KEY),
+  capability: capabilityForEntry(_ENTRY_ID),
+  flushHtml: async () => {
+    if (typeof flushPendingSave === 'function') flushPendingSave()
+    else if (typeof flushPendingSaves === 'function') flushPendingSaves()
+    // 🔴 降级保护：本 entry 的 capability 仍是 single_onlyoffice（后端无 per-entry
+    //    adapter）⇒ readStoreProjection 会 404。捕获后返回空投影，让 OO 走「无投影」
+    //    路径（与改线前 legacy 行为等价）。capability 升 bidirectional 后自动失效。
+    try {
+      const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: _ENTRY_ID })
+      return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: _SHEET_KEY }
+    } catch {
+      return { expectedRevision: 0, projection: null, sheetKey: _SHEET_KEY }
+    }
+  },
+  reloadHtml: async () => { if (typeof loadData === 'function') await loadData(props.wpId); else if (typeof refreshData === 'function') await refreshData(props.wpId) },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+
 onMounted(() => { checkOOHealth(); loadData(props.wpId) })
 onBeforeUnmount(() => { flushPendingSaves() })
 

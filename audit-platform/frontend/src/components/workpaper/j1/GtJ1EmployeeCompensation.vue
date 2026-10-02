@@ -7,7 +7,11 @@
 
     <!-- dual mode bar (only non-index sheets) -->
     <div v-if="!isLoading && isHtmlSheet" class="j1-dual-mode-bar">
-      <el-segmented :model-value="dualMode.mode.value === 'html' ? 'HTML' : 'OnlyOffice'" @change="(v: any) => dualMode.switchMode(v === 'HTML' ? 'html' : 'onlyoffice')" :options="['HTML', 'OnlyOffice']" size="small" />
+      <!-- BP-10 / AC 1.4：OO 不可用时不显示切换器（原先显示但点了没反应 = 无声失败） -->
+      <el-segmented v-if="dualMode.ooAvailable.value" :model-value="dualMode.mode.value === 'html' ? 'HTML' : 'OnlyOffice'" @change="(v: any) => dualMode.switchMode(v === 'HTML' ? 'html' : 'onlyoffice')" :options="['HTML', 'OnlyOffice']" size="small" />
+      <!-- 能力诚实披露：文案真源在 sync/workpaperEntrySyncNotice.ts，宿主不得内联提示中文；
+           已注册 bidirectional 的 entry 由组件自己返 null 不渲染 ⇒ 无需本地条件。 -->
+      <GtEntrySyncCapabilityNotice entry-id="xlsx/j1/gt-j1-employee-compensation" />
       <el-tag v-if="dualMode.ooAvailable.value" size="small" type="success">OnlyOffice 就绪</el-tag>
       <el-tag v-else-if="dualMode.checking.value" size="small" type="info">检测中...</el-tag>
       <el-tag v-else size="small" type="warning">仅结构化视图</el-tag>
@@ -109,6 +113,7 @@ import { useWorkpaperReviewThreads } from '../composables/useWorkpaperReviewThre
 import CycleTabProcedure from '../shared/CycleTabProcedure.vue'
 import { useWorkpaperEntryDualMode } from '../composables/useWorkpaperEntryDualMode'
 import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
+import GtEntrySyncCapabilityNotice from '../sync/GtEntrySyncCapabilityNotice.vue'
 
 // ── defineAsyncComponent lazy 加载 ──────────────────────────────────────────
 const J1TabIndex = defineAsyncComponent(() => import('./core/J1TabIndex.vue'))

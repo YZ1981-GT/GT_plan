@@ -80,9 +80,9 @@ ADAPTER_ID: Final[str] = "h7.biological_assets_detail"
 WP_CODES: Final[frozenset[str]] = frozenset({"H7B"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "H/H7 生产性生物资产.xlsx"
-#: 逐字取 openpyxl 现算（225,641 B）
+#: 2026-10-01 安全净化后实测（194,163 B）：3 个 Equation.3 OLE 已转静态预览。
 TEMPLATE_SHA256: Final[str] = (
-    "df55f0051d9b3a67f894f82392d5f4420c959cd1c68c57a56c5605701db9c8c5"
+    "109a0e4ba6d08da93fc727adac7473c4047f588253fd62c955db67804bf151ec"
 )
 
 STORE_ITEM_ID: Final[str] = _h702c.STORE_ITEM_ID_H702_COST
@@ -576,3 +576,32 @@ async def attach_pilot_adapters(
         session=session,
         contract_payload_builder=build_contract_payload,
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# provisioning 白名单接口（approved bundle 发布侧）
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 🔴 这两个名字是**硬前置**，不是装饰：
+# `fix_task76_provision_projection_definitions.py` 经
+# `projection_provisioning.load_projection_supply()` **只认** `publish_pilot_definitions`
+# 与 `PILOT_WP_CODES`，缺任一即抛 `ProviderModuleNotAllowedError: provider 是空壳`，
+# 且该脚本连 `--check`（只读）都 fail closed 在第一个缺口上 ⇒ 缺这两行，本 entry 永远
+# 拿不到 approved bundle，`register_from_manifest()` 也就永远注册不上。
+#
+# 实现在 `phase5_h_cycle_common.publish_definitions_for`（九条共用一份，逐行对照
+# `phase5_entry_orchestration.publish_definitions`）。`specs` 必须与
+# `build_contract_payload` 同源 —— 两者都用 `managed_row_table_specs()`。
+
+
+async def publish_pilot_definitions(publisher: Any) -> HC.HDefinitions:
+    """发布本 entry 的四段 definition + approved bundle。"""
+    return await HC.publish_definitions_for(
+        IDENTITY,
+        managed_row_table_specs(),
+        publisher=publisher,
+        contract_payload_builder=build_contract_payload,
+    )
+
+
+PILOT_WP_CODES = WP_CODES

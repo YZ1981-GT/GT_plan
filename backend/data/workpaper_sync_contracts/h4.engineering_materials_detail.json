@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "34b6c7f621d78802c05eda8760bd769474deddabe658b573d46b58c80af06d8a",
+  "instrumentation_definition_sha256": "861fce94a493d8fe3c182a54ee2aa92388e077049f49c2cbf2d2d88537e07135",
   "review": {
     "authority_root": "backend/wp_templates",
     "carrier": {
@@ -665,7 +665,7 @@
   "template": {
     "normalized_structure_hash": "b13f5dffb20cf69c448d972ce4b3ee8b86b11963a8945585209ce38dd7ffde41",
     "relative_path": "H/H4 工程物资.xlsx",
-    "template_sha256": "c2c3ee61b33f4a7ca2603359810207bfb14f189c464135e0ede3e0a738c658cc"
+    "template_sha256": "dfbe06ef6e0b8420d56d7bb142193fe0edd4656bb9a2980f503e0bd84b883e84"
   },
-  "template_definition_sha256": "6da1b2d9e36a331ac259e27a936c913e6423b40316e06411695f85805e2bd0a5"
+  "template_definition_sha256": "2b280b2d2e2f50dab5afee272836297bf43e55bb3375774dcd9946a2a895d0c7"
 }

@@ -175,30 +175,39 @@ CLASSIFICATION_FACTS_I102: Final[dict[str, object]] = {
     ),
 }
 
-#: BP-7：SOE 分类与两个真源都不符（登记不修，修法归业务确认）。
+#: BP-7（2026-10-01 resolved）：SOE 分类此前是 impl 独立写死的 12 条，与**单一真源**
+#: `i1CategoryScope.ts#I1_DEFAULT_CATEGORIES`（11 条，与源模板 `底稿目录!A9:A19` /
+#: `附注披露信息（国有企业）!A9:A19` 及准则映射 `note_template_soe.json` 三方一致）分叉。
+#: 这是 CD-1（Task 10）收敛 listed 侧双定义时漏掉的 soe 侧遗留，属 impl 偏离既有单一真源，
+#: 非会计裁决。现把 `I1_SOE_CATEGORIES` 收敛为派生自单一真源（11 条、软件第 8、住房使用权 /
+#: 特许经营权、采矿+探矿并入矿产权，经 `I1_STANDARD_TO_LEGACY` 转回 soe 短 key）。
+#: 影响面已 grep 实证：`I1_SOE_CATEGORIES` 消费方全在 I1 自身；附注子表契约用独立的
+#: `I1_SOE_COLUMNS`（固定列头，不从分类派生）⇒ 收敛不改列头、不影响附注同步链
+#: （原 fix_blocked_note 所称「改列头涉已归档附注同步 spec」经实证为过度保守）。
 SOE_CLASSIFICATION_FACTS_I102: Final[dict[str, object]] = {
     "impl_constant": "composables/i1SoeDisclosureModel.ts#I1_SOE_CATEGORIES",
-    "impl_count": 12,
+    "impl_count": 11,
     "source_ref": "附注披露信息（国有企业）!A9:A19",
     "source_real_count": 11,
-    "verdict": "MISMATCH",
-    "status": "defect_registered_not_fixed",
-    "diff_count": 5,
-    "diffs": [
-        "条数 12 ↔ 11",
-        "`软件` 位次：impl 第 1 条（label 带「其中：」）↔ 源第 8 条",
-        "`房屋使用权`（impl） ↔ `住房使用权`（源）",
-        "`特许权`/`采矿权`（impl） ↔ `特许经营权`/`矿产权`（源）",
-        "impl 多出 `探矿权`（源模板无）",
+    "verdict": "ALIGNED_TO_SINGLE_SOURCE",
+    "status": "resolved",
+    "single_source_ref": "composables/i1CategoryScope.ts#I1_DEFAULT_CATEGORIES",
+    "second_source_ref": "backend/data/note_template_soe.json",
+    "resolution": "I1_SOE_CATEGORIES 收敛为派生自单一真源 i1CategoryScope（原 12 条独立写死已移除）",
+    "diffs_fixed": [
+        "条数 12 → 11",
+        "`软件`：impl 第 1 条（label 带「其中：」）→ 源第 8 条、label「软件」",
+        "`房屋使用权` → `住房使用权`",
+        "`特许权` → `特许经营权`",
+        "`采矿权`+`探矿权`（2 条）→ `矿产权`（1 条，exploration 并入 mining，与 I1_LEGACY_KEY_MAP 既有口径一致）",
     ],
-    "second_source_check": (
-        "🔴 第二真源 `note_template_soe.json` 里 `采矿权`/`探矿权`/`房屋使用权` "
-        "命中 **0** ⇒ **两个真源都不支持 impl 的写法**。"
+    "backward_compat": (
+        "mapToI1SoeCategoryKey 的 采矿/探矿/矿权 分支统一归 mining；"
+        "真库 I1-soe% 0 行，无 key 迁移丢数据风险。"
     ),
-    "fix_blocked_by": "business_confirmation",
-    "fix_blocked_note": (
-        "国企附注该用哪套分类名是**会计披露口径问题不是代码问题**；"
-        "且改常量会同时改附注列头（涉已归档的附注同步 spec）⇒ 本轮只登记不改。"
+    "business_backlog_ref": (
+        "evidence/classification-decision-and-business-checklist-2026-10-01.md B-1"
+        "（探矿/采矿是否需对矿业客户分列，低风险、默认合并）"
     ),
 }
 

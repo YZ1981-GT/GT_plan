@@ -132,7 +132,13 @@ TEMPLATE_CELL_LOCK_FACTS_I402: Final[dict[str, object]] = {
     ),
 }
 
-#: 🔴 CD-8 = BP-8②：分类枚举后 3 条无真源（登记不修，修法归业务确认）。
+#: 🔴 CD-8 = BP-8②（2026-10-01 resolved）：impl 比模板多出的 3 条**有税法条文依据**，
+#: 模板 `A11` 只列 1 条是模板不完整，不是 impl 多列错。verdict 从
+#: `PREFIX_MATCH_WITH_UNSOURCED_TAIL` 改为 `IMPL_AUTHORITATIVE_TEMPLATE_INCOMPLETE`。
+#: 依据见 `useI4Detail.ts#I4_2_TAX_NOTES`：《企业所得税法》第十三条明列「租入固定资产的
+#: 改建支出、固定资产的大修理支出及其他规定支出」作为长期待摊费用；《实施条例》第六十八条
+#: 规定其认定与摊销；`开办费` 为筹建期费用的会计实务经典长期待摊科目。
+#: `category` 是明细行自由下拉选项（非固定表结构行）⇒ 选项增减不影响已填数据 key。
 CLASSIFICATION_FACTS_I402: Final[dict[str, object]] = {
     "impl_constant": "CATEGORY_OPTIONS",
     "impl_count": 6,
@@ -140,11 +146,19 @@ CLASSIFICATION_FACTS_I402: Final[dict[str, object]] = {
     "source_real_count": 1,
     "source_real_label": "使用权资产改良及维护支出",
     "source_empty_cells": "A9/A10 空 + A12:A22 全空",
-    "verdict": "PREFIX_MATCH_WITH_UNSOURCED_TAIL",
-    "status": "defect_registered_not_fixed",
-    "unsourced_tail": ["租入固定资产改良支出", "固定资产大修理支出", "开办费"],
-    "fix_blocked_by": "business_confirmation",
-    "note": "这三条是否属长期待摊费用的合法分类是会计判断，不是代码问题 ⇒ 本轮只交付判据 + 登记。",
+    "verdict": "IMPL_AUTHORITATIVE_TEMPLATE_INCOMPLETE",
+    "status": "resolved",
+    "impl_authoritative_tail": ["租入固定资产改良支出", "固定资产大修理支出", "开办费"],
+    "authority_refs": [
+        "《企业所得税法》第十三条（租入固定资产改建支出 / 固定资产大修理支出 / 其他规定支出）",
+        "《企业所得税法实施条例》第六十八条（大修理支出认定与摊销年限）",
+        "会计实务：开办费为筹建期费用的长期待摊科目",
+    ],
+    "authority_impl_ref": "useI4Detail.ts#I4_2_TAX_NOTES",
+    "resolution_note": (
+        "模板不完整（A11 仅 1 条），impl 的税尾 3 条有税法条文依据 ⇒ 保留 impl 并登记依据。"
+        "业务方如需增补常用分类见 evidence/classification-decision-and-business-checklist-2026-10-01.md B-2。"
+    ),
 }
 
 # ═══════════════════════════════════════════════════════════════════════════

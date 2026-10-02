@@ -17,7 +17,23 @@ const ENTRY = 'xlsx/gt-d4-operating-revenue'
 const API_BASE = process.env.D4_L2_API_BASE || 'http://127.0.0.1:9980'
 const SYNC_BASE = `${API_BASE}/api/projects/${PROJECT_ID}/workpapers/${WP_ID}/sync/entries/${ENTRY}`
 const DELTA = 12345.67
-const SKIP_KEYS = new Set(['seq', 'index', 'row_no', 'no', 'order', 'month'])
+// 🔴 禁改列 = 序号/月份类（改了无业务意义） ∪ **行身份派生源**。
+//
+// `label` 必须在列表里：`useD4Adjudication.ts` 的 D4-1 派生行身份是
+// `xsheet-${section}-${labelKey(label)}`（现算：全前端唯一一处「用业务字段值派生行身份」），
+// 改 label ⇒ 行身份漂移 ⇒ **在 xlsx 里造出一条 store 侧不存在的孤儿行**。
+// 2026-09-28 实证后果：这样产生的孤儿行使后续所有 materialize 抛
+// `roundtrip_projection_mismatch`（「反读出未提交的受管字段 … 共 338 个」），
+// 整个 gt-d4-operating-revenue entry 的在线编辑被打挂，且**污染留在 representation 里
+// 不会自愈** —— 必须 `d43_rematerialize_dual_sheet.py --apply --force` 从权威模板重建才能清。
+//
+// `group_label` 原先只在下方 amount 分支里单独判（`colKey === 'group_label'`），
+// 文本分支漏判；一并并入本集合消除该不一致。
+const SKIP_KEYS = new Set([
+  'seq', 'index', 'row_no', 'no', 'order', 'month',
+  'group_label',
+  'label', // ← 行身份派生源，禁改（见上）
+])
 
 const EVIDENCE_DIR = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -38,6 +54,8 @@ type L2Case = {
 type SheetResult = {
   code: string
   status: 'applied_store_ok' | 'applied_store_miss' | 'no_safe_target' | 'type_fail' | 'op_error' | 'op_timeout' | 'enter_fail'
+  /** 测试后是否已把格写回原值（见循环末尾还原块）。`skipped` = L2_NO_RESTORE=1。 */
+  restored?: 'ok' | 'skipped' | 'type_fail' | 'save_timeout'
   target_ref?: string
   old_value?: number | string
   new_value?: number | string
@@ -129,7 +147,7 @@ function pickSample(
       if (seen.has(k)) continue
       seen.add(k)
       const colKey = (k.split('/').pop() || '').toLowerCase()
-      if (SKIP_KEYS.has(colKey) || colKey === 'group_label') continue
+      if (SKIP_KEYS.has(colKey)) continue // group_label 已并入 SKIP_KEYS
       const n = Number((field as { value?: unknown })?.value)
       if (Number.isFinite(n) && Math.abs(n) > 1) return { fieldKey: k, value: n, kind: 'amount' }
     }
@@ -528,9 +546,41 @@ test.describe('D4 全盘 L2 OO→HTML（逐张金额）', () => {
         }, { timeout: 120_000, intervals: [2_500] }).toBeTruthy()
       } catch { /* */ }
 
+      // ── 测试后还原（2026-09-28 加）───────────────────────────────────────
+      // 不还原的后果不是"测试不干净"这么轻：L2MARK / +12345.67 会**永久留在真实业务数据**里
+      // （审计师能看到 `L2MARK-D4-3-2wi7` 这种产品名），且随 content_commit 一代代传下去。
+      // 故校验完立即把格写回原值并再 forcesave 一次。
+      // 用 `L2_NO_RESTORE=1` 可关（只在需要留现场排查时用）。
+      let restored: 'ok' | 'skipped' | 'type_fail' | 'save_timeout' = 'skipped'
+      if (!process.env.L2_NO_RESTORE) {
+        lastForcesave = null
+        const back = await typeIntoOoCell(page, String(locate.target), String(oldValue))
+        const backText = await readOoCell(page, String(locate.target))
+        const backOk = back.ok && backText != null && (
+          sample.kind === 'amount'
+            ? (() => { const n = toNum(backText); return n != null && Math.abs(n - Number(oldValue)) <= 0.05 })()
+            : String(backText).includes(String(oldValue).slice(0, 12))
+        )
+        if (!backOk) {
+          restored = 'type_fail'
+        } else {
+          await page.waitForTimeout(3_000)
+          const saveBtn2 = page.locator('[data-testid="wp-sync-host-forcesave"]')
+          try {
+            await expect(saveBtn2).toBeEnabled({ timeout: 30_000 })
+            await saveBtn2.click()
+            await expect.poll(() => lastForcesave !== null, { timeout: 90_000 }).toBeTruthy()
+            restored = 'ok'
+          } catch {
+            restored = 'save_timeout'
+          }
+        }
+      }
+
       results.push({
         code: c.code,
         status: storeOk ? 'applied_store_ok' : 'applied_store_miss',
+        restored,
         target_ref: String(locate.target),
         old_value: oldValue,
         new_value: newValue,

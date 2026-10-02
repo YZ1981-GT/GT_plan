@@ -7,6 +7,7 @@
   <div class="gt-a38" v-loading="loading">
     <div class="gt-a38__header">
       <el-segmented v-model="activeMode" :options="modeOptions" size="default" />
+      <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a38-goodwill-impairment" />
       <div class="gt-a38__xref">
         <span class="gt-a38__xref-label">单体层核对：</span>
         <GtIndexChip v-for="ref in xrefCodes" :key="ref" :value="ref" :validate="true" @click="onChipClick" />
@@ -151,7 +152,8 @@
           <div class="gt-a38__section-title">（二）预计未来现金流量的现值（最多 5 年）</div>
           <el-table :data="dcfTableRows" border size="small" class="gt-a38__table">
             <el-table-column label="" width="130" prop="label" />
-            <el-table-column v-for="(_, i) in 5" :key="i" :label="`第${i + 1}年`" align="right">
+            <!-- 🔴 Property 22 修复：key 从裸下标 i 改为稳定标识 year_{n}，列数由 FORECAST_YEARS 驱动 -->
+            <el-table-column v-for="(_, i) in FORECAST_YEARS" :key="`year_${i + 1}`" :label="`第${i + 1}年`" align="right">
               <template #default="{ row }">
                 <el-input-number v-if="row.editable" v-model="recoverable.dcf.cash_flows[i]" :disabled="readonly" :controls="false" size="small" style="width:100%" />
                 <span v-else class="gt-a38__calc">{{ row.values[i] }}</span>
@@ -234,7 +236,7 @@
 
 <script setup lang="ts">
 import WpAmountInput from './shared/WpAmountInput.vue'
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, toRef, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import { Plus, Delete } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
@@ -245,6 +247,13 @@ import {
 } from '@/components/workpaper/composables/useA38Goodwill'
 import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
 
+import { useWorkpaperSyncBridge } from './sync/useWorkpaperSyncBridge'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+
+const WorkpaperSyncEditorHost = defineAsyncComponent(() => import('./sync/WorkpaperSyncEditorHost.vue'))
 defineOptions({ name: 'GtA38GoodwillImpairment' })
 
 const props = withDefaults(defineProps<{
@@ -283,10 +292,14 @@ const dcfPv = computed(() => calcDcfPv(recoverable.value.dcf))
 const terminalPv = computed(() => calcTerminalPv(recoverable.value.dcf))
 const dcfOver5 = computed(() => recoverable.value.dcf.cash_flows.filter((c) => c != null).length > 5)
 
+/** 🔴 Property 22 修复：列数由数据驱动（预测期年数），不写死 5。 */
+const FORECAST_YEARS = computed(() => recoverable.value.dcf.cash_flows.length || 5)
+
 const dcfTableRows = computed(() => {
+  const years = FORECAST_YEARS.value
   const r = recoverable.value.dcf.discount_rate
-  const factors = Array.from({ length: 5 }, (_, i) => (r == null || r <= -1 ? '—' : (1 / Math.pow(1 + r, i + 1)).toFixed(4)))
-  const pvs = Array.from({ length: 5 }, (_, i) => {
+  const factors = Array.from({ length: years }, (_, i) => (r == null || r <= -1 ? '—' : (1 / Math.pow(1 + r, i + 1)).toFixed(4)))
+  const pvs = Array.from({ length: years }, (_, i) => {
     if (r == null || r <= -1) return '—'
     const cf = recoverable.value.dcf.cash_flows[i]
     return fmt(num(cf) * (1 / Math.pow(1 + r, i + 1)))
@@ -329,6 +342,33 @@ watch(activeMode, async (newMode, oldMode) => {
   }
   if (newMode === 'docx') docxDirty.value = true
 })
+
+
+// ─── sync bridge（替代 legacy mode + GtOnlyOfficeSheet）───
+const _ENTRY_ID = 'xlsx/gt-a38-goodwill-impairment'
+const _SHEET_KEY = 'a38goodwillimpairment-managed'
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: ref(_ENTRY_ID),
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: ref(_SHEET_KEY),
+  capability: capabilityForEntry(_ENTRY_ID),
+  flushHtml: async () => {
+    if (typeof flushPendingSave === 'function') flushPendingSave()
+    else if (typeof flushPendingSaves === 'function') flushPendingSaves()
+    // 🔴 降级保护：本 entry 的 capability 仍是 single_onlyoffice（后端无 per-entry
+    //    adapter）⇒ readStoreProjection 会 404。捕获后返回空投影，让 OO 走「无投影」
+    //    路径（与改线前 legacy 行为等价）。capability 升 bidirectional 后自动失效。
+    try {
+      const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: _ENTRY_ID })
+      return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: _SHEET_KEY }
+    } catch {
+      return { expectedRevision: 0, projection: null, sheetKey: _SHEET_KEY }
+    }
+  },
+  reloadHtml: async () => { if (typeof loadData === 'function') await loadData(props.wpId); else if (typeof refreshData === 'function') await refreshData(props.wpId) },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
 
 onMounted(load)
 onBeforeUnmount(flushSave)

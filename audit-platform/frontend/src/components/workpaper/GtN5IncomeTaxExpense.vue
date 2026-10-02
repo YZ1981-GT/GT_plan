@@ -274,15 +274,47 @@ const isReadonly = computed(() => !!props.readonly)
 // ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI + 挂真实 Host） ───
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 
-// ─── 双模式 ──────────────────────────────────────────────────────────────────
+// ─── 双模式（修复 inert 空实现 → 真实切换 + health 检查 + 失败回落 HTML）───
+// spec: n2-n5-json-table-identity-and-cross-entry-readonly 任务 6（NC-13 / NB-P13）
+// 🔴 保留宿主内联形态 + modeOptions 为普通数组（不带 .value，与 N1/N3 的 ref 形态不同）
+const _n5OoAvailable = ref(false)
+const _n5OoChecking = ref(false)
+
+async function _n5CheckOoHealth(): Promise<boolean> {
+  _n5OoChecking.value = true
+  try {
+    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
+    const healthy = (res as any).data?.data?.healthy ?? (res as any).data?.healthy ?? false
+    _n5OoAvailable.value = !!healthy
+    return _n5OoAvailable.value
+  } catch {
+    _n5OoAvailable.value = false
+    return false
+  } finally {
+    _n5OoChecking.value = false
+  }
+}
+
 const dualMode = {
   currentMode: ref<'html' | 'onlyoffice'>('html'),
   modeOptions: [
     { label: 'HTML', value: 'html' },
     { label: 'OnlyOffice', value: 'onlyoffice' },
   ],
-  isOoAvailable: ref(true),
-  onModeChange: () => {},
+  isOoAvailable: _n5OoAvailable,
+  onModeChange: (val: 'html' | 'onlyoffice') => {
+    if (val === dualMode.currentMode.value) return
+    if (val === 'onlyoffice' && !_n5OoAvailable.value) {
+      import('element-plus').then(({ ElMessage }) => {
+        ElMessage.warning('OnlyOffice 服务不可用，已回落到 HTML 模式')
+      })
+      return
+    }
+    dualMode.currentMode.value = val
+    if (val === 'html') {
+      selfLoad()
+    }
+  },
 }
 
 // ─── sheetName 归一（纯函数，见 composables/n5SheetRouting.ts）────────────────
@@ -370,6 +402,9 @@ provide('n5TrialBalance', tbTrialBalance)
 provide('n5TbSourceCodes', tbSourceCodes)
 provide('scheduleAutoSnapshot', () => runtime?.version.scheduleAutoSnapshot())
 onMounted(async () => {
+  // OO 健康检查（修复 inert → redeemable）
+  void _n5CheckOoHealth()
+
   // 如果 htmlData 为 null（selfLoad 场景），自行加载
   if (!props.htmlData) {
     await selfLoad()

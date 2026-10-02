@@ -20,7 +20,9 @@
 import { computed, ref, onScopeDispose, type ComputedRef, type Ref } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
+import { resolveWorkpaperByCode } from '@/services/resolveWorkpaperByCode'
 import { parseNum } from './useN4FormulaEngine'
+import { payloadJson } from './shared/checklistPayload'
 import { calcExpenseDiff } from './useN4MultiTaxEngine'
 
 /**
@@ -175,7 +177,10 @@ export function useN4CrossSheet(
       try {
         const parsed = JSON.parse(accrualResp.conclusion)
         if (parsed && typeof parsed === 'object') {
-          _n2AccrualMap.value = new Map(Object.entries(parsed).map(([k, v]) => [_normalizeTaxName(k), parseNum(v)]))
+          _n2AccrualMap.value = new Map(Object.entries(parsed).map(([k, v]) => [
+            _normalizeTaxName(k),
+            parseNum(typeof v === 'string' || typeof v === 'number' ? v : 0),
+          ]))
         }
       } catch { /* 解析失败忽略 */ }
     }
@@ -356,11 +361,9 @@ export function useN4CrossSheet(
     const pid = options.projectId.value
 
     try {
-      const wpData: any = await api.get(
-        `/api/projects/${pid}/wp-index/by-code/N2`,
-        { _silent: true } as any,
-      )
-      const wpId = wpData?.working_paper_id || wpData?.wp_id || wpData?.id
+      // 🔴 原调 `/api/projects/{pid}/wp-index/by-code/N2` —— 后端无此路由（恒 404，被 catch 吞掉，
+      //    N4 从未真正读到 N2 计提额）。改走唯一 wp_id 出口。
+      const wpId = (await resolveWorkpaperByCode(pid, 'N2'))?.wpId
       if (!wpId) return
 
       const res = await api.get(
@@ -373,22 +376,21 @@ export function useN4CrossSheet(
       //    （useN2Adjudication 不写 per-tax "N2-1-{tax}-accrual"），须从行数组现算 + 归一化税种名。
       const rowsResp = responses.find((r: any) => r.item_id === 'N2-1-adjudication-rows')
       if (rowsResp) {
-        const raw = rowsResp.remark ?? rowsResp.conclusion
-        let n2Rows: any[] = []
-        if (raw) {
-          try {
-            const parsed = JSON.parse(raw)
-            if (Array.isArray(parsed)) n2Rows = parsed
-          } catch { /* 忽略 */ }
-        }
+        // NC-34：实际非空列优先（`remark ?? conclusion` 遇 remark 空串会丢整表）
+        const parsed = payloadJson('N2-1-adjudication-rows', rowsResp)
+        const n2Rows: any[] = Array.isArray(parsed) ? parsed : []
+        let read = 0
         for (const row of n2Rows) {
           const key = _normalizeTaxName(String(row.taxType ?? ''))
-          if (key) _n2AccrualMap.value.set(key, parseNum(row.creditAmount))
+          if (key) {
+            _n2AccrualMap.value.set(key, parseNum(row.creditAmount))
+            read += 1
+          }
         }
+        // 🔴 只在真读到 N2 计提行时持久化：原先无条件写 —— N2 未编制时每次打开 N4-1 都写一次 `{}`，
+        //    且会把此前已持久化的计提额覆盖成空。（by-code 404 修好前此路径从未执行，故未暴露）
+        if (read > 0) _persistN2AccrualData()
       }
-
-      // 持久化
-      _persistN2AccrualData()
     } catch {
       // N2未创建或无数据，不阻塞
     }

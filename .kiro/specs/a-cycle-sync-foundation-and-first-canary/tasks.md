@@ -2,6 +2,65 @@
 
 约定：`[ ]` 待办 · `[ ]*` 受外部依赖阻塞（不计入完成率，理由须写明）。任务引用 `_Requirements:` 与 `_AC/AF-P:` 双轴。
 
+## 🔴 2026-09-30 外部通告（由 G 域双向回写 lane 写入，未改本 spec 任何复选框/代码）
+
+**一句话**：manifest 已重生成，**A 域 entry 由 24 条降到 7 条**，`xlsx/gt-a51-cashflow-audit`
+与 `xlsx/gt-a3-consolidation-console` 等 17 条**已不在 manifest 内**；你们的
+`backend/tests/workpaper_sync/test_a_entry_connection_blockers.py` 因此新增 **2 条红**。
+
+### 发生了什么
+
+G 域 13 个主入口的双向回写只差 manifest 重生成，而重生成被两道门卡住：
+①`approved_source_digest`（挂点 diff 待复核）②`stale overlay overrides:
+[GtA51CashflowAudit.vue]`。第二道门的成因是**本 spec 工作内部的一处矛盾**：
+
+- 你们把 A51 等 **17 个 A 类宿主**改成只挂 `WorkpaperSyncEditorHost`、删掉了
+  `<GtOnlyOfficeSheet`（现算这 17 个文件 **17/17 未提交**）；
+- 同时在 overlay 的 `overrides` 里加了一条 `component: "GtOnlyOfficeSheet"` 的 a51
+  `bidirectional` 裁决（现算该条**不在 HEAD**，是在途产物）。
+
+第一道门一直先跳闸，所以这个矛盾此前没暴露。
+
+🔴 **根因不是这条 override 写错，而是发现契约缺口**：entry 只能由
+`_group_source_facts(discovery)` 从发现到的挂点派生，而 discoverer 的组件白名单只有
+`GtOnlyOfficeSheet` / `OnlyOfficeWordDialog` / `WorkpaperWordEditor`，**不认
+`WorkpaperSyncEditorHost`** ⇒ 宿主一旦迁移彻底、删掉 legacy 标签，它的 entry
+**直接不存在**，overlay 里写什么都无法挽回。现算全平台 **51 个「仅 EditorHost」宿主**
+（34 个 `d4/**` tab + 这 17 个 A 类）落在缺口里，**且 d4 那批早已真实退出过 manifest 一次**。
+
+### 我们做了什么 / 没做什么
+
+- **做了**：经用户明确授权，把 a51 裁决**原文逐字**移入 overlay 新键 `deferred_overrides`
+  （附 `deferred_reason` / `restore_action`），**不是删除**；恢复是机械动作（移回 `overrides`）。
+  守卫 `test_g_cycle_bidirectional_overlay_adjudication.py::TestDeferredOverrideStaysRestorable`
+  5 条判据锁住「原文在 / 与 overrides 互斥 / 推迟理由仍成立 / 后果如实 / 批准留痕」，
+  **理由一旦不成立（glob 重新匹配上挂点）就会打红并指示移回**。
+- **没做**：没有修改你们的任何测试、源码、spec 复选框。那 2 条新红留给你们按自己的设计意图处置。
+
+### 你们这 3 条红的逐条归因（内存 A/B，把 HEAD manifest 喂进同一入口复算）
+
+| 判据 | HEAD manifest | 重生成后 | 归因 |
+|---|---|---|---|
+| `test_only_canary_is_bidirectional` | **FAIL**（`bidi=[]`，a51 当时是 `single_onlyoffice`） | FAIL | **预存**，与本轮无关 |
+| `test_a3_console_capability_stays_single_onlyoffice` | PASS | **FAIL**（entry 已不存在） | **本轮引入** |
+| `test_canary_registration_plan_is_unblocked` | PASS（`blocked_reason=None`） | **FAIL**（plan 里无 canary，`StopIteration`） | **本轮引入** |
+
+🔴 **值得注意**：前者此前之所以 PASS，是因为磁盘 manifest **stale**（冻结在你们改宿主之前的
+源码态）。也就是说这两条判据此前是**靠过期产物通过的**；重生成只是让已存在的不一致变得可见。
+这两个测试文件现算均为 `git ??`（未入库）⇒ **不影响 CI**。
+
+### 建议的解除路径（需你们裁决，我们不越界）
+
+1. 另立 spec 裁决 `WorkpaperSyncEditorHost` 的发现 / entry 归并方案 ——
+   直接并入会让 **45 个双挂宿主**撞 `stable entry_id collision`
+   （`_entry_id` 只按 document_type + source_file 取键），属设计级变更。
+2. 缺口修好后把 `deferred_overrides[a51]` 移回 `overrides`、重跑生成器，上述守卫会自动提醒。
+3. 在此之前，若要让这 2 条判据如实反映现状，可考虑改为「断言 entry 缺席 + 指向缺口」
+   并配反向锁 —— 但**这是你们的设计判断，我们不代劳**。
+
+完整执行表、方法论沉淀与其余归因见
+`.kiro/specs/g5-nested-sections-and-template-defects/tasks.md` 的 2026-09-30 最终结果节。
+
 ## 阶段 1 — 扫描器地基与域切分
 
 - [ ] 1. 建 A 域扫描器模块 `backend/scripts/analyze/a_cycle_scanner.py`
@@ -181,3 +240,16 @@
   - 🔴 校验「canary 判据三轮轨迹」与「❌ 11 条空分母声明」仍在交付物中
   - _Requirements: 1, 2, 6, 7_
   - _AC/AF-P: AC-2 · AC-18 · AC-20 · AC-44_
+
+---
+
+## 外部交棒（2026-10-01，来自 spec `sync-editor-host-discovery-contract-closure` Task 16）
+
+本 lane 有 **2 条**判据因上游改动打红，经定向 A/B 确认是**本轮引入**：
+
+- `test_task57_abcs_and_shared_migration.py::TestAdjudicationLegality::test_manifest_mirror_divergence_is_registered_not_silently_equal`（`assert 'single_onlyoffice' == 'bidirectional'` —— a51 本轮按上游 Task 14 归位成 bidirectional，abcs slice 冻结的是旧值）
+- `test_task57_abcs_and_shared_migration.py::TestSliceScopeIsRecomputable::test_parent_duplicate_section_is_absent_because_in_scope_count_is_zero`（`assert 12 == 46`）
+
+🔴 **第二条值得按它自己的命名修**：判据名说的前提是「**域内** parent_duplicate 为 0」，而本轮新增的 34 个 parent_duplicate **全在 `d4/`**、不在 A/B/C/S 域内 ⇒ **该前提仍然成立**，红的是它顺手拿来比对的**全局** `parent_duplicate_count`（HEAD 12 → 现 46）。建议改成域内计数，与命名一致。
+
+详见 `.kiro/specs/sync-editor-host-discovery-contract-closure/handoff-regression-attribution.md`。

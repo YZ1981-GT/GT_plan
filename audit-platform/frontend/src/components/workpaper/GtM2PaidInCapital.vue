@@ -33,6 +33,8 @@
             size="small"
             @change="dualMode.switchMode"
           />
+          <!-- BP-7 MC-12: 未接入双向回写的 notice -->
+          <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-m2-paid-in-capital" />
         </div>
 
         <!-- 结构化视图（HTML sheet 分支） -->
@@ -140,6 +142,7 @@ import { ref, computed, inject, onMounted, provide, toRef, defineAsyncComponent 
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useM2EntryDualMode } from './composables/useM2EntryDualMode'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────

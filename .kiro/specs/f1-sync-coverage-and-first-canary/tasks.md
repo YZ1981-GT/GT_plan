@@ -8,6 +8,15 @@
 
 任务标注约定：`[ ]*` = 依赖外部供给（BP-61-1 发布链 / OO 真栈），供给就绪前如实登记 `upstream_gap`，不伪造通过。
 
+## 🔴 2026-09-30 现扫勘误：核心交付物已在库（假红），复选框未回标
+**现算证据**：`STORE_MERGE_REGISTRY` 已含 **`f1.prepayment_detail`**；
+`backend/data/workpaper_sync_contracts/f1.prepayment_detail.json` 是**正式契约**（非 candidate）；
+`phase5_f*.py` **24 个 provider 全部 git 跟踪**；本 spec 目录下 `evidence/` **7 个文件**已产出。
+
+⇒ canary 主线已交付，复选框 `0/22` 与磁盘不符。**只登记不代勾** —— 本 spec 另有 3 条 `[ ]*`
+（依赖外部供给）与若干变异 / 真栈判据各有 AC，须逐条跑过再勾。
+
+
 ## Tasks
 
 ### 阶段 0：前置门 + slice 核对 + 形态判定 + 红判据

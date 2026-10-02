@@ -10,6 +10,7 @@
     <!-- Toolbar -->
     <div class="gt-a51__toolbar">
       <el-segmented v-model="viewMode" :options="segOpts" size="small" />
+      <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a51-cashflow-audit" />
       <div class="gt-a51__toolbar-right">
         <el-button size="small" text @click="tipsVisible = true">💡 会计提示</el-button>
         <span class="gt-a51__save-status">
@@ -249,8 +250,19 @@
       </el-tab-pane>
     </el-tabs>
 
-    <!-- Excel Mode -->
-    <GtOnlyOfficeSheet v-else :wp-id="props.wpId" sheet-name="A5-1" class="gt-a51__oo" />
+    <!-- Excel Mode — sync bridge 统一 OO 挂载（替代 legacy GtOnlyOfficeSheet） -->
+    <template v-else>
+      <WorkpaperSyncEditorHost
+        v-if="syncOoDescriptor"
+        ref="syncHostRef"
+        :descriptor="syncOoDescriptor"
+        :bridge="syncBridge"
+        class="gt-a51__oo"
+      />
+      <div v-else class="gt-a51__oo-loading">
+        <span>正在打开同步编辑器…</span>
+      </div>
+    </template>
 
     <!-- 会计提示 Drawer -->
     <el-drawer v-model="tipsVisible" title="会计提示" direction="rtl" size="480px">
@@ -265,22 +277,23 @@
 <script setup lang="ts">
 import { ref, computed, toRef, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { useA51CashflowAudit, AUDIT_OBJECTIVES, PROGRAM_STEPS, AUDIT_ROWS, RECONCILE_GROUPS, CHECK4_SECTIONS, CHECK5_ROWS, OTHER_CF_GROUPS, ACCOUNTING_TIPS } from './composables/useA51CashflowAudit'
-import { useA51EditorMode } from './composables/useA51EditorMode'
+import { useA51SyncMode, A51_SYNC_ENTRY_ID } from './composables/useA51SyncMode'
+import { readStoreProjection } from './sync/workpaperSyncApi'
 import { fmtAmount } from '@/utils/formatters'
 
-const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+
+const WorkpaperSyncEditorHost = defineAsyncComponent(() => import('./sync/WorkpaperSyncEditorHost.vue'))
 
 defineOptions({ name: 'GtA51CashflowAudit' })
 
 const props = withDefaults(defineProps<{
   wpId: string
+  projectId?: string
   readonly?: boolean
-}>(), { readonly: false })
+}>(), { readonly: false, projectId: '' })
 
-// ─── Editor Mode ───
-const { mode, onlyofficeHealthy, checkHealth, switchToExcel, switchToStructured } = useA51EditorMode()
-
-// ─── Data ───
+// ─── Editor Mode (sync bridge — 依 AC-41 从形态 1 收敛到形态 2) ───
 const {
   lastSavedAt, saveError,
   loadData, refreshData, getField, setField,
@@ -290,22 +303,46 @@ const {
   flushPendingSave,
 } = useA51CashflowAudit({ wpId: toRef(props, 'wpId') })
 
+// 🔴 sync bridge 接桥（参照 D4 useD4SyncMode，替代 legacy useA51EditorMode）
+const A51_SHEET_KEY = 'a51-managed'
+// flushPendingSave/reloadA51：函数声明（提升），此处引用安全。
+// flushHtml 内先 flush 再 readStoreProjection（防投影旧值，参照 D4 主控 §4.1）。
+function flushPendingAndProject() { flushPendingSave() }
+async function reloadA51(/* minimumRevision: number */) { await refreshData(props.wpId) }
+
+const {
+  syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions,
+  busy: syncBusy, syncStateTag, syncHostRef, ooHealthy,
+} = useA51SyncMode({
+  sheetKey: A51_SHEET_KEY,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  isReadonly: toRef(props, 'readonly'),
+  flushHtml: async () => {
+    flushPendingAndProject()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: A51_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: A51_SHEET_KEY,
+    }
+  },
+  reloadHtml: async () => { await reloadA51() },
+})
+
+// mode 变量别名（template 用 mode === 'structured' 的旧判断需兼容）
+const mode = computed(() => editorMode.value === '在线编辑' ? 'excel' : 'structured')
+
 // ─── View state ───
 const activeTab = ref('program')
 const tipsVisible = ref(false)
-const viewMode = ref('结构化视图')
-const segOpts = computed(() =>
-  onlyofficeHealthy.value ? ['结构化视图', 'Excel编辑'] : ['结构化视图'],
-)
-
-// Mode switch sync
-watch(viewMode, async (val) => {
-  if (val === 'Excel编辑') {
-    await switchToExcel(() => flushPendingSave())
-  } else {
-    await switchToStructured(props.wpId, refreshData)
-  }
-})
+// 🔴 segOpts 改用 sync bridge 的 modeOptions（形态 2: label/value 分离）
+const viewMode = editorMode  // el-segmented 直接绑 editorMode
+const segOpts = modeOptions
 
 // ─── Helpers ───
 const fmtAmt = fmtAmount
@@ -332,7 +369,7 @@ const auditTableData = computed(() => AUDIT_ROWS)
 // ─── Lifecycle ───
 onMounted(async () => {
   await loadData(props.wpId)
-  await checkHealth()
+  // 🔴 健康检查已由 useA51SyncMode 的 mount 期自动探测，不需额外调用
 })
 onBeforeUnmount(() => { flushPendingSave() })
 </script>

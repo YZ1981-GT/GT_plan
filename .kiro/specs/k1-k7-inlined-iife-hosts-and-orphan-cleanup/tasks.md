@@ -221,7 +221,7 @@
      - `k1AdjudicationModel.ts` 的 `a${i}`：文件自己注释写着「不能改」
      - `k1AdjK11Writeback.ts` 的 `r${i}`：写的是 `${rowKey}` 键，读的却是 `r${i}` 键 ⇒ 读写分叉
      - `K5TabAdjudication.vue` 的 `r${i}`：「从专项表带入」会写进孤儿键
-
+     
      随机化后存量 AJE/RJE 读不回来，回写也落不到正确位置。这 3 处已撤回为确定性槽位号，在 facts 层 `FIXED_SLOT_PERSISTED_KEY_SITES` 重分类为**扫描器误报**，并加反向守卫 `TestFixedSlotKeysAreDeterministic`（p4），防止被「再修一次」。前端 `k1FourTableWiring.spec.ts` 的 2 条失败因此恢复
   - 教训：位置化扫描器命中 ≠ 缺陷。下标是不是「槽位号」，要看它有没有流进持久化 item_id。动手改之前必须先做数据流核对
 - `[ ]*` Task 12：依赖 BP-1

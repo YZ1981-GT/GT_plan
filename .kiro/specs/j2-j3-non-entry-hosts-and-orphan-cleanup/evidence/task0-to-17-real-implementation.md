@@ -339,3 +339,10 @@ notice 0 · contract 0 且 **J2 列映射可共用 J1**（两者 14 列语义逐
 🔴 **1 项预存失败（与本轮无关）**：`j2/J2RuntimeMigration.unit.test.ts#L26` 断言宿主
 不含 `provide('jumpToSection'`，而它实在 `GtJ2DefinedBenefitPlan.vue#L143`。
 `git status` 确认本轮**未改**该宿主 ⇒ 测试期望与实现不符，属预存。
+
+## 2026-10-01 supersession：Task 9 完成与 Task 14 拆分
+
+- Task 9 原“部分完成”由后续 spec `j1-post-publish-semantic-and-evidence-closure` 收口：删除 J2 零入边 barrel 后 8 个 composable、J3 零入边 barrel 后 5 个 composable；保留 `J3TabDetail.vue` 真消费的 `useJ3ImportExport`。
+- 删除仅测试死模块的 6 个测试文件，并从 formulaEngineInventory 摘除 J2/J3 死登记；`ieOrphanBaseline` 基线 6→5。
+- `J3TabIndex` 进度键从永远读空的 `J3-detail/J3-check` 改为真实 `J3-1-/J3-2-`；守卫确认 J3 Tab 不直接 PUT checklist。
+- Task 14 拆成 14a 登记（完成）和 14b 模板治理（未完成）。因此本 spec 终态为 17/19；余 Task 13、14b。

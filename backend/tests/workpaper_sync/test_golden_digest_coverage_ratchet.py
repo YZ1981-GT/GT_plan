@@ -70,7 +70,6 @@ _UNCOVERED_BY_GOLDEN_GATE: frozenset[str] = frozenset({
     "a51", "c2",
     "f2", "f3", "f4", "f5",
     "i1", "i2", "i3", "i4", "i5", "i6",
-    "j1", "l1",
 })
 
 #: 🔴 **违反**「bidirectional ⟹ 在门内」的 family。**已清空**（2026-09-30）。

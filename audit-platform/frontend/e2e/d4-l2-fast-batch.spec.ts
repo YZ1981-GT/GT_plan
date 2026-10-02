@@ -15,7 +15,11 @@ const ENTRY = 'xlsx/gt-d4-operating-revenue'
 const API_BASE = process.env.D4_L2_API_BASE || 'http://127.0.0.1:9980'
 const SYNC_BASE = `${API_BASE}/api/projects/${PROJECT_ID}/workpapers/${WP_ID}/sync/entries/${ENTRY}`
 const DELTA = 12345.67
-const SKIP_KEYS = new Set(['seq', 'index', 'row_no', 'no', 'order', 'month', 'group_label'])
+// 🔴 `label` 必须在列表里（2026-09-28 加）：`useD4Adjudication.ts` 的 D4-1 派生行身份是
+// `xsheet-${section}-${labelKey(label)}`，改 label ⇒ 行身份漂移 ⇒ 在 xlsx 里造出 store 侧
+// 不存在的孤儿行 ⇒ 后续 materialize 全部抛 `roundtrip_projection_mismatch` 打挂整个 entry，
+// 且污染不自愈（须 rematerialize --force 从权威模板重建）。详见 d4-l2-oo-to-html-all.spec.ts 注释。
+const SKIP_KEYS = new Set(['seq', 'index', 'row_no', 'no', 'order', 'month', 'group_label', 'label'])
 const DEFAULT_ONLY = 'D4-6,D4-7,D4-8,D4-9,D4-11,D4-12,D4-14,D4-15,D4-16,D4-17,D4-18,D4-19,D4-20,D4-21,D4-23,D4-24,D4-33,D4-34,D4-36'
 
 const EVIDENCE_DIR = resolve(
