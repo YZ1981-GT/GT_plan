@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""L5 长期应付款 —— 受管 `明细表L5-2` 的身份/几何/字段声明（**三区同键 + flat 账龄**）。
+"""L5 长期应付款 —— 受管 `明细表L5-2` 的身份/几何/字段声明（**两区同键 + flat 账龄**，R24 占位续行作静态骨架）。
 
 spec: l5-true-bidirectional-2026-10-01 · T4（T1 架构坐实见 `.agents/tasks/.../t1-architecture-gate.md`）
 
@@ -72,7 +72,7 @@ AUTHORITY_MODEL: Final[AuthorityModel] = AuthorityModel.projection_contract
 HEADER_GROUP_ROW: Final[int] = 8
 HEADER_LEAF_ROW: Final[int] = 9
 
-#: 三区共享的 store 键（双前缀 `L5-L5-2-`，照 `useL5Detail.ts` 实测 `ITEM_ROWS`）。
+#: 两区共享的 store 键（双前缀 `L5-L5-2-`，照 `useL5Detail.ts` 实测 `ITEM_ROWS`）。
 STORE_ITEM_ID: Final[str] = "L5-L5-2-rows"
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 ROW_IDENTITY_STORE_KEY: Final[str] = "key"
@@ -183,13 +183,14 @@ def _section_spec(
     section_value: str,
     error_label: str,
 ) -> RowTableSheetSpec:
-    """三区共用的声明工厂（照 `phase5_g9_02_detail._section_spec`）。
+    """各受管区共用的声明工厂（照 `phase5_g9_02_detail._section_spec`；L5 现为两区 R1/R2）。
 
-    三区**只在**行号区间、`uuid_col`、`table_key`、`template_id` 后缀、`row_section_value`、
-    `footer_row` 上不同；表头 / 字段集 / 公式列 / store 键 / 账龄声明完全相同 —— 抄三份必漂移。
+    各区**只在**行号区间、`uuid_col`、`table_key`、`template_id` 后缀、`row_section_value`、
+    `footer_row` 上不同；表头 / 字段集 / 公式列 / store 键 / 账龄声明完全相同 —— 抄多份必漂移。
 
-    🔴 `template_id` 必须逐区不同（`L52R1/R2/R3`）：instrumentation 的 definedName 按它命名，
-    三区共用会争同一个 definedName（框架层 `build_instrumentation_payload_for_sheets` 有显式门）。
+    🔴 `template_id` 必须逐区不同（`L52R1/R2`；R24 其他段作静态骨架不建区，故无 R3）：
+    instrumentation 的 definedName 按它命名，各区共用会争同一个 definedName
+    （框架层 `build_instrumentation_payload_for_sheets` 有显式门）。
     `sheet_key` 反过来必须共享（否则契约层产出两个同 `excel_name` 的 sheet 条目）。
     """
     return RowTableSheetSpec(
@@ -275,6 +276,10 @@ _HTML_STORE_NOTE: Final[str] = (
     "unadjusted/aje/rje/audited + 债权人）退 html_only：继续喂 L5-5/L5-6/L5-7，不进契约、OO 侧不渲染。"
     "真库 `L5-L5-2-rows` 现算 0 行，零迁移负担。"
 )
+#: 🔴 **此常量是契约数据（`reviewed_basis` 字段，参与 canonical digest，被磁盘契约字节锁定）**，
+#: 非 docstring —— 其中「三区 UUID 列 AD/AE/AF」为勘误前措辞，与同串前文「两受管区 R11:15·R18:22」
+#: 内部不一致。改它会改动已交付 reviewed 契约 `l5.long_term_payables.json` 的 digest（超出「只改注释」范围），
+#: 故保持原字节不动；终态两区结论以模块 docstring 与 `ALL_SPECS_L52`（现为两段）为准。
 _REVIEWED_BASIS: Final[str] = (
     "openpyxl 逐格实测 L/L5 长期应付款.xlsx 的 明细表L5-2（sha 09380626…）："
     "两级表头 R8 组（债权人名称/未审数/期初调整/账项调整/重分类调整/审定数/减一年内到期/披露审定数/"

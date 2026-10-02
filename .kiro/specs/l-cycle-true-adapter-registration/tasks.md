@@ -557,12 +557,98 @@
   - 每条独立 commit，manifest 逐条翻转，禁批量翻转后统一验证
   - _判据：LR-P22 逐条复用_
 
-- [ ] 13.* L5~L8 接线（前置：先修 inert 开关）
+- [x] 13.* L5~L8 接线（前置：先修 inert 开关）
   - 🔴 L5~L8 的 `ui_toolbar_gate.anchor is None`（连宿主锚点都没有）+ BP-4 模式开关 inert
     （切到 OnlyOffice 不渲染任何 OO 宿主）⇒ **必须先补锚点与开关**，否则 DOM 判据无对象
   - 标 `*` 的理由：开关修复属前端宿主改造，与本 spec 的 adapter 注册主线可分离，
     且需真实浏览器验证（Playwright）；不标 `*` 的部分（contract/provider）照常推进
   - _判据：LR-P22 逐条复用_
+  - **实施证据（2026-10-01~02 落档，四条独立 commit，均在当前分支历史，`git show --stat` 核对）**：
+    - 🔴 **manifest 四条翻转现算（硬口径，本次落档现扫
+      `backend/data/workpaper_sync_entry_manifest.json`）**：
+      | entry | capability | adapter_id | migration_state | representation_id（真库 entry_state 现查）/ gen |
+      |---|---|---|---|---|
+      | `xlsx/gt-l5-long-term-payables` | `bidirectional` | `l5.long_term_payables` | `adapter_registered` | `651e97b3-438b-4098-8dd2-f68f88e39f6d` / gen 1 |
+      | `xlsx/gt-l6-special-payables` | `bidirectional` | `l6.special_payables` | `adapter_registered` | `51492e61-bf37-4d04-b9d8-ae7c7ff83344` / gen 1 |
+      | `xlsx/gt-l7-other-noncurrent-liabilities` | `bidirectional` | `l7.other_noncurrent_liabilities` | `adapter_registered` | `fe8f97f8-d600-42e8-be58-b809f4c0854f` / gen 1 |
+      | `xlsx/gt-l8-financial-expenses` | `bidirectional` | `l8.financial_expenses` | `adapter_registered` | `6e3d963f-7cf3-4869-be2c-d6be489b4010` / gen 1 |
+      现算 manifest `entries` 总数 **155**、`migration_state=adapter_registered` **20 条**、
+      `capability=bidirectional` **20 条**（`stats.capability_counts.bidirectional` 亦 20，stats 与 entries 一致）。
+      L1~L8 八条全部 `bidirectional`/`adapter_registered`（L 域真双向 **8/8 全闭环**）。
+      🔴 真库 `working_paper_sync_entry_state` 现查八条 L entry 全部有 `current_representation_id` + `generation 1`
+      （上表后四列即现查值）—— 与 L5 verification-note 当日「本地 PG 非整库回退、三表全 0」的旧快照不同，
+      库在那之后已恢复/重新 seed；**判成败一律查数据，不看退出码**，本次现查即库态证据。
+
+    - **L5 长期应付款（科目 2701）**：commit `6bca74514`（25 文件 / +3700 −104）。受管表 `明细表L5-2`，
+      走**两区同键**（区① 售后租回 R11:15 + 区② 分期付款 R18:22，共享 store 键 `L5-L5-2-rows` + section 字段）
+      + 首次启用 **flat 账龄**（T~X 5 桶）+ html_only 13 键；R24「其他」占位续行**作静态骨架**
+      （用户裁决 A：typography 门 BP-21 拒纯省略号占位行受管，零能力损失，省略号续行非业务行）。
+      🔴 **平台根因修复**：`published_identity_observer._build_identity_binding` 的**同键多区消歧**缺口
+      —— 两区共享 `sheet_key='l52-managed'` 时 observer 只用 sheet_key 对齐、无法选主表、fail-closed
+      「不得随手挑第一张」；按用户裁决修平台 observer，新增 `elif len(matched)>1` 用冻结锚点 `table_name`
+      对齐 provider `managed_row_table_specs()` 选主区（方案 (i)，blast radius = 所有同键多区 entry，
+      当前真实命中仅 L5；G9 范式 `manifest_capability_enabled()==False` 从未翻、从未行使该路径）。
+      变异证明 6 例（主区选中 / 换冻结锚点选另一区 / 对不上 fail-closed / 空 fail-closed / provider 解析）。
+      测试：`test_l5_adapter_registration.py` **32 passed**（含 observer 消歧 6 例）；真 OO ConvertService 往返
+      **9 步 + 3 专项断言全绿**（两区 section 对齐 / rowId 稳定 / 无幽灵行 / E,L,M,N,O,R,S 七列公式幸存 /
+      静态骨架 R24 占位续行幸存 / L5-3 的 `='明细表L5-2'!A{n}` 镜像引用未被打坏 / 不写库）。
+      五环发布 revision 1 / representation gen 1 / `representation_id 651e97b3…`（上表现查一致）。
+      证据 `.agents/tasks/l5-true-bidirectional-2026-10-01/verification-note.md`（T7 中间卡点叙述已标注
+      为被取代，终态全绿）。
+
+    - **L6 专项应付款（科目 2711）**：commit `6c533c272`。受管表 `明细表L6-2`（方案 b，HTML 忠实渲染）。
+      🔴 **平台根因修复**：`excel_materialize` 的 **NCR（named cell range）materialize sheet 名传播缺口**
+      —— CJK sheet 名被序列化成数字字符引用，致误报 `PropagationDriftError`；本轮修 materialize 的 sheet 名
+      传播并补 `test_materialize_ncr_sheet_name_propagation.py`（97 行）守护。测试：
+      `test_l6_adapter_registration.py` 现跑 **26 passed / 1 failed**，🔴 唯一红
+      `TestRegistration::test_l_cycle_whitelist_ledger_counts_paired` 是**预存过期断言**（见本条末「如实留白」），
+      非 L6 功能缺陷。真 OO 往返脚本 `verify_l6_oo94_roundtrip.py` 已交付。
+      五环发布 representation gen 1 / `representation_id 51492e61…`（上表现查）。
+
+    - **L7 其他非流动负债**：commit `b117123b1`（前端 L7-2 稳定 rowId `key→rowId`/`newRowIdentity('l72det')`
+      + host `procedureDualMode` 模式切换器 + provider/contract 五处注册，adapter 测试 20 passed）
+      + `e7c25a9a6`（五环发布 + 模板净化 `sanitize_l7_template_external_links.py`（受管表 `明细表L7-2`
+      横向共享公式组 M12:N16 展开，受管 sheet 0 diff，sha 9fe0→35e4）+ manifest 翻 bidirectional
+      + 真 OO 往返 9 步全绿）+ `f3ca09422`（剥离误提交的并发 N4 注册编辑，修「引用未提交模块」P0）。
+      受管表明细表 L7-2 走方案 b。manifest 翻转 mount-diff **零能力损失**（现查 `l7-flip-diff.md`：
+      entry 155→155、唯一翻转 = L7、capability_counts.bidirectional 16→17、host_count 154 不变）。
+      测试：`test_l7_adapter_registration.py` 现跑 **passed**（随 L5~L8 合跑 97 passed 中含 L7 全绿）。
+      五环发布 representation gen 1 / `representation_id fe8f97f8…`（上表现查）。
+      证据 `.agents/tasks/l7-true-bidirectional-2026-10-01/{plan.md,l7-flip-diff.md}`。
+
+    - **L8 财务费用（科目 6603，损益类 occurrence）**：commit `8b643501a`（provider/契约/注册/host/
+      身份模块 `l8DetailRowIdentity.ts` +117 / merge 引擎补丁 `phase5_row_table_sheet.py` +10）
+      + `55bd1d1d4`（翻 manifest `single_onlyoffice`→`bidirectional`）。受管表 `明细表L8-2`，走**方案 D1
+      混合身份**：10 输入骨架行 `GTROW` 双向 + 用户 `addRow` 自铸 `l82det` + 3 派生行 R11/R13/R20
+      只读模板计算不进 store。三件补课：跨行派生行 / 双 footer / 28 裸 IF。模板净化
+      `sanitize_l8_template_external_links.py`（76069→65929 bytes）。🔴 **平台根因修复**：merge 引擎
+      skeleton skip（`phase5_row_table_sheet.py` 补 10 行，使模板预印骨架行不被当幽灵行/不进 store）。
+      测试：`test_l8_adapter_registration.py` + `test_phase5_row_table_sheet.py` 现跑 **passed**
+      （随 L5~L8 合跑 97 passed 中含 L8 全绿）。五环发布 representation gen 1 /
+      `representation_id 6e3d963f…`（上表现查）。
+
+    - 🔴 **如实留白（四条共同，不勾成完成）**：
+      ① **真浏览器 Playwright 端到端 = 未实测**：四条宿主的 `procedureDualMode`/模式切换器/
+         `GtEntrySyncCapabilityNotice` 代码已改但 dev server（3030）未起，标**「代码已改但未实测
+         （环境待 start-dev.bat）」**，不勾浏览器端到端。四条真 OO 往返是 docker `audit-onlyoffice`
+         的 `ConvertService.ashx` xlsx→xlsx **引擎**（证「OO 不改坏受管区 / 公式 / 隐藏 UUID 列」），
+         **不等于**用户在 OO 浏览器内人工改值后 forcesave 回流（后者需 Playwright，同 lane spec 的 `[ ]*` 端到端）。
+      ② **预存过期断言（非本轮引入、非功能缺陷）**：`test_l6_adapter_registration.py::TestRegistration::
+         test_l_cycle_whitelist_ledger_counts_paired` 写死「L 域应 6 条（L1/L2/L3/L4/L6/L7）」，而 L 域
+         真双向交付已达 **8 条**（L5/L8 后续补齐）⇒ 现算 `len(wl_l)==8 != 6` 打红。`git stash` 掉本轮
+         docstring 改动后该条**仍红**（在干净 HEAD 即红）⇒ 坐实是「断言计数过期」而非本轮或 L5~L8 功能缺陷；
+         属该 L6 测试 owner 按现算 8 条重刷（本 spec 不代改他人写死断言，仅如实登记）。
+      ③ L5 的 `_REVIEWED_BASIS`（契约数据，参与 digest、被磁盘契约字节锁定）内含勘误前「三区」措辞，
+         **刻意不改**（改它会动已交付 reviewed 契约 digest，超出「只改注释」范围），已在 `phase5_l5_sheets.py`
+         该常量上方加注说明；两区终态以模块 docstring + `ALL_SPECS_L52`（现为两段）为准。
+
+    - 🔴 **本轮有意不做、留后续独立条目（非假装未提及）**：
+      ① **L5-3 备抵科目（2702）/ 未确认融资费用明细表**：本轮不受管，留后续独立条目
+         （L5-2 的 `='明细表L5-2'!A{n}` 跨 sheet 镜像引用本轮已在真 OO 往返专门断言「不被 L5-2 扩行打坏」，
+         但 L5-3 自身全链路对齐是另一 spec）。
+      ② **L8-6 + L6-4 + L7-4 等检查表重构**：本轮有意不做，留后续独立条目（本轮受管表选型落在各自明细表
+         L{6,7,8}-2，检查表类受管区重构属另一轮）。
+      ③ 以上两类**均未勾成完成**，如实标为「有意后续」。
 
 ## 阶段 7：收尾
 
@@ -601,3 +687,32 @@
     - 🔴 **如实留白**：本收尾项中「INDEX.md 顶部 Active 统计段重算」未重跑全目录现扫
       （本次只更新本 spec 行的完成度数字，未动统计段 —— 因勾选子项不改变 spec 的 active 归属，
       按铁律⑫「禁按增量推算」则统计段应由做增删 spec 的任务现扫维护，本次无增删）。
+
+  - **补注（2026-10-02 第二次落档，task 13 L5~L8 闭环后）**：
+    - 🔴 **task 13 已勾（L5~L8 真双向落档）** ⇒ 本 spec 顶层任务 **17/17** 全勾。相应把
+      `.kiro/specs/INDEX.md` 本 spec 行完成度 `16/17` → **`17/17`**（Python `read_bytes()/write_bytes()`
+      维护 CRLF，改前自检 OLD 恰 1 处命中、改后该行未转义 pipe 数仍 **4**、全文仍纯 CRLF；
+      统计段未动，理由同上「勾选子项不改变 active 归属」）。
+    - 🔴 **本次 L5 轮 `_` 前缀探针清理**：删除工作树残留的本 spec L5 一次性探针 5 个 ——
+      `_l5p_formula_check.py` / `_l5p_l53_geometry.py`（现读确认 docstring 均标「一次性探针」且
+      分析 `L5 长期应付款.xlsx`，归属本 spec）+ 其 stdout 输出 `_l5_formula_check.txt` /
+      `_l5_geometry.txt` / `_l5_l53_geometry.txt`。**只删本 spec 自己的 `_l5p`/`_l5` 前缀** ——
+      `git status` 现算无其他 L5 残留；并发会话 K/J/N/I 的 `_*.py`/`_*.txt` 一律未碰。
+      （L5 verification-note 当日记这两 `.py` 是「前序会话、非本轮」，但其内容确为本 L5 spec 的
+      探针且 `_` 前缀 = 用完即删 ⇒ 本次按归属删除。）
+    - 🔴 **复盘延伸：L 域真双向 8/8 全闭环**（原 task 14 复盘写于 L1~L4 期）—— 本次现扫
+      manifest 坐实 L1~L8 **八条**全 `bidirectional`/`adapter_registered`，真库八条 entry_state
+      全有 representation gen 1。前序三份 L spec「标 100% 而 manifest 一条未翻」的结构性问题，
+      至此由本 spec 的 L1~L8 逐条 overlay 追加 + 干净 HEAD worktree `--apply` 全部补翻。
+      **同类待查（G/I/J/C）仍登记未核**，口径不变（查 manifest JSON 的 capability/adapter_id/
+      migration_state，不接受勾选作证据）。
+    - 🔴 **本次发现的一处「预存假绿/假红」如实登记（非本轮引入）**：
+      `test_l6_adapter_registration.py::TestRegistration::test_l_cycle_whitelist_ledger_counts_paired`
+      写死「L 域 6 条」而真双向交付已 **8 条** ⇒ 现算打红；`git stash` 掉本轮改动后**仍红**
+      （干净 HEAD 即红）⇒ 坐实是该测试的**计数过期断言**，非 L5~L8 功能缺陷。本 spec 不代改
+      他人写死断言，登记待其 owner 按现算 8 条重刷。
+    - 🔴 **分支名与内容语义不符（L5 review 第 4 条，观察不动）**：当前实际分支 HEAD 为
+      `work/2026-10-01-i-cycle-classification-convergence`（任务书称 `work/2026-10-01-n-cycle-sync-three-specs`，
+      两者均以 N/I 循环命名却装着 L 的真双向工作）—— **不改分支名**（改名是高风险 git 操作、多会话共用），
+      仅如实记录现状。L5~L8 四条收口 commit（`6bca74514` / `6c533c272` / `b117123b1` + `e7c25a9a6`
+      + `f3ca09422` / `8b643501a` + `55bd1d1d4`）均在本分支历史里。

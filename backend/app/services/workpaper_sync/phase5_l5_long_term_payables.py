@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
-"""L5 长期应付款「明细表 L5-2」—— L 循环真双向 entry（**三区同键 + flat 账龄**）。
+"""L5 长期应付款「明细表 L5-2」—— L 循环真双向 entry（**两区同键 + flat 账龄**，R24 占位续行作静态骨架）。
 
 spec: l5-true-bidirectional-2026-10-01 · T4；几何/选型见 `phase5_l5_sheets`，T1 架构坐实见
 `.agents/tasks/l5-true-bidirectional-2026-10-01/t1-architecture-gate.md`。
+🔴 **勘误（用户裁决 A，2026-10-02）**：T1/report 原记「三区同键」，终态收敛为两区（R24「其他」占位
+续行走静态骨架，typography 门 BP-21 拒受管）；`SPECS` 现为两段，详见 `phase5_l5_sheets` 模块 docstring。
 
-本模块声明 IDENTITY + 三区 SPECS 与 L5 幻影码选型，身份/契约/发布委派 `phase5_l_cycle_common`
-（照 L7），**store 投影/合并/迭代走三区门面** `phase5_l5_store_facade`（照 G9），且
-`attach_adapters` 补 sibling binding 覆盖区②③（否则真 OO extract 只读区①的 UUID 列，区②③消失）。
+本模块声明 IDENTITY + 两区 SPECS 与 L5 幻影码选型，身份/契约/发布委派 `phase5_l_cycle_common`
+（照 L7），**store 投影/合并/迭代走多区门面** `phase5_l5_store_facade`（照 G9），且
+`attach_adapters` 补 sibling binding 覆盖区②（否则真 OO extract 只读区①的 UUID 列，区②消失）。
 """
 from __future__ import annotations
 
@@ -43,7 +45,7 @@ IDENTITY: Final[_L.LEntryIdentity] = _L.LEntryIdentity(
         "reason": "R7~R16 全部是跨 sheet 聚合 明细表L5-2 的下游视图，非录入表；受管表选 L5-2",
     },
     extra_review={
-        # 🔴 三区同键声明（照 G9 契约 html_store 的 row_section_* 字段，但 l_cycle_common 的
+        # 🔴 两区同键声明（照 G9 契约 html_store 的 row_section_* 字段，但 l_cycle_common 的
         #    html_store 是单 item 形态 ⇒ 经 extra_review 作顶层 review 键带出，纯声明，引擎行为
         #    由 SPEC 的 row_section_field/value 驱动，不读契约）。
         "row_sections": {
@@ -115,7 +117,7 @@ def assert_entry_selectable(*, resolution: TemplateResolutionFacts | None = None
     return entry
 
 
-# ── 受管 sheet / instrumentation（三区各一条）──────────────────────────────
+# ── 受管 sheet / instrumentation（两区各一条，R24 其他段作静态骨架不建区）──────
 def managed_row_table_specs() -> tuple[RowTableSheetSpec, ...]: return SPECS
 def section_specs() -> tuple[RowTableSheetSpec, ...]: return tuple(s for s in SPECS if s.row_section_field)
 def instrumentation_specs() -> tuple[ExcelInstrumentationSpec, ...]: return _L.instrumentation_specs_for(IDENTITY, SPECS)
@@ -166,11 +168,11 @@ async def resolve_published_frozen_definitions(*, session: Any, representation: 
 
 
 async def attach_adapters(registry: WorkpaperSyncAdapterRegistry, *, session: Any) -> tuple[str, ...]:
-    """发布链编排：attach L5 adapter，**带区②③ sibling binding**。
+    """发布链编排：attach L5 adapter，**带区② sibling binding**。
 
-    🔴 与 `l_cycle_common.attach_l_entry_adapter` 的差异（本模块覆盖它）：L5 是三区同键，
-    每区有独立 uuid_col（AD/AE/AF）。只传主表 binding ⇒ 真 OO extract 只读区① UUID 列，
-    区②③的受管字段在 roundtrip 后全部消失（I5 实测过同一缺陷）。照 `attach_h_entry_adapter`
+    🔴 与 `l_cycle_common.attach_l_entry_adapter` 的差异（本模块覆盖它）：L5 是两区同键（R24 其他段
+    作静态骨架不建区），每区有独立 uuid_col（AD/AE）。只传主表 binding ⇒ 真 OO extract 只读区① UUID 列，
+    区②的受管字段在 roundtrip 后全部消失（I5 实测过同一缺陷）。照 `attach_h_entry_adapter`
     按 contract table_key 与 instrumentation spec 组装 sibling bindings（主表去重，其余逐表保留 UUID 列）。
     """
     if ADAPTER_ID in {reg.adapter_id for reg in registry.registrations()}:
@@ -248,7 +250,7 @@ async def attach_adapters(registry: WorkpaperSyncAdapterRegistry, *, session: An
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# store 门面重导出（三区同键，伴生模块 `phase5_l5_store_facade`）
+# store 门面重导出（两区同键，伴生模块 `phase5_l5_store_facade`）
 # ═══════════════════════════════════════════════════════════════════════════
 from app.services.workpaper_sync.phase5_l5_store_facade import (  # noqa: E402
     build_store_projection,

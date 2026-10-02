@@ -4,6 +4,14 @@ spec: `l5-true-bidirectional-2026-10-01`。本轮为**第一次迭代**（无 re
 基点 HEAD `55bd1d1d4009929a71ca3f7f58eaf9f2e605ba3b`。工作树脏（并发 K/J/N/I ~数百项未提交改动）——
 正常，全程只逐文件 add 本任务产物，绝不 `git add -A/.`。
 
+## ✅ 完成：commit `6bca74514a337dc81bad9abb68162e050655a543`（未 push）
+
+25 文件 / +3700 −104。逐文件 add（禁 -A），`git show --stat` 核对 commit 零触碰并发 J/N/K/I 模块，
+三处注册共同触点只在 L 块末尾追加 L5 行/块。worktree `.worktrees/l5-flip` + 临时分支 `work/2026-10-02-l5-flip`
++ node_modules junction 已清；探针 `_l5p_*` 已删（残留 `_l5p_formula_check.py`/`_l5p_l53_geometry.py` 是前序会话、非本轮）。
+🔴 commit 含**平台共享文件** `published_identity_observer.py` 的 `_build_identity_binding` 同键多区消歧根因修复
+（受影响面=所有同 sheet_key 多区 entry，当前真实命中仅 L5；review 须专门核这条）。
+
 ---
 
 ## T1 判定（读 `t1-architecture-gate.md`，严格据此执行）
@@ -171,6 +179,13 @@ L5 两区同键首次真实翻 manifest 并走到 `observe_published_frozen_defi
   非本任务。本任务的 manifest/overlay 在**干净 worktree（HEAD+仅 L5）task73 46 passed** 已证正确。
 - L5/L7/l_cycle_common/row_table_sheet 相关套件：95 passed（除 task73 的 8 条并发红）。
 
+> 🔴🔴 **以下为被后续取代的中间叙述（append-only 保留，勿据此判定终态）**：下文「步骤 ① attach 即停
+> / `FrozenChildUnusableError` / 拟修 observer / 已 send_message warning 待裁决」记录的是 observer
+> 根因修复**之前**的中间卡点。用户裁决 A + 方案 (i) 已修平台 observer
+> `_build_identity_binding` 同键多区消歧（见本文件上文「🔴 平台 observer 根因修复」节），
+> **终态 = T7 真 OO 往返 9 步 + 3 专项断言全绿（退出码 0），见本节开头「T7 真 OO 往返…✅」**。
+> 本中间叙述与文件末尾残留的 `- [ ]` T6/T7 勾选框均为被取代的早期快照，终态以上文 ✅ 为准。
+
 写了 `verify_l5_oo94_roundtrip.py`（两区 + key + section + 账龄 + 静态骨架 + L5-3 镜像 + 不写库）。真 OO 往返链路在
 **步骤 ① attach** 即停：`FrozenChildUnusableError: 契约声明了 2 张带 row_identity 的表
 ['long_term_payable_rows_r1','long_term_payable_rows_r2']，但一 sheet 锚点 'l52-managed' 未能唯一对齐
@@ -201,6 +216,11 @@ row_identity 表」只用 **sheet_key 对齐**选主表（`matched=[t for s,t in
 因该修改触碰**跨 entry 共享的平台 observer**（高 blast radius），已 `send_message severity=warning` 报用户裁决：
 修平台 observer（推荐，根因修复）vs 其它路径。未裁决前不改 observer、不提交、不 push。
 T2/T3/T4/T5/T6 全部成立且已验证（见上）；仅 T7 真 OO 往返卡在此 observer 消歧。
+
+> 🔴 **以下 `- [ ]` 为被取代的早期进度快照（append-only 保留，非终态）**：T6/T7 两项**均已完成且全绿**，
+> 终态证据见上文 `### T6 overlay + 干净 worktree 翻 manifest ✅` 与 `### T7 真 OO 往返 + 回归归因 + 提交 ✅`
+> 两节（T6 唯一翻转 L5、mount-diff 零能力损失；T7 9 步 + 3 专项断言全绿、退出码 0、commit `6bca74514`）。
+> 注：下方 T7 条目写「三区 section」亦为勘误前措辞，终态是两区 + R24 占位静态。此处勾选框不勾、不删，仅标注取代。
 
 ### T6 overlay + 干净 worktree 翻 manifest
 - [ ] 翻转范围（只 L5）+ mount-diff 零能力损失 + baseline diff
