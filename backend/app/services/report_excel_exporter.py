@@ -24,6 +24,7 @@ from uuid import UUID
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.cell.cell import MergedCell
+from openpyxl.comments import Comment
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side, numbers
 from openpyxl.utils import get_column_letter
 from sqlalchemy import select
@@ -31,7 +32,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.core import Project
 from app.models.report_models import FinancialReport, FinancialReportType
-from app.services.parent_company_scope import resolve_parent_standalone_project
+from app.services.parent_company_scope import (
+    resolve_parent_company_context,
+    resolve_parent_standalone_project,
+)
+from app.services.parent_company_values import load_parent_company_values
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +79,11 @@ _EQ_PLACEHOLDER_RE = re.compile(
 )
 #   header placeholders embedded in text: {{company_full_name}} 等
 _HEADER_PLACEHOLDER_RE = re.compile(r"\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}")
+
+# 有分公司时母公司汇总上年数尚无同口径结转：必须强制留空，不能被 fill_empty_as=zero 复活
+_PARENT_PRIOR_FORCE_BLANK = "_force_blank_prior"
+_PARENT_PRIOR_BLANK_REASON = "_prior_blank_reason"
+_PARENT_PRIOR_DEFAULT_REASON = "母公司汇总上年数未结转"
 
 # Header placeholder keys handled by header replacement track
 _HEADER_KEYS = frozenset(
@@ -376,6 +386,24 @@ class ReportExcelExporter:
             )
             return {}
 
+        try:
+            context = await resolve_parent_company_context(
+                self.db, project, standalone_project=parent_project
+            )
+            if context.has_branches:
+                return await self._load_parent_aggregate_row_index(
+                    project, year, report_types, context, mode=mode
+                )
+        except Exception as e:  # 企业树/汇总口径失败：宁可留空，不回落本部制造错数
+            logger.warning(
+                "母公司汇总节点解析失败（project=%s year=%s）：%s；母公司列留空",
+                getattr(project, "id", None),
+                year,
+                e,
+            )
+            return {}
+
+        # P13：无直属分公司严格保留原 standalone 报表读取路径
         parent_data = await self._load_report_data(
             parent_project.id, year, report_types, mode=mode,
         )
@@ -385,6 +413,52 @@ class ReportExcelExporter:
                 code = r.get("row_code")
                 if code:
                     index[code] = r
+        return index
+
+    async def _load_parent_aggregate_row_index(
+        self,
+        project: Any,
+        year: int,
+        report_types: list[str],
+        context: Any,
+        *,
+        mode: str,
+    ) -> dict[str, dict]:
+        """有分公司时对 ``{根代码}:parent`` 科目金额只求值一次，再映射成报表行。
+
+        先聚合科目、后求报表公式，保证非线性公式仍正确；审定数含已审批母分差额，
+        未审数只含本部与分公司。上年同口径结转不在本轮，逐行打强制留空标记，
+        后续两条模板填充路径均据此跳过 ``fill_empty_as=zero`` 并写 Excel 批注。
+        """
+        from app.services.consol_report_values import (
+            load_report_rows,
+            report_values,
+            resolve_consol_standard,
+        )
+
+        values = await load_parent_company_values(
+            self.db, project.id, year, context
+        )
+        amounts = values.unadjusted if mode == "unadjusted" else values.audited
+        standard = await resolve_consol_standard(self.db, project.id)
+        rows = await load_report_rows(self.db, standard)
+        evaluated = await report_values(rows, amounts, categories=values.categories)
+        wanted = set(report_types)
+        index: dict[str, dict] = {}
+        for row in rows:
+            if row.report_type not in wanted:
+                continue
+            value = evaluated[row.row_code]
+            index[row.row_code] = {
+                "row_code": row.row_code,
+                "row_name": row.row_name,
+                "current_period_amount": value.amount,
+                "prior_period_amount": None,
+                "blank_reason": value.reason,
+                "source_node_key": values.parent_node_key,
+                _PARENT_PRIOR_FORCE_BLANK: True,
+                _PARENT_PRIOR_BLANK_REASON: _PARENT_PRIOR_DEFAULT_REASON,
+            }
         return index
 
     def _load_template(self, template_key: str) -> Workbook | None:
@@ -613,6 +687,20 @@ class ReportExcelExporter:
         except (TypeError, ValueError):
             return None
 
+    @staticmethod
+    def _parent_prior_blank_reason(row: dict | None) -> str | None:
+        if row and row.get(_PARENT_PRIOR_FORCE_BLANK):
+            return str(row.get(_PARENT_PRIOR_BLANK_REASON) or _PARENT_PRIOR_DEFAULT_REASON)
+        return None
+
+    @staticmethod
+    def _mark_parent_prior_blank(cell: Any, reason: str) -> None:
+        """强制清空并用批注明示原因（不能只留日志，交付件必须可见溯源）。"""
+        if cell is None:
+            return
+        cell.value = None
+        cell.comment = Comment(reason, "系统")
+
     def _resolve_fill_value(
         self,
         row: dict | None,
@@ -624,6 +712,8 @@ class ReportExcelExporter:
 
         返回 ``(should_write, value)``；should_write=False 表示留空（blank）。
         """
+        if period == "prior" and self._parent_prior_blank_reason(row):
+            return False, None
         amount = self._resolve_amount(row, period)
         if amount is not None:
             return True, amount
@@ -768,8 +858,13 @@ class ReportExcelExporter:
                         cell.value = None
                         continue
                     source = parent_index if is_parent else row_index
+                    source_row = source.get(code)
+                    prior_reason = self._parent_prior_blank_reason(source_row) if is_parent and period == "prior" else None
+                    if prior_reason:
+                        self._mark_parent_prior_blank(cell, prior_reason)
+                        continue
                     should_write, value = self._resolve_fill_value(
-                        source.get(code), period, code, fill_empty_map
+                        source_row, period, code, fill_empty_map
                     )
                     cell.value = value if should_write else None
                     continue
@@ -892,12 +987,18 @@ class ReportExcelExporter:
 
                 prior_parent_ref = info.get("prior_parent")
                 if prior_parent_ref:
-                    should_write, value = self._resolve_fill_value(
-                        parent_row, "prior", code, fill_empty_map
-                    )
-                    self._write_mapped_cell(
-                        ws, prior_parent_ref, value if should_write else None
-                    )
+                    prior_reason = self._parent_prior_blank_reason(parent_row)
+                    if prior_reason:
+                        cell = self._anchor_cell(ws, prior_parent_ref)
+                        if cell is not None and not self._is_formula_cell(cell):
+                            self._mark_parent_prior_blank(cell, prior_reason)
+                    else:
+                        should_write, value = self._resolve_fill_value(
+                            parent_row, "prior", code, fill_empty_map
+                        )
+                        self._write_mapped_cell(
+                            ws, prior_parent_ref, value if should_write else None
+                        )
 
     def _write_mapped_cell(self, ws, coord: str, value) -> None:
         """按坐标写入数据格，跳过公式格与合并格非锚点成员（仅写左上角）."""

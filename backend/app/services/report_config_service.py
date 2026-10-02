@@ -461,6 +461,9 @@ class ReportConfigService:
                 from app.models.audit_platform_schemas import EventPayload, EventType
                 from app.services.event_bus import event_bus
 
+                # project_id 是占位（主模板无项目维度），真正的作用对象由 handler 按
+                # extra.standard/report_type/row_code 反查克隆项目。该事件类型不在
+                # EventBus 的年度补齐范围内（YEAR_SCOPED_EVENT_TYPES），占位 id 不会被当项目查年度。
                 await event_bus.publish(EventPayload(
                     event_type=EventType.REPORT_CONFIG_MASTER_UPDATED,
                     project_id=user_id or config_id,  # fallback: config_id as UUID placeholder

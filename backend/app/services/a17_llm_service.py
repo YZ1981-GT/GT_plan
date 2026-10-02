@@ -195,11 +195,12 @@ async def _retrieve_rag_context(
         )
         if not results:
             return ""
-        # 拼接检索结果为上下文文本
+        # 拼接检索结果为上下文文本（标题取检索内核附带的 document_name；旧键 title/file_name
+        # 在结果里从来不存在，标题恒为空 —— spec knowledge-base-retrieval-and-authz-closure 5.2）
         snippets = []
         for r in results[:top_k]:
-            title = r.get("title") or r.get("file_name") or ""
-            content = r.get("content") or r.get("text") or ""
+            title = r.get("document_name") or ""
+            content = r.get("content") or ""
             if content:
                 snippet = f"【{title}】{content[:500]}" if title else content[:500]
                 snippets.append(snippet)

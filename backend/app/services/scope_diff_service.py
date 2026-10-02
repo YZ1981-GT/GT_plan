@@ -1,4 +1,4 @@
-"""合并范围校对服务 — 树形(projects 三代码) vs consol_scope 表差异
+"""合并范围校对服务 — 合并企业树成员 vs consol_scope 表差异
 
 group-tree-architecture 需求 9：
 
@@ -7,8 +7,10 @@ group-tree-architecture 需求 9：
 - sync_scope: **仅增量添加**树形子企业到 consol_scope 表，**不自动删除** scope 中多出条目
     （Req 9.4：移除交用户手动确认，避免误删手工配置的合并范围）
 
-权威源：projects 表三代码（company_code / parent_company_code / ultimate_company_code），
-consol_scope 表作校对参考（Req 9.5）。差异提示不阻塞树形展示。
+权威源：各项目三码 + 与上级关系推导出的合并企业树（consol-tree-three-code-autobuild 需求 11.3：
+与合并计算同一棵树，``consol_tree_service.build_tree``），consol_scope 表作校对参考（Req 9.5）。
+T = 树中的**子公司类企业**（含经中间企业间接持有、按最终控制方挂靠的）；母公司本身与各级分公司
+不是合并范围成员（分公司并入所属企业汇总，不单独纳入合并范围）。差异提示不阻塞树形展示。
 """
 
 from __future__ import annotations
@@ -22,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.consolidation_models import ConsolScope
 from app.models.core import Project
-from app.services.consol_tree_service import build_group_trees_from_projects
+from app.services.project_audit_year import resolve_project_audit_year
 
 logger = logging.getLogger(__name__)
 
@@ -44,30 +46,24 @@ async def _load_consol_project(db: AsyncSession, project_id: UUID) -> Project:
 
 
 def _resolve_year(project: Project) -> int | None:
-    """从合并项目推导年度：优先 audit_period_end 年份，回退 audit_year。"""
-    ape = getattr(project, "audit_period_end", None)
-    if ape is not None:
-        return ape.year
-    return getattr(project, "audit_year", None)
+    """合并项目的审计年度（平台统一解析，与企业树同一口径）。"""
+    return resolve_project_audit_year(project)
 
 
-def _collect_tree_members(tree: dict, root_code: str) -> dict[str, str | None]:
-    """遍历单棵集团树，收集除根节点外所有节点的 {company_code: company_name}。
+async def _tree_members(db: AsyncSession, project_id: UUID) -> dict[str, str | None]:
+    """本合并项目企业树中的子公司类企业 {企业代码: 企业名称}（合并计算同一棵树）。"""
+    from app.services.consol_calc_basis import entity_kinds
+    from app.services.consol_tree_service import build_tree, iter_nodes
 
-    根节点（company_code == root_code，即 ultimate 最终控制方）是合并母公司本身，
-    不计入"子企业"成员集合。
-    """
+    tree = await build_tree(db, project_id)
+    if tree is None:
+        return {}
+    kinds = entity_kinds(tree)
     members: dict[str, str | None] = {}
-
-    def _walk(node: dict) -> None:
-        code = (node.get("companyCode") or "").strip()
-        if code and code != root_code:
-            members[code] = node.get("companyName")
-        for child in node.get("children", []):
-            _walk(child)
-
-    for child in tree.get("children", []):
-        _walk(child)
+    for node in iter_nodes(tree):
+        code = (node.company_code or "").strip()
+        if code and kinds.get(code) == "subsidiary" and code not in members:
+            members[code] = node.company_name
     return members
 
 
@@ -82,23 +78,9 @@ async def compute_scope_diff(db: AsyncSession, project_id: UUID) -> dict:
     """
     project = await _load_consol_project(db, project_id)
     year = _resolve_year(project)
-    root_code = (project.company_code or "").strip()
 
-    # --- 树形成员 T：本合并项目所属集团树的所有子节点 company_code ---
-    # 取同一 ultimate（= 本合并项目的 company_code，作为最终控制方根）的项目构建树。
-    tree_members: dict[str, str | None] = {}
-    if root_code:
-        stmt = sa.select(Project).where(
-            Project.is_deleted == sa.false(),
-            Project.ultimate_company_code == root_code,
-        )
-        proj_result = await db.execute(stmt)
-        group_projects = list(proj_result.scalars().all())
-        forest = build_group_trees_from_projects(group_projects, year=year)
-        for tree in forest["trees"]:
-            if (tree.get("ultimateCode") or "").strip() == root_code:
-                tree_members = _collect_tree_members(tree, root_code)
-                break
+    # --- 树形成员 T：本合并项目企业树中的子公司类企业（与合并计算同一棵树）---
+    tree_members = await _tree_members(db, project_id)
 
     # --- 合并范围成员 S：consol_scope 表 is_included=true 的 company_code ---
     scope_stmt = sa.select(ConsolScope).where(
@@ -149,7 +131,7 @@ async def sync_scope(db: AsyncSession, project_id: UUID, company_codes: list[str
     project = await _load_consol_project(db, project_id)
     year = _resolve_year(project)
     if year is None:
-        raise HTTPException(status_code=400, detail="合并项目缺少审计期末日期，无法确定年度")
+        raise HTTPException(status_code=400, detail="无法确定合并项目的审计年度")
 
     # 去重 + 过滤空白
     wanted = [c.strip() for c in company_codes if c and c.strip()]
@@ -167,19 +149,8 @@ async def sync_scope(db: AsyncSession, project_id: UUID, company_codes: list[str
     )
     existing_codes = {(c or "").strip() for c in existing_result.scalars().all()}
 
-    # 同集团项目 company_code → client_name（用于填充 company_name）
-    root_code = (project.company_code or "").strip()
-    name_map: dict[str, str] = {}
-    if root_code:
-        name_result = await db.execute(
-            sa.select(Project.company_code, Project.client_name).where(
-                Project.is_deleted == sa.false(),
-                Project.ultimate_company_code == root_code,
-            )
-        )
-        for code, client_name in name_result.all():
-            if code:
-                name_map[code.strip()] = client_name
+    # 企业树成员的名称（用于填充 company_name；不在树中的代码照常新增、名称留空）
+    name_map = await _tree_members(db, project_id)
 
     added = 0
     for code in wanted:

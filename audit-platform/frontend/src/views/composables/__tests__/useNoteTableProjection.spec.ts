@@ -188,6 +188,38 @@ describe('useNoteTableProjection — activeTableColumns 的 null 语义', () => 
   })
 })
 
+describe('useNoteTableProjection — 原始 table_index 到投影 tab 的映射', () => {
+  it('续表的多个源下标映射到同一张投影表，独立表映射自身', () => {
+    const { currentNoteTables, resolveProjectedTableIndex } = mount({
+      table_data: {
+        _tables: [
+          mainTable(),
+          contTable(),
+          { name: '另一张', headers: ['项目', '金额'], rows: [] },
+        ],
+      },
+    })
+
+    expect(currentNoteTables.value).toHaveLength(2)
+    expect(resolveProjectedTableIndex(0)).toBe(0)
+    expect(resolveProjectedTableIndex('1')).toBe(0)
+    expect(resolveProjectedTableIndex(2)).toBe(1)
+  })
+
+  it('非法、负数、非整数和越界源下标统一回退第 0 张', () => {
+    const { resolveProjectedTableIndex } = mount({
+      table_data: { _tables: [mainTable(), contTable(), { name: '另一张', headers: ['项目'], rows: [] }] },
+    })
+
+    expect(resolveProjectedTableIndex(undefined)).toBe(0)
+    expect(resolveProjectedTableIndex('')).toBe(0)
+    expect(resolveProjectedTableIndex('abc')).toBe(0)
+    expect(resolveProjectedTableIndex(-1)).toBe(0)
+    expect(resolveProjectedTableIndex('1.5')).toBe(0)
+    expect(resolveProjectedTableIndex(99)).toBe(0)
+  })
+})
+
 describe('useNoteTableProjection — activeTableTab 切换', () => {
   it('按 tab 下标取表，越界回落到第 0 张', () => {
     const { activeTableTab, activeTableData } = mount({

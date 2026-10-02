@@ -5,7 +5,7 @@
 
 设计要点：
 - **本地优先**：默认 enable_plugins=False、不传 llm_client、不调 Azure 端点，纯本地解析。
-- **降级链路**：markitdown 不可用或抛错时返回 None，调用方走旧路径（MinerU OCR / PyPDF2 / python-docx）。
+- **降级链路**：markitdown 不可用或抛错时返回 None，调用方走旧路径（MinerU OCR / pypdf / python-docx）。
 - **延迟初始化**：MarkItDown 实例首次使用时才构造，避免后端启动时加载 magika/onnxruntime 模型。
 - **流式接口**：用 convert_stream(BytesIO, file_extension=...) 而非 convert(path)，安全策略最窄
   （不允许 markitdown 自行 fetch 远端 URI）。

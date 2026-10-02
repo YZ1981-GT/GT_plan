@@ -629,15 +629,53 @@ async def _resolve_project_audit_year(
     return None
 
 
-async def _resolve_project_sync_context(
-    db: AsyncSession, project_id: UUID
-) -> tuple[int | None, dict | None]:
-    """一次查询取回 ``(审计年度, 结构化准则)``；任何异常 → ``(None, None)`` fail-open。
+def _section_blocked_for_project(
+    section_id: str,
+    template_type: str | None,
+    report_scope: str | None,
+) -> bool:
+    """该章节是否**不该出现在这个项目**（例：单体项目的合并专属章节）。
 
-    合并了原先只为 ``audit_year`` 而做的那次查询（R4.7：守卫不引入额外 DB 往返）。
-    准则优先读 v2 权威源，缺失时用旧列 ``template_type`` / ``report_scope`` 兜底；
-    两者皆空返回 ``None``（表示"不可判"，守卫据此放行，而不是被
-    ``_normalize_standard`` 补成默认的 soe 从而误杀上市项目）。
+    🔴 2026-09-30：底稿披露同步原先从不看口径 —— 单体项目的底稿一保存，就在附注里
+    **新建**「合并范围的变化」「母公司财务报表主要项目注释」等合并专属章节
+    （真库实测单体项目 19 行这类残留，全部来自本同步入口，而附注生成链一直是过滤的）。
+
+    * 变体取 ``projects.template_type`` / ``report_scope`` 两列 —— 与附注生成
+      （wizard basic_info，真库逐项目与两列一致）、目录树、存量清理脚本**同源**。
+      🔴 不用 ``applicable_standard_v2.entity_type``：真库有项目两者不一致
+      （``template_type=listed`` 而 v2 为 soe），按 v2 会拿国企编号去裁上市项目。
+    * 变体未知 ⇒ 不拦截（``section_allowed_for_project`` 的 fail-open，不误杀）。
+    * 调用方只在**没有活动行**时调用：拦新建，也拦软删行复活（否则存量清理软删后，
+      下一次底稿保存会原样复活）；已有活动行的更新不在此处裁决。
+    """
+    from app.services.note_section_catalog import section_allowed_for_project
+
+    return not section_allowed_for_project(section_id, template_type, report_scope)
+
+
+def _scope_skip_result(section_id: str, now: datetime) -> dict[str, Any]:
+    """口径不适用时的跳过结果：形状与正常返回兼容（批量汇总按键求和不会 KeyError）。"""
+    return {
+        "success": True,
+        "section_id": section_id,
+        "synced_at": now.isoformat(),
+        "rows_synced": 0,
+        "created": False,
+        "revived": False,
+        "texts_synced": 0,
+        "blocked_by_manual_override": False,
+        "skipped": True,
+        "reason": "section_not_applicable_to_report_scope",
+    }
+
+
+async def _resolve_project_sync_facts(
+    db: AsyncSession, project_id: UUID
+) -> tuple[int | None, dict | None, str | None, str | None]:
+    """一次查询取回 ``(审计年度, 结构化准则, template_type, report_scope)``。
+
+    任何异常 / 形态不对 → 全 ``None``（fail-open）。后两项是**原始列值**
+    （口径守卫用，见 :func:`_section_blocked_for_project`），非字符串一律视为未知。
     """
     try:
         row = (
@@ -654,7 +692,7 @@ async def _resolve_project_sync_context(
             )
         ).first()
         if row is None:
-            return None, None
+            return None, None, None, None
         audit_year, v2, template_type, report_scope = row
         year = audit_year if isinstance(audit_year, int) and audit_year > 0 else None
         standard: dict | None = None
@@ -664,13 +702,36 @@ async def _resolve_project_sync_context(
             standard = StandardUnificationService._normalize_standard(
                 {"entity_type": template_type, "scope": report_scope}
             )
-        return year, standard
+        return (
+            year,
+            standard,
+            template_type if isinstance(template_type, str) else None,
+            report_scope if isinstance(report_scope, str) else None,
+        )
     except Exception as err:  # pragma: no cover - 查询异常时安全降级
         logger.warning(
             "resolve project sync context failed for project %s: %s; falling back",
             project_id, err,
         )
-        return None, None
+        return None, None, None, None
+
+
+async def _resolve_project_sync_context(
+    db: AsyncSession, project_id: UUID
+) -> tuple[int | None, dict | None]:
+    """一次查询取回 ``(审计年度, 结构化准则)``；任何异常 → ``(None, None)`` fail-open。
+
+    合并了原先只为 ``audit_year`` 而做的那次查询（R4.7：守卫不引入额外 DB 往返）。
+    准则优先读 v2 权威源，缺失时用旧列 ``template_type`` / ``report_scope`` 兜底；
+    两者皆空返回 ``None``（表示"不可判"，守卫据此放行，而不是被
+    ``_normalize_standard`` 补成默认的 soe 从而误杀上市项目）。
+
+    与 :func:`_resolve_project_sync_facts` 是同一次查询（本函数只取前两项，保留原契约）。
+    """
+    year, standard, _template_type, _report_scope = await _resolve_project_sync_facts(
+        db, project_id
+    )
+    return year, standard
 
 
 def _guard_standard_matches_project(
@@ -769,8 +830,13 @@ async def sync_from_workpaper(
         raise ValueError("section_id 不能为空")
     section_id = section_id.strip()
 
-    # 一次查询同时拿到审计年度与项目准则（R4.7）
-    audit_year, project_standard = await _resolve_project_sync_context(db, project_id)
+    # 一次查询同时拿到审计年度、项目准则与口径两列（R4.7）
+    (
+        audit_year,
+        project_standard,
+        project_template_type,
+        project_report_scope,
+    ) = await _resolve_project_sync_facts(db, project_id)
     # 🔴 守卫必须在任何写入之前：定位键不含 current_standard，跨主体类型的推送
     # 会静默写进错误章节（国企项目的「五、xx」是另一套压缩编号）。
     _guard_standard_matches_project(
@@ -811,6 +877,20 @@ async def sync_from_workpaper(
     )
     result = await db.execute(stmt)
     note = result.scalar_one_or_none()
+
+    # 🔴 口径守卫必须在「软删行复活」之前：没有活动行时，新建与复活都会让这一章
+    # 出现在本项目附注里。守卫放在复活之后 ⇒ 存量清理软删的合并专属章节，
+    # 下一次底稿保存就被原样复活（唯一键不含 is_deleted，复活是必经分支）。
+    # 此处之前没有任何写入 ⇒ 跳过即零写入。
+    if note is None and _section_blocked_for_project(
+        section_id, project_template_type, project_report_scope
+    ):
+        logger.info(
+            "wp_disclosure_sync: skip %s for project=%s (not applicable to project "
+            "report scope %s/%s)",
+            section_id, project_id, project_template_type, project_report_scope,
+        )
+        return _scope_skip_result(section_id, now)
 
     # 软删行复活：唯一索引 uq_disclosure_notes_project_year_section 建在
     # (project_id, year, note_section) 上且**不含 is_deleted** → 被软删的章节
@@ -1212,6 +1292,25 @@ class WpDisclosureSyncService:
         note = await self._get_note(db, project_id, section_id, year=target_year)
 
         if note is None:
+            # 🔴 口径守卫在复活之前（理由同 `sync_from_workpaper`）：无活动行时新建与
+            # 复活都会让这一章出现在本项目附注里。只在无活动行时才多查一次项目。
+            (
+                _year, _std, project_template_type, project_report_scope,
+            ) = await _resolve_project_sync_facts(db, project_id)
+            if _section_blocked_for_project(
+                section_id, project_template_type, project_report_scope
+            ):
+                logger.info(
+                    "sync_from_html: skip %s for project=%s (not applicable to project "
+                    "report scope %s/%s)",
+                    section_id, project_id, project_template_type, project_report_scope,
+                )
+                return {
+                    "success": True,
+                    "synced": False,
+                    "section_id": section_id,
+                    "reason": "section_not_applicable_to_report_scope",
+                }
             # 软删行复活（唯一键 (project_id, year, note_section) 不含 is_deleted，
             # 直接 INSERT 会撞键 500）；命中则复用该行走更新分支
             revived_stmt = sa.select(DisclosureNote).where(

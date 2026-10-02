@@ -298,14 +298,17 @@ class TestContractDelivery:
 # LR-P16：契约归属 —— 接过既有守卫里因并发会话而整体过期的那部分实质判据
 # ═══════════════════════════════════════════════════════════════════════════
 
-#: 🔴 并发会话（分支 `work/2026-09-27-k-lane1-template-orphan-keys`）留下的已知中间态。
-#: 本 spec **不代改**它们的文件，如实登记，待其 owner 收口后从本集合移除。
+#: 🔴 并发会话留下的已知中间态。本 spec **不代改**它们的文件，如实登记，
+#: 待其 owner 收口后从本集合移除（反向断言 `stale` 会逼着移除，见下方判据）。
 #: 平台既有范式见 `test_registration_isolation_and_alignment.py::_KNOWN_MISALIGNED`。
-KNOWN_CONCURRENT_GAPS: Mapping[str, str] = {
-    "a51.cashflow_audit.json": (
-        "review_status=reviewed 但缺 review.entry_id（未跟踪新文件，并发会话在途）"
-    ),
-}
+#:
+#: 2026-10-01 清空：原唯一条目 `a51.cashflow_audit.json` 已**从磁盘消失**
+#: （它当时是并发会话的未跟踪新文件 `??`，未被提交；现算 `workpaper_sync_contracts/` 下
+#: 60 份契约里无此名，`generate_workpaper_sync_managed_sheets.py --check` 也因
+#: 「登记表有 a51 而磁盘无文件」报错 ⇒ 那条缺口的**对象本身不在了**）。
+#: 🔴 措辞上不写「已修好」—— 它不是被补上 `review.entry_id`，而是整份契约没落库；
+#: a51 的收口归 `published-representation-production-path-and-lane-adjudication` 一侧。
+KNOWN_CONCURRENT_GAPS: Mapping[str, str] = {}
 
 
 class TestContractOwnershipInLDomain:
@@ -328,16 +331,23 @@ class TestContractOwnershipInLDomain:
             out[f.name] = json.loads(f.read_bytes().decode("utf-8"))
         return out
 
+    #: 已接线的 L 域生产契约（逐条具名追加，禁通配）。2026-10-01 task 12 追加 l4。
+    _L_PRODUCTION: dict[str, str] = {
+        L1_CONTRACT_FILE: L1_ENTRY_ID,
+        "l4.bonds_payable.json": "xlsx/gt-l4-bonds-payable",
+    }
+
     def test_l_domain_has_exactly_one_production_contract(
         self, contracts: dict[str, dict[str, Any]]
     ) -> None:
+        """名字保留（历史引用）；判据为「L 域生产契约恰为已具名登记的集合」。"""
         l_prod = {
             name: doc
             for name, doc in contracts.items()
             if name.startswith("l") and str(doc.get("review_status")) == "reviewed"
         }
-        assert sorted(l_prod) == [L1_CONTRACT_FILE], (
-            f"L 域生产契约实得 {sorted(l_prod)}，期望恰 {[L1_CONTRACT_FILE]}"
+        assert sorted(l_prod) == sorted(self._L_PRODUCTION), (
+            f"L 域生产契约实得 {sorted(l_prod)}，期望恰 {sorted(self._L_PRODUCTION)}"
         )
 
     def test_every_production_contract_declares_its_owner(
@@ -375,15 +385,15 @@ class TestContractOwnershipInLDomain:
     def test_no_other_l_entry_sneaks_in_a_contract(
         self, contracts: dict[str, dict[str, Any]]
     ) -> None:
-        """L2~L8 尚未接线 ⇒ 不得出现它们的生产契约（反方向也要红）。"""
+        """未接线的 L entry 不得出现生产契约（反方向也要红）。"""
         owners = {
             str((doc.get("review") or {}).get("entry_id"))
             for doc in contracts.values()
             if str(doc.get("review_status")) == "reviewed"
         }
         l_owners = {o for o in owners if "-l" in o and o.startswith("xlsx/gt-l")}
-        assert l_owners == {L1_ENTRY_ID}, (
-            f"L 域生产契约归属实得 {sorted(l_owners)}，期望恰 {[L1_ENTRY_ID]}"
+        assert l_owners == set(self._L_PRODUCTION.values()), (
+            f"L 域生产契约归属实得 {sorted(l_owners)}，期望恰 {sorted(self._L_PRODUCTION.values())}"
         )
 
     def test_candidate_contracts_keep_entry_id_null(

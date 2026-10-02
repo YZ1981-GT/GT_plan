@@ -24,3 +24,14 @@ backend/data/workpaper_sync_contracts/*.json text eol=lf
 # checkout 后磁盘也保持 LF，避免后人写字节级断言时踩同款「本机红、CI 绿」的坑
 # （本轮就是先写成 read_bytes() 比较才发现的）。不产生行尾 churn。
 backend/data/note_workpaper_sync_registry.json text eol=lf
+
+# entry↔wp_code 裁决台账同样强制 LF（2026-09-28）。
+# `test_a_entry_connection_blockers.py::test_adjudication_covers_canary_and_e1_plan_unblocker`
+# 直接校验磁盘原始字节必须是 LF，断言消息写明「CRLF 会让 digest 与 CI 对不上」。
+# 🔴 它在 `backend/data/` 根下，**不被**上面那条 `workpaper_sync_contracts/*.json` 覆盖
+# ⇒ core.autocrlf=true 在 checkout 时把 LF blob 转成 CRLF，该守卫就在 Windows 本机长期红、
+#    CI 的 Linux 上却是绿的 —— 与上面两条注释描述的是**同一个坑，第三次踩**。
+# 触类旁通已 grep 全仓字节级 LF 断言（`b"\r\n" not in`）：其余命中对象都在
+# `workpaper_sync_contracts/` 下、已被覆盖，本文件是唯一漏网的。
+# index 里本就是 LF，加这条不产生行尾 churn。
+backend/data/workpaper_sync_entry_wp_code_adjudication.json text eol=lf

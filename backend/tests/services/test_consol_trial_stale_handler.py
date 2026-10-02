@@ -107,10 +107,15 @@ class TestHandleChildTbUpdated:
             "app.services.consol_trial_stale_handler.mark_consol_trial_stale",
             new_callable=AsyncMock,
             return_value=2,
-        ) as mock_mark:
+        ) as mock_mark, patch("app.services.event_bus.event_bus.broadcast_raw") as sse:
             await handle_child_tb_updated(event)
             assert mock_mark.await_count == 2
             mock_db.commit.assert_awaited_once()
+        # spec consol-elimination-single-source-push 需求 8.3：每个上级合并项目各广播一次「推送结果过期」
+        assert [(c.args[0], c.args[1]["project_id"], c.args[1]["source_project_id"]) for c in sse.call_args_list] == [
+            ("consol.push_stale", str(parent1), str(child_id)),
+            ("consol.push_stale", str(parent2), str(child_id)),
+        ]
 
 
 class TestRegister:

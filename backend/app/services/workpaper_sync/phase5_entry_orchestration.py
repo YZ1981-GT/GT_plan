@@ -276,9 +276,32 @@ def build_orchestration(cfg: Phase5EntryConfig) -> types.SimpleNamespace:
     # ── 契约文件 ────────────────────────────────────────────────────
 
     def contract_file_path() -> Path:
+        """磁盘契约路径。
+
+        🔴 **只能走 `contracts.contract_path_for`**（那是本仓唯一拼契约路径处，
+        `CONTRACTS_DIR = <backend>/data/workpaper_sync_contracts`）。
+
+        本函数原先自己拼 `_BACKEND_ROOT / "backend/data/..."`，而 `_BACKEND_ROOT`
+        已经**是** `<repo>/backend` ⇒ 把 `backend` 拼了两次，得
+        `<repo>/backend/backend/data/workpaper_sync_contracts/{adapter_id}.json`。
+
+        后果不是「报错」而是**静默写错地方**：5 个 entry（d2/d3/d5/d6/d7 ——
+        它们是唯一没传 `contract_file_path_fn` 的）的 `generate_phase5_*_contract.py
+        --apply` 会把契约写进 `backend/backend/` 下的影子目录并打印 `[apply] wrote`，
+        而运行时 `load_contract()` 走的是正确的 `contract_path_for` ⇒ **真正的磁盘契约
+        永远不会被重生成**。D3 扩容面（4 个灰度开关全 True、6 个 spec）之所以能在契约里
+        一张不落地缺席、而双向锁 `assert_contract_file_matches_source()` 还报绿，
+        这个错路径就是其中一环（另一环是 `build_contract_payload()` 根本没接扩容面）。
+        实测工作树里 `backend/backend/data/` 确实存在（被同类错路径写出来的
+        `guard_assertion_grades.json`）。
+
+        下方 `test_entry_contract_file_path_is_single_sourced` 钉住本修复。
+        """
         if cfg.contract_file_path_fn is not None:
             return cfg.contract_file_path_fn()
-        return _BACKEND_ROOT / f"backend/data/workpaper_sync_contracts/{cfg.adapter_id}.json"
+        from app.services.workpaper_sync.contracts import contract_path_for
+
+        return contract_path_for(cfg.adapter_id)
 
     def load_contract_from_disk() -> SyncContract:
         from app.services.workpaper_sync.contracts import load_contract

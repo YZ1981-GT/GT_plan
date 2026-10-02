@@ -41,32 +41,28 @@ from app.services.consol_tree_service import TreeNode
 
 
 def _make_tree(n_children: int = 3) -> TreeNode:
-    """构造 1 母 N 子合成企业树。
+    """构造 1 母 N 子合成企业树（三码推导；母公司只有合并项目，没有单户项目）。
 
     子公司分支：
     - SUB001: 正常数据（多科目含负数）
     - SUB002: 无 TB 数据（空字典）
     - SUB003: 含负数科目（累计折旧）
     """
-    children = []
-    for i in range(1, n_children + 1):
-        children.append(TreeNode(
-            project_id=uuid.uuid4(),
-            company_code=f"SUB{i:03d}",
-            company_name=f"子公司{chr(64 + i)}",
-            parent_company_code="PARENT",
-            ultimate_company_code="PARENT",
-            consol_level=1,
-        ))
-    return TreeNode(
-        project_id=uuid.uuid4(),
-        company_code="PARENT",
-        company_name="母公司",
-        parent_company_code=None,
-        ultimate_company_code="PARENT",
-        consol_level=2,
-        children=children,
+    from app.services.consol_group_tree import ProjectRecord, derive_group_tree
+
+    root = ProjectRecord(
+        id=uuid.uuid4(), company_code="PARENT", client_name="母公司",
+        report_scope="consolidated", audit_year=2025,
     )
+    records = [root] + [
+        ProjectRecord(
+            id=uuid.uuid4(), company_code=f"SUB{i:03d}", client_name=f"子公司{chr(64 + i)}",
+            report_scope="standalone", audit_year=2025,
+            parent_company_code="PARENT", relation_to_parent="subsidiary",
+        )
+        for i in range(1, n_children + 1)
+    ]
+    return derive_group_tree(records, root, 2025).root
 
 
 def _synthetic_company_amounts() -> list[tuple[dict, dict[str, Decimal]]]:
@@ -125,12 +121,17 @@ class TestSyntheticDataset:
     """12.1 验证合成数据集构造正确性。"""
 
     def test_tree_has_correct_structure(self):
-        """企业树：1 母 3 子，叶子恰为 3 个子公司。"""
+        """企业树：1 母 3 子 ⇒ 数据叶子 = 母公司数据节点 + 3 个子公司（差额节点不是数据叶子）。
+
+        口径变更（spec consol-tree-three-code-autobuild 任务 7.3，有意）：旧断言「叶子恰为 3 个子公司」
+        对应「母公司本体不计入」的旧口径（F5）；母公司没建单户项目时数据节点金额按 0 计、仍列出。
+        """
         tree = _make_tree(3)
         leaves = _collect_leaves(tree)
-        assert len(leaves) == 3
-        codes = {n.company_code for n in leaves}
-        assert codes == {"SUB001", "SUB002", "SUB003"}
+        assert [n.node_key for n in leaves] == [
+            "PARENT:parent", "SUB001:subsidiary", "SUB002:subsidiary", "SUB003:subsidiary",
+        ]
+        assert leaves[0].project_id is None and "standalone_missing" in leaves[0].flags
 
     def test_synthetic_data_includes_all_branches(self):
         """合成数据包含：正常/无 TB/负数 三种分支。"""

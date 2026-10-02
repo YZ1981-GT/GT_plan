@@ -3,7 +3,7 @@
  *
  * 验证 useReportExport 核心动作：
  * - onExportExcel: 调用 downloadFileAsBlob，URL 通过 getReportExcelUrl 生成
- * - onExportAllExcel: 调用 downloadFileAsBlob，URL 为 export-all 路径
+ * - onExportAllExcel: 调用认证 downloadFile，URL 为项目级 export-excel POST
  * - copyReportTable: 有数据时调用 clipboard.write（HTML+text）并显示成功消息
  * - copyReportTable: 空数据时显示 warning
  * - onReportImported: 关闭弹窗 + 调 fetchReport
@@ -23,6 +23,11 @@ vi.mock('element-plus', () => ({
 const mockGetReportExcelUrl = vi.fn().mockReturnValue('/api/reports/proj-1/2025/balance_sheet/export')
 vi.mock('@/services/auditPlatformApi', () => ({
   getReportExcelUrl: (...args: any[]) => mockGetReportExcelUrl(...args),
+}))
+
+const mockDownloadFile = vi.fn()
+vi.mock('@/utils/http', () => ({
+  downloadFile: (...args: any[]) => mockDownloadFile(...args),
 }))
 
 const mockDownloadFileAsBlob = vi.fn()
@@ -87,38 +92,37 @@ describe('useReportExport — onExportExcel', () => {
 describe('useReportExport — onExportAllExcel', () => {
   beforeEach(() => { vi.clearAllMocks() })
 
-  it('calls downloadFileAsBlob with export-all URL', async () => {
+  it('calls authenticated downloadFile for audited all-report export', async () => {
     const options = createOptions()
     const { onExportAllExcel } = useReportExport(options)
 
     onExportAllExcel()
     await flushPromises()
 
-    // 🔴 2026-09-28 修：文件名由 `全部报表_2025.xlsx` 更正为 `全部报表_已审_2025.xlsx`。
-    // 实现里已审/未审是**成对**的两个导出（未审走 `?mode=unadjusted`、名为 `全部报表_未审_`），
-    // 文件名带口径标记是有意设计 —— 审计交付物混淆已审/未审后果严重。
-    // 旧期望缺 `已审_`，该条一直红。
-    expect(mockDownloadFileAsBlob).toHaveBeenCalledWith(
-      '/api/reports/proj-1/2025/export',
-      '全部报表_已审_2025.xlsx',
+    expect(mockDownloadFile).toHaveBeenCalledWith(
+      '/api/projects/proj-1/reports/export-excel',
+      {
+        method: 'post',
+        data: { year: 2025, mode: 'audited' },
+        fileName: '全部报表_已审_2025.xlsx',
+      },
     )
   })
 
-  // 原测试只覆盖了已审一半 ⇒ 补未审路径，并钉死「两者 URL 与文件名都不得混」
-  it('未审导出走 mode=unadjusted 且文件名带「未审」（与已审成对，不得混淆）', async () => {
+  it('calls authenticated downloadFile for unadjusted all-report export', async () => {
     const options = createOptions()
-    const { onExportAllUnadjusted } = useReportExport(options) as any
-    if (typeof onExportAllUnadjusted !== 'function') {
-      // 该导出若改名/下线，本条应显式失败而不是静默跳过
-      throw new Error('useReportExport 未暴露未审全量导出方法，请更新本判据')
-    }
+    const { onExportAllUnadjusted } = useReportExport(options)
 
     onExportAllUnadjusted()
     await flushPromises()
 
-    expect(mockDownloadFileAsBlob).toHaveBeenCalledWith(
-      '/api/reports/proj-1/2025/export?mode=unadjusted',
-      '全部报表_未审_2025.xlsx',
+    expect(mockDownloadFile).toHaveBeenCalledWith(
+      '/api/projects/proj-1/reports/export-excel',
+      {
+        method: 'post',
+        data: { year: 2025, mode: 'unadjusted' },
+        fileName: '全部报表_未审_2025.xlsx',
+      },
     )
   })
 })

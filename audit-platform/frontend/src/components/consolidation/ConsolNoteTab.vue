@@ -23,8 +23,11 @@
             <el-tooltip content="导入导出与批量操作" placement="bottom">
               <el-button size="small" @click="showNoteBatchDialog = true">📦</el-button>
             </el-tooltip>
-            <el-tooltip content="根据公式从项目数据重新计算" placement="bottom">
-              <el-button size="small" @click="refreshNoteByFormula" :loading="noteRefreshing">🔄</el-button>
+            <el-tooltip content="按合并附注公式把合并数填入本章节；手工单元格保留原值" placement="bottom">
+              <el-button size="small" type="primary" data-testid="consol-note-fill" @click="fillCurrentByFormula" :loading="formulaFilling">ƒx 按公式填入</el-button>
+            </el-tooltip>
+            <el-tooltip content="查看本章节有公式单元格的个别数汇总、调整、抵销、合并数及各下级贡献" placement="bottom">
+              <el-button size="small" data-testid="consol-note-breakdown" @click="openNoteBreakdown()">📊 查看差额</el-button>
             </el-tooltip>
             <!-- B.1.13: 重新汇总按钮 -->
             <el-tooltip content="从子公司单体附注重新汇总" placement="bottom">
@@ -55,11 +58,13 @@
             <el-table-column v-for="(h, hi) in selectedNoteSection.headers" :key="hi" :label="h" :min-width="hi === 0 ? 200 : 130">
               <template #default="{ row, $index }">
                 <el-input v-if="noteEditMode && lazyEdit.isEditing($index, hi)" v-model="row[hi]" size="small" :placeholder="h"
+                  :class="{ 'gt-note-cell-manual': isManual(row, hi) }"
                   :style="{ textAlign: hi === 0 ? 'left' : 'right' }"
-                  @blur="lazyEdit.stopEdit()" @input="markNoteDirty()" autofocus />
+                  @blur="lazyEdit.stopEdit()" @input="onNoteCellInput(row, hi)" autofocus />
                 <CommentTooltip v-else-if="hi > 0" :comment="cellComments.getComment(selectedNoteSection?.section_id || 'default', $index, hi)">
                 <span class="gt-note-cell-text"
-                  :class="{ 'gt-note-cell-editable': noteEditMode }"
+                  :class="{ 'gt-note-cell-editable': noteEditMode, 'gt-note-cell-manual': isManual(row, hi) }"
+                  :title="isManual(row, hi) ? '手工单元格：按公式填入时保留' : ''"
                   :style="{ textAlign: 'right' }"
                   @click="noteEditMode && lazyEdit.startEdit($index, hi)">{{ row[hi] || '-' }}</span>
                 </CommentTooltip>
@@ -147,6 +152,12 @@
               <el-button :type="noteEditMode ? '' : 'primary'" @click="exitNoteEdit(true)">📋 查看</el-button>
               <el-button :type="noteEditMode ? 'primary' : ''" @click="enterNoteEdit()">✏️ 编辑</el-button>
             </el-button-group>
+            <el-tooltip content="按公式填入" placement="bottom">
+              <el-button size="small" type="primary" @click="fillCurrentByFormula" :loading="formulaFilling">ƒx 按公式填入</el-button>
+            </el-tooltip>
+            <el-tooltip content="查看差额" placement="bottom">
+              <el-button size="small" @click="openNoteBreakdown()">📊 查看差额</el-button>
+            </el-tooltip>
             <el-tooltip content="公式管理" placement="bottom">
               <el-button size="small" @click="openNoteFormula">ƒx</el-button>
             </el-tooltip>
@@ -164,10 +175,12 @@
             <el-table-column v-for="(h, hi) in selectedNoteSection.headers" :key="hi" :label="h" :min-width="hi === 0 ? 200 : 130">
               <template #default="{ row, $index }">
                 <el-input v-if="noteEditMode && lazyEdit.isEditing($index + 10000, hi)" v-model="row[hi]" size="small" :placeholder="h"
+                  :class="{ 'gt-note-cell-manual': isManual(row, hi) }"
                   :style="{ textAlign: hi === 0 ? 'left' : 'right' }"
-                  @blur="lazyEdit.stopEdit()" @input="markNoteDirty()" autofocus />
+                  @blur="lazyEdit.stopEdit()" @input="onNoteCellInput(row, hi)" autofocus />
                 <span v-else class="gt-note-cell-text"
-                  :class="{ 'gt-note-cell-editable': noteEditMode }"
+                  :class="{ 'gt-note-cell-editable': noteEditMode, 'gt-note-cell-manual': isManual(row, hi) }"
+                  :title="isManual(row, hi) ? '手工单元格：按公式填入时保留' : ''"
                   :style="{ textAlign: hi === 0 ? 'left' : 'right' }"
                   @click="noteEditMode && lazyEdit.startEdit($index + 10000, hi)">{{ row[hi] || '-' }}</span>
               </template>
@@ -201,8 +214,8 @@
     @sum="onNoteCtxSum"
     @compare="onNoteCtxCompare"
   >
-    <div class="gt-ucell-ctx-item" @click="drillDownFromCell"><span class="gt-ucell-ctx-icon">📊</span> 查看汇总穿透</div>
-    <div class="gt-ucell-ctx-item" @click="onCtxViewConsolBreakdown"><span class="gt-ucell-ctx-icon">🔗</span> 查看合并明细</div>
+    <div class="gt-ucell-ctx-item" @click="openNoteBreakdownForSelection"><span class="gt-ucell-ctx-icon">📊</span> 查看该格差额</div>
+    <div v-if="selectedCellIsManual" class="gt-ucell-ctx-item" @click="restoreSelectedFormula"><span class="gt-ucell-ctx-icon">↩</span> 恢复按公式填入</div>
     <div class="gt-ucell-ctx-item" @click="addCellComment"><span class="gt-ucell-ctx-icon">💬</span> 添加批注</div>
     <div class="gt-ucell-ctx-item" @click="markCellReviewed"><span class="gt-ucell-ctx-icon">✅</span> 标记已复核</div>
     <div class="gt-ucell-ctx-divider" />
@@ -237,7 +250,7 @@
         <el-button size="small" @click="() => { openNoteFormula(); showNoteBatchDialog = false }">ƒx 打开公式管理</el-button>
         <el-button size="small" @click="exportNoteFormulas" :loading="noteBatchLoading">📥 导出公式模板</el-button>
         <el-button size="small" @click="noteFormulaFileRef?.click()" :loading="noteBatchLoading">📤 导入公式</el-button>
-        <el-button size="small" type="primary" @click="applyAllNoteFormulas" :loading="noteBatchLoading">▶ 一键取数计算</el-button>
+        <el-button size="small" type="primary" @click="fillAllByFormula" :loading="noteBatchLoading">ƒx 全部按公式填入</el-button>
       </div>
       <p style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary);margin:4px 0 0">
         导出 Excel 每个表格一个 Sheet（编号+标题），导入按 Sheet 名自动匹配。
@@ -358,7 +371,7 @@
         <div style="flex:1;min-width:0">
           <p style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);margin:0 0 6px;font-weight:600">① 选择汇总单位</p>
           <div style="border:1px solid var(--gt-color-border-purple);border-radius:6px;padding:6px;max-height:200px;overflow-y:auto;background: var(--gt-color-bg-white)">
-            <el-tree :data="aggTreeData" :props="{ label: 'label', children: 'children' }"
+            <el-tree :data="aggTreeData" :props="{ label: 'label', children: 'children', disabled: 'disabled' }"
               show-checkbox node-key="key" ref="aggTreeRef"
               default-expand-all>
               <template #default="{ data }">
@@ -430,14 +443,83 @@
     `openNoteFormula()` 改为发出 EventBus `open-formula-manager` 事件，nodeKey='consol_note'。
   -->
 
-  <!-- 合并附注穿透弹窗（统一组件，source=note）：右键"查看合并明细"打开 -->
-  <ConsolBreakdownDialog
-    v-model="consolBreakdownVisible"
-    source="note"
-    :project-id="props.projectId"
-    :year="props.year"
-    :section-id="consolBreakdownSectionId"
-  />
+  <!-- 「按公式填入」结果：手工保留与取不到数必须显式列出，不静默 -->
+  <el-dialog v-model="showFillResultDialog" title="按公式填入结果" width="720px" append-to-body destroy-on-close
+    data-testid="consol-note-fill-result">
+    <el-alert :title="fillResultSummary" :type="fillDetails.some((r) => r.kind === 'blank') ? 'warning' : 'success'"
+      :closable="false" show-icon style="margin-bottom:10px" />
+    <el-table :data="fillDetails" border size="small" max-height="400" empty-text="全部公式单元格已填入">
+      <el-table-column label="结果" width="90">
+        <template #default="{ row }">
+          <el-tag :type="row.kind === 'kept' ? 'info' : 'warning'" size="small">{{ row.kind === 'kept' ? '保留手工' : '未填入' }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="position" label="单元格" min-width="190" show-overflow-tooltip />
+      <el-table-column label="当前手工值" width="130" align="right">
+        <template #default="{ row }"><GtAmountCell v-if="row.current !== null" :value="row.current" /></template>
+      </el-table-column>
+      <el-table-column label="公式值" width="130" align="right">
+        <template #default="{ row }"><GtAmountCell v-if="row.formula_value !== null" :value="row.formula_value" /></template>
+      </el-table-column>
+      <el-table-column prop="reason" label="说明" min-width="190" show-overflow-tooltip />
+    </el-table>
+    <template #footer><el-button @click="showFillResultDialog = false">关闭</el-button></template>
+  </el-dialog>
+
+  <!-- 合并附注差额：四度量 + 所选汇总节点的直接子节点贡献（与报表差额表同一节点金额内核） -->
+  <el-dialog v-model="showNoteBreakdownDialog" :title="`附注差额 — ${noteBreakdown?.title || selectedNoteSection?.title || ''}`"
+    width="92%" top="3vh" append-to-body destroy-on-close data-testid="consol-note-breakdown-dialog">
+    <div class="gt-note-breakdown-toolbar">
+      <span>汇总节点</span>
+      <el-select v-model="noteBreakdownNodeKey" size="small" style="width:240px" placeholder="根合并节点"
+        data-testid="consol-note-breakdown-node" @change="loadNoteBreakdown">
+        <el-option v-for="n in noteAggregateNodes" :key="n.node_key" :label="n.label" :value="n.node_key" />
+      </el-select>
+      <span v-if="noteBreakdown" :class="{ 'gt-note-breakdown-check--bad': noteBreakdownAudit.mismatched.length }"
+        data-testid="consol-note-breakdown-check">{{ noteBreakdownAuditText }}</span>
+      <span style="flex:1" />
+      <el-button size="small" :loading="noteBreakdownLoading" @click="loadNoteBreakdown">🔄 刷新</el-button>
+    </div>
+    <el-alert v-if="noteBreakdownError" type="error" :closable="false" show-icon :title="noteBreakdownError" />
+    <el-table v-loading="noteBreakdownLoading" :data="noteBreakdownTableRows" border size="small" max-height="62vh"
+      empty-text="本章节还没有取数公式" :row-class-name="noteBreakdownRowClass" data-testid="consol-note-breakdown-table">
+      <el-table-column type="expand" width="44">
+        <template #default="{ row }">
+          <div class="gt-note-breakdown-children">
+            <p>所选汇总节点的直接子节点贡献（各列均按本单元格公式求值）</p>
+            <el-table :data="noteBreakdownChildren(row)" border size="small" empty-text="所选节点没有下级贡献">
+              <el-table-column prop="label" label="下级节点" min-width="180" />
+              <el-table-column prop="kind_label" label="节点类型" width="100" />
+              <el-table-column label="贡献" width="150" align="right">
+                <template #default="{ row: child }"><GtAmountCell :value="child.value" /></template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column prop="position" label="单元格" fixed="left" min-width="200" show-overflow-tooltip />
+      <el-table-column label="个别数汇总" min-width="130" align="right">
+        <template #default="{ row }"><GtAmountCell :value="row.individual" /></template>
+      </el-table-column>
+      <el-table-column label="调整" min-width="120" align="right">
+        <template #default="{ row }"><GtAmountCell :value="row.adjustment" /></template>
+      </el-table-column>
+      <el-table-column label="抵销" min-width="120" align="right" class-name="gt-note-elim-col" label-class-name="gt-note-elim-col">
+        <template #default="{ row }"><GtAmountCell :value="row.elimination" /></template>
+      </el-table-column>
+      <el-table-column label="合并数" min-width="130" align="right">
+        <template #default="{ row }"><strong><GtAmountCell :value="row.consolidated" /></strong></template>
+      </el-table-column>
+      <el-table-column label="公式" min-width="260" show-overflow-tooltip>
+        <template #default="{ row }"><code>{{ row.formula }}</code></template>
+      </el-table-column>
+      <el-table-column label="来源" width="90">
+        <template #default="{ row }">{{ formulaSourceLabel(row.source) }}</template>
+      </el-table-column>
+      <el-table-column prop="note" label="说明" min-width="180" show-overflow-tooltip />
+    </el-table>
+    <template #footer><el-button @click="showNoteBreakdownDialog = false">关闭</el-button></template>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
@@ -445,22 +527,46 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { consolNoteSections as P_cn } from '@/services/apiPaths'
+import { consolNoteSections as P_cn, consolidation as P_consol } from '@/services/apiPaths'
+import {
+  fillConsolNoteByFormula,
+  getConsolNoteBreakdown,
+  listConsolNoteFormulas,
+  type ConsolNoteBreakdown,
+  type ConsolNoteFillResult,
+  type ConsolTreeNode,
+} from '@/services/consolidationApi'
+import { nodeLabel as treeNodeLabel, walkTree } from '@/components/consolidation/composables/consolTreeView'
+import {
+  clearManual,
+  emptyEditRow,
+  fillDetailRows,
+  fillSummaryText,
+  findBreakdownCell,
+  fromEditRows,
+  isManual,
+  markManual,
+  noteBreakdownCheck,
+  noteBreakdownCheckText,
+  noteBreakdownRows,
+  notePayload,
+  sectionIdsWithFormulas,
+  toEditRows,
+  type FillDetailRow,
+  type NoteEditRow,
+} from '@/components/consolidation/composables/consolNoteView'
 import { useAcnr } from '@/services/acnr/useAcnr'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import SelectionBar from '@/components/common/SelectionBar.vue'
-import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import { useCellComments } from '@/composables/useCellComments'
 import { useLazyEdit } from '@/composables/useLazyEdit'
 import { useEditMode } from '@/composables/useEditMode'
 import { useFullscreen } from '@/composables/useFullscreen'
-import { useTableSearch } from '@/composables/useTableSearch'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useTableToolbar } from '@/composables/useTableToolbar'
-import ConsolNoteTreeEnhanced from '@/components/notes/ConsolNoteTreeEnhanced.vue'
-import ConsolBreakdownDialog from '@/components/consolidation/ConsolBreakdownDialog.vue'
+import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { eventBus } from '@/utils/eventBus'
 import type { ConsolCatalogSelectPayload, ConsolTreeAggregatePayload, ConsolNoteAuditAllPayload } from '@/utils/eventBus'
@@ -472,11 +578,11 @@ const props = defineProps<{
   year: number
   standard: string
   currentEntity: { code: string; name: string }
-  groupTree: any[]
+  groupTree: ConsolTreeNode[]
   consolNoteTree: any[]
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'note-node-click', data: { section_id: string; title?: string }): void
   (e: 'audit-all'): void
   (e: 'load-note-tree', forceRefresh?: boolean): void
@@ -520,15 +626,37 @@ async function jumpToNoteSection(sectionId?: string, title?: string) {
 const selectedNoteSection = ref<any>(null)
 const { isEditing: noteEditMode, isDirty: noteDirty, enterEdit: enterNoteEdit, exitEdit: exitNoteEdit, markDirty: markNoteDirty, clearDirty: clearNoteDirty } = useEditMode({ guardRoute: false })
 const { isFullscreen: noteFullscreen, toggleFullscreen: toggleNoteFullscreen } = useFullscreen()
-const noteRefreshing = ref(false)
+const formulaFilling = ref(false)
 const reaggregating = ref(false)
 const noteSingleAuditLoading = ref(false)
 const noteFileRef = ref<HTMLInputElement | null>(null)
 const noteTableRef = ref<any>(null)
 
-// ─── 合并明细穿透（统一组件 ConsolBreakdownDialog，source=note） ──────────────
-const consolBreakdownVisible = ref(false)
-const consolBreakdownSectionId = ref('')
+// ─── 合并附注公式填入与差额（同报表差额表的节点金额内核） ─────────────────────
+const showFillResultDialog = ref(false)
+const fillResultSummary = ref('')
+const fillDetails = ref<FillDetailRow[]>([])
+const showNoteBreakdownDialog = ref(false)
+const noteBreakdownLoading = ref(false)
+const noteBreakdownError = ref('')
+const noteBreakdown = ref<ConsolNoteBreakdown | null>(null)
+const noteBreakdownNodeKey = ref<string | null>(null)
+const noteBreakdownTarget = reactive({ row: -1, col: -1 })
+
+/** 企业树中的汇总节点（树序）；与报表差额表 / 合并试算平衡表的节点选择同一判定 */
+const noteAggregateNodes = computed(() => {
+  const out: Array<{ node_key: string; label: string }> = []
+  for (const root of props.groupTree) {
+    for (const node of walkTree(root)) {
+      if (node.kind === 'aggregate') out.push({ node_key: node.node_key, label: treeNodeLabel(node) })
+    }
+  }
+  return out
+})
+const noteBreakdownTableRows = computed(() => noteBreakdownRows(noteBreakdown.value))
+const noteBreakdownAudit = computed(() => noteBreakdownCheck(noteBreakdown.value))
+const noteBreakdownAuditText = computed(() => noteBreakdownCheckText(noteBreakdownAudit.value))
+
 // useTableToolbar 管理选中行状态（editRows 是动态嵌套属性，用 computed 桥接）
 const noteEditRows = computed({
   get: () => selectedNoteSection.value?.editRows ?? [],
@@ -536,9 +664,8 @@ const noteEditRows = computed({
 })
 const {
   selectedRows: noteSelectedRows,
-  selectedCount: noteSelectedCount,
   onSelectionChange: onNoteSelectionChange,
-  deleteSelectedRows: deleteNoteRows,
+  deleteSelectedRows,
 } = useTableToolbar(noteEditRows)
 const noteBatchFileRef = ref<HTMLInputElement | null>(null)
 const noteFormulaFileRef = ref<HTMLInputElement | null>(null)
@@ -595,10 +722,13 @@ const displayPrefs = useDisplayPrefsStore()
 /** 格式化金额（跟随全局单位设置） */
 const fmt = (v: any) => displayPrefs.fmt(v)
 
-// ─── 表格内搜索（Ctrl+F） ──────────────────────────────────────────────────
-const noteSearch = useTableSearch(computed(() => []), ['row_name'])
 // 兼容别名
 const selectedCells = noteCtx.selectedCells
+const selectedCellIsManual = computed(() => {
+  const sec = selectedNoteSection.value
+  const cell = selectedCells.value[0]
+  return !!sec && selectedCells.value.length === 1 && !!cell && isManual(sec.editRows?.[cell.row], cell.col)
+})
 const drillDownCell = reactive({ itemName: '', colName: '', totalValue: 0 as number | null, sectionId: '', rowIdx: -1, colIdx: -1 })
 
 // ─── 批注 ────────────────────────────────────────────────────────────────────
@@ -620,13 +750,17 @@ const aggTarget = reactive({
   colHeader: '',
 })
 
+// 汇总选择树：键用 node_key（同一企业的合并户与母公司户是两个节点，按企业代码会撞键）；
+// 差额节点没有企业数据，不可勾选；提交时按勾选节点的企业代码去重（后端按企业取数）
 const aggTreeData = computed(() => {
   function buildAggNode(node: any): any {
     return {
-      key: node.company_code || 'root',
-      label: node.company_name || node.name,
-      icon: node.children?.length ? '🏢' : '🏠',
+      key: node.node_key || node.company_code || 'root',
+      companyCode: node.company_code || '',
+      label: node.display_name || node.company_name || node.name,
+      icon: node.kind === 'elim' ? '📝' : node.children?.length ? '🏢' : '🏠',
       ratio: node.shareholding,
+      disabled: node.kind === 'elim',
       children: (node.children || []).map(buildAggNode),
     }
   }
@@ -648,7 +782,29 @@ function fmtAmt(v: any): string {
   return fmt(v)
 }
 
-// onNoteSelectionChange 和 deleteNoteRows 已由 useTableToolbar 提供
+// onNoteSelectionChange 已由 useTableToolbar 提供
+
+/** 编辑值即成为手工单元格；第 0 列是项目名，不参与取数公式 */
+function onNoteCellInput(row: NoteEditRow, col: number) {
+  markManual(row, col)
+  markNoteDirty()
+}
+
+/** 删除行后手工标记随行对象一起移动；保存时重新按当前行号序列化 */
+async function deleteNoteRows() {
+  if (await deleteSelectedRows()) markNoteDirty()
+}
+
+/** 取消手工保护；下一次「按公式填入」会重新写入该格 */
+function restoreSelectedFormula() {
+  noteCtx.closeContextMenu()
+  const sec = selectedNoteSection.value
+  const cell = selectedCells.value[0]
+  if (!sec || !cell) return
+  clearManual(sec.editRows[cell.row], cell.col)
+  markNoteDirty()
+  ElMessage.success('已恢复为公式单元格；点击“按公式填入”即可取最新合并数')
+}
 
 // ─── 单元格选中与右键菜单 ──────────────────────────────────────────────────
 function noteCellClassName({ rowIndex, columnIndex }: any) {
@@ -660,6 +816,7 @@ function noteCellClassName({ rowIndex, columnIndex }: any) {
   // 批注/复核标记
   const ccClass = cellComments.commentCellClass(sheetKey, rowIndex, columnIndex)
   if (ccClass) classes.push(ccClass)
+  if (isManual(sec?.editRows?.[rowIndex], columnIndex)) classes.push('gt-note-manual-cell')
   return classes.join(' ')
 }
 
@@ -725,26 +882,83 @@ function onNoteCtxCompare() {
   if (noteCtx.selectedCells.value.length < 2) return
   const vals = noteCtx.selectedCells.value.map(c => Number(c.value) || 0)
   const diff = vals[0] - vals[1]
+  // eslint-disable-next-line gt-audit/no-amount-toFixed -- 这里格式化的是百分比，不是金额
   const pct = vals[1] !== 0 ? ((diff / Math.abs(vals[1])) * 100).toFixed(2) : '—'
   ElMessage.info(`差异：${fmtAmt(diff)}（${pct}%）| 值1=${fmtAmt(vals[0])} 值2=${fmtAmt(vals[1])}`)
 }
 
-function drillDownFromCell() {
-  noteCtx.closeContextMenu()
-  if (noteCtx.selectedCells.value.length) {
-    emit('note-node-click', { section_id: '__drill_down__' })
-  }
+const FORMULA_SOURCE_LABEL: Record<string, string> = { seed: '自动种子', manual: '人工' }
+const NODE_KIND_LABEL: Record<string, string> = { data: '单户', elim: '差额', aggregate: '下级汇总' }
+
+function formulaSourceLabel(source: string | null | undefined): string {
+  return FORMULA_SOURCE_LABEL[source || ''] || source || ''
 }
 
-/** 右键"查看合并明细"：打开统一穿透弹窗（source=note），以当前选中附注章节的 section_id 穿透 */
-function onCtxViewConsolBreakdown() {
-  noteCtx.closeContextMenu()
-  consolBreakdownSectionId.value = selectedNoteSection.value?.section_id || ''
-  if (!consolBreakdownSectionId.value) {
+/** 打开章节差额；传 row/col 时，按模板行标签定位并高亮该单元格对应公式 */
+async function openNoteBreakdown(target?: { row: number; col: number }) {
+  const sec = selectedNoteSection.value
+  if (!sec?.section_id) {
     ElMessage.info('请先选择附注章节')
     return
   }
-  consolBreakdownVisible.value = true
+  noteCtx.closeContextMenu()
+  noteBreakdownTarget.row = target?.row ?? -1
+  noteBreakdownTarget.col = target?.col ?? -1
+  showNoteBreakdownDialog.value = true
+  await loadNoteBreakdown()
+}
+
+async function openNoteBreakdownForSelection() {
+  const cell = selectedCells.value[0]
+  if (!cell) {
+    ElMessage.info('请先选择附注单元格')
+    return
+  }
+  await openNoteBreakdown({ row: cell.row, col: cell.col })
+}
+
+async function loadNoteBreakdown() {
+  const sec = selectedNoteSection.value
+  if (!sec?.section_id || noteBreakdownLoading.value) return
+  noteBreakdownLoading.value = true
+  noteBreakdownError.value = ''
+  try {
+    const result = await getConsolNoteBreakdown(props.projectId, props.year, sec.section_id, {
+      nodeKey: noteBreakdownNodeKey.value,
+      standard: props.standard,
+    })
+    noteBreakdown.value = result
+    if (!noteBreakdownNodeKey.value && result.node_key) noteBreakdownNodeKey.value = result.node_key
+    // 已保存数据插删过行时，用行标签把编辑格映射回模板公式行（与后端填入同口径）
+    if (noteBreakdownTarget.row >= 0 && noteBreakdownTarget.col >= 1) {
+      const rowLabel = String(sec.editRows?.[noteBreakdownTarget.row]?.[0] || '')
+      const found = findBreakdownCell(result.cells, rowLabel, noteBreakdownTarget.row, noteBreakdownTarget.col)
+      if (found) {
+        noteBreakdownTarget.row = found.row_index
+        noteBreakdownTarget.col = found.col_index
+      }
+    }
+  } catch (err: any) {
+    noteBreakdown.value = null
+    const detail = err?.response?.data?.detail
+    noteBreakdownError.value = typeof detail === 'string' && detail ? detail : '加载附注差额失败'
+  } finally {
+    noteBreakdownLoading.value = false
+  }
+}
+
+function noteBreakdownChildren(row: ReturnType<typeof noteBreakdownRows>[number]) {
+  return (noteBreakdown.value?.children || []).map((child) => ({
+    node_key: child.node_key,
+    label: child.label || child.node_key,
+    kind_label: NODE_KIND_LABEL[child.kind] || child.kind,
+    value: row.children?.[child.node_key] ?? null,
+  }))
+}
+
+function noteBreakdownRowClass({ row }: { row: ReturnType<typeof noteBreakdownRows>[number] }): string {
+  if (row.row_index === noteBreakdownTarget.row && row.col_index === noteBreakdownTarget.col) return 'gt-note-breakdown-target'
+  return ''
 }
 
 function addCellComment() {
@@ -864,7 +1078,7 @@ async function executeAggregate() {
 
     if (aggTarget.mode === 'direct') {
       const entityCode = props.currentEntity.code || ''
-      const data = await api.post(`P_cn.list(props.standard)aggregate/${props.projectId}/${props.year}`, {
+      const data = await api.post(P_cn.aggregate(props.projectId, props.year), {
         section_id: sec.section_id,
         row_idx: c.row,
         col_idx: c.col,
@@ -882,8 +1096,10 @@ async function executeAggregate() {
     } else {
       const checkedNodes = aggTreeRef.value?.getCheckedNodes() || []
       if (!checkedNodes.length) { ElMessage.warning('请选择要汇总的单位'); aggLoading.value = false; return }
-      const companyCodes = checkedNodes.map((n: any) => n.key).filter((k: string) => k !== 'root')
-      const data = await api.post(`P_cn.list(props.standard)aggregate/${props.projectId}/${props.year}`, {
+      const companyCodes: string[] = [...new Set<string>(
+        checkedNodes.map((n: any) => String(n.companyCode || '')).filter((c: string) => !!c),
+      )]
+      const data = await api.post(P_cn.aggregate(props.projectId, props.year), {
         section_id: aggTarget.source === 'same' ? sec.section_id : (aggTarget.source === 'note' ? (aggTarget as any).noteSection : sec.section_id),
         row_idx: c.row,
         col_idx: c.col,
@@ -928,31 +1144,45 @@ function copyEntireNoteTable() {
   }
 }
 
-async function refreshNoteByFormula() {
+function noteFormulaError(err: any, action: string) {
+  const status = err?.response?.status || err?.status || 0
+  const detail = err?.response?.data?.detail || err?.data?.detail
+  if ((status === 400 || status === 423) && typeof detail === 'string' && detail) {
+    ElMessage.warning(`${action}：${detail}`)
+    return
+  }
+  handleApiError(err, action)
+}
+
+/** 把该章节有公式单元格的合并数写入已保存数据；手工单元格保留，取不到数逐格提示 */
+async function fillCurrentByFormula(): Promise<boolean> {
   const sec = selectedNoteSection.value
-  if (!sec || !props.projectId) { ElMessage.warning('请先选择章节'); return }
-  noteRefreshing.value = true
+  if (!sec || !props.projectId) {
+    ElMessage.warning('请先选择章节')
+    return false
+  }
+  // 未保存的编辑必须先落库并带 manual_cells；否则后端读到旧数据会覆盖用户刚输入的值
+  if (noteDirty.value && !(await saveNoteData())) return false
+  formulaFilling.value = true
   try {
-    const entityCode = props.currentEntity.code || ''
-    const data = await api.post(`P_cn.list(props.standard)refresh/${props.projectId}/${props.year}/${sec.section_id}`, {
-      standard: props.standard,
-      company_code: entityCode,
-    }, { validateStatus: (s: number) => s < 600 })
-    const result = data
-    if (result?.rows?.length) {
-      const headers = sec.headers
-      sec.editRows = result.rows.map((r: string[]) => {
-        const obj: any = {}
-        for (let j = 0; j < headers.length; j++) obj[j] = r[j] || ''
-        return obj
-      })
-      ElMessage.success(`已刷新 ${result.rows.length} 行数据`)
-    } else {
-      ElMessage.info('暂无可计算的公式数据，请确认项目中已有对应科目的试算表数据')
-    }
+    const result = await fillConsolNoteByFormula(props.projectId, props.year, sec.section_id, props.standard)
+    sec.headers = result.data?.headers || sec.headers
+    sec.savedData = { ...(result.data || {}) }
+    sec.editRows = toEditRows(sec.headers, result.data?.rows || [], result.data?.manual_cells)
+    clearNoteDirty()
+    clearAutoSaveDraft()
+    fillResultSummary.value = fillSummaryText(result)
+    fillDetails.value = fillDetailRows(result)
+    if (fillDetails.value.length) showFillResultDialog.value = true
+    if (result.blank?.length) ElMessage.warning(fillResultSummary.value)
+    else ElMessage.success(fillResultSummary.value)
+    return true
   } catch (err: any) {
-    handleApiError(err, '公式刷新')
-  } finally { noteRefreshing.value = false }
+    noteFormulaError(err, '按公式填入')
+    return false
+  } finally {
+    formulaFilling.value = false
+  }
 }
 
 // B.1.13: 重新汇总（从子公司单体附注汇总到合并附注）
@@ -962,20 +1192,27 @@ async function handleReaggregate() {
   if (!props.projectId) return
   reaggregating.value = true
   try {
-    // 计算不变：沿用现有 reaggregate 端点，不改任何入参/聚合逻辑（Req 20.9）。
-    await api.post(`/api/disclosure-notes/${props.projectId}/${props.year}/reaggregate`)
-    ElMessage.success('重新汇总完成')
-    // Reload current section
-    if (selectedNoteSection.value?.section_id) {
+    const sec = selectedNoteSection.value
+    const result: any = await api.post(
+      P_consol.notes.reaggregate(props.projectId, props.year),
+      sec?.section_id ? { section_ids: [sec.section_id] } : {},
+    )
+    const updated = result?.sections_updated ?? 0
+    const processed = result?.sections_processed ?? 0
+    const errors = Array.isArray(result?.errors) ? result.errors : []
+    if (errors.length) ElMessage.warning(`重新汇总完成：处理 ${processed} 个章节，更新 ${updated} 个，${errors.length} 个有告警`)
+    else ElMessage.success(`重新汇总完成：更新 ${updated} 个章节`)
+    // Reload current section；准则传附注模板类型，不再误传企业代码
+    if (sec?.section_id) {
       eventBus.emit('consol-catalog-select', {
         type: 'note',
-        sectionId: selectedNoteSection.value.section_id,
-        title: selectedNoteSection.value.title,
-        standard: props.currentEntity?.code || '',
+        sectionId: sec.section_id,
+        title: sec.title,
+        standard: props.standard,
       })
     }
   } catch (err: any) {
-    handleApiError(err, '汇总')
+    handleApiError(err, '重新汇总')
   } finally {
     reaggregating.value = false
   }
@@ -984,28 +1221,32 @@ async function handleReaggregate() {
 function addNoteRow() {
   const sec = selectedNoteSection.value
   if (!sec?.headers) return
-  const obj: any = {}
-  for (let j = 0; j < sec.headers.length; j++) obj[j] = ''
-  // 直接 push 到 editRows（useTableToolbar 的 noteEditRows 会同步）
-  sec.editRows.push(obj)
+  sec.editRows.push(emptyEditRow(sec.headers.length))
+  markNoteDirty()
 }
 
-// deleteNoteRows 已由 useTableToolbar.deleteSelectedRows 提供（含 confirmBatch 确认弹窗）
+// deleteNoteRows 封装 useTableToolbar.deleteSelectedRows：删除后同步 dirty，手工标记随行移动
 
-async function saveNoteData() {
+async function saveNoteData(): Promise<boolean> {
   const sec = selectedNoteSection.value
-  if (!sec || !props.projectId) return
-  const rows = sec.editRows.map((r: any) => sec.headers.map((_: string, j: number) => r[j] || ''))
+  if (!sec || !props.projectId) return false
+  const data = notePayload(sec.savedData, sec.headers, sec.editRows)
   try {
-    await api.put(
-      `P_cn.list(props.standard)data/${props.projectId}/${props.year}/${sec.section_id}`,
-      { data: { headers: sec.headers, rows } },
+    const result: any = await api.put(
+      P_cn.data(props.projectId, props.year, sec.section_id),
+      { data },
       { validateStatus: (s: number) => s < 600 },
     )
+    if (result?.ok === false) throw Object.assign(new Error(result.error || '保存失败'), { status: 500 })
+    sec.savedData = data
     ElMessage.success('附注数据已保存')
     clearNoteDirty()
     clearAutoSaveDraft()
-  } catch (err) { handleApiError(err, '保存') }
+    return true
+  } catch (err) {
+    handleApiError(err, '保存')
+    return false
+  }
 }
 
 async function exportNoteTemplate() {
@@ -1060,12 +1301,18 @@ async function onNoteFileSelected(e: Event) {
     for (let i = startRow; i < json.length; i++) {
       const r = json[i]
       if (!r || !r.length) continue
-      const obj: any = {}
-      for (let j = 0; j < sec.headers.length; j++) obj[j] = r[j] != null ? String(r[j]) : ''
+      const obj: NoteEditRow = {}
+      const manual: number[] = []
+      for (let j = 0; j < sec.headers.length; j++) {
+        obj[j] = r[j] != null ? String(r[j]) : ''
+        if (j > 0 && obj[j] !== '') manual.push(j)
+      }
+      if (manual.length) obj.__manual = manual
       imported.push(obj)
     }
     if (imported.length) {
       sec.editRows.push(...imported)
+      markNoteDirty()
       ElMessage.success(`已导入 ${imported.length} 行`)
     } else {
       ElMessage.warning('未解析到有效数据')
@@ -1114,7 +1361,7 @@ async function batchExportAllData() {
   noteBatchLoading.value = true
   try {
     const usedNames = new Set<string>()
-    const data = await api.get(`P_cn.list(props.standard)${props.standard}`, {
+    const data = await api.get(P_cn.list(props.standard), {
       validateStatus: (s: number) => s < 600,
     })
     const groups = Array.isArray(data) ? data : (data ?? [])
@@ -1124,7 +1371,7 @@ async function batchExportAllData() {
     let sheetCount = 0
     for (const g of groups) {
       for (const c of (g.children || [])) {
-        const detail = await api.get(`P_cn.list(props.standard)${props.standard}/${c.section_id}`, {
+        const detail = await api.get(P_cn.detail(props.standard, c.section_id), {
           validateStatus: (s: number) => s < 600,
         })
         const sec = detail?.data ?? detail
@@ -1154,7 +1401,7 @@ async function batchExportAllTemplates() {
   noteBatchLoading.value = true
   try {
     const usedNames = new Set<string>()
-    const data = await api.get(`P_cn.list(props.standard)${props.standard}`, {
+    const data = await api.get(P_cn.list(props.standard), {
       validateStatus: (s: number) => s < 600,
     })
     const groups = Array.isArray(data) ? data : (data ?? [])
@@ -1163,7 +1410,7 @@ async function batchExportAllTemplates() {
     let sheetCount = 0
     for (const g of groups) {
       for (const c of (g.children || [])) {
-        const detail = await api.get(`P_cn.list(props.standard)${props.standard}/${c.section_id}`, {
+        const detail = await api.get(P_cn.detail(props.standard, c.section_id), {
           validateStatus: (s: number) => s < 600,
         })
         const sec = detail?.data ?? detail
@@ -1197,7 +1444,7 @@ async function onNoteBatchImport(e: Event) {
     // 故用整簿读取：一次解析拿到所有 sheet 的 AOA，与原实现等价。
     const { sheetNames, sheets } = await readWorkbookAoa(file)
     let matched = 0
-    const data = await api.get(`P_cn.list(props.standard)${props.standard}`, {
+    const data = await api.get(P_cn.list(props.standard), {
       validateStatus: (s: number) => s < 600,
     })
     const groups = Array.isArray(data) ? data : (data ?? [])
@@ -1214,9 +1461,21 @@ async function onNoteBatchImport(e: Event) {
       if (json.length < 2) continue
       const headers = json[0].map((c: any) => String(c || ''))
       const rows = json.slice(1).filter((r: any[]) => r.some(c => c != null && c !== '')).map((r: any[]) => r.map(c => String(c ?? '')))
+      // Excel 导入属于人工录入：所有非空数值格都标为手工，后续「按公式填入」不得静默覆盖
+      const editRows: NoteEditRow[] = rows.map((r: string[]) => {
+        const item: NoteEditRow = {}
+        const manual: number[] = []
+        for (let col = 0; col < headers.length; col++) {
+          item[col] = r[col] || ''
+          if (col > 0 && item[col] !== '') manual.push(col)
+        }
+        if (manual.length) item.__manual = manual
+        return item
+      })
+      const serialised = fromEditRows(headers, editRows)
       await api.put(
-        `P_cn.list(props.standard)data/${props.projectId}/${props.year}/${sectionId}`,
-        { data: { headers, rows } },
+        P_cn.data(props.projectId, props.year, sectionId),
+        { data: { headers, ...serialised } },
         { validateStatus: (s: number) => s < 600 },
       )
       matched++
@@ -1236,19 +1495,23 @@ async function onNoteBatchImport(e: Event) {
 function openNoteFormula() {
   const sec = selectedNoteSection.value
   if (!sec) { ElMessage.warning('请先选择章节'); return }
-  // 透传 nodeKey 到全局 FormulaManagerDialog；附带 section_id / section_title 便于扩展
+  // 项目级合并模块无 wpId，显式传完整上下文，避免全局挂载层退成普通报表域
   eventBus.emit('open-formula-manager', {
     nodeKey: 'consol_note',
-    section_id: sec.section_id,
-    section_title: sec.title,
-  } as any)
+    scope: 'consol_note',
+    projectId: props.projectId,
+    year: props.year,
+    templateType: props.standard,
+    noteSection: sec.section_id,
+    noteSectionTitle: sec.title,
+  })
 }
 
 async function exportNoteFormulas() {
   noteBatchLoading.value = true
   try {
     const headers = ['章节ID', '章节标题', '行号', '列号', '公式类型', '公式表达式', '数据来源', '说明']
-    const data = await api.get(`P_cn.list(props.standard)${props.standard}`, {
+    const data = await api.get(P_cn.list(props.standard), {
       validateStatus: (s: number) => s < 600,
     })
     const groups = Array.isArray(data) ? data : (data ?? [])
@@ -1296,23 +1559,56 @@ async function onNoteFormulaImport(e: Event) {
   }
 }
 
-async function applyAllNoteFormulas() {
+async function fillAllByFormula() {
+  if (noteBatchLoading.value) return
+  if (noteDirty.value && !(await saveNoteData())) return
   noteBatchLoading.value = true
   try {
-    const entityCode = props.currentEntity.code || ''
-    const data = await api.post(`P_cn.list(props.standard)apply-formulas/${props.projectId}/${props.year}`, {
-      standard: props.standard,
-      company_code: entityCode,
-    }, { validateStatus: (s: number) => s < 600 })
-    const result = data
-    const updated = result?.updated_sections || 0
-    ElMessage.success(`已对 ${updated} 个附注表格执行公式取数计算`)
-    if (selectedNoteSection.value) {
-      onNoteNodeClick({ section_id: selectedNoteSection.value.section_id })
+    const templateType = props.standard.includes('listed') ? 'listed' : 'soe'
+    const formulaList = await listConsolNoteFormulas(templateType)
+    const sectionIds = sectionIdsWithFormulas(formulaList)
+    if (!sectionIds.length) {
+      ElMessage.info('当前模板还没有合并附注公式')
+      return
     }
+    let filled = 0
+    let kept = 0
+    let blank = 0
+    const failed: string[] = []
+    let currentResult: ConsolNoteFillResult | null = null
+    for (const sectionId of sectionIds) {
+      try {
+        const result = await fillConsolNoteByFormula(props.projectId, props.year, sectionId, templateType)
+        filled += result.filled?.length || 0
+        kept += result.kept_manual?.length || 0
+        blank += result.blank?.length || 0
+        if (sectionId === selectedNoteSection.value?.section_id) currentResult = result
+      } catch (err: any) {
+        const detail = err?.response?.data?.detail
+        failed.push(`${sectionId}${typeof detail === 'string' && detail ? `：${detail}` : ''}`)
+        if (err?.response?.status === 400 || err?.response?.status === 423) {
+          noteFormulaError(err, '全部按公式填入')
+          break
+        }
+      }
+    }
+    if (currentResult && selectedNoteSection.value) {
+      const sec = selectedNoteSection.value
+      sec.headers = currentResult.data?.headers || sec.headers
+      sec.savedData = { ...(currentResult.data || {}) }
+      sec.editRows = toEditRows(sec.headers, currentResult.data?.rows || [], currentResult.data?.manual_cells)
+      clearNoteDirty()
+      clearAutoSaveDraft()
+    }
+    const summary = `已处理 ${sectionIds.length - failed.length}/${sectionIds.length} 个有公式章节：填入 ${filled} 格，保留手工 ${kept} 格，取不到数 ${blank} 格`
+    if (failed.length || blank) ElMessage.warning(`${summary}${failed.length ? `；失败 ${failed.length} 个章节` : ''}`)
+    else ElMessage.success(summary)
   } catch (err: any) {
-    handleApiError(err, '一键取数计算')
-  } finally { noteBatchLoading.value = false; showNoteBatchDialog.value = false }
+    noteFormulaError(err, '全部按公式填入')
+  } finally {
+    noteBatchLoading.value = false
+    showNoteBatchDialog.value = false
+  }
 }
 
 // ─── 审核 ────────────────────────────────────────────────────────────────────
@@ -1322,7 +1618,7 @@ async function onNoteAuditAll(_e?: Event) {
   noteAuditResults.value = []
   try {
     const entityCode = props.currentEntity.code || ''
-    const data = await api.post(`P_cn.list(props.standard)audit-all/${props.projectId}/${props.year}`, {
+    const data = await api.post(P_cn.auditAll(props.projectId, props.year), {
       standard: props.standard,
       company_code: entityCode,
     }, { validateStatus: (s: number) => s < 600 })
@@ -1372,7 +1668,7 @@ async function auditCurrentNote() {
   try {
     const entityCode = props.currentEntity.code || ''
     const currentRows = sec.editRows.map((r: any) => sec.headers.map((_: string, j: number) => r[j] || ''))
-    const data = await api.post(`P_cn.list(props.standard)audit/${props.projectId}/${props.year}/${sec.section_id}`, {
+    const data = await api.post(P_cn.audit(props.projectId, props.year, sec.section_id), {
       standard: props.standard,
       company_code: entityCode,
       headers: sec.headers,
@@ -1396,42 +1692,39 @@ function onNoteNodeClick(data: { section_id: string; title?: string }) {
   if (!data.section_id) return
   noteSelectedRows.value = []
   selectedCells.value = []
-  api.get(`P_cn.list(props.standard)${props.standard}/${data.section_id}`, {
+  noteBreakdown.value = null
+  noteBreakdownNodeKey.value = null
+  noteBreakdownTarget.row = -1
+  noteBreakdownTarget.col = -1
+  api.get(P_cn.detail(props.standard, data.section_id), {
     validateStatus: (s: number) => s < 600,
   }).then(async (detail: any) => {
     const sec = detail?.data ?? detail
     if (sec && !sec.error) {
       const headers = sec.headers || []
       let rows = sec.rows || []
+      let savedContent: Record<string, unknown> = {}
 
-      // 尝试加载用户已保存的数据覆盖模板
+      // 尝试加载用户已保存的数据覆盖模板；保留 manual_cells 等元数据，保存时不得整包丢失
       try {
-        const saved = await api.get(
-          `P_cn.list(props.standard)data/${props.projectId}/${props.year}/${data.section_id}`,
-          { validateStatus: (s: number) => s < 600 }
+        const saved: any = await api.get(
+          P_cn.data(props.projectId, props.year, data.section_id),
+          { validateStatus: (s: number) => s < 600 },
         )
-        const savedData = saved
-        if (savedData?.content?.rows?.length) {
-          rows = savedData.content.rows
+        if (saved?.content && typeof saved.content === 'object') savedContent = { ...saved.content }
+        if (Array.isArray((savedContent as any).rows) && (savedContent as any).rows.length) {
+          rows = (savedContent as any).rows
         }
       } catch { /* 无已保存数据，用模板默认 */ }
 
-      const editRows = rows.map((r: string[]) => {
-        const obj: any = {}
-        for (let j = 0; j < headers.length; j++) obj[j] = (Array.isArray(r) ? r[j] : '') || ''
-        return obj
-      })
-      while (editRows.length < 5) {
-        const obj: any = {}
-        for (let j = 0; j < headers.length; j++) obj[j] = ''
-        editRows.push(obj)
-      }
+      const editRows = toEditRows(headers, rows, (savedContent as any).manual_cells)
       selectedNoteSection.value = {
         section_id: sec.section_id,
         title: sec.title,
         parent_section: sec.parent_section,
         headers,
         editRows,
+        savedData: savedContent,
         // Req 20.4：以 ACNR NOTE 地址标识源单体附注 section（reaggregate 溯源），
         // 与统一寻址体系一致，可追溯；仅为标识，不参与计算。
         noteAddr: sourceNoteAddr(sec.section_id),
@@ -1521,6 +1814,9 @@ defineExpose({
   selectedCells,
   drillDownCell,
   onNoteAuditAll,
+  fillCurrentByFormula,
+  openNoteBreakdown,
+  openNoteBreakdownForSelection,
 })
 </script>
 
@@ -1620,4 +1916,17 @@ defineExpose({
 .gt-note-compact-table :deep(.el-table__row td) { height: 32px; }
 .gt-note-compact-table :deep(.el-table__header th) { height: 34px; }
 .gt-note-compact-table :deep(.el-input__inner) { height: 28px; font-size: var(--gt-font-size-sm); }
+
+/* 手工单元格：按公式填入时后端保留；视觉上用麦田黄提示保护状态 */
+.gt-note-cell-manual { background: var(--gt-color-wheat-light) !important; }
+.gt-note-compact-table :deep(td.gt-note-manual-cell) { background: var(--gt-color-wheat-light) !important; }
+.gt-note-breakdown-toolbar {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);
+}
+.gt-note-breakdown-check--bad { color: var(--gt-color-coral); }
+.gt-note-breakdown-children { padding: 8px 28px 12px; }
+.gt-note-breakdown-children p { margin: 0 0 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); }
+:deep(td.gt-note-elim-col), :deep(th.gt-note-elim-col) { background: var(--gt-color-wheat-light) !important; }
+:deep(.gt-note-breakdown-target td) { box-shadow: inset 0 0 0 1px var(--gt-color-primary); }
 </style>

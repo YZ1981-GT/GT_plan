@@ -12441,22 +12441,26 @@
       }
     },
     {
-      "adapter_id": "h10.asset_disposal_income_adjustment",
-      "canonical_resolver": "workpaper_sync_published_representation",
-      "capability": "bidirectional",
+      "adapter_id": null,
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "capability": "single_onlyoffice",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-h10-asset-disposal-income",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [],
-        "review_status": "published_representation_verified"
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "review_status": "source_inventory_reviewed"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue",
-      "html_store": "checklist_responses_h10_adjustment_rows",
+      "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "adapter_registered",
+      "migration_state": "legacy_fake_bidirectional",
       "mounts": [
         {
           "attributes": [
@@ -12518,17 +12522,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_93cb812298351090ad15",
+          "mountId": "mount_155483d344d4c739df64",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || ''\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 58,
+            "endLine": 43,
             "startColumn": 7,
-            "startLine": 50
+            "startLine": 35
           },
-          "templateNodeOrdinal": 14,
+          "templateNodeOrdinal": 12,
           "wpExpression": ":wp-id=\"props.wpId\""
         },
         {
@@ -12584,17 +12588,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_861d480c2915aca1a87b",
+          "mountId": "mount_ed087f2e06c609fc8fe4",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || ''\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 175,
+            "endLine": 160,
             "startColumn": 7,
-            "startLine": 168
+            "startLine": 153
           },
-          "templateNodeOrdinal": 28,
+          "templateNodeOrdinal": 26,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
@@ -12607,8 +12611,8 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue#L168",
-          "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue#L153",
+          "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue#L35",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L736"
         ]
@@ -12642,22 +12646,26 @@
       }
     },
     {
-      "adapter_id": "h2.construction_in_progress_detail",
-      "canonical_resolver": "workpaper_sync_published_representation",
-      "capability": "bidirectional",
+      "adapter_id": null,
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "capability": "single_onlyoffice",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-h2-construction-in-progress",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [],
-        "review_status": "published_representation_verified"
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "review_status": "source_inventory_reviewed"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue",
-      "html_store": "checklist_responses_h2_2_rows",
+      "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "adapter_registered",
+      "migration_state": "legacy_fake_bidirectional",
       "mounts": [
         {
           "attributes": [
@@ -12843,22 +12851,26 @@
       }
     },
     {
-      "adapter_id": "h3.investment_property_detail",
-      "canonical_resolver": "workpaper_sync_published_representation",
-      "capability": "bidirectional",
+      "adapter_id": null,
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "capability": "single_onlyoffice",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-h3-investment-property",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [],
-        "review_status": "published_representation_verified"
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "review_status": "source_inventory_reviewed"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtH3InvestmentProperty.vue",
-      "html_store": "checklist_responses_h3_2_cost_rows__h3_2_fair_rows",
+      "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "adapter_registered",
+      "migration_state": "legacy_fake_bidirectional",
       "mounts": [
         {
           "attributes": [
@@ -13044,22 +13056,26 @@
       }
     },
     {
-      "adapter_id": "h4.engineering_materials_detail",
-      "canonical_resolver": "workpaper_sync_published_representation",
-      "capability": "bidirectional",
+      "adapter_id": null,
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "capability": "single_onlyoffice",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-h4-engineering-materials",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [],
-        "review_status": "published_representation_verified"
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "review_status": "source_inventory_reviewed"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtH4EngineeringMaterials.vue",
-      "html_store": "checklist_responses_h4_2_rows",
+      "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "adapter_registered",
+      "migration_state": "legacy_fake_bidirectional",
       "mounts": [
         {
           "attributes": [
@@ -13238,22 +13254,26 @@
       }
     },
     {
-      "adapter_id": "h5.oil_gas_assets_detail",
-      "canonical_resolver": "workpaper_sync_published_representation",
-      "capability": "bidirectional",
+      "adapter_id": null,
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "capability": "single_onlyoffice",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-h5-oil-gas-assets",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [],
-        "review_status": "published_representation_verified"
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "review_status": "source_inventory_reviewed"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue",
-      "html_store": "checklist_responses_h5_2_rows",
+      "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "adapter_registered",
+      "migration_state": "legacy_fake_bidirectional",
       "mounts": [
         {
           "attributes": [
@@ -13439,22 +13459,26 @@
       }
     },
     {
-      "adapter_id": "h6.asset_disposal_clearing_detail",
-      "canonical_resolver": "workpaper_sync_published_representation",
-      "capability": "bidirectional",
+      "adapter_id": null,
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "capability": "single_onlyoffice",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-h6-asset-disposal-clearing",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [],
-        "review_status": "published_representation_verified"
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "review_status": "source_inventory_reviewed"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue",
-      "html_store": "checklist_responses_h6_2_rows",
+      "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "adapter_registered",
+      "migration_state": "legacy_fake_bidirectional",
       "mounts": [
         {
           "attributes": [
@@ -13633,22 +13657,26 @@
       }
     },
     {
-      "adapter_id": "h7.biological_assets_detail",
-      "canonical_resolver": "workpaper_sync_published_representation",
-      "capability": "bidirectional",
+      "adapter_id": null,
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "capability": "single_onlyoffice",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-h7-biological-assets",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [],
-        "review_status": "published_representation_verified"
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "review_status": "source_inventory_reviewed"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue",
-      "html_store": "checklist_responses_h7_2_cost_rows__h7_2_fair_rows",
+      "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "adapter_registered",
+      "migration_state": "legacy_fake_bidirectional",
       "mounts": [
         {
           "attributes": [
@@ -13834,22 +13862,26 @@
       }
     },
     {
-      "adapter_id": "h8.right_of_use_assets_detail",
-      "canonical_resolver": "workpaper_sync_published_representation",
-      "capability": "bidirectional",
+      "adapter_id": null,
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "capability": "single_onlyoffice",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-h8-right-of-use-assets",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [],
-        "review_status": "published_representation_verified"
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "review_status": "source_inventory_reviewed"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue",
-      "html_store": "checklist_responses_h8_2_rows",
+      "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "adapter_registered",
+      "migration_state": "legacy_fake_bidirectional",
       "mounts": [
         {
           "attributes": [
@@ -14028,22 +14060,26 @@
       }
     },
     {
-      "adapter_id": "h9.lease_liability_detail",
-      "canonical_resolver": "workpaper_sync_published_representation",
-      "capability": "bidirectional",
+      "adapter_id": null,
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "capability": "single_onlyoffice",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-h9-lease-liabilities",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [],
-        "review_status": "published_representation_verified"
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "review_status": "source_inventory_reviewed"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue",
-      "html_store": "checklist_responses_h9_2_rows",
+      "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "adapter_registered",
+      "migration_state": "legacy_fake_bidirectional",
       "mounts": [
         {
           "attributes": [
@@ -15420,17 +15456,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_576ed6ec1d24723923f3",
+          "mountId": "mount_5157a481e621c6ef2342",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || ''\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 27,
+            "endLine": 28,
             "startColumn": 7,
-            "startLine": 20
+            "startLine": 21
           },
-          "templateNodeOrdinal": 8,
+          "templateNodeOrdinal": 9,
           "wpExpression": ":wp-id=\"props.wpId\""
         },
         {
@@ -15486,17 +15522,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_05e5ab631427639c1d50",
+          "mountId": "mount_2a2519d5b4ad434489f4",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || ''\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 11,
-            "endLine": 166,
+            "endLine": 167,
             "startColumn": 9,
-            "startLine": 159
+            "startLine": 160
           },
-          "templateNodeOrdinal": 22,
+          "templateNodeOrdinal": 23,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
@@ -15509,8 +15545,8 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtI6ResearchDevelopmentExpense.vue#L159",
-          "audit-platform/frontend/src/components/workpaper/GtI6ResearchDevelopmentExpense.vue#L20",
+          "audit-platform/frontend/src/components/workpaper/GtI6ResearchDevelopmentExpense.vue#L160",
+          "audit-platform/frontend/src/components/workpaper/GtI6ResearchDevelopmentExpense.vue#L21",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L736"
         ]
@@ -15812,17 +15848,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_ffcc4c63ed0225892841",
+          "mountId": "mount_b6ff93a2c60e5eb58ef4",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || ''\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 36,
+            "endLine": 40,
             "startColumn": 7,
-            "startLine": 29
+            "startLine": 33
           },
-          "templateNodeOrdinal": 11,
+          "templateNodeOrdinal": 12,
           "wpExpression": ":wp-id=\"props.wpId\""
         },
         {
@@ -15878,17 +15914,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_b241ffd0dc22af32c5db",
+          "mountId": "mount_4b5b9c7bef6f5b6e94c6",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || ''\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 11,
-            "endLine": 145,
+            "endLine": 149,
             "startColumn": 9,
-            "startLine": 138
+            "startLine": 142
           },
-          "templateNodeOrdinal": 22,
+          "templateNodeOrdinal": 23,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
@@ -15901,8 +15937,8 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue#L138",
-          "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue#L29",
+          "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue#L142",
+          "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue#L33",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L736"
         ]
@@ -18108,26 +18144,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "l1.short_term_loans",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-l1-short-term-loans",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtL1ShortTermLoans.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_l1_detail_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mounts": [
         {
           "attributes": [
@@ -18292,26 +18324,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "l2.interest_payable",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-l2-interest-payable",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_l2_interest_payable_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mounts": [
         {
           "attributes": [
@@ -18366,17 +18394,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_f9a234e756e493d50999",
+          "mountId": "mount_5a9c7c262e58e42971b5",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || 'L2A'\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 27,
+            "endLine": 30,
             "startColumn": 7,
-            "startLine": 20
+            "startLine": 23
           },
-          "templateNodeOrdinal": 8,
+          "templateNodeOrdinal": 9,
           "wpExpression": ":wp-id=\"props.wpId\""
         },
         {
@@ -18418,17 +18446,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_8ef0536650d2ee3b1be3",
+          "mountId": "mount_32654a6f3e4a0c06c6c0",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 93,
+            "endLine": 96,
             "startColumn": 7,
-            "startLine": 88
+            "startLine": 91
           },
-          "templateNodeOrdinal": 17,
+          "templateNodeOrdinal": 18,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
@@ -18441,7 +18469,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue#L20",
+          "audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue#L23",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L736"
         ]
@@ -18476,27 +18504,89 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "l3.long_term_loans",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-l3-long-term-loans",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtL3LongTermLoans.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_l3_voucher_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mounts": [
+        {
+          "attributes": [
+            {
+              "argument": null,
+              "expression": "isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'",
+              "kind": "directive",
+              "name": "if",
+              "raw": "v-if=\"isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'\""
+            },
+            {
+              "argument": "wp-id",
+              "expression": "props.wpId",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":wp-id=\"props.wpId\""
+            },
+            {
+              "argument": "project-id",
+              "expression": "props.projectId",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":project-id=\"props.projectId\""
+            },
+            {
+              "argument": "sheet-name",
+              "expression": "props.sheetName || 'L3A'",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":sheet-name=\"props.sheetName || 'L3A'\""
+            },
+            {
+              "argument": "readonly",
+              "expression": "isReadonly",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":readonly=\"isReadonly\""
+            },
+            {
+              "argument": null,
+              "expression": "height: calc(100vh - 180px)",
+              "kind": "attribute",
+              "name": "style",
+              "raw": "style=\"height: calc(100vh - 180px)\""
+            }
+          ],
+          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
+          "component": "GtOnlyOfficeSheet",
+          "condition": "v-if=\"isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'\"",
+          "documentType": "xlsx",
+          "file": "audit-platform/frontend/src/components/workpaper/GtL3LongTermLoans.vue",
+          "importKind": "dynamic",
+          "localName": "GtOnlyOfficeSheet",
+          "loop": null,
+          "mountId": "mount_695da2c519c4303f1e50",
+          "runtimeCardinality": "single",
+          "sheetExpression": ":sheet-name=\"props.sheetName || 'L3A'\"",
+          "sourceKind": "template_ast",
+          "sourceSpan": {
+            "endColumn": 9,
+            "endLine": 30,
+            "startColumn": 7,
+            "startLine": 23
+          },
+          "templateNodeOrdinal": 9,
+          "wpExpression": ":wp-id=\"props.wpId\""
+        },
         {
           "attributes": [
             {
@@ -18536,29 +18626,30 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_5eb9c937c0aa1162feb5",
+          "mountId": "mount_3d9421be48be3a169345",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 123,
+            "endLine": 145,
             "startColumn": 7,
-            "startLine": 118
+            "startLine": 140
           },
-          "templateNodeOrdinal": 18,
+          "templateNodeOrdinal": 23,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
       "parent_entry_id": null,
       "profile_source": {
-        "editability_fact": "component_readonly_prop_defaults_editable",
+        "editability_fact": "host_forwards_runtime_readonly_flag",
         "inbound_reference_count": 1,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
+          "audit-platform/frontend/src/components/workpaper/GtL3LongTermLoans.vue#L23",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L736"
         ]
@@ -18572,9 +18663,9 @@
         "editability": "editable",
         "host_reachable": true,
         "mount_cardinality": "single",
-        "mount_count": 1,
+        "mount_count": 2,
         "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
-        "readonly_binding": "absent",
+        "readonly_binding": "runtime_expression",
         "room_model": "shared",
         "room_service_state": "room_service_wired",
         "schema_version": 1
@@ -18582,6 +18673,7 @@
       "wp_match": {
         "component_types": [],
         "sheet_expressions": [
+          ":sheet-name=\"props.sheetName || 'L3A'\"",
           ":sheet-name=\"props.sheetName\""
         ],
         "sheet_literals": [],
@@ -18592,27 +18684,89 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "l4.bonds_payable",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-l4-bonds-payable",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtL4BondsPayable.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_l4_fin_liab_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mounts": [
+        {
+          "attributes": [
+            {
+              "argument": null,
+              "expression": "isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'",
+              "kind": "directive",
+              "name": "if",
+              "raw": "v-if=\"isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'\""
+            },
+            {
+              "argument": "wp-id",
+              "expression": "props.wpId",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":wp-id=\"props.wpId\""
+            },
+            {
+              "argument": "project-id",
+              "expression": "props.projectId",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":project-id=\"props.projectId\""
+            },
+            {
+              "argument": "sheet-name",
+              "expression": "props.sheetName || 'L4A'",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":sheet-name=\"props.sheetName || 'L4A'\""
+            },
+            {
+              "argument": "readonly",
+              "expression": "isReadonly",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":readonly=\"isReadonly\""
+            },
+            {
+              "argument": null,
+              "expression": "height: calc(100vh - 180px)",
+              "kind": "attribute",
+              "name": "style",
+              "raw": "style=\"height: calc(100vh - 180px)\""
+            }
+          ],
+          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
+          "component": "GtOnlyOfficeSheet",
+          "condition": "v-if=\"isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'\"",
+          "documentType": "xlsx",
+          "file": "audit-platform/frontend/src/components/workpaper/GtL4BondsPayable.vue",
+          "importKind": "dynamic",
+          "localName": "GtOnlyOfficeSheet",
+          "loop": null,
+          "mountId": "mount_8a8d4f72480c9f30477c",
+          "runtimeCardinality": "single",
+          "sheetExpression": ":sheet-name=\"props.sheetName || 'L4A'\"",
+          "sourceKind": "template_ast",
+          "sourceSpan": {
+            "endColumn": 9,
+            "endLine": 30,
+            "startColumn": 7,
+            "startLine": 23
+          },
+          "templateNodeOrdinal": 9,
+          "wpExpression": ":wp-id=\"props.wpId\""
+        },
         {
           "attributes": [
             {
@@ -18652,29 +18806,30 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_6d71b42fc1ea989a54e8",
+          "mountId": "mount_d0e36dbbf3d7b83809f6",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 135,
+            "endLine": 157,
             "startColumn": 7,
-            "startLine": 130
+            "startLine": 152
           },
-          "templateNodeOrdinal": 20,
+          "templateNodeOrdinal": 25,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
       "parent_entry_id": null,
       "profile_source": {
-        "editability_fact": "component_readonly_prop_defaults_editable",
+        "editability_fact": "host_forwards_runtime_readonly_flag",
         "inbound_reference_count": 1,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
+          "audit-platform/frontend/src/components/workpaper/GtL4BondsPayable.vue#L23",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L736"
         ]
@@ -18688,9 +18843,9 @@
         "editability": "editable",
         "host_reachable": true,
         "mount_cardinality": "single",
-        "mount_count": 1,
+        "mount_count": 2,
         "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
-        "readonly_binding": "absent",
+        "readonly_binding": "runtime_expression",
         "room_model": "shared",
         "room_service_state": "room_service_wired",
         "schema_version": 1
@@ -18698,6 +18853,7 @@
       "wp_match": {
         "component_types": [],
         "sheet_expressions": [
+          ":sheet-name=\"props.sheetName || 'L4A'\"",
           ":sheet-name=\"props.sheetName\""
         ],
         "sheet_literals": [],
@@ -18708,27 +18864,89 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "l5.long_term_payables",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-l5-long-term-payables",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtL5LongTermPayables.vue",
-      "html_store": "unresolved",
+      "html_store": "L5-L5-2-rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mounts": [
+        {
+          "attributes": [
+            {
+              "argument": null,
+              "expression": "isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'",
+              "kind": "directive",
+              "name": "if",
+              "raw": "v-if=\"isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'\""
+            },
+            {
+              "argument": "wp-id",
+              "expression": "props.wpId",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":wp-id=\"props.wpId\""
+            },
+            {
+              "argument": "project-id",
+              "expression": "props.projectId",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":project-id=\"props.projectId\""
+            },
+            {
+              "argument": "sheet-name",
+              "expression": "props.sheetName || 'L5A'",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":sheet-name=\"props.sheetName || 'L5A'\""
+            },
+            {
+              "argument": "readonly",
+              "expression": "isReadonly",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":readonly=\"isReadonly\""
+            },
+            {
+              "argument": null,
+              "expression": "height: calc(100vh - 180px)",
+              "kind": "attribute",
+              "name": "style",
+              "raw": "style=\"height: calc(100vh - 180px)\""
+            }
+          ],
+          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
+          "component": "GtOnlyOfficeSheet",
+          "condition": "v-if=\"isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'\"",
+          "documentType": "xlsx",
+          "file": "audit-platform/frontend/src/components/workpaper/GtL5LongTermPayables.vue",
+          "importKind": "dynamic",
+          "localName": "GtOnlyOfficeSheet",
+          "loop": null,
+          "mountId": "mount_d14436eac9b6a3073894",
+          "runtimeCardinality": "single",
+          "sheetExpression": ":sheet-name=\"props.sheetName || 'L5A'\"",
+          "sourceKind": "template_ast",
+          "sourceSpan": {
+            "endColumn": 9,
+            "endLine": 31,
+            "startColumn": 7,
+            "startLine": 24
+          },
+          "templateNodeOrdinal": 9,
+          "wpExpression": ":wp-id=\"props.wpId\""
+        },
         {
           "attributes": [
             {
@@ -18768,29 +18986,30 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_2d62da493612da324262",
+          "mountId": "mount_060ecb728c77d9fc8aab",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 104,
+            "endLine": 127,
             "startColumn": 7,
-            "startLine": 99
+            "startLine": 122
           },
-          "templateNodeOrdinal": 16,
+          "templateNodeOrdinal": 21,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
       "parent_entry_id": null,
       "profile_source": {
-        "editability_fact": "component_readonly_prop_defaults_editable",
+        "editability_fact": "host_forwards_runtime_readonly_flag",
         "inbound_reference_count": 1,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
+          "audit-platform/frontend/src/components/workpaper/GtL5LongTermPayables.vue#L24",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L736"
         ]
@@ -18804,9 +19023,9 @@
         "editability": "editable",
         "host_reachable": true,
         "mount_cardinality": "single",
-        "mount_count": 1,
+        "mount_count": 2,
         "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
-        "readonly_binding": "absent",
+        "readonly_binding": "runtime_expression",
         "room_model": "shared",
         "room_service_state": "room_service_wired",
         "schema_version": 1
@@ -18814,6 +19033,7 @@
       "wp_match": {
         "component_types": [],
         "sheet_expressions": [
+          ":sheet-name=\"props.sheetName || 'L5A'\"",
           ":sheet-name=\"props.sheetName\""
         ],
         "sheet_literals": [],
@@ -18824,27 +19044,89 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "l6.special_payables",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-l6-special-payables",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtL6SpecialPayables.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_l6_special_payable_detail_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mounts": [
+        {
+          "attributes": [
+            {
+              "argument": null,
+              "expression": "isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'",
+              "kind": "directive",
+              "name": "if",
+              "raw": "v-if=\"isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'\""
+            },
+            {
+              "argument": "wp-id",
+              "expression": "props.wpId",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":wp-id=\"props.wpId\""
+            },
+            {
+              "argument": "project-id",
+              "expression": "props.projectId",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":project-id=\"props.projectId\""
+            },
+            {
+              "argument": "sheet-name",
+              "expression": "props.sheetName || 'L6A'",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":sheet-name=\"props.sheetName || 'L6A'\""
+            },
+            {
+              "argument": "readonly",
+              "expression": "isReadonly",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":readonly=\"isReadonly\""
+            },
+            {
+              "argument": null,
+              "expression": "height: calc(100vh - 180px)",
+              "kind": "attribute",
+              "name": "style",
+              "raw": "style=\"height: calc(100vh - 180px)\""
+            }
+          ],
+          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
+          "component": "GtOnlyOfficeSheet",
+          "condition": "v-if=\"isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'\"",
+          "documentType": "xlsx",
+          "file": "audit-platform/frontend/src/components/workpaper/GtL6SpecialPayables.vue",
+          "importKind": "dynamic",
+          "localName": "GtOnlyOfficeSheet",
+          "loop": null,
+          "mountId": "mount_de611c284e3d0250ca69",
+          "runtimeCardinality": "single",
+          "sheetExpression": ":sheet-name=\"props.sheetName || 'L6A'\"",
+          "sourceKind": "template_ast",
+          "sourceSpan": {
+            "endColumn": 9,
+            "endLine": 31,
+            "startColumn": 7,
+            "startLine": 24
+          },
+          "templateNodeOrdinal": 9,
+          "wpExpression": ":wp-id=\"props.wpId\""
+        },
         {
           "attributes": [
             {
@@ -18884,29 +19166,30 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_070084b11a98a58814b5",
+          "mountId": "mount_c20193b4de462f199306",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 80,
+            "endLine": 103,
             "startColumn": 7,
-            "startLine": 75
+            "startLine": 98
           },
-          "templateNodeOrdinal": 13,
+          "templateNodeOrdinal": 18,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
       "parent_entry_id": null,
       "profile_source": {
-        "editability_fact": "component_readonly_prop_defaults_editable",
+        "editability_fact": "host_forwards_runtime_readonly_flag",
         "inbound_reference_count": 1,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
+          "audit-platform/frontend/src/components/workpaper/GtL6SpecialPayables.vue#L24",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L736"
         ]
@@ -18920,9 +19203,9 @@
         "editability": "editable",
         "host_reachable": true,
         "mount_cardinality": "single",
-        "mount_count": 1,
+        "mount_count": 2,
         "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
-        "readonly_binding": "absent",
+        "readonly_binding": "runtime_expression",
         "room_model": "shared",
         "room_service_state": "room_service_wired",
         "schema_version": 1
@@ -18930,6 +19213,7 @@
       "wp_match": {
         "component_types": [],
         "sheet_expressions": [
+          ":sheet-name=\"props.sheetName || 'L6A'\"",
           ":sheet-name=\"props.sheetName\""
         ],
         "sheet_literals": [],
@@ -18940,27 +19224,89 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "l7.other_noncurrent_liabilities",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-l7-other-noncurrent-liabilities",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtL7OtherNoncurrentLiabilities.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_l7_other_noncurrent_detail_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mounts": [
+        {
+          "attributes": [
+            {
+              "argument": null,
+              "expression": "isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'",
+              "kind": "directive",
+              "name": "if",
+              "raw": "v-if=\"isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'\""
+            },
+            {
+              "argument": "wp-id",
+              "expression": "props.wpId",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":wp-id=\"props.wpId\""
+            },
+            {
+              "argument": "project-id",
+              "expression": "props.projectId",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":project-id=\"props.projectId\""
+            },
+            {
+              "argument": "sheet-name",
+              "expression": "props.sheetName || 'L7A'",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":sheet-name=\"props.sheetName || 'L7A'\""
+            },
+            {
+              "argument": "readonly",
+              "expression": "isReadonly",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":readonly=\"isReadonly\""
+            },
+            {
+              "argument": null,
+              "expression": "height: calc(100vh - 180px)",
+              "kind": "attribute",
+              "name": "style",
+              "raw": "style=\"height: calc(100vh - 180px)\""
+            }
+          ],
+          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
+          "component": "GtOnlyOfficeSheet",
+          "condition": "v-if=\"isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'\"",
+          "documentType": "xlsx",
+          "file": "audit-platform/frontend/src/components/workpaper/GtL7OtherNoncurrentLiabilities.vue",
+          "importKind": "dynamic",
+          "localName": "GtOnlyOfficeSheet",
+          "loop": null,
+          "mountId": "mount_ebe273cdfc04edb82b8a",
+          "runtimeCardinality": "single",
+          "sheetExpression": ":sheet-name=\"props.sheetName || 'L7A'\"",
+          "sourceKind": "template_ast",
+          "sourceSpan": {
+            "endColumn": 9,
+            "endLine": 31,
+            "startColumn": 7,
+            "startLine": 24
+          },
+          "templateNodeOrdinal": 9,
+          "wpExpression": ":wp-id=\"props.wpId\""
+        },
         {
           "attributes": [
             {
@@ -19000,29 +19346,30 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_be2b5c5704b1a82ba595",
+          "mountId": "mount_13b7afb5749beeffe0c7",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 81,
+            "endLine": 104,
             "startColumn": 7,
-            "startLine": 76
+            "startLine": 99
           },
-          "templateNodeOrdinal": 13,
+          "templateNodeOrdinal": 18,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
       "parent_entry_id": null,
       "profile_source": {
-        "editability_fact": "component_readonly_prop_defaults_editable",
+        "editability_fact": "host_forwards_runtime_readonly_flag",
         "inbound_reference_count": 1,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
+          "audit-platform/frontend/src/components/workpaper/GtL7OtherNoncurrentLiabilities.vue#L24",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L736"
         ]
@@ -19036,9 +19383,9 @@
         "editability": "editable",
         "host_reachable": true,
         "mount_cardinality": "single",
-        "mount_count": 1,
+        "mount_count": 2,
         "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
-        "readonly_binding": "absent",
+        "readonly_binding": "runtime_expression",
         "room_model": "shared",
         "room_service_state": "room_service_wired",
         "schema_version": 1
@@ -19046,6 +19393,7 @@
       "wp_match": {
         "component_types": [],
         "sheet_expressions": [
+          ":sheet-name=\"props.sheetName || 'L7A'\"",
           ":sheet-name=\"props.sheetName\""
         ],
         "sheet_literals": [],
@@ -19056,27 +19404,89 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "l8.financial_expenses",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-l8-financial-expenses",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtL8FinancialExpenses.vue",
-      "html_store": "unresolved",
+      "html_store": "L8-2",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mounts": [
+        {
+          "attributes": [
+            {
+              "argument": null,
+              "expression": "isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'",
+              "kind": "directive",
+              "name": "if",
+              "raw": "v-if=\"isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'\""
+            },
+            {
+              "argument": "wp-id",
+              "expression": "props.wpId",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":wp-id=\"props.wpId\""
+            },
+            {
+              "argument": "project-id",
+              "expression": "props.projectId",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":project-id=\"props.projectId\""
+            },
+            {
+              "argument": "sheet-name",
+              "expression": "props.sheetName || 'L8A'",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":sheet-name=\"props.sheetName || 'L8A'\""
+            },
+            {
+              "argument": "readonly",
+              "expression": "isReadonly",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":readonly=\"isReadonly\""
+            },
+            {
+              "argument": null,
+              "expression": "height: calc(100vh - 180px)",
+              "kind": "attribute",
+              "name": "style",
+              "raw": "style=\"height: calc(100vh - 180px)\""
+            }
+          ],
+          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
+          "component": "GtOnlyOfficeSheet",
+          "condition": "v-if=\"isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'\"",
+          "documentType": "xlsx",
+          "file": "audit-platform/frontend/src/components/workpaper/GtL8FinancialExpenses.vue",
+          "importKind": "dynamic",
+          "localName": "GtOnlyOfficeSheet",
+          "loop": null,
+          "mountId": "mount_4f0eb39c96c8f81407e0",
+          "runtimeCardinality": "single",
+          "sheetExpression": ":sheet-name=\"props.sheetName || 'L8A'\"",
+          "sourceKind": "template_ast",
+          "sourceSpan": {
+            "endColumn": 9,
+            "endLine": 31,
+            "startColumn": 7,
+            "startLine": 24
+          },
+          "templateNodeOrdinal": 9,
+          "wpExpression": ":wp-id=\"props.wpId\""
+        },
         {
           "attributes": [
             {
@@ -19116,29 +19526,30 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_76cd464e262ccdf7cdd7",
+          "mountId": "mount_51ec1bd8f69539962856",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 96,
+            "endLine": 119,
             "startColumn": 7,
-            "startLine": 91
+            "startLine": 114
           },
-          "templateNodeOrdinal": 15,
+          "templateNodeOrdinal": 20,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
       "parent_entry_id": null,
       "profile_source": {
-        "editability_fact": "component_readonly_prop_defaults_editable",
+        "editability_fact": "host_forwards_runtime_readonly_flag",
         "inbound_reference_count": 1,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
+          "audit-platform/frontend/src/components/workpaper/GtL8FinancialExpenses.vue#L24",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L736"
         ]
@@ -19152,9 +19563,9 @@
         "editability": "editable",
         "host_reachable": true,
         "mount_cardinality": "single",
-        "mount_count": 1,
+        "mount_count": 2,
         "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
-        "readonly_binding": "absent",
+        "readonly_binding": "runtime_expression",
         "room_model": "shared",
         "room_service_state": "room_service_wired",
         "schema_version": 1
@@ -19162,6 +19573,7 @@
       "wp_match": {
         "component_types": [],
         "sheet_expressions": [
+          ":sheet-name=\"props.sheetName || 'L8A'\"",
           ":sheet-name=\"props.sheetName\""
         ],
         "sheet_literals": [],
@@ -20921,10 +21333,10 @@
             },
             {
               "argument": "sheet-name",
-              "expression": "props.sheetName",
+              "expression": "props.sheetName || ''",
               "kind": "directive",
               "name": "bind",
-              "raw": ":sheet-name=\"props.sheetName\""
+              "raw": ":sheet-name=\"props.sheetName || ''\""
             },
             {
               "argument": null,
@@ -20942,15 +21354,15 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_eed1a0732da75ac4820c",
+          "mountId": "mount_f15dda5db29a92dafa1c",
           "runtimeCardinality": "single",
-          "sheetExpression": ":sheet-name=\"props.sheetName\"",
+          "sheetExpression": ":sheet-name=\"props.sheetName || ''\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 125,
+            "endLine": 123,
             "startColumn": 7,
-            "startLine": 120
+            "startLine": 118
           },
           "templateNodeOrdinal": 21,
           "wpExpression": ":wp-id=\"props.wpId\""
@@ -20989,8 +21401,7 @@
       "wp_match": {
         "component_types": [],
         "sheet_expressions": [
-          ":sheet-name=\"props.sheetName || ''\"",
-          ":sheet-name=\"props.sheetName\""
+          ":sheet-name=\"props.sheetName || ''\""
         ],
         "sheet_literals": [],
         "source_host": "audit-platform/frontend/src/components/workpaper/GtN1DeferredTaxAssets.vue",
@@ -21544,26 +21955,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "n4.taxes_and_surcharges",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-n4-taxes-and-surcharges",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_n4_detail_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mounts": [
         {
           "attributes": [
@@ -21608,6 +22015,13 @@
               "kind": "attribute",
               "name": "style",
               "raw": "style=\"height: calc(100vh - 180px)\""
+            },
+            {
+              "argument": "fallback",
+              "expression": "dualMode.onOoLoadFailed",
+              "kind": "directive",
+              "name": "on",
+              "raw": "@fallback=\"dualMode.onOoLoadFailed\""
             }
           ],
           "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -21618,17 +22032,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_e4f3726977025b8cbdfd",
+          "mountId": "mount_edca0062f9625b401ad8",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || ''\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 23,
+            "endLine": 30,
             "startColumn": 7,
-            "startLine": 16
+            "startLine": 22
           },
-          "templateNodeOrdinal": 8,
+          "templateNodeOrdinal": 9,
           "wpExpression": ":wp-id=\"props.wpId\""
         },
         {
@@ -21684,17 +22098,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_4da0fe87085e417927a0",
+          "mountId": "mount_cff7306eaaf7b765fbcf",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || ''\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 42,
+            "endLine": 49,
             "startColumn": 7,
-            "startLine": 35
+            "startLine": 42
           },
-          "templateNodeOrdinal": 10,
+          "templateNodeOrdinal": 11,
           "wpExpression": ":wp-id=\"props.wpId\""
         },
         {
@@ -21750,17 +22164,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_538f75bd42b33a22a337",
+          "mountId": "mount_dd1a5efeeae96686c43a",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || ''\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 118,
+            "endLine": 125,
             "startColumn": 7,
-            "startLine": 111
+            "startLine": 118
           },
-          "templateNodeOrdinal": 17,
+          "templateNodeOrdinal": 18,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
@@ -21773,9 +22187,9 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L111",
-          "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L16",
-          "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L35",
+          "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L118",
+          "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L22",
+          "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L42",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L736"
         ]
@@ -21873,6 +22287,13 @@
               "kind": "attribute",
               "name": "style",
               "raw": "style=\"height: calc(100vh - 180px)\""
+            },
+            {
+              "argument": "fallback",
+              "expression": "dualMode.onOoLoadFailed",
+              "kind": "directive",
+              "name": "on",
+              "raw": "@fallback=\"dualMode.onOoLoadFailed\""
             }
           ],
           "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -21883,17 +22304,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_ec6870d44a542d232dc4",
+          "mountId": "mount_df9bb29ceb4046bbe845",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || ''\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 23,
+            "endLine": 29,
             "startColumn": 7,
-            "startLine": 16
+            "startLine": 21
           },
-          "templateNodeOrdinal": 8,
+          "templateNodeOrdinal": 9,
           "wpExpression": ":wp-id=\"props.wpId\""
         },
         {
@@ -21949,17 +22370,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_df9bb29ceb4046bbe845",
+          "mountId": "mount_b2222ecf17894a4fc98c",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || ''\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 33,
+            "endLine": 39,
             "startColumn": 7,
-            "startLine": 26
+            "startLine": 32
           },
-          "templateNodeOrdinal": 9,
+          "templateNodeOrdinal": 10,
           "wpExpression": ":wp-id=\"props.wpId\""
         },
         {
@@ -22015,17 +22436,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_b2222ecf17894a4fc98c",
+          "mountId": "mount_34d71a5847cc85d1e1a6",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || ''\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 43,
+            "endLine": 49,
             "startColumn": 7,
-            "startLine": 36
+            "startLine": 42
           },
-          "templateNodeOrdinal": 10,
+          "templateNodeOrdinal": 11,
           "wpExpression": ":wp-id=\"props.wpId\""
         },
         {
@@ -22081,17 +22502,17 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_9ed9c376e912e433fe64",
+          "mountId": "mount_12d8a6851b4d1704acd2",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || ''\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 188,
+            "endLine": 196,
             "startColumn": 7,
-            "startLine": 181
+            "startLine": 189
           },
-          "templateNodeOrdinal": 24,
+          "templateNodeOrdinal": 25,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
@@ -22104,10 +22525,10 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L16",
-          "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L181",
-          "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L26",
-          "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L36",
+          "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L189",
+          "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L21",
+          "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L32",
+          "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L42",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L736"
         ]
@@ -25668,14 +26089,14 @@
       }
     }
   ],
-  "manifest_digest": "76b22f208bf6503525433d8ef8dd2a93f3818d1f5a79bc0d814ce07c63c4bde3",
-  "overlay_digest": "090598ce26564e42c9f0993e19089c20daf5f7d34b625e45471a5508d2798c62",
-  "profile_source_digest": "2b33f279d47d4584e29dc24d66c36577a05a58abb3d6d996762c7780c320ea93",
+  "manifest_digest": "fa7158fb61f0cfc75db31cee8fcda6eeac2928630035f5679ee70164543fab97",
+  "overlay_digest": "643c582cbb98155bb31d38cbac6ae74b10cf299fd8ad90ac7933aa45c9eb0b51",
+  "profile_source_digest": "3533963dfd24332ec2a5ebf081c833f9d103a69e7cc72bf7686cef98531127f8",
   "schema_version": 1,
-  "source_digest": "0d17382a259c3a3454f873f84ad316369ddcb65dd79148822093ff8dbcbbca56",
+  "source_digest": "b165847f6ae14ec9f4d0044c406abcbef06645f6f5311a558626921fd48abc97",
   "stats": {
     "by_component": {
-      "GtOnlyOfficeSheet": 238,
+      "GtOnlyOfficeSheet": 244,
       "OnlyOfficeWordDialog": 2,
       "WorkpaperWordEditor": 4
     },
@@ -25694,7 +26115,7 @@
     "host_count": 154,
     "independent_entry_count": 142,
     "legacy_fake_bidirectional_count": 121,
-    "mount_count": 244,
+    "mount_count": 250,
     "parent_duplicate_count": 12,
     "room_model_counts": {
       "exclusive": 6,

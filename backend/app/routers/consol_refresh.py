@@ -56,6 +56,6 @@ async def get_refresh_status(
 ):
     """job 状态兜底查询（SSE 断开可查，EH6）。"""
     job = get_job(job_id)
-    if job is None:
+    if job is None or job.project_id != str(project_id) or job.year != year:
         raise HTTPException(status_code=404, detail="刷新任务不存在或已过期")
     return job.to_dict()

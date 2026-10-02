@@ -68,12 +68,24 @@ class _FakeRegistry:
 
 
 def _install_fakes(monkeypatch, *, counter: list[str]) -> None:
-    """把四条 pilot attach + 指纹换成计数替身。"""
+    """把四条 pilot attach + 指纹 + 源码事实预热换成计数替身。
+
+    源码事实预热换掉是为了让编排用例不去扫真实前端树（冷算数秒）；预热本身由
+    「源码事实预热」一节的用例单独覆盖。
+    """
 
     async def fake_fingerprint(svc):  # noqa: ARG001
         return "FIXED-FINGERPRINT"
 
     monkeypatch.setattr(router_mod, "_registration_state_fingerprint", fake_fingerprint)
+
+    def fake_warm() -> tuple[str, ...]:
+        counter.append("warm")
+        return ()
+
+    monkeypatch.setattr(
+        "app.services.workpaper_sync.entry_source_facts.warm_source_fact_caches", fake_warm
+    )
 
     async def make_attach(name: str):
         async def attach(registry, *, session):  # noqa: ARG001
@@ -487,3 +499,193 @@ def test_startup_log_reports_projection_failures_as_their_own_number() -> None:
     assert "跳过 %d 个" not in warm_source, (
         "仍在用合并的「跳过」口径 —— 本次修复正是要拆掉它"
     )
+
+
+# ═══ 4. 冷注册的同步重活不占事件循环（spec startup-prewarm-event-loop-unblocking） ═══
+#
+# 现场实测（改前）：后端 reload 后就绪的第一个 /api/health 要 16.23s；进程内复现第一段预热，
+# 事件循环心跳最大滞后 8.30s —— 7.9s 连续卡在 `observe_descriptor_facts → frontend_reference_index`
+# （扫 5000+ 前端文件），另有整簿 openpyxl 解析累计 3.6s。预热虽是后台任务，却独占事件循环。
+
+
+async def _max_loop_lag_while(coro) -> tuple[float, object]:
+    """与 ``coro`` 并发跑一个 10ms 心跳，返回（心跳最大滞后秒数, coro 结果）。"""
+    import time
+
+    lags: list[float] = []
+    done = asyncio.Event()
+
+    async def heartbeat() -> None:
+        while not done.is_set():
+            t = time.perf_counter()
+            await asyncio.sleep(0.01)
+            lags.append(time.perf_counter() - t - 0.01)
+
+    beat = asyncio.create_task(heartbeat())
+    await asyncio.sleep(0.03)
+    try:
+        result = await coro
+    finally:
+        done.set()
+        await beat
+    return max(lags, default=0.0), result
+
+
+@pytest.mark.asyncio
+async def test_cold_registration_warms_source_facts_off_the_event_loop(monkeypatch) -> None:
+    import threading
+    import time
+
+    calls: list[str] = []
+    _install_fakes(monkeypatch, counter=calls)
+    loop_thread = threading.get_ident()
+    warm_threads: list[int] = []
+
+    def slow_warm() -> tuple[str, ...]:
+        warm_threads.append(threading.get_ident())
+        calls.append("warm")
+        time.sleep(0.4)  # 模拟源码事实首算（CPU + 文件系统）
+        return ()
+
+    monkeypatch.setattr(
+        "app.services.workpaper_sync.entry_source_facts.warm_source_fact_caches", slow_warm
+    )
+
+    lag, _ = await _max_loop_lag_while(router_mod._attach_pilot_adapters(_context()))
+
+    assert warm_threads and all(t != loop_thread for t in warm_threads), (
+        "源码事实首算跑在了事件循环线程上 —— 首算期间整个后端不响应任何请求"
+    )
+    assert lag < 0.2, f"冷注册期间事件循环被占住 {lag:.2f}s（首算应在工作线程）"
+    assert calls.index("warm") < calls.index("simple"), (
+        f"预热必须早于各 pilot attach（它们在事件循环上用这些缓存）：{calls}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_source_fact_warmup_runs_once_per_cold_build_and_not_on_hits(monkeypatch) -> None:
+    """预热在锁内：并发冷请求只预热一次；缓存命中路径不进锁、不跳线程。"""
+    calls: list[str] = []
+    _install_fakes(monkeypatch, counter=calls)
+
+    await asyncio.gather(*(router_mod._attach_pilot_adapters(_context()) for _ in range(6)))
+    await router_mod._attach_pilot_adapters(_context())
+
+    assert calls.count("warm") == 1, (
+        f"源码事实预热跑了 {calls.count('warm')} 次 —— 应只在唯一那次冷注册里跑（锁内）"
+    )
+
+
+@pytest.mark.asyncio
+async def test_warmup_failure_does_not_abort_the_registration(monkeypatch) -> None:
+    """预热失败不在这里抛：原调用点会以原错误 fail closed（见 warm_source_fact_caches）。"""
+    calls: list[str] = []
+    _install_fakes(monkeypatch, counter=calls)
+
+    def failing_warm() -> tuple[str, ...]:
+        calls.append("warm")
+        return ("frontend_reference_index",)
+
+    monkeypatch.setattr(
+        "app.services.workpaper_sync.entry_source_facts.warm_source_fact_caches", failing_warm
+    )
+    got = await router_mod._attach_pilot_adapters(_context())
+    assert "manifest-adapter" in got and calls.count("d2") == 1
+
+
+def test_warm_source_fact_caches_builds_every_process_level_fact_cache(monkeypatch) -> None:
+    """预热必须覆盖 attach 路径上用到的全部零参源码事实缓存，且单项失败不影响其余项。"""
+    from app.services.workpaper_sync import entry_source_facts as F
+
+    called: list[str] = []
+
+    def make(name: str, *, fail: bool = False):
+        def fake():
+            called.append(name)
+            if fail:
+                raise F.EntrySourceFactError(f"{name} boom")
+            return name
+
+        return fake
+
+    for name in F._WARMABLE_SOURCE_FACTS:
+        monkeypatch.setattr(F, name, make(name, fail=name == "frontend_reference_index"))
+
+    failed = F.warm_source_fact_caches()
+
+    assert called == list(F._WARMABLE_SOURCE_FACTS), called
+    assert failed == ("frontend_reference_index",)
+
+    # 覆盖面：`clear_source_fact_caches` 清的零参缓存必须全在预热清单里（新增一项缓存却忘了预热，
+    # 它的首算就会回到事件循环上）。
+    tree = ast.parse(textwrap.dedent(inspect.getsource(F.clear_source_fact_caches)))
+    cleared = {
+        node.func.value.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "cache_clear"
+        and isinstance(node.func.value, ast.Name)
+    }
+    zero_arg = {
+        name for name in cleared
+        if not inspect.signature(inspect.unwrap(getattr(F, name))).parameters
+    }
+    assert zero_arg <= set(F._WARMABLE_SOURCE_FACTS), (
+        f"这些零参源码事实缓存没有被预热：{sorted(zero_arg - set(F._WARMABLE_SOURCE_FACTS))}"
+    )
+    assert "component_source_facts" in cleared - zero_arg, "判据分母异常：带参缓存不应被计入"
+
+
+@pytest.mark.asyncio
+async def test_observe_parses_the_workbook_off_the_event_loop(monkeypatch) -> None:
+    """整簿观测（openpyxl + 结构指纹）必须在工作线程里跑。"""
+    import threading
+    import time
+
+    from app.services.workpaper_sync import published_identity_observer as OBS
+
+    observer = OBS.PublishedIdentityObserver(session=object(), resolution=object())
+    rep = {"entry_id": "xlsx/probe", "adapter_id": "probe.contract", "adapter_build_digest": "d",
+           "document_type": "xlsx"}
+
+    async def fake_resolve(**_kw):
+        return object()
+
+    async def fake_noop(**_kw):
+        return None
+
+    async def fake_children(**_kw):
+        return ("1.0.0", {})
+
+    class _Stop(Exception):
+        pass
+
+    loop_thread = threading.get_ident()
+    seen: list[int] = []
+
+    def slow_observe(**_kw):
+        seen.append(threading.get_ident())
+        time.sleep(0.3)
+        return {}
+
+    def stop(**_kw):
+        raise _Stop()
+
+    monkeypatch.setattr(observer, "_assert_representation_shape", lambda representation, **_kw: rep)
+    monkeypatch.setattr(observer, "_resolve", fake_resolve)
+    monkeypatch.setattr(observer, "_assert_is_current", fake_noop)
+    monkeypatch.setattr(observer, "_assert_frozen_bundle_link", lambda **_kw: None)
+    monkeypatch.setattr(observer, "_load_frozen_children", fake_children)
+    monkeypatch.setattr(observer, "_read_published_bytes", lambda **_kw: b"PK")
+    monkeypatch.setattr(observer, "_load_frozen_contract", lambda **_kw: object())
+    monkeypatch.setattr(observer, "_observe_workbook", slow_observe)
+    monkeypatch.setattr(observer, "_assert_matches_frozen_digests", stop)
+
+    async def run() -> None:
+        with pytest.raises(_Stop):
+            await observer.observe(representation=object(), project_id=uuid.uuid4())
+
+    lag, _ = await _max_loop_lag_while(run())
+    assert seen and seen[0] != loop_thread, "整簿观测跑在了事件循环线程上"
+    assert lag < 0.15, f"整簿观测期间事件循环被占住 {lag:.2f}s"

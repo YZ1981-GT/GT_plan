@@ -224,8 +224,11 @@ def test_d104_three_regions_have_distinct_table_keys_and_store_items() -> None:
     items = [s.store_item_id for s in D104.SPECS_D104]
     assert len(keys) == len(set(keys)), f"table_key 重复：{keys}"
     assert len(items) == len(set(items)), f"store_item_id 重复：{items}"
+    # 🔴 2026-09-28：第三键原写 `D1-notetype-rows`（漏 `D1-bd` 前缀），与前端真源
+    #    `d1AdjudicationModel.D1_BD_NOTETYPE_KEY`、`prefill_anchor_map`、
+    #    `d_cycle_extraction.presets` 三处及真库载荷全部不一致，已统一。
     assert set(items) == {
-        "D1-bd-individual-rows", "D1-bd-portfolio-rows", "D1-notetype-rows"
+        "D1-bd-individual-rows", "D1-bd-portfolio-rows", "D1-bd-notetype-rows"
     }
 
 
@@ -289,3 +292,80 @@ def test_downstream_consumers_are_declared() -> None:
     joined = " ".join(consumers)
     for expected in ("useD1EclCalc", "parseD1_4Rows", "useD1Adjudication", "progressKeys"):
         assert expected in joined, f"下游消费方清单缺 {expected}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🔴 跨层 store 键一致性（2026-09-28 新增，防「键名错一个前缀 ⇒ 静默丢数据」复发）
+#
+# 为什么必须跨层断言：D1-4 第三区曾把 `D1-bd-notetype-rows` 写成 `D1-notetype-rows`，
+# 而三条既存判据只在 sync 声明层内部自比（`SPECS_D104` 之间互不重复、三个一组相等），
+# **在同一层里自我一致 ⇒ 全绿**，错键就这样被判据背书了近两周。真正能抓住它的判据必须
+# 跨出声明层，去比对独立演化的另外两层：前端持久化常量与后端 prefill 锚点表。
+#
+# 本节刻意不引入真库（CI 无 PG）：两个后端模块直接 import、前端文件按文本读固定路径。
+# ═══════════════════════════════════════════════════════════════════════════
+
+_FRONTEND_D1_ADJ_MODEL = (
+    _BACKEND.parent
+    / "audit-platform"
+    / "frontend"
+    / "src"
+    / "components"
+    / "workpaper"
+    / "composables"
+    / "d1AdjudicationModel.ts"
+)
+
+
+def test_d104_store_keys_match_frontend_persistence_constants() -> None:
+    """三区 store 键必须与前端 `d1AdjudicationModel.ts` 的持久化常量逐字一致。
+
+    前端那三个 `export const` 是 HTML 侧真正读写 `checklist_responses.item_id` 的地方 ——
+    sync 声明层若与它不一致，OO 侧就会读空并把回写落进无消费方的键。
+    """
+    assert _FRONTEND_D1_ADJ_MODEL.exists(), f"前端真源缺失：{_FRONTEND_D1_ADJ_MODEL}"
+    src = _FRONTEND_D1_ADJ_MODEL.read_text(encoding="utf-8")
+    for spec in D104.SPECS_D104:
+        needle = f"'{spec.store_item_id}'"
+        assert needle in src, (
+            f"声明层 store 键 {spec.store_item_id!r}（{spec.table_key}）在前端 "
+            f"d1AdjudicationModel.ts 中不存在 —— 两层已漂移。sync 侧改键或前端改键，"
+            f"二者必须同时改；只改一侧会让该区在 OO 模式下读空、回写丢失。"
+        )
+
+
+def test_d104_notetype_key_matches_prefill_anchor_map() -> None:
+    """第三区键必须与 `prefill_anchor_map` 里 D1-4「按票据种类小计」那条锚点一致。
+
+    该锚点是报表/附注取数链读这块数据的入口（`currentUnadjusted` 列求和），
+    它与前端常量是**独立演化的第三层** —— 三层对齐才算键名正确。
+    """
+    from app.services.prefill_anchor_map import ANCHOR_MAP
+
+    hits = [
+        spec
+        for (wp, sheet, _label), spec in ANCHOR_MAP.items()
+        if wp == "D1" and sheet == D104.MANAGED_SHEET_D104
+    ]
+    assert hits, "prefill_anchor_map 里找不到 D1-4 的锚点 —— 先确认该表未被改名/搬走"
+    anchor_items = {s.item_id for s in hits}
+    assert D104.SPEC_D104_NOTETYPE.store_item_id in anchor_items, (
+        f"第三区声明键 {D104.SPEC_D104_NOTETYPE.store_item_id!r} 不在 prefill 锚点 "
+        f"{sorted(anchor_items)} 内 —— 取数链读不到 OO 回写的数据"
+    )
+
+
+def test_mutation_wrong_prefix_third_key_would_be_caught() -> None:
+    """变异反证：把第三区键改回漏前缀的错名 ⇒ 上面两条判据必须打红。
+
+    没有这条，「跨层一致」可能只是恰好成立（比如前端文件里另有别的地方出现过该字符串）。
+    """
+    wrong = "D1-notetype-rows"
+    src = _FRONTEND_D1_ADJ_MODEL.read_text(encoding="utf-8")
+    assert f"'{wrong}'" not in src, (
+        "前端竟然也有错名字面量 —— 那本判据的正向断言会恒真，须先清理前端再启用"
+    )
+    from app.services.prefill_anchor_map import ANCHOR_MAP
+
+    all_anchor_items = {s.item_id for s in ANCHOR_MAP.values()}
+    assert wrong not in all_anchor_items, "prefill 锚点里也有错名 ⇒ 正向断言会恒真"

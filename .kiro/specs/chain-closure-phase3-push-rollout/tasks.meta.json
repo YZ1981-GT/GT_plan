@@ -1,0 +1,211 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. P0-a 推送引擎入库（需求 1）": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945386853
+      },
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945428497
+      },
+      {
+        "executionId": "c2008473-820d-4207-8f9f-c385d51b3593",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790950862576
+      }
+    ],
+    "2. P0-b 接入注册表单一真源（需求 2）": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945386922
+      },
+      {
+        "executionId": "c2008473-820d-4207-8f9f-c385d51b3593",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790949613432
+      },
+      {
+        "executionId": "c2008473-820d-4207-8f9f-c385d51b3593",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790950863378
+      }
+    ],
+    "3. 决策 1 · 状态机 + 撤回复核 + 事件（需求 3.1, 3.2）": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945386960
+      },
+      {
+        "executionId": "c2008473-820d-4207-8f9f-c385d51b3593",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790950875885
+      },
+      {
+        "executionId": "c2008473-820d-4207-8f9f-c385d51b3593",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790951442519
+      }
+    ],
+    "4. 决策 1 · 复核权限（需求 3.3）": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945386989
+      },
+      {
+        "executionId": "c2008473-820d-4207-8f9f-c385d51b3593",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790951452259
+      },
+      {
+        "executionId": "c2008473-820d-4207-8f9f-c385d51b3593",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790951948642
+      }
+    ],
+    "5. 决策 1 · 底稿→大厅镜像（需求 3.6）": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387021
+      },
+      {
+        "executionId": "c2008473-820d-4207-8f9f-c385d51b3593",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790951959667
+      }
+    ],
+    "6. 决策 1 · SSE 与事件调用点守卫（需求 3.5, 7.2）": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387054
+      }
+    ],
+    "7. 决策 1 · 前端大厅与底稿调整页（需求 3.4, 3.7）": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387088
+      }
+    ],
+    "8. 决策 2 · V176 / R176 + ORM + 三层一致（需求 4.1, 4.7）": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387137
+      }
+    ],
+    "9. 决策 2 · 唯一写入函数 + 发布门 + 令牌（需求 4.2, 4.4, 4.6）": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387165
+      }
+    ],
+    "10. 决策 2 · 重算与读口径（需求 4.3, 4.5）": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387196
+      }
+    ],
+    "11. 决策 2 · 前端试算表页（需求 4.1, 4.3）": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387228
+      }
+    ],
+    "12. 决策 3 · 附注主表交接（需求 5）": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387257
+      }
+    ],
+    "13. P1 · K1 binding（需求 6.1, 6.2, 6.4）": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387288
+      }
+    ],
+    "14. P1 · K1 前端配套（需求 6.3）": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387342
+      }
+    ],
+    "15. 报表过期标记按行标、按行清（需求 7.1）": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387372
+      }
+    ],
+    "16. 端到端集成（SQLite 真 ORM + 真 PG 关键段）": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387415
+      }
+    ],
+    "17. 真库试跑（事务内执行后回滚，零痕迹指纹比对）": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387455
+      }
+    ],
+    "19. 收尾": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387493
+      }
+    ],
+    "16a. 保存上述闭环矩阵的基线、修复后结果和逐项故障注入结果；每项结果注明测试文件、命令、返回码和关键断言，不能只贴“全绿”。": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387538
+      }
+    ],
+    "16b. 证明四表入库、调整复核通过、撤回复核三条入口最终都落到同一 `formula_push` 编排，并逐目标核对 TB、底稿、披露、审定表、报表、调整大厅和附注章节的写入方。": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387584
+      }
+    ],
+    "17a. 真 PG 试跑和事务回滚后，逐表/逐章节/逐运行记录做零痕迹指纹比对；任何真实写入必须单独标记用户授权状态。": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387611
+      }
+    ],
+    "18a. Playwright 按用户可见流程验证复核、撤回、试算表新列、公式推送页签、E1/K1 提示条和附注主表；真实“立即推送”写库未获授权时保持 `[ ]*`，不得以试跑或合成 SSE 冒充。": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387639
+      }
+    ],
+    "19a. 在目标提交的干净临时 worktree 重跑阶段二/三定向套件，核对 `git ls-files`、冲突数、未跟踪实现数、INDEX 与 memory 的路径/状态，再清理一次性探针。": [
+      {
+        "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
+        "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
+        "timestamp": 1790945387673
+      }
+    ]
+  }
+}

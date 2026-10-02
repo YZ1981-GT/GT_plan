@@ -227,6 +227,7 @@ class StandardUnificationService:
 
         # 3. 双写旧字段（迁移期向后兼容）
         project.template_type = normalized["entity_type"]
+        scope_changed = project.report_scope != normalized["scope"]
         project.report_scope = normalized["scope"]
 
         # 同步 wizard_state 嵌套字段（深拷贝 + 重新赋值 + flag_modified
@@ -248,6 +249,12 @@ class StandardUnificationService:
 
         # 4. flush（本方法只 flush 不 commit，事务提交由调用方（router/wizard）统一管理。）
         await self.db.flush()
+
+        # consol-tree-three-code-autobuild 需求 7.2：报表类型（合并 ↔ 单户）变了 ⇒ 企业树与派生链接跟着变
+        if scope_changed:
+            from app.services.group_links import sync_group_links_for
+
+            await sync_group_links_for(self.db, project)
 
         logger.info(
             "StandardUnificationService: project %s standard %s -> %s (changed_by=%s)",

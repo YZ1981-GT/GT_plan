@@ -7,9 +7,32 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
+      <!-- 程序表 L6A 模式切换器（HTML / OnlyOffice 双向） -->
+      <div v-if="isProcedureSheet" class="l6-procedure-toolbar">
+        <el-segmented
+          :model-value="procedureDualMode.currentMode.value"
+          :options="procedureDualMode.modeOptions.value"
+          size="small"
+          @change="procedureDualMode.onModeChange"
+        />
+        <!-- BP-7 / AC 1.4：能力诚实披露。文案真源在 sync/workpaperEntrySyncNotice.ts，
+             已注册 bidirectional 的 entry 自动返 null 不渲染 ⇒ 无需本地条件。 -->
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-l6-special-payables" />
+        <el-tag v-if="!procedureDualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+      </div>
+
+      <GtOnlyOfficeSheet
+        v-if="isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :sheet-name="props.sheetName || 'L6A'"
+        :readonly="isReadonly"
+        style="height: calc(100vh - 180px)"
+      />
+
       <!-- L6 主sheet 底稿目录 -->
       <L6TabIndex
-        v-if="currentSheet === 'L6'"
+        v-else-if="currentSheet === 'L6'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
@@ -106,6 +129,7 @@ import { ref, computed, inject, onMounted, provide, defineAsyncComponent, toRef 
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+import { useCycleHtmlOoDualMode } from './composables/useCycleHtmlOoDualMode'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -123,6 +147,7 @@ const L6TabSpecialCheck = defineAsyncComponent(() => import('./l6/inspection/L6T
 // Shared
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtAProgramConsole.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -174,6 +199,12 @@ const currentSheet = computed(() => {
   return name
 })
 
+const isProcedureSheet = computed(() => currentSheet.value === 'L6A')
+const procedureDualMode = useCycleHtmlOoDualMode({
+  wpId: toRef(props, 'wpId') as any,
+  storagePrefix: 'l6-proc:',
+})
+
 // ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI/displayPrefs + 挂真实 Host） ───
 // 复核对话与版本历史由 Runtime Boundary 统一 provide('openReviewDialog') + version 承载，
 // 本主入口不再本地 new GtReviewDialog / useWorkpaperVersionToolbar（避免重复 provider/Host）。
@@ -218,5 +249,13 @@ onMounted(() => {
 
 .loading-container {
   padding: 24px;
+}
+
+.l6-procedure-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 </style>

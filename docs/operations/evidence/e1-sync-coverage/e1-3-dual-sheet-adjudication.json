@@ -1,0 +1,62 @@
+{
+  "spec": "e1-sync-coverage-and-first-canary",
+  "task": 18,
+  "adjudication_subject": "E1-3 同编号双 sheet 裁决",
+  "adjudication_date": "2026-09-26",
+  "status": "adjudicated",
+
+  "facts": {
+    "sheet_a": {
+      "name": "银行存款及其他货币资金明细表(仅人民币)E1-3",
+      "geometry": "92r×28c / 185 formulas",
+      "variant": "rmb"
+    },
+    "sheet_b": {
+      "name": "银行存款及其他货币资金明细表(人民币及外币)E1-3",
+      "geometry": "89r×41c / 567 formulas (全平台单 sheet 公式最多)",
+      "variant": "multi"
+    },
+    "shared_store_key": "E1-bank-detail-rows",
+    "variant_key": "E1-bank-variant",
+    "variant_type_definition": "useE1BankDetail.ts:9  type BankDetailVariant = 'rmb' | 'multi'",
+    "variant_derivation": "E1TabBankDetail.vue:35  variant = props.sheetName?.includes('人民币及外币') ? 'multi' : 'rmb'",
+    "variant_persisted": "useE1BankDetail.ts:61  VARIANT_KEY = 'E1-bank-variant'",
+    "column_set_difference": "rmb 版不下发原币列 (fxCurrency / fxRate)；useE1BankDetail.ts:110 注释明写「两 variant 字段集不同是 AC 1.9 的意图」",
+    "data_corruption_risk": "若两张同时受管，OO 在 rmb sheet 上 forcesave 回写整行会把 multi 侧的原币列写成缺省/抹零",
+    "existing_guard": "e1BankVariantIntegrity.spec.ts 守 HTML 侧跨 variant 金额守恒，防 recalcRow 由原币反推抹零"
+  },
+
+  "options_evaluated": [
+    {
+      "id": "option_1",
+      "description": "只接 (仅人民币) rmb 一张",
+      "rejected": true,
+      "reason": "rmb 是 multi 的投影子集（缺原币列），接子集会丢列"
+    },
+    {
+      "id": "option_2",
+      "description": "只接 (人民币及外币) multi 一张",
+      "selected": true,
+      "reason": "multi 是列集超集，rmb 是其投影子集；接超集不丢列"
+    },
+    {
+      "id": "option_3",
+      "description": "两张都接（各占独立受管区）",
+      "rejected": true,
+      "reason": "同一 store 键 E1-bank-detail-rows 映射到两个列集不同的 sheet，OO 回写会在 rmb 侧抹零 multi 的原币列。硬前置是先拆键（或引入 per-variant 列集投影），当前引擎不支持「一 store item 投影到两张列集不同的 sheet」"
+    }
+  ],
+
+  "verdict": {
+    "selected_option": "option_2",
+    "managed_sheet": "银行存款及其他货币资金明细表(人民币及外币)E1-3",
+    "managed_variant": "multi",
+    "unmanaged_sheet": "银行存款及其他货币资金明细表(仅人民币)E1-3",
+    "unmanaged_variant": "rmb",
+    "unmanaged_disposition": "保持 legacy_fake_bidirectional 并显式登记",
+    "future_prerequisite": "若要两张都接，硬前置是先把 E1-bank-detail-rows 拆成两个独立键（或引入 per-variant 列集投影）"
+  },
+
+  "production_code_changed": false,
+  "note": "裁决阶段不改任何生产代码（spec 需求 3.5 / E1-P5 诚实边界红线）。声明文件 phase5_e1_03_bank_detail.py 待 Task 19 按本裁决结果创建。"
+}

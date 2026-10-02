@@ -1,12 +1,12 @@
 """ConsolNoteData ORM 模型 — 合并附注用户数据存储
 
-三层一致：V041 迁移 + 本 ORM + routers/consol_note_sections.py service
+三层一致：V041 迁移（+ V172 is_stale）+ 本 ORM + routers/consol_note_sections.py service
 """
 
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Index, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, Index, Integer, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -25,6 +25,8 @@ class ConsolNoteData(Base):
     section_id: Mapped[str] = mapped_column(String(50), nullable=False)
     data: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # V172：合并推送后置真（合并数已变化，附注数据待更新）；「按公式填入」后清除
+    is_stale: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
 
     __table_args__ = (
         UniqueConstraint("project_id", "year", "section_id"),

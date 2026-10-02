@@ -1,0 +1,1708 @@
+{
+  "domain_files": {
+    "production": 136,
+    "test": 27,
+    "total": 163,
+    "without_lower_branch": {
+      "production": 123,
+      "test": 5,
+      "missed_production": 13
+    }
+  },
+  "row_identity": {
+    "families": {
+      "A_positional_template": 3,
+      "B_array_addressing": 92,
+      "C_display_ordinal": 1982,
+      "D_entropy_key": 59,
+      "E_stable_identity": 218,
+      "E_files": 28,
+      "M_row_dash_n": 0
+    },
+    "remove_row": {
+      "total": 31,
+      "by_type": {
+        "by_rowid": 13,
+        "by_index": 14,
+        "other": 4
+      },
+      "signature_count": 13
+    }
+  },
+  "templates": {
+    "entries": {
+      "N1 递延所得税资产": {
+        "file": "N1 递延所得税资产.xlsx",
+        "sha256": "2ca3ebbcd6f65c91da37bc576bb1af071543bf54d10b05d71c1216d2993386b5",
+        "size": 125085,
+        "sheets": [
+          {
+            "name": "底稿目录",
+            "max_row": 28,
+            "max_col": 8,
+            "hidden": false,
+            "formula_count": 0,
+            "naked_if_count": 0,
+            "last_value_col": 7,
+            "ghost_cols": 1
+          },
+          {
+            "name": "递延所得税资产审计程序表的N1A",
+            "max_row": 25,
+            "max_col": 11,
+            "hidden": false,
+            "formula_count": 6,
+            "naked_if_count": 0,
+            "last_value_col": 11,
+            "ghost_cols": 0
+          },
+          {
+            "name": "递延所得税资产审定表N1-1",
+            "max_row": 35,
+            "max_col": 15,
+            "hidden": false,
+            "formula_count": 128,
+            "naked_if_count": 20,
+            "last_value_col": 15,
+            "ghost_cols": 0
+          },
+          {
+            "name": "附注披露信息（上市公司）",
+            "max_row": 54,
+            "max_col": 11,
+            "hidden": false,
+            "formula_count": 20,
+            "naked_if_count": 0,
+            "last_value_col": 6,
+            "ghost_cols": 5
+          },
+          {
+            "name": "附注披露信息（国企）",
+            "max_row": 74,
+            "max_col": 256,
+            "hidden": false,
+            "formula_count": 48,
+            "naked_if_count": 0,
+            "last_value_col": 7,
+            "ghost_cols": 249
+          },
+          {
+            "name": "递延所得税资产明细表N1-2",
+            "max_row": 52,
+            "max_col": 14,
+            "hidden": false,
+            "formula_count": 134,
+            "naked_if_count": 0,
+            "last_value_col": 14,
+            "ghost_cols": 0
+          },
+          {
+            "name": "调整分录汇总N1-3",
+            "max_row": 31,
+            "max_col": 10,
+            "hidden": false,
+            "formula_count": 6,
+            "naked_if_count": 0,
+            "last_value_col": 10,
+            "ghost_cols": 0
+          },
+          {
+            "name": "递延所得税资产（负债）测算表N1-4",
+            "max_row": 63,
+            "max_col": 15,
+            "hidden": false,
+            "formula_count": 227,
+            "naked_if_count": 120,
+            "last_value_col": 14,
+            "ghost_cols": 1
+          },
+          {
+            "name": "可用以后年度税前利润弥补的亏损检查表的N1-5",
+            "max_row": 30,
+            "max_col": 13,
+            "hidden": false,
+            "formula_count": 24,
+            "naked_if_count": 0,
+            "last_value_col": 13,
+            "ghost_cols": 0
+          },
+          {
+            "name": "GT_Custom",
+            "max_row": 8,
+            "max_col": 2,
+            "hidden": true,
+            "formula_count": 0,
+            "naked_if_count": 0,
+            "last_value_col": 2,
+            "ghost_cols": 0
+          }
+        ]
+      },
+      "N2 应交税费": {
+        "file": "N2 应交税费.xlsx",
+        "sha256": "24e92c2353b2abd6d89537361f195b490977757b9b49896285beb0661a6443b1",
+        "size": 159454,
+        "sheets": [
+          {
+            "name": "底稿目录",
+            "max_row": 24,
+            "max_col": 8,
+            "hidden": false,
+            "formula_count": 0,
+            "naked_if_count": 0,
+            "last_value_col": 6,
+            "ghost_cols": 2
+          },
+          {
+            "name": "应交税费审计程序表N2A",
+            "max_row": 36,
+            "max_col": 11,
+            "hidden": false,
+            "formula_count": 7,
+            "naked_if_count": 0,
+            "last_value_col": 10,
+            "ghost_cols": 1
+          },
+          {
+            "name": "应交税费审计程序表O1A （原底稿）",
+            "max_row": 79,
+            "max_col": 12,
+            "hidden": true,
+            "formula_count": 6,
+            "naked_if_count": 0,
+            "last_value_col": 12,
+            "ghost_cols": 0
+          },
+          {
+            "name": "应交税费审定表N2-1",
+            "max_row": 31,
+            "max_col": 14,
+            "hidden": false,
+            "formula_count": 198,
+            "naked_if_count": 32,
+            "last_value_col": 14,
+            "ghost_cols": 0
+          },
+          {
+            "name": "附注披露信息（上市公司）",
+            "max_row": 27,
+            "max_col": 11,
+            "hidden": false,
+            "formula_count": 47,
+            "naked_if_count": 0,
+            "last_value_col": 4,
+            "ghost_cols": 7
+          },
+          {
+            "name": "附注披露信息（国企）",
+            "max_row": 24,
+            "max_col": 11,
+            "hidden": false,
+            "formula_count": 77,
+            "naked_if_count": 0,
+            "last_value_col": 5,
+            "ghost_cols": 6
+          },
+          {
+            "name": "应交税费明细表N2-2",
+            "max_row": 42,
+            "max_col": 23,
+            "hidden": false,
+            "formula_count": 96,
+            "naked_if_count": 0,
+            "last_value_col": 17,
+            "ghost_cols": 6
+          },
+          {
+            "name": "调整分录汇总表N2-3",
+            "max_row": 37,
+            "max_col": 10,
+            "hidden": false,
+            "formula_count": 7,
+            "naked_if_count": 0,
+            "last_value_col": 10,
+            "ghost_cols": 0
+          },
+          {
+            "name": "税收政策检查N2-4",
+            "max_row": 35,
+            "max_col": 8,
+            "hidden": false,
+            "formula_count": 7,
+            "naked_if_count": 0,
+            "last_value_col": 8,
+            "ghost_cols": 0
+          },
+          {
+            "name": "应交税金认定表N2-5",
+            "max_row": 56,
+            "max_col": 15,
+            "hidden": false,
+            "formula_count": 105,
+            "naked_if_count": 0,
+            "last_value_col": 10,
+            "ghost_cols": 5
+          },
+          {
+            "name": "增值税测算表N2-6",
+            "max_row": 48,
+            "max_col": 8,
+            "hidden": false,
+            "formula_count": 25,
+            "naked_if_count": 0,
+            "last_value_col": 6,
+            "ghost_cols": 2
+          },
+          {
+            "name": "出口退税核对表N2-7",
+            "max_row": 56,
+            "max_col": 8,
+            "hidden": false,
+            "formula_count": 45,
+            "naked_if_count": 10,
+            "last_value_col": 6,
+            "ghost_cols": 2
+          },
+          {
+            "name": "应交其他税费测算表N2-8",
+            "max_row": 26,
+            "max_col": 9,
+            "hidden": false,
+            "formula_count": 23,
+            "naked_if_count": 0,
+            "last_value_col": 9,
+            "ghost_cols": 0
+          },
+          {
+            "name": "房产税测算表N2-9",
+            "max_row": 30,
+            "max_col": 7,
+            "hidden": false,
+            "formula_count": 25,
+            "naked_if_count": 0,
+            "last_value_col": 7,
+            "ghost_cols": 0
+          },
+          {
+            "name": "土地增值税测算表N2-10",
+            "max_row": 51,
+            "max_col": 7,
+            "hidden": false,
+            "formula_count": 23,
+            "naked_if_count": 9,
+            "last_value_col": 5,
+            "ghost_cols": 2
+          },
+          {
+            "name": "应交税费检查表N2-11",
+            "max_row": 27,
+            "max_col": 16,
+            "hidden": false,
+            "formula_count": 13,
+            "naked_if_count": 0,
+            "last_value_col": 16,
+            "ghost_cols": 0
+          },
+          {
+            "name": "出口退税额复核示例",
+            "max_row": 24,
+            "max_col": 8,
+            "hidden": false,
+            "formula_count": 6,
+            "naked_if_count": 0,
+            "last_value_col": 8,
+            "ghost_cols": 0
+          },
+          {
+            "name": "GT_Custom",
+            "max_row": 8,
+            "max_col": 2,
+            "hidden": true,
+            "formula_count": 0,
+            "naked_if_count": 0,
+            "last_value_col": 2,
+            "ghost_cols": 0
+          }
+        ]
+      },
+      "N3 递延所得税负债": {
+        "file": "N3 递延所得税负债.xlsx",
+        "sha256": "dd3759ffa5859716e07cf8cffb35594122cf1bd999cedd24bc84a3f3ab77ac5f",
+        "size": 89735,
+        "sheets": [
+          {
+            "name": "底稿目录",
+            "max_row": 19,
+            "max_col": 8,
+            "hidden": false,
+            "formula_count": 0,
+            "naked_if_count": 0,
+            "last_value_col": 6,
+            "ghost_cols": 2
+          },
+          {
+            "name": "递延所得税负债审计程序表的N3A",
+            "max_row": 29,
+            "max_col": 11,
+            "hidden": false,
+            "formula_count": 6,
+            "naked_if_count": 0,
+            "last_value_col": 11,
+            "ghost_cols": 0
+          },
+          {
+            "name": "递延所得税负债审定表N3-1",
+            "max_row": 24,
+            "max_col": 14,
+            "hidden": false,
+            "formula_count": 92,
+            "naked_if_count": 14,
+            "last_value_col": 14,
+            "ghost_cols": 0
+          },
+          {
+            "name": "递延所得税负债明细表N3-2",
+            "max_row": 31,
+            "max_col": 14,
+            "hidden": false,
+            "formula_count": 58,
+            "naked_if_count": 0,
+            "last_value_col": 14,
+            "ghost_cols": 0
+          },
+          {
+            "name": "调整分录汇总表N3-3",
+            "max_row": 23,
+            "max_col": 10,
+            "hidden": false,
+            "formula_count": 6,
+            "naked_if_count": 0,
+            "last_value_col": 10,
+            "ghost_cols": 0
+          },
+          {
+            "name": "GT_Custom",
+            "max_row": 8,
+            "max_col": 2,
+            "hidden": true,
+            "formula_count": 0,
+            "naked_if_count": 0,
+            "last_value_col": 2,
+            "ghost_cols": 0
+          }
+        ]
+      },
+      "N4 税金及附加": {
+        "file": "N4 税金及附加.xlsx",
+        "sha256": "ae2ae9e1b290b11afe41be1e12156df20c47bc64644a293a5d5547bc35dd8c73",
+        "size": 55903,
+        "sheets": [
+          {
+            "name": "底稿目录",
+            "max_row": 19,
+            "max_col": 8,
+            "hidden": false,
+            "formula_count": 0,
+            "naked_if_count": 0,
+            "last_value_col": 7,
+            "ghost_cols": 1
+          },
+          {
+            "name": "税金及附加审计程序表N4A ",
+            "max_row": 21,
+            "max_col": 11,
+            "hidden": false,
+            "formula_count": 5,
+            "naked_if_count": 0,
+            "last_value_col": 11,
+            "ghost_cols": 0
+          },
+          {
+            "name": "税金及附加审计程序表O2A（原底稿）",
+            "max_row": 47,
+            "max_col": 12,
+            "hidden": true,
+            "formula_count": 5,
+            "naked_if_count": 0,
+            "last_value_col": 12,
+            "ghost_cols": 0
+          },
+          {
+            "name": "税金及附加审定表N4-1",
+            "max_row": 24,
+            "max_col": 14,
+            "hidden": false,
+            "formula_count": 136,
+            "naked_if_count": 20,
+            "last_value_col": 14,
+            "ghost_cols": 0
+          },
+          {
+            "name": "附注披露信息（上市公司）",
+            "max_row": 18,
+            "max_col": 12,
+            "hidden": false,
+            "formula_count": 32,
+            "naked_if_count": 0,
+            "last_value_col": 5,
+            "ghost_cols": 7
+          },
+          {
+            "name": "附注披露信息（国企）",
+            "max_row": 17,
+            "max_col": 11,
+            "hidden": false,
+            "formula_count": 6,
+            "naked_if_count": 0,
+            "last_value_col": 5,
+            "ghost_cols": 6
+          },
+          {
+            "name": "税金及附加明细表N4-2",
+            "max_row": 34,
+            "max_col": 11,
+            "hidden": false,
+            "formula_count": 46,
+            "naked_if_count": 0,
+            "last_value_col": 11,
+            "ghost_cols": 0
+          },
+          {
+            "name": "调整分录汇总表N4-3",
+            "max_row": 25,
+            "max_col": 10,
+            "hidden": false,
+            "formula_count": 6,
+            "naked_if_count": 0,
+            "last_value_col": 10,
+            "ghost_cols": 0
+          },
+          {
+            "name": "GT_Custom",
+            "max_row": 8,
+            "max_col": 2,
+            "hidden": true,
+            "formula_count": 0,
+            "naked_if_count": 0,
+            "last_value_col": 2,
+            "ghost_cols": 0
+          }
+        ]
+      },
+      "N5 所得税费用": {
+        "file": "N5 所得税费用.xlsx",
+        "sha256": "0fa060b214a7eed83bf53e5153752abdb765cc1da922506d6d539d3003f8bd3d",
+        "size": 124437,
+        "sheets": [
+          {
+            "name": "底稿目录",
+            "max_row": 24,
+            "max_col": 8,
+            "hidden": false,
+            "formula_count": 0,
+            "naked_if_count": 0,
+            "last_value_col": 7,
+            "ghost_cols": 1
+          },
+          {
+            "name": "所得税审计程序表N5A",
+            "max_row": 28,
+            "max_col": 11,
+            "hidden": false,
+            "formula_count": 6,
+            "naked_if_count": 0,
+            "last_value_col": 11,
+            "ghost_cols": 0
+          },
+          {
+            "name": "所得税审计程序表N3A (原底稿)",
+            "max_row": 51,
+            "max_col": 10,
+            "hidden": true,
+            "formula_count": 6,
+            "naked_if_count": 0,
+            "last_value_col": 10,
+            "ghost_cols": 0
+          },
+          {
+            "name": "所得税费用审定表N5-1",
+            "max_row": 28,
+            "max_col": 14,
+            "hidden": false,
+            "formula_count": 36,
+            "naked_if_count": 6,
+            "last_value_col": 14,
+            "ghost_cols": 0
+          },
+          {
+            "name": "附注披露信息（上市公司）",
+            "max_row": 29,
+            "max_col": 12,
+            "hidden": false,
+            "formula_count": 48,
+            "naked_if_count": 0,
+            "last_value_col": 4,
+            "ghost_cols": 8
+          },
+          {
+            "name": "附注披露信息（国企",
+            "max_row": 32,
+            "max_col": 255,
+            "hidden": false,
+            "formula_count": 54,
+            "naked_if_count": 0,
+            "last_value_col": 4,
+            "ghost_cols": 251
+          },
+          {
+            "name": "所得税费用明细表N5-2",
+            "max_row": 38,
+            "max_col": 10,
+            "hidden": false,
+            "formula_count": 12,
+            "naked_if_count": 0,
+            "last_value_col": 6,
+            "ghost_cols": 4
+          },
+          {
+            "name": "调整分录汇总表N5-3",
+            "max_row": 39,
+            "max_col": 10,
+            "hidden": false,
+            "formula_count": 6,
+            "naked_if_count": 0,
+            "last_value_col": 10,
+            "ghost_cols": 0
+          },
+          {
+            "name": "当期所得税费用计算表N5-4",
+            "max_row": 82,
+            "max_col": 7,
+            "hidden": false,
+            "formula_count": 90,
+            "naked_if_count": 0,
+            "last_value_col": 5,
+            "ghost_cols": 2
+          },
+          {
+            "name": "纳税调整明细表N5-5",
+            "max_row": 107,
+            "max_col": 8,
+            "hidden": false,
+            "formula_count": 45,
+            "naked_if_count": 9,
+            "last_value_col": 8,
+            "ghost_cols": 0
+          },
+          {
+            "name": "税收优惠明细表N5-6",
+            "max_row": 54,
+            "max_col": 6,
+            "hidden": false,
+            "formula_count": 22,
+            "naked_if_count": 0,
+            "last_value_col": 6,
+            "ghost_cols": 0
+          },
+          {
+            "name": "加计扣除研发费用情况明细表N5-6-1",
+            "max_row": 43,
+            "max_col": 7,
+            "hidden": false,
+            "formula_count": 62,
+            "naked_if_count": 0,
+            "last_value_col": 6,
+            "ghost_cols": 1
+          },
+          {
+            "name": "高新技术企业认定条件检查表N5-6-2",
+            "max_row": 18,
+            "max_col": 13,
+            "hidden": false,
+            "formula_count": 10,
+            "naked_if_count": 4,
+            "last_value_col": 13,
+            "ghost_cols": 0
+          },
+          {
+            "name": "财产损失明细表N5-7",
+            "max_row": 15,
+            "max_col": 7,
+            "hidden": false,
+            "formula_count": 17,
+            "naked_if_count": 0,
+            "last_value_col": 6,
+            "ghost_cols": 1
+          },
+          {
+            "name": "递延所得税费用核对表N5-8",
+            "max_row": 44,
+            "max_col": 10,
+            "hidden": false,
+            "formula_count": 70,
+            "naked_if_count": 0,
+            "last_value_col": 10,
+            "ghost_cols": 0
+          },
+          {
+            "name": "GT_Custom",
+            "max_row": 8,
+            "max_col": 2,
+            "hidden": true,
+            "formula_count": 0,
+            "naked_if_count": 0,
+            "last_value_col": 2,
+            "ghost_cols": 0
+          }
+        ]
+      }
+    },
+    "totals": {
+      "sheets": 59,
+      "formulas": 2185,
+      "sheets_with_fx": 49
+    }
+  },
+  "transport_keys": {
+    "owners": {
+      "N1-1-adj": [
+        "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts"
+      ],
+      "N1-4-calc": [
+        "audit-platform/frontend/src/components/workpaper/composables/useN1CalcTable.ts"
+      ],
+      "N1-2-detail": [
+        "audit-platform/frontend/src/components/workpaper/composables/useN1Detail.ts"
+      ],
+      "N1-": [
+        "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts"
+      ],
+      "N2-": [
+        "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts"
+      ],
+      "N3-": [
+        "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts"
+      ],
+      "N4-1": [
+        "audit-platform/frontend/src/components/workpaper/composables/useN4Adjudication.ts"
+      ],
+      "N4-2": [
+        "audit-platform/frontend/src/components/workpaper/composables/useN4Detail.ts"
+      ],
+      "N4-": [
+        "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts"
+      ],
+      "N5-": [
+        "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts"
+      ]
+    },
+    "owner_count": 10,
+    "all_keys": [
+      "N1-1",
+      "N1-1-",
+      "N1-1-adj",
+      "N1-1-aje-net",
+      "N1-1-conclusion",
+      "N1-1-notes",
+      "N1-1-rje-net",
+      "N1-1-total-audited",
+      "N1-1-total-begin",
+      "N1-1-审定表",
+      "N1-1-结论",
+      "N1-2",
+      "N1-2 明细表暂无数据，请先在明细表录入暂时性差异项目",
+      "N1-2-",
+      "N1-2-detail",
+      "N1-2-detail-rows",
+      "N1-2-total-deferred-tax-asset",
+      "N1-2-明细表",
+      "N1-2数据解析失败，请手动新增",
+      "N1-2暂无明细数据，请先编制明细表",
+      "N1-3",
+      "N1-3-",
+      "N1-3-entries",
+      "N1-3-调整分录",
+      "N1-4",
+      "N1-4 测算表暂无可匹配项目（请先编制 N1-4 或核对项目名称）",
+      "N1-4-",
+      "N1-4-calc",
+      "N1-4-calc-rows",
+      "N1-4-total-deferred-tax-asset",
+      "N1-4-total-deferred-tax-liability",
+      "N1-4-测算表",
+      "N1-4-结论",
+      "N1-4测算表负债部分→N3递延所得税负债",
+      "N1-5",
+      "N1-5 亏损检查表暂无数据，请先在 N1-5 录入各到期年度亏损",
+      "N1-5 亏损检查表暂无数据，请先编制 N1-5",
+      "N1-5 无可确认的可弥补亏损（均已届满或确认额为 0）",
+      "N1-5 无可确认的可弥补亏损（均已届满或预计应纳税所得额为 0）",
+      "N1-5-",
+      "N1-5-lead-rows",
+      "N1-5-loss-check",
+      "N1-5-loss-rows",
+      "N1-5-rows",
+      "N1-5-total-recognizable",
+      "N1-N1A-",
+      "N1-disclosure-listed-",
+      "N1-disclosure-soe-",
+      "N1-index-directory",
+      "N1-递延所得税资产-数据.xlsx",
+      "N1-递延所得税资产-模板.xlsx",
+      "N2-1",
+      "N2-1-adjudication-rows",
+      "N2-1-conclusion",
+      "N2-1-end-audited-total",
+      "N2-1-note",
+      "N2-10",
+      "N2-10 土增税测算",
+      "N2-10-area",
+      "N2-10-lvt-rows",
+      "N2-10-lvt-total",
+      "N2-10-note",
+      "N2-10-土地增值税测算",
+      "N2-11",
+      "N2-11 检查表",
+      "N2-11-test-meta",
+      "N2-11-voucher-check",
+      "N2-11-应交税费检查",
+      "N2-2",
+      "N2-2-conclusion",
+      "N2-2-detail-rows",
+      "N2-2-note",
+      "N2-3",
+      "N2-3-entries",
+      "N2-3-调整分录",
+      "N2-4",
+      "N2-4-conclusion",
+      "N2-4-process",
+      "N2-4-税收政策检查",
+      "N2-5",
+      "N2-5-custom-taxes",
+      "N2-5-matrix",
+      "N2-5-process",
+      "N2-5-认定表",
+      "N2-6",
+      "N2-6 增值税测算",
+      "N2-6-conclusion",
+      "N2-6-input-calc",
+      "N2-6-non-deductible-from-export",
+      "N2-6-note",
+      "N2-6-output-calc",
+      "N2-6-vat-payable",
+      "N2-6-vat-rows",
+      "N2-6-审计结论",
+      "N2-6-审计说明",
+      "N2-7",
+      "N2-7-export-refund",
+      "N2-7-ledger",
+      "N2-7-note",
+      "N2-7-total",
+      "N2-7-出口退税核对",
+      "N2-8",
+      "N2-8 其他税费测算",
+      "N2-8-auto-book",
+      "N2-8-conclusion",
+      "N2-8-consumption-tax",
+      "N2-8-manual-rows",
+      "N2-8-note",
+      "N2-8-surtax-education",
+      "N2-8-surtax-local-education",
+      "N2-8-surtax-total",
+      "N2-8-surtax-urban",
+      "N2-8-urban-area-type",
+      "N2-8-其他税费测算",
+      "N2-9",
+      "N2-9 房产税测算",
+      "N2-9-note",
+      "N2-9-property-rows",
+      "N2-9-property-tax-total",
+      "N2-9-rows",
+      "N2-9-房产税测算",
+      "N2-note-listed",
+      "N2-note-soe",
+      "N2-project-year",
+      "N2-应交税费-数据.xlsx",
+      "N2-应交税费-模板.xlsx",
+      "N3-1",
+      "N3-1-",
+      "N3-1-begin-balance",
+      "N3-1-change-total",
+      "N3-1-end-balance-total",
+      "N3-1-审定表",
+      "N3-2",
+      "N3-2-",
+      "N3-2-rows",
+      "N3-2-明细表",
+      "N3-3",
+      "N3-3-",
+      "N3-3-entries",
+      "N3-3-调整分录",
+      "N3-N3A-",
+      "N3-cross-n1-asset-balance",
+      "N3-cross-n1-same-entity",
+      "N3-index-directory",
+      "N3-递延所得税负债-数据.xlsx",
+      "N3-递延所得税负债-模板.xlsx",
+      "N4-1",
+      "N4-1-",
+      "N4-1-adjudicated-amount",
+      "N4-1-adjudication",
+      "N4-1-audit-conclusion",
+      "N4-1-audit-note",
+      "N4-1-audited-total",
+      "N4-1-rows",
+      "N4-1-rows-v2",
+      "N4-1-审定表",
+      "N4-2",
+      "N4-2-",
+      "N4-2-conclusion",
+      "N4-2-detail",
+      "N4-2-detail-rows",
+      "N4-2-note",
+      "N4-2-rows-v2",
+      "N4-2-subtotal",
+      "N4-3",
+      "N4-3-",
+      "N4-3-aje-net",
+      "N4-3-audit-conclusion",
+      "N4-3-audit-notes",
+      "N4-3-entries",
+      "N4-3-rje-net",
+      "N4-3-调整分录",
+      "N4-N4A-",
+      "N4-cross-n2-accrual",
+      "N4-disclosure-listed",
+      "N4-disclosure-listed-",
+      "N4-disclosure-soe-",
+      "N4-index-directory",
+      "N4-附注国企-不适用",
+      "N5-1",
+      "N5-1-",
+      "N5-1-current-tax",
+      "N5-1-deferred-tax",
+      "N5-1-审定表",
+      "N5-2",
+      "N5-2-",
+      "N5-2-明细表",
+      "N5-3",
+      "N5-3-",
+      "N5-3-entries",
+      "N5-3-调整分录",
+      "N5-4",
+      "N5-4-",
+      "N5-4-calc-rows",
+      "N5-4-当期所得税计算",
+      "N5-5",
+      "N5-5-",
+      "N5-5-adjustment-rows",
+      "N5-5-纳税调整明细",
+      "N5-6",
+      "N5-6-",
+      "N5-6-1",
+      "N5-6-1-",
+      "N5-6-1-rd-projects",
+      "N5-6-1-研发加计扣除",
+      "N5-6-2",
+      "N5-6-2-",
+      "N5-6-2-高新认定",
+      "N5-6-税收优惠",
+      "N5-7",
+      "N5-7-",
+      "N5-7-财产损失",
+      "N5-8",
+      "N5-8-",
+      "N5-8-reconcile-rows",
+      "N5-8-递延核对",
+      "N5-N5A-",
+      "N5-cross-a-profit",
+      "N5-cross-i2-capitalized",
+      "N5-cross-i6-expensed",
+      "N5-cross-n1-change",
+      "N5-cross-n3-change",
+      "N5-disclosure-listed-",
+      "N5-disclosure-soe-",
+      "N5-index-directory",
+      "N5-所得税费用-数据.xlsx",
+      "N5-所得税费用-模板.xlsx"
+    ]
+  },
+  "endpoints": {
+    "publish-to-tb": {
+      "code": 5,
+      "comment": 16
+    },
+    "trial-balance/writeback": {
+      "code": 0,
+      "comment": 5
+    }
+  },
+  "structural_zeros": {
+    "trial-balance/writeback": 0,
+    "#REF!_dead_formula": 0,
+    "*EntryDualMode.ts": 0,
+    "useChecklistPersistence": 0,
+    "contract-ocr": 0,
+    "GtEntrySyncCapabilityNotice": 0,
+    "http.put": 0,
+    "api.put": 7,
+    "loose_only": 0,
+    "M_style_row_dash_n": 5
+  },
+  "defined_names": {
+    "per_entry": {
+      "N1 递延所得税资产": {
+        "total": 24,
+        "broken": 14,
+        "details": [
+          {
+            "name": "AS2DocOpenMode",
+            "value": "\"AS2DocumentEdit\"",
+            "broken": false
+          },
+          {
+            "name": "bs",
+            "value": "{#N/A,#N/A,FALSE,\"BBPREP\"}",
+            "broken": false
+          },
+          {
+            "name": "bs_1",
+            "value": "{#N/A,#N/A,FALSE,\"BBPREP\"}",
+            "broken": false
+          },
+          {
+            "name": "gg",
+            "value": "{#N/A,#N/A,FALSE,\"BBPREP\"}",
+            "broken": false
+          },
+          {
+            "name": "TextRefCopyRangeCount",
+            "value": "136",
+            "broken": false
+          },
+          {
+            "name": "XREF_COLUMN_1",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XREF_COLUMN_2",
+            "value": "[1]Breakdown!#REF!",
+            "broken": true
+          },
+          {
+            "name": "XREF_COLUMN_3",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XREF_COLUMN_5",
+            "value": "'[2]2004'!#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefActiveRow",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefColumnsCount",
+            "value": "2",
+            "broken": false
+          },
+          {
+            "name": "XRefCopy1",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefCopy1Row",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefCopy2Row",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefCopyRangeCount",
+            "value": "2",
+            "broken": false
+          },
+          {
+            "name": "XRefPaste1",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefPaste1Row",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefPaste2",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefPaste2Row",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefPaste3",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefPaste3Row",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefPasteRangeCount",
+            "value": "2",
+            "broken": false
+          },
+          {
+            "name": "本循环科目",
+            "value": "[3]索引!$D$15:$D$76",
+            "broken": false
+          },
+          {
+            "name": "发的撒发",
+            "value": "{#N/A,#N/A,FALSE,\"BBPREP\"}",
+            "broken": false
+          }
+        ]
+      },
+      "N2 应交税费": {
+        "total": 24,
+        "broken": 14,
+        "details": [
+          {
+            "name": "AS2DocOpenMode",
+            "value": "\"AS2DocumentEdit\"",
+            "broken": false
+          },
+          {
+            "name": "bs",
+            "value": "{#N/A,#N/A,FALSE,\"BBPREP\"}",
+            "broken": false
+          },
+          {
+            "name": "bs_1",
+            "value": "{#N/A,#N/A,FALSE,\"BBPREP\"}",
+            "broken": false
+          },
+          {
+            "name": "gg",
+            "value": "{#N/A,#N/A,FALSE,\"BBPREP\"}",
+            "broken": false
+          },
+          {
+            "name": "TextRefCopyRangeCount",
+            "value": "136",
+            "broken": false
+          },
+          {
+            "name": "XREF_COLUMN_1",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XREF_COLUMN_2",
+            "value": "[1]Breakdown!#REF!",
+            "broken": true
+          },
+          {
+            "name": "XREF_COLUMN_3",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XREF_COLUMN_5",
+            "value": "'[2]2004'!#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefActiveRow",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefColumnsCount",
+            "value": "2",
+            "broken": false
+          },
+          {
+            "name": "XRefCopy1",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefCopy1Row",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefCopy2Row",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefCopyRangeCount",
+            "value": "2",
+            "broken": false
+          },
+          {
+            "name": "XRefPaste1",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefPaste1Row",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefPaste2",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefPaste2Row",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefPaste3",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefPaste3Row",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefPasteRangeCount",
+            "value": "2",
+            "broken": false
+          },
+          {
+            "name": "本循环科目",
+            "value": "[3]索引!$D$15:$D$76",
+            "broken": false
+          },
+          {
+            "name": "发的撒发",
+            "value": "{#N/A,#N/A,FALSE,\"BBPREP\"}",
+            "broken": false
+          }
+        ]
+      },
+      "N3 递延所得税负债": {
+        "total": 24,
+        "broken": 14,
+        "details": [
+          {
+            "name": "AS2DocOpenMode",
+            "value": "\"AS2DocumentEdit\"",
+            "broken": false
+          },
+          {
+            "name": "bs",
+            "value": "{#N/A,#N/A,FALSE,\"BBPREP\"}",
+            "broken": false
+          },
+          {
+            "name": "bs_1",
+            "value": "{#N/A,#N/A,FALSE,\"BBPREP\"}",
+            "broken": false
+          },
+          {
+            "name": "gg",
+            "value": "{#N/A,#N/A,FALSE,\"BBPREP\"}",
+            "broken": false
+          },
+          {
+            "name": "TextRefCopyRangeCount",
+            "value": "136",
+            "broken": false
+          },
+          {
+            "name": "XREF_COLUMN_1",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XREF_COLUMN_2",
+            "value": "[1]Breakdown!#REF!",
+            "broken": true
+          },
+          {
+            "name": "XREF_COLUMN_3",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XREF_COLUMN_5",
+            "value": "'[2]2004'!#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefActiveRow",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefColumnsCount",
+            "value": "2",
+            "broken": false
+          },
+          {
+            "name": "XRefCopy1",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefCopy1Row",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefCopy2Row",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefCopyRangeCount",
+            "value": "2",
+            "broken": false
+          },
+          {
+            "name": "XRefPaste1",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefPaste1Row",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefPaste2",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefPaste2Row",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefPaste3",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefPaste3Row",
+            "value": "#REF!",
+            "broken": true
+          },
+          {
+            "name": "XRefPasteRangeCount",
+            "value": "2",
+            "broken": false
+          },
+          {
+            "name": "本循环科目",
+            "value": "[3]索引!$D$15:$D$76",
+            "broken": false
+          },
+          {
+            "name": "发的撒发",
+            "value": "{#N/A,#N/A,FALSE,\"BBPREP\"}",
+            "broken": false
+          }
+        ]
+      },
+      "N4 税金及附加": {
+        "total": 0,
+        "broken": 0,
+        "details": []
+      },
+      "N5 所得税费用": {
+        "total": 0,
+        "broken": 0,
+        "details": []
+      }
+    },
+    "total": 72,
+    "broken": 42
+  },
+  "footers": {
+    "normal": 49,
+    "missing_slash": 3,
+    "no_footer": 7,
+    "total": 59,
+    "details": [
+      {
+        "file": "N1 递延所得税资产",
+        "sheet_xml": "xl/worksheets/sheet4.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N1 递延所得税资产",
+        "sheet_xml": "xl/worksheets/sheet2.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N1 递延所得税资产",
+        "sheet_xml": "xl/worksheets/sheet3.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N1 递延所得税资产",
+        "sheet_xml": "xl/worksheets/sheet1.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N1 递延所得税资产",
+        "sheet_xml": "xl/worksheets/sheet9.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N1 递延所得税资产",
+        "sheet_xml": "xl/worksheets/sheet10.xml",
+        "footer": null,
+        "type": "none"
+      },
+      {
+        "file": "N1 递延所得税资产",
+        "sheet_xml": "xl/worksheets/sheet7.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N1 递延所得税资产",
+        "sheet_xml": "xl/worksheets/sheet8.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N1 递延所得税资产",
+        "sheet_xml": "xl/worksheets/sheet5.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N1 递延所得税资产",
+        "sheet_xml": "xl/worksheets/sheet6.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N2 应交税费",
+        "sheet_xml": "xl/worksheets/sheet4.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N2 应交税费",
+        "sheet_xml": "xl/worksheets/sheet2.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N2 应交税费",
+        "sheet_xml": "xl/worksheets/sheet3.xml",
+        "footer": null,
+        "type": "none"
+      },
+      {
+        "file": "N2 应交税费",
+        "sheet_xml": "xl/worksheets/sheet1.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N2 应交税费",
+        "sheet_xml": "xl/worksheets/sheet13.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N2 应交税费",
+        "sheet_xml": "xl/worksheets/sheet14.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N2 应交税费",
+        "sheet_xml": "xl/worksheets/sheet15.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N2 应交税费",
+        "sheet_xml": "xl/worksheets/sheet16.xml",
+        "footer": null,
+        "type": "none"
+      },
+      {
+        "file": "N2 应交税费",
+        "sheet_xml": "xl/worksheets/sheet17.xml",
+        "footer": "&C&P&N",
+        "type": "missing_slash"
+      },
+      {
+        "file": "N2 应交税费",
+        "sheet_xml": "xl/worksheets/sheet18.xml",
+        "footer": null,
+        "type": "none"
+      },
+      {
+        "file": "N2 应交税费",
+        "sheet_xml": "xl/worksheets/sheet11.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N2 应交税费",
+        "sheet_xml": "xl/worksheets/sheet12.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N2 应交税费",
+        "sheet_xml": "xl/worksheets/sheet9.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N2 应交税费",
+        "sheet_xml": "xl/worksheets/sheet5.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N2 应交税费",
+        "sheet_xml": "xl/worksheets/sheet6.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N2 应交税费",
+        "sheet_xml": "xl/worksheets/sheet10.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N2 应交税费",
+        "sheet_xml": "xl/worksheets/sheet8.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N2 应交税费",
+        "sheet_xml": "xl/worksheets/sheet7.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N3 递延所得税负债",
+        "sheet_xml": "xl/worksheets/sheet4.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N3 递延所得税负债",
+        "sheet_xml": "xl/worksheets/sheet3.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N3 递延所得税负债",
+        "sheet_xml": "xl/worksheets/sheet2.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N3 递延所得税负债",
+        "sheet_xml": "xl/worksheets/sheet1.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N3 递延所得税负债",
+        "sheet_xml": "xl/worksheets/sheet5.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N3 递延所得税负债",
+        "sheet_xml": "xl/worksheets/sheet6.xml",
+        "footer": null,
+        "type": "none"
+      },
+      {
+        "file": "N4 税金及附加",
+        "sheet_xml": "xl/worksheets/sheet4.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N4 税金及附加",
+        "sheet_xml": "xl/worksheets/sheet2.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N4 税金及附加",
+        "sheet_xml": "xl/worksheets/sheet3.xml",
+        "footer": "&C&P&N",
+        "type": "missing_slash"
+      },
+      {
+        "file": "N4 税金及附加",
+        "sheet_xml": "xl/worksheets/sheet1.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N4 税金及附加",
+        "sheet_xml": "xl/worksheets/sheet9.xml",
+        "footer": null,
+        "type": "none"
+      },
+      {
+        "file": "N4 税金及附加",
+        "sheet_xml": "xl/worksheets/sheet8.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N4 税金及附加",
+        "sheet_xml": "xl/worksheets/sheet7.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N4 税金及附加",
+        "sheet_xml": "xl/worksheets/sheet5.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N4 税金及附加",
+        "sheet_xml": "xl/worksheets/sheet6.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N5 所得税费用",
+        "sheet_xml": "xl/worksheets/sheet4.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N5 所得税费用",
+        "sheet_xml": "xl/worksheets/sheet2.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N5 所得税费用",
+        "sheet_xml": "xl/worksheets/sheet3.xml",
+        "footer": "&C&P&N",
+        "type": "missing_slash"
+      },
+      {
+        "file": "N5 所得税费用",
+        "sheet_xml": "xl/worksheets/sheet1.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N5 所得税费用",
+        "sheet_xml": "xl/worksheets/sheet10.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N5 所得税费用",
+        "sheet_xml": "xl/worksheets/sheet12.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N5 所得税费用",
+        "sheet_xml": "xl/worksheets/sheet13.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N5 所得税费用",
+        "sheet_xml": "xl/worksheets/sheet14.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N5 所得税费用",
+        "sheet_xml": "xl/worksheets/sheet15.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N5 所得税费用",
+        "sheet_xml": "xl/worksheets/sheet16.xml",
+        "footer": null,
+        "type": "none"
+      },
+      {
+        "file": "N5 所得税费用",
+        "sheet_xml": "xl/worksheets/sheet9.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N5 所得税费用",
+        "sheet_xml": "xl/worksheets/sheet11.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N5 所得税费用",
+        "sheet_xml": "xl/worksheets/sheet7.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N5 所得税费用",
+        "sheet_xml": "xl/worksheets/sheet8.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N5 所得税费用",
+        "sheet_xml": "xl/worksheets/sheet6.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      },
+      {
+        "file": "N5 所得税费用",
+        "sheet_xml": "xl/worksheets/sheet5.xml",
+        "footer": "&C&P/&N",
+        "type": "normal"
+      }
+    ]
+  }
+}

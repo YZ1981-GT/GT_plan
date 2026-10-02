@@ -14,7 +14,7 @@ from sqlalchemy import select, update
 
 from app.core.database import async_session
 from app.models.ai_models import KnowledgeIndex
-from app.models.knowledge_models import KnowledgeDocument
+from app.models.knowledge_models import KnowledgeAccessLevel, KnowledgeDocument, KnowledgeFolder
 from app.services.content_extractor import ContentExtractor
 from app.services.knowledge_index_service import KnowledgeIndexService
 
@@ -35,18 +35,22 @@ async def run_indexing_pipeline(doc_id: UUID) -> None:
     """
     async with async_session() as db:
         try:
-            # Eager load folder for access_level resolution
-            from sqlalchemy.orm import joinedload
-            from sqlalchemy import select as sa_select
-
-            result = await db.execute(
-                sa_select(KnowledgeDocument)
-                .options(joinedload(KnowledgeDocument.folder))
-                .where(KnowledgeDocument.id == doc_id)
-            )
-            doc = result.scalar_one_or_none()
+            # 🔴 旧实现 joinedload(KnowledgeDocument.folder) —— 模型没有 folder 关系，
+            #    每次都在第一行 AttributeError，流水线从未跑通过（spec
+            #    knowledge-base-retrieval-and-authz-closure 5.11）。文件夹按 folder_id 单独取。
+            doc = await db.get(KnowledgeDocument, doc_id)
             if not doc or doc.is_deleted:
                 logger.warning(f"[IndexingPipeline] doc_id={doc_id} not found or deleted, skip")
+                return
+            folder = await db.get(KnowledgeFolder, doc.folder_id) if doc.folder_id else None
+            effective = _effective_access(doc, folder)
+            if effective is None or effective == KnowledgeAccessLevel.private:
+                # 私有文档不进任何项目分区 / 全局哨兵分区：索引是按项目检索的共享层，
+                # 私有内容一旦入索引，任何能查该分区的调用方都能召回它。
+                # 文档正文词法检索仍按「创建者本人可读」照常召回，不依赖索引。
+                doc.index_status = "skipped"
+                doc.index_error = "private document is not indexed (served by lexical retrieval)"
+                await db.commit()
                 return
 
             # Step 1: Content Extraction
@@ -71,7 +75,7 @@ async def run_indexing_pipeline(doc_id: UUID) -> None:
 
             # Step 2+3: Chunking + Embedding + Upsert
             svc = KnowledgeIndexService(db)
-            project_id = _resolve_index_project_id(doc)
+            project_id = _resolve_index_project_id(doc, folder)
 
             await svc.incremental_update(
                 project_id=project_id,
@@ -99,23 +103,31 @@ async def run_indexing_pipeline(doc_id: UUID) -> None:
                 pass
 
 
-def _resolve_index_project_id(doc: KnowledgeDocument) -> UUID:
+def _effective_access(doc: KnowledgeDocument, folder: KnowledgeFolder | None):
+    """生效级别：文档级非空取文档，否则继承文件夹（与 KnowledgeAccessPolicy 同一继承语义）。"""
+    if doc.access_level is not None:
+        return doc.access_level
+    return folder.access_level if folder is not None else None
+
+
+def _resolve_index_project_id(doc: KnowledgeDocument, folder: KnowledgeFolder | None = None) -> UUID:
     """确定文档应索引到哪个 project_id。
 
-    - public 文档 → GLOBAL_KB_PROJECT_ID (哨兵)
-    - project_group → 第一个 project_id
-    - private → GLOBAL_KB_PROJECT_ID (fallback)
+    - public → GLOBAL_KB_PROJECT_ID（哨兵分区）
+    - project_group → 生效 project_ids 的第一个（文档级非空取文档，否则继承文件夹）
+    - private → 调用方已跳过，不会走到这里
+
+    旧实现把 project_ids 固定取文档自身的（继承文件夹时恒为空）⇒ 项目组文件夹里的文档全被
+    索引进**全局**分区，任何项目都能召回。
     """
-    # 尝试从 folder 关联获取 access_level
-    effective_access = getattr(doc, "access_level", None)
-    if not effective_access and hasattr(doc, "folder") and doc.folder:
-        effective_access = doc.folder.access_level
-
-    if effective_access == "project_group" and getattr(doc, "project_ids", None):
-        project_ids = doc.project_ids
-        if project_ids:
-            return UUID(str(project_ids[0]))
-
+    effective = _effective_access(doc, folder)
+    if effective == KnowledgeAccessLevel.project_group:
+        pids = doc.project_ids if doc.access_level is not None else (folder.project_ids if folder else None)
+        for raw in pids or []:
+            try:
+                return UUID(str(raw))
+            except (ValueError, TypeError):
+                continue
     return GLOBAL_KB_PROJECT_ID
 
 
