@@ -7,6 +7,23 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
+      <!-- 公式推送：后台已按四表 / 试算表 / 调整分录更新本底稿（不静默替换未保存的编辑） -->
+      <el-alert
+        v-if="pushNotice"
+        type="info"
+        :closable="true"
+        show-icon
+        style="margin-bottom: 8px"
+        :title="`后台已按公式推送更新 ${pushNotice.count} 项数据`"
+        @close="pushNotice = null"
+      >
+        <template #default>
+          <span>当前页面仍显示打开时的数据；载入后被更新的项目以最新数据为准。</span>
+          <el-button size="small" type="primary" link :loading="pushReloading" @click="reloadPushedItems">
+            载入最新数据
+          </el-button>
+        </template>
+      </el-alert>
       <!-- P2#13: 全局告警面板 -->
       <template v-if="globalAlerts.length">
         <el-alert
@@ -158,7 +175,7 @@
  *
  * 科目覆盖：1001 库存现金 / 1002 银行存款 / 1012 其他货币资金
  */
-import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
 import type { Ref } from 'vue'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
@@ -181,6 +198,10 @@ import {
   buildAccountListSeedRowsFromAccounts,
   buildDigitalSeedRows,
 } from './composables/e1BankAccountPrefill'
+import { parseNum } from './composables/useE1FormulaEngine'
+import { e1HostAdjTotalSeeds, e1HostAuditedTotals } from './composables/e1HostAuditedTotals'
+import { e1PushNotice, e1PushedRows, type E1PushNotice } from './composables/e1FormulaPushNotice'
+import { subscribeProjectEvent } from '@/services/sse/projectEventStream'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -364,11 +385,12 @@ function reconcileCashAggregateFromRows(): void {
   let parsed: any[]
   try { parsed = JSON.parse(rowsResp.remark) } catch { return }
   if (!Array.isArray(parsed) || parsed.length === 0) return
-  const num = (v: any): number => { const n = parseFloat(String(v ?? '')); return isFinite(n) ? n : 0 }
   let opening = 0, ending = 0
   for (const r of parsed) {
-    const op = num(r.opening), inc = num(r.increase), dec = num(r.decrease)
-    const fx = num(r.fxRate) || 1
+    const op = parseNum(r.opening), inc = parseNum(r.increase), dec = parseNum(r.decrease)
+    // 🔴 汇率与 useE1CashDetail 同口径 parseNum：外币待录入（fxRate 0）折人民币为 0，
+    //    不再 `|| 1` 按人民币计 —— 否则宿主与明细表 / 后端公式推送三处算出不同合计、来回覆盖
+    const fx = parseNum(r.fxRate)
     opening += op
     ending += (op + inc - dec) * fx   // 未审期末（人民币）= (期初+增-减)×汇率，与 useE1CashDetail.recalcRow 一致
   }
@@ -410,48 +432,18 @@ async function reExtractFromFourTable(): Promise<void> {
   await saveImmediate([item])
 }
 
+/** 读当前内存值（审定合计派生 / 告警共用）。 */
+const getRemark = (key: string): string | null | undefined => allResponses.value.get(key)?.remark
+
 /**
- * 从已有的未审聚合键 + 调整分录实时派生 E1-adj-total-* 审定合计，
- * 确保披露表在审定表未渲染的情况下也能取到值（persist-first：不覆盖已有）。
+ * 从未审聚合键 + 账项调整（本地 + 大厅已确认）派生 E1-adj-total-* 审定合计（仅内存，不落库），
+ * 确保披露表在审定表未渲染的情况下也能取到值。
+ * 🔴 **总是派生**：旧实现「键已存在就跳过」会回放陈旧的持久化审定合计；这些键由后端公式推送独占写入，
+ *    前端只需与之同式（e1HostAuditedTotals ↔ useE1Adjudication.aggregateAuditedByCode ↔ e1_calc）。
  */
 function seedAdjTotalsFromAggregates(): void {
-  const _num = (k: string) => parseFloat(allResponses.value.get(k)?.remark || '0') || 0
-  const _adj = (k: string) => _num(`E1-adjustment-by-item-${k}-ending`)
-
-  // 1001 库存现金审定 = 未审 + AJE/RJE
-  const cash = _num('E1-cash-detail-total-unaudited') + _adj('cash')
-  // 1002 银行存款审定 = 未审 + AJE/RJE
-  const bank = _num('E1-bank-detail-principal-total-unaudited') + _adj('bank_principal')
-  // 1012 其他货币资金审定 = 未审(other + digital) + AJE/RJE
-  const other = _num('E1-bank-detail-other-total-unaudited') + _num('E1-digital-total-unaudited')
-    + _adj('other_mf') + _adj('digital')
-
-  const seeds: Array<[string, number]> = [
-    ['E1-adj-total-1001', cash],
-    ['E1-adj-total-1002', bank],
-    ['E1-adj-total-1012', other],
-  ]
-  for (const [key, val] of seeds) {
-    // persist-first：已有非零值不覆盖（审定表 syncAuditedTotals 已写入的优先）
-    if (allResponses.value.has(key)) continue
-    if (Math.abs(val) < 0.005) continue // 零值不种子（与 buildCrossSheetSeeds 同策略）
-    allResponses.value.set(key, { item_id: key, conclusion: null, remark: String(val) })
-  }
-  // 期初同理
-  const _numO = (k: string) => parseFloat(allResponses.value.get(k)?.remark || '0') || 0
-  const _adjO = (k: string) => _numO(`E1-adjustment-by-item-${k}-opening`)
-  const cashO = _numO('E1-cash-detail-opening-unaudited') + _adjO('cash')
-  const bankO = _numO('E1-bank-detail-principal-opening-unaudited') + _adjO('bank_principal')
-  const otherO = _numO('E1-bank-detail-other-opening-unaudited') + _adjO('other_mf') + _adjO('digital')
-  const seedsO: Array<[string, number]> = [
-    ['E1-adj-total-1001-opening', cashO],
-    ['E1-adj-total-1002-opening', bankO],
-    ['E1-adj-total-1012-opening', otherO],
-  ]
-  for (const [key, val] of seedsO) {
-    if (allResponses.value.has(key)) continue
-    if (Math.abs(val) < 0.005) continue
-    allResponses.value.set(key, { item_id: key, conclusion: null, remark: String(val) })
+  for (const [key, remark] of e1HostAdjTotalSeeds(getRemark, (k) => allResponses.value.has(k))) {
+    allResponses.value.set(key, { item_id: key, conclusion: null, remark })
   }
 }
 
@@ -461,19 +453,11 @@ const globalAlerts = computed(() => {
   const alerts: Array<{ type: 'warning' | 'info' | 'success'; message: string }> = []
 
   // ① 审定合计 vs TB 差异
-  // 🔴 审定合计从跨sheet未审聚合键+账项调整实时计算（与 useE1Adjudication.writebackTrialBalance 的
-  // 1001/1002/1012 归组口径一致），而非读 E1-adj-total-*（那些仅在审定表 flushSave 后才写，
-  // 审定表未编辑时为 0 → 误报「审定合计 0.00 ≠ TB数」）。writeback 键非 0 时优先用（已编辑场景）。
-  const _num = (k: string) => parseFloat(allResponses.value.get(k)?.remark || '0') || 0
-  const _adj = (k: string) => _num(`E1-adjustment-by-item-${k}-ending`)
-  const _wb = _num('E1-adj-total-1001') + _num('E1-adj-total-1002') + _num('E1-adj-total-1012')
-  const _computed =
-    (_num('E1-cash-detail-total-unaudited') + _adj('cash'))                                  // 1001
-    + (_num('E1-bank-detail-principal-total-unaudited') + _adj('bank_principal'))            // 1002
-    + (_num('E1-bank-detail-other-total-unaudited') + _num('E1-digital-total-unaudited')      // 1012
-       + _adj('other_mf') + _adj('digital'))
-  const totalAudited = Math.abs(_wb) > 0.005 ? _wb : _computed
-  const tbAmount = parseFloat(allResponses.value.get('E1-adj-tb-amount-ending')?.remark || '0')
+  // 🔴 审定合计按审定表同式实时派生（e1HostAuditedTotals：未审 + 本地调整 + 大厅已确认调整），
+  //    不读可能陈旧的 E1-adj-total-* 持久化值，也不再「持久化值非 0 优先」（两个口径并存即误报来源）。
+  const totals = e1HostAuditedTotals(getRemark, 'ending')
+  const totalAudited = totals['1001'] + totals['1002'] + totals['1012']
+  const tbAmount = parseNum(getRemark('E1-adj-tb-amount-ending'))
   if (tbAmount && Math.abs(totalAudited - tbAmount) > 1) {
     alerts.push({ type: 'warning', message: `E1-1 审定合计 ${totalAudited.toFixed(2)} ≠ TB数 ${tbAmount.toFixed(2)}，差异 ${(totalAudited - tbAmount).toFixed(2)}` })
   } else if (tbAmount && totalAudited) {
@@ -500,6 +484,36 @@ const globalAlerts = computed(() => {
 
   return alerts
 })
+
+// ─── 公式推送提示条（SSE formula.pushed）────────────────────────────────────
+const pushNotice = ref<E1PushNotice | null>(null)
+const pushReloading = ref(false)
+
+/** 用户点「载入最新数据」：只取回被推送改过的条目替换内存，其余（含未保存的编辑）不动。 */
+async function reloadPushedItems(): Promise<void> {
+  const notice = pushNotice.value
+  if (!notice || !props.wpId) return
+  pushReloading.value = true
+  try {
+    const resp: any = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const rows = Array.isArray(resp?.data) ? resp.data : Array.isArray(resp) ? resp : []
+    for (const r of e1PushedRows(rows, notice.itemIds)) {
+      allResponses.value.set(r.item_id, { item_id: r.item_id, conclusion: r.conclusion ?? null, remark: r.remark ?? null })
+    }
+    seedAdjTotalsFromAggregates()
+    pushNotice.value = null
+  } catch (e) {
+    console.warn('[GtE1MonetaryFund] 载入公式推送结果失败:', e)
+  } finally {
+    pushReloading.value = false
+  }
+}
+
+const _pushSub = subscribeProjectEvent(props.projectId, 'formula.pushed', (data) => {
+  const notice = e1PushNotice(data, props.wpId)
+  if (notice) pushNotice.value = notice
+})
+onBeforeUnmount(() => _pushSub.close())
 
 // Save functions (passed to children; children call these for persistence + auto snapshot)
 async function saveImmediate(items: any[]) {

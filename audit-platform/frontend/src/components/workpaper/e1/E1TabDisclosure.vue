@@ -53,13 +53,11 @@ import {
   e1MainRows,
   e1NoteTextKey,
   e1NoteTexts,
-  e1SummableRows,
 } from '../composables/e1DisclosureScope'
 import {
-  isE1MainRowDeducted,
-  isE1MainRowSlotPrefilled,
-  resolveE1MainRowAmount,
-} from '../composables/e1MainRowPrefill'
+  computeE1DisclosureMainRows,
+  type E1DisclosureMainRowValue,
+} from '../composables/e1DisclosureMainRows'
 import WpAmountInput from '../shared/WpAmountInput.vue'
 import WpDisclosureConsistencyPanel from '../shared/disclosure/WpDisclosureConsistencyPanel.vue'
 import {
@@ -193,14 +191,6 @@ const storagePrefix = computed(() => `E1-disclosure-${variant.value}`)
 
 // ─── Project Row Items (Listed) ──────────────────────────────────────────────
 
-interface DisclosureRow {
-  key: string
-  label: string
-  crossKey: string  // allResponses key for 期末
-  endingAmount: number
-  openingAmount: number
-}
-
 // 披露主表行与列头的**单一真源** = composables/e1DisclosureScope.ts
 // （行标签逐字取自源 xlsx 并带 sourceRef，供后端守卫做三向比对；
 //  改造前此处内联两套 ITEMS，且 overseas 行写的是缩写「其中：存放境外」
@@ -242,56 +232,15 @@ loadOpenings()
 const remarkGetter = (key: string): string | null | undefined =>
   props.allResponses.get(key)?.remark
 
-// 单项期末数：审定表跨 sheet 审定数（`E1-adj-total-{code}`）只读取数。
-// 🔴 三个无科目码行（finance_co / accrued / digital）走**语义槽键**
-//    `E1-adj-slot-{key}`，并从 bank/other_mf 里扣减以避免双算 —— 口径与依据见
-//    `composables/e1MainRowPrefill.ts` 文件头（本组件不复现取数逻辑）。
-//    取不到值时纯函数返 null，此处按 0 参与合计但由 `endingResolved` 区分「空白 vs 0」。
-function effEnding(item: { key: string; crossKey: string }): number {
-  return resolveE1MainRowAmount(item, remarkGetter) ?? 0
-}
-// 单项期初数：手工覆盖优先（openingMap 显式含该 key），否则自动预填审定表期初审定数
-// （`E1-adj-total-{code}-opening` 或槽键的 -opening，本年期初=上年年末）。
-function effOpening(item: { key: string; crossKey: string }): number {
-  if (item.key in openingMap.value) return Number(openingMap.value[item.key]) || 0
-  return resolveE1MainRowAmount(item, remarkGetter, 'opening') ?? 0
-}
-// 某项期初是否自动预填（无手工覆盖且取到了非 0 预填值）——供 UI 标注
-function isOpeningPrefilled(item: { key: string; crossKey: string }): boolean {
-  if (item.key in openingMap.value) return false
-  return (resolveE1MainRowAmount(item, remarkGetter, 'opening') ?? 0) !== 0
-}
-
-const disclosureRows = computed<(DisclosureRow & { openingPrefilled: boolean })[]>(() => {
-  const items = disclosureItems.value
-  return items.map(item => {
-    let endingAmount = effEnding(item)
-    let openingAmount = effOpening(item)
-    // 合计行 = 参与合计的行之和（排除合计行自身与「其中：」备注行，
-    // 由 e1SummableRows 按真源的 isTotal/isMemo 判定，不在此处硬编码 key）
-    if (item.isTotal) {
-      const subs = e1SummableRows(variant.value)
-      endingAmount = subs.reduce((sum, i) => sum + effEnding(i), 0)
-      openingAmount = subs.reduce((sum, i) => sum + effOpening(i), 0)
-    }
-    return {
-      key: item.key,
-      label: item.label,
-      crossKey: item.crossKey,
-      endingAmount,
-      openingAmount,
-      openingPrefilled: item.isTotal ? false : isOpeningPrefilled(item),
-      // 🔴 「本项目无此科目」与「余额为 0」必须可区分：纯函数返 null 即前者，
-      //    此时期末列显示「—」而不是 0.00（Property 35）。合计行恒为已解析。
-      endingResolved:
-        item.isTotal || resolveE1MainRowAmount(item, remarkGetter) !== null,
-      // 该行是否由语义槽预填（供「预填」标记）
-      endingSlotPrefilled: isE1MainRowSlotPrefilled(item, remarkGetter),
-      // 该行金额是否已扣除单独列示项（供 tooltip 说明，避免用户以为数字错了）
-      endingDeducted: isE1MainRowDeducted(item, remarkGetter),
-    }
-  })
-})
+// 披露主表取数 = 纯函数 `computeE1DisclosureMainRows`（与后端公式推送共用同一算式，双侧夹具守卫）：
+// - 期末：审定表跨 sheet 审定数（`E1-adj-total-{code}`）只读取数；三个无科目码行
+//   （finance_co / accrued / digital）走语义槽键 `E1-adj-slot-{key}`，并从 bank/other_mf 扣减避免双算；
+//   取不到值按 0 参与合计，由 `endingResolved` 区分「空白 vs 0」（Property 35）。
+// - 期初：手工覆盖优先（openingMap 显式含该 key），否则自动预填审定表期初审定数。
+// - 合计：参与合计的行之和（排除合计行自身与「其中：」备注行）。
+const disclosureRows = computed<E1DisclosureMainRowValue[]>(() =>
+  computeE1DisclosureMainRows(variant.value, remarkGetter, openingMap.value),
+)
 
 // ─── Foreign Currency Tables (简版 / 详细版，两种披露版本共用) ────────────────
 

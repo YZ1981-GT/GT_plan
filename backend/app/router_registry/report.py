@@ -13,6 +13,7 @@
   §92 Phase 3 F1 双向穿透：附注来源追溯
   §93 Phase 3 F1.2 双向穿透：报表行构成科目
   §94 Phase 4 F2: 多年度对比分析
+  §105 公式推送（chain-closure-phase2-formula-push-engine）
 """
 from fastapi import FastAPI
 
@@ -138,3 +139,7 @@ def register_report_routers(app: FastAPI) -> None:
     # ═══ §104. disclosure-payload-authority-source：披露同步覆盖率只读查询 ═══
     from app.routers.disclosure_sync_coverage import router as disclosure_coverage_router
     app.include_router(disclosure_coverage_router, tags=["disclosure-sync-coverage"])
+
+    # ═══ §105. chain-closure-phase2-formula-push-engine：公式推送（规则 / 立即推送 / 采用 / 锁定） ═══
+    from app.routers.formula_push import router as formula_push_router
+    app.include_router(formula_push_router, tags=["formula-push"])

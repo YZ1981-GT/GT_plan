@@ -144,6 +144,12 @@ from app.models.acnr_invalidation_model import (  # noqa: F401
     AcnrInvalidationEpoch,
     AcnrInvalidationOutbox,
 )
+# 公式推送引擎目标级状态 / 运行记录（迁移 V169）
+from app.models.formula_push_models import (  # noqa: F401
+    FormulaPushRun,
+    FormulaPushState,
+)
+
 # 底稿 HTML ↔ OnlyOffice 双向回写同步域（迁移 V151 的 28 张表）
 from app.models.workpaper_sync_models import (  # noqa: F401
     WORKPAPER_SYNC_TABLES,
@@ -327,4 +333,7 @@ __all__ = [
     "AcnrProjectOverlay",
     "AcnrInvalidationEpoch",
     "AcnrInvalidationOutbox",
+    # --- 公式推送引擎 (chain-closure-phase2-formula-push-engine / V169) ---
+    "FormulaPushRun",
+    "FormulaPushState",
 ]
