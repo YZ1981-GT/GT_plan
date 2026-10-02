@@ -481,6 +481,40 @@ _REVIEWED_BASIS: Final[str] = (
 )
 
 
+def _expansion_sheets_payload() -> list[dict[str, Any]]:
+    """扩容面（D3-6 / D3-4 双区 / D3-5 / D3-7 双区）的契约 `sheets[]` 条目。
+
+    spec: d3-sync-coverage-via-row-table-engine · Task 6/8/9/10/11/12（接线重建）
+
+    🔴 **本函数一度丢失**：Task 6~12 的 evidence 明确记录过它的存在与两次演进
+    （Task 6 新建 `_expansion_sheet_row_table_payload()` + 本函数、`sheets` 里 splice
+    `*_expansion_sheets_payload()`，entry 模块 869→942 行；Task 8 把它重构为**按
+    `sheet_key` 分组**以支持 D3-4 双区，942→965 行），但那份工作树从未 `git add` ⇒
+    入库版本的 `build_contract_payload()` 里既没有这两个私有函数、也没有 splice，
+    磁盘契约停在「只有 D3-2 一张」。
+
+    后果是一个**两把锁都看不见**的缺口：
+      * `assert_contract_file_matches_source()` 比「磁盘 vs 源 payload」—— 两边漏的是
+        同样 4 张 ⇒ 逐字节相等 ⇒ 报绿；
+      * `assert_specs_align_with_contract_sheets()` 能看见，但它没有生产调用方，
+        只在本 lane 的 `test_d3_expansion.py` 里被调用 ⇒ 那 3 条红从 commit
+        `57c78b53c` 起就一直在 HEAD 上（CI `backend-tests` 全量带 `-x`）。
+
+    🔴 重建时**不再写 D3 私有实现**，改调 d567 lane 后来抽出的共享实现
+    `phase5_d567_expansion_contract.build_expansion_sheets()` —— 它的按 `sheet_key`
+    分组逻辑与 Task 8 重构后的 D3 版逐字同构（双区两个 spec 共享同一 `sheet_key`
+    必须归入同一 `sheets[]` 条目的 `tables[]`，否则契约解析器报「sheet_key 重复」
+    fail-closed）。共享实现原先硬编码 `carries_total_formula: True`，本次同步改成读
+    `spec.footer_carries_total_formula` —— 全仓唯一取 False 的正是 D3-4 段②贷方。
+    """
+    from app.services.workpaper_sync import phase5_d3_expansion as _exp
+    from app.services.workpaper_sync.phase5_d567_expansion_contract import (
+        build_expansion_sheets,
+    )
+
+    return build_expansion_sheets(_exp.managed_row_table_specs())
+
+
 def build_contract_payload() -> dict[str, Any]:
     from app.services.workpaper_sync.excel_extract import TABLE_SHEET_ANCHOR
 
@@ -512,7 +546,8 @@ def build_contract_payload() -> dict[str, Any]:
                 "excel_name": MANAGED_SHEET,
                 "locator": {"anchor": TABLE_SHEET_ANCHOR},
                 "tables": [_rows_table_payload()],
-            }
+            },
+            *_expansion_sheets_payload(),
         ],
         "review": {
             "entry_id": ENTRY_ID,

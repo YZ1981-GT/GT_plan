@@ -975,3 +975,13 @@ verified**，Task 72 的 `named_required_scenarios_really_executed` 判据恒 fa
 
 环境性失败（stash 对照证明与本改动无关）：Task 70 gate 8 条（JSON byte-lock / D2 drift / evidence 表）、
 Task 30 的 6 个 ERROR（writer inventory source digest stale）、Task 67 的 9 条、Task 41/42 的 3 条真实数据 tripwire。
+---
+
+## 外部交棒（2026-10-01，来自 spec `sync-editor-host-discovery-contract-closure` Task 16）
+
+上游修复「挂点发现器不认 `WorkpaperSyncEditorHost`」后，本 umbrella 有 **2 条**判据经定向 A/B 确认由该轮引入；这里只登记 owner，不代改既有 Task 21 / 67，不代勾：
+
+1. **Task 21 / RG-17（疑真实运行时缺陷，优先级最高）**：`test_task21_room_service.py::TestDocKeyIsMtimeFree::test_rg17_is_clear_on_the_real_manifest` 新增 **17** 处红，均为 A 类同步宿主 `room_model=shared` 但 `doc_key` 不含 wp 维度。它们在 HEAD 里也是 shared，但当时 resolver 是 legacy，RG-17 不走同步载体分支；发现契约修好后才暴露。请在「doc_key 加 wp 维度」与「有事实依据的显式共享豁免」两路中裁定，禁止默认豁免。
+2. **Task 67 / BP-16（冻结等值判据过期）**：`test_task63_subcode_adjudication.py::TestResidencyReverification::test_bp16_manifest_criterion_is_recomputed_from_the_manifest` 失败为 `assert 155 == 189`。上方 Task 63 自己已明确 BP-16 owner 是 manifest 生成侧 / Task 67，**不在 Task 63**。现有等值断言把 HEAD 的全局 `entry_count=155` 写死；entry 数会随宿主迁移变化，建议改为现算或有语义的棘轮，而不是把新值 189 再写死。
+
+逐条失败文案、两态复现方法和其余 8 条 owner 见 `.kiro/specs/sync-editor-host-discovery-contract-closure/handoff-regression-attribution.md`。

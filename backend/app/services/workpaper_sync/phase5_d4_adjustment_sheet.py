@@ -54,8 +54,20 @@ HEADER_ROW_D44: Final[int] = 5
 FIRST_DATA_ROW_D44: Final[int] = 6
 LAST_DATA_ROW_D44: Final[int] = 20
 FOOTER_ROW_D44: Final[int] = 21
-#: A21 完整文本 63 字，取前缀作 marker（引擎按前缀搜 A 列定位 footer 锚）。
-FOOTER_MARKER_D44: Final[str] = "提示："
+#: A21 的**完整**文本（63 字）。
+#:
+#: 🔴 必须是完整文本，**不能只写前缀 `"提示："`**：`excel_materialize._find_marker_row`
+#:    的判据是 `text.strip() == marker`（**全等**，不是 startswith）⇒ 前缀永不命中 ⇒
+#:    `assert_footer_anchor_stable` 抛 `FooterAnchorDriftError: footer marker 在列 A 上
+#:    一处都找不到`，rematerialize 整趟失败（T10* 真栈实测 14.2s 即挂）。
+#:    误判过程：openpyxl 读 A21 确实以「提示：」开头 ⇒ 我据此认为前缀可行；
+#:    但那是我自己写的 startswith 判据，与引擎的全等判据不是一回事。
+#:    对照：已落地的同类 sheet 一律用完整行文本（D4-19 `三、审计说明` /
+#:    D4-34 `2.咨询业务`），没有一个用前缀。
+FOOTER_MARKER_D44: Final[str] = (
+    "提示：本底稿适用于调整分录较多、较复杂的项目，且仅列示与本报表项目相关的审计调整。"
+    "项目组可根据项目实际情况选择是否使用该底稿。"
+)
 MANAGED_LAST_COL_D44: Final[str] = "J"
 #: 🔴 差异 3/4：模板 K~O 五列全空，取紧邻 J 右侧首个 ⇒ 现成载体，无需注入。
 UUID_COL_D44: Final[str] = "K"

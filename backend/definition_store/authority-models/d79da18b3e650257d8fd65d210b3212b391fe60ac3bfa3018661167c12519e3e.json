@@ -1,0 +1,1 @@
+{"authority_model":"projection_contract","content_authority":"structured_projection","entry_id":"xlsx/gt-l5-long-term-payables","merge_model":"stable_field_three_way","pilot_class":"l_cycle_long_term_payables","required_slots":["template","instrumentation","contract"],"schema_version":"authority-model-definition:v1"}

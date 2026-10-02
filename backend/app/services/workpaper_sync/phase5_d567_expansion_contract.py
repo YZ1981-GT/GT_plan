@@ -57,10 +57,19 @@ def build_expansion_sheets(managed_row_table_specs: Any) -> list[dict[str, Any]]
                 "json_pointer": f"/rows/*/{spec.row_identity_key}",
             },
             "delete_policy": "tombstone",
+            # 🔴 `carries_total_formula` / `search_column` 必须**读 spec 字段**，不能硬编码。
+            #    `RowTableSheetSpec.footer_carries_total_formula` 是 D3 lane 为「合计行不带
+            #    公式」的区专门加的字段（默认 True）；本仓现算全部扩容 spec 里只有 D3-4 段②
+            #    贷方（`GT_D34_CREDIT_ROWS`，footer 标记「差异合理性分析」）取 False。硬编码
+            #    True 会让它在契约里被声明成「合计行带公式」⇒ 与模板实际不符。
+            #    d5/d6/d7 现有 spec 这两个字段全取默认值 ⇒ 本次改为读字段对它们是零 diff
+            #    （由三家生成脚本 check 模式实测确认）。
             "footer_anchor": {
                 "marker": spec.footer_marker or "合计",
-                "search_column": "A",
-                "carries_total_formula": True,
+                "search_column": getattr(spec, "footer_search_column", "A") or "A",
+                "carries_total_formula": bool(
+                    getattr(spec, "footer_carries_total_formula", True)
+                ),
             },
             "formula_mask": list(spec.formula_mask),
             "fields": fields,

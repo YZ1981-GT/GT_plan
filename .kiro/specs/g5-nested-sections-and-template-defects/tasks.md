@@ -12,6 +12,322 @@ F5 spec 裁决 F5-H2 + F2 spec（模板缺陷走覆盖层的两个先例）· D4
 🔴 **G5 的难点全在模板结构与模板缺陷，不在平台前置**：`blocked_by` 只有 `BP-1~4 + BP-6`
 （无 BP-5/7/8）、definedName 0、主受管表裸 IF 0、TB 发布门已接。
 
+## 🔴 2026-09-30 现扫勘误：核心交付物已在库（假红），复选框未回标
+**现算证据**：`STORE_MERGE_REGISTRY` 已含 **`g5.long_term_receivable_detail`**；
+`backend/data/workpaper_sync_contracts/g5.long_term_receivable_detail.json` 是**正式契约**；
+G 域 **32 个 provider / 14 个正式契约**全部 git 跟踪。
+
+⇒ 本 spec 的 entry 层与嵌套段声明主线已交付，复选框 `0/14` 与磁盘不符。
+**只登记不代勾**：本 spec 另有「三处漏加小计处置」「G5-1!B35 越界缺陷登记 + 交棒（明确不修）」
+「16384 转置策略」等任务，各有独立 AC 与裁决，须逐条核过再勾。
+
+### 🔴 当日自我更正：上面那句「主线已交付」说得不够准，真实状态是「备好了但没接上」
+
+同日更深一层现算（用户要求「不要假红」后重查）推翻了「契约+注册在库 ⇒ 主线已交付」这个推论：
+
+| 判据 | 现算值 |
+|---|---|
+| manifest 里 G 域 entry | **21** |
+| 其中 `capability == 'bidirectional'` | **1**（只有 `xlsx/gt-g7-long-term-equity-main`） |
+| 仍是 `single_onlyoffice` | **19**（含 `xlsx/gt-g5-long-term-receivable`） |
+| G5 entry 的 `migration_state` | **`legacy_fake_bidirectional`** |
+| G5 entry 的 `canonical_resolver` | **`legacy_sheet_onlyoffice_router`**（不是 published representation） |
+| G5 entry 的 `html_store` | **`unresolved`** |
+| `evidence.legacy_reasons` | `["template_only_open", "no_durable_forcesave_ack", "missing_adapter"]` ← **过期**，adapter 其实已注册 |
+
+⇒ **双向回写在运行时从未启用**。契约/注册/provider/宿主改线都齐了，但 manifest 的
+`capability` 没翻，而运行时门（`assert_manifest_capability_enabled` 一族）读的正是 manifest。
+「交付物在库」与「运行时接上了」是两件事 —— 与 `l-cycle-true-adapter-registration` 立的
+口径一致：**验收看 manifest 现算翻转，勾选与契约存在都不算**。
+
+**本轮已做（代码，不是登记）**：`backend/data/workpaper_sync_entry_overlay.json` 新增
+**13 条 G 域 bidirectional 裁决**（G1/G2/G3/G4-main/G5/G6-main/G8/G9/G10/G11/G12/G13/G14），
+每条六项前置逐一现算通过：正式契约 reviewed（非 candidate）· `STORE_MERGE_REGISTRY` 已注册 ·
+`DELIVERED_PER_ENTRY_CONTRACTS` 台账登记且 provider 模块存在 ·
+`build_manifest_registration_plan` 判**可注册** · `check_sync_provider_golden_digest`
+覆盖（G 域 13 家在 `PROVIDERS` 名单内）且 **161 digest 零漂移** ·
+宿主已改线（`WorkpaperSyncEditorHost` + `syncBridge`，与已翻的 d1/d2/d4/g7/h1 **同形**）。
+新建守卫 `backend/tests/workpaper_sync/test_g_cycle_bidirectional_overlay_adjudication.py`
+（**33 passed + 1 xfailed**）。
+
+**仍未通（如实登记，不擅自绕过）**：manifest 重生成被 `approved_source_digest` 门拒绝 ——
+现算 mount diff 是**新增挂点 0 / 消失挂点 18 处，全在 A 类**（A101/A111/A121/A171/A1721/
+A1731/A173/A174/A176/A177/A181/A182/A271/A3/A51/A81/A91 + `GtWpRenderer.vue`），**G 域 0 处**。
+那道门的全部意义就是「前端挂点一变就停下来让人看一眼」，自己改 `approved_source_digest`
+等于替别人批准 18 处未复核的 A 类改动（而那批文件恰好被批量插入脚本改坏过三类 Vue 语法错误）
+⇒ 不碰。守卫里那条 `xfail(strict=True)` 钉住诉求：A 类 diff 复核 + 生成器 `--apply` 后它会
+xpass，strict 模式下 xpass 即失败，逼迫下一个人删标记而不是忘掉。
+
+**顺带发现的平台级事实**：`a51.cashflow_audit`（A 循环 canary）的 override 早已在 overlay 里，
+但 manifest 同样没翻 —— **同一道门把 A 循环 canary 也卡住了**。本轮 `test_workpaper_sync_manifest_contract`
+与 `test_task73_entry_profile_manifest` 现算 **9 failed + 6 errors，根因全是这道门**；
+用 HEAD 字节替换 overlay 复跑**同样 9+6**（仅工作树红 = 空集）⇒ 与本轮 13 条 override 无关，属预存。
+
+
+## 🔴 2026-09-30 续：两道门逐道实测，第二道暴露发现契约缺口（manifest 仍未翻）
+
+接上节。本轮按用户「修复卡住那个门，跑通」的要求**逐道走到底**，结论是**不能过门**，
+且过程中发现一个比门本身更根本的架构缺口。如实登记，未勾任何复选框。
+
+### 第一道门 `approved_source_digest`：复核通过，但不批准
+
+完整 mount diff 复核已做完（`approved=b6291b9f… / current=2bdb9baf…`），归因三类、数字闭合：
+
+| 类别 | 规模 | 归因 | 裁决 |
+|---|---|---|---|
+| A 类宿主整体退网 | 17 宿主 / 17 挂点 | 改用 `WorkpaperSyncEditorHost` + `GtEntrySyncCapabilityNotice` | 能力升级非损失 |
+| condition 配对变化 | 38 宿主 | **在 legacy 挂点前插入 `WorkpaperSyncEditorHost` 真双向分支** ⇒ legacy 降级 `v-else-if` | 就是双向接线本体 |
+| C22 净增 1 挂点 | 1 宿主 | C21-1 补 BP-10 模式开关 + CC-63 `ooSheetName` 修复 | C 轮 spec 实施 |
+
+`GtOnlyOfficeSheet 238 − 17 + 1 = 222` ✓ 闭合；新增宿主 **0**；Word 两类 5/2 未变。
+
+🔴 **方法论教训（必带下一轮）**：`mountId` 内嵌 `sourceSpan`，**任何行号位移都会换 hash**
+⇒ 按 `mountId` 做 diff 会得出「G 域消失 33 / 新增 33」的假象。必须改用**不含行号的语义键**
+`(file, component, documentType, wpExpression, sheetExpression, condition, loop, importKind, sourceKind)`
+的多重集对比。另：既存守卫 `test_the_pending_mount_diff_contains_no_g_cycle_host` 的
+`key_of` 取 `m.get("line")`（live 侧其实叫 `sourceSpan`，两侧都取不到值恒为空）⇒ 它的
+「G 域 0 处」是**宿主×组件粒度**的正确结论，与细粒度的「17 对 condition 变化」不矛盾，不是 bug。
+
+**为什么复核通过仍不批准**：现算 `git status` 显示那 17 个 A 类宿主 **17/17 全部未提交**
+（最后一次提交是无关 feature `44f07ff95`）⇒ 批准等于把复核签名落在一个**可能从未进入
+历史的树态**上。已把本轮一度写入的 digest **完整回滚**（`approved_source_digest` 与
+`review_basis` 逐字复原为 HEAD 值，21 条 overrides 全部保留；现算与 HEAD 的唯一差异键是
+`overrides`）。
+
+### 第二道门 `stale overlay overrides: [GtA51CashflowAudit.vue]`：他人在途产物，不可删
+
+绕过第一道后实测撞到。根因是并发 A 轮会话的工作**自相矛盾**：他们同时在做
+①把 A51 改成只挂 `WorkpaperSyncEditorHost`（源码里 `<GtOnlyOfficeSheet` 已为 0）
+②加一条 `component: "GtOnlyOfficeSheet"` 的 a51 `bidirectional` override。
+先前第一道门一直先跳闸，所以他们还没撞到这个矛盾。
+
+`git show HEAD:…overlay.json` 现算 **HEAD 只有 7 条 override**，工作树 21 条
+= 7 + 我的 13 条 G + **a51**；我开工时记录的是「overrides 8→21」⇒ **a51 那条不在 HEAD，
+是他人未提交产物** ⇒ 删它来放行自己的门 = 改别人的在途工作，拒绝。
+（生成器对 0 匹配规则无豁免机制，设计上不许留死规则。）
+
+### 🔴 更根本：发现契约缺口 —— 迁移最彻底的宿主会从挂点清册整体消失
+
+entry 只能由 `_group_source_facts(discovery)` 派生，而 discoverer 的组件白名单只有
+`GtOnlyOfficeSheet` / `OnlyOfficeWordDialog` / `WorkpaperWordEditor`，**不认
+`WorkpaperSyncEditorHost`** ⇒ 一个宿主一旦完成迁移、删掉 legacy 标签，它的 entry
+**直接不存在**。现算规模：**51 个「仅 EditorHost」宿主**（34 个 `d4/**` tab + 17 个 A 类）
++ **45 个双挂宿主**。
+
+**这不是假设，已经发生过一次**：34 个 `d4/**` tab 宿主**已经真的从 manifest 里消失了**，
+当时只在 overlay 的 `review_basis` 里留了一句「属有意迁移的既成事实」，没有任何判据
+守住「这些 entry 去哪了」。守卫新增
+`TestDiscoveryContractGap::test_the_gap_has_already_silently_dropped_the_d4_tab_hosts` 钉住它。
+
+**为什么不能顺手修**：把 EditorHost 并入发现，会让那 45 个双挂宿主的两个组件组产出
+**同一个 entry_id**（`_entry_id(document_type, source_file)` 只按文档类型 + 文件路径取键），
+生成器 `stable entry_id collision` 当场抛错 ⇒ 需要先裁决「两个组件组如何归并成一个 entry」，
+属设计级变更，**另立 spec**。
+
+### 本轮守卫变更（`test_g_cycle_bidirectional_overlay_adjudication.py`，**40 passed + 1 xfailed**）
+
+- 新增 `TestSecondGateIsConcurrentInFlightWork` 3 条：a51 override 不在 HEAD（**配空分母防护**：
+  先断言能从 HEAD 读到确定存在的 `GtD2AccountsReceivable.vue` 那条，否则 `not in` 会恒真）/
+  A51 源码已无 legacy 标签 / 17 个 A 类宿主 17/17 未提交
+- 新增 `TestDiscoveryContractGap` 3 条：发现白名单无 EditorHost / stale manifest 里的
+  「仅 EditorHost」entry 已不可派生 / d4 那批已消失 + 碰撞推论锚点
+- `xfail(strict=True)` 理由改写为**两道门 + 架构缺口**的真实归因（原文写的「18 处 A 类挂点
+  待复核、G 域 0 处」已被本轮事实细化）
+
+🔴 **写判据时自己踩的坑（已修）**：首版把缺口判据写成「这批宿主一个都不在 manifest 里」，
+实测打红并列出全部 17 个 —— 因为**磁盘 manifest 是 stale 的**，它按旧源码态生成，那时这
+17 个宿主还挂着 legacy 组件。正确命题是「**在 stale 清册里但已无法再派生**」。
+教训：断言派生结论前必须拿真实产物对一次，否则就是凭推理写判据。
+
+### 解除步骤（给下一个人）
+
+1. 等并发 A 轮会话提交，并由其自行解决「a51 override 指向已删 legacy 挂点」的矛盾
+2. 另立 spec 裁决 `WorkpaperSyncEditorHost` 的发现 / entry 归并方案（45 个双挂宿主的碰撞）
+3. 复核并更新 `overlay.approved_source_digest`
+4. `python backend/scripts/gen/generate_workpaper_sync_manifest.py --apply`
+5. 删掉守卫里的 `xfail(strict=True)` 与 `TestSecondGateIsConcurrentInFlightWork` /
+   `TestDiscoveryContractGap`（它们是现状锚点，解除后会红，红即「该删」的信号）
+
+**预存红未受影响**：`test_workpaper_sync_manifest_contract.py`（6 errors）+
+`test_task73_entry_profile_manifest.py`（9 failed）回滚后逐条复现，全部同源于第一道门，
+本轮引入 **0**。
+
+## ✅ 2026-09-30 最终结果：两道门已过，13 条 G 主入口 capability 已翻 bidirectional
+
+承上两节。用户明确授权「a51 那条矛盾的 override 你来代并发会话处置」后，按下述方式收口。
+**上一节「不能过门」的结论已被本节取代**（保留原文以留审计轨迹，勿按那一节行动）。
+
+### a51 的处置：移入 `deferred_overrides`，不是删除
+
+overlay 新增顶层键 `deferred_overrides`（生成器不读，`overlay_digest` 覆盖全文件；
+现算确认无任何测试钉死 overlay 顶层键集），把 a51 裁决**原文逐字**搬进去，附
+`deferred_on` / `deferred_by` / `deferred_reason` / `restore_action` 四个字段。
+
+🔴 **处置依据（关键）**：把它留在 `overrides` 里**并不能保住 a51 的能力**。entry 只能由
+`_group_source_facts(discovery)` 从发现到的挂点派生，而 discoverer 的组件白名单不含
+`WorkpaperSyncEditorHost` ⇒ `xlsx/gt-a51-cashflow-audit` 重生成后**根本不存在**，
+overlay 写什么都一样。所以它留着只有阻塞作用、没有保护作用 ——
+这条推理是「可以动它」的全部正当性来源，不是「为了让自己的门通过」。
+
+恢复条件与守卫：`TestDeferredOverrideStaysRestorable` 5 条判据锁住「原文逐字在」
+「与 overrides 互斥」「推迟理由仍成立（glob 仍无匹配挂点）」「后果如实（entry 确实不在
+清册、前后端同口径）」「批准已留痕」。理由一旦不成立本节即红，红即「移回 `overrides`」的信号。
+
+### 执行与验证
+
+| 步骤 | 结果 |
+|---|---|
+| `generate_workpaper_sync_manifest.py --check` | 两道门均过，报产物 stale |
+| `--apply` | manifest + 前端投影已重生成，`manifest_digest=c17ad880…` |
+| entry 数 | **155 → 138**（17 个 A 类宿主退出，见下） |
+| capability 分布 | `bidirectional` **5 → 18**、`single_onlyoffice` 144 → 114 |
+| 13 条 G 主入口 | **13/13** `capability=bidirectional` + `migration_state=adapter_registered` + `adapter_id` 逐一对上 |
+| `build_manifest_registration_plan` | 13/13 `blocked_reason is None`，provider 逐一对上 |
+| `generate_workpaper_sync_legacy_baseline.py --apply` | 下游派生产物随之重生成 |
+| `check_sync_provider_golden_digest.py` | ✅ 161 个 digest 逐个不变（覆盖 24 家，零跳过） |
+| 本 spec 守卫 | **43 passed**，原 `xfail(strict=True)` 已按设计删除 |
+| `test_workpaper_sync_manifest_contract.py` + `test_task73_entry_profile_manifest.py` | **52 passed**（原 9 failed + 6 errors 全部转绿） |
+
+### 🔴 必须如实说明的三件事
+
+**①「capability 翻了」≠「运行时已接通」。** `check_workpaper_sync_closure.py` 现算
+`registry_bidirectional_without_registered_adapter: 18` —— 这 18 条**包含本来就 bidirectional
+的 5 条**（d1/d2/d4/g7/h1）。即「翻 capability」与「adapter 进运行时注册表」是两步，
+后者对**全部** 18 条都仍未完成，不是 G 独有的欠账。同理
+`bidirectional_without_contract_evidence` / `without_browser_evidence` 各 18 条。
+closure 门按其 docstring 设计恒非零（债务报告），关键三项 `bidirectional_without_adapter`
+/ `registry_fake_bidirectional` / `registry_stale_adapter` 现算**均为 0**。
+
+**②本次连带使 17 个 A 类 entry 退出 manifest（13 条 xlsx + 已有 docx bundle 不受影响）。**
+A 域仍在清册的只剩 7 条（a10/a12/a16/a17 四个 docx bundle + a112 + a115 + a38）。
+这是发现契约缺口的直接后果、而非本轮新造的问题 —— 34 个 `d4/**` tab 早已同样退出过。
+
+**③🔴 发现 HEAD 的 committed manifest 自身不自洽，本次重生成顺带修正。**
+HEAD 产物里 `entries` 现算 5 条 bidirectional，而它的 `stats.capability_counts` 声明 4
+（`single_onlyoffice` 144 vs 声明 145）。生成器在同一函数里由 entries 算 stats，
+**不可能产出这种偏差** ⇒ 该 manifest 被手改过（`phase5_h_cycle_common.py` 明令禁止手改）。
+`git log -- manifest` 定位到最后一次改动是 `1ec6a1050 feat(sync): D1 adapter 注册 ——
+**manifest bidirectional** + overlay per-entry …`：它把 entries 里 D1 的 capability 改成
+bidirectional 却没重跑生成器。新产物现算完全自洽（18/18、138/138）。
+**这个手改之所以能长期存活，正是因为 digest 门把重生成堵住了 —— 没人能重生成，手改就没人能发现。**
+
+### 归因：`test_projection_lane_regression_gate.py` 4 条红**全部预存**
+
+🔴 其中 2 条点名 G7（`test_production_manifest_registers_nothing_for_g7` /
+`test_stage_two_is_correctly_still_blocked_by_the_disk_manifest`），看起来像本轮引入，
+实为预存。**内存 A/B 铁证**（不改磁盘、`build_production_registry(manifest=…)` 本就支持传入）：
+把 **HEAD manifest** 喂进同一个 `register_from_manifest`，注册结果是同样 4 条
+（d2/d4/g7/h1）、`G7 已注册 = True`，`reason=None`。即 G7 在 HEAD 态下就已注册
+（它的 capability 在 HEAD 就是 bidirectional，本轮 diff 只动了它的 `mounts` 与
+`profile_source`）⇒ 这 2 条在我动手前就是红的。另 2 条与 manifest 无关：
+`attach_pilot_adapters() got an unexpected keyword argument 'session'`（签名漂移）、
+`working_paper_content_version_rows: 登记 198、真库 276`（真库行数漂移）。
+
+🔴 方法论沉淀：**归因不要靠「看起来像」，内存 A/B 比 `git stash` 更安全**——
+工作树里有并发会话的在途改动时不能 stash，而把旧产物在内存里喂进同一入口即可做对照组。
+
+### 🔴 补：本轮确实引入了 2 条新红（如实登记，未粉饰）
+
+`backend/tests/workpaper_sync/test_a_entry_connection_blockers.py` 现跑 3 failed / 158 passed。
+内存 A/B 逐条归因（把 HEAD manifest 喂进同一入口复算，不靠推理）：
+
+| 判据 | HEAD manifest | 重生成后 | 归因 |
+|---|---|---|---|
+| `test_only_canary_is_bidirectional` | **FAIL**（`bidi=[]`） | FAIL | 预存 |
+| `test_a3_console_capability_stays_single_onlyoffice` | PASS | **FAIL** | **本轮引入** |
+| `test_canary_registration_plan_is_unblocked` | PASS | **FAIL**（`StopIteration`） | **本轮引入** |
+
+成因：a51 与 a3-console 的 entry 随重生成退出清册（发现契约缺口的直接后果）。
+🔴 **但要说清这两条此前为何 PASS —— 靠的是产物 stale**：磁盘 manifest 冻结在 A 类宿主改线
+之前的源码态，所以 entry 还在。重生成只是让已存在的不一致变得可见，不是新造不一致。
+两个文件现算均 `git ??` 未入库 ⇒ **不影响 CI**（CI 的 `backend-tests` 只跑已入库文件）。
+
+**处置**：不改并发会话的测试（那是他们的设计判断），改为在
+`.kiro/specs/a-cycle-sync-foundation-and-first-canary/tasks.md` 追加外部通告，
+含三条解除路径建议。
+
+### 🔴 完整回归归因（内存/文件级 A/B 实测，不靠推理）
+
+A/B 做法：把 **4 个生成产物**（manifest / legacy baseline / 两个 `.generated.ts`）临时
+`git checkout HEAD --` 还原，跑同一组测试，再按 sha256 校验**强制还原**；overlay 不动
+（它只被生成器读）。工作树里有并发会话的在途改动 ⇒ **不能 `git stash`**，这是比 stash
+更安全的替代。
+
+**本轮修好的（净减 15 条红）**
+| 套件 | 改动前 | 改动后 |
+|---|---|---|
+| `test_workpaper_sync_manifest_contract.py` | 6 errors | **0** |
+| `test_task73_entry_profile_manifest.py` | 9 failed | **0** |
+
+**本轮引入的（12 条，全部同一类：冻结快照里写着 155 条 manifest 的对账算术）**
+| 套件 | 条数 | 判据 |
+|---|---:|---|
+| `test_task57_abcs_and_shared_migration.py` | 6 | `test_abcs_denominator_is_non_vacuous` · `test_ad1_scope_arithmetic_closes` · `test_letter_bucket_counts_recompute` · `test_manifest_mirror_divergence_is_registered_not_silently_equal` · `test_no_abcs_adapter_is_registered` · `test_selection_rule_recomputes_the_entry_set` |
+| `test_task63_subcode_adjudication.py` | 3 | `test_record_is_reproducible` · `test_bp16_manifest_criterion_is_recomputed_from_the_manifest` · `test_source_digests_cover_every_file_the_measured_criteria_read` |
+| `test_a_entry_connection_blockers.py` | 2 | `test_a3_console_capability_stays_single_onlyoffice` · `test_canary_registration_plan_is_unblocked` |
+| `test_task46_d_cycle_migration.py` | 1 | `TestAc14HonestModeVisibility::test_registered_entry_ids_agree_with_the_slice` |
+
+**根因统一**：这些 slice / record 是**冻结在 155 条 manifest 那一版**的审阅产物
+（`workpaper_sync_abcs_cycle_manifest_slice.json` 750 KB、`workpaper_sync_task63_*` 等），
+entry 数 155→138 后它们与 manifest 的对账不再闭合。**处置 = 只登记不代改**：
+这些产物属各自 lane 的审阅面（与 manifest 同为 review-gated 产物），
+重生成需要其 owner 复核，不在本轮授权范围内。
+
+**确认为预存、与本轮无关的（抽样实测）**
+- `test_projection_lane_regression_gate.py` 4 条：2 条点名 G7（内存 A/B 证明 HEAD 态下
+  `G7 已注册 = True`，本来就红）+ `attach_pilot_adapters()` 签名漂移 + 真库行数 198 vs 276
+- `test_task57` 另 23 条 / L·M·N·A 九套件另 79 条：**并发会话改 17 个 A 类宿主**导致的前端
+  源码事实漂移（`source_refs` 行号 / sheet 字面量 / dual-mode 载体），A/B 两侧同红
+- `test_task31_frontend_contract.py` 3 条：测的是**另一个**产物
+  `workpaperSyncContract.generated.ts`（由 router + 枚举生成），与 entry manifest 无关
+- `test_g_foundation_p4_p8_p17_p18_red_baselines.py` 的 TB 门那条：两个输入
+  （`GATE_GAP_FAMILIES` 静态元组 + `STORE_MERGE_REGISTRY`）我都没碰
+
+### 🔴 事故与处置：生成产物在会话中途被并发会话回退过一次
+
+第 2、3 批 A/B 之间，4 个生成产物被回退成 HEAD 版本（manifest 回到 155 / bidirectional 4 /
+`b6291b9f`），而 **overlay 仍是我的版本**（digest `2bdb9baf` / 20 overrides / 1 deferred）
+⇒ 出现「overlay 已批准、产物却是旧的」不一致态。发现途径是 A/B 脚本的
+`assert all(sha != before), "checkout 未生效"` 打红 —— **那条断言本是防脚本自身出错的，
+结果抓到了外部回退**。
+
+处置 = 重跑两个生成器。**四个产物的 digest 与第一次逐字一致**
+（`c17ad880…` / `6bbfa57a…` / `810d3ae8…` / `e890ff2e…`）⇒ 生成是确定性的、可复现，
+回退不造成信息损失。
+
+🔴 方法论：**多会话并发下「我刚写的文件」不是稳定前提**。凡跨多步的产物操作，
+每步前后都要现算校验（本轮正是靠 A/B 脚本的还原自检才发现）；且**派生产物被回退可
+机械恢复、真源（overlay）被回退才是真损失** —— 所以真源的改动要尽早独立落盘/提交。
+
+### 🔴 golden digest 门后来打红 —— 归因为并发会话的 D4 契约，不是 G
+
+本轮早先跑该门为 **✅ 161 digest 逐个不变（24 家，零跳过）**；收尾复跑变红：
+```
+❌ golden digest 发生漂移：[d4] sheet[d44-managed]: 基线=a367bf8bf2e02e71 现算=1fa82f831f2f034a
+```
+按门自带的排查顺序第 1 步现算，坐实是**并发会话的在途改动**：
+- `git status` 显示 `backend/data/workpaper_sync_contracts/d4.revenue_detail.json` 为 ` M`（未提交）；
+- 逐 sheet 对账该契约的 HEAD 版 vs 工作树版：**36 张 sheet 里只有 `d44-managed` 变了**
+  （4138 B → 4198 B），其余 35 张逐字不变 —— 恰好就是门报漂移的那一张；
+- 门只报这**一行**，即**包括 13 条 G 在内的其余所有家零漂移**。
+
+⇒ **不执行 `--update`**：那会把别人未提交的 D4-4 改动重新基线化，等于替他们批准。
+另注：该门的覆盖面在本会话期间由并发提交 `88397deb5` 从 24 家扩到 34 家，
+故「161 digest / 24 家」是本轮早先的采样值，**不可当作当前口径引用**。
+
+### 最终状态核验（收尾现算）
+
+| 项 | 值 |
+|---|---|
+| `generate_workpaper_sync_manifest.py --check` | **[OK]** `manifest digest c17ad880…` |
+| manifest | entry 138 · `bidirectional` 18 · `source_digest 2bdb9baf…` |
+| 13 条 G 主入口 | 13/13 `bidirectional` + `adapter_registered` + `adapter_id` 对齐 |
+| `build_manifest_registration_plan` | 13/13 `blocked_reason is None` |
+| overlay | digest `2bdb9baf…` · `overrides` 20 · `deferred_overrides` 1 · G 域 14 |
+| 前端投影 | 与后端同口径（无 a51）·`bidirectional` 127 次 |
+| G 域 foundation + 本轮守卫 | **193 passed / 1 skipped**（skip = 如实标注的真栈待跑） |
+| `test_workpaper_sync_manifest_contract` + `test_task73` | **52 passed**（原 6 errors + 9 failed） |
+
 ## Tasks
 
 ### 阶段 0：前置门 + 几何补测 + 红判据

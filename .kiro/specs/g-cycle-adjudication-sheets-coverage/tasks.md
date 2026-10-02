@@ -114,3 +114,21 @@
 - 🔴 **AdjudicationSheetSpec 是硬前置**：D1 spec 产出，当前不确定是否在 HEAD。若不在则 Task 2 起全部阻塞。
 - 🔴 **G1-1 是全平台公式最密的审定表**（504 格 / 93×11 = 49% 密度），逐格声明量巨大。
 - 🔴 **G5-1!B35 是唯一需要修的模板缺陷**（越界引用），其余审定表只声明不修。
+
+---
+
+## 外部交棒（2026-10-01，来自 spec `sync-editor-host-discovery-contract-closure` Task 16）
+
+本 lane 有 **3 条**判据因上游改动打红，经定向 A/B 确认是**本轮引入**：
+
+- `test_task49_g_cycle_migration.py::TestAc14HonestModeVisibility::test_registered_entry_ids_agree_with_the_slice`
+- `test_task49_g_cycle_migration.py::TestAdjudicationLegality::test_manifest_mirror_divergence_is_registered_not_silently_equal`
+- `test_task49_g_cycle_migration.py::TestProperty20And21NotClaimedPassingForThisSlice::test_no_slice_entry_has_a_registered_adapter`
+
+**根因**：上游 overlay 新增 13 条 G override，把 G1~G14（除 G7）翻成 `capability=bidirectional` / `migration_state=adapter_registered`，而 G slice 是**冻结快照**，记录的是 provider 交付前的状态。
+
+🔴 **上游已如实登记这是边界越界**（其 design §九 T5）：原定边界是「不翻能力裁决」。裁定**保留 + 登记、不删**的四条理由里，最关键一条是 golden 覆盖棘轮的红文案「bidirectional 但未进 golden 门的 family = `['a51']`」**只点 a51 不点 G** ⇒ 反证 g1~g14 的 provider 已全部在 golden digest 基线内。
+
+**两条处置方向请本 lane 裁定**（上游不预判）：(a) slice 过期 ⇒ 复核 provider 确已交付后重取快照；(b) 认为不该翻 ⇒ 删 overlay 那 13 条 + 重跑两个生成器即可**完全复原**（可逆）。
+
+详见 `.kiro/specs/sync-editor-host-discovery-contract-closure/handoff-regression-attribution.md`。

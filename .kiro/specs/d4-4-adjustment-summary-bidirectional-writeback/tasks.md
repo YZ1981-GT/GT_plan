@@ -531,3 +531,40 @@ state **`created`**（只有一条 `request_frozen` 事件）。run 3 在同一 
 是否该有 reaper 把这类「等不到 callback 的 frozen request」收敛掉，属平台侧课题
 （`command_service` 里已有 `forcesave_callback_wait_timeout_seconds` 的 destroy 决策口径，
 但那是「离开时怎么判」，不是「后台清理」）—— 登记为遗留项，不在本 spec 范围内擅自改。
+
+---
+
+## 2026-10-01 d44-managed golden 红收口（用户明确授权，append-only）
+
+前述完整 `FOOTER_MARKER_D44` 修复已由真栈与 48 条契约测试证明正确，但
+`backend/scripts/check/_sync_provider_golden_digest.json` 仍冻结旧前缀版 digest，导致
+`check_sync_provider_golden_digest.py` 唯一红：
+
+```text
+[d4] sheet[d44-managed]: 基线=a367bf8bf2e02e71 现算=1fa82f831f2f034a
+```
+
+本次**没有**执行 `--update`。先把 current 与 baseline 做全字段递归 diff，现算有 **14** 处差异：
+除 d44 两处因果字段外，还含 D3 新增 `d34~d37-managed`、6 家 provider 的整体 contract digest 与
+`digest_count 198→202` 等并发/additive 状态；全量更新会把它们一起固化，无法归因。
+
+只精准更新 d4 的两处：
+
+| baseline 字段 | 旧值 | 新值 | 理由 |
+|---|---|---|---|
+| `providers[d4].contract_payload_sha256` | `90f9add7…` | `3121e56a…` | d44 既有 sheet 的 marker 变化会改变 d4 整体 contract；同步更新保持该 provider 快照自洽 |
+| `providers[d4].sheet_digests[d44-managed]` | `a367bf8b…` | `1fa82f83…` | `.tables[0].footer_anchor.marker` 从错误前缀改为模板 A21 完整 63 字 |
+
+其余字段一字不动。更新后严格递归 diff 从 **14→12**，且 d4 provider（索引 4）差异为 **0**；
+剩余 12 条仍是 D3/H 等其它 lane 的 additive/整体摘要差异，没有被本次“顺手批准”。
+
+验收：
+
+* `test_d4_4_adjustment_contract.py`：**48 passed**（含真调 `_find_marker_row`：完整文本命中 R21、前缀返 `None`）；
+* `check_sync_provider_golden_digest.py`：**202 digest 逐个不变，34 家，零跳过**；
+* `test_check_sync_provider_golden_digest.py`：**11 passed**；
+* 联跑 golden coverage 时另有 a51 单条红（`bidirectional` 但未入 `PROVIDERS`），是
+  `sync-editor-host-discovery-contract-closure` 已独立交棒的欠账，与 d44 无因果关系，不通过改 d44 基线掩盖。
+
+教训：**接受一个既有 sheet 的行为修复时，应更新该 sheet digest + provider 整体 contract digest；
+但绝不能用全量 `--update` 代替归因。先递归列出将变化的每个路径，再只接受有因果链的字段。**

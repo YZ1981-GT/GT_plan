@@ -3284,6 +3284,16 @@ def _apply_workbook_propagation(
         #    —— `re` 的交替是最左优先、同位置按候选顺序，故降序排列即等价。
         import re as _re
 
+        # 🔴 候选还要含**数字字符引用（NCR）编码的 sheet 名**：某些 Excel 保存路径把公式里
+        #    的 CJK sheet 名序列化成 `&#26126;&#32454;&#34920;`（如 L6 的 附注国企/检查表L6-4，
+        #    `'明细表L6-2'!P20-SUM(...)`），而计划期 `ref_before` 由解码后的 XML 得到裸中文
+        #    `'明细表L6-2'!P20`。前四种候选（含 `&apos;`）都只覆盖单引号转义，不覆盖 NCR ⇒
+        #    裸中文的 `count()` 在 NCR 序列化的 sheet.xml 里恒为 0 → 误报 PropagationDriftError
+        #    （L6 附注国企 sheet5 P20/Q20/R20/S20 四条真栈）。补 NCR 候选即对齐该序列化形态。
+        #    NCR 只编码非 ASCII 字符（与 openpyxl/Excel 写法一致），ASCII（引号/列标/行号/`!`）不动。
+        def _ncr(s: str) -> str:
+            return "".join(ch if ord(ch) < 128 else f"&#{ord(ch)};" for ch in s)
+
         replacements: dict[str, str] = {}
         for before, after in sorted(pairs, key=lambda kv: len(kv[0]), reverse=True):
             for cand_before, cand_after in (
@@ -3291,6 +3301,9 @@ def _apply_workbook_propagation(
                 (_escape(before), _escape(after)),
                 (_apos(before), _apos(after)),
                 (before, after),
+                # NCR 形态（CJK sheet 名被编码成 &#N;）；与上面单引号/转义候选正交。
+                (_apos(_ncr(before)), _apos(_ncr(after))),
+                (_ncr(before), _ncr(after)),
             ):
                 if text.count(cand_before):
                     # 同一 cand_before 被两条声明共用时保留首个映射（与串行版

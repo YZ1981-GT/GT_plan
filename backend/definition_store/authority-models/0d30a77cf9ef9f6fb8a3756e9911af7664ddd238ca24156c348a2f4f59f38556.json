@@ -1,0 +1,1 @@
+{"authority_model":"projection_contract","content_authority":"structured_projection","entry_id":"xlsx/gt-l4-bonds-payable","merge_model":"stable_field_three_way","pilot_class":"l_cycle_bonds_payable","required_slots":["template","instrumentation","contract"],"schema_version":"authority-model-definition:v1"}

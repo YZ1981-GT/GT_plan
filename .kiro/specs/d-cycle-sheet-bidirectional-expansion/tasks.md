@@ -90,3 +90,18 @@ Registry 一 entry 一 adapter 不变；多 sheet 只扩契约 `sheets[]`。分�
   }
 }
 ```
+
+---
+
+## 外部交棒（2026-10-01，来自 spec `sync-editor-host-discovery-contract-closure` Task 16）
+
+本 lane 有 **2 条**判据因上游修掉「挂点发现器不认 `WorkpaperSyncEditorHost`」而打红，经定向 A/B 确认是**本轮引入**（A 态 HEAD 绿 / B 态红）：
+
+- `test_task46_d_cycle_migration.py::TestProperty69EvidencePerEntry::test_slice_scope_is_recomputable_from_the_manifest`
+- `test_task46_d_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_parent_duplicates_not_counted_as_independent`
+
+**根因**：34 个 `d4/**` tab 原先**完全没有 entry**（发现器看不见它们），现在成为 `xlsx/gt-d4-operating-revenue` 的 parent_duplicate ⇒ 现算 34 与 D slice 冻结的 40 不等。
+
+🔴 **不是「数字变小」而是「口径变了」**：冻结的 40 是在那 34 个 tab 不可见时统计的，两个数不可直接比大小。重算前请先确认 slice 的 `parent_duplicate` 定义是否纳入本轮新可见的 tab。
+
+逐条归因、复现命令与产物差异表见 `.kiro/specs/sync-editor-host-discovery-contract-closure/handoff-regression-attribution.md`（上游**只登记不代改**）。

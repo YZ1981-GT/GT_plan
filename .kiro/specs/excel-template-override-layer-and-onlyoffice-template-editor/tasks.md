@@ -525,12 +525,51 @@
 
 ### Wave 6 —— 变异检验与收口
 
-- [-] 23. T5：变异检验脚本
+- [x] 23. T5：变异检验脚本
   - 逐条改一字看是否打红；四态判定（RED / GREEN / ANCHOR-MISS / WRONG-TEST）
   - 锚点跨行时注意 CRLF
-  - 🔴 **阻塞原因（不是未做，是让路）**：5-lane 分工书 §2 把
-    `backend/scripts/diagnose/mutate_*.py` 划给 **E**（判据治理泳道），而本 spec 的文件记号表
-    把它列为 T5。按分工书规则 1「文件在别人名下就停手」，D 不建这个文件。
+  - ✅ **2026-09-30 已交付**：`backend/scripts/diagnose/mutate_template_override_guards.py`
+    （kit 范式，10 条变异 **10/10 RED**、守卫文件覆盖面 **3/3**、退出码 0；
+    `--check-anchors` 10/10 OK 且只读性核验通过；全量基线 **129 passed**、零 `.mutbak` 残留、
+    生产文件 `git diff` 为空）
+  - **接手依据（原阻塞是「让路」，不是未做）**：5-lane 分工书 §2 把
+    `backend/scripts/diagnose/mutate_*.py` 划给 **E**（判据治理泳道），本 spec 文件记号表
+    把它列为 T5；D 按规则 1 让路并在分工书 §12.5 登记冲突、请 A 确认口径。
+    D lane 已于 §12.8 / §12.13（2026-09-04 / 09-05）收口，而**该口径至今无确认记录** ⇒
+    本任务长期停在 `[-]`。2026-09-30 现算后接手，三条依据：
+    ① `_mutation_kit` 已成熟（9 模块）且 **89 / 186** 个 mutate 脚本已采纳 —— 分工书 §10.3
+      当时记的是「E 已交 1 个」。用 kit 范式建**不产生**新的待迁移债务（这正是当初让路时
+      最该担心的：按老范式建会立刻变成第 21 个待迁移项，让 §10.3 那个 CI job 红得更久）
+    ② 变异清单与预期态由 D 在本任务里列全了六类结构性判据，不需重新设计
+    ③ D 移交的三条必守项（§12.7）在脚本头逐条落实
+  - **十条变异对应六类判据**：M01/M02 Property 5 两个方向（后代 / 祖先各一条，合并会看不出
+    某个方向未被保护）· M03 import 期调用被摘 · **M04 必守项③形态样本**（改 `OVERRIDE_ROOT`
+    ⇒ 整模块 import 抛 ⇒ 三文件全部收集期 ERROR）· M05 越界门返回值 · M06
+    `CURRENT_METADATA_SUFFIXES` 反方向 · M07 Property 2 的 AST 扫描器 · M08 Property 15
+    有损层（openpyxl）· M09 pageSetup 两集合相交 · M10 xlsm 现状锚点
+  - 🔴 **首轮 6/10，四条非 RED 逐条查出两类问题（这正是变异检验的价值）**：
+    - **两条无效变异 / 错锚点（我的脚本缺陷）**：M04 写方法级 nodeid 当预期信号 ——
+      收集期错误的名字是**文件级**的（`test_x.py` 而非 `test_x.py::Cls::method`），一条都匹配不上
+      ⇒ 改 `want="*"`，且 `-rf` 必须补成 **`-rfE`**（kit 的 `run_pytest` 同时按 `^FAILED` 与
+      `^ERROR` 收名，但只给 `-rf` 时 pytest 的 short summary **不打印 ERROR 行**）；
+      M07 原锚点选在 `assert_target_within_override_root(AUTHORITATIVE_ROOT / …)` 上被判
+      **WRONG-TEST** —— 那不是写入调用，而扫描器只看四类写入形态（`_WRITE_ATTRS` 方法接收者 /
+      `os.replace` 第二参 / `shutil.copy*` 第二参 / `open(...,'w')` 第一参）⇒ 改成
+      `versions_dir.mkdir(...)` 的接收者
+    - **🔴 两条是真实判据缺口（已修判据，不是删变异）**：
+      **M06** —— `test_metadata_suffixes_cover_what_activate_writes` 的 docstring 声称
+      「双向锁死」，实现只有方向①（写了的都已登记）；往常量里多塞一个从不写的 `.bogus`
+      **照样全绿**。多登记的危害与漏登记相反但同样实在：解析的 glob 会据此静默排除同后缀的
+      杂项文件，该报的歧义错不再报。已补方向②断言（登记项必须真被写）。
+      **M05** —— `test_inside_root_passes_and_returns_resolved` 的 docstring 说「返回值这件事
+      必须断言，否则这道门只是装饰」，但样本输入 `fake_root / "sub" / "x.xlsx"` **本身已规范化**
+      ⇒ `target == target.resolve()` 恒等 ⇒ 把实现的 `return resolved` 改成 `return target`
+      照样全绿。已补一个含 `..` 但仍在根内的输入（先断言它 resolve 前后确实不同，防这条又恒真）
+  - **不可变异的一条（如实登记，不假装覆盖）**：V154 部分唯一索引 COALESCE
+    （`TestProperty18ConcurrentCurrentVersion`）—— 索引由迁移建，改 SQL 文件不会让**已应用**的
+    索引改变（迁移按 version 去重不重跑）⇒ 变异后判据照常绿，那会是一条**假 GREEN**，比没有更糟。
+    它的保护由 `test_the_partial_unique_index_really_exists`（真库现查索引存在）＋
+    `TestProperty18ConcurrentCurrentVersion`（真库并发实测）承担，已写进脚本头
   - D 已完成的替代动作：Task 5 要求的那次变异检验用一次性 tmp 脚本真跑过，结论
     **RED**（三信号全命中、还原后 md5 一致、还原后回绿），脚本已按规则 8 清理。
   - **移交给 E 的三条实测必守项**（已写进分工书 §12.7）：

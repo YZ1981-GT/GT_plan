@@ -1156,6 +1156,28 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         #    写它会毁掉整册取数联动，已降级为契约里的只读投影声明。
         #    🔴 本条与台账条目**必须成对**（`len(白名单) == len(台账)` 是判据）。
         "app.services.workpaper_sync.phase5_l1_short_term_loans",
+        # ── L 循环第四条（task 12 最后一条）：受管 L2-4，走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l2_interest_payable",
+        # ── L 循环第三条（task 12）：受管 L3-9，走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l3_long_term_loans",
+        # ── L 循环第二条（task 12，与台账条目成对）：受管 L4-3，走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l4_bonds_payable",
+        # ── L 循环第五条（spec l7-true-bidirectional，与台账条目成对）：受管 L7-2，走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l7_other_noncurrent_liabilities",
+        # ── L 循环第六条（spec l6-true-bidirectional，与台账条目成对）：受管 L6-2（科目 2711），走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l6_special_payables",
+        # ── L 循环第七条（spec l8-true-bidirectional，与台账条目成对）：受管 L8-2（科目 6603 损益类），走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l8_financial_expenses",
+        # ── L 循环第八条（spec l5-true-bidirectional，与台账条目成对）：受管 L5-2（科目 2701 长期应付款），两区同键 + flat 账龄（R24 其他占位续行作静态骨架），走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l5_long_term_payables",
+        # ── K 循环 K1-9 双区 + 调整分录汇总六条（与台账条目成对）──
+        "app.services.workpaper_sync.phase5_k1_baddebt_reversal_writeoff",
+        "app.services.workpaper_sync.phase5_k8_selling_expenses",
+        "app.services.workpaper_sync.phase5_k9_admin_expenses",
+        "app.services.workpaper_sync.phase5_k10_other_income",
+        "app.services.workpaper_sync.phase5_k11_asset_impairment_loss",
+        "app.services.workpaper_sync.phase5_k12_non_operating_income",
+        "app.services.workpaper_sync.phase5_k13_non_operating_expense",
     }
 )
 
