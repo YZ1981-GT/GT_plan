@@ -2759,4 +2759,39 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "零迁移负担。`adapter_registered=False` 是顺序：五环发布后再翻 manifest。"
         ),
     },
+    # ── L 循环第八条（spec: l5-true-bidirectional-2026-10-01）────────────────────────
+    {
+        "contract_id": "l5.long_term_payables",
+        "provider_module": "app.services.workpaper_sync.phase5_l5_long_term_payables",
+        "delivered_by_task": "l5-true-bidirectional-2026-10-01-task-4",
+        "pilot_class": "l_cycle_long_term_payables",
+        "entry_id": "xlsx/gt-l5-long-term-payables",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "L/L5 长期应付款.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "L 循环第八条（spec l5-true-bidirectional），受管 `明细表L5-2`（科目 2701 长期应付款，"
+            "负债类余额口径 期末=期初-借+贷）：🔴 两区同键 + flat 账龄（照 G9 多区 + D6 flat，L 域首次）。"
+            "两个受管数据区 R11:15 售后租回（小计 A16）/ R18:22 分期付款（小计 A23），区之间夹区标题 "
+            "A10/A17 与小计作模板静态骨架；R24「其他」段 A24='…'(U+2026 排版续行占位) + 合计 A25="
+            "SUM(B16,B23,B24) 亦作静态骨架不受管（用户裁决 A，2026-10-02：现查 R24 真库 0 行无痕迹 + HTML "
+            "无用户可填「其他」分组 + Excel 输入格空 ⇒ 占位续行非业务行；平台 typography 门 BP-21 比幽灵行"
+            "更硬，对纯省略号占位行 fail-closed；T1 候选 C「三区」漏测此门，勘误为两区，零能力损失）。"
+            "两区共享 store 键 `L5-L5-2-rows`（双前缀）+ section 字段分区（saleLeaseback/installment），"
+            "逐区独立 uuid_col AD/AE + template_id L52R1/R2 + footer 16/23。两级表头 R8 组 / R9 叶子；"
+            "7 公式列 E=B-C+D / L=B+F+G / M=C+H+J / N=D+I+K / O=L-M+N / R=L-P / S=O-Q（受管输入行同形、"
+            "本行算术、无跨行派生）；账龄 T~X 单组 5 桶 flat（6个月以内/6-12月/1～2年/２～3年/3年以上，"
+            "叶子全角字符 ～=U+FF5E ／ ２=U+FF12）。🔴 融资属性列（名义金额/折现率/现值/起止日/款项类型/"
+            "币种/担保 + HTML 旧标量 unadjusted/aje/rje/audited + 债权人）退 html_only（照 D4-5）：继续喂 "
+            "L5-5/L5-6/L5-7，不进契约、OO 侧不渲染。受管表 明细表L5-2 零裸 IF（bare_IF=0，不需 neutralize，"
+            "但整册裸 IF 仅 审定表L5-1 12 格 ⇒ per-file 中性化照挂）；UUID 列 AD/AE（物理 max_column=AD(30)，"
+            "R11~R25 全空坐实，AF 不用）。身份字段 `key`（非 rowId，私有 Date.now+Math.random 生成器收敛到共享 "
+            "newRowIdentity('l52det')，已有 key 优先不重铸、历史行补铸 + section 落默认区）。审定表 "
+            "L5-1 是 R7~R16 全跨 sheet 聚合的下游视图（非录入表），不选 canary；未确认融资费用明细表 "
+            "L5-3（A 列 ='明细表L5-2'!A{n} 硬行号镜像）本轮不受管、作独立后续，真 OO 往返已断言 L5-2 "
+            "materialize 不打坏 L5-3 既有镜像公式。真库 `L5-L5-2-rows` 现算 0 行，零迁移负担。"
+            "`adapter_registered=False` 是顺序：五环发布后再翻 manifest。"
+        ),
+    },
 )

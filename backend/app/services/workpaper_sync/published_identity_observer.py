@@ -1086,8 +1086,18 @@ class PublishedIdentityObserver:
         ``table_key`` 取契约里与主 sheet 锚点对齐的那张 ``row_identity`` 表。
 
         单 sheet entry：``row_identity`` 表必须恰好 1 张。多 sheet entry（如 D4-2+D4-3）：
-        允许 ≥2 张，但**主** binding 必须绑到 ``anchors['sheet_key']`` 对应的那张，
-        sibling 由 attach / publish 另传 ``sibling_bindings`` —— 不得「随手挑第一张」。
+        允许 ≥2 张，主 binding 绑到 ``anchors['sheet_key']`` 对应的那张，sibling 由 attach /
+        publish 另传 ``sibling_bindings`` —— 不得「随手挑第一张」。
+
+        🔴 **同一 sheet_key 多受管区**（spec `l5-true-bidirectional-2026-10-01` · T7 根因修复）：
+        G9/L5 这类「同一张 sheet 多个受管区、共享 sheet_key」的 entry，``matched``（按 sheet_key）
+        会命中多张，sheet_key 本身无法消歧。此时用冻结 ``anchors['table_name']``
+        （``sheet_anchors[0]`` = 主区的 Excel Table 名）去对齐 **provider 的
+        ``managed_row_table_specs()``**（每张 spec 的 ``table_name`` 与 ``table_key``），选出主区的
+        ``table_key``，其余区由 attach 另传 sibling。沿用 H attach 侧既有的「observer 依赖 provider
+        ``managed_row_table_specs``」模式，不引入新架构耦合、零契约改动。
+        🔴 **单表 / 多 sheet 既有分支一字不动**；只在「同 sheet_key matched>1」时走此消歧，且消歧后
+        仍不唯一（table_name 对不上任何一张 / 对上多张）照旧 fail-closed，不得随手挑第一张。
         """
         from app.services.workpaper_sync.excel_extract import ExcelIdentityBinding
 
@@ -1112,6 +1122,11 @@ class PublishedIdentityObserver:
             table_key = matched[0]
         elif len(row_tables) == 1:
             table_key = row_tables[0][1]
+        elif len(matched) > 1:
+            # 🔴 同 sheet_key 多受管区：用冻结 anchors['table_name'] 对齐 provider spec 的 table_name。
+            table_key = self._primary_table_key_by_frozen_table_name(
+                contract=contract, anchors=anchors, matched=matched, ctx=ctx
+            )
         else:
             raise FrozenChildUnusableError(
                 f"契约声明了 {len(row_tables)} 张带 row_identity 的表 "
@@ -1128,6 +1143,81 @@ class PublishedIdentityObserver:
             dynamic_column_columns={
                 key: dict(value) for key, value in dynamic_bindings.items()
             },
+        )
+
+    def _primary_table_key_by_frozen_table_name(
+        self, *, contract: SyncContract, anchors: Mapping[str, str],
+        matched: list[str], ctx: Mapping[str, Any],
+    ) -> str:
+        """同一 sheet_key 多受管区：用冻结 ``anchors['table_name']`` 对齐 provider spec 选主 table_key。
+
+        spec: `l5-true-bidirectional-2026-10-01` · T7（L5 两区同键首次真实命中；G9 范式从未翻 manifest
+        故此路径此前未被运行过）。
+
+        ``anchors`` 来自 ``sheet_anchors[0]``（主区的冻结 instrumentation）。provider 的
+        ``managed_row_table_specs()`` 每张 spec 带 ``table_name``（Excel Table displayName）+
+        ``table_key``（契约 table_key）。按 ``table_name == anchors['table_name']`` 选出主区 table_key，
+        且该 table_key 必须在 ``matched``（同 sheet_key 的候选）里。
+
+        🔴 fail-closed：provider 不可解析 / table_name 对不上任何一张 / 对上多张 ⇒ 抛错，不随手挑第一张。
+        """
+        frozen_table_name = str(anchors.get("table_name") or "").strip()
+        if not frozen_table_name:
+            raise FrozenChildUnusableError(
+                "同 sheet_key 多受管区消歧需要冻结 anchors['table_name']，但它为空 —— "
+                "frozen instrumentation 锚点缺 Excel Table 名",
+                stage=ObservationStage.observe_workbook,
+                context=ctx,
+            )
+        provider = self._resolve_provider_for_contract(contract=contract, ctx=ctx)
+        specs_fn = getattr(provider, "managed_row_table_specs", None)
+        if not callable(specs_fn):
+            raise FrozenChildUnusableError(
+                f"provider {getattr(provider, '__name__', provider)!r} 未暴露 "
+                "managed_row_table_specs()，同 sheet_key 多受管区无法按 table_name 消歧",
+                stage=ObservationStage.observe_workbook,
+                context=ctx,
+            )
+        # table_name → table_key（只收候选 matched 里的，避免跨 sheet 的同名污染）。
+        matched_set = set(matched)
+        hits = [
+            str(getattr(spec, "table_key", "") or "")
+            for spec in specs_fn()
+            if str(getattr(spec, "table_name", "") or "") == frozen_table_name
+            and str(getattr(spec, "table_key", "") or "") in matched_set
+        ]
+        if len(hits) != 1:
+            raise FrozenChildUnusableError(
+                f"同 sheet_key 多受管区按冻结 table_name {frozen_table_name!r} 消歧命中 "
+                f"{len(hits)} 张 {hits}（候选 {matched}）—— 必须恰 1 张，不得随手挑第一张",
+                stage=ObservationStage.observe_workbook,
+                context=ctx,
+            )
+        return hits[0]
+
+    def _resolve_provider_for_contract(
+        self, *, contract: SyncContract, ctx: Mapping[str, Any]
+    ) -> Any:
+        """按 ``contract.contract_id``（= 冻结 adapter_id）解析 provider 模块。
+
+        走 ``store_item_registry.STORE_MERGE_REGISTRY[adapter_id].provider_module`` 这条稳定映射
+        （与 attach 侧按 provider 取 managed_row_table_specs 同源），不读 registry alias。
+        """
+        import importlib
+
+        from app.services.workpaper_sync.store_item_registry import STORE_MERGE_REGISTRY
+
+        adapter_id = str(getattr(contract, "contract_id", "") or "").strip()
+        plan = STORE_MERGE_REGISTRY.get(adapter_id)
+        if plan is None or not getattr(plan, "provider_module", ""):
+            raise FrozenChildUnusableError(
+                f"adapter {adapter_id!r} 在 STORE_MERGE_REGISTRY 无 provider_module 映射，"
+                "同 sheet_key 多受管区无法定位 provider 做 table_name 消歧",
+                stage=ObservationStage.observe_workbook,
+                context=ctx,
+            )
+        return importlib.import_module(
+            f"app.services.workpaper_sync.{plan.provider_module}"
         )
 
     # ─── stage 8 ─────────────────────────────────────────────────────

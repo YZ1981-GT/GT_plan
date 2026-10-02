@@ -1,5 +1,5 @@
 {
-  "baseline_digest": "205593f09859a81c33f4546adfaa1f8fc6c63e6cc2bf8f33fb066091e474660e",
+  "baseline_digest": "a052c868c1b59017f2eb280f70613045e4aaacbdf9b4728481906b3017766982",
   "entries": [
     {
       "capability": "single_html",
@@ -5613,13 +5613,13 @@
       }
     },
     {
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "entry_id": "xlsx/gt-l5-long-term-payables",
       "flags": {
         "claimed_bidirectional_without_adapter": false,
         "html_reload_only": false,
-        "missing_adapter": true,
+        "missing_adapter": false,
         "no_durable_forcesave_ack": true,
         "no_forcesave_command": true,
         "single_mode_switch_visible": false,
@@ -5627,9 +5627,8 @@
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtL5LongTermPayables.vue",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "reason_codes": [
-        "missing_adapter",
         "no_durable_forcesave_ack",
         "no_forcesave_command",
         "template_only_open"
@@ -5639,12 +5638,31 @@
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
       ],
       "source_sha256": {
-        "audit-platform/frontend/src/components/workpaper/GtL5LongTermPayables.vue": "6ae4ad82903d1fa9eb4cac5a87dffb7aeb2d23e42fc4811a6f3b257e63255ef0",
+        "audit-platform/frontend/src/components/workpaper/GtL5LongTermPayables.vue": "46f22e0b74370e8b171738ae0ee7e5536d33680edd9cc8bce8e8cd98cfa27339",
         "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "55c3ae082d392ad50623a3313463ca61ca187e1cd1b3398c20e1454c075a9d9a"
       },
       "ui_characterization": {
-        "evidence": [],
-        "mode_switch_visible": false
+        "evidence": [
+          {
+            "file": "audit-platform/frontend/src/components/workpaper/GtL5LongTermPayables.vue",
+            "kind": "segmented_mode_switch",
+            "line": 12,
+            "snippet": "<el-segmented"
+          },
+          {
+            "file": "audit-platform/frontend/src/components/workpaper/GtL5LongTermPayables.vue",
+            "kind": "dual_mode_state",
+            "line": 13,
+            "snippet": ":model-value=\"procedureDualMode.currentMode.value\""
+          },
+          {
+            "file": "audit-platform/frontend/src/components/workpaper/GtL5LongTermPayables.vue",
+            "kind": "mount_condition_mode_gate",
+            "line": 24,
+            "snippet": "v-if=\"isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'\""
+          }
+        ],
+        "mode_switch_visible": true
       }
     },
     {
@@ -7678,15 +7696,15 @@
       }
     }
   ],
-  "manifest_digest": "cf778b6619b53320d0300035e33d27ae274b08475e9788ddcca073287a2065ce",
+  "manifest_digest": "fa7158fb61f0cfc75db31cee8fcda6eeac2928630035f5679ee70164543fab97",
   "schema_version": 1,
-  "source_digest": "86a21603b225b58b3141f3c5cddfbde6fddf0aac929c6a8fbe07d7f71bd0b0f1",
+  "source_digest": "0d9dc4684cfce5a773fd25e6bf88b767704fc60b288531cb5e027928c3ca567b",
   "stats": {
     "claimed_bidirectional_without_adapter_count": 0,
     "entry_count": 155,
     "html_reload_only_count": 15,
     "independent_entry_count": 142,
-    "missing_adapter_count": 123,
+    "missing_adapter_count": 122,
     "no_durable_forcesave_ack_count": 142,
     "no_forcesave_command_count": 124,
     "single_mode_switch_visible_count": 117,

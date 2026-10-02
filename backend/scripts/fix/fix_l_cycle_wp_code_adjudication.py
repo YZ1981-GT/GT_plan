@@ -263,6 +263,39 @@ _ROWS: tuple[dict[str, Any], ...] = (
             "wp_count_with_payload": 0,
         },
     },
+    {
+        "entry_id": "xlsx/gt-l5-long-term-payables",
+        "contract_id": "l5.long_term_payables",
+        "wp_codes": ["L5"],
+        "resolvable_for_provisioning": True,
+        "matcher_domain_conflict": None,
+        "basis": {
+            "heuristic_is_wrong_because": "manifest 幻影码 L5L 经 wp_template_finder 单册与 sheet 级均零命中（GtL5LongTermPayables → L5L 是幻影码）",
+            "heuristic_would_say": ["L5L"],
+            "managed_excel_name": "明细表L5-2",
+            "template_relative_path": "L/L5 长期应付款.xlsx",
+            "wp_index_evidence": (
+                "受管 明细表L5-2 是整册 12 sheet 工作簿里的一张（科目 2701 长期应付款），"
+                "审定表 L5-1 / 两张附注 / L5-3~L5-7 全部跨 sheet 引用它，不是独立文件 ⇒ "
+                "目标码取持有整册文件的 L5；判据用 `COALESCE(file_path,'') <> ''`（L1 空串陷阱）。"
+                "🔴 wp_codes 用整册底稿码 L5（不是科目码 2701，照 L1~L8 一律用底稿码）。"
+            ),
+        },
+        "store_payload_evidence": {
+            "max_payload_bytes": 0,
+            "measured_at": "2026-10-01",
+            "store_item_id": "L5-L5-2-rows",
+            "why_null": (
+                "本 item 真库 `L5-L5-2-rows` 现算 0 行（三区同键，明细表从未录入，空表单是"
+                "合法业务事实）；身份字段 key 已收敛到稳定 rowId（newRowIdentity('l52det')，"
+                "已有不重铸、历史行补铸 + section 落默认区）⇒ 零迁移负担。真库 L5 载荷仅 "
+                "`L5-adj-*` / `L5-*-note` / `L5-chk-conclusion` 等夹具行，属 审定表L5-1 / L5-4 "
+                "相关，不属受管表 L5-2。"
+            ),
+            "wp_code_with_payload": None,
+            "wp_count_with_payload": 0,
+        },
+    },
 )
 
 

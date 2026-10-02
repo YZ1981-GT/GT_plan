@@ -820,6 +820,16 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="L8-2-full-data", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── L5（spec l5-true-bidirectional）：受管 L5-2（科目 2701 长期应付款），两区同键 + flat 账龄 ──
+    #    store 单键 `L5-L5-2-rows`（双前缀）、身份字段 key；两区共享此键、section 字段分区
+    #    （售后租回/分期付款）；R24 其他占位续行作静态骨架不受管；融资属性 + HTML 旧标量退 html_only 不预登记为独立键。
+    #    受管表 明细表L5-2 零裸 IF，整册裸 IF 仅 审定表L5-1 12 格 ⇒ per-file 中性化照挂。
+    "l5.long_term_payables": StoreMergePlan(
+        adapter_id="l5.long_term_payables",
+        provider_module="phase5_l5_long_term_payables",
+        items=(StoreItemSpec(item_id="L5-L5-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
 }
 
 
