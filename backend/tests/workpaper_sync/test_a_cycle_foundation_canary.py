@@ -1118,3 +1118,572 @@ class TestProperty22DynamicColumn:
         dyn_col = manifest_slice.get("dynamic_column_identity", {})
         lak = dyn_col.get("label_as_key_site_count", 0)
         assert lak == 3, f"label-as-key 应为 3，实际 {lak}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# §7 TestCanaryE2EBidirectionalConsistency — Task 15*
+#     canary 端到端闭环（自建夹具，真库无业务载荷）
+#
+# 🔴 **外部阻塞**：`A5-1` 前缀在真库 28 行里**不存在**（0 行），
+#    闭环验证须自建夹具，无法用既有数据。
+#    本类用纯 Python 合成 checklist_responses 数据，验证
+#    build_store_projection ↔ merge_projection_into_responses
+#    的双向一致性——这是 HTML 侧 ↔ Excel 侧双向回写的核心数据模型。
+#
+# 阻塞项（标 `[ ]*` 的理由）：
+#   1. 真库 A5-1 前缀行数 = 0 ⇒ 无法用真实业务数据做端到端验证
+#   2. adapter_id 当前为 null（BP-5）⇒ capability 仍是 single_onlyoffice
+#   3. Playwright 端到端需 start-dev.bat 环境
+#
+# 代码已改但未实测真实环境。
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestCanaryE2EBidirectionalConsistency:
+    """Task 15* — canary A5-1 端到端闭环（自建夹具）。
+
+    验证 build_store_projection ↔ merge_projection_into_responses
+    的双向一致性（HTML 侧 ↔ xlsx 侧数据模型层）。
+
+    🔴 AC-18 / AF-P22: A5-1 真库 0 行，闭环须自建夹具。
+    _Requirements: 6_
+    _AC/AF-P: AC-18 · AF-P22_
+    """
+
+    # ─── 夹具：合成 A5-1 审定表数据（模拟审计助理填写） ──────────
+
+    @staticmethod
+    def _synthetic_audit_responses() -> dict[str, str]:
+        """构造一组覆盖审定表全部 editable 字段的合成数据。
+
+        item_id 格式遵循 GtA51CashflowAudit.vue 中 setField 的真实调用：
+        `a51-audit-{row_id}.{field}`，其中 row_id ∈ {1..5, 7}（6=小计/8=差异均为公式行）。
+        """
+        rows = {
+            "1": ("100000.00", "5000.00", "货币资金审计说明", "审阅银行对账单"),
+            "2": ("-20000.00", "0", "受限存款说明", ""),
+            "3": ("50000.00", "1000.00", "现金等价物说明", "国债逆回购"),
+            "4": ("8000.00", "-500.00", "外币现金说明", "按即期汇率折算"),
+            "5": ("130000.00", "", "上年余额与审定数核对", ""),
+            "7": ("138000.00", "5500.00", "现金流量表列报数", "与报表勾稽"),
+        }
+        responses: dict[str, str] = {}
+        for row_id, (unadj, adj, expl, remark) in rows.items():
+            prefix = f"a51-audit-{row_id}"
+            responses[f"{prefix}.unadjusted"] = unadj
+            responses[f"{prefix}.adjustment"] = adj
+            responses[f"{prefix}.explanation"] = expl
+            if remark:
+                responses[f"{prefix}.remark"] = remark
+        # 审计说明（独立 item_id）
+        responses["a51-audit-note"] = "经核对，现金及现金等价物余额合理"
+        return responses
+
+    @staticmethod
+    def _synthetic_program_responses() -> dict[str, str]:
+        """构造程序表部分数据（3 个步骤 + 审批签字）。
+
+        验证非审定表字段不会干扰投影的逆映射。
+        """
+        responses: dict[str, str] = {}
+        for step_id in ("step-1", "step-2", "step-3"):
+            prefix = f"a51-program-{step_id}"
+            responses[f"{prefix}.conclusion"] = "Y"
+            responses[f"{prefix}.executor"] = "张三"
+            responses[f"{prefix}.description"] = f"已执行{step_id}审计程序"
+            responses[f"{prefix}.index_ref"] = "E1-1"
+        responses["a51-program-approval.manager"] = "李四"
+        responses["a51-program-approval.date"] = "2025-12-31"
+        return responses
+
+    @staticmethod
+    def _synthetic_reconcile_responses() -> dict[str, str]:
+        """构造勾稽核对部分数据（组 1 的 2 条明细 + 报表数）。"""
+        responses: dict[str, str] = {}
+        responses["a51-reconcile-1-1.amount"] = "45000.00"
+        responses["a51-reconcile-1-1.remark"] = "经营活动现金流入"
+        responses["a51-reconcile-1-1.index_ref"] = "A5-1-3"
+        responses["a51-reconcile-1-2.amount"] = "-12000.00"
+        responses["a51-reconcile-1-2.remark"] = "经营活动现金流出"
+        responses["a51-reconcile-1.report_amount"] = "33000.00"
+        return responses
+
+    # ─── 导入投影函数 ─────────────────────────────────────────
+
+    @staticmethod
+    def _import_projection_functions():
+        """延迟导入 A51 投影函数，避免模块级失败影响其他测试类。"""
+        try:
+            from app.services.workpaper_sync.phase5_a51_cashflow_audit import (
+                build_store_projection,
+                merge_projection_into_responses,
+            )
+            return build_store_projection, merge_projection_into_responses
+        except ImportError:
+            pytest.skip(
+                "phase5_a51_cashflow_audit 模块不可导入"
+                "（可能 adapter 尚未注册或依赖缺失）"
+            )
+
+    # ─── 核心双向一致性测试 ───────────────────────────────────
+
+    def test_roundtrip_audit_fields_are_preserved(self) -> None:
+        """HTML→Excel→HTML 往返：审定表全部 editable 字段值不丢不变。
+
+        这是双向回写的核心不变式——store 投影是无损的。
+        """
+        build_proj, merge_back = self._import_projection_functions()
+
+        original = self._synthetic_audit_responses()
+
+        # HTML → Excel（正向投影）
+        projection = build_proj(original)
+        assert projection["entry_id"] == "xlsx/gt-a51-cashflow-audit", (
+            "投影 entry_id 应匹配 canary"
+        )
+        sheets = projection.get("sheets", {})
+        assert len(sheets) > 0, "审定表数据非空时投影应产出至少一个 sheet"
+
+        # Excel → HTML（逆向合并）
+        restored = merge_back(
+            projection=projection,
+            base_responses={},  # 空基底——验证投影自身包含完整信息
+        )
+
+        # 🔴 不变式：凡在 AUDIT_FIELD_MAP 中 mode==editable 的字段，
+        #    原始值非空时 roundtrip 后须完全相等。
+        from app.services.workpaper_sync.phase5_a51_sheets import AUDIT_FIELD_MAP
+
+        editable_keys = {
+            f"a51-audit-{suffix}"
+            for suffix, _col, _row, mode, _desc in AUDIT_FIELD_MAP
+            if mode == "editable"
+        }
+        for key in editable_keys:
+            orig_val = original.get(key, "")
+            if orig_val:  # 非空值必须 roundtrip 保真
+                assert key in restored, (
+                    f"字段 {key} 在 roundtrip 后丢失"
+                )
+                assert restored[key] == orig_val, (
+                    f"字段 {key} roundtrip 不一致: "
+                    f"原始={orig_val!r}, 恢复={restored.get(key)!r}"
+                )
+
+    def test_roundtrip_with_mixed_fields_does_not_cross_contaminate(self) -> None:
+        """混合数据（审定表 + 程序表 + 勾稽核对）：投影只映射受管字段，不污染。
+
+        程序表和勾稽核对数据不应出现在审定表的投影 cell 中，
+        反向合并也不应引入不存在的 item_id。
+        """
+        build_proj, merge_back = self._import_projection_functions()
+
+        # 混合所有类型的数据
+        mixed = {}
+        mixed.update(self._synthetic_audit_responses())
+        mixed.update(self._synthetic_program_responses())
+        mixed.update(self._synthetic_reconcile_responses())
+
+        projection = build_proj(mixed)
+        sheets = projection.get("sheets", {})
+
+        # 审定表 sheet 只应包含审定表字段的 cell 坐标
+        from app.services.workpaper_sync.phase5_a51_sheets import (
+            SHEET_KEY_AUDIT, AUDIT_FIELD_MAP,
+        )
+        audit_sheet = sheets.get(SHEET_KEY_AUDIT, {})
+        valid_cells = {
+            f"{col}{row}"
+            for _suffix, col, row, mode, _desc in AUDIT_FIELD_MAP
+            if mode == "editable"
+        }
+        for cell_ref in audit_sheet:
+            assert cell_ref in valid_cells, (
+                f"投影中出现预期外的 cell 坐标 {cell_ref}，可能是跨字段污染"
+            )
+
+        # 逆向合并：以混合数据为基底，合并后程序表字段应保持原值
+        restored = merge_back(
+            projection=projection,
+            base_responses=dict(mixed),
+        )
+        for key in self._synthetic_program_responses():
+            assert restored.get(key) == mixed[key], (
+                f"程序表字段 {key} 在 merge 后被意外修改"
+            )
+
+    def test_projection_empty_responses_produce_empty_sheets(self) -> None:
+        """空 responses → 投影应为空 sheets（不产生幽灵 cell）。"""
+        build_proj, _merge_back = self._import_projection_functions()
+
+        projection = build_proj({})
+        sheets = projection.get("sheets", {})
+        for sheet_key, cells in sheets.items():
+            assert len(cells) == 0, (
+                f"空 responses 时 sheet {sheet_key} 不应有 cell，"
+                f"实际有 {len(cells)} 个"
+            )
+
+    def test_merge_into_empty_base_recovers_projection_values(self) -> None:
+        """投影值合并到空基底 = 投影包含的所有值都出现在结果中。
+
+        这验证 merge 函数不依赖基底预存值就能恢复数据。
+        """
+        build_proj, merge_back = self._import_projection_functions()
+
+        original = self._synthetic_audit_responses()
+        projection = build_proj(original)
+        restored = merge_back(projection=projection, base_responses={})
+
+        # 统计：恢复的 key 数量 ≥ 投影 sheet 中 cell 数量
+        from app.services.workpaper_sync.phase5_a51_sheets import SHEET_KEY_AUDIT
+        audit_cells = projection.get("sheets", {}).get(SHEET_KEY_AUDIT, {})
+        nonempty_restored = {k: v for k, v in restored.items() if v}
+        assert len(nonempty_restored) >= len(audit_cells), (
+            f"恢复的非空 key 数 ({len(nonempty_restored)}) 应 ≥ "
+            f"投影 cell 数 ({len(audit_cells)})"
+        )
+
+    def test_idempotent_double_roundtrip(self) -> None:
+        """双次往返幂等性：HTML→Excel→HTML→Excel→HTML 结果与单次相同。
+
+        如果单次 roundtrip 保真，双次也应保真——
+        这排除了 merge 过程中引入的类型转换/精度漂移。
+        """
+        build_proj, merge_back = self._import_projection_functions()
+
+        original = self._synthetic_audit_responses()
+
+        # 第一次 roundtrip
+        proj1 = build_proj(original)
+        restored1 = merge_back(projection=proj1, base_responses={})
+
+        # 第二次 roundtrip（用第一次恢复的数据）
+        proj2 = build_proj(restored1)
+        restored2 = merge_back(projection=proj2, base_responses={})
+
+        # 第一次和第二次的审定表字段应完全一致
+        from app.services.workpaper_sync.phase5_a51_sheets import AUDIT_FIELD_MAP
+        editable_keys = {
+            f"a51-audit-{suffix}"
+            for suffix, _col, _row, mode, _desc in AUDIT_FIELD_MAP
+            if mode == "editable"
+        }
+        for key in editable_keys:
+            v1 = restored1.get(key, "")
+            v2 = restored2.get(key, "")
+            assert v1 == v2, (
+                f"双次 roundtrip 不幂等: {key} 第一次={v1!r}, 第二次={v2!r}"
+            )
+
+    def test_real_db_a51_zero_rows_confirms_blocking_reason(self) -> None:
+        """AF-P22: 真库 A5-1 前缀确实为 0 行（确认阻塞理由仍成立）。
+
+        🔴 有库时执行，无库时 skip 并标原因。
+        """
+        dsn = None
+        try:
+            from app.core.config import settings
+            raw = str(getattr(settings, "DATABASE_URL", "") or "")
+            dsn = raw.replace("+asyncpg", "").replace("+aiosqlite", "")
+        except Exception:
+            pass
+
+        if not dsn or "postgresql" not in dsn:
+            pytest.skip(
+                "Task 15* 阻塞理由确认需 PG 连接（无库时 skip，非静默 pass）"
+            )
+
+        import psycopg2  # type: ignore[import-untyped]
+        try:
+            conn = psycopg2.connect(dsn)
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT COUNT(*) FROM checklist_responses "
+                    "WHERE item_id LIKE 'a51-%' OR item_id LIKE 'A5-1%'"
+                )
+                count = cur.fetchone()[0]
+                # 🔴 断言 0 行——这正是 Task 15* 被标 `*` 的理由。
+                # 如果有朝一日这个断言打红（count > 0），说明真库有了业务数据，
+                # 此时应解除 Task 15* 的外部阻塞标记并补充真实 E2E 验证。
+                assert count == 0, (
+                    f"A5-1 前缀在真库已有 {count} 行——"
+                    "Task 15* 的外部阻塞理由不再成立，"
+                    "应解除 `*` 标记并补充真实 E2E 验证"
+                )
+            finally:
+                conn.close()
+        except psycopg2.OperationalError:
+            pytest.skip("PG 连接失败（Docker 未运行或端口不可达）")
+
+    def test_entry_id_and_field_map_consistency(self) -> None:
+        """投影函数使用的 ENTRY_ID 与 canary entry_id 完全一致。
+
+        防止 entry_id 拼写漂移导致投影挂到错误的 entry 上。
+        """
+        from app.services.workpaper_sync.phase5_a51_sheets import ENTRY_ID
+        assert ENTRY_ID == CANARY_ENTRY_ID, (
+            f"phase5_a51_sheets.ENTRY_ID ({ENTRY_ID}) "
+            f"与 canary ({CANARY_ENTRY_ID}) 不一致"
+        )
+
+    def test_audit_field_map_covers_all_editable_rows(self) -> None:
+        """AUDIT_FIELD_MAP 的 editable 行覆盖 6 个数据行（排除公式行 13/15）。
+
+        如果 FIELD_MAP 新增或删除了行，本断言会打红——
+        此时上面的 roundtrip 测试可能不再覆盖全部字段。
+        """
+        from app.services.workpaper_sync.phase5_a51_sheets import AUDIT_FIELD_MAP
+
+        editable_rows = {
+            row for _suffix, _col, row, mode, _desc in AUDIT_FIELD_MAP
+            if mode == "editable"
+        }
+        # 🔴 设计文档记录 6 个数据行：8,9,10,11,12,14（13=小计,15=差异为公式行）
+        expected_rows = {8, 9, 10, 11, 12, 14}
+        assert editable_rows == expected_rows, (
+            f"editable 行集合漂移: 期望 {expected_rows}, 实际 {editable_rows}"
+        )
+
+    # ─── 补充：Task 15* 自建夹具闭环扩展 ─────────────────────────
+
+    def test_contract_payload_structural_integrity(self) -> None:
+        """AF-P22 补充: build_contract_payload 产出有效的契约结构。
+
+        🔴 契约是 build_store_projection / merge_projection_into_responses 的
+        上游声明；结构不完整会导致投影写到错误的 cell 或遗漏字段。
+        自建夹具闭环须验证该管线上游也是完整的。
+
+        验证点：
+        - 契约有 contract_id 且与 adapter_id 一致
+        - sheets 非空且至少包含审定表 sheet
+        - 每个 table.field 有 stable_field_key / mode / cell 三要素
+        - 公式 cell 的 mode 为 'formula'（受保护）
+        """
+        try:
+            from app.services.workpaper_sync.phase5_a51_cashflow_audit import (
+                build_contract_payload,
+            )
+            from app.services.workpaper_sync.phase5_a51_sheets import ADAPTER_ID
+        except ImportError:
+            pytest.skip("phase5_a51_cashflow_audit 不可导入")
+
+        payload = build_contract_payload()
+
+        # 基本结构：contract_id 匹配 ADAPTER_ID
+        assert "contract_id" in payload, "契约缺少 contract_id"
+        assert payload["contract_id"] == ADAPTER_ID, (
+            f"contract_id '{payload['contract_id']}' 与 ADAPTER_ID '{ADAPTER_ID}' 不一致"
+        )
+        assert "sheets" in payload and len(payload["sheets"]) > 0, (
+            "契约 sheets 不应为空（A5-1 有 2 张受管 sheet 声明了字段）"
+        )
+
+        # 逐 sheet → table → field 校验要素
+        total_fields = 0
+        for sheet in payload["sheets"]:
+            assert "sheet_key" in sheet, f"sheet 缺少 sheet_key: {list(sheet.keys())}"
+            for table in sheet.get("tables", []):
+                for f in table.get("fields", []):
+                    total_fields += 1
+                    assert "stable_field_key" in f, (
+                        f"字段缺少 stable_field_key: {f}"
+                    )
+                    assert "mode" in f, f"字段缺少 mode: {f.get('stable_field_key')}"
+                    assert "cell" in f, f"字段缺少 cell: {f.get('stable_field_key')}"
+                    assert f["mode"] in ("editable", "formula"), (
+                        f"未知 mode '{f['mode']}': {f['stable_field_key']}"
+                    )
+        assert total_fields > 0, "契约中无任何 field 声明"
+
+    def test_formula_cells_excluded_from_editable_projection(self) -> None:
+        """AF-P22 补充: 公式 cell 不出现在 editable 投影中。
+
+        🔴 核心不变式：build_store_projection 只映射 mode=editable 的字段，
+        公式 cell（G8~G15 审定数 / 小计 / 差异）必须由 Excel 公式引擎计算，
+        如果它们被当作 editable 写入，会覆盖公式导致静默数据损坏。
+        """
+        build_proj, _merge = self._import_projection_functions()
+
+        from app.services.workpaper_sync.phase5_a51_sheets import (
+            AUDIT_FORMULA_CELLS, SHEET_KEY_AUDIT,
+        )
+        formula_coords = {f"{col}{row}" for col, row, _f in AUDIT_FORMULA_CELLS}
+
+        # 用满载数据跑投影
+        full_data = self._synthetic_audit_responses()
+        projection = build_proj(full_data)
+        audit_cells = projection.get("sheets", {}).get(SHEET_KEY_AUDIT, {})
+
+        leaked = formula_coords & set(audit_cells.keys())
+        assert len(leaked) == 0, (
+            f"公式 cell 泄露到 editable 投影中: {leaked}——"
+            "这会覆盖 Excel 公式导致静默数据损坏"
+        )
+
+    def test_projection_cell_coords_within_field_map(self) -> None:
+        """AF-P22 补充: 投影产出的每个 cell 坐标都在 AUDIT_FIELD_MAP 声明范围内。
+
+        🔴 防止投影函数写到 FIELD_MAP 未声明的 cell（幽灵 cell），
+        那些位置在 merge_back 时没有逆映射 → 单向丢失。
+        """
+        build_proj, _merge = self._import_projection_functions()
+
+        from app.services.workpaper_sync.phase5_a51_sheets import (
+            AUDIT_FIELD_MAP, SHEET_KEY_AUDIT,
+        )
+        declared_cells = {
+            f"{col}{row}"
+            for _suffix, col, row, mode, _desc in AUDIT_FIELD_MAP
+            if mode == "editable"
+        }
+
+        full_data = self._synthetic_audit_responses()
+        projection = build_proj(full_data)
+        audit_cells = projection.get("sheets", {}).get(SHEET_KEY_AUDIT, {})
+
+        undeclared = set(audit_cells.keys()) - declared_cells
+        assert len(undeclared) == 0, (
+            f"投影产出了 AUDIT_FIELD_MAP 未声明的 cell 坐标: {undeclared}——"
+            "这些 cell 在 merge_back 时没有逆映射，会单向丢失"
+        )
+
+    def test_static_region_declarations_cover_audit_cells(self) -> None:
+        """AF-P22 补充: 静态区声明覆盖全部审定表 editable + formula cell。
+
+        🔴 静态区声明（static_region_declarations）是 instrumentation 的入口——
+        如果声明的范围小于实际受管 cell，Excel 侧会在回写时漏掉边界上的格子。
+        """
+        try:
+            from app.services.workpaper_sync.phase5_a51_sheets import (
+                static_region_declarations,
+                AUDIT_FIELD_MAP,
+                AUDIT_FORMULA_CELLS,
+                SHEET_KEY_AUDIT,
+            )
+        except ImportError:
+            pytest.skip("phase5_a51_sheets 静态区声明不可导入")
+
+        regions = static_region_declarations()
+        # 找到审定表对应的区域
+        audit_regions = [
+            r for r in regions if r.get("sheet_key") == SHEET_KEY_AUDIT
+        ]
+        assert len(audit_regions) == 1, (
+            f"应恰有 1 个审定表静态区声明，实际 {len(audit_regions)}"
+        )
+        region = audit_regions[0]
+
+        # 区域必须有 managed_ref（覆盖范围）
+        managed_ref = region.get("managed_ref", "")
+        assert managed_ref, "审定表静态区缺少 managed_ref"
+
+        # 验证 managed_ref 覆盖了所有已声明 cell 的列范围和行范围
+        all_cols = set()
+        all_rows = set()
+        for _suffix, col, row, _mode, _desc in AUDIT_FIELD_MAP:
+            all_cols.add(col)
+            all_rows.add(row)
+        for col, row, _formula in AUDIT_FORMULA_CELLS:
+            all_cols.add(col)
+            all_rows.add(row)
+
+        # 解析 managed_ref "$D$8:$H$15" 形态
+        ref_match = re.match(
+            r"\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)", managed_ref
+        )
+        assert ref_match, f"managed_ref 格式不合法: {managed_ref}"
+        ref_col_start, ref_row_start, ref_col_end, ref_row_end = (
+            ref_match.group(1),
+            int(ref_match.group(2)),
+            ref_match.group(3),
+            int(ref_match.group(4)),
+        )
+
+        # 行范围检查
+        assert ref_row_start <= min(all_rows), (
+            f"managed_ref 起始行 {ref_row_start} > 最小 cell 行 {min(all_rows)}"
+        )
+        assert ref_row_end >= max(all_rows), (
+            f"managed_ref 终止行 {ref_row_end} < 最大 cell 行 {max(all_rows)}"
+        )
+
+    def test_selective_field_roundtrip_preserves_partial_data(self) -> None:
+        """AF-P22 补充: 只填部分字段的 roundtrip 不丢不增。
+
+        🔴 真实场景中审计助理往往只填了前 2 行就切到 Excel——
+        部分数据 roundtrip 须精确保真，不能因 merge 把空位填成空字符串
+        也不能因投影把未填字段的空 cell 写进去。
+        """
+        build_proj, merge_back = self._import_projection_functions()
+
+        # 只填 row 1（货币资金）
+        sparse = {
+            "a51-audit-1.unadjusted": "100000.00",
+            "a51-audit-1.adjustment": "5000.00",
+        }
+        projection = build_proj(sparse)
+        restored = merge_back(projection=projection, base_responses={})
+
+        # 填了的字段须在
+        assert restored.get("a51-audit-1.unadjusted") == "100000.00"
+        assert restored.get("a51-audit-1.adjustment") == "5000.00"
+
+        # 未填字段不应出现在恢复结果中（merge 不应凭空造值）
+        from app.services.workpaper_sync.phase5_a51_sheets import AUDIT_FIELD_MAP
+        editable_keys = {
+            f"a51-audit-{suffix}"
+            for suffix, _col, _row, mode, _desc in AUDIT_FIELD_MAP
+            if mode == "editable"
+        }
+        unfilled_present = {
+            k for k in editable_keys - set(sparse)
+            if k in restored and restored[k]
+        }
+        assert len(unfilled_present) == 0, (
+            f"merge 给未填字段凭空赋值: {unfilled_present}"
+        )
+
+    def test_managed_sheet_keys_and_names_are_consistent(self) -> None:
+        """AF-P22 补充: sheet key 常量与 sheet name 常量数量一致。
+
+        🔴 如果新增受管 sheet 时只加了 name 没加 key（或反之），
+        投影/契约/instrumentation 三条消费路径会静默脱钩。
+        """
+        from app.services.workpaper_sync.phase5_a51_sheets import (
+            MANAGED_SHEETS, ALL_SHEET_KEYS, UNMANAGED_SHEETS,
+        )
+
+        assert len(MANAGED_SHEETS) == len(ALL_SHEET_KEYS), (
+            f"MANAGED_SHEETS ({len(MANAGED_SHEETS)}) 与 "
+            f"ALL_SHEET_KEYS ({len(ALL_SHEET_KEYS)}) 不等长——"
+            "新增 sheet 时漏加了一侧"
+        )
+        # 受管 + 不受管 = 9 sheets（Task 12 已锁）
+        assert len(MANAGED_SHEETS) + len(UNMANAGED_SHEETS) == 9, (
+            f"受管 {len(MANAGED_SHEETS)} + 不受管 {len(UNMANAGED_SHEETS)} "
+            f"≠ 9（A5-1 册总 sheet 数）"
+        )
+
+    def test_blocking_reason_documented_and_fixture_is_synthetic(self) -> None:
+        """AF-P22: 自建夹具的闭环测试须明确标注阻塞理由。
+
+        本测试类的全部合成数据（_synthetic_*_responses）须满足：
+        - 使用 a51- 前缀（与 STORE_ITEM_PREFIX 一致）
+        - 不引用真库数据（item_id 不与真库 28 行的 prefix 重合）
+        🔴 如果真库将来有了 A5-1 数据（test_real_db_a51_zero_rows 打红），
+        应解除 `*` 标记并补充真实 E2E 验证——本测试类的合成夹具不可替代真实数据。
+        """
+        from app.services.workpaper_sync.phase5_a51_sheets import STORE_ITEM_PREFIX
+
+        all_synthetic = {}
+        all_synthetic.update(self._synthetic_audit_responses())
+        all_synthetic.update(self._synthetic_program_responses())
+        all_synthetic.update(self._synthetic_reconcile_responses())
+
+        for key in all_synthetic:
+            assert key.startswith(STORE_ITEM_PREFIX), (
+                f"合成数据 key '{key}' 不以 '{STORE_ITEM_PREFIX}' 开头——"
+                "可能污染其他 entry 的 namespace"
+            )

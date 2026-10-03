@@ -43,8 +43,15 @@ import { fetchOnlyOfficeHealthy } from '../sync/onlyOfficeHealth'
 /** A5-1 独立 entry id。 */
 export const A51_SYNC_ENTRY_ID = 'xlsx/gt-a51-cashflow-audit'
 
-/** 在线编辑视图标签。 */
-const ONLINE_EDIT_LABEL = '在线编辑'
+/**
+ * 🔴 形态 2 mode 值（AC-41）——逻辑值与显示标签分离。
+ * 改文案不再破坏逻辑（形态 1 的核心缺陷）。
+ * OO 值用 'excel'（非 'onlyoffice'，依 AF-P18——A 域 'onlyoffice' 字面量 = 0）。
+ */
+const MODE_STRUCTURED = 'structured' as const
+const MODE_EXCEL = 'excel' as const
+const MODE_LABEL_STRUCTURED = '结构化视图'
+const MODE_LABEL_EXCEL = '在线编辑'
 
 export interface UseA51SyncModeOptions {
   /** A5-1 的 sheetKey（默认 'a51-managed'）。 */
@@ -92,27 +99,29 @@ export function useA51SyncMode(options: UseA51SyncModeOptions) {
   )
 
   /**
-   * 🔴 形态 2 modeOptions（label/value 分离）——依 AC-41 从形态 1 收敛。
-   * 中文标签仅用于显示，逻辑值是 'html' / ONLINE_EDIT_LABEL。
+   * 🔴 形态 2 editorMode（label/value 分离）——依 AC-41 从形态 1 收敛。
+   * 逻辑值是 'structured' / 'excel'，中文标签仅用于 modeOptions 的 label。
    */
   const editorMode = computed<string>({
-    get: () => (syncBridge.mode.value === 'oo' ? ONLINE_EDIT_LABEL : '结构化视图'),
+    get: () => (syncBridge.mode.value === 'oo' ? MODE_EXCEL : MODE_STRUCTURED),
     set: (target: string) => { void switchMode(target) },
   })
 
   const modeOptions = computed(() =>
-    ['结构化视图', ONLINE_EDIT_LABEL].map(value => ({
-      label: value,
-      value,
+    [
+      { label: MODE_LABEL_STRUCTURED, value: MODE_STRUCTURED },
+      { label: MODE_LABEL_EXCEL, value: MODE_EXCEL },
+    ].map(opt => ({
+      ...opt,
       disabled:
-        (busy.value && !(value === '结构化视图' && String(syncBridge.state.value) === 'applied'))
-        || (value === ONLINE_EDIT_LABEL && options.isReadonly.value),
+        (busy.value && !(opt.value === MODE_STRUCTURED && String(syncBridge.state.value) === 'applied'))
+        || (opt.value === MODE_EXCEL && options.isReadonly.value),
     })),
   )
 
   async function switchMode(target: string): Promise<void> {
-    if (busy.value && !(target === '结构化视图' && String(syncBridge.state.value) === 'applied')) return
-    if (target === ONLINE_EDIT_LABEL) {
+    if (busy.value && !(target === MODE_STRUCTURED && String(syncBridge.state.value) === 'applied')) return
+    if (target === MODE_EXCEL) {
       if (options.isReadonly.value) return
       if (syncBridge.mode.value === 'oo') return
       if (!ooHealthy.value) await checkOoHealth(true)
@@ -121,7 +130,7 @@ export function useA51SyncMode(options: UseA51SyncModeOptions) {
       try { await syncBridge.switchToOnlyOffice() } catch { /* 已记入 lastError */ } finally { syncSwitching.value = false }
       return
     }
-    if (target !== '结构化视图') return
+    if (target !== MODE_STRUCTURED) return
     if (syncBridge.mode.value === 'oo') {
       syncSwitching.value = true
       try {

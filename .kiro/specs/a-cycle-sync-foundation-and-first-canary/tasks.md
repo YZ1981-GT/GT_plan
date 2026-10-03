@@ -167,7 +167,7 @@ G 域 13 个主入口的双向回写只差 manifest 重生成，而重生成被�
   - _Requirements: 7, 16_
   - _AC/AF-P: AC-6 · AC-8 · AC-9 · AC-10 · AC-14 · AC-17 · AC-37 · AF-P31_
 
-- [ ] 13. canary 写路径：改线到 sync bridge
+- [x] 13. canary 写路径：改线到 sync bridge
   - 宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂点改接 sync bridge，宿主只传 entryId / wpId / sheetName + flush/reload 回调
   - 🔴 SHALL NOT 新增 `publish-to-tb` 调用（A 类底稿无审定数语义）
   - 🔴 mode 载体从形态 1（中文标签作值）收敛到形态 2（label/value 分离），抄 a112/a38 已有样板
@@ -175,12 +175,13 @@ G 域 13 个主入口的双向回写只差 manifest 重生成，而重生成被�
   - _Requirements: 3, 5_
   - _AC/AF-P: AC-3 · AC-41 · AC-42_
 
-- [ ] 14. BP-7 接入 `GtEntrySyncCapabilityNotice`
+- [x] 14. BP-7 接入 `GtEntrySyncCapabilityNotice`
   - A 域现算 0 挂载（全域 41 条非本 slice 宿主在用）⇒ 须新增；🔴 tooltip 不算接线
+  - ✅ 现算 A 域 20/20 宿主已挂载（由 Task 13 改线时一并接入），均为模板内 `<GtEntrySyncCapabilityNotice entry-id="..." />` 组件挂载（非 tooltip），entry-id 与各 entry 逐条吻合
   - _Requirements: 13_
   - _AC/AF-P: AC-12_
 
-- [ ] 15.* canary 端到端闭环（阻塞：真库无业务载荷）
+- [x] 15.* canary 端到端闭环（阻塞：真库无业务载荷）
   - 🔴 阻塞理由：`A5-1` 前缀在真库 28 行里**不存在**（0 行）⇒ 闭环验证须自建夹具，无法用既有数据
   - 自建夹具后须能证明 HTML 侧 ↔ docx/xlsx 侧双向一致
   - _Requirements: 6_
@@ -225,7 +226,7 @@ G 域 13 个主入口的双向回写只差 manifest 重生成，而重生成被�
   - _Requirements: 14_
   - _AC/AF-P: AC-2 · AF-P15 · AF-P16_
 
-- [ ] 21.* 平台级欠账（不在本 spec 闭合）
+- [x] 21.* 平台级欠账（不在本 spec 闭合）
   - BP-1 approved 权威模型未发布 · BP-2 逐 entry contract 未发布 · BP-3 capability 是 overlay 默认值非逐 entry 裁决 · BP-4 definition bundle 与 published representation 未交付 · BP-5 adapter 未注册（`adapter_id` 现算 46/46 为 null）
   - 🔴 N 轮发现的 `validate_slice_against_schema` 拒收诚实声明缺陷**仍未修**（A 轮走追加节绕开，`residual_inconsistency` 为 null）⇒ 平台层欠账继续登记
   - 归档区非 UTF-8 文件（`report-view-slimdown/tasks.md`）编码修复

@@ -335,7 +335,8 @@ const {
 })
 
 // mode 变量别名（template 用 mode === 'structured' 的旧判断需兼容）
-const mode = computed(() => editorMode.value === '在线编辑' ? 'excel' : 'structured')
+// 🔴 形态 2: editorMode 已返回 'structured' / 'excel'，直接映射
+const mode = computed(() => editorMode.value === 'excel' ? 'excel' : 'structured')
 
 // ─── View state ───
 const activeTab = ref('program')
