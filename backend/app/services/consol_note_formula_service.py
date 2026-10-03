@@ -661,6 +661,84 @@ async def _context(db: AsyncSession, project_id: UUID, year: int | None):
     return ctx
 
 
+async def _note_data_record(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    section_id: str,
+    *,
+    node_key: str | None,
+    allow_root_legacy_fallback: bool = True,
+) -> ConsolNoteData | None:
+    """按节点读取附注行；只有根合并节点允许回退 V041 的 NULL 兼容行。"""
+    target = (
+        ConsolNoteData.node_key.is_(None)
+        if node_key is None
+        else ConsolNoteData.node_key == node_key
+    )
+    record = (await db.execute(sa.select(ConsolNoteData).where(
+        ConsolNoteData.project_id == project_id,
+        ConsolNoteData.year == year,
+        ConsolNoteData.section_id == section_id,
+        target,
+    ))).scalar_one_or_none()
+    if record is not None or not node_key or not allow_root_legacy_fallback:
+        return record
+
+    from app.services.consol_group_tree import ROLE_CONSOL
+
+    if not node_key.endswith(f":{ROLE_CONSOL}"):
+        return None
+    return (await db.execute(sa.select(ConsolNoteData).where(
+        ConsolNoteData.project_id == project_id,
+        ConsolNoteData.year == year,
+        ConsolNoteData.section_id == section_id,
+        ConsolNoteData.node_key.is_(None),
+    ))).scalar_one_or_none()
+
+
+async def _note_data_record_exact(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    section_id: str,
+    *,
+    node_key: str | None,
+) -> ConsolNoteData | None:
+    """读取写入目标行，不允许根节点把 legacy 行当成节点行。"""
+    target = ConsolNoteData.node_key.is_(None) if node_key is None else ConsolNoteData.node_key == node_key
+    return (await db.execute(sa.select(ConsolNoteData).where(
+        ConsolNoteData.project_id == project_id,
+        ConsolNoteData.year == year,
+        ConsolNoteData.section_id == section_id,
+        target,
+    ))).scalar_one_or_none()
+
+
+async def _copy_note_data_record(
+    db: AsyncSession,
+    source: ConsolNoteData,
+    *,
+    project_id: UUID,
+    year: int,
+    section_id: str,
+    node_key: str,
+) -> ConsolNoteData:
+    """把根节点 legacy 数据复制为节点专属行，避免填入覆盖项目级兼容行。"""
+    record = ConsolNoteData(
+        project_id=project_id,
+        year=year,
+        section_id=section_id,
+        node_key=node_key,
+        data=dict(source.data or {}) if isinstance(source.data, dict) else {},
+        is_stale=bool(source.is_stale),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db.add(record)
+    await db.flush()
+    return record
+
+
 async def note_breakdown(
     db: AsyncSession, project_id: UUID, year: int | None, section_id: str, *,
     node_key: str | None = None, standard: str | None = None,
@@ -777,17 +855,29 @@ def fill_rows(
 
 
 async def fill_by_formula(
-    db: AsyncSession, project_id: UUID, year: int, section_id: str, *, standard: str | None = None,
+    db: AsyncSession, project_id: UUID, year: int, section_id: str, *,
+    node_key: str | None = None, standard: str | None = None,
 ) -> dict:
-    """「按公式填入」（design §7.3）：合并数写入 ``consol_note_data``（无则按模板行起）；
-    ``data.manual_cells`` 里的单元格保留原值并在响应列出；清除 ``is_stale``。只 flush，路由提交。"""
-    breakdown = await note_breakdown(db, project_id, year, section_id, standard=standard)
+    """「按公式填入」：按节点把合并数写入 ``consol_note_data``；旧调用不带节点键时使用项目级兼容行。"""
+    breakdown = await note_breakdown(
+        db, project_id, year, section_id, node_key=node_key, standard=standard,
+    )
     tt = breakdown["template_type"]
     table = find_table(tt, section_id) or {}
-    record = (await db.execute(sa.select(ConsolNoteData).where(
-        ConsolNoteData.project_id == project_id, ConsolNoteData.year == breakdown["year"],
-        ConsolNoteData.section_id == section_id,
-    ))).scalar_one_or_none()
+    source_record = await _note_data_record(
+        db, project_id, breakdown["year"], section_id, node_key=node_key,
+    )
+    record = source_record
+    if node_key is not None:
+        # 根节点允许从 legacy NULL 行读取，但写入时必须落到节点专属行。
+        record = await _note_data_record_exact(
+            db, project_id, breakdown["year"], section_id, node_key=node_key,
+        )
+        if record is None and source_record is not None and source_record.node_key is None:
+            record = await _copy_note_data_record(
+                db, source_record, project_id=project_id, year=breakdown["year"],
+                section_id=section_id, node_key=node_key,
+            )
     data = dict(record.data or {}) if record is not None and isinstance(record.data, dict) else {}
     headers = data.get("headers") or table.get("headers") or []
     rows = data.get("rows") if isinstance(data.get("rows"), list) and data.get("rows") else table.get("rows") or []
@@ -795,8 +885,10 @@ async def fill_by_formula(
     data.update({"headers": headers, "rows": new_rows})
     now = datetime.now(timezone.utc)
     if record is None:
-        db.add(ConsolNoteData(project_id=project_id, year=breakdown["year"], section_id=section_id, data=data,
-                              is_stale=False, updated_at=now))
+        db.add(ConsolNoteData(
+            project_id=project_id, year=breakdown["year"], section_id=section_id,
+            node_key=node_key, data=data, is_stale=False, updated_at=now,
+        ))
     else:
         record.data = data
         record.is_stale = False
@@ -806,6 +898,7 @@ async def fill_by_formula(
         "project_id": str(project_id),
         "year": breakdown["year"],
         "section_id": section_id,
+        "node_key": node_key,
         "template_type": tt,
         **summary,
         "is_stale": False,

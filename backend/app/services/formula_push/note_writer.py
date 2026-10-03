@@ -23,11 +23,93 @@ spec: chain-closure-phase2-formula-push-engine · design §五 附注单元格 /
 """
 from __future__ import annotations
 
+import json
+import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from app.services.formula_push.js_compat import js_json_number, read_number
+
+logger = logging.getLogger(__name__)
+
+# ─── 附注模板数据（按需加载，进程生命周期内缓存） ──────────────────────────
+_DATA_DIR = Path(__file__).resolve().parents[3] / "data"
+
+_TEMPLATE_CACHE: dict[str, list[dict]] = {}
+
+
+def _load_note_template(template_type: str) -> list[dict]:
+    """加载附注模板 sections 列表，缓存。"""
+    if template_type in _TEMPLATE_CACHE:
+        return _TEMPLATE_CACHE[template_type]
+    path = _DATA_DIR / f"note_template_{template_type}.json"
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    sections = data.get("sections") or []
+    _TEMPLATE_CACHE[template_type] = sections
+    return sections
+
+
+def _find_template_table(
+    template_type: str, section_number: str, table_name: str,
+) -> dict | None:
+    """从附注模板中按 section_number 和 table name 定位到目标表定义。"""
+    sections = _load_note_template(template_type)
+    for sec in sections:
+        if sec.get("section_number") != section_number:
+            continue
+        for tbl in sec.get("tables") or []:
+            if tbl.get("name") == table_name:
+                return tbl
+    return None
+
+
+#: 模板类型 → 公式推送的附注章节号
+_SECTION_MAP: dict[str, str] = {
+    "listed": "五、1",
+    "soe": "八、1",
+}
+
+
+@dataclass(frozen=True)
+class MainSkeleton:
+    """后端构建的附注主表骨架，与前端 buildE1SyncPayload 产出逐字一致。"""
+    rows: list[dict]
+    columns: list[dict]
+
+
+def build_main_skeleton(template_type: str, table_name: str) -> MainSkeleton | None:
+    """按附注模板（listed 五、1 / soe 八、1）构建主表骨架。
+
+    产出 rows = [{label, end_amount: None, prior_amount: None, is_total?}]
+    与 columns，与前端 ``buildE1{Listed,Soe}Columns()`` 逐字一致。
+    找不到模板表返回 None。
+
+    spec: chain-closure-phase3-push-rollout · design §五 · 需求 5.1
+    """
+    section_number = _SECTION_MAP.get(template_type)
+    if section_number is None:
+        return None
+    tbl_def = _find_template_table(template_type, section_number, table_name)
+    if tbl_def is None:
+        return None
+    rows: list[dict] = []
+    for row_def in tbl_def.get("rows") or []:
+        label = row_def.get("label", "")
+        row: dict = {"label": label, "end_amount": None, "prior_amount": None}
+        if row_def.get("is_total"):
+            row["is_total"] = True
+        rows.append(row)
+    columns: list[dict] = []
+    for col_def in tbl_def.get("columns") or []:
+        col: dict = {}
+        for k in ("key", "label", "is_label", "flat", "format"):
+            if k in col_def:
+                col[k] = col_def[k]
+        columns.append(col)
+    return MainSkeleton(rows=rows, columns=columns)
 
 #: 附注字段 → (披露行取值键, addr_id 期间后缀)
 NOTE_FIELDS: dict[str, tuple[str, str]] = {

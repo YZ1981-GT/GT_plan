@@ -206,10 +206,12 @@ class TestR4StaleMarksFinancialReport:
     async def test_stale_cascade_marks_financial_report(
         self, seeded: AsyncSession, monkeypatch
     ):
-        """🔴 核心变异：调整分录 stale 级联必须置 financial_report.is_stale。
+        """🔴 核心变异：调整分录 stale 级联必须按受影响报表行置 `financial_report.is_stale`。
 
-        修复前：只标 AuditReport，financial_report 一行未标（红）
-        修复后：该项目该年度全部被标，且 AuditReport 仍被标（零回归）
+        修复前：只标 AuditReport，financial_report 未标（红）；旧的 R4 修复虽然
+        已能整表标记，但任务 15 要求有科目时只标受影响行。
+        修复后：1122 对应的 BS-006 被标记，6001 对应的 IS-001 保持清洁，且
+        AuditReport 仍被标记（零回归）。
         """
         from app.models.report_models import OpinionType
 
@@ -277,14 +279,48 @@ class TestR4StaleMarksFinancialReport:
         async with factory() as s:
             fr = (await s.execute(sa.select(FinancialReport))).scalars().all()
             assert fr, "fixture 未造 financial_report 行，判据无分母"
-            stale_n = sum(1 for r in fr if r.is_stale)
-            assert stale_n == len(fr), (
-                f"financial_report 仅 {stale_n}/{len(fr)} 被标 stale"
-                f"：stale 级联没标到财务报表数据表；三表单独 update 诊断={diag}"
+            stale_codes = {r.row_code for r in fr if r.is_stale}
+            assert stale_codes == {"BS-006"}, (
+                f"有科目 1122 时应只标 BS-006，实际 stale={stale_codes}"
+                f"；三表单独 update 诊断={diag}"
+            )
+            clean_codes = {r.row_code for r in fr if not r.is_stale}
+            assert clean_codes == {"IS-001"}, (
+                f"不受 1122 影响的 IS-001 不应被标 stale，实际清洁行={clean_codes}"
             )
             ar = (await s.execute(sa.select(AuditReport))).scalars().all()
             assert ar and all(r.is_stale for r in ar), (
                 "AuditReport 不再被标 ⇒ 零回归被破坏"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("account_codes", [None, []])
+    async def test_stale_cascade_without_accounts_marks_all_financial_reports(
+        self, seeded: AsyncSession, monkeypatch, account_codes
+    ):
+        """没有受影响科目时，报表 stale 级联才整表兜底。"""
+        handler = _find_handler(
+            "_mark_reports_stale_on_adjustment", EventType.ADJUSTMENT_APPROVED
+        )
+        assert handler is not None, "取不到 _mark_reports_stale_on_adjustment handler"
+
+        import sys as _sys
+
+        factory = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
+        hmod = _sys.modules[handler.__module__]
+        monkeypatch.setattr(hmod, "async_session_factory", factory)
+
+        await handler(EventPayload(
+            event_type=EventType.ADJUSTMENT_APPROVED,
+            project_id=PROJ_ID,
+            year=YEAR,
+            account_codes=account_codes,
+        ))
+
+        async with factory() as s:
+            fr = (await s.execute(sa.select(FinancialReport))).scalars().all()
+            assert fr and all(r.is_stale for r in fr), (
+                "account_codes 缺失时应整表标记 FinancialReport"
             )
 
 

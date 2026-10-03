@@ -461,6 +461,45 @@ async def _write_entries(
     return None
 
 
+def _has_obscured_data(table_data: dict, table_name: str) -> str | None:
+    """检查附注章节是否有会被骨架遮挡的数据（需求 5.2）。
+
+    如果 sub_table_data 以外有非空非零数值（顶层 rows/_tables 有业务数据）、
+    或 sub_table_data 里该表以外的子表有人工/锁定单元格，返回中文原因；否则 None。
+
+    只检查该表**缺失**时的「原表格」——即 rows / _tables 里可能存在用户不可见
+    但将被骨架覆盖的数据。
+    """
+    # 检查顶层 rows 有非空非零数值
+    rows = table_data.get("rows")
+    if isinstance(rows, list):
+        for r in rows:
+            if not isinstance(r, dict):
+                continue
+            for k, v in r.items():
+                if k in ("label", "row_type", "is_total", "is_label"):
+                    continue
+                if v is not None and v != 0 and v != "" and v != "0":
+                    return f"顶层 rows 含非空数值（{k}={v!r}）"
+    # 检查 _tables 有非空非零数值
+    tables = table_data.get("_tables")
+    if isinstance(tables, list):
+        for t in tables:
+            if not isinstance(t, dict):
+                continue
+            t_rows = t.get("rows")
+            if isinstance(t_rows, list) and len(t_rows) > 0:
+                for r in t_rows:
+                    if not isinstance(r, dict):
+                        continue
+                    vals = r.get("values")
+                    if isinstance(vals, list):
+                        for v in vals:
+                            if v is not None and v != 0 and v != "" and v != "0":
+                                return f"_tables 含非空数值"
+    return None
+
+
 async def _push_note(
     ctx: _Ctx, *, rule: PushRule, binding: Any, overlay: Mapping[str, Any], sources: Any, paper: _Paper,
 ) -> str | None:
@@ -494,6 +533,42 @@ async def _push_note(
     table = None
     if reason is None:
         table, reason = note_writer.locate_table(table_data, table_name)
+
+    # ── 缺表时尝试建骨架（需求 5.1）──────────────────────────────────
+    skeleton_built = False
+    if table is None and reason and "没有" in reason and table_data is not None:
+        # _source 必须是 workpaper/workpaper_html（locate_table 已检查过 → 这里只补建缺的子表）
+        source = table_data.get("_source")
+        if source in note_writer.WORKPAPER_SOURCES:
+            # 遮挡数据检查（需求 5.2）：原表格有非空非零数值或人工/锁定单元格 → 跳过
+            blocked = _has_obscured_data(table_data, table_name)
+            if blocked:
+                ctx.skip(rule.rule_id, "note", "note", section_addr,
+                         f"附注 {section} 章节已有自定义数据（{blocked}），建骨架会遮挡原数据，跳过")
+                return None
+            skeleton = note_writer.build_main_skeleton(template_type, table_name)
+            if skeleton is None:
+                ctx.skip(rule.rule_id, "note", "note", section_addr,
+                         f"附注模板「{template_type}」中没有「{table_name}」表定义，无法建骨架")
+                return None
+            # 浅合并：保留其余子表、叙述、原有 rows/_tables（需求 5.3）
+            sub = table_data.setdefault("sub_table_data", {})
+            sub[table_name] = skeleton.rows
+            cols = table_data.setdefault("_sub_table_columns", {})
+            cols[table_name] = skeleton.columns
+            table_data["_source"] = "workpaper"
+            # 缺省 _current_standard（引擎按项目模板类型选章节，此时该字段可能未设）
+            if "_current_standard" not in table_data:
+                table_data["_current_standard"] = template_type
+            # 重新定位
+            table, reason = note_writer.locate_table(table_data, table_name)
+            if table is not None:
+                skeleton_built = True
+                logger.info(
+                    "formula_push: 为附注 %s 建「%s」主表骨架（%d 行），template_type=%s",
+                    section, table_name, len(skeleton.rows), template_type,
+                )
+
     if table is None:
         ctx.skip(rule.rule_id, "note", "note", section_addr, reason or "附注表格无法定位")
         return None

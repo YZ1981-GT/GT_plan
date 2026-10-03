@@ -6,7 +6,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, Index, Integer, String, UniqueConstraint, text
+from sqlalchemy import Boolean, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -23,12 +23,27 @@ class ConsolNoteData(Base):
     project_id: Mapped[uuid.UUID] = mapped_column(nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     section_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    node_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
     data: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
     # V172：合并推送后置真（合并数已变化，附注数据待更新）；「按公式填入」后清除
     is_stale: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
 
     __table_args__ = (
-        UniqueConstraint("project_id", "year", "section_id"),
+        # V177：旧项目级兼容行与节点级行分别做部分唯一约束；SQLite 测试库也保持同一语义。
+        Index(
+            "uq_cnd_legacy_project_year_section",
+            "project_id", "year", "section_id",
+            unique=True,
+            postgresql_where=text("node_key IS NULL"),
+            sqlite_where=text("node_key IS NULL"),
+        ),
+        Index(
+            "uq_cnd_project_year_section_node",
+            "project_id", "year", "section_id", "node_key",
+            unique=True,
+            postgresql_where=text("node_key IS NOT NULL"),
+            sqlite_where=text("node_key IS NOT NULL"),
+        ),
         Index("ix_cnd_proj_year", "project_id", "year"),
     )

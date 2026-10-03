@@ -79,6 +79,11 @@
         "executionId": "c2008473-820d-4207-8f9f-c385d51b3593",
         "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
         "timestamp": 1790951959667
+      },
+      {
+        "executionId": "c2008473-820d-4207-8f9f-c385d51b3593",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790952559564
       }
     ],
     "6. 决策 1 · SSE 与事件调用点守卫（需求 3.5, 7.2）": [
@@ -86,6 +91,16 @@
         "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
         "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
         "timestamp": 1790945387054
+      },
+      {
+        "executionId": "c2008473-820d-4207-8f9f-c385d51b3593",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790952571624
+      },
+      {
+        "executionId": "c2008473-820d-4207-8f9f-c385d51b3593",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790953099373
       }
     ],
     "7. 决策 1 · 前端大厅与底稿调整页（需求 3.4, 3.7）": [
@@ -93,6 +108,16 @@
         "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
         "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
         "timestamp": 1790945387088
+      },
+      {
+        "executionId": "c2008473-820d-4207-8f9f-c385d51b3593",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790953106143
+      },
+      {
+        "executionId": "c2008473-820d-4207-8f9f-c385d51b3593",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790953723555
       }
     ],
     "8. 决策 2 · V176 / R176 + ORM + 三层一致（需求 4.1, 4.7）": [
@@ -100,6 +125,16 @@
         "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
         "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
         "timestamp": 1790945387137
+      },
+      {
+        "executionId": "c2008473-820d-4207-8f9f-c385d51b3593",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790953731938
+      },
+      {
+        "executionId": "c2008473-820d-4207-8f9f-c385d51b3593",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790954044188
       }
     ],
     "9. 决策 2 · 唯一写入函数 + 发布门 + 令牌（需求 4.2, 4.4, 4.6）": [
@@ -107,6 +142,11 @@
         "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
         "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
         "timestamp": 1790945387165
+      },
+      {
+        "executionId": "c2008473-820d-4207-8f9f-c385d51b3593",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790954050442
       }
     ],
     "10. 决策 2 · 重算与读口径（需求 4.3, 4.5）": [
@@ -114,6 +154,16 @@
         "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
         "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
         "timestamp": 1790945387196
+      },
+      {
+        "executionId": "c2d74ddd-cdc7-4ef6-a8f7-dc6114468876",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790954528236
+      },
+      {
+        "executionId": "c2d74ddd-cdc7-4ef6-a8f7-dc6114468876",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790955468571
       }
     ],
     "11. 决策 2 · 前端试算表页（需求 4.1, 4.3）": [
@@ -121,6 +171,16 @@
         "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
         "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
         "timestamp": 1790945387228
+      },
+      {
+        "executionId": "c2d74ddd-cdc7-4ef6-a8f7-dc6114468876",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790955475592
+      },
+      {
+        "executionId": "c2d74ddd-cdc7-4ef6-a8f7-dc6114468876",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790956011690
       }
     ],
     "12. 决策 3 · 附注主表交接（需求 5）": [
@@ -128,6 +188,16 @@
         "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
         "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
         "timestamp": 1790945387257
+      },
+      {
+        "executionId": "c2d74ddd-cdc7-4ef6-a8f7-dc6114468876",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790956017984
+      },
+      {
+        "executionId": "c2d74ddd-cdc7-4ef6-a8f7-dc6114468876",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790956701757
       }
     ],
     "13. P1 · K1 binding（需求 6.1, 6.2, 6.4）": [
@@ -135,6 +205,11 @@
         "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
         "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
         "timestamp": 1790945387288
+      },
+      {
+        "executionId": "c2d74ddd-cdc7-4ef6-a8f7-dc6114468876",
+        "chatSessionId": "sess_45bbb867-c29c-476b-8693-8f67ea8d5068",
+        "timestamp": 1790956707344
       }
     ],
     "14. P1 · K1 前端配套（需求 6.3）": [
@@ -142,6 +217,16 @@
         "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
         "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
         "timestamp": 1790945387342
+      },
+      {
+        "executionId": "5b4250e4-f281-40bd-8948-ccf95514f1d3",
+        "chatSessionId": "sess_3652d319-b1d4-4505-820e-09f3664c68f9",
+        "timestamp": 1790964795989
+      },
+      {
+        "executionId": "5b4250e4-f281-40bd-8948-ccf95514f1d3",
+        "chatSessionId": "sess_3652d319-b1d4-4505-820e-09f3664c68f9",
+        "timestamp": 1790968809329
       }
     ],
     "15. 报表过期标记按行标、按行清（需求 7.1）": [
@@ -149,6 +234,16 @@
         "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
         "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
         "timestamp": 1790945387372
+      },
+      {
+        "executionId": "5b4250e4-f281-40bd-8948-ccf95514f1d3",
+        "chatSessionId": "sess_3652d319-b1d4-4505-820e-09f3664c68f9",
+        "timestamp": 1790968822065
+      },
+      {
+        "executionId": "5b4250e4-f281-40bd-8948-ccf95514f1d3",
+        "chatSessionId": "sess_3652d319-b1d4-4505-820e-09f3664c68f9",
+        "timestamp": 1790970468557
       }
     ],
     "16. 端到端集成（SQLite 真 ORM + 真 PG 关键段）": [
@@ -156,6 +251,11 @@
         "executionId": "342db85e-7c75-4c1a-9b72-dde9e5c43b7e",
         "chatSessionId": "sess_3ea728f3-ac0c-488f-b63e-1c34cc434df6",
         "timestamp": 1790945387415
+      },
+      {
+        "executionId": "5b4250e4-f281-40bd-8948-ccf95514f1d3",
+        "chatSessionId": "sess_3652d319-b1d4-4505-820e-09f3664c68f9",
+        "timestamp": 1790970476589
       }
     ],
     "17. 真库试跑（事务内执行后回滚，零痕迹指纹比对）": [

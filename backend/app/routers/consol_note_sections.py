@@ -10,12 +10,14 @@ import json
 from pathlib import Path
 from uuid import UUID
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import check_consol_lock, require_project_access
+from app.models.consol_note_data_models import ConsolNoteData
 from app.models.core import User
 
 router = APIRouter(prefix="/api/consol-note-sections", tags=["consol-note-sections"])
@@ -73,6 +75,7 @@ async def get_note_breakdown(
 @router.post("/fill-by-formula/{project_id}/{year}/{section_id}")
 async def fill_note_by_formula(
     project_id: UUID, year: int, section_id: str,
+    node_key: str | None = Query(None, description="企业树节点；根节点允许读取历史兼容行但写入节点专属行"),
     standard: str | None = Query(None, description="附注模板（soe / listed）；不传按项目口径"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("edit")),
@@ -82,7 +85,9 @@ async def fill_note_by_formula(
     from app.services.consol_note_formula_service import NoteFormulaError, fill_by_formula
 
     try:
-        result = await fill_by_formula(db, project_id, year, section_id, standard=standard)
+        result = await fill_by_formula(
+            db, project_id, year, section_id, node_key=node_key, standard=standard,
+        )
     except NoteFormulaError as e:
         await db.rollback()
         raise _note_error(e) from e
@@ -138,54 +143,181 @@ async def get_section_detail(standard: str, section_id: str):
     return {"error": "章节不存在", "section_id": section_id}
 
 
-# ─── 用户数据存储（按项目+年度+章节） ─────────────────────────────────────────
+# ─── 用户数据存储（按项目+年度+章节+节点） ───────────────────────────────────
+
+
+def _node_filter(node_key: str | None) -> sa.ColumnElement[bool]:
+    """旧请求读写项目级 NULL 行；带节点键时严格匹配节点行。"""
+    return ConsolNoteData.node_key.is_(None) if node_key is None else ConsolNoteData.node_key == node_key
+
+
+def _requested_node_key(query_node_key: str | None, body: dict | None = None) -> str | None:
+    """统一兼容旧 body 调用和新 query 参数调用。显式 query 参数优先。"""
+    if query_node_key is not None:
+        return query_node_key
+    return body.get("node_key") if isinstance(body, dict) else None
+
+
+def _is_root_consol_node(node_key: str | None) -> bool:
+    """企业树根合并节点的键格式为 ``{company_code}:consol``。"""
+    return bool(node_key and node_key.endswith(":consol"))
+
+
+async def _load_saved_note_data(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    node_key: str | None,
+) -> dict[str, dict]:
+    """批量读取指定节点的附注数据；根节点逐章节优先专属行、再回退 legacy 行。"""
+    params: dict[str, object] = {"pid": project_id, "y": year}
+    if node_key is None:
+        node_clause = "node_key IS NULL"
+    else:
+        params["nk"] = node_key
+        node_clause = "node_key = :nk"
+        if _is_root_consol_node(node_key):
+            node_clause = "(node_key = :nk OR node_key IS NULL)"
+
+    result = await db.execute(text(
+        "SELECT section_id, data, node_key "
+        "FROM consol_note_data "
+        "WHERE project_id = :pid AND year = :y AND " + node_clause
+    ), params)
+    saved: dict[str, dict] = {}
+    for row in result.fetchall():
+        section_id, data, row_node_key = row
+        if row_node_key == node_key or section_id not in saved:
+            saved[section_id] = data if isinstance(data, dict) else {}
+    return saved
+
+
+async def _load_note_data_for_company(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    section_id: str,
+    company_code: str,
+    *,
+    node_key: str | None = None,
+) -> dict | None:
+    """读取企业附注数据，优先使用共享 section_id + node_key，兼容旧后缀键。"""
+    params: dict[str, object] = {
+        "pid": project_id,
+        "y": year,
+        "sid": section_id,
+        "legacy_sid": f"{section_id}_{company_code}",
+        "source_nk": node_key or f"{company_code}:consol",
+    }
+    result = await db.execute(text(
+        "SELECT section_id, data, node_key "
+        "FROM consol_note_data "
+        "WHERE project_id = :pid AND year = :y "
+        "AND ((section_id = :sid AND node_key = :source_nk) "
+        "OR (section_id = :legacy_sid AND node_key IS NULL))"
+    ), params)
+    rows = result.fetchall()
+    for row in rows:
+        if row[0] == section_id and row[2] == params["source_nk"]:
+            return row[1] if isinstance(row[1], dict) else {}
+    for row in rows:
+        if row[0] == params["legacy_sid"] and row[2] is None:
+            return row[1] if isinstance(row[1], dict) else {}
+    return None
+
+
+async def _load_note_record(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    section_id: str,
+    node_key: str | None,
+) -> ConsolNoteData | None:
+    """加载附注数据；根合并节点允许从 NULL legacy 行读取，但不改变其写入归属。"""
+    record = (await db.execute(sa.select(ConsolNoteData).where(
+        ConsolNoteData.project_id == project_id,
+        ConsolNoteData.year == year,
+        ConsolNoteData.section_id == section_id,
+        _node_filter(node_key),
+    ))).scalar_one_or_none()
+    if record is not None or not node_key or not node_key.endswith(":consol"):
+        return record
+    return (await db.execute(sa.select(ConsolNoteData).where(
+        ConsolNoteData.project_id == project_id,
+        ConsolNoteData.year == year,
+        ConsolNoteData.section_id == section_id,
+        ConsolNoteData.node_key.is_(None),
+    ))).scalar_one_or_none()
+
+
+async def _save_note_record(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    section_id: str,
+    node_key: str | None,
+    data: dict,
+    now,
+) -> ConsolNoteData:
+    """按节点 upsert；不使用旧项目级 ON CONFLICT，兼容 V177 两个部分唯一索引。"""
+    target = await _load_note_record(db, project_id, year, section_id, node_key)
+    # 根节点回退到 legacy 只用于展示；带 node_key 的保存必须创建专属行。
+    if target is not None and node_key is not None and target.node_key != node_key:
+        target = None
+    if target is None:
+        target = ConsolNoteData(
+            project_id=project_id,
+            year=year,
+            section_id=section_id,
+            node_key=node_key,
+            data=data,
+            updated_at=now,
+        )
+        db.add(target)
+    else:
+        target.data = data
+        target.updated_at = now
+    return target
 
 
 @router.get("/data/{project_id}/{year}/{section_id}")
 async def get_note_data(
     project_id: UUID, year: int, section_id: str,
+    node_key: str | None = Query(None, description="企业树节点；不传读取项目级兼容行"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
-    """加载用户已保存的附注数据"""
-    result = await db.execute(
-        text("SELECT data, updated_at FROM consol_note_data WHERE project_id = :pid AND year = :y AND section_id = :sid"),
-        {"pid": project_id, "y": year, "sid": section_id},
-    )
-    row = result.fetchone()
-    if not row:
-        return {"content": {}, "updated_at": None}
-    return {"content": row[0] if isinstance(row[0], dict) else {}, "updated_at": str(row[1]) if row[1] else None}
+    """加载用户已保存的附注数据。根节点无专属行时兼容读取历史项目级行。"""
+    record = await _load_note_record(db, project_id, year, section_id, node_key)
+    if record is None:
+        return {"content": {}, "updated_at": None, "node_key": node_key}
+    return {
+        "content": record.data if isinstance(record.data, dict) else {},
+        "updated_at": str(record.updated_at) if record.updated_at else None,
+        "node_key": record.node_key or node_key,
+    }
 
 
 @router.put("/data/{project_id}/{year}/{section_id}")
 async def save_note_data(
     project_id: UUID, year: int, section_id: str,
     body: dict,
+    node_key: str | None = Query(None, description="企业树节点；不传保存项目级兼容行"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("edit")),
     _lock_check=Depends(check_consol_lock),
 ):
-    """保存用户编辑的附注数据"""
-    import uuid
+    """保存用户编辑的附注数据，带节点键时只写节点专属行。"""
     from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc)
-    data_json = json.dumps(body.get("data", {}), ensure_ascii=False)
     try:
-        await db.execute(
-            text("""
-                INSERT INTO consol_note_data (id, project_id, year, section_id, data, updated_at)
-                VALUES (:id, :pid, :y, :sid, CAST(:data AS jsonb), :now)
-                ON CONFLICT (project_id, year, section_id)
-                DO UPDATE SET data = CAST(:data AS jsonb), updated_at = :now
-            """),
-            {"id": str(uuid.uuid4()), "pid": project_id, "y": year, "sid": section_id, "data": data_json, "now": now},
-        )
+        await _save_note_record(db, project_id, year, section_id, node_key, body.get("data", {}), now)
         await db.commit()
-        return {"ok": True, "updated_at": str(now)}
+        return {"ok": True, "updated_at": str(now), "node_key": node_key}
     except Exception as e:
         await db.rollback()
-        return {"ok": False, "error": str(e)}
+        return {"ok": False, "error": str(e), "node_key": node_key}
 
 
 # ─── 公式刷新：根据项目数据重新计算附注表格 ──────────────────────────────────
@@ -194,6 +326,7 @@ async def save_note_data(
 async def refresh_note_by_formula(
     project_id: UUID, year: int, section_id: str,
     body: dict,
+    node_key: str | None = Query(None, description="企业树节点；根节点按 node_key 读取对应企业试算表"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("edit")),
 ):
@@ -207,8 +340,11 @@ async def refresh_note_by_formula(
     """
     standard = body.get("standard", "soe")
     company_code = body.get("company_code", "")
-    
-    # 加载章节模板
+    node_key = _requested_node_key(node_key, body)
+    # 节点键是企业树中企业身份的唯一标识；旧调用仍通过 company_code 读取单体数据。
+    if node_key and not company_code:
+        company_code = node_key.split(":", 1)[0]
+
     sections = _load_sections(standard)
     template = None
     for sec in sections:
@@ -310,6 +446,7 @@ async def refresh_note_by_formula(
 async def audit_all_notes(
     project_id: UUID, year: int,
     body: dict,
+    node_key: str | None = Query(None, description="企业树节点；不传读取项目级兼容行"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
@@ -323,19 +460,17 @@ async def audit_all_notes(
     """
     standard = body.get("standard", "soe")
     company_code = body.get("company_code", "")
+    node_key = _requested_node_key(node_key, body)
+    if node_key and not company_code:
+        company_code = node_key.split(":", 1)[0]
     
     sections = _load_sections(standard)
     results = []
     
-    # 加载用户已保存的数据
+    # 加载用户已保存的数据；带节点键时严格隔离，根合并节点允许兼容读取 legacy 行
     saved_data = {}
     try:
-        rows = await db.execute(
-            text("SELECT section_id, data FROM consol_note_data WHERE project_id = :pid AND year = :y"),
-            {"pid": project_id, "y": year},
-        )
-        for r in rows.fetchall():
-            saved_data[r[0]] = r[1] if isinstance(r[1], dict) else {}
+        saved_data = await _load_saved_note_data(db, project_id, year, node_key)
     except Exception:
         pass
     
@@ -475,12 +610,16 @@ async def audit_all_notes(
 async def audit_single_note(
     project_id: UUID, year: int, section_id: str,
     body: dict,
+    node_key: str | None = Query(None, description="企业树节点；不传读取项目级兼容行"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
     """对指定附注表格执行公式审核（前端传入当前编辑的数据）"""
     standard = body.get("standard", "soe")
     company_code = body.get("company_code", "")
+    node_key = _requested_node_key(node_key, body)
+    if node_key and not company_code:
+        company_code = node_key.split(":", 1)[0]
     headers = body.get("headers", [])
     data_rows = body.get("rows", [])
 
@@ -692,12 +831,16 @@ async def audit_single_note(
 async def apply_all_formulas(
     project_id: UUID, year: int,
     body: dict,
+    node_key: str | None = Query(None, description="企业树节点；不传写入项目级兼容行"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("edit")),
 ):
     """对所有附注表格执行公式取数计算，从试算表提取数据填充"""
     standard = body.get("standard", "soe")
     company_code = body.get("company_code", "")
+    node_key = _requested_node_key(node_key, body)
+    if node_key and not company_code:
+        company_code = node_key.split(":", 1)[0]
 
     sections = _load_sections(standard)
 
@@ -759,23 +902,15 @@ async def apply_all_formulas(
             new_rows.append(new_row)
 
         if filled:
-            # 保存到数据库
             now = _dt.utcnow()
-            data_json = json.dumps({"headers": headers, "rows": new_rows}, ensure_ascii=False)
+            data = {"headers": headers, "rows": new_rows}
             try:
-                await db.execute(
-                    text("""
-                        INSERT INTO consol_note_data (id, project_id, year, section_id, data, updated_at)
-                        VALUES (:id, :pid, :y, :sid, CAST(:data AS jsonb), :now)
-                        ON CONFLICT (project_id, year, section_id)
-                        DO UPDATE SET data = CAST(:data AS jsonb), updated_at = :now
-                    """),
-                    {"id": str(_uuid.uuid4()), "pid": project_id, "y": year,
-                     "sid": sec["section_id"], "data": data_json, "now": now},
+                await _save_note_record(
+                    db, project_id, year, sec["section_id"], node_key, data, now,
                 )
                 updated += 1
             except Exception:
-                pass
+                await db.rollback()
 
     if updated:
         await db.commit()
@@ -789,6 +924,7 @@ async def apply_all_formulas(
 async def aggregate_data(
     project_id: UUID, year: int,
     body: dict,
+    node_key: str | None = Query(None, description="当前汇总节点；不传保持旧 company_code 语义"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
@@ -805,6 +941,9 @@ async def aggregate_data(
     company_codes = body.get("company_codes", [])
     standard = body.get("standard", "soe")
     source = body.get("source", "same")
+    node_key = _requested_node_key(node_key, body)
+    if node_key and not company_code:
+        company_code = node_key.split(":", 1)[0]
 
     # 获取目标企业列表
     target_codes = []
@@ -836,14 +975,13 @@ async def aggregate_data(
     count = 0
     for code in target_codes:
         try:
-            # 查询该企业的附注数据
-            result = await db.execute(
-                text("SELECT data FROM consol_note_data WHERE project_id = :pid AND year = :y AND section_id = :sid"),
-                {"pid": project_id, "y": year, "sid": f"{section_id}_{code}"},
+            # 查询该企业的附注数据：新数据使用共享 section_id + node_key，旧数据兼容后缀 section_id
+            data = await _load_note_data_for_company(
+                db, project_id, year, section_id, code,
+                node_key=f"{code}:consol" if node_key is None else f"{code}:consol",
             )
-            row = result.fetchone()
-            if row and isinstance(row[0], dict):
-                rows = row[0].get("rows", [])
+            if isinstance(data, dict):
+                rows = data.get("rows", [])
                 if row_idx < len(rows) and col_idx < len(rows[row_idx]):
                     val = rows[row_idx][col_idx]
                     try:

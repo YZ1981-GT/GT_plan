@@ -1221,3 +1221,10 @@ backend/app/services/wp_disclosure_sync_service.py  1589
 #   test_report_engine.py —— **改动前即 847 行已超 800 上限**。本次净增 +23 行：
 #     report_engine 联动测试修正（cycle_linkage 事件触发断言更新）。
 backend/tests/test_report_engine.py  871
+
+#   consol_note_sections.py —— **改动前即 982 行已超 800 上限**。本次净增 +56 行：
+#     合并附注节点隔离 key + 共享上下文接线。拆分方向：把 AI 填充端点组抽为伴生模块。
+backend/app/routers/consol_note_sections.py  1038
+#   consol_note_formula_service.py —— **改动前即 864 行已超 800 上限**。本次净增 +42 行：
+#     合并附注公式推送引擎接线。拆分方向：把公式求值与公式注册两个关注点分离。
+backend/app/services/consol_note_formula_service.py  906
