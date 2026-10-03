@@ -45,6 +45,11 @@
         "executionId": "2253f2f6-f026-48fb-ba4a-6d38978f3560",
         "chatSessionId": "sess_2efb5552-0704-445d-bfa3-334f02a0801e",
         "timestamp": 1791022547578
+      },
+      {
+        "executionId": "2253f2f6-f026-48fb-ba4a-6d38978f3560",
+        "chatSessionId": "sess_2efb5552-0704-445d-bfa3-334f02a0801e",
+        "timestamp": 1791022727602
       }
     ],
     "1.4 节点写入不修改 legacy 行；根首次写入从 legacy 建立节点专属行；处理唯一冲突并保持事务可用": [
@@ -52,6 +57,16 @@
         "executionId": "2253f2f6-f026-48fb-ba4a-6d38978f3560",
         "chatSessionId": "sess_2efb5552-0704-445d-bfa3-334f02a0801e",
         "timestamp": 1791021721359
+      },
+      {
+        "executionId": "2253f2f6-f026-48fb-ba4a-6d38978f3560",
+        "chatSessionId": "sess_2efb5552-0704-445d-bfa3-334f02a0801e",
+        "timestamp": 1791022732094
+      },
+      {
+        "executionId": "2253f2f6-f026-48fb-ba4a-6d38978f3560",
+        "chatSessionId": "sess_2efb5552-0704-445d-bfa3-334f02a0801e",
+        "timestamp": 1791022957283
       }
     ],
     "1.5 真 ORM/SQLite 测试：双节点隔离、非法节点、年度/项目/章节范围、根回退、非根不回退、复制后 legacy 不变、无键 NULL 兼容": [

@@ -53,7 +53,7 @@
   - P2 两条变异（`current→debit` / `rp→6`）；P3 变异「公式数阈值推演」⇒ F1-5/F1-7 误判 `static_region` 必红
   - _Requirements: 2.2, 2.3_
 
-- [ ] 5. F1-P6 / F1-P9 红判据：F1-2 口径 + prefill 预设
+- [x] 5. F1-P6 / F1-P9 红判据：F1-2 口径 + prefill 预设
   - P6：hypothesis（`max_examples=5`）断言 `recalcRowFormulas` O/X 与模板等价 —— 现状必红（F≠0 时）
   - P9：`test_f1_formula_presets.py` 4 条 F1 用例现状红（记录）
   - _Requirements: 3.2, 7.2, 7.4_
@@ -119,12 +119,12 @@
 
 ### 阶段 2：F1-5 / F1-7（单区 + 三区）
 
-- [ ] 13. `phase5_f1_05_long_term.py` + FC-7 派生列裁决
+- [x] 13. `phase5_f1_05_long_term.py` + FC-7 派生列裁决
   - `F1-lt-rows` / header R5 / 数据 R6-14 / footer R15 / UUID `N` / `formula_columns=()`
   - J 列 `auditedBalance`：裁决 `auto_source`（默认）或注入公式，证据落盘；F1-P10 判据
   - _Requirements: 4.1, 4.2_
 
-- [ ] 14. `phase5_f1_07_voucher_check.py` 三区声明 + OCR 写入粒度实测
+- [x] 14. `phase5_f1_07_voucher_check.py` 三区声明 + OCR 写入粒度实测
   - 三 spec：`f17-current`(R17-37/R38) / `f17-credit`(R42-64/R65) / `f17-post`(R69-85/R86)，UUID `T`，
     三区各自 `field_specs`（列集不同）；F1-P12 判据
   - 实测 `F1VoucherCheckDialog.runOcr` 回填粒度（单表单 vs 整表），结论登记（FC-8）
@@ -132,7 +132,7 @@
 
 ### 阶段 3：F1-4 区④（dict 子数组）+ F1-3 可行性核
 
-- [ ] 15. `phase5_f1_04_analysis.py` 区④ `suppliers[]` + 专用 merge 门面
+- [x] 15. `phase5_f1_04_analysis.py` 区④ `suppliers[]` + 专用 merge 门面
   - 行源 `F1-ana-pack.suppliers[]`（`rowId`），header R40 / 数据 R41-50 / footer R51「小计」 / `formula_columns=("E","G")`
   - merge 门面只替换 `suppliers`，其余 8 键逐字保留（F1-P11）；区①~③ 核后登记 HTML-only（裁决 F1-H5）
   - `computeTop5` 自动填不回归
@@ -151,18 +151,18 @@
   - 同步注释（L136-141）与单测；D3/G2 同型登记移交（不修）
   - _Requirements: 3.2, 7.2_
 
-- [ ] 18. prefill 预设修复 + 披露块 `--check` owner
+- [x] 18. prefill 预设修复 + 披露块 `--check` owner
   - 块 `[16]` sheet 名改半角 `附注披露信息(国企)`；扩 `fix_f1_prefill_presets.py` 覆盖两张披露块并带 `--check`
   - `test_f1_formula_presets.py` 4 条 F1 用例转绿（D2 那条移交，不在本任务）；F1-P9
   - _Requirements: 7.4_
 
 ### 阶段 5：F1-2 明细 + F1-1 审定表
 
-- [ ] 19. `phase5_f1_02_detail.py`（两级表头 + nested 账龄 ×3，仅 THREE_YEAR 启用）
+- [x] 19. `phase5_f1_02_detail.py`（两级表头 + nested 账龄 ×3，仅 THREE_YEAR 启用）
   - 前置：Task 17 已落地；非 THREE_YEAR 时受管关闭 + 中文原因（F1-P15）；下游消费方回写后重算（F1-P16）
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 20. F1-1 影响评估 → 口径修复 → `phase5_f1_01_adjudication.py`
+- [x] 20. F1-1 影响评估 → 口径修复 → `phase5_f1_01_adjudication.py`
   - 影响评估：真库 F1-1 per-cell AJE/RJE 手填键现状 + `adjustmentReconcile` 语义 + TB 发布金额变化（裁决 F1-H4）；
     结论需业务确认后才改 `useF1Adjudication.buildRow` 取数
   - `AdjudicationSheetSpec`：性质区 `fixed_rows`（5 rowKey）+ 账龄区 `slot_driven`（仅 THREE_YEAR）+ 逐格 mask（93 公式）

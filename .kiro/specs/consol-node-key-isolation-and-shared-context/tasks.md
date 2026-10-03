@@ -8,8 +8,8 @@
 - [ ] 1. V177 契约与节点作用域基础
   - [x] 1.1 现读 V177、ORM、索引定义与 migration status，确认节点键和 NULL 行的唯一性/并发语义；若不满足，暂停并提出新迁移，不在本任务重复 DDL
   - [x] 1.2 在附注 service 建立共享 node scope 解析：项目权限、有效年度、树构建、精确 node_key 存在性、根 consol 判定；query 参数优先于 body
-  - [-] 1.3 建统一节点行 loader/writer：精确节点行优先；只允许有效根 GET fallback 到同项目/年度/章节 NULL 行；无键旧调用只查 NULL
-  - [~] 1.4 节点写入不修改 legacy 行；根首次写入从 legacy 建立节点专属行；处理唯一冲突并保持事务可用
+  - [x] 1.3 建统一节点行 loader/writer：精确节点行优先；只允许有效根 GET fallback 到同项目/年度/章节 NULL 行；无键旧调用只查 NULL
+  - [x] 1.4 节点写入不修改 legacy 行；根首次写入从 legacy 建立节点专属行；处理唯一冲突并保持事务可用
   - [~] 1.5 真 ORM/SQLite 测试：双节点隔离、非法节点、年度/项目/章节范围、根回退、非根不回退、复制后 legacy 不变、无键 NULL 兼容
   - _需求：1.1~1.6；设计：§二~§三、P1~P4_
 
@@ -38,7 +38,7 @@
   - [~] 4.5 真 ORM/SQLite 集团测试 + FastAPI 真请求：至少两个同企业不同角色节点、缺省根兼容、非法节点、全部报表字段契约、节点金额与同节点 trial/breakdown 逐行对拍、上期缺失原因、非根不读根物化值
   - _需求：4.1~4.5；设计：§六、P5、P8_
 
-- [ ] 5. 前端树节点共享上下文
+- [x] 5. 前端树节点共享上下文
   - [~] 5.1 `ConsolidationIndex.vue` 将 `{code,name,nodeKey}` 单一上下文传给报表加载器和 `ConsolNoteTab`；实体类型要求 nodeKey
   - [~] 5.2 报表请求经 `GET /api/consolidation/reports/{project_id}/{year}` 显式发送 nodeKey；附注所有节点级读取/写入/公式/审核/刷新/聚合/穿透请求传当前 nodeKey；独立穿透选择以当前节点初始化
   - [~] 5.3 报表和附注缓存键包含 project/year/nodeKey/report-or-template 维度；刷新仅清除对应节点缓存

@@ -147,7 +147,7 @@ BP-7 notice 接入 16 个宿主、mode 载体收敛、`SHEET_MAP` 错位修复�
   - `h7.biological_asset_detail.json` + `phase5_biological_asset_detail`
   - 走 `register_from_manifest()` 注册（HC-1）；零回归基线**现算**（HC-8 / GC-10）
 
-- [ ] 17.* roundtrip 实证（依赖 BP-4 真 OO 9.4 场景集）
+- [x] 17.* roundtrip 实证（依赖 BP-4 真 OO 9.4 场景集）
   - 🔴 前置：三条真库主表键零载荷 ⇒ roundtrip 须先有真实数据；
     **不得造数据当实证**，须等真实项目录入或明确标注为合成场景（并在报告里写明）
 

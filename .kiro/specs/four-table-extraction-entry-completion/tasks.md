@@ -125,20 +125,20 @@
   - 输出 `html_data["indicator_prefill"]` = `{key: {current, prior}}`
   - _Requirements: 8.1, 8.2, 8.3_
 
-- [ ] 17. D4-6 前端消费 indicator_prefill + 传递 htmlData
+- [x] 17. D4-6 前端消费 indicator_prefill + 传递 htmlData
   - 主入口 `GtD4OperatingRevenue.vue` 向 `D4TabIndicator` 传递 `:html-data="props.htmlData"` prop
   - `D4TabIndicator.vue` 增加 `htmlData` 可选 prop
   - `loadIndicators()` 增加预填逻辑：`D4-6-indicators-v2` 无持久化时从 `htmlData.indicator_prefill` 按 key 填入 `current`/`prior`
   - 已有持久化数据不覆盖
   - _Requirements: 8.1, 8.3_
 
-- [ ] 18. D4-7 月度联动（从 D4-2 汇总种子）
+- [x] 18. D4-7 月度联动（从 D4-2 汇总种子）
   - `D4TabMarginMonthly.vue` 的 `loadMonthly()` 增加种子逻辑：`D4-7-monthly` 无持久化时从 `allResponses.get('D4-2-rows')` 读取所有产品行的 `months[12]` 按月 SUM 汇总作为收入行 seed
   - 成本侧留 0（D4-2 无成本数据），不伪造
   - 已有持久化数据不覆盖；D4-2 无数据时留空
   - _Requirements: 8.4_
 
-- [ ] 19. D4-7 产品预填（从 segment_prefill）
+- [x] 19. D4-7 产品预填（从 segment_prefill）
   - 主入口向 `D4TabMarginMonthly` 传递 `:html-data="props.htmlData"` prop
   - `D4TabMarginMonthly.vue` 增加 `htmlData` 可选 prop
   - `loadProducts()` 增加种子逻辑：`D4-7-products` 无持久化时从 `htmlData.segment_prefill` 预填产品行（`label` → `name`、`current_revenue` → `curRevenue`、`current_cost` → `curCost`、`prior_revenue` → `priorRevenue`、`prior_cost` → `priorCost`）
@@ -165,7 +165,7 @@
   - 前端 vitest：D4-7 `loadMonthly` 无持久化 + 有 D4-2 数据时 seed 收入行 = D4-2 月度 SUM（Property 10）；D4-7 `loadProducts` 无持久化 + 有 segment_prefill 时产品数 = prefill 行数（Property 11）
   - _Requirements: 6.1, 6.2, 6.3_
 
-- [ ] 23.(*) 真栈实测 + 收口（Phase 3）
+- [x] 23.(*) 真栈实测 + 收口（Phase 3）
   - Playwright：打开 D4 底稿 → D4-6 指标表的"本期"列至少 3 项非零（TB 预填生效）→ D4-7 月度收入行非全零（D4-2 联动生效）→ D4-7 产品表行数 ≥ 1（segment_prefill 预填生效）
   - D4-7 月度导入导出：导出模板 → 填数据 → 导入 → `loadMonthly()` 刷新验证
   - `get_diagnostics` 校验三件套；清理 `tmp_*`/`_wip_*`

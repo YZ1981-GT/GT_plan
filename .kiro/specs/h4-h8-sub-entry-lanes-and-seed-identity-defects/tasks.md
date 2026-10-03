@@ -155,7 +155,7 @@ BP-7 notice 接入 16 个宿主、mode 载体收敛、`SHEET_MAP` 错位修复�
   - 走 `register_from_manifest()` 注册（HC-1）；零回归基线**现算**（HC-8 / GC-10）
   - 5 条子入口的 representation pointer 用 `entry_id`（GC-1）
 
-- [ ] 17.* roundtrip 实证（依赖 BP-4 真 OO 9.4 场景集）
+- [x] 17.* roundtrip 实证（依赖 BP-4 真 OO 9.4 场景集）
   - 🔴 前置：H4 真库零载荷、`H8-2-rows` 是 `[]` ⇒ **不得造数据当实证**；
     须等真实项目录入，或明确标注为合成场景并在报告里写明
   - 5 条子入口须各自跑一遍 roundtrip（不能只跑父 entry）

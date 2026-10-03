@@ -67,7 +67,7 @@
   - _Requirements: 5_
   - _AC/AG-P: AC-10 · AC-17 · AC-26 · AC-44 · AG-P14 · AG-P15_
 
-- [ ] 8. BP-11 非双射裁定（a91）
+- [x] 8. BP-11 非双射裁定（a91）
   - 现读确认 `a9-1-deficiency-letter` 与 `a9-2-deficiency-letter-governance` **两个 componentType 都解析到 `GtA91DeficiencyLetter.vue`**
   - 追溯成因：两者各有独立归档 spec（28/28 与 18/18）但代码合并到一个宿主 ⇒ 与 M 轮 MC-25 同型
   - 🔴 裁定契约归属：「每 componentType 各一份」还是「共享一份」，理由写入 `design.md`；收口后 BP-11 成员集变空集

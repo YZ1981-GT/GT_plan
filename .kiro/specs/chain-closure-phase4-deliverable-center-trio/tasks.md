@@ -53,7 +53,7 @@
   - TestClient 真请求覆盖 ready/blocked、job 属主项目校验、403 零写入、重试冲突、下载前物理哈希校验；去鉴权与错项目变异必须红。
   - _需求：1.6, 3.5, 5.1, 5.6, 7.4_
 
-- [ ] 10. 前端交付中心三件套状态
+- [x] 10. 前端交付中心三件套状态
   - `deliverableApi.ts` 增 readiness/trio/item/attempt 类型和真实端点；`DeliverableCenter.vue` 显示固定顺序、硬/软闸门、快照和 `0/3` 至 `3/3` 进度。
   - `platform_persist_failed` / 文件缺失 / 指纹错误不提示正式下载成功；全部用户可见文案中文。
   - Vitest 真挂载验证阻断、成功、部分失败和文件失败；删失败状态显示的变异必须红。
