@@ -431,29 +431,29 @@ def _spec_of_store_item(store_item_id: str) -> Any:
 
 
 def build_store_projection(
-    store_item_id: str,
     payload: str | bytes | Sequence[Any],
     *,
     contract: SyncContract,
     limits: Any | None = None,
+    store_item_id: str | None = None,
 ) -> Any:
     from app.services.workpaper_sync.phase5_row_table_sheet import (
         build_store_projection as _engine,
     )
-    spec = _spec_of_store_item(store_item_id)
+    spec = _spec_of_store_item(store_item_id or STORE_ITEM_ID)
     return _engine(spec, payload, contract=contract, limits=limits)
 
 
 def merge_projection_into_store_rows(
-    store_item_id: str,
     *,
     projection: Any,
     base_rows: list[Mapping[str, Any]],
+    store_item_id: str | None = None,
 ) -> tuple[list[dict[str, Any]], int, int, set[str]]:
     from app.services.workpaper_sync.phase5_row_table_sheet import (
         merge_projection_into_store_rows as _engine_merge,
     )
-    spec = _spec_of_store_item(store_item_id)
+    spec = _spec_of_store_item(store_item_id or STORE_ITEM_ID)
     return _engine_merge(
         spec, projection=projection, base_rows=base_rows
     )

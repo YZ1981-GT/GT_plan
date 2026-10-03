@@ -879,3 +879,76 @@ async def attach_h_entry_adapter(
         sheet_keys=sheet_keys,
     )
     return (identity.adapter_id,)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 泛化 store projection / merge / iter（I 循环 6 家委托到这里）
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def _spec_of_store_item_for(
+    identity: HEntryIdentity,
+    specs: Sequence[Any],
+    store_item_id: str | None,
+) -> Any:
+    """在给定 specs 中按 store_item_id 查找对应 spec。未命中即抛。"""
+    default_id = specs[0].store_item_id if specs else None
+    target = store_item_id or default_id
+    for spec in specs:
+        if spec.store_item_id == target:
+            return spec
+    raise HEntrySelectionError(
+        f"entry {identity.entry_id}: store item {target!r} 不在受管清单里；"
+        f"已受管：{sorted(s.store_item_id for s in specs)}"
+    )
+
+
+def build_store_projection_for(
+    identity: HEntryIdentity,
+    specs: Sequence[Any],
+    payload: Any,
+    *,
+    contract: Any,
+    limits: Any | None = None,
+    store_item_id: str | None = None,
+) -> Any:
+    """HTML store 载荷 → Projection（泛化版，供 I 循环 6 家委托调用）。"""
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        build_store_projection as _engine,
+    )
+
+    spec = _spec_of_store_item_for(identity, specs, store_item_id)
+    return _engine(spec, payload, contract=contract, limits=limits)
+
+
+def merge_projection_into_store_rows_for(
+    identity: HEntryIdentity,
+    specs: Sequence[Any],
+    *,
+    projection: Any,
+    base_rows: list,
+    store_item_id: str | None = None,
+) -> Any:
+    """projection → HTML store 行（泛化版，供 I 循环 6 家委托调用）。"""
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        merge_projection_into_store_rows as _engine_merge,
+    )
+
+    spec = _spec_of_store_item_for(identity, specs, store_item_id)
+    return _engine_merge(spec, projection=projection, base_rows=base_rows)
+
+
+def iter_store_rows_for(
+    identity: HEntryIdentity,
+    specs: Sequence[Any],
+    payload: Any,
+    *,
+    store_item_id: str | None = None,
+) -> Any:
+    """流式 (row_identity, row)（泛化版，供 I 循环 6 家委托调用）。"""
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        iter_store_rows as _engine_iter,
+    )
+
+    spec = _spec_of_store_item_for(identity, specs, store_item_id)
+    return _engine_iter(spec, payload)

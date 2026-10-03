@@ -528,6 +528,8 @@ def normalize_value(value: Any, value_type: ValueType) -> Any:
         )
     if value_type is ValueType.date:
         # 顺序要紧：datetime 是 date 的子类，先判 datetime 才能拒绝它。
+        if isinstance(value, str) and not value.strip():
+            return None  # 空字符串 = 审计师未填日期，视为 null
         if isinstance(value, datetime):
             raise ValueNormalizationError(
                 f"date 字段收到 datetime {value!r} —— 日期与时点是两种值，不得互相折叠"

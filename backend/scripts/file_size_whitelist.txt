@@ -1252,7 +1252,7 @@ backend/app/services/workpaper_sync/phase5_g1_trading_financial_assets.py  849
 backend/app/services/workpaper_sync/phase5_g2_interest_receivable.py  857
 backend/app/services/workpaper_sync/phase5_g8_other_equity.py  853
 backend/app/services/workpaper_sync/phase5_g9_other_noncurrent.py  817
-backend/app/services/workpaper_sync/phase5_h_cycle_common.py  882
+backend/app/services/workpaper_sync/phase5_h_cycle_common.py  960
 backend/app/services/workpaper_sync/phase5_e1_monetary_fund.py  924
 #   test_a_cycle_foundation_canary.py — A 域 canary(A5-1) foundation spec 全部判据:
 #     slice 域切 / 门控回溯 / mode 二分 / 结构性零 23 项 / 模板缺陷台账 / E2E 闭环 15 测试,
