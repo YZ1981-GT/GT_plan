@@ -1228,3 +1228,7 @@ backend/app/routers/consol_note_sections.py  1038
 #   consol_note_formula_service.py —— **改动前即 864 行已超 800 上限**。本次净增 +42 行：
 #     合并附注公式推送引擎接线。拆分方向：把公式求值与公式注册两个关注点分离。
 backend/app/services/consol_note_formula_service.py  906
+
+#   test_m_cycle_spec_guard.py —— M 循环三份 spec 的统一守卫（MC-1~29 判据 + 变异），
+#     改动前即 1540 行已超 800 上限。本次净增 +42 行：spec 状态对齐。
+backend/tests/workpaper_sync/test_m_cycle_spec_guard.py  1582
