@@ -585,6 +585,14 @@ def _template_abs_path():
     return backend_root / "wp_templates" / TEMPLATE_RELATIVE_PATH
 
 
+def excel_carrier_gate():
+    """OOXML 载体安全门（first-publication 接口要求）。"""
+    from app.services.workpaper_sync.excel_instrumentation import (
+        ExcelIdentityCarrierGate,
+    )
+    return ExcelIdentityCarrierGate.load()
+
+
 def read_authoritative_template() -> bytes:
     """读取权威模板文件字节。"""
     path = _template_abs_path()

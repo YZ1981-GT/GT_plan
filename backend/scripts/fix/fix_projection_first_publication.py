@@ -95,6 +95,10 @@ CHECK_ENTRY_STATES: Final[tuple[str, ...]] = (
     "blocked_store_payload_shape",
     # substrate 暂存阶段失败（instrumentation 读取/注入出错）
     "blocked_substrate_staging",
+    # provider 能力结构性缺陷（主 binding 不唯一等）
+    "blocked_provider_capability",
+    # Python 运行时错误（AttributeError / TypeError 等 provider 代码 bug）
+    "blocked_runtime_error",
     # 🔴 兜底格，语义 = **词表要扩**（不是「某种已知阻塞」）。它必须长得一眼就不对劲，
     #    才不会像 `blocked_contract_not_reviewed` 那样被当成一个正常结论读过去。
     "blocked_unregistered_failure_shape",
@@ -141,6 +145,11 @@ _ERROR_CODE_TO_STATE: Final[Mapping[str, str]] = {
     "sync_pilot_store_payload_invalid": "blocked_store_payload_shape",
     # ── substrate 暂存阶段失败（instrumentation 抛错等非安全类失败）──
     "substrate_staging_failed": "blocked_substrate_staging",
+    # ── provider 能力缺失（主 binding 不唯一等结构性问题）──────────
+    "provider_capability_missing": "blocked_provider_capability",
+    # ── Python 运行时错误（AttributeError / TypeError 等）────────
+    "AttributeError": "blocked_runtime_error",
+    "TypeError": "blocked_runtime_error",
 }
 
 #: 结算格 → 解除方与解除动作。报告里必须写出来 —— 「卡住了」不带「谁能解」的
@@ -186,6 +195,14 @@ _STATE_UNBLOCK_OWNER: Final[Mapping[str, str]] = {
     "blocked_substrate_staging": (
         "substrate 暂存阶段失败（instrumentation 读取或注入出错）—— "
         "解除方：检查模板/契约/instrumentation 产物一致性"
+    ),
+    "blocked_provider_capability": (
+        "provider 能力结构性缺陷（如主 binding 不唯一 / 契约多 table 匹配）—— "
+        "解除方：修改 provider 的 instrumentation spec 或契约的 table 声明"
+    ),
+    "blocked_runtime_error": (
+        "provider 代码运行时错误（AttributeError / TypeError 等）—— "
+        "解除方：修复 provider 模块的接口缺失或参数错误"
     ),
     "blocked_unregistered_failure_shape": (
         "🔴 词表要扩：把该 error_code 登记进 `_ERROR_CODE_TO_STATE` 并给出解除方"
