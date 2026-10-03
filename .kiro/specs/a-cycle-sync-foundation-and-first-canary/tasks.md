@@ -63,7 +63,7 @@ G 域 13 个主入口的双向回写只差 manifest 重生成，而重生成被�
 
 ## 阶段 1 — 扫描器地基与域切分
 
-- [ ] 1. 建 A 域扫描器模块 `backend/scripts/analyze/a_cycle_scanner.py`
+- [x] 1. 建 A 域扫描器模块 `backend/scripts/analyze/a_cycle_scanner.py`
   - 实现域切分：按 `wp_code_patterns[0]` 首字母，断言 46 = A 20 / B 10 / C 1 / S 10 / 无码 5；🔴 禁按 entry_id 猜域（`xlsx/gt-c-control-test` 反例）
   - 实现 strict 域四路取并（目录段 / `^(?:use|Gt)?A\d` / **`^a\d` 小写** / `^a\d+-`），断言 148（生产 79）；变异证明：去掉小写分支应漏 34
   - 统一行数口径 `len(text.split("\n"))`，注释剥离保留行号
@@ -72,14 +72,14 @@ G 域 13 个主入口的双向回写只差 manifest 重生成，而重生成被�
   - _Requirements: 1, 16_
   - _AC/AF-P: AC-1 · AC-5 · AC-11 · AC-29 · AF-P2 · AF-P3 · AF-P5_
 
-- [ ] 2. slice 自相矛盾与 pilot 排除守卫
+- [x] 2. slice 自相矛盾与 pilot 排除守卫
   - 登记 4 处矛盾：B 11→10 · C 2→1 · 共享 4→5 · 通道 5→4；另 `*DualMode*.ts` 正文 115 vs 字段 114
   - 断言 `excluded_pilot_entry_count` = **1**（首次非 0）· `in_scope_parent_duplicate_count` = **0**（🔴 与 N 反转，条件节不触发）
   - 引用 `excluded_from_slice` 两条否决原文（「不为它硬指一本册」/「不得为凑字段编一个码」）
   - _Requirements: 1_
   - _AC/AF-P: AC-1 · AC-31 · AC-47 · AF-P4 · AF-P6 · AF-P7_
 
-- [ ] 3. entry_groups 二维分组复算
+- [x] 3. entry_groups 二维分组复算
   - 第一维按 `htmlRendererRegistry.ts` **模块边**匹配（🔴 须同时认提升的 `const` 与内联 `defineAsyncComponent`，只认一种漏 94/211）；断言 `componentType:` 行数 **211**
   - 第二维扫宿主 **import 闭包深度 3** 的 HTTP 站点，断言通道 4 种、A 域涉 3 种
   - 断言 13 组 / 9 家族 / 4 通道；A 域 GRP-01 15 / GRP-02 1 / GRP-03 3 / GRP-10 1 = 20
@@ -88,7 +88,7 @@ G 域 13 个主入口的双向回写只差 manifest 重生成，而重生成被�
 
 ## 阶段 2 — 门控与载体判据
 
-- [ ] 4. 门控判据最终版（递归回溯）+ 两中间版本变异证明
+- [x] 4. 门控判据最终版（递归回溯）+ 两中间版本变异证明
   - 实现 `effective_conds`：自身 `v-*`/`:` 绑定 + `v-else`/`v-else-if` 的兄弟链头回溯；对挂点**及全部祖先**逐节点求并
   - mode token 正则 `\b\w*[Mm]ode\b`（覆盖 mode/renderMode/activeMode/dualMode/editorMode）
   - 断言 OO 挂点 **20** · segmented **19** · mode 门控 **19** · 无门控恰 1（a3-console）
@@ -97,7 +97,7 @@ G 域 13 个主入口的双向回写只差 manifest 重生成，而重生成被�
   - _Requirements: 4_
   - _AC/AF-P: AC-13 · AF-P13 ~ AF-P16_
 
-- [ ] 5. mode 载体二分判据
+- [x] 5. mode 载体二分判据
   - 形态 1（17 条）：字符串数组 + **中文标签作 mode 值**，`mode === '结构化视图'` 18 处 ⇒ 登记为「改文案即破坏逻辑」，与 BP-14 同型
   - 形态 2（2 条 a112/a38）：对象数组 `{label, value}` + `activeMode` + `ref<'html'|'docx'>` ⇒ 正面样板
   - 🔴 扫 `modeOptions` 须区分字符串数组与对象数组（本轮踩过「4 值混排」误读）
@@ -107,14 +107,14 @@ G 域 13 个主入口的双向回写只差 manifest 重生成，而重生成被�
 
 ## 阶段 3 — 写路径、模板与真库
 
-- [ ] 6. 写路径与通道守卫（含空分母声明）
+- [x] 6. 写路径与通道守卫（含空分母声明）
   - 🔴 断言 `publish-to-tb` 在 A 域 = **0** 并声明**空分母**（前十一轮首次），禁写「已验证发布门唯一」
   - 断言 `trial-balance/writeback` = 0（反向断言仍有效）· `field-overrides` 4/2 文件 · 确认门 7/3 文件独立存在
   - 🔴 断言宿主内 `/checklist-responses` = **0** ⇒ 判据须走 import 闭包（AC-42）
   - _Requirements: 3_
   - _AC/AF-P: AC-3 · AC-4 · AC-42 · AF-P8 ~ AF-P12_
 
-- [ ] 7. 权威册 format 分流 + sha256 前置门
+- [x] 7. 权威册 format 分流 + sha256 前置门
   - sha256 + size 18/18 match 置于测试最前，失败即中止；断言 A 目录 97 本 = xlsx 65 + docx 32
   - 分流：docx 16 走 `python-docx` · xlsx 2 走 `openpyxl` · 无册 2 声明空分母
   - 🔴 保留反证：openpyxl 读 docx 抛 `InvalidFileException`
@@ -123,14 +123,14 @@ G 域 13 个主入口的双向回写只差 manifest 重生成，而重生成被�
   - _Requirements: 7_
   - _AC/AF-P: AC-38 · AC-44 · AF-P26 ~ AF-P29 · AF-P31_
 
-- [ ] 8. footer 读 raw XML（禁用 openpyxl）
+- [x] 8. footer 读 raw XML（禁用 openpyxl）
   - 🔴 用 `zipfile` 读 `xl/worksheets/sheet*.xml` 的 `<oddFooter>`；断言三态 **2 有内容 + 7 有容器无 oddFooter + 4 无容器 = 13**
   - 锁定内容值：`第 &P 页，共 &N 页`（中文）· `Page &P`（英文无 `&N`）
   - 🔴 在注释中记录「第一版用 `ws.oddFooter` 读出全空是解析失败，不是事实」
   - _Requirements: 7, 8_
   - _AC/AF-P: AC-36 · AF-P30_
 
-- [ ] 9. 契约字段与真库守卫（asyncpg）
+- [x] 9. 契约字段与真库守卫（asyncpg）
   - 断言 A 域 28 行 · `conclusion` 非空 **24** > `remark` **4** ⇒ NC-34 连续第二轮成立，映射须覆盖 `conclusion`
   - 分布断言 A21 19 / A1 5 / A17 3 / A15 1；全域 1,034,702 行 / conclusion 非空 130
   - 🔴 `*-review-session-*` 白名单排除（第三轮出现，261 B）⇒ 沉淀为跨循环通用规则
@@ -140,7 +140,7 @@ G 域 13 个主入口的双向回写只差 manifest 重生成，而重生成被�
   - _Requirements: 10_
   - _AC/AF-P: AC-19 · AC-34 · AF-P23 ~ AF-P25_
 
-- [ ] 10. 结构性零 23 项 + 变异证明
+- [x] 10. 结构性零 23 项 + 变异证明
   - 逐项实现「零断言 + 变异证明」成对结构
   - 🔴 特别登记三处「我自己的口径错误」作为案例：footer 解析失败 / `modeOptions` 结构误读 / 门控两次口径迭代
   - `per-entry dual-mode composable = 0` 的变异证明 = 同一正则全域跑出 **114** 个模块
@@ -150,7 +150,7 @@ G 域 13 个主入口的双向回写只差 manifest 重生成，而重生成被�
 
 ## 阶段 4 — canary a51 闭环
 
-- [ ] 11. canary 选型与三轮轨迹登记
+- [x] 11. canary 选型与三轮轨迹登记
   - 断言 a51 五项替代判据全中且全域唯一：零区分项（BP 仅 6 项）· xlsx 册 · 主组 GRP-01 · redeemable · `literal_sheet_name`
   - 🔴 写明三轮轨迹：**M 偏离（M 域零载荷）→ N 收回（N4-1-rows 1665 B）→ A 再偏离（唯一命中是 E2E seed）**
   - 断言 A 域真库 28 行与 20 条 entry 交集仅 **1**（`A17-1-ch01`）且含 `（E2E seed）` 标记
@@ -158,7 +158,7 @@ G 域 13 个主入口的双向回写只差 manifest 重生成，而重生成被�
   - _Requirements: 6_
   - _AC/AF-P: AC-18 · AF-P20 ~ AF-P22_
 
-- [ ] 12. canary 读路径：A5-1 册 9 sheets 结构固化
+- [x] 12. canary 读路径：A5-1 册 9 sheets 结构固化
   - 现读 9 个 sheet 名（`表头（请先填写）` / `A5-1现金流量审计程序` / `A5-1-1列示于现金流量表的现金及现金等价物` / `A5-1-3相关报表勾稽关系核对` / `A5-1-4现金流量核查` / `A5-1-5现金流量核查` / `A5-1-6其他现金流量` / `会计提示` / `GT_Custom`），🔴 按原始字面量锁定禁归一化
   - 断言 hidden 恰 1（`GT_Custom`）· 公式格 57 · 「合计」标签 4 处全在 A 列
   - 登记 `definedName` 22 / broken 14（形态与 N 域同源）为记录型断言
@@ -188,13 +188,13 @@ G 域 13 个主入口的双向回写只差 manifest 重生成，而重生成被�
 
 ## 阶段 5 — 收口与平台级欠账
 
-- [ ] 16. 模板层缺陷台账 T-1 ~ T-11 记录型守卫
+- [x] 16. 模板层缺陷台账 T-1 ~ T-11 记录型守卫
   - 逐项锁定现状：T-1 AE 列除零（10:1）· T-2 `F6-10` 跨循环码 · T-3 A3-3 definedName 261/190（含 `.dbf` 与中文名）· T-4 A5-1 22/14 · T-5 `20l×年` · T-6 934 行巨表 99.5% 合并 · T-7 纯信函 0 表格 · T-8 指引文字占标题位 · T-9 示例公司名两种 · T-10 A3-8 无册 · T-11 写死 5 列 + 裸下标 key
   - 🔴 本任务 SHALL NOT 修改任何模板文件；交付后 sha256 仍须 18/18 match
   - _Requirements: 7_
   - _AC/AF-P: AC-9 · AC-21 · AC-26 · AC-40 · AC-46 · AC-48_
 
-- [ ] 17. 归档 spec 边界与欠账登记
+- [x] 17. 归档 spec 边界与欠账登记
   - 宽关键词扫出 35 份；断言 **6 份未 100%**（7 条欠账：a11-1 19/21 · a17-3-1 15/16 · a17-3 16/17 · a17-4 16/17 · a17-7 20/21 · a18-2 14/15）⇒ 🔴 与 N 轮（16 份全绿）反转
   - 断言 **4 份 0/0**（有 tasks.md 零编号任务）⇒ 「159/159」表述须附此说明
   - 追溯 BP-11 成因：a9-1 与 a9-2 各有独立归档 spec 但共用宿主 `GtA91DeficiencyLetter.vue` ⇒ 与 M 轮 MC-25 同型
@@ -203,21 +203,21 @@ G 域 13 个主入口的双向回写只差 manifest 重生成，而重生成被�
   - _Requirements: 11_
   - _AC/AF-P: AC-25 · AF-P34_
 
-- [ ] 18. 路由接入状态登记（三轮三态）
+- [x] 18. 路由接入状态登记（三轮三态）
   - 断言 `resolveProcedureSheetKey.ts` **91 行且无 A 分支**
   - 🔴 三轮三态一并登记：**M 缺 4 条（M1/M3/M7/M8）· N 完备 5/5 · A 整段缺失**
   - 判定是否需为 A 域新增分支（A 类底稿是否走程序表路由 —— 须业务确认，暂标登记）
   - _Requirements: 16_
   - _AC/AF-P: AC-28 · AF-P35_
 
-- [ ] 19. Property 22 判据落地（首次非空分母）
+- [x] 19. Property 22 判据落地（首次非空分母）
   - 按 slice `recompute_recipe` 复算：站点 **7** · label-as-key **3** · verdict **PARTIAL**
   - A 域份额 **1** 条（a38 `#L154`：`v-for="(_, i) in 5"` 写死列数 + `key="i"` 裸下标，两类缺陷同时命中）
   - 🔴 结论写 **PARTIAL**，禁写「通过」；并指出它与 AC-41 形态 1（中文标签作 mode 值）**根因同源**（label 作 identity）
   - _Requirements: 15_
   - _AC/AF-P: AC-48 · AF-P36_
 
-- [ ] 20. 删除清册一致性守卫
+- [x] 20. 删除清册一致性守卫
   - 🔴 断言口径：「现算 orphan dual-mode 模块数 == 0」**且**「`delete_after_rewire` 非空」，禁断言「删除清单非空」
   - 断言 `delete_files` **0** · `delete_after_rewire` **1**（`useWpDualMode.ts`，3 条边全在 B 域）· `latent_orphan_after_rewire` **1**（`createDualMode.ts`，barrel-only，🔴 不擅自删，barrel 入边按路径解析禁 stem 相等）
   - 断言 `must_rewire` **46**（A 域 20）· `must_not_delete` **5** · 共享基类边 **26+1**（本 slice 5 条全在 B 域，A 域贡献 **0** ⇒ 空分母）
@@ -233,7 +233,7 @@ G 域 13 个主入口的双向回写只差 manifest 重生成，而重生成被�
   - _Requirements: 11, 13_
   - _AC/AF-P: AC-33 · AF-P1_
 
-- [ ] 22. 交付前自检
+- [x] 22. 交付前自检
   - 跑算术自检表全部 16 行等式；校验 AC-1~48 与 AF-P1~36 无缺号、每条至少被某份 tasks 引用一次
   - 校验判定分布 **8 + 13 + 5 + 11 + 11 = 48**（🔴 逐条数表格，禁凭印象）
   - 校验 sha256 仍 18/18 match、无 U+FFFD、「N 处」类表述与列举项数一致
