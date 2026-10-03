@@ -2,7 +2,7 @@
 
 ## Overview
 
-**spec**：`f1-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：0/22（Task 0~21），Design-First 未实施
+**spec**：`f1-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**4/22 已实施**（2026-09-27 接管后更新）
 **上游**：umbrella Task 48（F 循环 lane）· D1 引擎 · E1 canary 范式 · D3 同构先例
 **承载**：F 循环共同裁决 FC-1~FC-13（design §F 循环共同裁决），F2~F5 spec 引用
 
@@ -65,7 +65,7 @@
 
 ### 阶段 1：canary 链路（F1-6，从零打通）
 
-- [ ] 7. `phase5_f1_prepayment.py` 从零建
+- [x] 7. `phase5_f1_prepayment.py` 从零建
   - 常量：`ENTRY_ID="xlsx/gt-f1-prepayment"` / `ADAPTER_ID="f1.prepayment_detail"` / `WP_CODES={"F1P"}` /
     `EXPECTED_PROFILE_ID` / `TEMPLATE_RELATIVE_PATH="F/F1 预付账款.xlsx"` /
     `TEMPLATE_SHA256="f30055cbebc7daedec6d073e983e7ada5375c3edf50b49880c7aa571846510dd"`（本 spec 实测）
@@ -78,7 +78,7 @@
     `instrumentation_specs()` 复数 / `build_contract_payload` / `attach_pilot_adapters` / `build_matcher`
   - _Requirements: 1.2, 1.3_
 
-- [ ] 8. `phase5_f1_06_related_party.py` canary 薄声明（无 def/class）
+- [x] 8. `phase5_f1_06_related_party.py` canary 薄声明（无 def/class）
   - `store_item_id="F1-rp-rows"` / `row_identity_key="rowId"` / header R6 / 数据 R7-9 / footer R10「合计」 /
     UUID `N` / `formula_columns=("F","H")` / `FORMULA_TEMPLATES={"F":"=C{r}+D{r}-E{r}","H":"=F{r}-G{r}"}`
   - 13 字段（A-M，键取 `RelatedPartyRow`：`partyName/relationship/priorBalance/debit/credit/endBalance/badDebt/
@@ -95,18 +95,27 @@
   - 🔴 第③环卡 BP-61-1 时如实登记 `upstream_gap`，`adapter_registered=False` 与真库对齐
   - _Requirements: 1.4, 1.5, 1.8, 9.2_
 
-- [ ] 10. 宿主接桥（保留 legacy 给未接 sheet）
+- [x] 10. 宿主接桥（保留 legacy 给未接 sheet）
   - `GtF1Prepayment.vue` 引入 `useWorkpaperSyncBridge({entryId,wpId,projectId,sheetKey,capability,flushHtml,reloadHtml})` +
     `WorkpaperSyncEditorHost`（`.oo-container` 确定高度）；`flushHtml` 先 `flushPendingSave()` 再 `readStoreProjection`
   - `F1_SHEET_KEY_BY_CODE` + `isF1SyncManagedSheet` 从 provider 受管清单派生；两套宿主 gating 不叠加工具条
   - _Requirements: 1.6, 9.4_
+  - **已完成**（2026-09-27 接管修复）：修 4 处致命缺陷 + 补双模式 4 分支保存协议。
+    ① `useF1FormData` 补导出 `flushPendingSave`（原 ReferenceError）；
+    ② `WorkpaperSyncEditorHost` 补 `:descriptor="syncOoDescriptor"`（原漏必填 prop，编辑器永不创建）；
+    ③ `flushHtml` 返回值包装 `{expectedRevision, projection, sheetKey}`（原缺 sheetKey）；
+    ④ `renderMode` computed getter/setter + `switchRenderMode` 4 分支保存协议（照 D3 范式）；
+    后端 `_rows_table_payload` 改委托框架层 `spec_to_contract_sheet_payload`（原手写缺 anchor 致 parse_contract 抛）；
+    alignment guard 从红转绿。
 
 - [ ]* 11. canary 验收：三谓词 + DB 证据（F1-P4）
   - _Requirements: 1.7_
 
-- [ ] 12. 批量 e2e 骨架：`e2e/fixtures/f1-l2-cases.json` + `e2e/f1-l2-oo-to-html-all.spec.ts` +
+- [x] 12. 批量 e2e 骨架：`e2e/fixtures/f1-l2-cases.json` + `e2e/f1-l2-oo-to-html-all.spec.ts` +
   `backend/scripts/e2e/seed_f1_publish_e2e.py`（照 D4/E1 lane；七态结果枚举）
   - _Requirements: 9.3_
+  - **已完成**（2026-09-27 接管修复）：`e2e/f1-l2-oo-to-html-all.spec.ts` 改 `readFileSync`（原 `import ... from json`
+    在 Playwright ESM 加载器下抛 `needs an import attribute of "type: json"`，整文件 0 tests → 修复后 1 test）。
 
 ### 阶段 2：F1-5 / F1-7（单区 + 三区）
 

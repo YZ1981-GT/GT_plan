@@ -72,6 +72,11 @@ G7 RG-3 先例 · 模板覆盖层 spec
 - [ ]* 9. lane M 发布链五环 + 宿主接桥（`GtF2InventoryMain.vue`，他册 sheet 不进受管集合）+ canary 真栈
   - 🔴 **upstream_gap**：BP-61-1（published representation 三表近空，186 个 planned entry 一个都注册不上）。
     代码层已就绪（Task 7 的 `attach_pilot_adapters` + Task 8 的 SPEC_F206），供给就绪后真栈注册。
+  - **接桥部分已完成**（2026-09-27）：`GtF2InventoryMain.vue` 接入 `useWorkpaperSyncBridge` +
+    `WorkpaperSyncEditorHost`（descriptor+bridge props） + `renderMode` computed getter/setter +
+    `switchRenderMode` 4 分支保存协议（照 D3 范式）；`useF2FormData` 补导出 `flushPendingSave`；
+    后端 `_rows_table_payload` 改委托框架层 + 契约重算过 `parse_contract`。
+  - 未做：发布链③④⑤环 + canary 真栈（卡 BP-61-1）。
   - _Requirements: 7.1, 7.4_
 
 - [x] 10. F2-7 / F2-12 声明；F2-5 分组、F2-10/11/13 多块形态核后声明或登记
@@ -121,6 +126,10 @@ G7 RG-3 先例 · 模板覆盖层 spec
 
 - [ ]* 17. lane S 发布链五环 + 宿主接桥（`GtF2StocktakeBundle.vue`，docx 通道不受影响）+ canary 真栈
   - 🔴 **upstream_gap**：同 Task 9*（BP-61-1），代码层已就绪（Task 14 + 15）。
+  - **接桥部分已完成**（2026-09-27）：`GtF2StocktakeBundle.vue` 接入 syncBridge + EditorHost +
+    renderMode 4 分支 + `useF2StocktakeFormData` 补导出 `flushPendingSave`（noop，无 debounce）+
+    后端 `_rows_table_payload` 改委托框架层 + 契约重算。
+  - 未做：发布链③④⑤环 + canary 真栈（卡 BP-61-1）。
   - _Requirements: 3.6, 7.1, 7.4_
 
 ### lane V：valuation（F2-47 至 F2-49 册）
@@ -139,6 +148,10 @@ G7 RG-3 先例 · 模板覆盖层 spec
 
 - [ ]* 21. lane V 发布链五环 + 宿主接桥（`GtF2InventoryValuation.vue`）+ canary 真栈
   - 🔴 **upstream_gap**：同 Task 9*（BP-61-1），代码层已就绪（Task 18 + 19）。
+  - **接桥部分已完成**（2026-09-27）：`GtF2InventoryValuation.vue` 接入 syncBridge + EditorHost +
+    renderMode 4 分支 + `useF2ValuationFormData` 抽 `_flushPending` 函数+导出 +
+    后端从零补建 `build_contract_payload`/`contract_file_path`/`load_contract_from_disk` + 契约重算。
+  - 未做：发布链③④⑤环 + canary 真栈（卡 BP-61-1）。
   - _Requirements: 7.1, 7.4_
 
 ### lane P：special（F2-55 至 F2-58 册）
@@ -152,6 +165,11 @@ G7 RG-3 先例 · 模板覆盖层 spec
 
 - [ ]* 24. lane P 发布链五环 + 宿主接桥（`GtF2InventorySpecial.vue`，IPO 门控不影响受管 sheet）+ canary 真栈
   - 🔴 **upstream_gap**：同 Task 9*（BP-61-1），代码层已就绪（Task 22 + 23）。
+  - **接桥部分已完成**（2026-09-27）：`GtF2InventorySpecial.vue` 接入 syncBridge + EditorHost +
+    renderMode 4 分支 + `useF2SpecialFormData` 补 `_flushPending`（空实现，无 pending 队列） +
+    后端从零补建 `build_contract_payload` + `_instrumentation_of`/`instrumentation_specs`/
+    `template_definition_payload`/`instrumentation_definition_payload`（四函数原缺失）+ 契约重算。
+  - 未做：发布链③④⑤环 + canary 真栈（卡 BP-61-1）。
   - _Requirements: 7.1, 7.4_
 
 ### 收口
