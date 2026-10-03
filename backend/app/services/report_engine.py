@@ -1343,6 +1343,9 @@ class ReportEngine:
                 row.formula_used = config.formula
                 row.source_accounts = source_accounts if source_accounts else None
                 row.generated_at = generated_at
+                # 任务 15：成功处理到的报表行就是本次全量重算的实际范围，
+                # 只清这些行的过期标记；配置外的历史行保持原状态。
+                row.is_stale = False
                 row.indent_level = config.indent_level
                 row.is_total_row = config.is_total_row
             else:
@@ -1359,6 +1362,7 @@ class ReportEngine:
                     generated_at=generated_at,
                     indent_level=config.indent_level,
                     is_total_row=config.is_total_row,
+                    is_stale=False,
                 )
                 self.db.add(row)
 
@@ -1958,6 +1962,8 @@ class ReportEngine:
                     row = existing.scalar_one_or_none()
                     if row:
                         row.current_period_amount = current_amount
+                        # 任务 15：仅本次实际增量重算的行清除过期标记。
+                        row.is_stale = False
                         # Req 15.3：更新受影响报表单元的最近计算时间
                         # （FinancialReport 以 generated_at 承载 last_computed_at）。
                         row.generated_at = now

@@ -118,6 +118,35 @@ describe('useGroupTree.fetchTree', () => {
     expect(error.value).toBe('网络错误')
     expect(trees.value).toEqual([])
   })
+
+  it('归一化保留旧展示字段，并把回退 forest key 传给所有后代', async () => {
+    const child = makeNode({
+      id: 'child',
+      companyCode: 'C',
+      companyName: '子公司',
+      shareholding: 66.67,
+      consolMethod: 'equity',
+    })
+    const root = makeNode({
+      id: 'root',
+      companyCode: 'G',
+      companyName: '集团',
+      children: [child],
+    })
+    mockGet.mockResolvedValueOnce({
+      trees: [{ ultimateCode: 'G', ultimateName: '集团', year: 2025, rootProjectId: null, children: [root] }],
+      independents: [],
+    })
+
+    const { trees, fetchTree } = useGroupTree()
+    await fetchTree()
+
+    expect(trees.value[0].key).toBe('G@2025')
+    expect(trees.value[0].children[0].forestKey).toBe('G@2025')
+    expect(trees.value[0].children[0].children[0].forestKey).toBe('G@2025')
+    expect(trees.value[0].children[0].children[0].shareholding).toBe(66.67)
+    expect(trees.value[0].children[0].children[0].consolMethod).toBe('equity')
+  })
 })
 
 // ─── 搜索过滤 ────────────────────────────────────────────────────────────────

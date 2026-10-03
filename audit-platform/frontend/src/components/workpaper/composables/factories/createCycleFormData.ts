@@ -12,6 +12,7 @@
  *   - isDirty 追踪
  */
 import { ref, computed, onScopeDispose, type Ref, type ComputedRef } from 'vue'
+import { getAuthHeaders } from '@/utils/authToken'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -98,8 +99,9 @@ export function createCycleFormData<T extends Record<string, unknown> = Record<s
     if (!wpId.value) return
     loading.value = true
     try {
+      // 🔴 后端鉴权是 Bearer 头（不认 cookie）⇒ `credentials: 'include'` 不起作用，必须自带 Authorization
       const response = await fetch(getApiBase(), {
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         credentials: 'include',
       })
       if (!response.ok) throw new Error(`Load failed: ${response.status}`)
@@ -132,7 +134,7 @@ export function createCycleFormData<T extends Record<string, unknown> = Record<s
       const items = Array.from(formData.value.values())
       await fetch(getApiBase(), {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         credentials: 'include',
         body: JSON.stringify({ items }),
       })

@@ -7,6 +7,8 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
+      <!-- BP-7 MC-12: 未接入双向回写的 notice（M9 无模式切换，常显在顶部） -->
+      <div class="mode-toggle-bar"><GtEntrySyncCapabilityNotice entry-id="xlsx/gt-m9-other-comprehensive-income" /></div>
       <!-- M9 底稿目录 -->
       <M9TabIndex
         v-if="currentSheet === 'index'"
@@ -108,6 +110,7 @@ import { ref, computed, inject, onMounted, onBeforeUnmount, provide, toRef, defi
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 

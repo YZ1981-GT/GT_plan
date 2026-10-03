@@ -18,6 +18,7 @@
         :options="modeOptions"
         size="small"
       />
+      <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a173-consultation-record" />
       <span class="gt-a173__save-status">
         <template v-if="saveStatus === 'saving'">
           <el-icon class="is-loading"><Loading /></el-icon> 保存中...
@@ -175,12 +176,13 @@
               </div>
               <el-upload
                 v-if="!props.readonly"
-                :action="`/api/knowledge-base/projects/${props.projectId}/documents`"
+                :action="P_kl.projectUpload(props.projectId)"
+                name="files"
                 :headers="uploadHeaders"
                 :on-success="handleUploadSuccess"
                 :on-error="handleUploadError"
                 :show-file-list="false"
-                accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.xlsx,.xls"
+                accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.xlsx,.xls,.xlsm,.txt,.md,.csv"
                 multiple
                 class="gt-a173__upload"
               >
@@ -311,21 +313,19 @@
     </div>
 
     <!-- Online Edit Mode -->
-    <GtOnlyOfficeSheet
-      v-else
-      :wp-id="props.wpId"
-      sheet-name="A17-3"
-      :project-id="props.projectId"
-      class="gt-a173__oo"
-      @fallback="handleOOFallback"
-    />
+    <template v-else>
+      <WorkpaperSyncEditorHost v-if="syncOoDescriptor" :descriptor="syncOoDescriptor" :bridge="syncBridge" class="a173consultationrecord__oo" />
+      <div v-else style="display:flex;align-items:center;justify-content:center;height:400px;color:#909399">正在打开同步编辑器…</div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, watch, toRef } from 'vue'
 import { Loading, MagicStick, Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { getAuthHeaders } from '@/utils/authToken'
+import { knowledgeLibrary as P_kl } from '@/services/apiPaths'
 import {
   useA173ConsultationRecord,
   CONSULT_TYPE_OPTIONS,
@@ -335,6 +335,13 @@ const GtOnlyOfficeSheet = defineAsyncComponent(
   () => import('./GtOnlyOfficeSheet.vue'),
 )
 
+import { useWorkpaperSyncBridge } from './sync/useWorkpaperSyncBridge'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+
+const WorkpaperSyncEditorHost = defineAsyncComponent(() => import('./sync/WorkpaperSyncEditorHost.vue'))
 defineOptions({ name: 'GtA173ConsultationRecord' })
 
 const props = withDefaults(defineProps<{
@@ -374,11 +381,8 @@ watch(saveStatus, (s) => {
 const newFileTag = ref('')
 const uploadedDocIds = ref<string[]>([])
 
-// Upload headers (auth token)
-const uploadHeaders = computed(() => {
-  const token = localStorage.getItem('token') || ''
-  return { Authorization: token ? `Bearer ${token}` : '' }
-})
+// Upload headers（el-upload 原生上传不经 http 拦截器；token 走 authToken 单一入口）
+const uploadHeaders = computed(() => getAuthHeaders())
 
 function handleAddFileTag() {
   if (newFileTag.value.trim()) {
@@ -388,20 +392,43 @@ function handleAddFileTag() {
 }
 
 function handleUploadSuccess(response: any, file: any) {
-  const filename = response?.data?.filename || file?.name || ''
+  // 响应经 ResponseWrapperMiddleware 包成 {code,message,data}；
+  // data = {uploaded, files:[{id,name,...}], failed:[{filename, reason}]}
+  const payload = response?.data ?? response
+  const saved = Array.isArray(payload?.files) ? payload.files[0] : null
+  const filename = saved?.name || file?.name || ''
+  if (!saved?.id) {
+    // 后端逐文件容错：该文件保存失败时 files 为空、failed 带中文原因 —— 不能再提示「已存入知识库」
+    const reason = Array.isArray(payload?.failed) ? payload.failed[0]?.reason : ''
+    ElMessage.warning(`${filename || '文件'} 未能存入知识库${reason ? `：${reason}` : '，请重试'}`)
+    return
+  }
   if (filename) {
     addFileTag(filename)
   }
-  // 如果后端返回了 doc_id（OCR 识别后入库的文档 ID）
-  const docId = response?.data?.doc_id || response?.data?.id
-  if (docId) {
-    uploadedDocIds.value.push(docId)
-  }
-  ElMessage.success(`${filename} 上传成功，已存入知识库`)
+  uploadedDocIds.value.push(saved.id)
+  ElMessage.success(
+    saved.text_extracted
+      ? `${filename} 上传成功，已存入知识库`
+      : `${filename} 已存入知识库，但未识别出文字内容，AI 生成时无法引用`,
+  )
 }
 
-function handleUploadError() {
-  ElMessage.warning('文件上传失败，请重试')
+/**
+ * el-upload 失败回调：`error.message` 是响应原文（element-plus ajax.getError）。
+ * 后端错误体形如 `{code, message}`（413 请求体过大 / 403 无权 / 500 …）—— 取出中文原因展示，
+ * 不再一律「请重试」（403 重试没有意义）。
+ */
+function handleUploadError(error: any, file: any) {
+  let reason = ''
+  try {
+    const body = JSON.parse(String(error?.message || ''))
+    reason = typeof body?.message === 'string' ? body.message : typeof body?.detail === 'string' ? body.detail : ''
+  } catch {
+    reason = ''
+  }
+  const name = file?.name || '文件'
+  ElMessage.warning(reason ? `${name} 上传失败：${reason}` : `${name} 上传失败，请重试`)
 }
 
 // ─── AI Generate ───
@@ -463,6 +490,33 @@ function handleOOFallback() {
 }
 
 // ─── Lifecycle ───
+
+// ─── sync bridge（替代 legacy mode + GtOnlyOfficeSheet）───
+const _ENTRY_ID = 'xlsx/gt-a173-consultation-record'
+const _SHEET_KEY = 'a173consultationrecord-managed'
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: ref(_ENTRY_ID),
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: ref(_SHEET_KEY),
+  capability: capabilityForEntry(_ENTRY_ID),
+  flushHtml: async () => {
+    if (typeof flushPendingSave === 'function') flushPendingSave()
+    else if (typeof flushPendingSaves === 'function') flushPendingSaves()
+    // 🔴 降级保护：本 entry 的 capability 仍是 single_onlyoffice（后端无 per-entry
+    //    adapter）⇒ readStoreProjection 会 404。捕获后返回空投影，让 OO 走「无投影」
+    //    路径（与改线前 legacy 行为等价）。capability 升 bidirectional 后自动失效。
+    try {
+      const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: _ENTRY_ID })
+      return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: _SHEET_KEY }
+    } catch {
+      return { expectedRevision: 0, projection: null, sheetKey: _SHEET_KEY }
+    }
+  },
+  reloadHtml: async () => { if (typeof loadData === 'function') await loadData(props.wpId); else if (typeof refreshData === 'function') await refreshData(props.wpId) },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+
 onMounted(() => { checkOOHealth(); loadData(props.wpId) })
 onBeforeUnmount(() => { flushPendingSaves() })
 

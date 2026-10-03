@@ -1413,7 +1413,7 @@ const aiHost = computed(() =>
 
 // ─── AI 文档对话采纳 ─────────────────────────────────────────────────────────
 function onDocAiAdopt(_payload: { content: string; messageId: string }) {
-  // 采纳事件由 DocAiChatPanel 内部调用 adoptContent API（走确认流）
+  // 采纳事件由 PlatformAiChatPanel 内部调用 adoptContent API（走确认流）
   // D4: AI 内容已经过 wrap_ai_output_with_log → pending 状态，不直接写入
   // 父组件在确认流完成后可刷新附注内容
   if (currentNote.value?.note_section) {
@@ -1950,7 +1950,7 @@ async function goAdoptSection(section: string) {
 
 // ─── 多表投影 + 两级分组表头（useNoteTableProjection composable）───────────
 import { useNoteTableProjection } from '@/views/composables/useNoteTableProjection'
-const { activeTableTab, currentNoteTables, activeTableData, activeTableColumns } =
+const { activeTableTab, currentNoteTables, activeTableData, activeTableColumns, resolveProjectedTableIndex } =
   useNoteTableProjection({ currentNote, projectSubTablesClient, deriveLegacyTableHeaders })
 
 // 注：per-tab 说明文本框（activeTabNoteText/activeTabNoteTextEditable）已移除。
@@ -2859,7 +2859,10 @@ onMounted(async () => {
     // 反向跳转可能传入关键词标题（如损益类 三、信用减值损失），DB 实际章节可能被截断
     // （三、信用减值损失（损），需解析为 noteList 中的精确 note_section 再定位。
     const resolvedSection = resolveSectionInList(targetSection)
+    const targetTableIndex = route.query.table_index
     await fetchDetail(resolvedSection)
+    await nextTick()
+    activeTableTab.value = String(resolveProjectedTableIndex(targetTableIndex))
     await locateTreeNode(resolvedSection)  // 左侧树形定位：展开祖先分组 + 高亮 + 滚动到可视区
     // 🔴 用 history.replaceState 清理 URL query，禁止用 router.replace：
     // DefaultLayout 的 router-view 以 :key="fullPath"（含 query）渲染，router.replace 改 query
@@ -2867,6 +2870,7 @@ onMounted(async () => {
     try {
       const url = new URL(window.location.href)
       url.searchParams.delete('section')
+      url.searchParams.delete('table_index')
       url.searchParams.delete('noteTemplate')
       window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
     } catch { /* 清理 URL 失败不影响已选中章节 */ }

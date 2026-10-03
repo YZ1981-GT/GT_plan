@@ -10,12 +10,7 @@
           @change="dualMode.onModeChange"
         />
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
-        <!--
-          AC 1.4 的「可操作原因」—— 未注册 adapter 却给出可点的模式切换时必须常显。
-          spec: n-cycle-sync-foundation-and-first-canary Task 19（BP-7）
-          🔴 只放 el-tooltip 不算接线：EP 的 tooltip 内容 hover 后才进 DOM。
-        -->
-        <GtEntrySyncCapabilityNotice :entry-id="N4_ENTRY_ID" />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-n4-taxes-and-surcharges" />
       </div>
 
       <!-- 双模式：HTML sheet 切到 OnlyOffice -->
@@ -26,7 +21,6 @@
         :sheet-name="props.sheetName || ''"
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
-        @fallback="dualMode.onOoLoadFailed"
       />
 
       <!-- N4A 程序表 → 复用 a-program-console -->
@@ -141,18 +135,14 @@
  * Requirements: 1.1, 1.2, 1.3, 1.6, 1.7, 1.8, 1.9, 1.11
  */
 import { ref, computed, inject, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
-import { ElMessage } from 'element-plus'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
-import { fetchOnlyOfficeHealthy } from './sync/onlyOfficeHealth'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 // ─── defineAsyncComponent lazy 加载子组件 ────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtCycleAProgramRouter = defineAsyncComponent(() => import('./GtCycleAProgramRouter.vue'))
-const GtEntrySyncCapabilityNotice = defineAsyncComponent(
-  () => import('./sync/GtEntrySyncCapabilityNotice.vue'),
-)
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 // n4/core/
 const N4TabIndex = defineAsyncComponent(() => import('./n4/core/N4TabIndex.vue'))
@@ -194,9 +184,6 @@ function handleNavigate(sheetName: string): void {
   emit('navigate-sheet', sheetName)
 }
 
-/** manifest 的稳定 entry_id —— AC 1.4 通知与 sync 判据的唯一锚点 */
-const N4_ENTRY_ID = 'xlsx/gt-n4-taxes-and-surcharges'
-
 // ─── 状态 ────────────────────────────────────────────────────────────────────
 const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
@@ -207,54 +194,50 @@ const isReadonly = computed(() => !!props.readonly)
 // ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI + 挂真实 Host） ───
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 
-// ─── 双模式 ──────────────────────────────────────────────────────────────────
-/**
- * 🔴 这里原先是 `onModeChange: () => {}` 的**空实现**（BP-5 / NC-13）：
- * `<el-segmented>` 显示两个可点选项，但 `currentMode` 永远是 `'html'`，
- * 下面那个 `v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"`
- * 的 OO 挂载点**结构性不可达** —— 正是 AC 1.4 禁止的「以双模式成功态呈现假双向」。
- *
- * spec: n-cycle-sync-foundation-and-first-canary Task 13（canary 短板①）
- *
- * 三条设计约束：
- * 1. **保留宿主内联形态**（决策 3：不做载体归一化重构），只把开关变成可兑现的。
- * 2. 健康探针走平台**统一能力层** `sync/onlyOfficeHealth.ts`（带 TTL 缓存 + 并发去重），
- *    SHALL NOT 在这里再抄一份 `http.get('/api/workpapers/onlyoffice/health')` ——
- *    「各自再抄一遍」正是该模块被提到 `sync/` 层要解决的问题（BP-4 同源）。
- * 3. `modeOptions` **不带 `disabled`**：D4 已实证，未就绪时置灰会把入口彻底锁死、
- *    点击被吞掉。门禁放在 `onModeChange` 里 `await` 兜底 + 失败显式回落并提示。
- */
-const currentMode = ref<'html' | 'onlyoffice'>('html')
-const isOoAvailable = ref(true)
-const modeOptions = [
-  { label: 'HTML', value: 'html' },
-  { label: 'OnlyOffice', value: 'onlyoffice' },
-]
+// ─── 双模式（修复 inert 空实现 → 真实切换 + health 检查 + 失败回落 HTML）───
+// spec: n-cycle-sync-foundation-and-first-canary 任务 13（NC-13 / NF-P9）
+// 🔴 保留宿主内联形态（依决策 3 不做载体归一化），但门控须由真实 switchMode 驱动。
+const _ooAvailable = ref(false)
+const _ooChecking = ref(false)
 
-async function onModeChange(val: string | number | boolean): Promise<void> {
-  const next = String(val) === 'onlyoffice' ? 'onlyoffice' : 'html'
-  if (next === currentMode.value) return
-  if (next === 'onlyoffice') {
-    // forceRefresh：用户**已经点了**，不能被一个卡在过期边界的旧值挡住这次真实点击
-    const healthy = await fetchOnlyOfficeHealthy(true)
-    isOoAvailable.value = healthy
-    if (!healthy) {
-      currentMode.value = 'html'
-      ElMessage.warning('OnlyOffice 服务当前不可用，已保持 HTML 模式')
+async function _checkOoHealth(): Promise<boolean> {
+  _ooChecking.value = true
+  try {
+    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
+    const healthy = (res as any).data?.data?.healthy ?? (res as any).data?.healthy ?? false
+    _ooAvailable.value = !!healthy
+    return _ooAvailable.value
+  } catch {
+    _ooAvailable.value = false
+    return false
+  } finally {
+    _ooChecking.value = false
+  }
+}
+
+const dualMode = {
+  currentMode: ref<'html' | 'onlyoffice'>('html'),
+  modeOptions: [
+    { label: 'HTML', value: 'html' },
+    { label: 'OnlyOffice', value: 'onlyoffice' },
+  ],
+  isOoAvailable: _ooAvailable,
+  onModeChange: (val: 'html' | 'onlyoffice') => {
+    if (val === dualMode.currentMode.value) return
+    if (val === 'onlyoffice' && !_ooAvailable.value) {
+      // 🔴 显式反馈（NC-13 修复静默 return）：不可用原因 + 已回落 HTML
+      import('element-plus').then(({ ElMessage }) => {
+        ElMessage.warning('OnlyOffice 服务不可用，已回落到 HTML 模式')
+      })
       return
     }
-  }
-  currentMode.value = next
+    dualMode.currentMode.value = val
+    if (val === 'html') {
+      // 切回 HTML 时刷新数据（与 useWorkpaperEntryDualMode 行为一致）
+      selfLoad()
+    }
+  },
 }
-
-/** GtOnlyOfficeSheet @fallback：文档渲染/超时失败 → 回落 HTML 并标记不可用 */
-function onOoLoadFailed(): void {
-  isOoAvailable.value = false
-  currentMode.value = 'html'
-  ElMessage.warning('OnlyOffice 文档加载失败，已回落 HTML 模式')
-}
-
-const dualMode = { currentMode, modeOptions, isOoAvailable, onModeChange, onOoLoadFailed }
 
 // ─── sheetName 归一（纯函数，见 composables/n4SheetRouting.ts）────────────────
 // 🔴 披露判定前置于 wp_code 正则 + 国企多写法全认，防披露组件静默挂不上
@@ -315,6 +298,9 @@ provide('getRowDot', reviewThreads.getRowDot)
 
 // ─── 生命周期 ────────────────────────────────────────────────────────────────
 onMounted(async () => {
+  // OO 健康检查（修复 inert → redeemable）
+  void _checkOoHealth()
+
   // 如果 htmlData 为 null（selfLoad 场景），自行加载
   if (!props.htmlData) {
     await selfLoad()
@@ -327,9 +313,6 @@ onMounted(async () => {
     allResponses.value = map
   }
   isLoading.value = false
-
-  // OO 可用性预检（统一能力层带 TTL 缓存 + 并发去重，切底稿不会逐张重打）
-  isOoAvailable.value = await fetchOnlyOfficeHealthy()
 
   // ─── EventBus 订阅 ─────────────────────────────────────────────────
   eventBus.on('disclosure:refresh' as any, onDisclosureRefresh)

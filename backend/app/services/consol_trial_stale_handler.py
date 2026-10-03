@@ -1,7 +1,8 @@
 """P1 — 子公司试算表更新 → 母公司合并 trial stale 标记.
 
 监听 TRIAL_BALANCE_UPDATED 事件：当某子公司 trial_balance 审定数变更时，
-反向查找其所有 parent 合并项目，把对应 consol_trial 行标记 is_stale=true。
+反向查找其所有 parent 合并项目，把对应 consol_trial 行标记 is_stale=true，
+并广播 SSE ``consol.push_stale``（合并推送结果过期，spec consol-elimination-single-source-push 需求 8.3）。
 
 设计定位：stale 是**观测/提示**机制，不自动重算（用户决定何时重算）。
 前端据 is_stale 显示"子公司数据已更新，建议重新汇总"提示 + 重算入口。
@@ -60,6 +61,11 @@ async def handle_child_tb_updated(event: Any) -> None:
                 total += await mark_consol_trial_stale(parent_id, year, db)
             await db.commit()
 
+            # spec consol-elimination-single-source-push 需求 8.3：只标过期、不自动推送；
+            # 合并页收到 consol.push_stale 后提示「子企业数据已变化，建议重新推送」
+            from app.services.consol_push_service import broadcast_stale
+
+            broadcast_stale(parents, year, project_id)
             if total > 0:
                 logger.info(
                     "子公司 TB 变更(项目 %s)→ 标记 %d 个合并项目 trial stale",

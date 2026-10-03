@@ -823,6 +823,9 @@ describe('WorkpaperWordEditor — OnlyOffice / 降级下载 upload', () => {
 
   describe('downloadTemplate URL 构建', () => {
     it('downloadTemplate("main") 使用 /wp-templates/{selectedVersion}/prefilled-download', async () => {
+      // 模拟已登录：原生 fetch 须带上 auth store 里的真实 token（空 token 恰是 401 缺陷形态）
+      const { useAuthStore } = await import('@/stores/auth')
+      useAuthStore().token = 'test-token-a16'
       // Mock fetch for download
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -849,7 +852,7 @@ describe('WorkpaperWordEditor — OnlyOffice / 降级下载 upload', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/wp-templates/A16-1/prefilled-download'),
         expect.objectContaining({
-          headers: expect.objectContaining({ Authorization: expect.any(String) }),
+          headers: expect.objectContaining({ Authorization: 'Bearer test-token-a16' }),
         }),
       )
     })
@@ -1533,6 +1536,11 @@ describe('WorkpaperWordEditor — dual-mode unit tests', () => {
 
   describe('export button in structured view', () => {
     it('export triggers prefilled-download API call for the correct wp_code', async () => {
+      // 原生 fetch 不经 http 拦截器：必须带上 auth store 里的**真实** token。
+      // 旧断言 `Authorization: expect.any(String)` 对 "Bearer "（空 token）也成立 ——
+      // 正是知识库上传恒 401 那一类缺陷的形态，故钉死具体值。
+      const { useAuthStore } = await import('@/stores/auth')
+      useAuthStore().token = 'test-token-a8'
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
         blob: () => Promise.resolve(new Blob(['docx-content'])),
@@ -1555,7 +1563,7 @@ describe('WorkpaperWordEditor — dual-mode unit tests', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/wp-templates/A8-1/prefilled-download'),
         expect.objectContaining({
-          headers: expect.objectContaining({ Authorization: expect.any(String) }),
+          headers: expect.objectContaining({ Authorization: 'Bearer test-token-a8' }),
         }),
       )
 
@@ -1720,6 +1728,8 @@ describe('WorkpaperWordEditor — export/import toolbar buttons', () => {
 
   describe('导出 Word button', () => {
     it('click triggers prefilled-download with include_responses=true', async () => {
+      const { useAuthStore } = await import('@/stores/auth')
+      useAuthStore().token = 'test-token-export'
       mockFetch.mockResolvedValue({
         ok: true,
         blob: () => Promise.resolve(new Blob(['docx-content'])),
@@ -1736,7 +1746,7 @@ describe('WorkpaperWordEditor — export/import toolbar buttons', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringMatching(/\/wp-templates\/A8-1\/prefilled-download\?include_responses=true/),
         expect.objectContaining({
-          headers: expect.objectContaining({ Authorization: expect.any(String) }),
+          headers: expect.objectContaining({ Authorization: 'Bearer test-token-export' }),
         }),
       )
 
@@ -1746,6 +1756,8 @@ describe('WorkpaperWordEditor — export/import toolbar buttons', () => {
 
   describe('导出模板 button', () => {
     it('click triggers prefilled-download with include_guidance=true', async () => {
+      const { useAuthStore } = await import('@/stores/auth')
+      useAuthStore().token = 'test-token-template'
       mockFetch.mockResolvedValue({
         ok: true,
         blob: () => Promise.resolve(new Blob(['template-content'])),
@@ -1762,7 +1774,7 @@ describe('WorkpaperWordEditor — export/import toolbar buttons', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringMatching(/\/wp-templates\/A8-1\/prefilled-download\?include_guidance=true/),
         expect.objectContaining({
-          headers: expect.objectContaining({ Authorization: expect.any(String) }),
+          headers: expect.objectContaining({ Authorization: 'Bearer test-token-template' }),
         }),
       )
 

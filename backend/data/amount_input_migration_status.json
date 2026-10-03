@@ -1,15 +1,15 @@
 {
-  "scanned_files": 1872,
+  "scanned_files": 1876,
   "totals": {
-    "el_input_number": 3053,
+    "el_input_number": 3029,
     "el_input_number_with_formatter": 18,
-    "wp_amount_input": 1878
+    "wp_amount_input": 1912
   },
-  "column_classified_total": 3721,
+  "column_classified_total": 3727,
   "confirmed_violation": [
     {
       "file": "d4/core/D4TabAdjudication.vue",
-      "line": 384,
+      "line": 410,
       "label": "未审数",
       "full_label": "本期 / 未审数",
       "control": "el-input-number",
@@ -22,7 +22,7 @@
     },
     {
       "file": "d4/core/D4TabAdjudication.vue",
-      "line": 397,
+      "line": 451,
       "label": "账项调整",
       "full_label": "本期 / 账项调整",
       "control": "el-input-number",
@@ -35,7 +35,7 @@
     },
     {
       "file": "d4/core/D4TabAdjudication.vue",
-      "line": 410,
+      "line": 464,
       "label": "重分类调整",
       "full_label": "本期 / 重分类调整",
       "control": "el-input-number",
@@ -48,7 +48,7 @@
     },
     {
       "file": "d4/core/D4TabAdjudication.vue",
-      "line": 432,
+      "line": 486,
       "label": "未审数",
       "full_label": "上期 / 未审数",
       "control": "el-input-number",
@@ -61,7 +61,7 @@
     },
     {
       "file": "d4/core/D4TabAdjudication.vue",
-      "line": 445,
+      "line": 526,
       "label": "账项调整",
       "full_label": "上期 / 账项调整",
       "control": "el-input-number",
@@ -74,7 +74,7 @@
     },
     {
       "file": "d4/core/D4TabAdjudication.vue",
-      "line": 458,
+      "line": 539,
       "label": "重分类调整",
       "full_label": "上期 / 重分类调整",
       "control": "el-input-number",
@@ -113,7 +113,7 @@
     },
     {
       "file": "d6/D6TabAdjudication.vue",
-      "line": 109,
+      "line": 119,
       "label": "AJE",
       "full_label": "AJE",
       "control": "el-input-number",
@@ -126,7 +126,7 @@
     },
     {
       "file": "d6/D6TabAdjudication.vue",
-      "line": 124,
+      "line": 134,
       "label": "RJE",
       "full_label": "RJE",
       "control": "el-input-number",
@@ -139,7 +139,7 @@
     },
     {
       "file": "d6/D6TabAdjudication.vue",
-      "line": 146,
+      "line": 156,
       "label": "期末未审",
       "full_label": "期末未审",
       "control": "el-input-number",
@@ -152,7 +152,7 @@
     },
     {
       "file": "d6/D6TabAdjudication.vue",
-      "line": 161,
+      "line": 177,
       "label": "AJE",
       "full_label": "AJE",
       "control": "el-input-number",
@@ -165,7 +165,7 @@
     },
     {
       "file": "d6/D6TabAdjudication.vue",
-      "line": 176,
+      "line": 192,
       "label": "RJE",
       "full_label": "RJE",
       "control": "el-input-number",
@@ -191,7 +191,7 @@
     },
     {
       "file": "d7/D7TabAdjudication.vue",
-      "line": 97,
+      "line": 104,
       "label": "AJE",
       "full_label": "AJE",
       "control": "el-input-number",
@@ -204,7 +204,7 @@
     },
     {
       "file": "d7/D7TabAdjudication.vue",
-      "line": 103,
+      "line": 110,
       "label": "RJE",
       "full_label": "RJE",
       "control": "el-input-number",
@@ -217,7 +217,7 @@
     },
     {
       "file": "d7/D7TabAdjudication.vue",
-      "line": 116,
+      "line": 123,
       "label": "期末未审",
       "full_label": "期末未审",
       "control": "el-input-number",
@@ -230,7 +230,7 @@
     },
     {
       "file": "d7/D7TabAdjudication.vue",
-      "line": 122,
+      "line": 135,
       "label": "AJE",
       "full_label": "AJE",
       "control": "el-input-number",
@@ -243,7 +243,7 @@
     },
     {
       "file": "d7/D7TabAdjudication.vue",
-      "line": 128,
+      "line": 141,
       "label": "RJE",
       "full_label": "RJE",
       "control": "el-input-number",
@@ -295,7 +295,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 510,
+      "line": 523,
       "label": "收入",
       "full_label": "银行对账单/流水 / 收入",
       "control": "el-input-number",
@@ -308,7 +308,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 516,
+      "line": 529,
       "label": "支出",
       "full_label": "银行对账单/流水 / 支出",
       "control": "el-input-number",
@@ -321,7 +321,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 522,
+      "line": 535,
       "label": "余额",
       "full_label": "银行对账单/流水 / 余额",
       "control": "el-input-number",
@@ -334,7 +334,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 530,
+      "line": 543,
       "label": "借方发生额",
       "full_label": "银行日记账 / 借方发生额",
       "control": "el-input-number",
@@ -347,7 +347,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 536,
+      "line": 549,
       "label": "贷方发生额",
       "full_label": "银行日记账 / 贷方发生额",
       "control": "el-input-number",
@@ -360,7 +360,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 542,
+      "line": 555,
       "label": "余额",
       "full_label": "银行日记账 / 余额",
       "control": "el-input-number",
@@ -373,7 +373,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 616,
+      "line": 629,
       "label": "金额",
       "full_label": "金额",
       "control": "el-input-number",
@@ -386,7 +386,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 671,
+      "line": 684,
       "label": "借方",
       "full_label": "借方",
       "control": "el-input-number",
@@ -399,7 +399,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 677,
+      "line": 690,
       "label": "贷方",
       "full_label": "贷方",
       "control": "el-input-number",
@@ -412,7 +412,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 761,
+      "line": 774,
       "label": "借方",
       "full_label": "记账凭证 / 借方",
       "control": "el-input-number",
@@ -425,7 +425,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 767,
+      "line": 780,
       "label": "贷方",
       "full_label": "记账凭证 / 贷方",
       "control": "el-input-number",
@@ -438,7 +438,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 793,
+      "line": 806,
       "label": "金额",
       "full_label": "银行对账单 / 金额",
       "control": "el-input-number",
@@ -451,7 +451,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 905,
+      "line": 918,
       "label": "金额",
       "full_label": "银行对账单 / 金额",
       "control": "el-input-number",
@@ -464,7 +464,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 937,
+      "line": 950,
       "label": "借方",
       "full_label": "记账凭证 / 借方",
       "control": "el-input-number",
@@ -477,7 +477,7 @@
     },
     {
       "file": "e1/E1TabBankFlowReconcile.vue",
-      "line": 943,
+      "line": 956,
       "label": "贷方",
       "full_label": "记账凭证 / 贷方",
       "control": "el-input-number",
@@ -1036,7 +1036,7 @@
     },
     {
       "file": "GtB50RiskAssessment.vue",
-      "line": 1597,
+      "line": 1599,
       "label": "余额/金额",
       "full_label": "余额/金额",
       "control": "el-input-number",
@@ -2063,7 +2063,7 @@
     },
     {
       "file": "j2/J2TabDisclosureListed.vue",
-      "line": 491,
+      "line": 493,
       "label": "期末数(%)",
       "full_label": "期末数(%)",
       "control": "el-input-number",
@@ -2076,7 +2076,7 @@
     },
     {
       "file": "j2/J2TabDisclosureListed.vue",
-      "line": 497,
+      "line": 499,
       "label": "期初数(%)",
       "full_label": "期初数(%)",
       "control": "el-input-number",
@@ -2089,7 +2089,7 @@
     },
     {
       "file": "j2/J2TabDisclosureSoe.vue",
-      "line": 725,
+      "line": 726,
       "label": "期末数(%)",
       "full_label": "期末数(%)",
       "control": "el-input-number",
@@ -2102,7 +2102,7 @@
     },
     {
       "file": "j2/J2TabDisclosureSoe.vue",
-      "line": 731,
+      "line": 732,
       "label": "期初数(%)",
       "full_label": "期初数(%)",
       "control": "el-input-number",
@@ -3935,7 +3935,7 @@
     },
     {
       "file": "k4/core/K4TabCheck.vue",
-      "line": 165,
+      "line": 180,
       "label": "借方金额",
       "full_label": "借方金额",
       "control": "el-input-number",
@@ -3948,7 +3948,7 @@
     },
     {
       "file": "k4/core/K4TabCheck.vue",
-      "line": 168,
+      "line": 183,
       "label": "贷方金额",
       "full_label": "贷方金额",
       "control": "el-input-number",
@@ -6418,22 +6418,9 @@
     },
     {
       "file": "l5/core/L5TabAdjudication.vue",
-      "line": 68,
+      "line": 69,
       "label": "未审数",
       "full_label": "期初数 / 未审数",
-      "control": "el-input-number",
-      "has_formatter": false,
-      "semantic": "amount",
-      "bucket": "confirmed_violation",
-      "reason": "",
-      "non_amount_category": null,
-      "batch": 3
-    },
-    {
-      "file": "l5/core/L5TabAdjudication.vue",
-      "line": 69,
-      "label": "账项调整",
-      "full_label": "期初数 / 账项调整",
       "control": "el-input-number",
       "has_formatter": false,
       "semantic": "amount",
@@ -6445,71 +6432,6 @@
     {
       "file": "l5/core/L5TabAdjudication.vue",
       "line": 70,
-      "label": "重分类调整",
-      "full_label": "期初数 / 重分类调整",
-      "control": "el-input-number",
-      "has_formatter": false,
-      "semantic": "amount",
-      "bucket": "confirmed_violation",
-      "reason": "",
-      "non_amount_category": null,
-      "batch": 3
-    },
-    {
-      "file": "l5/core/L5TabAdjudication.vue",
-      "line": 76,
-      "label": "未审数",
-      "full_label": "期末数 / 未审数",
-      "control": "el-input-number",
-      "has_formatter": false,
-      "semantic": "amount",
-      "bucket": "confirmed_violation",
-      "reason": "",
-      "non_amount_category": null,
-      "batch": 3
-    },
-    {
-      "file": "l5/core/L5TabAdjudication.vue",
-      "line": 77,
-      "label": "账项调整",
-      "full_label": "期末数 / 账项调整",
-      "control": "el-input-number",
-      "has_formatter": false,
-      "semantic": "amount",
-      "bucket": "confirmed_violation",
-      "reason": "",
-      "non_amount_category": null,
-      "batch": 3
-    },
-    {
-      "file": "l5/core/L5TabAdjudication.vue",
-      "line": 78,
-      "label": "重分类调整",
-      "full_label": "期末数 / 重分类调整",
-      "control": "el-input-number",
-      "has_formatter": false,
-      "semantic": "amount",
-      "bucket": "confirmed_violation",
-      "reason": "",
-      "non_amount_category": null,
-      "batch": 3
-    },
-    {
-      "file": "l5/core/L5TabAdjudication.vue",
-      "line": 102,
-      "label": "未审数",
-      "full_label": "期初数 / 未审数",
-      "control": "el-input-number",
-      "has_formatter": false,
-      "semantic": "amount",
-      "bucket": "confirmed_violation",
-      "reason": "",
-      "non_amount_category": null,
-      "batch": 3
-    },
-    {
-      "file": "l5/core/L5TabAdjudication.vue",
-      "line": 103,
       "label": "账项调整",
       "full_label": "期初数 / 账项调整",
       "control": "el-input-number",
@@ -6522,7 +6444,7 @@
     },
     {
       "file": "l5/core/L5TabAdjudication.vue",
-      "line": 104,
+      "line": 71,
       "label": "重分类调整",
       "full_label": "期初数 / 重分类调整",
       "control": "el-input-number",
@@ -6535,7 +6457,7 @@
     },
     {
       "file": "l5/core/L5TabAdjudication.vue",
-      "line": 110,
+      "line": 77,
       "label": "未审数",
       "full_label": "期末数 / 未审数",
       "control": "el-input-number",
@@ -6548,7 +6470,7 @@
     },
     {
       "file": "l5/core/L5TabAdjudication.vue",
-      "line": 111,
+      "line": 78,
       "label": "账项调整",
       "full_label": "期末数 / 账项调整",
       "control": "el-input-number",
@@ -6561,7 +6483,7 @@
     },
     {
       "file": "l5/core/L5TabAdjudication.vue",
-      "line": 112,
+      "line": 79,
       "label": "重分类调整",
       "full_label": "期末数 / 重分类调整",
       "control": "el-input-number",
@@ -6574,7 +6496,85 @@
     },
     {
       "file": "l5/core/L5TabAdjudication.vue",
-      "line": 154,
+      "line": 103,
+      "label": "未审数",
+      "full_label": "期初数 / 未审数",
+      "control": "el-input-number",
+      "has_formatter": false,
+      "semantic": "amount",
+      "bucket": "confirmed_violation",
+      "reason": "",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
+      "file": "l5/core/L5TabAdjudication.vue",
+      "line": 104,
+      "label": "账项调整",
+      "full_label": "期初数 / 账项调整",
+      "control": "el-input-number",
+      "has_formatter": false,
+      "semantic": "amount",
+      "bucket": "confirmed_violation",
+      "reason": "",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
+      "file": "l5/core/L5TabAdjudication.vue",
+      "line": 105,
+      "label": "重分类调整",
+      "full_label": "期初数 / 重分类调整",
+      "control": "el-input-number",
+      "has_formatter": false,
+      "semantic": "amount",
+      "bucket": "confirmed_violation",
+      "reason": "",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
+      "file": "l5/core/L5TabAdjudication.vue",
+      "line": 111,
+      "label": "未审数",
+      "full_label": "期末数 / 未审数",
+      "control": "el-input-number",
+      "has_formatter": false,
+      "semantic": "amount",
+      "bucket": "confirmed_violation",
+      "reason": "",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
+      "file": "l5/core/L5TabAdjudication.vue",
+      "line": 112,
+      "label": "账项调整",
+      "full_label": "期末数 / 账项调整",
+      "control": "el-input-number",
+      "has_formatter": false,
+      "semantic": "amount",
+      "bucket": "confirmed_violation",
+      "reason": "",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
+      "file": "l5/core/L5TabAdjudication.vue",
+      "line": 113,
+      "label": "重分类调整",
+      "full_label": "期末数 / 重分类调整",
+      "control": "el-input-number",
+      "has_formatter": false,
+      "semantic": "amount",
+      "bucket": "confirmed_violation",
+      "reason": "",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
+      "file": "l5/core/L5TabAdjudication.vue",
+      "line": 155,
       "label": "期末数（最终审定）",
       "full_label": "期末数（最终审定）",
       "control": "el-input-number",
@@ -6899,7 +6899,7 @@
     },
     {
       "file": "l6/core/L6TabAdjudication.vue",
-      "line": 95,
+      "line": 91,
       "label": "未审数",
       "full_label": "期初数 / 未审数",
       "control": "el-input-number",
@@ -6912,7 +6912,7 @@
     },
     {
       "file": "l6/core/L6TabAdjudication.vue",
-      "line": 110,
+      "line": 106,
       "label": "账项调整",
       "full_label": "期初数 / 账项调整",
       "control": "el-input-number",
@@ -6925,7 +6925,7 @@
     },
     {
       "file": "l6/core/L6TabAdjudication.vue",
-      "line": 154,
+      "line": 150,
       "label": "未审数",
       "full_label": "期末数 / 未审数",
       "control": "el-input-number",
@@ -6938,7 +6938,7 @@
     },
     {
       "file": "l6/core/L6TabAdjudication.vue",
-      "line": 169,
+      "line": 165,
       "label": "账项调整",
       "full_label": "期末数 / 账项调整",
       "control": "el-input-number",
@@ -7211,7 +7211,7 @@
     },
     {
       "file": "l7/core/L7TabAdjudication.vue",
-      "line": 96,
+      "line": 92,
       "label": "期初未审数",
       "full_label": "期初未审数",
       "control": "el-input-number",
@@ -7224,7 +7224,7 @@
     },
     {
       "file": "l7/core/L7TabAdjudication.vue",
-      "line": 112,
+      "line": 108,
       "label": "期初AJE",
       "full_label": "期初AJE",
       "control": "el-input-number",
@@ -7237,7 +7237,7 @@
     },
     {
       "file": "l7/core/L7TabAdjudication.vue",
-      "line": 128,
+      "line": 124,
       "label": "期初RJE",
       "full_label": "期初RJE",
       "control": "el-input-number",
@@ -7250,7 +7250,7 @@
     },
     {
       "file": "l7/core/L7TabAdjudication.vue",
-      "line": 156,
+      "line": 152,
       "label": "期末未审数",
       "full_label": "期末未审数",
       "control": "el-input-number",
@@ -7263,7 +7263,7 @@
     },
     {
       "file": "l7/core/L7TabAdjudication.vue",
-      "line": 172,
+      "line": 168,
       "label": "期末AJE",
       "full_label": "期末AJE",
       "control": "el-input-number",
@@ -7276,7 +7276,7 @@
     },
     {
       "file": "l7/core/L7TabAdjudication.vue",
-      "line": 188,
+      "line": 184,
       "label": "期末RJE",
       "full_label": "期末RJE",
       "control": "el-input-number",
@@ -7432,7 +7432,7 @@
     },
     {
       "file": "l8/core/L8TabAdjudication.vue",
-      "line": 72,
+      "line": 68,
       "label": "本期未审",
       "full_label": "本期未审",
       "control": "el-input-number",
@@ -7445,7 +7445,7 @@
     },
     {
       "file": "l8/core/L8TabAdjudication.vue",
-      "line": 88,
+      "line": 84,
       "label": "AJE",
       "full_label": "AJE",
       "control": "el-input-number",
@@ -7458,7 +7458,7 @@
     },
     {
       "file": "l8/core/L8TabAdjudication.vue",
-      "line": 104,
+      "line": 100,
       "label": "RJE",
       "full_label": "RJE",
       "control": "el-input-number",
@@ -7471,7 +7471,7 @@
     },
     {
       "file": "l8/core/L8TabAdjudication.vue",
-      "line": 132,
+      "line": 128,
       "label": "上期发生额",
       "full_label": "上期发生额",
       "control": "el-input-number",
@@ -11192,7 +11192,7 @@
     },
     {
       "file": "d2/D2TabDetail.vue",
-      "line": 386,
+      "line": 443,
       "label": "band.label",
       "full_label": "期末审定账龄 / band.label",
       "control": "el-input-number",
@@ -11230,33 +11230,20 @@
       "batch": 3
     },
     {
+      "file": "d4/core/D4TabRevenueDetail.vue",
+      "line": 311,
+      "label": "label",
+      "full_label": "label",
+      "control": "WpAmountInput",
+      "has_formatter": false,
+      "semantic": "ambiguous",
+      "bucket": "ambiguous",
+      "reason": "dynamic_label",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
       "file": "d4/ipo/D4TabCustomerChecklist.vue",
-      "line": 190,
-      "label": "seg.cols[0].label",
-      "full_label": "seg.cols[0].label",
-      "control": "WpAmountInput",
-      "has_formatter": false,
-      "semantic": "ambiguous",
-      "bucket": "ambiguous",
-      "reason": "dynamic_label",
-      "non_amount_category": null,
-      "batch": 3
-    },
-    {
-      "file": "d4/ipo/D4TabDealer.vue",
-      "line": 175,
-      "label": "col.label",
-      "full_label": "col.label",
-      "control": "WpAmountInput",
-      "has_formatter": false,
-      "semantic": "ambiguous",
-      "bucket": "ambiguous",
-      "reason": "dynamic_label",
-      "non_amount_category": null,
-      "batch": 3
-    },
-    {
-      "file": "d4/ipo/D4TabOverseas.vue",
       "line": 192,
       "label": "seg.cols[0].label",
       "full_label": "seg.cols[0].label",
@@ -11269,8 +11256,34 @@
       "batch": 3
     },
     {
+      "file": "d4/ipo/D4TabDealer.vue",
+      "line": 177,
+      "label": "col.label",
+      "full_label": "col.label",
+      "control": "WpAmountInput",
+      "has_formatter": false,
+      "semantic": "ambiguous",
+      "bucket": "ambiguous",
+      "reason": "dynamic_label",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
+      "file": "d4/ipo/D4TabOverseas.vue",
+      "line": 193,
+      "label": "seg.cols[0].label",
+      "full_label": "seg.cols[0].label",
+      "control": "WpAmountInput",
+      "has_formatter": false,
+      "semantic": "ambiguous",
+      "bucket": "ambiguous",
+      "reason": "dynamic_label",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
       "file": "d4/ipo/D4TabUndisclosedRp.vue",
-      "line": 181,
+      "line": 182,
       "label": "col.label",
       "full_label": "col.label",
       "control": "WpAmountInput",
@@ -11543,7 +11556,7 @@
     },
     {
       "file": "e1/E1TabDisclosure.vue",
-      "line": 1556,
+      "line": 1505,
       "label": "openingLabel",
       "full_label": "openingLabel",
       "control": "WpAmountInput",
@@ -11556,7 +11569,7 @@
     },
     {
       "file": "e1/E1TabDisclosure.vue",
-      "line": 1567,
+      "line": 1516,
       "label": "endingLabel",
       "full_label": "endingLabel",
       "control": "WpAmountInput",
@@ -11582,7 +11595,7 @@
     },
     {
       "file": "e1/E1TabLargeCheck.vue",
-      "line": 365,
+      "line": 405,
       "label": "col.label",
       "full_label": "col.label",
       "control": "el-input-number",
@@ -12557,7 +12570,7 @@
     },
     {
       "file": "GtA38GoodwillImpairment.vue",
-      "line": 154,
+      "line": 156,
       "label": "`第${i + 1}年`",
       "full_label": "`第${i + 1}年`",
       "control": "el-input-number",
@@ -13271,5 +13284,5 @@
       "batch": 3
     }
   ],
-  "ok_count": 2701
+  "ok_count": 2706
 }

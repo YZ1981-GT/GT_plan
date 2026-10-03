@@ -1,0 +1,61 @@
+{
+  "mode": "check",
+  "supply_rows": {
+    "working_paper_sync_definition_artifact": 179,
+    "working_paper_sync_definition_bundle": 88,
+    "working_paper_representation_upgrade_candidate": 1,
+    "working_paper_content_representation": 283
+  },
+  "entries": [
+    {
+      "target": {
+        "entry_id": "xlsx/gt-h6-asset-disposal-clearing",
+        "contract_id": "h6.asset_disposal_clearing_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_h6_asset_disposal_clearing",
+        "wp_codes": [
+          "H6"
+        ],
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "a555164c-4fb1-4614-8506-2ea95fd20e40",
+        "wp_code": "H6",
+        "store_bytes": 0,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "stages": {
+        "authority_model": "would_create",
+        "bundle": "would_create",
+        "contract": "would_create",
+        "instrumentation": "would_create",
+        "template": "would_create"
+      },
+      "digests": {
+        "authority_model": "13308ee2806e850d08129fdaf590cea7aadb0a7755da2385ca2a99168de6cfd3",
+        "bundle": "aa910a0b77501128f80ef54f989fbf5e40fc6432a3789a66db143cb16983d4b4",
+        "contract": "ede38ed733bcf3d50d21245c6ca04e852c1e844e79b116482479a467ceda7062",
+        "instrumentation": "f3172f4c2c27fcf74be70dddeb3171d0e4e9467f809f16e4cb1e5ede25cf7b27",
+        "template": "7f4d8be94c50ce77aeac6a044fd11f5bf172a5cbfe01df9ee4d5ef91c54a9dcf"
+      },
+      "would_create": [
+        "authority_model",
+        "bundle",
+        "contract",
+        "instrumentation",
+        "template"
+      ],
+      "reused": [],
+      "representation": {
+        "settlement": "blocked",
+        "current_representation_id": null,
+        "current_definition_bundle_id": null,
+        "candidates_awaiting_contract": 0,
+        "candidate_bound_to_target_bundle": null,
+        "candidate_bound_state": null
+      },
+      "definition_bundle_sha256": "aa910a0b77501128f80ef54f989fbf5e40fc6432a3789a66db143cb16983d4b4"
+    }
+  ],
+  "errors": [],
+  "would_create_total": 5
+}

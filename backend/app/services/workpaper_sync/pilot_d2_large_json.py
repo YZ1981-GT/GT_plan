@@ -1042,8 +1042,16 @@ def build_contract_payload() -> dict[str, Any]:
         "review_status": "reviewed",
         "document_type": "xlsx",
         "template_definition_sha256": canonical_digest(template_payload),
+        # 🔴 2026-10-03：与 orchestrator 的 publish_definitions 保持一致——用单数路径
+        # （orchestrator 的 instrumentation_definition_payload 走 build_instrumentation_payload
+        # 而非 build_instrumentation_payload_for_sheets），否则发布的 digest 与契约声明不一致。
         "instrumentation_definition_sha256": canonical_digest(
-            instrumentation_definition_payload()
+            build_instrumentation_payload(
+                spec=instrumentation_spec(),
+                template_definition_sha256=canonical_digest(template_payload),
+                template_sha256=TEMPLATE_SHA256,
+                gate=excel_carrier_gate(),
+            )
         ),
         "template": {
             "relative_path": TEMPLATE_RELATIVE_PATH,

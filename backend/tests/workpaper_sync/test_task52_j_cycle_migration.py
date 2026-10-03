@@ -1790,7 +1790,14 @@ class TestOrphanDualModeInventory:
         🔴 **双态（2026-09-27）**：盘点期声明「窄口径 29」，其中 J 贡献 3 条里有 2 条
         （OD-1 `useJ2EntryDualMode` / OD-2 `useJ3EntryDualMode`）会随 lane spec Task 9
         的删除消失（第 3 条 J1 宿主属**地基 spec** 的改线，不在本 lane）。
-        ⇒ 期望值 = 声明值 − **现算已删的 J 贡献条数**，删到哪一步都自洽。
+        ⇒ 期望值 = 声明值 − **现算已删条数**，删到哪一步都自洽。
+
+        🔴 **2026-09-30 修一条潜伏缺陷**：原实现只扣「已删的 **J** 贡献」，而现算的窄口径是
+        **全循环**的消费边总数 ⇒ 任何一个 lane 删掉非 J 的已声明消费方，两侧就对不上。
+        实测 M 循环删 `useM9EntryDualMode.ts` 后本判据即红（现算 26 vs 期望 27），
+        而这与 J 循环毫无关系 —— 是**跨循环假红**，且 M lane 一提交就会在干净 HEAD 上复现。
+        改为按 slice 的 `statement_position_consumer_sites`（additive，29 条机器可读清单）
+        逐条判「文件是否已删」，扣的是**任一**已声明消费方。
         """
         shared = manifest_slice["orphan_dual_mode_inventory"]["shared_base"]
         statement = _statement_edges_to(SHARED_BASE)
@@ -1801,14 +1808,26 @@ class TestOrphanDualModeInventory:
             str(s) for s in (shared.get("j_cycle_contribution_sites") or ())
         ]
         assert declared_j_sites, "slice 的 j_cycle_contribution_sites 为空 ⇒ 分母坏了"
-        deleted_j_sites = [
-            s for s in declared_j_sites if deletion_already_executed(s)
+        declared_sites = [
+            str(s) for s in (shared.get("statement_position_consumer_sites") or ())
         ]
-        expected_narrow = shared["statement_position_consumers"] - len(deleted_j_sites)
+        assert len(declared_sites) == shared["statement_position_consumers"], (
+            f"消费边清单 {len(declared_sites)} 条 != 声明 "
+            f"{shared['statement_position_consumers']} ⇒ 分母坏了"
+        )
+        # J 的 3 条必须是全量清单的子集：两个 key 各写一次，漂移了要当场红
+        assert set(declared_j_sites) <= set(declared_sites), (
+            f"J 贡献不在全量清单里：{sorted(set(declared_j_sites) - set(declared_sites))}"
+        )
+        deleted_sites = [s for s in declared_sites if deletion_already_executed(s)]
+        deleted_j_sites = [s for s in declared_j_sites if deletion_already_executed(s)]
+        assert set(deleted_j_sites) <= set(deleted_sites)
+        expected_narrow = shared["statement_position_consumers"] - len(deleted_sites)
         assert len(statement) == expected_narrow, (
             f"窄口径现算 {len(statement)} != 期望 {expected_narrow}"
             f"（盘点期声明 {shared['statement_position_consumers']} − "
-            f"已删 J 贡献 {len(deleted_j_sites)} 条：{deleted_j_sites}）"
+            f"已删的已声明消费方 {len(deleted_sites)} 条：{deleted_sites}，"
+            f"其中 J 贡献 {len(deleted_j_sites)} 条）"
         )
         wide = _wide_scope_edge_files("useWorkpaperEntryDualMode")
         narrow_files = {e.split("#")[0] for e in statement}
@@ -1821,12 +1840,13 @@ class TestOrphanDualModeInventory:
         )
         # 🔴 宽口径同样按删除进度现算。另：盘点期之后**并发会话**给非 J 循环模块
         #    （G2 / N2 / K9 宿主）加了提到基类名的注释/字符串 ⇒ 宽口径只会**增长**。
-        #    判据因此改为「宽口径 ≥ 声明值 − 已删 J 贡献」+「宽 > 窄」两条，
+        #    判据因此改为「宽口径 ≥ 声明值 − 已删条数」+「宽 > 窄」两条，
         #    而不是等值 —— 等值会让任何非 J 循环的新增注释把 J 侧守卫打红（跨循环假红）。
-        expected_wide_floor = jd6["wide_scope_consumer_count"] - len(deleted_j_sites)
+        #    🔴 2026-09-30：下界同样改用 `deleted_sites`（任一已声明消费方），理由同窄口径。
+        expected_wide_floor = jd6["wide_scope_consumer_count"] - len(deleted_sites)
         assert len(wide) >= expected_wide_floor, (
             f"宽口径现算 {len(wide)} < 下界 {expected_wide_floor}"
-            f"（JD-6 声明 {jd6['wide_scope_consumer_count']} − 已删 {len(deleted_j_sites)}）"
+            f"（JD-6 声明 {jd6['wide_scope_consumer_count']} − 已删 {len(deleted_sites)}）"
             " ⇒ 有非预期的消费边消失"
         )
         assert jd6["statement_position_consumer_count"] == shared["statement_position_consumers"]

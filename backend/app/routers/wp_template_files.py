@@ -11,7 +11,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
-from starlette.requests import Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,7 +21,6 @@ from app.services.four_table.occurrence_by_standard_code import (
 )
 from app.services.wp_template_init_service import (
     get_workpaper_file,
-    get_workpaper_storage_path,
     init_workpaper_from_template,
     list_available_templates,
     prefill_workpaper_xlsx,
@@ -134,54 +132,6 @@ async def get_available_templates():
     """列出所有可用模板（供前端展示）"""
     templates = list_available_templates()
     return {"items": templates, "total": len(templates)}
-
-
-@router.post("/upload-xlsx")
-async def upload_xlsx_file(
-    project_id: str,
-    wp_id: str,
-    request: Request,
-):
-    """接收 Univer 导出的 xlsx blob 并覆盖保存
-
-    P2-2: 加入文件级冲突检测——如果服务端文件的修改时间比客户端打开时更新，
-    说明有其他人在此期间保存过，返回 409 提示冲突。
-    前端通过 header X-File-Opened-At 传递打开时间戳。
-    """
-    pid = UUID(project_id)
-    wid = UUID(wp_id)
-    storage_path = get_workpaper_storage_path(pid, wid)
-
-    # P2-2: 文件级冲突检测
-    opened_at = request.headers.get("X-File-Opened-At")
-    if opened_at and storage_path.exists():
-        try:
-            file_mtime = storage_path.stat().st_mtime
-            client_opened = float(opened_at)
-            if file_mtime > client_opened:
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "error_code": "XLSX_FILE_CONFLICT",
-                        "message": "底稿文件已被其他用户修改，请刷新后重试",
-                        "server_mtime": file_mtime,
-                        "client_opened_at": client_opened,
-                    },
-                )
-        except (ValueError, TypeError):
-            pass  # 无法解析时间戳，跳过冲突检测
-
-    form = await request.form()
-    file = form.get("file")
-    if file:
-        content = await file.read()
-        storage_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(storage_path, "wb") as f:
-            f.write(content)
-        logger.info("xlsx saved: %s (%d bytes)", storage_path.name, len(content))
-        return {"message": "xlsx 已保存", "size_kb": round(len(content) / 1024, 1)}
-
-    raise HTTPException(status_code=400, detail="未收到文件")
 
 
 async def _get_tb_data_for_prefill(

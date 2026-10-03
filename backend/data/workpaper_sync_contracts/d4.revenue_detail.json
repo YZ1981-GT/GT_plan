@@ -6631,7 +6631,7 @@
           ],
           "footer_anchor": {
             "carries_total_formula": false,
-            "marker": "提示：",
+            "marker": "提示：本底稿适用于调整分录较多、较复杂的项目，且仅列示与本报表项目相关的审计调整。项目组可根据项目实际情况选择是否使用该底稿。",
             "search_column": "A"
           },
           "formula_mask": [],

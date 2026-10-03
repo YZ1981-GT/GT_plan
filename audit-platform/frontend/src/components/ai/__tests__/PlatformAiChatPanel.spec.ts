@@ -256,14 +256,26 @@ describe('宿主迁移完整性', () => {
   const VIEW_DIR = resolve(__dirname, '../../../views')
   const COMPONENT_DIR = resolve(__dirname, '../../..')
 
+  // 🔴 WorkpaperEditor 不在此列（2026-09-09 起的有意设计，不是遗漏）：
+  // spec workpaper-page-formula-toolbar-closure Req 4「AI assist 只能通过公共 DSH adapter /
+  // PlatformAiChatPanel 链，不得由 guidance 或 WorkpaperEditor 再裸挂第二条链」—— 底稿页的
+  // AI 对话由全局 DshPanel 承载（buildAmbientHost 在有 wpId 时构造底稿宿主），下面单列断言。
   const HOST_PAGES = [
-    { name: 'WorkpaperEditor', path: resolve(VIEW_DIR, 'WorkpaperEditor.vue') },
     { name: 'ReportView', path: resolve(VIEW_DIR, 'ReportView.vue') },
     { name: 'DisclosureEditor', path: resolve(VIEW_DIR, 'DisclosureEditor.vue') },
     { name: 'KnowledgeBase', path: resolve(VIEW_DIR, 'KnowledgeBase.vue') },
     { name: 'DshPanel', path: resolve(COMPONENT_DIR, 'components/ai/DshPanel.vue') },
     { name: 'AIChatView', path: resolve(VIEW_DIR, 'ai/AIChatView.vue') },
   ]
+
+  it('WorkpaperEditor 不再裸挂第二条 AI 对话链（由全局 DshPanel 以底稿宿主承载）', () => {
+    const source = readFileSync(resolve(VIEW_DIR, 'WorkpaperEditor.vue'), 'utf-8')
+    expect(source).not.toMatch(/<PlatformAiChatPanel\b/)
+    expect(source).not.toMatch(/<DocAiChatPanel\b/)
+    // 承载方：DshPanel 按路由的 projectId + wpId 构造底稿宿主（buildAmbientHost → buildWorkpaperHost）
+    const dsh = readFileSync(resolve(COMPONENT_DIR, 'components/ai/DshPanel.vue'), 'utf-8')
+    expect(dsh).toMatch(/buildAmbientHost\(\{[\s\S]*?wpId:\s*route\.params\.wpId/)
+  })
 
   for (const { name, path } of HOST_PAGES) {
     it(`${name} 使用 PlatformAiChatPanel 且传 :host`, () => {

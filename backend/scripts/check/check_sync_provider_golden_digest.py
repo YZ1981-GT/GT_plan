@@ -102,6 +102,39 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     #    🔴 H9 是首个 `header_rows` 域扩容（3→4）之后落地的契约 —— 它本身是 2 级，
     #    但同循环的 H2/H4/H5/H7/H8 是 4 级；本门的 digest 会在扩容被回退时打红。
     ("h9", "phase5_h9_lease_liabilities", "ADAPTER_ID", True, True),
+    # ── 覆盖面补齐（2026-09-30，spec h-cycle-sync-foundation-and-first-canary）──────
+    #    🔴 缘起：翻 H 的 capability 前置第⑤项「golden digest 覆盖且零漂移」现算只覆盖
+    #    h9 一家。把台账（51 条 / 48 family）与本表（当时 24 家）对一遍，发现**24 个
+    #    family 从未进过基线** —— 门对它们恒绿，因为没有东西可比。这与 f1 曾被 `[SKIP]`
+    #    吞掉是同类不同机制：f1 是「登记了但跑挂被跳过」，这些是「**压根没登记**」，
+    #    连 stderr 都不会有一行。详见 `test_golden_digest_coverage_ratchet.py`。
+    #
+    #    🔴 本批先补 **已上线 bidirectional 却在门外**的两家 + H 循环 8 家：
+    #    `g7` / `h1` 是早期 pilot（`pilot_*` 命名），当初按 `phase5_*` 收录时漏掉，
+    #    而它们**正在被用户使用**，优先级高于尚未翻门的 H。
+    #
+    #    五元组按**现场 introspect** 定，不照抄不靠猜（`inspect.signature` 实打实看过）：
+    #      · `g7`/`h1` 用 `PILOT_ADAPTER_ID`，且只有 `instrumentation_spec`（单数）
+    #        ⇒ `plural_instr=False`；
+    #      · H 八家用 `ADAPTER_ID`，都有 `instrumentation_specs`（复数）⇒ `True`
+    #        （H2/H4/H5/H7/H8 是四级表头，留 False 会让扩容面对本门不可见）。
+    #
+    #    🔴 `g7` 的 `has_projection=False` 是**照脚本自己的处置说明**关掉那一段，不是偷懒：
+    #    `pilot_g7_two_level_dynamic` 既无 `MANAGED_FIELD_SPECS` 也无
+    #    `managed_row_table_specs()`，`_synthetic_rows()` 造不出合成 payload 而**直接抛**
+    #    RuntimeError（它刻意不返回空清单 —— 空清单会让 digest 算得出来却什么都没覆盖到）。
+    #    文件头注释写明：真不适用某一段就关那一段的开关（B60 同样处理），
+    #    不要让它整家抛异常然后被跳过。g7 仍核 contract + instrumentation 两段。
+    ("g7", "pilot_g7_two_level_dynamic", "PILOT_ADAPTER_ID", False, False),
+    ("h1", "pilot_h1_grouped_dynamic", "PILOT_ADAPTER_ID", True, False),
+    ("h2", "phase5_h2_construction_in_progress", "ADAPTER_ID", True, True),
+    ("h3", "phase5_h3_investment_property", "ADAPTER_ID", True, True),
+    ("h4", "phase5_h4_engineering_materials", "ADAPTER_ID", True, True),
+    ("h5", "phase5_h5_oil_gas_assets", "ADAPTER_ID", True, True),
+    ("h6", "phase5_h6_asset_disposal_clearing", "ADAPTER_ID", True, True),
+    ("h7", "phase5_h7_biological_assets", "ADAPTER_ID", True, True),
+    ("h8", "phase5_h8_right_of_use_assets", "ADAPTER_ID", True, True),
+    ("h10", "phase5_h10_asset_disposal_income", "ADAPTER_ID", True, True),
     # ── G9（spec: g-cycle-single-region-detail-lanes · Task 8 / C-5）────────
     #    🔴 全库**首个「一个 store 键 × 三个受管区」** provider：`明细表G9-2` 的
     #    R12-16 / R19-23 / R26-28 三区行都存在同一个 `G9-detail-rows` 数组里，区归属由
@@ -168,17 +201,7 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     ("g4", "phase5_g4_bond_investment", "ADAPTER_ID", True, True),
     ("g6", "phase5_g6_other_bond", "ADAPTER_ID", True, True),
     ("g5", "phase5_g5_long_term_receivable", "ADAPTER_ID", True, True),
-    # ── N4 canary（spec: n-cycle-sync-foundation-and-first-canary · Task 7）──
-    #    🔴 N 循环**首条**纳入零回归门的 provider。`plural_instr=True`：它的
-    #    `instrumentation_definition_payload()` 走 phase5_l_cycle_common 的
-    #    `build_instrumentation_payload_for_sheets(specs=instrumentation_specs())`，
-    #    注册路径读的是**复数**。留 False 会让本门只核单 spec ⇒ 将来打开 N4-1/N4-3
-    #    等灰度开关时扩容面对判据完全不可见（D2 注释警告过的假绿）。
-    #    `has_projection=True`：薄转发框架层 `build_store_projection`，任何 digest 漂移
-    #    都来自引擎本身。本条的 contract digest 会在误改上打红：① `header_rows` 从 **1**
-    #    被改成 2（N4-2 是单级表头）② `formula_mask` 的 E/I/K 三列被改 ③ 行身份从
-    #    `rowKey` 改成 `rowId`（同税种可多行，熵键是本 entry 的有意选择）。
-    ("n4", "phase5_n4_taxes_and_surcharges", "ADAPTER_ID", True, True),
+    # ── N4 canary 条目随 N 循环 provider 入库时补回（phase5_n4 尚未提交）──
 )
 
 
@@ -533,10 +556,22 @@ def main() -> int:
     for d in drift:
         print(f"   [{d['label']}] {d['field']}: 基线={d['disk'][:16]} 现算={d['source'][:16]}")
     print("\n排查顺序：")
-    print("  1. `git status --porcelain -- app/services/workpaper_sync/<该 provider 模块>.py`")
-    print("     —— 若该文件有非你本次改动的未提交改动（并发会话），基线本身已过期，")
-    print("        应先 `--update` 重取真实当前基线，再验证你自己的改动是否零回归。")
-    print("  2. 若该 provider 正是你本次改动的对象，落全量 diff 排查：对比抽取前后的")
+    print("  1. 🔴 查的是**整个 import 闭包**，不是 PROVIDERS 里登记的那一个模块文件：")
+    print("     `git status --porcelain -- backend/app/services/workpaper_sync/`")
+    print("     —— 实测教训（2026-09-30）：`[d4] sheet[d44-managed]` 漂移时，登记模块")
+    print("        `phase5_d4_revenue_detail.py` **无任何未提交改动**，真因在它 import 的")
+    print("        兄弟模块 `phase5_d4_adjustment_sheet.py`（`FOOTER_MARKER_D44` 从前缀")
+    print("        改成完整文本）。只查登记模块会得出「它没改 ⇒ 走第 2 条 ⇒ 这是真实回归」")
+    print("        的错误结论。按 sheet_key 反查产出它的模块：")
+    print("        `grep -rn '<该 sheet_key>' backend/app/services/workpaper_sync/`")
+    print("  2. 若闭包内有非你本次改动的未提交改动（并发会话），基线本身已过期 ——")
+    print("     该改动的作者负责 `--update`；**你不要替他们更新**（那会把未提交状态固化")
+    print("     进基线，他们回退时门会反向打红且归因丢失）。")
+    print("  3. 要证明「我的改动与本漂移无因果」，用行级 trace 而不是看文件名：")
+    print("     `sys.settrace` 包住 build_contract_payload/instrumentation_specs，")
+    print("     断言你改的那个文件**零行被执行**（import 过不算 —— lazy import 会把它")
+    print("     装进 sys.modules 造成假阳）。")
+    print("  4. 若该 provider 的闭包正是你本次改动的对象，落全量 diff 排查：对比抽取前后的")
     print("     build_contract_payload/build_store_projection/instrumentation_spec 输出")
     print("     （Requirement 4.2）—— 这才是真实回归。")
     return 1

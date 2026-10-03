@@ -161,7 +161,7 @@ Task 47 下游 lane spec**，与 D4 lane 同型。已存在的上游产物复用
   - E1-P12：其余 10 个 contract（b60/d1/d2/d3/d4/d5/d6/d7/g7/h1）golden digest 基线（必绿）
   - _Requirements: 6.2, 6.3, 8.3_
 
-- [ ] 6. **E1-P16 / E1-P17 / E1-P18 红判据**（复盘新增三条，D 类 spec 均无）
+- [x] 6. **E1-P16 / E1-P17 / E1-P18 红判据**（复盘新增三条，D 类 spec 均无）
   - 🔴 **E1-P16 OCR 第二写入方**：E1 有 7 个 `E1*OcrConfirmDialog`（全目录 OCR 提及 **454 次**），
     对 `-rows` 键是**整表替换**语义 ⇒ 与 OO forcesave 构成两个批量写入方。判据：受管 sheet 处于
     OO 编辑态时 OCR 确认入口 `disabled` + 中文原因可见。**D4 范式零 OCR**（d4 目录弹窗 0 个、
@@ -215,7 +215,7 @@ Task 47 下游 lane spec**，与 D4 lane 同型。已存在的上游产物复用
   - Task 3 的 E1-P1 SHALL 转绿（`legacy_fake_bidirectional` → `adapter_registered`，三条 reasonCodes 全消）
   - _Requirements: 1.4, 1.5_
 
-- [ ] 10. 宿主接桥（保留 legacy 给未接 sheet）
+- [x] 10. 宿主接桥（保留 legacy 给未接 sheet）
   - `GtE1MonetaryFund.vue` 引入 `useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost`，
     **保留** legacy `GtOnlyOfficeSheet`（D1 宿主同款 `v-if` / `v-else-if` 结构）
   - 按 Task 1 裁决的路线 α，受管 sheet 的子组件各挂挂载点以使 manifest 产出 `parent_duplicate`
@@ -283,11 +283,11 @@ Task 47 下游 lane spec**，与 D4 lane 同型。已存在的上游产物复用
 
 ### 阶段 3：E1-6 + E1-7/8/9（共享 composable，variant 参数化）
 
-- [ ] 15. `phase5_e1_06_reconciliation.py` 声明（E1-6 余额调节表）
+- [x] 15. `phase5_e1_06_reconciliation.py` 声明（E1-6 余额调节表）
   - `store_item_id="E1-reconciliation-rows"`（实测）；56r×17c/14f
   - _Requirements: 2.1, 2.3_
 
-- [ ] 16. `phase5_e1_07_08_09_cash_count.py` **一个文件声明三张** + `HTML_ONLY_ITEM_IDS_E1`
+- [x] 16. `phase5_e1_07_08_09_cash_count.py` **一个文件声明三张** + `HTML_ONLY_ITEM_IDS_E1`
   - 🔴 **三张共享 `useE1CashCount`(534) 且只差 `variant` 参数**（`rmb` / `fx` / `cert`）⇒
     `RowTableSheetSpec` 只应差 `variant` 与列集，**不得复制三份** —— 与 D5/D6/D7 共享 33 个同名
     函数、只差 `aging_layout` 一参同范式
@@ -304,7 +304,7 @@ Task 47 下游 lane spec**，与 D4 lane 同型。已存在的上游产物复用
 
 ### 阶段 4：E1-10 账户清单（首次遭遇 OCR 冲突源）
 
-- [ ] 17. `phase5_e1_10_account_list.py` 声明 + OCR 冲突判据收口
+- [x] 17. `phase5_e1_10_account_list.py` 声明 + OCR 冲突判据收口
   - `store_item_id="E1-account-list-rows"`（实测）；37r×12c/7f，**但是动态行表不是 static_region**
   - 🔴 **三向联动**：`useE1AccountList`(340) 另读 `E1-bank-detail-rows`（跨 sheet 取 E1-3 账户）
     与 `E1-account-commit-snapshot`（与 E1-11 联动）⇒ E1-P10 须断言这两个下游在回写后正确重算
@@ -316,7 +316,7 @@ Task 47 下游 lane spec**，与 D4 lane 同型。已存在的上游产物复用
 
 ### 阶段 5：E1-3 双 sheet 共享键（数据损坏级风险）
 
-- [ ] 18. E1-3 同编号双 sheet 可行性核 + 裁决（**不改生产代码**）
+- [x] 18. E1-3 同编号双 sheet 可行性核 + 裁决（**不改生产代码**）
   - 🔴 D 类**从未出现**此形态：`(仅人民币)` 92r×28c/185f 与 `(人民币及外币)` 89r×**41c**/**567f**
     （全平台单 sheet 公式最多），而前端只有一个 `E1-bank-detail-rows`
   - 🔴 **复盘已把风险从「待裁决」升级为数据损坏级**，实证：
@@ -374,7 +374,7 @@ Task 47 下游 lane spec**，与 D4 lane 同型。已存在的上游产物复用
 
 ### 阶段 7：可行性核 + 收口
 
-- [ ] 21. E1-5 调整分录汇总可行性核 + 裁决（**第八张同型，不改生产代码**）
+- [x] 21. E1-5 调整分录汇总可行性核 + 裁决（**第八张同型，不改生产代码**）
   - 已实证：`E1TabAdjustment.vue` 接 `useAdjustmentCentralSync` ⇒ 经后端 `AdjustmentSyncService`
     中央登记；`E1-adjustment-rows` 是 hub store；模板 26r×10c / 仅 7 公式
   - 待核：借贷平衡不变式是否仅 HTML 侧强制 / 有无行身份列

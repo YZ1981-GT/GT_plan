@@ -1,0 +1,61 @@
+{
+  "mode": "check",
+  "supply_rows": {
+    "working_paper_sync_definition_artifact": 179,
+    "working_paper_sync_definition_bundle": 88,
+    "working_paper_representation_upgrade_candidate": 1,
+    "working_paper_content_representation": 283
+  },
+  "entries": [
+    {
+      "target": {
+        "entry_id": "xlsx/gt-h2-construction-in-progress",
+        "contract_id": "h2.construction_in_progress_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_h2_construction_in_progress",
+        "wp_codes": [
+          "H2"
+        ],
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "10bbe52d-b604-410d-9c01-876087a8545f",
+        "wp_code": "H2",
+        "store_bytes": 0,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "stages": {
+        "authority_model": "would_create",
+        "bundle": "would_create",
+        "contract": "would_create",
+        "instrumentation": "would_create",
+        "template": "would_create"
+      },
+      "digests": {
+        "authority_model": "94968e0e0921d33b8c15f1d83186bb9bc375300d3479c4f94930d37b24c68366",
+        "bundle": "d5b6f6aff47a7d58e6be06b62afcc721836e9f3eaceba87266046ad0a43f1c03",
+        "contract": "54ac71557e8f4e41724ca9a926e754dbf7b4259ff1cfefcd456c4cccf1790e72",
+        "instrumentation": "ef0e27ca9a36bb5067034775a7a6cf0635474fddea149e23c04dcec4d72c4454",
+        "template": "16bf58e9288a9aabc0c878d736eb0bc0ab28c7fc52f1b017e294a2d7bde2d632"
+      },
+      "would_create": [
+        "authority_model",
+        "bundle",
+        "contract",
+        "instrumentation",
+        "template"
+      ],
+      "reused": [],
+      "representation": {
+        "settlement": "blocked",
+        "current_representation_id": null,
+        "current_definition_bundle_id": null,
+        "candidates_awaiting_contract": 0,
+        "candidate_bound_to_target_bundle": null,
+        "candidate_bound_state": null
+      },
+      "definition_bundle_sha256": "d5b6f6aff47a7d58e6be06b62afcc721836e9f3eaceba87266046ad0a43f1c03"
+    }
+  ],
+  "errors": [],
+  "would_create_total": 5
+}

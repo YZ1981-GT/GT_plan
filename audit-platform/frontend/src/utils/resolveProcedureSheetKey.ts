@@ -4,7 +4,7 @@
  * spec workpaper-h-fixed-assets-cycle H-F13（Task 3.6）
  * 原始实现：F-F13 Task 3.7（E1/D/F 路由）
  * G-investment-cycle G-F12 Task 3.5: 加 G 循环路由 G1→g1a / G4→g4a / G7→g7a
- * M-equity-cycle M-F5 Task 2.4: 加 M 循环路由 M2→m2a / M4→m4a / M5→m5a / M6→m6a / M9→m9a / M10→m10a
+ * M-equity-cycle M-F5 Task 2.4: 加 M 循环路由 M1→m1a / M2→m2a / M3→m3a / M4→m4a / M5→m5a / M6→m6a / M7→m7a / M8→m8a / M9→m9a / M10→m10a
  * N-tax-cycle N-F5 Task 2.5: 加 N 循环路由 N1→n1a / N2→n2a / N3→n3a / N4→n4a / N5→n5a
  *
  * 路由映射：
@@ -15,7 +15,7 @@
  * - I 循环：I1→i1a / I3→i3a / I4→i4a (后续按需扩展)
  * - J 循环：J1→j1a / J2→j2a / J3→j3a
  * - L 循环：L1→l1a / L3→l3a / L5→l5a / L8→l8a
- * - M 循环：M2→m2a / M4→m4a / M5→m5a / M6→m6a / M9→m9a / M10→m10a
+ * - M 循环：M1→m1a / M2→m2a / M3→m3a / M4→m4a / M5→m5a / M6→m6a / M7→m7a / M8→m8a / M9→m9a / M10→m10a
  * - N 循环：N1→n1a / N2→n2a / N3→n3a / N4→n4a / N5→n5a
  * - 默认：E1→e1a
  */
@@ -53,12 +53,16 @@ export function resolveProcedureSheetKey(wpCode: string): string {
   if (upper.startsWith('L3')) return 'l3a' // L3 长期借款
   if (upper.startsWith('L5')) return 'l5a' // L5 长期应付款
   if (upper.startsWith('L8')) return 'l8a' // L8 财务费用
-  // M 权益循环路由（M-F5: M2→m2a / M4→m4a / M5→m5a / M6→m6a / M9→m9a / M10→m10a）
+  // M 权益循环路由（M-F5: M10 必须在 M1 之前判断，避免 startsWith('M1') 误匹配 M10）
   if (upper.startsWith('M10')) return 'm10a' // M10 其他权益工具（必须在 M1 之前判断）
+  if (upper.startsWith('M1')) return 'm1a' // M1 应付股利（🔴 MC-28 补全：原缺失，fallthrough 到 e1a）
   if (upper.startsWith('M2')) return 'm2a' // M2 实收资本
+  if (upper.startsWith('M3')) return 'm3a' // M3 库存股（🔴 MC-28 补全）
   if (upper.startsWith('M4')) return 'm4a' // M4 资本公积
   if (upper.startsWith('M5')) return 'm5a' // M5 盈余公积
   if (upper.startsWith('M6')) return 'm6a' // M6 未分配利润
+  if (upper.startsWith('M7')) return 'm7a' // M7 专项储备（🔴 MC-28 补全）
+  if (upper.startsWith('M8')) return 'm8a' // M8 一般风险准备（🔴 MC-28 补全）
   if (upper.startsWith('M9')) return 'm9a' // M9 其他综合收益
   // N 税金循环路由（N-F5: N1→n1a / N2→n2a / N3→n3a / N4→n4a / N5→n5a）
   if (upper.startsWith('N1')) return 'n1a' // N1 递延所得税资产

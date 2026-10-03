@@ -158,6 +158,18 @@ async def auto_generate_draft_eliminations(
     trades = await get_trades(db, project_id, year)
     arap_list = await get_arap_list(db, project_id, year)
 
+    # 归属预填（spec consol-tree-three-code-autobuild 任务 8.4）：交易各方都在同一母公司的分公司闭包内
+    # ⇒ 预填该企业的母分差额，否则留空（本项目合并差额）。只是草稿默认值，审批前由审计师确认。
+    # 建树失败吞掉时必须在 SAVEPOINT 里：PG 语句失败会中止整个事务，后面的提交就等于回滚。
+    tree = None
+    try:
+        from app.services.consol_tree_service import build_tree
+
+        async with db.begin_nested():
+            tree = await build_tree(db, project_id)
+    except Exception as err:  # noqa: BLE001 - 建树失败不阻断草稿生成，归属留空
+        logger.warning("auto-elimination: build_tree 失败，归属预填留空 (project=%s): %s", project_id, err)
+
     # 同一次生成的草稿共享一个 entry_group_id，便于成组复核
     group_id = uuid4()
     created: list[EliminationEntry] = []
@@ -182,6 +194,12 @@ async def auto_generate_draft_eliminations(
         seq += 1
         entry_type = _RULE_TYPE_TO_ENTRY_TYPE[rule_type]
         account_code, account_name = _RULE_TYPE_TO_ACCOUNT[rule_type]
+        related = _collect_related_company_codes(rule_type, trades, arap_list)
+        branch_code = None
+        if tree is not None:
+            from app.services.consol_calc_basis import suggest_branch_entity
+
+            branch_code = suggest_branch_entity(tree, project_id, related)
 
         entry = EliminationEntry(
             id=uuid4(),
@@ -205,7 +223,8 @@ async def auto_generate_draft_eliminations(
                 }
             ],
             entry_group_id=group_id,
-            related_company_codes=_collect_related_company_codes(rule_type, trades, arap_list),
+            related_company_codes=related,
+            branch_entity_code=branch_code,
             is_continuous=False,
             # S3 / ADR-CONSOL-203：自动生成强制草稿，绝不直接 APPROVED
             review_status=ReviewStatusEnum.draft,

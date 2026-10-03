@@ -78,8 +78,9 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
     // 触发路径：有续表的章节里改一次单元格 → 依赖变化 → 重算 → 列重复。
     // 故这里对参与合并的表做**逐层拷贝**（表壳 + headers 数组 + 每行 + 每行 values），
     // 合并只发生在副本上，源数据只读。
-    const cloneTable = (t: any) => ({
+    const cloneTable = (t: any, sourceIndex: number) => ({
       ...t,
+      _sourceTableIndexes: [sourceIndex],
       headers: Array.isArray(t?.headers) ? [...t.headers] : t?.headers,
       rows: Array.isArray(t?.rows)
         ? t.rows.map((r: any) => ({
@@ -98,7 +99,7 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
       if (isContinuation && merged.length > 0) {
         // 有独立列定义（_column_groups 或 columns）的续表不合并——它是完整独立子表
         if (t._column_groups || (t.columns && Array.isArray(t.columns) && t.columns.length > 0)) {
-          merged.push(cloneTable(t))
+          merged.push(cloneTable(t, i))
           continue
         }
         // 找到对应主表（续表名通常含主表名前缀）
@@ -110,7 +111,7 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
           if (matchIdx >= 0) prevIdx = matchIdx
           else {
             // 找不到对应主表，作为独立 tab 保留不合并
-            merged.push(cloneTable(t))
+            merged.push(cloneTable(t, i))
             continue
           }
         }
@@ -136,12 +137,37 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
           if (ri >= prevRows.length) prevRows.push(prevRow)
         }
         prev.rows = prevRows
+        prev._sourceTableIndexes = Array.from(new Set([
+          ...(Array.isArray(prev._sourceTableIndexes) ? prev._sourceTableIndexes : []),
+          i,
+        ]))
       } else {
-        merged.push(cloneTable(t))
+        merged.push(cloneTable(t, i))
       }
     }
     return merged
   })
+
+  /**
+   * 把后端/URL 使用的原始 table_index 映射到投影后的 el-tabs 下标。
+   * 续表合并后多个源下标可能共同指向同一张投影表；所有非法值统一回退第 0 张。
+   */
+  const resolveProjectedTableIndex = (tableIndex: unknown): number => {
+    let sourceIndex: number
+    if (typeof tableIndex === 'number') {
+      sourceIndex = tableIndex
+    } else if (typeof tableIndex === 'string' && tableIndex.trim()) {
+      sourceIndex = Number(tableIndex)
+    } else {
+      return 0
+    }
+    if (!Number.isInteger(sourceIndex) || sourceIndex < 0) return 0
+
+    const projectedIndex = currentNoteTables.value.findIndex((table) =>
+      Array.isArray(table?._sourceTableIndexes) && table._sourceTableIndexes.includes(sourceIndex),
+    )
+    return projectedIndex >= 0 ? projectedIndex : 0
+  }
 
   const activeTableData = computed<any>(() => {
     const idx = parseInt(activeTableTab.value) || 0
@@ -192,5 +218,11 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
     return result
   })
 
-  return { activeTableTab, currentNoteTables, activeTableData, activeTableColumns }
+  return {
+    activeTableTab,
+    currentNoteTables,
+    activeTableData,
+    activeTableColumns,
+    resolveProjectedTableIndex,
+  }
 }

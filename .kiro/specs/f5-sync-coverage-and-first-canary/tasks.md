@@ -2,7 +2,7 @@
 
 ## Overview
 
-**spec**：`f5-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**8/22 已实施**（2026-09-26）
+**spec**：`f5-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**12/22 已实施**（2026-10-03 复盘修正，原 8/22 偏低）
 **上游**：umbrella Task 48 · FC-1~FC-13（`f1-sync-coverage-and-first-canary/design.md`）· D1 引擎 ·
 F2 spec（模板缺陷走覆盖层的先例 F2-26!J9）· F3 spec（FC-11 工具链根因 + FC-5 例外的裁决结构）· E1-2（预填行范式）
 

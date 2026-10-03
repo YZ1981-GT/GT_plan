@@ -6,6 +6,12 @@ prepare/apply/restore/read_versions 四个操作。
 
 locator 结构: {"wp_id": str(uuid), "item": str(item_id), "cell": str(json_path)}
 version 策略: 使用 row updated_at ISO 字符串作为 CAS 版本标识。
+
+cell 取值：
+- ``"."`` / ``"key.sub"`` —— remark 是 JSON 文档，按路径读写（写 ``"."`` 时整份 ``json.dumps``）。
+- :data:`RAW_CELL` (``"@raw"``) —— remark 是**原文**（底稿前端大量键存纯文本数字 ``376.73``、
+  行 JSON 由前端 ``JSON.stringify`` 生成）：读返回原字符串，写把字符串原样落库（``None`` → 空串）。
+  用 ``"."`` 写这类键会把 ``"376.73"`` 再编码成 ``"\\"376.73\\""``、把空值写成 ``""`` 两个引号。
 """
 
 from __future__ import annotations
@@ -14,7 +20,7 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,8 +65,18 @@ def _version_from_timestamp(ts: datetime | str | None) -> str:
     if ts is None:
         return "__none__"
     if isinstance(ts, str):
-        return ts
+        # SQLite 以 `str(datetime)`（空格分隔）存储，PG 返回 datetime ⇒ 两者 isoformat
+        # 形态不同。归一为 datetime.isoformat()，使 apply 写入的版本号与随后读回的版本号
+        # 在两种方言下逐字相等（CAS 判据的前提）。无法解析时原样返回（不臆造版本）。
+        try:
+            return datetime.fromisoformat(ts).isoformat()
+        except ValueError:
+            return ts
     return ts.isoformat()
+
+
+#: remark 原文模式（见模块 docstring）
+RAW_CELL = "@raw"
 
 
 def _cell_read(remark_json: str | None, cell: str) -> Any:
@@ -70,7 +86,10 @@ def _cell_read(remark_json: str | None, cell: str) -> Any:
     - "." 表示整个 remark 值
     - "key" 表示顶层 key
     - "key.sub" 表示嵌套路径
+    - "@raw" 表示 remark 原文（不做 JSON 解析）
     """
+    if cell == RAW_CELL:
+        return remark_json
     if remark_json is None:
         return None
     try:
@@ -91,6 +110,12 @@ def _cell_read(remark_json: str | None, cell: str) -> Any:
 
 def _cell_write(remark_json: str | None, cell: str, value: Any) -> str:
     """向 remark JSON 中按 cell (json path) 写入值，返回新 JSON 字符串。"""
+    if cell == RAW_CELL:
+        if value is None:
+            return ""
+        if not isinstance(value, str):
+            raise TypeError(f"{RAW_CELL} 只接受字符串（调用方负责格式化），收到 {type(value).__name__}")
+        return value
     if remark_json is None or remark_json == "":
         data: Any = {}
     else:
@@ -222,18 +247,29 @@ class WorkpaperMutationAdapter:
             new_remark = _cell_write(remark, cell, mutation.after_value)
 
             # UPSERT
+            # 🔴 修复前只写 (wp_id, item_id, remark, updated_at)：真库 `project_id NOT NULL`
+            #    无默认 ⇒ 新行与冲突行（PG 对 INSERT 先校验 NOT NULL 再判冲突）两种情况都抛
+            #    NotNullViolation；`updated_at` 传 isoformat 字符串，asyncpg 对 timestamptz
+            #    严格拒收 str。单测建表 project_id 可空 ⇒ 长期假绿。
+            #    id 显式生成（不依赖 PG 默认值，SQLite 同样成立）；content_version 按 V161
+            #    「每次成功写入 +1」语义推进。
             await self._session.execute(
                 text(
-                    "INSERT INTO checklist_responses (wp_id, item_id, remark, updated_at) "
-                    "VALUES (:wp_id, :item_id, :remark, :updated_at) "
+                    "INSERT INTO checklist_responses "
+                    "(id, project_id, wp_id, item_id, remark, created_at, updated_at, content_version) "
+                    "VALUES (:id, :project_id, :wp_id, :item_id, :remark, :created_at, :updated_at, 1) "
                     "ON CONFLICT (wp_id, item_id) DO UPDATE "
-                    "SET remark = :remark, updated_at = :updated_at"
+                    "SET remark = EXCLUDED.remark, updated_at = EXCLUDED.updated_at, "
+                    "content_version = checklist_responses.content_version + 1"
                 ),
                 {
+                    "id": str(uuid4()),
+                    "project_id": str(mutation.target.project_id),
                     "wp_id": str(wp_id),
                     "item_id": item_id,
                     "remark": new_remark,
-                    "updated_at": now.isoformat(),
+                    "created_at": now,
+                    "updated_at": now,
                 },
             )
             await self._session.flush()
@@ -294,14 +330,15 @@ class WorkpaperMutationAdapter:
             await self._session.execute(
                 text(
                     "UPDATE checklist_responses "
-                    "SET remark = :remark, updated_at = :updated_at "
+                    "SET remark = :remark, updated_at = :updated_at, "
+                    "content_version = content_version + 1 "
                     "WHERE wp_id = :wp_id AND item_id = :item_id"
                 ),
                 {
                     "wp_id": str(wp_id),
                     "item_id": item_id,
                     "remark": new_remark,
-                    "updated_at": now.isoformat(),
+                    "updated_at": now,
                 },
             )
             await self._session.flush()

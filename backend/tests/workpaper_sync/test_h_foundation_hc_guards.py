@@ -64,12 +64,34 @@ class TestHfP1ManifestCapability:
         assert entry is not None, f"{entry_id} 不在 manifest 里"
         assert str(entry.get("document_type")) == "xlsx"
         assert entry.get("independent_entry") is True
-        # 🔴 实测值是 single_onlyoffice —— slice 记的 `capability=null` 不是 manifest 字段值
-        assert str(entry.get("capability")) == "single_onlyoffice"
-        # 🔴 `capability_target` 字段**不存在**（读取返 None）；缺省不得当 bidirectional
+        # 🔴 **2026-10-01 翻面**：原断言 `capability == 'single_onlyoffice'` 与
+        #    `adapter_id is None`。九条 entry 已按六项前置翻为 bidirectional
+        #    （commit `33e2a049b`，审计见 foundation spec 文末），继续要求迁移前的值
+        #    就是要求成果不许存在。翻面后断言迁移后四项齐备，门被关回去会红。
+        assert str(entry.get("capability")) == "bidirectional", (
+            f"{entry_id}: capability={entry.get('capability')!r} —— 正向门被关回去了"
+        )
+        assert entry.get("adapter_id"), f"{entry_id}: adapter_id 为空"
+        assert str(entry.get("migration_state")) == "adapter_registered", (
+            f"{entry_id}: migration_state={entry.get('migration_state')!r}"
+        )
+        assert (
+            str(entry.get("canonical_resolver")) == "workpaper_sync_published_representation"
+        ), f"{entry_id}: canonical_resolver={entry.get('canonical_resolver')!r} 仍是 legacy 路由"
+        assert str(entry.get("html_store")) != "unresolved", (
+            f"{entry_id}: html_store 仍是 unresolved ⇒ 翻了 capability 却没裁决 store"
+        )
+        # 🔴 `capability_target` 字段**仍然不存在**（读取返 None）—— 这条与翻门无关，
+        #    它防的是「把缺省当 bidirectional」，保留。
         assert entry.get("capability_target") is None
-        assert entry.get("adapter_id") is None
-        assert len(entry.get("mounts") or ()) == 2
+        # 🔴 mounts 数**不再写死 2**：并发会话的 spec
+        #    `sync-editor-host-discovery-contract-closure` 让发现器纳入
+        #    `WorkpaperSyncEditorHost`，同一宿主的挂点数会从 2 变 3（legacy OO + 同步载体 +
+        #    目录页）。写死 2 会在那条 spec 落地时整列打红，而那不是缺陷。
+        #    真正要守的是「至少有 legacy 与同步两个挂点、不是单挂点」。
+        assert len(entry.get("mounts") or ()) >= 2, (
+            f"{entry_id}: 挂点数 {len(entry.get('mounts') or ())} < 2 ⇒ 宿主退化成单挂点"
+        )
         profile = (entry.get("scenario_profile") or {}).get("profile_id")
         assert profile == "xlsx.editable.shared.single.room_service_wired.v1"
 

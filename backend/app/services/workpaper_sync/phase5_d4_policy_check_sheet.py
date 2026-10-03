@@ -107,11 +107,12 @@ def mapping_digest_payload_d45() -> dict[str, Any]:
     # 直接读 T09 文件保证锁死
     from pathlib import Path
 
-    evidence = (
-        Path(__file__).resolve().parents[4]
-        / ".kiro/specs/d-cycle-sheet-bidirectional-expansion/evidence"
-        / "T09-d45-block-field-mapping.json"
-    )
+    _spec_root = Path(__file__).resolve().parents[4] / ".kiro/specs"
+    # 归档前路径
+    evidence = _spec_root / "d-cycle-sheet-bidirectional-expansion" / "evidence" / "T09-d45-block-field-mapping.json"
+    if not evidence.exists():
+        # 归档后路径
+        evidence = _spec_root / "_archive/17-2026-10-03-verified-batch/d-cycle-sheet-bidirectional-expansion/evidence/T09-d45-block-field-mapping.json"
     raw = json.loads(evidence.read_text(encoding="utf-8"))
     return raw["digest_payload"]
 

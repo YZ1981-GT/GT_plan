@@ -121,6 +121,7 @@ import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules, UploadFile, UploadUserFile } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { getAuthHeaders } from '@/utils/authToken'
 import AuditContextHeader from './dialogs/AuditContextHeader.vue'
 import { confirmLeave } from '@/utils/confirm'
 import { handleApiError } from '@/utils/errorHandler'
@@ -175,10 +176,8 @@ const formRules: FormRules = {
 const uploadAction = computed(() =>
   `/api/projects/${props.projectId}/attachments/upload`
 )
-const uploadHeaders = computed(() => {
-  const token = localStorage.getItem('token') || ''
-  return { Authorization: `Bearer ${token}` }
-})
+// el-upload 原生上传不经 http 拦截器：鉴权头必须走 authToken 单一入口（旧读 localStorage 恒空 → 401）
+const uploadHeaders = computed(() => getAuthHeaders())
 
 function onUploadSuccess(response: any, _file: UploadFile) {
   if (response?.id) {

@@ -1,6 +1,8 @@
 import { ref, type ComputedRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getReportExcelUrl, type ReportRow } from '@/services/auditPlatformApi'
+import { reports as reportPaths } from '@/services/apiPaths/report'
+import { downloadFile } from '@/utils/http'
 
 // ─── Interfaces ─────────────────────────────────────────────────────────────
 
@@ -42,16 +44,24 @@ export function useReportExport(options: UseReportExportOptions): UseReportExpor
   }
 
   function onExportAllExcel() {
-    import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
-      const url = `/api/reports/${projectId.value}/${year.value}/export`
-      downloadFileAsBlob(url, `全部报表_已审_${year.value}.xlsx`)
+    void downloadFile(reportPaths.exportAllExcel(projectId.value), {
+      method: 'post',
+      data: {
+        year: year.value,
+        mode: 'audited',
+      },
+      fileName: `全部报表_已审_${year.value}.xlsx`,
     })
   }
 
   function onExportAllUnadjusted() {
-    import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
-      const url = `/api/reports/${projectId.value}/${year.value}/export?mode=unadjusted`
-      downloadFileAsBlob(url, `全部报表_未审_${year.value}.xlsx`)
+    void downloadFile(reportPaths.exportAllExcel(projectId.value), {
+      method: 'post',
+      data: {
+        year: year.value,
+        mode: 'unadjusted',
+      },
+      fileName: `全部报表_未审_${year.value}.xlsx`,
     })
   }
 

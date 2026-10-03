@@ -2347,6 +2347,17 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "GRP-01 + redeemable + literal_sheet_name。"
             "adapter_registered=False：同其他循环卡 BP-1~BP-5 平台级缺口"
             "（无真 OO 9.4 roundtrip 与人工审核均未完成）。"
+            "🔴 **2026-09 更新（spec workpaper-sync-pure-static-lane-and-combined-"
+            "workbook-resolution）**：纯静态 instrumentation 通道已上提为平台一等通道 —— "
+            "6 处平台阻塞全部处置（3 处旁路 + 3 处加分派臂，放宽既有校验 0 处），"
+            "静态注入器 / 静态 payload 构建器 / substrate 第三臂 / 身份 binding 静态臂 / "
+            "观测清册静态形态均已落地，digest 不变式逐位成立。"
+            "⇒ 本字段**仍保持 False**，唯一未完成的前置是**真栈往返**"
+            "（后端 9980 + 前端 3030 + `audit-onlyoffice` healthy + Playwright MCP 四项齐备，"
+            "HTML 改→同步 OO→OO 改→回读 HTML 四步缺一不可）。"
+            "现算环境：后端 9980 与 `audit-onlyoffice` 在位，**前端 3030 未起** ⇒ "
+            "往返「待环境」，措辞按项目铁律记作「代码已改但未实测」。"
+            "**禁**先翻本字段再补实测（那是假绿）。"
         ),
     },
     # ── C 循环 canary（spec: c-cycle-sync-foundation-and-first-canary · Task 22/23）──
@@ -2459,339 +2470,186 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "这个治理动作，不在平台供给。"
         ),
     },
-    # ── K1-9 坏账准备转回/核销同 sheet 双区（lane 1 Task 12）──────────
+    # ── K/L/N 批量 provision（2026-10-03）──────────────────────────
     {
         "contract_id": "k1.baddebt_reversal_writeoff_check",
         "provider_module": "app.services.workpaper_sync.phase5_k1_baddebt_reversal_writeoff",
-        "delivered_by_task": "k1-k7-inlined-iife-hosts-and-orphan-cleanup-task-12",
-        "pilot_class": "k1_baddebt_reversal_writeoff_check",
+        "delivered_by_task": "batch-provision-2026-10-03",
+        "pilot_class": "phase5",
         "entry_id": "xlsx/gt-k1-other-receivables",
         "document_type": "xlsx",
         "authority_model": "projection_contract",
-        "template_relative_path": "K/K1 其他应收款.xlsx",
+        "template_relative_path": "K/K1 坏账准备核销及收回检查表.xlsx",
         "adapter_registered": False,
-        "reason": (
-            "K1-9 的 `K1-9-writeoff` 是 dict store：`tables.reversal` / `tables.writeoff` 两个动态区"
-            "共用同一 sheet；两区字段与金额列不同，分别声明 spec，并以 I/J 独立 UUID 列驱动兄弟区位移。"
-            "OO→HTML 走 dedicated merge，保留 auditProcedures/auditNote/conclusion/conclusionOption。"
-            "adapter_registered 仅在首版 representation 真发布并翻 overlay 后改 True。"
-        ),
+        "reason": "批量 provision（2026-10-03）。definition 链由 task76 --apply 写入。",
     },
-    # ── K 循环调整分录汇总六条（spec: k-cycle-sync-foundation-and-first-canary ·
-    #    k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub）──────────
     {
         "contract_id": "k8.selling_expenses_adjustment",
         "provider_module": "app.services.workpaper_sync.phase5_k8_selling_expenses",
-        "delivered_by_task": "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub-task-18",
-        "pilot_class": "k8_adjustment_summary",
+        "delivered_by_task": "batch-provision-2026-10-03",
+        "pilot_class": "phase5",
         "entry_id": "xlsx/gt-k8-selling-expenses",
         "document_type": "xlsx",
         "authority_model": "projection_contract",
-        "template_relative_path": "K/K8 销售费用.xlsx",
+        "template_relative_path": "K/K8 销售费用调整核查表.xlsx",
         "adapter_registered": False,
-        "reason": (
-            "K 循环「调整分录汇总K8-3」真双向。受管表 = `调整分录汇总K8-3`，store = "
-            "`K8-3-adj-entries`（remark JSON 行数组，行身份 `id`）。六册模板层同构（单级表头 R5 十列 A..J、"
-            "数据区纯空白、footer 为合并「提示：」文字不承载 SUM、UUID 载体取现成空列 K），"
-            "共享内核 `phase5_k_adjustment_summary`，本模块只持身份常量。"
-            "`adapter_registered=False` 是**顺序**：发布链 definitions/bundle 与首版 "
-            "representation 由 `fix_task76_provision_projection_definitions.py` / "
-            "`fix_projection_first_publication.py` 写库，再由 reviewed overlay 翻 capability。"
-        ),
+        "reason": "批量 provision（2026-10-03）。definition 链由 task76 --apply 写入。",
     },
     {
         "contract_id": "k9.admin_expenses_adjustment",
         "provider_module": "app.services.workpaper_sync.phase5_k9_admin_expenses",
-        "delivered_by_task": "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub-task-18",
-        "pilot_class": "k9_adjustment_summary",
+        "delivered_by_task": "batch-provision-2026-10-03",
+        "pilot_class": "phase5",
         "entry_id": "xlsx/gt-k9-admin-expenses",
         "document_type": "xlsx",
         "authority_model": "projection_contract",
-        "template_relative_path": "K/K9 管理费用.xlsx",
+        "template_relative_path": "K/K9 管理费用调整核查表.xlsx",
         "adapter_registered": False,
-        "reason": (
-            "K 循环「调整分录汇总K9-3」真双向。受管表 = `调整分录汇总K9-3`，store = "
-            "`K9-3-adj-entries`（remark JSON 行数组，行身份 `id`）。六册模板层同构（单级表头 R5 十列 A..J、"
-            "数据区纯空白、footer 为合并「提示：」文字不承载 SUM、UUID 载体取现成空列 K），"
-            "共享内核 `phase5_k_adjustment_summary`，本模块只持身份常量。"
-            "`adapter_registered=False` 是**顺序**：发布链 definitions/bundle 与首版 "
-            "representation 由 `fix_task76_provision_projection_definitions.py` / "
-            "`fix_projection_first_publication.py` 写库，再由 reviewed overlay 翻 capability。"
-        ),
+        "reason": "批量 provision（2026-10-03）。definition 链由 task76 --apply 写入。",
     },
     {
         "contract_id": "k10.other_income_adjustment",
         "provider_module": "app.services.workpaper_sync.phase5_k10_other_income",
-        "delivered_by_task": "k-cycle-sync-foundation-and-first-canary-task-22",
-        "pilot_class": "k10_adjustment_summary",
+        "delivered_by_task": "batch-provision-2026-10-03",
+        "pilot_class": "phase5",
         "entry_id": "xlsx/gt-k10-other-income",
         "document_type": "xlsx",
         "authority_model": "projection_contract",
-        "template_relative_path": "K/K10 其他收益.xlsx",
+        "template_relative_path": "K/K10 其他收益调整核查表.xlsx",
         "adapter_registered": False,
-        "reason": (
-            "K 循环「调整分录汇总K10-3」真双向。受管表 = `调整分录汇总K10-3`，store = "
-            "`K10-3-entries`（remark JSON 行数组，行身份 `id`）。六册模板层同构（单级表头 R5 十列 A..J、"
-            "数据区纯空白、footer 为合并「提示：」文字不承载 SUM、UUID 载体取现成空列 K），"
-            "共享内核 `phase5_k_adjustment_summary`，本模块只持身份常量。"
-            "`adapter_registered=False` 是**顺序**：发布链 definitions/bundle 与首版 "
-            "representation 由 `fix_task76_provision_projection_definitions.py` / "
-            "`fix_projection_first_publication.py` 写库，再由 reviewed overlay 翻 capability。"
-        ),
+        "reason": "批量 provision（2026-10-03）。definition 链由 task76 --apply 写入。",
     },
     {
         "contract_id": "k11.asset_impairment_loss_adjustment",
         "provider_module": "app.services.workpaper_sync.phase5_k11_asset_impairment_loss",
-        "delivered_by_task": "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub-task-18",
-        "pilot_class": "k11_adjustment_summary",
+        "delivered_by_task": "batch-provision-2026-10-03",
+        "pilot_class": "phase5",
         "entry_id": "xlsx/gt-k11-asset-impairment-loss",
         "document_type": "xlsx",
         "authority_model": "projection_contract",
-        "template_relative_path": "K/K11 资产减值损失.xlsx",
+        "template_relative_path": "K/K11 资产减值损失调整核查表.xlsx",
         "adapter_registered": False,
-        "reason": (
-            "K 循环「调整分录汇总K11-3」真双向。受管表 = `调整分录汇总K11-3`，store = "
-            "`K11-3-adj-entries`（remark JSON 行数组，行身份 `id`）。六册模板层同构（单级表头 R5 十列 A..J、"
-            "数据区纯空白、footer 为合并「提示：」文字不承载 SUM、UUID 载体取现成空列 K），"
-            "共享内核 `phase5_k_adjustment_summary`，本模块只持身份常量。"
-            "`adapter_registered=False` 是**顺序**：发布链 definitions/bundle 与首版 "
-            "representation 由 `fix_task76_provision_projection_definitions.py` / "
-            "`fix_projection_first_publication.py` 写库，再由 reviewed overlay 翻 capability。"
-        ),
+        "reason": "批量 provision（2026-10-03）。definition 链由 task76 --apply 写入。",
     },
     {
         "contract_id": "k12.non_operating_income_adjustment",
         "provider_module": "app.services.workpaper_sync.phase5_k12_non_operating_income",
-        "delivered_by_task": "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub-task-18",
-        "pilot_class": "k12_adjustment_summary",
+        "delivered_by_task": "batch-provision-2026-10-03",
+        "pilot_class": "phase5",
         "entry_id": "xlsx/gt-k12-non-operating-income",
         "document_type": "xlsx",
         "authority_model": "projection_contract",
-        "template_relative_path": "K/K12 营业外收入.xlsx",
+        "template_relative_path": "K/K12 营业外收入调整核查表.xlsx",
         "adapter_registered": False,
-        "reason": (
-            "K 循环「调整分录汇总K12-3」真双向。受管表 = `调整分录汇总K12-3`，store = "
-            "`K12-3-rows`（remark JSON 行数组，行身份 `id`）。六册模板层同构（单级表头 R5 十列 A..J、"
-            "数据区纯空白、footer 为合并「提示：」文字不承载 SUM、UUID 载体取现成空列 K），"
-            "共享内核 `phase5_k_adjustment_summary`，本模块只持身份常量。"
-            "`adapter_registered=False` 是**顺序**：发布链 definitions/bundle 与首版 "
-            "representation 由 `fix_task76_provision_projection_definitions.py` / "
-            "`fix_projection_first_publication.py` 写库，再由 reviewed overlay 翻 capability。"
-        ),
+        "reason": "批量 provision（2026-10-03）。definition 链由 task76 --apply 写入。",
     },
     {
         "contract_id": "k13.non_operating_expense_adjustment",
         "provider_module": "app.services.workpaper_sync.phase5_k13_non_operating_expense",
-        "delivered_by_task": "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub-task-18",
-        "pilot_class": "k13_adjustment_summary",
+        "delivered_by_task": "batch-provision-2026-10-03",
+        "pilot_class": "phase5",
         "entry_id": "xlsx/gt-k13-non-operating-expense",
         "document_type": "xlsx",
         "authority_model": "projection_contract",
-        "template_relative_path": "K/K13 营业外支出.xlsx",
+        "template_relative_path": "K/K13 营业外支出调整核查表.xlsx",
         "adapter_registered": False,
-        "reason": (
-            "K 循环「调整分录汇总K13-3」真双向。受管表 = `调整分录汇总K13-3`，store = "
-            "`K13-3-adj-entries`（remark JSON 行数组，行身份 `id`）。六册模板层同构（单级表头 R5 十列 A..J、"
-            "数据区纯空白、footer 为合并「提示：」文字不承载 SUM、UUID 载体取现成空列 K），"
-            "共享内核 `phase5_k_adjustment_summary`，本模块只持身份常量。"
-            "`adapter_registered=False` 是**顺序**：发布链 definitions/bundle 与首版 "
-            "representation 由 `fix_task76_provision_projection_definitions.py` / "
-            "`fix_projection_first_publication.py` 写库，再由 reviewed overlay 翻 capability。"
-        ),
+        "reason": "批量 provision（2026-10-03）。definition 链由 task76 --apply 写入。",
     },
-    # ── L 循环第二条（spec: l-cycle-true-adapter-registration · Task 12）────────────
-    {
-        "contract_id": "l4.bonds_payable",
-        "provider_module": "app.services.workpaper_sync.phase5_l4_bonds_payable",
-        "delivered_by_task": "l-cycle-true-adapter-registration-task-12",
-        "pilot_class": "l_cycle_bonds_payable",
-        "entry_id": "xlsx/gt-l4-bonds-payable",
-        "document_type": "xlsx",
-        "authority_model": "projection_contract",
-        "template_relative_path": "L/L4 应付债券.xlsx",
-        "adapter_registered": False,
-        "reason": (
-            "L 循环第二条真双向 entry，首条走 `phase5_l_cycle_common` 骨架（task 11）。"
-            "受管表 = `划分为金融负债的其他金融工具明细表L4-3`（选型逐张排除见 "
-            "`phase5_l4_sheets` docstring：L4-1 派生汇总 / L4-2 双段带小计需多段引擎 / "
-            "L4-7·L4-8 BP-8 同尾码且为计算排程 / L4-4 与调整分录模块重复）。"
-            "几何：三级表头 r10/r11/r12（header_rows=3）· 数据 r13~r17 · footer **A18**「合计」· "
-            "38 字段（10 标量 + 14 对数量/金额）· R/S/AF~AM 十列逐行公式进 formula_mask · "
-            "UUID 列 AO（max_column=40 +1）· 册内零 definedName、零 Excel Table。"
-            "store = `L4-3-rows`（remark JSON 行数组，稳定 `rowId`），🔴 取代位置化旧键 "
-            "`L4-3-row-{index+1}-data`（lane spec task 18 标 [x] 而未改）；真库旧键 0 行。"
-            "旧候选契约 `l4.bonds_payable.candidate.json` 无任何 sheet/field，已由本 reviewed "
-            "契约取代并删除；其 BP-8 route A 裁决原样继承进 `review.bp8_sheet_granularity_collapse`。"
-            "`adapter_registered=False` 是**顺序**：五环发布与 manifest 翻转随后执行。"
-        ),
-    },
-    # ── L 循环第三条（spec: l-cycle-true-adapter-registration · Task 12）────────────
-    {
-        "contract_id": "l3.long_term_loans",
-        "provider_module": "app.services.workpaper_sync.phase5_l3_long_term_loans",
-        "delivered_by_task": "l-cycle-true-adapter-registration-task-12",
-        "pilot_class": "l_cycle_long_term_loans",
-        "entry_id": "xlsx/gt-l3-long-term-loans",
-        "document_type": "xlsx",
-        "authority_model": "projection_contract",
-        "template_relative_path": "L/L3 长期借款.xlsx",
-        "adapter_registered": False,
-        "reason": (
-            "L 循环第三条，受管 `长期借款检查表L3-9`：前端/模板字段 16/16 对齐、数据 r12~r20、"
-            "footer A21、数据区零公式、UUID AI；store `L3-L3-9-voucher-rows` 已是稳定 rowId JSON。"
-            "只把私有生成器收敛到共享 newRowIdentity，criteria/note/conclusion 不预登记。"
-            "L3-1 派生汇总、L3-2 分组复杂、L3-7 有 4 个 #REF! 均不选。"
-            "册内 38 definedName（31 broken）与 L3-7 的 4 个 #REF! 只登记不改。"
-            "`adapter_registered=False` 是顺序：五环发布后再翻 manifest。"
-        ),
-    },
-    # ── L 循环第四条（spec: l-cycle-true-adapter-registration · Task 12 最后一条）──
     {
         "contract_id": "l2.interest_payable",
         "provider_module": "app.services.workpaper_sync.phase5_l2_interest_payable",
-        "delivered_by_task": "l-cycle-true-adapter-registration-task-12",
-        "pilot_class": "l_cycle_interest_payable",
+        "delivered_by_task": "batch-provision-2026-10-03",
+        "pilot_class": "phase5",
         "entry_id": "xlsx/gt-l2-interest-payable",
         "document_type": "xlsx",
         "authority_model": "projection_contract",
         "template_relative_path": "L/L2 应付利息.xlsx",
         "adapter_registered": False,
-        "reason": (
-            "L 循环第四条（task 12 最后一条），受管 `应付利息检查表L2-4`：L3-9 的孪生凭证检查表。"
-            "前端/模板字段 16/16 对齐、两级表头 r10/r11、数据 r12~r23（12 行，比 L3-9 多 3 行）、"
-            "footer A24、数据区零公式、UUID T（有效列 P / 物理 max_column S）；"
-            "r25/r26 是引用 L2-2 的本期发生额/检查比例派生行，声明只读、不入受管区。"
-            "store `L2-L2-4-voucher-rows` 已是稳定 rowId JSON，只把私有 vc- 生成器收敛到"
-            "共享 newRowIdentity('l24vc')；criteria/note/conclusion 不预登记。"
-            "审定表 L2-1 派生汇总、明细表 L2-2 被检查比例跨 sheet 引用、调整分录 L2-3 与调整分录"
-            "模块重复，均不选。册内 0 definedName / 0 external rels / 112 裸 IF（受管表零命中，"
-            "per-file 中性化仍挂）。`adapter_registered=False` 是顺序：五环发布后再翻 manifest。"
-        ),
+        "reason": "批量 provision（2026-10-03）。definition 链由 task76 --apply 写入。",
     },
-    # ── L 循环第五条（spec: l7-true-bidirectional-2026-10-01）────────────────────────
     {
-        "contract_id": "l7.other_noncurrent_liabilities",
-        "provider_module": "app.services.workpaper_sync.phase5_l7_other_noncurrent_liabilities",
-        "delivered_by_task": "l7-true-bidirectional-2026-10-01-task-3",
-        "pilot_class": "l_cycle_other_noncurrent_liabilities",
-        "entry_id": "xlsx/gt-l7-other-noncurrent-liabilities",
+        "contract_id": "l3.long_term_loans",
+        "provider_module": "app.services.workpaper_sync.phase5_l3_long_term_loans",
+        "delivered_by_task": "batch-provision-2026-10-03",
+        "pilot_class": "phase5",
+        "entry_id": "xlsx/gt-l3-long-term-loans",
         "document_type": "xlsx",
         "authority_model": "projection_contract",
-        "template_relative_path": "L/L7 其他非流动负债.xlsx",
+        "template_relative_path": "L/L3 长期借款.xlsx",
         "adapter_registered": False,
-        "reason": (
-            "L 循环第五条（spec l7-true-bidirectional），受管 `明细表L7-2`：L7 整册唯一的数据录入源"
-            "（审定表 L7-1 / 两张附注 / 检查表 L7-4 全部跨 sheet 引用它），HTML 子组件 L7TabDetail.vue "
-            "是其忠实渲染（27 列语义逐列对齐、行动态、公式一致、持久化已是单 item JSON 数组 "
-            "`L7-L7-2-full-data`）。两级表头 r10/r11、数据区 r12~r16（5 行）、footer A17「合计」"
-            "（B17~O17 连续 =SUM）、A..R 18 字段与前端 L7DetailRow 18/18 对齐；五个公式列 "
-            "E=B+C-D / L=B+F+G / M=C+H+J / N=D+I+K / O=L+M-N（负债口径），OO 侧不得被值覆盖；"
-            "UUID 列 AB（物理 max_column=AA）。store 已改稳定 rowId（私有 Date.now+Math.random "
-            "生成器收敛到共享 newRowIdentity('l72det')，已有 rowId 优先不重铸）；sibling "
-            "L7-L7-2-rows / -row-N-end_balance 不预登记。审定表 L7-1 是 R7~R11 全跨 sheet 公式的"
-            "下游视图（非录入表），不选 canary。受管表零裸 IF / 零 #REF!，整册裸 IF 仅 审定表L7-1 "
-            "6 格（per-file 中性化照挂）。真库 `L7-L7-2-%` 现算 0 行，零迁移负担。"
-            "`adapter_registered=False` 是顺序：五环发布后再翻 manifest。"
-        ),
+        "reason": "批量 provision（2026-10-03）。definition 链由 task76 --apply 写入。",
     },
-    # ── L 循环第六条（spec: l6-true-bidirectional-2026-10-01）────────────────────────
     {
-        "contract_id": "l6.special_payables",
-        "provider_module": "app.services.workpaper_sync.phase5_l6_special_payables",
-        "delivered_by_task": "l6-true-bidirectional-2026-10-01-task-3",
-        "pilot_class": "l_cycle_special_payables",
-        "entry_id": "xlsx/gt-l6-special-payables",
+        "contract_id": "l4.bonds_payable",
+        "provider_module": "app.services.workpaper_sync.phase5_l4_bonds_payable",
+        "delivered_by_task": "batch-provision-2026-10-03",
+        "pilot_class": "phase5",
+        "entry_id": "xlsx/gt-l4-bonds-payable",
         "document_type": "xlsx",
         "authority_model": "projection_contract",
-        "template_relative_path": "L/L6 专项应付款.xlsx",
+        "template_relative_path": "L/L4 应付债券.xlsx",
         "adapter_registered": False,
-        "reason": (
-            "L 循环第六条（spec l6-true-bidirectional），受管 `明细表L6-2`（科目 2711 专项应付款）："
-            "L6 整册唯一的数据录入源（审定表 L6-1 / 两张附注 / 检查表 L6-4 全部跨 sheet 引用它），"
-            "HTML 子组件 L6TabDetail.vue 是其忠实渲染（24 有效业务列 A~X 语义逐列对齐、行动态、"
-            "公式一致、持久化已是单 item JSON 数组 `L6-L6-2-rows`，非 L7 的 -full-data）。两级表头 "
-            "r8/r9、数据区 r10~r19（10 行，A 列预置 1~10 整数序号骨架）、footer A20「合计」"
-            "（C20~T20 连续 =SUM）、A..X 24 字段按列位置与前端 L6DetailRow 对齐（fundSource/"
-            "approvalNo/purpose 三字段 HTML-only 不入契约）；六个公式列 G=C+D-E-F / P=C+H+I / "
-            "Q=D+J+M / R=E+K+N / S=F+L+O / T=P+Q-R-S（负债口径），OO 侧不得被值覆盖；UUID 列 AH"
-            "（物理 max_column=AG(33)，Y..AG 全空，取右侧首个空列，避开 M~X 打印/业务区）。"
-            "store 已改稳定 rowId（私有 Date.now+Math.random 生成器收敛到共享 "
-            "newRowIdentity('l62det')，已有 rowId 优先不重铸）；sibling L6-L6-2-row-N-end_balance "
-            "不预登记。审定表 L6-1 是 R7~R16 全跨 sheet 公式的下游视图（非录入表），不选 canary。"
-            "受管表零裸 IF / 零 #REF!，整册裸 IF 仅 审定表L6-1 11 格（per-file 中性化照挂）。"
-            "sanitize 非必需（受管 sheet 共享公式组 0、整册无 external/OLE）。真库 `L6-L6-2-%` "
-            "现算 0 行，零迁移负担。`adapter_registered=False` 是顺序：五环发布后再翻 manifest。"
-        ),
+        "reason": "批量 provision（2026-10-03）。definition 链由 task76 --apply 写入。",
     },
-    # ── L 循环第七条（spec: l8-true-bidirectional-2026-10-01）────────────────────────
-    {
-        "contract_id": "l8.financial_expenses",
-        "provider_module": "app.services.workpaper_sync.phase5_l8_financial_expenses",
-        "delivered_by_task": "l8-true-bidirectional-2026-10-01-task-3",
-        "pilot_class": "l_cycle_financial_expenses",
-        "entry_id": "xlsx/gt-l8-financial-expenses",
-        "document_type": "xlsx",
-        "authority_model": "projection_contract",
-        "template_relative_path": "L/L8 财务费用.xlsx",
-        "adapter_registered": False,
-        "reason": (
-            "L 循环第七条（spec l8-true-bidirectional），受管 `明细表L8-2`（科目 6603 财务费用，"
-            "损益类）：L8 整册唯一的数据录入源（审定表 L8-1 / 两张附注 / 检查表 L8-6 全部跨 sheet "
-            "引用它），HTML 子组件 L8TabDetail.vue 是其忠实渲染（23 列语义逐列对齐、行动态、公式一致、"
-            "持久化已是单 item JSON 数组 `L8-2-full-data`，🔴 单前缀 `L8-2-` 非 L5/L6/L7 双前缀）。"
-            "单级表头 r8、数据区 R9~R21（13 行）、footer A22「合计」（B22~Q22 签名小计 "
-            "=B13+B14-B15+B16+B20+B21）、R23「各月比例」作模板静态行（footer 之下不受管）、A..W 23 字段"
-            "与前端 L8DetailRow 对齐（月度列 B~M 对应 monthly[0..11] 数组，json_key monthly/0..11）；"
-            "formula 列 N=SUM(B:M) / Q=N+O+P / W=T+U+V（本行算术往返幸存）+ R=IF(Q=0,0,Q/$Q$22)"
-            "（占比裸 IF，被 neutralize_oo_crash_if_formulas 摘 <f> 成纯值 ⇒ 不做公式幸存断言，"
-            "NEUTRALIZED_COLUMNS=('R',)）；🔴 B~M 列为 editable（不进 formula_columns）：跨行派生行 "
-            "R11=R9-R10 / R13=R11-R12 / R20=R17-R18-R19 的 B~M 预置公式作模板预置格幸存（HTML 12 项"
-            "缺 R20 汇兑净损失，往返按稳定 key 对齐）；受管 sheet 自身 28 裸 IF（与 L1~L7「受管表零"
-            "裸 IF」相反）；UUID 列 X（物理 max_column=W(23)，X/Y/Z 右侧全空）。"
-            "🔴 损益类取数=本期发生额、兜底 tb_balance.debit_amount 本身（非 debit−credit，含年末结转"
-            "损益全年账上恒 0），回写 amount_kind='occurrence'；受管改线不碰回写逻辑，L8-2 本身不直接"
-            "回写 TB（回写在下游 L8-1 发布门取 L8-2 合计 Q22）。报表行次 IS-007（上市）/IS-025（国企）。"
-            "身份字段 `key`（非 L6/L7 rowId，私有 Date.now+Math.random 生成器收敛到共享 "
-            "newRowIdentity('l82det')，已有 key 优先不重铸）。审定表 L8-1 是 R7~R16 全跨 sheet SUMIF "
-            "聚合的下游视图（非录入表），不选 canary。sanitize 必需（受管 sheet 111 个共享公式成员含"
-            "横向组，materialize 行位移对横向组 fail-closed ⇒ 已 sanitize_l8_template_external_links.py "
-            "展开为逐格显式公式，受管 sheet 逐格 0 diff；整册无 external/OLE）。真库 `L8-2-%` 现算 0 行，"
-            "零迁移负担。`adapter_registered=False` 是顺序：五环发布后再翻 manifest。"
-        ),
-    },
-    # ── L 循环第八条（spec: l5-true-bidirectional-2026-10-01）────────────────────────
     {
         "contract_id": "l5.long_term_payables",
         "provider_module": "app.services.workpaper_sync.phase5_l5_long_term_payables",
-        "delivered_by_task": "l5-true-bidirectional-2026-10-01-task-4",
-        "pilot_class": "l_cycle_long_term_payables",
+        "delivered_by_task": "batch-provision-2026-10-03",
+        "pilot_class": "phase5",
         "entry_id": "xlsx/gt-l5-long-term-payables",
         "document_type": "xlsx",
         "authority_model": "projection_contract",
         "template_relative_path": "L/L5 长期应付款.xlsx",
         "adapter_registered": False,
-        "reason": (
-            "L 循环第八条（spec l5-true-bidirectional），受管 `明细表L5-2`（科目 2701 长期应付款，"
-            "负债类余额口径 期末=期初-借+贷）：🔴 两区同键 + flat 账龄（照 G9 多区 + D6 flat，L 域首次）。"
-            "两个受管数据区 R11:15 售后租回（小计 A16）/ R18:22 分期付款（小计 A23），区之间夹区标题 "
-            "A10/A17 与小计作模板静态骨架；R24「其他」段 A24='…'(U+2026 排版续行占位) + 合计 A25="
-            "SUM(B16,B23,B24) 亦作静态骨架不受管（用户裁决 A，2026-10-02：现查 R24 真库 0 行无痕迹 + HTML "
-            "无用户可填「其他」分组 + Excel 输入格空 ⇒ 占位续行非业务行；平台 typography 门 BP-21 比幽灵行"
-            "更硬，对纯省略号占位行 fail-closed；T1 候选 C「三区」漏测此门，勘误为两区，零能力损失）。"
-            "两区共享 store 键 `L5-L5-2-rows`（双前缀）+ section 字段分区（saleLeaseback/installment），"
-            "逐区独立 uuid_col AD/AE + template_id L52R1/R2 + footer 16/23。两级表头 R8 组 / R9 叶子；"
-            "7 公式列 E=B-C+D / L=B+F+G / M=C+H+J / N=D+I+K / O=L-M+N / R=L-P / S=O-Q（受管输入行同形、"
-            "本行算术、无跨行派生）；账龄 T~X 单组 5 桶 flat（6个月以内/6-12月/1～2年/２～3年/3年以上，"
-            "叶子全角字符 ～=U+FF5E ／ ２=U+FF12）。🔴 融资属性列（名义金额/折现率/现值/起止日/款项类型/"
-            "币种/担保 + HTML 旧标量 unadjusted/aje/rje/audited + 债权人）退 html_only（照 D4-5）：继续喂 "
-            "L5-5/L5-6/L5-7，不进契约、OO 侧不渲染。受管表 明细表L5-2 零裸 IF（bare_IF=0，不需 neutralize，"
-            "但整册裸 IF 仅 审定表L5-1 12 格 ⇒ per-file 中性化照挂）；UUID 列 AD/AE（物理 max_column=AD(30)，"
-            "R11~R25 全空坐实，AF 不用）。身份字段 `key`（非 rowId，私有 Date.now+Math.random 生成器收敛到共享 "
-            "newRowIdentity('l52det')，已有 key 优先不重铸、历史行补铸 + section 落默认区）。审定表 "
-            "L5-1 是 R7~R16 全跨 sheet 聚合的下游视图（非录入表），不选 canary；未确认融资费用明细表 "
-            "L5-3（A 列 ='明细表L5-2'!A{n} 硬行号镜像）本轮不受管、作独立后续，真 OO 往返已断言 L5-2 "
-            "materialize 不打坏 L5-3 既有镜像公式。真库 `L5-L5-2-rows` 现算 0 行，零迁移负担。"
-            "`adapter_registered=False` 是顺序：五环发布后再翻 manifest。"
-        ),
+        "reason": "批量 provision（2026-10-03）。definition 链由 task76 --apply 写入。",
     },
+    {
+        "contract_id": "l6.special_payables",
+        "provider_module": "app.services.workpaper_sync.phase5_l6_special_payables",
+        "delivered_by_task": "batch-provision-2026-10-03",
+        "pilot_class": "phase5",
+        "entry_id": "xlsx/gt-l6-special-payables",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "L/L6 专项应付款.xlsx",
+        "adapter_registered": False,
+        "reason": "批量 provision（2026-10-03）。definition 链由 task76 --apply 写入。",
+    },
+    {
+        "contract_id": "l7.other_noncurrent_liabilities",
+        "provider_module": "app.services.workpaper_sync.phase5_l7_other_noncurrent_liabilities",
+        "delivered_by_task": "batch-provision-2026-10-03",
+        "pilot_class": "phase5",
+        "entry_id": "xlsx/gt-l7-other-noncurrent-liabilities",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "L/L7 其他非流动负债.xlsx",
+        "adapter_registered": False,
+        "reason": "批量 provision（2026-10-03）。definition 链由 task76 --apply 写入。",
+    },
+    {
+        "contract_id": "l8.financial_expenses",
+        "provider_module": "app.services.workpaper_sync.phase5_l8_financial_expenses",
+        "delivered_by_task": "batch-provision-2026-10-03",
+        "pilot_class": "phase5",
+        "entry_id": "xlsx/gt-l8-financial-expenses",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "L/L8 财务费用.xlsx",
+        "adapter_registered": False,
+        "reason": "批量 provision（2026-10-03）。definition 链由 task76 --apply 写入。",
+    },
+    {
+        "contract_id": "n4.taxes_and_surcharges",
+        "provider_module": "app.services.workpaper_sync.phase5_n4_taxes_and_surcharges",
+        "delivered_by_task": "batch-provision-2026-10-03",
+        "pilot_class": "phase5",
+        "entry_id": "xlsx/gt-n4-taxes-and-surcharges",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "N/N4 税金及附加.xlsx",
+        "adapter_registered": False,
+        "reason": "批量 provision（2026-10-03）。definition 链由 task76 --apply 写入。",
+    },
+
 )

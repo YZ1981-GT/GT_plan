@@ -398,6 +398,7 @@ async function switchRenderMode(target: F4RenderMode): Promise<void> {
 
 const dualMode = useF4DualMode({
   wpId: wpIdRef,
+  projectId: computed(() => props.projectId),
   sheetName: computed(() => props.sheetName || ''),
   reloadAll: () => formData.loadAll(),
 })

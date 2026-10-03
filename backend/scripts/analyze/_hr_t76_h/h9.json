@@ -1,0 +1,61 @@
+{
+  "mode": "check",
+  "supply_rows": {
+    "working_paper_sync_definition_artifact": 179,
+    "working_paper_sync_definition_bundle": 88,
+    "working_paper_representation_upgrade_candidate": 1,
+    "working_paper_content_representation": 283
+  },
+  "entries": [
+    {
+      "target": {
+        "entry_id": "xlsx/gt-h9-lease-liabilities",
+        "contract_id": "h9.lease_liability_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_h9_lease_liabilities",
+        "wp_codes": [
+          "H9"
+        ],
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "812e41bf-d34f-4989-8ba7-f60456d7bb49",
+        "wp_code": "H9",
+        "store_bytes": 819,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "stages": {
+        "authority_model": "would_create",
+        "bundle": "would_create",
+        "contract": "would_create",
+        "instrumentation": "would_create",
+        "template": "would_create"
+      },
+      "digests": {
+        "authority_model": "7e25b7d858ce5ad7322e707342e684d1598611c4b492cc5aaf02c400459cc165",
+        "bundle": "00dbc160cd852bf8f50f929cac1a90644be84702a03a78b23c8e56794c438c33",
+        "contract": "419c1729af5bd3d965fc2a83c77e48db1da72d1bf9c495dc94c5968cb7dd721a",
+        "instrumentation": "9b569e96990fe1230da001c3ef56b431e0f7ccea1dda4355c5d3179e6f68ece9",
+        "template": "47b7f74345c0104a290e9dd0cb487c09ddcd0b0db299fa61e543946a6cae0e9c"
+      },
+      "would_create": [
+        "authority_model",
+        "bundle",
+        "contract",
+        "instrumentation",
+        "template"
+      ],
+      "reused": [],
+      "representation": {
+        "settlement": "blocked",
+        "current_representation_id": null,
+        "current_definition_bundle_id": null,
+        "candidates_awaiting_contract": 0,
+        "candidate_bound_to_target_bundle": null,
+        "candidate_bound_state": null
+      },
+      "definition_bundle_sha256": "00dbc160cd852bf8f50f929cac1a90644be84702a03a78b23c8e56794c438c33"
+    }
+  ],
+  "errors": [],
+  "would_create_total": 5
+}

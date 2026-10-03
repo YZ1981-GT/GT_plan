@@ -69,7 +69,7 @@ vi.mock('@/services/apiPaths', async (importOriginal) => {
 })
 
 /** 合并 worksheet 场景：调用页传 scope + 当前 worksheet，不传 wpId（项目级模块）。 */
-function create(sheetName?: string) {
+function create(sheetName?: string, extra: Record<string, unknown> = {}) {
   return shallowMount(FormulaManagerDialog, {
     props: {
       modelValue: false,
@@ -78,6 +78,7 @@ function create(sheetName?: string) {
       projectId: 'project-1',
       year: 2025,
       sheetName,
+      ...extra,
     },
     global: { plugins: [ElementPlus], renderStubDefaultSlot: false },
   })
@@ -87,6 +88,14 @@ const state = (wrapper: ReturnType<typeof create>) => (wrapper.vm as any).$.setu
 
 async function open(sheetName?: string) {
   const w = create(sheetName)
+  await w.setProps({ modelValue: true })
+  await flushPromises()
+  await flushPromises()
+  return w
+}
+
+async function openContext(extra: Record<string, unknown>) {
+  const w = create(undefined, extra)
   await w.setProps({ modelValue: true })
   await flushPromises()
   await flushPromises()
@@ -153,6 +162,35 @@ describe('合并工作底稿 scope 定位', () => {
     await flushPromises()
 
     expect(state(w).selectedPath).toBe('合并报表 > 合并资产负债表')
+    w.unmount()
+  })
+})
+
+
+describe('合并报表 / 合并附注 scope 定位', () => {
+  it('合并报表树完整列出六类，并按当前报表定位（含 equity_statement 真枚举）', async () => {
+    const w = await openContext({ scope: 'consol_report', initialReportType: 'equity_statement', templateType: 'listed' })
+    const root = state(w).treeData.find((node: any) => node.key === 'consol_report')
+    expect(root.children.map((node: any) => node.key)).toEqual([
+      'consol_report_bs', 'consol_report_is', 'consol_report_cfs',
+      'consol_report_eq', 'consol_report_cfss', 'consol_report_imp',
+    ])
+    expect(state(w).selectedNodeKey).toBe('consol_report_eq')
+    expect(state(w).selectedPath).toBe('合并报表 > 合并所有者权益变动表')
+    expect(state(w).activeConsolReportType).toBe('equity_statement')
+    expect(state(w).isConsolFormulaNode).toBe(true)
+    w.unmount()
+  })
+
+  it('合并附注是独立节点，不再落到单体附注 preset 分支', async () => {
+    const w = await openContext({
+      scope: 'consol_note', noteSection: '五-1-1', noteSectionTitle: '货币资金', templateType: 'soe',
+    })
+    expect(state(w).treeData.some((node: any) => node.key === 'consol_note')).toBe(true)
+    expect(state(w).selectedNodeKey).toBe('consol_note')
+    expect(state(w).selectedPath).toBe('合并附注 > 货币资金')
+    expect(state(w).isConsolNoteNode).toBe(true)
+    expect(state(w).isConsolFormulaNode).toBe(true)
     w.unmount()
   })
 })

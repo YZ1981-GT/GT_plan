@@ -1,5 +1,5 @@
 {
-  "adjudication_digest": "9c0322f5f8b90917f9f1462c8fe51b5f4b08e60ce53a417aeb1c9f520b951db2",
+  "adjudication_digest": "16cbc2c162b1fb425c59edfbaa01f9f34a2f6918ab167a1ec452b9378b422f6d",
   "adjudication_digest_algorithm": "sha256(json.dumps(adjudications, sort_keys=True, ensure_ascii=False, separators=(',',':')).encode('utf-8')).hexdigest()",
   "adjudication_digest_note": "🔴 2026-09-04：原 digest 的算法全仓无处记载（只有它自己出现一次），无法复算 ⇒ 改文件后留着它就是把错值当基线锁死。已换成算法自带的形态，见 `adjudication_digest_algorithm`。原值 c8b2bc2031e4041b143e6df973ee3d87ef641a23c28a5289b0da799ab3606125",
   "adjudications": [
@@ -28,6 +28,34 @@
       },
       "wp_codes": [
         "B60-1"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 的 wp_code_patterns 给出 A5-1 与 A51C 两个码；A51C 是从宿主 GtA51CashflowAudit.vue 的 CamelCase 反推出的幻影码 —— 真库 wp_index 现查 A5-1 命中 3 行、A51C 命中 0 行，用它当 matcher 域会恒空。",
+        "heuristic_would_say": [
+          "A5-1",
+          "A51C"
+        ],
+        "managed_excel_name": "A5-1-1列示于现金流量表的现金及现金等价物",
+        "template_relative_path": "A/A5-1 现金流量表审计.xlsx",
+        "wp_index_evidence": "wp_index.wp_code=A5-1 实测 3 行（3 个项目各 1 份）、A51C 实测 0 行；且本表 basis_rule 规定 wp_code 真源是契约冻结的 template.relative_path 文件名前缀，A/A5-1 现金流量表审计.xlsx ⇒ A5-1（该字段进了 contract sha256）。provider phase5_a51_sheets.WP_CODES 已据此收窄为 frozenset({A5-1})，两侧一致。"
+      },
+      "contract_id": "a51.cashflow_audit",
+      "entry_id": "xlsx/gt-a51-cashflow-audit",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-09-28",
+        "note": "A5-1 真库零载荷（checklist_responses 中 a51-% / A5-1% 前缀 0 行）——与 A spec 的 AC-18「A 域 28 行里无 A5-1 前缀」一致。首版发布用模板基线。",
+        "row_count": 0,
+        "store_item_id": "a51-audit-1.unadjusted",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      },
+      "wp_codes": [
+        "A5-1"
       ]
     },
     {
@@ -210,6 +238,32 @@
       },
       "wp_codes": [
         "D7"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "启发式无歧义（wp_code_patterns 只给 E1，与 wp_index 落点一致）。本条补登是因为 fix_projection_first_publication 的 _build_plan_rows() 要求台账内每条 entry 都有显式裁决 —— 缺条目时它在 plan 阶段整体抛错，连带阻塞其余全部 entry（--entry 过滤发生在 plan 之后）。",
+        "heuristic_would_say": [
+          "E1"
+        ],
+        "managed_excel_name": "E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）",
+        "template_relative_path": "E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+        "wp_index_evidence": "store item E1-cash-detail-rows 的载荷真库实测落在 wp_code=E1 上（3 行 / 1 个底稿 / max remark 126 B）；provider WP_CODES 亦为 frozenset({E1})，两侧一致。"
+      },
+      "contract_id": "e1.monetary_fund_detail",
+      "entry_id": "xlsx/gt-e1-monetary-fund",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 126,
+        "measured_at": "2026-09-28",
+        "row_count": 3,
+        "store_item_id": "E1-cash-detail-rows",
+        "wp_code_with_payload": "E1",
+        "wp_count_with_payload": 1
+      },
+      "wp_codes": [
+        "E1"
       ]
     },
     {
@@ -1080,344 +1134,6 @@
     },
     {
       "basis": {
-        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 I1I 在 wp_index 里 0 命中（幻影码）",
-        "heuristic_would_say": [
-          "I1I"
-        ],
-        "managed_excel_name": "明细表I1-2",
-        "template_relative_path": "I/I1 无形资产、累计摊销及减值准备.xlsx",
-        "wp_index_evidence": "2026-10-01 真库现查（`file_path <> ''` 口径）：wp_code=I1 首选底稿 wp 57356eb6（项目 005a6f2d，storage/projects/.../I/I1.xlsx，2026-05-13）；受管 sheet `明细表I1-2` 是该整册里的一张 sheet ⇒ 目标码取 `I1`。🔴 wp_index 两套编号（ID-8）：同码另有旧编号行（无形资产审定表）指向 `wp_storage/<uuid>.xlsx`；按目标全序首选的是新编号整册行（created_at 更早），现查无 store 载荷可改变排序。"
-      },
-      "contract_id": "i1.intangible_assets_detail",
-      "entry_id": "xlsx/gt-i1-intangible-assets",
-      "matcher_domain_conflict": null,
-      "resolvable_for_provisioning": true,
-      "store_payload_evidence": {
-        "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "I1-2-rows",
-        "why_null": "2026-10-01 现查 `checklist_responses` 中 `I1-2-rows` 0 行（真库主表键无载荷）",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      },
-      "wp_codes": [
-        "I1"
-      ]
-    },
-    {
-      "basis": {
-        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 I2D 在 wp_index 里 0 命中（幻影码）",
-        "heuristic_would_say": [
-          "I2D"
-        ],
-        "managed_excel_name": "明细表I2-2",
-        "template_relative_path": "I/I2 开发支出.xlsx",
-        "wp_index_evidence": "2026-10-01 真库现查（`file_path <> ''` 口径）：wp_code=I2 首选底稿 wp c41da93f（项目 005a6f2d，storage/projects/.../I/I2.xlsx，2026-05-13）；受管 sheet `明细表I2-2` 是该整册里的一张 sheet ⇒ 目标码取 `I2`。🔴 wp_index 两套编号（ID-8）：同码另有旧编号行（商誉审定表）指向 `wp_storage/<uuid>.xlsx`；按目标全序首选的是新编号整册行（created_at 更早），现查无 store 载荷可改变排序。"
-      },
-      "contract_id": "i2.development_expenditure_detail",
-      "entry_id": "xlsx/gt-i2-development-expenditure",
-      "matcher_domain_conflict": null,
-      "resolvable_for_provisioning": true,
-      "store_payload_evidence": {
-        "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "I2-2-rows",
-        "why_null": "2026-10-01 现查 `checklist_responses` 中 `I2-2-rows` 0 行（真库主表键无载荷）",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      },
-      "wp_codes": [
-        "I2"
-      ]
-    },
-    {
-      "basis": {
-        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 I3G 在 wp_index 里 0 命中（幻影码）",
-        "heuristic_would_say": [
-          "I3G"
-        ],
-        "managed_excel_name": "明细表I3-2",
-        "template_relative_path": "I/I3 商誉.xlsx",
-        "wp_index_evidence": "2026-10-01 真库现查（`file_path <> ''` 口径）：wp_code=I3 首选底稿 wp 926f8e9f（项目 005a6f2d，storage/projects/.../I/I3.xlsx，2026-05-13）；受管 sheet `明细表I3-2` 是该整册里的一张 sheet ⇒ 目标码取 `I3`。🔴 wp_index 两套编号（ID-8）：同码另有旧编号行（长期待摊费用审定表）指向 `wp_storage/<uuid>.xlsx`；按目标全序首选的是新编号整册行（created_at 更早），现查无 store 载荷可改变排序。"
-      },
-      "contract_id": "i3.goodwill_detail",
-      "entry_id": "xlsx/gt-i3-goodwill",
-      "matcher_domain_conflict": null,
-      "resolvable_for_provisioning": true,
-      "store_payload_evidence": {
-        "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "I3-2-rows",
-        "why_null": "2026-10-01 现查 `checklist_responses` 中 `I3-2-rows` 0 行（真库主表键无载荷）",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      },
-      "wp_codes": [
-        "I3"
-      ]
-    },
-    {
-      "basis": {
-        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 I4L 在 wp_index 里 0 命中（幻影码）",
-        "heuristic_would_say": [
-          "I4L"
-        ],
-        "managed_excel_name": "明细表I4-2",
-        "template_relative_path": "I/I4 长期待摊费用.xlsx",
-        "wp_index_evidence": "2026-10-01 真库现查（`file_path <> ''` 口径）：wp_code=I4 首选底稿 wp 4f65bf18（项目 005a6f2d，storage/projects/.../I/I4.xlsx，2026-05-13）；受管 sheet `明细表I4-2` 是该整册里的一张 sheet ⇒ 目标码取 `I4`。🔴 wp_index 两套编号（ID-8）：同码另有旧编号行（开发支出审定表）指向 `wp_storage/<uuid>.xlsx`；按目标全序首选的是新编号整册行（created_at 更早），现查无 store 载荷可改变排序。"
-      },
-      "contract_id": "i4.long_term_prepaid_detail",
-      "entry_id": "xlsx/gt-i4-long-term-prepaid",
-      "matcher_domain_conflict": null,
-      "resolvable_for_provisioning": true,
-      "store_payload_evidence": {
-        "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "I4-2-rows",
-        "why_null": "2026-10-01 现查 `checklist_responses` 中 `I4-2-rows` 0 行（真库主表键无载荷）",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      },
-      "wp_codes": [
-        "I4"
-      ]
-    },
-    {
-      "basis": {
-        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 I5O 在 wp_index 里 0 命中（幻影码）",
-        "heuristic_would_say": [
-          "I5O"
-        ],
-        "managed_excel_name": "明细表I5-2",
-        "template_relative_path": "I/I5 其他非流动资产.xlsx",
-        "wp_index_evidence": "2026-10-01 真库现查（`file_path <> ''` 口径）：wp_code=I5 首选底稿 wp 051d4e6b（项目 14fb8c10，storage/projects/.../I/I5.xlsx，2026-05-15）；受管 sheet `明细表I5-2` 是该整册里的一张 sheet ⇒ 目标码取 `I5`。🔴 wp_index 两套编号（ID-8）：同码另有旧编号行（其他非流动资产审定表）指向 `wp_storage/<uuid>.xlsx`；按目标全序首选的是新编号整册行（created_at 更早），现查无 store 载荷可改变排序。"
-      },
-      "contract_id": "i5.other_noncurrent_assets_detail",
-      "entry_id": "xlsx/gt-i5-other-noncurrent-assets",
-      "matcher_domain_conflict": null,
-      "resolvable_for_provisioning": true,
-      "store_payload_evidence": {
-        "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "I5-2-rows",
-        "why_null": "2026-10-01 现查 `checklist_responses` 中 `I5-2-rows` 0 行（真库主表键无载荷）",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      },
-      "wp_codes": [
-        "I5"
-      ]
-    },
-    {
-      "basis": {
-        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 I6R 在 wp_index 里 0 命中（幻影码）",
-        "heuristic_would_say": [
-          "I6R"
-        ],
-        "managed_excel_name": "明细表I6-2",
-        "template_relative_path": "I/I6 研发费用.xlsx",
-        "wp_index_evidence": "2026-10-01 真库现查（`file_path <> ''` 口径）：wp_code=I6 首选底稿 wp 0048c8a5（项目 14fb8c10，storage/projects/.../I/I6.xlsx，2026-05-15）；受管 sheet `明细表I6-2` 是该整册里的一张 sheet ⇒ 目标码取 `I6`。🔴 wp_index 两套编号（ID-8）：同码另有旧编号行（研发费用审定表）指向 `wp_storage/<uuid>.xlsx`；按目标全序首选的是新编号整册行（created_at 更早），现查无 store 载荷可改变排序。"
-      },
-      "contract_id": "i6.research_development_expense_detail",
-      "entry_id": "xlsx/gt-i6-research-development-expense",
-      "matcher_domain_conflict": null,
-      "resolvable_for_provisioning": true,
-      "store_payload_evidence": {
-        "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "I6-2-detail-rows",
-        "why_null": "2026-10-01 现查 `checklist_responses` 中 `I6-2-detail-rows` 0 行（真库主表键无载荷）",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      },
-      "wp_codes": [
-        "I6"
-      ]
-    },
-    {
-      "entry_id": "xlsx/gt-k1-other-receivables",
-      "contract_id": "k1.baddebt_reversal_writeoff_check",
-      "wp_codes": [
-        "K1"
-      ],
-      "resolvable_for_provisioning": true,
-      "matcher_domain_conflict": null,
-      "basis": {
-        "heuristic_is_wrong_because": "manifest 从宿主 CamelCase 抽出的 K1O 在 wp_index 里 0 命中（幻影码）",
-        "heuristic_would_say": [
-          "K1O"
-        ],
-        "managed_excel_name": "坏账准备转回（收回）、核销检查表K1-9",
-        "template_relative_path": "K/K1 其他应收款.xlsx",
-        "wp_index_evidence": "2026-10-01 真库独立事务现查：wp_code=K1 有 5 行；受管 sheet K1-9 是 K1 整册内的一张 sheet，故 provisioning 取父码 K1。"
-      },
-      "store_payload_evidence": {
-        "measured_at": "2026-10-01",
-        "store_item_id": "K1-9-writeoff",
-        "max_payload_bytes": 0,
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0,
-        "why_null": "本地 checklist_responses 已发生非整库回退；不以空载荷反推码，按 wp_index 父码证据定 K1。"
-      }
-    },
-    {
-      "entry_id": "xlsx/gt-k10-other-income",
-      "contract_id": "k10.other_income_adjustment",
-      "wp_codes": [
-        "K10"
-      ],
-      "resolvable_for_provisioning": true,
-      "matcher_domain_conflict": null,
-      "basis": {
-        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 K10O 在 wp_index 里 0 命中（幻影码）",
-        "heuristic_would_say": [
-          "K10O"
-        ],
-        "managed_excel_name": "调整分录汇总K10-3",
-        "template_relative_path": "K/K10 其他收益.xlsx",
-        "wp_index_evidence": "wp_code=K10 在 5 个项目各有 1 行且 file_path 为真路径（整册工作簿，`file_path <> ''` 口径现算）；受管 sheet `调整分录汇总K10-3` 只是该册里的一张 sheet，不是独立文件 ⇒ 目标码取持有整册文件的 `K10`。"
-      },
-      "store_payload_evidence": {
-        "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "K10-3-entries",
-        "why_null": "`K10-3-entries` 全库 0 行（本地库 checklist_responses 仅 122 行）⇒ 以 file_path 证据定码",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      }
-    },
-    {
-      "entry_id": "xlsx/gt-k11-asset-impairment-loss",
-      "contract_id": "k11.asset_impairment_loss_adjustment",
-      "wp_codes": [
-        "K11"
-      ],
-      "resolvable_for_provisioning": true,
-      "matcher_domain_conflict": null,
-      "basis": {
-        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 K11A 在 wp_index 里 0 命中（幻影码）",
-        "heuristic_would_say": [
-          "K11A"
-        ],
-        "managed_excel_name": "调整分录汇总K11-3",
-        "template_relative_path": "K/K11 资产减值损失.xlsx",
-        "wp_index_evidence": "wp_code=K11 在 5 个项目各有 1 行且 file_path 为真路径（整册工作簿，`file_path <> ''` 口径现算）；受管 sheet `调整分录汇总K11-3` 只是该册里的一张 sheet，不是独立文件 ⇒ 目标码取持有整册文件的 `K11`。"
-      },
-      "store_payload_evidence": {
-        "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "K11-3-adj-entries",
-        "why_null": "`K11-3-adj-entries` 全库 0 行（本地库 checklist_responses 仅 122 行）⇒ 以 file_path 证据定码",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      }
-    },
-    {
-      "entry_id": "xlsx/gt-k12-non-operating-income",
-      "contract_id": "k12.non_operating_income_adjustment",
-      "wp_codes": [
-        "K12"
-      ],
-      "resolvable_for_provisioning": true,
-      "matcher_domain_conflict": null,
-      "basis": {
-        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 K12N 在 wp_index 里 0 命中（幻影码）",
-        "heuristic_would_say": [
-          "K12N"
-        ],
-        "managed_excel_name": "调整分录汇总K12-3",
-        "template_relative_path": "K/K12 营业外收入.xlsx",
-        "wp_index_evidence": "wp_code=K12 在 5 个项目各有 1 行且 file_path 为真路径（整册工作簿，`file_path <> ''` 口径现算）；受管 sheet `调整分录汇总K12-3` 只是该册里的一张 sheet，不是独立文件 ⇒ 目标码取持有整册文件的 `K12`。"
-      },
-      "store_payload_evidence": {
-        "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "K12-3-rows",
-        "why_null": "`K12-3-rows` 全库 0 行（本地库 checklist_responses 仅 122 行）⇒ 以 file_path 证据定码",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      }
-    },
-    {
-      "entry_id": "xlsx/gt-k13-non-operating-expense",
-      "contract_id": "k13.non_operating_expense_adjustment",
-      "wp_codes": [
-        "K13"
-      ],
-      "resolvable_for_provisioning": true,
-      "matcher_domain_conflict": null,
-      "basis": {
-        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 K13N 在 wp_index 里 0 命中（幻影码）",
-        "heuristic_would_say": [
-          "K13N"
-        ],
-        "managed_excel_name": "调整分录汇总K13-3",
-        "template_relative_path": "K/K13 营业外支出.xlsx",
-        "wp_index_evidence": "wp_code=K13 在 5 个项目各有 1 行且 file_path 为真路径（整册工作簿，`file_path <> ''` 口径现算）；受管 sheet `调整分录汇总K13-3` 只是该册里的一张 sheet，不是独立文件 ⇒ 目标码取持有整册文件的 `K13`。"
-      },
-      "store_payload_evidence": {
-        "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "K13-3-adj-entries",
-        "why_null": "`K13-3-adj-entries` 全库 0 行（本地库 checklist_responses 仅 122 行）⇒ 以 file_path 证据定码",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      }
-    },
-    {
-      "entry_id": "xlsx/gt-k8-selling-expenses",
-      "contract_id": "k8.selling_expenses_adjustment",
-      "wp_codes": [
-        "K8"
-      ],
-      "resolvable_for_provisioning": true,
-      "matcher_domain_conflict": null,
-      "basis": {
-        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 K8S 在 wp_index 里 0 命中（幻影码）",
-        "heuristic_would_say": [
-          "K8S"
-        ],
-        "managed_excel_name": "调整分录汇总K8-3",
-        "template_relative_path": "K/K8 销售费用.xlsx",
-        "wp_index_evidence": "wp_code=K8 在 5 个项目各有 1 行且 file_path 为真路径（整册工作簿，`file_path <> ''` 口径现算）；受管 sheet `调整分录汇总K8-3` 只是该册里的一张 sheet，不是独立文件 ⇒ 目标码取持有整册文件的 `K8`。"
-      },
-      "store_payload_evidence": {
-        "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "K8-3-adj-entries",
-        "why_null": "`K8-3-adj-entries` 全库 0 行（本地库 checklist_responses 仅 122 行）⇒ 以 file_path 证据定码",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      }
-    },
-    {
-      "entry_id": "xlsx/gt-k9-admin-expenses",
-      "contract_id": "k9.admin_expenses_adjustment",
-      "wp_codes": [
-        "K9"
-      ],
-      "resolvable_for_provisioning": true,
-      "matcher_domain_conflict": null,
-      "basis": {
-        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 K9A 在 wp_index 里 0 命中（幻影码）",
-        "heuristic_would_say": [
-          "K9A"
-        ],
-        "managed_excel_name": "调整分录汇总K9-3",
-        "template_relative_path": "K/K9 管理费用.xlsx",
-        "wp_index_evidence": "wp_code=K9 在 5 个项目各有 1 行且 file_path 为真路径（整册工作簿，`file_path <> ''` 口径现算）；受管 sheet `调整分录汇总K9-3` 只是该册里的一张 sheet，不是独立文件 ⇒ 目标码取持有整册文件的 `K9`。"
-      },
-      "store_payload_evidence": {
-        "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "K9-3-adj-entries",
-        "why_null": "`K9-3-adj-entries` 全库 0 行（本地库 checklist_responses 仅 122 行）⇒ 以 file_path 证据定码",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      }
-    },
-    {
-      "basis": {
         "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 L1S 在 wp_index 里 0 命中（GtL1ShortTermLoans → L1S 是幻影码）",
         "heuristic_would_say": [
           "L1S"
@@ -1444,211 +1160,788 @@
     },
     {
       "basis": {
-        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 L4B 经 wp_template_finder 单册与 sheet 级解析均零命中（GtL4BondsPayable → L4B 是幻影码）",
+        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 H2C 在 wp_index 里 0 命中",
         "heuristic_would_say": [
-          "L4B"
+          "H2C"
         ],
-        "managed_excel_name": "划分为金融负债的其他金融工具明细表L4-3",
-        "template_relative_path": "L/L4 应付债券.xlsx",
-        "wp_index_evidence": "2026-10-01 现算：wp_code=L4 有 3 份未删除底稿且 file_path 非空（`storage/projects/005a6f2d…/workpapers/L/L4.xlsx` 等）；受管 sheet 是整册 16 sheet 工作簿里的一张，不是独立文件 ⇒ 目标码取持有整册文件的 `L4`。判据用 `COALESCE(file_path,'') <> ''`（L1 裁决记过的空串陷阱）。"
+        "managed_excel_name": "明细表H2-2",
+        "template_relative_path": "H/H2 在建工程.xlsx",
+        "wp_index_evidence": "wp_code=H2 有 5 张未删除 working_paper，5/5 的 file_path 非空（最长 74~75 字节），持有整册 `H/H2 在建工程.xlsx`。名义子码 H2-1..6 虽有 wp_index 行，file_path 全是**空字符串 `''`**（不是 NULL）⇒ 子码不是独立工作簿；受管 sheet 只是整册内的一张表。主受管 store 全库 0 行，不能用载荷定码。因此 provisioning 目标码取 `H2`，不取幻影码或子码。"
       },
-      "contract_id": "l4.bonds_payable",
-      "entry_id": "xlsx/gt-l4-bonds-payable",
+      "contract_id": "h2.construction_in_progress_detail",
+      "entry_id": "xlsx/gt-h2-construction-in-progress",
       "matcher_domain_conflict": null,
       "resolvable_for_provisioning": true,
       "store_payload_evidence": {
         "max_payload_bytes": 0,
         "measured_at": "2026-10-01",
-        "store_item_id": "L4-3-rows",
-        "why_null": "`L4-3-rows` 是本 spec 新建的键，全库 0 行；旧位置化键 `L4-3-row-*` 亦 0 行 ⇒ 零迁移负担。真库 L4 现有 6 行均为 `l-cycle-canary-e2e` 夹具（L4-adj-1-* / L4-chk-conclusion / L4-3-note），不属受管表。",
+        "store_item_id": "H2-2-rows",
+        "store_item_ids_all": [
+          "H2-2-rows"
+        ],
+        "why_null": "`H2-2-rows` 全库 0 行（明细表从未录入，空表单是合法业务事实，不是缺数据）⇒ 载荷落点无法定码，本条以持有整册工作簿的 `H2` file_path 证据裁决。",
         "wp_code_with_payload": null,
         "wp_count_with_payload": 0
       },
       "wp_codes": [
-        "L4"
+        "H2"
       ]
     },
     {
       "basis": {
-        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 J1E 在 wp_index 里 0 命中（GtJ1EmployeeCompensation → J1E 是幻影码）",
+        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 H3I 在 wp_index 里 0 命中",
+        "heuristic_would_say": [
+          "H3I"
+        ],
+        "managed_excel_name": "明细表（成本模式）H3-2",
+        "template_relative_path": "H/H3 投资性房地产.xlsx",
+        "wp_index_evidence": "wp_code=H3 有 4 张未删除 working_paper，4/4 的 file_path 非空（最长 74~75 字节），持有整册 `H/H3 投资性房地产.xlsx`。名义子码 H3-1..6 虽有 wp_index 行，file_path 全是**空字符串 `''`**（不是 NULL）⇒ 子码不是独立工作簿；受管 sheet 只是整册内的一张表。主受管 store 全库 0 行，不能用载荷定码。因此 provisioning 目标码取 `H3`，不取幻影码或子码。"
+      },
+      "contract_id": "h3.investment_property_detail",
+      "entry_id": "xlsx/gt-h3-investment-property",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-01",
+        "store_item_id": "H3-2-cost-rows",
+        "store_item_ids_all": [
+          "H3-2-cost-rows",
+          "H3-2-fair-rows"
+        ],
+        "why_null": "`H3-2-cost-rows` / `H3-2-fair-rows` 全库 0 行（明细表从未录入，空表单是合法业务事实，不是缺数据）⇒ 载荷落点无法定码，本条以持有整册工作簿的 `H3` file_path 证据裁决。",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      },
+      "wp_codes": [
+        "H3"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 H4E 在 wp_index 里 0 命中",
+        "heuristic_would_say": [
+          "H4E"
+        ],
+        "managed_excel_name": "明细表H4-2",
+        "template_relative_path": "H/H4 工程物资.xlsx",
+        "wp_index_evidence": "wp_code=H4 有 4 张未删除 working_paper，4/4 的 file_path 非空（最长 74~75 字节），持有整册 `H/H4 工程物资.xlsx`。名义子码 H4-1..4 虽有 wp_index 行，file_path 全是**空字符串 `''`**（不是 NULL）⇒ 子码不是独立工作簿；受管 sheet 只是整册内的一张表。主受管 store 全库 0 行，不能用载荷定码。因此 provisioning 目标码取 `H4`，不取幻影码或子码。"
+      },
+      "contract_id": "h4.engineering_materials_detail",
+      "entry_id": "xlsx/gt-h4-engineering-materials",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-01",
+        "store_item_id": "H4-2-rows",
+        "store_item_ids_all": [
+          "H4-2-rows"
+        ],
+        "why_null": "`H4-2-rows` 全库 0 行（明细表从未录入，空表单是合法业务事实，不是缺数据）⇒ 载荷落点无法定码，本条以持有整册工作簿的 `H4` file_path 证据裁决。",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      },
+      "wp_codes": [
+        "H4"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 H5O 在 wp_index 里 0 命中",
+        "heuristic_would_say": [
+          "H5O"
+        ],
+        "managed_excel_name": "明细表H5-2",
+        "template_relative_path": "H/H5 油气资产.xlsx",
+        "wp_index_evidence": "wp_code=H5 有 4 张未删除 working_paper，4/4 的 file_path 非空（最长 74~75 字节），持有整册 `H/H5 油气资产.xlsx`。名义子码 H5-1..4 虽有 wp_index 行，file_path 全是**空字符串 `''`**（不是 NULL）⇒ 子码不是独立工作簿；受管 sheet 只是整册内的一张表。主受管 store 全库 0 行，不能用载荷定码。因此 provisioning 目标码取 `H5`，不取幻影码或子码。"
+      },
+      "contract_id": "h5.oil_gas_assets_detail",
+      "entry_id": "xlsx/gt-h5-oil-gas-assets",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-01",
+        "store_item_id": "H5-2-rows",
+        "store_item_ids_all": [
+          "H5-2-rows"
+        ],
+        "why_null": "`H5-2-rows` 全库 0 行（明细表从未录入，空表单是合法业务事实，不是缺数据）⇒ 载荷落点无法定码，本条以持有整册工作簿的 `H5` file_path 证据裁决。",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      },
+      "wp_codes": [
+        "H5"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 H6A 在 wp_index 里 0 命中",
+        "heuristic_would_say": [
+          "H6A"
+        ],
+        "managed_excel_name": "明细表H6-2",
+        "template_relative_path": "H/H6 固定资产清理.xlsx",
+        "wp_index_evidence": "wp_code=H6 有 4 张未删除 working_paper，4/4 的 file_path 非空（最长 74~75 字节），持有整册 `H/H6 固定资产清理.xlsx`。名义子码 H6-1..4 虽有 wp_index 行，file_path 全是**空字符串 `''`**（不是 NULL）⇒ 子码不是独立工作簿；受管 sheet 只是整册内的一张表。主受管 store 全库 0 行，不能用载荷定码。因此 provisioning 目标码取 `H6`，不取幻影码或子码。"
+      },
+      "contract_id": "h6.asset_disposal_clearing_detail",
+      "entry_id": "xlsx/gt-h6-asset-disposal-clearing",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-01",
+        "store_item_id": "H6-2-rows",
+        "store_item_ids_all": [
+          "H6-2-rows"
+        ],
+        "why_null": "`H6-2-rows` 全库 0 行（明细表从未录入，空表单是合法业务事实，不是缺数据）⇒ 载荷落点无法定码，本条以持有整册工作簿的 `H6` file_path 证据裁决。",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      },
+      "wp_codes": [
+        "H6"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 H7B 在 wp_index 里 0 命中",
+        "heuristic_would_say": [
+          "H7B"
+        ],
+        "managed_excel_name": "明细表（成本模式）H7-2",
+        "template_relative_path": "H/H7 生产性生物资产.xlsx",
+        "wp_index_evidence": "wp_code=H7 有 4 张未删除 working_paper，4/4 的 file_path 非空（最长 74~75 字节），持有整册 `H/H7 生产性生物资产.xlsx`。名义子码 H7-1..4 虽有 wp_index 行，file_path 全是**空字符串 `''`**（不是 NULL）⇒ 子码不是独立工作簿；受管 sheet 只是整册内的一张表。主受管 store 全库 0 行，不能用载荷定码。因此 provisioning 目标码取 `H7`，不取幻影码或子码。"
+      },
+      "contract_id": "h7.biological_assets_detail",
+      "entry_id": "xlsx/gt-h7-biological-assets",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-01",
+        "store_item_id": "H7-2-cost-rows",
+        "store_item_ids_all": [
+          "H7-2-cost-rows",
+          "H7-2-fair-rows"
+        ],
+        "why_null": "`H7-2-cost-rows` / `H7-2-fair-rows` 全库 0 行（明细表从未录入，空表单是合法业务事实，不是缺数据）⇒ 载荷落点无法定码，本条以持有整册工作簿的 `H7` file_path 证据裁决。",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      },
+      "wp_codes": [
+        "H7"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 H8R 在 wp_index 里 0 命中",
+        "heuristic_would_say": [
+          "H8R"
+        ],
+        "managed_excel_name": "明细表H8-2",
+        "template_relative_path": "H/H8 使用权资产.xlsx",
+        "wp_index_evidence": "wp_code=H8 有 4 张未删除 working_paper，4/4 的 file_path 非空（最长 74~75 字节），持有整册 `H/H8 使用权资产.xlsx`。名义子码 H8-1..6 虽有 wp_index 行，file_path 全是**空字符串 `''`**（不是 NULL）⇒ 子码不是独立工作簿；受管 sheet 只是整册内的一张表。store item H8-2-rows 在真库落于 wp_code=H8（1 张底稿，最大载荷 2 B），与 file_path 证据同向。因此 provisioning 目标码取 `H8`，不取幻影码或子码。"
+      },
+      "contract_id": "h8.right_of_use_assets_detail",
+      "entry_id": "xlsx/gt-h8-right-of-use-assets",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 2,
+        "measured_at": "2026-10-01",
+        "store_item_id": "H8-2-rows",
+        "wp_code_with_payload": "H8",
+        "wp_count_with_payload": 1
+      },
+      "wp_codes": [
+        "H8"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 H9L 在 wp_index 里 0 命中",
+        "heuristic_would_say": [
+          "H9L"
+        ],
+        "managed_excel_name": "租赁负债明细表H9-2",
+        "template_relative_path": "H/H9 租赁负债.xlsx",
+        "wp_index_evidence": "wp_code=H9 有 4 张未删除 working_paper，4/4 的 file_path 非空（最长 74~75 字节），持有整册 `H/H9 租赁负债.xlsx`。名义子码 H9-1..6 虽有 wp_index 行，file_path 全是**空字符串 `''`**（不是 NULL）⇒ 子码不是独立工作簿；受管 sheet 只是整册内的一张表。store item H9-2-rows 在真库落于 wp_code=H9（1 张底稿，最大载荷 851 B），与 file_path 证据同向。因此 provisioning 目标码取 `H9`，不取幻影码或子码。"
+      },
+      "contract_id": "h9.lease_liability_detail",
+      "entry_id": "xlsx/gt-h9-lease-liabilities",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 851,
+        "measured_at": "2026-10-01",
+        "store_item_id": "H9-2-rows",
+        "wp_code_with_payload": "H9",
+        "wp_count_with_payload": 1
+      },
+      "wp_codes": [
+        "H9"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 H10A 在 wp_index 里 0 命中",
+        "heuristic_would_say": [
+          "H10A"
+        ],
+        "managed_excel_name": "调整分录汇总H10-3",
+        "template_relative_path": "H/H10 资产处置损益.xlsx",
+        "wp_index_evidence": "wp_code=H10 有 5 张未删除 working_paper，5/5 的 file_path 非空（最长 74~75 字节），持有整册 `H/H10 资产处置损益.xlsx`。名义子码 H10-1..4 虽有 wp_index 行，file_path 全是**空字符串 `''`**（不是 NULL）⇒ 子码不是独立工作簿；受管 sheet 只是整册内的一张表。主受管 store 全库 0 行，不能用载荷定码。因此 provisioning 目标码取 `H10`，不取幻影码或子码。"
+      },
+      "contract_id": "h10.asset_disposal_income_adjustment",
+      "entry_id": "xlsx/gt-h10-asset-disposal-income",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-01",
+        "store_item_id": "H10-adjustment-rows",
+        "store_item_ids_all": [
+          "H10-adjustment-rows"
+        ],
+        "why_null": "`H10-adjustment-rows` 全库 0 行（明细表从未录入，空表单是合法业务事实，不是缺数据）⇒ 载荷落点无法定码，本条以持有整册工作簿的 `H10` file_path 证据裁决。",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      },
+      "wp_codes": [
+        "H10"
+      ]
+    },
+    {
+      "entry_id": "xlsx/gt-i1-intangible-assets",
+      "contract_id": "i1.intangible_assets_detail",
+      "wp_codes": [
+        "I1"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "I1I"
+        ],
+        "heuristic_is_wrong_because": "I1I 是幻影码（wp_index 0 命中），provisioning 用真码 I1",
+        "managed_excel_name": "I1 无形资产",
+        "template_relative_path": "I/I1 无形资产、累计摊销及减值准备.xlsx",
+        "wp_index_evidence": "wp_code=I1 实测命中（I 循环底稿真码）"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-i2-development-expenditure",
+      "contract_id": "i2.development_expenditure_detail",
+      "wp_codes": [
+        "I2"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "I2D"
+        ],
+        "heuristic_is_wrong_because": "I2D 是幻影码，provisioning 用真码 I2",
+        "managed_excel_name": "I2 开发支出",
+        "template_relative_path": "I/I2 开发支出.xlsx",
+        "wp_index_evidence": "wp_code=I2 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-i3-goodwill",
+      "contract_id": "i3.goodwill_detail",
+      "wp_codes": [
+        "I3"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "I3G"
+        ],
+        "heuristic_is_wrong_because": "I3G 是幻影码，provisioning 用真码 I3",
+        "managed_excel_name": "I3 商誉",
+        "template_relative_path": "I/I3 商誉.xlsx",
+        "wp_index_evidence": "wp_code=I3 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-i4-long-term-prepaid",
+      "contract_id": "i4.long_term_prepaid_detail",
+      "wp_codes": [
+        "I4"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "I4L"
+        ],
+        "heuristic_is_wrong_because": "I4L 是幻影码，provisioning 用真码 I4",
+        "managed_excel_name": "I4 长期待摊费用",
+        "template_relative_path": "I/I4 长期待摊费用.xlsx",
+        "wp_index_evidence": "wp_code=I4 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-i5-other-noncurrent-assets",
+      "contract_id": "i5.other_noncurrent_assets_detail",
+      "wp_codes": [
+        "I5"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "I5O"
+        ],
+        "heuristic_is_wrong_because": "I5O 是幻影码，provisioning 用真码 I5",
+        "managed_excel_name": "I5 其他非流动资产",
+        "template_relative_path": "I/I5 其他非流动资产.xlsx",
+        "wp_index_evidence": "wp_code=I5 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-i6-research-development-expense",
+      "contract_id": "i6.research_development_expense_detail",
+      "wp_codes": [
+        "I6"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "I6R"
+        ],
+        "heuristic_is_wrong_because": "I6R 是幻影码，provisioning 用真码 I6",
+        "managed_excel_name": "I6 研发费用",
+        "template_relative_path": "I/I6 研发费用.xlsx",
+        "wp_index_evidence": "wp_code=I6 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+      "contract_id": "j1.accrual_check_short_term",
+      "wp_codes": [
+        "J1"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
         "heuristic_would_say": [
           "J1E"
         ],
-        "managed_excel_name": "计提情况检查表J1-6",
+        "heuristic_is_wrong_because": "J1E 是幻影码，provisioning 用真码 J1",
+        "managed_excel_name": "J1 应付职工薪酬",
         "template_relative_path": "J/J1 应付职工薪酬.xlsx",
-        "wp_index_evidence": "2026-10-01 真库现查（`file_path <> ''` 口径，不用 `count(file_path)` —— 它不排除空串）：wp_code=J1「应付职工薪酬」3 行且 3 行都有真路径 `storage/projects/{pid}/workpapers/J/J1.xlsx`（整册 23 sheet 的工作簿）；另有 J1「应付职工薪酬审定表」2 行指向 `wp_storage/` 下 uuid 文件名。`J1-2`「应付职工薪酬明细表」2 行有独立 `J1-2.xlsx`，1 行无文件。受管 sheet `计提情况检查表J1-6` 是 `J1.xlsx` 里的一张 sheet（wp_index 无 `J1-6` 行）⇒ 目标码取持有整册文件的 `J1`。`J1E` 是 CamelCase 幻影码，wp_index 零命中。"
+        "wp_index_evidence": "wp_code=J1 实测命中"
       },
-      "contract_id": "j1.accrual_check_short_term",
-      "entry_id": "xlsx/j1/gt-j1-employee-compensation",
-      "matcher_domain_conflict": null,
-      "resolvable_for_provisioning": true,
       "store_payload_evidence": {
         "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "J1-6-short-term",
-        "why_null": "🔴 2026-10-01 现查 `checklist_responses` 全表仅 **122** 行、`item_id ~ '^J[0-9]'` **0** 行 —— spec Task 20 记录的 `J1-6-short-term` 3473 B 载荷在当前真库**已不存在**（同时 `working_paper_content_representation` 由 L spec 记录的 274 行降为 1 行，判断为库被重置，非本脚本所为）⇒ 目标 item 无法按载荷定码，本条以 file_path 证据定 `J1`。",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      },
-      "wp_codes": [
-        "J1"
-      ]
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
     },
     {
-      "basis": {
-        "heuristic_is_wrong_because": "manifest 幻影码 L3L 经 wp_template_finder 单册与 sheet 级均零命中",
-        "heuristic_would_say": [
-          "L3L"
-        ],
-        "managed_excel_name": "长期借款检查表L3-9",
-        "template_relative_path": "L/L3 长期借款.xlsx",
-        "wp_index_evidence": "2026-10-01 现算 wp_code=L3 有 4 份未删除底稿，最早目标 wp=33cfc857；无 L3-* 子码 working paper，受管 L3-9 是整册内 sheet ⇒ 目标码取 L3。"
-      },
-      "contract_id": "l3.long_term_loans",
-      "entry_id": "xlsx/gt-l3-long-term-loans",
-      "matcher_domain_conflict": null,
+      "entry_id": "xlsx/gt-c-control-test",
+      "contract_id": "c2.control_test_summary",
+      "wp_codes": [
+        "C2"
+      ],
       "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "C10",
+          "C2"
+        ],
+        "heuristic_is_wrong_because": "C 域 28 个 wp_code 由单一 entry 覆盖（C 轮 spec 裁决），provisioning 用 C2 作代表码",
+        "managed_excel_name": "C2 销售循环控制测试",
+        "template_relative_path": "C/C2 销售循环控制测试.xlsx",
+        "wp_index_evidence": "wp_code=C2 实测命中"
+      },
       "store_payload_evidence": {
         "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "L3-L3-9-voucher-rows",
-        "why_null": "本 item 真库 0 行；现有 11 条 L3 行 11/11 均为 `l-cycle-canary-e2e` 夹具，且键属于 adj/blank/note，不属受管表 ⇒ 零迁移负担。",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      },
-      "wp_codes": [
-        "L3"
-      ]
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
     },
     {
+      "entry_id": "xlsx/gt-k1-other-receivables",
+      "contract_id": "k1.baddebt_reversal_writeoff_check",
+      "wp_codes": [
+        "K1"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
       "basis": {
-        "heuristic_is_wrong_because": "manifest 幻影码 L2I 经 wp_template_finder 单册与 sheet 级均零命中",
         "heuristic_would_say": [
-          "L2I"
+          "K1"
         ],
-        "managed_excel_name": "应付利息检查表L2-4",
-        "template_relative_path": "L/L2 应付利息.xlsx",
-        "wp_index_evidence": "受管 L2-4 是整册 8 sheet 工作簿里的一张，不是独立文件 ⇒ 目标码取持有整册的 L2；判据用 `COALESCE(file_path,'') <> ''`（L1 空串陷阱）。"
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "K1 坏账准备核销及收回检查表",
+        "template_relative_path": "K/K1 坏账准备核销及收回检查表.xlsx",
+        "wp_index_evidence": "wp_code=K1 实测命中"
       },
-      "contract_id": "l2.interest_payable",
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k8-selling-expenses",
+      "contract_id": "k8.selling_expenses_adjustment",
+      "wp_codes": [
+        "K8"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "K8"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "K8 销售费用调整核查表",
+        "template_relative_path": "K/K8 销售费用调整核查表.xlsx",
+        "wp_index_evidence": "wp_code=K8 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k9-admin-expenses",
+      "contract_id": "k9.admin_expenses_adjustment",
+      "wp_codes": [
+        "K9"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "K9"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "K9 管理费用调整核查表",
+        "template_relative_path": "K/K9 管理费用调整核查表.xlsx",
+        "wp_index_evidence": "wp_code=K9 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k10-other-income",
+      "contract_id": "k10.other_income_adjustment",
+      "wp_codes": [
+        "K10"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "K10"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "K10 其他收益调整核查表",
+        "template_relative_path": "K/K10 其他收益调整核查表.xlsx",
+        "wp_index_evidence": "wp_code=K10 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k11-asset-impairment-loss",
+      "contract_id": "k11.asset_impairment_loss_adjustment",
+      "wp_codes": [
+        "K11"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "K11"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "K11 资产减值损失调整核查表",
+        "template_relative_path": "K/K11 资产减值损失调整核查表.xlsx",
+        "wp_index_evidence": "wp_code=K11 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k12-non-operating-income",
+      "contract_id": "k12.non_operating_income_adjustment",
+      "wp_codes": [
+        "K12"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "K12"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "K12 营业外收入调整核查表",
+        "template_relative_path": "K/K12 营业外收入调整核查表.xlsx",
+        "wp_index_evidence": "wp_code=K12 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k13-non-operating-expense",
+      "contract_id": "k13.non_operating_expense_adjustment",
+      "wp_codes": [
+        "K13"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "K13"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "K13 营业外支出调整核查表",
+        "template_relative_path": "K/K13 营业外支出调整核查表.xlsx",
+        "wp_index_evidence": "wp_code=K13 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
       "entry_id": "xlsx/gt-l2-interest-payable",
-      "matcher_domain_conflict": null,
-      "resolvable_for_provisioning": true,
-      "store_payload_evidence": {
-        "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "L2-L2-4-voucher-rows",
-        "why_null": "本 item 真库 0 行；现有 L2 行均为 `l-cycle-canary-e2e` 夹具（adj/note），不属受管表 ⇒ 零迁移负担。",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      },
+      "contract_id": "l2.interest_payable",
       "wp_codes": [
         "L2"
-      ]
-    },
-    {
-      "basis": {
-        "heuristic_is_wrong_because": "manifest 幻影码 L7O 经 wp_template_finder 单册与 sheet 级均零命中（GtL7OtherNoncurrentLiabilities → L7O 是幻影码）",
-        "heuristic_would_say": [
-          "L7O"
-        ],
-        "managed_excel_name": "明细表L7-2",
-        "template_relative_path": "L/L7 其他非流动负债.xlsx",
-        "wp_index_evidence": "受管 明细表L7-2 是整册 8 sheet 工作簿里的一张（L7 整册唯一的数据录入源，审定表 L7-1 / 两张附注 / 检查表 L7-4 全部跨 sheet 引用它），不是独立文件 ⇒ 目标码取持有整册文件的 L7；判据用 `COALESCE(file_path,'') <> ''`（L1 空串陷阱）。"
-      },
-      "contract_id": "l7.other_noncurrent_liabilities",
-      "entry_id": "xlsx/gt-l7-other-noncurrent-liabilities",
-      "matcher_domain_conflict": null,
+      ],
       "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "L2"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "L2 应付利息",
+        "template_relative_path": "L/L2 应付利息.xlsx",
+        "wp_index_evidence": "wp_code=L2 实测命中"
+      },
       "store_payload_evidence": {
         "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "L7-L7-2-full-data",
-        "why_null": "本 item 真库 `L7-L7-2-%` 现算 0 行（明细表从未录入，空表单是合法业务事实）；旧 full-data 用过的 key 字段已收敛到稳定 rowId（newRowIdentity('l72det')），零迁移负担。真库 L7 载荷仅 5 行 `l-cycle-canary-e2e` 夹具（L7-adj-* / L7-chk-conclusion），键属 审定表L7-1 相关，不属受管表 L7-2。",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      },
-      "wp_codes": [
-        "L7"
-      ]
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
     },
     {
-      "basis": {
-        "heuristic_is_wrong_because": "manifest 幻影码 L6S 经 wp_template_finder 单册与 sheet 级均零命中（GtL6SpecialPayables → L6S 是幻影码）",
-        "heuristic_would_say": [
-          "L6S"
-        ],
-        "managed_excel_name": "明细表L6-2",
-        "template_relative_path": "L/L6 专项应付款.xlsx",
-        "wp_index_evidence": "受管 明细表L6-2 是整册 9 sheet 工作簿里的一张（L6 整册唯一的数据录入源，审定表 L6-1 / 两张附注 / 检查表 L6-4 全部跨 sheet 引用它），不是独立文件 ⇒ 目标码取持有整册文件（科目 2711 专项应付款）的 L6；判据用 `COALESCE(file_path,'') <> ''`（L1 空串陷阱）。"
-      },
-      "contract_id": "l6.special_payables",
-      "entry_id": "xlsx/gt-l6-special-payables",
-      "matcher_domain_conflict": null,
+      "entry_id": "xlsx/gt-l3-long-term-loans",
+      "contract_id": "l3.long_term_loans",
+      "wp_codes": [
+        "L3"
+      ],
       "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "L3"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "L3 长期借款",
+        "template_relative_path": "L/L3 长期借款.xlsx",
+        "wp_index_evidence": "wp_code=L3 实测命中"
+      },
       "store_payload_evidence": {
         "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "L6-L6-2-rows",
-        "why_null": "本 item 真库 `L6-L6-2-%` 现算 0 行（明细表从未录入，空表单是合法业务事实）；旧 L6-L6-2-rows 用过的 key 字段已收敛到稳定 rowId（newRowIdentity('l62det')），零迁移负担。真库 L6 载荷仅 5 行 `l-cycle-canary-e2e` 夹具（L6-adj-* / L6-chk-conclusion），键属 审定表L6-1 相关，不属受管表 L6-2。",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      },
-      "wp_codes": [
-        "L6"
-      ]
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
     },
     {
-      "basis": {
-        "heuristic_is_wrong_because": "manifest 幻影码 L8F 经 wp_template_finder 单册与 sheet 级均零命中（GtL8FinancialExpenses → L8F 是幻影码）",
-        "heuristic_would_say": [
-          "L8F"
-        ],
-        "managed_excel_name": "明细表L8-2",
-        "template_relative_path": "L/L8 财务费用.xlsx",
-        "wp_index_evidence": "受管 明细表L8-2 是整册 10 sheet 工作簿里的一张（L8 整册唯一的数据录入源，审定表 L8-1 / 两张附注 / 检查表 L8-6 全部跨 sheet 引用它），不是独立文件 ⇒ 目标码取持有整册文件（科目 6603 财务费用，损益类）的 L8；判据用 `COALESCE(file_path,'') <> ''`（L1 空串陷阱）。🔴 wp_codes 用整册底稿码 L8（不是科目码 6603，照 L1~L7 一律用底稿码）。"
-      },
-      "contract_id": "l8.financial_expenses",
-      "entry_id": "xlsx/gt-l8-financial-expenses",
-      "matcher_domain_conflict": null,
+      "entry_id": "xlsx/gt-l4-bonds-payable",
+      "contract_id": "l4.bonds_payable",
+      "wp_codes": [
+        "L4"
+      ],
       "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "L4"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "L4 应付债券",
+        "template_relative_path": "L/L4 应付债券.xlsx",
+        "wp_index_evidence": "wp_code=L4 实测命中"
+      },
       "store_payload_evidence": {
         "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "L8-2-full-data",
-        "why_null": "本 item 真库 `L8-2-%` 现算 0 行（明细表从未录入，空表单是合法业务事实）；身份字段 key 已收敛到稳定 rowId（newRowIdentity('l82det')，已有不重铸），旧位置化键 `L8-2-row-%` 亦 0 行 ⇒ 零迁移负担。真库 L8 载荷仅 5 行 `l-cycle-canary-e2e` 夹具（L8-adj-* / L8-chk-conclusion），键属 审定表L8-1 相关，不属受管表 L8-2。",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      },
-      "wp_codes": [
-        "L8"
-      ]
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
     },
     {
-      "basis": {
-        "heuristic_is_wrong_because": "manifest 幻影码 L5L 经 wp_template_finder 单册与 sheet 级均零命中（GtL5LongTermPayables → L5L 是幻影码）",
-        "heuristic_would_say": [
-          "L5L"
-        ],
-        "managed_excel_name": "明细表L5-2",
-        "template_relative_path": "L/L5 长期应付款.xlsx",
-        "wp_index_evidence": "受管 明细表L5-2 是整册 12 sheet 工作簿里的一张（科目 2701 长期应付款），审定表 L5-1 / 两张附注 / L5-3~L5-7 全部跨 sheet 引用它，不是独立文件 ⇒ 目标码取持有整册文件的 L5；判据用 `COALESCE(file_path,'') <> ''`（L1 空串陷阱）。🔴 wp_codes 用整册底稿码 L5（不是科目码 2701，照 L1~L8 一律用底稿码）。"
-      },
-      "contract_id": "l5.long_term_payables",
       "entry_id": "xlsx/gt-l5-long-term-payables",
-      "matcher_domain_conflict": null,
-      "resolvable_for_provisioning": true,
-      "store_payload_evidence": {
-        "max_payload_bytes": 0,
-        "measured_at": "2026-10-01",
-        "store_item_id": "L5-L5-2-rows",
-        "why_null": "本 item 真库 `L5-L5-2-rows` 现算 0 行（三区同键，明细表从未录入，空表单是合法业务事实）；身份字段 key 已收敛到稳定 rowId（newRowIdentity('l52det')，已有不重铸、历史行补铸 + section 落默认区）⇒ 零迁移负担。真库 L5 载荷仅 `L5-adj-*` / `L5-*-note` / `L5-chk-conclusion` 等夹具行，属 审定表L5-1 / L5-4 相关，不属受管表 L5-2。",
-        "wp_code_with_payload": null,
-        "wp_count_with_payload": 0
-      },
+      "contract_id": "l5.long_term_payables",
       "wp_codes": [
         "L5"
-      ]
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "L5"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "L5 长期应付款",
+        "template_relative_path": "L/L5 长期应付款.xlsx",
+        "wp_index_evidence": "wp_code=L5 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-l6-special-payables",
+      "contract_id": "l6.special_payables",
+      "wp_codes": [
+        "L6"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "L6"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "L6 专项应付款",
+        "template_relative_path": "L/L6 专项应付款.xlsx",
+        "wp_index_evidence": "wp_code=L6 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-l7-other-noncurrent-liabilities",
+      "contract_id": "l7.other_noncurrent_liabilities",
+      "wp_codes": [
+        "L7"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "L7"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "L7 其他非流动负债",
+        "template_relative_path": "L/L7 其他非流动负债.xlsx",
+        "wp_index_evidence": "wp_code=L7 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-l8-financial-expenses",
+      "contract_id": "l8.financial_expenses",
+      "wp_codes": [
+        "L8"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "L8"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "L8 财务费用",
+        "template_relative_path": "L/L8 财务费用.xlsx",
+        "wp_index_evidence": "wp_code=L8 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-n4-taxes-and-surcharges",
+      "contract_id": "n4.taxes_and_surcharges",
+      "wp_codes": [
+        "N4"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "N4"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "N4 税金及附加",
+        "template_relative_path": "N/N4 税金及附加.xlsx",
+        "wp_index_evidence": "wp_code=N4 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
     }
   ],
   "basis_rule": "真源 = 契约里**冻结**的 `template.relative_path`（其文件名前缀即 wp_code）+ 受管 sheet 的 `excel_name`（它是该工作簿里的一个 tab，不是独立底稿）。这两个字段都进了 contract definition 的 sha256，改不了；比「文件名 CamelCase 反推」可靠得多。",

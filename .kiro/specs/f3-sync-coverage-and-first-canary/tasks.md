@@ -2,7 +2,7 @@
 
 ## Overview
 
-**spec**：`f3-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**10/20 已实施**（2026-09-26）
+**spec**：`f3-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**14/20 已实施**（2026-10-03 复盘修正，原 10/20 偏低）
 **上游**：umbrella Task 48 · FC-1~FC-13（`f1-sync-coverage-and-first-canary/design.md`；**FC-11 由本 spec 提出**）·
 D1 引擎 · D1 应收票据镜像先例 · D2-1 稳定 rowKey 固定行先例
 

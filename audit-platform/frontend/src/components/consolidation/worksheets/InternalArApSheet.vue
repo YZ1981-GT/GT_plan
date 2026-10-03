@@ -20,7 +20,7 @@
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
       <span>📋 <b>内部往来抵消</b>：每行一笔往来（本方↔对方），账龄段横向展开。❶先确认账龄段设置（3年段/5年段/自定义）❷导出模板按格式填写 ❸导入后自动追加。
-        <b>请先确认账龄段后再导出模板</b>，列结构与账龄段一致。底部自动生成抵消分录（往来抵消+坏账冲回），汇总到合并抵消分录表。</span>
+        <b>请先确认账龄段后再导出模板</b>，列结构与账龄段一致。底部预览自动生成的抵消分录（往来抵消+坏账冲回），保存后到「合并抵消分录」表点「生成草稿分录」，审批后计入合并数。</span>
     </div>
 
     <!-- 账龄段选择 -->
@@ -210,6 +210,7 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useExcelIO } from '@/composables/useExcelIO'
 import { useTableToolbar } from '@/composables/useTableToolbar'
 import { useConsolSubjectSource } from '../composables/useConsolSubjectSource'
+import { arapPreviewLines, restoreArApRows, savedAgingLength } from '../composables/elimSourceGroups'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface AgingSegment { name: string; startMonth: number; endMonth: number; impairmentRate: number }
@@ -222,11 +223,16 @@ interface ArApRow {
   _reconcileStatus?: string; _reconcileDiff?: number; _impairmentDiff?: number
 }
 
-const props = defineProps<{ companies: CompanyCol[] }>()
+const props = defineProps<{
+  companies: CompanyCol[]
+  /** 已保存的行（切回本表 / 刷新页面后恢复；不传 = 空表） */
+  initialRows?: ArApRow[] | null
+}>()
 const emitArap = defineEmits<{
   (e: 'save', data: ArApRow[]): void
   (e: 'open-formula', key: string): void
-  (e: 'entries-changed', entries: any[]): void
+  /** 行数据变化：父组件据此生成「合并抵消分录明细表」的待生成分组（与本表预览同一计算） */
+  (e: 'rows-changed', rows: ArApRow[]): void
 }>()
 
 const { isFullscreen, toggleFullscreen } = useFullscreen()
@@ -307,7 +313,20 @@ function resizeArr(arr: (number|null)[], len: number) {
 }
 
 // ─── 数据行 ───────────────────────────────────────────────────────────────────
-const rows = reactive<ArApRow[]>([mkEmpty(), mkEmpty(), mkEmpty()])
+// 账龄段设置不入库，只有行里的账龄金额数组：按数组长度选回预设（3 年段 4 段 / 5 年段 6 段），
+// 其他长度用「第 n 段」占位的自定义段 —— 不能套用预设段名（段界未知），也不能少显示段（隐藏的金额仍会被合计）
+const savedAgingLen = savedAgingLength(props.initialRows)
+if (savedAgingLen === AGING_5.length) {
+  agingPreset.value = '5year'
+} else if (savedAgingLen > AGING_3.length) {
+  agingPreset.value = 'custom'
+  customAging.length = 0
+  for (let i = 0; i < savedAgingLen; i += 1) {
+    customAging.push({ name: `第${i + 1}段`, startMonth: 0, endMonth: 0, impairmentRate: 0 })
+  }
+}
+const restored = restoreArApRows(props.initialRows, agingSegments.value.length)
+const rows = reactive<ArApRow[]>(restored.length ? restored : [mkEmpty(), mkEmpty(), mkEmpty()])
 
 function mkEmpty(): ArApRow {
   const len = agingCount.value
@@ -398,54 +417,12 @@ function runReconcile() {
   ElMessage.success(`核对完成：${matched} 笔一致，${diffCount} 笔有差异`)
 }
 
-// ─── 自动生成抵消分录 ────────────────────────────────────────────────────────
-const generatedEntries = computed(() => {
-  const entries: any[] = []
-  const pairMap = new Map<string, { local: number; remote: number; localImp: number; remoteImp: number; localByAging: number[]; remoteByAging: number[] }>()
-  for (const row of rows) {
-    if (!row.localSubject && !row.remoteSubject) continue
-    const key = `${row.localSubject}|${row.remoteSubject}`
-    if (!pairMap.has(key)) pairMap.set(key, { local: 0, remote: 0, localImp: 0, remoteImp: 0, localByAging: agingSegments.value.map(() => 0), remoteByAging: agingSegments.value.map(() => 0) })
-    const m = pairMap.get(key)!
-    m.local += sumArr(row.localAmounts)
-    m.remote += sumArr(row.remoteAmounts)
-    m.localImp += sumArr(row.localImpairments)
-    m.remoteImp += sumArr(row.remoteImpairments)
-    // 按账龄段累加
-    for (let i = 0; i < agingSegments.value.length; i++) {
-      m.localByAging[i] += n(row.localAmounts[i])
-      m.remoteByAging[i] += n(row.remoteAmounts[i])
-    }
-  }
-  for (const [key, vals] of pairMap) {
-    const [localSubj, remoteSubj] = key.split('|')
-    const amount = Math.min(vals.local, vals.remote)
-    if (amount > 0) {
-      // 往来抵消分录
-      entries.push({ direction: '借', subject: localSubj || remoteSubj, amount, desc: `内部往来抵消（本方${fmt(vals.local)} / 对方${fmt(vals.remote)}）` })
-      entries.push({ direction: '贷', subject: remoteSubj || localSubj, amount, desc: `内部往来抵消` })
-    }
-    // 坏账准备冲回（本方+对方的坏账都要冲回）
-    if (vals.localImp > 0) {
-      entries.push({ direction: '借', subject: '坏账准备', amount: vals.localImp, desc: `冲回本方坏账（${localSubj}）` })
-      entries.push({ direction: '贷', subject: '信用减值损失', amount: vals.localImp, desc: `冲回本方坏账` })
-    }
-    if (vals.remoteImp > 0) {
-      entries.push({ direction: '借', subject: '坏账准备', amount: vals.remoteImp, desc: `冲回对方坏账（${remoteSubj}）` })
-      entries.push({ direction: '贷', subject: '信用减值损失', amount: vals.remoteImp, desc: `冲回对方坏账` })
-    }
-    // 差异提示
-    const diff = Math.round((vals.local - vals.remote) * 100) / 100
-    if (Math.abs(diff) > 0.01) {
-      entries.push({ direction: '—', subject: '⚠️ 差异', amount: diff, desc: `${localSubj}↔${remoteSubj} 未抵消差异` })
-    }
-  }
-  return entries
-})
+// ─── 自动生成抵消分录（预览）──────────────────────────────────────────────────
+// 与「合并抵消分录明细表」的待生成分组同一计算（elimSourceGroups）：每对往来科目抵销（借负债方、贷资产方）
+// + 本方 / 对方坏账冲回；本方与对方金额不等只提示差异。生成草稿分录在明细表里做。
+const generatedEntries = computed(() => arapPreviewLines(rows))
 
-watch(generatedEntries, (entries) => {
-  emitArap('entries-changed', entries.map(e => ({ ...e, source: '内部往来' })))
-}, { immediate: true })
+watch(() => rows, (v) => emitArap('rows-changed', v), { deep: true, immediate: true })
 
 const headerStyle = { background: '#f0edf5', fontSize: '10px', color: '#333', padding: '2px 0' }
 const cellStyle = { padding: '2px 3px', fontSize: '11px' }

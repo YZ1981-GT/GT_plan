@@ -223,6 +223,7 @@ class TestCheckRejectsItemsBlock:
     """🔴 改造前 `--check` 兼容读 `items` ⇒ 死配置也报 exit 0。本判据把它钉死。"""
 
     def test_check_passes_on_current_data(self):
+        env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
         result = subprocess.run(
             [sys.executable, str(FIX_SCRIPT), "--check"],
             capture_output=True,
@@ -230,6 +231,7 @@ class TestCheckRejectsItemsBlock:
             encoding="utf-8",
             errors="replace",
             cwd=str(_BACKEND.parent),
+            env=env,
         )
         assert result.returncode == 0, (
             f"--check 在当前数据上应 exit 0:\n{result.stdout}\n{result.stderr}"

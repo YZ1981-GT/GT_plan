@@ -18,7 +18,6 @@ Requirements: 6.6
 from __future__ import annotations
 
 import logging
-from decimal import Decimal
 from typing import Any
 from urllib.parse import quote
 
@@ -29,8 +28,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import authorize_wp_edit, get_current_user
 from app.models.core import User
+from app.services.project_audit_year import fetch_project_audit_year
+from app.services.tb_audited_writer import publish_rows
 
 from app.routers.wp_render_strategies._x3_adjustment_import_export import (
     X3_SHEET_SPECS,
@@ -307,14 +308,14 @@ async def m9_tb_writeback(
     """
     from uuid import UUID as _UUID
 
-    from app.models.audit_platform_models import TrialBalance
     from app.routers._wp_gate import enforce_wp_gate
 
-    # Wp_Bound_Gate：审定数回写 trial_balance（写副作用）之前完成授权判定（Req 8.5 / tb writeback）。
+    # Wp_Bound_Gate + 项目编辑权：写入 TB 前完成全部授权判定。
     try:
         _wpid = _UUID(str(wp_id))
     except (ValueError, TypeError):
         raise HTTPException(status_code=404, detail="资源不存在或不可访问")
+    project_id = await authorize_wp_edit(db, current_user, _wpid)
     await enforce_wp_gate(
         db, current_user,
         entrypoint="workpaper.tb_writeback", action="tb_writeback", method="POST",
@@ -322,50 +323,42 @@ async def m9_tb_writeback(
         route_name="/api/m9-other-comprehensive-income/{wp_id}/tb-writeback",
     )
 
-    # 从 wp_id 获取 project_id
-    wp_result = await db.execute(
-        sa.text("SELECT project_id FROM working_paper WHERE id = :wp_id"),
-        {"wp_id": wp_id},
-    )
-    wp_row = wp_result.fetchone()
-    if not wp_row:
-        raise HTTPException(404, f"底稿不存在: {wp_id}")
-
-    project_id = wp_row[0]
     account_code = request.account_code
+    year = await fetch_project_audit_year(db, project_id)
+    if year is None:
+        raise HTTPException(400, "项目未设置审计年度，无法定位 trial_balance")
 
-    # 查找匹配的 trial_balance 行
-    stmt = (
-        sa.select(TrialBalance)
-        .where(
-            TrialBalance.project_id == project_id,
-            TrialBalance.standard_account_code == account_code,
-            TrialBalance.is_deleted == sa.false(),
+    try:
+        publish_report = await publish_rows(
+            db,
+            project_id,
+            year,
+            [{
+                "account_code": account_code,
+                "audited_amount": request.audited_amount,
+            }],
+            source="m9:tb-writeback",
         )
-        .order_by(TrialBalance.year.desc())
-        .limit(1)
-    )
-    result = await db.execute(stmt)
-    row = result.scalar_one_or_none()
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
-    if not row:
+    if not publish_report.updated_rows:
+        reason = publish_report.skipped[0].reason if publish_report.skipped else "未更新试算表"
         raise HTTPException(
             404,
-            f"试算表中未找到科目 {account_code}，请先导入试算表数据",
+            f"试算表中未找到可发布科目 {account_code}，请先导入试算表数据（{reason}）",
         )
 
-    # 更新 audited_amount
-    row.audited_amount = Decimal(str(request.audited_amount))
-    await db.flush()
+    published = publish_report.updated_rows[0]
     await db.commit()
 
     logger.info(
-        "M9 TB回写完成: project=%s account=%s amount=%s",
-        project_id, account_code, request.audited_amount,
+        "M9 TB回写完成: project=%s year=%s account=%s amount=%s",
+        project_id, year, account_code, published.audited_amount,
     )
 
     return TBWritebackResponse(
         message="回写成功",
-        account_code=account_code,
-        audited_amount=str(row.audited_amount),
+        account_code=published.account_code,
+        audited_amount=str(published.audited_amount),
     )

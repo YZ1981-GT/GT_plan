@@ -2,6 +2,35 @@
 
 import os
 import sys
+import warnings
+
+# ── 启动期第三方库警告抑制（无害、不可控、污染日志）──────────────────────────
+# 1) jieba/_compat.py 在 import 期使用已弃用的 pkg_resources（jieba 自身已有 fallback）
+#    setuptools>=81 把此警告改为 UserWarning（非 DeprecationWarning），两类都抑制
+warnings.filterwarnings(
+    "ignore",
+    message="pkg_resources is deprecated",
+    category=DeprecationWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message="pkg_resources is deprecated",
+    category=UserWarning,
+)
+# 2) openpyxl 读含 Conditional Formatting / Data Validation 扩展的 xlsx 时发出 UserWarning
+#    这些扩展不影响数据读取，只是 openpyxl 不支持完整保留它们
+warnings.filterwarnings(
+    "ignore",
+    message="Conditional Formatting extension",
+    category=UserWarning,
+    module="openpyxl",
+)
+warnings.filterwarnings(
+    "ignore",
+    message="Data Validation extension",
+    category=UserWarning,
+    module="openpyxl",
+)
 
 # FastAPI 每个 include_router 会嵌套一层 merged_lifespan（当前约 950+ 层）。
 # 进入 lifespan 主体时栈已深约 6000+ 帧，其中的迁移/门禁子调用会再叠加，
@@ -431,17 +460,28 @@ def _register_phase_handlers() -> None:
             "[启动] 合并 stale handler 注册失败: %s", e
         )
 
-    # adj-formula-repair-and-approval-gate-wiring 任务 3.4:
-    # 调整分录审批 → TB 调整列 + 审定数重算
+    # 调整分录复核通过 / 撤回 → 试算表调整列 + 审定数重算
     try:
         from app.services.event_bus import event_bus
         from app.services.adjustment_approved_recalc_handler import (
             register_adjustment_approved_recalc_handler,
         )
-        register_adjustment_approved_recalc_handler(event_bus)  # ADJUSTMENT_APPROVED → recalc adjustments + audited
+        register_adjustment_approved_recalc_handler(event_bus)
     except Exception as e:
         _log.getLogger("audit_platform").warning(
-            "[启动] 调整分录审批 recalc handler 注册失败: %s", e
+            "[启动] 调整分录复核 recalc handler 注册失败: %s", e
+        )
+
+    # chain-closure-phase2-formula-push-engine 任务 11:
+    # 试算表更新（四表入库 / 调整审批重算）、E1 底稿保存 → 公式推送到底稿与附注
+    try:
+        from app.services.event_bus import event_bus
+        from app.services.formula_push.triggers import register_formula_push_handlers
+
+        register_formula_push_handlers(event_bus)
+    except Exception as e:
+        _log.getLogger("audit_platform").warning(
+            "[启动] 公式推送 handler 注册失败: %s", e
         )
 
 

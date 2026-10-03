@@ -57,6 +57,7 @@ child inventory、correlation id）。**绝不**降级成 ``None`` / 空 identit
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import uuid
@@ -607,7 +608,11 @@ class PublishedIdentityObserver:
             entry_id=entry_id,
             correlation_id=cid,
         )
-        observed = self._observe_workbook(
+        # 🔴 整簿解析（openpyxl + 结构指纹）移出事件循环（spec startup-prewarm-event-loop-unblocking
+        #    Requirement 2）：冷注册里它累计占事件循环 3.6s，期间后端不响应任何请求。输入是不可变字节 +
+        #    冻结契约，函数不碰会话；`shared_workbook_from_bytes` 读的 ContextVar 由 to_thread 复制过去。
+        observed = await asyncio.to_thread(
+            self._observe_workbook,
             data=data,
             contract=contract,
             instrumentation=instrumentation,
@@ -1086,20 +1091,60 @@ class PublishedIdentityObserver:
         ``table_key`` 取契约里与主 sheet 锚点对齐的那张 ``row_identity`` 表。
 
         单 sheet entry：``row_identity`` 表必须恰好 1 张。多 sheet entry（如 D4-2+D4-3）：
-        允许 ≥2 张，主 binding 绑到 ``anchors['sheet_key']`` 对应的那张，sibling 由 attach /
-        publish 另传 ``sibling_bindings`` —— 不得「随手挑第一张」。
+        允许 ≥2 张，但**主** binding 必须绑到 ``anchors['sheet_key']`` 对应的那张，
+        sibling 由 attach / publish 另传 ``sibling_bindings`` —— 不得「随手挑第一张」。
 
-        🔴 **同一 sheet_key 多受管区**（spec `l5-true-bidirectional-2026-10-01` · T7 根因修复）：
-        G9/L5 这类「同一张 sheet 多个受管区、共享 sheet_key」的 entry，``matched``（按 sheet_key）
-        会命中多张，sheet_key 本身无法消歧。此时用冻结 ``anchors['table_name']``
-        （``sheet_anchors[0]`` = 主区的 Excel Table 名）去对齐 **provider 的
-        ``managed_row_table_specs()``**（每张 spec 的 ``table_name`` 与 ``table_key``），选出主区的
-        ``table_key``，其余区由 attach 另传 sibling。沿用 H attach 侧既有的「observer 依赖 provider
-        ``managed_row_table_specs``」模式，不引入新架构耦合、零契约改动。
-        🔴 **单表 / 多 sheet 既有分支一字不动**；只在「同 sheet_key matched>1」时走此消歧，且消歧后
-        仍不唯一（table_name 对不上任何一张 / 对上多张）照旧 fail-closed，不得随手挑第一张。
+        🔴 **静态臂**（spec workpaper-sync-pure-static-lane…，第 5 处阻塞）：纯静态 entry
+        的锚点只带 ``sheet_key`` / ``defined_name`` / ``anchor`` / ``region_kind`` 四键，
+        既没有 ``table_name`` 也没有 ``uuid_column_letter``，且契约里一张带 ``row_identity``
+        的表都没有 ⇒ 走动态路径必被判 ``FrozenChildUnusableError``。静态臂按
+        ``region_kind == "static"`` 分派到 defined-name 形态 binding；两臂在
+        「**禁随手挑第一张**」这条上判据**对称**。
+
+        ``ExcelIdentityBinding.kind`` 是派生属性（有 ``defined_name`` 即 ``static_region``），
+        且静态 binding 形态与 canary provider 现有 ``static_identity_bindings()`` 一致 ⇒
+        ``excel_extract`` / ``excel_materialize`` 侧零改动。
+
+        前置：第 6 处阻塞（``_observe_workbook`` 的观测清册）必须**先**解除 ——
+        ``_observe_workbook`` 在 ``observe()`` 内的执行位置更早，它未解除时本臂的运行时
+        路径根本到不了（会先撞裸 ``AttributeError``）。
         """
         from app.services.workpaper_sync.excel_extract import ExcelIdentityBinding
+
+        if str(anchors.get("region_kind") or "") == "static":
+            ctx = self._identity_context(
+                resolution=resolution, entry_id=entry_id, correlation_id=correlation_id
+            )
+            static_tables = [
+                (sheet.sheet_key, table.table_key)
+                for sheet in contract.sheets
+                for table in sheet.tables
+                if table.row_identity is None
+            ]
+            if not static_tables:
+                raise FrozenChildUnusableError(
+                    "契约未声明任何静态表（`row_identity is None`）—— 静态受管区无从绑定",
+                    stage=ObservationStage.observe_workbook,
+                    context=ctx,
+                )
+            primary_sheet = str(anchors.get("sheet_key") or "").strip()
+            matched = [
+                table_key for sheet_key, table_key in static_tables
+                if sheet_key == primary_sheet
+            ]
+            if len(matched) != 1:
+                raise FrozenChildUnusableError(
+                    f"静态主 binding 未能唯一对齐 sheet_key={primary_sheet!r}"
+                    f"（匹配 {matched!r}，契约静态表 "
+                    f"{[t for _s, t in static_tables]}）—— 不得随手挑第一张",
+                    stage=ObservationStage.observe_workbook,
+                    context=ctx,
+                )
+            return ExcelIdentityBinding(
+                defined_name=str(anchors["defined_name"]),
+                table_key=matched[0],
+                metadata_sheet=GT_SYNC_SHEET_NAME,
+            )
 
         row_tables = [
             (sheet.sheet_key, table.table_key)
@@ -1122,11 +1167,6 @@ class PublishedIdentityObserver:
             table_key = matched[0]
         elif len(row_tables) == 1:
             table_key = row_tables[0][1]
-        elif len(matched) > 1:
-            # 🔴 同 sheet_key 多受管区：用冻结 anchors['table_name'] 对齐 provider spec 的 table_name。
-            table_key = self._primary_table_key_by_frozen_table_name(
-                contract=contract, anchors=anchors, matched=matched, ctx=ctx
-            )
         else:
             raise FrozenChildUnusableError(
                 f"契约声明了 {len(row_tables)} 张带 row_identity 的表 "
@@ -1143,81 +1183,6 @@ class PublishedIdentityObserver:
             dynamic_column_columns={
                 key: dict(value) for key, value in dynamic_bindings.items()
             },
-        )
-
-    def _primary_table_key_by_frozen_table_name(
-        self, *, contract: SyncContract, anchors: Mapping[str, str],
-        matched: list[str], ctx: Mapping[str, Any],
-    ) -> str:
-        """同一 sheet_key 多受管区：用冻结 ``anchors['table_name']`` 对齐 provider spec 选主 table_key。
-
-        spec: `l5-true-bidirectional-2026-10-01` · T7（L5 两区同键首次真实命中；G9 范式从未翻 manifest
-        故此路径此前未被运行过）。
-
-        ``anchors`` 来自 ``sheet_anchors[0]``（主区的冻结 instrumentation）。provider 的
-        ``managed_row_table_specs()`` 每张 spec 带 ``table_name``（Excel Table displayName）+
-        ``table_key``（契约 table_key）。按 ``table_name == anchors['table_name']`` 选出主区 table_key，
-        且该 table_key 必须在 ``matched``（同 sheet_key 的候选）里。
-
-        🔴 fail-closed：provider 不可解析 / table_name 对不上任何一张 / 对上多张 ⇒ 抛错，不随手挑第一张。
-        """
-        frozen_table_name = str(anchors.get("table_name") or "").strip()
-        if not frozen_table_name:
-            raise FrozenChildUnusableError(
-                "同 sheet_key 多受管区消歧需要冻结 anchors['table_name']，但它为空 —— "
-                "frozen instrumentation 锚点缺 Excel Table 名",
-                stage=ObservationStage.observe_workbook,
-                context=ctx,
-            )
-        provider = self._resolve_provider_for_contract(contract=contract, ctx=ctx)
-        specs_fn = getattr(provider, "managed_row_table_specs", None)
-        if not callable(specs_fn):
-            raise FrozenChildUnusableError(
-                f"provider {getattr(provider, '__name__', provider)!r} 未暴露 "
-                "managed_row_table_specs()，同 sheet_key 多受管区无法按 table_name 消歧",
-                stage=ObservationStage.observe_workbook,
-                context=ctx,
-            )
-        # table_name → table_key（只收候选 matched 里的，避免跨 sheet 的同名污染）。
-        matched_set = set(matched)
-        hits = [
-            str(getattr(spec, "table_key", "") or "")
-            for spec in specs_fn()
-            if str(getattr(spec, "table_name", "") or "") == frozen_table_name
-            and str(getattr(spec, "table_key", "") or "") in matched_set
-        ]
-        if len(hits) != 1:
-            raise FrozenChildUnusableError(
-                f"同 sheet_key 多受管区按冻结 table_name {frozen_table_name!r} 消歧命中 "
-                f"{len(hits)} 张 {hits}（候选 {matched}）—— 必须恰 1 张，不得随手挑第一张",
-                stage=ObservationStage.observe_workbook,
-                context=ctx,
-            )
-        return hits[0]
-
-    def _resolve_provider_for_contract(
-        self, *, contract: SyncContract, ctx: Mapping[str, Any]
-    ) -> Any:
-        """按 ``contract.contract_id``（= 冻结 adapter_id）解析 provider 模块。
-
-        走 ``store_item_registry.STORE_MERGE_REGISTRY[adapter_id].provider_module`` 这条稳定映射
-        （与 attach 侧按 provider 取 managed_row_table_specs 同源），不读 registry alias。
-        """
-        import importlib
-
-        from app.services.workpaper_sync.store_item_registry import STORE_MERGE_REGISTRY
-
-        adapter_id = str(getattr(contract, "contract_id", "") or "").strip()
-        plan = STORE_MERGE_REGISTRY.get(adapter_id)
-        if plan is None or not getattr(plan, "provider_module", ""):
-            raise FrozenChildUnusableError(
-                f"adapter {adapter_id!r} 在 STORE_MERGE_REGISTRY 无 provider_module 映射，"
-                "同 sheet_key 多受管区无法定位 provider 做 table_name 消歧",
-                stage=ObservationStage.observe_workbook,
-                context=ctx,
-            )
-        return importlib.import_module(
-            f"app.services.workpaper_sync.{plan.provider_module}"
         )
 
     # ─── stage 8 ─────────────────────────────────────────────────────
@@ -1485,6 +1450,72 @@ def _collect_static_region_physical(*, data, contract, key, defined_name):
     return sheet_name
 
 
+@dataclass(frozen=True)
+class StaticIdentityInventory:
+    """纯静态 entry 的身份清册 —— 与行 UUID 清册**同位**，载荷是 definedName 锚点。
+
+    ═══ 为什么需要它（spec workpaper-sync-pure-static-lane…，第 6 处阻塞）═══
+
+    `PublishedIdentityObserver._observe_workbook` 里那行
+    `canonical_digest(inventory.inventory_digest_input)` **没有** `None` 守卫，而
+    :func:`collect_workbook_structure` 的第 3 返回值 `primary_inventory` 初值 `None`、
+    **只在动态 Excel-Table 分支内**赋值。全静态锚点集合下它恒 `None` ⇒ 纯静态 entry 在
+    请求期观测抛的是裸 `AttributeError`，而不是设计好的 `FrozenChildUnusableError`。
+
+    🔴 处置方式是**消除 `None`** 而不是给那行加 `None` 特判、也不是把字段改成
+    `Optional` —— 后两者会让 `identity_inventory_sha256` 对纯静态 entry 变成一个假值
+    （或干脆消失），从此这个 digest 对静态锚点漂移**零反漂移能力**。
+
+    本类型让该 digest 仍是一个**真实观测值**：definedName 被删 / 改名 / 改指向另一张
+    sheet，三种情形都会改 `regions` 进而改 digest。
+    """
+
+    #: `(sheet_key, defined_name, physical_sheet)` 三元组，按观测顺序。
+    regions: tuple[tuple[str, str, str], ...]
+    #: ═══ 以下三项是**真实观测值**，不是补出来的常量 ═══
+    #:
+    #: 🔴 它们的存在理由是**消费方审计的结论**（Requirement 6.6），不是凑接口：
+    #:    `excel_extract._assert_static_anchor_retained()` 现读用 `expected.defined_names`
+    #:    与 `expected.hidden_sheet_present`，而 Requirement 5.5 要求 `excel_extract`
+    #:    零改动 ⇒ 静态清册必须**真实提供**这两项，否则 `AttributeError` 只是从
+    #:    `_observe_workbook` 搬到了 `excel_extract`。
+    #:    三项全部由 `structure_fingerprint(data)` 现读得出（见 `collect_workbook_structure`）。
+    hidden_sheet_present: bool = False
+    hidden_sheet_is_hidden: bool = False
+    excluded_from_business_enumeration: bool = False
+
+    @property
+    def is_static_region_inventory(self) -> bool:
+        """静态形态判别器（显式命名，避免消费方靠 `hasattr` 猜类型）。"""
+        return True
+
+    @property
+    def defined_names(self) -> tuple[str, ...]:
+        """本清册观测到的 workbook-scope definedName —— 静态区的唯一区域锚点。"""
+        return tuple(defined_name for _key, defined_name, _physical in self.regions)
+
+    @property
+    def row_uuids(self) -> tuple[str, ...]:
+        """恒空 —— 纯静态区结构上没有行身份（不是「读不到」）。"""
+        return ()
+
+    @property
+    def duplicate_row_uuids(self) -> tuple[str, ...]:
+        """恒空 —— 没有行身份就不可能有重复行身份。"""
+        return ()
+
+    @property
+    def empty_row_uuids(self) -> tuple[str, ...]:
+        """恒空 —— 同上。"""
+        return ()
+
+    @property
+    def inventory_digest_input(self) -> dict[str, Any]:
+        """🔴 形态由 Requirement 6.2 钉死，**不含**上面三项隐藏 sheet 事实 ——
+        本 digest 的职责是 definedName 锚点的反漂移（删 / 改名 / 改指向都会改它）。"""
+        return {"kind": "static_region", "regions": [list(r) for r in self.regions]}
+
+
 def collect_workbook_structure(*, data, contract, sheet_anchors, context=None):
     """One physical collection path for publication and request-time observation."""
     ctx = context or {}
@@ -1502,6 +1533,10 @@ def collect_workbook_structure(*, data, contract, sheet_anchors, context=None):
         shared_sync_pairs = _read_gt_sync_pairs(data)
         physical, rows, transposed = {}, {}, {}
         primary_inventory = None
+        #: 静态受管区的观测三元组 `(sheet_key, defined_name, physical_sheet)`。
+        #: 循环结束时若没有任何动态清册，就用它构造 `StaticIdentityInventory` 当第 3
+        #: 返回值 —— 这是「消除 None」而不是「特判 None」。
+        static_observed: list[tuple[str, str, str]] = []
         for anchor in sheet_anchors:
             key = anchor["sheet_key"]
             if anchor.get("anchor") == "defined_name_ref":
@@ -1511,6 +1546,9 @@ def collect_workbook_structure(*, data, contract, sheet_anchors, context=None):
                     physical[key] = _collect_static_region_physical(
                         data=data, contract=contract, key=key,
                         defined_name=anchor["defined_name"],
+                    )
+                    static_observed.append(
+                        (str(key), str(anchor["defined_name"]), str(physical[key]))
                     )
                     continue
                 # 转置 anchor 泛化（spec d4-12-transposed-writeback）：按 sheet_key 从注册表
@@ -1586,6 +1624,24 @@ def collect_workbook_structure(*, data, contract, sheet_anchors, context=None):
             rows[key] = sorted(int(row) for row in inventory.row_uuids if str(row).isdigit())
             if primary_inventory is None:
                 primary_inventory = inventory
+        # 🔴 含动态 Excel-Table 锚点时第 3 返回值**仍是**改动前的 `primary_inventory`
+        #    对象（动态路径零改动）；只有「一个动态清册都没有、但有静态观测结果」才构造
+        #    静态清册。两条件都不满足时仍返回 `None` —— 那是「锚点集合本身为空」的形态，
+        #    由 `_observe_workbook` 的既有 `if not sheet_anchors` 判据挡在前面。
+        if primary_inventory is None and static_observed:
+            # 隐藏 metadata sheet 的三项事实全部**现读** fingerprint 得出（已在本函数
+            # 开头算过一次），不是补常量 —— 详见 `StaticIdentityInventory` 的字段注释。
+            all_sheets = set(fingerprint.sheet_names)
+            primary_inventory = StaticIdentityInventory(
+                regions=tuple(static_observed),
+                hidden_sheet_present=GT_SYNC_SHEET_NAME in all_sheets,
+                hidden_sheet_is_hidden=GT_SYNC_SHEET_NAME in set(
+                    fingerprint.hidden_sheet_names
+                ),
+                excluded_from_business_enumeration=(
+                    GT_SYNC_SHEET_NAME not in set(fingerprint.business_sheet_names())
+                ),
+            )
         structure = observe_structure_inventory(contract=contract, fingerprint=fingerprint,
             physical_sheet_by_key=physical, row_uuid_rows_by_sheet=rows,
             transposed_fields_by_sheet=transposed)

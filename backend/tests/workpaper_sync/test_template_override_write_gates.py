@@ -448,6 +448,22 @@ class TestProperty1RootEscapeGate:
         assert got == (fake_root / "sub" / "x.xlsx").resolve()
         assert got.is_absolute()
 
+        # 🔴 **2026-09-30 变异检验（T5 / M05）补的缺口**：上面三行用的输入
+        # （`fake_root / "sub" / "x.xlsx"`）**本身就已规范化** ⇒ `target == target.resolve()`
+        # 恒成立 ⇒ 把实现的 `return resolved` 改成 `return target` 照样全绿。
+        # docstring 说「返回值这件事必须断言」，但真正能区分两者的输入必须是
+        # **resolve 前后不同**的：这里用一个含 `..` 但仍落在根内的路径（不越界、会通过门），
+        # 未 resolve 的原样路径带着 `..`，一旦被调用方拿去落盘就会在文件系统上造出
+        # 与预期不同的层级。
+        noisy = fake_root / "sub" / ".." / "sub" / "x.xlsx"
+        assert noisy != noisy.resolve(), "样本必须 resolve 前后不同，否则这条判据又恒真"
+        got_noisy = mod.assert_target_within_override_root(noisy)
+        assert got_noisy == noisy.resolve(), (
+            "门必须返回 resolve 后的路径 —— 返回原始路径时调用方会带着 `..` 去落盘，"
+            "这道门就只是个装饰"
+        )
+        assert ".." not in got_noisy.parts
+
     def test_wp_code_with_separator_is_rejected_before_path_join(self, tmp_path, monkeypatch):
         """`wp_code` 含分隔符必须在拼路径**之前**被拒。
 
@@ -933,10 +949,26 @@ class TestProperty16And17VersionChain:
             if p.is_file() and p.suffix.lower() != authoritative.suffix.lower()
         ]
         assert stray, "activate 一个元数据文件都没写 —— 判据在空集上恒真"
+
+        # 方向①：写了的每一个后缀都必须登记（漏登记 ⇒ 解析 glob 把它当第二个 current）
         unregistered = sorted(set(stray) - mod.CURRENT_METADATA_SUFFIXES)
         assert not unregistered, (
             f"activate 写了未登记的元数据后缀 {unregistered} —— "
             "解析的 glob 会把它当成另一个当前版本并抛歧义错"
+        )
+
+        # 方向②：登记的每一项都必须真被写。
+        #
+        # 🔴 **2026-09-30 变异检验（T5 / M06）补的缺口**：本 docstring 声称「双向锁死」，
+        # 而此前只有方向① —— 往 `CURRENT_METADATA_SUFFIXES` 里多塞一个从来不写的后缀
+        # （变异 M06 塞了 `.bogus`）**照样全绿**。多登记的危害与漏登记相反但同样实在：
+        # 解析的 glob 会把真正该报歧义的杂项文件静默排除掉，于是「目录里多了个
+        # current.xlsx.bak」这类异常从报错变成无声无息。
+        unwritten = sorted(mod.CURRENT_METADATA_SUFFIXES - set(stray))
+        assert not unwritten, (
+            f"CURRENT_METADATA_SUFFIXES 登记了 activate 从不写的后缀 {unwritten} —— "
+            "解析的 glob 会据此静默排除同后缀的杂项文件，该报的歧义错不会再报。"
+            "若确实新增了元数据文件，请让 activate 真的写它；否则从常量里删掉"
         )
 
         # 反面确认：登记之后解析必须仍能工作

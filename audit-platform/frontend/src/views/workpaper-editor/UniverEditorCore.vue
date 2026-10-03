@@ -75,8 +75,6 @@ const {
   loadErrorState,
   loadErrorMessage,
   dirty,
-  loadedFromXlsx,
-  fileOpenedAt,
   initUniver,
   dispose,
 } = useEditorUniver({
@@ -129,8 +127,6 @@ const {
   hasPrefillMapping,
   autoSave,
   initUniver,
-  loadedFromXlsx,
-  fileOpenedAt,
   loading,
   showStaleImpactPanel,
 })

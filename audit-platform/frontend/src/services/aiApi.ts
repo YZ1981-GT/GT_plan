@@ -3,6 +3,7 @@
  * 封装所有 AI 相关 API 调用
  */
 import http from '@/utils/http'
+import { getAuthHeaders } from '@/utils/authToken'
 import { ai as P_ai, aiProject as P_aip, wpAI as P_wpai } from './apiPaths'
 
 // ─── Types ───
@@ -420,9 +421,10 @@ export const chatApi = {
     useRag: boolean = true,
     onChunk: (chunk: string) => void
   ): Promise<void> {
+    // 原生 fetch 不经 http.ts 拦截器 ⇒ 自带鉴权头
     const response = await fetch(P_ai.chat.messageStream, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ session_id: sessionId, message, use_rag: useRag }),
     })
 

@@ -14,6 +14,7 @@
  * 与 useWorkpaperImportExport 保持等价行为。
  */
 import { ref, type Ref } from 'vue'
+import { getAuthHeaders } from '@/utils/authToken'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -51,20 +52,9 @@ export interface ImportExportReturn {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function getAuthToken(): string | null {
-  try {
-    const raw = localStorage.getItem('token') || localStorage.getItem('auth_token')
-    return raw || null
-  } catch {
-    return null
-  }
-}
-
+/** 原生 fetch 的鉴权头：走 authToken 单一入口（旧实现读 localStorage，token 迁移后恒空 → 401） */
 function buildHeaders(): HeadersInit {
-  const headers: Record<string, string> = {}
-  const token = getAuthToken()
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  return headers
+  return getAuthHeaders()
 }
 
 function downloadBlob(blob: Blob, filename: string): void {

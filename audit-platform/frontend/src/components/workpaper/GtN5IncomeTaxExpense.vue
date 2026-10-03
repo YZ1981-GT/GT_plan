@@ -10,11 +10,6 @@
           @change="dualMode.onModeChange"
         />
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
-        <!--
-          AC 1.4 的「可操作原因」—— 未注册 adapter 却给出可点的模式切换时必须常显。
-          spec: n2-n5-json-table-identity-and-cross-entry-readonly（BP-7，与 canary 同形）
-        -->
-        <GtEntrySyncCapabilityNotice :entry-id="N5_ENTRY_ID" />
       </div>
 
       <!-- 双模式：HTML sheet 切到 OnlyOffice -->
@@ -25,7 +20,6 @@
         :sheet-name="props.sheetName || ''"
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
-        @fallback="dualMode.onOoLoadFailed"
       />
 
       <!-- N5A 程序表 → OnlyOffice fallback -->
@@ -75,7 +69,6 @@
         v-else-if="currentSheet === 'N5-2'"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
-        :project-id="props.projectId"
         :is-readonly="isReadonly"
         @navigate="handleNavigate"
         @navigate-sheet="handleNavigate"
@@ -86,7 +79,6 @@
         v-else-if="currentSheet === 'N5-3'"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
-        :project-id="props.projectId"
         :is-readonly="isReadonly"
         @navigate="handleNavigate"
         @navigate-sheet="handleNavigate"
@@ -212,18 +204,10 @@
  * Requirements: 1.1, 1.2, 1.3, 1.6, 1.7, 1.8, 1.9, 1.11
  */
 import { ref, computed, inject, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
-import { ElMessage } from 'element-plus'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
-import { fetchOnlyOfficeHealthy } from './sync/onlyOfficeHealth'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
-
-/** manifest 的稳定 entry_id —— AC 1.4 通知与 sync 判据的唯一锚点 */
-const N5_ENTRY_ID = 'xlsx/gt-n5-income-tax-expense'
-const GtEntrySyncCapabilityNotice = defineAsyncComponent(
-  () => import('./sync/GtEntrySyncCapabilityNotice.vue'),
-)
 // ─── defineAsyncComponent lazy 加载子组件 ────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 
@@ -290,44 +274,48 @@ const isReadonly = computed(() => !!props.readonly)
 // ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI + 挂真实 Host） ───
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 
-// ─── 双模式 ──────────────────────────────────────────────────────────────────
-/**
- * 🔴 这里原先与 N4 宿主**逐字同形**的 `onModeChange: () => {}` 空实现（BP-5 / NC-13）。
- *
- * spec: n2-n5-json-table-identity-and-cross-entry-readonly Task 6
- * 复用 foundation Task 13 在 canary N4 上已验证的改造形态，**不并行各自发明**：
- * 统一能力层探针 + 不带 disabled 的 modeOptions + 失败显式回落并提示。
- */
-const currentMode = ref<'html' | 'onlyoffice'>('html')
-const isOoAvailable = ref(true)
-const modeOptions = [
-  { label: 'HTML', value: 'html' },
-  { label: 'OnlyOffice', value: 'onlyoffice' },
-]
+// ─── 双模式（修复 inert 空实现 → 真实切换 + health 检查 + 失败回落 HTML）───
+// spec: n2-n5-json-table-identity-and-cross-entry-readonly 任务 6（NC-13 / NB-P13）
+// 🔴 保留宿主内联形态 + modeOptions 为普通数组（不带 .value，与 N1/N3 的 ref 形态不同）
+const _n5OoAvailable = ref(false)
+const _n5OoChecking = ref(false)
 
-async function onModeChange(val: string | number | boolean): Promise<void> {
-  const next = String(val) === 'onlyoffice' ? 'onlyoffice' : 'html'
-  if (next === currentMode.value) return
-  if (next === 'onlyoffice') {
-    const healthy = await fetchOnlyOfficeHealthy(true)
-    isOoAvailable.value = healthy
-    if (!healthy) {
-      currentMode.value = 'html'
-      ElMessage.warning('OnlyOffice 服务当前不可用，已保持 HTML 模式')
+async function _n5CheckOoHealth(): Promise<boolean> {
+  _n5OoChecking.value = true
+  try {
+    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
+    const healthy = (res as any).data?.data?.healthy ?? (res as any).data?.healthy ?? false
+    _n5OoAvailable.value = !!healthy
+    return _n5OoAvailable.value
+  } catch {
+    _n5OoAvailable.value = false
+    return false
+  } finally {
+    _n5OoChecking.value = false
+  }
+}
+
+const dualMode = {
+  currentMode: ref<'html' | 'onlyoffice'>('html'),
+  modeOptions: [
+    { label: 'HTML', value: 'html' },
+    { label: 'OnlyOffice', value: 'onlyoffice' },
+  ],
+  isOoAvailable: _n5OoAvailable,
+  onModeChange: (val: 'html' | 'onlyoffice') => {
+    if (val === dualMode.currentMode.value) return
+    if (val === 'onlyoffice' && !_n5OoAvailable.value) {
+      import('element-plus').then(({ ElMessage }) => {
+        ElMessage.warning('OnlyOffice 服务不可用，已回落到 HTML 模式')
+      })
       return
     }
-  }
-  currentMode.value = next
+    dualMode.currentMode.value = val
+    if (val === 'html') {
+      selfLoad()
+    }
+  },
 }
-
-/** GtOnlyOfficeSheet @fallback：文档渲染/超时失败 → 回落 HTML 并标记不可用 */
-function onOoLoadFailed(): void {
-  isOoAvailable.value = false
-  currentMode.value = 'html'
-  ElMessage.warning('OnlyOffice 文档加载失败，已回落 HTML 模式')
-}
-
-const dualMode = { currentMode, modeOptions, isOoAvailable, onModeChange, onOoLoadFailed }
 
 // ─── sheetName 归一（纯函数，见 composables/n5SheetRouting.ts）────────────────
 // 🔴 披露判定前置于 wp_code 正则 + 国企多写法全认（源模板 tab 名缺右括号）
@@ -414,6 +402,9 @@ provide('n5TrialBalance', tbTrialBalance)
 provide('n5TbSourceCodes', tbSourceCodes)
 provide('scheduleAutoSnapshot', () => runtime?.version.scheduleAutoSnapshot())
 onMounted(async () => {
+  // OO 健康检查（修复 inert → redeemable）
+  void _n5CheckOoHealth()
+
   // 如果 htmlData 为 null（selfLoad 场景），自行加载
   if (!props.htmlData) {
     await selfLoad()
@@ -427,9 +418,6 @@ onMounted(async () => {
     _absorbFourTableKeys(props.htmlData)
   }
   isLoading.value = false
-
-  // OO 可用性预检（统一能力层带 TTL 缓存 + 并发去重）
-  isOoAvailable.value = await fetchOnlyOfficeHealthy()
 
   // ─── EventBus 订阅 ─────────────────────────────────────────────────
   eventBus.on('disclosure:refresh' as any, onDisclosureRefresh)

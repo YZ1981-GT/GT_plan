@@ -39,7 +39,7 @@
         <div class="gt-fm-breadcrumb">
           <div style="display: flex; align-items: center; gap: 8px;">
             <el-tag size="small" type="info" effect="plain" style="font-weight: 600;">{{ scopeLabel }}</el-tag>
-            <el-tag size="small" type="success" effect="plain" title="当前页/当前节点已加载的公式数">
+            <el-tag v-if="!isConsolFormulaNode" size="small" type="success" effect="plain" title="当前页/当前节点已加载的公式数">
               {{ props.wpId ? (selectedWpSheetCode ? '本页公式' : '全册公式') : '本域公式' }}
               {{ props.wpId ? wpFormulaRows.length : scopeFormulas.length }}
             </el-tag>
@@ -61,7 +61,7 @@
               {{ activeReportLevelLabel }}
             </el-tag>
           </div>
-          <div style="display: flex; gap: 6px; align-items: center;">
+          <div v-if="!isConsolFormulaNode" style="display: flex; gap: 6px; align-items: center;">
             <el-button size="small" @click="showFormulaDashboard = true">📊 公式看板</el-button>
             <el-button size="small" @click="onOpenGlobalScopeOverview">🌐 全局公式</el-button>
             <SharedTemplatePicker
@@ -89,9 +89,19 @@
           </div>
         </div>
 
+        <ConsolFormulaManagementPanel
+          v-if="isConsolFormulaNode && projectId && year"
+          :mode="isConsolNoteNode ? 'note' : 'report'"
+          :project-id="projectId"
+          :year="year"
+          :template-type="fmTemplateType"
+          :report-type="activeConsolReportType || 'balance_sheet'"
+          :note-section="props.noteSection"
+        />
+
         <!-- 分类 Tab -->
         <!-- Sprint 5.10: 健康度卡片 + URI 搜索 -->
-        <div class="gt-fm-health-bar">
+        <div v-if="!isConsolFormulaNode" class="gt-fm-health-bar">
           <div class="gt-fm-health-card">
             <span class="gt-fm-health-label">健康度</span>
             <span class="gt-fm-health-value" :style="{ color: healthPercent >= 80 ? 'var(--gt-color-success)' : healthPercent >= 50 ? 'var(--gt-color-wheat)' : 'var(--gt-color-danger)' }">
@@ -109,7 +119,7 @@
           />
         </div>
 
-        <el-tabs v-model="activeCategory" size="small" style="margin-bottom: 8px;">
+        <el-tabs v-if="!isConsolFormulaNode" v-model="activeCategory" size="small" style="margin-bottom: 8px;">
           <el-tab-pane name="all">
             <template #label>全部 ({{ currentRows.length }})</template>
           </el-tab-pane>
@@ -182,10 +192,20 @@
               @rollback-applied="onHistoryRollbackApplied"
             />
           </el-tab-pane>
+          <!-- chain-closure-phase2-formula-push-engine：公式推送（四表 / 试算表 / 调整分录 → 底稿 → 附注） -->
+          <el-tab-pane v-if="pushWpCode && projectId && year" name="formula_push">
+            <template #label>📤 公式推送</template>
+            <FormulaPushPanel
+              v-if="activeCategory === 'formula_push'"
+              :project-id="projectId"
+              :year="year"
+              :wp-code="pushWpCode"
+            />
+          </el-tab-pane>
         </el-tabs>
 
         <!-- 批量操作栏 -->
-        <div v-if="selectedRows.length > 0 && !isCrossCheckMode" class="gt-fm-batch-bar">
+        <div v-if="!isConsolFormulaNode && selectedRows.length > 0 && !isCrossCheckMode" class="gt-fm-batch-bar">
           <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">已选 <b>{{ selectedRows.length }}</b> 条</span>
           <el-button size="small" @click="onBatchApplyCategory('auto_calc')">⚡ 标记为自动运算</el-button>
           <el-button size="small" @click="onBatchApplyCategory('logic_check')">🔍 标记为逻辑审核</el-button>
@@ -197,7 +217,7 @@
         <!-- 公式表格（报表/附注/底稿） -->
         <el-alert v-if="wpFormulaError" :title="wpFormulaError" type="error" :closable="false" show-icon />
         <el-alert v-if="wpSheetLocateMiss" :title="wpSheetLocateMiss" type="warning" :closable="false" show-icon />
-        <el-table v-if="!isCrossCheckMode && !['user_formulas', 'history'].includes(activeCategory)" v-loading="wpFormulaLoading" ref="formulaTableRef" class="gt-fm-main-table" :data="filteredRows" size="small" border max-height="calc(100vh - 300px)" style="width: 100%"
+        <el-table v-if="!isConsolFormulaNode && !isCrossCheckMode && !['user_formulas', 'history', 'formula_push'].includes(activeCategory)" v-loading="wpFormulaLoading" ref="formulaTableRef" class="gt-fm-main-table" :data="filteredRows" size="small" border max-height="calc(100vh - 300px)" style="width: 100%"
           :header-cell-style="{ background: '#edf3f9', fontSize: '12px', whiteSpace: 'nowrap' }"
           :row-class-name="getRowClassName"
           @selection-change="onSelectionChange"
@@ -275,7 +295,7 @@
           </el-table-column>
         </el-table>
 
-        <div class="gt-fm-footer">
+        <div v-if="!isConsolFormulaNode" class="gt-fm-footer">
           <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">共 {{ currentRows.length }} 行，{{ currentRows.filter(r => r.formula).length }} 个公式{{ Object.values(formulaResults).filter(r => r.value != null).length ? `，${Object.values(formulaResults).filter(r => r.value != null).length} 个已计算` : '' }}</span>
         </div>
 
@@ -713,10 +733,18 @@ import {
   reportConfigFormula,
   wpFormula,
   wpUserFormula,
+  formulaPush,
 } from '@/services/apiPaths/formula'
 import { fmtAmount } from '@/utils/formatters'
 import FormulaEditDialog from './FormulaEditDialog.vue'
 import FormulaHistoryTab from './FormulaHistoryTab.vue'
+import FormulaPushPanel from './FormulaPushPanel.vue'
+import ConsolFormulaManagementPanel from './ConsolFormulaManagementPanel.vue'
+import {
+  CONSOL_REPORT_TREE_ITEMS,
+  consolReportNodeOfType,
+  consolReportTypeOfNode,
+} from './consolFormulaManagement'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -1029,6 +1057,11 @@ const fmTreeRef = ref<any>(null)
 const expandedKeys = ref<string[]>([])
 const selectedNodeKey = ref('report_balance_sheet')
 const selectedPath = ref('报表 > 资产负债表')
+
+/** 合并报表 / 合并附注使用独立 CRUD 面板，禁止落入单体 report_config / note preset 分支。 */
+const activeConsolReportType = computed(() => consolReportTypeOfNode(selectedNodeKey.value))
+const isConsolNoteNode = computed(() => selectedNodeKey.value === 'consol_note')
+const isConsolFormulaNode = computed(() => !!activeConsolReportType.value || isConsolNoteNode.value)
 
 /**
  * 节点 key → 报表类型（`balance_sheet` 等），非报表类节点返回 ''。
@@ -1535,10 +1568,13 @@ const treeData = computed(() => {
   // ── 扩展节点（非五域核心，保留合并/表间/数据质量规则） ──
   // 合并报表（收敛为 ACNR report 域子集；保留为独立入口方便审计师直达）
   acnrDrivenTree.push({
-    key: 'consol_report', label: '合并报表', icon: '🔗', children: [
-      { key: 'consol_report_bs', label: '合并资产负债表', icon: '' },
-      { key: 'consol_report_is', label: '合并利润表', icon: '' },
-    ],
+    key: 'consol_report', label: '合并报表', icon: '🔗', children:
+      CONSOL_REPORT_TREE_ITEMS.map((item) => ({ ...item, icon: '' })),
+  })
+
+  // 合并附注公式（模板级单元格公式，独立于单体附注校验预设）
+  acnrDrivenTree.push({
+    key: 'consol_note', label: '合并附注', icon: '📝',
   })
 
   // 合并工作底稿
@@ -1716,6 +1752,36 @@ let wpRequest = 0
 let dialogSession = 0
 const formulaSubject = () => JSON.stringify([props.wpId, props.projectId, props.year])
 const selectedWpCode = ref('')
+/** 后端公式推送接入清单；请求失败保持空集，页签 fail-closed。 */
+const pushWpCodes = ref<string[]>([])
+let pushBindingsRequest = 0
+
+async function loadPushBindings(): Promise<void> {
+  const request = ++pushBindingsRequest
+  pushWpCodes.value = []
+  if (!props.projectId) return
+  try {
+    const data: any = await api.get(formulaPush.bindings(props.projectId), {
+      _silent: true,
+      validateStatus: (s: number) => s < 600,
+    } as any)
+    if (request !== pushBindingsRequest || !visible.value) return
+    const codes = Array.isArray(data?.supported_wp_codes)
+      ? data.supported_wp_codes
+      : Array.isArray(data?.bindings) ? data.bindings.map((item: any) => item?.wp_code) : []
+    pushWpCodes.value = codes
+      .filter((code: unknown): code is string => typeof code === 'string' && !!code.trim())
+      .map((code) => code.trim().toUpperCase())
+  } catch {
+    if (request === pushBindingsRequest) pushWpCodes.value = []
+  }
+}
+
+const pushWpCode = computed(() => {
+  // normalizeWpCode 产出小写形态（e1-1），推送 binding 按大写主编码登记
+  const code = normalizeWpCode(selectedWpCode.value || props.wpCode || '').split('-')[0].toUpperCase()
+  return pushWpCodes.value.includes(code) ? code : ''
+})
 const selectedWpSheetCode = ref('')
 
 function normalizeWpCode(value: string): string {
@@ -2064,12 +2130,32 @@ async function applyConsolWorksheetTarget() {
   try { fmTreeRef.value?.setCurrentKey('consolidation') } catch { /* ignore */ }
 }
 
+/** 合并报表入口：按调用页当前六类报表定位，默认资产负债表。 */
+async function applyConsolReportTarget() {
+  const nodeKey = consolReportNodeOfType(props.initialReportType)
+  const item = CONSOL_REPORT_TREE_ITEMS.find((entry) => entry.key === nodeKey)
+  selectedNodeKey.value = nodeKey
+  selectedPath.value = `合并报表 > ${item?.label || '合并资产负债表'}`
+  expandedKeys.value = [...new Set([...expandedKeys.value, 'consol_report'])]
+  await nextTick()
+  try { fmTreeRef.value?.setCurrentKey(nodeKey) } catch { /* ignore */ }
+}
+
+/** 合并附注入口：独立单元格公式面板，章节由 noteSection 传入面板定位。 */
+async function applyConsolNoteTarget() {
+  selectedNodeKey.value = 'consol_note'
+  selectedPath.value = props.noteSectionTitle ? `合并附注 > ${props.noteSectionTitle}` : '合并附注'
+  await nextTick()
+  try { fmTreeRef.value?.setCurrentKey('consol_note') } catch { /* ignore */ }
+}
+
 // 初始加载当前报表的数据
 watch([visible, () => props.wpId, () => props.wpCode, () => props.projectId, () => props.year, () => props.sheetName, () => props.initialReportType], async ([v]) => {
   ++dialogSession
   ++wpRequest
   wpFormulaLoading.value = false
   if (v) {
+    void loadPushBindings()
     activeCategory.value = 'all'
     uriSearchQuery.value = ''
     selectedRows.value = []
@@ -2189,8 +2275,12 @@ watch([visible, () => props.wpId, () => props.wpCode, () => props.projectId, () 
     } else if (props.scope === 'consol_worksheet') {
       // 合并工作底稿：项目级入口，按当前 worksheet 定位（无 wpId 不代表无当前页）
       await applyConsolWorksheetTarget()
-    } else if (props.scope === 'note' || props.scope === 'consol_note') {
-      // 附注页打开 → 定位到调用页当前章节节点。
+    } else if (props.scope === 'consol_report') {
+      await applyConsolReportTarget()
+    } else if (props.scope === 'consol_note') {
+      await applyConsolNoteTarget()
+    } else if (props.scope === 'note') {
+      // 单体附注页打开 → 定位到调用页当前章节节点。
       // props.rows 是附注表格行（row_code 形如「五、1-R1」），不能走下方报表启发式，
       // 否则前缀全不匹配被兜底成 report_balance_sheet，弹窗默认显示资产负债表公式。
       await applyNoteScopeTarget()
@@ -2240,6 +2330,10 @@ function onTreeNodeClick(data: any) {
       selectedPath.value = `试算平衡表 > ${data.label}`
     } else if (data.key.startsWith('report_')) {
       selectedPath.value = `报表 > ${data.label}`
+    } else if (consolReportTypeOfNode(data.key)) {
+      selectedPath.value = `合并报表 > ${data.label}`
+    } else if (data.key === 'consol_note') {
+      selectedPath.value = '合并附注'
     } else if (data.key.startsWith('note_')) {
       selectedPath.value = `附注 > ${data._sectionTitle || data.label}`
       if (!notePresetFormulas.value.length) {
@@ -2890,7 +2984,6 @@ async function onApplyFormulas() {
 
     const result = data
     const results = result?.results || []
-    const rowValues = result?.row_values || {}
 
     // 统计执行结果
     const successCount = results.filter((r: any) => r.value != null && !r.error).length
@@ -2906,22 +2999,8 @@ async function onApplyFormulas() {
       }
     }
 
-    // 如果是报表节点，将结果回写到 report_config
-    if (activeReportType.value && Object.keys(rowValues).length) {
-      try {
-        const reportType = activeReportType.value
-        const updates = Object.entries(rowValues).map(([code, val]) => ({
-          row_code: code,
-          current_period_amount: val,
-        }))
-        await api.post(P_rc.batchUpdate, {
-          project_id: props.projectId,
-          report_type: reportType,
-          applicable_standard: `soe_standalone`,
-          updates,
-        }, { validateStatus: (s: number) => s < 600 })
-      } catch { /* 回写失败不影响主流程 */ }
-    }
+    // 计算结果只在本弹窗展示；报表金额由报表生成 / 合并推送写入 financial_report
+    // （原「回写报表配置」写的是报表配置上不存在的金额列，从未落库；该后端接口已删除）
 
     if (errorCount > 0) {
       ElMessage.warning(`执行完成：${successCount} 条成功，${errorCount} 条失败`)

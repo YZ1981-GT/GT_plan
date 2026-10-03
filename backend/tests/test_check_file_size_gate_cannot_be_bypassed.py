@@ -110,3 +110,51 @@ class TestTheGateStillDoesItsRealJob:
     def test_limits_table_is_non_empty(self) -> None:
         """分母非空：LIMITS 空了的话上面所有判据都在空集上恒真。"""
         assert C.LIMITS.get(".py") and C.LIMITS.get(".vue")
+
+
+def _malformed_whitelist_lines(text: str) -> list[tuple[int, str]]:
+    """`load_whitelist` 会静默丢弃的非注释行（不是 `path  int` 两段）。"""
+    bad: list[tuple[int, str]] = []
+    for no, raw in enumerate(text.splitlines(), 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) != 2 or not parts[1].isdigit():
+            bad.append((no, line))
+    return bad
+
+
+class TestWhitelistEntriesAreNotSilentlyDropped:
+    """层 3：白名单条目格式错 ⇒ `load_whitelist` 静默跳过 ⇒ 登记意图从未生效。
+
+    起因（2026-09-30，chain-closure-phase2-formula-push-engine 收尾）：`E1TabDisclosure.vue`
+    与 `g7SoeDisclosureModel.ts` 自 2026-08-16 登记起**只有路径没有基线数字**，一直按默认
+    上限判超限 ⇒ 门禁对它们是「墙」（把文件改小的提交也被拒），而登记者以为已豁免。
+    """
+
+    def test_every_whitelist_entry_has_path_and_integer_baseline(self) -> None:
+        text = C.WHITELIST_FILE.read_text(encoding="utf-8")
+        bad = _malformed_whitelist_lines(text)
+        assert not bad, (
+            "以下白名单行不是 `path  baseline_lines` 两段 ⇒ 会被 load_whitelist 静默丢弃：\n"
+            + "\n".join(f"  L{no}: {line}" for no, line in bad)
+        )
+
+    def test_mutation_path_only_entry_is_caught_and_really_dropped(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """变异证明：只写路径的条目被本判据抓到，且 `load_whitelist` 确实把它丢了。"""
+        sample = "# 注释\nfoo/bar.vue  1700\nfoo/only_path.vue\nfoo/bad_num.vue  12x\n"
+        assert [line for _, line in _malformed_whitelist_lines(sample)] == [
+            "foo/only_path.vue", "foo/bad_num.vue  12x",
+        ]
+        # 🔴 同一份文本喂给真实 load_whitelist：畸形两条确实不在结果里（判据与实现同口径）
+        fake = tmp_path / "whitelist.txt"
+        fake.write_text(sample, encoding="utf-8")
+        monkeypatch.setattr(C, "WHITELIST_FILE", fake)
+        assert C.load_whitelist() == {"foo/bar.vue": 1700}
+
+    def test_whitelist_is_non_empty(self) -> None:
+        """分母非空：白名单读不出条目时上面的判据在空集上恒真。"""
+        assert len(C.load_whitelist()) > 10

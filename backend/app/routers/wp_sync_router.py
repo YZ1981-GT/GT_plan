@@ -651,6 +651,15 @@ async def _attach_pilot_adapters(
         if cached is not None:
             return _replay_cached_registrations(svc, cached)
 
+        # 🔴 源码事实首算挪到工作线程（spec startup-prewarm-event-loop-unblocking Requirement 1）：
+        #    下面各 attach 在事件循环上调 `observe_descriptor_facts` / `observe_room_facts`，首算要扫
+        #    5000+ 个前端文件与全部路由（现场实测连续 7.9s 不让出循环 ⇒ 这段时间整个后端不响应）。
+        #    放在锁内：并发首请求若先拿到锁，同样不会在循环上首算。首算失败不在这里报 —— 原调用点
+        #    会以原错误 fail closed（见 `warm_source_fact_caches` docstring）。
+        from app.services.workpaper_sync.entry_source_facts import warm_source_fact_caches
+
+        await asyncio.to_thread(warm_source_fact_caches)
+
         explicit = (
             await attach_pilot_adapters(svc.registry, session=svc.session)
             + await attach_d2_pilot_adapters(svc.registry, session=svc.session)

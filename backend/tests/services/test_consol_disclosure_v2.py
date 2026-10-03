@@ -246,54 +246,72 @@ class TestFetchSubsidiaryList:
     """B.1.3 _fetch_subsidiary_list 测试."""
 
     @pytest.mark.asyncio
-    async def test_returns_descendants(self):
-        """从 consol_tree_service 获取后代节点."""
-        from app.services.consol_tree_service import TreeNode
+    async def test_returns_data_leaves(self):
+        """返回企业树数据叶子：母公司本体 + 子公司，各带 node_key / entity_kind。
+
+        口径变更（spec consol-tree-three-code-autobuild 任务 7.5，有意）：旧版返回根的全部后代，
+        三码树里含差额节点（没有单体附注）且漏母公司本体；现只返回数据叶子。
+        """
+        from app.services.consol_group_tree import ProjectRecord, derive_group_tree
+
+        def rec(code, name, scope, parent=None):
+            return ProjectRecord(
+                id=uuid4(), company_code=code, client_name=name, report_scope=scope, audit_year=2025,
+                parent_company_code=parent, relation_to_parent="subsidiary" if parent else None,
+            )
+
+        root = rec("ROOT", "母公司", "consolidated")
+        parent_s = rec("ROOT", "母公司", "standalone")
+        c1, c2 = rec("C1", "子公司1", "standalone", "ROOT"), rec("C2", "子公司2", "standalone", "ROOT")
+        tree = derive_group_tree([root, parent_s, c1, c2], root, 2025).root
 
         mock_db = AsyncMock()
-        root_id = uuid4()
-        child1_id = uuid4()
-        child2_id = uuid4()
+        mock_db.execute = AsyncMock(side_effect=RuntimeError("template_type 读取失败 ⇒ 降级 None"))
+        with patch("app.services.consol_tree_service.build_tree", new=AsyncMock(return_value=tree)):
+            result = await _fetch_subsidiary_list(mock_db, root.id)
 
-        root_node = TreeNode(
-            project_id=root_id,
-            company_code="ROOT",
-            company_name="母公司",
-            parent_company_code=None,
-            ultimate_company_code="ROOT",
-            consol_level=1,
-            children=[
-                TreeNode(
-                    project_id=child1_id,
-                    company_code="C1",
-                    company_name="子公司1",
-                    parent_company_code="ROOT",
-                    ultimate_company_code="ROOT",
-                    consol_level=2,
-                ),
-                TreeNode(
-                    project_id=child2_id,
-                    company_code="C2",
-                    company_name="子公司2",
-                    parent_company_code="ROOT",
-                    ultimate_company_code="ROOT",
-                    consol_level=2,
-                ),
-            ],
-        )
+        assert [(r["node_key"], r["entity_kind"]) for r in result] == [
+            ("ROOT:parent", "parent"), ("C1:subsidiary", "subsidiary"), ("C2:subsidiary", "subsidiary"),
+        ]
+        assert [r["project_id"] for r in result] == [parent_s.id, c1.id, c2.id]
+        assert all(r["template_type"] is None for r in result)
 
-        with patch(
-            "app.services.consol_tree_service.build_tree",
-            return_value=root_node,
-        ), patch(
-            "app.services.consol_tree_service.get_descendants",
-            return_value=root_node.children,
-        ):
-            result = await _fetch_subsidiary_list(mock_db, root_id)
+    @pytest.mark.asyncio
+    async def test_leaf_without_project_not_used_as_source(self):
+        """没有单户项目的数据叶子（母公司未建单体）不进附注取数来源，但仍列在清单里."""
+        from app.services.consol_disclosure_service import _aggregate_common_section
 
-        assert len(result) == 2
-        assert result[0]["company_code"] == "C1"
-        assert result[1]["company_code"] == "C2"
+        leaves = [
+            {"project_id": None, "company_code": "ROOT", "entity_kind": "parent"},
+            {"project_id": uuid4(), "company_code": "S1", "entity_kind": "subsidiary"},
+        ]
+        captured: dict = {}
+
+        async def _fake_aggregate(**kwargs):
+            captured.update(kwargs)
+            return None
+
+        with patch("app.services.consol_note_aggregation_service.aggregate_section", new=_fake_aggregate):
+            section = await _aggregate_common_section(
+                db=AsyncMock(), consol_project_id=uuid4(), year=2025,
+                mapping={"section_id": "五、1", "aggregation_method": "simple_sum"},
+                subsidiaries=leaves,
+            )
+        assert captured["child_filter"] == {"subsidiaries": [leaves[1]["project_id"]]}
+        assert section["table_data"]["child_count"] == 1
+
+    def test_counts_only_subsidiary_entities(self):
+        """家数只数子公司企业：母公司/本部、分公司不计；旧清单没有 entity_kind 时按全部是子公司处理."""
+        leaves = [
+            {"project_id": uuid4(), "company_code": "ROOT", "entity_kind": "parent", "consol_level": 1},
+            {"project_id": uuid4(), "company_code": "BR", "entity_kind": "branch", "consol_level": 1},
+            {"project_id": uuid4(), "company_code": "S1", "entity_kind": "subsidiary", "consol_level": 2},
+            {"project_id": None, "company_code": "S2", "entity_kind": "subsidiary", "consol_level": 2},
+        ]
+        assert _build_consol_paragraph_vars(leaves, 2025)["subsidiary_count"] == 2
+        sections = _generate_consol_only_sections_v2(uuid4(), 2025, leaves)
+        scope = next(s for s in sections if s["section_id"] == "consol_scope")
+        assert scope["table_data"]["summary"] == "纳入合并范围子公司 2 家"
 
     @pytest.mark.asyncio
     async def test_returns_empty_when_no_tree(self):

@@ -219,6 +219,7 @@ import type { BatchUploadItem } from '@/components/attachment/BatchUploadResultD
 import AttachmentHandbookDialog from './AttachmentHandbookDialog.vue'
 import { downloadFile } from '@/utils/http'
 import { api } from '@/services/apiProxy'
+import { subscribeProjectEvent, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import { workpapers as P_wp, attachments as P_att } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import { rules } from '@/utils/formRules'
@@ -655,17 +656,17 @@ onMounted(async () => {
 })
 
 // ─── SSE 实时同步：监听其他入口上传的附件 ───
-let sseSource: EventSource | null = null
+// 🔴 走项目共享事件总线（后端 `broadcast_raw('attachment.uploaded')` 经项目事件流下发，fetch 流带 Authorization）。
+//    旧实现用原生 EventSource 直连 `/api/sse/projects/{pid}`：该路由后端不存在、原生 EventSource 也无法带鉴权头
+//    ⇒ 连接即失败，「其他入口上传后本页自动刷新」从未生效。
+let attachmentSub: ProjectEventSubscription | null = null
 onMounted(() => {
-  try {
-    sseSource = new EventSource(`/api/sse/projects/${projectId.value}`)
-    sseSource.addEventListener('attachment.uploaded', () => {
-      loadAttachments()
-    })
-  } catch { /* SSE 不可用时静默降级 */ }
+  attachmentSub = subscribeProjectEvent(projectId.value, 'attachment.uploaded', () => {
+    loadAttachments()
+  })
 })
 onUnmounted(() => {
-  sseSource?.close()
+  attachmentSub?.close()
   if (highlightTimer) clearTimeout(highlightTimer)
 })
 </script>

@@ -37,6 +37,8 @@
             size="small"
             @change="dualMode.switchMode"
           />
+          <!-- BP-7 MC-12: 未接入双向回写的 notice（常显摘要 + tooltip 细节） -->
+          <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-m6-retained-earnings" />
         </div>
 
         <!-- 结构化视图（HTML sheet 分支） -->
@@ -138,6 +140,7 @@ import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useM6EntryDualMode } from './composables/useM6EntryDualMode'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 

@@ -80,7 +80,7 @@ BP-7 notice 接入 16 个宿主、mode 载体收敛、`SHEET_MAP` 错位修复�
   - 断言 `localStorage` 中 `h10-draft:` 前缀键数 == 0
   - 变异「造一条草稿后跑 roundtrip」SHALL 打红并列出键名
 
-- [ ] 5. 草稿长期一致性归口四条（HX-P8）
+- [x] 5. 草稿长期一致性归口四条（HX-P8）
   - ① PUT 3 次全败后 SHALL **可见上报错误**（现状 `#L105` 写草稿是静默的 —— 真正的缺口）
   - ② adapter 回写窗口内 SHALL 禁用 `#L105` 的 `setItem` 分支
   - ③ UI SHALL 显示「有 N 条未同步草稿」（现状用户完全不知道存在第三份数据）
@@ -282,15 +282,44 @@ Task 3 原本只点了 `h10RelatedH6Pull.ts` + `useH10CrossSheet.ts`。按 AC �
 | ③ UI 显示「有 N 条未同步草稿」 | 无 `pendingDraftCount` 之类暴露；10 个 H10 组件里只有宿主注释提到「草稿」，无用户可见计数 | ❌ 未做 |
 | ④ `restoreDrafts()` 回灌后立即重试 PUT，成功即删 | `restoreDrafts` → `saveImmediate(itemId, updated, 1)` → `localStorage.removeItem(key)`；失败时 `saveImmediate` 自己会把草稿重新 `setItem` 回去 | ✅ |
 
-⇒ ②③ 是真缺口（各需一个新增机制 + UI 文案），本轮**不顺手做**：它们要动宿主工具条与
-sync 桥的交互时序，属独立改动面，硬塞进本轮会让「回退链收敛」这次改动的回归面变模糊。
-Task 5 保持未勾，欠账在此显式登记。
+⇒ ②③ 当时判为真缺口，先登记欠账、Task 5 暂不勾（避免把「回退链收敛」那次改动的回归面搞混）。
+
+#### ✅ ②③ 已于同日补齐（Task 5 现已回标 [x]）
+
+**② adapter 回写窗口门**：`useH10FormData` 新增 `draftsSuspended` + `setDraftsSuspended`，
+落草稿前判门；门内 `return` 且**不落草稿**，改发 `ElMessage.error` 明说「未能保存…请稍后重填」。
+宿主 `GtH10AssetDisposalIncome.vue` 用 `watch` 驱动，窗口取**并集**
+`hSync.busy.value || hSync.renderMode.value === 'onlyoffice'`。
+🔴 窗口刻意取宽而非只取 `busy`：`applied` 之后 `reloadHtml` 还没跑完时 busy 已可能落下，
+而那段时间 store 恰好是 adapter 刚写的新值 —— 此刻落草稿，下次 `restoreDrafts()` 会把
+**回写前的旧值**盖回 store。表象是「在 Excel 里改的东西过一会自己变回去了」且无任何报错。
+取宽的代价只是这段时间 PUT 失败要用户重填；取窄的代价是**静默回滚 Excel 侧的编辑**。
+
+**③ 未同步草稿可见计数**：`pendingDraftCount` + `refreshPendingDraftCount()`（按存储前缀
+**现算**，不是累加器 —— 累加器看不到别的标签页/上个会话留下的草稿），在落草稿 / 删草稿 /
+回灌三个时点各刷一次；宿主工具条加 `data-testid="h10-pending-draft-count"` 的 warning tag
++ tooltip。🔴 宿主**一处存储 API 都不碰**，只读计数 —— HC-10 的分类判据按「文件文本里是否
+出现该 API 名」统计第三处存储的持有者，宿主一出现就会被记成新增一处、把 foundation 清册搞脏
+（守卫里有这条反向断言）。
+
+**守卫两层，且都做了变异反证**：
+* 文本/位置层 `backend/tests/workpaper_sync/test_h_lane3_draft_store_hardening.py`（10 例）
+  —— 含「门必须在 `setItem` **之前**」的位置判据（写在后面等于没写）、「门内必须 return 且
+  不得落草稿」、「宿主窗口表达式必须同时含 `busy` 与 OO 模式」、「宿主不得出现存储 API」。
+  变异①把门改成恒假 ⇒ 位置判据 + 分支判据 **2 红**；变异②宿主窗口表达式去掉 OO 模式
+  ⇒ 并集判据 **1 红**并打印实测表达式。均已还原。
+* 行为层 `useH10DraftStore.spec.ts`（5 例，vitest）—— 让 PUT 必失败，分别在挂起/未挂起下
+  断言草稿有没有真落盘、计数对不对、窗口关闭后能否恢复落草稿。
+  🔴 这一层不可省：文本判据抓得住「门被删/被挪」，抓不住「门在、但 `draftsSuspended` 从来
+  没被置真」这种接线断裂。变异「门恒假」⇒ 行为层 **2 红**（`expected 1 to be +0`），已还原。
+
+①④ 现状本就成立，本轮只加了回归锁（spec 原文「现状 #L105 写草稿是静默的」已过期）。
 
 ### 🔴 Task 18* / 19* 保持 `[ ]*`
 
 三条 entry 的契约与 provider **早已在库并注册台账**（现算 `h2/h6/h10` 三条 `provider_module`
 import 全 OK、契约文件在盘），但 manifest 的 `capability` 仍是 `single_onlyoffice`
-（全平台 `bidirectional` 现算仅 4 条）⇒ 正向门按设计仍关着，BP-1~BP-3 未解除；
+（全平台 `bidirectional` 现算 **18 条**，见文末「数字勘误」）⇒ 正向门按设计仍关着，BP-1~BP-3 未解除；
 Task 19* 的 roundtrip + 发布链实证还额外要 BP-4 真 OO 场景集。
 ⚠️ Task 18* 里写的 provider 名（`phase5_construction_in_progress_detail` 等）与实际交付名
 （`phase5_h2_construction_in_progress` 等）**不一致**，以台账现算为准；`phase5_*` 前缀这条
@@ -310,3 +339,60 @@ Task 19* 的 roundtrip + 发布链实证还额外要 BP-4 真 OO 场景集。
   的判据变更；
 * 搬前后测试数**逐个对齐**：两文件合计仍 **170 passed**，全 H 套件仍 **364 passed**
   （9 个测试文件），确认没有用例在搬运中丢失。
+
+### 数字勘误（2026-09-30 同日复核）
+
+我本轮初稿写「全平台 `bidirectional` 现算**仅 4 条**」，那是**过期值**：读数之后、复核之前
+并发会话重生成了 manifest（overlay 里早已裁决的 G 循环 13 条 + D1 落了地）。
+
+🔴 这个数必须连「在哪个状态」一起报 —— 现在**工作树与 HEAD 不同**，且 **HEAD 自己的
+`stats` 与自己的 `entries` 还不一致**（逐条扫 `entries` 才是真值，`stats` 会漂）：
+
+| 状态 | entries | stats 写的 | 逐条扫 entries 的真值 |
+|---|---|---|---|
+| HEAD（已入库） | 155 | 4 | **5**（`d1`/`d2`/`d4`/`g7`/`h1`） |
+| 工作树（未提交） | 138 | 18 | **18**（多出的 13 条全是 G 循环） |
+
+工作树侧两侧 digest 同为 `c17ad880…`、生成器 `--check` exit 0（自洽）；HEAD 侧是 `afdffafd…`。
+并发会话已改 overlay 并 `--apply`，但三个生成产物**尚未提交**。
+
+**结论不变**：H2/H6/H10 三条仍是 `single_onlyoffice` / `adapter_id=None`，正向门仍关着。
+翻门的前置六项审计与「本轮为何不翻」见 foundation spec 文末
+「capability 正向门的前置六项审计 + 数字勘误」节（第⑤项 golden digest 只覆盖 h9 一家）。
+
+---
+
+## 2026-10-01 Task 18* 欠账更新：capability 门已开，但 runtime 注册仍 0/9
+
+H2 / H6 / H10 的 manifest 现算已是 `capability=bidirectional` ·
+`adapter_id=h2.construction_in_progress_detail` / `h6.asset_disposal_clearing_detail` /
+`h10.asset_disposal_income_adjustment` · `migration_state=adapter_registered` ·
+`canonical_resolver=workpaper_sync_published_representation`，
+`html_store` 分别裁决为 `checklist_responses_h2_2_rows` / `..._h6_2_rows` /
+`..._h10_adjustment_rows`（commit `33e2a049b`）。六项前置逐条 9/9，详见 foundation spec
+文末「capability 正向门已打开」节。
+
+**Task 18* 仍保持 `[ ]*`**，但欠账理由从「BP-1~BP-3 门关着」更新为两条更精确的卡点：
+
+1. **`register_from_manifest()` 真 session 实证：注册成功 0/9**。`blocked_reason` 已全为
+   `None`（capability 门确实开了），卡在下一环 `_describe_entry_supply`：
+   「该 entry 还没有 current published representation（`working_paper_sync_entry_state` 无行）」
+   —— 要 `ContentMutationService.commit(...)` 产出首版 content version，属真实录入。
+2. **已翻门的 5 条（d1/d2/d4/g7/h1）同样注册不上**，报
+   `entry_source_fact_unavailable: 挂载组件不唯一 ['GtOnlyOfficeSheet','WorkpaperSyncEditorHost']`
+   —— 平台级预存缺陷，归并发会话 spec `sync-editor-host-discovery-contract-closure`。
+
+### 🔴 本 Task 的 AC 有两处接口/字段写错（以现读为准，不回填改 AC 正文）
+* AC 写「走 `register_from_manifest()` 注册」—— 它**不是自由函数**，是
+  `WorkpaperSyncAdapterRegistry` 的 **async 方法**且需 `session=`；生产构造点是
+  `build_production_registry()`（自己 bind 计划；直接 `bind_registration_plan()` 缺
+  `plan` 位置参数）。
+* AC 写「三份 `primary_table` 全部带 `frozen_key: true` + `frozen_reason`（HC-8）」——
+  这两个字段在实现里**不存在**（全仓 `rg frozen_key|frozen_reason` 在 h6 provider 与
+  `contracts.py` 里均 0 命中），契约也没有 `primary_table` 标记。实际落地的冻结机制是
+  生产者侧 `review.frozen_cross_ref`：现算 **h6** 的 `H6-2-rows` → `h10RelatedH6Pull.ts` /
+  `h1SoeClearingH6Pull.ts` / `h6DisclosureModel.ts` 三个消费方。h2 / h10 契约**无**该字段。
+
+### HX-P2（发布后重跑 H1 golden digest 断言不变）：**成立**
+`check_sync_provider_golden_digest` 现跑唯一漂移是 `[d4] sheet[d44-managed]`
+（并发会话未提交的 `phase5_d4_adjustment_sheet.py` 所致），**h1 零漂移** ⇒ 该条达标。

@@ -96,7 +96,7 @@ def _is_all_zero(row: LeafRow) -> bool:
 
 
 async def _fetch_currency_map(
-    ctx: RenderContext, year: int, prefixes: list[str]
+    ctx: RenderContext, year: int, prefixes: list[str], *, strict: bool = False
 ) -> dict[str, str]:
     """取 `account_code → currency_code` 映射（外币披露表需要，`LeafRow` 不含该列）。
 
@@ -108,7 +108,7 @@ async def _fetch_currency_map(
         return {}
     try:
         active_filter = await get_active_filter(
-            ctx.db, TbBalance.__table__, ctx.project_id, year or 0
+            ctx.db, TbBalance.__table__, ctx.project_id, year or 0, strict=strict
         )
         prefix_filter = sa.or_(*[TbBalance.account_code.like(f"{p}%") for p in ps])
         result = await ctx.db.execute(
@@ -125,6 +125,8 @@ async def _fetch_currency_map(
             if (r.code or "").strip()
         }
     except Exception as e:  # noqa: BLE001 — fail-open
+        if strict:
+            raise
         logger.warning("E1 render: currency map 查询失败: %s", e)
         try:
             await ctx.db.rollback()
@@ -365,6 +367,8 @@ async def _build_account_prefill(
     year: int,
     accounts,
     slot_leaves: dict[str, list[LeafRow]],
+    *,
+    strict: bool = False,
 ) -> dict:
     """账户级取数（`tb_aux_balance` 的 `银行账户` 维度）→ `account_prefill` 载荷。
 
@@ -391,7 +395,7 @@ async def _build_account_prefill(
 
         prefixes = [c for codes in slot_codes.values() for c in codes]
         rows = await fetch_e1_bank_accounts(
-            ctx.db, ctx.project_id, year, account_prefixes=prefixes
+            ctx.db, ctx.project_id, year, account_prefixes=prefixes, strict=strict
         )
         if not rows:
             return _empty_account_prefill()
@@ -408,16 +412,21 @@ async def _build_account_prefill(
             payload["accounts"].setdefault(slot_key, [])
         return payload
     except Exception as e:  # noqa: BLE001 — 见上方 docstring 的零回归论证
+        if strict:
+            raise
         logger.warning("E1 render: 账户级取数构建失败（退回叶子口径）: %s", e)
         return _empty_account_prefill()
 
 
-async def _build_four_table_extraction(ctx: RenderContext, year: int) -> dict:
+async def _build_four_table_extraction(ctx: RenderContext, year: int, *, strict: bool = False) -> dict:
     """从四表库提取 E1 全套取数结果（明细预填 + 审定预填 + 受限分类 + 溯源）。
 
     科目定位走 `four_table.resolve_semantic_accounts`（**按科目名逐项目定位**）——
     标准码在项目间并不一致、且「数字货币」「存放财务公司款项」没有一级标准科目，
     写死任何码都会在部分项目取空或取错（详见 `e_cycle_specs` 模块 docstring）。
+
+    ``strict=True``（公式推送引擎用）：四表 / 币种 / 账户级三处取数失败一律上抛，不退化成空结果 ——
+    写入方拿「取数失败的空」去推送，会把真实金额刷成 0。render 路径保持 fail-open（默认）。
 
     Returns:
         ``{four_table_prefill, account_prefill, adjudication_prefill,
@@ -430,8 +439,8 @@ async def _build_four_table_extraction(ctx: RenderContext, year: int) -> dict:
         all_prefixes.extend(slot.codes or [])
     all_prefixes = [p for p in dict.fromkeys(all_prefixes) if p]
 
-    subtree = await fetch_tb_subtree(ctx.db, ctx.project_id, year, all_prefixes)
-    currency_map = await _fetch_currency_map(ctx, year, all_prefixes)
+    subtree = await fetch_tb_subtree(ctx.db, ctx.project_id, year, all_prefixes, strict=strict)
+    currency_map = await _fetch_currency_map(ctx, year, all_prefixes, strict=strict)
 
     slot_leaves = build_e1_slot_leaves(subtree, accounts)
     detail = build_e1_detail_rows(slot_leaves, currency_map)
@@ -440,7 +449,7 @@ async def _build_four_table_extraction(ctx: RenderContext, year: int) -> dict:
     source_codes = accounts.as_dict()
     source_codes["parent_check"] = build_e1_parent_check(subtree, accounts)
 
-    account_prefill = await _build_account_prefill(ctx, year, accounts, slot_leaves)
+    account_prefill = await _build_account_prefill(ctx, year, accounts, slot_leaves, strict=strict)
 
     return {
         "four_table_prefill": {

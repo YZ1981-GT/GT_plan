@@ -51,10 +51,14 @@ from app.services.ledger_import.direction_resolver import resolve_account_direct
 
 # 合法的状态转换
 _VALID_TRANSITIONS: dict[ReviewStatus, set[ReviewStatus]] = {
-    ReviewStatus.draft: {ReviewStatus.pending_review},
+    ReviewStatus.draft: {
+        ReviewStatus.pending_review,
+        ReviewStatus.approved,
+        ReviewStatus.rejected,
+    },
     ReviewStatus.pending_review: {ReviewStatus.approved, ReviewStatus.rejected},
     ReviewStatus.rejected: {ReviewStatus.draft},
-    ReviewStatus.approved: set(),  # approved 不可转换
+    ReviewStatus.approved: {ReviewStatus.draft},  # 撤回复核
 }
 
 
@@ -389,13 +393,14 @@ class AdjustmentService:
         entry_group_id: UUID,
         change: ReviewStatusChange,
         reviewer_id: UUID,
+        *,
+        allow_approved_revoke: bool = False,
     ) -> dict[str, Any]:
-        """复核状态机转换。
+        """执行调整分录复核状态转换并返回事件所需的影响范围。
 
-        adj-formula-repair-and-approval-gate-wiring 复盘修正：
-        返回受影响的 `{year, account_codes}`，供 router 在 commit 后发布
-        ADJUSTMENT_APPROVED 事件时使用 —— 原实现让 router 调 `_get_group_rows`
-        私有方法并在 commit 后二次查库，既破坏封装又多一次往返。
+        大厅可以直接把草稿转为 approved/rejected；approved 只能通过专用
+        ``revoke-review`` 端点回到 draft。撤回和驳回返工都会清除复核元数据，
+        防止草稿状态继续携带上一轮审批人的身份与时间。
         """
         adj_rows = await self._get_group_rows(project_id, entry_group_id)
         if not adj_rows:
@@ -408,6 +413,8 @@ class AdjustmentService:
             raise ValueError(
                 f"非法状态转换：{current.value} → {target.value}"
             )
+        if current == ReviewStatus.approved and target == ReviewStatus.draft and not allow_approved_revoke:
+            raise ValueError("已通过的调整须使用撤回复核端点")
 
         if target == ReviewStatus.rejected and not change.reason:
             raise ValueError("驳回时必须填写原因")
@@ -415,21 +422,26 @@ class AdjustmentService:
         now = datetime.now(timezone.utc)
         for row in adj_rows:
             row.review_status = target
+            row.updated_by = reviewer_id
             if target == ReviewStatus.approved:
                 row.reviewer_id = reviewer_id
                 row.reviewed_at = now
+                row.rejection_reason = None
             elif target == ReviewStatus.rejected:
                 row.reviewer_id = reviewer_id
                 row.reviewed_at = now
                 row.rejection_reason = change.reason
             elif target == ReviewStatus.draft:
-                # 从 rejected 回到 draft，清除驳回信息
+                row.reviewer_id = None
+                row.reviewed_at = None
                 row.rejection_reason = None
 
         await self.db.flush()
 
         # 在 flush 前已加载的 ORM 行上取值（不再查库），供 router 发事件
         return {
+            "previous_status": current.value,
+            "status": target.value,
             "year": adj_rows[0].year,
             "account_codes": sorted({r.account_code for r in adj_rows if r.account_code}),
         }
@@ -760,11 +772,12 @@ class AdjustmentService:
         if not account_codes:
             return WPAdjustmentSummary(wp_code=wp_code, accounts=account_codes)
 
-        # 获取未审数（从 trial_balance）
+        # 获取未审数和底稿调整分量（从 trial_balance）
         tb = TrialBalance.__table__
         tb_q = (
             sa.select(
                 sa.func.coalesce(sa.func.sum(tb.c.unadjusted_amount), 0).label("unadj"),
+                sa.func.coalesce(sa.func.sum(tb.c.wp_adjustment), 0).label("wp_adj"),
             )
             .where(
                 tb.c.project_id == project_id,
@@ -774,7 +787,9 @@ class AdjustmentService:
             )
         )
         tb_result = await self.db.execute(tb_q)
-        unadjusted = Decimal(str(tb_result.scalar() or 0))
+        tb_row = tb_result.one()
+        unadjusted = Decimal(str(tb_row.unadj or 0))
+        wp_adjustment = Decimal(str(tb_row.wp_adj or 0))
 
         # 获取 AJE/RJE 明细
         # v2 约定（category_natural_positive）：调整净额 SUM(debit)-SUM(credit) 是"借正贷负"，
@@ -854,7 +869,7 @@ class AdjustmentService:
             rje_details=rje_details,
             aje_total=aje_total,
             rje_total=rje_total,
-            audited_amount=unadjusted + aje_total + rje_total,
+            audited_amount=unadjusted + aje_total + rje_total + wp_adjustment,
         )
 
     # ------------------------------------------------------------------
@@ -867,10 +882,14 @@ class AdjustmentService:
         adj_type: AdjustmentType,
     ) -> str:
         """生成下一个编号 AJE-001 / RJE-001（使用 pg_advisory_xact_lock 防并发竞争）"""
+        import hashlib
         from sqlalchemy import text as sa_text
         prefix = "AJE" if adj_type == AdjustmentType.aje else "RJE"
-        # 使用 advisory lock 防止并发竞争产生重复编号
-        lock_key = hash(f"{project_id}:{year}:{prefix}") % (2**31)
+        # 稳定摘要 —— 跨进程 / 跨重启一致（ADR-P3-005 / ADR-P3-008）
+        raw = f"{project_id}:{year}:{prefix}"
+        lock_key = int.from_bytes(
+            hashlib.sha256(raw.encode("utf-8")).digest()[:4], "big", signed=False,
+        ) % (2**31)
         # SQLite 测试 dialect 没有 pg_advisory_xact_lock，跳过（单进程测试隔离即可）
         bind = self.db.get_bind()
         if bind is None or bind.dialect.name != "sqlite":

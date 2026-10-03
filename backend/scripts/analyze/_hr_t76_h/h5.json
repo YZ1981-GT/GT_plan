@@ -1,0 +1,61 @@
+{
+  "mode": "check",
+  "supply_rows": {
+    "working_paper_sync_definition_artifact": 179,
+    "working_paper_sync_definition_bundle": 88,
+    "working_paper_representation_upgrade_candidate": 1,
+    "working_paper_content_representation": 283
+  },
+  "entries": [
+    {
+      "target": {
+        "entry_id": "xlsx/gt-h5-oil-gas-assets",
+        "contract_id": "h5.oil_gas_assets_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_h5_oil_gas_assets",
+        "wp_codes": [
+          "H5"
+        ],
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "360623ab-54b9-47ca-a4c8-4e19329fbf84",
+        "wp_code": "H5",
+        "store_bytes": 0,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "stages": {
+        "authority_model": "would_create",
+        "bundle": "would_create",
+        "contract": "would_create",
+        "instrumentation": "would_create",
+        "template": "would_create"
+      },
+      "digests": {
+        "authority_model": "cdf9bb13feff07f12ee91b78ee5db9f64371759c4db83340fcf8b346c2b5d477",
+        "bundle": "4a74801486fe69b2a803407e4ee9767b5e52c611a05912c5b20626b6b22049eb",
+        "contract": "dd12e2f233f108b62efa056a1010e32efcda2051224e9a461dbdf9e60479c7e3",
+        "instrumentation": "cbe70d959b6d8b70c54771b61c406196b9b4e1c8d6f00fa812f5e9989dfdef97",
+        "template": "b9862f6e0febcb73522d0ea693e063919b1043edc680e38eadcbcc4cfed4c309"
+      },
+      "would_create": [
+        "authority_model",
+        "bundle",
+        "contract",
+        "instrumentation",
+        "template"
+      ],
+      "reused": [],
+      "representation": {
+        "settlement": "blocked",
+        "current_representation_id": null,
+        "current_definition_bundle_id": null,
+        "candidates_awaiting_contract": 0,
+        "candidate_bound_to_target_bundle": null,
+        "candidate_bound_state": null
+      },
+      "definition_bundle_sha256": "4a74801486fe69b2a803407e4ee9767b5e52c611a05912c5b20626b6b22049eb"
+    }
+  ],
+  "errors": [],
+  "would_create_total": 5
+}

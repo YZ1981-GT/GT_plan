@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TrialBalance
 from app.services.field_override_service import FieldOverrideService
+from app.services.tb_audited_writer import publish_rows
 
 logger = logging.getLogger(__name__)
 
@@ -110,45 +111,43 @@ class STransactionTBWritebackService:
                 f"支持: {sorted(S_TRANSACTION_COMPONENT_TYPES)}"
             )
 
-        # 查找匹配的 trial_balance 行
-        stmt = (
-            sa.select(TrialBalance)
-            .where(
-                TrialBalance.project_id == project_id,
-                TrialBalance.year == year,
-                TrialBalance.standard_account_code == account_code,
-                TrialBalance.is_deleted == sa.false(),
-            )
-            .limit(1)
+        # 统一发布门负责定位、写入四个审定分量，并记录发布基准。
+        publish_report = await publish_rows(
+            self.db,
+            project_id,
+            year,
+            [{
+                "account_code": account_code,
+                "audited_amount": abs(audited_amount),
+            }],
+            source=(
+                f"s-transaction:{wp_code or component_type or 'unknown'}"
+            ),
         )
-        result = await self.db.execute(stmt)
-        row = result.scalar_one_or_none()
-
-        if not row:
+        if not publish_report.updated_rows:
+            reason = publish_report.skipped[0].reason if publish_report.skipped else "未更新试算表"
             raise LookupError(
-                f"试算表中未找到科目 {account_code}（project={project_id}, year={year}），"
-                f"请先导入试算表数据"
+                f"试算表中未找到科目 {account_code}（project={project_id}, year={year}）：{reason}"
             )
 
-        # 保存旧值
-        previous_amount = str(row.audited_amount) if row.audited_amount is not None else None
-
-        # v2 正数口径：audited_amount 始终为正数（绝对值存储）
-        row.audited_amount = Decimal(str(abs(audited_amount)))
-
-        # 仅 flush，不 commit（Requirements 9.3）
-        await self.db.flush()
+        published = publish_report.updated_rows[0]
+        previous_amount = (
+            str(published.previous_amount)
+            if published.previous_amount is not None
+            else None
+        )
+        audited_value = str(published.audited_amount)
 
         logger.info(
             "S-transaction TB回写(flush): project=%s year=%s account=%s "
             "amount=%s (prev=%s) component=%s wp_code=%s",
             project_id, year, account_code,
-            row.audited_amount, previous_amount, component_type, wp_code,
+            audited_value, previous_amount, component_type, wp_code,
         )
 
         return {
-            "account_code": account_code,
-            "audited_amount": str(row.audited_amount),
+            "account_code": published.account_code,
+            "audited_amount": audited_value,
             "previous_amount": previous_amount,
         }
 

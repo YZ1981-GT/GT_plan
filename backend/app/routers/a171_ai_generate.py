@@ -59,19 +59,20 @@ async def a171_ai_generate(
     if not getattr(settings, "WP_AI_SERVICE_ENABLED", True):
         raise HTTPException(503, "AI 服务未启用")
 
-    # 1. 加载项目上下文
+    # 1. 加载项目上下文（项目以底稿自身所属项目为准；router 级 dedicated_wp_gate 已校验可访问该底稿）
     project_context = await _load_project_context(wp_id, db)
+    project_uuid = _parse_uuid(project_context.get("project_id"))
 
-    # 2. 加载知识库文档（用户指定 or 自动检索）
+    # 2. 加载知识库文档（用户指定 or 自动检索）；均按「当前用户 ∩ 底稿所属项目」判定可见性
     kb_texts: list[str] = []
     sources: list[str] = []
     if body.knowledge_doc_ids:
-        kb_texts, sources = await _load_selected_kb_docs(body.knowledge_doc_ids, db)
+        kb_texts, sources = await _load_selected_kb_docs(
+            body.knowledge_doc_ids, project_uuid, current_user, db
+        )
     else:
         kb_texts, sources = await _load_auto_kb_docs(
-            project_context.get("project_id", ""),
-            body.chapter_title,
-            db,
+            project_uuid, body.chapter_title, current_user, db
         )
 
     # 3. 构造 user prompt
@@ -177,56 +178,81 @@ async def _load_project_context(wp_id: str, db: AsyncSession) -> dict:
     return ctx
 
 
-async def _load_selected_kb_docs(doc_ids: list[str], db: AsyncSession) -> tuple[list[str], list[str]]:
-    """加载用户指定的知识库文档"""
-    import sqlalchemy as sa
+#: 用户点名参考文档：最多读取的 ID 数 / 进入提示词的篇数 / 每篇字数
+_SELECTED_DOC_ID_CAP = 20
+_SELECTED_DOC_LIMIT = 5
+_DOC_CHAR_LIMIT = 4000
 
+
+def _parse_uuid(value) -> UUID | None:
+    try:
+        return UUID(str(value)) if value else None
+    except (ValueError, TypeError):
+        return None
+
+
+async def _load_selected_kb_docs(
+    doc_ids: list[str], project_id: UUID | None, user, db: AsyncSession
+) -> tuple[list[str], list[str]]:
+    """加载用户在界面上点名的知识库文档（如 A17-3 上传的咨询附件）。
+
+    🔴 旧实现查遗留表 ``ai_knowledge_base`` 的 ``title`` / ``content`` —— 该表没有这两列、
+    也没有任何写入方，SQL 恒失败被吞成空 ⇒ 点名的文档从未进入 AI 生成（spec
+    knowledge-base-retrieval-and-authz-closure 5.6）。现改读 ``knowledge_documents``，
+    每篇过单一判定面（当前用户 ∩ 底稿所属项目）；客户端传来的 ID 不可信，
+    不可见 / 已删除的静默跳过（不暴露存在性）。
+    """
+    if project_id is None or not doc_ids:
+        return [], []
+    try:
+        from app.services.knowledge_index_service import KnowledgeIndexService
+
+        docs = await KnowledgeIndexService(db).load_documents(
+            doc_ids[:_SELECTED_DOC_ID_CAP], user=user, project_id=project_id
+        )
+    except Exception as e:  # noqa: BLE001 - 参考资料缺失不阻断生成
+        logger.warning("A17-1 AI: 加载指定知识库文档失败（降级为无参考）: %s", e)
+        return [], []
     texts: list[str] = []
     sources: list[str] = []
-    try:
-        result = await db.execute(
-            sa.text("""
-                SELECT id, title, content FROM ai_knowledge_base
-                WHERE id = ANY(:ids)
-                LIMIT 5
-            """),
-            {"ids": doc_ids},
-        )
-        for row in result.fetchall():
-            content = row.content or ""
-            if content:
-                texts.append(content[:4000])
-                sources.append(row.title or str(row.id))
-    except Exception as e:
-        logger.warning("A17-1 AI: 加载指定KB文档失败: %s", e)
+    for doc in docs:
+        content = doc.get("content") or ""
+        if not content:
+            continue
+        texts.append(content[:_DOC_CHAR_LIMIT])
+        sources.append(doc.get("document_name") or doc["source_id"])
+        if len(texts) >= _SELECTED_DOC_LIMIT:
+            break
     return texts, sources
 
 
 async def _load_auto_kb_docs(
-    project_id: str, chapter_title: str, db: AsyncSession
+    project_id: UUID | None, chapter_title: str, user, db: AsyncSession
 ) -> tuple[list[str], list[str]]:
-    """自动从知识库检索相关文档"""
-    texts: list[str] = []
-    sources: list[str] = []
-    if not project_id:
-        return texts, sources
+    """按章节标题自动检索知识库（文档正文词法 + 可用时的向量；来源名取 document_name）。"""
+    if project_id is None:
+        return [], []
     try:
         from app.services.reference_doc_service import ReferenceDocService
 
-        docs = await ReferenceDocService.load_from_knowledge_base(
-            project_id=UUID(project_id),
-            category="audit_standards",
+        docs = await ReferenceDocService.search_knowledge_base(
+            project_id,
             keywords=[chapter_title, "审计", "CAS"],
+            category="audit_standards",
             max_docs=3,
             db=db,
+            user=user,
         )
-        for doc in docs:
-            content = doc.get("content", "") if isinstance(doc, dict) else str(doc)
-            if content:
-                texts.append(content[:4000])
-                sources.append(doc.get("title", "知识库文档") if isinstance(doc, dict) else "知识库文档")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning("A17-1 AI: 自动检索KB失败 (降级为无参考): %s", e)
+        return [], []
+    texts: list[str] = []
+    sources: list[str] = []
+    for doc in docs:
+        content = doc.get("content") or ""
+        if content:
+            texts.append(content[:_DOC_CHAR_LIMIT])
+            sources.append(doc.get("document_name") or "知识库文档")
     return texts, sources
 
 

@@ -1,0 +1,61 @@
+{
+  "mode": "check",
+  "supply_rows": {
+    "working_paper_sync_definition_artifact": 179,
+    "working_paper_sync_definition_bundle": 88,
+    "working_paper_representation_upgrade_candidate": 1,
+    "working_paper_content_representation": 283
+  },
+  "entries": [
+    {
+      "target": {
+        "entry_id": "xlsx/gt-h4-engineering-materials",
+        "contract_id": "h4.engineering_materials_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_h4_engineering_materials",
+        "wp_codes": [
+          "H4"
+        ],
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "f287d31f-9cd1-46e5-8356-111a5061930d",
+        "wp_code": "H4",
+        "store_bytes": 0,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "stages": {
+        "authority_model": "would_create",
+        "bundle": "would_create",
+        "contract": "would_create",
+        "instrumentation": "would_create",
+        "template": "would_create"
+      },
+      "digests": {
+        "authority_model": "7ad471d8ba6c102297d14b6fa949516a5c6e510b9f2eb9e2556f8810ad50ccfe",
+        "bundle": "51104fe43416c00079ebcd1b486461b0b9789c0d1b044c4952dd83a80d88ba4a",
+        "contract": "ca09e704d3fcc6339a66e305922f763bfd85f40663559684e175170095b1e266",
+        "instrumentation": "34b6c7f621d78802c05eda8760bd769474deddabe658b573d46b58c80af06d8a",
+        "template": "6da1b2d9e36a331ac259e27a936c913e6423b40316e06411695f85805e2bd0a5"
+      },
+      "would_create": [
+        "authority_model",
+        "bundle",
+        "contract",
+        "instrumentation",
+        "template"
+      ],
+      "reused": [],
+      "representation": {
+        "settlement": "blocked",
+        "current_representation_id": null,
+        "current_definition_bundle_id": null,
+        "candidates_awaiting_contract": 0,
+        "candidate_bound_to_target_bundle": null,
+        "candidate_bound_state": null
+      },
+      "definition_bundle_sha256": "51104fe43416c00079ebcd1b486461b0b9789c0d1b044c4952dd83a80d88ba4a"
+    }
+  ],
+  "errors": [],
+  "would_create_total": 5
+}

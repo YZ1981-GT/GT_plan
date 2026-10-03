@@ -10,6 +10,7 @@
   <div class="gt-a181">
     <div class="gt-a181__toolbar">
       <el-segmented v-model="mode" :options="modeOptions" size="small" />
+      <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a181-regulatory-submission" />
       <span class="gt-a181__save-status">
         <template v-if="saveStatus === 'saving'"><el-icon class="is-loading"><Loading /></el-icon> 保存中...</template>
         <template v-else-if="saveStatus === 'saved' && lastSavedAt">✓ 已保存</template>
@@ -108,29 +109,72 @@
       </template>
     </div>
 
-    <GtOnlyOfficeSheet v-else :wp-id="props.wpId" sheet-name="A18-1" class="gt-a181__oo" />
+    <!-- Excel 在线编辑 — sync bridge -->
+    <template v-else>
+      <WorkpaperSyncEditorHost v-if="syncOoDescriptor" :descriptor="syncOoDescriptor" :bridge="syncBridge" class="gt-a181__oo" />
+      <div v-else class="gt-a181__oo" style="display:flex;align-items:center;justify-content:center;color:#909399">正在打开同步编辑器…</div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { ref, computed, toRef, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { useA181RegulatorySubmission } from './composables/useA181RegulatorySubmission'
+import { useWorkpaperSyncBridge } from './sync/useWorkpaperSyncBridge'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { fetchOnlyOfficeHealthy } from './sync/onlyOfficeHealth'
 
-const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+
+const WorkpaperSyncEditorHost = defineAsyncComponent(() => import('./sync/WorkpaperSyncEditorHost.vue'))
 
 defineOptions({ name: 'GtA181RegulatorySubmission' })
 
-const props = withDefaults(defineProps<{ wpId: string; readonly?: boolean }>(), { readonly: false })
+const props = withDefaults(defineProps<{ wpId: string; projectId?: string; readonly?: boolean }>(), { readonly: false, projectId: '' })
 
-const mode = ref('结构化视图')
-const modeOptions = ['结构化视图', '在线编辑']
+// ─── sync bridge（替代 legacy mode + GtOnlyOfficeSheet）───
+const A181_ENTRY_ID = 'xlsx/gt-a181-regulatory-submission'
+const A181_SHEET_KEY = 'a181-managed'
 
-const wpIdRef = ref(props.wpId)
+const wpIdRef = toRef(props, 'wpId')
 const {
   loading, recipient, body, issuance, projectContext,
   saveStatus, lastSavedAt, loadData, updateField, flushPendingSaves,
 } = useA181RegulatorySubmission(wpIdRef)
+
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: ref(A181_ENTRY_ID),
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: ref(A181_SHEET_KEY),
+  capability: capabilityForEntry(A181_ENTRY_ID),
+  flushHtml: async () => {
+    flushPendingSaves()
+    // 🔴 降级保护：本 entry capability 仍是 single_onlyoffice（后端无 per-entry
+    //    adapter）⇒ readStoreProjection 会 404。捕获后返回空投影。
+    try {
+      const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: A181_ENTRY_ID })
+      return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: A181_SHEET_KEY }
+    } catch {
+      return { expectedRevision: 0, projection: null, sheetKey: A181_SHEET_KEY }
+    }
+  },
+  reloadHtml: async () => { await loadData(props.wpId) },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const mode = computed<string>({
+  get: () => syncBridge.mode.value === 'oo' ? '在线编辑' : '结构化视图',
+  set: (target) => {
+    if (target === '在线编辑') { void syncBridge.switchToOnlyOffice() }
+    else if (syncBridge.mode.value === 'oo') { void syncBridge.switchToHtml() }
+  },
+})
+const modeOptions = computed(() => ['结构化视图', '在线编辑'].map(v => ({
+  label: v, value: v,
+  disabled: v === '在线编辑' && props.readonly,
+})))
 
 onMounted(() => { loadData(props.wpId) })
 onBeforeUnmount(() => { flushPendingSaves() })

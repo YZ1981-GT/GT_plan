@@ -122,13 +122,67 @@ class TestGeometryFrozen:
         )
         assert LAST_DATA_ROW_D44 - FIRST_DATA_ROW_D44 + 1 == 15, "模板数据区容量应为 15 行"
 
-    def test_footer_marker_matches_template_a21(self, worksheet):
-        """footer marker 必须是 A21 真实文本的前缀（引擎按前缀搜 A 列定位锚）。"""
+    def test_footer_marker_equals_template_a21_verbatim(self, worksheet):
+        """🔴 footer marker 必须与 A21 **全等**，不能只写前缀。
+
+        引擎判据是 `_find_marker_row` 里的 `text.strip() == marker`（**全等**），
+        不是 `startswith`。首版把 marker 写成 `"提示："` 前缀，openpyxl 侧
+        `a21.startswith(marker)` 当然为真、48 个单测全绿 —— 但真栈 rematerialize
+        14.2s 就抛 `FooterAnchorDriftError: footer marker 在列 A 上一处都找不到`。
+        **本地断言用的是我自己的 startswith 口径，与引擎的全等口径不是一回事。**
+
+        对照：已落地的同类 sheet 一律用完整行文本（D4-19 `三、审计说明` /
+        D4-34 `2.咨询业务`），没有一个用前缀。
+        """
         a21 = str(worksheet.cell(row=FOOTER_ROW_D44, column=1).value or "")
-        assert a21.startswith(FOOTER_MARKER_D44), (
-            f"A{FOOTER_ROW_D44} 不以 marker {FOOTER_MARKER_D44!r} 开头，实得 {a21[:24]!r}"
-        )
         assert len(a21) == 63, f"A{FOOTER_ROW_D44} 提示文本长度变了：现算 {len(a21)} 字"
+        assert FOOTER_MARKER_D44 == a21.strip(), (
+            "marker 与模板 A21 不全等 —— 引擎按全等匹配，不等即定位不到 footer 锚\n"
+            f"marker  = {FOOTER_MARKER_D44!r}\n"
+            f"模板A21 = {a21.strip()!r}"
+        )
+
+    def test_engine_marker_matcher_rejects_a_prefix_marker(self, worksheet):
+        """变异反证：用**引擎自己的**匹配函数证明「前缀 marker」确实定位不到。
+
+        不是断言「我觉得前缀不行」，而是真调 `_find_marker_row`：
+        完整文本 → 命中行 21；前缀 `"提示："` → `None`。
+        """
+        import zipfile
+
+        from app.services.workpaper_sync.excel_materialize import (
+            _find_marker_row,
+            _shared_strings,
+        )
+
+        with zipfile.ZipFile(_TEMPLATE) as zf:
+            entries = {n: zf.read(n) for n in zf.namelist()}
+        # 定位该 sheet 的 part
+        wb_xml = entries["xl/workbook.xml"].decode("utf-8")
+        rels = entries["xl/_rels/workbook.xml.rels"].decode("utf-8")
+        import re as _re
+
+        m = _re.search(
+            r'<sheet name="' + _re.escape(MANAGED_SHEET_D44) + r'"[^>]*r:id="([^"]+)"', wb_xml
+        )
+        assert m, "定位不到 D4-4 的 sheet 关系 id"
+        rid = m.group(1)
+        m2 = _re.search(r'Id="' + _re.escape(rid) + r'"[^>]*Target="([^"]+)"', rels)
+        assert m2, "定位不到 sheet part 路径"
+        part = "xl/" + m2.group(1).lstrip("/")
+        xml = entries[part].decode("utf-8")
+        shared = _shared_strings(entries)
+
+        full = _find_marker_row(xml, column="A", marker=FOOTER_MARKER_D44, shared=shared)
+        assert full == FOOTER_ROW_D44, (
+            f"引擎用完整 marker 定位到行 {full}，期望 {FOOTER_ROW_D44}"
+        )
+
+        prefix_only = _find_marker_row(xml, column="A", marker="提示：", shared=shared)
+        assert prefix_only is None, (
+            "引擎居然用前缀也能命中 —— 那说明 _find_marker_row 改成了 startswith，"
+            "本条判据（以及上面那条全等断言的必要性）需要重新评估"
+        )
 
     def test_data_region_has_no_formula_and_no_content(self, worksheet):
         """数据区公式格 0 + 非空格 0 —— 这两条是 `formula_mask` 为空的**判据**。"""
@@ -496,11 +550,16 @@ class TestRowCountExceedsTemplateCapacity:
         assert FOOTER_MARKER_D44 in str(anchor.marker)
 
     def test_footer_marker_is_searchable_in_column_a_below_data_region(self, worksheet):
-        """marker 必须能在 A 列、数据区**之下**被搜到（引擎按列扫描定位锚）。"""
+        """marker 必须在 A 列**唯一**命中且落在数据区之下。
+
+        🔴 判据用**全等**（`== marker`）而不是 `startswith` —— 与引擎
+        `_find_marker_row` 的 `text.strip() == marker` 同口径。首版用 startswith，
+        与引擎口径不一致，导致「本地绿、真栈 FooterAnchorDriftError」。
+        """
         hits = [
             r
             for r in range(1, worksheet.max_row + 1)
-            if str(worksheet.cell(row=r, column=1).value or "").startswith(FOOTER_MARKER_D44)
+            if str(worksheet.cell(row=r, column=1).value or "").strip() == FOOTER_MARKER_D44
         ]
         assert hits == [FOOTER_ROW_D44], (
             f"marker「{FOOTER_MARKER_D44}」在 A 列命中行 {hits}，期望恰 [{FOOTER_ROW_D44}] —— "

@@ -7,7 +7,10 @@ vi.mock('@/utils/http', () => ({ default: { get: mocks.get } }))
 import { useDisclosureCapabilities } from '../useDisclosureCapabilities'
 
 describe('Feature: advanced-query-disclosure-integration-hardening, Property P12', () => {
-  beforeEach(() => mocks.get.mockReset())
+  // 花括号体：表达式体会把 spy 返回给 vitest，被当作 teardown 在每条用例后多调一次（隐藏的额外调用）
+  beforeEach(() => {
+    mocks.get.mockReset()
+  })
 
   it('historical_upload=false 时统一禁用并始终给出中文理由', async () => {
     await fc.assert(fc.asyncProperty(

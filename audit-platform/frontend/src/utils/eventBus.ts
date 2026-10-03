@@ -18,7 +18,7 @@ export type { SSEEventType } from '@/types/sse'
 
 /** 公式保存/应用 */
 export interface FormulaChangedPayload {
-  action: 'saved' | 'applied'
+  action: 'saved' | 'applied' | 'refreshed'
 }
 
 /** 准则切换 */
@@ -53,6 +53,13 @@ export interface OpenFormulaManagerPayload {
    * 否则全局挂载层会把它误判为报表域。
    */
   scope?: 'note' | 'consol_note' | 'consol_worksheet' | 'consol_report' | 'report' | 'tb' | 'workpaper'
+  /** 合并/单体公式所用模板版别；公式中心只归一为 soe / listed。 */
+  templateType?: 'soe' | 'listed' | string
+  /** 附注公式入口的当前章节编号与标题。 */
+  noteSection?: string
+  noteSectionTitle?: string
+  /** 报表或试算入口当前报表类型（六类 report_type）。 */
+  initialReportType?: string
 }
 
 /**
@@ -104,13 +111,18 @@ export interface RowNameAlignmentCandidateWire {
   source_kind: string
 }
 
-/** 合并树节点选择 */
+/** 合并树节点选择（节点来自后端三码推导的企业树） */
 export interface ConsolTreeSelectPayload {
   companyCode?: string
   label?: string
+  /** 树内唯一键 {企业代码}:{角色}；差额节点据此打开差额分录面板 */
+  nodeKey?: string
+  /** consol / consol_elim / parent / hq / branch_elim / subsidiary / branch */
+  role?: string
+  /** aggregate / elim / data */
+  kind?: string
   isReport?: boolean
   reportType?: string
-  isDiff?: boolean
   switchTab?: string
 }
 
@@ -128,6 +140,8 @@ export interface ConsolCatalogSelectPayload {
 export interface ConsolRefreshEntityPayload {
   companyCode: string
   companyName: string
+  /** 树内稳定节点身份；同一企业不同角色不可混用缓存 */
+  nodeKey: string
   types: string[]
 }
 
@@ -485,6 +499,10 @@ export type Events = {
   } | void
   'adjustment:updated': void
   'adjustment:deleted': void
+  /** SSE bridge: 后端 broadcast_raw 复核状态变更 → 前端 mitt（大厅/底稿刷新） */
+  'adjustment:review-changed': { projectId: string; year?: number; entry_group_id?: string; new_status?: string }
+  /** SSE bridge: 后端 broadcast_raw 底稿同步到达 → 前端 mitt（大厅刷新） */
+  'adjustment:sync-arrived': { projectId: string; year?: number; wp_code?: string }
   'dataset:activated': void
 
   // 编辑锁强抢通知（useEditingLock → SSE force_acquired 反射）

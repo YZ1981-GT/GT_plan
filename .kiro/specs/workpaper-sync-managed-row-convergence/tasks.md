@@ -6,7 +6,7 @@
 
 ## 阶段 0：前置确认（不写代码，先钉死假设）
 
-- [ ] 1. 钉死 R1：adopt 后不会复现 `7→33` 写爆
+- [x] 1. 钉死 R1：adopt 后不会复现 `7→33` 写爆
   - 用 `d4_materialize_harness.py` 的 `rebased_world` 以**当前 gen165 字节**为 substrate，
     构造"store 认领 substrate 现有 33 行"的 projection，跑 materialize
   - 判据：materialize **不插行**（受管区已是 33 行）且产物 extract 后 `extra=0`
@@ -21,7 +21,7 @@
 
 ## 阶段 1：③ 反向收敛端点（P0 核心，零引擎改动）
 
-- [ ] 3. 新增 `POST {USER_SYNC_PREFIX}/adopt-substrate` 端点（骨架 + 鉴权）
+- [x] 3. 新增 `POST {USER_SYNC_PREFIX}/adopt-substrate` 端点（骨架 + 鉴权）
   - `wp_sync_router.py` 加路由，复用 `_guard(action="adopt_substrate")` 与 `_registration`
   - 🔴 **必在 `router_registry` 确认 wp_sync router 已注册**（本端点挂在既有 router 上，
     应自动生效，但需确认 `USER_SYNC_PREFIX` 前缀拼接正确）
@@ -56,7 +56,7 @@
 
 ## 阶段 2：① 刷新取数来源弹窗（P0 前端）
 
-- [ ] 8. `GtWpRenderer.vue` 刷新取数改为来源选择弹窗
+- [x] 8. `GtWpRenderer.vue` 刷新取数改为来源选择弹窗
   - 「刷新取数」按钮改为先开弹窗；既有 `onRowNameAlignmentRefresh` 成为第一选项（实现不改）
   - 新增「以在线编辑（OO）侧为准，覆盖表单」→ 调 adopt-substrate（带二次确认 + 破坏性提示）
   - 「以表单为准，覆盖在线编辑」置灰并注明依赖 Requirement 4
@@ -90,7 +90,7 @@
   - 判据：清空后该行不再进 extracted（依据实测"空业务格行不产字段"）
   - _Validates: Requirement 4.2, 4.3_
 
-- [ ] 13. 删物理行路径（仅在需要压缩行数时，接 build_delete_plan）
+- [x] 13. 删物理行路径（仅在需要压缩行数时，接 build_delete_plan）
   - 接 `resolve_deleted_row_keys` / `build_delete_plan`（现算签名见 requirements Req 4）
   - 🔴 先解决 R2：写探针钉死"某区间是否被公式引用"，**探针须带变异证明**
     （本轮的正则口径已被证失效，不可复用）
@@ -332,7 +332,7 @@ single_pass / static_region）。
 - [ ] 15* 死代码守卫 —— 🔴 **前提已反转**：G2 决定 `shrink_sheet_rows`
       **刻意不接线**，故不能加「必须有生产消费方」的守卫（那会与 G2 冲突）。
       当前守的是**反向**判据（收敛不得产出删行计划）。本条转入删行 spec。
-- [ ] 13* 删物理行路径 —— 转独立 spec（需先补齐多区位移联动，见 G2）
+- [x] 13* 删物理行路径 —— 转独立 spec（需先补齐多区位移联动，见 G2）
 
 ---
 

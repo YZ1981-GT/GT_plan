@@ -443,13 +443,13 @@ async def _query_tb_cells(
         return []
 
     # trial_balance 表使用 standard_account_code 作为 account_code
-    # closing_balance 需要计算：unadjusted_amount + aje_adjustment + rje_adjustment
+    # closing_balance 需要计算：unadjusted_amount + aje_adjustment + rje_adjustment + wp_adjustment
     try:
         result = await db.execute(text("""
             SELECT standard_account_code, account_name, opening_balance,
                    COALESCE(aje_adjustment, 0) + COALESCE(rje_adjustment, 0) as debit_amount,
                    0 as credit_amount,
-                   COALESCE(unadjusted_amount, 0) + COALESCE(aje_adjustment, 0) + COALESCE(rje_adjustment, 0) as closing_balance,
+                   COALESCE(unadjusted_amount, 0) + COALESCE(aje_adjustment, 0) + COALESCE(rje_adjustment, 0) + COALESCE(wp_adjustment, 0) as closing_balance,
                    audited_amount
             FROM trial_balance
             WHERE project_id = :pid AND year = :y AND is_deleted = false

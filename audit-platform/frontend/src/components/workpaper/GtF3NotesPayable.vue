@@ -429,6 +429,8 @@ const dualMode = useF3DualMode({
 
   wpId: toRef(props, 'wpId'),
 
+  projectId: toRef(props, 'projectId'),
+
   sheetName: sheetNameRef,
 
   reloadAll: () => formData.loadAll(),

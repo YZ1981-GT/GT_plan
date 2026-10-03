@@ -221,14 +221,10 @@ const EXPLICIT_ENTRIES: Array<Pick<FormulaEngineInventoryEntry, 'composable' | '
   { composable: 'useG0FormulaEngine', filePath: 'src/components/workpaper/g0-confirmation/composables/useG0FormulaEngine.ts', kind: 'formula-engine' },
   // S34 IPO bundle（试点引擎所在）
   { composable: 'useS34FormulaEngine', filePath: 'src/components/workpaper/s34-ipo-bundle/useS34FormulaEngine.ts', kind: 'formula-engine' },
-  // J 循环公式引擎
+  // J 循环公式引擎（J2/J3 零生产可达引擎已删除，只保留真实 J1）
   { composable: 'useJ1FormulaEngine', filePath: 'src/composables/workpaper/j1/useJ1FormulaEngine.ts', kind: 'formula-engine' },
-  { composable: 'useJ2FormulaEngine', filePath: 'src/composables/workpaper/j2/useJ2FormulaEngine.ts', kind: 'formula-engine' },
-  { composable: 'useJ3FormulaEngine', filePath: 'src/composables/workpaper/j3/useJ3FormulaEngine.ts', kind: 'formula-engine' },
   // 跨表勾稽：src/composables 下的独立 CrossSheet
   { composable: 'useL1CrossSheet', filePath: 'src/composables/useL1CrossSheet.ts', kind: 'cross-sheet' },
-  { composable: 'useJ2CrossSheet', filePath: 'src/composables/workpaper/j2/useJ2CrossSheet.ts', kind: 'cross-sheet' },
-  { composable: 'useJ3CrossSheet', filePath: 'src/composables/workpaper/j3/useJ3CrossSheet.ts', kind: 'cross-sheet' },
 ]
 
 // ─── 条目构建（元数据登记，不触碰计算实现） ─────────────────────────────────────

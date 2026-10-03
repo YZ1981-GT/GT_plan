@@ -41,11 +41,15 @@ describe('SSEEventType', () => {
       'workpaper.review_passed',
       'workpaper.stale_detected',
       'cross_check.failed',
+      'formula.pushed',
+      'consol.pushed',
+      'consol.push_stale',
+      'consol.push_failed',
     ]
 
     // If SSEEventType is a proper union, all these assignments compile without error
     // This test verifies the type covers all known events at runtime
-    expect(knownEvents.length).toBeGreaterThanOrEqual(26)
+    expect(knownEvents.length).toBeGreaterThanOrEqual(29)
     // Each event follows domain.action format
     knownEvents.forEach(event => {
       expect(event).toMatch(/^[a-z_]+\.[a-z_]+$/)

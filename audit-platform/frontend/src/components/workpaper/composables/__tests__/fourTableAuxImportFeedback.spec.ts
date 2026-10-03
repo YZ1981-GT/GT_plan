@@ -97,7 +97,10 @@ describe('auxImportPrompt — reason → 可辨别中文提示（Requirement 4.4
 })
 
 describe('manualImportK1DetailFromAux — 手动入口语义（区别于 AutoSeed）', () => {
-  beforeEach(() => vi.mocked(http.post).mockReset())
+  // 花括号体：表达式体会把 spy 返回给 vitest，被当作 teardown 在每条用例后多调一次（隐藏的额外调用）
+  beforeEach(() => {
+    vi.mocked(http.post).mockReset()
+  })
 
   it('打字面量正确的 K1 端点 URL', () => {
     expect(K1_IMPORT_AUX_URL('wp-9')).toBe('/api/workpapers/wp-9/k1/import-aux-balance')

@@ -558,7 +558,43 @@ class TestNoteChainUnchanged:
 
     判据取源码字节（行尾归一后）与 HEAD 相等 —— 比"跑一遍看输出"更强：输出相同
     可能是测试面没覆盖到改动，源码字节相同则连未覆盖路径也不可能变。
+
+    ─── 并发 spec 改动登记（2026-09-30，按下方判据的失败提示如实登记）───────────
+    `backend/app/services/disclosure_engine.py` 被**并发**的「单体附注不得出现合并
+    专属章节」修复改动：`get_notes_tree` 增加按项目口径过滤 + 新增私有
+    `_project_scope_columns`（复用本文件既有的 `_get_project_basic_info` 取
+    wizard `basic_info`，未新增 DB 查询、未碰 `Project.report_scope`）。
+
+    🔴 本 spec 的附注零回归结论**仍然成立**，理由不是"我看了觉得没关系"，而是下面
+    `test_existing_chain_never_imports_linkage_module` 这条**与提交时点无关**的判据：
+    既有链路十个模块一个都不 import 新增的联动模块 ⇒ 联动仍是纯加法式。
+    （原字节判据是 worktree↔HEAD 比对，改动一提交就自动变绿 —— 它能抓"现在有人正在
+    改"，抓不到"已经改进 HEAD 了"。故补上不随提交自愈的那条。）
     """
+
+    def test_existing_chain_never_imports_linkage_module(self):
+        """🔴 不随提交自愈的零回归判据：既有链路模块一个都不依赖联动模块。
+
+        字节判据比的是 worktree↔HEAD，改动落 commit 后恒绿；本条比的是**代码结构**，
+        联动模块一旦被既有链路 import（= 从加法式变成侵入式），无论提交与否都打红。
+        """
+        stem = Path(NOTE_LINKAGE_NEW).stem
+        offenders = []
+        for rel in NOTE_CHAIN_FILES:
+            src = _read(_REPO / rel)
+            body = "\n".join(
+                ln for ln in src.splitlines() if not ln.lstrip().startswith("#")
+            )
+            if stem in body:
+                offenders.append(rel)
+        assert not offenders, (
+            f"既有附注链路已依赖联动模块 {stem}：{offenders} —— 联动不再是纯新增，"
+            "本 spec 的附注零回归结论失效，需重新评估"
+        )
+        # 反向自检：真源里确实存在这个模块名（否则上面是在找一个不存在的串，恒绿）
+        assert stem in _read(_REPO / NOTE_LINKAGE_NEW), (
+            f"联动模块自身不含模块名 {stem} ⇒ 扫描串写错，本判据恒绿"
+        )
 
     @pytest.mark.parametrize("rel", NOTE_CHAIN_FILES)
     def test_existing_chain_file_bytes_equal_head(self, rel):
@@ -578,12 +614,23 @@ class TestNoteChainUnchanged:
         )
 
     def test_linkage_module_is_new_not_a_rewrite(self):
-        """联动模块在 HEAD 里不存在 ⇒ 结构上不可能改变既有链路的任何输出。"""
+        """联动模块是加法式：要么还没进 HEAD（纯新增），要么已进且未被改写。
+
+        🔴 2026-09-30 按本判据**自己的**失败提示修（原文：「已在 HEAD 中 —— 本判据的
+        「纯新增」前提失效，需改为与 HEAD 版逐字节对照」）：模块已于本 spec 交付时落
+        commit，`_git_show(...) is None` 这个前提从那一刻起永假 ⇒ 判据长期红。
+        这与上面字节判据「一提交就自愈」是**同一个病的两面**：拿「相对 HEAD 的状态」
+        当不变量，会随提交动作翻面。真正的加法式不变量在
+        `test_existing_chain_never_imports_linkage_module`（与提交时点无关）。
+        """
         p = _REPO / NOTE_LINKAGE_NEW
         assert p.exists(), f"联动模块缺失: {NOTE_LINKAGE_NEW}"
-        assert _git_show(NOTE_LINKAGE_NEW) is None, (
-            "`procedure_trim_note_linkage.py` 已在 HEAD 中 —— 本判据的「纯新增」"
-            "前提失效，需改为与 HEAD 版逐字节对照"
+        head = _git_show(NOTE_LINKAGE_NEW)
+        if head is None:
+            return  # 还没进 HEAD：原始「纯新增」前提成立，无需对照
+        assert _read(p).replace("\r\n", "\n") == head.replace("\r\n", "\n"), (
+            f"{NOTE_LINKAGE_NEW} 与 HEAD 不同 —— 联动模块被改写（未提交的改动）。"
+            "若确为并发 spec 的改动，需在此如实登记并重新评估零回归结论"
         )
 
     def test_chain_file_list_is_not_empty_and_paths_are_real(self):

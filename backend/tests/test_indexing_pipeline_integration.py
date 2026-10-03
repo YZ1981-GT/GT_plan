@@ -180,3 +180,76 @@ def test_resolve_index_project_id_project_group():
     mock_doc.project_ids = [str(pid)]
 
     assert _resolve_index_project_id(mock_doc) == pid
+
+
+# ---------------------------------------------------------------------------
+# spec knowledge-base-retrieval-and-authz-closure 5.11
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_index_project_id_inherits_folder_project_group():
+    """文档继承文件夹权限时，项目分区取**文件夹**的 project_ids。
+
+    旧实现只看文档自身 project_ids（继承时恒为空）⇒ 项目组文件夹里的文档全进了全局分区。
+    """
+    from app.models.knowledge_models import KnowledgeAccessLevel
+
+    pid = uuid.uuid4()
+    doc = MagicMock(access_level=None, project_ids=None)
+    folder = MagicMock(access_level=KnowledgeAccessLevel.project_group, project_ids=["坏值", str(pid)])
+    assert _resolve_index_project_id(doc, folder) == pid
+
+
+@pytest.mark.asyncio
+async def test_pipeline_skips_private_documents_and_never_indexes_them():
+    """私有文档（含继承私有文件夹）不进任何索引分区，状态如实记为 skipped。"""
+    from app.models.knowledge_models import KnowledgeAccessLevel
+
+    doc_id = uuid.uuid4()
+    doc = MagicMock(
+        id=doc_id, is_deleted=False, content_text="私有笔记", storage_path=None, version=1,
+        access_level=None, project_ids=None, folder_id=uuid.uuid4(),
+        index_status="pending", index_error=None,
+    )
+    folder = MagicMock(access_level=KnowledgeAccessLevel.private, project_ids=None)
+    session = AsyncMock()
+    session.get = AsyncMock(side_effect=[doc, folder])
+    session.commit = AsyncMock()
+
+    with patch("app.services.indexing_pipeline.async_session") as factory, \
+            patch("app.services.indexing_pipeline.KnowledgeIndexService") as svc_cls:
+        ctx = AsyncMock()
+        ctx.__aenter__ = AsyncMock(return_value=session)
+        ctx.__aexit__ = AsyncMock(return_value=False)
+        factory.return_value = ctx
+        await run_indexing_pipeline(doc_id)
+
+    svc_cls.assert_not_called()
+    assert doc.index_status == "skipped"
+    assert "private" in doc.index_error
+    session.commit.assert_awaited()
+
+
+def test_pipeline_no_longer_references_missing_folder_relationship():
+    """回归：KnowledgeDocument 没有 folder 关系；joinedload(KnowledgeDocument.folder) 每次必抛。
+
+    用 AST 判定真实的属性访问（注释 / docstring 不产生 Attribute 节点，不会误报或漏报）。
+    """
+    import ast
+    import inspect
+    import textwrap
+
+    from app.models.knowledge_models import KnowledgeDocument
+    from app.services import indexing_pipeline
+
+    assert not hasattr(KnowledgeDocument, "folder")
+    tree = ast.parse(textwrap.dedent(inspect.getsource(indexing_pipeline)))
+    offending = [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Attribute)
+        and node.attr == "folder"
+        and isinstance(node.value, ast.Name)
+        and node.value.id in {"KnowledgeDocument", "doc"}
+    ]
+    assert offending == [], f"仍在访问不存在的 folder 关系（行 {offending}）"
