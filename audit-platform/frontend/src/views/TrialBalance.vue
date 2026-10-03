@@ -344,7 +344,8 @@
                   <tr><td>未审数</td><td>审计前客户账面金额（= 期初 + 借方发生 − 贷方发生）</td><td>余额表汇总计算</td></tr>
                   <tr><td>审计调整 · 借方 / 贷方</td><td>审计发现的错报调整分录(AJE)</td><td>底稿/集中调整登记</td></tr>
                   <tr><td>重分类调整 · 借方 / 贷方</td><td>重新分类列报调整(RJE)</td><td>底稿/集中调整登记</td></tr>
-                  <tr><td>审定数</td><td>最终审定金额 = 未审数 + AJE净额 + RJE净额</td><td>系统自动计算</td></tr>
+                  <tr><td>底稿调整</td><td>审定表发布到试算表时的差额分量（审定数与未审+AJE+RJE之差）</td><td>审定表发布门</td></tr>
+                  <tr><td>审定数</td><td>最终审定金额 = 未审数 + AJE净额 + RJE净额 + 底稿调整</td><td>系统自动计算</td></tr>
                 </tbody>
               </table>
             </div>
@@ -738,6 +739,13 @@
             clickable @click="onUnadjustedClick(row)"
           />
           <GtAmountCell v-else :value="row.unadjusted_amount" />
+          <el-tooltip
+            v-if="!row._isSubtotal && !row._isTotal && hasPublishBaseChanged(row)"
+            content="发布后未审数已变化，建议重新发布"
+            placement="top"
+          >
+            <span class="gt-publish-drift-badge">⚠</span>
+          </el-tooltip>
           </CommentTooltip>
         </template>
       </el-table-column>
@@ -759,6 +767,11 @@
           <GtAmountCell v-else :value="row.aje_adjustment" />
         </template>
       </el-table-column>
+      <el-table-column label="底稿调整" width="150" align="right" class-name="gt-amt-col">
+        <template #default="{ row }">
+          <GtAmountCell :value="row.wp_adjustment" />
+        </template>
+      </el-table-column>
       <el-table-column label="联动" width="100" align="center">
         <template #default="{ row }">
           <LinkageBadge v-if="row.row_code" :count="getAdjustments(row.row_code).length" type="adjustment" />
@@ -766,7 +779,7 @@
       </el-table-column>
       <el-table-column label="审定数" width="160" align="right" class-name="gt-amt-col">
         <template #default="{ row, $index }">
-          <CommentTooltip :comment="tbComments.getComment('trial_balance', $index, 5)">
+          <CommentTooltip :comment="tbComments.getComment('trial_balance', $index, 7)">
           <span
             v-if="!row._isSubtotal && !row._isTotal"
             class="gt-trace-clickable"
@@ -841,7 +854,7 @@
           title="折叠/展开审计调整和重分类调整的借贷明细列"
         >{{ tbSumCollapseAdj ? '展开调整列' : '折叠调整列' }}</el-button>
         <span style="flex:1" />
-        <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary);align-self:center">审计调整从调整分录自动汇总 · 审定数=未审数+调整借-贷+重分类借-贷</span>
+        <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary);align-self:center">审计调整从调整分录自动汇总 · 审定数=未审数+调整借-贷+重分类借-贷+底稿调整</span>
       </div>
       <!-- P1-5: 快捷筛选按钮组 -->
       <div class="gt-tb-filter-bar" v-if="tbSummaryRows.length">
@@ -1506,6 +1519,14 @@ function getDirectionClass(row: any): string {
   return dir === '贷' ? 'gt-dir-credit' : 'gt-dir-debit'
 }
 
+/** 判断行是否已发布且发布后未审数已变化（未审数 ≠ 发布基准） */
+function hasPublishBaseChanged(row: TrialBalanceRow): boolean {
+  if (!row.wp_published_at || row.wp_publish_base == null) return false
+  const unadj = Number(row.unadjusted_amount) || 0
+  const base = Number(row.wp_publish_base) || 0
+  return Math.abs(unadj - base) > 0.005
+}
+
 // 用户点击方向列切换借贷
 function toggleDirection(row: any) {
   const code = row.standard_account_code
@@ -1798,18 +1819,19 @@ function getActualCat(r: any): string {
 const groupedRows = computed<DisplayRow[]>(() => {
   const result: DisplayRow[] = []
   // 用于"负债和权益合计"
-  const liabEquitySub = { unadjusted: 0, rje: 0, aje: 0, audited: 0 }
+  const liabEquitySub = { unadjusted: 0, rje: 0, aje: 0, wp: 0, audited: 0 }
 
   // ── 第一部分：资产 / 负债 / 权益 ──
   for (const cat of CATEGORY_ORDER) {
     const catRows = rows.value.filter(r => getActualCat(r) === cat)
     if (!catRows.length) continue
 
-    const sub = { unadjusted: 0, rje: 0, aje: 0, audited: 0 }
+    const sub = { unadjusted: 0, rje: 0, aje: 0, wp: 0, audited: 0 }
     for (const r of catRows) {
       const u = num(r.unadjusted_amount)
       const rj = num(r.rje_adjustment)
       const aj = num(r.aje_adjustment)
+      const wp = num(r.wp_adjustment)
       const au = num(r.audited_amount)
 
       const dir = getDirection(r)
@@ -1819,6 +1841,7 @@ const groupedRows = computed<DisplayRow[]>(() => {
       sub.unadjusted += Math.abs(u) * sign
       sub.rje += rj
       sub.aje += aj
+      sub.wp += wp
       sub.audited += Math.abs(au) * sign
 
       result.push({ ...r, _highlight: r.exceeds_materiality })
@@ -1832,6 +1855,7 @@ const groupedRows = computed<DisplayRow[]>(() => {
       unadjusted_amount: String(sub.unadjusted),
       rje_adjustment: String(sub.rje),
       aje_adjustment: String(sub.aje),
+      wp_adjustment: String(sub.wp),
       audited_amount: String(sub.audited),
       opening_balance: null,
       exceeds_materiality: false,
@@ -1844,6 +1868,7 @@ const groupedRows = computed<DisplayRow[]>(() => {
       liabEquitySub.unadjusted += sub.unadjusted
       liabEquitySub.rje += sub.rje
       liabEquitySub.aje += sub.aje
+      liabEquitySub.wp += sub.wp
       liabEquitySub.audited += sub.audited
     }
 
@@ -1856,6 +1881,7 @@ const groupedRows = computed<DisplayRow[]>(() => {
         unadjusted_amount: String(liabEquitySub.unadjusted),
         rje_adjustment: String(liabEquitySub.rje),
         aje_adjustment: String(liabEquitySub.aje),
+        wp_adjustment: String(liabEquitySub.wp),
         audited_amount: String(liabEquitySub.audited),
         opening_balance: null,
         exceeds_materiality: false,
@@ -1868,12 +1894,13 @@ const groupedRows = computed<DisplayRow[]>(() => {
   // ── 第二部分：损益类（收入 - 成本 - 费用 = 净利润） ──
   const incomeExpenseRows = rows.value.filter(r => INCOME_EXPENSE_CATS.includes(getActualCat(r)))
   if (incomeExpenseRows.length) {
-    const netProfit = { unadjusted: 0, rje: 0, aje: 0, audited: 0 }
+    const netProfit = { unadjusted: 0, rje: 0, aje: 0, wp: 0, audited: 0 }
 
     for (const r of incomeExpenseRows) {
       const u = num(r.unadjusted_amount)
       const rj = num(r.rje_adjustment)
       const aj = num(r.aje_adjustment)
+      const wp = num(r.wp_adjustment)
       const au = num(r.audited_amount)
 
       // 收入类（贷方）：取绝对值加正数；费用/成本类（借方）：取绝对值减
@@ -1883,6 +1910,7 @@ const groupedRows = computed<DisplayRow[]>(() => {
       netProfit.unadjusted += Math.abs(u) * sign
       netProfit.rje += rj
       netProfit.aje += aj
+      netProfit.wp += wp
       netProfit.audited += Math.abs(au) * sign
 
       result.push({ ...r, _highlight: r.exceeds_materiality })
@@ -1896,6 +1924,7 @@ const groupedRows = computed<DisplayRow[]>(() => {
       unadjusted_amount: String(netProfit.unadjusted),
       rje_adjustment: String(netProfit.rje),
       aje_adjustment: String(netProfit.aje),
+      wp_adjustment: String(netProfit.wp),
       audited_amount: String(netProfit.audited),
       opening_balance: null,
       exceeds_materiality: false,
@@ -2935,8 +2964,8 @@ function copyTbTable() {
     headers = ['行次', '项目', '未审数', '审计调整-借', '审计调整-贷', '重分类-借', '重分类-贷', '审定数']
     dataRows = data.map((r: any) => [r.row_code, r.row_name, r.unadjusted, r.aje_dr, r.aje_cr, r.rcl_dr, r.rcl_cr, r.audited])
   } else {
-    headers = ['科目编码', '科目名称', '未审数', 'RJE调整', 'AJE调整', '审定数']
-    dataRows = data.map((r: any) => [r.standard_account_code, r.account_name, r.unadjusted_amount, r.rje_adjustment, r.aje_adjustment, r.audited_amount])
+    headers = ['科目编码', '科目名称', '未审数', 'RJE调整', 'AJE调整', '底稿调整', '审定数']
+    dataRows = data.map((r: any) => [r.standard_account_code, r.account_name, r.unadjusted_amount, r.rje_adjustment, r.aje_adjustment, r.wp_adjustment, r.audited_amount])
   }
   const text = [headers.join('\t'), ...dataRows.map(r => r.join('\t'))].join('\n')
   const html = `<table border="1"><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>${dataRows.map(r => `<tr>${r.map(c => `<td>${c ?? ''}</td>`).join('')}</tr>`).join('')}</table>`
@@ -2991,7 +3020,8 @@ tbCtx.setupTableDrag(tbTableRef, (rowIdx: number, colIdx: number) => {
   if (colIdx === 2) return row.unadjusted_amount
   if (colIdx === 3) return row.rje_adjustment
   if (colIdx === 4) return row.aje_adjustment
-  if (colIdx === 5) return row.audited_amount
+  if (colIdx === 5) return row.wp_adjustment
+  if (colIdx === 7) return row.audited_amount
   return null
 })
 
@@ -3005,6 +3035,7 @@ const tbColumns = [
   { key: 'unadjusted_amount', label: '未审数' },
   { key: 'rje_adjustment', label: 'RJE调整' },
   { key: 'aje_adjustment', label: 'AJE调整' },
+  { key: 'wp_adjustment', label: '底稿调整' },
   { key: 'audited_amount', label: '审定数' },
 ]
 
@@ -4531,6 +4562,16 @@ async function onTbSumImportFile(e: Event) {
 }
 :deep(.el-table__row:hover) .gt-tb-row-actions__trigger {
   opacity: 1;
+}
+
+/* ── 底稿调整发布变化标记 ── */
+.gt-publish-drift-badge {
+  display: inline-block;
+  margin-left: 4px;
+  color: var(--el-color-warning);
+  font-size: 12px;
+  cursor: help;
+  vertical-align: middle;
 }
 </style>
 

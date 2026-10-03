@@ -869,12 +869,13 @@ async def sync_from_workpaper(
     rows_synced = _count_rows_synced(clean_sub_table_data)
 
     # ─── 查现有记录 ───────────────────────────────────────────────────
+    # 🔴 with_for_update()：串行前端同步与引擎写同一行，消除丢失更新（需求 5, ADR-P3-003）
     stmt = sa.select(DisclosureNote).where(
         DisclosureNote.project_id == project_id,
         DisclosureNote.year == target_year,
         DisclosureNote.note_section == section_id,
         DisclosureNote.is_deleted == sa.false(),
-    )
+    ).with_for_update()
     result = await db.execute(stmt)
     note = result.scalar_one_or_none()
 

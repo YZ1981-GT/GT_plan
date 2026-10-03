@@ -92,7 +92,11 @@ from app.core.database import async_session as async_session_factory
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.services.event_bus import event_bus
 from app.services.procedure_table_auto_service import invalidate_auto_cache
-from app.services.tb_audited_writer import publish_rows
+from app.services.tb_audited_writer import (
+    build_publish_token,
+    load_current_audited_amounts,
+    publish_rows,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -461,11 +465,6 @@ async def _on_d_audit_determination_saved(payload: EventPayload) -> None:
         return
 
     confirmed_by = extra.get("confirmed_by")  # 发布确认者（服务端可校验权限）
-    # 幂等键：优先用调用方给的 publish_token；缺省则由 wp/project/year/version 合成，
-    # 使"同一确认重复投递"共用同一 token（重复投递不产生重复效果）。
-    publish_token = extra.get("publish_token") or (
-        f"{project_id}:{year}:{wp_code}:{extra.get('target_version', '')}"
-    )
 
     async with async_session_factory() as session:
         try:
@@ -478,6 +477,36 @@ async def _on_d_audit_determination_saved(payload: EventPayload) -> None:
                     wp_code[0] if wp_code else "?", confirmed_by, project_id,
                 )
                 return
+
+            # 幂等键：显式 token 原样透传；缺省时绑定项目、年度、底稿、发布行和发布前目标状态。
+            if extra.get("publish_token"):
+                publish_token = str(extra["publish_token"])
+            else:
+                try:
+                    current_audited_amounts = await load_current_audited_amounts(
+                        session,
+                        project_id,
+                        year,
+                        [
+                            str(row.get("account_code") or row.get("standard_account_code") or "")
+                            for row in rows
+                        ],
+                    )
+                    publish_token = build_publish_token(
+                        project_id=project_id,
+                        year=year,
+                        wp_code=wp_code,
+                        rows=rows,
+                        current_audited_amounts=current_audited_amounts,
+                    )
+                except (InvalidOperation, TypeError, ValueError) as exc:
+                    logger.warning(
+                        "[%s→TB] 发布 token 无法构造，整批拒绝 project=%s: %s",
+                        wp_code[0] if wp_code else "?",
+                        project_id,
+                        exc,
+                    )
+                    return
 
             # ② 耐久幂等 ack：同一 publish_token 只生效一次。ON CONFLICT DO NOTHING →
             #    rowcount==0 表示此确认已应用过，直接跳过（不重复回写 TB、不重复级联）。

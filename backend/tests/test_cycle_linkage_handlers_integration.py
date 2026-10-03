@@ -269,6 +269,58 @@ class TestOnDAuditDeterminationSaved:
         assert call_args.account_codes == ["1001", "1002"]
 
     @pytest.mark.asyncio
+    async def test_missing_publish_token_is_stable_for_repeated_payload(
+        self,
+        mock_session,
+        patch_session_factory,
+        patch_event_bus,
+        patch_publisher_ok,
+        patch_publish_rows,
+        sample_project_id,
+    ):
+        """缺省 token 绑定实际载荷；同一载荷重复投递生成同一稳定摘要。"""
+        from app.services.event_handlers_cycle_linkage import (
+            _on_d_audit_determination_saved,
+        )
+        from app.services.tb_audited_writer import build_publish_token
+
+        rows = [
+            {"standard_account_code": "1001", "audited_amount": "100000.50"},
+            {"standard_account_code": "1002", "audited_amount": "250000.00"},
+        ]
+        payload = EventPayload(
+            event_type=EventType.WORKPAPER_SAVED,
+            project_id=sample_project_id,
+            year=2025,
+            extra={
+                "wp_code": "D1-1",
+                "publish_confirmed": True,
+                "confirmed_by": str(uuid.uuid4()),
+                "parsed_data": {"rows": rows},
+            },
+        )
+
+        await _on_d_audit_determination_saved(payload)
+        await _on_d_audit_determination_saved(payload)
+
+        assert patch_event_bus.await_count == 2
+        first = patch_event_bus.await_args_list[0].args[0]
+        second = patch_event_bus.await_args_list[1].args[0]
+        expected = build_publish_token(
+            project_id=sample_project_id,
+            year=2025,
+            wp_code="D1-1",
+            rows=rows,
+            current_audited_amounts={},
+        )
+        assert first.extra["publish_token"] == expected
+        assert second.extra["publish_token"] == expected
+        assert len(expected) == 24
+        assert str(sample_project_id) not in expected
+        assert patch_publish_rows[0]["rows"] == rows
+        assert patch_publish_rows[1]["rows"] == rows
+
+    @pytest.mark.asyncio
     async def test_invalid_wp_code_skips(
         self, mock_session, patch_session_factory, patch_event_bus, sample_project_id
     ):

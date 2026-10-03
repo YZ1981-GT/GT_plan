@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
@@ -55,6 +57,120 @@ class PublishRowsResult:
 
 
 _ZERO = Decimal("0")
+
+
+def canonical_publish_token_amount(value: Any) -> str | None:
+    """将金额规范化为与进程和 JSON 浮点表示无关的字符串。"""
+    if value is None:
+        return None
+    try:
+        amount = Decimal(str(value)).quantize(Decimal("0.01"))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValueError(f"发布 token 金额无法规范化: {value!r}") from exc
+    if amount == 0:
+        amount = Decimal("0.00")
+    return format(amount, "f")
+
+
+def _token_row_values(row: dict[str, Any] | Any) -> tuple[str, Any]:
+    """读取 token 摘要所需的科目编码和审定数。"""
+    if isinstance(row, dict):
+        account_code = row.get("account_code") or row.get("standard_account_code")
+        audited_amount = row.get("audited_amount")
+    else:
+        account_code = getattr(row, "account_code", None) or getattr(
+            row, "standard_account_code", None
+        )
+        audited_amount = getattr(row, "audited_amount", None)
+    account_code = str(account_code or "").strip()
+    if not account_code:
+        raise ValueError("发布 token 行缺少 account_code")
+    return account_code, audited_amount
+
+
+def build_publish_token(
+    *,
+    project_id: UUID,
+    year: int,
+    wp_code: str,
+    rows: Iterable[dict[str, Any] | Any],
+    current_audited_amounts: dict[str, list[Any]],
+) -> str:
+    """构造跨进程稳定的发布 token。
+
+    摘要绑定项目、年度、底稿、规范化发布行和发布前目标行状态。这样相同内容
+    重复发布可幂等，而目标行在两次发布之间发生变化时会得到新的 token。
+    """
+    normalized_rows = []
+    for row in rows:
+        account_code, audited_amount = _token_row_values(row)
+        normalized_rows.append(
+            {
+                "account_code": account_code,
+                "audited_amount": canonical_publish_token_amount(audited_amount),
+            }
+        )
+    normalized_rows.sort(
+        key=lambda row: (row["account_code"], row["audited_amount"] or "")
+    )
+
+    target_state = []
+    for account_code in sorted({row["account_code"] for row in normalized_rows}):
+        values = current_audited_amounts.get(account_code)
+        if values is None:
+            values = [None]
+        normalized_values = sorted(
+            (canonical_publish_token_amount(value) for value in values),
+            key=lambda value: value or "",
+        )
+        target_state.append(
+            {
+                "account_code": account_code,
+                "audited_amounts": normalized_values,
+            }
+        )
+
+    canonical = json.dumps(
+        {
+            "project_id": str(project_id),
+            "year": year,
+            "wp_code": wp_code,
+            "rows": normalized_rows,
+            "target_state": target_state,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:24]
+
+
+async def load_current_audited_amounts(
+    session: AsyncSession,
+    project_id: UUID,
+    year: int,
+    account_codes: Iterable[str],
+) -> dict[str, list[Any]]:
+    """读取发布前目标行的审定数，供发布 token 绑定真实目标状态。"""
+    codes = sorted({str(code).strip() for code in account_codes if str(code).strip()})
+    if not codes:
+        return {}
+
+    result = await session.execute(
+        sa.select(TrialBalance)
+        .where(
+            TrialBalance.project_id == project_id,
+            TrialBalance.year == year,
+            TrialBalance.standard_account_code.in_(codes),
+            TrialBalance.is_deleted.is_(False),
+        )
+    )
+    current: dict[str, list[Any]] = {}
+    for row in result.scalars().all():
+        current.setdefault(str(row.standard_account_code), []).append(
+            row.audited_amount
+        )
+    return current
 
 
 def _decimal(value: Any, *, field_name: str) -> Decimal:

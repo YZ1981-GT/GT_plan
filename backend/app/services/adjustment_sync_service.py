@@ -76,18 +76,22 @@ class AdjustmentSyncService:
         """内容签名 = sha256(类型 + 摘要 + 逐行：科目/名称/报表行/借/贷)。
 
         用于判断底稿分录内容是否有变化。签名相同 → 不写库；不同 → 原地更新。
+        金额一律 quantize 到 2 位小数后再 str，消除 SQLite 往返后精度漂移。
         """
         parts: list[str] = [
             str(adjustment_type.value if hasattr(adjustment_type, "value") else adjustment_type),
             description or "",
         ]
+        _q = Decimal("0.01")
         for code, li in zip(resolved_codes, line_items):
+            d = (li.debit_amount or Decimal(0))
+            c = (li.credit_amount or Decimal(0))
             parts.append("|".join([
                 code,
                 (li.account_name or "").strip(),
                 (li.report_line_code or "").strip(),
-                str(li.debit_amount or 0),
-                str(li.credit_amount or 0),
+                str(Decimal(str(d)).quantize(_q)),
+                str(Decimal(str(c)).quantize(_q)),
             ]))
         raw = "\n".join(parts)
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
@@ -105,14 +109,17 @@ class AdjustmentSyncService:
             str(head.adjustment_type.value if hasattr(head.adjustment_type, "value") else head.adjustment_type),
             head.description or "",
         ]
+        _q = Decimal("0.01")
         # entry_rows 已按 line_no 排序
         for e in entry_rows:
+            d = (e.debit_amount or Decimal(0))
+            c = (e.credit_amount or Decimal(0))
             parts.append("|".join([
                 e.standard_account_code or "",
                 (e.account_name or "").strip(),
                 (e.report_line_code or "").strip(),
-                str(e.debit_amount or 0),
-                str(e.credit_amount or 0),
+                str(Decimal(str(d)).quantize(_q)),
+                str(Decimal(str(c)).quantize(_q)),
             ]))
         raw = "\n".join(parts)
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]

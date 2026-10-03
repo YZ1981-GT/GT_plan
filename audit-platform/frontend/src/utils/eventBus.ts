@@ -499,6 +499,10 @@ export type Events = {
   } | void
   'adjustment:updated': void
   'adjustment:deleted': void
+  /** SSE bridge: 后端 broadcast_raw 复核状态变更 → 前端 mitt（大厅/底稿刷新） */
+  'adjustment:review-changed': { projectId: string; year?: number; entry_group_id?: string; new_status?: string }
+  /** SSE bridge: 后端 broadcast_raw 底稿同步到达 → 前端 mitt（大厅刷新） */
+  'adjustment:sync-arrived': { projectId: string; year?: number; wp_code?: string }
   'dataset:activated': void
 
   // 编辑锁强抢通知（useEditingLock → SSE force_acquired 反射）

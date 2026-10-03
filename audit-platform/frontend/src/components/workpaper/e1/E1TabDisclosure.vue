@@ -1144,6 +1144,7 @@ async function syncToDisclosureNotes(): Promise<void> {
       props.wpId || '',
       applicableStandards.value,
       snapshot,
+      { mainTable: false },  // 主表由后端公式推送写入（需求 5.4）
     )
     // 显式携带审计年度，定位到项目审计年度的附注记录（否则后端默认取服务器当前年）
     const yr = Number(auditYear.value) || undefined

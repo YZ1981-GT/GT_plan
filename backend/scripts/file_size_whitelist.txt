@@ -1208,3 +1208,16 @@ backend/tests/test_batch_project_service.py  1113
 backend/tests/test_disclosure_row_level_merge.py  803
 backend/tests/test_doc_ai_context_builder.py  1221
 backend/app/services/knowledge_index_service.py  1307
+
+# --- batch: adjustment+tb+cycles 在途提交 ---
+#   Adjustments.vue —— **改动前即 1853 行已超 1500 上限**。本次净增 +78 行：
+#     调整分录中央同步（useAdjustmentCentralSync 接线 + EventBus 监听 + 审定表联动）。
+#     拆分方向：把「创建/编辑/审批」三组对话框抽为独立组件，属独立打磨任务。
+audit-platform/frontend/src/views/Adjustments.vue  1932
+#   wp_disclosure_sync_service.py —— **改动前即 1545 行已超 800 上限**。本次净增 +43 行：
+#     附注同步覆盖率面板接线（覆盖率计算 + duty_rows 去重）。
+#     拆分方向：把「sync 执行」与「覆盖率统计」两个关注点分文件。
+backend/app/services/wp_disclosure_sync_service.py  1589
+#   test_report_engine.py —— **改动前即 847 行已超 800 上限**。本次净增 +23 行：
+#     report_engine 联动测试修正（cycle_linkage 事件触发断言更新）。
+backend/tests/test_report_engine.py  871

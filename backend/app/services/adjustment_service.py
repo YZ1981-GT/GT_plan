@@ -772,11 +772,12 @@ class AdjustmentService:
         if not account_codes:
             return WPAdjustmentSummary(wp_code=wp_code, accounts=account_codes)
 
-        # 获取未审数（从 trial_balance）
+        # 获取未审数和底稿调整分量（从 trial_balance）
         tb = TrialBalance.__table__
         tb_q = (
             sa.select(
                 sa.func.coalesce(sa.func.sum(tb.c.unadjusted_amount), 0).label("unadj"),
+                sa.func.coalesce(sa.func.sum(tb.c.wp_adjustment), 0).label("wp_adj"),
             )
             .where(
                 tb.c.project_id == project_id,
@@ -786,7 +787,9 @@ class AdjustmentService:
             )
         )
         tb_result = await self.db.execute(tb_q)
-        unadjusted = Decimal(str(tb_result.scalar() or 0))
+        tb_row = tb_result.one()
+        unadjusted = Decimal(str(tb_row.unadj or 0))
+        wp_adjustment = Decimal(str(tb_row.wp_adj or 0))
 
         # 获取 AJE/RJE 明细
         # v2 约定（category_natural_positive）：调整净额 SUM(debit)-SUM(credit) 是"借正贷负"，
@@ -866,7 +869,7 @@ class AdjustmentService:
             rje_details=rje_details,
             aje_total=aje_total,
             rje_total=rje_total,
-            audited_amount=unadjusted + aje_total + rje_total,
+            audited_amount=unadjusted + aje_total + rje_total + wp_adjustment,
         )
 
     # ------------------------------------------------------------------

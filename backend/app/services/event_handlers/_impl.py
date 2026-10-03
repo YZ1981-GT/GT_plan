@@ -1103,15 +1103,82 @@ def register_event_handlers() -> None:
                 try:
                     from app.models.report_models import FinancialReport
 
-                    await session.execute(
-                        _sa.update(FinancialReport)
-                        .where(
-                            FinancialReport.project_id == project_id,
-                            FinancialReport.year == year,
-                            FinancialReport.is_deleted == False,  # noqa: E712
-                        )
-                        .values(is_stale=True)
+                    financial_stmt = _sa.update(FinancialReport).where(
+                        FinancialReport.project_id == project_id,
+                        FinancialReport.year == year,
+                        FinancialReport.is_deleted == False,  # noqa: E712
                     )
+
+                    # 有明确科目时只标记公式直接引用这些科目的报表行，
+                    # 并沿 ROW() 引用闭包标记派生合计行；没有科目才整表兜底。
+                    # 这样调整 1122 不会把只取 6001 的利润表行也标成过期。
+                    account_codes = [
+                        code for code in (payload.account_codes or []) if code
+                    ]
+                    if account_codes:
+                        from app.services.report_config_service import ReportConfigService
+                        from app.services.report_engine import ReportEngine, ReportFormulaParser
+
+                        report_engine = ReportEngine(session)
+                        applicable_standard = (
+                            await ReportConfigService.resolve_applicable_standard(
+                                session, project_id,
+                            )
+                        )
+                        configs = await report_engine._load_report_configs(
+                            applicable_standard,
+                        )
+                        affected_codes: set[str] = set()
+                        for rows in configs.values():
+                            for config in rows:
+                                if report_engine._is_affected(
+                                    config.formula, account_codes,
+                                ):
+                                    affected_codes.add(config.row_code)
+
+                        # ROW() 是跨报表行的派生依赖，按 row_code 建立传递闭包，
+                        # 与 ReportEngine.regenerate_affected 保持相同的影响口径。
+                        changed = True
+                        while changed:
+                            changed = False
+                            for rows in configs.values():
+                                for config in rows:
+                                    if config.row_code in affected_codes:
+                                        continue
+                                    parser = ReportFormulaParser(
+                                        session, project_id, year,
+                                    )
+                                    if any(
+                                        ref in affected_codes
+                                        for ref in parser.extract_row_refs(config.formula)
+                                    ):
+                                        affected_codes.add(config.row_code)
+                                        changed = True
+
+                        affected_pairs = [
+                            _sa.and_(
+                                FinancialReport.report_type == report_type,
+                                FinancialReport.row_code.in_(
+                                    {
+                                        config.row_code
+                                        for config in rows
+                                        if config.row_code in affected_codes
+                                    }
+                                ),
+                            )
+                            for report_type, rows in configs.items()
+                            if any(
+                                config.row_code in affected_codes for config in rows
+                            )
+                        ]
+                        # 有科目但没有任何公式命中时，不应退化为整表标记。
+                        financial_stmt = financial_stmt.where(
+                            _sa.or_(*affected_pairs)
+                            if affected_pairs
+                            else _sa.false()
+                        )
+
+                    await session.execute(financial_stmt.values(is_stale=True))
                 except Exception as e:
                     from app.services.stale_degraded_logger import log_stale_degraded
                     log_stale_degraded(

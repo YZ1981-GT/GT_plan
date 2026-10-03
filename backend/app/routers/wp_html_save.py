@@ -40,11 +40,8 @@ mutation，由 Task 25 的 coordinator 调 `ContentMutationService.commit(...)` 
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 from datetime import datetime, timezone
-from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
@@ -59,6 +56,11 @@ from app.models.core import User
 from app.models.workpaper_models import WorkingPaper, WpIndex
 from app.services.cross_ref_service import cross_ref_service
 from app.services.project_audit_year import fetch_project_audit_year
+from app.services.tb_audited_writer import (
+    build_publish_token,
+    canonical_publish_token_amount,
+    load_current_audited_amounts,
+)
 from app.services.workpaper_sync.content_mutation import (
     HtmlOnlyCommitPlan,
     HtmlOnlyEntryHasRepresentationError,
@@ -638,16 +640,8 @@ class PublishToTbResponse(BaseModel):
 
 
 def _canonical_token_amount(value: Any) -> str | None:
-    """将金额规范化为与进程和 JSON 浮点表示无关的字符串。"""
-    if value is None:
-        return None
-    try:
-        amount = Decimal(str(value)).quantize(Decimal("0.01"))
-    except (InvalidOperation, TypeError, ValueError) as exc:
-        raise ValueError(f"发布 token 金额无法规范化: {value!r}") from exc
-    if amount == 0:
-        amount = Decimal("0.00")
-    return format(amount, "f")
+    """保留旧私有导入契约，实际规范化由统一写入服务提供。"""
+    return canonical_publish_token_amount(value)
 
 
 def _build_publish_token(
@@ -658,51 +652,14 @@ def _build_publish_token(
     rows: list[dict[str, Any]],
     current_audited_amounts: dict[str, list[Any]],
 ) -> str:
-    """构造跨进程稳定的显式发布 token。
-
-    摘要同时绑定发布载荷和发布前目标行状态。这样同一批内容重复提交仍幂等，
-    但目标行在中间被改动后再发布相同内容不会复用旧 token。
-    """
-    normalized_rows = [
-        {
-            "account_code": str(row["account_code"]).strip(),
-            "audited_amount": _canonical_token_amount(row["audited_amount"]),
-        }
-        for row in rows
-    ]
-    normalized_rows.sort(
-        key=lambda row: (row["account_code"], row["audited_amount"] or "")
+    """保留路由测试和调用方使用的私有入口，实际算法集中在统一写入服务。"""
+    return build_publish_token(
+        project_id=project_id,
+        year=year,
+        wp_code=wp_code,
+        rows=rows,
+        current_audited_amounts=current_audited_amounts,
     )
-
-    target_state = []
-    for account_code in sorted({row["account_code"] for row in normalized_rows}):
-        values = current_audited_amounts.get(account_code)
-        if values is None:
-            values = [None]
-        normalized_values = sorted(
-            (_canonical_token_amount(value) for value in values),
-            key=lambda value: value or "",
-        )
-        target_state.append(
-            {
-                "account_code": account_code,
-                "audited_amounts": normalized_values,
-            }
-        )
-
-    canonical = json.dumps(
-        {
-            "project_id": str(project_id),
-            "year": year,
-            "wp_code": wp_code,
-            "rows": normalized_rows,
-            "target_state": target_state,
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-    )
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:24]
 
 
 async def _load_current_audited_amounts(
@@ -711,28 +668,8 @@ async def _load_current_audited_amounts(
     year: int,
     account_codes: list[str],
 ) -> dict[str, list[Any]]:
-    """读取发布前目标行的审定数，供 token 绑定真实目标状态。"""
-    from app.models.audit_platform_models import TrialBalance
-
-    codes = sorted({code for code in account_codes if code})
-    if not codes:
-        return {}
-
-    result = await db.execute(
-        sa.select(TrialBalance)
-        .where(
-            TrialBalance.project_id == project_id,
-            TrialBalance.year == year,
-            TrialBalance.standard_account_code.in_(codes),
-            TrialBalance.is_deleted.is_(False),
-        )
-    )
-    current = {}
-    for row in result.scalars().all():
-        current.setdefault(str(row.standard_account_code), []).append(
-            row.audited_amount
-        )
-    return current
+    """保留路由私有入口，实际目标状态查询集中在统一写入服务。"""
+    return await load_current_audited_amounts(db, project_id, year, account_codes)
 
 
 @router.post("/{wp_id}/audit-determination/publish-to-tb", response_model=PublishToTbResponse)
