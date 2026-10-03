@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "59311033451588831eeeed2d9bee6ca4d70e2af04d5ceb1eae1c2504d3fd38a1",
+  "instrumentation_definition_sha256": "63d96619de4240988e647ec44691ed20ee478e44e06d2bf8101b6dcd963506b2",
   "review": {
     "authority_root": "backend/wp_templates",
     "canary_scope": {
@@ -321,5 +321,5 @@
     "relative_path": "C/C2 销售循环控制测试.xlsx",
     "template_sha256": "1f3035e9f78b1561cd1a418249d4ccc5a7aea77d7bf074bc7b1ac235328aaa41"
   },
-  "template_definition_sha256": "553e9c18822435a7201b16526f8b00839885fa655336bdb9a031abbeb1df8f99"
+  "template_definition_sha256": "a76d69d66e19b3bc9bbdaef4a88a83ef9ee53e38192526c8d804a851eba45c2a"
 }

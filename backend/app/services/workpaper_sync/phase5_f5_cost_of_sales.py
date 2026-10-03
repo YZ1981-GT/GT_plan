@@ -385,8 +385,11 @@ def instrumentation_definition_payload() -> dict[str, Any]:
 
 def authority_model_payload() -> dict[str, Any]:
     return {
+        "schema_version": "authority-model-definition:v1",
         "entry_id": ENTRY_ID,
         "authority_model": AUTHORITY_MODEL.value,
+        "content_authority": "structured_projection",
+        "merge_model": "stable_field_three_way",
         "pilot_class": PHASE5_WAVE,
         "reason": (
             "F5 营业成本：结构化 Tab（HTML store）与 OnlyOffice 共写同一份权威模板，"

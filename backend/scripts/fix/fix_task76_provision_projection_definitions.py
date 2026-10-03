@@ -553,7 +553,13 @@ async def run_check(session: Any, targets: list[ProvisionTarget]) -> dict[str, A
             entry_id=target.entry_id,
             bundle_id=publisher.ids.get("bundle"),
         )
-        item["definition_bundle_sha256"] = definitions.bundle_sha256
+        item["definition_bundle_sha256"] = (
+            definitions.bundle_sha256
+            if hasattr(definitions, "bundle_sha256")
+            else definitions.get("definition_bundle_sha256")
+            if isinstance(definitions, dict)
+            else None
+        )
         report["entries"].append(item)
     report["would_create_total"] = sum(
         len(e.get("would_create") or ()) for e in report["entries"]

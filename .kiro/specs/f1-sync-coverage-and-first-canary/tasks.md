@@ -2,7 +2,7 @@
 
 ## Overview
 
-**spec**：`f1-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**4/22 已实施**（2026-09-27 接管后更新）
+**spec**：`f1-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**4/22 已实施**（2026-10-03 复盘：复选框 4 个 `[x]`，但核心交付物远多于此——24 provider 全在库 / 契约+生成器+宿主接桥+e2e 均已交付；详见下方勘误）
 **上游**：umbrella Task 48（F 循环 lane）· D1 引擎 · E1 canary 范式 · D3 同构先例
 **承载**：F 循环共同裁决 FC-1~FC-13（design §F 循环共同裁决），F2~F5 spec 引用
 

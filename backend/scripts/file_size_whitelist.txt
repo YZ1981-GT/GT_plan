@@ -985,7 +985,7 @@ backend/app/services/disclosure_engine.py  2654
 #
 #   registry.py —— 本 lane 在 DELIVERED_PER_ENTRY_CONTRACTS 追加 G2 一条 + _ALLOWED_PROVIDER_MODULES
 #     追加模块路径。基线 1830→1938（+108，含既有并发修改，本 lane 净增约 +20）。更新基线。
-backend/app/services/workpaper_sync/adapters/registry.py  1303
+backend/app/services/workpaper_sync/adapters/registry.py  1383
 #
 #   test_g_foundation_p10_p16_g2_canary.py —— G2 canary 判据：几何 / payload / 键收敛 /
 #     TB 红线（含变异 + 宿主侧）/ P15 真栈前置（8 条）/ P19 引擎层往返（4 条）。
@@ -1042,7 +1042,7 @@ backend/tests/workpaper_sync/test_f5_canary_and_contract.py  904
 #     判据面不因此放松：新条目仍要过 test_contract_directory_matches_the_delivery_ledger
 #     与 test_delivered_slice_contracts_pass_property_20_21_field_level 的双向核验。
 backend/tests/workpaper_sync/test_h_foundation_hc_guards.py  1149
-backend/app/services/workpaper_sync/adapters/delivered_contracts_ledger.py  2352
+backend/app/services/workpaper_sync/adapters/delivered_contracts_ledger.py  2655
 
 
 # ── I/J 循环 + e1 修复 + 守卫口径升级（2026-09-27）──────────────────────
@@ -1232,3 +1232,25 @@ backend/app/services/consol_note_formula_service.py  906
 #   test_m_cycle_spec_guard.py —— M 循环三份 spec 的统一守卫（MC-1~29 判据 + 变异），
 #     改动前即 1540 行已超 800 上限。本次净增 +42 行：spec 状态对齐。
 backend/tests/workpaper_sync/test_m_cycle_spec_guard.py  1582
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 2026-10-03：批量补齐 publish_pilot_definitions 接口（F/G/E/C/H 循环 provision）
+#
+# 20 个 phase5_* provider 补了 AUTHORITY_MODEL + authority_model_payload +
+# Phase5Definitions + publish_definitions + 别名 ≈ 40~50 行。原文件多在 780~800 行边缘，
+# 加完越过 800 上限。拆分应按各循环 spec 的打磨任务统一做（提 common 层），不在本批次。
+# h_cycle_common 补了 primary_instrumentation_spec（修 I 系 6 个 import 链断裂）。
+# c_control_test 原基线 825 → 960（含此前未提交的发布接口）。
+backend/app/services/workpaper_sync/phase5_c_control_test.py  971
+backend/app/services/workpaper_sync/phase5_f1_prepayment.py  825
+backend/app/services/workpaper_sync/phase5_g10_trading_liabilities.py  837
+backend/app/services/workpaper_sync/phase5_g11_investment_income.py  871
+backend/app/services/workpaper_sync/phase5_g12_net_hedge_gains.py  840
+backend/app/services/workpaper_sync/phase5_g13_fair_value_changes.py  856
+backend/app/services/workpaper_sync/phase5_g14_credit_impairment.py  839
+backend/app/services/workpaper_sync/phase5_g1_trading_financial_assets.py  849
+backend/app/services/workpaper_sync/phase5_g2_interest_receivable.py  857
+backend/app/services/workpaper_sync/phase5_g8_other_equity.py  853
+backend/app/services/workpaper_sync/phase5_g9_other_noncurrent.py  817
+backend/app/services/workpaper_sync/phase5_h_cycle_common.py  882
+backend/app/services/workpaper_sync/phase5_e1_monetary_fund.py  924

@@ -113,7 +113,9 @@ __all__ = [
     "H_AUTHORITY_MODEL",
     "HDefinitions",
     "authority_model_payload",
+    "primary_instrumentation_spec",
     "publish_definitions_for",
+    "publish_h_entry_definitions",
 ]
 
 
@@ -331,6 +333,23 @@ def instrumentation_specs_for(
     attach 期 `_align_specs_to_sibling_tables` fail-closed 打挂**整个 entry**。
     """
     return tuple(_instrumentation_of(identity, s) for s in specs)
+
+
+def primary_instrumentation_spec(
+    identity: HEntryIdentity, specs: Sequence[Any]
+) -> ExcelInstrumentationSpec:
+    """取本 entry 的主 instrumentation spec（第一个）。
+
+    I 系六个 provider 调用此函数取单个 spec 来定位 UUID_COL / ROWS_TABLE_KEY。
+    与 projection_first_publication._primary_instrumentation_spec 语义相同，
+    但入参是 (identity, specs) 而非 provider 模块。
+    """
+    all_specs = instrumentation_specs_for(identity, specs)
+    if not all_specs:
+        raise HEntrySelectionError(
+            f"{identity.entry_id} 无受管 sheet ⇒ 无 instrumentation spec"
+        )
+    return all_specs[0]
 
 
 def template_definition_payload(
@@ -753,6 +772,10 @@ async def publish_definitions_for(
         bundle_id=bundle.bundle_id,
         bundle_sha256=bundle.canonical_sha256,
     )
+
+
+# I 系六个 provider 用此名称调用（历史接口名，保留向后兼容）
+publish_h_entry_definitions = publish_definitions_for
 
 
 async def resolve_published_frozen_definitions(

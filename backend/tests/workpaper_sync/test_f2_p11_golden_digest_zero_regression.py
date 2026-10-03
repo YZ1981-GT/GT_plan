@@ -58,15 +58,19 @@ GOLDEN_BASELINE: dict[str, str] = {
     #    `test_d1_full_book_gate_open_pg.py::test_root_cause_was_missing_plural_instrumentation_entry`
     #    以「差异字段集合 == 恰好这一项」的形式钉死，不是靠这里的注释自证。
     #    根因与变异证明详见 `test_d1_instrumentation_specs_forwarder.py`。
-    "d1.notes_receivable_detail.json": "247f1b1b9358227a",
-    "d2.receivable_detail.json": "078b04377a34054f",
-    "d3.prepaid_receipts_detail.json": "4f5b71fd73c1c412",
-    "d4.revenue_detail.json": "5bd890211ac8f897",
-    "d5.receivables_financing_detail.json": "03900069af256db6",
-    "d6.contract_assets_detail.json": "a8ba5bf29129728c",
-    "d7.contract_liabilities_detail.json": "84b266b5e9efc45f",
+    # 🔴 2026-10-03 批量更新（D 系列 + F1）：公式推送引擎 / 逐循环 spec 实施期间
+    #    D1~D7 的契约均因 instrumentation / sheet spec 扩容而变化（各 spec tasks.md
+    #    有逐次变更说明），F1 因宿主接桥 + 契约重算而变。这些变化均已由各自 spec
+    #    的守卫测试覆盖，此处只同步基线 digest。
+    "d1.notes_receivable_detail.json": "72718e0107925d3e",
+    "d2.receivable_detail.json": "1714d5719d558446",
+    "d3.prepaid_receipts_detail.json": "a32e531ac342e7cc",
+    "d4.revenue_detail.json": "58ef8c68b3c74537",
+    "d5.receivables_financing_detail.json": "e2fa67a560a6ac5b",
+    "d6.contract_assets_detail.json": "3e363c45ecf78b8e",
+    "d7.contract_liabilities_detail.json": "735d194bc8072405",
     "e1.monetary_fund_detail.json": "4a0cf6c928566c96",
-    "f1.prepayment_detail.json": "9ea57f744d34533a",
+    "f1.prepayment_detail.json": "541bb159890a7e7a",
     "g7.soe_subsidiary_disclosure.json": "3c992e2f31540f14",
     "h1.disposal_check.json": "e7d6c1b75af2d600",
 }

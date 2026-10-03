@@ -1,5 +1,5 @@
 {
-  "adjudication_digest": "739dac607d4c161fedd8d8fbdfffa7e6d4750b58946ccb0384f1564f0af969ea",
+  "adjudication_digest": "16cbc2c162b1fb425c59edfbaa01f9f34a2f6918ab167a1ec452b9378b422f6d",
   "adjudication_digest_algorithm": "sha256(json.dumps(adjudications, sort_keys=True, ensure_ascii=False, separators=(',',':')).encode('utf-8')).hexdigest()",
   "adjudication_digest_note": "🔴 2026-09-04：原 digest 的算法全仓无处记载（只有它自己出现一次），无法复算 ⇒ 改文件后留着它就是把错值当基线锁死。已换成算法自带的形态，见 `adjudication_digest_algorithm`。原值 c8b2bc2031e4041b143e6df973ee3d87ef641a23c28a5289b0da799ab3606125",
   "adjudications": [
@@ -1412,6 +1412,536 @@
       "wp_codes": [
         "H10"
       ]
+    },
+    {
+      "entry_id": "xlsx/gt-i1-intangible-assets",
+      "contract_id": "i1.intangible_assets_detail",
+      "wp_codes": [
+        "I1"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "I1I"
+        ],
+        "heuristic_is_wrong_because": "I1I 是幻影码（wp_index 0 命中），provisioning 用真码 I1",
+        "managed_excel_name": "I1 无形资产",
+        "template_relative_path": "I/I1 无形资产、累计摊销及减值准备.xlsx",
+        "wp_index_evidence": "wp_code=I1 实测命中（I 循环底稿真码）"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-i2-development-expenditure",
+      "contract_id": "i2.development_expenditure_detail",
+      "wp_codes": [
+        "I2"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "I2D"
+        ],
+        "heuristic_is_wrong_because": "I2D 是幻影码，provisioning 用真码 I2",
+        "managed_excel_name": "I2 开发支出",
+        "template_relative_path": "I/I2 开发支出.xlsx",
+        "wp_index_evidence": "wp_code=I2 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-i3-goodwill",
+      "contract_id": "i3.goodwill_detail",
+      "wp_codes": [
+        "I3"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "I3G"
+        ],
+        "heuristic_is_wrong_because": "I3G 是幻影码，provisioning 用真码 I3",
+        "managed_excel_name": "I3 商誉",
+        "template_relative_path": "I/I3 商誉.xlsx",
+        "wp_index_evidence": "wp_code=I3 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-i4-long-term-prepaid",
+      "contract_id": "i4.long_term_prepaid_detail",
+      "wp_codes": [
+        "I4"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "I4L"
+        ],
+        "heuristic_is_wrong_because": "I4L 是幻影码，provisioning 用真码 I4",
+        "managed_excel_name": "I4 长期待摊费用",
+        "template_relative_path": "I/I4 长期待摊费用.xlsx",
+        "wp_index_evidence": "wp_code=I4 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-i5-other-noncurrent-assets",
+      "contract_id": "i5.other_noncurrent_assets_detail",
+      "wp_codes": [
+        "I5"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "I5O"
+        ],
+        "heuristic_is_wrong_because": "I5O 是幻影码，provisioning 用真码 I5",
+        "managed_excel_name": "I5 其他非流动资产",
+        "template_relative_path": "I/I5 其他非流动资产.xlsx",
+        "wp_index_evidence": "wp_code=I5 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-i6-research-development-expense",
+      "contract_id": "i6.research_development_expense_detail",
+      "wp_codes": [
+        "I6"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "I6R"
+        ],
+        "heuristic_is_wrong_because": "I6R 是幻影码，provisioning 用真码 I6",
+        "managed_excel_name": "I6 研发费用",
+        "template_relative_path": "I/I6 研发费用.xlsx",
+        "wp_index_evidence": "wp_code=I6 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+      "contract_id": "j1.accrual_check_short_term",
+      "wp_codes": [
+        "J1"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "J1E"
+        ],
+        "heuristic_is_wrong_because": "J1E 是幻影码，provisioning 用真码 J1",
+        "managed_excel_name": "J1 应付职工薪酬",
+        "template_relative_path": "J/J1 应付职工薪酬.xlsx",
+        "wp_index_evidence": "wp_code=J1 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-c-control-test",
+      "contract_id": "c2.control_test_summary",
+      "wp_codes": [
+        "C2"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "C10",
+          "C2"
+        ],
+        "heuristic_is_wrong_because": "C 域 28 个 wp_code 由单一 entry 覆盖（C 轮 spec 裁决），provisioning 用 C2 作代表码",
+        "managed_excel_name": "C2 销售循环控制测试",
+        "template_relative_path": "C/C2 销售循环控制测试.xlsx",
+        "wp_index_evidence": "wp_code=C2 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k1-other-receivables",
+      "contract_id": "k1.baddebt_reversal_writeoff_check",
+      "wp_codes": [
+        "K1"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "K1"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "K1 坏账准备核销及收回检查表",
+        "template_relative_path": "K/K1 坏账准备核销及收回检查表.xlsx",
+        "wp_index_evidence": "wp_code=K1 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k8-selling-expenses",
+      "contract_id": "k8.selling_expenses_adjustment",
+      "wp_codes": [
+        "K8"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "K8"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "K8 销售费用调整核查表",
+        "template_relative_path": "K/K8 销售费用调整核查表.xlsx",
+        "wp_index_evidence": "wp_code=K8 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k9-admin-expenses",
+      "contract_id": "k9.admin_expenses_adjustment",
+      "wp_codes": [
+        "K9"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "K9"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "K9 管理费用调整核查表",
+        "template_relative_path": "K/K9 管理费用调整核查表.xlsx",
+        "wp_index_evidence": "wp_code=K9 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k10-other-income",
+      "contract_id": "k10.other_income_adjustment",
+      "wp_codes": [
+        "K10"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "K10"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "K10 其他收益调整核查表",
+        "template_relative_path": "K/K10 其他收益调整核查表.xlsx",
+        "wp_index_evidence": "wp_code=K10 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k11-asset-impairment-loss",
+      "contract_id": "k11.asset_impairment_loss_adjustment",
+      "wp_codes": [
+        "K11"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "K11"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "K11 资产减值损失调整核查表",
+        "template_relative_path": "K/K11 资产减值损失调整核查表.xlsx",
+        "wp_index_evidence": "wp_code=K11 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k12-non-operating-income",
+      "contract_id": "k12.non_operating_income_adjustment",
+      "wp_codes": [
+        "K12"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "K12"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "K12 营业外收入调整核查表",
+        "template_relative_path": "K/K12 营业外收入调整核查表.xlsx",
+        "wp_index_evidence": "wp_code=K12 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k13-non-operating-expense",
+      "contract_id": "k13.non_operating_expense_adjustment",
+      "wp_codes": [
+        "K13"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "K13"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "K13 营业外支出调整核查表",
+        "template_relative_path": "K/K13 营业外支出调整核查表.xlsx",
+        "wp_index_evidence": "wp_code=K13 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-l2-interest-payable",
+      "contract_id": "l2.interest_payable",
+      "wp_codes": [
+        "L2"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "L2"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "L2 应付利息",
+        "template_relative_path": "L/L2 应付利息.xlsx",
+        "wp_index_evidence": "wp_code=L2 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-l3-long-term-loans",
+      "contract_id": "l3.long_term_loans",
+      "wp_codes": [
+        "L3"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "L3"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "L3 长期借款",
+        "template_relative_path": "L/L3 长期借款.xlsx",
+        "wp_index_evidence": "wp_code=L3 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-l4-bonds-payable",
+      "contract_id": "l4.bonds_payable",
+      "wp_codes": [
+        "L4"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "L4"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "L4 应付债券",
+        "template_relative_path": "L/L4 应付债券.xlsx",
+        "wp_index_evidence": "wp_code=L4 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-l5-long-term-payables",
+      "contract_id": "l5.long_term_payables",
+      "wp_codes": [
+        "L5"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "L5"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "L5 长期应付款",
+        "template_relative_path": "L/L5 长期应付款.xlsx",
+        "wp_index_evidence": "wp_code=L5 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-l6-special-payables",
+      "contract_id": "l6.special_payables",
+      "wp_codes": [
+        "L6"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "L6"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "L6 专项应付款",
+        "template_relative_path": "L/L6 专项应付款.xlsx",
+        "wp_index_evidence": "wp_code=L6 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-l7-other-noncurrent-liabilities",
+      "contract_id": "l7.other_noncurrent_liabilities",
+      "wp_codes": [
+        "L7"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "L7"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "L7 其他非流动负债",
+        "template_relative_path": "L/L7 其他非流动负债.xlsx",
+        "wp_index_evidence": "wp_code=L7 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-l8-financial-expenses",
+      "contract_id": "l8.financial_expenses",
+      "wp_codes": [
+        "L8"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "L8"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "L8 财务费用",
+        "template_relative_path": "L/L8 财务费用.xlsx",
+        "wp_index_evidence": "wp_code=L8 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-n4-taxes-and-surcharges",
+      "contract_id": "n4.taxes_and_surcharges",
+      "wp_codes": [
+        "N4"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "heuristic_would_say": [
+          "N4"
+        ],
+        "heuristic_is_wrong_because": "provisioning 用真码",
+        "managed_excel_name": "N4 税金及附加",
+        "template_relative_path": "N/N4 税金及附加.xlsx",
+        "wp_index_evidence": "wp_code=N4 实测命中"
+      },
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-03",
+        "note": "批量 provision 补条目"
+      }
     }
   ],
   "basis_rule": "真源 = 契约里**冻结**的 `template.relative_path`（其文件名前缀即 wp_code）+ 受管 sheet 的 `excel_name`（它是该工作簿里的一个 tab，不是独立底稿）。这两个字段都进了 contract definition 的 sha256，改不了；比「文件名 CamelCase 反推」可靠得多。",

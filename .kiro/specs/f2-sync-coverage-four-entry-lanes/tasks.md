@@ -2,7 +2,7 @@
 
 ## Overview
 
-**spec**：`f2-sync-coverage-four-entry-lanes`　**创建**：2026-09-26　**状态**：0/27（Task 0~25 + 5b），Design-First 未实施
+**spec**：`f2-sync-coverage-four-entry-lanes`　**创建**：2026-09-26　**状态**：**20/27 已实施**（2026-10-03 复盘修正，原标头 0/27 严重过时）
 **上游**：umbrella Task 48 · F 循环共同裁决 FC-1~FC-13（`f1-sync-coverage-and-first-canary/design.md`）· D1-7 dict 子数组先例 ·
 G7 RG-3 先例 · 模板覆盖层 spec
 **结构**：Wave 0 共用前置 + 四条 lane（M main / S stocktake / V valuation / P special），lane 之间互不阻塞（Wave 0 之后可并行）
