@@ -42,11 +42,23 @@ _VERDICT_PATH = (
     / ".kiro/specs/d3-sync-coverage-via-row-table-engine/evidence"
     / "task15-d3-03-single-html.json"
 )
+if not _VERDICT_PATH.exists():
+    _VERDICT_PATH = (
+        _REPO
+        / ".kiro/specs/_archive/17-2026-10-03-verified-batch/d3-sync-coverage-via-row-table-engine/evidence"
+        / "task15-d3-03-single-html.json"
+    )
 _D44_VERDICT_PATH = (
     _REPO
     / ".kiro/specs/d-cycle-sheet-bidirectional-expansion/evidence"
     / "T08-d44-single-html-adjudication.json"
 )
+if not _D44_VERDICT_PATH.exists():
+    _D44_VERDICT_PATH = (
+        _REPO
+        / ".kiro/specs/_archive/17-2026-10-03-verified-batch/d-cycle-sheet-bidirectional-expansion/evidence"
+        / "T08-d44-single-html-adjudication.json"
+    )
 
 
 @pytest.fixture(scope="module")

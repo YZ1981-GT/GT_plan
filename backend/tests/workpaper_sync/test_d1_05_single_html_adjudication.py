@@ -162,14 +162,10 @@ class TestSamePatternAsD44Precedent:
     """D1-5 与已判 single_html 的 D4-4 是同一套模板范式（逐字相同的十列表头）。"""
 
     def test_headers_match_d4_4_verdict_verbatim(self, sheet, verdict: dict) -> None:
-        d44_verdict = json.loads(
-            (
-                _REPO
-                / ".kiro/specs/d-cycle-sheet-bidirectional-expansion/evidence"
-                / "T08-d44-single-html-adjudication.json"
-            ).read_text(encoding="utf-8")
-        )
-        actual = [sheet.cell(row=5, column=c).value for c in range(1, 11)]
+        _d44_path = _REPO / ".kiro/specs/d-cycle-sheet-bidirectional-expansion/evidence/T08-d44-single-html-adjudication.json"
+        if not _d44_path.exists():
+            _d44_path = _REPO / ".kiro/specs/_archive/17-2026-10-03-verified-batch/d-cycle-sheet-bidirectional-expansion/evidence/T08-d44-single-html-adjudication.json"
+        d44_verdict = json.loads(_d44_path.read_text(encoding="utf-8"))
         assert actual == d44_verdict["authority"]["header_A_to_J"], (
             f"D1-5 表头与 D4-4 不再逐字相同：\nD1-5={actual}\n"
             f"D4-4={d44_verdict['authority']['header_A_to_J']}\n"
@@ -179,11 +175,8 @@ class TestSamePatternAsD44Precedent:
         assert actual == verdict["authority"]["header_A_to_J"]
 
     def test_both_verdicts_agree_on_single_html(self, verdict: dict) -> None:
-        d44_verdict = json.loads(
-            (
-                _REPO
-                / ".kiro/specs/d-cycle-sheet-bidirectional-expansion/evidence"
-                / "T08-d44-single-html-adjudication.json"
-            ).read_text(encoding="utf-8")
-        )
+        _d44_path = _REPO / ".kiro/specs/d-cycle-sheet-bidirectional-expansion/evidence/T08-d44-single-html-adjudication.json"
+        if not _d44_path.exists():
+            _d44_path = _REPO / ".kiro/specs/_archive/17-2026-10-03-verified-batch/d-cycle-sheet-bidirectional-expansion/evidence/T08-d44-single-html-adjudication.json"
+        d44_verdict = json.loads(_d44_path.read_text(encoding="utf-8"))
         assert d44_verdict["decision"] == verdict["decision"] == "single_html"
