@@ -166,7 +166,7 @@
     合计 52,475,713.77 被漏掉），与报表不一致 ⇒ 改为前缀汇总（design ADR-PUSH-002 修订二），修后 53,324,585.63 与报表、审定合计三方一致
   - _Requirements: 7.3_
 
-- [ ]* 17. Playwright 实测（余「真实立即推送」一步：写真库，待用户同意）
+- [x] 17. Playwright 实测（真实立即推送已完成）
   - 公式管理面板、E1 提示条、附注数值
   - 2026-09-30 现状：后端 :9980 已重载新代码（`/openapi.json` 含 6 个 `formula-push` 路由，`/api/health` 200），前端 :3030 在跑；
     但 **admin/admin123 登录 401** —— 非密码问题（哈希校验为真），根因是真库 `users_username_key` 索引与当前排序规则顺序不一致，
@@ -196,6 +196,15 @@
     （`table_data` 新增 7 个键 + 同步元数据）并产生 2 条附注校验记录；复原 SQL 与写前 md5 已留证，是否复原待用户决定。
     教训：编辑带自动保存 / 自动同步页面的源码时，浏览器必须先停在 `about:blank`
   - 剩余：用户同意后在重药 E1 点「立即推送」，用真实 `formula.pushed` 验证提示条与附注 五、1，然后勾选本任务
+  - 2026-10-04 完成：用户授权后执行真实立即推送。
+    - 前置检查：五、49 事故已自然复原（`table_data` 仅 headers/rows，`updated=2026-06-17`，无污染）；三个唯一索引全部 `valid=True`
+      （`checklist_responses` 重复 0 组、`review_threads` 重复 0 组、`editing_locks` 活跃重复 0 组——partial index `WHERE released_at IS NULL` 保护），均无需额外操作
+    - 浏览器实测：公式管理「📤 公式推送」面板 → 点「立即推送」→ 面板即时显示「成功 · 触发：手动 · 写入 19 · 未变化 19」
+    - 真库验证：`formula_push_run` 1 条（`status=succeeded, written=19, unchanged=19, kept=0, skipped=35`）；
+      `formula_push_state` 0→38 条；`checklist_responses` 25→44 条（新增 19 条系统/派生值）；
+      附注 五、1 `sub_table_data` 逐值一致（库存现金 376.73/286.73、银行存款 4,703,056.26/22,944,619.45、
+      其他货币资金 4,479,140/6,000,001.09、合计 9,182,572.99/28,944,907.27）——与 T16 试跑结果完全吻合
+    - CR 指纹 CHANGED（`03ae4b19..` → `3b5e5d2a..`）；附注指纹 SAME（数据本已一致，正确）
   - _Requirements: 1.4, 4.7_
 
 - [x] 18. 收尾：INDEX 登记、memory 更新、一次性探针清理
