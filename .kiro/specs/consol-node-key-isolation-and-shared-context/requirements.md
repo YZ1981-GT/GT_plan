@@ -1,6 +1,6 @@
 # 需求文档：合并附注节点隔离与共享 node_key 上下文
 
-> 工作流：Design-First。验收标准采用 EARS 风格；正确性属性见设计 §六。
+> 工作流：Design-First。验收标准采用 EARS 风格；正确性属性见设计 §八。
 > 上游：`consol-tree-three-code-autobuild`（node_key 树身份）与 `consol-elimination-single-source-push`（统一合并计算内核）。
 > 数据层前提：当前工作树已有 V177 `consol_note_data.node_key` 与两套部分唯一索引；本 spec 消费该变更，不重复创建同一迁移。
 
