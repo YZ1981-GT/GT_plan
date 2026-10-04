@@ -9,7 +9,7 @@
   <div class="gt-a101">
     <!-- Toolbar -->
     <div class="gt-a101__toolbar">
-      <el-segmented v-model="mode" :options="modeOptions" size="small" />
+      <el-segmented v-model="activeMode" :options="modeOptions" size="small" />
       <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a101-governance-communication" />
       <span class="gt-a101__save-status">
         <template v-if="saveStatus === 'saving'">
@@ -21,7 +21,7 @@
     </div>
 
     <!-- Structured View -->
-    <div v-if="mode === '结构化视图'" class="gt-a101__layout">
+    <div v-if="activeMode === 'html'" class="gt-a101__layout">
       <!-- Left Navigation Sidebar -->
       <nav class="gt-a101__nav">
         <ul class="gt-a101__nav-list">
@@ -221,8 +221,12 @@ const props = withDefaults(defineProps<{
 }>(), { projectId: '', htmlData: null })
 
 // ─── Mode Switch ───
-const mode = ref('结构化视图')
-const modeOptions = ref(['结构化视图', '在线编辑'])
+const activeMode = ref<'html' | 'docx'>('html')
+const docxAvailable = ref(true)
+const modeOptions = computed(() => [
+  { label: '结构化视图', value: 'html' },
+  { label: 'Word编辑', value: 'docx', disabled: !docxAvailable.value },
+])
 
 // ─── Composable ───
 const {
@@ -270,16 +274,16 @@ async function checkOOHealth() {
     const { api } = await import('@/services/apiProxy')
     const res = await api.get<any>('/api/workpapers/onlyoffice/health', { _silent: true } as any)
     if (!res?.healthy) {
-      modeOptions.value = ['结构化视图']
+      docxAvailable.value = false
     }
   } catch {
-    modeOptions.value = ['结构化视图']
+    docxAvailable.value = false
   }
 }
 
 // Flush before switching to OO
-watch(mode, async (newMode, oldMode) => {
-  if (oldMode === '结构化视图' && newMode === '在线编辑') {
+watch(activeMode, async (newMode, oldMode) => {
+  if (oldMode === 'html' && newMode === 'docx') {
     await flushPendingSaves()
   }
 })

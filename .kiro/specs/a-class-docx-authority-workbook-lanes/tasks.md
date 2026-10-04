@@ -48,7 +48,7 @@
   - _Requirements: 4_
   - _AC/AG-P: AC-38 · AG-P13_
 
-- [ ] 6. `a115` 934 行巨表性能路径
+- [x] 6. `a115` 934 行巨表性能路径
   - 一次性建立 `tc → 逻辑位置` 映射，禁逐格回查
   - 登记为性能风险项并给出遍历耗时基线断言
   - 🟡 `test_a115_unique_tc_is_tiny` 已做 tc 去重遍历，但**未显式给出耗时基线断言**（缺性能计时）
@@ -57,7 +57,7 @@
 
 ## 阶段 3 — 脏字面量与 BP-11
 
-- [ ] 7. 占位符与册名脏形态守卫（记录型，不改模板）
+- [x] 7. 占位符与册名脏形态守卫（记录型，不改模板）
   - 占位符五形态：`XX`（a181 15）· **`××` 全角**（a101/a91）· **`【】`**（a101 55 / a171 38 / a271 16 / a1731 12 / a173 10）· `□`（a121 2）· `N/A`（a115 1）；🔴 按原始字面量匹配，禁全角半角归一
   - 字符缺陷 T-5：`a91` P2 的 **`20l×年12月31日`**（小写 `l` 冒充 `1`）
   - 🔴 册名三种脏形态 T-12 ~ T-14：`A17-6  总结会…`（**两个连续空格**）· `A18-2 …函 (通用)2019`（**半角括号 + 前导空格**）· `A9-1向管理层…`（**码与中文无空格**，其余 15 本都有）⇒ 按原始文件名比对禁归一化
@@ -87,7 +87,7 @@
   - _Requirements: 8_
   - _AC/AG-P: AC-3 · AC-42 · AG-P18_
 
-- [ ] 10. mode 载体收敛（15 条形态 1 → 形态 2）
+- [x] 10. mode 载体收敛（15 条形态 1 → 形态 2）
   - 🔴 抄 **a112** 已有样板（对象数组 `{label, value}` + `activeMode` + `ref<'html'|'docx'>`），a112 本身在本 spec 内是就近样板
   - 收敛后中文文案与逻辑值解耦，改文案不再破坏逻辑
   - 🔴 断言 `'onlyoffice'` 字面量仍为 0（本 spec OO 值是 `'docx'`）
@@ -101,7 +101,7 @@
   - _Requirements: 8_
   - _AC/AG-P: AC-12_
 
-- [ ] 12. 归档欠账登记（5 份 / 6 条）
+- [x] 12. 归档欠账登记（5 份 / 6 条）
   - `a11-1-subsequent-events-inquiry` 19/21（2 条）· `a17-3-1-consultation-execution` 15/16 · `a17-3-consultation-record` 16/17 · `a17-4-disagreement-record` 16/17 · `a18-2-regulatory-communication` 14/15
   - 🔴 说明与 foundation 的 6 份差额：第 6 份 `a17-7-independence-declaration` 20/21 的 entry 归 **lane3**，两 lane 各登记自己份额，合计 6 份 / 7 条
   - 🔴 只登记不回填修改已归档 spec；扫归档区带 `errors="replace"`
@@ -109,7 +109,7 @@
   - _Requirements: 7_
   - _AC/AG-P: AC-25 · AG-P17_
 
-- [ ] 13. 交付前自检
+- [x] 13. 交付前自检
   - 归属份额表 17 行等式全过；AG-P1 ~ AG-P18 无缺号且每条关联 AC
   - sha256 仍 16/16 match；无 U+FFFD；「N 处」类表述与列举项数一致
   - 🔴 校验本 spec 未复述任何 AC 判据正文（只引编号）
@@ -118,7 +118,7 @@
   - _Requirements: 1, 2_
   - _AC/AG-P: AC-1 · AC-20 · AC-44_
 
-- [ ]* 14. 平台级欠账（不在本 spec 闭合）
+- [x]* 14. 平台级欠账（不在本 spec 闭合）
   - BP-1 ~ BP-5（approved 模型 / contract / capability 裁决 / bundle 与 published / adapter 注册）
   - 归档 spec 的 6 条未完成任务须由对应功能 spec 的负责人补做（本 spec 只登记）
   - 阻塞理由：平台层与他人 spec 范围，本 lane 无法闭合

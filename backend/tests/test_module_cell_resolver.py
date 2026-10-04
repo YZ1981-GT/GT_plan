@@ -425,7 +425,9 @@ class TestModuleCellResolverE2E:
         db = AsyncMock()
         db.execute = AsyncMock(return_value=mock_result)
 
-        result = await resolver.resolve(db, "note:五-1-1|A2:E2", "proj-1", 2025)
+        # 3.2 起 _query_note_cells 用 ORM select 并把 project_id 规整为 UUID，
+        # 故此处须传合法 UUID（生产中 project_id 恒为真实 UUID）。
+        result = await resolver.resolve(db, "note:五-1-1|A2:E2", "11111111-1111-1111-1111-111111111111", 2025)
         assert result["module"] == "note"
         assert result["total"] == 5
         assert result["rows"][0]["value"] == "1001"
@@ -485,3 +487,347 @@ class TestModuleCellResolverE2E:
         assert result["rows"][6]["value"] == 1200.0
         for item in result["rows"]:
             assert item["module"] == "tb"
+
+
+class TestNoteNodeKeyWiring:
+    """Task 3.1：filters.node_key 一路透传 _dispatch → resolve → _query_note_cells。
+
+    本任务只验证「接线到位」——node_key 确实流到附注取数器的参数上。
+    按 node_key 过滤 SQL 本身（有键精确等值、无键 NULL、稳定排序）由 3.2 实现并测试。
+    """
+
+    @pytest.fixture
+    def resolver(self):
+        return ModuleCellResolver()
+
+    @pytest.mark.asyncio
+    async def test_resolve_passes_node_key_to_note_fetcher(self, resolver, monkeypatch):
+        """resolve(..., filters={node_key}) 把 node_key 传给 _query_note_cells。"""
+        from unittest.mock import AsyncMock
+        import app.services.custom_query.module_cell_resolver as mcr
+
+        captured = {}
+
+        async def _spy(db, project_id, year, section_id, cell_range, node_key=None):
+            captured["project_id"] = project_id
+            captured["year"] = year
+            captured["section_id"] = section_id
+            captured["cell_range"] = cell_range
+            captured["node_key"] = node_key
+            return []
+
+        monkeypatch.setattr(mcr, "_query_note_cells", _spy)
+
+        db = AsyncMock()
+        await resolver.resolve(
+            db, "note:五-1-1|A2:E2", "proj-1", 2025,
+            {"node_key": "C001:consol"},
+        )
+
+        assert captured["node_key"] == "C001:consol"
+        assert captured["project_id"] == "proj-1"
+        assert captured["year"] == 2025
+        assert captured["section_id"] == "五-1-1"
+        assert captured["cell_range"] == "A2:E2"
+
+    @pytest.mark.asyncio
+    async def test_resolve_without_filters_passes_none_node_key(self, resolver, monkeypatch):
+        """省略 filters（旧 4-参调用）时 node_key 为 None（legacy NULL 语义入口）。"""
+        from unittest.mock import AsyncMock
+        import app.services.custom_query.module_cell_resolver as mcr
+
+        captured = {}
+
+        async def _spy(db, project_id, year, section_id, cell_range, node_key=None):
+            captured["node_key"] = node_key
+            return []
+
+        monkeypatch.setattr(mcr, "_query_note_cells", _spy)
+
+        db = AsyncMock()
+        await resolver.resolve(db, "note:五-1-1|A2:E2", "proj-1", 2025)
+
+        assert captured["node_key"] is None
+
+    @pytest.mark.asyncio
+    async def test_resolve_filters_without_node_key_passes_none(self, resolver, monkeypatch):
+        """filters 存在但无 node_key 键时 node_key 为 None。"""
+        from unittest.mock import AsyncMock
+        import app.services.custom_query.module_cell_resolver as mcr
+
+        captured = {}
+
+        async def _spy(db, project_id, year, section_id, cell_range, node_key=None):
+            captured["node_key"] = node_key
+            return []
+
+        monkeypatch.setattr(mcr, "_query_note_cells", _spy)
+
+        db = AsyncMock()
+        await resolver.resolve(db, "note:五-1-1|A2:E2", "proj-1", 2025, {"other": "x"})
+
+        assert captured["node_key"] is None
+
+    @pytest.mark.asyncio
+    async def test_dispatch_passes_filters_node_key_through(self, monkeypatch):
+        """全链路：_dispatch(QueryRequest.filters) → resolve → _query_note_cells。
+
+        用真实 QueryRequest 与真实 _dispatch，仅在最底层附注取数器打桩，
+        证明 filters.node_key 不在中途被丢弃（F8：旧实现 _dispatch 丢 filters）。
+        """
+        from unittest.mock import AsyncMock
+        import app.services.custom_query.module_cell_resolver as mcr
+        from app.services.custom_query.business_fetchers import _dispatch
+        from app.services.custom_query.query_orchestrator import QueryRequest
+
+        captured = {}
+
+        async def _spy(db, project_id, year, section_id, cell_range, node_key=None):
+            captured["node_key"] = node_key
+            captured["section_id"] = section_id
+            return []
+
+        monkeypatch.setattr(mcr, "_query_note_cells", _spy)
+
+        req = QueryRequest(
+            entry="business",
+            project_id="proj-9",
+            source="note:五-2-1|C3:D8",
+            year=2024,
+            filters={"node_key": "C777:parent"},
+        )
+        db = AsyncMock()
+        result = await _dispatch(req, db, None)
+
+        assert isinstance(result, dict)
+        assert captured["node_key"] == "C777:parent"
+        assert captured["section_id"] == "五-2-1"
+
+    @pytest.mark.asyncio
+    async def test_dispatch_report_module_ignores_node_key(self, monkeypatch):
+        """report 模块不接收 node_key（node_key 仅对 note 有语义）。"""
+        from unittest.mock import AsyncMock
+        import app.services.custom_query.module_cell_resolver as mcr
+        from app.services.custom_query.business_fetchers import _dispatch
+        from app.services.custom_query.query_orchestrator import QueryRequest
+
+        import inspect
+
+        # _query_report_cells 签名保持 5 参，无 node_key —— 证明未误扩散
+        sig = inspect.signature(mcr._query_report_cells)
+        assert "node_key" not in sig.parameters
+
+        async def _spy(db, project_id, year, report_type, cell_range):
+            return []
+
+        monkeypatch.setattr(mcr, "_query_report_cells", _spy)
+
+        req = QueryRequest(
+            entry="business",
+            project_id="proj-9",
+            source="report:balance_sheet|C2:C5",
+            year=2024,
+            filters={"node_key": "C777:consol"},
+        )
+        db = AsyncMock()
+        result = await _dispatch(req, db, None)
+        assert isinstance(result, dict)
+        assert result["module"] == "report"
+
+
+# ─── Task 3.2: _query_note_cells 节点过滤（真 ORM / 真 SQLite，P6）────────────
+# spec: consol-node-key-isolation-and-shared-context（需求 3.1~3.2；设计 §五.1、P6、ADR-CNSC-004）
+#
+# 验证 custom query 附注取数的归属元组隔离：
+#   - 有 node_key → 精确等值匹配该节点行；不读其它节点、不读 legacy、不读其它项目/年度/章节
+#   - 无 node_key → 只读 legacy NULL 行，不回退任何节点行
+#   - 稳定排序（ORDER BY id），不套根 legacy fallback
+# 被测的是真实生产函数 _query_note_cells + ModuleCellResolver.resolve（禁用 mock 替换被测函数本身），
+# 真 ConsolNoteData ORM 行落 SQLite，经 db.flush/commit 后真查询。
+
+from datetime import datetime, timezone
+
+import tests.conftest  # noqa: F401  注册全部模型 + SQLite 方言补丁
+from app.models.consol_note_data_models import ConsolNoteData
+from app.services.custom_query.module_cell_resolver import (
+    _query_note_cells,
+    module_cell_resolver,
+)
+
+# 复用 test_consol_push 的真集团夹具（真 SQLite 内存库 + 真 ORM 行）。
+# 不可重命名 db/factory/group：db 夹具按参数名 `factory` 解析依赖，group 同理，
+# pytest 以原始函数参数名解析 fixture 依赖，别名会导致 "fixture 'factory' not found"。
+from tests.test_consol_push import (  # noqa: F401,E402
+    Y,
+    db,
+    factory,
+    group,
+)
+
+_SID = "note_5_1"
+
+
+def _note_payload(tag: str) -> dict:
+    """构造附注 data JSONB —— resolver 读 data['rows'] 的 code/name/year_end/... 列。
+
+    用 ``name`` 列承载 tag，便于按 B2（name 列）断言命中了哪一行数据源。
+    """
+    return {"rows": [{"code": "1001", "name": tag, "year_end": 100, "year_begin": 90, "formula": None}]}
+
+
+async def _add_note(db, *, project_id, year, section_id, node_key, data):
+    rec = ConsolNoteData(
+        project_id=project_id, year=year, section_id=section_id,
+        node_key=node_key, data=data, is_stale=False,
+        updated_at=datetime.now(timezone.utc),
+    )
+    db.add(rec)
+    await db.flush()
+    return rec
+
+
+def _b2_value(cells: list[dict]):
+    """从 _query_note_cells 返回里取 B2（第 2 行 name 列）的 value。"""
+    for c in cells:
+        if c["cell_ref"] == "B2":
+            return c["value"]
+    return None
+
+
+class TestQueryNoteCellsNodeFilter:
+    """Task 3.2：_query_note_cells 按 project/year/section + 精确 node_key 过滤。
+
+    **Validates: Requirements 3.1, 3.2**
+    """
+
+    @pytest.mark.asyncio
+    async def test_node_key_exact_match_isolates_from_other_node(self, db, group):
+        """P6：有 node_key → 只命中该节点行，不串到另一节点行。"""
+        pid = group["G"].id
+        await _add_note(db, project_id=pid, year=Y, section_id=_SID, node_key="G:parent", data=_note_payload("parent"))
+        await _add_note(db, project_id=pid, year=Y, section_id=_SID, node_key="B:subsidiary", data=_note_payload("subB"))
+        await db.commit()
+
+        a = await _query_note_cells(db, str(pid), Y, _SID, "A2:E2", node_key="G:parent")
+        b = await _query_note_cells(db, str(pid), Y, _SID, "A2:E2", node_key="B:subsidiary")
+        assert _b2_value(a) == "parent"
+        assert _b2_value(b) == "subB"
+
+    @pytest.mark.asyncio
+    async def test_node_key_does_not_read_legacy_null_row(self, db, group):
+        """ADR-CNSC-004：有 node_key 但该节点无行时，不回退 legacy NULL 行（空结果）。"""
+        pid = group["G"].id
+        await _add_note(db, project_id=pid, year=Y, section_id=_SID, node_key=None, data=_note_payload("legacy"))
+        await db.commit()
+
+        # 即便是根 consol 键，custom query 也不套根 legacy fallback。
+        cells = await _query_note_cells(db, str(pid), Y, _SID, "A2:E2", node_key="G:consol")
+        assert _b2_value(cells) in (None, ""), "有键无行时不得回退 legacy"
+
+    @pytest.mark.asyncio
+    async def test_no_node_key_reads_only_legacy_null_row(self, db, group):
+        """无 node_key → 只读 legacy NULL 行，不读任何节点行。"""
+        pid = group["G"].id
+        await _add_note(db, project_id=pid, year=Y, section_id=_SID, node_key=None, data=_note_payload("legacy"))
+        await _add_note(db, project_id=pid, year=Y, section_id=_SID, node_key="G:consol", data=_note_payload("node"))
+        await db.commit()
+
+        cells = await _query_note_cells(db, str(pid), Y, _SID, "A2:E2", node_key=None)
+        assert _b2_value(cells) == "legacy", "无键只命中 NULL 行，不读节点行"
+
+    @pytest.mark.asyncio
+    async def test_filters_project_year_section(self, db, group):
+        """同 node_key 下跨项目 / 年度 / 章节的行互不命中。"""
+        pid = group["G"].id
+        other_pid = group["A"].id
+        nk = "G:parent"
+        await _add_note(db, project_id=pid, year=Y, section_id=_SID, node_key=nk, data=_note_payload("target"))
+        await _add_note(db, project_id=other_pid, year=Y, section_id=_SID, node_key=nk, data=_note_payload("other_project"))
+        await _add_note(db, project_id=pid, year=Y - 1, section_id=_SID, node_key=nk, data=_note_payload("other_year"))
+        await _add_note(db, project_id=pid, year=Y, section_id="other_sec", node_key=nk, data=_note_payload("other_section"))
+        await db.commit()
+
+        cells = await _query_note_cells(db, str(pid), Y, _SID, "A2:E2", node_key=nk)
+        assert _b2_value(cells) == "target", "只命中同项目+年度+章节+节点的行"
+
+    @pytest.mark.asyncio
+    async def test_resolve_end_to_end_passes_node_key_filter(self, db, group):
+        """真编排器入口：ModuleCellResolver.resolve(filters={node_key}) 精确命中节点行。"""
+        pid = group["G"].id
+        await _add_note(db, project_id=pid, year=Y, section_id=_SID, node_key="G:parent", data=_note_payload("parent"))
+        await _add_note(db, project_id=pid, year=Y, section_id=_SID, node_key="B:subsidiary", data=_note_payload("subB"))
+        await db.commit()
+
+        res = await module_cell_resolver.resolve(
+            db, f"note:{_SID}|A2:E2", str(pid), Y, {"node_key": "B:subsidiary"},
+        )
+        assert res["module"] == "note"
+        assert _b2_value(res["rows"]) == "subB"
+
+    @pytest.mark.asyncio
+    async def test_resolve_without_node_key_reads_legacy(self, db, group):
+        """真编排器入口：无 node_key filters → 只读 legacy NULL 行。"""
+        pid = group["G"].id
+        await _add_note(db, project_id=pid, year=Y, section_id=_SID, node_key=None, data=_note_payload("legacy"))
+        await _add_note(db, project_id=pid, year=Y, section_id=_SID, node_key="G:consol", data=_note_payload("node"))
+        await db.commit()
+
+        res = await module_cell_resolver.resolve(db, f"note:{_SID}|A2:E2", str(pid), Y)
+        assert _b2_value(res["rows"]) == "legacy"
+
+    @pytest.mark.asyncio
+    async def test_stable_order_and_exact_match_sql_node_branch(self, db, group, monkeypatch):
+        """稳定排序 + 精确等值变异证明（有键分支）。
+
+        捕获发给 db.execute 的真实 ORM 语句并编译为 SQL 文本：
+          - 必含 ``ORDER BY consol_note_data.id`` —— 若去掉排序，断言失败（非恒绿）；
+          - 必含 ``consol_note_data.node_key = `` 的等值谓词；
+          - 不得含 ``IS NULL``（有键时不走 legacy 分支）。
+        """
+        pid = group["G"].id
+        await _add_note(db, project_id=pid, year=Y, section_id=_SID, node_key="G:parent", data=_note_payload("parent"))
+        await db.commit()
+
+        captured = []
+        orig_execute = db.execute
+
+        async def _spy_execute(stmt, *a, **kw):
+            captured.append(stmt)
+            return await orig_execute(stmt, *a, **kw)
+
+        monkeypatch.setattr(db, "execute", _spy_execute)
+
+        cells = await _query_note_cells(db, str(pid), Y, _SID, "A2:E2", node_key="G:parent")
+        assert _b2_value(cells) == "parent"
+
+        note_stmts = [s for s in captured if "consol_note_data" in str(s)]
+        assert note_stmts, "应执行一次 consol_note_data 查询"
+        sql = str(note_stmts[0])
+        assert "ORDER BY consol_note_data.id" in sql, f"必须带稳定排序 ORDER BY id：{sql}"
+        assert "consol_note_data.node_key = " in sql, f"有键时必须精确等值匹配 node_key：{sql}"
+        assert "IS NULL" not in sql, f"有键时不得走 legacy NULL 分支：{sql}"
+
+    @pytest.mark.asyncio
+    async def test_sql_legacy_branch_uses_is_null(self, db, group, monkeypatch):
+        """无键分支变异证明：SQL 走 ``node_key IS NULL``，不含等值谓词。"""
+        pid = group["G"].id
+        await _add_note(db, project_id=pid, year=Y, section_id=_SID, node_key=None, data=_note_payload("legacy"))
+        await db.commit()
+
+        captured = []
+        orig_execute = db.execute
+
+        async def _spy_execute(stmt, *a, **kw):
+            captured.append(stmt)
+            return await orig_execute(stmt, *a, **kw)
+
+        monkeypatch.setattr(db, "execute", _spy_execute)
+
+        cells = await _query_note_cells(db, str(pid), Y, _SID, "A2:E2", node_key=None)
+        assert _b2_value(cells) == "legacy"
+
+        note_stmts = [s for s in captured if "consol_note_data" in str(s)]
+        assert note_stmts, "应执行一次 consol_note_data 查询"
+        sql = str(note_stmts[0])
+        assert "consol_note_data.node_key IS NULL" in sql, f"无键必须走 legacy NULL 分支：{sql}"
+        assert "ORDER BY consol_note_data.id" in sql, f"必须带稳定排序 ORDER BY id：{sql}"

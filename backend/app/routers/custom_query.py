@@ -2569,6 +2569,17 @@ class CellWritebackRequest(BaseModel):
     cell_ref: str  # e.g. "B7"
     new_value: Any = None
     module: Literal["workpaper", "report", "note", "adj", "tb"] = "workpaper"
+    # ─── 附注（note）节点归属字段（R3.3；设计 §五.2）────────────────────────
+    # note 模块的 cell writeback 必须显式携带附注记录的完整归属元组，供 writer 在
+    # 事务锁定记录后逐项复验（Task 3.4）：
+    #   - record id：note 模块以 wp_code 字段承载 consol_note_data.id（见下方 wp_id 赋值）。
+    #   - cell 定位：sheet_name + cell_ref。
+    #   - 乐观锁：X-File-Opened-At header（opened_at）。
+    #   - 归属：note_year / note_section_id / node_key（project_id 复用顶层字段）。
+    # 其余模块（workpaper/report/adj/tb）忽略以下字段，保持向后兼容。
+    note_year: int | None = None
+    note_section_id: str | None = None
+    node_key: str | None = None
 
 
 @router.post("/cell-writeback")
@@ -2656,6 +2667,10 @@ async def cell_writeback(
             opened_at=opened_at,
             module=body.module,
             project_id=body.project_id,
+            # 附注归属字段（R3.3）——其余模块忽略
+            year=body.note_year,
+            section_id=body.note_section_id,
+            node_key=body.node_key,
         )
         await db.commit()
     except WritebackConflict as e:

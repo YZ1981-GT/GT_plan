@@ -620,6 +620,40 @@ export const customQuery = {
   templateDetail: (id: string) => `/api/custom-query/templates/${id}`,
 } as const
 
+/** 跨模块单元格写回模块名（与后端 CellWritebackRequest.module 对齐）。 */
+export type CellWritebackModule = 'workpaper' | 'report' | 'note' | 'adj' | 'tb'
+
+/**
+ * `POST /api/custom-query/cell-writeback` 请求体（与后端 `CellWritebackRequest` 对齐）。
+ *
+ * 🔴 字段名为 **snake_case**：本仓前端请求体直发后端字段名（无 camel↔snake 转换拦截器，
+ * 见 useBatchQuery 等既有调用），故此接口刻意沿用后端 schema 的字段名以保证线上契约一致。
+ *
+ * 乐观锁时间戳不在请求体内，经 `X-File-Opened-At` header 传递（ISO 8601）。
+ *
+ * 合并附注（`module: 'note'`）节点归属字段（R3.3）：note 回写必须显式携带附注记录的
+ * 完整归属元组，供后端在事务锁定记录后逐项复验，不得把可猜测的记录 ID 当作授权边界：
+ *   - 记录 ID：note 模块以 `wp_code` 承载 `consol_note_data.id`。
+ *   - 单元格定位：`sheet_name` + `cell_ref`。
+ *   - 归属：`project_id` + `note_year` + `note_section_id` + `node_key`。
+ * 其余模块（workpaper/report/adj/tb）忽略这些可选字段。
+ */
+export interface CellWritebackRequest {
+  project_id: string
+  wp_code: string
+  sheet_name: string
+  /** e.g. "B7" */
+  cell_ref: string
+  new_value?: unknown
+  module?: CellWritebackModule
+  /** 附注归属年度（仅 module='note'，R3.3） */
+  note_year?: number | null
+  /** 附注章节 ID（仅 module='note'，R3.3） */
+  note_section_id?: string | null
+  /** 附注合并节点键（仅 module='note'，R3.3；null/省略 = legacy 旧调用） */
+  node_key?: string | null
+}
+
 // ─── 系统枚举字典 ───────────────────────────────────────────────────────────
 
 export const systemDicts = {

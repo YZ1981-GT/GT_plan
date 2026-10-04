@@ -147,6 +147,10 @@ class WritebackTarget:
       sheet_name: sheet 名称（定位 cell 用）。
       cell_ref:   cell 引用（如 ``E100``）。
       old_value:  目标当前旧值；未提供（``_UNSET``）时由服务只读捕获。
+      project_id: 附注归属项目 ID（note 模块，R3.3）；其余模块忽略。
+      year:       附注归属年度（note 模块，R3.3）。
+      section_id: 附注章节 ID（note 模块，R3.3）。
+      node_key:   附注合并节点键（note 模块，R3.3；None 表 legacy 旧调用）。
     """
 
     new_value: Any
@@ -157,6 +161,13 @@ class WritebackTarget:
     sheet_name: str | None = None
     cell_ref: str | None = None
     old_value: Any = field(default=_UNSET)
+    # ─── 附注（note）节点归属字段（R3.3；设计 §五.2）────────────────────────
+    # note 模块回写时承载附注记录的完整归属元组，供 writer 在锁定记录后逐项复验
+    # （Task 3.4）。其余模块忽略。record id = wp_id / cell 定位 = sheet_name+cell_ref。
+    project_id: str | None = None
+    year: int | None = None
+    section_id: str | None = None
+    node_key: str | None = None
 
 
 @dataclass

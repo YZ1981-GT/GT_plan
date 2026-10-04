@@ -587,3 +587,153 @@ class TestEndpoints:
             gen = await c.post("/api/consolidation/reports/generate", params={"project_id": gid},
                                json={"project_id": gid, "year": Y})
             assert gen.status_code == 403
+
+
+# ─────────── 任务 4.2：普通合并报表按 node_key 读时计算（非根不冒充根物化值）───────────
+# spec consol-node-key-isolation-and-shared-context 任务 4.2，设计 §六.2，需求 4.1~4.4、P8。
+# 真 FastAPI 请求 + 真 ORM/SQLite；证明 GET /reports/{pid}/{year} 按 node_key 经
+# load_view_context → node_measures → consol_report_values.node_report 实时求值，
+# 且**非根节点不读项目级物化 FinancialReport 冒充**（投毒 FinancialReport 作变异反证）。
+
+
+class TestReportNodeKeyReadTime:
+    @pytest.mark.asyncio
+    async def test_node_key_matches_shared_kernel_and_default_root(self, db, group, client_for):
+        """GET 按 node_key 的本期金额逐行 == 同节点 trial_view 的「合并审定数」列（同一求值内核）；
+        省略 node_key ⇒ 默认根合并节点，与显式传根 node_key 结果一致。"""
+        from app.services.consol_report_view_service import (
+            load_prior_year_node_report,
+            load_view_context,
+            trial_view,
+        )
+
+        admin = _User(UserRole.admin)
+        gid = str(group["G"].id)
+        # 制造一笔已审批内部往来抵销（让根与子节点金额有可观测差异）
+        db.add(_entry(group["A"], "IT-1", EliminationEntryType.internal_trade,
+                      [("6001", "主营业务收入", "120", "0"), ("6401", "主营业务成本", "0", "120")]))
+        db.add(_entry(group["G"], "IA-1", EliminationEntryType.internal_ar_ap,
+                      [("2202", "应付账款", "50", "0"), ("1122", "应收账款", "0", "50")]))
+        await db.commit()
+
+        ctx = await load_view_context(db, group["G"].id)
+
+        async def _get(client, node_key=None, rt="balance_sheet"):
+            params = {"report_type": rt}
+            if node_key is not None:
+                params["node_key"] = node_key
+            resp = await client.get(f"/api/consolidation/reports/{gid}/{Y}", params=params)
+            assert resp.status_code == 200, resp.text
+            return {r["row_code"]: r for r in resp.json()}
+
+        async with client_for(admin) as c:
+            for node_key in (None, "G:consol", "A:consol"):
+                effective = node_key or "G:consol"
+                for rt in ("balance_sheet", "income_statement"):
+                    rows = await _get(c, node_key, rt)
+                    trial = await trial_view(ctx.basis, ctx.rows, report_type=rt, node_key=effective)
+                    trial_by = {r["row_code"]: r for r in trial["rows"]}
+                    assert set(rows) == set(trial_by), (node_key, rt)
+                    for code, row in rows.items():
+                        # 本期金额 == 同节点 trial_view 的合并审定数列（同一内核），逐行精确到分
+                        assert row["current_period_amount"] == trial_by[code]["consolidated"], (effective, rt, code)
+                    # 上期（任务 4.3）按**同节点上一有效审计年度**计算，不冒充根项目级 FinancialReport.prior：
+                    #   - 根 G:consol：上年同企业合并项目 G24 存在（孤节点无 TB）⇒ 可求值行上期 = 0.00；
+                    #   - 非根 A:consol：不在上年孤节点树中 ⇒ 上期整体 null + 原因。
+                    prior = await load_prior_year_node_report(
+                        db, project_id=group["G"].id, node_key=effective, year=Y, report_type=rt,
+                    )
+                    for code, row in rows.items():
+                        pv = prior.amounts.get(code)
+                        expected = None if pv is None or pv.amount is None else str(pv.amount)
+                        assert row["prior_period_amount"] == expected, (effective, rt, code)
+                    if effective == "A:consol":
+                        assert prior.unavailable is not None  # 非根节点上年树无此节点
+                        assert all(r["prior_period_amount"] is None for r in rows.values())
+
+            # 根与非根确有差异（否则「非根不冒充」不可证）：A:consol 的 BS-006 只含 A 子树
+            root_rows = await _get(c, "G:consol")
+            node_rows = await _get(c, "A:consol")
+            assert root_rows["BS-006"]["current_period_amount"] != node_rows["BS-006"]["current_period_amount"]
+            # A 子树 BS-006 = A1 的 80（A:parent 0），A 本级无应收抵销
+            assert node_rows["BS-006"]["current_period_amount"] == "80.00"
+
+    @pytest.mark.asyncio
+    async def test_non_root_does_not_impersonate_materialized_financial_report(self, db, group, client_for):
+        """变异反证：投毒项目级物化 FinancialReport（根口径）为哨兵值；
+        非根节点 GET 必须返回**该节点实时计算值**，而非物化哨兵；根节点同样不读哨兵。"""
+        from app.models.report_models import FinancialReport
+        from app.services.consol_report_view_service import load_view_context, trial_view
+
+        admin = _User(UserRole.admin)
+        gid = str(group["G"].id)
+        SENTINEL = D("99999.00")  # 任何真实节点金额都不会等于它
+        # 投毒：为项目 G 写入根口径物化报表，BS-006 = 哨兵。若端点读 FinancialReport，哨兵会泄漏。
+        db.add(FinancialReport(
+            project_id=group["G"].id, year=Y, report_type=FinancialReportType.balance_sheet,
+            row_code="BS-006", row_name="应收账款", current_period_amount=SENTINEL,
+            prior_period_amount=SENTINEL,
+        ))
+        await db.commit()
+
+        ctx = await load_view_context(db, group["G"].id)
+        trial_root = {r["row_code"]: r for r in
+                      (await trial_view(ctx.basis, ctx.rows, report_type="balance_sheet", node_key="G:consol"))["rows"]}
+        trial_node = {r["row_code"]: r for r in
+                      (await trial_view(ctx.basis, ctx.rows, report_type="balance_sheet", node_key="A:consol"))["rows"]}
+
+        async with client_for(admin) as c:
+            root = {r["row_code"]: r for r in
+                    (await c.get(f"/api/consolidation/reports/{gid}/{Y}",
+                                 params={"report_type": "balance_sheet"})).json()}
+            node = {r["row_code"]: r for r in
+                    (await c.get(f"/api/consolidation/reports/{gid}/{Y}",
+                                 params={"report_type": "balance_sheet", "node_key": "A:consol"})).json()}
+
+        # 根节点读时计算 ≠ 哨兵（证明不读物化行）
+        assert root["BS-006"]["current_period_amount"] != str(SENTINEL)
+        assert root["BS-006"]["current_period_amount"] == trial_root["BS-006"]["consolidated"]
+        # 非根节点读时计算 ≠ 哨兵、也 ≠ 根口径物化值 ⇒ 不冒充
+        assert node["BS-006"]["current_period_amount"] != str(SENTINEL)
+        assert node["BS-006"]["current_period_amount"] == trial_node["BS-006"]["consolidated"]
+        assert node["BS-006"]["current_period_amount"] != root["BS-006"]["current_period_amount"]
+        # 上期（任务 4.3）按同节点上一年度计算，绝不复用项目级物化哨兵（prior_period_amount=SENTINEL）：
+        #   - 根 G:consol：上年孤节点可求值 ⇒ prior 为计算值（≠ 哨兵）；
+        #   - 非根 A:consol：上年树无此节点 ⇒ prior 为 null（≠ 哨兵，更不冒充）。
+        assert root["BS-006"]["prior_period_amount"] != str(SENTINEL)
+        assert node["BS-006"]["prior_period_amount"] != str(SENTINEL)
+        assert node["BS-006"]["prior_period_amount"] is None
+
+    @pytest.mark.asyncio
+    async def test_invalid_node_key_and_empty_rejected(self, db, group, client_for):
+        """非法 node_key / 空字符串明确拒绝（经企业树校验，设计 §六.1，ADR-CNSC-001）。"""
+        admin = _User(UserRole.admin)
+        gid = str(group["G"].id)
+        async with client_for(admin) as c:
+            bad = await c.get(f"/api/consolidation/reports/{gid}/{Y}",
+                              params={"report_type": "balance_sheet", "node_key": "NOPE:consol"})
+            assert bad.status_code == 400 and "没有节点" in bad.json()["detail"]
+            empty = await c.get(f"/api/consolidation/reports/{gid}/{Y}",
+                                params={"report_type": "balance_sheet", "node_key": ""})
+            assert empty.status_code == 400
+            # company_code 不是 node_key（ADR-CNSC-001：禁按企业代码兜底）
+            by_code = await c.get(f"/api/consolidation/reports/{gid}/{Y}",
+                                  params={"report_type": "balance_sheet", "node_key": "A"})
+            assert by_code.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_non_consol_project_and_blank_reason(self, db, group, client_for):
+        """非合并项目报表端点 404；公式取数超合并口径的行给 current=null + blank_reason（不伪造 0）。"""
+        admin = _User(UserRole.admin)
+        async with client_for(admin) as c:
+            # 单户项目 B 不是合并项目
+            not_consol = await c.get(f"/api/consolidation/reports/{group['B'].id}/{Y}",
+                                     params={"report_type": "balance_sheet"})
+            assert not_consol.status_code == 404
+            # IS-030 = TB('4003','本期发生额') 对权益类非损益科目 ⇒ 留空并给原因
+            gid = str(group["G"].id)
+            income = {r["row_code"]: r for r in
+                      (await c.get(f"/api/consolidation/reports/{gid}/{Y}",
+                                   params={"report_type": "income_statement"})).json()}
+            assert income["IS-030"]["current_period_amount"] is None
+            assert income["IS-030"]["blank_reason"] and "不是损益类" in income["IS-030"]["blank_reason"]

@@ -9,25 +9,25 @@
 
 <template>
   <div class="gt-a3-console">
-    <!-- BP-10 收口：a3-console 原是全 A 域唯一 no_switch_at_all，此处补模式开关 -->
+    <!-- BP-10 收口：a3-console 原是全 A 域唯一 no_switch_at_all，此处补模式开关。
+         🔴 形态 2（label/value 分离）：中文只出现在 label，value 用稳定英文标识
+         'html' / 'docx'，禁用中文标签作逻辑值（抄 a38 / a112 样板）。 -->
     <div class="gt-a3-console__toolbar">
-      <el-segmented v-model="viewMode" :options="modeOptions" size="small" />
+      <el-segmented v-model="activeMode" :options="modeOptions" size="small" />
       <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a3-consolidation-console" />
-      <el-tag :type="syncStateTag.type" size="small">{{ syncStateTag.text }}</el-tag>
     </div>
 
-    <!-- 在线编辑模式：整册 OO 编辑 -->
-    <template v-if="viewMode === '在线编辑'">
-      <WorkpaperSyncEditorHost
-        v-if="syncOoDescriptor"
-        :descriptor="syncOoDescriptor"
-        :bridge="syncBridge"
-        style="height: calc(100vh - 200px); min-height: 500px"
+    <!-- OnlyOffice 编辑模式：整册 OO 编辑（mode 门控，非 sheet 路由兜底） -->
+    <div v-if="activeMode === 'docx'" class="gt-a3-console__oo">
+      <GtOnlyOfficeSheet
+        :wp-id="wpId"
+        sheet-name="A3-3"
+        :project-id="projectId"
+        :whole-workbook="true"
+        :readonly="readonly"
+        @fallback="docxDirty = true"
       />
-      <div v-else style="display:flex;align-items:center;justify-content:center;height:400px;color:#909399">
-        正在打开同步编辑器…
-      </div>
-    </template>
+    </div>
 
     <el-tabs v-else v-model="activeTab">
       <!-- Tab 1: 程序表 -->
@@ -148,13 +148,13 @@
     </div>
       </el-tab-pane>
 
-      <!-- Tab 2: A3-3 结构化主体判断 (sync bridge) -->
+      <!-- Tab 2: A3-3 结构化主体判断 -->
       <el-tab-pane v-if="wpIdMap['A3-3']" label="A3-3 结构化主体判断" name="A3-3" lazy>
-        <!-- 🔴 OO 编辑已收敛到顶层 segmented「在线编辑」模式（BP-10 收口）。
-             此 tab 保留为结构化入口提示，避免与顶层挂点重复挂载同一 descriptor。 -->
+        <!-- 🔴 OO 编辑已收敛到顶层 segmented「Word编辑」模式（BP-10 收口）。
+             此 tab 保留为结构化入口提示，避免与顶层挂点重复挂载同一册。 -->
         <el-alert type="info" :closable="false" show-icon>
           <template #title>A3-3 结构化主体纳入合并范围的判断</template>
-          <span>该底稿的表格编辑请切到顶部「在线编辑」模式（Excel 在线编辑器）。</span>
+          <span>该底稿的表格编辑请切到顶部「Word编辑」模式（Excel 在线编辑器）。</span>
         </el-alert>
       </el-tab-pane>
 
@@ -171,10 +171,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, defineAsyncComponent, toRef } from 'vue'
+import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowDown, InfoFilled } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import GtOnlyOfficeSheet from '@/components/workpaper/GtOnlyOfficeSheet.vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { api } from '@/services/apiProxy'
 import { getWpIndex, type WpIndexItem } from '@/services/workpaperApi'
 import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
@@ -233,56 +235,24 @@ const wpIdMap = computed<Record<string, string>>(() => {
   return map
 })
 
-// 加载 wpIndex
-
-// ─── sync bridge（替代 legacy mode + GtOnlyOfficeSheet）───
-const _ENTRY_ID = 'xlsx/gt-a3-consolidation-console'
-const _SHEET_KEY = 'a3consolidationconsole-managed'
-const syncBridge = useWorkpaperSyncBridge({
-  entryId: ref(_ENTRY_ID),
-  wpId: toRef(props, 'wpId'),
-  projectId: toRef(props, 'projectId'),
-  sheetKey: ref(_SHEET_KEY),
-  capability: capabilityForEntry(_ENTRY_ID),
-  flushHtml: async () => {
-    if (typeof flushPendingSave === 'function') flushPendingSave()
-    else if (typeof flushPendingSaves === 'function') flushPendingSaves()
-    // 🔴 降级保护：本 entry 的 capability 仍是 single_onlyoffice（后端无 per-entry
-    //    adapter）⇒ readStoreProjection 会 404。捕获后返回空投影，让 OO 走「无投影」
-    //    路径（与改线前 legacy 行为等价）。capability 升 bidirectional 后自动失效。
-    try {
-      const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: _ENTRY_ID })
-      return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: _SHEET_KEY }
-    } catch {
-      return { expectedRevision: 0, projection: null, sheetKey: _SHEET_KEY }
-    }
-  },
-  reloadHtml: async () => { if (typeof loadData === 'function') await loadData(props.wpId); else if (typeof refreshData === 'function') await refreshData(props.wpId) },
-})
-const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
-
 // ─── BP-10 收口：补模式开关（原全 A 域唯一 no_switch_at_all）───
-// 🔴 mode 载体用形态 2（label/value 分离），禁中文标签直接作逻辑值
-const viewMode = computed<string>({
-  get: () => syncBridge.mode.value === 'oo' ? '在线编辑' : '结构化视图',
-  set: (target: string) => {
-    if (target === '在线编辑') {
-      if (props.readonly) return
-      void syncBridge.switchToOnlyOffice().catch(() => { /* 已记入 lastError */ })
-    } else if (syncBridge.mode.value === 'oo') {
-      void syncBridge.switchToHtml().catch(() => { /* 已记入 lastError */ })
-    }
-  },
-})
-const modeOptions = computed(() => ['结构化视图', '在线编辑'].map(v => ({
-  label: v,
-  value: v,
-  disabled: v === '在线编辑' && props.readonly,
-})))
-const syncStateTag = computed(() => {
-  if (syncBridge.dirty?.value) return { text: '有未同步改动', type: 'warning' as const }
-  if (String(syncBridge.lastError?.value || '')) return { text: '同步失败', type: 'danger' as const }
-  return { text: syncBridge.mode.value === 'oo' ? 'Excel 在线编辑' : '已同步', type: 'success' as const }
+// 🔴 mode 载体用形态 2（label/value 分离）：中文只在 label，value 是稳定英文标识。
+//    'html' = 结构化视图（el-tabs），'docx' = 整册 OnlyOffice 编辑。
+//    OO 挂点由此 activeMode 门控真实渲染（不再是 sheet 路由兜底）。
+const activeMode = ref<'html' | 'docx'>('html')
+const docxDirty = ref(false)
+const modeOptions = computed(() => [
+  { label: '结构化视图', value: 'html' },
+  { label: 'Word编辑', value: 'docx', disabled: props.readonly },
+])
+
+// 切回 html 时若 OO 侧有改动则刷新本地数据（抄 a38 样板）
+watch(activeMode, async (newMode, oldMode) => {
+  if (newMode === 'html' && oldMode === 'docx' && docxDirty.value) {
+    docxDirty.value = false
+    initData()
+  }
+  if (newMode === 'docx') docxDirty.value = true
 })
 
 onMounted(async () => {
@@ -498,6 +468,10 @@ function debounceSave() {
   padding: 8px 12px;
   border-bottom: 1px solid #ebeef5;
   flex-wrap: wrap;
+}
+.gt-a3-console__oo {
+  flex: 1;
+  min-height: calc(100vh - 240px);
 }
 .gt-a3-console :deep(.el-tabs) {
   flex: 1;

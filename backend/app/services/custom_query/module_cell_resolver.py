@@ -322,22 +322,66 @@ async def _query_note_cells(
     year: int | None,
     section_id: str,
     cell_range: str,
+    node_key: str | None = None,
 ) -> list[dict]:
     """从 consol_note_data.data JSONB 提取 cell。
 
     虚拟 sheet 列映射：A=code, B=name, C=year_end, D=year_begin, E=formula
+
+    节点归属（R3.1、R3.2；设计 §五.1、ADR-CNSC-004）：
+      - 读取同时限定 project_id / year / section_id 与节点键。
+      - 有 node_key 时精确等值匹配该节点行；无 node_key 时只取 legacy
+        ``node_key IS NULL`` 兼容行。
+      - **不**套用附注 GET 的根节点 legacy 回退：有键只看该节点行、无键只看
+        NULL 行，保持 custom query 的精确身份契约。
+      - 结果按稳定主键 ``id`` 排序后取第一行。归属元组
+        (project_id, year, section_id, node_key) 由 V177 两套部分唯一索引保证
+        至多一行（node 行索引 uq_cnd_project_year_section_node、legacy 行索引
+        uq_cnd_legacy_project_year_section），``ORDER BY id`` 仅为并发/脏数据下
+        结果确定性兜底，不改变「取唯一一行」语义。
+
+    Args:
+        node_key: 节点身份。``None`` 表示旧调用，只读 legacy NULL 行。
+
+    实现：用 ORM ``select(ConsolNoteData)`` 而非 text() 裸 SQL —— ``project_id``
+    的 UUID 绑定与 ``data`` JSONB 反序列化都由 SQLAlchemy 按方言正确处理，
+    PG 与 SQLite 两侧一致（避免 spec 2.3 教训里 text() 在 SQLite 下 UUID
+    绑定/存储形态不匹配、JSONB 返回字符串而非 dict 的问题）。
     """
+    import uuid as _uuid
+
+    from sqlalchemy import select
+
+    from app.models.consol_note_data_models import ConsolNoteData
+
     sheet_name = f"note_{section_id}"
 
     if not project_id or not year:
         return []
 
+    # project_id 入参可能是字符串；统一转成 UUID 让 ORM 按方言绑定存储形态。
     try:
-        result = await db.execute(text("""
-            SELECT data FROM consol_note_data
-            WHERE project_id = :pid AND year = :y AND section_id = :sid
-            LIMIT 1
-        """), {"pid": project_id, "y": year, "sid": section_id})
+        pid_val: Any = project_id if isinstance(project_id, _uuid.UUID) else _uuid.UUID(str(project_id))
+    except (ValueError, AttributeError, TypeError):
+        return []
+
+    # 有键：精确等值匹配节点行；无键：只匹配 legacy NULL 行（不回退根节点）。
+    stmt = (
+        select(ConsolNoteData.data)
+        .where(
+            ConsolNoteData.project_id == pid_val,
+            ConsolNoteData.year == year,
+            ConsolNoteData.section_id == section_id,
+        )
+    )
+    if node_key is not None:
+        stmt = stmt.where(ConsolNoteData.node_key == node_key)
+    else:
+        stmt = stmt.where(ConsolNoteData.node_key.is_(None))
+    stmt = stmt.order_by(ConsolNoteData.id).limit(1)
+
+    try:
+        result = await db.execute(stmt)
         note_row = result.first()
     except Exception as e:
         logger.warning("_query_note_cells failed: %s", e)
@@ -493,8 +537,14 @@ class ModuleCellResolver:
         source: str,
         project_id: str | None,
         year: int | None = None,
+        filters: dict | None = None,
     ) -> dict:
         """按 source 命名空间路由到 4 个 _query_*_cells。
+
+        Args:
+            filters: custom query 的 ``req.filters``；其 ``node_key`` 透传给附注
+                取数器以隔离节点（R3.1）。node_key 仅对 note 模块有语义，
+                report/adj/tb 忽略之。省略或无 node_key 时 note 走 legacy NULL 行语义。
 
         Returns:
             {rows: [...], columns: [...], total: int, source: str, module: str}
@@ -513,12 +563,15 @@ class ModuleCellResolver:
         if not project_id:
             return {"rows": [], "columns": [], "total": 0, "error": "跨模块 cell 查询需要 project_id"}
 
+        # filters.node_key 透传给附注取数器（R3.1）；缺省为 None（legacy NULL 行）。
+        node_key = (filters or {}).get("node_key")
+
         cells: list[dict] = []
 
         if module == "report":
             cells = await _query_report_cells(db, project_id, year, qualifier, cell_range)
         elif module == "note":
-            cells = await _query_note_cells(db, project_id, year, qualifier, cell_range)
+            cells = await _query_note_cells(db, project_id, year, qualifier, cell_range, node_key)
         elif module == "adj":
             cells = await _query_adj_cells(db, project_id, year, qualifier, cell_range)
         elif module == "tb":

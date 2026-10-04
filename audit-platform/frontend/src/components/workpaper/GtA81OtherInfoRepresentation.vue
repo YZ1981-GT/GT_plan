@@ -11,7 +11,7 @@
 <template>
   <div class="gt-a81">
     <div class="gt-a81__toolbar">
-      <el-segmented v-model="mode" :options="modeOptions" size="small" />
+      <el-segmented v-model="activeMode" :options="modeOptions" size="small" />
       <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a81-other-info-representation" />
       <span class="gt-a81__save-status">
         <template v-if="saveStatus === 'saving'"><el-icon class="is-loading"><Loading /></el-icon> 保存中...</template>
@@ -20,7 +20,7 @@
       </span>
     </div>
 
-    <div v-if="mode === '结构化视图'" class="gt-a81__content">
+    <div v-if="activeMode === 'html'" class="gt-a81__content">
       <el-skeleton v-if="loading" :rows="8" animated />
       <template v-else>
         <!-- 编制指导 -->
@@ -273,8 +273,11 @@ defineOptions({ name: 'GtA81OtherInfoRepresentation' })
 
 const props = withDefaults(defineProps<{ wpId: string; readonly?: boolean ; projectId?: string }>(), { readonly: false })
 
-const mode = ref('结构化视图')
-const modeOptions = ['结构化视图', '在线编辑']
+const activeMode = ref<'html' | 'docx'>('html')
+const modeOptions = [
+  { label: '结构化视图', value: 'html' },
+  { label: 'Word编辑', value: 'docx' },
+]
 
 const newFileInputs = reactive<Record<number, string>>({ 1: '', 4: '', 5: '' })
 

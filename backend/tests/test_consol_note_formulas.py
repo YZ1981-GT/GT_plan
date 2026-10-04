@@ -263,6 +263,57 @@ class TestFillRows:
         assert [r[1] for r in rows3] == ["10.00", "", "", "", "30.00"]
         assert [b["row_index"] for b in s3["blank"]] == [1] and "不止一个" in s3["blank"][0]["reason"]
 
+    def test_object_rows_shape_preserved_in_place(self):
+        """对象行（dict）：按 code 定位、col_index→键名原位写入；其余键/值/行形态保持 dict（需求 2.4）。"""
+        saved = [
+            {"code": "1001", "name": "库存现金", "year_end": "手填", "year_begin": "1", "formula": None},
+            {"code": "1002", "name": "银行存款", "year_end": "", "year_begin": "2", "formula": "x"},
+            {"code": "T", "name": "合  计", "year_end": "", "year_begin": "3", "formula": None},
+        ]
+        template = [["库存现金", "", ""], ["银行存款", "", ""], ["合  计", "", ""]]
+        rows, summary = fill_rows(["项目", "期末", "期初"], saved, self.CELLS, {(0, 1)}, template)
+        # col_index 1 → year_end；非目标键保持不变、行仍是 dict
+        assert all(isinstance(r, dict) for r in rows), "对象行不得被改造成数组"
+        assert rows[0]["year_end"] == "手填", "手工保护格不覆盖"
+        assert (rows[0]["name"], rows[0]["year_begin"], rows[0]["formula"]) == ("库存现金", "1", None), "非目标键原值保留"
+        assert rows[1]["year_end"] == "20.00" and rows[1]["formula"] == "x", "填入目标键，其余键不动"
+        assert rows[2]["year_end"] == "30.00" and rows[2]["year_begin"] == "3"
+        # col_index 2 → year_begin 的那条 cell 取不到数 ⇒ 留空、原值不变
+        assert rows[2]["year_begin"] == "3", "留空的公式不覆盖对象行原值"
+        assert [b["col_index"] for b in summary["blank"]] == [2]
+        assert [k["row_index"] for k in summary["kept_manual"]] == [0]
+        assert summary["kept_manual"][0]["current"] == "手填", "保留数量与保留值准确"
+
+    def test_array_narrow_rows_not_force_padded(self):
+        """二维数组：窄行只在写入目标列时按需补位，非目标行/非目标 cell 不被改形（需求 2.4 保形）。"""
+        # 第 1 行只有 1 列（无数据列），第 2 行 2 列
+        saved = [["库存现金", "", ""], ["银行存款"], ["合  计", ""]]
+        template = [["库存现金", "", ""], ["银行存款", "", ""], ["合  计", "", ""]]
+        rows, _summary = fill_rows(["项目", "期末", "期初"], saved, self.CELLS[:3], set(), template)
+        assert rows[0] == ["库存现金", "10.00", ""], "原本等宽行不新增列"
+        assert rows[1] == ["银行存款", "20.00"], "窄行只补到目标列（第 1 列），不强制补到表头宽度"
+        assert rows[2] == ["合  计", "30.00"], "两列行写第 1 列即可，不补第 2 列"
+
+    def test_kept_count_matches_actual_preserved(self):
+        """多个手工保护格：kept_manual 条数与行次须与实际保留的单元格逐一对应（准确报告保留数量）。"""
+        saved = [["库存现金", "A", "B"], ["银行存款", "C", "D"], ["合  计", "E", "F"]]
+        cells = [
+            {"row_index": 0, "col_index": 1, "consolidated": "10.00"},
+            {"row_index": 0, "col_index": 2, "consolidated": "11.00"},
+            {"row_index": 1, "col_index": 1, "consolidated": "20.00"},
+            {"row_index": 2, "col_index": 1, "consolidated": "30.00"},
+        ]
+        manual = {(0, 1), (0, 2), (2, 1)}  # 3 个手工格
+        rows, summary = fill_rows(["项目", "期末", "期初"], saved, cells, manual, self.TEMPLATE)
+        kept = {(k["target_row"], k["col_index"]): k["current"] for k in summary["kept_manual"]}
+        assert len(summary["kept_manual"]) == 3, "报告的保留数量 = 实际手工格数"
+        assert kept == {(0, 1): "A", (0, 2): "B", (2, 1): "E"}, "保留的行列与当前值逐一准确"
+        # 非手工格正常填入；手工格原值一个都没动
+        assert rows[0] == ["库存现金", "A", "B"] and rows[2] == ["合  计", "E", "F"]
+        assert rows[1] == ["银行存款", "20.00", "D"], "只有未保护的目标格被填"
+        filled = {(f["target_row"], f["col_index"]) for f in summary["filled"]}
+        assert filled == {(1, 1)}, "填入数 + 保留数 不重叠，合计覆盖所有有值 cell"
+
 
 # ─────────────────────────────── 真库 + 端点 ───────────────────────────────
 

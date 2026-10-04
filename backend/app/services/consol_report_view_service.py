@@ -20,6 +20,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.consol_calc_basis import (
@@ -346,6 +347,78 @@ async def load_view_context(db: AsyncSession, project_id: UUID, year: int | None
     return ViewContext(basis=basis, rows=await load_report_rows(db, standard), standard=standard, year=effective_year)
 
 
+@dataclass(frozen=True)
+class PriorNodeReport:
+    """上一有效审计年度**同一 node_key** 的合并数行值（spec consol-node-key-isolation 任务 4.3，设计 §六.4）。
+
+    - ``amounts``：{row_code: RowValue}（``report_type`` 行），合并数度量，与本期同一求值口径；
+    - ``unavailable``：整体不可用的原因（上年无同企业合并项目 / 上年合并树无此节点）；
+      非空时 ``amounts`` 为空，所有行上期一律 ``null`` 并带此原因，**不**读项目级物化 prior 冒充。
+    行能求值 ⇒ 上期取其 ``amount``；行级公式不支持 ⇒ 该行上期 ``null`` 并给该行自己的原因（P9，不以 0 代替）。
+    """
+
+    amounts: dict[str, "RowValue"]
+    unavailable: str | None
+
+
+async def load_prior_year_node_report(
+    db: AsyncSession,
+    *,
+    project_id: UUID,
+    node_key: str,
+    year: int,
+    report_type: str,
+) -> PriorNodeReport:
+    """按**同一 node_key、上一有效审计年度**计算该报表类型的合并数行值（设计 §六.4）。
+
+    上一年度的合并是**另一个**合并项目（同企业代码、``report_scope=consolidated``、``audit_year=year-1``）：
+    1. 按本项目企业代码解析上年同企业合并项目；没有 ⇒ ``unavailable``（上年无同企业合并项目）。
+    2. 以上年合并项目装载上年视图上下文（企业树 + 计算口径 + 报表配置，``year-1``）；
+       非合并项目 / 上年无数据 ⇒ ``unavailable``。
+    3. 上年合并树里**精确**定位同一 ``node_key``（``node_measures`` 的键）；不在 ⇒ ``unavailable``
+       （上年合并树无此节点；ADR-CNSC-001：禁按 company_code / 前缀兜底）。
+    4. 命中 ⇒ 经 ``node_report`` 以合并数度量求该 report_type 行值，与本期**同一共享求值口径**。
+
+    只读、不写库；绝不读取根项目级 ``FinancialReport.prior_period_amount`` 充当节点上期。
+    """
+    from app.models.core import Project
+    from app.services.consol_calc_basis import MEASURE_CONSOLIDATED, node_measures
+    from app.services.note_section_catalog import normalize_report_scope
+
+    company_code = (await db.execute(
+        sa.select(Project.company_code).where(Project.id == project_id)
+    )).scalar_one_or_none()
+    if not company_code:
+        return PriorNodeReport({}, "上一年度无同企业合并项目（本项目未填企业代码）")
+
+    prior_year = year - 1
+    candidates = (await db.execute(
+        sa.select(Project.id, Project.report_scope).where(
+            Project.company_code == company_code,
+            Project.audit_year == prior_year,
+            Project.is_deleted.is_(False),
+        ).order_by(Project.created_at, Project.id)
+    )).all()
+    prior_ids = [pid for pid, scope in candidates if normalize_report_scope(scope) == "consolidated"]
+    if not prior_ids:
+        return PriorNodeReport({}, f"上一年度（{prior_year}）无同企业合并项目，无节点上期可取")
+
+    prior_ctx = await load_view_context(db, prior_ids[0], prior_year)
+    if prior_ctx is None:
+        return PriorNodeReport({}, f"上一年度（{prior_year}）合并项目无有效审计年度或计算口径")
+
+    measures_by_node = node_measures(prior_ctx.basis)
+    node_values = measures_by_node.get(node_key)
+    if node_values is None:
+        return PriorNodeReport({}, f"上一年度（{prior_year}）合并树中没有节点 {node_key}")
+
+    by_measure = await node_report(prior_ctx.rows, node_values, categories=prior_ctx.basis.categories)
+    consolidated = by_measure[MEASURE_CONSOLIDATED]
+    type_codes = {r.row_code for r in prior_ctx.rows if r.report_type == report_type}
+    amounts = {code: v for code, v in consolidated.items() if code in type_codes}
+    return PriorNodeReport(amounts, None)
+
+
 async def load_entry_drill(
     db: AsyncSession, ctx: ViewContext, *, row_code: str, measure: str, node_key: str | None,
 ) -> dict:
@@ -439,6 +512,7 @@ async def child_contributions(
 __all__ = [
     "DRILL_MEASURES",
     "TRIAL_COLUMNS",
+    "PriorNodeReport",
     "ViewContext",
     "ViewError",
     "aggregate_nodes",
@@ -449,6 +523,7 @@ __all__ = [
     "individual_drill_rows",
     "load_entry_drill",
     "load_individual_drill",
+    "load_prior_year_node_report",
     "load_view_context",
     "trial_view",
 ]

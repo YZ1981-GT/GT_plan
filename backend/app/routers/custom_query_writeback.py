@@ -44,6 +44,12 @@ class WritebackTargetSpec(BaseModel):
     sheet_name: str | None = None
     cell_ref: str | None = None
     project_id: str | None = None
+    # ─── 附注（note）节点归属字段（R3.3；设计 §五.2）────────────────────────
+    # note 模块回写时随 record id (wp_id) + cell 定位 (sheet_name+cell_ref) 一并携带
+    # 完整归属元组，供 writer 锁定记录后逐项复验（Task 3.4）。其余模块忽略。
+    year: int | None = None
+    section_id: str | None = None
+    node_key: str | None = None
 
 
 class WritebackPreviewRequest(BaseModel):
@@ -75,6 +81,11 @@ def _to_writeback_targets(raw_targets: Any) -> list[Any]:
                 wp_code=data.get("wp_code"),
                 sheet_name=data.get("sheet_name"),
                 cell_ref=data.get("cell_ref"),
+                # 附注归属字段（R3.3）——其余模块为 None
+                project_id=data.get("project_id"),
+                year=data.get("year"),
+                section_id=data.get("section_id"),
+                node_key=data.get("node_key"),
             )
         )
     return built
@@ -191,6 +202,10 @@ async def writeback_confirm(
             opened_at=opened_at,
             module=target.module,
             project_id=body.project_id,
+            # 附注归属字段（R3.3）——target.project_id 为单目标项目归属，缺省回退请求级
+            year=target.year,
+            section_id=target.section_id,
+            node_key=target.node_key,
         )
         written.append(result if isinstance(result, dict) else {"result": "ok"})
     await db.commit()

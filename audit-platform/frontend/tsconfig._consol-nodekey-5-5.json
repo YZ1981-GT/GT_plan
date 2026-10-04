@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", "module": "ESNext", "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true, "strict": true, "skipLibCheck": true,
+    "noEmit": true, "isolatedModules": true, "moduleDetection": "force",
+    "jsx": "preserve", "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vitest/globals", "node"],
+    "paths": { "@/*": ["./src/*"] }, "baseUrl": "."
+  },
+  "include": [
+    "src/services/__tests__/consolNodeKeyPassthrough.spec.ts",
+    "src/services/consolidationApi.ts",
+    "src/env.d.ts"
+  ]
+}

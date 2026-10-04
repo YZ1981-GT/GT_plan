@@ -1217,11 +1217,23 @@ export async function getConsolNoteBreakdown(
   return api.get(P_cn.breakdown(projectId, year, sectionId), { params })
 }
 
-/** 按公式填入：合并数写入章节数据（手工单元格保留并列出；清除待更新标记；合并锁定时 423） */
+/**
+ * 按公式填入：合并数写入章节数据（手工单元格保留并列出；清除待更新标记；合并锁定时 423）。
+ *
+ * spec consol-node-key-isolation-and-shared-context 任务 5.2（需求 5.3）：
+ * ``nodeKey`` 可选，仅新版合并页按当前树节点传入；后端 ``fill-by-formula`` 端点
+ * node_key query 优先于 body（任务 2.1~2.2 已实现），根节点写入专属行，不改 legacy。
+ * 旧调用不传 nodeKey 维持项目级 NULL 兼容路径。
+ */
 export async function fillConsolNoteByFormula(
-  projectId: string, year: number, sectionId: string, standard?: string | null,
+  projectId: string, year: number, sectionId: string,
+  standard?: string | null, nodeKey?: string | null,
 ): Promise<ConsolNoteFillResult> {
   const url = P_cn.fillByFormula(projectId, year, sectionId)
+  const qs = new URLSearchParams()
+  if (standard) qs.set('standard', standard)
+  if (nodeKey) qs.set('node_key', nodeKey)
+  const query = qs.toString()
   // 400（模板口径不匹配）/ 423（合并锁定）须由附注页带具体操作语境展示，抑制全局重复 toast
-  return api.post(standard ? `${url}?standard=${standard}` : url, undefined, { _silent: true } as any)
+  return api.post(query ? `${url}?${query}` : url, undefined, { _silent: true } as any)
 }

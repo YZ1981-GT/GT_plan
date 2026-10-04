@@ -188,6 +188,20 @@ async def seed(plan: GroupPlan) -> dict:
     """幂等写入合成集团到真实数据库。返回统计 + 母项目 id。"""
     import sqlalchemy as sa
 
+    # 确保全部 ORM 模型已注册到 metadata，否则跨模块外键（如 projects.accounting_standard_id
+    # → accounting_standards）在 flush 期无法解析其目标表（NoReferencedTableError）。
+    # 运行中的后端在启动时导入了全部模型；standalone 脚本须显式触发同样的注册。
+    import importlib
+    import pkgutil
+
+    import app.models as _models_pkg
+
+    for _m in pkgutil.walk_packages(_models_pkg.__path__, prefix="app.models."):
+        try:
+            importlib.import_module(_m.name)
+        except Exception:  # noqa: BLE001  个别可选模块缺依赖时跳过，不影响核心表注册
+            pass
+
     from app.core.database import async_session
     from app.models.audit_platform_models import AccountCategory, TrialBalance
     from app.models.base import UserRole
@@ -242,12 +256,19 @@ async def seed(plan: GroupPlan) -> dict:
                 report_scope="consolidated",
                 consolidation_type="subsidiary",
                 consol_level=2,
+                # 物化审计年度：build_group_tree → resolve_project_audit_year 需要它，
+                # 否则（名称无 _YYYY 后缀、无 audit_period_end）年度解析为 None、企业树构建失败，
+                # 附注/报表节点作用域解析对该项目恒 404 —— UAT 开箱不可复现（spec 任务 6.5）。
+                audit_year=plan.year,
                 manager_id=user.id,
             )
             db.add(parent)
             await db.flush()
             stats["created"].append(f"parent_project:{plan.parent_name}")
         else:
+            # 历史行可能缺物化年度：补齐使企业树可解析（幂等，不覆盖已有正确值）。
+            if parent.audit_year is None:
+                parent.audit_year = plan.year
             stats["skipped"].append(f"parent_project:{plan.parent_name}")
 
         # ── 2) 子项目 + trial_balance（幂等）─────────────────────────────────
@@ -264,6 +285,9 @@ async def seed(plan: GroupPlan) -> dict:
                     parent_project_id=parent.id,
                     report_scope="standalone",
                     consol_level=1,
+                    # 子户年度须与 load_year_records 的 Project.audit_year == year 过滤对齐，
+                    # 否则子户不进企业树、节点金额按 0 计（spec 任务 6.5）。
+                    audit_year=plan.year,
                     manager_id=user.id,
                 )
                 db.add(child)
@@ -273,6 +297,9 @@ async def seed(plan: GroupPlan) -> dict:
                 # 确保父子关系正确（修正历史脏数据）
                 if child.parent_project_id != parent.id:
                     child.parent_project_id = parent.id
+                # 历史行可能缺物化年度：补齐使子户进入企业树（幂等，不覆盖已有正确值）。
+                if child.audit_year is None:
+                    child.audit_year = plan.year
                 stats["skipped"].append(f"child_project:{child_spec.name}")
 
             # trial_balance 行（按唯一键去重）

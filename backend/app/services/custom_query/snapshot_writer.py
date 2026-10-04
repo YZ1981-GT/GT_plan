@@ -88,6 +88,10 @@ class SnapshotWriter:
         opened_at: datetime,
         module: str = "workpaper",
         project_id: str | None = None,
+        *,
+        year: int | None = None,
+        section_id: str | None = None,
+        node_key: str | None = None,
     ) -> dict:
         """单事务写 cell 到对应模块。
 
@@ -100,7 +104,12 @@ class SnapshotWriter:
             new_value: 新值
             opened_at: 前端打开时的 updated_at 时间戳
             module: 模块名 ('workpaper', 'report', 'note', 'adj', 'tb')
-            project_id: 项目 ID（ACNR 解析 project context，R15.4）
+            project_id: 项目 ID（ACNR 解析 project context，R15.4；note 模块归属校验的
+                项目维度，R3.3）
+            year: 附注归属年度（note 模块，R3.3）；其余模块忽略。
+            section_id: 附注章节 ID（note 模块，R3.3）；其余模块忽略。
+            node_key: 附注合并节点键（note 模块，R3.3；None 表示 legacy 旧调用）；
+                其余模块忽略。
 
         Returns:
             {
@@ -125,7 +134,9 @@ class SnapshotWriter:
             )
         elif module == "note":
             return await self._write_note_cell(
-                db, user, wp_id, sheet_name, cell_ref, new_value, opened_at
+                db, user, wp_id, sheet_name, cell_ref, new_value, opened_at,
+                project_id=project_id, year=year, section_id=section_id,
+                node_key=node_key,
             )
         elif module == "adj":
             return await self._write_adj_cell(
@@ -431,11 +442,22 @@ class SnapshotWriter:
         cell_ref: str,
         new_value: Any,
         opened_at: datetime,
+        *,
+        project_id: str | None = None,
+        year: int | None = None,
+        section_id: str | None = None,
+        node_key: str | None = None,
     ) -> dict:
-        """写回 consol_note_data.data JSONB（委托 snapshot_writer_modules）。"""
+        """写回 consol_note_data.data JSONB（委托 snapshot_writer_modules）。
+
+        归属字段 ``(project_id, year, section_id, node_key)`` 随 ``record id = wp_id`` +
+        ``cell_ref`` + ``opened_at`` 一并下传（R3.3）。锁定后复验属 Task 3.4。
+        """
         return await _mod.write_note_cell(
             db, user, wp_id, sheet_name, cell_ref, new_value, opened_at,
             check_lock=self._check_optimistic_lock,
+            project_id=project_id, year=year, section_id=section_id,
+            node_key=node_key,
         )
     async def _write_adj_cell(
         self,

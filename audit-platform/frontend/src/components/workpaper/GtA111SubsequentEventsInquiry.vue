@@ -15,7 +15,7 @@
   <div class="gt-a111">
     <!-- Toolbar -->
     <div class="gt-a111__toolbar">
-      <el-segmented v-model="mode" :options="modeOptions" size="small" />
+      <el-segmented v-model="activeMode" :options="modeOptions" size="small" />
       <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a111-subsequent-events-inquiry" />
       <div class="gt-a111__toolbar-right">
         <span class="gt-a111__save-status">
@@ -27,7 +27,7 @@
     </div>
 
     <!-- Structured View -->
-    <div v-if="mode === '结构化视图'" class="gt-a111__layout">
+    <div v-if="activeMode === 'html'" class="gt-a111__layout">
       <!-- Left Navigation -->
       <aside class="gt-a111__nav">
         <div
@@ -195,8 +195,12 @@ const props = withDefaults(defineProps<{ wpId: string; projectId?: string }>(), 
 
 // ─── Mode switch ─────────────────────────────────────────────────────────────
 
-const mode = ref('结构化视图')
-const modeOptions = ref(['结构化视图', '在线编辑'])
+const activeMode = ref<'html' | 'docx'>('html')
+const docxAvailable = ref(true)
+const modeOptions = computed(() => [
+  { label: '结构化视图', value: 'html' },
+  { label: 'Word编辑', value: 'docx', disabled: !docxAvailable.value },
+])
 const purposeCollapse = ref<string[]>([])
 const navItems = NAV_ITEMS
 
@@ -206,10 +210,10 @@ async function checkOOHealth() {
   try {
     const res = await api.get<any>('/api/workpapers/onlyoffice/health', { _silent: true } as any)
     if (!res?.healthy) {
-      modeOptions.value = ['结构化视图']
+      docxAvailable.value = false
     }
   } catch {
-    modeOptions.value = ['结构化视图']
+    docxAvailable.value = false
   }
 }
 
@@ -223,8 +227,8 @@ const {
 } = useA111SubsequentEvents(wpIdRef)
 
 // Flush pending saves before switching to OO
-watch(mode, async (newMode, oldMode) => {
-  if (oldMode === '结构化视图' && newMode === '在线编辑') {
+watch(activeMode, async (newMode, oldMode) => {
+  if (oldMode === 'html' && newMode === 'docx') {
     await flushPendingSaves()
   }
 })

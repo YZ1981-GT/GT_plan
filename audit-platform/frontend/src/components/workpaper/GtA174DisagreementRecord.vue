@@ -12,7 +12,7 @@
     <!-- Mode Switch -->
     <div class="gt-a174__toolbar">
       <el-segmented
-        v-model="mode"
+        v-model="activeMode"
         :options="modeOptions"
         size="small"
       />
@@ -31,7 +31,7 @@
     </div>
 
     <!-- Structured View -->
-    <div v-if="mode === '结构化视图'" class="gt-a174__content">
+    <div v-if="activeMode === 'html'" class="gt-a174__content">
       <!-- Loading -->
       <el-skeleton v-if="loading" :rows="10" animated />
 
@@ -229,8 +229,12 @@ const props = withDefaults(defineProps<{
 }>(), { projectId: '', readonly: false })
 
 // ─── Mode Switch ───
-const mode = ref('结构化视图')
-const modeOptions = ref(['结构化视图', '在线编辑'])
+const activeMode = ref<'html' | 'docx'>('html')
+const docxAvailable = ref(true)
+const modeOptions = computed(() => [
+  { label: '结构化视图', value: 'html' },
+  { label: 'Word编辑', value: 'docx', disabled: !docxAvailable.value },
+])
 
 // ─── Composable ───
 const wpIdRef = ref(props.wpId)
@@ -307,9 +311,9 @@ async function checkOOHealth() {
     const { default: http } = await import('@/utils/http')
     const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
     const healthy = res?.data?.data?.healthy ?? res?.data?.healthy
-    if (!healthy) modeOptions.value = ['结构化视图']
+    if (!healthy) docxAvailable.value = false
   } catch {
-    modeOptions.value = ['结构化视图']
+    docxAvailable.value = false
   }
 }
 function handleOOFallback() {

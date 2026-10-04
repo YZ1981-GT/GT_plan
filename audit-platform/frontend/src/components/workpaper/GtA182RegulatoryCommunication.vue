@@ -11,7 +11,7 @@
 <template>
   <div class="gt-a182">
     <div class="gt-a182__toolbar">
-      <el-segmented v-model="mode" :options="modeOptions" size="small" />
+      <el-segmented v-model="activeMode" :options="modeOptions" size="small" />
       <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a182-regulatory-communication" />
       <div class="gt-a182__toolbar-right">
         <el-tooltip content="AI辅助（即将上线）" placement="top">
@@ -27,7 +27,7 @@
       </div>
     </div>
 
-    <div v-if="mode === '结构化视图'" class="gt-a182__content">
+    <div v-if="activeMode === 'html'" class="gt-a182__content">
       <el-skeleton v-if="loading" :rows="8" animated />
       <template v-else>
         <!-- 区块1: 收件人 -->
@@ -207,8 +207,11 @@ defineOptions({ name: 'GtA182RegulatoryCommunication' })
 
 const props = withDefaults(defineProps<{ wpId: string; readonly?: boolean ; projectId?: string }>(), { readonly: false })
 
-const mode = ref('结构化视图')
-const modeOptions = ['结构化视图', '在线编辑']
+const activeMode = ref<'html' | 'docx'>('html')
+const modeOptions = [
+  { label: '结构化视图', value: 'html' },
+  { label: 'Word编辑', value: 'docx' },
+]
 const introCollapse = ref<string[]>([])
 const guidanceCollapse = ref<string[]>([])
 

@@ -19,6 +19,7 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-unit-tests")
 import pytest
 from hypothesis import given, settings, strategies as st
 
+from app.services.custom_query.addressing_service import ResolvedTarget
 from app.services.custom_query.snapshot_writer import (
     AuditWriteFailed,
     SnapshotWriter,
@@ -639,7 +640,12 @@ class TestProperty26CrossModuleWriteRouting:
             written_sql.append(stmt_str)
             if "SELECT" in stmt_str and "consol_note_data" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = ("nd-001", note_data, now)
+                # Task 3.3：note SELECT ... FOR UPDATE 现一并读出归属列
+                # (id, data, updated_at, project_id, year, section_id, node_key)
+                mock_result.first.return_value = (
+                    "nd-001", note_data, now,
+                    "test-project-id", 2025, "五-1-1", "ENT001:consol",
+                )
                 return mock_result
             return MagicMock()
 

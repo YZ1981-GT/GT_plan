@@ -9,7 +9,7 @@
 <template>
   <div class="gt-a181">
     <div class="gt-a181__toolbar">
-      <el-segmented v-model="mode" :options="modeOptions" size="small" />
+      <el-segmented v-model="activeMode" :options="modeOptions" size="small" />
       <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a181-regulatory-submission" />
       <span class="gt-a181__save-status">
         <template v-if="saveStatus === 'saving'"><el-icon class="is-loading"><Loading /></el-icon> 保存中...</template>
@@ -18,7 +18,7 @@
       </span>
     </div>
 
-    <div v-if="mode === '结构化视图'" class="gt-a181__content">
+    <div v-if="activeMode === 'html'" class="gt-a181__content">
       <el-skeleton v-if="loading" :rows="6" animated />
       <template v-else>
         <!-- 区块1: 收件人 -->
@@ -164,17 +164,17 @@ const syncBridge = useWorkpaperSyncBridge({
   reloadHtml: async () => { await loadData(props.wpId) },
 })
 const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
-const mode = computed<string>({
-  get: () => syncBridge.mode.value === 'oo' ? '在线编辑' : '结构化视图',
+const activeMode = computed<'html' | 'docx'>({
+  get: () => syncBridge.mode.value === 'oo' ? 'docx' : 'html',
   set: (target) => {
-    if (target === '在线编辑') { void syncBridge.switchToOnlyOffice() }
+    if (target === 'docx') { void syncBridge.switchToOnlyOffice() }
     else if (syncBridge.mode.value === 'oo') { void syncBridge.switchToHtml() }
   },
 })
-const modeOptions = computed(() => ['结构化视图', '在线编辑'].map(v => ({
-  label: v, value: v,
-  disabled: v === '在线编辑' && props.readonly,
-})))
+const modeOptions = computed(() => [
+  { label: '结构化视图', value: 'html', disabled: false },
+  { label: 'Word编辑', value: 'docx', disabled: props.readonly },
+])
 
 onMounted(() => { loadData(props.wpId) })
 onBeforeUnmount(() => { flushPendingSaves() })

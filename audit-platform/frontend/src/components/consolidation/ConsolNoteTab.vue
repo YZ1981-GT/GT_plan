@@ -523,7 +523,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -577,7 +577,9 @@ const props = defineProps<{
   projectId: string
   year: number
   standard: string
-  currentEntity: { code: string; name: string }
+  // 单一节点上下文（spec consol-node-key-isolation-and-shared-context 任务 5.1，需求 5.1）：
+  // code/name 仅为企业属性，nodeKey 是节点身份且必需，不能缺省或仅凭 company_code 推断。
+  currentEntity: { code: string; name: string; nodeKey: string }
   groupTree: ConsolTreeNode[]
   consolNoteTree: any[]
 }>()
@@ -640,8 +642,16 @@ const showNoteBreakdownDialog = ref(false)
 const noteBreakdownLoading = ref(false)
 const noteBreakdownError = ref('')
 const noteBreakdown = ref<ConsolNoteBreakdown | null>(null)
-const noteBreakdownNodeKey = ref<string | null>(null)
+// spec consol-node-key-isolation-and-shared-context 任务 5.2（需求 5.3）：
+// 独立的差额穿透节点选择以当前树节点初始化，而非 null（根）。用户在穿透弹窗显式另选
+// 只影响该穿透视图（loadNoteBreakdown 发出所选 nodeKey），不反向改写页面当前 nodeKey。
+const noteBreakdownNodeKey = ref<string | null>(props.currentEntity.nodeKey || null)
 const noteBreakdownTarget = reactive({ row: -1, col: -1 })
+
+// 切换当前合并树节点时，穿透选择同步到新节点（用户未在弹窗中另选的情况下）。
+watch(() => props.currentEntity.nodeKey, (nk) => {
+  noteBreakdownNodeKey.value = nk || null
+})
 
 /** 企业树中的汇总节点（树序）；与报表差额表 / 合并试算平衡表的节点选择同一判定 */
 const noteAggregateNodes = computed(() => {
@@ -1083,6 +1093,7 @@ async function executeAggregate() {
         row_idx: c.row,
         col_idx: c.col,
         company_code: entityCode,
+        node_key: props.currentEntity.nodeKey,
         mode: 'direct',
         standard: props.standard,
       }, { validateStatus: (s: number) => s < 600 })
@@ -1104,6 +1115,7 @@ async function executeAggregate() {
         row_idx: c.row,
         col_idx: c.col,
         company_codes: companyCodes,
+        node_key: props.currentEntity.nodeKey,
         mode: 'custom',
         source: aggTarget.source,
         report_types: aggTarget.reportTypes,
@@ -1165,7 +1177,7 @@ async function fillCurrentByFormula(): Promise<boolean> {
   if (noteDirty.value && !(await saveNoteData())) return false
   formulaFilling.value = true
   try {
-    const result = await fillConsolNoteByFormula(props.projectId, props.year, sec.section_id, props.standard)
+    const result = await fillConsolNoteByFormula(props.projectId, props.year, sec.section_id, props.standard, props.currentEntity.nodeKey)
     sec.headers = result.data?.headers || sec.headers
     sec.savedData = { ...(result.data || {}) }
     sec.editRows = toEditRows(sec.headers, result.data?.rows || [], result.data?.manual_cells)
@@ -1235,7 +1247,7 @@ async function saveNoteData(): Promise<boolean> {
     const result: any = await api.put(
       P_cn.data(props.projectId, props.year, sec.section_id),
       { data },
-      { validateStatus: (s: number) => s < 600 },
+      { params: { node_key: props.currentEntity.nodeKey }, validateStatus: (s: number) => s < 600 },
     )
     if (result?.ok === false) throw Object.assign(new Error(result.error || '保存失败'), { status: 500 })
     sec.savedData = data
@@ -1476,7 +1488,7 @@ async function onNoteBatchImport(e: Event) {
       await api.put(
         P_cn.data(props.projectId, props.year, sectionId),
         { data: { headers, ...serialised } },
-        { validateStatus: (s: number) => s < 600 },
+        { params: { node_key: props.currentEntity.nodeKey }, validateStatus: (s: number) => s < 600 },
       )
       matched++
     }
@@ -1578,7 +1590,7 @@ async function fillAllByFormula() {
     let currentResult: ConsolNoteFillResult | null = null
     for (const sectionId of sectionIds) {
       try {
-        const result = await fillConsolNoteByFormula(props.projectId, props.year, sectionId, templateType)
+        const result = await fillConsolNoteByFormula(props.projectId, props.year, sectionId, templateType, props.currentEntity.nodeKey)
         filled += result.filled?.length || 0
         kept += result.kept_manual?.length || 0
         blank += result.blank?.length || 0
@@ -1621,7 +1633,7 @@ async function onNoteAuditAll(_e?: Event) {
     const data = await api.post(P_cn.auditAll(props.projectId, props.year), {
       standard: props.standard,
       company_code: entityCode,
-    }, { validateStatus: (s: number) => s < 600 })
+    }, { params: { node_key: props.currentEntity.nodeKey }, validateStatus: (s: number) => s < 600 })
     const result = data
     noteAuditResults.value = Array.isArray(result?.results) ? result.results : []
     noteAuditSummary.totalSections = result?.total_sections || 0
@@ -1673,7 +1685,7 @@ async function auditCurrentNote() {
       company_code: entityCode,
       headers: sec.headers,
       rows: currentRows,
-    }, { validateStatus: (s: number) => s < 600 })
+    }, { params: { node_key: props.currentEntity.nodeKey }, validateStatus: (s: number) => s < 600 })
     const result = data
     noteAuditResults.value = Array.isArray(result?.results) ? result.results : []
     noteAuditSummary.totalSections = 1
@@ -1693,7 +1705,8 @@ function onNoteNodeClick(data: { section_id: string; title?: string }) {
   noteSelectedRows.value = []
   selectedCells.value = []
   noteBreakdown.value = null
-  noteBreakdownNodeKey.value = null
+  // 换章节时重置穿透选择到当前树节点（任务 5.2 需求 5.3：以当前节点为初始值，不回落根 null）
+  noteBreakdownNodeKey.value = props.currentEntity.nodeKey || null
   noteBreakdownTarget.row = -1
   noteBreakdownTarget.col = -1
   api.get(P_cn.detail(props.standard, data.section_id), {
@@ -1709,7 +1722,7 @@ function onNoteNodeClick(data: { section_id: string; title?: string }) {
       try {
         const saved: any = await api.get(
           P_cn.data(props.projectId, props.year, data.section_id),
-          { validateStatus: (s: number) => s < 600 },
+          { params: { node_key: props.currentEntity.nodeKey }, validateStatus: (s: number) => s < 600 },
         )
         if (saved?.content && typeof saved.content === 'object') savedContent = { ...saved.content }
         if (Array.isArray((savedContent as any).rows) && (savedContent as any).rows.length) {

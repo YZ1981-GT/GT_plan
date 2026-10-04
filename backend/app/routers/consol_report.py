@@ -18,7 +18,6 @@ from io import BytesIO
 from urllib.parse import quote
 from uuid import UUID
 
-import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,7 +32,7 @@ from app.models.consolidation_schemas import (
     ConsolReportGenerateRequest,
     ConsolReportRow,
 )
-from app.models.report_models import FinancialReport, FinancialReportType
+from app.models.report_models import FinancialReportType
 from app.services.consol_report_service import (
     generate_consol_reports_sync,
     generate_consol_workpaper_sync,
@@ -154,78 +153,112 @@ async def get_consol_report(
     project_id: UUID,
     year: int,
     report_type: FinancialReportType = Query(..., description="报表类型"),
+    node_key: str | None = Query(None, description="合并树节点；省略时默认当前树的根合并节点"),
     db: AsyncSession = Depends(get_db),
     user=Depends(require_project_access("readonly")),
 ):
-    """获取合并报表数据"""
-    result = await db.execute(
-        sa.select(FinancialReport).where(
-            FinancialReport.project_id == project_id,
-            FinancialReport.year == year,
-            FinancialReport.report_type == report_type,
-            FinancialReport.is_deleted.is_(False),
-        ).order_by(FinancialReport.row_code)
-    )
-    rows = list(result.scalars().all())
+    """获取合并报表数据（按所选树节点 node_key **读时计算**，复用合并计算内核）。
 
-    if not rows:
+    node_key（spec consol-node-key-isolation-and-shared-context 任务 4.1/4.2，设计 §六，需求 4.1~4.4）：
+    - 省略 ⇒ 默认选当前合并项目企业树的**根合并节点**，保持旧页面默认行为；
+    - 显式值 ⇒ 经**当前项目/年度企业树**精确校验（`find_node_by_key`），不在树中则 400，
+      非合并项目 / 无有效年度 / 跨年 则由 `resolve_report_node_scope` 以明确 400 / 404 拒绝；
+      禁按 company_code、冒号前缀或 `:consol` 后缀兜底判根（ADR-CNSC-001）。
+
+    金额来源（任务 4.2 / 4.3，设计 §六.2~§六.5）：以校验后的 `scope.node_key` 经
+    `load_view_context` → `node_measures(basis)[node_key]` → `consol_report_values.node_report`
+    求所选 `report_type` 行的**合并数**（`MEASURE_CONSOLIDATED`），与合并试算 / 差额 / 附注共用同一
+    求值口径（`consol_report_view_service.trial_view` / `note_cell_values` 同款）。**不再**读取项目级
+    物化 `FinancialReport` 冒充非根节点金额；无法求值的行给 `current_period_amount=null` + `blank_reason`。
+
+    本期 / 上期共享口径（任务 4.3，设计 §六.4）：
+    - **本期**金额按请求 `scope.node_key` 读时计算（上方 `consolidated`）；
+    - **上期**金额只用**上一有效审计年度同一 node_key** 的树与同一共享求值上下文计算
+      （`load_prior_year_node_report`）：上年无同企业合并项目 / 上年合并树无此节点 ⇒ 整体
+      `prior_period_amount=null` 并带原因；行级公式不支持 ⇒ 该行上期 `null` + 原因。**绝不**复用根项目级
+      `FinancialReport.prior_period_amount` 冒充非根节点上期。
+
+    股东权益表（设计 §六.5）：与其余报表同走节点 `node_report` 合并数求值，**不**调用项目级
+    `ReportEngine.enrich_equity_statement_rows`，即节点金额不被项目级 enrichment 覆盖。
+
+    `ConsolReportRow[]` 既有字段语义保留（设计 §六.3）：row_code / row_name / row_index / indent_level /
+    is_total(_row) / current_period_amount / prior_period_amount / formula_used / source_accounts /
+    blank_reason / is_stale —— 该填的填、该 null 的 null 并给原因，不伪造 0、不冒充。
+    """
+    from app.services.consol_calc_basis import MEASURE_CONSOLIDATED, node_measures
+    from app.services.consol_note_scope import NoteScopeError, resolve_report_node_scope
+    from app.services.consol_report_values import REPORT_TYPE_ORDER, node_report
+    from app.services.consol_report_view_service import load_prior_year_node_report, load_view_context
+
+    try:
+        scope = await resolve_report_node_scope(db, project_id, year, node_key=node_key)
+    except NoteScopeError as e:
+        raise HTTPException(status_code=getattr(e, "status", 400), detail=str(e)) from e
+
+    # 读时计算：装载合并视图上下文（企业树 + 计算口径 + 报表配置），只装载一次。
+    # scope.year 为经企业树解析的有效年度（_load_tree 保证非 None）。
+    ctx = await load_view_context(db, project_id, scope.year)
+    if ctx is None:
+        # resolve_report_node_scope 已拦非合并项目 / 无年度；此处 None 仅为防御（口径漂移时明确报错而非静默）。
+        raise HTTPException(status_code=404, detail="只有合并报表项目有合并报表（项目不存在、不是合并项目或没有审计年度）")
+
+    report_type_value = report_type.value
+    if report_type_value not in REPORT_TYPE_ORDER:
+        raise HTTPException(status_code=400, detail=f"不支持的报表类型：{report_type_value}")
+
+    measures_by_node = node_measures(ctx.basis)
+    node_measure_values = measures_by_node.get(scope.node_key)
+    if node_measure_values is None:
+        # 校验已保证 node_key 在树中；node_measures 遍历同一棵树必含该键，缺失即口径漂移。
+        raise HTTPException(status_code=500, detail=f"节点 {scope.node_key} 不在合并计算口径内")
+
+    # 全部报表类型一起求值（跨表 ROW 需要），只返回所请求类型；合并数度量不要求线性。
+    by_measure = await node_report(ctx.rows, node_measure_values, categories=ctx.basis.categories)
+    consolidated = by_measure[MEASURE_CONSOLIDATED]
+
+    # 报表配置（report config）无该类型的任何行 ⇒ 该项目口径下不出此表（设计 §六.6：无报表配置按明确错误）。
+    type_rows = [r for r in ctx.rows if r.report_type == report_type_value]
+    if not type_rows:
         raise HTTPException(
             status_code=404,
-            detail=f"合并{report_type.value}不存在，请先生成合并报表",
+            detail=f"合并{report_type.value}没有报表配置，无法生成",
         )
 
-    if report_type == FinancialReportType.equity_statement:
-        from app.services.report_engine import ReportEngine
+    # 上期（任务 4.3，设计 §六.4）：按**同一 node_key、上一有效审计年度**的树与共享求值上下文计算。
+    # 整体不可用（上年无同企业合并项目 / 上年合并树无此节点）⇒ prior 为 None 的空表 + unavailable 原因；
+    # 行级公式不支持 ⇒ 该行上期 null + 该行原因。绝不读项目级 FinancialReport.prior 冒充非根节点上期。
+    prior = await load_prior_year_node_report(
+        db, project_id=project_id, node_key=scope.node_key, year=scope.year, report_type=report_type_value,
+    )
 
-        engine = ReportEngine(db)
-        row_dicts = [
-            {
-                "row_code": r.row_code,
-                "row_name": r.row_name,
-                "current_period_amount": r.current_period_amount,
-                "prior_period_amount": r.prior_period_amount,
-                "indent_level": r.indent_level,
-                "is_total_row": r.is_total_row,
-                "formula_used": r.formula_used,
-                "source_accounts": r.source_accounts,
-            }
-            for r in rows
-        ]
-        enriched = await engine.enrich_equity_statement_rows(project_id, year, row_dicts)
-        meta = {r.row_code: r for r in rows}
-        return [
+    # 权益表（equity_statement）与其余报表同走上方节点 node_report 合并数求值，不再调用项目级
+    # ReportEngine.enrich_equity_statement_rows ⇒ 节点金额不被项目级 enrichment 覆盖（设计 §六.5）。
+    out: list[ConsolReportRow] = []
+    for row in type_rows:
+        value = consolidated.get(row.row_code)
+        amount = None if value is None else (None if value.amount is None else str(value.amount))
+        reason = None if value is None else value.reason
+        prior_value = prior.amounts.get(row.row_code)
+        prior_amount = None if prior_value is None else (
+            None if prior_value.amount is None else str(prior_value.amount)
+        )
+        out.append(
             ConsolReportRow(
-                row_code=d.get("row_code") or "",
-                row_name=d.get("row_name") or "",
-                indent_level=d.get("indent_level") or 0,
-                is_total_row=bool(d.get("is_total_row")),
-                is_total=bool(d.get("is_total_row")),
-                current_period_amount=d.get("current_period_amount"),
-                prior_period_amount=d.get("prior_period_amount"),
-                formula_used=d.get("formula_used"),
-                source_accounts=d.get("source_accounts"),
-                blank_reason=getattr(meta.get(d.get("row_code")), "blank_reason", None),
-                is_stale=bool(getattr(meta.get(d.get("row_code")), "is_stale", False)),
+                row_code=row.row_code or "",
+                row_name=row.row_name or "",
+                row_index=row.row_number or 0,
+                indent_level=row.indent_level or 0,
+                is_total_row=bool(row.is_total_row),
+                is_total=bool(row.is_total_row),
+                current_period_amount=amount,
+                prior_period_amount=prior_amount,
+                formula_used=row.formula,
+                source_accounts=None,
+                blank_reason=reason,
+                is_stale=False,
             )
-            for d in enriched
-        ]
-
-    return [
-        ConsolReportRow(
-            row_code=r.row_code or "",
-            row_name=r.row_name or "",
-            indent_level=r.indent_level or 0,
-            is_total_row=bool(r.is_total_row),
-            is_total=bool(r.is_total_row),
-            current_period_amount=r.current_period_amount,
-            prior_period_amount=r.prior_period_amount,
-            formula_used=r.formula_used,
-            source_accounts=r.source_accounts,
-            blank_reason=r.blank_reason,
-            is_stale=bool(r.is_stale),
         )
-        for r in rows
-    ]
+    return out
 
 
 @router.get("/{project_id}/{year}/balance-check", response_model=BalanceCheckResult)

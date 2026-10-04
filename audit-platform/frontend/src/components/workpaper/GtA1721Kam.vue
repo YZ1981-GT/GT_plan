@@ -10,7 +10,7 @@
   <div class="gt-a1721">
     <!-- Toolbar -->
     <div class="gt-a1721__toolbar">
-      <el-segmented v-model="mode" :options="modeOptions" size="small" />
+      <el-segmented v-model="activeMode" :options="modeOptions" size="small" />
       <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a1721-kam" />
       <span class="gt-a1721__save-status">
         <template v-if="saveStatus === 'saving'">
@@ -22,7 +22,7 @@
     </div>
 
     <!-- Structured View -->
-    <div v-if="mode === '结构化视图'" class="gt-a1721__content">
+    <div v-if="activeMode === 'html'" class="gt-a1721__content">
 
       <!-- Section 四: 适用性 (at TOP) -->
       <el-card shadow="never" class="gt-a1721__section gt-a1721__applicability">
@@ -359,8 +359,12 @@ const props = withDefaults(defineProps<{
 }>(), { projectId: '', htmlData: null })
 
 // ─── Mode Switch ───
-const mode = ref('结构化视图')
-const modeOptions = ref(['结构化视图', '在线编辑'])
+const activeMode = ref<'html' | 'docx'>('html')
+const docxAvailable = ref(true)
+const modeOptions = computed(() => [
+  { label: '结构化视图', value: 'html' },
+  { label: 'Word编辑', value: 'docx', disabled: !docxAvailable.value },
+])
 
 // ─── Composable ───
 const {
@@ -398,16 +402,16 @@ async function checkOOHealth() {
     // ResponseWrapperMiddleware信封：{code,message,data:{healthy:true}} 或直接 {healthy:true}
     const healthy = res?.data?.healthy ?? res?.healthy
     if (!healthy) {
-      modeOptions.value = ['结构化视图']
+      docxAvailable.value = false
     }
   } catch {
-    modeOptions.value = ['结构化视图']
+    docxAvailable.value = false
   }
 }
 
 // Flush before switching to OO
-watch(mode, async (newMode, oldMode) => {
-  if (oldMode === '结构化视图' && newMode === '在线编辑') {
+watch(activeMode, async (newMode, oldMode) => {
+  if (oldMode === 'html' && newMode === 'docx') {
     await flushPendingSaves()
   }
 })

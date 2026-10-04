@@ -133,7 +133,9 @@ async def _dispatch(
     )
 
     if is_module_cell_source(source):
-        return await module_cell_resolver.resolve(db, source, pid, year)
+        # filters 完整传入：resolver 据此把 node_key 透传给附注取数器（R3.1）。
+        # node_key 仅对 note 模块有语义；report/adj/tb 忽略之。
+        return await module_cell_resolver.resolve(db, source, pid, year, filters)
 
     # ── disclosure_note:{section_id}（附注树叶子）──
     if source.startswith("disclosure_note:"):

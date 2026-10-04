@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import re
 from collections.abc import Iterable, Sequence
@@ -21,7 +22,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -53,6 +54,9 @@ from app.services.consol_report_values import (
     term_matches,
 )
 from app.services.consol_tree_service import iter_nodes
+
+if TYPE_CHECKING:  # 仅类型标注；运行时按需延迟 import，避免与 consol_note_scope 的环依赖
+    from app.services.consol_note_scope import NoteRequestContext
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 NOTE_ROW_TYPE = "consol_note"   # 不在 REPORT_TYPE_ORDER 里 ⇒ ordered_rows 排在全部报表行之后
@@ -130,10 +134,36 @@ def label_key(value: Any) -> str:
     return row_name_key(value)
 
 
+# 对象行（dict）在附注表坐标系下的键映射：表第 0 列是项目名（``name`` / ``code``），
+# 第 1 列（期末）= ``year_end``、第 2 列（期初）= ``year_begin``（与 custom_query 取数器的
+# note 虚拟 sheet 一致：C=year_end, D=year_begin）。公式 col_index 必 ≥ 1（第 0 列是项目名，
+# ``_check_cell`` 不允许写），因此此处只需映射数据列。
+NOTE_TABLE_OBJECT_KEYS: dict[int, str] = {1: "year_end", 2: "year_begin"}
+
+
 def _first_cell(row: Any) -> str:
+    """行首格（项目名，用于按名定位）：二维数组取第 0 列；对象行取 ``name``（模板行首列是项目名，
+    对象行的 ``name`` 存同一项目名；``name`` 缺失时退回 ``code``）。"""
     if isinstance(row, (list, tuple)) and row:
         return str(row[0] or "")
+    if isinstance(row, dict):
+        return str(row.get("name") or row.get("code") or "")
     return ""
+
+
+def _object_col_key(col_index: int) -> str | None:
+    """附注表列号 → 对象行键名；未知数据列返回 None（视为该形态不支持的列，留空给原因）。"""
+    return NOTE_TABLE_OBJECT_KEYS.get(col_index)
+
+
+def _cell_value(row: Any, col_index: int) -> Any:
+    """按行形态读单元格当前值（手工保留 / blank 报告用），不改变行。"""
+    if isinstance(row, dict):
+        key = _object_col_key(col_index)
+        return None if key is None else row.get(key)
+    if isinstance(row, (list, tuple)):
+        return row[col_index] if 0 <= col_index < len(row) else None
+    return None
 
 
 # ─────────────────────────────── 种子规划（纯函数） ───────────────────────────────
@@ -670,7 +700,13 @@ async def _note_data_record(
     node_key: str | None,
     allow_root_legacy_fallback: bool = True,
 ) -> ConsolNoteData | None:
-    """按节点读取附注行；只有根合并节点允许回退 V041 的 NULL 兼容行。"""
+    """按节点读取附注行；只有**经企业树验证的根合并节点**允许回退 V041 的 NULL 兼容行。
+
+    ADR-CNSC-001：根身份不能靠 ``node_key.endswith(':consol')`` 字符串后缀判定 —— 同企业的子合并
+    节点（如 ``A:consol``）role 也是 consol 但**不是**树根，不得回退 legacy。调用方若已持有经树验证
+    的作用域（``consol_note_scope.NodeScope``），应传 ``allow_root_legacy_fallback=scope.is_root_consol``
+    短路本函数内的建树；未传时（旧直接调用）本函数自行建树按树根判定，不再用后缀兜底。
+    """
     target = (
         ConsolNoteData.node_key.is_(None)
         if node_key is None
@@ -685,9 +721,8 @@ async def _note_data_record(
     if record is not None or not node_key or not allow_root_legacy_fallback:
         return record
 
-    from app.services.consol_group_tree import ROLE_CONSOL
-
-    if not node_key.endswith(f":{ROLE_CONSOL}"):
+    # 回退前经企业树确认 node_key 确为树根合并节点（而非仅 role=consol 的子节点）。
+    if not await _is_tree_root_consol(db, project_id, node_key):
         return None
     return (await db.execute(sa.select(ConsolNoteData).where(
         ConsolNoteData.project_id == project_id,
@@ -695,6 +730,16 @@ async def _note_data_record(
         ConsolNoteData.section_id == section_id,
         ConsolNoteData.node_key.is_(None),
     ))).scalar_one_or_none()
+
+
+async def _is_tree_root_consol(db: AsyncSession, project_id: UUID, node_key: str) -> bool:
+    """经当前企业树判定 node_key 是否为树根合并节点（ADR-CNSC-001）。建树失败按非根处理。"""
+    from app.services.consol_group_tree import ROLE_CONSOL, build_group_tree
+
+    result = await build_group_tree(db, project_id)
+    if result is None or result.root is None:
+        return False
+    return result.root.node_key == node_key and result.root.role == ROLE_CONSOL
 
 
 async def _note_data_record_exact(
@@ -724,13 +769,18 @@ async def _copy_note_data_record(
     section_id: str,
     node_key: str,
 ) -> ConsolNoteData:
-    """把根节点 legacy 数据复制为节点专属行，避免填入覆盖项目级兼容行。"""
+    """把根节点 legacy 数据复制为节点专属行，避免填入覆盖项目级兼容行。
+
+    必须深拷贝：``data`` 内 ``headers`` / ``rows`` 是嵌套列表，浅拷贝（``dict(...)``）会让
+    节点专属行与 legacy 行共享同一批嵌套列表 ⇒ 后续按公式填入 / 保存改动节点行时会连带篡改
+    legacy 行（违反 design §三.7 / P3「NULL 行字节/字段不变」）。
+    """
     record = ConsolNoteData(
         project_id=project_id,
         year=year,
         section_id=section_id,
         node_key=node_key,
-        data=dict(source.data or {}) if isinstance(source.data, dict) else {},
+        data=copy.deepcopy(source.data) if isinstance(source.data, dict) else {},
         is_stale=bool(source.is_stale),
         updated_at=datetime.now(timezone.utc),
     )
@@ -742,8 +792,13 @@ async def _copy_note_data_record(
 async def note_breakdown(
     db: AsyncSession, project_id: UUID, year: int | None, section_id: str, *,
     node_key: str | None = None, standard: str | None = None,
+    request_ctx: "NoteRequestContext | None" = None,
 ) -> dict:
-    """某章节有公式的单元格：个别数汇总 / 调整 / 抵销 / 合并数，及所选汇总节点各直接子节点的贡献（需求 6.3）。"""
+    """某章节有公式的单元格：个别数汇总 / 调整 / 抵销 / 合并数，及所选汇总节点各直接子节点的贡献（需求 6.3）。
+
+    ``request_ctx``：调用方已装载的共享请求上下文（``consol_note_scope.NoteRequestContext``）。传入时复用其
+    已解析的企业树、计算口径与 ``node_measures`` 缓存，不再重建树 / 重取数（设计 §四「一次请求只装载一次」）。
+    """
     from app.services.consol_report_view_service import ViewError, find_node
 
     tt = await _project_template(db, project_id, standard)
@@ -751,12 +806,16 @@ async def note_breakdown(
     if table is None:
         raise NoteFormulaError(f"合并附注模板（{tt}）中没有表格 {section_id}", status=404)
     await ensure_seeded(db, tt)
-    ctx = await _context(db, project_id, year)
+    if request_ctx is not None:
+        ctx = request_ctx.view
+        measures = request_ctx.node_measures()
+    else:
+        ctx = await _context(db, project_id, year)
+        measures = node_measures(ctx.basis)
     try:
         node = find_node(ctx.basis.tree, node_key)
     except ViewError as exc:
         raise NoteFormulaError(str(exc), status=exc.status) from exc
-    measures = node_measures(ctx.basis)
     children = [
         (c.node_key, measures[c.node_key][MEASURE_CONSOLIDATED]) for c in node.children
     ] if node.kind == KIND_AGGREGATE else []
@@ -806,8 +865,9 @@ def _manual_cells(data: dict) -> set[tuple[int, int]]:
     return out
 
 
-def _target_row(out: list[list[str]], template_rows: Sequence[Any], r: int) -> tuple[int | None, str | None]:
-    """公式按模板行号登记；已保存数据可能插删过行 ⇒ 按项目名找行：同号同名优先，否则全表唯一同名行。"""
+def _target_row(out: Sequence[Any], template_rows: Sequence[Any], r: int) -> tuple[int | None, str | None]:
+    """公式按模板行号登记；已保存数据可能插删过行 ⇒ 按项目名找行：同号同名优先，否则全表唯一同名行。
+    ``out`` 为保留原形态（二维数组或对象）的行序列；行首名由 ``_first_cell`` 按形态读取。"""
     want = label_key(_first_cell(template_rows[r])) if r < len(template_rows) else None
     if want is None:
         return (r, None) if r < len(out) else (None, f"模板没有第 {r + 1} 行")
@@ -824,13 +884,24 @@ def _target_row(out: list[list[str]], template_rows: Sequence[Any], r: int) -> t
 def fill_rows(
     headers: Sequence[Any], rows: Sequence[Any], cells: Sequence[dict], manual: set[tuple[int, int]],
     template_rows: Sequence[Any],
-) -> tuple[list[list[str]], dict]:
+) -> tuple[list[Any], dict]:
     """把合并数写进行数据（纯函数，P10）：手工单元格不动；留空的公式不写（保留原值）并列出原因；
-    行按项目名定位（``_target_row``），找不到不写。手工标记按已保存数据的实际行号。"""
+    行按项目名定位（``_target_row``），找不到不写。手工标记按已保存数据的实际行号。
+
+    保持行原形态（design §四 / 需求 2.4）：二维数组行保持列表并按位置列号写入，不把其它行
+    补齐成等宽（只在写入目标行时按需补到该列）；对象行（dict）按 ``NOTE_TABLE_OBJECT_KEYS`` 把列号
+    映射成键名原位更新，保留其余键、键序与行形状，不改写成数组。
+    """
     width = len(headers)
-    out = [[str(v) if v is not None else "" for v in (list(r) if isinstance(r, (list, tuple)) else [])] for r in rows]
-    for row in out:
-        row.extend([""] * (width - len(row)))
+    # 深拷贝保形：二维数组 → list（元素字符串化，与既有存储一致）；对象行 → dict（原键原序保留）。
+    out: list[Any] = []
+    for r in rows:
+        if isinstance(r, dict):
+            out.append(dict(r))
+        elif isinstance(r, (list, tuple)):
+            out.append([str(v) if v is not None else "" for v in r])
+        else:
+            out.append(r)
     filled, kept, blank = [], [], []
     for cell in cells:
         r, c = cell["row_index"], cell["col_index"]
@@ -840,16 +911,31 @@ def fill_rows(
             blank.append({**where, "reason": why})
             continue
         if (target, c) in manual:
-            kept.append({**where, "current": out[target][c], "formula_value": cell.get(MEASURE_CONSOLIDATED)})
+            current = _cell_value(out[target], c)
+            kept.append({**where, "current": current, "formula_value": cell.get(MEASURE_CONSOLIDATED)})
             continue
         value = cell.get(MEASURE_CONSOLIDATED)
         if value is None:
             blank.append({**where, "reason": cell.get("note") or "取不到数"})
             continue
-        if c >= width:
-            blank.append({**where, "reason": f"已保存数据只有 {width} 列"})
+        row_obj = out[target]
+        if isinstance(row_obj, dict):
+            key = _object_col_key(c)
+            if key is None:
+                known = "、".join(f"第 {i} 列={k}" for i, k in sorted(NOTE_TABLE_OBJECT_KEYS.items()))
+                blank.append({**where, "reason": f"对象行没有第 {c} 列（已知数据列：{known}）"})
+                continue
+            row_obj[key] = value
+        elif isinstance(row_obj, list):
+            if c >= width:
+                blank.append({**where, "reason": f"已保存数据只有 {width} 列"})
+                continue
+            if c >= len(row_obj):  # 该行比表头窄：只补到目标列，不强制全行等宽
+                row_obj.extend([""] * (c + 1 - len(row_obj)))
+            row_obj[c] = value
+        else:
+            blank.append({**where, "reason": "行形态不支持填入（既非二维数组也非对象）"})
             continue
-        out[target][c] = value
         filled.append({**where, "value": value})
     return out, {"filled": filled, "kept_manual": kept, "blank": blank}
 
@@ -857,10 +943,16 @@ def fill_rows(
 async def fill_by_formula(
     db: AsyncSession, project_id: UUID, year: int, section_id: str, *,
     node_key: str | None = None, standard: str | None = None,
+    request_ctx: "NoteRequestContext | None" = None,
 ) -> dict:
-    """「按公式填入」：按节点把合并数写入 ``consol_note_data``；旧调用不带节点键时使用项目级兼容行。"""
+    """「按公式填入」：按节点把合并数写入 ``consol_note_data``；旧调用不带节点键时使用项目级兼容行。
+
+    ``request_ctx``：共享请求上下文；传入时与内部的 ``note_breakdown`` 复用同一份视图上下文与
+    ``node_measures`` 缓存，一次「按公式填入」请求只建一次树（设计 §四）。
+    """
     breakdown = await note_breakdown(
         db, project_id, year, section_id, node_key=node_key, standard=standard,
+        request_ctx=request_ctx,
     )
     tt = breakdown["template_type"]
     table = find_table(tt, section_id) or {}

@@ -222,9 +222,17 @@
     </div>
 
     <div v-else-if="activeMode === 'docx'" class="gt-a38__docx">
+      <!--
+        BP-6 step ② (spec a-class-runtime-sheetname-and-carrier-exceptions, Task 8)：
+        sheet-name 从中文连写字面 `A3-8商誉减值测试` 收敛为纯码 `A3-8`。
+        前置（step ①，不可颠倒）：合册 `A/A3-7内部往来核对表、A3-8商誉减值测试.xlsx`
+        在磁盘且 `find_template_file_any('A3-8')` 已能解析（Task 7 + pure-static-lane spec）。
+        whole-workbook 模式下 sheet-name 对册解析与 room doc_key(__whole__) 均不参与定位，
+        改为纯码是安全且消除 19 条 literal 里唯一异形的收敛。
+      -->
       <GtOnlyOfficeSheet
         :wp-id="wpId"
-        sheet-name="A3-8商誉减值测试"
+        sheet-name="A3-8"
         :project-id="projectId"
         :whole-workbook="true"
         :readonly="readonly"

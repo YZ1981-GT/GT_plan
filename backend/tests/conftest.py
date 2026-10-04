@@ -293,3 +293,23 @@ def _drop_singleton_method_shadows():
             continue
         for method in methods:
             singleton.__dict__.pop(method, None)
+
+
+@pytest.fixture(autouse=True)
+def _reset_consol_note_seed_cache():
+    """清理合并附注种子化的进程级签名缓存（``consol_note_formula_service._SEEDED``）。
+
+    ``ensure_seeded`` 用模块级 ``_SEEDED`` 记「本进程已按此签名种子化过」以跳过重复种子化。
+    但测试每个用例都 drop_all / create_all 重建内存库，``_SEEDED`` 却跨用例存活 ⇒ 先跑过并
+    种子化 "soe" 的用例会污染后续用例：若后续用例在读取公式前先插了一条人工公式（``has_rows=True``），
+    ``ensure_seeded`` 会因 ``has_rows and _SEEDED.get(tt)==signature`` 命中而**跳过种子**，导致种子公式缺失。
+    这是测试隔离缺陷（生产不会在种子化后 drop 表），用例间清空缓存即可根治，不改生产逻辑。
+    """
+    try:
+        from app.services import consol_note_formula_service as _svc
+    except Exception:  # pragma: no cover - 该服务不可导入时无需清理
+        yield
+        return
+    _svc._SEEDED.clear()
+    yield
+    _svc._SEEDED.clear()

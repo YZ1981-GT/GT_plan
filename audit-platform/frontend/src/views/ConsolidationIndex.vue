@@ -602,6 +602,12 @@ import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { useConsolReportAddress } from '@/components/consolidation/composables/useConsolReportAddress'
 import ReportEquityTable from '@/components/report/ReportEquityTable.vue'
 import { useReportColumns } from '@/views/composables/useReportColumns'
+import {
+  reportCacheKey as buildReportCacheKey,
+  noteCacheKey as buildNoteCacheKey,
+  clearNodeCache,
+} from '@/views/consolCacheKeys'
+import { ConsolRequestGuard, type RequestContext } from '@/views/consolRequestGuard'
 import { handleApiError } from '@/utils/errorHandler'
 import { downloadFile } from '@/utils/http'
 import { useNavigationStack } from '@/composables/useNavigationStack'
@@ -1459,37 +1465,32 @@ const {
 const reportCache = new Map<string, any[]>()
 const noteCache = new Map<string, any[]>()
 
-function cacheScopeKey(nodeKey = currentEntityNodeKey()): string {
-  return `${projectId.value}:${effectiveEntityYear()}:${nodeKey}`
-}
-
+// 四维缓存键与精确清理委托给纯函数模块 consolCacheKeys.ts（可单测，守护尾冒号身份边界）。
 function reportCacheKey(): string {
-  return `${cacheScopeKey()}:${consolReportType.value}:${consolReportTemplateType.value}`
+  return buildReportCacheKey(
+    projectId.value, effectiveEntityYear(), currentEntityNodeKey(),
+    consolReportType.value, consolReportTemplateType.value,
+  )
 }
 function noteCacheKey(): string {
-  return `${cacheScopeKey()}:notes:${consolNoteTemplateType.value}`
+  return buildNoteCacheKey(
+    projectId.value, effectiveEntityYear(), currentEntityNodeKey(),
+    consolNoteTemplateType.value,
+  )
 }
 /** 清除指定树节点的缓存（刷新时调用；不能按企业代码清理同企业的其他角色节点） */
 function clearEntityCache(nodeKey: string, types?: string[]) {
-  const prefix = `${cacheScopeKey(nodeKey)}:`
-  if (!types || types.includes('all_reports')) {
-    for (const key of reportCache.keys()) {
-      if (key.startsWith(prefix)) reportCache.delete(key)
-    }
-  } else {
-    for (const t of types) {
-      if (['balance_sheet', 'income_statement', 'cash_flow_statement', 'equity_statement', 'cash_flow_supplement', 'impairment_provision'].includes(t)) {
-        for (const standard of ['soe', 'listed']) {
-          reportCache.delete(`${prefix}${t}:${standard}`)
-        }
-      }
-    }
-  }
-  if (!types || types.includes('notes')) {
-    for (const key of noteCache.keys()) {
-      if (key.startsWith(`${prefix}notes:`)) noteCache.delete(key)
-    }
-  }
+  clearNodeCache(reportCache, noteCache, projectId.value, effectiveEntityYear(), nodeKey, types)
+}
+
+// ─── 过期响应保护（spec consol-node-key-isolation-and-shared-context 任务 5.4，设计 §七、ADR-CNSC-005）──
+// 缓存分区（上面）与过期响应保护（下面）是两个独立条件：切 project/year/nodeKey 后旧请求的慢响应
+// 后到时，即便缓存没命中、即便请求未被取消，也必须在提交前被「序号最新 + 上下文一致」双闸门拦下，
+// 不得写入 consolReportRows / consolNoteTree / 缓存。守卫按通道维护单调递增序号，纯逻辑见 consolRequestGuard.ts。
+const consolRequestGuard = new ConsolRequestGuard()
+/** 读取当前节点级请求上下文（与缓存 scope 同维度）。 */
+function currentRequestContext(): RequestContext {
+  return { projectId: projectId.value, year: effectiveEntityYear(), nodeKey: currentEntityNodeKey() }
 }
 
 function consolReportRowClass({ row }: { row: any }) {
@@ -1622,24 +1623,37 @@ async function loadConsolReport(forceRefresh = false) {
     consolReportRows.value = reportCache.get(cacheKey)!
     return
   }
+  // 过期响应保护（任务 5.4）：发起前捕获当时上下文 + 递增 'report' 通道序号。
+  const ticket = consolRequestGuard.begin('report', currentRequestContext())
+  const reqReportType = consolReportType.value
   consolReportLoading.value = true
   try {
+    // 单一节点上下文（spec consol-node-key-isolation-and-shared-context 任务 5.1，需求 4.1/4.5、5.1）：
+    // 报表加载器从当前实体 {code,name,nodeKey} 取 nodeKey，作为 node_key 发给后端（后端任务 4.1 已支持可选 query）。
     const rows = await api.get(
-      P_consol.reports.list(projectId.value, effectiveEntityYear()),
-      { params: { report_type: consolReportType.value } },
+      P_consol.reports.list(String(ticket.context.projectId), ticket.context.year),
+      { params: { report_type: reqReportType, node_key: ticket.context.nodeKey } },
     )
+    // 提交前双闸门校验：序号仍最新 + 上下文（project/year/nodeKey）仍一致，否则丢弃该响应，
+    // 不写 consolReportRows、不写缓存（切节点后旧响应不覆盖新节点数据）。
+    if (!consolRequestGuard.isCurrent(ticket, currentRequestContext())) return
     const result = Array.isArray(rows) ? rows : []
     consolReportRows.value = result
     reportCache.set(cacheKey, result)
-    consolComments.loadComments(`report_${consolReportType.value}`)
+    consolComments.loadComments(`report_${reqReportType}`)
   } catch (err: any) {
+    // 失败也要先过闸门：过期请求的失败不得清空当前节点已有数据。
+    if (!consolRequestGuard.isCurrent(ticket, currentRequestContext())) return
     if (err?.response?.status === 404) {
       consolReportRows.value = []
     } else {
       consolReportRows.value = []
     }
   }
-  finally { consolReportLoading.value = false }
+  finally {
+    // loading 标志只在仍是最新请求时复位，避免过期请求的 finally 过早关闭当前请求的 loading。
+    if (consolRequestGuard.isCurrent(ticket, currentRequestContext())) consolReportLoading.value = false
+  }
 }
 
 async function loadConsolMappingPreset() {
@@ -1745,11 +1759,16 @@ async function loadConsolNoteTree(forceRefresh = false) {
     consolNoteTree.value = noteCache.get(cacheKey)!
     return
   }
+  // 过期响应保护（任务 5.4）：发起前捕获当时上下文 + 递增 'note' 通道序号。
+  const ticket = consolRequestGuard.begin('note', currentRequestContext())
+  const reqTemplateType = consolNoteTemplateType.value
   consolNoteLoading.value = true
   try {
-    const data = await api.get(P_cn.list(consolNoteTemplateType.value), {
+    const data = await api.get(P_cn.list(reqTemplateType), {
       validateStatus: (s: number) => s < 600,
     })
+    // 提交前双闸门校验：序号仍最新 + 上下文一致，否则丢弃（切节点后旧附注树不覆盖新节点）。
+    if (!consolRequestGuard.isCurrent(ticket, currentRequestContext())) return
     const groups = Array.isArray(data) ? data : (data ?? [])
     if (!Array.isArray(groups) || !groups.length) {
       consolNoteTree.value = []
@@ -1769,8 +1788,13 @@ async function loadConsolNoteTree(forceRefresh = false) {
     }))
     consolNoteTree.value = tree
     noteCache.set(cacheKey, tree)
-  } catch { consolNoteTree.value = [] }
-  finally { consolNoteLoading.value = false }
+  } catch {
+    if (!consolRequestGuard.isCurrent(ticket, currentRequestContext())) return
+    consolNoteTree.value = []
+  }
+  finally {
+    if (consolRequestGuard.isCurrent(ticket, currentRequestContext())) consolNoteLoading.value = false
+  }
 }
 
 function _switchNoteTemplate() {
