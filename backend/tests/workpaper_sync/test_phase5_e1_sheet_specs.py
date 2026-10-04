@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
-"""E1 声明层红判据（E1-P2 / E1-P3 / E1-P12 / E1-P16 / E1-P17 / E1-P18）。
+"""E1 声明层红判据（E1-P2 / E1-P3 / E1-P8 / E1-P12 / E1-P16 / E1-P17 / E1-P18）。
 
 spec: e1-sync-coverage-and-first-canary · Tasks 4/5/6
 Properties: E1-P2（键名逐字实证）/ E1-P3（binding_kind 三元组 + 自省变异）/
-            E1-P12（零回归基线）/ E1-P16（OCR 第二写入方登记）/
+            E1-P8（公式管理双模式一致性 + 不新建第二个按钮 owner）/
+            E1-P12（零回归基线 + golden digest 门级验证）/
+            E1-P16（OCR 第二写入方登记）/
             E1-P17（TB 发布门：sync 不触达 trial_balance）/
             E1-P18（E1-3 列集守恒：只接 multi variant）
 
@@ -200,6 +202,35 @@ class TestP3BindingKindTriad:
         assert SPEC_E110.binding_kind is BindingKind.excel_table
         assert SPEC_E110.store_item_id == "E1-account-list-rows"
         assert SPEC_E110.row_identity_key == "id"
+
+    def test_mutation_e1_11_declared_as_row_table_would_break(self) -> None:
+        """🔴 变异 ④c：E1-11 声明成行表 ⇒ 会走整条位移链而它没有 Table，必红。
+
+        static_region 绕开整条位移链（row_shift / footer 两门 / minted UUID /
+        workbook 传播 / 兄弟 Table ref 维护）。E1-11 没有 Excel Table、没有 UUID 列、
+        row_identity_key 为空 ⇒ 硬塞进行表引擎会在 Table 查找阶段就崩。
+        """
+        # E1-11 的声明明确是 static_region
+        assert SPEC_E111.binding_kind is BindingKind.static_region, (
+            "E1-11 应为 static_region，不是行表"
+        )
+        # 行表引擎的三个硬前置：Table 名 / UUID 列 / 行身份键 —— E1-11 三个都没有
+        assert SPEC_E111.table_name == "", (
+            f"E1-11 有 table_name={SPEC_E111.table_name!r} —— "
+            "若声明成行表，引擎会找这个 Table 然后崩（因为工作簿里不存在）"
+        )
+        assert SPEC_E111.uuid_col == "", (
+            f"E1-11 有 uuid_col={SPEC_E111.uuid_col!r} —— "
+            "若声明成行表，引擎会往这列注 UUID 然后覆盖原有数据"
+        )
+        assert SPEC_E111.row_identity_key == "", (
+            f"E1-11 有 row_identity_key={SPEC_E111.row_identity_key!r} —— "
+            "若声明成行表，merge 会按此键做行匹配但 store 里没有这个键"
+        )
+        # 正面断言：它确实用 definedName 锚点（static_region 的机制）
+        assert SPEC_E111.defined_name, (
+            "E1-11 的 defined_name 为空 —— static_region 必须有 definedName 锚点"
+        )
 
     def test_self_introspection_mutation_formula_count_threshold(self) -> None:
         """🔴 自省变异（第 3 条）：把判据改回公式数阈值（< 10 ⇒ static_region）。
@@ -516,3 +547,355 @@ class TestE1DeclarationConsistency:
     def test_e1_11_cross_sheet_snapshot_key_declared(self) -> None:
         """E1-11 ↔ E1-10 联动的快照键已登记。"""
         assert CROSS_SHEET_SNAPSHOT_KEY_E111 == "E1-account-commit-snapshot"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# E1-P8：公式管理双模式一致性（Requirement 6.2 / 6.3）
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestP8FormulaManagerDualMode:
+    """E1-P8：公式管理入口在两种渲染模式下行为一致。
+
+    **Validates: Requirements 6.2, 6.3**
+
+    E1 是平台公式管理的**范式源头**（`D4TabOtherMargin.vue:32` 明写「同 E1 范式」）。
+    宿主 `GtE1MonetaryFund.vue` 通过 `openFormulaManager()` 函数 emit
+    `open-formula-manager` 事件到顶层 `FormulaManagerDialog`。
+
+    判据分两层：
+    * **声明层（现在可验）**：宿主里**恰一处** `open-formula-manager` 发射入口、
+      零第二按钮 owner、emit 使用平台全局 eventBus 不走组件 $emit。
+    * **行为层（红基线）**：双模式切换后事件仍到达顶层弹窗 —— 现状只有 legacy 模式
+      （sync bridge 未接入，Task 10），无法验证 ⇒ strict xfail 记录红态。
+
+    🔴 本判据同时钉住 `workpaper-page-formula-toolbar-closure` 需求 1.4/2.4 红线：
+    不得在 E1 宿主内新建第二个按钮 owner。
+    """
+
+    #: 宿主文件相对仓库根的路径
+    _HOST_REL = (
+        "audit-platform/frontend/src/components/workpaper/GtE1MonetaryFund.vue"
+    )
+
+    @pytest.fixture(scope="class")
+    def host_source(self) -> str:
+        """读取 E1 宿主 Vue 文件源码。"""
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parents[3]
+        host_path = repo_root / self._HOST_REL
+        assert host_path.exists(), f"E1 宿主不存在：{host_path}"
+        return host_path.read_text(encoding="utf-8")
+
+    # ── 声明层判据（现在可验，必须全绿）────────────────────────────
+
+    def test_host_emits_open_formula_manager_event(self, host_source: str) -> None:
+        """宿主通过 eventBus 发射 `open-formula-manager` 事件。"""
+        assert "open-formula-manager" in host_source, (
+            "GtE1MonetaryFund.vue 不含 'open-formula-manager' 事件 ⇒ "
+            "公式管理入口可能已被删除或改名"
+        )
+
+    def test_open_formula_manager_uses_eventbus_not_component_emit(
+        self, host_source: str
+    ) -> None:
+        """公式管理走平台全局 eventBus，不走组件 $emit。
+
+        顶层 FormulaManagerDialog 通过 eventBus 监听而非父子 prop/event 链 ⇒
+        `$emit('open-formula-manager')` 是错法（事件到不了全局弹窗）。
+        """
+        assert "eventBus.emit('open-formula-manager'" in host_source, (
+            "GtE1MonetaryFund.vue 的 open-formula-manager 不走 eventBus.emit ⇒ "
+            "事件到不了顶层 FormulaManagerDialog"
+        )
+
+    def test_exactly_one_formula_manager_button_owner(self, host_source: str) -> None:
+        """宿主里恰一处 `openFormulaManager` 按钮绑定（不新建第二个按钮 owner）。
+
+        🔴 `workpaper-page-formula-toolbar-closure` 需求 1.4/2.4 红线：
+        E1 侧不得新建第二个按钮 owner 或第二套 location owner。
+        """
+        import re
+
+        # 只计 @click 绑定中的 openFormulaManager 调用，不计函数定义或注释
+        click_bindings = re.findall(
+            r'@click\s*=\s*"[^"]*openFormulaManager[^"]*"', host_source
+        )
+        assert len(click_bindings) == 1, (
+            f"GtE1MonetaryFund.vue 里有 {len(click_bindings)} 处 openFormulaManager "
+            f"按钮绑定，应恰好 1 处 ⇒ 违反「不新建第二个按钮 owner」红线"
+        )
+
+    def test_exactly_one_eventbus_emit_call(self, host_source: str) -> None:
+        """宿主里恰一处 `eventBus.emit('open-formula-manager', ...)` 调用。
+
+        多于一处意味着有重复的 emit 源 —— 潜在的双触发 bug。
+        """
+        import re
+
+        emit_calls = re.findall(
+            r"eventBus\.emit\(\s*['\"]open-formula-manager['\"]", host_source
+        )
+        assert len(emit_calls) == 1, (
+            f"GtE1MonetaryFund.vue 里有 {len(emit_calls)} 处 "
+            "eventBus.emit('open-formula-manager') 调用，应恰好 1 处"
+        )
+
+    def test_formula_manager_function_defined(self, host_source: str) -> None:
+        """宿主定义了 `openFormulaManager` 函数（函数定义存在）。"""
+        import re
+
+        fn_defs = re.findall(r"function\s+openFormulaManager\s*\(", host_source)
+        assert len(fn_defs) == 1, (
+            f"GtE1MonetaryFund.vue 里有 {len(fn_defs)} 处 openFormulaManager 函数定义，"
+            "应恰好 1 处"
+        )
+
+    def test_formula_manager_comment_references_global_dialog(
+        self, host_source: str
+    ) -> None:
+        """注释里引用顶层 FormulaManagerDialog 作为响应方（声明机制不变）。"""
+        assert "FormulaManagerDialog" in host_source, (
+            "GtE1MonetaryFund.vue 不含 FormulaManagerDialog 引用 ⇒ "
+            "公式管理的全局弹窗响应链可能已断裂"
+        )
+
+    def test_no_formula_manager_dialog_import_in_host(self, host_source: str) -> None:
+        """宿主不直接 import FormulaManagerDialog（那是顶层组件的职责）。
+
+        如果宿主 import 了它，说明有人试图在 E1 侧独立挂载弹窗 —— 违反
+        「平台唯一一套」的范式。
+        """
+        import re
+
+        imports = re.findall(
+            r"import\s+.*FormulaManagerDialog", host_source
+        )
+        assert len(imports) == 0, (
+            f"GtE1MonetaryFund.vue 直接 import 了 FormulaManagerDialog "
+            f"({len(imports)} 处) ⇒ 违反「顶层全局弹窗」范式"
+        )
+
+    # ── 行为层判据（红基线：双模式一致性需 sync bridge 才可验）──────
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "🔴 红基线（Task 10 未实施），不是回归。双模式一致性判据需要 sync bridge "
+            "（`useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost`）已接入 E1 宿主，"
+            "才能在 OO 模式下验证 `open-formula-manager` 事件是否仍到达顶层。"
+            "现状只有 legacy 模式（sync bridge 未接入、Task 10），无法切换模式 ⇒ "
+            "双模式一致性判据无从验证。"
+            "spec `e1-sync-coverage-and-first-canary` Task 10 完成后本条 SHALL 转绿。"
+            "2026-10-XX 转 strict xfail：sync bridge 落地后本条 XPASS 并报错，强制摘掉标记。"
+        ),
+    )
+    def test_dual_mode_formula_manager_event_delivery(
+        self, host_source: str
+    ) -> None:
+        """行为层：sync bridge 接入后，两种模式下 open-formula-manager 都能到达顶层。
+
+        现状只有 legacy 模式 ⇒ 断言宿主已引入 sync bridge。
+        Task 10 完成后此断言自动成立。
+        """
+        assert "useWorkpaperSyncBridge" in host_source, (
+            "GtE1MonetaryFund.vue 尚未引入 useWorkpaperSyncBridge ⇒ "
+            "只有 legacy 模式，双模式一致性无从验证"
+        )
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "🔴 红基线（Task 10 未实施），不是回归。"
+            "WorkpaperSyncEditorHost 是 OO 渲染模式的载体 ⇒ "
+            "它不在宿主里意味着 OO 模式下公式管理按钮的 DOM 上下文不存在。"
+            "Task 10 完成后本条 SHALL 转绿。"
+        ),
+    )
+    def test_sync_editor_host_present_for_oo_mode(self, host_source: str) -> None:
+        """sync bridge 的 WorkpaperSyncEditorHost 已在宿主内（OO 模式载体）。"""
+        assert "WorkpaperSyncEditorHost" in host_source, (
+            "GtE1MonetaryFund.vue 不含 WorkpaperSyncEditorHost ⇒ "
+            "OO 编辑模式无载体，公式管理在该模式下无法验证"
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# E1-P12 补充：golden digest 门级零回归（补充既有的 contract 注册表检查）
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestP12GoldenDigestGate:
+    """E1-P12 补充：`check_sync_provider_golden_digest` 门级零回归。
+
+    **Validates: Requirements 8.3**
+
+    既有 `TestP12ZeroRegressionBaseline` 验证 contract 注册表层面的子集关系。
+    本类补充**门级**验证：E1 已在 `check_sync_provider_golden_digest.PROVIDERS` 登记，
+    且 golden digest 基线文件里有 E1 条目。
+
+    🔴 这条判据让「E1 加入 PROVIDERS 但基线没有 --update」的状态可被检测到 ——
+    否则门会对 E1 新生成一份 digest、与空基线对比「零差异」（因为没有基线可比）。
+    """
+
+    @pytest.fixture(scope="class")
+    def golden_gate_providers(self) -> tuple:
+        """从门脚本加载 PROVIDERS 元组。"""
+        import importlib.util
+        import sys
+        from pathlib import Path
+
+        gate_path = (
+            Path(__file__).resolve().parents[3]
+            / "backend"
+            / "scripts"
+            / "check"
+            / "check_sync_provider_golden_digest.py"
+        )
+        assert gate_path.exists(), f"golden digest 门脚本不存在：{gate_path}"
+        spec = importlib.util.spec_from_file_location(
+            "_check_golden", gate_path
+        )
+        assert spec and spec.loader
+        mod = importlib.util.module_from_spec(spec)
+        # 门脚本会 reconfigure stdout/stderr，在 import 时避免副作用
+        old_argv = sys.argv[:]
+        sys.argv = ["test"]
+        try:
+            spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        finally:
+            sys.argv = old_argv
+        return mod.PROVIDERS
+
+    @pytest.fixture(scope="class")
+    def golden_baseline(self) -> dict:
+        """加载 golden digest 基线 JSON。"""
+        import json
+        from pathlib import Path
+
+        baseline_path = (
+            Path(__file__).resolve().parents[3]
+            / "backend"
+            / "scripts"
+            / "check"
+            / "_sync_provider_golden_digest.json"
+        )
+        assert baseline_path.exists(), (
+            f"golden digest 基线文件不存在：{baseline_path} ⇒ "
+            "可能忘了 --update"
+        )
+        return json.loads(baseline_path.read_text(encoding="utf-8"))
+
+    # ── E1 在门的 PROVIDERS 登记 ──────────────────────────────────
+
+    def test_e1_registered_in_golden_gate_providers(
+        self, golden_gate_providers: tuple
+    ) -> None:
+        """E1 在 `check_sync_provider_golden_digest.PROVIDERS` 里。"""
+        labels = {p[0] for p in golden_gate_providers}
+        assert "e1" in labels, (
+            "E1 (label='e1') 不在 golden digest 门的 PROVIDERS 里 ⇒ "
+            "E1 的 digest 不受门监管，改动不会被检测到"
+        )
+
+    def test_e1_provider_module_matches(
+        self, golden_gate_providers: tuple
+    ) -> None:
+        """PROVIDERS 里 E1 的模块名正确。"""
+        e1_entries = [p for p in golden_gate_providers if p[0] == "e1"]
+        assert len(e1_entries) == 1, f"E1 在 PROVIDERS 里应恰好 1 条，实际 {len(e1_entries)}"
+        assert e1_entries[0][1] == "phase5_e1_monetary_fund", (
+            f"E1 模块名 {e1_entries[0][1]!r} ≠ 'phase5_e1_monetary_fund'"
+        )
+
+    def test_e1_uses_adapter_id_not_pilot(
+        self, golden_gate_providers: tuple
+    ) -> None:
+        """E1 用 ADAPTER_ID（不是 PILOT_ADAPTER_ID）。"""
+        e1_entries = [p for p in golden_gate_providers if p[0] == "e1"]
+        assert e1_entries[0][2] == "ADAPTER_ID"
+
+    def test_e1_has_projection_enabled(
+        self, golden_gate_providers: tuple
+    ) -> None:
+        """E1 的 has_projection=True（有 build_store_projection）。"""
+        e1_entries = [p for p in golden_gate_providers if p[0] == "e1"]
+        assert e1_entries[0][3] is True, (
+            "E1 的 has_projection 应为 True ⇒ "
+            "E1 有 build_store_projection，门应核 projection digest"
+        )
+
+    def test_e1_uses_plural_instrumentation(
+        self, golden_gate_providers: tuple
+    ) -> None:
+        """E1 的 plural_instr=True（走 instrumentation_specs 复数）。"""
+        e1_entries = [p for p in golden_gate_providers if p[0] == "e1"]
+        assert e1_entries[0][4] is True, (
+            "E1 的 plural_instr 应为 True ⇒ "
+            "注册路径读的是 instrumentation_specs()（复数）"
+        )
+
+    # ── E1 在 golden digest 基线文件里有条目 ─────────────────────
+
+    def test_e1_in_golden_baseline_file(self, golden_baseline: dict) -> None:
+        """golden digest 基线 JSON 里有 E1 条目。
+
+        🔴 没有基线条目时，门会对 E1 新算 digest 但**无东西可比** ⇒
+        E1 的 digest 变了也检测不到（恒绿是假绿）。
+        """
+        providers_in_baseline = {
+            p["label"] for p in golden_baseline.get("providers", [])
+        }
+        assert "e1" in providers_in_baseline, (
+            "golden digest 基线文件里没有 E1 条目 ⇒ "
+            "需跑 `check_sync_provider_golden_digest.py --update` 重建基线"
+        )
+
+    def test_e1_baseline_has_contract_digest(self, golden_baseline: dict) -> None:
+        """E1 的基线条目里有 contract_payload_sha256。"""
+        e1_entries = [
+            p for p in golden_baseline.get("providers", [])
+            if p.get("label") == "e1"
+        ]
+        assert len(e1_entries) == 1
+        assert e1_entries[0].get("contract_payload_sha256"), (
+            "E1 基线条目缺 contract_payload_sha256 ⇒ 门对 E1 契约内容变更不可见"
+        )
+
+    def test_e1_baseline_adapter_id_matches(self, golden_baseline: dict) -> None:
+        """基线里 E1 的 adapter_id 与 provider 声明的一致。"""
+        e1_entries = [
+            p for p in golden_baseline.get("providers", [])
+            if p.get("label") == "e1"
+        ]
+        assert len(e1_entries) == 1
+        assert e1_entries[0].get("adapter_id") == ADAPTER_ID, (
+            f"基线 adapter_id={e1_entries[0].get('adapter_id')!r} "
+            f"≠ provider ADAPTER_ID={ADAPTER_ID!r}"
+        )
+
+    # ── 既有 10 条 contract 在基线文件里仍存在（补充 TestP12ZeroRegressionBaseline）──
+
+    #: 与 TestP12ZeroRegressionBaseline.BASELINE_CONTRACTS_BEFORE_E1 对齐
+    _PRE_E1_LABELS = frozenset({
+        "b60", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "g7", "h1",
+    })
+
+    def test_pre_e1_contracts_still_in_golden_baseline(
+        self, golden_baseline: dict
+    ) -> None:
+        """E1 加入前已有的 10 个 provider 在基线文件里仍全部存在。
+
+        与 `TestP12ZeroRegressionBaseline.test_all_existing_contracts_untouched`
+        互补：那条检查 `DELIVERED_PER_ENTRY_CONTRACTS`（注册表），
+        本条检查基线文件（门的比对基准）—— 注册表有但基线没有 = 门恒绿假绿。
+        """
+        baseline_labels = {
+            p["label"] for p in golden_baseline.get("providers", [])
+        }
+        missing = sorted(self._PRE_E1_LABELS - baseline_labels)
+        assert not missing, (
+            f"golden digest 基线文件里缺少 E1 前已有的 provider：{missing} ⇒ "
+            "这些 provider 的 digest 变了也检测不到"
+        )
