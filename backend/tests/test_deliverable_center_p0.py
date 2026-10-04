@@ -723,8 +723,17 @@ def test_version_chain_time_desc(n):
     _run_in_isolated_db(_body)
 
 
-def test_dual_path_downgrade_returns_blob_on_platform_failure():
-    """3.9 单元测试：平台写失败仍返回 blob（降级标志），版本记录仍留存（2.3）"""
+def test_platform_write_failure_is_fail_closed_no_version():
+    """平台落盘失败 fail-closed：不创建版本、不残留空占位行（需求 3.1 / 8.2）。
+
+    🔴 语义反转说明（phase4 chain-closure-phase4-deliverable-center-trio Task 4）：
+    旧用例 ``test_dual_path_downgrade_returns_blob_on_platform_failure`` 断言「写盘
+    失败仍返回 blob + 版本记录留存」。那正是需求 8.2 明令反转的 fail-OPEN「blob 可
+    下载但平台落盘失败」语义 —— 它会在数据库留一个指向不存在文件的「成功」版本行。
+
+    现在 render_and_store 是 fail-closed：落盘/校验失败 ⇒ 不建版本、清理本 attempt
+    文件、清掉 create_task 的空占位版本，返回 version=None + platform_persist_failed。
+    """
 
     async def _runner():
         engine = create_async_engine(TEST_DATABASE_URL, echo=False)
@@ -745,13 +754,14 @@ def test_dual_path_downgrade_returns_blob_on_platform_failure():
                     user_id=user_id,
                     selected_sections=["opinion"],
                 )
-                # 降级标志置位
+                # 降级标志置位，但 **不得** 创建成功版本（fail-closed）
                 assert result.platform_persist_failed is True
-                # blob 信息仍可用（download_url 仍生成），且版本记录仍创建留存
-                assert result.download_url is not None
-                assert result.version is not None
+                assert result.version is None, "落盘失败不得创建版本（需求 3.1）"
+                # 版本链为空：连 create_task 的空占位 v1 也已被清理
                 chain = await svc.get_version_chain(task.id)
-                assert any(v.id == result.version.id for v in chain)
+                assert chain == [], (
+                    f"落盘失败后不应残留任何版本行，实际：{[v.version_no for v in chain]}"
+                )
         finally:
             await engine.dispose()
 

@@ -191,6 +191,11 @@ class WordExportTaskVersion(Base):
     #   {"diffs": [...]}          = 已比对；非空即有手工改动 → 拒绝；空数组 → 放行
     # 🔴 判据不是「非空即拒绝」——`{"diffs": []}` 非空但表示已比对且一致。
     drift_report: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # V180（chain-closure-phase4-deliverable-center-trio Task 3 / 需求 3.2）
+    # 显式 file_sha256 命名列（历史 file_hash 由 DeliverableHashService 旁路写；
+    # phase4 新链路写 file_sha256，由最终落盘文件计算）+ snapshot_id 直绑三件套共享快照。
+    file_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    snapshot_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     __table_args__ = (
         Index(
@@ -287,6 +292,20 @@ class ExportJob(Base):
         server_default=func.now(), onupdate=func.now()
     )
 
+    # V180（phase4 Task 3）：三件套共享快照 + 固定总数/成功计数 + readiness 摘要 + 时间点。
+    # snapshot_id 是三件套应共享的不可变交付快照摘要（需求 1.5/2.4）；
+    # trio_total 固定 3，trio_succeeded 只统计正式三件套（需求 2.6/4.4）。
+    snapshot_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    trio_total: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("3"), nullable=False
+    )
+    trio_succeeded: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("0"), nullable=False
+    )
+    readiness: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
     __table_args__ = (
         Index("idx_export_jobs_v2_project", "project_id", "status"),
     )
@@ -316,6 +335,78 @@ class ExportJobItem(Base):
     error_message: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
+    # V180（phase4 Task 3）：稳定步骤键 + 固定顺序 + 共享快照 + 文件指纹投影 + attempt 投影。
+    # 禁用显示名称作为稳定键（design §3.2）；中文名由前端映射，后端用这些固定英文键。
+    step_key: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    sequence: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    snapshot_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    version_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    file_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    file_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    attempt_count: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("0"), nullable=False
+    )
+    last_attempt_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+
     __table_args__ = (
         Index("idx_export_job_items_v2_job", "job_id", "status"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# export_job_attempts — append-only 尝试历史（phase4 Task 3）
+# ---------------------------------------------------------------------------
+
+class ExportJobAttempt(Base):
+    """交付 job 的 append-only 尝试历史。
+
+    设计 §3.3：失败 attempt 永不覆盖，重试只能新增 attempt 并更新 item 的当前投影；
+    同一 item 的 ``attempt_no`` 单调递增且唯一（迁移 V180 唯一索引守护）。
+    保留原始异常类型、中文用户消息、可诊断细节、时间点、快照 id 与文件指纹。
+    """
+
+    __tablename__ = "export_job_attempts"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("export_jobs_v2.id"), nullable=False
+    )
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("export_job_items_v2.id"), nullable=False
+    )
+    attempt_no: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(30), server_default=text("'running'"), nullable=False
+    )
+    #: 触发来源：initial（初次生成）/ retry（用户重试）/ recovery（中断恢复）
+    trigger: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    snapshot_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    diagnostic_detail: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    file_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    file_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    version_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    started_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+    __table_args__ = (
+        Index(
+            "uq_export_job_attempt_item_no",
+            "item_id", "attempt_no", unique=True,
+        ),
+        Index("idx_export_job_attempts_job", "job_id", "item_id"),
     )

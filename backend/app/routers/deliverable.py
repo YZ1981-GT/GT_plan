@@ -74,6 +74,16 @@ def _ensure_task_belongs(task, project_id: UUID) -> None:
         raise HTTPException(status_code=403, detail="交付物不属于该项目")
 
 
+def _ensure_store_succeeded(store) -> None:
+    """fail-closed（需求 3.1）：render_and_store 落盘/校验失败时 version=None。
+
+    此时不得按成功返回版本号/下载链接，统一抛 500 中文错误，由上层回滚。
+    （旧 fail-open 会返回一个指向不存在文件的「成功」版本行。）
+    """
+    if store.version is None:
+        raise HTTPException(status_code=500, detail="文件未落盘或校验失败，无法出具")
+
+
 async def _is_project_eqcr(db: AsyncSession, user_id: UUID, project_id: UUID) -> bool:
     from app.services.eqcr_workbench_service import EqcrWorkbenchService
 
@@ -602,6 +612,7 @@ async def render_report_body(
         selected_sections=body.selected_sections,
         file_name=docx_path.name,
     )
+    _ensure_store_succeeded(store)
 
     # 同步 audit_report.report_body_json
     report = await rbs._audit_svc.get_report(project_id, body.year)
@@ -740,6 +751,7 @@ async def render_disclosure_notes(
         selected_sections=body.selected_sections,
         file_name=file_name,
     )
+    _ensure_store_succeeded(store)
     # 章节状态落库（需求 1.4/1.5）：内部 fail-open，落库失败只 warning 不阻断交付件
     from app.services.deliverable_section_state_service import (
         persist_note_export_section_states,
@@ -868,6 +880,7 @@ async def render_financial_reports(
         selected_sections=body.selected_sections or body.report_types,
         file_name=file_name,
     )
+    _ensure_store_succeeded(store)
     await _advance_to_editing(dsvc, task.id)
     await db.commit()
     return DeliverableExportResponse(

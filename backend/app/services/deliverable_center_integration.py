@@ -89,6 +89,18 @@ class DeliverableCenterIntegration:
             file_name=file_name,
         )
 
+        # fail-closed（需求 3.1）：落盘/校验失败时 render_and_store 不建版本、
+        # 返回 version=None。此时不得伪造 EvidenceRef，直接返回失败结果。
+        if store_result.version is None:
+            return {
+                "task_id": str(task.id),
+                "version_no": None,
+                "download_url": None,
+                "is_new_task": is_new,
+                "evidence_ref": None,
+                "platform_persist_failed": True,
+            }
+
         # 构建 EvidenceRef 指向该版本
         evidence_ref = EvidenceRef(
             evidence_type=EvidenceType.deliverable,
@@ -155,6 +167,15 @@ class DeliverableCenterIntegration:
             user_id=user_id,
             file_name=file_name,
         )
+
+        if store_result.version is None:
+            return {
+                "task_id": str(task.id),
+                "version_no": None,
+                "download_url": None,
+                "is_new_task": is_new,
+                "platform_persist_failed": True,
+            }
 
         return {
             "task_id": str(task.id),

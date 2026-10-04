@@ -1,6 +1,6 @@
 import { api } from '@/services/apiProxy'
 import { deliverables } from '@/services/apiPaths/report'
-import { wordExports } from '@/services/apiPaths/report'
+import { wordExports, deliverableTrio } from '@/services/apiPaths/report'
 
 export interface DeliverableItem {
   task_id: string
@@ -397,4 +397,196 @@ export async function fetchSectionStates(projectId: string, taskId: string) {
   return api.get<{ sections: DeliverableSectionStateItem[] }>(
     `/api/projects/${projectId}/deliverables/${taskId}/section-states`,
   )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 交付中心三件套（chain-closure-phase4 · Task 10/11）
+//
+// 正式三件套：审定财务报表(financial_report) → 报表附注(disclosure_notes)
+// → 审计报告正文(audit_report)，固定顺序、同一快照。类型显式区分 TrioStepKey /
+// ReadinessResult / ExportJobTrio* / ExportJobAttempt，不用可选英文字段拼状态。
+// 端点经项目级鉴权：readiness/状态/下载=readonly，创建/重试=edit。
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** 正式三件套稳定键（固定顺序；unadjusted 是辅助项，不在此列）。 */
+export type TrioStepKey = 'financial_report' | 'disclosure_notes' | 'audit_report'
+
+/**
+ * 三件套 job / item 状态常量（与后端 ExportJob/ExportJobItem.status 同源）。
+ * 单一真源，禁在组件内散落 `=== 'failed'` 等字符串字面量。
+ */
+export const TRIO_STATUS = {
+  QUEUED: 'queued',
+  RUNNING: 'running',
+  SUCCEEDED: 'succeeded',
+  PARTIAL: 'partial',
+  FAILED: 'failed',
+  BLOCKED: 'blocked',
+  SKIPPED: 'skipped',
+  CANCELLED: 'cancelled',
+} as const
+
+/** job 终态集合（轮询到任一即停止）。 */
+export const TRIO_TERMINAL_STATUSES: readonly string[] = [
+  TRIO_STATUS.SUCCEEDED,
+  TRIO_STATUS.PARTIAL,
+  TRIO_STATUS.FAILED,
+  TRIO_STATUS.BLOCKED,
+  TRIO_STATUS.CANCELLED,
+]
+
+/** 三件套中文名（展示用，禁裸英文 key）。与后端 TRIO_LABELS 同源。 */
+export const TRIO_STEP_LABELS: Record<TrioStepKey, string> = {
+  financial_report: '审定财务报表',
+  disclosure_notes: '报表附注',
+  audit_report: '审计报告正文',
+}
+
+/** readiness 的一条闸门（硬 blocker 或软 warning）。 */
+export interface ReadinessGate {
+  code: string
+  message: string
+  evidence?: Record<string, unknown>
+}
+
+/** readiness 中逐项三件套状态（后端 trio_status）。 */
+export interface ReadinessTrioStep {
+  key: TrioStepKey
+  sequence: number
+  status: string
+}
+
+/**
+ * readiness 判定结果（后端 ReadinessResult.to_dict）。
+ * `status`：ready | blocked | ready_with_warnings。
+ * `snapshot_id` 为三件套应共享的交付快照 id（null = 尚未建立）。
+ */
+export interface ReadinessResult {
+  status: 'ready' | 'blocked' | 'ready_with_warnings' | string
+  project_id: string
+  year: number
+  hard_blockers: ReadinessGate[]
+  warnings: ReadinessGate[]
+  sources?: Record<string, unknown>
+  snapshot?: { id?: string | null; digest?: string | null } | null
+  snapshot_id?: string | null
+  trio_status?: ReadinessTrioStep[]
+}
+
+/**
+ * 三件套 job 的逐项明细（后端 ExportJobItemResponse）。
+ * `status`：queued | running | succeeded | failed | blocked | skipped。
+ * 失败项 `error_message` 为最近一次失败原因（历史完整原因见 attempts）。
+ */
+export interface ExportJobTrioItem {
+  id: string
+  job_id: string
+  word_export_task_id: string | null
+  status: string
+  error_message: string | null
+  finished_at: string | null
+}
+
+/**
+ * 三件套 job（后端 ExportJobResponse）。
+ * `status`：queued | running | succeeded | partial | failed | blocked。
+ */
+export interface ExportJobTrioResult {
+  id: string
+  project_id: string
+  job_type: string
+  status: string
+  payload: Record<string, unknown> | null
+  progress_total: number
+  progress_done: number
+  failed_count: number
+  initiated_by: string
+  created_at: string | null
+  updated_at: string | null
+  items: ExportJobTrioItem[]
+}
+
+/**
+ * append-only 尝试历史（后端 ExportJobAttemptResponse，design §3.3）。
+ * 失败 attempt 永不覆盖；重试只新增 attempt。前端刷新 job 不得用空数组覆盖历史。
+ */
+export interface ExportJobAttempt {
+  id: string
+  job_id: string
+  item_id: string
+  attempt_no: number
+  status: string
+  trigger: string | null
+  snapshot_id: string | null
+  error_type: string | null
+  error_message: string | null
+  diagnostic_detail: Record<string, unknown> | null
+  file_path: string | null
+  file_size: number | null
+  file_sha256: string | null
+  version_id: string | null
+  started_at: string | null
+  finished_at: string | null
+}
+
+/** 创建三件套 job 的请求体。 */
+export interface CreateTrioRequest {
+  year: number
+  template_variant?: string
+  steps?: string[]
+  optional_sections?: Record<string, boolean> | null
+}
+
+/** 重试响应体（后端 retry_trio_job）。 */
+export interface TrioRetryResult {
+  job_id: string
+  retried_count: number
+}
+
+/** 交付前就绪判定（readonly）。 */
+export async function fetchTrioReadiness(
+  projectId: string,
+  year: number,
+): Promise<ReadinessResult> {
+  return api.get<ReadinessResult>(deliverableTrio.readiness(projectId, year))
+}
+
+/** 一键出具三件套（edit）：readiness ready 才创建并执行 job。 */
+export async function createTrio(
+  projectId: string,
+  body: CreateTrioRequest,
+): Promise<ExportJobTrioResult> {
+  return api.post<ExportJobTrioResult>(deliverableTrio.create(projectId), body)
+}
+
+/** 查询三件套 job 状态与逐项明细（readonly）。 */
+export async function fetchTrioJob(
+  projectId: string,
+  jobId: string,
+): Promise<ExportJobTrioResult> {
+  return api.get<ExportJobTrioResult>(deliverableTrio.job(projectId, jobId))
+}
+
+/** 拉取整个 job 的完整尝试历史（readonly，append-only）。 */
+export async function fetchTrioJobAttempts(
+  projectId: string,
+  jobId: string,
+): Promise<ExportJobAttempt[]> {
+  return api.get<ExportJobAttempt[]>(deliverableTrio.attempts(projectId, jobId))
+}
+
+/**
+ * 重试三件套 job 的失败项（edit，真正重跑步骤）。
+ * 快照已变化时后端返回 409（前端据此置灰并提示重新检查）。
+ */
+export async function retryTrioJob(
+  projectId: string,
+  jobId: string,
+): Promise<TrioRetryResult> {
+  return api.post<TrioRetryResult>(deliverableTrio.retry(projectId, jobId), {})
+}
+
+/** 三件套正式项下载 URL（readonly，下载前后端再次物理指纹校验）。 */
+export function trioItemDownloadUrl(projectId: string, itemId: string): string {
+  return deliverableTrio.itemDownload(projectId, itemId)
 }

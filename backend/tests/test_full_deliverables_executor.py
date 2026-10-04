@@ -155,16 +155,15 @@ def _patch_steps(
     fail_step: str | None = None,
     kam_warning: str | None = None,
 ):
-    """以桩替换三个渲染步骤，避免依赖真实模板/报表数据。"""
+    """以桩替换正式三件套的三个渲染步骤，避免依赖真实模板/报表数据。
+
+    phase4 权威三件套的稳定键是 ``financial_report / disclosure_notes / audit_report``；
+    ``audit_report`` 复用 ``_run_report_body`` 渲染路径。``fail_step`` 用稳定键指定要失败的步骤。
+    """
 
     async def _ok_financial(project_id, year, user_id):
-        if fail_step == "financial_reports":
-            raise RuntimeError("财务报表生成失败（桩）")
-        return uuid.uuid4()
-
-    async def _ok_financial_unadj(project_id, year, user_id):
-        if fail_step == "financial_reports_unadjusted":
-            raise RuntimeError("未审财务报表生成失败（桩）")
+        if fail_step == "financial_report":
+            raise RuntimeError("审定财务报表生成失败（桩）")
         return uuid.uuid4()
 
     async def _ok_notes(project_id, year, user_id):
@@ -173,28 +172,35 @@ def _patch_steps(
         return uuid.uuid4()
 
     async def _ok_report(project_id, year, user_id, payload):
-        if fail_step == "report_body":
-            raise RuntimeError("报告正文生成失败（桩）")
+        if fail_step == "audit_report":
+            raise RuntimeError("审计报告正文生成失败（桩）")
         return uuid.uuid4(), kam_warning, {"key_audit_matters": True}
 
     executor._run_financial_reports = _ok_financial  # type: ignore[assignment]
-    executor._run_financial_reports_unadjusted = _ok_financial_unadj  # type: ignore[assignment]
     executor._run_disclosure_notes = _ok_notes  # type: ignore[assignment]
     executor._run_report_body = _ok_report  # type: ignore[assignment]
     # 跳过试算表前置（桩测不插入 trial_balance）
     executor.precheck = lambda project_id, year: _noop()  # type: ignore[assignment]
+    # 跳过真实 snapshot refs 捕获（桩测无报表/附注数据），digest 仍由稳定输入计算。
+    executor._build_snapshot_input = (  # type: ignore[assignment]
+        lambda project_id, year, payload: _snapshot_stub(project_id, year)
+    )
 
 
 async def _noop():
     return None
 
 
+async def _snapshot_stub(project_id, year):
+    return {"project_id": str(project_id), "year": year, "_stub": True}
+
+
 class TestFullDeliverablesExecutor:
-    """全套生成执行器 — 失败隔离与进度。"""
+    """全套生成执行器 — 正式三件套顺序、失败隔离、依赖阻断与状态聚合（phase4）。"""
 
     @pytest.mark.asyncio
     async def test_all_steps_succeed(self, test_db, test_project, test_user):
-        """四步全成功 → job succeeded，进度 4/4，0 失败。"""
+        """正式三件套全成功 → job succeeded，trio 3/3，0 失败，固定顺序与稳定键。"""
         executor = FullDeliverablesExecutor(test_db)
         _patch_steps(executor)
 
@@ -203,20 +209,23 @@ class TestFullDeliverablesExecutor:
             user_id=test_user.id,
             payload={"year": 2024, "template_variant": "simple"},
         )
-        assert result.done == 4
+        assert result.done == 3
         assert result.failed == 0
         assert result.status == "succeeded"
-        assert len(result.outcomes) == 4
+        assert result.trio_total == 3
+        assert result.trio_succeeded == 3
+        assert len(result.outcomes) == 3
+        # 固定顺序 financial_report → disclosure_notes → audit_report（需求 2.1）
         assert [o.step for o in result.outcomes] == [
-            "financial_reports",
-            "financial_reports_unadjusted",
+            "financial_report",
             "disclosure_notes",
-            "report_body",
+            "audit_report",
         ]
+        assert [o.sequence for o in result.outcomes] == [1, 2, 3]
 
     @pytest.mark.asyncio
     async def test_single_step_failure_isolated(self, test_db, test_project, test_user):
-        """中间步骤（附注）失败不阻断后续报告正文 → partial_failed，3 成功 1 失败。"""
+        """中间步骤（附注）失败 ⇒ audit_report 被依赖阻断，financial 仍成功 → partial_failed。"""
         executor = FullDeliverablesExecutor(test_db)
         _patch_steps(executor, fail_step="disclosure_notes")
 
@@ -225,47 +234,61 @@ class TestFullDeliverablesExecutor:
             user_id=test_user.id,
             payload={"year": 2024, "template_variant": "simple"},
         )
-        assert result.done == 3
-        assert result.failed == 1
+        # 1 成功（financial_report）+ 1 失败（disclosure_notes）+ 1 阻断（audit_report）
+        assert result.done == 1
+        assert result.failed == 2  # failed + blocked 合并计数（均非正式成功）
         assert result.status == "partial_failed"
-        # 失败的是附注步骤，报告正文仍执行成功
+        assert result.trio_succeeded == 1
         by_step = {o.step: o for o in result.outcomes}
         assert by_step["disclosure_notes"].succeeded is False
-        assert by_step["financial_reports"].succeeded is True
-        assert by_step["financial_reports_unadjusted"].succeeded is True
-        assert by_step["report_body"].succeeded is True
+        assert by_step["financial_report"].succeeded is True
+        # audit_report 因前置附注失败被标 blocked_by_dependency（而非伪装成导出异常）
+        assert by_step["audit_report"].status == "blocked_by_dependency"
+        assert by_step["audit_report"].succeeded is False
 
     @pytest.mark.asyncio
-    async def test_first_step_failure_does_not_abort(self, test_db, test_project, test_user):
-        """首步失败后续仍执行（需求 14.3）。"""
+    async def test_first_step_failure_blocks_dependent(self, test_db, test_project, test_user):
+        """首步（财报）失败后续附注仍执行；audit_report 因前置缺失被阻断（需求 2.1/4.4）。"""
         executor = FullDeliverablesExecutor(test_db)
-        _patch_steps(executor, fail_step="financial_reports")
+        _patch_steps(executor, fail_step="financial_report")
 
         result = await executor.run(
             project_id=test_project.id,
             user_id=test_user.id,
             payload={"year": 2024, "template_variant": "simple"},
         )
-        assert result.done == 3
-        assert result.failed == 1
-        assert result.status == "partial_failed"
-
-    @pytest.mark.asyncio
-    async def test_unadjusted_step_failure_isolated(self, test_db, test_project, test_user):
-        """未审报表步骤失败不阻断附注/报告正文。"""
-        executor = FullDeliverablesExecutor(test_db)
-        _patch_steps(executor, fail_step="financial_reports_unadjusted")
-
-        result = await executor.run(
-            project_id=test_project.id,
-            user_id=test_user.id,
-            payload={"year": 2024, "template_variant": "simple"},
-        )
-        assert result.done == 3
-        assert result.failed == 1
         by_step = {o.step: o for o in result.outcomes}
-        assert by_step["financial_reports_unadjusted"].succeeded is False
+        # financial_report 失败；disclosure_notes 无依赖，仍执行成功
+        assert by_step["financial_report"].succeeded is False
         assert by_step["disclosure_notes"].succeeded is True
+        # audit_report 依赖 financial_report（已失败）⇒ 阻断
+        assert by_step["audit_report"].status == "blocked_by_dependency"
+        assert result.status == "partial_failed"
+        assert result.trio_succeeded == 1
+
+    @pytest.mark.asyncio
+    async def test_all_fail_is_failed_status(self, test_db, test_project, test_user):
+        """前两项均失败 ⇒ audit 被阻断 ⇒ 三项无一正式成功 → failed。"""
+        executor = FullDeliverablesExecutor(test_db)
+
+        async def _boom_financial(project_id, year, user_id):
+            raise RuntimeError("财报失败")
+
+        async def _boom_notes(project_id, year, user_id):
+            raise RuntimeError("附注失败")
+
+        _patch_steps(executor)
+        executor._run_financial_reports = _boom_financial  # type: ignore[assignment]
+        executor._run_disclosure_notes = _boom_notes  # type: ignore[assignment]
+
+        result = await executor.run(
+            project_id=test_project.id,
+            user_id=test_user.id,
+            payload={"year": 2024, "template_variant": "simple"},
+        )
+        assert result.done == 0
+        assert result.trio_succeeded == 0
+        assert result.status == "failed"
 
     @pytest.mark.asyncio
     async def test_kam_warning_persisted_in_payload(self, test_db, test_project, test_user):
@@ -285,7 +308,7 @@ class TestFullDeliverablesExecutor:
 
     @pytest.mark.asyncio
     async def test_progress_increments_per_item(self, test_db, test_project, test_user):
-        """每步创建一个 job item，进度 total 等于步骤数。"""
+        """每步创建一个 job item，trio_total 固定 3，progress_total == 3。"""
         executor = FullDeliverablesExecutor(test_db)
         _patch_steps(executor)
 
@@ -296,6 +319,8 @@ class TestFullDeliverablesExecutor:
         )
         job = await executor.job_svc.get_job(result.job_id)
         items = await executor.job_svc.get_job_items(result.job_id)
-        assert job.progress_total == 4
-        assert job.progress_done == 4
-        assert len(items) == 4
+        assert job.progress_total == 3
+        assert job.progress_done == 3
+        assert job.trio_total == 3
+        assert job.trio_succeeded == 3
+        assert len(items) == 3

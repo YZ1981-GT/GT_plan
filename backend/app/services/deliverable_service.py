@@ -64,11 +64,17 @@ class DeliverableDTO:
 
 @dataclass
 class StoreResult:
-    version: WordExportTaskVersion
+    #: 成功落盘并校验通过时为新版本行；**写盘/校验失败时为 None**（fail-closed，
+    #: 需求 3.1：落盘失败不得创建看似成功的版本）。调用方见到 version=None 必须
+    #: 按失败处理，不得当成功交付。
+    version: WordExportTaskVersion | None
     download_url: str
     platform_persist_failed: bool = False
     file_path: str | None = None
     html_path: str | None = None
+    #: 本次落盘最终文件的指纹（成功时填），由统一 compute_file_fingerprint 计算。
+    file_sha256: str | None = None
+    file_size: int | None = None
 
 
 @dataclass
@@ -468,71 +474,142 @@ class DeliverableService(ExportTaskService):
         file_path = out_dir / fname
         html_path = out_dir / f"{task.doc_type}_v{next_no}.html"
 
-        platform_persist_failed = False
+        # ────────────────────────────────────────────────────────────────
+        # fail-closed（需求 3.1~3.3）：先生成/落盘/校验最终文件，**校验通过**
+        # 才创建成功版本。任一段失败 ⇒ 清理本 attempt 产生的临时/最终文件、
+        # 不创建版本、不删除历史有效版本、返回 version=None + platform_persist_failed。
+        #
+        # 旧实现是 fail-OPEN：写盘失败照样 create_version(file_path=None)，
+        # 留下一个「成功」版本行指向不存在的文件（需求 8.2 明令反转的 blob 降级语义）。
+        # ────────────────────────────────────────────────────────────────
+        from app.services.deliverable_file_fingerprint import (
+            FileFingerprintError,
+            compute_file_fingerprint,
+        )
+
+        wrote_file = False
+        wrote_html = False
         try:
+            # ① 落盘最终文件
             if docx_path and docx_path.exists():
                 file_path.write_bytes(docx_path.read_bytes())
+                wrote_file = True
             elif docx_bytes:
                 file_path.write_bytes(docx_bytes)
+                wrote_file = True
             else:
                 raise ValueError("无文件内容可存储")
 
             if html_content:
                 html_path.write_text(html_content, encoding="utf-8")
-            file_size = file_path.stat().st_size
-        except Exception as exc:
-            logger.error("平台存储写入失败 task=%s: %s", task_id, exc)
-            platform_persist_failed = True
-            file_size = len(docx_bytes) if docx_bytes else 0
-            file_path = None
-            html_path = None
+                wrote_html = True
 
+            # ② 校验最终文件：is_file / 可读 / size>0 / SHA-256（统一指纹入口）
+            fingerprint = compute_file_fingerprint(file_path)
+        except (OSError, ValueError, FileFingerprintError) as exc:
+            logger.error("平台存储落盘/校验失败 task=%s: %s", task_id, exc)
+            # 清理本 attempt 产生的临时/最终文件（不触碰历史有效版本的文件）
+            self._cleanup_attempt_files(
+                file_path if wrote_file else None,
+                html_path if wrote_html else None,
+            )
+            # 清理 create_task 遗留的空占位版本（file_path IS NULL），使 fail-closed 后
+            # 该 task 不残留任何「成功」版本行（需求 3.1：落盘失败不得创建成功版本）。
+            await self._purge_empty_placeholder_versions(task_id)
+            # 不创建版本、不改 task 状态/路径；返回失败结果供上层按失败处理。
+            return StoreResult(
+                version=None,
+                download_url="",
+                platform_persist_failed=True,
+                file_path=None,
+                html_path=None,
+            )
+
+        file_size = fingerprint.size
+
+        # ③ 校验通过 → 创建成功版本并绑定 file_sha256 / file_size
         version = await self.create_version(
             task_id,
-            file_path=str(file_path) if file_path else None,
-            html_path=str(html_path) if html_path and html_path.exists() else None,
+            file_path=str(file_path),
+            html_path=str(html_path) if wrote_html and html_path.exists() else None,
             user_id=user_id,
             source_snapshot_refs=source_snapshot_refs,
             selected_sections=selected_sections,
-            file_size=file_size if not platform_persist_failed else None,
+            file_size=file_size,
             created_via=created_via,
             edited_by=edited_by,
             edited_at=edited_at,
         )
+        # 显式 file_sha256（phase4 新链路由最终落盘文件计算，需求 3.2）；
+        # snapshot_id 直绑三件套共享快照（source_snapshot_refs 内若带 snapshot_id）。
+        version.file_sha256 = fingerprint.sha256
+        if isinstance(source_snapshot_refs, dict):
+            snap_id = source_snapshot_refs.get("snapshot_id")
+            if snap_id:
+                version.snapshot_id = str(snap_id)
 
-        if not platform_persist_failed and file_path and file_path.exists():
-            await DeliverableHashService(self.db).bind_version_hash(
-                version, task, user_id
-            )
+        # 历史 file_hash 链（旁路审计日志绑定）保持不变，复用同一文件
+        await DeliverableHashService(self.db).bind_version_hash(version, task, user_id)
 
-        if not platform_persist_failed:
-            task.file_path = str(file_path)
-            task.html_path = str(html_path) if html_path and html_path.exists() else None
-            task.file_size = file_size
-            # 需求 7.1：继承模式下**不覆盖** task 级快照绑定。
-            # 覆盖会让 stale 判定基准漂移到「最后一次人工编辑的时刻」，
-            # 而该版本内容并未按当时的试算表重算 → staleness 被静默洗白。
-            if not inherit_snapshot_refs:
-                task.source_snapshot_refs = source_snapshot_refs
-            task.selected_sections = selected_sections
-            # 渲染完成并落盘 → 交付物进入 generated 态。
-            # 既覆盖 draft 直接生成，也覆盖经 generating 中间态的标准渲染流程
-            # （draft→generating→generated→editing），避免任务卡在 generating。
-            if task.status in (
-                WordExportStatus.draft.value,
-                WordExportStatus.generating.value,
-            ):
-                task.status = WordExportStatus.generated.value
-            await self.db.flush()
+        task.file_path = str(file_path)
+        task.html_path = str(html_path) if wrote_html and html_path.exists() else None
+        task.file_size = file_size
+        # 需求 7.1：继承模式下**不覆盖** task 级快照绑定。
+        # 覆盖会让 stale 判定基准漂移到「最后一次人工编辑的时刻」，
+        # 而该版本内容并未按当时的试算表重算 → staleness 被静默洗白。
+        if not inherit_snapshot_refs:
+            task.source_snapshot_refs = source_snapshot_refs
+        task.selected_sections = selected_sections
+        # 渲染完成并落盘 → 交付物进入 generated 态。
+        if task.status in (
+            WordExportStatus.draft.value,
+            WordExportStatus.generating.value,
+        ):
+            task.status = WordExportStatus.generated.value
+        await self.db.flush()
 
         download_url = f"/api/projects/{task.project_id}/deliverables/{task_id}/versions/{version.version_no}/download"
         return StoreResult(
             version=version,
             download_url=download_url,
-            platform_persist_failed=platform_persist_failed,
-            file_path=str(file_path) if file_path else None,
-            html_path=str(html_path) if html_path and html_path.exists() else None,
+            platform_persist_failed=False,
+            file_path=str(file_path),
+            html_path=str(html_path) if wrote_html and html_path.exists() else None,
+            file_sha256=fingerprint.sha256,
+            file_size=file_size,
         )
+
+    @staticmethod
+    def _cleanup_attempt_files(*paths: Path | None) -> None:
+        """删除本次 attempt 落盘的临时/最终文件（fail-closed 清理）。
+
+        只删传入的本 attempt 文件，**绝不**遍历目录删历史有效版本的文件。
+        删除本身的 OSError 吞掉（文件可能根本没写成功）。
+        """
+        for p in paths:
+            if p is None:
+                continue
+            try:
+                if p.exists():
+                    p.unlink()
+            except OSError:
+                logger.warning("清理失败文件未成功（忽略）: %s", p)
+
+    async def _purge_empty_placeholder_versions(self, task_id: UUID) -> None:
+        """删除该 task 下 file_path 为空的占位版本行（fail-closed）。
+
+        ``create_task`` 会预建一个无文件的 v1 占位版本；``render_and_store`` 落盘失败
+        时若不清理它，该 task 仍残留一个 file_path IS NULL 的「版本」行 —— 正是
+        需求 3.1 要消除的「看似成功的空版本」。只删 file_path 为空的占位行，
+        **保留**任何已绑定文件的历史有效版本。
+        """
+        await self.db.execute(
+            sa.delete(WordExportTaskVersion).where(
+                WordExportTaskVersion.word_export_task_id == task_id,
+                WordExportTaskVersion.file_path.is_(None),
+            )
+        )
+        await self.db.flush()
 
     async def list_deliverables(
         self,

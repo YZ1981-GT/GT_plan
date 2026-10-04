@@ -44,6 +44,10 @@ def register_report_routers(app: FastAPI) -> None:
 
     app.include_router(deliverable_router, tags=["deliverable-center"])
 
+    # ═══ chain-closure-phase4：交付中心三件套（项目级鉴权 trio 端点，Task 9） ═══
+    from app.routers.deliverable_trio import router as deliverable_trio_router
+    app.include_router(deliverable_trio_router, tags=["deliverable-trio"])
+
     # ═══ deliverable-lineage-and-writeback: 溯源 + 章节状态 ═══
     from app.routers.deliverable_lineage import router as deliverable_lineage_router
     app.include_router(deliverable_lineage_router, tags=["deliverable-lineage"])

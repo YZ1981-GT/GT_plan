@@ -167,6 +167,11 @@ class OnlyOfficeCallbackService:
             edited_by=editor_id,
             edited_at=datetime.now(timezone.utc),
         )
+        # fail-closed（需求 3.1）：落盘/校验失败时无成功版本，不跑差异检测。
+        # 返回 error=1 让 OnlyOffice 认定保存失败（避免客户端误以为已保存）。
+        if stored.version is None:
+            logger.error("OnlyOffice 保存落盘失败 task=%s，未创建版本", task_id)
+            return {"error": 1}
         await self.detect_and_store_report_drift(
             task,
             version=stored.version,

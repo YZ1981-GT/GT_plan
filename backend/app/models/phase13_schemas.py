@@ -148,6 +148,32 @@ class ExportJobResponse(BaseModel):
     items: list[ExportJobItemResponse] = []
 
 
+class ExportJobAttemptResponse(BaseModel):
+    """append-only 尝试历史响应（phase4 Task 7，design §3.3）。
+
+    完整保留原始异常类型、中文消息、诊断细节、时间点、快照与文件指纹；
+    前端据此显示「第 N 次尝试」及其失败原因，刷新 job 不得清空历史。
+    """
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    job_id: UUID
+    item_id: UUID
+    attempt_no: int
+    status: str
+    trigger: str | None = None
+    snapshot_id: str | None = None
+    error_type: str | None = None
+    error_message: str | None = None
+    diagnostic_detail: dict | None = None
+    file_path: str | None = None
+    file_size: int | None = None
+    file_sha256: str | None = None
+    version_id: UUID | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+
+
 class FullPackageRequest(BaseModel):
     """全套导出请求"""
     year: int

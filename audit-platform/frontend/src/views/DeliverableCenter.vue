@@ -18,6 +18,21 @@
       @regenerate="onRegenerateTrio"
     />
 
+    <!-- chain-closure-phase4 Task 11：三件套失败项重试 + 尝试历史。
+         仅当存在三件套 job 时展示；重试入口由权限 + 快照有效性门控（需求 6.3）。 -->
+    <TrioRetryPanel
+      v-if="trioJob"
+      :project-id="projectId"
+      :year="year"
+      :job="trioJob"
+      :attempts="trioAttempts"
+      :can-edit="trioCanEdit"
+      :snapshot-valid="trioSnapshotValid"
+      @job-updated="onTrioJobUpdated"
+      @attempts-updated="onTrioAttemptsUpdated"
+      @snapshot-stale="onTrioSnapshotStale"
+    />
+
     <DeliverableToolbar
       v-model:doc-type="filterDocType"
       v-model:status="filterStatus"
@@ -219,6 +234,7 @@ import { FolderOpened, Reading } from '@element-plus/icons-vue'
 import { downloadFile } from '@/utils/http'
 import ApprovalPanel from '@/components/deliverable/ApprovalPanel.vue'
 import CompletenessBanner from '@/components/deliverable/CompletenessBanner.vue'
+import TrioRetryPanel from '@/components/deliverable/TrioRetryPanel.vue'
 import OnlyOfficeEditor from '@/components/deliverable/OnlyOfficeEditor.vue'
 import DeliverableToolbar from '@/components/deliverable/DeliverableToolbar.vue'
 import DeliverableGroupList from '@/components/deliverable/DeliverableGroupList.vue'
@@ -249,10 +265,15 @@ import {
   rejectDeliverable,
   submitApproval,
   deleteDeliverable,
+  fetchTrioReadiness,
+  fetchTrioJobAttempts,
   type DeliverableItem,
   type DeliverableVersion,
   type OptionalSection,
+  type ExportJobTrioResult,
+  type ExportJobAttempt,
 } from '@/services/deliverableApi'
+import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import {
   checkGenerateReady,
   type DataReadiness,
@@ -346,6 +367,55 @@ const confirmReportLoading = ref(false)
 
 // 生成入口前置数据就绪状态（需求 21.4 / Property 37）
 const readiness = ref<DataReadiness>({ trialBalanceReady: false, reportsReady: false })
+
+// ── chain-closure-phase4 Task 11：三件套 job 失败项重试 + 尝试历史 ──
+const { can: canOp } = usePermissionMatrix()
+/** 当前三件套 job（创建/查询后填充；为空则不展示重试面板）。 */
+const trioJob = ref<ExportJobTrioResult | null>(null)
+/** append-only 尝试历史（轮询刷新时合并，不清空旧原因）。 */
+const trioAttempts = ref<ExportJobAttempt[]>([])
+/** 快照是否仍有效（readiness 阻断 / 重试 409 时置 false）。 */
+const trioSnapshotValid = ref(true)
+/** 编辑/交付权限：report:edit（manager/partner/admin 持有）。 */
+const trioCanEdit = computed(() => canOp('report:edit'))
+
+/** 轮询到新 job 状态：更新本地 job（面板据此刷新进度/完成态）。 */
+function onTrioJobUpdated(job: ExportJobTrioResult) {
+  trioJob.value = job
+}
+/** 尝试历史更新：直接采用面板已 append-only 合并的结果。 */
+function onTrioAttemptsUpdated(attempts: ExportJobAttempt[]) {
+  trioAttempts.value = attempts
+}
+/** 后端 409 / readiness 阻断：标记快照失效，置灰重试并提示重新检查前置链。 */
+function onTrioSnapshotStale() {
+  trioSnapshotValid.value = false
+}
+
+/**
+ * 刷新三件套 job + 尝试历史 + 快照有效性（需求 6.5：刷新不丢历史）。
+ * readiness blocked ⇒ 快照失效。供外部载入既有 job 时调用。
+ */
+async function refreshTrioReadiness() {
+  try {
+    const r = await fetchTrioReadiness(projectId.value, year.value)
+    trioSnapshotValid.value = r.status !== 'blocked'
+  } catch {
+    /* readiness 不可用时不阻断页面，保守置灰由后端 409 兜底 */
+  }
+  if (trioJob.value) {
+    try {
+      const fresh = await fetchTrioJobAttempts(projectId.value, trioJob.value.id)
+      // append-only：合并保留旧原因
+      const byId = new Map<string, ExportJobAttempt>()
+      for (const a of trioAttempts.value) byId.set(a.id, a)
+      for (const a of fresh) byId.set(a.id, a)
+      trioAttempts.value = [...byId.values()].sort((a, b) => a.attempt_no - b.attempt_no)
+    } catch {
+      /* 保留现有历史 */
+    }
+  }
+}
 
 /**
  * 三类生成入口统一前置检查（需求 21.4/21.7）。
@@ -795,7 +865,11 @@ async function runArchive() {
   }
 }
 
-onMounted(loadList)
+onMounted(async () => {
+  await loadList()
+  // 载入三件套快照有效性（有既存 job 时一并刷新尝试历史，需求 6.5）
+  await refreshTrioReadiness()
+})
 </script>
 
 <style scoped>

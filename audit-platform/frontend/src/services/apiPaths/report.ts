@@ -213,6 +213,26 @@ export const deliverables = {
     `/api/projects/${pid}/deliverables/package/${jobId}/download`,
 } as const
 
+// ─── 交付中心三件套（chain-closure-phase4，项目级鉴权 trio 端点，Task 9/10/11） ──
+//
+// 与既有 wordExports（仅登录态）并存但语义不同：本组每个端点经
+// require_project_access 真依赖链校验项目级权限（readiness/状态/下载=readonly，
+// 创建/重试=edit）。prefix = /api/projects/{pid}/deliverables/trio。
+
+export const deliverableTrio = {
+  readiness: (pid: string, year: number) =>
+    `/api/projects/${pid}/deliverables/trio/readiness?year=${year}`,
+  create: (pid: string) => `/api/projects/${pid}/deliverables/trio`,
+  job: (pid: string, jobId: string) =>
+    `/api/projects/${pid}/deliverables/trio/jobs/${jobId}`,
+  attempts: (pid: string, jobId: string) =>
+    `/api/projects/${pid}/deliverables/trio/jobs/${jobId}/attempts`,
+  retry: (pid: string, jobId: string) =>
+    `/api/projects/${pid}/deliverables/trio/jobs/${jobId}/retry`,
+  itemDownload: (pid: string, itemId: string) =>
+    `/api/projects/${pid}/deliverables/trio/items/${itemId}/download`,
+} as const
+
 // ─── Word 导出后台任务（一键生成全套，audit-report-template-integration §14） ──
 
 export const wordExports = {

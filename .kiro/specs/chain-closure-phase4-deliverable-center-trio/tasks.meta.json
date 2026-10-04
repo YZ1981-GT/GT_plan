@@ -1,0 +1,233 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. 基线与入口清册": [
+      {
+        "executionId": "81150c7f-87b8-4e68-9cdf-580538b14ece",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791046212313
+      },
+      {
+        "executionId": "0a5b3091-3b84-4276-b5d7-094628503f08",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791046360919
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791074294950
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791074586404
+      }
+    ],
+    "2. readiness 基线与硬/软闸门": [
+      {
+        "executionId": "81150c7f-87b8-4e68-9cdf-580538b14ece",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791046212374
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791074591038
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791075106068
+      }
+    ],
+    "3. 快照与 schema/ORM 三层一致": [
+      {
+        "executionId": "81150c7f-87b8-4e68-9cdf-580538b14ece",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791046212408
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791075111408
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791075816461
+      }
+    ],
+    "4. 文件指纹与版本 fail-closed": [
+      {
+        "executionId": "81150c7f-87b8-4e68-9cdf-580538b14ece",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791046212443
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791075821152
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791077271009
+      }
+    ],
+    "5. executor 固定顺序与步骤依赖": [
+      {
+        "executionId": "81150c7f-87b8-4e68-9cdf-580538b14ece",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791046212477
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791077276218
+      }
+    ],
+    "6. savepoint 隔离与事务边界": [
+      {
+        "executionId": "81150c7f-87b8-4e68-9cdf-580538b14ece",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791046212536
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791077981417
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791078774798
+      }
+    ],
+    "7. job/item/attempt 不可变历史": [
+      {
+        "executionId": "81150c7f-87b8-4e68-9cdf-580538b14ece",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791046212571
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791078780054
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791079473496
+      }
+    ],
+    "8. 真正重试失败步骤": [
+      {
+        "executionId": "81150c7f-87b8-4e68-9cdf-580538b14ece",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791046212605
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791079478636
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791080247603
+      }
+    ],
+    "9. readiness/生成/重试/下载端点与权限": [
+      {
+        "executionId": "81150c7f-87b8-4e68-9cdf-580538b14ece",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791046212637
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791080253430
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791081076178
+      }
+    ],
+    "11. 前端失败项重试与历史": [
+      {
+        "executionId": "81150c7f-87b8-4e68-9cdf-580538b14ece",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791046212668
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791081081550
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791081943145
+      }
+    ],
+    "12. SQLite 真 ORM/文件故障全链回归": [
+      {
+        "executionId": "81150c7f-87b8-4e68-9cdf-580538b14ece",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791046212703
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791081948480
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791082818392
+      }
+    ],
+    "13. 真 PG 临时 schema 与事务回滚": [
+      {
+        "executionId": "81150c7f-87b8-4e68-9cdf-580538b14ece",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791046212739
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791082824262
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791083435255
+      }
+    ],
+    "17. clean HEAD 对照与冲突归因": [
+      {
+        "executionId": "81150c7f-87b8-4e68-9cdf-580538b14ece",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791046212773
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791083463473
+      }
+    ],
+    "18. 收尾与追溯": [
+      {
+        "executionId": "81150c7f-87b8-4e68-9cdf-580538b14ece",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791046212812
+      },
+      {
+        "executionId": "813b8ac4-a373-47e0-aae2-206d09c272a9",
+        "chatSessionId": "sess_fe0f6586-aa30-4e38-b01a-568b27fefecb",
+        "timestamp": 1791083805993
+      }
+    ]
+  }
+}

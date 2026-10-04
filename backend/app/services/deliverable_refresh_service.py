@@ -190,6 +190,9 @@ class DeliverableRefreshService:
             user_id=actor_id,
             created_via="refresh_section",
         )
+        # fail-closed（需求 3.1）：落盘/校验失败无成功版本，刷新视为失败。
+        if store_result.version is None:
+            raise ValueError("章节刷新落盘失败，未生成版本")
 
         return RefreshResult(
             version_no=store_result.version.version_no,
@@ -334,6 +337,9 @@ class DeliverableRefreshService:
             user_id=actor_id,
             created_via="refresh_stale",
         )
+        # fail-closed（需求 3.1）：落盘/校验失败无成功版本，刷新视为失败。
+        if store_result.version is None:
+            raise ValueError("附注刷新落盘失败，未生成版本")
 
         return RefreshResult(
             version_no=store_result.version.version_no,

@@ -466,6 +466,9 @@ class TemplateFillService:
             file_name=f"audit_report_v{version_no}.docx",
             created_via="generate",
         )
+        # fail-closed（需求 3.1）：落盘/校验失败无成功版本，确认视为失败。
+        if store_result.version is None:
+            raise ValueError("报告正文落盘失败，未生成版本")
 
         # 6. KAM 校验（Word 模式）
         validation_warning = await self._validate_kam(

@@ -28,6 +28,7 @@ from app.deps import get_current_user
 from app.models.core import User
 from app.models.phase13_models import WordExportDocType, WordExportStatus
 from app.models.phase13_schemas import (
+    ExportJobAttemptResponse,
     ExportJobResponse,
     ExportJobItemResponse,
     FullDeliverablesRequest,
@@ -445,6 +446,41 @@ async def get_job_status(
 
 
 # ------------------------------------------------------------------
+# attempt 不可变历史（phase4 Task 7，design §3.3；需求 4.3/4.6/5.4）
+#
+# HTTP 边界说明：正式的交付中心路由（/deliverables/jobs/{job_id} 等）由 Task 9 建立。
+# 本只读端点挂在**既有**、已在 router_registry（report.py）注册的 word-exports 路由下，
+# 用于「TestClient 查询完整历史」的验收，不涉及新增 router 注册；读接口不写库、不 commit。
+# ------------------------------------------------------------------
+
+@router.get(
+    "/jobs/{job_id}/attempts",
+    response_model=list[ExportJobAttemptResponse],
+)
+async def get_job_attempts(
+    project_id: UUID,
+    job_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """返回整个 job 的 append-only 尝试历史（含原始失败原因、单调编号、时间点）。
+
+    刷新时返回**完整**历史，前端不得用空数组覆盖已有 attempt（design §7 末段）。
+    """
+    from app.services.export_job_service import ExportJobService
+
+    job_svc = ExportJobService(db)
+    job = await job_svc.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if job.project_id != project_id:
+        raise HTTPException(status_code=403, detail="任务不属于该项目")
+
+    attempts = await job_svc.get_job_attempts(job_id)
+    return [ExportJobAttemptResponse.model_validate(a) for a in attempts]
+
+
+# ------------------------------------------------------------------
 # 重试失败项 (Stage 2.5)
 # ------------------------------------------------------------------
 
@@ -465,10 +501,20 @@ async def retry_failed_items(
     if job.project_id != project_id:
         raise HTTPException(status_code=403, detail="任务不属于该项目")
 
+    from app.services.full_deliverables_executor import SnapshotMismatchError
+
     try:
-        retried = await job_svc.retry_failed(job_id)
+        retried = await job_svc.retry_failed(
+            job_id,
+            user_id=current_user.id,
+            requesting_project_id=project_id,
+        )
         await db.commit()
         return {"job_id": str(job_id), "retried_count": retried}
+    except SnapshotMismatchError as e:
+        # 快照已变化：绝不在旧快照上混用新数据重试（需求 5.5）。要求重新发起一键出具。
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=e.message)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"重试失败: {str(e)}")
