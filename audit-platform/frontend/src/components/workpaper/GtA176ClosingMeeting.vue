@@ -21,7 +21,7 @@
       <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a176-closing-meeting" />
       <div class="gt-a176__toolbar-right">
         <el-button
-          v-if="mode === '结构化视图' && !props.readonly"
+          v-if="mode === 'html' && !props.readonly"
           size="small"
           type="primary"
           :loading="prefillLoading"
@@ -42,7 +42,7 @@
     </div>
 
     <!-- Structured View -->
-    <div v-if="mode === '结构化视图'" class="gt-a176__content">
+    <div v-if="mode === 'html'" class="gt-a176__content">
       <el-skeleton v-if="loading" :rows="10" animated />
 
       <template v-else>
@@ -180,8 +180,8 @@ const props = withDefaults(defineProps<{
 }>(), { projectId: '', readonly: false })
 
 // ─── Mode Switch ───
-const mode = ref('结构化视图')
-const modeOptions = ref(['结构化视图', '在线编辑'])
+const mode = ref<'html' | 'docx'>('html')
+const modeOptions = ref([{ label: '结构化视图', value: 'html' }, { label: '在线编辑', value: 'docx' }])
 
 // ─── Composable ───
 const wpIdRef = ref(props.wpId)
@@ -200,13 +200,13 @@ const {
 // ─── Dual-mode bidirectional sync ───
 watch(mode, async (newMode, oldMode) => {
   if (!props.wpId) return
-  if (oldMode === '结构化视图' && newMode === '在线编辑') {
+  if (oldMode === 'html' && newMode === 'docx') {
     // 结构化 → OO：先flush保存，再生成docx
     await flushPendingSaves()
     try {
       await api.post(`/api/workpapers/${props.wpId}/a176/generate-docx`, {}, { _silent: true } as any)
     } catch { /* OO will load existing file */ }
-  } else if (oldMode === '在线编辑' && newMode === '结构化视图') {
+  } else if (oldMode === 'docx' && newMode === 'html') {
     // OO → 结构化：从docx同步回DB
     try {
       await api.post(`/api/workpapers/${props.wpId}/a176/sync-from-docx`, {}, { _silent: true } as any)
@@ -298,9 +298,9 @@ async function checkOOHealth() {
     const http = (await import('@/utils/http')).default
     const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
     const healthy = res?.data?.data?.healthy ?? res?.data?.healthy
-    if (!healthy) modeOptions.value = ['结构化视图']
+    if (!healthy) modeOptions.value = [{ label: '结构化视图', value: 'html' }]
   } catch {
-    modeOptions.value = ['结构化视图']
+    modeOptions.value = [{ label: '结构化视图', value: 'html' }]
   }
 }
 

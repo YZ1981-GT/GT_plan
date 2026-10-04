@@ -27,7 +27,7 @@
       </div>
     </div>
 
-    <div v-if="mode === '结构化视图'" class="gt-a182__content">
+    <div v-if="mode === 'html'" class="gt-a182__content">
       <el-skeleton v-if="loading" :rows="8" animated />
       <template v-else>
         <!-- 区块1: 收件人 -->
@@ -207,8 +207,8 @@ defineOptions({ name: 'GtA182RegulatoryCommunication' })
 
 const props = withDefaults(defineProps<{ wpId: string; readonly?: boolean ; projectId?: string }>(), { readonly: false })
 
-const mode = ref('结构化视图')
-const modeOptions = ['结构化视图', '在线编辑']
+const mode = ref<'html' | 'docx'>('html')
+const modeOptions = [{ label: '结构化视图', value: 'html' }, { label: '在线编辑', value: 'docx' }]
 const introCollapse = ref<string[]>([])
 const guidanceCollapse = ref<string[]>([])
 
