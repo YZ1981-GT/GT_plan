@@ -312,44 +312,40 @@ class TestBP6NoAuthoritativeBook:
         assert len(declared) >= 2, f"它应是合册（≥2 字面声明码），实得 {sorted(declared)}"
 
     def test_other_codes_resolve_and_a38_now_resolves_too(self) -> None:
-        """原 `test_other_codes_resolve_but_a38_does_not` —— 🔴 变异证明已**重建**。
+        """双向变异证明（在被测函数的**下一层**注入故障，不替换被测函数本身）。
 
-        原证明用 `rglob` 口径，建立在假事实上 ⇒ 无效。重建后：
-        * 对照组改为「`A3-3` / `A5-1` / `A10-1` 经 `find_template_file_any` 能解析」；
-        * 加 `A3-8` 的**双向**变异：修复**前** `None`、修复**后**得合册。
+        方向②（生产态）：A3-8 经 _find_combined_workbook_declaring 解析到合册。
+        方向①（故障注入）：将 _find_combined_workbook_declaring 临时置为恒 None，
+        A3-8 回到 None —— 证明没有该修复则纯码也解析不到。
+        对照组 A3-3 / A5-1 / A10-1 在两个方向下均不受影响（加法证明）。
         """
-        import subprocess
-        import sys
-        import types
+        from unittest.mock import patch
 
         from app.services import wp_template_finder as FINDER
 
         for code in ("A3-3", "A5-1", "A10-1"):
             assert FINDER.find_template_file_any_unresolved(code) is not None, code
 
-        # 方向②（修复后）
+        # 方向②（修复后 / 生产态）
         after = FINDER.find_template_file_any_unresolved("A3-8")
         assert after is not None, "A3-8 修复后应能解析到合册"
         assert "A3-8" in FINDER._literal_wp_codes_in_filename(Path(after).name)
 
-        # 方向①（修复前）：从 git HEAD 版 finder 现取，不凭记忆写死
-        res = subprocess.run(
-            ["git", "show", "HEAD:backend/app/services/wp_template_finder.py"],
-            cwd=TEMPLATE_DIR.parent.parent, capture_output=True, check=False,
-        )
-        if res.returncode != 0 or not res.stdout:
-            pytest.skip("git show 取不到 HEAD 版 finder（无法做修复前变异）")
-        head = types.ModuleType("_wp_finder_head_lane3")
-        head.__file__ = str(Path(FINDER.__file__))
-        sys.modules[head.__name__] = head
-        exec(compile(res.stdout.decode("utf-8"), head.__file__, "exec"), head.__dict__)
-        assert head.find_template_file_any_unresolved("A3-8") is None, (
-            "修复前 `find_template_file_any('A3-8')` 应为 None —— 双向变异的方向① 失效"
-        )
-        # 对照组在修复前后**一致**（证明新逻辑是加法，没顺带改别人的走向）
-        for code in ("A3-3", "A5-1", "A10-1"):
-            assert head.find_template_file_any_unresolved(code) == \
-                FINDER.find_template_file_any_unresolved(code), code
+        # 方向①（修复前）：在下一层注入故障
+        with patch.object(
+            FINDER,
+            "_find_combined_workbook_declaring",
+            return_value=None,
+        ):
+            assert FINDER.find_template_file_any_unresolved("A3-8") is None, (
+                "禁用 _find_combined_workbook_declaring 后 A3-8 应回到 None "
+                "—— 证明没有合册声明码解析则纯码也解析不到"
+            )
+            # 对照组在故障注入下**仍能解析**（证明新逻辑是加法，没顺带改别人的走向）
+            for code in ("A3-3", "A5-1", "A10-1"):
+                assert FINDER.find_template_file_any_unresolved(code) is not None, (
+                    f"故障注入不应影响 {code} 的解析"
+                )
 
     def test_bp6_global_count_1(self, manifest_slice: dict) -> None:
         """AH-P13 补: 全 slice BP-6 仅 1 条（a38），A 域独占。"""

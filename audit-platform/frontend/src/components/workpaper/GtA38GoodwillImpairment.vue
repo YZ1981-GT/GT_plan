@@ -224,7 +224,7 @@
     <div v-else-if="activeMode === 'docx'" class="gt-a38__docx">
       <GtOnlyOfficeSheet
         :wp-id="wpId"
-        sheet-name="A3-8商誉减值测试"
+        sheet-name="A3-8"
         :project-id="projectId"
         :whole-workbook="true"
         :readonly="readonly"
