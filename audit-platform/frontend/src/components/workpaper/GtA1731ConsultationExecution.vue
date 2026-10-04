@@ -33,7 +33,7 @@
     </div>
 
     <!-- Structured View -->
-    <div v-if="mode === '结构化视图'" class="gt-a1731__content">
+    <div v-if="mode === 'html'" class="gt-a1731__content">
       <!-- Loading -->
       <el-skeleton v-if="loading" :rows="8" animated />
 
@@ -303,8 +303,8 @@ const props = withDefaults(defineProps<{
 }>(), { projectId: '', readonly: false })
 
 // ─── Mode Switch ───
-const mode = ref('结构化视图')
-const modeOptions = ref(['结构化视图', '在线编辑'])
+const mode = ref<'html' | 'docx'>('html')
+const modeOptions = ref([{ label: '结构化视图', value: 'html' }, { label: '在线编辑', value: 'docx' }])
 
 // ─── Composable ───
 const wpIdRef = ref(props.wpId)
@@ -391,9 +391,9 @@ async function checkOOHealth() {
     const { default: http } = await import('@/utils/http')
     const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
     const healthy = res?.data?.data?.healthy ?? res?.data?.healthy
-    if (!healthy) modeOptions.value = ['结构化视图']
+    if (!healthy) modeOptions.value = [{ label: '结构化视图', value: 'html' }]
   } catch {
-    modeOptions.value = ['结构化视图']
+    modeOptions.value = [{ label: '结构化视图', value: 'html' }]
   }
 }
 

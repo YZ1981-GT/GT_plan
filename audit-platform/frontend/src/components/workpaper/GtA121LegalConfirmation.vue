@@ -20,7 +20,7 @@
     </div>
 
     <!-- Structured View -->
-    <div v-if="mode === '结构化视图'" class="gt-a121__content">
+    <div v-if="mode === 'html'" class="gt-a121__content">
 
       <!-- ═══════════ Part 1: 发函 ═══════════ -->
       <el-card class="gt-a121__card gt-a121__card--send" shadow="never">
@@ -336,8 +336,8 @@ const props = withDefaults(defineProps<{
 }>(), { projectId: '', htmlData: null })
 
 // ─── Mode Switch ───
-const mode = ref('结构化视图')
-const modeOptions = ref(['结构化视图', '在线编辑'])
+const mode = ref<'html' | 'docx'>('html')
+const modeOptions = ref([{ label: '结构化视图', value: 'html' }, { label: '在线编辑', value: 'docx' }])
 
 // ─── Composable ───
 const {
@@ -364,16 +364,16 @@ async function checkOOHealth() {
     const { api } = await import('@/services/apiProxy')
     const res = await api.get<any>('/api/workpapers/onlyoffice/health', { _silent: true } as any)
     if (!res?.healthy) {
-      modeOptions.value = ['结构化视图']
+      modeOptions.value = [{ label: '结构化视图', value: 'html' }]
     }
   } catch {
-    modeOptions.value = ['结构化视图']
+    modeOptions.value = [{ label: '结构化视图', value: 'html' }]
   }
 }
 
 // Flush before switching to OO
 watch(mode, async (newMode, oldMode) => {
-  if (oldMode === '结构化视图' && newMode === '在线编辑') {
+  if (oldMode === 'html' && newMode === 'docx') {
     await flushPendingSaves()
   }
 })

@@ -18,7 +18,7 @@
       </span>
     </div>
 
-    <div v-if="mode === '结构化视图'" class="gt-a181__content">
+    <div v-if="mode === 'html'" class="gt-a181__content">
       <el-skeleton v-if="loading" :rows="6" animated />
       <template v-else>
         <!-- 区块1: 收件人 -->
@@ -164,17 +164,17 @@ const syncBridge = useWorkpaperSyncBridge({
   reloadHtml: async () => { await loadData(props.wpId) },
 })
 const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
-const mode = computed<string>({
-  get: () => syncBridge.mode.value === 'oo' ? '在线编辑' : '结构化视图',
+const mode = computed<'html' | 'docx'>({
+  get: () => syncBridge.mode.value === 'oo' ? 'docx' : 'html',
   set: (target) => {
-    if (target === '在线编辑') { void syncBridge.switchToOnlyOffice() }
+    if (target === 'docx') { void syncBridge.switchToOnlyOffice() }
     else if (syncBridge.mode.value === 'oo') { void syncBridge.switchToHtml() }
   },
 })
-const modeOptions = computed(() => ['结构化视图', '在线编辑'].map(v => ({
-  label: v, value: v,
-  disabled: v === '在线编辑' && props.readonly,
-})))
+const modeOptions = computed(() => [
+  { label: '结构化视图', value: 'html' as const, disabled: false },
+  { label: '在线编辑', value: 'docx' as const, disabled: props.readonly },
+])
 
 onMounted(() => { loadData(props.wpId) })
 onBeforeUnmount(() => { flushPendingSaves() })
