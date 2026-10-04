@@ -85,6 +85,63 @@ KNOWN_CHECKSUM_DRIFTS: tuple[KnownChecksumDrift, ...] = (
         "d002d0f2f9abc71b2a91b8c15b0c140fd1237f59b6730b0a992c944743a7d329",
         "应用后被编辑；逐对象核验当前文件声明的 7 个对象在 public 全部存在。",
     ),
+    KnownChecksumDrift(
+        "005",
+        "4c3b449f79b731e05b0d5a956d6f45974e58bd0c13254f3767c6b7ccb42a5a72",
+        "1f090aa8e4b386f8fed4d1a0aadb7d997d8c3d7f4d6dd6afa4a4d83ebb907d97",
+        "应用时为未提交中间版本（已建 4 条 project_isolation 策略 + admin_query_all_working_papers）；"
+        "当前文件新增的 admin_query_all_reports() 从未执行，已由 V178 补齐。逐对象核验其余策略/函数/索引"
+        "在 public 全部存在。",
+    ),
+    KnownChecksumDrift(
+        "006",
+        "5d8bc687d6955c41991a8c6e6fa2e779dbaf57ab3adacc0fa00117753062a826",
+        "e208aa45e2fd7711e28da2198c1d84761c5d9043a4af2879b53c733fdd3e7924",
+        "应用后被编辑：仅 CREATE→CREATE IF NOT EXISTS 幂等化，无新增对象；eqcr_snapshots 表 + 3 索引"
+        "在 public 全部存在，无需补迁移。",
+    ),
+    KnownChecksumDrift(
+        "010",
+        "75b4426d7af3aa6329f7aa27c0df2c3e8d23fec96a297f17afdcb56052ea53f7",
+        "14a8718657cfb215d5532f0cf61be2f7f8ad1f91d6a4e4c93b60ea2de8adbea4",
+        "应用后被编辑：仅 3 个 CREATE INDEX 加 IF NOT EXISTS，无新对象；3 索引在 public 全部存在，"
+        "无需补迁移。",
+    ),
+    KnownChecksumDrift(
+        "016",
+        "1b8bd5a05e34057a30282e5b0d48c0d5cb5ba0c10f1129172432d157c5ca4aed",
+        "d7ad301fcb44bcfffa59274533df28e3bca34b8d064cf5cc953d46aebdeeb69c",
+        "应用后被编辑：ALTER/INDEX 包进 DO $body$ 存在性守卫，对象集合不变；version/previous_version_id"
+        " 列 + 2 索引在 public 全部存在，无需补迁移。",
+    ),
+    KnownChecksumDrift(
+        "017",
+        "4eaa3d8d8c33f7fd57d2afa48ceb5326cc58b4d6e47f280ebcb0af8ab965aed3",
+        "fb46b27d6ab7f2e37c1c67c0a7969dbd3360b94e4684cd426aa0b8301caba3b6",
+        "版本槽文件被替换（原 v3_refinement_tables 重编号至 V037）；新文件 fix_schema_drift 从未由 runner"
+        " 执行，但其声明的 job_status_enum/interrupted/import_jobs 三列效果经其它途径已在 public 全部存在，"
+        "无需补迁移。",
+    ),
+    KnownChecksumDrift(
+        "019",
+        "72eadeb331edeab7e9738d64984cfb74a0e657f9d37f357c61e65a41c5a2d1f6",
+        "ee63dd219d63ceadb782949e7cd67a6ffc74e5c9c705b15db63d20f33d6ad495",
+        "版本槽文件被替换（原 seed_workpaper_template_version 重编号至 V038）；新文件 add_note_section_id_columns"
+        " 从未执行，7 列已由 V051 补，缺失的 ck_disclosure_notes_level_range + 2 索引已由 V179 补齐。",
+    ),
+    KnownChecksumDrift(
+        "051",
+        "48054d52f39a257c013aec7b9966bf7c45b122fa32378c943c3a37101ef36fcf",
+        "5fac975524e9fddf96e47c869cce17a976ea2f24cdac23179b5b9c56e882a9f1",
+        "应用时为未提交 working-tree 版本，最终提交后未再改；当前文件声明的全部列（12 表 deleted_at + 多表列）"
+        "与 3 个 enum 值在 public 全部存在，无需补迁移。",
+    ),
+    KnownChecksumDrift(
+        "057",
+        "d345271b6d5e092e835f10863d244962976836fc33012c268ce9dce1ba686dd4",
+        "bf087518cfe47ac97adbd1e990b0022b50dcfbeb3a817fa2e83586c1c01f1b79",
+        "应用时为未提交 working-tree 版本；editing_locks 表 + 3 索引在 public 全部存在，无需补迁移。",
+    ),
 )
 
 
