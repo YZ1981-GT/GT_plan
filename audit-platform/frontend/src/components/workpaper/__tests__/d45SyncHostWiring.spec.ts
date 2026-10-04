@@ -11,6 +11,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { isD4LegacyOoBlocked } from '../composables/d4Constants'
 
 const TAB = resolve(__dirname, '..', 'd4', 'policy', 'D4TabPolicyCheck.vue')
 const PARENT = resolve(__dirname, '..', 'GtD4OperatingRevenue.vue')
@@ -92,7 +93,13 @@ describe('父级 GtD4OperatingRevenue 不得把 D4-5 并入 isD4DetailSheet', ()
   })
 
   it('D4-5 从父级 OO / 工具条路径排除', () => {
-    expect(parentSrc).toMatch(/currentSheet\s*!==\s*['"]D4-5['"]/)
+    // 原断言锚定字面量 `currentSheet !== 'D4-5'`。该单点特判已收敛进 d4Constants 的
+    // `D4_LEGACY_OO_BLOCKED_SHEETS`（legacy 禁入名单单一真源，同批纳入 D4-4）。
+    // 守护的**意图不变**，改为更强的两段断言：行为层 + 门控源码层。
+    // ① 行为层：D4-5 确实被 legacy 禁入名单挡住（比字面量更贴近真实语义）
+    expect(isD4LegacyOoBlocked('D4-5')).toBe(true)
+    // ② 源码层：宿主 legacy 分支受 `isLegacyOoBlocked` 门控（而非散落的逐 sheet 字面量）
+    expect(parentSrc).toMatch(/renderMode === 'onlyoffice'[\s\S]{0,120}!isLegacyOoBlocked/)
     expect(parentSrc).toContain('<D4TabPolicyCheck')
   })
 })

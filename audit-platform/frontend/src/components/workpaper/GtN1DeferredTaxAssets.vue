@@ -48,7 +48,7 @@
         :wp-id="props.wpId"
         sheet-name="N1A"
         :schema="{ columns: [], rows: [] }"
-        :html-data="{ programs: [], schema: { columns: [], rows: [] } }"
+        :html-data="{ programs: [], trim_decisions: [] }"
         :readonly="isReadonly"
       />
       <!-- N1-1 审定表（资产类借方！期末=期初+借-贷） -->
@@ -113,14 +113,12 @@
         :is-readonly="isReadonly"
         :year="effectiveYear"
         :view-mode="dualMode.isMatrix.value ? 'matrix' : 'structured'"
-        @navigate="handleNavigate"
-        @exit-matrix="dualMode.switchMode('structured')"
       />
       <!-- OnlyOffice fallback: 未迁移 sheet / 参考辅助 -->
       <GtOnlyOfficeSheet
         v-else
         :wp-id="props.wpId"
-        :sheet-name="props.sheetName"
+        :sheet-name="props.sheetName || ''"
         style="height: 100%; min-height: 600px"
       />
     </template>
@@ -156,7 +154,9 @@ import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useN1DualMode } from './composables/useN1DualMode'
+import { isN1HtmlSheet, normalizeN1SheetName } from './composables/n1SheetRouting'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+import { useAuditContext } from '@/composables/useAuditContext'
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
 // Core
@@ -211,11 +211,15 @@ const isReadonly = computed(() => !!props.readonly)
  * 铁律：亏损弥补期限届满/剩余年限判断依赖审计年度，不能用 new Date() 当前年
  * （2026 年做 2025 年报会整体偏一年）。
  */
-const effectiveYear = computed<number | undefined>(() => {
+const auditContextYear = useAuditContext().year
+const effectiveYear = computed<number>(() => {
   if (props.year) return props.year
   const raw = (props.htmlData as any)?.project_context?.audit_year
   const parsed = Number(raw)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+  if (Number.isFinite(parsed) && parsed > 0) return parsed
+  const context = Number(auditContextYear.value)
+  // 审计上下文正常情况下必有年度；0 仅表示「未知」，不会拿当前自然年误判亏损届满。
+  return Number.isFinite(context) && context > 0 ? context : 0
 })
 
 // ─── sheetName → 子组件分发 ──────────────────────────────────────────────────
@@ -237,29 +241,9 @@ const effectiveYear = computed<number | undefined>(() => {
  *   可用以后年度税前利润弥补的亏损检查表的N1-5       → N1-5               → N1TabLossCheck
  *   GT_Custom                                          → skip (hidden)
  */
-const currentSheet = computed(() => {
-  const name = props.sheetName || ''
-
-  // GT_Custom → skip (hidden config sheet)
-  if (name === 'GT_Custom') return 'skip'
-
-  // 提取 N1-N 编码（N1-1 ~ N1-5）
-  const codeMatch = name.match(/N1-[1-5]/)
-  if (codeMatch) return codeMatch[0]
-
-  // 程序表 N1A
-  if (name.match(/N1A/) || name.includes('程序表')) return 'procedure'
-
-  // 附注特殊匹配
-  if (name.includes('上市公司')) return 'disclosure-listed'
-  if (name.includes('国企') || name.includes('国有企业')) return 'disclosure-soe'
-
-  // 底稿目录（默认）
-  if (name.includes('底稿目录') || name === 'N1' || name === '') return 'index'
-
-  // 未匹配 → OO fallback
-  return name
-})
+// 🔴 判定实现收敛到共享路由（BP-10）：披露判定前置于 wp_code 正则 + 国企多写法全认。
+//    原内联实现 `/N1-[1-5]/` 在披露判定之前 —— 与 D2 实测中招的缺陷同形。
+const currentSheet = computed(() => normalizeN1SheetName(props.sheetName))
 
 // ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI/displayPrefs + 挂真实 Host） ───
 // 复核对话与版本历史由 Runtime Boundary 统一 provide('openReviewDialog') + version 承载，
@@ -286,10 +270,7 @@ const supportsMatrix = computed(() => currentSheet.value === 'N1-5')
 const dualMode = useN1DualMode({ wpId: wpIdRef, supportsMatrix })
 
 /** N1-1~N1-5 + 附注 为 HTML 专属组件渲染的 sheet；N1A/GT_Custom 走 OO */
-const isHtmlSheet = computed(() => {
-  const s = currentSheet.value
-  return /^N1-\d+$/.test(s) || s === 'index' || s === 'disclosure-listed' || s === 'disclosure-soe'
-})
+const isHtmlSheet = computed(() => isN1HtmlSheet(currentSheet.value))
 
 /**
  * 支持双模式切换的 sheet = HTML sheet 且非底稿目录。

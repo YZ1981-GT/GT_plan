@@ -14,6 +14,22 @@
     </span>
     <el-button size="small" link type="primary" @click="goNote">查看附注章节</el-button>
     <el-button size="small" link @click="load">刷新状态</el-button>
+    <!--
+      项目级覆盖率（spec disclosure-payload-authority-source / ADR-DPA-002）：
+      本状态条是**单页视角**（只说这一页同步没同步），覆盖率面板补**全项目视角**
+      （还有哪些披露章节从未同步）。挂这里是因为设计 §四 指定「复用既有
+      GtWpDisclosureSyncBar 展示位」，且本组件已一处接入 GtWpRenderer、
+      覆盖全部循环的披露 sheet。
+      🔴 附注侧（DisclosureEditor）入口本轮未挂：该宿主 3401 行、HARD_CAPS 登记
+      ceiling 1800（既有瘦身欠账），pre-commit 门禁硬拒绝任何触碰。
+      见 spec design.md §十三。
+    -->
+    <el-popover placement="bottom-end" :width="380" trigger="click">
+      <template #reference>
+        <el-button size="small" link>项目覆盖率</el-button>
+      </template>
+      <DisclosureSyncCoveragePanel :project-id="projectId" :year="year" />
+    </el-popover>
   </div>
 </template>
 
@@ -22,8 +38,16 @@
  * 底稿披露 sheet 顶部「附注同步状态条」（附注模块联动复盘 P0-2）
  *
  * 一处接入 GtWpRenderer → 覆盖全部循环的披露 sheet：告诉审计师本页披露表
- * 是否已同步到附注、上次同步于何时。解决"46 个 buildXSyncPayload 就绪但
- * 生产零同步记录"的根因之一：UI 上没有"还没做"的可见信号。
+ * 是否已同步到附注、上次同步于何时。解决"载荷构造器已大批就绪但生产同步覆盖率
+ * 很低"的根因之一：UI 上没有"还没做"的可见信号。
+ *
+ * 🔴 此处原写死"46 个 buildXSyncPayload"与"生产零同步记录"，两个数字都过期：
+ *   实际不是零同步而是低覆盖（真库 disclosure_notes 1052 行 / last_sync_at 非空 93）。
+ *   构造器数量**不再写死** —— 它随各循环 spec 增减而漂移，复算口径：
+ *     export function build\w*SyncPayload  于 audit-platform/frontend/src/**\/*.{ts,vue}
+ *   （spec disclosure-payload-authority-source 曾把 46 纠正为 109，而 109 同样是错数，
+ *    穷举 120 种口径组合无一命中，真值 69 —— 教训 T25：换掉过期数字时，新数字必须
+ *    和旧数字同标准验证，否则只是把错数换成错数。见其 design §十四。)
  *
  * 只读：不代替页内「同步到附注」动作（推送依赖各 tab 的 payload builder）。
  */
@@ -32,6 +56,7 @@ import { useRouter } from 'vue-router'
 import http from '@/utils/http'
 import { disclosureNotes as P_dn } from '@/services/apiPaths/report'
 import { resolveDisclosureVariantFromSheet } from './composables/disclosureSyncBar'
+import DisclosureSyncCoveragePanel from '../disclosure/DisclosureSyncCoveragePanel.vue'
 
 const props = defineProps<{
   projectId?: string

@@ -229,6 +229,35 @@ ENTROPY_RX = re.compile(r"Date\.now\(\)|Math\.random\(\)")
 FALLBACK_RX = re.compile(r"\?\?|\|\|")
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# 🔴 扫描器误报：固定槽位持久化键（2026-10-01 复盘 lane 1 Task 15 时登记）
+# ═══════════════════════════════════════════════════════════════════════════
+# KC-6 判别式只看「身份值里有没有下标 token」，分不清两种形态：
+#   ① 动态行身份（行可增删、id 只在载荷内引用）—— 下标 = 缺陷，应值化
+#   ② 固定槽位键（行集合由常量/配置派生、条数固定，rowKey 是**持久化 item_id 的一段**）
+#      —— 下标就是槽位号，必须确定性，**值化 = 数据丢失**
+# lane 1 Task 15 把 ② 也一律换成 `newRowIdentity()`，造成三处真回归：
+#   · k1AdjudicationModel.ts  `a${i}` → `K1-1-aging-gross-a0-unadj`（文件自注「不能改」）
+#     ⇒ 每次渲染换一套 key，存量账龄 AJE/RJE 全部读不回
+#   · k1AdjK11Writeback.ts    `r${i}` → 写 `K1-1-${block}-${rowKey}-${field}`，
+#     同函数仍读 `K1-1-${block}-r${i}-unadj` ⇒ **读写键分叉**，回写进孤儿键
+#   · K5TabAdjudication.vue   `r${i}` → 「从专项表带入」按 rowKey 写 `K5-1-${rowKey}-unadj`，
+#     同文件 L524 仍按 `r${idx}` 读 ⇒ 带入的值写进孤儿键、界面不显示
+# 现已撤回为确定性槽位号。它们从 BP-8 分母里**重分类为误报**（不是「已收敛」）。
+#: (文件名, 身份值原文, 该值流入的 item_id 模板片段) —— 第三元是可伪证依据
+FIXED_SLOT_PERSISTED_KEY_SITES: tuple[tuple[str, str, str], ...] = (
+    ("k1AdjudicationModel.ts", "`a${i}`", "K1-1-aging-gross-a0-unadj"),
+    ("k1AdjK11Writeback.ts", "`r${i}`", "`K1-1-${block}-${rowKey}-${field}`"),
+    ("K5TabAdjudication.vue", "`r${i}`", "`K5-1-${rowKey}-unadj`"),
+)
+
+
+def is_fixed_slot_exempt(p: pathlib.Path, value: str) -> bool:
+    """该命中是否属登记的固定槽位持久化键（扫描器误报）。"""
+    v = value.strip().rstrip(",")
+    return any(p.name == f and v == val for f, val, _ in FIXED_SLOT_PERSISTED_KEY_SITES)
+
+
 def family_of(value: str) -> str:
     """三族判别式 —— 可复算布尔表达式，不是人工归类。
 
@@ -251,6 +280,8 @@ def positional_identity_hits(
         for i, line in enumerate(src.split("\n"), 1):
             for m in IDENTITY_KEY_RX.finditer(line):
                 val = m.group(2).strip()
+                if is_fixed_slot_exempt(p, val):
+                    continue
                 if POSITIONAL_TOKEN_RX.search(val) or POSITIONAL_INTERP_RX.search(val):
                     hits.append(
                         (f"{p.relative_to(ROOT).as_posix()}#L{i}", m.group(1), val)
@@ -401,6 +432,8 @@ def defect_by_entry(files: list[pathlib.Path]) -> dict[int, int]:
         for line in src.split("\n"):
             for m in IDENTITY_KEY_RX.finditer(line):
                 val = m.group(2).strip()
+                if is_fixed_slot_exempt(p, val):
+                    continue
                 if not (
                     POSITIONAL_TOKEN_RX.search(val)
                     or POSITIONAL_INTERP_RX.search(val)
@@ -469,6 +502,132 @@ ROW_IDENTITY_MODULE = (
     WP_COMPOSABLES / "shared" / "rowIdentity.ts"
 )
 ROW_IDENTITY_FACTORY = "newRowIdentity"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 契约目录的「文件 ≠ 契约」口径
+# ═══════════════════════════════════════════════════════════════════════════
+# 🔴 为什么需要这一层：`backend/data/workpaper_sync_contracts/` 里**不全是契约**。
+#   并发的 L 循环 spec 把一张键映射表 `_l_cycle_positional_key_mapping.json` 放进了
+#   这个目录（它的内容是 `{_note, L5..L8, legacy_compat}`，没有 `review_status`，
+#   也不是任何 adapter 的 `{adapter_id}.json`）。
+#
+#   生产侧不受影响 —— `contracts.load_contract()` 按**精确文件名**取，
+#   `phase5_a51` 的分母按 `review_status == "reviewed"` 筛。但 K 的守卫原先按
+#   「目录里每个 `*.json` 都是契约」写，于是被这一个文件打红。那是**口径错**
+#   （前提不成立），不是 K 侧的缺陷。
+#
+#   处置：显式白名单 + **反向断言**（白名单成员必须真的不是契约、且白名单里不得有
+#   失效条目）。只存一句理由的名单是「加一行就变绿」的后门（方法论铁律 ㉗⑤）。
+CONTRACT_DIR = DATA / "workpaper_sync_contracts"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# K 循环真双向晋级账本（2026-10-01）—— 「K 有没有生产契约 / adapter」的唯一真源
+# ═══════════════════════════════════════════════════════════════════════════
+# 🔴 原先 K 守卫写的是「K 循环生产契约数 == 0」「13 条 adapter_id 全 null」—— 那是**晋级前**
+#    的事实。晋级后若把这些判据直接删掉，就失去「谁晋级了、谁没有、为什么」的审计轨迹；
+#    若各文件各写一份清单，就是 N 个漂移面。⇒ 统一读这里，判据改成「恰好等于账本」。
+#: reviewed 生产契约（6 条：调整分录汇总六册）。entry 序号 → contract_id。
+K_REVIEWED_CONTRACTS: dict[int, str] = {
+    1: "k1.baddebt_reversal_writeoff_check",
+    8: "k8.selling_expenses_adjustment",
+    9: "k9.admin_expenses_adjustment",
+    10: "k10.other_income_adjustment",
+    11: "k11.asset_impairment_loss_adjustment",
+    12: "k12.non_operating_income_adjustment",
+    13: "k13.non_operating_expense_adjustment",
+}
+#: 已发布首版 representation 且 manifest 翻成 bidirectional 的 entry（6 条：K1 + 5 条调整表）。
+K_BIDIRECTIONAL_ENTRIES: tuple[int, ...] = (1, 8, 9, 11, 12, 13)
+#: 契约已 reviewed、但**首版发布被 OOXML 安全门拒绝**的 entry 及原因（不是代码缺陷，
+#: 是安全策略裁决：`workpaper_sync_limits.json` 的 `allow_embedded_objects=false`）。
+K_PUBLISH_BLOCKED: dict[int, str] = {
+    10: (
+        "K10 权威模板 `K/K10 其他收益.xlsx` 的 `明细表K10-2` 嵌入了 2 个 Word 对象"
+        "（xl/embeddings/Microsoft_Word___.docx / Microsoft_Word___1.docx），"
+        "OOXML 安全门 embedded_objects 拒绝 ⇒ 首版发布停在 stage 3/10。"
+        "解除需安全策略裁决（放行嵌入对象或剥离后重发模板），不在本 spec 内放宽。"
+    ),
+}
+
+
+#: 13 条 entry 全名（序号 → entry_id）
+K_ENTRY_ID_BY_INDEX: dict[int, str] = {
+    1: "xlsx/gt-k1-other-receivables",
+    2: "xlsx/gt-k2-other-current-assets",
+    3: "xlsx/gt-k3-other-payables",
+    4: "xlsx/gt-k4-other-current-liabilities",
+    5: "xlsx/gt-k5-provisions",
+    6: "xlsx/gt-k6-held-for-sale",
+    7: "xlsx/gt-k7-deferred-income",
+    8: "xlsx/gt-k8-selling-expenses",
+    9: "xlsx/gt-k9-admin-expenses",
+    10: "xlsx/gt-k10-other-income",
+    11: "xlsx/gt-k11-asset-impairment-loss",
+    12: "xlsx/gt-k12-non-operating-income",
+    13: "xlsx/gt-k13-non-operating-expense",
+}
+
+
+def k_expected_manifest_adapters() -> dict[str, str]:
+    """晋级账本推出的期望：{entry_id: adapter_id}（只含已翻 bidirectional 的 5 条）。"""
+    return {K_ENTRY_ID_BY_INDEX[n]: K_REVIEWED_CONTRACTS[n] for n in K_BIDIRECTIONAL_ENTRIES}
+
+
+def k_manifest_adapters(manifest: dict) -> dict[str, str]:
+    """现算：manifest 里 wp_code_patterns 以 K 开头且 adapter_id 非空的 {entry_id: adapter_id}。"""
+    return {
+        e["entry_id"]: e["adapter_id"]
+        for e in manifest["entries"]
+        if e.get("adapter_id")
+        and any(
+            str(p).startswith("K")
+            for p in ((e.get("wp_match") or {}).get("wp_code_patterns") or [])
+        )
+    }
+
+
+def k_reviewed_contract_owners() -> dict[str, str]:
+    """现算：契约目录里 review_status=reviewed 且归属 K 循环的 {文件名: entry_id}。"""
+    import json as _json
+
+    out: dict[str, str] = {}
+    for p in sorted(CONTRACT_DIR.glob("*.json")):
+        doc = _json.loads(p.read_text(encoding="utf-8"))
+        if doc.get("review_status") != "reviewed":
+            continue
+        owner = str((doc.get("review") or {}).get("entry_id") or "")
+        if re.match(r"^xlsx/gt-k(1[0-3]|[1-9])(?![0-9])-", owner):
+            out[p.name] = owner
+    return out
+
+
+#: 契约目录里的**非契约**文件。新增条目必须同时说明归属 spec 与为何放在这里。
+NON_CONTRACT_FILES_IN_CONTRACT_DIR: tuple[str, ...] = (
+    # 归属 l5-l8-inert-switch-and-child-tab-carriers；读它的只有
+    # `test_l_lane3_inert_and_carriers.py`（5 处硬编码该路径）⇒ 本 spec 不搬动它，
+    # 只如实登记。搬家动作是跨 spec 待办。
+    "_l_cycle_positional_key_mapping.json",
+)
+
+
+def contract_dir_split() -> tuple[dict[str, dict], dict[str, dict]]:
+    """把契约目录按「有没有 `review_status`」分成 (契约, 非契约)。
+
+    返回两个 `{文件名: 文档}`。判定依据是**文档结构**而不是文件名前缀 ——
+    `_example.candidate.json` 同样以 `_` 开头，但它是合法 candidate 契约。
+    """
+    import json as _json
+
+    contracts: dict[str, dict] = {}
+    others: dict[str, dict] = {}
+    for p in sorted(CONTRACT_DIR.glob("*.json")):
+        doc = _json.loads(p.read_text(encoding="utf-8"))
+        if doc.get("review_status") is None:
+            others[p.name] = doc
+        else:
+            contracts[p.name] = doc
+    return contracts, others
 
 
 def bp8_expected_defect_total() -> int:

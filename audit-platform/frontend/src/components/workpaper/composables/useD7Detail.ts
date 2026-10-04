@@ -390,9 +390,21 @@ export function useD7Detail(options: UseD7DetailOptions) {
 
   // ─── 期后结转联动 (D7-7 → D7-2) ────────────────────────────────────
 
+  // 🔴 watch 源**必须**同时包含 `rows.value.length`（spec d567-sync-coverage Property 9 实测修复）：
+  //    原来只watch `D7-7-post-rows` 的 remark + `immediate: true` ⇒ 它在 setup 当场就跑一次，
+  //    而那一刻 `rows` 还是空数组（上面的 rows watch 被 `if (!segments.value.length) return`
+  //    挡着，账龄段是异步 fetch 的）⇒ 空数组 map 出来啥也没改；等 rows 真加载好，本 watch 的
+  //    源（post-rows remark）**没变** ⇒ 永不重跑 ⇒ **打开底稿时期后结转联动根本不生效**，
+  //    只有事后再改一次 D7-7 才会补上。这正是 Property 9「回写后下游重算」要覆盖的形态。
+  //
+  //    用 `rows.value.length`（而非 `rows` 本身）作第二源：本回调内部 `rows.value = rows.value.map(...)`
+  //    每次都产生新数组引用，若把 `rows` 直接当源会自触发成死循环；map 不改变长度 ⇒ 用长度当源安全。
   watch(
-    () => allResponses.value.get('D7-7-post-rows')?.remark,
-    (jsonStr) => {
+    [
+      () => allResponses.value.get('D7-7-post-rows')?.remark,
+      () => rows.value.length,
+    ],
+    ([jsonStr]) => {
       if (!jsonStr) return
       let postRows: any[] = []
       try { postRows = JSON.parse(jsonStr) } catch { return }

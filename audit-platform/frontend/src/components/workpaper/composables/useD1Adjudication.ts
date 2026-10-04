@@ -21,8 +21,17 @@ import { parseNum, calcChangeRate, calcSubtotal } from './useD1FormulaEngine'
 import {
   D1_ADJ_CONCLUSION_KEY,
   D1_ADJ_NOTE_KEY,
+  D1_ADJ_ROWS_KEY,
   D1_ADJ_TB_AMOUNT_KEY,
+  D1_ADJ_VALUE_FIELD_MAP,
   d1AdjAnchorByRowKey,
+  readD1AdjCellValue,
+  readD1BadDebtByNoteType,
+  readD1CategoryAmounts,
+  restoreD1AdjDerivedValue,
+  serializeD1AdjRows,
+  syncD1DerivedIntoRows,
+  type D1AdjRowCellStates,
   d1AdjRowKey,
   isD1AdjAnchor,
   readD1AdjudicationTotals,
@@ -53,6 +62,13 @@ export interface AdjudicationDetailRow {
   reasonAnalysis: string
   isFromCrossSheet: boolean
   isEditable: boolean
+  /**
+   * 逐格四态（Task 33）：`{field: 'S1'|'S2'|'S3'|'S4'}`。
+   *
+   * UI 据此显示「已人工覆盖」标记（S2/S4）与「恢复取数」入口（S4 还要能看到双值）。
+   * 无上游派生值的行是 `{}` —— 纯手工，无「覆盖」概念。
+   */
+  cellStates: D1AdjRowCellStates
 }
 
 export interface AdjudicationSection {
@@ -173,6 +189,7 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
     label: string,
     amounts: D1PeriodAmounts,
     isFromCrossSheet: boolean,
+    cellStates?: D1AdjRowCellStates,
   ): AdjudicationDetailRow {
     const rowKey = d1AdjRowKey(section, slug)
     const change = amounts.currentAudited - amounts.priorAudited
@@ -191,8 +208,19 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
       changeRate: calcChangeRate(amounts.priorAudited, amounts.currentAudited),
       reasonAnalysis: readD1AnchorReason(allResponses.value, section, slug),
       isFromCrossSheet,
-      // 跨表取数命中的行不可手工改（以上游明细为准）；净值区块恒只读
-      isEditable: SECTION_META[section].editable && !isFromCrossSheet,
+      /**
+       * 🔴 Task 33：**不再因 cross-sheet 命中而强制只读**。
+       *
+       * 修前是 `SECTION_META[section].editable && !isFromCrossSheet` —— D1-2 一有行，
+       * 该行就变只读，配合「cross-sheet 无条件覆盖显示值」等于审计师的手工值既看不见
+       * 也改不了（静默丢数据）。现在覆盖由逐格四态表达（`cellStates`）：
+       * 改了哪一格就那一格进 S2/S4 并显示覆盖值，其余格继续跟随上游。
+       *
+       * 净值区仍恒只读（`SECTION_META.net.editable === false`）—— 它是公式（原值 − 坏账）。
+       */
+      isEditable: SECTION_META[section].editable,
+      /** 逐格四态（无上游派生值的行为空对象 —— 纯手工无"覆盖"概念）。 */
+      cellStates: cellStates ?? {},
     }
   }
 
@@ -207,6 +235,7 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
 
     return {
       rowKey: `${sectionKey}-subtotal`,
+      cellStates: {},
       label,
       priorUnadjusted: sum('priorUnadjusted'),
       priorAje: sum('priorAje'),
@@ -230,10 +259,24 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
     const t = totals.value
 
     const grossDetailRows = t.categories.map((c) =>
-      buildRow('gross', c.slug, c.label, t.gross[c.slug], t.grossFromCrossSheet[c.slug]),
+      buildRow(
+        'gross',
+        c.slug,
+        c.label,
+        t.gross[c.slug],
+        t.grossFromCrossSheet[c.slug],
+        t.grossCellStates[c.slug],
+      ),
     )
     const bdDetailRows = t.categories.map((c) =>
-      buildRow('bd', c.slug, c.label, t.provision[c.slug], t.provisionFromCrossSheet[c.slug]),
+      buildRow(
+        'bd',
+        c.slug,
+        c.label,
+        t.provision[c.slug],
+        t.provisionFromCrossSheet[c.slug],
+        t.provisionCellStates[c.slug],
+      ),
     )
     // 净值恒 = 原值 − 坏账（源模板 B16=B8-B12），不可手工
     const netDetailRows = t.categories.map((c) =>
@@ -399,11 +442,119 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
     saveImmediate([...byId.values()])
   }
 
-  function updateCell(rowKey: string, field: string, value: number): void {
+  /**
+   * 写侧**单写**（Task 32）：改动落进行数组 `D1-adj-rows` 这一个 item。
+   *
+   * 🔴 改造前这里写的是 per-cell 锚点 `D1-adj-{section}-{slug}-{field}`（纯文本 remark）。
+   *    per-cell 形态装不下四态状态机的第三个量 `snap`（`derivedSnapshot` 只能挂在行对象上）
+   *    ⇒ 不切到行数组，Task 33 的逐格覆盖状态机就没有载体。
+   *
+   * 🔴 旧 per-cell 键**只读不写**：读侧 `readD1AdjRowAmounts` 仍回落它们（既有项目金额不归零），
+   *    写侧不再更新它们。首次编辑某行时 `serializeD1AdjRows` 会把该行原本只在 per-cell 里的
+   *    旧值一并固化进行对象 ⇒ 迁移在编辑时自然完成，不需要批量迁移脚本。
+   *
+   * 🔴 `flushAdjItems()` **不用改**：它按 `isD1AdjAnchor` 前缀收集，而
+   *    `D1-adj-rows` 天然满足 `startsWith('D1-adj-')`（判据钉住这条）。
+   */
+  function updateCell(rowKey: string, field: string, value: number | string): void {
     if (isReadonly.value) return
-    setLocal(d1AdjAnchorByRowKey(rowKey, field), null, String(value))
+
+    // 🔴 非金额字段（`reason` 原因分析，文本）仍写 per-cell 锚点。
+    //    `serializeRows` 只序列化 `spec.valueFields`（数字）与结构键，文本字段会被**丢弃**
+    //    ⇒ 若把 reason 也塞进行数组路径，它会静默丢失。
+    //    实测证据：模板列「原因分析」调的正是本函数（`updateCell(row.rowKey, 'reason', v)`），
+    //    Task 32 切写侧时漏了这个分支 —— 判据 `reason 仍落 per-cell 且不丢` 钉住它。
+    //    读侧 `readD1AnchorReason` 也读 per-cell，两侧口径一致。
+    if (!(field in D1_ADJ_VALUE_FIELD_MAP)) {
+      setLocal(d1AdjAnchorByRowKey(rowKey, field), null, String(value ?? ''))
+      if (saveTimer) clearTimeout(saveTimer)
+      saveTimer = setTimeout(() => {
+        saveTimer = null
+        flushAdjItems()
+      }, 2000)
+      return
+    }
+
+    setLocal(
+      D1_ADJ_ROWS_KEY,
+      null,
+      serializeD1AdjRows(allResponses.value, totals.value.categories, {
+        rowId: rowKey,
+        field,
+        value: parseNum(value),
+      }),
+    )
 
     // Debounce 2s
+    if (saveTimer) clearTimeout(saveTimer)
+    saveTimer = setTimeout(() => {
+      saveTimer = null
+      flushAdjItems()
+    }, 2000)
+  }
+
+  // ─── 四态同步器（Task 33）────────────────────────────────────────────────
+
+  /**
+   * cross-sheet 的**原始派生值**（未经四态合并）—— 同步器的输入与 watch 的触发源。
+   *
+   * 🔴 watch 这个 computed 而不是 `allResponses`：同步器自己会写 store，watch allResponses
+   * 会自激。虽然 `syncD1DerivedIntoRows` 幂等（无变化返 `null`）能兜住死循环，
+   * 但只在上游明细真变时触发更干净（与 D4 的 `watch([crossSheetMainRows, …])` 同构）。
+   */
+  const derivedBySection = computed(() => ({
+    gross: readD1CategoryAmounts(allResponses.value),
+    bd: readD1BadDebtByNoteType(allResponses.value),
+  }))
+
+  /**
+   * 把 cross-sheet 派生值物化进行对象（`stored` + `derivedSnapshot`）。
+   *
+   * 🔴 **只有跑过它，四态才完整**：`snap` 为 `null` 时 `resolveD1AdjCell` 只能按
+   * 「stored 是否非零」降级成 S1/S2，认不出 S3/S4 的「上游已变」维度。
+   *
+   * 🔴 只写未被覆盖的格（S1/S3）；S2/S4 的 stored 保持不动、只推 snap。
+   * 写进 snap 的是 **derived** 而不是显示值 —— 后者在 S2 下等于 stored，写完
+   * `snap == stored` 会让下一次判定认为「未覆盖」⇒ **覆盖标记自我擦除**（D4 的事故）。
+   */
+  function syncDerivedIntoStore(): void {
+    if (isReadonly.value) return
+    const raw = syncD1DerivedIntoRows(
+      allResponses.value,
+      totals.value.categories,
+      derivedBySection.value,
+    )
+    if (raw === null) return // 幂等：无变化不写库
+    setLocal(D1_ADJ_ROWS_KEY, null, raw)
+  }
+
+  watch(derivedBySection, () => { syncDerivedIntoStore() }, { immediate: true, deep: true })
+
+  /**
+   * 恢复取数：把某格从覆盖态退回 S1（纯派生）。`stored ← derived`、`snap ← derived`。
+   *
+   * 🔴 **当场写对**，不靠下一次同步自愈 —— 否则此刻若发生 flushSave / 切 OO，
+   * 库里留的还是覆盖值（D4 判据 P15 的原文要求）。
+   */
+  function restoreDerivedValue(rowKey: string, field: string): void {
+    if (isReadonly.value) return
+    const section: D1AdjSection = rowKey.startsWith('bd-') ? 'bd' : 'gross'
+    const slug = rowKey.slice(section.length + 1)
+    const derived = derivedBySection.value[section]?.[slug]
+    if (!derived) return
+    const camel = D1_ADJ_VALUE_FIELD_MAP[field as keyof typeof D1_ADJ_VALUE_FIELD_MAP]
+    if (!camel) return
+    setLocal(
+      D1_ADJ_ROWS_KEY,
+      null,
+      restoreD1AdjDerivedValue(
+        allResponses.value,
+        totals.value.categories,
+        rowKey,
+        field,
+        parseNum(derived[camel]),
+      ),
+    )
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(() => {
       saveTimer = null
@@ -474,10 +625,20 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
     const targetRowKey = resolveRowKeyFromAccount(detail.debitAccount || detail.creditAccount || '')
     if (!targetRowKey) return
 
+    // 🔴 与 updateCell 同走行数组单写（Task 32）——此处改造前写 per-cell 锚点，
+    //    若只切 updateCell 会让同一格在两种形态间抖动（谁后写谁生效）。
+    //    累加基数用**双读**当前值（行对象优先、回落 per-cell），不是只读 per-cell。
     const fieldSuffix = entryType === 'AJE' ? 'current-aje' : 'current-rje'
-    const itemId = d1AdjAnchorByRowKey(targetRowKey, fieldSuffix)
-    const existing = parseNum(getVal(itemId).remark)
-    setLocal(itemId, null, String(existing + amount))
+    const existing = readD1AdjCellValue(allResponses.value, targetRowKey, fieldSuffix)
+    setLocal(
+      D1_ADJ_ROWS_KEY,
+      null,
+      serializeD1AdjRows(allResponses.value, totals.value.categories, {
+        rowId: targetRowKey,
+        field: fieldSuffix,
+        value: existing + amount,
+      }),
+    )
 
     // Debounce save
     if (saveTimer) clearTimeout(saveTimer)
@@ -528,6 +689,9 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
     autoChangeDescription,
     refreshCrossSheetData,
     updateCell,
+    // Task 33：四态同步器与恢复取数（UI 的「恢复取数」入口调后者）。
+    syncDerivedIntoStore,
+    restoreDerivedValue,
     saveAuditNote,
     saveAuditConclusion,
     aiGenerateNote,

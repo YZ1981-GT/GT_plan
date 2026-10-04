@@ -143,9 +143,35 @@ describe('Property 22: Note Index Additive Non-Regression (Req 17.1, 17.3)', () 
               expect(node.label).toBe(note!.section_title)
               // (3) 叶子 indexRef 恒等于 note:{note_section}
               expect(node.indexRef).toBe(`note:${note!.note_section}`)
-              // (4) 剥离 indexRef 后即为 pre-change 形态 {id,label,data}
-              const { indexRef: _d, ...bare } = node
-              expect(bare).toEqual({ id: note!.id, label: note!.section_title, data: note })
+              // (4) 剥离 indexRef 后，三个**承重字段**仍是 pre-change 形态。
+              //
+              // 🔴 2026-09-28 修：原断言是 `expect(bare).toEqual({id,label,data})`，
+              // 即「剥掉 indexRef 后必须**恰好只剩**这三个键」。叶子后来新增了
+              // `validationStatus`（左树校验状态圆点）⇒ 本条一直红。
+              //
+              // 该判据要证的是「indexRef 是可无损剥离的附加字段」，**不该顺带禁止
+              // 其他附加字段** —— 否则每加一个无关字段都要改这条，它就会长期红着
+              // 变成噪音（本轮正是如此）。故改为：三个承重字段逐值相等 + indexRef
+              // 可剥离；新增字段允许存在，但下方 (4b) 要求它们必须是**已登记**的，
+              // 防"什么都能加"退化成无约束。
+              const { indexRef: _d, ...bare } = node as Record<string, unknown>
+              expect(bare.id).toBe(note!.id)
+              expect(bare.label).toBe(note!.section_title)
+              expect(bare.data).toEqual(note)
+
+              // (4b) 叶子字段集必须落在已登记白名单内（新增字段须显式登记，
+              //      使"加字段"成为一个有意识的动作而不是悄悄发生）
+              const ALLOWED_LEAF_KEYS = new Set([
+                'id', 'label', 'data', 'indexRef',
+                // 左树校验状态圆点（P0-2：由后端 findings 派生）
+                'validationStatus',
+              ])
+              const unexpected = Object.keys(node).filter((k) => !ALLOWED_LEAF_KEYS.has(k))
+              expect(
+                unexpected,
+                `叶子出现未登记字段 ${JSON.stringify(unexpected)}；`
+                + '若为有意新增请加入 ALLOWED_LEAF_KEYS 并说明用途',
+              ).toEqual([])
             }
           })
 

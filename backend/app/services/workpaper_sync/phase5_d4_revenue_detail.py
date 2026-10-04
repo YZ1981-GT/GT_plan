@@ -257,6 +257,14 @@ from app.services.workpaper_sync.phase5_d4_discount_sheet import (  # noqa: E402
     build_store_projection_d419,
     merge_projection_into_d419_rows,
 )
+from app.services.workpaper_sync.phase5_d4_adjustment_sheet import (  # noqa: E402
+    STORE_ITEM_ID_D44,
+    TABLE_KEY_D44,
+    sheet_payload_d44,
+    instrumentation_spec_d44,
+    build_store_projection_d44,
+    merge_projection_into_d44_rows,
+)
 from app.services.workpaper_sync.phase5_d4_product_price_sheet import (  # noqa: E402
     STORE_ITEM_ID_D411,
     sheet_payload_d411,
@@ -421,6 +429,15 @@ _INCLUDE_D418_CUTOFF_SHEET: Final[bool] = True
 #: D4-19 销售折扣与折让检查接入（批次B 第四张，2026-09-20）。单 sheet 单动态行，行身份=id、
 #: 受管列 A-D+F-N、formula_mask E（折扣比例派生）、注入 UUID 列 P。provider=phase5_d4_discount_sheet。
 _INCLUDE_D419_DISCOUNT_SHEET: Final[bool] = True
+#: D4-4 营业收入调整分录汇总接入（2026-09-28，spec d4-4-adjustment-summary-bidirectional-writeback）。
+#: 单 sheet 单动态行，行身份=**rowId**（两种格式并存：前端 `d4a-{base36}-{rand}` / 导入侧 uuid4，
+#: 故 `_rows()` 禁加格式正则）、受管列 **A~J 连续十列**、`formula_mask` **空**（数据区公式格现算 0，
+#: 借贷合计/平衡差额是前端 computed 不落 cell）、UUID 列 **K**（模板 K~O 本就全空 ⇒ 无需注入）。
+#: footer marker = A21「提示：」（提示文本非合计 ⇒ carries_total_formula=False）。
+#: provider=phase5_d4_adjustment_sheet。**本表是 D4 全组最后一张脱离 single_html 的 sheet**。
+#: 🔴 命名取既有惯例 `_INCLUDE_D{n}_{名字}_SHEET`（同 D419/D417/D420/D434/D48 五个先例），
+#:    spec design §3 写的 `_INCLUDE_D44_SHEET` 与惯例不符，已在 tasks.md 登记更正。
+_INCLUDE_D44_ADJUSTMENT_SHEET: Final[bool] = True
 #: D4-11 产品销售价格分析接入（批次B 第五张，2026-09-20）。单 sheet 单动态行，行身份=rowId
 #: （前端本轮新增+backfill）、受管列 B-I/K/M/N/O、formula_mask J/L（差异率派生）、注入 UUID 列 P。
 #: provider=phase5_d4_product_price_sheet。
@@ -532,6 +549,7 @@ STORE_ITEM_IDS: Final[tuple[str, ...]] = (
     *((STORE_ITEM_ID_D417,) if _INCLUDE_D417_CUTOFF_SHEET else ()),
     *((STORE_ITEM_ID_D418,) if _INCLUDE_D418_CUTOFF_SHEET else ()),
     *((STORE_ITEM_ID_D419,) if _INCLUDE_D419_DISCOUNT_SHEET else ()),
+    *((STORE_ITEM_ID_D44,) if _INCLUDE_D44_ADJUSTMENT_SHEET else ()),
     *((STORE_ITEM_ID_D411,) if _INCLUDE_D411_PRICE_SHEET else ()),
     *((STORE_ITEM_ID_D410,) if _INCLUDE_D410_PRICE_SHEET else ()),
     *(store_item_ids_d420() if _INCLUDE_D420_RETURN_SHEET else ()),
@@ -862,6 +880,15 @@ def instrumentation_specs() -> tuple:
                 ),
             )
             if _INCLUDE_D418_CUTOFF_SHEET
+            else ()
+        ),
+        *(
+            (
+                instrumentation_spec_d44(
+                    entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
+                ),
+            )
+            if _INCLUDE_D44_ADJUSTMENT_SHEET
             else ()
         ),
         *(
@@ -1204,6 +1231,9 @@ def build_contract_payload() -> dict[str, Any]:
             *([sheet_payload_d417()] if _INCLUDE_D417_CUTOFF_SHEET else []),
             *([sheet_payload_d418()] if _INCLUDE_D418_CUTOFF_SHEET else []),
             *([sheet_payload_d419()] if _INCLUDE_D419_DISCOUNT_SHEET else []),
+            # D4-4 营业收入调整分录汇总：单动态行表，行身份 rowId（两格式并存），
+            # 受管 A~J 十列连续，formula_mask 空，UUID 列 K（现成空列）。
+            *([sheet_payload_d44()] if _INCLUDE_D44_ADJUSTMENT_SHEET else []),
             *([sheet_payload_d411()] if _INCLUDE_D411_PRICE_SHEET else []),
             *([sheet_payload_d410()] if _INCLUDE_D410_PRICE_SHEET else []),
             *([sheet_payload_d420()] if _INCLUDE_D420_RETURN_SHEET else []),
@@ -1851,6 +1881,13 @@ def build_combined_store_projection(
         if _INCLUDE_D418_CUTOFF_SHEET
         else []
     )
+    # 🔴 `payloads.get(..., [])` 的默认值必须是 **`[]`** 而不是 `{}`：D4-8 曾用 `{}`，
+    #    `_decode` 对非 list 返回非 list ⇒ `_rows` 拿不到行 ⇒ **静默把 180 个 cell 全投 0**。
+    d44_projs = (
+        [build_store_projection_d44(payloads.get(STORE_ITEM_ID_D44, []), contract=contract, limits=limits)]
+        if _INCLUDE_D44_ADJUSTMENT_SHEET
+        else []
+    )
     d419_projs = (
         [build_store_projection_d419(payloads.get(STORE_ITEM_ID_D419, []), contract=contract, limits=limits)]
         if _INCLUDE_D419_DISCOUNT_SHEET
@@ -1935,7 +1972,7 @@ def build_combined_store_projection(
     values.update(fixed.values)
     if d413_fixed is not None:
         values.update(d413_fixed.values)
-    for proj in (d421, d422, d423, d424, d435, d41, d49, *ipo_checklist_projs, *inspection_projs, *interview_projs, *d46_projs, *d417_projs, *d418_projs, *d419_projs, *d411_projs, *d410_projs, *d420_projs, *d433_projs, *d48_projs, *d434_projs, *d436_projs, *d47_projs, *d414_projs):
+    for proj in (d421, d422, d423, d424, d435, d41, d49, *ipo_checklist_projs, *inspection_projs, *interview_projs, *d46_projs, *d417_projs, *d418_projs, *d419_projs, *d44_projs, *d411_projs, *d410_projs, *d420_projs, *d433_projs, *d48_projs, *d434_projs, *d436_projs, *d47_projs, *d414_projs):
         values.update(proj.values)
     if d429 is not None:
         values.update(d429.values)
@@ -1961,6 +1998,7 @@ def build_combined_store_projection(
         **{k: v for p in d417_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d418_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d419_projs for k, v in dict(p.row_keys).items()},
+        **{k: v for p in d44_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d411_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d410_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d420_projs for k, v in dict(p.row_keys).items()},
@@ -2040,6 +2078,17 @@ def merge_projection_into_all_d4_stores(
             )
         }
         if _INCLUDE_D418_CUTOFF_SHEET
+        else {}
+    )
+    # D4-4：merge 返回**裸 list** ⇒ 依赖 `_RAW_PAYLOAD_ITEM_TABLE_KEYS` 归一成 4-tuple。
+    d44_results = (
+        {
+            STORE_ITEM_ID_D44: merge_projection_into_d44_rows(
+                projection=projection,
+                base_payload=base_by_item.get(STORE_ITEM_ID_D44, []),
+            )
+        }
+        if _INCLUDE_D44_ADJUSTMENT_SHEET
         else {}
     )
     d419_results = (
@@ -2145,6 +2194,7 @@ def merge_projection_into_all_d4_stores(
         **d417_results,
         **d418_results,
         **d419_results,
+        **d44_results,
         **d411_results,
         **d410_results,
         **d420_results,
@@ -2178,6 +2228,11 @@ _RAW_PAYLOAD_ITEM_TABLE_KEYS: Final[dict[str, tuple[str, ...]]] = {
     STORE_ITEM_ID_D417: ("d4_17_rows",),
     STORE_ITEM_ID_D418: ("d4_18_rows",),
     STORE_ITEM_ID_D419: ("d4_19_rows",),
+    # 🔴 D4-4 必须在此登记：`merge_projection_into_d44_rows` 返回裸 list，漏登记会让
+    #    `_normalize_merge_updates` 归一不到 4-tuple ⇒ `store_mirror.py` 的硬解包
+    #    `for item_id, (merged_rows, applied, _visited, _touched) in updates.items()`
+    #    抛 `ValueError` ⇒ **打挂整个 entry 的回写**（D4-8 踩过）。
+    STORE_ITEM_ID_D44: (TABLE_KEY_D44,),
     STORE_ITEM_ID_D411: ("d4_11_rows",),
     STORE_ITEM_ID_D410: ("d4_10_rows",),
     "D4-20-summary": ("d4_20_summary",),

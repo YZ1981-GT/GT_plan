@@ -122,7 +122,7 @@
 | 1 | D4-1 | 营业收入审定表 | d4-1-adjudication (12/12) | ✅ d41-managed(同sheet双区) | D4TabAdjudication | ✅ | ✅ (2026-09-20落地,e2e/L2 REQUEST_PATH级证据已在,真OO canvas待env) |
 | 2 | D4-2 | 主营业务收入明细 | d4-revenue-matrix (11/13) | ✅ d42-managed | 宿主走桥 | ✅ | ✅ |
 | 3 | D4-3 | 其他业务收入明细 | d-cycle-expansion (9/9) | ✅ d43-managed | D4TabOtherRevenue(宿主走桥) | ✅ | ✅ |
-| 4 | D4-4 | 调整分录汇总 | gap-closure (0/5) | ❌ | — | — | ⬜ 已裁 single_html(无行身份列) |
+| 4 | D4-4 | 调整分录汇总 | d4-4-adjustment-summary (2026-09-28) | ✅ d44-managed | D4TabAdjustment | ✅ | ✅ (原 `⬜ single_html` 裁决已推翻，见第十二轮) |
 | 5 | D4-5 | 会计政策检查 | d-cycle-expansion | ✅ d45-managed | D4TabPolicyCheck | ✅ | ✅ |
 | 6 | D4-6 | 重要指标分析 | d-cycle-expansion | ✅ d46-managed(批次B从零) | D4TabIndicator | ✅ | ✅ (批次B 2026-09-20落地,真OO待验) |
 | 7 | D4-7 | 毛利率分析 | d-cycle-expansion | ✅ d47-managed | D4TabMarginMonthly | ✅ | ✅ (动态产品区+静态月度区,gen76) |
@@ -161,13 +161,18 @@
 > 🔴 **重要口径**：下方「✅」是**三维代码全绿（REQUEST_PATH 级）**——后端契约 + 前端接桥 + 宿主登记齐全。但**没有一张到主控 §6.4 的 `ONLYOFFICE_VERIFIED`**（需真实 OO 往返产生 `working_paper_content_application` state=applied + operation 终态 + OO 侧 content version，见 §9.5）。真 OO 验证是 env 门（start-dev.bat 全栈 + OO 容器），列为批次C。
 > 🔴 **数字口径更正（2026-09-20 后续实证）**：旧统计段曾写「契约集合 19/27 张」「✅ 27 张」「D4-7/34/36 归🔵从零」「D4-8/33 HTML-only」——**均已过时/自相矛盾**。以本段为准（契约磁盘实测 32 张；D4-33/34/36/7 已落地为 ✅；D4-8 因非法 key 修复+落盘转 🟡 半接入）。
 
-- ✅ 三维代码全绿(REQUEST_PATH)：**34 张** — D4-1/2/3/5/6/7/8/9/10/11/**12**/**14**/15/16/17/18/19/20/21/22/23/24/25/26/27/28/29/30/31/32/33/34/35/36
-  - 前端宿主 `isD4DedicatedSyncSheet` 登记 32 张（D4-1/5/6/7/8/9/10/11/**12**/**14**/15~36 除 D4-4/13）；D4-2/3 走宿主统一桥
+- ✅ 三维代码全绿(REQUEST_PATH)：**35 张** — D4-1/2/3/**4**/5/6/7/8/9/10/11/**12**/**14**/15/16/17/18/19/20/21/22/23/24/25/26/27/28/29/30/31/32/33/34/35/36
+  - 前端宿主 `isD4DedicatedSyncSheet` 现算登记 **34 张**（含新增 `'D4-4'`）；D4-2/3 走宿主统一桥
+  - 磁盘契约现算 **36 张 sheet_key / 785 受管字段**（2026-09-28 新增 `d44-managed` + 10 字段）
+  - `D4_LEGACY_OO_BLOCKED_SHEETS` 现算仅剩 **`['D4-5']`**（D4-4 接桥后已摘除）
 - 🟡 半接入(后端契约已落但前端未接桥 / representation 未 rematerialize)：**0 张**
 - ⏸ 待专项 spec(硬约束,非机械 provider)：**0 张** — D4-12 已于 2026-09-20 经 `d4-12-transposed-writeback`（15/15）落地：泛化绑死 D4-29 的转置引擎为参数化 `TransposedSheetSpec` + 注册表分派（D4-29 逐字节/mapping_digest 零回归）→ D4-12 provider（首列 B、21 字段 R11-R31、GT-CONTRACT- 载体）→ instrument 注入 definedName+隐藏载体行→契约 34 张→发布 gen83→前端接桥+宿主登记，转 ✅ 三维代码全绿。D4-14 已于 2026-09-21 经路线A全受管落地转 ✅
-- ⬜ 裁决 single_html/N/A：**2 张** — D4-4(无行身份列) / D4-13(纯叙述文本表)
+- ⬜ 裁决 single_html/N/A：**1 张** — D4-13(纯叙述文本表)
+  - 🔴 **D4-4 已于 2026-09-28 移出本类**：原裁决理由「无行身份 UUID 列载体」经 openpyxl 实测
+    **不成立**（模板 A1:J23 的 K~O 五列全空，紧邻受管末列 J 右侧即 K；且前端
+    `D4AdjustmentRow` 本就有 `rowId`）⇒ 转 ✅ 三维代码全绿。详见第十二轮。
 
-> 校验：34 + 0 + 0 + 2 = 36 ✓
+> 校验：35 + 0 + 0 + 1 = 36 ✓（2026-09-28 D4-4 从 ⬜ 转 ✅ 后重算）
 > 契约集合现 **34 张**（+d4-12-managed，转置 21 字段 R11-R31 首列 B；此前 33 张含 d414-managed）；entry `xlsx/gt-d4-operating-revenue`
 > 磁盘契约 `assert_contract_file_matches_source` = OK（此前因 D4-8 非法 key 一直 DRIFT 红态，已修复消除）。
 > ✅ **D4-8 的 representation 已发布**（commit `98ab0eaef`）：rematerialize **gen 81→82 / revision 106**，
@@ -394,7 +399,10 @@
    - ✅ **落地记录（2026-09-20）**：核心 = 把绑死 D4-29 的转置引擎**泛化**为参数化 `TransposedSheetSpec`（geometry/identity/store 形态全字段）+ `transposed_registry.resolve_transposed_specs` 注册表分派，`adapters/excel.py` 4 处旁路（materialize 单/多 binding + extract + verify）从「if is_enabled 单例」改「for spec 遍历」，`published_identity_observer` 转置 anchor 识别一并泛化（原硬编码 D4-29 SHEET_KEY/DEFINED_NAME/首列 C）。**D4-29 零回归实证**：materialize sha256 count=0/2/12/14 逐字节 == 泛化前、extract 逐字段 ==、mapping_digest `e3193dd9…` 逐字符不变（`evidence/d429-zero-regression.json` + 变异守卫 `test_d429_unaffected_when_registry_only_d429`）。D4-12 provider `phase5_d4_12_contract`（首列 **B**≠D4-29 的 C、21 字段 R11-R31、扁平 store `D4-12-contracts-v2`、`GT-CONTRACT-` 载体、`contractAmount` value_type=amount、mapping_digest `2d3a1c5f…` 冻结）。instrument 注入走既有 `excel_instrumentation` transposed_sheets 分支（实测 D4-29 的 definedName+载体行也是 instrument 注入而非模板预置，故 D4-12 零新注入代码）。发布链 gen82→83（contract `0e2023fa`，34 张含 d4-12-managed），无 Roundtrip/FooterAnchor/SoftTimeout。前端 `D4TabContract.vue` 接 `useWorkpaperSyncBridge`+`WorkpaperSyncEditorHost`（替 legacy `GtOnlyOfficeSheet`）+ 三态中文 tag，宿主 `isD4DedicatedSyncSheet` 含 'D4-12'。守卫 `test_transposed_registry`(10)/`test_d4_12_contract`(6)/`test_d4_12_transposed_roundtrip`(11,真 instrument 往返)/`test_d4_12_mirror_consume`(5,第四维)/`mutate_d4_12_transposed_guards`(4 锚点全 RED + 每条 D4-29 回归绿)/`d4ContractSyncHostWiring.spec.ts`(10) 全绿；D4 辐射面 340 passed 零回归。真 OO canvas 往返 env 门（批次C，同全组标准）。
    - 🔴 **发布链途中修复一处 pre-existing bug（与 D4-12 无关）**：`d43_rematerialize_dual_sheet._read_store_map` 对缺失 store item 统一塞 `EMPTY_STORE_PAYLOAD("[]")`，但 dict-store（D4-31 singleton `{}` / D4-9 / D4-35）拿 `"[]"` 被 `build_store_projection` 判「必须是单对象/字典」抛 `ValueError` 打挂整册 rematerialize。修复 = 缺失时**不塞该 key**（fixed_ids 除外），让 `build_combined_store_projection` 的 `payloads.get(item, <per-item 默认>)` 用 provider 单源默认；回归守卫 `test_dict_store_missing_key_uses_provider_default_not_empty_list`。
    - ✅ **D4-14 已完成（2026-09-21，见上方第 3 条）**：源模板物理列冻结（`营业收入发生检查表D4-14` A1:AK52，37 物理列，R13-14 两级表头，数据区 R15-36，footer 单行 `合计` R37），footer/引擎非障碍。裁决门经审计业务复核**签署确认路线A（全受管）**，14+2 无对应字段列全补前端字段，Phase 0-5 全落地。（此前"12 任务全未开始 / 待签署"记录已过时作废。）
-5. **D4-4/D4-13** 保持裁决（single_html / N/A），不做单元格双向。
+5. ~~**D4-4/D4-13** 保持裁决（single_html / N/A），不做单元格双向。~~
+   🔴 **D4-4 部分已作废（2026-09-28）**：其 `single_html` 裁决的两条理由经实测均不成立，
+   已落地真双向（spec `d4-4-adjustment-summary-bidirectional-writeback`，见第十二轮）。
+   **D4-13 的 N/A 裁决仍然有效**（纯叙述文本表，无行维度）。
 
 ## 关键教训（写入本清册以防再犯）
 
@@ -865,3 +873,1246 @@ DELETE 200 之后 GET /formulas 仍返回该条）。同款缺陷在 `list_by_wp
   `test_task21_room_service.py`（AST 判据收窄+扩面）/ `test_wp_formula_endpoint.py`（回读断言）/
   `useD4SyncMode.spec.ts`（缓存/去重/forceRefresh）
 - 证据刷新：`docs/operations/evidence/d4-bidirectional-acceptance/D4-{1..36}.json`（30 份，全量重跑）
+
+---
+
+## 2026-09-28 第六轮：D4-4 裁决复核（两条理由均已不成立）+ legacy OO 活口封堵 + 三处口径勘误
+
+> **本轮触发**：用户要求「聚焦 D4-4」复核双向回写与公式管理的改进空间。逐条重算上方清册对 D4-4 的
+> `⬜ single_html` 裁决后发现：**两条理由现均不成立**，且 D4-4 当时存在一条**活的 legacy OnlyOffice
+> 通道**（能进、能编、改动不回 store）。本段同时勘误四处已过期的统计口径。
+> **本轮只做低风险即修项 + 出 spec**；`d44-managed` 的真双向落地跨前后端且需 live PG 发布链，按铁律
+> 「>500 行 / 3+ 组件 / 跨前后端 = 先写 spec」另立专项 spec，不在本轮直接改。
+
+### ① D4-4 裁决两条理由逐条复核 —— 均已不成立
+
+上方 `d4-adjustment-and-analysis-gap-closure` Task 1 的原裁决：「owner 已裁决 = single_html
+（不可单元格级双向），理由实证成立：**hub store 被 A13/借贷平衡语义占用**、**模板无行身份 UUID 列载体**」。
+
+**理由①「模板无行身份 UUID 列载体」→ 不成立**（openpyxl 实测三本含该 sheet 的册，几何逐字一致）：
+
+| 项 | 实测值 |
+|---|---|
+| sheet 名 / 范围 | `营业收入调整分录汇总D4-4` / `A1:J23` |
+| 表头 | R5，A~J **10 列**（调整事项说明/类别/报表项目/科目名称/附注项目/……/借方调整金额/贷方调整金额/索引/备注） |
+| 数据区 | R6~R20（15 行空白），R21 = 提示文本（非合计行） |
+| **数据区公式格** | **0**（该册仅 6 个公式在 R3/R4 表头引用「底稿目录」，不在受管区） |
+| **UUID 载体候选** | **K/L/M/N/O 五列全空**；紧邻 `max_column`(J) 右侧第一个空列即 **K** |
+| sheet-scope definedName | 0（两本）/ 4（一本，均非 `GT_` 前缀） |
+
+「模板没有 UUID 列」是事实，但**从来不是阻塞**：D4-12 的落地方式正是 instrument 注入 definedName +
+隐藏载体行，D4-8 是 definedName 锚定静态区。D4-4 有现成空列，**连隐藏行都不用加**，门槛低于 D4-12。
+且该理由隐含的「前端无行身份」**已过期**：`useD4Adjustment.ts` 的 `D4AdjustmentRow` 已有 `rowId`
+（`d4a-{base36}-{rand}`），`removeRow(rowId)` **按身份删**（非 index），真库 3 行全带 rowId。
+对比 D4-7 当初的阻塞之一正是「前端 products 无 rowId，须补 rowId + backfill」—— **D4-4 这一步已不用做**。
+
+**理由②「hub store 被 A13/借贷平衡语义占用」→ 不成立**（现读 `useD4Adjustment.ts` 287 行）：
+
+- `debitTotal` / `creditTotal` / `balanceDiff` / `isBalanced` 全是 `computed`，**不落库**
+- `pushToA13(rowIds)` / `publishAdjustment()` 只读 `rows` 后 `eventBus.emit`，**不写 store**
+- `useAdjustmentCentralSync.ts`（218 行）**零写路径**（无 `api.post/put`、无 `.set()`、无 dispatchEvent）
+
+落库的 `D4-4-rows` 就是纯粹的 10 字段行数组 JSON。对比 D4-1 审定表 —— 其 store 还要承载
+`publish-to-tb` 发布门，语义占用**更重**，却已落地 `d41-managed`（同 sheet 双区 14 字段）。
+
+**第三个可能阻塞（footer）亦排除**：`contracts.py:712` 为 `footer_anchor: FooterAnchorSpec | None = None`
+（可选），且已有 **3 个无 footer 声明的 D4 provider 先例**（`phase5_d4_erp_check_sheet` /
+`_other_margin_sheet` / `_product_margin_sheet`）。D4-4 无「合计」行不构成阻塞。
+
+⇒ **结论**：D4-4 是 D4 剩余表中**几何最简、落地成本最低**的一张（单区动态行表、10 列 1:1、公式格 0、
+无 footer、非转置、非静态矩阵），却是唯一被永久裁 N/A 的。已立专项 spec 承接（见 §④）。
+
+### ② 🔴 已修：D4-4 的 legacy OnlyOffice 活口（本轮真实风险，优先于落地双向）
+
+宿主 `GtD4OperatingRevenue.vue` 的 legacy 分支原条件为
+`renderMode === 'onlyoffice' && !isD4DedicatedSyncSheet && currentSheet !== 'D4-5'`。逐项代入现算名单
+（`isD4DetailSheet` 7 码 = D4-2/3/6/7/30/31/32；`isD4DedicatedSyncSheet` **33** 码；`KNOWN_HTML_SHEETS`
+38 码）得 **legacy 实际命中集 = {D4, D4A, D4-4, D4-22A, D4-31T}** 共 5 张。其中 D4/D4A/D4-22A/D4-31T
+无结构化 store（目录页 / 程序表 / 访谈示例），走 legacy「看原册」是**合理用途**；**只有 D4-4 有 store
+载荷**。按本文件顶部判据三维自身的定义（「走 legacy `GtOnlyOfficeSheet`（未接桥＝**假双向/单向**）」），
+用户可在 D4-4 点「在线编辑」正常进入 OO 并编辑，改动不回 HTML store —— **静默数据丢失**，比「不给入口」
+更危险。`ooSheetName` 经 `resolveD4SheetLabel('D4-4', …)` 解析为真实存在的
+`营业收入调整分录汇总D4-4`，即**确实打得开**，不是打不开。
+
+**修复**（诚实降级优于静默丢失）：新增 `d4Constants.ts` 的 `D4_LEGACY_OO_BLOCKED_SHEETS`
+（legacy 禁入名单**单一真源**，含三条入名单判据与移除条件），宿主据此：`renderMode` getter 对禁入表
+恒 `'html'`（不能只靠模板分支挡 —— `dualMode.mode` 是宿主级单例且切 sheet 不重置，会残留
+`onlyoffice` 使 segmented 选中态错位）、setter no-op、「在线编辑」选项恒 `disabled`、工具栏显示
+`本表暂不支持在线编辑`（带 title 说明原因）。原 `currentSheet !== 'D4-5'` 单点特判**收敛进该名单**
+（D4-5 已在 dedicated 内，本不可能命中，属冗余残留；行为逐字等价）。
+
+守卫 `composables/__tests__/d4LegacyOoBlocked.spec.ts`（7 tests）采**双向判据**：正向 D4-4/D4-5 被挡
++ **反向变异证明**（D4/D4A/D4-22A/D4-31T 仍放行）—— 否则「把 legacy 通道整个堵死」也能让正向变绿，
+而那会破坏 4 张无载荷表的合理用途。另 `d45SyncHostWiring.spec.ts` 原锚定字面量
+`/currentSheet\s*!==\s*['"]D4-5['"]/` 的断言**等价更新**为行为层 + 门控源码层（守护意图不变）。
+**变异反证已实做**：名单改空集 → 5 红（含「D4-4 被挡」），还原后 7 passed。
+
+⇒ **D4-4 的 `⬜ single_html` 现在是"名实相符"的**：此前是「标 single_html 但实际有 OO 单向活口」。
+
+### ③ 四处统计口径勘误（本轮现算，上方各段对应数字已过期）
+
+| 项 | 上方记录 | **2026-09-28 现算** |
+|---|---|---|
+| 契约 `d4.revenue_detail.json` sheet 数 | 34 张 | **35 张**（新增 `d413-managed`） |
+| 受管字段总数 | 751 | **775**（`text 327 / amount 417 / ratio 9 / boolean 20 / json 2`） |
+| 宿主 `isD4DedicatedSyncSheet` 登记 | 32 张 | **33 张**（含 D4-13） |
+| 裁决 `⬜ single_html/N/A` | **2 张**（D4-4 / D4-13） | **1 张**（仅 D4-4） |
+| 平台 `legacy_fake_bidirectional` | 137 | **135** |
+
+🔴 **其中最需更正的是 D4-13**：上方逐张清册记「D4-13 ⬜ evidence 裁 N/A（纯叙述文本表）」，但契约现已
+含 `d413-managed`（2 字段 `process`/`conclusion`，静态 `defined_name_ref` 锚定 `GT_MANAGED_REGION_D413`，
+provider `phase5_d4_erp_check_sheet.py`），前端 `D4TabErpCheck.vue` 已接（`d413-managed` ×2），宿主
+dedicated 已含 `'D4-13'` ⇒ **D4-13 早已落地，该 N/A 裁决已作废**。故 ⬜ 实际只剩 D4-4 一张。
+
+**另两处需一并知悉（非本文件记录，但与本文件结论相关）**：
+- `_archive/14-d4-bidirectional-writeback/README.md` 的「L2 只做了 1 张（D4-2）」**已过期**：
+  `evidence/d4-bidirectional-acceptance/d4-fleet-bidirectional-status.json`（captured 2026-09-25）实测
+  **L1 passed 35/35；L2 `applied_store_ok=15` / `applied_store_miss=1`（D4-22）/ `empty_payload_skip=19`
+  / `pipeline_failures=0`**。19 张 skip 的根因是真库该 item 无载荷（空表），属**需先 seed 才能验**，
+  不是 wiring gap。另注意 `d4-l2-oo-to-html-all.json`（35 cases 批量）`store_ok_count=0` 而
+  `d4-l2-oo-to-html-serial.json`（5 cases 串行）`applied_store_ok=4` —— **批量与串行结果不一致**，
+  该差异尚无结论，留待 L2 专项复核。
+- 第五轮 §⑥ 登记的「`sheet_name` 改记观测值——代码已改、未实测」**已兑现**：证据目录现算 44 个文件，
+  其中 36 份有 `sheet_name` 且**全部为观测文本，退化为纯编码的 0 份**。
+
+### ④ 🔴 口径盲区登记：entry 级 manifest 表达不了「entry 内部分 sheet 未迁」
+
+`backend/data/workpaper_sync_entry_manifest.json` 现算 155 entry，**D4 仅 1 个 entry**
+（`xlsx/gt-d4-operating-revenue`，`capability=bidirectional`、`migration_state=adapter_registered`）。
+D4-4 没有独立 entry，故**不计入** `legacy_fake_bidirectional`(135)；但修复前它的运行时行为确是假双向。
+⇒ **父 entry 标 `bidirectional` 会掩盖其下个别 sheet 仍走 legacy 的事实**，manifest 这一层无法表达。
+本轮的 `D4_LEGACY_OO_BLOCKED_SHEETS` 是前端侧的补偿表达；根治需要 sheet 粒度的能力声明（建议纳入
+平台总纲 `workpaper-html-onlyoffice-bidirectional-writeback-closure` 考虑）。
+
+### ⑤ 本轮其他修复（D4-4 分析的副产物）
+
+1. **D4-4 导入导出漏 2 列（静默丢数据）**：`_SHEET_HEADERS["D4-4"]` 原 **8 列**，漏源模板 **F 列「……」**
+   （前端 `placeholder`）与 **J 列「备注」**（`remark`）。后果不是报错而是导出不带出 + 导入不解析，
+   前端 `safeParseRows` 对缺键兜底空串 ⇒ 用户填的内容无声消失。已补至 10 列（F 列导出头命名为
+   「补充说明」），并把原内联导出分支抽成 `_export_d4_4_row()`（对齐 `_export_d4_1_row` 既有范式）。
+   守卫 `backend/tests/test_d4_4_import_export_roundtrip.py`（12 passed）三层判据：列数/列序
+   **直接读权威册 R5 表头对账**（钉死到物理列）+ `len(export) == len(headers)` 等长不变量 + 往返等值
+   + **接线断言**（防「抽了函数但调用点没接上」—— 其余用例直调函数，不接线也会全绿）。
+   **变异反证**：headers 改回 8 列 → 8 红。
+2. **sheet label 错名 + 双源冲突**：`d4SheetLabels.ts` 的 `'D4-附注国企'` 值为
+   `附注披露信息（国有企业）`，而三本权威册真名是 **`附注披露信息（国企）`**；因 `resolveD4SheetLabel`
+   有 `includes('国企')||includes('国有')` 兜底，**错名长期不可见**（M 轮 MC-23「fallback 掩盖错名」同型）。
+   已修 + 新建 `backend/tests/test_d4_sheet_labels_match_workbook.py`（6 passed）：**每个 label 值必须在
+   `wp_templates/D/D4*.xlsx` 十本册 sheetnames 并集内逐字存在**（哨兵 `'D4'` 除外，白名单钉死为恰
+   `['D4','D4-目录']`），两条自检防恒真。**变异反证**：改回错名 → 2 红。
+3. **`generated/dSheetLabels.ts` 过期产物**：该文件 55 对中 48 对 sheet 名不含自身编码、22 个值在册内
+   根本不存在（D4-1/2/3/4 全指向「主营业务收入审计程序表D4A（修订前）」等）。**根因不是脚本 bug 也不是
+   ACNR 数据错** —— 现算 `global_catalog.json` 的 D4 条目 36 条**完全正确**（name 不以 code 结尾 = 0/36、
+   不在册内 = 0/36），`generate_sheet_labels.py` 逻辑忠实；错的是**该文件从未随 catalog 重新生成**。
+   且 CI 守卫 `check_sheet_labels_generated.py` **早已接进 `governance-checks.yml:233` 并一直是红的
+   （exit=1）**，属「被忽略的红」。已重新生成 → **111 条**，守卫 exit 0；两侧 D4 段共同键 36 个
+   **值冲突 31 → 0**；generated 值不在册内 **0 / 111**。该文件生产消费方现算仍为 **0**（正确但未被消费），
+   保留不删（ACNR 体系产物 + 有 CI 守卫，删除需同步改 CI job）。
+
+### ⑥ 诚实暴露：PRE-EXISTING 红（已实证与本轮无关）
+
+`backend/tests/test_d4_price_import_formula_preserve.py::test_parse_d4_9_and_d4_11_field_mapping`
+—— 以 bytes 级 `git show HEAD:` 临时替换 `_d4_import_export.py` 复跑，HEAD 版同样 `1 failed, 4 passed`
+⇒ PRE-EXISTING。根因判断为**生产代码正确、测试输入过期**：`_parse_d4_9_row` 现返回含 `rowId`（行身份）
+与 `_period`（本期/上期），是 `d4-9-customer-structure-bidirectional-writeback` 双区落地的正确产物；
+而测试仍传 4 元组 `("客户乙", 200, 5, "3")`，D4-9 headers 加列后位置错位（实测 `name='5'`、`amount=3.0`）。
+owner = D4-9，不属 D4-4 范围，按第五轮先例不擅自扩范围硬修，登记为独立待办。
+
+### ⑦ 本轮改动文件
+
+- `audit-platform/frontend/src/components/workpaper/composables/d4Constants.ts`（legacy 禁入名单单一真源）
+- `audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue`（门控接线 + 降级提示）
+- `audit-platform/frontend/src/components/workpaper/composables/d4SheetLabels.ts`（国企附注错名）
+- `audit-platform/frontend/src/generated/dSheetLabels.ts`（重新生成，55 → 111 条）
+- `backend/app/routers/wp_render_strategies/_d4_import_export.py`（D4-4 补 2 列 + 抽 `_export_d4_4_row`）
+- 守卫：`d4LegacyOoBlocked.spec.ts`（新，7）/ `test_d4_4_import_export_roundtrip.py`（新，12）/
+  `test_d4_sheet_labels_match_workbook.py`（新，6）/ `d45SyncHostWiring.spec.ts`（断言等价更新）
+
+### ⑧ 运行时实测（2026-09-28，start-dev.bat 全栈 + OO 容器已启，Playwright MCP）
+
+环境探活：后端 9980 `healthy`（postgres ok / redis ok）· 前端 3030 200 · OO 8080 `true` ·
+平台探针 `/api/workpapers/onlyoffice/health` → `{"healthy": true, "active_sessions": 0, "max_sessions": 10}`。
+用例场地 = project `0ec33ac9…a49` / wp `b3ab3c46…923f`（wp_code `D4`，真库 54 行载荷）。
+
+**正向（D4-4 禁入生效）✅**：tab「营业收入调整分录汇总D4-4」选中后，
+`radio "结构化视图" [checked]` + `radio "在线编辑" [disabled]` + 标签
+`本表暂不支持在线编辑`（title = 「本表尚未接入双向同步，在线编辑的改动无法回写到结构化数据，
+故暂不开放，以免数据丢失」），**console 0 errors**。截图 `d4-4-legacy-oo-blocked-verified.png`。
+
+**反向（未一刀切堵死）✅**：D4-2（宿主桥）与 D4A（legacy 合理用途）的「在线编辑」均**无 `[disabled]`、
+有 `cursor=pointer`、无禁用标签** —— 证明禁入名单只挡该挡的那一张。
+
+#### 🔴 实测抓到一个设计缺口（已补进 spec Req 2.5 / 5.7 + design §5.1b + Task 13b）
+
+`D4TabAdjustment.vue` 的 `el-table` 恰 **8 个业务列**（DOM 取 `thead th` =
+`[摘要, 分类, 报表项目, 会计科目, 附注项目, 借方, 贷方, 索引号]`，源码注释亦编号 1~8），
+而模板有 **10 列**、`D4AdjustmentRow` 类型有 **10 个字段**、`safeParseRows` 解析 **10 个**、
+导入导出（本轮已补）**10 列** —— **只有 UI 少 `placeholder`(F「……」) 与 `remark`(J「备注」) 两列**。
+
+含义：若把 10 列全纳入受管而 UI 仍 8 列，用户在 OO 侧改 F/J → 回写进 store → 切回结构化视图
+**看不见**，表现为「改动丢了」（实为存了但不可见），**比不回写更难排查**。而「这 2 列不纳入受管」
+同样被拒 —— 模板里真实存在这两列 ⇒ OO 侧可编辑 ⇒ 不纳入则 materialize 会用 store 旧值覆盖用户输入。
+⇒ 唯一正确解是**五层一致**（模板 / 类型 / 解析 / UI / 导入导出 都 10 列），已写进 spec Task 13b。
+
+⚠️ **同名陷阱（记录以免后人误判）**：该文件有 6 处 `placeholder="摘要"` 之类，那是 **el-input 的
+占位文本属性**，与 `D4AdjustmentRow.placeholder` **字段**同名却无关。只 grep `placeholder` 会误判
+「该字段已在 UI」。判断某受管字段是否有 UI 列，须看 `el-table-column` 的 `label` 与
+`row.<field>` / `updateCell(..., '<field>', ...)` 绑定，不能看占位属性。
+
+#### 🔴🔴 实测发现 D4 entry 的 materialize 当前处于 500（与本批无关，但阻塞全部 D4 在线编辑）
+
+在 D4-2（宿主桥）真实点「在线编辑」：`store-projection` **200** → `pending-mutations` **200** →
+`materialize` **500**（自动重试 3 次全 500）。响应体：
+
+```
+error_code: roundtrip_projection_mismatch
+message: staged representation 反读出未提交的受管字段
+  ['adjudication_main_rows/xsheet-main-L2MARK-D4-2-4fel/current_unadjusted', ...]（共 338 个）
+  —— 受管区域被写入了不属于本次 projection 的值
+```
+
+**根因链**：字段身份里的 `L2MARK-D4-2-4fel` / `L2MARK-D4-2-nmna` 是 **L2 验收 e2e 写入的标记**
+（`e2e/d4-l2-oo-to-html-all.spec.ts` 与 `e2e/d4-l2-fast-batch.spec.ts` 里的
+`L2MARK-${c.code}-${Date.now()}`）。历史批量 L2 跑测时把标记写进了 OO canvas → 进了 xlsx staged
+representation，但 HTML store 侧没有对应行（**正是 `store_ok_count=0` 的表现**）⇒ 现在 materialize
+的往返校验反读出 338 个不在当前 projection 里的受管字段 ⇒ fail-closed 500。
+
+🔴 **这解释了本文件 §③ 登记的那个未解之谜**：`d4-l2-oo-to-html-all.json`（35 cases 批量）
+`store_ok_count=0` 而 `d4-l2-oo-to-html-serial.json`（5 cases 串行）`applied_store_ok=4` ——
+**批量在同一 entry 上连写 34 处，污染了 representation，后续 materialize 全部失败**；串行每次只写
+一处且逐次确认，故能通。⇒ 「批量 vs 串行不一致」不是并发 contention，是**测试数据残留导致的
+representation 污染**。
+
+**与本批无关的静态实证**（不是推理）：materialize 链路五个核心模块
+（`materialize_coordinator` / `excel_materialize` / `adapters/excel` / `phase5_d4_revenue_detail` /
+`oo_to_html`）**全部不 import** `_d4_import_export`；`workpaper_sync` 全目录 import 它的文件 **= 0**；
+反向 `_d4_import_export.py` 既不 import `workpaper_sync` 也不含 `materialize`。而本批后端改动
+**只有** `_d4_import_export.py` 一个文件。
+
+**建议处置（另立，不在本批）**：①清理 staged representation 里的 L2MARK 残留行（或重新 rematerialize
+到干净代际）②给 L2 e2e 加**测试后清理**（写标记 → 验证 → 还原原值），否则每跑一次批量 L2 就再污染一次
+③批量 L2 改为串行或每 case 独立 entry 代际。
+
+> ⚠️ 另记：切底稿时有 `PATCH /api/editing-locks/workpaper/{wpId}/heartbeat` **404** 的 console error。
+> 端点与注册都存在（`routers/editing_locks.py` + `router_registry/collaboration.py`），404 属「无活跃锁
+> 可续期」的业务响应，非路由缺失；前端未静默处理该 404 而已。与本批无关。
+
+---
+
+## 2026-09-28 第七轮：materialize 500 的根因定位 + L2 e2e 根治（数据清理受阻于引擎缺口）
+
+> 承接第六轮 §⑧ 登记的「D4 entry materialize 500」。本轮把根因挖到底、**根治了"再污染"**，
+> 但**现存污染的清理受阻于一处平台级引擎缺口**，按「不擅自弱化 fail-closed 判据、不 hack 数据」
+> 原则登记待裁决，未硬改。
+
+### ① 根因链（三层，全部实证）
+
+1. **`useD4Adjudication.ts:691`**：D4-1 派生行身份 = `` `xsheet-${section}-${labelKey(label)}` `` ——
+   **行身份由业务字段 `label` 派生**。现算：387 个 `rowId`/`rowKey` 模板串命中里，**这是全前端
+   唯一一处「用业务字段值派生行身份」**（其余全是常量 / index / 时间戳 / section key 派生）。
+2. **L2 e2e 的 `SKIP_KEYS` 不含 `label`** ⇒ 测试挑"安全格"时选中 label 列 ⇒ 写入 `L2MARK-…`
+   ⇒ **行身份漂移** ⇒ 在 xlsx 里造出 store 侧不存在的孤儿行。
+3. **污染由 gen 165（2026-09-28 04:58 的 `content_commit`）固化**，不是 9-25 的历史遗留：
+   那次 commit 的 intended 是 **merged projection**（store + OO 变更），OO 侧有 L2MARK 行故不报错；
+   而"用户点在线编辑"时 materialize 的 intended 是 **flushHtml 给的纯 store projection**，
+   没有这些行 ⇒ `extra` ⇒ fail-closed 500。
+
+xlsx 实测（gen165 artifact，L2MARK 共 **18 处**）：
+
+| sheet | cell | 值 | 性质 |
+|---|---|---|---|
+| 营业收入审定表D4-1 | **W20 / W21** | `xsheet-main-L2MARK-D4-2-{nmna,4fel}` | **UUID 身份载体列 = 孤儿根源** |
+| 营业收入审定表D4-1 | A20 / A21 | `L2MARK-D4-2-{nmna,4fel}` | label 列 |
+| 营业收入审定表D4-1 | X36 | `xsheet-other-L2MARK-D4-3-2wi7` | store 里**有**此身份 ⇒ **非**孤儿 |
+| 主营业务收入明细表D4-2 | A12 / A24 | `L2MARK-D4-2-*` | 产品名被改写（store 的 `D4-2-rows` 无 L2MARK） |
+
+D4-1 共 26 个行身份 = 8 个 `GTROW-D41*`（instrumentation mint）+ 18 个 `xsheet-*`（含 2 个 L2MARK 孤儿）。
+
+### ② 🔴 平台级引擎缺口（本轮最重发现，待裁决）
+
+**`excel_materialize` 没有「清空 substrate 上 store 已无对应的受管行」的能力。**
+
+- 引擎的 `orphan` 是**反向**概念：`orphan = [身份 for 身份 in projection.row_keys if 该身份在 substrate 上无物理行]`
+  ⇒ 触发**插行**。反方向（substrate 有、projection 无）**无任何处理**。
+- `tombstoned_row_keys` 看似是出口，实测**不是**：`_scan_row_identities` 只把它加进 `taken`
+  （防 mint 时复用已删 ID）+ 算 `reused_tombstones`，**不排除那些行**。且
+  `publish_first_generation` 恒传 `()`（注释自陈「首版没有任何已删除行」）。
+- `_scan_row_identities` 对「UUID 列空但业务列有内容」的行按 `assign_new_id` **mint 新身份**
+  ⇒ 这些 mint 出来的身份进 extracted projection ⇒ 与 store 比就是 `extra`。
+
+**后果（比本次事故更广）**：只要 xlsx 与 store 的受管行集不一致，**该 entry 的「点在线编辑」就永久
+失败**，而「从 OO 侧 forcesave」却仍能成功（intended 是 merged projection）—— 这是一处**结构性不对称**，
+且形成死锁：进不去 OO 就无法用 OO 侧路径修复。
+⚠️ **推论（需独立验证）**：按此机制，**用户在 HTML 侧删一行**就会造成 store 少行 / xlsx 多行 ⇒
+下次点在线编辑即 500。这条比测试污染严重得多，建议优先验证。
+
+### ③ 两条清理路径均被该缺口挡住（已实测，非推理）
+
+| 路径 | 结果 |
+|---|---|
+| 增量 materialize（点在线编辑） | **500** `roundtrip_projection_mismatch`，extra **338** 个 |
+| 模板重建 `d43_rematerialize_dual_sheet.py --apply --force` | **同样失败**，extra **77** 个，但 table 变成 `d4_10_rows/GTROW-D410-0013+` |
+
+模板重建为何也失败：`stage_instrumented_substrate` 的 `source_bytes = provider.read_authoritative_template()`
+⇒ 从**权威模板**重建；而权威模板 `重要客户销售价格分析D4-10` 的 **R13~R33 预置了 21 行示例数据**
+（`大额客户一` / `产品1`…），而 store 的 `D4-10-data` 是 **`{"rows": []}`** ⇒ 这 21 行模板示例行
+被 mint 身份后全部变成孤儿。
+⇒ **「模板自带示例数据 + store 该表为空」的 sheet，从模板重建必然 extra 失败**。D4 组里这类 sheet
+不止 D4-10，需普查。
+
+✅ **失败无副作用**：`--apply --force` 抛异常前未 commit，实测 DB 仍 gen 165 / 190 reps /
+latest 仍 04:58 ⇒ 事务正确回滚，**无半应用态**。
+✅ **已备份**：190 个历史 representation 副本存于 `%TEMP%\d4-remat-backup-20260928`；
+原目录旧代际本身亦天然保留（gen 1~165 的 xlsx 全在）。
+
+### ④ 本轮已交付：L2 e2e 根治（防再污染，零风险）
+
+- `e2e/d4-l2-oo-to-html-all.spec.ts`：`SKIP_KEYS` **加 `label`**；把原先只在 amount 分支单独判、
+  **文本分支漏判**的 `group_label` 并入集合；补完整根因注释。
+- `e2e/d4-l2-fast-batch.spec.ts`：`SKIP_KEYS` 加 `label`。
+- **新增测试后还原块**：校验完立即写回 `oldValue` + 再 forcesave 一次（`L2_NO_RESTORE=1` 可关），
+  `SheetResult` 加 `restored: 'ok'|'skipped'|'type_fail'|'save_timeout'`。
+  不还原的后果不是"测试不干净"而是 **L2MARK 永久留在真实业务数据里**（审计师会看到
+  `L2MARK-D4-3-2wi7` 这种产品名）并随 content_commit 一代代传下去。
+- 新建守卫 `src/components/workpaper/composables/__tests__/l2RowIdentityGuard.spec.ts`（8 tests）：
+  从 `useD4Adjudication.ts` 源码**现算**身份派生源字段（**不写死 `['label']`**），断言其必须全部
+  出现在两个 e2e 的 `SKIP_KEYS` 里 ⇒ 将来新增别的派生源也会被抓。含 2 条防恒真自检。
+- 验证：`npx playwright test --list` 成功解析两个 e2e（转译通过）；
+  **变异反证已实做**（摘掉 `label` → 2 红含解释消息，还原后 8 passed）。
+
+🔴 **两处工具教训**：
+① `npx tsc --noEmit -p tsconfig.json` 对 `e2e/` 是**恒真检查**（`include` 只有 `src/**`），
+   差点当成有效验证 ⇒ e2e 的语法/转译校验改用 `npx playwright test --list`。
+② 守卫首版断言 `/colKey === 'group_label'/` **命中了自己的注释**而假红 ⇒ 已加 `stripComments()`。
+   这是「grep 命中必判注释 / 代码」铁律的同型，**在自己写的守卫里同样会踩**。
+
+### ⑤ 待裁决的解阻选项（均需独立 spec，本轮不做）
+
+| 选项 | 说明 | 风险 |
+|---|---|---|
+| (a) 引擎补「store 无对应的受管行 → 清空业务内容 + 清 UUID」 | 治本，且能一并解决「HTML 侧删行」这条更广的缺陷 | 动核心引擎，需完整 spec + 变异反证 |
+| (b) 回退代际到 gen 164（09-25 14:44，污染前） | 见效快 | 丢 gen 165 的内容；且若 gen 164 也已行集不一致则无效 |
+| (c) 一次性运维工具「按身份清除指定孤儿行」 | 范围可控、可审计 | 需新工具 + 只治本次症状不治根因 |
+
+> 建议顺序：先验证 ②的推论（HTML 侧删行是否也会卡死）。若成立，(a) 的优先级应显著提高 ——
+> 那不是"测试污染的善后"，而是**一条用户日常操作就能触发的 entry 级卡死**。
+
+### ⑥ 🔴 更正本轮 §② 的结论：不是「引擎没有删行能力」，而是「能力已建、接线缺失」
+
+§② 写的「`excel_materialize` **没有**清空/删除 substrate 上 store 已无对应受管行的能力」
+**表述不准确，就此更正**。准确事实（逐项实证）：
+
+**引擎有完整的删行能力**，在 `app/services/workpaper_sync/excel_workbook_row_change.py`
+（spec `excel-workbook-wide-row-change-propagation` 的产物）：
+
+| 导出 / 实现 | 位置 |
+|---|---|
+| `build_delete_plan` | L1903（`__all__` 导出） |
+| `resolve_deleted_row_keys` | L1785（`__all__` 导出，名字即「算出哪些行被删了」） |
+| `shrink_sheet_rows(xml, *, delete_at, count)` | L1836 |
+| `_validate_delete` / `is_deleted_row` / `_delete_remap` | L546 / L627 / L2265 |
+
+且**测试覆盖充分**：`backend/tests/workpaper_sync/` 下 **14 个** `test_workbook_row_change_*` /
+`test_multi_sheet_workbook_change_merge` / `test_sibling_table_ref_row_shift` 等文件，
+其中 `test_workbook_row_change_delete.py` 覆盖 Property **P10~P15 + P35**，并已在 D2（删得成的
+正常路径）与 K11（100% 阻断的 fail-closed 路径）**两个载体**上双向取证。
+
+**真正的缺口是接线** —— 各生产消费方实际 import 的符号：
+
+| 消费方 | import 的符号 |
+|---|---|
+| `excel_materialize.py` | `plan_workbook_row_change_for_insert` · `PropagationDriftError` · `_escape` ← **只有 insert** |
+| `excel_extract.py` | `normalise_propagated_part` |
+| `adapters/excel.py` | `merge_workbook_row_change_propagations` |
+| `adapters/base.py` · `g7_oo_crash_if_neutralize.py` | 无直接 import |
+
+⇒ **`build_delete_plan` 与 `resolve_deleted_row_keys` 在生产代码里零消费方**（全仓唯一调用方
+是它们自己的测试）。`excel_materialize.py` 全文唯一含 "delete" 的地方是 L1870 的一句**注释**
+（提到 `delete_policy=tombstone`）。
+
+**这与 memory 里 D4-8 的 `merge_d48_from_projection`「全仓唯一调用方是自己的测试」完全同型** ——
+「能力已建 + flag 已翻 + 测试全绿」≠ 接线完整。本轮是该模式的第二个实例，且后果更重：
+materialize 只插不删 ⇒ store 少行时 substrate 多出的行留着 ⇒ extract 反读出来 ⇒ `extra` ⇒ 500。
+
+#### 修复形状（接线，非新建能力）
+
+在 `plan_managed_writes` 的行集一致性段（现有 §6.2「orphan → 插行」与 §6.6「行集一致性」之间）
+补反方向处理：对 `substrate 有身份 / projection 无该身份` 的行，经 `resolve_deleted_row_keys`
+判定后走 `build_delete_plan` + `shrink_sheet_rows`。
+
+🔴 **但有一个必须先由设计裁决的语义问题，不能由实施者单方面定**：
+materialize 如何区分下面两种「projection 里没有这行」？
+
+| 情形 | 应有行为 |
+|---|---|
+| 用户在 HTML 侧**删了**一行 | 应删除 substrate 上的物理行 |
+| 该行是**模板预置示例数据**（如 D4-10 的 R13~R33「大额客户一/产品1」，store 恒 `rows: []`） | 删掉是否正确？模板占位行被删后，用户下次想填就没有模板样式行了 |
+
+两者在 projection 层**无法区分**（都表现为「substrate 有、projection 无」）。需要显式的删除意图
+或「模板预置行」标记才能分流。而现状是前端 bridge **只传 `{sheetKey, expectedRevision, projection}`**
+（已现读 `useWorkpaperSyncBridge.ts` / `workpaperSyncApi.ts` 确认，无 tombstone / deleted_rows 字段），
+即**删除意图根本没被传到后端**。
+
+⇒ 故本轮**不直接改引擎**：这是跨前后端的设计级变更（`excel_materialize.py` 3600+ 行核心路径，
+影响所有 entry），且「接错会静默删用户数据」比现在的 fail-closed 500 危险得多。
+按铁律另立 spec，建议名 `workpaper-sync-row-delete-wiring`，范围：
+①前端传删除意图 ②`resolve_deleted_row_keys` / `build_delete_plan` 接进 `plan_managed_writes`
+③模板预置行与用户删行的分流判据 ④全 entry 回归 + 变异反证。
+
+#### 本轮两次自我更正（方法论教训）
+
+1. 先断言「引擎没有删行能力」—— **错**。根因：只在 `excel_materialize.py` 里 grep，没查模块全集。
+2. 再断言「`excel_workbook_row_change` 生产消费方 = 0」—— **也错**（真值 5）。根因：
+   PowerShell `Select-String -Path backend\app\**\*.py` 的 `**` **不递归**，得到假零。
+   ⇒ 「结构性零须配变异证明」这条铁律，对**工具本身的口径**同样适用：报 0 之前先用另一条通路
+   （Python `rglob`）复核一次。本轮两个错误结论都是"零/不存在"型断言，且都源于扫描面不足。
+
+---
+
+## 2026-09-28 第八轮：materialize 500 的根因**更正** —— L2MARK 只占 1.5%，主因是行身份不稳定 + 只插不删
+
+> **本轮定位**：第七轮把 materialize 500 归因为「L2 e2e 造的 L2MARK 孤儿行」。本轮把 `extra`
+> **字段级全集**算出来后，该归因被**证伪**：L2MARK 只占 402 个 extra 字段中的 **6 个（1.5%）**。
+> 真正的主因是一条此前完全没看见的链：**行身份每次重建都重新 mint** ⇒ substrate 累积同一份
+> 业务数据的多个副本 ⇒ 叠加「materialize 只插不删」⇒ 永久性 `roundtrip_projection_mismatch`。
+>
+> 🔴 **两个结论反转**（与第七轮相反，以本轮为准）：
+> 1. **删除孤儿行是安全的** —— 三批 `d4r-*` 内容逐字相同，是重复副本而非独有数据；
+>    第七轮「删会丢用户数据」的担忧**不成立**。
+> 2. **真实风险是反向的** —— 不删则 entry 永久不可用，且孤儿**仍在持续新增**
+>    （最新一批时间戳是本日 12:57:59）。
+
+### ① `extra` 字段级全集：402 字段 / 73 身份
+
+口径与生产判据逐字对齐（`content_mutation.py:1868` 的 `extra = sorted(set(right) - set(left))`）：
+
+- `left`（intended）= live `store-projection` 端点返回的 `projection.values`，**909** 字段
+- `right`（extracted）= 对 gen165 **已发布 substrate 字节**跑真 `adapter.extract`，**1311** 字段
+- 口径自证：`common = 909`、`missing = 0` ⇒ 两侧 key 命名空间完全可比（若 common=0 则清单不可信）
+
+| table | extra 字段 | extra 身份 | 性质 |
+|---|---|---|---|
+| `revenue_detail_rows` | 281 | 26 | **14 个 `d4r-*` 重复副本** + 12 个 `GTROW-D42-*` |
+| `d4_10_rows` | 49 | 21 | `GTROW-D410-*`，模板占位骨架 |
+| `customer_prior_rows` | 20 | 10 | `GTROW-D49P-*` |
+| `customer_current_rows` | 18 | 9 | `GTROW-D49C-*` |
+| `invoice_compare_rows` | 12 | 12 | `GTROW-D423-*`（仅 `month` 一个字段） |
+| `key_indicator_rows` | 12 | 12 | `GTROW-D422-*`（仅 `metric_name`） |
+| `adjudication_main_rows` | **6** | **2** | **`xsheet-main-L2MARK-*` —— 第七轮以为的主因，实占 1.5%** |
+| `d4_31_interview` | 4 | 1 | `GTROW-D431-0005` |
+
+⇒ 三类孤儿，性质与处置**各不相同**，不能一刀切：
+
+| 类 | 身份数 | 来源 | 可否安全丢弃 |
+|---|---|---|---|
+| A `d4r-*` 旧批 | 14 | 前端 rowId 生成器每次重建都 mint 新值 | **可** —— 内容与 store 现存批逐字相同 |
+| B `GTROW-*` | 57 | instrumentation 给**模板占位行** mint 的身份 | **可** —— 占位骨架非业务数据 |
+| C `xsheet-*L2MARK*` | 2 | L2 e2e 写业务字段致身份漂移（第七轮已根治再污染） | **可** —— 测试垃圾 |
+
+### ② 主因实证：同一份业务数据在 substrate 上有 **3 个副本**
+
+D4-2（`主营业务收入明细表D4-2`）的身份载体列 `W` 上有 **21 个 `d4r-*` 行**，按时间戳分三批
+（`d4r-{Date.now().toString(36)}-{random}`，解码后）：
+
+| 批次 | 时间戳解码 | 行数 | substrate 行号 | 在 live store 里 |
+|---|---|---|---|---|
+| `d4r-mtl69x8j-*` | 2026-09-03 14:57:08 | 7 | R24~R30 | ❌ 孤儿 |
+| `d4r-muclbqzb-*` | 2026-09-22 19:28:14 | 7 | R31~R37 | ❌ 孤儿 |
+| `d4r-muks1021-*` | **2026-09-28 12:57:59** | 7 | R38~R44 | ✅ 唯一在 store 的一批 |
+
+**三批内容逐字相同**（这是「可安全丢弃」的判据本身，不是推测）：
+`营业收入_批发_分销` / `_纯销` / `_终端` / `_服务费及其他` / `_物业与租赁_物业` / `_租赁` /
+`_物流_仓储`，且 12 个月金额完全一致（如纯销 `B=55287496.99 … N=764410208.16` 三批逐值相同）。
+唯一差异是第一批 R24 的 `A` 列已被 L2 e2e 改成 `L2MARK-D4-2-4fel`（即 C 类污染的来源）。
+
+live `store-projection` 的 `revenue_detail_rows` 只有 **7 行 = 单批 `muks1021`**
+⇒ store 被**整批替换**，前两批在 store 侧已不存在，但在 substrate 上被永久保留。
+
+**DB 侧交叉实证**（`checklist_responses`，只读查询）：
+`item_id='D4-2-rows'`、`remark` 1739 B、`updated_at` 2026-09-28 05:48:32 UTC（= 13:48 本地）、
+`remark LIKE '%rowId%'` 为 **True** ⇒ store 里的行**带** `rowId` 字段，
+故 `useD4RevenueDetail.ts:78` 的 `raw.rowId || generateRowId()` fallback **未触发**，
+整批替换发生在别处（`importFromLedger` 是 push 语义、提示语明写「现有行保留」，也不是它）。
+⇒ **替换者尚未定位**，这是本轮留下的唯一未闭合问题（见 ⑤）。
+
+### ③ 机制层：为什么孤儿只增不减
+
+`materialize` 的 `orphan` 是**反向**概念（projection 有、substrate 无 ⇒ **插行**）；
+substrate 上「store 已无对应」的受管行**没有任何代码会去清除**。第七轮已实证接线缺口：
+`excel_materialize.py` 只 import `plan_workbook_row_change_for_insert`，
+而 `build_delete_plan`(L1903) / `resolve_deleted_row_keys`(L1785) **生产零消费方**。
+
+⇒ 每次「行身份漂移一次」= substrate 上永久多留一批行。本轮 D4-2 的 3 批就是这条链跑了 3 次的
+**端到端实物证据**。第七轮把「HTML 侧删行也会卡死 entry」列为**未验证的推论**，
+本轮据此**升级为已证实**（不再是仅有机制层面的两条间接实证）。
+
+### ④ rematerialize 被堵死的真原因（更正第七轮的描述）
+
+第七轮记录 `--apply --force` 报 77 个 `d4_10_rows` extra，归因为「模板预置了 21 行示例数据」。
+本轮直读权威模板 `backend/wp_templates/D/D4 收入底稿.xlsx` 的 `重要客户销售价格分析D4-10`，
+把这件事**精确化**（原描述「示例数据」不够准，它其实是**公式骨架**）：
+
+- R13~R33 内容：`A` 列序号 1~7、`B` 列 `大额客户一`~`大额客户五` / `异常客户X` / `异常客户Y`
+  （只在每组首行）、`C` 列 `产品1/2/3`、`H` 列 `0`，而 **`E`/`G`/`J`/`M` 四列是 `=IF(...)` 公式**
+- 本 sheet **无 Excel Table（`ws.tables` 为空）、无 definedName（44 个里命中 D4-10 的为 0）、
+  `xl/tables/` 下 0 个 part** ⇒ 受管区完全由**契约显式声明**，不是从 Table 推出来的
+- extract 把 `B`/`C`/`H` 的占位文本读成 `customer` / `product` / `unit_price` 业务值
+
+⇒ 与 store 的 `D4-10-data = {"rows": []}` **必然冲突**。这不是「偶然撞上脏数据」，
+而是**模板占位骨架与受管区语义的结构性冲突**：只要受管行区内预置了非空占位内容，
+「从权威模板重建」这条清理路径就恒被堵死。⇒ 两条清理路径（增量 / 模板重建）
+被**两个不同的**缺口挡住，不是同一个（第七轮记作「同一缺口」，此处更正）。
+
+### ⑤ 本轮未闭合 + 上游缺陷（`importFromLedger` 的身份幂等性）
+
+**未闭合**：谁整批替换了 `D4-2-rows`（使 store 只剩最新一批）尚未定位。
+已排除 L78 fallback（store 带 `rowId`）与 `importFromLedger`（push 语义）。
+
+**上游缺陷（已定位，需裁决）**：`useD4RevenueDetail.ts:308` 的 `importFromLedger`
+对每个台账产品**无条件** `rowId: generateRowId()`，即使该产品行已存在。
+⇒ 同一产品重复导入即产生**内容相同、身份不同**的行，是「持续制造孤儿」的上游。
+改它属**行为变更**（现提示语承诺「现有行保留」，去重/复用 id 会改变既有语义），
+故本轮只登记不擅改，留待裁决。备选：按 `product` 名复用已有行 `rowId`（幂等导入）／
+导入前提示已存在同名产品并让用户选择覆盖或新增。
+
+### ⑥ 探针口径教训（两条独立通路互校才发现漏报）
+
+身份级普查探针 `_d4p_orphan_census.py` 的前缀族学习用了 `len(token) >= 4` 过滤，
+把 **`d4r`（长度 3）整族漏掉** ⇒ 该探针报「孤儿 288 个、其中 L2MARK 2 个」，
+把本轮真正的主因（14 个 `d4r-*`）**全部漏报**。是字段级探针（走真 `adapter.extract`）
+才把它抓出来。
+
+⇒ 教训：**「自造匹配器 + 单一通路」会系统性漏报，且漏掉的恰好可能是主因**。
+凡要下「某类东西共 N 个」的结论，必须有第二条独立通路（最好是走生产代码路径）交叉验证；
+本轮两条通路的结论不一致（288 vs 73 身份），正是互校起作用的信号。
+
+另：本轮违反过自己既有的铁律 —— 用 `python -c` 跑含正则的核验，导致终端卡死 120s 超时
+（PowerShell 把引号/反斜杠解析坏了）。已改回「含正则一律写探针文件」。
+
+### ⑦ 归因更正：当前 500 形态是 commit `e52e5e5ce`（本日 13:39）的副作用，且是一个两难
+
+第七轮把 500 归因为「gen 165 的 `content_commit`（本日 04:58）固化了 L2MARK 污染」。
+本轮查到**另一个并发会话**的提交改变了这件事的性质：
+
+```
+e52e5e5ce  2026-09-28 13:39:05 +0800  Kiro
+fix(d4-sync): overlay 行集合以 store row_keys 为权威，不再从旧 substrate 带入已删除行
+```
+
+该提交改了 `projection_first_publication.py` 的 overlay 规则
+（`baseline ⊕ store` 的 `row_keys` 合并）：
+
+- **改前**：按**并集** ⇒ baseline 的旧行被带回 intended
+- **改后**：`store` 声明了该 table → **store 行集为权威**；store 未声明的 table → baseline 原样
+
+改动的动机在其注释里写得很清楚，而且引用的实测数字**与本轮完全吻合**：
+
+> 若按并集合并，旧行全部被带回——materialize 写 33 行进只有 12 行数据区的模板，
+> 产生大量空行 / 旧数据残留（**2026-09-28 D4-2 实测 7→33 行事故形态**）。
+
+本轮独立实测的 D4-2：store **7** 行 ｜ substrate **21** 个 `d4r-*` + **12** 个 `GTROW-D42-*`
+= **33** 个身份 ⇒ 与注释里的 `7→33` 逐值一致。
+
+**完整时间线**（三件事都发生在本日）：
+
+| 时刻 | 事件 | 后果 |
+|---|---|---|
+| 12:57:59 | `d4r-muks1021-*` 批身份生成 | store 变成 7 个全新身份，旧两批成孤儿 |
+| **13:39:05** | `e52e5e5ce` 把 overlay 改为 store 权威 | 修掉「33 行写进 12 行数据区」的写爆 |
+| 13:48:32 | store `D4-2-rows` 落库（7 行） | intended 定格为 7 行 |
+
+⇒ **这是一个两难，两条路都不通**：
+
+| overlay 规则 | 后果 |
+|---|---|
+| 并集（改前） | 旧行被带回 intended ⇒ materialize 写 33 行进 12 行数据区 ⇒ 写爆 / 旧数据残留 |
+| store 权威（改后） | 旧行不在 intended ⇒ extract 仍读得到 ⇒ `extra` 402 ⇒ **materialize 恒 500** |
+
+缺的是**第三件事**：把 substrate 上 store 已不认领的受管行**清掉**。
+只要它缺位，读方向（overlay 主动丢弃旧行）与写方向（materialize 只插不删）就永久不自洽。
+`e52e5e5ce` 的注释预期「模板脚手架行…由 identity carrier 机制自动处理…roundtrip 校验中
+extract 读到但投影没有的 **protected** 字段会被豁免」—— 本轮 402 个 extra 即该预期的**反例**：
+它们是 `customer`/`product`/`period_total` 一类**业务字段**，不是 protected，不在豁免范围内。
+
+⇒ 修复落点三选（详见 spec）：
+
+| 落点 | 做法 | 评价 |
+|---|---|---|
+| (a) materialize 侧 | 把 store 声明的 table 的受管区**收缩到 store 行集** | **正解**，与 overlay 规则严格对偶；但动核心引擎 |
+| (b) 判据侧 | 豁免「store 声明的 table 内、store 未列出的行」的字段 | 止血；但 substrate 永久残留旧行，OO 侧用户仍看见 33 行 |
+| (c) overlay 侧 | 回退成并集 | **不可行**，直接复现 33 行写爆事故 |
+
+🔴 **(a) 的分流判据不需要新协议**（这更正第七轮「必须先传删除意图才能分流」的判断）：
+判据可直接取自 projection 自身 —— **凡 store 在本次 projection 的 `row_keys` 里声明了该
+table，则该 table 受管区内 store 未列出的受管行即应被清除；store 未声明的 table 一律不碰**。
+这与 overlay 的取舍规则是同一条规则的两个方向，因此不会误删（store 没声明 ⇒ 不动）。
+真正需要裁决的只剩一件小得多的事：D4-10 这类 `rows: []` 的表，清除占位骨架后
+用户下次填写就没有模板样式行了 —— 这是 UX 取舍，不是正确性问题。
+
+---
+
+## 2026-09-28 第九轮：extra 真实规模的**再更正**（77 不是 402）+ 方向裁决 C + store_mirror 抽取
+
+> **本轮定位**：第八轮把 extra 记作 402 并据此立了一个「公式格豁免」任务。本轮用**生产判据
+> 口径**重算后，两件事都被证伪：真实 extra 是 **77**，且公式格豁免**本来就存在并生效**。
+> 随后确定根治方向为 **C（materialize 侧收敛）**，并先行完成了一项独立的正确重构
+> （`store_mirror` 抽取）。
+
+### ① 🔴 最重要的更正：裸差集口径让 extra 连续两轮虚高
+
+第八轮（402）与本轮首算（126）都用了**裸差集**：
+
+```python
+extra = set(extracted) - set(intended)        # ❌ 没应用生产豁免
+```
+
+而生产判据 `_assert_roundtrip_equivalent`（`content_mutation.py:1819`）在算 extra **之前**
+先跑 `_managed()`，剔除两类字段：
+
+```python
+word_only  = {spec.stable_field_key for spec in contract.all_fields()
+              if spec.mode is FieldMode.word_only}
+protected  = {spec.stable_field_key for spec in contract.all_fields()
+              if spec.mode in PROTECTED_MODES}          # {formula, auto_source}
+left, right = _managed(intended), _managed(extracted)   # ← 豁免在此生效
+extra = sorted(set(right) - set(left))
+```
+
+实测（D4 契约）：
+
+| 口径 | extracted | intended | extra |
+|---|---|---|---|
+| 裸差集（本轮首算，错） | 1311 | 1185 | **126** |
+| `_managed`（生产判据，对） | 1238 | 1161 | **77** |
+
+差额 **73** 全是公式字段，且**全部已被现有豁免命中**（逐 key 验证）：
+`period_total` 33 + `amount_ratio` 20 + `quantity_ratio` 20，
+对应 D4 契约里 5 个 `mode=formula` 模板（`revenue_detail_rows/{row_uuid}/period_total`、
+`customer_current_rows` 与 `customer_prior_rows` 各自的 `amount_ratio`/`quantity_ratio`）。
+
+⇒ **spec 的 Task 10「公式格豁免」是假命题，无需实现**（第八轮 §④ 里「豁免机制未覆盖公式列」
+的论断据此作废）。豁免的 `{row_uuid}` 模板匹配对 `GTROW-D42-0013` 这类身份**工作正常**。
+
+🔴 **方法论教训（第三次同型）**：
+本轮之前已有两条铁律——「结构性零须配变异证明」、「报 0 前换第二条通路复核」。
+本轮补第三条：**凡计数类结论要喂给判据，必须用生产判据自己的口径复算，不得自造差集**。
+自造差集不但让数字虚高 3.9 倍（402 vs 真实约 103），还凭空立了一个任务。
+
+### ② extra 77 的真实构成：三种成因混在一起（全是 `editable`）
+
+| table | extra 字段 | 成因 |
+|---|---|---|
+| `d4_10_rows` | 49 | **模板占位骨架**：`GTROW-D410-0013~0033`，值为「大额客户一~异常客户Y / 产品1~3 / unit_price=0」，store 的 `D4-10-data` 恒 `{"rows": []}` —— 从未被认领 |
+| `key_indicator_rows` | 12 | **双重身份**：同一指标既有 `GTROW-D422-0012`（metric_name=年度预算）又有 label 派生身份 `key_indicator_rows/年度预算` |
+| `invoice_compare_rows` | 12 | **双重身份**：`GTROW-D423-0012`(1月) 与 `invoice_compare_rows/1月` 并存 |
+| `d4_31_interview` | 4 | **L2 测试污染**：`GTROW-D431-0005` 的 4 个字段全是 `L2MARK-D4-31-uxqb` |
+
+「双重身份」是第八轮 `useD4Adjudication.ts` label 派生身份问题的**同型再现**：
+部分前端组件用业务字段值（月份名/指标名）派生 rowId，而 instrumentation 用 `GTROW-*`，
+substrate 上两套身份并存，store 只认一套 ⇒ 另一套恒为 extra。
+
+⇒ 这 77 行**都不是 store 当前认领的数据**（store 认的是另一套身份或另一批行），
+故 C 的收敛（清空/删除）对它们是安全的。
+
+### ③ 方向裁决：C（materialize 侧收敛）为根治主线，P0 反向收敛降级
+
+本轮先实现了 P0 反向收敛端点（`adopt-substrate`），真调后发现**核心假设失效**：
+
+`store_mirror` 的 merge 语义是「以 base（当前 store）行集为权威，只更新已有行、
+**不追加** base 没有的行」——这与 overlay 读方向「store 为权威」是**一致的设计**
+（两个方向都不无中生有）。所以 adopt 无论跑多少次，store 都追不上 substrate：
+extra 只从 402（裸差集）降到 77（`_managed` 口径下仍 77），`changed_item_count` 报 0。
+
+实测佐证：`merge_projection_into_all_d4_stores` 在**空 base** 下能产出完整行
+（`D4-10-data applied=49`），但在**真实 base**（当前 store）下对「projection 有 / base 无」
+的行不追加。
+
+⇒ **P0 不是解阻路径**。裁决走 **C**，理由：
+
+| | P0 反向收敛（substrate→store） | **C（materialize 侧收敛）** |
+|---|---|---|
+| 语义方向 | 把 substrate 累积的重复/占位行灌回表单，让审计师手工删 | **表单权威、在线编辑跟随**（审计场景的自然预期） |
+| 是否治病根 | 否——「只插不删」仍在，下次编辑继续累积 | **是**——补上删除侧，extra 从源头不再产生 |
+| 对既有脏数据 | 让 store 吞下 | 由收敛逻辑自动清掉 |
+
+一句话：**A/B 是让病人吞下病灶，C 是切除病灶。**
+
+### ④ C 的收敛落点与判据（已定位，未实现）
+
+落点：`excel_materialize.plan_managed_writes`（L1625），紧接 6.2 orphan 插行之后。
+该处已有全部所需变量：
+
+```python
+physical         = dict(scan.row_identity_by_row)        # substrate 现有 row→identity
+row_of_identity  = {identity: row}                       # 反向表
+wanted           = projection.row_keys[table_key]        # store 声明的行
+orphan           = [i for i in wanted if i not in row_of_identity]   # ← 已有：插行方向
+# 缺的反向：stale = [row for row, i in physical.items() if i not in wanted]
+```
+
+**判据（与 overlay 严格对偶）**：仅当 `table_key ∈ projection.row_keys`（store 声明了该
+table）才收敛；未声明一律不碰。这保证「少做而非多做」，不会误删。
+
+**动作**：经用户裁决改为**删物理行**而非留空行。理由：动态插行能力**已具备且生产在用**
+（6.2 的 `_plan_row_shift` + `plan_workbook_row_change_for_insert`），既然不够用时能动态插，
+就不该靠预留空行凑数 —— 留空行是半吊子。
+
+🔴 **删行的悬空引用风险已由引擎自带保护化解**：`build_delete_plan`（`excel_workbook_row_change.py:1903`）
+第一件事就是 `find_dangling_sites`，若删行会让任何公式变 `#REF!` 即抛 `DanglingReferenceError`
+（默认 `allow_ref_errors=False` fail-closed）。
+⇒ 第八轮 R2「不知 stale 行是否被公式引用」**无需我自己写正则判定**（那个口径已证失效），
+引擎会精确判定并拒绝。
+
+**待实现时处理的技术约束**：`build_delete_plan` 的 `at`/`count` 是**连续区间**语义，
+而 stale 行可能不连续 ⇒ 需按 (sheet, 连续区间) 分组、每组一个 plan、且**从下往上删**
+（先删高行号，避免行号位移影响后续定位）。
+
+### ⑤ 本轮已交付的独立重构：`store_mirror` 抽取（与 C 无关，但必须保留）
+
+问题：「把 Projection 按 provider 分发、逐 store item merge 后写回 `checklist_responses`」
+这件事有**两个**触发方（OO callback 落地 / 反向收敛端点），若各写一套就是第二真源。
+而原实现是 `OoToHtmlCoordinator` 的**私有方法**（绑死 coordinator 状态），外部无法复用。
+
+交付：
+
+- 新建 `backend/app/services/workpaper_sync/store_mirror.py` —— 把三个方法
+  （`_mirror_store_backed_if_needed` 111 行 / `_mirror_dedicated_dict_stores` 82 行 /
+  `_mirror_d4_dual_stores` 277 行，共 **472 行**）搬成**会话无关**模块级函数，
+  入参只有 `(session, adapter_id, project_id, wp_id, merged_projection, commit)`
+- `oo_to_html.py` 三方法改**薄转发**（3686 → 3233 行），行为逐字节等价
+- 抽取前先现算确认依赖面极干净：这三个方法只用 `self._session` 与
+  `state.frozen.{adapter_id, project_id, wp_id}`，无其它 coordinator 状态
+
+🔴 **抽取过程暴露并修掉两个真缺陷**（都是真调 adopt 才触发的）：
+
+1. **缺模块级 `import json`** —— 原 `_mirror_dedicated_dict_stores` 靠 `oo_to_html` 外层
+   作用域的 `import json`，搬成独立模块函数后失去它 ⇒ `json.loads` 抛 `NameError` ⇒ 500。
+   ⇒ 教训：**搬移代码必须检查函数体内使用的名字是否都在新作用域可见**，AST 解析通过
+   ≠ 运行期名字可解析（`NameError` 是运行期的）。
+2. **逐 item commit 破坏原子性** —— `store_mirror` 有 **6 处** `await session.commit()`
+   （OO callback 幂等重放场景可接受），但 adopt 中途失败会留**部分写入**（实测发生：
+   D4 store 137 → 154 行）。⇒ 三个函数加 `commit: bool = True`（默认不变，OO callback
+   逐字节等价），adopt 传 `commit=False` 并自己统一 commit + 异常 rollback。
+   审计留痕也移到 commit **之前**入同一事务（否则「改了 store 却没留痕」，回滚快照丢失
+   —— 首次 500 正是这样丢掉了快照）。
+
+两个既有守卫**跟随执行层迁移**改扫描目标（判据意图不变，都额外加了「OO 侧转发未被误删」断言）：
+`test_d4_mirror_shape_invariants::test_d4_8_has_dedicated_consumption_block`、
+`test_d2_store_value_equivalence::_oo_to_html_tree`。
+
+回归：镜像直接面 **35 passed**；扩展面（task26 OO callback + b60/g7h1/d4_12/d4_14 mirror +
+store_item_registry + d4_store_item_wiring_gap）**192 passed**；commit 参数化后复跑 **167 passed**。
+
+### ⑥ `adopt-substrate` 端点：降级为运维工具（保留，附已知局限）
+
+端点本身可用（`POST {USER_SYNC_PREFIX}/adopt-substrate`，body `{dry_run, expected_revision}`），
+带完整保护：published 准入 fail-closed（**不得降级成空 projection = 清空整表**）、
+`expected_revision` 并发锁（409）、覆盖前留存原值 + hash-chain 审计、原子事务。
+`adopt_substrate` 已登记进 `_WRITE_ACTIONS`（未登记则 `_action_authorizer` 恒 403）。
+
+🔴 **两条已知局限（不修则误用）**：
+
+1. **merge 语义 ≠ 覆盖语义**：它「不追加 base 没有的行」（见 §③），所以「以 OO 侧为准
+   覆盖表单」实际**覆盖不完整**。作为运维工具使用时须知晓。
+2. **`changed_item_count` 不可信**：`_snapshot_store` 的 after 快照在**同一未提交事务**内
+   读取，读不到 store_mirror 自己的未提交写 ⇒ 实测报 0 而真实改了 12 个 item。
+
+### ⑦ live D4 store 的污染现状与处置裁决
+
+盘点：D4 的 **39 个 store item 中 30 个带测试污染标记**
+（`l2-seed-*` 14 / `GTROW-*` 10 / `L2MARK-*` 8 / `probeB` 1 / `xsheet-*` 1），
+且**绝大多数是 2026-09-25 及更早的历史遗留**，非本轮造成。
+本轮 adopt 真正新增的只有 3 项：`D4-2-rows`（+15 行 substrate 重复副本，
+原 7 行 `muks1021` 批**完好保留** ⇒ 纯增量无丢失）、`D4-30-customers`、`D4-32-groups`。
+另 10 项只是 `updated_at` 被刷新（值相同的无条件 UPDATE），内容未变。
+
+⇒ **裁决：不清理，保留污染态作为 C 的回归靶子。** 理由：
+
+- 这个底稿的 store 从建立起就是测试数据堆积，**没有干净基线可回退**（且无 adopt 前快照）
+- 单清 store 会让问题**更严重**：store 空 + substrate 仍 33 行 ⇒ extra 从 77 涨到接近 1238
+- 要真「用新数据重测」得双侧一起重置，而重置后 extra 天然为 0、materialize 自然会过 ——
+  **那验证的是「空底稿能物化」，不是「C 收敛逻辑正确」**，反而失去验证靶子
+- 当前 77 个 extra 是理想回归样本：真实、可复现、覆盖三种成因
+
+⇒ **用 C 治污染，而不是先清污染再验 C。** C 落地后这 77 个 extra 会被收敛逻辑自动清掉，
+那既是修复验证，也顺带治好了污染。
+
+### ⑧ 本轮交付状态
+
+| 项 | 状态 |
+|---|---|
+| extra 口径更正（402/126 → **77**）+ 公式豁免本已存在 | ✅ 实证并登记 |
+| 方向裁决 C + 收敛落点/判据/删行方案定稿 | ✅ 已定，**未实现** |
+| `store_mirror` 抽取 + 2 缺陷修复 + 2 守卫迁移 | ✅ 交付，回归全绿 |
+| `adopt-substrate` 端点（降级运维工具）+ 局限登记 | ✅ 交付 |
+| **C 的收敛实现（Task 11/12/13）** | ⏸ **一行未写** —— D4 的 materialize 仍 500 |
+| live 污染 | 保留（作 C 的靶子，已裁决） |
+| 探针与临时产物 | ✅ 全清（18 探针 + 6 产物） |
+
+---
+
+## 2026-09-28 第十轮：C 方案落地（受管行收敛 + 模板骨架豁免）—— extra 归零，暴露第五层根因
+
+> **本轮定位**：按用户裁决实施 C（materialize 侧收敛）。过程中判据被实测连续修正**三次**，
+> 最终形态与初始设计相差很远。结果：`extra` 从 77 归零（真实链路确认不再报 extra），
+> 但 500 未解除 —— 错误推进到 `missing`，暴露一个与本 spec 无关的既有缺陷（第五层根因）。
+
+### ① 判据的三次修正（每次都由实测推翻，不是设计推演）
+
+| 版本 | 判据 | 被什么推翻 |
+|---|---|---|
+| v1 | `stale = physical 里不在 store row_keys 的行`，一律删 | `test_d4_1_materialize_extract_realchain` **4 红**：`IdentityRetentionError: OO 往返后丢失 3 个 row identity, 首个 'GTROW-D41MAIN-0009'` |
+| v2 | v1 + 排除模板骨架行（`GTROW-{template}-{4位}`，非 MINTED） | 4 红转绿，但**对 D4 无效**：46 个 stale 身份 **100%** 是模板骨架 ⇒ 全被跳过 ⇒ extra 仍 77 |
+| v3（终态） | v2 + **roundtrip 侧豁免**模板骨架行的 extra（E3） | extra 归零 ✅ |
+
+**v1 为什么错**：instrumentation 给模板的**每个**受管行预生成 `GTROW-{template}-{row:04d}` 身份，
+而 store 只声明「有业务数据的行」⇒ 骨架行不在 `row_keys` 里是**常态**，不代表用户删了行。
+
+**v2 为什么不够**：D4 的 extra 全部来自模板骨架行（模板在受管区自带非空业务值），
+排除它们等于什么都不收敛。
+
+### ② E3 豁免的设计：合取条件，不弱化 fail-closed
+
+```python
+# content_mutation._assert_roundtrip_equivalent，算出 extra 后过滤
+if (identity
+        and identity not in declared          # ② store 未声明该行
+        and is_template_skeleton_identity(identity)):   # ① 是模板骨架
+    continue   # 豁免
+```
+
+②是关键。语义诚实：**store 没声明的行，其 Excel 侧内容不是 materialize 写的**
+（materialize 只写 projection 里有的东西），判它「反读出未提交的受管字段」本就是归因错误。
+
+两种情形**仍然报错**（已由变异反证锁住）：
+
+| 情形 | 为何仍报 |
+|---|---|
+| store **声明了**骨架行却缺字段 | ②不成立 ⇒ store 认领了就要字段完整（否则静默丢数据） |
+| 非骨架孤儿（`d4r-*` / `xsheet-*` / `GTROW-MINTED-*`） | ①不成立 ⇒ 那才是真孤儿，交收敛逻辑删除 |
+
+### ③ 为什么 D2（清模板占位）被否决 —— 实测数据推翻了我的推荐
+
+我原推荐清理权威模板的受管区占位内容。实测 166 个 editable 非空字段后**撤回**：
+它们混着两类完全不同的东西。
+
+| 类别 | 身份数 | 内容 | 可否清 |
+|---|---|---|---|
+| 真示例 | ~23 | `大额客户一`/`产品1`（D4-10 21 行）、`客户1`/`新增主要客户`（D4-28 2 行） | 可清 |
+| **模板应有内容** | ~60+ | `key_indicator_rows` 12 行 = `年度预算`/`主营业务收入`/`销售人员数量`…（审计指标**正式名称**）；`invoice_compare_rows` 12 行 = `1月`~`12月`（表的**固有结构**）；`d45_policy_groups` = `1.销售商品收入`/`（1）收入会计政策`（会计政策**条目标题**）；`customer_totals` 4 = 合计初始值；`d4_32_groups` 34 = 分组编号 | **不可清** |
+
+清掉后者会让审计师打开 D4-22 看到 12 行空白、D4-23 没有月份 —— **破坏模板业务语义**。
+
+🔴 **这反而指向第四层根因**：如果 `1月`~`12月`、`年度预算` 是模板**应有**的行，它们
+**本就该在 store 里**（作为行的初始数据），而不是只存在于 Excel 侧。extra 的深层成因是
+**这些 table 缺少「模板固有行 → store 初始化」的接线**。E3 是在判据层承认这个现状，
+而非修它（修它 = 逐 table 定义「哪些是固有行」并实现初始化，远超本 spec 范围）。
+
+### ④ 交付清单（4 个文件）
+
+| 文件 | 改动 |
+|---|---|
+| `contracts.py` | 新增 `is_template_skeleton_identity()` + `_TEMPLATE_ROW_IDENTITY_RE`。🔴 **放在 contracts（底层无依赖）而非 excel_materialize/excel_extract**：收敛判据与 roundtrip 豁免**两处都要用**，各写一份就是第二真源（漂移时症状分别是「误删模板行」与「误报 extra」，相距很远） |
+| `content_mutation.py` | `_assert_roundtrip_equivalent` 加模板骨架豁免（合取三条件） |
+| `excel_materialize.py` | 6.2b 收敛判据（与 overlay 对偶）+ 6.8b **分级**动作 + 阶段 0 删行执行 + `_shrink_managed_table_ref`（Table ref 对称收缩）+ `shrink_sheet_rows` **首个生产接线点**（闭合「能力已建 ≠ 接线完整」） |
+| `test_managed_row_convergence.py`（新） | 22 tests / 3 组不变量，每组配变异反证；含 3 条**源码锁**（防判据形态被「简化」后变异反证仍绿） |
+
+**分级动作**（更正 6，由 D4-31 实测确立）：
+
+| 情形 | 动作 |
+|---|---|
+| 删后受管区仍剩 ≥1 行有身份数据行 | 删物理行（行数精确跟随 store） |
+| 删后受管区归零（D4-31 是 `A5:K5` **单行区**） | 清空 editable 字面值格，保留物理行 + 身份载体 + 公式格 |
+
+后者的依据：纯删行在 D4-31 实测撞 `IdentityCarrierMissingError`
+（「Table ref 覆盖的行区间内一个 row identity 都没反读到」），整个 entry 反而彻底不可用。
+⇒ 「清空」与「删行」**不是二选一，而是按受管区容量分流**——最初的清空建议与后来的删行
+裁决各覆盖了分级的一侧。
+
+### ⑤ 结果：extra 归零，但 500 未解除 —— 第五层根因（既有缺陷，非本轮引入）
+
+真实链路（UI 点「在线编辑」，D4-3 受管 sheet）现在报的是 **`missing`** 而不是 `extra`：
+
+```
+staged representation 反读后缺少受管字段
+adjudication_main_rows/xsheet-other-g5d43680692/{current_unadjusted,label,prior_unadjusted}（共 3 个）
+```
+
+离线实证根因（`_c3_missing` 探针，只读）：
+
+| 口径 | `xsheet-other-g5d43680692` 的 table 归属 |
+|---|---|
+| `store-projection` 端点的 `row_keys` | `adjudication_other_rows` ✅ |
+| provider 纯 store 投影的 `row_keys` | `adjudication_other_rows` ✅ |
+| **端点的 `values` key 前缀** | **同一行有两套**：`adjudication_main_rows/…` ＋ `adjudication_other_rows/…` 🔴 |
+| provider 纯 store 投影的 `values` key | 只有 `adjudication_other_rows/…`（且字段更全，含 `current_aje`/`current_rje`） |
+
+⇒ `main_rows/` 那三个 key **由 overlay 引入**，即 **substrate extract 把 D4-1 同 sheet 双区的
+other 区身份按主表 `table_key` 产出了字段 key**。materialize 拿到
+`adjudication_main_rows/xsheet-other-*` 后，在 main 受管区找不到该身份的物理行（它在 other 区）
+⇒ 没写入 ⇒ 反读缺失 ⇒ `missing`。
+
+🔴 这是 **D4-1 双区 extract 的 table 归属缺陷**，与受管行收敛无关，且**未由本轮引入**
+（本轮没碰 extract 的 table 归属）。影响面推测涵盖所有同 sheet 多受管区底稿
+（D4-1 / D4-9 / D4-20 / D4-34 / D4-36 等），需独立排查。
+
+### ⑥ 回归与 pre-existing 红的权威判定
+
+- 收敛与豁免相关面：`test_task38_excel_materialize` / `test_d4_1_materialize_extract_realchain` /
+  `test_task15_content_mutation_pg` / `test_single_pass_failure_atomicity` /
+  `test_projection_first_publication` 合计 **238 passed**；新守卫 **22 passed**
+- `test_projection_first_publication.py` **3 红**已用 `git stash` **权威判定为 pre-existing**
+  （stash 掉本轮三个文件后照样红）：
+  ① `test_row_keys_merge_preserves_order_and_dedupes` —— 断言 overlay 的 row_keys 按**并集保序**
+  （`('a','b','c')`），而实际 `('b','c')`：这是并发会话 commit `e52e5e5ce` 把 overlay 从并集
+  改成「store 权威」留下的**测试欠账**
+  ② `test_host_target_codes_equal_the_reviewed_adjudication` —— 「只比对了 34/51 个已交付 entry」
+  分母不足
+  ③ `test_row_bearing_table_key_agrees_with_every_declaring_provider` —— E1 provider 缺
+  `ROWS_TABLE_KEY` 声明（`ProviderCapabilityError`）
+
+### ⑦ 方法论教训（第四条，补入铁律）
+
+前三条是「结构性零须配变异证明」「报 0 前换第二通路复核」「计数类结论须用生产口径复算」。
+本轮补第四条：
+
+🔴 **判据设计必须先在真实样本上跑一遍再写实现** —— 本轮判据被实测推翻三次
+（v1 删骨架行致 4 红 → v2 对 D4 完全无效 → v3 才成立）。若按 v1 直接实现完再验，
+会在「已改核心引擎 + 已动 live 数据」之后才发现方向错。
+先用离线探针把「这个判据在真实数据上会命中什么」量清，代价远低于事后回滚。
+---
+
+## 第十一轮（F1 + G2 + G3）：D4 materialize 500 **已修复并真实链路验收通过**
+
+第十轮结束时 500 仍在，卡在第五层根因。本轮连做三处修改把余下三层全部收口，
+**真实链路**（点 D4-3「在线编辑」）已返回 **200 OK**、OnlyOffice 编辑器正常加载。
+
+### ① 完整错误演进链（七层，每层都有实证）
+
+| 层 | 报错形态 | 成因 | 处置 |
+|---|---|---|---|
+| 1 | `extra` 402 / 126 | **裸差集**未应用生产 `_managed` 豁免 ⇒ 两轮都虚高 | 改用生产口径，真值 **77** |
+| 2 | `extra` 77 | substrate 有模板骨架行 / store 未声明 | **E3** roundtrip 豁免（合取：是骨架 ∧ store 未声明） |
+| 3 | `missing` 3 个 | overlay 把 other 区身份归进 main 表 row_keys（错位 key） | **F1** overlay 逐 table 判据 |
+| 4 | — | 上述两处修完后暴露：main 区 R22 承载 other 段身份 | 由 6.2b 收敛判 stale |
+| 5 | `extra` 7 个 `GTROW-MINTED-*` | **删行**缺兄弟 Table ref 收缩 ⇒ other 区出现 uuid 空行 ⇒ 反读被重新 mint | **G2** 删行降级为清空 |
+| 6 | `extra` 1 个 `label` | 清空对 text 写**空串** ⇒ 落成「存在且值为空串」的格 ⇒ 反读仍算有值 | **G3** 新增 `CellWriteKind.blank` |
+| 7 | **200 OK** | — | ✅ |
+
+🔴 第 5 层是**本轮自己引入**的（删行是新增路径），不是既有缺陷 —— 如实登记。
+
+### ② G2 裁决：删物理行降级为「清空业务格」
+
+删行牵动**一整套行号位移联动**，而插行路径为此已积累专门处理：
+
+* `_shift_sibling_table_refs` —— 同 sheet 兄弟 Table 的 ref 位移
+  （D4-1 是 main `R8~R22` / other `R25~R36` **双区**，删 main 区一行就动 other 区）
+* footer anchor 与 `GT_FOOTER_ROW` 重冻结、合计公式区间扩张
+* `_apply_workbook_propagation` —— definedName 与**引用侧 sheet** 的跨表公式行号
+
+删行要**全部对称实现**才安全。实测代价：只补了自己那个 Table ref 的收缩（未补兄弟 ref）
+就让 other 区出现 uuid 空行 ⇒ `_scan_row_identities` 按 tombstone 策略**重新 mint**
+`GTROW-MINTED-*` ⇒ 新身份不在 intended ⇒ 又一轮 `extra`。
+
+拒绝方案 G1（补齐兄弟 ref）的理由：每补一处暴露下一处，远超「修 D4 的 500」的范围。
+
+⇒ `shrink_sheet_rows` / `_shrink_managed_table_ref` / `MaterializePlan.stale_deleted`
+**代码保留但刻意不启用**，并有守卫**反向断言**「收敛不得产出删行计划」，
+留给后续独立 spec 补齐多区位移联动后再开。
+
+### ③ 🔴 G3 根因：「清空」与「写空文本」在 OOXML 是**两种不同的格**
+
+`_cell_xml` 对 `CellWriteKind.inline_text` 的 `None` 与 `""` **一视同仁**，都渲染成：
+
+```xml
+<c r="A22" s="42" t="inlineStr"><is><t xml:space="preserve"></t></is></c>
+```
+
+—— 一个**存在且值为空串**的格。`xml:space="preserve"` 明确保留空串，extract 反读得 `""`，
+于是 **cell 仍算有值** ⇒ 仍产出该字段的 key ⇒ `extra` 消不掉。
+
+而 amount 字段「恰好」好了是**巧合**：`_render_number("")` 落成 `<v></v>`（空数值节点），
+openpyxl 读回 `None`。**靠巧合不能作判据**，且 `<v></v>` 本身不是干净形态。
+
+⇒ 这精确解释了为什么 extra 从 **7 个降到 1 个**：main 表 7 个字段里 6 个是 amount（消失），
+1 个是 text 的 `label`（残留）。**数字对得上不是偶然，是同一机理的两种落盘形态。**
+
+**修法**：新增 `CellWriteKind.blank`，渲染 `<c r=".." s=".."/>`（无 `t`、无 `<v>`、无 `<is>`，
+**保留样式** `s=` 符合 AC 3.5），收敛清空对**所有** value_type 统一用它，消除 text/number 分叉。
+
+先例同型（不是新发明）：`boolean_literal` 对 `None` 也刻意落真空格而不是 `<v>0</v>` ——
+后者把「未填」变成「填了 false」，对「是否函证」这类审计字段是实质性语义错误（BP-22）。
+
+### ④ 真实链路验收（权威判据，非离线）
+
+点 D4-3「在线编辑」→ `POST .../materialize` **200 OK**：
+
+* `generation` 165 → **166**、`replayed: false` ⇒ 真实执行而非重放缓存
+* `artifact_sha256: d7d15bc3…`、OnlyOffice iframe 正常加载、页面 **0 errors**
+
+新 substrate `000000166-d7d15bc324af.xlsx`（sha256 与端点返回一致）四条判据全过：
+
+| 判据 | 实测 |
+|---|---|
+| ① 身份载体列**未被动** | `W22 = 'xsheet-other-g5d43680692'` ✅（否则会被重新 mint） |
+| ② 业务格**全空** | `A22~H22`（A/B/C/D/F/G/H）7 格全空；`label` 从 `g5d43680692` 变空 ⇒ **收敛真实执行** |
+| ③ 公式格**完好** | `E22 = =SUM(B22:D22)` / `I22 = =SUM(F22:H22)` 未被破坏 |
+| ④ 无新 uuid 空行 | other 区 `X25~X36` 身份全在 ⇒ 第 5 层不复发 |
+
+🔴 判据①③是「**清空不等于清行**」的正面证据：身份与公式都必须留，
+清了身份 ⇒ 重新 mint（第 5 层复发）；清了公式 ⇒ 毁模板（且公式本就被 `PROTECTED_MODES` 豁免）。
+
+### ⑤ 回归
+
+`test_managed_row_convergence.py` **26 passed**（本轮新增 2 条）：
+
+* `test_clearing_uses_blank_kind_not_empty_string` —— 源码锁：收敛必须用 blank，
+  且**显式反断言**「退回 `_write_kind_for(spec)` + 空串」这一失败形态
+* `test_blank_kind_renders_a_truly_empty_cell` —— 渲染形态断言，含**变异反证**：
+  同样传 `None`，`inline_text` **仍然**产出 `<is><t xml:space="preserve">` ⇒
+  证明两者不可互换、本条判据有真实区分力（不是在断言恒真的事）
+
+相关面 **230 passed 零回归**：`test_task38_excel_materialize` /
+`test_d4_1_materialize_extract_realchain` / `test_task15_content_mutation_pg` /
+`test_single_pass_failure_atomicity` / `test_static_region_writeback`。
+
+### ⑥ 方法论教训（第五条，补入铁律）
+
+🔴 **「部分生效」比「完全不生效」更容易误判方向** —— 本轮 extra 从 7 降到 1 时，
+很容易把它当成「还有一层独立的新问题」。实际上 7→1 与 6:1 的 amount/text 构成比
+**是同一个机理的两种落盘形态**：数字本身就是根因的指纹。
+
+⇒ 判据：**修一处后若报错数量变了但没归零，先算「消失的那些」与「残留的那些」有什么系统性差别**
+（本轮是 value_type ⇒ 落盘 kind ⇒ 空值语义），而不是直接假设又遇到新一层。
+按类型/分组给残留项分桶，往往一步就指到真因。
+
+### ⑦ 遗留（各自另立 spec，本轮不做）
+
+1. **删行的多区位移联动** —— 兄弟 Table ref / footer 重冻结 / definedName / 跨 sheet 公式。
+   代码已在（`shrink_sheet_rows` + `_shrink_managed_table_ref` + `stale_deleted`）但不启用，
+   有守卫反向断言守着，开启前必须先补齐全部对称处理。
+2. **模板固有行 → store 初始化接线**（第四层根因）—— 166 个 editable 非空字段里 ~60+ 是
+   模板应有内容（`年度预算` 等审计指标正式名、`1月`~`12月` 固有结构、会计政策条目），
+   它们缺「模板固有行进 store」的接线。E3 是在**判据层承认现状**，不是根治。
+3. **D4-1 `W22` 被写入 other 段身份的原始成因** —— 本轮只做了收敛清理，
+   未追查它最初是怎么写进 main 区的（`A22=g5d43680692`、`B/E/F/I=0`，R22 是 main 区追加插入点）。
+
+### ⑧ 补充实证：收敛是**幂等**的（跨 sheet 复验）
+
+换 **D4-2** 再点一次「在线编辑」：同样 **200 OK**，且三个信号同时成立：
+
+| 信号 | 值 | 含义 |
+|---|---|---|
+| `generation` | 仍 **166**（未递进） | 产物逐字节相同 ⇒ 无需新 generation |
+| `artifact_sha256` | `d7d15bc3…` 与上次**完全相同** | 同上，字节级确认 |
+| `replayed` | **`false`** | 不是重放缓存，**真跑了一遍**得到同样结果 |
+
+⇒ 收敛**一次到位且稳定**：首次把 stale 行清空后，后续 materialize 找不到新的 stale 行，
+于是产出不变。若收敛有震荡（例如清空又被重新 mint、或每次清不同的行），
+这里会看到 generation 持续递进 —— 那正是第 5 层（`GTROW-MINTED-*`）的症状。
+
+🔴 **`replayed: false` + generation 不变** 这个组合是判断幂等的关键：
+单看「200」不能区分「真的稳定」与「被缓存挡住了」。
+
+### ⑨ 任务 #2 结论：live「部分收敛态」无需人工处置
+
+原担心：live store 只有 154 行（含历史测试污染），而 substrate 有 440 个物理身份行，
+差 286 行 —— 是否需要人工清理？
+
+**不需要**。生产 roundtrip 已通过（200 OK + 幂等），因为那 286 行差额的构成是：
+
+* **模板骨架行**（`GTROW-{template}-{NNNN}`）—— 由 E3 豁免，是**设计允许**的状态
+  （store 只声明有业务数据的行，模板预置行不进 store 是常态，非「用户删了行」）
+* 公式字段 —— 由 `PROTECTED_MODES` 豁免
+
+🔴 **这里踩了一次「同一个坑的第三次」**：我写了个离线探针想复算 extra，得 126 个
+（形如 `customer_current_rows/GTROW-D49C-0014/amount_ratio`）。**探针是错的** ——
+它的 `_iter_fields` 走 `contract.dynamic_tables`，而 `SyncContract` **没有这个属性**
+（同一天早些时候刚实测过），于是 `protected_templates` 近乎为空，
+**公式字段与骨架行两类豁免全都没应用**。
+
+这与第八/九轮「裸差集得 402/126」是**同一形态的第三次复发**。
+⇒ 强化铁律：**凡自建差集复算，第一步必须先断言豁免集非空**
+（`assert protected_templates`），否则「豁免没生效」会静默地表现为「有一堆 extra」。
+生产判据（真实链路 200）永远优先于自建探针。
+
+那 286 行差额指向的是**遗留项 2（模板固有行→store 初始化接线）**，
+不是本轮要修的东西，也不影响 D4 可用性。
+
+---
+
+## 第十二轮（2026-09-28）：D4-4 调整分录汇总接成真双向 —— **全组最后一张 `single_html` 清零**
+
+spec `d4-4-adjustment-summary-bidirectional-writeback`。本轮把 D4-4 从 `⬜ single_html`
+接成 ✅ 三维代码全绿，使逐张清册的 `⬜` 从 2 张降到 **1 张**（仅剩 D4-13 纯叙述文本表）。
+
+### ① 原 `single_html` 裁决的两条理由经实测**均不成立**
+
+| 原裁决理由 | 实测复核 |
+|---|---|
+| 模板无行身份 UUID 列载体 | **不成立**。`A1:J23`，**K~O 五列全空**，紧邻受管末列 J 右侧即 K；前端 `D4AdjustmentRow` **本就有 `rowId`**。对比 D4-19 是「模板无空列 → 注入列 P」才落地的，D4-4 连注入都不用 |
+| hub store 被 A13/借贷平衡语义占用 | **不成立**。`debitTotal`/`creditTotal`/`balanceDiff`/`isBalanced` 全是 `computed` 不落库；`pushToA13`/`publishAdjustment` 只读 rows 后 `eventBus.emit`；`useAdjustmentCentralSync` 零写路径。落库的 `D4-4-rows` 就是干净的 10 字段行数组 |
+
+它反而是剩余表里**几何最简**的一张：单区动态行、模板 10 列 ↔ 前端 10 字段 **1:1 双射**、
+数据区公式格 **0**、R6~R20 完全空白、无合并、非转置。
+
+### ② 几何冻结现算（11 项零更正）
+
+`D4 收入底稿.xlsx`（199,176 B / 46 张 sheet）的 `营业收入调整分录汇总D4-4`：
+`max_row=23` / `max_column=10` / 表头 R5 十列逐字全对 / 数据区 R6~R20（**15 行**）/
+footer marker A21「提示：」（**63 字**）/ 数据区公式格 **0** / 非空格 **0** /
+合并仅 `A1:J1`+`A2:J2` 且数据区无合并 / **K~O 五列全空** / `LAST_DATA_ROW(20) < FOOTER_ROW(21)`。
+
+### ③ 🔴 两处 spec 前提在实施时已过期（如实登记，以现算为准）
+
+**其一（文件迁移）**：spec Task 2 要求确认「`oo_to_html.py` 的 4-tuple 硬解包行仍在（现算 L2842）」。
+现算它**已不在 `oo_to_html.py`** —— 本会话此前的 spec `workpaper-sync-managed-row-convergence`
+Task 3 把三个 `_mirror_*` 抽到了会话无关模块 `store_mirror.py`（OO callback 与 adopt-substrate
+共用，避免第二真源）。现算位置：`store_mirror.py` **L314**；`_mirror_d4_dual_stores`(×2) 与
+`_dict_store_items`(×7) 也都在该模块。⇒ Task 7/8 的目标文件随之改为 `store_mirror.py`，
+守卫文件头的过期描述已一并更正。
+
+**其二（接线点数）**：design §3 的表列了 **8 处**接线，现算 D4-19 的真实接线点是 **11 处**
+（design 把 `values.update` / `row_keys` / `results` 几处合并计了）。全部照做：
+1 import · 2 flag · 3 `STORE_ITEM_IDS` · 4 `instrumentation_specs` · 5 `sheets` ·
+6 `d44_projs` · 7 `values.update` 循环 · 8 `row_keys` 合并 · 9 `d44_results` ·
+10 `**d44_results` 展开 · 11 `_RAW_PAYLOAD_ITEM_TABLE_KEYS`。
+⇒ 「D4-8 曾只完成 5/8 处」的教训在本轮变成「按 8 处做会漏 3 处」。
+
+**其三（命名）**：design 写 `_INCLUDE_D44_SHEET`，而既有 5 个同类 flag 都是
+`_INCLUDE_D{n}_{名字}_SHEET`（D419_DISCOUNT / D417_CUTOFF / D420_RETURN / D434_CONTRACT /
+D48_PRODUCT_MARGIN）⇒ 采用 `_INCLUDE_D44_ADJUSTMENT_SHEET`。
+
+### ④ 🔴 变异反证抓到一个「归一幂等」造成的潜在假绿
+
+`merge_projection_into_all_d4_stores` **末尾自己就调了** `_normalize_merge_updates`，
+所以它的返回**已经是** 4-tuple。守卫若只断言「归一后是 4-tuple」，对
+「`_RAW_PAYLOAD_ITEM_TABLE_KEYS` 的登记生效」与「登记冗余」**无法区分**（重复归一是幂等透传）。
+
+摘掉登记重跑：`applied = 0`；带登记：`applied = 10`。
+⇒ **`applied=0` 的后果不是报错**，而是 `store_mirror` 的护栏
+``if applied <= 0 and base_rows: continue`` 把 D4-4 的回写**静默丢掉**（不报错、不落库）
+—— 比 `ValueError` 难查得多。该反证已固化为守卫
+`test_mutation_dropping_raw_payload_registration_collapses_applied`。
+
+### ⑤ Req 2.5 的「五层不一致」已补齐
+
+2026-09-28 实测：模板有 F/J 列 ✓ · `D4AdjustmentRow` 有字段 ✓ · `safeParseRows` 解析 ✓ ·
+导入导出 ✓ · **UI 只有 8 列** ✗（源码注释编号 1~8）。
+
+不补的后果不是「少两列」：F/J 在模板里真实存在 ⇒ OO 侧可编辑 ⇒ 用户改完回写进 store，
+但切回结构化视图**看不见** ⇒ 表现为「改动丢了」（实为存了但不可见），比不回写更难排查。
+⇒ 已补 `补充说明`(F/`placeholder`) 与 `备注`(J/`remark`) 两列，五层一致。
+
+⚠️ **同名陷阱**：该文件另有 6 处 `placeholder="…"` 是 **el-input 的占位文本属性**，
+与 `D4AdjustmentRow.placeholder` **字段**同名但无关。守卫判据因此锚定
+`updateCell(row.rowId, 'placeholder', v)` 而不是 `placeholder` 字符串本身。
+
+### ⑥ `_rows()` 两层强度（本轮设计裁决）
+
+| 层 | 强度 | 理由 |
+|---|---|---|
+| 容器层 | **容差**（None/空串/空白/坏 JSON/dict/数字/bytes/含非对象元素 → `[]`，不抛） | 与另外 35 张 sheet 共享 entry，这里抛异常会打挂**整个 entry** 的 rematerialize（D4-9 真实事故） |
+| 行层 | **fail-closed**（缺 `rowId` / 空串 / 重复 → `ValueError`） | 丢行身份会让 materialize 在错误受管区插行 + extract 反读错位 key，极难归因（D4-1 的 W22 追了七层）；不得退回数组下标作身份（Property 23） |
+
+**禁加 rowId 格式正则**：本表行身份两种格式并存（前端 `d4a-{base36}-{rand}` /
+导入侧 `uuid4()`），加校验会拒掉导入产生的行。
+
+### ⑦ 契约规模现算对账
+
+apply 前磁盘 **35 张 / 775 字段**（与文档一致），源码 36/785，差额恰 +1/+10；
+`--apply` 后磁盘 **36 张 / 785 字段**（文件 555,518 → 562,622 B），
+增量校验「+1 张 / +10 字段 / 新增 sheet_key 只有 `d44-managed` / 该表恰 10 字段」全通，
+`assert_contract_file_matches_source()` 无 DRIFT。
+
+**CS-13 空分母已显式记录**：d44 字段 mode 集合 = `['editable']`、`mode=='formula'` 字段数 **0**、
+`formula_mask=[]` ⇒ 「formula 字段必须落在 formula_mask 内」的**分母为 0**，空分母成立，
+**不得**因 mask 为空而判违规。
+
+### ⑧ 🔴 方法论：同一条铁律的正反两向在一天内都踩到
+
+「判断代码是否真做了 X 一律用 AST，禁文本匹配 —— 注释/docstring 正反两向都会骗过扫描器」：
+
+* **反向**（此前）：docstring 写「权限：`require_project_access`」冒充真实现 ⇒ **漏报**；
+* **正向**（本轮）：我在 provider 的 docstring 里写了禁令**反例**
+  「写 `assert rowId.startswith('d4a-')` 之类断言会…被拒」，而首版探针用文本匹配查
+  「有无 rowId 格式断言」⇒ 把这段**说明文字**当成真断言 ⇒ **假阳**。
+
+⇒ 改用 AST（只看 `Call` 节点；docstring 是 `Expr(Constant)`、`#` 注释不进 AST ⇒ 天然排除），
+并加**变异反证**（对真实 `rid.startswith('d4a-')` 必须命中，证明判据非恒绿）。
+
+另一处同型：前端守卫的 `stripComments` 自检首版用单字母样本 `a`/`b`/`c`，而保留内容
+`code` 里就含 `c` ⇒ 断言自撞打红。**判据本身写错了**，不是被测对象有问题。
+
+### ⑨ 🔴 发明了一条不存在的基准（自查纠正）
+
+前端守卫首版写了「dedicated 列表与 legacy 禁入名单**不得有交集**」—— **那是我臆想的规则**。
+实际 `D4-5` 刻意同时在两处（`d4Constants.ts` 注释明说它是「历史冗余项，已接子组件桥
+`d45-managed`，故实际不可能命中 legacy 分支」）。发明一条不存在的基准会把**有意设计判成缺陷**。
+
+⇒ 判据收窄为「只断言 D4-4 的迁移完成」，D4-5 走**带反向断言的显式豁免**：
+不只写理由文本（那是加一行就变绿的后门），而是断言它声称的条件真的成立 ——
+`D4TabPolicyCheck.vue` 确实 `useD4SyncMode` + `d45-managed`。
+
+### ⑩ 另一处「期望值不变但成因改变」
+
+spec Task 13 预期 `d4LegacyOoBlocked.spec.ts` 的「推导 legacy 命中集」用例期望值要
+**从 4 张变 5 张**。现算结论是 **期望值不变**（仍 4 张）：D4-4 原先被禁入名单挡住、
+现在被 `bridged`（dedicated）排除，**两条路径都不进命中集**。
+
+⇒ 只看结果无法区分这两种状态。已补一条独立用例
+`① D4-4 的排除成因是「已接 dedicated 桥」而非「在禁入名单里」` 把成因本身钉死。
+这与「口径不同 ≠ 有偏差」是同一条纪律。
+
+### ⑪ 交付物与测试
+
+**新增**：`backend/app/services/workpaper_sync/phase5_d4_adjustment_sheet.py`（325 行，12 函数）·
+`backend/tests/test_d4_4_adjustment_contract.py`（**48 tests**）·
+`audit-platform/frontend/src/components/workpaper/__tests__/d4AdjustmentSyncHostWiring.spec.ts`（**21 tests**）
+
+**改动**：`phase5_d4_revenue_detail.py`（11 处接线，2728→2783 行）·
+`d4.revenue_detail.json`（35→36 张 / 775→785 字段）·
+`test_d4_mirror_shape_invariants.py`（+D4-4 专项 12 tests，含 2 条变异反证）·
+`D4TabAdjustment.vue`（接桥 + 补 2 列）· `useD4Adjustment.ts`（导出 `flushPendingSave`）·
+`GtD4OperatingRevenue.vue`（dedicated +`'D4-4'`）· `d4Constants.ts`（legacy 名单 −`'D4-4'`）·
+`d4LegacyOoBlocked.spec.ts`（期望翻转 + 成因判据 + 变异反证）
+
+**测试**：后端相关面 **71 + 55 passed**；前端 D4 接桥面 **98 passed**。
+`A9-1 mode switch` 那条红经 `git stash` 归因为**预存失败**（与本轮无关）。
+
+### ⑫ 环境门 —— **2026-09-30 已全部在真栈跑通（原 `UNVERIFIABLE` 清零）**
+
+原记录：Task 10*（发布链）需 live PG；14*（L1）/ 15*（L2 seed）/ 16*（L2 真 OO canvas
+往返）需 start-dev.bat 全栈 + OO 容器，按全组既有标准列为 env 门。
+**2026-09-30 全栈起齐后逐项跑完，5 项全 ✅**（D4 是全组第一张把 L2 真 OO canvas
+往返做到 application `applied` + 真库逐值对账的底稿）：
+
+| # | 结果 | 关键证据 |
+|---|---|---|
+| 10* | ✅ | gen 166→167→**168** / revision 188；途中修一处 footer marker 全等匹配真缺陷 |
+| 15* | ✅ | `seed_d4_4_adjustment_l2.py`（幂等 4 模式），3 行借贷各 168000 平衡；substrate R21~R23 十列全对、footer 正确下移 R24 |
+| 14* | ✅ | L1 `1 passed / 1.8m`，`D4-4.json`：`d2_sync_hits=0` / `console_errors=0` / `http_errors=0` / `oo_iframe_count=1` |
+| 16* | ✅ | L2 `1 passed / 1.2m`，OO 写 `J21` → `cs_error=0`/`cs_outcome=accepted`（非 `4=no_changes`）→ operation `oo_to_html` `applied` → application gen169 `applied`/rev 190/conflict 0 → 真库 `D4-4-rows` 第 1 行 `remark` 变 marker、另 2 行逐字未动 |
+
+三条可复用的结论（对后续各循环 L1/L2 都成立，非 D4-4 专属）：
+
+1. **`doc_editor_called` 不是有效判据**：现算 **36 张 L1 证据全部为 `false`**，无一例
+   `true` ⇒ 该 init-script 猴补在本平台从未触发，是全 fleet 一致的探针失效。OO 挂载应由
+   `oo_iframe_count=1` + `sync_host_mounted=true` + `materialize_ok=true` 三项承担。
+   （一个在所有样本上取同一值的字段没有判别力，写成判据等于永假门。）
+2. **点「在线编辑」前必须等切换器解除 `disabled`**：`useD4SyncMode.switchMode` 首行
+   `if (busy.value && ...) return` 会**静默吞掉** busy 期的点击，报错却落在 3 分钟后的
+   materialize 轮询上。且 D4 是整册 37 sheet materialize，**轮询要 300s 不是 180s**
+   （实测超时后 18 秒才出现 `applied` operation）。
+3. **forcesave 的 `cs_error` 必须从 `await waitForResponse()` 的 Response 直接
+   `await res.json()` 取**：`page.on('response')` 里 `void res.json().then(...)` 异步塞的
+   变量在 `waitForResponse` resolve 时常还是 `null`（它只等响应头）⇒ 把一次
+   `cs_error=0` 的真实成功误判成失败。证据自相矛盾时（`cellTextAfterSave` 已是 marker、
+   forcesave 已是 202，却报失败）应先怀疑取值时序，别先怀疑被测对象。
+
+另：本轮顺带发现 `audit-platform/frontend/playwright.config.ts` 自身 IPv4/IPv6 口径
+不一致 —— `use.baseURL` 写死 `127.0.0.1:3030` 而 `webServer.url` 用 `localhost:3030`，
+本机 Vite 现算**只监听 IPv6**（`netstat` 仅 `TCP [::1]:3030 LISTENING`）⇒ webServer
+探活能过、所有相对 `page.goto` 必 `ECONNREFUSED`，**本机任何 e2e 都跑不起来**，与 D4-4
+无关。Playwright 1.60.0 无 `--base-url` CLI 选项，本轮用一次性 `playwright._d44.config.ts`
+只覆盖 baseURL 绕过（不改共享配置，避免影响并发会话），根因登记为遗留项。

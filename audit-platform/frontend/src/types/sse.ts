@@ -68,3 +68,9 @@ export type SSEEventType =
   | 'a13_summary_updated'
   // 复核对话
   | 'review_message.created'
+  // 公式推送（chain-closure-phase2-formula-push-engine；后端 broadcast_raw，载荷见 e1FormulaPushNotice）
+  | 'formula.pushed'
+  // 合并推送（consol-elimination-single-source-push；raw SSE，事件名在 event channel）
+  | 'consol.pushed'
+  | 'consol.push_stale'
+  | 'consol.push_failed'

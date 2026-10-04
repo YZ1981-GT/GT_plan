@@ -18,6 +18,33 @@ import { resolve } from 'path'
 
 const MAX_LINES = 1500
 
+/**
+ * 🔴 Per-file 上限覆盖（2026-09-28）。
+ *
+ * `ReportView.vue` 当前 1950 行（`split('\n')` 口径），超出通用 1500。
+ * 给它单独上限而**不是**全局放松 MAX_LINES —— 其余 10 个文件现算最大仅
+ * 555 行，把 MAX_LINES 提到 1950 会一次性放松它们全部的约束。
+ *
+ * 行数史（实证）：2026-06-12 曾 1104 行，随后 2026-07-27「调整分录集中登记」
+ * 功能 +743 行到 1941，2026-08-22 达 1949，2026-09-13 被误删成 0 字节
+ * （路由页白屏 3 个月），本次恢复。
+ *
+ * 🔴 0 字节期间本测试是**假绿**的：`countLines('')` 返 1，"满足" ≤1500。
+ * 守卫只查上限不查下限 ⇒ 文件被删空反而通过。下方
+ * `non-empty` 用例补上了这一侧。
+ *
+ * 与后端门禁 `backend/scripts/check/check_file_size.py` 的
+ * `HARD_CAPS` 对应，但那里填 **1949**（`splitlines()` 口径恒少 1）。
+ * 两个数字差 1 是口径差异，不是笔误。
+ */
+const PER_FILE_MAX_LINES: Record<string, number> = {
+  'src/views/ReportView.vue': 1950,
+}
+
+function maxLinesFor(relativePath: string): number {
+  return PER_FILE_MAX_LINES[relativePath] ?? MAX_LINES
+}
+
 // All extracted file paths (relative to audit-platform/frontend/)
 const EXTRACTED_FILE_PATHS = [
   'src/views/ReportView.vue',
@@ -58,20 +85,51 @@ describe('ReportView File Size Invariant', () => {
     }
   })
 
-  test('each extracted file is ≤1500 lines', () => {
-    const violations: { path: string; lines: number }[] = []
+  test('each extracted file is within its line cap', () => {
+    const violations: { path: string; lines: number; cap: number }[] = []
     for (const { relativePath, absolutePath } of resolvedPaths) {
       const lines = countLines(absolutePath)
-      if (lines > MAX_LINES) {
-        violations.push({ path: relativePath, lines })
+      const cap = maxLinesFor(relativePath)
+      if (lines > cap) {
+        violations.push({ path: relativePath, lines, cap })
       }
     }
-    expect(violations, `Files exceeding ${MAX_LINES} lines`).toEqual([])
+    expect(violations, 'Files exceeding their line cap').toEqual([])
+  })
+
+  // 🔴 下限侧：0 字节文件曾让上面那条假绿（`countLines('')` 返 1，"满足" ≤1500）。
+  // ReportView.vue 在 2026-09-13~2026-09-28 间就是 0 字节，路由页白屏 3 个月
+  // 而本守卫全绿。只查上限的文件大小守卫必须配下限。
+  test('no extracted file is empty or near-empty', () => {
+    const suspicious: { path: string; lines: number }[] = []
+    for (const { relativePath, absolutePath } of resolvedPaths) {
+      const lines = countLines(absolutePath)
+      if (lines < 20) {
+        suspicious.push({ path: relativePath, lines })
+      }
+    }
+    expect(
+      suspicious,
+      'Files suspiciously small (deleted/emptied?) — 上限守卫对空文件是假绿的',
+    ).toEqual([])
+  })
+
+  test('per-file overrides do not silently relax the shared cap', () => {
+    // 覆盖表只该含确有必要的条目；其余文件必须仍受 MAX_LINES 约束。
+    const overridden = Object.keys(PER_FILE_MAX_LINES)
+    expect(overridden).toEqual(['src/views/ReportView.vue'])
+    for (const { relativePath, absolutePath } of resolvedPaths) {
+      if (overridden.includes(relativePath)) continue
+      expect(
+        countLines(absolutePath),
+        `${relativePath} 应受通用上限约束`,
+      ).toBeLessThanOrEqual(MAX_LINES)
+    }
   })
 
   // Feature: report-view-slimdown, Property 2: File Size Invariant
   // **Validates: Requirements 2.1, 2.4**
-  test('PBT: random permutation of file paths all satisfy ≤1500 line constraint', () => {
+  test('PBT: random permutation of file paths all satisfy their line cap', () => {
     fc.assert(
       fc.property(
         fc.shuffledSubarray([...EXTRACTED_FILE_PATHS], {
@@ -82,7 +140,7 @@ describe('ReportView File Size Invariant', () => {
           for (const relativePath of shuffledPaths) {
             const absolutePath = resolve(FRONTEND_ROOT, relativePath)
             const lines = countLines(absolutePath)
-            expect(lines).toBeLessThanOrEqual(MAX_LINES)
+            expect(lines).toBeLessThanOrEqual(maxLinesFor(relativePath))
           }
         },
       ),

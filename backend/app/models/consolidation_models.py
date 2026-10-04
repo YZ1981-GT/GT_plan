@@ -200,7 +200,14 @@ class EliminationEntry(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     credit_amount: Mapped[Decimal] = mapped_column(Numeric(20, 2), server_default="0", nullable=False)
     lines: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     entry_group_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    # 留痕与筛选用（V167 起不参与金额分摊，ADR-CTREE-003）；实际存 list[str]
     related_company_codes: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # V167：分录归属的差额节点 —— None=所在合并项目的「合并差额」，非空=该企业代码的「母分差额」
+    branch_entity_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # V172：分录来源 —— None=手工；ws_* = 合并工作底稿生成的草稿；legacy_sheet = 旧版明细表转入
+    origin: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # V172：来源内确定性键（同来源同键只对应一笔未删分录，重复生成按此更新草稿）
+    origin_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
     is_continuous: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
     prior_year_entry_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     review_status: Mapped[ReviewStatusEnum] = mapped_column(
@@ -208,6 +215,17 @@ class EliminationEntry(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     )
     reviewer_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        # V172：同来源同键只对应一笔未删分录（重复生成按来源键更新草稿，不重复入账）
+        Index(
+            "ux_elim_entries_origin",
+            "project_id", "year", "origin", "origin_key",
+            unique=True,
+            postgresql_where=text("is_deleted = false AND origin_key IS NOT NULL"),
+            sqlite_where=text("is_deleted = 0 AND origin_key IS NOT NULL"),
+        ),
+    )
 
 
 class InternalTrade(Base, SoftDeleteMixin, TimestampMixin):
@@ -367,7 +385,12 @@ class ComponentResult(Base, SoftDeleteMixin, TimestampMixin):
 
 
 class ConsolWorksheet(Base, SoftDeleteMixin, TimestampMixin):
-    """合并差额表 — 每个节点(company_code)×科目×年度一行"""
+    """合并差额表 — 每个企业树节点 × 科目 × 年度一行。
+
+    V167 起 ``node_company_code`` 存节点键 ``node_key``（``{企业代码}:{角色}``，
+    如 ``X:consol`` / ``X:consol_elim`` / ``X:parent``）；列名沿用，语义见
+    ``consol_group_tree``（合并户与母公司户同企业代码，节点身份必须含角色）。
+    """
     __tablename__ = "consol_worksheet"
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

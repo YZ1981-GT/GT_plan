@@ -33,8 +33,10 @@ from tests.workpaper_sync.k_foundation_facts import (  # noqa: E402
     BP6_INDEXES,
     DATA,
     K_INDEXES,
+    NON_CONTRACT_FILES_IN_CONTRACT_DIR,
     ROOT,
     WP_COMPOSABLES,
+    contract_dir_split,
     endpoint_index,
     k_domain_files,
     literal_hits,
@@ -437,23 +439,66 @@ class TestKFP57ContractVsAdapterDenominators:
     """🔴 KC-22③：「契约已发」≠「adapter 已注册」，两个分母混用必算错。"""
 
     def test_contract_directory_counts(self) -> None:
+        """🔴 口径勘误：契约目录里的文件**不全是契约**。
+
+        原判据写 `reviewed + candidate == len(files)`，前提是「目录里每个 `*.json`
+        都是契约」。现算该前提不成立 —— 并发的 L 循环 spec 把一张键映射表
+        （无 `review_status`、不是任何 `{adapter_id}.json`）放进了同一目录。
+        生产侧不受影响（按精确文件名取 / 按 `review_status` 筛），但按「全是契约」
+        写的判据会被它打红，而红的原因与 K 循环无关。
+
+        ⇒ 分母改为「契约文件」而非「目录文件」，差集用可伪证白名单锁住。
+        """
         files = sorted(CONTRACT_DIR.glob("*.json"))
         assert files, "契约目录为空 ⇒ 分母塌了"
-        reviewed = candidate = 0
-        for p in files:
-            doc = json.loads(p.read_text(encoding="utf-8"))
-            status = doc.get("review_status")
-            if status == "candidate":
-                candidate += 1
-            elif status == "reviewed":
-                reviewed += 1
+        contracts, others = contract_dir_split()
+        reviewed = sum(
+            1 for d in contracts.values() if d.get("review_status") == "reviewed"
+        )
+        candidate = sum(
+            1 for d in contracts.values() if d.get("review_status") == "candidate"
+        )
         assert candidate >= 1, (
             "candidate 反例分母为空 ⇒ 「candidate 不得进生产」这条判据没有对象"
         )
         assert reviewed >= 20, f"reviewed 契约只有 {reviewed} 份 ⇒ 分母异常"
-        assert reviewed + candidate == len(files), (
-            "有契约的 review_status 既非 reviewed 也非 candidate"
+        assert reviewed + candidate == len(contracts), (
+            f"契约文件的 review_status 既非 reviewed 也非 candidate："
+            f"{sorted(set(contracts) - {k for k, v in contracts.items() if v.get('review_status') in ('reviewed', 'candidate')})}"
         )
+        assert len(contracts) + len(others) == len(files), "两类之和不等于目录文件数"
+
+    def test_non_contract_whitelist_is_exact_and_falsifiable(self) -> None:
+        """🔴 白名单必须可伪证：成员真的不是契约 + 名单里没有失效条目。
+
+        只写一句理由的名单 = 加一行就变绿的后门（方法论铁律 ㉗⑤）。这里对每个成员
+        实打实验三件事：① 真的没有 `review_status` ② 真的不是任何 adapter 的
+        `{adapter_id}.json`（`load_contract` 取不到）③ 文件真的还在。
+        """
+        from app.services.workpaper_sync.contracts import load_contract
+
+        _contracts, others = contract_dir_split()
+        assert set(others) == set(NON_CONTRACT_FILES_IN_CONTRACT_DIR), (
+            f"非契约文件集变了：多 {sorted(set(others) - set(NON_CONTRACT_FILES_IN_CONTRACT_DIR))}，"
+            f"少 {sorted(set(NON_CONTRACT_FILES_IN_CONTRACT_DIR) - set(others))}"
+        )
+        for name in NON_CONTRACT_FILES_IN_CONTRACT_DIR:
+            p = CONTRACT_DIR / name
+            assert p.exists(), f"白名单条目 {name} 已不存在 ⇒ 名单须删该行"
+            doc = json.loads(p.read_text(encoding="utf-8"))
+            assert doc.get("review_status") is None, (
+                f"{name} 现在有 review_status 了 ⇒ 它成了契约，须移出白名单"
+            )
+            with pytest.raises(Exception):
+                load_contract(name.removesuffix(".json"))
+
+    def test_the_whitelist_is_not_vacuous(self) -> None:
+        """🔴 反向：白名单非空且**确实**在起作用（去掉它判据就会红）。"""
+        assert len(NON_CONTRACT_FILES_IN_CONTRACT_DIR) >= 1, (
+            "白名单为空 ⇒ 若目录里真没有非契约文件，应把本组判据删掉而不是留空名单"
+        )
+        _contracts, others = contract_dir_split()
+        assert others, "目录里已无非契约文件 ⇒ 白名单与本判据一并删除"
 
     def test_adapter_id_non_null_count_is_smaller_than_reviewed(self) -> None:
         """🔴 adapter_id 非空的 entry 数**远小于** reviewed 契约数。"""
@@ -483,19 +528,14 @@ class TestKFP57ContractVsAdapterDenominators:
         )
 
     def test_no_k_entry_has_an_adapter(self) -> None:
-        """K 循环 13 条的 adapter_id 全 null。"""
-        manifest = json.loads(FULL_MANIFEST_PATH.read_text(encoding="utf-8"))
-        k_with_adapter = [
-            e["entry_id"] for e in manifest["entries"]
-            if e.get("adapter_id")
-            and any(
-                str(p).startswith("K")
-                for p in ((e.get("wp_match") or {}).get("wp_code_patterns") or [])
-            )
-        ]
-        assert k_with_adapter == [], (
-            f"K 循环有 entry 已注册 adapter：{k_with_adapter}"
+        """K 循环 adapter_id 非空的 entry **恰好**等于晋级账本（2026-10-01 起 5 条）。"""
+        from tests.workpaper_sync.k_foundation_facts import (
+            k_expected_manifest_adapters,
+            k_manifest_adapters,
         )
+
+        manifest = json.loads(FULL_MANIFEST_PATH.read_text(encoding="utf-8"))
+        assert k_manifest_adapters(manifest) == k_expected_manifest_adapters()
 
 
 # ════════════════════════════════════════════════════════════════════════════

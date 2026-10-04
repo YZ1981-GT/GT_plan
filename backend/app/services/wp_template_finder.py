@@ -9,6 +9,7 @@ sheet 名归一化 / 历史遗留 sheet 过滤工具。
 from __future__ import annotations
 
 import functools
+import hashlib
 import json
 import logging
 import re
@@ -20,8 +21,9 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 TEMPLATES_DIR = BACKEND_DIR / "wp_templates"
 INDEX_FILE = TEMPLATES_DIR / "_index.json"
 
-# 缓存模板索引
+# 缓存模板索引（`_index_fingerprint` 是缓存对应的 `_index.json` 内容 sha256）
 _index_cache: list[dict] | None = None
+_index_fingerprint: str | None = None
 
 # Sheet 级独立模板：优先于「F2-21至F2-26」等包内近空 sheet。
 # F2-22/F2-23 在线编辑应对齐通用底稿 G2-6-2 / G2-6-1（Word）。
@@ -91,17 +93,49 @@ def _should_skip_historical_sheet(name: str) -> bool:
 
 
 def _load_index() -> list[dict]:
-    """加载模板索引（带缓存）"""
-    global _index_cache
-    if _index_cache is not None:
-        return _index_cache
+    """加载模板索引（按**内容指纹**缓存，返回调用方私有副本）。
+
+    🔴 **失效判据必须是内容指纹，不能是 (size, mtime)**：索引由
+    `scripts/ops/setup_wp_templates_dir.py` 用「临时文件 + `os.replace`」原子替换，
+    替换后的文件**可以大小相同**（例如只换了个同长度的文件名），而 mtime 也可能被
+    工具回拨。这时基于 stat 的缓存不会失效，finder 会一直拿着旧索引跑，表现为
+    「明明改了索引却不生效」且无任何报错。判据
+    `test_finder_cache_reloads_same_size_atomic_replace_and_returns_copies`
+    就是构造这个场景（同字节数 + `os.utime` 把 mtime 设回原值）。
+    实测读 124,633 字节 + sha256 每次 0.094 ms，比它要防的那类排查便宜得多。
+
+    🔴 **返回副本**：缓存是进程级共享的 `list[dict]`，直接交出去等于把可变内部状态
+    暴露给每个调用方 —— 任何一处顺手改一个 `filename`，此后**全进程**的模板解析都跟着
+    错，且改动点与故障点隔得很远。条目按构造是扁平标量（`build_index` 只写
+    str/float），故逐条 `dict()` 浅拷贝即足够（实测 0.031 ms，比 deepcopy 快 30 倍）。
+    """
+    global _index_cache, _index_fingerprint
     if not INDEX_FILE.exists():
         logger.warning("模板索引文件不存在: %s", INDEX_FILE)
         return []
-    with open(INDEX_FILE, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    _index_cache = data.get("files", [])
-    return _index_cache
+    raw = INDEX_FILE.read_bytes()
+    fingerprint = hashlib.sha256(raw).hexdigest()
+    if _index_cache is None or fingerprint != _index_fingerprint:
+        data = json.loads(raw.decode("utf-8"))
+        _index_cache = data.get("files", [])
+        _index_fingerprint = fingerprint
+    return [dict(entry) for entry in _index_cache]
+
+
+#: 索引条目的**角色**：有角色的条目不是该 wp_code 的普通候选，需按角色分流。
+#: `whole_workbook` = 整册合并本；`dedicated_subtemplate` = 专用子模板。
+_ROLE_WHOLE_WORKBOOK = "whole_workbook"
+
+
+def _is_bundle_entry(entry: dict) -> bool:
+    """是否为**普通**（无角色）条目 —— 只有这类算该 wp_code 的常规候选。
+
+    没有这道过滤，`find_all_template_files("F2")` 会把整册合并本与专用 docx 一起返回，
+    调用方按「多文件底稿」逐个渲染，整册本就被当成一份普通拆分包重复渲染一遍。
+    真库 476 条现在**一条 role 都没有**（现算）⇒ 本过滤对存量数据是恒等变换，
+    只在登记了角色之后才生效。
+    """
+    return not str(entry.get("role") or "")
 
 
 def _wp_code_filename_prefix_ok(filename: str, wp_code: str) -> bool:
@@ -184,6 +218,19 @@ def find_whole_workbook_templates(wp_code: str) -> tuple[Path, ...]:
     """
     if not wp_code:
         return ()
+    # 🔴 索引里**显式登记**了 `role="whole_workbook"` 时以索引为准（单一真源）：
+    #    整册本的身份是人裁决的，不该由文件名正则去猜。真库 476 条一条 role 都没有
+    #    （现算）⇒ 下面的目录扫描仍是现行唯一路径；登记之后才切到索引口径。
+    declared = [
+        TEMPLATES_DIR / str(e.get("relative_path") or "")
+        for e in _load_index()
+        if e.get("wp_code") == wp_code
+        and str(e.get("role") or "") == _ROLE_WHOLE_WORKBOOK
+    ]
+    declared = [p for p in declared if p.is_file()]
+    if declared:
+        declared.sort(key=lambda p: (len(p.name), p.name))
+        return tuple(declared)
     subdir = TEMPLATES_DIR / wp_code[0]
     if not subdir.exists():
         return ()
@@ -207,6 +254,104 @@ def find_whole_workbook_template(wp_code: str) -> Path | None:
     """
     candidates = find_whole_workbook_templates(wp_code)
     return candidates[0] if candidates else None
+
+
+# ---------------------------------------------------------------------------
+# 合册声明码索引（spec workpaper-sync-pure-static-lane-and-combined-workbook-resolution）
+# ---------------------------------------------------------------------------
+#
+# 解决的是「一个文件装多个 wp_code」时**第二个码找不到自己所在的册**：
+# `A/A3-7内部往来核对表、A3-8商誉减值测试.xlsx` 里的 `A3-8` 在两路入口上
+# `find_template_file_any` 返回 `None`（可见失败），`find_template_file` 返回**错的册**
+# （父程序表 `A3 合并流程程序表.xlsx`，静默错答，更坏）。
+#
+# 根因两层叠加：
+#   ① **前缀而非包含** —— `_wp_code_filename_prefix_ok(合册名, "A3-8")` 为 `False`
+#      （真名以 `A3-7` 起头），且 `_index.json` 给该册挂的 `wp_code` 是 `"A3"`；
+#   ② **A-only 子码正则** `_LEGACY_A_ONLY_SUB_CODE_RE` 命中 ⇒ 走
+#      `find_template_file_any` 的「A 子码严格分支」，该分支两次同名前缀尝试都不中就
+#      `return None`，到不了通用链的「至」范围回退。
+#
+# 🔴 **三条捷径已显式否决，不要再试**：
+#   * **禁**重新生成或手改 `wp_templates/_index.json` —— A 子码分支用的是
+#     `_match_filename_prefix(e["filename"], wp_code)`（按**文件名**前缀），**不是**
+#     `e["wp_code"] == wp_code`；而 `_match_filename_prefix(该合册名, "A3-8")` 恒 `False`
+#     ⇒ 给索引补一条记录对该分支**毫无作用**。且该文件是生成物，手改会漂。
+#   * **禁**用 `app/data/wp_code_overrides.json` 修 —— 那张表的值是 componentType 而不是
+#     模板路径，且本模块根本不读它。
+#   * **禁**改 `_LEGACY_A_ONLY_SUB_CODE_RE` 成字母类无关 —— 那会让 `D2-2` / `E1-3` 这类
+#     Excel 子表也走子码分支，而它们的真实载体是范围式父文件，子码分支的同名前缀判据
+#     匹配不到 ⇒ 实测数百个 wp_code 变 `None`（D/E/F 十九本范围册**零缺陷**正是因为这条
+#     A-only 正则放它们走通用链）。
+
+#: 范围式命名标记。含这些字符的文件名**不**由本节的合册逻辑处理 ——
+#: 范围式由既有「{主码}-N至{主码}-M」回退负责，两者分工不重叠。
+_RANGE_MARKERS: tuple[str, ...] = ("至", "~", "～")
+
+#: 文件名里的 wp_code 字面形态（`A3-8` / `D4-33` / `A17-2-1`）。
+_FILENAME_CODE_RE = re.compile(r"[A-Z]+\d+(?:-\d+)*")
+
+
+def _literal_wp_codes_in_filename(filename: str) -> frozenset[str]:
+    """文件名里**字面列举**的 wp_code 集合（不做范围展开）。
+
+    纯函数：不读磁盘、无副作用、对同一输入恒等输出。
+
+    对范围式命名返回**空集**（fail-closed）：`D4-1至D4-4` 字面只有 `D4-1` / `D4-4`，
+    当成「声明集」用会漏掉 `D4-2` / `D4-3` ⇒ 宁可不答，不给错答案。
+
+    **为什么不实现范围展开**：A 域现算**零本**范围式合册（多码册里 A 的两本全是顿号形态，
+    「至」形态全在 D/E/F），而 D/E/F 的范围式已由既有回退处理且零缺陷。实现一个当前无
+    调用场景的展开器属于「需要存在吗」的第一道否决。扩展点就留在本函数的 fail-closed 上：
+    将来真出现 A 域范围册时，它返回空集 ⇒ 表现为「**不认**」而不是「认错」。
+    """
+    stem = filename.rsplit(".", 1)[0] if "." in filename else filename
+    if any(marker in stem for marker in _RANGE_MARKERS):
+        return frozenset()
+    return frozenset(_FILENAME_CODE_RE.findall(stem))
+
+
+def _combined_book_covers(filename: str, wp_code: str) -> bool:
+    """该合册是否承载 ``wp_code``（本人被字面声明，或其**祖先码**被声明）。
+
+    祖先规则解决「册内有 sheet 但文件名未声明」：`A3-8-1可收回金额测试` 这张 sheet 在册里，
+    而文件名只写到 `A3-8` ⇒ `"A3-8-1".startswith("A3-8" + "-")` 成立。
+
+    🔴 用 `+ "-"` 而**不是**裸 `startswith`：裸前缀会让声明码 `A3-8` 误命中请求码 `A3-80`
+    （那是**另一个码**，不是它的子码）。
+    """
+    declared = _literal_wp_codes_in_filename(filename)
+    if len(declared) < 2:
+        # 只声明一个码的册不是合册，不参与本节逻辑 —— 少了这条收窄，几乎每个
+        # `{码} {中文名}.xlsx` 都会被当成「承载自己的合册」，把大量码的解析走向改掉。
+        return False
+    return wp_code in declared or any(
+        wp_code.startswith(code + "-") for code in declared
+    )
+
+
+def _find_combined_workbook_declaring(wp_code: str) -> Path | None:
+    """承载 ``wp_code`` 的合册（**纯路径**解析，全程不读 xlsx 字节）。
+
+    确定性排序 `(名字长度, 名字)`，与 :func:`find_whole_workbook_templates` 同惯例 ——
+    不依赖 `iterdir()` 的枚举顺序。同一 wp_code 被两本及以上合册声明时取排序首个；
+    该情形现算 **0** 例，判据的意义是「将来真出现时可记录、可复现」。
+    """
+    if not wp_code:
+        return None
+    subdir = TEMPLATES_DIR / wp_code[0]
+    if not subdir.exists():
+        return None
+    hits = sorted(
+        (
+            f
+            for f in subdir.iterdir()
+            if f.suffix.lower() in (".xlsx", ".xlsm")
+            and _combined_book_covers(f.name, wp_code)
+        ),
+        key=lambda p: (len(p.name), p.name),
+    )
+    return hits[0] if hits else None
 
 
 #: 主模板优先级阶梯（**按序**，前一级命中即不看后一级）。
@@ -345,6 +490,18 @@ def find_template_file(wp_code: str) -> Path | None:
                     elif not range_match:
                         # 无法解析范围但文件名匹配模式，保守返回
                         return f
+
+            # ── 合册声明码（spec workpaper-sync-pure-static-lane-…）────────────
+            #
+            # 插在范围回退**之后**、终极回退**之前**，纯加法：
+            # `D2-2` / `E1-5` / `F2-40` 现算在**范围回退**命中（三者的同名前缀判据均
+            # `False`，靠「至」范围匹配），位置在本步骤之前 ⇒ 它们完全不进这里；
+            # 只有原本会掉进「终极回退抢父程序表」的码（如 `A3-8` 曾拿到
+            # `A3 合并流程程序表.xlsx` 这个**错册**）才进本步骤。
+            combined = _find_combined_workbook_declaring(wp_code)
+            if combined is not None:
+                return combined
+
             # 终极回退：用主表
             for f in sorted(template_subdir.iterdir()):
                 if f.name.startswith(primary + " ") and f.suffix.lower() in (".xlsx", ".xlsm"):
@@ -423,7 +580,9 @@ def find_all_template_files(wp_code: str) -> list[Path]:
     index = _load_index()
     candidates = [
         e for e in index
-        if e["wp_code"] == wp_code and e["format"] in ("xlsx", "xlsm", "docx")
+        if e["wp_code"] == wp_code
+        and e["format"] in ("xlsx", "xlsm", "docx")
+        and _is_bundle_entry(e)
     ]
     results = []
     for c in candidates:
@@ -516,6 +675,15 @@ def find_template_file_any(wp_code: str) -> Path | None:
             for f in sorted(subdir.iterdir()):
                 if f.suffix.lower() in (".xlsx", ".xlsm") and _match_filename_prefix(f.name, wp_code):
                     return f
+
+        # ── 合册声明码（spec workpaper-sync-pure-static-lane-…）─────────────────
+        #
+        # 插在两次同名前缀尝试（索引 + 磁盘）**之后**、`return None` **之前**，纯加法：
+        # 当前能解析的 A 子码（如 `A3-7`，现算命中合册本身）在更早的步骤已返回 ⇒ 行为不变；
+        # 只有当前返回 `None` 的码才进本步骤。
+        combined = _find_combined_workbook_declaring(wp_code)
+        if combined is not None:
+            return combined
         return None
 
     # 主程序表：xlsx 优先
@@ -536,8 +704,12 @@ def find_template_file_any(wp_code: str) -> Path | None:
 
 
 def list_available_templates() -> list[dict]:
-    """列出所有可用模板（供前端选择）"""
-    index = _load_index()
+    """列出所有可用模板（供前端选择）。
+
+    带角色的条目（整册合并本 / 专用子模板）不进这张表 —— 它们不是"可选的主模板"，
+    由各自的专用入口取（`find_whole_workbook_template*` 等）。
+    """
+    index = [e for e in _load_index() if _is_bundle_entry(e)]
     # 按 wp_code 去重，只返回主文件
     seen = set()
     result = []

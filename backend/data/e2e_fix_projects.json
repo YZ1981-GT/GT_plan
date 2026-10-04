@@ -35,9 +35,9 @@
       "warnings": []
     },
     "FIX-INT": {
-      "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
-      "project_name": "重庆和平药房连锁有限责任公司_2025",
-      "business_category": "A1",
+      "project_id": "c8621493-70aa-46a9-8285-e0674e4e1418",
+      "project_name": "重庆医药集团宜宾医药有限公司新健康大药房临港店_2025",
+      "business_category": null,
       "ready": true,
       "missing_wp_codes": [],
       "warnings": []
@@ -71,7 +71,7 @@
     "TEST_PROJECT_ID": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
     "TEST_PROJECT_ID_FIX_A": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
     "TEST_PROJECT_ID_FIX_B": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
-    "TEST_PROJECT_ID_FIX_INT": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+    "TEST_PROJECT_ID_FIX_INT": "c8621493-70aa-46a9-8285-e0674e4e1418",
     "TEST_PROJECT_ID_FIX_RP": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
     "TEST_PROJECT_ID_FIX_F": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
     "TEST_PROJECT_ID_FIX_I6": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",

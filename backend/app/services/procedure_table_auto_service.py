@@ -220,7 +220,7 @@ class ProcedureTableService:
                     result["summary"] = f"共{count}笔 ¥{amount:,.0f}（全部已批）"
             elif source == "control_deficiency_count":
                 try:
-                    from app.models.issue_ticket_models import IssueTicket
+                    from app.models.phase15_models import IssueTicket
                     deficiency_stmt = sa.select(sa.func.count()).select_from(IssueTicket).where(
                         IssueTicket.project_id == project_id,
                         IssueTicket.category == "internal_control",

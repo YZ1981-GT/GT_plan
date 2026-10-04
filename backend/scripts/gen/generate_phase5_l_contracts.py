@@ -23,12 +23,26 @@ sys.path.insert(0, str(_BACKEND))
 
 from app.services.workpaper_sync import (  # noqa: E402
     phase5_l1_short_term_loans as _l1,
+    phase5_l2_interest_payable as _l2,
+    phase5_l3_long_term_loans as _l3,
+    phase5_l4_bonds_payable as _l4,
+    phase5_l5_long_term_payables as _l5,
+    phase5_l7_other_noncurrent_liabilities as _l7,
+    phase5_l6_special_payables as _l6,
+    phase5_l8_financial_expenses as _l8,
 )
 from app.services.workpaper_sync.definitions import canonical_digest  # noqa: E402
 
-#: adapter_id → provider 模块。L2~L8 接线时在此追加。
+#: adapter_id → provider 模块。L5~L8 接线时在此追加。
 _PROVIDERS = {
     _l1.ADAPTER_ID: _l1,
+    _l2.ADAPTER_ID: _l2,
+    _l3.ADAPTER_ID: _l3,
+    _l4.ADAPTER_ID: _l4,
+    _l5.ADAPTER_ID: _l5,
+    _l7.ADAPTER_ID: _l7,
+    _l6.ADAPTER_ID: _l6,
+    _l8.ADAPTER_ID: _l8,
 }
 
 

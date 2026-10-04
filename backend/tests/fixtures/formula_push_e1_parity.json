@@ -1,0 +1,1030 @@
+{
+  "spec": "chain-closure-phase2-formula-push-engine",
+  "generatedBy": "audit-platform/frontend/src/components/workpaper/composables/__tests__/e1FormulaPushParity.spec.ts",
+  "constants": {
+    "hallAdjItemKeys": [
+      "cash",
+      "bank_principal",
+      "other_mf"
+    ],
+    "mainRowSlots": {
+      "finance_co": "finance_co",
+      "accrued": "accrued_interest",
+      "digital": "digital"
+    },
+    "mainRowDeductions": {
+      "bank": [
+        "finance_co"
+      ],
+      "other_mf": [
+        "digital"
+      ]
+    },
+    "mainRows": {
+      "listed": [
+        {
+          "key": "cash",
+          "label": "库存现金",
+          "noteLabel": null,
+          "crossKey": "E1-adj-total-1001",
+          "isTotal": false,
+          "isMemo": false
+        },
+        {
+          "key": "bank",
+          "label": "银行存款",
+          "noteLabel": null,
+          "crossKey": "E1-adj-total-1002",
+          "isTotal": false,
+          "isMemo": false
+        },
+        {
+          "key": "finance_co",
+          "label": "存放财务公司款项",
+          "noteLabel": null,
+          "crossKey": "",
+          "isTotal": false,
+          "isMemo": false
+        },
+        {
+          "key": "other_mf",
+          "label": "其他货币资金",
+          "noteLabel": null,
+          "crossKey": "E1-adj-total-1012",
+          "isTotal": false,
+          "isMemo": false
+        },
+        {
+          "key": "accrued",
+          "label": "存款应计利息",
+          "noteLabel": null,
+          "crossKey": "",
+          "isTotal": false,
+          "isMemo": false
+        },
+        {
+          "key": "digital",
+          "label": "数字货币",
+          "noteLabel": null,
+          "crossKey": "",
+          "isTotal": false,
+          "isMemo": false
+        },
+        {
+          "key": "total",
+          "label": "合计",
+          "noteLabel": null,
+          "crossKey": "",
+          "isTotal": true,
+          "isMemo": false
+        },
+        {
+          "key": "overseas",
+          "label": "其中：存放在境外的款项总额",
+          "noteLabel": null,
+          "crossKey": "",
+          "isTotal": false,
+          "isMemo": true
+        }
+      ],
+      "soe": [
+        {
+          "key": "cash",
+          "label": "现金",
+          "noteLabel": "库存现金",
+          "crossKey": "E1-adj-total-1001",
+          "isTotal": false,
+          "isMemo": false
+        },
+        {
+          "key": "bank",
+          "label": "银行存款",
+          "noteLabel": null,
+          "crossKey": "E1-adj-total-1002",
+          "isTotal": false,
+          "isMemo": false
+        },
+        {
+          "key": "other_mf",
+          "label": "其他货币资金",
+          "noteLabel": null,
+          "crossKey": "E1-adj-total-1012",
+          "isTotal": false,
+          "isMemo": false
+        },
+        {
+          "key": "digital",
+          "label": "数字货币",
+          "noteLabel": null,
+          "crossKey": "",
+          "isTotal": false,
+          "isMemo": false
+        },
+        {
+          "key": "total",
+          "label": "合计",
+          "noteLabel": null,
+          "crossKey": "",
+          "isTotal": true,
+          "isMemo": false
+        },
+        {
+          "key": "overseas",
+          "label": "其中：存放在境外的款项总额",
+          "noteLabel": "其中：存放在境外的款项总额",
+          "crossKey": "",
+          "isTotal": false,
+          "isMemo": true
+        }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "listed_rmb_rows",
+      "fourTablePrefill": {
+        "cash": [
+          {
+            "code": "1001.01",
+            "name": "人民币",
+            "currency": "CNY",
+            "opening": 286.73,
+            "increase": 90,
+            "decrease": 0,
+            "ending": 376.73
+          },
+          {
+            "code": "1001.02",
+            "name": "美元",
+            "currency": "USD",
+            "opening": 100.5,
+            "increase": 20.25,
+            "decrease": 10,
+            "ending": 110.75
+          }
+        ],
+        "bank": [
+          {
+            "code": "1002.01",
+            "name": "工行",
+            "currency": "",
+            "opening": 22944619.45,
+            "increase": 1000000.1,
+            "decrease": 19241563.29,
+            "ending": 4703056.26
+          }
+        ],
+        "other": [
+          {
+            "code": "1012.02",
+            "name": "保证金",
+            "currency": "CNY",
+            "opening": 6000001.09,
+            "increase": 0.1,
+            "decrease": 1520861.19,
+            "ending": 4479140
+          }
+        ],
+        "finance_co": [],
+        "digital": []
+      },
+      "accountPrefill": null,
+      "entries": {
+        "E1-cash-detail-rows": "[{\"id\":\"fixed-rmb\",\"currency\":\"人民币\",\"opening\":286.73,\"increase\":90,\"decrease\":0,\"fxRate\":1,\"adjustment\":0,\"note\":\"四表取数 1001.01\"},{\"id\":\"cash-ft-1001.02\",\"currency\":\"USD\",\"opening\":100.5,\"increase\":20.25,\"decrease\":10,\"fxRate\":7.1,\"adjustment\":0,\"note\":\"四表取数 1001.02\"},{\"id\":\"cash-u1\",\"currency\":\"欧元\",\"opening\":3.3,\"increase\":0,\"decrease\":1.1,\"fxRate\":7.9,\"adjustment\":0,\"note\":\"手工\"},{\"id\":\"cash-ft-1001.03\",\"currency\":\"HKD\",\"opening\":50,\"increase\":5,\"decrease\":1,\"fxRate\":0,\"adjustment\":0,\"note\":\"四表取数 1001.03\"},{\"id\":\"cash-u2\",\"currency\":\"日元\",\"opening\":1000,\"increase\":0,\"decrease\":0,\"adjustment\":0,\"note\":\"缺汇率\"}]",
+        "E1-bank-detail-rows": "[{\"id\":\"bank-principal-institution-ft-1002.01\",\"section\":\"principal\",\"group\":\"institution\",\"opening\":22944619.45,\"increase\":1000000.1,\"decrease\":19241563.29,\"adjustment\":0},{\"id\":\"bank-fin-1\",\"section\":\"principal\",\"group\":\"finance\",\"opening\":1000,\"increase\":500.5,\"decrease\":200.25},{\"id\":\"bank-principal-other-ft-1012.02\",\"section\":\"principal\",\"group\":\"other\",\"opening\":6000001.09,\"increase\":0.1,\"decrease\":1520861.19},{\"id\":\"bank-accrued-1\",\"section\":\"accrued\",\"group\":\"institution\",\"opening\":12.5,\"increase\":3,\"decrease\":1}]",
+        "E1-bank-variant": "rmb",
+        "E1-adjustment-by-item-cash-ending": "-10.5",
+        "E1-adjustment-by-item-cash-opening": "2",
+        "E1-adjustment-by-item-bank_principal-ending": "1000",
+        "E1-adjustment-by-item-other_mf-ending": "-0.1",
+        "E1-adjustment-by-item-digital-ending": "5",
+        "E1-adjustment-by-item-accrued_bank-ending": "7.77",
+        "E1-adjustment-by-item-finance_co-ending": "3",
+        "E1-hall-adj-cash-ending": "100",
+        "E1-hall-adj-other_mf-ending": "-50.25",
+        "E1-hall-adj-bank_principal-ending": "0",
+        "E1-hall-adj-digital-ending": "999",
+        "E1-digital-opening-unaudited": "10",
+        "E1-digital-total-unaudited": "20.5",
+        "E1-accrued-interest-rows": "[{\"category\":\"bank\",\"accruedRmb\":12.34},{\"category\":\"finance\",\"accruedRmb\":1.5},{\"accruedRmb\":2}]",
+        "E1-adj-accrued_finance-opening-unadj": "0.5",
+        "E1-disclosure-listed-openings": "{\"bank\":111.11,\"overseas\":\"5\"}",
+        "E1-disclosure-soe-openings": "{\"cash\":\"abc\"}"
+      },
+      "expected": {
+        "variant": "rmb",
+        "cashSeeds": [
+          {
+            "id": "fixed-rmb",
+            "opening": 286.73,
+            "increase": 90,
+            "decrease": 0,
+            "fxRate": 1
+          },
+          {
+            "id": "cash-ft-1001.02",
+            "opening": 100.5,
+            "increase": 20.25,
+            "decrease": 10,
+            "fxRate": 0
+          }
+        ],
+        "bankSeeds": [
+          {
+            "id": "bank-principal-institution-ft-1002.01",
+            "opening": 22944619.45,
+            "increase": 1000000.1,
+            "decrease": 19241563.29
+          },
+          {
+            "id": "bank-principal-other-ft-1012.02",
+            "opening": 6000001.09,
+            "increase": 0.1,
+            "decrease": 1520861.19
+          }
+        ],
+        "detail": {
+          "E1-cash-detail-opening-unaudited": "1440.53",
+          "E1-cash-detail-total-unaudited": "1180.435",
+          "E1-bank-detail-principal-opening-unaudited": "22945619.45",
+          "E1-bank-detail-principal-total-unaudited": "4704356.510000002",
+          "E1-bank-detail-institution-opening-unaudited": "22944619.45",
+          "E1-bank-detail-institution-total-unaudited": "4703056.260000002",
+          "E1-bank-detail-finance-opening-unaudited": "1000",
+          "E1-bank-detail-finance-total-unaudited": "1300.25",
+          "E1-bank-detail-other-opening-unaudited": "6000001.09",
+          "E1-bank-detail-other-total-unaudited": "4479140"
+        },
+        "adjTotals": {
+          "E1-adj-total-1001": "1269.935",
+          "E1-adj-total-1001-opening": "1442.53",
+          "E1-adj-total-1002": "4705356.510000002",
+          "E1-adj-total-1002-opening": "22945619.45",
+          "E1-adj-total-1012": "4479115.15",
+          "E1-adj-total-1012-opening": "6000011.09"
+        },
+        "slots": {
+          "E1-adj-slot-finance_co": "1303.25",
+          "E1-adj-slot-finance_co-opening": "1000",
+          "E1-adj-slot-accrued": "23.61",
+          "E1-adj-slot-accrued-opening": "0.5",
+          "E1-adj-slot-digital": "25.5",
+          "E1-adj-slot-digital-opening": "10"
+        },
+        "disclosure": {
+          "listed": [
+            {
+              "key": "cash",
+              "endingAmount": 1269.935,
+              "openingAmount": 1442.53,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "bank",
+              "endingAmount": 4704053.260000002,
+              "openingAmount": 111.11,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "finance_co",
+              "endingAmount": 1303.25,
+              "openingAmount": 1000,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "other_mf",
+              "endingAmount": 4479089.65,
+              "openingAmount": 6000001.09,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "accrued",
+              "endingAmount": 23.61,
+              "openingAmount": 0.5,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "digital",
+              "endingAmount": 25.5,
+              "openingAmount": 10,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "total",
+              "endingAmount": 9185765.205000002,
+              "openingAmount": 6002565.2299999995,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "overseas",
+              "endingAmount": 0,
+              "openingAmount": 5,
+              "endingResolved": false,
+              "openingResolved": true
+            }
+          ],
+          "soe": [
+            {
+              "key": "cash",
+              "endingAmount": 1269.935,
+              "openingAmount": 0,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "bank",
+              "endingAmount": 4704053.260000002,
+              "openingAmount": 22944619.45,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "other_mf",
+              "endingAmount": 4479089.65,
+              "openingAmount": 6000001.09,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "digital",
+              "endingAmount": 25.5,
+              "openingAmount": 10,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "total",
+              "endingAmount": 9184438.345000003,
+              "openingAmount": 28944630.54,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "overseas",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": false,
+              "openingResolved": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "soe_multi_accounts",
+      "fourTablePrefill": {
+        "cash": [],
+        "bank": [
+          {
+            "code": "1002",
+            "name": "银行存款",
+            "currency": "",
+            "opening": 8255,
+            "increase": 921,
+            "decrease": 52,
+            "ending": 9124
+          }
+        ],
+        "other": [],
+        "finance_co": [],
+        "digital": []
+      },
+      "accountPrefill": {
+        "accounts": {
+          "bank": [
+            {
+              "account_code": "1002",
+              "account_no": "6222-1",
+              "bank_name": "工行",
+              "currency": "CNY",
+              "opening": 1000,
+              "debit": 200,
+              "credit": 50,
+              "closing": 1150
+            },
+            {
+              "account_code": "1002",
+              "account_no": "6222-1",
+              "bank_name": "工行二",
+              "currency": "",
+              "opening": 5,
+              "debit": 1,
+              "credit": 2,
+              "closing": 4
+            },
+            {
+              "account_code": "1002",
+              "account_no": "",
+              "bank_name": "建行",
+              "currency": "USD",
+              "opening": 7200,
+              "debit": 720,
+              "credit": 0,
+              "closing": 7920
+            }
+          ],
+          "other": [
+            {
+              "account_code": "1012",
+              "account_no": "BZJ",
+              "bank_name": "保证金",
+              "currency": "人民币",
+              "opening": 300,
+              "debit": 0,
+              "credit": 100,
+              "closing": 200
+            }
+          ],
+          "finance_co": [
+            {
+              "account_code": "1002.09",
+              "account_no": "CWGS",
+              "bank_name": "财务公司",
+              "currency": "CNY",
+              "opening": 50,
+              "debit": 5,
+              "credit": 0,
+              "closing": 55
+            }
+          ],
+          "unassigned": []
+        },
+        "reconcile": {},
+        "meta": {
+          "source": "tb_aux_balance",
+          "account_count": 5,
+          "parsed_level_dist": {}
+        }
+      },
+      "entries": {
+        "E1-bank-variant": "multi",
+        "E1-bank-detail-rows": "[{\"id\":\"bank-principal-institution-acct-6222-1\",\"section\":\"principal\",\"group\":\"institution\",\"opening\":1000,\"increase\":200,\"decrease\":50,\"fxCurrency\":\"人民币\",\"fxRate\":1,\"openingFc\":1000,\"increaseFc\":200,\"decreaseFc\":50,\"adjustmentFc\":0},{\"id\":\"bank-principal-institution-acct-1002\",\"section\":\"principal\",\"group\":\"institution\",\"opening\":0,\"increase\":0,\"decrease\":0,\"fxCurrency\":\"USD\",\"fxRate\":0,\"openingFc\":0,\"increaseFc\":0,\"decreaseFc\":0},{\"id\":\"usd-auth\",\"section\":\"principal\",\"group\":\"institution\",\"opening\":1,\"increase\":1,\"decrease\":1,\"fxCurrency\":\"美元\",\"fxRate\":7.2,\"openingFc\":1000,\"increaseFc\":100.5,\"decreaseFc\":0.25},{\"id\":\"legacy-group\",\"section\":\"weird\",\"group\":\"bank\",\"opening\":10,\"increase\":5,\"decrease\":1},{\"id\":\"fx-empty\",\"section\":\"principal\",\"group\":\"other\",\"opening\":300,\"increase\":0,\"decrease\":100,\"fxCurrency\":\"人民币\",\"fxRate\":\"\"},{\"id\":\"bank-principal-finance-acct-CWGS\",\"section\":\"principal\",\"group\":\"finance\",\"opening\":50,\"increase\":5,\"decrease\":0,\"fxCurrency\":\"CNY\",\"fxRate\":1,\"openingFc\":50,\"increaseFc\":5,\"decreaseFc\":0}]",
+        "E1-adjustment-by-item-bank_principal-opening": "1.25",
+        "E1-hall-adj-bank_principal-ending": "12.5",
+        "E1-disclosure-soe-openings": "{\"bank\":0,\"digital\":\"3.5\"}"
+      },
+      "expected": {
+        "variant": "multi",
+        "cashSeeds": [],
+        "bankSeeds": [
+          {
+            "id": "bank-principal-institution-acct-6222-1",
+            "opening": 1000,
+            "increase": 200,
+            "decrease": 50
+          },
+          {
+            "id": "bank-principal-institution-acct-6222-1-2",
+            "opening": 5,
+            "increase": 1,
+            "decrease": 2
+          },
+          {
+            "id": "bank-principal-institution-acct-1002",
+            "opening": 7200,
+            "increase": 720,
+            "decrease": 0
+          },
+          {
+            "id": "bank-principal-other-acct-BZJ",
+            "opening": 300,
+            "increase": 0,
+            "decrease": 100
+          },
+          {
+            "id": "bank-principal-finance-acct-CWGS",
+            "opening": 50,
+            "increase": 5,
+            "decrease": 0
+          }
+        ],
+        "detail": {
+          "E1-cash-detail-opening-unaudited": "0",
+          "E1-cash-detail-total-unaudited": "0",
+          "E1-bank-detail-principal-opening-unaudited": "8260",
+          "E1-bank-detail-principal-total-unaudited": "9140.8",
+          "E1-bank-detail-institution-opening-unaudited": "8210",
+          "E1-bank-detail-institution-total-unaudited": "9085.8",
+          "E1-bank-detail-finance-opening-unaudited": "50",
+          "E1-bank-detail-finance-total-unaudited": "55",
+          "E1-bank-detail-other-opening-unaudited": "300",
+          "E1-bank-detail-other-total-unaudited": "200"
+        },
+        "adjTotals": {
+          "E1-adj-total-1001": "0",
+          "E1-adj-total-1001-opening": "0",
+          "E1-adj-total-1002": "9153.3",
+          "E1-adj-total-1002-opening": "8261.25",
+          "E1-adj-total-1012": "200",
+          "E1-adj-total-1012-opening": "300"
+        },
+        "slots": {
+          "E1-adj-slot-finance_co": "55",
+          "E1-adj-slot-finance_co-opening": "50",
+          "E1-adj-slot-accrued": null,
+          "E1-adj-slot-accrued-opening": null,
+          "E1-adj-slot-digital": null,
+          "E1-adj-slot-digital-opening": null
+        },
+        "disclosure": {
+          "listed": [
+            {
+              "key": "cash",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "bank",
+              "endingAmount": 9098.3,
+              "openingAmount": 8211.25,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "finance_co",
+              "endingAmount": 55,
+              "openingAmount": 50,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "other_mf",
+              "endingAmount": 200,
+              "openingAmount": 300,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "accrued",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": false,
+              "openingResolved": false
+            },
+            {
+              "key": "digital",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": false,
+              "openingResolved": false
+            },
+            {
+              "key": "total",
+              "endingAmount": 9353.3,
+              "openingAmount": 8561.25,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "overseas",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": false,
+              "openingResolved": false
+            }
+          ],
+          "soe": [
+            {
+              "key": "cash",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "bank",
+              "endingAmount": 9098.3,
+              "openingAmount": 0,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "other_mf",
+              "endingAmount": 200,
+              "openingAmount": 300,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "digital",
+              "endingAmount": 0,
+              "openingAmount": 3.5,
+              "endingResolved": false,
+              "openingResolved": true
+            },
+            {
+              "key": "total",
+              "endingAmount": 9298.3,
+              "openingAmount": 303.5,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "overseas",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": false,
+              "openingResolved": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "no_rows_leaf_fallback",
+      "fourTablePrefill": {
+        "cash": [
+          {
+            "code": "1001",
+            "name": "库存现金",
+            "currency": "",
+            "opening": 50,
+            "increase": 10,
+            "decrease": 5,
+            "ending": 55
+          }
+        ],
+        "bank": [
+          {
+            "code": "1002.01",
+            "name": "工行",
+            "currency": "",
+            "opening": 100,
+            "increase": 50,
+            "decrease": 30,
+            "ending": 120
+          },
+          {
+            "code": "1002.02",
+            "name": "农行",
+            "currency": "",
+            "opening": 0.1,
+            "increase": 0.2,
+            "decrease": 0,
+            "ending": 0.3
+          }
+        ],
+        "other": [
+          {
+            "code": "1012.01",
+            "name": "其他",
+            "currency": "",
+            "opening": 7,
+            "increase": 0,
+            "decrease": 0,
+            "ending": 7
+          }
+        ],
+        "finance_co": [],
+        "digital": []
+      },
+      "accountPrefill": null,
+      "entries": {
+        "E1-adjustment-by-item-other_mf-opening": "0.3"
+      },
+      "expected": {
+        "variant": "multi",
+        "cashSeeds": [
+          {
+            "id": "fixed-rmb",
+            "opening": 50,
+            "increase": 10,
+            "decrease": 5,
+            "fxRate": 1
+          }
+        ],
+        "bankSeeds": [
+          {
+            "id": "bank-principal-institution-ft-1002.01",
+            "opening": 100,
+            "increase": 50,
+            "decrease": 30
+          },
+          {
+            "id": "bank-principal-institution-ft-1002.02",
+            "opening": 0.1,
+            "increase": 0.2,
+            "decrease": 0
+          },
+          {
+            "id": "bank-principal-other-ft-1012.01",
+            "opening": 7,
+            "increase": 0,
+            "decrease": 0
+          }
+        ],
+        "detail": {
+          "E1-cash-detail-opening-unaudited": "50",
+          "E1-cash-detail-total-unaudited": "55",
+          "E1-bank-detail-principal-opening-unaudited": "100.1",
+          "E1-bank-detail-principal-total-unaudited": "120.3",
+          "E1-bank-detail-institution-opening-unaudited": "100.1",
+          "E1-bank-detail-institution-total-unaudited": "120.3",
+          "E1-bank-detail-finance-opening-unaudited": null,
+          "E1-bank-detail-finance-total-unaudited": null,
+          "E1-bank-detail-other-opening-unaudited": "7",
+          "E1-bank-detail-other-total-unaudited": "7"
+        },
+        "adjTotals": {
+          "E1-adj-total-1001": "55",
+          "E1-adj-total-1001-opening": "50",
+          "E1-adj-total-1002": "120.3",
+          "E1-adj-total-1002-opening": "100.1",
+          "E1-adj-total-1012": "7",
+          "E1-adj-total-1012-opening": "7.3"
+        },
+        "slots": {
+          "E1-adj-slot-finance_co": null,
+          "E1-adj-slot-finance_co-opening": null,
+          "E1-adj-slot-accrued": null,
+          "E1-adj-slot-accrued-opening": null,
+          "E1-adj-slot-digital": null,
+          "E1-adj-slot-digital-opening": null
+        },
+        "disclosure": {
+          "listed": [
+            {
+              "key": "cash",
+              "endingAmount": 55,
+              "openingAmount": 50,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "bank",
+              "endingAmount": 120.3,
+              "openingAmount": 100.1,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "finance_co",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": false,
+              "openingResolved": false
+            },
+            {
+              "key": "other_mf",
+              "endingAmount": 7,
+              "openingAmount": 7.3,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "accrued",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": false,
+              "openingResolved": false
+            },
+            {
+              "key": "digital",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": false,
+              "openingResolved": false
+            },
+            {
+              "key": "total",
+              "endingAmount": 182.3,
+              "openingAmount": 157.4,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "overseas",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": false,
+              "openingResolved": false
+            }
+          ],
+          "soe": [
+            {
+              "key": "cash",
+              "endingAmount": 55,
+              "openingAmount": 50,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "bank",
+              "endingAmount": 120.3,
+              "openingAmount": 100.1,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "other_mf",
+              "endingAmount": 7,
+              "openingAmount": 7.3,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "digital",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": false,
+              "openingResolved": false
+            },
+            {
+              "key": "total",
+              "endingAmount": 182.3,
+              "openingAmount": 157.4,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "overseas",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": false,
+              "openingResolved": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "untouched_default_cash",
+      "fourTablePrefill": {
+        "cash": [
+          {
+            "code": "1001.01",
+            "name": "人民币",
+            "currency": "CNY",
+            "opening": 1,
+            "increase": 2,
+            "decrease": 0.5,
+            "ending": 2.5
+          }
+        ],
+        "bank": [],
+        "other": [],
+        "finance_co": [],
+        "digital": []
+      },
+      "accountPrefill": null,
+      "entries": {
+        "E1-cash-detail-rows": "[{\"id\":\"fixed-rmb\",\"currency\":\"人民币\",\"opening\":0,\"increase\":0,\"decrease\":0,\"fxRate\":1,\"adjustment\":0,\"note\":\"\"}]",
+        "E1-bank-variant": "rmb"
+      },
+      "expected": {
+        "variant": "rmb",
+        "cashSeeds": [
+          {
+            "id": "fixed-rmb",
+            "opening": 1,
+            "increase": 2,
+            "decrease": 0.5,
+            "fxRate": 1
+          }
+        ],
+        "bankSeeds": [],
+        "detail": {
+          "E1-cash-detail-opening-unaudited": "0",
+          "E1-cash-detail-total-unaudited": "0",
+          "E1-bank-detail-principal-opening-unaudited": "0",
+          "E1-bank-detail-principal-total-unaudited": "0",
+          "E1-bank-detail-institution-opening-unaudited": "0",
+          "E1-bank-detail-institution-total-unaudited": "0",
+          "E1-bank-detail-finance-opening-unaudited": null,
+          "E1-bank-detail-finance-total-unaudited": null,
+          "E1-bank-detail-other-opening-unaudited": "0",
+          "E1-bank-detail-other-total-unaudited": "0"
+        },
+        "adjTotals": {
+          "E1-adj-total-1001": "0",
+          "E1-adj-total-1001-opening": "0",
+          "E1-adj-total-1002": "0",
+          "E1-adj-total-1002-opening": "0",
+          "E1-adj-total-1012": "0",
+          "E1-adj-total-1012-opening": "0"
+        },
+        "slots": {
+          "E1-adj-slot-finance_co": null,
+          "E1-adj-slot-finance_co-opening": null,
+          "E1-adj-slot-accrued": null,
+          "E1-adj-slot-accrued-opening": null,
+          "E1-adj-slot-digital": null,
+          "E1-adj-slot-digital-opening": null
+        },
+        "disclosure": {
+          "listed": [
+            {
+              "key": "cash",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "bank",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "finance_co",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": false,
+              "openingResolved": false
+            },
+            {
+              "key": "other_mf",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "accrued",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": false,
+              "openingResolved": false
+            },
+            {
+              "key": "digital",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": false,
+              "openingResolved": false
+            },
+            {
+              "key": "total",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "overseas",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": false,
+              "openingResolved": false
+            }
+          ],
+          "soe": [
+            {
+              "key": "cash",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "bank",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "other_mf",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "digital",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": false,
+              "openingResolved": false
+            },
+            {
+              "key": "total",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": true,
+              "openingResolved": true
+            },
+            {
+              "key": "overseas",
+              "endingAmount": 0,
+              "openingAmount": 0,
+              "endingResolved": false,
+              "openingResolved": false
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

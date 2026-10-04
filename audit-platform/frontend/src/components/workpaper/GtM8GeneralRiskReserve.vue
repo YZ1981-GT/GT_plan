@@ -22,6 +22,8 @@
           size="small"
           @change="dualMode.switchMode"
         />
+          <!-- BP-7 MC-12: 未接入双向回写的 notice -->
+          <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-m8-general-risk-reserve" />
       </div>
 
       <!-- HTML 结构化模式 -->
@@ -137,6 +139,7 @@ import { ref, computed, inject, onMounted, onBeforeUnmount, provide, toRef, defi
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useM8EntryDualMode } from './composables/useM8EntryDualMode'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────

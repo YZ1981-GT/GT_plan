@@ -177,6 +177,7 @@ import { useD7FormData } from './composables/useD7FormData'
 import { useD7CrossSheet } from './composables/useD7CrossSheet'
 import { useD7EntryDualMode, type D7RenderMode } from './composables/useD7EntryDualMode'
 import { resolveD7SheetCode } from './composables/useD7SheetRouting'
+import { managedSheetsForEntry } from './sync/workpaperSyncManagedSheets.generated'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
 import { useAgingConfig } from '@/composables/useAgingConfig'
 import GtWpReviewRail from './GtWpReviewRail.vue'
@@ -312,13 +313,26 @@ const ooSheetName = computed(() =>
 // 不在前端重造 27 列→stable-key 映射；账龄 nested（agingPrior/agingAudited）由服务端
 // store-projection + phase5_d7 的 _resolve_json_path/_set_json_path 处理。
 const D7_SYNC_ENTRY_ID = 'xlsx/gt-d7-contract-liabilities'
-const D7_MANAGED_SHEET_KEY = 'd72-managed'
-const isD7DetailSheet = computed(() => currentSheet.value === 'D7-2')
+
+/**
+ * 受管 sheet 集合 —— **从 provider 派生**（Property 15），不再写死单张。
+ * D7 provider 侧受管区是 **6 张**（d71/d72/d74/d75/d76/d77），改造前前端只认 d72。
+ * 🔴 键换算走后端权威 `excelName` + 前端 `resolveD7SheetCode`，不做字符串推演（裁决 G3）。
+ */
+const D7_MANAGED_SHEET_BY_CODE: ReadonlyMap<string, string> = new Map(
+  managedSheetsForEntry(D7_SYNC_ENTRY_ID).map(
+    (s) => [resolveD7SheetCode(s.excelName), s.sheetKey] as const,
+  ),
+)
+const isD7DetailSheet = computed(() => D7_MANAGED_SHEET_BY_CODE.has(currentSheet.value))
 const syncSwitching = ref(false)
 /** 统一宿主实例 —— 切回结构化视图前用它 forceSave()（内部走 room forcesave）。 */
 const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
 const syncEntryId = ref(D7_SYNC_ENTRY_ID)
-const syncSheetKey = ref(D7_MANAGED_SHEET_KEY)
+/** 🔴 computed 而非一次性 ref（Property 15）：否则切 sheet 后仍指向 d72-managed。 */
+const syncSheetKey = computed(
+  () => D7_MANAGED_SHEET_BY_CODE.get(currentSheet.value) ?? '',
+)
 const syncBridge = useWorkpaperSyncBridge({
   entryId: syncEntryId,
   wpId: toRef(props, 'wpId'),
@@ -335,7 +349,8 @@ const syncBridge = useWorkpaperSyncBridge({
     return {
       expectedRevision: snap.expectedRevision,
       projection: snap.projection,
-      sheetKey: D7_MANAGED_SHEET_KEY,
+      // 🔴 桥内 `flushed.sheetKey ?? sheetKey()` flushed 优先 ⇒ 必须回传当前 sheet 的键。
+      sheetKey: syncSheetKey.value,
     }
   },
   reloadHtml: async (_minimumRevision: number) => {

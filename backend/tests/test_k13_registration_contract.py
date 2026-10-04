@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -32,6 +33,14 @@ _FE_REGISTRY = (
     / "components"
     / "workpaper"
     / "htmlRendererRegistry.ts"
+)
+
+_BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(_BACKEND_ROOT) not in sys.path:  # pragma: no cover
+    sys.path.insert(0, str(_BACKEND_ROOT))
+
+from scripts.check.workpaper_component_manifest import (  # noqa: E402
+    parse_registry_component_types,
 )
 _VUE_ENTRY = (
     _REPO_ROOT
@@ -61,13 +70,16 @@ def _load_overrides() -> dict[str, str]:
 
 
 def _parse_fe_component_types() -> set[str]:
-    """解析前端 htmlRendererRegistry.ts 中 REGISTRY_LIST 段的 componentType。"""
-    text = _FE_REGISTRY.read_text(encoding="utf-8")
-    start = text.find("const REGISTRY_LIST")
-    end = text.find("export const HTML_RENDERER_REGISTRY")
-    assert start >= 0 and end > start, "无法定位 REGISTRY_LIST"
-    ct_re = re.compile(r"componentType:\s*'([a-z0-9-]+)'")
-    return set(ct_re.findall(text[start:end]))
+    """前端注册表登记的全部 componentType。
+
+    🔴 2026-09-28 改：委托给唯一解析入口
+    `scripts.check.workpaper_component_manifest.parse_registry_component_types`，
+    不再手写「`const REGISTRY_LIST` 到 `export const HTML_RENDERER_REGISTRY` 的切片
+    + 正则」。注册表按渲染器家族拆到 `registry/entries/*.ts` 后那段只剩 6 个 spread
+    ⇒ 手写版解析出 **0 条**，本文件的注册契约因此恒红。
+    同一份手抄副本全仓共 4 处（本文件 + k12/k13 + dedicated_component_registry_contract）。
+    """
+    return set(parse_registry_component_types())
 
 
 # ─── VALID_COMPONENT_TYPES ────────────────────────────────────────────────────

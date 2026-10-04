@@ -432,6 +432,64 @@ export function displayValueForCellState(
   return d ?? 0
 }
 
+/** 逐格（per-cell）派生格四态解析结果 —— 含 `snap === null` 降级。 */
+export interface PerCellDerivedResolution {
+  state: DerivedCellState
+  /** 应显示值（S1/S3 = derived，S2/S4 = stored）。 */
+  display: number
+  stored: number | null
+  snap: number | null
+  derived: number
+}
+
+/**
+ * 逐格派生格四态解析（**带 `snap === null` 降级**）——D5-1 / D6-1 / D7-1 三家审定表共用。
+ *
+ * 🔴🔴 为什么必须有降级、且必须是**共享一份**：
+ *
+ * `snap === null` 表示「该格从未由派生写入过」——迁移前就存过值的格，或同步器还没跑过一轮。
+ * 此时**不能**直接把三个量丢给 `resolveCellState`：
+ *   `resolveCellState(0, null, 100)` ⇒ `overridden = !_eq(0, null) = true` ⇒ **S4**
+ *   ⇒ `displayValueForCellState('S4', 0, 100)` 取 stored ⇒ **上游值 100 被显示成 0**。
+ * 这是 D1 实测踩到的回归（`useD1DisclosureDerived.spec.ts` 的 `endBalance` 期望 140 实得 0，
+ * 见 `d1AdjudicationModel.resolveD1AdjCell` 同段注释）。
+ *
+ * 在 per-cell 形态下还**更严重**：同步器判 S2/S4 后会**跳过写 snap**（为了冻结 snap 让 S4 可达），
+ * 于是 `snap` 永远为 `null` ⇒ 该格永久显示 0 且永久标「已覆盖」，**不可自愈**。
+ *
+ * 降级依据（与 D1 逐字同规则）：按 stored 是否非零二分 ——
+ *   * stored 非零 ⇒ 迁移前就存在手工值 ⇒ 判 **S2**（已覆盖、上游未变），显示 stored
+ *     （这正是「cross_sheet 不再无条件盖掉手工值」要修的那一半）；
+ *   * stored 为零/缺失 ⇒ 无手工录入 ⇒ 判 **S1**（纯派生），显示 derived，与修前行为一致。
+ * 同步器跑过一轮后 snap 不再为 null，四态即完整（含 S3/S4 的「上游已变」维度）。
+ *
+ * 🔴 读侧（rows computed）与写侧（syncDerivedCellsIntoStore）**必须都调本函数**：
+ *    只在读侧降级、写侧用裸 `resolveCellState`，snap 依旧永不落地，降级就成了每次重算的补丁。
+ */
+export function resolvePerCellDerivedState(
+  stored: number | null | undefined,
+  snap: number | null | undefined,
+  derived: number | null | undefined,
+): PerCellDerivedResolution {
+  const s = _finiteOrNull(stored)
+  const p = _finiteOrNull(snap)
+  const d = _finiteOrNull(derived) ?? 0
+
+  if (p === null) {
+    const overridden = s !== null && Math.abs(s) > CELL_VALUE_TOLERANCE
+    return {
+      state: overridden ? 'S2' : 'S1',
+      display: overridden ? (s as number) : d,
+      stored: s,
+      snap: p,
+      derived: d,
+    }
+  }
+
+  const state = resolveCellState(s, p, d)
+  return { state, display: displayValueForCellState(state, s, d), stored: s, snap: p, derived: d }
+}
+
 // ─── 历史固定行迁移 ──────────────────────────────────────────────────────────
 
 /**

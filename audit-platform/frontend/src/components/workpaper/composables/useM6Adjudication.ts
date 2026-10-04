@@ -238,13 +238,16 @@ export function useM6Adjudication(
    * - publish 'substantive:adjudicated'
    */
   async function saveAdjudication(): Promise<void> {
-    const items = computedRows.value.map((row, i) => {
-      const n = i + 1
+    const items = computedRows.value.map((row) => {
+      // BP-10 去位置化：用内存里的熵键 row.key 替代数组下标 row-${n}。
+      // 熵键在 addRow 时生成，形如 m6-adj-{timestamp}-{random}，每行唯一且稳定。
+      // 旧键 M6-1-row-${n}-* 是位置化的——行的增删会导致所有后续行的键整体错位。
+      const k = row.key
       return [
-        { itemId: `M6-1-row-${n}-name`, data: { remark: row.itemName } },
-        { itemId: `M6-1-row-${n}-category`, data: { remark: row.category } },
-        { itemId: `M6-1-row-${n}-audited`, data: { remark: String(row.audited) } },
-        { itemId: `M6-1-row-${n}-endBalance`, data: { remark: String(row.endBalance) } },
+        { itemId: `M6-1-${k}-name`, data: { remark: row.itemName } },
+        { itemId: `M6-1-${k}-category`, data: { remark: row.category } },
+        { itemId: `M6-1-${k}-audited`, data: { remark: String(row.audited) } },
+        { itemId: `M6-1-${k}-endBalance`, data: { remark: String(row.endBalance) } },
       ]
     }).flat()
 
@@ -345,8 +348,9 @@ export function useM6Adjudication(
   function _triggerSave(rowIndex: number): void {
     const row = rows.value[rowIndex]
     if (!row) return
-    const n = rowIndex + 1
-    debouncedSave(`M6-1-row-${n}-data`, {
+    // BP-10 去位置化：用 row.key（熵键）替代 row-${n}（位置下标）
+    const k = row.key
+    debouncedSave(`M6-1-${k}-data`, {
       remark: JSON.stringify({
         key: row.key,
         itemName: row.itemName,

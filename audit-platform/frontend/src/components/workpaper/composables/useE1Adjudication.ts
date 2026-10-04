@@ -25,6 +25,8 @@ import {
   exceedsThreshold,
 } from './useE1FormulaEngine'
 import { buildE1MainRowSlotWrites } from './e1MainRowPrefill'
+import { e1AdjustmentFor } from './e1AdjustmentFor'
+import { e1AdjudicationSaveItemIds } from './e1BackendOwnedKeys'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
 
@@ -232,11 +234,12 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
   }
 
   /**
-   * 从 E1-5 调整分录按项目归集账项调整
-   * keys: 'E1-adjustment-by-item-{itemKey}'
+   * 账项调整 = E1-5 调整分录按项目归集（`E1-adjustment-by-item-{itemKey}-{period}`）
+   * + 调整分录大厅已确认调整（`E1-hall-adj-{itemKey}-ending`，后端公式推送写入，仅期末三行）。
+   * 口径见 `e1AdjustmentFor`（ADR-PUSH-001）。
    */
   function getAdjustment(itemKey: string, period: 'opening' | 'ending'): number {
-    return parseNum(getVal(`E1-adjustment-by-item-${itemKey}-${period}`).remark)
+    return e1AdjustmentFor((key) => getVal(key).remark, itemKey, period)
   }
 
   // ─── Row Builder ─────────────────────────────────────────────────────
@@ -606,8 +609,11 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
 
   function flushSave(): void {
     const items: ChecklistItem[] = []
+    // 🔴 后端独占键（试算平衡表数 / 审定合计 / 语义槽）只在内存同步、不回写 ——
+    //    公式推送引擎是它们唯一的写入方（e1BackendOwnedKeys）
+    const saveIds = new Set(e1AdjudicationSaveItemIds(allResponses.value.keys()))
     for (const [, resp] of allResponses.value) {
-      if (resp.item_id.startsWith('E1-adj-')) {
+      if (saveIds.has(resp.item_id)) {
         items.push({ item_id: resp.item_id, conclusion: resp.conclusion, remark: resp.remark })
       }
     }

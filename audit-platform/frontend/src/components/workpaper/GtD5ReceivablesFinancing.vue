@@ -146,6 +146,7 @@ import { useD5FormData } from './composables/useD5FormData'
 import { useD5CrossSheet } from './composables/useD5CrossSheet'
 import { useD5EntryDualMode, type D5RenderMode } from './composables/useD5EntryDualMode'
 import { resolveD5SheetCode } from './composables/useD5SheetRouting'
+import { managedSheetsForEntry } from './sync/workpaperSyncManagedSheets.generated'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
@@ -247,16 +248,38 @@ const ooSheetName = computed(() =>
   dualMode.resolveOoSheetName() || props.sheetName || '底稿目录',
 )
 
-// ─── G5-1 D5-2 canary：useWorkpaperSyncBridge + store-projection flush ────────
+// ─── G5-1 canary：useWorkpaperSyncBridge + store-projection flush ─────────────
 //
-// 🔴 只覆盖 D5-2「应收款项融资明细」（manifest entry 的 managed sheet = d52-managed）。
+// 🔴 覆盖面已从「只 D5-2 一张」扩到 **provider 契约声明的全部受管 sheet**
+//    （spec d567-sync-coverage Property 15）。清单由 `managedSheetsForEntry` 下发，
+//    见下方 `D5_MANAGED_SHEET_BY_CODE`。
 const D5_SYNC_ENTRY_ID = 'xlsx/gt-d5-receivables-financing'
-const D5_MANAGED_SHEET_KEY = 'd52-managed'
-const isD5DetailSheet = computed(() => currentSheet.value === 'D5-2')
+
+/**
+ * 受管 sheet 集合 —— **从 provider 派生**（Property 15），不再写死单张。
+ *
+ * 🔴 改造前是 `const D5_MANAGED_SHEET_KEY = 'd52-managed'` + `currentSheet === 'D5-2'`，
+ *    而 provider 侧 D5 受管区早已是 **3 张**（d51/d52/d54）⇒ 另两张在前端根本进不了
+ *    在线编辑通道，是「声明层扩了、UI 不认」的两真源缺陷。
+ * 🔴 键换算用后端权威 `excelName` 过前端自己的 `resolveD5SheetCode`，**不做字符串推演**
+ *    （裁决 G3；且 `d51-managed` 的真实 sheet 名是 `审定表D5`、**无 `-1` 后缀**，推演必错）。
+ */
+const D5_MANAGED_SHEET_BY_CODE: ReadonlyMap<string, string> = new Map(
+  managedSheetsForEntry(D5_SYNC_ENTRY_ID).map(
+    (s) => [resolveD5SheetCode(s.excelName), s.sheetKey] as const,
+  ),
+)
+const isD5DetailSheet = computed(() => D5_MANAGED_SHEET_BY_CODE.has(currentSheet.value))
 const syncSwitching = ref(false)
 const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
 const syncEntryId = ref(D5_SYNC_ENTRY_ID)
-const syncSheetKey = ref(D5_MANAGED_SHEET_KEY)
+/**
+ * 🔴 必须是 **computed**（Property 15 的「读 Ref」半句）：原来是 `ref(字面量)` 一次性初始化，
+ *    切到别的受管 sheet 后它仍指向 d52-managed ⇒ 桥会把编辑 materialize 进错的受管区。
+ */
+const syncSheetKey = computed(
+  () => D5_MANAGED_SHEET_BY_CODE.get(currentSheet.value) ?? '',
+)
 const syncBridge = useWorkpaperSyncBridge({
   entryId: syncEntryId,
   wpId: toRef(props, 'wpId'),
@@ -273,7 +296,9 @@ const syncBridge = useWorkpaperSyncBridge({
     return {
       expectedRevision: snap.expectedRevision,
       projection: snap.projection,
-      sheetKey: D5_MANAGED_SHEET_KEY,
+      // 🔴 必须回传**当前** sheet 的受管键：桥内是 `flushed.sheetKey ?? sheetKey()`
+      //    —— flushed 优先，写死字面量会让任何 sheet 的编辑都落进 d52-managed。
+      sheetKey: syncSheetKey.value,
     }
   },
   reloadHtml: async (_minimumRevision: number) => {

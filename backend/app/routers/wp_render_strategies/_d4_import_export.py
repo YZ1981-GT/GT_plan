@@ -110,8 +110,14 @@ _SHEET_HEADERS: dict[str, list[str]] = {
         "销售订单", "订单日期", "定价表单价", "同期市场价格",
         "差异原因分析", "市场价格来源", "备注",
     ],
+    # D4-4 列序对齐源模板 `营业收入调整分录汇总D4-4`（A1:J23，表头 R5）的 A~J 十列：
+    #   A 调整事项说明→摘要 / B 类别→分类 / C 报表项目 / D 科目名称→会计科目 / E 附注项目 /
+    #   F ……→补充说明 / G 借方调整金额→借方 / H 贷方调整金额→贷方 / I 索引→索引号 / J 备注
+    # 🔴 原先只有 8 列，漏了 F(placeholder) 与 J(remark) —— 前端 `D4AdjustmentRow` 这两个字段
+    #    有值时导出不带出、导入静默丢弃（前端 safeParseRows 对缺键兜底空串，故不报错只丢数据）。
     "D4-4": [
-        "摘要", "分类", "报表项目", "会计科目", "附注项目", "借方", "贷方", "索引号",
+        "摘要", "分类", "报表项目", "会计科目", "附注项目", "补充说明",
+        "借方", "贷方", "索引号", "备注",
     ],
     "D4-12": [
         "索引号", "合同名称", "客户名称", "合同金额", "合同日期",
@@ -783,16 +789,7 @@ async def d4_export_data(
                 data_row.get("remark", ""),
             ]
         elif sheet == "D4-4":
-            row_values = [
-                data_row.get("description", ""),
-                data_row.get("category", ""),
-                data_row.get("reportItem", ""),
-                data_row.get("accountName", ""),
-                data_row.get("noteItem", ""),
-                _safe_float(data_row.get("debitAmount")),
-                _safe_float(data_row.get("creditAmount")),
-                data_row.get("indexRef", ""),
-            ]
+            row_values = _export_d4_4_row(data_row)
         elif sheet == "D4-6":
             current = _safe_float(data_row.get("current"))
             prior = _safe_float(data_row.get("prior"))
@@ -1832,6 +1829,26 @@ def _parse_d4_3_row(row: tuple, actual_headers: list[str], expected_headers: lis
     }
 
 
+def _export_d4_4_row(data: dict) -> list:
+    """D4AdjustmentRow → D4-4 列头顺序（10 列，逐位对齐 _SHEET_HEADERS["D4-4"]）。
+
+    与 `_parse_d4_4_row` 构成往返对：前端 10 个业务字段全部带出，缺一即导出丢列、
+    用户改后再导入时该列内容被静默丢弃（rowId 不参与导出，导入侧新生成）。
+    """
+    return [
+        _safe_str(data.get("description")),
+        _safe_str(data.get("category")),
+        _safe_str(data.get("reportItem")),
+        _safe_str(data.get("accountName")),
+        _safe_str(data.get("noteItem")),
+        _safe_str(data.get("placeholder")),
+        _safe_float(data.get("debitAmount")),
+        _safe_float(data.get("creditAmount")),
+        _safe_str(data.get("indexRef")),
+        _safe_str(data.get("remark")),
+    ]
+
+
 def _parse_d4_4_row(row: tuple, actual_headers: list[str], expected_headers: list[str]) -> dict:
     """解析D4-4调整分录行"""
     from uuid import uuid4
@@ -1845,6 +1862,8 @@ def _parse_d4_4_row(row: tuple, actual_headers: list[str], expected_headers: lis
         except ValueError:
             return None
 
+    # 键集必须覆盖前端 `D4AdjustmentRow` 的全部 10 个业务字段（rowId 由导入侧新生成）：
+    # 缺任一键 → 前端 safeParseRows 兜底成空串 ⇒ 用户在该列填的内容被静默丢弃。
     return {
         "rowId": str(uuid4()),
         "description": _safe_str(_col_val("摘要")),
@@ -1852,9 +1871,11 @@ def _parse_d4_4_row(row: tuple, actual_headers: list[str], expected_headers: lis
         "reportItem": _safe_str(_col_val("报表项目")),
         "accountName": _safe_str(_col_val("会计科目")),
         "noteItem": _safe_str(_col_val("附注项目")),
+        "placeholder": _safe_str(_col_val("补充说明")),
         "debitAmount": _safe_float(_col_val("借方")),
         "creditAmount": _safe_float(_col_val("贷方")),
         "indexRef": _safe_str(_col_val("索引号")),
+        "remark": _safe_str(_col_val("备注")),
     }
 
 

@@ -5,18 +5,29 @@ spec: d1-sync-row-table-engine-and-d1-coverage · Task 19 · Requirements 2.5 / 
 
 ═══ 为什么这条能跑，而 D1/D3/D5/D6/D7 跑不了 ═══
 
-`d4.revenue_detail` 是 D 循环里**唯一** `adapter_registered=True` 的 entry
-（`backend/data/workpaper_sync_d_cycle_manifest_slice.json` 实测；D1/D3/D5/D6/D7 全为
-`false`，manifest capability 非 `bidirectional` ⇒ `attach_adapters()` 在任何 DB 查询之前
-短路返回 `()`）。因此 Task 19 的「D4 整册真 materialize + verify 全绿」是本 spec 家族里
-唯一**当下就能真跑**的真栈判据。
+`d4.revenue_detail` 是本 spec 家族里第一条能真跑整册门的 entry。
 
-🔴 **必须走隔离式 attach，不能走全量注册**：共享的
-`registry.register_from_manifest()` 会在轮到 D4 **之前**先炸在 `d2.receivable_detail`
-的 `ContractDriftError`（真实实测：`sheet='d21-managed' table='adjudication_cells'
-field='adjudication_cells/aging_b' locator='B:static:10'`，根因是并发会话把 D2-1 加进
-契约后 live representation 尚未重物化）。那是 D2 lane 的在途工作，与 D4 无关 ⇒ 本脚本
-直接调 `phase5_d4_revenue_detail.attach_pilot_adapters()` 单独挂 D4。
+🔴🔴 **本段原有两句断言已被 2026-09-28 实测推翻，保留原文作对照并就地更正**：
+
+原文①「D4 是 D 循环里**唯一** `adapter_registered=True` 的 entry；D1/D3/D5/D6/D7 的
+manifest capability 非 `bidirectional` ⇒ `attach_adapters()` 在任何 DB 查询之前短路
+返回 `()`」⇒ **对 D1 已不成立**。现算 `backend/data/workpaper_sync_entry_manifest.json`
+的 `entries`：`xlsx/gt-d1-notes-receivable` 现为 `capability="bidirectional"` /
+`adapter_id="d1.notes_receivable_detail"`，且真库有它的 published representation。
+D1 的整册门 harness 是 `verify_d1_full_book_real_stack.py`（它现在卡在另一处：
+representation 冻结的 `structure_hash` 已过期，需重新发布）。
+
+原文②「共享的 `registry.register_from_manifest()` 会在轮到 D4 **之前**先炸在
+`d2.receivable_detail` 的 `ContractDriftError`」⇒ **已不成立**。
+`register_from_manifest()` 现在**逐 entry 隔离** `SyncDomainError`（含
+`ContractDriftError` 与观测器 `PublishedIdentityObserverError` 全部子类），
+记成 typed `RegistrationFailure` 后**继续**下一个 entry
+（spec `workpaper-sync-registration-isolation-and-d2-republish` 的核心修复）。
+
+**但本脚本仍走隔离式 attach** —— 理由从「不这样会被 D2 炸掉」改为
+「只验 D4 一条，不必为拿一个 adapter 去跑整份 manifest 的注册链」。
+即：结论不变，依据变了。⇒ 直接调
+`phase5_d4_revenue_detail.attach_pilot_adapters()` 单独挂 D4。
 
 🔴 **`before` 必须用真实 substrate 字节，不能用 `read_authoritative_template()`**：
 D4 这条真实数据已演化 164 代，权威模板与当前 representation 之间存在大量**合法**结构差异

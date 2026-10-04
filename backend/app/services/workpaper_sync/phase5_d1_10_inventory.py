@@ -72,9 +72,15 @@ _FIELD_SPECS_D110: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] =
     ("index_ref", "O", "editable", "text", "indexRef", "索引号", ""),
 )
 
-#: footer 公式列（仅 H 列 SUM = 票据金额合计）。
-_FORMULA_COLUMNS_D110: Final[tuple[str, ...]] = ("H",)
-_FORMULA_TEMPLATES_D110: Final[dict[str, str]] = {"H": "=SUM(H14:H{r})"}
+# 🔴 2026-09-28 修正：footer SUM 列不进 `formula_columns`（数据区逐格实测零公式）。
+#    `formula_mask` 现算为 `{col}{first_data_row}:{col}{last_data_row}`，覆盖不到 footer；
+#    填进去只会让 H 列（票据金额）的整个数据区被 `merge._protection` 判
+#    `read_only_masked_cell`，OO 侧监盘录入的金额永远写不回 store。
+_FORMULA_COLUMNS_D110: Final[tuple[str, ...]] = ()
+_FORMULA_TEMPLATES_D110: Final[dict[str, str]] = {}
+
+#: footer 行 SUM 公式（`{last}` = last_data_row）。纯实测证据，不进 spec。
+FOOTER_SUM_TEMPLATES_D110: Final[dict[str, str]] = {"H": "=SUM(H14:H{last})"}
 
 SPEC_D110: Final[RowTableSheetSpec] = RowTableSheetSpec(
     managed_sheet=MANAGED_SHEET_D110,

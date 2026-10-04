@@ -1,0 +1,318 @@
+{
+  "contract_id": "l2.interest_payable",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "d94d263f8ca77f57e2ff751346bfe58e79ecca048284a9aef488408ec4b46bba",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "derived_readonly_sheet": {
+      "excel_name": "应付利息检查表L2-4",
+      "reason": "R25/R26 为引用 L2-2 的本期发生额与检查比例派生行，受管区截止 r23、footer r24"
+    },
+    "entry_id": "xlsx/gt-l2-interest-payable",
+    "html_store": {
+      "html_only_keys": [],
+      "item_id": "L2-L2-4-voucher-rows",
+      "note": "整张 L2-4 应付利息检查表存成 `L2-L2-4-voucher-rows` 的 remark JSON 数组；每行已有稳定 rowId，增删改均按 rowId。2026-10-01 只把私有 Date.now+Math.random 生成器换成平台共享 newRowIdentity('l24vc')，已有 rowId 优先不重铸。criteria/note/conclusion 三个 sibling item 本轮不受管、不预登记。真库本 item 0 行，零迁移负担。",
+      "row_identity_key": "rowId",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "l_cycle_interest_payable",
+    "reviewed_basis": "2026-10-01 openpyxl 逐格实测 L2 应付利息.xlsx（8 sheet，sha 8a747c99…）：L2-4 两级表头 r10/r11、数据 r12~r23、footer A24、A..P 16 字段与前端 VoucherCheckRow 16/16 对齐、数据区公式 0；物理 max_column=S 故 UUID=T；r25/r26 是引用 L2-2 的派生行声明只读；manifest 幻影码 L2I finder 零命中。",
+    "template_defects_registered": {
+      "bare_if": {
+        "managed_sheet": 0,
+        "workbook_total": 112
+      },
+      "defined_names": {
+        "broken": 0,
+        "total": 0
+      },
+      "note": "不改模板；L2-4 受管表本身零 #REF!/零裸 IF，per-file 中性化仍挂"
+    }
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "应付利息检查表L2-4",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "l24-managed",
+      "tables": [
+        {
+          "anchor": "A10",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "date",
+              "header_source_ref": "源xlsx!应付利息检查表L2-4!A11",
+              "header_text": "日期",
+              "json_pointer": "/rows/{row_uuid}/date",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付利息检查表L2-4!A12",
+              "stable_field_key": "interest_payable_voucher_rows/{row_uuid}/date",
+              "store_item_id": "L2-L2-4-voucher-rows",
+              "value_type": "date"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_no",
+              "header_source_ref": "源xlsx!应付利息检查表L2-4!B11",
+              "header_text": "凭证编号",
+              "json_pointer": "/rows/{row_uuid}/voucherNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付利息检查表L2-4!B12",
+              "stable_field_key": "interest_payable_voucher_rows/{row_uuid}/voucher_no",
+              "store_item_id": "L2-L2-4-voucher-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "business_content",
+              "header_source_ref": "源xlsx!应付利息检查表L2-4!C11",
+              "header_text": "业务内容",
+              "json_pointer": "/rows/{row_uuid}/businessContent",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付利息检查表L2-4!C12",
+              "stable_field_key": "interest_payable_voucher_rows/{row_uuid}/business_content",
+              "store_item_id": "L2-L2-4-voucher-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "counter_account",
+              "header_source_ref": "源xlsx!应付利息检查表L2-4!D11",
+              "header_text": "对方科目",
+              "json_pointer": "/rows/{row_uuid}/counterAccount",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付利息检查表L2-4!D12",
+              "stable_field_key": "interest_payable_voucher_rows/{row_uuid}/counter_account",
+              "store_item_id": "L2-L2-4-voucher-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "counter_sub_account",
+              "header_source_ref": "源xlsx!应付利息检查表L2-4!E11",
+              "header_text": "对方明细科目",
+              "json_pointer": "/rows/{row_uuid}/counterSubAccount",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付利息检查表L2-4!E12",
+              "stable_field_key": "interest_payable_voucher_rows/{row_uuid}/counter_sub_account",
+              "store_item_id": "L2-L2-4-voucher-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "debit_amount",
+              "header_source_ref": "源xlsx!应付利息检查表L2-4!F11",
+              "header_text": "借方金额",
+              "json_pointer": "/rows/{row_uuid}/debitAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付利息检查表L2-4!F12",
+              "stable_field_key": "interest_payable_voucher_rows/{row_uuid}/debit_amount",
+              "store_item_id": "L2-L2-4-voucher-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "credit_amount",
+              "header_source_ref": "源xlsx!应付利息检查表L2-4!G11",
+              "header_text": "贷方金额",
+              "json_pointer": "/rows/{row_uuid}/creditAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付利息检查表L2-4!G12",
+              "stable_field_key": "interest_payable_voucher_rows/{row_uuid}/credit_amount",
+              "store_item_id": "L2-L2-4-voucher-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "supporting_doc",
+              "header_source_ref": "源xlsx!应付利息检查表L2-4!H11",
+              "header_text": "支持性文件",
+              "json_pointer": "/rows/{row_uuid}/supportingDoc",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付利息检查表L2-4!H12",
+              "stable_field_key": "interest_payable_voucher_rows/{row_uuid}/supporting_doc",
+              "store_item_id": "L2-L2-4-voucher-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "check_1",
+              "header_source_ref": "源xlsx!应付利息检查表L2-4!I11",
+              "header_text": "核对内容①",
+              "json_pointer": "/rows/{row_uuid}/check1",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付利息检查表L2-4!I12",
+              "stable_field_key": "interest_payable_voucher_rows/{row_uuid}/check_1",
+              "store_item_id": "L2-L2-4-voucher-rows",
+              "value_type": "boolean"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "check_2",
+              "header_source_ref": "源xlsx!应付利息检查表L2-4!J11",
+              "header_text": "核对内容②",
+              "json_pointer": "/rows/{row_uuid}/check2",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付利息检查表L2-4!J12",
+              "stable_field_key": "interest_payable_voucher_rows/{row_uuid}/check_2",
+              "store_item_id": "L2-L2-4-voucher-rows",
+              "value_type": "boolean"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "check_3",
+              "header_source_ref": "源xlsx!应付利息检查表L2-4!K11",
+              "header_text": "核对内容③",
+              "json_pointer": "/rows/{row_uuid}/check3",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付利息检查表L2-4!K12",
+              "stable_field_key": "interest_payable_voucher_rows/{row_uuid}/check_3",
+              "store_item_id": "L2-L2-4-voucher-rows",
+              "value_type": "boolean"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "check_4",
+              "header_source_ref": "源xlsx!应付利息检查表L2-4!L11",
+              "header_text": "核对内容④",
+              "json_pointer": "/rows/{row_uuid}/check4",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付利息检查表L2-4!L12",
+              "stable_field_key": "interest_payable_voucher_rows/{row_uuid}/check_4",
+              "store_item_id": "L2-L2-4-voucher-rows",
+              "value_type": "boolean"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "check_5",
+              "header_source_ref": "源xlsx!应付利息检查表L2-4!M11",
+              "header_text": "核对内容⑤",
+              "json_pointer": "/rows/{row_uuid}/check5",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付利息检查表L2-4!M12",
+              "stable_field_key": "interest_payable_voucher_rows/{row_uuid}/check_5",
+              "store_item_id": "L2-L2-4-voucher-rows",
+              "value_type": "boolean"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_no",
+              "header_source_ref": "源xlsx!应付利息检查表L2-4!N11",
+              "header_text": "索引号",
+              "json_pointer": "/rows/{row_uuid}/indexNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付利息检查表L2-4!N12",
+              "stable_field_key": "interest_payable_voucher_rows/{row_uuid}/index_no",
+              "store_item_id": "L2-L2-4-voucher-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "abnormal",
+              "header_source_ref": "源xlsx!应付利息检查表L2-4!O11",
+              "header_text": "是否异常",
+              "json_pointer": "/rows/{row_uuid}/abnormal",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付利息检查表L2-4!O12",
+              "stable_field_key": "interest_payable_voucher_rows/{row_uuid}/abnormal",
+              "store_item_id": "L2-L2-4-voucher-rows",
+              "value_type": "boolean"
+            },
+            {
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              },
+              "column_key": "remark",
+              "header_source_ref": "源xlsx!应付利息检查表L2-4!P11",
+              "header_text": "备注",
+              "json_pointer": "/rows/{row_uuid}/remark",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付利息检查表L2-4!P12",
+              "stable_field_key": "interest_payable_voucher_rows/{row_uuid}/remark",
+              "store_item_id": "L2-L2-4-voucher-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "interest_payable_voucher_rows",
+          "uuid_col": "T"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "4d1b0fe348308cc353d108a9233d5988113da324418cdbd8726a829e2e29c90f",
+    "relative_path": "L/L2 应付利息.xlsx",
+    "template_sha256": "8a747c9931f5a5e0f3a89d243b1eb6aea13ce9b16743664e7ce1a3d4678c989a"
+  },
+  "template_definition_sha256": "825780173c387b9ca46730642879079117c6fdf7aaf19893dcb5a50ff451d2fb"
+}

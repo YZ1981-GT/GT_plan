@@ -6,7 +6,6 @@
 import { readK14AdjustmentNets, type K14AdjustmentNets } from './useK1Adjustment'
 import { calcSubtotal } from './useK1FormulaEngine'
 import { K1_PORTFOLIO_COUNT } from './k1AdjudicationModel'
-import { newRowIdentity } from './shared/rowIdentity'
 
 export type K14WritebackScope = 'all' | 'receivable' | 'baddebt'
 
@@ -89,7 +88,7 @@ function portfolioRowSpecs(
   const specs: { rowKey: string; weight: number }[] = []
   for (let i = 0; i < count; i++) {
     specs.push({
-      rowKey: newRowIdentity('r'),
+      rowKey: `r${i}`,
       weight: num(map, `K1-1-${block}-r${i}-unadj`),
     })
   }

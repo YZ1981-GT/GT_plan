@@ -674,17 +674,30 @@ const fvDisposal = reactive<I3FairValueDisposal>(defaultFvDisposal())
 const waccParams = reactive<I3WaccParams>(defaultWaccParams())
 const growthBenchmarks = reactive<I3GrowthBenchmarks>(defaultGrowthBenchmarks())
 
+/** 缺 rowId 的旧 I3-6 行的确定性身份：只由 CGU 名与同名出现次序决定，不含数组下标。 */
+function legacyCguRowId(cguName: string, occurrence: number): string {
+  return `cgu-name-${encodeURIComponent(cguName)}${occurrence > 1 ? `~${occurrence}` : ''}`
+}
+
 const cguList = computed<CguItem[]>(() => {
   const raw = readResponsePayload(props.allResponses?.get('I3-6-rows'))
   if (Array.isArray(raw) && raw.length) {
+    // 🔴 ID-1 族 B：上游 I3-6 行缺 rowId（旧数据）时**不得**回落到下标 —— 本处是 computed，
+    // 每次 allResponses 变化都会重算，随机 id 会让身份每次保存都变；下标则在删/插行后串到别的 CGU。
+    // 回落改为按 CGU 名派生的确定性 id（与 handleLinkToI36 的「rowId 优先 / cguName 兜底」匹配口径一致），
+    // 同名第 k 次出现带 `~k` 后缀。
+    const seen = new Map<string, number>()
     return raw.map((r: any, idx: number) => {
       const b1 = Number(r.goodwillB1 ?? r.goodwillAmount) || 0
       const b2 = Number(r.minorityB2) || 0
       const a = Number(r.assetGroupCarrying) || 0
       const book = Number(r.cguBookValue) || (a + b1 + b2)
+      const cguName = String(r.cguName || `资产组${idx + 1}`)
+      const occurrence = (seen.get(cguName) ?? 0) + 1
+      seen.set(cguName, occurrence)
       return {
-        rowId: String(r.rowId || `cgu-${idx}`),
-        cguName: String(r.cguName || `资产组${idx + 1}`),
+        rowId: String(r.rowId || legacyCguRowId(cguName, occurrence)),
+        cguName,
         cguBookValue: book,
         goodwillAmount: b1,
       }

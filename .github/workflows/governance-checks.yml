@@ -986,6 +986,25 @@ jobs:
       - name: Run bold-marker hygiene tests
         run: python -m pytest backend/tests/test_note_bold_marker_hygiene.py -q
 
+  note-template-stale-overwrite-guard:
+    # 平台级：附注模板「陈旧副本整体覆盖」防复发（2026-09-30 事故）
+    # 背景：`56acf363d`（G 循环 spec，与附注无关）把两份附注模板整体换成了 7 月下旬的
+    # 陈旧副本：带 columns 的表 listed 411→11 / soe 260→3，另删整章、改名覆盖母公司章。
+    # 各循环的 note 结构守卫当场全红，但红了三天没人被拦住，期间还有修复把守卫往陈旧
+    # 数据上凑。本守卫只锁不可能是有意改动的宏观棘轮（columns/guidance 覆盖率只增不减、
+    # 表头 `<br/>` 为 0、零悬空 parent），纯 JSON 读 < 1 秒，信号强误报近零。
+    # 恢复工具：backend/scripts/fix/restore_note_templates_from_stale_overwrite.py
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 hypothesis==6.112.1
+      - name: Run stale-overwrite guard
+        run: python -m pytest backend/tests/test_note_template_stale_overwrite_guard.py -q
+
   h-cycle-ai-wiring:
     # H 循环披露 Tab 的 AI / 复核接线守卫
     # （h-cycle-legacy-cleanup-and-platform-hygiene R2 / R3）
@@ -1041,10 +1060,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Regenerate registry and assert no drift
-        run: |
-          python backend/scripts/gen_note_wp_sync_registry.py --write
-          git diff --exit-code backend/data/note_workpaper_sync_registry.json
+      # 🔴 2026-09-28 修：本步原为 `--write` + `git diff --exit-code`，而生成器当时
+      #    每次都写 generated_at=datetime.now() ⇒ diff 必然非空 ⇒ **本步永远失败**。
+      #    本 job 无 continue-on-error 也无 if:，即每次 push work/** 与每个 PR 都在红，
+      #    红成常态后无人再看 ⇒ 门禁形同不存在。实测后果：committed 停在 76 entries
+      #    而前端真源已 78（缺 L2 应付利息 / L4 应付债券），长期无人发现。
+      #    已让生成器输出幂等（entries 未变则沿用原 generated_at）并加 --check，
+      #    只读校验、漂移 exit 2，不需要可写工作树。
+      #    变异证明见 spec disclosure-payload-authority-source design §十四。
+      - name: Assert registry has no drift vs frontend source of truth
+        run: python backend/scripts/gen_note_wp_sync_registry.py --check
 
   note-report-row-code:
     # 平台级：附注 report_row_code 与 report_config 编号体系一致性守卫
@@ -3571,8 +3596,18 @@ jobs:
         run: python -m pytest backend/tests/test_variant_matrix_null_audit.py -q
       - name: Parent company chapter idempotent check
         run: python backend/scripts/fix/fix_note_parent_company_chapter.py --check
+      # 🔴 2026-09-30：单体报告**没有**母公司章 —— 但 4 个一级章（listed 十六 / soe 七 /
+      #    soe 十二 / listed 十七）是迁移脚本合成的、硬编码 scope="both"，而 scope 过滤逐节
+      #    扁平不继承父章 ⇒ 章自身放行。判据真源是 Word 权威册（单体册有没有这个 Heading 1），
+      #    脚本每次 --check 都重读 docx，登记表过期即红。
+      - name: Chapter scope aligned with Word authority (standalone has no parent chapter)
+        run: python backend/scripts/fix/fix_note_chapter_scope.py --check
+      - name: Standalone must not carry consolidated-only chapters (write/read/cleanup)
+        run: python -m pytest backend/tests/test_note_standalone_consolidated_only_scope.py -q
       - name: Mutation check (every guard must go red, then restore)
         run: python backend/scripts/diagnose/mutate_parent_company_note_guards.py
+      - name: Mutation check (standalone scope guards; 15 mutations must all die)
+        run: python backend/scripts/diagnose/mutate_note_standalone_scope_guards.py
       # 真实库验收：无合并项目时诚实输出「无法验收」并 exit 0（禁 fixture 冒充）。
       # CI 无 DB ⇒ 脚本连不上库返 2，故用 || true 只作烟测；真实验收在本地/预发跑。
       - name: Live verification (honest report; DB-less in CI)
@@ -5909,6 +5944,12 @@ jobs:
         run: python backend/scripts/gen/generate_workpaper_sync_program_milestones.py --check
       - name: Program milestone guards (DAG, digests, evidence, live read-only DB)
         run: python -m pytest backend/tests/workpaper_sync/test_workpaper_sync_program_milestones.py -q --tb=short
+      # 受管 sheet 清单前端投影（d567-sync-coverage Property 15）。
+      # 🔴 用 `--check` 而非 `--apply` + `git diff`：本仓已有该约定，且 apply-后比较那种写法
+      #    只要产物含时间戳就变成**永假门**（见 disclosure-payload 五轮复盘 T29）。
+      #    本生成器输出幂等（无时间戳/随机量），--check 无违规时必绿。
+      - name: Recompute and byte-check managed-sheet projection
+        run: python backend/scripts/gen/generate_workpaper_sync_managed_sheets.py --check
 
   tb-writeback-no-direct-call:
     # TB 回写直调门禁（tb-writeback-explicit-publish-gate Task 18 / Req 9.1, 9.2）
@@ -6035,8 +6076,10 @@ jobs:
 
 
   row-table-engine-and-registry-guards:
-    # 行表引擎 + store 形态注册表四道卡点
-    # （spec d1-sync-row-table-engine-and-d1-coverage Tasks 20/21/22 · Requirements 7.1~7.5）
+    # 行表引擎 + store 形态注册表**六道**卡点
+    # （spec d1-sync-row-table-engine-and-d1-coverage Tasks 20/21/22 · Requirements 7.1~7.5；
+    #   第 5 道 = 2026-09-28 实测缺陷② 防复发 · Requirements 1.2 / 6.6；
+    #   第 6 道 = 缺陷③ 两方向 parity 棘轮基线 · Requirements 3.1 / 3.3 / 7.3）
     #
     # 🔴 为什么四道都进 CI 而不只放 pytest：`tests/workpaper_sync/` 有大量与本 spec 无关的
     #    既存失败（另有 tests/scripts 10 项已 stash 验证与本 spec 零交集），在那个分母上
@@ -6082,16 +6125,48 @@ jobs:
         run: python backend/scripts/check/check_sheet_specs_fully_registered.py
       - name: Gate 4 — registry lookup is O(1) dict (linear probe counter-proof)
         run: python backend/scripts/check/check_sync_registry_lookup_is_o1.py
+      # 🔴 Gate 5（2026-09-28 新增）—— formula_columns 不得覆盖任何 editable 字段的列。
+      #    实测缺陷：D1 有 8 个受管区把「只在 footer 出现的 SUM 列」填进 formula_columns，
+      #    而 formula_mask 现算为 {col}{first_data_row}:{col}{last_data_row}（覆盖数据区、
+      #    覆盖不到 footer）⇒ 14 个 editable 字段的整个数据区被 merge._protection 判
+      #    read_only_masked_cell，OO 改动写不回 store（需求 1.5 在后端不可达，与 D4-1 修前同型）。
+      #    对保护 footer 毫无作用，纯误伤。
+      #    规则刻意是「交集为空」而非「恰等于 mode=formula 列集」：后者在本仓库有 10 处假阳
+      #    （TEMPLATE_ONLY_FORMULA_COLUMNS_* 形态 —— 模板有列、store 侧前端重算、不进
+      #    field_specs，只进 mask 让 OO 只读，完全正当）。自测含**双向**变异反证。
+      - name: Gate 5 — formula_columns must not mask any editable column
+        run: python backend/scripts/check/check_row_table_formula_columns_consistency.py
+      # 🔴 Gate 6（2026-09-28 新增）—— 出/回两方向能取到的 store item 集合 == provider 声明全集。
+      #    需求 3.3 的精确落点。既有 Gate（check_store_item_ids_fully_wired）只覆盖 D4 一家，
+      #    D1 的 18 个 item 零覆盖。实测：42 个 adapter 里 14 个「声明了 N 个、装配链只看得到
+      #    1 个」，合计 48 个 item 不可见（D1 最大：18 声明 / 1 可见 / 缺口 17）。
+      #    根因是两方向的取法与「声明放在哪」不匹配：出方向门槛是 len(STORE_ITEM_IDS)>1
+      #    （复数常量），回方向分派点是 plan.dual_store_fn；而 D1/D3/D5/D6/D7 的扩容声明全在
+      #    伴生模块 phase5_*_expansion 里，两方向都不读它 ⇒ 伴生模块的 all_store_item_ids()
+      #    没有任何生产代码调用。棘轮基线 KNOWN_UNWIRED 冻结这 14 家（**只许变短**），
+      #    新增立即红；基线项修好后不删也会红（失效条目检查）。
+      - name: Gate 6 — store item two-way parity (ratchet baseline, shrink only)
+        run: python backend/scripts/check/check_store_item_two_way_parity.py
       # 卡点自身的变异反证自测（stdlib + pytest，不依赖 tests/workpaper_sync 既存失败分母）
       - name: Install guard self-test dependency
         run: python -m pip install pytest==8.4.2
-      - name: Run the four guards' self-tests (with mutation counter-proofs)
+      # 🔴 接入层对账（2026-09-28 新增）——「workflow 声明的每个 backend/*.py 都必须
+      #    在版本控制里」。本轮实测：Gate 5/6 的 2 个门禁 + 2 个自测本地全绿、tasks.md
+      #    也登记了「立成 CI 卡点」，但四个文件**从未提交**，接线的 yml 改动也没提交
+      #    ⇒ 只看本地一切正常、只看 HEAD 则 CI 压根不引用，「卡点已建立」在仓库里
+      #    没有任何对应物。这条判据自己就是防这个的，所以必须自己进 CI。
+      #    附带抓到一处他 lane 既存欠账（ci.yml 的 audit-xlsx-drift 引用的脚本不存在），
+      #    已按棘轮登记 + 三条反向断言（仍缺失 / 所在 job 仍 continue-on-error / 只许变短）。
+      - name: Run the seven guards' self-tests (with mutation counter-proofs)
         run: >-
           python -m pytest
           backend/tests/scripts/test_check_sync_provider_golden_digest.py
           backend/tests/scripts/test_check_framework_layer_has_no_wp_code_branch.py
           backend/tests/scripts/test_check_sheet_specs_fully_registered.py
           backend/tests/scripts/test_check_sync_registry_lookup_is_o1.py
+          backend/tests/scripts/test_check_row_table_formula_columns_consistency.py
+          backend/tests/scripts/test_check_store_item_two_way_parity.py
+          backend/tests/scripts/test_ci_declared_gates_exist.py
           -q
       # 引擎与声明层等价判据（框架层 ≡ 七家 provider 原实现，逐元组/逐字段）
       - name: Run row-table engine equivalence & declaration guards
@@ -6103,6 +6178,7 @@ jobs:
           backend/tests/workpaper_sync/test_adjudication_sheet_spec.py
           backend/tests/workpaper_sync/test_d1_sheet_specs.py
           backend/tests/workpaper_sync/test_d1_instrumentation_specs_expansion.py
+          backend/tests/workpaper_sync/test_d1_multi_store_wiring.py
           -q
       # 🔴 收敛后的薄转发必须保住「畸形 store 载荷 = domain 错误(4xx)」这条分类
       #    （Task 16/17 曾漏做错误转译，四家从 4xx 退化成 opaque 500；golden digest
@@ -6154,3 +6230,47 @@ jobs:
           backend/tests/workpaper_sync/test_e1_04_e1_11_specs.py
           backend/tests/workpaper_sync/test_e1_provider_and_expansion.py
           -q
+  lazy-import-resolvability:
+    # 函数体内 lazy import 可解析性（全仓级，不属任何单一 lane）
+    #
+    # 🔴 这个守卫 2026-09 就写好并提交了，但**两个 workflow 引用它 0 次** —— 从来没在
+    #    HEAD 上跑过，只在开发者工作树上跑。而它守的恰恰是「模块加载期与静态检查都发现
+    #    不了、每次调用必抛 ImportError」那一类：`prefill_engine._resolve_adj_formula`
+    #    的 `from app.models.phase10_models import Adjustment` 就是原始事故。
+    #
+    # 接进 CI 的直接收益（2026-09-28 实测）：在 `git worktree add --detach HEAD` 的干净
+    # 检出上一跑就报「新增 7 处」，其中 4 处是 `phase5_d3_expansion.py` 函数体内 lazy
+    # import 四个**未入库**的 sheet 子模块 —— 正是同日 Gate 6 在干净检出上 traceback
+    # 崩掉的根因。当时是靠手工起 worktree 才发现的；本 job 让它在 CI 上直接可见。
+    #
+    # 守卫内部分三类，第三类是接 CI 时新建的：
+    #   ① `_FLAG_GATED_PLACEHOLDERS` —— flag=False 的未实现占位（不是缺陷）
+    #   ② `_KNOWN_UNRESOLVED_BASELINE` —— 待修工单（任何检出上都是真缺陷）
+    #   ③ `_CHECKOUT_DEPENDENT_UNRESOLVED` —— **检出相关**：import 侧已提交、定义侧没提交
+    #      ⇒ 工作树可解析 / HEAD 不可解析，两种检出表现**恰好相反**，单张清单表达不了。
+    # ③ 豁免僵尸检查，但配两条独立反向断言（按 `git show HEAD:` 静态判定，脱离当前检出）：
+    #   * 每条在 HEAD 版代码里必须**真的**取不到 ⇒ 定义侧一入库立刻要求移除登记；
+    #   * import 侧文件必须**已提交** ⇒ 否则该 import 在 HEAD 上不存在，登记纯噪音。
+    # 另外僵尸检查本身加了「源文件不在本检出」豁免 —— 实测 `phase5_d{5,6,7}_expansion.py`
+    # 在 HEAD 上不存在，旧口径会要求删掉 3 条**仍然有效**的工单。
+    #
+    # 4 处变异全打红（M1/M2 必须在纯 HEAD 检出上做 —— ③ 的条目在工作树上本来就可解析，
+    # 在工作树上清空清单也不会红，这正是它需要单独成类的原因）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 🔴 需要完整历史：反向断言用 `git show HEAD:<path>` 读定义侧的 HEAD 版内容
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run lazy import resolvability guard
+        run: python -m pytest backend/tests/test_lazy_import_resolvability.py -q

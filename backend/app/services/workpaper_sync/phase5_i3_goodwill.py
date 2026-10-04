@@ -94,8 +94,10 @@ ADAPTER_ID: Final[str] = "i3.goodwill_detail"
 WP_CODES: Final[frozenset[str]] = frozenset({"I3G"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "I/I3 商誉.xlsx"
+#: 🔴 2026-10-01 净化（`sanitize_i_cycle_template_external_links.py`，过 OOXML 门）后现算；
+#: 净化前 `96cd6d6cb70698ce90087269aa3f5c3f70a7d80955bd2985904099c3d9257366`（slice 冻结值，append-only 保留；`.preclean.bak` 即其字节）。
 TEMPLATE_SHA256: Final[str] = (
-    "96cd6d6cb70698ce90087269aa3f5c3f70a7d80955bd2985904099c3d9257366"
+    "99512b340ccb79bf884d9f3362010f302bd8aaf45be0f3b082c99899f5253085"
 )
 
 STORE_ITEM_ID: Final[str] = _i302.STORE_ITEM_ID_I302
@@ -169,6 +171,16 @@ _EXTRA_REVIEW: Final[dict[str, Any]] = {
         "本 sheet（明细表I3-2）的行身份是 `useI3Detail.ts` 的 rowId"
         "（`row-${Date.now()}-${random}` 族 A 安全生成）⇒ 本契约 sites 为空，"
         "🔴 但**不得**据此推断「I3 无位置化问题」—— 那 7 处的修复归 lane 1 的 Task 3~9。"
+    ),
+    # ✅ 2026-10-01 lane 1 Task 4~7 已修：7 处改为「上游 rowId 优先 → 按业务值复用旧 id → 新生成」，
+    #    守卫 `test_i_cycle_registered_defects_fixed.py` + vitest `i3DisclosureRowIdentity.spec.ts`。
+    "positional_identity_fix_status": "fixed_out_of_sheet",
+    "legacy_positional_ids_grandfathered": True,
+    "legacy_positional_id_pattern": r"^(cgu|bv|imp|perf|ap|tc-i18)-\d+$",
+    "positional_identity_persist_chain": (
+        "useI3Disclosure pullFromDetailRows → _persistSection('cgu_allocation') → "
+        "options.onSave(`${prefix}-cgu_allocation-rows`) → GtI3Goodwill.vue http.put；"
+        "键 I3-disc-{listed|soe}-cgu_allocation-rows（修复未改键名）"
     ),
     # 🔴 删行属下标族 + 双重叠
     "row_delete_api": {
@@ -495,3 +507,74 @@ async def resolve_published_frozen_definitions(
     return await HC.resolve_published_frozen_definitions(
         IDENTITY, session=session, representation=representation, contract=contract
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ── 五环发布面（委托 HC，2026-10-01）
+#
+# 🔴 硬前置：`projection_provisioning.load_projection_supply()` 只认
+#    `publish_pilot_definitions` + `PILOT_WP_CODES`；`projection_first_publication`
+#    另要 `instrumentation_spec()`（单数 = 主表）与 `build_store_projection`。
+#    实现全在 `phase5_h_cycle_common`，这里只写薄委托（与 J1 / L1 同形，不复制逻辑）。
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def instrumentation_spec() -> ExcelInstrumentationSpec:
+    return HC.primary_instrumentation_spec(IDENTITY, managed_row_table_specs())
+
+
+def build_store_projection(
+    payload: Any,
+    *,
+    contract: SyncContract,
+    limits: Any | None = None,
+    store_item_id: str | None = None,
+) -> Any:
+    """🔴 `payload` 必须是首位位置参数（golden digest 门按此调用）。"""
+    return HC.build_store_projection_for(
+        IDENTITY,
+        managed_row_table_specs(),
+        payload,
+        contract=contract,
+        limits=limits,
+        store_item_id=store_item_id,
+    )
+
+
+def merge_projection_into_store_rows(
+    *, projection: Any, base_rows: list, store_item_id: str | None = None
+) -> Any:
+    return HC.merge_projection_into_store_rows_for(
+        IDENTITY,
+        managed_row_table_specs(),
+        projection=projection,
+        base_rows=base_rows,
+        store_item_id=store_item_id,
+    )
+
+
+def iter_store_rows(payload: Any, *, store_item_id: str | None = None) -> Any:
+    return HC.iter_store_rows_for(
+        IDENTITY, managed_row_table_specs(), payload, store_item_id=store_item_id
+    )
+
+
+async def publish_definitions(publisher: Any) -> HC.HEntryDefinitions:
+    return await HC.publish_h_entry_definitions(
+        IDENTITY,
+        managed_row_table_specs(),
+        publisher=publisher,
+        contract_payload_builder=build_contract_payload,
+    )
+
+
+publish_pilot_definitions = publish_definitions
+
+#: 首版发布 binding 装配读的两个 provider 常量（与 J1 / L1 同名）。🔴 必须有：
+#: `ExcelInstrumentationSpec` 的字段名是 `uuid_col`，而 `projection_first_publication`
+#: 按 `spec.uuid_column or provider.UUID_COL` 取 ⇒ 缺这个常量时 UUID 列解析为 None，
+#: 首版发布炸在 `excel_entry_identity_inventory_invalid`（I6 实测）。
+#: 多受管表（I5）时 `ROWS_TABLE_KEY` 指向主表，其余由 sibling binding 覆盖。
+UUID_COL: Final[str] = instrumentation_spec().uuid_col
+ROWS_TABLE_KEY: Final[str] = managed_row_table_specs()[0].table_key
+PILOT_WP_CODES = WP_CODES

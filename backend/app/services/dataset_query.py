@@ -30,8 +30,13 @@ async def get_active_filter(
     *,
     force_dataset_id: UUID | None = None,
     current_user_id: UUID | None = None,  # F41: 项目权限校验（可选，渐进迁移）
+    strict: bool = False,
 ) -> sa.ColumnElement:
     """获取四表查询的统一过滤条件
+
+    ``strict=True``（公式推送等写入方用）：active dataset 查询失败时**原样上抛**，不 rollback、
+    不退化为「不按数据集过滤」。默认 fail-open 会 ``db.rollback()`` —— 在调用方事务里等于把
+    已 flush 的写入（如推送运行记录）静默撤销，且退化后的过滤会读到非当前数据集的行。
 
     过渡期逻辑：
     - 始终包含 project_id + year + is_deleted=false
@@ -97,6 +102,8 @@ async def get_active_filter(
                 table.c.is_deleted == sa.false(),
             )
     except Exception:
+        if strict:
+            raise
         # ledger_datasets 表可能不存在或查询失败，需要 rollback 恢复事务
         try:
             await db.rollback()

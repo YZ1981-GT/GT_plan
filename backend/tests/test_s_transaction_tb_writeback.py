@@ -14,10 +14,17 @@ Requirements: 9.1, 9.2, 9.3, 9.4
 from __future__ import annotations
 
 from decimal import Decimal
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
+
+from app.services.tb_audited_writer import (
+    PublishRowResult,
+    PublishRowSkip,
+    PublishRowsResult,
+)
 
 from app.services.s_transaction_tb_writeback_service import (
     S_TRANSACTION_COMPONENT_TYPES,
@@ -34,20 +41,33 @@ PROJECT_ID = uuid4()
 YEAR = 2025
 
 
-class FakeTrialBalanceRow:
-    """模拟 TrialBalance ORM 行"""
+def _published_result(
+    account_code: str,
+    audited: str,
+    previous: str | None = "4800",
+) -> PublishRowsResult:
+    return PublishRowsResult(
+        updated_account_codes=[account_code],
+        updated_rows=[
+            PublishRowResult(
+                account_code=account_code,
+                audited_amount=Decimal(audited),
+                previous_amount=Decimal(previous) if previous is not None else None,
+                published_at=datetime.now(timezone.utc),
+            )
+        ],
+    )
 
-    def __init__(self, code: str, unadj: float = 100.0, aje: float = 0, audited: float | None = None):
-        self.standard_account_code = code
-        self.unadjusted_amount = Decimal(str(unadj))
-        self.aje_adjustment = Decimal(str(aje))
-        self.audited_amount = Decimal(str(audited)) if audited is not None else None
-        self.is_deleted = False
+
+def _skipped_result(account_code: str) -> PublishRowsResult:
+    return PublishRowsResult(
+        skipped=[PublishRowSkip(account_code, "未找到未删除的试算表行")]
+    )
 
 
 @pytest.fixture
 def mock_db():
-    """创建 mock AsyncSession"""
+    """创建 mock AsyncSession；统一 writer 的 flush 由其自身测试负责。"""
     db = AsyncMock()
     db.flush = AsyncMock()
     db.commit = AsyncMock()
@@ -94,53 +114,53 @@ class TestWritebackAuditedAmount:
 
     @pytest.mark.asyncio
     async def test_writeback_v2_positive(self, mock_db):
-        """v2 正数口径：audited_amount 存储为正数."""
-        fake_row = FakeTrialBalanceRow("1601", unadj=5000, audited=4800)
+        """v2 正数口径：统一 writer 收到原值并返回旧值."""
+        with patch(
+            "app.services.s_transaction_tb_writeback_service.publish_rows",
+            new=AsyncMock(return_value=_published_result("1601", "5200.5")),
+        ) as mock_publish:
+            svc = STransactionTBWritebackService(mock_db)
+            result = await svc.writeback_audited_amount(
+                project_id=PROJECT_ID,
+                year=YEAR,
+                account_code="1601",
+                audited_amount=5200.50,
+                component_type="s4-nonmonetary-exchange",
+                wp_code="S4",
+            )
 
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = fake_row
-        mock_db.execute = AsyncMock(return_value=mock_result)
-
-        svc = STransactionTBWritebackService(mock_db)
-        result = await svc.writeback_audited_amount(
-            project_id=PROJECT_ID,
-            year=YEAR,
-            account_code="1601",
-            audited_amount=5200.50,
-            component_type="s4-nonmonetary-exchange",
-            wp_code="S4",
-        )
-
-        # 验证正数存储
-        assert fake_row.audited_amount == Decimal("5200.5")
-        assert result["account_code"] == "1601"
-        assert result["audited_amount"] == "5200.5"
-        assert result["previous_amount"] == "4800"
-
-        # 验证仅 flush 不 commit
-        mock_db.flush.assert_awaited_once()
+        mock_publish.assert_awaited_once()
+        assert mock_publish.call_args.args[:3] == (mock_db, PROJECT_ID, YEAR)
+        assert mock_publish.call_args.args[3] == [
+            {"account_code": "1601", "audited_amount": 5200.5}
+        ]
+        assert mock_publish.call_args.kwargs == {"source": "s-transaction:S4"}
+        assert result == {
+            "account_code": "1601",
+            "audited_amount": "5200.5",
+            "previous_amount": "4800",
+        }
         mock_db.commit.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_writeback_negative_converts_to_positive(self, mock_db):
-        """负数输入自动取绝对值（v2 正数口径）."""
-        fake_row = FakeTrialBalanceRow("2202", audited=None)
+        """负数输入交给统一 writer 前自动取绝对值."""
+        with patch(
+            "app.services.s_transaction_tb_writeback_service.publish_rows",
+            new=AsyncMock(return_value=_published_result("2202", "800", previous=None)),
+        ) as mock_publish:
+            svc = STransactionTBWritebackService(mock_db)
+            result = await svc.writeback_audited_amount(
+                project_id=PROJECT_ID,
+                year=YEAR,
+                account_code="2202",
+                audited_amount=-800.0,
+                wp_code="S5",
+            )
 
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = fake_row
-        mock_db.execute = AsyncMock(return_value=mock_result)
-
-        svc = STransactionTBWritebackService(mock_db)
-        result = await svc.writeback_audited_amount(
-            project_id=PROJECT_ID,
-            year=YEAR,
-            account_code="2202",
-            audited_amount=-800.0,
-            wp_code="S5",
-        )
-
-        # 负数转正
-        assert fake_row.audited_amount == Decimal("800.0")
+        assert mock_publish.call_args.args[3] == [
+            {"account_code": "2202", "audited_amount": 800.0}
+        ]
         assert result["previous_amount"] is None
 
     @pytest.mark.asyncio
@@ -159,41 +179,37 @@ class TestWritebackAuditedAmount:
 
     @pytest.mark.asyncio
     async def test_writeback_account_not_found(self, mock_db):
-        """科目不存在抛 LookupError."""
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute = AsyncMock(return_value=mock_result)
+        """统一 writer 跳过目标行时转换为 LookupError."""
+        with patch(
+            "app.services.s_transaction_tb_writeback_service.publish_rows",
+            new=AsyncMock(return_value=_skipped_result("9999")),
+        ):
+            svc = STransactionTBWritebackService(mock_db)
 
-        svc = STransactionTBWritebackService(mock_db)
-
-        with pytest.raises(LookupError, match="未找到科目"):
-            await svc.writeback_audited_amount(
-                project_id=PROJECT_ID,
-                year=YEAR,
-                account_code="9999",
-                audited_amount=100,
-            )
+            with pytest.raises(LookupError, match="未找到科目"):
+                await svc.writeback_audited_amount(
+                    project_id=PROJECT_ID,
+                    year=YEAR,
+                    account_code="9999",
+                    audited_amount=100,
+                )
 
     @pytest.mark.asyncio
     async def test_flush_not_commit(self, mock_db):
-        """确认 service 层仅 flush 不 commit（Req 9.3）."""
-        fake_row = FakeTrialBalanceRow("1901")
+        """service 仅使用统一 writer，不在自身 commit."""
+        with patch(
+            "app.services.s_transaction_tb_writeback_service.publish_rows",
+            new=AsyncMock(return_value=_published_result("1901", "200")),
+        ):
+            svc = STransactionTBWritebackService(mock_db)
+            await svc.writeback_audited_amount(
+                project_id=PROJECT_ID,
+                year=YEAR,
+                account_code="1901",
+                audited_amount=200,
+                wp_code="S8",
+            )
 
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = fake_row
-        mock_db.execute = AsyncMock(return_value=mock_result)
-
-        svc = STransactionTBWritebackService(mock_db)
-        await svc.writeback_audited_amount(
-            project_id=PROJECT_ID,
-            year=YEAR,
-            account_code="1901",
-            audited_amount=200,
-            wp_code="S8",
-        )
-
-        # 核心断言：flush 被调用，commit 未被调用
-        mock_db.flush.assert_awaited_once()
         mock_db.commit.assert_not_awaited()
 
 
@@ -207,71 +223,63 @@ class TestWritebackBatch:
 
     @pytest.mark.asyncio
     async def test_batch_all_success(self, mock_db):
-        """批量回写全部成功."""
-        fake_rows = {
-            "1601": FakeTrialBalanceRow("1601", audited=1000),
-            "1701": FakeTrialBalanceRow("1701", audited=2000),
-        }
-
-        call_count = [0]
-
-        async def mock_execute(stmt, *args, **kwargs):
-            result = MagicMock()
-            if call_count[0] < 2:
-                code = ["1601", "1701"][call_count[0]]
-                result.scalar_one_or_none.return_value = fake_rows[code]
-            call_count[0] += 1
-            return result
-
-        mock_db.execute = mock_execute
-
-        svc = STransactionTBWritebackService(mock_db)
-        results = await svc.writeback_batch(
-            project_id=PROJECT_ID,
-            year=YEAR,
-            rows=[
-                {"account_code": "1601", "audited_amount": 1500},
-                {"account_code": "1701", "audited_amount": 2500},
-            ],
-            component_type="s4-nonmonetary-exchange",
-            wp_code="S4",
-        )
+        """批量回写全部成功，逐行调用统一 writer."""
+        with patch(
+            "app.services.s_transaction_tb_writeback_service.publish_rows",
+            new=AsyncMock(
+                side_effect=[
+                    _published_result("1601", "1500", previous="1000"),
+                    _published_result("1701", "2500", previous="2000"),
+                ]
+            ),
+        ) as mock_publish:
+            svc = STransactionTBWritebackService(mock_db)
+            results = await svc.writeback_batch(
+                project_id=PROJECT_ID,
+                year=YEAR,
+                rows=[
+                    {"account_code": "1601", "audited_amount": 1500},
+                    {"account_code": "1701", "audited_amount": 2500},
+                ],
+                component_type="s4-nonmonetary-exchange",
+                wp_code="S4",
+            )
 
         assert len(results) == 2
-        assert all("error" not in r for r in results)
+        assert all("error" not in item for item in results)
+        assert [item["account_code"] for item in results] == ["1601", "1701"]
+        assert mock_publish.await_count == 2
+        assert mock_publish.call_args_list[0].kwargs == {"source": "s-transaction:S4"}
+        assert mock_publish.call_args_list[1].kwargs == {"source": "s-transaction:S4"}
 
     @pytest.mark.asyncio
     async def test_batch_partial_failure(self, mock_db):
         """批量回写部分失败时不中断其他行."""
-        fake_row = FakeTrialBalanceRow("1601", audited=1000)
-
-        call_count = [0]
-
-        async def mock_execute(stmt, *args, **kwargs):
-            result = MagicMock()
-            if call_count[0] == 0:
-                result.scalar_one_or_none.return_value = fake_row
-            else:
-                result.scalar_one_or_none.return_value = None
-            call_count[0] += 1
-            return result
-
-        mock_db.execute = mock_execute
-
-        svc = STransactionTBWritebackService(mock_db)
-        results = await svc.writeback_batch(
-            project_id=PROJECT_ID,
-            year=YEAR,
-            rows=[
-                {"account_code": "1601", "audited_amount": 1500},
-                {"account_code": "9999", "audited_amount": 100},
-            ],
-            wp_code="S4",
-        )
+        with patch(
+            "app.services.s_transaction_tb_writeback_service.publish_rows",
+            new=AsyncMock(
+                side_effect=[
+                    _published_result("1601", "1500", previous="1000"),
+                    _skipped_result("9999"),
+                ]
+            ),
+        ):
+            svc = STransactionTBWritebackService(mock_db)
+            results = await svc.writeback_batch(
+                project_id=PROJECT_ID,
+                year=YEAR,
+                rows=[
+                    {"account_code": "1601", "audited_amount": 1500},
+                    {"account_code": "9999", "audited_amount": 100},
+                ],
+                wp_code="S4",
+            )
 
         assert len(results) == 2
         assert "error" not in results[0]
+        assert results[0]["account_code"] == "1601"
         assert "error" in results[1]
+        assert "未找到科目" in results[1]["error"]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

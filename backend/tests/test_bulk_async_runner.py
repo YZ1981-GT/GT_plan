@@ -290,3 +290,50 @@ def test_schedule_import_returns_task_id(monkeypatch):
     )
     assert bulk_progress_service.get_task(task_id) is not None
     assert bulk_progress_service.get_task(task_id).operation == "import"
+
+
+# ---------------------------------------------------------------------------
+# 密码保护 fail-closed（spec environment-hygiene-deps-and-scratch-schemas Requirement 4.3）
+#
+# 走**真** bulk_export_service.export（不 patch 它）：要求密码而缺 pyzipper 时，后台任务必须
+# 失败、错误文本就是中文原因（不带「503: 」前缀 —— runner 用 ``str(exc)`` 写错误）、且不落 ZIP。
+# 旧实现在同一情形下会「导出完成」并落一个**明文** ZIP。
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_run_export_with_password_but_no_pyzipper_fails_without_writing_zip(tmp_path, monkeypatch):
+    import sys
+
+    monkeypatch.setattr(bulk_async_runner, "BULK_EXPORT_DIR", tmp_path / "bulk_exports")
+    factory, _ = _fake_session_factory()
+    monkeypatch.setattr(bulk_async_runner, "async_session_factory", factory)
+    monkeypatch.setitem(sys.modules, "pyzipper", None)  # import pyzipper → ImportError
+
+    task = bulk_progress_service.create_task("proj-1", "user-1", "export-data", total=0)
+    build = AsyncMock(return_value=_make_manifest_stub(2))
+    with patch("app.services.bulk_tab.manifest_builder.build_manifest", build), patch(
+        "app.services.bulk_tab.bulk_export_service.build_manifest", build
+    ):
+        await bulk_async_runner._run_export(
+            task.task_id,
+            project_id=uuid.uuid4(),
+            cycles=["D"],
+            mode="data",
+            only_with_data=False,
+            exported_by="tester",
+            platform_version="v1",
+            audit_year=2025,
+            filename="x.zip",
+            # 合法 ASCII 密码：Req 8.3 起中文密码在 export() 第 0 步就被 422 拦掉，
+            # 用中文会让本条测的不再是「缺 pyzipper」这条链路
+            password="Audit-Pa55!",
+        )
+
+    t = bulk_progress_service.get_task(task.task_id)
+    assert t.status == "failed"
+    assert (t.error or "").startswith("服务器未安装 AES 加密组件"), t.error
+    assert t.result_path is None
+    assert build.await_count == 1, "只允许 runner 的进度预计数调用一次；导出本身必须在建 manifest 之前失败"
+    out_dir = tmp_path / "bulk_exports"
+    assert not out_dir.exists() or not any(out_dir.iterdir())

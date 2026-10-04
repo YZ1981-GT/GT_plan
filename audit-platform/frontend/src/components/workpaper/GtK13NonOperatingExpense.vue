@@ -5,7 +5,7 @@
     </div>
 
     <template v-else>
-      <div v-if="isHtmlSheet && currentSheet !== 'K13'" class="k13-header-toolbar">
+      <div v-if="isHtmlSheet && currentSheet !== 'K13' && !isSyncManagedSheet" class="k13-header-toolbar">
         <!-- 一律绑定 :model-value（非 v-model）：切 OO 前必须 config 拉取成功，switchMode 内才置 currentMode -->
         <el-segmented
           v-if="dualMode.isOoAvailable.value"
@@ -14,6 +14,10 @@
           size="small"
           @change="dualMode.onModeChange"
         />
+        <!-- BP-7 / AC 1.4：能力诚实披露。文案真源在 sync/workpaperEntrySyncNotice.ts，
+             宿主里**不得**内联任何提示中文；已注册 bidirectional 的 entry
+             由组件自己返 null 不渲染 ⇒ 无需本地 v-if。 -->
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-k13-non-operating-expense" />
         <!-- OnlyOffice 状态：检测中 / 拉取成功（就绪）/ 仅结构化（对齐 D4「拉取成功才可以」） -->
         <el-tag v-if="dualMode.checking.value" size="small" type="warning">OnlyOffice 检测中…</el-tag>
         <el-tag
@@ -27,7 +31,7 @@
 
       <!-- OnlyOffice 模式 -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
+        v-if="isHtmlSheet && !isSyncManagedSheet && dualMode.currentMode.value === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -36,7 +40,7 @@
       />
 
       <!-- HTML 结构化视图 -->
-      <template v-else-if="dualMode.currentMode.value === 'html'">
+      <template v-else-if="isSyncManagedSheet || dualMode.currentMode.value === 'html'">
         <!-- 底稿目录 -->
         <K13TabIndex
           v-if="currentSheet === 'K13'"
@@ -154,6 +158,7 @@ import {
 } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useK13DualMode } from './composables/useK13DualMode'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 
@@ -219,6 +224,12 @@ const dualMode = useK13DualMode({
 
 /** 当前 sheet 是否为 HTML 可渲染（有匹配子组件） */
 const isHtmlSheet = computed(() => currentSheet.value !== '')
+
+/**
+ * `K13-3` 调整分录汇总已接平台真双向桥（Tab 内自带「结构化视图 / 在线编辑」切换，
+ * 后端 `phase5_k13_*`）⇒ 本宿主的 legacy 单向 OO 切换在这张 sheet 上让位，避免两套切换器同屏。
+ */
+const isSyncManagedSheet = computed(() => currentSheet.value === 'K13-3')
 
 /**
  * 从 sheetName 提取编码 (K13/K13A/K13-1~K13-4/附注)

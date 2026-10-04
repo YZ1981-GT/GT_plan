@@ -20,7 +20,14 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.consolidation_models import ConsolQueryTemplate, ConsolWorksheet
-from app.services.consol_tree_service import TreeNode, build_tree, get_descendants
+from app.services.consol_tree_service import (
+    TreeNode,
+    build_tree,
+    find_node,
+    get_descendants,
+    iter_nodes,
+    worksheet_key,
+)
 
 
 ZERO = Decimal("0")
@@ -47,15 +54,18 @@ async def execute_query(
 ) -> dict:
     """执行透视查询。
 
-    Returns {headers: [...], rows: [[...]], totals: [...]}
+    企业维度按差额表节点键 ``node_key`` 取数（spec consol-tree-three-code-autobuild 任务 7.5），
+    表头显示节点展示名（如「某集团（合并差额）」），列顺序按企业树先序；``node_keys`` 与表头企业列一一对应。
+    ``node_company_code`` 与 ``filters.company_codes`` 可传 node_key 或纯企业代码（纯代码 = 该企业的全部节点）。
+
+    Returns {headers: [...], rows: [[...]], totals: [...], node_keys: [...]}
     """
     if value_field not in VALID_VALUE_FIELDS:
         value_field = "consolidated_amount"
 
-    # Determine which company codes to include
-    company_codes = await _resolve_company_codes(
-        db, project_id, node_company_code, aggregation_mode
-    )
+    tree = await build_tree(db, project_id)
+    keys = _resolve_node_keys(tree, node_company_code, aggregation_mode)
+    labels, order = _node_labels(tree)
 
     # Load worksheet data
     query = sa.select(ConsolWorksheet).where(
@@ -63,25 +73,24 @@ async def execute_query(
         ConsolWorksheet.year == year,
         ConsolWorksheet.is_deleted == sa.false(),
     )
-    if company_codes is not None:
-        query = query.where(ConsolWorksheet.node_company_code.in_(company_codes))
+    if keys is not None:
+        query = query.where(ConsolWorksheet.node_company_code.in_(keys))
 
     # Apply filters
     if filters:
         if "account_codes" in filters and filters["account_codes"]:
             query = query.where(ConsolWorksheet.account_code.in_(filters["account_codes"]))
         if "company_codes" in filters and filters["company_codes"]:
-            query = query.where(ConsolWorksheet.node_company_code.in_(filters["company_codes"]))
+            wanted = _expand_refs(tree, filters["company_codes"])
+            query = query.where(ConsolWorksheet.node_company_code.in_(wanted))
 
     result = await db.execute(query)
     rows = result.scalars().all()
 
-    if row_dimension == "account" and col_dimension == "company":
-        pivot_result = _pivot_account_by_company(rows, value_field)
-    elif row_dimension == "company" and col_dimension == "account":
-        pivot_result = _pivot_company_by_account(rows, value_field)
+    if row_dimension == "company" and col_dimension == "account":
+        pivot_result = _pivot_company_by_account(rows, value_field, labels, order)
     else:
-        pivot_result = _pivot_account_by_company(rows, value_field)
+        pivot_result = _pivot_account_by_company(rows, value_field, labels, order)
 
     if transpose:
         pivot_result = _transpose(pivot_result)
@@ -89,42 +98,62 @@ async def execute_query(
     return pivot_result
 
 
-async def _resolve_company_codes(
-    db: AsyncSession,
-    project_id: UUID,
+def _node_labels(tree: TreeNode | None) -> tuple[dict[str, str], dict[str, int]]:
+    """节点键 → 展示名、树序。"""
+    if tree is None:
+        return {}, {}
+    labels: dict[str, str] = {}
+    for n in iter_nodes(tree):
+        labels.setdefault(worksheet_key(n), n.display_name or n.company_name)
+    return labels, {key: i for i, key in enumerate(labels)}
+
+
+def _expand_refs(tree: TreeNode | None, refs: list[str]) -> list[str]:
+    """筛选项 → 节点键：node_key 原样；纯企业代码展开为该企业在树中的全部节点。"""
+    out: list[str] = []
+    for ref in refs:
+        ref = str(ref)
+        if ":" in ref or tree is None:
+            out.append(ref)
+            continue
+        matched = [worksheet_key(n) for n in iter_nodes(tree) if n.company_code == ref]
+        out.extend(matched or [ref])
+    return out
+
+
+def _resolve_node_keys(
+    tree: TreeNode | None,
     node_company_code: str | None,
     aggregation_mode: str,
 ) -> list[str] | None:
-    """根据汇总模式确定要包含的企业编码列表"""
+    """根据汇总模式确定要包含的节点键列表（None = 全部）。"""
     if not node_company_code:
-        return None  # All codes
-
-    tree = await build_tree(db, project_id)
-    if not tree:
+        return None
+    if tree is None:
         return [node_company_code]
-
-    from app.services.consol_tree_service import find_node as _find
-    target = _find(tree, node_company_code)
+    target = find_node(tree, node_company_code)
     if not target:
         return [node_company_code]
+    if aggregation_mode == "children":
+        return [worksheet_key(target)] + [worksheet_key(c) for c in target.children]
+    if aggregation_mode == "descendants":
+        return [worksheet_key(n) for n in [target] + get_descendants(target)]
+    return [worksheet_key(target)]
 
-    if aggregation_mode == "self":
-        return [target.company_code]
-    elif aggregation_mode == "children":
-        return [target.company_code] + [c.company_code for c in target.children]
-    elif aggregation_mode == "descendants":
-        all_nodes = [target] + get_descendants(target)
-        return [n.company_code for n in all_nodes]
-    return [node_company_code]
+
+def _ordered_keys(rows: list[ConsolWorksheet], order: dict[str, int]) -> list[str]:
+    keys = set(r.node_company_code for r in rows)
+    return sorted(keys, key=lambda k: (order.get(k, len(order)), k))
 
 
 def _pivot_account_by_company(
-    rows: list[ConsolWorksheet], value_field: str
+    rows: list[ConsolWorksheet], value_field: str,
+    labels: dict[str, str] | None = None, order: dict[str, int] | None = None,
 ) -> dict:
-    """行=科目，列=企业，含合计列"""
-    # Collect unique dimensions
+    """行=科目，列=企业（节点），含合计列"""
+    labels = labels or {}
     accounts: list[str] = sorted(set(r.account_code for r in rows))
-    companies: list[str] = sorted(set(r.node_company_code for r in rows))
+    companies = _ordered_keys(rows, order or {})
 
     # Build data matrix
     data_map: dict[str, dict[str, Decimal]] = defaultdict(lambda: defaultdict(lambda: ZERO))
@@ -132,7 +161,7 @@ def _pivot_account_by_company(
         val = getattr(r, value_field, ZERO) or ZERO
         data_map[r.account_code][r.node_company_code] = val
 
-    headers = ["科目编码"] + companies + ["合计"]
+    headers = ["科目编码"] + [labels.get(c, c) for c in companies] + ["合计"]
     result_rows = []
     col_totals = defaultdict(lambda: ZERO)
 
@@ -155,27 +184,29 @@ def _pivot_account_by_company(
         grand_total += col_totals[comp]
     totals.append(str(grand_total))
 
-    return {"headers": headers, "rows": result_rows, "totals": totals}
+    return {"headers": headers, "rows": result_rows, "totals": totals, "node_keys": companies}
 
 
 def _pivot_company_by_account(
-    rows: list[ConsolWorksheet], value_field: str
+    rows: list[ConsolWorksheet], value_field: str,
+    labels: dict[str, str] | None = None, order: dict[str, int] | None = None,
 ) -> dict:
-    """行=企业，列=科目，含合计列"""
+    """行=企业（节点），列=科目，含合计列"""
+    labels = labels or {}
     accounts: list[str] = sorted(set(r.account_code for r in rows))
-    companies: list[str] = sorted(set(r.node_company_code for r in rows))
+    companies = _ordered_keys(rows, order or {})
 
     data_map: dict[str, dict[str, Decimal]] = defaultdict(lambda: defaultdict(lambda: ZERO))
     for r in rows:
         val = getattr(r, value_field, ZERO) or ZERO
         data_map[r.node_company_code][r.account_code] = val
 
-    headers = ["企业编码"] + accounts + ["合计"]
+    headers = ["企业"] + accounts + ["合计"]
     result_rows = []
     col_totals = defaultdict(lambda: ZERO)
 
     for comp in companies:
-        row_data = [comp]
+        row_data = [labels.get(comp, comp)]
         row_total = ZERO
         for acct in accounts:
             val = data_map[comp][acct]
@@ -192,7 +223,7 @@ def _pivot_company_by_account(
         grand_total += col_totals[acct]
     totals.append(str(grand_total))
 
-    return {"headers": headers, "rows": result_rows, "totals": totals}
+    return {"headers": headers, "rows": result_rows, "totals": totals, "node_keys": companies}
 
 
 def _transpose(pivot_result: dict) -> dict:
@@ -217,7 +248,7 @@ def _transpose(pivot_result: dict) -> dict:
             new_row.append(r[col_idx] if col_idx < len(r) else "0")
         new_rows.append(new_row)
 
-    return {"headers": new_headers, "rows": new_rows, "totals": []}
+    return {"headers": new_headers, "rows": new_rows, "totals": [], "node_keys": pivot_result.get("node_keys", [])}
 
 
 async def export_excel(

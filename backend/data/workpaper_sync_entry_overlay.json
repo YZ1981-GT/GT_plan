@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "review_status": "reviewed",
-  "approved_source_digest": "b6291b9fd3f2ee78718c8edaaafef0cb792c5a0e2e2b54470cd4a2116d790034",
-  "review_basis": "2026-09-23 mount diff 复核：sourceDigest 由 cc0af3f8… → b6291b9f…（mounts 266→244 / hosts 175→154 / component 3→3 无增无减 / 0 个新增宿主 / 0 个新增 (file,component) 对 / 0 个对的挂载数变化）。归因两条，均非能力损失：①**21 个 `d4/**` tab 宿主退网**（每个 1 条 GtOnlyOfficeSheet 挂载）来自已提交的 commit cd9592ff5「feat(d4-sync): D4 全量迁移至 useD4SyncMode」+ ebc6e1b92 —— D4 各 tab 不再各自挂 GtOnlyOfficeSheet 而走 useD4SyncMode 统一通道，属有意迁移的既成事实；随之 parent_rules 的 `audit-platform/frontend/src/components/workpaper/d4/**/*.vue` 规则再无匹配对象，而 generator 对 0 匹配规则 fail closed（抛 `stale overlay parent_rules`，令其永久不可运行）⇒ 本次一并删除该已死规则（D4 根 entry `xlsx/gt-d4-operating-revenue` 仍在，未受影响；h4/h8/n1/j1/b60 等其余 parent_rules 均仍有匹配，不动）。②`GtWpRenderer.vue [WorkpaperWordEditor]` 在 diff 里显示为退网，**实为度量口径差、不是语义变化**：discoverer 的 registryWordMount 把 word dispatcher 产出到 `dispatchers` 数组，而 diff 的 current 侧只数 `mounts` 数组（approved 侧数的是 manifest entries[].mounts[]，已折入 dispatcher），故被误计入 retired。现算实证：live `dispatchers` 仍含该 fact，且 `mountId = mount_d4b8a91cbb8386a448b3` 与 approved manifest 里那条 `sourceKind=registry_ast` 挂载**逐字一致**（host 仍 GtWpRenderer.vue，registryEvidence 仍指 registry/entries/core.ts#L87 的 word-template 条目）—— 既没搬家也没 re-hash；Word 编辑能力零损失（live byComponent `WorkpaperWordEditor=4`，A10/A12/A16/A17 bundle 四条 template_ast 挂载俱在，registry `word-template` → WorkpaperWordEditor.vue 绑定仍在）⇒ overrides 里 GtWpRenderer×WorkpaperWordEditor 的 `registry_dispatch_reviewed` 规则保留不动。7 条纯 re-hash（D2/D3/D4/D5/D6/D7 + GtWpRenderer 的 GtOnlyOfficeSheet）为行号位移，mount 数未变。前一版基线：2026-09-14 mount diff 复核（registry/entries 拆分跟进，65e7c371… → cc0af3f8…）。该版归因原文：归因两处均属良性预期拓扑变化：①commit 82f58ea44（D4-IPO/价格分析/四表取数综合交付）扩容/接线了 D4 analysis·ipo·inspection·other 目录约 20 个 GtOnlyOfficeSheet 宿主（sheet 扩容），②同 commit 把 htmlRendererRegistry.ts 的集中式 defineAsyncComponent 注册拆分到 registry/entries/*.ts 子模块，word-template（WorkpaperWordEditor）改为在 core.ts 内联注册 —— discoverer 的 registryWordMount 相应改为遍历 registry/entries/*.ts 定位（三重校验不弱化：word-template 条目存在 / 绑定 WorkpaperWordEditor.vue lazy import / GtWpRenderer 动态挂载），word dispatcher 的 registryEvidence.file 由主 registry 改指 registry/entries/core.ts#L87。mount 统计 hosts=175 mounts=265（GtOnlyOfficeSheet 259 / OnlyOfficeWordDialog 2 / WorkpaperWordEditor 4），无意外丢失宿主。前一版基线：2026-09-13 mount diff 复核（D4-5 双向收口前置，d9fddb64… → 65e7c371…）。",
+  "approved_source_digest": "b165847f6ae14ec9f4d0044c406abcbef06645f6f5311a558626921fd48abc97",
+  "review_basis": "2026-10-01 L8 财务费用（科目 6603 损益类）真双向 adapter_registered 翻转（新增 1 条 L8 override：GtL8FinancialExpenses.vue→l8.financial_expenses，bidirectional/adapter_registered，html_store=L8-2；受管表 明细表L8-2 是 L8 整册唯一数据录入源，HTML 子组件 L8TabDetail.vue 行身份字段 key（非 L6/L7 rowId）已换稳定 rowId（newRowIdentity l82det，已有不重铸），host 补 procedureDualMode 真模式切换器（el-segmented + GtOnlyOfficeSheet 过程表挂载块 v-if=isProcedureSheet && procedureDualMode.currentMode.value==='onlyoffice' sheet-name=props.sheetName||'L8A'）+ 挂 GtEntrySyncCapabilityNotice entry-id=xlsx/gt-l8-financial-expenses 作 BP-7/AC 1.4 能力诚实披露，翻转后 adapter 已注册故 notice 自动返 null 不渲染，与 L1/L3/L6/L7 一致）。approved_source_digest 在干净 worktree(.worktrees/l8-flip, 基于 6c533c272 只叠加 L8 host+overlay 改动)重算得 f85f682e…（旧值 2da2ecde… 为 L6 轮）；mount-diff 零能力损失复核（按完整 manifest build 对比 HEAD 6c533c272）：entry 集合 155→155 零增减、唯一翻转 entry=xlsx/gt-l8-financial-expenses（capability single_onlyoffice→bidirectional、migration_state legacy_fake_bidirectional→adapter_registered、adapter_id None→l8.financial_expenses）、changed entry count=1、per-entry mount 1→2(+1)、stats.mount_count 248→249(+1)、host_count 154 不变、byComponent 仅 GtOnlyOfficeSheet 242→243(+1)（OnlyOfficeWordDialog 2、WorkpaperWordEditor 4 不变）、capability_counts bidirectional 18→19 / single_onlyoffice 131→130 / single_html 5 / unreachable 1、legacy_fake_bidirectional 123→122，其它所有 entry 零变化；受管表 明细表L8-2 单级表头 r8、数据区 R9~R21、footer A22「合计」、formula 列 N/Q/R/W（R 列裸 IF 被 neutralize 摘成纯值）、B~M editable + 跨行派生行 R11/R13/R20 预置公式幸存、UUID 列 X、科目 6603 损益类 amount_kind=occurrence；sanitize 必需（受管 sheet 111 个共享公式成员含横向组，已 sanitize_l8_template_external_links.py 展开为逐格显式公式，受管 sheet 0 diff，整册无 external/OLE，sha d915e309…→f56843b0…）。baseline 下游 diff 仅 L8（mode_switch_visible False→True、missing_adapter True→False）+ 顶层 digest/stats，无并发预存哈希修正。task73 在干净 worktree 46 passed 0 failed。 || 2026-10-01 L6 专项应付款（科目 2711）真双向 adapter_registered 翻转（新增 1 条 L6 override：GtL6SpecialPayables.vue→l6.special_payables，bidirectional/adapter_registered；受管表 明细表L6-2 是 L6 整册唯一数据录入源，HTML 子组件 L6TabDetail.vue 行身份已换稳定 rowId（newRowIdentity l62det，已有不重铸），host 补 procedureDualMode 真模式切换器（el-segmented + GtOnlyOfficeSheet 过程表挂载块 v-if=isProcedureSheet && procedureDualMode.currentMode.value==='onlyoffice' sheet-name=props.sheetName||'L6A'）+ 挂 GtEntrySyncCapabilityNotice entry-id=xlsx/gt-l6-special-payables 作 BP-7/AC 1.4 能力诚实披露，翻转后 adapter 已注册故 notice 自动返 null 不渲染，与 L1/L3/L7 一致）。approved_source_digest 在干净 worktree(.worktrees/l6-flip, 基于 f3ca09422 只叠加 L6 host+overlay 改动)重算得 2da2ecde…（旧值 7ae8f4c7… 为 L7 轮）；mount-diff 零能力损失复核（按完整 manifest build 对比 HEAD f3ca09422）：entry 集合 155→155 零增减、唯一翻转 entry=xlsx/gt-l6-special-payables（capability single_onlyoffice→bidirectional、migration_state legacy_fake_bidirectional→adapter_registered、adapter_id None→l6.special_payables）、changed entry count=1、per-entry mount 1→2(+1)、stats.mount_count 247→248(+1)、host_count 154 不变、byComponent 仅 GtOnlyOfficeSheet 241→242(+1)（OnlyOfficeWordDialog 2、WorkpaperWordEditor 5 不变）、capability_counts bidirectional 17→18 / single_onlyoffice 132→131 / single_html 5 / unreachable 1，其它所有 entry 零变化；受管表 明细表L6-2 六个公式列 G/P/Q/R/S/T，UUID 列 AH（物理 max_col AG），数据区 r10~r19（A 列预置 1~10 序号），sanitize 非必需（受管 sheet 共享公式组 0）。baseline 下游 diff 仅 L6 + 顶层 digest/stats，无并发预存哈希修正。 || 2026-10-01 L7 其他非流动负债真双向 adapter_registered 翻转（新增 1 条 L7 override：GtL7OtherNoncurrentLiabilities.vue→l7.other_noncurrent_liabilities，bidirectional/adapter_registered；受管表 明细表L7-2 是 L7 整册唯一数据录入源，HTML 子组件 L7TabDetail.vue 行身份已换稳定 rowId（newRowIdentity l72det），host 补 procedureDualMode 真模式切换器（el-segmented + GtOnlyOfficeSheet 过程表挂载块 v-if=\"isProcedureSheet && procedureDualMode.currentMode.value==='onlyoffice'\" sheet-name=props.sheetName||'L7A'）+ 挂 GtEntrySyncCapabilityNotice entry-id=xlsx/gt-l7-other-noncurrent-liabilities 作 BP-7/AC 1.4 能力诚实披露，翻转后 adapter 已注册故 notice 自动返 null 不渲染，与 L1/L3 一致）。approved_source_digest 在干净 worktree(.worktrees/l7-flip, 基于 b117123b1 只叠加 L7 host+overlay 改动)重算得 7ae8f4c7…（旧值 d648767136… 为 L4 轮）；mount-diff 零能力损失复核（按完整 manifest build 对比 HEAD b117123b1）：entry 集合 155→155 零增减、唯一翻转 entry=xlsx/gt-l7-other-noncurrent-liabilities（capability single_onlyoffice→bidirectional、migration_state legacy_fake_bidirectional→adapter_registered、adapter_id None→l7.other_noncurrent_liabilities）、changed entry count=1、per-entry mount 1→2(+1)、stats.mount_count 246→247(+1)、host_count 154 不变、byComponent 仅 GtOnlyOfficeSheet 240→241(+1)（OnlyOfficeWordDialog 2、WorkpaperWordEditor 4 不变）、capability_counts bidirectional 16→17 / single_onlyoffice 133→132 / single_html 5 / unreachable 1，其它所有 entry 零变化；baseline 下游 diff 仅 L7 + 顶层 digest/stats，无并发预存哈希修正。task73 在干净 worktree 46 passed 0 failed。 || 2026-10-01 L2 应付利息真双向 adapter_registered 翻转（新增 1 条 L2 override：GtL2InterestPayable.vue→l2.interest_payable，bidirectional/adapter_registered；同步在 L2 host 补挂 GtEntrySyncCapabilityNotice entry-id=xlsx/gt-l2-interest-payable 作 BP-7/AC 1.4 能力诚实披露，翻转后 adapter 已注册故 notice 自动返 null 不渲染，与 L1/L3 一致）。approved_source_digest 在干净 HEAD worktree(c917b65d2) 重算得 6f2ecb72…（旧值 5fffe95a… 为 L3 轮）；mount-diff 零能力损失复核：mount_count 245→245 不变（补挂 Notice 不产生新的 OnlyOffice/dispatcher mount，仅刷新 source_digest 内容哈希），host_count 154 不变、byComponent GtOnlyOfficeSheet 239/OnlyOfficeWordDialog 2/WorkpaperWordEditor 4 全不变、entry 集合零增减；capability 范围校验：唯一变化为 xlsx/gt-l2-interest-payable（single_onlyoffice→bidirectional、legacy_fake_bidirectional→adapter_registered、adapter_id None→l2.interest_payable），legacy_fake_bidirectional_count 126→125、bidirectional 15→16、single_onlyoffice 134→133，其它所有 entry（含 L1/L3/L4 保持 bidirectional、L5~L8 保持 single_onlyoffice、全部非 L entry）零变化。 || 2026-10-01 L4 应付债券 host 补 procedureDualMode 真模式切换器（GtL4BondsPayable.vue 新增 el-segmented + GtOnlyOfficeSheet 过程表挂载块，v-if=\"isProcedureSheet && procedureDualMode.currentMode.value==='onlyoffice'\"，sheet-name=props.sheetName||'L4A'，消除 segmented 正则误判放行；L4 本就 bidirectional，不翻转任何 capability）。approved_source_digest 在干净 HEAD worktree(8f8574bd4，含该 host commit)重算得 d648767136…（旧值 6f2ecb72… 为 L2 轮）；mount-diff 零能力损失复核（按完整 manifest build 对比 HEAD）：entry 集合 155→155 零增减、所有 155 条 capability/migration_state 零翻转、唯一 per-entry mount 变化为 xlsx/gt-l4-bonds-payable 1→2(+1)、stats.mount_count 245→246(+1)、host_count 154 不变、byComponent 仅 GtOnlyOfficeSheet 239→240(+1)（OnlyOfficeWordDialog 2、WorkpaperWordEditor 4 不变）、capability_counts 全不变（bidirectional 16/single_html 5/single_onlyoffice 133/unreachable 1）。 || L5(l5-true-bidirectional,2026-10-02): 翻转 xlsx/gt-l5-long-term-payables manifest 能力 single_onlyoffice->bidirectional（host GtL5LongTermPayables.vue L5A 程序表加 procedureDualMode HTML↔OO 切换器 + GtOnlyOfficeSheet 挂载块 sheet-name=props.sheetName||'L5A' + GtEntrySyncCapabilityNotice entry-id=xlsx/gt-l5-long-term-payables）。受管 明细表L5-2 两区同键（售后租回 R11:15 + 分期付款 R18:22，共享 L5-L5-2-rows + section 分区，uuid AD/AE），R24 其他段作模板静态骨架不受管（typography 门 BP-21 拒 A24=… 占位续行，用户裁决 A，T1「三区」勘误为两区）。approved_source_digest 在干净 worktree(.worktrees/l5-flip,基于 55bd1d1d4 只叠加 L5 host+overlay)重算 f85f682e…->b165847f…；mount-diff 零能力损失（唯一翻转=L5，byComponent 仅 GtOnlyOfficeSheet 243->244，capability bidirectional 19->20/single_onlyoffice 130->129）。",
   "entry_id_strategy": "document_type_plus_semantic_source_path_v1",
   "wp_match_strategy": "source_sheet_literals_and_component_code_v1",
   "defaults_by_component": {
@@ -13,8 +13,12 @@
       "capability": "single_onlyoffice",
       "migration_state": "legacy_fake_bidirectional",
       "expected_profile": {
-        "editability": ["editable"],
-        "room_model": ["shared"],
+        "editability": [
+          "editable"
+        ],
+        "room_model": [
+          "shared"
+        ],
         "scenario_profile_ids": [
           "xlsx.editable.shared.single.room_service_wired.v1"
         ],
@@ -38,8 +42,13 @@
       "capability": "single_onlyoffice",
       "migration_state": "legacy_fake_bidirectional",
       "expected_profile": {
-        "editability": ["editable"],
-        "room_model": ["shared", "exclusive"],
+        "editability": [
+          "editable"
+        ],
+        "room_model": [
+          "shared",
+          "exclusive"
+        ],
         "scenario_profile_ids": [
           "docx.editable.shared.single.room_service_wired.v1",
           "docx.editable.exclusive.single.room_service_wired.v1"
@@ -64,8 +73,12 @@
       "capability": "single_html",
       "migration_state": "legacy_fake_bidirectional",
       "expected_profile": {
-        "editability": ["editable"],
-        "room_model": ["exclusive"],
+        "editability": [
+          "editable"
+        ],
+        "room_model": [
+          "exclusive"
+        ],
         "scenario_profile_ids": [
           "docx.editable.exclusive.single.room_service_wired.v1",
           "docx.editable.exclusive.dynamic.room_service_wired.v1"
@@ -128,8 +141,12 @@
       "component": "GtOnlyOfficeSheet",
       "reason": "Historical simplified stub; htmlRendererRegistry resolves g6-other-bond-investment-ecl to GtG6OtherBondInvestmentEcl.vue",
       "expected_profile": {
-        "editability": ["unreachable"],
-        "room_model": ["none"],
+        "editability": [
+          "unreachable"
+        ],
+        "room_model": [
+          "none"
+        ],
         "scenario_profile_ids": [
           "xlsx.unreachable.none.single.room_service_wired.v1"
         ],
@@ -226,6 +243,201 @@
       "html_store": "checklist_responses_d1_notes_receivable_rows",
       "canonical_resolver": "workpaper_sync_published_representation",
       "adapter_id": "d1.notes_receivable_detail",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtL1ShortTermLoans.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_l1_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "l1.short_term_loans",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtL4BondsPayable.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_l4_fin_liab_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "l4.bonds_payable",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtL3LongTermLoans.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_l3_voucher_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "l3.long_term_loans",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_k8_adjustment_entries",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "k8.selling_expenses_adjustment",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_k9_adjustment_entries",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "k9.admin_expenses_adjustment",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_k11_adjustment_entries",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "k11.asset_impairment_loss_adjustment",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_k12_adjustment_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "k12.non_operating_income_adjustment",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_k13_adjustment_entries",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "k13.non_operating_expense_adjustment",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_k1_writeoff_dict",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "k1.baddebt_reversal_writeoff_check",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_n4_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "n4.taxes_and_surcharges",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_l2_interest_payable_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "l2.interest_payable",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtL7OtherNoncurrentLiabilities.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_l7_other_noncurrent_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "l7.other_noncurrent_liabilities",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtL6SpecialPayables.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_l6_special_payable_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "l6.special_payables",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtL8FinancialExpenses.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "L8-2",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "l8.financial_expenses",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtL5LongTermPayables.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "L5-L5-2-rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "l5.long_term_payables",
       "capability": "bidirectional",
       "migration_state": "adapter_registered",
       "evidence_patch": {

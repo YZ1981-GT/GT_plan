@@ -75,7 +75,7 @@ import hashlib
 import json
 import pathlib
 import re
-from typing import Any, Callable
+from typing import Any, Callable, Final
 
 import pytest
 
@@ -143,6 +143,20 @@ HTML_COUNTERPART_VERDICTS = ("none", "exists")
 NOTICE_MODULE = SYNC_DIR / "workpaperEntrySyncNotice.ts"
 NOTICE_COMPONENT = SYNC_DIR / "GtEntrySyncCapabilityNotice.vue"
 NOTICE_COMPONENT_NAME = "GtEntrySyncCapabilityNotice"
+
+#: 2026-10-01 已完成首版发布 + manifest 翻转的 I entry。slice 是规划期 append-only 快照，
+#: 仍记 `single_onlyoffice / adapter_id=null`；live manifest 必须按本表断言迁移终态。
+MIGRATED_I_ENTRIES: Final[dict[str, str]] = {
+    "xlsx/gt-i1-intangible-assets": "i1.intangible_assets_detail",
+    "xlsx/gt-i2-development-expenditure": "i2.development_expenditure_detail",
+    "xlsx/gt-i3-goodwill": "i3.goodwill_detail",
+    "xlsx/gt-i4-long-term-prepaid": "i4.long_term_prepaid_detail",
+    "xlsx/gt-i5-other-noncurrent-assets": "i5.other_noncurrent_assets_detail",
+    "xlsx/gt-i6-research-development-expense": "i6.research_development_expense_detail",
+}
+SANITIZED_I_TEMPLATES: Final[frozenset[str]] = frozenset({
+    "I2 开发支出.xlsx", "I3 商誉.xlsx", "I4 长期待摊费用.xlsx", "I5 其他非流动资产.xlsx",
+})
 
 #: 四个 pilot 的 contract 文件 → 它应属的 entry_id（Property 70 的归属判据，逐文件读 review.entry_id）。
 #: 🔴 实值逐文件读出，**不按文件名猜**：b60 是三段式 `xlsx/b60/gt-b60-bundle`，
@@ -988,17 +1002,19 @@ class TestAdjudicationLegality:
         for entry in manifest_slice["independent_entries"]:
             live = by_id[entry["entry_id"]]
             mirror = entry["manifest_mirror"]
-            assert mirror["capability"] == live["capability"], (
-                f"{entry['entry_id']}: manifest_mirror 与 manifest 现值不符（镜像已过期）"
-            )
-            assert mirror["html_store"] == live["html_store"]
-            assert mirror["capability"] == overlay_default["capability"], (
-                f"{entry['entry_id']}: 该值不是来自 overlay 的组件级默认值 —— BP-9 的因果链断了"
-            )
-            assert entry["capability"] != live["capability"], (
-                f"{entry['entry_id']}: slice 与 manifest 竟然一致 —— BP-9 的分歧前提不成立，"
-                "要么 manifest 被手改了，要么 slice 抄了 manifest 的错值"
-            )
+            # slice / mirror 是迁移前 append-only 快照；live 已在五环发布后翻转。
+            assert mirror["capability"] == overlay_default["capability"]
+            assert entry["capability"] != mirror["capability"]
+            if entry["entry_id"] in MIGRATED_I_ENTRIES:
+                assert live["capability"] == "bidirectional"
+                assert live["migration_state"] == "adapter_registered"
+                assert live["adapter_id"] == MIGRATED_I_ENTRIES[entry["entry_id"]]
+                assert live["html_store"].startswith("checklist_responses_i")
+            else:  # 后续 slice 增 entry 时默认仍走历史分歧判据
+                assert mirror["capability"] == live["capability"], (
+                    f"{entry['entry_id']}: manifest_mirror 与 manifest 现值不符（镜像已过期）"
+                )
+                assert mirror["html_store"] == live["html_store"]
             assert "BP-9" in str(mirror["divergence_from_slice"])
 
 
@@ -1365,19 +1381,30 @@ class TestClassificationRowModelDerivation:
             checked += 1
         assert checked >= 6, f"只核了 {checked} 条 declaration 的源侧基线 —— 分母缩水"
 
+    #: 🔴 CD-2（I1 `I1_SOE_CATEGORIES`）在 lane1 Task 11a（2026-10-01）**已收敛**为派生自单一真源
+    #: `i1CategoryScope.ts#I1_DEFAULT_CATEGORIES` 的 `.map()` 表达式（不再是写死的 12 条数组字面量）。
+    #: 这是「缺陷还在才绿」被翻面的典型（与 BP-6 同款）：slice 的 CD-2 保持修复前快照
+    #: （12 条 / MISMATCH，append-only 不回填），本判据对它跳过，收敛的正面证据搬到
+    #: `test_i_cycle_registered_defects_fixed.py::TestBp7SoeClassificationConvergedToSingleSource`。
+    _CONVERGED_DECLARATION_IDS = frozenset({"CD-2"})
+
     def test_impl_constants_read_back_exactly_the_frozen_labels(
         self, manifest_slice: dict
     ) -> None:
         """🔴 三边锁的第③边：现读 impl 常量 == slice 冻结的 impl_labels。
 
-        改了 impl 常量而不改声明 ⇒ 打红。
+        改了 impl 常量而不改声明 ⇒ 打红。已收敛的 declaration（CD-2）移到翻面守卫，这里跳过。
         """
         checked = 0
+        skipped_converged = 0
         for dec in self._declarations(manifest_slice):
             kind = dec["impl_extraction_kind"]
             if kind == "none":
                 assert dec["impl_constant"] is None, f"{dec['id']}: kind=none 但 impl_constant 非空"
                 assert dec["impl_labels"] == [], f"{dec['id']}: kind=none 但 impl_labels 非空"
+                continue
+            if dec["id"] in self._CONVERGED_DECLARATION_IDS:
+                skipped_converged += 1
                 continue
             module = _resolve_repo(dec["impl_module"])
             assert module.exists(), f"{dec['id']}: impl_module 不存在"
@@ -1388,7 +1415,8 @@ class TestClassificationRowModelDerivation:
                 f"{dec['id']}: impl 现读 {got!r}，slice 冻结为 {dec['impl_labels']!r}"
             )
             checked += 1
-        assert checked == 6, f"impl 侧核了 {checked} 条（应为 6：CD-1/2/3/4/6/8）"
+        assert checked == 5, f"impl 侧核了 {checked} 条（应为 5：CD-1/3/4/6/8；CD-2 已收敛跳过）"
+        assert skipped_converged == 1, f"收敛跳过数应为 1（CD-2），实为 {skipped_converged}"
 
     def test_verdicts_equal_the_actual_comparison(self, manifest_slice: dict) -> None:
         """🔴 三边锁的合成边：`verdict` 必须等于「源真读 vs impl 现读」的实际结果。
@@ -1568,7 +1596,7 @@ class TestClassificationRowModelDerivation:
         #      但 verdict 仍是 PREFIX_MATCH_WITH_UNSOURCED_TAIL（impl 与 Excel source 不等值）
         for label in ("租入固定资产改良支出", "固定资产大修理支出", "开办费"):
             for workbook in sorted(I_TEMPLATE_DIR.iterdir()):
-                if workbook.name.startswith("~$"):
+                if workbook.name.startswith("~$") or workbook.suffix.lower() != ".xlsx":
                     continue
                 hits = self._xlsx_exact_hits(workbook, label)
                 assert not hits, f"CD-8: {label!r} 竟在 {workbook.name} 里命中 {hits}"
@@ -1767,42 +1795,11 @@ class TestProperty23RowIdentityStaticPrereq:
                     f"{entry['entry_id']}: 非 helper 族的身份生成式不含随机源：{expr!r}"
                 )
 
-    def test_positional_identity_inventory_is_exhaustive_and_partitioned(
-        self, manifest_slice: dict, i_files: list[pathlib.Path]
-    ) -> None:
-        inventory = manifest_slice["dynamic_row_identity"]["positional_identity_inventory"]
-        hits = _positional_identity_hits(i_files)
-        actual = {f"{rel}#L{no}" for rel, no, _key, _expr in hits}
-        declared: set[str] = set()
-        for hit in inventory["family_a_pure_index_persisted"]["hits"]:
-            declared.add(hit["site"])
-        for hit in inventory["family_b_index_as_fallback"]["hits"]:
-            declared.add(hit["site"])
-        declared.add("audit-platform/frontend/src/components/workpaper/i3/impairment/I3TabRecoverableTest.vue#L686")
-        assert actual == declared, (
-            f"位置化命中集合漂移：多={sorted(actual - declared)} 少={sorted(declared - actual)}"
-        )
-        assert len(actual) == inventory["total_hits"] == 6
-        assert inventory["family_a_pure_index_persisted"]["count"] == 1
-        assert inventory["family_b_index_as_fallback"]["count"] == 4
-
-    def test_family_a_hit_writes_to_the_declared_persisted_key(self, manifest_slice: dict) -> None:
-        """family_a 的那条必须真落库 —— 否则它不该是最严重的一族。"""
-        hit = manifest_slice["dynamic_row_identity"]["positional_identity_inventory"][
-            "family_a_pure_index_persisted"
-        ]["hits"][0]
-        path = _resolve_repo(hit["site"])
-        body = path.read_text(encoding="utf-8")
-        line = body.splitlines()[_line_no_of(hit["site"]) - 1]
-        assert "cgu-${i}" in line, f"family_a 的表达式漂移：{line.strip()!r}"
-        assert "_persistSection('cgu_allocation')" in body, "落库调用不见了 —— 该条已非持久化身份"
-        assert re.search(
-            r"options\?\.onSave\?\.\(\s*`\$\{prefix\}-\$\{sectionKey\}-rows`", body
-        ), "_persistSection 的键拼接形态漂移"
-        for const, value in (("ITEM_PREFIX_LISTED", "I3-disc-listed"), ("ITEM_PREFIX_SOE", "I3-disc-soe")):
-            assert re.search(
-                r"\b" + const + r"\s*=\s*['\"]" + re.escape(value) + r"['\"]", body
-            ), f"{const} 的值漂移 —— BP-6 的 writes_to_key 声明失效"
+    # 🔴 `test_positional_identity_inventory_is_exhaustive_and_partitioned` 与
+    # `test_family_a_hit_writes_to_the_declared_persisted_key` 已**翻面**搬到
+    # `test_i_cycle_registered_defects_fixed.py`（BP-6 八个 site 已修，2026-10-01）。
+    # 本文件是规划期快照：判据「缺陷还在才绿」，修复后留在这里只会逼人把修复改回去。
+    # slice 登记值不回填（append-only），翻面版断言「登记保持原值 + 现算为零」。
 
     def test_display_sequence_sites_are_not_flagged(
         self, manifest_slice: dict, i_files: list[pathlib.Path]
@@ -2064,13 +2061,18 @@ class TestProperty20And21NotClaimed:
         carrier = BACKEND / "tests" / "workpaper_sync" / "test_task13_contract_registry.py"
         assert carrier.exists(), "Property 21 的字段级判据承载者不存在"
 
-    def test_no_slice_entry_has_a_registered_adapter(
+    def test_slice_entries_have_their_reviewed_registered_adapters(
         self, manifest_slice: dict, full_manifest: dict
     ) -> None:
+        """2026-10-01 五环发布后，6/6 必须是 live adapter；slice 的 null 保留历史态。"""
         by_id = {e["entry_id"]: e for e in full_manifest["entries"]}
+        assert {e["entry_id"] for e in manifest_slice["independent_entries"]} == set(MIGRATED_I_ENTRIES)
         for entry in manifest_slice["independent_entries"]:
-            assert by_id[entry["entry_id"]]["adapter_id"] is None
-            assert entry["adapter_id"] is None
+            assert entry["adapter_id"] is None  # append-only 规划期快照
+            live = by_id[entry["entry_id"]]
+            assert live["adapter_id"] == MIGRATED_I_ENTRIES[entry["entry_id"]]
+            assert live["capability"] == "bidirectional"
+            assert live["migration_state"] == "adapter_registered"
 
     def test_registry_delivered_contracts_contain_no_slice_entry(
         self, manifest_slice: dict
@@ -2122,8 +2124,16 @@ class TestProperty28DefinitionDriftFailClosed:
         for record in templates["files"]:
             path = root / record["name"]
             assert path.exists(), f"缺模板 {record['name']}"
-            assert path.stat().st_size == record["size"], f"{record['name']}: size 漂移"
-            assert _sha256_of(path) == record["sha256"], f"{record['name']}: sha256 漂移"
+            historical = path.with_suffix(path.suffix + ".preclean.bak")
+            if record["name"] in SANITIZED_I_TEMPLATES:
+                # slice 冻结的是净化前字节；`.preclean.bak` 是门负例与历史证据，live 模板必须不同。
+                assert historical.is_file(), f"{record['name']}: 缺净化前门负例"
+                assert historical.stat().st_size == record["size"]
+                assert _sha256_of(historical) == record["sha256"]
+                assert _sha256_of(path) != record["sha256"]
+            else:
+                assert path.stat().st_size == record["size"], f"{record['name']}: size 漂移"
+                assert _sha256_of(path) == record["sha256"], f"{record['name']}: sha256 漂移"
             assert len(_sheet_names(path)) == record["sheet_count"], (
                 f"{record['name']}: sheet 数漂移"
             )
@@ -2134,7 +2144,10 @@ class TestProperty28DefinitionDriftFailClosed:
     def test_registered_file_set_equals_the_disk_set(self, manifest_slice: dict) -> None:
         templates = manifest_slice["authoritative_templates"]
         root = ROOT / templates["root"]
-        disk = {p.name for p in root.iterdir() if p.is_file() and not p.name.startswith("~$")}
+        disk = {
+            p.name for p in root.iterdir()
+            if p.is_file() and p.suffix.lower() == ".xlsx" and not p.name.startswith("~$")
+        }
         declared = {f["name"] for f in templates["files"]}
         assert disk == declared, f"登记集合与磁盘不符：多={sorted(declared - disk)} 少={sorted(disk - declared)}"
 
@@ -2491,25 +2504,8 @@ class TestAc14HonestModeVisibility:
                     f"{entry['entry_id']}: 额外站点行号漂移 {all_sites[1]} vs 声明 {extra}"
                 )
 
-    def test_bp10_is_registered_because_no_host_mounts_the_notice(
-        self, manifest_slice: dict
-    ) -> None:
-        """AC 1.4 的义务未兑现 —— 断言「未挂载」这个实况 + 它已登记为 BP-10。
-
-        🔴 这不是把缺陷说成通过：判据锁的是「登记与实况一致」。哪天真挂上了，这条会打红，
-        提示作者来解除 BP-10（两个方向都锁死）。
-        """
-        registered = {bp["id"] for bp in manifest_slice["blocking_preconditions"]}
-        assert "BP-10" in registered
-        for entry in manifest_slice["independent_entries"]:
-            source = (WP_COMPONENTS / entry["host"]).read_text(encoding="utf-8")
-            assert NOTICE_COMPONENT_NAME not in source, (
-                f"{entry['entry_id']}: 宿主已挂 {NOTICE_COMPONENT_NAME} —— BP-10 可以解除了，"
-                "请把它从 blocking_preconditions 移除并改这条判据"
-            )
-            assert "workpaperEntrySyncNotice" not in source
-            for ref in entry["ui_gate_source_refs"]:
-                assert _resolve_repo(ref).exists(), f"{entry['entry_id']}: ui_gate_source_ref 不存在 {ref}"
+    # 🔴 `test_bp10_is_registered_because_no_host_mounts_the_notice` 已翻面搬到
+    # `test_i_cycle_registered_defects_fixed.py`（I6 首处挂载，foundation Task 21）。
 
 
 # ════════════════════════════════════════════════════════════════════════════

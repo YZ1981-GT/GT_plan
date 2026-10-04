@@ -209,6 +209,7 @@ import { useD6FormData } from './composables/useD6FormData'
 import { useD6CrossSheet } from './composables/useD6CrossSheet'
 import { useD6EntryDualMode, type D6RenderMode } from './composables/useD6EntryDualMode'
 import { resolveD6SheetCode } from './composables/useD6SheetRouting'
+import { managedSheetsForEntry } from './sync/workpaperSyncManagedSheets.generated'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
 import { eventBus } from '@/utils/eventBus'
 import GtWpReviewRail from './GtWpReviewRail.vue'
@@ -361,12 +362,25 @@ const ooSheetName = computed(() =>
 // flushHtml 先 flushPendingSave（flush 掉 debounce 未落库的行）再 readStoreProjection。
 // 账龄 FLAT（agePrior1y/ageEnd1y）由服务端 store-projection + phase5_d6 处理。
 const D6_SYNC_ENTRY_ID = 'xlsx/gt-d6-contract-assets'
-const D6_MANAGED_SHEET_KEY = 'd62-managed'
-const isD6DetailSheet = computed(() => currentSheet.value === 'D6-2')
+
+/**
+ * 受管 sheet 集合 —— **从 provider 派生**（Property 15），不再写死单张。
+ * D6 provider 侧受管区是 **7 张**（d61/d62/d63/d65/d66/d68/d69），改造前前端只认 d62。
+ * 🔴 键换算走后端权威 `excelName` + 前端 `resolveD6SheetCode`，不做字符串推演（裁决 G3）。
+ */
+const D6_MANAGED_SHEET_BY_CODE: ReadonlyMap<string, string> = new Map(
+  managedSheetsForEntry(D6_SYNC_ENTRY_ID).map(
+    (s) => [resolveD6SheetCode(s.excelName), s.sheetKey] as const,
+  ),
+)
+const isD6DetailSheet = computed(() => D6_MANAGED_SHEET_BY_CODE.has(currentSheet.value))
 const syncSwitching = ref(false)
 const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
 const syncEntryId = ref(D6_SYNC_ENTRY_ID)
-const syncSheetKey = ref(D6_MANAGED_SHEET_KEY)
+/** 🔴 computed 而非一次性 ref（Property 15）：否则切 sheet 后仍指向 d62-managed。 */
+const syncSheetKey = computed(
+  () => D6_MANAGED_SHEET_BY_CODE.get(currentSheet.value) ?? '',
+)
 const syncBridge = useWorkpaperSyncBridge({
   entryId: syncEntryId,
   wpId: toRef(props, 'wpId'),
@@ -383,7 +397,8 @@ const syncBridge = useWorkpaperSyncBridge({
     return {
       expectedRevision: snap.expectedRevision,
       projection: snap.projection,
-      sheetKey: D6_MANAGED_SHEET_KEY,
+      // 🔴 桥内 `flushed.sheetKey ?? sheetKey()` flushed 优先 ⇒ 必须回传当前 sheet 的键。
+      sheetKey: syncSheetKey.value,
     }
   },
   reloadHtml: async (_minimumRevision: number) => {

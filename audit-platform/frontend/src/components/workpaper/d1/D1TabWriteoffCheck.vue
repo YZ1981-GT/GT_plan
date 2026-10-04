@@ -47,6 +47,13 @@ const props = defineProps<{
   isReadonly: boolean
   displayPrefs: any
   sheetName?: string
+  /**
+   * entry 级「OnlyOffice 会话进行中 / 同步在途」（需求 5.7 · P17 第三写入方定序）。
+   * 宿主 `GtD1NotesReceivable.vue` 传 `crossSheetWriteBlocked`。
+   * 🔴 默认 `false` 只是让本组件在别处被单独挂载时不崩；**宿主必须显式传**，
+   * 由源码守卫 `d1CrossSheetWriteOrdering.spec.ts` 钉死（漏传即打红）。
+   */
+  ooSessionActive?: boolean
 }>()
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
@@ -104,6 +111,8 @@ const {
       .catch(() => { /* silent */ })
   },
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+  // P17：entry 级 OO 会话信号，composable 侧据此拒绝跨 sheet 直写
+  ooSessionActive: computed(() => props.ooSessionActive === true) as Ref<boolean>,
 })
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
@@ -131,6 +140,19 @@ function onReview(sectionId: string) {
 
 // ─── P1: 同步到D1-4 ─────────────────────────────────────────────────────────
 
+// 🔴 **P17 第三写入方定序**（需求 5.7）：两个入口都必须按返回值分支。
+//    改造前这里**无条件** `ElMessage.success('已同步到D1-4')` —— composable 在 readonly 时
+//    静默 return，UI 照样报成功 ⇒ 假成功。现在 OO 会话进行中也会被拒，拒绝必须可见。
+//    两个 handler 必须一起改：只改一个就是「改一半」，另一条路照样静默直写 + 假成功。
+function reportCrossSheetWrite(result: { ok: boolean; reason?: string }): void {
+  if (result.ok) {
+    ElMessage.success('已同步到D1-4')
+    return
+  }
+  // duration 给长一些：这条是「为什么没同步」的唯一说明，一闪而过等于没提示
+  ElMessage({ type: 'warning', message: result.reason || '同步未执行', duration: 6000 })
+}
+
 async function onSyncReversalToD14() {
   try {
     await ElMessageBox.confirm(
@@ -138,9 +160,8 @@ async function onSyncReversalToD14() {
       '同步确认',
       { confirmButtonText: '同步', cancelButtonText: '取消', type: 'warning' },
     )
-    syncReversalToD14()
-    ElMessage.success('已同步到D1-4')
-  } catch { /* 用户取消 */ }
+  } catch { return /* 用户取消 */ }
+  reportCrossSheetWrite(syncReversalToD14())
 }
 
 async function onSyncWriteoffToD14() {
@@ -150,9 +171,8 @@ async function onSyncWriteoffToD14() {
       '同步确认',
       { confirmButtonText: '同步', cancelButtonText: '取消', type: 'warning' },
     )
-    syncWriteoffToD14()
-    ElMessage.success('已同步到D1-4')
-  } catch { /* 用户取消 */ }
+  } catch { return /* 用户取消 */ }
+  reportCrossSheetWrite(syncWriteoffToD14())
 }
 
 // ─── P1: AI辅助生成 ─────────────────────────────────────────────────────────

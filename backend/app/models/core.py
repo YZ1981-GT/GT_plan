@@ -94,11 +94,19 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     parent_company_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
     ultimate_company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ultimate_company_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # V167（consol-tree-three-code-autobuild）：与上级企业的关系
+    # subsidiary=子公司（独立法人，合并时抵销）/ branch=分公司（非独立法人，并入母公司汇总）/ None=未填。
+    # 企业树由三码 + 本列实时推导（consol_group_tree）；上级代码为空或等于本企业代码
+    # （本企业就是上级企业，需求 1.5）时本列恒为 None。
+    relation_to_parent: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # 派生值（ADR-CTREE-001）：直接消费本项目的合并项目，由 group_links.sync_group_links
+    # 按三码重算，不是企业树的真源 —— 业务代码不得手工赋值。
     parent_project_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("projects.id"), nullable=True
     )
     consol_level: Mapped[int] = mapped_column(default=1)
-    # 合并类型：subsidiary=母子合并（需抵销）/ branch=母分汇总（直接加总，无抵销）
+    # 历史列（V167 起不再读写）：合并方式改由下级企业的与上级关系自动识别
+    # （只有子公司=母子合并 / 只有分公司=总分汇总 / 两者并存），见 consol_group_tree.
     consolidation_type: Mapped[str | None] = mapped_column(
         String(20), nullable=True, default=None
     )

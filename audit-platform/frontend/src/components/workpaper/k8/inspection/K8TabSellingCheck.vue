@@ -400,7 +400,7 @@ function pullBookAmountFromK82(): void {
   ElMessage.success(`已从 K8-2 带入本期发生额 ${amt.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
 }
 
-// ④ 行级附件 OCR（上传原始凭证 → /d4/contract-ocr → 确认 → 回填业务内容+标记附件）
+// ④ 行级附件 OCR（上传原始凭证 → /api/workpapers/{wpId}/d4/contract-ocr → 确认 → 回填业务内容+标记附件）
 const ocrFileInput = ref<HTMLInputElement | null>(null)
 let currentOcrRowId = ''
 function triggerOcr(rowId: string): void {
@@ -416,7 +416,7 @@ async function handleOcrFile(event: Event): Promise<void> {
     const formData = new FormData()
     formData.append('file', file)
     ElMessage.info('正在OCR识别...')
-    const res = await http.post('/api/d4/contract-ocr', formData, {
+    const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     const ocrText = res.data?.data?.text || res.data?.text || ''

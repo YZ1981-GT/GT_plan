@@ -104,13 +104,29 @@ def test_whole_excel_rejects_range_split_packs() -> None:
         assert not finder._is_whole_excel_template_name(name), name
 
 
-def test_whole_excel_rejects_the_space_separated_variant() -> None:
-    """``D4 收入底稿.xlsx``（编码后是空格）不算整册本。
+def test_whole_excel_accepts_both_spacings_of_the_short_name() -> None:
+    """编码与中文短名之间**有没有空格都算**整册本名。
 
-    D 目录里同时存在带空格与不带空格两份，判据必须确定地只认一份；权威惯例是
-    不带空格的 ``D4收入底稿.xlsx``（它才是入库的那份）。
+    🔴 判据方向已反转（2026-09-30，D4 重复文件删除）。原判据叫
+    ``test_whole_excel_rejects_the_space_separated_variant``，断言带空格那份
+    「不算整册本」，理由写的是「权威惯例是不带空格的 ``D4收入底稿.xlsx``（它才是
+    入库的那份）」。两件事让它必须改：
+
+    1. **库里留下来的恰恰是带空格那份** —— D 目录曾并存只差一个空格的两份整册本
+       （``D4收入底稿.xlsx`` 352,950 B 未净化 / ``D4 收入底稿.xlsx`` 199,176 B 已净化），
+       用户核实为重复入库后删掉了未净化的不带空格那份。若名形判据拒收带空格形态，
+       D4 的「完整Excel」页签会解析不到任何文件。
+    2. **该判据在删文件之前就已经是红的** —— ``_is_whole_excel_template_name``
+       的 docstring 早已把两种形态都列为 True，上面
+       ``test_whole_excel_accepts_code_plus_chinese_short_name`` 也断言不带空格
+       那份为 True，与本条原断言**互相矛盾**。删文件只是让这处矛盾非修不可。
+
+    名形判据是**纯函数**，与文件在不在磁盘上无关 —— 不带空格的形态仍然合法，
+    只是那个文件已不在库里（由
+    ``test_whole_excel_tab_document_identity.py::test_the_unsanitized_d4_twin_is_gone``
+    断言）。真正的排他判据是下面的「范围式拆分包一律不算」。
     """
-    assert not finder._is_whole_excel_template_name("D4 收入底稿.xlsx")
+    assert finder._is_whole_excel_template_name("D4 收入底稿.xlsx")
     assert finder._is_whole_excel_template_name("D4收入底稿.xlsx")
 
 

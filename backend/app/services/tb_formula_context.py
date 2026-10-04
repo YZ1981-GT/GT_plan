@@ -56,9 +56,15 @@ __all__ = ["build_tb_formula_data", "PRELOADED_COLUMN_KEYS"]
 
 #: 本模块保证写入每个科目的规范列名。
 #:
-#: 🔴 守卫据此断言「注册列名全部可解析」（`test_tb_summary_adj_caliber` 的 B7 组），
+#: 🔴 **本常量被 `build_tb_formula_data` 实际用于校验输出**（而非仅作文档）：
+#: 每构造完一个科目的字典就断言键集 == 本常量。
+#:
+#: 这条自校验是补上来的 —— 首版本常量只出现在 `__all__` 与 docstring 里，
+#: 实现另手写一份 9 个键的字面量，两份清单**无任何一致性检查**，是漂移温床；
+#: 且首版注释声称「守卫据此断言」而那个守卫并不存在，属假声明。
+#:
 #: 判据按**键存在性**而非按值 —— `本期借方` 无 `tb_balance` 数据时的 0 是诚实的 0，
-#: 真缺陷形态是规范名根本不在 tb_data 里。
+#: 真缺陷形态是规范名根本不在 tb_data 里（`_resolve_tb_column` 的「已注册但无数据」态）。
 PRELOADED_COLUMN_KEYS: tuple[str, ...] = (
     "期末余额",
     "审定数",
@@ -159,4 +165,85 @@ async def build_tb_formula_data(
             exc_info=True,
         )
 
+    # ── 输出自校验：键集必须恰为 PRELOADED_COLUMN_KEYS ──
+    #
+    # 🔴 让常量**真的参与运行**，而不是当文档挂着。上面的字面量与常量是两份清单，
+    # 少写一个键就会退化成 B7 的「已注册但无数据」态（恒 0、只记 trace、不报错），
+    # 那是最难发现的形态 —— 本断言把它变成启动即炸。
+    #
+    # 用 `assert` 而非 raise：这是**编程错误**（代码与常量不同步）而非数据异常，
+    # 与本模块其余 fail-open 策略（数据取不到就降级）性质不同。
+    expected = set(PRELOADED_COLUMN_KEYS)
+    for code, cols in tb_data.items():
+        missing = expected - set(cols)
+        assert not missing, (
+            f"科目 {code} 缺预载键 {sorted(missing)} —— "
+            f"实现与 PRELOADED_COLUMN_KEYS 不同步，缺键会让公式取数静默返 0"
+        )
+
     return tb_data
+
+
+#: 公式里出现这些 token 之一，才需要载入调整额（避免为不用调整额的公式白查一次）。
+_ADJ_TOKENS: tuple[str, ...] = ("ADJ(", "AJE调整", "RJE调整")
+
+
+async def load_adj_map_if_needed(
+    db: "AsyncSession",
+    *,
+    project_id: UUID,
+    year: int,
+    formula: str | None,
+    account_codes: "set[str]",
+    exclude_origins: frozenset[str],
+) -> dict[str, dict[str, Decimal]] | None:
+    """公式用到调整额时批量取数，否则返 ``None``（不发查询）。
+
+    spec: tb-adjustment-column-formula-closure Phase 1
+
+    ## 为什么在这里而不在 `formula_engine`
+
+    `formula_engine` 的定位是 **L1 纯内核**（文件头声明「无 DB/async 耦合」）。
+    把 `adj_net_batch` 调用写在它里面会破坏这个声明 —— 取数是 L2 的职责。
+    本函数就是那个 L2 取数口，`FormulaEngine.execute` 调它。
+
+    ## `exclude_origins` 必须由调用方显式给
+
+    口径矩阵（见 `adjustment_amount_source` 文件头）有两行都涉及 ``ADJ()``：
+    - 第 2 行「ADJ() 底稿呈现」：``frozenset()``（不排除，审计师要看到全部来源）
+    - 第 4 行「试算平衡表调整列」：``frozenset({"workpaper"})``（防 V124 双计）
+
+    本函数**不设默认值**，迫使调用方明示自己属哪一行 —— 给默认值会让
+    下一个调用方在不知道有两种口径的情况下静默继承一个。
+
+    Returns:
+        ``adj_net_batch`` 的原样返回值；公式不含调整额 token 时返 ``None``。
+        取数失败时返 ``None`` 并留 warning（fail-open，``ADJ()`` 得 0）。
+    """
+    if not formula or not any(t in formula for t in _ADJ_TOKENS):
+        return None
+    if not account_codes:
+        return None
+    try:
+        from app.services.adjustment_amount_source import (
+            DEFAULT_INCLUDE_STATUSES,
+            adj_net_batch,
+        )
+
+        return await adj_net_batch(
+            db,
+            project_id=project_id,
+            year=year,
+            account_codes=account_codes,
+            include_statuses=DEFAULT_INCLUDE_STATUSES,
+            exclude_origins=exclude_origins,
+        )
+    except Exception:
+        logger.warning(
+            "调整额取数失败（project=%s year=%s formula=%s），ADJ()/AJE调整 将返 0",
+            project_id,
+            year,
+            formula,
+            exc_info=True,
+        )
+        return None

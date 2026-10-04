@@ -88,14 +88,14 @@
         </template>
       </el-table-column>
       <el-table-column prop="bookAmount" label="账面金额" min-width="120" align="right">
-        <template #default="{ row, $index }">
-          <el-input-number v-if="!isReadonly" v-model="row.bookAmount" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleCellUpdate($index, 'bookAmount', row.bookAmount)" />
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" v-model="row.bookAmount" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleCellUpdate(row.rowKey, 'bookAmount', row.bookAmount)" />
           <span v-else class="cell-value">{{ fmtAmount(row.bookAmount) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="taxAmount" label="税收金额" min-width="120" align="right">
-        <template #default="{ row, $index }">
-          <el-input-number v-if="!isReadonly" v-model="row.taxAmount" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleCellUpdate($index, 'taxAmount', row.taxAmount)" />
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" v-model="row.taxAmount" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleCellUpdate(row.rowKey, 'taxAmount', row.taxAmount)" />
           <span v-else class="cell-value">{{ fmtAmount(row.taxAmount) }}</span>
         </template>
       </el-table-column>
@@ -103,8 +103,8 @@
         <template #header>
           <span class="formula-header" title="调增 = max(账面−税收, 0)">调增</span>
         </template>
-        <template #default="{ row, $index }">
-          <el-input-number v-if="!isReadonly" v-model="row.addBack" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleCellUpdate($index, 'addBack', row.addBack)" />
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" v-model="row.addBack" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleCellUpdate(row.rowKey, 'addBack', row.addBack)" />
           <span v-else class="cell-value add-back">{{ fmtAmount(row.addBack) }}</span>
         </template>
       </el-table-column>
@@ -112,20 +112,20 @@
         <template #header>
           <span class="formula-header" title="调减 = max(税收−账面, 0)">调减</span>
         </template>
-        <template #default="{ row, $index }">
-          <el-input-number v-if="!isReadonly" v-model="row.deduct" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleCellUpdate($index, 'deduct', row.deduct)" />
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" v-model="row.deduct" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleCellUpdate(row.rowKey, 'deduct', row.deduct)" />
           <span v-else class="cell-value deduct">{{ fmtAmount(row.deduct) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="basis" label="依据" min-width="140">
-        <template #default="{ row, $index }">
-          <el-input v-if="!isReadonly" v-model="row.basis" size="small" placeholder="依据" @change="() => handleCellUpdate($index, 'basis', row.basis)" />
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" v-model="row.basis" size="small" placeholder="依据" @change="() => handleCellUpdate(row.rowKey, 'basis', row.basis)" />
           <span v-else class="cell-value">{{ row.basis || '—' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="60" align="center" v-if="!isReadonly">
-        <template #default="{ row, $index }">
-          <el-button v-if="!row.isFixed" type="danger" link size="small" @click="handleRemoveRow($index)">删除</el-button>
+        <template #default="{ row }">
+          <el-button v-if="!row.isFixed" type="danger" link size="small" @click="handleRemoveRow(row.rowKey)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -209,7 +209,7 @@ const projectIdRef = computed(() => props.projectId || '') as Ref<string>
 const allResponsesRef = computed(() => props.allResponses)
 
 const formData = useN5FormData({ wpId: wpIdRef, projectId: projectIdRef })
-const importExport = useN5ImportExport({ wpId: wpIdRef })
+const importExport = useN5ImportExport({ wpId: wpIdRef, projectId: projectIdRef })
 
 const adjustment = useN5TaxAdjustment({
   allResponses: allResponsesRef,
@@ -256,8 +256,10 @@ onMounted(async () => {
 
 // ─── 事件处理 ────────────────────────────────────────────────────────────────
 
-async function handleCellUpdate(index: number, field: string, value: any) {
-  await adjustment.updateRow(index, field as any, value)
+// 🔴 表格渲染的是 filteredRows（按分类过滤），模板行下标是**过滤后**的位置；
+//    原先拿它去改未过滤数组 ⇒ 有过滤时改/删的是另一行。改按稳定身份寻址。
+async function handleCellUpdate(rowKey: string, field: string, value: any) {
+  await adjustment.updateRow(rowKey, field as any, value)
 }
 
 async function handleAddRow() {
@@ -282,8 +284,8 @@ async function handleAddRow() {
   ElMessage.success(`已新增：${name}`)
 }
 
-async function handleRemoveRow(index: number) {
-  await adjustment.removeRow(index)
+async function handleRemoveRow(rowKey: string) {
+  await adjustment.removeRow(rowKey)
   ElMessage.success('已删除')
 }
 
@@ -296,10 +298,21 @@ async function handleSyncToCalc() {
   finally { syncLoading.value = false }
 }
 
+async function chooseImportFile(): Promise<void> {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async () => {
+    const file = input.files?.[0]
+    if (file) await importExport.importData(file, 'N5-5')
+  }
+  input.click()
+}
+
 function handleImportExportCmd(cmd: string) {
   if (cmd === 'exportTemplate') importExport.exportTemplate('N5-5')
   else if (cmd === 'exportData') importExport.exportData('N5-5')
-  else if (cmd === 'importData') importExport.importData('N5-5')
+  else if (cmd === 'importData') void chooseImportFile()
 }
 
 async function saveNotes() { await formData.setField('5', 'audit-notes', auditNotes.value) }

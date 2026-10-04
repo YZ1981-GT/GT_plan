@@ -2,7 +2,7 @@
 
 ## Overview
 
-**spec**：`f4-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**8/20 已实施**（2026-09-26）
+**spec**：`f4-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**10/20 已实施**（2026-10-03 复盘修正，原 8/20 偏低）
 **上游**：umbrella Task 48 · FC-1~FC-13（`f1-sync-coverage-and-first-canary/design.md`）· D1 引擎 ·
 F1 spec（借贷镜像同构 + 三家审定表统一口径裁决）· F3 spec（FC-11 工具链根因）
 

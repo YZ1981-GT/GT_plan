@@ -1413,7 +1413,7 @@ const aiHost = computed(() =>
 
 // ─── AI 文档对话采纳 ─────────────────────────────────────────────────────────
 function onDocAiAdopt(_payload: { content: string; messageId: string }) {
-  // 采纳事件由 DocAiChatPanel 内部调用 adoptContent API（走确认流）
+  // 采纳事件由 PlatformAiChatPanel 内部调用 adoptContent API（走确认流）
   // D4: AI 内容已经过 wrap_ai_output_with_log → pending 状态，不直接写入
   // 父组件在确认流完成后可刷新附注内容
   if (currentNote.value?.note_section) {
@@ -1948,145 +1948,10 @@ async function goAdoptSection(section: string) {
 // 单位切换（侧边栏）
 
 
-// 多表格支持
-const activeTableTab = ref('0')
-
-const currentNoteTables = computed(() => {
-  if (!currentNote.value?.table_data) return []
-  const td = currentNote.value.table_data
-  // 新格式：_tables 数组（后端已为 workpaper 来源注入投影表）
-  let rawTables: any[] | null = null
-  if (td._tables && Array.isArray(td._tables) && td._tables.length > 0) {
-    rawTables = td._tables
-  }
-  if (!rawTables) {
-    // 客户端兜底投影：workpaper 来源的 sub_table_data + _sub_table_columns
-    const clientProjected = projectSubTablesClient(td)
-    if (clientProjected && clientProjected.length > 0) {
-      rawTables = clientProjected
-    }
-  }
-  if (!rawTables) {
-    // 旧格式：单表格
-    if (td.rows) {
-      const headers = (Array.isArray(td.headers) && td.headers.length > 0)
-        ? td.headers
-        : (deriveLegacyTableHeaders(td) || td.headers || [])
-      rawTables = [{ name: currentNote.value.section_title, headers, rows: td.rows }]
-    } else {
-      return []
-    }
-  }
-
-  // 渲染时合并续表：表名以"续"开头 或 含"（续："的表，把其列合并到同名主表
-  const merged: any[] = []
-  for (let i = 0; i < rawTables.length; i++) {
-    const t = rawTables[i]
-    const name = (t.name || '') as string
-    // 判定是否为续表：以"续"开头（模板格式）或含"（续："（sub_table_data 格式）
-    const isContinuation = name.startsWith('续') || name.includes('（续：') || name.includes('(续：')
-    if (isContinuation && merged.length > 0) {
-      // 有独立列定义（_column_groups 或 columns）的续表不合并——它是完整独立子表
-      if (t._column_groups || (t.columns && Array.isArray(t.columns) && t.columns.length > 0)) {
-        merged.push(t)
-        continue
-      }
-      // 找到对应主表（续表名通常含主表名前缀，如"按坏账计提方法分类披露（续：上年年末余额）"对应"按坏账计提方法分类披露"）
-      let prevIdx = merged.length - 1
-      // 尝试精确匹配：续表名去掉"（续：...）"后 === 某已有表名
-      const baseName = name.replace(/[（(]续[：:].*$/, '').trim()
-      if (baseName) {
-        const matchIdx = merged.findIndex(m => (m.name || '').trim() === baseName)
-        if (matchIdx >= 0) prevIdx = matchIdx
-        else {
-          // 找不到对应主表，作为独立 tab 保留不合并
-          merged.push(t)
-          continue
-        }
-      }
-      const prev = merged[prevIdx]
-      const prevHeaders: string[] = prev.headers || []
-      const nextHeaders: string[] = t.headers || []
-      // 续表 headers 第一列通常是重复的标签列（类别/名称），跳过
-      const skipFirst = nextHeaders.length > 0 && prevHeaders.length > 0 &&
-        (nextHeaders[0] === prevHeaders[0] || nextHeaders[0] === '类别' || nextHeaders[0] === '名称')
-      const appendHeaders = skipFirst ? nextHeaders.slice(1) : nextHeaders
-      prev.headers = [...prevHeaders, ...appendHeaders]
-
-      // 合并行 values
-      const prevRows: any[] = prev.rows || []
-      const nextRows: any[] = t.rows || []
-      for (let ri = 0; ri < Math.max(prevRows.length, nextRows.length); ri++) {
-        const prevRow = ri < prevRows.length ? prevRows[ri] : { label: '', values: [] }
-        const nextRow = ri < nextRows.length ? nextRows[ri] : { values: [] }
-        const nextVals = nextRow.values || []
-        const appendVals = skipFirst ? nextVals : nextVals
-        if (!prevRow.values) prevRow.values = []
-        prevRow.values = [...prevRow.values, ...appendVals]
-        if (ri >= prevRows.length) prevRows.push(prevRow)
-      }
-      prev.rows = prevRows
-    } else {
-      merged.push(t)
-    }
-  }
-  return merged
-})
-
-const activeTableData = computed(() => {
-  const idx = parseInt(activeTableTab.value) || 0
-  const table = currentNoteTables.value[idx] || currentNoteTables.value[0] || null
-  return table
-})
-
-/**
- * 解析当前表的列结构，支持两级分组表头（el-table-column 嵌套）。
- * 返回列描述数组：无 group 的独立列 {type:'flat', headerIdx, label}
- * 有 group 的连续列合并为 {type:'grouped', group, children:[{headerIdx, label}]}
- */
-const activeTableColumns = computed(() => {
-  const table = activeTableData.value
-  if (!table?.headers?.length) return []
-  const headers = table.headers as string[]
-  const groups: Array<{ group: string; start: number; span: number }> | null =
-    (table as any)?._column_groups ?? null
-
-  if (!groups || groups.length === 0) {
-    // 无分组信息 → 全部扁平列（走旧逻辑兼容）
-    return null
-  }
-
-  // 构建列结构：按 headers 索引逐列归类
-  type FlatCol = { type: 'flat'; headerIdx: number; label: string }
-  type GroupedCol = { type: 'grouped'; group: string; children: Array<{ headerIdx: number; label: string }> }
-  type Col = FlatCol | GroupedCol
-
-  const result: Col[] = []
-  // 标记哪些索引被分组占用
-  const grouped = new Set<number>()
-  for (const g of groups) {
-    for (let i = g.start; i < g.start + g.span; i++) grouped.add(i)
-  }
-
-  let gi = 0 // groups 游标
-  for (let i = 0; i < headers.length; i++) {
-    if (grouped.has(i)) {
-      // 找到对应的 group 定义
-      const g = groups.find(gg => gg.start === i)
-      if (g) {
-        const children: Array<{ headerIdx: number; label: string }> = []
-        for (let j = g.start; j < g.start + g.span && j < headers.length; j++) {
-          children.push({ headerIdx: j, label: headers[j] })
-        }
-        result.push({ type: 'grouped', group: g.group, children })
-        i = g.start + g.span - 1 // 跳到分组末尾
-      }
-    } else {
-      result.push({ type: 'flat', headerIdx: i, label: headers[i] })
-    }
-  }
-  return result
-})
+// ─── 多表投影 + 两级分组表头（useNoteTableProjection composable）───────────
+import { useNoteTableProjection } from '@/views/composables/useNoteTableProjection'
+const { activeTableTab, currentNoteTables, activeTableData, activeTableColumns, resolveProjectedTableIndex } =
+  useNoteTableProjection({ currentNote, projectSubTablesClient, deriveLegacyTableHeaders })
 
 // 注：per-tab 说明文本框（activeTabNoteText/activeTabNoteTextEditable）已移除。
 // 底稿披露表「表格下面的文本框」经同步写入 note.text_content（_note_texts→_format_note_texts），
@@ -2280,120 +2145,22 @@ const {
   invalidateAllCache: () => invalidateDetailCache(),  // 全部刷新：清空全部章节缓存
 })
 
-// #20: 首次同步引导横幅（从未同步过的项目一次性提示）
-const syncHintDismissed = ref(localStorage.getItem(`gt_note_sync_hint_dismissed_${projectId.value}`) === 'true')
-const showSyncHint = computed(() => {
-  if (syncHintDismissed.value) return false
-  // noteList 全部无 last_sync_at 时视为从未同步
-  const list = noteList.value || []
-  if (!list.length) return false
-  return !list.some((n: any) => n.last_sync_at || n.last_sync_source)
-})
-function dismissSyncHint() {
-  syncHintDismissed.value = true
-  localStorage.setItem(`gt_note_sync_hint_dismissed_${projectId.value}`, 'true')
-}
+// ─── 编制进度 + 首次同步引导（useNoteProgressHints composable）─────────────
+import { useNoteProgressHints } from '@/views/composables/useNoteProgressHints'
+const { showSyncHint, dismissSyncHint, noteProgress } =
+  useNoteProgressHints({ projectId, noteList })
 
-// #22: 编制进度统计
-const noteProgress = computed(() => {
-  const list = (noteList.value || []) as any[]
-  if (!list.length) return { complete: 0, textOnly: 0, tableOnly: 0, empty: 0, total: 0 }
-  let complete = 0, textOnly = 0, tableOnly = 0, empty = 0
-  for (const n of list) {
-    const hasText = !!(n.text_content && n.text_content.trim())
-    const hasData = !!n.has_data
-    if (hasText && hasData) complete++
-    else if (hasText) textOnly++
-    else if (hasData) tableOnly++
-    else empty++
-  }
-  return { complete, textOnly, tableOnly, empty, total: list.length }
-})
-
+// ─── 附注→披露表跳转（useNoteDisclosureJumpActions composable）──────────────
+import { useNoteDisclosureJumpActions } from '@/views/composables/useNoteDisclosureJumpActions'
 const { resolveInstance: acnrResolveInstance } = useAcnr()
-const jumpingDisclosure = ref(false)
-
-const disclosureJumpTarget = computed(() =>
-  resolveNoteDisclosureJumpTarget(currentNote.value),
-)
-
-function jumpToLastSyncWorkpaper(): void {
-  const note = currentNote.value as any
-  const wpId = note?.last_sync_wp_id
-  if (!wpId || !projectId.value) return
-  const sheet = note?.table_data?._last_sync_sheet
-    || note?.table_data?._last_sync_sheet_name
-    || ''
-  router.push({
-    path: `/projects/${projectId.value}/workpapers/${wpId}/edit`,
-    query: sheet ? { sheet: String(sheet) } : {},
-  })
-}
-
-/** 附注 → G7/G10 披露表（上市/国企 sheet）；优先同步 wp_id，否则 ACNR 解析 */
-async function jumpToDisclosureSheet(): Promise<void> {
-  const target = disclosureJumpTarget.value
-  const wpFamily = target?.wpCode ?? 'G7'
-  const wpFamilyLabelMap: Record<string, string> = {
-    D1: '应收票据',
-    E1: '货币资金',
-    F1: '预付款项',
-    F2: '存货',
-    G1: '交易性金融资产',
-    G7: '长期股权投资',
-    G10: '交易性金融负债',
-    G11: '投资收益',
-    G13: '公允价值变动收益',
-    G14: '信用减值损失',
-    H1: '固定资产',
-    H2: '在建工程',
-    H8: '使用权资产',
-    H9: '租赁负债',
-    H10: '资产处置收益',
-    I1: '无形资产',
-    I2: '开发支出',
-    I3: '商誉',
-    I4: '长期待摊费用',
-    I5: '其他非流动资产',
-    I6: '研发费用',
-    K1: '其他应收款',
-    K11: '资产减值损失',
-    K13: '营业外支出',
-    N1: '递延所得税资产',
-    J1: '应付职工薪酬',
-  }
-  const wpFamilyLabel = wpFamilyLabelMap[wpFamily] ?? wpFamily
-  if (!target || !projectId.value) {
-    ElMessage.warning(`当前章节未关联${wpFamilyLabel}披露表`)
-    return
-  }
-  jumpingDisclosure.value = true
-  try {
-    let wpId = target.wpId
-    if (!wpId) {
-      const res = await acnrResolveInstance({
-        project_id: projectId.value,
-        parent: wpFamily,
-        sheet_code: wpFamily,
-      })
-      if (res?.found && res.wp_id) {
-        wpId = res.wp_id
-      }
-    }
-    if (!wpId) {
-      ElMessage.warning(`未找到 ${wpFamily} 底稿，请先在项目中生成`)
-      return
-    }
-    router.push({
-      path: `/projects/${projectId.value}/workpapers/${wpId}/edit`,
-      query: { sheet: target.sheet },
-    })
-  } catch {
-    ElMessage.warning(`跳转披露表失败，请手动打开 ${wpFamily} 底稿`)
-  } finally {
-    jumpingDisclosure.value = false
-  }
-}
+const {
+  jumpingDisclosure, disclosureJumpTarget,
+  jumpToLastSyncWorkpaper, jumpToDisclosureSheet,
+} = useNoteDisclosureJumpActions({
+  currentNote, projectId, router,
+  resolveTarget: resolveNoteDisclosureJumpTarget as any,
+  acnrResolveInstance: acnrResolveInstance as any,
+})
 
 async function onFormulaApplied() {
   // 公式应用后刷新当前附注数据
@@ -3092,7 +2859,10 @@ onMounted(async () => {
     // 反向跳转可能传入关键词标题（如损益类 三、信用减值损失），DB 实际章节可能被截断
     // （三、信用减值损失（损），需解析为 noteList 中的精确 note_section 再定位。
     const resolvedSection = resolveSectionInList(targetSection)
+    const targetTableIndex = route.query.table_index
     await fetchDetail(resolvedSection)
+    await nextTick()
+    activeTableTab.value = String(resolveProjectedTableIndex(targetTableIndex))
     await locateTreeNode(resolvedSection)  // 左侧树形定位：展开祖先分组 + 高亮 + 滚动到可视区
     // 🔴 用 history.replaceState 清理 URL query，禁止用 router.replace：
     // DefaultLayout 的 router-view 以 :key="fullPath"（含 query）渲染，router.replace 改 query
@@ -3100,6 +2870,7 @@ onMounted(async () => {
     try {
       const url = new URL(window.location.href)
       url.searchParams.delete('section')
+      url.searchParams.delete('table_index')
       url.searchParams.delete('noteTemplate')
       window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
     } catch { /* 清理 URL 失败不影响已选中章节 */ }
@@ -3218,98 +2989,17 @@ const deSearch = useTableSearch(
   ['label']
 )
 
-function deCellClassName({ rowIndex, columnIndex }: any) {
-  const classes: string[] = []
-  const selClass = deCtx.cellClassName({ rowIndex, columnIndex })
-  if (selClass) classes.push(selClass)
-  const sec = activeTableData.value
-  const sheetKey = sec?.section_id || currentNote.value?.note_section || 'default'
-  const ccClass = deComments.commentCellClass(sheetKey, rowIndex, columnIndex)
-  if (ccClass) classes.push(ccClass)
-  return classes.join(' ')
-}
-
-function onDeCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
-  deCtx.closeContextMenu()
-  const tableRows = activeTableData.value?.rows || []
-  const rowIdx = tableRows.indexOf(row)
-  const headers = activeTableData.value?.headers || []
-  const colIdx = headers.indexOf(column.label)
-  if (rowIdx < 0 || colIdx < 0) return
-  const values = row.values || row.cells || []
-  const value = values[colIdx] ?? ''
-  deCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey, event.shiftKey)
-  deCtx.contextMenu.itemName = values[0] || `行${rowIdx + 1}`
-  // 单元格激活编辑：编辑模式下点击非合计行直接激活
-  if (editMode.value && !row.is_total) {
-    if (colIdx === 0) {
-      activateCell(rowIdx, -1)  // label 列用 -1 标识
-    } else {
-      activateCell(rowIdx, colIdx - 1)
-    }
-  }
-}
-
-function onDeCellContextMenu(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
-  const tableRows = activeTableData.value?.rows || []
-  const rowIdx = tableRows.indexOf(row)
-  const headers = activeTableData.value?.headers || []
-  const colIdx = headers.indexOf(column.label)
-  // 如果右键点击的单元格已在选区内，保持选区不变
-  if (rowIdx >= 0 && colIdx >= 0 && !deCtx.isCellSelected(rowIdx, colIdx)) {
-    const values = row.values || row.cells || []
-    const value = values[colIdx] ?? ''
-    deCtx.selectCell(rowIdx, colIdx, value, false)
-    deCtx.contextMenu.itemName = values[0] || `行${rowIdx + 1}`
-  }
-  deCtx.openContextMenu(event, deCtx.contextMenu.itemName)
-}
-
-function onDeCtxCopy() {
-  deCtx.closeContextMenu()
-  deCtx.copySelectedValues()
-  ElMessage.success('已复制')
-}
-
-function onDeCtxFormula() {
-  deCtx.closeContextMenu()
-  showNoteFormulaManager.value = true
-}
-
-// V3 Req 9.6: 数字信任度
-const trustScorePanelRef = ref<InstanceType<typeof TrustScorePanel> | null>(null)
-
-// V3 Req 10.4: 可解释状态机
-const smPanelRef = ref<InstanceType<typeof StatusMachinePanel> | null>(null)
-const disclosureInstanceId = ref('')
-
-// V3 Req 11.6: 时光机
-const tmDrawerRef = ref<InstanceType<typeof TimeMachineDrawer> | null>(null)
-function onTimeMachineRestored(_snap: any) {
-  window.location.reload()
-}
-
-function onDeCtxTrustScore() {
-  deCtx.closeContextMenu()
-  const section = currentNote.value?.note_section || ''
-  const cell = deCtx.contextMenu.rowData ? `row${deCtx.selectedCells.value[0]?.row || 0}` : ''
-  const context = `note:${section}|${cell}`
-  trustScorePanelRef.value?.open(context)
-}
-
-function onDeCtxSum() {
-  deCtx.closeContextMenu()
-  const sum = deCtx.sumSelectedValues()
-  ElMessage.info(`选中 ${deCtx.selectedCells.value.length} 格，合计：${fmtAmount(sum)}`)
-}
-
-function onDeCtxCompare() {
-  deCtx.closeContextMenu()
-  if (deCtx.selectedCells.value.length < 2) return
-  const vals = deCtx.selectedCells.value.map(c => Number(c.value) || 0)
-  const diff = vals[0] - vals[1]
-  ElMessage.info(`差异：${fmtAmount(diff)}`)
-}
+// ─── 表格单元格交互 + 三个只读面板句柄（useNoteTableInteraction composable）───
+import { useNoteTableInteraction } from '@/views/composables/useNoteTableInteraction'
+const {
+  trustScorePanelRef, smPanelRef, disclosureInstanceId, tmDrawerRef,
+  onTimeMachineRestored,
+  deCellClassName, onDeCellClick, onDeCellContextMenu,
+  onDeCtxCopy, onDeCtxFormula, onDeCtxTrustScore, onDeCtxSum, onDeCtxCompare,
+} = useNoteTableInteraction({
+  activeTableData, currentNote, editMode, showNoteFormulaManager,
+  deCtx: deCtx as any, deComments, activateCell, fmtAmount,
+})
 
 // ─── 单元格右键动作（useNoteCellActions composable）─────────────────────────
 import { useNoteCellActions } from '@/views/composables/useNoteCellActions'
@@ -3323,52 +3013,13 @@ const {
   onCellDetailNavigate, onAutoCellTraceClick, onTraceJumpToTB,
 } = useNoteCellActions({ projectId, year, currentNote, activeTableData, deCtx, router, route })
 
-// ─── 校验错误标记（左侧目录树红色标记 + 单元格红色边框） ─────────────────────
-/** 判断某章节是否有校验错误 */
-function hasSectionValidationError(noteSection: string | undefined): boolean {
-  if (!noteSection || !validationFindings.value.length) return false
-  return validationFindings.value.some(f => f.note_section === noteSection && f.severity === 'error')
-}
-
-/** 获取分组节点下的校验错误数量 */
-function getGroupValidationErrorCount(groupNode: any): number {
-  if (!validationFindings.value.length) return 0
-  const sections = new Set<string>()
-  function collectSections(node: any) {
-    if (node.data?.note_section) sections.add(node.data.note_section)
-    if (node.children) node.children.forEach(collectSections)
-  }
-  collectSections(groupNode)
-  return validationFindings.value.filter(f => sections.has(f.note_section) && f.severity === 'error').length
-}
-
-/** 获取单元格的校验错误信息（用于 tooltip） */
-function getCellValidationError(rowIndex: number, colIndex: number): string {
-  if (!currentNote.value || !validationFindings.value.length) return ''
-  const section = currentNote.value.note_section
-  // 匹配当前章节的校验错误，检查是否有针对特定行列的错误
-  const findings = validationFindings.value.filter(f => f.note_section === section && f.severity === 'error')
-  if (!findings.length) return ''
-  // 对合计行（最后一行或 is_total）显示余额类校验错误
-  const rows = activeTableData.value?.rows || []
-  const row = rows[rowIndex]
-  if (row?.is_total) {
-    const balanceFinding = findings.find(f => f.check_type === '余额' || f.check_type === '其中项')
-    if (balanceFinding) {
-      const expected = balanceFinding.expected_value ?? '-'
-      const actual = balanceFinding.actual_value ?? '-'
-      return `${balanceFinding.message}（期望: ${expected}, 实际: ${actual}）`
-    }
-  }
-  // 对宽表行检查横向公式错误
-  if (row?.formula_type === 'opening_plus_changes') {
-    const wideFinding = findings.find(f => f.check_type === '宽表')
-    if (wideFinding) {
-      return `${wideFinding.message}`
-    }
-  }
-  return ''
-}
+// ─── 校验错误标记（useNoteValidationMarks composable）───────────────────────
+import { useNoteValidationMarks } from '@/views/composables/useNoteValidationMarks'
+const {
+  hasSectionValidationError, getGroupValidationErrorCount, getCellValidationError,
+} = useNoteValidationMarks({
+  validationFindings: validationFindings as any, currentNote, activeTableData,
+})
 </script>
 
 <style scoped>

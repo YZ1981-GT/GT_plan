@@ -91,7 +91,7 @@ _SECTIONS: Final[list[dict]] = [
     {"key": "s1r1", "sfx": "S1R1", "first": 13, "last": 17, "footer": 18, "val": "s1_finance_lease"},
     {"key": "s1r2", "sfx": "S1R2", "first": 20, "last": 24, "footer": 25, "val": "s1_installment_sale"},
     {"key": "s1r3", "sfx": "S1R3", "first": 27, "last": 31, "footer": 32, "val": "s1_installment_service"},
-    {"key": "s1r4", "sfx": "S1R4", "first": 34, "last": 38, "footer": 39, "val": "s1_other"},
+    {"key": "s1r4", "sfx": "S1R4", "first": 34, "last": 37, "footer": 39, "val": "s1_other"},
     # 段②（二）未确认融资收益
     {"key": "s2r1", "sfx": "S2R1", "first": 45, "last": 49, "footer": 50, "val": "s2_finance_lease"},
     {"key": "s2r2", "sfx": "S2R2", "first": 52, "last": 56, "footer": 57, "val": "s2_installment_sale"},

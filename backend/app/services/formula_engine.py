@@ -104,6 +104,14 @@ class FormulaContext:
     wp_data: dict[str, dict[str, Decimal]] = field(default_factory=dict)
     # 辅助核算数据源（供 AUX 函数）：account_code → {辅助项: 金额}
     aux_data: dict[str, dict[str, Decimal]] = field(default_factory=dict)
+    # 调整额数据源（供 ADJ 函数）：account_code → {aje_net/aje_dr/aje_cr/rje_*: 金额}
+    #
+    # 结构与 `adjustment_amount_source.adj_net_batch` 的返回值**逐键相同**——
+    # L2 直接塞批量取数结果，禁做键名转换（转换点就是漂移点）。
+    # 🔴 与 `tb_data["AJE调整"]` 的语义差异：本字段是**实时汇总**，tb_data 那两键
+    # 是 `trial_balance` 的**持久化快照**。两者可以不等 —— 不等即快照过期，
+    # 那是需求 3.3 要暴露的信号，不是本字段要掩盖的事。
+    adj_data: dict[str, dict[str, Decimal]] = field(default_factory=dict)
     # 默认列名
     default_column: str = "期末余额"
 
@@ -114,14 +122,39 @@ class FormulaContext:
         tb_map: dict[str, Decimal],
         row_cache: dict[str, Any] | None = None,
         prior_map: dict[str, Decimal] | None = None,
+        adj_map: dict[str, dict[str, Decimal]] | None = None,
     ) -> "FormulaContext":
-        """从简单的 科目→金额 字典构建上下文（向后兼容）"""
+        """从简单的 科目→金额 字典构建上下文（向后兼容）。
+
+        ``adj_map``（可选）：``adj_net_batch`` 的返回值。传入时一个参数服务两条
+        取数路径 —— 往 ``tb_data`` 补 ``AJE调整``/``RJE调整`` 两键（供 ``TB()``）
+        并原样塞进 ``adj_data``（供 ``ADJ()``），键名来源单一避免两处各写一份。
+
+        🔴 **缺省时不产这两键**（需求 3.4）：既有 3 键的值与语义逐字不变，
+        只增不改，既有调用方零回归。
+
+        🔴 **本方法只产 3(+2) 键，不是完整预载**。需要全部 14 个注册列名的调用方
+        走 `tb_formula_context.build_tb_formula_data` —— 方法名里的 "simple" 就是
+        这个意思，扩成全键会让它变成第二份预载实现。
+        """
         tb_data = {code: {"期末余额": val, "审定数": val, "未审数": val} for code, val in tb_map.items()}
+        if adj_map:
+            for code, adj in adj_map.items():
+                # 只给 tb_map 里存在的科目补键：本方法的 tb_data 分母由 tb_map 决定，
+                # 凭 adj_map 无中生有会让 `SUM_TB` 的科目区间多出 tb_map 没有的科目。
+                if code in tb_data:
+                    tb_data[code]["AJE调整"] = adj.get("aje_net", Decimal("0"))
+                    tb_data[code]["RJE调整"] = adj.get("rje_net", Decimal("0"))
         prior_data = {}
         if prior_map:
             prior_data = {code: {"期末余额": val} for code, val in prior_map.items()}
         rc = {k: Decimal(str(v)) for k, v in (row_cache or {}).items()}
-        return cls(tb_data=tb_data, row_cache=rc, prior_tb_data=prior_data)
+        return cls(
+            tb_data=tb_data,
+            row_cache=rc,
+            prior_tb_data=prior_data,
+            adj_data=dict(adj_map) if adj_map else {},
+        )
 
 
 # ── 列名映射（中文 → 标准字段名） ──
@@ -870,6 +903,40 @@ def _handle_aux(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decim
     return val
 
 
+def _handle_adj(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
+    """ADJ('code','adj_type') — 调整额**实时汇总**（归一净额口径）。
+
+    ``adj_type`` 接受 `normalize_adj_type` 的全部写法（aje_net / aje / AJE /
+    审计调整 / rje_net / rje / RJE / 重分类）。归一失败抛
+    :class:`FormulaColumnError`（配置错，与 ``TB`` 未注册列名同语义），
+    **禁**静默返 0 —— 那会让写错的第二参看起来像"该科目无调整"。
+
+    🔴 **只给净额不给 dr/cr**：ADR-ADJ-005 的 ``*_dr``/``*_cr`` 是展示用原始
+    借贷（恒非负未归一），参与算式会对贷方正常类方向反掉（Phase 0 的 B4）。
+    故 ``ADJ('6001','aje_dr')`` 走归一失败报错，而非返回借方合计。
+
+    🔴 **与 ``TB(code,'AJE调整')`` 的差异**：本函数取 `ctx.adj_data` = 实时汇总；
+    ``TB()`` 取 `ctx.tb_data` = `trial_balance` 持久化快照。不等即快照过期。
+    完整说明见 `adjustment_amount_source` 文件头。
+    """
+    str_args = _extract_string_args(args, ctx, trace)
+    code = str_args[0] if str_args else ''
+    raw_type = str_args[1] if len(str_args) > 1 else ''
+
+    # 归一复用单一真源（禁另写一份表）。函数体内 import 是为保住 L1「无 DB/async
+    # 耦合」声明 —— 该模块同时导出 async 取数函数，模块级 import 会把它拉进 L1。
+    from app.services.adjustment_amount_source import normalize_adj_type
+
+    try:
+        norm_type = normalize_adj_type(raw_type)
+    except ValueError as exc:
+        raise FormulaColumnError(f"ADJ('{code}','{raw_type}')：{exc}") from exc
+
+    val = ctx.adj_data.get(code, {}).get(f"{norm_type}_net", Decimal("0"))
+    trace.append(f"ADJ('{code}','{raw_type}') = {val}")
+    return val
+
+
 def _handle_note(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
     """NOTE('section','field','column') — 附注数据取值"""
     str_args = _extract_string_args(args, ctx, trace)
@@ -909,6 +976,7 @@ _REGISTRY.register("PREV", _handle_prev, arity=2, description="上年同期值",
 _REGISTRY.register("AUX", _handle_aux, arity=3, description="辅助核算取值", syntax="AUX('科目','维度','列名')", category="取数")
 _REGISTRY.register("NOTE", _handle_note, arity=3, description="附注数据取值", syntax="NOTE('章节','字段','列名')", category="取数")
 _REGISTRY.register("WP", _handle_wp, arity=2, description="底稿数据取值", syntax="WP('底稿编码','列名')", category="取数")
+_REGISTRY.register("ADJ", _handle_adj, arity=2, description="调整额实时汇总（净额）", syntax="ADJ('科目编码','aje_net|rje_net')", category="取数")
 
 # 引用函数
 _REGISTRY.register("ROW", _handle_row, arity=1, description="引用其他行次", syntax="ROW('行次编码')", category="引用")
@@ -1015,9 +1083,14 @@ def execute_formula(
     tb_map: dict[str, Decimal],
     row_cache: dict[str, Any],
     column: str = "期末余额",
+    adj_map: dict[str, dict[str, Decimal]] | None = None,
 ) -> Decimal:
-    """简易版执行（向后兼容）。返回 Decimal 值。"""
-    ctx = FormulaContext.from_simple_map(tb_map, row_cache)
+    """简易版执行（向后兼容）。返回 Decimal 值。
+
+    ``adj_map``：``adj_net_batch`` 的返回值。**本函数同步**不能自己取数 ——
+    调用方（async）取好传进来；不传则 ``ADJ()`` 返 0（既有行为，零回归）。
+    """
+    ctx = FormulaContext.from_simple_map(tb_map, row_cache, adj_map=adj_map)
     result = execute(formula, ctx)
     return result.value
 
@@ -1216,6 +1289,21 @@ def _execute_regex(formula: str, ctx: FormulaContext) -> FormulaResult:
                     wp_data = ctx.wp_data.get(wp_code, {})
                     val = wp_data.get(col_name, Decimal("0"))
                     trace_msg = f"WP('{wp_code}','{col_name}') = {val}"
+
+            elif token_name == "ADJ":
+                # 🔴 本分支**必须存在**：`val` 初值是 0 且循环末尾无条件替换 ⇒
+                # 缺分支的 token 会被静默置 0，且只在降级路径错（AST 路径正常），
+                # 是最难发现的形态。守卫 `test_every_token_pattern_has_regex_branch`。
+                #
+                # 🔴 **直接复用 AST 路径的 handler**，不另写一份归一+取值 ——
+                # 两路径等值由「同一个函数」保证，而非靠测试比对两份平行实现。
+                try:
+                    val = _handle_adj(
+                        [ASTString(match.group(1)), ASTString(match.group(2))],
+                        ctx, result.trace,
+                    )
+                except FormulaColumnError as exc:
+                    result.errors.append(str(exc))
 
             expression = expression.replace(match.group(0), str(val), 1)
             if trace_msg:
@@ -1554,7 +1642,17 @@ class FormulaEngine:
             if r.standard_account_code:
                 tb_map[r.standard_account_code] = tb_map.get(r.standard_account_code, Decimal("0")) + (r.unadjusted_amount or Decimal("0"))
 
-        val = execute_formula(formula_str, tb_map, {})
+        # 调整额取数（供 ADJ() 与 TB(code,'AJE调整')）。
+        # 🔴 `exclude_origins=frozenset()` = 口径矩阵**第 2 行**「ADJ() 底稿呈现」，
+        # 与 `prefill_engine._resolve_adj_formula` 对齐（同一张底稿里两种 ADJ 必须
+        # 同口径）；与试算平衡表/报表的第 4 行刻意不同。理由见伴生模块 docstring。
+        from app.services.tb_formula_context import load_adj_map_if_needed
+
+        adj_map = await load_adj_map_if_needed(
+            db, project_id=project_id, year=year, formula=formula_str,
+            account_codes=set(tb_map.keys()), exclude_origins=frozenset(),
+        )
+        val = execute_formula(formula_str, tb_map, {}, adj_map=adj_map)
 
         # ── 父子双算显式告警（R7.5：不改口径但必须让调用方知道） ──────────────
         warnings: list[str] = []

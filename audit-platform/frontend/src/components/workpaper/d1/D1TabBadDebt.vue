@@ -8,7 +8,8 @@
  * ECL差异警告（小计行旁黄色 el-alert）
  */
 import { ref, inject, toRef, computed, type Ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+// 🔴 裁决 A1 移除新增入口后 `ElMessageBox` 不再使用（原只用于 prompt 票据种类名）。
+import { ElMessage } from 'element-plus'
 import WpAmountInput from '../shared/WpAmountInput.vue'
 import { useD1BadDebt, type BadDebtRow } from '../composables/useD1BadDebt'
 import type { ChecklistResponse } from '../composables/useD1FormData'
@@ -60,7 +61,7 @@ const {
   noteTypeRows,
   noteTypeSubtotal,
   noteTypeCheck,
-  addNoteTypeRow,
+  // 🔴 裁决 A1：不再解构 `addNoteTypeRow`（新增入口已移除）
   removeNoteTypeRow,
   updateNoteTypeCell,
 } = useD1BadDebt({
@@ -93,21 +94,10 @@ function fmtAmount(val: number): string {
 
 const noteTypeTableData = computed(() => [...noteTypeRows.value, noteTypeSubtotal.value])
 
-/** 动态行新增须先 prompt 输入票据种类名（平台底稿交互铁律）。 */
-async function onAddNoteTypeRow(): Promise<void> {
-  if (props.isReadonly) return
-  try {
-    const { value } = await ElMessageBox.prompt('请输入票据种类名称', '新增票据种类小计', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      inputPlaceholder: '如：财务公司承兑汇票、信用证',
-      inputValidator: (v: string) => (String(v || '').trim() ? true : '名称不能为空'),
-    })
-    if (addNoteTypeRow(String(value))) ElMessage.success('已新增票据种类行')
-  } catch {
-    /* 用户取消 */
-  }
-}
+// 🔴 2026-09-28 裁决 A1：`onAddNoteTypeRow` 已删除（原 prompt 新增票据种类行）。
+//    理由见模板 R23/R24 上下零余量的说明（本文件「按票据种类小计」表头处注释）。
+//    `removeNoteTypeRow` **保留** —— 它只允许删非 `isFixed` 行，用于清理历史遗留的
+//    自定义行；两行固定行删不掉。
 
 // ─── Table Data ──────────────────────────────────────────────────────────────
 
@@ -540,14 +530,18 @@ function onReview(sectionId: string) {
         <el-tag size="small" type="info" effect="plain">
           源模板 D1-4 R23/R24 —— D1-1 审定表「二、应收票据坏账准备」的取数来源
         </el-tag>
-        <el-button
-          size="small"
-          type="primary"
-          plain
-          :disabled="isReadonly"
-          style="margin-left:auto"
-          @click="onAddNoteTypeRow"
-        >+ 票据种类</el-button>
+        <!--
+          🔴 2026-09-28 裁决 A1：移除「+ 票据种类」新增入口。
+          源模板 D1-4 只有 R23/R24 两行票据种类小计，紧接 R25 就是「三、审计说明」
+          —— **上下零余量**（openpyxl 现读实测）。该区在同步层声明为 `static_region`
+          （first_data_row=23 / last_data_row=24），设计上**绕开位移链**不会自动插行，
+          所以新增的第三行在 Excel 侧物理上无处可去，只会在 OO 往返时静默丢失。
+          需要第三种票据种类（如供应链票据）请先改源模板留行，再把本区改判为动态行区。
+          详见 `.kiro/specs/d1-sync-row-table-engine-and-d1-coverage/tasks.md` K 节。
+        -->
+        <el-tag size="small" type="info" effect="plain" style="margin-left:auto">
+          固定两行（随源模板 R23/R24）
+        </el-tag>
       </div>
 
       <div class="notetype-hint">

@@ -453,6 +453,23 @@ def _route_objects(text: str) -> Iterable[str]:
         yield text[match.start() : end + 1]
 
 
+#: 路由真源文件（canonical「我的程序任务」路由允许的落点）。
+#:
+#: 🔴 2026-09-28 修：原先写死 `router/index.ts`。路由已按域拆分，`index.ts` 只剩装配
+#: （文件内自述「路由装配：domains/*.ts 为唯一真源」），canonical 路由本体搬到了
+#: `router/domains/dashboard.ts` ⇒ 守卫把它判成"并行任务页路由"报成新增债务，
+#: `test_current_repository_baseline_is_exact` 因此长期红。这是**扫描器没跟上路由域
+#: 拆分**，与 htmlRendererRegistry 分域拆分同型，不是真的多出一个并行页面。
+_ROUTER_SOURCE_RE = re.compile(
+    r"^audit-platform/frontend/src/router/(index\.ts|domains/[\w.-]+\.ts)$"
+)
+
+
+def _is_router_source(rel: str) -> bool:
+    """`rel` 是否落在路由真源（装配文件或分域文件）内。"""
+    return bool(_ROUTER_SOURCE_RE.fullmatch(rel))
+
+
 def _scan_parallel_task_surface(rel: str, path: Path, text: str) -> list[Finding]:
     findings: list[Finding] = []
     if path.suffix.lower() == ".vue":
@@ -475,7 +492,7 @@ def _scan_parallel_task_surface(rel: str, path: Path, text: str) -> list[Finding
             if not procedure_route:
                 continue
             canonical = bool(
-                rel == "audit-platform/frontend/src/router/index.ts"
+                _is_router_source(rel)
                 and re.search(r"path\s*:\s*['\"]my-procedures['\"]", candidate)
                 and re.search(r"name\s*:\s*['\"]MyProcedureTasks['\"]", candidate)
                 and re.search(r"import\(['\"]@/views/MyProcedureTasks\.vue['\"]\)", candidate)
@@ -498,6 +515,45 @@ def scan_frontend_file(path: Path, root: Path) -> list[Finding]:
     return _scan_ts_instance_task(rel, text) + _scan_parallel_task_surface(rel, path, text)
 
 
+def _scan_duplicate_canonical_routes(root_path: Path) -> list[Finding]:
+    """仓库级去重：canonical「我的程序任务」路由**全仓只许一处**。
+
+    🔴 为什么要在仓库级再查一遍：`_scan_parallel_task_surface` 的 `canonical_seen > 1`
+    是**文件内**计数。路由按域拆分后，同一条 canonical 路由若同时出现在
+    `domains/dashboard.ts` 与 `domains/projects.ts`，两个文件各自只看到 1 次 ⇒
+    原判据天然失效、双注册静默放行。这里按全仓统计，第 2 处及以后逐一报债务。
+    """
+    hits: list[tuple[str, str]] = []
+    router_dir = root_path / "audit-platform/frontend/src/router"
+    if not router_dir.is_dir():
+        return []
+    for path in sorted(router_dir.rglob("*.ts")):
+        rel = normalize_repo_path(path, root_path)
+        if not _is_router_source(rel):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for block in _route_objects(text):
+            candidate = block.split("children:", 1)[0]
+            if (
+                re.search(r"path\s*:\s*['\"]my-procedures['\"]", candidate)
+                and re.search(r"name\s*:\s*['\"]MyProcedureTasks['\"]", candidate)
+                and re.search(r"import\(['\"]@/views/MyProcedureTasks\.vue['\"]\)", candidate)
+            ):
+                hits.append((rel, block))
+    return [
+        Finding(
+            rel,
+            "route:MyProcedureTasks(duplicate-canonical)",
+            RULE_PARALLEL_TASK_PAGE,
+            _normalized_fingerprint(block),
+        )
+        for rel, block in hits[1:]
+    ]
+
+
 def scan_repository(root: str | Path) -> list[Finding]:
     root_path = Path(root).resolve()
     findings: list[Finding] = []
@@ -510,6 +566,7 @@ def scan_repository(root: str | Path) -> list[Finding]:
         for path in sorted(frontend_root.rglob("*")):
             if path.suffix.lower() in {".ts", ".vue"}:
                 findings.extend(scan_frontend_file(path, root_path))
+        findings.extend(_scan_duplicate_canonical_routes(root_path))
     migrations = root_path / "backend/migrations"
     if migrations.is_dir():
         for path in sorted(migrations.rglob("*")):

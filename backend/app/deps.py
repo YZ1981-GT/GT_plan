@@ -310,6 +310,47 @@ async def assert_project_permission(
 
 
 # ---------------------------------------------------------------------------
+# Fine-grained project permission
+# ---------------------------------------------------------------------------
+
+
+def require_project_permission(permission: str) -> Callable:
+    """按项目成员级别和共享权限映射校验细粒度项目权限。
+
+    先复用 ``assert_project_permission(..., "review")`` 保证项目成员、归档状态
+    和 RLS 上下文正确，再用 project_permissions 的合并权限集合判断具体能力。
+    """
+    from app.services.project_permissions import ALL_PERMISSIONS
+
+    if permission not in ALL_PERMISSIONS:
+        raise ValueError(f"未登记的项目权限: {permission!r}")
+
+    async def dependency(
+        project_id: UUID,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ) -> User:
+        from app.services.project_permissions import resolve_project_permissions
+
+        user = await assert_project_permission(
+            db, current_user, project_id, "review"
+        )
+        if current_user.role.value != "admin":
+            permissions = await resolve_project_permissions(db, current_user, project_id)
+            if permission not in permissions:
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "error_code": "PROJECT_PERMISSION_REQUIRED",
+                        "permission": permission,
+                    },
+                )
+        return user
+
+    return dependency
+
+
+# ---------------------------------------------------------------------------
 # require_wp_edit_permission — 底稿编辑权门禁（Module_Refresh 用）
 # ---------------------------------------------------------------------------
 

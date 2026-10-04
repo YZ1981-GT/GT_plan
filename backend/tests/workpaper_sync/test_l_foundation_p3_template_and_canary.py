@@ -98,7 +98,20 @@ class TestTask20TemplateGeometry:
         # owned = 100 - 10 = 90
 
     def test_8_entries_sha256_match_slice(self, entries: list[dict]) -> None:
-        """8 册 sha256 与 slice template_ref 等值（LF-P23）。"""
+        """8 册 sha256 与 slice template_ref 等值；合法净化的模板走**双态**（LF-P23）。
+
+        🔴 2026-10-01 L4 首版发布被外部 hyperlink 门拒，且真 OO 插行被受管表横向共享公式
+        fail-closed；按 D/I/J 范式净化后，slice 仍 append-only 冻结净化前 digest，现算则必须
+        等于 provider 的净化后哨兵。直接把 slice digest 改成新值会抹掉审计轨迹，禁止。
+        """
+        from app.services.workpaper_sync import phase5_l4_bonds_payable as L4
+
+        sanitized = {
+            "L4 应付债券.xlsx": {
+                "pre": L4.PRE_SANITIZE_TEMPLATE_SHA256,
+                "post": L4.TEMPLATE_SHA256,
+            },
+        }
         for e in entries:
             tr = e.get("template_ref", {})
             wb_name = tr.get("workbook")
@@ -110,9 +123,14 @@ class TestTask20TemplateGeometry:
             if not wb_path.exists():
                 pytest.fail(f"模板 {wb_name} 不存在")
             actual_sha = _sha256_of(wb_path)
-            assert actual_sha == expected_sha, (
-                f"{wb_name} sha256 不匹配：{actual_sha[:16]}… ≠ {expected_sha[:16]}…"
-            )
+            san = sanitized.get(str(wb_name))
+            if san:
+                assert expected_sha == san["pre"], "slice 的净化前 digest 被回填"
+                assert actual_sha == san["post"], f"{wb_name}: 现算 ≠ 净化后 provider 哨兵"
+            else:
+                assert actual_sha == expected_sha, (
+                    f"{wb_name} sha256 不匹配：{actual_sha[:16]}… ≠ {expected_sha[:16]}…"
+                )
             wb = load_workbook(wb_path, read_only=True, data_only=True)
             actual_sheets = len(wb.sheetnames)
             wb.close()
@@ -303,8 +321,12 @@ class TestTask34StructuralZeros:
         `review_status` 门失效）。
 
         判据从「零期望」改为「逐条具名」——**不是删断言也不是加豁免**：
-        总数仍锁 2、l4 仍必须是 candidate 且 entry_id 为 null、l1 必须是 reviewed 且
-        entry_id 恰为本 entry。L2/L3/L5~L8 接线时在此逐条追加。
+        总数仍锁 2、l1 必须是 reviewed 且 entry_id 恰为本 entry。L2/L3/L5~L8 接线时在此逐条追加。
+
+        🔴 2026-10-01（task 12）：l4 由 candidate 转 reviewed 生产契约
+        `l4.bonds_payable.json`（`review.entry_id = xlsx/gt-l4-bonds-payable`），candidate 草案删除。
+        总数仍是 2，l4 断言由「candidate + entry_id null」改为「reviewed + entry_id 具名 +
+        candidate 不得并存」。
         """
         import json as _json
 
@@ -316,7 +338,7 @@ class TestTask34StructuralZeros:
         )
         by_name = {f.name: _json.loads(f.read_text("utf-8")) for f in l_contracts}
         assert len(l_contracts) == 2, (
-            f"L 前缀契约应为 2（l1 reviewed + l4 candidate），实得 {sorted(by_name)}"
+            f"L 前缀契约应为 2（l1 + l4 均 reviewed），实得 {sorted(by_name)}"
         )
 
         l1 = by_name.get("l1.short_term_loans.json")
@@ -334,11 +356,12 @@ class TestTask34StructuralZeros:
             "l1 的 candidate 草案仍在 ⇒ 与 reviewed 生产契约构成双源"
         )
 
-        l4 = by_name.get("l4.bonds_payable.candidate.json")
-        assert l4 is not None, "l4 candidate 契约不该消失（L4 尚未接线）"
-        assert str(l4.get("review_status")) == "candidate"
-        assert (l4.get("review") or {}).get("entry_id") is None, (
-            "l4 仍是 candidate ⇒ review.entry_id 必须为 null"
+        l4 = by_name.get("l4.bonds_payable.json")
+        assert l4 is not None, "l4 生产契约缺失（task 12 已交付）"
+        assert str(l4.get("review_status")) == "reviewed"
+        assert (l4.get("review") or {}).get("entry_id") == "xlsx/gt-l4-bonds-payable"
+        assert not (CONTRACT_DIR / "l4.bonds_payable.candidate.json").exists(), (
+            "l4 的 candidate 草案仍在 ⇒ 与 reviewed 生产契约构成双源"
         )
 
     def test_l_domain_adapter_id_is_null(self, entries: list[dict]) -> None:

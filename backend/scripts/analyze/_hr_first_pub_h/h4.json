@@ -1,0 +1,103 @@
+{
+  "mode": "check",
+  "closed_vocabulary": [
+    "ready_to_publish",
+    "blocked_missing_approved_bundle",
+    "blocked_ooxml_gate",
+    "blocked_contract_not_reviewed",
+    "blocked_lane_undecided",
+    "already_published",
+    "blocked_row_insertion_required",
+    "blocked_template_contract_drift",
+    "blocked_roundtrip_divergence",
+    "blocked_unmanaged_region_drift",
+    "store_empty_nothing_to_publish",
+    "blocked_store_payload_shape",
+    "blocked_unregistered_failure_shape"
+  ],
+  "check_stages": [
+    "lane_adjudicated",
+    "supply_observed",
+    "plan_resolved",
+    "substrate_instrumented",
+    "ooxml_gate_passed",
+    "adapter_built",
+    "projection_composed",
+    "materialized",
+    "roundtrip_verified",
+    "unmanaged_regions_verified"
+  ],
+  "error_code_to_state": {
+    "projection_bundle_not_provisioned": "blocked_missing_approved_bundle",
+    "ooxml_security_rejected": "blocked_ooxml_gate",
+    "contract_not_reviewed": "blocked_contract_not_reviewed",
+    "lane_undecided": "blocked_lane_undecided",
+    "lane_is_opaque": "blocked_lane_undecided",
+    "first_publication_already_done": "already_published",
+    "excel_materialize_row_set_divergence": "blocked_row_insertion_required",
+    "excel_materialize_editable_write_failed": "blocked_template_contract_drift",
+    "excel_materialize_protected_region_violation": "blocked_template_contract_drift",
+    "excel_materialize_shared_formula_master_write": "blocked_template_contract_drift",
+    "excel_materialize_row_identity_write_failed": "blocked_template_contract_drift",
+    "excel_materialize_dynamic_column_binding_unusable": "blocked_template_contract_drift",
+    "excel_materialize_footer_anchor_drift": "blocked_template_contract_drift",
+    "excel_materialize_footer_formula_range_stale": "blocked_template_contract_drift",
+    "excel_materialize_write_strategy_forbidden": "blocked_template_contract_drift",
+    "excel_materialize_template_library_write": "blocked_template_contract_drift",
+    "value_normalization_failed": "blocked_template_contract_drift",
+    "roundtrip_projection_mismatch": "blocked_roundtrip_divergence",
+    "excel_extract_roundtrip_not_equivalent": "blocked_roundtrip_divergence",
+    "adapter_unmanaged_region_drift": "blocked_unmanaged_region_drift",
+    "store_payload_empty_and_not_publishable": "store_empty_nothing_to_publish",
+    "sync_pilot_store_payload_invalid": "blocked_store_payload_shape"
+  },
+  "state_unblock_owner": {
+    "blocked_missing_approved_bundle": "先跑 backend/scripts/fix/fix_task76_provision_projection_definitions.py",
+    "blocked_ooxml_gate": "解除条件属安全策略裁决，不在首版发布 spec 范围内放宽",
+    "blocked_contract_not_reviewed": "契约复核方：把该 per-entry 契约的 `review_status` 推到 `reviewed`（本入口不放宽该准入）",
+    "blocked_lane_undecided": "lane 裁决真源 `projection_lane_registry.adjudicate_lane`（L1~L5）—— 判 opaque 说明该 entry 不走 projection lane；判 undecided 时诊断已点名首个不成立判据与其真源文件；另一种成因是裁决码族下没有存活底稿",
+    "blocked_row_insertion_required": "结构性插行泳道（excel-structural-row-insertion-and-shift-aware-verification 的 Wave 4：plan_managed_writes 接 RowShiftPlan）",
+    "blocked_template_contract_drift": "契约/模板裁决：受管区行列范围或字段 value_type 与权威模板不一致",
+    "blocked_roundtrip_divergence": "materialize/extract 两侧口径裁决（写进去的与反读出来的不等值）",
+    "blocked_unmanaged_region_drift": "未管理区域策略裁决（本次写入动到了被逐字节锁死的部件）",
+    "store_empty_nothing_to_publish": "🔴 无需解除 —— 这不是阻塞。该 entry 的 HTML store 还没有内容，而它的 provider 没有「空载荷」合法状态（如 G7：动态列数量必须由实测实体列表决定，空列表被 `iter_store_entities` 故意拒绝）。要做的是先在 HTML 侧录入数据，之后首版即可发布",
+    "blocked_store_payload_shape": "store 载荷形态裁决：`remark` 里有内容但不符合该 pilot 的 store schema（根形态错 / state version 对不上 / 必填结构缺失）—— 解除方是前端 store 写入侧或数据修复，**不是**放宽 provider 的校验",
+    "blocked_unregistered_failure_shape": "🔴 词表要扩：把该 error_code 登记进 `_ERROR_CODE_TO_STATE` 并给出解除方"
+  },
+  "target_order_sql": "(CASE WHEN COALESCE(LENGTH(store.remark), 0) > 0 THEN 0 ELSE 1 END), wi.wp_code, wp.created_at, wp.id",
+  "entries": [
+    {
+      "entry_id": "xlsx/gt-h4-engineering-materials",
+      "contract_id": "h4.engineering_materials_detail",
+      "adjudicated_wp_codes": [
+        "H4"
+      ],
+      "wp_code": "H4",
+      "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+      "wp_id": "f287d31f-9cd1-46e5-8356-111a5061930d",
+      "store_bytes": 0,
+      "state": "ready_to_publish",
+      "error_code": "",
+      "diagnosis": "全链十阶段通过；store 载荷 0 字节（0 字节仍是合法首版：空 projection + instrumented 载体）",
+      "stages": {
+        "lane_adjudicated": true,
+        "supply_observed": true,
+        "plan_resolved": true,
+        "substrate_instrumented": true,
+        "ooxml_gate_passed": true,
+        "adapter_built": true,
+        "projection_composed": true,
+        "materialized": true,
+        "roundtrip_verified": true,
+        "unmanaged_regions_verified": true
+      },
+      "projection_facts": {
+        "value_count": 0,
+        "row_keys": {
+          "engineering_materials_detail_rows": 0
+        }
+      },
+      "published": {}
+    }
+  ]
+}

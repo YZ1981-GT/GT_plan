@@ -131,7 +131,8 @@ async def refresh_all(
         tree = await build_tree(db, parent_project_id)
         if tree is not None:
             result.nodes_refreshed = 1 + len(get_descendants(tree))
-            root_node_label = tree.company_code
+            # 进度标签用带角色后缀的展示名（如「某集团（合并）」），旧式节点退回企业代码
+            root_node_label = getattr(tree, "display_name", None) or tree.company_code
         else:
             result.nodes_refreshed = 0
             logger.warning("级联刷新：项目 %s 未找到企业树（build_tree 返回 None）", parent_project_id)
@@ -189,6 +190,9 @@ async def refresh_all(
     _emit(progress_cb, STEP_REPORT, 5, TOTAL_STEPS, root_node_label, "running")
     try:
         await generate_consol_reports_sync(db, parent_project_id, year)
+        # 报表 service 只 flush；worker 使用独立 session，必须在报表步骤成功后提交，
+        # 否则 session 退出时会回滚已生成的 financial_report 行。
+        await db.commit()
         result.steps_completed.append(STEP_REPORT)
         _emit(progress_cb, STEP_REPORT, 5, TOTAL_STEPS, root_node_label, "completed")
     except Exception as exc:  # noqa: BLE001 - 失败隔离（下游步：记录后继续）

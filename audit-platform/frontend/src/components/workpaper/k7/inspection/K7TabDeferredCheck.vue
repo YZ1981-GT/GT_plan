@@ -218,7 +218,7 @@
     </details>
 
     <el-dialog v-model="samplingVisible" title="抽凭引擎 — 递延收益(2401)" width="90%" top="5vh" destroy-on-close>
-      <GtVoucherSamplingEngine v-if="samplingVisible" account-code="2401" phase="final" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
+      <GtVoucherSamplingEngine v-if="samplingVisible" :account-code="samplingAccountCode" phase="final" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
     </el-dialog>
   </div>
 </template>
@@ -232,6 +232,17 @@
 import { ref, reactive, computed, inject, onMounted, defineAsyncComponent } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
+
+/**
+ * 抽凭科目码取自单一真源 `k7AccountScope`（K7 递延收益）。原为模板内字面量；
+ * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
+ * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ */
+import { k7QueryCodes } from '../../composables/k7AccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = k7QueryCodes().join(',')
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 

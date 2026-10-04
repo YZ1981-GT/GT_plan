@@ -21,12 +21,23 @@ import { calcDeferredTaxExpense } from './useN5IncomeTaxEngine'
 import { calcSubtotal, parseNum } from './useN5FormulaEngine'
 import { eventBus } from '@/utils/eventBus'
 import type { ChecklistResponse } from './useN5FormData'
+import {
+  withStableRowKeys,
+  generatedRowKey,
+  removeRowByKey,
+  semanticRowKey,
+  updateRowByKey,
+  type StableRowKey,
+} from './shared/stableRowIdentity'
+import { payloadJson } from './shared/checklistPayload'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /** 递延核对明细行 */
 export interface N5DeferredReconcileRow {
-  /** 行序号 */
+  /** 稳定行身份（随行落库；BP-8 同族，原按下标增删改） */
+  rowKey: StableRowKey
+  /** 行序号（仅展示） */
   index: number
   /** 项目名称（暂时性差异项目） */
   label: string
@@ -151,15 +162,12 @@ export function useN5DeferredReconcile(options: UseN5DeferredReconcileOptions) {
 
   const rows: ComputedRef<N5DeferredReconcileRow[]> = computed(() => {
     const itemId = 'N5-8-reconcile-rows'
-    const resp = allResponses.value.get(itemId)
-    let raw: any[] = []
-    if (resp?.conclusion) {
-      try { raw = JSON.parse(resp.conclusion) } catch { raw = [] }
-    }
+    const parsed = payloadJson(itemId, allResponses.value.get(itemId))
+    const raw: any[] = Array.isArray(parsed) ? parsed : []
 
     if (raw.length === 0) return _getDefaultRows()
 
-    return raw.map((r: any, i: number) => {
+    return withStableRowKeys(raw, (r: any) => r?.label).map(({ raw: r, rowKey }: { raw: any; rowKey: StableRowKey }, i: number) => {
       const assetBeginning = parseNum(r.assetBeginning)
       const assetEnding = parseNum(r.assetEnding)
       const assetChange = assetEnding - assetBeginning
@@ -169,6 +177,7 @@ export function useN5DeferredReconcile(options: UseN5DeferredReconcileOptions) {
       const deferredExpense = calcDeferredTaxExpense(liabilityChange, assetChange)
 
       return {
+        rowKey,
         index: i + 1,
         label: r.label || `项目${i + 1}`,
         assetBeginning,
@@ -232,15 +241,12 @@ export function useN5DeferredReconcile(options: UseN5DeferredReconcileOptions) {
    * 更新指定行字段
    */
   async function updateRow(
-    rowIndex: number,
+    rowKey: StableRowKey,
     field: keyof Pick<N5DeferredReconcileRow, 'label' | 'assetBeginning' | 'assetEnding' | 'liabilityBeginning' | 'liabilityEnding' | 'remark'>,
     value: number | string,
   ): Promise<void> {
-    const currentRows = rows.value.map(r => ({ ...r }))
-    if (rowIndex >= 0 && rowIndex < currentRows.length) {
-      ;(currentRows[rowIndex] as any)[field] = value
-      await _saveRows(currentRows)
-    }
+    if (!rows.value.some(r => r.rowKey === rowKey)) return
+    await _saveRows(updateRowByKey(rows.value, rowKey, r => ({ ...r, [field]: value })))
   }
 
   /**
@@ -248,7 +254,9 @@ export function useN5DeferredReconcile(options: UseN5DeferredReconcileOptions) {
    */
   async function addRow(label: string): Promise<void> {
     const currentRows = rows.value.map(r => ({ ...r }))
+    const semantic = semanticRowKey(label)
     currentRows.push({
+      rowKey: semantic && !currentRows.some(r => r.rowKey === semantic) ? semantic : generatedRowKey(),
       index: currentRows.length + 1,
       label,
       assetBeginning: 0,
@@ -266,9 +274,8 @@ export function useN5DeferredReconcile(options: UseN5DeferredReconcileOptions) {
   /**
    * 删除指定行
    */
-  async function removeRow(rowIndex: number): Promise<void> {
-    const currentRows = rows.value.filter((_, i) => i !== rowIndex)
-    await _saveRows(currentRows)
+  async function removeRow(rowKey: StableRowKey): Promise<void> {
+    await _saveRows(removeRowByKey(rows.value, rowKey))
   }
 
   /**
@@ -322,6 +329,7 @@ export function useN5DeferredReconcile(options: UseN5DeferredReconcileOptions) {
       '资产减值准备',
     ]
     return defaults.map((label, i) => ({
+      rowKey: semanticRowKey(label),
       index: i + 1,
       label,
       assetBeginning: 0,

@@ -1,0 +1,56 @@
+# 任务清单：合并附注节点隔离与共享上下文
+
+> 需求：#[[file:.kiro/specs/consol-node-key-isolation-and-shared-context/requirements.md]] ·
+> 设计：#[[file:.kiro/specs/consol-node-key-isolation-and-shared-context/design.md]]
+> 顺序：附注身份与旧入口 → custom query → 普通报表 → 前端 → 端点/集成验证 → 浏览器验收。
+> 规则：所有任务初始未完成；标 `[x]` 必须记录代码与通过测试证据。V177 已存在，不重复创建同一迁移。PBT `max_examples=5`。
+
+- [ ] 1. V177 契约与节点作用域基础
+  - [x] 1.1 现读 V177、ORM、索引定义与 migration status，确认节点键和 NULL 行的唯一性/并发语义；若不满足，暂停并提出新迁移，不在本任务重复 DDL
+  - [x] 1.2 在附注 service 建立共享 node scope 解析：项目权限、有效年度、树构建、精确 node_key 存在性、根 consol 判定；query 参数优先于 body
+  - [x] 1.3 建统一节点行 loader/writer：精确节点行优先；只允许有效根 GET fallback 到同项目/年度/章节 NULL 行；无键旧调用只查 NULL
+  - [x] 1.4 节点写入不修改 legacy 行；根首次写入从 legacy 建立节点专属行；处理唯一冲突并保持事务可用
+  - [~] 1.5 真 ORM/SQLite 测试：双节点隔离、非法节点、年度/项目/章节范围、根回退、非根不回退、复制后 legacy 不变、无键 NULL 兼容
+  - _需求：1.1~1.6；设计：§二~§三、P1~P4_
+
+- [ ] 2. 附注公式端点统一节点上下文
+  - [~] 2.1 全仓 grep 旧端点调用方；保留兼容路径，但统一接入节点解析与共享行 loader/writer
+  - [~] 2.2 `/refresh`、`/audit-all`、`/audit`、`/apply-formulas`、`/aggregate`、差额穿透与 `fill-by-formula` 复用一次共享视图上下文
+  - [~] 2.3 删除这些路径中引用不存在 TB 列的 SQL；TB 直接读取限定真实 ORM/schema 字段；异常返回明确错误/逐项原因，不吞异常或伪造 0/模板成功
+  - [~] 2.4 公式填入只写专属节点行，保留手工保护格，准确报告保留数量；保持对象/二维数组原形状
+  - [~] 2.5 真 ORM/SQLite 测试：不同节点公式结果、手工格保护、失败响应、旧路由节点语义与事务回滚；真发 FastAPI 请求验证权限依赖
+  - _需求：1.5、2.1~2.5；设计：§四、P2~P5_
+
+- [ ] 3. custom query 附注 cell 读写归属
+  - [~] 3.1 `business_fetchers._dispatch` 将 filters 完整传到 module-cell resolver；将 `filters.node_key` 传入附注 fetcher
+  - [~] 3.2 `_query_note_cells` 按 project/year/section 与精确 node_key 过滤；无 node_key 只查 NULL；加入稳定排序，不套用根 legacy fallback
+  - [~] 3.3 扩展 note writeback 请求归属字段：project_id/year/section_id/node_key/record id/cell 定位与现有乐观锁字段；核查调用方并同步前端/API 类型
+  - [~] 3.4 writer 在 `FOR UPDATE` 后复验所有归属字段、权限/状态与乐观锁；缺行/不匹配拒绝回滚，不 fallback 到 legacy
+  - [~] 3.5 支持 dict 与二维数组行，保留行列及非目标 cell；对行列越界和不支持形状返回明确错误
+  - [~] 3.6 真 SQLite/ORM writer 测试覆盖跨项目、跨年度、跨章节、跨节点伪造 ID、行不存在、乐观锁、对象/数组更新及独立事务复读；真发 HTTP 请求验证鉴权和响应
+  - _需求：3.1~3.6；设计：§五、P6~P7_
+
+- [ ] 4. 普通合并报表按节点读时计算
+  - [~] 4.1 `GET /api/consolidation/reports/{project_id}/{year}` 增可选 node_key；缺省选当前树根；显式键经当前项目/年度树精确验证，非法键/年度明确拒绝
+  - [~] 4.2 复用 `load_view_context`、`node_measures`、`consol_report_values`，按 node_key 计算所选 report_type；不从项目级物化金额冒充非根金额
+  - [~] 4.3 保留 `ConsolReportRow[]` 既有字段语义；本期/上期按同节点共享口径计算，缺节点/公式不支持给 null 与原因；股东权益表不由项目级 enrichment 覆盖节点金额
+  - [~] 4.4 不写 `FinancialReport`、不改其唯一键和 generate/push 写入流程；报表 config 不存在时返回明确错误
+  - [~] 4.5 真 ORM/SQLite 集团测试 + FastAPI 真请求：至少两个同企业不同角色节点、缺省根兼容、非法节点、全部报表字段契约、节点金额与同节点 trial/breakdown 逐行对拍、上期缺失原因、非根不读根物化值
+  - _需求：4.1~4.5；设计：§六、P5、P8_
+
+- [x] 5. 前端树节点共享上下文
+  - [~] 5.1 `ConsolidationIndex.vue` 将 `{code,name,nodeKey}` 单一上下文传给报表加载器和 `ConsolNoteTab`；实体类型要求 nodeKey
+  - [~] 5.2 报表请求经 `GET /api/consolidation/reports/{project_id}/{year}` 显式发送 nodeKey；附注所有节点级读取/写入/公式/审核/刷新/聚合/穿透请求传当前 nodeKey；独立穿透选择以当前节点初始化
+  - [~] 5.3 报表和附注缓存键包含 project/year/nodeKey/report-or-template 维度；刷新仅清除对应节点缓存
+  - [~] 5.4 加请求上下文与递增序号保护，切项目/年度/nodeKey 后旧响应不得提交；不能只依赖缓存或取消请求
+  - [~] 5.5 API/组件测试覆盖透传、同企业同角色身份区分、缓存分区与局部清理、请求乱序、差额穿透独立选择；用户可见错误中文
+  - _需求：4.5、5.1~5.5；设计：§七、P9_
+
+- [ ] 6. 端到端回归与契约收口
+  - [~] 6.1 定向运行合并附注公式、合并报表视图、module-cell resolver、snapshot writer 与相关端点测试；将预存失败与本 spec 新增失败分开记录
+  - [~] 6.2 真 FastAPI 请求覆盖成功/拒绝、权限依赖、响应 envelope、旧 body node_key 与 query 优先级；不得以 service-only 测试替代
+  - [~] 6.3 审查全量 SQL 对 `consol_note_data` 的查询/更新，确认不存在绕过作用域 helper 的附注节点读写；节点金额无第二套 company_code 算法
+  - [~] 6.4 执行定向 lint/type/test；前端类型检查使用本仓可运行的单区域配置并用 TS2322 变异证明目标文件实际纳入检查
+  - [~] 6.5 Playwright 真浏览器：切换两个树节点、普通报表重载、附注保存后重读、快速切换制造响应乱序、确认数据互不串用；环境不可运行则保持未完成并记录阻塞
+  - [~] 6.6 按需求 1~6 与设计 P1~P9 逐项复核覆盖，检查三件套链接、端点名/字段名、所有任务证据完整；未实际验证的任务不打勾
+  - _需求：6.1~6.5；设计：§八~§十_

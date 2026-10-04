@@ -41,11 +41,15 @@ export interface ParentCompanySourceView {
   companyCode: string | null
   /** 来源口径的中文标签；未定位到时为 null。 */
   scopeLabel: string | null
+  /** 有分公司时的母公司汇总节点及标记（branch-only 增量字段）。 */
+  sourceNodeKey?: string | null
+  includesBranches?: boolean
 }
 
 /** 口径英文值 → 中文标签（UI 全中文化铁律；未知值原样透出便于排查）。 */
 export function parentScopeLabel(scope: unknown): string | null {
   if (scope === 'standalone') return '单体（母公司）'
+  if (scope === 'parent_aggregate') return '母公司汇总（本部＋分公司）'
   if (scope === 'consolidated') return '合并'
   if (typeof scope === 'string' && scope.trim()) return scope
   return null
@@ -63,6 +67,8 @@ export function readParentCompanySource(table: unknown): ParentCompanySourceView
     projectName: null,
     companyCode: null,
     scopeLabel: null,
+    sourceNodeKey: null,
+    includesBranches: false,
   }
   if (!table || typeof table !== 'object') return blank
   const t = table as Record<string, unknown>
@@ -77,12 +83,14 @@ export function readParentCompanySource(table: unknown): ParentCompanySourceView
   const projectName = typeof m?.source_project_name === 'string' ? m.source_project_name : null
   const companyCode = typeof m?.source_company_code === 'string' ? m.source_company_code : null
   const scopeLabel = parentScopeLabel(m?.source_scope)
+  const sourceNodeKey = typeof m?.source_node_key === 'string' ? m.source_node_key : null
+  const includesBranches = m?.includes_branches === true
 
   if (missing) {
-    return { state: 'missing', projectName, companyCode, scopeLabel: null }
+    return { state: 'missing', projectName, companyCode, scopeLabel: null, sourceNodeKey, includesBranches }
   }
   if (m && (projectName || companyCode || scopeLabel)) {
-    return { state: 'resolved', projectName, companyCode, scopeLabel }
+    return { state: 'resolved', projectName, companyCode, scopeLabel, sourceNodeKey, includesBranches }
   }
   return blank
 }
@@ -93,6 +101,9 @@ export function parentCompanySourceSummary(view: ParentCompanySourceView): strin
   const name = view.projectName || '—'
   const code = view.companyCode || '—'
   const scope = view.scopeLabel || '—'
+  if (view.includesBranches) {
+    return `本章审定数取自母公司汇总节点「${view.sourceNodeKey || '—'}」（${name}，企业代码 ${code}，口径 ${scope}）；未审数与期初数为本部加分公司，不含母分差额`
+  }
   return `本章数据取自母公司单体项目「${name}」（企业代码 ${code}，口径 ${scope}）`
 }
 

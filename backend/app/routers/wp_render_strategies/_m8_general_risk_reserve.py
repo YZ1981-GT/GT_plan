@@ -121,7 +121,7 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
     # ── 取项目行业信息（用于行业守卫） ───────────────────────────────────
     project_info: dict[str, Any] = {}
     try:
-        from app.models.audit_platform_models import Project
+        from app.models.core import Project
         result = await db.execute(
             sa.select(Project).where(Project.id == project_id)
         )

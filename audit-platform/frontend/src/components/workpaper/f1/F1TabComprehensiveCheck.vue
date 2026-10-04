@@ -138,9 +138,9 @@
   </nav>
 
   <el-collapse id="f1-7-sampling" class="sampling-engine-collapse" style="margin-bottom: 12px">
-    <el-collapse-item title="自动抽凭（科目 1123 预付账款 · 样本按借贷方向自动分配）" name="auto-sampling">
+    <el-collapse-item title="自动抽凭（科目 ${samplingAccountCode} 预付账款 · 样本按借贷方向自动分配）" name="auto-sampling">
       <GtVoucherSamplingEngine
-        account-code="1123"
+        :account-code="samplingAccountCode"
         :phase="currentPhase"
         default-method="mus"
         :workpaper-id="wpId"
@@ -677,6 +677,17 @@ import F1VoucherCheckDialog from './F1VoucherCheckDialog.vue'
 import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
+
+/**
+ * 抽凭科目码取自单一真源 `f1AccountScope`（F1 预付账款）。
+ * 原为模板内字面量；接真源后科目口径与该循环的取数/回写共用同一定义，
+ * 避免各处独立硬编码而漂移。本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2
+ */
+import { f1QueryCodes } from '../composables/f1AccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = f1QueryCodes().join(',')
 
 const f1VoucherNav = [
   { id: 'f1-7-sample', label: '样本' },

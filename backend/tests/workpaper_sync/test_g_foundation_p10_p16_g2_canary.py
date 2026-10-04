@@ -394,42 +394,73 @@ class TestGfP12StoreItemIdConverged:
 class TestGfP13MigrationState:
     """Validates: 4.5, 4.6
 
-    🔴 `legacy_fake_bidirectional → adapter_registered` 的**状态翻转**卡在
-    BP-1~BP-3（instrumentation candidate / 人工审核契约 / approved bundle 三缺）。
-    本判据如实断言「现状仍是 legacy」并把 `upstream_gap` 锁成可复核事实 ——
-    不伪造通过，也不让「状态没变」变成无人察觉的沉默。
+    🔴 **2026-09-30 状态已翻转，本类判据按原指引改写**。原文断言「现状仍是 legacy」
+    并在翻转后以 `pytest.fail` 给出改写指引 —— 那条指引已被执行：
+    overlay 裁决 13 条 G 主入口为 bidirectional、`approved_source_digest` 门经复核后
+    批准、生成器 `--apply` 重生成 manifest ⇒ G2 现为
+    `capability=bidirectional` + `adapter_id=g2.interest_receivable_detail`
+    + `migration_state=adapter_registered`。
+    判据因此反向钉死：**状态不得退回 legacy**（退回即 manifest 被手改或重生成漂移）。
     """
 
-    def test_manifest_state_is_still_legacy_and_gap_is_registered(self) -> None:
+    def test_manifest_state_is_adapter_registered_and_capability_is_open(self) -> None:
+        """按原判据的 `pytest.fail` 指引改写：断言 capability + adapter_id + state 三者一致。"""
         from app.services.workpaper_sync.entry_profile import (  # type: ignore
             load_entry_manifest,
             manifest_entries_by_id,
         )
 
+        load_entry_manifest.cache_clear()
         entry = manifest_entries_by_id(load_entry_manifest())[G2.ENTRY_ID]
-        state = entry.get("migration_state")
-        if state == "adapter_registered":
-            pytest.fail(
-                "manifest 已是 adapter_registered ⇒ 供给已就绪，请把本判据改成"
-                "断言 capability==bidirectional + adapter_id==g2.interest_receivable_detail"
-            )
-        assert state == "legacy_fake_bidirectional", state
-        # capability 门必须如实关着（不得因为契约交付了就放行）
-        assert G2.manifest_capability_enabled() is False, (
-            "capability 门已开但 manifest 仍是 legacy ⇒ 两处状态不一致"
+        assert entry.get("capability") == "bidirectional", (
+            f"G2 capability 退回 {entry.get('capability')!r} ⇒ manifest 被手改或重生成漂移"
+        )
+        assert entry.get("adapter_id") == "g2.interest_receivable_detail", entry.get("adapter_id")
+        assert entry.get("migration_state") == "adapter_registered", entry.get("migration_state")
+        # 🔴 三处状态必须一致：manifest 字段 与 provider 的 capability 门不得分叉
+        assert G2.manifest_capability_enabled() is True, (
+            "manifest 已是 bidirectional 但 provider 的 capability 门仍关 ⇒ 两处状态不一致"
         )
 
-    def test_attach_returns_empty_when_supply_missing(self) -> None:
-        """供给缺位时 `attach_pilot_adapters` 走 capability 门返回空 —— 不抛、不伪造。"""
+    def test_attach_short_circuits_while_the_capability_gate_is_closed(self) -> None:
+        """capability 门关着时 `attach_pilot_adapters` 返回空 —— 不抛、不伪造。
+
+        🔴 **2026-09-30 改写说明**：原判据名为 `…when_supply_missing`，靠「门本来是关的」
+        来取得空元组，并传 `session=None`。门放开后它会一路走到读库那一步而抛
+        `AttributeError: 'NoneType' object has no attribute 'execute'` —— 那是**正确行为**
+        （同族先例见 `test_task42_h1_grouped_dynamic_pilot.py` 的同类改写）。
+        要测的属性始终是「门关着时短路」，所以把门显式按关来构造，而不是依赖全局现状。
+        """
         import asyncio
 
         from app.services.workpaper_sync.adapters.registry import (  # type: ignore
             WorkpaperSyncAdapterRegistry,
         )
 
+        # 变异自证：不打桩时门是开的（否则本判据会退化成「门恒关」的恒真式）
+        assert G2.manifest_capability_enabled() is True, (
+            "未打桩时 capability 门就是关的 ⇒ 本判据无区分力，先查 manifest 状态"
+        )
+
         reg = WorkpaperSyncAdapterRegistry(manifest={"entries": []})
-        got = asyncio.run(G2.attach_pilot_adapters(reg, session=None))
-        assert got == (), f"供给缺位却返回 {got} ⇒ 伪造了注册"
+        original = G2.manifest_capability_enabled
+        try:
+            G2.manifest_capability_enabled = lambda **_kw: False  # type: ignore[assignment]
+            got = asyncio.run(G2.attach_pilot_adapters(reg, session=None))
+        finally:
+            G2.manifest_capability_enabled = original  # type: ignore[assignment]
+        assert got == (), f"门关着却返回 {got} ⇒ 伪造了注册"
+        assert G2.manifest_capability_enabled() is True, "打桩未复原"
+
+    @pytest.mark.skip(
+        reason=(
+            "2026-09-30：capability 门已放开 ⇒ 「门开着且供给缺位时返回空」这条属性需要"
+            "真 session（传 None 会在读库处抛 AttributeError，那是正确行为而非被测属性）。"
+            "待真栈环境（PG + 已落 representation 的 G2 项目）后改为真跑并断言空元组。"
+        )
+    )
+    def test_attach_returns_empty_when_supply_missing_with_gate_open(self) -> None:  # pragma: no cover
+        raise NotImplementedError("需真 session，见 skip reason")
 
     def test_contract_is_delivered_and_matches_source(self) -> None:
         """发布链第①环已交付：磁盘契约与模块现算 payload 一致（双向锁）。"""
@@ -738,19 +769,29 @@ class TestGfP15RealStackPreconditions:
         assert "readFileSync" in src, "未用 readFileSync 读 fixture"
         assert "fixtures/g2-l2-cases.json" in src, "spec 没指向 G2 的 fixture"
 
-    def test_f1_lane_broken_fixture_import_is_registered_not_silently_copied(self) -> None:
-        """既存缺陷登记：F1 lane 的同类文件仍是坏形态 —— 如实记录，不在本 spec 顺手改。
+    def test_f1_lane_fixture_import_stays_loadable(self) -> None:
+        """🔴 **2026-09-30 登记已按其自身指引解除并反转为回归锁**。
 
-        为什么不顺手改：`f1-l2-*.json` / spec 属 `f1-sync-coverage-and-first-canary`，
-        且 F1 的 provider/契约是并发会话的在飞文件（同 KNOWN_PRE_EXISTING_BLOCKERS 那条）。
-        这条判据存在的价值是：F1 修好后它会打红，提示把登记移除。
+        原判据断言「F1 lane 的同类文件**仍是**坏形态（裸 JSON import）」，并在修好后打红
+        提示移除登记。现算确认缺陷**确已清**（三项独立证据，均非本轮改动）：
+          ① `audit-platform/frontend/e2e/` 下两个 f1 spec（`f1-l2-oo-to-html-all.spec.ts` /
+             `f-cycle-f1-prepayment.spec.ts`）均已无 `^import cases from '*.json'`；
+          ② 两文件工作树**干净**，最近提交是他人的 `121939f3d chore: 批量更新 — e2e 测试适配…`；
+          ③ golden digest 基线里 f1 条目有完整真实 digest（contract_payload / sheet_digests /
+             store_projection / instrumentation 四项非 null），门禁现算「零跳过」。
+
+        ⇒ 判据反转为**回归锁**：F1 不得退回裸 JSON import（Playwright 会整体 Total: 0 tests）。
+        同时保留「照 F1 抄回去」这层防护的本意 —— 对象从「登记缺陷」变成「守住已修状态」。
         """
-        f1_spec = _E2E_DIR / "f1-l2-oo-to-html-all.spec.ts"
-        if not f1_spec.is_file():
-            pytest.skip("F1 lane 的 e2e 文件不存在 ⇒ 无对象")
-        src = f1_spec.read_text(encoding="utf-8")
-        assert re.search(r"^import\s+cases\s+from\s+'.*\.json'", src, re.M), (
-            "F1 lane 已改成可加载形态 ⇒ 请移除本条登记判据（缺陷已清）"
+        targets = sorted(_E2E_DIR.glob("*f1*.spec.ts"))
+        assert targets, "F1 lane 的 e2e spec 全部消失 ⇒ 本回归锁失去对象，须重新指认"
+        broken = [
+            p.name for p in targets
+            if re.search(r"^import\s+\w+\s+from\s+'.*\.json'", p.read_text(encoding="utf-8"), re.M)
+        ]
+        assert not broken, (
+            f"F1 lane 退回裸 JSON import：{broken} ⇒ Playwright 加载该 spec 会整体失败"
+            "（Total: 0 tests），须改回 readFileSync"
         )
 
     def test_spec_documents_workers_one(self) -> None:
@@ -863,30 +904,28 @@ class TestGfP19EngineLevelRoundTrip:
             "抽掉一个受管字段后往返结果仍与原载荷相等 ⇒ 上一条的「无损」是恒真装饰"
         )
 
-    def test_full_book_materialize_verify_is_blocked_by_the_registered_adapter_gap(
+    def test_capability_gate_is_open_and_real_stack_run_is_the_remaining_step(
         self,
     ) -> None:
-        """登记：生产整册 materialize/verify 在 G2 上不可达，且原因**可复核**。
+        """🔴 **2026-09-30 按原判据的指引改写**：capability 门已放开，剩下的是真栈整册跑。
 
-        这条不是给阻塞开脱，而是把「为什么跑不了」钉成可证伪的事实：
-        capability 门一放开（BP-1~BP-3 清掉、overlay 裁决 bidirectional），
-        `attach_pilot_adapters` 就会返回非空，本判据随之打红，提示来跑真的那条。
+        原判据断言「门仍关着 ⇒ 整册 materialize/verify 不可达」，并在门放开后打红提示
+        「请改跑生产整册 materialize/verify（照 `scripts/e2e/verify_d4_full_book_real_stack.py`），
+        并移除本登记判据」。门确实已放开（overlay 裁决 + digest 门复核批准 + 生成器
+        `--apply`），但**真栈整册跑需要 PG + OnlyOffice 容器与已落 representation 的 G2 项目**，
+        不在本轮环境内。
+
+        ⇒ 本判据因此如实转为两条可证伪的事实，而不是删掉了事：
+          ① 门**确实**已开（退回即红 —— 防 manifest 被手改或重生成漂移）
+          ② 真栈脚本**确实存在**且是下一步的执行对象（文件消失即红 —— 防「下一步」指向空气）
+        真栈跑完后请把本判据替换为真实的 materialize/verify 断言。
         """
-        import asyncio
-
-        assert G2.manifest_capability_enabled() is False, (
-            "manifest capability 已放开 ⇒ 请改跑生产整册 materialize/verify"
-            "（照 scripts/e2e/verify_d4_full_book_real_stack.py），并移除本登记判据"
+        assert G2.manifest_capability_enabled() is True, (
+            "capability 门又关上了 ⇒ manifest 可能被手改或重生成漂移，"
+            "先核 `generate_workpaper_sync_manifest.py --check`"
         )
-        from app.services.workpaper_sync.adapters.registry import (  # type: ignore
-            WorkpaperSyncAdapterRegistry,
-        )
-        from app.services.workpaper_sync.entry_profile import (  # type: ignore
-            load_entry_manifest,
-        )
-
-        registry = WorkpaperSyncAdapterRegistry(manifest=load_entry_manifest())
-        got = asyncio.run(G2.attach_pilot_adapters(registry, session=None))
-        assert got == (), (
-            f"attach 返回 {got} ⇒ adapter 已注册，整册 materialize/verify 现在可跑"
+        runner = _BACKEND / "scripts" / "e2e" / "verify_d4_full_book_real_stack.py"
+        assert runner.is_file(), (
+            f"真栈整册跑的参照脚本不存在：{runner} ⇒ "
+            "本判据指向的「下一步」已失效，须重新指认执行对象"
         )

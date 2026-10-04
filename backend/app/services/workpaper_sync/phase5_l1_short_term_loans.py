@@ -35,8 +35,6 @@ finder 零命中）—— 同 d6 的 `D6C` 范式。
 
 from __future__ import annotations
 
-import hashlib
-import json
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -48,15 +46,12 @@ from app.services.workpaper_sync.adapters.registry import (
     WorkpaperSyncAdapterRegistry,
 )
 from app.services.workpaper_sync.contracts import (
-    CONTRACT_SCHEMA_VERSION,
     SyncContract,
     contract_path_for,
     load_contract,
-    parse_contract,
 )
 from app.services.workpaper_sync.definitions import canonical_digest
 from app.services.workpaper_sync.entry_profile import (
-    Capability,
     DescriptorFacts,
     RoomFacts,
     load_entry_manifest,
@@ -65,29 +60,9 @@ from app.services.workpaper_sync.entry_profile import (
 from app.services.workpaper_sync.excel_instrumentation import (
     ExcelIdentityCarrierGate,
     ExcelInstrumentationSpec,
-    build_instrumentation_payload,
-    build_template_payload,
-    normalized_structure_hash,
 )
-from app.services.workpaper_sync.models import (
-    AuthorityModel,
-    BundleSlot,
-    DefinitionKind,
-    SyncDomainError,
-)
-from app.services.workpaper_sync.phase5_row_table_sheet import (
-    RowTableSheetSpec,
-    StoreKind,
-)
-from app.services.workpaper_sync.phase5_row_table_sheet import (
-    managed_field_specs as _engine_managed_field_specs,
-)
-
-
-class EntrySelectionError(SyncDomainError):
-    """冻结的 canary entry 不再满足选型必要条件（manifest / 模板真源漂移即打红）。"""
-
-    error_code = "sync_phase5_l1_selection_invalid"
+from app.services.workpaper_sync.models import SyncDomainError
+from app.services.workpaper_sync.phase5_row_table_sheet import RowTableSheetSpec
 
 
 class StorePayloadError(SyncDomainError):
@@ -96,7 +71,9 @@ class StorePayloadError(SyncDomainError):
     error_code = "sync_phase5_l1_store_payload_invalid"
 
 
-from app.services.workpaper_sync.phase5_l1_sheets import (
+#: 🔴 整组 re-export：守卫与生成器按 `phase5_l1_short_term_loans.<常量>` 读几何真源，
+#: 本模块内未直接使用的也要留（F401 是有意的）。
+from app.services.workpaper_sync.phase5_l1_sheets import (  # noqa: F401,E402
     ADAPTER_ID,
     AUTHORITY_MODEL,
     DERIVED_SHEET,
@@ -138,35 +115,56 @@ from app.services.workpaper_sync.phase5_l1_sheets import (
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 3. 权威模板
+# 3~6. 权威模板 / 选型 / instrumentation / 契约 —— 装配全部委派 L 公共骨架
 # ═══════════════════════════════════════════════════════════════════════════
+#
+# 🔴 task 11 回迁：本模块只保留**声明**（IDENTITY + SPEC_L12）与 L1 独有的选型判据
+# （零回退 + 父码 canonical resolver）。回迁前后契约 canonical digest 逐字节不变
+# （`0567f010…`，守卫 `test_l_cycle_common.py`）。
 
+from app.services.workpaper_sync import phase5_l_cycle_common as _L  # noqa: E402
+
+IDENTITY: Final[_L.LEntryIdentity] = _L.LEntryIdentity(
+    entry_id=ENTRY_ID,
+    adapter_id=ADAPTER_ID,
+    phase5_wave=PHASE5_WAVE,
+    wp_codes=frozenset(WP_CODES),
+    template_relative_path=TEMPLATE_RELATIVE_PATH,
+    template_sha256=TEMPLATE_SHA256,
+    primary_store_item_id=STORE_ITEM_ID,
+    row_identity_store_key=ROW_IDENTITY_STORE_KEY,
+    html_store_note=_HTML_STORE_NOTE,
+    reviewed_basis=_REVIEWED_BASIS,
+    authority_model=AUTHORITY_MODEL,
+    expected_profile_id=EXPECTED_PROFILE_ID,
+    html_only_keys=tuple(HTML_ONLY_ROW_KEYS),
+    derived_readonly_sheet={
+        "excel_name": DERIVED_SHEET,
+        "reason": (
+            "R7~R11 无一个可输入格：B/C/D/F/G/H 全是 SUMIF 引用受管表、"
+            "E/I/J/L 是加总、K 是裸 IF、R11 是 SUM ⇒ 只读投影，一格不写"
+        ),
+    },
+)
+SPECS: Final[tuple[RowTableSheetSpec, ...]] = (SPEC_L12,)
+
+#: 与公共骨架同一个类 —— 骨架抛的就是它，调用方 `except EntrySelectionError` 照常生效。
+#: 🔴 错误码由 `sync_phase5_l1_selection_invalid` 并入 `sync_phase5_l_selection_invalid`
+#: （现算全仓无任何消费方引用旧字面量）。
+EntrySelectionError = _L.LEntrySelectionError
 _BACKEND_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 
 
 def excel_carrier_gate() -> ExcelIdentityCarrierGate:
-    return ExcelIdentityCarrierGate.load()
+    return _L.excel_carrier_gate()
 
 
 def authoritative_template_path() -> Path:
-    return excel_carrier_gate().assert_template_under_authority(TEMPLATE_RELATIVE_PATH)
+    return _L.authoritative_template_path(IDENTITY)
 
 
 def read_authoritative_template() -> bytes:
-    path = authoritative_template_path()
-    data = path.read_bytes()
-    digest = hashlib.sha256(data).hexdigest()
-    if digest != TEMPLATE_SHA256:
-        raise EntrySelectionError(
-            f"权威模板字节已变: {TEMPLATE_RELATIVE_PATH} 实测 sha256={digest}，"
-            f"冻结哨兵={TEMPLATE_SHA256} —— `backend/wp_templates/` 运行时只读"
-        )
-    return data
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# 4. 选型必要条件（真实 manifest，不经封闭枚举）
-# ═══════════════════════════════════════════════════════════════════════════
+    return _L.read_authoritative_template(IDENTITY)
 
 
 @dataclass(frozen=True)
@@ -179,6 +177,7 @@ class TemplateResolutionFacts:
 def assert_no_implicit_template_fallback(
     resolution: TemplateResolutionFacts, *, wp_codes: frozenset[str]
 ) -> None:
+    """L1 独有：幻影码不得命中任何模板 + 父码 canonical resolver 落在权威模板。"""
     missing = sorted(wp_codes - set(resolution.by_wp_code))
     if missing:
         raise EntrySelectionError(
@@ -234,67 +233,25 @@ def assert_entry_selectable(
     return entry
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# 5. instrumentation spec 与 definition payloads
-# ═══════════════════════════════════════════════════════════════════════════
+def instrumentation_specs() -> tuple[ExcelInstrumentationSpec, ...]:
+    """复数形态（注册路径优先读这个）—— L1 本轮单受管 sheet，故只有一条。"""
+    return _L.instrumentation_specs_for(IDENTITY, SPECS)
 
 
 def instrumentation_spec() -> ExcelInstrumentationSpec:
-    return ExcelInstrumentationSpec(
-        entry_id=ENTRY_ID,
-        template_id=TEMPLATE_ID,
-        template_relative_path=TEMPLATE_RELATIVE_PATH,
-        managed_sheet=MANAGED_SHEET,
-        first_data_row=FIRST_DATA_ROW,
-        last_data_row=LAST_DATA_ROW,
-        footer_row=FOOTER_ROW,
-        managed_last_col=MANAGED_LAST_COL,
-        uuid_col=UUID_COL,
-        table_name=TABLE_NAME,
-    )
-
-
-def instrumentation_specs() -> tuple[ExcelInstrumentationSpec, ...]:
-    """复数形态（注册路径优先读这个）—— L1 本轮单受管 sheet，故只有一条。"""
-    return (instrumentation_spec(),)
+    return instrumentation_specs()[0]
 
 
 def template_definition_payload() -> dict[str, Any]:
-    return build_template_payload(
-        spec=instrumentation_spec(),
-        template_sha256=TEMPLATE_SHA256,
-        structure_hash=normalized_structure_hash(read_authoritative_template()),
-    )
+    return _L.template_definition_payload(IDENTITY, SPECS)
 
 
 def instrumentation_definition_payload() -> dict[str, Any]:
-    return build_instrumentation_payload(
-        spec=instrumentation_spec(),
-        template_definition_sha256=canonical_digest(template_definition_payload()),
-        template_sha256=TEMPLATE_SHA256,
-        gate=excel_carrier_gate(),
-    )
+    return _L.instrumentation_definition_payload(IDENTITY, SPECS)
 
 
 def authority_model_payload() -> dict[str, Any]:
-    return {
-        "schema_version": "authority-model-definition:v1",
-        "authority_model": AUTHORITY_MODEL.value,
-        "content_authority": "structured_projection",
-        "merge_model": "stable_field_three_way",
-        "required_slots": [
-            BundleSlot.template.value,
-            BundleSlot.instrumentation.value,
-            BundleSlot.contract.value,
-        ],
-        "entry_id": ENTRY_ID,
-        "pilot_class": PHASE5_WAVE,
-    }
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# 6. per-entry contract（与磁盘契约双向锁死）
-# ═══════════════════════════════════════════════════════════════════════════
+    return _L.authority_model_payload(IDENTITY)
 
 
 def stable_key_for(column_key: str, row_identity: str = "{row_uuid}") -> str:
@@ -306,60 +263,8 @@ def stable_key_for(column_key: str, row_identity: str = "{row_uuid}") -> str:
     return _engine_stable_key_for(SPEC_L12, column_key, row_identity)
 
 
-
 def build_contract_payload() -> dict[str, Any]:
-    from app.services.workpaper_sync.phase5_row_table_sheet import (
-        spec_to_contract_sheet_payload,
-    )
-
-    template_payload = template_definition_payload()
-    return {
-        "schema_version": CONTRACT_SCHEMA_VERSION,
-        "contract_id": ADAPTER_ID,
-        "semantic_version": "1.0.0",
-        "review_status": "reviewed",
-        "document_type": "xlsx",
-        "template_definition_sha256": canonical_digest(template_payload),
-        "instrumentation_definition_sha256": canonical_digest(
-            instrumentation_definition_payload()
-        ),
-        "template": {
-            "relative_path": TEMPLATE_RELATIVE_PATH,
-            "template_sha256": TEMPLATE_SHA256,
-            "normalized_structure_hash": template_payload["normalized_structure_hash"],
-        },
-        #: 🔴 只用 `hidden_uuid_column`（册内零 definedName / 零 Excel Table，
-        #: 声明 `defined_name` / `excel_table` 需先新建；`hidden_sheet` 由 Task 17 的
-        #: `_GT_SYNC` 注入）。sheet 锚点走 `excel_table_sheet_association`，
-        #: 禁 `sheet_id` / `sheet_display_name`（OO 9.4 实测 failed）。
-        "identity_carriers": [
-            "hidden_sheet",
-            "excel_table",
-            "hidden_uuid_column",
-        ],
-        "sheets": [spec_to_contract_sheet_payload(SPEC_L12)],
-        "review": {
-            "entry_id": ENTRY_ID,
-            "pilot_class": PHASE5_WAVE,
-            "authority_root": "backend/wp_templates",
-            "html_store": {
-                "table": "checklist_responses",
-                "item_id": STORE_ITEM_ID,
-                "row_identity_key": ROW_IDENTITY_STORE_KEY,
-                "shape": "json_array_of_row_objects",
-                "html_only_keys": list(HTML_ONLY_ROW_KEYS),
-                "note": _HTML_STORE_NOTE,
-            },
-            "derived_readonly_sheet": {
-                "excel_name": DERIVED_SHEET,
-                "reason": (
-                    "R7~R11 无一个可输入格：B/C/D/F/G/H 全是 SUMIF 引用受管表、"
-                    "E/I/J/L 是加总、K 是裸 IF、R11 是 SUM ⇒ 只读投影，一格不写"
-                ),
-            },
-            "reviewed_basis": _REVIEWED_BASIS,
-        },
-    }
+    return _L.build_contract_payload(IDENTITY, SPECS)
 
 
 def contract_file_path() -> Path:
@@ -371,18 +276,7 @@ def load_contract_from_disk() -> SyncContract:
 
 
 def assert_contract_file_matches_source() -> SyncContract:
-    expected = build_contract_payload()
-    on_disk = load_contract_from_disk()
-    if canonical_digest(on_disk.canonical_payload) != canonical_digest(expected):
-        raise EntrySelectionError(
-            "磁盘 per-entry contract 与本模块现算 payload 不一致 —— "
-            f"disk={canonical_digest(on_disk.canonical_payload)} "
-            f"source={canonical_digest(expected)}；"
-            "请用 `& d:/GT_plan/.venv/Scripts/python.exe "
-            "backend/scripts/gen/generate_phase5_l_contracts.py --apply` 重生成"
-        )
-    parse_contract(expected, adapter_id=ADAPTER_ID)
-    return on_disk
+    return _L.assert_contract_file_matches_source(IDENTITY, build_contract_payload())
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -480,77 +374,20 @@ class Phase5Definitions:
 
 async def publish_definitions(publisher: Any) -> Phase5Definitions:
     """五环发布：template → instrumentation → contract → bundle（顺序不可颠倒）。"""
-    contract = assert_contract_file_matches_source()
-    authority = await publisher.publish_definition(
-        kind=DefinitionKind.authority_model,
-        payload=authority_model_payload(),
-        logical_id=f"{ADAPTER_ID}.authority-model",
-        semantic_version="1.0.0",
-    )
-    template_payload = template_definition_payload()
-    template = await publisher.publish_definition(
-        kind=DefinitionKind.template,
-        payload=template_payload,
-        logical_id=f"{ADAPTER_ID}.template",
-        semantic_version="1.0.0",
-        blob_bytes=read_authoritative_template(),
-        structure_hash=template_payload["normalized_structure_hash"],
-    )
-    instrumentation = await publisher.publish_definition(
-        kind=DefinitionKind.instrumentation,
-        payload=instrumentation_definition_payload(),
-        logical_id=f"{ADAPTER_ID}.instrumentation",
-        semantic_version="1.0.0",
-    )
-    contract_definition = await publisher.publish_definition(
-        kind=DefinitionKind.contract,
-        payload=dict(contract.canonical_payload),
-        logical_id=ADAPTER_ID,
-        semantic_version=contract.semantic_version,
-    )
-    if template.sha256 != contract.template_definition_sha256:
-        raise EntrySelectionError(
-            f"已发布 template digest {template.sha256} 与契约声明 "
-            f"{contract.template_definition_sha256} 不一致 —— 单向引用断裂"
-        )
-    if instrumentation.sha256 != contract.instrumentation_definition_sha256:
-        raise EntrySelectionError(
-            f"已发布 instrumentation digest {instrumentation.sha256} 与契约声明 "
-            f"{contract.instrumentation_definition_sha256} 不一致 —— 单向引用断裂"
-        )
-    bundle = await publisher.publish_bundle(
-        authority_model_definition_id=authority.definition_id,
-        authority_model=AUTHORITY_MODEL,
-        authority_model_definition_sha256=authority.sha256,
-        slots={
-            BundleSlot.template: {
-                "type": "definition",
-                "ref": f"definition:{template.definition_id}",
-                "digest": template.sha256,
-            },
-            BundleSlot.instrumentation: {
-                "type": "definition",
-                "ref": f"definition:{instrumentation.definition_id}",
-                "digest": instrumentation.sha256,
-            },
-            BundleSlot.contract: {
-                "type": "definition",
-                "ref": f"definition:{contract_definition.definition_id}",
-                "digest": contract_definition.sha256,
-            },
-        },
+    out = await _L.publish_definitions(
+        IDENTITY, SPECS, publisher, contract_payload=build_contract_payload()
     )
     return Phase5Definitions(
-        authority_model_definition_id=authority.definition_id,
-        authority_model_definition_sha256=authority.sha256,
-        template_definition_id=template.definition_id,
-        template_definition_sha256=template.sha256,
-        instrumentation_definition_id=instrumentation.definition_id,
-        instrumentation_definition_sha256=instrumentation.sha256,
-        contract_definition_id=contract_definition.definition_id,
-        contract_definition_sha256=contract_definition.sha256,
-        bundle_id=bundle.bundle_id,
-        bundle_sha256=bundle.canonical_sha256,
+        authority_model_definition_id=out["authority"].definition_id,
+        authority_model_definition_sha256=out["authority"].sha256,
+        template_definition_id=out["template"].definition_id,
+        template_definition_sha256=out["template"].sha256,
+        instrumentation_definition_id=out["instrumentation"].definition_id,
+        instrumentation_definition_sha256=out["instrumentation"].sha256,
+        contract_definition_id=out["contract"].definition_id,
+        contract_definition_sha256=out["contract"].sha256,
+        bundle_id=out["bundle"].bundle_id,
+        bundle_sha256=out["bundle"].canonical_sha256,
     )
 
 
@@ -560,7 +397,7 @@ async def publish_definitions(publisher: Any) -> Phase5Definitions:
 
 
 def build_matcher() -> EntryMatcher:
-    return EntryMatcher(document_type="xlsx", wp_codes=WP_CODES)
+    return _L.build_matcher(IDENTITY)
 
 
 def build_registration(
@@ -571,15 +408,9 @@ def build_registration(
     room: RoomFacts,
     contract: SyncContract | None = None,
 ) -> AdapterRegistration:
-    return AdapterRegistration(
-        adapter=adapter,
-        entry_id=ENTRY_ID,
-        matcher=build_matcher(),
-        bundle=bundle,
-        descriptor=descriptor,
-        room=room,
-        declared_capability=Capability.bidirectional,
-        contract=contract if contract is not None else load_contract_from_disk(),
+    return _L.build_registration(
+        IDENTITY, adapter=adapter, bundle=bundle, descriptor=descriptor, room=room,
+        contract=contract,
     )
 
 
@@ -592,60 +423,27 @@ def register_adapter(
     room: RoomFacts,
     contract: SyncContract | None = None,
 ) -> AdapterRegistration:
-    registration = build_registration(
-        adapter=adapter, bundle=bundle, descriptor=descriptor, room=room, contract=contract
+    return _L.register_adapter(
+        registry, IDENTITY, adapter=adapter, bundle=bundle, descriptor=descriptor, room=room,
+        contract=contract,
     )
-    registry.register(registration)
-    return registration
 
 
 def manifest_capability_enabled(manifest: Mapping[str, Any] | None = None) -> bool:
-    """manifest 是否已把本 entry 裁决成 bidirectional 且 adapter_id 对得上。
-
-    🔴 这是「先翻 manifest 再注册」的门：注册路径读它，避免 manifest 仍是
-    `legacy_fake_bidirectional` 时就把 adapter 挂上去（那会让账本与运行时脱钩）。
-    """
-    payload = manifest if manifest is not None else load_entry_manifest()
-    entry = manifest_entries_by_id(payload).get(ENTRY_ID)
-    if entry is None:
-        return False
-    if str(entry.get("capability") or "") != Capability.bidirectional.value:
-        return False
-    return str(entry.get("adapter_id") or "") == ADAPTER_ID
+    """manifest 是否已把本 entry 裁决成 bidirectional 且 adapter_id 对得上。"""
+    return _L.manifest_capability_enabled(IDENTITY, manifest=manifest)
 
 
 def assert_manifest_capability_enabled(manifest: Mapping[str, Any] | None = None) -> None:
-    if not manifest_capability_enabled(manifest):
-        raise EntrySelectionError(
-            f"manifest 尚未把 {ENTRY_ID!r} 裁决成 bidirectional + "
-            f"adapter_id={ADAPTER_ID!r} —— 发布链第⑤环走完后须重生成 manifest 再注册"
-        )
+    _L.assert_manifest_capability_enabled(IDENTITY, manifest=manifest)
 
 
 async def resolve_published_frozen_definitions(
     *, session: Any, representation: Any, contract: SyncContract
 ) -> Any:
-    from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
-    from app.services.workpaper_sync.published_identity_observer import (
-        observe_published_frozen_definitions,
+    return await _L.resolve_published_frozen_definitions(
+        IDENTITY, session=session, representation=representation, contract=contract
     )
-    from app.services.workpaper_sync.resolution import CanonicalResolutionService
-
-    observation = await observe_published_frozen_definitions(
-        session=session,
-        resolution=CanonicalResolutionService(
-            session, CanonicalArtifactRepository(_BACKEND_ROOT)
-        ),
-        representation=representation,
-        correlation_id=f"{ADAPTER_ID}@{getattr(representation, 'id', None)}",
-    )
-    if observation.definitions.contract.canonical_sha256 != contract.canonical_sha256:
-        raise EntrySelectionError(
-            f"entry {ENTRY_ID}: 观测器读出的契约 digest "
-            f"{observation.definitions.contract.canonical_sha256} 与本模块 source-locked 的 "
-            f"{contract.canonical_sha256} 不一致 —— 冻结身份与生产契约脱钩"
-        )
-    return observation
 
 
 def contract_payload_digest() -> str:
@@ -654,81 +452,16 @@ def contract_payload_digest() -> str:
 
 
 def dump_contract_json() -> str:
-    """生成器落盘用的 JSON 文本（2 空格缩进 + 排序键 + 尾换行，与既有契约文件同形态）。"""
-    return json.dumps(
-        build_contract_payload(), ensure_ascii=False, indent=2, sort_keys=True
-    ) + "\n"
+    return _L.dump_contract_json(build_contract_payload())
 
 
 async def attach_adapters(
     registry: WorkpaperSyncAdapterRegistry, *, session: Any
 ) -> tuple[str, ...]:
-    """按 manifest + 真库 representation 把本 entry 的 adapter 挂进 registry。
-
-    三道前置缺一即静默返回空元组（不是抛错 —— 启动期 attach 对「还没供给」必须容忍）：
-    ① manifest 已裁决 bidirectional + adapter_id 对得上；
-    ② 真库有 current published representation；
-    ③ 该 representation 绑定了 definition bundle。
-    """
-    if ADAPTER_ID in {reg.adapter_id for reg in registry.registrations()}:
-        return ()
-    if not manifest_capability_enabled():
-        return ()
-
-    import sqlalchemy as sa
-
-    from app.models.workpaper_sync_models import WorkpaperContentRepresentation
-    from app.services.workpaper_sync import entry_source_facts as facts
-    from app.services.workpaper_sync.adapters.excel import build_excel_adapter
-    from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
-    from app.services.workpaper_sync.projection_target_resolution import (
-        resolve_visible_current_representation_id,
+    """按 manifest + 真库 representation 把本 entry 的 adapter 挂进 registry（三道前置缺一返空）。"""
+    return await _L.attach_l_entry_adapter(
+        registry, IDENTITY, session=session, contract_payload_builder=build_contract_payload
     )
-    from app.services.workpaper_sync.resolution import CanonicalResolutionService
-
-    representation_id = await resolve_visible_current_representation_id(
-        session, entry_id=ENTRY_ID
-    )
-    if representation_id is None:
-        return ()
-    representation = (
-        await session.execute(
-            sa.select(WorkpaperContentRepresentation).where(
-                WorkpaperContentRepresentation.id == representation_id
-            )
-        )
-    ).scalar_one_or_none()
-    if representation is None or representation.definition_bundle_id is None:
-        return ()
-
-    resolution = CanonicalResolutionService(
-        session, CanonicalArtifactRepository(_BACKEND_ROOT)
-    )
-    bundle = await resolution.load_bundle_snapshot(representation.definition_bundle_id)
-    contract = assert_contract_file_matches_source()
-    entry = manifest_entries_by_id(load_entry_manifest())[ENTRY_ID]
-    descriptor = facts.observe_descriptor_facts(entry)
-    if descriptor is None:
-        raise EntrySelectionError(
-            f"entry {ENTRY_ID} 的宿主实测不可达（产不出 descriptor 事实）—— "
-            "不可达入口不得注册 adapter"
-        )
-    observation = await resolve_published_frozen_definitions(
-        session=session, representation=representation, contract=contract
-    )
-    register_adapter(
-        registry,
-        adapter=build_excel_adapter(
-            definitions=observation.definitions,
-            binding=observation.identity_binding,
-            direction="html_to_oo",
-        ),
-        bundle=bundle,
-        descriptor=descriptor,
-        room=facts.observe_room_facts(entry),
-        contract=contract,
-    )
-    return (ADAPTER_ID,)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

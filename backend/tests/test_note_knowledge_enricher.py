@@ -73,6 +73,8 @@ class FakeKnowledgeService:
         wp_code=None,
         account_code=None,
         audit_area=None,
+        restrict_to=None,
+        category=None,
     ):
         self.calls.append(
             {
@@ -83,6 +85,7 @@ class FakeKnowledgeService:
                 "user": user,
                 "account_code": account_code,
                 "audit_area": audit_area,
+                "restrict_to": restrict_to,
             }
         )
         if self._raise is not None:
@@ -218,6 +221,41 @@ async def test_retrieve_doc_filter_scope():
 
     cites = await enricher.retrieve("pid", "q", doc_filter=[UUID(keep)])
     assert {c.source_id for c in cites} == {keep}
+
+
+@pytest.mark.asyncio
+async def test_doc_filter_is_pushed_down_as_restrict_to():
+    """C5：doc_filter 下推为 restrict_to（截断 top_k 之前生效），无过滤时不传该参数。"""
+    from uuid import UUID, uuid4
+
+    doc_id, folder_id = uuid4(), uuid4()
+    enricher, ks, _ = _make_enricher(results=[])
+    await enricher.retrieve("pid", "q", doc_filter=[str(folder_id).upper(), doc_id])
+    assert ks.calls[-1]["restrict_to"] == sorted([doc_id, folder_id], key=str)
+
+    await enricher.retrieve("pid", "q")
+    assert ks.calls[-1]["restrict_to"] is None
+
+
+@pytest.mark.asyncio
+async def test_doc_filter_matches_folder_by_ancestor_id_not_name():
+    """点名文件夹：按文档所在文件夹链的 ID 匹配（旧实现按文件夹名字符串，同名文件夹会串）。"""
+    from uuid import uuid4
+
+    folder_id = str(uuid4())
+    inside = {**_result(str(uuid4())), "folder_ancestor_ids": [str(uuid4()), folder_id]}
+    outside = {**_result(str(uuid4())), "folder_ancestor_ids": [str(uuid4())], "folder_path": folder_id}
+    enricher, _, _ = _make_enricher(results=[inside, outside])
+    cites = await enricher.retrieve("pid", "q", doc_filter=[folder_id])
+    assert [c.source_id for c in cites] == [inside["source_id"]]
+
+
+@pytest.mark.asyncio
+async def test_unparseable_doc_filter_returns_empty_without_searching():
+    """过滤值全部无法解析：不得退化为全库检索。"""
+    enricher, ks, _ = _make_enricher(results=[_result("d1")])
+    assert await enricher.retrieve("pid", "q", doc_filter=["附注模板"]) == []
+    assert ks.calls == []
 
 
 # ── P1: 命中即注入 prompt ─────────────────────────────────────────────────

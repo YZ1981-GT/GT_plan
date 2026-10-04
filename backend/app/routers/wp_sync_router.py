@@ -132,6 +132,14 @@ from app.services.workpaper_sync.repository import WorkpaperSyncRepository
 from app.services.workpaper_sync.request_application import RequestApplicationService
 from app.services.workpaper_sync.resolution import CanonicalResolutionService
 from app.services.workpaper_sync.rooms import RoomScope, RoomService
+from app.services.workpaper_sync.adopt_substrate_response import (
+    AdoptPlanDigestMismatchError,
+    AdoptPlanVerificationError,
+    AdoptRevisionConflictError,
+    AdoptSubstrateError,
+    AdoptSubstrateNotPublishedError,
+    compute_adopt_substrate,
+)
 from app.services.workpaper_sync.store_projection_response import (
     compute_store_projection_response,
 )
@@ -336,6 +344,10 @@ _WRITE_ACTIONS: frozenset[str] = frozenset(
         "resolve_conflicts",
         "retry_apply",
         "rollback",
+        # spec workpaper-sync-managed-row-convergence Requirement 2：反向收敛覆盖 store，
+        # 是**写** action（`workflow_locked` 下与其它写一样被拒 —— 归档/复核通过的底稿
+        # 不该被 adopt 覆盖）。dry_run 分支虽只读，但同一端点同一 action，按写登记从严。
+        "adopt_substrate",
     }
 )
 
@@ -639,6 +651,15 @@ async def _attach_pilot_adapters(
         if cached is not None:
             return _replay_cached_registrations(svc, cached)
 
+        # 🔴 源码事实首算挪到工作线程（spec startup-prewarm-event-loop-unblocking Requirement 1）：
+        #    下面各 attach 在事件循环上调 `observe_descriptor_facts` / `observe_room_facts`，首算要扫
+        #    5000+ 个前端文件与全部路由（现场实测连续 7.9s 不让出循环 ⇒ 这段时间整个后端不响应）。
+        #    放在锁内：并发首请求若先拿到锁，同样不会在循环上首算。首算失败不在这里报 —— 原调用点
+        #    会以原错误 fail closed（见 `warm_source_fact_caches` docstring）。
+        from app.services.workpaper_sync.entry_source_facts import warm_source_fact_caches
+
+        await asyncio.to_thread(warm_source_fact_caches)
+
         explicit = (
             await attach_pilot_adapters(svc.registry, session=svc.session)
             + await attach_d2_pilot_adapters(svc.registry, session=svc.session)
@@ -819,6 +840,91 @@ async def read_store_projection(
         )
     except SyncDomainError as exc:
         raise _domain_error(exc, status=422) from exc
+
+
+@router.post(USER_SYNC_PREFIX + "/adopt-substrate")
+async def adopt_substrate(
+    project_id: uuid.UUID,
+    wp_id: uuid.UUID,
+    entry_id: str,
+    payload: Mapping[str, Any] = Body(default_factory=dict),
+    svc: _SyncServices = Depends(_services),
+) -> dict[str, Any]:
+    """反向收敛：以**已发布** substrate 为准，覆盖本 entry 的 HTML store。
+
+    spec workpaper-sync-managed-row-convergence（Requirement 2/3）。用于打破死锁——
+    当 materialize 因 `roundtrip_projection_mismatch` 恒 500 时，让 store 认领 substrate
+    现有行集（`extra→0`），materialize 随即恢复。**不删任何数据**，多余行显示在 HTML 侧
+    供审计师手工处理。
+
+    body:
+      - `dry_run`: True 只算差异不落库（返回完整 Overwrite_Plan：两侧逐表行数 + 逐 item
+        三清单与四个计数 + `plan_digest` + 显式跳过清单）
+      - `expected_revision`: 并发保护；与服务端当前 content_revision 不符 → 409
+      - `plan_digest`: 从 dry_run 拿到并回传；与服务端重算值不符 → 409
+        （spec adopt-overwrite-and-refresh-source Requirement 3.4 —— 用户确认的那份差异
+        摘要必须就是将执行的那份；revision 管「表单整体版本」，它管「那份增删清单」）
+
+    🔴 破坏性写操作：覆盖前留存被改 item 原值（可回滚）+ 写 hash-chain 审计。
+    业务住伴生 service（`adopt_substrate_response`），本端点只 guard + 映射状态码。
+    """
+    scope = await _guard(
+        svc,
+        project_id=project_id,
+        wp_id=wp_id,
+        entry_id=entry_id,
+        action="adopt_substrate",
+    )
+    registration = await _registration(svc, scope)
+    dry_run = bool(payload.get("dry_run", False))
+    raw_rev = payload.get("expected_revision")
+    expected_revision = int(raw_rev) if raw_rev is not None else None
+    raw_digest = payload.get("plan_digest")
+    expected_plan_digest = str(raw_digest).strip() if raw_digest is not None else None
+    try:
+        return await compute_adopt_substrate(
+            session=svc.session,
+            project_id=project_id,
+            wp_id=wp_id,
+            entry_id=scope.entry_id,
+            registration=registration,
+            resolution=svc.resolution,
+            expected_revision=expected_revision,
+            dry_run=dry_run,
+            expected_plan_digest=expected_plan_digest,
+        )
+    except AdoptRevisionConflictError as exc:
+        # 并发冲突：客户端应刷新后重试。
+        raise HTTPException(
+            status_code=409,
+            detail={"error_code": exc.error_code, "message": str(exc)},
+        ) from exc
+    except AdoptPlanDigestMismatchError as exc:
+        # 计划已过期：两侧在用户看摘要与按确认之间变化过 ⇒ 让前端重取 dry_run。
+        raise HTTPException(
+            status_code=409,
+            detail={"error_code": exc.error_code, "message": str(exc)},
+        ) from exc
+    except AdoptSubstrateNotPublishedError as exc:
+        # 无已发布底稿可采纳 —— fail visible，绝不空覆盖。
+        raise HTTPException(
+            status_code=409,
+            detail={"error_code": exc.error_code, "message": str(exc)},
+        ) from exc
+    except AdoptPlanVerificationError as exc:
+        # 提交前复读与计划不符 ⇒ service 已回滚整个事务。这是**服务端自身不一致**
+        # （声明漂移 / merge 语义变化 / 并发删除），不是用户改输入能重试的事 ⇒ 500。
+        # 🔴 本分支必须排在兜底 `except AdoptSubstrateError` **之前**：它是后者的子类，
+        #    放到后面永远进不去，会被静默映成 422（spec 6.3 / design § Error Handling）。
+        raise HTTPException(
+            status_code=500,
+            detail={"error_code": exc.error_code, "message": str(exc)},
+        ) from exc
+    except AdoptSubstrateError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"error_code": exc.error_code, "message": str(exc)},
+        ) from exc
 
 
 @router.post(USER_SYNC_PREFIX + "/materialize")

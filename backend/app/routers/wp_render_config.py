@@ -37,6 +37,7 @@ from app.services.wp_auto_fill_service import _resolve_auto_fill_values
 from app.services.wp_account_package_resolver import resolve_package_sheets
 from app.services.wp_render_schema_service import WpRenderSchemaService
 from app.services.wp_template_version_service import WpTemplateVersionService
+from app.services.wp_template_finder import _should_skip_historical_sheet
 from app.services.project_audit_year import (
     PROJECT_AUDIT_YEAR_BIZ_SQL,
     PROJECT_AUDIT_YEAR_SQL,
@@ -715,6 +716,10 @@ async def _get_render_config_impl(
         if sheet_name and not _sheet_name_matches(cls.sheet_name, sheet_name):
             continue
         if cls.sheet_name and "GT_Custom" in cls.sheet_name:
+            continue
+        # 🔴 MC-24 统一过滤：OO 侧已有 _should_skip_historical_sheet，HTML 侧此前缺失。
+        # 两侧 sheet 集合不等的根因是 render_config 没调这个函数。现补齐，使两侧口径一致。
+        if cls.sheet_name and _should_skip_historical_sheet(cls.sheet_name):
             continue
         # sheet_name 级 skip override（隐藏辅助/遗留 sheet）：
         #   - A1-11 的文号规则页等辅助 sheet

@@ -12,6 +12,7 @@
  */
 
 import type { DirectionSource } from '@/types/sign-convention'
+import { getAuthHeaders } from '@/utils/authToken'
 
 export interface TrialBalanceRow {
   account_code: string
@@ -156,9 +157,10 @@ export async function saveDirectionOverride(
   reason: string,
 ): Promise<{ id: string; override_at: string }> {
   const url = `/api/projects/${projectId}/datasets/${datasetId}/sign-convention/direction-override`
+  // 原生 fetch 不经 http.ts 拦截器 ⇒ 自带鉴权头（端点将来接上项目鉴权时不至于恒 401）
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify({
       table_name: 'tb_balance',
       record_id: recordId,

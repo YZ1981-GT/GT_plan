@@ -214,7 +214,11 @@ def test_profit_total_is_placeholder_not_revenue(blocks):
 
 # ─── 表达式可解析 ────────────────────────────────────────────────────────────
 
-_PREFILL_ONLY_FUNCS = {"ADJ"}
+# 🔴 **已清空**（2026-09-28，spec tb-adjustment-column-formula-closure Phase 1）：
+# 唯一成员 `ADJ` 已注册进 `formula_engine._REGISTRY`，`validate_formula` 不再
+# 把它报成「未知函数」⇒ 豁免不再需要。保留空集合以便将来新增同类函数时复用
+# 下方 `test_all_formulas_parse` 的过滤结构。
+_PREFILL_ONLY_FUNCS: set[str] = set()
 _UNKNOWN_FUNC_RE = re.compile(r"未知函数:\s*([A-Z_]+)\(\)")
 
 
@@ -239,10 +243,20 @@ def test_all_formulas_parse(blocks, wp_code):
 
 
 def test_prefill_only_func_allowlist_still_needed():
-    """反向自检：ADJ 若注册进 formula_engine，本豁免应移除。"""
+    """豁免清单不得残留已注册函数，且 `ADJ` 必须确实已注册。
+
+    原断言（清单 ∩ 已注册 == ∅）在 2026-09-28 因 ADJ 注册而打红，清单据此清空。
+    🔴 清单空后原断言恒真 ⇒ 补正向断言 ADJ 在 `_REGISTRY` 里，防注册被撤销后静默变绿。
+    spec: tb-adjustment-column-formula-closure Phase 1 Task 1.3
+    """
     from app.services.formula_engine import _REGISTRY
 
-    assert _PREFILL_ONLY_FUNCS & set(_REGISTRY.known_function_names()) == set()
+    known = set(_REGISTRY.known_function_names())
+    assert _PREFILL_ONLY_FUNCS & known == set()
+    assert "ADJ" in known, (
+        "ADJ 不在 _REGISTRY 中 —— 豁免已按「ADJ 已注册」清空，"
+        "注册撤销必须同步恢复豁免"
+    )
 
 
 # ─── 幂等脚本 ────────────────────────────────────────────────────────────────

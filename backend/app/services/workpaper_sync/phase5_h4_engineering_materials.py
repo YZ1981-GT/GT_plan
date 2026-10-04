@@ -58,9 +58,9 @@ ADAPTER_ID: Final[str] = "h4.engineering_materials_detail"
 WP_CODES: Final[frozenset[str]] = frozenset({"H4E"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "H/H4 工程物资.xlsx"
-#: 逐字取 openpyxl 现算（112,937 B）
+#: 2026-10-01 安全净化后实测（97,345 B）：Equation.3 OLE 已转静态预览。
 TEMPLATE_SHA256: Final[str] = (
-    "c2c3ee61b33f4a7ca2603359810207bfb14f189c464135e0ede3e0a738c658cc"
+    "dfbe06ef6e0b8420d56d7bb142193fe0edd4656bb9a2980f503e0bd84b883e84"
 )
 
 STORE_ITEM_ID: Final[str] = _h402.STORE_ITEM_ID_H402
@@ -414,3 +414,32 @@ async def attach_pilot_adapters(
         session=session,
         contract_payload_builder=build_contract_payload,
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# provisioning 白名单接口（approved bundle 发布侧）
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 🔴 这两个名字是**硬前置**，不是装饰：
+# `fix_task76_provision_projection_definitions.py` 经
+# `projection_provisioning.load_projection_supply()` **只认** `publish_pilot_definitions`
+# 与 `PILOT_WP_CODES`，缺任一即抛 `ProviderModuleNotAllowedError: provider 是空壳`，
+# 且该脚本连 `--check`（只读）都 fail closed 在第一个缺口上 ⇒ 缺这两行，本 entry 永远
+# 拿不到 approved bundle，`register_from_manifest()` 也就永远注册不上。
+#
+# 实现在 `phase5_h_cycle_common.publish_definitions_for`（九条共用一份，逐行对照
+# `phase5_entry_orchestration.publish_definitions`）。`specs` 必须与
+# `build_contract_payload` 同源 —— 两者都用 `managed_row_table_specs()`。
+
+
+async def publish_pilot_definitions(publisher: Any) -> HC.HDefinitions:
+    """发布本 entry 的四段 definition + approved bundle。"""
+    return await HC.publish_definitions_for(
+        IDENTITY,
+        managed_row_table_specs(),
+        publisher=publisher,
+        contract_payload_builder=build_contract_payload,
+    )
+
+
+PILOT_WP_CODES = WP_CODES

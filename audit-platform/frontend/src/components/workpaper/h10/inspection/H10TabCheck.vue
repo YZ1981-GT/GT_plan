@@ -133,7 +133,7 @@
     >
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && wpId && projectId"
-        account-code="6115"
+        :account-code="samplingAccountCode"
         phase="final"
         default-method="mus"
         :workpaper-id="wpId"
@@ -155,6 +155,17 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
+
+/**
+ * 抽凭科目码取自单一真源 `hCycleAccountScope`（H10 资产处置损益）。原为模板内字面量；
+ * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
+ * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ */
+import { h10Scope } from '../../composables/hCycleAccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = h10Scope.grossCode()
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),

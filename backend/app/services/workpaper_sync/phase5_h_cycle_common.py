@@ -77,7 +77,12 @@ from app.services.workpaper_sync.excel_instrumentation import (
     build_template_payload,
     normalized_structure_hash,
 )
-from app.services.workpaper_sync.models import SyncDomainError
+from app.services.workpaper_sync.models import (
+    AuthorityModel,
+    BundleSlot,
+    DefinitionKind,
+    SyncDomainError,
+)
 from app.services.workpaper_sync.sheet_geometry import col_index
 
 __all__ = [
@@ -105,6 +110,12 @@ __all__ = [
     "assert_manifest_capability_enabled",
     "resolve_published_frozen_definitions",
     "attach_h_entry_adapter",
+    "H_AUTHORITY_MODEL",
+    "HDefinitions",
+    "authority_model_payload",
+    "primary_instrumentation_spec",
+    "publish_definitions_for",
+    "publish_h_entry_definitions",
 ]
 
 
@@ -121,6 +132,11 @@ class HStorePayloadError(SyncDomainError):
 
 
 H_AUTHORITY_ROOT: Final[str] = "backend/wp_templates"
+
+#: 九条 H entry 的 authority model —— 与 D/E/F/G/L 已交付各家逐字相同。
+#: `register()` 的 RG-8/RG-9（`assert_authority_model_contract_pairing`）要求
+#: `projection_contract` 必须解析到 approved per-entry contract，H 九条都有。
+H_AUTHORITY_MODEL: Final[AuthorityModel] = AuthorityModel.projection_contract
 
 #: 四载体（与 D/E/F/G 已交付 11 家逐字相同）。
 H_PHASE5_IDENTITY_CARRIERS: Final[tuple[str, ...]] = (
@@ -317,6 +333,23 @@ def instrumentation_specs_for(
     attach 期 `_align_specs_to_sibling_tables` fail-closed 打挂**整个 entry**。
     """
     return tuple(_instrumentation_of(identity, s) for s in specs)
+
+
+def primary_instrumentation_spec(
+    identity: HEntryIdentity, specs: Sequence[Any]
+) -> ExcelInstrumentationSpec:
+    """取本 entry 的主 instrumentation spec（第一个）。
+
+    I 系六个 provider 调用此函数取单个 spec 来定位 UUID_COL / ROWS_TABLE_KEY。
+    与 projection_first_publication._primary_instrumentation_spec 语义相同，
+    但入参是 (identity, specs) 而非 provider 模块。
+    """
+    all_specs = instrumentation_specs_for(identity, specs)
+    if not all_specs:
+        raise HEntrySelectionError(
+            f"{identity.entry_id} 无受管 sheet ⇒ 无 instrumentation spec"
+        )
+    return all_specs[0]
 
 
 def template_definition_payload(
@@ -564,6 +597,187 @@ def register_adapter(
     return registration
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# definition 发布（approved bundle）—— 本段此前**整段缺失**
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 🔴 为什么补这一段（2026-10-01，spec h-cycle-sync-foundation-and-first-canary）：
+#
+# H 九条的 **attach 侧**（`attach_h_entry_adapter`）一直是完整的，但**publish 侧**在本
+# 模块里从来没有过。后果是 `fix_task76_provision_projection_definitions.py`
+# —— `ProjectionDefinitionProvisioner` 的唯一消费宿主、也是产出 approved bundle 的唯一
+# 入口 —— 经 `projection_provisioning.load_projection_supply()` 只认
+# `publish_pilot_definitions` 与 `PILOT_WP_CODES` 两个名字，缺任一即抛
+# `ProviderModuleNotAllowedError: provider 是空壳`。
+#
+# 现算缺口面：台账 51 条里 **只有 12 条**同时具备这两个名字（a51/b60/d1~d7/g7/h1/l1），
+# 其余 **39 条**缺（含 H 全部 9 条、G 全部 13 条、I 全部 6 条…）。而该脚本连
+# **`--check`（只读）** 都 fail closed 在第一个缺口（实测 `xlsx/gt-e1-monetary-fund`）
+# ⇒ 这个诊断入口**平台级跑不完**，H 的供给状况此前根本看不到。
+#
+# 🔴 实现**不新造口径**：逐行对照 `phase5_entry_orchestration.publish_definitions`
+# （D/E/F/L 十二家共用的那份），四段 definition + bundle 的 kind / logical_id /
+# semantic_version / slot 结构 / 两条单向引用校验全部一致。差别只有两处，都是 H 侧既有事实：
+#   ① payload 由 HC 的 `(identity, specs)` 版函数产出（H 的 payload 函数带参数）；
+#   ② `authority_model` 取本模块的 `H_AUTHORITY_MODEL`（值与那十二家相同）。
+#
+# ⚠️ 本函数**只发布 definition 与 bundle**，不碰 representation / entry pointer ——
+# 那是 provisioner 自己的后续阶段。publish 成功 ≠ 该 entry 可注册：注册还要
+# published representation（见 `attach_h_entry_adapter` 第③环）。
+
+
+@dataclass(frozen=True)
+class HDefinitions:
+    """一次 `publish_definitions_for()` 的产出（字段名与 provisioner 的读取面逐字对齐）。
+
+    🔴 字段名不可改：`projection_provisioning.ProjectionDefinitionProvisioner.ensure()`
+    逐个读 `template_definition_id` / `..._sha256` / `instrumentation_*` / `contract_*` /
+    `authority_model_*` / `bundle_id` / `bundle_sha256`。改名会在真 provisioning 时才炸。
+    """
+
+    entry_id: str
+    adapter_id: str
+    authority_model_definition_id: Any
+    authority_model_definition_sha256: str
+    template_definition_id: Any
+    template_definition_sha256: str
+    instrumentation_definition_id: Any
+    instrumentation_definition_sha256: str
+    contract_definition_id: Any
+    contract_definition_sha256: str
+    bundle_id: Any
+    bundle_sha256: str
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "entry_id": self.entry_id,
+            "adapter_id": self.adapter_id,
+            "authority_model": H_AUTHORITY_MODEL.value,
+            "authority_model_definition_id": str(self.authority_model_definition_id),
+            "authority_model_definition_sha256": self.authority_model_definition_sha256,
+            "template_definition_id": str(self.template_definition_id),
+            "template_definition_sha256": self.template_definition_sha256,
+            "instrumentation_definition_id": str(self.instrumentation_definition_id),
+            "instrumentation_definition_sha256": self.instrumentation_definition_sha256,
+            "contract_definition_id": str(self.contract_definition_id),
+            "contract_definition_sha256": self.contract_definition_sha256,
+            "bundle_id": str(self.bundle_id),
+            "bundle_sha256": self.bundle_sha256,
+        }
+
+
+def authority_model_payload(identity: HEntryIdentity) -> dict[str, Any]:
+    """authority-model definition 的 payload（与十二家已交付逐字同形）。"""
+    return {
+        "schema_version": "authority-model-definition:v1",
+        "authority_model": H_AUTHORITY_MODEL.value,
+        "content_authority": "structured_projection",
+        "merge_model": "stable_field_three_way",
+        "required_slots": [
+            BundleSlot.template.value,
+            BundleSlot.instrumentation.value,
+            BundleSlot.contract.value,
+        ],
+        "entry_id": identity.entry_id,
+        "pilot_class": identity.phase5_wave,
+    }
+
+
+async def publish_definitions_for(
+    identity: HEntryIdentity,
+    specs: Sequence[Any],
+    *,
+    publisher: Any,
+    contract_payload_builder: Any,
+) -> HDefinitions:
+    """发布该 entry 的四段 definition + approved bundle。
+
+    :param specs: 受管区 spec（必须与 `build_contract_payload` 用的**同一来源**，九条实测
+        都是 `managed_row_table_specs()`）—— 否则 template/instrumentation digest 会与契约
+        声明不等，下面两条单向引用校验当场打红。
+    """
+    contract = assert_contract_file_matches_source(identity, contract_payload_builder())
+    authority = await publisher.publish_definition(
+        kind=DefinitionKind.authority_model,
+        payload=authority_model_payload(identity),
+        logical_id=f"{identity.adapter_id}.authority-model",
+        semantic_version="1.0.0",
+    )
+    tp = template_definition_payload(identity, specs)
+    template = await publisher.publish_definition(
+        kind=DefinitionKind.template,
+        payload=tp,
+        logical_id=f"{identity.adapter_id}.template",
+        semantic_version="1.0.0",
+        blob_bytes=read_authoritative_template(identity),
+        structure_hash=tp["normalized_structure_hash"],
+    )
+    instr = await publisher.publish_definition(
+        kind=DefinitionKind.instrumentation,
+        payload=instrumentation_definition_payload(identity, specs),
+        logical_id=f"{identity.adapter_id}.instrumentation",
+        semantic_version="1.0.0",
+    )
+    contract_def = await publisher.publish_definition(
+        kind=DefinitionKind.contract,
+        payload=dict(contract.canonical_payload),
+        logical_id=identity.adapter_id,
+        semantic_version=contract.semantic_version,
+    )
+    # 🔴 两条**单向引用**校验：契约里冻结的 digest 必须等于刚发布出来的 digest。
+    #    方向是「契约声明 → 已发布」，不是反过来按发布结果改契约。
+    if template.sha256 != contract.template_definition_sha256:
+        raise HEntrySelectionError(
+            f"entry {identity.entry_id}: 已发布 template digest {template.sha256} 与契约声明 "
+            f"{contract.template_definition_sha256} 不一致 —— 单向引用断裂"
+        )
+    if instr.sha256 != contract.instrumentation_definition_sha256:
+        raise HEntrySelectionError(
+            f"entry {identity.entry_id}: 已发布 instrumentation digest {instr.sha256} 与契约"
+            f"声明 {contract.instrumentation_definition_sha256} 不一致 —— 单向引用断裂"
+        )
+    bundle = await publisher.publish_bundle(
+        authority_model_definition_id=authority.definition_id,
+        authority_model=H_AUTHORITY_MODEL,
+        authority_model_definition_sha256=authority.sha256,
+        slots={
+            BundleSlot.template: {
+                "type": "definition",
+                "ref": f"definition:{template.definition_id}",
+                "digest": template.sha256,
+            },
+            BundleSlot.instrumentation: {
+                "type": "definition",
+                "ref": f"definition:{instr.definition_id}",
+                "digest": instr.sha256,
+            },
+            BundleSlot.contract: {
+                "type": "definition",
+                "ref": f"definition:{contract_def.definition_id}",
+                "digest": contract_def.sha256,
+            },
+        },
+    )
+    return HDefinitions(
+        entry_id=identity.entry_id,
+        adapter_id=identity.adapter_id,
+        authority_model_definition_id=authority.definition_id,
+        authority_model_definition_sha256=authority.sha256,
+        template_definition_id=template.definition_id,
+        template_definition_sha256=template.sha256,
+        instrumentation_definition_id=instr.definition_id,
+        instrumentation_definition_sha256=instr.sha256,
+        contract_definition_id=contract_def.definition_id,
+        contract_definition_sha256=contract_def.sha256,
+        bundle_id=bundle.bundle_id,
+        bundle_sha256=bundle.canonical_sha256,
+    )
+
+
+# I 系六个 provider 用此名称调用（历史接口名，保留向后兼容）
+publish_h_entry_definitions = publish_definitions_for
+
+
 async def resolve_published_frozen_definitions(
     identity: HEntryIdentity,
     *,
@@ -665,3 +879,76 @@ async def attach_h_entry_adapter(
         sheet_keys=sheet_keys,
     )
     return (identity.adapter_id,)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 泛化 store projection / merge / iter（I 循环 6 家委托到这里）
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def _spec_of_store_item_for(
+    identity: HEntryIdentity,
+    specs: Sequence[Any],
+    store_item_id: str | None,
+) -> Any:
+    """在给定 specs 中按 store_item_id 查找对应 spec。未命中即抛。"""
+    default_id = specs[0].store_item_id if specs else None
+    target = store_item_id or default_id
+    for spec in specs:
+        if spec.store_item_id == target:
+            return spec
+    raise HEntrySelectionError(
+        f"entry {identity.entry_id}: store item {target!r} 不在受管清单里；"
+        f"已受管：{sorted(s.store_item_id for s in specs)}"
+    )
+
+
+def build_store_projection_for(
+    identity: HEntryIdentity,
+    specs: Sequence[Any],
+    payload: Any,
+    *,
+    contract: Any,
+    limits: Any | None = None,
+    store_item_id: str | None = None,
+) -> Any:
+    """HTML store 载荷 → Projection（泛化版，供 I 循环 6 家委托调用）。"""
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        build_store_projection as _engine,
+    )
+
+    spec = _spec_of_store_item_for(identity, specs, store_item_id)
+    return _engine(spec, payload, contract=contract, limits=limits)
+
+
+def merge_projection_into_store_rows_for(
+    identity: HEntryIdentity,
+    specs: Sequence[Any],
+    *,
+    projection: Any,
+    base_rows: list,
+    store_item_id: str | None = None,
+) -> Any:
+    """projection → HTML store 行（泛化版，供 I 循环 6 家委托调用）。"""
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        merge_projection_into_store_rows as _engine_merge,
+    )
+
+    spec = _spec_of_store_item_for(identity, specs, store_item_id)
+    return _engine_merge(spec, projection=projection, base_rows=base_rows)
+
+
+def iter_store_rows_for(
+    identity: HEntryIdentity,
+    specs: Sequence[Any],
+    payload: Any,
+    *,
+    store_item_id: str | None = None,
+) -> Any:
+    """流式 (row_identity, row)（泛化版，供 I 循环 6 家委托调用）。"""
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        iter_store_rows as _engine_iter,
+    )
+
+    spec = _spec_of_store_item_for(identity, specs, store_item_id)
+    return _engine_iter(spec, payload)

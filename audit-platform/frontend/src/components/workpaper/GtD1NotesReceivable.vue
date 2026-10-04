@@ -386,6 +386,8 @@
 
         :all-responses="allResponses"
 
+        :oo-session-active="crossSheetWriteBlocked"
+
         :wp-id="props.wpId"
 
         :project-id="props.projectId"
@@ -820,6 +822,26 @@ const syncBridge = useWorkpaperSyncBridge({
 
 /** 避免 `:descriptor="syncBridge.descriptor.value"` 丢失对 ref 的追踪 */
 const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+
+/**
+ * entry 级「跨 sheet 直写 store 必须让路」信号（需求 5.7 · P17 第三写入方定序）。
+ *
+ * 🔴 **为什么不能用 `renderMode`**：`renderMode` 是**当前显示 sheet** 的模式。
+ * D1-3 走 `syncBridge`、其余 sheet 走 `dualMode`，两者是**两个独立的 mode 源**
+ * ⇒ 在 D1-3 切到「在线编辑」（`syncBridge.mode='oo'`）后导航到 D1-16，
+ * `renderMode` 读的是 `dualMode.mode`（仍为 `html`）⇒ D1-16 的 HTML 表单会正常渲染，
+ * **而 D1-3 的 OO 会话还开着**。这正是 P17 要堵的分叉窗口 ——
+ * 此时 D1-16 的「同步到D1-4」若直写 `D1-bd-portfolio-rows`，
+ * 就与已 materialize 的产物分叉。
+ *
+ * 口径与工具栏 `syncBusy` 一致（`mode==='oo'` ∪ 在途），不另造判断源。
+ */
+const crossSheetWriteBlocked = computed(
+  () =>
+    syncBridge.mode.value === 'oo'
+    || syncSwitching.value
+    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
 
 /** 切换中或桥处于在途状态时禁用工具栏（供模板 disabled 门控）。 */
 const syncBusy = computed(

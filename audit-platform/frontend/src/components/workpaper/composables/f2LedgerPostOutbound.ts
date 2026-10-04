@@ -12,6 +12,8 @@
  * 优雅降级：无 projectId/年度/科目 → error；HTTP 非 2xx / 期后无分录 → empty；异常 → error。
  */
 
+import { getAuthHeaders } from '@/utils/authToken'
+
 /** 无法归集到具体存货名称时的兜底桶名 */
 export const UNMATCHED_NAME = '未匹配存货'
 
@@ -164,10 +166,9 @@ export async function pullPostPeriodOutbound(
   const dateTo = windowEnd(postYear, monthsAfter)
 
   try {
-    const token = sessionStorage.getItem('token') || ''
     const url = `/api/projects/${projectId}/ledger/entries/${accountCode}?year=${postYear}`
       + `&date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}&limit=1000`
-    const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    const resp = await fetch(url, { headers: getAuthHeaders() })
     if (!resp || !resp.ok) {
       return { ...empty, status: 'empty', message: `期后（${postYear}年）序时账无数据或未导入` }
     }

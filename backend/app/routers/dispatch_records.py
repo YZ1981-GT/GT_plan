@@ -155,7 +155,7 @@ async def create_dispatch_records(
 
     # publish EventBus 事件
     if result.dispatched:
-        event_bus.publish(
+        await event_bus.publish(
             EventPayload(
                 event_type=EventType.DISPATCH_CREATED,
                 project_id=project_id,
@@ -217,7 +217,7 @@ async def revoke_dispatch_record(
         raise HTTPException(status_code=403, detail="权限不足：仅分发人或项目经理可撤回")
 
     # publish EventBus 事件
-    event_bus.publish(
+    await event_bus.publish(
         EventPayload(
             event_type=EventType.DISPATCH_REVOKED,
             project_id=project_id,

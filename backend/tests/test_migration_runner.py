@@ -528,10 +528,14 @@ class TestSplitSqlStatements:
         finally:
             mod._SCHEMA_VERSION_DDL = original_ddl
 
-    async def test_comment_only_migration_executes_without_error(
+    async def test_comment_only_migration_is_refused_not_registered(
         self, sqlite_engine, tmp_path: Path
     ):
-        """纯注释迁移文件（如 V001）应正常执行，不报错。"""
+        """纯注释且未声明 no-op 的迁移 → 失败、**不登记**（spec migration-integrity-and-enum-drift-closure Req 2）。
+
+        旧契约是「纯注释迁移正常执行并登记」—— 正是 V042 以空文件被登记为已应用、
+        后写入的内容永不执行的机制。V001 这类有意基线须在注释里写 no-op（见下一条用例）。
+        """
         import app.core.migration_runner as mod
         original_ddl = mod._SCHEMA_VERSION_DDL
         mod._SCHEMA_VERSION_DDL = textwrap.dedent("""\
@@ -553,8 +557,90 @@ class TestSplitSqlStatements:
 
         try:
             runner = MigrationRunner(engine=sqlite_engine, migrations_dir=mig_dir)
-            # 不应抛出异常
-            executed = await runner.run_pending()
-            assert "002" in executed
+            result = await runner.run_pending()
+            assert "002" not in result.executed
+            assert [(f.version, f.error_type) for f in result.failed] == [("002", "EmptyMigrationError")]
+            assert "002" not in await runner.get_applied_versions()
+
+            # 文件补上内容后下次启动自动执行（失败不是永久状态）
+            (mig_dir / "V002__comment_only.sql").write_text(
+                "-- 补上内容\nCREATE TABLE IF NOT EXISTS late_filled (id INTEGER PRIMARY KEY);\n",
+                encoding="utf-8",
+            )
+            retry = await runner.run_pending()
+            assert retry.executed == ["002"] and retry.failed == []
+            async with sqlite_engine.begin() as conn:
+                assert (await conn.execute(text(
+                    "SELECT count(*) FROM sqlite_master WHERE name = 'late_filled'"
+                ))).scalar() == 1
         finally:
             mod._SCHEMA_VERSION_DDL = original_ddl
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            "",  # 编辑器先建空文件、reload worker 抢先跑迁移 —— V042 的真实成因
+            "   \n\n",
+            "/* 只有块注释 */\n",
+        ],
+    )
+    async def test_empty_files_are_refused(self, sqlite_engine, tmp_path: Path, content: str):
+        import app.core.migration_runner as mod
+        original_ddl = mod._SCHEMA_VERSION_DDL
+        mod._SCHEMA_VERSION_DDL = textwrap.dedent("""\
+            CREATE TABLE IF NOT EXISTS schema_version (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                version   VARCHAR(20)  NOT NULL UNIQUE,
+                filename  VARCHAR(255) NOT NULL,
+                applied_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                checksum  VARCHAR(64)  NOT NULL
+            );
+        """)
+        mig_dir = tmp_path / "migrations"
+        mig_dir.mkdir()
+        (mig_dir / "V001__init.sql").write_text("-- baseline, no-op\n", encoding="utf-8")
+        (mig_dir / "V002__empty.sql").write_text(content, encoding="utf-8")
+        try:
+            runner = MigrationRunner(engine=sqlite_engine, migrations_dir=mig_dir)
+            result = await runner.run_pending()
+            assert [f.version for f in result.failed] == ["002"]
+            assert "002" not in await runner.get_applied_versions()
+        finally:
+            mod._SCHEMA_VERSION_DDL = original_ddl
+
+    async def test_declared_noop_migration_is_registered(self, sqlite_engine, tmp_path: Path):
+        """注释里写明 no-op 的零语句迁移照常登记（V001 基线形态）。"""
+        import app.core.migration_runner as mod
+        original_ddl = mod._SCHEMA_VERSION_DDL
+        mod._SCHEMA_VERSION_DDL = textwrap.dedent("""\
+            CREATE TABLE IF NOT EXISTS schema_version (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                version   VARCHAR(20)  NOT NULL UNIQUE,
+                filename  VARCHAR(255) NOT NULL,
+                applied_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                checksum  VARCHAR(64)  NOT NULL
+            );
+        """)
+        mig_dir = tmp_path / "migrations"
+        mig_dir.mkdir()
+        (mig_dir / "V001__init.sql").write_text("-- baseline, no-op\n", encoding="utf-8")
+        (mig_dir / "V002__intentional.sql").write_text(
+            "-- 占位：上游已由 V00X 覆盖，本版本有意为 No-Op\n", encoding="utf-8"
+        )
+        try:
+            runner = MigrationRunner(engine=sqlite_engine, migrations_dir=mig_dir)
+            result = await runner.run_pending()
+            assert result.executed == ["002"] and result.failed == []
+        finally:
+            mod._SCHEMA_VERSION_DDL = original_ddl
+
+    def test_real_v001_baseline_still_declares_noop(self):
+        """仓库里唯一的零语句迁移 V001 必须保留 no-op 声明，否则新库首启会把基线判失败。"""
+        from app.core.migration_runner import _declares_noop
+
+        v001 = Path(__file__).resolve().parents[1] / "migrations" / "V001__init.sql"
+        content = v001.read_text(encoding="utf-8")
+        assert MigrationRunner._split_sql_statements(content) == []
+        assert _declares_noop(content)
+        # 反向：「no-op」出现在 SQL 标识符里（而非注释）不算声明
+        assert not _declares_noop("CREATE TABLE no_op_marker (id int);")

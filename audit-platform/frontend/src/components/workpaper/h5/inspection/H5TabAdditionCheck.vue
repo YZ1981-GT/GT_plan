@@ -94,7 +94,7 @@
     <!-- 抽凭引擎 -->
     <el-dialog v-model="samplingVisible" title="H5-7 增加检查 — 抽凭引擎" width="85%" destroy-on-close>
       <GtVoucherSamplingEngine
-        account-code="1631"
+        :account-code="samplingAccountCode"
         phase="final"
         :workpaper-id="wpId"
         :project-id="projectId"
@@ -138,8 +138,22 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist, buildChecklistDirectPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
+// 科目码单一真源（禁组件内字面量）
+import { h5Scope } from '../../composables/hCycleAccountScope'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean; year?: number }>()
+
+/**
+ * 抽凭科目码（真源 `h5Scope`，原硬编码 `"1631"`）。
+ *
+ * 🔴 取值不变（`H5_ACCOUNT_DEF.grossFallback === '1631'` 油气资产）⇒ 运行时行为不变。
+ * 改接真源的理由：`wp_account_mapping.json` 的 H5 条目是 `1606`（固定资产清理，**错**），
+ * 且真源已把历史错码 `1611`（融资租赁资产）登记进 `wrongLegacyCodes` —— 接真源后这类
+ * "照 json 修正"不会误伤本处。本组件无 tbSourceCodes prop ⇒ `grossCode()` 走兜底。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.5/R5.4
+ */
+const samplingAccountCode = h5Scope.grossCode()
+
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const formData = useH5FormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })

@@ -25,6 +25,12 @@ import {
   calcContractLiabilityTotal,
 } from './useD7FormulaEngine'
 import { eventBus } from '@/utils/eventBus'
+// 🔴 逐格四态覆盖状态机（spec d567-sync-coverage Task 20）——**共享一份**，绝不在 D7 侧另写。
+//    D7-1 双区块（nature / aging）的 `priorUnadjusted` + `currentUnadjusted` 四列都是派生格。
+import {
+  resolvePerCellDerivedState,
+  type DerivedCellState,
+} from './shared/dynamicAdjudicationRows'
 import type { ChecklistResponse } from './useD7FormData'
 import type useD7CrossSheet from './useD7CrossSheet'
 
@@ -48,6 +54,14 @@ export interface AdjudicationRow {
   isEditable: boolean
   isDeductionRow: boolean
   rowType: 'detail' | 'subtotal' | 'deduction' | 'total' | 'tb' | 'diff'
+  /**
+   * 逐格覆盖态（spec d567-sync-coverage Task 20）：仅**派生格**
+   * （`priorUnadjusted` / `currentUnadjusted`）在 S2/S4 时有条目。S1/S3 不产生条目。
+   */
+  cellOverrides?: Record<
+    string,
+    { state: DerivedCellState; stored: number; snap: number; derived: number }
+  >
 }
 
 export interface UseD7AdjudicationOptions {
@@ -101,12 +115,76 @@ function getNumFromResponse(map: Map<string, ChecklistResponse>, itemId: string)
   return parseNum(map.get(itemId)?.remark)
 }
 
+// ─── 逐格四态（per-cell）键与解析 ────────────────────────────────────────────
+
+/** D7-1 的两个区块（持久化键的一段）。 */
+export type D7Block = 'nature' | 'aging'
+
+/** 两列派生字段（prior/current 的未审数都来自 cross_sheet）。 */
+const DERIVED_FIELDS = ['priorUnadjusted', 'currentUnadjusted'] as const
+
+function d7ItemId(block: D7Block, rowKey: string, field: string): string {
+  return `D7-1-adj-${block}-${rowKey}-${field}`
+}
+
+/** 派生快照键（照 D1/D3/D5 同款 `{itemId}-snap`）。 */
+function d7SnapId(block: D7Block, rowKey: string, field: string): string {
+  return `${d7ItemId(block, rowKey, field)}-snap`
+}
+
+/**
+ * 读某键的数值；空串/缺键/非数 → `null`。
+ *
+ * 🔴 **不能用 `getNumFromResponse`**（它对缺键返回 0）：`snap` 必须区分「没有快照」(null)
+ *    与「快照是 0」(0)，否则四态判定的 `snap === null` 降级分支永不触发。
+ */
+function readCellOrNull(map: Map<string, ChecklistResponse>, itemId: string): number | null {
+  const raw = map.get(itemId)?.remark
+  if (raw == null || raw === '') return null
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
+}
+
+/** 解析某派生格的四态（读侧与写侧共用）。 */
+function resolveD7Cell(
+  map: Map<string, ChecklistResponse>,
+  block: D7Block,
+  rowKey: string,
+  field: string,
+  derived: number,
+) {
+  return resolvePerCellDerivedState(
+    readCellOrNull(map, d7ItemId(block, rowKey, field)),
+    readCellOrNull(map, d7SnapId(block, rowKey, field)),
+    derived,
+  )
+}
+
+/** 把两列的解析结果收成 `cellOverrides`（仅 S2/S4 留条目；全 S1/S3 时返 undefined）。 */
+function collectOverrides(
+  entries: Array<[string, ReturnType<typeof resolvePerCellDerivedState>]>,
+): AdjudicationRow['cellOverrides'] | undefined {
+  const out: NonNullable<AdjudicationRow['cellOverrides']> = {}
+  for (const [field, r] of entries) {
+    if (r.state === 'S2' || r.state === 'S4') {
+      out[field] = {
+        state: r.state,
+        stored: r.stored ?? 0,
+        snap: r.snap ?? 0,
+        derived: r.derived,
+      }
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 function buildRow(params: {
   rowKey: string; label: string
   priorUnadjusted: number; priorAje: number; priorRje: number
   currentUnadjusted: number; currentAje: number; currentRje: number
   reasonAnalysis: string; isFromCrossSheet: boolean; isEditable: boolean
   isDeductionRow: boolean; rowType: AdjudicationRow['rowType']
+  cellOverrides?: AdjudicationRow['cellOverrides']
 }): AdjudicationRow {
   const priorAudited = calcAuditedAmount(params.priorUnadjusted, params.priorAje, params.priorRje)
   const currentAudited = calcAuditedAmount(params.currentUnadjusted, params.currentAje, params.currentRje)
@@ -149,13 +227,25 @@ export function useD7Adjudication(options: UseD7AdjudicationOptions) {
         // 调整数（AJE/RJE）纯 computed 从按性质分组的 adjustmentTotals 派生（Req 10.3, 11.2）
         const adj = config.natureKey ? adjByNature[config.natureKey] : { aje: 0, rje: 0 }
 
+        // ─── 两列未审数：cross_sheet 派生格，走四态覆盖状态机（Task 20）────────────
+        // 🔴 原实现 `agg ? agg.prior : manual` —— 聚合对象**一存在就无条件盖掉手工值**
+        //    （连 D5 的 `!== 0` 都没有），是三家里最激进的一版，已替换。
+        // 🔴 `agg` 缺失（该性质键不在聚合里）⇒ **没有派生源** ⇒ 该格纯手工，
+        //    不进状态机也不进同步器（否则会把 derived=0 写进 stored 抹掉手工值）。
+        const priorCell = agg
+          ? resolveD7Cell(map, 'nature', config.rowKey, 'priorUnadjusted', agg.prior)
+          : null
+        const currentCell = agg
+          ? resolveD7Cell(map, 'nature', config.rowKey, 'currentUnadjusted', agg.current)
+          : null
+
         return buildRow({
           rowKey: config.rowKey,
           label: config.label,
-          priorUnadjusted: agg ? agg.prior : getNumFromResponse(map, `${prefix}-priorUnadjusted`),
+          priorUnadjusted: priorCell ? priorCell.display : getNumFromResponse(map, `${prefix}-priorUnadjusted`),
           priorAje: getNumFromResponse(map, `${prefix}-priorAje`),
           priorRje: getNumFromResponse(map, `${prefix}-priorRje`),
-          currentUnadjusted: agg ? agg.current : getNumFromResponse(map, `${prefix}-currentUnadjusted`),
+          currentUnadjusted: currentCell ? currentCell.display : getNumFromResponse(map, `${prefix}-currentUnadjusted`),
           currentAje: adj.aje,
           currentRje: adj.rje,
           reasonAnalysis: map.get(`${prefix}-reasonAnalysis`)?.remark || '',
@@ -163,6 +253,10 @@ export function useD7Adjudication(options: UseD7AdjudicationOptions) {
           isEditable: config.isEditable,
           isDeductionRow: config.isDeductionRow,
           rowType: config.rowType,
+          cellOverrides: collectOverrides([
+            ...(priorCell ? [['priorUnadjusted', priorCell] as const] : []),
+            ...(currentCell ? [['currentUnadjusted', currentCell] as const] : []),
+          ] as Array<[string, ReturnType<typeof resolvePerCellDerivedState>]>),
         })
       })
 
@@ -236,15 +330,21 @@ export function useD7Adjudication(options: UseD7AdjudicationOptions) {
       const crossPrior = agingByKey.prior[seg.key] ?? 0
       // 调整数纯 computed 从按账龄分组的 adjustmentTotals 派生（Req 10.4, 11.2）
       const adj = adjByAging[seg.key] ?? { aje: 0, rje: 0 }
-      const isFromCrossSheet = crossCurrent !== 0 || crossPrior !== 0
+
+      // ─── 两列未审数：cross_sheet 派生格，走四态覆盖状态机（Task 20）──────────────
+      // 🔴 原实现按 `isFromCrossSheet = crossCurrent !== 0 || crossPrior !== 0` **一个标志管两列**：
+      //    只要 current 非零，prior 也被切到 cross（哪怕 crossPrior 是 0）⇒ 期初手工值被吞。
+      //    改为逐列独立判定，且「派生值恰为 0」不再被误当成「无派生源」。
+      const priorCell = resolveD7Cell(map, 'aging', rowKey, 'priorUnadjusted', crossPrior)
+      const currentCell = resolveD7Cell(map, 'aging', rowKey, 'currentUnadjusted', crossCurrent)
 
       return buildRow({
         rowKey,
         label: seg.label,
-        priorUnadjusted: isFromCrossSheet ? crossPrior : getNumFromResponse(map, `${prefix}-priorUnadjusted`),
+        priorUnadjusted: priorCell.display,
         priorAje: getNumFromResponse(map, `${prefix}-priorAje`),
         priorRje: getNumFromResponse(map, `${prefix}-priorRje`),
-        currentUnadjusted: isFromCrossSheet ? crossCurrent : getNumFromResponse(map, `${prefix}-currentUnadjusted`),
+        currentUnadjusted: currentCell.display,
         currentAje: adj.aje,
         currentRje: adj.rje,
         reasonAnalysis: map.get(`${prefix}-reasonAnalysis`)?.remark || '',
@@ -252,6 +352,10 @@ export function useD7Adjudication(options: UseD7AdjudicationOptions) {
         isEditable: true,
         isDeductionRow: false,
         rowType: 'detail',
+        cellOverrides: collectOverrides([
+          ['priorUnadjusted', priorCell],
+          ['currentUnadjusted', currentCell],
+        ]),
       })
     })
 
@@ -332,6 +436,70 @@ export function useD7Adjudication(options: UseD7AdjudicationOptions) {
   watch(() => auditNotes.value.conclusion, (v) => debouncedSave('D7-1-note-conclusion', { remark: v }))
   watch(() => auditNotes.value.agingExplanation, (v) => debouncedSave('D7-1-note-aging-explanation', { remark: v }))
 
+  // ─── 派生格逐格落库 + snap 维护（四态状态机，Task 20）───────────────────────
+  //
+  // 🔴 上游「13 条纯函数判据全绿但生产坏掉」的教训：S4 可达性完全取决于 snap 怎么维护。
+  //    只写**未被覆盖**的格（S1/S3）；S2/S4 跳过 ⇒ 冻结 snap 在覆盖发生时的派生值，S4 才可达。
+
+  /** D7 的全部派生格（两区块 × 两列）。nature 区 agg 缺失的行不是派生格，不进清单。 */
+  function _derivedCells(): Array<{ block: D7Block; rowKey: string; field: string; derived: number }> {
+    const out: Array<{ block: D7Block; rowKey: string; field: string; derived: number }> = []
+    const natAgg = crossSheet.natureAggregation.value as any
+    for (const config of NATURE_BLOCK_CONFIG) {
+      const agg = config.natureKey ? natAgg[config.natureKey] : null
+      if (!agg) continue // 无派生源 ⇒ 纯手工格，不同步（否则 derived=0 会抹掉手工值）
+      out.push({ block: 'nature', rowKey: config.rowKey, field: 'priorUnadjusted', derived: agg.prior })
+      out.push({ block: 'nature', rowKey: config.rowKey, field: 'currentUnadjusted', derived: agg.current })
+    }
+    const agingByKey = crossSheet.agingByKey.value
+    for (const seg of crossSheet.agingSegments.value) {
+      const rowKey = LEGACY_AGING_ROWKEY[seg.key] ?? seg.key
+      out.push({ block: 'aging', rowKey, field: 'priorUnadjusted', derived: agingByKey.prior[seg.key] ?? 0 })
+      out.push({ block: 'aging', rowKey, field: 'currentUnadjusted', derived: agingByKey.current[seg.key] ?? 0 })
+    }
+    return out
+  }
+
+  /** 幂等写一格（值未变则不写）。 */
+  function _writeCellIfChanged(itemId: string, value: number): void {
+    const cur = allResponses.value.get(itemId)?.remark
+    const next = String(value)
+    if (cur === next) return
+    const map = allResponses.value
+    map.set(itemId, { item_id: itemId, conclusion: null, remark: next })
+    allResponses.value = new Map(map)
+    debouncedSave(itemId, { remark: next })
+  }
+
+  /** 派生格同步进 store（幂等）：仅未覆盖格（S1/S3）写 stored + snap。 */
+  function syncDerivedCellsIntoStore(): void {
+    if (isReadonly.value) return
+    for (const { block, rowKey, field, derived } of _derivedCells()) {
+      // 🔴 覆盖判定必须走与读侧同一个 `resolveD7Cell`（内含 snap===null 降级），不可手写第二份。
+      const { state } = resolveD7Cell(allResponses.value, block, rowKey, field, derived)
+      if (state === 'S2' || state === 'S4') continue // 冻结 snap，不跟随上游
+      _writeCellIfChanged(d7SnapId(block, rowKey, field), derived)
+      _writeCellIfChanged(d7ItemId(block, rowKey, field), derived)
+    }
+  }
+
+  watch(
+    () => _derivedCells().map(c => `${c.block}/${c.rowKey}/${c.field}=${c.derived}`).join('|'),
+    () => { syncDerivedCellsIntoStore() },
+    { immediate: true },
+  )
+
+  /** 恢复取数：把某派生格从覆盖态（S2/S4）退回 S1。只影响被点那一格，**当场**写对。 */
+  function restoreDerivedValue(block: D7Block, rowKey: string, field: string): void {
+    if (isReadonly.value) return
+    const cell = _derivedCells().find(
+      c => c.block === block && c.rowKey === rowKey && c.field === field,
+    )
+    if (!cell) return
+    _writeCellIfChanged(d7ItemId(block, rowKey, field), cell.derived)
+    _writeCellIfChanged(d7SnapId(block, rowKey, field), cell.derived)
+  }
+
   // ─── updateCell ────────────────────────────────────────────────────────
 
   function updateCell(rowKey: string, field: string, value: number | string): void {
@@ -377,6 +545,10 @@ export function useD7Adjudication(options: UseD7AdjudicationOptions) {
     auditNotes,
     updateCell,
     publishAdjudicated,
+    // 逐格覆盖：恢复取数（把派生格从 S2/S4 退回 S1）
+    restoreDerivedValue,
+    // Internal (for testing)
+    _syncDerivedCellsIntoStore: syncDerivedCellsIntoStore,
   }
 }
 

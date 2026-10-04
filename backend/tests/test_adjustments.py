@@ -564,8 +564,8 @@ async def test_review_status_rejected_to_draft(db_session: AsyncSession, seeded_
 
 
 @pytest.mark.asyncio
-async def test_review_status_illegal_transition(db_session: AsyncSession, seeded_db):
-    """非法转换：draft → approved"""
+async def test_review_status_draft_to_approved(db_session: AsyncSession, seeded_db):
+    """draft → approved：大厅允许直接审批，并记录完整复核元数据。"""
     pid = seeded_db
     svc = AdjustmentService(db_session)
     created = await svc.create_entry(pid, AdjustmentCreate(
@@ -577,11 +577,63 @@ async def test_review_status_illegal_transition(db_session: AsyncSession, seeded
     ), TEST_USER.id)
     await db_session.flush()
 
-    with pytest.raises(ValueError, match="非法状态转换"):
+    await svc.change_review_status(
+        pid, created.entry_group_id,
+        ReviewStatusChange(status=ReviewStatus.approved), TEST_USER.id,
+    )
+    await db_session.flush()
+
+    rows = await svc._get_group_rows(pid, created.entry_group_id)
+    assert rows[0].review_status == ReviewStatus.approved
+    assert rows[0].reviewer_id == TEST_USER.id
+    assert rows[0].reviewed_at is not None
+    assert rows[0].rejection_reason is None
+    assert rows[0].updated_by == TEST_USER.id
+
+
+@pytest.mark.asyncio
+async def test_review_status_approved_to_draft_requires_revoke_path(
+    db_session: AsyncSession, seeded_db
+):
+    """approved → draft 只能走专用撤回路径，并清理上一轮复核元数据。"""
+    pid = seeded_db
+    svc = AdjustmentService(db_session)
+    created = await svc.create_entry(pid, AdjustmentCreate(
+        adjustment_type=AdjustmentType.aje, year=2025,
+        line_items=[
+            AdjustmentLineItem(standard_account_code="1001", debit_amount=Decimal("100")),
+            AdjustmentLineItem(standard_account_code="6001", credit_amount=Decimal("100")),
+        ],
+    ), TEST_USER.id)
+    await db_session.flush()
+
+    await svc.change_review_status(
+        pid, created.entry_group_id,
+        ReviewStatusChange(status=ReviewStatus.approved), TEST_USER.id,
+    )
+    await db_session.flush()
+
+    # 直接调用未授权的状态转换仍必须拒绝，避免绕过撤回端点。
+    with pytest.raises(ValueError, match="已通过的调整须使用撤回复核端点"):
         await svc.change_review_status(
             pid, created.entry_group_id,
-            ReviewStatusChange(status=ReviewStatus.approved), TEST_USER.id,
+            ReviewStatusChange(status=ReviewStatus.draft), TEST_USER.id,
         )
+
+    revoke_operator = uuid.uuid4()
+    await svc.change_review_status(
+        pid, created.entry_group_id,
+        ReviewStatusChange(status=ReviewStatus.draft), revoke_operator,
+        allow_approved_revoke=True,
+    )
+    await db_session.flush()
+
+    rows = await svc._get_group_rows(pid, created.entry_group_id)
+    assert rows[0].review_status == ReviewStatus.draft
+    assert rows[0].reviewer_id is None
+    assert rows[0].reviewed_at is None
+    assert rows[0].rejection_reason is None
+    assert rows[0].updated_by == revoke_operator
 
 
 # ===== 13.4 get_summary =====

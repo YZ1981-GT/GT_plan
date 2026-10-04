@@ -170,6 +170,18 @@ async def test_p4_recalc_excludes_workpaper_origin(db_session, pid):
     await sync_svc.sync_from_workpaper(pid, _req(debit="5000", credit="5000"), _USER_ID)
     await db_session.flush()
 
+    # ADR-ADJ-003: recalc_adjustments 只纳入 approved，故两侧都须标 approved
+    # 以隔离测试 origin 过滤逻辑（而非被 review_status 过滤遮盖）
+    import sqlalchemy as sa
+    all_adjs = (await db_session.execute(
+        sa.select(Adjustment).where(
+            Adjustment.project_id == pid, Adjustment.is_deleted == sa.false(),
+        )
+    )).scalars().all()
+    for a in all_adjs:
+        a.review_status = ReviewStatus.approved
+    await db_session.flush()
+
     tb_svc = TrialBalanceService(db_session)
     await tb_svc.recalc_adjustments(pid, 2025, company_code="001")
     await db_session.flush()

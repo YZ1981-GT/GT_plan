@@ -688,14 +688,14 @@
 
     <el-dialog
       v-model="samplingVisible"
-      title="抽凭引擎 — 其他非流动资产(1911) 针对性检查"
+      :title="`抽凭引擎 — ${I5_ACCOUNT_LABEL}(${samplingGate.accountCode.value}) 针对性检查`"
       width="90%"
       top="5vh"
       destroy-on-close
     >
       <GtVoucherSamplingEngine
         v-if="samplingVisible && props.wpId && props.projectId"
-        account-code="1911"
+        :account-code="samplingGate.accountCode.value"
         phase="final"
         :workpaper-id="props.wpId"
         :project-id="props.projectId"
@@ -709,6 +709,9 @@
 <script setup lang="ts">
 import { computed, inject, ref, toRef, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
+// 科目码单一真源 + 空科目降级门（禁硬编码、禁以不存在的科目发起抽样）
+import { i5GrossQueryCodes } from '../../composables/i5AccountScope'
+import { useSamplingAccountGate } from '../../composables/useSamplingAccountGate'
 import { MagicStick } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
@@ -747,6 +750,22 @@ const isReadonly = computed(() => Boolean(props.isReadonly))
 const projectId = computed(() => props.projectId)
 const checkOpts = I5_4_CHECK_OPTIONS.filter((o) => o !== '') as string[]
 const samplingVisible = ref(false)
+
+/** 底稿名（`wp_index` 实证：I5 = 其他非流动资产） */
+const I5_ACCOUNT_LABEL = '其他非流动资产'
+
+/**
+ * 抽凭科目门。🔴 原硬编码 `account-code="1911"` —— 该码在 `account_chart` 与
+ * `tb_balance` **全库零命中**；真源 `I5_GROSS_FALLBACK_STANDARD` 为**空串**
+ * （宁缺勿造：其他非流动资产无标准独立科目码，`1901` 是待处理财产损溢）。
+ * render 未下发 `tbSourceCodes` 时降级禁用，而非以不存在的码查库。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.4 / R2.1 / R2.2
+ */
+const samplingGate = useSamplingAccountGate({
+  codes: () => i5GrossQueryCodes(),
+  accountLabel: I5_ACCOUNT_LABEL,
+  isReadonly: () => props.isReadonly,
+})
 const samplingYear = computed(() => props.year || new Date().getFullYear())
 const asOfYear = computed(() => props.year || new Date().getFullYear())
 
@@ -833,6 +852,12 @@ function handleSyncSpecificAmount() {
 function handleSampling() {
   if (!props.wpId || !props.projectId) {
     ElMessage.warning('缺少工作底稿或项目上下文，无法打开抽凭引擎')
+    return
+  }
+  // 🔴 R2.2：科目解析不出时不得发起抽样（原硬编码 `1911` 在 account_chart/tb_balance
+  //    全库零命中，会以不存在的科目查库）。真源 I5_GROSS_FALLBACK_STANDARD 为空串。
+  if (!samplingGate.canSample.value) {
+    ElMessage.warning(samplingGate.disabledReason.value)
     return
   }
   samplingVisible.value = true

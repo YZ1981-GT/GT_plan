@@ -19,6 +19,17 @@ import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
 
+/**
+ * 抽凭科目码取自单一真源 `f4AccountScope`（F4 应付账款）。原为模板内字面量；
+ * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
+ * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ */
+import { f4GrossQueryCodes } from '../composables/f4AccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = f4GrossQueryCodes().join(',')
+
 const f4VoucherNav = [
   { id: 'f4-8-sample', label: '样本' },
   { id: 'f4-8-sampling', label: '抽凭' },
@@ -247,9 +258,9 @@ async function generateAiConclusion() {
     </nav>
 
     <el-collapse id="f4-8-sampling" class="sampling-engine-collapse">
-      <el-collapse-item title="自动抽凭（科目 2202 应付账款 · 样本按借贷方向自动分配）" name="auto-sampling">
+      <el-collapse-item title="自动抽凭（科目 ${samplingAccountCode} 应付账款 · 样本按借贷方向自动分配）" name="auto-sampling">
         <GtVoucherSamplingEngine
-          account-code="2202"
+          :account-code="samplingAccountCode"
           :phase="currentPhase"
           default-method="random"
           :workpaper-id="wpId"

@@ -7,6 +7,29 @@
 #   - 🔴 baseline 必须填**当前真实行数**，不得虚高 —— 虚高等于预留膨胀空间
 #
 # 登记理由：
+#   phase5_a51_cashflow_audit.py / phase5_c_control_test.py —— 2026-09-30 入册。
+#     🔴 这两个不是本轮作者的代码：它们是 `a-cycle-sync-foundation-and-first-canary`
+#     （A5-1 现金流量表审计）与 `c-cycle-sync-foundation-and-first-canary`（C 控制测试）
+#     的生产模块，此前**从未提交**，而 adapters/registry.py 与
+#     adapters/delivered_contracts_ledger.py 用**字符串常量**登记并动态加载它们
+#     ⇒ 干净检出在 import 期就挂。本轮为恢复分支自洽把它们补入库（见 commit 说明）。
+#     入册而不拆分的理由：拆别人的生产代码等于把风险转移给那两条 lane 而收益只是
+#     「我的提交能过」。拆分责任归各自 lane；届时应连带把本表条目删掉。
+#   workpaper_sync 的 contracts / excel_extract / excel_materialize /
+#     excel_workbook_row_change 四件 —— 2026-09-29 基线上调（+140 / +238 / +1140 / +693）。
+#     spec: workpaper-sync-row-deletion-multi-region-propagation（删物理行的多区位移联动）。
+#     增量来源是八条欠账的对偶实现：删行门面 + 公共扫描 + 兄弟表 ref 收缩 + definedName
+#     位移 + 跨 sheet 传播 + 裸引用平移 + verify 侧归一化 + 结构块平移（A8）。
+#     🔴 本轮**没有**抽伴生模块，理由是判据侧成本：`plan_managed_writes` /
+#     `_stage_cpu_segment_scoped` 上挂着多条 **AST 结构锁**（断言「依次调用哪几个动作」），
+#     把代码搬出去会让那些锁只看一层、变成空转而不是打红（本轮已在
+#     `_assert_roundtrip_equivalent` 搬移上实测到这个形态，见 design 勘误 E.10.4）。
+#     ⇒ 拆分必须与「让结构锁跟随间接层」同一批做，属独立重构，不塞进本 spec。
+#     将来的切分轴（按职责，不按行数）：
+#       excel_materialize → 计划期（plan_managed_writes 及其 6.x 步）/ 应用期（_apply_*）
+#       excel_workbook_row_change → 扫描（scan/find_*）/ 计划（build_*_plan）/ 执行（apply_*）
+#       excel_extract → 反读（extract_*）/ 校验门（verify_*）
+#       contracts → schema 解析 / 规则表（CS-*）
 #   check_x3_deviation_registry.py —— Deviation_Registry 十一组活探针 + 自我失效机制，
 #     每组探针含「判据 + 反空转对照组 + 可复算 method」三段，拆分会让「一组的判据
 #     与它的对照组」跨文件，反空转关系不可见。spec: x3-adjustment-entry-import-export 任务 1.7
@@ -28,9 +51,15 @@ backend/scripts/check/check_x3_deviation_registry.py  2474
 backend/scripts/diagnose/mutate_ie_lifecycle_guards.py  1290
 
 audit-platform/frontend/src/components/workpaper/g4-bond-investment-ecl/impairment/G4TabEclMeasurement.vue  1700
-audit-platform/frontend/src/components/workpaper/e1/E1TabDisclosure.vue
+#   E1TabDisclosure.vue / g7SoeDisclosureModel.ts —— 2026-09-30 补基线数字（= 当前真实行数，splitlines 口径）。
+#     🔴 两条自 5bb3142f6（2026-08-16）登记起**只有路径没有数字**，`load_whitelist` 按
+#     「非两段即跳过」静默丢弃 ⇒ 登记意图从未生效，两份文件一直按 1500 上限判超限（门变成「墙」：
+#     连把文件改小的提交也被拒）。同批登记的 G7TabDisclosureSOE.vue 已于 7b65c77b9 补过数字，这两条漏了。
+#     E1 取 2012 = chain-closure-phase2-formula-push-engine 把主表取数抽到 e1DisclosureMainRows.ts 后的
+#     行数（HEAD 2063 → 2012）。守卫：test_check_file_size_gate_cannot_be_bypassed.py 层 3。
+audit-platform/frontend/src/components/workpaper/e1/E1TabDisclosure.vue  2012
 audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclosure/G7TabDisclosureSOE.vue  1667
-audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclosure/g7SoeDisclosureModel.ts
+audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclosure/g7SoeDisclosureModel.ts  1670
 
 #   G7TabAdjudication.vue —— **改动前即 1647 行已超 1500 上限**（HEAD 现状）。
 #     tb-writeback-explicit-publish-gate Task 12（G 循环）把 TB 回写从「保存即
@@ -229,7 +258,7 @@ backend/app/services/workpaper_sync/content_mutation.py  2293
 #     `formula_mask` 的 A1 语义解析层（与 `column_in_ranges`/`parse_a1_range` 同源），
 #     `merge._protection` 只是消费方。拆分方向：A1 解析工具（约 90 行）可下沉 `contracts_a1.py`。
 #     spec: d4-html-to-oo-store-contract-alignment（真栈②覆盖往返修复）
-backend/app/services/workpaper_sync/contracts.py  1546
+backend/app/services/workpaper_sync/contracts.py  1686
 backend/app/services/workpaper_sync/definitions.py  892
 backend/app/services/workpaper_sync/endpoint_guard.py  1119
 backend/app/services/workpaper_sync/entry_source_facts.py  1096
@@ -238,12 +267,21 @@ backend/app/services/workpaper_sync/excel_entry_gate.py  1317
 #   excel_extract.py —— 基线 3900 → 4159（+259）。D4 同 sheet 多区累积归一化几轮修复累积
 #     （unextend_total_formula_chain 接线等）。拆分方向见本表顶部第 1 条。
 #     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure（同 sheet 多区）
-backend/app/services/workpaper_sync/excel_extract.py  4159
+backend/app/services/workpaper_sync/excel_extract.py  4397
 backend/app/services/workpaper_sync/excel_instrumentation.py  2200
 #   excel_materialize.py —— 基线 3120 → 3660（+540）。D4 同 sheet 多区兄弟 Table ref 位移
 #     （_sheet_table_parts / _shift_sibling_table_refs / footer 同 sheet 放行）+ _GT_SYNC
 #     重冻结几轮修复累积。spec: workpaper-html-onlyoffice-bidirectional-writeback-closure
-backend/app/services/workpaper_sync/excel_materialize.py  3660
+#   🔴 2026-09-28 基线 3660 → 3691（+31，spec d1-sync-row-table-engine-and-d1-coverage）：
+#     `_apply_workbook_propagation` 改**单次扫描同时替换**（原逐对串行 `str.replace()` 在
+#     「多处引用处于位移链不同位置」时会互吃命中，D1-4 实测 8 条声明改出 12 处 ⇒
+#     `PropagationDriftError`）。3691 = 本 spec 提交后的真实行数（`git show :<path>` 口径）。
+#
+#     ⚠️ **工作树可能显示更大**（实测 3949）：ref_collision 那条 lane 在同一文件里有
+#     ~258 行未提交改动（`CellWriteKind` / `MaterializePlan` / `plan_managed_writes` /
+#     `_grow_managed_table_ref` 等 10 个 hunk）。本行**不抬到 3949** —— 那等于替那条 lane
+#     预留额度、并把它的膨胀记到本 spec 账上。该 lane 提交时应由它自己上调本值。
+backend/app/services/workpaper_sync/excel_materialize.py  4831
 #   materialize_coordinator.py —— 基线 2936 早已 stale（本次改动前 HEAD 实测 3017）。
 #     2026-09-22 僵死 lease 的治本分流（+134 行）：按「这一代是否**真正接管过内容**」分两支 ——
 #     ① 从未接管（room 停在 opening / descriptor 确认从未到达 / 序列为 0 / 无 application）
@@ -572,7 +610,7 @@ backend/tests/workpaper_sync/test_workbook_row_change_delete.py  888
 #     行数。该文件把「行变更计划 + apply 补丁 + verify 逆归一化对称判据」内聚在一处，拆分会让
 #     apply↔verify 的候选形态对称性失联（本次 bug 正是两侧候选不对称）。后续应抽 apply/verify
 #     伴生模块使其变小；技术债登记，不留膨胀空间。
-backend/app/services/workpaper_sync/excel_workbook_row_change.py  2328
+backend/app/services/workpaper_sync/excel_workbook_row_change.py  3021
 
 # ═══════════════════════════════════════════════════════════════════════════
 # spec: platform-architecture-convergence（2026-09-08 归档入库）
@@ -607,7 +645,15 @@ backend/scripts/gen/generate_component_capability_manifest.py  852
 #   **单文件可逐条复核**（契约 digest 冻结在库里的 published definition 上，重构风险高
 #   于收益）。若后续 canary 数量继续增长（>8 个），再统一抽 `phase5_canary_base`。
 #   完整交付事实见 evidence/g5-1-canary-feasibility-and-wave-census.md §6–§11。
-backend/app/services/workpaper_sync/phase5_d1_notes_receivable.py  1040
+# 🔴 2026-09-28 基线 1040 → 1239（spec d1-sync-row-table-engine-and-d1-coverage）。
+#   曾一度记账到 1364（整册门根因修复 ~90 行 + 本 lane 早先的功能实现 ~270 行），
+#   当时明确写了「这是记账不是豁免，欠账是抽伴生模块」。**该欠账已销**：
+#   `build_combined_store_projection` / `merge_projection_into_all_d1_stores` /
+#   `_projection_slice_for` 共 162 行已抽到 `phase5_d1_combined_store.py`（222 行），
+#   entry 模块保留同名薄转发 ⇒ registry、判据与外部调用方的引用路径一个都没改。
+#   1364 → 1239。剩余行数是 entry 特有的常量声明 / 契约装配 / instrumentation 声明 /
+#   发布编排，与伴生模块正交，再抽就会把「一个 entry 的身份」打散。
+backend/app/services/workpaper_sync/phase5_d1_notes_receivable.py  1239
 backend/app/services/workpaper_sync/phase5_d3_prepaid_receipts.py  967
 backend/app/services/workpaper_sync/phase5_d5_receivables_financing.py  888
 backend/app/services/workpaper_sync/phase5_d6_contract_assets.py  964
@@ -772,7 +818,7 @@ backend/scripts/diagnose/diagnose_guidance_source_ref_localization.py  860
 #   补齐专用 parser（_parse_d4_17/18/19_row + _parse_d4_20_return_row/_20_provision_row）+ import
 #   分发分支 + export 行构造分支 + D4-20 子表键错位修复（item_id 映射，DEC-2）；同批删裸 D4-20
 #   死配置 header（DEC-1）。与既有 _parse_d4_XX 同构、内聚同一 IO 模块，拆分方向不变（独立瘦身 spec）。
-backend/app/routers/wp_render_strategies/_d4_import_export.py  3655
+backend/app/routers/wp_render_strategies/_d4_import_export.py  4101
 
 # spec: d4-dual-mode-formula-governance（P0 阻塞修复，2026-09-14 入库）
 #   三个文件均为**改动前即大文件**，本次为 P0 必要修改净增，非从零造超限：
@@ -791,7 +837,7 @@ backend/app/routers/wp_render_strategies/_d4_import_export.py  3655
 #     该文件的瘦身属独立 spec（whitelist 已有登记说明），不与 P0 安全修复同批。
 #     spec: d4-dual-mode-formula-governance P0-项4/项5
 backend/app/services/formula_engine.py  1964
-backend/tests/test_cycle_linkage_handlers_integration.py  1096
+backend/tests/test_cycle_linkage_handlers_integration.py  1205
 
 # spec: tb-writeback-explicit-publish-gate（Task 13 I 循环入库，2026）
 #   I1TabAdjudication.vue —— 改动前即 1596 行已超 1500 上限（HEAD splitlines 口径）。
@@ -939,7 +985,7 @@ backend/app/services/disclosure_engine.py  2654
 #
 #   registry.py —— 本 lane 在 DELIVERED_PER_ENTRY_CONTRACTS 追加 G2 一条 + _ALLOWED_PROVIDER_MODULES
 #     追加模块路径。基线 1830→1938（+108，含既有并发修改，本 lane 净增约 +20）。更新基线。
-backend/app/services/workpaper_sync/adapters/registry.py  1303
+backend/app/services/workpaper_sync/adapters/registry.py  1383
 #
 #   test_g_foundation_p10_p16_g2_canary.py —— G2 canary 判据：几何 / payload / 键收敛 /
 #     TB 红线（含变异 + 宿主侧）/ P15 真栈前置（8 条）/ P19 引擎层往返（4 条）。
@@ -996,7 +1042,7 @@ backend/tests/workpaper_sync/test_f5_canary_and_contract.py  904
 #     判据面不因此放松：新条目仍要过 test_contract_directory_matches_the_delivery_ledger
 #     与 test_delivered_slice_contracts_pass_property_20_21_field_level 的双向核验。
 backend/tests/workpaper_sync/test_h_foundation_hc_guards.py  1149
-backend/app/services/workpaper_sync/adapters/delivered_contracts_ledger.py  2352
+backend/app/services/workpaper_sync/adapters/delivered_contracts_ledger.py  2655
 
 
 # ── I/J 循环 + e1 修复 + 守卫口径升级（2026-09-27）──────────────────────
@@ -1071,15 +1117,145 @@ backend/tests/workpaper_sync/test_k_lane2_p3_variants_template_writepaths.py  10
 # AJE/RJE 分录 CRUD + 状态机 + 错报转换
 backend/app/services/adjustment_service.py  980
 # 全平台 EventBus handler 注册中心
-backend/app/services/event_handlers/_impl.py  2088
+backend/app/services/event_handlers/_impl.py  2315
 # OCR 流水线（本次仅修 1 处 lazy import 错名）
 backend/app/services/ocr_service_v2.py  854
 # prefill 公式 resolver 注册表 + 9 个 resolver
 backend/app/services/prefill_engine.py  1646
 # 试算表四列重算链
-backend/app/services/trial_balance_service.py  1065
+backend/app/services/trial_balance_service.py  1159
 # 分录大厅全部端点
 backend/app/routers/adjustments.py  1763
 # 附件端点（本次仅修 4 处 Attachment lazy import 错路径；
 # HEAD 版 1701 行即已超限，工作树另有前序重构使其降至 821 行）
 backend/app/routers/attachments.py  821
+
+# ledger-penetration 凭证穿透 / 挂凭链路 —— V166 凭证日期消歧
+# （spec voucher-sampling-account-scope-and-attach-closure）。
+# 三者在 HEAD 版即已超限（4213 / 1634 / 942 = 上限的 2.8x / 2.0x / 1.2x），属历史大文件。
+# 🔴 baseline 一律填 **HEAD 真实行数**而非本次改动后的行数 —— 不给本次增量预留膨胀空间。
+#    本次 delta = +46 / +78 / +19，全部落在 baseline+5%（4423 / 1715 / 989）之内。
+#    其中 ledger_penetration.py 原始 delta 是 +93（+5.69% 已超阈值），按门禁提示的优先顺序
+#    「抽伴生模块（优先）」把 parse_iso_date 抽到 routers/_voucher_date.py（28 行）后降至 1712。
+# 登记为待办：三者都该整体瘦身。下次再往这三个文件加功能应**先拆分再改**，不再滚雪球加基线。
+audit-platform/frontend/src/views/LedgerPenetration.vue  4213
+backend/app/routers/ledger_penetration.py  1634
+backend/app/services/ledger_penetration_service.py  942
+#
+# report_engine.py / consol_report_service.py —— 报表求值编排层历史大文件。
+#   两者在 spec tb-adjustment-column-formula-closure Phase 1 之前**已分别达
+#   2226 / 1008 行**（远超默认 800）却从未登记：门禁只扫暂存文件，而它们此前
+#   若干次提交未触发（或曾 --no-verify）。本轮因给 ADJ() 接线而进入暂存区，
+#   门禁首次报出。
+#   🔴 baseline 填的是**改动前的 HEAD 行数**而非当前行数 —— 不把本轮增量
+#   固化进基线，本轮增量由 +5% 容差吸收；下次再加功能会立刻顶到上限，
+#   届时必须先拆分。
+#   登记为待办：report_engine 的 ReportFormulaParser（取数缓存 + 列名映射）
+#   与模块级 evaluate_formula（L2 编排）是两个关注点，可按此切分。
+backend/app/services/report_engine.py  2226
+backend/app/services/consol_report_service.py  1008
+
+# ── 2026-09-28 spec d1-sync-row-table-engine-and-d1-coverage · X2 ────────────
+#   test_template_override_resolution.py —— **HEAD 就已 889 行超 800 上限且不在册**
+#   （历史遗留，非本 spec 造成）。本 spec 把它的两条判据从「两个标量计数」改成
+#   **逐份具名登记 + 反向断言**：原口径锁 `一致==451 && 漂移==23`，任何 lane 改一份
+#   权威模板都会翻红，而修红最省事就是把数字改成现算值 ⇒ 静默吸收别人的漂移。
+#   🔴 已按门的首选处置抽伴生模块：两张具名清单（30 + 2 条）连归因注释共 57 行抽到
+#   `_template_index_drift_registry.py`（101 行），宿主 1003 → 946。
+#   剩余 57 行增量是两条判据的具名对账逻辑 + 失效条目反向断言，属判据本体不可再抽。
+#   baseline 946 = 当前真实行数，不留膨胀空间。
+backend/tests/workpaper_sync/test_template_override_resolution.py  946
+backend/app/services/workpaper_sync/phase5_a51_cashflow_audit.py  891
+backend/app/services/workpaper_sync/phase5_c_control_test.py  825
+
+#   fix_note_parent_company_chapter.py —— **改动前即 2291 行已远超 800 上限**（HEAD 现状，
+#     此前从未登记 ⇒ 门禁对它一直没生效，重新暂存时才第一次报出来）。
+#     2026-09-30 净增 +17 行：round-trip 自检放行「仅尾部换行」差异（其余差异仍 exit 2）。
+#     🔴 更正：此前同条登记描述的 `_norm_header`/`_headers_correspond`（表头比较容 `<br/>`）
+#     **已撤回** —— 那是在给 `56acf363d` 陈旧覆盖带回的 `<br/>` 打补丁（覆盖前两份模板表头
+#     `<br/>` 为 0），根因修复见 `restore_note_templates_from_stale_overwrite.py`。
+#     不拆分的理由：本文件是 `note-parent-company-chapter` spec 的产物，Task 3~7 + 11 的
+#     「apply 动作 ↔ 同名 check 判据」成对定义，拆开会让每个 Task 的两侧跨文件；且它属
+#     另一条 lane 的工作面（沿用本表 phase5_a51/phase5_c 两条的同一理由）。
+#     baseline 取当前真实行数，门禁对本文件生效（拦膨胀 >5%）。
+#     拆分方向：列定义常量（`_listed_lte_*` / `_soe_lte_*` / `_G_*` 约 300 行）是纯数据，
+#     可下沉 `_note_parent_company_columns.py`；该 spec 收尾时应连带把本条删掉。
+backend/scripts/fix/fix_note_parent_company_chapter.py  2308
+
+#   test_note_parent_company_chapter.py —— **改动前即 2823 行已远超 800 上限**（HEAD 现状，
+#     此前从未登记 ⇒ 门禁对它一直没生效）。
+#     🔴 更正：此前同条登记描述的两处改动（`_norm` 容 `<br/>`、`PARENT_TABLE_CENSUS`
+#     21→18 / 13→11）**已全部撤回**，本文件逐字回到 cace65a9f 的内容。两处都是把守卫往
+#     `56acf363d` 的陈旧覆盖上凑：覆盖前模板表头 `<br/>` 为 0、普查值正是 21 / 13
+#     ⇒ 原判据与原登记值都是对的，错的是被覆盖的数据。
+#     不拆分沿用本表「守卫测试」一类的既定归属边界（一个 Task 一个文件是该 spec 的判据
+#     归属方式）；baseline 取当前真实行数，门禁生效（拦膨胀 >5%）。
+#     拆分方向（按 Property 分组）：源 docx 事实基线与 fixtures / 表名唯一性与普查 /
+#     同构对齐与 Task 6 / 列元数据与 Task 7 四组，属该 spec 独立任务。
+backend/tests/test_note_parent_company_chapter.py  2823
+
+# --- batch-1 platform push: existing large files, baseline = current lines ---
+audit-platform/frontend/src/services/commonApi.ts  2243
+backend/app/core/migration_runner.py  1115
+backend/app/routers/doc_ai_chat.py  1324
+backend/app/routers/template_library_mgmt.py  1069
+backend/app/routers/wp_bulk_router.py  888
+backend/app/routers/wp_html_save.py  875
+backend/app/security/coverage_guard.py  1000
+backend/scripts/gen/generate_workpaper_sync_manifest.py  899
+backend/tests/test_adjustments.py  1024
+backend/tests/test_batch_project_service.py  1113
+backend/tests/test_disclosure_row_level_merge.py  803
+backend/tests/test_doc_ai_context_builder.py  1221
+backend/app/services/knowledge_index_service.py  1307
+
+# --- batch: adjustment+tb+cycles 在途提交 ---
+#   Adjustments.vue —— **改动前即 1853 行已超 1500 上限**。本次净增 +78 行：
+#     调整分录中央同步（useAdjustmentCentralSync 接线 + EventBus 监听 + 审定表联动）。
+#     拆分方向：把「创建/编辑/审批」三组对话框抽为独立组件，属独立打磨任务。
+audit-platform/frontend/src/views/Adjustments.vue  1932
+#   wp_disclosure_sync_service.py —— **改动前即 1545 行已超 800 上限**。本次净增 +43 行：
+#     附注同步覆盖率面板接线（覆盖率计算 + duty_rows 去重）。
+#     拆分方向：把「sync 执行」与「覆盖率统计」两个关注点分文件。
+backend/app/services/wp_disclosure_sync_service.py  1589
+#   test_report_engine.py —— **改动前即 847 行已超 800 上限**。本次净增 +23 行：
+#     report_engine 联动测试修正（cycle_linkage 事件触发断言更新）。
+backend/tests/test_report_engine.py  871
+
+#   consol_note_sections.py —— **改动前即 982 行已超 800 上限**。本次净增 +56 行：
+#     合并附注节点隔离 key + 共享上下文接线。拆分方向：把 AI 填充端点组抽为伴生模块。
+backend/app/routers/consol_note_sections.py  1038
+#   consol_note_formula_service.py —— **改动前即 864 行已超 800 上限**。本次净增 +42 行：
+#     合并附注公式推送引擎接线。拆分方向：把公式求值与公式注册两个关注点分离。
+backend/app/services/consol_note_formula_service.py  906
+
+#   test_m_cycle_spec_guard.py —— M 循环三份 spec 的统一守卫（MC-1~29 判据 + 变异），
+#     改动前即 1540 行已超 800 上限。本次净增 +42 行：spec 状态对齐。
+backend/tests/workpaper_sync/test_m_cycle_spec_guard.py  1582
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 2026-10-03：批量补齐 publish_pilot_definitions 接口（F/G/E/C/H 循环 provision）
+#
+# 20 个 phase5_* provider 补了 AUTHORITY_MODEL + authority_model_payload +
+# Phase5Definitions + publish_definitions + 别名 ≈ 40~50 行。原文件多在 780~800 行边缘，
+# 加完越过 800 上限。拆分应按各循环 spec 的打磨任务统一做（提 common 层），不在本批次。
+# h_cycle_common 补了 primary_instrumentation_spec（修 I 系 6 个 import 链断裂）。
+# c_control_test 原基线 825 → 960（含此前未提交的发布接口）。
+backend/app/services/workpaper_sync/phase5_c_control_test.py  971
+backend/app/services/workpaper_sync/phase5_f1_prepayment.py  825
+backend/app/services/workpaper_sync/phase5_g10_trading_liabilities.py  837
+backend/app/services/workpaper_sync/phase5_g11_investment_income.py  871
+backend/app/services/workpaper_sync/phase5_g12_net_hedge_gains.py  840
+backend/app/services/workpaper_sync/phase5_g13_fair_value_changes.py  856
+backend/app/services/workpaper_sync/phase5_g14_credit_impairment.py  839
+backend/app/services/workpaper_sync/phase5_g1_trading_financial_assets.py  849
+backend/app/services/workpaper_sync/phase5_g2_interest_receivable.py  857
+backend/app/services/workpaper_sync/phase5_g8_other_equity.py  853
+backend/app/services/workpaper_sync/phase5_g9_other_noncurrent.py  817
+backend/app/services/workpaper_sync/phase5_h_cycle_common.py  960
+backend/app/services/workpaper_sync/phase5_e1_monetary_fund.py  924
+#   test_a_cycle_foundation_canary.py — A 域 canary(A5-1) foundation spec 全部判据:
+#     slice 域切 / 门控回溯 / mode 二分 / 结构性零 23 项 / 模板缺陷台账 / E2E 闭环 15 测试,
+#     拆分会让 canary 五项替代判据 + roundtrip 变异反证 跨文件。
+#     spec: a-cycle-sync-foundation-and-first-canary
+backend/tests/workpaper_sync/test_a_cycle_foundation_canary.py  1689
