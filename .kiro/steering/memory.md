@@ -59,6 +59,9 @@ inclusion: always
 - 链条：四表入库 / 调整审批 → `TRIAL_BALANCE_UPDATED` → `formula_push.engine.run` → E1 明细 / 审定表 / 披露表 → 附注（上市 五、1 / 国企 八、1）；规则 `backend/data/formula_push_rules.json`；公式管理「📤 公式推送」页；**余 T17 真实「立即推送」待用户同意写库**（面板 / 试跑 / 附注数值已真浏览器验过）
 - 🔴 教训：**写入方取数一律 `strict`**（fail-open 会 rollback 撤销已 flush 写入且零失败痕迹）· **试算表取数按标准码前缀**（与报表 `ReportFormulaParser` 同口径）· **改带自动保存/自动同步页面的源码前浏览器先停 `about:blank`**（HMR 重挂载即真实写库，已踩：重药 五、49）· 真库待决：3 个唯一索引含重复键（C24 / editing_locks / review_threads）、和平药房_2025 试算表 1012 父子双计多 414 万
 
+### 交付中心三件套 `chain-closure-phase4-deliverable-center-trio`（2026-10-04，16/18，commit `e3ea78a9b`；详见 spec `task18-finalization.md`）
+- **交付分级（不得混用）**：readiness 硬/软闸门·snapshot digest(无时间/绝对路径)·指纹 fail-closed·executor 固定序(financial_report→disclosure_notes→audit_report,未审仅辅助)·savepoint 隔离·attempt 不可变历史·真实重试·端点鉴权·前端 TrioRetryPanel = **已通过 SQLite/PG + 已通过 clean HEAD**（Task18 提交后全新 worktree 复跑 90+PG6=96 绿）；**T14 真实项目 dry-run / T15 Playwright / T16 授权真实出具写库 = `[ ]*` 外部依赖未做**（不以 SQLite/HTTP 200 冒充，须授权+可连接环境）。🔴 **Task17 归因（已交付≠在库再现）**：phase4 全部核心产物曾完全不在 HEAD `19c65589d`，本地绿**只因未跟踪模块本地存在**，clean checkout 在 `full_deliverables_executor.py` 顶层 import 断链；修复=specific-file staging(禁 add -A)+clean worktree 复跑转绿才勾 `[x]`。**fail-closed 消费方比 task17 清册多 5 处**(deliverable/center_integration/refresh/onlyoffice_callback/template_fill 全判 render_and_store version=None)，漏任一处则「平台持久化失败」仍伪成功
+
 ### 全链打通阶段三（2026-10-01 体检，待用户拍板后立 spec）
 - 现状：四表→TB 未审数 / 审批→TB 调整列 / →报表审定数 / 大厅 = 绿；底稿明细·审定·披露 + 附注只有 E1 由 `formula_push` 后端推，其余 77 个 wp_code 靠「打开页面时种一次」+ 前端 `buildXSyncPayload` 防抖推附注（261 个附注章节标底稿来源却从未同步）
 - 🔴 待拍板 4 件：①TB 审定数两个写入方（发布门直写 `audited_amount` 会被 `recalc_audited` 覆盖；真库仅测试项目 9 行漂移）②附注权威源（ADR-DPA-001「留前端」与「经公式管理自动推」冲突，建议按章节交接 + 前后端对拍守卫）③「确认」= 大厅 approved（approved 无撤回出口）④TB 未审数保持映射聚合，只在公式管理只读可见
