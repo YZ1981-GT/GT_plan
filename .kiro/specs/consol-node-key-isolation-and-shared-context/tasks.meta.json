@@ -531,6 +531,16 @@
         "executionId": "6ddd84ab-b065-4067-b71b-38c6cc9e84b9",
         "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
         "timestamp": 1791073564283
+      },
+      {
+        "executionId": "88f5951d-0e18-4aa1-9097-248a604f1c97",
+        "chatSessionId": "sess_89f68b56-1ccc-460e-b13b-d49a6bbc7c1b",
+        "timestamp": 1791085168298
+      },
+      {
+        "executionId": "88f5951d-0e18-4aa1-9097-248a604f1c97",
+        "chatSessionId": "sess_89f68b56-1ccc-460e-b13b-d49a6bbc7c1b",
+        "timestamp": 1791086043987
       }
     ],
     "6.6 按需求 1~6 与设计 P1~P9 逐项复核覆盖，检查三件套链接、端点名/字段名、所有任务证据完整；未实际验证的任务不打勾": [
