@@ -6,7 +6,7 @@
  * - 支持 trial_balance, adjustment, ledger
  * - wp_code 通过 API 解析为 wp_id
  */
-import { api } from '@/services/apiProxy'
+import { resolveWorkpaperByCode } from '@/services/resolveWorkpaperByCode'
 import type { LinkageContract } from '@/types/linkageContract'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -32,17 +32,10 @@ export async function resolveLinkageRoute(
       if (UUID_PATTERN.test(target_id)) {
         return `/projects/${projectId}/workpapers/${target_id}`
       }
-      // wp_code → wp_id 通过 API 解析
-      try {
-        const data: any = await api.get(
-          `/api/projects/${projectId}/wp-index/by-code/${target_id}`,
-        )
-        const wpId = data?.working_paper_id || data?.wp_id || data?.id
-        if (wpId) return `/projects/${projectId}/workpapers/${wpId}`
-      } catch {
-        /* wp_code not found */
-      }
-      return null
+      // wp_code → wp_id：走唯一 wp_id 出口（原 `/wp-index/by-code/` 后端无此路由、恒 404 ⇒
+      // 所有按编码的联动跳转静默返回 null）
+      const resolved = await resolveWorkpaperByCode(projectId, target_id, false)
+      return resolved ? `/projects/${projectId}/workpapers/${resolved.wpId}` : null
     }
 
     case 'report':

@@ -7,19 +7,38 @@
     <template v-else>
       <!-- 顶部工具栏（双模式切换）— 目录页隐藏 -->
       <div v-if="currentSheet !== 'H4'" class="h4-header-toolbar">
-        <el-segmented
-          :model-value="currentMode"
-          :options="modeOptions"
-          size="small"
-          :disabled="!isOoAvailable && currentMode === 'html'"
-          @change="onModeChange"
-        />
+        <!--
+          v-model 而非 :model-value + @change：setter 走 useHSyncMode.switchMode，
+          四分支保存协议在那里收口。
+          🔴 也删掉了 `:disabled="!isOoAvailable && currentMode === 'html'"` ——
+             健康未就绪时该条件恒真，整个切换器被锁死、点击被彻底忽略（D4 bug ③）。
+             健康门禁已移进 switchMode（await 兜底 + 不可用时明确告知）。
+        -->
+        <el-segmented v-model="currentMode" :options="modeOptions" size="small" />
+        <el-tag v-if="isH4SyncManagedSheet" size="small" :type="hSync.syncStateTag.value.type">
+          {{ hSync.syncStateTag.value.text }}
+        </el-tag>
+        <el-tag v-else-if="hSync.lastNotice.value" size="small" :type="hSync.lastNotice.value.type">
+          {{ hSync.lastNotice.value.text }}
+        </el-tag>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h4-engineering-materials" />
       </div>
 
-      <!-- OnlyOffice 模式 -->
+      <!--
+        受管 sheet（H4-2）的在线编辑 —— 统一双向宿主。
+        🔴 `.oo-container` 必须有**确定高度**（D4 踩过 height:100% 被压成一条）。
+      -->
+      <div v-if="currentMode === 'onlyoffice' && isH4SyncManagedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="hSync.descriptor.value"
+          :bridge="hSync.syncBridge"
+        />
+      </div>
+
+      <!-- 非受管 sheet 的 OnlyOffice 模式（legacy 只读视图，无双向回写） -->
       <GtOnlyOfficeSheet
-        v-if="currentMode === 'onlyoffice'"
+        v-else-if="currentMode === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -210,7 +229,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent, nextTick } from 'vue'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useH4FormData } from './composables/useH4FormData'
-import { useH4DualMode } from './composables/useH4DualMode'
+import { useHSyncMode } from './composables/useHSyncMode'
 import { useH4CrossSheet } from './composables/useH4CrossSheet'
 import { buildH4DetailSeedRows } from './composables/h4DetailPrefill'
 import { eventBus } from '@/utils/eventBus'
@@ -218,6 +237,11 @@ import { eventBus } from '@/utils/eventBus'
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+
+/** H4 entry id（manifest 冻结值，与 `phase5_h4_engineering_materials.ENTRY_ID` 逐字一致）。 */
+const H4_SYNC_ENTRY_ID = 'xlsx/gt-h4-engineering-materials'
 // 版本 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtCycleAProgramRouter.vue'))
 
@@ -273,18 +297,47 @@ const {
   loadAllResponses,
 } = formData
 
-// ─── 双模式 HTML ↔ OnlyOffice ────────────────────────────────────────────────
-const {
-  currentMode,
-  isOoAvailable,
-  modeOptions,
-  onModeChange,
-} = useH4DualMode({
-  wpId: toRef(props, 'wpId') as any,
-  sheetName: toRef(props, 'sheetName') as any,
-  autoSave: async () => { await flushPending() },
-  reloadAll: async () => { await bootstrapLoad() },
+// ─── 双模式 HTML ↔ OnlyOffice（统一接桥，替代 useH4DualMode）──────────────────
+//
+// H4-2（`明细表H4-2`）是受管表：受管 + 已接桥 ⇒ 渲染 `WorkpaperSyncEditorHost`，
+// OO 侧改动经 forcesave 回写 store。其余 sheet 仍走 `GtOnlyOfficeSheet` 只读视图
+// （受管面未覆盖，不得假称可双向，但**保留**可看 Excel）。
+//
+// 🔴 换掉 `useH4DualMode` 的两个理由：① 它不建桥 ⇒ OO 侧编辑回不到 HTML（假双向）；
+//    ② 它的 `isOoAvailable` 被宿主用在 `:disabled` 上，健康检查未就绪时该条件恒真、
+//       整个切换器被锁死、点击被彻底忽略（D4 已实证的 bug ③）。
+//
+// 🔴 载体是 `formdata_composable`（H9/H6/H8 都是 host_inline）⇒ flush 钩子取
+//    `useH4FormData` 导出的 `flushPending`，不是宿主内联函数。
+//    它本就是 `useH4DualMode` 的 `autoSave`，语义一致（清防抖 + 立即落库）。
+const hSync = useHSyncMode({
+  entryId: H4_SYNC_ENTRY_ID,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  currentCode: computed(() => currentSheet.value),
+  isReadonly,
+  flushHtml: async () => {
+    // 不 flush 就把最后一批防抖内的编辑留在客户端，materialize 出的 xlsx 会少这批改动。
+    await flushPending()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: H4_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: hSync.sheetKey.value,
+    }
+  },
+  reloadHtml: async () => { await bootstrapLoad() },
 })
+
+/** 模板 `ref="syncEditorHostRef"` 的落点 —— 直接复用桥里的 ref（见 H9 宿主同款说明）。 */
+const syncEditorHostRef = hSync.syncHostRef
+const isH4SyncManagedSheet = computed(() => hSync.isManagedSheet.value)
+const currentMode = hSync.renderMode
+const modeOptions = hSync.modeOptions
 
 /** 从 sheetName 提取编码 (H4/H4A/H4-1~H4-9/附注) */
 const currentSheet = computed(() => {
@@ -422,6 +475,17 @@ function _handleTbUpdated(e: Event) {
 
 .loading-container {
   padding: 24px;
+}
+
+/**
+ * 统一双向宿主的容器。
+ *
+ * 🔴 必须给**确定高度**，不能用 `height: 100%`：本组件根节点是 auto 高度，`100%` 解析成
+ *    父级内容高度（此刻为 0）⇒ 编辑器被压成一条，看起来像没加载。D4 踩过一次。
+ */
+.oo-container {
+  min-height: 600px;
+  height: calc(100vh - 200px);
 }
 
 .h4-header-toolbar {

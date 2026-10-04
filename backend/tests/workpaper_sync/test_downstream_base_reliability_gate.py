@@ -4,8 +4,13 @@
 spec: workpaper-html-onlyoffice-bidirectional-writeback-closure
 被兑现的散文: tasks.md Task 20 正文最后一条 —— 「本门未过，Wave 2 coordinator 与任何
 adapter pilot 不得宣称 base 可靠。」在本文件出现之前，这句话**没有任何守卫兑现**：
-门现算 916 条 blocking facts（`[BLOCKED]`），而 Wave 2–5 的 Tasks 25–47 / 58 / 59 全部
-标着 `[x]`。这正是平台假绿第①源的治理层形态 —— 一句约束只活在散文里，等于不存在。
+门现算数百条 blocking facts（`[BLOCKED]`，2026-06-01 实测 750 条），而门之后的 wave 里
+大批任务标着 `[x]`（同日实测 282 条跨 wave 宣称、涉及 47 个任务）。这正是平台假绿第①源的
+治理层形态 —— 一句约束只活在散文里，等于不存在。
+
+🔴 本 docstring 里的一切计数都是**快照**，判据一律由 :func:`issues` fixture 现跑
+`evaluate_gate()` 得出。散文里写死的数字会随门收敛而失真（本文件首版写的 916 / 912 / 4
+到 2026-06-01 已变成 750 / 747 / 3），所以读到数字请以现算为准。
 
 ## 判据形态（三类「宣称」，全部落在结构与真实执行上）
 
@@ -46,8 +51,9 @@ C 证据结构   slice / manifest / contract 里的 entry 节点在**结构上**
 实测：归属 Task 20 的六条准则（`keeps_legacy_write_path_beside_unified_commit`、
 `after_save_still_increments_revision`、`representation_upgrade_increments_business_revision`、
 `artifact_snapshot_writer_not_verifiable`、`retired_writer_not_verifiable`、
-`missing_required_domain`）**当前全为 0**；912 条归 Task 74、4 条归 Task 71。若「本门未过」
-只按归属 Task 20 的准则判，本守卫会**恒绿** —— 而门自己 `exit 1 [BLOCKED]`。
+`missing_required_domain`）**当前全为 0**；欠账全部归 Task 74 与 Task 71（2026-06-01 实测
+747 归 Task 74、3 归 Task 71）。若「本门未过」只按归属 Task 20 的准则判，本守卫会**恒绿**
+—— 而门自己 `exit 1 [BLOCKED]`。
 
 Task 20 正文对此有明文裁决：移交的是**裁决归属**，`check_workpaper_writer_revision_gate.py`
 「必须继续算这七条、继续把它们计入 `has_debt`，一行计算都不许删」。所以：
@@ -681,11 +687,15 @@ def test_a_relocated_criterion_still_blocks_the_door(
 @pytest.mark.xfail(
     strict=True,
     reason=(
-        "存量欠账：门现算 916 条 blocking facts，912 条归 Task 74（Wave 7）、4 条归 "
-        "Task 71（Wave 7），而 Tasks 25–47 / 58 / 59（Wave 2–5）已全部标 [x]。"
-        "解除条件 = Task 74 把七条准则清零 + Task 71 清掉 multi_resolver，"
+        "存量欠账：门 `[BLOCKED]`，而门之后的下游任务已大批标 [x]。"
+        "解除条件 = **Task 74** 把它名下的准则清零 + **Task 71** 清掉 `multi_resolver`，"
         "或把这些下游任务的 [x] 改回未完成态。清零后本条会 XPASS(strict) 报错，"
         "届时必须删掉这个 xfail 标记（不许留着当装饰）。"
+        " 🔴 计数一律**现算**（`issues` fixture 跑 `evaluate_gate()`），下面的数字只是某次"
+        "实测快照、**不是判据**：2026-06-01 实测门 750 条 blocking facts（747 归 Task 74、"
+        "3 归 Task 71），本条现算 282 条跨 wave 宣称、涉及 47 个任务。"
+        "（上一次快照写的是 916 / 912 / 4 与「Tasks 25–47 / 58 / 59」，已随门收敛而失真 —— "
+        "reason 里的数字会烂，故此处显式标注为快照并把真源指回 `evaluate_gate()`。）"
     ),
 )
 def test_downstream_completed_tasks_do_not_outrun_the_owner_of_the_open_debt(
@@ -722,9 +732,12 @@ def test_downstream_completed_tasks_do_not_outrun_the_owner_of_the_open_debt(
 @pytest.mark.xfail(
     strict=True,
     reason=(
-        "存量欠账：Task 20 把守 `bulk_adapters` 闸（把守者 20/30/44），闸后的 "
-        "Tasks 45/46/47 已标 [x]，而门 [BLOCKED]。解除条件 = 门归零（Task 74 + Task 71），"
-        "或把闸后已 [x] 的任务改回未完成态。归零后本条 XPASS(strict) 报错，须删标记。"
+        "存量欠账：Task 20 把守 `bulk_adapters` 闸（把守者 20/30/44），闸后已有任务标 [x]，"
+        "而门 [BLOCKED]。解除条件 = 门归零（**Task 74** 清七条准则 + **Task 71** 清 "
+        "`multi_resolver`），或把闸后已 [x] 的任务改回未完成态。归零后本条 XPASS(strict) "
+        "报错，须删标记。"
+        " 🔴 计数**现算**，下列数字只是快照、不是判据：2026-06-01 实测门 750 条 blocking "
+        "facts、本条 23 条越门宣称。（上一次快照写「Tasks 45/46/47」与门 916 条，已失真。）"
     ),
 )
 def test_no_task_behind_the_bulk_adapter_gate_is_completed_while_the_door_is_blocked(

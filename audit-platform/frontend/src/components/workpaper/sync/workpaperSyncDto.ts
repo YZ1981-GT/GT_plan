@@ -552,6 +552,29 @@ export interface WorkpaperSyncForcesaveAccepted {
   readonly replayed: boolean
   /** 出站失败时的 error_code；`null` 才代表 Command Service 已受理。 */
   readonly dispatchError: string | null
+  /**
+   * Command Service 的原始返回码（`0`=accepted / `4`=no_changes / …）。
+   *
+   * 🔴 2026-09-22 补解析。后端 `request_forcesave` 一直在 202 里回传
+   * `cs_error / cs_outcome / callback_expected` 三项，并对
+   * `terminal_without_callback`（no_changes / doc_not_online / configuration_error /
+   * implementation_defect）**就地终结** request+shell，源码注释写的就是
+   * 「避免前端无限等 status 6」。但前端此前**根本不解析这三项**，于是后端明确说过
+   * 「不会再有 callback」之后，桥照样进 `waiting_application` 干等 ——
+   * 用户「进 OO 什么都没改直接点保存」必然永久转圈（真栈实测）。
+   *
+   * 出站失败（`dispatchError !== null`）时三项为 `null`：那条路径连 CS 都没调到。
+   */
+  readonly csError: number | null
+  /** CS 结果的语义名（`accepted` / `no_changes` / …），用于给用户讲人话。 */
+  readonly csOutcome: string | null
+  /**
+   * 这次 forcesave **是否还会有 callback**。
+   *
+   * `false` ⇒ 后端已终结 request+shell，**不得**进入 `waiting_application`。
+   * `null` ⇒ 后端未给（旧版本 / 出站失败），按「可能会来」保守处理。
+   */
+  readonly callbackExpected: boolean | null
 }
 
 export function parseForcesaveAccepted(payload: unknown): WorkpaperSyncForcesaveAccepted {
@@ -571,6 +594,9 @@ export function parseForcesaveAccepted(payload: unknown): WorkpaperSyncForcesave
       `forcesave 的 dispatch_error=${JSON.stringify(dispatchError)} 既不是 null 也不是 error_code 字符串`,
     )
   }
+  const csError = wire.cs_error
+  const csOutcome = wire.cs_outcome
+  const callbackExpected = wire.callback_expected
   return {
     forcesaveRequestId: requiredOpaqueId(wire, 'forcesave_request_id', 'forcesave'),
     operationId: requiredOpaqueId(wire, 'operation_id', 'forcesave'),
@@ -579,6 +605,12 @@ export function parseForcesaveAccepted(payload: unknown): WorkpaperSyncForcesave
     pollAfterMs: requiredInt(wire, 'poll_after_ms', 'forcesave'),
     replayed: wire.replayed === true,
     dispatchError: typeof dispatchError === 'string' ? dispatchError : null,
+    // 三项都**宽松**解析：缺字段按 null（旧后端 / 出站失败路径），不 refuse ——
+    // 这三项是「能不能少等一会儿」的优化信号，拿不到时退回原有保守行为即可，
+    // 为它们把整个保存流程打挂是过度反应。
+    csError: typeof csError === 'number' ? csError : null,
+    csOutcome: typeof csOutcome === 'string' ? csOutcome : null,
+    callbackExpected: typeof callbackExpected === 'boolean' ? callbackExpected : null,
   }
 }
 
@@ -607,6 +639,17 @@ export interface WorkpaperSyncOperationSnapshot {
   readonly duplicateOfOperationId: string | null
   readonly errorCode: string | null
   readonly errorStage: string | null
+  /**
+   * post-durable 失败的真因（由后端从 application 事件流投影）。
+   *
+   * `errorCode` 在这条路径上恒为 null —— `apply_durable_incoming` 在 durable 之后
+   * 刻意不抛（AC 5.7/5.8），失败只落 application 事件流。这三项补上之后，界面才能
+   * 从「同步失败」变成「金额列填了文本」这类可操作信息。`applicationErrorMessage`
+   * 的中文措辞由后端单源词表给，前端不再抄一份码→文案的映射。
+   */
+  readonly applicationErrorCode: string | null
+  readonly applicationErrorStage: string | null
+  readonly applicationErrorMessage: string | null
   readonly acceptedAt: string | null
   readonly applicationBoundAt: string | null
   readonly operationFinishedAt: string | null
@@ -711,6 +754,23 @@ export function parseOperationSnapshot(payload: unknown): WorkpaperSyncOperation
     duplicateOfOperationId,
     errorCode: typeof errorCode === 'string' && errorCode !== '' ? errorCode : null,
     errorStage: typeof wire.error_stage === 'string' ? wire.error_stage : null,
+    // 🔴 post-durable 失败的真因不在 operation 行上（`apply_durable_incoming` 在 durable
+    // 之后刻意不抛，失败只落 application 事件流），所以 `error_code` 恒为 null，界面只剩
+    // 一句「同步失败」。真栈实测：往 amount 列填文本 →
+    // `excel_materialize_editable_write_failed` 全程只在后端日志里。
+    // 后端按读侧投影补了这三个字段，**中文措辞由后端给**（单源词表在
+    // `excel_materialize.FAILURE_KINDS`），前端只负责显示，不在这里再抄一份码→文案。
+    applicationErrorCode:
+      typeof wire.application_error_code === 'string' && wire.application_error_code !== ''
+        ? wire.application_error_code
+        : null,
+    applicationErrorStage:
+      typeof wire.application_error_stage === 'string' ? wire.application_error_stage : null,
+    applicationErrorMessage:
+      typeof wire.application_error_message === 'string' &&
+      wire.application_error_message !== ''
+        ? wire.application_error_message
+        : null,
     acceptedAt: typeof wire.accepted_at === 'string' ? wire.accepted_at : null,
     applicationBoundAt:
       typeof wire.application_bound_at === 'string' ? wire.application_bound_at : null,

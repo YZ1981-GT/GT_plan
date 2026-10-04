@@ -1,0 +1,106 @@
+{
+  "captured_at": "2026-09-24T14:32:12.850Z",
+  "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+  "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
+  "entry": "xlsx/gt-d4-operating-revenue",
+  "materialize_200": true,
+  "d4_35": {
+    "managed_sheet": "其他业务收入检查表D4-35",
+    "table_key": "other_revenue_check_rows",
+    "row_ids": [
+      "GTROW-D435-9001",
+      "GTROW-D435-9002"
+    ],
+    "scan_window": {
+      "from": 3,
+      "to": 45
+    },
+    "oo_matched_by": "exact",
+    "oo_active_sheet": "其他业务收入检查表D4-35",
+    "expected_vs_found": [
+      {
+        "row_id": "GTROW-D435-9001",
+        "fields": [
+          {
+            "field": "content",
+            "column": "C",
+            "want": "探针-废料销售收入",
+            "hit_row": 26
+          },
+          {
+            "field": "amount",
+            "column": "F",
+            "want": 50000,
+            "hit_row": 26
+          },
+          {
+            "field": "voucher_no",
+            "column": "B",
+            "want": "记-0312",
+            "hit_row": 26
+          }
+        ]
+      },
+      {
+        "row_id": "GTROW-D435-9002",
+        "fields": [
+          {
+            "field": "content",
+            "column": "C",
+            "want": "探针-租金收入",
+            "hit_row": 27
+          },
+          {
+            "field": "amount",
+            "column": "F",
+            "want": 2500.5,
+            "hit_row": 27
+          },
+          {
+            "field": "voucher_no",
+            "column": "B",
+            "want": "记-0620",
+            "hit_row": 27
+          }
+        ]
+      }
+    ],
+    "missing": []
+  },
+  "d4_13": {
+    "managed_sheet": "营业收入账面金额与ERP系统核对记录D4-13",
+    "table_key": "d413_erp_check_fixed",
+    "oo_matched_by": "exact",
+    "oo_active_sheet": "营业收入账面金额与ERP系统核对记录D4-13",
+    "expected_vs_found": [
+      {
+        "field": "process",
+        "ref": "A6",
+        "want": "探针-D4-13-核对过程正文（真栈）",
+        "got": "探针-D4-13-核对过程正文（真栈）",
+        "equal": true
+      },
+      {
+        "field": "conclusion",
+        "ref": "A16",
+        "want": "探针-D4-13-核对结论正文（真栈）",
+        "got": "探针-D4-13-核对结论正文（真栈）",
+        "equal": true
+      }
+    ],
+    "missing": [],
+    "stray_hits": [],
+    "column_scan": {
+      "A6": "探针-D4-13-核对过程正文（真栈）",
+      "A16": "探针-D4-13-核对结论正文（真栈）",
+      "A1": "致同会计师事务所",
+      "A2": "营业收入账面金额与ERP系统核对记录",
+      "A3": "被审计单位：",
+      "A4": "会计期间：202X年度",
+      "A5": "一、核对过程",
+      "A15": "二、核对结论",
+      "A19": "提示：对于互联网等业务数据量大的被审计单位，应结合IT审计完成核对。"
+    }
+  },
+  "console_errors": []
+}

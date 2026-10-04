@@ -25,19 +25,35 @@
 -->
 <template>
   <div
-    class="wp-sync-editor-host"
+    ref="rootEl"
+    :class="['wp-sync-editor-host', { 'wp-sync-editor-host--fullscreen': isFullscreen }]"
     data-testid="wp-sync-host"
     :data-bridge-state="bridge.state.value"
     :data-dirty="bridge.dirty.value ? '1' : '0'"
   >
-    <!-- 状态条：文案唯一真源是桥的 feedback（error 优先，Property 48） -->
-    <div
-      class="wp-sync-editor-host__status"
-      :class="`wp-sync-editor-host__status--${feedback.kind}`"
-      data-testid="wp-sync-host-status"
-      :data-kind="feedback.kind"
-    >
-      {{ feedback.message }}
+    <!-- 状态条：文案唯一真源是桥的 feedback（error 优先，Property 48）。
+         全屏按钮独立于状态条 —— 状态条的 `.text` 是既有判据的断言点（AC 11.5/Property 48
+         等一系列用例逐字比较它），混进按钮标签会让那批判据全部打红。 -->
+    <div class="wp-sync-editor-host__status-row">
+      <div
+        class="wp-sync-editor-host__status"
+        :class="`wp-sync-editor-host__status--${feedback.kind}`"
+        data-testid="wp-sync-host-status"
+        :data-kind="feedback.kind"
+      >
+        {{ feedback.message }}
+      </div>
+      <!-- 全屏切换：与 GtOnlyOfficeSheet 同款交互（原生 Fullscreen API + ESC 退出） -->
+      <button
+        v-if="editorLive"
+        type="button"
+        class="wp-sync-editor-host__fullscreen-btn"
+        data-testid="wp-sync-host-fullscreen"
+        :title="isFullscreen ? '退出全屏' : '全屏编辑'"
+        @click="toggleFullscreen"
+      >
+        {{ isFullscreen ? '退出全屏' : '全屏编辑' }}
+      </button>
     </div>
 
     <!-- 宿主侧失败：载入/挂载/保存早于确认。桥的失败已在状态条里，两处互不覆盖 -->
@@ -101,6 +117,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 import { describeBridgeFailure, type WorkpaperSyncBridge, type WorkpaperSyncBridgeError } from './useWorkpaperSyncBridge'
+import { WorkpaperSyncOperationTracker } from './workpaperSyncOperationTracker'
 import WorkpaperSyncContentRefreshBanner from './WorkpaperSyncContentRefreshBanner.vue'
 import type { WorkpaperContentRefresh } from './workpaperSyncContentRefresh'
 import type { WorkpaperSyncEditorLaunchDescriptor } from './workpaperSyncDto'
@@ -143,11 +160,22 @@ const props = withDefaults(
      * 消费需求，强制必填会逼出一个空协调器（而空协调器就是死代码）。
      */
     contentRefresh?: WorkpaperContentRefresh | null
+    /**
+     * forcesave 之后是否由本宿主自行把 operation 推进到终态。**默认开**。
+     *
+     * 🔴 默认开、只给显式关的开关：29 个挂载点里漏一个就是「保存后永久转圈」，
+     * 而那正是 2026-09-22 真栈复现的缺陷。关掉它的唯一正当理由是**测试隔离**
+     * （按「桥只在被调用时发请求」建立判据的那批独立回归 —— 宿主自轮询会多打一次
+     * operation GET 并抢掉排队 mock），所以它由测试显式声明「本文件不测追踪」，
+     * 而不是让生产逐个去开。同一取舍桥上的 `installBeforeUnload` 已有先例。
+     */
+    trackOperation?: boolean
   }>(),
   {
     documentServerUrl: '',
     docsApiLoader: null,
     contentRefresh: null,
+    trackOperation: true,
   },
 )
 
@@ -184,6 +212,50 @@ const containerId = ref('')
 let editorInstance: WorkpaperSyncDocEditorInstance | null = null
 let mountedKey: string | null = null
 let mountSeq = 0
+
+// ── 全屏切换（与 GtOnlyOfficeSheet 同款：浏览器原生 Fullscreen API + CSS fixed 兜底）
+const rootEl = ref<HTMLElement | null>(null)
+const isFullscreen = ref(false)
+
+function handleFullscreenChange(): void {
+  // 用户按 ESC 退出浏览器全屏时同步状态
+  if (!document.fullscreenElement && isFullscreen.value) {
+    isFullscreen.value = false
+    document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }
+}
+
+function handleEscFullscreen(e: KeyboardEvent): void {
+  if (e.key === 'Escape' && isFullscreen.value) {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {})
+    }
+    isFullscreen.value = false
+    document.removeEventListener('keydown', handleEscFullscreen)
+    document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }
+}
+
+function toggleFullscreen(): void {
+  if (!isFullscreen.value) {
+    const el = rootEl.value as (HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void }) | null
+    if (el?.requestFullscreen) {
+      el.requestFullscreen().catch(() => { /* CSS fallback 仍生效 */ })
+    } else if (el?.webkitRequestFullscreen) {
+      el.webkitRequestFullscreen()
+    }
+    isFullscreen.value = true
+    document.addEventListener('keydown', handleEscFullscreen)
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+  } else {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {})
+    }
+    isFullscreen.value = false
+    document.removeEventListener('keydown', handleEscFullscreen)
+    document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }
+}
 
 // ── 桥投影（模板不能自动解包 prop 上的 ref，一律经 computed）
 
@@ -496,7 +568,79 @@ async function forceSave(): Promise<{ operationId: string }> {
     throw refusal
   }
   emit('saveRequested', { operationId })
+  startOperationTracking(operationId)
   return { operationId }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// operation 推进器（forcesave → 终态）
+//
+// 🔴 2026-09-22 真栈缺陷的修复点。用户点保存后 UI 永久停在「已发送强制保存，等待
+// OnlyOffice 回传文件」，而服务端早已 `applied`。根因是**两边都没接**：桥
+// `switchToHtml()` 止于 `apply('shell_tracking_started')`（它刻意被动：自轮询会让
+// 「桥只在被调用时发请求」那批独立回归判据全部打红），而 `WorkpaperSyncOperationTracker`
+// 在生产代码里零调用方。
+//
+// 放在宿主而不是桥：宿主持有组件生命周期，能保证定时器随卸载停掉。本文件因此是
+// 全仓**唯一**的 tracker 生产实例化点。
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** 追踪窗口上限：超过即 fail-visible（spec Task 34「不得无限等待」）。 */
+const OPERATION_TRACKING_DEADLINE_MS = 180_000
+
+/** 后端没给 `poll_after_ms` 时的兜底轮询间隔。 */
+const OPERATION_TRACKING_FALLBACK_POLL_MS = 1_000
+
+let operationTracker: WorkpaperSyncOperationTracker | null = null
+
+function stopOperationTracking(): void {
+  operationTracker?.stop()
+  operationTracker = null
+}
+
+function startOperationTracking(operationId: string): void {
+  if (!props.trackOperation) return
+  // 🔴 只在桥真的进入「等待 OnlyOffice 回传」时才追踪。
+  //
+  // 后端对 Command Service 的 `no_changes` / `doc_not_online` 等 terminal 情形已就地
+  // 终结 request+shell 并回传 `callback_expected=false`，桥据此落 `forcesave_frozen`。
+  // 那种情形**不会有 callback**，去轮询一个永不推进的 operation 只会白烧请求，
+  // 并在窗口到点后报一个假的「超时」把用户从可重试的 frozen 推进 error 终态。
+  if (props.bridge.state.value !== 'waiting_application') return
+  stopOperationTracking()
+  const tracker = new WorkpaperSyncOperationTracker({
+    scope: props.bridge.scope(),
+    operationId,
+    // 后端 202 给的 `poll_after_ms` 是它自己的节奏建议，优先用它。
+    pollIntervalMs: props.bridge.pollAfterMs.value ?? OPERATION_TRACKING_FALLBACK_POLL_MS,
+    deadlineMs: OPERATION_TRACKING_DEADLINE_MS,
+    // 🔴 取快照必须走**桥的** api 通道，不能用 tracker 的模块级默认 `getOperation`：
+    // 桥是唯一持有 api 注入点的地方（测试注入 stub、生产注入真实客户端）。用默认值
+    // 等于绕开注入 —— 判据会看到「宿主在打真实 HTTP 而 spy 没被调用」。
+    poll: (_scope, id) => props.bridge.fetchOperationSnapshot(id),
+    onSnapshot: (snapshot) => {
+      try {
+        props.bridge.ingestOperationSnapshot(snapshot)
+      } catch (error) {
+        // 快照推不进状态机 ⇒ 接线错误，必须可见；同时停掉轮询免得每周期再抛一次。
+        stopOperationTracking()
+        failHost('operation_tracking', error, true)
+        return
+      }
+      // 终态判定用**快照自己**声明的 terminal（服务端事实），不是前端按状态名反推。
+      if (snapshot.terminal) stopOperationTracking()
+    },
+    onDeadline: () => {
+      operationTracker = null
+      failHost(
+        'operation_tracking',
+        hostRefusal('editor_host_operation_tracking_timeout'),
+        true,
+      )
+    },
+  })
+  operationTracker = tracker
+  void tracker.start()
 }
 
 /** 只读同步态投影。宿主自己只贡献 DOM 事实，其余逐项来自桥。 */
@@ -529,6 +673,10 @@ function getSyncState(): {
 onBeforeUnmount(() => {
   mountSeq += 1
   destroyEditor()
+  // 定时器必须随宿主卸载停掉 —— 这正是推进器放在宿主而不是桥里的原因。
+  stopOperationTracking()
+  document.removeEventListener('keydown', handleEscFullscreen)
+  document.removeEventListener('fullscreenchange', handleFullscreenChange)
 })
 
 defineExpose({ forceSave, getSyncState })
@@ -542,11 +690,46 @@ defineExpose({ forceSave, getSyncState })
   width: 100%;
   height: 100%;
   min-height: 480px;
+  position: relative;
+}
+
+/* 全屏模式：CSS fixed 兜底（浏览器原生 Fullscreen API 不可用时仍能铺满视口） */
+.wp-sync-editor-host--fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: #fff;
+  min-height: 100vh;
+  height: 100vh;
+}
+
+.wp-sync-editor-host__status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .wp-sync-editor-host__status {
   font-size: 13px;
   color: #606266;
+}
+
+.wp-sync-editor-host__fullscreen-btn {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #606266;
+  background: #fff;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.wp-sync-editor-host__fullscreen-btn:hover {
+  color: #4b2d77;
+  border-color: #d8b8ee;
 }
 
 .wp-sync-editor-host__status--error {

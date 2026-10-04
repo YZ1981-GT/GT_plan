@@ -366,17 +366,19 @@ async function handleLoadTb(silent = false): Promise<void> {
 //   (b) 应并入统一显式发布门：现移除 onAfterSave 自动回写，改为用户显式二次确认 →
 //       走统一 `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（与其余 I 循环一致）。
 // 开发支出为资产类科目（render 下发优先 → 兜底 1704），口径 balance。
-const publishing = ref(false)
 
 const {
   rows, auditNote, auditConclusion, summary,
   totalRow, tbRow, diffRow, tbDiff, hasTbDiff, hasAjeApprox,
+  publishing, publishToTb,
   addRow, removeRow, updateRow,
   seedFromDetail, syncAjeFromI23, applyTbToUnadj,
   save, saveAuditField,
 } = useI2Adjudication({
   allResponses: allResponsesRef,
   tbData: tbDataRef,
+  wpId: computed(() => props.wpId),
+  accountCode: i2AccountCode,
   saveResponses: props.saveResponse,
   // 普通保存不再自动回写 TB（Req 1）；TB 回写走显式发布门 publishToTb
 })

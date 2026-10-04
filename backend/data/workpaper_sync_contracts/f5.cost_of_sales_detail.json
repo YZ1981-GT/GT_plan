@@ -1,0 +1,321 @@
+{
+  "contract_id": "f5.cost_of_sales_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "e3a573862b3a2aa951b9fa3d832173c2b1f4743deeb2d16941a5410fe870f584",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-f5-cost-of-sales",
+    "html_store": {
+      "item_ids": [
+        "F5-8-rows",
+        "F5-1-adj-other-rows"
+      ],
+      "note": "F5 营业成本的结构化 Tab 行数据存成 checklist_responses 的 remark JSON 数组，一张 sheet 一条 item。本契约按 stable field + rowId 拆开，禁止把整 JSON 当一个字段。",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "phase5_cost_of_sales",
+    "reviewed_basis": "openpyxl 逐格实测 F/F5 营业成本.xlsx（11 sheets）+ 前端 useF5*.ts 按值 grep + 真库 checklist_responses 载荷实测（F5-8-rows 675 B / 2 行全带 rowId）"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "重大调整核查表F5-8",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "f58-managed",
+      "tables": [
+        {
+          "anchor": "A12",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "adjustment_date",
+              "header_source_ref": "源xlsx!重大调整核查表F5-8!A13",
+              "header_text": "日期",
+              "json_pointer": "/rows/{row_uuid}/date",
+              "mode": "editable",
+              "source_ref": "源xlsx!重大调整核查表F5-8!A14",
+              "stable_field_key": "major_adjustment_rows/{row_uuid}/adjustment_date",
+              "store_item_id": "F5-8-rows",
+              "value_type": "date"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_no",
+              "header_source_ref": "源xlsx!重大调整核查表F5-8!B13",
+              "header_text": "凭证号",
+              "json_pointer": "/rows/{row_uuid}/voucherNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!重大调整核查表F5-8!B14",
+              "stable_field_key": "major_adjustment_rows/{row_uuid}/voucher_no",
+              "store_item_id": "F5-8-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "item_content",
+              "header_source_ref": "源xlsx!重大调整核查表F5-8!C13",
+              "header_text": "重大调整事项内容",
+              "json_pointer": "/rows/{row_uuid}/itemContent",
+              "mode": "editable",
+              "source_ref": "源xlsx!重大调整核查表F5-8!C14",
+              "stable_field_key": "major_adjustment_rows/{row_uuid}/item_content",
+              "store_item_id": "F5-8-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "debit_amount",
+              "header_source_ref": "源xlsx!重大调整核查表F5-8!D13",
+              "header_text": "借方",
+              "json_pointer": "/rows/{row_uuid}/debitAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!重大调整核查表F5-8!D14",
+              "stable_field_key": "major_adjustment_rows/{row_uuid}/debit_amount",
+              "store_item_id": "F5-8-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "credit_amount",
+              "header_source_ref": "源xlsx!重大调整核查表F5-8!E13",
+              "header_text": "贷方",
+              "json_pointer": "/rows/{row_uuid}/creditAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!重大调整核查表F5-8!E14",
+              "stable_field_key": "major_adjustment_rows/{row_uuid}/credit_amount",
+              "store_item_id": "F5-8-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "adjustment_reason",
+              "header_source_ref": "源xlsx!重大调整核查表F5-8!F13",
+              "header_text": "调整理由",
+              "json_pointer": "/rows/{row_uuid}/adjustmentReason",
+              "mode": "editable",
+              "source_ref": "源xlsx!重大调整核查表F5-8!F14",
+              "stable_field_key": "major_adjustment_rows/{row_uuid}/adjustment_reason",
+              "store_item_id": "F5-8-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "reason_adequate",
+              "header_source_ref": "源xlsx!重大调整核查表F5-8!H13",
+              "header_text": "理由是否充分",
+              "json_pointer": "/rows/{row_uuid}/reasonAdequate",
+              "mode": "editable",
+              "source_ref": "源xlsx!重大调整核查表F5-8!H14",
+              "stable_field_key": "major_adjustment_rows/{row_uuid}/reason_adequate",
+              "store_item_id": "F5-8-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "三、审计说明：",
+            "search_column": "A"
+          },
+          "formula_mask": [],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "major_adjustment_rows",
+          "uuid_col": "I"
+        }
+      ]
+    },
+    {
+      "excel_name": "营业务成本审定表F5-1",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "f51-managed",
+      "tables": [
+        {
+          "anchor": "A5",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "item_label",
+              "header_source_ref": "源xlsx!营业务成本审定表F5-1!A6",
+              "header_text": "项目",
+              "json_pointer": "/rows/{row_uuid}/label",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业务成本审定表F5-1!A20",
+              "stable_field_key": "adjudication_other_rows/{row_uuid}/item_label",
+              "store_item_id": "F5-1-adj-other-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_unadjusted",
+              "header_source_ref": "源xlsx!营业务成本审定表F5-1!B6",
+              "header_text": "本期未审数",
+              "json_pointer": "/rows/{row_uuid}/currentUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业务成本审定表F5-1!B20",
+              "stable_field_key": "adjudication_other_rows/{row_uuid}/current_unadjusted",
+              "store_item_id": "F5-1-adj-other-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_aje",
+              "header_source_ref": "源xlsx!营业务成本审定表F5-1!C6",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/currentAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业务成本审定表F5-1!C20",
+              "stable_field_key": "adjudication_other_rows/{row_uuid}/current_aje",
+              "store_item_id": "F5-1-adj-other-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_rje",
+              "header_source_ref": "源xlsx!营业务成本审定表F5-1!D6",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/currentRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业务成本审定表F5-1!D20",
+              "stable_field_key": "adjudication_other_rows/{row_uuid}/current_rje",
+              "store_item_id": "F5-1-adj-other-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!营业务成本审定表F5-1!F6",
+              "header_text": "上期未审数",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业务成本审定表F5-1!F20",
+              "stable_field_key": "adjudication_other_rows/{row_uuid}/prior_unadjusted",
+              "store_item_id": "F5-1-adj-other-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!营业务成本审定表F5-1!G6",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业务成本审定表F5-1!G20",
+              "stable_field_key": "adjudication_other_rows/{row_uuid}/prior_aje",
+              "store_item_id": "F5-1-adj-other-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_rje",
+              "header_source_ref": "源xlsx!营业务成本审定表F5-1!H6",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/priorRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业务成本审定表F5-1!H20",
+              "stable_field_key": "adjudication_other_rows/{row_uuid}/prior_rje",
+              "store_item_id": "F5-1-adj-other-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_ref",
+              "header_source_ref": "源xlsx!营业务成本审定表F5-1!J6",
+              "header_text": "索引",
+              "json_pointer": "/rows/{row_uuid}/indexRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业务成本审定表F5-1!J20",
+              "stable_field_key": "adjudication_other_rows/{row_uuid}/index_ref",
+              "store_item_id": "F5-1-adj-other-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "小计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "E20:E25",
+            "I20:I25"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowKey",
+            "kind": "field"
+          },
+          "table_key": "adjudication_other_rows",
+          "uuid_col": "K"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "d8b13c774513ecdb505cb3837c76a6ff11a94e1ab42b2dfa187cf479cc78988d",
+    "relative_path": "F/F5 营业成本.xlsx",
+    "template_sha256": "417e5ae7453528725f3ae5eb06f70d36269b089cd73a00884c835f4586267cb7"
+  },
+  "template_definition_sha256": "1304569fe6ee6b3ffd77d0ea5ade1ba6822d42125161aac04a96f50b0f1c9745"
+}

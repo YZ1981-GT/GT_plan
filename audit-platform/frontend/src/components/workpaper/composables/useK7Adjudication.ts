@@ -24,6 +24,7 @@ import {
   calcLiabilityEndBalance,
   calcSubtotal,
 } from './useK7FormulaEngine'
+import { newRowIdentity } from './shared/rowIdentity'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -128,7 +129,7 @@ export function useK7Adjudication(params: UseK7AdjudicationParams) {
     if (prefill?.value && prefill.value.length > 0 && !hasSeededPrefill.value) {
       // 从 tb_balance 明细子科目预填（余额模式）
       rows.value = prefill.value.map((p, i) => _normalizeRow({
-        rowKey: `pf-${i}`,
+        rowKey: newRowIdentity('pf'),
         project: p.name,
         group: '与资产相关',
         beginBalance: p.opening_balance,

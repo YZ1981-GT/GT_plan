@@ -5,6 +5,11 @@
  */
 import { computed, onBeforeUnmount, ref, watch, type ComputedRef } from 'vue'
 import { calcConcentration, calcSubtotal, parseNum } from './useF3FormulaEngine'
+import {
+  F3_ROW_ID_PREFIX,
+  resolveF3RowId,
+  type F3RowIdentityMintStats,
+} from './f3RowIdentity'
 import type { UseF3BaseOptions } from './useF3Adjudication'
 
 export const F3_RELATED_RELATIONSHIPS = [
@@ -86,7 +91,15 @@ export function computeRelatedPartyRow(
   return { ...stored, closingBalance, concentration, riskFlags }
 }
 
-function migrateRow(raw: any, i: number): F3RelatedPartyNoteRow {
+/**
+ * 行身份铸造计数（出参）—— 供 `loadRows` 判断"是否需要立即回写"。
+ *
+ * 类型别名指向 F3 四表共用的单源 `f3RowIdentity`（本文件曾内联过一份同名接口，
+ * F3-7/F3-2 也需要同一逻辑 ⇒ 收敛为单源，避免四处各写一遍）。
+ */
+export type F3RelatedPartyMintStats = F3RowIdentityMintStats
+
+function migrateRow(raw: any, i: number, stats?: F3RowIdentityMintStats): F3RelatedPartyNoteRow {
   const legacyFaceValue = parseNum(raw.faceValue)
   const legacyNotes = [
     raw.settlementMethod ? `结算方式：${raw.settlementMethod}` : '',
@@ -94,9 +107,13 @@ function migrateRow(raw: any, i: number): F3RelatedPartyNoteRow {
     raw.auditEvaluation,
     raw.remark,
   ].filter(Boolean).join('；')
+  // 🔴 缺 rowId 时铸新身份并**记数**（委托 f3RowIdentity 单源）：`loadRows` 据此立即回写。
+  // 不回写的话 store 里仍无 rowId，下次载入又铸一个新的 ⇒ 行身份每次都变，
+  // OO↔HTML roundtrip 会把 A 行的值并进 B 行（与 BP-7 下标派生同型危害）。
+  const rowId = resolveF3RowId(raw, F3_ROW_ID_PREFIX.relatedParty, stats)
   return {
     ...emptyRelatedPartyRow(i + 1),
-    rowId: raw.rowId || raw.id || generateRowId(),
+    rowId,
     seq: raw.seq ?? i + 1,
     partyName: String(raw.partyName || ''),
     relationship: String(raw.relationship || ''),
@@ -113,12 +130,15 @@ function migrateRow(raw: any, i: number): F3RelatedPartyNoteRow {
   }
 }
 
-export function safeParseRelatedPartyRows(jsonStr: string | null | undefined): F3RelatedPartyNoteRow[] {
+export function safeParseRelatedPartyRows(
+  jsonStr: string | null | undefined,
+  stats?: F3RelatedPartyMintStats,
+): F3RelatedPartyNoteRow[] {
   if (!jsonStr) return []
   try {
     const parsed = JSON.parse(jsonStr)
     if (!Array.isArray(parsed)) return []
-    const base = parsed.map(migrateRow)
+    const base = parsed.map((raw, i) => migrateRow(raw, i, stats))
     const pruned = base.filter((row) => !isBlankRelatedPartyRow(row))
     const kept = pruned.length ? pruned : base.slice(0, 1)
     const total = calcSubtotal(kept.map((row) => row.openingBalance + row.creditMovement - row.debitMovement))
@@ -138,8 +158,20 @@ export function useF3RelatedParty(options: UseF3BaseOptions) {
   const auditConclusion = ref('')
 
   function loadRows(): void {
-    storedData.value = safeParseRelatedPartyRows(allResponses.value.get(STORAGE_KEY)?.remark)
-    if (storedData.value.length === 0) storedData.value = [computeRelatedPartyRow(emptyRelatedPartyRow(1))]
+    // 🔴 铸了新行身份就**立即回写**（spec f3-sync-coverage-and-first-canary Task 13）：
+    // 不回写则下次载入再铸一个新 rowId，行身份每次都变，破坏 OO↔HTML roundtrip。
+    // readonly 不写；回写内容与 watch 守卫比对的串一致（`JSON.stringify(storedData.value)`）
+    // ⇒ watch 命中守卫 return，不成环。
+    const stats: F3RelatedPartyMintStats = { minted: 0 }
+    storedData.value = safeParseRelatedPartyRows(
+      allResponses.value.get(STORAGE_KEY)?.remark,
+      stats,
+    )
+    if (storedData.value.length === 0) {
+      storedData.value = [computeRelatedPartyRow(emptyRelatedPartyRow(1))]
+      return
+    }
+    if (stats.minted > 0 && !readonly.value) persistRows()
   }
 
   watch(() => allResponses.value.get(STORAGE_KEY)?.remark, (raw) => {

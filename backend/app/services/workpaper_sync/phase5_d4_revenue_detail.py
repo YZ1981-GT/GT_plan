@@ -257,6 +257,14 @@ from app.services.workpaper_sync.phase5_d4_discount_sheet import (  # noqa: E402
     build_store_projection_d419,
     merge_projection_into_d419_rows,
 )
+from app.services.workpaper_sync.phase5_d4_adjustment_sheet import (  # noqa: E402
+    STORE_ITEM_ID_D44,
+    TABLE_KEY_D44,
+    sheet_payload_d44,
+    instrumentation_spec_d44,
+    build_store_projection_d44,
+    merge_projection_into_d44_rows,
+)
 from app.services.workpaper_sync.phase5_d4_product_price_sheet import (  # noqa: E402
     STORE_ITEM_ID_D411,
     sheet_payload_d411,
@@ -421,6 +429,15 @@ _INCLUDE_D418_CUTOFF_SHEET: Final[bool] = True
 #: D4-19 销售折扣与折让检查接入（批次B 第四张，2026-09-20）。单 sheet 单动态行，行身份=id、
 #: 受管列 A-D+F-N、formula_mask E（折扣比例派生）、注入 UUID 列 P。provider=phase5_d4_discount_sheet。
 _INCLUDE_D419_DISCOUNT_SHEET: Final[bool] = True
+#: D4-4 营业收入调整分录汇总接入（2026-09-28，spec d4-4-adjustment-summary-bidirectional-writeback）。
+#: 单 sheet 单动态行，行身份=**rowId**（两种格式并存：前端 `d4a-{base36}-{rand}` / 导入侧 uuid4，
+#: 故 `_rows()` 禁加格式正则）、受管列 **A~J 连续十列**、`formula_mask` **空**（数据区公式格现算 0，
+#: 借贷合计/平衡差额是前端 computed 不落 cell）、UUID 列 **K**（模板 K~O 本就全空 ⇒ 无需注入）。
+#: footer marker = A21「提示：」（提示文本非合计 ⇒ carries_total_formula=False）。
+#: provider=phase5_d4_adjustment_sheet。**本表是 D4 全组最后一张脱离 single_html 的 sheet**。
+#: 🔴 命名取既有惯例 `_INCLUDE_D{n}_{名字}_SHEET`（同 D419/D417/D420/D434/D48 五个先例），
+#:    spec design §3 写的 `_INCLUDE_D44_SHEET` 与惯例不符，已在 tasks.md 登记更正。
+_INCLUDE_D44_ADJUSTMENT_SHEET: Final[bool] = True
 #: D4-11 产品销售价格分析接入（批次B 第五张，2026-09-20）。单 sheet 单动态行，行身份=rowId
 #: （前端本轮新增+backfill）、受管列 B-I/K/M/N/O、formula_mask J/L（差异率派生）、注入 UUID 列 P。
 #: provider=phase5_d4_product_price_sheet。
@@ -532,6 +549,7 @@ STORE_ITEM_IDS: Final[tuple[str, ...]] = (
     *((STORE_ITEM_ID_D417,) if _INCLUDE_D417_CUTOFF_SHEET else ()),
     *((STORE_ITEM_ID_D418,) if _INCLUDE_D418_CUTOFF_SHEET else ()),
     *((STORE_ITEM_ID_D419,) if _INCLUDE_D419_DISCOUNT_SHEET else ()),
+    *((STORE_ITEM_ID_D44,) if _INCLUDE_D44_ADJUSTMENT_SHEET else ()),
     *((STORE_ITEM_ID_D411,) if _INCLUDE_D411_PRICE_SHEET else ()),
     *((STORE_ITEM_ID_D410,) if _INCLUDE_D410_PRICE_SHEET else ()),
     *(store_item_ids_d420() if _INCLUDE_D420_RETURN_SHEET else ()),
@@ -862,6 +880,15 @@ def instrumentation_specs() -> tuple:
                 ),
             )
             if _INCLUDE_D418_CUTOFF_SHEET
+            else ()
+        ),
+        *(
+            (
+                instrumentation_spec_d44(
+                    entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
+                ),
+            )
+            if _INCLUDE_D44_ADJUSTMENT_SHEET
             else ()
         ),
         *(
@@ -1204,6 +1231,9 @@ def build_contract_payload() -> dict[str, Any]:
             *([sheet_payload_d417()] if _INCLUDE_D417_CUTOFF_SHEET else []),
             *([sheet_payload_d418()] if _INCLUDE_D418_CUTOFF_SHEET else []),
             *([sheet_payload_d419()] if _INCLUDE_D419_DISCOUNT_SHEET else []),
+            # D4-4 营业收入调整分录汇总：单动态行表，行身份 rowId（两格式并存），
+            # 受管 A~J 十列连续，formula_mask 空，UUID 列 K（现成空列）。
+            *([sheet_payload_d44()] if _INCLUDE_D44_ADJUSTMENT_SHEET else []),
             *([sheet_payload_d411()] if _INCLUDE_D411_PRICE_SHEET else []),
             *([sheet_payload_d410()] if _INCLUDE_D410_PRICE_SHEET else []),
             *([sheet_payload_d420()] if _INCLUDE_D420_RETURN_SHEET else []),
@@ -1631,6 +1661,20 @@ def merge_projection_into_store_rows(
 
     只消费 ``revenue_detail_rows/*`` 键；D4-3 的 ``other_revenue_detail_rows/*`` 由
     :func:`merge_projection_into_d43_store_rows` / :func:`merge_projection_into_all_d4_stores` 处理。
+
+    🔴 幽灵行防护（2026-09-22 用户实测：D4-2 结构化视图第 12-14 行出现只有 rowId /
+    乱码、没有任何客户数据的空行）：Excel Table 在最后一行边界被 Tab/Enter/拖拽扩展时，
+    公式列（period_total=SUM(B:M)）会自动填到新行并缓存出 0 —— 这类值已由上面的
+    ``is_protected`` 挡掉。但如果那一行**恰好**还有一个杂散的 editable 格非空（复制格式
+    带下来的 0、被顶掉的空字符串、误粘贴的一个字符……），这唯一一个字段就会让该 identity
+    通过 shell 创建关卡，而 product 及其余 17 个字段因为从未在 Excel 里写入过内容、
+    根本不会产出 FieldValue，永久停留在初始空值——用户在结构化视图里看到的正是这样
+    「有 rowId、没数据」的行。
+
+    只对**本次新增**的 identity（不在 base_rows 里）加这道门：已存在的行即使被用户清空
+    全部字段也必须原样保留（清空是合法编辑），但一个「从未存在过」的身份要想真正落进
+    HTML store，其 product（该行的业务名称）必须至少有一个非空字符——没有名字的行
+    对审计底稿而言不是数据，是噪音。
     """
     field_to_path = {spec[0]: spec[4] for spec in MANAGED_FIELD_SPECS}
     prefix = f"{ROWS_TABLE_KEY}/"
@@ -1645,6 +1689,7 @@ def merge_projection_into_store_rows(
         by_id[rid] = copied
         order.append(rid)
 
+    pre_existing_ids = set(by_id)
     applied = 0
     visited = 0
     touched_rows: set[str] = set()
@@ -1674,6 +1719,16 @@ def merge_projection_into_store_rows(
             applied += 1
             touched_rows.add(str(rid))
             _ensure_months_list(target)
+
+    # 幽灵行剔除：只挑本次新增且 product 仍为空的 identity，已存在的行永不受影响。
+    ghost_ids = {
+        rid
+        for rid in order
+        if rid not in pre_existing_ids and not str(by_id[rid].get("product") or "").strip()
+    }
+    if ghost_ids:
+        order = [rid for rid in order if rid not in ghost_ids]
+        touched_rows -= ghost_ids
 
     return [by_id[rid] for rid in order], applied, visited, touched_rows
 
@@ -1826,6 +1881,13 @@ def build_combined_store_projection(
         if _INCLUDE_D418_CUTOFF_SHEET
         else []
     )
+    # 🔴 `payloads.get(..., [])` 的默认值必须是 **`[]`** 而不是 `{}`：D4-8 曾用 `{}`，
+    #    `_decode` 对非 list 返回非 list ⇒ `_rows` 拿不到行 ⇒ **静默把 180 个 cell 全投 0**。
+    d44_projs = (
+        [build_store_projection_d44(payloads.get(STORE_ITEM_ID_D44, []), contract=contract, limits=limits)]
+        if _INCLUDE_D44_ADJUSTMENT_SHEET
+        else []
+    )
     d419_projs = (
         [build_store_projection_d419(payloads.get(STORE_ITEM_ID_D419, []), contract=contract, limits=limits)]
         if _INCLUDE_D419_DISCOUNT_SHEET
@@ -1910,7 +1972,7 @@ def build_combined_store_projection(
     values.update(fixed.values)
     if d413_fixed is not None:
         values.update(d413_fixed.values)
-    for proj in (d421, d422, d423, d424, d435, d41, d49, *ipo_checklist_projs, *inspection_projs, *interview_projs, *d46_projs, *d417_projs, *d418_projs, *d419_projs, *d411_projs, *d410_projs, *d420_projs, *d433_projs, *d48_projs, *d434_projs, *d436_projs, *d47_projs, *d414_projs):
+    for proj in (d421, d422, d423, d424, d435, d41, d49, *ipo_checklist_projs, *inspection_projs, *interview_projs, *d46_projs, *d417_projs, *d418_projs, *d419_projs, *d44_projs, *d411_projs, *d410_projs, *d420_projs, *d433_projs, *d48_projs, *d434_projs, *d436_projs, *d47_projs, *d414_projs):
         values.update(proj.values)
     if d429 is not None:
         values.update(d429.values)
@@ -1936,6 +1998,7 @@ def build_combined_store_projection(
         **{k: v for p in d417_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d418_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d419_projs for k, v in dict(p.row_keys).items()},
+        **{k: v for p in d44_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d411_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d410_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d420_projs for k, v in dict(p.row_keys).items()},
@@ -2015,6 +2078,17 @@ def merge_projection_into_all_d4_stores(
             )
         }
         if _INCLUDE_D418_CUTOFF_SHEET
+        else {}
+    )
+    # D4-4：merge 返回**裸 list** ⇒ 依赖 `_RAW_PAYLOAD_ITEM_TABLE_KEYS` 归一成 4-tuple。
+    d44_results = (
+        {
+            STORE_ITEM_ID_D44: merge_projection_into_d44_rows(
+                projection=projection,
+                base_payload=base_by_item.get(STORE_ITEM_ID_D44, []),
+            )
+        }
+        if _INCLUDE_D44_ADJUSTMENT_SHEET
         else {}
     )
     d419_results = (
@@ -2120,6 +2194,7 @@ def merge_projection_into_all_d4_stores(
         **d417_results,
         **d418_results,
         **d419_results,
+        **d44_results,
         **d411_results,
         **d410_results,
         **d420_results,
@@ -2153,6 +2228,11 @@ _RAW_PAYLOAD_ITEM_TABLE_KEYS: Final[dict[str, tuple[str, ...]]] = {
     STORE_ITEM_ID_D417: ("d4_17_rows",),
     STORE_ITEM_ID_D418: ("d4_18_rows",),
     STORE_ITEM_ID_D419: ("d4_19_rows",),
+    # 🔴 D4-4 必须在此登记：`merge_projection_into_d44_rows` 返回裸 list，漏登记会让
+    #    `_normalize_merge_updates` 归一不到 4-tuple ⇒ `store_mirror.py` 的硬解包
+    #    `for item_id, (merged_rows, applied, _visited, _touched) in updates.items()`
+    #    抛 `ValueError` ⇒ **打挂整个 entry 的回写**（D4-8 踩过）。
+    STORE_ITEM_ID_D44: (TABLE_KEY_D44,),
     STORE_ITEM_ID_D411: ("d4_11_rows",),
     STORE_ITEM_ID_D410: ("d4_10_rows",),
     "D4-20-summary": ("d4_20_summary",),
@@ -2243,6 +2323,52 @@ def merge_d413_fixed_from_projection(
 
 #: D4-35 store item（dict 形态 {rows, sampling, periodAmount}，非行数组，不进 STORE_ITEM_IDS）。
 STORE_ITEM_ID_D435_DICT: Final[str] = STORE_ITEM_ID_D435
+
+
+def all_store_item_ids() -> tuple[str, ...]:
+    """本 entry **全部**需要喂 payload 的 store item —— 出/回两方向的**唯一**权威口径。
+
+    spec: d4-html-to-oo-store-contract-alignment · Task 4 · Requirement 3.1
+
+    🔴 存在的理由（真栈实证）：`store_projection_response.py` 出方向装配 payload 时只遍历
+    ``STORE_ITEM_IDS`` + ``STORE_ITEM_IDS_D45_FIXED`` 两个来源，于是**漏掉**了 provider
+    另外声明的两批 item ——
+
+      * ``STORE_ITEM_ID_D435_DICT``（``D4-35-data``，dict 形态，注释明写"不进 STORE_ITEM_IDS"）；
+      * ``STORE_ITEM_IDS_D413_FIXED``（``D4-13-process`` / ``-conclusion``，纯文本固定项）。
+
+    结果：D4-35 切 OO 恒空、D4-13 两段正文恒写不进 OO（探针实证 D4-35 字段数 0 vs 对照 32、
+    D4-13 两键值 ``''`` vs 正文）。而回方向 ``oo_to_html.py`` 三批清单都消费了 ⇒ 两侧真源不一致。
+
+    本函数把「本 entry 有哪些 store item」收敛成一个口径，两方向都从它取（不得各自维护并集）。
+    条件常量（``STORE_ITEM_IDS_D47_DEDICATED`` 仅 ``_INCLUDE_D47_MARGIN_SHEET`` 开时定义）
+    一律 ``getattr`` 兜底，保持与各 ``_INCLUDE_*`` 门控一致。去重但**保序**（首见优先），
+    便于判据与日志稳定比对。
+
+    ⚠️ per-item 的缺省值规则（list ``[]`` / dict/singleton ``{}`` / 纯文本 fixed ``""``）
+    **不在**本函数职责内 —— 那是各调用点按 provider 单源规则处理，本函数只回答"有哪些 item"。
+    """
+    import sys as _sys
+
+    _module = _sys.modules[__name__]
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    def _add(item_id: str) -> None:
+        if item_id and item_id not in seen:
+            seen.add(item_id)
+            ordered.append(item_id)
+
+    for group in (
+        tuple(STORE_ITEM_IDS),
+        tuple(getattr(_module, "STORE_ITEM_IDS_D45_FIXED", ()) or ()),
+        tuple(getattr(_module, "STORE_ITEM_IDS_D413_FIXED", ()) or ()),
+        (STORE_ITEM_ID_D435_DICT,),
+        tuple(getattr(_module, "STORE_ITEM_IDS_D47_DEDICATED", ()) or ()),
+    ):
+        for item_id in group:
+            _add(str(item_id))
+    return tuple(ordered)
 
 #: D4-9 store item（dict 形态 {current,prior}+totals，嵌套非行数组）。**在** STORE_ITEM_IDS 里
 #: （combined projection / 单 item flush 需要），但 oo_to_html 镜像走专用 dict 块（不进 rows 循环）。
@@ -2598,52 +2724,25 @@ def _attach_sibling_bindings(
     contract: Any,
     dynamic_bindings: Mapping[str, Any],
 ) -> tuple[Any, ...]:
-    """Attach 时补 sibling binding（与 publish 的 `_sibling_identity_bindings` 同规则）。
+    """Attach 时补 sibling binding —— 薄转发框架层 `attach_sibling_bindings`（Task 10 泛化）。
 
     🔴 对齐规则与 publish 路径共享同一内核 `_align_specs_to_sibling_tables`：按
     managed sheet 归组、同 sheet 双区靠 UUID 列一一配对、计数守卫数行 table 不数
     sheet。两路径必须使用同一规则，否则 publish 与 attach 的 sibling binding 会漂移。
+
+    函数体已收敛进框架层 `phase5_row_table_sheet.attach_sibling_bindings`（逐字节等价，
+    Property 8 判据钉住），本模块只把 `provider=本模块` 传入 —— 取代原硬编码
+    `import app.services.workpaper_sync.phase5_d4_revenue_detail as _provider`。
     """
-    from app.services.excel_structure_fingerprint import GT_SYNC_SHEET_NAME
-    from app.services.workpaper_sync.excel_extract import ExcelIdentityBinding
-    from app.services.workpaper_sync.projection_first_publication import (
-        _align_specs_to_sibling_tables,
+    import app.services.workpaper_sync.phase5_d4_revenue_detail as _self
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        attach_sibling_bindings,
     )
 
-    # attach 路径以本模块为 provider（暴露 instrumentation_specs）。
-    import app.services.workpaper_sync.phase5_d4_revenue_detail as _provider
-
-    pairs = _align_specs_to_sibling_tables(
-        provider=_provider, contract=contract, primary=primary
+    return attach_sibling_bindings(
+        provider=_self, primary=primary, contract=contract,
+        dynamic_bindings=dynamic_bindings,
     )
-    siblings: list[Any] = []
-    for spec, dynamic in pairs:
-        binding = ExcelIdentityBinding(
-            table_name=str(spec.table_name),
-            uuid_column=str(spec.uuid_col),
-            table_key=str(dynamic.table_key),
-            metadata_sheet=GT_SYNC_SHEET_NAME,
-            defined_name_prefix=str(
-                getattr(spec, "defined_name_prefix", None) or "GT_"
-            ),
-            tombstoned_row_keys=(),
-            dynamic_column_columns={
-                str(table_key): dict(mapping)
-                for table_key, mapping in (dynamic_bindings or {}).items()
-                if isinstance(mapping, Mapping)
-            },
-        )
-        siblings.append(binding)
-    # 静态受管区 binding（引擎静态路径；无动态行，不经 _align_specs_to_sibling_tables）。
-    # 复用 publish 侧同一通用生成器，两路径 binding 不漂移。
-    from app.services.workpaper_sync.projection_first_publication import (
-        _static_region_bindings,
-    )
-
-    siblings.extend(
-        _static_region_bindings(provider=_provider, metadata_sheet=GT_SYNC_SHEET_NAME)
-    )
-    return tuple(siblings)
 
 
 def manifest_capability_enabled(*, manifest: Mapping[str, Any] | None = None) -> bool:

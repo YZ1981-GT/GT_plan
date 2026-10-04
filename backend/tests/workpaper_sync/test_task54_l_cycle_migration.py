@@ -1169,8 +1169,40 @@ class TestLCycleFormDifferences:
                 none_.append(code)
             assert not has_own, f"{code}: 宿主不应直接 import per-entry dual-mode（实测 {specs}）"
         assert sorted(shared) == sorted(REDEEMABLE_CODES), f"共享载体组现算 {shared}"
-        assert sorted(child) == sorted(INERT_CODES), f"子 Tab 组现算 {child}"
-        assert sorted(none_) == sorted(NO_CARRIER_CODES), f"无载体组现算 {none_}"
+
+        # ── inert 四条的分组随「删除计划是否已执行」而变（2026-09-28 修正）──────
+        #
+        # 🔴 原断言写死 `child == INERT_CODES`，于是**删除计划一执行本条必红**：
+        #    `useL5DualMode.ts`~`useL8DualMode.ts` 已被删（工作树实测），子 Tab 不再 import
+        #    它们 ⇒ 现算 `child == []`、四条落进 `none_`。
+        #    而删这四个 carrier 正是本 slice 自己的 `deletion_plan.inert_switch_blocks_to_remove`
+        #    所声明的动作（下方 `test_..._deletion_plan...` 还在断言它）
+        #    ⇒ 红的是判据没跟上、不是生产回归（另已 grep 确认**无残留 import**，只剩 3 处文档注释）。
+        #
+        #    改法不是把期望值换成 `[]`（那会在删除被回滚时静默放过），而是**按 carrier 文件
+        #    是否还在**现算当前处于哪个阶段，两阶段各自仍是严格等式 —— 信息量不减。
+        carriers_alive = [
+            c for c in INERT_CODES
+            if (ROOT / "audit-platform/frontend/src/components/workpaper/composables"
+                / f"use{c}DualMode.ts").exists()
+        ]
+        if carriers_alive:
+            assert sorted(carriers_alive) == sorted(INERT_CODES), (
+                f"inert carrier 只剩一部分：{carriers_alive} —— 删除计划执行到一半，"
+                "要么删完要么回滚，不得半删（半删时子 Tab 分组会横跨两态、无法归因）"
+            )
+            assert sorted(child) == sorted(INERT_CODES), f"子 Tab 组现算 {child}"
+            assert sorted(none_) == sorted(NO_CARRIER_CODES), f"无载体组现算 {none_}"
+        else:
+            # 删除计划已执行：四条 inert entry 不再有任何 dual-mode 载体
+            assert child == [], (
+                f"carrier 文件已全删，但子 Tab 仍 import per-entry dual-mode：{child} "
+                "⇒ 有残留 import，前端会构建失败"
+            )
+            assert sorted(none_) == sorted(tuple(NO_CARRIER_CODES) + INERT_CODES), (
+                f"无载体组现算 {none_}（删除后应为 L3/L4 + L5~L8 共 6 条）"
+            )
+
         assert len(shared) + len(child) + len(none_) == len(L_CODES)
         assert not (set(shared) & set(child)) and not (set(child) & set(none_))
 
@@ -1725,10 +1757,32 @@ class TestProperty20AndProperty3:
     """Property 20 的前提方向（非空分母）+ Property 3 的否定方向。"""
 
     def test_no_slice_entry_has_a_contract(self, manifest_slice: dict) -> None:
+        """🔴 2026-09-28 按新事实重写（spec `l-cycle-true-adapter-registration` Task 5）。
+
+        原判据是「本 slice 的 8 条 entry **没有任何一条**有 contract」—— 那登记的是
+        「L 域零生产契约」这个现状。L1 已交付 reviewed 生产契约，故判据从「零期望」
+        改为「**恰 1 条且具名**」：l1 可以有，其余 7 条仍不得有。
+        **不是删断言也不是加豁免** —— 反方向（L2~L8 冒出 contract）照样打红。
+        """
         ids = {e["entry_id"] for e in manifest_slice["independent_entries"]}
+        #: 已按本 spec 接线、允许拥有生产契约的 entry。L2~L8 接线时逐条追加。
+        migrated = {"xlsx/gt-l1-short-term-loans"}
+        assert migrated <= ids, (
+            f"已迁移清单 {sorted(migrated)} 不在本 slice 的 entry 集合里 ⇒ 清单写错了"
+        )
+        owned_in_slice: dict[str, str] = {}
         for f in sorted(CONTRACT_DIR.glob("*.json")):
+            if f.stem.startswith("_"):
+                # README：`_*.json` 是 schema 文档与候选示例，不参与生产清册。
+                continue
             eid = (_load(f).get("review") or {}).get("entry_id")
-            assert eid not in ids, f"{f.name} 的 review.entry_id 属本 slice"
+            if eid in ids:
+                owned_in_slice[str(eid)] = f.name
+        assert set(owned_in_slice) == migrated, (
+            f"L slice 内持有生产契约的 entry 实得 {owned_in_slice}，"
+            f"期望恰 {sorted(migrated)} —— 多出的未走本 spec 的五环发布链，少了的说明回退"
+        )
+        assert owned_in_slice["xlsx/gt-l1-short-term-loans"] == "l1.short_term_loans.json"
 
     def test_pilot_contracts_still_own_what_they_owned(self) -> None:
         owners = {

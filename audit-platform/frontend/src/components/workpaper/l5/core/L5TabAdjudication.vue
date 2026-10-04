@@ -13,7 +13,8 @@
         <el-button size="small" type="primary" plain :loading="adjPullUnrec.loading.value" @click="openBringInUnrec">
           <el-icon><Download /></el-icon> 带入调整(未确认)
         </el-button>
-        <el-segmented v-model="dualMode.mode.value" :options="dualMode.modeOptions.value" size="small" @change="(val: any) => dualMode.switchMode(val)" />
+        <!-- BP-7 / AC 1.4：能力诚实披露（BP-4 inert 开关已摘除） -->
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-l5-long-term-payables" />
         <el-dropdown trigger="click" @command="handleImportExport">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -223,7 +224,7 @@ import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { useL5FormData } from '../../composables/useL5FormData'
-import { useL5DualMode } from '../../composables/useL5DualMode'
+import GtEntrySyncCapabilityNotice from '../../sync/GtEntrySyncCapabilityNotice.vue'
 import { useL5ImportExport } from '../../composables/useL5ImportExport'
 import { useL5Adjudication, type L5AdjudicationData, type L5AdjRow } from '../../composables/useL5Adjudication'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
@@ -236,7 +237,6 @@ defineEmits<{ (e: 'navigate', sheetName: string): void }>()
 const openReviewDialog = inject<() => void>('openReviewDialog', () => {})
 
 const formData = useL5FormData({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
-const dualMode = useL5DualMode({ wpId: computed(() => props.wpId) })
 const importExport = useL5ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
 
 function mkRow(key: string, category: L5AdjRow['category'], itemName: string): L5AdjRow {

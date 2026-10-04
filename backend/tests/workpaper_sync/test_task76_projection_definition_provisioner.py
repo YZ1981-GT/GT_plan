@@ -249,9 +249,32 @@ class TestGuardSelfChecks:
             assert path.is_file(), f"缺少判据对象：{path}"
 
     def test_pilot_denominator_is_four_and_source_backed(self) -> None:
-        assert len(PILOT_PROVIDERS) == 4, PILOT_PROVIDERS
-        assert len(set(PILOT_PROVIDERS)) == 4, "provider_module 有重复"
+        """分母由交付账本**现算**；四个原始 pilot 必须仍在账本里。
+
+        🔴 2026-09-22：原判据冻结 `len(PILOT_PROVIDERS) == 4`。`PILOT_PROVIDERS` 本就是从
+        `RG.DELIVERED_PER_ENTRY_CONTRACTS` 现算的（见模块顶部），G5-1 给 6 条 D entry 各发了
+        独立契约后账本 4 → 10 行，冻结的 4 于是把「契约交付了」报成「分母坏了」。
+        source-backed 那半截（每个 provider_module 都在 `_ALLOWED_PROVIDER_MODULES` 里）
+        一直是成立的 —— 失败只在分母。
+
+        改成：分母 == 账本行数（顺带卡住 provider_module 重复）+ 四个原始 pilot 的
+        provider 仍在册（这才是判据名里那个「四」的实质）。
+        """
+        ledger_modules = tuple(
+            sorted(str(row["provider_module"]) for row in RG.DELIVERED_PER_ENTRY_CONTRACTS)
+        )
+        assert PILOT_PROVIDERS == ledger_modules, "分母不是从交付账本现算的 ⇒ 存在第二份清单"
+        assert len(set(PILOT_PROVIDERS)) == len(PILOT_PROVIDERS), "provider_module 有重复"
         assert PILOT_PROVIDERS == tuple(sorted(PILOT_PROVIDERS)), "有序等值双断言"
+        # 四个原始 pilot（Task 40/41/42/43）的 provider 必须仍在册 —— 判据名里的「四」
+        original_pilots = {
+            "app.services.workpaper_sync.pilot_simple_checklist",
+            "app.services.workpaper_sync.pilot_d2_large_json",
+            "app.services.workpaper_sync.pilot_h1_grouped_dynamic",
+            "app.services.workpaper_sync.pilot_g7_two_level_dynamic",
+        }
+        missing = sorted(original_pilots - set(PILOT_PROVIDERS))
+        assert not missing, f"四个原始 pilot 的 provider 掉出交付账本: {missing}"
         for module_path in PILOT_PROVIDERS:
             assert module_path in RG._ALLOWED_PROVIDER_MODULES, module_path
 

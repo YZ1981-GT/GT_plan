@@ -15,7 +15,8 @@ export type M7RenderMode = WorkpaperRenderMode
  */
 const M7_SHEET_MAP: Record<string, string> = {
   index: '底稿目录',
-  procedure: '专项储备实质性程序表M7A',
+  // 🔴 MC-23 修正：真名含前导 + 中间 + 尾随三重空格（M7 唯一），禁 strip（MC-10）
+  procedure: ' 专项储备实质性程序表 M7A ',
   'M7-1': '审定表M7-1',
   'M7-2': '明细表M7-2',
   'M7-3': '调整分录汇总M7-3',

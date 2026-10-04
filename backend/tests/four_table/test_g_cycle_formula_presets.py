@@ -1,15 +1,25 @@
-"""守卫：G 循环公式预设科目码正确性与披露块覆盖。
+"""守卫：G 循环公式预设科目码正确性、sheet 存在性与披露块覆盖。
 
-锁定 `fix_g_cycle_prefill_presets.py`（审定表块纠偏）+
+锁定 `fix_g_cycle_prefill_presets.py`（审定表块纠偏 + sheet 名改名）+
 `fix_g_cycle_disclosure_presets.py`（披露块补全）的结果。
 
 Property 8：审定表块的科目码属于本循环报表行
 Property 9：损益类审定表块口径 = 本期发生额
 Property 10：每个有披露 sheet 的循环都有对应的披露块
+Property 11（2026-09-27 新增）：**每个 G 块的 `sheet` ∈ 对应源 xlsx 真实 tab 名**
+
+🔴 Property 11 是本文件此前缺的那条断言（spec `g-cycle-sync-foundation-and-first-canary`
+GC-8 / 红基线 RG-5）。D / E1 / F / I / J / K / L / H0 八个循环都有同款断言，
+唯独 G 没有 ⇒ 块 `[169]` `明细分析表G13-2` 与 `[170]` `明细分析表G14-2` 两个错名
+（真名 `明细表G13-2` / `明细表G14-2`）长期逃检，7 条预设指向不存在的 sheet、
+写 xlsx 的预填消费方找不到 sheet 而静默不填。
+口径照既有 `backend/tests/test_i_cycle_formula_presets.py::test_sheet_exists_in_template`
+（含它的「历史台账 + stale 检测」形态），**不新造第二套**。
 """
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -19,6 +29,7 @@ import pytest
 BACKEND = Path(__file__).resolve().parents[2]
 MAPPING_PATH = BACKEND / "data" / "prefill_formula_mapping.json"
 DISCLOSURE_SCRIPT = BACKEND / "scripts" / "fix" / "fix_g_cycle_disclosure_presets.py"
+TEMPLATE_DIR = BACKEND / "wp_templates" / "G"
 
 # 科目真源（g_cycle_specs.py 实证）
 G_ACCOUNT_CODES = {
@@ -36,6 +47,27 @@ PL_CYCLES = {"G11", "G12", "G13", "G14"}
 def g_mappings():
     data = json.loads(MAPPING_PATH.read_text(encoding="utf-8"))
     return [m for m in data.get("mappings", []) if m.get("wp_code", "").startswith("G")]
+
+
+@pytest.fixture(scope="module")
+def template_sheets() -> dict[str, list[str]]:
+    """{wp_code: [sheetname, ...]}，跳过 `~$` 锁文件。
+
+    口径逐字照 `test_i_cycle_formula_presets._load_template_sheetnames`。
+    """
+    import openpyxl
+
+    result: dict[str, list[str]] = {}
+    for xlsx_path in sorted(TEMPLATE_DIR.glob("*.xlsx")):
+        if xlsx_path.name.startswith("~$"):
+            continue
+        m = re.match(r"^(G\d+)\s", xlsx_path.stem)
+        if not m:
+            continue
+        wb = openpyxl.load_workbook(xlsx_path, read_only=True)
+        result[m.group(1)] = list(wb.sheetnames)
+        wb.close()
+    return result
 
 
 # ─── Property 8: 审定表块科目码属于本循环 ─────────────────────────────────────
@@ -165,3 +197,112 @@ def test_known_bad_codes_not_present(g_mappings):
                         f"{wp_code}|{block.get('sheet', '')} 公式含已纠偏错码"
                         f" {bad}: {formula[:80]}"
                     )
+
+
+# ─── Property 11: 块 sheet ∈ 源 xlsx 真实 tab（2026-09-27 补，GC-8）──────────
+
+#: 曾经「贴错标签」的 sheet 名 → 源 xlsx 真实 tab 名（**历史台账，非逃逸阀**）。
+#:
+#: 形态照 `test_i_cycle_formula_presets._HISTORICAL_SHEET_LABEL_FIXES`：
+#: 台账**不做豁免**，只做两件事 ①记载历史 ②由 :func:`test_no_stale_sheet_label_ledger`
+#: 做 stale 检测 —— 表里的错名一旦在数据里重新出现即打红。
+#:
+#: 🔴 2026-09-27（spec `g-cycle-sync-foundation-and-first-canary` Task 7）：
+#: 两条错名都照抄了 G11 的「明细分析表」前缀，而 G11 的 `明细分析表G11-2` **是真名**。
+#: 由 `fix_g_cycle_prefill_presets.RENAME_SHEETS` 改名（**不是删块** ——
+#: sheet 存在只是名字写错，删块会丢掉 4+3=7 条有效预设）。
+_HISTORICAL_SHEET_LABEL_FIXES: dict[tuple[str, str], str] = {
+    ("G13", "明细分析表G13-2"): "明细表G13-2",
+    ("G14", "明细分析表G14-2"): "明细表G14-2",
+}
+
+
+def test_property_11_every_block_sheet_exists_in_template(g_mappings, template_sheets):
+    """每个 G 块的 `sheet` 必须存在于对应源模板 xlsx 的 `sheetnames` 中。
+
+    🔴 **不 strip** —— G 目录确实有名字带空格的 tab
+    （`交易性金融资产实质性程序表G1A ` 尾部空格 / `信用减值损失审计程序表G14A -修订前` 名中空格），
+    strip 后比较会把「空格错位」这一类缺陷整类放过。
+
+    🔴 **无白名单** —— 源模板是唯一裁决者，预设必须对齐它。
+    """
+    bad: list[str] = []
+    for blk in g_mappings:
+        wp, sheet = blk.get("wp_code"), blk.get("sheet")
+        sheetnames = template_sheets.get(wp)
+        if sheetnames is None:
+            # G0 走 confirmation 组件族、无 G0 单册？—— 实测有 `G0 投资循环函证.xlsx`，
+            # 故这里落进来只可能是模板目录缺文件，属实缺陷不放过。
+            bad.append(f"{wp}: 源模板目录下找不到 {wp} 对应的 xlsx")
+            continue
+        if sheet in sheetnames:
+            continue
+        hint = ""
+        if (wp, sheet) in _HISTORICAL_SHEET_LABEL_FIXES:
+            hint = (
+                f"\n    🔴 该 sheet 名曾于 2026-09-27 被修正为 "
+                f"'{_HISTORICAL_SHEET_LABEL_FIXES[(wp, sheet)]}'，本次出现说明数据被回退"
+                "（`prefill_formula_mapping.json` 是多 spec 共享的回退高发文件）⇒ 重跑 "
+                "`python backend/scripts/fix/fix_g_cycle_prefill_presets.py`"
+            )
+        near = [n for n in sheetnames if sheet and len(sheet) > 4 and sheet[-5:] in n]
+        bad.append(
+            f"{wp} 的 sheet {sheet!r} 不存在于模板中。形近真名: {near}{hint}"
+        )
+    assert not bad, (
+        "以下 G 块指向源模板不存在的 sheet（预设在公式管理页看得见，但预填时写不进）:\n  "
+        + "\n  ".join(bad)
+    )
+
+
+def test_no_stale_sheet_label_ledger(template_sheets):
+    """历史台账里的每个「错名」都必须**确实是错的**、每个「真名」确实存在（stale 检测）。
+
+    防两种退化：台账变逃逸阀（有人把真名塞进来当豁免）/ 台账过期（源模板真加了该 tab）。
+    """
+    problems: list[str] = []
+    for (wp, wrong), right in _HISTORICAL_SHEET_LABEL_FIXES.items():
+        sheetnames = template_sheets.get(wp, [])
+        if wrong in sheetnames:
+            problems.append(
+                f"台账过期：{wrong!r} 现在**确实存在**于 {wp} 源模板中 ⇒ 它不再是错名，"
+                "请从 _HISTORICAL_SHEET_LABEL_FIXES 移除该条目"
+            )
+        if right not in sheetnames:
+            problems.append(
+                f"台账的「正确名」{right!r} 不在 {wp} 源模板中（{sheetnames}）⇒ 台账本身写错了"
+            )
+    assert not problems, "sheet 名台账自检失败:\n  " + "\n  ".join(problems)
+
+
+def test_property_11_reverse_self_check_would_catch_a_ghost_sheet(template_sheets):
+    """反向自检：判据确实能识别幽灵 sheet（防判据空转）。
+
+    合成一个不存在的名字塞进比对逻辑，必须被认定为「不在模板里」。
+    """
+    assert template_sheets, "模板 sheetnames 为空 —— 判据无基础"
+    ghost = "明细分析表G13-2"  # 已修正的历史错名，现在确实不该存在
+    assert ghost not in template_sheets["G13"], (
+        f"{ghost!r} 居然在 G13 模板里 —— 反向自检的前提不成立"
+    )
+    assert "明细表G13-2" in template_sheets["G13"]
+
+
+def test_prefill_script_check_is_clean():
+    """`fix_g_cycle_prefill_presets.py --check` 应 0 欠账（幂等锚点）。
+
+    🔴 `encoding="utf-8"` 必须显式声明（同本文件既有 `test_disclosure_presets_script_check`
+    的理由：Windows 下 locale GBK 解码中文 stdout 会让 `stdout` 变 None，
+    断言以 TypeError 恒失败 = 判据恒红且零信号）。
+    """
+    script = BACKEND / "scripts" / "fix" / "fix_g_cycle_prefill_presets.py"
+    result = subprocess.run(
+        [sys.executable, str(script), "--check"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        cwd=str(BACKEND.parent),
+    )
+    assert result.stdout is not None, "子进程 stdout 解码失败（应已由 encoding='utf-8' 兜住）"
+    assert result.returncode == 0, f"--check 有欠账:\n{result.stdout}\n{result.stderr}"

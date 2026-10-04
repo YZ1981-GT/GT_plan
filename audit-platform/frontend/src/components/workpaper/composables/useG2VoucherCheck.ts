@@ -10,6 +10,7 @@ import { ref, computed, watch, onBeforeUnmount, getCurrentInstance, type Ref, ty
 import { parseNum, calcInterest365, calcOverdueDays } from './useG2IntRecFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import type { SampledVoucher, FillMode } from './useSamplingAlgorithms'
+import { G2_ITEM_IDS } from './g2StorageContract'
 
 /** Excel 红色测试提示 1–5（应收利息） */
 export const G2_VOUCHER_CHECK_ITEMS = [
@@ -504,7 +505,8 @@ export function useG2VoucherCheck(options: UseG2VoucherCheckOptions) {
   /** 从 G2-2 明细借贷发生额预填总体（有数时才覆盖） */
   function seedPopulationFromDetail(force = false): void {
     if (readonly.value) return
-    const raw = allResponses.value.get('G2-2-detail-rows')?.remark
+    // 🔴 键取单一真源（Task 13 / BP-10）；原为内联字面量
+    const raw = allResponses.value.get(G2_ITEM_IDS.G2_2_DETAIL_ROWS)?.remark
     if (!raw) return
     try {
       const rows = JSON.parse(raw)

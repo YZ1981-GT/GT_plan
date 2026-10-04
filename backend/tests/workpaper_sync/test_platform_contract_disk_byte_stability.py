@@ -31,7 +31,8 @@ def test_delivered_contract_registry_and_disk_files_are_bidirectionally_equal() 
     disk = {
         p.stem
         for p in _CONTRACT_DIR.glob("*.json")
-        if not p.name.startswith("_example.")
+        if not p.name.startswith("_")
+        and ".candidate" not in p.stem
     }
     assert disk == registered
 

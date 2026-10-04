@@ -113,11 +113,13 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.custom_query import router as cq_router
     from app.routers.query_builder import router as qb_router
     from app.routers.consol_refresh import router as crf_router
+    from app.routers.consol_push import router as cpush_router
+    from app.routers.consol_note_formulas import router as cnf_router
 
     for r in [consol_router, cs_router, ct_router, it_router, ca_router,
               gw_router, fx_router, mi_router, cn_router, cr_router,
               cw_router, cwd_router, cns_router, ccc_router, anm_router, fal_router, cq_router, qb_router,
-              crf_router, crb_router, csd_router]:
+              crf_router, crb_router, csd_router, cpush_router, cnf_router]:
         app.include_router(r, tags=["合并报表"])
 
     # ═══ §7.1 高级查询：底稿回写预览 / 确认（custom_query 的伴生 router） ═══

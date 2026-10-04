@@ -4,6 +4,8 @@
 import { api } from '@/services/apiProxy'
 import { parseNum } from './useG13FormulaEngine'
 import { G13_SOURCE_INDEX_BY_BELONG } from './g13Constants'
+import { G1_ITEM_IDS } from './g1StorageContract'
+import { G10_ITEM_IDS } from './g10StorageContract'
 
 export type G13SourceBelong = 'G1' | 'G8' | 'G9' | 'G10' | 'H3'
 
@@ -130,18 +132,39 @@ function mapG8(raw: Record<string, unknown>): G13SourcePullSeed | null {
   }
 }
 
+/**
+ * G9-2 明细行 → G13 取数种子。
+ *
+ * 🔴 C-3（spec `g-cycle-single-region-detail-lanes`）：G9-2 已按权威模板重构为 28 列 A..AB。
+ * 读取点逐项改到模板列，旧键保留为存量回退（真库有 605 B 历史载荷）：
+ * * 投资项目 → B `investTarget`（旧 `assetName`）
+ * * 期末审定公允价值 → W `closingAuditedFairValue`（旧 `closingAdjusted`/`closingBalance`）
+ * * 期初审定公允价值 → J `openingAuditedFairValue`（旧 `openingAdjusted`/`openingBalance`）
+ * * **成本直接读 U `closingAuditedCost`**（旧实现用 `faceValueOrCost` 或拿期初余额顶替，
+ *   那是三分量缺拆分时代的近似；新模型里成本是显式列，不必再推）
+ * * 累计公允价值变动直接读 V `closingAuditedCumulativeFv`（旧实现用「公允价值 − 成本」倒算）
+ * * 工具种类 → A `category`（旧 `instrumentType` / `isDesignated` 已移除：模板用区标题
+ *   R18 强制 FVTPL / R25 指定 FVTPL + A 列类别表达）
+ */
 function mapG9(raw: Record<string, unknown>): G13SourcePullSeed | null {
-  const name = String(raw.assetName ?? '').trim()
+  const name = String(raw.investTarget ?? raw.assetName ?? '').trim()
   if (!name) return null
-  const periodFv = parseNum(raw.fvChangeAmount)
-  const fairValue = parseNum(raw.closingAdjusted ?? raw.closingBalance)
-  const opening = parseNum(raw.openingAdjusted ?? raw.openingBalance)
-  const cost = parseNum(raw.faceValueOrCost) || opening
-  const cumFv = fairValue - cost
-  const isDesignated = !!raw.isDesignated
-  const instrumentType = String(raw.instrumentType || '').includes('衍生')
-    ? (String(raw.classification || '').includes('负债') ? '衍生工具负债' : '衍生工具')
-    : (isDesignated ? '指定FVTPL' : String(raw.instrumentType || '其他'))
+  const periodFv = parseNum(raw.periodFvChange ?? raw.fvChangeAmount)
+  const fairValue = parseNum(
+    raw.closingAuditedFairValue ?? raw.closingAdjusted ?? raw.closingBalance,
+  )
+  const opening = parseNum(
+    raw.openingAuditedFairValue ?? raw.openingAdjusted ?? raw.openingBalance,
+  )
+  const cost = parseNum(raw.closingAuditedCost ?? raw.faceValueOrCost) || opening
+  const cumFv = raw.closingAuditedCumulativeFv != null
+    ? parseNum(raw.closingAuditedCumulativeFv)
+    : fairValue - cost
+  const section = String(raw.section ?? '')
+  const category = String(raw.category ?? raw.classification ?? '')
+  const instrumentType = category.includes('衍生')
+    ? '衍生工具'
+    : (section === 'designated_fvtpl' || raw.isDesignated ? '指定FVTPL' : (category || '其他'))
   const belong: 'G9' = 'G9'
   return {
     instrumentName: name,
@@ -156,7 +179,8 @@ function mapG9(raw: Record<string, unknown>): G13SourcePullSeed | null {
     fairValue,
     amountInPl: periodFv,
     sourceIndex: G13_SOURCE_INDEX_BY_BELONG.G9,
-    remark: isDesignated ? '自 G9-2 带入（指定）' : '自 G9-2 带入',
+    // 🔴 C-3：「是否指定」由**区归属**表达（模板 R25 是指定 FVTPL 区），不再读已移除的 isDesignated
+    remark: section === 'designated_fvtpl' ? '自 G9-2 带入（指定 FVTPL 区）' : '自 G9-2 带入',
   }
 }
 
@@ -214,10 +238,10 @@ function mapH3(raw: Record<string, unknown>): G13SourcePullSeed | null {
 }
 
 export const G13_SOURCE_PULL_SPECS: SourceSpec[] = [
-  { wpCode: 'G1', itemId: 'G1-2-rows', storage: 'conclusion', map: mapG1 },
+  { wpCode: 'G1', itemId: G1_ITEM_IDS.G1_2_ROWS, storage: 'conclusion', map: mapG1 },
   { wpCode: 'G8', itemId: 'G8-detail-rows', storage: 'remark', map: mapG8 },
   { wpCode: 'G9', itemId: 'G9-detail-rows', storage: 'remark', map: mapG9 },
-  { wpCode: 'G10', itemId: 'G10-detail-rows', storage: 'remark', map: mapG10 },
+  { wpCode: 'G10', itemId: G10_ITEM_IDS.G10_DETAIL_ROWS, storage: 'remark', map: mapG10 },
   { wpCode: 'H3', itemId: 'H3-2-fair-rows', storage: 'either', map: mapH3 },
 ]
 

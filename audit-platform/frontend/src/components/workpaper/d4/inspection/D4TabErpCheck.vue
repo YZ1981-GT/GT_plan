@@ -188,6 +188,13 @@ async function handleImportFile(uploadFile: any) {
   const res = await importData('D4-13', file)
   if (res) await reloadWorkpaperData?.()
 }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await handleImportFile(f) }
+  input.click()
+}
 
 // ─── 双向回写：ERP 核对差异 → A13 错报 + D4-1 审计说明 ─────────────────
 // 叙述式底稿无结构化差异数据，由审计师填差异金额后推送（结论文本作描述）。
@@ -212,6 +219,8 @@ async function handlePushToA13() {
   const desc = (conclusionText.value || '').trim() || 'ERP 系统核对存在差异'
   pushToA13([{ amount, description: `账面与ERP核对差异：${desc}`, indexRef: 'D4-13' }], '6001', '营业收入')
 }
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 <template>
@@ -223,21 +232,7 @@ async function handlePushToA13() {
         <el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">{{ syncStateTag.text }}</el-tag>
       </div>
       <div class="toolbar-right">
-        <el-dropdown trigger="click" size="small">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-              <el-dropdown-item>
-                <el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false"
-                  :disabled="isReadonly || importing" @change="handleImportFile">
-                  <span>导入数据</span>
-                </el-upload>
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        
         <span class="chip-label">关联</span>
         <GtIndexChip value="wp:D4-1" :context-project-id="projectId" />
         <GtIndexChip value="wp:D4-5" :context-project-id="projectId" />

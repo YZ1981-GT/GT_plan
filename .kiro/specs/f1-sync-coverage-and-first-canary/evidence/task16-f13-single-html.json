@@ -1,0 +1,38 @@
+{
+  "task": 16,
+  "sheet": "调整分录汇总F1-3",
+  "store_item_id": "F1-aje-rows",
+  "default_verdict": "single_html",
+  "fc_ref": "FC-6",
+  "unified_spec_ref": "cycle-adjustment-sheets-single-html-adjudication",
+  "prior_art": [
+    "D1-5", "D2-4", "D3-3", "D4-4", "D5-3", "D6-4", "D7-3", "E1-5"
+  ],
+  "three_party_readers": {
+    "useF1Adjustment": {
+      "file": "useF1Adjustment.ts:49",
+      "role": "primary owner",
+      "item_id": "F1-aje-rows"
+    },
+    "useF1LongTerm.mergeSuggestedIntoAje": {
+      "file": "useF1LongTerm.ts:328-346",
+      "role": "injection writer (减值/重分类拟调整合并)",
+      "reads": "F1-aje-rows",
+      "writes": "F1-aje-rows"
+    },
+    "useF1CrossSheet": {
+      "file": "useF1CrossSheet.ts:304",
+      "role": "reader (调整分录行数据解析)",
+      "reads": "F1-aje-rows"
+    }
+  },
+  "central_sync": {
+    "composable": "useAdjustmentCentralSync",
+    "mount_point": "F1TabAdjustment.vue:220",
+    "hub_store": "F1-aje-rows"
+  },
+  "verdict": "single_html",
+  "verdict_reason": "F1-aje-rows 有三方读写（primary + injection + reader）+ 中央调整登记（useAdjustmentCentralSync），与 D1-5/D2-4/D3-3/D4-4/D5-3/D6-4/D7-3/E1-5 同型。默认 single_html（FC-6），除非可行性核证明三方写入可串行化——当前三方写入不可串行化（useF1LongTerm 在用户操作时注入行到 F1-aje-rows，与 useF1Adjustment 的用户编辑可并发）。",
+  "production_code_changes": "none",
+  "evidence_date": "2026-09-26"
+}

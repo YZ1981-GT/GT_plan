@@ -16,6 +16,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.models.base import Base
 from app.models.audit_platform_models import (
     AccountCategory,
+    AccountMapping,
+    MappingType,
+    TbBalance,
     TrialBalance,
 )
 from app.models.core import Project, ProjectStatus, ProjectType
@@ -125,6 +128,57 @@ async def seeded_db(db_session: AsyncSession):
             unadjusted_amount=audited,
             audited_amount=audited,
             opening_balance=opening,
+        ))
+
+    # ── 上游数据：tb_balance + account_mapping ────────────────────────────
+    #
+    # 🔴 **必须种上游**：`ReportEngine.generate_all_reports` 开头会先调
+    # `TrialBalanceService.full_recalc`（"报表生成前自动 recalc trial_balance，
+    # 确保基于最新逻辑计算"，fail-open 包裹）。`recalc_unadjusted` 从
+    # `tb_balance` 经 `account_mapping` 重算 `unadjusted_amount`；若上游为空，
+    # 它会把上面种的 `trial_balance` **全部清零**（`closing = Decimal("0")`），
+    # 于是所有报表行都变 0 —— 这正是本文件 3 个测试长期红的原因，
+    # 与公式引擎无关（`_resolve_tb` / `evaluate_formula` 经实测均正常）。
+    #
+    # 口径必须与 `recalc_unadjusted` 严格对齐，否则重算值 ≠ 上面种的期望值：
+    #   - 资产/负债/权益类：取 `tb_balance.closing_balance`（v1 借正贷负），
+    #     贷方类再 `abs()` 转 v2 自然正数 ⇒ 这里直接存自然正数即可
+    #   - 损益类（5xxx/6xxx）：**不看 closing_balance**，从
+    #     `debit_amount`/`credit_amount` 取**单边**发生额（收入取贷方、费用取借方），
+    #     且 `opening` 被强制置 0
+    # 方向判定复用生产代码同一函数，避免两处口径漂移。
+    from app.services.ledger_import.direction_resolver import resolve_account_direction
+
+    for code, name, cat, audited, opening in tb_data:
+        is_income_expense = code[0] in ("5", "6")
+        direction, _src = resolve_account_direction(code, name)
+
+        if is_income_expense:
+            # 单边发生额：收入类记贷方、费用类记借方
+            dr = Decimal("0") if direction == "credit" else audited
+            cr = audited if direction == "credit" else Decimal("0")
+            closing = Decimal("0")   # 损益类年末已结转
+            opening_bal = Decimal("0")
+        else:
+            dr = Decimal("0")
+            cr = Decimal("0")
+            closing = audited
+            opening_bal = opening
+
+        db_session.add(TbBalance(
+            project_id=FAKE_PROJECT_ID, year=2025, company_code="001",
+            account_code=code, account_name=name,
+            opening_balance=opening_bal, closing_balance=closing,
+            debit_amount=dr, credit_amount=cr,
+        ))
+        # 1:1 自映射（客户科目码 == 标准科目码）。没有映射时
+        # `_resolved_std_subq()` 解析出 NULL，会被 `std IS NOT NULL` 过滤掉。
+        db_session.add(AccountMapping(
+            project_id=FAKE_PROJECT_ID,
+            original_account_code=code,
+            standard_account_code=code,
+            mapping_type=MappingType.auto_exact,
+            created_by=FAKE_USER_ID,
         ))
 
     await db_session.flush()
@@ -691,3 +745,126 @@ async def test_api_export_excel(client: AsyncClient):
     )
     assert resp.status_code == 200
     assert "spreadsheetml" in resp.headers.get("content-type", "")
+
+
+@pytest.mark.asyncio
+async def test_full_regeneration_clears_only_recomputed_rows(
+    db_session: AsyncSession, seeded_db
+):
+    """全量重算只清除实际生成的行，配置外的 stale 行保持不变。
+
+    Validates: Requirements 7.1
+    """
+    import sqlalchemy as sa
+
+    engine = ReportEngine(db_session)
+    await engine.generate_all_reports(
+        FAKE_PROJECT_ID, 2025, applicable_standard=TEST_STANDARD
+    )
+    await db_session.commit()
+
+    untouched = FinancialReport(
+        project_id=FAKE_PROJECT_ID,
+        year=2025,
+        report_type=FinancialReportType.balance_sheet,
+        row_code="UNTOUCHED-ROW",
+        row_name="配置外行",
+        current_period_amount=Decimal("9"),
+        prior_period_amount=Decimal("0"),
+        is_stale=True,
+        is_deleted=False,
+    )
+    db_session.add(untouched)
+    await db_session.execute(
+        sa.update(FinancialReport)
+        .where(
+            FinancialReport.project_id == FAKE_PROJECT_ID,
+            FinancialReport.year == 2025,
+            FinancialReport.is_deleted == sa.false(),
+        )
+        .values(is_stale=True)
+    )
+    await db_session.commit()
+
+    await engine.generate_all_reports(
+        FAKE_PROJECT_ID, 2025, applicable_standard=TEST_STANDARD
+    )
+    await db_session.commit()
+
+    rows = {
+        row.row_code: row
+        for row in (
+            await db_session.execute(
+                sa.select(FinancialReport).where(
+                    FinancialReport.project_id == FAKE_PROJECT_ID,
+                    FinancialReport.year == 2025,
+                )
+            )
+        ).scalars()
+    }
+    generated_codes = {code for code in rows if code != "UNTOUCHED-ROW"}
+    assert generated_codes
+    assert all(rows[code].is_stale is False for code in generated_codes)
+    assert rows["UNTOUCHED-ROW"].is_stale is True
+
+
+@pytest.mark.asyncio
+async def test_incremental_regeneration_clears_only_affected_rows(
+    db_session: AsyncSession, seeded_db
+):
+    """增量重算清受影响行及 ROW 闭包，未受影响行仍保持 stale。
+
+    Validates: Requirements 7.1
+    """
+    import sqlalchemy as sa
+
+    engine = ReportEngine(db_session)
+    await engine.generate_all_reports(
+        FAKE_PROJECT_ID, 2025, applicable_standard=TEST_STANDARD
+    )
+    await db_session.commit()
+
+    await db_session.execute(
+        sa.update(FinancialReport)
+        .where(
+            FinancialReport.project_id == FAKE_PROJECT_ID,
+            FinancialReport.year == 2025,
+            FinancialReport.is_deleted == sa.false(),
+        )
+        .values(is_stale=True)
+    )
+    tb_row = (
+        await db_session.execute(
+            sa.select(TrialBalance).where(
+                TrialBalance.project_id == FAKE_PROJECT_ID,
+                TrialBalance.year == 2025,
+                TrialBalance.standard_account_code == "1001",
+            )
+        )
+    ).scalar_one()
+    tb_row.audited_amount = Decimal("60000")
+    await db_session.flush()
+
+    count = await engine.regenerate_affected(
+        FAKE_PROJECT_ID,
+        2025,
+        changed_accounts=["1001"],
+        applicable_standard=TEST_STANDARD,
+    )
+    await db_session.commit()
+
+    rows = {
+        row.row_code: row
+        for row in (
+            await db_session.execute(
+                sa.select(FinancialReport).where(
+                    FinancialReport.project_id == FAKE_PROJECT_ID,
+                    FinancialReport.year == 2025,
+                )
+            )
+        ).scalars()
+    }
+    assert count > 0
+    assert rows["BS-002"].is_stale is False
+    assert rows["BS-010"].is_stale is False
+    assert rows["BS-003"].is_stale is True

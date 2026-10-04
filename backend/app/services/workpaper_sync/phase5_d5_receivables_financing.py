@@ -69,16 +69,8 @@ from app.services.workpaper_sync.models import (
 )
 
 
-class EntrySelectionError(SyncDomainError):
-    """冻结的 canary entry 不再满足选型必要条件。"""
 
-    error_code = "sync_phase5_d5_selection_invalid"
-
-
-class StorePayloadError(SyncDomainError):
-    """HTML store 大 JSON 载荷形态不合法。"""
-
-    error_code = "sync_phase5_d5_store_payload_invalid"
+# 🔴 Task 16/17 声明化：Error 类由共享编排工厂提供，兼容别名在文件底部 _orch 块之后。
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -147,20 +139,53 @@ MANAGED_FIELD_SPECS: Final[tuple[tuple[str, str, str, str, str, str, str], ...]]
 )
 
 
-def _col_index(letters: str) -> int:
-    idx = 0
-    for ch in letters:
-        idx = idx * 26 + (ord(ch) - 64)
-    return idx
+#: 🔴 Task 17 声明化：D5 原自带的 `_col_index` 函数体已删（Task 5 当时未覆盖 D5，本次一并
+#: 收敛）。它唯一的调用方是本文件已删除的 `_aging_field_specs` 等引擎函数，收敛后本文件
+#: 不再需要该别名（D5 无账龄组，`managed_field_specs()` 内部用框架层 `col_index`）。
 
+# ═══════════════════════════════════════════════════════════════════════════
+# Task 17 声明化（spec: d1-sync-row-table-engine-and-d1-coverage）：SPEC_D52 是本 entry
+# 唯一权威声明。🔴 D5 原本就是内联 7 元组的来源家（design 裁决 3 的零改动对照）+ 无账龄组
+# （引擎「无分组」路径基准样本，`aging_layout=None`）—— 若它的 digest 变了说明引擎理解错了。
+# ═══════════════════════════════════════════════════════════════════════════
+
+from app.services.workpaper_sync.phase5_row_table_sheet import (  # noqa: E402
+    RowTableSheetSpec,
+    StoreKind,
+)
+from app.services.workpaper_sync.phase5_row_table_sheet import (  # noqa: E402
+    managed_field_specs as _engine_managed_field_specs,
+)
+
+SPEC_D52: Final[RowTableSheetSpec] = RowTableSheetSpec(
+    managed_sheet=MANAGED_SHEET,
+    sheet_key=SHEET_KEY,
+    table_key=ROWS_TABLE_KEY,
+    template_id=TEMPLATE_ID,
+    table_name=TABLE_NAME,
+    uuid_col=UUID_COL,
+    first_data_row=FIRST_DATA_ROW,
+    last_data_row=LAST_DATA_ROW,
+    footer_row=FOOTER_ROW,
+    header_group_row=HEADER_GROUP_ROW,
+    header_leaf_row=HEADER_LEAF_ROW,
+    store_item_id=STORE_ITEM_ID,
+    empty_payload=EMPTY_STORE_PAYLOAD,
+    row_identity_key=ROW_IDENTITY_STORE_KEY,
+    store_kind=StoreKind.rows,
+    field_specs=MANAGED_FIELD_SPECS,  # 已是 7 元组，零改动对照，直接引用
+    formula_columns=("F", "J", "L", "O"),
+    aging_layout=None,  # D5 无账龄组：引擎「无分组」路径基准样本
+    footer_marker=FOOTER_MARKER,
+    error_label="D5-2 明细表",
+    #: 🔴 D5 首列 `category` 是枚举（非空字符串占位符合法但语义上不是"名称"），幽灵行防护
+    #: 改用第 1 位 `item_name`（原实现即 `MANAGED_FIELD_SPECS[1]`，与 D6 同款例外）。
+    ghost_row_anchor_index=1,
+)
 
 #: 四个公式列的只读区域（F/J/L/O）。
-FORMULA_MASK: Final[tuple[str, ...]] = (
-    f"F{FIRST_DATA_ROW}:F{LAST_DATA_ROW}",
-    f"J{FIRST_DATA_ROW}:J{LAST_DATA_ROW}",
-    f"L{FIRST_DATA_ROW}:L{LAST_DATA_ROW}",
-    f"O{FIRST_DATA_ROW}:O{LAST_DATA_ROW}",
-)
+#: 🔴 本值现由框架层 `SPEC_D52.formula_mask` property 现算，provider 不再手写字面量。
+FORMULA_MASK: Final[tuple[str, ...]] = SPEC_D52.formula_mask
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -324,7 +349,12 @@ def _src(cell: str) -> str:
 
 
 def stable_key_for(column_key: str, row_identity: str = "{row_uuid}") -> str:
-    return f"{ROWS_TABLE_KEY}/{row_identity}/{column_key}"
+    """薄转发框架层同名函数（Task 17 声明化，逐字节等价）。"""
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        stable_key_for as _engine_stable_key_for,
+    )
+
+    return _engine_stable_key_for(SPEC_D52, column_key, row_identity)
 
 
 def _rows_table_payload() -> dict[str, Any]:
@@ -380,6 +410,23 @@ _REVIEWED_BASIS: Final[str] = (
 )
 
 
+def _d567_expansion_sheets() -> list[dict[str, Any]]:
+    """D5 扩容面 sheets（D5-4 行表 + 审定表D5），灰度开关由 expansion 模块控制。
+
+    spec: d567-sync-coverage-via-row-table-engine · Task 6/7
+    """
+    from app.services.workpaper_sync import phase5_d5_expansion as _exp
+    from app.services.workpaper_sync.phase5_d567_expansion_contract import (
+        build_adjudication_sheet, build_expansion_sheets,
+    )
+
+    sheets = build_expansion_sheets(_exp.managed_row_table_specs())
+    if getattr(_exp, "_INCLUDE_D501_ADJUDICATION", False):
+        from app.services.workpaper_sync.phase5_d5_01_adjudication import SPEC_D501
+        sheets.extend(build_adjudication_sheet(SPEC_D501, key_prefix="d5_adj"))
+    return sheets
+
+
 def build_contract_payload() -> dict[str, Any]:
     from app.services.workpaper_sync.excel_extract import TABLE_SHEET_ANCHOR
 
@@ -411,7 +458,8 @@ def build_contract_payload() -> dict[str, Any]:
                 "excel_name": MANAGED_SHEET,
                 "locator": {"anchor": TABLE_SHEET_ANCHOR},
                 "tables": [_rows_table_payload()],
-            }
+            },
+            *_d567_expansion_sheets(),
         ],
         "review": {
             "entry_id": ENTRY_ID,
@@ -456,61 +504,9 @@ def assert_contract_file_matches_source() -> SyncContract:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def store_row_identity(row: Mapping[str, Any], *, ordinal: int) -> str:
-    raw = row.get(ROW_IDENTITY_STORE_KEY)
-    if not isinstance(raw, str) or not raw.strip():
-        raise StorePayloadError(
-            f"{STORE_ITEM_ID} 第 {ordinal} 行缺少稳定行身份 {ROW_IDENTITY_STORE_KEY!r}"
-            f"（实得 {raw!r}）—— 不得退回数组下标作身份（Requirement 6.5 / Property 23）"
-        )
-    return raw.strip()
-
-
-def iter_store_rows(
-    payload: str | bytes | Sequence[Any],
-) -> Iterator[tuple[str, Mapping[str, Any]]]:
-    if isinstance(payload, (str, bytes, bytearray)):
-        text = payload.decode("utf-8") if isinstance(payload, (bytes, bytearray)) else payload
-        try:
-            rows: Any = json.loads(text)
-        except ValueError as exc:
-            raise StorePayloadError(f"{STORE_ITEM_ID} 的 remark 不是合法 JSON: {exc}") from exc
-    else:
-        rows = payload
-    if not isinstance(rows, list):
-        raise StorePayloadError(
-            f"{STORE_ITEM_ID} 的载荷必须是行对象数组，实得 {type(rows).__name__} —— 必须 fail closed"
-        )
-    seen: set[str] = set()
-    for ordinal, row in enumerate(rows):
-        if not isinstance(row, Mapping):
-            raise StorePayloadError(
-                f"{STORE_ITEM_ID} 第 {ordinal} 项不是对象，实得 {type(row).__name__}"
-            )
-        identity = store_row_identity(row, ordinal=ordinal)
-        if identity in seen:
-            raise StorePayloadError(
-                f"{STORE_ITEM_ID} 出现重复行身份 {identity!r}（第 {ordinal} 项）—— 不得静默合并"
-            )
-        seen.add(identity)
-        yield identity, row
-
-
-def _resolve_json_path(row: Mapping[str, Any], json_path: str) -> Any:
-    cursor: Any = row
-    for segment in json_path.split("/"):
-        if not isinstance(cursor, Mapping):
-            return None
-        cursor = cursor.get(segment)
-    return cursor
-
-
-def split_store_row(
-    row: Mapping[str, Any], *, row_identity: str, contract: SyncContract
-) -> Iterator[tuple[str, Any, FieldSpec]]:
-    for column_key, _column, _mode, _vt, json_path, _leaf, _grp in MANAGED_FIELD_SPECS:
-        spec = contract.field_by_stable_key(stable_key_for(column_key))
-        yield stable_key_for(column_key, row_identity), _resolve_json_path(row, json_path), spec
+#: 🔴 Task 17 声明化：`store_row_identity` / `iter_store_rows` / `_resolve_json_path` /
+#: `split_store_row` 四个内部 helper 已收敛进框架层 `phase5_row_table_sheet`。
+#: `build_store_projection` 保留同名薄转发。
 
 
 def build_store_projection(
@@ -519,51 +515,28 @@ def build_store_projection(
     contract: SyncContract,
     limits: Any | None = None,
 ) -> Any:
-    from app.services.workpaper_sync.adapters.base import FieldValue, Projection
-    from app.services.workpaper_sync.excel_extract import StreamingProjectionBudget
-    from app.services.workpaper_sync.limits import load_limits
+    """薄转发框架层 `build_store_projection(SPEC_D52, ...)`（逐字节等价）。
 
-    lim = limits or load_limits()
-    budget = StreamingProjectionBudget(lim)
-    values: dict[str, FieldValue] = {}
-    row_keys: list[str] = []
-    for identity, row in iter_store_rows(payload):
-        budget.add_row(ROWS_TABLE_KEY)
-        row_keys.append(identity)
-        for stable_key, value, spec in split_store_row(
-            row, row_identity=identity, contract=contract
-        ):
-            budget.add_field()
-            values[stable_key] = FieldValue(
-                stable_key=stable_key,
-                value=value,
-                value_type=spec.value_type,
-                mode=spec.mode,
-                row_key=identity,
-            )
-    return Projection(
-        contract_id=contract.contract_id,
-        semantic_version=contract.semantic_version,
-        document_type=contract.document_type,
-        values=values,
-        row_keys={ROWS_TABLE_KEY: tuple(row_keys)},
+    🔴 **必须转译引擎异常**（2026-09-26 修 Task 17 遗留回归）：引擎抛
+    `RowTableStorePayloadError(Exception)`（非 domain 错误），若直接冒泡会被
+    `wp_sync_router` 当未知异常 ⇒ **opaque 500**；而收敛前本函数抛
+    `StorePayloadError(SyncDomainError)` 带 `error_code` ⇒ 映射 **4xx**。
+    畸形 store 载荷是**用户侧数据问题**（OCR/导入/手改可写出非数组），必须是 4xx。
+    框架层 docstring 原文已要求「provider 侧薄转发时按需转译」，Task 17 漏做了这一步。
+    golden digest 门禁只覆盖成功路径的三段产物，抓不到失败路径的错误分类漂移 ⇒
+    另立判据 `test_store_payload_error_stays_domain_error.py`。
+    """
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        RowTableStorePayloadError,
+        build_store_projection as _engine_build_store_projection,
     )
 
-
-def _set_json_path(row: dict[str, Any], json_path: str, value: Any) -> bool:
-    parts = json_path.split("/")
-    cursor: dict[str, Any] = row
-    for seg in parts[:-1]:
-        nxt = cursor.get(seg)
-        if not isinstance(nxt, dict):
-            nxt = {}
-            cursor[seg] = nxt
-        cursor = nxt
-    leaf = parts[-1]
-    if cursor.get(leaf) != value:
-        cursor[leaf] = value
-        return True
-    return False
+    try:
+        return _engine_build_store_projection(
+            SPEC_D52, payload, contract=contract, limits=limits
+        )
+    except RowTableStorePayloadError as exc:
+        raise StorePayloadError(str(exc)) from exc
 
 
 def merge_projection_into_store_rows(
@@ -571,318 +544,83 @@ def merge_projection_into_store_rows(
     projection: Any,
     base_rows: list[Mapping[str, Any]],
 ) -> tuple[list[dict[str, Any]], int, int, set[str]]:
-    """把已 extract 的 projection 合进 D5-2-rows HTML store 行（不读盘）。"""
-    field_to_path = {spec[0]: spec[4] for spec in MANAGED_FIELD_SPECS}
-    by_id: dict[str, dict[str, Any]] = {}
-    order: list[str] = []
-    for row in base_rows:
-        rid = str(row.get(ROW_IDENTITY_STORE_KEY) or "").strip()
-        if not rid:
-            continue
-        by_id[rid] = dict(row)
-        order.append(rid)
+    """薄转发框架层 `merge_projection_into_store_rows(SPEC_D52, ...)`（逐字节等价）。
 
-    applied = 0
-    visited = 0
-    touched_rows: set[str] = set()
-    for key in projection.stable_keys():
-        fv = projection.get(key)
-        if fv is None or getattr(fv, "is_protected", False):
-            continue
-        rid = getattr(fv, "row_key", None)
-        if not rid:
-            continue
-        target = by_id.get(str(rid))
-        if target is None:
-            target = {ROW_IDENTITY_STORE_KEY: str(rid)}
-            by_id[str(rid)] = target
-            order.append(str(rid))
-        field_id = str(key).rsplit("/", 1)[-1]
-        json_path = field_to_path.get(field_id)
-        if not json_path:
-            continue
-        visited += 1
-        new_val = getattr(fv, "value", None)
-        if _set_json_path(target, json_path, new_val):
-            applied += 1
-            touched_rows.add(str(rid))
+    🔴 幽灵行防护锚点取 `SPEC_D52.ghost_row_anchor_index=1`（`item_name`，不是 `[0]` 的
+    `category`）—— D5 首列是枚举类别不是自由文本名称，用它做门槛判不准"用户到底填了没"；
+    这条差异化已通过框架层 `ghost_row_anchor_index` 参数表达（与 D6 同款例外）。
+    `_set_json_path` 已收敛进框架层 `set_json_path`。
+    """
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        merge_projection_into_store_rows as _engine_merge,
+    )
 
-    return [by_id[rid] for rid in order], applied, visited, touched_rows
+    return _engine_merge(SPEC_D52, projection=projection, base_rows=base_rows)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 7. 发布
+# 共享发布编排（Task 16/17 声明化）
 # ═══════════════════════════════════════════════════════════════════════════
 
+from app.services.workpaper_sync.phase5_entry_orchestration import (  # noqa: E402
+    Phase5EntryConfig,
+    build_orchestration,
+)
 
-@dataclass(frozen=True)
-class Phase5Definitions:
-    authority_model_definition_id: uuid.UUID
-    authority_model_definition_sha256: str
-    template_definition_id: uuid.UUID
-    template_definition_sha256: str
-    instrumentation_definition_id: uuid.UUID
-    instrumentation_definition_sha256: str
-    contract_definition_id: uuid.UUID
-    contract_definition_sha256: str
-    bundle_id: uuid.UUID
-    bundle_sha256: str
+_orch = build_orchestration(Phase5EntryConfig(
+    phase5_wave=PHASE5_WAVE,
+    entry_id=ENTRY_ID,
+    adapter_id=ADAPTER_ID,
+    wp_codes=WP_CODES,
+    expected_profile_id=EXPECTED_PROFILE_ID,
+    template_relative_path=TEMPLATE_RELATIVE_PATH,
+    template_sha256=TEMPLATE_SHA256,
+    managed_sheet=MANAGED_SHEET,
+    template_id=TEMPLATE_ID,
+    sheet_key=SHEET_KEY,
+    rows_table_key=ROWS_TABLE_KEY,
+    first_data_row=FIRST_DATA_ROW,
+    last_data_row=LAST_DATA_ROW,
+    footer_row=FOOTER_ROW,
+    managed_last_col=MANAGED_LAST_COL,
+    uuid_col=UUID_COL,
+    table_name=TABLE_NAME,
+    authority_model=AUTHORITY_MODEL,
+    footer_marker=FOOTER_MARKER,
+    store_item_id=STORE_ITEM_ID,
+    error_code_prefix="sync_phase5_d5",
+    build_contract_payload_fn=build_contract_payload,
+))
 
-    def as_dict(self) -> dict[str, Any]:
-        return {
-            "entry_id": ENTRY_ID,
-            "adapter_id": ADAPTER_ID,
-            "authority_model": AUTHORITY_MODEL.value,
-            "authority_model_definition_id": str(self.authority_model_definition_id),
-            "authority_model_definition_sha256": self.authority_model_definition_sha256,
-            "template_definition_id": str(self.template_definition_id),
-            "template_definition_sha256": self.template_definition_sha256,
-            "instrumentation_definition_id": str(self.instrumentation_definition_id),
-            "instrumentation_definition_sha256": self.instrumentation_definition_sha256,
-            "contract_definition_id": str(self.contract_definition_id),
-            "contract_definition_sha256": self.contract_definition_sha256,
-            "definition_bundle_id": str(self.bundle_id),
-            "definition_bundle_sha256": self.bundle_sha256,
-        }
+# ── 导出工厂产出的名字 ──
+Phase5Definitions = _orch.Phase5Definitions
+TemplateResolutionFacts = _orch.TemplateResolutionFacts
+excel_carrier_gate = _orch.excel_carrier_gate
+authoritative_template_path = _orch.authoritative_template_path
+read_authoritative_template = _orch.read_authoritative_template
+assert_no_implicit_template_fallback = _orch.assert_no_implicit_template_fallback
+assert_entry_selectable = _orch.assert_entry_selectable
+instrumentation_spec = _orch.instrumentation_spec
+template_definition_payload = _orch.template_definition_payload
+instrumentation_definition_payload = _orch.instrumentation_definition_payload
+authority_model_payload = _orch.authority_model_payload
+contract_file_path = _orch.contract_file_path
+load_contract_from_disk = _orch.load_contract_from_disk
+assert_contract_file_matches_source = _orch.assert_contract_file_matches_source
+publish_definitions = _orch.publish_definitions
+build_matcher = _orch.build_matcher
+build_registration = _orch.build_registration
+register_adapter = _orch.register_adapter
+resolve_published_frozen_definitions = _orch.resolve_published_frozen_definitions
+attach_adapters = _orch.attach_adapters
+manifest_capability_enabled = _orch.manifest_capability_enabled
+assert_manifest_capability_enabled = _orch.assert_manifest_capability_enabled
 
-
-async def publish_definitions(publisher: Any) -> Phase5Definitions:
-    contract = assert_contract_file_matches_source()
-    authority = await publisher.publish_definition(
-        kind=DefinitionKind.authority_model,
-        payload=authority_model_payload(),
-        logical_id=f"{ADAPTER_ID}.authority-model",
-        semantic_version="1.0.0",
-    )
-    template_payload = template_definition_payload()
-    template = await publisher.publish_definition(
-        kind=DefinitionKind.template,
-        payload=template_payload,
-        logical_id=f"{ADAPTER_ID}.template",
-        semantic_version="1.0.0",
-        blob_bytes=read_authoritative_template(),
-        structure_hash=template_payload["normalized_structure_hash"],
-    )
-    instrumentation = await publisher.publish_definition(
-        kind=DefinitionKind.instrumentation,
-        payload=instrumentation_definition_payload(),
-        logical_id=f"{ADAPTER_ID}.instrumentation",
-        semantic_version="1.0.0",
-    )
-    contract_definition = await publisher.publish_definition(
-        kind=DefinitionKind.contract,
-        payload=dict(contract.canonical_payload),
-        logical_id=ADAPTER_ID,
-        semantic_version=contract.semantic_version,
-    )
-    if template.sha256 != contract.template_definition_sha256:
-        raise EntrySelectionError(
-            f"已发布 template digest {template.sha256} 与契约声明 "
-            f"{contract.template_definition_sha256} 不一致 —— 单向引用断裂"
-        )
-    if instrumentation.sha256 != contract.instrumentation_definition_sha256:
-        raise EntrySelectionError(
-            f"已发布 instrumentation digest {instrumentation.sha256} 与契约声明 "
-            f"{contract.instrumentation_definition_sha256} 不一致 —— 单向引用断裂"
-        )
-    bundle = await publisher.publish_bundle(
-        authority_model_definition_id=authority.definition_id,
-        authority_model=AUTHORITY_MODEL,
-        authority_model_definition_sha256=authority.sha256,
-        slots={
-            BundleSlot.template: {
-                "type": "definition",
-                "ref": f"definition:{template.definition_id}",
-                "digest": template.sha256,
-            },
-            BundleSlot.instrumentation: {
-                "type": "definition",
-                "ref": f"definition:{instrumentation.definition_id}",
-                "digest": instrumentation.sha256,
-            },
-            BundleSlot.contract: {
-                "type": "definition",
-                "ref": f"definition:{contract_definition.definition_id}",
-                "digest": contract_definition.sha256,
-            },
-        },
-    )
-    return Phase5Definitions(
-        authority_model_definition_id=authority.definition_id,
-        authority_model_definition_sha256=authority.sha256,
-        template_definition_id=template.definition_id,
-        template_definition_sha256=template.sha256,
-        instrumentation_definition_id=instrumentation.definition_id,
-        instrumentation_definition_sha256=instrumentation.sha256,
-        contract_definition_id=contract_definition.definition_id,
-        contract_definition_sha256=contract_definition.sha256,
-        bundle_id=bundle.bundle_id,
-        bundle_sha256=bundle.canonical_sha256,
-    )
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# 8. adapter 注册与宿主接线
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-def build_matcher() -> EntryMatcher:
-    return EntryMatcher(document_type="xlsx", wp_codes=WP_CODES)
-
-
-def build_registration(
-    *,
-    adapter: Any,
-    bundle: Any,
-    descriptor: DescriptorFacts,
-    room: RoomFacts,
-    contract: SyncContract | None = None,
-) -> AdapterRegistration:
-    return AdapterRegistration(
-        adapter=adapter,
-        entry_id=ENTRY_ID,
-        matcher=build_matcher(),
-        bundle=bundle,
-        descriptor=descriptor,
-        room=room,
-        declared_capability=Capability.bidirectional,
-        contract=contract if contract is not None else load_contract_from_disk(),
-    )
-
-
-def register_adapter(
-    registry: WorkpaperSyncAdapterRegistry,
-    *,
-    adapter: Any,
-    bundle: Any,
-    descriptor: DescriptorFacts,
-    room: RoomFacts,
-    contract: SyncContract | None = None,
-) -> AdapterRegistration:
-    registration = build_registration(
-        adapter=adapter, bundle=bundle, descriptor=descriptor, room=room, contract=contract
-    )
-    registry.register(registration)
-    return registration
-
-
-async def resolve_published_frozen_definitions(
-    *, session: Any, representation: Any, contract: SyncContract
-) -> Any:
-    from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
-    from app.services.workpaper_sync.published_identity_observer import (
-        observe_published_frozen_definitions,
-    )
-    from app.services.workpaper_sync.resolution import CanonicalResolutionService
-
-    observation = await observe_published_frozen_definitions(
-        session=session,
-        resolution=CanonicalResolutionService(
-            session, CanonicalArtifactRepository(_BACKEND_ROOT)
-        ),
-        representation=representation,
-        correlation_id=f"{ADAPTER_ID}@{getattr(representation, 'id', None)}",
-    )
-    if observation.definitions.contract.canonical_sha256 != contract.canonical_sha256:
-        raise EntrySelectionError(
-            f"entry {ENTRY_ID}: 观测器读出的契约 digest "
-            f"{observation.definitions.contract.canonical_sha256} 与本模块 source-locked 的 "
-            f"{contract.canonical_sha256} 不一致 —— 冻结身份与生产契约脱钩"
-        )
-    return observation
-
-
-async def attach_adapters(
-    registry: WorkpaperSyncAdapterRegistry, *, session: Any
-) -> tuple[str, ...]:
-    if ADAPTER_ID in {reg.adapter_id for reg in registry.registrations()}:
-        return ()
-    if not manifest_capability_enabled():
-        return ()
-
-    import sqlalchemy as sa
-
-    from app.models.workpaper_sync_models import WorkpaperContentRepresentation
-    from app.services.workpaper_sync.projection_target_resolution import (
-        resolve_visible_current_representation_id,
-    )
-    from app.services.workpaper_sync import entry_source_facts as facts
-    from app.services.workpaper_sync.adapters.excel import build_excel_adapter
-    from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
-    from app.services.workpaper_sync.resolution import CanonicalResolutionService
-
-    representation_id = await resolve_visible_current_representation_id(session, entry_id=ENTRY_ID)
-    if representation_id is None:
-        return ()
-    representation = (
-        await session.execute(
-            sa.select(WorkpaperContentRepresentation).where(
-                WorkpaperContentRepresentation.id == representation_id
-            )
-        )
-    ).scalar_one_or_none()
-    if representation is None or representation.definition_bundle_id is None:
-        return ()
-
-    resolution = CanonicalResolutionService(session, CanonicalArtifactRepository(_BACKEND_ROOT))
-    bundle = await resolution.load_bundle_snapshot(representation.definition_bundle_id)
-    contract = assert_contract_file_matches_source()
-    entry = manifest_entries_by_id(load_entry_manifest())[ENTRY_ID]
-    descriptor = facts.observe_descriptor_facts(entry)
-    if descriptor is None:
-        raise EntrySelectionError(
-            f"entry {ENTRY_ID} 的宿主实测不可达（产不出 descriptor 事实）—— 不可达入口不得注册 adapter"
-        )
-    observation = await resolve_published_frozen_definitions(
-        session=session, representation=representation, contract=contract
-    )
-    register_adapter(
-        registry,
-        adapter=build_excel_adapter(
-            definitions=observation.definitions,
-            binding=observation.identity_binding,
-            direction="html_to_oo",
-        ),
-        bundle=bundle,
-        descriptor=descriptor,
-        room=facts.observe_room_facts(entry),
-        contract=contract,
-    )
-    return (ADAPTER_ID,)
-
-
-def manifest_capability_enabled(*, manifest: Mapping[str, Any] | None = None) -> bool:
-    try:
-        assert_manifest_capability_enabled(manifest=manifest)
-    except EntrySelectionError:
-        return False
-    return True
-
-
-def assert_manifest_capability_enabled(*, manifest: Mapping[str, Any] | None = None) -> None:
-    entry = manifest_entries_by_id(
-        manifest if manifest is not None else load_entry_manifest()
-    )[ENTRY_ID]
-    capability = capability_of(entry)
-    if capability is not Capability.bidirectional:
-        raise EntrySelectionError(
-            f"entry {ENTRY_ID} 的 manifest capability={capability.value} —— "
-            "注册 bidirectional adapter 前必须先由 reviewed overlay 裁决为 bidirectional 并重生成 manifest"
-        )
-    if str(entry.get("adapter_id") or "") != ADAPTER_ID:
-        raise EntrySelectionError(
-            f"entry {ENTRY_ID} 的 manifest adapter_id={entry.get('adapter_id')!r} 与本 canary 的 {ADAPTER_ID!r} 不符"
-        )
-
-
-def _unused_instrumentation_error_guard() -> type[InstrumentationError]:
-    return InstrumentationError
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# 9. provisioning / attach 白名单接口别名
-# ═══════════════════════════════════════════════════════════════════════════
-
+# ── 别名 ──
 publish_pilot_definitions = publish_definitions
 attach_pilot_adapters = attach_adapters
 PILOT_WP_CODES = WP_CODES
+
+# ── Error 类兼容别名 ──
+EntrySelectionError = _orch.EntrySelectionError
+StorePayloadError = _orch.StorePayloadError

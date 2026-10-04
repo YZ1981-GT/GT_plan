@@ -102,6 +102,16 @@
               @change="(v: number) => updateCell(block.blockKey, row.rowKey, 'priorUnadjusted', v ?? 0)"
             />
             <span v-else :class="amtCellClass(row)">{{ fmtAmount(row.priorUnadjusted) }}</span>
+            <!--
+              逐格四态覆盖徽标（Task 20）。block3（净值）是纯公式区、composable 不产生
+              cellOverrides ⇒ 本组件自动不渲染，无需按 blockKey 加 v-if。
+            -->
+            <DerivedCellOverrideBadge
+              :overrides="row.cellOverrides"
+              field="priorUnadjusted"
+              :readonly="isReadonly"
+              @restore="restoreDerivedValue(block.blockKey, row.rowKey, 'priorUnadjusted')"
+            />
           </template>
         </el-table-column>
 
@@ -154,6 +164,12 @@
               @change="(v: number) => updateCell(block.blockKey, row.rowKey, 'currentUnadjusted', v ?? 0)"
             />
             <span v-else :class="amtCellClass(row)">{{ fmtAmount(row.currentUnadjusted) }}</span>
+            <DerivedCellOverrideBadge
+              :overrides="row.cellOverrides"
+              field="currentUnadjusted"
+              :readonly="isReadonly"
+              @restore="restoreDerivedValue(block.blockKey, row.rowKey, 'currentUnadjusted')"
+            />
           </template>
         </el-table-column>
 
@@ -376,6 +392,7 @@
 import { ref, computed, inject, toRef, type Ref } from 'vue'
 import { InfoFilled, Download } from '@element-plus/icons-vue'
 import { useD6Adjudication, type AdjudicationBlock, type AdjudicationRow, type AdjudicationPrefillRow } from '../composables/useD6Adjudication'
+import DerivedCellOverrideBadge from '../shared/DerivedCellOverrideBadge.vue'
 import { useD6AiGenerate } from '../composables/useD6AiGenerate'
 import { isChangeRateExceeding } from '../composables/useD6FormulaEngine'
 import { useAuditContext } from '@/composables/useAuditContext'
@@ -436,6 +453,8 @@ const {
   updateCell,
   addDynamicRow,
   removeDynamicRow,
+  // Task 20：逐格四态的「恢复取数」入口（DerivedCellOverrideBadge 的 @restore 调它）
+  restoreDerivedValue,
 } = useD6Adjudication({
   allResponses: allResponsesRef,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,

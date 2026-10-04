@@ -137,13 +137,17 @@ export function useF2ValuationFormData(options: { wpId: Ref<string>; projectId: 
     }, 2000))
   }
 
-  onScopeDispose(() => {
+  function _flushPending(): void {
     for (const t of _debounceTimers.values()) clearTimeout(t)
+    _debounceTimers.clear()
     if (_pendingItems.size) {
       const items = [..._pendingItems].map((id) => allResponses.value.get(id)).filter(Boolean) as ChecklistResponse[]
+      _pendingItems.clear()
       if (items.length) void _doSave(items)
     }
-  })
+  }
+
+  onScopeDispose(() => { _flushPending() })
 
   return {
     allResponses,
@@ -154,6 +158,7 @@ export function useF2ValuationFormData(options: { wpId: Ref<string>; projectId: 
     getSheet,
     saveItemsFromEvent,
     debouncedSave,
+    flushPendingSave: _flushPending,
   }
 }
 

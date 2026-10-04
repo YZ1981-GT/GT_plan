@@ -33,6 +33,7 @@ import {
 import type { ChecklistResponse } from './useF1FormData'
 import { api } from '@/services/apiProxy'
 import { publishGCycleSourceFv, sumFvFromChecklistRemark } from './gCycleSourceFv'
+import { G10_ITEM_IDS } from './g10StorageContract'
 
 export interface G10AdjudicationRow {
   rowKey: string
@@ -208,7 +209,7 @@ export function useG10Adjudication(opts: {
   )
 
   const detailTotalClosing = computed(() => {
-    const json = opts.allResponses.value.get('G10-detail-rows')?.remark
+    const json = opts.allResponses.value.get(G10_ITEM_IDS.G10_DETAIL_ROWS)?.remark
     if (!json) return null
     try {
       const arr = JSON.parse(json)
@@ -414,14 +415,14 @@ export function useG10Adjudication(opts: {
   /** 发布 G10 明细 FV 变动合计，供 G13 跨底稿勾稽 */
   function publishFvChangeForCross(): void {
     const fv = sumFvFromChecklistRemark(
-      opts.allResponses.value.get('G10-detail-rows')?.remark,
+      opts.allResponses.value.get(G10_ITEM_IDS.G10_DETAIL_ROWS)?.remark,
       'G10',
     )
     publishGCycleSourceFv('G10', fv)
   }
 
   watch(
-    () => opts.allResponses.value.get('G10-detail-rows')?.remark,
+    () => opts.allResponses.value.get(G10_ITEM_IDS.G10_DETAIL_ROWS)?.remark,
     () => { publishFvChangeForCross() },
   )
 

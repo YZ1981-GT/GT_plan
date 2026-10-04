@@ -98,12 +98,21 @@ class DefaultStagingCasGate:
 
 @dataclass
 class InMemoryAuthoritativeWriter:
-    """测试替身：模拟 commit_bytes(expected=…) CAS。"""
+    """测试替身：模拟「expected revision CAS」语义的 staging 提交。
+
+    🔴 方法名刻意**不叫** `commit_bytes`：那个名字在本平台是被保留的、承载 authority
+    model 的名字 —— `opaque_entry_gate.discover_commit_bytes_lane_arguments()` 以一条
+    纯名字 AST 扫描把「每处 `commit_bytes(...)` 都必须带字面量 `lane_id=`」锁死，靠的
+    就是这条保留（名字扫描无法被「换个接收者」绕过，这是它的优点）。本替身的签名与真
+    writer 完全不同（真 writer 是 async、17 个参数、含必填 `lane_id`、返回
+    `ContentCommitReceipt`），同名只会让那条判据要么误伤本文件、要么被迫加模块级豁免，
+    而模块级豁免会让**日后真的**出现在本模块的权威写入调用一起隐身。
+    """
 
     current_revision: str
     commits: list[dict[str, Any]] = field(default_factory=list)
 
-    def commit_bytes(
+    def commit_staging_bytes(
         self,
         *,
         expected_revision: str,
@@ -166,7 +175,7 @@ def run_staging_cas(
 
         before = writer.current_revision
         try:
-            new_rev = writer.commit_bytes(
+            new_rev = writer.commit_staging_bytes(
                 expected_revision=payload.client_content_revision,
                 staging_path=staging_path,
                 entry_id=payload.entry_id,

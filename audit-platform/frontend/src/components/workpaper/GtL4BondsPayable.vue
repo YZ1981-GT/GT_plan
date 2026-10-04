@@ -7,9 +7,31 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
+      <div v-if="isProcedureSheet" class="l4-procedure-toolbar">
+        <el-segmented
+          :model-value="procedureDualMode.currentMode.value"
+          :options="procedureDualMode.modeOptions.value"
+          size="small"
+          @change="procedureDualMode.onModeChange"
+        />
+        <!-- BP-7 / AC 1.4：能力诚实披露。文案真源在 sync/workpaperEntrySyncNotice.ts，
+             已注册 bidirectional 的 entry 自动返 null 不渲染 ⇒ 无需本地条件。 -->
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-l4-bonds-payable" />
+        <el-tag v-if="!procedureDualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+      </div>
+
+      <GtOnlyOfficeSheet
+        v-if="isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :sheet-name="props.sheetName || 'L4A'"
+        :readonly="isReadonly"
+        style="height: calc(100vh - 180px)"
+      />
+
       <!-- L4 主sheet 底稿目录 -->
       <L4TabIndex
-        v-if="currentSheet === 'L4'"
+        v-else-if="currentSheet === 'L4'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
@@ -178,6 +200,7 @@ import { ref, computed, inject, onMounted, provide, defineAsyncComponent, toRef 
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+import { useCycleHtmlOoDualMode } from './composables/useCycleHtmlOoDualMode'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -206,6 +229,7 @@ const L4TabBondCheck = defineAsyncComponent(() => import('./l4/inspection/L4TabB
 // Shared
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtAProgramConsole.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -256,6 +280,12 @@ const currentSheet = computed(() => {
   if (name.includes('上市')) return '附注上市'
   if (name.includes('国企')) return '附注国企'
   return name
+})
+
+const isProcedureSheet = computed(() => currentSheet.value === 'L4A')
+const procedureDualMode = useCycleHtmlOoDualMode({
+  wpId: toRef(props, 'wpId') as any,
+  storagePrefix: 'l4-proc:',
 })
 
 // ─── bondBranch 分支选择器（L4-7/L4-8 共享） ─────────────────────────────────
@@ -320,6 +350,14 @@ onMounted(() => {
 
 .loading-container {
   padding: 24px;
+}
+
+.l4-procedure-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 
 .branch-selector-container {

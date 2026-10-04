@@ -551,11 +551,16 @@ onUnmounted(() => {
 
 /**
  * 从 checklist_responses 恢复已保存的行数据
+ *
+ * BP-10 迁移兼容：同时匹配旧格式 M6-1-row-N-data（位置化）和新格式 M6-1-{key}-data（熵键）。
+ * 旧格式的行按顺序还原；新格式的行按 key 匹配。两种格式的数据都能正确加载，
+ * 下次保存时统一写成新格式（_triggerSave 已改用 ${k}）。
  */
 function _restoreRows(): M6AdjudicationRow[] {
   const restored: M6AdjudicationRow[] = []
   for (const [key, resp] of formData.allResponses.value.entries()) {
-    if (key.startsWith('M6-1-row-') && key.endsWith('-data') && resp.remark) {
+    // 匹配 M6-1-*-data（旧 row-N 格式和新熵键格式都命中）
+    if (key.startsWith('M6-1-') && key.endsWith('-data') && resp.remark) {
       try {
         const d = JSON.parse(resp.remark)
         restored.push({

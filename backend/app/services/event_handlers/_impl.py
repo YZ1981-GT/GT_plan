@@ -9,7 +9,7 @@ Validates: Requirements 10.1-10.6, 2.4, 8.1
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.core.database import async_session as async_session_factory
 from app.models.audit_platform_schemas import EventPayload, EventType
@@ -22,6 +22,23 @@ from app.services.trial_balance_service import TrialBalanceService
 from sqlalchemy.exc import IntegrityError
 
 logger = logging.getLogger(__name__)
+
+
+def _log_missing_year(handler: str, payload: EventPayload, *, target: str = "") -> None:
+    """订阅者拿到 year=None 时的**可见**降级（替代 ``payload.year or 2025`` 猜年份）。
+
+    EventBus 派发口已按项目审计年度补齐 year（``event_bus._backfill_year``），走到这里
+    说明项目本身查不到年度，或发布方传的 project_id 不是真实项目。记 stale-degraded
+    而不是猜一个年份去写别的年度的数据。
+    """
+    from app.services.stale_degraded_logger import log_stale_degraded
+
+    log_stale_degraded(
+        source=f"{handler}:{payload.event_type.value}",
+        target=target or f"project={payload.project_id}",
+        error="事件缺 year 且项目无审计年度可补，已跳过（不猜年份）",
+        context={"project_id": str(payload.project_id)},
+    )
 
 
 def _make_handler(service_class, method_name: str, after_commit_event_type: EventType | None = None):
@@ -96,10 +113,18 @@ async def _auto_map_on_dataset_activated(payload: "EventPayload") -> None:
       trial_balance。
 
     幂等：auto_match 跳过已存在映射、load_standard_template 增量加载；对每次
-    激活（含重新导入）安全可重跑。best-effort：失败只记日志，绝不影响导入激活主流程。
+    激活（含重新导入）安全可重跑。不影响导入激活主流程（数据已落库）。
+
+    🔴 结果必须可见（断点 2，2026-09-29）：原实现失败只 ``logger.warning``，用户侧只看到
+    「导入成功」而试算表为空，且无任何重试入口。现在结果统一经
+    :func:`_report_auto_map_outcome` 落两处：
+    ① ``ledger_datasets.validation_summary.auto_map``（持久，前端试算表页据此提示 + 一键修复）
+    ② 失败时推 ``sync.failed`` SSE（顶栏同步状态变红、带重试端点）
+    「成功但 0 条映射」与「映射率 < 80%」同样记为需关注（前者正是静默空试算表的形态）。
     """
     if not payload.project_id or not payload.year:
         return
+    dataset_id = (payload.extra or {}).get("dataset_id")
     try:
         from app.core.database import async_session
         from app.services import account_chart_service, mapping_service
@@ -115,14 +140,158 @@ async def _auto_map_on_dataset_activated(payload: "EventPayload") -> None:
             #    保存 account_mapping 并触发 MAPPING_CHANGED → 重算 trial_balance）
             result = await mapping_service.auto_match(payload.project_id, db, year=payload.year)
             logger.info(
-                "[auto-map] LEDGER_DATASET_ACTIVATED 自动科目映射完成: project=%s year=%s result=%s",
-                payload.project_id, payload.year, getattr(result, "saved", result),
+                "[auto-map] LEDGER_DATASET_ACTIVATED 自动科目映射完成: project=%s year=%s saved=%s rate=%s",
+                payload.project_id, payload.year,
+                getattr(result, "saved_count", None), getattr(result, "completion_rate", None),
             )
+        await _report_auto_map_outcome(
+            payload, dataset_id=dataset_id, result=result, error=None,
+        )
     except Exception as e:  # noqa: BLE001
         logger.warning(
             "[auto-map] LEDGER_DATASET_ACTIVATED 自动科目映射失败(不影响导入): project=%s year=%s err=%s",
             payload.project_id, payload.year, e,
         )
+        await _report_auto_map_outcome(payload, dataset_id=dataset_id, result=None, error=e)
+
+
+#: 映射率低于此值视为「需关注」—— 与试算表页引导步骤「映射 < 80% 停在第 2 步」同一阈值。
+AUTO_MAP_ATTENTION_RATE = 80.0
+
+
+def classify_auto_map_outcome(result: Any, error: BaseException | None) -> dict[str, Any]:
+    """把 auto_match 的结果归一成可持久化、可展示的状态（纯函数，便于逐分支测）。
+
+    status ∈ {ok, low_coverage, empty, failed}：
+    - failed：抛异常
+    - empty：没有任何客户科目（total_client=0）—— 余额表未被读到，试算表必然全 0
+    - low_coverage：映射率 < 80% —— 试算表会漏科目
+    - ok：其余
+    """
+    if error is not None:
+        return {
+            "status": "failed",
+            "message": f"自动科目映射失败：{type(error).__name__}: {str(error)[:300]}",
+        }
+    total = int(getattr(result, "total_client", 0) or 0)
+    rate = float(getattr(result, "completion_rate", 0.0) or 0.0)
+    base = {
+        "saved_count": int(getattr(result, "saved_count", 0) or 0),
+        "total_client": total,
+        "unmatched_count": int(getattr(result, "unmatched_count", 0) or 0),
+        "completion_rate": rate,
+    }
+    if total == 0:
+        return {**base, "status": "empty",
+                "message": "自动科目映射未读到任何客户科目，试算表将为空，请检查余额表后重新映射"}
+    if rate < AUTO_MAP_ATTENTION_RATE:
+        return {**base, "status": "low_coverage",
+                "message": f"自动科目映射完成率 {rate:.1f}% 低于 {AUTO_MAP_ATTENTION_RATE:.0f}%，"
+                           "试算表可能漏科目，请到科目映射页补全"}
+    return {**base, "status": "ok", "message": f"自动科目映射完成（{rate:.1f}%）"}
+
+
+async def _persist_auto_map_outcome(
+    *,
+    project_id: Any,
+    year: int | None,
+    dataset_id: str | None,
+    outcome: dict[str, Any],
+) -> None:
+    """把自动映射结果写到数据集 ``validation_summary.auto_map``。
+
+    ``dataset_id`` 缺省时按 (project_id, year) 取当前 active 数据集（手动「重新映射」
+    入口没有事件 payload，只知道项目与年度）。任何失败只记日志。
+    """
+    try:
+        import uuid as _uuid
+
+        from sqlalchemy.orm.attributes import flag_modified
+
+        from app.core.database import async_session
+        from app.models.dataset_models import LedgerDataset
+        from app.services.dataset_service import DatasetService
+
+        async with async_session() as db:
+            ds_id = _uuid.UUID(str(dataset_id)) if dataset_id else None
+            if ds_id is None and year is not None:
+                ds_id = await DatasetService.get_active_dataset_id(db, project_id, year)
+            if ds_id is None:
+                return
+            ds = await db.get(LedgerDataset, ds_id)
+            if ds is None:
+                return
+            summary = dict(ds.validation_summary or {})
+            summary["auto_map"] = outcome
+            ds.validation_summary = summary
+            flag_modified(ds, "validation_summary")
+            await db.commit()
+    except Exception as persist_err:  # noqa: BLE001
+        logger.warning(
+            "[auto-map] 结果落库失败 project=%s dataset=%s: %s", project_id, dataset_id, persist_err,
+        )
+
+
+async def record_auto_map_outcome(
+    project_id: Any,
+    year: int | None,
+    *,
+    result: Any,
+    error: BaseException | None,
+) -> dict[str, Any]:
+    """手动「重新自动映射」入口的结果回写（覆盖入库时留下的失败状态）。"""
+    from datetime import datetime, timezone
+
+    outcome = classify_auto_map_outcome(result, error)
+    outcome["year"] = year
+    outcome["at"] = datetime.now(timezone.utc).isoformat()
+    outcome["trigger"] = "manual"
+    await _persist_auto_map_outcome(
+        project_id=project_id, year=year, dataset_id=None, outcome=outcome,
+    )
+    return outcome
+
+
+async def _report_auto_map_outcome(
+    payload: "EventPayload",
+    *,
+    dataset_id: str | None,
+    result: Any,
+    error: BaseException | None,
+) -> None:
+    """把自动映射结果落到数据集 + 失败时推 SSE。自身任何失败都只记日志（不反向打断导入链）。"""
+    from datetime import datetime, timezone
+
+    outcome = classify_auto_map_outcome(result, error)
+    outcome["year"] = payload.year
+    outcome["at"] = datetime.now(timezone.utc).isoformat()
+    outcome["trigger"] = "dataset_activated"
+
+    # ① 持久化到数据集（前端「试算表」页读取；刷新页面也不丢）
+    await _persist_auto_map_outcome(
+        project_id=payload.project_id, year=payload.year,
+        dataset_id=dataset_id, outcome=outcome,
+    )
+
+    # ② 失败 / 空映射推 sync.failed：顶栏同步状态变红，带一键重试端点
+    if outcome["status"] in ("failed", "empty"):
+        try:
+            from app.services.event_bus import event_bus
+
+            fail = EventPayload(
+                event_type=EventType.SYNC_FAILED,
+                project_id=payload.project_id,
+                year=payload.year,
+                extra={
+                    "source_event": EventType.LEDGER_DATASET_ACTIVATED.value,
+                    "handler": "自动科目映射",
+                    "error": outcome["message"],
+                    "retry_endpoint": f"/api/projects/{payload.project_id}/mapping/auto-match",
+                },
+            )
+            await event_bus._notify_sse(fail)
+        except Exception as sse_err:  # noqa: BLE001
+            logger.warning("[auto-map] sync.failed 推送失败: %s", sse_err)
 
 
 async def _advance_project_status_on_dataset_activated(payload: "EventPayload") -> None:
@@ -648,6 +817,8 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _mark_workpapers_stale_by_account)
     event_bus.subscribe(EventType.MAPPING_CHANGED, _mark_workpapers_stale_by_account)
     event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, _mark_workpapers_stale_by_account)
+    event_bus.subscribe(EventType.ADJUSTMENT_APPROVED, _mark_workpapers_stale_by_account)  # 任务 3.7
+    event_bus.subscribe(EventType.ADJUSTMENT_REVIEW_REVOKED, _mark_workpapers_stale_by_account)
 
     logger.debug("Phase 9 workpaper event handlers registered")
 
@@ -868,6 +1039,8 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _notify_adjustment_event_sse)
     event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _notify_adjustment_event_sse)
     event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _notify_adjustment_event_sse)
+    event_bus.subscribe(EventType.ADJUSTMENT_APPROVED, _notify_adjustment_event_sse)  # 任务 3.7
+    event_bus.subscribe(EventType.ADJUSTMENT_REVIEW_REVOKED, _notify_adjustment_event_sse)
 
     logger.debug("Enterprise Linkage: adjustment SSE push handlers registered")
 
@@ -921,6 +1094,100 @@ def register_event_handlers() -> None:
                         context={"project_id": str(project_id), "year": year},
                     )
 
+                # 标记财务报表数据 stale
+                # spec chain-closure-phase1 R4：上面那段标的是 `AuditReport`
+                # （审计报告文本，真库单项目仅 1 行），而财务报表**真数据**在
+                # `financial_report`（单项目 258 行）此前**从未被标** ⇒ 调整分录审批后
+                # 报表值已过期却显示 is_stale=False，属静默陈旧。两张表都要标：
+                # AuditReport 供 AuditReportService.on_reports_updated 消费，不能删。
+                try:
+                    from app.models.report_models import FinancialReport
+
+                    financial_stmt = _sa.update(FinancialReport).where(
+                        FinancialReport.project_id == project_id,
+                        FinancialReport.year == year,
+                        FinancialReport.is_deleted == False,  # noqa: E712
+                    )
+
+                    # 有明确科目时只标记公式直接引用这些科目的报表行，
+                    # 并沿 ROW() 引用闭包标记派生合计行；没有科目才整表兜底。
+                    # 这样调整 1122 不会把只取 6001 的利润表行也标成过期。
+                    account_codes = [
+                        code for code in (payload.account_codes or []) if code
+                    ]
+                    if account_codes:
+                        from app.services.report_config_service import ReportConfigService
+                        from app.services.report_engine import ReportEngine, ReportFormulaParser
+
+                        report_engine = ReportEngine(session)
+                        applicable_standard = (
+                            await ReportConfigService.resolve_applicable_standard(
+                                session, project_id,
+                            )
+                        )
+                        configs = await report_engine._load_report_configs(
+                            applicable_standard,
+                        )
+                        affected_codes: set[str] = set()
+                        for rows in configs.values():
+                            for config in rows:
+                                if report_engine._is_affected(
+                                    config.formula, account_codes,
+                                ):
+                                    affected_codes.add(config.row_code)
+
+                        # ROW() 是跨报表行的派生依赖，按 row_code 建立传递闭包，
+                        # 与 ReportEngine.regenerate_affected 保持相同的影响口径。
+                        changed = True
+                        while changed:
+                            changed = False
+                            for rows in configs.values():
+                                for config in rows:
+                                    if config.row_code in affected_codes:
+                                        continue
+                                    parser = ReportFormulaParser(
+                                        session, project_id, year,
+                                    )
+                                    if any(
+                                        ref in affected_codes
+                                        for ref in parser.extract_row_refs(config.formula)
+                                    ):
+                                        affected_codes.add(config.row_code)
+                                        changed = True
+
+                        affected_pairs = [
+                            _sa.and_(
+                                FinancialReport.report_type == report_type,
+                                FinancialReport.row_code.in_(
+                                    {
+                                        config.row_code
+                                        for config in rows
+                                        if config.row_code in affected_codes
+                                    }
+                                ),
+                            )
+                            for report_type, rows in configs.items()
+                            if any(
+                                config.row_code in affected_codes for config in rows
+                            )
+                        ]
+                        # 有科目但没有任何公式命中时，不应退化为整表标记。
+                        financial_stmt = financial_stmt.where(
+                            _sa.or_(*affected_pairs)
+                            if affected_pairs
+                            else _sa.false()
+                        )
+
+                    await session.execute(financial_stmt.values(is_stale=True))
+                except Exception as e:
+                    from app.services.stale_degraded_logger import log_stale_degraded
+                    log_stale_degraded(
+                        source=f"adjustment:{payload.event_type.value}",
+                        target=f"FinancialReport:project={project_id},year={year}",
+                        error=f"FinancialReport is_stale 更新失败: {type(e).__name__}: {e}",
+                        context={"project_id": str(project_id), "year": year},
+                    )
+
                 # 标记附注 stale
                 await session.execute(
                     _sa.update(DisclosureNote)
@@ -956,6 +1223,8 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _mark_reports_stale_on_adjustment)
     event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _mark_reports_stale_on_adjustment)
     event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, _mark_reports_stale_on_adjustment)
+    event_bus.subscribe(EventType.ADJUSTMENT_APPROVED, _mark_reports_stale_on_adjustment)  # 任务 3.7
+    event_bus.subscribe(EventType.ADJUSTMENT_REVIEW_REVOKED, _mark_reports_stale_on_adjustment)
     logger.debug("Sprint 7 Task 7.2: stale cascade handlers registered")
 
     # ------------------------------------------------------------------
@@ -1016,6 +1285,8 @@ def register_event_handlers() -> None:
             "adjustment.created": "adjustment_created",
             "adjustment.updated": "adjustment_modified",
             "adjustment.deleted": "adjustment_deleted",
+            "adjustment.approved": "复核通过",
+            "adjustment.review_revoked": "撤回复核",
         }
         operation_type = op_map.get(payload.event_type.value if hasattr(payload.event_type, 'value') else str(payload.event_type), "unknown")
 
@@ -1039,6 +1310,8 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _record_tb_change_on_adjustment)
     event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _record_tb_change_on_adjustment)
     event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _record_tb_change_on_adjustment)
+    event_bus.subscribe(EventType.ADJUSTMENT_APPROVED, _record_tb_change_on_adjustment)
+    event_bus.subscribe(EventType.ADJUSTMENT_REVIEW_REVOKED, _record_tb_change_on_adjustment)
     logger.debug("Enterprise Linkage: TB change history handler registered")
 
     # ------------------------------------------------------------------
@@ -1191,8 +1464,14 @@ def register_event_handlers() -> None:
         row_code = extra.get("row_code", "")
         if row_code:
             uri = f"REPORT:{row_code}::"
+            # 🔴 原为 `payload.year or 2025`：对 2024 项目是错年份。EventBus 派发口已按项目
+            # 审计年度补齐 year；仍为 None = 项目无年度（或发布方传的不是真实项目 id，如
+            # report_config 模板级编辑），此时不猜年份，记 degraded 可见降级。
+            year = payload.year
+            if year is None:
+                _log_missing_year("formula_config_changed", payload, target=uri)
+                return
             try:
-                year = payload.year or 2025
                 result = await stale_engine.on_change(uri, payload.project_id, year)
                 # 漏标暴露：图已加载但该 source 无下游边（affected=0 且非降级），
                 # 多半是依赖图未随新公式重建 → 记录 degraded，不静默吞掉。
@@ -1220,7 +1499,12 @@ def register_event_handlers() -> None:
 
         extra = payload.extra or {}
         changed_wp_codes = extra.get("changed_wp_codes", [])
-        year = payload.year or 2025
+        # 🔴 原为 `payload.year or 2025`（错年份）。见 _stale_engine_on_formula_config_changed。
+        year = payload.year
+        if year is None:
+            if changed_wp_codes:
+                _log_missing_year("prefill_mapping_changed", payload, target=str(changed_wp_codes))
+            return
         for wp_code in changed_wp_codes:
             uri = f"WP:{wp_code}::预填充"
             try:
@@ -1247,7 +1531,12 @@ def register_event_handlers() -> None:
             return
         extra = payload.extra or {}
         affected_codes = extra.get("affected_account_codes", [])
-        year = payload.year or 2025
+        # 🔴 原为 `payload.year or 2025`（错年份）。见 _stale_engine_on_formula_config_changed。
+        year = payload.year
+        if year is None:
+            if affected_codes:
+                _log_missing_year("account_mapping_changed", payload, target=str(affected_codes))
+            return
         for code in affected_codes:
             uri = f"MAPPING:{code}::"
             try:
@@ -1516,11 +1805,29 @@ def register_event_handlers() -> None:
         )
 
     async def on_event_adjustment_approved(payload: EventPayload) -> None:
-        """ADJUSTMENT_BATCH_COMMITTED → 全部 DisclosureNote.is_stale=True (R2.1).
+        """ADJUSTMENT_APPROVED → 全部 DisclosureNote.is_stale=True.
 
-        语义：调整分录批量提交 — 试算表+报表已变化，附注下游视为陈旧。
-        实际订阅事件名：ADJUSTMENT_BATCH_COMMITTED（spec 设计名 ADJUSTMENT_APPROVED
-        在 EventType 中不存在，订阅最接近的语义事件）。
+        adj-formula-repair-and-approval-gate-wiring 任务 3.5:
+        改订阅 ADJUSTMENT_APPROVED（原错误订阅 ADJUSTMENT_BATCH_COMMITTED 名实不符）。
+        语义：调整分录审批通过 — 调整列+审定数已变化，附注下游视为陈旧。
+        """
+        await _mark_disclosure_notes_stale_for_project_year(
+            payload, source_event="ADJUSTMENT_APPROVED",
+        )
+
+    async def on_event_adjustment_review_revoked(payload: EventPayload) -> None:
+        """ADJUSTMENT_REVIEW_REVOKED → 全部 DisclosureNote.is_stale=True."""
+        await _mark_disclosure_notes_stale_for_project_year(
+            payload, source_event="ADJUSTMENT_REVIEW_REVOKED",
+        )
+
+    # adj-formula-repair-and-approval-gate-wiring 任务 3.6:
+    # 保留批量提交也标附注 stale 的行为（设计 §四.3），但用独立命名的 handler。
+    async def on_event_adjustment_batch_committed(payload: EventPayload) -> None:
+        """ADJUSTMENT_BATCH_COMMITTED → 全部 DisclosureNote.is_stale=True.
+
+        批量提交意味着一批草稿进入复核流程，附注编制者需要知道
+        「上游有在途变更」。行为保留、命名纠正（不再复用 approved 命名）。
         """
         await _mark_disclosure_notes_stale_for_project_year(
             payload, source_event="ADJUSTMENT_BATCH_COMMITTED",
@@ -1528,10 +1835,13 @@ def register_event_handlers() -> None:
 
     event_bus.subscribe(EventType.LEDGER_DATASET_ACTIVATED, on_event_ledger_activated)
     event_bus.subscribe(EventType.WORKPAPER_REVIEW_PASSED, on_event_workpaper_reviewed)
-    event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, on_event_adjustment_approved)
+    event_bus.subscribe(EventType.ADJUSTMENT_APPROVED, on_event_adjustment_approved)
+    event_bus.subscribe(EventType.ADJUSTMENT_REVIEW_REVOKED, on_event_adjustment_review_revoked)
+    event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, on_event_adjustment_batch_committed)
     logger.debug(
-        "Sprint 2 Task 2.5: 3 DisclosureNote stale event handlers registered "
-        "(LEDGER_DATASET_ACTIVATED / WORKPAPER_REVIEW_PASSED / ADJUSTMENT_BATCH_COMMITTED)"
+        "Sprint 2 Task 2.5 + adj-formula-repair: 5 DisclosureNote stale event handlers registered "
+        "(LEDGER_DATASET_ACTIVATED / WORKPAPER_REVIEW_PASSED / ADJUSTMENT_APPROVED / "
+        "ADJUSTMENT_REVIEW_REVOKED / ADJUSTMENT_BATCH_COMMITTED)"
     )
 
     # ------------------------------------------------------------------

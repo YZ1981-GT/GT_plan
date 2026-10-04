@@ -104,18 +104,38 @@ export function buildG9DisclosureAmountsFromDetailRows(
     closingAdjusted?: number
     openingBalance?: number
     closingBalance?: number
+    // 🔴 C-3 新增：权威模板列（28 列 A..AB）。旧四键保留为存量回退。
+    /** 模板 W 列：期末审定数 / 公允价值 */
+    closingAuditedFairValue?: number
+    /** 模板 J 列：期初审定数 / 公允价值 */
+    openingAuditedFairValue?: number
+    /** 行的区归属（替代已移除的 `isDesignated`） */
+    section?: string
+    /** 模板 A 列：类别 */
+    category?: string
   }>,
 ): G9DiscAmountMap {
   const out = emptyMap()
   for (const r of rows) {
-    const closing = parseNum(r.closingAdjusted ?? r.closingBalance)
-    const opening = parseNum(r.openingAdjusted ?? r.openingBalance)
-    if (r.isDesignated && (r.classification === 'FVTPL' || !r.classification)) {
+    // 🔴 C-3：期末/期初审定公允价值 = 模板 W / J 列；旧键留作存量回退
+    const closing = parseNum(
+      r.closingAuditedFairValue ?? r.closingAdjusted ?? r.closingBalance,
+    )
+    const opening = parseNum(
+      r.openingAuditedFairValue ?? r.openingAdjusted ?? r.openingBalance,
+    )
+    // 「指定 FVTPL」由**区归属**表达（模板 R25 区）；旧载荷回退读 isDesignated
+    const designated = r.section === 'designated_fvtpl'
+      || (r.isDesignated && (r.classification === 'FVTPL' || !r.classification))
+    if (designated) {
       out.designated.currentAmount += closing
       out.designated.priorAmount += opening
       continue
     }
-    const bucket = INSTRUMENT_TO_BUCKET[String(r.instrumentType ?? '').trim()]
+    // 🔴 C-3：工具种类走模板 **A 列 `category`**（旧 `instrumentType` 已移除）
+    const bucket = INSTRUMENT_TO_BUCKET[
+      String(r.category ?? r.instrumentType ?? '').trim()
+    ]
     if (!bucket) continue
     out[bucket].currentAmount += closing
     out[bucket].priorAmount += opening

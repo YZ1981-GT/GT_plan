@@ -141,9 +141,17 @@
             size="small"
             :disabled="!runtimeProjectId || !runtimeWpCode || loading || readonly"
             :loading="alignmentRefreshing"
-            @click="onRowNameAlignmentRefresh"
+            @click="onOpenRefreshSourceDialog"
           >
             <el-icon><Refresh /></el-icon> 刷新取数
+          </el-button>
+          <!-- 批量刷新（batch-refresh-workpaper-data spec Task 4） -->
+          <el-button
+            size="small"
+            :disabled="!runtimeProjectId || loading || readonly"
+            @click="batchRefreshVisible = true"
+          >
+            📋 批量刷新
           </el-button>
         </template>
         <template v-if="activeSheetName" #center>
@@ -297,6 +305,26 @@
          由「刷新取数」检测到 unmatched/ambiguous 行时经 eventBus 打开。 -->
     <GtRowNameAlignmentDialog />
 
+    <!-- 刷新取数来源选择弹窗（adopt-overwrite-and-refresh-source Task 10/11 方案 D）-->
+    <RefreshSourceDialog
+      v-model="refreshSourceDialogVisible"
+      :wp-id="wpId"
+      :project-id="runtimeProjectId ?? ''"
+      :entry-id="(activeComponentRef as any)?.syncEntryId ?? null"
+      :upstream-refresh="onRowNameAlignmentRefresh"
+      :reload="reload"
+    />
+
+    <!-- 批量刷新弹窗（batch-refresh-workpaper-data spec Task 4） -->
+    <BatchRefreshDialog
+      v-model:visible="batchRefreshVisible"
+      :project-id="runtimeProjectId ?? ''"
+      :current-wp-code="runtimeWpCode ?? ''"
+      :current-sheets="batchRefreshSheets"
+      :readonly="readonly"
+      @done="reload"
+    />
+
     <!-- 本底稿关联附件抽屉（工具栏「关联附件」打开；可编辑时支持解除关联）。 -->
     <WorkpaperAttachmentsDrawer
       v-model="attachmentsDrawerVisible"
@@ -349,6 +377,8 @@ import { isDisclosureSheetName } from './composables/disclosureSyncBar'
 import GtWpPreparationHeader from '@/components/workpaper/GtWpPreparationHeader.vue'
 import GtWorkpaperRuntimeHosts from '@/components/workpaper/GtWorkpaperRuntimeHosts.vue'
 import GtRowNameAlignmentDialog from '@/components/formula/GtRowNameAlignmentDialog.vue'
+import BatchRefreshDialog from '@/components/workpaper/shared/BatchRefreshDialog.vue'
+import RefreshSourceDialog from '@/components/workpaper/shared/RefreshSourceDialog.vue'
 import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
 import { useProjectStore } from '@/stores/project'
 import { subscribeInvalidation } from '@/services/acnr'
@@ -1015,6 +1045,13 @@ async function loadWholeExcelGrid(sheet?: string) {
 // 统一工具栏操作
 async function onExportTemplate() {
   if (!props.wpId) return
+  // 优先委托子组件的 sheet 级别导出（D4 等结构化底稿各 sheet 有专用 API）
+  const child = activeComponentRef.value
+  if (child && typeof child.handleExportTemplate === 'function') {
+    child.handleExportTemplate()
+    return
+  }
+  // 降级：通用底稿级别导出
   try {
     const resp = await http.get(`/api/workpapers/${props.wpId}/export-template`, {
       responseType: 'blob',
@@ -1181,6 +1218,22 @@ function openPageFormulaManager() {
 
 // ─── 行名对齐刷新（formula-row-name-alignment-confirmation Task 11）───────────
 const alignmentRefreshing = ref(false)
+/** 刷新取数来源选择弹窗（Task 10/11 方案 D）。 */
+const refreshSourceDialogVisible = ref(false)
+function onOpenRefreshSourceDialog(): void {
+  refreshSourceDialogVisible.value = true
+}
+
+// ─── 批量刷新弹窗 ──────────────────────────────────────────────────────
+const batchRefreshVisible = ref(false)
+const batchRefreshSheets = computed(() => {
+  const sheets = renderConfig.value?.sheets
+  if (!Array.isArray(sheets)) return []
+  return sheets.map((s: any) => ({
+    name: s.sheet_name || s.name || '',
+    wpCode: s.wp_code || s.sheet_code || '',
+  }))
+})
 
 /**
  * 「刷新取数」：收集当前 sheet 的对齐行（行名 + 科目前缀）→ 调 /row-name-alignment →
@@ -1226,15 +1279,10 @@ async function onRowNameAlignmentRefresh() {
     for (const w of wireRows) w.row_label = labelByKey.get(String(w.row_key)) ?? w.row_key
 
     if (data.has_pending) {
-      eventBus.emit('open-row-name-alignment', {
-        wpId: props.wpId,
-        projectId: runtimeProjectId.value,
-        year: preparationYear.value,
-        wpCode: runtimeWpCode.value,
-        sheetCode: extractSheetIndexNo(activeSheetName.value) || (renderConfig.value?.wp_code ?? ''),
-        datasetId: renderConfig.value?.dataset_id ?? null,
-        rows: wireRows,
-      })
+      // 静默按现有规则刷新数据，不弹行名对齐确认弹窗
+      // 用户若需查看/编辑映射规则，通过「公式管理」入口操作
+      ElMessage.success('正在刷新取数')
+      reload()
     } else {
       ElMessage.success('全部行名已匹配，正在刷新取数')
       reload()

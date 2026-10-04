@@ -283,9 +283,18 @@ def test_every_slice_passes_the_json_nominated_validator(slice_rel: str) -> None
         "`html_counterpart_verdict` 二值结论）真的落进校验器的判据，不是「有调用喂过这份"
         " slice」。G1 收口（SR-3 蕴含式）之后 D/F 两份 slice 确实都被喂过校验器了，但校验器对"
         " Task 48 之前的 slice 不施加那两个字段（`enforce_task48` 由任务号推导），欠账依旧无人"
-        "盯着 ⇒ 条件 ③ **未**兑现，本条 xfail 仍成立（实测 2026-08-31 仍 XFAIL 而非 XPASS）。"
+        "盯着 ⇒ 条件 ③ **未**兑现，本条 xfail 仍成立（实测 2026-08-31 仍 XFAIL 而非 XPASS；"
+        "2026-06-01 复测仍 XFAIL，现算 7 条哑登记）。"
         "届时本条 XPASS(strict) 打红，必须回来删标记。"
         " 禁止改用 skip（skip 记为通过 = fail-open）。"
+        " 🔴 条件 ① 现在已经**数据就绪**（2026-06-01 实测）：D slice 那 7 条的 "
+        "`html_counterpart_verdict` 全部已填 `exists`、`capability` 全部已改裁为 null，"
+        "即它们登记的那个 AP-1 违规**在磁盘上已不存在** ⇒ 这 7 条登记已是纯粹的僵尸行，"
+        "范式 owner / Task 46 只需把它们从 known_debt_inventory 删掉并在 Task 46 正文说明"
+        "「改裁已替代欠账」即可解除本条，不需要等任何新功能。"
+        " 本次盘点**刻意不代为删除**：范式 JSON 与两份 slice 是本文件的只读约束（并发会话在改），"
+        "且这 7 条的 owner 明写为「Task 46 D 循环回填（并发会话进行中）」—— 由第三方改别人"
+        "名下的治理数据来让判据转绿，正是本文件要拦的形态。"
     ),
 )
 def test_every_registered_debt_entry_still_has_a_carrier() -> None:

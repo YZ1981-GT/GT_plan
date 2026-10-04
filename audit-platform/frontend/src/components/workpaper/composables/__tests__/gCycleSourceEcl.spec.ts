@@ -23,7 +23,8 @@ describe('gCycleSourceEcl', () => {
     expect(resolveG14EclRowKey('D2')).toBe('ar')
     expect(resolveG14EclRowKey('ar')).toBe('ar')
     expect(resolveG14EclRowKey('wp:D1-1')).toBe('notes')
-    expect(resolveG14EclRowKey('D6-1')).toBe('ca')
+    // 🔴 C-9：D6（合同资产）的 ECL 落模板 R19「其他」行 —— 模板无合同资产专行
+    expect(resolveG14EclRowKey('D6-1')).toBe('other')
     expect(resolveG14EclRowKey('')).toBeNull()
   })
 

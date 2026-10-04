@@ -1,0 +1,91 @@
+{
+  "contract_id": "k2.adjudication_derived",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "json_field_id"
+  ],
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "byte_exact_comparison_required": true,
+    "derivation": {
+      "a_column_source_refs": {
+        "A10": "='明细表K2-2'!A14",
+        "A11": "='明细表K2-2'!A15",
+        "A12": "='明细表K2-2'!A16",
+        "A13": "='明细表K2-2'!A17",
+        "A7": "='明细表K2-2'!A11",
+        "A8": "='明细表K2-2'!A12",
+        "A9": "='明细表K2-2'!A13"
+      },
+      "derived_ratio": "R7:R13 的 A/B/C/D/F 列引上游；E/I/J/L 列本表算术；K/M 列 IF 比率 ⇒ 全区 0 个手工输入位",
+      "editable_labels": false,
+      "mode": "derived",
+      "why_labels_not_editable": "🔴 数据区 **A 列（项目名称）本身就是公式** —— `R7:R13` 的 A 列逐行是 `='明细表K2-2'!A{11..17}`。行名由上游明细表决定，本表改不了 ⇒ `editable_labels` 必须为 false。标 true 会让 adapter 把用户改的行名写回，下次打开被上游公式覆盖，用户以为保存失败。"
+    },
+    "draft_target_entry_id": "xlsx/gt-k2-other-current-assets",
+    "entry_id": null,
+    "footer_shape": {
+      "blank_row_before_footer": 14,
+      "footer": {
+        "A15": "合计",
+        "B15": "=SUM(B7:B14)"
+      },
+      "footer_row": 15,
+      "kc12_verdict": "normal_not_defect",
+      "row_14_is_blank": true,
+      "why_normal": "🔴 `R15` 的 `=SUM(B7:B14)` 把空行 `R14` 纳入区间属 KC-12 的**正常形态不是缺陷** —— 空行对 SUM 无影响，且留空行是为后续插行预留。把它当缺陷去「修」反而会让插行落到 SUM 区间外。"
+    },
+    "must_not_be_canary": true,
+    "newline_cells": {
+      "J5": "本期未审数与上期\n未审数的比较",
+      "L5": "本期审定数与上期\n审定数的比较"
+    },
+    "oo_counterpart_status": "present_but_no_input_cells",
+    "orphan_per_row_keys": {
+      "criterion": "per-row 键的 rowId 集合 SHALL ⊆ 主键（`K2-1-rows`）载荷的 rowId 集合",
+      "deletion_policy": "only_blank_valued",
+      "implementation": "audit-platform/frontend/src/components/workpaper/composables/shared/dynamicAdjudicationRows.ts :: scanOrphanRowKeys()",
+      "why_only_blank": "🔴 只删**值为空**的孤儿键。孤儿但有值的一律保留并记进 `orphanKeysWithValue` 交人工确认 —— 静默删除有值的键是不可逆数据丢失。",
+      "wired_at": "audit-platform/frontend/src/components/workpaper/composables/useK2Adjudication.ts :: pruneOrphanRowKeys()（loadRowDefs 内调用）"
+    },
+    "why_byte_exact": "🔴 `R5` 的表头含**单元格内换行符**（现算 2 格：J5 / L5）⇒ 三边比对必须**逐格字节**：禁 `strip()`、禁全半角归一、禁把 `\\n` 折成空格。归一化后 `本期未审数与上期\\n未审数的比较` 与 `本期未审数与上期未审数的比较` 会被判相等，掩盖模板与 HTML 表头不一致。",
+    "why_candidate_not_reviewed": "🔴 BP-1 未交付（无 approved authority model / reviewed per-entry contract / non-null definition bundle）。本文件是 lane 1 Task 20 的**纯派生标注草案**。",
+    "why_entry_id_is_null": "🔴 candidate 契约的 `review.entry_id` **必须为 null**（与 k1/k8~k13 各草案同口径）—— `test_task53_k_cycle_migration.py` 按 `review.entry_id` 判归属且不区分 candidate/reviewed。目标 entry 记在 `draft_target_entry_id`。",
+    "why_not_canary": "🔴 三条硬伤（与 foundation canary 选型的否决理由同源）：①TB 行定义非业务数据 ②有孤儿 per-row 键 ③100% 派生表。派生表做 canary 会让 roundtrip 判据恒真 —— 写什么都被公式覆盖，测不出 adapter 是否真的在工作。",
+    "why_writeback_is_noop": "🔴 OO 侧**无输入位**：数据区每一格都是公式（连行名都是）⇒ 回写方向空转。HTML→OO 没有值可写、OO→HTML 读到的只是上游派生结果。",
+    "writeback_direction_is_noop": true
+  },
+  "review_status": "candidate",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "0.1.0-draft",
+  "sheets": [
+    {
+      "excel_name": "审定表K2-1",
+      "locator": {
+        "anchor": "sheet_name_exact_match"
+      },
+      "sheet_geometry": {
+        "max_column": 16,
+        "max_row": 23,
+        "merged_ranges": [
+          "A1:N1",
+          "A2:N2",
+          "A5:A6",
+          "B5:E5",
+          "F17:H17",
+          "F5:I5",
+          "J5:K5",
+          "L5:M5",
+          "N5:N6"
+        ]
+      },
+      "sheet_key": "k201-derived",
+      "tables": [],
+      "why_no_tables": "🔴 全区派生、无输入位 ⇒ 不声明可回写表。声明 table 会让 adapter 以为有行可写，把派生格当用户值覆盖。"
+    }
+  ],
+  "template": {
+    "relative_path": "K/K2 其他流动资产.xlsx",
+    "template_sha256": "86740bb85e21ab85e85fefe9e9cd55d9e2267da406f8e3329096e21503919894"
+  }
+}

@@ -104,11 +104,11 @@ class ScenarioSubstitutionError(EvidenceError):
 class ScenarioKind(str, Enum):
     """`working_paper_entry_evidence_scenario.scenario_kind` 的取值域。
 
-    🔴 与 V151 的 `ck_wpees_scenario_kind` **同域**，一个不多一个不少：
+    🔴 与 V151（经 **V165** 扩域）的 `ck_wpees_scenario_kind` **同域**，一个不多一个不少：
 
         CHECK (scenario_kind IN
             ('standard', 'download_only', 'recovery_reject', 'recovery_claim',
-             'close_capture'))
+             'close_capture', 'authorization_reject'))
 
     第一版这里写的是语义分类（direction/identity/merge/…12 个值），真库插入直接
     `CheckViolationError` —— 而离线守卫全绿，因为没有任何判据把这个字段与 DDL 对上。
@@ -123,6 +123,14 @@ class ScenarioKind(str, Enum):
     recovery_reject = "recovery_reject"
     recovery_claim = "recovery_claim"
     close_capture = "close_capture"
+    #: 授权层直接拒绝、**三实体恒零**且不涉及 recovery case 的场景（V165 新增）。
+    #:
+    #: 与 `download_only` / `recovery_reject` 的区别只有一条但是关键：那两类的
+    #: `ck_wpees_download_only_zero_entities` 在三实体为零之外**还要求**
+    #: `recovery_case_ids >= 1`（它们都在终结/拒绝某个 case），而本类没有 case ——
+    #: quarantined incoming 在 sealing 阶段就被拒，生产上只留 rejected delivery +
+    #: quarantined artifact，operation/application/case 一个都不建。
+    authorization_reject = "authorization_reject"
 
 
 class ScenarioFamily(str, Enum):
@@ -173,6 +181,13 @@ class RequiredScenario:
             return ScenarioKind.recovery_reject
         if self.expects_recovery_case:
             return ScenarioKind.recovery_claim
+        # 🔴 V165：零 application 且不涉及 recovery case ⇒ authorization_reject。
+        # 必须排在上面三条**之后**：带 case 的零-application 场景归 recovery_reject、
+        # 三实体全零的归 download_only，它们的库层约束各自还要求 case ≥ 1。
+        # 排在 close 之前：kind 的唯一作用是选 V151 的 entity 约束分支，而「永不创建
+        # application」决定的是 entity 形状，比 close 语义更靠前。
+        if not self.expects_application:
+            return ScenarioKind.authorization_reject
         if self.family is ScenarioFamily.close:
             return ScenarioKind.close_capture
         return ScenarioKind.standard
@@ -183,11 +198,25 @@ class RequiredScenario:
 
         `standard` / `recovery_claim` / `close_capture` 三类在 `passed` 时被
         `ck_wpees_standard_requires_entities` 要求 `operation_ids>=1 AND
-        application_ids>=1`。因此「零 application 且不属于 download_only/recovery_reject」
-        的场景在当前 schema 下**无法**记成 passed —— 见
-        :data:`SCHEMA_UNREPRESENTABLE_SCENARIOS`。
+        application_ids>=1`；`download_only` / `recovery_reject` / `authorization_reject`
+        三类被该约束豁免。
+
+        🔴 **V165 之后本属性对全部已声明场景恒 True**，
+        :data:`SCHEMA_UNREPRESENTABLE_SCENARIOS` 因此为空：「零 application」的场景现在
+        必然落在被豁免的三类之一（见 :attr:`kind` 的推导）。
+
+        保留本属性**不是**冗余 —— 它是反向锁的判据源：谁将来新增一个「零 application 却
+        落进 standard/recovery_claim/close_capture」的组合，本属性立刻返回 False，而
+        `test_evidence_schema_representability.py` 的
+        `test_unrepresentable_scenarios_are_registered_not_silent` 会直接打红，要求把它
+        登记进 :data:`SCHEMA_UNREPRESENTABLE_SCENARIOS` 归因 —— 而不是等真库插入时才炸
+        `CheckViolationError`。
         """
-        if self.kind in (ScenarioKind.download_only, ScenarioKind.recovery_reject):
+        if self.kind in (
+            ScenarioKind.download_only,
+            ScenarioKind.recovery_reject,
+            ScenarioKind.authorization_reject,
+        ):
             return True
         return self.expects_application
 
@@ -368,26 +397,30 @@ NON_REPLACEABLE_SCENARIOS: Final[frozenset[str]] = frozenset(
     in (ScenarioFamily.close, ScenarioFamily.recovery, ScenarioFamily.authorization)
 )
 
-#: 🔴 **当前 V151 schema 无法以 `result='passed'` 表达**的必需场景 + 原因 + owner。
+#: 🔴 **当前 schema 无法以 `result='passed'` 表达**的必需场景 + 原因 + owner。
 #:
-#: 这不是豁免：这些场景仍然在 required set 里，仍然必须跑，且它们的 entry **不会**被判
-#: verified —— :class:`EvidenceRecomputer` 对它们记
-#: :attr:`EvidenceDefect.scenario_kind_unrepresentable`，entry 保持未验收。登记在这里
-#: 只是为了让「为什么永远差这一条」可归因，而不是每次重算都被当成新缺陷去查。
+#: 这不是豁免：登记在此的场景仍然在 required set 里，仍然必须跑，但它们的 entry **不会**
+#: 被判 verified —— :class:`EvidenceRecomputer` 对它们记
+#: :attr:`EvidenceDefect.scenario_kind_unrepresentable`，entry 保持未验收。登记只是为了让
+#: 「为什么永远差这一条」可归因，而不是每次重算都被当成新缺陷去查。
 #:
-#: 具体冲突：`ck_wpees_standard_requires_entities` 要求 `standard/recovery_claim/
-#: close_capture` 的 passed 行必须 `application_ids>=1`，而 AC 5.6 明文规定 quarantined
-#: incoming **永不**创建 application。两条同时成立时该行只能落 `failed/unverifiable`。
-#: 解法属于 evidence schema 的 owner（Task 9 建表 / Task 39 harness / Task 70 全量刷新），
-#: 例如给 V151 增加一个 `authorization_reject` kind。
-SCHEMA_UNREPRESENTABLE_SCENARIOS: Final[Mapping[str, str]] = {
-    "quarantined_rejects_application_and_engine": (
-        "AC 5.6 要求 quarantined incoming 永不创建 application（application_ids 恒空），"
-        "而 V151 的 ck_wpees_standard_requires_entities 要求非 download_only/"
-        "recovery_reject 的 passed 行 application_ids>=1；两者当前不可同时满足。"
-        "owner: evidence schema（V151 需要一个 authorization_reject kind）"
-    ),
-}
+#: ── 2026-09-26：**本表已清空（V165）** ────────────────────────────────────
+#: 原唯一条目 `quarantined_rejects_application_and_engine` 的冲突是：
+#: `ck_wpees_standard_requires_entities` 要求 `standard/recovery_claim/close_capture`
+#: 的 passed 行必须 `application_ids>=1`，而 AC 5.6 明文规定 quarantined incoming
+#: **永不**创建 application ⇒ 该行只能落 `failed/unverifiable`。
+#:
+#: V165 按本条欠账当年自己开的方子修复：给 kind 域加
+#: :attr:`ScenarioKind.authorization_reject`，让 `ck_wpees_standard_requires_entities`
+#: 豁免它，并**另加**一条 `ck_wpees_authorization_reject_zero_entities` 正面要求三实体
+#: 恒零（只豁免不加零约束，就等于允许该场景带伪造实体记 passed）。
+#:
+#: 🔴 空表**不等于**这条机制可以删：它是反向锁。谁将来新增一个「零 application 却落进
+#: standard/recovery_claim/close_capture」的场景组合，:attr:`RequiredScenario.
+#: schema_representable_as_passed` 会返回 False，必须在此登记归因，而不是让真库插入时
+#: 才炸 `CheckViolationError`。该不变量由
+#: `tests/workpaper_sync/test_evidence_schema_representability.py` 逐条锁死。
+SCHEMA_UNREPRESENTABLE_SCENARIOS: Final[Mapping[str, str]] = {}
 
 #: 允许把字段级两场景替换掉的 authority model（**枚举**，不是自由文本）。
 SUBSTITUTING_AUTHORITY_MODELS: Final[frozenset[AuthorityModel]] = frozenset(

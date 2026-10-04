@@ -1,0 +1,95 @@
+{
+  "captured_at": "2026-09-25T00:13:41.953Z",
+  "summary": {
+    "n": 5,
+    "applied_store_ok": 4,
+    "applied_store_miss": 1,
+    "no_safe_target": 0,
+    "type_fail": 0,
+    "op_error": 0,
+    "op_timeout": 0,
+    "enter_fail": 0
+  },
+  "results": [
+    {
+      "code": "D4-3",
+      "status": "applied_store_ok",
+      "target_ref": "A13",
+      "old_value": "g5d43680692",
+      "new_value": "L2MARK-D4-3-2wi7",
+      "operation_id": "0c33cdea-ab7b-4af4-a36c-d1f226690ea6",
+      "state_trail": [
+        "created",
+        "application_bound",
+        "rematerializing",
+        "applied"
+      ],
+      "store_got": "L2MARK-D4-3-2wi7",
+      "sample_field": "other_revenue_detail_rows/GTROW-D43-0013/item"
+    },
+    {
+      "code": "D4-10",
+      "status": "applied_store_ok",
+      "target_ref": "B13",
+      "old_value": "大额客户一",
+      "new_value": "L2MARK-D4-10-481q",
+      "operation_id": "f3bb7679-9e4c-48d4-8cfe-11110de1deb4",
+      "state_trail": [
+        "created",
+        "application_bound",
+        "rematerializing",
+        "applied"
+      ],
+      "store_got": "L2MARK-D4-10-481q",
+      "sample_field": "d4_10_rows/GTROW-D410-0013/customer"
+    },
+    {
+      "code": "D4-22",
+      "status": "applied_store_miss",
+      "target_ref": "A9",
+      "old_value": "年度预算",
+      "new_value": "L2MARK-D4-22-9sla",
+      "operation_id": "52200aa9-46cd-4712-b1f5-16a52125d1cc",
+      "state_trail": [
+        "created",
+        "application_bound",
+        "rematerializing",
+        "applied"
+      ],
+      "store_got": null,
+      "sample_field": "key_indicator_rows/GTROW-D422-0012/metric_name"
+    },
+    {
+      "code": "D4-26",
+      "status": "applied_store_ok",
+      "target_ref": "A23",
+      "old_value": "境外测试客户甲",
+      "new_value": "L2MARK-D4-26-druz",
+      "operation_id": "2df2bb74-c3bd-482a-91b2-da33f64896e9",
+      "state_trail": [
+        "created",
+        "application_bound",
+        "rematerializing",
+        "applied"
+      ],
+      "store_got": "L2MARK-D4-26-druz",
+      "sample_field": "overseas_sales_rows/D4-26-mu88u8xn-w2zt/customer_name"
+    },
+    {
+      "code": "D4-32",
+      "status": "applied_store_ok",
+      "target_ref": "A18",
+      "old_value": "……",
+      "new_value": "L2MARK-D4-32-j26r",
+      "operation_id": "a87cd73b-9cd5-4017-886d-84e911d16971",
+      "state_trail": [
+        "created",
+        "application_bound",
+        "rematerializing",
+        "applied"
+      ],
+      "store_got": "L2MARK-D4-32-j26r",
+      "sample_field": "d4_32_groups/GTROW-D432-0018/group_label"
+    }
+  ]
+}

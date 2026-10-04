@@ -221,6 +221,7 @@ import {
   K6_SOE_LIABILITY_NOTE_SECTION,
 } from '../../composables/k6NoteSectionMap'
 import { useK6NoteBlocks } from '../../composables/useK6NoteBlocks'
+import { newRowIdentity } from '../../composables/shared/rowIdentity'
 
 const K6_ACCOUNT_CODE = '1481'
 
@@ -296,7 +297,7 @@ function initDefaultAssetTable(): void {
   const categories = ['固定资产', '在建工程', '无形资产', '长期股权投资', '其他']
   assetSummary.value = [
     ...categories.map((cat, idx) => ({
-      id: `soe-asset-${idx}`,
+      id: newRowIdentity('soe-asset'),
       category: cat,
       bookValue: 0,
       impairment: 0,
@@ -328,7 +329,7 @@ function initDefaultLiabTable(): void {
   const categories = ['应付账款', '其他应付款', '应付职工薪酬', '其他']
   liabilitySummary.value = [
     ...categories.map((cat, idx) => ({
-      id: `soe-liab-${idx}`,
+      id: newRowIdentity('soe-liab'),
       category: cat,
       openingBalance: 0,
       periodChange: 0,

@@ -349,14 +349,37 @@ class TestPropagationOrderInApply:
         order = self._call_order(M.apply_plan_zip_with_report)
         assert "_apply_workbook_propagation" in order, order
         assert "patch_sheet_xml_indexed" in order, order
-        assert order.index("_apply_workbook_propagation") < order.index(
+        # 🔴 用**最后**一次传播而不是第一次：`apply_plan_zip_with_report` 现在有两支
+        #    （删行 / 插行），各自调一次传播。只看第一次的话另一支排到写格之后也是绿的。
+        last_propagation = max(
+            i for i, name in enumerate(order) if name == "_apply_workbook_propagation"
+        )
+        assert last_propagation < order.index(
             "patch_sheet_xml_indexed"
         ), f"传播排在写格之后 —— 写格的新字节会进入传播输入，对账口径失真：{order}"
 
     def test_propagation_follows_row_shift(self) -> None:
-        """AST：传播在 `shift_sheet_rows` 之后（传播的行号基于位移后口径）。"""
+        """AST：**每一支**里传播都排在该支的行变更之后（传播的行号基于变更后口径）。
+
+        🔴 原判据是 `order.index("shift_sheet_rows") < order.index("_apply_workbook_propagation")`
+        —— 取的都是**首次**出现。spec workpaper-sync-row-deletion-multi-region-propagation
+        给删行支也接上了传播声明，而删行支在源码里排在插行支**之前** ⇒ 首个传播调用属于
+        删行支（行号小于 `shift_sheet_rows`）⇒ 判据当场打红，而两支各自的顺序其实都对。
+
+        改成钉住**过滤后的整个序列**：这比原判据强（两支的顺序都被检查），且任何一支把
+        传播提到行变更之前都会立刻打红。
+        """
         order = self._call_order(M.apply_plan_zip_with_report)
-        assert "shift_sheet_rows" in order, order
-        assert order.index("shift_sheet_rows") < order.index(
-            "_apply_workbook_propagation"
-        ), order
+        watched = ("shrink_sheet_rows", "shift_sheet_rows", "_apply_workbook_propagation")
+        seq = [name for name in order if name in watched]
+        assert seq == [
+            # 删行支：先物理删行，再按声明传播
+            "shrink_sheet_rows",
+            "_apply_workbook_propagation",
+            # 插行支：先物理插行，再按声明传播
+            "shift_sheet_rows",
+            "_apply_workbook_propagation",
+        ], (
+            f"行变更与传播的相对顺序变了：{seq}。两支各自都必须是「先改行、后传播」——"
+            "传播的行号基于变更后口径，反过来就是拿旧行号去对账"
+        )

@@ -190,27 +190,28 @@ describe('G8 跨表勾稽辅助', () => {
     expect(s).toContain('Level3 1')
   })
 
-  it('pushG8FvToDetail 回写层次与审定FV', () => {
+  // 🔴 C-8（spec g-cycle-single-region-detail-lanes）：`pushG8FvToDetail` 已停用。
+  //    层次 / 数量 / 单价 / 公允价值合计 / 估值方法的权威源就是**本表 G8-4**，
+  //    而 `明细表G8-2` 按权威模板重构后（23 列 A..W）没有这五列 ⇒ 回写会造第二真源。
+  //    与 G9 的 `pushG9FvToDetail`、G10 的 `pushG10FvToDetail` 同族错误，同批处置。
+  it('pushG8FvToDetail 已停用：恒 0 且不写 store（方向错）', () => {
+    const before = JSON.stringify([{ rowId: 'd1', investeeName: '测试公司' }])
     const map = new Map<string, ChecklistResponse>([
       ['G8-detail-rows', {
         item_id: 'G8-detail-rows',
-        remark: JSON.stringify([{ rowId: 'd1', investeeName: '测试公司', fairValueLevel: 'Level1' }]),
+        remark: before,
         conclusion: null,
       } as ChecklistResponse],
     ])
     const saves: Array<{ id: string; remark?: string | null }> = []
     const n = pushG8FvToDetail(
       map,
-      (id, d) => {
-        saves.push({ id, remark: d.remark })
-        map.set(id, { item_id: id, remark: d.remark ?? null, conclusion: null } as ChecklistResponse)
-      },
+      (id, d) => { saves.push({ id, remark: d.remark }) },
       [enrichG8FairValueRow(baseRow({ fairValueLevel: 'Level3', closingAuditedQty: 10, closingAuditedPrice: 5 }))],
     )
-    expect(n).toBe(1)
-    const saved = JSON.parse(saves[0].remark!)
-    expect(saved[0].fairValueLevel).toBe('Level3')
-    expect(saved[0].fairValueTotal).toBe(50)
+    expect(n).toBe(0)
+    expect(saves).toEqual([])
+    expect(map.get('G8-detail-rows')?.remark).toBe(before)
   })
 
   it('pushG8FvToDesignation 同步层次到 G8-5', () => {
@@ -270,8 +271,8 @@ describe('useG8FairValueTest 联动', () => {
       isReadonly: ref(false),
     })
     expect(fv.hasLevelMismatch.value).toBe(true)
-    // 回写 G8-2 明细 + G8-5 指定表各 1
-    expect(fv.pushToDetail()).toBe(2)
+    // 🔴 C-8：只同步 G8-5 指定表 1 行 —— 往 G8-2 的回写已停用（恒 0，方向错）
+    expect(fv.pushToDetail()).toBe(1)
     // 差异 200 / 未审 1000 = 20% → hard
     expect(fv.diffWarningLevel.value).toBe('hard')
     expect(fv.diffRatioPct.value).toBe(20)

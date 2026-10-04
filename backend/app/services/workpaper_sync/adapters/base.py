@@ -606,7 +606,25 @@ class WorkpaperSyncAdapter(Protocol):
     def extract(self, *, artifact: Path, contract: SyncContract) -> Projection: ...
 
     def verify_unmanaged_regions(
-        self, *, before: Path, after: Path, contract: SyncContract
+        self,
+        *,
+        before: Path,
+        after: Path,
+        contract: SyncContract,
+        # 🔴 位移感知形参：编排方（`ContentMutationService._stage_cpu_segment_scoped`）
+        # **无条件**把 materialize 冻结下来的位移声明一并递过来，因此实现者**必须**能
+        # 接住这四个 keyword —— 只照 `before/after/contract` 写的 adapter 会在第一次
+        # 真实 commit 上 `TypeError`。会用它们的实现（`ExcelSyncAdapter`）据此把「受管
+        # 区域按契约声明位移」与「未声明的漂移」区分开；不会位移的载体（JSON/Word 正文）
+        # 接住后忽略即可，语义上等于 `None`（= 位移就是漂移）。
+        #
+        # 默认值与 `ExcelSyncAdapter.verify_unmanaged_regions` 逐一对齐：缺省时行为与
+        # 引入位移感知之前**逐字节相同**。类型留 `Any` 同样是与真实实现对齐 —— 声明成
+        # `RowShiftPlan` 会让 adapters.base 反向依赖 excel 侧的位移模块。
+        row_shift: Any = None,
+        total_formula_rows: Any = (),
+        propagation: Any = None,
+        per_table_shift: Any = None,
     ) -> UnmanagedRegionReport: ...
 
 

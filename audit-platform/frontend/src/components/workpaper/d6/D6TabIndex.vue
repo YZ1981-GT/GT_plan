@@ -5,7 +5,7 @@
 import { computed, inject, ref, onMounted, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
-import { D6_INDEX_ROWS, resolveD6SheetLabel } from '../composables/d6SheetLabels'
+import { D6_INDEX_ROWS, resolveD6SheetLabel, isD6SheetComplete } from '../composables/d6SheetLabels'
 import { loadCycleWorkpaperCards, type CycleWpCard } from '@/services/cycleDirectory'
 
 const D6PreparationHandbookDialog = defineAsyncComponent(() => import('./D6PreparationHandbookDialog.vue'))
@@ -25,42 +25,9 @@ const indexRows = computed(() =>
   })),
 )
 
-function hasJsonRows(m: Map<string, any>, key: string): boolean {
-  const raw = m.get(key)?.remark
-  if (!raw) return false
-  try {
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) && parsed.length > 0
-  } catch {
-    return false
-  }
-}
-
-function isSheetComplete(code: string, m: Map<string, any>): boolean {
-  switch (code) {
-    case 'D6A':
-      return [...m.keys()].some(k => k.startsWith('D6-proc-'))
-    case 'D6-1':
-      return [...m.keys()].some(k => k.startsWith('D6-1-adj-'))
-    case 'D6-2':
-      return hasJsonRows(m, 'D6-2-rows')
-    case 'D6-3':
-      return hasJsonRows(m, 'D6-3-rows')
-    case 'D6-4':
-      return hasJsonRows(m, 'D6-4-rows')
-    case 'D6-5':
-      return hasJsonRows(m, 'D6-5-rows')
-    case 'D6-6':
-      return hasJsonRows(m, 'D6-6-rows')
-    case 'D6-8':
-      return hasJsonRows(m, 'D6-8-rows')
-    case 'D6-附注上市':
-    case 'D6-附注国企':
-      return [...m.keys()].some(k => k.startsWith('D6-note-'))
-    default:
-      return false
-  }
-}
+// 完成度判定已提取为纯函数 isD6SheetComplete（d6SheetLabels.ts），供判据直接驱动。
+// 模板里 <template #default="{ row }"> 处仍以 isSheetComplete 名字调用，此处做本地别名。
+const isSheetComplete = isD6SheetComplete
 
 const applicableRows = computed(() => indexRows.value.filter(r => r.applicable))
 

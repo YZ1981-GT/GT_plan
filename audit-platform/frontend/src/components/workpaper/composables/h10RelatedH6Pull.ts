@@ -56,18 +56,12 @@ export async function pullH6ClearingNetForH10(projectId: string): Promise<H6Clea
   try {
     const res = await api.get(`/api/workpapers/${h6WpId}/checklist-responses`, { _silent: true } as any)
     const list: any[] = Array.isArray(res) ? res : (res?.data ?? [])
-    const keys = ['H6-2-rows', 'H6-detail-rows', 'H6-clearing-rows']
-    let rows: any[] = []
-    for (const key of keys) {
-      const item = list.find((r) => r?.item_id === key)
-      const parsed = parseRemark(item?.remark)
-      if (Array.isArray(parsed) && parsed.length) {
-        rows = parsed
-        break
-      }
-    }
-    if (!rows.length) {
-      return { status: 'empty', message: 'H6 清理明细为空', h6WpId, netGainLoss: null, rowCount: 0 }
+    // 🔴 BP-12 修复：三键回退链 → 单一权威键 + fail-loud
+    const AUTHORITATIVE_KEY = 'H6-2-rows'
+    const item = list.find((r) => r?.item_id === AUTHORITATIVE_KEY)
+    const rows = parseRemark(item?.remark)
+    if (!Array.isArray(rows) || !rows.length) {
+      return { status: 'empty', message: `H6 主表键 ${AUTHORITATIVE_KEY} 未找到或为空`, h6WpId, netGainLoss: null, rowCount: 0 }
     }
     const netGainLoss = rows.reduce((s, r) => s + rowGain(r), 0)
     return {

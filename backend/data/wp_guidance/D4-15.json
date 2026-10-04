@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-15",
+  "title": "D4-15 营业收入完整性检查表 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "验证营业收入的「完整性」认定：所有应记录的营业收入均已记录。测试方向为发货单→发票→记账凭证（从业务源头出发追溯到账），与 D4-14 发生测试方向相反。",
+      "source_refs": []
+    },
+    {
+      "key": "materials",
+      "title": "二、样本选取",
+      "content": "从发货单/出库单清单选取样本（非从账簿出发），在报告期内选择重要时期，选大额或异常项目（完整性评估为高风险时采用抽样）。每行3个维度各5列：发货单/发票/记账凭证的日期/编号/品名/数量/金额。",
+      "source_refs": []
+    },
+    {
+      "key": "formulas",
+      "title": "三、一致性判定",
+      "content": "「核核信息是否一致」列：三维度品名、数量、金额完全一致填√，存在差异填×并在备注说明。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 已发货但未开票/未入账：典型的收入遗漏（完整性缺陷）。\n2. 期末大额发货但次年才确认收入：关注截止性（联查 D4-18）。\n3. 测试方向为发货→发票→凭证，重点发现「漏记收入」而非「虚记收入」。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "2cce9b5996bb7d3c738a08036c2ffc1f848eb1e291c4ccd3b4c039f858c2a59b",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "b8042db92f3531430001198b943892f3733c0d8a4745ac87d4bb07cdf42d4857"
+  }
+}

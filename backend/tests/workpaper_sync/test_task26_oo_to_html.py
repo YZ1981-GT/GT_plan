@@ -1429,6 +1429,32 @@ def _imported_and_called(module: object) -> tuple[set[str], set[str]]:
     return imported, called
 
 
+#: 「无冲突发布分支」的源码锚点。G4-0d 引入 room apply 锁后这条分支被拆成
+#: `_apply_settled`（决策 + 取锁）+ `_apply_settled_locked`（锁内 commit），于是只看
+#: `_apply_settled` 的形态判据会**空转**：`merge.merged` / `BusinessMutation` /
+#: `CONFLICT_RESOLUTION` 全都搬到了后者，前者查不到 ⇒ 「发布分支不得直接读
+#: merge.merged」这类判据在拆分后恒真（假绿），而另两条直接 ValueError/AssertionError。
+#: 因此判据锚点取**两段源码之和**：拆成几段都不影响，只要这条分支整体上仍然合规。
+_SETTLED_BRANCH_METHODS: tuple[str, ...] = ("_apply_settled", "_apply_settled_locked")
+
+
+def _settled_branch_ast() -> ast.Module:
+    """把发布分支的全部方法源码拼成一棵可 walk 的树。
+
+    拼接前逐段 `dedent`，并确认每段都真的存在 —— 方法改名后必须让判据**红**，
+    而不是悄悄少查一段。
+    """
+    chunks: list[str] = []
+    for name in _SETTLED_BRANCH_METHODS:
+        method = getattr(OH.OoToHtmlCoordinator, name, None)
+        assert method is not None, (
+            f"`OoToHtmlCoordinator.{name}` 不存在 —— 发布分支被改名/拆分了，"
+            "形态判据的锚点必须同步更新，否则这几条判据会变成空转"
+        )
+        chunks.append(textwrap.dedent(inspect.getsource(method)))
+    return ast.parse("\n".join(chunks))
+
+
 class TestManualAdjudicationIsWired:
     """带裁决的调用必须发布**折叠结果**，不得「校验覆盖率后仍发布 `merge.merged`」。
 
@@ -1630,14 +1656,10 @@ class TestManualAdjudicationIsWired:
     def test_settle_branches_are_the_single_decision_point(self) -> None:
         """「要发布哪份 projection」只能有一个决策点，且发布分支不得再读 `merge.merged`。
 
-        判据是形态而不是行为：`_apply_settled` 里出现 `merge.merged` 就意味着有人在折叠
+        判据是形态而不是行为：发布分支里出现 `merge.merged` 就意味着有人在折叠
         之外又插了一条「直接取未收敛快照」的路 —— 那正是被修掉的那个缺陷。
         """
-        src = textwrap.dedent(
-            inspect.getsource(OH.OoToHtmlCoordinator._apply_settled)
-        )
-        fn = ast.parse(src).body[0]
-        assert isinstance(fn, ast.AsyncFunctionDef)
+        fn = _settled_branch_ast()
         merged_reads = [
             node.lineno
             for node in ast.walk(fn)
@@ -1669,10 +1691,7 @@ class TestManualAdjudicationIsWired:
         `resolution_choices` 时那道第二把锁直接失效（它只在 `resolution_choices` 非空时
         才校验折叠），而行为测试仍全绿 —— 所以判据必须落在这个关键字实参上。
         """
-        src = textwrap.dedent(
-            inspect.getsource(OH.OoToHtmlCoordinator._apply_settled)
-        )
-        fn = ast.parse(src).body[0]
+        fn = _settled_branch_ast()
         calls = [
             node
             for node in ast.walk(fn)
@@ -1726,10 +1745,7 @@ class TestManualAdjudicationIsWired:
 
     def test_conflict_resolution_source_bucket_is_distinguishable(self) -> None:
         """带裁决的应用必须记成 `conflict_resolution` source（AC 8.6 的分桶）。"""
-        src = textwrap.dedent(
-            inspect.getsource(OH.OoToHtmlCoordinator._apply_settled)
-        )
-        fn = ast.parse(src).body[0]
+        fn = _settled_branch_ast()
         names = {
             node.id
             for node in ast.walk(fn)
@@ -1968,13 +1984,26 @@ class TestCommitFenceHookWiring:
     def test_before_publish_is_called_between_unmanaged_check_and_publish(self) -> None:
         from app.services.workpaper_sync import content_mutation as CM
 
+        # 🔴 CPU 段（materialize → extract 等值 → 未管理区域 → structure hash）已被搬进
+        # `_stage_cpu_segment`，由 `_stage_and_verify` 卸到工作线程里跑，所以这条次序判据
+        # 横跨两个方法：段内证明「未管理区域比对在段里」，段外证明「段 → fence → publish」。
+        # 只在 `_stage_and_verify` 里 index 三个串会直接 ValueError（判据失锚而非判红）。
+        # CPU 段自身又被拆成 `_stage_cpu_segment`（开 workbook 读作用域）+
+        # `_stage_cpu_segment_scoped`（真干活），所以两段都扫。
+        cpu_src = "\n".join(
+            inspect.getsource(getattr(CM.ContentMutationService, name))
+            for name in ("_stage_cpu_segment", "_stage_cpu_segment_scoped")
+        )
+        assert "unmanaged.assert_equivalent()" in cpu_src, (
+            "未管理区域比对不在 CPU 段里 —— 次序判据失去锚点"
+        )
         src = inspect.getsource(CM.ContentMutationService._stage_and_verify)
-        i_unmanaged = src.index("unmanaged.assert_equivalent()")
+        i_cpu = src.index("self._stage_cpu_segment")
         i_fence = src.index("fence.before_publish(")
         i_publish = src.index("publish_representation(")
-        assert i_unmanaged < i_fence < i_publish, (
+        assert i_cpu < i_fence < i_publish, (
             "AC 8.10 的次序：extract 等值/未管理区域 → fence → publish。"
-            f"实测偏移 unmanaged={i_unmanaged} fence={i_fence} publish={i_publish}"
+            f"实测偏移 cpu_segment={i_cpu} fence={i_fence} publish={i_publish}"
         )
 
     def test_before_write_is_called_after_lock_and_before_any_write(self) -> None:
@@ -2020,6 +2049,65 @@ class TestCommitFenceHookWiring:
 # 十、无 fail-open：AuthorizationProbe 必填且异常不吞
 # ═══════════════════════════════════════════════════════════════════════════
 
+#: 唯一被豁免的 `except Exception: pass` —— `finally` 里释放 room apply 锁。
+#:
+#: 🔴 存在的理由：`finally` 中 `raise` 会用「解锁失败」**顶掉在飞的主异常**，诊断信息
+#: 严格变差；而本守卫的代理判据（每个 `except Exception` 必须 `raise` 或落 error 终态）
+#: 覆盖不到「释放锁」这个惯用法。豁免口径刻意钉到最窄：处理块必须**恰好只有 `pass`**，
+#: 且 `try` 体**唯一一条语句**是对该方法的调用。不按函数名豁免、不按「在 finally 里」
+#: 豁免、不按「任意 unlock」豁免 —— 任何别的 fail-open 吞异常照旧报红。
+_LOCK_RELEASE_EXEMPT_CALL = "unlock_room_oo_apply"
+
+
+def _is_sole_unlock_call(try_body: list[ast.stmt]) -> bool:
+    """`try` 体是否**恰好**只有一条 `[await] <obj>.unlock_room_oo_apply(...)`。"""
+    if len(try_body) != 1:
+        return False
+    stmt = try_body[0]
+    if not isinstance(stmt, ast.Expr):
+        return False
+    value = stmt.value
+    if isinstance(value, ast.Await):
+        value = value.value
+    if not isinstance(value, ast.Call):
+        return False
+    return (
+        isinstance(value.func, ast.Attribute)
+        and value.func.attr == _LOCK_RELEASE_EXEMPT_CALL
+    )
+
+
+def _bare_swallow_offenders(source: str) -> list[int]:
+    """返回「既不重抛也不落 error 终态」的 `except Exception` 行号。
+
+    `ast.Try` / `ast.TryStar` 是 `ExceptHandler` 的唯一父节点形态，因此按 try 节点
+    遍历与直接 walk handler 的覆盖面等价 —— 但这样才拿得到配对的 `try` 体，豁免
+    判据必须看它。
+    """
+    tree = ast.parse(source)
+    offenders: list[int] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Try, ast.TryStar)):
+            continue
+        for handler in node.handlers:
+            etype = handler.type
+            catches_broad = isinstance(etype, ast.Name) and etype.id in (
+                "Exception",
+                "BaseException",
+            )
+            if not catches_broad:
+                continue
+            body_src = "\n".join(ast.unparse(stmt) for stmt in handler.body)
+            if "raise" in body_src or "_record_post_durable_failure" in body_src:
+                continue
+            body_is_exactly_pass = len(handler.body) == 1 and isinstance(
+                handler.body[0], ast.Pass
+            )
+            if body_is_exactly_pass and _is_sole_unlock_call(node.body):
+                continue
+            offenders.append(handler.lineno)
+    return offenders
+
 
 class TestNoFailOpen:
     def test_probe_is_a_required_constructor_argument(self) -> None:
@@ -2036,26 +2124,89 @@ class TestNoFailOpen:
         `_record_post_durable_failure`。写成「记 WARNING 后继续」会把接线错误
         （函数名写错、列名写错、单参调用 async 签名）表现成「本项目无此限制」，
         而四层静态检查全绿（Requirement 5.12 点名禁止）。
+
+        唯一豁免见 `_LOCK_RELEASE_EXEMPT_CALL`：`finally` 里释放 room apply 锁的
+        `except Exception: pass`（`raise` 会顶掉在飞的主异常）。豁免不会悄悄变宽 ——
+        `test_lock_release_exemption_does_not_admit_generic_swallows` 反向钉住。
         """
-        tree = ast.parse(inspect.getsource(OH))
-        offenders: list[int] = []
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.ExceptHandler):
-                continue
-            etype = node.type
-            catches_broad = isinstance(etype, ast.Name) and etype.id in (
-                "Exception",
-                "BaseException",
-            )
-            if not catches_broad:
-                continue
-            body_src = "\n".join(
-                ast.unparse(stmt) for stmt in node.body
-            )
-            if "raise" not in body_src and "_record_post_durable_failure" not in body_src:
-                offenders.append(node.lineno)
+        offenders = _bare_swallow_offenders(inspect.getsource(OH))
         assert offenders == [], (
             f"第 {offenders} 行的 `except Exception` 既不重抛也不落 error 终态 —— fail-open"
+        )
+
+    def test_lock_release_exemption_does_not_admit_generic_swallows(self) -> None:
+        """反向自检：锁释放豁免不得放过**任何**别的吞异常形态。
+
+        豁免一旦按「在 finally 里」或「函数名含 unlock」写宽，本用例立刻变绿而
+        主判据仍然全绿 —— 那时守卫已经装饰化。故逐形态钉死。
+        """
+        probe = textwrap.dedent(
+            '''
+            async def generic_swallow(x):          # L3  必须报
+                try:
+                    await x.do_something()
+                except Exception:
+                    pass
+
+            async def exempt_shape(x, rid):        # L9  唯一豁免：不报
+                try:
+                    return await x.work()
+                finally:
+                    try:
+                        await x.unlock_room_oo_apply(rid)
+                    except Exception:
+                        pass
+
+            async def unlock_plus_extra(x, rid):   # L18 try 体不止一条 ⇒ 必须报
+                try:
+                    await x.unlock_room_oo_apply(rid)
+                    await x.also_do_this()
+                except Exception:
+                    pass
+
+            async def unlock_but_logs(x, rid):     # L25 处理块不是恰好 pass ⇒ 必须报
+                try:
+                    await x.unlock_room_oo_apply(rid)
+                except Exception:
+                    logger.warning("unlock failed")
+
+            async def other_unlock_in_finally(x, rid):  # L31 别的 unlock ⇒ 必须报
+                try:
+                    return await x.work()
+                finally:
+                    try:
+                        await x.unlock_something_else(rid)
+                    except Exception:
+                        pass
+            '''
+        )
+        lines = probe.splitlines()
+
+        def handler_line(marker: str) -> int:
+            """该函数体内第一个 `except Exception` 的 1-based 行号。"""
+            start = next(i for i, text in enumerate(lines) if marker in text)
+            offset = next(
+                i
+                for i in range(start + 1, len(lines))
+                if lines[i].strip().startswith("except Exception")
+            )
+            return offset + 1
+
+        offenders = _bare_swallow_offenders(probe)
+        expected = sorted(
+            handler_line(marker)
+            for marker in (
+                "def generic_swallow",
+                "def unlock_plus_extra",
+                "def unlock_but_logs",
+                "def other_unlock_in_finally",
+            )
+        )
+        assert sorted(offenders) == expected, (
+            f"豁免口径漂了：期待报 {expected}，实报 {sorted(offenders)}"
+        )
+        assert handler_line("def exempt_shape") not in offenders, (
+            "锁释放惯用法反而被报 —— 豁免失效"
         )
 
     def test_probe_failure_types_are_distinct_from_fence_failures(self) -> None:

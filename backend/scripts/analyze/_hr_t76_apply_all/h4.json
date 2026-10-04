@@ -1,0 +1,72 @@
+{
+  "mode": "apply",
+  "entries": [
+    {
+      "target": {
+        "entry_id": "xlsx/gt-h4-engineering-materials",
+        "contract_id": "h4.engineering_materials_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_h4_engineering_materials",
+        "wp_codes": [
+          "H4"
+        ],
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "f287d31f-9cd1-46e5-8356-111a5061930d",
+        "wp_code": "H4",
+        "store_bytes": 0,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "outcome": {
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "f287d31f-9cd1-46e5-8356-111a5061930d",
+        "entry_id": "xlsx/gt-h4-engineering-materials",
+        "contract_id": "h4.engineering_materials_detail",
+        "authority_model": "projection_contract",
+        "authority_model_definition_id": "afceb319-94e9-486d-b9d9-afd5486bffda",
+        "authority_model_definition_sha256": "7ad471d8ba6c102297d14b6fa949516a5c6e510b9f2eb9e2556f8810ad50ccfe",
+        "template_definition_id": "a80fb6af-fe20-4b74-a959-8392f43a0ea1",
+        "template_definition_sha256": "2b280b2d2e2f50dab5afee272836297bf43e55bb3375774dcd9946a2a895d0c7",
+        "instrumentation_definition_id": "39067fe1-4102-427a-b086-46764c8fc1dd",
+        "instrumentation_definition_sha256": "861fce94a493d8fe3c182a54ee2aa92388e077049f49c2cbf2d2d88537e07135",
+        "contract_definition_id": "4e51cb69-7c7e-4512-81e7-6c0a42628be5",
+        "contract_definition_sha256": "955220ebde2f9c9263759adcf99b3e2a643b71d32861c963d8607d1c027f3eba",
+        "definition_bundle_id": "eabd815e-c77e-4593-b3d0-701a4ee4c528",
+        "definition_bundle_sha256": "0837ebdf090eab9abb8fc15c19e11ac3a14346112e1f14d440d75afc135e33b5",
+        "created_stages": [
+          "template",
+          "instrumentation",
+          "contract",
+          "bundle"
+        ],
+        "reused_stages": [
+          "authority_model"
+        ],
+        "representation_settlement": "blocked",
+        "representation_reason": "entry xlsx/gt-h4-engineering-materials 没有 `state=awaiting_contract` 的 representation upgrade candidate 可绑定。approved bundle 已就位，缺的是**表示**侧供给：①该 entry 若还没有任何 content version/representation，首版只能由 `ContentMutationService.commit(...)`（唯一能推进 content_revision 的业务事务）产生；②已有 representation 时，纯 definitions 升级须先由 Task 17 的 instrumentation upgrader 登记 non-current candidate。本 provisioner **不**自建第三条 representation 写入路径（会伪造业务 projection 并绕过 `assert_candidate_finalizable`，Property 4 / 67 双打红）",
+        "attached_candidate_id": null,
+        "attach": null,
+        "content_revision_before": 0,
+        "content_revision_after": 0,
+        "revision_unchanged": true,
+        "entry_pointer_before": null,
+        "entry_pointer_after": null,
+        "created_anything": true
+      }
+    }
+  ],
+  "errors": [],
+  "supply_rows_before": {
+    "working_paper_sync_definition_artifact": 239,
+    "working_paper_sync_definition_bundle": 105,
+    "working_paper_representation_upgrade_candidate": 1,
+    "working_paper_content_representation": 283
+  },
+  "supply_rows_after": {
+    "working_paper_sync_definition_artifact": 242,
+    "working_paper_sync_definition_bundle": 106,
+    "working_paper_representation_upgrade_candidate": 1,
+    "working_paper_content_representation": 283
+  },
+  "created_total": 4
+}

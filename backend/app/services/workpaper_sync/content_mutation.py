@@ -101,7 +101,14 @@ from app.services.workpaper_sync.conflicts import (
     UnresolvedConflictError,
     assert_all_conflicts_resolved,
 )
-from app.services.workpaper_sync.contracts import FieldMode, PROTECTED_MODES, SyncContract
+from app.services.workpaper_sync.contracts import (
+    FieldMode,
+    PROTECTED_MODES,
+    SyncContract,
+    # spec workpaper-sync-managed-row-convergence E3：模板骨架行的 roundtrip 豁免
+    # （与 `excel_materialize` 的收敛判据共用同一真源）。
+    is_template_skeleton_identity,
+)
 from app.services.workpaper_sync.definitions import canonical_json_bytes, json_safe
 from app.services.workpaper_sync.entry_profile import Capability
 from app.services.workpaper_sync.limits import load_limits
@@ -1582,17 +1589,23 @@ class ContentMutationService:
         # 纯 CPU 段卸载到工作线程：事件循环可继续服务其他请求（Requirement 2.1）。
         # fence / artifact publish 仍留在事件循环侧（可能碰 DB / async IO）。
         started = time.perf_counter()
-        materialized, extracted, unmanaged, _cpu_structure_hash = await asyncio.to_thread(
+        # 🔴 2026-09-22：这一段此前把 structure_hash **算了两遍** —— 线程内算完返回，
+        # 调用侧解包成 `_cpu_structure_hash` 后从未使用，又在**事件循环上**对同一份
+        # output 重算一次。两遍都是整簿解析（D4 实测单次约 1.4s），而且事件循环上那一遍
+        # 恰好违背 spec workpaper-sync-materialize-large-table-performance Task 5 的
+        # 卸载意图（该任务明文把 `_projection_structure_hash` 划进 CPU 段）。
+        #
+        # 现在只保留线程内那一份：它在 CPU 段**末尾**计算，此时 `adapter.materialize`
+        # 已完成全部写入（含转置 sheet 覆盖），读的就是最终 output 字节 ——
+        # 「提交值必须来自最终 output」这条约束一字未松，只是不再白算第二遍。
+        # （published structure_hash 与 artifact 的一致性由
+        #  `test_g1_publish_structure_hash.py` 独立守护。）
+        materialized, extracted, unmanaged, structure_hash = await asyncio.to_thread(
             self._stage_cpu_segment,
             plan=plan,
             projection=projection,
             adapter=adapter,
             output=output,
-        )
-        # 在编排入口显式调用统一发布时刻公式；CPU 段的预计算仅用于线程内校验，
-        # 提交值必须来自最终 output，避免 BP-30 接线退化成间接死代码。
-        structure_hash = self._projection_structure_hash(
-            plan=plan, output=output, materialized=materialized
         )
         elapsed = time.perf_counter() - started
         soft_limit = float(load_limits().materialize_soft_limit_seconds)
@@ -1659,7 +1672,28 @@ class ContentMutationService:
 
         🔴 **不得**持有或操作 DB 会话（Property 4 / Requirement 2.2）：本方法跑在
         ``asyncio.to_thread`` 工作线程里，任何会话绑定都是隔离破坏。
+
+        🔴 三个阶段共用**一个** workbook 读作用域：materialize 读 substrate 链、
+        extract 读 output、verify 读 before+after，其中 substrate 与 output 会被反复
+        解析。D4-营业收入实测 `openpyxl.load_workbook` 90 次累计 40.3s。作用域让同一
+        文件（按 mtime/size 定身份）只解析一次，退出时关闭全部句柄。
         """
+        from app.services.workpaper_sync.excel_extract import workbook_read_scope
+
+        with workbook_read_scope():
+            return self._stage_cpu_segment_scoped(
+                plan=plan, projection=projection, adapter=adapter, output=output
+            )
+
+    def _stage_cpu_segment_scoped(
+        self,
+        *,
+        plan: ContentCommitPlan,
+        projection: Projection,
+        adapter: Any,
+        output: Path,
+    ) -> tuple[Any, Any, Any, str]:
+        """:meth:`_stage_cpu_segment` 的本体（拆出只为让作用域包住整段，判据不变）。"""
         materialized = adapter.materialize(
             substrate=plan.substrate_path,
             projection=projection,
@@ -1792,72 +1826,20 @@ class ContentMutationService:
     def _assert_roundtrip_equivalent(
         self, *, intended: Projection, extracted: Projection, contract: SyncContract
     ) -> None:
-        """反读出来的受管 projection 必须与要提交的逐字段等值（Property 65）。
+        """薄壳：转发给模块级纯函数 :func:`assert_roundtrip_equivalent`。
 
-        比较口径复用 `merge.values_equal`（金额 Decimal / 日期 ISO / 文本仅归一
-        CRLF），不自己写第二套。`word_only` 字段被排除：它们按定义永不进 HTML
-        projection，拿它们比较会让 Word 底稿恒判不等值。
+        🔴 为什么把实现搬出去（spec workpaper-sync-row-deletion-multi-region-propagation
+        复盘）：判据侧需要**用生产口径**算 `extra`（受管字段过滤 + 骨架行豁免都在里面，
+        测试侧复刻一份就是第二真源）。此前唯一办法是 unbound 调这个方法并传 `self=None`
+        —— 那依赖「函数体一个 `self` 都没用到」这个**没有守卫**的前提；哪天有人加一行
+        `self.limits`，判据就崩在 `AttributeError: 'NoneType' ...` 上，而那个 traceback
+        与被测的症状链毫无关系。搬成模块级纯函数后前提消失，判据直接调它。
+
+        本方法保留为薄壳是为了**不动任何调用点**（行为逐字不变）。
         """
-        word_only = {
-            spec.stable_field_key
-            for spec in contract.all_fields()
-            if spec.mode is FieldMode.word_only
-        }
-        # formula / auto_source 不由 materialize 写值；Excel 空公式格反读常为 0，
-        # store 侧多为 None —— 把它们拉进 Property 65 会在 OO 重算后假红（G4-0d）。
-        protected = {
-            spec.stable_field_key
-            for spec in contract.all_fields()
-            if spec.mode in PROTECTED_MODES
-        }
-
-        def _key_excluded(key: str, templates: set[str]) -> bool:
-            if key in templates:
-                return True
-            return any(
-                "{row_uuid}" in tpl
-                and key.startswith(tpl.split("{row_uuid}")[0])
-                and key.endswith(tpl.split("{row_uuid}")[-1])
-                for tpl in templates
-            )
-
-        def _managed(proj: Projection) -> dict[str, Any]:
-            return {
-                key: value
-                for key, value in proj.values.items()
-                if not _key_excluded(key, word_only) and not _key_excluded(key, protected)
-            }
-
-        left = _managed(intended)
-        right = _managed(extracted)
-        missing = sorted(set(left) - set(right))
-        if missing:
-            raise RoundtripEquivalenceError(
-                f"staged representation 反读后缺少受管字段 {missing[:5]}"
-                f"（共 {len(missing)} 个）—— materialize 没有把它们写进 OOXML，"
-                "或 extract 找不到 identity 载体"
-            )
-        extra = sorted(set(right) - set(left))
-        if extra:
-            raise RoundtripEquivalenceError(
-                f"staged representation 反读出未提交的受管字段 {extra[:5]}"
-                f"（共 {len(extra)} 个）—— 受管区域被写入了不属于本次 projection 的值"
-            )
-        for key in sorted(left):
-            mine, theirs = left[key], right[key]
-            # roundtrip 空值等价：提交「空 enum/text」（`""`）写进 OOXML 得到空单元格，
-            # extract 反读空单元格得到 `None` —— 两者表示同一件事「该格无值」。全局
-            # `normalize_value` 刻意不折叠 `""`/`None`/`MISSING`（merge 场景「清空」与
-            # 「从未设置」有别），故这里**仅在 roundtrip 场景**、且**两侧都为空表示**时
-            # 视为等值；只要有一侧非空就仍走严格 `values_equal`（不会放过真实漂移）。
-            if _is_roundtrip_empty(mine.value) and _is_roundtrip_empty(theirs.value):
-                continue
-            if not values_equal(mine.value, theirs.value, mine.value_type):
-                raise RoundtripEquivalenceError(
-                    f"受管字段 {key} 反读不等值：提交 {mine.value!r} → 反读 {theirs.value!r}"
-                    f"（value_type={mine.value_type.value}）—— Property 65 要求 projection "
-                    "与同 revision representation 等值"
-                )
+        assert_roundtrip_equivalent(
+            intended=intended, extracted=extracted, contract=contract
+        )
 
     # ─────────────────────────────────────────────────────────────────
     # 5.6 唯一事务
@@ -2180,12 +2162,145 @@ class ContentMutationService:
         }
 
 
+def assert_roundtrip_equivalent(
+    *, intended: Projection, extracted: Projection, contract: SyncContract
+) -> None:
+    """反读出来的受管 projection 必须与要提交的逐字段等值（Property 65）。
+
+    比较口径复用 `merge.values_equal`（金额 Decimal / 日期 ISO / 文本仅归一
+    CRLF），不自己写第二套。`word_only` 字段被排除：它们按定义永不进 HTML
+    projection，拿它们比较会让 Word 底稿恒判不等值。
+    """
+    word_only = {
+        spec.stable_field_key
+        for spec in contract.all_fields()
+        if spec.mode is FieldMode.word_only
+    }
+    # formula / auto_source 不由 materialize 写值；Excel 空公式格反读常为 0，
+    # store 侧多为 None —— 把它们拉进 Property 65 会在 OO 重算后假红（G4-0d）。
+    protected = {
+        spec.stable_field_key
+        for spec in contract.all_fields()
+        if spec.mode in PROTECTED_MODES
+    }
+
+    def _key_excluded(key: str, templates: set[str]) -> bool:
+        if key in templates:
+            return True
+        return any(
+            "{row_uuid}" in tpl
+            and key.startswith(tpl.split("{row_uuid}")[0])
+            and key.endswith(tpl.split("{row_uuid}")[-1])
+            for tpl in templates
+        )
+
+    def _managed(proj: Projection) -> dict[str, Any]:
+        return {
+            key: value
+            for key, value in proj.values.items()
+            if not _key_excluded(key, word_only) and not _key_excluded(key, protected)
+        }
+
+    left = _managed(intended)
+    right = _managed(extracted)
+    missing = sorted(set(left) - set(right))
+    if missing:
+        raise RoundtripEquivalenceError(
+            f"staged representation 反读后缺少受管字段 {missing[:5]}"
+            f"（共 {len(missing)} 个）—— materialize 没有把它们写进 OOXML，"
+            "或 extract 找不到 identity 载体"
+        )
+    extra = sorted(set(right) - set(left))
+    # ── 模板骨架行的 extra 豁免（spec workpaper-sync-managed-row-convergence E3）──
+    #
+    # ═══ 为什么必须豁免 ═══
+    #
+    # instrumentation 给模板的**每个**受管行预生成 `GTROW-{template}-{row:04d}` 身份，
+    # 而模板在受管区内**自带非空业务值**（实测 D4 权威模板：166 个 editable 非空字段，
+    # 含 `年度预算`/`1月`~`12月`/`1.销售商品收入` 这类**模板应有内容**，以及
+    # `大额客户一`/`产品1` 这类示例）。store 只声明「有业务数据的行」，所以这些骨架行
+    # 不在 `intended.row_keys` 里是**常态**。
+    #
+    # 后果：extract 反读出模板自带的值 ⇒ 它们恒为 `extra` ⇒ `roundtrip_projection_mismatch`
+    # 恒 500（D4 实测 77 个 extra 全部来自 46 个骨架身份），而三条显而易见的出路都不通：
+    #   * 当 stale 删掉骨架行 → `IdentityRetentionError`（Property 23/66，实测 4 红）
+    #   * 清空模板占位内容    → 会连 `年度预算`/`1月` 一起清掉，破坏模板业务语义
+    #   * 让 store 认领它们    → store 侧 merge 语义「不追加 base 没有的行」，追不上
+    #
+    # ═══ 豁免条件是**合取**，不弱化 fail-closed ═══
+    #
+    #   ① 身份是模板骨架（`is_template_skeleton_identity`，与收敛判据共用真源）
+    #   ② **且** store 在本次 projection 里**完全没声明**这一行
+    #
+    # ②是关键：它把豁免限定在「store 不负责的行」上。语义是诚实的 —— 那一行的 Excel
+    # 侧内容不是 materialize 写的（materialize 只写 projection 里有的东西），所以判它
+    # 「反读出未提交的受管字段」本就是归因错误。
+    #
+    # 反之两种情形**仍然报错**（fail-closed 未被削弱）：
+    #   * store **声明了**某骨架行却缺字段 ⇒ ②不成立 ⇒ 仍报（store 认领了就要字段完整）
+    #   * 非骨架身份（`d4r-*` / `xsheet-*` / `GTROW-MINTED-*`）的孤儿 ⇒ ①不成立 ⇒ 仍报
+    #     （那才是真孤儿，由 `excel_materialize` 的受管行收敛负责删除/清空）
+    if extra:
+        declared: set[str] = set()
+        for ids in (intended.row_keys or {}).values():
+            declared.update(str(x) for x in (ids or ()))
+        retained = []
+        for key in extra:
+            parts = key.split("/")
+            identity = parts[1] if len(parts) >= 3 else ""
+            if (
+                identity
+                and identity not in declared
+                and is_template_skeleton_identity(identity)
+            ):
+                continue  # 模板自带内容，且 store 未声明该行 ⇒ 豁免
+            retained.append(key)
+        extra = retained
+    if extra:
+        raise RoundtripEquivalenceError(
+            f"staged representation 反读出未提交的受管字段 {extra[:5]}"
+            f"（共 {len(extra)} 个）—— 受管区域被写入了不属于本次 projection 的值"
+        )
+    for key in sorted(left):
+        mine, theirs = left[key], right[key]
+        # roundtrip 空值等价：提交「空 enum/text」（`""`）写进 OOXML 得到空单元格，
+        # extract 反读空单元格得到 `None` —— 两者表示同一件事「该格无值」。全局
+        # `normalize_value` 刻意不折叠 `""`/`None`/`MISSING`（merge 场景「清空」与
+        # 「从未设置」有别），故这里**仅在 roundtrip 场景**、且**两侧都为空表示**时
+        # 视为等值；只要有一侧非空就仍走严格 `values_equal`（不会放过真实漂移）。
+        if _is_roundtrip_empty(mine.value) and _is_roundtrip_empty(theirs.value):
+            continue
+        # 🔴 归一化失败必须**点名字段**。`normalize_value` 抛的
+        #    `ValueNormalizationError` 只说「amount 字段收到 time
+        #    datetime.time(0, 0)」，不说是哪个 stable_field_key ——
+        #    18 张表 360 个值的 entry 上这等于无法定位（本仓库已登记过
+        #    同族教训：平台报错不点名会把排查带向错误方向）。
+        #    这里只补上下文再原样抛出，不改判定语义。
+        try:
+            equal = values_equal(mine.value, theirs.value, mine.value_type)
+        except Exception as exc:  # noqa: BLE001 —— 补上下文后原样抛
+            raise type(exc)(
+                f"受管字段 {key} 归一化失败（value_type={mine.value_type.value}，"
+                f"提交 {mine.value!r} → 反读 {theirs.value!r}）：{exc}"
+            ) from exc
+        if not equal:
+            raise RoundtripEquivalenceError(
+                f"受管字段 {key} 反读不等值：提交 {mine.value!r} → 反读 {theirs.value!r}"
+                f"（value_type={mine.value_type.value}）—— Property 65 要求 projection "
+                "与同 revision representation 等值"
+            )
+
+
 #: Task 26：本函数的实现已下沉到 `definitions.json_safe`（与 `canonical_json_bytes`
 #: 同一模块），因为 `conflicts.ValueEnvelope.to_jsonb()` 也必须用它 —— 少了那一步，
 #: 任何金额/日期字段的冲突在算 `conflict_set_digest` 时直接 `TypeError`。
 #: 这里保留旧名做别名：输出对每个输入逐字节相同（Decimal 仍走 `format(v, "f")`），
 #: 因此既有 projection artifact / event payload 的 digest 一个都不变。
 _json_safe = json_safe
+
+from app.services.workpaper_sync.projection_digest_value import (  # noqa: E402
+    canonical_value_for_digest,
+)
 
 
 def projection_canonical_digest(projection: Projection) -> str:
@@ -2196,7 +2311,6 @@ def projection_canonical_digest(projection: Projection) -> str:
     的 sha256，而 `working_paper_content_application.merged_projection_sha256` 必须与它
     逐字节相同（AC 8.12 要求 applied content version 同时绑定 merged projection hash 与
     result representation identity；两个 hash 出自两套序列化就等于没绑定）。
-
     因此本函数**只是**把那条链路的前两步提出来复用，绝不新写一份 payload 形态。
     PG 守卫 `test_application_merged_digest_equals_published_projection_artifact`
     正面比对这两个值。
@@ -2220,7 +2334,9 @@ def _projection_payload(projection: Projection) -> dict[str, Any]:
         "document_type": projection.document_type,
         "values": {
             key: {
-                "value": _json_safe(value.value),
+                # 值表示口径住 `projection_digest_value`（与 canonical_json_bytes 同层）：
+                # 裸 int/float 不归一会让「内容未改」判不出来 ⇒ AC 3.6 幂等复用失效。
+                "value": canonical_value_for_digest(value),
                 "value_type": value.value_type.value,
                 "mode": value.mode.value,
                 "row_key": value.row_key,

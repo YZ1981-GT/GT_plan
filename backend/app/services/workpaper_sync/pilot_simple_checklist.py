@@ -227,6 +227,14 @@ SHEET_KEY: Final[str] = f"{TEMPLATE_ID.lower()}-managed"
 ROWS_TABLE_KEY: Final[str] = "hour_budget_rows"
 META_TABLE_KEY: Final[str] = "hour_budget_meta"
 
+#: HTML store 身份 + 回方向合并 + 契约 html_store 段全在伴生模块 `pilot_b60_store_merge`
+#: （本文件卡行数门）。🔴 必须 re-export：`oo_to_html` 读 `bridge.STORE_ITEM_ID` /
+#: `getattr(bridge, plan.merge_rows_fn)`，而 bridge 就是本模块。
+from app.services.workpaper_sync.pilot_b60_store_merge import (  # noqa: E402
+    ROW_IDENTITY_STORE_KEY, STORE_ITEM_ID, html_store_payload,
+    merge_projection_into_store_rows,
+)
+
 #: 数据区与 footer（逐 sheet 读权威模板得来，见模块 docstring §三）。
 FIRST_DATA_ROW: Final[int] = 7
 LAST_DATA_ROW: Final[int] = 23
@@ -507,6 +515,9 @@ def _rows_table_payload() -> dict[str, Any]:
                 "value_type": value_type,
                 "source_ref": _src(f"{column}{FIRST_DATA_ROW}"),
                 "header_source_ref": _src(header_cell),
+                # 🔴 HTML 侧载体。此前全为 None（那时前端没有 HTML 面）⇒ 回方向无镜像目标。
+                #    formula 列也声明，但回方向由伴生模块按 mode 过滤（详见其 docstring）。
+                "store_item_id": STORE_ITEM_ID,
             }
             for column_key, column, mode, value_type, header_cell, _label in (
                 MANAGED_FIELD_SPECS
@@ -584,6 +595,8 @@ def build_contract_payload() -> dict[str, Any]:
                 "F 列 =(C+D)*E 公式、A24 合计 footer、3/4 行元信息标签 —— 逐字段 "
                 "source_ref/header_source_ref 均指向上述真实单元格"
             ),
+            # 🔴 2026-09-27 新增（此前无此段 ⇒ B60 被归为纯 Excel entry、回方向被跳过）。
+            "html_store": html_store_payload(),
         },
     }
 
@@ -1005,3 +1018,7 @@ def assert_manifest_capability_enabled(
 def _unused_instrumentation_error_guard() -> type[InstrumentationError]:
     """保留 `InstrumentationError` 的显式引用（它是本模块 payload 构建的失败类型）。"""
     return InstrumentationError
+
+
+__all__ = [*__all__, "ROW_IDENTITY_STORE_KEY", "STORE_ITEM_ID",
+           "html_store_payload", "merge_projection_into_store_rows"]

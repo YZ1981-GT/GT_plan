@@ -1,0 +1,75 @@
+{
+  "spec": "d1-sync-row-table-engine-and-d1-coverage",
+  "task": "26（接入 D1-4 坏账准备明细表，三区）",
+  "probed_at": "2026-09-26",
+  "method": "openpyxl 逐格直读权威模板 backend/wp_templates/D/D1 应收票据.xlsx（data_only=False）",
+  "sheet": "坏账准备明细表D1-4",
+  "dims": "A1:N30",
+  "header": {
+    "group_row": 10,
+    "leaf_row": 11,
+    "group_texts": { "A": "项目", "B": "期初余额", "F": "本期增加", "H": "本期减少", "K": "期末余额" },
+    "leaf_texts": { "B": "期初未审数", "C": "账项调整", "D": "重分类调整", "E": "期初审定数", "F": "计提", "G": "其他增加" },
+    "note": "两级表头（R10 组标题 / R11 叶子），与 D1-3 的单级表头 R10 不同构"
+  },
+  "sections": [
+    {
+      "section_key": "individual",
+      "store_item_id": "D1-bd-individual-rows",
+      "parent_row": 12,
+      "parent_label": "按单项计提",
+      "parent_formula_sample": "=SUM(B13:B16)",
+      "first_data_row": 13,
+      "last_data_row": 16,
+      "note": "父行 R12 是 SUM 小计（computed 不落库）；数据行 13-16 首格 A13 有「其中：」标签"
+    },
+    {
+      "section_key": "portfolio",
+      "store_item_id": "D1-bd-portfolio-rows",
+      "parent_row": 17,
+      "parent_label": "按组合计提",
+      "parent_formula_sample": "=SUM(B18:B21)",
+      "first_data_row": 18,
+      "last_data_row": 21,
+      "note": "🔴 该键有第三个写入方：useD1WriteoffCheck.syncReversalToD14 回写「按组合计提」父行（spec 需求 5.7 / P17）"
+    },
+    {
+      "section_key": "notetype",
+      "store_item_id": "D1-notetype-rows",
+      "first_data_row": 23,
+      "last_data_row": 24,
+      "row_labels": { "23": "银行承兑汇票小计", "24": "商业承兑汇票小计" },
+      "note": "🔴 本区在 footer（R22）**之下** ⇒ 命中 HTML_ONLY_ITEM_IDS_D45 那条「footer 下 static_row 与插行 fail-closed 冲突」判据，须裁决 static_region vs HTML-only，不得默认按动态行表接入。另：本区维度是「按票据种类」，与前两区的「按计提方法」是不同维度，不得合并（spec Task 26）"
+    }
+  ],
+  "footer": {
+    "row": 22,
+    "marker_raw": "合计 ",
+    "marker_codepoints": "5408 8ba1 0020",
+    "formula_sample": "=B12+B17",
+    "note": "🔴 marker 带**一个半角空格**尾缀（0x20）。与 D1-2 的纯「合计」、D3 的「合计」无空格、D7 的「合   计」三半角空格都不同 —— 照抄任一家都会 footer 定位失败",
+    "probe_lesson": "🔴 本条首版据终端输出**目测**记成「两个全角空格（3000 3000）」，被 test_d104_footer_marker_is_byte_exact 按 codepoint 打红后改为实测值。教训：目测终端输出不算实测，marker 必须按 codepoint 断言（终端渲染会把 0x20 与 0x3000 显示成相似宽度）"
+  },
+  "formula_columns_in_data_rows": ["E", "K", "N"],
+  "formula_templates": {
+    "E": "=B{r}+C{r}+D{r}",
+    "K": "=B{r}+SUM(F{r}:G{r})-SUM(H{r}:J{r})",
+    "N": "=K{r}+L{r}+M{r}"
+  },
+  "managed_last_col": "N",
+  "uuid_col_candidates": {
+    "note": "🔴 三区必须各用不同 UUID 列（D4-1 主营 W / 其他 X 的实测教训：同列会让行身份串区）。max_column=14(N) ⇒ 注入列可取 O/P/Q 三列",
+    "individual": "O",
+    "portfolio": "P",
+    "notetype": "Q"
+  },
+  "downstream_consumers": {
+    "note": "spec 需求 5.8 / P18：三键有下游 computed 消费方，零回归须覆盖它们",
+    "items": [
+      "useD1EclCalc.d1_4DataAvailable(:475)",
+      "useD1EclCalc.parseD1_4Rows(:497/:499)",
+      "useD1Adjudication 坏账区（d1AdjudicationModel.readD1BadDebtByNoteType）",
+      "D1TabIndex.vue:49 的 progressKeys"
+    ]
+  }
+}

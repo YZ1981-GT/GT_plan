@@ -191,7 +191,7 @@ function _sumRow(name: string, details: H2AdjudicationRow[]): H2AdjudicationRow 
   const endUnadj = calcSubtotal(details.map((r) => r.endUnadjusted))
   const endAdj = calcSubtotal(details.map((r) => r.endAdjustment))
   const row: H2AdjudicationRow = {
-    rowId: `row-total-${name}`,
+    rowId: `row-total-${name}-${Math.random().toString(36).slice(2, 7)}`,
     name: '合计',
     beginUnadjusted: beginUnadj,
     beginAdjustment: beginAdj,
@@ -386,7 +386,7 @@ export function useH2Adjudication(options: {
       const unadjRate = _calcChangeRate(endUnadj, beginUnadj)
       const audRate = _calcChangeRate(endAud, beginAud)
       return {
-        rowId: `net-${name}`,
+        rowId: `net-${name}-${Math.random().toString(36).slice(2, 7)}`,
         name,
         beginUnadjusted: beginUnadj,
         beginAudited: beginAud,

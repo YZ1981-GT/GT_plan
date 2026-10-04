@@ -171,8 +171,26 @@ async def compute_store_projection_response(
     empty = str(getattr(provider, "EMPTY_STORE_PAYLOAD", "[]"))
     store_item_ids = tuple(getattr(provider, "STORE_ITEM_IDS", ()) or ())
     if len(store_item_ids) > 1 and hasattr(provider, "build_combined_store_projection"):
+        # 🔴 payload 装配的**唯一**来源：provider 若暴露 `all_store_item_ids()`（Task 4），
+        #    就用它——它把 STORE_ITEM_IDS ∪ D45_FIXED ∪ D413_FIXED ∪ {D435_DICT} ∪ D47_DEDICATED
+        #    收敛成单一口径。此前本处只遍历 STORE_ITEM_IDS + D45_FIXED，**漏掉** D435_DICT 与
+        #    D413_FIXED ⇒ D4-35 切 OO 恒空、D4-13 两段正文恒写不进 OO（探针实证 0 vs 32 / '' vs 正文）。
+        #    未暴露该函数的老 provider 回退旧并集（行为不变）。
+        all_ids_fn = getattr(provider, "all_store_item_ids", None)
+        if callable(all_ids_fn):
+            combined_item_ids = tuple(all_ids_fn())
+        else:
+            combined_item_ids = store_item_ids + tuple(
+                getattr(provider, "STORE_ITEM_IDS_D45_FIXED", ()) or ()
+            )
+        # 缺失/空时塞 `""` 的集合 = **纯文本固定项**（D45 业务场景 6 项 / D413 核对过程·结论）：
+        #   它们进 provider 固定字段投影、缺省是空文本，不会像 dict-store 那样对 "[]"/"" 抛
+        #   非 domain ValueError。其余（list rows / dict-store 如 D4-9/D4-31/D4-35）缺失**不塞**。
+        fixed_text_ids = set(
+            getattr(provider, "STORE_ITEM_IDS_D45_FIXED", ()) or ()
+        ) | set(getattr(provider, "STORE_ITEM_IDS_D413_FIXED", ()) or ())
         payloads: dict[str, str] = {}
-        for item in store_item_ids:
+        for item in combined_item_ids:
             row = (
                 await session.execute(
                     sa.text(
@@ -182,28 +200,18 @@ async def compute_store_projection_response(
                     {"wp": str(wp_id), "item": item},
                 )
             ).scalar_one_or_none()
-            # 🔴 缺失/空 item **不塞** blanket `empty`（"[]"）：dict-store（D4-9 `{}`）与
-            #    singleton（D4-31 `{}`）拿到列表默认 "[]" 会在 provider 内抛非 domain
-            #    ValueError（如「D4-31 必须是单对象问卷」），一路冒泡成 opaque 500，
-            #    连累整个 entry（34 张）store-projection。让 build_combined_store_projection
-            #    的 `payloads.get(item, <per-item 默认>)` 用 provider 单源 per-item 默认
-            #    （list item → []、dict/singleton → {}）。与 d43_rematerialize 的
-            #    `test_dict_store_missing_key_uses_provider_default_not_empty_list` 同源修复，
-            #    此前只修了 rematerialize 侧、漏了本只读 projection 侧。
-            if row is not None and str(row).strip():
+            if item in fixed_text_ids:
+                # 纯文本固定项：缺失塞 ""（与原 D45_FIXED 循环同款）。
+                payloads[item] = str(row) if row is not None else ""
+            elif row is not None and str(row).strip():
+                # 🔴 list/dict-store 缺失/空 **不塞** blanket `empty`（"[]"）：dict-store（D4-9 `{}`）
+                #    与 singleton（D4-31 `{}`）拿到列表默认 "[]" 会在 provider 内抛非 domain
+                #    ValueError（如「D4-31 必须是单对象问卷」），一路冒泡成 opaque 500，连累整个
+                #    entry 的 store-projection。让 build_combined_store_projection 的
+                #    `payloads.get(item, <per-item 默认>)` 用 provider 单源 per-item 默认
+                #    （list item → [] / dict、singleton → {}）。与 d43_rematerialize 的
+                #    `test_dict_store_missing_key_uses_provider_default_not_empty_list` 同源修复。
                 payloads[item] = str(row)
-        # D4-5 固定 item（remark 纯文本）一并喂 combined
-        for item in tuple(getattr(provider, "STORE_ITEM_IDS_D45_FIXED", ()) or ()):
-            row = (
-                await session.execute(
-                    sa.text(
-                        "SELECT remark FROM checklist_responses "
-                        "WHERE wp_id = :wp AND item_id = :item LIMIT 1"
-                    ),
-                    {"wp": str(wp_id), "item": item},
-                )
-            ).scalar_one_or_none()
-            payloads[item] = str(row) if row is not None else ""
         store_projection = provider.build_combined_store_projection(
             payloads, contract=contract
         )

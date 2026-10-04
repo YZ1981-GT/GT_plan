@@ -36,6 +36,7 @@ import {
   getOperationConflicts,
   getOperationTimeline,
   getRecoveryCaseTimeline,
+  leaveRoom,
   listRecoveryCases,
   materialize,
   readStoreProjection,
@@ -193,6 +194,10 @@ const DRIVERS: Record<string, () => Promise<unknown>> = {
     requestForcesave(SCOPE, { roomId: UUID(2), participantId: UUID(3) }).catch(() => null),
   create_close_intent: () =>
     createCloseIntent(SCOPE, { roomId: UUID(2), participantId: UUID(3) }).catch(() => null),
+  leave_room: () =>
+    leaveRoom(SCOPE, { roomId: UUID(2), participantId: UUID(3), dirty: false }).catch(
+      () => null,
+    ),
   list_recovery_cases: () =>
     listRecoveryCases(SCOPE, { roomId: UUID(2), generation: 3 }).catch(() => null),
   claim_recovery_case: () =>

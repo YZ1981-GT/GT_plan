@@ -72,9 +72,47 @@ H1_WP_ID = "dbd9cc36-0d78-468a-b342-9478e15671d3"
 EXPECTED_H1_ITEM_COUNT = 24
 EXPECTED_H1_TOTAL_REMARK_BYTES = 19_524
 EXPECTED_H1_2_ROWS_BYTES = 9_026
-#: 🔴 本 pilot 的 store 载体今天**全库为空**。
-EXPECTED_DISPOSAL_ROWS_BYTES = 0
-EXPECTED_DISPOSAL_ROWS_WORKPAPERS = 0
+#: 🔴 本 pilot 的 store 载体**没有真实审计数据**（合成行 oracle 的理由）。
+#:
+#: 2026-09-28 实测全库出现 1 行，但它**不是真实数据**而是 E2E 残留：
+#:   wp c71b7c54…  remark = `[{"rowId": "GTROW-H18-0013", "name": "g4h1324785"}]`
+#:   （`name` 是随机串、`updated_by` 为 NULL、created 2026-09-11）
+#: 处置选「显式登记 + 形态断言」而不是删库行：
+#:   ① 不动共享 dev 库的数据（E2E 再跑还会生成，删了也会回来）；
+#:   ② 登记后**真实数据一旦出现仍然打红** —— 见 `_is_synthetic_e2e_payload`：
+#:      多一行、或这一行变成真实业务文本，都会红。
+EXPECTED_DISPOSAL_REAL_DATA_ROWS = 0
+
+#: 已登记的 E2E 残留行（wp_id → 该行必须满足的合成形态特征）。**只许变短**。
+KNOWN_E2E_ARTIFACT_WP_IDS: frozenset[str] = frozenset(
+    {"c71b7c54-6868-4fb9-9e14-083034f57815"}
+)
+
+#: 合成载荷的判别特征：行对象只有 `rowId` + `name`，且 `name` 是
+#: 「小写字母/数字混排、无中文、无空格」的随机串（E2E 生成器的形态）。
+_E2E_NAME_RE = __import__("re").compile(r"^[a-z0-9]{6,20}$")
+
+
+def _is_synthetic_e2e_payload(remark: str) -> bool:
+    """判断一行 `H1-8-rows` 载荷是否为 E2E 残留（而非真实审计数据）。
+
+    真实数据的特征是：字段数远多于 2（本 pilot 每行 25 个字段）、含中文业务文本。
+    只要出现任一「真实」特征就返回 False ⇒ 判据打红、提醒把 oracle 改跑在真实载荷上。
+    """
+    try:
+        rows = json.loads(remark or "[]")
+    except ValueError:
+        return False
+    if not isinstance(rows, list) or not rows:
+        return False
+    for row in rows:
+        if not isinstance(row, dict):
+            return False
+        if set(row) != {"rowId", "name"}:
+            return False
+        if not _E2E_NAME_RE.match(str(row.get("name") or "")):
+            return False
+    return True
 EXPECTED_REQUIRED_SCENARIOS = 24
 EXPECTED_FIELDS_PER_ROW = 25
 
@@ -187,10 +225,12 @@ async def _observe_real_store(engine: Any) -> dict[str, Any]:
 
     async with engine.connect() as conn:
         # ① 本 pilot 的 store item：全库有几条、多少字节。
+        # 🔴 2026-09-28 补取 `remark`：判据要能区分「真实审计数据」与「E2E 残留」
+        #    （原先只有 wp_id + 字节数，出现任何一行都只能笼统报红，无法核对形态）。
         disposal = (
             await conn.execute(
                 sa.text(
-                    "SELECT wp_id, coalesce(length(remark), 0) AS n "
+                    "SELECT wp_id, coalesce(length(remark), 0) AS n, remark "
                     "FROM public.checklist_responses WHERE item_id = :item "
                     "ORDER BY n DESC"
                 ),
@@ -240,7 +280,12 @@ async def _observe_real_store(engine: Any) -> dict[str, Any]:
     return {
         "disposal_item_id": P.STORE_ITEM_ID,
         "disposal_rows": [
-            {"wp_id": str(row.wp_id), "bytes": int(row.n)} for row in disposal
+            {
+                "wp_id": str(row.wp_id),
+                "bytes": int(row.n),
+                "remark": row.remark if isinstance(row.remark, str) else "",
+            }
+            for row in disposal
         ],
         "disposal_total_bytes": sum(int(row.n) for row in disposal),
         "h1_item_count": len(h1_items),
@@ -397,6 +442,14 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         raise _HarnessError(f"缺少迁移文件: {_MIGRATION}")
 
     forward = MigrationRunner._split_sql_statements(_MIGRATION.read_text(encoding="utf-8"))
+    # 🔴 生产按 V151 → V165 顺序 apply。V165 给 evidence `scenario_kind` 扩了
+    # `authorization_reject`（quarantined 场景的 kind）；只 apply V151 会让该场景的行撞
+    # V151 旧域 `ck_wpees_scenario_kind`（2026-09-26 实测 CheckViolationError）。
+    forward += MigrationRunner._split_sql_statements(
+        (_BACKEND / "migrations" / "V165__wpees_authorization_reject_kind.sql").read_text(
+            encoding="utf-8"
+        )
+    )
     schema = f"{_SCHEMA_PREFIX}{uuid.uuid4().hex[:12]}"
     ssl_off = {"ssl": False} if getattr(settings, "DB_DISABLE_SSL", False) else {}
     base_root = Path(tempfile.mkdtemp(prefix="tmp_task42_store_"))
@@ -929,17 +982,77 @@ def test_no_phase_crashed_during_collection(snap: dict[str, Any]) -> None:
 def test_disposal_store_item_is_empty_across_the_whole_database(
     real: dict[str, Any]
 ) -> None:
-    """🔴 `H1-8-rows` **全库 0 行 0 字节** —— 这是合成行 oracle 的理由，不是缺证据。
+    """🔴 `H1-8-rows` **没有真实审计数据** —— 这是合成行 oracle 的理由，不是缺证据。
 
     真实数据一旦出现，这条打红，提醒把 oracle 改跑在真实载荷上（并核对形态）。
+
+    ═══ 2026-09-28：从「0 行」收紧成「0 行**真实数据**」═══
+
+    全库现算 1 行，但它是 E2E 残留（见 `KNOWN_E2E_ARTIFACT_WP_IDS` 的说明），
+    不是真实审计数据。原断言写的是 `len(rows) == 0`，于是 E2E 跑一次就红，
+    而红的理由（"有数据了，去核对形态"）与事实（"有一行测试垃圾"）不符 —— 提示是误导的。
+
+    现在的口径：**逐行核对形态**，只放行已登记且确为合成形态的行；
+    多一行未登记的、或登记行变成真实业务文本，都会红。
     """
     from app.services.workpaper_sync import pilot_h1_grouped_dynamic as P
 
     assert real["disposal_item_id"] == P.STORE_ITEM_ID == "H1-8-rows"
-    assert len(real["disposal_rows"]) == EXPECTED_DISPOSAL_ROWS_WORKPAPERS == 0, real[
-        "disposal_rows"
-    ][:3]
-    assert real["disposal_total_bytes"] == EXPECTED_DISPOSAL_ROWS_BYTES == 0
+
+    rows = real["disposal_rows"]
+    unregistered = [r for r in rows if r["wp_id"] not in KNOWN_E2E_ARTIFACT_WP_IDS]
+    assert not unregistered, (
+        f"出现未登记的 {P.STORE_ITEM_ID} 数据：{unregistered[:3]} —— "
+        "若是真实审计数据，请把合成行 oracle 改跑在真实载荷上；"
+        "若是新的 E2E 残留，登记进 KNOWN_E2E_ARTIFACT_WP_IDS 并说明来源"
+    )
+
+    not_synthetic = [
+        r for r in rows if not _is_synthetic_e2e_payload(r.get("remark", ""))
+    ]
+    assert not not_synthetic, (
+        "已登记为 E2E 残留的行现在装着**非合成形态**的载荷 ⇒ 它变成真实数据了："
+        f"{[{k: v for k, v in r.items() if k != 'remark'} for r in not_synthetic]}；"
+        f"首行载荷片段={not_synthetic[0].get('remark', '')[:120]!r}"
+    )
+
+    # 「真实数据行」= 未登记 ∪ 形态非合成（上面两条的并集，用命名常量收口）。
+    # 🔴 不写成恒空的占位表达式 —— 它必须在任一类出现时非空，否则这条就是恒绿。
+    real_rows = [
+        r
+        for r in rows
+        if r["wp_id"] not in KNOWN_E2E_ARTIFACT_WP_IDS
+        or not _is_synthetic_e2e_payload(r.get("remark", ""))
+    ]
+    assert len(real_rows) == EXPECTED_DISPOSAL_REAL_DATA_ROWS == 0, real_rows[:3]
+
+    # 🔴 非空对照：登记表本身不许被清空 —— 否则上面两条在「库真有真实数据」时也可能空转
+    assert KNOWN_E2E_ARTIFACT_WP_IDS, "E2E 残留登记表被清空了，请同步核对判据是否仍成立"
+
+
+def test_synthetic_payload_detector_has_both_directions() -> None:
+    """🔴 `_is_synthetic_e2e_payload` 的正反对照 —— 防它退化成恒真/恒假。
+
+    上面那条判据整个建立在这个判别函数上：若它恒真，真实数据出现也放行（假绿）；
+    若它恒假，E2E 一跑就红（假阳）。故两个方向都要钉住。
+    """
+    # 正：真库现存那一行的实际形态
+    assert _is_synthetic_e2e_payload(
+        '[{"rowId": "GTROW-H18-0013", "name": "g4h1324785"}]'
+    )
+    # 反 ①：真实业务载荷（中文文本 + 多字段，本 pilot 每行 25 个字段）
+    assert not _is_synthetic_e2e_payload(
+        '[{"rowId": "GTROW-H18-0001", "assetName": "运输设备", '
+        '"disposalReason": "报废处置", "netBookValue": 12345.67}]'
+    )
+    # 反 ②：字段数对但 name 含中文 ⇒ 是人填的，不是生成的
+    assert not _is_synthetic_e2e_payload(
+        '[{"rowId": "GTROW-H18-0002", "name": "某某设备处置"}]'
+    )
+    # 反 ③：空 / 畸形一律不算「已核对过的合成形态」
+    assert not _is_synthetic_e2e_payload("")
+    assert not _is_synthetic_e2e_payload("[]")
+    assert not _is_synthetic_e2e_payload("{not json")
 
 
 def test_contract_declares_the_observed_emptiness(real: dict[str, Any]) -> None:
@@ -950,7 +1063,20 @@ def test_contract_declares_the_observed_emptiness(real: dict[str, Any]) -> None:
     store = payload["review"]["html_store"]
     assert store["item_id"] == P.STORE_ITEM_ID
     assert store["observed_empty_in_reference_database"] is True
-    assert real["disposal_total_bytes"] == 0
+    # 🔴 2026-09-28：字节数改为**排除已登记 E2E 残留**后再判 0。
+    #    契约那句 `observed_empty_in_reference_database` 说的是「没有真实业务载荷」，
+    #    而 E2E 跑一次就会留下一行合成数据（见 KNOWN_E2E_ARTIFACT_WP_IDS）。
+    #    原断言 `disposal_total_bytes == 0` 会把「E2E 跑过」误报成「契约声明失效」。
+    real_bytes = sum(
+        int(r["bytes"])
+        for r in real["disposal_rows"]
+        if r["wp_id"] not in KNOWN_E2E_ARTIFACT_WP_IDS
+        or not _is_synthetic_e2e_payload(r.get("remark", ""))
+    )
+    assert real_bytes == 0, (
+        f"排除 E2E 残留后仍有 {real_bytes} 字节真实载荷 ⇒ 契约的 "
+        "`observed_empty_in_reference_database` 已不成立，需重新核对并更新契约"
+    )
 
 
 def test_the_same_workpaper_family_really_has_h1_data(real: dict[str, Any]) -> None:
@@ -1245,25 +1371,30 @@ def test_black_box_scenarios_are_unverifiable(snap: dict[str, Any]) -> None:
     assert "identity_retention" in plan["black_box"], plan["black_box"]
 
 
-def test_upstream_gap_scenarios_are_failed_not_unverifiable(
+def test_task32_debts_cleared_scenarios_no_longer_upstream_gap(
     snap: dict[str, Any]
 ) -> None:
-    """Task 32 登记的两条缺口是**实现缺失**而不是环境缺失 ⇒ 必须 `failed`。
+    """Task 32 两条欠账已补（2026-09-25）⇒ `upstream_debt` 清空，两条场景不再 `upstream_gap`。
 
-    判定顺序不可交换：「上游缺口 → failed」在「黑盒环境缺失 → unverifiable」**之前**，
-    否则接了真实 OO 之后它们会自动变绿，而它们其实永远不会通过。
+    历史：`same_application_higher_sequence_fold` /
+    `wrong_prior_confirmation_bundle_fence_contributor_rejected` 曾各带一条 debt 让它们
+    恒 `failed`/`upstream_gap`。实现补齐后（claim expected_* 校验 + fold 读侧观测），
+    plan 不应再有任何 upstream_debt，两条场景也不得再落 `upstream_gap`。
+
+    注意：去 debt **不等于** 它们此刻 passed —— 它们仍是黑盒/证据依赖的场景，真实 OO
+    未执行前多为 `unverifiable`。本守卫只锁「不再是实现缺失的 failed」。
     """
     plan = snap["phases"]["plan"]
     scenarios = snap["phases"]["scenarios"]
-    assert plan["upstream_debt"], plan
-    for scenario_id in plan["upstream_debt"]:
-        row = scenarios[scenario_id]
-        assert row["result"] == "failed", (scenario_id, row)
-        assert row["error_code"] == "upstream_gap", (scenario_id, row)
-    assert set(plan["upstream_debt"]) == {
+    assert plan["upstream_debt"] == [], (
+        f"Task 32 两条欠账已补，plan 不应再有 upstream_debt：{plan['upstream_debt']}"
+    )
+    for scenario_id in (
         "same_application_higher_sequence_fold",
         "wrong_prior_confirmation_bundle_fence_contributor_rejected",
-    }, plan["upstream_debt"]
+    ):
+        row = scenarios[scenario_id]
+        assert row["error_code"] != "upstream_gap", (scenario_id, row)
 
 
 def test_run_is_not_verified_without_real_onlyoffice(snap: dict[str, Any]) -> None:

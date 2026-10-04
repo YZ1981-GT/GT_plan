@@ -235,8 +235,10 @@ export function useG8FairValueTest(opts: {
     fairValueDiff: calcSubtotal(rows.value.map((r) => r.fairValueDiff)),
   }))
 
+  // 🔴 C-8：G8-2 的 `closingBalance` 单值列已拆成三分量 ⇒ 回退链删除，
+  //    审定数一律取模板 T 列 `closingAdjusted`（由 `=Q+S` 重算）。
   const detailClosingAdjustedTotal = computed(() =>
-    calcSubtotal(detailRows.value.map((r) => parseNum(r.closingAdjusted ?? r.closingBalance))),
+    calcSubtotal(detailRows.value.map((r) => parseNum(r.closingAdjusted))),
   )
 
   const crossRefVariance = computed(() =>
@@ -416,19 +418,22 @@ export function useG8FairValueTest(opts: {
     let added = 0
     let updated = 0
 
+    // 🔴 C-8：G8-2 按权威模板重构后**没有** shareCount/pricePerShare/fairValueTotal/
+    //    fairValueLevel/valuationMethod 五列 —— 那五列的权威源就是**本表 G8-4**。
+    //    ⇒ 从 G8-2 同步过来的只有「名单 + 期末审定金额」；数量/单价/层次/估值方法
+    //    保持本表已有值（新行走 emptyRow 的默认），不再从明细表倒灌。
     for (const d of details) {
       const key = matchG8InvesteeKey(d.investeeName)
-      const qty = parseNum(d.shareCount)
-      const price = parseNum(d.pricePerShare)
-      const fv = parseNum(d.fairValueTotal) || calcFairValueAmount(qty, price) || parseNum(d.closingAdjusted)
+      const prevRow = existing.get(key)
+      const fv = parseNum(d.closingAdjusted)
+      // 数量以本表为准；本表无数量时单价留空，由审计人员按 G8-4 口径补
+      const qty = parseNum(prevRow?.closingAuditedQty)
       const patch: Partial<G8FairValueRow> = {
         investeeName: d.investeeName,
         closingUnadjustedQty: qty,
-        closingUnadjustedPrice: price || (qty ? fv / qty : 0),
+        closingUnadjustedPrice: qty ? fv / qty : parseNum(prevRow?.closingUnadjustedPrice),
         closingAuditedQty: qty,
-        closingAuditedPrice: price || (qty ? fv / qty : 0),
-        fairValueLevel: d.fairValueLevel || 'Level2',
-        valuationMethod: d.valuationMethod || G8_VALUATION_METHOD_OPTIONS[0],
+        closingAuditedPrice: qty ? fv / qty : parseNum(prevRow?.closingAuditedPrice),
       }
 
       if (existing.has(key)) {
@@ -446,7 +451,13 @@ export function useG8FairValueTest(opts: {
     ElMessage.success(`已从 G8-2 同步：新增 ${added} 行，更新 ${updated} 行`)
   }
 
-  /** 将审定层次/数量/单价/FV 回写 G8-2，并同步 G8-5 层次 */
+  /**
+   * 同步审定层次到 G8-5。
+   *
+   * 🔴 C-8：原先还回写 G8-2（层次/数量/单价/FV 五列）—— 那五列的权威源就是**本表**，
+   * 且 G8-2 按权威模板重构后没有这五列 ⇒ `pushG8FvToDetail` 已停用恒返 0。
+   * 保留调用点只为让「回写了几行」的提示口径不变（G8-2 恒 0）。
+   */
   function pushToDetail(): number {
     if (opts.isReadonly.value) return 0
     if (!rows.value.length) {
@@ -455,14 +466,11 @@ export function useG8FairValueTest(opts: {
     }
     const nDetail = pushG8FvToDetail(opts.allResponses.value, opts.debouncedSave, rows.value)
     const nDesig = pushG8FvToDesignation(opts.allResponses.value, opts.debouncedSave, rows.value)
-    if (!nDetail && !nDesig) {
-      ElMessage.warning('未匹配到 G8-2/G8-5 行，请先编制明细或核对被投资单位名称')
+    if (!nDesig) {
+      ElMessage.warning('未匹配到 G8-5 行，请先编制指定适当性检查表或核对被投资单位名称')
       return 0
     }
-    const parts: string[] = []
-    if (nDetail) parts.push(`G8-2 ${nDetail} 行`)
-    if (nDesig) parts.push(`G8-5 ${nDesig} 行`)
-    ElMessage.success(`已回写：${parts.join('，')}（层次/审定FV）`)
+    ElMessage.success(`已同步 G8-5 ${nDesig} 行（层次/审定FV）`)
     return nDetail + nDesig
   }
 

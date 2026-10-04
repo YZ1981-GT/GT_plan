@@ -32,7 +32,37 @@ const TARGETS = new Map([
     canonicalFile: 'audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue',
     documentType: 'docx',
   }],
+  // 🔴 真双向载体。spec: sync-editor-host-discovery-contract-closure
+  //
+  // 它此前**不在**白名单里，后果是：宿主一旦完成双向迁移、删掉 legacy 标签，
+  // 它在 manifest 里的 entry 就直接不存在（entry 只能由发现到的挂点派生）。
+  // 迁移越彻底越早消失 —— 34 个 `d4/**` tab 已真实消失过，17 个 A 类随后消失。
+  //
+  // `documentType: null` 是**刻意的**：本组件的 props 只有 `descriptor`/`bridge`，
+  // 不带 wp-id / sheet-name / 文档类型，且它同时服务 Excel 与 Word
+  // （见 WorkpaperSyncEditorHost.vue 首行注释）⇒ 文档类型无法从挂点自身推出，
+  // 必须由 `resolveSyncHostIdentity()` 的 L1/L2 或后端 overlay 的 L3 规则给出。
+  // **禁止**在这里填一个默认值（例如 'xlsx'）：现算 96/96 确实都是 xlsx，
+  // 但默认值会让第一个 docx 迁移宿主**静默**落到错误的 document_type。
+  ['workpapersynceditorhost', {
+    component: 'WorkpaperSyncEditorHost',
+    canonicalFile: 'audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue',
+    documentType: null,
+  }],
 ])
+
+/** 文档类型固定的组件（= 可作为 L1 兄弟信号的来源）。 */
+const FIXED_DOCUMENT_TYPE_COMPONENTS = new Set(
+  [...TARGETS.values()].filter((item) => item.documentType !== null).map((item) => item.component),
+)
+
+/** 需要靠解析链给出文档类型的组件。 */
+const DEFERRED_DOCUMENT_TYPE_COMPONENTS = new Set(
+  [...TARGETS.values()].filter((item) => item.documentType === null).map((item) => item.component),
+)
+
+/** L2 信号的取值形态：`{xlsx|docx}/…`（与后端 `_entry_id` 的产出同形）。 */
+const SYNC_ENTRY_ID_LITERAL = /^(?:xlsx|docx)\/[A-Za-z0-9][A-Za-z0-9/_-]*$/
 
 const EXCLUDED_SEGMENTS = new Set([
   '__tests__',
@@ -238,6 +268,11 @@ function discoverVueFile(repoRoot, file) {
   const relative = toPosix(path.relative(repoRoot, file))
   const bindings = collectBindings(repoRoot, file, parsed.ast)
   const mounts = []
+  //: L2 信号：模板里 `entry-id="{xlsx|docx}/…"` 的**静态字面量**。
+  //  读的是 AST 的属性节点（与读 `sheet-name` 完全同构）⇒ 注释里的同形文字不进 AST，
+  //  天然排除；也**不做跨文件闭包扫描** —— 实测有宿主 import 的共享模块里列了 51 个
+  //  entry_id 字面量，按「任意字符串字面量」取会得到无法判定的集合。
+  const entryIdDeclarations = []
   let ordinal = 0
 
   function visitElement(element) {
@@ -245,6 +280,16 @@ function discoverVueFile(repoRoot, file) {
     ordinal += 1
     const rawName = element.rawName || element.name || ''
     const normalized = normalizeComponentName(rawName)
+    for (const attribute of element.startTag?.attributes || []) {
+      // 静态属性：key.name 是字符串 'entry-id'，value 是 VLiteral
+      const key = attribute.key
+      const isStatic = attribute.directive !== true && String(key?.name || '') === 'entry-id'
+      const literal = attribute.value
+      if (isStatic && literal && typeof literal.value === 'string'
+          && SYNC_ENTRY_ID_LITERAL.test(literal.value)) {
+        entryIdDeclarations.push(literal.value)
+      }
+    }
     const binding = bindings.get(normalized)
     const directTarget = TARGETS.get(normalized)
     const target = binding || (directTarget ? { ...directTarget, importKind: 'global-auto', localName: rawName } : null)
@@ -297,7 +342,75 @@ function discoverVueFile(repoRoot, file) {
   for (const child of parsed.services?.getTemplateBodyTokenStore && parsed.ast.templateBody?.children || []) {
     if (child.type === 'VElement') visitElement(child)
   }
+  resolveSyncHostIdentity(relative, mounts, entryIdDeclarations)
   return mounts
+}
+
+/**
+ * 给文档类型待定的挂点（`WorkpaperSyncEditorHost`）解析身份。
+ * spec: sync-editor-host-discovery-contract-closure · Requirement 2
+ *
+ * 必须在**同一文件的全部挂点收集完之后**调用 —— L1 依赖兄弟挂点。
+ *
+ * 层级严格 L1 → L2，**没有第四层兜底**：两层都不成立就把 documentType 留 null 并标
+ * `needsOverlayRule`，交后端 overlay 的 L3 reviewed 规则裁决；仍无规则则生成器 fail closed。
+ *
+ * 🔴 为什么不兜底成 'xlsx'：现算 96/96 都是 xlsx，所以兜底"今天是对的"。但第一个 docx
+ * 宿主迁移时会**静默**落到 xlsx ⇒ entry_id 前缀错、与已交付契约失配，且无判据能看见。
+ */
+function resolveSyncHostIdentity(relative, mounts, entryIdDeclarations) {
+  const deferred = mounts.filter((item) => DEFERRED_DOCUMENT_TYPE_COMPONENTS.has(item.component))
+  if (!deferred.length) return
+
+  // ── L1：同文件里文档类型固定的兄弟挂点
+  const siblingTypes = [...new Set(
+    mounts
+      .filter((item) => FIXED_DOCUMENT_TYPE_COMPONENTS.has(item.component))
+      .map((item) => item.documentType),
+  )].sort()
+  if (siblingTypes.length > 1) {
+    throw new Error(
+      `${relative}: sync host document type is ambiguous — sibling mounts declare ${JSON.stringify(siblingTypes)}; `
+      + 'a reviewed overlay rule is required (Requirement 2.1)',
+    )
+  }
+
+  // ── L2：同模板里 `entry-id` 的**静态字面量**（注释不进 AST，天然排除）
+  const declared = [...new Set(entryIdDeclarations)].sort()
+  if (declared.length > 1) {
+    throw new Error(
+      `${relative}: sync host identity is ambiguous — template declares ${JSON.stringify(declared)}; `
+      + 'exactly one static entry-id literal is required (Requirement 2.2)',
+    )
+  }
+
+  // ── 交叉校验：两层都有信号时文档类型必须一致（独立来源，互不依赖）
+  if (siblingTypes.length === 1 && declared.length === 1) {
+    const declaredType = declared[0].split('/')[0]
+    if (declaredType !== siblingTypes[0]) {
+      throw new Error(
+        `${relative}: document type conflict — sibling mounts say '${siblingTypes[0]}' but the `
+        + `entry-id declaration '${declared[0]}' says '${declaredType}' (Requirement 2.5)`,
+      )
+    }
+  }
+
+  for (const fact of deferred) {
+    if (siblingTypes.length === 1) {
+      fact.documentType = siblingTypes[0]
+      fact.documentTypeSource = 'sibling_mount'
+    } else if (declared.length === 1) {
+      fact.documentType = declared[0].split('/')[0]
+      fact.documentTypeSource = 'entry_id_declaration'
+    } else {
+      fact.documentType = null
+      fact.documentTypeSource = null
+    }
+    fact.entryIdDeclaration = declared.length === 1 ? declared[0] : null
+    fact.needsOverlayRule = fact.documentType === null
+    // mountId 的输入里没有这些字段（见 mountId()），所以不必重算 —— 但显式记一笔：
+    // 身份解析**不改变**挂点的 mount 身份，只补齐它的文档类型来源。
+  }
 }
 
 function registryWordMount(repoRoot) {

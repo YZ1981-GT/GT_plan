@@ -17,6 +17,7 @@ import {
   type AdjudicationDetailRow,
   type AdjudicationSection,
 } from '../composables/useD1Adjudication'
+import D1CellOverrideBadge from './D1CellOverrideBadge.vue'
 import { isChangeRateExceeding } from '../composables/useD1FormulaEngine'
 import type { ChecklistResponse } from '../composables/useD1FormData'
 import GtReviewDot from '../GtReviewDot.vue'
@@ -83,6 +84,8 @@ const {
   saveAuditConclusion,
   aiGenerateNote,
   aiGenerateConclusion,
+  // Task 33：逐格四态的「恢复取数」入口（D1CellOverrideBadge 的 @restore 调它）。
+  restoreDerivedValue,
 } = useD1Adjudication({
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>,
   wpId: toRef(props, 'wpId') as Ref<string>,
@@ -284,32 +287,61 @@ const dSourceHints = [
           </el-table-column>
 
           <!-- 期初 -->
-          <el-table-column label="期初未审" width="110" align="right">
+          <!--
+            🔴 Task 33：金额格**不再**用 `!row.isFromCrossSheet` 挡编辑。
+            修前 cross-sheet 命中就整行只读 ⇒ 审计师录的手工值既看不见也改不了（静默丢数据）。
+            现在可编辑性只看区块本身（净值区仍恒只读，它是公式），覆盖由逐格四态
+            `row.cellStates[field]` 表达，`D1CellOverrideBadge` 负责显示标记与「恢复取数」。
+          -->
+          <el-table-column label="期初未审" width="130" align="right">
             <template #default="{ row }">
-              <el-tooltip v-if="row.isFromCrossSheet" :content="getCrossSheetTooltip(row)" placement="top">
+              <WpAmountInput
+                v-if="row.isEditable && !isReadonly"
+                :model-value="row.priorUnadjusted"
+                @update:model-value="(v: number) => updateCell(row.rowKey, 'prior-unadj', v || 0)"
+              />
+              <el-tooltip v-else-if="row.isFromCrossSheet" :content="getCrossSheetTooltip(row)" placement="top">
                 <span :class="getCellClass(row, 'priorUnadjusted')" v-html="fmtAmount(row.priorUnadjusted)" />
               </el-tooltip>
               <span v-else v-html="fmtAmount(row.priorUnadjusted)" />
+              <D1CellOverrideBadge
+                :row="row"
+                field="prior-unadj"
+                :readonly="isReadonly"
+                @restore="restoreDerivedValue"
+              />
             </template>
           </el-table-column>
-          <el-table-column label="期初AJE" width="100" align="right">
+          <el-table-column label="期初AJE" width="120" align="right">
             <template #default="{ row }">
               <WpAmountInput
-                v-if="row.isEditable && !isReadonly && !row.isFromCrossSheet"
+                v-if="row.isEditable && !isReadonly"
                 :model-value="row.priorAje"
                 @update:model-value="(v: number) => updateCell(row.rowKey, 'prior-aje', v || 0)"
               />
               <span v-else v-html="fmtAmount(row.priorAje)" />
+              <D1CellOverrideBadge
+                :row="row"
+                field="prior-aje"
+                :readonly="isReadonly"
+                @restore="restoreDerivedValue"
+              />
             </template>
           </el-table-column>
-          <el-table-column label="期初RJE" width="100" align="right">
+          <el-table-column label="期初RJE" width="120" align="right">
             <template #default="{ row }">
               <WpAmountInput
-                v-if="row.isEditable && !isReadonly && !row.isFromCrossSheet"
+                v-if="row.isEditable && !isReadonly"
                 :model-value="row.priorRje"
                 @update:model-value="(v: number) => updateCell(row.rowKey, 'prior-rje', v || 0)"
               />
               <span v-else v-html="fmtAmount(row.priorRje)" />
+              <D1CellOverrideBadge
+                :row="row"
+                field="prior-rje"
+                :readonly="isReadonly"
+                @restore="restoreDerivedValue"
+              />
             </template>
           </el-table-column>
           <el-table-column label="期初审定" width="110" align="right">
@@ -319,37 +351,55 @@ const dSourceHints = [
           </el-table-column>
 
           <!-- 期末 -->
-          <el-table-column label="期末未审" width="110" align="right">
+          <el-table-column label="期末未审" width="130" align="right">
             <template #default="{ row }">
-              <el-tooltip v-if="row.isFromCrossSheet" :content="getCrossSheetTooltip(row)" placement="top">
-                <span :class="getCellClass(row, 'currentUnadjusted')" v-html="fmtAmount(row.currentUnadjusted)" />
-              </el-tooltip>
               <WpAmountInput
-                v-else-if="row.isEditable && !isReadonly"
+                v-if="row.isEditable && !isReadonly"
                 :model-value="row.currentUnadjusted"
                 @update:model-value="(v: number) => updateCell(row.rowKey, 'current-unadj', v || 0)"
               />
+              <el-tooltip v-else-if="row.isFromCrossSheet" :content="getCrossSheetTooltip(row)" placement="top">
+                <span :class="getCellClass(row, 'currentUnadjusted')" v-html="fmtAmount(row.currentUnadjusted)" />
+              </el-tooltip>
               <span v-else v-html="fmtAmount(row.currentUnadjusted)" />
+              <D1CellOverrideBadge
+                :row="row"
+                field="current-unadj"
+                :readonly="isReadonly"
+                @restore="restoreDerivedValue"
+              />
             </template>
           </el-table-column>
-          <el-table-column label="期末AJE" width="100" align="right">
+          <el-table-column label="期末AJE" width="120" align="right">
             <template #default="{ row }">
               <WpAmountInput
-                v-if="row.isEditable && !isReadonly && !row.isFromCrossSheet"
+                v-if="row.isEditable && !isReadonly"
                 :model-value="row.currentAje"
                 @update:model-value="(v: number) => updateCell(row.rowKey, 'current-aje', v || 0)"
               />
               <span v-else v-html="fmtAmount(row.currentAje)" />
+              <D1CellOverrideBadge
+                :row="row"
+                field="current-aje"
+                :readonly="isReadonly"
+                @restore="restoreDerivedValue"
+              />
             </template>
           </el-table-column>
-          <el-table-column label="期末RJE" width="100" align="right">
+          <el-table-column label="期末RJE" width="120" align="right">
             <template #default="{ row }">
               <WpAmountInput
-                v-if="row.isEditable && !isReadonly && !row.isFromCrossSheet"
+                v-if="row.isEditable && !isReadonly"
                 :model-value="row.currentRje"
                 @update:model-value="(v: number) => updateCell(row.rowKey, 'current-rje', v || 0)"
               />
               <span v-else v-html="fmtAmount(row.currentRje)" />
+              <D1CellOverrideBadge
+                :row="row"
+                field="current-rje"
+                :readonly="isReadonly"
+                @restore="restoreDerivedValue"
+              />
             </template>
           </el-table-column>
           <el-table-column label="期末审定" width="110" align="right">

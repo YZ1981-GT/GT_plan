@@ -296,8 +296,11 @@ export function summarizeG10CrossChecks(m: Map<string, ChecklistResponse>): G10C
 
   const fvTotal = fvAuditedTotal(m)
   const detailForFv = parseG10DetailRows(m.get(G10_DETAIL_ROWS_KEY)?.remark ?? m.get(G10_DETAIL_KEY)?.remark)
+  // 🔴 C-7：`closingBalance` 回退链已删 —— 那是走审定线的 legacy 口径
+  //    （`=期初审定+变动−减少`），与权威模板的 `M=K+L`（未审线）双源且口径错。
+  //    审定数一律取模板 O 列 `closingAdjusted`（由 `enrichG10DetailRow` 按 `=M+N` 重算）。
   const detailFvTotal = detailForFv.length
-    ? calcSubtotal(detailForFv.map((r) => parseNum(r.closingAdjusted ?? r.closingBalance)))
+    ? calcSubtotal(detailForFv.map((r) => parseNum(r.closingAdjusted)))
     : null
   if (fvTotal == null) {
     items.push({

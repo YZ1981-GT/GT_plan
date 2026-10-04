@@ -250,6 +250,37 @@ def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _normalize_eol(raw: bytes) -> bytes:
+    """行尾归一（CRLF/CR → LF），供**文本**源做平台无关的 digest。"""
+    return raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+
+
+def _sha256_text_source(raw: bytes) -> str:
+    """文本源的**平台无关** sha256：先行尾归一再 hash。
+
+    🔴 为什么不能直接 `_sha256_bytes(path.read_bytes())`：本仓库
+    `core.autocrlf=true`，而 `backend/data/*.json` 没有 `eol=lf` 属性（`.gitattributes`
+    只给 `backend/data/workpaper_sync_contracts/*.json` 配了）。于是同一份内容在
+    Windows 工作树是 CRLF、在 Linux/CI 是 LF，raw sha256 **随平台分叉**：
+    实测 `onlyoffice_word_sdt_carrier_contract.json` raw=`bb82909043ab…`（347 处 CRLF、
+    0 处裸 LF）而归一后=`be4d11dde4e9…`，且归一结果与 `git show HEAD:<path>` **逐字节
+    相等** —— 100% 的差异就是行尾，内容一个字节都没变。
+
+    `carrier_contract_sha256` 已被写进多份裁决产物（`workpaper_sync_task62_*`、
+    `workpaper_sync_a16_a17_word_chain_*`），登记的是 LF 值 `be4d…`。用 raw hash 会让
+    这些产物在 Windows 上必红；而"重跑生成器"只是把 Windows-only digest 焊进基线 ——
+    本机绿、CI 红。行尾不是"载体裁决"这个事实的一部分，故归一后再 hash。
+
+    同形修法已在本仓库落地并转绿：`scripts/gen/generate_workpaper_task44_pilot_probe_registry.py`
+    的 `_normalize_eol()` 与 `scripts/check/check_task44_oo94_excel_pilot_gate.py`
+    的 `read_task_body()`。
+
+    ⚠️ 只对**文本**源用。DOCX/xlsx 等二进制源必须走 `_sha256_bytes()`：对二进制做
+    CRLF→LF 替换会破坏字节流，把"内容漂移"判据变成假绿。
+    """
+    return _sha256_bytes(_normalize_eol(raw))
+
+
 def word_structure_hash(data: bytes) -> str:
     """DOCX 的 normalized structure hash（Requirement 9.1 / 9.8 的漂移判据）。
 
@@ -298,7 +329,10 @@ class WordSdtCarrierGate:
                 f"instrumentation gate 基线缺失: {path} —— 缺基线等于没有 stale 判据"
             )
         raw = WORD_GATE_CONTRACT_PATH.read_bytes()
-        contract_digest = _sha256_bytes(raw)
+        # 契约是 JSON 文本 ⇒ digest 必须行尾归一，否则 CRLF 工作树算出的值与产物里
+        # 登记的 LF 值分叉（见 `_sha256_text_source` 的 🔴）。JSON 解析本身对行尾不敏感，
+        # 所以 `payload` 仍按**原始**字节解，语义零变化。
+        contract_digest = _sha256_text_source(raw)
         payload = json.loads(raw.decode("utf-8"))
         baseline = json.loads(path.read_text(encoding="utf-8"))
 
@@ -309,6 +343,20 @@ class WordSdtCarrierGate:
                 raise WordProbeEvidenceStaleError(
                     f"stale 判据引用的文件不存在: {item['path']}（role={item.get('role')}）"
                 )
+            # 🔴 这里**刻意保留 raw hash**，不要"顺手"改成 `_sha256_text_source`。
+            # 实测（2026-06-01）`onlyoffice_word_instrumentation_gate.json` 在 **HEAD 里**
+            # 登记的 7 条文本 digest 全部等于 CRLF 工作树的 raw 值（carrier_contract
+            # bb8290 / fingerprint_module 6d321a / probe_script 2809b4 / operation_matrix
+            # 55b9fa / instrumentation_report 00af03 / independent_recompute c84d78 /
+            # oo_build 1725f2），即这份基线是在 Windows 工作树上采的。
+            #
+            # 后果：单独在这里归一 ⇒ 实测值变成 LF digest、与基线的 CRLF 值不符 ⇒ 本门
+            # 立刻 fail closed，所有 `WordSdtCarrierGate.load()` 调用方全红。而归一**也
+            # 救不了 Linux**：LF 工作树无论归一与否都算不出 CRLF digest，基线值在 Linux
+            # 上不可达。要真正做到平台无关，必须「归一读」+「基线重采成 LF 值」**同时**
+            # 改 —— 后者是改 `backend/data/` 下的 fail-closed 基线产物，属独立决策，
+            # 不在本次修复范围（详见 docs/operations/evidence/suite-triage/
+            # generated-artifact-drift.md §EOL 根因修复）。
             observed = _sha256_bytes(target.read_bytes())
             if observed != item["sha256"]:
                 raise WordProbeEvidenceStaleError(

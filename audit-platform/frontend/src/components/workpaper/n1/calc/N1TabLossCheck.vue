@@ -57,6 +57,7 @@
 
       <!-- ═══ 主表：按源模板列顺序 ═══ -->
       <el-table
+        v-if="props.viewMode !== 'matrix'"
         :data="lossCheck.rows.value"
         border
         size="small"
@@ -293,7 +294,7 @@
     </el-card>
 
     <!-- ═══ 判断矩阵视图（源模板语义 Req 1.6 / Task 3.2） ═══ -->
-    <el-card shadow="never" class="n1-section-card n1-matrix-card">
+    <el-card v-if="props.viewMode === 'matrix'" shadow="never" class="n1-section-card n1-matrix-card">
       <template #header>
         <span class="section-title">判断矩阵（复核视角）</span>
       </template>
@@ -409,7 +410,7 @@
  *   确认金额 | 不确认金额(formula) | 依据 | 是否充足(el-select) | 来源三选(3 checkbox) |
  *   检查底稿索引 | 可确认递延税资产(formula) | 备注
  */
-import { ref, computed, toRef } from 'vue'
+import { ref, computed, toRef, onMounted } from 'vue'
 import type { ComputedRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { WarningFilled, MagicStick } from '@element-plus/icons-vue'
@@ -418,6 +419,8 @@ import GtIndexChip from '../../GtIndexChip.vue'
 // @ts-ignore
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import { useN1LossCheck } from '../../composables/useN1LossCheck'
+import { useN1FormData } from '../../composables/useN1FormData'
+import { useN1ImportExport } from '../../composables/useN1ImportExport'
 import N1LossJudgmentMatrix from './N1LossJudgmentMatrix.vue'
 import type { N1LossComputedRow, N1LossWarning, N1LossLeadKey, EditableLeadField } from '../../composables/useN1LossCheck'
 import { generateN1Text } from '../../composables/useN1AiText'
@@ -426,26 +429,29 @@ import { eventBus } from '@/utils/eventBus'
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 const props = defineProps<{
-  allResponses: Map<string, any>
   wpId: string
   projectId: string
   year: number
   isReadonly: boolean
-  formData: any
+  viewMode?: 'structured' | 'matrix'
 }>()
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 
 const wpIdRef = toRef(props, 'wpId')
 const projectIdRef = toRef(props, 'projectId')
-const auditYearRef = computed(() => props.year || new Date().getFullYear())
-const allResponsesRef = computed(() => props.allResponses ?? new Map())
+const auditYearRef = computed(() => props.year)
+const formData = useN1FormData({ wpId: wpIdRef, projectId: projectIdRef, year: auditYearRef })
+const importExport = useN1ImportExport({ wpId: wpIdRef, projectId: projectIdRef })
+const allResponsesRef = formData.allResponses
+
+onMounted(() => { void formData.loadData() })
 
 const lossCheck = useN1LossCheck({
   wpId: wpIdRef,
   projectId: projectIdRef,
   allResponses: allResponsesRef as ComputedRef<Map<string, any>>,
-  formData: props.formData,
+  formData,
   auditYear: auditYearRef,
 })
 
@@ -573,7 +579,7 @@ async function handleWritebackToN4() {
   writebackLoading.value = true
   try {
     const total = lossCheck.totals.value.recognizableAsset
-    await props.formData.saveField('N1-5-total-recognizable', { remark: String(total) })
+    await formData.saveField('N1-5-total-recognizable', { remark: String(total) })
     eventBus.emit('loss-check:recognizable-updated', {
       recognizableTotal: total,
       wpCode: 'N1',
@@ -591,8 +597,7 @@ async function handleWritebackToN4() {
 // ─── 导入导出 ────────────────────────────────────────────────────────────────
 
 async function handleImportExportCmd(cmd: string) {
-  const ie = props.formData?.importExport
-  if (!ie) { ElMessage.warning('导入导出功能未就绪'); return }
+  const ie = importExport
   switch (cmd) {
     case 'export-template':
       await ie.exportTemplate('N1-5')
@@ -608,7 +613,7 @@ async function handleImportExportCmd(cmd: string) {
         const file = (e.target as HTMLInputElement).files?.[0]
         if (file) {
           await ie.importData(file, 'N1-5')
-          await props.formData.loadData?.()
+          await formData.loadData?.()
         }
       }
       input.click()

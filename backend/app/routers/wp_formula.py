@@ -849,7 +849,20 @@ async def delete_formula(
     _target_cell = existing.target_cell
     _sheet_name = existing.sheet_name
 
-    await wp_formula_service.delete(db, formula_id)
+    # 🔴 2026-09-22 修复：必须传 project_id。`wp_formula_service.delete` 的第一道 ownership
+    #    门是「project_id 为 None 即拒绝并 return False」（Req 10.6），此前这里不传 ⇒ 服务层
+    #    永不执行 `db.delete(obj)`，而本函数又忽略返回值、无条件返回 `{"deleted": ...}` ⇒
+    #    **恒假成功**：前端显示删除成功，刷新后公式仍在（真栈实测：DELETE 200 之后
+    #    GET /formulas 仍返回该条，is_deleted 为 None）。
+    #    同款缺陷在 `list_by_wp` 路径上已修过（见上方 `list_formulas` 的注释「此前缺
+    #    project_id 恒空」），delete 是当时漏掉的最后一处。
+    deleted = await wp_formula_service.delete(
+        db, formula_id, project_id=wp.project_id
+    )
+    if not deleted:
+        # 上面已按 (id, wp_id) 校验过存在性，走到这里只可能是 project 归属不匹配。
+        # 不得再返回 200「已删除」—— 那正是本次修复要消灭的假成功。
+        raise HTTPException(status_code=404, detail="公式不存在")
     await db.commit()
     # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
 

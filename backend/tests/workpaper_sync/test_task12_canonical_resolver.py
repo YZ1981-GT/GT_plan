@@ -1124,10 +1124,19 @@ class TestResolverMigrationMatrix:
         # `TEMPLATES_DIR / ...` lookups that the d1262c80 file split had made
         # invisible are back in the denominator. The set is still enumerated
         # writer-by-writer on purpose -- see this test docstring.
+        #
+        # `find_whole_workbook_templates` is the sixth member (adjudicated as a
+        # resolver by the Task 74 inventory pass, commit a4c8d20cc). It scans
+        # TEMPLATES_DIR directly *by design* -- whole-workbook merged templates
+        # are deliberately absent from `_index.json`, which only indexes the
+        # range-split packages -- so it is a genuine path-resolution fork on the
+        # xlsx template-library lane, not on the Word lane Task 58 migrated.
+        # It is held to the same invariant as the other deferred helpers below.
         assert set(rows) == {
             "find_template_file_any",
             "find_all_template_files",
             "find_template_file",
+            "find_whole_workbook_templates",
             "_find_docx_by_index_or_disk",
             "_find_docx_on_disk",
         }, (
@@ -1167,7 +1176,12 @@ class TestResolverMigrationMatrix:
         # The three recovered rows are helpers of the same template-library lane:
         # none of them is on the Word lane Task 58 migrated, so each must still
         # carry a non-empty blocking_task that does not point at the done Task 58.
-        for name in ("find_template_file", "_find_docx_by_index_or_disk", "_find_docx_on_disk"):
+        for name in (
+            "find_template_file",
+            "find_whole_workbook_templates",
+            "_find_docx_by_index_or_disk",
+            "_find_docx_on_disk",
+        ):
             row = rows[name]
             assert row["status"] == "deferred", name
             assert str(row.get("blocking_task") or "").strip(), name

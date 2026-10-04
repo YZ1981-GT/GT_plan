@@ -347,6 +347,14 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         raise _HarnessError(f"缺少迁移文件: {_MIGRATION}")
 
     forward = MigrationRunner._split_sql_statements(_MIGRATION.read_text(encoding="utf-8"))
+    # 🔴 生产按 V151 → V165 顺序 apply。V165 给 evidence `scenario_kind` 扩了
+    # `authorization_reject`（quarantined 场景的 kind）；只 apply V151 会让该场景的行撞
+    # V151 旧域 `ck_wpees_scenario_kind`（2026-09-26 实测 CheckViolationError）。
+    forward += MigrationRunner._split_sql_statements(
+        (_BACKEND / "migrations" / "V165__wpees_authorization_reject_kind.sql").read_text(
+            encoding="utf-8"
+        )
+    )
     schema = f"{_SCHEMA_PREFIX}{uuid.uuid4().hex[:12]}"
     ssl_off = {"ssl": False} if getattr(settings, "DB_DISABLE_SSL", False) else {}
     base_root = Path(tempfile.mkdtemp(prefix="tmp_task43_store_"))
@@ -1158,22 +1166,22 @@ def test_black_box_scenarios_are_unverifiable(snap: dict[str, Any]) -> None:
         assert PH.SCENARIO_ORACLES[scenario_id].needs_black_box is True
 
 
-def test_upstream_gap_scenarios_are_failed_not_unverifiable(
+def test_task32_debts_cleared_scenarios_no_longer_upstream_gap(
     snap: dict[str, Any]
 ) -> None:
-    """Task 32 的两条缺口是**实现缺失**而不是环境缺失 ⇒ `failed`，且判定顺序在黑盒之前。"""
+    """Task 32 两条欠账已补（2026-09-25）⇒ upstream_debt 清空，两条不再 `upstream_gap`。
+
+    实现补齐后（claim expected_* 校验 + fold 读侧观测），这两条不再是「实现缺失」的
+    failed；真实 OO 未执行前仍可能 unverifiable，本守卫只锁「不再 upstream_gap」。
+    """
     results = snap["phases"]["scenarios"]
     debts = snap["phases"]["plan"]["upstream_debt"]
-    assert set(debts) == {
+    assert set(debts) == set(), f"Task 32 两条欠账已补，不应再有 upstream_debt：{debts}"
+    for scenario_id in (
         "same_application_higher_sequence_fold",
         "wrong_prior_confirmation_bundle_fence_contributor_rejected",
-    }, debts
-    for scenario_id in debts:
-        assert results[scenario_id]["result"] == "failed", (
-            scenario_id,
-            results[scenario_id],
-        )
-        assert results[scenario_id]["error_code"] == "upstream_gap", results[scenario_id]
+    ):
+        assert results[scenario_id]["error_code"] != "upstream_gap", results[scenario_id]
 
 
 def test_offline_scenarios_that_can_pass_really_passed(snap: dict[str, Any]) -> None:

@@ -77,7 +77,13 @@ export interface AdjudicationRow {
   change: number              // = 期末审定 - 期初审定
   changeRate: number | ''     // = (期末-期初)/期初
   reasonAnalysis: string
-  isFromSumif: boolean        // SUMIF自动取数标记
+  /**
+   * 取数来源（归一自旧 isFromSumif 布尔标记 —— spec d2-sync-coverage Q9）。
+   * - 'tb'     = SUMIF 从 D2-2 明细表按 creditRiskClassification 分类派生
+   * - 'manual' = 人工录入（SUMIF 无匹配或合计行）
+   * 与 shared/dynamicAdjudicationRows.DynamicRowSource 同域，接四态覆盖状态机。
+   */
+  source: 'tb' | 'manual'
   isEditable: boolean         // 合计行=false
 }
 
@@ -169,25 +175,14 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
             priorAudited: parseNum(row.priorAudited),
           }))
         }
-      } catch { /* fall through to row-by-row */ }
+      } catch { /* 主路径解析失败 → 返回空，不再退回死降级路径 */ }
     }
 
-    // 方式2: 逐行读取 D2-detail-{n}-{field} 格式
-    const countVal = getVal('D2-detail-count').remark
-    const count = parseNum(countVal)
-    if (count <= 0) return []
-
-    const rows: DetailRowForSumif[] = []
-    for (let i = 1; i <= count; i++) {
-      rows.push({
-        creditRiskClassification: getVal(`D2-detail-${i}-creditRiskClassification`).remark || getVal(`D2-detail-${i}-AI`).remark || '',
-        currentUnadjusted: parseNum(getVal(`D2-detail-${i}-currentUnadjusted`).remark),
-        currentAje: parseNum(getVal(`D2-detail-${i}-currentAje`).remark),
-        currentRje: parseNum(getVal(`D2-detail-${i}-currentRje`).remark),
-        priorAudited: parseNum(getVal(`D2-detail-${i}-priorAudited`).remark),
-      })
-    }
-    return rows
+    // 🔴 spec d2-sync-coverage Task 15：删死降级路径（裁决 E4 / Requirement 4.3）。
+    // 原「方式2」逐行读 D2-detail-{n}-{field} + D2-detail-count 已删 —— useD2Detail **只写**
+    // D2-detail-rows（JSON 数组），这两类键全仓零写入方、恒返 0，是从未生效的死代码。
+    // 主路径（读 D2-detail-rows JSON）是唯一权威；解析失败或无数据均返回空数组。
+    return []
   })
 
   // ─── SUMIF Aggregation ─────────────────────────────────────────────────
@@ -264,8 +259,9 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
       // 原因分析
       const reasonAnalysis = getVal(`D2-adj-${rowKey}-reason`).remark || ''
 
-      // 是否来自SUMIF
-      const isFromSumif = agg !== null && classification !== ''
+      // 取数来源（归一自旧 isFromSumif：SUMIF 派生 → 'tb'，否则人工 → 'manual'）
+      const source: 'tb' | 'manual' =
+        agg !== null && classification !== '' ? 'tb' : 'manual'
 
       return {
         rowKey,
@@ -281,7 +277,7 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
         change,
         changeRate,
         reasonAnalysis,
-        isFromSumif,
+        source,
         isEditable,
       }
     })
@@ -340,7 +336,7 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
       change,
       changeRate,
       reasonAnalysis: '',
-      isFromSumif: false,
+      source: 'manual',
       isEditable: false,
     }
   }

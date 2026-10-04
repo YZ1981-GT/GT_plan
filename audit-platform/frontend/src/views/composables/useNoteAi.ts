@@ -27,8 +27,11 @@ export interface UseNoteAiReturn {
   aiRewriteDialogVisible: Ref<boolean>
   aiRewriteInstruction: Ref<string>
   aiSelectedText: Ref<string>
+  /** 已选参考文档的名称摘要（仅界面回显；非空即「已加载」） */
   knowledgeContextText: Ref<string>
   knowledgeDocCount: Ref<number>
+  /** 已选参考文档 ID —— 续写 / 改写时交给后端逐篇判权后读正文 */
+  knowledgeDocIds: Ref<string[]>
   onAiContinueWrite: () => Promise<void>
   onAiRewriteOpen: () => void
   onAiRewriteConfirm: () => Promise<void>
@@ -48,9 +51,13 @@ export function useNoteAi(options: UseNoteAiOptions): UseNoteAiReturn {
   const aiSelectedText = ref('')
 
   // ── 知识库上下文 ──
-  const { pickDocuments, buildContext } = useKnowledge()
+  // 只在前端保留「选了哪几篇」：正文由后端按 ID 逐篇判权后读取并注入 LLM
+  // （spec knowledge-upload-robustness-and-consumer-wiring R6.2）。旧实现把前端拼好的
+  // `knowledge_context` 文本发给后端，而后端请求模型根本没有这个字段 —— 被静默丢弃。
+  const { pickDocuments } = useKnowledge()
   const knowledgeContextText = ref('')
   const knowledgeDocCount = ref(0)
+  const knowledgeDocIds = ref<string[]>([])
 
   function getSelectedText(): string {
     if (!editor.value) return ''
@@ -66,15 +73,34 @@ export function useNoteAi(options: UseNoteAiOptions): UseNoteAiReturn {
   async function onPickKnowledge() {
     const docs = await pickDocuments({ title: '选择参考文档（AI续写/改写时使用）', maxSelect: 5 })
     if (docs.length) {
-      knowledgeContextText.value = await buildContext(docs)
+      knowledgeDocIds.value = docs.map((d) => d.id)
+      knowledgeContextText.value = docs.map((d) => d.name).join('、')
       knowledgeDocCount.value = docs.length
-      ElMessage.success(`已加载 ${docs.length} 篇参考文档`)
+      ElMessage.success(`已选 ${docs.length} 篇参考文档，续写 / 改写时 AI 将参考它们`)
     }
   }
 
   function clearKnowledgeContext() {
     knowledgeContextText.value = ''
     knowledgeDocCount.value = 0
+    knowledgeDocIds.value = []
+  }
+
+  /**
+   * 选了参考文档却一篇都没用上（全部不可见 / 已删除 / 无正文）时如实告知；
+   * 否则用户会以为 AI 参考了资料。部分可用时说明实际篇数。
+   */
+  function reportKnowledgeUsage(used: number | undefined, verb: string): void {
+    const selected = knowledgeDocIds.value.length
+    if (!selected || used === undefined) {
+      ElMessage.success(`${verb}完成`)
+      return
+    }
+    if (used === 0) {
+      ElMessage.warning(`${verb}完成，但所选 ${selected} 篇参考文档均不可用（无权访问、已删除或未提取到正文），本次未参考`)
+      return
+    }
+    ElMessage.success(used < selected ? `${verb}完成（参考了 ${used}/${selected} 篇文档）` : `${verb}完成（参考了 ${used} 篇文档）`)
   }
 
   async function onAiContinueWrite() {
@@ -86,12 +112,12 @@ export function useNoteAi(options: UseNoteAiOptions): UseNoteAiReturn {
         text,
         section_number: currentNote.value?.note_section || '',
         year: year.value,
-        knowledge_context: knowledgeContextText.value || undefined,
+        knowledge_doc_ids: knowledgeDocIds.value,
       })
       if (res.error) { ElMessage.warning(res.error); return }
       if (res.appended) {
         editor.value?.commands.insertContent(res.appended)
-        ElMessage.success('续写完成')
+        reportKnowledgeUsage(res.knowledge_count, '续写')
       }
     } catch (e: any) {
       handleApiError(e, 'AI续写')
@@ -117,14 +143,14 @@ export function useNoteAi(options: UseNoteAiOptions): UseNoteAiReturn {
         instruction: aiRewriteInstruction.value,
         section_number: currentNote.value?.note_section || '',
         year: year.value,
-        knowledge_context: knowledgeContextText.value || undefined,
+        knowledge_doc_ids: knowledgeDocIds.value,
       })
       if (res.error) { ElMessage.warning(res.error); return }
       if (res.rewritten && res.rewritten !== res.original) {
         // 替换选中文本
         const { from, to } = editor.value!.state.selection
         editor.value!.chain().focus().deleteRange({ from, to }).insertContent(res.rewritten).run()
-        ElMessage.success('改写完成')
+        reportKnowledgeUsage(res.knowledge_count, '改写')
       }
     } catch (e: any) {
       handleApiError(e, 'AI改写')
@@ -178,6 +204,7 @@ export function useNoteAi(options: UseNoteAiOptions): UseNoteAiReturn {
     aiSelectedText,
     knowledgeContextText,
     knowledgeDocCount,
+    knowledgeDocIds,
     onAiContinueWrite,
     onAiRewriteOpen,
     onAiRewriteConfirm,

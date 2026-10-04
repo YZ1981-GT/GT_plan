@@ -1,0 +1,1038 @@
+{
+  "contract_id": "h8.right_of_use_assets_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "81f6c5ddb42a23c63e2f09c8f649e90ed12cc6d05b9fb16eb512c5e78bd1f658",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "carrier": {
+      "read": "host_inline_render_config_refetch",
+      "tb_publish_gate": null,
+      "write": "host_inline"
+    },
+    "column_coverage_closure": {
+      "effective_columns": 58,
+      "mapped": 58,
+      "template_only": 0
+    },
+    "derived_fields": [],
+    "derived_total_keys": [
+      "H8-2-initial-total"
+    ],
+    "effective_columns": 58,
+    "entry_id": "xlsx/gt-h8-right-of-use-assets",
+    "enum_fields": {},
+    "frozen_intra_entry_ref": {
+      "H8-2-rows": [
+        "GtH8RightOfUseAssets.vue",
+        "useH8Detail.ts",
+        "useH8Adjudication.ts",
+        "useH8CrossSheet.ts",
+        "useH8Disclosure.ts",
+        "useH8DisposalCheck.ts",
+        "useH8Depreciation.ts",
+        "useH8Impairment.ts",
+        "useH8LeaseModification.ts",
+        "useH8Recoverable.ts",
+        "useH8RelatedParty.ts",
+        "useH8LeaseIdentification.ts"
+      ]
+    },
+    "html_store": {
+      "item_ids": [
+        "H8-2-rows"
+      ],
+      "note": "H8 使用权资产的结构化 Tab 行数据存成 checklist_responses 的 **remark** JSON 数组，按 stable field + 行身份 `rowId` 拆开。🔴 模板 **58 有效列全部**映射 store 字段，`template_only_columns` 为**空** —— 全 H 唯一（H4 有 18 条、H9 有 2 条）。闭合自检 58 + 0 == 58。🔴 前端 19 个字段模板无列（store-only）：租赁合同要素 6 个（在 H8-4/H8-5 表）、初始计量 4 个（在 H8-6 表）、**未审净值 2 个**（模板 BE/BF 是审定口径）、其它 3 个、旧命名遗留折旧 4 个。🔴 三处易抄错已在 sheet 声明里逐条钉住：①原值块 3 增 3 减 vs 折旧/减值块 2 增 3 减；②未审期末 `K=SUM(D:G)-SUM(H:J)` 含期初 D，而 `AC=SUM(W:Y)-SUM(Z:AB)` 首格即期初，range 端点不能平移；③审定减少 `AL=Z+AI+AB+AA+AG+AH` 是**乱序但等价**，逐字保留模板原式不做整理（整理等于改模板）。🔴 `H8-adj-tb-amount-{ending,opening}` 是 **TB 核对种子**不是发布门 —— H8 `publishToTb` 全链路 0 处，sync 对 trial_balance 写 0 次。",
+      "payload_column": "remark",
+      "payload_column_mode": "dual_write_remark_and_conclusion",
+      "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useH8Detail.ts —— `_persist()` 经宿主 onSave 写 { item_id: 'H8-2-rows', remark: JSON.stringify(rows) }",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "phase5_right_of_use_assets_detail",
+    "reviewed_basis": "openpyxl 逐格实测 H/H8 使用权资产.xlsx 的 `明细表H8-2`（四级表头 R8/R9/R10/R11 共 51 个合并域 / 数据 R12-R31 共 20 行 / footer R32 `合计` / 有效内容列 58 即 A..BF（与 max_column 相等）/ 数据行公式列 17 个 / 四区块 D8:V8 原值 · W8:AM8 累计折旧 · AN8:BD8 减值准备 · BE8:BF9 审定净值 / footer 之下 R33-R38 为按 **A 列**类别 SUMPRODUCT 小计区） + 前端 `useH8Detail.ts` 按值 grep（ROWS_KEY / H8DetailRow 78 字段 / H8-2-initial-total 派生键 / H8-1 审定表 7 键 + H8-8 折旧 1 键 + TB 核对种子 2 键 皆属另表） + 四项闭合自检（58 映射 + 0 template-only == 58 有效列；列序连续 A..BF 无缺口；17 个公式模板与 R12 逐字一致；58 个 header_text 与模板最下层表头逐字一致） + 真库现算（`H8-2-rows` = `[]` 2 B ⇒ 主表无行；`H8-1-rows` 3656 B / `H8-listed-categories` 137 B 属另表）",
+    "sibling_tables_not_managed": [
+      "H8-1-cost-audited-total",
+      "H8-1-dep-audited-total",
+      "H8-1-impair-audited-total",
+      "H8-1-net-audited",
+      "H8-1-cost-rows",
+      "H8-1-dep-rows",
+      "H8-1-impair-rows",
+      "H8-8-dep-rows",
+      "H8-adj-tb-amount-ending",
+      "H8-adj-tb-amount-opening"
+    ],
+    "store_only_fields": [
+      "contractNo",
+      "lessor",
+      "leaseType",
+      "startDate",
+      "endDate",
+      "leaseTermMonths",
+      "h9InitialAmount",
+      "directCost",
+      "incentive",
+      "initialAmount",
+      "netBeginUnadj",
+      "netEndUnadj",
+      "modificationAmount",
+      "terminationDate",
+      "remark",
+      "accDepBegin",
+      "depCurrentPeriod",
+      "accDepEnd",
+      "netValue"
+    ],
+    "sub_entry_hosts": [
+      "h8/impairment/H8TabRecoverable.vue",
+      "h8/measurement/H8TabMeasurementAnnual.vue",
+      "h8/measurement/H8TabMeasurementMonthly.vue"
+    ],
+    "tb_publish_gate": null,
+    "template_only_columns": [],
+    "unmanaged_regions": [
+      {
+        "first_row": 33,
+        "group_by_column": "A",
+        "kind": "category_subtotal_block",
+        "last_row": 38,
+        "note": "A33='其中：'；R34-R38 为 =SUMPRODUCT(($A$12:$A$31=$A34)*(D$12:D$31)) 形态的按类别小计，行标签取 =底稿目录!A9..A13。🔴 分组列是 **A（使用权资产类别）**，H4 的同族区块按 **B** 分组 —— 守卫不得共用写死的分组列。不受管、不比对、不覆盖。"
+      }
+    ],
+    "uuid_column": "BG",
+    "variant_axis": null
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "明细表H8-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "h802-managed",
+      "tables": [
+        {
+          "anchor": "A8",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "category",
+              "header_source_ref": "源xlsx!明细表H8-2!A11",
+              "header_text": "使用权资产类别",
+              "json_pointer": "/rows/{row_uuid}/category",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!A12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/category",
+              "store_item_id": "H8-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "asset_name",
+              "header_source_ref": "源xlsx!明细表H8-2!B11",
+              "header_text": "使用权资产名称",
+              "json_pointer": "/rows/{row_uuid}/assetName",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!B12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/asset_name",
+              "store_item_id": "H8-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "asset_no",
+              "header_source_ref": "源xlsx!明细表H8-2!C11",
+              "header_text": "使用权资产编号",
+              "json_pointer": "/rows/{row_uuid}/assetNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!C12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/asset_no",
+              "store_item_id": "H8-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_begin_unadj",
+              "header_source_ref": "源xlsx!明细表H8-2!D11",
+              "header_text": "期初数",
+              "json_pointer": "/rows/{row_uuid}/costBeginUnadj",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!D12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_begin_unadj",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_inc_lease",
+              "header_source_ref": "源xlsx!明细表H8-2!E11",
+              "header_text": "本期租入",
+              "json_pointer": "/rows/{row_uuid}/costIncLease",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!E12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_inc_lease",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_inc_reval",
+              "header_source_ref": "源xlsx!明细表H8-2!F11",
+              "header_text": "租赁负债调整",
+              "json_pointer": "/rows/{row_uuid}/costIncReval",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!F12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_inc_reval",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_inc_other",
+              "header_source_ref": "源xlsx!明细表H8-2!G11",
+              "header_text": "其他增加",
+              "json_pointer": "/rows/{row_uuid}/costIncOther",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!G12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_inc_other",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_dec_sublease",
+              "header_source_ref": "源xlsx!明细表H8-2!H11",
+              "header_text": "转租赁为融资租赁",
+              "json_pointer": "/rows/{row_uuid}/costDecSublease",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!H12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_dec_sublease",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_dec_disposal",
+              "header_source_ref": "源xlsx!明细表H8-2!I11",
+              "header_text": "转让或持有待售",
+              "json_pointer": "/rows/{row_uuid}/costDecDisposal",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!I12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_dec_disposal",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_dec_other",
+              "header_source_ref": "源xlsx!明细表H8-2!J11",
+              "header_text": "其他减少",
+              "json_pointer": "/rows/{row_uuid}/costDecOther",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!J12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_dec_other",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_end_unadj",
+              "header_source_ref": "源xlsx!明细表H8-2!K11",
+              "header_text": "期末数",
+              "json_pointer": "/rows/{row_uuid}/costEndUnadj",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H8-2!K12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_end_unadj",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_open_adj",
+              "header_source_ref": "源xlsx!明细表H8-2!L11",
+              "header_text": "期初调整",
+              "json_pointer": "/rows/{row_uuid}/costOpenAdj",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!L12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_open_adj",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_aje_inc_lease",
+              "header_source_ref": "源xlsx!明细表H8-2!M11",
+              "header_text": "本期租入",
+              "json_pointer": "/rows/{row_uuid}/costAjeIncLease",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!M12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_aje_inc_lease",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_aje_inc_reval",
+              "header_source_ref": "源xlsx!明细表H8-2!N11",
+              "header_text": "租赁负债调整",
+              "json_pointer": "/rows/{row_uuid}/costAjeIncReval",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!N12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_aje_inc_reval",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_aje_inc_other",
+              "header_source_ref": "源xlsx!明细表H8-2!O11",
+              "header_text": "其他增加",
+              "json_pointer": "/rows/{row_uuid}/costAjeIncOther",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!O12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_aje_inc_other",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_aje_dec_sublease",
+              "header_source_ref": "源xlsx!明细表H8-2!P11",
+              "header_text": "转租赁为融资租赁",
+              "json_pointer": "/rows/{row_uuid}/costAjeDecSublease",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!P12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_aje_dec_sublease",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_aje_dec_disposal",
+              "header_source_ref": "源xlsx!明细表H8-2!Q11",
+              "header_text": "转让或持有待售",
+              "json_pointer": "/rows/{row_uuid}/costAjeDecDisposal",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!Q12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_aje_dec_disposal",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "R",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_aje_dec_other",
+              "header_source_ref": "源xlsx!明细表H8-2!R11",
+              "header_text": "其他减少",
+              "json_pointer": "/rows/{row_uuid}/costAjeDecOther",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!R12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_aje_dec_other",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "S",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_begin_aud",
+              "header_source_ref": "源xlsx!明细表H8-2!S11",
+              "header_text": "期初数",
+              "json_pointer": "/rows/{row_uuid}/costBeginAud",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H8-2!S12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_begin_aud",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "T",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_inc_aud",
+              "header_source_ref": "源xlsx!明细表H8-2!T11",
+              "header_text": "本期增加",
+              "json_pointer": "/rows/{row_uuid}/costIncAud",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H8-2!T12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_inc_aud",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "U",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_dec_aud",
+              "header_source_ref": "源xlsx!明细表H8-2!U11",
+              "header_text": "本期减少",
+              "json_pointer": "/rows/{row_uuid}/costDecAud",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H8-2!U12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_dec_aud",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "V",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_end_aud",
+              "header_source_ref": "源xlsx!明细表H8-2!V11",
+              "header_text": "期末数",
+              "json_pointer": "/rows/{row_uuid}/costEndAud",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H8-2!V12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/cost_end_aud",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "W",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_begin_unadj",
+              "header_source_ref": "源xlsx!明细表H8-2!W11",
+              "header_text": "期初数",
+              "json_pointer": "/rows/{row_uuid}/depBeginUnadj",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!W12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/dep_begin_unadj",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "X",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_prov_unadj",
+              "header_source_ref": "源xlsx!明细表H8-2!X11",
+              "header_text": "本期计提",
+              "json_pointer": "/rows/{row_uuid}/depProvUnadj",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!X12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/dep_prov_unadj",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Y",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_other_inc_unadj",
+              "header_source_ref": "源xlsx!明细表H8-2!Y11",
+              "header_text": "其他增加",
+              "json_pointer": "/rows/{row_uuid}/depOtherIncUnadj",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!Y12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/dep_other_inc_unadj",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Z",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_dec_sublease",
+              "header_source_ref": "源xlsx!明细表H8-2!Z11",
+              "header_text": "转租赁为融资租赁",
+              "json_pointer": "/rows/{row_uuid}/depDecSublease",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!Z12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/dep_dec_sublease",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AA",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_dec_disposal",
+              "header_source_ref": "源xlsx!明细表H8-2!AA11",
+              "header_text": "转让或持有待售",
+              "json_pointer": "/rows/{row_uuid}/depDecDisposal",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AA12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/dep_dec_disposal",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AB",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_other_dec_unadj",
+              "header_source_ref": "源xlsx!明细表H8-2!AB11",
+              "header_text": "其他减少",
+              "json_pointer": "/rows/{row_uuid}/depOtherDecUnadj",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AB12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/dep_other_dec_unadj",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AC",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_end_unadj",
+              "header_source_ref": "源xlsx!明细表H8-2!AC11",
+              "header_text": "期末数",
+              "json_pointer": "/rows/{row_uuid}/depEndUnadj",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H8-2!AC12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/dep_end_unadj",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AD",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_open_adj",
+              "header_source_ref": "源xlsx!明细表H8-2!AD11",
+              "header_text": "期初调整",
+              "json_pointer": "/rows/{row_uuid}/depOpenAdj",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AD12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/dep_open_adj",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AE",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_aje_prov",
+              "header_source_ref": "源xlsx!明细表H8-2!AE11",
+              "header_text": "本期计提",
+              "json_pointer": "/rows/{row_uuid}/depAjeProv",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AE12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/dep_aje_prov",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AF",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_aje_other_inc",
+              "header_source_ref": "源xlsx!明细表H8-2!AF11",
+              "header_text": "其他增加",
+              "json_pointer": "/rows/{row_uuid}/depAjeOtherInc",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AF12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/dep_aje_other_inc",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AG",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_aje_dec_sublease",
+              "header_source_ref": "源xlsx!明细表H8-2!AG11",
+              "header_text": "转租赁为融资租赁",
+              "json_pointer": "/rows/{row_uuid}/depAjeDecSublease",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AG12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/dep_aje_dec_sublease",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AH",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_aje_dec_disposal",
+              "header_source_ref": "源xlsx!明细表H8-2!AH11",
+              "header_text": "转让或持有待售",
+              "json_pointer": "/rows/{row_uuid}/depAjeDecDisposal",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AH12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/dep_aje_dec_disposal",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AI",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_aje_other_dec",
+              "header_source_ref": "源xlsx!明细表H8-2!AI11",
+              "header_text": "其他减少",
+              "json_pointer": "/rows/{row_uuid}/depAjeOtherDec",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AI12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/dep_aje_other_dec",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AJ",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_begin_aud",
+              "header_source_ref": "源xlsx!明细表H8-2!AJ11",
+              "header_text": "期初数",
+              "json_pointer": "/rows/{row_uuid}/depBeginAud",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H8-2!AJ12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/dep_begin_aud",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AK",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_inc_aud",
+              "header_source_ref": "源xlsx!明细表H8-2!AK11",
+              "header_text": "本期增加",
+              "json_pointer": "/rows/{row_uuid}/depIncAud",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H8-2!AK12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/dep_inc_aud",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AL",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_dec_aud",
+              "header_source_ref": "源xlsx!明细表H8-2!AL11",
+              "header_text": "本期减少",
+              "json_pointer": "/rows/{row_uuid}/depDecAud",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H8-2!AL12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/dep_dec_aud",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AM",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_end_aud",
+              "header_source_ref": "源xlsx!明细表H8-2!AM11",
+              "header_text": "期末数",
+              "json_pointer": "/rows/{row_uuid}/depEndAud",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H8-2!AM12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/dep_end_aud",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AN",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_begin_unadj",
+              "header_source_ref": "源xlsx!明细表H8-2!AN11",
+              "header_text": "期初数",
+              "json_pointer": "/rows/{row_uuid}/impairBeginUnadj",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AN12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/impair_begin_unadj",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AO",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_prov_unadj",
+              "header_source_ref": "源xlsx!明细表H8-2!AO11",
+              "header_text": "本期计提",
+              "json_pointer": "/rows/{row_uuid}/impairProvUnadj",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AO12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/impair_prov_unadj",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AP",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_other_inc_unadj",
+              "header_source_ref": "源xlsx!明细表H8-2!AP11",
+              "header_text": "其他增加",
+              "json_pointer": "/rows/{row_uuid}/impairOtherIncUnadj",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AP12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/impair_other_inc_unadj",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AQ",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_dec_sublease",
+              "header_source_ref": "源xlsx!明细表H8-2!AQ11",
+              "header_text": "转租赁为融资租赁",
+              "json_pointer": "/rows/{row_uuid}/impairDecSublease",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AQ12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/impair_dec_sublease",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AR",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_dec_disposal",
+              "header_source_ref": "源xlsx!明细表H8-2!AR11",
+              "header_text": "转让或持有待售",
+              "json_pointer": "/rows/{row_uuid}/impairDecDisposal",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AR12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/impair_dec_disposal",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AS",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_other_dec_unadj",
+              "header_source_ref": "源xlsx!明细表H8-2!AS11",
+              "header_text": "其他减少",
+              "json_pointer": "/rows/{row_uuid}/impairOtherDecUnadj",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AS12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/impair_other_dec_unadj",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AT",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_end_unadj",
+              "header_source_ref": "源xlsx!明细表H8-2!AT11",
+              "header_text": "期末数",
+              "json_pointer": "/rows/{row_uuid}/impairEndUnadj",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H8-2!AT12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/impair_end_unadj",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AU",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_open_adj",
+              "header_source_ref": "源xlsx!明细表H8-2!AU11",
+              "header_text": "期初调整",
+              "json_pointer": "/rows/{row_uuid}/impairOpenAdj",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AU12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/impair_open_adj",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AV",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_aje_prov",
+              "header_source_ref": "源xlsx!明细表H8-2!AV11",
+              "header_text": "本期计提",
+              "json_pointer": "/rows/{row_uuid}/impairAjeProv",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AV12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/impair_aje_prov",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AW",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_aje_other_inc",
+              "header_source_ref": "源xlsx!明细表H8-2!AW11",
+              "header_text": "其他增加",
+              "json_pointer": "/rows/{row_uuid}/impairAjeOtherInc",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AW12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/impair_aje_other_inc",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AX",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_aje_dec_sublease",
+              "header_source_ref": "源xlsx!明细表H8-2!AX11",
+              "header_text": "转租赁为融资租赁",
+              "json_pointer": "/rows/{row_uuid}/impairAjeDecSublease",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AX12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/impair_aje_dec_sublease",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AY",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_aje_dec_disposal",
+              "header_source_ref": "源xlsx!明细表H8-2!AY11",
+              "header_text": "转让或持有待售",
+              "json_pointer": "/rows/{row_uuid}/impairAjeDecDisposal",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AY12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/impair_aje_dec_disposal",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AZ",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_aje_other_dec",
+              "header_source_ref": "源xlsx!明细表H8-2!AZ11",
+              "header_text": "其他减少",
+              "json_pointer": "/rows/{row_uuid}/impairAjeOtherDec",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H8-2!AZ12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/impair_aje_other_dec",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "BA",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_begin_aud",
+              "header_source_ref": "源xlsx!明细表H8-2!BA11",
+              "header_text": "期初数",
+              "json_pointer": "/rows/{row_uuid}/impairBeginAud",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H8-2!BA12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/impair_begin_aud",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "BB",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_inc_aud",
+              "header_source_ref": "源xlsx!明细表H8-2!BB11",
+              "header_text": "本期增加",
+              "json_pointer": "/rows/{row_uuid}/impairIncAud",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H8-2!BB12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/impair_inc_aud",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "BC",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_dec_aud",
+              "header_source_ref": "源xlsx!明细表H8-2!BC11",
+              "header_text": "本期减少",
+              "json_pointer": "/rows/{row_uuid}/impairDecAud",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H8-2!BC12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/impair_dec_aud",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "BD",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_end_aud",
+              "header_source_ref": "源xlsx!明细表H8-2!BD11",
+              "header_text": "期末数",
+              "json_pointer": "/rows/{row_uuid}/impairEndAud",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H8-2!BD12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/impair_end_aud",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "BE",
+                "row_from": "row_identity"
+              },
+              "column_key": "net_begin_aud",
+              "header_source_ref": "源xlsx!明细表H8-2!BE11",
+              "header_text": "期初净值",
+              "json_pointer": "/rows/{row_uuid}/netBeginAud",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H8-2!BE12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/net_begin_aud",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "BF",
+                "row_from": "row_identity"
+              },
+              "column_key": "net_end_aud",
+              "header_source_ref": "源xlsx!明细表H8-2!BF11",
+              "header_text": "期末净值",
+              "json_pointer": "/rows/{row_uuid}/netEndAud",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H8-2!BF12",
+              "stable_field_key": "right_of_use_assets_detail_rows/{row_uuid}/net_end_aud",
+              "store_item_id": "H8-2-rows",
+              "value_type": "amount"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "K12:K31",
+            "S12:S31",
+            "T12:T31",
+            "U12:U31",
+            "V12:V31",
+            "AC12:AC31",
+            "AJ12:AJ31",
+            "AK12:AK31",
+            "AL12:AL31",
+            "AM12:AM31",
+            "AT12:AT31",
+            "BA12:BA31",
+            "BB12:BB31",
+            "BC12:BC31",
+            "BD12:BD31",
+            "BE12:BE31",
+            "BF12:BF31"
+          ],
+          "header_rows": 4,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "right_of_use_assets_detail_rows",
+          "uuid_col": "BG"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "0bda5f024b5430ee84783d9a5264beb0603e123d90cc05af8073965c860f3012",
+    "relative_path": "H/H8 使用权资产.xlsx",
+    "template_sha256": "05abaabbc46fe8861e171ea35b580fe7c69659363ab6d85e3be096a1e23747e9"
+  },
+  "template_definition_sha256": "2ef4e1ad7501c10d876942e774fa580b058bb4a9c897de977b9ff8c4b04356c7"
+}

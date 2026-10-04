@@ -10,6 +10,26 @@
  * - localStorage 持久化 (per wpId)
  * - OO 不可用时降级为 HTML 视图
  * - Follow useH4DualMode pattern
+ *
+ * ═══ 🔴 @deprecated 生产已停用（H6 接桥后）═══════════════════════════════════
+ *
+ * `GtH6AssetDisposalClearing.vue` 已改用 `composables/useHSyncMode.ts`（统一四分支保存
+ * 协议 + 真双向桥）。换掉本 composable 的两个理由：
+ *   ① 它**不建桥** ⇒ OO 侧编辑回不到 HTML（假双向）；
+ *   ② 它的 `isOoAvailable` 被宿主用在 `:disabled` 上，健康检查未就绪时整个切换器被锁死、
+ *      点击被彻底忽略（D4 已实证的 bug ③）。
+ *
+ * 🔴 **本文件当前生产消费为 0，但先不删** —— 删除有三处守卫连带影响，需要一次独立的
+ *    收敛动作（连同判据一起改），不能顺手做：
+ *   · `test_h_foundation_hc_guards.py::test_use_h4_dual_mode_is_chained_across_four_entries`
+ *     断言 `useH4DualMode` 恰有 **5 个**生产消费方，本文件是其中一个（它 import 了
+ *     `useH4DualMode`）⇒ 删了变 4 个，判据红；
+ *   · 同文件的 localStorage 判据把 `useH{2,3,4,6,8,9,10}DualMode.ts` 逐个列进
+ *     「UI 偏好存储」清单（本文件的 `STORAGE_PREFIX = 'h6-dual-mode:'` 在列）⇒ 删了清单缺项；
+ *   · `test_dual_mode_ui_preference_store_only_persists_a_mode_string` 遍历同一组 n。
+ *
+ *    上一轮把 `useH9FormData.ts` 当「零消费载体」删掉时，正是漏查了**测试消费方**
+ *    （`hCycleAccountScope.spec.ts` 依赖它）⇒ 判据 ENOENT 打红。此处不重复那个错误。
  */
 import { ref, onMounted, type Ref } from 'vue'
 

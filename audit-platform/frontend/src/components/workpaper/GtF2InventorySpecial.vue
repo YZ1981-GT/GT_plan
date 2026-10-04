@@ -3,15 +3,12 @@
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
       <div v-if="showHtmlToolbar" class="f2-spe-toolbar">
-        <el-segmented
-          :model-value="dualMode.currentMode.value"
-          :options="dualMode.modeOptions"
-          size="small"
-          @change="dualMode.onModeChange"
+        <el-segmented v-model="renderMode" :options="dualMode.modeOptions" size="small" :disabled="isF2SSyncManagedSheet && syncBusy"
         />
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
         <el-tag v-if="isIpoSheet && !formData.isIpoProject.value" size="small" type="info">IPO专项（当前项目不可见）</el-tag>
+        <el-tag v-if="isF2SSyncManagedSheet && syncBusy" size="small" type="info">同步中…</el-tag>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-f2-inventory-special" />
       </div>
 
@@ -24,8 +21,11 @@
         class="data-updated-bar"
       />
 
+      <div v-if="renderMode === 'onlyoffice' && isF2SSyncManagedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost ref="syncEditorHostRef" :descriptor="syncOoDescriptor" :bridge="syncBridge" />
+      </div>
       <GtOnlyOfficeSheet
-        v-if="dualMode.currentMode.value === 'onlyoffice'"
+        v-else-if="renderMode === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -247,6 +247,10 @@ const F2InterviewCheckExample = defineAsyncComponent(
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 
 const props = defineProps<{
   wpId: string
@@ -286,6 +290,47 @@ const { versionTrailRef, openVersionHistory } = versionToolbar
 
 provide('f2VersionTrailRef', versionTrailRef)
 provide('f2OpenVersionHistory', openVersionHistory)
+
+// ─── F2-57 canary：useWorkpaperSyncBridge 真双向 ──────────────────────────────
+const F2S_SYNC_ENTRY_ID = 'xlsx/gt-f2-inventory-special'
+const F2S_SHEET_KEY_BY_CODE: Record<string, string> = { 'F2-57': 'f257-managed' }
+const isF2SSyncManagedSheet = computed(() => currentSheet.value in F2S_SHEET_KEY_BY_CODE)
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const syncEntryId = ref(F2S_SYNC_ENTRY_ID)
+const syncSheetKey = computed(() => F2S_SHEET_KEY_BY_CODE[currentSheet.value] || 'f257-managed')
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId, wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey, capability: capabilityForEntry(F2S_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    formData.flushPendingSave()
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: F2S_SYNC_ENTRY_ID })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: syncSheetKey.value }
+  },
+  reloadHtml: async () => { await formData.loadAll() },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncSwitching = ref(false)
+const syncBusy = computed(() =>
+  syncSwitching.value || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+type F2SRenderMode = 'html' | 'onlyoffice'
+const renderMode = computed({
+  get: (): F2SRenderMode => isF2SSyncManagedSheet.value
+    ? (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html') : dualMode.currentMode.value,
+  set: (v: F2SRenderMode) => { if (isF2SSyncManagedSheet.value) void switchRenderMode(v); else void dualMode.switchMode(v) },
+})
+async function switchRenderMode(target: F2SRenderMode): Promise<void> {
+  if (target === renderMode.value) return
+  if (target === 'onlyoffice') { if (!isF2SSyncManagedSheet.value) return; syncSwitching.value = true; try { await syncBridge.switchToOnlyOffice() } catch {} finally { syncSwitching.value = false }; return }
+  if (syncBridge.mode.value !== 'oo') { syncBridge.persistMode('html'); return }
+  syncSwitching.value = true
+  try {
+    if (String(syncBridge.state.value) === 'applied') await syncBridge.reloadAfterApplied()
+    else if (syncBridge.mode.value === 'oo' && !syncBridge.dirty.value) await syncBridge.leaveWithoutSaving()
+    else if (syncBridge.canForcesave.value && syncEditorHostRef.value) await syncEditorHostRef.value.forceSave()
+    else syncBridge.persistMode('html')
+  } catch {} finally { syncSwitching.value = false }
+}
 
 const dualMode = useF2SpecialDualMode({
   wpId: toRef(props, 'wpId'),
@@ -369,6 +414,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .f2-inventory-special { padding: 12px; }
+.oo-container { min-height: 600px; height: calc(100vh - 200px); }
 .loading-container { padding: 24px; }
 .f2-spe-toolbar { margin-bottom: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .data-updated-bar { margin-bottom: 8px; }

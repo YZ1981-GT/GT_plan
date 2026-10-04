@@ -2,8 +2,9 @@
 import { computed, type Ref } from 'vue'
 import { computeG11DetailCrossCheck, type G11DetailCrossCheck } from './g11CrossHelpers'
 import type { ChecklistResponse } from './useF1FormData'
+import { G11_ITEM_IDS } from './g11StorageContract'
 
-const ADJ_KEY = 'G11-adj-rows'
+const ADJ_KEY = G11_ITEM_IDS.G11_ADJ_ROWS
 const DETAIL_KEY = 'G11-detail-rows'
 
 export function useG11CrossValidation(allResponses: Ref<Map<string, ChecklistResponse>>) {

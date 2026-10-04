@@ -417,9 +417,18 @@ async function handleImportFile(uploadFile: any) {
   const file = uploadFile.raw || uploadFile
   await importData('D4-14', file)
 }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await handleImportFile(f) }
+  input.click()
+}
 
 // ─── Lifecycle ───────────────────────────────────────────────────────
 ensureActiveTab()
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 <template>
@@ -430,21 +439,7 @@ ensureActiveTab()
         <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
       </div>
       <div class="toolbar-right">
-        <el-dropdown trigger="click" size="small">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-              <el-dropdown-item>
-                <el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false"
-                  :disabled="isReadonly || importing" @change="handleImportFile">
-                  <span>导入数据</span>
-                </el-upload>
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        
         <el-button size="small" type="primary" plain :disabled="isReadonly" @click="openSampling">
           🎲 抽凭引擎
         </el-button>

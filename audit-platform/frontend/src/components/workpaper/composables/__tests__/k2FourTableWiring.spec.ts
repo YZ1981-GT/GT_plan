@@ -429,3 +429,107 @@ describe('披露 sheet 名与源 xlsx tab 名一致（Property 11）', () => {
     }
   })
 })
+
+
+// ─── 孤儿 per-row 键清理（KC-20）─────────────────────────────────────────────
+//
+// 🔴 载荷取自真库 `审定表K2-1` 实测：一表 9 键组（1 主键 + 8 per-row）。
+// 主键清单里只有 `r-ls0ldh` / `r-5ac9vk` 两行 ⇒ `r-ryx6og` / `r-yqfa02` 的 4 个
+// 键是孤儿，且值全为空串；有值的 4 个键属活行，**不得误删**。
+
+describe('孤儿 per-row 键清理（KC-20：rowId 集合 ⊆ 行清单）', () => {
+  const LIVE_ROWS = serializeRows([
+    { rowId: 'r-ls0ldh', label: '待摊费用', source: 'manual' },
+    { rowId: 'r-5ac9vk', label: '待抵扣进项税', source: 'manual' },
+  ] as any)
+
+  /** 真库 8 个 per-row 键：前 4 个有值（活行），后 4 个空串（孤儿） */
+  const LIVE_PER_ROW: Record<string, string> = {
+    'K2-1-r-ls0ldh-begin': '-732505.4',
+    'K2-1-r-ls0ldh-unadj': '-1312178.93',
+    'K2-1-r-5ac9vk-begin': '-377709.19',
+    'K2-1-r-5ac9vk-unadj': '-406014.85',
+    'K2-1-r-ryx6og-begin': '',
+    'K2-1-r-ryx6og-unadj': '',
+    'K2-1-r-yqfa02-begin': '',
+    'K2-1-r-yqfa02-unadj': '',
+  }
+
+  function setupLive(extra: Record<string, string> = {}) {
+    const removed: string[] = []
+    const map = ref(mapOf({ 'K2-1-rows': LIVE_ROWS, ...LIVE_PER_ROW, ...extra }))
+    const api = useK2Adjudication(map as any, {
+      onSave: () => {},
+      onRemove: (ids) => { removed.push(...ids) },
+    })
+    return { api, map, removed }
+  }
+
+  it('真库形态：9 键组里恰 4 个孤儿被清，4 个有值的一个不少', () => {
+    const { map, removed } = setupLive()
+    expect(Object.keys(LIVE_PER_ROW)).toHaveLength(8)
+    expect(removed.sort()).toEqual([
+      'K2-1-r-ryx6og-begin',
+      'K2-1-r-ryx6og-unadj',
+      'K2-1-r-yqfa02-begin',
+      'K2-1-r-yqfa02-unadj',
+    ])
+    for (const k of removed) expect(map.value.has(k)).toBe(false)
+    // 🔴 有值的 4 个必须原样在库，且值逐字不变
+    expect(map.value.get('K2-1-r-ls0ldh-begin').remark).toBe('-732505.4')
+    expect(map.value.get('K2-1-r-ls0ldh-unadj').remark).toBe('-1312178.93')
+    expect(map.value.get('K2-1-r-5ac9vk-begin').remark).toBe('-377709.19')
+    expect(map.value.get('K2-1-r-5ac9vk-unadj').remark).toBe('-406014.85')
+  })
+
+  it('清理不动主键，也不动同前缀的非行键', () => {
+    const { map, removed } = setupLive({
+      'K2-1-audit-note': '说明',
+      'K2-1-audit-conclusion': '结论',
+    })
+    expect(map.value.has('K2-1-rows')).toBe(true)
+    expect(map.value.get('K2-1-audit-note').remark).toBe('说明')
+    expect(map.value.get('K2-1-audit-conclusion').remark).toBe('结论')
+    expect(removed).not.toContain('K2-1-rows')
+    expect(removed).not.toContain('K2-1-audit-note')
+  })
+
+  it('🔴 孤儿但有值 → 不删，进 orphanKeysWithValue 交人工确认', () => {
+    const { api, map, removed } = setupLive({ 'K2-1-r-zzz999-unadj': '-99999.01' })
+    expect(removed).not.toContain('K2-1-r-zzz999-unadj')
+    expect(map.value.get('K2-1-r-zzz999-unadj').remark).toBe('-99999.01')
+    expect(api.orphanKeysWithValue.value).toEqual(['K2-1-r-zzz999-unadj'])
+  })
+
+  it('幂等：清完再调无新增删除', () => {
+    const { api, removed } = setupLive()
+    const first = removed.length
+    api.pruneOrphanRowKeys()
+    api.pruneOrphanRowKeys()
+    expect(removed).toHaveLength(first)
+  })
+
+  it('清理后合计只由活行贡献（孤儿不进合计，活行一分不少）', () => {
+    const { api } = setupLive()
+    expect(api.rows.value.map((r) => r.rowKey)).toEqual(['r-ls0ldh', 'r-5ac9vk'])
+    expect(api.subtotalRow.value.begin).toBeCloseTo(-732505.4 + -377709.19, 2)
+    // 🔴 持久化键后缀是 `unadj`，模型字段名是 `unadjusted` —— 两个口径别混
+    expect(api.subtotalRow.value.unadjusted).toBeCloseTo(-1312178.93 + -406014.85, 2)
+    expect(api.subtotalRow.value.audited).toBeCloseTo(-1312178.93 + -406014.85, 2)
+  })
+
+  it('历史固定行 rowId 同样受判据保护（不是只认动态 r-xxx）', () => {
+    const removed: string[] = []
+    const map = ref(mapOf({
+      'K2-1-rows': serializeRows([
+        { rowId: 'contract-cost', label: '合同取得成本', source: 'legacy' },
+      ] as any),
+      'K2-1-contract-cost-begin': '100',
+      'K2-1-deposit-begin': '',
+      'K2-1-deposit-unadj': '',
+    }))
+    useK2Adjudication(map as any, { onSave: () => {}, onRemove: (ids) => { removed.push(...ids) } })
+    expect(removed.sort()).toEqual(['K2-1-deposit-begin', 'K2-1-deposit-unadj'])
+    expect(map.value.get('K2-1-contract-cost-begin').remark).toBe('100')
+  })
+})

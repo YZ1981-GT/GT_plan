@@ -162,6 +162,11 @@ function groupDef(key: F2TurnoverGroupKey): F2TurnoverGroupDef {
   return F2_TURNOVER_GROUPS.find((g) => g.key === key)!
 }
 
+/** BP-7 修复：稳定行身份生成器。 */
+function generateF2RowId(): string {
+  return `f2-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+}
+
 function emptyRow(id: string, groupKey: F2TurnoverGroupKey, segments: AgingSegment[]): F2TurnoverRow {
   const g = groupDef(groupKey)
   return {
@@ -248,19 +253,19 @@ function sumRows(list: F2TurnoverRow[]): F2TurnoverAmtBucket {
 function loadRows(map: Map<string, ChecklistResponse>, segments: AgingSegment[]): F2TurnoverRow[] {
   const raw = readRowJson(map.get(DATA_KEY))
   if (!raw) {
-    return F2_TURNOVER_GROUPS.map((g, i) => enrichRow(emptyRow(String(i + 1), g.key, segments), segments))
+    return F2_TURNOVER_GROUPS.map((g) => enrichRow(emptyRow(generateF2RowId(), g.key, segments), segments))
   }
   try {
     const parsed = JSON.parse(raw) as Partial<F2TurnoverRow>[]
     if (!Array.isArray(parsed) || !parsed.length) {
-      return F2_TURNOVER_GROUPS.map((g, i) => enrichRow(emptyRow(String(i + 1), g.key, segments), segments))
+      return F2_TURNOVER_GROUPS.map((g) => enrichRow(emptyRow(generateF2RowId(), g.key, segments), segments))
     }
     return parsed.map((r, i) => {
       const groupKey = resolveGroupKey(r)
       const aging = migrateAging(r, segments)
       return enrichRow(
         {
-          ...emptyRow(String(r.id || i + 1), groupKey, segments),
+          ...emptyRow(r.id || generateF2RowId(), groupKey, segments),
           ...r,
           groupKey,
           itemCode: String(r.itemCode || ''),
@@ -273,7 +278,7 @@ function loadRows(map: Map<string, ChecklistResponse>, segments: AgingSegment[])
       )
     })
   } catch {
-    return F2_TURNOVER_GROUPS.map((g, i) => enrichRow(emptyRow(String(i + 1), g.key, segments), segments))
+    return F2_TURNOVER_GROUPS.map((g) => enrichRow(emptyRow(generateF2RowId(), g.key, segments), segments))
   }
 }
 

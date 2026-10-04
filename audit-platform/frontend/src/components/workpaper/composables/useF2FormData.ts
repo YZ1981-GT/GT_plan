@@ -276,6 +276,8 @@ export function useF2FormData(options: UseF2FormDataOptions) {
     saveBatch,
     saveItemsFromEvent,
     debouncedSave,
+    // F2 canary：syncBridge 的 flushHtml 第一步须 flush 掉 2s debounce 未落库的行。
+    flushPendingSave: _flushPending,
   }
 }
 

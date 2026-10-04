@@ -13,6 +13,7 @@ import { ElMessage } from 'element-plus'
 import type { GenerateWorkpaperAiText } from '../composables/useWorkpaperScaffold'
 import GtIndexChip from '../GtIndexChip.vue'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { mintJRowId, withJRowIds } from '@/components/workpaper/composables/jRowIdentity'
 import { useAuditContext } from '@/composables/useAuditContext'
 
 interface RespItem { item_id: string; conclusion: string | null; remark: string | null }
@@ -36,7 +37,9 @@ interface AdjEntry {
   debitAmount: number; creditAmount: number
   indexRef: string; remark: string
 }
-let seq = 1
+// ⚠️ 原 `let seq = 1` 自增游标已移除（spec j2-j3-non-entry-hosts-and-orphan-cleanup Task 11）：
+//    行身份改由 `mintJRowId(entries.map(e => e.id))` 现算，游标不再是第二真源
+//    （两者并存时「删行后新增」会撞上已被左移占用的号）。
 const entries = reactive<AdjEntry[]>([])
 const CATEGORY_OPTIONS = ['报表调整', '账项调整', '其他']
 
@@ -80,7 +83,9 @@ void refreshStatus()
 
 function addEntry() {
   if (isReadonly.value) return
-  entries.push({ id: seq++, description: '', category: '账项调整', reportItem: '长期应付职工薪酬', accountName: '', noteItem: '', debitAmount: 0, creditAmount: 0, indexRef: '', remark: '' })
+  // 🔴 新增行身份改用安全生成器（原 `seq++` 虽不是下标，但与 load 的下标回落混用时
+  //    会让「删行后新增」撞上已被左移占用的号）。`mintJRowId` 保证严格大于现存所有 id。
+  entries.push({ id: mintJRowId(entries.map(e => e.id)), description: '', category: '账项调整', reportItem: '长期应付职工薪酬', accountName: '', noteItem: '', debitAmount: 0, creditAmount: 0, indexRef: '', remark: '' })
   scheduleSave()
 }
 function removeEntry(id: number) {
@@ -100,16 +105,26 @@ function load() {
   let loaded: AdjEntry[] | null = null
   if (raw) { try { const p = JSON.parse(raw); if (Array.isArray(p)) loaded = p } catch { /* ignore */ } }
   if (!loaded && props.htmlData?.adjustments && Array.isArray(props.htmlData.adjustments)) {
-    loaded = (props.htmlData.adjustments as Record<string, unknown>[]).map((e, i) => ({
-      id: i + 1, description: String(e.description ?? ''), category: String(e.category ?? '账项调整'),
-      reportItem: String(e.reportItem ?? '长期应付职工薪酬'), accountName: String(e.accountName ?? ''),
-      noteItem: String(e.noteItem ?? ''), debitAmount: n(e.debitAmount), creditAmount: n(e.creditAmount),
-      indexRef: String(e.indexRef ?? ''), remark: String(e.remark ?? ''),
-    }))
+    // 🔴 family_a 修复（spec j2-j3-non-entry-hosts-and-orphan-cleanup Task 11）：
+    //    原 `id: i + 1` 是**纯下标**、无上游兜底 ⇒ 删中间一行再新增会让后续行 id 左移、
+    //    备注串行。真库实证 `J2-3-entries` 171 B 的 `"id":1` 就是这条产生的。
+    //    改用 `withJRowIds` 逐行铸安全 number 身份（含 Math.random、不含下标）。
+    const seeded: number[] = []
+    loaded = withJRowIds(
+      (props.htmlData.adjustments as Record<string, unknown>[]).map(e => ({
+        id: undefined as number | undefined,
+        description: String(e.description ?? ''), category: String(e.category ?? '账项调整'),
+        reportItem: String(e.reportItem ?? '长期应付职工薪酬'), accountName: String(e.accountName ?? ''),
+        noteItem: String(e.noteItem ?? ''), debitAmount: n(e.debitAmount), creditAmount: n(e.creditAmount),
+        indexRef: String(e.indexRef ?? ''), remark: String(e.remark ?? ''),
+      })),
+      seeded,
+    ) as AdjEntry[]
   }
   if (loaded) {
-    entries.splice(0, entries.length, ...loaded.map((e, i) => ({ ...e, id: e.id ?? i + 1 })))
-    seq = Math.max(0, ...entries.map(e => e.id)) + 1
+    // 🔴 family_b 修复（Task 12）：只改**回落分支** —— 上游有 id 就原样保留（grandfather，
+    //    含历史的 `1..N`），缺了才铸。`withJRowIds` 内部即此语义。
+    entries.splice(0, entries.length, ...(withJRowIds(loaded) as AdjEntry[]))
   }
   const nt = props.allResponses?.get(KEY.note)?.remark; if (nt) auditNote.value = nt
   const cc = props.allResponses?.get(KEY.conclusion)?.remark; if (cc) auditConclusion.value = cc

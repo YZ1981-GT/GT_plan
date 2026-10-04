@@ -47,52 +47,119 @@ import {
   calcG10DetailClosingBalance,
 } from './useG10FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
+import { G10_ITEM_IDS } from './g10StorageContract'
 
+/**
+ * G10-2 明细行 —— 字段顺序与模板列序 A..S **逐列对应**。
+ *
+ * spec `g-cycle-single-region-detail-lanes` C-7；列模型依据
+ * `evidence/task8-c6-remaining-eight-template-logic.md` §2。
+ *
+ * ═══ 模板编制思路（负债侧「三分量 × 三阶段」）═══
+ *
+ * 与 G9（资产侧四阶段）的三处结构差异，照抄 G9 会错：
+ * 1. **调整与审定都是单列**（F/G 与 N/O），不拆成本与公允价值变动两分量 ——
+ *    负债侧的账项调整不区分分量。
+ * 2. **`L = D + I + J`**（期末累计公允价值变动含利息 J）。交易性金融负债的利息
+ *    计入财务费用**同时增加负债账面价值** ⇒ 利息必须进累计公允价值变动。
+ *    改造前前端算的是 `D + I`（漏 J），与模板不符。
+ * 3. **本期变动是净额列**（表头逐字「增加"+"/减少"—"」）⇒ **没有**「本期减少」列。
+ *    改造前的 `currentDecrease` 是自研列，且被喂进一个走**审定线**的
+ *    `closingBalance`（`=期初审定+变动−减少`）—— 模板 `K = C + H` 走**未审线**。
+ *
+ * `【公式】` 标记的字段由 `enrichG10DetailRow` 按模板公式重算，UI 只读。
+ */
 export interface G10DetailRow {
+  /** 行身份（受管 `row_identity_key`）。生成器带随机后缀，见 `genId`。 */
   rowId: string
+  /** 显示序号（不受管、不是身份） */
   seq: number
-  /** 类别：指定类 / 交易类 */
+
+  /** A 类别（指定类 / 交易类） */
   liabilityCategory: string
+  /** B 项目【按明细项目列示，如债券名称】 */
   liabilityName: string
-  liabilityType: string
-  counterparty: string
-  contractDate: string
-  maturityDate: string
-  couponRate: string
-  accruedInterest: number
-  issuanceDocIndex: string
-  /** 期初 — (一)初始确认金额 */
+
+  /** C 期初余额 / 初始确认金额 */
   openingInitialAmount: number
-  /** 期初 — (二)累计公允价值变动 */
+  /** D 期初余额 / 累计公允价值变动 */
   openingFvAccum: number
-  /** 期初 — (三)公允价值 */
+  /** E 期初余额 / 公允价值　**【公式】** `=C+D` */
   openingFairValue: number
+  /** F 期初调整数 */
   openingAdjustment: number
+  /** G 期初审定数　**【公式】** `=E+F` */
   openingAdjusted: number
-  /** 本期变动 */
+
+  /** H 本期变动（增加"+"/减少"—"）/ 初始确认金额 —— **净额列** */
   movementInitialAmount: number
+  /** I 本期变动 / 本期公允价值变动 */
   movementFvChange: number
+  /** J 本期变动 / 计入财务费用的利息 */
   interestExpense: number
-  currentDecrease: number
-  /** 期末 — (一)(二)(三)分解 */
+
+  /** K 期末余额 / 初始确认金额　**【公式】** `=C+H`（未审线） */
   closingInitialAmount: number
+  /** L 期末余额 / 累计公允价值变动　**【公式】** `=D+I+J`（🔴 含利息） */
   closingFvAccum: number
+  /** M 期末余额 / 公允价值　**【公式】** `=K+L` */
   closingFairValue: number
-  closingBalance: number
+  /** N 调整数 */
   closingAdjustment: number
+  /** O 审定数　**【公式】** `=M+N` */
   closingAdjusted: number
-  /** 兼容/辅助 */
-  initialAmount: number
-  openingBalance: number
-  currentIncrease: number
-  fairValueLevel: string
-  valuationMethod: string
-  profitLossAmount: number
-  isDerivative: boolean
-  hostContractDesc: string
-  embeddedDerivativeJudgment: string
-  confirmationStatus: string
-  remark: string
+
+  /** P 到期日 */
+  maturityDate: string
+  /** Q 票面利率 */
+  couponRate: string
+  /** R 期末应付利息 */
+  accruedInterest: number
+  /** S 发行文件索引 */
+  issuanceDocIndex: string
+}
+
+/**
+ * 改造前存在、**已从受管行模型移除**的字段（C-7）。
+ *
+ * 逐条给出归属而不是笼统「模板没有」—— 指不出归属的才是真冗余。
+ */
+export const DROPPED_LEGACY_G10_FIELDS: readonly { field: string; reason: string }[] = [
+  { field: 'initialAmount', reason: 'legacy 单值残留，与模板 C/K 重复' },
+  { field: 'openingBalance', reason: 'legacy 单值残留，与模板 E 重复' },
+  { field: 'currentIncrease', reason: 'legacy 单值残留，与模板 H 重复' },
+  { field: 'closingBalance', reason: 'legacy 走审定线的旧口径，与模板 M（=K+L，未审线）重复且口径错' },
+  { field: 'currentDecrease', reason: '模板 H 是净额列（增加"+"/减少"—"），拆增减会与 H 双源' },
+  { field: 'profitLossAmount', reason: 'legacy 别名，与模板 I 重复' },
+  { field: 'fairValueLevel', reason: '权威源是 公允价值测试表G10-5 / 第三层次公允价值计量的调节表G10-6' },
+  { field: 'valuationMethod', reason: '权威源同上（G10-5）' },
+  { field: 'isDerivative', reason: '权威源是 衍生金融工具核查表G10-8' },
+  { field: 'hostContractDesc', reason: '权威源同上（G10-8）' },
+  { field: 'embeddedDerivativeJudgment', reason: '权威源同上（G10-8）' },
+  { field: 'liabilityType', reason: '模板无此列；类别走 A 列，细分走 B 列文本' },
+  { field: 'counterparty', reason: '模板无此列，也无「自行添加」授权' },
+  { field: 'contractDate', reason: '模板无此列（到期日走 P 列）' },
+  { field: 'confirmationStatus', reason: 'G10 是**负债**不对外发函（G9 的 AB「发函情况」是资产侧函证）' },
+  { field: 'remark', reason: '模板无此列；索引走 S 列' },
+] as const
+
+/**
+ * `enrichG10DetailRow` 的入参：受管列的 `Partial` + **显式列出**的四个 legacy 单值键。
+ *
+ * 🔴 不用 `& Record<string, unknown>` 兜底：那样任何拼错的字段名都能通过编译
+ * （本轮实测 `Record<string, unknown>` 让 `G10DetailRow` 自身都不再可赋值给它，
+ * 反而把正常调用点判红）。只放真实存在过的四个 legacy 键，读完即弃、不回写。
+ */
+export type G10DetailRowInput = Partial<G10DetailRow> & {
+  rowId: string
+  /** legacy：与模板 C/K 重复 */
+  initialAmount?: number | string | null
+  /** legacy：与模板 E 重复 */
+  openingBalance?: number | string | null
+  /** legacy：与模板 H 重复 */
+  currentIncrease?: number | string | null
+  /** legacy：与模板 I 重复 */
+  profitLossAmount?: number | string | null
 }
 
 export interface G10DetailRowIssue {
@@ -103,14 +170,30 @@ export interface G10DetailRowIssue {
   variance?: number
 }
 
-const ITEM_ID_ROWS = 'G10-detail-rows'
+const ITEM_ID_ROWS = G10_ITEM_IDS.G10_DETAIL_ROWS
 const DIFF_TOLERANCE = 0.01
 
 function genId(): string {
   return `g10d-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`
 }
 
-export function enrichG10DetailRow(raw: Partial<G10DetailRow> & { rowId: string }, seq: number): G10DetailRow {
+/**
+ * 按模板 6 条公式重算派生列。
+ *
+ * | 列 | 公式 | 说明 |
+ * |---|---|---|
+ * | E | `=C+D` | 期初公允价值 |
+ * | G | `=E+F` | 期初审定数（单列调整） |
+ * | K | `=C+H` | 期末初始确认金额（🔴 **未审线**，不是从 G 推） |
+ * | L | `=D+I+J` | 期末累计公允价值变动（🔴 **含利息 J**） |
+ * | M | `=K+L` | 期末公允价值 |
+ * | O | `=M+N` | 期末审定数（单列调整） |
+ *
+ * 🔴 兼容读：旧载荷可能只有 `initialAmount`/`openingBalance`/`currentIncrease`/
+ * `profitLossAmount` 这些 legacy 单值键。G10 真库是 **2 B 空数组**（无真实行数据），
+ * 所以这里只做**读取兼容**，不做迁移统计与回写 —— 那套只有 G9（605 B 真载荷）需要。
+ */
+export function enrichG10DetailRow(raw: G10DetailRowInput, seq: number): G10DetailRow {
   const openingInitialAmount = parseNum(raw.openingInitialAmount ?? raw.initialAmount)
   const openingBalanceLegacy = parseNum(raw.openingBalance)
   let openingFvAccum: number
@@ -121,43 +204,31 @@ export function enrichG10DetailRow(raw: Partial<G10DetailRow> & { rowId: string 
   } else {
     openingFvAccum = 0
   }
+  // E = C + D
   const openingFairValue = calcBookFromParts(openingInitialAmount, openingFvAccum)
-  let openingAdjustment = parseNum(raw.openingAdjustment)
-  if (!raw.openingAdjustment && raw.openingAdjusted != null && Math.abs(openingBalanceLegacy) > 0.005) {
-    openingAdjustment = parseNum(raw.openingAdjusted) - openingFairValue
-  }
+  const openingAdjustment = parseNum(raw.openingAdjustment)
+  // G = E + F
   const openingAdjusted = calcAdjustedAmount(openingFairValue, openingAdjustment)
 
   const movementInitialAmount = parseNum(raw.movementInitialAmount ?? raw.currentIncrease)
   const movementFvChange = parseNum(raw.movementFvChange ?? raw.profitLossAmount)
   const interestExpense = parseNum(raw.interestExpense)
-  const currentDecrease = parseNum(raw.currentDecrease)
 
+  // K = C + H（未审线）
   const closingInitialAmount = openingInitialAmount + movementInitialAmount
-  const closingFvAccum = openingFvAccum + movementFvChange
+  // L = D + I + J（🔴 含利息）
+  const closingFvAccum = openingFvAccum + movementFvChange + interestExpense
+  // M = K + L
   const closingFairValue = calcBookFromParts(closingInitialAmount, closingFvAccum)
-  const closingBalance = calcG10DetailClosingBalance(
-    openingAdjusted,
-    movementInitialAmount,
-    movementFvChange,
-    interestExpense,
-    currentDecrease,
-  )
   const closingAdjustment = parseNum(raw.closingAdjustment)
-  const closingAdjusted = calcAdjustedAmount(closingBalance, closingAdjustment)
+  // O = M + N
+  const closingAdjusted = calcAdjustedAmount(closingFairValue, closingAdjustment)
 
   return {
     rowId: raw.rowId,
     seq,
     liabilityCategory: raw.liabilityCategory ?? G10_LIABILITY_CATEGORY_OPTIONS[0],
     liabilityName: raw.liabilityName ?? '',
-    liabilityType: raw.liabilityType ?? G10_LIABILITY_TYPE_OPTIONS[0],
-    counterparty: raw.counterparty ?? '',
-    contractDate: raw.contractDate ?? '',
-    maturityDate: raw.maturityDate ?? '',
-    couponRate: raw.couponRate ?? '',
-    accruedInterest: parseNum(raw.accruedInterest),
-    issuanceDocIndex: raw.issuanceDocIndex ?? '',
     openingInitialAmount,
     openingFvAccum,
     openingFairValue,
@@ -166,24 +237,15 @@ export function enrichG10DetailRow(raw: Partial<G10DetailRow> & { rowId: string 
     movementInitialAmount,
     movementFvChange,
     interestExpense,
-    currentDecrease,
     closingInitialAmount,
     closingFvAccum,
     closingFairValue,
-    closingBalance,
     closingAdjustment,
     closingAdjusted,
-    initialAmount: closingInitialAmount,
-    openingBalance: openingFairValue,
-    currentIncrease: movementInitialAmount,
-    fairValueLevel: raw.fairValueLevel ?? 'Level2',
-    valuationMethod: raw.valuationMethod ?? '',
-    profitLossAmount: movementFvChange,
-    isDerivative: !!raw.isDerivative,
-    hostContractDesc: raw.hostContractDesc ?? '',
-    embeddedDerivativeJudgment: raw.embeddedDerivativeJudgment ?? '',
-    confirmationStatus: raw.confirmationStatus ?? '',
-    remark: raw.remark ?? '',
+    maturityDate: raw.maturityDate ?? '',
+    couponRate: raw.couponRate ?? '',
+    accruedInterest: parseNum(raw.accruedInterest),
+    issuanceDocIndex: raw.issuanceDocIndex ?? '',
   }
 }
 
@@ -194,9 +256,9 @@ export function scanG10DetailIntegrity(rows: G10DetailRow[]): G10DetailRowIssue[
     if (!r.liabilityName?.trim() && Math.abs(r.closingAdjusted) > DIFF_TOLERANCE) {
       issues.push({ rowId: r.rowId, liabilityName: name, field: 'liabilityName', message: '有审定余额但项目名称为空' })
     }
-    if (r.fairValueLevel === 'Level3' && !r.valuationMethod?.trim()) {
-      issues.push({ rowId: r.rowId, liabilityName: name, field: 'valuationMethod', message: 'Level3 须填估值方法' })
-    }
+    // 🔴 C-7 移除「Level3 须填估值方法」：公允价值层次与估值方法的权威源是
+    //    公允价值测试表G10-5 / 第三层次调节表G10-6，G10-2 按模板重构后没有这两列。
+    //    该校验已在 useG10L3Reconciliation（以 G10-5/G10-6 为主表）承担。
     const openDecompDiff = r.openingFairValue - calcBookFromParts(r.openingInitialAmount, r.openingFvAccum)
     if (Math.abs(openDecompDiff) > DIFF_TOLERANCE) {
       issues.push({
@@ -217,26 +279,28 @@ export function scanG10DetailIntegrity(rows: G10DetailRow[]): G10DetailRowIssue[
         variance: closeDecompDiff,
       })
     }
-    const rollDiff = r.closingBalance - r.closingFairValue
-    if (Math.abs(rollDiff) > DIFF_TOLERANCE && Math.abs(r.closingBalance) > DIFF_TOLERANCE) {
+    // 🔴 C-7 新增：未审线校验（K=C+H / L=D+I+J）。改造前这里校验的是走**审定线**的
+    //    legacy `closingBalance`，那个口径本身就与模板不符 ⇒ 校验对象换成模板列。
+    const unauditedCostDiff =
+      r.closingInitialAmount - (r.openingInitialAmount + r.movementInitialAmount)
+    if (Math.abs(unauditedCostDiff) > DIFF_TOLERANCE) {
       issues.push({
         rowId: r.rowId,
         liabilityName: name,
-        field: 'closingBalance',
-        message: 'roll-forward 期末余额与 (一)+(二) 分解不一致（请核对本期减少/利息拆分）',
-        variance: rollDiff,
+        field: 'closingInitialAmount',
+        message: '期末初始确认金额应等于「期初 + 本期变动」（未审线 K=C+H）',
+        variance: unauditedCostDiff,
       })
     }
-    if (
-      Math.abs(r.movementFvChange) > DIFF_TOLERANCE
-      && Math.abs(r.profitLossAmount - r.movementFvChange) > DIFF_TOLERANCE
-    ) {
+    const unauditedFvDiff =
+      r.closingFvAccum - (r.openingFvAccum + r.movementFvChange + r.interestExpense)
+    if (Math.abs(unauditedFvDiff) > DIFF_TOLERANCE) {
       issues.push({
         rowId: r.rowId,
         liabilityName: name,
-        field: 'movementFvChange',
-        message: '本期 FV 变动与计入损益金额应一致（FVTPL）',
-        variance: r.profitLossAmount - r.movementFvChange,
+        field: 'closingFvAccum',
+        message: '期末累计公允价值变动应等于「期初 + 本期变动 + 计入财务费用的利息」（L=D+I+J）',
+        variance: unauditedFvDiff,
       })
     }
   }
@@ -262,7 +326,14 @@ export function useG10Detail(opts: {
 }) {
   const auditYearRef = useWorkpaperAuditYear()
   const rows = ref<G10DetailRow[]>([])
-  const activeTab = ref<'basic' | 'movement' | 'closing'>('basic')
+  /**
+   * 表格分组视图。
+   *
+   * 🔴 C-7 从三段改四段：模板两级表头是四个一级分组（期初余额 C-E+F/G ·
+   * 本期变动 H-J · 期末余额 K-M+N/O · 单列补充 A/B/P-S），原先把「期初 + 变动」挤在
+   * 一个 tab 里，列宽被压到看不清分量归属。
+   */
+  const activeTab = ref<'basic' | 'opening' | 'movement' | 'closing'>('basic')
   const activeRowIndex = ref(0)
   const auxLoading = ref(false)
   const procedureMarking = ref(false)
@@ -282,15 +353,22 @@ export function useG10Detail(opts: {
     movementInitialAmount: calcSubtotal(rows.value.map((r) => r.movementInitialAmount)),
     movementFvChange: calcSubtotal(rows.value.map((r) => r.movementFvChange)),
     interestExpense: calcSubtotal(rows.value.map((r) => r.interestExpense)),
-    currentDecrease: calcSubtotal(rows.value.map((r) => r.currentDecrease)),
-    closingBalance: calcSubtotal(rows.value.map((r) => r.closingBalance)),
+    closingFairValue: calcSubtotal(rows.value.map((r) => r.closingFairValue)),
     closingAdjusted: calcSubtotal(rows.value.map((r) => r.closingAdjusted)),
   }))
 
-  const typeSubtotals = computed(() => {
+  /**
+   * 按 **A 列「类别」** 分组小计（改造前按已删除的 `liabilityType` 分组）。
+   *
+   * 模板只有 A 列一个分类维度（指定类 / 交易类），`liabilityType`（债券/理财/衍生…）
+   * 是自研的第二维度，已随 C-7 一并移除。
+   */
+  const categorySubtotals = computed(() => {
     const result: Record<string, number> = {}
-    for (const t of G10_LIABILITY_TYPE_OPTIONS) {
-      result[t] = calcSubtotal(rows.value.filter((r) => r.liabilityType === t).map((r) => r.closingAdjusted))
+    for (const c of G10_LIABILITY_CATEGORY_OPTIONS) {
+      result[c] = calcSubtotal(
+        rows.value.filter((r) => r.liabilityCategory === c).map((r) => r.closingAdjusted),
+      )
     }
     result['总计'] = totals.value.closingAdjusted
     return result
@@ -313,9 +391,11 @@ export function useG10Detail(opts: {
 
   const integrityIssues = computed(() => scanG10DetailIntegrity(rows.value))
 
-  const level3MissingMethodCount = computed(() =>
-    integrityIssues.value.filter((i) => i.field === 'valuationMethod').length,
-  )
+  /**
+   * 🔴 C-7 恒 0：「Level3 缺估值方法」的校验随层次列一起迁到 G10-5/G10-6
+   * （`useG10L3Reconciliation`）。保留导出以免打断调用方。
+   */
+  const level3MissingMethodCount = computed(() => 0)
 
   /** G10-2 行 → G10-5 匹配（按项目名称） */
   const fvLinkByRowId = computed(() => {
@@ -355,9 +435,10 @@ export function useG10Detail(opts: {
     const linkedIds = new Set(links.map((l) => l.detailRowId))
     for (const row of rows.value) {
       if (!isG10DerivativeDetailRow(row)) continue
+      // 🔴 C-7：只认 G10-8 的链接清单。改造前还会回退读 G10-2 自己的
+      //    `embeddedDerivativeJudgment` / `remark` 是否含 "G10-8" —— 那两列已随
+      //    权威模板重构移除（权威源是 G10-8），回退读等于让 G10-2 自证已核查。
       const viaG108 = linkedIds.has(row.rowId)
-        || String(row.embeddedDerivativeJudgment ?? '').includes('G10-8')
-        || String(row.remark ?? '').includes('G10-8')
       map.set(row.rowId, { linked: viaG108, viaG108 })
     }
     return map
@@ -620,7 +701,7 @@ export function useG10Detail(opts: {
     currentRowKey,
     totalRow,
     totals,
-    typeSubtotals,
+    categorySubtotals,
     adjudicationClosingTotal,
     adjCrossVariance,
     hasAdjCrossMismatch,

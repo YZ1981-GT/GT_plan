@@ -9,6 +9,30 @@
  * - 切 OO 前预拉 onlyoffice-config（拉取成功才切，对齐 useF2DualMode 范式）
  * - 切换前 autoSave
  * - localStorage 持久化 (per wpId)
+ *
+ * ═══ 🔴 @deprecated 生产已停用（H2 接桥后）═══════════════════════════════════
+ *
+ * `GtH2ConstructionInProgress.vue` 已改用 `composables/useHSyncMode.ts`（统一四分支保存
+ * 协议 + 真双向桥）。换掉本 composable 的两个理由与 H6/H8/H4 同：
+ *   ① 它**不建桥** ⇒ OO 侧编辑回不到 HTML（假双向）；
+ *   ② 它把 `isOoAvailable` 暴露给宿主做 `:disabled`，健康检查未就绪时切换器整体锁死
+ *      （D4 已实证的 bug ③）。
+ *
+ * 宿主侧原本包在本 composable 外面的「目录页 `H2` 与程序表 `*A` 禁切 OO」策略
+ * **保留在宿主层**（`GtH2ConstructionInProgress.vue` 的 `currentMode` setter），
+ * 没有下沉进 `useHSyncMode` —— 通用层不该认识具体 sheet 短码。
+ *
+ * 🔴 **本文件当前生产与测试消费均为 0，但先不删**（与 `useH6DualMode` 同一处置）：
+ *    删除会连带打红两处判据，需要一次独立的收敛动作连同判据一起改：
+ *   · `test_h_foundation_hc_guards.py` 的 localStorage 判据把
+ *     `useH{2,3,4,6,8,9,10}DualMode.ts` 逐个列进「UI 偏好存储」清单，
+ *     本文件的 `STORAGE_PREFIX = 'h2-dual-mode:'` 在列 ⇒ 删了清单缺项；
+ *   · `test_dual_mode_ui_preference_store_only_persists_a_mode_string` 遍历同一组。
+ *
+ *    上一轮把 `useH9FormData.ts` 当「零消费载体」删掉时漏查了**测试消费方**
+ *    （`hCycleAccountScope.spec.ts` 依赖它）⇒ 判据 ENOENT 打红。此处不重复那个错误：
+ *    本次的「零消费」结论是 grep `useH2DualMode` 限定 `*.ts/*.vue/*.py` 后现算的，
+ *    命中只剩注释与本文件自身。
  */
 import { ref, computed, onMounted, type Ref } from 'vue'
 import http from '@/utils/http'

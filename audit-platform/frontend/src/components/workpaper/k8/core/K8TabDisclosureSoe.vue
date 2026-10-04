@@ -108,6 +108,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildK8SyncPayload } from '../../composables/k8NoteSectionMap'
 import type { Ref } from 'vue'
+import { newRowIdentity } from '../../composables/shared/rowIdentity'
 
 const K8_ACCOUNT_CODE = '6601'
 const ABNORMAL_THRESHOLD = 0.3
@@ -169,7 +170,7 @@ const DEFAULT_SOE_PROJECTS = [
 
 function initDefaultRows(): void {
   disclosureRows.value = DEFAULT_SOE_PROJECTS.map((name, idx) => ({
-    id: `soe-${idx}`,
+    id: newRowIdentity('soe'),
     project: name,
     currentAmount: 0,
     priorAmount: 0,
@@ -194,7 +195,7 @@ function buildRowsFromK81(): DisclosureRow[] | null {
   const names = Object.keys(map)
   if (!names.length) return null
   return names.map((name, idx) => ({
-    id: `k81-${idx}`,
+    id: newRowIdentity('k81'),
     project: name,
     currentAmount: Number(map[name].audited ?? 0),
     priorAmount: Number(map[name].prior ?? 0),
@@ -229,12 +230,11 @@ function applyAutoFill(): void {
       row.priorAmount = Number(src.priorAmount ?? src.prior ?? 0)
     }
   }
-  let idx = disclosureRows.value.length
   for (const name of names) {
     if (!existing.has(name)) {
       const src = (data as any)[name]
       disclosureRows.value.push({
-        id: `k81-${idx++}`,
+        id: newRowIdentity('k81'),
         project: name,
         currentAmount: Number(src.audited ?? 0),
         priorAmount: Number(src.prior ?? 0),

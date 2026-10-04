@@ -7,8 +7,10 @@ import {
 import { G14_LINE_ITEMS, isG14OciCounterpart, g14CounterpartHint } from '../g14Constants'
 
 describe('g14ProvisionTb', () => {
-  it('1142 直接匹配合同资产减值准备', () => {
-    const def = G14_LINE_ITEMS.find((d) => d.rowKey === 'ca')!
+  // 🔴 C-9：模板 `明细表G14-2` 固定行集无「合同资产减值损失」专行 ⇒ 1142 的取数落
+  //    模板 R19「其他」行（`rowKey: 'other'`），原 `ca` 行已删。
+  it('1142 直接匹配合同资产减值准备（落「其他」行）', () => {
+    const def = G14_LINE_ITEMS.find((d) => d.rowKey === 'other')!
     const hit = matchProvisionTbRow(
       [{ standard_account_code: '1142', account_name: '合同资产减值准备', audited_amount: -8000 }],
       def,
@@ -56,7 +58,11 @@ describe('G14 FVOCI / OCI counterpart', () => {
     expect(g14CounterpartHint('othdebt')).toContain('而非坏账准备贷方')
   })
 
-  it('合同资产与 ECL 交叉索引', () => {
-    expect(G14_LINE_ITEMS.find((d) => d.rowKey === 'ca')?.provisionAccount).toBe('合同资产减值准备')
+  it('🔴 合同资产并入「其他」行：对应科目名与 D6 的 ECL 交叉索引都挂该行', async () => {
+    const { G14_ECL_CROSS_REF } = await import('../g14Constants')
+    const other = G14_LINE_ITEMS.find((d) => d.rowKey === 'other')!
+    expect(other.provisionAccount).toContain('合同资产减值准备')
+    expect(G14_ECL_CROSS_REF.other).toBe('wp:D6-1')
+    expect(G14_ECL_CROSS_REF).not.toHaveProperty('ca')
   })
 })

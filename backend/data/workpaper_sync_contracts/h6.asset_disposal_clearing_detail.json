@@ -1,0 +1,374 @@
+{
+  "contract_id": "h6.asset_disposal_clearing_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "f3172f4c2c27fcf74be70dddeb3171d0e4e9467f809f16e4cb1e5ede25cf7b27",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "carrier": {
+      "read": "render_config_snapshot_passthrough",
+      "tb_publish_gate": "H6TabAdjudication → useH6Adjudication.publishToTb （POST /api/workpapers/{wpId}/audit-determination/publish-to-tb，科目 1606，中文二次确认；sync 路径对 trial_balance 写 0 次）",
+      "write": "host_inline"
+    },
+    "derived_fields": [
+      "endAdjustment"
+    ],
+    "derived_total_keys": [
+      "H6-2-subtotal-gain-loss",
+      "H6-2-subtotal-net-book-value",
+      "H6-2-subtotal-begin-unadjusted",
+      "H6-2-subtotal-end-unadjusted",
+      "H6-2-subtotal-begin-audited",
+      "H6-2-subtotal-end-audited"
+    ],
+    "effective_columns": 16,
+    "entry_id": "xlsx/gt-h6-asset-disposal-clearing",
+    "enum_fields": {
+      "status": [
+        "清理中",
+        "已完成",
+        "已结转"
+      ]
+    },
+    "frozen_cross_ref": {
+      "H6-2-rows": [
+        "h10RelatedH6Pull.ts",
+        "h1SoeClearingH6Pull.ts",
+        "h6DisclosureModel.ts"
+      ]
+    },
+    "html_store": {
+      "item_ids": [
+        "H6-2-rows"
+      ],
+      "note": "H6 固定资产清理的结构化 Tab 行数据存成 checklist_responses 的 **remark** JSON 数组。本契约按 stable field + 行身份 `rowId` 拆开。🔴 16 个模板列全部有 store 字段（`template_only_columns` 为空）；反向有 20 个 HTML 字段模板无列（store-only，含 accDepreciation / tax / netGainLoss / h1Reference / h10Reference 五个兼容别名与派生列 endAdjustment）。🔴 公式列 E/I/J/K/L 中 **J / K 的 json_key 不落库**（前端 load 时 `applyH62BalanceFormulas` 重算），E/I/L 落库 —— **部分落库**，不同于 H9 的「公式列一律不落库」。`formula_mask` 保证 OO 侧不被 HTML 的 None 覆盖。",
+      "payload_column": "remark",
+      "payload_column_mode": "dual_write_remark_and_conclusion",
+      "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts —— `_persist()` 经宿主 onSave 写 { item_id: 'H6-2-rows', remark: JSON.stringify(rows) }",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "non_persisted_formula_keys": [
+      "increaseAudited",
+      "decreaseAudited"
+    ],
+    "pilot_class": "phase5_asset_disposal_clearing_detail",
+    "reviewed_basis": "openpyxl 逐格实测 H/H6 固定资产清理.xlsx 的 `明细表H6-2`（两级表头 R9/R10 / 数据 R11-15 共 5 行 / footer R16 A16='　合计'（前导全角空格 U+3000）且 B16..L16 各 =SUM(x11:x15) / 公式列 E·I·J·K·L / 有效内容列 16 即 A..P / max_column=25 是空列尾巴 / 表头合并 A9:A10·F9:F10·M9:M10·N9:N10·O9:O10·P9:P10 纵向 + B9:E9·G9:H9·I9:L9 横向 / 册内 8 sheets 且**无** GT_Custom） + 前端 `useH6Detail.ts` 按值 grep（ROWS_KEY=#L119 / _persist()=#L531-570 的落库字段 / applyH62BalanceFormulas 的 E·I·J·K·L 重算 / 6 个 H6-2-subtotal-* 同批写出 / status 三值中文枚举 / rowId 生成式为时间戳+随机属 HC-7 族 A） + 真库现算（checklist_responses.item_id='H6-2-rows' **无行** ⇒ roundtrip 真实证需造数据，这正是 canary 选 H9 而非 H6 的原因，如实登记不粉饰）",
+    "store_only_fields": [
+      "seq",
+      "originalCost",
+      "accumulatedDepreciation",
+      "accDepreciation",
+      "impairmentProvision",
+      "netBookValue",
+      "disposalIncome",
+      "disposalExpenses",
+      "taxAmount",
+      "tax",
+      "gainLoss",
+      "netGainLoss",
+      "transferAccount",
+      "completionDate",
+      "status",
+      "refH1Code",
+      "h1Reference",
+      "refH10Code",
+      "h10Reference",
+      "endAdjustment"
+    ],
+    "tb_publish_gate": "H6TabAdjudication → useH6Adjudication.publishToTb （POST /api/workpapers/{wpId}/audit-determination/publish-to-tb，科目 1606，中文二次确认；sync 路径对 trial_balance 写 0 次）",
+    "template_only_columns": [],
+    "uuid_column": "Q",
+    "variant_axis": null
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "明细表H6-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "h602-managed",
+      "tables": [
+        {
+          "anchor": "A9",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "asset_name",
+              "header_source_ref": "源xlsx!明细表H6-2!A10",
+              "header_text": "项目",
+              "json_pointer": "/rows/{row_uuid}/assetName",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H6-2!A11",
+              "stable_field_key": "asset_disposal_clearing_detail_rows/{row_uuid}/asset_name",
+              "store_item_id": "H6-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "begin_unadjusted",
+              "header_source_ref": "源xlsx!明细表H6-2!B10",
+              "header_text": "期初数",
+              "json_pointer": "/rows/{row_uuid}/beginUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H6-2!B11",
+              "stable_field_key": "asset_disposal_clearing_detail_rows/{row_uuid}/begin_unadjusted",
+              "store_item_id": "H6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "period_increase",
+              "header_source_ref": "源xlsx!明细表H6-2!C10",
+              "header_text": "本期增加",
+              "json_pointer": "/rows/{row_uuid}/periodIncrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H6-2!C11",
+              "stable_field_key": "asset_disposal_clearing_detail_rows/{row_uuid}/period_increase",
+              "store_item_id": "H6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "period_decrease",
+              "header_source_ref": "源xlsx!明细表H6-2!D10",
+              "header_text": "本期减少",
+              "json_pointer": "/rows/{row_uuid}/periodDecrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H6-2!D11",
+              "stable_field_key": "asset_disposal_clearing_detail_rows/{row_uuid}/period_decrease",
+              "store_item_id": "H6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_unadjusted",
+              "header_source_ref": "源xlsx!明细表H6-2!E10",
+              "header_text": "期末数",
+              "json_pointer": "/rows/{row_uuid}/endUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H6-2!E11",
+              "stable_field_key": "asset_disposal_clearing_detail_rows/{row_uuid}/end_unadjusted",
+              "store_item_id": "H6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "begin_adjustment",
+              "header_source_ref": "源xlsx!明细表H6-2!F10",
+              "header_text": "期初调整",
+              "json_pointer": "/rows/{row_uuid}/beginAdjustment",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H6-2!F11",
+              "stable_field_key": "asset_disposal_clearing_detail_rows/{row_uuid}/begin_adjustment",
+              "store_item_id": "H6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "aje_increase",
+              "header_source_ref": "源xlsx!明细表H6-2!G10",
+              "header_text": "本期增加",
+              "json_pointer": "/rows/{row_uuid}/ajeIncrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H6-2!G11",
+              "stable_field_key": "asset_disposal_clearing_detail_rows/{row_uuid}/aje_increase",
+              "store_item_id": "H6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "aje_decrease",
+              "header_source_ref": "源xlsx!明细表H6-2!H10",
+              "header_text": "本期减少",
+              "json_pointer": "/rows/{row_uuid}/ajeDecrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H6-2!H11",
+              "stable_field_key": "asset_disposal_clearing_detail_rows/{row_uuid}/aje_decrease",
+              "store_item_id": "H6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "begin_audited",
+              "header_source_ref": "源xlsx!明细表H6-2!I10",
+              "header_text": "期初数",
+              "json_pointer": "/rows/{row_uuid}/beginAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H6-2!I11",
+              "stable_field_key": "asset_disposal_clearing_detail_rows/{row_uuid}/begin_audited",
+              "store_item_id": "H6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "increase_audited",
+              "header_source_ref": "源xlsx!明细表H6-2!J10",
+              "header_text": "本期增加",
+              "json_pointer": "/rows/{row_uuid}/increaseAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H6-2!J11",
+              "stable_field_key": "asset_disposal_clearing_detail_rows/{row_uuid}/increase_audited",
+              "store_item_id": "H6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "decrease_audited",
+              "header_source_ref": "源xlsx!明细表H6-2!K10",
+              "header_text": "本期减少",
+              "json_pointer": "/rows/{row_uuid}/decreaseAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H6-2!K11",
+              "stable_field_key": "asset_disposal_clearing_detail_rows/{row_uuid}/decrease_audited",
+              "store_item_id": "H6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_audited",
+              "header_source_ref": "源xlsx!明细表H6-2!L10",
+              "header_text": "期末数",
+              "json_pointer": "/rows/{row_uuid}/endAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表H6-2!L11",
+              "stable_field_key": "asset_disposal_clearing_detail_rows/{row_uuid}/end_audited",
+              "store_item_id": "H6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "disposal_reason",
+              "header_source_ref": "源xlsx!明细表H6-2!M10",
+              "header_text": "转入清理的原因",
+              "json_pointer": "/rows/{row_uuid}/disposalReason",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H6-2!M11",
+              "stable_field_key": "asset_disposal_clearing_detail_rows/{row_uuid}/disposal_reason",
+              "store_item_id": "H6-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "start_date",
+              "header_source_ref": "源xlsx!明细表H6-2!N10",
+              "header_text": "转入清理的时间",
+              "json_pointer": "/rows/{row_uuid}/startDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H6-2!N11",
+              "stable_field_key": "asset_disposal_clearing_detail_rows/{row_uuid}/start_date",
+              "store_item_id": "H6-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "over_one_year_progress",
+              "header_source_ref": "源xlsx!明细表H6-2!O10",
+              "header_text": "转入固定资产清理起始时间已超过1年的固定资产清理进展情况",
+              "json_pointer": "/rows/{row_uuid}/overOneYearProgress",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H6-2!O11",
+              "stable_field_key": "asset_disposal_clearing_detail_rows/{row_uuid}/over_one_year_progress",
+              "store_item_id": "H6-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              },
+              "column_key": "remarks",
+              "header_source_ref": "源xlsx!明细表H6-2!P10",
+              "header_text": "备注",
+              "json_pointer": "/rows/{row_uuid}/remarks",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表H6-2!P11",
+              "stable_field_key": "asset_disposal_clearing_detail_rows/{row_uuid}/remarks",
+              "store_item_id": "H6-2-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "　合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "E11:E15",
+            "I11:I15",
+            "J11:J15",
+            "K11:K15",
+            "L11:L15"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "asset_disposal_clearing_detail_rows",
+          "uuid_col": "Q"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "2bbe9c6546c96749f1863f310b427098a8695c7a856dd991cfa0fd0214eeb5fa",
+    "relative_path": "H/H6 固定资产清理.xlsx",
+    "template_sha256": "c7d0d78a798ce9c3c47aab64ea02ffc93919a9b02474d8801d115c614656e8a8"
+  },
+  "template_definition_sha256": "7f4d8be94c50ce77aeac6a044fd11f5bf172a5cbfe01df9ee4d5ef91c54a9dcf"
+}

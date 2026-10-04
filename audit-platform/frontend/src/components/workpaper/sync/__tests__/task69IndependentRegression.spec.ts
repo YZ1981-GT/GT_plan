@@ -578,6 +578,14 @@ function makeHarness(options: HarnessOptions = {}): Harness {
   const props: Record<string, unknown> = {
     bridge,
     docsApiLoader,
+    // 🔴 本 harness 用「排队的 mock 响应」驱动桥，并由各用例自己调
+    //    `bridge.refreshOperation()` 观测状态推进。宿主 2026-09-22 起会在
+    //    `waiting_application` 之后自动追踪 operation（修「保存后永久转圈」），
+    //    那会多打一次 operation GET、抢掉队首响应，使本文件里与「要不要轮询」无关的
+    //    判据（mount→ready→confirm 顺序、404/403 归一、fail-open 文案、AC 11.5 八事件…）
+    //    集体打红。这里显式关掉自动追踪，声明「本文件不测追踪行为」——
+    //    追踪本身由 `workpaperSyncEditorHostTracking.spec.ts` 专门验。
+    trackOperation: false,
     onReady: (payload: unknown) => record('emit', 'ready', payload as Record<string, unknown>),
     onDirty: (payload: unknown) => record('emit', 'dirty', payload as Record<string, unknown>),
     onSaveRequested: (payload: unknown) =>

@@ -334,16 +334,32 @@ class TestRegistrationAccountingIdentity:
         assert len(registered) + unregistered == len(planned)
 
     def test_every_unregistered_entry_has_a_reason(self) -> None:
-        """未注册的 entry 必须逐个有原因 —— 「注册不上」不带原因等于没有结论。"""
+        """未注册的 entry 必须逐个「有结论」——「注册不上」不带结论等于没有结论。
+
+        🔴 spec workpaper-sync-registration-isolation-and-d2-republish（AC 5.12）：
+        「注册失败（真故障）」与「供给不足」是**两个并列、不相交**的桶——前者进
+        `outcome.failures`（带 error_code/message），后者进 `outcome.reasons`。
+        账目恒等式因此是 `registered + reasons + failures == planned`（见
+        `ManifestRegistrationOutcome.as_dict` 的 `unregistered_entry_count =
+        len(reasons) + len(failures)`）。一个 entry 只要落进任一桶就算「有结论」；
+        本判据据此对两桶取并集，而不是只看 `reasons`（否则隔离路径下漂移失败的 entry
+        会被误判成「无结论」——那恰恰把 fail-visible 的失败当成了没结论）。
+        """
         outcome = _SNAPSHOT["production_outcome"]
         planned = set(outcome.planned_entry_ids)
         registered = set(outcome.registered_entry_ids)
         unregistered = sorted(planned - registered)
         assert unregistered, "全部注册成功 —— 本判据在空集上，需要重新裁决分母"
         reasons = dict(outcome.reasons)
-        missing = [e for e in unregistered if not str(reasons.get(e) or "").strip()]
+        failures = dict(getattr(outcome, "failures", {}) or {})
+        missing = [
+            e
+            for e in unregistered
+            if not str(reasons.get(e) or "").strip()
+            and not str(getattr(failures.get(e), "message", "") or "").strip()
+        ]
         assert not missing, (
-            f"{len(missing)} 个未注册 entry 没有原因（示例 {missing[:3]}）"
+            f"{len(missing)} 个未注册 entry 既无 reason 也无 failure（示例 {missing[:3]}）"
         )
 
     def test_planned_count_equals_manifest_plan_length(self) -> None:
@@ -527,7 +543,16 @@ class TestBindingConstraintComesFromThreeArmMeasurement:
         bp = next(
             item for item in gate.BINDING_CONSTRAINTS if item["id"] == "BP-61-1"
         )
-        measured = bp["measured_2026_09_04"]
+        # 🔴 比的是**最新一条带时点读数**，不是 `measured_2026_09_04` 那个快照：
+        #    后者的键名就是那次更正事件的日期，原地改数等于让「当天读到 2 行」这条
+        #    已发生的事实被今天的数字冒名顶替。真库行数天天涨 ⇒ 只有序列形态能同时
+        #    做到「与真库现查逐项相等」和「历史读数一条不丢」。
+        series = bp["measured_readings"]
+        assert isinstance(series, tuple) and len(series) >= 2, (
+            "`measured_readings` 必须是**带时点的序列**（≥2 条）—— 只留最新一条会让"
+            "「2026-09-04 当天读到 2 行」这条判断错误的证据消失"
+        )
+        measured = dict(series[-1])
         assert int(measured["working_paper_sync_entry_state_rows_total"]) == int(
             _SNAPSHOT["rows_entry_state"]
         ), (
@@ -541,6 +566,37 @@ class TestBindingConstraintComesFromThreeArmMeasurement:
         manifest_backed = [i for i in ids if not i.startswith(OPAQUE_ENTRY_PREFIX)]
         assert int(measured["of_which_opaque_namespace"]) == len(opaque)
         assert int(measured["of_which_manifest_entry"]) == len(manifest_backed)
+
+    def test_the_reading_series_preserves_the_2026_09_04_correction(self) -> None:
+        """🔴 反向自检：序列首条必须仍是 2026-09-04 那条 2 行读数，且与完整快照不漂移。
+
+        两件事一起钉：
+
+        1. **append-only** —— 首条读数（2 行、其中 1 行 manifest entry）是「原文『全表
+           0 行』是假话」这个判断错误的唯一数字证据，删掉或改掉它等于让错误消失；
+        2. **单一真源** —— 序列首条与 `measured_2026_09_04` 快照的同名三项逐字相等。
+           没有这条，序列就成了同一事实的第二个真源，改一边不改另一边无人发现。
+        """
+        gate = _load_task61_gate()
+        bp = next(
+            item for item in gate.BINDING_CONSTRAINTS if item["id"] == "BP-61-1"
+        )
+        first = dict(bp["measured_readings"][0])
+        snapshot = dict(bp["measured_2026_09_04"])
+
+        assert str(first["measured_at"]) == "2026-09-04"
+        assert int(first["working_paper_sync_entry_state_rows_total"]) == 2, (
+            "序列首条不再是 2 行 —— 那条读数是「原文『全表 0 行』是假话」的唯一证据"
+        )
+        for key in (
+            "working_paper_sync_entry_state_rows_total",
+            "of_which_opaque_namespace",
+            "of_which_manifest_entry",
+        ):
+            assert int(first[key]) == int(snapshot[key]), (
+                f"{key}: 序列首条 {first[key]}、`measured_2026_09_04` 快照 "
+                f"{snapshot[key]} —— 同一事实两处登记已漂移"
+            )
 
 
 # ═══════════════════════════════════════════════════════════════════════════

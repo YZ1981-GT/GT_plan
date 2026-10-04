@@ -10,12 +10,8 @@
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon> 带入调整
         </el-button>
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
+        <!-- BP-7 / AC 1.4：能力诚实披露（BP-4 inert 开关已摘除） -->
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-l6-special-payables" />
         <el-dropdown trigger="click" @command="handleImportExport">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -345,7 +341,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import { fmtAmount } from '@/utils/formatters'
 import { useL6FormData } from '../../composables/useL6FormData'
-import { useL6DualMode } from '../../composables/useL6DualMode'
+import GtEntrySyncCapabilityNotice from '../../sync/GtEntrySyncCapabilityNotice.vue'
 import { useL6ImportExport } from '../../composables/useL6ImportExport'
 import {
   useL6Adjudication,
@@ -379,11 +375,7 @@ const formData = useL6FormData({
   sheetPrefix: 'L6-L6-1',
 })
 
-// ─── DualMode ────────────────────────────────────────────────────────────────
-
-const dualMode = useL6DualMode({
-  wpId: computed(() => props.wpId),
-})
+// ─── DualMode 已摘除（BP-4 路线②） ────────────────────────────────────────
 
 // ─── ImportExport ────────────────────────────────────────────────────────────
 

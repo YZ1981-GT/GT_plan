@@ -1697,7 +1697,7 @@
       "section_title": "合并范围的变化",
       "account_name": "合并范围的变化",
       "content_type": "text",
-      "scope": "both",
+      "scope": "consolidated_only",
       "level": 1,
       "parent_section_id": null,
       "sort_index": 7,
@@ -19934,7 +19934,7 @@
               "account_codes": [
                 "2001"
               ],
-              "report_row_code": "BS-031",
+              "report_row_code": "BS-041",
               "row_type": "data"
             },
             {
@@ -21175,7 +21175,7 @@
               "account_codes": [
                 "2001"
               ],
-              "report_row_code": "BS-031",
+              "report_row_code": "BS-041",
               "row_type": "data"
             },
             {
@@ -21187,7 +21187,7 @@
               "account_codes": [
                 "2241"
               ],
-              "report_row_code": "BS-037",
+              "report_row_code": "BS-050",
               "row_type": "data"
             },
             {
@@ -21611,15 +21611,15 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 594,
-      "section_id": "chapter-08-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-ban-feng-xian-zhun-bei",
+      "sort_order": 893,
+      "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-ban-feng-xian-zhun-bei",
       "level": 2,
-      "parent_section_id": "chapter-08-cai-wu-bao-biao-xiang-mu-zhu-shi",
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 93,
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_m_equity_structure",
-      "_aligned_at": "2026-08-02 14:20:10"
+      "_aligned_at": "2026-09-30 14:41:41"
     },
     {
       "section_id": "chapter-09-huo-you-shi-xiang",
@@ -22407,7 +22407,7 @@
       "section_title": "母公司财务报表的主要项目附注",
       "account_name": "母公司财务报表的主要项目附注",
       "content_type": "text",
-      "scope": "both",
+      "scope": "consolidated_only",
       "level": 1,
       "parent_section_id": null,
       "sort_index": 12,

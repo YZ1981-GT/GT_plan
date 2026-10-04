@@ -21,6 +21,7 @@ import {
 } from './useG1TraFinFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import type { TradingDetailRow } from './useG1Detail'
+import { G1_ITEM_IDS } from './g1StorageContract'
 import {
   matchSecurityKey,
   findBySecurityKeys,
@@ -775,7 +776,7 @@ export function useG1IncomeCalc(opts: {
       return { ...d, dividendIncome: parseNum(hit.interestSubtotal) }
     })
     if (matched) {
-      opts.debouncedSave('G1-2-rows', { conclusion: JSON.stringify(next) })
+      opts.debouncedSave(G1_ITEM_IDS.G1_2_ROWS, { conclusion: JSON.stringify(next) })
       dispatchG1DetailUpdated('G1-5')
     }
     const unmatchedNames = interestRows.value

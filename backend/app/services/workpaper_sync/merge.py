@@ -87,6 +87,7 @@ client-confirmed 基线）并复用 :func:`values_equal` 做 roundtrip 反读等
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
@@ -117,7 +118,7 @@ from app.services.workpaper_sync.contracts import (
     FieldSpec,
     SyncContract,
     ValueType,
-    column_in_ranges,
+    cell_in_ranges,
 )
 from app.services.workpaper_sync.definitions import canonical_json_bytes
 
@@ -322,6 +323,36 @@ RETIRED_DEFERRALS: Final[tuple[Mapping[str, Any], ...]] = (
         ),
     },
     {
+        "capability": "normalize_value（projection digest 的值表示口径）",
+        "intended_status": "retired",
+        # Task 15 拥有 canonical projection payload（`_projection_payload` / 落盘口径），
+        # 本条登记是 2026-09-22 对它的修补：值表示未归一导致 AC 3.6 幂等复用恒不命中。
+        "retired_by_task": "15",
+        "consumer": (
+            "projection_digest_value.canonical_value_for_digest(...) —— "
+            "`_projection_payload` 序列化每个字段值前，先过 merge 的**比较键**口径"
+        ),
+        "expected_consumer_module": (
+            "app/services/workpaper_sync/projection_digest_value.py"
+        ),
+        # 🔴 无 `commits_through`：本模块是一个**纯函数**（bytes/值 → 规范表示），
+        #    不 import content_mutation、不碰会话、不 stage、不发布、零写入面。
+        #    与 `excel_extract` / `word_sdt_engine` 同类：只借 merge 的值规范化口径。
+        "commits_through": None,
+        "reason": (
+            "AC 3.6 的幂等复用比的是 `projection_sha256`，而 `_projection_payload` 原先只做 "
+            "`json_safe(value.value)` —— 它规范了 Decimal/date，却让裸 int/float 原样透出。"
+            "真栈实测（wp b3ab3c46 / entry xlsx/gt-d4-operating-revenue / revision 120）："
+            "已提交 projection 与当次 flush 的 projection **899 个键逐键相等**，但 canonical "
+            "字节 121485 vs 121487、digest 不同，首个差异是 period_total 的 `0`（int）vs "
+            "`0.0`（float）。后果是「内容一字未改」永远判不出来，幂等复用成了死代码，"
+            "每次点『在线编辑』都全量重物化（D4 换页签实测 31.5s）。"
+            "修法必须复用 merge 的 `normalize_value`（它就是『把值规范化成比较键』的单源）——"
+            "另写一套阈值/口径就会出现第二真源，而两套口径分叉的表现恰恰就是本缺陷。"
+            "少了这条登记，Task 14 的双向等值判据会把它误报成『绕过唯一 commit 入口』。"
+        ),
+    },
+    {
         "capability": "WordInstanceObservation / Word 侧 StructuralAnomaly 输入形态",
         "intended_status": "retired",
         "retired_by_task": "59",
@@ -497,6 +528,8 @@ def normalize_value(value: Any, value_type: ValueType) -> Any:
         )
     if value_type is ValueType.date:
         # 顺序要紧：datetime 是 date 的子类，先判 datetime 才能拒绝它。
+        if isinstance(value, str) and not value.strip():
+            return None  # 空字符串 = 审计师未填日期，视为 null
         if isinstance(value, datetime):
             raise ValueNormalizationError(
                 f"date 字段收到 datetime {value!r} —— 日期与时点是两种值，不得互相折叠"
@@ -608,6 +641,58 @@ class _FieldTemplate:
     sheet_excel_name: str | None
     table_key: str | None
     formula_mask: tuple[str, ...]
+    #: 该表数据区首行（``anchor`` 行 + ``header_rows``）。动态行字段的受保护判定要用它
+    #: 区分「mask 声明的是整个数据区列」还是「mask 针对某个模板固定行」。None = 非表字段。
+    first_data_row: int | None = None
+
+
+_ANCHOR_ROW_RE = re.compile(r"^[A-Z]+(\d+)")
+
+
+def _first_data_row_of(table: Any) -> int | None:
+    """数据区首行 = ``anchor`` 单元格行号 + ``header_rows``。
+
+    ``anchor`` 形如 ``A7`` 或 ``A7:Z9``（取起点行）。拿不到就返回 None（判定退化为「只保护
+    静态格」，是安全侧 —— 不会把该保护的动态行放开，只是可能少保护，而少保护的动态行由
+    CS-13 要求声明 ``mode=formula`` 兜住）。
+    """
+    m = _ANCHOR_ROW_RE.match(str(getattr(table, "anchor", "") or "").split(":")[0])
+    if m is None:
+        return None
+    return int(m.group(1)) + int(getattr(table, "header_rows", 0) or 0)
+
+
+def _mask_spans_data_column(column: str, first_data_row: int, mask: tuple[str, ...]) -> bool:
+    """该列是否被 mask 声明为**整个数据区**只读（区别于「针对某个模板固定行」）。
+
+    判据：存在同列 mask 区间，其行跨度是**多行**（``r2 > r1``）**且覆盖首数据行**。
+
+    * ``K8:K200``（覆盖数据区、多行）⇒ True —— 这一列在设计上就是受保护的（如 G7 的
+      ``masked_note``：editable 但整列受保护）；
+    * 单格 ``B12`` 或单行 ``C23:F23`` ⇒ False —— 这是针对某个**模板固定行**（小计/合计/
+      差异行）的声明，materialize 插行后行号已失效，不能拿它否决动态数据行的 editable。
+    """
+    from app.services.workpaper_sync.contracts import parse_a1_range
+
+    target = _column_index_a1(column)
+    for raw in mask:
+        c1, r1, c2, r2 = parse_a1_range(raw, location="formula_mask")
+        col_low, col_high = sorted((_column_index_a1(c1), _column_index_a1(c2)))
+        row_low, row_high = sorted((r1, r2))
+        if (
+            col_low <= target <= col_high
+            and row_high > row_low  # 多行区间
+            and row_low <= first_data_row <= row_high  # 覆盖首数据行
+        ):
+            return True
+    return False
+
+
+def _column_index_a1(column: str) -> int:
+    index = 0
+    for char in column:
+        index = index * 26 + (ord(char) - ord("A") + 1)
+    return index
 
 
 def _segments_match(template: str, actual: str) -> tuple[bool, str]:
@@ -658,6 +743,7 @@ class ContractIndex:
                             sheet_excel_name=sheet.excel_name,
                             table_key=table.table_key,
                             formula_mask=tuple(table.formula_mask),
+                            first_data_row=_first_data_row_of(table),
                         )
                     )
         for spec in contract.fields + contract.repeaters:
@@ -677,9 +763,23 @@ class ContractIndex:
     def _protection(template: _FieldTemplate) -> ProtectionPolicy:
         """三类只读来源分别登记（AC 6.6 的「公式 / auto-source / 受保护单元格」）。
 
-        第三类是**独立判据**：契约允许一个 `editable` 字段的列落在 `formula_mask` 里
+        第三类是**独立判据**：契约允许一个 `editable` 字段的**格**落在 `formula_mask` 里
         （Task 13 只校验反向：formula 字段必须在 mask 内）。这种格在 OO 里是受保护
         单元格，仍必须只读 —— 把这条与前两条合并会让「受保护单元格」永不被测到。
+
+        🔴 必须做**格级**判定（`cell_in_ranges`），不能只比列（`column_in_ranges`）。
+        逐格式 mask（如 D4-1 的 48 格）会把数据区之外的小计/合计/差异行的列整列带进
+        列跨度；只比列会把声明 `editable` 的金额字段全部误判成 `read_only_masked_cell`，
+        真栈实测 OO 改动被挡在 store 外、需求 1.5 整条不可达。
+
+        动态行字段（`row_from=row_identity`）分两种：
+        * mask 用**多行区间**把该列整个数据区声明为只读（如 G7 的 ``K8:K200``）⇒ 该列在设计上
+          受保护（editable 但只读），仍判 ``read_only_masked_cell``；
+        * mask 只用**单格/单行**声明该列的某个**模板固定行**（小计/合计/差异行，如 D4-1 的
+          ``B12``、D4-9 的 ``C23:F23``）⇒ 那是模板坐标，materialize 插行后已指向别的行，
+          **不能**拿它否决动态数据行的 editable 声明。用 `_mask_spans_data_column` 区分二者。
+
+        真正整列是公式的动态行字段，CS-13 要求它声明 ``mode=formula``，走第一类判定。
         """
         spec = template.spec
         if spec.mode is FieldMode.formula:
@@ -688,12 +788,22 @@ class ContractIndex:
             return ProtectionPolicy.read_only_auto_source
         if spec.mode is FieldMode.word_only:
             return ProtectionPolicy.word_only
-        if (
-            spec.cell is not None
-            and template.formula_mask
-            and column_in_ranges(spec.cell.column, template.formula_mask)
-        ):
-            return ProtectionPolicy.read_only_masked_cell
+        if spec.cell is not None and template.formula_mask:
+            if spec.cell.row_from == "static" and spec.cell.static_row is not None:
+                # 静态格：精确格级判定（列 + 那一行）。
+                if cell_in_ranges(
+                    spec.cell.column, spec.cell.static_row, template.formula_mask
+                ):
+                    return ProtectionPolicy.read_only_masked_cell
+            elif (
+                spec.cell.row_from == "row_identity"
+                and template.first_data_row is not None
+                and _mask_spans_data_column(
+                    spec.cell.column, template.first_data_row, template.formula_mask
+                )
+            ):
+                # 动态行：仅当该列被多行区间声明为整个数据区只读时才保护。
+                return ProtectionPolicy.read_only_masked_cell
         return ProtectionPolicy.editable
 
     @staticmethod

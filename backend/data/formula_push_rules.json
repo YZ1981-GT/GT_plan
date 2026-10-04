@@ -1,0 +1,811 @@
+{
+  "version": 1,
+  "spec": "chain-closure-phase2-formula-push-engine",
+  "note": "公式推送规则清单：目标地址 + 来源公式 + 写入策略 + 触发事件。由 app/services/formula_push/rules.py 加载即校验；公式管理「公式推送」面板只读展示。",
+  "rules": [
+    {
+      "rule_id": "E1.cash_rows.four_table",
+      "page_key": "workpaper:E1",
+      "stage": "source",
+      "policy": "editable",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-2",
+        "item_id": "E1-cash-detail-rows",
+        "rows": "four_table_seeded",
+        "fields": [
+          "opening",
+          "increase",
+          "decrease"
+        ]
+      },
+      "source": {
+        "kind": "four_table_leaves",
+        "slots": [
+          "cash"
+        ],
+        "formula_text": "库存现金（1001）末级科目：期初 = 期初余额，本期增加 = 本期借方，本期减少 = 本期贷方"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "现金明细表中由四表带入的行（人民币默认行、cash-ft-科目编码 行）随四表刷新期初 / 增加 / 减少；用户改过或锁定的单元格保留"
+    },
+    {
+      "rule_id": "E1.bank_rows.four_table",
+      "page_key": "workpaper:E1",
+      "stage": "source",
+      "policy": "editable",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-3",
+        "item_id": "E1-bank-detail-rows",
+        "rows": "four_table_seeded",
+        "fields": [
+          "opening",
+          "increase",
+          "decrease"
+        ]
+      },
+      "source": {
+        "kind": "four_table_leaves",
+        "slots": [
+          "bank",
+          "other"
+        ],
+        "formula_text": "银行存款（1002）末级科目 → 银行机构分组，其他货币资金（1012）末级科目 → 其他货币资金分组：期初 = 期初余额，本期增加 = 本期借方，本期减少 = 本期贷方"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "银行存款明细表中由四表带入的本金行随四表刷新期初 / 增加 / 减少；用户改过或锁定的单元格保留"
+    },
+    {
+      "rule_id": "E1.tb_amount.ending",
+      "page_key": "workpaper:E1",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-1",
+        "item_id": "E1-adj-tb-amount-ending"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('1001','期末余额')+TB('1002','期末余额')+TB('1012','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "审定表「试算平衡表数」期末 = 试算表 1001 / 1002 / 1012 审定数之和（与报表审定数同源；审定表发布到试算表后两者应一致）"
+    },
+    {
+      "rule_id": "E1.tb_amount.opening",
+      "page_key": "workpaper:E1",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-1",
+        "item_id": "E1-adj-tb-amount-opening"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('1001','年初余额')+TB('1002','年初余额')+TB('1012','年初余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "审定表「试算平衡表数」期初 = 试算表 1001 / 1002 / 1012 年初余额之和"
+    },
+    {
+      "rule_id": "E1.hall_adj.cash.ending",
+      "page_key": "workpaper:E1",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-1",
+        "item_id": "E1-hall-adj-cash-ending"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "adj": "hall_approved_excluding_workpaper"
+        },
+        "expression": "ADJ('1001','aje_net')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "库存现金期末账项调整中来自调整分录大厅的部分：已批准、且不是由本底稿 E1-5 汇入大厅的审计调整净额"
+    },
+    {
+      "rule_id": "E1.hall_adj.bank_principal.ending",
+      "page_key": "workpaper:E1",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-1",
+        "item_id": "E1-hall-adj-bank_principal-ending"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "adj": "hall_approved_excluding_workpaper"
+        },
+        "expression": "ADJ('1002','aje_net')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "银行存款（本金）期末账项调整中来自调整分录大厅的部分：已批准、且不是由本底稿 E1-5 汇入大厅的审计调整净额"
+    },
+    {
+      "rule_id": "E1.hall_adj.other_mf.ending",
+      "page_key": "workpaper:E1",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-1",
+        "item_id": "E1-hall-adj-other_mf-ending"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "adj": "hall_approved_excluding_workpaper"
+        },
+        "expression": "ADJ('1012','aje_net')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "其他货币资金（本金）期末账项调整中来自调整分录大厅的部分：已批准、且不是由本底稿 E1-5 汇入大厅的审计调整净额"
+    },
+    {
+      "rule_id": "E1.cash_detail.opening",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-2",
+        "item_id": "E1-cash-detail-opening-unaudited"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_cash_detail_total",
+        "params": {
+          "period": "opening"
+        },
+        "formula_text": "Σ 现金明细行期初；尚无明细行时取四表库存现金末级科目期初余额合计"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "现金明细期初未审合计（审定表库存现金期初未审数取此值）"
+    },
+    {
+      "rule_id": "E1.cash_detail.ending",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-2",
+        "item_id": "E1-cash-detail-total-unaudited"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_cash_detail_total",
+        "params": {
+          "period": "ending"
+        },
+        "formula_text": "Σ（期初 + 本期增加 − 本期减少）× 期末汇率；尚无明细行时取四表库存现金末级科目期末余额合计"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "现金明细期末未审合计（折人民币；审定表库存现金期末未审数取此值）"
+    },
+    {
+      "rule_id": "E1.bank_detail.principal.opening",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-3",
+        "item_id": "E1-bank-detail-principal-opening-unaudited"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_bank_detail_total",
+        "params": {
+          "group": "principal",
+          "period": "opening"
+        },
+        "formula_text": "银行机构分组期初 + 财务公司分组期初（本金行）；尚无明细行时取四表银行存款末级科目期初余额合计"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "银行存款（本金）期初未审合计"
+    },
+    {
+      "rule_id": "E1.bank_detail.principal.ending",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-3",
+        "item_id": "E1-bank-detail-principal-total-unaudited"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_bank_detail_total",
+        "params": {
+          "group": "principal",
+          "period": "ending"
+        },
+        "formula_text": "银行机构分组期末 + 财务公司分组期末（本金行，按人民币 / 多币种口径逐行折算）；尚无明细行时取四表银行存款末级科目期末余额合计"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "银行存款（本金）期末未审合计"
+    },
+    {
+      "rule_id": "E1.bank_detail.institution.opening",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-3",
+        "item_id": "E1-bank-detail-institution-opening-unaudited"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_bank_detail_total",
+        "params": {
+          "group": "institution",
+          "period": "opening"
+        },
+        "formula_text": "Σ 银行机构分组本金行期初；尚无明细行时取四表银行存款末级科目期初余额合计"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "银行机构存款期初未审合计"
+    },
+    {
+      "rule_id": "E1.bank_detail.institution.ending",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-3",
+        "item_id": "E1-bank-detail-institution-total-unaudited"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_bank_detail_total",
+        "params": {
+          "group": "institution",
+          "period": "ending"
+        },
+        "formula_text": "Σ 银行机构分组本金行期末（按人民币 / 多币种口径逐行折算）；尚无明细行时取四表银行存款末级科目期末余额合计"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "银行机构存款期末未审合计"
+    },
+    {
+      "rule_id": "E1.bank_detail.finance.opening",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-3",
+        "item_id": "E1-bank-detail-finance-opening-unaudited"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_bank_detail_total",
+        "params": {
+          "group": "finance",
+          "period": "opening"
+        },
+        "formula_text": "Σ 财务公司分组本金行期初（四表无对应科目，只由明细行汇总）"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "存放财务公司款项期初未审合计"
+    },
+    {
+      "rule_id": "E1.bank_detail.finance.ending",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-3",
+        "item_id": "E1-bank-detail-finance-total-unaudited"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_bank_detail_total",
+        "params": {
+          "group": "finance",
+          "period": "ending"
+        },
+        "formula_text": "Σ 财务公司分组本金行期末（按人民币 / 多币种口径逐行折算；四表无对应科目，只由明细行汇总）"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "存放财务公司款项期末未审合计"
+    },
+    {
+      "rule_id": "E1.bank_detail.other.opening",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-3",
+        "item_id": "E1-bank-detail-other-opening-unaudited"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_bank_detail_total",
+        "params": {
+          "group": "other",
+          "period": "opening"
+        },
+        "formula_text": "Σ 其他货币资金分组本金行期初；尚无明细行时取四表其他货币资金末级科目期初余额合计"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "其他货币资金期初未审合计"
+    },
+    {
+      "rule_id": "E1.bank_detail.other.ending",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-3",
+        "item_id": "E1-bank-detail-other-total-unaudited"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_bank_detail_total",
+        "params": {
+          "group": "other",
+          "period": "ending"
+        },
+        "formula_text": "Σ 其他货币资金分组本金行期末（按人民币 / 多币种口径逐行折算）；尚无明细行时取四表其他货币资金末级科目期末余额合计"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "其他货币资金期末未审合计"
+    },
+    {
+      "rule_id": "E1.adj_total.1001.ending",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-1",
+        "item_id": "E1-adj-total-1001"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_adjudicated_total",
+        "params": {
+          "account_code": "1001",
+          "period": "ending"
+        },
+        "formula_text": "库存现金期末审定数 = 期末未审数 + E1-5 账项调整 + 大厅已确认调整"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "1001 期末审定合计（报表 / 附注 / 分析表引用）"
+    },
+    {
+      "rule_id": "E1.adj_total.1001.opening",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-1",
+        "item_id": "E1-adj-total-1001-opening"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_adjudicated_total",
+        "params": {
+          "account_code": "1001",
+          "period": "opening"
+        },
+        "formula_text": "库存现金期初审定数 = 期初未审数 + E1-5 期初账项调整"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "1001 期初审定合计（附注期初数预填引用）"
+    },
+    {
+      "rule_id": "E1.adj_total.1002.ending",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-1",
+        "item_id": "E1-adj-total-1002"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_adjudicated_total",
+        "params": {
+          "account_code": "1002",
+          "period": "ending"
+        },
+        "formula_text": "银行存款（本金）期末审定数 = 期末未审数 + E1-5 账项调整 + 大厅已确认调整"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "1002 期末审定合计（报表 / 附注 / 分析表引用）"
+    },
+    {
+      "rule_id": "E1.adj_total.1002.opening",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-1",
+        "item_id": "E1-adj-total-1002-opening"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_adjudicated_total",
+        "params": {
+          "account_code": "1002",
+          "period": "opening"
+        },
+        "formula_text": "银行存款（本金）期初审定数 = 期初未审数 + E1-5 期初账项调整"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "1002 期初审定合计（附注期初数预填引用）"
+    },
+    {
+      "rule_id": "E1.adj_total.1012.ending",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-1",
+        "item_id": "E1-adj-total-1012"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_adjudicated_total",
+        "params": {
+          "account_code": "1012",
+          "period": "ending"
+        },
+        "formula_text": "其他货币资金期末审定数 + 数字货币期末审定数（各自 = 期末未审数 + E1-5 账项调整；其他货币资金另加大厅已确认调整）"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "1012 期末审定合计（报表 / 附注 / 分析表引用）"
+    },
+    {
+      "rule_id": "E1.adj_total.1012.opening",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-1",
+        "item_id": "E1-adj-total-1012-opening"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_adjudicated_total",
+        "params": {
+          "account_code": "1012",
+          "period": "opening"
+        },
+        "formula_text": "其他货币资金期初审定数 + 数字货币期初审定数（各自 = 期初未审数 + E1-5 期初账项调整）"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "1012 期初审定合计（附注期初数预填引用）"
+    },
+    {
+      "rule_id": "E1.adj_slot.finance_co.ending",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-1",
+        "item_id": "E1-adj-slot-finance_co"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_main_row_slot",
+        "params": {
+          "slot": "finance_co",
+          "period": "ending"
+        },
+        "formula_text": "存放财务公司款项期末审定数；未审、调整、审定三值全为 0 时保持空白"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "披露主表「存放财务公司款项」期末取数槽"
+    },
+    {
+      "rule_id": "E1.adj_slot.finance_co.opening",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-1",
+        "item_id": "E1-adj-slot-finance_co-opening"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_main_row_slot",
+        "params": {
+          "slot": "finance_co",
+          "period": "opening"
+        },
+        "formula_text": "存放财务公司款项期初审定数；未审、调整、审定三值全为 0 时保持空白"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "披露主表「存放财务公司款项」期初取数槽"
+    },
+    {
+      "rule_id": "E1.adj_slot.accrued.ending",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-1",
+        "item_id": "E1-adj-slot-accrued"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_main_row_slot",
+        "params": {
+          "slot": "accrued",
+          "period": "ending"
+        },
+        "formula_text": "应计利息期末审定数（四个子项合计）；未审、调整、审定三值全为 0 时保持空白"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "披露主表「存款应计利息」期末取数槽"
+    },
+    {
+      "rule_id": "E1.adj_slot.accrued.opening",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-1",
+        "item_id": "E1-adj-slot-accrued-opening"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_main_row_slot",
+        "params": {
+          "slot": "accrued",
+          "period": "opening"
+        },
+        "formula_text": "应计利息期初审定数（四个子项合计）；未审、调整、审定三值全为 0 时保持空白"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "披露主表「存款应计利息」期初取数槽"
+    },
+    {
+      "rule_id": "E1.adj_slot.digital.ending",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-1",
+        "item_id": "E1-adj-slot-digital"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_main_row_slot",
+        "params": {
+          "slot": "digital",
+          "period": "ending"
+        },
+        "formula_text": "数字货币期末审定数；未审、调整、审定三值全为 0 时保持空白"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "披露主表「数字货币」期末取数槽"
+    },
+    {
+      "rule_id": "E1.adj_slot.digital.opening",
+      "page_key": "workpaper:E1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "E1",
+        "sheet_code": "E1-1",
+        "item_id": "E1-adj-slot-digital-opening"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_main_row_slot",
+        "params": {
+          "slot": "digital",
+          "period": "opening"
+        },
+        "formula_text": "数字货币期初审定数；未审、调整、审定三值全为 0 时保持空白"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "披露主表「数字货币」期初取数槽"
+    },
+    {
+      "rule_id": "E1.note.main_rows",
+      "page_key": "workpaper:E1",
+      "stage": "note",
+      "policy": "editable",
+      "target": {
+        "domain": "note",
+        "section_by_template": {
+          "listed": "五、1",
+          "soe": "八、1"
+        },
+        "table": "货币资金",
+        "rows": "e1_disclosure_main",
+        "fields": [
+          "end_amount",
+          "prior_amount"
+        ]
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "e1_disclosure_main_rows",
+        "params": {},
+        "formula_text": "按报表准则取披露主表行：库存现金 = 1001 审定数；银行存款 = 1002 审定数 − 存放财务公司款项；其他货币资金 = 1012 审定数 − 数字货币；存放财务公司款项 / 存款应计利息 / 数字货币取各自取数槽；合计 = 各行之和；期初数可在底稿披露表手工覆盖"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "附注货币资金主表（上市 五、1 / 国企 八、1）期末 / 期初数；附注中人工改过、锁定或整节人工覆盖的保留"
+    }
+  ]
+}

@@ -1330,8 +1330,16 @@ def read_task_body(task_number: int = TASK_NUMBER, *, text: str | None = None) -
 
     🔴 按**任务编号**定位而不是行号：行号随上游任务增删漂移。checkbox 状态用 `[ x~-]`
     通配 —— 本门不因 Task 44 被勾选而失效（勾选是簿记，不是事实）。
+
+    🔴 行尾归一成 `\\n`：本仓库 `core.autocrlf=true` 且 `.md` 没有 `eol=lf` 属性，
+    checkout 后 tasks.md 在 Windows 上是 CRLF、在 Linux/CI 上是 LF。`probe_registry_payload`
+    把 `task_body_sha256` 落进 `backend/data/`，若哈希 raw 文本则同一份正文在两个平台算出两个
+    digest —— 本机重跑 `--apply` 只会把 Windows-only 的值焊进产物，CI 必红（实测：
+    CRLF `3316ebe6…` vs LF `b7ce721c…`，正文 LF 归一后逐字节相同）。行尾不是"任务正文"这个
+    事实的一部分，故在真源入口一次归一，下游 anchor 计数 / AC 提取 / digest 全部平台无关。
     """
     body = text if text is not None else _TASKS_MD.read_bytes().decode("utf-8")
+    body = body.replace("\r\n", "\n").replace("\r", "\n")
     starts: list[tuple[int, int, int]] = [
         (int(m.group(1)), m.start(), m.end()) for m in _TASK_HEADER_RE.finditer(body)
     ]

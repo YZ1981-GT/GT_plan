@@ -430,117 +430,38 @@ describe('K1 Integration: 抽凭引擎(GtVoucherSamplingEngine科目1221) + 行�
     })
   })
 
-  // ═══ Part D: 双模式OO — useK1DualMode health check + fallback ═══
+  // ═══ Part D: K1-9 真双向接桥（旧 useK1DualMode 已按 BP-5 删除）═══
 
-  describe('双模式OO: useK1DualMode health check + HTML fallback', () => {
-    it('checkOOHealth returns false when OO server is unavailable', async () => {
-      // Mock fetch to simulate OO down
-      const originalFetch = globalThis.fetch
-      globalThis.fetch = vi.fn().mockRejectedValue(new Error('Connection refused'))
-
-      const { useK1DualMode } = await import(
-        '@/components/workpaper/composables/useK1DualMode'
-      )
-
-      const mode = useK1DualMode({ wpId: ref('wp-001') })
-      const result = await mode.checkOOHealth()
-
-      expect(result).toBe(false)
-      expect(mode.isOoAvailable.value).toBe(false)
-
-      globalThis.fetch = originalFetch
+  describe('K1-9 双模式：平台 sync bridge + HTML fallback', () => {
+    it('宿主不再引用已删除的 useK1DualMode，健康探测走平台单源', async () => {
+      const { readFileSync } = await import('node:fs')
+      const { resolve } = await import('node:path')
+      const host = readFileSync(resolve(__dirname, '../GtK1OtherReceivables.vue'), 'utf-8')
+      expect(host).not.toContain('useK1DualMode')
+      expect(host).toContain('fetchOnlyOfficeHealthy')
+      expect(host).toContain("currentSheet.value === 'K1-9'")
     })
 
-    it('checkOOHealth returns true when OO server responds healthy', async () => {
-      const originalFetch = globalThis.fetch
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ data: { data: { healthy: true } } }),
-      })
-
-      const { useK1DualMode } = await import(
-        '@/components/workpaper/composables/useK1DualMode'
-      )
-
-      const mode = useK1DualMode({ wpId: ref('wp-002') })
-      const result = await mode.checkOOHealth()
-
-      expect(result).toBe(true)
-      expect(mode.isOoAvailable.value).toBe(true)
-
-      globalThis.fetch = originalFetch
+    it('K1-9 Tab 挂平台编辑宿主并调用专用 wrapper', async () => {
+      const { readFileSync } = await import('node:fs')
+      const { resolve } = await import('node:path')
+      const tab = readFileSync(resolve(__dirname, '../k1/inspection/K1TabWriteoffCheck.vue'), 'utf-8')
+      expect(tab).toContain('<WorkpaperSyncEditorHost')
+      expect(tab).toContain('useK1WriteoffSync({')
+      expect(tab).toContain('K1_ONLINE_EDIT_LABEL')
+      expect(tab).toContain('snapshotRemark: () => buildSavePayload().remark')
+      expect(tab).toContain('height: calc(100vh - 280px)')
     })
 
-    it('checkOOHealth supports 双层兼容 (result.data?.data?.healthy fallback chain)', async () => {
-      const originalFetch = globalThis.fetch
-
-      // Test first level: result.data.data.healthy
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ data: { data: { healthy: true } } }),
-      })
-
-      const { useK1DualMode } = await import(
-        '@/components/workpaper/composables/useK1DualMode'
-      )
-      let mode = useK1DualMode({ wpId: ref('wp-003') })
-      let result = await mode.checkOOHealth()
-      expect(result).toBe(true)
-
-      // Test second level: result.data.healthy (no nested data)
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ data: { healthy: true } }),
-      })
-      mode = useK1DualMode({ wpId: ref('wp-004') })
-      result = await mode.checkOOHealth()
-      expect(result).toBe(true)
-
-      // Test third level: result.healthy (flat)
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ healthy: true }),
-      })
-      mode = useK1DualMode({ wpId: ref('wp-005') })
-      result = await mode.checkOOHealth()
-      expect(result).toBe(true)
-
-      globalThis.fetch = originalFetch
-    })
-
-    it('switchMode to onlyoffice is blocked when isOoAvailable is false', async () => {
-      const originalFetch = globalThis.fetch
-      globalThis.fetch = vi.fn().mockRejectedValue(new Error('offline'))
-
-      const { useK1DualMode } = await import(
-        '@/components/workpaper/composables/useK1DualMode'
-      )
-
-      const mode = useK1DualMode({ wpId: ref('wp-006') })
-      await mode.checkOOHealth() // sets isOoAvailable = false
-
-      await mode.switchMode('onlyoffice')
-      expect(mode.currentMode.value).toBe('html') // stayed on HTML (fallback)
-
-      globalThis.fetch = originalFetch
-    })
-
-    it('currentMode defaults to "html" (structure view)', () => {
-      // useK1DualMode defaults currentMode = 'html'
-      // This is the fallback when OO is unavailable
-      const mode = { currentMode: ref<'html' | 'onlyoffice'>('html') }
-      expect(mode.currentMode.value).toBe('html')
-    })
-
-    it('modeOptions has exactly 2 entries: 结构化视图 + 在线编辑', async () => {
-      const { useK1DualMode } = await import(
-        '@/components/workpaper/composables/useK1DualMode'
-      )
-      const mode = useK1DualMode({ wpId: ref('wp-007') })
-
-      expect(mode.modeOptions).toHaveLength(2)
-      expect(mode.modeOptions[0]).toEqual({ label: '结构化视图', value: 'html' })
-      expect(mode.modeOptions[1]).toEqual({ label: '在线编辑', value: 'onlyoffice' })
+    it('专用 wrapper 委派真驱动并锁定 entry/sheet/dict store', async () => {
+      const { readFileSync } = await import('node:fs')
+      const { resolve } = await import('node:path')
+      const src = readFileSync(resolve(__dirname, '../composables/k1WriteoffSync.ts'), 'utf-8')
+      expect(src).toContain('useD4SyncMode({')
+      expect(src).toContain("xlsx/gt-k1-other-receivables")
+      expect(src).toContain("k109-managed")
+      expect(src).toContain("K1-9-writeoff")
+      expect(src).toContain('readStoreProjection({')
     })
   })
 

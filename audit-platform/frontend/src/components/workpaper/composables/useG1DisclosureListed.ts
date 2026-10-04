@@ -28,6 +28,7 @@ import type { G1ListedSyncSnapshot } from './g1DisclosureSyncPayload'
 import { buildG1AdjudicationRows } from './useG1Adjudication'
 import { parseG1AdjStore } from './g1AdjudicationItems'
 import { migrateLegacyLevel3Row, summarizeLevel3ByDisclosureLeaf } from './useG1Level3'
+import { G1_ITEM_IDS } from './g1StorageContract'
 
 const ITEM_STORE = 'G1-note-listed-store'
 const ITEM_NOTE = 'G1-note-listed-note'
@@ -442,7 +443,7 @@ export function useG1DisclosureListed(opts: {
   /** 从 G1-2 汇总质押/变现受限项数，写入附注说明草稿提示 */
   function pullPledgeFlagsFromDetail() {
     if (opts.isReadonly.value) return
-    const raw = opts.allResponses.value.get('G1-2-rows')?.conclusion
+    const raw = opts.allResponses.value.get(G1_ITEM_IDS.G1_2_ROWS)?.conclusion
     if (!raw) return
     try {
       const list = JSON.parse(raw) as Array<{

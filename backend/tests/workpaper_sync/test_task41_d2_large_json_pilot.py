@@ -147,7 +147,20 @@ _COLUMN_PREFS = (
 _AGING_CONFIG = _FRONTEND / "composables" / "useAgingConfig.ts"
 _ROUTER = _BACKEND / "app" / "routers" / "wp_sync_router.py"
 
-#: 真实载荷的实测事实（pg 侧守卫从**库里**重新取一次并逐条比对；这里作为字面量互锁）。
+#: 真实载荷的实测事实。
+#:
+#: 🔴 **只有 `REAL_PAYLOAD_ROWS` 仍与库逐条互锁**（pg 侧 `test_real_store_payload_is_the
+#: _frozen_866kb_shape` 现取现比，等式）。另两个是 **2026-09-06 的历史观测快照**，
+#: 已不再与库等值比对：
+#:
+#:   * `REAL_PAYLOAD_BYTES`：库里那一行 2026-09-10 被改成带空格的 JSON 排版
+#:     ⇒ stored 906,239 → 1,009,966，而信息量（紧凑序列化）只从 906,239 → 905,387。
+#:     排版是写入方的自由、零信息增量，所以 pg 侧改为「紧凑口径下界 + 排版开销上限」。
+#:   * `REAL_D2_ITEM_COUNT`：用户每打开一个新分区就多一条空 item（2026-09-10 多出
+#:     `D2-entry-rows`）⇒ pg 侧改为下界。
+#:
+#: 本文件是离线守卫，这两个字面量留作**量级依据**（AC 6.12 的「866KB+」由它们成立），
+#: 不得据此反推「库里现在就是这个数」。
 REAL_PAYLOAD_BYTES = 906_239
 REAL_PAYLOAD_ROWS = 1_260
 REAL_D2_ITEM_COUNT = 24
@@ -686,14 +699,31 @@ class TestAuthoritativeTemplate:
         # 正向：权威根确实出现在代码字面量里（否则上面这条是空集恒真）。
         assert any("wp_templates" in text for text in literals)
 
-    def test_managed_sheet_is_one_of_eleven_and_only_it_is_declared(
+    def test_managed_sheets_are_d22_and_d23_after_expansion(
         self, workbook: Any, contract: Any
     ) -> None:
-        """工作簿 11 张 sheet，契约只声明受管的那一张（`managed_tables_of` 会 fail closed）。"""
+        """扩容后契约声明 D2-2 + D2-3 两张受管 sheet（spec d2-sync-coverage Task 8，1→3 区）。
+
+        旧断言「契约只声明 D2-2 一张」按新形态改写 + 反向断言：D2-2 仍在且仍单 table（Q1 零回归）。
+        """
+        from app.services.workpaper_sync import phase5_d2_01_adjudication as ADJ
+        from app.services.workpaper_sync import phase5_d2_03_bad_debt as BD
+
         assert len(workbook.sheetnames) == 11, workbook.sheetnames
-        assert P.MANAGED_SHEET in workbook.sheetnames
-        assert [sheet.excel_name for sheet in contract.sheets] == [P.MANAGED_SHEET]
-        assert len(contract.sheets[0].tables) == 1
+        assert BD.MANAGED_SHEET_D23 in workbook.sheetnames
+        assert ADJ.MANAGED_SHEET_D21 in workbook.sheetnames
+        excel_names = [sheet.excel_name for sheet in contract.sheets]
+        # 扩容后 3 张受管 sheet：D2-2 明细 + D2-3 坏账 + D2-1 审定（D2-4 判 single_html 不接）。
+        assert excel_names == [P.MANAGED_SHEET, BD.MANAGED_SHEET_D23, ADJ.MANAGED_SHEET_D21], excel_names
+        by_key = {s.sheet_key: s for s in contract.sheets}
+        assert P.SHEET_KEY in by_key, "D2-2 明细表不得因扩容而消失"
+        assert len(by_key[P.SHEET_KEY].tables) == 1
+        assert by_key[P.SHEET_KEY].tables[0].table_key == P.ROWS_TABLE_KEY
+        assert [t.table_key for t in by_key[BD.SHEET_KEY_D23].tables] == [
+            BD.ROWS_TABLE_KEY_INDIVIDUAL, BD.ROWS_TABLE_KEY_COMBINED,
+        ]
+        # 受管区：D2-2 ① + D2-3 ② + D2-1 ① = 4（D2-4 不计）。
+        assert sum(len(s.tables) for s in contract.sheets) == 4, "受管区应 1→4"
 
     def test_template_sentinel_rejects_a_mutated_workbook(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -729,13 +759,17 @@ class TestContractIsGroundedInTheTemplate:
         assert P.PILOT_ADAPTER_ID in available_contract_ids()
 
     def test_field_counts_are_the_real_template_facts(self, contract: Any) -> None:
-        """覆盖计数硬判据（空集恒等价不算通过）。"""
-        assert len(contract.all_fields()) == EXPECTED_FIELD_COUNT == 39
+        """覆盖计数硬判据（按 D2-2 sheet 作用域，扩容 D2-3 后 all_fields 是全 entry 67 字段）。"""
+        d22_sheet = {s.sheet_key: s for s in contract.sheets}[P.SHEET_KEY]
+        d22_fields = [f for t in d22_sheet.tables for f in t.fields]
+        assert len(d22_fields) == EXPECTED_FIELD_COUNT == 39
         assert len(P.MANAGED_FIELD_SPECS) == EXPECTED_FIELD_COUNT
         assert len(P.SCALAR_FIELD_SPECS) == 21
         assert len(P.AGING_GROUPS) * len(P.AGING_SEGMENTS) == 18
-        assert len(contract.protected_field_keys()) == EXPECTED_PROTECTED_COUNT == 3
-        assert len(contract.editable_field_keys()) == 36
+        d22_protected = [f for f in d22_fields if f.mode.value == "formula"]
+        assert len(d22_protected) == EXPECTED_PROTECTED_COUNT == 3
+        d22_editable = [f for f in d22_fields if f.mode.value == "editable"]
+        assert len(d22_editable) == 36
 
     def test_column_letters_cover_a_to_am_without_gap(self, worksheet: Any) -> None:
         """39 列必须**连续**覆盖 A..AM，且与 sheet 的 `max_column` 一致。"""
@@ -750,11 +784,11 @@ class TestContractIsGroundedInTheTemplate:
     def test_every_managed_header_matches_the_real_cell_text(
         self, contract: Any, worksheet: Any
     ) -> None:
-        """39 次比对：每个字段的 `header_source_ref` 指向的格文本 == 登记文本。"""
+        """39 次比对：header_source_ref 指向的格文本 == 登记文本（限 D2-2 sheet，D2-3 有同名列）。"""
+        d22_sheet = {s.sheet_key: s for s in contract.sheets}[P.SHEET_KEY]
         by_key = {
             spec.column_key: spec
-            for sheet in contract.sheets
-            for table in sheet.tables
+            for table in d22_sheet.tables
             for spec in table.fields
         }
         compared = 0
@@ -882,7 +916,8 @@ class TestContractIsGroundedInTheTemplate:
         assert table.delete_policy is not None
         assert table.delete_policy.value == "tombstone"
         # 39 个 stable key 全部带 `{row_uuid}` 占位，且没有任何数组下标形态。
-        keys = [spec.stable_field_key for spec in contract.all_fields()]
+        # 🔴 限 D2-2 sheet：D2-1（静态 cell）/ D2-3 有各自身份判据，不在此 all_fields 混判。
+        keys = [spec.stable_field_key for t in contract.sheets[0].tables for spec in t.fields]
         assert all("{row_uuid}" in key for key in keys), keys[:3]
         assert not any(re.search(r"/\d+/", key) for key in keys)
 
@@ -1664,12 +1699,23 @@ class TestUpstreamDebtsAreVisibleFacts:
             "dynamic_column_stable_keys",
         }
 
-    def test_dynamic_family_is_structurally_unreachable_for_every_xlsx_entry(self) -> None:
+    def test_dynamic_family_is_structurally_unreachable_for_every_xlsx_entry(
+        self, manifest: dict[str, Any]
+    ) -> None:
         """实测：全 manifest 只有 1 条 dynamic，且是 docx ⇒ AC 6.9 场景对 xlsx 不可达。"""
         observed = P.assert_dynamic_family_is_unreachable_for_xlsx_entries()
         assert observed["xlsx_dynamic"] == ()
         assert observed["dynamic"] == ("docx/gt-wp-renderer",), observed["dynamic"]
-        assert observed["total"] == 186, observed["total"]
+        # 🔴 `total` 是**分母自证**（扫过整份 manifest，不是空跑），不是一个要冻结的
+        # 业务常量。写死过 186，而 manifest 会随宿主拓扑增减：实测 186 → 176 → 155
+        # （commit cd9592ff5 把 D4 各 tab 迁到 `useD4SyncMode` 后 21 条 `xlsx/d4/**`
+        # entry 退网）。绝对数一落后，打红的就是「manifest 缩了」而不是「不可达性坏了」，
+        # 判据指错人。所以跟**活 manifest 现算条数**比。
+        assert observed["total"] == len(manifest["entries"]), (
+            f"扫过 {observed['total']} 条，活 manifest 现算 {len(manifest['entries'])} 条 "
+            "⇒ 观测面没覆盖整份 manifest"
+        )
+        assert observed["total"] >= 100, f"manifest 只有 {observed['total']} 条 ⇒ 分母可疑"
 
     def test_debt_note_is_retracted_when_upstream_fixes_the_gate(
         self, manifest: dict[str, Any]
@@ -1932,49 +1978,117 @@ def _room_facts() -> Any:
     return RoomFacts(shared_doc_key=True, doc_key_includes_mtime=False, participant_lease=True)
 
 
+def _manifest_before_enablement() -> dict[str, Any]:
+    """把本 pilot 的 entry 退回 **finalize 之前**的 manifest 形态（capability 未启用）。
+
+    🔴 这是「顺序不可交换」这条属性的**取证输入**，不是对 manifest 的改写：真源文件一个
+    字节都不动，只在内存深拷贝上把本 entry 的 `capability` / `adapter_id` 退回 reviewed
+    overlay 裁决**之前**的取值。2026-09-07 起活体 manifest 已是 `bidirectional` +
+    `adapter_id=d2.receivable_detail`（Task 36 finalize 之后的 overlay 动作），所以
+    「finalize 之前必须被拒」这条属性只能拿这份退回形态取证 —— 少了它，顺序门就没有
+    任何一条判据还在跑否证臂。
+    """
+    payload = json.loads(json.dumps(load_entry_manifest()))
+    for item in payload["entries"]:
+        if item["entry_id"] == P.PILOT_ENTRY_ID:
+            item["capability"] = "single_onlyoffice"
+            item["adapter_id"] = None
+    return payload
+
+
 class TestOrderingGate:
     """**Validates: Requirements 12.1 / 12.10**"""
 
     def test_capability_is_not_enabled_before_finalize(self) -> None:
+        """顺序门的**后置条件**：capability 只能在 finalize 之后启用。
+
+        🔴 判据已反转（2026-09-07）：本条原先记录的是「今天还没启用」这个**临时前置
+        条件**（`capability=single_onlyoffice` / `adapter_id=None` / 顺序门必抛）。那个
+        前置条件今天真被满足了 —— Task 36 finalize 产出 published representation 之后，
+        reviewed overlay 才把本 entry 裁决为 `bidirectional` 并同步写回 `adapter_id`
+        （`migration_state=adapter_registered`）。
+
+        诚实的修法是把它**反转成后置条件**，而不是删掉：
+        ① 已启用这件事必须为真（manifest 三字段 + 顺序门放行，同一套判据）；
+        ② **顺序不可交换这条属性必须仍有牙齿** —— 把 manifest 退回 finalize 之前的形态，
+           顺序门必须照旧抛，且诊断点名 `manifest capability`。
+        少了 ②，本条就退化成「读一句 manifest 说已启用」。
+        """
         entry = manifest_entries_by_id(load_entry_manifest())[P.PILOT_ENTRY_ID]
-        assert capability_of(entry) is Capability.single_onlyoffice
-        assert entry["adapter_id"] is None
+        # ① 后置条件：已启用，且 adapter_id / migration_state 同步写回
+        assert capability_of(entry) is Capability.bidirectional
+        assert entry["adapter_id"] == P.PILOT_ADAPTER_ID
+        assert str(entry.get("migration_state") or "") == "adapter_registered"
+        P.assert_manifest_capability_enabled()  # 不抛即放行
+        # ② 顺序门仍可打红：退回 finalize 之前的形态 ⇒ 必须照旧拒绝
         with pytest.raises(P.PilotSelectionError, match="manifest capability"):
-            P.assert_manifest_capability_enabled()
+            P.assert_manifest_capability_enabled(manifest=_manifest_before_enablement())
 
     def test_capability_predicate_agrees_with_the_ordering_gate(self) -> None:
-        """真值判定与顺序门必须**同一套判据**（两处各写一套会悄悄不一致）。"""
-        assert P.manifest_capability_enabled() is False
-        manifest = json.loads(json.dumps(load_entry_manifest()))
-        for item in manifest["entries"]:
-            if item["entry_id"] == P.PILOT_ENTRY_ID:
-                item["capability"] = "bidirectional"
-                item["adapter_id"] = P.PILOT_ADAPTER_ID
-        assert P.manifest_capability_enabled(manifest=manifest) is True
-        P.assert_manifest_capability_enabled(manifest=manifest)
+        """真值判定与顺序门必须**同一套判据**（两处各写一套会悄悄不一致）。
 
-    def test_attach_is_a_no_op_before_enablement_and_never_raises(self) -> None:
+        🔴 两臂互换（2026-09-07）：本条原先假定活体是「未启用」，用篡改出的 bidirectional
+        manifest 跑 True 那一臂。今天活体本身已是 bidirectional，于是两臂交换位置 ——
+        **属性一个字没变**：`manifest_capability_enabled()` 必须恰好是
+        `assert_manifest_capability_enabled()` 的布尔翻译，两个方向都验。
+        """
+        # 活体（已启用）：谓词 True，顺序门放行
+        assert P.manifest_capability_enabled() is True
+        P.assert_manifest_capability_enabled()
+        # 退回 finalize 之前：谓词 False，顺序门抛 —— 同一套判据的另一侧
+        before = _manifest_before_enablement()
+        assert P.manifest_capability_enabled(manifest=before) is False
+        with pytest.raises(P.PilotSelectionError, match="manifest capability"):
+            P.assert_manifest_capability_enabled(manifest=before)
+
+    def test_attach_is_a_no_op_before_enablement_and_never_raises(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """🔴 未启用时接线必须返回空元组、**一次库都不读**，而不是抛异常。
 
         首轮实测（辐射面 Task 28 的路由守卫 8 例打红）：这里抛 `PilotSelectionError` 会让
         `_registration` / `_apply_durable_incoming` 对**所有** entry 都 500 —— Task 28 的
         fixture 用的 `ENTRY` 正是本 pilot 冻结的这个 entry。判据用 `session=None`：真去读库
         就会 `AttributeError`，所以「返回空元组」同时证明了「没读库」。
+
+        🔴 取证输入换了（2026-09-07），属性没换：capability 启用之后，活体 attach 会正常
+        走到读库那一步（`session=None` ⇒ AttributeError），那是**正确行为**、不是回归。
+        要测的属性始终是「未启用时短路」，所以把 pilot 模块里的 `load_entry_manifest`
+        换成退回 finalize 之前的 manifest —— 判据链路全程仍是生产的
+        （`attach_pilot_adapters` → `manifest_capability_enabled` →
+        `assert_manifest_capability_enabled` → `load_entry_manifest`），只有输入被替换。
         """
         import asyncio
 
-        registry = RG.WorkpaperSyncAdapterRegistry(manifest=load_entry_manifest())
+        before = _manifest_before_enablement()
+        monkeypatch.setattr(P, "load_entry_manifest", lambda *a, **k: before)
+        registry = RG.WorkpaperSyncAdapterRegistry(manifest=before)
         assert asyncio.run(P.attach_pilot_adapters(registry, session=None)) == ()
         assert registry.registrations() == ()
 
     def test_ledger_records_adapter_not_registered_yet(self) -> None:
+        """交付登记表对「adapter 是否已注册」必须如实记账，且不得自我授权。
+
+        🔴 判据已反转（2026-09-07）：本条原先钉 `adapter_registered is False`（Task 41
+        交付当时的临时前置条件）。今天该行已是 `True` —— 2026-09-07 实测真库
+        `register_from_manifest()` 已注册本 adapter。反转成后置条件的同时把「顺序没被
+        绕过」一并钉住：`reason` 必须写明 capability 裁决发生在 finalize **之后**，并且
+        manifest 侧必须真的写回了 `adapter_id` —— 否则一行 `adapter_registered=True`
+        就成了登记表给自己发的许可。
+        """
         row = next(
             r
             for r in RG.DELIVERED_PER_ENTRY_CONTRACTS
             if r["contract_id"] == P.PILOT_ADAPTER_ID
         )
-        assert row["adapter_registered"] is False
-        assert "方可" in row["reason"] or "才启用" in row["reason"] or "后启用" in row["reason"]
+        assert row["adapter_registered"] is True
+        reason = str(row["reason"])
+        assert "顺序门仍然成立且未被绕过" in reason, reason
+        assert "finalize" in reason, reason
+        # 🔴 双源交叉：登记表说已注册 ⇒ manifest 必须同步是 bidirectional + adapter_id 写回
+        entry = manifest_entries_by_id(load_entry_manifest())[str(row["entry_id"])]
+        assert capability_of(entry) is Capability.bidirectional, entry
+        assert entry["adapter_id"] == P.PILOT_ADAPTER_ID, entry
 
     def test_contract_orphan_is_visible_in_the_registry_report(self) -> None:
         """契约有了但 adapter 没注册 ⇒ 必须作为**可见欠账**报出来（不是静默）。"""
@@ -2001,7 +2115,12 @@ class TestOrderingGate:
 
         from app.services.workpaper_sync.entry_profile import EntryProfileDriftError
 
-        registry = RG.WorkpaperSyncAdapterRegistry(manifest=load_entry_manifest())
+        # 🔴 registry 用**退回 finalize 之前**的 manifest 构造（2026-09-07）：活体
+        #    manifest 已是 bidirectional，拿它跑本条会让 capability 判据直接放行、
+        #    判定落到后面的 bundle 形态上（实测 `AttributeError: 'object' object has no
+        #    attribute 'state'`）—— 那时被测的就不再是顺序门了。退回形态才让
+        #    「capability 未启用 ⇒ 拒绝注册」重新成为本条真正的被测判据。
+        registry = RG.WorkpaperSyncAdapterRegistry(manifest=_manifest_before_enablement())
         with pytest.raises((EntryProfileDriftError, RG.RegistryError)) as exc:
             P.register_pilot_adapter(
                 registry,
@@ -2220,14 +2339,16 @@ class TestRealPayloadFactsAreFrozen:
         assert 866_000 <= REAL_PAYLOAD_BYTES
         assert REAL_PAYLOAD_BYTES / 1024 == pytest.approx(885.0, abs=0.1)
 
-    def test_store_item_id_is_the_only_item_the_contract_claims(self, contract: Any) -> None:
-        """契约只声明 `D2-detail-rows` 一条 item ⇒ 回写不会碰其他 23 条。"""
-        blob = json.dumps(contract.canonical_payload, ensure_ascii=False)
-        assert blob.count(f'"{P.STORE_ITEM_ID}"') >= 1
-        others = re.findall(r'"(D2-(?!detail-rows)[a-z0-9-]+)"', blob)
-        assert others == [], others
+    def test_d22_sheet_only_claims_detail_rows_item(self, contract: Any) -> None:
+        """D2-2 sheet 只声明 D2-detail-rows（旧「整契约只有它」按新形态改写 + 反向断言不引 D2-3 键）。"""
+        d22_payload = next(
+            s for s in contract.canonical_payload["sheets"] if s["sheet_key"] == P.SHEET_KEY
+        )
         declared = {
             item["store_item_id"]
-            for item in contract.canonical_payload["sheets"][0]["tables"][0]["fields"]
+            for table in d22_payload["tables"]
+            for item in table["fields"]
         }
-        assert declared == {P.STORE_ITEM_ID}
+        assert declared == {P.STORE_ITEM_ID}, declared
+        # 反向断言：D2-2 sheet 绝不引用 D2-3 的坏账 store 键。
+        assert not any(str(s).startswith("D2-bd-") for s in declared), declared

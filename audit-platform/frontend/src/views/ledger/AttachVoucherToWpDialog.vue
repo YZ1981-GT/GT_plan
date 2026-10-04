@@ -13,6 +13,8 @@ import { attachVoucher } from '@/components/workpaper/composables/useAttachedVou
 
 interface VoucherTarget {
   voucherNo: string
+  /** 凭证日期 YYYY-MM-DD。🔴 凭证号跨日重复，无日期时底稿回拉可能命中同号别张凭证。 */
+  voucherDate?: string | null
   accountCode?: string | null
 }
 
@@ -48,10 +50,13 @@ const ACCOUNT_TO_WP: Array<{ prefix: string; wp: string }> = [
 ]
 
 interface WpOption {
+  /** 真实 `working_paper.id`。🔴 绝不可用 `wp_index_id` 兜底 —— 见 loadWorkpapers 注释。 */
   wp_id: string
   wp_code: string
   wp_name: string
   cycle: string
+  /** 底稿是否已生成。false 的项不进选项（挂上去拉不回来）。 */
+  wpGenerated: boolean
 }
 
 const loading = ref(false)
@@ -94,10 +99,13 @@ function suggestWpCode(): string {
 }
 
 const loadError = ref('')
+/** 被过滤掉的未生成底稿提示（如实告知，避免用户找不到目标底稿而困惑） */
+const ungeneratedHint = ref('')
 
 async function loadWorkpapers(): Promise<void> {
   loading.value = true
   loadError.value = ''
+  ungeneratedHint.value = ''
   try {
     if (!props.projectId) {
       loadError.value = '项目ID缺失，请从项目内页面打开'
@@ -115,23 +123,40 @@ async function loadWorkpapers(): Promise<void> {
       page += 1
     }
     const opts: WpOption[] = []
+    let ungeneratedCount = 0
     for (const it of collected) {
-      // wp_id 可为 null（底稿未生成），此时用 wp_index_id 替代作为标识
-      // 挂凭目标只需底稿存在（wp_index 有记录），不强制文件已生成
-      const wpId = (it?.wp_id ?? it?.wp_index_id ?? it?.id ?? '') as string
       const code = String(it?.wp_code || '')
-      if (!wpId || !code) continue
+      if (!code) continue
+      // 🔴 只认真实 `working_paper.id`，绝不用 `wp_index_id` 兜底。
+      //    旧代码写 `it.wp_id ?? it.wp_index_id ?? it.id`，理由是「挂凭目标只需底稿存在，
+      //    不强制文件已生成」—— 但底稿侧回拉用的是真实 wp_id（props.wpId），
+      //    存进 sampled_vouchers 的若是 wp_index_id，两个 ID 永不相等
+      //    ⇒ 挂凭成功、提示成功、**永远拉不回来**，且无任何报错（静默黑洞）。
+      //    契约里 `wp_generated` 就是为此设计的（注释原文：前端据此禁用依赖具体
+      //    底稿资源的读取/写入动作）—— 挂凭正是写入动作，故未生成的底稿不进选项。
+      const wpId = String(it?.wp_id ?? '')
+      const generated = it?.wp_generated === true || (!!wpId && it?.wp_generated == null)
+      if (!wpId || !generated) {
+        ungeneratedCount += 1
+        continue
+      }
       opts.push({
         wp_id: wpId,
         wp_code: code,
         wp_name: String(it?.wp_name ?? code),
         cycle: code[0] || '?',
+        wpGenerated: true,
       })
     }
     wpOptions.value = opts
 
     if (opts.length === 0) {
-      loadError.value = '该项目暂无底稿，请先在底稿管理中生成底稿'
+      loadError.value = ungeneratedCount > 0
+        ? `该项目 ${ungeneratedCount} 张底稿均未生成，无法挂凭。请先在底稿管理中生成底稿`
+        : '该项目暂无底稿，请先在底稿管理中生成底稿'
+    } else if (ungeneratedCount > 0) {
+      // 如实告知被过滤掉的数量，避免用户以为「我要的底稿怎么不在列表里」
+      ungeneratedHint.value = `${ungeneratedCount} 张未生成的底稿已隐藏（生成后才能挂凭）`
     }
 
     // 智能默认：按科目推断的建议底稿若已生成则预选
@@ -181,6 +206,7 @@ async function confirm(): Promise<void> {
         await attachVoucher(props.projectId, {
           year: props.year,
           voucherNo: v.voucherNo,
+          voucherDate: v.voucherDate ?? null,
           accountCode: v.accountCode ?? null,
           workpaperId: selectedWpId.value,
           source: 'ledger',

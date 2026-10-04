@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-7",
+  "title": "D4-7 毛利率分析表 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "按产品分析主营业务收入的结构、单价、单位成本与毛利率的本期/上期变动，从分析程序层面识别毛利率异常，佐证收入与成本的真实性和配比合理性。",
+      "source_refs": []
+    },
+    {
+      "key": "data_sources",
+      "title": "二、数据来源",
+      "content": "从 D4-2 主营明细按产品汇总收入，从对应成本科目汇总成本，或从 ERP 产品利润表导出。逐产品填写本期数量、单价、收入、单位成本、成本，以及上期收入、成本用于对比。",
+      "source_refs": []
+    },
+    {
+      "key": "formulas",
+      "title": "三、计算公式",
+      "content": "本期平均单价 = 主营业务收入 / 数量\n结构比 = 本产品收入 / 收入合计\n单位成本 = 主营业务成本 / 数量\n毛利 = 主营业务收入 − 主营业务成本\n毛利率 = 毛利 / 收入（收入为0返0）\n变动比例 = (本期 − 上期) / 上期",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 毛利率变动超过5个百分点的产品须重点分析原因（售价/成本/结构变化）。\n2. 单价变动超过20%的产品须检查是否符合定价政策（联查 D4-11 价格分析）。\n3. 毛利率显著高于同行业须警惕收入虚增或成本少计。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "5bb313d0681f343ab16d5d56e3aca10c1d4fb17c6e94a8db42ce15674e299ca6",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "237db4add7eff46ef2173f077f10653fc9952774c0d24ff332da86b03026e95d"
+  }
+}

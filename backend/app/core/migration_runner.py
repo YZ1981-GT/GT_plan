@@ -112,6 +112,25 @@ def _is_comment_only(stmt: str) -> bool:
     return True
 
 
+#: 有意的零语句迁移须在注释里写明 ``no-op``（V001 基线：``-- (no-op: existing schema baseline)``）
+_NOOP_MARKER_RE = re.compile(r"(?:--|/\*)[^\n]*\bno-op\b", re.IGNORECASE)
+
+
+class EmptyMigrationError(RuntimeError):
+    """迁移文件分句后没有任何可执行语句，且未声明 ``no-op``。
+
+    spec migration-integrity-and-enum-drift-closure Requirement 2：V042 曾以**空文件**
+    被登记为已应用（schema_version.checksum = sha256("")，登记时间早于内容提交）——
+    编辑器先建空文件、``--reload`` 的 worker 抢在内容写入前跑了迁移。之后写入的内容
+    因「版本已应用」永不执行。抛本异常走 run_pending 的失败分支：记失败、不登记、
+    下次启动重试，文件补上内容后自然执行。
+    """
+
+
+def _declares_noop(sql_content: str) -> bool:
+    return bool(_NOOP_MARKER_RE.search(sql_content))
+
+
 @dataclass
 class MigrationFile:
     """一个待执行的迁移脚本。"""
@@ -974,6 +993,11 @@ class MigrationRunner:
 
         statements = self._split_sql_statements(sql_content)
         logger.debug("[Migration] %s 共 %d 条语句", mig.filename, len(statements))
+        if not statements and not _declares_noop(sql_content):
+            raise EmptyMigrationError(
+                f"{mig.filename} 分句后没有可执行语句（空文件或只有注释）—— 拒绝登记为已应用；"
+                "若确为有意的空迁移，请在注释中写明 no-op"
+            )
 
         async with self._engine.begin() as conn:
             for stmt in statements:

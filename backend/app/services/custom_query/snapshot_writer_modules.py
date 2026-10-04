@@ -216,14 +216,20 @@ async def write_tb_cell(
     wp_id 在 tb 模块中是 trial_balance 记录的 id。
     """
     result = await db.execute(
-        text("SELECT id, updated_at FROM trial_balance WHERE id = :tid FOR UPDATE"),
+        text("""
+            SELECT id, project_id, year, standard_account_code,
+                   audited_amount, updated_at
+            FROM trial_balance
+            WHERE id = :tid
+            FOR UPDATE
+        """),
         {"tid": wp_id},
     )
     row = result.first()
     if not row:
         raise ValueError(f"Trial balance record not found: {wp_id}")
 
-    current_updated_at = row[1]
+    current_updated_at = row[5]
     check_lock(opened_at, current_updated_at, user)
 
     _, col_idx = _parse_cell_ref(cell_ref)
@@ -233,14 +239,26 @@ async def write_tb_cell(
             "Only audited_amount (column G) is writable in trial_balance"
         )
 
-    now = datetime.now(timezone.utc)
-    await db.execute(
-        text("""
-            UPDATE trial_balance
-            SET audited_amount = :new_val, updated_at = :now
-            WHERE id = :tid
-        """),
-        {"new_val": new_value, "now": now, "tid": wp_id},
-    )
+    from app.services.tb_audited_writer import publish_rows
 
-    return {"success": True, "updated_at": now.isoformat(), "old_value": None}
+    publish_report = await publish_rows(
+        db,
+        row[1],
+        int(row[2]),
+        [{
+            "trial_balance_id": row[0],
+            "account_code": row[3],
+            "audited_amount": new_value,
+        }],
+        source="custom-query:tb-cell",
+    )
+    if not publish_report.updated_rows:
+        reason = publish_report.skipped[0].reason if publish_report.skipped else "未更新试算表"
+        raise ValueError(f"Trial balance record was not updated: {wp_id}（{reason}）")
+
+    published = publish_report.updated_rows[0]
+    return {
+        "success": True,
+        "updated_at": published.published_at.isoformat(),
+        "old_value": published.previous_amount,
+    }

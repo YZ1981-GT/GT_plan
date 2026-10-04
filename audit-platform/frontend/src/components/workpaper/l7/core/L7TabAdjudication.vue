@@ -10,12 +10,8 @@
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon> 带入调整
         </el-button>
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
+        <!-- BP-7 / AC 1.4：能力诚实披露（BP-4 inert 开关已摘除） -->
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-l7-other-noncurrent-liabilities" />
         <el-button size="small" @click="handleAI('adjudication')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -315,7 +311,8 @@
  * - 公式列: 虚线下划线 + cursor:help + tooltip showing formula source
  * - TB回写: 审定数变化 → writebackTB(2801)
  * - EventBus: subscribe 'adjustment:created' → refresh AJE/RJE columns
- * - el-segmented 双模式(HTML/OO) at top using useL7DualMode
+ * - 顶部能力提示走 GtEntrySyncCapabilityNotice（BP-4 路线②：原 el-segmented 双模式开关
+ *   是死开关 —— 切到 OnlyOffice 不渲染任何 OO 宿主，已连同 `useL7DualMode` 一并摘除）
  * - GtIndexChip for cross-references
  * - Font 13px, formula columns with dashed-underline style
  * - 方法论上下文: amber left-border block
@@ -329,7 +326,7 @@ import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { useL7FormData } from '../../composables/useL7FormData'
-import { useL7DualMode } from '../../composables/useL7DualMode'
+import GtEntrySyncCapabilityNotice from '../../sync/GtEntrySyncCapabilityNotice.vue'
 import {
   useL7Adjudication,
   type L7AdjudicationRow,
@@ -379,12 +376,6 @@ const L7_SOURCE_HINTS: string[] = [
 const formData = useL7FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
-})
-
-// ─── DualMode ────────────────────────────────────────────────────────────────
-
-const dualMode = useL7DualMode({
-  wpId: computed(() => props.wpId),
 })
 
 // ─── 审定表行数据（5个项目行，对应xlsx row7~row11） ──────────────────────────

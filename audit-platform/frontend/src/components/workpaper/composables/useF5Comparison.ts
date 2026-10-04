@@ -9,6 +9,11 @@
  */
 import { computed, ref, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcChangeAmount } from './useF5CosOfFormulaEngine'
+import {
+  F5_ROW_ID_PREFIX,
+  resolveStableRowId,
+  type RowIdentityMintStats,
+} from './f5RowIdentity'
 import type { ChecklistResponse } from './useF1FormData'
 
 export interface UseF5ComparisonOptions {
@@ -90,12 +95,15 @@ export function defaultF5ComparisonRows(): StoredComparisonRow[] {
   return Array.from({ length: F5_COMPARISON_DEFAULT_ROWS }, () => emptyF5ComparisonRow())
 }
 
-export function migrateF5ComparisonRows(jsonStr: string | null | undefined): StoredComparisonRow[] {
+export function migrateF5ComparisonRows(
+  jsonStr: string | null | undefined,
+  stats?: RowIdentityMintStats,
+): StoredComparisonRow[] {
   if (!jsonStr) return []
   try {
     const parsed = JSON.parse(jsonStr)
     if (!Array.isArray(parsed)) return []
-    return parsed.map((r: any, i: number) => {
+    return parsed.map((r: any) => {
       const product = String(r?.product ?? r?.variety ?? r?.label ?? '')
       let currentQty = parseNum(r?.currentQty ?? r?.qty)
       let currentUnitCost = parseNum(r?.currentUnitCost ?? r?.unitCost ?? r?.avgUnitCost)
@@ -125,7 +133,9 @@ export function migrateF5ComparisonRows(jsonStr: string | null | undefined): Sto
       }
 
       return {
-        id: String(r?.id ?? r?.rowId ?? `cmp-migrated-${i}`),
+        // 🔴 BP-7 修复（f5-sync-coverage-and-first-canary Task 6）：原为
+        //    `String(r?.id ?? r?.rowId ?? \`cmp-migrated-${i}\`)` —— 下标派生身份。
+        id: resolveStableRowId(r, F5_ROW_ID_PREFIX.comparison, stats),
         product,
         currentQty,
         currentUnitCost,
@@ -198,8 +208,13 @@ export function useF5Comparison(options: UseF5ComparisonOptions) {
   }
 
   function loadRows(): void {
-    const migrated = migrateF5ComparisonRows(rawJson())
+    // 🔴 BP-7（需求 3.1）：铸了新行身份就立即回写，否则下次载入又换一个新 id。
+    const stats: RowIdentityMintStats = { minted: 0 }
+    const migrated = migrateF5ComparisonRows(rawJson(), stats)
     storedRows.value = migrated.length ? migrated : defaultF5ComparisonRows()
+    if (stats.minted > 0 && migrated.length && !readonly.value) {
+      persist()
+    }
   }
 
   watch(() => rawJson(), (raw) => {

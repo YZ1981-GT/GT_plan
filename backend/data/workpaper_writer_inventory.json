@@ -4691,8 +4691,8 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          882,
-          890
+          895,
+          903
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -9507,7 +9507,7 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          3025
+          3311
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -9515,7 +9515,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 2992,
+      "line": 3278,
       "module": "app.routers.wp_render_strategies._d4_import_export",
       "qualname": "_handle_d4_13_import",
       "resolver_identities": [],
@@ -19998,7 +19998,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 3294,
+      "line": 3307,
       "module": "app.services.workpaper_sync.oo_to_html",
       "qualname": "OoToHtmlCoordinator._mirror_d2_store_if_needed",
       "resolver_identities": [],
@@ -20052,13 +20052,13 @@
           "checklist_responses.remark"
         ],
         "swallowed_exception_lines": [
-          2775,
-          2941,
-          2995,
-          3049,
-          3102,
-          3155,
-          3208
+          2788,
+          2954,
+          3008,
+          3062,
+          3115,
+          3168,
+          3221
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -20245,7 +20245,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 268,
+      "line": 269,
       "module": "app.services.workpaper_sync.repository",
       "qualname": "WorkpaperSyncRepository.bump_content_revision",
       "resolver_identities": [],
@@ -22397,7 +22397,7 @@
       "writer_id": "app.services.wp_xlsx_export_service::_sync_export_workpaper_xlsx"
     }
   ],
-  "inventory_digest": "6a051515c26c45c7d08f3c3d6b1b724721bd13ff93063d8ab08b1076c0ef354b",
+  "inventory_digest": "6ed7718885b9391a238853cce715bb00244da2c24e2c436f6114a7748276495e",
   "overlay_digest": "68e7127ad0b18caef6caa084471d30f8678170703fe7c5d141cfff2422ece9e6",
   "representation_upgrade_lane": [
     {
@@ -22509,7 +22509,7 @@
     }
   ],
   "schema_version": 1,
-  "source_digest": "61e3cf8831a3ceb9c9015b5b0ccb9ca4d00a6d4a04e058e0cf50c48f706a38b1",
+  "source_digest": "a84c5dba4f26740632815e3476eb1942a2e04c2e7c724b88c7ff3008ecf9447a",
   "stats": {
     "artifact_snapshot_only_count": 1,
     "by_content_store": {

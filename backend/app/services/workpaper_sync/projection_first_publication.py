@@ -396,6 +396,39 @@ def stage_instrumented_substrate(
         source_bytes = provider.read_authoritative_template()
         gate = provider.excel_carrier_gate()
         specs_fn = getattr(provider, "instrumentation_specs", None)
+        spec_fn = getattr(provider, "instrumentation_spec", None)
+        static_only_fn = getattr(provider, "static_only_instrumentation_spec", None)
+
+        # ── DEC-3 结构化守卫：**先于**分派，判据是「有 static_only 即不得有行表 spec」──
+        #
+        # 🔴 放在分派**之前**而不是「进第三臂时才查」：一个同时暴露 static_only 与
+        #    `instrumentation_specs` 的 provider 会先命中第一臂，那样就永远查不到它 ——
+        #    而「给纯静态 entry 造了行表 spec」正是 DEC-3 明禁的形态（注退化动态表当载体）。
+        #
+        # 🔴 判据是**单向蕴含**，**不是**「三者恰暴露其一」：现算既有 provider 中存在
+        #    同时暴露 `instrumentation_spec` 与 `instrumentation_specs` 的双入口回落形态
+        #    （`_dynamic_column_bindings` / `_static_region_bindings` 都写了「specs 不可用
+        #    时回落 spec」的逻辑），用统一断言会把既有 entry 打红。
+        if callable(static_only_fn):
+            row_spec_entries = [
+                name
+                for name, fn in (("instrumentation_spec", spec_fn),
+                                 ("instrumentation_specs", specs_fn))
+                if callable(fn)
+            ]
+            if row_spec_entries:
+                from app.services.workpaper_sync.excel_instrumentation import (
+                    InstrumentationError,
+                )
+
+                raise InstrumentationError(
+                    f"provider 同时暴露 `static_only_instrumentation_spec` 与 "
+                    f"{row_spec_entries!r} —— 纯静态 entry 不得有行表 spec"
+                    "（归档 spec workpaper-sync-static-cell-sheet-writeback 的 DEC-3 明禁"
+                    "「给纯静态 sheet 注退化动态表当载体」）。删掉行表 spec，"
+                    "或者本 entry 其实不是纯静态、应走前两臂。"
+                )
+
         if callable(specs_fn):
             from app.services.workpaper_sync.excel_instrumentation import (
                 instrument_workbook_bytes_multi,
@@ -404,7 +437,7 @@ def stage_instrumented_substrate(
             instrumented = instrument_workbook_bytes_multi(
                 source_bytes, specs_fn(), gate=gate
             )
-        else:
+        elif callable(spec_fn):
             from app.services.workpaper_sync.excel_instrumentation import (
                 instrument_workbook_bytes,
             )
@@ -413,6 +446,37 @@ def stage_instrumented_substrate(
                 source_bytes,
                 provider.instrumentation_spec(),
                 gate=gate,
+            )
+        else:
+            # ── 第三臂（追加在既有两臂**之后**）：纯静态 entry ──────────────
+            #
+            # 既有两臂的判据与先后逐条不变 ⇒ 任何带行表 spec 的 provider 在进入本臂
+            # **之前**即命中原臂。改造前这里是无条件 `else: provider.instrumentation_spec()`，
+            # 对没有行表 spec 的 provider 抛裸 `AttributeError`；现在它落进本臂。
+            from app.services.workpaper_sync.excel_instrumentation import (
+                InstrumentationError,
+                instrument_workbook_bytes_static_only,
+            )
+
+            if not callable(static_only_fn):
+                raise InstrumentationError(
+                    f"provider 三个 instrumentation 入口一个都没有暴露 —— "
+                    "需要 `instrumentation_specs()` / `instrumentation_spec()` / "
+                    "`static_only_instrumentation_spec()` 之一"
+                )
+            # 载体清单从 provider 的显式常量取，**不从** `gate.allowed_carriers` 推导：
+            # gate 的真源是 Task 5 探针门（放行集是上界），按它推导即语义过度声明。
+            identity_carriers = getattr(provider, "IDENTITY_CARRIERS", None)
+            if not identity_carriers:
+                raise InstrumentationError(
+                    "纯静态 provider 必须显式声明 `IDENTITY_CARRIERS` —— "
+                    "载体清单不得从 gate.allowed_carriers 推导"
+                )
+            instrumented = instrument_workbook_bytes_static_only(
+                source_bytes,
+                static_only_fn(),
+                gate=gate,
+                identity_carriers=tuple(identity_carriers),
             )
     except Exception as exc:
         raise SubstrateStagingError(
@@ -734,6 +798,41 @@ async def _approved_projection_bundle_id(
 # ═══════════════════════════════════════════════════════════════════════════
 
 
+def _primary_instrumentation_spec(provider: Any) -> Any:
+    """取 instrumentation 的主 spec，兼容单 sheet 与多 sheet provider。
+
+    🔴 `stage_instrumented_substrate()` 已经按 `instrumentation_specs()`（复数）→
+    `instrumentation_spec()`（单数）→ static-only 三臂分派，但本函数的调用方此前仍**硬调**
+    `provider.instrumentation_spec()`。结果 H 九条全部在 instrumentation 真完成后、现算
+    identity inventory 时裸崩：
+
+    ``AttributeError: phase5_h9_lease_liabilities has no instrumentation_spec
+    (Did you mean instrumentation_specs?)``
+
+    随后宿主又把未登记的 `substrate_staging_failed` 交给封闭结算词表，二次抛
+    `HostError`，连 `--check --entry H9` 的 JSON 都产不出来。即「支持复数」只接了半条链。
+
+    多 sheet instrumentation 的返回值本就明确「以第一张 spec 为主字段、其余清单含全部
+    sheet」（`instrument_workbook_bytes_multi` docstring），所以 identity inventory 的
+    主锚点也必须取同一张 `specs[0]`；这不是新选择规则。
+    """
+    specs_fn = getattr(provider, "instrumentation_specs", None)
+    if callable(specs_fn):
+        specs = tuple(specs_fn())
+        if not specs:
+            raise SubstrateStagingError(
+                "provider.instrumentation_specs() 返回空序列 —— 多 sheet 入口不得空转"
+            )
+        return specs[0]
+    spec_fn = getattr(provider, "instrumentation_spec", None)
+    if callable(spec_fn):
+        return spec_fn()
+    raise SubstrateStagingError(
+        "provider 未暴露 instrumentation_specs() 或 instrumentation_spec()，"
+        "无法现算行身份清单"
+    )
+
+
 def _observe_identity_inventory(*, instrumented: Any, provider: Any) -> Any:
     """从 instrumented 字节现算 identity inventory 并投影成类型化对象。
 
@@ -747,13 +846,16 @@ def _observe_identity_inventory(*, instrumented: Any, provider: Any) -> Any:
     )
     from app.services.workpaper_sync.excel_entry_gate import parse_identity_inventory
 
-    spec = provider.instrumentation_spec()
+    spec = _primary_instrumentation_spec(provider)
     raw = identity_inventory(
         instrumented.instrumented_bytes,
         expected_table=getattr(spec, "table_name", None)
         or getattr(provider, "TABLE_NAME", None),
-        uuid_column_letter=getattr(spec, "uuid_column", None)
-        or getattr(provider, "UUID_COL", None),
+        uuid_column_letter=(
+            getattr(spec, "uuid_col", None)
+            or getattr(spec, "uuid_column", None)
+            or getattr(provider, "UUID_COL", None)
+        ),
         # 🔴 **刻意不传** `uuid_sheet_id` / `uuid_sheet_name`。
         #
         # `identity_inventory` 的 `winner` 按 `("sheet_id", "sheet_name", "table_sheet")`
@@ -995,16 +1097,79 @@ def overlay_store_on_baseline_projection(
         values[key] = _coerce_excel_numeric_text_field(field)
 
     row_keys: dict[str, tuple[str, ...]] = {}
+    # 🔴 store 的 row_keys 是 HTML 侧当前行集合的**权威来源**。当用户在结构化视图中
+    # 删除旧行并重新导入时，store 只包含新行；baseline（旧 substrate extract）仍持有
+    # 旧行 identity（包括旧数据行 + 模板脚手架 GTROW/L2MARK）。
+    #
+    # 若按并集合并，旧行全部被带回——materialize 写 33 行进只有 12 行数据区的模板，
+    # 产生大量空行 / 旧数据残留（2026-09-28 D4-2 实测 7→33 行事故形态）。
+    #
+    # 正确语义：store 有声明的 table → store 为准；store 没有的 table → baseline 原样。
+    # 模板脚手架行（GTROW/L2MARK）不在 store row_keys 中但可能在 baseline 中——它们
+    # 由 materialize 的 identity carrier 机制自动处理（写隐藏 UUID 列），不需要投影
+    # 层面保留。roundtrip 校验中 extract 读到但投影没有的 protected 字段会被豁免。
+    store_table_keys = set(store_projection.row_keys.keys())
     for table_key in {*baseline.row_keys, *store_projection.row_keys}:
-        merged: list[str] = []
-        for source in (
-            baseline.row_keys.get(table_key, ()),
-            store_projection.row_keys.get(table_key, ()),
-        ):
-            for key in source:
-                if key not in merged:
-                    merged.append(key)
-        row_keys[table_key] = tuple(merged)
+        if table_key in store_table_keys:
+            # store 有这张表 → store 的行集合是权威
+            row_keys[table_key] = store_projection.row_keys[table_key]
+        else:
+            # store 没有这张表（baseline-only）→ 保留 baseline
+            row_keys[table_key] = baseline.row_keys.get(table_key, ())
+
+    # 🔴 清理 values：baseline 中属于「不在最终 row_keys 中」的行的字段值不应保留。
+    # 仅在有 row_keys 声明时才清理——如果 baseline 和 store 都没有 row_keys（空 dict），
+    # 不做清理（兼容无行身份表的简单场景，如 store None 清空基线值）。
+    #
+    # ═══ 判据是**逐 table** 的，不是全集（spec workpaper-sync-managed-row-convergence F1）═══
+    #
+    # 首版按「身份在 row_keys **全集**里」过滤，对同 sheet 多受管区底稿不足：
+    # D4-1 有 main / other 两个受管区（uuid 列分别是 W / X，区间 R8~R22 / R25~R36）。
+    # 实测 substrate 的 **W22**（main 区末行）被写入了 other 段身份
+    # `xsheet-other-g5d43680692`，于是 extract 用 **main 表的 specs** 实例化它，
+    # 产出 `adjudication_main_rows/xsheet-other-g5d43680692/{label,current_unadjusted,...}`。
+    # 该身份确实在 `adjudication_other_rows` 的 row_keys 里 ⇒ 全集判据放它过 ⇒
+    # 错位的 `main_rows/` 前缀字段被带进 intended ⇒ materialize 在 main 区找不到它的
+    # 物理行 ⇒ 反读缺失 ⇒ `roundtrip_projection_mismatch: 反读后缺少受管字段`。
+    #
+    # 且这是**自我强化**的：错位 key 进 intended ⇒ materialize 按 main 表把它当 orphan
+    # 插进 main 区 ⇒ 下次 extract 又读出来。全集判据无法打破这个循环。
+    #
+    # ⇒ 改为逐 table 判：字段 key 的 table 段必须与该身份**在 row_keys 里的实际归属**一致。
+    #   store 是行归属的权威（它的 `sectionKey` 明确说该行属 other 区），所以 baseline 侧
+    #   任何「把 A 表的身份挂在 B 表前缀下」的字段一律丢弃。
+    #
+    # 🔴 只在能判定归属时才丢：key 不含 table 段、或该身份不在任何 row_keys 里（后者已被
+    #   下方全集判据拦掉），都不走本分支 —— 少做而非多做。
+    if row_keys:
+        final_row_id_set: set[str] = set()
+        for ids in row_keys.values():
+            final_row_id_set.update(ids)
+        #: 身份 → 它在最终 row_keys 里归属的 table 集合（正常恰一个；
+        #: 同一身份出现在多个 table 时不收窄，保持既有行为）。
+        owner_tables: dict[str, set[str]] = {}
+        for table_key, ids in row_keys.items():
+            for rid in ids or ():
+                owner_tables.setdefault(str(rid), set()).add(str(table_key))
+
+        def _table_segment_agrees(key: str, row_key: str) -> bool:
+            owners = owner_tables.get(str(row_key))
+            if not owners:
+                return True  # 归属未知 ⇒ 交给下方全集判据，本判据不表态
+            segment = str(key).split("/", 1)[0]
+            if segment == str(key):
+                return True  # key 不含 table 段（静态字段等）⇒ 不适用
+            return segment in owners
+
+        values = {
+            key: val for key, val in values.items()
+            if not hasattr(val, 'row_key')
+            or not val.row_key
+            or (
+                val.row_key in final_row_id_set
+                and _table_segment_agrees(key, val.row_key)
+            )
+        }
 
     return Projection(
         contract_id=str(store_projection.contract_id),
@@ -1080,9 +1245,39 @@ def _row_bearing_table_key(*, contract: Any, provider: Any) -> str:
                 "不得静默取一侧：那会把「契约改了表名而 provider 没跟」变成无声的错行写入"
             )
         return derived
-    # 多受管 sheet（如 D4-2 + D4-3）：主 binding 必须取 provider.ROWS_TABLE_KEY。
+    # 多受管 sheet（如 D4-2 + D4-3）：声明 ROWS_TABLE_KEY 时仍优先双向锁死。
     if declared and declared in candidates:
         return declared
+
+    # 🔴 H3/H7 是「两张受管 sheet × 每张一张动态行 table」，provider 刻意不再抄一份
+    # `ROWS_TABLE_KEY` 常量，但 `instrumentation_specs()[0]` 已冻结主 sheet 身份。
+    # 原实现到这里无条件要求 ROWS_TABLE_KEY ⇒ H3/H7 即使 instrumentation 成功，也在
+    # adapter 装配处被拒。用**第一张 instrumentation spec ↔ 契约 sheet** 的现有双向身份
+    # 推导主 table；这与 `instrument_workbook_bytes_multi`「返回值以第一张 spec 为主字段」
+    # 的定义同源，不新增排序规则。
+    specs_fn = getattr(provider, "instrumentation_specs", None)
+    if callable(specs_fn):
+        specs = tuple(specs_fn())
+        if specs:
+            first = specs[0]
+            managed = str(getattr(first, "managed_sheet", "") or "")
+            resolved = str(getattr(first, "resolved_sheet_key", "") or "")
+            matched = [
+                str(table.table_key)
+                for sheet in contract.sheets
+                if (managed and sheet.excel_name == managed)
+                or (resolved and sheet.sheet_key == resolved)
+                for table in sheet.tables
+                if table.row_identity is not None
+                and str(table.table_key) in candidates
+            ]
+            if len(matched) == 1:
+                return matched[0]
+            raise ProviderCapabilityError(
+                f"provider {getattr(provider, '__name__', provider)!r} 的首张 instrumentation "
+                f"spec（managed_sheet={managed!r} / sheet_key={resolved!r}）在契约里匹配到 "
+                f"{len(matched)} 张行 table {matched} —— 主 binding 必须唯一"
+            )
     raise ProviderCapabilityError(
         f"契约 {contract.contract_id!r} 里满足「row_identity 声明非空 ∧ 有 "
         f"row_from=row_identity 字段」的表有 {len(candidates)} 张 {candidates}"
@@ -1337,14 +1532,16 @@ def _identity_binding(
     from app.services.excel_structure_fingerprint import GT_SYNC_SHEET_NAME
     from app.services.workpaper_sync.excel_extract import ExcelIdentityBinding
 
-    spec = provider.instrumentation_spec()
+    spec = _primary_instrumentation_spec(provider)
     inventory = staged.identity_inventory
     return ExcelIdentityBinding(
         table_name=str(
             getattr(spec, "table_name", None) or getattr(provider, "TABLE_NAME", "")
         ),
         uuid_column=str(
-            getattr(spec, "uuid_column", None) or getattr(provider, "UUID_COL", "")
+            getattr(spec, "uuid_col", None)
+            or getattr(spec, "uuid_column", None)
+            or getattr(provider, "UUID_COL", "")
         ),
         table_key=_row_bearing_table_key(contract=contract, provider=provider),
         metadata_sheet=GT_SYNC_SHEET_NAME,

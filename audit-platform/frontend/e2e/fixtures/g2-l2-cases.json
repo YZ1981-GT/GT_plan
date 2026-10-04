@@ -1,0 +1,59 @@
+{
+  "description": "G2 应收利息 L2 (OO→HTML) e2e 用例集。结构照 D4/F1 lane；canary 受管面只有明细表G2-2。",
+  "spec": "g-cycle-sync-foundation-and-first-canary",
+  "task": "16",
+  "entry_id": "xlsx/gt-g2-interest-receivable",
+  "adapter_id": "g2.interest_receivable_detail",
+  "run_note": "必须 --workers=1：同一 wp 的 OO room 与 forcesave 是串行资源，并行会互相抢 revision。",
+  "seed_policy": {
+    "decision": "no_seed",
+    "adjudication": "GF-H2",
+    "rationale": "真库 checklist_responses 已有真实载荷，seed 脚本会覆盖真实数据且掩盖「空表往返也算 store_mirrored」的假绿。",
+    "evidence_queried_at": "2026-09-27",
+    "evidence_sql": "SELECT jsonb_array_length(remark::jsonb) FROM checklist_responses WHERE item_id='G2-2-detail-rows'",
+    "evidence": {
+      "store_item_id": "G2-2-detail-rows",
+      "remark_bytes": 475,
+      "row_count": 1,
+      "wp_id": "ede443da-3848-4a3f-af21-848559aa0e25",
+      "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+      "wp_code": "G2",
+      "wp_name": "应收利息"
+    }
+  },
+  "preconditions": {
+    "store_item_id": "G2-2-detail-rows",
+    "min_row_count": 1,
+    "must_assert_before_skip": true,
+    "why": "P15：不先断言「参与 roundtrip 的行数 > 0 且来自真库」，一张空表往返也会被三谓词判成 store_mirrored —— 出去 0 行、回来 0 行、镜像一致，全部成立而什么都没验证。"
+  },
+  "cases": [
+    {
+      "id": "g2-2-detail-basic",
+      "sheet_key": "g202-managed",
+      "sheet_name": "明细表G2-2",
+      "store_item_id": "G2-2-detail-rows",
+      "description": "canary: 明细表G2-2 数据行编辑（投资种类 + 期初/本期 → 公式列 E/H/J 自动算）",
+      "header_row": 9,
+      "first_data_row": 10,
+      "last_data_row": 15,
+      "footer_row": 16,
+      "uuid_col": "N",
+      "edit_cell": "A10",
+      "edit_value": "G2-E2E-国债投资",
+      "expect_formula_columns": ["E", "H", "J"],
+      "expect_footer_total_formula": true,
+      "result_enum": "pending_adapter",
+      "pending_reason": "manifest capability 仍是 single_onlyoffice（BP-1~BP-3 平台级欠账未清），attach 走 capability 门返回空 ⇒ adapter 未注册，真栈三谓词跑不了。"
+    }
+  ],
+  "result_enum_values": [
+    "pass",
+    "fail_confirm",
+    "fail_forcesave",
+    "fail_mirror",
+    "fail_marker",
+    "upstream_gap",
+    "pending_adapter"
+  ]
+}

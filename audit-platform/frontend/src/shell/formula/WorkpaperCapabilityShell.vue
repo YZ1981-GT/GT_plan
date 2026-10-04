@@ -47,9 +47,11 @@
       </button>
     </aside>
 
+    <!-- review panel: 内容由外层 GtReviewDialog drawer 承载，
+         aside 仅作为 DOM 锚点，不占布局空间（宽度 0）。 -->
     <aside
       v-if="openId === 'review'"
-      class="wp-capability-shell__panel"
+      class="wp-capability-shell__panel wp-capability-shell__panel--overlay"
       :aria-label="SHELL_A11Y_NAMES['rail-panel']"
       tabindex="-1"
       ref="panelEl"
@@ -229,10 +231,7 @@ onBeforeUnmount(() => {
 })
 
 const cssVars = computed(() =>
-  shellLayoutCssVars(
-    resolvedTokens.value,
-    openId.value === 'guidance' || openId.value === 'review',
-  ),
+  shellLayoutCssVars(resolvedTokens.value, false),  // 面板作为 flex 子元素自然挤压，不需要 padding-right
 )
 
 let lastTrigger: HTMLElement | null = null
@@ -329,7 +328,6 @@ defineExpose({
   flex: 1;
   min-width: 0;
   min-height: 0;
-  padding-right: var(--wp-shell-content-inset-right, 0);
 }
 
 .wp-capability-shell__rail-strip {
@@ -402,6 +400,17 @@ defineExpose({
   width: 0;
   min-width: 0;
   border: 0;
+}
+
+/* review panel 不占 flex 空间——内容由 GtReviewDialog drawer 承载 */
+.wp-capability-shell__panel--overlay {
+  flex: 0 0 0 !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+  border: none !important;
+  display: none;
 }
 
 @media (min-width: 1280px) {

@@ -20,8 +20,13 @@ describe('g10DetailFromAdjudication', () => {
     )
     expect(result.filled).toBe(1)
     expect(result.added).toBe(1)
-    expect(result.rows[0].liabilityType).toBe('交易性债券')
+    // 🔴 C-7：`liabilityType` 已移除（模板无此列）⇒ 分类判别只剩 A 列 `liabilityCategory`
+    //    与 B 列 `liabilityName`（名称取 G10-1 分项的 defaultName）。
+    expect(result.rows[0].liabilityName).toBe('发行的交易性债券')
+    expect(result.rows[0].liabilityCategory).toBe('交易类')
+    expect(result.rows[0]).not.toHaveProperty('liabilityType')
     expect(result.rows[0].openingFairValue).toBe(100)
+    // M = K + L；K = C + H = 80 + 10 = 90；L = D + I + J = 20 + 5 + 0 = 25 ⇒ 115
     expect(result.rows[0].closingFairValue).toBe(115)
     expect(result.rows[0].openingInitialAmount).toBe(80)
     expect(result.rows[0].movementInitialAmount).toBe(10)
@@ -34,9 +39,9 @@ describe('g10DetailFromAdjudication', () => {
       fv_derivative_liability: { openingUnadjusted: 0, closingUnadjusted: 0 },
     }
     const existing = [
+      // 🔴 C-7：匹配键从「类型 + 类别」改为「类别 + 名称」（模板 A + B 两个受管列）
       enrichG10DetailRow({
         rowId: 'd1',
-        liabilityType: '衍生金融负债',
         liabilityCategory: '交易类',
         liabilityName: '衍生金融负债',
       }, 1),
@@ -45,7 +50,7 @@ describe('g10DetailFromAdjudication', () => {
     expect(result.updated).toBe(1)
     expect(result.added).toBe(0)
     expect(result.rows[0].closingFairValue).toBe(60)
-    expect(result.rows[0].isDerivative).toBe(true)
+    expect(result.rows[0].liabilityName).toContain('衍生')
   })
 
   it('pullG10DetailFromAdjudicationResponses 读取 responses', () => {

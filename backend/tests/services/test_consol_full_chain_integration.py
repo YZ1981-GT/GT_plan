@@ -1,4 +1,4 @@
-"""合并模块全链路集成测试（封板交付物 ①）
+"""合并模块全链路集成测试（封板交付物 ①；spec consol-tree-three-code-autobuild 任务 7.6 按三码模型改写）
 
 目标：用 **真实 SQLite DB + 真实 ORM 行 + 真实 service** 跑通整条合并管线，
 捕捉单阶段 mock 测试抓不到的「跨阶段签名漂移」回归。这是会同时咬到以下两次
@@ -6,17 +6,21 @@ merge 回归的测试：
   1. Phase 1 把 generate_consol_reports_sync 改成 async，而 Phase 2 仍 sync 调用；
   2. Phase 1 删了 _execute_formula，令 Phase 2 报表公式失效。
 
-与既有 test_consol_phase0_integration.py 的区别：那个是**纯函数**测试（喂内存
-TreeNode/字典），不经 build_tree → ORM → upsert_trial_row 真实落库，因此抓不到
-签名漂移 / NULL 主键 / async 未 await 等运行时缺陷。本测试用真实 DB 行。
-
 覆盖：
-- test_full_chain_subsidiary：aggregate_individual_sum → recalculate_trial →
-  reconcile，断言 B1 恒等式 + provenance 自洽（Phase 0→0 真实 DB 链路）。
+- test_full_chain_subsidiary：aggregate_individual_sum → recalculate_trial → recalc_full → reconcile，
+  断言合并恒等式 + 溯源自洽 + P8（差额表根合并数 == 试算合并数，对账 0 差异）。
 - test_cascade_refresh_awaits_async_report（回归守卫）：refresh_all 后 report 步
   必须在 steps_completed 且不在 errors，且无 "coroutine was never awaited" 警告。
-- test_branch_consolidation_skips_elimination：母分汇总 consol_amount == individual_sum。
+- test_mixed_group_branch_and_subsidiary：子公司与分公司并存 —— 合并差额与母分差额两处分录各自计入、
+  孤儿分录两条路径都不计入、P10 科目方向归一、只在分录里出现的科目建行、P8 恒等。
 - test_approved_vs_draft_elimination：仅 approved 抵销影响 consol_elimination。
+
+有意的口径变更（旧断言不作为正确性依据，design §十二）：
+- 企业树按三码推导：测试项目必须带审计年度、下级项目填上级代码；不再写 parent_project_id；
+- 个别数汇总取全部数据叶子，**母公司本体计入**（旧版只取子公司叶子，F5）；
+- 抵销金额按科目方向归一（贷方性质科目「借减贷」取反，F7）；
+- 删除「consolidation_type=branch 时整体跳过抵销」—— 合并方式由下级关系推导，
+  母分差额分录照常计入（旧测试 test_branch_consolidation_skips_elimination 改写为并存用例）。
 
 real-DB 测试范式：SQLite in-memory + JSONB/ARRAY 兼容 shim（先于模型导入），
 PG-only SQL 路径在 service 内已有 sqlite dialect 兜底。
@@ -30,6 +34,7 @@ from decimal import Decimal
 
 import pytest
 import pytest_asyncio
+import sqlalchemy as sa
 from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -54,7 +59,7 @@ import app.models.workpaper_models  # noqa: E402, F401
 from app.models.audit_platform_models import AccountCategory, TrialBalance  # noqa: E402
 from app.models.base import UserRole  # noqa: E402
 from app.models.consolidation_models import (  # noqa: E402
-    ConsolTrial,
+    ConsolWorksheet,
     EliminationEntry,
     EliminationEntryType,
     ReviewStatusEnum,
@@ -66,6 +71,7 @@ from app.services.consol_reconciliation_service import (  # noqa: E402
     reconcile_worksheet_vs_trial,
 )
 from app.services.consol_trial_service import recalculate_trial  # noqa: E402
+from app.services.consol_worksheet_engine import recalc_full  # noqa: E402
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 YEAR = 2025
@@ -97,14 +103,13 @@ async def db_session() -> AsyncSession:
 # ---------------------------------------------------------------------------
 
 
-def _tb_row(project_id: uuid.UUID, company_code: str, code: str, name: str,
-            category: AccountCategory, amount: str) -> TrialBalance:
-    """构造一行子公司审定试算（audited_amount 即 B1 取数源）。"""
+def _tb_row(project_id: uuid.UUID, code: str, name: str, category: AccountCategory, amount: str) -> TrialBalance:
+    """构造一行单户审定试算（audited_amount 即个别数取数源）。"""
     return TrialBalance(
         id=uuid.uuid4(),
         project_id=project_id,
         year=YEAR,
-        company_code=company_code,
+        company_code="001",
         standard_account_code=code,
         account_name=name,
         account_category=category,
@@ -113,146 +118,198 @@ def _tb_row(project_id: uuid.UUID, company_code: str, code: str, name: str,
     )
 
 
-async def _seed_group(
-    session: AsyncSession,
-    *,
-    consolidation_type: str = "subsidiary",
-    n_children: int = 2,
-) -> tuple[Project, list[Project]]:
-    """造 1 母 N 子合成集团：母 report_scope=consolidated，子挂 parent_project_id，
-    每个子公司带几行 trial_balance（audited_amount），commit 落库。
+def _project(code: str, name: str, scope: str, *, parent: str | None = None, relation: str | None = None) -> Project:
+    return Project(
+        id=uuid.uuid4(),
+        name=f"{name}_{YEAR}",
+        client_name=f"【集成测试】{name}",
+        company_code=code,
+        parent_company_code=parent,
+        ultimate_company_code="GRP_PARENT",
+        relation_to_parent=relation,
+        report_scope=scope,
+        audit_year=YEAR,
+        consol_level=2 if scope == "consolidated" else 1,
+    )
 
-    返回 (parent, [children])。各子公司科目刻意部分重叠（验证跨公司加总）+
-    部分独有（验证不丢科目）+ 含负数（累计折旧）。
+
+# 子公司科目矩阵：1001 货币资金（两家都有）/ 1602 累计折旧（贷方性质备抵，两家都有）/
+# 6001 营业收入（仅子A）/ 2202 应付账款（仅子B）
+_CHILD_SPECS = [
+    [
+        ("1001", "货币资金", AccountCategory.asset, "1000000.50"),
+        ("1122", "应收账款", AccountCategory.asset, "30000.00"),
+        ("1602", "累计折旧", AccountCategory.asset, "200000.00"),
+        ("6001", "营业收入", AccountCategory.revenue, "300000.00"),
+    ],
+    [
+        ("1001", "货币资金", AccountCategory.asset, "250000.00"),
+        ("1602", "累计折旧", AccountCategory.asset, "80000.00"),
+        ("2202", "应付账款", AccountCategory.liability, "150000.00"),
+    ],
+]
+# 母公司本体（单户项目）
+_PARENT_SPEC = [
+    ("1001", "货币资金", AccountCategory.asset, "40000.00"),
+    ("2202", "应付账款", AccountCategory.liability, "5000.00"),
+]
+
+
+async def _seed_group(session: AsyncSession, *, n_children: int = 2) -> tuple[Project, list[Project]]:
+    """造 1 母 N 子合成集团：母公司合并 + 单户两个项目，子公司上级代码填母公司代码（三码建树）。
+
+    返回 (合并项目, [子公司单户项目])。
     """
-    user = User(
+    session.add(User(
         id=uuid.uuid4(),
         username=f"uat_{uuid.uuid4().hex[:8]}",
         email=f"{uuid.uuid4().hex[:8]}@uat.local",
         hashed_password="x",
         role=UserRole.admin,
-    )
-    session.add(user)
-
-    parent = Project(
-        id=uuid.uuid4(),
-        name="合成集团母公司",
-        client_name="【集成测试】合成集团母公司",
-        company_code="GRP_PARENT",
-        ultimate_company_code="GRP_PARENT",
-        report_scope="consolidated",
-        consolidation_type=consolidation_type,
-        consol_level=2,
-    )
-    session.add(parent)
+    ))
+    parent = _project("GRP_PARENT", "合成集团母公司", "consolidated")
+    parent_standalone = _project("GRP_PARENT", "合成集团母公司", "standalone")
+    session.add_all([parent, parent_standalone])
+    for code, name, category, amount in _PARENT_SPEC:
+        session.add(_tb_row(parent_standalone.id, code, name, category, amount))
 
     children: list[Project] = []
-    # 子公司科目矩阵：(code, name, category) → {child_index: amount}
-    # 1001 货币资金（两家都有）/ 1601 累计折旧（负数，两家都有）/
-    # 6001 营业收入（仅子A）/ 2001 应付账款（仅子B）
-    child_specs = [
-        # 子 A
-        [
-            ("1001", "货币资金", AccountCategory.asset, "1000000.50"),
-            ("1601", "累计折旧", AccountCategory.asset, "-200000.00"),
-            ("6001", "营业收入", AccountCategory.revenue, "300000.00"),
-        ],
-        # 子 B
-        [
-            ("1001", "货币资金", AccountCategory.asset, "250000.00"),
-            ("1601", "累计折旧", AccountCategory.asset, "-80000.00"),
-            ("2001", "应付账款", AccountCategory.liability, "150000.00"),
-        ],
-    ]
     for i in range(n_children):
-        code_letter = chr(ord("A") + i)
-        child = Project(
-            id=uuid.uuid4(),
-            name=f"子公司{code_letter}",
-            client_name=f"【集成测试】子公司{code_letter}",
-            company_code=f"GRP_SUB_{code_letter}",
-            parent_company_code="GRP_PARENT",
-            ultimate_company_code="GRP_PARENT",
-            parent_project_id=parent.id,
-            report_scope="standalone",
-            consol_level=1,
-        )
+        letter = chr(ord("A") + i)
+        child = _project(f"GRP_SUB_{letter}", f"子公司{letter}", "standalone",
+                         parent="GRP_PARENT", relation="subsidiary")
         session.add(child)
         children.append(child)
-        spec = child_specs[i % len(child_specs)]
-        for code, name, category, amount in spec:
-            session.add(_tb_row(child.id, child.company_code, code, name, category, amount))
+        for code, name, category, amount in _CHILD_SPECS[i % len(_CHILD_SPECS)]:
+            session.add(_tb_row(child.id, code, name, category, amount))
 
     await session.commit()
     return parent, children
 
 
+def _entry(project_id, no, entry_type, lines, *, status=ReviewStatusEnum.approved, branch=None):
+    return EliminationEntry(
+        id=uuid.uuid4(),
+        project_id=project_id,
+        year=YEAR,
+        entry_no=no,
+        entry_type=entry_type,
+        account_code=lines[0][0],
+        debit_amount=sum((Decimal(ln[2]) for ln in lines), Decimal("0")),
+        credit_amount=sum((Decimal(ln[3]) for ln in lines), Decimal("0")),
+        lines=[
+            {"account_code": code, "account_name": name, "debit_amount": dr, "credit_amount": cr}
+            for code, name, dr, cr in lines
+        ],
+        entry_group_id=uuid.uuid4(),
+        branch_entity_code=branch,
+        review_status=status,
+        is_deleted=False,
+    )
+
+
+async def _root_worksheet(session: AsyncSession, project_id: uuid.UUID, root_key: str) -> dict[str, Decimal]:
+    rows = (await session.execute(
+        sa.select(ConsolWorksheet.account_code, ConsolWorksheet.consolidated_amount).where(
+            ConsolWorksheet.project_id == project_id,
+            ConsolWorksheet.node_company_code == root_key,
+            ConsolWorksheet.is_deleted == sa.false(),
+        )
+    )).all()
+    return {code: Decimal(str(amount)) for code, amount in rows}
+
+
 # ---------------------------------------------------------------------------
-# 测试 2：Phase 0→0 真实 DB 全链路（aggregate → trial → reconcile）
+# 测试 1：真实 DB 全链路（aggregate → trial → worksheet → reconcile）
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_full_chain_subsidiary(db_session: AsyncSession):
-    """母子合并真实链路：aggregate_individual_sum → recalculate_trial → reconcile。
+    """母子合并真实链路：aggregate_individual_sum → recalculate_trial → recalc_full → reconcile。
 
     断言：
-    - consol_trial 行实际落库（真实 ORM 写入，非 mock）。
-    - B1 恒等式：consol_amount == individual_sum + consol_adjustment + consol_elimination。
-    - provenance 自洽：consolidation_breakdown.by_company 金额合计 == individual_sum。
-    - 跨公司加总数值正确（1001 两家相加 / 1601 负数相加 / 独有科目不丢）。
-    - reconcile 不抛异常（B2 观测手段）。
+    - consol_trial 行实际落库（真实 ORM 写入，非 mock）；
+    - 个别数 = 全部数据叶子（母公司本体 + 两家子公司，口径变更：旧版不含母公司本体）；
+    - 合并恒等式 consol_amount == individual_sum + consol_adjustment + consol_elimination；
+    - 溯源自洽：by_company 合计 == individual_sum，且每行标注节点（node_key / role / entity_kind）；
+    - P8：差额表根合并数与试算合并数逐科目相等，对账 0 差异。
     """
-    parent, children = await _seed_group(db_session, consolidation_type="subsidiary")
+    parent, children = await _seed_group(db_session)
+    db_session.add(_entry(parent.id, "IA-2025-001", EliminationEntryType.internal_ar_ap, [
+        ("2202", "应付账款", "20000.00", "0"),
+        ("1122", "应收账款", "0", "20000.00"),
+    ]))
+    await db_session.commit()
 
-    # ① B1 汇总
+    # ① B1 汇总：3 个数据叶子（母公司、子A、子B）
     agg = await aggregate_individual_sum(db_session, parent.id, YEAR)
-    assert agg.companies_traversed == 2
-    assert agg.accounts_aggregated == 4  # 1001 / 1601 / 6001 / 2001
+    assert agg.companies_traversed == 3
+    assert agg.accounts_aggregated == 5  # 1001 / 1122 / 1602 / 6001 / 2202
 
-    # ② 重算 trial（内部会再调 aggregate，再叠加抵销；只 flush）
+    # ② 重算 trial（只 flush）
     trials = await recalculate_trial(db_session, parent.id, YEAR)
     await db_session.commit()
-    assert len(trials) == 4
-
+    assert len(trials) == 5
     by_code = {t.standard_account_code: t for t in trials}
 
-    # 跨公司加总数值
-    assert by_code["1001"].individual_sum == Decimal("1250000.50")  # 1000000.50 + 250000.00
-    assert by_code["1601"].individual_sum == Decimal("-280000.00")  # -200000 + -80000
+    assert by_code["1001"].individual_sum == Decimal("1290000.50")  # 40000 + 1000000.50 + 250000
+    assert by_code["1602"].individual_sum == Decimal("280000.00")   # 备抵科目正数口径相加
     assert by_code["6001"].individual_sum == Decimal("300000.00")   # 仅子 A
-    assert by_code["2001"].individual_sum == Decimal("150000.00")   # 仅子 B
+    assert by_code["2202"].individual_sum == Decimal("155000.00")   # 母公司 5000 + 子 B 150000
+    # 应付账款贷方性质：借 20000 ⇒ −20000；应收账款借方性质：贷 20000 ⇒ −20000
+    assert by_code["2202"].consol_elimination == Decimal("-20000.00")
+    assert by_code["1122"].consol_elimination == Decimal("-20000.00")
+    assert by_code["1122"].consol_amount == Decimal("10000.00")
 
-    # B1 恒等式 + provenance 自洽
     for t in trials:
         assert t.consol_amount == t.individual_sum + t.consol_adjustment + t.consol_elimination, (
-            f"B1 恒等式破坏：{t.standard_account_code}"
+            f"合并恒等式破坏：{t.standard_account_code}"
         )
-        assert t.is_stale is False  # 重算后清除陈旧标记
+        assert t.is_stale is False
         breakdown = t.consolidation_breakdown
         assert breakdown is not None and "by_company" in breakdown
-        recomputed = sum(
-            (Decimal(row["amount"]) for row in breakdown["by_company"]), Decimal("0")
-        )
-        assert recomputed == t.individual_sum, (
-            f"provenance 不自洽：{t.standard_account_code} "
-            f"by_company 合计={recomputed} ≠ individual_sum={t.individual_sum}"
-        )
+        recomputed = sum((Decimal(row["amount"]) for row in breakdown["by_company"]), Decimal("0"))
+        assert recomputed == t.individual_sum, f"溯源不自洽：{t.standard_account_code}"
 
-    # 1001 两家公司都贡献，provenance 应有 2 行
-    assert len(by_code["1001"].consolidation_breakdown["by_company"]) == 2
-    # 2001 仅子 B 贡献，provenance 应有 1 行
-    assert len(by_code["2001"].consolidation_breakdown["by_company"]) == 1
+    rows_1001 = by_code["1001"].consolidation_breakdown["by_company"]
+    assert [(r["node_key"], r["role"], r["entity_kind"]) for r in rows_1001] == [
+        ("GRP_PARENT:parent", "parent", "parent"),
+        ("GRP_SUB_A:subsidiary", "subsidiary", "subsidiary"),
+        ("GRP_SUB_B:subsidiary", "subsidiary", "subsidiary"),
+    ]
+    assert len(by_code["2202"].consolidation_breakdown["by_company"]) == 2
 
-    # ③ B2 对账（观测手段，永不抛）。worksheet 未跑，根节点 ws_map 为空，
-    #    但 reconcile 必须正常返回（不阻断）。
+    # ③ 差额表 + ④ 对账：P8 逐科目相等
+    await recalc_full(db_session, parent.id, YEAR)
+    root = await _root_worksheet(db_session, parent.id, "GRP_PARENT:consol")
+    assert root == {code: t.consol_amount for code, t in by_code.items()}
     recon = await reconcile_worksheet_vs_trial(db_session, parent.id, YEAR)
-    assert recon is not None
-    assert isinstance(recon.diffs, list)
+    assert recon.is_reconciled is True and recon.diffs == [] and recon.max_abs_diff == Decimal("0")
+
+
+@pytest.mark.asyncio
+async def test_recalculate_trial_zeroes_vanished_accounts(db_session: AsyncSession):
+    """需求 5.6：科目从数据叶子与分录里都消失后，重算把该试算行清零（不残留旧数）。"""
+    parent, children = await _seed_group(db_session)
+    await recalculate_trial(db_session, parent.id, YEAR)
+    await db_session.commit()
+
+    tb = (await db_session.execute(
+        sa.select(TrialBalance).where(
+            TrialBalance.project_id == children[0].id, TrialBalance.standard_account_code == "6001")
+    )).scalar_one()
+    tb.is_deleted = True
+    await db_session.commit()
+
+    by_code = {t.standard_account_code: t for t in await recalculate_trial(db_session, parent.id, YEAR)}
+    gone = by_code["6001"]
+    assert (gone.individual_sum, gone.consol_amount) == (Decimal("0"), Decimal("0"))
+    assert gone.consolidation_breakdown["by_company"] == []
 
 
 # ---------------------------------------------------------------------------
-# 测试 3：cascade refresh 必须 await async 报表（回归守卫）
+# 测试 2：cascade refresh 必须 await async 报表（回归守卫）
 # ---------------------------------------------------------------------------
 
 
@@ -264,18 +321,17 @@ async def test_cascade_refresh_awaits_async_report(db_session: AsyncSession):
     （TypeError），要么 Python 抛 "coroutine 'xxx' was never awaited" RuntimeWarning。
     本测试同时断言：
       - report 在 steps_completed，不在 errors；
-      - 整个 refresh_all 过程不产生 "coroutine was never awaited" 警告。
-    这正是 Phase 1 改 async / Phase 2 仍 sync 调用会触发的回归。
+      - 整个 refresh_all 过程不产生 "coroutine was never awaited" 警告；
+      - 对账步两条路径同源、0 差异（P8）。
     """
     from app.services.consol_cascade_refresh_service import refresh_all, STEP_REPORT
 
-    parent, children = await _seed_group(db_session, consolidation_type="subsidiary")
+    parent, children = await _seed_group(db_session)
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         result = await refresh_all(db_session, parent.id, YEAR)
 
-    # 不应有"协程未被 await"警告
     never_awaited = [
         w for w in caught
         if "never awaited" in str(w.message) or "was never awaited" in str(w.message)
@@ -284,63 +340,95 @@ async def test_cascade_refresh_awaits_async_report(db_session: AsyncSession):
         f"检测到未 await 的协程警告（report 步签名漂移回归）：{[str(w.message) for w in never_awaited]}"
     )
 
-    # report 步必须真实完成，且不在错误清单
     report_errors = [e for e in result.errors if e.get("step") == STEP_REPORT]
     assert not report_errors, f"report 步报错（应已 await async）：{report_errors}"
     assert STEP_REPORT in result.steps_completed, (
         f"report 步未完成。steps_completed={result.steps_completed} errors={result.errors}"
     )
-
-    # 关键前置步骤也应完成（trial 是 report 的依赖）
     assert "trial" in result.steps_completed
     assert "worksheet" in result.steps_completed
+    # 三节点模型：合并、合并差额、母公司 + 两家子公司
+    assert result.nodes_refreshed == 5
+    assert result.reconciliation is not None and result.reconciliation.is_reconciled is True
 
 
 # ---------------------------------------------------------------------------
-# 测试 4：母分汇总（branch）跳过抵销
+# 测试 3：子公司与分公司并存（需求 4.2 / 5.x / 6.x）
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_branch_consolidation_skips_elimination(db_session: AsyncSession):
-    """母分汇总（consolidation_type="branch"）：直接加总，无抵销，
-    consol_amount == individual_sum（走 recalculate_trial 的 branch 分支）。
-    即使存在已审批抵销分录，branch 也不应消费它。
+async def test_mixed_group_branch_and_subsidiary(db_session: AsyncSession):
+    """母公司同时有子公司与分公司：合并差额与母分差额两处分录各自计入（口径变更：旧版
+    ``consolidation_type=branch`` 时整体跳过抵销，现由关系推导、两类差额节点并存）。
+
+    - P10：借方性质科目（应收账款）借 100 ⇒ 合并数 +100；贷方性质科目（应付账款）贷 100 ⇒ +100；
+    - 「其他调整」进调整列；只在分录里出现的科目（其他应付款 2241）在合并试算建行；
+    - 归属到不存在的母分差额节点的分录是孤儿：两条路径都不计入，重算结果列出；
+    - P8：差额表根合并数 == 试算合并数，对账 0 差异。
     """
-    parent, children = await _seed_group(db_session, consolidation_type="branch")
-
-    # 故意塞一条 approved 抵销，验证 branch 分支不会消费它
-    db_session.add(EliminationEntry(
-        id=uuid.uuid4(),
-        project_id=parent.id,
-        year=YEAR,
-        entry_no="ELIM-BRANCH-01",
-        entry_type=EliminationEntryType.internal_trade,
-        account_code="1001",
-        debit_amount=Decimal("0"),
-        credit_amount=Decimal("99999.00"),
-        lines=[{"account_code": "1001", "debit_amount": "0", "credit_amount": "99999.00"}],
-        entry_group_id=uuid.uuid4(),
-        review_status=ReviewStatusEnum.approved,
-        is_deleted=False,
-    ))
+    parent, children = await _seed_group(db_session, n_children=1)
+    branch = _project("GRP_BR_1", "合成集团母公司上海分公司", "standalone", parent="GRP_PARENT", relation="branch")
+    db_session.add(branch)
+    db_session.add(_tb_row(branch.id, "1001", "货币资金", AccountCategory.asset, "7000.00"))
+    db_session.add(_tb_row(branch.id, "2202", "应付账款", AccountCategory.liability, "3000.00"))
+    db_session.add_all([
+        # 合并差额（branch_entity_code 为空）
+        _entry(parent.id, "IA-2025-001", EliminationEntryType.internal_ar_ap, [
+            ("1122", "应收账款", "100.00", "0"), ("1001", "货币资金", "0", "100.00"),
+        ]),
+        # 母分差额（归属母公司自己的母分差额节点）：贷 应付账款 100 ⇒ +100
+        _entry(parent.id, "IA-2025-002", EliminationEntryType.internal_ar_ap, [
+            ("1001", "货币资金", "100.00", "0"), ("2202", "应付账款", "0", "100.00"),
+        ], branch="GRP_PARENT"),
+        # 其他调整：只在分录里出现的科目 2241
+        _entry(parent.id, "OT-2025-001", EliminationEntryType.other, [
+            ("1001", "货币资金", "30.00", "0"), ("2241", "其他应付款", "0", "30.00"),
+        ]),
+        # 孤儿：子公司A 没有分公司 ⇒ 没有母分差额节点
+        _entry(parent.id, "IA-2025-003", EliminationEntryType.internal_ar_ap, [
+            ("1001", "货币资金", "999.00", "0"), ("1122", "应收账款", "0", "999.00"),
+        ], branch="GRP_SUB_A"),
+    ])
     await db_session.commit()
 
-    trials = await recalculate_trial(db_session, parent.id, YEAR)
+    ws = await recalc_full(db_session, parent.id, YEAR)
+    assert [o["entry_no"] for o in ws["orphan_entries"]] == ["IA-2025-003"]
+
+    by_code = {t.standard_account_code: t for t in await recalculate_trial(db_session, parent.id, YEAR)}
     await db_session.commit()
 
-    for t in trials:
-        assert t.consol_elimination == Decimal("0"), (
-            f"branch 不应有抵销：{t.standard_account_code} elim={t.consol_elimination}"
-        )
-        assert t.consol_adjustment == Decimal("0")
-        assert t.consol_amount == t.individual_sum, (
-            f"branch 合并数应等于汇总数：{t.standard_account_code}"
-        )
+    # 个别数：母公司本部 40000 + 分公司 7000 + 子A 1000000.50
+    assert by_code["1001"].individual_sum == Decimal("1047000.50")
+    # 1001：合并差额 贷 100 ⇒ −100；母分差额 借 100 ⇒ +100；其他调整 借 30 ⇒ 调整 +30；孤儿不计
+    assert by_code["1001"].consol_elimination == Decimal("0.00")
+    assert by_code["1001"].consol_adjustment == Decimal("30.00")
+    assert by_code["1122"].consol_elimination == Decimal("100.00")   # P10 借方性质借 100 ⇒ +100
+    assert by_code["2202"].consol_elimination == Decimal("100.00")   # P10 贷方性质贷 100 ⇒ +100
+    assert by_code["2241"].individual_sum == Decimal("0")
+    assert by_code["2241"].consol_adjustment == Decimal("30.00")
+    assert by_code["2241"].account_name == "其他应付款"
+
+    # 溯源：母公司有分公司 ⇒ 本部 + 分公司两行（均属母公司汇总），子公司一行
+    rows = by_code["1001"].consolidation_breakdown["by_company"]
+    assert [(r["node_key"], r["entity_kind"]) for r in rows] == [
+        ("GRP_PARENT:hq", "parent"), ("GRP_BR_1:branch", "branch"), ("GRP_SUB_A:subsidiary", "subsidiary"),
+    ]
+
+    # 母分差额节点金额在差额表里单列，母公司汇总节点 = 母分差额 + 本部 + 分公司
+    branch_elim = await _root_worksheet(db_session, parent.id, "GRP_PARENT:branch_elim")
+    assert branch_elim["2202"] == Decimal("100.00") and branch_elim["1001"] == Decimal("100.00")
+    parent_agg = await _root_worksheet(db_session, parent.id, "GRP_PARENT:parent")
+    assert parent_agg["1001"] == Decimal("47100.00")
+
+    root = await _root_worksheet(db_session, parent.id, "GRP_PARENT:consol")
+    assert root == {code: t.consol_amount for code, t in by_code.items()}
+    recon = await reconcile_worksheet_vs_trial(db_session, parent.id, YEAR)
+    assert recon.is_reconciled is True and recon.diffs == []
 
 
 # ---------------------------------------------------------------------------
-# 测试 5：仅 approved 抵销影响 consol_elimination（draft 不消费）
+# 测试 4：仅 approved 抵销影响 consol_elimination（draft 不消费）
 # ---------------------------------------------------------------------------
 
 
@@ -348,54 +436,31 @@ async def test_branch_consolidation_skips_elimination(db_session: AsyncSession):
 async def test_approved_vs_draft_elimination(db_session: AsyncSession):
     """母子合并：draft 抵销不消费，仅 approved 影响 consol_elimination。
 
-    验证 recalculate_trial 的 APPROVED-only 过滤 + ReviewStatusEnum 小写成员修复。
+    口径变更：货币资金是借方性质科目，贷 50000 ⇒ −50000（与旧版「借减贷」同号）；
+    个别数含母公司本体 40000。
     """
-    parent, children = await _seed_group(db_session, consolidation_type="subsidiary")
-
-    # 一条 draft（不应生效）+ 一条 approved（应生效），都打到 1001
-    db_session.add(EliminationEntry(
-        id=uuid.uuid4(),
-        project_id=parent.id,
-        year=YEAR,
-        entry_no="ELIM-DRAFT-01",
-        entry_type=EliminationEntryType.internal_ar_ap,
-        account_code="1001",
-        debit_amount=Decimal("0"),
-        credit_amount=Decimal("777777.00"),
-        lines=[{"account_code": "1001", "debit_amount": "0", "credit_amount": "777777.00"}],
-        entry_group_id=uuid.uuid4(),
-        review_status=ReviewStatusEnum.draft,
-        is_deleted=False,
-    ))
-    db_session.add(EliminationEntry(
-        id=uuid.uuid4(),
-        project_id=parent.id,
-        year=YEAR,
-        entry_no="ELIM-APPR-01",
-        entry_type=EliminationEntryType.internal_ar_ap,
-        account_code="1001",
-        debit_amount=Decimal("0"),
-        credit_amount=Decimal("50000.00"),
-        lines=[{"account_code": "1001", "debit_amount": "0", "credit_amount": "50000.00"}],
-        entry_group_id=uuid.uuid4(),
-        review_status=ReviewStatusEnum.approved,
-        is_deleted=False,
-    ))
+    parent, children = await _seed_group(db_session)
+    db_session.add_all([
+        _entry(parent.id, "ELIM-DRAFT-01", EliminationEntryType.internal_ar_ap, [
+            ("1001", "货币资金", "0", "777777.00"), ("2202", "应付账款", "777777.00", "0"),
+        ], status=ReviewStatusEnum.draft),
+        _entry(parent.id, "ELIM-APPR-01", EliminationEntryType.internal_ar_ap, [
+            ("1001", "货币资金", "0", "50000.00"), ("2202", "应付账款", "50000.00", "0"),
+        ]),
+    ])
     await db_session.commit()
 
     trials = await recalculate_trial(db_session, parent.id, YEAR)
     await db_session.commit()
-
     by_code = {t.standard_account_code: t for t in trials}
     t1001 = by_code["1001"]
 
-    # 仅 approved 的 credit 50000 生效：elim = debit(0) - credit(50000) = -50000
     assert t1001.consol_elimination == Decimal("-50000.00"), (
         f"应只消费 approved 抵销，得到 {t1001.consol_elimination}（draft 777777 不应生效）"
     )
-    # 恒等式仍成立
     assert t1001.consol_amount == t1001.individual_sum + t1001.consol_adjustment + t1001.consol_elimination
-    assert t1001.consol_amount == Decimal("1250000.50") + Decimal("-50000.00")
-
+    assert t1001.consol_amount == Decimal("1290000.50") + Decimal("-50000.00")
+    # 应付账款贷方性质：借 50000 ⇒ −50000
+    assert by_code["2202"].consol_elimination == Decimal("-50000.00")
     # 未涉及抵销的科目 elim 为 0
-    assert by_code["2001"].consol_elimination == Decimal("0")
+    assert by_code["6001"].consol_elimination == Decimal("0")

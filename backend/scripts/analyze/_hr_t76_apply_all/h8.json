@@ -1,0 +1,72 @@
+{
+  "mode": "apply",
+  "entries": [
+    {
+      "target": {
+        "entry_id": "xlsx/gt-h8-right-of-use-assets",
+        "contract_id": "h8.right_of_use_assets_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_h8_right_of_use_assets",
+        "wp_codes": [
+          "H8"
+        ],
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "34bbc627-1781-4cf3-a207-5fb7a91bd00d",
+        "wp_code": "H8",
+        "store_bytes": 2,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "outcome": {
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "34bbc627-1781-4cf3-a207-5fb7a91bd00d",
+        "entry_id": "xlsx/gt-h8-right-of-use-assets",
+        "contract_id": "h8.right_of_use_assets_detail",
+        "authority_model": "projection_contract",
+        "authority_model_definition_id": "9e4e0d40-e646-4c92-9ea8-a29275943b5d",
+        "authority_model_definition_sha256": "6e966bad800e2f774a518a396c4424612da4d8f3c2db63e21fcab29fac18d82a",
+        "template_definition_id": "81af3dd6-567b-4a71-8072-508f212268ff",
+        "template_definition_sha256": "2ef4e1ad7501c10d876942e774fa580b058bb4a9c897de977b9ff8c4b04356c7",
+        "instrumentation_definition_id": "568bf350-94af-4a0c-92cc-478dfba8f0e6",
+        "instrumentation_definition_sha256": "81f6c5ddb42a23c63e2f09c8f649e90ed12cc6d05b9fb16eb512c5e78bd1f658",
+        "contract_definition_id": "62b6f51a-e1e1-48ec-afca-1734a8b3cc98",
+        "contract_definition_sha256": "b71a6b8190b3d5992b4360abeb02ccb6ebd836641a8c3bd66ca2fee059d387d9",
+        "definition_bundle_id": "c2668d98-1299-4f49-bee2-cede9586da34",
+        "definition_bundle_sha256": "d3ea1a90f96049a8838eec28548c3729ebf7e9d19b599f9439a1e469afeae08a",
+        "created_stages": [
+          "template",
+          "instrumentation",
+          "contract",
+          "bundle"
+        ],
+        "reused_stages": [
+          "authority_model"
+        ],
+        "representation_settlement": "blocked",
+        "representation_reason": "entry xlsx/gt-h8-right-of-use-assets 没有 `state=awaiting_contract` 的 representation upgrade candidate 可绑定。approved bundle 已就位，缺的是**表示**侧供给：①该 entry 若还没有任何 content version/representation，首版只能由 `ContentMutationService.commit(...)`（唯一能推进 content_revision 的业务事务）产生；②已有 representation 时，纯 definitions 升级须先由 Task 17 的 instrumentation upgrader 登记 non-current candidate。本 provisioner **不**自建第三条 representation 写入路径（会伪造业务 projection 并绕过 `assert_candidate_finalizable`，Property 4 / 67 双打红）",
+        "attached_candidate_id": null,
+        "attach": null,
+        "content_revision_before": 0,
+        "content_revision_after": 0,
+        "revision_unchanged": true,
+        "entry_pointer_before": null,
+        "entry_pointer_after": null,
+        "created_anything": true
+      }
+    }
+  ],
+  "errors": [],
+  "supply_rows_before": {
+    "working_paper_sync_definition_artifact": 248,
+    "working_paper_sync_definition_bundle": 108,
+    "working_paper_representation_upgrade_candidate": 1,
+    "working_paper_content_representation": 283
+  },
+  "supply_rows_after": {
+    "working_paper_sync_definition_artifact": 251,
+    "working_paper_sync_definition_bundle": 109,
+    "working_paper_representation_upgrade_candidate": 1,
+    "working_paper_content_representation": 283
+  },
+  "created_total": 4
+}

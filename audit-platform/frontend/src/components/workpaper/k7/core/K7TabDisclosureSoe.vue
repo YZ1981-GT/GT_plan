@@ -282,6 +282,7 @@ import {
   K7_NOTE_SECTION,
   type K7GrantDetailRow,
 } from '../../composables/k7NoteSectionMap'
+import { newRowIdentity } from '../../composables/shared/rowIdentity'
 
 const K7_ACCOUNT_CODE = '2401'
 
@@ -345,7 +346,7 @@ function initDefaultRows(): void {
   const incomeDefaults = ['研发费用补助', '稳岗补贴', '产业扶持资金', '出口退税补贴', '其他与收益相关补助']
 
   assetRelatedRows.value = assetDefaults.map((name, idx) => ({
-    id: `asset-${idx}`,
+    id: newRowIdentity('asset'),
     project: name,
     beginBalance: 0,
     increase: 0,
@@ -353,7 +354,7 @@ function initDefaultRows(): void {
   }))
 
   incomeRelatedRows.value = incomeDefaults.map((name, idx) => ({
-    id: `income-${idx}`,
+    id: newRowIdentity('income'),
     project: name,
     beginBalance: 0,
     increase: 0,
@@ -398,7 +399,7 @@ function loadSavedData(): void {
 function normalizeGrantRow(raw: any, idx: number): GrantRow {
   const n = (v: any): number => (typeof v === 'number' && Number.isFinite(v) ? v : Number(v) || 0)
   return {
-    id: String(raw?.id || `grant-${idx}-${Date.now()}`),
+    id: String(raw?.id || newRowIdentity('grant')),
     grantItem: String(raw?.grantItem ?? ''),
     beginBalance: n(raw?.beginBalance),
     newGrant: n(raw?.newGrant),

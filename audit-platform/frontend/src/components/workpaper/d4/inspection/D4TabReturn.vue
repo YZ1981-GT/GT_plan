@@ -288,9 +288,17 @@ async function checkAiHealth() { try { const res = await http.get('/api/ai/healt
 checkAiHealth()
 
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
-function handleExportTemplate(sheet: string) { exportTemplate(sheet as any) }
-function handleExportData(sheet: string) { exportData(sheet as any) }
-async function handleImportFile(sheet: string, uploadFile: any) { await importData(sheet as any, uploadFile.raw || uploadFile) }
+
+// ─── expose 给 GtWpRenderer 工具栏委托（D4-20 有 3 个子区域，默认导出 provision）──
+function handleExportTemplate() { exportTemplate('D4-20-provision' as any) }
+function handleExportData() { exportData('D4-20-provision' as any) }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await importData('D4-20-provision' as any, f) }
+  input.click()
+}
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 
 const aiNoteLoading = ref(false)
 const aiConclusionLoading = ref(false)
@@ -352,31 +360,6 @@ function fmtRate(v: number): string { if (!v) return '—'; return (v * 100).toF
       <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
       <el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">{{ syncStateTag.text }}</el-tag>
       <div class="toolbar-right">
-        <el-dropdown trigger="click" size="small">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item disabled class="dropdown-section-label">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="handleExportTemplate('D4-20-provision')">　重新测算表</el-dropdown-item>
-              <el-dropdown-item @click="handleExportTemplate('D4-20-current')">　本期退货明细</el-dropdown-item>
-              <el-dropdown-item @click="handleExportTemplate('D4-20-post')">　期后退货明细</el-dropdown-item>
-              <el-dropdown-item divided disabled class="dropdown-section-label">导出数据</el-dropdown-item>
-              <el-dropdown-item @click="handleExportData('D4-20-provision')">　重新测算表</el-dropdown-item>
-              <el-dropdown-item @click="handleExportData('D4-20-current')">　本期退货明细</el-dropdown-item>
-              <el-dropdown-item @click="handleExportData('D4-20-post')">　期后退货明细</el-dropdown-item>
-              <el-dropdown-item divided disabled class="dropdown-section-label">导入数据</el-dropdown-item>
-              <el-dropdown-item>
-                <el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly || importing" @change="(f: any) => handleImportFile('D4-20-provision', f)"><span>　重新测算表</span></el-upload>
-              </el-dropdown-item>
-              <el-dropdown-item>
-                <el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly || importing" @change="(f: any) => handleImportFile('D4-20-current', f)"><span>　本期退货明细</span></el-upload>
-              </el-dropdown-item>
-              <el-dropdown-item>
-                <el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly || importing" @change="(f: any) => handleImportFile('D4-20-post', f)"><span>　期后退货明细</span></el-upload>
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
         <GtIndexChip value="wp:D4-1" :context-project-id="projectId" />
         <GtIndexChip value="wp:D4-12" :context-project-id="projectId" />
         <el-tooltip content="将标记「是否异常=是」的退货推送至 A13 未更正错报汇总（金额与方向由人工认定），并同步至 D4-1 审计说明" placement="top">

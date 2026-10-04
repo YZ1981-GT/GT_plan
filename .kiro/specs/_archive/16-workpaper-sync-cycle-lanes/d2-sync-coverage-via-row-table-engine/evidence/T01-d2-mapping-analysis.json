@@ -1,0 +1,93 @@
+{
+  "template_sha256": "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa",
+  "D2-3": {
+    "geometry": "27行 x 14列(N) / 69公式",
+    "header_rows": [
+      10,
+      11
+    ],
+    "formula_columns": [
+      "E",
+      "K",
+      "N"
+    ],
+    "formula_templates": {
+      "E": "=B{r}+C{r}+D{r}",
+      "K": "=B{r}+SUM(F{r}:G{r})-SUM(H{r}:J{r})",
+      "N": "=K{r}+L{r}+M{r}"
+    },
+    "physical_segments": [
+      {
+        "label": "按单项评估计提",
+        "subtotal_row": 12,
+        "first_data_row": 13,
+        "last_data_row": 16,
+        "note": "行13 是「其中：」子行起点；小计在行12（=SUM(B13:B16)）"
+      },
+      {
+        "label": "信用风险组合计提",
+        "subtotal_row": 17,
+        "first_data_row": 18,
+        "last_data_row": 21,
+        "note": "小计在行17（=SUM(B18:B20)，注意 E17/K17/N17 =SUM(..:21) 含第4行）"
+      }
+    ],
+    "footer_total_row": 22,
+    "html_only_below_footer": [
+      23,
+      27
+    ],
+    "frontend_store_keys": [
+      "D2-bd-individual-rows",
+      "D2-bd-aging-rows",
+      "D2-bd-customer-rows"
+    ],
+    "frontend_categories": [
+      "individual",
+      "aging",
+      "customer-type"
+    ],
+    "ALIGNMENT_VERDICT": {
+      "conclusion": "MISALIGNED_3_KEYS_TO_2_PHYSICAL_SEGMENTS",
+      "detail": "前端 3 个 store 键（individual/aging/customer-type）+ 3 块 UI 表，但模板只有 2 个物理段（单项评估计提 R12-16 / 信用风险组合计提 R17-21）。前端 aging + customer-type 在模板里合并成「信用风险组合计提」单一段，无独立物理承载区。强行三键映射到两段会在 R18-20 里 aging/customer-type 行身份串区，OO 回写无法区分归属。",
+      "spec_e2_says": "三受管区（依据前端 3 store 键），与 D1-4 同型",
+      "measured_reality": "模板只有 2 物理段；前端 3 分类对模板不是 3 对 3"
+    }
+  },
+  "D2-4": {
+    "geometry": "25行 x 10列(J) / 6公式",
+    "formula_cells_all_are_header_refs": true,
+    "formula_note": "6 公式全是行3/4 的 =底稿目录!Ax 表头引用，数据区零公式",
+    "header_row": 5,
+    "data_region_start": 6,
+    "data_region_end_before_hint": 22,
+    "hint_row": 23,
+    "columns": {
+      "A": "调整事项说明",
+      "B": "类别（报表调整/账项调整/其他）",
+      "C": "报表项目",
+      "D": "科目名称",
+      "E": "附注项目",
+      "F": "……",
+      "G": "借方调整金额",
+      "H": "贷方调整金额",
+      "I": "索引",
+      "J": "备注"
+    },
+    "row_identity_col_present": false,
+    "row_identity_note": "模板无 GTROW/UUID/稳定 key 列；A 列是「调整事项说明」文本非身份键。空列可注入（max_col=J，K 及以后为空）。"
+  },
+  "D2-1": {
+    "geometry": "62行 x 13列(M) / 311公式 / 密度38%",
+    "shape": "逐格 mask（非列向区间）",
+    "core_4_rows_block1": {
+      "row_8": "单项计提坏账准备（F8/G8/H8 = SUMIF 明细表D2-2 按 creditRiskClassification）",
+      "row_9": "按组合计提坏账准备（=SUM(10:12) 小计）",
+      "row_10": "账龄组合（F10/G10/H10 = SUMIF「账龄组合」）",
+      "row_11": "客户类型组合（F11/G11/H11 = SUMIF「客户类型组合」）",
+      "row_13": "小计（=SUM(8,9)）"
+    },
+    "sumif_source": "明细表D2-2!$AI$13:$AI$25 按 creditRiskClassification 分类",
+    "note": "D2-1 是多区块重复结构（8-13 原值 / 15-20 坏账准备 / 22-27 净值 / 28-35 账龄原值 / 36-43 账龄坏账 / 44-51 账龄净值），非简单 4 行。spec 裁决聚焦核心：行8/9/10/11/13。逐格形态 + SUMIF 取数 + 人工覆盖四态。"
+  }
+}

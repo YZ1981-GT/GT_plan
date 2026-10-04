@@ -169,10 +169,12 @@ class TrialBalanceResolver:
 
 
 class ConsolTrialResolver:
-    """合并报表数据源：读 consol_trial.consol_amount。
+    """合并报表数据源（兼容保留）：读 consol_trial.consol_amount。
 
-    取数口径与原 consol_report_service._resolve_consol_tb/_resolve_sum_consol 一致
-    （迁移逻辑不改语义）：忽略列名，统一返回 consol_amount（合并数）。
+    🔴 合并报表生成已不再使用本类（spec consol-elimination-single-source-push ADR-CSP-003）：
+    本类按科目码**精确匹配**、忽略列名，与单体前缀口径不一致（``TB('1122')`` 取不到 ``112201``）；
+    合并报表改由 ``consol_report_values.BasisResolver`` 取计算口径的合并数（前缀口径、列名受检）。
+    保留仅为兼容既有调用与测试，新代码不要注入本类。
     全程 async（A3：消除 sync self.db.query 的 MissingGreenlet 风险）。
     """
 

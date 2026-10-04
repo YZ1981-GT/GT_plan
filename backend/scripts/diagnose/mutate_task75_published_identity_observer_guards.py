@@ -269,8 +269,8 @@ MUTATIONS: list[Mutation] = [
     # ═══ 路由：manifest 驱动注册必须真被 await（additive 死代码）══════════════
     Mutation(
         id="M23", side="be", path=ROUTER, kind="replace",
-        anchor="    outcome = await svc.registry.register_from_manifest(session=svc.session)",
-        new="    outcome = svc.registry.register_from_manifest",
+        anchor="        outcome = await svc.registry.register_from_manifest(session=svc.session)",
+        new="        outcome = svc.registry.register_from_manifest",
         want=f"{_REGT}::test_registrar_is_wired_on_both_production_paths",
         why="HTML→OO 解析入口不再 await manifest 驱动注册 ⇒ 计划永不执行，Task 75 的注册器变成"
             "additive 死代码（假绿第①源）",

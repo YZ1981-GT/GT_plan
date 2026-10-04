@@ -132,6 +132,14 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         raise _HarnessError(f"缺少迁移文件: {_MIGRATION}")
 
     forward = MigrationRunner._split_sql_statements(_MIGRATION.read_text(encoding="utf-8"))
+    # 🔴 生产按 V151 → V165 顺序 apply。V165 给 evidence `scenario_kind` 扩了
+    # `authorization_reject`（quarantined 场景的 kind）；只 apply V151 会让该场景的行撞
+    # V151 旧域 `ck_wpees_scenario_kind`（2026-09-26 实测 CheckViolationError）。
+    forward += MigrationRunner._split_sql_statements(
+        (_BACKEND / "migrations" / "V165__wpees_authorization_reject_kind.sql").read_text(
+            encoding="utf-8"
+        )
+    )
     schema = f"{_SCHEMA_PREFIX}{uuid.uuid4().hex[:12]}"
     ssl_off = {"ssl": False} if getattr(settings, "DB_DISABLE_SSL", False) else {}
     base_root = Path(tempfile.mkdtemp(prefix="tmp_task39_store_"))
@@ -868,11 +876,19 @@ class TestScenarioRowsAreRealAndSchemaValid:
         assert ordinals == list(range(1, len(rows) + 1)), ordinals
 
     def test_scenario_kind_domain_is_accepted_by_v151(self, snap: dict[str, Any]) -> None:
-        """真库接受面 —— 离线守卫对 CHECK 一无所知（Task 29 复盘实测过这个坑）。"""
+        """真库接受面 —— 离线守卫对 CHECK 一无所知（Task 29 复盘实测过这个坑）。
+
+        🔴 2026-09-26：域为 V151 + **V165**（`authorization_reject`）。这些 kind 全部出自
+        **真插入成功**的行（`snap["phases"]["scenarios"]`），所以「新 kind 被真库接受」由
+        行本身证明；这里再锁「没有第七个 kind 混进来」。测试名保留以免打断变异脚本的 want。
+        """
         kinds = {info["scenario_kind"] for info in snap["phases"]["scenarios"].values()}
         assert kinds <= {
-            "standard", "download_only", "recovery_reject", "recovery_claim", "close_capture"
+            "standard", "download_only", "recovery_reject", "recovery_claim", "close_capture",
+            "authorization_reject",
         }, kinds
+        # quarantined 场景在 D2 的 required set 里 ⇒ 新 kind 必须真出现，否则 V165 没被行覆盖
+        assert "authorization_reject" in kinds, kinds
 
     def test_result_is_derived_by_the_oracle_not_supplied(self, snap: dict[str, Any]) -> None:
         """每行的 `result` 与 harness 返回的 decision 一致，且非 passed 必带 error_code。"""

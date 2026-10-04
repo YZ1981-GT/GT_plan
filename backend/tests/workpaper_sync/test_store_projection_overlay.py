@@ -38,6 +38,12 @@ def _proj(values: dict[str, FieldValue], *, rows: dict[str, tuple[str, ...]] | N
 
 class TestOverlayStoreOnBaselineProjection:
     def test_baseline_scaffold_keys_survive_when_absent_from_store(self) -> None:
+        """当 store 声明了 row_keys，以 store 为准（权威）。
+
+        baseline 中的脚手架行（GTROW）不随投影保留——它们由 materialize 的 identity
+        carrier 机制自动处理。2026-09-28 D4-2 事故形态：旧 substrate 带入全部旧行
+        identity，导致 materialize 写 33 行进 12 行模板 → 大量空行 / 旧数据残留。
+        """
         baseline = _proj(
             {
                 "receivable_detail_rows/GTROW-D22-0013/seq": _fv(
@@ -60,9 +66,11 @@ class TestOverlayStoreOnBaselineProjection:
         merged = overlay_store_on_baseline_projection(
             baseline=baseline, store_projection=store
         )
-        assert "receivable_detail_rows/GTROW-D22-0013/seq" in merged.values
+        # store 声明了 row_keys → store 为准：只有 dr-1
+        assert merged.row_keys["receivable_detail_rows"] == ("dr-1",)
         assert merged.values["receivable_detail_rows/dr-1/remark"].value == "new"
-        assert merged.row_keys["receivable_detail_rows"] == ("GTROW-D22-0013", "dr-1")
+        # GTROW 脚手架行不在 store row_keys 中 → 不在合并结果中
+        assert "receivable_detail_rows/GTROW-D22-0013/seq" not in merged.values
 
     def test_store_none_placeholder_without_baseline_key_is_dropped(self) -> None:
         baseline = _proj({})

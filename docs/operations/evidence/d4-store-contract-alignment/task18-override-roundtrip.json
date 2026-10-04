@@ -1,0 +1,61 @@
+{
+  "captured_at": "2026-09-25T13:04:27.937Z",
+  "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+  "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
+  "entry": "xlsx/gt-d4-operating-revenue",
+  "target": {
+    "row_id": "xsheet-main-营业收入_批发_分销",
+    "label": "营业收入_批发_分销",
+    "old_value": 153480628.74,
+    "new_value": 153492974.41,
+    "cell_ref": "B12",
+    "oo_cell_text_after_typing": "153492974.41"
+  },
+  "oo_locate": {
+    "ok": true,
+    "matchedBy": "ok",
+    "activeSheet": "营业收入审定表D4-1",
+    "scanned": {
+      "B8": "",
+      "B9": "",
+      "B10": "",
+      "B11": "",
+      "B12": "153480628.74"
+    },
+    "hitRow": 12,
+    "target": "B12",
+    "located": true
+  },
+  "materialize_200": true,
+  "forcesave": {
+    "forcesave_request_id": "59382ae4-4712-4944-8630-aeab29a55851",
+    "operation_id": "6917e307-29cd-415b-8289-6aebe53331e5",
+    "request_sequence": 1,
+    "state": "accepted",
+    "poll_after_ms": 500,
+    "replayed": false,
+    "dispatch_error": null,
+    "cs_error": 0,
+    "cs_outcome": "accepted",
+    "callback_expected": true
+  },
+  "operation_id": "6917e307-29cd-415b-8289-6aebe53331e5",
+  "operation_state_trail": [
+    "created",
+    "application_bound",
+    "rematerializing",
+    "applied"
+  ],
+  "operation_final_state": "applied",
+  "store_value_after": 153492974.41,
+  "html": {
+    "table_has_new_value": true,
+    "table_snippet": "项目\n\t\n本期\n\t\n上期\n\t\n变动率\n\n\n未审数\n\t\n账项调整\n\t\n重分类调整\n\t\n审定数\n\t\n未审数\n\t\n账项调整\n\t\n重分类调整\n\t\n审定数\nL2MARK-D4-2-4fel\n\t\n76,715,623.03\n\t\n-\n\t\n-\n\t\n76,715,623.03\n\t\n-\n\t\n-\n\t\n-\n\t\n-\n\t\nN/A\n\n\n营业收入_批发_纯销\n\t\n1,528,820,416.32\n\t\n-\n\t\n-\n\t\n1,528,820,416.32\n\t\n-\n\t\n-\n\t\n-\n\t\n-\n\t\nN/A\n\n\n营业收入_批发_终端\n\t\n89,847,600.46\n\t\n-\n\t\n-\n\t\n89,847,600.46\n\t\n-\n\t\n-\n\t\n-\n\t\n-\n\t\nN/A\n\n\n营业收入_服务费及其他\n\t\n16,389,521.26\n\t\n-\n\t\n-\n\t\n16,389,521.26\n\t\n-\n\t\n-\n\t\n-\n\t\n-\n\t\nN/A\n\n\n营业收入_物业与租赁_物业\n\t\n175,221.24\n\t\n-\n\t\n-\n\t\n175,221.24\n\t\n-\n\t\n-\n\t\n-\n\t\n-\n\t\nN/A\n\n\n营业收入_物业与租赁_租赁\n\t\n1,100,917.44\n\t\n-\n\t\n-\n\t\n1,100,917.44\n\t\n-\n\t\n-\n\t\n-\n\t\n-\n\t\nN/A\n\n\n营业收入_物流_仓储\n\t\n1,844,830.88\n\t\n-\n\t\n-\n\t\n1,844,830.88\n\t\n-\n\t\n-\n\t\n-\n\t\n-\n\t",
+    "override_tag_count": 1,
+    "override_tag_texts": [
+      "覆盖·上游已变"
+    ]
+  },
+  "sync_errors": [],
+  "console_errors": []
+}

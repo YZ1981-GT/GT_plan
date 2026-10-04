@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-3",
+  "title": "D4-3 其他业务收入明细表 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "列示其他业务收入（科目6051）各项目的本期/上期对比，为 D4-1 审定表其他业务收入行提供明细支撑。",
+      "source_refs": []
+    },
+    {
+      "key": "data_sources",
+      "title": "二、数据来源",
+      "content": "从序时账按科目6051及其明细项目汇总取得。「项目」列填写其他业务收入项目名称（如租赁收入、材料销售、咨询收入等）。",
+      "source_refs": []
+    },
+    {
+      "key": "formulas",
+      "title": "三、计算公式",
+      "content": "本期审定 = 本期未审数 + 本期调整\n上期审定 = 上期未审数 + 上期调整\n变动分析用于识别其他业务收入的异常增减。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 其他业务收入占比是否异常增大，是否存在将主营收入错分类为其他业务的情形。\n2. 与主营业务收入增长趋势是否匹配。\n3. 出租、销售材料等具体业务应与 D4-33 毛利率分析、D4-34 合同测算相互印证。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "921fb38c01668344461f7b663abe31b90edafa76fb662939152cbaef8762fc2d",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "5adacb955ba7375f2cde5500c1868b7e9f5bb1e718278a7f40e6212f90c09e00"
+  }
+}

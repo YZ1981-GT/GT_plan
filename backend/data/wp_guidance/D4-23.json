@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-23",
+  "title": "D4-23 收入与开具发票金额比较 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "按月比较营业收入账面金额与增值税发票开具金额，验证收入的完整性与准确性，识别账面收入与开票的系统性差异。",
+      "source_refs": []
+    },
+    {
+      "key": "data_sources",
+      "title": "二、数据来源",
+      "content": "主营/其他业务收入取自账面；增值税专票、普票的金额与份数取自开票系统或增值税申报表。按月逐行填列。",
+      "source_refs": []
+    },
+    {
+      "key": "formulas",
+      "title": "三、计算公式",
+      "content": "营业收入合计 = 主营业务收入 + 其他业务收入\n开票金额合计 = 增值税发票金额 + 普通发票金额\n差异 = 营业收入合计 − 开票金额合计（口径差异，如未开票收入、预收开票需说明）",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 收入 > 开票：可能存在未开票收入（须核实是否已确认纳税义务）或提前确认。\n2. 开票 > 收入：可能存在开票未确认收入（预收）或虚开发票。\n3. 差异逐月波动异常：关注收入确认与开票节奏的合理性。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "47ab9c5ce584c8a440dd830f823157d6546ee1ec7bab9464b0b620621145b4ce",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "f45df8a8ffaa6f4fa7972a7512235e72745c4a1ee8c142d902a5bc6bff4d37cf"
+  }
+}

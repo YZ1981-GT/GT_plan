@@ -92,6 +92,11 @@ function emptyAging(segments: AgingSegment[]): AgingData {
   return a
 }
 
+/** BP-7 修复：稳定行身份生成器。 */
+function generateF2RowId(): string {
+  return `f2-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+}
+
 function emptyRow(id: string, segments: AgingSegment[]): BioAssetRow {
   return {
     id,
@@ -149,7 +154,8 @@ export function normalizeBioAssetRow(
   segments: AgingSegment[] = PRESET_SEGMENTS.THREE_YEAR,
 ): BioAssetRow {
   const migrated = migrateLegacy(partial as Record<string, unknown>, segments)
-  const base = { ...emptyRow(partial.id || '1', segments), ...migrated, id: partial.id || '1' }
+  const resolvedId = partial.id || generateF2RowId()
+  const base = { ...emptyRow(resolvedId, segments), ...migrated, id: resolvedId }
   base.aging = migrateAging(base, segments)
   return base
 }
@@ -212,13 +218,13 @@ export function sumBioAssetMovement(rows: Array<Partial<BioAssetRow>>) {
 
 function loadRows(map: Map<string, ChecklistResponse>, segments: AgingSegment[]): BioAssetRow[] {
   const raw = readRowJson(map.get(ROWS_KEY))
-  if (!raw) return [emptyRow('1', segments)]
+  if (!raw) return [emptyRow(generateF2RowId(), segments)]
   try {
     const parsed = JSON.parse(raw) as Partial<BioAssetRow>[]
-    if (!Array.isArray(parsed) || !parsed.length) return [emptyRow('1', segments)]
-    return parsed.map((r, i) => normalizeBioAssetRow({ ...r, id: r.id || String(i + 1) }, segments))
+    if (!Array.isArray(parsed) || !parsed.length) return [emptyRow(generateF2RowId(), segments)]
+    return parsed.map((r) => normalizeBioAssetRow({ ...r, id: r.id || generateF2RowId() }, segments))
   } catch {
-    return [emptyRow('1', segments)]
+    return [emptyRow(generateF2RowId(), segments)]
   }
 }
 

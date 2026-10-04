@@ -216,7 +216,7 @@ class NoteAIAssistantService:
         try:
             from sqlalchemy import select
 
-            from app.models.models import WpIndex
+            from app.models.workpaper_models import WpIndex
 
             result = await self.db.execute(
                 select(WpIndex.parsed_data).where(

@@ -53,7 +53,10 @@ describe('G10-1 审定表 — 三部分结构与勾稽', () => {
 })
 
 describe('G10-2 明细 — 区段 Tab 与合计', () => {
-  it('enrich 对齐 Excel (一)(二)(三) 分解与 roll-forward', () => {
+  // 🔴 C-7（spec g-cycle-single-region-detail-lanes）：列模型改为权威模板 19 列 A..S。
+  //    `currentDecrease` 已删（模板 H 是净额列「增加"+"/减少"—"」）、`closingBalance` 已删
+  //    （它走审定线，而模板 M=K+L 走未审线）、`L=D+I+J` 含利息（原实现漏 J）。
+  it('enrich 按模板六条公式重算（K=C+H / L=D+I+J / M=K+L / O=M+N）', () => {
     const row = enrichG10DetailRow({
       rowId: 't1',
       liabilityName: '短期融资券',
@@ -64,29 +67,42 @@ describe('G10-2 明细 — 区段 Tab 与合计', () => {
       movementInitialAmount: 20,
       movementFvChange: 3,
       interestExpense: 1,
-      currentDecrease: 10,
     }, 1)
     expect(row.liabilityCategory).toBe('指定类')
-    expect(row.openingFairValue).toBe(105)
-    expect(row.openingAdjusted).toBe(105)
-    expect(row.closingInitialAmount).toBe(120)
-    expect(row.closingFvAccum).toBe(8)
-    expect(row.closingFairValue).toBe(128)
-    expect(row.closingBalance).toBe(calcG10DetailClosingBalance(105, 20, 3, 1, 10))
-    expect(row.closingAdjusted).toBe(row.closingBalance)
+    expect(row.openingFairValue).toBe(105)   // E = C + D
+    expect(row.openingAdjusted).toBe(105)    // G = E + F
+    expect(row.closingInitialAmount).toBe(120) // K = C + H（未审线）
+    // 🔴 L = D + I + J = 5 + 3 + 1 = 9（改造前算 D+I=8，漏了计入财务费用的利息）
+    expect(row.closingFvAccum).toBe(9)
+    expect(row.closingFairValue).toBe(129)   // M = K + L
+    expect(row.closingAdjusted).toBe(129)    // O = M + N（N=0）
   })
 
-  it('旧字段迁移：initialAmount/openingBalance/currentIncrease', () => {
+  it('本期变动是净额列：减少填负数直接进 H，不存在 currentDecrease', () => {
+    const row = enrichG10DetailRow({
+      rowId: 'net',
+      openingInitialAmount: 100,
+      movementInitialAmount: -30,
+    }, 1)
+    expect(row.closingInitialAmount).toBe(70)
+    expect(row).not.toHaveProperty('currentDecrease')
+    expect(row).not.toHaveProperty('closingBalance')
+  })
+
+  it('legacy 单值键仍可读入（读完即弃，不回写）', () => {
     const row = enrichG10DetailRow({
       rowId: 'legacy',
       initialAmount: 80,
       openingBalance: 90,
       currentIncrease: 10,
-      currentDecrease: 5,
     }, 1)
     expect(row.openingInitialAmount).toBe(80)
     expect(row.openingFvAccum).toBe(10)
     expect(row.movementInitialAmount).toBe(10)
+    // 🔴 legacy 键不进产出对象（否则回写后又成了第二真源）
+    expect(row).not.toHaveProperty('initialAmount')
+    expect(row).not.toHaveProperty('openingBalance')
+    expect(row).not.toHaveProperty('currentIncrease')
   })
 
   it('合计行累加', () => {
@@ -95,10 +111,28 @@ describe('G10-2 明细 — 区段 Tab 与合计', () => {
     expect(calcSubtotal([a.closingAdjusted, b.closingAdjusted])).toBe(170)
   })
 
-  it('Level3 缺估值方法触发校验', () => {
-    const row = enrichG10DetailRow({ rowId: 'l3', liabilityName: '债券', fairValueLevel: 'Level3' }, 1)
-    const issues = scanG10DetailIntegrity([row])
-    expect(issues.some((i) => i.field === 'valuationMethod')).toBe(true)
+  // 🔴 C-7：「Level3 缺估值方法」随层次列一起迁到 G10-5/G10-6（useG10L3Reconciliation）。
+  //    G10-2 不再有 fairValueLevel/valuationMethod 两列，这条校验在此处必须消失。
+  it('层次与估值方法已不属 G10-2：不再产出 valuationMethod 类校验', () => {
+    const row = enrichG10DetailRow({ rowId: 'l3', liabilityName: '债券' }, 1)
+    expect(row).not.toHaveProperty('fairValueLevel')
+    expect(row).not.toHaveProperty('valuationMethod')
+    expect(scanG10DetailIntegrity([row]).some((i) => i.field === 'valuationMethod')).toBe(false)
+  })
+
+  it('未审线校验：K≠C+H 或 L≠D+I+J 时报出（校验对象是模板列不是 legacy 列）', () => {
+    const good = enrichG10DetailRow({
+      rowId: 'ok',
+      liabilityName: '债券',
+      openingInitialAmount: 100,
+      openingFvAccum: 5,
+      movementInitialAmount: 20,
+      movementFvChange: 3,
+      interestExpense: 1,
+    }, 1)
+    const issues = scanG10DetailIntegrity([good])
+    expect(issues.some((i) => i.field === 'closingInitialAmount')).toBe(false)
+    expect(issues.some((i) => i.field === 'closingFvAccum')).toBe(false)
   })
 })
 

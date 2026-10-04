@@ -1,5 +1,30 @@
-"""模板索引全量投影、原子应用与 finder 缓存生命周期守卫。"""
+"""模板索引全量投影、原子应用与 finder 缓存生命周期守卫。
 
+🔴 **本文件当前有 7 条红，是「实现从未落地」而不是回归 —— 接手前先读这段**（2026-09-30 现算）：
+
+1. **5 条 error**：fixture 里 `monkeypatch.setattr(setup, "SPECIAL_ENTRY_ROLES", {})`
+   抛 `AttributeError`。现读 `backend/scripts/ops/setup_wp_templates_dir.py`（152 行，
+   顶层函数只有 `_force_utf8_console` / `parse_wp_code` / `main`）确认它**没有**本文件
+   断言的那套 API：`SPECIAL_ENTRY_ROLES` / `render_index` / `build_index` /
+   `validate_index`，`main()` 也不收 `argv`（本文件调的是 `setup.main([])`）。
+   本文件由 `d3b3d80d9`（2026-09-14）加入，而该脚本最后一次改动是
+   `3979f46cc`（2026-05-29）—— **测试先于实现入库，实现一直没来**。
+2. **2 条 failure**：`test_finder_role_separation_uses_index_as_single_source`
+   （按 `_index.json` 的 `role` 分离整册/专用子模板）与
+   `test_finder_cache_reloads_same_size_atomic_replace_and_returns_copies`
+   （`_load_index()` 须返回深拷贝、且同字节数原子替换也要重载）——同属上面那套未落地能力。
+
+🔴 **为什么这 7 条以前"看不出来"**：本文件在**模块导入期**用
+`importlib.util.spec_from_file_location` 按路径加载那个脚本，而脚本里原先有一行**模块级**
+`sys.stdout = io.TextIOWrapper(sys.stdout.buffer, ...)`。它接管并（回收时）关掉
+pytest capture 的底层 buffer ⇒ 整个会话崩在 teardown（`ValueError: I/O operation on
+closed file`，报错位置在 `_pytest/capture.py`），**pytest 连一行结论都打不出来**。
+守卫 `tests/scripts/test_script_import_safety.py` 本该拦住这类事，但它只按点号形态
+（`from scripts.x import`）找被 import 的脚本，看不见路径式加载 ⇒ 本文件长期在它视野外。
+2026-09-30 两处都已根因修复（重绑搬进函数 + 守卫补路径式口径），于是这 7 条从
+「静默崩会话」变成「明确报错」。**不要**为了变绿去 skip 或删断言 —— 缺的是实现，
+补实现需要单独立 spec（漂移检测 + 原子 `--apply` + 角色/扩展名槽位保全 + 双向校验）。
+"""
 from __future__ import annotations
 
 import copy

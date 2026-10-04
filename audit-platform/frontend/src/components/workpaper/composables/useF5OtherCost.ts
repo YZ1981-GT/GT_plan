@@ -13,6 +13,11 @@ import {
   calcAdjustedAmount,
   calcChangeAmount,
 } from './useF5CosOfFormulaEngine'
+import {
+  F5_ROW_ID_PREFIX,
+  resolveStableRowId,
+  type RowIdentityMintStats,
+} from './f5RowIdentity'
 import type { ChecklistResponse } from './useF1FormData'
 
 export interface UseF5OtherCostOptions {
@@ -124,12 +129,15 @@ export function defaultF5OtherCostRows(): StoredOtherCostRow[] {
   return [...fixed, ...blanks]
 }
 
-export function migrateF5OtherCostRows(jsonStr: string | null | undefined): StoredOtherCostRow[] {
+export function migrateF5OtherCostRows(
+  jsonStr: string | null | undefined,
+  stats?: RowIdentityMintStats,
+): StoredOtherCostRow[] {
   if (!jsonStr) return []
   try {
     const parsed = JSON.parse(jsonStr)
     if (!Array.isArray(parsed)) return []
-    return parsed.map((r: any, i: number) => {
+    return parsed.map((r: any) => {
       const item = String(r?.item ?? r?.costItem ?? r?.label ?? '')
       const isFixed = Boolean(
         r?.isFixed
@@ -143,7 +151,9 @@ export function migrateF5OtherCostRows(jsonStr: string | null | undefined): Stor
         r?.priorUnaudited ?? r?.priorAmount ?? r?.priorAmt ?? r?.priorUnadjusted,
       )
       return {
-        id: String(r?.id ?? r?.rowId ?? `oc-migrated-${i}`),
+        // 🔴 BP-7 修复（f5-sync-coverage-and-first-canary Task 6）：原为
+        //    `String(r?.id ?? r?.rowId ?? \`oc-migrated-${i}\`)` —— 下标派生身份。
+        id: resolveStableRowId(r, F5_ROW_ID_PREFIX.otherCost, stats),
         item,
         isFixed,
         currentUnaudited,
@@ -248,8 +258,13 @@ export function useF5OtherCost(options: UseF5OtherCostOptions) {
   }
 
   function loadRows(): void {
-    const migrated = migrateF5OtherCostRows(rawJson())
+    // 🔴 BP-7（需求 3.1）：铸了新行身份就立即回写，否则下次载入又换一个新 id。
+    const stats: RowIdentityMintStats = { minted: 0 }
+    const migrated = migrateF5OtherCostRows(rawJson(), stats)
     storedRows.value = migrated.length ? migrated : defaultF5OtherCostRows()
+    if (stats.minted > 0 && migrated.length && !readonly.value) {
+      persist()
+    }
   }
 
   watch(() => rawJson(), (raw) => {

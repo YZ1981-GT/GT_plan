@@ -10,6 +10,7 @@ import {
   calcCheckStats,
   migrateContractCostCheckSheet,
   emptyCheckSample,
+  newContractCostCheckId,
   pruneBlankContractCostCheckSamples,
   type ContractCostCheckSheet,
   type ContractCostCheckSample,
@@ -249,7 +250,7 @@ export function useF2ContractCostCheck(opts: {
 
   function fillFromSampling(vouchers: SampledVoucher[], fillMode: FillMode): void {
     if (readonly.value) return
-    const mapped = vouchers.map((v, i) => mapVoucherToRow(v, `${Date.now()}-${i}`))
+    const mapped = vouchers.map((v) => mapVoucherToRow(v, newContractCostCheckId()))
     if (fillMode === 'replace') {
       sheet.value = { ...sheet.value, samples: mapped }
     } else if (fillMode === 'merge') {

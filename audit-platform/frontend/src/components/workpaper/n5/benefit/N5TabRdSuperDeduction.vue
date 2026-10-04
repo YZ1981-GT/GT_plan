@@ -77,38 +77,38 @@
       <el-table :data="rd.expensedRows.value" border size="small" class="rd-table">
         <el-table-column prop="index" label="序号" width="55" align="center" />
         <el-table-column prop="projectName" label="研发项目名称" min-width="160">
-          <template #default="{ row, $index }">
-            <el-input v-if="!isReadonly" v-model="row.projectName" size="small" @change="() => handleRowUpdate($index, 'projectName', row.projectName)" />
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.projectName" size="small" @change="() => handleRowUpdate(row.rowKey, 'projectName', row.projectName)" />
             <span v-else class="item-name">{{ row.projectName }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="personnelCost" label="人员人工" min-width="100" align="right">
-          <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" v-model="row.personnelCost" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleRowUpdate($index, 'personnelCost', row.personnelCost)" />
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.personnelCost" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleRowUpdate(row.rowKey, 'personnelCost', row.personnelCost)" />
             <span v-else class="cell-value">{{ fmtAmount(row.personnelCost) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="directInput" label="直接投入" min-width="100" align="right">
-          <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" v-model="row.directInput" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleRowUpdate($index, 'directInput', row.directInput)" />
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.directInput" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleRowUpdate(row.rowKey, 'directInput', row.directInput)" />
             <span v-else class="cell-value">{{ fmtAmount(row.directInput) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="depreciation" label="折旧费用" min-width="100" align="right">
-          <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" v-model="row.depreciation" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleRowUpdate($index, 'depreciation', row.depreciation)" />
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.depreciation" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleRowUpdate(row.rowKey, 'depreciation', row.depreciation)" />
             <span v-else class="cell-value">{{ fmtAmount(row.depreciation) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="amortization" label="摊销" min-width="90" align="right">
-          <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" v-model="row.amortization" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleRowUpdate($index, 'amortization', row.amortization)" />
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.amortization" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleRowUpdate(row.rowKey, 'amortization', row.amortization)" />
             <span v-else class="cell-value">{{ fmtAmount(row.amortization) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="otherExpense" label="其他" min-width="90" align="right">
-          <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" v-model="row.otherExpense" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleRowUpdate($index, 'otherExpense', row.otherExpense)" />
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.otherExpense" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleRowUpdate(row.rowKey, 'otherExpense', row.otherExpense)" />
             <span v-else class="cell-value">{{ fmtAmount(row.otherExpense) }}</span>
           </template>
         </el-table-column>
@@ -273,8 +273,9 @@ async function handleRateChange(rate: number) {
   await rd.setSuperRate(rate)
 }
 
-async function handleRowUpdate(index: number, field: string, value: any) {
-  await rd.updateRow(index, field as any, value)
+// 按稳定身份寻址（BP-8）：模板行下标在过滤/分组子表里与全量数组下标不一致
+async function handleRowUpdate(rowKey: string, field: string, value: any) {
+  await rd.updateRow(rowKey, field as any, value)
 }
 
 async function handleAddProject() {

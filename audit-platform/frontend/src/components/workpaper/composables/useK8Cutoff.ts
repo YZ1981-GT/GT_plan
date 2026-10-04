@@ -19,6 +19,7 @@ import { ElMessage } from 'element-plus'
 import { parseNum } from './useK8FormulaEngine'
 import { isCrossPeriod } from './useK8CutoffEngine'
 import { deriveConclusion as canonicalDeriveConclusion } from './cutoffCanonical'
+import { newRowIdentity } from './shared/rowIdentity'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -170,7 +171,7 @@ export function useK8Cutoff(params: UseK8CutoffParams) {
     const amount = parseNum(raw.amount)
     const sourceAmount = parseNum(raw.sourceAmount)
     return {
-      rowKey: raw.rowKey ?? `row-${idx}`,
+      rowKey: raw.rowKey ?? newRowIdentity('row'),
       index: idx + 1,
       voucherNo: raw.voucherNo ?? '',
       bookDate,

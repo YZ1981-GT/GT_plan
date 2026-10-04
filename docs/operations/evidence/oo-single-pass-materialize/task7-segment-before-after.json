@@ -1,0 +1,497 @@
+{
+  "label": "task7-segment-before-after",
+  "captured_at": "2026-09-23T01:39:40.156Z",
+  "spec": "oo-single-pass-materialize-and-room-leave",
+  "task": "7 真库前后对照计时证据",
+  "requirements": [
+    "1.5"
+  ],
+  "scope": {
+    "entry_id": "xlsx/gt-d4-operating-revenue",
+    "binding_count": 39,
+    "substrate_bytes": 236694,
+    "projection_field_count": 218
+  },
+  "protocol": {
+    "rounds": 3,
+    "modes": [
+      "chained",
+      "default"
+    ],
+    "interleaved": true,
+    "same_world_same_projection": true,
+    "harness_prepare_seconds": 4.095,
+    "tracemalloc": false,
+    "structure_fingerprint_cache_cleared_before_each_run": true,
+    "replica_fidelity": {
+      "production_function": "ContentMutationService._stage_cpu_segment_scoped",
+      "timed_steps_found_in_production": [
+        "materialize",
+        "extract",
+        "roundtrip_verify",
+        "unmanaged_verify",
+        "structure_hash"
+      ],
+      "timed_steps_missing_from_production": [],
+      "production_wraps_one_workbook_read_scope": true,
+      "roundtrip_verify_touches_instance_state": false,
+      "excluded_from_total": [
+        "stage_stream / publish_representation（内容寻址落库前的文件 IO，在 CPU 段之后）",
+        "projection artifact 序列化与 publish_projection",
+        "DB 单事务（`_commit_once`）与 outbox",
+        "HTTP / OO 握手 / 前端加载态 —— 用户感知的 ~30s 里含这些",
+        "复用判定（命中时整段压根不跑；本证据量的是复用**落空**那条路径）"
+      ]
+    }
+  },
+  "runs": [
+    {
+      "mode": "chained",
+      "substrate": "world_base_instrumented_template",
+      "spans_seconds": {
+        "materialize": 17.089,
+        "extract": 2.798,
+        "roundtrip_verify": 0.001,
+        "unmanaged_verify": 2.676,
+        "structure_hash": 2.322
+      },
+      "segment_total_seconds": 24.886,
+      "spans_sum_seconds": 24.885,
+      "calls": {
+        "load_workbook": 95,
+        "load_workbook_on_files": 80,
+        "load_workbook_in_memory": 15,
+        "workbook_save": 2,
+        "materialize_trips": 39,
+        "single_pass_trips": 0,
+        "load_workbook_by_site": {
+          "excel_extract.py:3087 _acquire_read_only_workbook": 80,
+          "phase5_transposed_sheet.py:357 resolve_managed_sheet": 12,
+          "excel_structure_fingerprint.py:523 _structure_fingerprint_uncached": 2,
+          "excel_structure_fingerprint.py:589 _read_gt_sync_pairs": 1
+        },
+        "workbook_save_by_site": {
+          "phase5_transposed_sheet.py:423 materialize_transposed_workbook": 2
+        }
+      },
+      "extracted_field_count": 218,
+      "unmanaged_verify": {
+        "reports": 39,
+        "reports_equivalent": 0,
+        "reports_drifted": 39,
+        "last_report_equivalent": false,
+        "last_report_first_difference": "workbook_and_styles: 0c5777024e35… → debbeadb21ba…（before 覆盖 3 项，after 覆盖 3 项）"
+      },
+      "structure_hash": "972c3404dad629b0238f1346c07ee143ebed6fa7c4fda0830b4aa5735fdb5266",
+      "artifact": {
+        "bytes": 246110,
+        "sha256": "caac3f9370bae995ef7cacc9513637a84d7bf2e69ff459628a77b3528dcdd970"
+      },
+      "round": 1,
+      "order": 1
+    },
+    {
+      "mode": "default",
+      "substrate": "world_base_instrumented_template",
+      "spans_seconds": {
+        "materialize": 5.49,
+        "extract": 2.82,
+        "roundtrip_verify": 0.001,
+        "unmanaged_verify": 2.081,
+        "structure_hash": 2.408
+      },
+      "segment_total_seconds": 12.8,
+      "spans_sum_seconds": 12.799,
+      "calls": {
+        "load_workbook": 19,
+        "load_workbook_on_files": 4,
+        "load_workbook_in_memory": 15,
+        "workbook_save": 2,
+        "materialize_trips": 1,
+        "single_pass_trips": 1,
+        "load_workbook_by_site": {
+          "phase5_transposed_sheet.py:357 resolve_managed_sheet": 12,
+          "excel_extract.py:3087 _acquire_read_only_workbook": 4,
+          "excel_structure_fingerprint.py:523 _structure_fingerprint_uncached": 2,
+          "excel_structure_fingerprint.py:589 _read_gt_sync_pairs": 1
+        },
+        "workbook_save_by_site": {
+          "phase5_transposed_sheet.py:423 materialize_transposed_workbook": 2
+        }
+      },
+      "extracted_field_count": 218,
+      "unmanaged_verify": {
+        "reports": 39,
+        "reports_equivalent": 0,
+        "reports_drifted": 39,
+        "last_report_equivalent": false,
+        "last_report_first_difference": "workbook_and_styles: 0c5777024e35… → debbeadb21ba…（before 覆盖 3 项，after 覆盖 3 项）"
+      },
+      "structure_hash": "972c3404dad629b0238f1346c07ee143ebed6fa7c4fda0830b4aa5735fdb5266",
+      "artifact": {
+        "bytes": 246110,
+        "sha256": "b6cd8ce3f3b92f02082e2379e4927fdf0a5f2244ff475bfdb96fc717cf149505"
+      },
+      "round": 1,
+      "order": 2
+    },
+    {
+      "mode": "chained",
+      "substrate": "world_base_instrumented_template",
+      "spans_seconds": {
+        "materialize": 17.51,
+        "extract": 2.8,
+        "roundtrip_verify": 0.001,
+        "unmanaged_verify": 2.137,
+        "structure_hash": 2.342
+      },
+      "segment_total_seconds": 24.791,
+      "spans_sum_seconds": 24.79,
+      "calls": {
+        "load_workbook": 95,
+        "load_workbook_on_files": 80,
+        "load_workbook_in_memory": 15,
+        "workbook_save": 2,
+        "materialize_trips": 39,
+        "single_pass_trips": 0,
+        "load_workbook_by_site": {
+          "excel_extract.py:3087 _acquire_read_only_workbook": 80,
+          "phase5_transposed_sheet.py:357 resolve_managed_sheet": 12,
+          "excel_structure_fingerprint.py:523 _structure_fingerprint_uncached": 2,
+          "excel_structure_fingerprint.py:589 _read_gt_sync_pairs": 1
+        },
+        "workbook_save_by_site": {
+          "phase5_transposed_sheet.py:423 materialize_transposed_workbook": 2
+        }
+      },
+      "extracted_field_count": 218,
+      "unmanaged_verify": {
+        "reports": 39,
+        "reports_equivalent": 0,
+        "reports_drifted": 39,
+        "last_report_equivalent": false,
+        "last_report_first_difference": "workbook_and_styles: 0c5777024e35… → debbeadb21ba…（before 覆盖 3 项，after 覆盖 3 项）"
+      },
+      "structure_hash": "972c3404dad629b0238f1346c07ee143ebed6fa7c4fda0830b4aa5735fdb5266",
+      "artifact": {
+        "bytes": 246110,
+        "sha256": "72814b6d0379089c8395d93081d53e7be92fd1f693d63299e2d0323444a7a252"
+      },
+      "round": 2,
+      "order": 3
+    },
+    {
+      "mode": "default",
+      "substrate": "world_base_instrumented_template",
+      "spans_seconds": {
+        "materialize": 5.418,
+        "extract": 2.72,
+        "roundtrip_verify": 0.001,
+        "unmanaged_verify": 2.131,
+        "structure_hash": 2.405
+      },
+      "segment_total_seconds": 12.675,
+      "spans_sum_seconds": 12.674,
+      "calls": {
+        "load_workbook": 19,
+        "load_workbook_on_files": 4,
+        "load_workbook_in_memory": 15,
+        "workbook_save": 2,
+        "materialize_trips": 1,
+        "single_pass_trips": 1,
+        "load_workbook_by_site": {
+          "phase5_transposed_sheet.py:357 resolve_managed_sheet": 12,
+          "excel_extract.py:3087 _acquire_read_only_workbook": 4,
+          "excel_structure_fingerprint.py:523 _structure_fingerprint_uncached": 2,
+          "excel_structure_fingerprint.py:589 _read_gt_sync_pairs": 1
+        },
+        "workbook_save_by_site": {
+          "phase5_transposed_sheet.py:423 materialize_transposed_workbook": 2
+        }
+      },
+      "extracted_field_count": 218,
+      "unmanaged_verify": {
+        "reports": 39,
+        "reports_equivalent": 0,
+        "reports_drifted": 39,
+        "last_report_equivalent": false,
+        "last_report_first_difference": "workbook_and_styles: 0c5777024e35… → debbeadb21ba…（before 覆盖 3 项，after 覆盖 3 项）"
+      },
+      "structure_hash": "972c3404dad629b0238f1346c07ee143ebed6fa7c4fda0830b4aa5735fdb5266",
+      "artifact": {
+        "bytes": 246110,
+        "sha256": "3dff5f11388d5a6e130f269272cd86a7804a9036bdb1cf8f3b5c620a7e2b66c5"
+      },
+      "round": 2,
+      "order": 4
+    },
+    {
+      "mode": "chained",
+      "substrate": "world_base_instrumented_template",
+      "spans_seconds": {
+        "materialize": 17.127,
+        "extract": 2.931,
+        "roundtrip_verify": 0.001,
+        "unmanaged_verify": 2.17,
+        "structure_hash": 2.382
+      },
+      "segment_total_seconds": 24.611,
+      "spans_sum_seconds": 24.61,
+      "calls": {
+        "load_workbook": 95,
+        "load_workbook_on_files": 80,
+        "load_workbook_in_memory": 15,
+        "workbook_save": 2,
+        "materialize_trips": 39,
+        "single_pass_trips": 0,
+        "load_workbook_by_site": {
+          "excel_extract.py:3087 _acquire_read_only_workbook": 80,
+          "phase5_transposed_sheet.py:357 resolve_managed_sheet": 12,
+          "excel_structure_fingerprint.py:523 _structure_fingerprint_uncached": 2,
+          "excel_structure_fingerprint.py:589 _read_gt_sync_pairs": 1
+        },
+        "workbook_save_by_site": {
+          "phase5_transposed_sheet.py:423 materialize_transposed_workbook": 2
+        }
+      },
+      "extracted_field_count": 218,
+      "unmanaged_verify": {
+        "reports": 39,
+        "reports_equivalent": 0,
+        "reports_drifted": 39,
+        "last_report_equivalent": false,
+        "last_report_first_difference": "workbook_and_styles: 0c5777024e35… → debbeadb21ba…（before 覆盖 3 项，after 覆盖 3 项）"
+      },
+      "structure_hash": "972c3404dad629b0238f1346c07ee143ebed6fa7c4fda0830b4aa5735fdb5266",
+      "artifact": {
+        "bytes": 246110,
+        "sha256": "209956745211085fc8867056e25f7a4def683d7386ef4fe8eee2ac97d2e08b1b"
+      },
+      "round": 3,
+      "order": 5
+    },
+    {
+      "mode": "default",
+      "substrate": "world_base_instrumented_template",
+      "spans_seconds": {
+        "materialize": 5.602,
+        "extract": 2.747,
+        "roundtrip_verify": 0.001,
+        "unmanaged_verify": 2.113,
+        "structure_hash": 2.412
+      },
+      "segment_total_seconds": 12.876,
+      "spans_sum_seconds": 12.875,
+      "calls": {
+        "load_workbook": 19,
+        "load_workbook_on_files": 4,
+        "load_workbook_in_memory": 15,
+        "workbook_save": 2,
+        "materialize_trips": 1,
+        "single_pass_trips": 1,
+        "load_workbook_by_site": {
+          "phase5_transposed_sheet.py:357 resolve_managed_sheet": 12,
+          "excel_extract.py:3087 _acquire_read_only_workbook": 4,
+          "excel_structure_fingerprint.py:523 _structure_fingerprint_uncached": 2,
+          "excel_structure_fingerprint.py:589 _read_gt_sync_pairs": 1
+        },
+        "workbook_save_by_site": {
+          "phase5_transposed_sheet.py:423 materialize_transposed_workbook": 2
+        }
+      },
+      "extracted_field_count": 218,
+      "unmanaged_verify": {
+        "reports": 39,
+        "reports_equivalent": 0,
+        "reports_drifted": 39,
+        "last_report_equivalent": false,
+        "last_report_first_difference": "workbook_and_styles: 0c5777024e35… → debbeadb21ba…（before 覆盖 3 项，after 覆盖 3 项）"
+      },
+      "structure_hash": "972c3404dad629b0238f1346c07ee143ebed6fa7c4fda0830b4aa5735fdb5266",
+      "artifact": {
+        "bytes": 246110,
+        "sha256": "b882cad7adf776c9afe8a9e7980ffcb82111b114767b1cb8b71939d54b2e988f"
+      },
+      "round": 3,
+      "order": 6
+    }
+  ],
+  "steady_state_probe": {
+    "mode": "default",
+    "substrate": "previous_generation_artifact",
+    "spans_seconds": {
+      "materialize": 5.435,
+      "extract": 2.785,
+      "roundtrip_verify": 0.001,
+      "unmanaged_verify": 2.667,
+      "structure_hash": 1.902
+    },
+    "segment_total_seconds": 12.79,
+    "spans_sum_seconds": 12.789,
+    "calls": {
+      "load_workbook": 18,
+      "load_workbook_on_files": 4,
+      "load_workbook_in_memory": 14,
+      "workbook_save": 2,
+      "materialize_trips": 1,
+      "single_pass_trips": 1,
+      "load_workbook_by_site": {
+        "phase5_transposed_sheet.py:357 resolve_managed_sheet": 12,
+        "excel_extract.py:3087 _acquire_read_only_workbook": 4,
+        "excel_structure_fingerprint.py:523 _structure_fingerprint_uncached": 1,
+        "excel_structure_fingerprint.py:589 _read_gt_sync_pairs": 1
+      },
+      "workbook_save_by_site": {
+        "phase5_transposed_sheet.py:423 materialize_transposed_workbook": 2
+      }
+    },
+    "extracted_field_count": 218,
+    "unmanaged_verify": {
+      "reports": 39,
+      "reports_equivalent": 39,
+      "reports_drifted": 0,
+      "last_report_equivalent": true,
+      "last_report_first_difference": null
+    },
+    "structure_hash": "972c3404dad629b0238f1346c07ee143ebed6fa7c4fda0830b4aa5735fdb5266",
+    "artifact": {
+      "bytes": 246110,
+      "sha256": "96af1266e98f37202cb8971c17b84e10fc6e562151999fd74728c1d0cb333fba"
+    },
+    "question": "正常 runs 的 unmanaged drift 是否由「模板 → 第一代产物」造成",
+    "answer": "是：第二代 substrate 上 verify 全部等价"
+  },
+  "summary": {
+    "chained": {
+      "materialize": {
+        "n": 3,
+        "min": 17.089,
+        "median": 17.127,
+        "max": 17.51
+      },
+      "extract": {
+        "n": 3,
+        "min": 2.798,
+        "median": 2.8,
+        "max": 2.931
+      },
+      "roundtrip_verify": {
+        "n": 3,
+        "min": 0.001,
+        "median": 0.001,
+        "max": 0.001
+      },
+      "unmanaged_verify": {
+        "n": 3,
+        "min": 2.137,
+        "median": 2.17,
+        "max": 2.676
+      },
+      "structure_hash": {
+        "n": 3,
+        "min": 2.322,
+        "median": 2.342,
+        "max": 2.382
+      },
+      "segment_total": {
+        "n": 3,
+        "min": 24.611,
+        "median": 24.791,
+        "max": 24.886
+      }
+    },
+    "default": {
+      "materialize": {
+        "n": 3,
+        "min": 5.418,
+        "median": 5.49,
+        "max": 5.602
+      },
+      "extract": {
+        "n": 3,
+        "min": 2.72,
+        "median": 2.747,
+        "max": 2.82
+      },
+      "roundtrip_verify": {
+        "n": 3,
+        "min": 0.001,
+        "median": 0.001,
+        "max": 0.001
+      },
+      "unmanaged_verify": {
+        "n": 3,
+        "min": 2.081,
+        "median": 2.113,
+        "max": 2.131
+      },
+      "structure_hash": {
+        "n": 3,
+        "min": 2.405,
+        "median": 2.408,
+        "max": 2.412
+      },
+      "segment_total": {
+        "n": 3,
+        "min": 12.675,
+        "median": 12.8,
+        "max": 12.876
+      }
+    }
+  },
+  "verdict": {
+    "requirement": "1.5",
+    "status": "partial",
+    "materialize_span": {
+      "span": "materialize",
+      "target_seconds": 10.0,
+      "before_chained": {
+        "n": 3,
+        "min": 17.089,
+        "median": 17.127,
+        "max": 17.51
+      },
+      "after_single_pass": {
+        "n": 3,
+        "min": 5.418,
+        "median": 5.49,
+        "max": 5.602
+      },
+      "met_on_worst_run": true,
+      "met_on_median": true,
+      "speedup_on_median": 3.12
+    },
+    "full_cpu_segment": {
+      "span": "segment_total",
+      "target_seconds": 10.0,
+      "before_chained": {
+        "n": 3,
+        "min": 24.611,
+        "median": 24.791,
+        "max": 24.886
+      },
+      "after_single_pass": {
+        "n": 3,
+        "min": 12.675,
+        "median": 12.8,
+        "max": 12.876
+      },
+      "met_on_worst_run": false,
+      "met_on_median": false,
+      "speedup_on_median": 1.94
+    },
+    "remaining_median_seconds_outside_materialize": {
+      "extract": 2.747,
+      "roundtrip_verify": 0.001,
+      "unmanaged_verify": 2.113,
+      "structure_hash": 2.408
+    },
+    "remaining_median_seconds_total": 7.269,
+    "next_lever": "任务 8/9（materialize/extract/verify 共用一个 workbook_read_scope，全流程对同一份字节只解析一次）—— 本证据里 materialize 之外那几段尚未优化"
+  },
+  "environment": {
+    "python": "3.12.8",
+    "platform": "Windows-10-10.0.19045-SP0",
+    "openpyxl": "3.1.5"
+  }
+}

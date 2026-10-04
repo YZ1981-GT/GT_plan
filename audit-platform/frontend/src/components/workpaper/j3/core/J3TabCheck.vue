@@ -15,6 +15,7 @@ import http from '@/utils/http'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtThTip from '../../GtThTip.vue'
 import J3VariationDialog, { type VariationRow } from './J3VariationDialog.vue'
+import { mintJRowId, withJRowIds } from '@/components/workpaper/composables/jRowIdentity'
 
 interface RespItem { item_id: string; conclusion: string | null; remark: string | null }
 const props = defineProps<{
@@ -34,7 +35,7 @@ function n(v: unknown): number { const x = typeof v === 'number' ? v : parseFloa
 function fmt(v: number | null | undefined): string { if (v === null || v === undefined || v === 0) return '-'; return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
 // ── 1. 增减变动准确性测算表（19 列，引导式录入） ──────────────────────────────
-let vSeq = 1
+// ⚠️ 原 `let vSeq = 1` 已移除（Task 12）：身份改由 `mintJRowId(...)` 现算，不留第二真源。
 const variationRows = reactive<VariationRow[]>([])
 function diffSalary(r: VariationRow) { return n(r.calcSalary) - n(r.bookSalary) }
 function diffExpense(r: VariationRow) { return n(r.calcExpense) - n(r.bookExpense) }
@@ -58,7 +59,7 @@ function openEditVar(row: VariationRow) { if (isReadonly.value) return; editingV
 function onVarSave(row: VariationRow) {
   const idx = variationRows.findIndex(r => r.id === row.id)
   if (idx >= 0) variationRows.splice(idx, 1, { ...row })
-  else variationRows.push({ ...row, id: vSeq++ })
+  else variationRows.push({ ...row, id: mintJRowId(variationRows.map(r => r.id)) })
   scheduleSave()
 }
 function removeVar(id: number) {
@@ -72,11 +73,11 @@ interface VoucherRow {
   id: number; date: string; voucherType: string; voucherNo: string; businessContent: string
   detailAccount: string; counterAccount: string; debit: number; credit: number; attachment: string; conclusion: string
 }
-let vcSeq = 1
+// ⚠️ 原 `let vcSeq = 1` 已移除（Task 12）：同上。
 const voucherRows = reactive<VoucherRow[]>([])
 function addVoucher() {
   if (isReadonly.value) return
-  voucherRows.push({ id: vcSeq++, date: '', voucherType: '', voucherNo: '', businessContent: '', detailAccount: '', counterAccount: '', debit: 0, credit: 0, attachment: '', conclusion: '' })
+  voucherRows.push({ id: mintJRowId(voucherRows.map(r => r.id)), date: '', voucherType: '', voucherNo: '', businessContent: '', detailAccount: '', counterAccount: '', debit: 0, credit: 0, attachment: '', conclusion: '' })
   scheduleSave()
 }
 function removeVoucher(id: number) {
@@ -99,10 +100,14 @@ const aiLoading = ref('')
 // ── 加载 / 保存 ───────────────────────────────────────────────────────────────
 function parseArr<T>(id: string): T[] | null { const raw = props.allResponses?.get(id)?.remark; if (!raw) return null; try { const p = JSON.parse(raw); return Array.isArray(p) ? p : null } catch { return null } }
 function load() {
+  // 🔴 family_b 修复 ×2（spec j2-j3-non-entry-hosts-and-orphan-cleanup Task 12）：
+  //    只改**回落分支** —— 上游有 id 就原样保留（grandfather），缺了才铸安全 number 身份。
+  //    🔴 真库实证 `J3-2-variation` 288 B 的 `"id":1` 正是这条回落产生并已落库的
+  //    ⇒ 绝不能重写它（重写 = 换身份），所以 `withJRowIds` 对已有 id 一律放行。
   const v = parseArr<VariationRow>(KEY.variation)
-  if (v) { variationRows.splice(0, variationRows.length, ...v.map((r, i) => ({ ...r, id: r.id ?? i + 1 }))); vSeq = Math.max(0, ...variationRows.map(r => r.id)) + 1 }
+  if (v) { variationRows.splice(0, variationRows.length, ...(withJRowIds(v) as VariationRow[])) }
   const vc = parseArr<VoucherRow>(KEY.vouchers)
-  if (vc) { voucherRows.splice(0, voucherRows.length, ...vc.map((r, i) => ({ ...r, id: r.id ?? i + 1 }))); vcSeq = Math.max(0, ...voucherRows.map(r => r.id)) + 1 }
+  if (vc) { voucherRows.splice(0, voucherRows.length, ...(withJRowIds(vc) as VoucherRow[])) }
   const nt = props.allResponses?.get(KEY.note)?.remark; if (nt) auditNote.value = nt
   const cc = props.allResponses?.get(KEY.conclusion)?.remark; if (cc) auditConclusion.value = cc
 }

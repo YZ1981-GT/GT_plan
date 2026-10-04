@@ -79,6 +79,11 @@ function labelsToCustomSegments(labels: string[]): AgingSegment[] {
   }))
 }
 
+/** BP-7 修复：稳定行身份生成器。 */
+function generateF2RowId(): string {
+  return `f2-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+}
+
 function emptyRow(id: string, segments: AgingSegment[]): F2OutsourcedRow {
   return {
     id,
@@ -154,11 +159,11 @@ function enrichRow(r: F2OutsourcedRow, segments: AgingSegment[]): F2OutsourcedRo
 
 function loadRows(map: Map<string, ChecklistResponse>, segments: AgingSegment[]): F2OutsourcedRow[] {
   const raw = readRowJson(map.get(DATA_KEY))
-  if (!raw) return [enrichRow(emptyRow('1', segments), segments)]
+  if (!raw) return [enrichRow(emptyRow(generateF2RowId(), segments), segments)]
   try {
     const parsed = JSON.parse(raw) as Partial<F2OutsourcedRow>[]
     if (!Array.isArray(parsed) || !parsed.length) {
-      return [enrichRow(emptyRow('1', segments), segments)]
+      return [enrichRow(emptyRow(generateF2RowId(), segments), segments)]
     }
     return parsed.map((r, i) => {
       const aging = migrateAging(r, segments)
@@ -173,7 +178,7 @@ function loadRows(map: Map<string, ChecklistResponse>, segments: AgingSegment[])
       const amount = amountHint || (processingCostHint && !(fee || freight || tax) ? processingCostHint : amountHint)
       return enrichRow(
         {
-          ...emptyRow(String(r.id || i + 1), segments),
+          ...emptyRow(r.id || generateF2RowId(), segments),
           ...r,
           processorName: String(r.processorName || ''),
           contractNo: String(r.contractNo || ''),
@@ -189,7 +194,7 @@ function loadRows(map: Map<string, ChecklistResponse>, segments: AgingSegment[])
       )
     })
   } catch {
-    return [enrichRow(emptyRow('1', segments), segments)]
+    return [enrichRow(emptyRow(generateF2RowId(), segments), segments)]
   }
 }
 

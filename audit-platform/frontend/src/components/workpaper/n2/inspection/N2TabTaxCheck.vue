@@ -253,7 +253,7 @@
     <el-dialog v-model="samplingVisible" title="抽凭引擎 — 应交税费(2221)" width="90%" top="5vh" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="samplingVisible"
-        account-code="2221"
+        :account-code="samplingAccountCode"
         phase="final"
         :workpaper-id="props.wpId"
         :project-id="props.projectId"
@@ -277,6 +277,17 @@ import { ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
 import { useN2FormData } from '../../composables/useN2FormData'
+
+/**
+ * 抽凭科目码取自单一真源 `n2AccountScope`（N2 应交税费）。原为模板内字面量；
+ * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
+ * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ */
+import { n2QueryCodes } from '../../composables/n2AccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = n2QueryCodes().join(',')
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 

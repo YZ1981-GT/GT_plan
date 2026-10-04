@@ -106,6 +106,11 @@ const LEGACY_AGING = [
   { flat: 'agingGt3', key: 'over3' },
 ] as const
 
+/** BP-7 修复：稳定行身份生成器（同 F1 generateRowId 写法）。 */
+function generateF2RowId(): string {
+  return `f2-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+}
+
 function dataKey(sheetCode: string): string {
   return `${sheetCode}-rows`
 }
@@ -222,17 +227,17 @@ function loadRows(
   segments: AgingSegment[],
 ): F2DetailRow[] {
   const raw = readRowJson(map.get(dataKey(sheetCode)))
-  if (!raw) return [enrichRow(emptyRow('1', segments), hasQuantity, segments)]
+  if (!raw) return [enrichRow(emptyRow(generateF2RowId(), segments), hasQuantity, segments)]
   try {
     const parsed = JSON.parse(raw) as Partial<F2DetailRow>[]
     if (!Array.isArray(parsed) || !parsed.length) {
-      return [enrichRow(emptyRow('1', segments), hasQuantity, segments)]
+      return [enrichRow(emptyRow(generateF2RowId(), segments), hasQuantity, segments)]
     }
     return parsed.map((r, i) => {
       const aging = migrateAging(r, segments)
       return enrichRow(
         {
-          ...emptyRow(String(r.id || i + 1), segments),
+          ...emptyRow(r.id || generateF2RowId(), segments),
           ...r,
           itemCode: String(r.itemCode || ''),
           supplier: String(r.supplier || r.itemCode || ''),
@@ -254,7 +259,7 @@ function loadRows(
       )
     })
   } catch {
-    return [enrichRow(emptyRow('1', segments), hasQuantity, segments)]
+    return [enrichRow(emptyRow(generateF2RowId(), segments), hasQuantity, segments)]
   }
 }
 

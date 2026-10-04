@@ -1289,6 +1289,56 @@ class TestAuthorityLogicalSuffixMatchesProviders:
             f"只核对了 {len(checked)} 个 provider 的 authority logical_id 后缀，分母过小"
         )
 
+    # ═══ 🔴 发布编排欠账清单的反向自检（2026-09-27 补）═══
+    #
+    # `_PROVIDERS_WITHOUT_PUBLISH_ORCHESTRATION` 让「无 publish_definitions 的 provider」
+    # 不打红。这三条防止那张清单变成万能挡箭牌。
+
+    def test_debt_list_entries_are_all_in_the_provider_whitelist(self) -> None:
+        """清单里不得有白名单之外的条目（否则是拼写错或指向已删模块的僵尸登记）。"""
+        from app.services.workpaper_sync.adapters import registry as registry_module
+
+        debt = R._PROVIDERS_WITHOUT_PUBLISH_ORCHESTRATION
+        extra = sorted(debt - registry_module._ALLOWED_PROVIDER_MODULES)
+        assert not extra, (
+            f"欠账清单里这些 provider 不在白名单 `_ALLOWED_PROVIDER_MODULES` 里：{extra} "
+            "—— 要么拼错了模块名，要么模块已删而登记没清"
+        )
+
+    def test_debt_list_does_not_cover_providers_that_do_have_orchestration(self) -> None:
+        """已实现编排的 provider **不得**同时出现在欠账清单里（重复登记会掩盖回退）。
+
+        🔴 若某 provider 既有 `publish_definitions()` 又被登记为欠账，那么将来有人
+        删掉它的编排函数时，守卫会因为清单里有它而**静默放行** —— 这正是清单要防的事。
+        """
+        checked = set(R.assert_authority_logical_suffix_matches_providers())
+        overlap = sorted(checked & R._PROVIDERS_WITHOUT_PUBLISH_ORCHESTRATION)
+        assert not overlap, (
+            f"这些 provider 已有 authority model 发布编排却仍登记在欠账清单里：{overlap} "
+            "—— 请从 `_PROVIDERS_WITHOUT_PUBLISH_ORCHESTRATION` 移除，"
+            "否则删掉它们的编排不会被发现"
+        )
+
+    def test_whitelist_is_partitioned_by_orchestration_status(self) -> None:
+        """白名单 = 已核对编排的 ∪ 已登记欠账的，两者无交集、无遗漏。
+
+        🔴 这条把「每个白名单 provider 都有明确归属」变成可执行判据：
+        新增 provider 既不写编排、也不登记欠账时，它落在两个集合之外 ⇒ 本条打红
+        （`assert_authority_logical_suffix_matches_providers()` 那边也会抛）。
+        """
+        from app.services.workpaper_sync.adapters import registry as registry_module
+
+        whitelist = set(registry_module._ALLOWED_PROVIDER_MODULES)
+        checked = set(R.assert_authority_logical_suffix_matches_providers())
+        debt = set(R._PROVIDERS_WITHOUT_PUBLISH_ORCHESTRATION)
+        unaccounted = sorted(whitelist - checked - debt)
+        assert not unaccounted, (
+            f"这些白名单 provider 既无发布编排也未登记欠账：{unaccounted}"
+        )
+        assert checked | debt == whitelist, (
+            f"两集合并起来 {len(checked | debt)} ≠ 白名单 {len(whitelist)}"
+        )
+
     def test_logical_id_is_derived_not_hardcoded(self) -> None:
         """`authority_model_logical_id` 由 contract_id 派生。"""
         assert (

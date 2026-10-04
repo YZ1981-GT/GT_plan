@@ -228,16 +228,124 @@ def _merge_override(base: dict[str, Any], override: dict[str, Any]) -> dict[str,
     return result
 
 
+#: 组内多组件时，entry 的默认值取谁 —— legacy 组件排在同步载体之前。
+#:
+#: 🔴 **单一真源在 `entry_source_facts.COMPONENT_PRECEDENCE`**，这里只是引用。
+#: 不在两处各写一份：`check_workpaper_sync_closure.py` 与 task73 交叉规则也要用它，
+#: 两份定义一旦漂移，不同消费方会对同一 entry 得出不同的组件级事实。
+#:
+#: 顺序的目的是**零 churn**，不是「legacy 更重要」：45 个「既挂 legacy 又挂
+#: WorkpaperSyncEditorHost」的宿主，其 entry 取值因此逐字不变。若反过来让同步载体优先，
+#: 45 条 entry 的 capability / html_store / canonical_resolver 会一次性全变 —— 那等于把
+#: 「修发现契约」和「重新裁决 45 条 entry 的能力」捆在一起做，任一处出错都无法归因。
+#: 能力裁决属各 lane 的 overlay override，不属本处。
+#: spec: sync-editor-host-discovery-contract-closure · Requirement 3.3
+_COMPONENT_PRECEDENCE: tuple[str, ...] = _facts.COMPONENT_PRECEDENCE
+
+
+def _primary_component(group: list[dict[str, Any]]) -> str:
+    """组的主组件：按 `_COMPONENT_PRECEDENCE` 取最高者。"""
+    present = {str(item.get("component")) for item in group}
+    unknown = sorted(present - set(_COMPONENT_PRECEDENCE))
+    if unknown:
+        raise ManifestGenerationError(
+            f"unknown mount component(s) {unknown}; add them to _COMPONENT_PRECEDENCE "
+            "with a reviewed position (Requirement 3.3)"
+        )
+    for component in _COMPONENT_PRECEDENCE:
+        if component in present:
+            return component
+    raise ManifestGenerationError("group has no component")
+
+
+def _resolve_deferred_document_types(
+    discovery: dict[str, Any], rules: list[dict[str, Any]]
+) -> Counter[int]:
+    """L3：给发现器未能定文档类型的挂点套用 overlay 的 reviewed 规则。
+
+    发现器已做 L1（同文件兄弟挂点）与 L2（模板里的 `entry-id` 静态字面量）。
+    到这里仍为空的挂点必须被 `sync_host_entry_rules` 覆盖，否则 fail closed ——
+    **没有第四层兜底**（默认 'xlsx' 会让第一个 docx 迁移宿主静默落错）。
+
+    spec: sync-editor-host-discovery-contract-closure · Requirement 2.3
+    """
+    matched: Counter[int] = Counter()
+    for fact in [*discovery["mounts"], *discovery["dispatchers"]]:
+        # 🔴 幂等：本函数**原地**补齐 discovery 的 documentType。若只跳过「已有
+        # documentType」的挂点，同一个 discovery 对象第二次 build 时规则会零匹配 ⇒
+        # stale-rule 门误报（实测被 task73 的「翻转每个 capability 后重建」判据咬出来）。
+        # 故把自己填过的（`documentTypeSource == "overlay_rule"`）也重新走一遍并计数。
+        if fact.get("documentType") and fact.get("documentTypeSource") != "overlay_rule":
+            continue
+        file = str(fact.get("file"))
+        component = str(fact.get("component"))
+        hits = [
+            (index, rule)
+            for index, rule in enumerate(rules)
+            if _matches(rule, file=file, component=component)
+        ]
+        if len(hits) > 1:
+            raise ManifestGenerationError(
+                f"sync_host_entry_rules overlap for {file} [{component}]: "
+                f"{[rule.get('file_glob') for _, rule in hits]}"
+            )
+        if not hits:
+            raise ManifestGenerationError(
+                f"sync host mount has no resolvable document type: {file} [{component}]; "
+                "the discoverer found neither a sibling mount (L1) nor a single static "
+                "entry-id literal (L2), so a reviewed `sync_host_entry_rules` entry is "
+                "required (Requirement 2.3). Refusing to guess a default."
+            )
+        index, rule = hits[0]
+        declared = str(rule.get("entry_id") or "")
+        document_type = declared.split("/", 1)[0] if "/" in declared else ""
+        if document_type not in {"xlsx", "docx"}:
+            raise ManifestGenerationError(
+                f"sync_host_entry_rules[{index}].entry_id must look like '{{xlsx|docx}}/...', "
+                f"got {declared!r}"
+            )
+        if not str(rule.get("reason") or ""):
+            raise ManifestGenerationError(
+                f"sync_host_entry_rules[{index}] needs a reason (reviewed adjudication)"
+            )
+        fact["documentType"] = document_type
+        fact["documentTypeSource"] = "overlay_rule"
+        fact["entryIdDeclaration"] = declared
+        matched[index] += 1
+    return matched
+
+
 def _group_source_facts(discovery: dict[str, Any]) -> list[list[dict[str, Any]]]:
+    """按 (宿主文件, 文档类型) 分组，组内按组件优先级 + 行号排序。
+
+    🔴 分组键原为 `(file, component)`。换成 `(file, document_type)` 的理由：
+    `_entry_id(document_type, source_file)` **不含 component**，所以同一文件的两个组件
+    会产出同一个 entry_id ⇒ `stable entry_id collision`。而同一宿主同一文档类型本来就
+    **应当**是同一条 entry（entry 的身份是「哪份底稿」，不是「用哪个组件渲染」）。
+    现算前置确认：没有任何宿主同时挂 xlsx 与 docx 的 legacy 组件 ⇒ 换键不并掉现有 entry。
+    spec: sync-editor-host-discovery-contract-closure · Requirement 3.1
+    """
     groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for fact in [*discovery["mounts"], *discovery["dispatchers"]]:
         file = fact.get("file")
         component = fact.get("component")
+        document_type = fact.get("documentType")
         if not isinstance(file, str) or not isinstance(component, str):
             raise ManifestGenerationError("every source fact needs file and component")
-        groups[(file, component)].append(fact)
+        if not isinstance(document_type, str) or not document_type:
+            raise ManifestGenerationError(
+                f"source fact has no document type after resolution: {file} [{component}]"
+            )
+        groups[(file, document_type)].append(fact)
     return [
-        sorted(items, key=lambda item: (item.get("sourceSpan", {}).get("startLine", 0), item["mountId"]))
+        sorted(
+            items,
+            key=lambda item: (
+                _COMPONENT_PRECEDENCE.index(str(item.get("component"))),
+                item.get("sourceSpan", {}).get("startLine", 0),
+                item["mountId"],
+            ),
+        )
         for _, items in sorted(groups.items())
     ]
 
@@ -319,13 +427,22 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
         if not isinstance(value, list) or any(not isinstance(item, dict) for item in value):
             raise ManifestGenerationError(f"overlay.{name} must be an array of objects")
 
+    # L3：给发现器未定文档类型的同步载体挂点套 reviewed 规则（无规则则 fail closed）
+    sync_host_entry_rules = overlay.get("sync_host_entry_rules") or []
+    if not isinstance(sync_host_entry_rules, list) or any(
+        not isinstance(item, dict) for item in sync_host_entry_rules
+    ):
+        raise ManifestGenerationError("overlay.sync_host_entry_rules must be an array of objects")
+    sync_rule_hits = _resolve_deferred_document_types(discovery, sync_host_entry_rules)
+
     entries: list[dict[str, Any]] = []
     matched_rule_ids: Counter[tuple[str, int]] = Counter()
     seen_entry_ids: set[str] = set()
     used_expectations: dict[str, dict[str, set[str]]] = {}
     for group in _group_source_facts(discovery):
         source_file = group[0]["file"]
-        component = group[0]["component"]
+        component = _primary_component(group)
+        mount_components = sorted({str(item.get("component")) for item in group})
         document_types = {item.get("documentType") for item in group}
         if len(document_types) != 1 or document_types.pop() not in {"xlsx", "docx"}:
             raise ManifestGenerationError(f"inconsistent document type for {source_file} [{component}]")
@@ -363,6 +480,38 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
 
         independent = True
         parent_entry_id = None
+        # 同步载体挂点自带的身份声明（L2 的模板字面量 / L3 的 reviewed 规则）。
+        # 声明值 != 自身路径派生值 ⇒ 该宿主转发父级身份 = parent_duplicate。
+        # 🔴 复用既有机制，不新造 migration_state —— 被删掉的那条
+        # `d4/**` × GtOnlyOfficeSheet parent_rule 说的就是同一件事。
+        # spec: sync-editor-host-discovery-contract-closure · Requirement 3.6
+        declarations = sorted({
+            str(item.get("entryIdDeclaration"))
+            for item in group
+            if item.get("entryIdDeclaration")
+        })
+        if len(declarations) > 1:
+            raise ManifestGenerationError(
+                f"entry {entry_id}: conflicting sync host identity declarations {declarations}"
+            )
+        declared_parent = (
+            declarations[0] if declarations and declarations[0] != entry_id else None
+        )
+        if declared_parent and parent_rule:
+            raise ManifestGenerationError(
+                f"entry {entry_id}: both a reviewed parent_rule and a sync host identity "
+                f"declaration ({declared_parent}) claim the parent relation; "
+                "exactly one source must own it"
+            )
+        if declared_parent:
+            independent = False
+            parent_entry_id = declared_parent
+            value["adapter_id"] = None
+            value["migration_state"] = "parent_duplicate"
+            value.setdefault("evidence", {})["parent_reason"] = (
+                "sync host declares the parent entry identity "
+                f"({group[0].get('documentTypeSource')})"
+            )
         if parent_rule:
             index = parent_rules.index(parent_rule)
             matched_rule_ids[("parent_rules", index)] += 1
@@ -395,6 +544,11 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
             "parent_entry_id": parent_entry_id,
             "wp_match": _source_match(group, component),
             "document_type": document_type,
+            # 该 entry 实际出现过的组件集合 + 是否已挂真双向载体。
+            # 🔴 这两个字段让「该宿主已接同步载体」首次成为清册里的可查事实 ——
+            # 而「它此前完全不可见」正是本 spec 要修的缺陷本体。
+            "mount_components": mount_components,
+            "sync_editor_host_mounted": "WorkpaperSyncEditorHost" in mount_components,
             "html_store": value.get("html_store"),
             "canonical_resolver": value.get("canonical_resolver"),
             "adapter_id": value.get("adapter_id"),
@@ -411,6 +565,7 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
                 host_path=source_file,
                 document_type=document_type,
                 mounts=group,
+                primary_component=component,
             )
             derived = _facts.derive_entry_profile(host_facts)
         except _facts.EntrySourceFactError as exc:
@@ -440,10 +595,15 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
             raise ManifestGenerationError(f"entry {entry_id} misses fields: {sorted(missing)}")
         entries.append(entry)
 
+    # `sync_host_entry_rules` 的命中数在 L3 解析阶段就记下了（它发生在分组之前）
+    for index in range(len(sync_host_entry_rules)):
+        matched_rule_ids[("sync_host_entry_rules", index)] += sync_rule_hits[index]
+
     for section_name, rules in (
         ("parent_rules", parent_rules),
         ("unreachable_rules", unreachable_rules),
         ("overrides", overrides),
+        ("sync_host_entry_rules", sync_host_entry_rules),
     ):
         stale = [
             rule.get("file_glob")

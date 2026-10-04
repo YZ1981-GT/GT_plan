@@ -1,11 +1,17 @@
 <template>
   <div id="app">
-    <router-view />
+    <!-- Element Plus 内置文案（空表格、分页、日期面板、下拉无匹配等）统一走中文语言包；
+         未配置时默认英文（空表格显示「No Data」）。ElMessageBox 等命令式组件经全局配置同样生效。 -->
+    <ElConfigProvider :locale="zhCn">
+      <router-view />
+    </ElConfigProvider>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { ElConfigProvider } from 'element-plus'
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { useAuthStore } from '@/stores/auth'
 import { useDictStore } from '@/stores/dict'
 

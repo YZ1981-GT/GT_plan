@@ -1,0 +1,267 @@
+{
+  "contract_id": "g2.interest_receivable_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "83bbda14a0359c80716f98fb88c53c79f723d4a3b3197958d862315ac5fcf826",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-g2-interest-receivable",
+    "html_store": {
+      "item_ids": [
+        "G2-2-detail-rows"
+      ],
+      "note": "G2 应收利息的结构化 Tab 行数据存成 checklist_responses 的 **remark** JSON 数组（`conclusion` 是字面 null 占位 —— FD-1 的 null 占位子形态，全 slice 仅 G2 一条）。本契约按 stable field + 行身份 `id` 拆开。🔴 判 payload mode 时必须先剔除字面 null 占位再判，否则会被误判成 dual_write。",
+      "null_placeholder_column": "conclusion",
+      "payload_column": "remark",
+      "payload_column_mode": "remark_only",
+      "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG2Detail.ts —— 写入点为 { item_id, conclusion: null, remark: JSON.stringify(rows) }",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "phase5_interest_receivable",
+    "reviewed_basis": "openpyxl 逐格实测 G/G2 应收利息.xlsx 的 `明细表G2-2`（单级表头 R9 / 数据 R10-15 / footer R16 合计 / 公式列 E·H·J 共 18 格 / 有效内容列 13 即 A-M、N·O·P 全空 / 0 个 definedName / 数据行恰好 E·H·J 三列 locked） + 前端 `useG2Detail.ts` 按值 grep（STORAGE_KEY:122 / generateId:145 / InterestDetailRow 字段键 / 写入点的 conclusion:null 占位）"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "明细表G2-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "g202-managed",
+      "tables": [
+        {
+          "anchor": "A9",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "invest_type",
+              "header_source_ref": "源xlsx!明细表G2-2!A9",
+              "header_text": "投资种类",
+              "json_pointer": "/rows/{row_uuid}/investType",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G2-2!A10",
+              "stable_field_key": "interest_detail_rows/{row_uuid}/invest_type",
+              "store_item_id": "G2-2-detail-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "invest_target",
+              "header_source_ref": "源xlsx!明细表G2-2!B9",
+              "header_text": "投资项目",
+              "json_pointer": "/rows/{row_uuid}/investTarget",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G2-2!B10",
+              "stable_field_key": "interest_detail_rows/{row_uuid}/invest_target",
+              "store_item_id": "G2-2-detail-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "opening_unadjusted",
+              "header_source_ref": "源xlsx!明细表G2-2!C9",
+              "header_text": "期初余额",
+              "json_pointer": "/rows/{row_uuid}/openingUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G2-2!C10",
+              "stable_field_key": "interest_detail_rows/{row_uuid}/opening_unadjusted",
+              "store_item_id": "G2-2-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "opening_adjustment",
+              "header_source_ref": "源xlsx!明细表G2-2!D9",
+              "header_text": "期初调整数",
+              "json_pointer": "/rows/{row_uuid}/openingAdjustment",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G2-2!D10",
+              "stable_field_key": "interest_detail_rows/{row_uuid}/opening_adjustment",
+              "store_item_id": "G2-2-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "opening_audited",
+              "header_source_ref": "源xlsx!明细表G2-2!E9",
+              "header_text": "期初余额审定数",
+              "json_pointer": "/rows/{row_uuid}/openingAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表G2-2!E10",
+              "stable_field_key": "interest_detail_rows/{row_uuid}/opening_audited",
+              "store_item_id": "G2-2-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "debit",
+              "header_source_ref": "源xlsx!明细表G2-2!F9",
+              "header_text": "借方发生",
+              "json_pointer": "/rows/{row_uuid}/debit",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G2-2!F10",
+              "stable_field_key": "interest_detail_rows/{row_uuid}/debit",
+              "store_item_id": "G2-2-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "credit",
+              "header_source_ref": "源xlsx!明细表G2-2!G9",
+              "header_text": "贷方发生",
+              "json_pointer": "/rows/{row_uuid}/credit",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G2-2!G10",
+              "stable_field_key": "interest_detail_rows/{row_uuid}/credit",
+              "store_item_id": "G2-2-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "closing_unadjusted",
+              "header_source_ref": "源xlsx!明细表G2-2!H9",
+              "header_text": "期末余额",
+              "json_pointer": "/rows/{row_uuid}/closingUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表G2-2!H10",
+              "stable_field_key": "interest_detail_rows/{row_uuid}/closing_unadjusted",
+              "store_item_id": "G2-2-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "closing_adjustment",
+              "header_source_ref": "源xlsx!明细表G2-2!I9",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/closingAdjustment",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G2-2!I10",
+              "stable_field_key": "interest_detail_rows/{row_uuid}/closing_adjustment",
+              "store_item_id": "G2-2-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "closing_audited",
+              "header_source_ref": "源xlsx!明细表G2-2!J9",
+              "header_text": "应收利息余额审定数",
+              "json_pointer": "/rows/{row_uuid}/closingAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表G2-2!J10",
+              "stable_field_key": "interest_detail_rows/{row_uuid}/closing_audited",
+              "store_item_id": "G2-2-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "interest_due_date",
+              "header_source_ref": "源xlsx!明细表G2-2!K9",
+              "header_text": "应收取的日期（结息日）",
+              "json_pointer": "/rows/{row_uuid}/interestDueDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G2-2!K10",
+              "stable_field_key": "interest_detail_rows/{row_uuid}/interest_due_date",
+              "store_item_id": "G2-2-detail-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "accrual_period",
+              "header_source_ref": "源xlsx!明细表G2-2!L9",
+              "header_text": "预计收取日期",
+              "json_pointer": "/rows/{row_uuid}/accrualPeriod",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G2-2!L10",
+              "stable_field_key": "interest_detail_rows/{row_uuid}/accrual_period",
+              "store_item_id": "G2-2-detail-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "collection_status",
+              "header_source_ref": "源xlsx!明细表G2-2!M9",
+              "header_text": "发函或期后收款情况",
+              "json_pointer": "/rows/{row_uuid}/collectionStatus",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G2-2!M10",
+              "stable_field_key": "interest_detail_rows/{row_uuid}/collection_status",
+              "store_item_id": "G2-2-detail-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "E10:E15",
+            "H10:H15",
+            "J10:J15"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "interest_detail_rows",
+          "uuid_col": "N"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "9b228ab9c016a470664bd2a85d80af791e11f5ff9ffe90ab22325c0e579c4868",
+    "relative_path": "G/G2 应收利息.xlsx",
+    "template_sha256": "c7563e85a3ebffb7f60a5800dca66f76a5baef97e57cd4be4147f484e7decc84"
+  },
+  "template_definition_sha256": "f27d60ce659527a54a7b9ec6d60edcf7466ea310281ae8fa0ae3da4d8a327552"
+}

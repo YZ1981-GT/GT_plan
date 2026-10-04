@@ -26,6 +26,14 @@ import {
   calcYoyChange,
   calcSubtotal,
 } from './useN4FormulaEngine'
+import {
+  adoptRowKey,
+  findRowByKey,
+  generatedRowKey,
+  removeRowByKey,
+  semanticRowKey,
+} from './shared/stableRowIdentity'
+import { payloadJson, payloadText } from './shared/checklistPayload'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -118,17 +126,14 @@ export function useN4Adjudication(params: UseN4AdjudicationParams) {
     auditConclusion.value = _getString(`${ITEM_PREFIX}-audit-conclusion`)
   }
 
+  // 🔴 原写法 `item.remark ?? item.conclusion`：remark 为空串时返回 ''，
+  //    载荷在 conclusion 的整表会被静默丢弃（NC-34）。统一走双列取列规则。
   function _getJson(itemId: string): any {
-    const item = allResponses.value.get(itemId)
-    if (!item) return null
-    const raw = item.remark ?? item.conclusion
-    if (!raw) return null
-    try { return JSON.parse(raw) } catch { return raw }
+    return payloadJson(itemId, allResponses.value.get(itemId))
   }
 
   function _getString(itemId: string): string {
-    const item = allResponses.value.get(itemId)
-    return (item?.remark ?? item?.conclusion ?? '') as string
+    return payloadText(itemId, allResponses.value.get(itemId))
   }
 
   function _normalizeRow(raw: any): N4AdjRow {
@@ -140,7 +145,8 @@ export function useN4Adjudication(params: UseN4AdjudicationParams) {
     const yoyChange = calcYoyChange(audited, prior)
 
     return {
-      rowKey: raw.rowKey ?? `row-${Math.random().toString(36).slice(2, 10)}`,
+      // 已落库身份优先；缺失时用税种语义键（与默认行 `row-${taxType}` 同形）
+      rowKey: adoptRowKey(raw, raw.taxType),
       taxType: raw.taxType ?? '',
       unadjusted,
       aje,
@@ -155,7 +161,7 @@ export function useN4Adjudication(params: UseN4AdjudicationParams) {
 
   function _buildDefaultRows(): N4AdjRow[] {
     return DEFAULT_TAX_TYPES.map((item) => ({
-      rowKey: `row-${item.taxType}`,
+      rowKey: semanticRowKey(item.taxType),
       taxType: item.taxType,
       unadjusted: 0,
       aje: 0,
@@ -266,7 +272,7 @@ export function useN4Adjudication(params: UseN4AdjudicationParams) {
 
   function updateCell(rowKey: string, field: keyof N4AdjRow, value: number | string): void {
     if (isReadonly?.value) return
-    const row = rows.value.find(r => r.rowKey === rowKey)
+    const row = findRowByKey(rows.value, rowKey)
     if (!row || !row.isEditable) return
     ;(row as any)[field] = value
     _recalcRow(row)
@@ -284,7 +290,12 @@ export function useN4Adjudication(params: UseN4AdjudicationParams) {
   function addRow(taxType: string): void {
     if (isReadonly?.value) return
     rows.value.push({
-      rowKey: `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      // 语义键优先（`row-消费税`）：删掉后重新新增同一税种仍能对上历史载荷；
+      // 税种名为空才退熵键。见 composables/shared/stableRowIdentity.ts
+      // 🔴 语义键已被占用（同税种第二行）时必须退熵键，否则两行共用一份历史数据
+      rowKey: ((k) => (k && !findRowByKey(rows.value, k) ? k : generatedRowKey()))(
+        semanticRowKey(taxType),
+      ),
       taxType,
       unadjusted: 0,
       aje: 0,
@@ -301,9 +312,9 @@ export function useN4Adjudication(params: UseN4AdjudicationParams) {
 
   function removeRow(rowKey: string): void {
     if (isReadonly?.value) return
-    const idx = rows.value.findIndex(r => r.rowKey === rowKey)
-    if (idx >= 0) {
-      rows.value.splice(idx, 1)
+    const next = removeRowByKey(rows.value, rowKey)
+    if (next.length !== rows.value.length) {
+      rows.value = next
       isChanged.value = true
       _persist()
     }

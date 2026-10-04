@@ -37,6 +37,7 @@ import check_workpaper_ac_coverage_gate as gate  # noqa: E402
 from generate_workpaper_ac_coverage_matrix import (  # noqa: E402
     _MATRIX,
     _OVERLAY,
+    _read_lines,
     _sha256,
     _stable_json,
     CoverageMatrixError,
@@ -55,7 +56,17 @@ SPEC_DIR = REPO / ".kiro" / "specs" / "workpaper-html-onlyoffice-bidirectional-w
 
 
 def _doc(name: str) -> list[str]:
-    return SPEC_DIR.joinpath(name).read_bytes().decode("utf-8").split("\n")
+    """委托生产读取器，**不复制**一份切行逻辑。
+
+    🔴 这里曾自带 ``read_bytes().decode().split("\n")``：CRLF 工作树上每行尾留 ``\r``，
+    于是本文件「真文档能无异常解析」与 oracle 表头整行 ``.index()`` 两条判据，测的是
+    「文档在 LF 下能不能解析」而不是「解析器对不对」—— 同一份 design.md 在 CI(LF) 绿、
+    本地(CRLF) 红，且报出的是「Property 1 没有 Validates 行」这种**伪文档缺陷**。
+    读取器只能有一个：判据与生产共用 ``_read_lines``，行号语义才一致。
+    摘要仍走 ``read_bytes()`` 原始字节（见 ``test_matrix_pins_a_digest_of_every_spec_document``），
+    本改动不碰 EOL 捕获口径。
+    """
+    return _read_lines(SPEC_DIR.joinpath(name))
 
 
 @pytest.fixture(scope="module")

@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-32",
+  "title": "D4-32 客户/供应商资金流水检查 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "检查客户与供应商之间的资金流水，识别异常资金往来，重点发现资金体外循环、回流等收入舞弊迹象。",
+      "source_refs": []
+    },
+    {
+      "key": "materials",
+      "title": "二、资料准备",
+      "content": "按6个组别分别记录（客户银行收款/客户非银收款/供应商银行付款/供应商非银付款/关联方收款/关联方付款），填写单位名称、交易金额、占比、开户行、账号、流水获取途径、是否异常。导入时按「组别」列恢复分组。",
+      "source_refs": []
+    },
+    {
+      "key": "formulas",
+      "title": "三、资金回流识别",
+      "content": "系统辅助识别可疑资金回流：一进一出金额差异 <10% 且时间间隔 <30天，提示可能存在资金闭环（销售回款→采购付款→回到关联方）。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 大额现金、频繁小额、个人账户收付款：异常交易信号。\n2. 收款方与付款方存在关联、金额时间高度吻合：疑似资金体外循环虚构交易。\n3. 资金流水与账面收入/采购不匹配：关注真实业务实质。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "5b029cac006bcb0e55a60340577b957fa1e5646a32085b999e81557ee01ea90f",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "51f63483f4fa775fb54969a193523336d4a996b3cbac1607acb11cfdda7167f1"
+  }
+}

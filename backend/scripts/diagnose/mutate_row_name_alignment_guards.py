@@ -26,6 +26,28 @@ _REPO = Path(__file__).resolve().parents[3]
 _ALIGN = _REPO / "backend" / "app" / "services" / "four_table" / "row_name_alignment.py"
 _STORE = _REPO / "backend" / "app" / "services" / "row_name_mapping_service.py"
 
+_SPEC_NAME = "formula-row-name-alignment-confirmation"
+
+
+def _spec_dir(name: str = _SPEC_NAME) -> Path:
+    """解析 spec 目录 —— active 区与 `_archive/*/` 都找。
+
+    🔴 **不得写死 `.kiro/specs/<name>/`**：spec 归档后会被 `git mv` 到
+    `.kiro/specs/_archive/<分组>/<name>/`，写死路径会让本脚本在归档当天起
+    `write_text` 抛 `FileNotFoundError`（2026-09-25 实测踩过：归档 7 个 spec 后本脚本
+    立即炸在末尾写 evidence 那一步，而它没挂 CI、也没有测试调用它，所以**不会有人替你发现**）。
+    """
+    active = _REPO / ".kiro" / "specs" / name
+    if active.is_dir():
+        return active
+    for archived in sorted((_REPO / ".kiro" / "specs" / "_archive").glob(f"*/{name}")):
+        if archived.is_dir():
+            return archived
+    raise FileNotFoundError(
+        f"spec 目录找不到：active `.kiro/specs/{name}/` 与 `_archive/*/{name}/` 都不存在 —— "
+        "spec 被改名或删除了，请先确认真源位置，不要静默降级到别处写 evidence"
+    )
+
 _TEST_ALIGN = "backend/tests/four_table/test_row_name_alignment.py"
 _TEST_STORE = "backend/tests/four_table/test_row_name_mapping_service.py"
 
@@ -146,10 +168,8 @@ def main() -> int:
         "verdicts": verdicts,
         "pass": ok,
     }
-    out_path = (
-        _REPO / ".kiro" / "specs" / "formula-row-name-alignment-confirmation"
-        / "evidence" / "T13-mutation-verdict.json"
-    )
+    out_path = _spec_dir() / "evidence" / "T13-mutation-verdict.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0 if ok else 1

@@ -553,20 +553,26 @@ class WorkpaperSyncAdapterRegistry:
         本方法自己不放宽任何准入判据：真正的注册仍由 :meth:`register` 执行（approved
         bundle / authority model 配对 / contract 双重漂移 / matcher 重叠一条不少），
         而 provider 侧的 `attach_*` 又必须先经 Task 75 的 published-identity 观测器读出
-        frozen identity。本方法只做三件事：按计划派发、把「为什么没注册」记成可读原因、
-        把结果汇总成可断言的 outcome。
+        frozen identity。本方法只做四件事：按计划派发、把「为什么没注册（供给不足）」记成
+        可读原因、把**注册失败（真故障）** 记成 typed failure、把结果汇总成可断言的 outcome。
 
-        ⚠️ **不吞异常**：provider 抛出的 `SyncDomainError`（含观测器的
-        `PublishedIdentityObserverError`）原样上抛 —— 「注册失败」与「供给不足」必须可
-        分辨，把前者降级成后者正是 AC 5.12 明令禁止的形态。
+        🔴 **按 entry 隔离**（本 spec 核心修复）：某个 entry 的 provider/register 抛
+        `SyncDomainError`（含 `ContractDriftError` / 观测器 `PublishedIdentityObserverError`
+        / `RegistryError` 全部子类）时，记成一条 :class:`RegistrationFailure`（真故障，与
+        「供给不足 reason」分型 —— AC 5.12）并**继续**下一个 entry，不让整批中断。非
+        `SyncDomainError`（DB 故障 / `AttributeError` 等）仍**上抛** —— 那是真 bug，不能被
+        当成 fail-visible 的注册失败吞掉。隔离前是「全有或全无」：一个 entry 抛错整批中断、
+        缓存不写 ⇒ **所有** entry 的 sync 端点都 422（本 spec 起因）。隔离后 blast radius 只
+        收敛到出错的那一个 entry；准入判据一条不放宽（`register()` RG-1~19 照跑）。
         """
         registered: list[str] = []
-        # 🔴 已注册的 entry_id **实录**，不再由 `planned - reasons` 反算：反算让
-        #    `len(registered) + len(reasons) == len(planned)` 变成恒真式（reasons ⊆ planned
-        #    时无论如何都成立），于是「有 entry 被静默跳过」这条判据测不出任何东西
-        #    —— 变异 M19（把 `reasons[...] = supply` 换成 `pass`）实测 GREEN 就是这个根因。
+        # 🔴 已注册的 entry_id **实录**，不再由 `planned - reasons - failures` 反算：反算让
+        #    记账等式变成恒真式（子集关系下无论如何都成立），于是「有 entry 被静默跳过」这条
+        #    判据测不出任何东西 —— 变异 M19（把 `reasons[...] = supply` 换成 `pass`）实测
+        #    GREEN 就是这个根因。三集合各有独立来源，跳过一个即三边之和少 1、立刻打红。
         registered_entries: list[str] = []
         reasons: dict[str, str] = {}
+        failures: dict[str, RegistrationFailure] = {}
         for item in self.registration_plan:
             if item.entry_id in self._by_entry_id:
                 registered.append(self._by_entry_id[item.entry_id].adapter_id)
@@ -579,8 +585,20 @@ class WorkpaperSyncAdapterRegistry:
             if supply is not None:
                 reasons[item.entry_id] = supply
                 continue
-            provider = _load_entry_provider(item)
-            ids = tuple(await provider(self, session=session))
+            # 🔴 只在这里隔离：只捕获 SyncDomainError（契约漂移 / 观测器 / 注册准入等
+            #    fail-visible 域异常），记成 typed failure 并继续下一个 entry。非域异常
+            #    （DB / AttributeError）仍上抛 —— 它是真 bug，不是「这个 entry 契约漂移」。
+            try:
+                provider = _load_entry_provider(item)
+                ids = tuple(await provider(self, session=session))
+            except SyncDomainError as exc:  # noqa: PERF203 - 隔离必须逐 entry
+                failures[item.entry_id] = RegistrationFailure(
+                    entry_id=item.entry_id,
+                    error_code=str(getattr(exc, "error_code", "") or type(exc).__name__),
+                    message=str(exc),
+                    exc_type=type(exc).__name__,
+                )
+                continue
             if not ids:
                 reasons[item.entry_id] = _describe_provider_block(item)
                 continue
@@ -591,6 +609,7 @@ class WorkpaperSyncAdapterRegistry:
             reasons=dict(sorted(reasons.items())),
             planned_entry_ids=tuple(item.entry_id for item in self.registration_plan),
             registered_entry_ids=tuple(sorted(set(registered_entries))),
+            failures=dict(sorted(failures.items())),
         )
 
     def registrations(self) -> tuple[AdapterRegistration, ...]:
@@ -922,338 +941,42 @@ PENDING_ENGINE_ADAPTERS: Final[tuple[Mapping[str, Any], ...]] = (
     },
 )
 
-#: Task 13 自己交付的三份文件。engine adapter 之外的 `adapters/*.py` 只能是这三个。
+#: Task 13 自己交付的三份文件。engine adapter 之外的 `adapters/*.py` 只能是这三个
+#: + `NON_CARRIER_COMPANION_MODULES`（见下）。
 TASK13_ADAPTER_MODULES: Final[tuple[str, ...]] = (
     "__init__.py",
     "base.py",
     "registry.py",
 )
 
+#: **非载体**伴生模块 —— `adapters/` 下不实现任何 carrier protocol 的纯数据 / 纯声明文件。
+#:
+#: 🔴 为什么要单独一类而不是塞进 `TASK13_ADAPTER_MODULES`：
+#: `test_engine_adapters_match_the_delivery_registry_exactly` 用
+#: 「`adapters/*.py` 文件集合 == 登记集合」来挡「有人新增 adapter 绕过载体 gate」。
+#: 那条判据的保护对象是**载体**。把数据模块混进 Task 13 那三份里会模糊语义
+#: （那三份是「Task 13 交付物」这个历史事实，不该被后来的文件污染）；
+#: 而放宽成 glob 白名单又会让真正新增的 carrier 也蒙混过关。
+#: ⇒ 单列一类，**逐个显式登记 + 写明为什么它不是载体**，判据对 carrier 的力度不变。
+#:
+#: 登记项：
+#: * `delivered_contracts_ledger.py` —— `DELIVERED_PER_ENTRY_CONTRACTS` 的数据台账。
+#:   从本文件抽出（曾占 1172 行 / 47%，且按设计每交付一条契约就增 40~60 行，
+#:   连续两次提交各触发一次行数门禁；继续上调 whitelist 基线等于预留膨胀空间，
+#:   是白名单注释第 7 行明令禁止的）。它**零 import 平台运行时**、
+#:   不含任何函数与类，只有一个 `Final[tuple[Mapping[str, Any], ...]]` 字面量。
+NON_CARRIER_COMPANION_MODULES: Final[tuple[str, ...]] = (
+    "delivered_contracts_ledger.py",
+)
 
-# ═══════════════════════════════════════════════════════════════════════════
-# per-entry 生产契约交付登记（Task 40 追加；只加不动）
-# ═══════════════════════════════════════════════════════════════════════════
-#
-# Task 13 交付时 `backend/data/workpaper_sync_contracts/` 里没有任何生产契约，它的
-# `test_contract_directory_holds_no_production_contract_yet` 把这个事实写成**绝对空清册**。
-# Tasks 40~57 / 62~64 逐 entry 发布契约后那条清册必然过期，但**不能**把判据删掉 ——
-# 删掉之后「谁能往契约目录里放生产契约」就无人把守了。
-#
-# 做法与 :data:`DELIVERED_ENGINE_ADAPTERS` / `merge.RETIRED_DEFERRALS` 同款：把「已发布」
-# 做成一张登记表，边界判据改为与 `contracts.available_contract_ids()` **双向等值**：
-#
-# * 出现未登记的生产契约 ⇒ 打红（有人绕过 pilot 门放了个契约）；
-# * 登记了却没有对应文件 ⇒ 打红（登记表与事实脱钩）；
-# * 登记的 `entry_id` 不在 source-backed manifest 里 ⇒ 打红（契约指向已消失的入口）。
 
-#: **已发布**的 per-entry 生产契约。每条写明由哪个任务发布、对应哪个 manifest entry、
-#: 权威模板载体，以及"为什么这次发布没有跳过 finalize 顺序"。
-DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
-    {
-        "contract_id": "b60.hour_budget",
-        "provider_module": "app.services.workpaper_sync.pilot_simple_checklist",
-        "delivered_by_task": "40",
-        "pilot_class": "simple_checklist",
-        "entry_id": "xlsx/b60/gt-b60-bundle",
-        "document_type": "xlsx",
-        "authority_model": "projection_contract",
-        "template_relative_path": "B/B60-1 审计项目工时预算与控制表.xlsx",
-        "adapter_registered": False,
-        "reason": (
-            "Task 40 冻结 simple_checklist pilot 的唯一合格 entry（174 个候选里唯一"
-            "independent 且 wp_code 与 wp_templates/_index.json 精确相等、零回退的那个），"
-            "逐 sheet 读权威模板后人工审核并发布 approved authority model / per-entry "
-            "contract / non-null bundle。`adapter_registered=False` 是**顺序**而不是遗漏："
-            "任务正文要求「经 Task 36 finalize Task 17 candidate 为 published "
-            "representation 后，方可注册 adapter / 接宿主 / 启用 capability」。"
-            "Task 75 已交付该 finalize 缺的公共观测器（`published_identity_observer`）并把 "
-            "`resolve_published_frozen_definitions()` 改成真实现；今天仍未注册的原因换成了"
-            "**供给**：`working_paper_sync_definition_bundle` / "
-            "`working_paper_content_representation` / `working_paper_sync_entry_state` 三表"
-            "实测 0 行。其中 approved bundle 与 candidate 受控 attach 是 Task 76 的交付；"
-            "**published representation 不是** —— 它的生产者是 "
-            "`ContentMutationService.commit(...)`（首版 content version）与 Task 36 / Task 77 "
-            "的 finalize gate（同 content version 的新代际）。"
-            "（Task 77 更正：首版此处把 representation 一并归给 Task 76，属误记。）"
-            "`register_from_manifest()` 对本 entry 给出的显式原因即"
-            "「还没有 current published representation」。"
-            "契约孤儿由 `RegistryReport.contract_files_without_adapter` 持续可见。"
-        ),
-    },
-    # ── Task 41 追加（只加不动；本条起至 tuple 结束是 Task 41 的字节区间）────────
-    {
-        "contract_id": "d2.receivable_detail",
-        "provider_module": "app.services.workpaper_sync.pilot_d2_large_json",
-        "delivered_by_task": "41",
-        "pilot_class": "d2_large_json",
-        "entry_id": "xlsx/gt-d2-accounts-receivable",
-        "document_type": "xlsx",
-        "authority_model": "projection_contract",
-        "template_relative_path": "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
-        "adapter_registered": True,
-        "reason": (
-            "Task 41 冻结 d2_large_json pilot 的唯一候选 entry（`assess_pilot_classes()` 实测 "
-            "1 个候选、bidirectional 0 个），逐 sheet 读权威模板的 11 张 sheet 后只声明受管 "
-            "sheet `明细表D2-2`，按 stable field + row UUID 把真实 906,239 字节的 HTML store "
-            "载荷（`checklist_responses.item_id='D2-detail-rows'`，1260 行 × 39 列）拆成 "
-            "49,140 个字段，禁止把整 JSON 当一个字段（AC 6.9 / 6.12）。"
-            "`adapter_registered=True`：2026-09-07 实测真库 `register_from_manifest()` 已注册"
-            "`d2.receivable_detail` —— 该 entry 的 manifest 已由 reviewed overlay 裁决为 "
-            "`bidirectional`（`adapter_id` 同步写回），approved bundle / current published "
-            "representation / entry_state 三件供给齐备，观测器真读出 frozen identity 后走完 "
-            "`build_excel_adapter` → `registry.register()`（RG-1~RG-19 一条不少）。"
-            "顺序门仍然成立且未被绕过：capability 裁决是 finalize **之后**的 reviewed overlay "
-            "动作（Task 36 / Task 77 的 finalize gate 已产出 published representation），"
-            "不是本登记表自己宣称的。"
-            "🔴 「注册成功」≠「pilot 已验收」：真实 OO required scenarios 未按 Task 70 "
-            "刷新，evidence 保持 UNVERIFIABLE（`RegistryReport.contract_files_without_adapter` "
-            "对本 entry 已不再登记为孤儿）。"
-        ),
-    },
-    # ── Task 42 追加（只加不动；本条起至 tuple 结束是 Task 42 的字节区间）────────
-    {
-        "contract_id": "h1.disposal_check",
-        "provider_module": "app.services.workpaper_sync.pilot_h1_grouped_dynamic",
-        "delivered_by_task": "42",
-        "pilot_class": "h1_grouped_dynamic",
-        "entry_id": "xlsx/gt-h1-fixed-assets",
-        "document_type": "xlsx",
-        "authority_model": "projection_contract",
-        "template_relative_path": "H/H1 固定资产.xlsx",
-        "adapter_registered": True,
-        "reason": (
-            "Task 42 冻结 h1_grouped_dynamic pilot 的唯一候选 entry（`assess_pilot_classes()` "
-            "实测 1 个候选、bidirectional 0 个），逐 sheet 读权威模板的 26 张 sheet 后只声明"
-            "受管 sheet `减少检查表H1-8` —— 它是契约 schema 域内（`header_rows` 1..3）分组"
-            "最深的一张：三级表头 10/11/12 行（4 个横向组 + 3 个中层 + 6 个真叶子）、"
-            "动态行 13..27、L/O 两列逐行公式、A28 合计 footer、B/E 两条数据验证。"
-            "25 个字段各带 source_ref / header_source_ref / mid_source_ref / "
-            "group_source_ref；骨架行数由 `skeleton_row_count(seed) = max(seed,1)` 决定，"
-            "不写死模板自带的 15 行。X 列是模板占位列（表头 `……`）故按 Requirement 6.1 "
-            "不声明；UUID 列取 AB 而非 AA（AA11 有可见注解）。"
-            "工作簿里分组更深的 `明细表H1-2`（四级表头）**表达不了**，登记为 "
-            "`pilot_h1_grouped_dynamic.UPSTREAM_DEBT_FOUR_LEVEL_HEADER_NOT_EXPRESSIBLE`。"
-            "`adapter_registered=True`：2026-09-07 实测真库 `register_from_manifest()` 已注册"
-            "`h1.disposal_check` —— 该 entry 的 manifest 已由 reviewed overlay 裁决为 "
-            "`bidirectional`（`adapter_id` 同步写回），approved bundle / current published "
-            "representation / entry_state 三件供给齐备，观测器真读出 frozen identity 后走完 "
-            "`build_excel_adapter` → `registry.register()`（RG-1~RG-19 一条不少）。"
-            "顺序门仍然成立且未被绕过：capability 裁决是 finalize **之后**的 reviewed overlay "
-            "动作（Task 36 / Task 77 的 finalize gate 已产出 published representation）。"
-            "🔴 「注册成功」≠「pilot 已验收」：真实 OO required scenarios 未按 Task 70 "
-            "刷新，evidence 保持 UNVERIFIABLE。"
-        ),
-    },
-    # ── Task 43 追加（只加不动；本条起至 tuple 结束是 Task 43 的字节区间）────────
-    {
-        "contract_id": "g7.soe_subsidiary_disclosure",
-        "provider_module": "app.services.workpaper_sync.pilot_g7_two_level_dynamic",
-        "delivered_by_task": "43",
-        "pilot_class": "g7_two_level_dynamic",
-        "entry_id": "xlsx/gt-g7-long-term-equity-main",
-        "document_type": "xlsx",
-        "authority_model": "projection_contract",
-        "template_relative_path": "G/G7 长期股权投资.xlsx",
-        "adapter_registered": True,
-        "reason": (
-            "Task 43 冻结 g7_two_level_dynamic pilot 的 entry。`assess_pilot_classes()` 实测 "
-            "**3 个**候选（gt-g7-equity-method / gt-g7-equity-subsidiary / "
-            "gt-g7-long-term-equity-main）、bidirectional 0 个；收敛到一个的决定性事实是 "
-            "**matcher 域独占**：前两个共用 `wp_code_patterns == [\"G7E\"]`，以它为 "
-            "`EntryMatcher.wp_codes` 的 adapter 会触发 RG-3 `MatcherOverlapError` / "
-            "`AmbiguousAdapterError`，而 `G7L` 只属本 entry。"
-            "逐 sheet 读权威模板的 22 张 sheet 后只声明受管 sheet `附注披露信息（国企）`，"
-            "并在其上声明两张表：① 静态块 `minority_financials`（源「2、主要财务信息」，"
-            "两级表头 62/63 行 —— 行 62 的 5 个**空白**横向合并就是源模板自己的动态列占位，"
-            "行 63 的 10 个叶子只有 2 个不同 label 各重复 5 次；10 metric × 10 动态列 = 100 "
-            "个字段，`C64:L73` 逐格实测全空 ⇒ 全部 editable）；② 动态行表 "
-            "`former_subsidiary_basic`（源「（1）原子公司的基本情况」，5 行骨架、A 列字面量 "
-            "1..5 ⇒ auto_source、B..G 逐格跨 sheet 公式 ⇒ formula + formula_mask B79:G83、"
-            "footer 取 A85 真实文本）。"
-            "本 pilot 是四类里**唯一**真有 `{slot}_{seq}` 动态列的那个：键由 Task 36 的 "
-            "`dynamic_column_stable_keys(slot=table_key, count=…)` 生成（签名里拿不到 label），"
-            "列数由 `dynamic_column_keys_for_entities()` 从实体列表推出、不写死；"
-            "键→列的实测绑定由 `dynamic_column_binding_for()` 产出。"
-            "上市侧同构的 5 张动态列矩阵因数据格在源模板里全是公式 ⇒ 零 editable 字段、"
-            "merge 家族两条 required scenario 结构性不可满足，故未选用，登记为 "
-            "`pilot_g7_two_level_dynamic.UPSTREAM_DEBT_TWO_LEVEL_MATRIX_MODE_IS_PER_COLUMN`。"
-            "`adapter_registered=True`：2026-09-07 实测真库 `register_from_manifest()` 已注册"
-            "`g7.soe_subsidiary_disclosure` —— 该 entry 的 manifest 已由 reviewed overlay "
-            "裁决为 `bidirectional`（`adapter_id` 同步写回），approved bundle / current "
-            "published representation / entry_state 三件供给齐备，观测器真读出 frozen "
-            "identity（含 observed_dynamic_columns 由工作簿物理列跨度 + merge 铺开的 label "
-            "现读）后走完 `build_excel_adapter` → `registry.register()`（RG-1~RG-19 一条不少）。"
-            "顺序门仍然成立且未被绕过：capability 裁决是 finalize **之后**的 reviewed overlay "
-            "动作（Task 36 / Task 77 的 finalize gate 已产出 published representation）。"
-            "🔴 「注册成功」≠「pilot 已验收」：真实 OO required scenarios 未按 Task 70 "
-            "刷新，evidence 保持 UNVERIFIABLE。"
-        ),
-    },
-    # ── G5-1 追加（Phase 5 首个 canary，harness 无关的独立 entry 双向路径）─────────
-    {
-        "contract_id": "d1.notes_receivable_detail",
-        "provider_module": "app.services.workpaper_sync.phase5_d1_notes_receivable",
-        "delivered_by_task": "G5-1",
-        "pilot_class": "phase5_notes_receivable",
-        "entry_id": "xlsx/gt-d1-notes-receivable",
-        "document_type": "xlsx",
-        "authority_model": "projection_contract",
-        "template_relative_path": "D/D1 应收票据.xlsx",
-        "adapter_registered": False,
-        "reason": (
-            "G5-1 Phase 5 首个 canary。**不是第五个 pilot**：四个 pilot 是 "
-            "`pilot_harness.PilotClass` 封闭枚举的代表，`xlsx/gt-d1-notes-receivable` 的 "
-            "entry_id 不含 d2/h1/g7 会被归进 catch-all `simple_checklist`（B60 已占），故本 "
-            "provider 的选型守卫 `assert_entry_selectable` 直接在真 manifest + 真 finder 上核"
-            "四条事实（entry 存在 / independent=True / profile==D2/B60 同型 "
-            "`xlsx.editable.shared.single.room_service_wired.v1` / wp_code==['D1N']）+ 零回退"
-            "（D1N find/any 均 None、父码 D1 落权威模板），**不**调 `assess_pilot_classes()`。"
-            "逐 sheet 读权威模板 `D/D1 应收票据.xlsx`（21 张 sheet）后只声明受管 sheet "
-            "`原值明细表（按客户）D1-3`：单级表头行 10（15 列 A..O）、数据区 11..20、"
-            "G/J/L/O 四列逐行公式 `=D+E+F` / `=D+H-I` / `=J+K` / `=L+M+N`（openpyxl 逐格实测）、"
-            "A21 合计 footer。HTML store = `checklist_responses.item_id='D1-cust-rows'`"
-            "（前端 useD1DetailCustomer.ts 的 CustomerRow 整行数组 serializeRows()），按 "
-            "stable field + rowId 拆成 15 字段/行，禁止把整 JSON 当一个字段。"
-            "`adapter_registered=False` 是**顺序**：Task 4 把 overlay 裁决为 bidirectional 并"
-            "重生 manifest（当前 capability=single_onlyoffice）、发布链产出 approved bundle + "
-            "current published representation 之后方可注册；未就绪时 `attach_adapters` 返回空"
-            "元组且一次库都不读，契约孤儿由 `RegistryReport.contract_files_without_adapter` "
-            "持续可见。"
-        ),
-    },
-    # ── G5-1 追加（Phase 5 第二个 canary：D7 合同负债，两级表头 + 账龄组）─────────
-    {
-        "contract_id": "d7.contract_liabilities_detail",
-        "provider_module": "app.services.workpaper_sync.phase5_d7_contract_liabilities",
-        "delivered_by_task": "G5-1",
-        "pilot_class": "phase5_contract_liabilities",
-        "entry_id": "xlsx/gt-d7-contract-liabilities",
-        "document_type": "xlsx",
-        "authority_model": "projection_contract",
-        "template_relative_path": "D/D7 合同负债.xlsx",
-        "adapter_registered": False,
-        "reason": (
-            "G5-1 Phase 5 第二个 canary（同 D1 的 harness 无关独立 entry 路径，非第五 pilot）。"
-            "选型守卫 assert_entry_selectable 直接核四条 manifest 事实（entry 存在 / "
-            "independent=True / profile==D2/B60 同型 / wp_code==['D7C']）+ 零回退（D7C find/any "
-            "均 None、父码 D7 落权威模板），不调 assess_pilot_classes()。逐 sheet 读权威模板 "
-            "D/D7 合同负债.xlsx 后只声明受管 sheet 明细表D7-2：两级表头行 8 / 行 9（账龄子标题），"
-            "27 列 A-AA，数据区 10-22，I/P/R/U 四列逐行公式 =F+G+H / =F-N+O（贷方科目）/ =P+Q / "
-            "=R+S+T，A23 合计 footer；19 标量 + 两个账龄组各 4 段（THREE_YEAR），字段键与前端 "
-            "useD7Detail.DetailRow 锁死。HTML store = checklist_responses.item_id='D7-2-rows'，"
-            "账龄 nested keyed。wp_code 裁决=['D7']（**不是 D7C 幻影码 / D7-2 名义码**）：查真库"
-            "确认 store 载荷落 wp_code=D7（project 0ec33ac9 / wp 6f23dcce / 669B）。"
-            "`adapter_registered=False` 是顺序：overlay 裁决 bidirectional + 重生 manifest + 发布链"
-            "产出 approved bundle + current published representation 之后方可注册。"
-        ),
-    },
-    # ── G5-1 追加（Phase 5 第三个 canary：D3 预收账款，两级表头 + 账龄组）─────────
-    {
-        "contract_id": "d3.prepaid_receipts_detail",
-        "provider_module": "app.services.workpaper_sync.phase5_d3_prepaid_receipts",
-        "delivered_by_task": "G5-1",
-        "pilot_class": "phase5_prepaid_receipts",
-        "entry_id": "xlsx/gt-d3-prepaid-accounts",
-        "document_type": "xlsx",
-        "authority_model": "projection_contract",
-        "template_relative_path": "D/D3 预收账款.xlsx",
-        "adapter_registered": False,
-        "reason": (
-            "G5-1 Phase 5 第三个 canary（同 D1/D7 的 harness 无关独立 entry 路径）。选型守卫 "
-            "assert_entry_selectable 核四条 manifest 事实（entry 存在 / independent=True / "
-            "profile==room_service_wired.v1 / wp_code==['D3P']）+ 零回退（D3P find/any 均 None、"
-            "父码 D3 落净化后权威模板）。逐 sheet 读净化后权威模板 D/D3 预收账款.xlsx（外链净化后 "
-            "sha256 699a9be0）后只声明受管 sheet 预收账款明细表D3-2：两级表头行 10 / 行 11（账龄"
-            "子标题），27 列 A-AA，数据区 12-23，H/O/Q/T 四列逐行公式 =E+F+G / =E+N-M（贷方科目）/ "
-            "=O+P / =Q+R+S，A24「合计」footer（纯两字无空格，非 D7 的三空格）；19 标量 + 两个账龄组"
-            "各 4 段（THREE_YEAR），字段键与前端 useD3Detail.DetailRow 锁死。HTML store = "
-            "checklist_responses.item_id='D3-det-rows'，账龄 nested keyed。wp_code 裁决=['D3']"
-            "（**不是 D3P 幻影码 / D3-2 名义码**）：D3-det-rows 全库 0 行（同 H1 空表单），但 sibling "
-            "D3-vc-current-rows 载荷落 wp_code=D3（1 行 3601B）已证 D3 store 落点=D3，且 D3 wp 未删除"
-            "有 file_path。`adapter_registered=False`：**与真实库对齐**——真库 "
-            "`register_from_manifest()` 当前只注册 {d2,d4,g7,h1}（有真实供给的 entry），"
-            "D3-det-rows / D3-vc 全库 0 行、无 current published representation ⇒ 未注册成功。"
-            "原登记乐观标 True 与现实脱钩（Property 49 实测捕获）；发布链真正产出 representation 后再回填 True。"
-        ),
-    },
-    # ── G5-1 追加（Phase 5 第四个 canary：D6 合同资产，两级表头 + 账龄组，账龄 FLAT 键）─────
-    {
-        "contract_id": "d6.contract_assets_detail",
-        "provider_module": "app.services.workpaper_sync.phase5_d6_contract_assets",
-        "delivered_by_task": "G5-1",
-        "pilot_class": "phase5_contract_assets",
-        "entry_id": "xlsx/gt-d6-contract-assets",
-        "document_type": "xlsx",
-        "authority_model": "projection_contract",
-        "template_relative_path": "D/D6 合同资产.xlsx",
-        "adapter_registered": False,
-        "reason": (
-            "G5-1 Phase 5 第四个 canary（同 D1/D3/D7 的 harness 无关独立 entry 路径）。选型守卫核四条"
-            "manifest 事实（entry 存在 / independent=True / profile==room_service_wired.v1 / "
-            "wp_code==['D6C']）+ 零回退（D6C find/any 均 None、父码 D6 落净化后权威模板）。逐 sheet 读"
-            "净化后权威模板 D/D6 合同资产.xlsx（外链净化后 sha256 88125e42）后只声明受管 sheet "
-            "明细表D6-2：两级表头行 12 / 行 13（账龄子标题），32 列 A-AF（受管 A-AD），数据区 14-25，"
-            "J/Q/T 三列逐行公式 =G+H+I / =G+O-P（借方科目）/ =Q+R+S，A26「合   计」footer（3 半角空格，"
-            "同 D7）；22 标量 + 两个账龄组各 4 段（K-N 期初 / U-X 期末，**FLAT 键 agePrior*/ageEnd***，"
-            "非 D3/D7 的 nested），字段键与前端 useD6Detail.DetailRow 锁死。HTML store = "
-            "checklist_responses.item_id='D6-2-rows'。wp_code 裁决=['D6']（**不是 D6C 幻影码 / D6-2 "
-            "名义码**）：D6-2-rows 全库 0 行（同 H1/D3 空表单），D6 wp 未删除有 file_path。"
-            "`adapter_registered=False`：**与真实库对齐**——真库 `register_from_manifest()` 当前只注册 "
-            "{d2,d4,g7,h1}，D6-2-rows 0 行、无 current published representation ⇒ 未注册成功。"
-            "原乐观标 True 与现实脱钩（Property 49 捕获）；发布链产出 representation 后再回填 True。"
-        ),
-    },
-    # ── G5-1 追加（Phase 5 第五个 canary：D5 应收款项融资，两级表头无账龄 FVOCI）─────
-    {
-        "contract_id": "d5.receivables_financing_detail",
-        "provider_module": "app.services.workpaper_sync.phase5_d5_receivables_financing",
-        "delivered_by_task": "G5-1",
-        "pilot_class": "phase5_receivables_financing",
-        "entry_id": "xlsx/gt-d5-receivables-financing",
-        "document_type": "xlsx",
-        "authority_model": "projection_contract",
-        "template_relative_path": "D/D5 应收款项融资.xlsx",
-        "adapter_registered": False,
-        "reason": (
-            "G5-1 Phase 5 第五个 canary（同 D1/D3/D6/D7 的 harness 无关独立 entry 路径）。选型守卫核"
-            "四条 manifest 事实（entry 存在 / independent=True / profile==room_service_wired.v1 / "
-            "wp_code==['D5R']）+ 零回退（D5R find/any 均 None、父码 D5 落净化后权威模板）。逐 sheet 读"
-            "净化后权威模板 D/D5 应收款项融资.xlsx（外链净化后 sha256 92c5f7f2）后只声明受管 sheet "
-            "应收款项融资明细表D5-2：两级表头行 10（组标题 期初数 C:G / 本期变动 H:I / 期末数 J:P）/ "
-            "行 11（子标题），17 列 A-Q，数据区 12-16，F/J/L/O 四列逐行公式 =C+E+D / =C+H-I / =J+K / "
-            "=J+N+M，A17「合计」footer（纯两字，同 D3）；**FVOCI 无账龄组**（最简 canary，group 下"
-            "每个子列是不同语义字段），字段键与前端 useD5Detail.DetailRow 锁死（postRealized/eclStage "
-            "store-only 不入）。HTML store = checklist_responses.item_id='D5-2-rows'。wp_code 裁决=['D5']"
-            "（**不是 D5R 幻影码 / D5-2 名义码**）：D5-2-rows 全库 0 行（同 H1/D3/D6 空表单），D5 wp 未删除"
-            "有 file_path。`adapter_registered=False`：**与真实库对齐**——真库 `register_from_manifest()` "
-            "当前只注册 {d2,d4,g7,h1}，D5-2-rows 0 行、无 current published representation ⇒ 未注册成功。"
-            "原乐观标 True 与现实脱钩（Property 49 捕获）；发布链产出 representation 后再回填 True。"
-        ),
-    },
-    # ── G5-1 D4 营业收入（位置数组；契约含 D4-2/D4-3/D4-5 sibling sheets）─────
-    {
-        "contract_id": "d4.revenue_detail",
-        "provider_module": "app.services.workpaper_sync.phase5_d4_revenue_detail",
-        "delivered_by_task": "G5-1",
-        "pilot_class": "phase5_revenue_detail",
-        "entry_id": "xlsx/gt-d4-operating-revenue",
-        "document_type": "xlsx",
-        "authority_model": "projection_contract",
-        "template_relative_path": "D/D4 收入底稿.xlsx",
-        "adapter_registered": True,
-        "reason": (
-            "G5-1 Phase 5 第六个 canary（第五种行形态：位置数组）。选型守卫 assert_entry_selectable "
-            "核四条 manifest 事实（entry 存在 / independent=True / profile==room_service_wired.v1 / "
-            "wp_code==['D4O']）+ 零回退（D4O find/any 均 None、父码 D4 落净化后权威模板）+ "
-            "mapping_digest 哨兵。权威模板 D/D4 收入底稿.xlsx（sha256 b8fb92d4…）；受管 sheets="
-            "d42-managed / d43-managed / d45-managed（D4-5 政策检查：分组紧凑表 + 经营模式 B11–B16；"
-            "宿主 D4TabPolicyCheck 独立，不进 isD4DetailSheet）。HTML store 含 D4-2-rows / D4-3-rows / "
-            "D4-5-policy-groups + D4-5-biz-*。wp_code 裁决=['D4']（真载荷落点）。"
-            "D4-9 重要客户结构分析作为 sibling sheet（d49-managed，同 entry / 同 adapter）"
-            "并入本 entry —— 与 D4-1/2/3/5/15/16/21~29/35 同架构（overlay 规则：D4 子表 mount "
-            "归父 entry，不独立计数）。"
-        ),
-    },
+#: 逐 entry 契约的交付登记表 —— 数据已抽到伴生模块 `delivered_contracts_ledger.py`
+#: （它在本文件里曾占 1172 行 / 47%，且按设计持续增长，两次触发行数门禁）。
+#:
+#: 🔴 **本处只 re-export，追加新条目请改那个文件**。所有既有 import 路径不变：
+#:    `from ...adapters.registry import DELIVERED_PER_ENTRY_CONTRACTS` 仍可用。
+from app.services.workpaper_sync.adapters.delivered_contracts_ledger import (  # noqa: E402
+    DELIVERED_PER_ENTRY_CONTRACTS,
 )
 
 
@@ -1284,32 +1007,63 @@ class ManifestRegistrationPlanItem:
 
 
 @dataclass(frozen=True)
+class RegistrationFailure:
+    """一个 entry 的**注册失败**（真故障，与「供给不足 reason」分型）。
+
+    起因是该 entry 的 provider attach / `register()` 抛了 `SyncDomainError`（如
+    `ContractDriftError`：契约声明的受管结构与已发布 representation 漂移）。它**不是**
+    「本项目无此数据」——AC 5.12 明令二者必须可分辨。请求解析到该 entry 时，端点据此把
+    **原始** error_code/message 透传成 422（不退化成泛化 `adapter_not_ready`）。
+    """
+
+    entry_id: str
+    error_code: str
+    message: str
+    exc_type: str
+
+
+@dataclass(frozen=True)
 class ManifestRegistrationOutcome:
     """一次 `register_from_manifest()` 的结果。
 
-    `reasons` 必须覆盖**全部**未注册的计划 entry，因此
-    ``len(registered_entry_ids) + len(reasons) == len(planned_entry_ids)`` 应当成立 ——
-    这条等式是「没有 entry 被静默跳过」的可断言形态（守卫据此打红）。
+    未注册的计划 entry 分两类，**必须可分辨**（AC 5.12）：
+      * ``reasons`` —— 供给不足（静态/数据原因，非故障：还没 approved bundle / published
+        representation 等）；
+      * ``failures`` —— 注册失败（真故障：provider/register 抛 `SyncDomainError`，如契约漂移）。
+
+    记账等式（守卫据此打红「没有 entry 被静默跳过」）：
+    ``len(registered_entry_ids) + len(reasons) + len(failures) == len(planned_entry_ids)``，
+    三集合的 entry_id **两两不相交**。
 
     🔴 ``registered_entry_ids`` 是 :meth:`WorkpaperSyncAdapterRegistry.register_from_manifest`
-    **实录**的字段，**不是** ``planned - reasons`` 反算出来的。反算过一版：那样写上面那条
-    等式在 ``reasons ⊆ planned`` 时**恒真**，于是「静默跳过一个 entry」既不进 reasons 也
-    不进 registered，等式照样成立 ⇒ 判据是装饰（变异 M19 实测 GREEN）。两个集合各有独立
-    来源之后，跳过一个 entry 会让两边之和少 1，等式立刻打红。
+    **实录**的字段，**不是** ``planned - reasons - failures`` 反算出来的。反算过一版：那样写
+    上面那条等式在子集关系下**恒真**，于是「静默跳过一个 entry」照样满足等式 ⇒ 判据是装饰
+    （变异 M19 实测 GREEN）。各集合独立来源之后，跳过一个 entry 会让三边之和少 1，立刻打红。
     """
 
     registered_adapter_ids: tuple[str, ...]
     reasons: Mapping[str, str]
     planned_entry_ids: tuple[str, ...]
     registered_entry_ids: tuple[str, ...]
+    #: 🔴 注册失败（真故障）—— 与 `reasons` 并列、不相交。默认空 dict 保持向后兼容
+    #: （历史构造 outcome 的测试无需改；隔离路径按 entry 填充）。
+    failures: Mapping[str, RegistrationFailure] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "registered_adapter_ids": list(self.registered_adapter_ids),
             "registered_entry_ids": list(self.registered_entry_ids),
             "planned_entry_count": len(self.planned_entry_ids),
-            "unregistered_entry_count": len(self.reasons),
+            "unregistered_entry_count": len(self.reasons) + len(self.failures),
             "reasons": dict(self.reasons),
+            "failures": {
+                eid: {
+                    "error_code": f.error_code,
+                    "message": f.message,
+                    "exc_type": f.exc_type,
+                }
+                for eid, f in self.failures.items()
+            },
         }
 
 
@@ -1328,6 +1082,104 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_d6_contract_assets",
         "app.services.workpaper_sync.phase5_d5_receivables_financing",
         "app.services.workpaper_sync.phase5_d4_revenue_detail",
+        # ── E1 canary（spec: e1-sync-coverage-and-first-canary）──────
+        "app.services.workpaper_sync.phase5_e1_monetary_fund",
+        # ── F1 canary（spec: f1-sync-coverage-and-first-canary）──────
+        "app.services.workpaper_sync.phase5_f1_prepayment",
+        # ── F2 四 lane（spec: f2-sync-coverage-four-entry-lanes）──────
+        "app.services.workpaper_sync.phase5_f2_inventory_main",
+        "app.services.workpaper_sync.phase5_f2_stocktake_bundle",
+        "app.services.workpaper_sync.phase5_f2_inventory_valuation",
+        "app.services.workpaper_sync.phase5_f2_inventory_special",
+        # ── F3 / F4 / F5 canary（spec: f{3,4,5}-sync-coverage-and-first-canary）──────
+        "app.services.workpaper_sync.phase5_f3_notes_payable",
+        "app.services.workpaper_sync.phase5_f4_accounts_payable",
+        "app.services.workpaper_sync.phase5_f5_cost_of_sales",
+        # ── G2 canary（spec: g-cycle-sync-foundation-and-first-canary · Task 14）──
+        #    🔴 G 循环首条 `phase5_*` provider。同循环的 G7 走
+        #    `pilot_g7_two_level_dynamic`（上面 pilot 段已登记），两者并存是裁决 GF-H3
+        #    的直接结果：G7 是旧先导范式，新建的 17 条一律 `phase5_*`。
+        "app.services.workpaper_sync.phase5_g2_interest_receivable",
+        # ── H 循环（spec: h-cycle-sync-… / h2-h6-h10-… / h4-h8-…）──────────────
+        #    🔴 同循环的 H1 走 `pilot_h1_grouped_dynamic`（上面 pilot 段已登记），
+        #    新建的一律 `phase5_*`（同 G2/G7 并存的裁决）。
+        #    🔴 **本段是补漏**：H9 的台账条目在首轮（commit 91933bd68）就已登记，
+        #    但漏了这张白名单 ⇒ `test_registrar_delegates_to_each_entry_own_attach`
+        #    的 `len(_ALLOWED_PROVIDER_MODULES) == len(DELIVERED_PER_ENTRY_CONTRACTS)`
+        #    从那时起就红。追加台账条目时**必须同步这里**，否则 provider 会在
+        #    `build_manifest_registration_plan` 里被判「不得从登记表任意 import」而拒绝注册。
+        "app.services.workpaper_sync.phase5_h9_lease_liabilities",
+        "app.services.workpaper_sync.phase5_h6_asset_disposal_clearing",
+        "app.services.workpaper_sync.phase5_h4_engineering_materials",
+        "app.services.workpaper_sync.phase5_h8_right_of_use_assets",
+        "app.services.workpaper_sync.phase5_h2_construction_in_progress",
+        "app.services.workpaper_sync.phase5_h3_investment_property",
+        "app.services.workpaper_sync.phase5_h5_oil_gas_assets",
+        "app.services.workpaper_sync.phase5_h7_biological_assets",
+        "app.services.workpaper_sync.phase5_h10_asset_disposal_income",
+        # ── G 循环 lane（spec: g4-g6-… / g5-… / g-cycle-single-region-…）────────
+        #    🔴 **同上一段的补漏形态**：台账条目已登记但漏了白名单。
+        "app.services.workpaper_sync.phase5_g8_other_equity",
+        "app.services.workpaper_sync.phase5_g9_other_noncurrent",
+        "app.services.workpaper_sync.phase5_g10_trading_liabilities",
+        "app.services.workpaper_sync.phase5_g1_trading_financial_assets",
+        "app.services.workpaper_sync.phase5_g3_dividend_receivable",
+        "app.services.workpaper_sync.phase5_g4_bond_investment",
+        "app.services.workpaper_sync.phase5_g5_long_term_receivable",
+        "app.services.workpaper_sync.phase5_g6_other_bond",
+        "app.services.workpaper_sync.phase5_g11_investment_income",
+        "app.services.workpaper_sync.phase5_g12_net_hedge_gains",
+        "app.services.workpaper_sync.phase5_g13_fair_value_changes",
+        "app.services.workpaper_sync.phase5_g14_credit_impairment",
+        # ── I 循环（spec: i-cycle-sync-… / i1-i3-… / i2-i4-i5-…）───────────────
+        #    🔴 **6/6 全覆盖**。表头层级覆盖 1/2/3/4 四种
+        #    （i6 单级 · i5 两级 · i2+i4 三级 · i1+i3 四级=平台上界）。
+        "app.services.workpaper_sync.phase5_i1_intangible_assets",
+        "app.services.workpaper_sync.phase5_i2_development_expenditure",
+        "app.services.workpaper_sync.phase5_i3_goodwill",
+        "app.services.workpaper_sync.phase5_i4_long_term_prepaid",
+        "app.services.workpaper_sync.phase5_i5_other_noncurrent_assets",
+        "app.services.workpaper_sync.phase5_i6_research_development_expense",
+        # ── J 循环（spec: j-cycle-sync-foundation-and-first-canary）────────────
+        #    🔴 manifest 里 J 只有 2 条 entry（1 独立 + 1 parent_duplicate）
+        #    ⇒ 本循环恒 1 条 provider。
+        "app.services.workpaper_sync.phase5_j1_employee_compensation",
+        # ── A 循环 canary（spec: a-cycle-sync-foundation-and-first-canary）────
+        "app.services.workpaper_sync.phase5_a51_cashflow_audit",
+        # ── C 循环 canary（spec: c-cycle-sync-foundation-and-first-canary · Task 22）──
+        #    🔴 C 域 store 是 per-field 标量行（非 JSON 数组），行身份用 B 列控制编号
+        #    业务键（位置化槽 `m` 不进契约）—— 详见 provider docstring 与台账 reason。
+        "app.services.workpaper_sync.phase5_c_control_test",
+        # ── L 循环首条（spec: l-cycle-true-adapter-registration · Task 6/7）──────
+        #    🔴 受管 sheet 是 `明细表L1-2`（数据源头）而**不是**前序 spec 选的
+        #    `审定表L1-1` —— 后者 R7~R11 全是 SUMIF/加总/裸 IF，无一可输入格，
+        #    写它会毁掉整册取数联动，已降级为契约里的只读投影声明。
+        #    🔴 本条与台账条目**必须成对**（`len(白名单) == len(台账)` 是判据）。
+        "app.services.workpaper_sync.phase5_l1_short_term_loans",
+        # ── L 循环第四条（task 12 最后一条）：受管 L2-4，走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l2_interest_payable",
+        # ── L 循环第三条（task 12）：受管 L3-9，走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l3_long_term_loans",
+        # ── L 循环第二条（task 12，与台账条目成对）：受管 L4-3，走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l4_bonds_payable",
+        # ── L 循环第五条（spec l7-true-bidirectional，与台账条目成对）：受管 L7-2，走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l7_other_noncurrent_liabilities",
+        # ── L 循环第六条（spec l6-true-bidirectional，与台账条目成对）：受管 L6-2（科目 2711），走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l6_special_payables",
+        # ── L 循环第七条（spec l8-true-bidirectional，与台账条目成对）：受管 L8-2（科目 6603 损益类），走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l8_financial_expenses",
+        # ── L 循环第八条（spec l5-true-bidirectional，与台账条目成对）：受管 L5-2（科目 2701 长期应付款），两区同键 + flat 账龄（R24 其他占位续行作静态骨架），走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l5_long_term_payables",
+        # ── K 循环 K1-9 双区 + 调整分录汇总六条（与台账条目成对）──
+        "app.services.workpaper_sync.phase5_k1_baddebt_reversal_writeoff",
+        "app.services.workpaper_sync.phase5_k8_selling_expenses",
+        "app.services.workpaper_sync.phase5_k9_admin_expenses",
+        "app.services.workpaper_sync.phase5_k10_other_income",
+        "app.services.workpaper_sync.phase5_k11_asset_impairment_loss",
+        "app.services.workpaper_sync.phase5_k12_non_operating_income",
+        "app.services.workpaper_sync.phase5_k13_non_operating_expense",
+        # ── K/L/N 批量 provision（2026-10-03）──────────────────────────
+        "app.services.workpaper_sync.phase5_n4_taxes_and_surcharges",
     }
 )
 
@@ -1524,7 +1376,8 @@ __all__ = [
     "assert_contract_file_current", "assert_document_types_agree",
     "WorkpaperSyncAdapterRegistry", "build_production_registry",
     "DELIVERED_ENGINE_ADAPTERS", "PENDING_ENGINE_ADAPTERS", "TASK13_ADAPTER_MODULES",
+    "NON_CARRIER_COMPANION_MODULES",
     "DELIVERED_PER_ENTRY_CONTRACTS",
-    "ManifestRegistrationPlanItem", "ManifestRegistrationOutcome",
+    "ManifestRegistrationPlanItem", "ManifestRegistrationOutcome", "RegistrationFailure",
     "build_manifest_registration_plan",
 ]

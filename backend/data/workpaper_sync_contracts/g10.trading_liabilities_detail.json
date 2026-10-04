@@ -1,0 +1,359 @@
+{
+  "contract_id": "g10.trading_liabilities_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "cbeaf6884273a531ed4ad04595bb24929e04e74d4aa698d899bdf66086b5747c",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-g10-trading-financial-liabilities",
+    "html_store": {
+      "item_ids": [
+        "G10-detail-rows"
+      ],
+      "note": "G10 交易性金融负债的明细行存成 checklist_responses 的 **remark** JSON 数组（真库实证 remark 2 B 即空数组 / conclusion 0 B —— 本条**没有**真实行数据，roundtrip 判据一律用合成行）。单个受管区 R11-R20 ⇒ 契约里一条 `tables[]`、`html_store.item_ids` 一条 `G10-detail-rows`。🔴 该键是 BP-10 第二严重的重复声明（6 处 `const … = 'G10-detail-rows'`），收敛到 per-cycle storage contract 是未清欠账，本 spec 只在 provider 侧立单一口径。",
+      "payload_column": "remark",
+      "payload_column_mode": "remark_only",
+      "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG10Detail.ts —— 写入点为 debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(list) })",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "phase5_trading_financial_liabilities",
+    "reviewed_basis": "openpyxl 逐格实测 G/G10 交易性金融负债.xlsx 的 `明细表G10-2`（两级表头 R9 组 / R10 叶子 / 单个受管区 R11-R20 / footer R21 逐列 =SUM(x11:x20) 且 O21 例外为 =M21+N21 / 6 个公式列 E·G·K·L·M·O 共 60 格 / 有效内容列 19 即 A-S 且 T-X 全空 / max_column=24 含空列 / 0 个 definedName / 受管表零裸 IF，整册 28 格裸 IF 全在 审定表G10-1) + 前端 `useG10Detail.ts` 按值 grep（ITEM_ID_ROWS / genId 带随机后缀 / G10DetailRow 19 字段与模板列序 A..S 逐列对应 / 无 section 字段即单区） + 模板编制思路见 spec evidence/task8-c6-remaining-eight-template-logic.md §2（CAS22 FVTPL 负债口径 / 调整与审定**单列**不拆分量 / L=D+I+J 含计入财务费用的利息 / K=C+H 走未审线 / 本期变动是净额列无「本期减少」）"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "明细表G10-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "g1002-managed",
+      "tables": [
+        {
+          "anchor": "A9",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "liability_category",
+              "header_source_ref": "源xlsx!明细表G10-2!A10",
+              "header_text": "类别",
+              "json_pointer": "/rows/{row_uuid}/liabilityCategory",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G10-2!A11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/liability_category",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "liability_name",
+              "header_source_ref": "源xlsx!明细表G10-2!B10",
+              "header_text": "项目【按明细项目列示，如债券名称】",
+              "json_pointer": "/rows/{row_uuid}/liabilityName",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G10-2!B11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/liability_name",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "opening_initial_amount",
+              "header_source_ref": "源xlsx!明细表G10-2!C10",
+              "header_text": "初始确认金额",
+              "json_pointer": "/rows/{row_uuid}/openingInitialAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G10-2!C11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/opening_initial_amount",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "opening_fv_accum",
+              "header_source_ref": "源xlsx!明细表G10-2!D10",
+              "header_text": "累计公允价值变动",
+              "json_pointer": "/rows/{row_uuid}/openingFvAccum",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G10-2!D11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/opening_fv_accum",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "opening_fair_value",
+              "header_source_ref": "源xlsx!明细表G10-2!E10",
+              "header_text": "公允价值",
+              "json_pointer": "/rows/{row_uuid}/openingFairValue",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表G10-2!E11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/opening_fair_value",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "opening_adjustment",
+              "header_source_ref": "源xlsx!明细表G10-2!F10",
+              "header_text": "期初调整数",
+              "json_pointer": "/rows/{row_uuid}/openingAdjustment",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G10-2!F11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/opening_adjustment",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "opening_adjusted",
+              "header_source_ref": "源xlsx!明细表G10-2!G10",
+              "header_text": "期初审定数",
+              "json_pointer": "/rows/{row_uuid}/openingAdjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表G10-2!G11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/opening_adjusted",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "movement_initial_amount",
+              "header_source_ref": "源xlsx!明细表G10-2!H10",
+              "header_text": "初始确认金额",
+              "json_pointer": "/rows/{row_uuid}/movementInitialAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G10-2!H11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/movement_initial_amount",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "movement_fv_change",
+              "header_source_ref": "源xlsx!明细表G10-2!I10",
+              "header_text": "本期公允价值变动",
+              "json_pointer": "/rows/{row_uuid}/movementFvChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G10-2!I11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/movement_fv_change",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "interest_expense",
+              "header_source_ref": "源xlsx!明细表G10-2!J10",
+              "header_text": "计入财务费用的利息",
+              "json_pointer": "/rows/{row_uuid}/interestExpense",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G10-2!J11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/interest_expense",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "closing_initial_amount",
+              "header_source_ref": "源xlsx!明细表G10-2!K10",
+              "header_text": "初始确认金额",
+              "json_pointer": "/rows/{row_uuid}/closingInitialAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表G10-2!K11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/closing_initial_amount",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "closing_fv_accum",
+              "header_source_ref": "源xlsx!明细表G10-2!L10",
+              "header_text": "累计公允价值变动",
+              "json_pointer": "/rows/{row_uuid}/closingFvAccum",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表G10-2!L11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/closing_fv_accum",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "closing_fair_value",
+              "header_source_ref": "源xlsx!明细表G10-2!M10",
+              "header_text": "公允价值",
+              "json_pointer": "/rows/{row_uuid}/closingFairValue",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表G10-2!M11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/closing_fair_value",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "closing_adjustment",
+              "header_source_ref": "源xlsx!明细表G10-2!N10",
+              "header_text": "调整数",
+              "json_pointer": "/rows/{row_uuid}/closingAdjustment",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G10-2!N11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/closing_adjustment",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "closing_adjusted",
+              "header_source_ref": "源xlsx!明细表G10-2!O10",
+              "header_text": "审定数",
+              "json_pointer": "/rows/{row_uuid}/closingAdjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表G10-2!O11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/closing_adjusted",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              },
+              "column_key": "maturity_date",
+              "header_source_ref": "源xlsx!明细表G10-2!P10",
+              "header_text": "到期日",
+              "json_pointer": "/rows/{row_uuid}/maturityDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G10-2!P11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/maturity_date",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              },
+              "column_key": "coupon_rate",
+              "header_source_ref": "源xlsx!明细表G10-2!Q10",
+              "header_text": "票面利率",
+              "json_pointer": "/rows/{row_uuid}/couponRate",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G10-2!Q11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/coupon_rate",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "R",
+                "row_from": "row_identity"
+              },
+              "column_key": "accrued_interest",
+              "header_source_ref": "源xlsx!明细表G10-2!R10",
+              "header_text": "期末应付利息",
+              "json_pointer": "/rows/{row_uuid}/accruedInterest",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G10-2!R11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/accrued_interest",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "S",
+                "row_from": "row_identity"
+              },
+              "column_key": "issuance_doc_index",
+              "header_source_ref": "源xlsx!明细表G10-2!S10",
+              "header_text": "发行文件索引",
+              "json_pointer": "/rows/{row_uuid}/issuanceDocIndex",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G10-2!S11",
+              "stable_field_key": "g10_detail_rows/{row_uuid}/issuance_doc_index",
+              "store_item_id": "G10-detail-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "E11:E20",
+            "G11:G20",
+            "K11:K20",
+            "L11:L20",
+            "M11:M20",
+            "O11:O20"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "g10_detail_rows",
+          "uuid_col": "T"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "b22d05bc81db21ce8b24b179ee76afa77d2c64e770b394dd674336890d208553",
+    "relative_path": "G/G10 交易性金融负债.xlsx",
+    "template_sha256": "3afd5131f3783c017f3b7e728e1b081188de71acebb46bdb43e2f8b24fb63da3"
+  },
+  "template_definition_sha256": "f67d10450c98e2f2090b6be52bf0f673160c785ca519bb8f159cb8049fe1f1bd"
+}

@@ -15,6 +15,7 @@ import { ref, computed, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ChecklistResponse } from './useF1FormData'
 import { parseNum } from './useG1TraFinFormulaEngine'
+import { G1_ITEM_IDS } from './g1StorageContract'
 
 export type G1Yn = 'yes' | 'no' | 'na' | ''
 
@@ -53,7 +54,7 @@ export interface G1ClassificationRow {
 
 const DATA_KEY = 'G1-9-rows'
 const CONCLUSION_KEY = 'G1-9-conclusion'
-const DETAIL_KEY = 'G1-2-rows'
+const DETAIL_KEY = G1_ITEM_IDS.G1_2_ROWS
 
 export function emptyClassificationRow(id: string, seq: number): G1ClassificationRow {
   return {

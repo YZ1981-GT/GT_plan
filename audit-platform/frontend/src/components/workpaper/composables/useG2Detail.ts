@@ -28,6 +28,7 @@ import { remapRowAgingData } from '@/composables/useAgingMigration'
 import type { ChecklistResponse } from './useF1FormData'
 import { ElMessage } from 'element-plus'
 import { syncG2AgingPresetToAllSheets, type G2AgingSyncDetail } from './g2AgingSync'
+import { G2_ITEM_IDS } from './g2StorageContract'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -119,7 +120,10 @@ export interface InterestDetailTotals {
   agingAudited: AgingBucket
 }
 
-const STORAGE_KEY = 'G2-2-detail-rows'
+// 🔴 派生自单一真源 `g2StorageContract.G2_ITEM_IDS`（Task 13 / BP-10）。
+//    这个键同时是 sync 契约的 `store_item_id`（`phase5_g2_02_detail.STORE_ITEM_ID_G202`）
+//    ⇒ 改它会同时改掉受管表的投影目标，必须只有一处声明。
+const STORAGE_KEY = G2_ITEM_IDS.G2_2_DETAIL_ROWS
 const AGING_PRESET_KEY = 'G2-2-aging-preset'
 const AGING_CUSTOM_KEY = 'G2-2-aging-custom-segments'
 

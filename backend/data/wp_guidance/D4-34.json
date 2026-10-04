@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-34",
+  "title": "D4-34 其他业务收入合同测算表 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "根据其他业务（房屋租赁、咨询等）合同条款测算应计收入，与账面实计收入比较，验证其他业务收入确认的准确性。本表分房屋租赁、咨询业务等子类型。",
+      "source_refs": []
+    },
+    {
+      "key": "materials",
+      "title": "二、资料准备",
+      "content": "房屋租赁：填写承租方、租赁期间、租赁面积、合同单价、本期实际租赁月数。咨询业务：填写委托方、咨询项目、委托期限、合同金额。均须附合同索引。",
+      "source_refs": []
+    },
+    {
+      "key": "formulas",
+      "title": "三、计算公式",
+      "content": "租赁应计收入 = 合同单价 × 租赁面积 × 本期实际租赁月数\n咨询应计收入 = 按履约进度或完工百分比确认\n差异 = 应计收入 − 实计收入",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 差异 >5% 须查明原因（免租期、提前退租、押金冲抵、合同变更）。\n2. 租金收入应在租赁期内均匀确认，关注是否一次性提前确认。\n3. 本表结论与 D4-33 其他业务毛利率分析、D4-3 其他业务明细相互印证。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "cae03d4a4d1e76a097104e159778c166cca309cb9c12aef374acae6d2cb948ec",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "f8c30ca5eff455f9b6f7d07a7ff2940f8a42877993bd26bfaad7b73bfa9f8f62"
+  }
+}

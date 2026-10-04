@@ -166,6 +166,7 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
+import { F2_INVENTORY_ACCOUNT_CODES } from '../../composables/f2NoteSectionMap'
 
 export interface SegmentOption {
   label: string
@@ -223,8 +224,19 @@ const activeSegment = ref(props.defaultSegment || (props.segments.length ? props
 // 虚拟滚动: >50行启用更大的maxHeight
 const tableMaxHeight = computed(() => props.displayRows.length > 50 ? 560 : 420)
 
-// 存货计价测试科目范围（保留原 account-code 值 1401~1411，不新增硬编码）
-const valuationAccountCodes = '1401,1402,1403,1404,1405,1406,1407,1408,1409,1410,1411'.split(',')
+/**
+ * 存货计价测试的科目范围 —— 取自单一真源 `F2_INVENTORY_ACCOUNT_CODES`。
+ *
+ * 🔴 原为 `'1401,...,1411'.split(',')`，注释写「保留原 account-code 值，不新增硬编码」——
+ * 但它本身就是硬编码，只是从模板搬到了脚本里，守卫（R6.6「换地方硬编码」）据此判违规。
+ * 真源现算为 `['1401'..'1412']`（`Array.from({length:12}, …)`），比原字面量**多一个 1412**，
+ * 覆盖更完整的存货族；两者都是存货区间，抽样总体只会变大不会取错科目。
+ *
+ * ⚠️ 与 `F2TabContractCostCheck` 区分：那张表查的是**合同履约成本**（真实库零命中，
+ * 走 `f2ContractCostAccountScope` 的宁缺勿造降级），不能用本存货族常量。
+ * spec: voucher-sampling-account-scope-and-attach-closure R6.6
+ */
+const valuationAccountCodes = [...F2_INVENTORY_ACCOUNT_CODES]
 
 function handleSamplingFilled(payload: {
   samples: SampledVoucher[]

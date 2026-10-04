@@ -22,6 +22,8 @@
  * {@link SYNC_ADAPTER_REGISTERED_ENTRY_IDS}，或反过来登记了但 slice 仍为 null，都打红。
  */
 
+import { WORKPAPER_SYNC_MANIFEST } from './workpaperSyncManifest.generated'
+
 /** 通知级别。当前只有一种：两侧未互通。 */
 export type EntrySyncNoticeLevel = 'not_synchronized'
 
@@ -43,20 +45,32 @@ export interface EntrySyncNotice {
 /**
  * **已接通双向回写**的 entry_id —— 只有它们不再显示「两侧数据未互通」。
  *
- * ═══ 2026-09-06：D2 已接通 ═══
+ * 🔴 2026-09-22 改为从 source-backed manifest **现算**，不再手工维护数组。
  *
- * D2 明细表走 `useD2SyncBridge` + 后端 `/d2-sync/{push-to-excel,pull-from-excel}`，
- * 引擎是本 spec 已交付的 `build_store_projection` / `materialize_projection` /
- * `extract_projection`。离线实测：756 行 → 29,484 字段 → xlsx → 读回 **diff=0**；
- * 在 Excel 改一格再回写，HTML 侧拿到新值（PASS）。
+ * 原实现是硬编码 `['xlsx/gt-d2-accounts-receivable']`，于是真栈出现这个缺陷：
+ * D4（`xlsx/gt-d4-operating-revenue`）、G7、H1 三个 entry 早已在 manifest 里
+ * `capability=bidirectional` + `migration_state=adapter_registered`，前端却因为没人
+ * 往这个数组里补一行，**继续在真双向底稿上显示「两侧数据未互通」** —— 正是本 spec
+ * AC 1.4 / §12.9 明令要消灭的「假双向文案」，只是方向反了：这次是把**真**双向说成假的。
+ * 用户在 D4-2 上实测撞到（截图：结构化视图页签旁常显该红字 + tooltip 说「互不同步」）。
  *
- * 其余 entry 仍为空是**事实**而非占位：它们的宿主还挂在只翻 ref 的
- * `usePilotBridgeAdapter` 上（零 API 调用），所以必须继续显示可操作原因。
- * 判据两侧都有真分母：已登记 ⇒ 无通知；未登记 ⇒ 必须有通知。
+ * 数组形态的根本问题是它是**第二个真源**：manifest 由
+ * `backend/scripts/gen/generate_workpaper_sync_manifest.py` 现算并生成
+ * `workpaperSyncManifest.generated.ts`，而这里要人再抄一遍 —— 抄漏不会有任何报错，
+ * 只会静默误导用户。改成直接筛 `WORKPAPER_SYNC_MANIFEST`（与宿主 `capabilityForEntry`
+ * 同一真源、与后端 `_capability_of` 同口径；未登记的 entry 不在 `bidirectional` 里，
+ * 因此天然 fail-closed 为「显示通知」）后，新 entry 接通双向只需重新生成 manifest，
+ * 这里零改动。
+ *
+ * 保留导出名与 `readonly string[]` 形态是为了不动既有测试与调用方签名：它现在是
+ * **派生值**（manifest 里全部 `bidirectional` entry），不是手工清单。
  */
-export const SYNC_ADAPTER_REGISTERED_ENTRY_IDS: readonly string[] = [
-  'xlsx/gt-d2-accounts-receivable',
-]
+export const SYNC_ADAPTER_REGISTERED_ENTRY_IDS: readonly string[] =
+  Object.freeze(
+    WORKPAPER_SYNC_MANIFEST.filter((e) => e.capability === 'bidirectional').map(
+      (e) => e.entryId,
+    ),
+  )
 
 /** 标签文案（短，放得进工具栏）。 */
 export const ENTRY_SYNC_NOTICE_LABEL = '两侧数据未互通'

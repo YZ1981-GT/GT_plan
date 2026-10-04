@@ -54,24 +54,41 @@ async def generate_consol_reports(
     db: AsyncSession = Depends(get_db),
     user=Depends(require_project_access("edit")),
 ):
-    """生成合并报表"""
+    """生成合并报表（全部报表类型，按项目口径；取不到数的行留空并写明原因）。"""
+    from app.services.consol_report_values import CONSOL_STANDARDS, resolve_consol_standard
+
+    if data.project_id != project_id:
+        raise HTTPException(status_code=400, detail="请求体中的项目与权限校验的项目不一致")
+    standard = data.applicable_standard if data.applicable_standard in CONSOL_STANDARDS else (
+        await resolve_consol_standard(db, data.project_id)
+    )
     try:
-        # Phase 1 A3：generate_consol_reports_sync 已改 async（sync→async 统一），需 await。
-        results = await generate_consol_reports_sync(db, data.project_id, data.year, data.applicable_standard)
-        # 报表行由 service flush（未 commit）。按"service 只 flush，router 统一 commit"铁律，
-        # 此处先 commit 让报表行持久化，再独立写审计 —— 确保审计失败回滚绝不波及已落库的报表。
-        await db.commit()
-        # 5D.2 / 需求 7.2：合并公式审计纳入哈希链（module='consol'）。
-        # 与单体报表（report_config.py，module='report'）同源留痕。
-        # 审计写入独立事务 + try/except，失败仅告警不影响报表生成主流程。
-        await _write_consol_formula_audit(db, str(data.project_id), data.year, results, user_id=user.id if hasattr(user, "id") else None)
-        return {
-            "message": "合并报表生成成功",
-            "report_types": list(results.keys()),
-            "row_counts": {k: len(v) for k, v in results.items()},
-        }
+        results = await generate_consol_reports_sync(db, data.project_id, data.year, standard)
+    except ValueError as e:
+        await db.rollback()
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"合并报表生成失败: {str(e)}")
+        await db.rollback()
+        logger.exception("合并报表生成失败 project=%s year=%s", data.project_id, data.year)
+        raise HTTPException(status_code=500, detail=f"合并报表生成失败: {e}") from e
+    # 报表行由 service flush（未 commit）。按"service 只 flush，router 统一 commit"铁律，
+    # 此处先 commit 让报表行持久化，再独立写审计 —— 确保审计失败回滚绝不波及已落库的报表。
+    await db.commit()
+    # 5D.2 / 需求 7.2：合并公式审计纳入哈希链（module='consol'）。
+    # 审计写入独立事务 + try/except，失败仅告警不影响报表生成主流程。
+    await _write_consol_formula_audit(db, str(data.project_id), data.year, results, user_id=user.id if hasattr(user, "id") else None)
+    blank = {k: sum(1 for r in v if r.get("blank_reason")) for k, v in results.items()}
+    return {
+        "message": "合并报表生成成功",
+        "applicable_standard": standard,
+        "standard_note": (
+            None if data.applicable_standard in (None, standard)
+            else f"传入口径「{data.applicable_standard}」不是合并口径，已按项目模板类型使用 {standard}"
+        ),
+        "report_types": list(results.keys()),
+        "row_counts": {k: len(v) for k, v in results.items()},
+        "blank_counts": {k: n for k, n in blank.items() if n},
+    }
 
 
 async def _write_consol_formula_audit(
@@ -175,6 +192,7 @@ async def get_consol_report(
             for r in rows
         ]
         enriched = await engine.enrich_equity_statement_rows(project_id, year, row_dicts)
+        meta = {r.row_code: r for r in rows}
         return [
             ConsolReportRow(
                 row_code=d.get("row_code") or "",
@@ -186,6 +204,8 @@ async def get_consol_report(
                 prior_period_amount=d.get("prior_period_amount"),
                 formula_used=d.get("formula_used"),
                 source_accounts=d.get("source_accounts"),
+                blank_reason=getattr(meta.get(d.get("row_code")), "blank_reason", None),
+                is_stale=bool(getattr(meta.get(d.get("row_code")), "is_stale", False)),
             )
             for d in enriched
         ]
@@ -201,6 +221,8 @@ async def get_consol_report(
             prior_period_amount=r.prior_period_amount,
             formula_used=r.formula_used,
             source_accounts=r.source_accounts,
+            blank_reason=r.blank_reason,
+            is_stale=bool(r.is_stale),
         )
         for r in rows
     ]

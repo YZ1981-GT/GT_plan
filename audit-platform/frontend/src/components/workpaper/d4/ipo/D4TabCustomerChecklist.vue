@@ -133,6 +133,13 @@ async function handleImportFile(f: any) {
   await reloadHost()
   emit('imported')
 }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await handleImportFile(f) }
+  input.click()
+}
 
 function alignOf(col: ChecklistColumnSpec) {
   if (col.type === 'amount' || col.type === 'number' || col.type === 'percent') return 'right'
@@ -142,6 +149,8 @@ function alignOf(col: ChecklistColumnSpec) {
 function pctText(v: unknown): string {
   return v == null ? '—' : (Number(v) * 100).toFixed(2) + '%'
 }
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 <template>
@@ -154,14 +163,7 @@ function pctText(v: unknown): string {
         title="按客户名称从账面（辅助余额表）重取金额列；账面无匹配保持空值，不写 0"
         @click="handleRefreshInterSheet"
       >🔄 刷新取数</el-button>
-      <el-dropdown trigger="click" size="small">
-        <el-button size="small">导入导出 ▾</el-button>
-        <template #dropdown><el-dropdown-menu>
-          <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-          <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-          <el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="handleImportFile"><span>导入数据</span></el-upload></el-dropdown-item>
-        </el-dropdown-menu></template>
-      </el-dropdown>
+      
       <GtIndexChip value="wp:D4-1" :context-project-id="projectId" />
       <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-28-customer-checklist')">复核</el-button>
     </div>

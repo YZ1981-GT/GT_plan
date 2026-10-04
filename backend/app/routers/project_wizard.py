@@ -21,6 +21,7 @@ from app.models.audit_platform_schemas import (
     ValidationResult,
     WizardState,
     WizardStep,
+    WizardStepSaveResponse,
 )
 from app.models.core import Project, User
 from app.services import project_wizard_service
@@ -50,10 +51,16 @@ def _to_project_response(project: Project) -> ProjectCreateResponse:
         template_type=project.template_type,
         company_subtype=project.company_subtype,
         report_scope=project.report_scope,
+        parent_company_name=project.parent_company_name,
+        parent_company_code=project.parent_company_code,
+        relation_to_parent=project.relation_to_parent,
+        ultimate_company_name=project.ultimate_company_name,
+        ultimate_company_code=project.ultimate_company_code,
         parent_project_id=project.parent_project_id,
         consol_level=project.consol_level or 1,
         consol_lock=bool(project.consol_lock),
         created_at=project.created_at,
+        notices=list(getattr(project, "_group_notices", None) or []),
     )
 
 
@@ -261,19 +268,30 @@ async def list_available_subsidiaries(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[ProjectCreateResponse]:
-    """列出可挂为子公司的候选单体项目（需求 5.1）。
+    """列出可纳入本合并项目的候选单体项目（需求 5.1；consol-tree-three-code-autobuild 任务 6.3）。
 
-    候选 = 用户可见 + 非本项目 + report_scope != consolidated +
-    （未挂到其他集团 或 已挂到本项目）。仅 consolidated 项目可调（R3：不影响非合并流程）。
+    候选 = 用户可见 + 非合并项目 + 同审计年度 + 有企业代码 + 不是本企业 +
+    **不在本企业树中**（已按三码识别的下级不再列出）+ 未被其他合并项目消费（派生链接为空或指向本项目）。
+    返回的 ``relation_to_parent`` 为纳入后将采用的关系（已填取原值，未填按企业名称推断）。
+    仅 consolidated 项目可调（R3：不影响非合并流程）。
     """
-    from sqlalchemy import select, or_
+    from sqlalchemy import or_, select
+
     from app.models.core import ProjectUser
+    from app.services.consol_tree_service import build_tree, iter_nodes
+    from app.services.group_relation import infer_relation_from_name, normalize_relation
+    from app.services.project_audit_year import resolve_project_audit_year
 
     parent = await db.get(Project, project_id)
     if parent is None or parent.is_deleted:
         raise HTTPException(status_code=404, detail="项目不存在")
     if parent.report_scope != "consolidated":
         raise HTTPException(status_code=400, detail="仅合并项目可配置合并范围")
+
+    parent_code = (parent.company_code or "").strip()
+    year = resolve_project_audit_year(parent)
+    tree = await build_tree(db, project_id)
+    in_tree = {n.company_code for n in iter_nodes(tree)} if tree is not None else set()
 
     query = select(Project).where(
         Project.is_deleted == False,  # noqa: E712
@@ -290,7 +308,21 @@ async def list_available_subsidiaries(
             ProjectUser.is_deleted == False,  # noqa: E712
         )
     result = await db.execute(query)
-    return [_to_project_response(p) for p in result.scalars().all()]
+    out: list[ProjectCreateResponse] = []
+    for p in result.scalars().all():
+        code = (p.company_code or "").strip()
+        if not code or code == parent_code or code in in_tree:
+            continue
+        if resolve_project_audit_year(p) != year:
+            continue
+        resp = _to_project_response(p)
+        try:
+            explicit = normalize_relation(p.relation_to_parent)
+        except ValueError:
+            explicit = None
+        resp.relation_to_parent = explicit or infer_relation_from_name(p.client_name)
+        out.append(resp)
+    return out
 
 
 @router.post("/{project_id}/attach-subsidiaries", response_model=list[ProjectCreateResponse])
@@ -300,10 +332,12 @@ async def attach_subsidiaries(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[ProjectCreateResponse]:
-    """把选中的已有单体项目挂为本合并项目的子公司（需求 5.1）。
+    """把选中的已有单体项目纳入本合并项目（需求 5.1；consol-tree-three-code-autobuild 需求 7.5）。
 
     - 仅 consolidated 项目可调（R3：非合并项目流程不变）。
-    - 设置子项目 parent_project_id = 本项目；consol_level = 母 + 1。
+    - 改写下级项目（及其同企业另一口径项目）的集团关系：上级 = 本企业、控制方 = 本企业的控制方
+      （空则本企业）、关系缺省按名称；再按三码重算派生链接 —— 不直接写 parent_project_id。
+    - 跳过：合并项目、本企业自己的单户项目、其他审计年度的项目。
     - 成功后广播 CONSOL_SCOPE_CHANGED（需求 5.2）→ 前端树自动刷新。
     - 仅 admin/partner 或有写权限者可操作（沿用项目可见性，权限不足的子项目跳过）。
     """
@@ -327,6 +361,23 @@ async def attach_subsidiaries(
         )
         allowed_ids = {r[0] for r in mine.all()}
 
+    # consol-tree-three-code-autobuild 需求 7.5：不再直接写 parent_project_id（派生值），
+    # 改为把下级项目的三码与关系改写为「上级 = 本企业」，再按三码重算链接。
+    from app.services.group_links import (
+        apply_group_values,
+        propagate_to_counterpart,
+        sync_group_links,
+    )
+    from app.services.group_relation import resolve_relation
+    from app.services.project_audit_year import resolve_project_audit_year
+
+    parent_code = (parent.company_code or "").strip()
+    if not parent_code:
+        raise HTTPException(status_code=400, detail="本合并项目未填企业代码，无法按三码纳入下级企业")
+    year = resolve_project_audit_year(parent)
+    ultimate_code = (parent.ultimate_company_code or "").strip() or parent_code
+    ultimate_name = parent.ultimate_company_name or parent.client_name
+
     attached: list[Project] = []
     for child_id in body.child_project_ids:
         if child_id == project_id:
@@ -338,18 +389,34 @@ async def attach_subsidiaries(
             continue
         if child.report_scope == "consolidated":
             continue  # 不允许把合并项目挂为子公司
-        child.parent_project_id = project_id
+        if (child.company_code or "").strip() == parent_code:
+            continue  # 本企业自己的单户项目天然就是「母公司」节点，无需纳入
+        if resolve_project_audit_year(child) != year:
+            continue  # 企业树按审计年度隔离（需求 3.8）
+        apply_group_values(child, {
+            "parent_company_name": parent.client_name,
+            "parent_company_code": parent_code,
+            "relation_to_parent": resolve_relation(
+                child.relation_to_parent, parent_code, child.client_name, child.company_code
+            ),
+            "ultimate_company_name": ultimate_name,
+            "ultimate_company_code": ultimate_code,
+        })
+        await propagate_to_counterpart(db, child)
         child.consol_level = (parent.consol_level or 1) + 1
         attached.append(child)
 
+    if attached:
+        await sync_group_links(db, year)
     await db.commit()
     for c in attached:
         await db.refresh(c)
 
-    # 需求 5.2：合并范围变更广播，前端树自动刷新（ADR-CONSOL-303）
+    # 需求 5.2：合并范围变更广播，前端树自动刷新（ADR-CONSOL-303）。链接没变（已纳入过）时
+    # sync_group_links 不会广播，这里对本合并项目再显式推一次。
     if attached:
         from app.services.consol_scope_service import _emit_scope_changed
-        _emit_scope_changed(project_id, _extract_project_audit_year(parent))
+        _emit_scope_changed(project_id, year)
 
     return [_to_project_response(c) for c in attached]
 
@@ -375,58 +442,8 @@ class UpdateParentCodeResponse(BaseModel):
     parent_project_id: str | None
 
 
-async def _would_form_cycle(
-    db: AsyncSession,
-    project: Project,
-    new_parent_code: str,
-) -> bool:
-    """后端二次校验：将 project.parent_company_code 设为 new_parent_code 是否形成循环。
-
-    从 new_parent_code 出发，沿 parent_company_code → company_code 链向上遍历
-    （限定同一 ultimate 分组、未删除项目）。若遍历途中遇到 project 自身的
-    company_code → 形成循环（project 成为自己的祖先），返回 True。
-
-    带 visited 集合防止遍历途中已存在的环导致死循环。
-    parent 指向不存在的代码 → 链断裂（脱挂），不算循环，返回 False。
-    """
-    from sqlalchemy import select
-
-    own_code = (project.company_code or "").strip()
-    target_code = (new_parent_code or "").strip()
-    if not target_code:
-        return False
-    # 自己当自己的上级 → 直接判循环
-    if own_code and target_code == own_code:
-        return True
-    if not own_code:
-        # 自身无 company_code，无法成为任何节点的祖先 → 不可能循环
-        return False
-
-    # 同一 ultimate 分组内的候选项目（按 company_code 索引）
-    ultimate = (project.ultimate_company_code or "").strip()
-    stmt = select(Project).where(Project.is_deleted == False)  # noqa: E712
-    if ultimate:
-        stmt = stmt.where(Project.ultimate_company_code == ultimate)
-    res = await db.execute(stmt)
-    by_code: dict[str, Project] = {}
-    for p in res.scalars().all():
-        c = (p.company_code or "").strip()
-        if c and c not in by_code:
-            by_code[c] = p
-
-    visited: set[str] = set()
-    current_code = target_code
-    while current_code:
-        if current_code == own_code:
-            return True  # 走回自身 → 循环
-        if current_code in visited:
-            return False  # 已存在的环（不含自身），链终止
-        visited.add(current_code)
-        node = by_code.get(current_code)
-        if node is None:
-            return False  # 链断裂（指向不存在企业）→ 脱挂，无循环
-        current_code = (node.parent_company_code or "").strip()
-    return False
+# 旧 _would_form_cycle（跨年度、按项目而非企业、把「上级=本企业」判成环）已由
+# consol_group_tree.would_form_cycle 取代（同年度、企业实体、需求 1.5 口径）。
 
 
 @router.patch("/{project_id}/parent-code", response_model=UpdateParentCodeResponse)
@@ -441,87 +458,83 @@ async def update_parent_code(
     用于树形拖拽调整层级（Task 15）。后端二次校验循环引用（Task 15.2），
     并将变更写入 app_audit_log（who/when/old/new，Task 16.1）。
 
-    - parent_company_code 为空/None → 脱挂到顶层。
-    - 设为自身 company_code 或形成循环 → 400 拒绝。
-    - 同步解析 parent_project_id（匹配同 ultimate 内 company_code 的项目；
-      找不到则置 None，与批量导入脱挂行为一致）。
-    - 审计日志写入失败不阻断主更新（try/except 吞，仅告警）。
+    consol-tree-three-code-autobuild（需求 1.5 / 8.5 / 7.2）：
+    - 同企业同年度的合并项目与单户项目**两口径同写**（集团关系属于企业，不属于某个项目）；
+    - 上级代码非空须通过统一社会信用代码校验（422）；
+    - 上级代码 = 本企业代码 ⇒ 本企业就是上级企业（顶层），接受；空 ⇒ 脱挂到顶层；
+    - 形成循环（同年度）⇒ 400；
+    - 与上级关系：有有效上级时保留原值、缺省按名称；否则清空；
+    - 不再自行解析 parent_project_id，改为按三码重算整年派生链接（sync_group_links）；
+    - 审计日志放进 SAVEPOINT：写失败只回滚这一步，不毒化主事务。
     """
+    from app.services.consol_group_tree import load_year_records, would_form_cycle
+    from app.services.group_links import apply_group_values, find_counterpart, sync_group_links
+    from app.services.group_relation import resolve_relation
+    from app.services.project_audit_year import resolve_project_audit_year
+    from app.services.uscc_validator import validate_uscc
+
     project = await db.get(Project, project_id)
     if project is None or project.is_deleted:
         raise HTTPException(status_code=404, detail="项目不存在")
 
     old_value = project.parent_company_code
     new_value = (body.parent_company_code or "").strip() or None
+    own_code = (project.company_code or "").strip()
+    year = resolve_project_audit_year(project)
 
-    # 后端二次校验：循环引用
     if new_value is not None:
-        own_code = (project.company_code or "").strip()
-        if own_code and new_value == own_code:
-            raise HTTPException(status_code=400, detail="不能将项目的上级设为自身")
-        if await _would_form_cycle(db, project, new_value):
+        ok, err = validate_uscc(new_value)
+        if not ok:
+            raise HTTPException(status_code=422, detail=f"上级企业代码：{err}")
+        if own_code and year is not None and would_form_cycle(
+            await load_year_records(db, year), year, own_code, new_value,
+        ):
             raise HTTPException(
                 status_code=400, detail="该调整会形成循环引用（项目成为自己的祖先）"
             )
 
-    # 更新 parent_company_code
-    project.parent_company_code = new_value
-
-    # 同步解析 parent_project_id（与批量导入解析逻辑一致：匹配同 ultimate 内 company_code）
-    new_parent_project_id = None
-    if new_value is not None:
-        from sqlalchemy import select
-
-        stmt = select(Project).where(
-            Project.company_code == new_value,
-            Project.is_deleted == False,  # noqa: E712
-            Project.id != project.id,
-        )
-        ultimate = (project.ultimate_company_code or "").strip()
-        if ultimate:
-            stmt = stmt.where(Project.ultimate_company_code == ultimate)
-        res = await db.execute(stmt)
-        candidates = res.scalars().all()
-        target = None
-        if candidates:
-            # 优先同年度
-            ay = project.audit_year
-            if ay is not None:
-                for c in candidates:
-                    if c.audit_year == ay:
-                        target = c
-                        break
-            target = target or candidates[0]
-        if target is not None:
-            new_parent_project_id = target.id
-    project.parent_project_id = new_parent_project_id
+    counterpart = await find_counterpart(
+        db, project_id=project.id, company_code=own_code or None,
+        audit_year=year, report_scope=project.report_scope,
+    )
+    for target in (project, counterpart):
+        if target is None:
+            continue
+        apply_group_values(target, {
+            "parent_company_code": new_value,
+            "relation_to_parent": resolve_relation(
+                target.relation_to_parent, new_value, target.client_name, target.company_code
+            ),
+        })
 
     # Task 16.1：写 app_audit_log（who/when/old/new）。失败不阻断主更新。
     try:
         from sqlalchemy import text
 
         details = {"old": old_value, "new": new_value}
-        await db.execute(
-            text(
-                "INSERT INTO app_audit_log "
-                "(id, user_id, action, resource_type, resource_id, details, created_at) "
-                "VALUES (gen_random_uuid(), :user_id, :action, :resource_type, "
-                ":resource_id, CAST(:details AS jsonb), :now)"
-            ),
-            {
-                "user_id": str(current_user.id),
-                "action": "project.parent_code.change",
-                "resource_type": "project",
-                "resource_id": str(project_id),
-                "details": json.dumps(details, ensure_ascii=False),
-                "now": datetime.now(timezone.utc),
-            },
-        )
+        async with db.begin_nested():
+            await db.execute(
+                text(
+                    "INSERT INTO app_audit_log "
+                    "(id, user_id, action, resource_type, resource_id, details, created_at) "
+                    "VALUES (gen_random_uuid(), :user_id, :action, :resource_type, "
+                    ":resource_id, CAST(:details AS jsonb), :now)"
+                ),
+                {
+                    "user_id": str(current_user.id),
+                    "action": "project.parent_code.change",
+                    "resource_type": "project",
+                    "resource_id": str(project_id),
+                    "details": json.dumps(details, ensure_ascii=False),
+                    "now": datetime.now(timezone.utc),
+                },
+            )
     except Exception as exc:  # noqa: BLE001
         # app_audit_log 是 PG 专用表（gen_random_uuid/::jsonb），SQLite 测试会失败，
-        # 审计日志写入失败不应阻断主更新。
+        # 审计日志写入失败不应阻断主更新（SAVEPOINT 已回滚这一步）。
         logger.warning("parent_company_code 变更审计日志写入失败: %s", exc)
 
+    await sync_group_links(db, year)
     await db.commit()
     await db.refresh(project)
 
@@ -664,14 +677,14 @@ async def get_wizard_state(
     return await project_wizard_service.get_wizard_state(project_id, db)
 
 
-@router.put("/{project_id}/wizard/{step}", response_model=WizardState)
+@router.put("/{project_id}/wizard/{step}", response_model=WizardStepSaveResponse)
 async def update_step(
     project_id: UUID,
     step: WizardStep,
     data: dict,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> WizardState:
+) -> WizardStepSaveResponse:
     """更新指定步骤数据并持久化。
 
     Validates: Requirements 1.3, 1.4, 1.5
@@ -740,6 +753,10 @@ async def delete_project(
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
     project.is_deleted = True
+    # 需求 7.2：删除后按三码重算本年度派生链接（下级不再指向已删的合并项目）
+    from app.services.group_links import sync_group_links_for
+
+    await sync_group_links_for(db, project)
     await db.commit()
     return {"id": str(project_id), "deleted": True}
 
@@ -754,8 +771,11 @@ async def batch_delete_projects(
     from fastapi import HTTPException
     if current_user.role.value not in ("admin", "partner", "manager"):
         raise HTTPException(status_code=403, detail="权限不足，仅管理员/合伙人/项目经理可删除项目")
-    from sqlalchemy import select, update
-    count = 0
+    from sqlalchemy import select
+
+    from app.services.group_links import sync_group_links_for
+
+    deleted: list[Project] = []
     for pid in body.project_ids:
         result = await db.execute(
             select(Project).where(Project.id == pid, Project.is_deleted == False)  # noqa: E712
@@ -763,6 +783,8 @@ async def batch_delete_projects(
         p = result.scalar_one_or_none()
         if p:
             p.is_deleted = True
-            count += 1
+            deleted.append(p)
+    # 需求 7.2：整批删除后按涉及的年度各重算一次派生链接
+    await sync_group_links_for(db, *deleted)
     await db.commit()
-    return {"deleted_count": count, "requested": len(body.project_ids)}
+    return {"deleted_count": len(deleted), "requested": len(body.project_ids)}

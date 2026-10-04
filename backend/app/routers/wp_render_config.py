@@ -37,6 +37,7 @@ from app.services.wp_auto_fill_service import _resolve_auto_fill_values
 from app.services.wp_account_package_resolver import resolve_package_sheets
 from app.services.wp_render_schema_service import WpRenderSchemaService
 from app.services.wp_template_version_service import WpTemplateVersionService
+from app.services.wp_template_finder import _should_skip_historical_sheet
 from app.services.project_audit_year import (
     PROJECT_AUDIT_YEAR_BIZ_SQL,
     PROJECT_AUDIT_YEAR_SQL,
@@ -705,10 +706,20 @@ async def _get_render_config_impl(
     # 逐 sheet 重复调用会产生 N 倍冗余 DB 查询（J1 14 sheet=28 次、H7 26 sheet 更甚）。
     # 按 component_type 在单次请求内 memo，renderer 只跑一次。
     _dedicated_render_memo: dict[str, dict | None] = {}
+    # ovr = wp_code 级 override，是循环不变量（与具体 sheet 无关），提前固化到循环外。
+    # 🔴 根因修复：当 classifications 为空 / 全部 sheet 被 continue 跳过时，循环体内的
+    #    `ovr = _WP_CODE_OVERRIDE.get(wp_code)` 从未执行，循环后第 `if ovr in
+    #    _SELF_CONTAINED_DEDICATED` 会触发 UnboundLocalError → 整个 render-config 500。
+    #    （空 sheet 集底稿如 c24c0705 首当其冲；有 sheet 的底稿从未暴露此边界。）
+    ovr = _WP_CODE_OVERRIDE.get(wp_code)
     for cls in classifications:
         if sheet_name and not _sheet_name_matches(cls.sheet_name, sheet_name):
             continue
         if cls.sheet_name and "GT_Custom" in cls.sheet_name:
+            continue
+        # 🔴 MC-24 统一过滤：OO 侧已有 _should_skip_historical_sheet，HTML 侧此前缺失。
+        # 两侧 sheet 集合不等的根因是 render_config 没调这个函数。现补齐，使两侧口径一致。
+        if cls.sheet_name and _should_skip_historical_sheet(cls.sheet_name):
             continue
         # sheet_name 级 skip override（隐藏辅助/遗留 sheet）：
         #   - A1-11 的文号规则页等辅助 sheet
@@ -761,7 +772,7 @@ async def _get_render_config_impl(
                         or "不打印" in _sn_lower or _sn_lower.startswith("示例")
                         or (_is_bundle and "底稿目录" in _sn_lower)):
                     continue
-        ovr = _WP_CODE_OVERRIDE.get(wp_code)
+        # ovr 已在循环外固化（wp_code 级不变量），此处不再重复赋值。
         # 多 sheet 底稿：按 sheet 级编码查 override（协作者 confirmation-* 精细组件，
         # 如 D0-5→confirmation-alternative-d05）。sheet 级 override 优先于 class_code 派生。
         _sheet_ovr = None

@@ -9,10 +9,18 @@
 
 from __future__ import annotations
 
-import re
+import sys
 from pathlib import Path
 
 import pytest
+
+_BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(_BACKEND_ROOT) not in sys.path:  # pragma: no cover
+    sys.path.insert(0, str(_BACKEND_ROOT))
+
+from scripts.check.workpaper_component_manifest import (  # noqa: E402
+    parse_registry_component_types,
+)
 
 from app.routers.wp_render_config import (
     _CONFIRMATION_COMPONENTS,
@@ -23,27 +31,16 @@ from app.routers.wp_render_strategies import RENDERER_DISPATCH
 from app.services.dedicated_component_types import DEDICATED_COMPONENT_TYPES
 from app.services.wp_classification_service import VALID_COMPONENT_TYPES
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-_FE_REGISTRY = (
-    _REPO_ROOT
-    / "audit-platform"
-    / "frontend"
-    / "src"
-    / "components"
-    / "workpaper"
-    / "htmlRendererRegistry.ts"
-)
-
-_CT_RE = re.compile(r"componentType:\s*'([a-z0-9-]+)'")
-
-
 def _parse_fe_component_types() -> set[str]:
-    text = _FE_REGISTRY.read_text(encoding="utf-8")
-    # 仅取 REGISTRY_LIST 段内的 componentType（避免 HtmlComponentType union 干扰）
-    start = text.find("const REGISTRY_LIST")
-    end = text.find("export const HTML_RENDERER_REGISTRY")
-    assert start >= 0 and end > start, "无法定位 REGISTRY_LIST"
-    return set(_CT_RE.findall(text[start:end]))
+    """🔴 2026-09-28 改：委托给唯一解析入口，不再手写 REGISTRY_LIST 切片。
+
+    原实现取 `const REGISTRY_LIST` 到 `export const HTML_RENDERER_REGISTRY` 之间的
+    切片再正则 componentType。注册表按渲染器家族拆到 `registry/entries/*.ts` 后，
+    那段只剩 6 个 spread ⇒ 解析出 **0 条**，于是 `whole - fe_types` 报出 91 个
+    「WHOLE 不在 FE registry」—— 看着像注册漂移，实为解析失败。
+    仓库里同一份手抄副本共 4 处（本文件 + k10/k12/k13 契约），全部同时恒红。
+    """
+    return set(parse_registry_component_types())
 
 
 @pytest.fixture(scope="module")
@@ -57,7 +54,21 @@ def test_whole_equals_dedicated_source():
 
 def test_dedicated_count_stable():
     """防误删：当前整册专属为 90 项（含 A/B Bundle + C/H/I/J/K/L/M/N/S + G1/G5 + B22A/B22B-deficiency/B22B-control-matrix/B22C + B23 + B50）。"""
-    assert len(DEDICATED_COMPONENT_TYPES) == 90
+    # 91 = 90 + a5-1-cashflow-audit（A 循环 canary 整册路由）
+    # spec: a-cycle-sync-foundation-and-first-canary
+    assert len(DEDICATED_COMPONENT_TYPES) == 91
+
+
+def test_fe_registry_parse_is_not_empty(fe_types: set[str]):
+    """结构性零守卫：解析结果必须非空，且含跨家族锚点。
+
+    没有这条，「解析出 0 条」会伪装成「91 个 componentType 全部缺失」——
+    2026-09-28 实测就是这个形态（注册表拆分后手写切片解析器失效）。
+    锚点跨 core / programs / specialized 三个分域文件，确保 spread 各族都解析到。
+    """
+    assert len(fe_types) >= 90, len(fe_types)
+    for anchor in ("a1-dashboard", "b22a-control-matrix", "k8-selling-expenses"):
+        assert anchor in fe_types, f"{anchor} 未解析到 —— 分域 spread 可能漏族"
 
 
 def test_whole_subset_of_valid_and_fe(fe_types: set[str]):

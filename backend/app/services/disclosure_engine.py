@@ -49,6 +49,7 @@ from app.services.parent_company_note_sections import (
     is_parent_company_section,
     resolve_parent_scope_for_notes,
 )
+from app.services.parent_company_values import load_parent_company_values
 from app.services.note_template_service import NoteTemplateService
 from app.services.note_template_merge import merge_templates
 from app.services.note_custom_template_service import NoteCustomTemplateService
@@ -672,7 +673,11 @@ class DisclosureEngine:
             return ctx
 
         ctx["project_id"] = scope.parent_project_id
-        ctx["_tb_cache"] = await self._parent_tb_cache(scope.parent_project_id, year)
+        if scope.has_branches:
+            ctx["_tb_cache"] = await self._parent_aggregate_tb_cache(project_id, year, scope)
+        else:
+            # P13：无直属分公司严格保留原 standalone 查询路径与载荷形态
+            ctx["_tb_cache"] = await self._parent_tb_cache(scope.parent_project_id, year)
         ctx[PARENT_SOURCE_META_KEY] = build_parent_source_meta(scope)
         return ctx
 
@@ -756,6 +761,55 @@ class DisclosureEngine:
             cached = {}
             self._parent_tb_cache_store = cached
         cached[key] = tb
+        return tb
+
+    async def _parent_aggregate_tb_cache(
+        self, project_id: UUID, year: int, scope: ParentScopeCache
+    ) -> dict:
+        """有分公司时的母公司章缓存。
+
+        审定数取精确 parent 汇总节点的 ``consolidated``（本部+分公司+已审批母分差额）；
+        未审数/期初数只取 parent 子树数据叶子之和，不叠加差额。代码键与名称键仍保持
+        `_parent_tb_cache` 的旧形状，resolver 无需另建管道。
+        """
+        store = getattr(self, "_parent_aggregate_tb_cache_store", None)
+        key = (project_id, year, scope.parent_node_key)
+        if isinstance(store, dict) and key in store:
+            return store[key]
+
+        tb: dict[str, dict] = {}
+        try:
+            if scope.parent_context is None:
+                raise LookupError("母公司汇总上下文缺失")
+            values = await load_parent_company_values(
+                self.db, project_id, year, scope.parent_context
+            )
+            for code in sorted(set(values.audited) | set(values.unadjusted) | set(values.opening)):
+                entry = {
+                    "audited": float(values.audited.get(code, 0)),
+                    "unadjusted": float(values.unadjusted.get(code, 0)),
+                    "opening": float(values.opening.get(code, 0)),
+                }
+                tb[code] = entry
+                name = values.names.get(code)
+                if name:
+                    tb[name] = entry
+        except Exception as err:
+            logger.warning(
+                "母公司汇总节点 %s 的金额预加载失败：%s；该章节取数留空",
+                scope.parent_node_key,
+                err,
+            )
+            try:
+                await self.db.rollback()
+            except Exception:
+                pass
+            tb = {}
+
+        if not isinstance(store, dict):
+            store = {}
+            self._parent_aggregate_tb_cache_store = store
+        store[key] = tb
         return tb
 
     async def _get_project_basic_info(self, project_id: UUID) -> dict:
@@ -1165,7 +1219,7 @@ class DisclosureEngine:
         headers = table_template.get("headers", ["项目", "期末余额", "期初余额"])
         template_rows = table_template.get("rows", [])
         if not template_rows:
-            return {"headers": headers, "rows": []}
+            return _with_column_meta({"headers": headers, "rows": []}, table_template)
 
         # 使用预加载缓存
         wp_data = getattr(self, '_wp_cache', None) or {}
@@ -2326,12 +2380,47 @@ class DisclosureEngine:
     # ------------------------------------------------------------------
     # 获取附注
     # ------------------------------------------------------------------
+    async def _project_scope_columns(self, project_id: UUID) -> tuple[str | None, str | None]:
+        """``(template_type, report_scope)``；读不到 / 形态不对 ⇒ ``(None, None)``（不过滤）。
+
+        口径源**复用生成链已有的那一个**：``_get_project_basic_info``（wizard
+        ``basic_info``）—— 与 ``_load_templates`` / ``_get_active_template_type``
+        同源，真库 5 个正式项目逐项与 ``projects`` 两列一致。
+        🔴 不在本层查 ``Project.report_scope``：母公司取数口径的单一真源约束
+        （``test_parent_company_note_sourcing`` Property 20）禁止本层自拼
+        ``(company_code, audit_year, report_scope)``，源码级判据按文本断言。
+
+        fail-open 的理由：这是**读**侧过滤，失败时退回原行为（全量返回）不会丢数据；
+        反过来若把异常当成「全部不适用」会让目录树整棵变空。
+        """
+        try:
+            basic_info = await self._get_project_basic_info(project_id)
+        except Exception as err:  # pragma: no cover - 读侧降级
+            logger.warning("notes tree: resolve project scope failed for %s: %s", project_id, err)
+            return None, None
+        if not isinstance(basic_info, dict):
+            return None, None
+        template_type = basic_info.get("template_type")
+        scope = basic_info.get("report_scope")
+        if not isinstance(template_type, str):
+            return None, None
+        return template_type, scope if isinstance(scope, str) else None
+
     async def get_notes_tree(
         self,
         project_id: UUID,
         year: int,
     ) -> list[dict]:
-        """获取附注目录树"""
+        """获取附注目录树（按项目口径过滤：单体项目不返回合并专属章节）。
+
+        🔴 2026-09-30：原实现直接返回 DB 全部未删行、不看口径。附注生成本身按模板
+        scope 过滤，但底稿披露同步是另一条写入口（从不过滤）⇒ 单体项目里被同步写进了
+        「合并范围的变化」「母公司财务报表主要项目注释」等合并专属章节，目录树原样显示。
+        读侧与 Word 导出（``note_applies_to_report_scope``）、生成侧
+        （``filter_template_sections``）改为同一判据 ``section_allowed_for_project``。
+        """
+        from app.services.note_section_catalog import section_allowed_for_project
+
         result = await self.db.execute(
             sa.select(DisclosureNote)
             .where(
@@ -2342,6 +2431,13 @@ class DisclosureEngine:
             .order_by(DisclosureNote.sort_order)
         )
         notes = result.scalars().all()
+        template_type, report_scope = await self._project_scope_columns(project_id)
+        if template_type is not None:
+            notes = [
+                n
+                for n in notes
+                if section_allowed_for_project(n.note_section, template_type, report_scope)
+            ]
         # has_data：与 NoteWordExporter._has_content 收敛为同一共享 helper
         # （note_content_utils.note_has_data，单一真源），防"附注树标记≠Word 导出结果"漂移
         # （spec disclosure-notes-selective-generation Req2）。is_empty(not_applicable)→false。

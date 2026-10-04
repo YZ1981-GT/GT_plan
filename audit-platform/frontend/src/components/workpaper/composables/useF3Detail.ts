@@ -11,6 +11,11 @@ import {
   calcTermDays,
   calcSubtotal,
 } from './useF3FormulaEngine'
+import {
+  F3_ROW_ID_PREFIX,
+  resolveF3RowId,
+  type F3RowIdentityMintStats,
+} from './f3RowIdentity'
 import type { ChecklistResponse } from './useF3FormData'
 import type { UseF3BaseOptions } from './useF3Adjudication'
 
@@ -165,14 +170,18 @@ function emptyStored(seq: number): StoredF3DetailRow {
   }
 }
 
-function safeParseRows(jsonStr: string | null | undefined): StoredF3DetailRow[] {
+function safeParseRows(
+  jsonStr: string | null | undefined,
+  stats?: F3RowIdentityMintStats,
+): StoredF3DetailRow[] {
   if (!jsonStr) return []
   try {
     const parsed = JSON.parse(jsonStr)
     if (!Array.isArray(parsed)) return []
     return parsed.map((raw: any, i: number) => ({
       ...emptyStored(i + 1),
-      rowId: raw.rowId || raw.id || generateRowId(),
+      // 🔴 缺 rowId 时铸新并记数（委托 f3RowIdentity 单源）；`loadRows` 据此立即回写。
+      rowId: resolveF3RowId(raw, F3_ROW_ID_PREFIX.detail, stats),
       seq: raw.seq ?? i + 1,
       ticketNo: raw.ticketNo || raw.noteNo || raw.billNo || '',
       relatedPartyType: raw.relatedPartyType || raw.relationship || '非关联方',
@@ -244,7 +253,10 @@ export function useF3Detail(options: UseF3BaseOptions) {
   const searchQuery = ref('')
 
   function loadRows(): void {
-    storedData.value = safeParseRows(allResponses.value.get(STORAGE_KEY)?.remark)
+    // 🔴 铸了新行身份就立即回写（spec f3-sync-coverage-and-first-canary Task 15）。
+    const stats: F3RowIdentityMintStats = { minted: 0 }
+    storedData.value = safeParseRows(allResponses.value.get(STORAGE_KEY)?.remark, stats)
+    if (storedData.value.length > 0 && stats.minted > 0 && !readonly.value) persistRows()
     if (storedData.value.length === 0) storedData.value = [emptyStored(1)]
   }
 

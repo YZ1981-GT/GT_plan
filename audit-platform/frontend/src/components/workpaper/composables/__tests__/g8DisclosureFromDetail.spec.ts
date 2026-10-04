@@ -66,6 +66,10 @@ describe('buildG8DesignationNarrative', () => {
 })
 
 describe('pullG8DisclosureFromDetail', () => {
+  // 🔴 C-8（spec g-cycle-single-region-detail-lanes）：G8-2 改权威模板 23 列 A..W。
+  //    fixture 的 `ociCurrentChange` → 模板 J 列 `movementFvChange`（FVOCI 下本期公允
+  //    价值变动就是本期 OCI，两字段原本双源）；`ociCumulativeChange` → 模板 R 列
+  //    `closingOciCumulative`。
   it('上市：带入余额与 OCI，标记 dividend 缺失', () => {
     const m = mapOf({
       'G8-detail-rows': {
@@ -75,8 +79,8 @@ describe('pullG8DisclosureFromDetail', () => {
             openingAdjusted: 10,
             closingAdjusted: 1000,
             designationReason: '战略持有',
-            ociCurrentChange: 50,
-            ociCumulativeChange: 200,
+            movementFvChange: 50,
+            closingOciCumulative: 200,
             ociToRetainedEarnings: 0,
             transferReason: '',
           },
@@ -85,8 +89,8 @@ describe('pullG8DisclosureFromDetail', () => {
             openingAdjusted: 5,
             closingAdjusted: 100,
             designationReason: '',
-            ociCurrentChange: 10,
-            ociCumulativeChange: 20,
+            movementFvChange: 10,
+            closingOciCumulative: 20,
             ociToRetainedEarnings: 5,
             transferReason: '处置',
           },

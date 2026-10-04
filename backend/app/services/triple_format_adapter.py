@@ -458,9 +458,14 @@ class ConsolWorksheetAdapter:
     async def consol_to_structure(
         db: AsyncSession, project_id: UUID, year: int,
     ) -> dict:
-        """从合并差额表生成 structure.json（多企业宽表）"""
+        """从合并差额表生成 structure.json（节点 × 科目宽表）。
+
+        差额表每个企业树节点一组行（``node_company_code`` = node_key），首列显示节点展示名；
+        全量重算会软删过期行，这里只取未删行（spec consol-tree-three-code-autobuild 任务 7.5）。
+        """
         try:
             from app.models.consolidation_models import ConsolWorksheet
+            from app.services.consol_tree_service import build_tree, iter_nodes, worksheet_key
         except ImportError:
             return {"sheets": [], "metadata": {"module": "consol_worksheet", "error": "model not available"}}
 
@@ -468,30 +473,43 @@ class ConsolWorksheetAdapter:
             sa.select(ConsolWorksheet).where(
                 ConsolWorksheet.project_id == project_id,
                 ConsolWorksheet.year == year,
-            ).order_by(ConsolWorksheet.account_code)
+                ConsolWorksheet.is_deleted == sa.false(),
+            )
         )
-        rows = result.scalars().all()
+        tree = await build_tree(db, project_id)
+        labels: dict[str, str] = {}
+        if tree is not None:
+            for n in iter_nodes(tree):
+                labels.setdefault(worksheet_key(n), n.display_name or n.company_name)
+        order = {key: i for i, key in enumerate(labels)}
+        rows = sorted(
+            result.scalars().all(),
+            key=lambda w: (order.get(w.node_company_code, len(order)), w.node_company_code, w.account_code),
+        )
 
         cells = {}
-        headers = ["科目编码", "科目名称", "子公司汇总", "调整借方", "调整贷方", "抵消借方", "抵消贷方", "差额净额", "合并数"]
+        headers = ["节点", "科目编码", "下级合计", "调整借方", "调整贷方", "抵消借方", "抵消贷方", "差额净额", "合并数"]
         for c, h in enumerate(headers):
             cells[f"0:{c}"] = {"value": h, "style": {"bold": True, "textAlign": "center"}}
 
+        def _num(value):
+            return float(value) if value else None
+
         for r, row in enumerate(rows):
-            cells[f"{r+1}:0"] = {"value": row.account_code}
-            cells[f"{r+1}:1"] = {"value": ""}  # account_name 需从 trial_balance 关联获取
-            cells[f"{r+1}:2"] = {"value": float(row.children_amount_sum) if row.children_amount_sum else None}
-            cells[f"{r+1}:3"] = {"value": float(row.adjustment_debit) if row.adjustment_debit else None}
-            cells[f"{r+1}:4"] = {"value": float(row.adjustment_credit) if row.adjustment_credit else None}
-            cells[f"{r+1}:5"] = {"value": float(row.elimination_debit) if row.elimination_debit else None}
-            cells[f"{r+1}:6"] = {"value": float(row.elimination_credit) if row.elimination_credit else None}
-            cells[f"{r+1}:7"] = {"value": float(row.net_difference) if row.net_difference else None}
-            cells[f"{r+1}:8"] = {"value": float(row.consolidated_amount) if row.consolidated_amount else None}
+            cells[f"{r+1}:0"] = {"value": labels.get(row.node_company_code, row.node_company_code)}
+            cells[f"{r+1}:1"] = {"value": row.account_code}
+            cells[f"{r+1}:2"] = {"value": _num(row.children_amount_sum)}
+            cells[f"{r+1}:3"] = {"value": _num(row.adjustment_debit)}
+            cells[f"{r+1}:4"] = {"value": _num(row.adjustment_credit)}
+            cells[f"{r+1}:5"] = {"value": _num(row.elimination_debit)}
+            cells[f"{r+1}:6"] = {"value": _num(row.elimination_credit)}
+            cells[f"{r+1}:7"] = {"value": _num(row.net_difference)}
+            cells[f"{r+1}:8"] = {"value": _num(row.consolidated_amount)}
 
         return {
             "sheets": [{
                 "name": "合并差额表",
-                "cols": [{"width": 80}, {"width": 150}] + [{"width": 110}] * 7,
+                "cols": [{"width": 180}, {"width": 90}] + [{"width": 110}] * 7,
                 "rows": [{"height": 22}] * (len(rows) + 1),
                 "cells": cells,
                 "merges": [],

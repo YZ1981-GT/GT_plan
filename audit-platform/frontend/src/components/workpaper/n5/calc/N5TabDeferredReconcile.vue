@@ -78,14 +78,14 @@
       <!-- DTA列组 -->
       <el-table-column label="递延所得税资产（DTA）" align="center">
         <el-table-column prop="assetBeginning" label="期初" min-width="100" align="right">
-          <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" v-model="row.assetBeginning" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleUpdate($index, 'assetBeginning', row.assetBeginning)" />
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.assetBeginning" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleUpdate(row.rowKey, 'assetBeginning', row.assetBeginning)" />
             <span v-else class="cell-value">{{ fmtAmount(row.assetBeginning) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="assetEnding" label="期末" min-width="100" align="right">
-          <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" v-model="row.assetEnding" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleUpdate($index, 'assetEnding', row.assetEnding)" />
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.assetEnding" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleUpdate(row.rowKey, 'assetEnding', row.assetEnding)" />
             <span v-else class="cell-value">{{ fmtAmount(row.assetEnding) }}</span>
           </template>
         </el-table-column>
@@ -103,14 +103,14 @@
       <!-- DTL列组 -->
       <el-table-column label="递延所得税负债（DTL）" align="center">
         <el-table-column prop="liabilityBeginning" label="期初" min-width="100" align="right">
-          <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" v-model="row.liabilityBeginning" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleUpdate($index, 'liabilityBeginning', row.liabilityBeginning)" />
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.liabilityBeginning" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleUpdate(row.rowKey, 'liabilityBeginning', row.liabilityBeginning)" />
             <span v-else class="cell-value">{{ fmtAmount(row.liabilityBeginning) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="liabilityEnding" label="期末" min-width="100" align="right">
-          <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" v-model="row.liabilityEnding" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleUpdate($index, 'liabilityEnding', row.liabilityEnding)" />
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.liabilityEnding" :controls="false" :precision="2" size="small" class="cell-input" @change="() => handleUpdate(row.rowKey, 'liabilityEnding', row.liabilityEnding)" />
             <span v-else class="cell-value">{{ fmtAmount(row.liabilityEnding) }}</span>
           </template>
         </el-table-column>
@@ -138,8 +138,8 @@
       </el-table-column>
       <!-- 备注 -->
       <el-table-column prop="remark" label="备注" min-width="120">
-        <template #default="{ row, $index }">
-          <el-input v-if="!isReadonly" v-model="row.remark" size="small" placeholder="备注" @change="() => handleUpdate($index, 'remark', row.remark)" />
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" v-model="row.remark" size="small" placeholder="备注" @change="() => handleUpdate(row.rowKey, 'remark', row.remark)" />
           <span v-else class="cell-value">{{ row.remark || '—' }}</span>
         </template>
       </el-table-column>
@@ -251,8 +251,9 @@ onMounted(async () => {
 
 // ─── 事件处理 ────────────────────────────────────────────────────────────────
 
-async function handleUpdate(index: number, field: string, value: any) {
-  await reconcile.updateRow(index, field as any, value)
+// 按稳定身份寻址（BP-8）：模板行下标在过滤/分组子表里与全量数组下标不一致
+async function handleUpdate(rowKey: string, field: string, value: any) {
+  await reconcile.updateRow(rowKey, field as any, value)
 }
 
 async function handleSetN1(val: number) {

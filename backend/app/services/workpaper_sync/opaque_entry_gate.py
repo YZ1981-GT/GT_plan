@@ -546,6 +546,24 @@ ENTRY_ID_NAMESPACE_SPLIT_NOTE: Final[Mapping[str, Any]] = {
                 "`projection_contract`)。⇒ 「零迁移成本」已不成立"
             ),
         },
+        {
+            "measured_at": "2026-09-23",
+            "working_paper_content_version_rows": 198,
+            "working_paper_content_representation_rows": 202,
+            "working_paper_content_application_rows": 69,
+            "working_paper_sync_entry_state_rows": 12,
+            "note": (
+                "静默库实测（连续两次独立连接、相隔 112 秒读数逐项相同；三表 30 分钟内"
+                "无写入、无写意图锁、本库无 active backend）。趋势确认：两周内 "
+                "version 2→198、representation 2→202。`working_paper_content_application` "
+                "由 0→69 ⇒ 2026-09-04 那条读数附带的「application 表仍为 0」也已过期，"
+                "application 层同样开始积累迁移债。entry_state 2→12 行，其中 11 行是 "
+                "manifest entry、1 行仍是唯一的 `opaque-` 命名空间行 ⇒ 分叉的**两侧都在长**，"
+                "改 entry_id 口径的代价随每份 representation 单调上升。"
+                "🔴 本条只登记行数读数；「capability 是否已翻转、约束是否已解除」不在本表"
+                "裁决范围内（见 `scope_boundary` / `adjudication_owner_task`）。"
+            ),
+        },
     ),
     #: 🔴 本登记表裁决的**范围边界**。加这一条是因为它极易被误读成「统管所有 entry_id
     #: 口径」：它只管 opaque lane **内部**的 `wp_code` / `wp_id` / `wp_code_with_sheet`
@@ -792,6 +810,147 @@ def discover_opaque_entry_id_call_sites() -> tuple[OpaqueEntryIdCallSite, ...]:
     return tuple(sites)
 
 
+@dataclass(frozen=True)
+class NonWriterEntryIdSite:
+    """一处**只读**的 `opaque_entry_id(...)` 调用点登记 —— 它不是 lane。
+
+    为什么需要这一张表：`opaque_entry_id` 既被**写入路径**用来定 entry 命名空间，也被
+    **只读的迁移/诊断计划**用来「展示同一个 wp 在分裂口径下会落到哪两个 entry」。后者
+    结构上无法登记成 lane：一条 lane 只有一个 `entry_id_source`，而这种探测函数会同时
+    产生 `wp_code` 与 `wp_id` 两种形态（登记任一种都会触发 `实参形态漂移`），它也没有
+    `writer_ref`、没有 `commit_bytes(lane_id=...)`。把它登记成 lane 等于**对 authority
+    model 说谎**（凭空多出一条不存在的权威写入路径）。
+
+    🔴 这张表不是「豁免开关」，豁免必须**挣来**：:func:`assert_non_writer_sites_are_read_only`
+    会打开登记函数的 AST 子树，确认里面没有任何权威写入标记
+    （:data:`_AUTHORITY_WRITE_MARKERS`）。哪天有人往这个函数里加了 `commit_bytes(...)`，
+    豁免当场自失效打红 —— 判据不靠「名单上有名字」，靠「结构上确实写不出去」。
+
+    `call_count` 把**条数**也钉死：既防「探测函数被删/改名」（stale 豁免，与 lane 的
+    `无调用点的登记` 同款），也防「在已豁免的函数里悄悄多加一处调用」。
+    """
+
+    module: str
+    qualname: str
+    call_count: int
+    reason: str
+    adjudication_owner_task: str
+
+    @property
+    def site_ref(self) -> str:
+        return f"{self.module}::{self.qualname}"
+
+
+#: **全部**只读 `opaque_entry_id(...)` 调用点。与 :data:`OPAQUE_AUTHORITY_LANES` 一样是
+#: 一张**可枚举且双向锁死**的表，不是「记得加就加」的清单。
+NON_WRITER_ENTRY_ID_SITES: Final[tuple[NonWriterEntryIdSite, ...]] = (
+    NonWriterEntryIdSite(
+        module="app.services.custom_template_ingestion.namespace_migration",
+        qualname="legacy_opaque_ids_for_wp",
+        call_count=2,
+        reason=(
+            "只读探测：故意用同一个 wp_id 调两次（`wp_code=wp_code` 与 `wp_code=None`）"
+            "来**展示** ENTRY_ID_NAMESPACE_SPLIT_NOTE 记录的分裂口径下会生成的两个 legacy "
+            "entry_id。唯一调用方 `migration_plan_for_instance` 只产出 cutover 映射计划"
+            "（docstring：不执行写入）。复用真 `opaque_entry_id` 是对的 —— 命名空间公式"
+            "只能有一个真源，抄一份到探测里才是真正的漂移风险。"
+        ),
+        adjudication_owner_task="65",
+    ),
+)
+
+#: 权威写入标记：出现在只读豁免函数的 AST 子树里即豁免自失效。
+#: `commit_bytes` / `commit_restore` 是 :class:`AuthoritativeContentWriter` 的两个落库
+#: 入口，类名本身也算（拿到 writer 就等于拿到写入能力）。
+_AUTHORITY_WRITE_MARKERS: Final[frozenset[str]] = frozenset(
+    {"commit_bytes", "commit_restore", "AuthoritativeContentWriter"}
+)
+
+
+def _function_node_by_qualname(
+    tree: ast.Module, qualname: str
+) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
+    """按 `Class.method` / `func` 逐段下钻定位定义节点（找不到返回 None）。"""
+    node: ast.AST = tree
+    for part in qualname.split("."):
+        found: ast.AST | None = None
+        for child in ast.iter_child_nodes(node):
+            if (
+                isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                and child.name == part
+            ):
+                found = child
+                break
+        if found is None:
+            return None
+        node = found
+    return node if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) else None
+
+
+def assert_non_writer_sites_are_read_only(
+    sites: Sequence[NonWriterEntryIdSite] | None = None,
+) -> Mapping[str, tuple[str, ...]]:
+    """每条只读豁免都必须**挣来**：登记函数里不得有任何权威写入标记。
+
+    返回 `site_ref -> 在该函数里实测到的 opaque_entry_id 调用行号`（供 evidence 用）。
+
+    三个方向一起报告（与 :func:`assert_lane_registry_covers_source` 同款，不算到第一个
+    就 raise，否则后面的方向在守卫里无法被独立 falsify）：
+
+    1. **登记指向不存在的函数** —— 模块文件或函数被删/改名（stale 豁免）；
+    2. **函数里出现权威写入标记** —— 豁免自失效（它已经不是只读路径了）；
+    3. **调用条数与登记不等** —— 在已豁免的函数里悄悄多加/少了一处调用。
+    """
+    registered = tuple(sites) if sites is not None else NON_WRITER_ENTRY_ID_SITES
+    missing: list[str] = []
+    writes: list[str] = []
+    counts: list[str] = []
+    verified: dict[str, tuple[str, ...]] = {}
+
+    for site in registered:
+        path = _BACKEND / Path(*site.module.split(".")).with_suffix(".py")
+        if not path.is_file():
+            missing.append(f"{site.site_ref} → 模块文件不存在: {path}")
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        func = _function_node_by_qualname(tree, site.qualname)
+        if func is None:
+            missing.append(f"{site.site_ref} → 模块里找不到该函数定义")
+            continue
+        hits: list[str] = []
+        for node in ast.walk(func):
+            if isinstance(node, ast.Name) and node.id in _AUTHORITY_WRITE_MARKERS:
+                writes.append(f"{site.site_ref}:{node.lineno} 出现 `{node.id}`")
+            if isinstance(node, ast.Attribute) and node.attr in _AUTHORITY_WRITE_MARKERS:
+                writes.append(f"{site.site_ref}:{node.lineno} 出现 `.{node.attr}`")
+            if isinstance(node, ast.Call):
+                called = (
+                    node.func.id
+                    if isinstance(node.func, ast.Name)
+                    else node.func.attr
+                    if isinstance(node.func, ast.Attribute)
+                    else ""
+                )
+                if called == "opaque_entry_id":
+                    hits.append(str(node.lineno))
+        if len(hits) != site.call_count:
+            counts.append(
+                f"{site.site_ref} 登记 call_count={site.call_count}，实测 {len(hits)} "
+                f"处（行 {hits}）"
+            )
+        verified[site.site_ref] = tuple(hits)
+
+    if missing or writes or counts:
+        raise OpaqueLaneRegistryDriftError(
+            "只读 `opaque_entry_id` 豁免登记（NON_WRITER_ENTRY_ID_SITES）与源码不一致：\n"
+            f"  登记指向不存在的函数 ({len(missing)}): {missing}\n"
+            f"  函数里出现权威写入标记 ({len(writes)}): {writes}\n"
+            f"  调用条数不等 ({len(counts)}): {counts}\n"
+            "豁免必须挣来：只读探测一旦能写出去，它就该是一条登记在案的 lane，而不是豁免"
+        )
+    return verified
+
+
 def assert_lane_registry_covers_source(
     sites: Sequence[OpaqueEntryIdCallSite] | None = None,
 ) -> Mapping[str, tuple[str, ...]]:
@@ -813,11 +972,30 @@ def assert_lane_registry_covers_source(
     """
     discovered = tuple(sites) if sites is not None else discover_opaque_entry_id_call_sites()
 
+    # 🔴 先验豁免：只读豁免必须先被**结构**证明是只读（函数里没有权威写入标记、条数对得上），
+    # 才允许下面把它从「未登记的调用点」里放行。顺序不能反 —— 反了就退化成「名单上有名字
+    # 就放行」，而那正是本模块反复点名的假绿形态。
+    assert_non_writer_sites_are_read_only()
+
     by_lane: dict[str, list[str]] = {lane.lane_id: [] for lane in OPAQUE_AUTHORITY_LANES}
+    exempt_hits: dict[str, list[str]] = {
+        site.site_ref: [] for site in NON_WRITER_ENTRY_ID_SITES
+    }
     unregistered: list[str] = []
     drifted: list[str] = []
 
     for site in discovered:
+        exempt = [
+            known
+            for known in NON_WRITER_ENTRY_ID_SITES
+            if known.module == site.module
+            and _qualname_matches(known.qualname, site.enclosing_qualname)
+        ]
+        if exempt:
+            # 只读探测：不进 lane 分母，但**记账**——条数由 `call_count` 钉死（见下）。
+            for known in exempt:
+                exempt_hits[known.site_ref].append(f"{site.module}:{site.line}")
+            continue
         # 定义处自身不是调用点，`discover_*` 只收 `ast.Call`，故此处无需再排除；
         # 但同一模块里可能有多个 lane（当前没有），所以匹配用 (module, qualname) 双键。
         matched = [
@@ -843,13 +1021,23 @@ def assert_lane_registry_covers_source(
             )
 
     stale = sorted(lane_id for lane_id, hits in by_lane.items() if not hits)
+    # 豁免侧的 stale 方向：登记了却在**当前这批调用点**里一次都没命中 / 条数不符 ⇒ 打红。
+    # `assert_non_writer_sites_are_read_only` 管的是磁盘源码，这里管的是传进来的这批 sites，
+    # 两者都要 —— 否则注入式守卫可以靠「把豁免函数的调用点全删掉」悄悄绕过豁免记账。
+    stale_exempt = sorted(
+        f"{site.site_ref} 登记 call_count={site.call_count}，本批命中 "
+        f"{len(exempt_hits[site.site_ref])} 处"
+        for site in NON_WRITER_ENTRY_ID_SITES
+        if len(exempt_hits[site.site_ref]) != site.call_count
+    )
 
-    if unregistered or stale or drifted:
+    if unregistered or stale or drifted or stale_exempt:
         raise OpaqueLaneRegistryDriftError(
             "opaque lane 登记表与源码 `opaque_entry_id(...)` 调用点不一致：\n"
             f"  未登记的调用点 ({len(unregistered)}): {unregistered}\n"
             f"  无调用点的登记 ({len(stale)}): {stale}\n"
             f"  实参形态漂移 ({len(drifted)}): {drifted}\n"
+            f"  只读豁免记账不符 ({len(stale_exempt)}): {stale_exempt}\n"
             "登记表是 custom/opaque 的**唯一**可枚举分母：漏登记等于让一条写入路径没有 "
             "authority model 真源，形态漂移等于悄悄换了 entry_id 命名空间"
         )

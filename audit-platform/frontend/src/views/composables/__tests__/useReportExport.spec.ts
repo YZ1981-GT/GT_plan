@@ -3,7 +3,7 @@
  *
  * 验证 useReportExport 核心动作：
  * - onExportExcel: 调用 downloadFileAsBlob，URL 通过 getReportExcelUrl 生成
- * - onExportAllExcel: 调用 downloadFileAsBlob，URL 为 export-all 路径
+ * - onExportAllExcel: 调用认证 downloadFile，URL 为项目级 export-excel POST
  * - copyReportTable: 有数据时调用 clipboard.write（HTML+text）并显示成功消息
  * - copyReportTable: 空数据时显示 warning
  * - onReportImported: 关闭弹窗 + 调 fetchReport
@@ -23,6 +23,11 @@ vi.mock('element-plus', () => ({
 const mockGetReportExcelUrl = vi.fn().mockReturnValue('/api/reports/proj-1/2025/balance_sheet/export')
 vi.mock('@/services/auditPlatformApi', () => ({
   getReportExcelUrl: (...args: any[]) => mockGetReportExcelUrl(...args),
+}))
+
+const mockDownloadFile = vi.fn()
+vi.mock('@/utils/http', () => ({
+  downloadFile: (...args: any[]) => mockDownloadFile(...args),
 }))
 
 const mockDownloadFileAsBlob = vi.fn()
@@ -87,16 +92,37 @@ describe('useReportExport — onExportExcel', () => {
 describe('useReportExport — onExportAllExcel', () => {
   beforeEach(() => { vi.clearAllMocks() })
 
-  it('calls downloadFileAsBlob with export-all URL', async () => {
+  it('calls authenticated downloadFile for audited all-report export', async () => {
     const options = createOptions()
     const { onExportAllExcel } = useReportExport(options)
 
     onExportAllExcel()
     await flushPromises()
 
-    expect(mockDownloadFileAsBlob).toHaveBeenCalledWith(
-      '/api/reports/proj-1/2025/export',
-      '全部报表_2025.xlsx',
+    expect(mockDownloadFile).toHaveBeenCalledWith(
+      '/api/projects/proj-1/reports/export-excel',
+      {
+        method: 'post',
+        data: { year: 2025, mode: 'audited' },
+        fileName: '全部报表_已审_2025.xlsx',
+      },
+    )
+  })
+
+  it('calls authenticated downloadFile for unadjusted all-report export', async () => {
+    const options = createOptions()
+    const { onExportAllUnadjusted } = useReportExport(options)
+
+    onExportAllUnadjusted()
+    await flushPromises()
+
+    expect(mockDownloadFile).toHaveBeenCalledWith(
+      '/api/projects/proj-1/reports/export-excel',
+      {
+        method: 'post',
+        data: { year: 2025, mode: 'unadjusted' },
+        fileName: '全部报表_未审_2025.xlsx',
+      },
     )
   })
 })

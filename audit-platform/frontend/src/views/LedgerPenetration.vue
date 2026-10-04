@@ -2201,16 +2201,30 @@ function openAttachToWorkpaper(fallbackRow?: any) {
     : (fallbackRow ? [fallbackRow] : [])
 
   const seen = new Set<string>()
-  const list: Array<{ voucherNo: string; accountCode?: string | null }> = []
+  const list: Array<{ voucherNo: string; voucherDate?: string | null; accountCode?: string | null }> = []
   for (const r of pool) {
     const vno = String(r?.voucher_no || '').trim()
-    if (!vno || seen.has(vno)) continue
-    seen.add(vno)
-    list.push({ voucherNo: vno, accountCode: r?.account_code || currentAccount.value || null })
+    if (!vno) continue
+    // 🔴 去重键必须含日期：凭证号在真实数据中跨日重复（实测单号最多对应 83 个日期），
+    //    只按 voucher_no 去重会把「1月的0075」和「3月的0075」误并成一条，
+    //    导致只挂进去一张、另一张静默丢失。
+    const vdate = normalizeVoucherDate(r?.voucher_date)
+    const key = `${vno}@${vdate || ''}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    list.push({
+      voucherNo: vno,
+      voucherDate: vdate,
+      accountCode: r?.account_code || currentAccount.value || null,
+    })
   }
-  // 凭证层：右键行无 voucher_no 时用当前凭证兜底
+  // 凭证层：右键行无 voucher_no 时用当前凭证兜底（带当前穿透的日期）
   if (list.length === 0 && currentLevel.value === 'voucher' && currentVoucher.value) {
-    list.push({ voucherNo: currentVoucher.value, accountCode: currentAccount.value || null })
+    list.push({
+      voucherNo: currentVoucher.value,
+      voucherDate: currentVoucherDate.value || null,
+      accountCode: currentAccount.value || null,
+    })
   }
 
   if (list.length === 0) {
@@ -2227,7 +2241,11 @@ function attachCurrentVoucher() {
     ElMessage.warning('请先穿透到某张凭证')
     return
   }
-  attachVouchers.value = [{ voucherNo: currentVoucher.value, accountCode: currentAccount.value || null }]
+  attachVouchers.value = [{
+    voucherNo: currentVoucher.value,
+    voucherDate: currentVoucherDate.value || null,
+    accountCode: currentAccount.value || null,
+  }]
   attachDialogVisible.value = true
 }
 
@@ -2280,6 +2298,10 @@ const currentAccount = ref('')
 const currentAccountOpening = ref(0)  // 穿透时记录期初余额
 const currentAuxOpening = ref(0)  // 辅助明细穿透时记录期初余额
 const currentVoucher = ref('')
+const currentVoucherMonth = ref<number | null>(null)
+// 🔴 凭证号在真实数据中不唯一（实测 8 个项目里 7 个跨月/跨日重复，单号最多对应
+// 83 个不同日期）。(voucher_date, voucher_no) 才唯一对应一张凭证，故穿透时带上日期。
+const currentVoucherDate = ref<string>('')
 const currentAuxType = ref('')
 const currentAuxCode = ref('')
 const searchKeyword = ref('')
@@ -3015,9 +3037,13 @@ async function loadLedger() {
 async function loadVoucher() {
   loading.value = true
   try {
+    const params: Record<string, unknown> = { year: year.value }
+    // 优先用完整日期（唯一定位一张凭证），无日期时退化为月份过滤
+    if (currentVoucherDate.value) params.voucher_date = currentVoucherDate.value
+    else if (currentVoucherMonth.value != null) params.month = currentVoucherMonth.value
     const data = await api.get(
       P_ledger.voucher(projectId.value, currentVoucher.value),
-      { params: { year: year.value } }
+      { params }
     )
     voucherItems.value = data ?? []
   } catch { voucherItems.value = [] }
@@ -3713,12 +3739,32 @@ function resetLedgerVirtualState() {
   ledgerSelectedKeys.value = new Set()
 }
 
+/**
+ * 把行上的 voucher_date 归一化为 `YYYY-MM-DD`（后端按 date 列等值比较）。
+ * 取不到或格式不符一律返回 ''，由调用方退化为「不按日期区分」。
+ */
+function normalizeVoucherDate(raw: unknown): string {
+  const s = String(raw ?? '')
+  if (!s) return ''
+  const d = s.length >= 10 ? s.slice(0, 10) : s
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : ''
+}
+
 function drillToVoucher(row: any) {
   if (!row.voucher_no) return
   currentVoucher.value = row.voucher_no
+  currentVoucherDate.value = normalizeVoucherDate(row.voucher_date)
+  const m = currentVoucherDate.value ? Number(currentVoucherDate.value.slice(5, 7)) : null
+  currentVoucherMonth.value = (m && m >= 1 && m <= 12) ? m : null
   currentLevel.value = 'voucher'
   breadcrumbs.value.push({
-    label: `凭证 ${row.voucher_no}`, level: 'voucher', voucher: row.voucher_no,
+    label: currentVoucherDate.value
+      ? `凭证 ${row.voucher_no}（${currentVoucherDate.value}）`
+      : `凭证 ${row.voucher_no}`,
+    level: 'voucher',
+    voucher: row.voucher_no,
+    voucherDate: currentVoucherDate.value,
+    voucherMonth: currentVoucherMonth.value,
   })
   loadVoucher()
 }
@@ -3755,7 +3801,7 @@ function navigateTo(index: number) {
   currentLevel.value = crumb.level
   if (crumb.level === 'balance') loadBalance()
   else if (crumb.level === 'ledger') { currentAccount.value = crumb.account || ''; loadLedger() }
-  else if (crumb.level === 'voucher') { currentVoucher.value = crumb.voucher || ''; loadVoucher() }
+  else if (crumb.level === 'voucher') { currentVoucher.value = crumb.voucher || ''; currentVoucherDate.value = crumb.voucherDate || ''; currentVoucherMonth.value = crumb.voucherMonth ?? null; loadVoucher() }
   else if (crumb.level === 'aux_balance') { currentAccount.value = crumb.account || ''; loadAuxBalance() }
   else if (crumb.level === 'aux_ledger') {
     currentAccount.value = crumb.account || currentAccount.value

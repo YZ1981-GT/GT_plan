@@ -61,8 +61,15 @@ VALID_SOURCE_TYPES = frozenset([
     "ai_generated",
 ])
 
+# 🔴 2026-09-28 修：原先写的是 cwd 相对路径 Path("backend/data/...")，
+# 只有恰好从仓库根启动才命中。从 `backend/` 目录跑 pytest 时它解析成
+# `backend/backend/data/...` ⇒ 目录不存在 ⇒ scan_* 返回 0 条 summary，
+# 而"扫不到"当时只记 warning 不记 error ⇒ 整个校验器空转仍报 status=warn。
+# 锚定 __file__ 后两种 cwd 都正确（与同目录 workpaper_component_manifest.py 一致）。
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+
 # Schema 根目录 (生产 schema)
-SCHEMA_ROOT = Path("backend/data/ledger_adapters/wp_render_schema")
+SCHEMA_ROOT = _REPO_ROOT / "backend" / "data" / "ledger_adapters" / "wp_render_schema"
 # Generated 子目录
 GENERATED_DIR = SCHEMA_ROOT / "generated"
 # 语义注册表
@@ -188,9 +195,10 @@ def scan_production_schemas() -> tuple[list[dict[str, str]], list[dict[str, Any]
     issues: list[dict[str, str]] = []
     summaries: list[dict[str, Any]] = []
 
+    # 扫不到真源必须是 error：否则"零 schema"会被当成"零问题"静默通过
     if not SCHEMA_ROOT.exists():
         issues.append({
-            "level": "warning",
+            "level": "error",
             "check": "schema_root_missing",
             "context": str(SCHEMA_ROOT),
             "message": f"Schema root directory not found: {SCHEMA_ROOT}",
@@ -198,6 +206,13 @@ def scan_production_schemas() -> tuple[list[dict[str, str]], list[dict[str, Any]
         return issues, summaries
 
     yaml_files = sorted(SCHEMA_ROOT.glob("*.yaml"))
+    if not yaml_files:
+        issues.append({
+            "level": "error",
+            "check": "schema_root_empty",
+            "context": str(SCHEMA_ROOT),
+            "message": f"No production schema YAML found under {SCHEMA_ROOT}",
+        })
     for yaml_path in yaml_files:
         data = _load_yaml(yaml_path)
         if data is None:
@@ -264,7 +279,7 @@ def scan_registry() -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
 
     if not REGISTRY_PATH.exists():
         issues.append({
-            "level": "warning",
+            "level": "error",
             "check": "registry_missing",
             "context": str(REGISTRY_PATH),
             "message": f"Registry file not found: {REGISTRY_PATH}",

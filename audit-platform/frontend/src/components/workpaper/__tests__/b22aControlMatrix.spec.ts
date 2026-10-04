@@ -191,15 +191,14 @@ describe('B22A 内部控制了解程序表 — 检查项 CRUD (6.3)', () => {
 
       matrix.addCheckItem(1)
 
-      // Count should be 3
-      const countItem = allResponses.value.get('B22A-T1-count')
-      expect(countItem!.remark).toBe('3')
+      // 行数从 legacy 的 2 行迁移后 +1 = 3（按行为断言，不读 count 键）
+      expect(matrix.getCheckItems(1)).toHaveLength(3)
       expect(saveFn).toHaveBeenCalled()
     })
     scope.stop()
   })
 
-  it('removeCheckItem 递减 count + 移位数据', async () => {
+  it('removeCheckItem 删中间行：行数递减且剩余行内容不串台（BC-53）', async () => {
     const { useB22AControlMatrix } = await import('../composables/useB22AControlMatrix')
 
     const scope = effectScope()
@@ -217,11 +216,15 @@ describe('B22A 内部控制了解程序表 — 检查项 CRUD (6.3)', () => {
       const matrix = useB22AControlMatrix(allResponses, saveFn)
       matrix.initialize()
 
-      // Remove item 2 → item 3 shifts to position 2
+      // 改造前是「shift 搬迁」：删第 2 行后第 3 行的值被搬到位置 2、身份丢失。
+      // 改造后是「摘除行对象」：剩余两行各自的内容跟着自己的 rowId 走。
       matrix.removeCheckItem(2, 2)
 
-      expect(allResponses.value.get('B22A-T2-count')!.remark).toBe('2')
-      expect(allResponses.value.get('B22A-T2-item-2-point')!.remark).toBe('第三项')
+      const items = matrix.getCheckItems(2)
+      expect(items).toHaveLength(2)
+      expect(items.map((i) => i.controlPoint)).toEqual(['第一项', '第三项'])
+      // 显示序号连续重排
+      expect(items.map((i) => i.index)).toEqual([1, 2])
     })
     scope.stop()
   })
@@ -243,9 +246,9 @@ describe('B22A 内部控制了解程序表 — 检查项 CRUD (6.3)', () => {
 
       matrix.setConclusion(1, 1, '设计有效')
 
-      const item = allResponses.value.get('B22A-T1-item-1-conclusion')
-      expect(item!.conclusion).toBe('设计有效')
-      expect(saveFn).toHaveBeenCalledWith([expect.objectContaining({ conclusion: '设计有效' })])
+      // 按行为断言（读回来的值），不绑定存储键形状
+      expect(matrix.getCheckItems(1)[0].conclusion).toBe('设计有效')
+      expect(saveFn).toHaveBeenCalled()
     })
     scope.stop()
   })
@@ -267,8 +270,8 @@ describe('B22A 内部控制了解程序表 — 检查项 CRUD (6.3)', () => {
 
       matrix.setUnderstandingMethod(1, 1, ['询问', '观察', '穿行测试'])
 
-      const item = allResponses.value.get('B22A-T1-item-1-method')
-      expect(item!.remark).toBe('询问,观察,穿行测试')
+      // 按行为断言：读回的 methods 数组与写入一致
+      expect(matrix.getCheckItems(1)[0].methods).toEqual(['询问', '观察', '穿行测试'])
     })
     scope.stop()
   })
@@ -529,11 +532,11 @@ describe('B22A 内部控制了解程序表 — 续审模式 (6.8)', () => {
 
       matrix.markNoChange(1, 1, '张三')
 
-      const nochangeItem = allResponses.value.get('B22A-T1-item-1-nochange')
-      expect(nochangeItem).toBeDefined()
-      expect(nochangeItem!.conclusion).toBe('Y')
-      expect(nochangeItem!.remark).toBe('张三')
-      expect(nochangeItem!.wp_ref).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      // 按行为断言：读回的 CheckItem 带确认标记/确认人/日期
+      const item = matrix.getCheckItems(1)[0]
+      expect(item.noChangeConfirmed).toBe(true)
+      expect(item.noChangeConfirmer).toBe('张三')
+      expect(item.noChangeDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     })
     scope.stop()
   })

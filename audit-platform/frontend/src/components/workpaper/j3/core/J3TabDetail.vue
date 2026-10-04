@@ -14,6 +14,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import http from '@/utils/http'
 import { ElMessage } from 'element-plus'
 import { useJ3ImportExport } from '@/composables/workpaper/j3/useJ3ImportExport'
+import { mintJRowId, withJRowIds } from '@/components/workpaper/composables/jRowIdentity'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtThTip from '../../GtThTip.vue'
 import J3PlanDialog from './J3PlanDialog.vue'
@@ -42,13 +43,13 @@ interface SbpRow {
   instrumentQty: number; vestingPeriod: string; fvMethod: string; agreementChange: string
   bsUpdate: string; remainingPeriod: string; agreementIndex: string; calcTableIndex: string; conclusion: string
 }
-let seq = 1
+// ⚠️ 原 `let seq = 1` 已移除（Task 12）：身份改由 `mintJRowId(plans.map(p => p.id))` 现算。
 const plans = reactive<SbpRow[]>([])
 const TYPE_OPTIONS = ['以权益工具结算', '以现金结算', '以权益与现金结合结算']
 
 function emptyPlan(name: string): SbpRow {
   return {
-    id: seq++, name, type: '以权益工具结算', grantDate: '', approvalDept: '', exerciseDate: '',
+    id: mintJRowId(plans.map(p => p.id)), name, type: '以权益工具结算', grantDate: '', approvalDept: '', exerciseDate: '',
     instrumentQty: 0, vestingPeriod: '', fvMethod: '', agreementChange: '', bsUpdate: '',
     remainingPeriod: '', agreementIndex: '', calcTableIndex: '', conclusion: '',
   }
@@ -67,7 +68,7 @@ function openEditDialog(row: SbpRow) { if (isReadonly.value) return; editingPlan
 function onDialogSave(plan: SbpRow) {
   const idx = plans.findIndex(p => p.id === plan.id)
   if (idx >= 0) plans.splice(idx, 1, { ...plan })
-  else plans.push({ ...plan, id: seq++ })
+  else plans.push({ ...plan, id: mintJRowId(plans.map(p => p.id)) })
   scheduleSave()
 }
 
@@ -123,8 +124,14 @@ function parsePlans(raw: string | null | undefined): SbpRow[] | null {
   try { const p = JSON.parse(raw); return Array.isArray(p) ? p : null } catch { return null }
 }
 function applyPlans(loaded: SbpRow[]) {
-  plans.splice(0, plans.length, ...loaded.map((p, i) => ({ ...emptyPlan(''), ...p, id: p.id ?? i + 1 })))
-  seq = Math.max(0, ...plans.map(p => p.id)) + 1
+  // 🔴 family_b 修复（spec j2-j3-non-entry-hosts-and-orphan-cleanup Task 12）：
+  //    只改**回落分支**，保留「上游有 id 时优先用上游 id」语义（grandfather）。
+  //    覆盖的真实回落情形：① render-config 种子派生的行尚未保存 ② 旧数据无 id。
+  plans.splice(
+    0,
+    plans.length,
+    ...(withJRowIds(loaded.map(p => ({ ...emptyPlan(''), ...p }))) as SbpRow[]),
+  )
 }
 function load() {
   const saved = parsePlans(props.allResponses?.get(KEY.plans)?.remark)

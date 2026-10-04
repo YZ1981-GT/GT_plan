@@ -1077,8 +1077,27 @@ class TestCollectWorkbookStructureStatic:
             data=data, contract=contract, sheet_anchors=anchors
         )
         assert physical["d433-managed"] == STATIC_SHEET
-        # 静态区无 primary_inventory（那是动态 row UUID 路径产的）
-        assert primary_inventory is None
+        # 🔴 **断言已更新**（spec workpaper-sync-pure-static-lane-and-combined-workbook-
+        #    resolution，Requirement 6.1）：原断言是 `primary_inventory is None`，注释写
+        #    「静态区无 primary_inventory（那是动态 row UUID 路径产的）」—— 那句话把一个
+        #    **缺陷**说成了设计：第 3 返回值恒 `None` 会让
+        #    `PublishedIdentityObserver._observe_workbook` 里那行
+        #    `canonical_digest(inventory.inventory_digest_input)`（**无** None 守卫）
+        #    在全静态锚点下抛**裸 `AttributeError`**，而不是设计好的
+        #    `FrozenChildUnusableError`。
+        #    现在静态路径返回真实的 `StaticIdentityInventory`：`row_uuids` 恒空（静态区
+        #    结构上没有行身份，这一点没变），但 definedName 锚点进了
+        #    `inventory_digest_input` ⇒ `identity_inventory_sha256` 对纯静态 entry 仍有
+        #    反漂移意义（definedName 被删 / 改名 / 改指向另一张 sheet 都会改 digest）。
+        from app.services.workpaper_sync.published_identity_observer import (
+            StaticIdentityInventory,
+        )
+
+        assert isinstance(primary_inventory, StaticIdentityInventory)
+        assert primary_inventory.row_uuids == ()          # 静态区无行身份（不变）
+        assert primary_inventory.regions == (
+            ("d433-managed", STATIC_DEFINED_NAME, STATIC_SHEET),
+        )
         # 结构清册含静态 fields 的绝对坐标（E12/F12/G12 由 _cell_coordinates_for 静态路径产）
         locators = {loc for (_sk, _tk, _fk, loc) in structure}
         assert any(":12" in loc for loc in locators)
@@ -1511,7 +1530,16 @@ class TestKindMisrouteMutation:
             data=data, contract=contract, sheet_anchors=anchors
         )
         assert physical["d433-managed"] == STATIC_SHEET
-        assert primary_inventory is None
+        # 🔴 **断言已更新**（同上，Requirement 6.1）：正确路由的静态锚点现在产出真实的
+        #    `StaticIdentityInventory` 而不是 `None`。本方法是「误路由变异」的**绿基线**，
+        #    它要证的是「正确路由不报错」—— 换成 isinstance 判据后这一点更强：
+        #    既证不报错，又证走的确实是静态路径（误路由到转置会产另一种对象或抛错）。
+        from app.services.workpaper_sync.published_identity_observer import (
+            StaticIdentityInventory,
+        )
+
+        assert isinstance(primary_inventory, StaticIdentityInventory)
+        assert primary_inventory.row_uuids == ()
 
 
 # ═══════════════════════════════════════════════════════════════════════════

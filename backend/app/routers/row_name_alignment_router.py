@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import require_wp_edit_permission
+from app.deps import require_wp_edit_permission, get_current_user
 from app.models.core import User
 from app.models.workpaper_models import WpIndex, WorkingPaper
 from app.services.project_audit_year import PROJECT_AUDIT_YEAR_SQL
@@ -255,4 +255,50 @@ async def confirm_row_name_mapping(
             }
             for rk, m in result.items()
         }
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 批量刷新底稿取数（batch-refresh-workpaper-data spec Task 2）
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class BatchRefreshRequest(BaseModel):
+    """批量刷新请求。"""
+    project_id: UUID
+    wp_ids: list[UUID] = Field(..., max_length=500)
+
+
+@router.post("/batch-refresh")
+async def batch_refresh(
+    body: BatchRefreshRequest,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """批量刷新底稿取数：对 wp_ids 逐个执行行名对齐 + 自动确认。
+
+    串行处理，每底稿独立 try/catch。返回每底稿刷新结果汇总。
+    """
+    from app.services.workpaper_refresh_service import batch_refresh_workpapers
+
+    results = await batch_refresh_workpapers(db, body.project_id, body.wp_ids)
+    await db.commit()
+
+    success = sum(1 for r in results if r.ok)
+    failed = sum(1 for r in results if not r.ok)
+    return {
+        "total": len(results),
+        "success": success,
+        "failed": failed,
+        "results": [
+            {
+                "wp_id": r.wp_id,
+                "wp_code": r.wp_code,
+                "ok": r.ok,
+                "error": r.error,
+                "auto_matched": r.auto_matched,
+                "pending": r.pending,
+            }
+            for r in results
+        ],
     }

@@ -308,7 +308,7 @@ export function useH3Adjustment(params: {
       for (const cat of H3_ASSET_CATEGORIES) {
         if (!have.has(cat)) {
           base.push({
-            rowId: `${kind}-${cat}`,
+            rowId: `${kind}-${cat}-${Math.random().toString(36).slice(2, 7)}`,
             category: cat,
             beginBalance: 0,
             increase: 0,

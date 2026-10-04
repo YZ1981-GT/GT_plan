@@ -28,12 +28,15 @@ import {
 } from './g2SoeDisclosureRows'
 import type { G2SoeSyncSnapshot } from './g2DisclosureSyncPayload'
 
+import { G2_ITEM_IDS } from './g2StorageContract'
+
 const ITEM_ROWS = 'G2-note-soe-rows'
 const ITEM_NOTE = 'G2-note-soe-note'
-const ITEM_ADJ = 'G2-1-rows'
-const ITEM_ADJ_LEGACY = 'G2-1-adj-rows'
-const ITEM_DETAIL = 'G2-2-detail-rows'
-const ITEM_OVERDUE = 'G2-6-overdue-rows'
+// 🔴 以下四个派生自单一真源 `g2StorageContract.G2_ITEM_IDS`（Task 13 / BP-10）
+const ITEM_ADJ = G2_ITEM_IDS.G2_1_ROWS
+const ITEM_ADJ_LEGACY = G2_ITEM_IDS.G2_1_ROWS_LEGACY
+const ITEM_DETAIL = G2_ITEM_IDS.G2_2_DETAIL_ROWS
+const ITEM_OVERDUE = G2_ITEM_IDS.G2_6_OVERDUE_ROWS
 
 export function useG2DisclosureSoe(opts: {
   allResponses: Ref<Map<string, ChecklistResponse>>

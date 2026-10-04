@@ -445,29 +445,39 @@ export function useH3FormData(params: {
 
   // ─── Flush (组件卸载时确保无数据丢失) ──────────────────────────────────────
 
-  function _flushPending(): void {
+  /**
+   * 清防抖 + 立即落库，**await 到真正写完**。
+   *
+   * 🔴 从 `void _doSave(items)`（发射后不管）改成 `await`：双向回写的桥在切
+   * 「在线编辑」前必须确认 HTML 侧已落库，否则 materialize 出的 xlsx 会少掉防抖窗口
+   * 内那批编辑（静默丢数据）。卸载路径仍可 fire-and-forget（组件已走，没人等它），
+   * 但桥路径必须能 await ⇒ 统一改成 async 并导出。
+   *
+   * 用户要求的「点保存后切换要丝滑」在这条路径上成立：已保存 ⇒ `_pendingItems` 为空
+   * ⇒ 本函数是零请求空转，切换耗时只剩桥的 materialize。
+   */
+  async function flushPendingSaves(): Promise<void> {
     for (const timer of _debounceTimers.values()) {
       clearTimeout(timer)
     }
     _debounceTimers.clear()
 
-    if (_pendingItems.size > 0) {
-      const items: ChecklistItem[] = []
-      for (const itemId of _pendingItems) {
-        const resp = allResponses.value.get(itemId)
-        if (resp) items.push(resp)
-      }
-      _pendingItems.clear()
-      if (items.length > 0) {
-        void _doSave(items)
-      }
+    if (_pendingItems.size === 0) return
+    const items: ChecklistItem[] = []
+    for (const itemId of _pendingItems) {
+      const resp = allResponses.value.get(itemId)
+      if (resp) items.push(resp)
+    }
+    _pendingItems.clear()
+    if (items.length > 0) {
+      await _doSave(items)
     }
   }
 
   // ─── Lifecycle ─────────────────────────────────────────────────────────────
 
   onScopeDispose(() => {
-    _flushPending()
+    void flushPendingSaves()
   })
 
   // ─── Return ────────────────────────────────────────────────────────────────
@@ -490,6 +500,8 @@ export function useH3FormData(params: {
     saveImmediate,
     debouncedSave,
     saveBatch,
+    //: 切「在线编辑」前的必经一步（见函数 docstring）—— 双向桥的 `flushHtml` 调它。
+    flushPendingSaves,
     // Load
     selfLoad,
     loadAllResponses,

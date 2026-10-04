@@ -1,0 +1,61 @@
+{
+  "mode": "check",
+  "supply_rows": {
+    "working_paper_sync_definition_artifact": 179,
+    "working_paper_sync_definition_bundle": 88,
+    "working_paper_representation_upgrade_candidate": 1,
+    "working_paper_content_representation": 283
+  },
+  "entries": [
+    {
+      "target": {
+        "entry_id": "xlsx/gt-h8-right-of-use-assets",
+        "contract_id": "h8.right_of_use_assets_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_h8_right_of_use_assets",
+        "wp_codes": [
+          "H8"
+        ],
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "34bbc627-1781-4cf3-a207-5fb7a91bd00d",
+        "wp_code": "H8",
+        "store_bytes": 2,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "stages": {
+        "authority_model": "would_create",
+        "bundle": "would_create",
+        "contract": "would_create",
+        "instrumentation": "would_create",
+        "template": "would_create"
+      },
+      "digests": {
+        "authority_model": "6e966bad800e2f774a518a396c4424612da4d8f3c2db63e21fcab29fac18d82a",
+        "bundle": "204fa3b2d705523ce6db45c54bc43b1e55edb425150b8cd7066effd6bbe5ac58",
+        "contract": "6b4ac7008e86b8223eb9902f7ee023e810e9fa6d85da9fd1c54fa15ac56f5e7a",
+        "instrumentation": "a4526d4d6e5384518d58c5ca6a54795ed0fb82f3a72cdf44b58c7bc1cf0b7502",
+        "template": "6bf4e3e1751a171d1ab004ca52c60edd4d7e20622f493f44e41b189f6284b4ee"
+      },
+      "would_create": [
+        "authority_model",
+        "bundle",
+        "contract",
+        "instrumentation",
+        "template"
+      ],
+      "reused": [],
+      "representation": {
+        "settlement": "blocked",
+        "current_representation_id": null,
+        "current_definition_bundle_id": null,
+        "candidates_awaiting_contract": 0,
+        "candidate_bound_to_target_bundle": null,
+        "candidate_bound_state": null
+      },
+      "definition_bundle_sha256": "204fa3b2d705523ce6db45c54bc43b1e55edb425150b8cd7066effd6bbe5ac58"
+    }
+  ],
+  "errors": [],
+  "would_create_total": 5
+}

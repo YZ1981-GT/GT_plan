@@ -433,7 +433,7 @@ export function useH4Adjudication(params: {
       const change = endAud - beginAud
       const rate = calcH4ChangeRate(change, beginAud)
       list.push({
-        rowId: `net-${name}`,
+        rowId: `net-${name}-${Math.random().toString(36).slice(2, 7)}`,
         name,
         beginUnadjusted: beginUnadj,
         beginAudited: beginAud,

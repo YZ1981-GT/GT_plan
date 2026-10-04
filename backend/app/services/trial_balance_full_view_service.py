@@ -47,9 +47,10 @@ class TrialBalanceFullViewService:
             unadjusted = row.unadjusted_amount or Decimal("0")
             aje = row.aje_adjustment or Decimal("0")
             rje = row.rje_adjustment or Decimal("0")
+            wp_adj = row.wp_adjustment or Decimal("0")
             audited = row.audited_amount or Decimal("0")
-            other_adj = audited - unadjusted - aje - rje
-            balance_ok = abs(unadjusted + aje + rje + other_adj - audited) < Decimal("0.01")
+            other_adj = audited - unadjusted - aje - rje - wp_adj
+            balance_ok = abs(unadjusted + aje + rje + wp_adj + other_adj - audited) < Decimal("0.01")
 
             view.append({
                 "account_code": row.standard_account_code,
@@ -57,6 +58,7 @@ class TrialBalanceFullViewService:
                 "unadjusted": unadjusted,
                 "aje_adjustment": aje,
                 "rje_adjustment": rje,
+                "wp_adjustment": wp_adj,
                 "other_adjustment": other_adj,
                 "audited": audited,
                 "opening_balance": row.opening_balance or Decimal("0"),
@@ -67,21 +69,23 @@ class TrialBalanceFullViewService:
     async def check_balance_formula(
         self, project_id: UUID, year: int
     ) -> dict[str, Any]:
-        """平衡公式校验：SUM(未审+AJE+RJE+其他) == SUM(审定)"""
+        """平衡公式校验：SUM(未审+AJE+RJE+底稿调整+其他) == SUM(审定)"""
         view = await self.get_full_view(project_id, year)
         total_unadj = sum(r["unadjusted"] for r in view)
         total_aje = sum(r["aje_adjustment"] for r in view)
         total_rje = sum(r["rje_adjustment"] for r in view)
+        total_wp_adj = sum(r["wp_adjustment"] for r in view)
         total_other = sum(r["other_adjustment"] for r in view)
         total_audited = sum(r["audited"] for r in view)
 
-        computed = total_unadj + total_aje + total_rje + total_other
+        computed = total_unadj + total_aje + total_rje + total_wp_adj + total_other
         diff = abs(computed - total_audited)
 
         return {
             "total_unadjusted": total_unadj,
             "total_aje": total_aje,
             "total_rje": total_rje,
+            "total_wp_adjustment": total_wp_adj,
             "total_other": total_other,
             "total_audited": total_audited,
             "computed_total": computed,

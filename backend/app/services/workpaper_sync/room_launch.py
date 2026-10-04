@@ -330,6 +330,7 @@ def build_signed_launch_config(
     user: LaunchUserIdentity,
     secret: str,
     lang: str = "zh-CN",
+    target_sheet: str = "",
 ) -> dict[str, Any]:
     """在 coordinator 产出的 config 上补齐短 TTL URL 与协同身份，然后整体签名。
 
@@ -358,6 +359,30 @@ def build_signed_launch_config(
     customization["autosave"] = True
     customization["forcesave"] = False
     editor["customization"] = customization
+
+    # ── 打开即定位的**客户端**一半（实测必需，见下）─────────────────────────────
+    #
+    # 服务端那一半（contents 端点按 token 里的目标 sheet 派生 activeTab 字节）只在
+    # DocServer **真去下载** `document.url` 时起作用。DS 按 `document.key` 缓存文档，
+    # 而 `derive_doc_key()` 只由 `(wp_id, entry_id, generation)` 派生 —— 同一本工作簿的
+    # 47 张 sheet 逐字同 key（那是 shared room 要的：所有编辑者必须进同一个协同会话，
+    # 否则两个会话各存一次整本，互相覆盖对方 sheet 的改动）。于是第二次打开时 DS 命中
+    # 缓存、不再取新签的 URL，用户看到的仍是**首次**下载那份字节的 activeTab。
+    #
+    # 2026-09-22 真库实测（Playwright，wp b3ab3c46…、generation 97）：
+    #   1) 首开 D4-6 → `asc_getActiveWorksheetIndex()` = 10 = `重要指标分析D4-6` ✅
+    #      （服务端派生字节确实生效）
+    #   2) 同 key 再开 D4-2 → 仍是 index 10 `重要指标分析D4-6` ❌（DS 没重新下载）
+    # 两条合起来证明：字节级 activeTab 在「复用 generation 再打开」这条最常见路径上
+    # 结构性失效，必须有一个**每次打开都由客户端执行**的定位。`actionLink` 正是它：
+    # 它随 config 下发、由浏览器侧编辑器在打开时应用，与 DS 缓存无关。
+    #
+    # 只对 xlsx 设：word/slide 没有「工作表」概念，给它们塞 actionLink 只会让编辑器
+    # 去找一个不存在的书签。
+    if str(document_type or "") == "xlsx" and str(target_sheet or "").strip():
+        editor["actionLink"] = {
+            "action": {"type": "bookmark", "data": str(target_sheet).strip()}
+        }
 
     # 只保留 OO 认识的顶层键（generation / write_fence_epoch 已在 descriptor 顶层）
     config: dict[str, Any] = {

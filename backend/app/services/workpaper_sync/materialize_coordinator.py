@@ -120,6 +120,7 @@ representation generation** 而 `content_revision` **不变**。
 from __future__ import annotations
 
 import ast
+import logging
 import base64
 import hashlib
 import hmac
@@ -163,6 +164,12 @@ from app.services.workpaper_sync.content_mutation import (
 from app.services.workpaper_sync.contracts import SyncContract
 from app.services.workpaper_sync.definitions import canonical_digest
 from app.services.workpaper_sync.entry_profile import Capability
+from app.services.workpaper_sync.materialize_reuse_verdict import (
+    HIT as REUSE_HIT,
+    REPLAYED as REUSE_REPLAYED,
+    ReuseVerdict,
+    verdict_for_miss,
+)
 from app.services.workpaper_sync.models import (
     ActorType,
     ArtifactKind,
@@ -975,6 +982,8 @@ _REQUIRED_SLOT_KEYS: Final[tuple[str, ...]] = ("template", "instrumentation", "c
 STALE_ON_REPLAY_MARKER: Final[str] = "stale-substrate/replay"
 STALE_ON_ROOM_OPEN_MARKER: Final[str] = "stale-substrate/room-open"
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class EditorLaunchDescriptor:
@@ -1226,6 +1235,12 @@ class MaterializeOutcome:
     rooms_opened: int
     revision_delta: int
     receipt: ContentCommitReceipt | None
+    #: 机器可读的复用判词（requirements 3.1）。**无默认值**是刻意的：
+    #: 三条终结路径各自知道自己是 hit / replayed / 哪一类 miss，给默认值等于允许某条路径
+    #: 悄悄记成别的桶 —— 而那正是上一轮那个「未命中与真改动长得一样」的缺陷形态。
+    #: `business_identity_reused` 留着不动（它是 AC 3.6 的 revision 记账口径，
+    #: `assert_revision_delta` 在用），本字段是它的**归因**面而不是替代。
+    reuse_verdict: ReuseVerdict
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -1240,6 +1255,7 @@ class MaterializeOutcome:
             "commit_count": int(self.commit_count),
             "rooms_opened": int(self.rooms_opened),
             "revision_delta": int(self.revision_delta),
+            "reuse_verdict": self.reuse_verdict.as_dict(),
         }
 
 
@@ -1789,6 +1805,16 @@ class MaterializeCoordinator:
             reuse = await self._find_business_identity_reuse(
                 request=request, pre=pre, payload_sha256=token.payload_sha256
             )
+            # 未命中要**当场**归因（requirements 3.3）：此刻还没开 operation、没写任何东西，
+            # 两条腿的库状态与上面那次探测逐字相同 ⇒ 归因是确定的。放到 commit 之后再算就
+            # 只能看到「已经变了的世界」，分不出「内容真变了」与「digest 口径分叉」。
+            verdict = (
+                REUSE_HIT
+                if reuse is not None
+                else await self._classify_reuse_miss(
+                    request=request, pre=pre, payload_sha256=token.payload_sha256
+                )
+            )
             operation = await self._open_operation(request=request, pre=pre)
             if reuse is not None:
                 outcome = await self._settle_reuse(
@@ -1801,7 +1827,11 @@ class MaterializeCoordinator:
                 )
             else:
                 outcome = await self._commit_and_settle(
-                    checked, pending=pending, pre=pre, operation_id=operation.id
+                    checked,
+                    pending=pending,
+                    pre=pre,
+                    operation_id=operation.id,
+                    reuse_verdict=verdict,
                 )
 
         revision_after = await self._read_content_revision(request.wp_id)
@@ -1826,6 +1856,7 @@ class MaterializeCoordinator:
             rooms_opened=max(0, rooms_after - rooms_before),
             revision_delta=delta,
             receipt=outcome.receipt,
+            reuse_verdict=outcome.reuse_verdict,
         )
 
     # ─────────────────────────────────────────────────────────────────
@@ -1839,8 +1870,14 @@ class MaterializeCoordinator:
         pending: WorkpaperPendingMutation,
         pre: MaterializePreflight,
         operation_id: uuid.UUID,
+        reuse_verdict: ReuseVerdict,
     ) -> MaterializeOutcome:
-        """事务 B + C：唯一业务 commit，然后 room/participant/descriptor。"""
+        """事务 B + C：唯一业务 commit，然后 room/participant/descriptor。
+
+        `reuse_verdict` 由调用方在**开 operation 之前**算好并透传（requirements 3.1）：
+        本方法走到这里说明复用未命中，判词里带的是「为什么未命中」。不在这里重算 ——
+        commit 之后世界已经前进，那时算出来的归因必然失真。
+        """
         request = authorized.request
         # 与 OO→HTML rematerialize 同构：Excel projection commit 必须带冻结
         # structure_anchors，否则 content_mutation 会 content_commit_failed。
@@ -1928,6 +1965,7 @@ class MaterializeCoordinator:
             rooms_opened=0,  # 由 materialize() 用真实行数差覆盖
             revision_delta=0,
             receipt=receipt,
+            reuse_verdict=reuse_verdict,
         )
 
     async def _replay_committed(
@@ -1999,6 +2037,7 @@ class MaterializeCoordinator:
             rooms_opened=0,
             revision_delta=0,
             receipt=None,
+            reuse_verdict=REUSE_REPLAYED,
         )
 
     async def _settle_reuse(
@@ -2061,6 +2100,7 @@ class MaterializeCoordinator:
             rooms_opened=0,
             revision_delta=0,
             receipt=None,
+            reuse_verdict=REUSE_HIT,
         )
 
     # ─────────────────────────────────────────────────────────────────
@@ -2238,8 +2278,46 @@ class MaterializeCoordinator:
         pre.bundle_identity.assert_same_as(room_bundle, where="materialize-room")
         try:
             participant = await self._join_or_reuse_participant(request, room=room)
-        except _ExpiredLeaseRoomSuperseded:
-            # 僵死 lease 已终结并 supersede；同一次 materialize 内开新 room。
+        except _ExpiredLeaseRoomSuperseded as exc:
+            # 🔴 2026-09-22（第二版，替代同日上午那版「直接抛 409」）：僵死**写** lease 触发
+            #    supersede 之后，**同代重开在结构上不可能**（`room.generation ≡
+            #    representation.generation`，而 `uq_wpoor_generation` 使 superseded 代际永不
+            #    可重建），所以必须换一代。
+            #
+            #    上午那版的做法是抛 409 让客户端「重新 flush → 提交以发布新 generation」。
+            #    真栈实测证明这条建议**客户端无法执行**：`content_commit` 只在发布**新
+            #    content version** 时才走 `_next_generation_probe`，而「重新 flush」在内容
+            #    一字未改时命中 `_find_business_identity_reuse`（AC 3.6 幂等复用、零 revision）
+            #    ⇒ 不发布、不旋转 ⇒ 下一次 materialize 又撞同一间死 room ⇒ **409 永久死循环，
+            #    用户再也进不去在线编辑**。真栈证据（wp b3ab3c46 / entry gt-d4-operating-revenue）：
+            #    room gen 93 `state=active` / `confirmed=True` / `latest_request_sequence=2`
+            #    但 `latest_durable_sequence=0`，edit lease 过期后每次点「在线编辑」恒 409。
+            #    而 **lease 到期是正常场景**（TTL 4h，用户离开再回来即触发），不是边缘情况。
+            #
+            #    正解：materialize 自己**旋转 representation generation**。
+            #    `create_representation` 支持「同一个 `content_version_id` + 新 `generation`
+            #    + 复用同一 artifact」，于是：
+            #      · 不产生新 content version ⇒ **business revision 不变**，AC 3.6 的
+            #        「业务身份相同不得产生重复 revision」继续成立（`assert_revision_delta`
+            #        照样看到 delta=0）；
+            #      · generation 变了 ⇒ `doc_key` 变了 ⇒ OnlyOffice 按 doc_key 的缓存文档被
+            #        换掉，「被撤销写会话的未落盘编辑可能被后来者静默继承」这条污染路径**照样
+            #        被切断**（这正是当初要 supersede 整代的唯一理由）；
+            #      · 旧代 room 的 `revoke_participant` 已经 fence+1 + refresh_required，
+            #        任何在旧 fence 下冻结的请求仍被拒 —— 安全前提一条没松。
+            #    也不需要重新 materialize 字节：artifact 与 bundle 逐项复用，只换代际。
+            #
+            #    只重试**一次**：第二次仍失败说明不是「僵死 lease」这一类，按 409 如实透出。
+            rotated = await self._rotate_generation_for_stale_room(
+                representation, project_id=request.project_id
+            )
+            if rotated is None:
+                raise DescriptorSubstrateStaleError(
+                    f"{STALE_ON_ROOM_OPEN_MARKER}: 本代 room 因僵死写会话（过期/被撤销的 "
+                    f"edit lease）已作废（{exc}），且无法为同一内容版本旋转出新 generation "
+                    "—— 请重新 flush → 提交后再进在线编辑"
+                ) from exc
+            representation = rotated
             try:
                 room, room_bundle = await self._rooms.open_or_reuse_room(
                     request.scope,
@@ -2247,14 +2325,17 @@ class MaterializeCoordinator:
                     opened_base_version_id=content_version_id,
                     ttl=self._room_ttl,
                 )
-            except (RepresentationNotPublishedError, BundleAliasDriftError) as exc:
+            except (RepresentationNotPublishedError, BundleAliasDriftError) as retry_exc:
                 raise DescriptorSubstrateStaleError(
-                    f"{STALE_ON_ROOM_OPEN_MARKER}: 开 room 时 representation "
-                    f"{representation.id} 已不可用（{exc}）—— preflight 与 room 打开之间"
-                    "发生了并发推进，请重新 flush"
-                ) from exc
-            pre.bundle_identity.assert_same_as(room_bundle, where="materialize-room-retry")
+                    f"{STALE_ON_ROOM_OPEN_MARKER}: 旋转到 generation "
+                    f"{representation.generation} 后开 room 仍失败（{retry_exc}）"
+                ) from retry_exc
+            pre.bundle_identity.assert_same_as(
+                room_bundle, where="materialize-room-rotated"
+            )
             participant = await self._join_or_reuse_participant(request, room=room)
+            representation_id = representation.id
+            representation_generation = int(representation.generation)
         await self._session.commit()
 
         descriptor = EditorLaunchDescriptor(
@@ -2289,6 +2370,102 @@ class MaterializeCoordinator:
         )
         self.descriptors_issued += 1
         return descriptor
+
+    async def _rotate_generation_for_stale_room(
+        self,
+        representation: WorkpaperContentRepresentation,
+        *,
+        project_id: uuid.UUID,
+    ) -> WorkpaperContentRepresentation | None:
+        """为**同一个 content version** 发一代新 representation（只换 generation）。
+
+        用途只有一个：上一代 room 因僵死写会话作废后，给 materialize 一个可开的新代际。
+        见调用点的长注释（为什么不能同代重开、为什么这样仍然安全、为什么 revision 不动）。
+
+        与 `content_commit` 的分工：commit 负责「内容变了 ⇒ 新 content version + 新
+        representation」；本方法负责「内容没变，但代际不可用 ⇒ 同内容换代」。两者都经
+        `repo.create_representation`（同一道 approved-bundle 门禁），不存在第二条发布路径。
+
+        返回 ``None`` = 拿不到可复用的 bundle/authority 身份，交调用方按 409 如实透出
+        （宁可报错，也不猜一个 bundle —— 猜错等于用别的 entry 的 definition 开 room）。
+        """
+        entry_id = str(representation.entry_id)
+        next_generation = int(
+            (
+                await self._session.execute(
+                    sa.select(
+                        sa.func.max(WorkpaperContentRepresentation.generation)
+                    ).where(
+                        WorkpaperContentRepresentation.wp_id == representation.wp_id,
+                        WorkpaperContentRepresentation.entry_id == entry_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            or 0
+        )
+        max_room = int(
+            (
+                await self._session.execute(
+                    sa.select(sa.func.max(WorkpaperOoRoom.generation)).where(
+                        WorkpaperOoRoom.wp_id == representation.wp_id,
+                        WorkpaperOoRoom.entry_id == entry_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            or 0
+        )
+        # 与 `content_mutation._next_generation_probe` 逐字同口径：必须同时越过
+        # representation 与 **room** 的历史最大代际 —— 只看 representation 会撞上历史残留
+        # room 的 `uq_wpoor_generation`。
+        generation = max(next_generation, max_room) + 1
+        if (
+            representation.definition_bundle_id is None
+            or representation.authority_model_definition_id is None
+        ):
+            return None
+        rotated = await self._repo.create_representation(
+            project_id=project_id,
+            wp_id=representation.wp_id,
+            entry_id=entry_id,
+            content_version_id=representation.content_version_id,
+            generation=generation,
+            document_type=str(representation.document_type),
+            # 复用同一 artifact：字节一模一样，只是换代际，不需要重新 materialize。
+            artifact_id=representation.artifact_id,
+            artifact_sha256=str(representation.artifact_sha256),
+            definition_bundle_id=representation.definition_bundle_id,
+            authority_model_definition_id=representation.authority_model_definition_id,
+            adapter_id=str(representation.adapter_id),
+            adapter_build_digest=str(representation.adapter_build_digest),
+            structure_hash=str(representation.structure_hash),
+            identity_inventory_sha256=str(representation.identity_inventory_sha256),
+            # 🔴 `reason` 不是自由文本：`ck_wpcr_reason` 是封闭词表
+            #    （content_commit / definition_upgrade / rollback / rematerialize）。
+            #    本场景内容未变、definition 未变，只是把同一份字节按新代际重新物化出来给
+            #    编辑器打开 ⇒ 语义上恰是 `rematerialize`。首版写了自由文本 `stale_room_rotation`，
+            #    被该 CHECK 挡成 IntegrityError（PG 真栈实测）——封闭词表这次帮了忙。
+            reason="rematerialize",
+            parent_representation_id=representation.id,
+        )
+        # entry pointer 必须跟着走：materialize 的 preflight 与 `open_or_reuse_room` 的
+        # published 门都按 pointer 认「当前代」。`set_entry_pointer` 的契约正是
+        # 「切 pointer **不改 content revision**」—— 与本路径要的语义逐字吻合。
+        await self._repo.set_entry_pointer(
+            wp_id=representation.wp_id,
+            entry_id=entry_id,
+            representation_id=rotated.id,
+            generation=generation,
+        )
+        await self._session.flush()
+        logger.info(
+            "entry %s 的 generation %s 因僵死写会话作废，已为同一 content version %s "
+            "旋转到 generation %s（revision 不变、artifact 复用、doc_key 已换）",
+            entry_id,
+            representation.generation,
+            representation.content_version_id,
+            generation,
+        )
+        return rotated
 
     async def _join_or_reuse_participant(
         self, request: MaterializeRequest, *, room: WorkpaperOoRoom
@@ -2335,8 +2512,39 @@ class MaterializeCoordinator:
         if live.revoked_at is not None or (
             live.expires_at is not None and live.expires_at <= _now()
         ):
-            # 僵死 lease 仍占 uq_wpoop_active_lease：先终结并 supersede，
-            # 由 _open_room_and_descriptor 同一次 materialize 内开新 room。
+            # 僵死 lease 仍占 uq_wpoop_active_lease，必须先让它离开 active/closing。
+            # 🔴 2026-09-22 治本分流：按「这一代是否**真正接管过内容**」决定反应强度。
+            #
+            # ① 从未接管（room 停在 opening、descriptor 确认从未到达、request/durable
+            #    序列为 0、无 application、fence 仍是初值）⇒ 污染在物理上不可能发生。
+            #    轻量释放 lease（active → expired，partial unique 槽位即刻腾出）+ 续租
+            #    room 使用窗口，**复用同代 room** 重新 join 一个干净 lease。用户当场回到
+            #    在线编辑：不烧 generation、不抛 409。
+            #
+            #    这一支修的是一个真栈稳定复现的死锁：旧代码无条件把僵死 lease 当「写会话
+            #    被撤销」处理 → 作废整代 → 而 materialize 无法旋转 generation（那是
+            #    content_commit 的职责），且「重新 flush」在内容未改时走 business-identity
+            #    复用路径、**同样不触发旋转** ⇒ 永远回到同一间死 room。真栈同一 entry 已
+            #    堆积 6 个从未确认即被遗弃的代际（g69/76/77/78/80/93）。
+            #
+            # ② 接管过（确认到达过 / 有 request 或 durable 内容 / fence 被提升过）⇒
+            #    「OO 的 c=drop 不证明已合入内容被移除」这条前提成立，保持原有重型反应：
+            #    revoke（fence+1 + refresh_required）→ supersede 本代 → 由调用方抛 409
+            #    stale，要求重新 flush→commit 发布新 generation 后再进。
+            released = await self._rooms.release_stale_lease_on_pristine_room(
+                room_id=room.id,
+                participant_id=live.id,
+                ttl=self._room_ttl,
+            )
+            if released:
+                return await self._rooms.join_participant(
+                    request.scope,
+                    room_id=room.id,
+                    user_id=request.user_id,
+                    mode="edit",
+                    permission_epoch=int(request.permission_epoch),
+                    lease_token=(request.lease_token or uuid.uuid4().hex),
+                )
             await self._rooms.revoke_participant(
                 room_id=room.id,
                 participant_id=live.id,
@@ -2759,6 +2967,101 @@ class MaterializeCoordinator:
         if representation is None:
             return None
         return version, representation
+
+    async def _classify_reuse_miss(
+        self,
+        *,
+        request: MaterializeRequest,
+        pre: MaterializePreflight,
+        payload_sha256: str,
+    ) -> ReuseVerdict:
+        """未命中归因（requirements 3.3，判词形态见 `materialize_reuse_verdict`）。
+
+        只在 :meth:`_find_business_identity_reuse` 返回 `None` 之后调用，且在**开 operation
+        之前** —— 同一个 session、其间零写入 ⇒ 两条腿复查的结果与那次探测逐字相同。
+
+        ═══ 为什么只复查 version 那条腿就够 ═══
+
+        `_find_business_identity_reuse` 的两条查询是串联的：version 命中才查
+        representation。所以未命中只有两种来源，而 version 腿的真假就把它们分开了：
+
+        * version 腿**没**命中 ⇒ `projection_sha256` 不等 ⇒ 用业务比较面归因
+          （内容真变了 / 契约变了 / 🔴 digest 口径分叉）；
+        * version 腿命中了 ⇒ 未命中必来自 substrate + bundle 腿。
+
+        ⚠️ 这里多付**一次** projection 载荷读盘（~120KB JSON）。它只发生在未命中路径上，
+        而那条路径紧接着就是整趟物化（真库 D4 实测 CPU 段 7.5s）⇒ 相对成本可忽略。
+        命中路径一个字节都不多读。
+        """
+        version_matched = (
+            await self._session.execute(
+                sa.select(sa.func.count())
+                .select_from(WorkpaperContentVersion)
+                .where(
+                    WorkpaperContentVersion.id == pre.base_content_version_id,
+                    WorkpaperContentVersion.wp_id == request.wp_id,
+                    WorkpaperContentVersion.projection_sha256 == payload_sha256,
+                )
+            )
+        ).scalar_one() > 0
+        base_payload = (
+            None
+            if version_matched
+            else await self._read_base_projection_payload(request=request, pre=pre)
+        )
+        return verdict_for_miss(
+            base_payload=base_payload,
+            incoming_payload=_projection_payload(request.projection),
+            base_version_matched=version_matched,
+        )
+
+    async def _read_base_projection_payload(
+        self, *, request: MaterializeRequest, pre: MaterializePreflight
+    ) -> Mapping[str, Any] | None:
+        """读回基线 content version 落盘的那份 canonical projection 载荷。
+
+        读**落盘字节**而不是从别处重算：digest 就是对这份字节算的，拿它当比较的一侧才能
+        回答「digest 说不一样，业务内容到底一样不一样」。从内存里另算一份就把待查的那条
+        口径又用了一遍。
+
+        返回 `None` 的三种情形都归 `no_base_projection`（合法「无从比较」，不是缺陷）：
+        历史行没有 `projection_artifact_id`、artifact 行/文件缺失、载荷不是 JSON 对象
+        （早期 representation 的 projection 位可能是占位字节）。
+        **不抛** —— 归因失败不该把一次正常的全量物化搞失败。
+        """
+        version = (
+            await self._session.execute(
+                sa.select(WorkpaperContentVersion).where(
+                    WorkpaperContentVersion.id == pre.base_content_version_id
+                )
+            )
+        ).scalar_one_or_none()
+        artifact_id = None if version is None else version.projection_artifact_id
+        if artifact_id is None:
+            return None
+        artifact = (
+            await self._session.execute(
+                sa.select(WorkpaperArtifact).where(WorkpaperArtifact.id == artifact_id)
+            )
+        ).scalar_one_or_none()
+        if artifact is None:
+            return None
+        try:
+            path = self._artifacts.resolve_published_artifact(
+                project_id=request.project_id,
+                kind=artifact.kind,
+                state=artifact.state,
+                relative_path=artifact.relative_path,
+            )
+            payload = json.loads(path.read_bytes().decode("utf-8"))
+        except Exception:  # noqa: BLE001 - 见 docstring：归因不得升级成物化失败
+            logger.info(
+                "[reuse_verdict] 基线 projection 载荷不可读（artifact=%s）⇒ 归因 "
+                "no_base_projection",
+                artifact_id,
+            )
+            return None
+        return payload if isinstance(payload, dict) else None
 
     async def _latest_representation(
         self, *, wp_id: uuid.UUID, entry_id: str, version_id: uuid.UUID

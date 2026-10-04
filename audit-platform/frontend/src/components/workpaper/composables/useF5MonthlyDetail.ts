@@ -15,6 +15,11 @@ import {
   calcAdjustedAmount,
   calcChangeRate,
 } from './useF5CosOfFormulaEngine'
+import {
+  F5_ROW_ID_PREFIX,
+  resolveStableRowId,
+  type RowIdentityMintStats,
+} from './f5RowIdentity'
 import type { ChecklistResponse } from './useF1FormData'
 
 export interface UseF5MonthlyDetailOptions {
@@ -115,12 +120,15 @@ export function emptyF5MonthlyRow(product = ''): StoredMonthlyRow {
   }
 }
 
-export function migrateF5MonthlyRows(jsonStr: string | null | undefined): StoredMonthlyRow[] {
+export function migrateF5MonthlyRows(
+  jsonStr: string | null | undefined,
+  stats?: RowIdentityMintStats,
+): StoredMonthlyRow[] {
   if (!jsonStr) return []
   try {
     const parsed = JSON.parse(jsonStr)
     if (!Array.isArray(parsed)) return []
-    return parsed.map((r: any, i: number) => {
+    return parsed.map((r: any) => {
       let months = emptyMonths()
       if (Array.isArray(r?.months)) {
         months = normalizeMonths(r.months)
@@ -130,7 +138,11 @@ export function migrateF5MonthlyRows(jsonStr: string | null | undefined): Stored
         )
       }
       return {
-        id: String(r?.id ?? r?.rowId ?? `m-${Date.now()}-${i}`),
+        // 🔴 BP-7 修复（f5-sync-coverage-and-first-canary Task 6）：原为
+        //    `String(r?.id ?? r?.rowId ?? \`m-${Date.now()}-${i}\`)` —— 下标派生身份，
+        //    插删行后同一逻辑行换 id，OO↔HTML roundtrip 会把 A 行的值并进 B 行。
+        //    现缺 id（或 id 是旧下标形态）时铸稳定 UUID，并由 loadRows() 立即回写。
+        id: resolveStableRowId(r, F5_ROW_ID_PREFIX.monthlyDetail, stats),
         product: String(r?.product ?? r?.variety ?? r?.label ?? ''),
         months,
         currentAje: parseNum(r?.currentAje),
@@ -226,10 +238,16 @@ export function useF5MonthlyDetail(options: UseF5MonthlyDetailOptions) {
   }
 
   function loadRows(): void {
-    const migrated = migrateF5MonthlyRows(rawJson())
+    // 🔴 BP-7（需求 3.1）：铸了新行身份就**立即回写**。不回写的话 store 里仍无 id，
+    //    下次载入又铸一个新的 ⇒ 身份每次都变，与下标派生一样破坏 roundtrip。
+    const stats: RowIdentityMintStats = { minted: 0 }
+    const migrated = migrateF5MonthlyRows(rawJson(), stats)
     storedRows.value = migrated.length
       ? migrated
       : [emptyF5MonthlyRow('品种1'), emptyF5MonthlyRow('品种2'), emptyF5MonthlyRow('品种3')]
+    if (stats.minted > 0 && migrated.length && !readonly.value) {
+      persist()
+    }
   }
 
   watch(() => rawJson(), (raw) => {

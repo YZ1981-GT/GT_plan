@@ -23,9 +23,44 @@
  * 这不是长期方案 —— Wave 5 的每个 entry 迁移时宿主会直接用 `WorkpaperSyncEditorHost`
  * 并彻底删除 adapter-shaped wiring。本层只是 Task 45 的过渡胶水。
  *
- * ═══ 删除条件 ═══
+ * ═══ 🔴 实际行为与上述自述不符（2026-09-27 实测，务必先读这段）═══
  *
- * 当四个 pilot 宿主全部改为直接渲染 `WorkpaperSyncEditorHost` 时，本文件删除。
+ * 上面那段「底层全部委派给 sync bridge」**不成立**。本文件的实现里：
+ *
+ * - `switchMode()` 只做 `currentMode.value = target` + `localStorage.setItem`，
+ *   **零 API 调用** —— 它既不 materialize，也不产 descriptor；
+ * - `isOoAvailable` 硬编码 `ref(true)`，从不读 manifest capability，也不看 bridge 有没有
+ *   报错 ⇒ 宿主那面「OnlyOffice 拉取成功」的绿 tag 是**无条件**亮的；
+ * - `ooConfig` 恒 `null`（下方接口注释自称「仅作兼容占位」）。
+ *
+ * 也就是说：挂本适配器的宿主**没有**真双向回写。切「在线编辑」渲染的是 legacy
+ * `GtOnlyOfficeSheet`（走 `wp_onlyoffice_router`，与 HTML 侧 store 不互通），切回来只是
+ * 重读本地数据。`sync/__tests__/bridgeMaterializeDriven.spec.ts` 有一条专门钉住
+ * 「本文件不得被当成驱动方」。
+ *
+ * ═══ 删除条件：**已满足**，删除动作待独立一笔 ═══
+ *
+ * 原条件是「当四个 pilot 宿主全部改为直接渲染 `WorkpaperSyncEditorHost` 时删除」。
+ * 四个 pilot 现已全部迁完，**生产消费方为零**（2026-09-27 全仓 grep 现算）：
+ *
+ * | pilot | 终态 |
+ * |---|---|
+ * | D2 `GtD2AccountsReceivable.vue` | 宿主直接调 `useWorkpaperSyncBridge`（`42d2f6e6f`） |
+ * | H1 `GtH1FixedAssets.vue` | 经包装 `composables/useHSyncMode.ts` 调桥 |
+ * | G7 `GtG7LongTermEquityMain.vue` | 宿主直接调桥（受管 sheet `g7n-managed`） |
+ * | B60 `b60/GtB60Bundle.vue` | 宿主直接调桥（受管 sheet `b601-managed`，绑 B60-1 wpId） |
+ * | B60 `b60/GtB60DocxPane.vue` | **不适用**：manifest 里它是 `parent_duplicate`、 |
+ * |  | `adapter_id=null` 且无契约 ⇒ 无受管面，改用本地 legacy mode ref |
+ *
+ * 之所以文件还在：删它是**跨前后端的一笔**，要同步改这些绑定本文件路径的判据 ——
+ * `test_task45_pilot_legacy_deletion.py`（整个 `TestPilotAdapterFieldContract` 类 +
+ * `TestProperty48NoLegacySuccessMessages.PILOT_ADAPTER` + 统一 storage 前缀那三条）、
+ * `test_task46/48/49_*_cycle_migration.py::test_bridge_adapter_supports_entry_id`、
+ * `test_task66_legacy_deletion_plan.py` 的 rollback 对照路径。混进接线那一笔会让
+ * 「宿主迁移」和「判据改判」的责任互相掩护，故留作独立一步。
+ *
+ * ⚠️ 在删除之前：**不要给本文件接新的消费方**。新宿主一律 `useWorkpaperSyncBridge` +
+ * `WorkpaperSyncEditorHost`（或 `useHSyncMode` 那样的包装模块）。
  */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 

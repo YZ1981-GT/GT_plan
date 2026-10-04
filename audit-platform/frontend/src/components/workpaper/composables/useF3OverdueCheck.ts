@@ -5,6 +5,11 @@
  */
 import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
 import { calcOverdueDays, calcTermDays, calcSubtotal, parseNum } from './useF3FormulaEngine'
+import {
+  F3_ROW_ID_PREFIX,
+  resolveF3RowId,
+  type F3RowIdentityMintStats,
+} from './f3RowIdentity'
 import type { UseF3BaseOptions } from './useF3Adjudication'
 import { injectF3Adjustments, type F3InjectAdjustmentRow } from './f3AdjustmentInject'
 
@@ -95,13 +100,14 @@ export function computeOverdueRow(stored: F3OverdueNoteRow, asOf = new Date()): 
   return { ...stored, termDays, overdueDays, unpaidAmount, riskFlags }
 }
 
-function migrateRow(raw: any, i: number): F3OverdueNoteRow {
+function migrateRow(raw: any, i: number, stats?: F3RowIdentityMintStats): F3OverdueNoteRow {
   const base = emptyOverdueRow(i + 1, Number(raw.attSlot) || i + 1)
   const legacyNote = [raw.overdueReason, raw.collectionStatus, raw.auditAdvice, raw.remark]
     .filter(Boolean).join('；')
   return computeOverdueRow({
     ...base,
-    rowId: raw.rowId || raw.id || generateRowId(),
+    // 🔴 缺 rowId 时铸新并记数（委托 f3RowIdentity 单源）；`loadRows` 据此立即回写。
+    rowId: resolveF3RowId(raw, F3_ROW_ID_PREFIX.overdue, stats),
     seq: raw.seq ?? i + 1,
     noteType: String(raw.noteType || ''),
     ticketNo: String(raw.ticketNo ?? raw.noteNo ?? ''),
@@ -120,12 +126,15 @@ function migrateRow(raw: any, i: number): F3OverdueNoteRow {
   })
 }
 
-export function safeParseOverdueRows(jsonStr: string | null | undefined): F3OverdueNoteRow[] {
+export function safeParseOverdueRows(
+  jsonStr: string | null | undefined,
+  stats?: F3RowIdentityMintStats,
+): F3OverdueNoteRow[] {
   if (!jsonStr) return []
   try {
     const parsed = JSON.parse(jsonStr)
     if (!Array.isArray(parsed)) return []
-    const rows = parsed.map(migrateRow)
+    const rows = parsed.map((raw, i) => migrateRow(raw, i, stats))
     const pruned = rows.filter((r) => !isBlankOverdueRow(r))
     const kept = pruned.length ? pruned : rows.slice(0, 1)
     return kept.map((r, i) => ({ ...r, seq: i + 1 }))
@@ -143,8 +152,15 @@ export function useF3OverdueCheck(options: UseF3BaseOptions) {
   const auditConclusion = ref('')
 
   function loadRows(): void {
-    storedData.value = safeParseOverdueRows(allResponses.value.get(STORAGE_KEY)?.remark)
-    if (storedData.value.length === 0) storedData.value = [computeOverdueRow(emptyOverdueRow(1))]
+    // 🔴 铸了新行身份就立即回写（spec f3-sync-coverage-and-first-canary Task 13 同款处置）：
+    // 不回写则下次载入再铸新 rowId，行身份每次都变，破坏 OO↔HTML roundtrip。
+    const stats: F3RowIdentityMintStats = { minted: 0 }
+    storedData.value = safeParseOverdueRows(allResponses.value.get(STORAGE_KEY)?.remark, stats)
+    if (storedData.value.length === 0) {
+      storedData.value = [computeOverdueRow(emptyOverdueRow(1))]
+      return
+    }
+    if (stats.minted > 0 && !readonly.value) persistRows()
   }
 
   watch(() => allResponses.value.get(STORAGE_KEY)?.remark, (raw) => {

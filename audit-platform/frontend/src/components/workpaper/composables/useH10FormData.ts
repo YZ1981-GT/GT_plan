@@ -21,6 +21,40 @@ export function useH10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
   const renderMeta = ref<Record<string, any>>({})
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
+  /**
+   * ② adapter 回写窗口门（spec `h2-h6-h10-pilot-cross-reference-lanes` Task 5 ②）。
+   *
+   * 🔴 为什么必须有：草稿是 H10 独有的**第三处**数据存储。OO→HTML 回写期间 store 正在被
+   * adapter 覆写，此刻若 PUT 失败又把旧值写成本地草稿，`restoreDrafts()` 下次回灌就会把
+   * **回写前的旧值**盖回 store —— 表现是「在 Excel 里改的东西过一会自己变回去了」，
+   * 而且没有任何报错。窗口内改为**不落草稿 + 明说没保住**（宁可让用户重填，不可静默回滚）。
+   */
+  const draftsSuspended = ref(false)
+  function setDraftsSuspended(v: boolean): void {
+    draftsSuspended.value = !!v
+  }
+
+  /**
+   * ③ 未同步草稿条数（spec 同上 Task 5 ③）。
+   *
+   * 🔴 现算而非计数器累加：草稿可能被别的标签页 / 上一个会话留下，累加器看不到它们。
+   */
+  const pendingDraftCount = ref(0)
+  function refreshPendingDraftCount(): void {
+    if (!opts.wpId.value) {
+      pendingDraftCount.value = 0
+      return
+    }
+    const prefix = `${DRAFT_PREFIX}:${opts.wpId.value}:`
+    let n = 0
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        if (localStorage.key(i)?.startsWith(prefix)) n += 1
+      }
+    } catch { /* 存储不可用时按 0 计，不阻塞业务 */ }
+    pendingDraftCount.value = n
+  }
+
   function restoreDrafts(): void {
     if (!opts.wpId.value) return
     for (let i = 0; i < localStorage.length; i++) {
@@ -36,6 +70,7 @@ export function useH10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
         }
       } catch { /* ignore corrupt draft */ }
     }
+    refreshPendingDraftCount()
   }
 
   async function loadResponses() {
@@ -96,27 +131,63 @@ export function useH10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
         try {
           localStorage.removeItem(draftKey(opts.wpId.value, itemId))
         } catch { /* ignore */ }
+        refreshPendingDraftCount()
         return
       } catch {
         if (i < retries - 1) await new Promise((r) => setTimeout(r, 500 * 2 ** i))
       }
     }
+    // 🔴 ② adapter 回写窗口内**不落草稿**：此刻 store 正被 adapter 覆写，落草稿会在
+    //    下次 restoreDrafts 时把回写前的旧值盖回去（静默回滚）。宁可明说没保住。
+    if (draftsSuspended.value) {
+      ElMessage.error(
+        `H10 数据未能保存（${itemId}）：Excel 回写正在进行，为避免覆盖回写结果未暂存本地，请稍后重填`,
+      )
+      return
+    }
     try {
       localStorage.setItem(draftKey(opts.wpId.value, itemId), JSON.stringify(updated))
       ElMessage.warning(`H10 数据暂存本地（${itemId}），网络恢复后将自动同步`)
+      refreshPendingDraftCount()
     } catch { /* ignore */ }
   }
+
+  /** 还在防抖窗口里、尚未发出的载荷（item_id → payload）。 */
+  const _pending = new Map<string, ChecklistResponse>()
 
   function debouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
     const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
     const updated = { ...existing, ...data, item_id: itemId }
     allResponses.value.set(itemId, updated)
+    _pending.set(itemId, updated)
     const prev = _debounceTimers.get(itemId)
     if (prev) clearTimeout(prev)
     _debounceTimers.set(itemId, setTimeout(() => {
       _debounceTimers.delete(itemId)
+      _pending.delete(itemId)
       void saveImmediate(itemId, updated)
     }, 2000))
+  }
+
+  /**
+   * 清防抖 + 立即落库，**await 到真正写完**。切「在线编辑」前的必经一步。
+   *
+   * 🔴 防抖窗口是 **2000ms**（全 H 与 H3/H5 并列最长）：漏 flush 就会丢最多 2 秒的编辑，
+   * 而 materialize 出的 xlsx 不会有任何提示。
+   *
+   * 🔴 逐个 await 而不是 `Promise.all`：`saveImmediate` 自带 3 次重试 + 指数退避，并发发多个
+   * PUT 到同一个 wpId 会让后端的 upsert 相互覆盖（这也是原 `debouncedSave` 按 item 拆 PUT
+   * 的原因）。待写盘最多就是屏幕上改过的那几个 item，串行代价可忽略。
+   */
+  async function flushPendingSaves(): Promise<void> {
+    for (const t of _debounceTimers.values()) clearTimeout(t)
+    _debounceTimers.clear()
+    if (_pending.size === 0) return
+    const batch = [..._pending.entries()]
+    _pending.clear()
+    for (const [itemId, payload] of batch) {
+      await saveImmediate(itemId, payload)
+    }
   }
 
   /** 6115 损益类：贷方发生 − 借方发生 */
@@ -208,7 +279,9 @@ export function useH10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
   }
 
   onScopeDispose(() => {
-    for (const t of _debounceTimers.values()) clearTimeout(t)
+    // 🔴 原实现是裸 `clearTimeout`：防抖窗口内那批改动**直接丢掉**且无提示
+    //    （H9/H8/H6 三个宿主同源缺陷已修，这里是同一条）。改为先落库再退出。
+    void flushPendingSaves()
   })
 
   return {
@@ -217,10 +290,15 @@ export function useH10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     allResponses,
     renderMeta,
     accountCode: H10_ACCOUNT_CODE,
+    draftsSuspended,
+    setDraftsSuspended,
+    pendingDraftCount,
+    refreshPendingDraftCount,
     loadAll,
     getSheet,
     saveImmediate,
     debouncedSave,
+    flushPendingSaves,
     fetchTrialBalanceAmount,
     handleDisposalCompleted,
     handleSourceDisposalUpdated,

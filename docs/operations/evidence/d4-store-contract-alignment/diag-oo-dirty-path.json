@@ -1,0 +1,281 @@
+{
+  "captured_at": "2026-09-24T02:33:45.016Z",
+  "target_cell": "D30",
+  "steps": [
+    {
+      "step": "baseline",
+      "host_dirty": "0",
+      "oo": {
+        "ok": true,
+        "modified": false,
+        "cellText": ""
+      }
+    },
+    {
+      "step": "dom_probe",
+      "domProbe": {
+        "candidates": [
+          {
+            "sel": "#ce-cell-name",
+            "tag": "INPUT",
+            "id": "ce-cell-name",
+            "visible": true
+          },
+          {
+            "sel": "#ce-cell-content",
+            "tag": "TEXTAREA",
+            "id": "ce-cell-content",
+            "visible": true
+          },
+          {
+            "sel": "input#ce-cell-name",
+            "tag": "INPUT",
+            "id": "ce-cell-name",
+            "visible": true
+          },
+          {
+            "sel": "#cell-editing-box",
+            "tag": "DIV",
+            "id": "cell-editing-box",
+            "visible": true
+          },
+          {
+            "sel": "#ws-canvas",
+            "tag": "CANVAS",
+            "id": "ws-canvas",
+            "visible": true
+          },
+          {
+            "sel": "#ws-canvas-outer",
+            "tag": "DIV",
+            "id": "ws-canvas-outer",
+            "visible": true
+          },
+          {
+            "sel": "canvas",
+            "tag": "CANVAS",
+            "id": "ws-canvas",
+            "visible": true
+          },
+          {
+            "sel": ".statusbar",
+            "tag": "DIV",
+            "id": "",
+            "visible": true
+          },
+          {
+            "sel": "#toolbar",
+            "tag": "DIV",
+            "id": "toolbar",
+            "visible": true
+          },
+          {
+            "sel": "#id_target_cursor",
+            "tag": "DIV",
+            "id": "id_target_cursor",
+            "visible": false
+          }
+        ],
+        "inputs": [
+          {
+            "id": "title-doc-name",
+            "cls": "",
+            "type": "text",
+            "visible": true
+          },
+          {
+            "id": "rib-doc-name",
+            "cls": "",
+            "type": "text",
+            "visible": false
+          },
+          {
+            "id": "",
+            "cls": "form-control",
+            "type": "text",
+            "visible": true
+          },
+          {
+            "id": "",
+            "cls": "form-control",
+            "type": "text",
+            "visible": true
+          },
+          {
+            "id": "",
+            "cls": "form-control",
+            "type": "text",
+            "visible": true
+          },
+          {
+            "id": "chb-952",
+            "cls": "checkbox__native",
+            "type": "checkbox",
+            "visible": false
+          },
+          {
+            "id": "chb-953",
+            "cls": "checkbox__native",
+            "type": "checkbox",
+            "visible": false
+          },
+          {
+            "id": "chb-1454",
+            "cls": "checkbox__native",
+            "type": "checkbox",
+            "visible": false
+          },
+          {
+            "id": "chb-1457",
+            "cls": "checkbox__native",
+            "type": "checkbox",
+            "visible": false
+          },
+          {
+            "id": "chb-1455",
+            "cls": "checkbox__native",
+            "type": "checkbox",
+            "visible": false
+          },
+          {
+            "id": "chb-1456",
+            "cls": "checkbox__native",
+            "type": "checkbox",
+            "visible": false
+          },
+          {
+            "id": "",
+            "cls": "form-control",
+            "type": "text",
+            "visible": false
+          }
+        ],
+        "canvases": [
+          {
+            "id": "ws-canvas",
+            "w": 1046,
+            "h": 313,
+            "visible": true
+          },
+          {
+            "id": "ws-canvas-overlay",
+            "w": 1046,
+            "h": 313,
+            "visible": true
+          },
+          {
+            "id": "ws-canvas-graphic",
+            "w": 1046,
+            "h": 313,
+            "visible": true
+          },
+          {
+            "id": "ws-canvas-graphic-overlay",
+            "w": 1046,
+            "h": 313,
+            "visible": true
+          },
+          {
+            "id": "",
+            "w": 14,
+            "h": 313,
+            "visible": true
+          },
+          {
+            "id": "",
+            "w": 1046,
+            "h": 14,
+            "visible": true
+          },
+          {
+            "id": "ce-canvas",
+            "w": 300,
+            "h": 150,
+            "visible": false
+          },
+          {
+            "id": "ce-canvas-overlay",
+            "w": 300,
+            "h": 150,
+            "visible": false
+          },
+          {
+            "id": "",
+            "w": 50,
+            "h": 50,
+            "visible": false
+          },
+          {
+            "id": "",
+            "w": 12,
+            "h": 16,
+            "visible": false
+          },
+          {
+            "id": "",
+            "w": 12,
+            "h": 16,
+            "visible": false
+          }
+        ]
+      }
+    },
+    {
+      "step": "pathB_namebox_keyboard",
+      "marker": "diag118559",
+      "tried": true,
+      "host_dirty": "0",
+      "oo": {
+        "ok": true,
+        "modified": false,
+        "cellText": "diag118559"
+      }
+    },
+    {
+      "step": "pathC_canvas_keyboard",
+      "tried": true,
+      "marker": "diag118559c",
+      "canvas_box": {
+        "x": 140,
+        "y": 392.59375,
+        "width": 1046,
+        "height": 313
+      },
+      "host_dirty": "0",
+      "oo": {
+        "ok": true,
+        "modified": false,
+        "cellText": "diag118559"
+      }
+    },
+    {
+      "step": "pathD_internal_api_control",
+      "tried": true,
+      "modified_before": false,
+      "inserted": true,
+      "closeRet": true,
+      "modified_after": true,
+      "cellText": "diag118559d",
+      "host_dirty_after": "0"
+    },
+    {
+      "step": "pathE_forcesave_after_modified",
+      "tried": true,
+      "save_btn_enabled": true,
+      "host_dirty_at_click": "0",
+      "forcesave_responses": [
+        {
+          "status": 202,
+          "body": "{\"code\": 202, \"message\": \"success\", \"data\": {\"forcesave_request_id\": \"02b7bb2b-4503-4bc7-9087-04324797d91f\", \"operation_id\": \"71dc8828-9166-4970-9ff7-1bffbe31b4e5\", \"request_sequence\": 3, \"state\": \"accepted\", \"poll_after_ms\": 500, \"replayed\": false, \"dispatch_error\": null, \"cs_error\": 0, \"cs_outcome\": \"accepted\", \"callback_expected\": true}}"
+        }
+      ],
+      "callback_hits": [],
+      "callback_arrived": false,
+      "oo_after": {
+        "ok": true,
+        "modified": false,
+        "cellText": "diag118559d"
+      }
+    }
+  ]
+}

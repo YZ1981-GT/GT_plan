@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", "module": "ESNext", "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true, "strict": true, "skipLibCheck": true,
+    "noEmit": true, "isolatedModules": true, "moduleDetection": "force",
+    "jsx": "preserve", "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "paths": { "@/*": ["./src/*"] }, "baseUrl": "."
+  },
+  "include": [
+    "src/components/workpaper/GtL8FinancialExpenses.vue",
+    "src/components/workpaper/l8/core/L8TabDetail.vue",
+    "src/components/workpaper/l8/core/l8DetailRowIdentity.ts",
+    "src/components/workpaper/composables/useL8Detail.ts",
+    "src/components/workpaper/composables/shared/rowIdentity.ts",
+    "src/components/workpaper/composables/useCycleHtmlOoDualMode.ts",
+    "src/components/workpaper/composables/dualModeLabels.ts",
+    "src/components/workpaper/composables/l8AccountScope.ts",
+    "src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+    "src/components/workpaper/sync/workpaperEntrySyncNotice.ts",
+    "src/env.d.ts"
+  ]
+}

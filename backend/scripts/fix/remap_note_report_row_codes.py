@@ -132,6 +132,40 @@ def _resolve_db_url() -> str:
 FAMILIES = ("listed", "soe")
 
 
+#: 同名多码的人工裁决表：`variant|section_number|归一标签` → 选定编号。
+#:
+#: 🔴 **为什么必须有这张表**（2026-09-30 实证）：原实现对「标签映射到多个编号」一律判
+#: `ambiguous` 并**原样保留**，却**从不检查现绑定是否在候选集里**。实测把两份模板的
+#: 全部待人工条目逐条对照候选集：**8 条现绑定连候选都不是**（`存货` 绑到「预付款项」、
+#: `短期借款` 绑到「使用权资产」、`其他应付款` 绑到「其他非流动资产」…），
+#: 而「候选内的真歧义」**0 条**。也就是说 `ambiguous` 这一类从来不是「两个都对、不好选」，
+#: 而是「绑的那个根本不在候选里」—— 脚本保留它、守卫 allowlist 又给它写上
+#: 「ambiguous：两码同名」的理由，一个确定错的绑定就这样被合法化了半年。
+#:
+#: 裁决依据（结构性，可复核）：`report_config` 里同名两码中，**行号小、且落在本段
+#: 语义位置内**的那个是主表行；行号大的那个一律位于某个 `is_total_row` 合计行**之后**、
+#: 与 `△`/`▲` 金融企业专用行相邻，属扩展块。逐条实证：
+#:   BS-010 存货      在 009 其他应收款 与 011 合同资产 之间；BS-018 在 015 流动资产合计 之后、紧邻 △买入返售金融资产
+#:   BS-041 短期借款  紧随 040「流动负债：」；BS-055 在 054 流动负债合计 之后、紧邻 △向中央银行借款
+#:   BS-050 其他应付款在 049 应交税费 与 051 持有待售负债 之间；BS-075 在 074 其中：应交税金 之后、紧邻 ▲应付手续费及佣金
+#:   BS-064 长期应付款在 063 租赁负债 与 065 预计负债 之间；BS-092 在 091 所有者权益合计 之后
+#:   BS-085 其他综合收益 在 084 减：库存股 与 086 专项储备 之间；BS-115 在 114 之后的扩展块（公式取 3102 而非 4003）
+#:   BS-083 资本公积  在 080「所有者权益：」段内（081 实收资本 / 082 其他权益工具 / 083 资本公积）；
+#:                    BS-079 在 077 其中：优先股 / 078 永续债 之后、所有者权益段**之前**
+#: `soe|八、93|存货` → `BS-010` 与 restricted-assets-note-row-scope-rollout Task 3
+#: 的既有裁决一致（该 spec 当时已按公式实证选过 BS-010，后被改回 BS-008）。
+AMBIGUOUS_ADJUDICATION: dict[str, str] = {
+    "listed|三、重要会计政策、会|资本公积": "BS-083",
+    "soe|八、18|其他综合收益": "BS-085",
+    "soe|八、53|长期应付款": "BS-064",
+    "soe|八、81|短期借款": "BS-041",
+    "soe|八、91|短期借款": "BS-041",
+    "soe|八、91|其他应付款": "BS-050",
+    "soe|八、92|短期借款": "BS-041",
+    "soe|八、93|存货": "BS-010",
+}
+
+
 def _family_of(standard: str) -> str | None:
     s = (standard or "").lower()
     if s.startswith("listed"):
@@ -194,16 +228,26 @@ class Resolution:
     label: str
     old_code: str
     new_code: str | None
-    reason: str  # 'ok' | 'unchanged' | 'ambiguous' | 'not_found'
+    #: 'ok'（唯一解析，需改写）| 'unchanged'（已正确）| 'ambiguous'（同名多码且现绑定
+    #: **在**候选集内，安全保留）| 'foreign'（同名多码但现绑定**不在**候选集内 ⇒ 确定错，
+    #: 需进 `AMBIGUOUS_ADJUDICATION` 裁决）| 'not_found'（标签查不到）
+    reason: str
 
     def __str__(self) -> str:
         tail = {
             "ok": f"{self.old_code} → {self.new_code}",
             "unchanged": f"{self.old_code}（已正确）",
-            "ambiguous": f"{self.old_code}（标签映射到多个编号，保留）",
+            "ambiguous": f"{self.old_code}（标签同名多码，现绑定在候选集内，保留）",
+            "foreign": (
+                f"{self.old_code}（🔴 同名多码，且现绑定**不在**候选集 "
+                f"{self.candidates} 内 ⇒ 确定错；请在 AMBIGUOUS_ADJUDICATION 里裁决）"
+            ),
             "not_found": f"{self.old_code}（标签在 report_config 中找不到，保留）",
         }[self.reason]
         return f"{self.variant} §{self.section} 「{self.label}」 {tail}"
+
+    #: `foreign` 时带上候选集，让报文自带可复核依据（不必再去翻索引）
+    candidates: tuple[str, ...] = ()
 
 
 def _walk_rows(rows: Any) -> Iterable[dict[str, Any]]:
@@ -238,7 +282,22 @@ def resolve_doc(
             out.append(Resolution(variant, section_no, label, old, None, "not_found"))
             return
         if len(codes) > 1:
-            out.append(Resolution(variant, section_no, label, old, None, "ambiguous"))
+            chosen = AMBIGUOUS_ADJUDICATION.get(f"{variant}|{section_no}|{label}")
+            if chosen and chosen != old:
+                out.append(Resolution(variant, section_no, label, old, chosen, "ok"))
+                if apply:
+                    row["report_row_code"] = chosen
+                return
+            if chosen == old or old in codes:
+                out.append(Resolution(variant, section_no, label, old, old, "ambiguous"))
+                return
+            # 现绑定既不在候选集里、也没有人工裁决 ⇒ 确定错，必须被看见
+            out.append(
+                Resolution(
+                    variant, section_no, label, old, None, "foreign",
+                    candidates=tuple(codes),
+                )
+            )
             return
         new = codes[0]
         if new == old:
@@ -273,21 +332,33 @@ def process(path: Path, index: dict[str, Any], *, apply: bool, check_only: bool)
 
     results = resolve_doc(doc, variant, index, apply=apply and not check_only)
     stale = [r for r in results if r.reason == "ok"]
+    foreign = [r for r in results if r.reason == "foreign"]
     manual = [r for r in results if r.reason in ("ambiguous", "not_found")]
     ok = [r for r in results if r.reason == "unchanged"]
 
-    log.append(f"共 {len(results)} 行带 report_row_code：已正确 {len(ok)} / 需改写 {len(stale)} / 待人工 {len(manual)}")
+    log.append(
+        f"共 {len(results)} 行带 report_row_code：已正确 {len(ok)} / 需改写 {len(stale)}"
+        f" / 确定错 {len(foreign)} / 待人工 {len(manual)}"
+    )
     if manual:
         log.append("待人工核对（脚本不改）：")
         log.extend("  ~ " + str(r) for r in manual)
 
     if check_only:
-        if stale:
-            log.append(f"[FAIL] {len(stale)} 行编号陈旧：")
-            log.extend("  x " + str(r) for r in stale)
+        if stale or foreign:
+            if stale:
+                log.append(f"[FAIL] {len(stale)} 行编号陈旧：")
+                log.extend("  x " + str(r) for r in stale)
+            if foreign:
+                log.append(f"[FAIL] {len(foreign)} 行现绑定不在候选集内（确定错）：")
+                log.extend("  x " + str(r) for r in foreign)
             return False, log
         log.append("无陈旧编号")
         return True, log
+    if foreign:
+        # 非 check 模式也必须报出来：脚本不会替你猜，但绝不装作没看见
+        log.append(f"[WARN] {len(foreign)} 行现绑定不在候选集内，需人工裁决：")
+        log.extend("  x " + str(r) for r in foreign)
 
     if not stale:
         log.append("无需修改")

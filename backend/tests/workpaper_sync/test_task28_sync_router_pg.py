@@ -40,8 +40,10 @@ guard、router、repository、request/application 服务、V151 的 scope index 
 
 ═══ 隔离与采集 ═══
 
-scratch schema `tmp_task28_router_<hex>` + 独立文件根，结束 `DROP SCHEMA CASCADE` +
-`rmtree`。全部场景由**一次 `asyncio.run`** 跑完落进快照（module fixture）——
+scratch schema `tmp_task28_router_<hex>` + **生产读的那个文件根下的 per-run 子目录**
+`backend/storage/{project}/`（不是独立 temp 根 —— 生产按 BP-29 用 `backend/` 解析
+`relative_path`，换根就等于把字节发布到生产读不到的地方），结束 `DROP SCHEMA CASCADE` +
+只对那一个子目录 `rmtree`。全部场景由**一次 `asyncio.run`** 跑完落进快照（module fixture）——
 每个测试各自开 async 会污染共享连接池（Task 21~27 实测：第二个起
 `NoneType has no attribute send`）。采集阶段异常一律**记录不穿透**：穿透会把整个
 module 变成 collection ERROR，而 `-rf` 只列 FAILED 不列 ERROR ⇒ 定向变异看不到预期
@@ -55,7 +57,6 @@ import json
 import os
 import shutil
 import sys
-import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -74,15 +75,46 @@ if str(_BACKEND) not in sys.path:  # pragma: no cover - import 环境自举
 os.environ.setdefault("DB_DISABLE_SSL", "True")
 
 _SCHEMA_PREFIX = "tmp_task28_router_"
+
+#: scratch schema 里 V151 之外的最小平台表。
+#:
+#: 🔴 `wp_index` / `projects.is_deleted` / `working_paper.wp_index_id` / `working_paper.created_at`
+#:    这四项**不是**为了「让测试过」而加的：它们是生产**唯一**可见性口径
+#:    `projection_target_resolution.TARGET_VISIBILITY_SQL`
+#:    （`wp.is_deleted = false AND p.is_deleted = false AND wi.is_deleted = false`）
+#:    与全序 `VISIBLE_REPRESENTATION_ORDER_SQL`（`wp.created_at, wp.id`）**逐字要求**的列。
+#:    `_registration` → `_attach_pilot_adapters` → `pilot_d2_large_json.attach_pilot_adapters`
+#:    → `resolve_visible_current_representation_id()` 会跑这条 SQL，而本文件 fixture 的
+#:    `ENTRY` 正是该 pilot 冻结的 `xlsx/gt-d2-accounts-receivable`。manifest 侧 capability
+#:    翻成 `bidirectional` 之后，pilot 里「capability 未启用就 return () 且一次库都不读」的
+#:    早退分支不再生效 ⇒ 这条 SQL 第一次真的落到 scratch schema 上，缺表即 `UndefinedTableError`
+#:    逃出端点（`pending_mutation` / `rollback` 两个采集阶段整段崩，下游 8 例连带红）。
+#:
+#:    ⚠️ 这**不是**把 Task 30 的集成门提前：`wp_visibility` 域（delegation / reviewer 白名单 /
+#:    历史版本）仍然没搬进来，本文件的 visibility 仍由 `_Switchboard` 探针供给。这里只补齐
+#:    「生产那条可见性 SQL 能跑」所需的四项，且按生产语义把 `wp_index_id` 建成 NOT NULL FK
+#:    并真实播种 —— 让它可空/不播种才是放宽（那样 INNER JOIN 恒空，等于绕开可见性判据）。
 _STUB_DDL = """
-CREATE TABLE projects (id UUID PRIMARY KEY, name VARCHAR(200) NOT NULL DEFAULT 'stub');
+CREATE TABLE projects (
+    id UUID PRIMARY KEY,
+    name VARCHAR(200) NOT NULL DEFAULT 'stub',
+    is_deleted BOOLEAN NOT NULL DEFAULT false
+);
 CREATE TABLE users (id UUID PRIMARY KEY, username VARCHAR(100) NOT NULL DEFAULT 'stub');
+CREATE TABLE wp_index (
+    id UUID PRIMARY KEY,
+    project_id UUID NOT NULL REFERENCES projects(id),
+    wp_code VARCHAR(50) NOT NULL DEFAULT 'D2-2',
+    is_deleted BOOLEAN NOT NULL DEFAULT false
+);
 CREATE TABLE working_paper (
     id UUID PRIMARY KEY,
     project_id UUID NOT NULL REFERENCES projects(id),
+    wp_index_id UUID NOT NULL REFERENCES wp_index(id),
     file_version INTEGER NOT NULL DEFAULT 1,
     parsed_data JSONB,
     is_deleted BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 """
@@ -92,6 +124,35 @@ ENTRY = "xlsx/gt-d2-accounts-receivable"
 
 def _d(label: str) -> str:
     return hashlib.sha256(label.encode("utf-8")).hexdigest()
+
+
+def _instrumentation_payload() -> dict[str, Any]:
+    """instrumentation definition 的 canonical payload —— 本文件的**唯一**真源。
+
+    观测器 `published_identity_observer._read_definition_payload` 会现读 blob 字节、
+    重算 `canonical_digest(payload)` 并与 definition 行上冻结的 `sha256` 逐字比对
+    （已 approved 的 definition 不可被改写）。所以 blob 字节与行 digest 必须**同源派生**，
+    而不是像原先那样 blob 写 `json.dumps({"k": "instr"})`、行写
+    `_d("task28-instrumentation")` —— 两处各捏一遍必然不等。
+
+    ⚠️ 与 Task 26/27 的 PG 守卫不同，本文件**不**放结构锚点
+    （`managed_sheets` / `hidden_metadata_sheet`）：那两个文件的载体是 G1 真实
+    instrumented xlsx，观测器要按锚点反读受管结构；本文件的 representation 是
+    `b"PK\\x03\\x04" + json`（`validate_ooxml=False`），而观测顺序里
+    `_load_frozen_contract` 在 `_observe_workbook` **之前** —— `adapter_id` 为
+    `xlsx/gt-d2-accounts-receivable`（含 `/`），`contracts.contract_path_for` 按形态
+    直接拒，于是这条路径在读锚点前就以「adapter 的磁盘 per-entry contract 不可用」
+    收场（正是本文件要守的「没有可用的 approved adapter ⇒ fail visible 422」）。
+    在这里补锚点只会让 harness 声称一份它并不持有的受管结构。
+    """
+    return {"k": "instr"}
+
+
+def _instrumentation_digest() -> str:
+    """instr definition 行冻结的 `sha256`：由**生产 helper** 从 payload 派生。"""
+    from app.services.workpaper_sync import definitions as D
+
+    return D.canonical_digest(_instrumentation_payload())
 
 
 def _now() -> datetime:
@@ -172,7 +233,11 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
     )
     from app.routers import wp_sync_router as SR
     from app.services.workpaper_sync import definitions as D
-    from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
+    from app.services.workpaper_sync import pilot_d2_large_json as PD2
+    from app.services.workpaper_sync.artifacts import (
+        ArtifactStorageLayout,
+        CanonicalArtifactRepository,
+    )
     from app.services.workpaper_sync.endpoint_guard import (
         ScopeClaimCodec,
         SyncEndpointGuard,
@@ -197,15 +262,47 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         )
     if not _MIGRATION.exists():
         raise _HarnessError(f"缺少迁移文件: {_MIGRATION}")
+    if PD2._BACKEND_ROOT.resolve() != _BACKEND.resolve():
+        # 反漂移：harness 的文件根是**照抄**生产读的那个根，不是自己猜的。
+        raise _HarnessError(
+            "harness 文件根与生产读的根不一致："
+            f"pilot_d2_large_json._BACKEND_ROOT={PD2._BACKEND_ROOT} vs _BACKEND={_BACKEND}"
+        )
 
     forward = MigrationRunner._split_sql_statements(
         _MIGRATION.read_text(encoding="utf-8")
     )
     schema = f"{_SCHEMA_PREFIX}{uuid.uuid4().hex[:12]}"
     ssl_off = {"ssl": False} if getattr(settings, "DB_DISABLE_SSL", False) else {}
-    base_root = Path(tempfile.mkdtemp(prefix="tmp_task28_store_"))
-    (base_root / "storage").mkdir()
-    (base_root / "definition_store").mkdir()
+
+    # ── 文件根：必须与生产**读**的根一致（BP-29），隔离只靠 per-run 子目录 ──
+    #
+    # 🔴 原来这里是 `tempfile.mkdtemp()` 下的独立根，于是 harness 把字节发布到
+    #    `%TEMP%\tmp_task28_store_xxx\storage\…`，而 `pilot_d2_large_json` 用
+    #    `CanonicalArtifactRepository(_BACKEND_ROOT)`（= `backend/`）解析
+    #    `relative_path`（它自带 `storage/` 前缀）⇒ artifact 行在、文件不在生产读的根下，
+    #    `resolve_published_artifact` 正确地 fail visible（`artifact_publish_failed`：
+    #    「published artifact 指针指向的文件不存在」）。这是 harness 隔离错位，不是生产缺陷，
+    #    所以修 harness，**不**把 `artifact_publish_failed` 加进可接受错误集合（那样等于
+    #    把 harness bug 供成不变式）。D2 entry 的 capability 翻成 `bidirectional` 后
+    #    pilot 不再早退，这条路径才第一次真的走到文件系统，于是才暴露出来。
+    #
+    # 🔴 隔离形状：根取 `backend/`，但一切写入都落在 **per-run 子目录**
+    #    `backend/storage/{project}/` 里 —— `project` 是本次现生成的 uuid4，不可能与
+    #    既有目录撞名；`backend/storage/` 已被 .gitignore 忽略。teardown 只 rmtree 这一个
+    #    子目录，**绝不**碰 `backend/storage/` 本身或它的任何兄弟目录。
+    #    project 归属门（`assert_project_owns`）用生产**默认** layout 算
+    #    `storage/{project}/workpapers`，因此 `storage_dirname` 必须保持默认；
+    #    只有 definition_store 改挂到 per-run 目录下，让 teardown 目标收敛成一个。
+    project = uuid.uuid4()
+    base_root = _BACKEND
+    run_scratch_root = base_root / "storage" / str(project)
+    store_layout = ArtifactStorageLayout(
+        base_root,
+        definition_dirname=f"storage/{project}/definition_store",
+    )
+    run_scratch_root.mkdir(parents=True, exist_ok=False)
+    (store_layout.definition_root).mkdir(parents=True, exist_ok=True)
 
     admin = create_async_engine(
         settings.DATABASE_URL, poolclass=NullPool, connect_args=dict(ssl_off)
@@ -252,29 +349,46 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         if snap["apply_errors"]:
             raise _HarnessError(f"V151 应用失败: {snap['apply_errors'][:3]}")
 
-        project = uuid.uuid4()
         user_a, user_b = uuid.uuid4(), uuid.uuid4()
         wp_a, wp_b = uuid.uuid4(), uuid.uuid4()
-        artifacts = CanonicalArtifactRepository(base_root)
+        artifacts = CanonicalArtifactRepository(base_root, layout=store_layout)
+
+        wp_index_id = uuid.uuid4()
 
         async with engine.begin() as conn:
             await conn.exec_driver_sql(f"INSERT INTO projects (id) VALUES ('{project}')")
             for u in (user_a, user_b):
                 await conn.exec_driver_sql(f"INSERT INTO users (id) VALUES ('{u}')")
+            # 🔴 两份底稿共用同一条 wp_index：生产里 `wp_index` 是「底稿类型」（wp_code 维度），
+            #    同一项目同一类型可以有多个 working_paper 实例 —— 这正是
+            #    `working_paper_sync_entry_state` 主键为 `(wp_id, entry_id)`、
+            #    `resolve_visible_current_representation_id()` 必须带全序的原因。
+            await conn.exec_driver_sql(
+                "INSERT INTO wp_index (id, project_id) VALUES "
+                f"('{wp_index_id}', '{project}')"
+            )
             for w in (wp_a, wp_b):
                 await conn.exec_driver_sql(
-                    "INSERT INTO working_paper (id, project_id) VALUES "
-                    f"('{w}', '{project}')"
+                    "INSERT INTO working_paper (id, project_id, wp_index_id) VALUES "
+                    f"('{w}', '{project}', '{wp_index_id}')"
                 )
 
         # ── approved definition bundle（只为满足 representation 的 FK 与 room 的 bundle 门）
         world: dict[str, Any] = {}
+        # instrumentation 的 blob 必须是 `_instrumentation_payload()` 的 **canonical 字节**：
+        # 观测器会拿它重算 digest 与 definition 行的 `sha256` 复核。其余 slot 在本任务里
+        # 不被反读，保持占位字节即可。
+        def _def_payload(name: str) -> bytes:
+            if name == "instr":
+                return D.canonical_json_bytes(_instrumentation_payload())
+            return json.dumps({"k": name}, sort_keys=True).encode()
+
         blobs = {
             name: artifacts.publish_definition_blob(
                 project_id=project,
                 wp_id=wp_a,
                 definition_kind=kind,
-                payload=json.dumps({"k": name}, sort_keys=True).encode(),
+                payload=_def_payload(name),
             )
             for name, kind in {
                 "tpl": "template",
@@ -308,7 +422,8 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
             instr = await repo.create_definition_artifact(
                 kind="instrumentation", logical_id="task28.instr",
                 semantic_version="1.0.0", blob_artifact_id=art["instr"].id,
-                sha256=_d("task28-instrumentation"),
+                # 与 instr blob 字节**同源**（`_read_definition_payload` 的 digest 复核）。
+                sha256=_instrumentation_digest(),
                 structure_hash=_d("task28-instr-structure"), source_commit="task28",
             )
             contract_def = await repo.create_definition_artifact(
@@ -1044,7 +1159,18 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         except Exception as exc:  # noqa: BLE001
             snap["harness_errors"]["teardown"] = _err(exc)
         await admin.dispose()
-        shutil.rmtree(base_root, ignore_errors=True)
+        # 🔴 只删本次那一个 per-run 子目录，不删 `base_root`（= `backend/`）也不删
+        #    `backend/storage/` —— 后者在真机上装着全部项目的运行时文件。
+        #    删除前把路径重算一遍并断言「严格在 backend/storage/ 之下、且比它深一层」，
+        #    任何构造失误（空 project、`..`、指到 storage 本身）都在删之前被拦住。
+        _storage_root = (base_root / "storage").resolve()
+        _victim = run_scratch_root.resolve()
+        if _victim.parent == _storage_root and _victim != _storage_root:
+            shutil.rmtree(_victim, ignore_errors=True)
+        else:
+            snap["harness_errors"]["scratch_teardown_refused"] = (
+                f"拒绝删除 {_victim}：它不是 {_storage_root} 的直接子目录"
+            )
     return snap
 
 
@@ -1182,10 +1308,13 @@ class TestFlushDoesNotAdvanceRevision:
     def test_an_entry_without_an_approved_adapter_fails_visible(
         self, snap: dict[str, Any]
     ) -> None:
-        """registry 零注册 / capability 非 bidirectional ⇒ 422 且**不**创建 pending mutation。
+        """approved adapter 不可用 ⇒ 422 且**不**创建 pending mutation。
 
         `build_production_registry()` 当前刻意零注册（逐 entry adapter 属 Tasks 40~57 /
-        62~64），manifest 里这个 entry 的 capability 也是 `single_onlyoffice`。
+        62~64）。本文件的 `ENTRY`（`xlsx/gt-d2-accounts-receivable`）manifest capability
+        **现已是 `bidirectional`**（不再是 `single_onlyoffice`，见本文件 `_STUB_DDL` 上方
+        注释）—— 于是 pilot 不再早退、这条路径会真的走到库与文件系统，422 由「没有可用的
+        approved adapter」而不是「capability 未启用」给出。
         正确行为是 fail visible：静默成功会让审计师以为内容已进 OO（AC 3.9 / 1.7）。
         """
         observed = snap["scenarios"]["pending_mutation"]

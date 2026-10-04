@@ -260,6 +260,13 @@ const { exportTemplate, exportData, importData, importing } = useD4ImportExport(
 function handleExportTemplate() { exportTemplate('D4-17') }
 function handleExportData() { exportData('D4-17') }
 async function handleImportFile(uploadFile: any) { await importData('D4-17', uploadFile.raw || uploadFile) }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await handleImportFile(f) }
+  input.click()
+}
 
 const aiNoteLoading = ref(false)
 const aiConclusionLoading = ref(false)
@@ -288,6 +295,8 @@ async function genConclusion() {
 const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务暂不可用')
 
 function rowClassName({ row }: { row: any }) { return row.isCutoff === false ? 'row-cutoff-issue' : '' }
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 <template>
@@ -297,18 +306,7 @@ function rowClassName({ row }: { row: any }) { return row.isCutoff === false ? '
       <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
       <el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">{{ syncStateTag.text }}</el-tag>
       <div class="toolbar-right">
-        <el-dropdown trigger="click" size="small">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-              <el-dropdown-item>
-                <el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly || importing" @change="handleImportFile"><span>导入数据</span></el-upload>
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        
         <GtIndexChip value="wp:D4-1" :context-project-id="projectId" />
         <GtIndexChip value="wp:D4-14" :context-project-id="projectId" />
         <el-tooltip content="将跨期问题推送至 A13 未更正错报汇总（金额与方向由人工认定），并同步至 D4-1 审计说明" placement="top">

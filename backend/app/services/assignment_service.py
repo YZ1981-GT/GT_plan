@@ -174,14 +174,19 @@ class AssignmentService:
         # 发送通知给被委派人员
         await self._send_assignment_notifications(project_id, created)
 
-        # 发布 SSE 事件通知前端
+        # 发布 SSE 通知前端（纯广播，不触发任何 handler）。
+        # 🔴 修复前这里复用 EventType.DATA_IMPORTED（year=None）冒充「数据导入」：
+        #    DATA_IMPORTED 有 7 个订阅者，其中 5 个不看 year 直接按项目全量执行 ——
+        #    全项目底稿 prefill_stale=True、地址库/报表 Redis/程序表缓存全清；
+        #    且发布在 router commit 之前（debounce 窗口内若 commit 失败则是幽灵事件）。
+        #    委派只改人员与权限，不改任何账表数据，不应触碰数据链。
+        #    前端只需「委派已变」这一信号，走 broadcast_raw（不入 handler 链）。
         try:
             from app.services.event_bus import event_bus
-            from app.models.audit_platform_schemas import EventPayload, EventType
-            await event_bus.publish(EventPayload(
-                event_type=EventType.DATA_IMPORTED,  # 复用事件类型，前端按 project_id 过滤
-                project_id=project_id,
-            ))
+            event_bus.broadcast_raw(
+                "workpaper.assigned",
+                {"project_id": str(project_id), "kind": "assignment", "count": len(created)},
+            )
         except Exception:
             pass  # SSE 推送失败不阻断主流程
 

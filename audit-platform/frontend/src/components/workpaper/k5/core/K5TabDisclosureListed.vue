@@ -188,8 +188,12 @@ import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildK5SyncPayload, K5_NOTE_SECTION } from '../../composables/k5NoteSectionMap'
+import { newRowIdentity } from '../../composables/shared/rowIdentity'
+// 🔴 科目码走单一真源，原硬编码 '2701'（长期应付款）—— 预计负债是 '2801'。
+//    与 K5TabAdjudication 的 substantive:adjudicated 事件口径必须一致，否则附注静默失同步。
+import { K5_FALLBACK_STANDARD } from '../../composables/k5AccountScope'
 
-const K5_ACCOUNT_CODE = '2701'
+const K5_ACCOUNT_CODE = K5_FALLBACK_STANDARD
 
 const props = defineProps<{
   wpId: string
@@ -277,7 +281,7 @@ function initDefaultTable(): void {
   const categories = ['产品质量保证', '未决诉讼', '亏损合同', '重组义务', '弃置义务', '其他']
   provisionTable.value = [
     ...categories.map((cat, idx) => ({
-      id: `row-${idx}`,
+      id: newRowIdentity('row'),
       category: cat,
       beginBalance: 0,
       increase: 0,
@@ -345,7 +349,7 @@ function applyAutoFill(): void {
       contingentItems.value = rows
         .filter(r => r.lossLikelihood === 'possible' || r.recognition === 'disclose')
         .map((r, idx) => ({
-          id: `contingent-${idx}`,
+          id: newRowIdentity('contingent'),
           item: r.caseName || r.item || r.project || `事项${idx + 1}`,
           nature: r.nature || r.type || '待补充',
           financialImpact: Number(r.amount || r.estimatedLoss || 0),
@@ -467,7 +471,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
-      wpCode: 'K5', variant: 'listed', accountCode: '2701',
+      wpCode: 'K5', variant: 'listed', accountCode: K5_ACCOUNT_CODE,
       projectId: props.projectId, sectionIds: [K5_NOTE_SECTION.listed],
     })
     ElMessage.success('已同步到附注')

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-14T08:58:53Z",
+  "generatedAt": "2026-09-29T01:17:36Z",
   "sources": {
     "htmlRendererRegistry": "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
     "wpCodeOverrides": "backend/app/data/wp_code_overrides.json",
@@ -61,6 +61,15 @@
       "contextStrategy": "standard",
       "viaGtWpRenderer": true
     },
+    "a5-1-cashflow-audit": {
+      "componentType": "a5-1-cashflow-audit",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtA51CashflowAudit.vue",
+      "wpCodes": [
+        "A5-1"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
     "b13-bundle": {
       "componentType": "b13-bundle",
       "entryFile": "audit-platform/frontend/src/components/workpaper/GtB13Bundle.vue",
@@ -84,6 +93,58 @@
       "entryFile": "audit-platform/frontend/src/components/workpaper/GtB2Bundle.vue",
       "wpCodes": [
         "B2"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "b22a-control-matrix": {
+      "componentType": "b22a-control-matrix",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtB22AControlMatrix.vue",
+      "wpCodes": [
+        "B22A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "b22b-control-matrix": {
+      "componentType": "b22b-control-matrix",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtB22BControlMatrix.vue",
+      "wpCodes": [
+        "B22B"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "b22b-deficiency-evaluation": {
+      "componentType": "b22b-deficiency-evaluation",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue",
+      "wpCodes": [],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "b22c-design-effectiveness": {
+      "componentType": "b22c-design-effectiveness",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue",
+      "wpCodes": [
+        "B22C"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "b23-process-control": {
+      "componentType": "b23-process-control",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtB23ProcessControl.vue",
+      "wpCodes": [
+        "B23"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "b50-risk-assessment": {
+      "componentType": "b50-risk-assessment",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtB50RiskAssessment.vue",
+      "wpCodes": [
+        "B50"
       ],
       "contextStrategy": "standard",
       "viaGtWpRenderer": true
@@ -177,6 +238,62 @@
       "contextStrategy": "standard",
       "viaGtWpRenderer": true
     },
+    "g1-trading-financial-assets": {
+      "componentType": "g1-trading-financial-assets",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue",
+      "wpCodes": [
+        "G1",
+        "G1-1",
+        "G1-2",
+        "G1-3",
+        "G1-4",
+        "G1-5",
+        "G1-6",
+        "G1-7",
+        "G1-8",
+        "G1-9",
+        "G1-10",
+        "G1-11",
+        "G1-12",
+        "G1-13",
+        "G1-14",
+        "G1-note-listed",
+        "G1-note-soe",
+        "G1-附注披露信息（上市公司）",
+        "G1-附注披露信息（国企）",
+        "G1A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "g5-long-term-receivable": {
+      "componentType": "g5-long-term-receivable",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtG5LongTermReceivable.vue",
+      "wpCodes": [
+        "G5",
+        "G5-1",
+        "G5-2",
+        "G5-3",
+        "G5-4",
+        "G5-5",
+        "G5-6",
+        "G5-7",
+        "G5-8",
+        "G5-9",
+        "G5-10",
+        "G5-11",
+        "G5-12",
+        "G5-directory",
+        "G5-note-listed",
+        "G5-note-soe",
+        "G5-底稿目录",
+        "G5-附注披露信息（上市公司）",
+        "G5-附注披露信息（国企）",
+        "G5A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
     "h1-fixed-assets": {
       "componentType": "h1-fixed-assets",
       "entryFile": "audit-platform/frontend/src/components/workpaper/GtH1FixedAssets.vue",
@@ -216,6 +333,11 @@
         "H10-2",
         "H10-3",
         "H10-4",
+        "H10-disc-L",
+        "H10-disc-S",
+        "H10-附注披露信息（上市公司）",
+        "H10-附注披露信息（国企）",
+        "H10-附注披露信息（国有企业）",
         "H10A"
       ],
       "contextStrategy": "standard",
@@ -243,6 +365,8 @@
         "H2-15",
         "H2-16",
         "H2-17",
+        "H2-附注披露信息（上市公司）",
+        "H2-附注披露信息（国有企业）",
         "H2A"
       ],
       "contextStrategy": "standard",
@@ -283,6 +407,8 @@
         "H4-4",
         "H4-5",
         "H4-6",
+        "H4-6A",
+        "H4-6B",
         "H4-7",
         "H4-8",
         "H4-9",
@@ -329,6 +455,10 @@
         "H6-2",
         "H6-3",
         "H6-4",
+        "H6-disc-L",
+        "H6-disc-S",
+        "H6-附注披露信息（上市公司）",
+        "H6-附注披露信息（国有企业）",
         "H6A"
       ],
       "contextStrategy": "standard",
@@ -380,6 +510,10 @@
         "H8-12",
         "H8-13",
         "H8-14",
+        "H8-disc-L",
+        "H8-disc-S",
+        "H8-附注披露信息（上市公司）",
+        "H8-附注披露信息（国企）",
         "H8A"
       ],
       "contextStrategy": "standard",
@@ -394,6 +528,10 @@
         "H9-2",
         "H9-3",
         "H9-4",
+        "H9-disc-L",
+        "H9-disc-S",
+        "H9-附注披露信息（上市公司）",
+        "H9-附注披露信息（国企）",
         "H9A"
       ],
       "contextStrategy": "standard",
@@ -1261,6 +1399,9 @@
     "missingRegistryEntries": [],
     "missingWpCodeMappings": [],
     "missingEntryFiles": []
+  },
+  "intentionallyUnrouted": {
+    "b22b-deficiency-evaluation": "方案 A：B22B wp_code 改指向 b22b-control-matrix（控制矩阵登记册），缺陷评价组件兼容期保留但不再被任何 wp_code 路由"
   },
   "isComplete": true
 }

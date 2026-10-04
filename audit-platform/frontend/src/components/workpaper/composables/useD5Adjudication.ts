@@ -27,6 +27,13 @@ import {
 } from './useD5FormulaEngine'
 import { eventBus } from '@/utils/eventBus'
 import { resolveTbAmountWithSeed } from './dCycleTbSeed'
+// 🔴 复用平台级共享四态状态机（spec d567-sync-coverage Task 20）——**绝不**在 D5 侧另写一套。
+//    D5-1 是逐格固定行（per-cell），三个派生格（notes/acc 的 currentUnadjusted ← D5-2 聚合、
+//    oci-change 的 currentUnadjusted ← D5-4 公允价值），判定链与 D3-1/D4-1 完全同源。
+import {
+  resolvePerCellDerivedState,
+  type DerivedCellState,
+} from './shared/dynamicAdjudicationRows'
 import type { ChecklistResponse } from './useD5FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -46,6 +53,15 @@ export interface AdjudicationRow {
   changeRate: number | '' | 'N/A'
   isFromCrossSheet: boolean
   isEditable: boolean
+  /**
+   * 逐格覆盖态（spec d567-sync-coverage Task 20）：仅**派生格**
+   * （`currentUnadjusted`，来源 cross_sheet）在 S2/S4 时有值。
+   * S1/S3 不产生条目（纯派生跟随上游）。
+   */
+  cellOverrides?: Record<
+    string,
+    { state: DerivedCellState; stored: number; snap: number; derived: number }
+  >
 }
 
 export interface AdjustmentPayload {
@@ -106,6 +122,89 @@ function getResponseNum(allResponses: Map<string, ChecklistResponse>, itemId: st
   return parseNum(allResponses.get(itemId)?.remark)
 }
 
+/**
+ * 派生快照 per-cell 键（四态状态机的第三个量 `snap`）。
+ *
+ * 🔴 照 D4/D3-1 同款存法（`{itemId}-snap`），不自创机制。
+ */
+function snapItemId(rowKey: string, field: string): string {
+  return `${makeItemId(rowKey, field)}-snap`
+}
+
+/** 读某格 stored（落库主值）；空/非数 → null（与 snap 的 null 语义对称）。 */
+function readStoredCell(
+  allResponses: Map<string, ChecklistResponse>,
+  rowKey: string,
+  field: string,
+): number | null {
+  const raw = allResponses.get(makeItemId(rowKey, field))?.remark
+  if (raw == null || raw === '') return null
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
+}
+
+/** 读某格 snap（派生快照 `{itemId}-snap`）；空/非数 → null。 */
+function readSnapCell(
+  allResponses: Map<string, ChecklistResponse>,
+  rowKey: string,
+  field: string,
+): number | null {
+  const raw = allResponses.get(snapItemId(rowKey, field))?.remark
+  if (raw == null || raw === '') return null
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
+}
+
+/**
+ * 派生格四态解析（**共享一份**：`resolvePerCellDerivedState` 含 `snap === null` 降级）。
+ *
+ * 三个量：`stored`（落库主值，可能被 OO 回写/手工改过）/ `snap`（上一次派生写入的值）/
+ * `derived`（当前现算派生值）。S1/S3 显示派生值（跟随上游），S2/S4 显示 stored（人工覆盖值）。
+ *
+ * 🔴 **替代原 `cross !== 0 ? cross : manual` 二选一**：那套写法在上游一变时无法区分
+ *    「人工覆盖」与「派生跟随」，且派生值恰为 0 时把手工值当派生用。
+ */
+function resolveDerivedCellState(
+  allResponses: Map<string, ChecklistResponse>,
+  rowKey: string,
+  field: string,
+  derivedValue: number,
+) {
+  return resolvePerCellDerivedState(
+    readStoredCell(allResponses, rowKey, field),
+    readSnapCell(allResponses, rowKey, field),
+    derivedValue,
+  )
+}
+
+/** 派生格逐格覆盖解析结果：display = 应显示值，override 仅 S2/S4 有值。 */
+interface DerivedCellResult {
+  display: number
+  override?: { state: DerivedCellState; stored: number; snap: number; derived: number }
+}
+
+/** 供 rows computed 用的薄包装：S2/S4 时附带 override 三量。 */
+function resolveDerivedCell(
+  allResponses: Map<string, ChecklistResponse>,
+  rowKey: string,
+  field: string,
+  derivedValue: number,
+): DerivedCellResult {
+  const r = resolveDerivedCellState(allResponses, rowKey, field, derivedValue)
+  if (r.state === 'S2' || r.state === 'S4') {
+    return {
+      display: r.display,
+      override: {
+        state: r.state,
+        stored: r.stored ?? 0,
+        snap: r.snap ?? 0,
+        derived: r.derived,
+      },
+    }
+  }
+  return { display: r.display }
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD5Adjudication(options: UseD5AdjudicationOptions) {
@@ -131,10 +230,11 @@ export function useD5Adjudication(options: UseD5AdjudicationOptions) {
     const notesPriorUnadjusted = getResponseNum(responses, makeItemId('notes-receivable', 'priorUnadjusted'))
     const notesPriorAje = getResponseNum(responses, makeItemId('notes-receivable', 'priorAje'))
     const notesPriorRje = getResponseNum(responses, makeItemId('notes-receivable', 'priorRje'))
-    // 期末未审数：优先使用crossSheet聚合值（D5-2→D5-1），无则取手动值
-    const notesManualCurrent = getResponseNum(responses, makeItemId('notes-receivable', 'currentUnadjusted'))
+    // ─── currentUnadjusted：cross_sheet 派生格，走四态覆盖状态机（Task 20）──────────
+    // 🔴 派生值 = D5-2 明细按类别聚合。原实现 `cross !== 0 ? cross : manual` 二选一已替换。
     const notesCrossCurrent = catAgg.notesReceivable.current
-    const notesCurrentUnadjusted = notesCrossCurrent !== 0 ? notesCrossCurrent : notesManualCurrent
+    const notesCell = resolveDerivedCell(responses, 'notes-receivable', 'currentUnadjusted', notesCrossCurrent)
+    const notesCurrentUnadjusted = notesCell.display
     const notesCurrentAje = getResponseNum(responses, makeItemId('notes-receivable', 'currentAje')) + totalAje
     const notesCurrentRje = getResponseNum(responses, makeItemId('notes-receivable', 'currentRje')) + totalRje
 
@@ -158,15 +258,16 @@ export function useD5Adjudication(options: UseD5AdjudicationOptions) {
       changeRate: notesChangeRate,
       isFromCrossSheet: notesCrossCurrent !== 0,
       isEditable: true,
+      ...(notesCell.override ? { cellOverrides: { currentUnadjusted: notesCell.override } } : {}),
     }
 
     // ─── 应收账款行 ─────────────────────────────────────────────────
     const accPriorUnadjusted = getResponseNum(responses, makeItemId('accounts-receivable', 'priorUnadjusted'))
     const accPriorAje = getResponseNum(responses, makeItemId('accounts-receivable', 'priorAje'))
     const accPriorRje = getResponseNum(responses, makeItemId('accounts-receivable', 'priorRje'))
-    const accManualCurrent = getResponseNum(responses, makeItemId('accounts-receivable', 'currentUnadjusted'))
     const accCrossCurrent = catAgg.accountsReceivable.current
-    const accCurrentUnadjusted = accCrossCurrent !== 0 ? accCrossCurrent : accManualCurrent
+    const accCell = resolveDerivedCell(responses, 'accounts-receivable', 'currentUnadjusted', accCrossCurrent)
+    const accCurrentUnadjusted = accCell.display
     const accCurrentAje = getResponseNum(responses, makeItemId('accounts-receivable', 'currentAje')) + totalAje
     const accCurrentRje = getResponseNum(responses, makeItemId('accounts-receivable', 'currentRje')) + totalRje
 
@@ -190,6 +291,7 @@ export function useD5Adjudication(options: UseD5AdjudicationOptions) {
       changeRate: accChangeRate,
       isFromCrossSheet: accCrossCurrent !== 0,
       isEditable: true,
+      ...(accCell.override ? { cellOverrides: { currentUnadjusted: accCell.override } } : {}),
     }
 
     // ─── 小计行 (= 应收票据 + 应收账款) ─────────────────────────────
@@ -225,10 +327,10 @@ export function useD5Adjudication(options: UseD5AdjudicationOptions) {
     const ociPriorUnadjusted = getResponseNum(responses, makeItemId('oci-change', 'priorUnadjusted'))
     const ociPriorAje = getResponseNum(responses, makeItemId('oci-change', 'priorAje'))
     const ociPriorRje = getResponseNum(responses, makeItemId('oci-change', 'priorRje'))
-    // 期末：优先使用crossSheet计算的OCI变动值
-    const ociManualCurrent = getResponseNum(responses, makeItemId('oci-change', 'currentUnadjusted'))
+    // 期末：cross_sheet 派生格（← D5-4 公允价值测算），走四态覆盖状态机
     const ociCrossCurrent = ociData.current
-    const ociCurrentUnadjusted = ociCrossCurrent !== 0 ? ociCrossCurrent : ociManualCurrent
+    const ociCell = resolveDerivedCell(responses, 'oci-change', 'currentUnadjusted', ociCrossCurrent)
+    const ociCurrentUnadjusted = ociCell.display
     const ociCurrentAje = getResponseNum(responses, makeItemId('oci-change', 'currentAje'))
     const ociCurrentRje = getResponseNum(responses, makeItemId('oci-change', 'currentRje'))
 
@@ -252,6 +354,7 @@ export function useD5Adjudication(options: UseD5AdjudicationOptions) {
       changeRate: ociChangeRate,
       isFromCrossSheet: ociCrossCurrent !== 0,
       isEditable: true,
+      ...(ociCell.override ? { cellOverrides: { currentUnadjusted: ociCell.override } } : {}),
     }
 
     // ─── 公允价值合计行 (= 小计 - OCI变动) ──────────────────────────
@@ -391,6 +494,73 @@ export function useD5Adjudication(options: UseD5AdjudicationOptions) {
     },
   )
 
+  // ─── 派生格逐格落库 + snap 维护（四态状态机，Task 20）───────────────────────
+  //
+  // 🔴 上游「13 条纯函数判据全绿但生产坏掉」的教训：S4 可达性完全取决于 snap 怎么维护。
+  //    本段照 D3-1/D4 同款：watch 派生源变化 → 幂等把派生值写进 stored + snap
+  //    （仅**未被人工覆盖**的格：`stored ≠ snap ⟺ S2/S4` 时不写，冻结 snap 在覆盖发生时的
+  //    派生值，S4 才可达）。
+
+  /** D5 的三个 cross_sheet 派生格（rowKey + 现算派生值取法）。 */
+  function _derivedCells(): Array<{ rowKey: string; derived: number }> {
+    const catAgg = crossSheet.categoryAggregation.value
+    const ociData = crossSheet.ociChange.value
+    return [
+      { rowKey: 'notes-receivable', derived: catAgg.notesReceivable.current },
+      { rowKey: 'accounts-receivable', derived: catAgg.accountsReceivable.current },
+      { rowKey: 'oci-change', derived: ociData.current },
+    ]
+  }
+
+  /** 幂等写一格（值未变则不写，避免无谓 save）。 */
+  function _writeCellIfChanged(itemId: string, value: number): void {
+    const cur = allResponses.value.get(itemId)?.remark
+    const next = String(value)
+    if (cur === next) return
+    debouncedSave(itemId, { remark: next })
+  }
+
+  /**
+   * 派生格同步进 store（幂等）：把派生值写进 stored + snap，**仅对未覆盖格**
+   * （`stored == snap`，即 S1/S3）。覆盖格（S2/S4）**不写** —— 冻结 snap 在覆盖时的派生值，
+   * 否则 snap 无条件追上 derived ⇒ S4 不可达。
+   */
+  function syncDerivedCellsIntoStore(): void {
+    if (isReadonly.value) return
+    const field = 'currentUnadjusted'
+    for (const { rowKey, derived } of _derivedCells()) {
+      // 🔴 覆盖判定**必须**走与读侧同一个 `resolveDerivedCellState`（含 snap===null 降级），
+      //    不可手写第二份谓词：
+      //    ① 状态机的 overridden 是 `!_eq(stored, snap)`，而 `_eq(5, null) === false`
+      //       ⇒ 手写 `stored != null && snap != null && |Δ| > tol` 会把「有 stored 无 snap」
+      //       判成未覆盖，用派生值盖掉用户数据；
+      //    ② 而不带降级直接用 `resolveCellState` 又会把「stored=0 无 snap」判成 S4 ⇒ 永不写 snap
+      //       ⇒ 该格永久显示 0（不可自愈）。两个方向都踩过，故读写必须同源。
+      const { state } = resolveDerivedCellState(allResponses.value, rowKey, field, derived)
+      if (state === 'S2' || state === 'S4') continue // 冻结 snap，不跟随上游
+      _writeCellIfChanged(snapItemId(rowKey, field), derived)
+      _writeCellIfChanged(makeItemId(rowKey, field), derived)
+    }
+  }
+
+  watch(
+    () => _derivedCells().map(c => c.derived).join('|'),
+    () => { syncDerivedCellsIntoStore() },
+    { immediate: true },
+  )
+
+  /**
+   * 恢复取数：把某派生格从覆盖态（S2/S4）退回 S1（纯派生）。
+   * 只影响被点那一格：stored ← derived、snap ← derived（用当前派生值）。**当场**写对。
+   */
+  function restoreDerivedValue(rowKey: string, field: string = 'currentUnadjusted'): void {
+    if (isReadonly.value) return
+    const cell = _derivedCells().find(c => c.rowKey === rowKey)
+    if (!cell) return
+    _writeCellIfChanged(makeItemId(rowKey, field), cell.derived)
+    _writeCellIfChanged(snapItemId(rowKey, field), cell.derived)
+  }
+
   // ─── updateCell ──────────────────────────────────────────────────────
 
   function updateCell(rowKey: string, field: string, value: number | string): void {
@@ -456,9 +626,12 @@ export function useD5Adjudication(options: UseD5AdjudicationOptions) {
     updateCell,
     publishAdjudicated,
     onAdjustmentCreated,
+    // 逐格覆盖：恢复取数（把派生格从 S2/S4 退回 S1）
+    restoreDerivedValue,
     // Internal (for testing)
     _eventAjeAccum: eventAjeAccum,
     _eventRjeAccum: eventRjeAccum,
+    _syncDerivedCellsIntoStore: syncDerivedCellsIntoStore,
   }
 }
 

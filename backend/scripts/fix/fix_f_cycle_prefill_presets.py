@@ -393,8 +393,33 @@ def _find_block(doc: dict[str, Any], wp_code: str, sheet: str) -> dict[str, Any]
     return None
 
 
+def _cells(block: dict[str, Any]) -> list[dict[str, Any]]:
+    """块内公式格列表的**唯一**读写口径 —— 恒为 `cells` 键（FC-11 根因修复）。
+
+    🔴 spec: f3-sync-coverage-and-first-canary · Task 17 · Requirement 7.2③（FC-11）
+
+    改造前本脚本有 13 处 `items_key = "items" if "items" in block else "cells"` 的兼容读，
+    加上 `_ensure_block` / `_ensure_cells` 两处**主动创建 `items` 键**，共同造成
+    「脚本 `--check` 报 exit 0 全部到位，而运行时四个消费方一条都读不到」的矛盾：
+
+    运行时消费方（按值实测，**全部只读 `cells`**）：
+      * `wp_template_init_service.py:670`      预填写入 xlsx
+      * `formula_management/preset_library.py:163`  公式管理页预设
+      * `formula_reverse_index.py:294`         反向索引建边
+      * `linkage_graph_builder.py:214`         依赖图
+
+    ⇒ 本 helper 是单一口径：不存在 `cells` 时建空列表并挂上，**永不**创建 `items`。
+      `items` 键的存在本身由 `validate()` 判红（防回退）。
+    """
+    existing = block.get("cells")
+    if not isinstance(existing, list):
+        existing = []
+        block["cells"] = existing
+    return existing
+
+
 def _cell_refs_in_block(block: dict[str, Any]) -> set[str]:
-    return {str(c.get("cell_ref") or "") for c in block.get("cells") or block.get("items") or []}
+    return {str(c.get("cell_ref") or "") for c in _cells(block)}
 
 
 def _ensure_block(doc: dict[str, Any], block_def: dict[str, Any]) -> tuple[dict[str, Any], bool]:
@@ -403,30 +428,34 @@ def _ensure_block(doc: dict[str, Any], block_def: dict[str, Any]) -> tuple[dict[
     if existing is not None:
         return existing, False
     # 创建新块
+    # 🔴 FC-11 根因之二：此处原为 `"items": []` —— 新建块直接就造运行时读不到的键。
+    #    spec 的 Requirement 7.2③ 只点了 `_ensure_cells`，漏了这里；两处必须一起修，
+    #    否则下次新增块仍然产出死配置。
     new_block = {
         "wp_code": block_def["wp_code"],
         "wp_name": block_def.get("wp_name", ""),
         "sheet": block_def["sheet"],
         "account_codes": block_def.get("account_codes", []),
-        "items": [],
+        "cells": [],
     }
     _blocks(doc).append(new_block)
     return new_block, True
 
 
 def _ensure_cells(block: dict[str, Any], cells: list[dict[str, Any]]) -> list[str]:
-    """确保块中存在所有 cells；返回新增的 cell_ref 列表。"""
-    # 兼容 "cells" 与 "items" 两种键名
-    items_key = "items" if "items" in block else "cells"
-    if items_key not in block:
-        block["items"] = []
-        items_key = "items"
-    existing_refs = {str(c.get("cell_ref") or "") for c in block[items_key]}
+    """确保块中存在所有 cells；返回新增的 cell_ref 列表。
+
+    🔴 FC-11 根因之一（改造前 L417-432）：原实现 `items_key = "items" if "items" in block
+       else "cells"`，且块无键时主动 `block["items"] = []` ⇒ 造出运行时读不到的键。
+       现只走 `_cells()` 单一口径。
+    """
+    target = _cells(block)
+    existing_refs = {str(c.get("cell_ref") or "") for c in target}
     added: list[str] = []
     for cell in cells:
         ref = cell["cell_ref"]
         if ref not in existing_refs:
-            block[items_key].append(cell)
+            target.append(cell)
             existing_refs.add(ref)
             added.append(ref)
     return added
@@ -439,8 +468,7 @@ def _fix_aux_fabrications(doc: dict[str, Any]) -> list[str]:
         wp_code = b.get("wp_code", "")
         if not wp_code.startswith("F"):
             continue
-        items_key = "items" if "items" in b else "cells"
-        for cell in b.get(items_key, []):
+        for cell in _cells(b):
             formula = cell.get("formula", "")
             for fab in F34_AUX_FABRICATIONS:
                 if f"'{fab}'" in formula:
@@ -471,8 +499,7 @@ def _fix_f2_descriptions(doc: dict[str, Any]) -> list[str]:
                 continue
             if b.get("sheet") not in target_sheets:
                 continue
-            items_key = "items" if "items" in b else "cells"
-            for cell in b.get(items_key, []):
+            for cell in _cells(b):
                 formula = cell.get("formula", "")
                 desc = cell.get("description", "")
                 if (
@@ -494,8 +521,7 @@ def _fix_f2_range(doc: dict[str, Any]) -> list[str]:
     block = _find_block(doc, fix["wp_code"], fix["sheet"])
     if block is None:
         return changes
-    items_key = "items" if "items" in block else "cells"
-    for cell in block.get(items_key, []):
+    for cell in _cells(block):
         formula = cell.get("formula", "")
         if fix["old_range"] in formula:
             cell["formula"] = formula.replace(fix["old_range"], fix["new_range"])
@@ -512,8 +538,7 @@ def _fix_f5_pl_period(doc: dict[str, Any]) -> list[str]:
     for b in _blocks(doc):
         if b.get("wp_code") != "F5":
             continue
-        items_key = "items" if "items" in b else "cells"
-        for cell in b.get(items_key, []):
+        for cell in _cells(b):
             formula = cell.get("formula", "")
             for old_period, new_period in F5_PL_PERIOD_FIXES:
                 if f"'{old_period}'" in formula:
@@ -540,15 +565,18 @@ def _merge_f5_old_block(doc: dict[str, Any]) -> list[str]:
         changes.append(f"F5: 旧块 sheet 名 '{F5_OLD_SHEET}' → '{F5_CORRECT_SHEET}'")
         return changes
 
-    # 两块都在：把旧块独有 items 合并到新块，然后删旧块
-    new_items_key = "items" if "items" in new_block else "cells"
-    old_items_key = "items" if "items" in old_block else "cells"
-    existing_refs = {str(c.get("cell_ref") or "") for c in new_block.get(new_items_key, [])}
+    # 两块都在：把旧块独有公式格合并到新块，然后删旧块
+    # 🔴 FC-11 的读写边界：**读**存量旧块要兼容 `items`（那正是待迁移的死配置，
+    #    不兼容读就迁不动），**写**新块只走 `_cells()` 单一口径。这与 F5 spec
+    #    需求 2.3「契约只声明主键 / 前端 legacy 读回退保留」是同一条原则。
+    target = _cells(new_block)
+    existing_refs = {str(c.get("cell_ref") or "") for c in target}
+    legacy_source = old_block.get("cells") or old_block.get("items") or []
 
-    for cell in old_block.get(old_items_key, []):
+    for cell in legacy_source:
         ref = cell.get("cell_ref", "")
         if ref and ref not in existing_refs:
-            new_block[new_items_key].append(cell)
+            target.append(cell)
             existing_refs.add(ref)
             changes.append(f"F5/{F5_CORRECT_SHEET}: 从旧块迁入 {ref}")
 
@@ -668,8 +696,7 @@ def validate(doc: dict[str, Any]) -> list[str]:
             if cell["cell_ref"] not in refs:
                 issues.append(f"F3/{F3_SHEET_DETAIL}: 缺 {cell['cell_ref']}")
         # 禁 WP 成环
-        items_key = "items" if "items" in f3_det else "cells"
-        for cell in f3_det.get(items_key, []):
+        for cell in _cells(f3_det):
             if "WP(" in cell.get("formula", ""):
                 issues.append(f"F3/{F3_SHEET_DETAIL}: 明细表禁 WP() → {cell.get('cell_ref','')}")
 
@@ -703,8 +730,7 @@ def validate(doc: dict[str, Any]) -> list[str]:
         for cell in F4_DETAIL_BLOCK["cells"]:
             if cell["cell_ref"] not in refs:
                 issues.append(f"F4/{F4_SHEET_DETAIL}: 缺 {cell['cell_ref']}")
-        items_key = "items" if "items" in f4_det else "cells"
-        for cell in f4_det.get(items_key, []):
+        for cell in _cells(f4_det):
             if "WP(" in cell.get("formula", ""):
                 issues.append(f"F4/{F4_SHEET_DETAIL}: 明细表禁 WP() → {cell.get('cell_ref','')}")
 
@@ -738,8 +764,7 @@ def validate(doc: dict[str, Any]) -> list[str]:
     for b in _blocks(doc):
         if b.get("wp_code") != "F5":
             continue
-        items_key = "items" if "items" in b else "cells"
-        for cell in b.get(items_key, []):
+        for cell in _cells(b):
             formula = cell.get("formula", "")
             if "'期初余额'" in formula or "'期末余额'" in formula:
                 issues.append(
@@ -751,8 +776,7 @@ def validate(doc: dict[str, Any]) -> list[str]:
         wp_code = b.get("wp_code", "")
         if not wp_code.startswith("F"):
             continue
-        items_key = "items" if "items" in b else "cells"
-        for cell in b.get(items_key, []):
+        for cell in _cells(b):
             formula = cell.get("formula", "")
             for fab in F34_AUX_FABRICATIONS:
                 if f"'{fab}'" in formula:
@@ -768,13 +792,119 @@ def validate(doc: dict[str, Any]) -> list[str]:
     # F2 口径检查
     f2_adj = _find_block(doc, "F2", "审定表F2-1")
     if f2_adj:
-        items_key = "items" if "items" in f2_adj else "cells"
-        for cell in f2_adj.get(items_key, []):
+        for cell in _cells(f2_adj):
             formula = cell.get("formula", "")
             if "1401~1461" in formula:
                 issues.append(
                     f"F2/审定表F2-1: 口径 1401~1461 未修正 → {cell.get('cell_ref','')}"
                 )
+
+    issues.extend(_validate_fc11_invariants(doc))
+    return issues
+
+
+# ═════════════════════ FC-11 不变量校验（本 spec Task 17 新增）═════════════════
+#
+# 🔴 改造前 `--check` 兼容读 `items`，于是「脚本报 0 项欠账」与「运行时一条公式都不生效」
+#    可以同时成立。下面三条不变量把这个矛盾变成不可能：
+#      ① 任何 F 循环块都不得有 `items` 键        —— 防回退（工具链根因已修，数据也不许残留）
+#      ② 任何 F 循环块的 `cells` 必须非空        —— 空骨架块等于没配，不许静默通过
+#      ③ 块的 `sheet` 必须是源 xlsx 的可见 tab 名 —— 全角/错字 sheet 名解析不到
+#
+# 🔴 作用域限定 F 循环：全库另有 4 个 `cells` 与 `items` 都空的块（`[171]` J1`明细表J1-2␠` /
+#    `[179]` K1`明细表K1-2` / `[185]` K3`明细表K3-2` / `[195]` M2`明细表（非上市公司）M2-2`），
+#    属其他循环的遗留欠账，不在本 spec 范围。把它们一并打红会让本校验永远无法转绿 ⇒
+#    如实登记为顺带发现（见 evidence/task0-prerequisites.md §9），移交对应循环 spec。
+
+
+def _visible_tabs_by_wp_code() -> dict[str, set[str]]:
+    """读 `backend/wp_templates/**/{code} *.xlsx` 的可见 sheet tab 名（openpyxl 直读）。
+
+    与 `backend/tests/test_f_cycle_formula_presets.py::f345_xlsx_tabs` 同源同法，
+    差别只在这里覆盖全部 F 循环科目而非固定三家。openpyxl 缺失时返回空 dict
+    （校验③自动跳过，不伪造通过也不误红）。
+    """
+    try:
+        from openpyxl import load_workbook
+    except ImportError:  # pragma: no cover - 环境缺 openpyxl 时降级
+        return {}
+
+    template_dir = _BACKEND / "wp_templates"
+    tabs: dict[str, set[str]] = {}
+    for path in sorted(template_dir.glob("**/*.xlsx")):
+        if "~$" in path.name:
+            continue
+        code = path.stem.split(" ")[0]
+        if not code.startswith("F"):
+            continue
+        try:
+            wb = load_workbook(path, read_only=True, data_only=True)
+        except Exception:  # pragma: no cover - 损坏模板不该让校验崩
+            continue
+        try:
+            names = {sn for sn in wb.sheetnames if wb[sn].sheet_state == "visible"}
+        finally:
+            wb.close()
+        tabs.setdefault(code, set()).update(names)
+    return tabs
+
+
+#: 🔴 跨 spec 已知欠账（**如实登记、不静默跳过**）—— `(wp_code, sheet)` → 移交说明。
+#:
+#: 这些块命中上面的不变量，但归属其他 spec 的范围。把它们计入 `issues` 会让本脚本的
+#: `--check` 永远无法转绿（于是下一个人就会去放宽校验，FC-11 的老路）；直接从循环里
+#: `continue` 掉又会让它们彻底消失（静默跳过，同样是 FC-11 的老路）。
+#: 折中：单独归入 `[KNOWN-DEBT]` 段落**每次 `--check` 都打印**，但不判红。
+#: 对应 spec 接手时删掉这里的条目，它就自动变成必须修的红项。
+_KNOWN_CROSS_SPEC_DEBTS: dict[tuple[str, str], str] = {
+    ("F0", "审定表F0-1"): (
+        "sheet 名不存在于 F0 模板（真名 `函证结果汇总表F0-1`）⇒ 该块的 2 条 TB 公式"
+        "运行时解析不到 sheet。归 F0/函证循环 spec；本批 F3/F4/F5 不越界改"
+    ),
+}
+
+
+def _validate_fc11_invariants(doc: dict[str, Any]) -> list[str]:
+    issues: list[str] = []
+    known: list[str] = []
+    tabs = _visible_tabs_by_wp_code()
+
+    for idx, block in enumerate(_blocks(doc)):
+        wp_code = str(block.get("wp_code") or "")
+        if not wp_code.startswith("F"):
+            continue
+        sheet = str(block.get("sheet") or "")
+        label = f"{wp_code}/{sheet}(块[{idx}])"
+
+        debt_note = _KNOWN_CROSS_SPEC_DEBTS.get((wp_code, sheet))
+        if debt_note is not None:
+            known.append(f"{label}: {debt_note}")
+            continue
+
+        # ① 不得残留 items 键
+        if "items" in block:
+            issues.append(
+                f"{label}: 残留 `items` 键（{len(block.get('items') or [])} 条）—— "
+                "运行时四个消费方只读 `cells`，该键是死配置（FC-11）"
+            )
+
+        # ② cells 必须非空
+        if not _cells(block):
+            issues.append(
+                f"{label}: `cells` 为空 —— 空骨架块在公式管理页看不到、不预填、不建边（FC-11）"
+            )
+
+        # ③ sheet 名必须是源 xlsx 可见 tab
+        if sheet and wp_code in tabs and sheet not in tabs[wp_code]:
+            issues.append(
+                f"{label}: sheet 名不在源 xlsx 可见 tab 集合中 —— "
+                f"可用 tab: {sorted(tabs[wp_code])}"
+            )
+
+    if known:
+        print(f"[KNOWN-DEBT] {len(known)} 项跨 spec 已知欠账（不判红，见 _KNOWN_CROSS_SPEC_DEBTS）:")
+        for item in known:
+            print(f"  · {item}")
 
     return issues
 

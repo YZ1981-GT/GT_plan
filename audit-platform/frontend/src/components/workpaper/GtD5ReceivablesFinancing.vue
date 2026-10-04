@@ -12,12 +12,15 @@
       </div>
 
       <!-- G5-1 D5-2 canary：统一双向路径（descriptor → WorkpaperSyncEditorHost） -->
-      <WorkpaperSyncEditorHost
-        v-if="renderMode === 'onlyoffice' && isD5DetailSheet"
-        ref="syncEditorHostRef"
-        :descriptor="syncOoDescriptor"
-        :bridge="syncBridge"
-      />
+      <!-- 🔴 必须包在带确定高度的容器里，否则 host 的 height:100% 解析成 auto、
+           编辑区被压扁（见 workpaperSyncEditorHostSizing 守卫）。 -->
+      <div v-if="renderMode === 'onlyoffice' && isD5DetailSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+      </div>
 
       <!-- 其余 sheet 的在线编辑仍走 legacy GtOnlyOfficeSheet -->
       <GtOnlyOfficeSheet
@@ -143,6 +146,7 @@ import { useD5FormData } from './composables/useD5FormData'
 import { useD5CrossSheet } from './composables/useD5CrossSheet'
 import { useD5EntryDualMode, type D5RenderMode } from './composables/useD5EntryDualMode'
 import { resolveD5SheetCode } from './composables/useD5SheetRouting'
+import { managedSheetsForEntry } from './sync/workpaperSyncManagedSheets.generated'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
@@ -244,16 +248,38 @@ const ooSheetName = computed(() =>
   dualMode.resolveOoSheetName() || props.sheetName || '底稿目录',
 )
 
-// ─── G5-1 D5-2 canary：useWorkpaperSyncBridge + store-projection flush ────────
+// ─── G5-1 canary：useWorkpaperSyncBridge + store-projection flush ─────────────
 //
-// 🔴 只覆盖 D5-2「应收款项融资明细」（manifest entry 的 managed sheet = d52-managed）。
+// 🔴 覆盖面已从「只 D5-2 一张」扩到 **provider 契约声明的全部受管 sheet**
+//    （spec d567-sync-coverage Property 15）。清单由 `managedSheetsForEntry` 下发，
+//    见下方 `D5_MANAGED_SHEET_BY_CODE`。
 const D5_SYNC_ENTRY_ID = 'xlsx/gt-d5-receivables-financing'
-const D5_MANAGED_SHEET_KEY = 'd52-managed'
-const isD5DetailSheet = computed(() => currentSheet.value === 'D5-2')
+
+/**
+ * 受管 sheet 集合 —— **从 provider 派生**（Property 15），不再写死单张。
+ *
+ * 🔴 改造前是 `const D5_MANAGED_SHEET_KEY = 'd52-managed'` + `currentSheet === 'D5-2'`，
+ *    而 provider 侧 D5 受管区早已是 **3 张**（d51/d52/d54）⇒ 另两张在前端根本进不了
+ *    在线编辑通道，是「声明层扩了、UI 不认」的两真源缺陷。
+ * 🔴 键换算用后端权威 `excelName` 过前端自己的 `resolveD5SheetCode`，**不做字符串推演**
+ *    （裁决 G3；且 `d51-managed` 的真实 sheet 名是 `审定表D5`、**无 `-1` 后缀**，推演必错）。
+ */
+const D5_MANAGED_SHEET_BY_CODE: ReadonlyMap<string, string> = new Map(
+  managedSheetsForEntry(D5_SYNC_ENTRY_ID).map(
+    (s) => [resolveD5SheetCode(s.excelName), s.sheetKey] as const,
+  ),
+)
+const isD5DetailSheet = computed(() => D5_MANAGED_SHEET_BY_CODE.has(currentSheet.value))
 const syncSwitching = ref(false)
 const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
 const syncEntryId = ref(D5_SYNC_ENTRY_ID)
-const syncSheetKey = ref(D5_MANAGED_SHEET_KEY)
+/**
+ * 🔴 必须是 **computed**（Property 15 的「读 Ref」半句）：原来是 `ref(字面量)` 一次性初始化，
+ *    切到别的受管 sheet 后它仍指向 d52-managed ⇒ 桥会把编辑 materialize 进错的受管区。
+ */
+const syncSheetKey = computed(
+  () => D5_MANAGED_SHEET_BY_CODE.get(currentSheet.value) ?? '',
+)
 const syncBridge = useWorkpaperSyncBridge({
   entryId: syncEntryId,
   wpId: toRef(props, 'wpId'),
@@ -270,7 +296,9 @@ const syncBridge = useWorkpaperSyncBridge({
     return {
       expectedRevision: snap.expectedRevision,
       projection: snap.projection,
-      sheetKey: D5_MANAGED_SHEET_KEY,
+      // 🔴 必须回传**当前** sheet 的受管键：桥内是 `flushed.sheetKey ?? sheetKey()`
+      //    —— flushed 优先，写死字面量会让任何 sheet 的编辑都落进 d52-managed。
+      sheetKey: syncSheetKey.value,
     }
   },
   reloadHtml: async (_minimumRevision: number) => {
@@ -328,6 +356,14 @@ async function switchRenderMode(target: D5RenderMode): Promise<void> {
   try {
     if (String(syncBridge.state.value) === 'applied') {
       await syncBridge.reloadAfterApplied()
+    } else if (syncBridge.mode.value === 'oo' && !syncBridge.dirty.value) {
+      // 🔴 一个字都没改就点「结构化视图」⇒ clean close 直接回表单，**不**发强制保存。
+      // 改这一处之前，这条最常见的路径必然走到：冻结 forcesave → Command Service 返回
+      // 码 4（无改动）→ `forcesave_frozen` → 界面一条红字「文档没有检测到改动…」，而人
+      // 还留在 OO 里（真栈实测形态）。那不是错误，是「未改动直接返回」这条路以前不存在。
+      // `dirty` 为真时**不走**这条（桥里也会 refuse），留给下面的 forceSave 真保存 ——
+      // 绝不静默丢弃编辑。
+      await syncBridge.leaveWithoutSaving()
     } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
       await syncEditorHostRef.value.forceSave()
     } else {
@@ -394,5 +430,16 @@ onMounted(async () => {
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+/* 🔴 在线编辑区必须拿到**视口相关的确定高度**：`WorkpaperSyncEditorHost` 根元素是
+   height:100% + flex 列，父级为 auto 高度时编辑区被压扁，OnlyOffice 在页面上只剩一条
+   （2026-09-22 用户真栈实测，D4-2 同款缺陷；本文件由 workpaperSyncEditorHostSizing
+   守卫一并抓出）。数值与 D4 全部子 tab 的 `.oo-container` 逐字同款。 */
+.oo-container {
+  min-height: 600px;
+  height: calc(100vh - 280px);
+  overflow: hidden;
+  border-radius: 8px;
 }
 </style>

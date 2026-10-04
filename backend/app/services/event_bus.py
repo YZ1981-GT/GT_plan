@@ -31,6 +31,39 @@ logger = logging.getLogger(__name__)
 # Type alias for async event handlers
 EventHandler = Callable[[EventPayload], Coroutine[Any, Any, None]]
 
+#: 订阅者会读 ``payload.year`` 的事件类型 —— 发布方漏传时由 ``_backfill_year`` 按项目
+#: 审计年度补齐。**不是手填清单**：守卫 ``test_event_year_contract.py`` 现算「全仓
+#: subscribe 的 handler 里读 year 的事件类型」并断言它 ⊆ 本集合，新增读 year 的订阅者
+#: 而没登记到这里会打红（避免补齐覆盖面静默缩水）。
+YEAR_SCOPED_EVENT_TYPES: frozenset[EventType] = frozenset({
+    EventType.ADJUSTMENT_CREATED,
+    EventType.ADJUSTMENT_UPDATED,
+    EventType.ADJUSTMENT_DELETED,
+    EventType.ADJUSTMENT_APPROVED,
+    EventType.ADJUSTMENT_REVIEW_REVOKED,
+    EventType.ADJUSTMENT_BATCH_COMMITTED,
+    EventType.MAPPING_CHANGED,
+    EventType.ACCOUNT_MAPPING_CHANGED,
+    EventType.DATA_IMPORTED,
+    EventType.IMPORT_ROLLED_BACK,
+    EventType.LEDGER_DATASET_ACTIVATED,
+    EventType.LEDGER_DATASET_ROLLED_BACK,
+    EventType.MATERIALITY_CHANGED,
+    EventType.TRIAL_BALANCE_UPDATED,
+    EventType.REPORTS_UPDATED,
+    EventType.REPORT_ROW_CHANGED,
+    EventType.FORMULA_CONFIG_CHANGED,
+    EventType.PREFILL_MAPPING_CHANGED,
+    EventType.WORKPAPER_SAVED,
+    EventType.NOTE_UPDATED,
+    EventType.NOTE_SECTION_SAVED,
+    EventType.CONFIRMATION_RECEIVED,
+    EventType.CHECKLIST_COMPLETED,
+    EventType.STANDARD_CHANGED,
+    EventType.ELIMINATION_APPROVED,
+    EventType.ELIMINATION_REVOKED,
+})
+
 # Redis Stream 配置
 _STREAM_KEY = "audit:events"
 #: 公开别名。**replay 读取方必须与写入方同一个键。**
@@ -151,6 +184,39 @@ class EventBus:
         """立即发布事件，不经过 debounce（供需要立即触发的场景使用）"""
         await self._dispatch(payload)
 
+    async def _backfill_year(self, payload: EventPayload) -> None:
+        """发布方漏传 ``year`` 时，在唯一派发口按项目审计年度补齐。
+
+        🔴 修复前（2026-09-29 现扫）：数据链事件里有 11 个发布点不传 year
+        （OnlyOffice 在线保存 / 底稿上传 / 底稿导入 / 函证 ×3 发 WORKPAPER_SAVED，
+        科目表编辑发 ACCOUNT_MAPPING_CHANGED，报表公式 / 预填种子发
+        FORMULA_CONFIG_CHANGED / PREFILL_MAPPING_CHANGED …），而订阅者对缺 year
+        的处置各写各的：``if not year: return``（静默跳过 —— 如 OnlyOffice 保存后
+        stale 传播、C/D/F 循环联动一律不跑）或 ``payload.year or 2025``（对 2024
+        项目是**错年份**）。在派发口补一次，所有订阅者拿到同一个正确年份。
+
+        只对 :data:`YEAR_SCOPED_EVENT_TYPES` 补（其订阅者真的读 year）；
+        补不到（项目无任何年度信息）则保持 None，由订阅者的显式守卫可见降级。
+        """
+        if payload.year is not None or payload.event_type not in YEAR_SCOPED_EVENT_TYPES:
+            return
+        if not payload.project_id:
+            return
+        from app.services.project_audit_year import fetch_project_audit_year_standalone
+
+        year = await fetch_project_audit_year_standalone(payload.project_id)
+        if year is not None:
+            payload.year = year
+            logger.info(
+                "EventBus: %s 发布方未传 year，已按项目审计年度补齐 year=%s (project=%s)",
+                payload.event_type.value, year, payload.project_id,
+            )
+        else:
+            logger.warning(
+                "EventBus: %s 缺 year 且项目 %s 无审计年度可补，订阅者将按缺年度处理",
+                payload.event_type.value, payload.project_id,
+            )
+
     def broadcast_raw(self, event_type: str, extra: dict | None = None) -> None:
         """轻量级广播原始事件（同步调用）— 用于不走完整 EventBus dispatch 的场景。
 
@@ -220,6 +286,8 @@ class EventBus:
         """实际分发事件到处理器"""
         dedup_key = self._build_dedup_key(payload)
         self._pending.pop(dedup_key, None)
+        # 先按原 dedup_key 清 pending（补齐会改 year → 改 key），再补年度
+        await self._backfill_year(payload)
 
         event_type = payload.event_type
         handlers = self._handlers.get(event_type, [])

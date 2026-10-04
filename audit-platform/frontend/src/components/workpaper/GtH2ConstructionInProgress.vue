@@ -7,21 +7,36 @@
     <template v-else>
       <!-- 双模式切换器（OO 模式也需可见，否则无法切回结构化） -->
       <div v-if="showModeSwitch" class="h2-header-toolbar">
-        <el-segmented
-          :model-value="currentMode"
-          :options="modeOptions"
-          size="small"
-          @change="onModeChange"
-        />
-        <span v-if="healthTag" class="h2-oo-tag" :class="`h2-oo-tag--${healthTag.type}`">
-          {{ healthTag.text }}
+        <!--
+          v-model 而非 :model-value + @change：setter 是宿主层的 `currentMode`
+          computed，它先套 H2 专属策略（目录/程序表禁切 OO）再委托
+          useHSyncMode.switchMode，四分支保存协议在那里收口。
+        -->
+        <el-segmented v-model="currentMode" :options="modeOptions" size="small" />
+        <span
+          class="h2-oo-tag"
+          :class="`h2-oo-tag--${hSync.syncStateTag.value.type}`"
+        >
+          {{ hSync.syncStateTag.value.text }}
         </span>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h2-construction-in-progress" />
       </div>
 
-      <!-- OnlyOffice 模式 -->
+      <!--
+        受管 sheet（H2-2）的在线编辑 —— 统一双向宿主。
+        🔴 `.oo-container` 必须有**确定高度**（D4 踩过 height:100% 被压成一条）。
+      -->
+      <div v-if="currentMode === 'onlyoffice' && isH2SyncManagedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="hSync.descriptor.value"
+          :bridge="hSync.syncBridge"
+        />
+      </div>
+
+      <!-- 非受管 sheet 的 OnlyOffice 模式（legacy 只读视图，无双向回写） -->
       <GtOnlyOfficeSheet
-        v-if="currentMode === 'onlyoffice'"
+        v-else-if="currentMode === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -309,13 +324,13 @@
  * Spec: .kiro/specs/h2-construction-in-progress/ Task 1.1
  * Requirements: 1.1, 1.2, 1.6, 1.7, 1.8, 1.9
  */
-import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
-import useH2DualMode from './composables/useH2DualMode'
 import useH2ImportExport from './composables/useH2ImportExport'
 import { useH2C7Prerequisite } from './composables/useH2C7Prerequisite'
 import { useH2ApplicableStandards } from './composables/useH2ApplicableStandards'
+import { buildHSeedRowIds } from './composables/hSeedRowIdentity'
 import {
   H2_INTEREST_BRANCH_KEY,
   inactiveInterestCapResultKey,
@@ -326,6 +341,12 @@ import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { useHSyncMode } from './composables/useHSyncMode'
+
+/** H2 entry id（manifest 冻结值，与 `phase5_h2_construction_in_progress.ENTRY_ID` 逐字一致）。 */
+const H2_SYNC_ENTRY_ID = 'xlsx/gt-h2-construction-in-progress'
 // 版本 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载
 
 // core — H2TabIndex 非 lazy（底稿目录轻量，首屏必显）
@@ -387,31 +408,86 @@ function onInterestCapBranchChange(val: string | number | boolean) {
   }
 }
 
-// ─── 双模式 useH2DualMode (Task 6.2) ────────────────────────────────────────
-const {
-  currentMode,
-  modeOptions,
-  isOoAvailable,
-  onModeChange: _rawH2ModeChange,
-  healthTag,
-  onOoLoadFailed,
-} = useH2DualMode({
-  wpId: toRef(props, 'wpId') as any,
-  projectId: toRef(props, 'projectId') as any,
-  sheetName: computed(() => props.sheetName || '') as any,
-  autoSave: async () => { /* trigger version snapshot */ },
-  reloadAll: async () => { await selfLoad() },
+// ─── 双模式切换（统一接桥，替代 useH2DualMode）────────────────────────────────
+//
+// H2-2（`明细表H2-2`）是受管表：受管 + 已接桥 ⇒ 渲染 `WorkpaperSyncEditorHost`，
+// OO 侧改动经 forcesave 回写 store。其余 sheet 仍走 `GtOnlyOfficeSheet` 只读视图。
+//
+// 🔴 H2 的契约带**一处声明缺口**（GAP-1 `L 增加` 不参与双向，因为模板 L 是可输入格
+//    而 HTML 的 increaseTotal 由 5 个分项派生）—— 接桥不改变这一点：回写不动 L，
+//    Excel 侧 L 的重算由 Excel 自己做（`Q=J+L-N-O` 仍在模板里）。
+//    原第二处缺口（`O 其他减少` 1 格对 2 字段）已在 `useH2Detail._normalizeRow`
+//    载入期把 `transferOut` 并进 `decrease` 后消除，O ↔ decrease 现在是 1:1。
+const hSync = useHSyncMode({
+  entryId: H2_SYNC_ENTRY_ID,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  currentCode: computed(() => currentSheet.value),
+  isReadonly,
+  flushHtml: async () => {
+    await flushPendingSaves()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: H2_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: hSync.sheetKey.value,
+    }
+  },
+  reloadHtml: async () => { await selfLoad() },
 })
 
-/** C1: 目录/程序表不支持在线编辑(仅阻止切 OO 方向) */
-function onModeChange(val: string | number | boolean): void {
-  if (val === 'onlyoffice') {
-    const s = currentSheet.value
-    if (s === 'H2' || s.endsWith('A')) {
+/** 模板 `ref="syncEditorHostRef"` 的落点 —— 直接复用桥里的 ref。 */
+const syncEditorHostRef = hSync.syncHostRef
+const isH2SyncManagedSheet = computed(() => hSync.isManagedSheet.value)
+const modeOptions = hSync.modeOptions
+
+/**
+ * 当前模式 —— 在桥之上再套一层 **H2 专属策略**：目录页（`H2`）与程序表（`*A`）
+ * 不支持在线编辑，只阻止「切往 OO」这一个方向。
+ *
+ * 🔴 这条策略**留在宿主层**不塞进 `useHSyncMode`：它是 H2 自己的业务规则
+ *  （别的 entry 的目录/程序表没有同样约束），放进通用 composable 会让通用层
+ *   开始认识具体 sheet 短码。原实现（`useH2DualMode` 外面包一个 `onModeChange`）
+ *   就是这个形态，接桥后照样保留。
+ */
+const currentMode = computed<'html' | 'onlyoffice'>({
+  get: () => hSync.renderMode.value,
+  set: (val) => {
+    if (val === 'onlyoffice' && !h2OnlineEditAllowed.value) {
+      // 🔴 不静默 return（原实现就是静默 —— 用户点「在线编辑」界面毫无反应，
+      //    与 D4 bug ③ 同一种「点击被吞」的观感）。走 `lastNotice` 让工具栏标签
+      //    当场说明原因；`syncStateTag` 给 `lastNotice` 最高优先级。
+      hSync.lastNotice.value = {
+        text: '底稿目录与程序表不支持在线编辑，请在明细表等表页切换',
+        type: 'warning',
+      }
       return
     }
-  }
-  _rawH2ModeChange(val)
+    void hSync.switchMode(val)
+  },
+})
+
+/**
+ * 切换器为何在禁切的表页仍然显示：`useHSyncMode.legacyMode` 是**宿主级**单值，
+ * 用户在别的非受管表页切进 legacy OO 后再跳到 `H2A`，`renderMode` 仍读到
+ * `onlyoffice`。此时若把切换器藏掉，人就被关在 OO 视图里没有出口。
+ * ⇒ 控件保持可见（可切回结构化），只把「切往 OO」这一个方向拦掉并给出提示。
+ */
+const h2OnlineEditAllowed = computed(() => {
+  const s = currentSheet.value
+  return s !== 'H2' && !s.endsWith('A')
+})
+
+/**
+ * legacy OO 组件加载失败的兜底 —— 原 `useH2DualMode.onOoLoadFailed` 的替代。
+ * 只对**非受管** sheet 生效（受管 sheet 走桥，失败由 `hSync.lastNotice` 报）。
+ */
+function onOoLoadFailed(): void {
+  hSync.switchMode('html')
 }
 
 // ─── 导入导出 useH2ImportExport (Task 6.3) ───────────────────────────────────
@@ -496,6 +572,32 @@ async function selfLoad(): Promise<void> {
 // 子组件契约：inject('saveResponse')(itemId, value)。value 为字符串或对象（对象序列化进 remark）。
 // 防抖 800ms 批量 PUT /checklist-responses，并乐观更新本地 Map 供 selfLoad/跨表读取。
 const _saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+/**
+ * 待落库项（itemId → 本次要 PUT 的值）。
+ *
+ * 🔴 存在理由：`flushPendingSaves()` 必须能在**防抖窗口内**把同一批值立即写出去。
+ *    原实现把值捕获在 `setTimeout` 闭包里，外部无从取用 ⇒ 切「在线编辑」时最后不到
+ *    800ms 的编辑会留在客户端，materialize 出的 xlsx 少这批改动（静默丢数据）。
+ */
+const _pendingSaves = new Map<string, { conclusion: string | null; remark: string | null }>()
+
+/** 真正打端点（防抖到点与 flush 共用这一条路径，避免两处写法漂移）。 */
+async function _dispatchPendingSave(itemId: string): Promise<void> {
+  const payload = _pendingSaves.get(itemId)
+  if (!payload) return
+  _pendingSaves.delete(itemId)
+  try {
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items: [{ item_id: itemId, conclusion: payload.conclusion, remark: payload.remark }],
+    })
+    scheduleAutoSnapshot()
+  } catch (err: unknown) {
+    console.warn('[GtH2] persistResponse failed:', itemId, err)
+  }
+}
+
 function persistResponse(
   itemId: string,
   value: any,
@@ -515,16 +617,28 @@ function persistResponse(
   next.set(itemId, updated)
   allResponses.value = next
   if (isReadonly.value) return
+  _pendingSaves.set(itemId, {
+    conclusion: updated.conclusion ?? null,
+    remark: updated.remark ?? null,
+  })
   const prev = _saveTimers.get(itemId)
   if (prev) clearTimeout(prev)
   _saveTimers.set(itemId, setTimeout(() => {
     _saveTimers.delete(itemId)
-    http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion: updated.conclusion ?? null, remark: updated.remark ?? null }],
-    }).then(() => { scheduleAutoSnapshot() })
-      .catch((err: unknown) => console.warn('[GtH2] persistResponse failed:', itemId, err))
+    void _dispatchPendingSave(itemId)
   }, 800))
+}
+
+/**
+ * 清防抖 + 立即落库，**await 到真正写完**。切「在线编辑」前的必经一步。
+ *
+ * 用户要求的「点保存后切换要丝滑」在这条路径上成立：已保存 ⇒ `_pendingSaves` 为空
+ * ⇒ 本函数是零请求空转，切换耗时只剩桥的 materialize。未保存才在这里付出一次 PUT。
+ */
+async function flushPendingSaves(): Promise<void> {
+  for (const t of _saveTimers.values()) clearTimeout(t)
+  _saveTimers.clear()
+  await Promise.all([..._pendingSaves.keys()].map((id) => _dispatchPendingSave(id)))
 }
 
 // ─── provide for child components ────────────────────────────────────────────
@@ -612,8 +726,11 @@ function _seedDetailFromPrefill(): void {
   const prefill = props.htmlData?.detail_prefill
   if (!Array.isArray(prefill) || prefill.length === 0) return
 
+  const seedRowIds = buildHSeedRowIds(
+    prefill.map((p: any) => p?.accountCode ?? p?.account_code),
+  )
   const seedRows = prefill.map((p: any, i: number) => ({
-    rowId: `seed-${i}`,
+    rowId: seedRowIds[i],
     name: String(p.name || ''),
     cipBegin: Number(p.cipBegin) || 0,
     cipEnd: Number(p.cipEnd) || 0,
@@ -633,6 +750,11 @@ onMounted(() => {
     _seedDetailFromPrefill()
   })
 })
+
+// 🔴 本宿主原先**没有** onBeforeUnmount ⇒ 防抖定时器跟着组件一起悬着（离开底稿后
+//    仍会打一次 PUT，且持有已卸载组件的闭包）。flush 一次把待落库项真发出去并清干
+//    定时器 —— 既不泄漏也不丢最后不到 800ms 的编辑。
+onBeforeUnmount(() => { void flushPendingSaves() })
 </script>
 
 <style scoped>
@@ -658,6 +780,15 @@ onMounted(() => {
 .h2-oo-tag--success { color: #67c23a; background: #f0f9eb; }
 .h2-oo-tag--info { color: #909399; background: #f4f4f5; }
 .h2-oo-tag--warning { color: #e6a23c; background: #fdf6ec; }
+/*
+ * 🔴 `height: 100%` 会被父级压成一条（D4 踩过）：OnlyOffice iframe 需要
+ *    **确定**高度才撑得开，min-height 兜住父级无高度时的退化。
+ */
+.oo-container {
+  width: 100%;
+  min-height: 600px;
+  height: calc(100vh - 200px);
+}
 .interest-cap-branch-selector {
   display: flex;
   align-items: center;
