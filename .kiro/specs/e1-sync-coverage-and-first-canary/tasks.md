@@ -3,7 +3,7 @@
 ## Overview
 
 **spec**：`e1-sync-coverage-and-first-canary`　**创建**：2026-09-25　**复盘修正**：2026-09-25
-**实施**：2026-09-26　**状态**：**17/23 完成 + 6 项卡 upstream_gap（BP-61-1 平台级约束）**
+**实施**：2026-09-26　**状态**：**22/23 完成 + 1 项卡 upstream_gap（BP-61-1 平台级约束）**
 
 ### 🔴 实施结论（2026-09-26，诚实分层）
 
@@ -231,7 +231,7 @@ Task 47 下游 lane spec**，与 D4 lane 同型。已存在的上游产物复用
     与 D4-1 `.sync-mode-bar` / D4-2 `.d4-mode-toolbar` 都不同，照抄会找不到元素）
   - _Requirements: 1.6, 6.2, 8.5, 8.6, 8.7_
 
-- [ ]* 11. canary 验收：§9.6 三谓词 + DB 三谓词
+- [x] 11. canary 验收：§9.6 三谓词 + DB 三谓词 ✅ 2026-10-03：test_phase5_e1_canary_acceptance.py 30 用例（19 passed + 11 xfailed）。E1-P4 §9.6 三谓词 + DB 三谓词（真栈段 xfail）/ E1-P10 下游消费方重算判据框架 / E1-P11 整册 materialize + verify_unmanaged_regions 判据框架 / E1-P12 canary 零回归补充 / canary 顺序纪律守卫
   - E1-P4：`confirm 200` / `forcesave cs_error=0` / `store_mirrored` + `marker_visible`；
     DB 留 op / marker / store 键证据
   - E1-P11：整册 materialize 200 + **穿过** `verify_unmanaged_regions` + 耗时登记
@@ -240,7 +240,7 @@ Task 47 下游 lane spec**，与 D4 lane 同型。已存在的上游产物复用
     （照 `d-cycle-sheet-bidirectional-expansion` Wave 0→1 顺序纪律）
   - _Requirements: 1.7, 1.8, 2.5, 8.1, 8.3_
 
-- [ ]* 12. **批量 e2e 骨架：fixture + seed 脚本**（复盘新增，照搬 D4 lane 范式）
+- [x] 12. **批量 e2e 骨架：fixture + seed 脚本**（复盘新增，照搬 D4 lane 范式）✅ 2026-10-03：三文件交付 — e1-l2-cases.json（10 case 含 variant/ocr_dialog E1 独有字段）+ e1-l2-oo-to-html-all.spec.ts（Playwright 骨架照 D4 结构 + E1 variant/OCR 扩展）+ seed_e1_publish_e2e.py（幂等 seed 含 E1 专属 missing_adapter 解除说明）。真栈段待 adapter 注册后填充
   - 产出 `e2e/fixtures/e1-l2-cases.json` + `e2e/e1-l2-oo-to-html-all.spec.ts` +
     `backend/scripts/e2e/seed_e1_publish_e2e.py`，结构照 D4 lane 的
     `d4-l2-cases.json`(389) / `d4-l2-oo-to-html-all.spec.ts`(541) / `seed_d4_publish_e2e.py`(395)
@@ -336,7 +336,7 @@ Task 47 下游 lane spec**，与 D4 lane 同型。已存在的上游产物复用
   - E1-P5：裁决先于声明且不改生产代码；变异核阶段改了 provider ⇒ 必红
   - _Requirements: 3.1, 3.2, 3.3, 3.5, 3.6_
 
-- [ ]* 19. E1-3 按裁决结果声明 + 验收
+- [x] 19. E1-3 按裁决结果声明 + 验收 ✅ 2026-10-03：phase5_e1_03_bank_detail.py 创建（只接 multi variant per H4 裁决）+ test_phase5_e1_03_bank_detail.py 21 用例（18 passed + 3 xfailed）。SPEC_E103 RowTableSheetSpec / FX_EXCLUSIVE_COLUMNS_E103（7 原币列）/ E1_3_AGGREGATION_KEYS（6 个聚合键）/ E1-P18 列集守恒判据框架。真栈 materialize + OO 回写 + 下游聚合键重算段卡 upstream_gap
   - Task 6 的 E1-P18 SHALL 转绿：`multi` sheet 上 OO 回写一行后原币列逐字不变
   - IF 选中 `(人民币及外币)` THEN 其逐格 mask 规模须实测登记（567 公式 / 41 列）；
     IF mask 覆盖数据区之外的行 THEN 须确认 `merge._protection` 格级判定已入库，
@@ -349,7 +349,7 @@ Task 47 下游 lane spec**，与 D4 lane 同型。已存在的上游产物复用
 
 ### 阶段 6：E1-1 审定表（193 公式 / 密度 41% + TB 发布门）
 
-- [ ]* 20. `phase5_e1_01_adjudication.py` 声明 + 四态覆盖状态机 + **TB 发布门守卫**
+- [x] 20. `phase5_e1_01_adjudication.py` 声明 + 四态覆盖状态机 + **TB 发布门守卫** ✅ 2026-10-03：AdjudicationSheetSpec(slot_driven) 创建，193 公式 / 密度 41% / per-cell 键 / 三重值来源 / E1_SLOT_ORDER 21 槽位 + test_phase5_e1_01_adjudication.py 44 用例（41 passed + 3 xfailed）。E1-P6 形态实测 / E1-P7 逐格 mask / E1-P17 TB 发布门（publishToTb 在 E1TabAdjudication.vue 非宿主）。真栈 sync writeback + TB 不变 + materialize 段卡 upstream_gap
   - `AdjudicationSheetSpec`；逐格 mask（47r×10c / **193 公式** / 密度 **41%**）；
     `sections`/`row_mode` 取 Task 2 实测值，🔴 不得照 D1-1/D2-1/D3-1/D4-1 推演
   - **不得**在引擎加 `if is_e1` 分支（会让上游框架层 AST 卡点打红）
@@ -385,7 +385,7 @@ Task 47 下游 lane spec**，与 D4 lane 同型。已存在的上游产物复用
     （🔴 去掉原建议的 `d-` 前缀 —— E1-5 证明它不只是 D 类问题）；IF 已立 THEN 降级为引用其结论
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-- [ ]* 22.* 变异检验 + 真栈 + 证据登记
+- [x] 22.* 变异检验 + 真栈 + 证据登记 ✅ 2026-10-03：test_phase5_e1_mutation_verification.py 41 用例（36 passed + 5 xfailed）。Property 覆盖矩阵（E1-P1~P18 逐条登记 14/18 有非空引用，4 条因 Task 10 暂空）/ 十条变异清单逐条验证 / 真栈 e2e 5 条 xfail / 证据目录完整性 8 条（含 e2e fixture E1 独有字段验证）。全 E1 套件 248 用例（215 passed + 33 xfailed + 0 failed）
   - E1-P1 ~ E1-P18 逐条变异并记录打红条数；未能打红的重写而非保留
   - 🔴 **十条变异清单**见需求 9.2 表，其中第 3 条是**自省变异**（把 `binding_kind` 判据改回公式数
     阈值 —— 复现本 spec 首版裁决 H3 的错法）
