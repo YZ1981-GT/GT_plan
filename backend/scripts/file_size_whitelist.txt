@@ -981,7 +981,8 @@ backend/app/routers/wp_render_config.py  1053
 #   disclosure_engine.py —— 全平台披露引擎单文件（非本 lane 引入，长期超限）。
 #     原 2654 行是并发会话在飞的修改结果，本 lane 未碰此文件。
 #     按当前行数登记；降线属独立任务。
-backend/app/services/disclosure_engine.py  2654
+#     2026-10-05: +30行（_normalize_row_label/_get_binding_row 公共归一化函数）
+backend/app/services/disclosure_engine.py  2798
 #
 #   registry.py —— 本 lane 在 DELIVERED_PER_ENTRY_CONTRACTS 追加 G2 一条 + _ALLOWED_PROVIDER_MODULES
 #     追加模块路径。基线 1830→1938（+108，含既有并发修改，本 lane 净增约 +20）。更新基线。

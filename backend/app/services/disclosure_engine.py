@@ -60,6 +60,34 @@ from app.services.note_knowledge_enricher import NoteKnowledgeEnricher
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# 行标签归一化与 binding 行匹配（公共工具）
+# ---------------------------------------------------------------------------
+
+def _normalize_row_label(label: str) -> str:
+    """全角空格/多空格 → 单半角空格 → strip。
+
+    解决模板用"合　计"（全角空格）、binding 用"合计"（无空格）的静默失配。
+    """
+    return label.replace("\u3000", " ").replace("  ", " ").strip()
+
+
+def _get_binding_row(binding_rows: dict[str, Any], label: str) -> dict | None:
+    """按行标签查 binding_rows，先精确匹配再归一化容错。
+
+    返回 binding 行 dict 或 None。不猜测语义差异（如"1-2年"vs"1至2年"）——
+    标签文本不同的行保持 manual 兜底。
+    """
+    row = binding_rows.get(label)
+    if row is not None:
+        return row
+    norm = _normalize_row_label(label)
+    for bk, bv in binding_rows.items():
+        if _normalize_row_label(bk) == norm:
+            return bv
+    return None
+
+
 def _is_llm_error(text: str | None) -> bool:
     """判断 chat_completion 返回是否为服务降级占位串（非有效生成）。
 
@@ -1167,6 +1195,7 @@ class DisclosureEngine:
         table_template: dict,
         *,
         section_number: str | None = None,
+        table_index: int = 0,
     ) -> dict | None:
         """从模板构建 table_data，动态提取底稿明细行。
 
@@ -1182,37 +1211,37 @@ class DisclosureEngine:
         Sprint 1 Task 1.3 binding 分支（向后兼容）：
         - 当传入 ``section_number`` 且 binding 加载器命中 → 走新路径
           ``_build_with_binding``（按 binding 字段 7 source 解析器取数）
+        - ``table_index`` 是章节内 0-based 表序；越界时不借用首表，直接走 legacy
         - 未命中 / 不传 section_number → 走原 legacy 路径不变（不污染老代码）
         """
         # ── Sprint 1 Task 1.3 binding 分支 ─────────────────────────
         if section_number:
             try:
                 from app.services.note_template_bindings_loader import (
-                    get_binding_for_section,
+                    get_binding_for_table,
                 )
-                sec_binding = get_binding_for_section(section_number)
+                table_binding = get_binding_for_table(section_number, table_index)
             except Exception as _bl_err:
                 logger.warning(
-                    "binding loader failed for %s: %s; "
+                    "binding loader failed for %s table %s: %s; "
                     "falling back to legacy path",
-                    section_number, _bl_err,
+                    section_number, table_index, _bl_err,
                 )
-                sec_binding = None
-            if sec_binding:
-                tables = sec_binding.get("tables") or []
-                if tables and isinstance(tables[0], dict):
-                    try:
-                        return await self._build_with_binding(
-                            project_id, year, section_number,
-                            table_template, tables[0],
-                        )
-                    except Exception as _bind_err:
-                        logger.warning(
-                            "_build_with_binding failed for %s: %s; "
-                            "falling back to legacy path",
-                            section_number, _bind_err,
-                        )
-        # ── 原 legacy 路径（不修改） ───────────────────────────────
+                table_binding = None
+            if table_binding:
+                try:
+                    return await self._build_with_binding(
+                        project_id, year, section_number,
+                        table_template, table_binding,
+                        table_index=table_index,
+                    )
+                except Exception as _bind_err:
+                    logger.warning(
+                        "_build_with_binding failed for %s table %s: %s; "
+                        "falling back to legacy path",
+                        section_number, table_index, _bind_err,
+                    )
+        # ── 原 legacy 路径（不修改）───────────────────────────────
         if not table_template:
             return None
 
@@ -1406,6 +1435,8 @@ class DisclosureEngine:
         section_number: str,
         table_template: dict,
         table_binding: dict,
+        *,
+        table_index: int = 0,
     ) -> dict:
         """走 binding 驱动路径：按 header_normalize.semantic 调 7 source resolver.
 
@@ -1419,6 +1450,7 @@ class DisclosureEngine:
             project_id: 项目 UUID
             year:       附注会计年度
             section_number: 章节号（用于构造 binding_id）
+            table_index: 章节内 0-based 表序，供 resolver 读取同章多表的对应表
             table_template: 模板表（含 headers / rows[*].label / row_type）
             table_binding:  binding json 中对应的表 dict（含 header_normalize /
                             rows[*].binding / rows[*].formula / row_type）
@@ -1437,6 +1469,7 @@ class DisclosureEngine:
         # 母公司章（十六、* / 十二、*）会在此把 project_id 与 _tb_cache 换成
         # 同代码同年度 standalone 兄弟项目的（Task 12），其余章节逐键等价。
         ctx: dict = await self._build_resolver_ctx(project_id, year, section_number)
+        ctx["table_index"] = table_index
 
         # binding.rows 是 dict (label -> row_binding)
         binding_rows = table_binding.get("rows") or {}
@@ -1471,8 +1504,8 @@ class DisclosureEngine:
                 })
                 continue
 
-            # 找到这行的 binding（按 label 精确匹配）
-            row_binding = binding_rows.get(label) or {}
+            # 找到这行的 binding（按 label 精确匹配，容错全角空格归一化）
+            row_binding = _get_binding_row(binding_rows, label) or {}
             cell_bindings = row_binding.get("binding") or {}
             if not isinstance(cell_bindings, dict):
                 cell_bindings = {}
@@ -1555,6 +1588,75 @@ class DisclosureEngine:
         # Task 13：母公司章取数溯源随表落库（前端溯源面板 / 「本项目未建母公司单体」灰态）
         self._attach_parent_source_meta(out, ctx)
         return out
+
+    async def _build_section_table_data(
+        self,
+        project_id: UUID,
+        year: int,
+        tmpl: dict,
+        *,
+        content_type_str: str | None = None,
+        text_sections: list[str] | None = None,
+        per_table_guidance: dict[int, str] | None = None,
+    ) -> dict | None:
+        """按章节模板构建完整 table_data，并为每张表传递真实 0-based 索引。
+
+        ``_tables`` 是多表数据的权威容器，顶层 headers/rows/name 只保留首表
+        兼容镜像。生成、空详情重建和增量刷新必须共用这里，避免其中一条路径
+        重新回到首表 binding 或把多表降成单表。
+        """
+        content_type = content_type_str or tmpl.get("content_type", "table")
+        tables_list = tmpl.get("tables")
+        if isinstance(tables_list, list) and tables_list:
+            built_tables: list[dict] = []
+            for table_index, tbl in enumerate(tables_list):
+                if not isinstance(tbl, dict):
+                    built_tables.append({"name": "", "headers": [], "rows": []})
+                    continue
+                built = await self._build_table_data(
+                    project_id,
+                    year,
+                    tbl,
+                    section_number=tmpl.get("note_section"),
+                    table_index=table_index,
+                )
+                if built is None:
+                    built = {
+                        "name": tbl.get("name", ""),
+                        "headers": tbl.get("headers", []),
+                        "rows": [],
+                    }
+                else:
+                    built["name"] = tbl.get("name", "")
+                _carry_seed_column_meta(tbl, built)
+                built_tables.append(built)
+
+            _infer_table_names_from_text(built_tables, text_sections)
+            for idx, guidance in (per_table_guidance or {}).items():
+                if 0 <= idx < len(built_tables) and guidance:
+                    built_tables[idx]["guidance"] = guidance
+            _carry_seed_table_guidance(tables_list, built_tables)
+            if not built_tables:
+                return None
+            first = built_tables[0]
+            return {
+                "headers": first.get("headers", []),
+                "rows": first.get("rows", []),
+                "name": first.get("name", ""),
+                "_tables": built_tables,
+            }
+
+        if content_type in ("table", "mixed"):
+            table_template = tmpl.get("table_template", {})
+            if table_template:
+                return await self._build_table_data(
+                    project_id,
+                    year,
+                    table_template,
+                    section_number=tmpl.get("note_section"),
+                    table_index=0,
+                )
+        return None
 
     # ------------------------------------------------------------------
     # Wave2 (Task 3.2)：表内公式二次求值编排（灰度内调用）
@@ -1762,51 +1864,17 @@ class DisclosureEngine:
             if text_content and content_type_str == "table":
                 content_type_str = "mixed"  # 有正文就升级为 mixed
 
-            # 构建 table_data：支持多表格（tables 数组）
+            # 构建 table_data：生成、详情重建和增量刷新共用完整多表编排
             table_data = None
             try:
-                tables_list = tmpl.get("tables", [])
-                if tables_list:
-                    # 多表格模式
-                    built_tables = []
-                    for tbl in tables_list:
-                        built = await self._build_table_data(
-                            project_id, year,
-                            {"headers": tbl.get("headers", []), "rows": tbl.get("rows", [])},
-                            section_number=note_section,
-                        )
-                        if built:
-                            built["name"] = tbl.get("name", "")
-                        else:
-                            built = {
-                                "name": tbl.get("name", ""),
-                                "headers": tbl.get("headers", []),
-                                "rows": [],
-                            }
-                        _carry_seed_column_meta(tbl, built)
-                        built_tables.append(built)
-
-                    # 动态提取表格标题：name 为空或"（表N）"占位时，从 text_sections 按序号匹配
-                    _infer_table_names_from_text(built_tables, text_sections)
-                    # per-table guidance：写入对应表的 guidance 字段（仅有效索引）
-                    for idx, g in per_table_guidance.items():
-                        if 0 <= idx < len(built_tables) and g:
-                            built_tables[idx]["guidance"] = g
-                    # seed 显式声明的 guidance 优先于按段落游标推断的结果
-                    _carry_seed_table_guidance(tables_list, built_tables)
-                    # 存储为独立的 _tables 数组，避免循环引用
-                    if built_tables:
-                        table_data = {
-                            "headers": built_tables[0].get("headers", []),
-                            "rows": built_tables[0].get("rows", []),
-                            "name": built_tables[0].get("name", ""),
-                            "_tables": built_tables,
-                        }
-                elif content_type_str in ("table", "mixed"):
-                    table_data = await self._build_table_data(
-                        project_id, year, tmpl.get("table_template", {}),
-                        section_number=note_section,
-                    )
+                table_data = await self._build_section_table_data(
+                    project_id,
+                    year,
+                    tmpl,
+                    content_type_str=content_type_str,
+                    text_sections=text_sections,
+                    per_table_guidance=per_table_guidance,
+                )
             except Exception as _tbl_err:
                 logger.warning("build table_data failed for %s: %s", note_section, _tbl_err)
                 table_data = None
@@ -1972,12 +2040,15 @@ class DisclosureEngine:
                 referenced_codes = set()
                 for row in table_template.get("rows", []):
                     referenced_codes.update(row.get("account_codes", []))
+                for tbl in tmpl.get("tables", []) or []:
+                    if isinstance(tbl, dict):
+                        for row in tbl.get("rows", []) or []:
+                            referenced_codes.update(row.get("account_codes", []))
                 if referenced_codes and not referenced_codes.intersection(set(changed_accounts)):
                     continue
 
-            new_td = await self._build_table_data(
-                project_id, year, table_template,
-                section_number=note_section,
+            new_td = await self._build_section_table_data(
+                project_id, year, tmpl, content_type_str=content_type_str,
             )
 
             existing = await self.db.execute(
@@ -2343,8 +2414,8 @@ class DisclosureEngine:
         if not semantic:
             return None
 
-        # 查 binding_rows
-        row_binding = binding_rows.get(label) or {}
+        # 查 binding_rows（容错全角空格归一化，与 _build_with_binding 一致）
+        row_binding = _get_binding_row(binding_rows, label) or {}
         cell_bindings = row_binding.get("binding") or {}
         if not isinstance(cell_bindings, dict):
             return None
@@ -2486,38 +2557,15 @@ class DisclosureEngine:
                 templates = await self._load_templates(project_id, template_type)
                 tmpl = next((t for t in templates if t.get("note_section") == note_section), None)
                 if tmpl:
-                    tables_list = tmpl.get("tables", [])
-                    if tables_list:
-                        built_tables = []
-                        for tbl in tables_list:
-                            built = await self._build_table_data(
-                                project_id, year,
-                                {"headers": tbl.get("headers", []), "rows": tbl.get("rows", [])},
-                                section_number=note_section,
-                            )
-                            if built:
-                                built["name"] = tbl.get("name", "")
-                            else:
-                                built = {
-                                    "name": tbl.get("name", ""),
-                                    "headers": tbl.get("headers", []),
-                                    "rows": [],
-                                }
-                            _carry_seed_column_meta(tbl, built)
-                            built_tables.append(built)
-                        _carry_seed_table_guidance(tables_list, built_tables)
-                        if built_tables:
-                            note.table_data = {
-                                "headers": built_tables[0].get("headers", []),
-                                "rows": built_tables[0].get("rows", []),
-                                "name": built_tables[0].get("name", ""),
-                                "_tables": built_tables,
-                            }
-                    elif tmpl.get("table_template"):
-                        note.table_data = await self._build_table_data(
-                            project_id, year, tmpl["table_template"],
-                            section_number=note_section,
-                        )
+                    table_data = await self._build_section_table_data(
+                        project_id,
+                        year,
+                        tmpl,
+                        content_type_str=tmpl.get("content_type"),
+                        text_sections=tmpl.get("text_sections", []),
+                    )
+                    if table_data:
+                        note.table_data = table_data
                     if note.table_data:
                         from sqlalchemy.orm.attributes import flag_modified
                         flag_modified(note, "table_data")
