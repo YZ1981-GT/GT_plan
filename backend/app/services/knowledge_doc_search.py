@@ -568,7 +568,7 @@ class KnowledgeDocSearch:
             return {}
         known: dict[UUID, tuple[str, UUID | None]] = {}
         frontier = set(wanted)
-        for _ in range(_MAX_FOLDER_DEPTH):
+        for depth_iter in range(_MAX_FOLDER_DEPTH):
             need = [f for f in frontier if f not in known]
             if not need:
                 break
@@ -580,6 +580,15 @@ class KnowledgeDocSearch:
             for fid, name, parent in rows:
                 known[fid] = (name or "", parent)
             frontier = {known[f][1] for f in need if f in known and known[f][1] is not None}
+        else:
+            # for 循环用尽全部 _MAX_FOLDER_DEPTH 次迭代仍有未解析的祖先 → 目录树可能成环
+            remaining = [f for f in frontier if f not in known]
+            if remaining:
+                logger.warning(
+                    "[KB folder_paths] 目录树回溯达到上限 %d 层，仍有 %d 个祖先未解析"
+                    "（疑似 parent_id 成环）—— 返回截断路径",
+                    _MAX_FOLDER_DEPTH, len(remaining),
+                )
 
         out: dict[UUID, FolderPath] = {}
         for fid in wanted:
@@ -590,6 +599,10 @@ class KnowledgeDocSearch:
             while cur is not None and cur in known and cur not in chain:
                 chain.append(cur)
                 if len(chain) >= _MAX_FOLDER_DEPTH:
+                    logger.warning(
+                        "[KB folder_paths] 文件夹 %s 的祖先链达到 %d 层上限（截断）",
+                        fid, _MAX_FOLDER_DEPTH,
+                    )
                     break
                 cur = known[cur][1]
             chain.reverse()

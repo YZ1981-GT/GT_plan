@@ -109,10 +109,20 @@
     8/8 RED，每条还原后 sha256 与变异前逐字节一致，事后现查生产文件 `MUTATED` 残留 0、三文件复跑 46 passed。🔴 首版 M5 写成「候选后过滤」（仍在截断前）只打红 P4 不打红 P5 —— 那不是 design 要的「top_k 后过滤」，改为两处替换（范围不下推 + 截断后过滤）才命中 P5；教训：变异要按规格原文构造，打红了「某个」测试不等于打红了「该打红的」测试
   - _需求：7.3_
 
-- [ ] 13. 真栈与回归
-  - [ ]* 13.1 Playwright（design §9.5）全流程 + 截图证据；测试数据清理
-    - 卡环境：需 start-dev.bat 全栈 + Playwright MCP 可用。9.5 的端点级测试（真发请求 +
-      越权矩阵）已在 Task 9.5 以 TestClient 形态覆盖，本条只剩浏览器侧全流程截图。
+- [x] 13. 真栈与回归
+  - [x] 13.1 Playwright（design §9.5）全流程 + 截图证据；测试数据清理
+    - 证据（2026-10-05 Playwright MCP 实跑）：
+      ① admin 登录 → 知识库页面（截图 `evidence/01-kb-page-admin.png`）
+      ② 新建公开文件夹「Playwright测试文件夹」→ 上传 `_playwright_test_kb_doc.txt`（含独特词
+         `XYLOPHONE_ZEBRA_2026`）→ 文件夹显示 (1)（截图 `02-kb-folder-with-doc.png`）
+      ③ 搜索 `XYLOPHONE_ZEBRA_2026` → 命中 1 条，显示 `📁 /Playwright测试文件夹` 路径 +
+         正文片段含关键词 + admin 视角有预览/重命名/删除三按钮（截图 `03-kb-search-hit-with-snippet.png`）
+      ④ readonly 用户（`_kb_readonly_test`，DB 强制 `role=readonly`）登录 → 知识库页面：
+         工具栏**隐藏**新建文件夹/上传文档/上传文件夹/初始化预设四按钮（只剩搜索+刷新）；
+         文件夹树节点**无** ✏️🗑️ 管理按钮；文档行**无** selection 列（checkbox 不渲染）、
+         操作列**只有预览**（无重命名/删除）；**无**「上传到此文件夹」按钮
+         （截图 `04-kb-readonly-no-write-buttons.png`）
+      ⑤ 测试数据已清理（文件夹 + 文档 + readonly 测试用户 + 探针脚本 + 临时 txt 全删）
   - [x] 13.2 相关后端/前端测试集全绿；预存红逐条归因
     - 证据（2026-09-30 复跑）：后端 18 个知识库/检索测试文件 **242 passed / 2 failed**；
       前端 19 个 spec 文件 **332 passed / 0 failed**（`components/ai/__tests__` 全目录 +
