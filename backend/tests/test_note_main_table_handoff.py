@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from app.services.formula_push import note_writer as nw
-from app.services.formula_push.engine import _has_obscured_data
+from app.services.formula_push.note_writer import has_obscured_data as _has_obscured_data
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -30,7 +30,7 @@ class TestBuildMainSkeletonFixtureAlignment:
 
     @pytest.mark.parametrize("template_type", ["listed", "soe"])
     def test_rows_match_fixture(self, fixture, template_type):
-        skel = nw.build_main_skeleton(template_type, "货币资金")
+        skel = nw.build_main_skeleton(template_type, "五、1" if template_type == "listed" else "八、1", "货币资金")
         assert skel is not None, f"build_main_skeleton('{template_type}', '货币资金') 返回 None"
         expected_rows = fixture[template_type]["rows"]
         assert skel.rows == expected_rows, (
@@ -41,7 +41,7 @@ class TestBuildMainSkeletonFixtureAlignment:
 
     @pytest.mark.parametrize("template_type", ["listed", "soe"])
     def test_columns_match_fixture(self, fixture, template_type):
-        skel = nw.build_main_skeleton(template_type, "货币资金")
+        skel = nw.build_main_skeleton(template_type, "五、1" if template_type == "listed" else "八、1", "货币资金")
         assert skel is not None
         expected_cols = fixture[template_type]["columns"]
         assert skel.columns == expected_cols, (
@@ -57,7 +57,7 @@ class TestBuildMainSkeletonStructure:
     @pytest.mark.parametrize("template_type", ["listed", "soe"])
     def test_rows_have_none_values(self, template_type):
         """所有行的 end_amount / prior_amount 初始为 None。"""
-        skel = nw.build_main_skeleton(template_type, "货币资金")
+        skel = nw.build_main_skeleton(template_type, "五、1" if template_type == "listed" else "八、1", "货币资金")
         assert skel is not None
         for row in skel.rows:
             assert row["end_amount"] is None
@@ -65,7 +65,7 @@ class TestBuildMainSkeletonStructure:
 
     @pytest.mark.parametrize("template_type", ["listed", "soe"])
     def test_exactly_one_total_row(self, template_type):
-        skel = nw.build_main_skeleton(template_type, "货币资金")
+        skel = nw.build_main_skeleton(template_type, "五、1" if template_type == "listed" else "八、1", "货币资金")
         assert skel is not None
         total_rows = [r for r in skel.rows if r.get("is_total")]
         assert len(total_rows) == 1
@@ -73,8 +73,8 @@ class TestBuildMainSkeletonStructure:
 
     def test_listed_has_more_rows_than_soe(self):
         """listed 比 soe 多「存放财务公司款项」「存款应计利息」两行（准则口径差异）。"""
-        listed = nw.build_main_skeleton("listed", "货币资金")
-        soe = nw.build_main_skeleton("soe", "货币资金")
+        listed = nw.build_main_skeleton("listed", "五、1", "货币资金")
+        soe = nw.build_main_skeleton("soe", "八、1", "货币资金")
         assert listed is not None and soe is not None
         assert len(listed.rows) == len(soe.rows) + 2
         listed_labels = {r["label"] for r in listed.rows}
@@ -84,8 +84,8 @@ class TestBuildMainSkeletonStructure:
 
     def test_columns_differ_in_prior_label(self):
         """listed 期初列叫「上年年末余额」，soe 叫「期初余额」。"""
-        listed = nw.build_main_skeleton("listed", "货币资金")
-        soe = nw.build_main_skeleton("soe", "货币资金")
+        listed = nw.build_main_skeleton("listed", "五、1", "货币资金")
+        soe = nw.build_main_skeleton("soe", "八、1", "货币资金")
         assert listed is not None and soe is not None
         listed_prior = [c for c in listed.columns if c["key"] == "prior_amount"][0]
         soe_prior = [c for c in soe.columns if c["key"] == "prior_amount"][0]
@@ -93,10 +93,41 @@ class TestBuildMainSkeletonStructure:
         assert soe_prior["label"] == "期初余额"
 
     def test_unknown_template_returns_none(self):
-        assert nw.build_main_skeleton("unknown", "货币资金") is None
+        assert nw.build_main_skeleton("unknown", "五、1", "货币资金") is None
 
     def test_unknown_table_returns_none(self):
-        assert nw.build_main_skeleton("listed", "不存在的表") is None
+        assert nw.build_main_skeleton("listed", "五、1", "不存在的表") is None
+
+    def test_explicit_section_is_authoritative(self):
+        """传入的章节决定查找位置，不能回退到模板类型的隐式章节。"""
+        assert nw.build_main_skeleton("listed", "八、1", "货币资金") is None
+
+    def test_custom_template_and_section_are_supported(self, tmp_path, monkeypatch):
+        """任意规则登记的模板类型 / 章节均可构建骨架。"""
+        (tmp_path / "note_template_custom.json").write_text(
+            json.dumps({
+                "template_type": "custom",
+                "sections": [{
+                    "section_number": "自定义-1",
+                    "tables": [{
+                        "name": "自定义表",
+                        "rows": [{"label": "项目一", "is_total": True}],
+                        "columns": [{"key": "label", "label": "项目", "is_label": True}],
+                    }],
+                }],
+            }, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        old_cache = dict(nw._TEMPLATE_CACHE)
+        nw._TEMPLATE_CACHE.clear()
+        monkeypatch.setattr(nw, "_DATA_DIR", tmp_path)
+        try:
+            skel = nw.build_main_skeleton("custom", "自定义-1", "自定义表")
+        finally:
+            nw._TEMPLATE_CACHE.clear()
+            nw._TEMPLATE_CACHE.update(old_cache)
+        assert skel is not None
+        assert skel.rows == [{"label": "项目一", "end_amount": None, "prior_amount": None, "is_total": True}]
 
 
 # ── 遮挡数据检查（需求 5.2）──────────────────────────────────────────────
@@ -153,7 +184,7 @@ class TestSkeletonMerge:
     @pytest.mark.parametrize("template_type", ["listed", "soe"])
     def test_skeleton_rows_locatable_after_build(self, template_type):
         """build_main_skeleton 产出的行可被 locate_table 定位。"""
-        skel = nw.build_main_skeleton(template_type, "货币资金")
+        skel = nw.build_main_skeleton(template_type, "五、1" if template_type == "listed" else "八、1", "货币资金")
         assert skel is not None
         # 模拟将骨架写入 table_data
         td = {
@@ -168,7 +199,7 @@ class TestSkeletonMerge:
 
     def test_shallow_merge_preserves_other_subtables(self):
         """骨架合并保留其余子表。"""
-        skel = nw.build_main_skeleton("soe", "货币资金")
+        skel = nw.build_main_skeleton("soe", "八、1", "货币资金")
         assert skel is not None
         existing_td = {
             "_source": "workpaper",

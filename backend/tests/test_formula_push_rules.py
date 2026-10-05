@@ -22,6 +22,7 @@ import pytest
 
 from app.services.formula_engine import FormulaContext, execute
 from app.services.formula_push.rules import (
+    BindingSpec,
     RULES_PATH,
     PushRuleError,
     load_rules,
@@ -40,17 +41,22 @@ _BY_ID = {r.rule_id: r for r in _RULES}
 
 
 def test_real_rules_load_and_distribution():
-    assert len(_RULES) == len(_DOC["rules"]) == 30
-    assert Counter(r.stage for r in _RULES) == {"source": 7, "derived": 22, "note": 1}
-    assert Counter(r.policy for r in _RULES) == {"system": 5, "editable": 3, "derived": 22}
-    assert {r.wp_code for r in _RULES} == {"E1"}
+    assert len(_RULES) == len(_DOC["rules"]) == 54
+    assert Counter(r.stage for r in _RULES) == {"source": 28, "derived": 25, "note": 1}
+    assert Counter(r.policy for r in _RULES) == {"system": 26, "editable": 3, "derived": 25}
+    assert {r.wp_code for r in _RULES} == {
+        "E1", "K1",
+        "D1", "D2", "D3", "D4", "D6", "D7",
+        "H5", "H6", "H7", "H8", "H9", "H10",
+        "I1", "I2", "I3", "I4", "I5", "I6",
+    }
     assert len({r.target.identity() for r in _RULES}) == len(_RULES)
 
 
 def test_every_e1_backend_owned_key_has_exactly_one_rule():
     """design §四 的后端独占键全集 —— 少一条即某个键无人维护，多一条即键名漂移。"""
-    items = {r.target.item_id for r in _RULES if r.target.domain == "workpaper"}
-    expected = {
+    e1_items = {r.target.item_id for r in _RULES if r.target.domain == "workpaper" and r.wp_code == "E1"}
+    e1_expected = {
         "E1-cash-detail-rows", "E1-bank-detail-rows",
         "E1-adj-tb-amount-ending", "E1-adj-tb-amount-opening",
         "E1-hall-adj-cash-ending", "E1-hall-adj-bank_principal-ending", "E1-hall-adj-other_mf-ending",
@@ -60,7 +66,11 @@ def test_every_e1_backend_owned_key_has_exactly_one_rule():
         *(f"E1-adj-total-{c}{s}" for c in ("1001", "1002", "1012") for s in ("", "-opening")),
         *(f"E1-adj-slot-{k}{s}" for k in ("finance_co", "accrued", "digital") for s in ("", "-opening")),
     }
-    assert items == expected
+    assert e1_items == e1_expected
+
+    k1_items = {r.target.item_id for r in _RULES if r.target.domain == "workpaper" and r.wp_code == "K1"}
+    k1_expected = {"K1-1-audited-receivable", "K1-1-audited-baddebt", "K1-1-audited-net"}
+    assert k1_items == k1_expected
 
 
 def test_workpaper_saved_only_fires_derived_and_note_rules():
@@ -114,8 +124,95 @@ def test_note_rule_targets_both_templates():
 def test_known_derivations_check_accepts_real_names():
     names = {r.source.name for r in _RULES if r.source.kind == "derivation"}
     assert names == {"e1_cash_detail_total", "e1_bank_detail_total", "e1_adjudicated_total",
-                     "e1_main_row_slot", "e1_disclosure_main_rows"}
-    assert len(load_rules(known_derivations=names)) == 30
+                     "e1_main_row_slot", "e1_disclosure_main_rows", "k1_audited_total"}
+    assert len(load_rules(known_derivations=names)) == 54
+
+
+def _binding_spec(
+    *,
+    four_table_slots=("cash",),
+    derivations=("e1_cash_detail_total",),
+    tb_columns=("期末余额",),
+) -> BindingSpec:
+    return BindingSpec(
+        four_table_slots=frozenset(four_table_slots),
+        derivations=frozenset(derivations),
+        tb_columns=frozenset(tb_columns),
+    )
+
+
+def test_binding_specs_isolate_derivations_and_four_table_slots():
+    doc = _doc_with(lambda rules: None)
+    doc["rules"] = [copy.deepcopy(_rule(doc["rules"], "E1.cash_rows.four_table"))]
+    raw = doc["rules"][0]
+    raw["rule_id"] = "A1.cash_rows.four_table"
+    raw["page_key"] = "workpaper:A1"
+    raw["target"].update(wp_code="A1", sheet_code="A1-1", item_id="A1-cash-detail-rows")
+    raw["source"]["slots"] = ["bank"]
+    raw["source"]["formula_text"] = "银行明细行"
+    raw["source"]["kind"] = "four_table_leaves"
+    specs = {
+        "A1": _binding_spec(four_table_slots=("cash",), derivations=("a_only",)),
+        "B1": _binding_spec(four_table_slots=("bank",), derivations=("b_only",)),
+    }
+    with pytest.raises(PushRuleError) as exc:
+        parse_rules(doc, binding_specs=specs)
+    assert any("四表槽" in error and "bank" in error for error in exc.value.errors)
+
+    raw["source"]["slots"] = ["cash"]
+    raw["source"]["kind"] = "derivation"
+    raw["source"].pop("slots", None)
+    raw["source"].update(name="b_only", params={}, formula_text="B 科目派生值")
+    with pytest.raises(PushRuleError) as exc:
+        parse_rules(doc, binding_specs=specs)
+    assert any("未实现" in error and "b_only" in error for error in exc.value.errors)
+
+
+def test_binding_spec_rejects_unloaded_tb_column_for_tb_and_sum_tb():
+    doc = copy.deepcopy(_DOC)
+    raw = _rule(doc["rules"], "E1.tb_amount.opening")
+    doc["rules"] = [raw]
+    raw["source"]["expression"] = "TB('1001','期末余额') + SUM_TB('1002~1002','本期发生额')"
+    spec = {"E1": _binding_spec(tb_columns=("期末余额",))}
+    with pytest.raises(PushRuleError) as exc:
+        parse_rules(doc, binding_specs=spec)
+    errors = exc.value.errors
+    assert any("tb_columns" in error and "本期发生额" in error and "未装载" in error for error in errors)
+
+
+def test_e1_rules_pass_with_explicit_binding_spec():
+    from app.services.formula_push.rules import _binding_specs_from_registry
+    from app.services.formula_push.bindings import supported_wp_codes as _swc
+    # 真实注册表全部 binding 的 spec（20 个），确保 54 条规则全部通过
+    all_specs = _binding_specs_from_registry(_swc())
+    assert len(load_rules(binding_specs=all_specs)) == 54
+
+
+def test_load_rules_cache_key_includes_binding_specs(tmp_path: Path):
+    path = tmp_path / "rules.json"
+    path.write_text(json.dumps(_DOC, ensure_ascii=False), encoding="utf-8")
+    restricted = _binding_spec(
+        four_table_slots=("cash",),
+        derivations=("e1_cash_detail_total",),
+        tb_columns=("期末余额",),
+    )
+    with pytest.raises(PushRuleError):
+        load_rules(path, binding_specs={"E1": restricted})
+    k1_spec = _binding_spec(four_table_slots=(), derivations=("k1_audited_total",), tb_columns=("期末余额", "年初余额", "本期发生额"))
+    complete = _binding_spec(
+        four_table_slots=("cash", "bank", "other", "finance_co", "digital"),
+        derivations=(
+            "e1_cash_detail_total", "e1_bank_detail_total", "e1_adjudicated_total",
+            "e1_main_row_slot", "e1_disclosure_main_rows",
+        ),
+        tb_columns=("期末余额", "年初余额", "本期发生额"),
+    )
+    from app.services.formula_push.rules import _binding_specs_from_registry
+    from app.services.formula_push.bindings import supported_wp_codes as _swc
+    all_specs = dict(_binding_specs_from_registry(_swc()))
+    all_specs["E1"] = complete
+    all_specs["K1"] = k1_spec
+    assert len(load_rules(path, binding_specs=all_specs)) == 54
 
 
 # ── 2. 校验器反向用例 ─────────────────────────────────────────────────────
@@ -179,6 +276,8 @@ _BAD_CASES = [
     ("附注规则指向底稿域", _set("E1.note.main_rows", ("target",),
                           {"domain": "workpaper", "wp_code": "E1", "sheet_code": "E1-1", "item_id": "E1-x"}),
      "必须是附注域"),
+    ("附注目标含未登记字段", _set("E1.note.main_rows", ("target", "fields"), ["end_amount", "bogus_field"]),
+     "未登记字段"),
     ("rule_id 格式", _set("E1.cash_detail.opening", ("rule_id",), "e1 cash"), "格式不合法"),
 ]
 
@@ -227,7 +326,7 @@ def test_addr_id_helpers():
 def test_load_rules_reloads_after_file_change(tmp_path: Path):
     path = tmp_path / "rules.json"
     path.write_text(json.dumps(_DOC, ensure_ascii=False), encoding="utf-8")
-    assert len(load_rules(path)) == 30
+    assert len(load_rules(path)) == 54
     smaller = copy.deepcopy(_DOC)
     smaller["rules"] = smaller["rules"][:3]
     path.write_text(json.dumps(smaller, ensure_ascii=False), encoding="utf-8")

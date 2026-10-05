@@ -143,6 +143,9 @@ class ReportConfig(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    # V179: 调整列公式（净额），有值时以公式为准，无值退回"从未审数公式反解科目码"路径
+    aje_formula: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rje_formula: Mapped[str | None] = mapped_column(Text, nullable=True)
     # D spec report-config-baseline / V040: 主模板更新→克隆项目标脏
     is_stale: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False

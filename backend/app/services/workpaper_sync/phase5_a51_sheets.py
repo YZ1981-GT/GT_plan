@@ -57,9 +57,9 @@ WP_CODES: Final[frozenset[str]] = frozenset({"A5-1"})
 
 TEMPLATE_RELATIVE_PATH: Final[str] = "A/A5-1 现金流量表审计.xlsx"
 TEMPLATE_SHA256: Final[str] = (
-    "2a331368dad3aaf3ac922c8f46a0052e9ba1ec8c0a3ae0504edddc8153dab462"
+    "9999f5b6511c5230e52732c10bf2eef86ee1238b9e0678e498ed2fffda9f503d"
 )
-TEMPLATE_SIZE: Final[int] = 60894
+TEMPLATE_SIZE: Final[int] = 46790
 
 # ─── 受管 sheet 声明 ───────────────────────────────────────────────────
 

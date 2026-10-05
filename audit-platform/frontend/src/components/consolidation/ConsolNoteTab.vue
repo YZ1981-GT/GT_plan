@@ -535,8 +535,10 @@ import {
   type ConsolNoteBreakdown,
   type ConsolNoteFillResult,
   type ConsolTreeNode,
+  type CurrentConsolEntity,
 } from '@/services/consolidationApi'
 import { nodeLabel as treeNodeLabel, walkTree } from '@/components/consolidation/composables/consolTreeView'
+import { createConsolRequestGuard } from '@/components/consolidation/composables/consolRequestGuard'
 import {
   clearManual,
   emptyEditRow,
@@ -567,7 +569,7 @@ import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useTableToolbar } from '@/composables/useTableToolbar'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
-import { useAutoSave } from '@/composables/useAutoSave'
+import { useAutoSave, buildDisclosureDraftKey, type DraftContext } from '@/composables/useAutoSave'
 import { eventBus } from '@/utils/eventBus'
 import type { ConsolCatalogSelectPayload, ConsolTreeAggregatePayload, ConsolNoteAuditAllPayload } from '@/utils/eventBus'
 import { handleApiError } from '@/utils/errorHandler'
@@ -577,7 +579,7 @@ const props = defineProps<{
   projectId: string
   year: number
   standard: string
-  currentEntity: { code: string; name: string }
+  currentEntity: CurrentConsolEntity
   groupTree: ConsolTreeNode[]
   consolNoteTree: any[]
 }>()
@@ -632,6 +634,73 @@ const noteSingleAuditLoading = ref(false)
 const noteFileRef = ref<HTMLInputElement | null>(null)
 const noteTableRef = ref<any>(null)
 
+/**
+ * 当前节点身份键。所有附注节点级请求统一经此取 nodeKey，
+ * 确保读写、公式、审核、汇总共享同一个节点上下文。
+ * 设计：consol-node-key-isolation-and-shared-context §七
+ */
+function currentNodeKey(): string | undefined {
+  return props.currentEntity.nodeKey || undefined
+}
+
+interface NotePageSnapshot {
+  projectId: string
+  year: number
+  nodeKey: string
+}
+
+interface NoteContextSnapshot extends NotePageSnapshot {
+  sectionId: string
+}
+
+interface AggregateSnapshot {
+  context: NoteContextSnapshot
+  section: any
+  row: number
+  col: number
+  mode: 'direct' | 'custom'
+  source: 'same' | 'report' | 'note'
+  reportTypes: string[]
+  noteSections: string[]
+  companyCodes: string[]
+  entityCode: string
+}
+
+function capturePageSnapshot(): NotePageSnapshot | null {
+  const projectId = String(props.projectId || '').trim()
+  const year = Number(props.year) || 0
+  if (!projectId || !year) return null
+  return { projectId, year, nodeKey: currentNodeKey() || '' }
+}
+
+function captureNoteSnapshot(section: any = selectedNoteSection.value): NoteContextSnapshot | null {
+  const page = capturePageSnapshot()
+  const sectionId = String(section?.section_id || '').trim()
+  if (!page || !sectionId) return null
+  return { ...page, sectionId }
+}
+
+function isPageSnapshotCurrent(snapshot: NotePageSnapshot): boolean {
+  const current = capturePageSnapshot()
+  return !!current
+    && current.projectId === snapshot.projectId
+    && current.year === snapshot.year
+    && current.nodeKey === snapshot.nodeKey
+}
+
+function isNoteSnapshotCurrent(snapshot: NoteContextSnapshot, section?: any): boolean {
+  return isPageSnapshotCurrent(snapshot)
+    && String(selectedNoteSection.value?.section_id || '') === snapshot.sectionId
+    && (!section || selectedNoteSection.value === section)
+}
+
+// ─── 请求上下文保护：切节点后旧响应不得提交（设计 §七、P9）──────────────────
+const noteRequestGuard = createConsolRequestGuard(() => ({
+  projectId: props.projectId,
+  year: props.year,
+  nodeKey: currentNodeKey() || '',
+}))
+
 // ─── 合并附注公式填入与差额（同报表差额表的节点金额内核） ─────────────────────
 const showFillResultDialog = ref(false)
 const fillResultSummary = ref('')
@@ -679,24 +748,41 @@ const cellComments = useCellComments(() => props.projectId, () => props.year, 'c
 const lazyEdit = useLazyEdit()
 
 // ─── 自动保存/草稿恢复 [R3.8] ──────────────────────────────────────────────
+const noteDraftContext = computed<DraftContext | null>(() => {
+  const sectionId = String(selectedNoteSection.value?.section_id || '').trim()
+  const nodeKey = String(currentNodeKey() || '').trim()
+  const projectId = String(props.projectId || '').trim()
+  const year = Number(props.year) || 0
+  if (!projectId || !year || !sectionId || !nodeKey) return null
+  // DraftContext 的 section 同时编码节点与章节，确保同一章节在不同合并节点间隔离。
+  return { project_id: projectId, year, section: `${nodeKey}:${sectionId}` }
+})
+const noteDraftKey = computed(() => {
+  const context = noteDraftContext.value
+  return context ? buildDisclosureDraftKey(context) : 'global'
+})
 const { clearDraft: clearAutoSaveDraft } = useAutoSave(
-  `consol_note_${props.projectId}_${props.year}`,
+  noteDraftKey,
   () => {
     const sec = selectedNoteSection.value
-    if (!sec) return null
+    const context = noteDraftContext.value
+    if (!sec || !context) return null
     return {
       section_id: sec.section_id,
+      node_key: currentNodeKey(),
       title: sec.title,
       headers: sec.headers,
       editRows: sec.editRows,
     }
   },
   (data) => {
-    if (!selectedNoteSection.value || !data) return
-    if (data.headers) selectedNoteSection.value.headers = data.headers
-    if (data.editRows) selectedNoteSection.value.editRows = data.editRows
+    const sec = selectedNoteSection.value
+    if (!sec || !data) return
+    if (data.section_id !== sec.section_id || data.node_key !== currentNodeKey()) return
+    if (data.headers) sec.headers = data.headers
+    if (data.editRows) sec.editRows = data.editRows
   },
-  { enabled: noteEditMode },
+  { enabled: noteEditMode, context: noteDraftContext },
 )
 
 // ─── 附注全审 ────────────────────────────────────────────────────────────────
@@ -1085,6 +1171,7 @@ async function executeAggregate() {
         company_code: entityCode,
         mode: 'direct',
         standard: props.standard,
+        node_key: currentNodeKey(),
       }, { validateStatus: (s: number) => s < 600 })
       const result = data
       if (result?.value != null) {
@@ -1109,6 +1196,7 @@ async function executeAggregate() {
         report_types: aggTarget.reportTypes,
         note_sections: aggTarget.noteSections,
         standard: props.standard,
+        node_key: currentNodeKey(),
       }, { validateStatus: (s: number) => s < 600 })
       const result = data
       if (result?.value != null) {
@@ -1165,7 +1253,7 @@ async function fillCurrentByFormula(): Promise<boolean> {
   if (noteDirty.value && !(await saveNoteData())) return false
   formulaFilling.value = true
   try {
-    const result = await fillConsolNoteByFormula(props.projectId, props.year, sec.section_id, props.standard)
+    const result = await fillConsolNoteByFormula(props.projectId, props.year, sec.section_id, props.standard, currentNodeKey())
     sec.headers = result.data?.headers || sec.headers
     sec.savedData = { ...(result.data || {}) }
     sec.editRows = toEditRows(sec.headers, result.data?.rows || [], result.data?.manual_cells)
@@ -1193,9 +1281,12 @@ async function handleReaggregate() {
   reaggregating.value = true
   try {
     const sec = selectedNoteSection.value
+    const body: Record<string, unknown> = sec?.section_id ? { section_ids: [sec.section_id] } : {}
+    const nk = currentNodeKey()
+    if (nk) body.node_key = nk
     const result: any = await api.post(
       P_consol.notes.reaggregate(props.projectId, props.year),
-      sec?.section_id ? { section_ids: [sec.section_id] } : {},
+      body,
     )
     const updated = result?.sections_updated ?? 0
     const processed = result?.sections_processed ?? 0
@@ -1232,8 +1323,12 @@ async function saveNoteData(): Promise<boolean> {
   if (!sec || !props.projectId) return false
   const data = notePayload(sec.savedData, sec.headers, sec.editRows)
   try {
+    const nk = currentNodeKey()
+    const url = nk
+      ? `${P_cn.data(props.projectId, props.year, sec.section_id)}?node_key=${encodeURIComponent(nk)}`
+      : P_cn.data(props.projectId, props.year, sec.section_id)
     const result: any = await api.put(
-      P_cn.data(props.projectId, props.year, sec.section_id),
+      url,
       { data },
       { validateStatus: (s: number) => s < 600 },
     )
@@ -1473,8 +1568,12 @@ async function onNoteBatchImport(e: Event) {
         return item
       })
       const serialised = fromEditRows(headers, editRows)
+      const nk = currentNodeKey()
+      const importUrl = nk
+        ? `${P_cn.data(props.projectId, props.year, sectionId)}?node_key=${encodeURIComponent(nk)}`
+        : P_cn.data(props.projectId, props.year, sectionId)
       await api.put(
-        P_cn.data(props.projectId, props.year, sectionId),
+        importUrl,
         { data: { headers, ...serialised } },
         { validateStatus: (s: number) => s < 600 },
       )
@@ -1578,7 +1677,7 @@ async function fillAllByFormula() {
     let currentResult: ConsolNoteFillResult | null = null
     for (const sectionId of sectionIds) {
       try {
-        const result = await fillConsolNoteByFormula(props.projectId, props.year, sectionId, templateType)
+        const result = await fillConsolNoteByFormula(props.projectId, props.year, sectionId, templateType, currentNodeKey())
         filled += result.filled?.length || 0
         kept += result.kept_manual?.length || 0
         blank += result.blank?.length || 0
@@ -1621,6 +1720,7 @@ async function onNoteAuditAll(_e?: Event) {
     const data = await api.post(P_cn.auditAll(props.projectId, props.year), {
       standard: props.standard,
       company_code: entityCode,
+      node_key: currentNodeKey(),
     }, { validateStatus: (s: number) => s < 600 })
     const result = data
     noteAuditResults.value = Array.isArray(result?.results) ? result.results : []
@@ -1671,6 +1771,7 @@ async function auditCurrentNote() {
     const data = await api.post(P_cn.audit(props.projectId, props.year, sec.section_id), {
       standard: props.standard,
       company_code: entityCode,
+      node_key: currentNodeKey(),
       headers: sec.headers,
       rows: currentRows,
     }, { validateStatus: (s: number) => s < 600 })
@@ -1693,12 +1794,17 @@ function onNoteNodeClick(data: { section_id: string; title?: string }) {
   noteSelectedRows.value = []
   selectedCells.value = []
   noteBreakdown.value = null
-  noteBreakdownNodeKey.value = null
+  // 差额穿透初始节点 = 当前树节点（设计 §七）；用户显式另选只影响穿透视图，不改页面 nodeKey
+  noteBreakdownNodeKey.value = currentNodeKey() || null
   noteBreakdownTarget.row = -1
   noteBreakdownTarget.col = -1
+  // §七 请求上下文保护：快照当前上下文与序号，响应提交前校验（P9）
+  const ticket = noteRequestGuard.startRequest()
   api.get(P_cn.detail(props.standard, data.section_id), {
     validateStatus: (s: number) => s < 600,
   }).then(async (detail: any) => {
+    // 响应到达：上下文或序号已变则丢弃
+    if (noteRequestGuard.isStale(ticket)) return
     const sec = detail?.data ?? detail
     if (sec && !sec.error) {
       const headers = sec.headers || []
@@ -1707,8 +1813,12 @@ function onNoteNodeClick(data: { section_id: string; title?: string }) {
 
       // 尝试加载用户已保存的数据覆盖模板；保留 manual_cells 等元数据，保存时不得整包丢失
       try {
+        const nk = currentNodeKey()
+        const dataUrl = nk
+          ? `${P_cn.data(props.projectId, props.year, data.section_id)}?node_key=${encodeURIComponent(nk)}`
+          : P_cn.data(props.projectId, props.year, data.section_id)
         const saved: any = await api.get(
-          P_cn.data(props.projectId, props.year, data.section_id),
+          dataUrl,
           { validateStatus: (s: number) => s < 600 },
         )
         if (saved?.content && typeof saved.content === 'object') savedContent = { ...saved.content }
@@ -1716,6 +1826,9 @@ function onNoteNodeClick(data: { section_id: string; title?: string }) {
           rows = (savedContent as any).rows
         }
       } catch { /* 无已保存数据，用模板默认 */ }
+
+      // 二次校验：两次 await 之间上下文可能已变
+      if (noteRequestGuard.isStale(ticket)) return
 
       const editRows = toEditRows(headers, rows, (savedContent as any).manual_cells)
       selectedNoteSection.value = {

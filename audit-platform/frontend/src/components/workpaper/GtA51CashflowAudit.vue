@@ -278,7 +278,6 @@
 import { ref, computed, toRef, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { useA51CashflowAudit, AUDIT_OBJECTIVES, PROGRAM_STEPS, AUDIT_ROWS, RECONCILE_GROUPS, CHECK4_SECTIONS, CHECK5_ROWS, OTHER_CF_GROUPS, ACCOUNTING_TIPS } from './composables/useA51CashflowAudit'
 import { useA51SyncMode, A51_SYNC_ENTRY_ID } from './composables/useA51SyncMode'
-import { readStoreProjection } from './sync/workpaperSyncApi'
 import { fmtAmount } from '@/utils/formatters'
 
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
@@ -319,17 +318,12 @@ const {
   projectId: toRef(props, 'projectId'),
   isReadonly: toRef(props, 'readonly'),
   flushHtml: async () => {
+    // 🔴 A5-1 不是 store-backed entry（后端 provider 无 STORE_ITEM_ID），
+    // 不能走 readStoreProjection（会 422 entry_not_store_backed）。
+    // 参照 B22A：flush pending saves，返回空 projection + expectedRevision=0，
+    // 后端 adapter 从 checklist_responses 自行读取并构造投影。
     flushPendingAndProject()
-    const snap = await readStoreProjection({
-      projectId: props.projectId,
-      wpId: props.wpId,
-      entryId: A51_SYNC_ENTRY_ID,
-    })
-    return {
-      expectedRevision: snap.expectedRevision,
-      projection: snap.projection,
-      sheetKey: A51_SHEET_KEY,
-    }
+    return { expectedRevision: 0, projection: null, sheetKey: A51_SHEET_KEY }
   },
   reloadHtml: async () => { await reloadA51() },
 })

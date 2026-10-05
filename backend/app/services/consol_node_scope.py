@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, TypeAlias
@@ -107,12 +108,17 @@ async def resolve_node_scope(
     effective_year = resolve_project_audit_year(project)
     if effective_year is None:
         raise NodeScopeError("项目没有有效审计年度")
+    if year != effective_year:
+        raise NodeScopeError(
+            f"请求年度 {year} 与项目有效审计年度 {effective_year} 不一致",
+            status=400,
+        )
 
     # 无 node_key — legacy 作用域
     if not node_key or not isinstance(node_key, str):
         return NodeScope(
             project_id=project_id,
-            year=year,
+            year=effective_year,
             section_id=section_id,
             node_key=None,
             tree=None,
@@ -133,7 +139,7 @@ async def resolve_node_scope(
 
     return NodeScope(
         project_id=project_id,
-        year=year,
+        year=effective_year,
         section_id=section_id,
         node_key=node_key,
         tree=result.root,
@@ -166,6 +172,30 @@ def _note_scope_filter(scope: NodeScope):
     return ConsolNoteData.node_key.is_(None)
 
 
+async def _load_exact_note_record(
+    db: AsyncSession,
+    scope: NodeScope,
+    *,
+    for_update: bool = False,
+    populate_existing: bool = False,
+) -> ConsolNoteData | None:
+    """只按当前四元组读取一行，不执行根节点 legacy 回退。"""
+    if not scope.section_id:
+        raise NodeScopeError("读取附注行必须提供 section_id")
+
+    stmt = sa.select(ConsolNoteData).where(
+        ConsolNoteData.project_id == scope.project_id,
+        ConsolNoteData.year == scope.year,
+        ConsolNoteData.section_id == scope.section_id,
+        _note_scope_filter(scope),
+    )
+    if for_update:
+        stmt = stmt.with_for_update()
+    if populate_existing:
+        stmt = stmt.execution_options(populate_existing=True)
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
 async def load_scoped_note_record(
     db: AsyncSession,
     scope: NodeScope,
@@ -177,34 +207,20 @@ async def load_scoped_note_record(
     if not scope.section_id:
         raise NodeScopeError("读取附注行必须提供 section_id")
 
-    stmt = (
-        sa.select(ConsolNoteData)
-        .where(
-            ConsolNoteData.project_id == scope.project_id,
-            ConsolNoteData.year == scope.year,
-            ConsolNoteData.section_id == scope.section_id,
-            _note_scope_filter(scope),
-        )
-    )
-    if for_update:
-        stmt = stmt.with_for_update()
-
-    record = (await db.execute(stmt)).scalar_one_or_none()
+    record = await _load_exact_note_record(db, scope, for_update=for_update)
     if record is not None or not scope.is_root_consol or not allow_root_legacy_fallback:
         return record
 
-    # 根合并节点回退读 legacy NULL 行
-    legacy = (
-        await db.execute(
-            sa.select(ConsolNoteData).where(
-                ConsolNoteData.project_id == scope.project_id,
-                ConsolNoteData.year == scope.year,
-                ConsolNoteData.section_id == scope.section_id,
-                ConsolNoteData.node_key.is_(None),
-            )
-        )
-    ).scalar_one_or_none()
-    return legacy
+    # 根合并节点回退读 legacy NULL 行；写入复制时也必须锁住该基线。
+    return await _load_exact_note_record(
+        db,
+        NodeScope(
+            project_id=scope.project_id,
+            year=scope.year,
+            section_id=scope.section_id,
+        ),
+        for_update=for_update,
+    )
 
 
 async def load_scoped_note_records(
@@ -259,7 +275,14 @@ async def save_scoped_note_record(
     *,
     now: datetime | None = None,
 ) -> ConsolNoteData:
-    """按作用域保存附注行，节点写入不更新 NULL legacy 行。"""
+    """按作用域保存附注行，节点写入不更新 NULL legacy 行。
+
+    PUT 的 ``data`` 是完整快照，因此保存时替换目标行的数据；无论是已有行还是
+    从 legacy 首次复制，都会深拷贝请求对象，避免嵌套 rows/单元格对象共享引用。
+    显式根节点首次保存会读取并锁定 legacy 行，仅继承其 ``is_stale`` 状态；
+    legacy 的数据、时间和身份始终不被修改。创建竞争由 V177 唯一约束裁决，
+    SAVEPOINT 回滚后重读赢家并应用本次快照，保持外层事务可继续。
+    """
     if not scope.section_id:
         raise NodeScopeError("保存附注行必须提供 section_id")
     if not isinstance(data, dict):
@@ -268,42 +291,62 @@ async def save_scoped_note_record(
     if now is None:
         now = datetime.now(timezone.utc)
 
-    record = await load_scoped_note_record(
-        db, scope, allow_root_legacy_fallback=False,
-    )
-
+    # 先锁定精确目标。显式节点绝不把根 legacy fallback 当成写入目标。
+    record = await _load_exact_note_record(db, scope, for_update=True)
     if record is not None:
-        record.data = data
+        record.data = copy.deepcopy(data)
         record.updated_at = now
         return record
 
-    # 根合并节点写入时不更新 legacy 行——直接创建节点专属行
-    if scope.is_root_consol and not scope.node_key:
-        # legacy 作用域的根节点写入（兼容旧调用）
-        legacy = await load_scoped_note_record(
-            db, scope, allow_root_legacy_fallback=True,
+    inherited_stale = bool(scope.node_key)
+    if scope.node_key is not None and scope.is_root_consol:
+        # 根节点首次写入：legacy 只作为基线读取，最终仍创建 node_key 专属行。
+        legacy_scope = NodeScope(
+            project_id=scope.project_id,
+            year=scope.year,
+            section_id=scope.section_id,
         )
+        legacy = await _load_exact_note_record(db, legacy_scope, for_update=True)
         if legacy is not None:
-            legacy.data = data
-            legacy.updated_at = now
-            return legacy
+            inherited_stale = bool(legacy.is_stale)
 
-    new_record = ConsolNoteData(
+    candidate = ConsolNoteData(
         project_id=scope.project_id,
         year=scope.year,
         section_id=scope.section_id,
         node_key=scope.node_key,
-        data=data,
-        is_stale=bool(scope.node_key),
+        data=copy.deepcopy(data),
+        # stale 表示数据是否等待上游刷新，不是“是否已经完成节点复制”。
+        # 新显式节点没有 legacy 基线时沿用历史约定标 stale；从 legacy 复制时
+        # 保留源状态；旧 NULL 行保持 fresh。
+        is_stale=inherited_stale if scope.node_key is not None else False,
         updated_at=now,
     )
-    async with db.begin_nested():
-        db.add(new_record)
-        try:
+
+    try:
+        # 必须在 SAVEPOINT 建立后 add，避免失败候选污染外层事务。
+        async with db.begin_nested():
+            db.add(candidate)
             await db.flush()
-        except IntegrityError:
-            raise NodeScopeError("附注行并发冲突，请重试", status=409)
-    return new_record
+    except IntegrityError as exc:
+        # SAVEPOINT 已经退出并回滚；此时才能查询，不会触发 PendingRollbackError。
+        winner = await _load_exact_note_record(
+            db, scope, populate_existing=True,
+        )
+        if winner is None:
+            original = getattr(exc, "orig", exc)
+            text = str(original).lower()
+            pgcode = getattr(original, "pgcode", None)
+            is_unique = pgcode == "23505" or "unique constraint" in text or "duplicate key" in text
+            if is_unique:
+                raise NodeScopeError("附注行并发冲突，请重试", status=409) from exc
+            raise
+        winner.data = copy.deepcopy(data)
+        winner.updated_at = now
+        await db.flush()
+        return winner
+
+    return candidate
 
 
 __all__ = [

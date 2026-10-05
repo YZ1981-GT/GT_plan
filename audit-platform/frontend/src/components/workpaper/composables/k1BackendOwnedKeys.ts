@@ -1,32 +1,32 @@
 /**
- * K1-1 后端公式推送独占键。
+ * K1-1 后端公式推送独占键分类。
  *
- * 公式推送是这些系统值的唯一持久化写入方。K1 页面仍可在内存中读取和计算
- * 它们，但普通字段保存不能把页面打开期间的旧值回写到 checklist_responses。
+ * 提示条识别用手写正则（K1 binding 接入前生成文件无 K1 键）；
+ * 保存集合从生成文件派生（K1 接入后自动生效，接入前不过滤）。
  *
- * spec: chain-closure-phase3-push-rollout · design §六 · 需求 6.3
+ * spec: formula-push-all-subjects-rollout · 阶段 4 / 任务 13
  */
-const BACKEND_OWNED = [
-  // 性质分布与组合行的期初、未审数。
+import { isOwnedKey } from '@/generated/formulaPushOwnedKeys'
+
+/** 提示条用的独占键识别（含 K1 binding 尚未接入时的手写正则兜底）。 */
+const _K1_BACKEND_OWNED_PATTERNS = [
   /^K1-1-(?:nature-(?:gross|prov)-n[0-4]|(?:receivable|baddebt)-r[0-3])-(?:begin|unadj)$/,
-  // 与财务报表核对区的三项系统值。
   /^K1-1-fs-(?:interest|dividend|other-total)$/,
-  // 后端按推送算式派生的审定合计。
   /^K1-1-audited-(?:receivable|baddebt|net)$/,
 ] as const
 
 export function isK1BackendOwnedKey(itemId: string): boolean {
-  return BACKEND_OWNED.some((re) => re.test(itemId))
+  // 生成文件优先（K1 接入后精确匹配）；兜底手写正则（K1 接入前提示条仍能识别）
+  if (isOwnedKey('K1', itemId)) return true
+  return _K1_BACKEND_OWNED_PATTERNS.some((re) => re.test(itemId))
 }
 
-/** K1 宿主保存集合：保留所有用户键，只过滤公式推送独占键。 */
+/** K1 宿主保存集合：按生成文件过滤独占键（K1 接入前生成文件无 K1 → 不过滤）。 */
 export function k1SaveItemIds(itemIds: Iterable<string>): string[] {
-  return [...itemIds].filter((id) => !isK1BackendOwnedKey(id))
+  return [...itemIds].filter((id) => !isOwnedKey('K1', id))
 }
 
-/** K1-1 审定表保存集合：K1-1 键中排除后端独占键。 */
+/** K1-1 审定表保存集合：同上口径。 */
 export function k1AdjudicationSaveItemIds(itemIds: Iterable<string>): string[] {
-  return [...itemIds].filter(
-    (id) => id.startsWith('K1-1-') && !isK1BackendOwnedKey(id),
-  )
+  return [...itemIds].filter((id) => !isOwnedKey('K1', id))
 }

@@ -55,9 +55,10 @@ inclusion: always
 - **✅ 预存 worksheet 测试失败已修（commit `ce898e83`）**：`test_consol_worksheet.py` 2 红根因 = seeded_db fixture 抵销用 `review_status=draft`，但 Phase1 引擎改为**只消费 APPROVED**（ADR-CONSOL-102）→ 抵销不生效；**引擎本身正确**（差额表中间节点 consolidated=Σ子节点 consolidated + 本级抵销/调整，不含本级个别数，非"丢本体"bug）；修复=fixture 改 approved；**教训：先读设计文档确认是引擎错还是 fixture 过时，不预设引擎会计 bug**
 - **四阶段三件套已归档 `_archive/09-consolidation-phases/`**（work commit `375edd8d`，封板①②完成后归档，非空归档）；**tasks.md 残留未勾项全是外部依赖**（真实集团数据 UAT `*` 卡 PG 0 consolidated + Playwright 待环境 + B6/B7 CAS20 审计专业复核），代码+测试层面已封板
 
-### 公式推送引擎 `chain-closure-phase2-formula-push-engine`（2026-09-30，17/18，已提交，工作分支 `work/2026-09-28-voucher-sampling-account-scope`）
-- 链条：四表入库 / 调整审批 → `TRIAL_BALANCE_UPDATED` → `formula_push.engine.run` → E1 明细 / 审定表 / 披露表 → 附注（上市 五、1 / 国企 八、1）；规则 `backend/data/formula_push_rules.json`；公式管理「📤 公式推送」页；**余 T17 真实「立即推送」待用户同意写库**（面板 / 试跑 / 附注数值已真浏览器验过）
+### 公式推送引擎 `chain-closure-phase2-formula-push-engine`（18/18；T17 真实立即推送 2026-10-04 用户授权完成，真库 run 1 / state 38，全 E1）
+- 链条：四表入库 / 调整审批 → `TRIAL_BALANCE_UPDATED` → `formula_push.engine.run` → E1 明细 / 审定表 / 披露表 → 附注（上市 五、1 / 国企 八、1）；规则 `backend/data/formula_push_rules.json`；公式管理「📤 公式推送」页
 - 🔴 教训：**写入方取数一律 `strict`**（fail-open 会 rollback 撤销已 flush 写入且零失败痕迹）· **试算表取数按标准码前缀**（与报表 `ReportFormulaParser` 同口径）· **改带自动保存/自动同步页面的源码前浏览器先停 `about:blank`**（HMR 重挂载即真实写库，已踩：重药 五、49）· 真库待决：3 个唯一索引含重复键（C24 / editing_locks / review_threads）、和平药房_2025 试算表 1012 父子双计多 414 万
+- **全科目铺开 spec `formula-push-all-subjects-rollout`（2026-10-04 新建 0/26）**：89 个科目主编码只有 E1 达 L3；🔴 4 个现存缺陷 ①K1 半接入（前端过滤 42 键而后端无 binding ⇒ 刷新即丢）②EventBus 去重键不含 `wp_id`（500ms 内两张底稿只派发后一张）③同根因吞「发布到试算表」确认（K6 现受影响）④三条 `after_save` 不带 `wp_code`；止血顺序 = 先修去重键再回退 K1 过滤（反过来 K1 发布被吞）；单一写入方在后端 `checklist-responses` 强制
 
 ### 全链打通阶段三（2026-10-01 体检，待用户拍板后立 spec）
 - 现状：四表→TB 未审数 / 审批→TB 调整列 / →报表审定数 / 大厅 = 绿；底稿明细·审定·披露 + 附注只有 E1 由 `formula_push` 后端推，其余 77 个 wp_code 靠「打开页面时种一次」+ 前端 `buildXSyncPayload` 防抖推附注（261 个附注章节标底稿来源却从未同步）

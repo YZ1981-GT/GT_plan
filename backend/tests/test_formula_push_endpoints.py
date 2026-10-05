@@ -19,6 +19,7 @@ from app.deps import get_current_user
 from app.models.base import PermissionLevel, ProjectUserRole, UserRole
 from app.models.core import ProjectUser, User
 from app.routers.formula_push import router
+from app.services.formula_push.bindings import get_binding, supported_wp_codes
 from tests._formula_push_env import CASH_OPENING, YEAR, base_entries, make_env
 
 
@@ -73,9 +74,10 @@ async def test_rules_listing_is_readonly_and_chinese(api):
     r = await c.get(f"{base}/rules", params={"wp_code": "E1"})
     assert r.status_code == 200, r.text
     payload = r.json()
-    assert payload["supported_wp_codes"] == ["E1"]
+    assert "E1" in payload["supported_wp_codes"] and "K1" in payload["supported_wp_codes"]
+    assert len(payload["supported_wp_codes"]) == 20  # E1 + K1 + 18 Tier A
     rules = payload["rules"]
-    assert len(rules) == 30 and {x["wp_code"] for x in rules} == {"E1"}
+    assert len(rules) == 30 and {x["wp_code"] for x in rules} == {"E1"}  # wp_code 过滤只返回 E1 的 30 条
     tb = next(x for x in rules if x["rule_id"] == "E1.tb_amount.ending")
     assert tb["formula"].startswith("TB('1001','期末余额')") and "试算" in tb["description"]
     assert all(x["description"] and x["formula"] for x in rules), "面板每条规则都要有中文说明与算式"
@@ -88,8 +90,11 @@ async def test_bindings_listing_is_readonly_and_returns_registry_shape(api):
     r = await c.get(f"{base}/bindings")
     assert r.status_code == 200, r.text
     assert r.json() == {
-        "supported_wp_codes": ["E1"],
-        "bindings": [{"wp_code": "E1", "account_prefixes": ["1001", "1002", "1012"]}],
+        "supported_wp_codes": list(supported_wp_codes()),
+        "bindings": [
+            {"wp_code": code, "account_prefixes": list(get_binding(code).account_prefixes)}
+            for code in supported_wp_codes()
+        ],
     }
 
 
@@ -97,10 +102,11 @@ async def test_bindings_listing_is_readonly_and_returns_registry_shape(api):
 async def test_bindings_listing_tracks_temporary_registry_registration_and_revoke(api):
     from app.services.formula_push.bindings import register_binding
 
-    class FakeBinding:
+    from tests._formula_push_binding import DummyPushBinding
+
+    class FakeBinding(DummyPushBinding):
         wp_code = "Z9"
         account_prefixes = ("9901",)
-        derivations = frozenset()
 
     c, base = api["client"], api["base"]
     api["as"]("reader")
@@ -108,14 +114,18 @@ async def test_bindings_listing_tracks_temporary_registry_registration_and_revok
     try:
         r = await c.get(f"{base}/bindings")
         assert r.status_code == 200
-        assert r.json()["supported_wp_codes"] == ["E1", "Z9"]
+        codes_with_z9 = r.json()["supported_wp_codes"]
+        assert "Z9" in codes_with_z9
+        assert len(codes_with_z9) == 21  # 20 permanent + Z9
         assert r.json()["bindings"][-1] == {"wp_code": "Z9", "account_prefixes": ["9901"]}
     finally:
         revoke()
 
     r = await c.get(f"{base}/bindings")
     assert r.status_code == 200
-    assert r.json()["supported_wp_codes"] == ["E1"]
+    codes_after = r.json()["supported_wp_codes"]
+    assert "Z9" not in codes_after
+    assert len(codes_after) == 20
 
 
 @pytest.mark.asyncio
@@ -248,3 +258,221 @@ def test_router_is_registered():
     paths = {getattr(r, "path", "") for r in app.routes}
     assert "/api/projects/{project_id}/formula-push/run" in paths
     assert "/api/projects/{project_id}/formula-push/states/adopt" in paths
+
+
+# ── Task 9：按 wp_code / wp_codes 隔离 ──────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_wp_codes_selective_run_only_pushes_specified_code(api):
+    """wp_codes=['E1'] 只推 E1；wp_codes=['K1']（未注册）不推任何底稿；wp_codes=[] 返回 400。"""
+    c, base, env = api["client"], api["base"], api["env"]
+    await env.seed_entries(base_entries())
+    # 只推 E1
+    r = await c.post(f"{base}/run", json={"year": YEAR, "wp_codes": ["E1"]})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["written_count"] == 20
+    assert (await env.entries())["E1-adj-tb-amount-ending"] == "606.73"
+
+    # 只推 K1（未注册）——不应改动 E1 的已有条目
+    before = await env.entries()
+    r = await c.post(f"{base}/run", json={"year": YEAR, "wp_codes": ["K1"]})
+    assert r.status_code == 200
+    assert r.json()["written_count"] == 0
+    assert await env.entries() == before
+
+    # 空列表 → 400
+    r = await c.post(f"{base}/run", json={"year": YEAR, "wp_codes": []})
+    assert r.status_code == 400 and "空列表" in r.json()["detail"]
+
+    # 空字符串元素被过滤后为空 → 400
+    r = await c.post(f"{base}/run", json={"year": YEAR, "wp_codes": ["", "  "]})
+    assert r.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_latest_and_states_filter_by_wp_code(api):
+    """按 wp_code 过滤时，states 只返回该 code 前缀的行；latest 返回涉及该 code 的运行。"""
+    c, base, env = api["client"], api["base"], api["env"]
+    await env.seed_entries(base_entries())
+    await c.post(f"{base}/run", json={"year": YEAR})
+
+    # 不带 wp_code：全量
+    all_states = (await c.get(f"{base}/states", params={"year": YEAR})).json()["states"]
+    all_count = len(all_states)
+    assert all_count > 0
+
+    # 带 wp_code=E1：只有 E1 前缀的状态
+    e1_states = (await c.get(f"{base}/states", params={"year": YEAR, "wp_code": "E1"})).json()["states"]
+    assert len(e1_states) == all_count  # 当前只有 E1
+    assert all(s["rule_id"].startswith("E1.") for s in e1_states)
+
+    # 带 wp_code=K1：无状态
+    k1_states = (await c.get(f"{base}/states", params={"year": YEAR, "wp_code": "K1"})).json()["states"]
+    assert k1_states == []
+
+    # latest 带 wp_code=E1：能找到运行
+    e1_latest = (await c.get(f"{base}/latest", params={"year": YEAR, "wp_code": "E1"})).json()
+    assert e1_latest["run"] is not None
+    assert e1_latest["state_counts"].get("pending_confirm", 0) >= 0
+    # detail.wp 只含 E1
+    wp_list = e1_latest["run"]["detail"].get("wp") or []
+    assert all(wp.get("wp_code") == "E1" for wp in wp_list)
+    # detail.items 只含 E1 前缀
+    items = e1_latest["run"]["detail"].get("items") or []
+    assert all(it.get("rule_id", "").startswith("E1.") for it in items)
+
+    # latest 带 wp_code=K1：无运行
+    k1_latest = (await c.get(f"{base}/latest", params={"year": YEAR, "wp_code": "K1"})).json()
+    assert k1_latest["run"] is None
+    assert k1_latest["state_counts"] == {}
+
+
+@pytest.mark.asyncio
+async def test_run_with_wp_codes_preserves_permission_checks(api):
+    """wp_codes 参数不绕过权限：reader 403、outsider 403。"""
+    c, base, env = api["client"], api["base"], api["env"]
+    await env.seed_entries(base_entries())
+    for who in ("reader", "outsider"):
+        api["as"](who)
+        r = await c.post(f"{base}/run", json={"year": YEAR, "wp_codes": ["E1"]})
+        assert r.status_code == 403, (who, r.status_code)
+
+
+@pytest.mark.asyncio
+async def test_read_endpoints_with_wp_code_preserve_permission_checks(api):
+    """wp_code 参数不绕过权限：outsider 403。"""
+    c, base = api["client"], api["base"]
+    api["as"]("outsider")
+    for path in (f"/latest?year={YEAR}&wp_code=E1", f"/states?year={YEAR}&wp_code=E1"):
+        r = await c.get(f"{base}{path}")
+        assert r.status_code == 403, (path, r.status_code)
+
+
+@pytest.mark.asyncio
+async def test_two_binding_isolation_wp_codes_and_states(api, monkeypatch):
+    """双 binding 隔离：wp_codes=['E1'] 只推 E1，Z9 的条目/状态不受影响。"""
+    import sqlalchemy as sa
+
+    from app.services.formula_push import engine as push
+    from app.services.formula_push.bindings import register_binding
+    from app.services.formula_push.bindings.e1 import WorkpaperTarget
+    from app.services.formula_push.rules import PushRule, PushSource, PushTarget
+
+    c, base, env = api["client"], api["base"], api["env"]
+    await env.seed_entries(base_entries())
+
+    # ── 注册 Z9 dummy binding + 造底稿/条目 ──
+    z9_wp_id = uuid.uuid4()
+    z9_idx = uuid.uuid4()
+    async with env.factory() as db:
+        await db.execute(sa.text("INSERT INTO wp_index (id, project_id, wp_code) VALUES (:i, :p, 'Z9')"),
+                         {"i": str(z9_idx), "p": str(env.pid)})
+        await db.execute(sa.text("INSERT INTO working_paper (id, project_id, wp_index_id) VALUES (:w, :p, :i)"),
+                         {"w": str(z9_wp_id), "p": str(env.pid), "i": str(z9_idx)})
+        await db.execute(sa.text(
+            "INSERT INTO checklist_responses (id, project_id, wp_id, item_id, remark, updated_at) "
+            "VALUES (:id, :p, :w, 'Z9-value', 'z9-old', '2026-09-01 08:00:00.000000+00:00')"
+        ), {"id": str(uuid.uuid4()), "p": str(env.pid), "w": str(z9_wp_id)})
+        await db.commit()
+
+    from types import SimpleNamespace
+
+    class Z9Binding:
+        wp_code = "Z9"
+        account_prefixes = ("9901",)
+        derivations = frozenset()
+        four_table_slots = frozenset()
+        tb_columns = frozenset({"期末余额"})
+        paper_codes = ("Z9",)
+
+        async def load_sources(self, db, project_id, year, wp_id):
+            return SimpleNamespace(warnings=[], template_type=None)
+
+        def workpaper_targets(self, rule, entries, sources):
+            return [WorkpaperTarget(
+                rule_id=rule.rule_id, policy=rule.policy,
+                addr_id=f"Z9/Z9/Z9-value", item_id="Z9-value",
+                formula_value="z9-new", current_value=entries.get("Z9-value"),
+            )], []
+
+        def apply(self, entries, target, value):
+            changed = entries.get(target.item_id) != str(value)
+            entries[target.item_id] = str(value)
+            return changed
+
+        def note_rows(self, entries, template_type, rule):
+            return []
+
+        def entry_warnings(self, entries):
+            return []
+
+    revoke = register_binding("Z9", Z9Binding)
+    try:
+        z9_rule = PushRule(
+            rule_id="Z9.value", page_key="workpaper:Z9", stage="source", policy="system",
+            target=PushTarget(domain="workpaper", wp_code="Z9", sheet_code="Z9", item_id="Z9-value", fields=("value",)),
+            source=PushSource(kind="derivation", name="fake", formula_text="Z9 测试值"),
+            triggers=("manual",), description="Z9 隔离测试",
+        )
+        real_load = push.load_push_rules
+        def patched_rules():
+            return real_load() + (z9_rule,)
+        monkeypatch.setattr(push, "load_push_rules", patched_rules)
+
+        # 全量推送：E1 + Z9 都推
+        r = await c.post(f"{base}/run", json={"year": YEAR})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["written_count"] > 20, "E1(20) + Z9(1) = 21+"
+
+        # Z9 条目已改
+        async with env.factory() as db:
+            z9_remark = (await db.execute(sa.text(
+                "SELECT remark FROM checklist_responses WHERE wp_id = :w AND item_id = 'Z9-value'"
+            ), {"w": str(z9_wp_id)})).scalar_one()
+        assert z9_remark == "z9-new"
+
+        # 选择性推 wp_codes=['E1']：Z9 的条目不应被再次改动
+        async with env.factory() as db:
+            await db.execute(sa.text(
+                "UPDATE checklist_responses SET remark = 'z9-user-edit' WHERE wp_id = :w AND item_id = 'Z9-value'"
+            ), {"w": str(z9_wp_id)})
+            await db.commit()
+        r = await c.post(f"{base}/run", json={"year": YEAR, "wp_codes": ["E1"]})
+        assert r.status_code == 200
+        async with env.factory() as db:
+            z9_after = (await db.execute(sa.text(
+                "SELECT remark FROM checklist_responses WHERE wp_id = :w AND item_id = 'Z9-value'"
+            ), {"w": str(z9_wp_id)})).scalar_one()
+        assert z9_after == "z9-user-edit", "wp_codes=['E1'] 不得改动 Z9 的条目"
+
+        # states 按 wp_code 过滤
+        e1_states = (await c.get(f"{base}/states", params={"year": YEAR, "wp_code": "E1"})).json()["states"]
+        z9_states = (await c.get(f"{base}/states", params={"year": YEAR, "wp_code": "Z9"})).json()["states"]
+        assert all(s["rule_id"].startswith("E1.") for s in e1_states)
+        assert all(s["rule_id"].startswith("Z9.") for s in z9_states)
+        assert len(z9_states) == 1
+
+        # state_counts 按 wp_code 过滤：Z9 只有 1 个 auto 状态
+        all_counts = (await c.get(f"{base}/latest", params={"year": YEAR})).json()["state_counts"]
+        z9_counts = (await c.get(f"{base}/latest", params={"year": YEAR, "wp_code": "Z9"})).json()["state_counts"]
+        e1_counts = (await c.get(f"{base}/latest", params={"year": YEAR, "wp_code": "E1"})).json()["state_counts"]
+        assert sum(z9_counts.values()) == 1, f"Z9 只有 1 条状态，实际 {z9_counts}"
+        assert sum(e1_counts.values()) + sum(z9_counts.values()) == sum(all_counts.values()), (
+            "E1 + Z9 状态数 = 全量状态数"
+        )
+
+        # latest 按 wp_code 裁剪 detail
+        e1_latest = (await c.get(f"{base}/latest", params={"year": YEAR, "wp_code": "E1"})).json()
+        assert e1_latest["run"] is not None
+        detail_items = e1_latest["run"]["detail"].get("items") or []
+        assert all(it.get("rule_id", "").startswith("E1.") for it in detail_items), "latest detail.items 不应含 Z9"
+        z9_latest = (await c.get(f"{base}/latest", params={"year": YEAR, "wp_code": "Z9"})).json()
+        assert z9_latest["run"] is not None
+        z9_items = z9_latest["run"]["detail"].get("items") or []
+        assert all(it.get("rule_id", "").startswith("Z9.") for it in z9_items)
+
+    finally:
+        revoke()

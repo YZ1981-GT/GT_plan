@@ -67,58 +67,58 @@
 
 ## Phase 2 — 数据模型（需求 4）
 
-- [ ] 2.1 现算确认最高迁移版本（**禁写死**，必须重新扫 `backend/migrations/V*.sql`
+- [x] 2.1 现算确认最高迁移版本（**禁写死**，必须重新扫 `backend/migrations/V*.sql`
       取最大值 +1）。
       🔴 **实测印证**：spec 撰写时现算 V165（故预期 V166），但 Phase 0 收尾时
       并发会话已加入 `V166__sampled_vouchers_date_and_wp_scope.sql` ⇒ **V166 已被占用**。
       本条的「禁写死」不是形式要求 —— 照 spec 文字写死会直接撞号，
       且 `scan_migrations` 的同号检测会抛 `RuntimeError`。
-- [ ] 2.2 写 `V{n}__report_config_adjustment_formula.sql` + 配对 `R{n}__*.sql`：
+- [x] 2.2 写 `V{n}__report_config_adjustment_formula.sql` + 配对 `R{n}__*.sql`：
       `ALTER TABLE report_config ADD COLUMN IF NOT EXISTS aje_formula TEXT`，
       同样加 `rje_formula`。⚠️ 必须 `IF NOT EXISTS`（D6 MigrationRunner 约定）
-- [ ] 2.3 P8 守卫：迁移连跑两次不报错；`scan_migrations` 无同号冲突
+- [x] 2.3 P8 守卫：迁移连跑两次不报错；`scan_migrations` 无同号冲突
       （V040 冲突后已加同号检测，确认新号不撞）
-- [ ] 2.4 ORM `ReportConfig` 加 `aje_formula` / `rje_formula` 的 `Mapped[str | None]`
-- [ ] 2.5 三层一致校验（需求 4.5）：迁移 + ORM + service 读写全部到位。
+- [x] 2.4 ORM `ReportConfig` 加 `aje_formula` / `rje_formula` 的 `Mapped[str | None]`
+- [x] 2.5 三层一致校验（需求 4.5）：迁移 + ORM + service 读写全部到位。
       写一个断言"ORM 列集 ⊆ 真实 PG 列集"的守卫（平台已有 drift detector，接进去）
-- [ ] 2.6 `summary_with_adjustments` 读 `aje_formula`/`rje_formula`：
+- [x] 2.6 `summary_with_adjustments` 读 `aje_formula`/`rje_formula`：
       有值走公式求值，无值**完全退回**现有反解科目码路径
-- [ ] 2.7 P7 守卫：761 条既有公式（现算，禁写死）求值结果前后逐条相等。
+- [x] 2.7 P7 守卫：761 条既有公式（现算，禁写死）求值结果前后逐条相等。
       🔴 这是 Phase 2 最重要的守卫——它证明"加字段不影响既有配置"
-- [ ] 2.8 需求 4.4：合计行纯行间引用（如 `ROW('IS-019')-ROW('IS-020')`）配上调整列公式后
+- [x] 2.8 需求 4.4：合计行纯行间引用（如 `ROW('IS-019')-ROW('IS-020')`）配上调整列公式后
       能取到数。先现算确认真库有多少这类行（`formula` 含 `ROW(` 但不含 `TB(`/`SUM_TB(`）
-- [ ] 2.9 报表配置读写端点（`P_rc.list` 等）支持新字段的读与写
-- [ ] 2.10 `report_config_baseline`（主模板回填通道）的 diff/apply 逻辑覆盖新字段
+- [x] 2.9 报表配置读写端点（`P_rc.list` 等）支持新字段的读与写
+- [x] 2.10 `report_config_baseline`（主模板回填通道）的 diff/apply 逻辑覆盖新字段
       —— 否则新字段永远不会随主模板更新传播（D spec 的 stale 机制）
 
 ## Phase 3 — 前端（需求 5）
 
-- [ ] 3.1 `FormulaManagerDialog` 的行模型从单 `formula` 扩成含 `aje_formula`/`rje_formula`。
+- [x] 3.1 `FormulaManagerDialog` 的行模型从单 `formula` 扩成含 `aje_formula`/`rje_formula`。
       🔴 先现算 `currentRows` 的消费点数量（编辑/保存/导入/导出/应用自动运算至少 5 处，
       本轮已知 `activeReportType` 收口后有 9 处 report_ 相关调用点）
-- [ ] 3.2 右侧表格加调整列公式列；未配置时显式区分「未配置（走默认推导）」vs「配置为空」（需求 5.2）
-- [ ] 3.3 修「N 个公式 / 健康度 X%」的分母口径说明（需求 5.3）：
+- [x] 3.2 右侧表格加调整列公式列；未配置时显式区分「未配置（走默认推导）」vs「配置为空」（需求 5.2）
+- [x] 3.3 修「N 个公式 / 健康度 X%」的分母口径说明（需求 5.3）：
       界面明示是"未审数列"还是"全部列"。现状 `37 个公式 / 51%` 只算未审数列却未说明
-- [ ] 3.4 公式编辑弹窗支持编辑调整列公式，且函数选择器能列出 `ADJ`
+- [x] 3.4 公式编辑弹窗支持编辑调整列公式，且函数选择器能列出 `ADJ`
       （它在 Phase 1 已注册进 `_REGISTRY`，前端若有独立函数清单需同步——
       先 grep 确认前端是否有第二份函数清单）
-- [ ] 3.5 前端类型检查：用单区域 tsconfig（先例 `tsconfig._g-single-region.json`）。
+- [x] 3.5 前端类型检查：用单区域 tsconfig（先例 `tsconfig._g-single-region.json`）。
       🔴 **必配变异证明**（注入 `number = string` 应报 TS2322）——本仓库全量 `vue-tsc`
       在 4GB/8GB 堆均 OOM，stdout 的 `error TS` 计数为 0 **不等于**通过（铁律㉔）
-- [ ] 3.6* Playwright 实测：试算平衡表利润表 tab → 公式管理 → 能看到并编辑调整列公式。
+- [ ]* 3.6* Playwright 实测：试算平衡表利润表 tab → 公式管理 → 能看到并编辑调整列公式。
       覆盖 4 个 tab（资产负债表/利润表/现金流量表/现金流量附表）+ 科目明细回归 + 报表域回归
 
 ## 收尾
 
-- [ ] 4.1 清理本轮所有 `_` 前缀一次性探针（`backend/scripts/analyze/_*`）
-- [ ] 4.2 更新 `memory.md`：勘误最高迁移版本（V044 → 实际值），
+- [x] 4.1 清理本轮所有 `_` 前缀一次性探针（`backend/scripts/analyze/_*`）
+- [x] 4.2 更新 `memory.md`：勘误最高迁移版本（V044 → 实际值），
       并记录「口径第四处已收敛」与「`TB(code,'AJE调整')` vs `ADJ(code,'aje_net')` 语义差异」
-- [ ] 4.3 登记 `.kiro/specs/INDEX.md`。⚠️ 该文件是**纯 CRLF**，插入须
+- [x] 4.3 登记 `.kiro/specs/INDEX.md`。⚠️ 该文件是**纯 CRLF**，插入须
       `read_bytes().decode('utf-8')` + `write_bytes()`；表格第三格内禁裸 pipe；
       校验"每行恰 4 个未转义 pipe"
-- [ ] 4.4 判据引用闭合性检查（铁律⑳）：脚本化验证每条需求判据与每个 Property
+- [x] 4.4 判据引用闭合性检查（铁律⑳）：脚本化验证每条需求判据与每个 Property
       至少被某个任务引用一次。**光数任务编号连续不算**
-- [ ] 4.5 PR 说明必须写明：**Phase 0 会改变现有显示数字**（含 draft 分录的项目调整列下降），
+- [x] 4.5 PR 说明必须写明：**Phase 0 会改变现有显示数字**（含 draft 分录的项目调整列下降），
       附 `evidence/phase0-diff.md` 逐行说明
 
 ## 任务与判据对照（闭合性自检）

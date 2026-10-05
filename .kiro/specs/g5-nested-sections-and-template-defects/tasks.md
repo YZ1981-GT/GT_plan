@@ -2,7 +2,7 @@
 
 ## Overview
 
-**spec**：`g5-nested-sections-and-template-defects`　**创建**：2026-09-26　**状态**：0/14（Task 0~13），Design-First 未实施
+**spec**：`g5-nested-sections-and-template-defects`　**创建**：2026-09-26　**状态**：**6/14 已实施**（2026-10-03 逐条核验：Task 0/8/9/11*/12*/13 已标 `[x]`；Task 1~7/10 的 AC 产物（evidence / 专用测试 / 几何补测）均不在库，如实保持 `[ ]`）
 **上游**：**`g-cycle-sync-foundation-and-first-canary`（GC-1~GC-10，硬前置）** · FC-1~FC-13 ·
 F5 spec 裁决 F5-H2 + F2 spec（模板缺陷走覆盖层的两个先例）· D4-29 转置引擎 ·
 `g4-g6-shared-workbook-three-entry-lanes`（16384 策略须同源）
@@ -12,14 +12,28 @@ F5 spec 裁决 F5-H2 + F2 spec（模板缺陷走覆盖层的两个先例）· D4
 🔴 **G5 的难点全在模板结构与模板缺陷，不在平台前置**：`blocked_by` 只有 `BP-1~4 + BP-6`
 （无 BP-5/7/8）、definedName 0、主受管表裸 IF 0、TB 发布门已接。
 
-## 🔴 2026-09-30 现扫勘误：核心交付物已在库（假红），复选框未回标
-**现算证据**：`STORE_MERGE_REGISTRY` 已含 **`g5.long_term_receivable_detail`**；
-`backend/data/workpaper_sync_contracts/g5.long_term_receivable_detail.json` 是**正式契约**；
-G 域 **32 个 provider / 14 个正式契约**全部 git 跟踪。
+## 2026-10-03 逐条核验结果
 
-⇒ 本 spec 的 entry 层与嵌套段声明主线已交付，复选框 `0/14` 与磁盘不符。
-**只登记不代勾**：本 spec 另有「三处漏加小计处置」「G5-1!B35 越界缺陷登记 + 交棒（明确不修）」
-「16384 转置策略」等任务，各有独立 AC 与裁决，须逐条核过再勾。
+**核验方式**：`git ls-files` 确认交付物在 HEAD + `grep` 核验关键内容 + manifest 现算。
+
+已在库的交付物（6 个 `[x]`）：
+- **entry 层 provider** `phase5_g5_long_term_receivable.py`（完整：ENTRY_ID / ADAPTER_ID / WP_CODES / TEMPLATE_SHA256 / assert_entry_selectable / build_registration / attach_pilot_adapters）
+- **G5-2 子区声明** `phase5_g5_02_balance_detail.py`（`_SECTIONS` + `ALL_SPECS_G502`，RowTableSheetSpec 嵌套）
+- **G5-9 转置声明** `phase5_g5_09_ecl_stage.py`（TransposedSheetSpec + 16384 策略 + 实体列 G..J）
+- **契约** `g5.long_term_receivable_detail.json` + 生成器 `generate_phase5_g5_contract.py`
+- **注册** `store_item_registry` G5-2-rows + `registry.py` ALLOWED + `check_sync_provider_golden_digest` PROVIDERS
+- **wp_code 裁决** adjudication.json 含 G5 条目
+- **宿主接桥** `GtG5LongTermReceivable.vue` 已接 `useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost`
+- **e2e** `g-cycle-g5-long-term-receivable.spec.ts` 在库
+
+未交付（8 个 `[ ]`，如实保持）：
+- **Task 1~5**：无 evidence 目录、无 G5 专用 Property 测试文件（`git ls-files *g5*test*` 零命中）
+- **Task 6/7**：模板覆盖层处置 + B35 缺陷登记——无 evidence、无生产代码改动
+- **Task 10**：段(二)(三)八子区声明——依赖 Task 2 几何补测结论（推断值不得写进声明）
+
+🔴 **manifest 现算**：G5 entry 仍为 `capability=single_onlyoffice` / `migration_state=legacy_fake_bidirectional`。
+tasks.md 勘误段描述的 13 条 G 域 overlay override + manifest 重生成翻转**未提交到 HEAD**（overlay 中无 G5 条目）。
+「交付物在库」与「运行时接上了」是两件事——验收看 manifest 现算翻转。
 
 ### 🔴 当日自我更正：上面那句「主线已交付」说得不够准，真实状态是「备好了但没接上」
 

@@ -50,26 +50,7 @@ class E1Sources:
     warnings: list[str] = field(default_factory=list)
 
 
-@dataclass(frozen=True)
-class WorkpaperTarget:
-    """一个底稿目标。``row_id``/``field`` 为空 = 单值键（写 remark）。"""
-
-    rule_id: str
-    policy: str
-    addr_id: str
-    item_id: str
-    formula_value: Any
-    current_value: Any
-    row_id: str | None = None
-    field: str | None = None
-    mirror_field: str | None = None
-
-
-@dataclass(frozen=True)
-class TargetSkip:
-    rule_id: str
-    addr_id: str | None
-    reason: str
+from app.services.formula_push.bindings import TargetSkip, WorkpaperTarget  # noqa: F401 — 重导出保持兼容
 
 
 @dataclass
@@ -168,13 +149,17 @@ class E1Binding:
     wp_code = WP_CODE
     account_prefixes = E1_ACCOUNT_CODES
     derivations = DERIVATIONS
+    four_table_slots = frozenset({"cash", "bank", "other", "finance_co", "digital"})
+    tb_columns = frozenset({"期末余额", "年初余额", "本期发生额"})
+    paper_codes = (WP_CODE,)
 
     load_sources = staticmethod(load_e1_sources)
 
     # ── 目标展开 ────────────────────────────────────────────────────────────
 
     def workpaper_targets(
-        self, rule: PushRule, entries: Mapping[str, Any], sources: E1Sources
+        self, rule: PushRule, entries: Mapping[str, Any], sources: E1Sources,
+        *, paper_code: str | None = None,
     ) -> tuple[list[WorkpaperTarget], list[TargetSkip]]:
         target = rule.target
         if target.domain != "workpaper":
@@ -271,7 +256,9 @@ class E1Binding:
 
     # ── 附注 ────────────────────────────────────────────────────────────────
 
-    def note_rows(self, entries: Mapping[str, Any], template_type: str) -> list[dict[str, Any]]:
+    def note_rows(
+        self, entries: Mapping[str, Any], template_type: str, rule: PushRule,
+    ) -> list[dict[str, Any]]:
         return e1_calc.disclosure_main_rows(entries, template_type)
 
     # ── 运行告警（进运行记录，不静默）────────────────────────────────────────

@@ -49,13 +49,13 @@ FORMULA_CONTEXTS: Mapping[str, tuple[str, ...]] = {
     #   TB(code,'年初余额') = opening_balance
     # 不用「未审数 + AJE调整 + RJE调整」现算：试算表 AJE 列按 V124 排除底稿来源分录（它们只经
     # 审定表发布门写进 audited_amount），现算会让 E1-5 的调整永远显示为差异（ADR-PUSH-002）。
-    "tb": ("trial_balance_audited",),
+    "tb": ("trial_balance_audited", "trial_balance_audited_occurrence"),
     # adj_data 只含大厅已批准、且 origin≠workpaper 的分录（ADR-PUSH-001）
     "adj": ("hall_approved_excluding_workpaper",),
 }
 #: 内核里语义不唯一的列名（与「期末余额」折叠为同一键）
 BANNED_COLUMNS: tuple[str, ...] = ("审定数", "未审数")
-#: 四表叶子槽（与 _e1_monetary_fund._DETAIL_SLOT_KEYS 的明细槽同名）
+#: 四表叶子槽（文档用途；校验改用各 binding 的 four_table_slots，见 BindingSpec）
 FOUR_TABLE_SLOTS: tuple[str, ...] = ("cash", "bank", "other", "finance_co", "digital")
 #: 各 stage 允许的 policy
 STAGE_POLICIES: Mapping[str, frozenset[str]] = {
@@ -63,6 +63,20 @@ STAGE_POLICIES: Mapping[str, frozenset[str]] = {
     "derived": frozenset({"derived"}),
     "note": frozenset({"editable"}),
 }
+
+
+@dataclass(frozen=True)
+class BindingSpec:
+    """校验规则时用的 binding 元信息（从 PushBinding 提取，可 hash）。"""
+    four_table_slots: frozenset[str]
+    derivations: frozenset[str]
+    tb_columns: frozenset[str]
+
+
+#: 提取 TB / SUM_TB 第二参数（列名）；排除 SUM_TB 中的 TB 子串
+_TB_COL_RE = re.compile(
+    r"(?<![A-Z_])(?:SUM_)?TB\(\s*['\"][^'\"]*['\"]\s*,\s*(['\"])(.*?)\1\s*\)"
+)
 
 _RULE_ID_RE = re.compile(r"^[A-Z]\d*(?:\.[A-Za-z0-9_]+)+$")
 _PAGE_KEY_RE = re.compile(r"^workpaper:([A-Z]\d*)$")
@@ -173,7 +187,12 @@ def _has_cjk(text: Any) -> bool:
     return isinstance(text, str) and bool(_CJK_RE.search(text))
 
 
-def _check_formula(rid: str, expression: Any, errors: list[str]) -> None:
+def _check_formula(
+    rid: str,
+    expression: Any,
+    errors: list[str],
+    tb_columns: Collection[str] | None = None,
+) -> None:
     from app.services.formula_engine import FormulaContext, execute, validate_formula
 
     if not isinstance(expression, str) or not expression.strip():
@@ -194,6 +213,15 @@ def _check_formula(rid: str, expression: Any, errors: list[str]) -> None:
         )
     if _TB_SINGLE_ARG_RE.search(expression):
         errors.append(f"{rid}: TB() 必须显式写列名")
+    if tb_columns is not None:
+        allowed_columns = frozenset(tb_columns)
+        used_columns = {match.group(2) for match in _TB_COL_RE.finditer(expression)}
+        unloaded = sorted(used_columns - allowed_columns)
+        if unloaded:
+            errors.append(
+                f"{rid}: 公式使用了 binding.tb_columns 未装载的试算表列 {unloaded} "
+                f"（当前 binding 可用 {sorted(allowed_columns)}）"
+            )
 
 
 def _check_target(rid: str, wp_code: str | None, raw: Any, errors: list[str]) -> PushTarget | None:
@@ -243,12 +271,21 @@ def _check_target(rid: str, wp_code: str | None, raw: Any, errors: list[str]) ->
     table = raw.get("table")
     if not isinstance(table, str) or not table:
         errors.append(f"{rid}: 附注目标缺 table")
+    from app.services.formula_push import note_writer
+
+    unknown_fields = sorted(set(fields) - set(note_writer.NOTE_FIELDS))
+    if unknown_fields:
+        errors.append(
+            f"{rid}: 附注 target.fields 含未登记字段 {unknown_fields} "
+            f"（可选 {sorted(note_writer.NOTE_FIELDS)}）"
+        )
     return PushTarget(domain=domain, rows=rows, fields=tuple(fields), table=table,
                       section_by_template=tuple(sorted(sections.items())))
 
 
 def _check_source(
-    rid: str, raw: Any, errors: list[str], known_derivations: Collection[str] | None
+    rid: str, raw: Any, errors: list[str], known_derivations: Collection[str] | None,
+    binding_spec: BindingSpec | None = None,
 ) -> PushSource | None:
     if not isinstance(raw, Mapping):
         errors.append(f"{rid}: source 缺失或不是对象")
@@ -259,7 +296,12 @@ def _check_source(
         return None
     if kind == "formula":
         expression = raw.get("expression")
-        _check_formula(rid, expression, errors)
+        _check_formula(
+            rid,
+            expression,
+            errors,
+            tb_columns=binding_spec.tb_columns if binding_spec is not None else None,
+        )
         context = raw.get("context") or {}
         if not isinstance(context, Mapping) or not context:
             errors.append(f"{rid}: 公式来源须声明 context（取数口径）")
@@ -287,17 +329,24 @@ def _check_source(
         if not isinstance(slots, list) or not slots:
             errors.append(f"{rid}: four_table_leaves 须声明 slots")
             slots = []
-        bad = sorted(set(slots) - set(FOUR_TABLE_SLOTS))
+        allowed_slots = (
+            binding_spec.four_table_slots if binding_spec is not None else frozenset(FOUR_TABLE_SLOTS)
+        )
+        bad = sorted(set(slots) - set(allowed_slots))
         if bad:
-            errors.append(f"{rid}: 四表槽 {bad} 不在 {FOUR_TABLE_SLOTS}")
+            errors.append(f"{rid}: 四表槽 {bad} 不在当前 binding 可用集合 {sorted(allowed_slots)}")
         return PushSource(kind=kind, slots=tuple(slots), formula_text=formula_text)
 
     name = raw.get("name")
     params = raw.get("params") or {}
     if not isinstance(name, str) or not name:
         errors.append(f"{rid}: derivation 须声明 name")
-    elif known_derivations is not None and name not in known_derivations:
-        errors.append(f"{rid}: 派生 {name!r} 未实现（已实现 {sorted(known_derivations)}）")
+    else:
+        allowed_derivations = (
+            binding_spec.derivations if binding_spec is not None else known_derivations
+        )
+        if allowed_derivations is not None and name not in allowed_derivations:
+            errors.append(f"{rid}: 派生 {name!r} 未实现（已实现 {sorted(allowed_derivations)}）")
     if not isinstance(params, Mapping):
         errors.append(f"{rid}: derivation.params 必须是对象")
         params = {}
@@ -307,14 +356,23 @@ def _check_source(
 def parse_rules(
     document: Any,
     *,
+    binding_specs: Mapping[str, BindingSpec] | None = None,
     known_derivations: Collection[str] | None = None,
     registered_wp_codes: Collection[str] | None = None,
 ) -> tuple[PushRule, ...]:
-    """校验并解析整份清单；有任何问题抛 :class:`PushRuleError`（含全部问题）。"""
-    if registered_wp_codes is None:
-        from app.services.formula_push.bindings import supported_wp_codes
+    """校验并解析整份清单；有任何问题抛 :class:`PushRuleError`（含全部问题）。
 
-        registered_wp_codes = supported_wp_codes()
+    ``binding_specs`` 是按主编码分组的规则校验元信息。传入后，四表槽、派生名和
+    TB 列都只按对应 binding 校验；不传时保留旧的全局 / ``known_derivations`` 兼容路径，
+    使这个函数仍可作为纯解析器单独使用。
+    """
+    if registered_wp_codes is None:
+        if binding_specs is not None:
+            registered_wp_codes = tuple(binding_specs)
+        else:
+            from app.services.formula_push.bindings import supported_wp_codes
+
+            registered_wp_codes = supported_wp_codes()
     registered_codes = set(registered_wp_codes)
     errors: list[str] = []
     if not isinstance(document, Mapping) or document.get("version") != 1:
@@ -348,6 +406,12 @@ def parse_rules(
         if wp_code is not None and wp_code not in registered_codes:
             errors.append(f"{rid}: 底稿 {wp_code} 未注册公式推送 binding")
 
+        binding_spec = None
+        if wp_code is not None and binding_specs is not None:
+            binding_spec = binding_specs.get(wp_code)
+            if binding_spec is None:
+                errors.append(f"{rid}: 底稿 {wp_code} 未提供 binding 规则校验元信息")
+
         stage, policy = raw.get("stage"), raw.get("policy")
         if stage not in STAGES:
             errors.append(f"{rid}: stage={stage!r} 不在 {STAGES}")
@@ -372,7 +436,7 @@ def parse_rules(
             errors.append(f"{rid}: description 须为中文说明")
 
         target = _check_target(rid, wp_code, raw.get("target"), errors)
-        source = _check_source(rid, raw.get("source"), errors, known_derivations)
+        source = _check_source(rid, raw.get("source"), errors, known_derivations, binding_spec)
         if target is not None:
             if stage == "note" and target.domain != "note":
                 errors.append(f"{rid}: stage=note 的目标必须是附注域")
@@ -400,27 +464,65 @@ def parse_rules(
 def _load_cached(
     path: str,
     mtime_ns: int,
+    binding_specs_key: tuple[tuple[str, BindingSpec], ...] | None,
     derivations: tuple[str, ...] | None,
     registered_codes: tuple[str, ...],
 ) -> tuple[PushRule, ...]:
     document = json.loads(Path(path).read_text(encoding="utf-8"))
     return parse_rules(
         document,
+        binding_specs=(dict(binding_specs_key) if binding_specs_key is not None else None),
         known_derivations=derivations,
         registered_wp_codes=registered_codes,
     )
 
 
+def _binding_specs_from_registry(codes: Collection[str]) -> dict[str, BindingSpec]:
+    """从注册表快照提取可哈希的规则校验元信息。"""
+    from app.services.formula_push.bindings import get_binding
+
+    specs: dict[str, BindingSpec] = {}
+    for code in codes:
+        binding = get_binding(code)
+        specs[code] = BindingSpec(
+            four_table_slots=frozenset(binding.four_table_slots),
+            derivations=frozenset(binding.derivations),
+            tb_columns=frozenset(binding.tb_columns),
+        )
+    return specs
+
+
+def _normalize_binding_specs(
+    binding_specs: Mapping[str, BindingSpec],
+) -> tuple[tuple[str, BindingSpec], ...]:
+    normalized: list[tuple[str, BindingSpec]] = []
+    for code, spec in binding_specs.items():
+        if not isinstance(code, str) or not isinstance(spec, BindingSpec):
+            raise TypeError("binding_specs 必须是 str -> BindingSpec 映射")
+        normalized.append((code, spec))
+    return tuple(sorted(normalized))
+
+
 def load_rules(
-    path: Path | str = RULES_PATH, *, known_derivations: Collection[str] | None = None
+    path: Path | str = RULES_PATH,
+    *,
+    binding_specs: Mapping[str, BindingSpec] | None = None,
+    known_derivations: Collection[str] | None = None,
 ) -> tuple[PushRule, ...]:
     """读取并校验规则清单（按文件修改时间和 binding 注册表版本缓存）。"""
     from app.services.formula_push.bindings import supported_wp_codes
 
     p = Path(path)
-    derivations = tuple(sorted(known_derivations)) if known_derivations is not None else None
     registered_codes = tuple(supported_wp_codes())
-    return _load_cached(str(p.resolve()), p.stat().st_mtime_ns, derivations, registered_codes)
+    if binding_specs is None and known_derivations is not None:
+        # 旧调用方显式提供派生注册表时，保留旧的纯解析语义；生产引擎传 binding_specs。
+        specs_key = None
+    else:
+        if binding_specs is None:
+            binding_specs = _binding_specs_from_registry(registered_codes)
+        specs_key = _normalize_binding_specs(binding_specs)
+    derivations = tuple(sorted(known_derivations)) if known_derivations is not None else None
+    return _load_cached(str(p.resolve()), p.stat().st_mtime_ns, specs_key, derivations, registered_codes)
 
 
 def rules_for(

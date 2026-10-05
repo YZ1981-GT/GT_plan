@@ -103,13 +103,42 @@ describe('useNoteTableProjection — 续表合并的三条例外', () => {
     expect(currentNoteTables.value[0].headers).toEqual(['项目', '期末余额', '期初余额'])
   })
 
-  it('例外③b：续表首列为「类别」/「名称」时同样跳过', () => {
-    const cont = { ...contTable(), headers: ['类别', '期初余额'] }
-    const main = { ...mainTable(), headers: ['类别', '期末余额'] }
-    const { currentNoteTables } = mount({ table_data: { _tables: [main, cont] } })
-    expect(currentNoteTables.value[0].headers).toEqual(['类别', '期末余额', '期初余额'])
+  it('例外③c：续表 source refs 与值列同步，且主表短行补 null', () => {
+    const main = {
+      ...mainTable(),
+      _sourceColumnRefs: [{ tableIndex: 0, valueIndex: 0, sourceSubTableKey: '主表', key: 'ending' }],
+      _sourceCellRefs: [[{
+        row: { tableIndex: 0, rowIndex: 0, sourceSubTableKey: '主表' },
+        column: { tableIndex: 0, valueIndex: 0, sourceSubTableKey: '主表', key: 'ending' },
+      }]],
+      _sourceLabelRefs: [{ tableIndex: 0, rowIndex: 0, sourceSubTableKey: '主表' }],
+      _sourceRowRefs: [[{ tableIndex: 0, rowIndex: 0, sourceSubTableKey: '主表' }]],
+    }
+    const continuation = {
+      ...contTable(),
+      _sourceColumnRefs: [{ tableIndex: 1, valueIndex: 0, sourceSubTableKey: '续表', key: 'opening' }],
+      _sourceCellRefs: [[{
+        row: { tableIndex: 1, rowIndex: 0, sourceSubTableKey: '续表' },
+        column: { tableIndex: 1, valueIndex: 0, sourceSubTableKey: '续表', key: 'opening' },
+      }]],
+      _sourceLabelRefs: [{ tableIndex: 1, rowIndex: 0, sourceSubTableKey: '续表' }],
+      _sourceRowRefs: [[{ tableIndex: 1, rowIndex: 0, sourceSubTableKey: '续表' }]],
+    }
+    const { currentNoteTables } = mount({ table_data: { _tables: [main, continuation] } })
+    const table = currentNoteTables.value[0]
+
+    expect(table.rows[0].values).toEqual([100, 90])
+    expect(table._sourceColumnRefs.map((ref: any) => ref?.key)).toEqual(['ending', 'opening'])
+    expect(table._sourceCellRefs[0].map((ref: any) => ref?.column?.key)).toEqual(['ending', 'opening'])
+
+    const mainShort = { ...main, rows: [] }
+    const { currentNoteTables: shortTables } = mount({ table_data: { _tables: [mainShort, continuation] } })
+    expect(shortTables.value[0].rows[0].values).toEqual([null, 90])
+    expect(shortTables.value[0]._sourceCellRefs[0][0]).toBeNull()
+    expect(shortTables.value[0]._sourceCellRefs[0][1]?.column?.key).toBe('opening')
   })
 })
+
 
 describe('useNoteTableProjection — 三层兜底顺序即优先级', () => {
   it('优先 _tables', () => {
@@ -125,7 +154,13 @@ describe('useNoteTableProjection — 三层兜底顺序即优先级', () => {
   })
 
   it('无 _tables 时用客户端投影，优先于旧格式 rows', () => {
-    const currentNote = ref<any>({ table_data: { rows: [{ label: '旧格式', values: [1] }] } })
+    const currentNote = ref<any>({
+      table_data: {
+        _source: 'workpaper',
+        sub_table_data: { client: [{ label: '客户端', amount: 2 }] },
+        rows: [{ label: '旧格式', values: [1] }],
+      },
+    })
     const { currentNoteTables } = useNoteTableProjection({
       currentNote,
       projectSubTablesClient: () => [{ name: '客户端投影', headers: ['x'], rows: [] }],

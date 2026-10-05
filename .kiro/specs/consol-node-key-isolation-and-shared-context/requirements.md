@@ -1,8 +1,10 @@
-# 需求文档：合并附注节点隔离与共享 node_key 上下文
+# 需求文档：合并节点隔离、共享上下文与工作底稿联动
 
 > 工作流：Design-First。验收标准采用 EARS 风格；正确性属性见设计 §六。
 > 上游：`consol-tree-three-code-autobuild`（node_key 树身份）与 `consol-elimination-single-source-push`（统一合并计算内核）。
 > 数据层前提：当前工作树已有 V177 `consol_note_data.node_key` 与两套部分唯一索引；本 spec 消费该变更，不重复创建同一迁移。
+> 工作底稿边界：合并工作底稿当前仍按 `(project_id, year, sheet_key)` 持久化，不属于附注的 `node_key` 隔离范围。第一批修复只统一父页有效年度和错误语义，不在前端伪造 `node_key`；若未来需要按合并节点保存工作底稿，必须另提 schema/迁移和兼容设计。
+> 公式与股比边界：公式管理必须通过真实 `consol_worksheet` reader、mutation adapter 和持久化审计接入；动态股比必须以 1~N 个稳定事件建模，不能把固定三次列或 G7 建议草稿当作正式抵销链路。
 
 ## 引言
 
@@ -34,7 +36,6 @@
 3. WHEN 取数失败或数据无法解析 THEN 端点 SHALL 返回可观察的错误或逐项原因，SHALL NOT 吞异常并报告成功、静默回传模板值或伪造为零。
 4. WHEN 节点级公式填入成功 THEN 结果 SHALL 只写回该节点附注行；存在手工保护的单元格时 SHALL 保留其原值，并在响应中如实报告保留数量。
 5. THE legacy 的刷新与批量套用入口 SHALL 与 `fill-by-formula` 的节点行读写行为一致；旧请求不传节点仍可走项目级 NULL 兼容路径。
-
 ## 需求 3：custom query 附注 cell 读写归属
 
 **用户故事**：作为自定义查询使用者，我希望 `note:{section}|{range}` 只读取所选节点附注，并且 cell writeback 只能修改该节点所属项目、年度和章节的数据。
@@ -79,3 +80,51 @@
 3. THE 前端 SHALL 提供 API/组件契约测试，覆盖 nodeKey 透传、节点切换缓存隔离和旧请求不覆盖新节点。
 4. WHEN 本地后端与前端可运行 THEN SHALL 使用 Playwright 实测树节点切换、普通报表重载、附注数据保存后重读、两个节点之间互不串值；若环境不可运行，任务 SHALL 保持未完成并记录具体阻塞，不得将静态检查当作浏览器实测。
 5. THE 定向回归 SHALL 覆盖现有合并附注公式、合并报表视图、module-cell resolver 与 snapshot writer 测试；不得把并行工作树既有失败误归因于本 spec。
+## 需求 7：合并工作底稿共享年度与加载状态
+
+**用户故事**：作为合并执行人，我希望右侧切换到合并工作底稿时，使用合并页当前有效年度加载同一套数据；当接口失败时，我能区分“没有数据”和“加载失败”。
+
+### 验收标准
+
+1. THE `ConsolidationIndex.vue` SHALL derive one effective year from the parent page (`treeYear`/`projectInfo.year` according to the existing page contract) and pass it explicitly to `ConsolWorksheetTabs`; the child SHALL NOT derive year from `route.query.year` or `new Date()`.
+2. WHEN the user clicks a node in the left enterprise tree THEN report/note views SHALL use that exact current `nodeKey`; the worksheet SHALL continue using its current `(project_id, effective_year, sheet_key)` scope until a separately designed node-scoped worksheet schema exists. Selecting a single-company node SHALL NOT fabricate a worksheet `node_key` or silently switch the worksheet data to another scope.
+3. WHEN the user only switches the right-side report, note or worksheet tab THEN the page SHALL preserve the left-tree `currentConsolEntity`; a tab switch SHALL NOT mutate the tree node or report/note node context.
+4. WHEN worksheet batch loading succeeds with no matching rows THEN the component SHALL show a Chinese empty state and keep editable defaults; WHEN the request fails, returns a non-2xx response, or the payload cannot be parsed THEN the component SHALL show a distinct Chinese load-error state and SHALL NOT silently replace the response with `{}`.
+5. THE worksheet save, batch load, prior-year extraction, G7 preview/import and formula-reload calls SHALL use the same parent-provided effective year; changing the page year SHALL invalidate the previous worksheet display before loading the new year.
+6. THE total-branch notice SHALL depend on the verified consolidation mode and current worksheet context, not merely on a root/default node or a truthy company code; a single-company/mother-company selection SHALL NOT display the pure branch-consolidation notice unless the mode contract says the project is branch-only.
+
+## 需求 8：合并工作底稿接入公式运行时
+
+**用户故事**：作为公式管理使用者，我希望从当前合并项目/年度的工作底稿、单体报表、附注和相关底稿取数，并把公式结果真实写回工作底稿，而不是只在前端缓存中显示。
+
+### 验收标准
+
+1. THE formula runtime SHALL recognize `consol_worksheet` as a first-class domain with an explicit locator containing at least `project_id`, `year`, `sheet_key` and cell/row identity; it SHALL NOT infer worksheet scope from a static `${nodeKey}_${index}` string.
+2. THE `consol_worksheet` reader SHALL batch-load persisted `consol_worksheet_data` under the exact project/year/sheet scope, distinguish missing cells from database/query errors, and preserve JSON object/array row shapes.
+3. THE `consol_worksheet` mutation adapter SHALL prepare and apply real persisted mutations with optimistic version/CAS checks, transaction rollback on failure, and an auditable source formula/run identity; a successful plan SHALL be observable after a fresh database read.
+4. Formula definitions for long-term investment, related-party balances and related-party transactions SHALL be able to reference the current tree node and its descendants as an explicit source scope. The source scope SHALL resolve through the enterprise-tree/node calculation services and existing report/note/workpaper readers, not by matching company-code prefixes.
+5. Users SHALL be able to review and edit formula bindings before execution; execution results SHALL report applied, skipped, missing and failed cells separately in Chinese UI messages.
+6. A formula run SHALL carry `project_id`, effective `year`, optional `node_key`, source scope, trigger and version/CAS metadata through planning, mutation, persistence and audit records; no front-end-only formula result qualifies as a completed write.
+
+## 需求 9：动态股比事件与正式抵销链路
+
+**用户故事**：作为合并执行人，我希望同一被投资单位在一个期间内发生 1 次、2 次或 3 次以上股比变动时，系统按事件顺序追溯每一段净资产和股比影响，并在确认后进入正式抵销建议/审批链路。
+
+### 验收标准
+
+1. THE share-change model SHALL support 1..N events for a company in a project/year; the UI SHALL generate columns/rows from persisted events and SHALL NOT treat `1 | 2 | 3` as the business limit.
+2. Each event SHALL have a stable event ID, effective date, sequence/order, before ratio, after ratio, source/provenance, review status and optional linked G7 source item; reordering display rows SHALL NOT change event identity.
+3. Events SHALL be sorted deterministically by effective date, then explicit sequence, then stable event ID; missing/duplicate dates or sequence conflicts SHALL be visible validation errors, not silently reordered into a different accounting meaning.
+4. The period model SHALL expose opening net assets, each event-period net assets, ratio delta and closing net assets. The second and later events SHALL be inserted/rendered from the event collection and SHALL not depend on hard-coded `share_change_2/3` sheets.
+5. The dynamic share-change calculation SHALL reconcile to the equity-method simulation and consolidation elimination suggestion chain, including disposal/additional investment, capital reserve/investment income effects and NCI where applicable; a suggestion draft SHALL remain non-posting until user confirmation and approval.
+6. G7-10 and other G7 source rows SHALL be normalized into the same event model with source row identity and provenance; re-import SHALL be idempotent and SHALL not duplicate events.
+7. Formal elimination suggestions SHALL carry project/year/node/source event IDs, calculation version and review status; only approved suggestions may enter the existing elimination recalculation/push chain. G7 linkage metadata alone SHALL NOT be treated as a formal elimination entry.
+8. THE model SHALL provide a trace for three changes in one period: event 1, event 2 and event 3 each show their source data, applicable net-asset period, ratio before/after, calculated adjustment and downstream suggestion/approval state.
+
+## 需求 10：新增范围的测试与运行时验证
+
+1. THE worksheet frontend/backend contract tests SHALL cover parent-year propagation, successful empty data, distinguishable HTTP/load error, prior-year/G7 year propagation and preservation of the left-tree node across right-tab switches.
+2. THE formula runtime tests SHALL use a real persisted worksheet row/object or array shape and verify reader miss/error distinction, adapter persistence, CAS conflict and fresh-read visibility; mocking only a front-end result is insufficient.
+3. THE share-change tests SHALL cover 1, 2, 3 and at least 4 events, deterministic date/sequence ordering, stable IDs, duplicate import idempotency, three-event trace and draft-versus-approved elimination behavior.
+4. WHEN local services are available THEN Playwright SHALL verify root, parent and single-company node behavior, effective-year worksheet request, distinct empty/error states, right-tab context preservation and dynamic 1/2/3-event rendering. Unavailable external data or services SHALL remain explicitly unverified.
+5. Existing requirements 1~6 and properties P1~P9 remain in force; these additions do not mark implementation tasks complete.

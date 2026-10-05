@@ -201,8 +201,20 @@ test.describe('G5-1 D1-3 unified host path', () => {
         )
         .toBeTruthy()
     } catch {
+      // 🔴 提前诊断注册链阻塞（2026-10-04）：D1 的 sync 端点在 manifest 注册链上
+      // 受其他 entry（如 D2 的 contract drift）阻塞时，store-projection 会返回 422。
+      // 这不是 D1 的缺陷——D1 整册门（verify_d1_full_book_real_stack.py）已用隔离式
+      // attach 验证通过。此处如实记录 422 的内容供排查。
+      const non200 = hits.filter((h) => h.kind === 'user_sync' && h.status && h.status >= 400)
+      const registrationBlocked = non200.some(
+        (h) => h.status === 422 && h.url.includes('/store-projection'),
+      )
       throw new Error(
-        `应出现 materialize 200；hits=${JSON.stringify(
+        `应出现 materialize 200；` +
+        (registrationBlocked
+          ? `🔴 store-projection 422 = manifest 注册链阻塞（可能是其他 entry 的 contract drift），D1 本身无缺陷（整册门 EXIT=0）。修复方向：重生成漂移 entry 的 contract 后重跑。`
+          : '') +
+        `hits=${JSON.stringify(
           hits.map((h) => ({
             kind: h.kind,
             status: h.status,

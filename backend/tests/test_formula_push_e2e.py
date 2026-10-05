@@ -476,18 +476,12 @@ async def test_note_section_follows_note_module_template_type(chain, template_ty
     assert (await env.runs())[-1].detail["note_sections"] == [section]
 
 
-# ── 取数失败即推送失败（strict）：不 rollback、不退化成「不按数据集过滤」────────────
+# ── 取数失败隔离到底稿（strict）：失败底稿回滚，运行 partial ────────────────
 
 
 @pytest.mark.asyncio
-async def test_dataset_lookup_failure_fails_the_push(monkeypatch):
-    """``ledger_datasets`` 查不了（缺表 / 连接断开）⇒ 本次推送失败、零写入、留失败记录并推 sync.failed。
-
-    fail-open 口径（去掉 ``get_active_filter`` 的 strict 分支）实测：``rollback`` 撤销了已 flush 的运行记录，
-    过滤退化为不按数据集 ⇒ 两个数据集的 1001.01 叶子同时进种子，``fixed-rmb`` 拿到**被替代版本**的 999；
-    随后照常提交 —— 写入 18 个条目、26 条推送状态，运行记录 0 条，不推 sync.failed，却仍广播
-    ``formula.pushed``（其 run_id 在库中不存在）。即：错数落库且面板与顶栏都看不到失败。
-    """
+async def test_dataset_lookup_failure_isolated_to_workpaper(monkeypatch):
+    """``ledger_datasets`` 查不了 ⇒ 当前底稿零写入，运行记 partial，不降级成全局 failed。"""
     tables = [m.__table__ for m in LEDGER + ADJUSTMENTS if m is not LedgerDataset]
     async with make_env(monkeypatch, extra_tables=tables) as env:
         await _wire(env, monkeypatch)
@@ -496,16 +490,16 @@ async def test_dataset_lookup_failure_fails_the_push(monkeypatch):
         await env.seed_entries({e1_calc.CASH_ROWS_KEY: cash_default_row()})
         before = await env.entries()
 
-        await tb_updated(env, expect_failure=True)  # handler 不冒泡
+        await tb_updated(env)  # handler 不冒泡；单张底稿失败仍提交 partial 运行记录
 
         assert await env.entries() == before
         assert await env.states() == {}
         [run] = await env.runs()
-        assert run.status == "failed" and "ledger_datasets" in run.detail["error"]
-        [evt] = env.failures
-        assert evt.event_type == EventType.SYNC_FAILED and evt.extra["handler"] == "公式推送"
-        assert evt.extra["retry_endpoint"] == f"/api/projects/{env.pid}/formula-push/run"
-        assert env.broadcasts == [], "失败不广播 formula.pushed"
+        assert run.status == "partial"
+        assert run.detail["wp"][0]["status"] == "failed"
+        assert "ledger_datasets" in run.detail["wp"][0]["reason"]
+        assert env.failures == [], "底稿级失败已隔离，不应发送全局 sync.failed"
+        assert [event for event, _ in env.broadcasts] == ["formula.pushed"]
 
 
 # ── 试算表口径与报表引擎同源：科目及其子级标准码（前缀汇总）─────────────────────────
@@ -549,6 +543,14 @@ async def test_tb_context_matches_report_engine_including_sub_level_codes(chain)
     assert snapshot.tb_data["1012"]["期末余额"] == Decimal("21225713.77")
     assert hall["1012"]["aje_net"] == Decimal("5") and adj["101202"]["aje_net"] == Decimal("5")
     assert "1003" not in hall and hall.get("1001", {}).get("aje_net", Decimal("0")) == 0
+
+    # 发生额 = audited_amount - opening_balance，与报表引擎审定模式的 TB(code,'本期发生额') 逐值相等
+    for code in E1_ACCOUNT_CODES:
+        push_occurrence = snapshot.tb_data[code]["本期发生额"]
+        report_occurrence = await report.resolve_tb(code, "本期发生额")
+        assert push_occurrence == report_occurrence, f"发生额口径不一致：{code}"
+    # 1012 子码聚合：期末 21225713.77 - 期初 36418371.85 = 负发生额
+    assert snapshot.tb_data["1012"]["本期发生额"] == Decimal("21225713.77") - Decimal("36418371.85")
 
     # 端到端：试算平衡表数 = 报表货币资金，E1 审定合计计入子级调整
     await env.seed_entries({e1_calc.BANK_VARIANT_KEY: "rmb"})

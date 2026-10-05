@@ -90,6 +90,8 @@ describe('面板（真挂载）', () => {
       '/api/projects/p1/formula-push/rules', '/api/projects/p1/formula-push/latest', '/api/projects/p1/formula-push/states',
     ])
     expect(calls[0].params).toEqual({ wp_code: 'E1' })
+    expect(calls[1].params).toEqual({ year: 2025, wp_code: 'E1' })
+    expect(calls[2].params).toEqual({ year: 2025, wp_code: 'E1' })
     const text = w.text()
     for (const s of ['公式推送 · E1', '最近一次推送', '成功', '触发：试算表更新', '写入 20', '待处理差异（2）',
       '待确认', '人工修改', '在附注模块中处理', '推送规则（1）', '系统值（总是跟随公式）', '试算表含多个公司编码']) {
@@ -106,14 +108,14 @@ describe('面板（真挂载）', () => {
     }
     await w.findAll('button').find((b) => b.text().includes('试跑'))!.trigger('click')
     await flushPromises()
-    expect(calls).toEqual([{ method: 'post', url: '/api/projects/p1/formula-push/run', body: { year: 2025, dry_run: true } }])
+    expect(calls).toEqual([{ method: 'post', url: '/api/projects/p1/formula-push/run', body: { year: 2025, dry_run: true, wp_codes: ['E1'] } }])
     // 四类计数与「最近一次推送」同口径（含未变化）；字段缺失按 0 显示而非 undefined
     expect(w.text()).toContain('试跑结果：将写入 26 项，未变化 9 项，保留 2 项，跳过 5 项（未写入任何数据）')
     calls.length = 0
     responses['post formula-push/run'] = { written_count: 3, kept_count: 1 }
     await w.findAll('button').find((b) => b.text().includes('立即推送'))!.trigger('click')
     await flushPromises()
-    expect(calls[0]).toEqual({ method: 'post', url: '/api/projects/p1/formula-push/run', body: { year: 2025, dry_run: false } })
+    expect(calls[0]).toEqual({ method: 'post', url: '/api/projects/p1/formula-push/run', body: { year: 2025, dry_run: false, wp_codes: ['E1'] } })
     expect(calls.slice(1).every((c) => c.method === 'get')).toBe(true)
   })
 
@@ -172,11 +174,70 @@ describe('面板（真挂载）', () => {
 describe('公式管理弹窗接线（源码级）', () => {
   const src = readFileSync(resolve(__dirname, '../FormulaManagerDialog.vue'), 'utf-8')
 
-  it('「公式推送」页只对后端接入清单中的底稿显示，且主公式表在该页隐藏', () => {
+  it('「公式推送」页对所有底稿显示（含未接入说明），且主公式表在该页隐藏', () => {
     expect(src).not.toContain('PUSH_WP_CODES')
     expect(src).toContain('formulaPush.bindings(props.projectId)')
-    expect(src).toMatch(/<el-tab-pane v-if="pushWpCode && projectId && year" name="formula_push">/)
+    expect(src).toMatch(/<el-tab-pane v-if="projectId && year" name="formula_push">/)
     expect(src).toContain("['user_formulas', 'history', 'formula_push'].includes(activeCategory)")
     expect(src).toContain('<FormulaPushPanel')
+    // 未接入底稿的说明
+    expect(src).toContain('本底稿尚未接入自动推送')
+  })
+})
+
+
+describe('按科目隔离（Task 10）', () => {
+  it('latest 和 states 的请求都带 wp_code 参数', async () => {
+    mountPanel()
+    await flushPromises()
+    const latestCall = calls.find((c) => c.url.includes('/latest'))
+    const statesCall = calls.find((c) => c.url.includes('/states'))
+    expect(latestCall?.params).toEqual({ year: 2025, wp_code: 'E1' })
+    expect(statesCall?.params).toEqual({ year: 2025, wp_code: 'E1' })
+  })
+
+  it('立即推送请求体带 wp_codes', async () => {
+    const w = mountPanel()
+    await flushPromises()
+    calls.length = 0
+    await w.findAll('button').find((b) => b.text().includes('立即推送'))!.trigger('click')
+    await flushPromises()
+    const runCall = calls.find((c) => c.method === 'post' && c.url.includes('/run'))
+    expect(runCall?.body).toEqual({ year: 2025, dry_run: false, wp_codes: ['E1'] })
+  })
+
+  it('全部推送按钮在多 binding 时可见', async () => {
+    const w = mount(FormulaPushPanel, {
+      props: { projectId: 'p1', year: 2025, wpCode: 'E1', supportedWpCodes: ['E1', 'K1'] },
+      global: { plugins: [ElementPlus] },
+    })
+    await flushPromises()
+    const allBtn = w.findAll('button').find((b) => b.text().includes('全部推送'))
+    expect(allBtn).toBeDefined()
+  })
+
+  it('全部推送按钮在单 binding 时隐藏', async () => {
+    const w = mount(FormulaPushPanel, {
+      props: { projectId: 'p1', year: 2025, wpCode: 'E1', supportedWpCodes: ['E1'] },
+      global: { plugins: [ElementPlus] },
+    })
+    await flushPromises()
+    const allBtn = w.findAll('button').find((b) => b.text().includes('全部推送'))
+    expect(allBtn).toBeUndefined()
+  })
+
+  it('全部推送请求体不带 wp_codes（= 后端全量推送语义）', async () => {
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as any)
+    const w = mount(FormulaPushPanel, {
+      props: { projectId: 'p1', year: 2025, wpCode: 'E1', supportedWpCodes: ['E1', 'K1'] },
+      global: { plugins: [ElementPlus] },
+    })
+    await flushPromises()
+    calls.length = 0
+    const allBtn = w.findAll('button').find((b) => b.text().includes('全部推送'))!
+    await allBtn.trigger('click')
+    await flushPromises()
+    const runCall = calls.find((c) => c.method === 'post' && c.url.includes('/run'))
+    expect(runCall?.body).toEqual({ year: 2025, dry_run: false })
   })
 })

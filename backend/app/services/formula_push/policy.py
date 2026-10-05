@@ -202,3 +202,18 @@ def apply_user_action(action: str, *, policy: str, state: str) -> str:
     if state != "locked":
         raise PolicyError(f"只有已锁定的目标可以解锁（当前状态 {state}）")
     return "pending_confirm"
+
+
+def decide_note(*, formula_value: Any, current_value: Any, cell_mode: str | None) -> Decision:
+    """附注单元格判定：以附注自身标记为准（需求 3.5），其余跟随公式值。
+
+    底稿来源章节（``_source=workpaper``）的数值只有「同步到附注」类写入方：附注编辑器的保存落在
+    ``_tables``，而读时投影每次都从 ``sub_table_data`` 重建 ``_tables``（``get_note_detail``）——
+    ``sub_table_data`` 里不存在未带标记的人工值，推送与点「同步到附注」同效。保留的只有单元格
+    ``_cell_modes`` manual / locked 与整节 ``_manual_override``（已折算进 ``cell_mode``）。
+    推送状态表不参与附注判定（面板对附注目标不提供采用 / 锁定，见 ``panel._checked_targets``）：
+    否则上次因附注标记记下的 locked，会在用户去掉标记后冒充面板锁定继续挡住推送。
+    """
+    if cell_mode is not None:
+        return decide("editable", formula_value=formula_value, current_value=current_value, external_mode=cell_mode)
+    return decide("derived", formula_value=formula_value, current_value=current_value)

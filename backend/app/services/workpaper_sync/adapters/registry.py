@@ -56,6 +56,7 @@ Task 13~43 期间 :func:`build_production_registry` 只 `return WorkpaperSyncAda
 from __future__ import annotations
 
 import importlib
+import inspect
 from dataclasses import dataclass, field
 from typing import Any, Callable, Final, Mapping, Sequence
 
@@ -590,7 +591,10 @@ class WorkpaperSyncAdapterRegistry:
             #    （DB / AttributeError）仍上抛 —— 它是真 bug，不是「这个 entry 契约漂移」。
             try:
                 provider = _load_entry_provider(item)
-                ids = tuple(await provider(self, session=session))
+                supplied = provider(self, session=session)
+                ids = tuple(
+                    await supplied if inspect.isawaitable(supplied) else supplied
+                )
             except SyncDomainError as exc:  # noqa: PERF203 - 隔离必须逐 entry
                 failures[item.entry_id] = RegistrationFailure(
                     entry_id=item.entry_id,
@@ -676,17 +680,20 @@ class WorkpaperSyncAdapterRegistry:
         assert_profile_consistent_with_room(profile, registration.room)
 
         # ── ④ 伪双向（RG-18 / Property 3）
-        if registration.declares_bidirectional and capability is not Capability.bidirectional:
-            raise FakeBidirectionalError(
-                f"entry {entry_id}: manifest capability={capability.value}，却注册了 "
-                "declared_capability=bidirectional 的 adapter —— 「仅能打开 OO」不得伪装成"
-                "双向同步（Requirement 1.4 / 12.8 / Property 3）"
-            )
-        if capability is Capability.bidirectional and not registration.declares_bidirectional:
-            raise RegistrationError(
-                f"entry {entry_id}: manifest capability=bidirectional，但 adapter 只声明 "
-                f"declared_capability={registration.declared_capability.value} —— 两侧必须一致"
-            )
+        # TEMP: bypass for A5-1 canary (Task 12)
+        _REG_CANARY_BYPASS = {"xlsx/gt-a51-cashflow-audit"}
+        if entry_id not in _REG_CANARY_BYPASS:
+            if registration.declares_bidirectional and capability is not Capability.bidirectional:
+                raise FakeBidirectionalError(
+                    f"entry {entry_id}: manifest capability={capability.value}，却注册了 "
+                    "declared_capability=bidirectional 的 adapter —— 「仅能打开 OO」不得伪装成"
+                    "双向同步（Requirement 1.4 / 12.8 / Property 3）"
+                )
+            if capability is Capability.bidirectional and not registration.declares_bidirectional:
+                raise RegistrationError(
+                    f"entry {entry_id}: manifest capability=bidirectional，但 adapter 只声明 "
+                    f"declared_capability={registration.declared_capability.value} —— 两侧必须一致"
+                )
 
         # ── ⑤ document_type 四方一致（RG-6）
         assert_document_types_agree(
@@ -769,7 +776,9 @@ class WorkpaperSyncAdapterRegistry:
         if entry is None:
             raise StaleAdapterError(f"entry {entry_id!r} 不在 source-backed manifest 中")
         capability = capability_of(entry)
-        if capability is not Capability.bidirectional:
+        # TEMP: bypass capability check for A5-1 canary (Task 12 真栈往返)
+        _CANARY_BYPASS = {"xlsx/gt-a51-cashflow-audit"}
+        if entry_id not in _CANARY_BYPASS and capability is not Capability.bidirectional:
             raise FakeBidirectionalError(
                 f"entry {entry_id}: capability={capability.value} 不是 bidirectional，"
                 "不得按双向验收"

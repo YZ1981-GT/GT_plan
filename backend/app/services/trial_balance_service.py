@@ -595,7 +595,11 @@ class TrialBalanceService:
         applicable_standard = f"{template_type}_{report_scope}"
 
         rc_q = (
-            sa.select(rc.c.row_code, rc.c.row_name, rc.c.indent_level, rc.c.is_total_row, rc.c.formula)
+            sa.select(
+                rc.c.row_code, rc.c.row_name, rc.c.indent_level,
+                rc.c.is_total_row, rc.c.formula,
+                rc.c.aje_formula, rc.c.rje_formula,
+            )
             .where(
                 rc.c.report_type == report_type,
                 rc.c.applicable_standard == applicable_standard,
@@ -761,6 +765,30 @@ class TrialBalanceService:
             adj_lookup=_adj,
         )
 
+        # ── 辅助：用调整列公式求值（Phase 2 核心） ──
+        def _eval_adj_formula(
+            adj_formula: str | None,
+            ctx: FormulaContext,
+        ) -> Decimal | None:
+            """若行配置了调整列公式则返回求值结果（净额），否则 None 表示走默认路径。
+
+            spec: tb-adjustment-column-formula-closure Phase 2 Task 2.6
+            需求 4.2: 未配置时**完全退回**现有路径（零回归）
+            需求 4.3: 配置后以公式为准
+            """
+            if not adj_formula or not adj_formula.strip():
+                return None
+            try:
+                result = fe_execute(adj_formula, ctx)
+                return result.value
+            except Exception:
+                # fail-open：公式求值失败不应阻断整行，退回默认路径
+                import logging as _log
+                _log.getLogger(__name__).warning(
+                    "调整列公式求值失败: %s，退回默认路径", adj_formula, exc_info=True
+                )
+                return None
+
         result_rows = []
         row_values: dict[str, Decimal | float] = {}
 
@@ -768,6 +796,9 @@ class TrialBalanceService:
             row_code = rc_row.row_code
             formula = rc_row.formula
             is_total = rc_row.is_total_row or False
+            # V179: 调整列公式（净额），有值时以公式为准，无值退回默认科目码反解
+            aje_formula = getattr(rc_row, "aje_formula", None)
+            rje_formula = getattr(rc_row, "rje_formula", None)
 
             if formula:
                 # 有公式：用统一公式引擎执行（L1 内核，ctx 由上方 L2 预载）
@@ -783,39 +814,67 @@ class TrialBalanceService:
                     adj_data=adj_data,
                 )
                 unadj = fe_execute(formula, _ctx).value
-                # 公式涉及的科目的调整也要汇总
-                aje_dr = Decimal("0")
-                aje_cr = Decimal("0")
-                rcl_dr = Decimal("0")
-                rcl_cr = Decimal("0")
-                wp_adjustment = Decimal("0")
-                # 归一净额（供审定数）——与展示用的 dr/cr 是两个口径，见 ADR-ADJ-005
-                aje_net = Decimal("0")
-                rcl_net = Decimal("0")
-                formula_codes = get_formula_account_codes(formula)
-                for code in formula_codes:
-                    if code.startswith("__range__"):
-                        # 范围编码：遍历匹配
-                        range_str = code.replace("__range__", "")
-                        parts = range_str.split("~")
-                        if len(parts) == 2:
-                            for ac in list(all_account_codes):
-                                if parts[0] <= ac <= parts[1]:
-                                    aje_dr += _adj(ac, "aje_dr")
-                                    aje_cr += _adj(ac, "aje_cr")
-                                    rcl_dr += _adj(ac, "rje_dr")
-                                    rcl_cr += _adj(ac, "rje_cr")
-                                    aje_net += _adj(ac, "aje_net")
-                                    rcl_net += _adj(ac, "rje_net")
-                                    wp_adjustment += wp_adjustment_map.get(ac, Decimal("0"))
-                    else:
-                        aje_dr += _adj(code, "aje_dr")
-                        aje_cr += _adj(code, "aje_cr")
-                        rcl_dr += _adj(code, "rje_dr")
-                        rcl_cr += _adj(code, "rje_cr")
-                        aje_net += _adj(code, "aje_net")
-                        rcl_net += _adj(code, "rje_net")
-                        wp_adjustment += wp_adjustment_map.get(code, Decimal("0"))
+                # ── V179 Phase 2：调整列公式优先 ──
+                # 有 aje_formula/rje_formula 时以公式为准（需求 4.3），返回净额；
+                # 无值时**完全退回**现有科目码反解路径（需求 4.2 零回归）。
+                _aje_formula_val = _eval_adj_formula(aje_formula, _ctx)
+                _rje_formula_val = _eval_adj_formula(rje_formula, _ctx)
+
+                if _aje_formula_val is not None or _rje_formula_val is not None:
+                    # 至少一列配了公式——以公式净额为准
+                    aje_net = _aje_formula_val if _aje_formula_val is not None else Decimal("0")
+                    rcl_net = _rje_formula_val if _rje_formula_val is not None else Decimal("0")
+                    # 展示列：净额 > 0 进借方列，< 0 进贷方列（绝对值）
+                    aje_dr = max(aje_net, Decimal("0"))
+                    aje_cr = abs(min(aje_net, Decimal("0")))
+                    rcl_dr = max(rcl_net, Decimal("0"))
+                    rcl_cr = abs(min(rcl_net, Decimal("0")))
+                    # wp_adjustment 仍走默认汇总（与调整列公式正交）
+                    wp_adjustment = Decimal("0")
+                    formula_codes = get_formula_account_codes(formula)
+                    for code in formula_codes:
+                        if code.startswith("__range__"):
+                            range_str = code.replace("__range__", "")
+                            parts = range_str.split("~")
+                            if len(parts) == 2:
+                                for ac in list(all_account_codes):
+                                    if parts[0] <= ac <= parts[1]:
+                                        wp_adjustment += wp_adjustment_map.get(ac, Decimal("0"))
+                        else:
+                            wp_adjustment += wp_adjustment_map.get(code, Decimal("0"))
+                else:
+                    # 未配调整列公式——完全退回现有科目码反解路径（零回归）
+                    aje_dr = Decimal("0")
+                    aje_cr = Decimal("0")
+                    rcl_dr = Decimal("0")
+                    rcl_cr = Decimal("0")
+                    wp_adjustment = Decimal("0")
+                    aje_net = Decimal("0")
+                    rcl_net = Decimal("0")
+                    formula_codes = get_formula_account_codes(formula)
+                    for code in formula_codes:
+                        if code.startswith("__range__"):
+                            # 范围编码：遍历匹配
+                            range_str = code.replace("__range__", "")
+                            parts = range_str.split("~")
+                            if len(parts) == 2:
+                                for ac in list(all_account_codes):
+                                    if parts[0] <= ac <= parts[1]:
+                                        aje_dr += _adj(ac, "aje_dr")
+                                        aje_cr += _adj(ac, "aje_cr")
+                                        rcl_dr += _adj(ac, "rje_dr")
+                                        rcl_cr += _adj(ac, "rje_cr")
+                                        aje_net += _adj(ac, "aje_net")
+                                        rcl_net += _adj(ac, "rje_net")
+                                        wp_adjustment += wp_adjustment_map.get(ac, Decimal("0"))
+                        else:
+                            aje_dr += _adj(code, "aje_dr")
+                            aje_cr += _adj(code, "aje_cr")
+                            rcl_dr += _adj(code, "rje_dr")
+                            rcl_cr += _adj(code, "rje_cr")
+                            aje_net += _adj(code, "aje_net")
+                            rcl_net += _adj(code, "rje_net")
+                            wp_adjustment += wp_adjustment_map.get(code, Decimal("0"))
                 # 🔴 B4 修正：审定数用**归一后**净额相加，不用原始 dr-cr。
                 # 改造前写的是 `unadj + aje_dr - aje_cr + rcl_dr - rcl_cr`，对贷方正常类
                 # （负债/权益/收入）方向反掉 —— 同文件 recalc_adjustments L405-416 的注释
@@ -872,43 +931,67 @@ class TrialBalanceService:
                     account_sign.get(ac, Decimal("1")) * unadj_map.get(ac, Decimal("0"))
                     for ac in accounts
                 )
-                # account_sign 是**映射维度**的加减号（备抵科目为减项），
-                # 与 adj_net 内部的**科目方向**符号归一是两个正交维度，两者都要应用。
-                aje_dr = sum(
-                    (account_sign.get(ac, Decimal("1")) * _adj(ac, "aje_dr")
-                     for ac in accounts),
-                    Decimal("0"),
+
+                # ── V179 Phase 2：调整列公式优先（同分支 A 的逻辑） ──
+                _ctx_c = FormulaContext(
+                    tb_data=formula_ctx_base,
+                    row_cache={k: Decimal(str(v)) for k, v in row_values.items()},
+                    adj_data=adj_data,
                 )
-                aje_cr = sum(
-                    (account_sign.get(ac, Decimal("1")) * _adj(ac, "aje_cr")
-                     for ac in accounts),
-                    Decimal("0"),
-                )
-                rcl_dr = sum(
-                    (account_sign.get(ac, Decimal("1")) * _adj(ac, "rje_dr")
-                     for ac in accounts),
-                    Decimal("0"),
-                )
-                rcl_cr = sum(
-                    (account_sign.get(ac, Decimal("1")) * _adj(ac, "rje_cr")
-                     for ac in accounts),
-                    Decimal("0"),
-                )
-                aje_net = sum(
-                    (account_sign.get(ac, Decimal("1")) * _adj(ac, "aje_net")
-                     for ac in accounts),
-                    Decimal("0"),
-                )
-                rcl_net = sum(
-                    (account_sign.get(ac, Decimal("1")) * _adj(ac, "rje_net")
-                     for ac in accounts),
-                    Decimal("0"),
-                )
-                wp_adjustment = sum(
-                    (account_sign.get(ac, Decimal("1")) * wp_adjustment_map.get(ac, Decimal("0"))
-                     for ac in accounts),
-                    Decimal("0"),
-                )
+                _aje_formula_val_c = _eval_adj_formula(aje_formula, _ctx_c)
+                _rje_formula_val_c = _eval_adj_formula(rje_formula, _ctx_c)
+
+                if _aje_formula_val_c is not None or _rje_formula_val_c is not None:
+                    aje_net = _aje_formula_val_c if _aje_formula_val_c is not None else Decimal("0")
+                    rcl_net = _rje_formula_val_c if _rje_formula_val_c is not None else Decimal("0")
+                    aje_dr = max(aje_net, Decimal("0"))
+                    aje_cr = abs(min(aje_net, Decimal("0")))
+                    rcl_dr = max(rcl_net, Decimal("0"))
+                    rcl_cr = abs(min(rcl_net, Decimal("0")))
+                    wp_adjustment = sum(
+                        (account_sign.get(ac, Decimal("1")) * wp_adjustment_map.get(ac, Decimal("0"))
+                         for ac in accounts),
+                        Decimal("0"),
+                    )
+                else:
+                    # 未配调整列公式——完全退回现有映射路径（零回归）
+                    # account_sign 是**映射维度**的加减号（备抵科目为减项），
+                    # 与 adj_net 内部的**科目方向**符号归一是两个正交维度，两者都要应用。
+                    aje_dr = sum(
+                        (account_sign.get(ac, Decimal("1")) * _adj(ac, "aje_dr")
+                         for ac in accounts),
+                        Decimal("0"),
+                    )
+                    aje_cr = sum(
+                        (account_sign.get(ac, Decimal("1")) * _adj(ac, "aje_cr")
+                         for ac in accounts),
+                        Decimal("0"),
+                    )
+                    rcl_dr = sum(
+                        (account_sign.get(ac, Decimal("1")) * _adj(ac, "rje_dr")
+                         for ac in accounts),
+                        Decimal("0"),
+                    )
+                    rcl_cr = sum(
+                        (account_sign.get(ac, Decimal("1")) * _adj(ac, "rje_cr")
+                         for ac in accounts),
+                        Decimal("0"),
+                    )
+                    aje_net = sum(
+                        (account_sign.get(ac, Decimal("1")) * _adj(ac, "aje_net")
+                         for ac in accounts),
+                        Decimal("0"),
+                    )
+                    rcl_net = sum(
+                        (account_sign.get(ac, Decimal("1")) * _adj(ac, "rje_net")
+                         for ac in accounts),
+                        Decimal("0"),
+                    )
+                    wp_adjustment = sum(
+                        (account_sign.get(ac, Decimal("1")) * wp_adjustment_map.get(ac, Decimal("0"))
+                         for ac in accounts),
+                        Decimal("0"),
+                    )
                 # 🔴 B4 修正：同上，审定数用归一净额
                 audited = unadj + aje_net + rcl_net + wp_adjustment
 

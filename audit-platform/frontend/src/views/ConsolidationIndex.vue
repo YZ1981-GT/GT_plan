@@ -104,7 +104,15 @@
     <el-tabs v-model="activeTab" class="gt-consol-tabs">
       <!-- Tab 0: 合并工作底稿 -->
       <el-tab-pane label="合并工作底稿" name="worksheets">
-        <ConsolWorksheetTabs ref="consolWorksheetTabsRef" />
+        <ConsolWorksheetTabs
+          v-if="worksheetContextReady"
+          :key="worksheetContextKey"
+          ref="consolWorksheetTabsRef"
+          :project-id="projectId"
+          :year="effectiveConsolYear()"
+          :consol-mode="treeMode"
+          :is-root-selection="currentConsolEntity.nodeKey === groupTree[0]?.node_key"
+        />
       </el-tab-pane>
 
       <!-- Tab 1: 集团架构 -->
@@ -187,7 +195,7 @@
         <ConsolTrialBalanceTab
           ref="consolTbTabRef"
           :project-id="projectId"
-          :year="treeYear"
+          :year="effectiveConsolYear()"
           :tree="groupTree[0] || null"
           @audit="onTbAudit"
           @cell-context-menu="onTbCellContextMenu"
@@ -228,7 +236,7 @@
             v-if="consolReportView === 'breakdown'"
             ref="consolBreakdownViewRef"
             :project-id="projectId"
-            :year="treeYear"
+            :year="effectiveConsolYear()"
             :report-type="consolReportType"
             :tree="groupTree[0] || null"
           />
@@ -238,7 +246,7 @@
               :rows="consolReportRows"
               :eq-columns="eqColumns"
               :eq-total-cols="eqTotalCols"
-              :year="projectInfo.year"
+              :year="effectiveConsolYear()"
               :table-max-height="consolEquityTableHeight"
               :cell-class-name="() => ''"
               :font-size="displayPrefs.fontConfig.tableFont"
@@ -351,7 +359,7 @@
         <ConsolNoteTab
           ref="consolNoteTabRef"
           :project-id="projectId"
-          :year="treeYear ?? projectInfo.year"
+          :year="effectiveConsolYear()"
           :standard="consolReportTemplateType"
           :current-entity="currentConsolEntity"
           :group-tree="groupTree"
@@ -536,7 +544,7 @@
     <ConsolElimNodePanel
       v-model="elimPanelVisible"
       :project-id="projectId"
-      :year="treeYear"
+      :year="effectiveConsolYear()"
       :node="elimPanelNode"
       :tree="groupTree[0] || null"
       @changed="onElimChanged"
@@ -558,6 +566,7 @@ import {
   type ConsolPushStatus,
   type ConsolTreeDiagnostic,
   type ConsolTreeNode,
+  type CurrentConsolEntity,
 } from '@/services/consolidationApi'
 import { api } from '@/services/apiProxy'
 import { projects as P_proj, reportConfig as P_rc, reportMapping as P_rm, consolNoteSections as P_cn, reports as reportPaths, consolidation as P_consol } from '@/services/apiPaths'
@@ -572,6 +581,7 @@ import {
   buildNameIndex,
   canEnterProject,
   countNodes,
+  currentConsolEntityForNode,
   findNodeByKey,
   flagTags,
   isElimNode,
@@ -600,6 +610,13 @@ import GtToolbar from '@/components/common/GtToolbar.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { useConsolReportAddress } from '@/components/consolidation/composables/useConsolReportAddress'
+import {
+  cacheScopeKey as _cacheScopeKey,
+  reportCacheKey as _reportCacheKey,
+  noteCacheKey as _noteCacheKey,
+  clearEntityCache as _clearEntityCache,
+} from '@/components/consolidation/composables/consolCacheKeys'
+import { createConsolRequestGuard } from '@/components/consolidation/composables/consolRequestGuard'
 import ReportEquityTable from '@/components/report/ReportEquityTable.vue'
 import { useReportColumns } from '@/views/composables/useReportColumns'
 import { handleApiError } from '@/utils/errorHandler'
@@ -624,9 +641,17 @@ const consolEvents = useProjectEvents(projectId)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
 
 // ─── 批注与复核持久化（合并报表/试算表共用） ─────────────────────────────────
-const consolComments = useCellComments(() => projectId.value, () => year.value, 'consol_report')
+const consolComments = useCellComments(() => projectId.value, effectiveConsolYear, 'consol_report')
 
 const activeTab = ref('worksheets')
+const projectInfoLoaded = ref(false)
+const groupTreeLoaded = ref(false)
+const worksheetContextReady = computed(() => (
+  projectInfoLoaded.value
+  && groupTreeLoaded.value
+  && Boolean(projectId.value && effectiveConsolYear())
+))
+const worksheetContextKey = computed(() => `${projectId.value}:${effectiveConsolYear()}`)
 const consolWorksheetTabsRef = ref<InstanceType<typeof ConsolWorksheetTabs> | null>(null)
 const consolNoteTabRef = ref<InstanceType<typeof ConsolNoteTab> | null>(null)
 const consolTbTabRef = ref<InstanceType<typeof ConsolTrialBalanceTab> | null>(null)
@@ -736,6 +761,12 @@ function _stopRefreshTracking() {
  */
 async function onRefreshAll() {
   if (refreshAllLoading.value) return
+  const effectiveYear = effectiveConsolYear()
+  if (!projectId.value || !effectiveYear) {
+    refreshAllLoading.value = false
+    refreshProgress.visible = false
+    return
+  }
   refreshAllLoading.value = true
   refreshProgress.visible = true
   refreshProgress.step = ''
@@ -744,7 +775,7 @@ async function onRefreshAll() {
   refreshProgress.node = ''
   let jobId = ''
   try {
-    const res: any = await api.post(P_consol.refreshAll(projectId.value, year.value))
+    const res: any = await api.post(P_consol.refreshAll(projectId.value, effectiveYear))
     jobId = res?.job_id || ''
     ElMessage.success('已开始一键刷新，正在更新整棵树的报表与附注…')
     _startRefreshTracking(jobId)
@@ -768,7 +799,7 @@ function _startRefreshTracking(jobId: string) {
       // 刷新当前 tab 数据
       if (activeTab.value === 'consol_report') reloadConsolReportView()
       else if (activeTab.value === 'consol_note') loadConsolNoteTree(true)
-      eventBus.emit('consol-refresh-done', { projectId: projectId.value, year: year.value })
+      eventBus.emit('consol-refresh-done', { projectId: projectId.value, year: effectiveConsolYear() })
     } else if (msg) {
       ElMessage.error(msg)
     }
@@ -805,7 +836,7 @@ function _startRefreshTracking(jobId: string) {
   const poll = async () => {
     polls += 1
     try {
-      const st: any = await api.get(P_consol.refreshStatus(projectId.value, year.value, jobId))
+      const st: any = await api.get(P_consol.refreshStatus(projectId.value, effectiveConsolYear(), jobId))
       if (st?.status === 'completed') {
         const errCount = Array.isArray(st.errors) ? st.errors.length : 0
         finish(true, errCount > 0 ? `一键刷新完成（${errCount} 步部分失败，请检查）` : '一键刷新完成')
@@ -838,7 +869,7 @@ async function onReaggregateNotes() {
   if (reaggregateLoading.value) return
   reaggregateLoading.value = true
   try {
-    const res: any = await api.post(P_consol.notes.reaggregate(projectId.value, year.value))
+    const res: any = await api.post(P_consol.notes.reaggregate(projectId.value, effectiveConsolYear()))
     const updated = res?.sections_updated ?? res?.sections_processed ?? 0
     const errCount = Array.isArray(res?.errors) ? res.errors.length : 0
     if (errCount > 0) {
@@ -890,11 +921,13 @@ const barYearOptions = computed(() => {
 
 function onYearChange() {
   // 年度切换后让企业树年度与报表/附注读取口径保持一致。
+  groupTreeLoaded.value = false
   treeYear.value = projectInfo.year
   reportCache.clear()
   noteCache.clear()
   loadConsolReport(true)
   loadConsolNoteTree(true)
+  void loadGroupTree()
 }
 
 function onStandardChange() {
@@ -907,7 +940,7 @@ function onStandardChange() {
 }
 
 function onOpenFormula() {
-  const effectiveYear = treeYear.value ?? projectInfo.year
+  const effectiveYear = effectiveConsolYear()
   if (activeTab.value === 'consol_note') {
     const section = consolNoteTabRef.value?.selectedNoteSection
     eventBus.emit('open-formula-manager', {
@@ -1076,7 +1109,7 @@ async function loadDrillDownData() {
     }
     const result: any = await api.post(P_rc.drillDown, {
       project_id: projectId.value,
-      year: treeYear.value ?? year.value,
+      year: effectiveConsolYear(),
       report_type: reportType,
       row_code: rowCode,
       // 试算页选了下级汇总节点 ⇒ 按该节点的直接下级分解（与页面显示的数同一节点）
@@ -1171,6 +1204,7 @@ async function exportDrillDown() {
 }
 
 async function loadProjectInfo() {
+  projectInfoLoaded.value = false
   try {
     const data = await api.get(P_proj.detail(projectId.value), { validateStatus: (s: number) => s < 600 })
     const p = data
@@ -1186,7 +1220,10 @@ async function loadProjectInfo() {
         return
       }
     }
-  } catch { /* ignore */ }
+    projectInfoLoaded.value = true
+  } catch {
+    projectInfoLoaded.value = false
+  }
 }
 
 // ─── Tab 1: 集团架构（企业树只渲染后端三码推导结果，需求 9.1）─────────────────────
@@ -1258,6 +1295,7 @@ function onReaggregateNow() {
  * 不再回退 listChildProjects：项目列表接口不支持按上级项目过滤，回退结果是全部可见项目（F13）。
  */
 async function loadGroupTree() {
+  groupTreeLoaded.value = false
   try {
     const res = await getWorksheetTree(projectId.value)
     groupTree.value = res?.tree ? [res.tree] : []
@@ -1267,12 +1305,14 @@ async function loadGroupTree() {
     treeMessage.value = res?.tree ? '' : (res?.message || '')
     treeDiagnostics.value = Array.isArray(res?.diagnostics) ? res.diagnostics : []
     diagnosticsDismissed.value = false
+    groupTreeLoaded.value = true
   } catch {
     groupTree.value = []
     treeMode.value = null
     treeModeLabel.value = null
     treeDiagnostics.value = []
     treeMessage.value = '加载企业树失败，请稍后重试'
+    groupTreeLoaded.value = false
   }
   // 树变化后刷新选中节点与面板节点的引用（节点可能已消失）
   const root = groupTree.value[0]
@@ -1288,7 +1328,17 @@ async function loadGroupTree() {
 
 function onTreeNodeClick(data: ConsolTreeNode) {
   selectedNode.value = data
-  if (isElimNode(data)) openElimPanel(data)
+  if (isElimNode(data)) {
+    openElimPanel(data)
+    return
+  }
+  currentConsolEntity.value = currentConsolEntityForNode(data)
+  if (activeTab.value === 'consol_report') reloadConsolReportView()
+  else if (activeTab.value === 'consol_note') {
+    const section = consolNoteTabRef.value?.selectedNoteSection
+    if (section?.section_id) consolNoteTabRef.value?.onNoteNodeClick(section)
+    else loadConsolNoteTree()
+  }
 }
 
 // ── 合并范围模板保存/引用 ──
@@ -1312,7 +1362,7 @@ function canOpenSubConsol(node: ConsolTreeNode | null): boolean {
 
 function goToProject(node: ConsolTreeNode | null) {
   if (!canOpenSubConsol(node)) return
-  router.push({ path: `/projects/${node!.project_id}/consolidation`, query: treeYear.value ? { year: String(treeYear.value) } : undefined })
+  router.push({ path: `/projects/${node!.project_id}/consolidation`, query: { year: String(effectiveConsolYear()) } })
 }
 
 /**
@@ -1378,7 +1428,6 @@ const consolReportLoading = ref(false)
 
 // 当前选中的合并主体（树形节点），每个合并节点有独立的报表和附注
 const ROOT_CONSOL_NODE_KEY = 'root:consol'
-type CurrentConsolEntity = { code: string; name: string; nodeKey: string }
 const currentConsolEntity = ref<CurrentConsolEntity>({ code: '', name: '', nodeKey: ROOT_CONSOL_NODE_KEY })
 
 function effectiveEntityYear(): number {
@@ -1456,41 +1505,32 @@ const {
 })
 
 // ─── 前端缓存：按项目/年度/节点身份/报表类型缓存，刷新时精确清理 ──────────
+// 纯逻辑已提取到 consolCacheKeys.ts（可测试）；这里仅组装当前 reactive 参数。
 const reportCache = new Map<string, any[]>()
 const noteCache = new Map<string, any[]>()
 
 function cacheScopeKey(nodeKey = currentEntityNodeKey()): string {
-  return `${projectId.value}:${effectiveEntityYear()}:${nodeKey}`
+  return _cacheScopeKey(projectId.value, effectiveEntityYear(), nodeKey)
 }
 
 function reportCacheKey(): string {
-  return `${cacheScopeKey()}:${consolReportType.value}:${consolReportTemplateType.value}`
+  return _reportCacheKey(projectId.value, effectiveEntityYear(), currentEntityNodeKey(), consolReportType.value, consolReportTemplateType.value)
 }
 function noteCacheKey(): string {
-  return `${cacheScopeKey()}:notes:${consolNoteTemplateType.value}`
+  return _noteCacheKey(projectId.value, effectiveEntityYear(), currentEntityNodeKey(), consolNoteTemplateType.value)
 }
 /** 清除指定树节点的缓存（刷新时调用；不能按企业代码清理同企业的其他角色节点） */
 function clearEntityCache(nodeKey: string, types?: string[]) {
-  const prefix = `${cacheScopeKey(nodeKey)}:`
-  if (!types || types.includes('all_reports')) {
-    for (const key of reportCache.keys()) {
-      if (key.startsWith(prefix)) reportCache.delete(key)
-    }
-  } else {
-    for (const t of types) {
-      if (['balance_sheet', 'income_statement', 'cash_flow_statement', 'equity_statement', 'cash_flow_supplement', 'impairment_provision'].includes(t)) {
-        for (const standard of ['soe', 'listed']) {
-          reportCache.delete(`${prefix}${t}:${standard}`)
-        }
-      }
-    }
-  }
-  if (!types || types.includes('notes')) {
-    for (const key of noteCache.keys()) {
-      if (key.startsWith(`${prefix}notes:`)) noteCache.delete(key)
-    }
-  }
+  _clearEntityCache(reportCache, noteCache, projectId.value, effectiveEntityYear(), nodeKey, types)
 }
+
+// ─── 请求上下文保护：切项目/年度/nodeKey 后旧响应不得提交（设计 §七、P9）──────
+// 每次异步加载前 startRequest 递增序号并快照上下文；响应提交前 isStale 校验。
+const reportRequestGuard = createConsolRequestGuard(() => ({
+  projectId: projectId.value,
+  year: effectiveEntityYear(),
+  nodeKey: currentEntityNodeKey(),
+}))
 
 function consolReportRowClass({ row }: { row: any }) {
   if (row.is_total_row) return 'gt-total-row'
@@ -1622,17 +1662,24 @@ async function loadConsolReport(forceRefresh = false) {
     consolReportRows.value = reportCache.get(cacheKey)!
     return
   }
+  // §七 请求上下文保护：快照当前上下文与序号，响应提交前校验（P9）
+  const ticket = reportRequestGuard.startRequest()
   consolReportLoading.value = true
   try {
+    const nodeKey = currentEntityNodeKey()
     const rows = await api.get(
       P_consol.reports.list(projectId.value, effectiveEntityYear()),
-      { params: { report_type: consolReportType.value } },
+      { params: { report_type: consolReportType.value, node_key: nodeKey } },
     )
+    // 响应到达：上下文或序号已变则丢弃（切换节点后旧请求先返回的场景）
+    if (reportRequestGuard.isStale(ticket)) return
     const result = Array.isArray(rows) ? rows : []
     consolReportRows.value = result
     reportCache.set(cacheKey, result)
     consolComments.loadComments(`report_${consolReportType.value}`)
   } catch (err: any) {
+    // 过期请求的错误也丢弃，不清空当前节点数据
+    if (reportRequestGuard.isStale(ticket)) return
     if (err?.response?.status === 404) {
       consolReportRows.value = []
     } else {

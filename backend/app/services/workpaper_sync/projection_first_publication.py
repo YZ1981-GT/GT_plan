@@ -684,6 +684,8 @@ async def publish_first_generation(
             anchors_from_instrumentation_specs(provider.instrumentation_specs())
             if callable(getattr(provider, "instrumentation_specs", None))
             else anchors_from_instrumentation_spec(provider.instrumentation_spec())
+            if callable(getattr(provider, "instrumentation_spec", None))
+            else _static_structure_anchors(provider)  # 纯静态 entry
         ),
         reason="content_commit",
     )
@@ -692,6 +694,31 @@ async def publish_first_generation(
         mutation=BusinessMutation(projection=projection),
         adapter=adapter,
     )
+
+
+def _static_structure_anchors(provider: Any) -> tuple[dict[str, str], ...]:
+    """纯静态 entry 的结构锚点——从 `static_only_instrumentation_spec` 投影。
+
+    与 `collect_workbook_structure` 的静态路径使用同一组键
+    （`sheet_key` / `defined_name` / `anchor` / `region_kind`），确保
+    发布时刻与请求时刻算出的 `structure_hash` 可比。
+    """
+    from app.services.workpaper_sync.excel_instrumentation import GT_SYNC_SHEET_NAME
+
+    static_fn = getattr(provider, "static_only_instrumentation_spec", None)
+    if not callable(static_fn):
+        return ()
+    spec = static_fn()
+    anchors = []
+    for region in spec.static_regions:
+        anchors.append({
+            "sheet_key": region.sheet_key,
+            "defined_name": region.defined_name,
+            "anchor": "defined_name_ref",
+            "region_kind": "static",
+            "metadata_sheet": GT_SYNC_SHEET_NAME,
+        })
+    return tuple(anchors)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -839,7 +866,43 @@ def _observe_identity_inventory(*, instrumented: Any, provider: Any) -> Any:
     锚点全部取自 provider 的冻结常量与 instrumentation 产出，**不猜**：
     `uuid_sheet_id` 用 instrumentation 当时记下的 sheetId（sheetId 不随展示名变化，
     是用户改 sheet 名后唯一还能定位的锚点）。
+
+    纯静态 entry（provider 暴露 `static_only_instrumentation_spec` 而非行表 spec）
+    走 `collect_workbook_structure` 的静态路径，返回 `StaticIdentityInventory`。
     """
+    # ── 纯静态 entry 分支 ──────────────────────────────────────────
+    static_only_fn = getattr(provider, "static_only_instrumentation_spec", None)
+    specs_fn = getattr(provider, "instrumentation_specs", None)
+    spec_fn = getattr(provider, "instrumentation_spec", None)
+    if callable(static_only_fn) and not callable(specs_fn) and not callable(spec_fn):
+        # 纯静态 entry：用 published_identity_observer 的静态路径取 identity inventory
+        from app.services.workpaper_sync.published_identity_observer import (
+            collect_workbook_structure,
+        )
+        contract = provider.load_contract_from_disk()
+        payload = provider.instrumentation_definition_payload()
+        # 从 payload 构建锚点（与 _frozen_sheet_anchors 同口径）
+        static_anchors = []
+        for ss in payload.get("static_sheets", []):
+            rbl = ss.get("region_boundary_locator", {})
+            static_anchors.append({
+                "sheet_key": ss["sheet_key"],
+                "defined_name": rbl.get("defined_name", ""),
+                "anchor": rbl.get("anchor", "defined_name_ref"),
+                "region_kind": rbl.get("region_kind", "static"),
+            })
+        _, _, inventory, _ = collect_workbook_structure(
+            data=instrumented.instrumented_bytes,
+            contract=contract,
+            sheet_anchors=tuple(static_anchors),
+        )
+        if inventory is None:
+            raise SubstrateStagingError(
+                "纯静态 entry 的 collect_workbook_structure 返回 None identity inventory"
+            )
+        return inventory
+
+    # ── 行表 entry 原路径（不动）──────────────────────────────────
     from app.services.excel_structure_fingerprint import (
         GT_SYNC_SHEET_NAME,
         identity_inventory,
@@ -1309,7 +1372,20 @@ def _store_projection_for_provider(
             "`build_store_projection` —— projection-based commit 必须提交业务 projection，"
             "不得用权威 OOXML 字节代替（Requirement 2.11 的反面）"
         )
-    return provider.build_store_projection(store_payload, contract=contract)
+    result = provider.build_store_projection(store_payload, contract=contract)
+    # 纯静态扁平型 provider（如 A5-1）的 build_store_projection 返回 cell 映射 dict
+    # 而非 Projection 对象。此时用空 Projection 代替（纯静态 entry 的首次发布不需要
+    # store 覆盖——substrate 基线已经是干净模板，store 内容通过 materialize 端点在
+    # 用户切换到 OO 时才真正投影）。
+    from app.services.workpaper_sync.adapters.base import Projection as _Proj
+    if not isinstance(result, _Proj):
+        return _Proj(
+            contract_id=contract.contract_id if contract else "",
+            semantic_version=getattr(contract, "semantic_version", "1.0.0"),
+            document_type=getattr(contract, "document_type", "xlsx"),
+            values={},
+        )
+    return result
 
 
 def _uuid_col_by_table(contract: Any) -> Mapping[tuple[str, str], str]:
@@ -1532,6 +1608,21 @@ def _identity_binding(
     from app.services.excel_structure_fingerprint import GT_SYNC_SHEET_NAME
     from app.services.workpaper_sync.excel_extract import ExcelIdentityBinding
 
+    # ── 纯静态 entry 分支 ──────────────────────────────────────────
+    static_only_fn = getattr(provider, "static_only_instrumentation_spec", None)
+    specs_fn = getattr(provider, "instrumentation_specs", None)
+    spec_fn = getattr(provider, "instrumentation_spec", None)
+    if callable(static_only_fn) and not callable(specs_fn) and not callable(spec_fn):
+        # 纯静态 entry：构造 defined_name 形态的 binding
+        static_spec = static_only_fn()
+        first_region = static_spec.static_regions[0]
+        return ExcelIdentityBinding(
+            defined_name=first_region.defined_name,
+            table_key=first_region.table_key,
+            metadata_sheet=GT_SYNC_SHEET_NAME,
+        )
+
+    # ── 行表 entry 原路径（不动）──────────────────────────────────
     spec = _primary_instrumentation_spec(provider)
     inventory = staged.identity_inventory
     return ExcelIdentityBinding(

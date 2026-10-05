@@ -598,6 +598,55 @@ def _replay_cached_registrations(
     return cached.adapter_ids
 
 
+async def _isolated_pilot_attach(
+    svc: "_SyncServices | _RegistrationWarmupContext",
+    *,
+    attach_pilot_adapters,
+    attach_d2,
+    attach_h1,
+    attach_g7,
+) -> tuple[str, ...]:
+    """逐条 pilot attach 并隔离 ``SyncDomainError``（如 ``ContractDriftError``）。
+
+    **根因修复（2026-10-04）**：此前四条 pilot attach 串行直调，D2 的
+    ``ContractDriftError``（contract 新增 adjudication_cells 但 representation 未重发）
+    会穿到 ``_ensure_adapters_ready`` 的 try/except → **所有** entry 的 sync 端点都 422。
+    而 ``register_from_manifest`` 内部已有 per-entry 隔离（spec
+    ``workpaper-sync-registration-isolation-and-d2-republish``），pilot attach 却没有。
+
+    修法与 ``register_from_manifest`` 同一模式：``SyncDomainError`` 记日志并跳过，
+    非域异常仍上抛（那是真 bug，不能吞）。
+    """
+    import logging
+
+    logger = logging.getLogger("workpaper_sync.pilot_attach")
+    adapters: list[str] = []
+
+    attach_fns = [
+        ("b60/simple_checklist", attach_pilot_adapters),
+        ("d2/large_json", attach_d2),
+        ("h1/grouped_dynamic", attach_h1),
+        ("g7/two_level_dynamic", attach_g7),
+    ]
+
+    for label, fn in attach_fns:
+        try:
+            result = await fn(svc.registry, session=svc.session)
+            adapters.extend(result)
+        except SyncDomainError as exc:
+            # 🔴 隔离：只记日志，不阻塞其他 pilot。与 register_from_manifest 里
+            # `except SyncDomainError` 的 blast radius 收敛逻辑同型。
+            error_code = str(getattr(exc, "error_code", "unknown"))
+            logger.warning(
+                "pilot attach [%s] 失败（隔离，不阻塞其他 entry）: %s — %s",
+                label,
+                error_code,
+                str(exc)[:300],
+            )
+
+    return tuple(adapters)
+
+
 async def _attach_pilot_adapters(
     svc: "_SyncServices | _RegistrationWarmupContext",
 ) -> tuple[str, ...]:
@@ -660,11 +709,12 @@ async def _attach_pilot_adapters(
 
         await asyncio.to_thread(warm_source_fact_caches)
 
-        explicit = (
-            await attach_pilot_adapters(svc.registry, session=svc.session)
-            + await attach_d2_pilot_adapters(svc.registry, session=svc.session)
-            + await attach_h1_pilot_adapters(svc.registry, session=svc.session)
-            + await attach_g7_pilot_adapters(svc.registry, session=svc.session)
+        explicit = await _isolated_pilot_attach(
+            svc,
+            attach_pilot_adapters=attach_pilot_adapters,
+            attach_d2=attach_d2_pilot_adapters,
+            attach_h1=attach_h1_pilot_adapters,
+            attach_g7=attach_g7_pilot_adapters,
         )
         # Task 75 追加（只加不动）：manifest 驱动的注册 —— 覆盖**全部** 186 条 entry，
         # 并为每条未注册 entry 给出显式原因（`outcome.reasons`）。四条 pilot attach 保留在

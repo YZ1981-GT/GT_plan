@@ -806,6 +806,585 @@
         "manual"
       ],
       "description": "附注货币资金主表（上市 五、1 / 国企 八、1）期末 / 期初数；附注中人工改过、锁定或整节人工覆盖的保留"
+    },
+    {
+      "rule_id": "K1.audited_total.receivable",
+      "page_key": "workpaper:K1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "K1",
+        "sheet_code": "K1-1",
+        "item_id": "K1-1-audited-receivable"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "k1_audited_total",
+        "params": {
+          "kind": "receivable"
+        },
+        "formula_text": "其他应收款原值审定合计 = Σ(单项计提 + 账龄组合 + 客户类型组合 + 其他组合) 各行(未审数 + AJE调整 + RJE调整)"
+      },
+      "triggers": [
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "K1-1 其他应收款原值审定合计（四个组合行 r0~r3 的审定数之和）"
+    },
+    {
+      "rule_id": "K1.audited_total.baddebt",
+      "page_key": "workpaper:K1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "K1",
+        "sheet_code": "K1-1",
+        "item_id": "K1-1-audited-baddebt"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "k1_audited_total",
+        "params": {
+          "kind": "baddebt"
+        },
+        "formula_text": "坏账准备审定合计 = Σ(单项计提 + 账龄组合 + 客户类型组合 + 其他组合) 各行(未审数 + AJE调整 + RJE调整)"
+      },
+      "triggers": [
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "K1-1 坏账准备审定合计（四个组合行 r0~r3 的审定数之和）"
+    },
+    {
+      "rule_id": "K1.audited_total.net",
+      "page_key": "workpaper:K1",
+      "stage": "derived",
+      "policy": "derived",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "K1",
+        "sheet_code": "K1-1",
+        "item_id": "K1-1-audited-net"
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "k1_audited_total",
+        "params": {
+          "kind": "net"
+        },
+        "formula_text": "其他应收款净值审定合计 = 原值审定合计 − 坏账准备审定合计"
+      },
+      "triggers": [
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "K1-1 其他应收款净值审定合计（原值合计减坏账合计）"
+    },
+    {
+      "rule_id": "D1.adj_tb_amount",
+      "page_key": "workpaper:D1",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "D1",
+        "sheet_code": "D1-1",
+        "item_id": "D1-adj-tb-amount"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('1121','期末余额') - TB('1231-01','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "应收票据审定表锚点「D1-adj-tb-amount」= TB('1121','期末余额') - TB('1231-01','期末余额')；Tier A 单公式推送"
+    },
+    {
+      "rule_id": "D2.adj_tb_amount",
+      "page_key": "workpaper:D2",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "D2",
+        "sheet_code": "D2-1",
+        "item_id": "D2-adj-tb-amount"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('1122','期末余额') - TB('1231-02','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "应收账款审定表锚点「D2-adj-tb-amount」= TB('1122','期末余额') - TB('1231-02','期末余额')；Tier A 单公式推送"
+    },
+    {
+      "rule_id": "D3.adj_trial_balance_amount",
+      "page_key": "workpaper:D3",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "D3",
+        "sheet_code": "D3-1",
+        "item_id": "D3-adj-trial-balance-amount"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('2203','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "预收账款审定表锚点「D3-adj-trial-balance-amount」= TB('2203','期末余额')；Tier A 单公式推送"
+    },
+    {
+      "rule_id": "D4.1_adj_tb_6001",
+      "page_key": "workpaper:D4",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "D4",
+        "sheet_code": "D4-1",
+        "item_id": "D4-1-adj-tb-6001"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('6001','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "销售收入审定表锚点「D4-1-adj-tb-6001」= TB('6001','期末余额')；Tier A 单公式推送（原预设用 '审定数' 列名，已改写为 '期末余额'：损益类科目 6001 主营业务收入，audited_amount 存审定发生额；trial_balance_audited 上下文 '期末余额' 映射到 audited_amount，语义等价）"
+    },
+    {
+      "rule_id": "D4.1_adj_tb_6051",
+      "page_key": "workpaper:D4",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "D4",
+        "sheet_code": "D4-1",
+        "item_id": "D4-1-adj-tb-6051"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('6051','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "销售收入审定表锚点「D4-1-adj-tb-6051」= TB('6051','期末余额')；Tier A 单公式推送（原预设用 '审定数' 列名，已改写为 '期末余额'：损益类科目 6051 其他业务收入，audited_amount 存审定发生额；trial_balance_audited 上下文 '期末余额' 映射到 audited_amount，语义等价）"
+    },
+    {
+      "rule_id": "D6.1_tb_amount",
+      "page_key": "workpaper:D6",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "D6",
+        "sheet_code": "D6-1",
+        "item_id": "D6-1-tb-amount"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('1141','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "合同资产审定表锚点「D6-1-tb-amount」= TB('1141','期末余额')；Tier A 单公式推送"
+    },
+    {
+      "rule_id": "D7.1_adj_aging_trial_balance_currentAudited",
+      "page_key": "workpaper:D7",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "D7",
+        "sheet_code": "D7-1",
+        "item_id": "D7-1-adj-aging-trial-balance-currentAudited"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('2205','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "合同负债审定表锚点「D7-1-adj-aging-trial-balance-currentAudited」= TB('2205','期末余额')；Tier A 单公式推送"
+    },
+    {
+      "rule_id": "H10.1_tb_amount",
+      "page_key": "workpaper:H10",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "H10",
+        "sheet_code": "H10-1",
+        "item_id": "H10-1-tb-amount"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('6115','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "资产处置损益审定表锚点「H10-1-tb-amount」= TB('6115','期末余额')；Tier A 单公式推送（原预设用 '审定数' 列名，已改写为 '期末余额'：损益类科目 6115 资产处置损益，audited_amount 存审定发生额；trial_balance_audited 上下文 '期末余额' 映射到 audited_amount，语义等价）"
+    },
+    {
+      "rule_id": "H5.1_tb_amount",
+      "page_key": "workpaper:H5",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "H5",
+        "sheet_code": "H5-1",
+        "item_id": "H5-1-tb-amount"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('1631','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "油气资产审定表锚点「H5-1-tb-amount」= TB('1631','期末余额')；Tier A 单公式推送"
+    },
+    {
+      "rule_id": "H6.1_tb_amount",
+      "page_key": "workpaper:H6",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "H6",
+        "sheet_code": "H6-1",
+        "item_id": "H6-1-tb-amount"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('1606','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "固定资产清理审定表锚点「H6-1-tb-amount」= TB('1606','期末余额')；Tier A 单公式推送"
+    },
+    {
+      "rule_id": "H7.1_tb_amount",
+      "page_key": "workpaper:H7",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "H7",
+        "sheet_code": "H7-1",
+        "item_id": "H7-1-tb-amount"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('1621','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "生产性生物资产审定表锚点「H7-1-tb-amount」= TB('1621','期末余额')；Tier A 单公式推送"
+    },
+    {
+      "rule_id": "H8.1_tb_amount",
+      "page_key": "workpaper:H8",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "H8",
+        "sheet_code": "H8-1",
+        "item_id": "H8-1-tb-amount"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('1901','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "使用权资产审定表锚点「H8-1-tb-amount」= TB('1901','期末余额')；Tier A 单公式推送"
+    },
+    {
+      "rule_id": "H9.1_tb_amount",
+      "page_key": "workpaper:H9",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "H9",
+        "sheet_code": "H9-1",
+        "item_id": "H9-1-tb-amount"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('2205','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "租赁负债审定表锚点「H9-1-tb-amount」= TB('2205','期末余额')；Tier A 单公式推送"
+    },
+    {
+      "rule_id": "I1.1_tb_cost",
+      "page_key": "workpaper:I1",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "I1",
+        "sheet_code": "I1-1",
+        "item_id": "I1-1-tb-cost"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('1701','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "无形资产审定表锚点「I1-1-tb-cost」= TB('1701','期末余额')；Tier A 单公式推送"
+    },
+    {
+      "rule_id": "I1.1_tb_amort",
+      "page_key": "workpaper:I1",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "I1",
+        "sheet_code": "I1-1",
+        "item_id": "I1-1-tb-amort"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('1702','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "无形资产审定表锚点「I1-1-tb-amort」= TB('1702','期末余额')；Tier A 单公式推送"
+    },
+    {
+      "rule_id": "I1.1_tb_impair",
+      "page_key": "workpaper:I1",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "I1",
+        "sheet_code": "I1-1",
+        "item_id": "I1-1-tb-impair"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('1703','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "无形资产审定表锚点「I1-1-tb-impair」= TB('1703','期末余额')；Tier A 单公式推送"
+    },
+    {
+      "rule_id": "I2.1_tb_amount",
+      "page_key": "workpaper:I2",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "I2",
+        "sheet_code": "I2-1",
+        "item_id": "I2-1-tb-amount"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('1717','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "开发支出审定表锚点「I2-1-tb-amount」= TB('1717','期末余额')；Tier A 单公式推送"
+    },
+    {
+      "rule_id": "I3.1_tb_amount",
+      "page_key": "workpaper:I3",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "I3",
+        "sheet_code": "I3-1",
+        "item_id": "I3-1-tb-amount"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('1711','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "商誉审定表锚点「I3-1-tb-amount」= TB('1711','期末余额')；Tier A 单公式推送"
+    },
+    {
+      "rule_id": "I4.1_tb_amount",
+      "page_key": "workpaper:I4",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "I4",
+        "sheet_code": "I4-1",
+        "item_id": "I4-1-tb-amount"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('1801','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "长期待摊费用审定表锚点「I4-1-tb-amount」= TB('1801','期末余额')；Tier A 单公式推送"
+    },
+    {
+      "rule_id": "I5.1_tb_amount",
+      "page_key": "workpaper:I5",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "I5",
+        "sheet_code": "I5-1",
+        "item_id": "I5-1-tb-amount"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('1911','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "其他非流动资产审定表锚点「I5-1-tb-amount」= TB('1911','期末余额')；Tier A 单公式推送"
+    },
+    {
+      "rule_id": "I6.1_tb_amount",
+      "page_key": "workpaper:I6",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "I6",
+        "sheet_code": "I6-1",
+        "item_id": "I6-1-tb-amount"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('6602','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "研发费用审定表锚点「I6-1-tb-amount」= TB('6602','期末余额')；Tier A 单公式推送（原预设用 '审定数' 列名，已改写为 '期末余额'：损益类科目 6602 研发费用，audited_amount 存审定发生额；trial_balance_audited 上下文 '期末余额' 映射到 audited_amount，语义等价）"
     }
   ]
 }

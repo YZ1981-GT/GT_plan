@@ -107,7 +107,7 @@
             <span class="gt-fm-health-value" :style="{ color: healthPercent >= 80 ? 'var(--gt-color-success)' : healthPercent >= 50 ? 'var(--gt-color-wheat)' : 'var(--gt-color-danger)' }">
               {{ healthPercent }}%
             </span>
-            <span class="gt-fm-health-desc">{{ healthDesc }}</span>
+            <span class="gt-fm-health-desc">{{ healthDesc }}（未审数列）</span>
           </div>
           <el-input
             v-model="uriSearchQuery"
@@ -193,14 +193,25 @@
             />
           </el-tab-pane>
           <!-- chain-closure-phase2-formula-push-engine：公式推送（四表 / 试算表 / 调整分录 → 底稿 → 附注） -->
-          <el-tab-pane v-if="pushWpCode && projectId && year" name="formula_push">
+          <el-tab-pane v-if="projectId && year" name="formula_push">
             <template #label>📤 公式推送</template>
             <FormulaPushPanel
-              v-if="activeCategory === 'formula_push'"
+              v-if="activeCategory === 'formula_push' && pushWpCode"
               :project-id="projectId"
               :year="year"
               :wp-code="pushWpCode"
+              :supported-wp-codes="pushWpCodes"
             />
+            <div v-else-if="activeCategory === 'formula_push' && !pushWpCode" class="gt-fp-not-connected">
+              <el-empty description="本底稿尚未接入自动推送" :image-size="64">
+                <template #description>
+                  <p>本底稿尚未接入自动推送</p>
+                  <p style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">
+                    已接入：{{ pushWpCodes.length ? pushWpCodes.join('、') : '暂无' }}
+                  </p>
+                </template>
+              </el-empty>
+            </div>
           </el-tab-pane>
         </el-tabs>
 
@@ -237,6 +248,19 @@
               <span v-else @click="startEdit(row)" style="color: var(--gt-color-text-placeholder); cursor: pointer; font-size: var(--gt-font-size-xs); border: 1px dashed var(--gt-color-border-light); padding: 2px 8px; border-radius: 4px;" title="点击添加公式">
                 + 点击添加公式
               </span>
+            </template>
+          </el-table-column>
+          <!-- V179: 调整列公式（审计调整 / 重分类调整） -->
+          <el-table-column label="AJE公式" min-width="180" show-overflow-tooltip>
+            <template #default="{ row }">
+              <code v-if="row.aje_formula" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-teal); word-break: break-all;">{{ row.aje_formula }}</code>
+              <span v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder);">未配置（走默认推导）</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="RJE公式" min-width="180" show-overflow-tooltip>
+            <template #default="{ row }">
+              <code v-if="row.rje_formula" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-teal); word-break: break-all;">{{ row.rje_formula }}</code>
+              <span v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder);">未配置（走默认推导）</span>
             </template>
           </el-table-column>
           <el-table-column label="分类" width="110" align="center">
@@ -2908,6 +2932,8 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
         formula: data.formula || null,
         formula_category: data.category,
         formula_description: data.description,
+        aje_formula: row.aje_formula || null,
+        rje_formula: row.rje_formula || null,
       })
       ElMessage.success('公式已保存')
       emit('saved')
@@ -2925,6 +2951,8 @@ async function saveEdit(row: any) {
       formula: editFormula.value || null,
       formula_category: editCategory.value,
       formula_description: editDescription.value,
+      aje_formula: row.aje_formula || null,
+      rje_formula: row.rje_formula || null,
     })
     row.formula = editFormula.value
     row.formula_category = editCategory.value
@@ -3385,6 +3413,8 @@ async function onSaveAllFormulas() {
           formula: row.formula,
           formula_category: row.formula_category,
           formula_description: row.formula_description,
+          aje_formula: row.aje_formula || null,
+          rje_formula: row.rje_formula || null,
         })
         saved++
       }

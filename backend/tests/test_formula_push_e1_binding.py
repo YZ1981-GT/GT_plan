@@ -24,7 +24,9 @@ from app.services.formula_push.bindings.e1 import DERIVATIONS, E1Binding, E1Sour
 from app.services.formula_push.rules import RULES_PATH, load_rules
 from app.services.formula_push.sources import FormulaSources, TbAuditedSnapshot
 
-RULES = {r.rule_id: r for r in load_rules(known_derivations=DERIVATIONS)}
+from app.services.formula_push.bindings.k1 import DERIVATIONS as K1_DERIVATIONS
+
+RULES = {r.rule_id: r for r in load_rules(known_derivations=DERIVATIONS | K1_DERIVATIONS)}
 B = E1Binding()
 
 
@@ -56,11 +58,11 @@ def _sources(**over) -> E1Sources:
 
 
 def test_registry_and_derivations_cover_rules():
-    assert supported_wp_codes() == ("E1",) and isinstance(get_binding("E1"), E1Binding)
+    assert "E1" in supported_wp_codes() and "K1" in supported_wp_codes() and isinstance(get_binding("E1"), E1Binding)
     with pytest.raises(KeyError, match="尚未接入"):
-        get_binding("D2")
+        get_binding("Z9")
     names = {r.source.name for r in RULES.values() if r.source.kind == "derivation"}
-    assert names == set(DERIVATIONS)
+    assert names == set(DERIVATIONS | K1_DERIVATIONS)
 
 
 # ── 行目标 ────────────────────────────────────────────────────────────────
@@ -195,7 +197,7 @@ def test_slot_blank_and_finance_unavailable():
 
 
 def test_note_rows_follow_template_type():
-    rows = B.note_rows({"E1-adj-total-1001": "5"}, "soe")
+    rows = B.note_rows({"E1-adj-total-1001": "5"}, "soe", RULES["E1.note.main_rows"])
     assert rows[0]["note_label"] == "库存现金" and rows[0]["ending"] == 5.0
 
 
@@ -362,10 +364,11 @@ def test_temporary_binding_is_the_single_registry_source(monkeypatch):
     from app.services.formula_push import triggers
     from app.services.formula_push.rules import PushRuleError, parse_rules
 
-    class FakeBinding:
+    from tests._formula_push_binding import DummyPushBinding
+
+    class FakeBinding(DummyPushBinding):
         wp_code = "Z9"
         account_prefixes = ("9901",)
-        derivations = frozenset()
 
     from app.services.formula_push.bindings import register_binding, watched_prefixes
 
@@ -394,3 +397,29 @@ def test_temporary_binding_is_the_single_registry_source(monkeypatch):
         get_binding("Z9")
     with pytest.raises(PushRuleError, match="未注册"):
         parse_rules(doc)
+
+
+# ── 试算表上下文口径覆盖（Task 8 守卫）─────────────────────────────────────
+
+
+def test_occurrence_context_returns_tb_data_with_period_amount():
+    """trial_balance_audited_occurrence 口径：context_for 返回含本期发生额的 tb_data。"""
+    tb = TbAuditedSnapshot(
+        tb_data={"1001": {"期末余额": Decimal("100"), "年初余额": Decimal("60"), "本期发生额": Decimal("40")}},
+        available=True,
+    )
+    fs = FormulaSources(tb=tb, hall_adj={})
+    ctx = fs.context_for({"tb": "trial_balance_audited_occurrence"})
+    assert ctx.tb_data["1001"]["本期发生额"] == Decimal("40")
+    assert ctx.tb_data["1001"]["期末余额"] == Decimal("100")
+    # 同一 snapshot 的旧口径也正常返回
+    ctx_old = fs.context_for({"tb": "trial_balance_audited"})
+    assert ctx_old.tb_data["1001"]["本期发生额"] == Decimal("40")
+
+
+def test_occurrence_context_unavailable_when_tb_missing():
+    """试算表未生成时两种口径都返回不可用原因。"""
+    fs = FormulaSources(tb=None, hall_adj={})
+    for ctx_name in ("trial_balance_audited", "trial_balance_audited_occurrence"):
+        reason = fs.unavailable_reason({"tb": ctx_name})
+        assert reason is not None and "试算表" in reason

@@ -150,8 +150,10 @@ def _apply_provision_name_filter(
     return [r for r in leaves if kw in (r.account_name or "")]
 
 
-async def _fetch_tb_balance_all(ctx: RenderContext) -> list[LeafRow]:
+async def _fetch_tb_balance_all(ctx: RenderContext, *, strict: bool = False) -> list[LeafRow]:
     """取 active 数据集**全部** `tb_balance` 行（**不筛叶子**，失败返 []，fail-open）。
+
+    :param strict: True 时异常上抛（推送引擎用），False 时 fail-open（渲染用）。
 
     🔴 为什么必须给全量而不是叶子：``parent_check`` 的 ``parent`` 口径取的是**父科目
     行本身**的金额（:func:`leaf_aggregation.parent_totals` 按 ``account_code == 前缀``
@@ -178,6 +180,8 @@ async def _fetch_tb_balance_all(ctx: RenderContext) -> list[LeafRow]:
         )
         return to_leaf_rows(result.fetchall())
     except Exception as e:  # noqa: BLE001
+        if strict:
+            raise
         logger.warning("K1 TB balance fetch failed: %s", e)
         try:
             await ctx.db.rollback()
@@ -187,7 +191,7 @@ async def _fetch_tb_balance_all(ctx: RenderContext) -> list[LeafRow]:
 
 
 async def _fetch_trial_balance_amounts(
-    ctx: RenderContext, standard_codes: list[str]
+    ctx: RenderContext, standard_codes: list[str], *, strict: bool = False,
 ) -> dict[str, dict[str, float]]:
     """按标准码前缀取 `trial_balance` 未审/审定额。
 
@@ -223,6 +227,8 @@ async def _fetch_trial_balance_amounts(
             out[best]["unadjusted"] += float(row.unadjusted_amount or 0)
             out[best]["audited"] += float(row.audited_amount or 0)
     except Exception as e:  # noqa: BLE001
+        if strict:
+            raise
         logger.warning("K1 trial_balance fetch failed: %s", e)
         try:
             await ctx.db.rollback()

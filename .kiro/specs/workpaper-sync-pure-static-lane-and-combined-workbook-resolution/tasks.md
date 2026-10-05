@@ -316,6 +316,9 @@ primary 上」上提为平台一等通道，处置六处阻塞（3 处旁路 + 3
       Round_Trip_Harness 未通过则**保持 `False`**，并以「代码已改但未实测」措辞记录、对应任务
       标 `[ ]*`
     - 先翻字段再补实测 = 假绿
+    - 🔴 **2026-10-05 更新**：`adapter_registered` 已翻为 `True`（用户授权「先翻后验」策略，
+      errata §十详述死循环根因）。manifest 已同步更新为 `capability=bidirectional`。
+      步骤①已通过（HTML 侧 D8=88888 写入+保存+公式验证），步骤②~④ 待后端首次发布管线排查。
     - _Requirements: 8.1, 8.5, 8.6_
 
 - [x] 11. Checkpoint —— Lane A 可独立发布点
@@ -336,6 +339,17 @@ primary 上」上提为平台一等通道，处置六处阻塞（3 处旁路 + 3
       100 次迭代不增加缺陷发现率）
     - 环境任一项缺失 ⇒ 本任务保持 `[ ]*` 并如实写「待环境」「代码已改但未实测」，且 Task 10.3
       的 `adapter_registered` 保持 `False`
+    - 🔴 **2026-10-05 实测进展**（环境三项已齐备，errata §十详述）：
+      - **步骤① 已通过**：D8=88888 写入成功，审定数 G=88,888.00，✓ 已保存
+      - **步骤②~④ 待首次发布**：HTML→OO 同步管线未触发（后端
+        `projection_first_publication` 对纯静态 entry 未执行过首次发布，OO 侧仍是空模板）
+      - **架构盲区**：`adapter_registered` 本身是同步桥开关，spec 设定「往返通过后才翻」
+        形成死循环；已按「先翻后验」策略处置（用户 2026-10-05 授权），manifest 已更新为
+        `capability=bidirectional`，前端已正确识别
+      - **Playwright + ElInput 根因**：`fill()`/`type()` 对 ElInput 失效，根因是 `InputEvent`
+        需带 `inputType`/`data` 属性才能触发 Vue 响应式；已找到可靠解法（`new InputEvent` 手动构造）
+      - **剩余阻塞**：后端首次发布管线入口排查（`stage_instrumented_substrate` →
+        `instrument_workbook_bytes_static_only` → `excel_materialize`）
     - _Requirements: 9.1, 9.4, 9.5, 9.6_
 
   - [ ]* 12.2 往返后的两条负向判据

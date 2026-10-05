@@ -79,21 +79,19 @@ def _mutation_calls_symbol() -> bool:
 
 
 def test_cross_lane_prerequisite_is_present_or_explained() -> None:
-    """依赖在 ⇒ 过；不在 ⇒ skip 并说清整册门 ⑤c 会怎么红、根因归谁。"""
+    """依赖在 ⇒ 强断言（两端都在）；不在 ⇒ 标红（不再 skip）。
+
+    2026-10-04 升级：`workpaper-sync-managed-row-convergence` 的 E3 已入库到 HEAD，
+    `contracts.is_template_skeleton_identity` 已定义且 `content_mutation` 已调用。
+    整册门 ⑤c（G1 roundtrip 等值门）现在应能在纯 HEAD 上跑通。
+    """
     defined = _contracts_defines_symbol()
     called = _mutation_calls_symbol()
-    if defined and called:
-        return
-    pytest.skip(
-        "整册门 ⑤c（G1 roundtrip 等值门）的跨 lane 前置依赖不在本检出：\n"
-        f"  contracts.{_SYMBOL} 已定义={defined} / content_mutation 已调用={called}\n"
-        "⇒ 跑 verify_d1_full_book_real_stack.py 会在第 ⑤c 步报\n"
-        "   `RoundtripEquivalenceError: staged representation 反读出未提交的受管字段`\n"
-        "   （18 个，形如 `*/GTROW-D14INDIVIDUAL-0013/item`、`*/GTROW-D12-0011/note_type`）。\n"
-        "   前五步全部正常。根因是 D1 模板在受管区内自带非空业务值、而 store 只声明\n"
-        "   有业务数据的行 ⇒ 模板骨架行恒为 extra；豁免属 "
-        "`workpaper-sync-managed-row-convergence` 的 E3，与本 spec 无关。\n"
-        "   整册门不在 CI 内（需真 PG + storage），故这不构成 CI 红。"
+    assert defined, (
+        f"contracts.py 里应已定义 {_SYMBOL}（managed-row-convergence E3 的产物）"
+    )
+    assert called, (
+        f"content_mutation.py 里应已调用 {_SYMBOL}（合取放行的第 ① 条件）"
     )
 
 
@@ -105,7 +103,7 @@ def test_exemption_keeps_fail_closed_shape() -> None:
     只留 ② 会把 `d4r-*` / `xsheet-*` / `GTROW-MINTED-*` 这些**真孤儿**放过。
     """
     if not (_contracts_defines_symbol() and _mutation_calls_symbol()):
-        pytest.skip("依赖不在本检出（上一条已说明）")
+        pytest.fail("依赖应已在本检出（上一条已断言）—— 此处不应再触发")
     src = _MUTATION.read_text(encoding="utf-8")
     i = src.find(_SYMBOL, src.find("def "))
     # 取调用点附近的代码（不含前面那一大段说明注释）
@@ -232,7 +230,9 @@ def test_skip_branch_must_be_removed_once_the_dependency_lands() -> None:
     两个方向都断言，所以它既提醒升级、也防止提前升级。
     """
     src = Path(__file__).read_text(encoding="utf-8")
-    problem = upgrade_verdict(_dependency_is_on_head(), "pytest.skip(" in src)
+    # 🔴 避免自引用：把字面量拆开，这样这行本身不会命中搜索
+    _skip_call = "pytest" + ".skip("
+    problem = upgrade_verdict(_dependency_is_on_head(), _skip_call in src)
     assert problem is None, problem
 
 

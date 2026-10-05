@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import re
 from collections.abc import Iterable, Sequence
@@ -131,6 +132,8 @@ def label_key(value: Any) -> str:
 
 
 def _first_cell(row: Any) -> str:
+    if isinstance(row, dict):
+        return str(row.get("label") or row.get("name") or "")
     if isinstance(row, (list, tuple)) and row:
         return str(row[0] or "")
     return ""
@@ -668,9 +671,9 @@ async def _note_data_record(
     section_id: str,
     *,
     node_key: str | None,
-    allow_root_legacy_fallback: bool = True,
+    is_root_consol: bool,
 ) -> ConsolNoteData | None:
-    """按节点读取附注行；只有根合并节点允许回退 V041 的 NULL 兼容行。"""
+    """按节点读取附注行；legacy NULL 回退只允许已验证的树根合并节点。"""
     target = (
         ConsolNoteData.node_key.is_(None)
         if node_key is None
@@ -682,13 +685,9 @@ async def _note_data_record(
         ConsolNoteData.section_id == section_id,
         target,
     ))).scalar_one_or_none()
-    if record is not None or not node_key or not allow_root_legacy_fallback:
+    if record is not None or not node_key or not is_root_consol:
         return record
 
-    from app.services.consol_group_tree import ROLE_CONSOL
-
-    if not node_key.endswith(f":{ROLE_CONSOL}"):
-        return None
     return (await db.execute(sa.select(ConsolNoteData).where(
         ConsolNoteData.project_id == project_id,
         ConsolNoteData.year == year,
@@ -730,7 +729,7 @@ async def _copy_note_data_record(
         year=year,
         section_id=section_id,
         node_key=node_key,
-        data=dict(source.data or {}) if isinstance(source.data, dict) else {},
+        data=copy.deepcopy(source.data) if isinstance(source.data, dict) else {},
         is_stale=bool(source.is_stale),
         updated_at=datetime.now(timezone.utc),
     )
@@ -742,6 +741,7 @@ async def _copy_note_data_record(
 async def note_breakdown(
     db: AsyncSession, project_id: UUID, year: int | None, section_id: str, *,
     node_key: str | None = None, standard: str | None = None,
+    _include_internal_scope: bool = False,
 ) -> dict:
     """某章节有公式的单元格：个别数汇总 / 调整 / 抵销 / 合并数，及所选汇总节点各直接子节点的贡献（需求 6.3）。"""
     from app.services.consol_report_view_service import ViewError, find_node
@@ -771,7 +771,8 @@ async def note_breakdown(
         cell["row_label"] = _first_cell(rows[r]).strip() if r < len(rows) else None
         cell["col_name"] = header_key(headers[c]) if c < len(headers) else None
     labels = {n.node_key: n.display_name or n.company_name for n in iter_nodes(ctx.basis.tree)}
-    return {
+    is_root_consol = node is ctx.basis.tree and node.role == "consol"
+    result = {
         "project_id": str(project_id),
         "year": ctx.year,
         "template_type": tt,
@@ -785,6 +786,9 @@ async def note_breakdown(
         if children else [],
         "cells": cells,
     }
+    if _include_internal_scope:
+        result["_is_root_consol"] = is_root_consol
+    return result
 
 
 # ─────────────────────────────── 按公式填入 ───────────────────────────────
@@ -821,16 +825,50 @@ def _target_row(out: list[list[str]], template_rows: Sequence[Any], r: int) -> t
         f"已保存数据里「{name}」行不止一个，未填入"
 
 
+def _row_to_list(row: Any, width: int) -> list[str]:
+    """把任意行形态转为定长 list[str]，用于公式填入的内部运算。"""
+    if isinstance(row, (list, tuple)):
+        cells = [str(v) if v is not None else "" for v in row]
+    elif isinstance(row, dict):
+        # 对象行按 values/cells dict 的 int 键或顺序值展开
+        vals = row.get("values") or row.get("cells") or {}
+        if isinstance(vals, dict):
+            cells = [str(row.get("label") or "")]
+            for i in range(1, width):
+                cells.append(str(vals.get(str(i), vals.get(i, ""))))
+        else:
+            cells = [str(v) if v is not None else "" for v in (list(vals) if isinstance(vals, (list, tuple)) else [])]
+    else:
+        cells = []
+    cells.extend([""] * (width - len(cells)))
+    return cells[:width]
+
+
+def _apply_to_dict_row(orig: dict, flat: list[str], width: int) -> dict:
+    """把填入后的 flat list 写回对象行，保持对象行原始键结构。"""
+    result = dict(orig)
+    vals = orig.get("values") or orig.get("cells") or {}
+    val_key = "values" if "values" in orig else "cells" if "cells" in orig else "values"
+    if isinstance(vals, dict):
+        result["label"] = flat[0] if flat else result.get("label", "")
+        new_vals = dict(vals)
+        for i in range(1, min(width, len(flat))):
+            key = str(i) if str(i) in vals else i if i in vals else str(i)
+            new_vals[key] = flat[i]
+        result[val_key] = new_vals
+    return result
+
+
 def fill_rows(
     headers: Sequence[Any], rows: Sequence[Any], cells: Sequence[dict], manual: set[tuple[int, int]],
     template_rows: Sequence[Any],
-) -> tuple[list[list[str]], dict]:
+) -> tuple[list, dict]:
     """把合并数写进行数据（纯函数，P10）：手工单元格不动；留空的公式不写（保留原值）并列出原因；
-    行按项目名定位（``_target_row``），找不到不写。手工标记按已保存数据的实际行号。"""
+    行按项目名定位（``_target_row``），找不到不写。手工标记按已保存数据的实际行号。
+    保持对象/二维数组原形状：若输入行是 dict，填入后还原为 dict。"""
     width = len(headers)
-    out = [[str(v) if v is not None else "" for v in (list(r) if isinstance(r, (list, tuple)) else [])] for r in rows]
-    for row in out:
-        row.extend([""] * (width - len(row)))
+    is_dict_row = [isinstance(r, dict) for r in rows]
+    out = [_row_to_list(r, width) for r in rows]
     filled, kept, blank = [], [], []
     for cell in cells:
         r, c = cell["row_index"], cell["col_index"]
@@ -851,7 +889,19 @@ def fill_rows(
             continue
         out[target][c] = value
         filled.append({**where, "value": value})
-    return out, {"filled": filled, "kept_manual": kept, "blank": blank}
+    # 还原对象行原始形状
+    result_rows: list = []
+    for i, flat in enumerate(out):
+        if i < len(is_dict_row) and is_dict_row[i] and i < len(rows):
+            result_rows.append(_apply_to_dict_row(rows[i], flat, width))  # type: ignore[arg-type]
+        else:
+            result_rows.append(flat)
+    return result_rows, {
+        "filled": filled,
+        "kept_manual": kept,
+        "kept_manual_count": len(kept),
+        "blank": blank,
+    }
 
 
 async def fill_by_formula(
@@ -861,11 +911,14 @@ async def fill_by_formula(
     """「按公式填入」：按节点把合并数写入 ``consol_note_data``；旧调用不带节点键时使用项目级兼容行。"""
     breakdown = await note_breakdown(
         db, project_id, year, section_id, node_key=node_key, standard=standard,
+        _include_internal_scope=True,
     )
     tt = breakdown["template_type"]
+    is_root_consol = bool(breakdown.get("_is_root_consol")) and breakdown["node_key"] == node_key
     table = find_table(tt, section_id) or {}
     source_record = await _note_data_record(
         db, project_id, breakdown["year"], section_id, node_key=node_key,
+        is_root_consol=is_root_consol,
     )
     record = source_record
     if node_key is not None:

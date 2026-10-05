@@ -43,14 +43,32 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
   const currentNoteTables = computed<any[]>(() => {
     if (!currentNote.value?.table_data) return []
     const td = currentNote.value.table_data
-    // 新格式：_tables 数组（后端已为 workpaper 来源注入投影表）
+    // workpaper 的 sub_table_data 是持久化真源。只要 raw 字段存在，就优先从
+    // raw 重新投影，避免保存前/单元格即时反写后继续显示后端注入的旧 `_tables`。
+    // `_tables` 只作为服务端附加元数据来源，不覆盖 raw 的 rows/headers/sidecar。
+    const isWorkpaperSource = td._source === 'workpaper' || td._source === 'workpaper_html'
+    const hasRawSubTables = isWorkpaperSource && Object.prototype.hasOwnProperty.call(td, 'sub_table_data')
+    const clientProjected = hasRawSubTables ? projectSubTablesClient(td) : null
     let rawTables: any[] | null = null
-    if (td._tables && Array.isArray(td._tables) && td._tables.length > 0) {
+    if (Array.isArray(clientProjected)) {
+      const serverTables = Array.isArray(td._tables) ? td._tables : []
+      const serverByKey = new Map(serverTables.map((table: any) => [
+        table?._source_sub_table_key || table?.name,
+        table,
+      ]))
+      rawTables = clientProjected.map((table: any) => {
+        const serverTable = serverByKey.get(table?._source_sub_table_key || table?.name)
+        const metadata = serverTable && typeof serverTable === 'object' ? { ...serverTable } : {}
+        // 导出开关以 raw 顶层清单为准，不能让旧投影的 false 残留覆盖已恢复的状态。
+        delete metadata.export_enabled
+        return { ...metadata, ...table }
+      })
+    }
+    if (!rawTables && td._tables && Array.isArray(td._tables) && td._tables.length > 0) {
       rawTables = td._tables
     }
     if (!rawTables) {
       // 客户端兜底投影：workpaper 来源的 sub_table_data + _sub_table_columns
-      const clientProjected = projectSubTablesClient(td)
       if (clientProjected && clientProjected.length > 0) {
         rawTables = clientProjected
       }
@@ -78,9 +96,67 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
     // 触发路径：有续表的章节里改一次单元格 → 依赖变化 → 重算 → 列重复。
     // 故这里对参与合并的表做**逐层拷贝**（表壳 + headers 数组 + 每行 + 每行 values），
     // 合并只发生在副本上，源数据只读。
+    const sourceRowRef = (sourceIndex: number, rowIndex: number, sourceSubTableKey?: string) => ({
+      tableIndex: sourceIndex,
+      rowIndex,
+      ...(sourceSubTableKey ? { sourceSubTableKey } : {}),
+    })
+    const cloneRefs = (value: any): any => {
+      if (!Array.isArray(value)) return value
+      return value.map((item: any) => Array.isArray(item)
+        ? item.map((nested: any) => nested && typeof nested === 'object' ? { ...nested } : nested)
+        : (item && typeof item === 'object' ? { ...item } : item))
+    }
+    const enrichSourceCoordinates = (table: any, sourceIndex: number, sourceKey?: string) => {
+      const rows = Array.isArray(table?.rows) ? table.rows : []
+      const valueCount = Math.max(0, (Array.isArray(table?.headers) ? table.headers.length : 0) - 1)
+      const sourceIndexes = Array.isArray(table?._source_row_indexes)
+        ? table._source_row_indexes
+        : rows.map((_row: any, rowIndex: number) => rowIndex)
+      const rowRefs = Array.isArray(table?._sourceRowRefs)
+        ? cloneRefs(table._sourceRowRefs)
+        : rows.map((_row: any, rowIndex: number) => [sourceRowRef(sourceIndex, sourceIndexes[rowIndex], sourceKey)])
+      const labelRefs = Array.isArray(table?._sourceLabelRefs)
+        ? table._sourceLabelRefs.map((ref: any) => ref && { ...ref })
+        : rows.map((_row: any, rowIndex: number) => sourceRowRef(sourceIndex, sourceIndexes[rowIndex], sourceKey))
+      const valueDefs = Array.isArray(table?.columns)
+        ? table.columns.filter((def: any) => def && !def.is_label)
+        : []
+      const columnRefs = Array.isArray(table?._sourceColumnRefs)
+        ? table._sourceColumnRefs.map((ref: any) => ref && { ...ref })
+        : Array.from({ length: valueCount }, (_unused, valueIndex) => ({
+            tableIndex: sourceIndex,
+            valueIndex,
+            ...(sourceKey ? {
+              sourceSubTableKey: sourceKey,
+              key: valueDefs[valueIndex]?.key,
+            } : {}),
+          }))
+      const cellRefs = Array.isArray(table?._sourceCellRefs)
+        ? cloneRefs(table._sourceCellRefs)
+        : rows.map((_row: any, rowIndex: number) => columnRefs.map((column: any) => ({
+          row: sourceRowRef(sourceIndex, sourceIndexes[rowIndex], sourceKey),
+          column: { ...column },
+        })))
+      return {
+        _sourceRowRefs: rowRefs,
+        _sourceLabelRefs: labelRefs,
+        _sourceColumnRefs: columnRefs,
+        _sourceCellRefs: cellRefs,
+        _sourceTableIndexes: Array.isArray(table?._sourceTableIndexes) ? [...table._sourceTableIndexes] : [sourceIndex],
+        _sourceTableKeys: Array.isArray(table?._sourceTableKeys)
+          ? [...table._sourceTableKeys]
+          : (sourceKey ? [sourceKey] : []),
+      }
+    }
+
     const cloneTable = (t: any, sourceIndex: number) => ({
       ...t,
-      _sourceTableIndexes: [sourceIndex],
+      ...enrichSourceCoordinates(t, sourceIndex, t?._source_sub_table_key),
+      _sourceTableIndexes: Array.isArray(t?._sourceTableIndexes) ? [...t._sourceTableIndexes] : [sourceIndex],
+      _sourceTableKeys: Array.isArray(t?._sourceTableKeys)
+        ? [...t._sourceTableKeys]
+        : (t?._source_sub_table_key ? [t._source_sub_table_key] : []),
       headers: Array.isArray(t?.headers) ? [...t.headers] : t?.headers,
       rows: Array.isArray(t?.rows)
         ? t.rows.map((r: any) => ({
@@ -124,22 +200,66 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
         const appendHeaders = skipFirst ? nextHeaders.slice(1) : nextHeaders
         prev.headers = [...prevHeaders, ...appendHeaders]
 
-        // 合并行 values
         const prevRows: any[] = prev.rows || []
         const nextRows: any[] = t.rows || []
+        const prevRowRefs: Array<Array<any>> = prev._sourceRowRefs || []
+        const nextRowRefs: Array<Array<any>> = t._sourceRowRefs || []
+        const prevLabelRefs: Array<any> = prev._sourceLabelRefs || []
+        const nextLabelRefs: Array<any> = t._sourceLabelRefs || []
+        const prevCellRefs: Array<Array<any>> = prev._sourceCellRefs || []
+        const nextCellRefs: Array<Array<any>> = t._sourceCellRefs || []
+        const nextColumnRefs: Array<any> = t._sourceColumnRefs || []
+        const nextValueStart = 0
+        const appendValueCount = appendHeaders.length
+        // headers 含标签列，但 rows.values 与两类 value sidecar 不含标签列；
+        // 因此 skipFirst 只影响表头，不能对业务值坐标再做 slice(1)。
+        const appendColumnRefs = Array.from({ length: appendValueCount }, (_unused, offset) =>
+          nextColumnRefs[offset + nextValueStart] ?? null,
+        )
+        const appendCellCount = appendValueCount
+        const previousValueCount = Math.max(0, prevHeaders.length - 1)
         for (let ri = 0; ri < Math.max(prevRows.length, nextRows.length); ri++) {
-          const prevRow = ri < prevRows.length ? prevRows[ri] : { label: '', values: [] }
-          const nextRow = ri < nextRows.length ? nextRows[ri] : { values: [] }
-          const nextVals = nextRow.values || []
-          const appendVals = skipFirst ? nextVals : nextVals
-          if (!prevRow.values) prevRow.values = []
+          const hasPrev = ri < prevRows.length
+          const hasNext = ri < nextRows.length
+          const prevRow = hasPrev ? prevRows[ri] : { label: '', values: [] }
+          const nextRow = hasNext ? nextRows[ri] : { values: [] }
+          const nextVals = Array.isArray(nextRow.values) ? nextRow.values : []
+          const appendVals = nextVals.slice(nextValueStart, nextValueStart + appendCellCount)
+          if (!Array.isArray(prevRow.values)) prevRow.values = []
+          // 续表多出新行时，先占住主表列位，不能让续表值左移到主表列。
+          while (prevRow.values.length < previousValueCount) prevRow.values.push(null)
+          while (appendVals.length < appendCellCount) appendVals.push(null)
           prevRow.values = [...prevRow.values, ...appendVals]
-          if (ri >= prevRows.length) prevRows.push(prevRow)
+          if (!hasPrev) prevRows.push(prevRow)
+
+          const prevRefs = hasPrev && Array.isArray(prevRowRefs[ri]) ? prevRowRefs[ri] : []
+          const nextRefs = Array.isArray(nextRowRefs[ri]) ? nextRowRefs[ri] : []
+          prevRowRefs[ri] = [...prevRefs, ...(hasNext ? nextRefs : [])]
+          if (!hasPrev) prevLabelRefs[ri] = null
+          else if (!prevLabelRefs[ri] && hasNext) prevLabelRefs[ri] = nextLabelRefs[ri] || null
+          const prevCells = hasPrev && Array.isArray(prevCellRefs[ri]) ? prevCellRefs[ri] : []
+          const nextCells = Array.isArray(nextCellRefs[ri]) ? nextCellRefs[ri] : []
+          const appendCells = Array.from({ length: appendCellCount }, (_unused, offset) =>
+            nextCells[offset + nextValueStart] ?? null,
+          )
+          while (prevCells.length < previousValueCount) prevCells.push(null)
+          prevCellRefs[ri] = [...prevCells, ...(hasNext ? appendCells : Array(appendCellCount).fill(null))]
         }
         prev.rows = prevRows
+        prev._sourceRowRefs = prevRowRefs
+        prev._sourceLabelRefs = prevLabelRefs
+        const previousColumnRefs = Array.from({ length: previousValueCount }, (_unused, valueIndex) =>
+          (Array.isArray(prev._sourceColumnRefs) ? prev._sourceColumnRefs[valueIndex] : null) ?? null,
+        )
+        prev._sourceColumnRefs = [...previousColumnRefs, ...appendColumnRefs]
+        prev._sourceCellRefs = prevCellRefs
         prev._sourceTableIndexes = Array.from(new Set([
           ...(Array.isArray(prev._sourceTableIndexes) ? prev._sourceTableIndexes : []),
-          i,
+          ...(Array.isArray(t._sourceTableIndexes) ? t._sourceTableIndexes : [i]),
+        ]))
+        prev._sourceTableKeys = Array.from(new Set([
+          ...(Array.isArray(prev._sourceTableKeys) ? prev._sourceTableKeys : []),
+          ...(Array.isArray(t._sourceTableKeys) ? t._sourceTableKeys : []),
         ]))
       } else {
         merged.push(cloneTable(t, i))

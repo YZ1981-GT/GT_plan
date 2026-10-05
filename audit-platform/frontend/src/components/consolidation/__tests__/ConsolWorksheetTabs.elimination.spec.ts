@@ -9,10 +9,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { defineComponent, h } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 
-const { saved, apiProxy, wsApi } = vi.hoisted(() => ({
+const { saved, apiProxy, wsApi, worksheetApi } = vi.hoisted(() => ({
   saved: { value: {} as Record<string, any> },
   apiProxy: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
   wsApi: { saveWorksheetData: vi.fn() },
+  worksheetApi: {
+    loadAllWorksheetData: vi.fn(),
+    loadWorksheetData: vi.fn(),
+    previewG7Linkage: vi.fn(),
+    importG7Linkage: vi.fn(),
+  },
 }))
 
 vi.mock('vue-router', () => ({
@@ -30,11 +36,11 @@ vi.mock('@/services/consolidationApi', () => ({
   }),
 }))
 vi.mock('@/services/consolWorksheetDataApi', () => ({
-  loadAllWorksheetData: vi.fn(() => Promise.resolve(saved.value)),
+  loadAllWorksheetData: (...a: any[]) => worksheetApi.loadAllWorksheetData(...a),
   saveWorksheetData: (...a: any[]) => wsApi.saveWorksheetData(...a),
-  loadWorksheetData: vi.fn().mockResolvedValue({}),
-  previewG7Linkage: vi.fn(),
-  importG7Linkage: vi.fn(),
+  loadWorksheetData: (...a: any[]) => worksheetApi.loadWorksheetData(...a),
+  previewG7Linkage: (...a: any[]) => worksheetApi.previewG7Linkage(...a),
+  importG7Linkage: (...a: any[]) => worksheetApi.importG7Linkage(...a),
 }))
 vi.mock('@/components/workpaper/composables/g7ConsolLinkageEntry', async () => {
   const { ref } = await import('vue')
@@ -64,6 +70,12 @@ const Pass = defineComponent({ setup(_, { slots }) { return () => h('div', [slot
 
 function mountTabs() {
   return mount(ConsolWorksheetTabs, {
+    props: {
+      projectId: 'p-g',
+      year: 2025,
+      consolMode: 'subsidiary',
+      isRootSelection: true,
+    },
     global: {
       stubs: {
         EliminationSheet: ElimStub, InternalArApSheet: ArApStub,
@@ -94,6 +106,10 @@ describe('ConsolWorksheetTabs → 合并抵消分录明细表', () => {
   beforeEach(() => {
     Object.values(apiProxy).forEach((f) => f.mockReset())
     wsApi.saveWorksheetData.mockReset().mockResolvedValue(true)
+    worksheetApi.loadAllWorksheetData.mockReset().mockResolvedValue({ status: 'empty', data: {} })
+    worksheetApi.loadWorksheetData.mockReset().mockResolvedValue({ status: 'empty', data: {} })
+    worksheetApi.previewG7Linkage.mockReset()
+    worksheetApi.importG7Linkage.mockReset()
     saved.value = {}
   })
 
@@ -102,6 +118,7 @@ describe('ConsolWorksheetTabs → 合并抵消分录明细表', () => {
       internal_arap: { rows: ARAP_ROWS },
       elimination: { rows: [{ _custom: true, source: '', direction: '借', subject: '应付账款', amount: 99 }] },
     }
+    worksheetApi.loadAllWorksheetData.mockResolvedValueOnce({ status: 'loaded', data: saved.value })
     const wrapper = mountTabs()
     await flushPromises()
     await openSheet(wrapper, 'elimination')

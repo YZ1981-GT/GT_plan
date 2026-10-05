@@ -33,6 +33,7 @@ import hashlib
 import logging
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -53,6 +54,100 @@ _VALID_FORMULA_TYPES = ("auto_calc", "logic_check", "reasonability")
 #   custom    — 用户自定义编辑（默认）
 #   reference — 参照另一条已保存公式（复用其 expression，见 reference_resolver）
 _VALID_FORMULA_SOURCES = ("preset", "custom", "reference")
+
+# V178 公式来源绑定的结构化契约。source_scope 描述可读取的项目/年度/节点范围，
+# binding 描述公式模板及其参数；两者不接受把 node_key 拼进伪地址的替代写法。
+_VALID_SCOPE_DOMAINS = frozenset({"report", "note", "workpaper", "consol_worksheet"})
+_BINDING_KEYS = frozenset({"kind", "template", "parameters"})
+
+
+def _validation_issue(status: str, message: str) -> list[dict]:
+    return [{
+        "ref": None,
+        "uri": None,
+        "status": status,
+        "reason": status,
+        "message": message,
+    }]
+
+
+def _normalize_json_object(value: Any, *, field_name: str) -> dict | None:
+    """只允许 JSON object，复制一份以避免调用方后续修改影响待写值。"""
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError(f"{field_name} 必须是 JSON 对象")
+    return dict(value)
+
+
+def _validate_source_scope(source_scope: Any) -> dict | None:
+    """验证并规范化公式来源范围，返回可安全 JSON 序列化的副本。"""
+    scope = _normalize_json_object(source_scope, field_name="source_scope")
+    if scope is None:
+        return None
+
+    required = {"project_id", "year", "include_descendants", "domains"}
+    missing = sorted(required - scope.keys())
+    if missing:
+        raise ValueError(f"source_scope 缺少字段：{', '.join(missing)}")
+
+    try:
+        scope_project_id = str(_as_uuid(scope["project_id"]))
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise ValueError("source_scope.project_id 必须是有效 UUID") from exc
+    scope["project_id"] = scope_project_id
+    if scope_project_id == "":
+        raise ValueError("source_scope.project_id 不能为空")
+
+    try:
+        scope["year"] = int(scope["year"])
+    except (TypeError, ValueError) as exc:
+        raise ValueError("source_scope.year 必须是整数") from exc
+    if not 1900 <= scope["year"] <= 2200:
+        raise ValueError("source_scope.year 超出有效范围")
+
+    if not isinstance(scope["include_descendants"], bool):
+        raise ValueError("source_scope.include_descendants 必须是布尔值")
+
+    domains = scope["domains"]
+    if not isinstance(domains, list) or not domains or any(
+        not isinstance(domain, str) or domain not in _VALID_SCOPE_DOMAINS
+        for domain in domains
+    ):
+        raise ValueError(
+            "source_scope.domains 必须是非空域列表，允许值为 "
+            + "/".join(sorted(_VALID_SCOPE_DOMAINS))
+        )
+    if len(set(domains)) != len(domains):
+        raise ValueError("source_scope.domains 不得重复")
+    scope["domains"] = list(domains)
+
+    if "node_key" in scope and scope["node_key"] is not None:
+        if not isinstance(scope["node_key"], str) or not scope["node_key"].strip():
+            raise ValueError("source_scope.node_key 必须是非空字符串")
+        scope["node_key"] = scope["node_key"].strip()
+
+    return scope
+
+
+def _validate_formula_binding(binding: Any) -> dict | None:
+    """验证可审阅的公式 binding，不允许空模板或非对象参数。"""
+    normalized = _normalize_json_object(binding, field_name="binding")
+    if normalized is None:
+        return None
+    if not isinstance(normalized.get("kind"), str) or not normalized["kind"].strip():
+        raise ValueError("binding.kind 必须是非空字符串")
+    if "template" in normalized and normalized["template"] is not None:
+        if not isinstance(normalized["template"], str) or not normalized["template"].strip():
+            raise ValueError("binding.template 必须是非空字符串")
+        normalized["template"] = normalized["template"].strip()
+    if "parameters" in normalized and not isinstance(normalized["parameters"], dict):
+        raise ValueError("binding.parameters 必须是 JSON 对象")
+    unknown = set(normalized) - _BINDING_KEYS
+    if unknown:
+        raise ValueError(f"binding 包含不支持字段：{', '.join(sorted(unknown))}")
+    normalized["kind"] = normalized["kind"].strip()
+    return normalized
 
 
 # ── Ownership error 工厂 ─────────────────────────────────────────────────────
@@ -104,16 +199,32 @@ def _normalize_refs(refs: list | None) -> list:
     return normalized
 
 
-def _compute_definition_hash(expression: str, formula_type: str, refs: list) -> str:
+def _compute_definition_hash(
+    expression: str,
+    formula_type: str,
+    refs: list,
+    source_scope: dict | None = None,
+    binding: dict | None = None,
+) -> str:
     """计算影响执行的定义字段 hash（definition_hash）。
 
-    仅含 expression + formula_type + sorted refs 序列化。
+    source_scope 和 binding 也属于公式定义：同一表达式切换到另一节点/年度或
+    另一绑定模板时，必须产生新的定义版本，避免 runtime 复用旧执行结果。
+    参数保持可选以兼容已有调用方。
     """
     import json
+
     payload = json.dumps(
-        {"expression": expression, "formula_type": formula_type, "refs": refs},
+        {
+            "expression": expression,
+            "formula_type": formula_type,
+            "refs": refs,
+            "source_scope": source_scope,
+            "binding": binding,
+        },
         sort_keys=True,
         ensure_ascii=False,
+        separators=(",", ":"),
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
@@ -172,6 +283,8 @@ class WpFormulaService:
         hint_text: str | None = None,
         formula_source: str = "custom",
         reference_formula_id: uuid.UUID | str | None = None,
+        source_scope: dict | None = None,
+        binding: dict | None = None,
     ) -> tuple[WpFormula | None, list[dict]]:
         """保存（upsert）一条底稿公式。
 
@@ -221,6 +334,28 @@ class WpFormulaService:
             ]
 
         normalized_refs = _normalize_refs(refs)
+
+        try:
+            normalized_source_scope = _validate_source_scope(source_scope)
+            normalized_binding = _validate_formula_binding(binding)
+        except ValueError as exc:
+            field_name = "source_scope" if "source_scope" in str(exc) else "binding"
+            return None, _validation_issue(
+                f"invalid_{field_name}",
+                str(exc),
+            )
+
+        if normalized_source_scope is not None:
+            if normalized_source_scope["project_id"] != str(project_uuid):
+                return None, _validation_issue(
+                    "source_scope_project_mismatch",
+                    "source_scope.project_id 必须与公式所属项目一致",
+                )
+            if normalized_source_scope.get("year") != year:
+                return None, _validation_issue(
+                    "source_scope_year_mismatch",
+                    "source_scope.year 必须与公式年度一致",
+                )
 
         # ── P0-项2：公式态分类保护（damaged/blocked 不静默仅存值，保留原始表达式作证据）──
         # 结构坏（damaged）或含非白名单内容（blocked）→ 拒绝写库，返回 issue（router 转 422）。
@@ -324,7 +459,13 @@ class WpFormulaService:
             return None, issues
 
         # ── 计算 definition_hash ──
-        def_hash = _compute_definition_hash(expression, ftype, normalized_refs)
+        def_hash = _compute_definition_hash(
+            expression,
+            ftype,
+            normalized_refs,
+            normalized_source_scope,
+            normalized_binding,
+        )
 
         # ── 稳定键推导（P0-项1）：与旧键 (sheet_name,target_cell) 双写共存 ──
         from app.services.formula_management.stable_key import derive_stable_key
@@ -355,6 +496,10 @@ class WpFormulaService:
             existing.hint_text = hint_text
             existing.formula_source = fsource
             existing.reference_formula_id = reference_uuid
+            if hasattr(existing, "source_scope"):
+                existing.source_scope = normalized_source_scope
+            if hasattr(existing, "binding"):
+                existing.binding = normalized_binding
             # ── P0-项1：稳定键双写（identity 不随 sheet 展示重命名而变）──
             if hasattr(existing, "stable_sheet_key"):
                 existing.stable_sheet_key = stable.stable_sheet_key
@@ -396,6 +541,8 @@ class WpFormulaService:
             hint_text=hint_text,
             formula_source=fsource,
             reference_formula_id=reference_uuid,
+            source_scope=normalized_source_scope,
+            binding=normalized_binding,
             # ── P0-项1：稳定键（identity 不随 sheet 展示重命名而变）──
             stable_sheet_key=stable.stable_sheet_key,
             row_key=stable.row_key,

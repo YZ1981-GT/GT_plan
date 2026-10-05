@@ -1,6 +1,24 @@
 <template>
-  <div class="cw-layout">
-    <!-- 总分汇总提示：仅在识别结果为纯「总分汇总」时显示（需求 4.6） -->
+  <div class="cw-layout" :data-load-status="worksheetLoadState">
+    <el-alert
+      v-if="worksheetLoadState === 'error'"
+      type="error"
+      :closable="false"
+      show-icon
+      class="cw-load-error"
+      data-testid="cw-load-error"
+      :title="worksheetLoadError || '合并工作底稿加载失败，请稍后重试'"
+    />
+    <el-alert
+      v-else-if="worksheetLoadState === 'empty'"
+      type="info"
+      :closable="false"
+      show-icon
+      class="cw-empty-state"
+      data-testid="cw-empty-state"
+      title="当前年度暂无已保存的合并工作底稿，已加载可编辑默认表格"
+    />
+    <!-- 总分汇总提示：仅在验证结果为纯「总分汇总」时显示（需求 4.6） -->
     <el-alert
       v-if="isBranchMode"
       type="info"
@@ -373,8 +391,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, markRaw, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, reactive, markRaw, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { List, Coin, TrendCharts, DataBoard, SetUp, Tickets, PieChart } from '@element-plus/icons-vue'
 import { getConsolScope, getWorksheetTree } from '@/services/consolidationApi'
@@ -387,10 +404,12 @@ import {
 import {
   importG7Linkage,
   loadAllWorksheetData,
+  loadWorksheetData,
   previewG7Linkage,
   saveWorksheetData,
   type G7LinkageFieldDiff,
   type G7LinkagePreview,
+  type WorksheetLoadStatus,
 } from '@/services/consolWorksheetDataApi'
 import { useG7ConsolLinkageEntry } from '@/components/workpaper/composables/g7ConsolLinkageEntry'
 import SubsidiaryInfoSheet from './SubsidiaryInfoSheet.vue'
@@ -412,7 +431,31 @@ import { eventBus } from '@/utils/eventBus'
 import type { FormulaChangedPayload } from '@/utils/eventBus'
 import { handleApiError } from '@/utils/errorHandler'
 import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
-import { loadWorksheetData } from '@/services/consolWorksheetDataApi'
+
+interface ConsolWorksheetTabsProps {
+  projectId: string
+  year: number
+  consolMode?: string | null
+  isRootSelection?: boolean
+}
+
+const props = withDefaults(defineProps<ConsolWorksheetTabsProps>(), {
+  consolMode: null,
+  isRootSelection: false,
+})
+
+const projectId = computed(() => props.projectId)
+const year = computed(() => props.year)
+
+const worksheetLoadState = ref<WorksheetLoadStatus>('empty')
+const worksheetLoadError = ref('')
+const worksheetLoading = ref(false)
+let worksheetRequestSeq = 0
+let scopeRequestSeq = 0
+
+function isWorksheetContextCurrent(projectSnapshot: string, yearSnapshot: number): boolean {
+  return projectId.value === projectSnapshot && year.value === yearSnapshot
+}
 
 // ─── 合并工作底稿导入导出列定义 ─────────────────────────────────────────────
 const CONSOL_SHEET_COLS: Record<string, ExcelColumn[]> = {
@@ -672,9 +715,7 @@ const activeSheet = ref('info')
 const eliminationSheetRef = ref<InstanceType<typeof EliminationSheet> | null>(null)
 
 // ─── 从合并范围加载子企业列表 ────────────────────────────────────────────────
-const route = useRoute()
-const projectId = computed(() => route.params.projectId as string)
-const year = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
+// 项目和年度由父页提供，确保工作底稿与左树/报表使用同一年度上下文。
 
 // ─── G7 联动 stale 常驻提示（Task 6.1；失败静默降级 Property 12） ────────────
 const linkageStale = useG7ConsolLinkageEntry(projectId, year)
@@ -885,24 +926,30 @@ async function confirmG7Linkage() {
 // 合并方式按下级企业的与上级关系自动识别（企业树接口 mode）；纯「总分汇总」才提示无需抵销底稿
 const treeMode = ref<string | null>(null)
 const rootCompanyCode = ref('')
-const isBranchMode = computed(() => treeMode.value === 'branch')
+const isBranchMode = computed(() => (props.consolMode ?? treeMode.value) === 'branch')
 
 async function loadConsolScope() {
-  if (!projectId.value) return
+  const projectSnapshot = projectId.value
+  const yearSnapshot = year.value
+  if (!projectSnapshot || !yearSnapshot) return
+  const ticket = ++scopeRequestSeq
   // 企业树：合并方式识别 + 企业列回退（合并范围表为空时取根合并节点下的子公司类成员）
   let treeMembers: { name: string; code: string; ratio: number }[] = []
   try {
-    const res = await getWorksheetTree(projectId.value)
+    const res = await getWorksheetTree(projectSnapshot)
+    if (ticket !== scopeRequestSeq || !isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) return
     treeMode.value = res?.mode ?? null
     treeMembers = directSubsidiaryMembers(res?.tree)
     // 本合并项目的企业代码：工作底稿里的「母公司」= 它（交易方留痕与归属预填用）
     rootCompanyCode.value = res?.tree?.company_code || ''
   } catch {
+    if (ticket !== scopeRequestSeq || !isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) return
     treeMode.value = null
   }
   try {
     // 优先从合并范围获取（持股比例等手工维护信息在这里）
-    const items = await getConsolScope(projectId.value, year.value)
+    const items = await getConsolScope(projectSnapshot, yearSnapshot)
+    if (ticket !== scopeRequestSeq || !isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) return
     if (Array.isArray(items) && items.length) {
       scopeCompanies.value = items
         .filter((s: any) => s.is_included && s.company_code)
@@ -914,21 +961,39 @@ async function loadConsolScope() {
       return
     }
   } catch { /* ignore */ }
+  if (ticket !== scopeRequestSeq || !isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) return
   // 回退：企业树中的子公司类成员（排除合并差额、母公司与分公司）
   scopeCompanies.value = treeMembers
 }
 
 async function loadAllData() {
-  if (!projectId.value) return
+  const projectSnapshot = projectId.value
+  const yearSnapshot = year.value
+  if (!projectSnapshot || !yearSnapshot) return
+  const ticket = ++worksheetRequestSeq
+  worksheetLoading.value = true
   try {
-    const saved = await loadAllWorksheetData(projectId.value, year.value)
-    if (saved.info?.rows) data.subsidiaryInfo = saved.info.rows
-    if (saved.cost?.rows) data.investmentCost = saved.cost.rows
-    if (saved.equity_inv?.rows) data.investmentEquity = saved.equity_inv.rows
-    if (saved.net_asset?.rows) data.netAsset = saved.net_asset.rows
-    if (saved.equity_sim?.rows) {
-      if (saved.equity_sim.rows.direct) data.equitySimDirect = saved.equity_sim.rows.direct
-      if (saved.equity_sim.rows.indirect) data.equitySimIndirect = saved.equity_sim.rows.indirect
+    const result = await loadAllWorksheetData(projectSnapshot, yearSnapshot)
+    if (ticket !== worksheetRequestSeq || !isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) return
+
+    if (result.status === 'error') {
+      // 同一上下文重载失败时保留已展示数据，避免网络抖动把有效表格清空。
+      worksheetLoadState.value = 'error'
+      worksheetLoadError.value = result.errorMessage || '工作底稿批量加载失败'
+      return
+    }
+
+    worksheetLoadState.value = result.status
+    worksheetLoadError.value = ''
+    resetWorksheetData()
+    const saved = result.data
+    if (Array.isArray(saved.info?.rows)) data.subsidiaryInfo = saved.info.rows
+    if (Array.isArray(saved.cost?.rows)) data.investmentCost = saved.cost.rows
+    if (Array.isArray(saved.equity_inv?.rows)) data.investmentEquity = saved.equity_inv.rows
+    if (Array.isArray(saved.net_asset?.rows)) data.netAsset = saved.net_asset.rows
+    if (saved.equity_sim?.rows && typeof saved.equity_sim.rows === 'object') {
+      if (Array.isArray(saved.equity_sim.rows.direct)) data.equitySimDirect = saved.equity_sim.rows.direct
+      if (Array.isArray(saved.equity_sim.rows.indirect)) data.equitySimIndirect = saved.equity_sim.rows.indirect
     }
     // 旧版「合并抵消分录」JSON（saved.elimination）不再恢复：分录唯一来源是 elimination_entries，
     // 旧版自定义行由明细表提示并转为草稿分录（需求 1.6 / 9.2）。旧实现读的 rows.equity/income/cross
@@ -938,19 +1003,28 @@ async function loadAllData() {
     internalRows.arap = Array.isArray(saved.internal_arap?.rows) ? saved.internal_arap.rows : null
     internalRows.trade = Array.isArray(saved.internal_trade?.rows) ? saved.internal_trade.rows : null
     savedSheetKeys.value = new Set(Object.keys(saved))
-    if (saved.capital?.rows) data.capitalReserve = saved.capital.rows
+    if (Array.isArray(saved.capital?.rows)) data.capitalReserve = saved.capital.rows
     // G7 建议草稿（只读；由 G7 联动勾选建议写入）
     const draft = saved.g7_suggestions
     g7SuggestionDraft.rows = Array.isArray(draft?.rows) ? draft.rows : []
     g7SuggestionDraft.note = typeof draft?.note === 'string' ? draft.note : ''
     g7SuggestionDraft.importedAt = typeof draft?.imported_at === 'string' ? draft.imported_at : ''
-    // 恢复动态股比变动表（share_change_1/2/3）
-    for (const times of [1, 2, 3] as const) {
-      const key = `share_change_${times}`
-      const rows = saved[key]?.rows
+    // 动态股比变动表：按后端返回的 share_change_N 键恢复，不把 3 次写死为业务上限。
+    for (const [key, content] of Object.entries(saved)) {
+      if (!/^share_change_\d+$/.test(key)) continue
+      const rows = content?.rows
       if (Array.isArray(rows)) shareChangeData[key] = rows
     }
-  } catch { /* 首次使用无数据，忽略 */ }
+  } catch (error: any) {
+    if (ticket === worksheetRequestSeq && isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) {
+      worksheetLoadState.value = 'error'
+      worksheetLoadError.value = error?.message || '工作底稿批量加载失败'
+    }
+  } finally {
+    if (ticket === worksheetRequestSeq && isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) {
+      worksheetLoading.value = false
+    }
+  }
 }
 
 /** 推送完成后的统一重载：范围、各工作底稿数据，以及当前抵消分录明细。 */
@@ -960,7 +1034,7 @@ async function reload() {
 }
 
 onMounted(async () => {
-  loadConsolScope()
+  void loadConsolScope()
   eventBus.on('formula-changed', onFormulaChanged)
   // 从后端加载已保存的工作底稿数据
   await loadAllData()
@@ -968,7 +1042,21 @@ onMounted(async () => {
   void linkageStale.refreshStale()
 })
 onUnmounted(() => {
+  worksheetRequestSeq += 1
+  scopeRequestSeq += 1
   eventBus.off('formula-changed', onFormulaChanged)
+})
+
+watch([projectId, year], ([nextProjectId, nextYear], previous) => {
+  if (nextProjectId === previous?.[0] && nextYear === previous?.[1]) return
+  worksheetRequestSeq += 1
+  scopeRequestSeq += 1
+  resetWorksheetData()
+  worksheetLoadState.value = 'empty'
+  worksheetLoadError.value = ''
+  if (nextProjectId && nextYear) {
+    void Promise.all([loadConsolScope(), loadAllData()])
+  }
 })
 
 async function onFormulaChanged(_payload: FormulaChangedPayload) {
@@ -1093,7 +1181,8 @@ function buildCapitalReserve(): CapitalReserveRow[] {
 }
 
 // ─── 数据 ─────────────────────────────────────────────────────────────────────
-const data = reactive({
+function createDefaultWorksheetData() {
+  return {
   subsidiaryInfo: Array.from({ length: 5 }, () => mkEmptyRow()) as SubsidiaryInfoRow[],
   investmentCost: Array.from({ length: 5 }, () => ({
     company_name:'',company_code:'',current_dividend:null,open_ratio:null,open_cost:null,open_impairment:null,open_fv:null,
@@ -1112,10 +1201,34 @@ const data = reactive({
   elimEquity: buildElimEquity(),
   elimIncome: buildElimIncome(),
   capitalReserve: buildCapitalReserve(),
-})
+  }
+}
 
-/** 股比变动表本地缓存（按 share_change_1/2/3），避免刷新丢失 */
+const data = reactive(createDefaultWorksheetData())
+
+/** 股比变动表本地缓存（按 share_change_N），避免刷新丢失 */
 const shareChangeData = reactive<Record<string, any[]>>({})
+
+function resetWorksheetData(options: { clearScope?: boolean; resetView?: boolean } = {}) {
+  Object.assign(data, createDefaultWorksheetData())
+  for (const key of Object.keys(shareChangeData)) delete shareChangeData[key]
+  internalRows.arap = null
+  internalRows.trade = null
+  savedSheetKeys.value = new Set()
+  g7SuggestionDraft.rows = []
+  g7SuggestionDraft.note = ''
+  g7SuggestionDraft.importedAt = ''
+  if (options.clearScope) {
+    scopeCompanies.value = []
+    rootCompanyCode.value = ''
+    treeMode.value = null
+  }
+  if (options.resetView) {
+    g7LinkagePreview.value = null
+    g7LinkageVisible.value = false
+    activeSheet.value = 'info'
+  }
+}
 
 // 子企业列：优先从合并范围树获取，降级从基本信息表获取
 const companyColumns = computed(() => {
@@ -1209,15 +1322,15 @@ async function doSave(sheetKey: string, payload: any) {
   if (!projectId.value) { ElMessage.warning('项目ID缺失'); return }
   try {
     const ok = await saveWorksheetData(projectId.value, year.value, sheetKey, { rows: payload })
-    if (ok) {
-      // 已保存 ⇒ 该表数据已知，生成草稿分录时由它负责（其中不再产出的来源键可删草稿）
-      savedSheetKeys.value = new Set([...savedSheetKeys.value, sheetKey])
-      ElMessage.success(`${sheetKey} 已保存`)
-    } else {
+    if (!ok) {
       ElMessage.error(`${sheetKey} 保存失败，请检查后端服务`)
+      return
     }
+    // 已保存 ⇒ 该表数据已知，生成草稿分录时由它负责（其中不再产出的来源键可删草稿）
+    savedSheetKeys.value = new Set([...savedSheetKeys.value, sheetKey])
+    ElMessage.success(`${sheetKey} 已保存`)
   } catch (err: any) {
-    handleApiError(err, '保存异常')
+    handleApiError(err, `${sheetKey} 保存`)
   }
 }
 
@@ -1260,9 +1373,17 @@ async function handleExportData() {
   const colKey = activeSheet.value.startsWith('share_change_') ? 'share_change' : activeSheet.value
   const cols = CONSOL_SHEET_COLS[colKey]
   if (!cols) return
+  if (!projectId.value || !year.value) {
+    ElMessage.warning('工作底稿上下文未就绪，无法导出')
+    return
+  }
   // 从后端加载当前 sheet 数据
-  const saved = await loadWorksheetData(projectId.value, year.value, activeSheet.value)
-  const rows = saved?.rows || []
+  const result = await loadWorksheetData(projectId.value, year.value, activeSheet.value)
+  if (result.status === 'error') {
+    ElMessage.error(result.errorMessage || '工作底稿加载失败，无法导出')
+    return
+  }
+  const rows = Array.isArray(result.data.rows) ? result.data.rows : []
   if (!rows.length) {
     ElMessage.info('当前表暂无数据可导出')
     return
@@ -1306,13 +1427,13 @@ async function handleImportFile(e: Event) {
     }
 
     // 保存到后端
-    const ok = await saveWorksheetData(projectId.value, year.value, activeSheet.value, { rows: mapped })
-    if (ok) {
+    try {
+      await saveWorksheetData(projectId.value, year.value, activeSheet.value, { rows: mapped })
       ElMessage.success(`已导入 ${mapped.length} 行到「${activeSheetLabel.value}」`)
       // 触发前端数据刷新
       await loadAllData()
-    } else {
-      ElMessage.error('导入保存失败')
+    } catch (error: any) {
+      handleApiError(error, '导入保存')
     }
   }, { skipRows: 0 })
   // 重置 file input

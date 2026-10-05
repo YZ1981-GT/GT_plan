@@ -66,10 +66,14 @@ def _find_template_table(
     return None
 
 
-#: 模板类型 → 公式推送的附注章节号
-_SECTION_MAP: dict[str, str] = {
-    "listed": "五、1",
-    "soe": "八、1",
+#: 附注字段 → (披露行取值键, addr_id 期间后缀)
+#
+# 字段由规则 target.fields 按需声明；登记表是字段语义的唯一真源。
+# ⚠ 顺序决定 build_main_skeleton 骨架行的键序和 e1_note_skeleton.json 夹具对拍，
+#   新增字段必须追加到末尾，不得调换已有顺序。
+NOTE_FIELDS: dict[str, tuple[str, str]] = {
+    "end_amount": ("ending", "end"),
+    "prior_amount": ("opening", "prior"),
 }
 
 
@@ -80,25 +84,26 @@ class MainSkeleton:
     columns: list[dict]
 
 
-def build_main_skeleton(template_type: str, table_name: str) -> MainSkeleton | None:
-    """按附注模板（listed 五、1 / soe 八、1）构建主表骨架。
+def build_main_skeleton(template_type: str, section: str, table_name: str) -> MainSkeleton | None:
+    """按规则声明的附注章节和表名构建主表骨架。
 
-    产出 rows = [{label, end_amount: None, prior_amount: None, is_total?}]
-    与 columns，与前端 ``buildE1{Listed,Soe}Columns()`` 逐字一致。
-    找不到模板表返回 None。
+    产出 rows = [{label, *NOTE_FIELDS: None, is_total?}]，columns 与模板定义一致。
+    找不到模板类型、章节或表返回 None；章节不再由模板类型隐式推导。
 
-    spec: chain-closure-phase3-push-rollout · design §五 · 需求 5.1
+    spec: formula-push-all-subjects-rollout · design §六 6.3 · 需求 5.2
     """
-    section_number = _SECTION_MAP.get(template_type)
-    if section_number is None:
+    try:
+        tbl_def = _find_template_table(template_type, section, table_name)
+    except FileNotFoundError:
+        # 保留未知模板类型的旧调用语义：无法加载模板时视为没有表定义。
         return None
-    tbl_def = _find_template_table(template_type, section_number, table_name)
     if tbl_def is None:
         return None
     rows: list[dict] = []
     for row_def in tbl_def.get("rows") or []:
         label = row_def.get("label", "")
-        row: dict = {"label": label, "end_amount": None, "prior_amount": None}
+        row: dict = {"label": label}
+        row.update({field_name: None for field_name in NOTE_FIELDS})
         if row_def.get("is_total"):
             row["is_total"] = True
         rows.append(row)
@@ -110,12 +115,6 @@ def build_main_skeleton(template_type: str, table_name: str) -> MainSkeleton | N
                 col[k] = col_def[k]
         columns.append(col)
     return MainSkeleton(rows=rows, columns=columns)
-
-#: 附注字段 → (披露行取值键, addr_id 期间后缀)
-NOTE_FIELDS: dict[str, tuple[str, str]] = {
-    "end_amount": ("ending", "end"),
-    "prior_amount": ("opening", "prior"),
-}
 
 
 @dataclass(frozen=True)
@@ -230,3 +229,40 @@ def total_formula(rows: Sequence[Any], total_index: int, field: str, value_keys:
         number = read_number(current) if ok else None
         total = total + (number if number is not None else 0.0)
     return total
+
+
+def has_obscured_data(table_data: dict, table_name: str) -> str | None:
+    """检查附注章节是否有会被骨架遮挡的数据（需求 5.2）。
+
+    如果 sub_table_data 以外有非空非零数值（顶层 rows/_tables 有业务数据）、
+    或 sub_table_data 里该表以外的子表有人工/锁定单元格，返回中文原因；否则 None。
+
+    只检查该表**缺失**时的「原表格」——即 rows / _tables 里可能存在用户不可见
+    但将被骨架覆盖的数据。
+    """
+    rows = table_data.get("rows")
+    if isinstance(rows, list):
+        for r in rows:
+            if not isinstance(r, dict):
+                continue
+            for k, v in r.items():
+                if k in ("label", "row_type", "is_total", "is_label"):
+                    continue
+                if v is not None and v != 0 and v != "" and v != "0":
+                    return f"顶层 rows 含非空数值（{k}={v!r}）"
+    tables = table_data.get("_tables")
+    if isinstance(tables, list):
+        for t in tables:
+            if not isinstance(t, dict):
+                continue
+            t_rows = t.get("rows")
+            if isinstance(t_rows, list) and len(t_rows) > 0:
+                for r in t_rows:
+                    if not isinstance(r, dict):
+                        continue
+                    vals = r.get("values")
+                    if isinstance(vals, list):
+                        for v in vals:
+                            if v is not None and v != 0 and v != "" and v != "0":
+                                return f"_tables 含非空数值"
+    return None

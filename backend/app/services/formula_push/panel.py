@@ -25,7 +25,7 @@ def _dedupe(addr_ids: Iterable[str]) -> list[str]:
 async def _checked_targets(
     db, project_id: UUID, year: int, addr_ids: Iterable[str], *, for_update: bool = False,
 ) -> tuple[list[str], dict[str, FormulaPushState], dict[str, PushRule]]:
-    """面板操作的目标校验：须有推送记录、规则仍在清单、且是可编辑目标。"""
+    """面板操作前的校验：须有推送记录、规则在清单、可编辑目标。"""
     wanted = _dedupe(addr_ids)
     if not wanted:
         raise PushActionError("请至少选择一个目标")
@@ -56,7 +56,7 @@ async def _checked_targets(
 
 
 async def adopt(db, *, project_id: UUID, year: int, addr_ids: Iterable[str], user_id: UUID | None) -> RunResult:
-    """采用公式值：以本次**重新算出**的公式值写入并转 auto（不用 last_formula_value —— 它可能已过时）。"""
+    """采用公式值：重新算出当前公式值写入并转 auto。"""
     wanted, _, _ = await _checked_targets(db, project_id, year, addr_ids)
     return await run_and_commit(
         db, project_id=project_id, year=year, trigger=MANUAL, triggered_by=user_id, force_addr_ids=wanted,
@@ -82,32 +82,56 @@ async def set_locked(
     return [rows[a] for a in wanted]
 
 
-async def latest_run(db, *, project_id: UUID, year: int) -> FormulaPushRun | None:
-    return (await db.execute(
+async def latest_run(db, *, project_id: UUID, year: int, wp_code: str | None = None) -> FormulaPushRun | None:
+    # 带 wp_code 时需逐条检查 detail 是否涉及该 code（Python 侧过滤，兼容 SQLite）。
+    # limit(100) 假设同一项目/年度的运行记录在 100 条内必然覆盖该 code 最近一次运行；
+    # 如果某个 code 被长时间不推而其他 code 持续推超 100 次，这里会漏找——实际使用中
+    # 推送频率远低于此上限。PG 上可改用 JSONB 查询 detail->'wp' @> '[{"wp_code":"E1"}]'，
+    # 但 SQLite 不支持；分页循环开销更高且此场景不值得。
+    max_scan = 100 if wp_code else 1
+    row = (await db.execute(
         sa.select(FormulaPushRun)
         .where(FormulaPushRun.project_id == project_id, FormulaPushRun.year == year)
         .order_by(FormulaPushRun.started_at.desc(), FormulaPushRun.id.desc())
-        .limit(1)
-    )).scalar_one_or_none()
+        .limit(max_scan)
+    )).scalars().all()
+    if not wp_code:
+        return row[0] if row else None
+    # 按 detail.wp 判定运行是否涉及该 code（Python 侧过滤，兼容 SQLite）
+    # items 级兜底使用 startswith(f"{wp_code}.")（带点号），不会误命中 E10 等更长前缀
+    prefix = f"{wp_code}."
+    for run in row:
+        detail = run.detail or {}
+        wp_list = detail.get("wp") or []
+        if any(isinstance(wp, dict) and wp.get("wp_code") == wp_code for wp in wp_list):
+            return run
+        # items 级兜底：rule_id 前缀
+        items = detail.get("items") or []
+        if any(isinstance(it, dict) and str(it.get("rule_id", "")).startswith(prefix) for it in items):
+            return run
+    return None
 
 
-async def state_counts(db, *, project_id: UUID, year: int) -> dict[str, int]:
-    rows = (await db.execute(
-        sa.select(FormulaPushState.state, sa.func.count())
-        .where(FormulaPushState.project_id == project_id, FormulaPushState.year == year)
-        .group_by(FormulaPushState.state)
-    )).all()
+async def state_counts(db, *, project_id: UUID, year: int, wp_code: str | None = None) -> dict[str, int]:
+    stmt = sa.select(FormulaPushState.state, sa.func.count()).where(
+        FormulaPushState.project_id == project_id, FormulaPushState.year == year,
+    )
+    if wp_code:
+        stmt = stmt.where(FormulaPushState.rule_id.like(f"{wp_code}.%"))
+    rows = (await db.execute(stmt.group_by(FormulaPushState.state))).all()
     return {str(state): int(n) for state, n in rows}
 
 
 async def list_states(
-    db, *, project_id: UUID, year: int, state: str | None = None,
+    db, *, project_id: UUID, year: int, state: str | None = None, wp_code: str | None = None,
 ) -> list[FormulaPushState]:
     stmt = sa.select(FormulaPushState).where(
         FormulaPushState.project_id == project_id, FormulaPushState.year == year,
     )
     if state:
         stmt = stmt.where(FormulaPushState.state == state)
+    if wp_code:
+        stmt = stmt.where(FormulaPushState.rule_id.like(f"{wp_code}.%"))
     return list((await db.execute(stmt.order_by(FormulaPushState.addr_id))).scalars().all())
 
 
@@ -128,9 +152,31 @@ def state_view(row: FormulaPushState) -> dict[str, Any]:
     }
 
 
-def run_view(row: FormulaPushRun | None) -> dict[str, Any] | None:
+def run_view(row: FormulaPushRun | None, *, wp_code: str | None = None) -> dict[str, Any] | None:
     if row is None:
         return None
+    detail = row.detail or {}
+    if wp_code:
+        prefix = f"{wp_code}."
+        matched_wp = [wp for wp in (detail.get("wp") or []) if isinstance(wp, dict) and wp.get("wp_code") == wp_code]
+        # note_sections 从匹配的 wp 记录提取（每张底稿的 note_sections 在运行记录中逐册记录）
+        wp_note_sections: set[str] = set()
+        for wp in matched_wp:
+            for ns in (wp.get("note_sections") or []):
+                if isinstance(ns, str):
+                    wp_note_sections.add(ns)
+        detail = {
+            **detail,
+            "wp": matched_wp,
+            "items": [it for it in (detail.get("items") or [])
+                      if isinstance(it, dict) and str(it.get("rule_id", "")).startswith(prefix)],
+            "changed_items": [ci for ci in (detail.get("changed_items") or [])
+                              if isinstance(ci, str) and ci.startswith(f"{wp_code}-")],
+            "note_sections": sorted(wp_note_sections),
+        }
+        # stages 从裁剪后 items 推导（全量运行的 stages 含其他 code 的阶段）
+        if detail["items"]:
+            detail["stages"] = sorted({it.get("stage") for it in detail["items"] if isinstance(it, dict) and it.get("stage")})
     return {
         "run_id": str(row.id),
         "trigger": row.trigger_source,
@@ -142,5 +188,5 @@ def run_view(row: FormulaPushRun | None) -> dict[str, Any] | None:
         "skipped_count": row.skipped_count,
         "started_at": row.started_at.isoformat() if row.started_at else None,
         "finished_at": row.finished_at.isoformat() if row.finished_at else None,
-        "detail": row.detail or {},
+        "detail": detail,
     }

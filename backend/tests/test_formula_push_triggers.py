@@ -8,6 +8,8 @@ from __future__ import annotations
 import uuid
 
 import pytest
+import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.services.formula_push import triggers
@@ -21,10 +23,16 @@ WP = uuid.uuid4()
 def calls(monkeypatch):
     got: list[tuple] = []
 
-    async def fake_push(project_id, year, trigger, *, wp_id=None):
-        got.append((project_id, year, trigger, wp_id))
+    async def fake_push(project_id, year, trigger, *, wp_id=None, codes=None):
+        normalized_codes = tuple(sorted(codes)) if codes is not None else None
+        got.append((project_id, year, trigger, wp_id, normalized_codes))
 
     monkeypatch.setattr(triggers, "_push", fake_push)
+
+    async def no_lookup(project_id, wp_id):
+        return None
+
+    monkeypatch.setattr(triggers, "_lookup_wp_code", no_lookup)
     return got
 
 
@@ -40,14 +48,40 @@ def saved(wp_code="E1", wp_id=WP, year=2025) -> EventPayload:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("codes, fires", [
-    (None, True), ([], True),                         # 全量重算
-    (["1002"], True), (["1001.01"], True), (["6601", "1012.03"], True),
-    (["6601", "2202"], False), (["10"], False), (["01001"], False),
+@pytest.mark.parametrize("codes, fires, selected", [
+    (None, True, None), ([], True, None),                         # 全量重算
+    (["1002"], True, ("E1",)), (["1001.01"], True, ("E1",)),
+    (["6601", "1012.03"], True, ("E1",)),
+    (["6601", "2202"], False, None), (["10"], False, None), (["01001"], False, None),
 ])
-async def test_trial_balance_updated_fires_only_when_cash_accounts_touched(calls, codes, fires):
+async def test_trial_balance_updated_fires_only_when_cash_accounts_touched(calls, codes, fires, selected):
     await triggers.on_trial_balance_updated(tb(codes))
-    assert calls == ([(PID, 2025, "TRIAL_BALANCE_UPDATED", None)] if fires else [])
+    assert calls == ([(PID, 2025, "TRIAL_BALANCE_UPDATED", None, selected)] if fires else [])
+
+
+@pytest.mark.asyncio
+async def test_trial_balance_updated_passes_only_matching_binding_codes(monkeypatch, calls):
+    # K1 已永久注册（account_prefixes = ('1221', '1231')）；测试只验证科目前缀过滤逻辑。
+    await triggers.on_trial_balance_updated(tb(["1001", "1221.01"]))
+    # E1 匹配 1001，K1 匹配 1221 → 两个 binding 都应跑
+    assert len(calls) == 1
+    _, _, _, _, codes = calls[0]
+    assert "E1" in codes and "K1" in codes
+    calls.clear()
+    await triggers.on_trial_balance_updated(tb(["1001"]))
+    _, _, _, _, codes2 = calls[0]
+    assert "E1" in codes2
+    assert "K1" not in codes2
+    calls.clear()
+    # 不匹配任何 binding 的科目码 → 仍可能匹配 Tier A 码
+    await triggers.on_trial_balance_updated(tb(["9999"]))
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_trial_balance_updated_empty_codes_preserve_full_rebuild_compatibility(calls):
+    await triggers.on_trial_balance_updated(tb([]))
+    assert calls == [(PID, 2025, "TRIAL_BALANCE_UPDATED", None, None)]
 
 
 @pytest.mark.asyncio
@@ -57,13 +91,87 @@ async def test_trial_balance_updated_without_year_is_not_guessed(calls):
 
 
 @pytest.mark.asyncio
-async def test_workpaper_saved_runs_only_that_e1_workpaper(calls):
-    await triggers.on_workpaper_saved(saved())
-    assert calls == [(PID, 2025, "WORKPAPER_SAVED", WP)]
+@pytest.mark.parametrize("wp_owned, index_owned, wp_deleted, index_deleted, expected", [
+    (True, True, False, False, "K1-1"),
+    (False, True, False, False, None),
+    (True, False, False, False, None),
+    (False, False, False, False, None),
+    (True, True, True, False, None),
+    (True, True, False, True, None),
+], ids=["active", "foreign-paper", "foreign-index", "foreign-both", "deleted-paper", "deleted-index"])
+async def test_lookup_wp_code_enforces_project_and_soft_delete(
+    monkeypatch, wp_owned, index_owned, wp_deleted, index_deleted, expected,
+):
+    import app.core.database as database
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    try:
+        project_id, other_project, wp_id, index_id = (uuid.uuid4() for _ in range(4))
+        async with engine.begin() as conn:
+            await conn.execute(sa.text(
+                "CREATE TABLE wp_index (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, "
+                "wp_code TEXT NOT NULL, is_deleted BOOLEAN NOT NULL DEFAULT 0)"
+            ))
+            await conn.execute(sa.text(
+                "CREATE TABLE working_paper (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, "
+                "wp_index_id TEXT NOT NULL, is_deleted BOOLEAN NOT NULL DEFAULT 0)"
+            ))
+            await conn.execute(sa.text(
+                "INSERT INTO wp_index (id, project_id, wp_code, is_deleted) "
+                "VALUES (:id, :pid, 'K1-1', :deleted)"
+            ), {"id": str(index_id), "pid": str(project_id if index_owned else other_project),
+                "deleted": index_deleted})
+            await conn.execute(sa.text(
+                "INSERT INTO working_paper (id, project_id, wp_index_id, is_deleted) "
+                "VALUES (:id, :pid, :index_id, :deleted)"
+            ), {"id": str(wp_id), "pid": str(project_id if wp_owned else other_project),
+                "index_id": str(index_id), "deleted": wp_deleted})
+        factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        monkeypatch.setattr(database, "async_session", factory)
+        assert await triggers._lookup_wp_code(project_id, wp_id) == expected
+        assert await triggers._lookup_wp_code(project_id, uuid.uuid4()) is None
+    finally:
+        await engine.dispose()
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("event", [saved(wp_code="D2"), saved(wp_code=None), saved(wp_id=None), saved(year=None)])
+async def test_workpaper_saved_runs_only_that_e1_workpaper(calls):
+    await triggers.on_workpaper_saved(saved())
+    assert calls == [(PID, 2025, "WORKPAPER_SAVED", WP, ("E1",))]
+
+
+@pytest.mark.asyncio
+async def test_workpaper_saved_normalizes_registered_subcode(monkeypatch, calls):
+    # K1 已永久注册，K1-1 归到主编码 K1
+    await triggers.on_workpaper_saved(saved(wp_code="K1-1"))
+    assert len(calls) == 1
+    _, _, _, _, codes = calls[0]
+    assert codes == ("K1",)
+
+
+@pytest.mark.asyncio
+async def test_workpaper_saved_looks_up_missing_code_and_normalizes_subcode(monkeypatch, calls):
+    # K1 已永久注册；测试 wp_code 缺失时的反查路径
+    async def lookup(project_id, wp_id):
+        assert (project_id, wp_id) == (PID, WP)
+        return "K1-1"
+
+    monkeypatch.setattr(triggers, "_lookup_wp_code", lookup)
+    await triggers.on_workpaper_saved(saved(wp_code=None))
+    assert len(calls) == 1
+    _, _, _, _, codes = calls[0]
+    assert codes == ("K1",)
+
+
+@pytest.mark.asyncio
+async def test_workpaper_saved_ignores_unregistered_subcode(calls):
+    # Z9 未注册 → Z9-1 保存不触发推送
+    await triggers.on_workpaper_saved(saved(wp_code="Z9-1"))
+    assert calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("event", [saved(wp_code="Z9"), saved(wp_code=None), saved(wp_id=None), saved(year=None)])
 async def test_workpaper_saved_ignores_other_or_incomplete_events(calls, event):
     await triggers.on_workpaper_saved(event)
     assert calls == []

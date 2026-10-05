@@ -444,6 +444,19 @@
         "review_status": "published_representation_verified",
         "legacy_reasons": []
       }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtA51CashflowAudit.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "unresolved",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "a51.cashflow_audit",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
     }
   ]
 }

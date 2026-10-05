@@ -37,9 +37,16 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.models.formula_push_models import FormulaPushRun, FormulaPushState
 from app.services.formula_push import note_writer
 from app.services.formula_push.bindings import get_binding, supported_wp_codes
-from app.services.formula_push.policy import Decision, decide, values_equal
+from app.services.formula_push.policy import Decision, decide, decide_note, values_equal
 from app.services.formula_push.results import CONFLICT, SKIPPED, PushItem, RunResult, _enum_value, _jsonable
-from app.services.formula_push.rules import TRIGGERS, PushRule, load_rules, note_addr_id, rules_for
+from app.services.formula_push.rules import (
+    TRIGGERS,
+    BindingSpec,
+    PushRule,
+    load_rules,
+    note_addr_id,
+    rules_for,
+)
 from app.services.formula_runtime.adapters.workpaper import (
     RAW_CELL,
     VersionConflict,
@@ -50,17 +57,13 @@ from app.services.formula_runtime.contracts import CanonicalFormulaTarget, Formu
 
 logger = logging.getLogger(__name__)
 
-#: SSE 事件名（前端 ``src/types/sse.ts`` 同名登记）
+#: SSE 事件名
 SSE_EVENT = "formula.pushed"
 MANUAL = "manual"
-#: 冻结底稿：与平台编辑锁同口径（wopi_service / wp_sync_router：review_passed、archived 只读），
-#: 另含旧值兼容的两个「复核通过」（working_paper_service.status_map 同样映射为复核通过）。
-#: 复核状态 ``levelN_passed`` 是逐级中间态（下一步即 ``pending_level{N+1}``），不是整张底稿通过。
+#: 冻结底稿状态（复核通过 / 已归档 / 逐级中间态）
 FROZEN_WP_STATUSES: Mapping[str, str] = {
-    "review_passed": "复核通过",
-    "archived": "已归档",
-    "review_level1_passed": "一级复核通过",
-    "review_level2_passed": "二级复核通过",
+    "review_passed": "复核通过", "archived": "已归档",
+    "review_level1_passed": "一级复核通过", "review_level2_passed": "二级复核通过",
 }
 FROZEN_NOTE_STATUSES: frozenset[str] = frozenset({"confirmed"})
 PERIOD_LABELS: Mapping[str, str] = {"end": "期末", "prior": "期初"}
@@ -68,7 +71,7 @@ PERIOD_LABELS: Mapping[str, str] = {"end": "期末", "prior": "期初"}
 
 @dataclass
 class _StateWrite:
-    """待落库的目标状态（底稿写入成功后才生效；冲突 / 跳过不产生）。"""
+    """待落库的目标状态。"""
 
     addr_id: str
     rule_id: str
@@ -85,27 +88,39 @@ class _StateWrite:
 class PushActionError(ValueError):
     """用户操作不合法（采用 / 锁定的目标不存在、策略不允许等；路由转 400）。"""
 
-
 # ── 规则 / 并发 / 年度 ────────────────────────────────────────────────────────
+
+def _binding_specs() -> dict[str, BindingSpec]:
+    """构建规则校验所需的注册 binding 元信息快照。"""
+    specs: dict[str, BindingSpec] = {}
+    for code in supported_wp_codes():
+        binding = get_binding(code)
+        specs[code] = BindingSpec(
+            four_table_slots=frozenset(binding.four_table_slots),
+            derivations=frozenset(binding.derivations),
+            tb_columns=frozenset(binding.tb_columns),
+        )
+    return specs
 
 
 def known_derivations() -> frozenset[str]:
+    """兼容旧调用方：返回注册 binding 的派生名并集。"""
     names: set[str] = set()
-    for code in supported_wp_codes():
-        names |= set(get_binding(code).derivations)
+    for spec in _binding_specs().values():
+        names |= set(spec.derivations)
     return frozenset(names)
 
 
 def load_push_rules() -> tuple[PushRule, ...]:
-    """规则清单（派生名按已接入 binding 校验，未实现的派生整份拒收）。"""
-    return load_rules(known_derivations=known_derivations())
+    """规则清单按每个 binding 自己的槽名、派生名和试算表列校验。"""
+    return load_rules(binding_specs=_binding_specs())
 
 
 _PROCESS_LOCKS: weakref.WeakValueDictionary = weakref.WeakValueDictionary()
 
 
 def _process_lock(project_id: UUID, year: int) -> asyncio.Lock:
-    """同进程按 (项目, 年度) 串行。asyncio 锁绑定事件循环，故键里带循环 id。"""
+    """同进程按 (项目, 年度) 串行。"""
     key = (id(asyncio.get_running_loop()), str(project_id), int(year))
     lock = _PROCESS_LOCKS.get(key)
     if lock is None:
@@ -119,7 +134,7 @@ def _dialect(db) -> str:
 
 
 async def _advisory_lock(db, project_id: UUID, year: int) -> None:
-    """跨进程串行：PG 事务级咨询锁（随调用方事务提交 / 回滚释放）。SQLite 无此能力，跳过。"""
+    """跨进程串行：PG 咨询锁；SQLite 跳过。"""
     if _dialect(db) != "postgresql":
         return
     await db.execute(
@@ -129,7 +144,7 @@ async def _advisory_lock(db, project_id: UUID, year: int) -> None:
 
 
 async def _project_audit_year(db, project_id: UUID) -> tuple[bool, int | None]:
-    """(项目存在且未删除, 审计年度)。年度口径与全平台一致（project_audit_year 5 级兜底）。"""
+    """(项目存在且未删除, 审计年度)。"""
     from app.models.core import Project
     from app.services.project_audit_year import resolve_project_audit_year
 
@@ -146,6 +161,7 @@ async def _project_audit_year(db, project_id: UUID) -> tuple[bool, int | None]:
 class _Paper:
     id: UUID
     status: str | None
+    paper_code: str | None = None
 
 
 def frozen_reason(status: Any) -> str | None:
@@ -154,12 +170,7 @@ def frozen_reason(status: Any) -> str | None:
 
 
 async def _find_workpapers(db, project_id: UUID, wp_code: str) -> list[_Paper]:
-    """裸 SQL，与写入适配器（``_verify_ownership`` / UPSERT）同一 uuid 传参口径。
-
-    真库唯一索引 ``uq_wp_index_project_code (project_id, wp_code)`` 与
-    ``uq_working_paper_project_index (project_id, wp_index_id)`` 都不带 ``is_deleted`` 条件 ⇒
-    一个项目一个编码至多一张底稿。多于一张 = 约束被破坏，推送地址（不含 wp_id）会串，直接报错。
-    """
+    """裸 SQL 按编码找底稿；一个项目一个编码至多一张（多于一张直接报错）。"""
     rows = (await db.execute(
         sa.text(
             "SELECT wp.id, wp.status FROM working_paper wp "
@@ -172,11 +183,11 @@ async def _find_workpapers(db, project_id: UUID, wp_code: str) -> list[_Paper]:
     )).all()
     if len(rows) > 1:
         raise RuntimeError(f"项目 {project_id} 有 {len(rows)} 张 {wp_code} 底稿，违反唯一约束，公式推送中止")
-    return [_Paper(id=UUID(str(r[0])), status=_enum_value(r[1])) for r in rows]
+    return [_Paper(id=UUID(str(r[0])), status=_enum_value(r[1]), paper_code=wp_code) for r in rows]
 
 
 async def _read_entries(db, wp_id: UUID, wp_code: str) -> dict[str, tuple[Any, str]]:
-    """条目快照 ``item_id → (remark, CAS 版本)``；版本口径与适配器 ``apply_many`` 的校验一致。"""
+    """条目快照 ``item_id → (remark, CAS 版本)``。"""
     rows = (await db.execute(
         sa.text(
             "SELECT item_id, remark, updated_at FROM checklist_responses "
@@ -216,7 +227,7 @@ class _Ctx:
     def decide(
         self, policy: str, *, addr_id: str, formula_value: Any, current_value: Any,
     ) -> Decision:
-        """底稿目标三态判定；「采用公式值」（force）对可编辑目标直接写入并转 auto。"""
+        """底稿目标三态判定；「采用公式值」（force）直接写入并转 auto。"""
         if addr_id in self.force and policy == "editable":
             if values_equal(current_value, formula_value):
                 return Decision("unchanged", "auto", differs=False, record_pushed=True)
@@ -231,21 +242,6 @@ class _Ctx:
         )
 
 
-def decide_note(*, formula_value: Any, current_value: Any, cell_mode: str | None) -> Decision:
-    """附注单元格判定：以附注自身标记为准（需求 3.5），其余跟随公式值。
-
-    底稿来源章节（``_source=workpaper``）的数值只有「同步到附注」类写入方：附注编辑器的保存落在
-    ``_tables``，而读时投影每次都从 ``sub_table_data`` 重建 ``_tables``（``get_note_detail``）——
-    ``sub_table_data`` 里不存在未带标记的人工值，推送与点「同步到附注」同效。保留的只有单元格
-    ``_cell_modes`` manual / locked 与整节 ``_manual_override``（已折算进 ``cell_mode``）。
-    推送状态表不参与附注判定（面板对附注目标不提供采用 / 锁定，见 :func:`_checked_targets`）：
-    否则上次因附注标记记下的 locked，会在用户去掉标记后冒充面板锁定继续挡住推送。
-    """
-    if cell_mode is not None:
-        return decide("editable", formula_value=formula_value, current_value=current_value, external_mode=cell_mode)
-    return decide("derived", formula_value=formula_value, current_value=current_value)
-
-
 # ── 运行 ──────────────────────────────────────────────────────────────────────
 
 
@@ -257,31 +253,27 @@ async def run(
     trigger: str,
     triggered_by: UUID | None = None,
     wp_id: UUID | None = None,
+    codes: Iterable[str] | None = None,
     dry_run: bool = False,
     force_addr_ids: Iterable[str] = (),
 ) -> RunResult:
-    """执行一次推送（调用方事务内，只 flush 不 commit）。
-
-    :param trigger: ``TRIAL_BALANCE_UPDATED`` / ``WORKPAPER_SAVED`` / ``manual``（决定跑哪些规则）
-    :param wp_id: 只推这张底稿（``WORKPAPER_SAVED`` 用）
-    :param dry_run: 在保存点内执行后整体回滚（含运行记录），返回「将写入 / 保留 / 待确认」
-    :param force_addr_ids: 「采用公式值」的目标 —— 可编辑目标直接写入当前公式值并转 auto
-    """
+    """执行一次推送（调用方事务内，只 flush 不 commit）。"""
     if trigger not in TRIGGERS:
         raise ValueError(f"未知触发来源 {trigger!r}（可选 {TRIGGERS}）")
     force = frozenset(str(a) for a in force_addr_ids)
+    selected_codes = frozenset(str(code).strip() for code in codes or () if str(code).strip()) if codes is not None else None
     async with _process_lock(project_id, year):
         await _advisory_lock(db, project_id, year)
         if not dry_run:
             return await _execute(
                 db, project_id=project_id, year=year, trigger=trigger,
-                triggered_by=triggered_by, wp_id=wp_id, force=force,
+                triggered_by=triggered_by, wp_id=wp_id, codes=selected_codes, force=force,
             )
         savepoint = await db.begin_nested()
         try:
             result = await _execute(
                 db, project_id=project_id, year=year, trigger=trigger,
-                triggered_by=triggered_by, wp_id=wp_id, force=force,
+                triggered_by=triggered_by, wp_id=wp_id, codes=selected_codes, force=force,
             )
         finally:
             await savepoint.rollback()
@@ -292,7 +284,7 @@ async def run(
 
 async def _execute(
     db, *, project_id: UUID, year: int, trigger: str, triggered_by: UUID | None,
-    wp_id: UUID | None, force: frozenset[str],
+    wp_id: UUID | None, codes: frozenset[str] | None, force: frozenset[str],
 ) -> RunResult:
     result = RunResult(project_id=project_id, year=year, trigger=trigger, forced=sorted(force))
     exists, audit_year = await _project_audit_year(db, project_id)
@@ -307,16 +299,31 @@ async def _execute(
         return result
 
     rules = load_push_rules()
-    plan: list[tuple[str, Any, tuple[PushRule, ...], list[_Paper]]] = []
+    plan: list[tuple[str, Any, tuple[PushRule, ...], list[_Paper], list[str]]] = []
     for code in supported_wp_codes():
+        if codes is not None and code not in codes:
+            continue
         code_rules = rules_for(rules, wp_code=code, trigger=trigger)
         if not code_rules:
             continue
-        papers = await _find_workpapers(db, project_id, code)
-        if wp_id is not None and all(p.id != wp_id for p in papers):
-            continue  # 事件指向的底稿不是本项目在用的该编码底稿
-        if papers:
-            plan.append((code, get_binding(code), code_rules, papers))
+        binding = get_binding(code)
+        paper_codes = tuple(getattr(binding, "paper_codes", None) or (code,))
+        papers: list[_Paper] = []
+        missing: list[str] = []
+        for pc in paper_codes:
+            found = await _find_workpapers(db, project_id, pc)
+            if found:
+                papers.extend(found)
+            else:
+                missing.append(pc)
+        if wp_id is not None:
+            # 事件指向具体底稿：只推命中的那一张（分册也算命中），其余册本次不动
+            papers = [p for p in papers if p.id == wp_id]
+            missing = []
+            if not papers:
+                continue  # 事件指向的底稿不是本 binding 在用的任一底稿
+        if papers or missing:
+            plan.append((code, binding, code_rules, papers, missing))
     if not plan and trigger != MANUAL:
         return result  # 事件触发且无目标底稿：不落运行记录（避免每次重算都记一条空记录）
 
@@ -334,8 +341,40 @@ async def _execute(
     )
     if not plan:
         result.add_warning("本项目没有已接入公式推送的底稿（当前接入：" + "、".join(supported_wp_codes()) + "）")
-    for code, binding, code_rules, papers in plan:
-        await _push_workpaper(ctx, wp_code=code, binding=binding, rules=code_rules, paper=papers[0])
+    for code, binding, code_rules, papers, missing_codes in plan:
+        # 声明了分册但该分册不存在 ⇒ 跳过并说明（ADR-FPA-008），不建保存点、不报错
+        for mc in missing_codes:
+            ctx.skip("*", "source", "workpaper", None,
+                     f"binding 声明的分册 {mc} 在本项目不存在，未推送（项目创建该底稿后下次推送纳入）")
+        # 附注 owner = 声明顺序首张实际底稿；frozen 则附注本次不推（真多册附注留给分册 canary 验证）
+        note_owner_id: UUID | None = papers[0].id if papers else None
+        for paper in papers:
+            is_note_owner = paper.id == note_owner_id
+            checkpoint = _workpaper_checkpoint(ctx)
+            savepoint = await db.begin_nested()
+            try:
+                await _push_workpaper(
+                    ctx, wp_code=code, binding=binding, rules=code_rules,
+                    paper=paper, push_note=is_note_owner,
+                )
+            except Exception as exc:  # noqa: BLE001 — 单张底稿隔离
+                await savepoint.rollback()
+                _restore_workpaper_checkpoint(ctx, checkpoint)
+                paper_label = paper.paper_code or code
+                reason = _workpaper_failure_reason(paper_label, exc)
+                result.status = "partial"
+                result.add_warning(reason)
+                result.workpapers.append({
+                    "wp_id": str(paper.id), "wp_code": code,
+                    "paper_code": paper.paper_code or code,
+                    "status": "failed", "reason": reason,
+                })
+                logger.warning(
+                    "formula_push: 底稿失败，已回滚保存点并继续 project=%s year=%s wp=%s paper=%s",
+                    ctx.project_id, ctx.year, code, paper.paper_code, exc_info=True,
+                )
+            else:
+                await savepoint.commit()
     touched = {i.addr_id for i in result.items}
     for addr in sorted(force - touched):
         result.add_warning(f"目标 {addr} 本次没有产生推送（行已删除或来源缺失），未采用")
@@ -352,14 +391,71 @@ async def _execute(
     return result
 
 
+@dataclass(frozen=True)
+class _WorkpaperCheckpoint:
+    """底稿保存点外的共享结果快照。"""
+
+    item_count: int
+    warning_count: int
+    workpaper_count: int
+    changed_item_count: int
+    note_section_count: int
+    wp_id_count: int
+    state_write_count: int
+
+
+def _workpaper_checkpoint(ctx: _Ctx) -> _WorkpaperCheckpoint:
+    result = ctx.result
+    return _WorkpaperCheckpoint(
+        item_count=len(result.items),
+        warning_count=len(result.warnings),
+        workpaper_count=len(result.workpapers),
+        changed_item_count=len(result.changed_items),
+        note_section_count=len(result.note_sections),
+        wp_id_count=len(result.wp_ids),
+        state_write_count=len(ctx.state_writes),
+    )
+
+
+def _restore_workpaper_checkpoint(ctx: _Ctx, checkpoint: _WorkpaperCheckpoint) -> None:
+    result = ctx.result
+    del result.items[checkpoint.item_count:]
+    del result.warnings[checkpoint.warning_count:]
+    del result.workpapers[checkpoint.workpaper_count:]
+    del result.changed_items[checkpoint.changed_item_count:]
+    del result.note_sections[checkpoint.note_section_count:]
+    del result.wp_ids[checkpoint.wp_id_count:]
+    del ctx.state_writes[checkpoint.state_write_count:]
+
+
+def _workpaper_failure_reason(wp_code: str, error: BaseException) -> str:
+    detail = str(error).strip() or type(error).__name__
+    return f"底稿 {wp_code} 公式推送失败，已回滚本底稿写入：{detail}"[:2000]
+
+
 async def _push_workpaper(
     ctx: _Ctx, *, wp_code: str, binding: Any, rules: tuple[PushRule, ...], paper: _Paper,
+    push_note: bool = True,
 ) -> None:
     result = ctx.result
+    paper_code = paper.paper_code or wp_code
+
+    def _remap(addr: str | None) -> str | None:
+        """将 binding 返回地址的首段从主编码替换为实际册编码（单册时恒等）。"""
+        if addr is None or paper_code == wp_code:
+            return addr
+        # 地址格式 "{wp_code}/..." → "{paper_code}/..."
+        if addr.startswith(f"{wp_code}/"):
+            return paper_code + addr[len(wp_code):]
+        return addr
+
     frozen = frozen_reason(paper.status)
     if frozen:
-        ctx.skip("*", "source", "workpaper", wp_code, frozen)
-        result.workpapers.append({"wp_id": str(paper.id), "wp_code": wp_code, "status": "frozen", "reason": frozen})
+        ctx.skip("*", "source", "workpaper", _remap(wp_code), frozen)
+        result.workpapers.append({
+            "wp_id": str(paper.id), "wp_code": wp_code, "paper_code": paper_code,
+            "status": "frozen", "reason": frozen,
+        })
         return
     sources = await binding.load_sources(ctx.db, ctx.project_id, ctx.year, paper.id)
     for text in sources.warnings:
@@ -373,39 +469,44 @@ async def _push_workpaper(
         for rule in (r for r in rules if r.stage == stage):
             targets, skips = binding.workpaper_targets(rule, overlay, sources)
             for s in skips:
-                ctx.skip(rule.rule_id, stage, "workpaper", s.addr_id, s.reason)
+                ctx.skip(rule.rule_id, stage, "workpaper", _remap(s.addr_id), s.reason)
             for t in targets:
+                addr = _remap(t.addr_id)
                 decision = ctx.decide(
-                    rule.policy, addr_id=t.addr_id, formula_value=t.formula_value, current_value=t.current_value,
+                    rule.policy, addr_id=addr, formula_value=t.formula_value, current_value=t.current_value,
                 )
                 action = decision.action
                 if decision.writes:
                     if binding.apply(overlay, t, t.formula_value):
                         effective_items.add(t.item_id)
                     else:
-                        action = "unchanged"  # 空写（如占位行 0 → 0）：存储值没变，如实记为未变化
-                item = PushItem(rule.rule_id, stage, "workpaper", t.addr_id, action, decision.state,
+                        action = "unchanged"
+                item = PushItem(rule.rule_id, stage, "workpaper", addr, action, decision.state,
                                 formula=t.formula_value, current=t.current_value)
                 pending.append((t.item_id, item, _StateWrite(
-                    addr_id=t.addr_id, rule_id=rule.rule_id, domain="workpaper", wp_id=paper.id,
+                    addr_id=addr, rule_id=rule.rule_id, domain="workpaper", wp_id=paper.id,
                     note_section=None, formula_value=t.formula_value,
                     current_after=t.formula_value if decision.writes else t.current_value,
-                    state=decision.state, record_pushed=decision.record_pushed, forced=t.addr_id in ctx.force,
+                    state=decision.state, record_pushed=decision.record_pushed, forced=addr in ctx.force,
                 )))
     for text in binding.entry_warnings(overlay):
         result.add_warning(text)
 
     changed = sorted(effective_items)
-    conflict = await _write_entries(ctx, paper.id, wp_code, changed, overlay, snapshot)
+    conflict = await _write_entries(ctx, paper.id, paper_code, changed, overlay, snapshot)
     if conflict is not None:
         reason = f"并发修改：条目「{conflict}」在推送期间被保存，本底稿本次未写入（下次推送重新计算）"
         for _, item, _ in pending:
             item.action, item.state, item.reason = CONFLICT, None, reason
             result.items.append(item)
-        for rule in (r for r in rules if r.stage == "note"):
-            ctx.skip(rule.rule_id, "note", "note", None, "底稿并发修改，附注本次未推送")
+        if push_note:
+            for rule in (r for r in rules if r.stage == "note"):
+                ctx.skip(rule.rule_id, "note", "note", None, "底稿并发修改，附注本次未推送")
         result.status = "partial"
-        result.workpapers.append({"wp_id": str(paper.id), "wp_code": wp_code, "status": "conflict", "reason": reason})
+        result.workpapers.append({
+            "wp_id": str(paper.id), "wp_code": wp_code, "paper_code": paper_code,
+            "status": "conflict", "reason": reason,
+        })
         return
 
     for _, item, state_write in pending:
@@ -416,25 +517,22 @@ async def _push_workpaper(
         result.wp_ids.append(str(paper.id))
 
     sections: list[str] = []
-    for rule in (r for r in rules if r.stage == "note"):
-        section = await _push_note(ctx, rule=rule, binding=binding, overlay=overlay, sources=sources, paper=paper)
-        if section:
-            sections.append(section)
+    if push_note:
+        for rule in (r for r in rules if r.stage == "note"):
+            section = await _push_note(ctx, rule=rule, binding=binding, overlay=overlay, sources=sources, paper=paper)
+            if section:
+                sections.append(section)
     result.workpapers.append({
-        "wp_id": str(paper.id), "wp_code": wp_code, "status": "pushed",
-        "changed_items": changed, "note_sections": sections,
+        "wp_id": str(paper.id), "wp_code": wp_code, "paper_code": paper_code,
+        "status": "pushed", "changed_items": changed, "note_sections": sections,
     })
 
 
 async def _write_entries(
-    ctx: _Ctx, wp_id: UUID, wp_code: str, changed: list[str],
+    ctx: _Ctx, wp_id: UUID, paper_code: str, changed: list[str],
     overlay: Mapping[str, Any], snapshot: Mapping[str, tuple[Any, str]],
 ) -> str | None:
-    """逐条目 CAS 写回；整张底稿一个保存点。返回冲突条目 id（None = 全部写入成功）。
-
-    期望版本取**快照读取时**的版本（不经 ``prepare_many`` 重读）：从读快照到写入的整个窗口
-    都在并发检测范围内，用户在这期间保存过的条目一定判冲突。
-    """
+    """逐条目 CAS 写回；返回冲突条目 id（None = 全部成功）。``paper_code`` 用于地址首段。"""
     if not changed:
         return None
     adapter = WorkpaperMutationAdapter(ctx.db)
@@ -444,7 +542,7 @@ async def _write_entries(
             before, version = snapshot.get(item_id, (None, _version_from_timestamp(None)))
             target = CanonicalFormulaTarget(
                 domain="workpaper", project_id=ctx.project_id, year=ctx.year,
-                addr_id=f"{wp_code}/*/{item_id}",
+                addr_id=f"{paper_code}/*/{item_id}",
                 locator={"wp_id": str(wp_id), "item": item_id, "cell": RAW_CELL},
                 wp_id=wp_id,
             )
@@ -461,49 +559,10 @@ async def _write_entries(
     return None
 
 
-def _has_obscured_data(table_data: dict, table_name: str) -> str | None:
-    """检查附注章节是否有会被骨架遮挡的数据（需求 5.2）。
-
-    如果 sub_table_data 以外有非空非零数值（顶层 rows/_tables 有业务数据）、
-    或 sub_table_data 里该表以外的子表有人工/锁定单元格，返回中文原因；否则 None。
-
-    只检查该表**缺失**时的「原表格」——即 rows / _tables 里可能存在用户不可见
-    但将被骨架覆盖的数据。
-    """
-    # 检查顶层 rows 有非空非零数值
-    rows = table_data.get("rows")
-    if isinstance(rows, list):
-        for r in rows:
-            if not isinstance(r, dict):
-                continue
-            for k, v in r.items():
-                if k in ("label", "row_type", "is_total", "is_label"):
-                    continue
-                if v is not None and v != 0 and v != "" and v != "0":
-                    return f"顶层 rows 含非空数值（{k}={v!r}）"
-    # 检查 _tables 有非空非零数值
-    tables = table_data.get("_tables")
-    if isinstance(tables, list):
-        for t in tables:
-            if not isinstance(t, dict):
-                continue
-            t_rows = t.get("rows")
-            if isinstance(t_rows, list) and len(t_rows) > 0:
-                for r in t_rows:
-                    if not isinstance(r, dict):
-                        continue
-                    vals = r.get("values")
-                    if isinstance(vals, list):
-                        for v in vals:
-                            if v is not None and v != 0 and v != "" and v != "0":
-                                return f"_tables 含非空数值"
-    return None
-
-
 async def _push_note(
     ctx: _Ctx, *, rule: PushRule, binding: Any, overlay: Mapping[str, Any], sources: Any, paper: _Paper,
 ) -> str | None:
-    """附注主表推送（按附注模块同一模板类型权威选章节）；返回有写入的章节号。"""
+    """附注主表推送；返回有写入的章节号。"""
     from app.models.report_models import DisclosureNote
 
     table_name = rule.target.table
@@ -541,12 +600,12 @@ async def _push_note(
         source = table_data.get("_source")
         if source in note_writer.WORKPAPER_SOURCES:
             # 遮挡数据检查（需求 5.2）：原表格有非空非零数值或人工/锁定单元格 → 跳过
-            blocked = _has_obscured_data(table_data, table_name)
+            blocked = note_writer.has_obscured_data(table_data, table_name)
             if blocked:
                 ctx.skip(rule.rule_id, "note", "note", section_addr,
                          f"附注 {section} 章节已有自定义数据（{blocked}），建骨架会遮挡原数据，跳过")
                 return None
-            skeleton = note_writer.build_main_skeleton(template_type, table_name)
+            skeleton = note_writer.build_main_skeleton(template_type, section, table_name)
             if skeleton is None:
                 ctx.skip(rule.rule_id, "note", "note", section_addr,
                          f"附注模板「{template_type}」中没有「{table_name}」表定义，无法建骨架")
@@ -574,11 +633,12 @@ async def _push_note(
         return None
 
     wrote = False
-    for row in binding.note_rows(overlay, template_type):
+    for row in binding.note_rows(overlay, template_type, rule):
         if row["is_total"] or row["is_memo"]:
             continue  # 合计按附注实际行重算（见 _push_note_total）；「其中：」备注行不由底稿取数
         index = note_writer.find_row(table.rows, [row["note_label"], row["label"]])
-        for field_name, (value_key, period) in note_writer.NOTE_FIELDS.items():
+        for field_name in rule.target.fields:
+            value_key, period = note_writer.NOTE_FIELDS[field_name]
             addr = note_addr_id(section, table_name, row["note_label"], period)
             if index is None:
                 ctx.skip(rule.rule_id, "note", "note", addr,
@@ -636,14 +696,15 @@ def _note_keep_reason(mode: str | None, decision: Decision) -> str | None:
 def _push_note_total(
     ctx: _Ctx, *, rule: PushRule, section: str, table_name: str, table: note_writer.NoteTable, paper: _Paper,
 ) -> bool:
-    """合计 = 合计行之前各非合计行之和（按附注实际行，人工行一并计入）；单元格自身人工 / 锁定则保留。"""
+    """合计 = 合计行之前各行之和（人工行一并计入）。"""
     index = note_writer.find_total_row(table.rows)
     if index is None:
         return False
     total_row = table.rows[index]
     label = note_writer.row_label(total_row) or "合计"
     wrote = False
-    for field_name, (_, period) in note_writer.NOTE_FIELDS.items():
+    for field_name in rule.target.fields:
+        _, period = note_writer.NOTE_FIELDS[field_name]
         ok, current, cell_mode = note_writer.read_cell(total_row, field_name, table.value_keys)
         if not ok:
             continue
@@ -674,7 +735,7 @@ def _record_note(
 
 
 async def _save_states(ctx: _Ctx, run_id: UUID) -> None:
-    """目标状态 upsert：公式值 / 当前值每次都更新；上次推送值只在写入或一致时更新。"""
+    """``(project_id, year, addr_id)`` 唯一的推送状态 upsert。"""
     for w in ctx.state_writes:
         row = ctx.states.get(w.addr_id)
         if row is None:
@@ -711,17 +772,15 @@ async def run_and_commit(
     trigger: str,
     triggered_by: UUID | None = None,
     wp_id: UUID | None = None,
+    codes: Iterable[str] | None = None,
     dry_run: bool = False,
     force_addr_ids: Iterable[str] = (),
 ) -> RunResult:
-    """执行并提交；成功后广播 ``formula.pushed``。失败回滚、另记一条 failed 运行记录后上抛。
-
-    ``dry_run`` 只回滚不提交、不记失败、不广播（试跑不留任何痕迹）。
-    """
+    """执行并提交；dry_run 只回滚不提交。"""
     try:
         result = await run(
             db, project_id=project_id, year=year, trigger=trigger, triggered_by=triggered_by,
-            wp_id=wp_id, dry_run=dry_run, force_addr_ids=force_addr_ids,
+            wp_id=wp_id, codes=codes, dry_run=dry_run, force_addr_ids=force_addr_ids,
         )
         if dry_run:
             await db.rollback()
@@ -741,7 +800,7 @@ async def run_and_commit(
 async def _record_failure(
     db, *, project_id: UUID, year: int, trigger: str, triggered_by: UUID | None, error: BaseException,
 ) -> None:
-    """失败也要在「最近推送」里看得见（否则面板显示的是上一次成功，掩盖了失败）。"""
+    """失败运行记录（面板可见降级）。"""
     now = datetime.now(timezone.utc)
     try:
         db.add(FormulaPushRun(

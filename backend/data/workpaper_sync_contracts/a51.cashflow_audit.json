@@ -5,7 +5,7 @@
     "hidden_sheet",
     "defined_name"
   ],
-  "instrumentation_definition_sha256": "223b5a69bf79edbd0119a3b5e68c106b7a0e85de0f94f9b6ae0a6e8f143c53ab",
+  "instrumentation_definition_sha256": "df0f31e6cad20ec6ad9517ff87f7d556bd5a989e80c4dfd35f8a3115b55d389c",
   "note": "A5-1 现金流量表审计——扁平键值对型契约（非行表型）。5 张受管 sheet 全固定行、0 个动态行表 ⇒ 受管区走 workbook-scope definedName 锚点（region_kind=static），不建 Excel Table / UUID 列（归档 spec workpaper-sync-static-cell-sheet-writeback 的 DEC-3）。审定表公式列 G 和勾稽核对公式列 B 标为 protected，回写不覆盖。A 类底稿无 TB 发布门（AC-3 空分母裁定）。",
   "review_status": "reviewed",
   "schema_version": "contract-definition:v1",
@@ -628,9 +628,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "6f29696ee9ec6a20089cd37178f3dd9e4926f239fe324347f81b735fc66f6c6b",
+    "normalized_structure_hash": "d28ada7fc7a848e55a70d0b342a698045241b81d3397e9924a1a7d6f16744fa4",
     "relative_path": "A/A5-1 现金流量表审计.xlsx",
-    "template_sha256": "2a331368dad3aaf3ac922c8f46a0052e9ba1ec8c0a3ae0504edddc8153dab462"
+    "template_sha256": "9999f5b6511c5230e52732c10bf2eef86ee1238b9e0678e498ed2fffda9f503d"
   },
-  "template_definition_sha256": "d1edfca4e7ed07f6c5dc010ee9cbd244c36b39b2517ce865990e98b8cce21d7e"
+  "template_definition_sha256": "834e4e4d135bb32f25de992958c0020ef9a2835f0e40ab07293e1eb011677af8"
 }

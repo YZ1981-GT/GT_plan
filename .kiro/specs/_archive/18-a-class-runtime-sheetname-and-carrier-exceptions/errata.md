@@ -59,12 +59,11 @@ find_template_file_any_unresolved("A3-8")
   → A3-7内部往来核对表、A3-8商誉减值测试.xlsx     （修复后）
 ```
 
-**宿主层（第二步，已完成）**：宿主传的是**中文字面 sheet 名**
+**宿主层（第二步，剩余阻塞）**：宿主传的是**中文字面 sheet 名**
 `A3-8商誉减值测试`（`template_ref.resolution_kind == 'literal_sheet_name'`、
 `sheet_name_literal == 'A3-8商誉减值测试'`），而不是 wp_code。两步修复**顺序不可
 颠倒**：须先确认册存在（已确认）、解析层通（已修），再把宿主的字面 sheet 名收敛到
-纯码 —— 已在 `GtA38GoodwillImpairment.vue` 中将 `sheet-name="A3-8商誉减值测试"`
-收敛为 `sheet-name="A3-8"`。
+纯码 —— 这一步依赖业务决策，登记为后继（tasks 任务 8 / 13）。
 
 ### 对守卫的影响
 
@@ -73,9 +72,11 @@ find_template_file_any_unresolved("A3-8")
   `rglob("*A3-8*")==1` 两数现算，防止 glob 口径假绿复发。
 - `test_other_codes_resolve_and_a38_now_resolves_too`：**双向变异证明重建**。
   - 方向②（修复后 / 生产态）：`A3-8` 解析到合册；
-  - 方向①（故障注入）：**在被测函数的下一层注入故障** —— 用 `patch.object` 把
+  - 方向①（修复前）：**在被测函数的下一层注入故障** —— 把依赖
     `_find_combined_workbook_declaring` 临时置为恒返回 `None`，`A3-8` 回到 `None`。
-    **不**替换被测生产函数本身（遵守铁律「守卫的故障注入不得替换被测生产函数本身」）。
+    **不**替换被测生产函数本身（遵守铁律「守卫的故障注入不得替换被测生产函数本身」），
+    也**不**依赖任何历史 commit SHA（原 `git show HEAD:` 变异已失效，因为 A3-8 修复
+    已提交进 HEAD）。
   - 对照组 `A3-3` / `A5-1` / `A10-1` 在**两个方向下都**解析到各自真实册 ⇒ 证明合册解析
     逻辑是**加法**，没有顺带改掉别人的走向。
 
@@ -96,7 +97,7 @@ AC-46 的本次再更正**只登记在本文件**；**不回填**归档/上游 s
 
 - 18 条为**纯 wp_code**（如 `A5-1` / `A10-1` 这类）；
 - **唯一异形**：`xlsx/gt-a38-goodwill-impairment` 的 `A3-8商誉减值测试`
-  —— **码 + 中文连写、无分隔符**，正是上面 E-1 的宿主层第二步已收敛的对象。
+  —— **码 + 中文连写、无分隔符**，正是上面 E-1 的宿主层第二步要收敛的对象。
 
 守卫 `test_a38_literal_is_the_unique_abnormal_among_19` **从 slice 现读派生**此结论
 （遍历全 slice 收集 literal、按纯码正则分流、断言恰 1 条异形且归属 a38），

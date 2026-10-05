@@ -7,7 +7,7 @@
  * 注：`trustScorePanelRef` / `smPanelRef` / `tmDrawerRef` 必须由本 composable 返回
  * 并在宿主模板上 `ref=` 绑定 —— 它们是**组件实例句柄**，只能由模板赋值。
  */
-import { ref, type ComputedRef, type Ref } from 'vue'
+import { ref, toRaw, type ComputedRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 
 interface CtxLike {
@@ -58,7 +58,7 @@ export function useNoteTableInteraction(options: UseNoteTableInteractionOptions)
   /** 把 (row, column) 解析成表内下标；任一维解析失败返回 null */
   function locate(row: any, column: any): { rowIdx: number; colIdx: number; values: any[] } | null {
     const tableRows = activeTableData.value?.rows || []
-    const rowIdx = tableRows.indexOf(row)
+    const rowIdx = tableRows.findIndex((candidate: any) => toRaw(candidate) === toRaw(row))
     const headers = activeTableData.value?.headers || []
     const colIdx = headers.indexOf(column?.label)
     if (rowIdx < 0 || colIdx < 0) return null
@@ -76,14 +76,18 @@ export function useNoteTableInteraction(options: UseNoteTableInteractionOptions)
     return classes.join(' ')
   }
 
+  function cellValue(row: any, values: any[], colIdx: number): unknown {
+    return colIdx === 0 ? (row?.label ?? '') : (values[colIdx - 1] ?? '')
+  }
+
   function onDeCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
     deCtx.closeContextMenu()
     const hit = locate(row, column)
     if (!hit) return
     const { rowIdx, colIdx, values } = hit
-    const value = values[colIdx] ?? ''
+    const value = cellValue(row, values, colIdx)
     deCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey, event.shiftKey)
-    deCtx.contextMenu.itemName = values[0] || `行${rowIdx + 1}`
+    deCtx.contextMenu.itemName = row?.label || `行${rowIdx + 1}`
     // 单元格激活编辑：编辑模式下点击非合计行直接激活
     if (editMode.value && !row.is_total) {
       activateCell(rowIdx, colIdx === 0 ? -1 : colIdx - 1)
@@ -94,9 +98,9 @@ export function useNoteTableInteraction(options: UseNoteTableInteractionOptions)
     const hit = locate(row, column)
     // 如果右键点击的单元格已在选区内，保持选区不变
     if (hit && !deCtx.isCellSelected(hit.rowIdx, hit.colIdx)) {
-      const value = hit.values[hit.colIdx] ?? ''
+      const value = cellValue(row, hit.values, hit.colIdx)
       deCtx.selectCell(hit.rowIdx, hit.colIdx, value, false)
-      deCtx.contextMenu.itemName = hit.values[0] || `行${hit.rowIdx + 1}`
+      deCtx.contextMenu.itemName = row?.label || `行${hit.rowIdx + 1}`
     }
     deCtx.openContextMenu(event, deCtx.contextMenu.itemName)
   }

@@ -263,6 +263,58 @@ class TestFillRows:
         assert [r[1] for r in rows3] == ["10.00", "", "", "", "30.00"]
         assert [b["row_index"] for b in s3["blank"]] == [1] and "不止一个" in s3["blank"][0]["reason"]
 
+    def test_dict_rows_preserve_shape(self):
+        """对象行（dict）填入后保持 dict 形状，不被转成 list（设计 §四）。"""
+        dict_rows = [
+            {"label": "库存现金", "values": {"1": "", "2": "1"}},
+            {"label": "银行存款", "values": {"1": "", "2": "2"}},
+            {"label": "合  计", "values": {"1": "", "2": "3"}},
+        ]
+        rows, summary = fill_rows(["项目", "期末", "期初"], dict_rows, self.CELLS, set(), self.TEMPLATE)
+        assert all(isinstance(r, dict) for r in rows), "对象行填入后仍是 dict"
+        assert rows[0]["values"]["1"] == "10.00"
+        assert rows[1]["values"]["1"] == "20.00"
+        assert rows[2]["values"]["1"] == "30.00"
+        assert rows[0]["values"]["2"] == "1", "未被公式覆盖的列保留原值"
+        assert rows[0]["label"] == "库存现金", "label 键保留"
+
+    def test_dict_rows_manual_cells_preserved(self):
+        """对象行的手工保护格不被覆盖（需求 2.4）。"""
+        dict_rows = [
+            {"label": "库存现金", "values": {"1": "手填", "2": "1"}},
+            {"label": "银行存款", "values": {"1": "", "2": "2"}},
+            {"label": "合  计", "values": {"1": "", "2": "3"}},
+        ]
+        rows, summary = fill_rows(["项目", "期末", "期初"], dict_rows, self.CELLS, {(0, 1)}, self.TEMPLATE)
+        assert rows[0]["values"]["1"] == "手填", "手工保护格原值不变"
+        assert summary["kept_manual_count"] == 1
+        assert len(summary["kept_manual"]) == 1
+        assert summary["kept_manual"][0]["current"] == "手填"
+
+    def test_mixed_list_and_dict_rows(self):
+        """混合 list/dict 行各自保持原形状。"""
+        mixed = [
+            ["库存现金", "", "1"],
+            {"label": "银行存款", "values": {"1": "", "2": "2"}},
+            ["合  计", "", "3"],
+        ]
+        rows, summary = fill_rows(["项目", "期末", "期初"], mixed, self.CELLS, set(), self.TEMPLATE)
+        assert isinstance(rows[0], list), "list 行保持 list"
+        assert isinstance(rows[1], dict), "dict 行保持 dict"
+        assert isinstance(rows[2], list), "list 行保持 list"
+        assert rows[0][1] == "10.00"
+        assert rows[1]["values"]["1"] == "20.00"
+        assert rows[2][1] == "30.00"
+
+    def test_kept_manual_count_in_summary(self):
+        """summary 包含准确的 kept_manual_count 数量（设计 §四 需求 2.4）。"""
+        saved = [["库存现金", "手填", "1"], ["银行存款", "手填2", "2"], ["合  计", "", "3"]]
+        _rows, summary = fill_rows(
+            ["项目", "期末", "期初"], saved, self.CELLS, {(0, 1), (1, 1)}, self.TEMPLATE,
+        )
+        assert summary["kept_manual_count"] == 2
+        assert len(summary["kept_manual"]) == 2
+
 
 # ─────────────────────────────── 真库 + 端点 ───────────────────────────────
 

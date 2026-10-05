@@ -15,6 +15,8 @@ export interface UseNotePersistOptions {
   clearEditDirty: () => void
   autoSaveClearDirty: () => void
   clearAutoSaveDraft: () => void
+  /** 保存前把投影编辑提交回 raw table_data；未提供时保持旧保存语义。 */
+  prepareTableData?: (tableData: any) => any
 }
 
 export interface UseNotePersistReturn {
@@ -24,7 +26,7 @@ export interface UseNotePersistReturn {
 }
 
 export function useNotePersist(options: UseNotePersistOptions): UseNotePersistReturn {
-  const { currentNote, textContent, editMode, clearEditDirty, autoSaveClearDirty, clearAutoSaveDraft } = options
+  const { currentNote, textContent, editMode, clearEditDirty, autoSaveClearDirty, clearAutoSaveDraft, prepareTableData } = options
 
   const saveLoading = ref(false)
   const justSaved = ref(false)
@@ -37,7 +39,13 @@ export function useNotePersist(options: UseNotePersistOptions): UseNotePersistRe
         body.text_content = textContent.value
       }
       if (currentNote.value!.content_type === 'table' || currentNote.value!.content_type === 'mixed') {
-        body.table_data = currentNote.value!.table_data
+        const prepared = prepareTableData
+          ? prepareTableData(currentNote.value!.table_data)
+          : currentNote.value!.table_data
+        if (prepared !== currentNote.value!.table_data) {
+          currentNote.value!.table_data = prepared
+        }
+        body.table_data = prepared
       }
       await updateDisclosureNote(currentNote.value!.id, body)
       ElMessage.success('保存成功')

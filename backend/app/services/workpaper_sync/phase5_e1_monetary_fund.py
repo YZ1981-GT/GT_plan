@@ -724,15 +724,23 @@ def manifest_capability_enabled(*, manifest: Mapping[str, Any] | None = None) ->
 
 
 def attach_pilot_adapters(
-    registry: Any, *, manifest: Mapping[str, Any] | None = None
+    registry: Any,
+    *,
+    session: Any = None,
+    manifest: Mapping[str, Any] | None = None,
 ) -> tuple[Any, ...]:
     """按 manifest capability 门决定是否注册 adapter。
+
+    ``session`` 是 manifest registry 的统一 provider 协议参数；E1 当前 capability
+    关闭时不需要访问数据库，但仍显式接收该参数，避免它在整批注册中以旧签名触发
+    ``TypeError``。返回值保持同步 tuple，registry 同时支持同步和异步 provider。
 
     🔴 **capability 未放行就返回空元组**，不抛异常也不放宽判据 ——
     `register_from_manifest()` 的编排需要「本 entry 暂不可注册」是一个**可继续**的结果，
     而不是让整条注册链崩掉。欠账由 `RegistryReport.contract_files_without_adapter`
     持续可见地报出来。
     """
+    del registry, session
     if not manifest_capability_enabled(manifest=manifest):
         return ()
     assert_entry_selectable(manifest=manifest)

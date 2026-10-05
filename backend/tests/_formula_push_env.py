@@ -79,9 +79,12 @@ def make_sources(*, cash_opening=286.73, tb_available=True, hall_1001="100", tem
         "other": [], "finance_co": [], "digital": [],
     }
     tb = TbAuditedSnapshot(
-        tb_data={"1001": {"期末余额": Decimal("476.73"), "年初余额": Decimal("286.73")},
-                 "1002": {"期末余额": Decimal("130"), "年初余额": Decimal("100")},
-                 "1012": {"期末余额": Decimal("0"), "年初余额": Decimal("0")}},
+        tb_data={"1001": {"期末余额": Decimal("476.73"), "年初余额": Decimal("286.73"),
+                          "本期发生额": Decimal("476.73") - Decimal("286.73")},
+                 "1002": {"期末余额": Decimal("130"), "年初余额": Decimal("100"),
+                          "本期发生额": Decimal("130") - Decimal("100")},
+                 "1012": {"期末余额": Decimal("0"), "年初余额": Decimal("0"),
+                          "本期发生额": Decimal("0") - Decimal("0")}},
         available=tb_available, company_codes=("001",),
     )
     zero = {"aje_net": Decimal("0"), "rje_net": Decimal("0")}

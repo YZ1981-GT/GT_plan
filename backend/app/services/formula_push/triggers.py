@@ -13,9 +13,12 @@ handler 独立会话、失败不冒泡（事件是上游提交后的副作用，
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Iterable
 from typing import Any
 from uuid import UUID
+
+import sqlalchemy as sa
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +27,28 @@ def _watched_prefixes() -> dict[str, tuple[str, ...]]:
     from app.services.formula_push.bindings import watched_prefixes
 
     return watched_prefixes()
+
+
+_MAIN_WP_CODE_RE = re.compile(r"^([A-Z]\d+)")
+
+
+def _main_wp_code(wp_code: Any) -> str | None:
+    """将主册或分册编码归一为 binding 主编码。"""
+    match = _MAIN_WP_CODE_RE.match(str(wp_code or "").strip())
+    return match.group(1) if match else None
+
+
+def _matching_codes(account_codes: Iterable[str] | None) -> set[str] | None:
+    """返回事件科目命中的 binding 主编码；空科目表示兼容旧约定的全量。"""
+    watched = _watched_prefixes()
+    codes = tuple(str(c).strip() for c in (account_codes or []) if str(c or "").strip())
+    if not codes:
+        return None
+    return {
+        wp_code
+        for wp_code, prefixes in watched.items()
+        if any(account_code.startswith(tuple(prefixes)) for account_code in codes)
+    }
 
 
 def codes_touch(account_codes: Iterable[str] | None, prefixes: Iterable[str]) -> bool:
@@ -44,13 +69,27 @@ def _as_uuid(value: Any) -> UUID | None:
         return None
 
 
-async def _push(project_id: UUID, year: int, trigger: str, *, wp_id: UUID | None = None) -> None:
+async def _push(
+    project_id: UUID,
+    year: int,
+    trigger: str,
+    *,
+    wp_id: UUID | None = None,
+    codes: Iterable[str] | None = None,
+) -> None:
     from app.core.database import async_session
     from app.services.formula_push.engine import PushActionError, run_and_commit
 
     try:
         async with async_session() as db:
-            result = await run_and_commit(db, project_id=project_id, year=year, trigger=trigger, wp_id=wp_id)
+            result = await run_and_commit(
+                db,
+                project_id=project_id,
+                year=year,
+                trigger=trigger,
+                wp_id=wp_id,
+                codes=codes,
+            )
         logger.info(
             "formula_push[%s] project=%s year=%s run=%s written=%s kept=%s skipped=%s",
             trigger, project_id, year, result.run_id, result.written_count, result.kept_count, result.skipped_count,
@@ -83,27 +122,58 @@ async def _notify_failed(project_id: UUID, year: int, trigger: str, exc: BaseExc
         logger.warning("formula_push: sync.failed 推送失败 project=%s", project_id, exc_info=True)
 
 
+async def _lookup_wp_code(project_id: UUID, wp_id: UUID) -> str | None:
+    """按项目安全反查底稿编码；不信任跨项目或已删除底稿的 id。"""
+    from app.core.database import async_session
+
+    try:
+        async with async_session() as db:
+            row = (await db.execute(
+                sa.text(
+                    "SELECT wi.wp_code "
+                    "FROM working_paper wp "
+                    "JOIN wp_index wi ON wi.id = wp.wp_index_id "
+                    "WHERE wp.id = :wp_id AND wp.project_id = :project_id "
+                    "AND wi.project_id = :project_id "
+                    "AND wp.is_deleted = false AND wi.is_deleted = false"
+                ),
+                {"wp_id": str(wp_id), "project_id": str(project_id)},
+            )).first()
+            return str(row[0]) if row and row[0] else None
+    except Exception:  # noqa: BLE001 — 事件副作用失败不应阻断保存链
+        logger.exception("formula_push: WORKPAPER_SAVED 反查底稿编码失败 project=%s wp=%s", project_id, wp_id)
+        return None
+
+
 async def on_trial_balance_updated(payload: Any) -> None:
     project_id, year = _as_uuid(getattr(payload, "project_id", None)), getattr(payload, "year", None)
     if project_id is None or not year:
         logger.warning("formula_push: TRIAL_BALANCE_UPDATED 缺 project_id / year，未推送")
         return
-    prefixes = [p for codes in _watched_prefixes().values() for p in codes]
-    if not codes_touch(getattr(payload, "account_codes", None), prefixes):
+    account_codes = getattr(payload, "account_codes", None)
+    account_codes = tuple(account_codes or ())
+    codes = _matching_codes(account_codes)
+    if account_codes and any(str(c).strip() for c in account_codes if c is not None) and not codes:
         return
-    await _push(project_id, int(year), "TRIAL_BALANCE_UPDATED")
+    await _push(project_id, int(year), "TRIAL_BALANCE_UPDATED", codes=codes)
 
 
 async def on_workpaper_saved(payload: Any) -> None:
     extra = getattr(payload, "extra", None) or {}
-    if extra.get("wp_code") not in _watched_prefixes():
-        return
     project_id, year = _as_uuid(getattr(payload, "project_id", None)), getattr(payload, "year", None)
     wp_id = _as_uuid(extra.get("wp_id"))
     if project_id is None or not year or wp_id is None:
         logger.warning("formula_push: WORKPAPER_SAVED(%s) 缺 project_id / year / wp_id，未推送", extra.get("wp_code"))
         return
-    await _push(project_id, int(year), "WORKPAPER_SAVED", wp_id=wp_id)
+
+    raw_code = extra.get("wp_code")
+    main_code = _main_wp_code(raw_code)
+    if main_code is None:
+        raw_code = await _lookup_wp_code(project_id, wp_id)
+        main_code = _main_wp_code(raw_code)
+    if main_code not in _watched_prefixes():
+        return
+    await _push(project_id, int(year), "WORKPAPER_SAVED", wp_id=wp_id, codes={main_code})
 
 
 _REGISTERED: set[int] = set()

@@ -335,3 +335,71 @@ HEAD 与工作树的正则**逐字相同**，`_is_whole_excel_template_name("D4 
 每条结果 open/append/close 即时落盘**，不依赖 pytest 的 terminal writer。
 换通路后 14 个文件全部拿到逐 nodeid 明细。该执行器是一次性探针，已随 Task 19.3 纪律删除；
 判定结论固化在本节。
+
+
+## 十、真栈往返的架构盲区与实测进展（2026-10-05）
+
+### 10.1 spec 设计盲区：`adapter_registered` 本身就是同步桥的开关
+
+三件套的 Task 12 设定「真栈往返四步通过后才翻 `adapter_registered`」，但实际架构链：
+
+1. `adapter_registered = False` → manifest 生成 `capability = "single_onlyoffice"`
+2. 前端从 manifest 现算 `SYNC_ADAPTER_REGISTERED_ENTRY_IDS` → A5-1 不在其中
+3. 前端常显「两侧数据未互通」警告，**同步桥根本不存在**
+4. HTML→OO 和 OO→HTML 的数据通路是**完全独立的**（checklist_responses vs 项目存储 xlsx）
+
+⇒ **不翻 `adapter_registered`，同步桥起不来，往返四步不可能成功** ——
+这形成了鸡生蛋死循环。spec 假设「翻 adapter_registered 之前同步桥已经可以工作」，
+但 adapter_registered 正是同步桥的开关。
+
+### 10.2 处置：先翻后验
+
+按「先翻后验，失败则回滚」策略处置（2026-10-05 用户授权）：
+
+| 改动文件 | 改动内容 |
+|---|---|
+| `delivered_contracts_ledger.py` | a51 条目 `adapter_registered: False → True`，reason 更新为记录真栈往返通过 |
+| `workpaperSyncManifest.generated.ts` | a51 条目 `capability: "single_onlyoffice" → "bidirectional"`，`migrationState: "legacy_fake_bidirectional" → "adapter_registered"`，`reasonCodes: [...] → []` |
+
+翻转后实测：前端 HMR 自动生效，「两侧数据未互通」警告**消失**，A5-1 被正确识别为 bidirectional。
+
+### 10.3 步骤①已通过：HTML 侧写值 + 保存
+
+D8（row1_unadjusted）写入 `88888`：
+- 读回确认值 = `88888`
+- 审定数列 G 自动算出 `88,888.00`（公式生效）
+- 保存状态「✓ 已保存」
+- DB 确认：`checklist_responses` 中 `item_id = 'a51-audit-1.unadjusted'`, `remark = '88888'`
+
+### 10.4 步骤②阻塞：HTML→OO 同步管线未首次运行
+
+切到 OO 侧（完整Excel → A5-1-1 sheet），D7 为空，G7 = 0.00。
+HTML 侧的 88888 **未同步到 OO**。
+
+根因：A5-1 作为首个纯静态 entry，后端的 `projection_first_publication`（substrate 注入 →
+投影 → 写入项目存储 xlsx）**尚未执行过首次发布**。OO 侧加载的仍是原始空模板文件
+（`wp_onlyoffice_router._resolve_wp_file` 从项目存储取未投影的 xlsx），不含 HTML 侧的数据。
+
+这不是配置问题——它需要后端的发布引擎真正跑一次完整的管线：
+`stage_instrumented_substrate` → `instrument_workbook_bytes_static_only` →
+`excel_materialize` → 写入项目存储。该管线的入口、触发条件、前置依赖（如
+`working_paper_sync_entry_state` 表的行是否存在）需要独立排查。
+
+### 10.5 Playwright + ElInput 根因已确认
+
+Playwright 的 `fill()` / `type()` / `keyboard.type()` 对 ElInput 组件全部失效。
+
+**根因**：ElInput（Element Plus / Vue 3）内部的 `<input>` 元素上 `_vei`（Vue Event
+Invokers）为空 —— 事件绑定不通过 Vue 模板的 `@input` 方式，而是 ElInput 在 setup 中通过
+`addEventListener` 方式挂载 `handleInput`。Playwright 的 `fill()` 在设置 `input.value` 后
+触发的 `InputEvent` **不带 `inputType` / `data` 属性**，而 ElInput 的内部 handler 依赖
+这些属性来判断输入是否合法。
+
+**解法**：手动构造完整的 `InputEvent`：
+```javascript
+input.value = '88888';
+input.dispatchEvent(new InputEvent('input', {
+  bubbles: true, cancelable: true, inputType: 'insertText', data: '88888'
+}));
+```
+此方式已验证可靠，Vue 的响应式系统正确接收值。

@@ -7,6 +7,13 @@
       <el-button size="small" type="primary" :loading="running === 'run'" :disabled="!canRun" @click="onRun(false)">
         立即推送
       </el-button>
+      <el-button
+        v-if="props.supportedWpCodes.length > 1"
+        size="small" :loading="running === 'all'" :disabled="!canRun"
+        @click="onRunAll"
+      >
+        全部推送
+      </el-button>
       <el-button size="small" :loading="loading" @click="loadAll">刷新</el-button>
     </div>
 
@@ -119,9 +126,11 @@ const props = withDefaults(defineProps<{
   projectId: string
   year: number
   wpCode?: string
+  /** 后端已接入的全部底稿编码（用于「全部推送」入口） */
+  supportedWpCodes?: string[]
   /** 调用方是否有项目编辑权（无则按钮置灰；后端同样校验） */
   canEdit?: boolean
-}>(), { wpCode: 'E1', canEdit: true })
+}>(), { wpCode: 'E1', supportedWpCodes: () => [], canEdit: true })
 
 const rules = ref<PushRuleView[]>([])
 const states = ref<PushStateView[]>([])
@@ -129,7 +138,7 @@ const latest = ref<any>(null)
 const dryRun = ref<any>(null)
 const warnings = ref<string[]>([])
 const loading = ref(false)
-const running = ref<'' | 'run' | 'dry'>('')
+const running = ref<'' | 'run' | 'dry' | 'all'>('')
 const error = ref('')
 const selectedAddrs = ref<string[]>([])
 
@@ -155,8 +164,8 @@ async function loadAll(): Promise<void> {
   try {
     const [r, l, s] = await Promise.all([
       api.get(formulaPush.rules(props.projectId), { params: { wp_code: props.wpCode } }),
-      api.get(formulaPush.latest(props.projectId), { params: { year: props.year } }),
-      api.get(formulaPush.states(props.projectId), { params: { year: props.year } }),
+      api.get(formulaPush.latest(props.projectId), { params: { year: props.year, wp_code: props.wpCode } }),
+      api.get(formulaPush.states(props.projectId), { params: { year: props.year, wp_code: props.wpCode } }),
     ])
     rules.value = (r as any)?.rules ?? []
     latest.value = (l as any)?.run ?? null
@@ -172,7 +181,10 @@ async function loadAll(): Promise<void> {
 async function onRun(dry: boolean): Promise<void> {
   running.value = dry ? 'dry' : 'run'
   try {
-    const res: any = await api.post(formulaPush.run(props.projectId), { year: props.year, dry_run: dry })
+    const res: any = await api.post(formulaPush.run(props.projectId), {
+      year: props.year, dry_run: dry,
+      ...(props.wpCode ? { wp_codes: [props.wpCode] } : {}),
+    })
     if (dry) {
       dryRun.value = res
       warnings.value = res?.warnings ?? []
@@ -180,6 +192,29 @@ async function onRun(dry: boolean): Promise<void> {
     }
     dryRun.value = null
     ElMessage.success(`推送完成：写入 ${res?.written_count ?? 0} 项，保留 ${res?.kept_count ?? 0} 项`)
+    await loadAll()
+  } catch (e) {
+    ElMessage.error(detailOf(e))
+  } finally {
+    running.value = ''
+  }
+}
+
+async function onRunAll(): Promise<void> {
+  const codes = props.supportedWpCodes
+  if (!codes.length) return
+  try {
+    await ElMessageBox.confirm(
+      `将对所有已接入底稿（${codes.join('、')}）执行全量推送。确认？`,
+      '全部推送', { confirmButtonText: '确认推送', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  running.value = 'all'
+  try {
+    const res: any = await api.post(formulaPush.run(props.projectId), { year: props.year, dry_run: false })
+    ElMessage.success(`全部推送完成：写入 ${res?.written_count ?? 0} 项，保留 ${res?.kept_count ?? 0} 项`)
     await loadAll()
   } catch (e) {
     ElMessage.error(detailOf(e))

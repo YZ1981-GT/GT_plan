@@ -460,9 +460,9 @@
                 {{ currentNote.status === 'confirmed' ? '已确认' : '草稿' }}
               </el-tag>
               <!-- 编辑操作按钮（置于标题行，随时可见，无需滚动到底部） -->
-              <el-button v-if="!editMode" size="small" @click="enterEdit()" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">编辑</el-button>
+              <el-button v-if="!editMode" size="small" @click="enterNoteEdit()" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">编辑</el-button>
               <template v-else>
-                <el-button size="small" @click="exitEdit(true)">取消</el-button>
+                <el-button size="small" @click="exitNoteEdit(true)">取消</el-button>
                 <el-button size="small" type="primary" @click="onSave" :loading="saveLoading" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">保存</el-button>
               </template>
             </div>
@@ -593,7 +593,7 @@
                               v-model="row.values[child.headerIdx - 1]" :controls="false" :precision="2"
                               size="small" style="width: 100%; height: 22px"
                               @change="onCellValueChange($index, child.headerIdx - 1, $event)"
-                              @blur="onActiveCellBlur($event, child.headerIdx - 1)"
+                              @blur="onActiveCellBlur($event, $index, child.headerIdx - 1)"
                               @keydown="onActiveCellKeydown($event, $index, child.headerIdx - 1)" />
                             <span v-else :class="['gt-amt', { 'total-val': row.is_total }]">
                               <GtAmountCell :value="getCellValue(row, child.headerIdx - 1)" :unit="noteUnit" />
@@ -671,16 +671,17 @@
             <!-- 表格结构编辑工具栏 (Req 38.1-38.6) — 置于表格下方、富文本上方 -->
             <div v-if="editMode && (currentNote.content_type === 'table' || currentNote.content_type === 'mixed')" class="gt-de-structure-toolbar">
               <el-button-group size="small">
-                <el-button @click="onStructureAddRow" title="在末尾新增行">➕ 行</el-button>
-                <el-button @click="onStructureDeleteRow" title="删除最后一行（合计行除外）" :disabled="!canDeleteRow">➖ 行</el-button>
-                <el-button @click="onStructureAddColumn" title="新增列">➕ 列</el-button>
-                <el-button @click="onStructureDeleteColumn" title="删除最后一列" :disabled="!canDeleteColumn">➖ 列</el-button>
+                <el-button @click="onStructureAddRow" :disabled="structureEditDisabled" :title="structureEditDisabled ? structureEditDisabledReason : '在末尾新增行'">➕ 行</el-button>
+                <el-button @click="onStructureDeleteRow" :disabled="structureEditDisabled || !canDeleteRow" title="删除最后一行（合计行除外）">➖ 行</el-button>
+                <el-button @click="onStructureAddColumn" :disabled="structureEditDisabled" :title="structureEditDisabled ? structureEditDisabledReason : '新增列'">➕ 列</el-button>
+                <el-button @click="onStructureDeleteColumn" :disabled="structureEditDisabled || !canDeleteColumn" title="删除最后一列">➖ 列</el-button>
               </el-button-group>
               <el-button-group size="small">
-                <el-button @click="noteTableStructure.undo()" :disabled="!noteTableStructure.canUndo.value" title="撤销 (Ctrl+Z)">↩ 撤销</el-button>
-                <el-button @click="noteTableStructure.redo()" :disabled="!noteTableStructure.canRedo.value" title="重做 (Ctrl+Y)">↪ 重做</el-button>
+                <el-button @click="noteTableStructure.undo()" :disabled="structureEditDisabled || !noteTableStructure.canUndo.value" title="撤销 (Ctrl+Z)">↩ 撤销</el-button>
+                <el-button @click="noteTableStructure.redo()" :disabled="structureEditDisabled || !noteTableStructure.canRedo.value" title="重做 (Ctrl+Y)">↪ 重做</el-button>
               </el-button-group>
-              <el-button size="small" @click="onRestoreTemplateStructure" title="恢复为模板默认结构">🔄 恢复模板结构</el-button>
+              <el-button size="small" @click="onRestoreTemplateStructure" :disabled="structureEditDisabled" :title="structureEditDisabled ? structureEditDisabledReason : '恢复为模板默认结构'">🔄 恢复模板结构</el-button>
+              <span v-if="structureEditDisabled" class="gt-de-structure-hint">{{ structureEditDisabledReason }}</span>
             </div>
 
             <div class="gt-de-editor-footer" v-if="editMode">
@@ -689,7 +690,7 @@
                 <el-button size="small" plain @click="onRestoreAutoMode" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : '恢复为自动提数模式'">恢复自动提数</el-button>
               </div>
               <div class="gt-de-footer-primary">
-                <el-button size="small" @click="exitEdit(true)">取消</el-button>
+                <el-button size="small" @click="exitNoteEdit(true)">取消</el-button>
                 <el-button size="small" type="primary" @click="onSave" :loading="saveLoading" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">保存</el-button>
               </div>
             </div>
@@ -1341,6 +1342,7 @@ import { useProjectEvents } from '@/composables/useProjectEvents'
 import { useStaleRefresh } from '@/composables/useStaleRefresh'
 import { handleApiError } from '@/utils/errorHandler'
 import { useNoteTableStructure, type TableData } from '@/composables/useNoteTableStructure'
+import { resolveNoteStructureEditState } from '@/views/composables/noteStructureEditing'
 import NoteOfflineExportDialog from '@/components/notes/NoteOfflineExportDialog.vue'
 import NoteOfflineImportDialog from '@/components/notes/NoteOfflineImportDialog.vue'
 import NoteTemplateSwitch from '@/components/notes/NoteTemplateSwitch.vue'
@@ -1359,6 +1361,15 @@ import { useNotePersist } from '@/views/composables/useNotePersist'
 import { useNoteRefresh } from '@/views/composables/useNoteRefresh'
 import { resolveNoteDisclosureJumpTarget } from '@/views/composables/noteDisclosureJump'
 import { projectSubTablesClient, deriveLegacyTableHeaders } from '@/components/workpaper/composables/disclosureColumnDefs'
+import {
+  applyProjectedCell,
+  applyProjectedLabel,
+  cloneNoteTableValue,
+  prepareNoteTableData,
+  readExportDisabledSubTables,
+  sourceKeysForProjectedTable,
+  NoteTableWritebackError,
+} from '@/views/composables/noteTableWriteback'
 import { useAcnr } from '@/services/acnr'
 import { useNoteTemplate } from '@/views/composables/useNoteTemplate'
 import { useNoteExport } from '@/views/composables/useNoteExport'
@@ -1736,6 +1747,27 @@ function formatSyncTime(iso: string | Date | null | undefined): string {
 
 const { isEditing: editMode, isDirty: editDirty, enterEdit, exitEdit, markDirty: markEditDirty, clearDirty: clearEditDirty } = useEditMode()
 
+const tableDataSnapshot = ref<any>(null)
+const hasTableDataSnapshot = ref(false)
+function enterNoteEdit() {
+  tableDataSnapshot.value = currentNote.value?.table_data == null
+    ? null
+    : cloneNoteTableValue(currentNote.value.table_data)
+  hasTableDataSnapshot.value = true
+  enterEdit()
+}
+async function exitNoteEdit(force = false): Promise<boolean> {
+  const result = await exitEdit(force)
+  if (result && !editMode.value && hasTableDataSnapshot.value) {
+    if (currentNote.value) {
+      currentNote.value.table_data = cloneNoteTableValue(tableDataSnapshot.value)
+    }
+    tableDataSnapshot.value = null
+    hasTableDataSnapshot.value = false
+  }
+  return result
+}
+
 // ─── 单元格激活编辑（仅活跃单元格渲染 input，其余保持轻量 span）──────────────────
 const activeCellEdit = ref<{ rowIndex: number; colIndex: number } | null>(null)
 
@@ -1814,7 +1846,7 @@ watch(() => editMode.value, async (editing) => {
   else editLock.release()
 })
 watch(() => editLock.isMine.value, (mine) => {
-  if (!mine && editMode.value) exitEdit()
+  if (!mine && editMode.value) exitNoteEdit()
 })
 const customTemplateId = ref('')
 const customTemplateName = ref('')
@@ -1998,16 +2030,30 @@ function toggleGuidanceExpand() {
 const exportEnabledTables = computed({
   get() {
     if (!currentNoteTables.value) return [] as number[]
+    const disabled = readExportDisabledSubTables(currentNote.value?.table_data)
     return currentNoteTables.value
-      .map((t: any, i: number) => t.export_enabled !== false ? i : -1)
+      .map((t: any, i: number) => {
+        const keys = sourceKeysForProjectedTable(t)
+        const enabled = keys.length > 0
+          ? keys.every(key => !disabled.has(key))
+          : t.export_enabled !== false
+        return enabled ? i : -1
+      })
       .filter((i: number) => i >= 0)
   },
   set(indices: number[]) {
-    if (!currentNote.value?.table_data?._tables) return
-    const tables = currentNote.value.table_data._tables
-    tables.forEach((t: any, i: number) => {
-      t.export_enabled = indices.includes(i)
+    const tableData = currentNote.value?.table_data
+    if (!tableData || typeof tableData !== 'object') return
+    const disabled = new Set<string>()
+    currentNoteTables.value.forEach((table: any, index: number) => {
+      if (indices.includes(index)) return
+      for (const key of sourceKeysForProjectedTable(table)) disabled.add(key)
     })
+    tableData._export_disabled_sub_tables = [...disabled]
+    // 普通 _tables 仍保留旧的表级语义；workpaper 投影只靠顶层源键持久化。
+    if (Array.isArray(tableData._tables) && tableData._source !== 'workpaper' && tableData._source !== 'workpaper_html') {
+      tableData._tables.forEach((table: any, index: number) => { table.export_enabled = indices.includes(index) })
+    }
     markEditDirty()
     autoSave.markDirty()
   },
@@ -2024,8 +2070,15 @@ watch(() => currentNote.value?.note_section, () => {
 watch(activeTableTab, () => { deactivateCell() })
 
 // ─── 附注表格结构编辑 (Req 38.1-38.6) ─────────────────────────────────────
+const structureEditState = computed(() => resolveNoteStructureEditState(
+  currentNote.value?.table_data,
+  activeTableData.value,
+))
+const structureEditDisabled = computed(() => !structureEditState.value.table)
+const structureEditDisabledReason = computed(() => structureEditState.value.reason || '')
+
 const noteTableStructure = useNoteTableStructure({
-  getActiveTable: () => activeTableData.value as TableData | null,
+  getActiveTable: () => structureEditState.value.table as TableData | null,
   markDirty: () => { if (editMode.value) { markEditDirty(); autoSave.markDirty() } },
 })
 
@@ -2078,55 +2131,101 @@ function getCellMode(row: any, colIdx: number): string {
   return ''
 }
 
-function onLabelChange(_rowIndex: number, _newValue: string) {
-  markEditDirty()
-  autoSave.markDirty()
-}
-
-function onCellValueChange(rowIndex: number, colIndex: number, _newValue: number | undefined) {
-  markEditDirty()
-  autoSave.markDirty()
-  if (!currentNote.value?.table_data?.rows) return
-  const rows = currentNote.value.table_data.rows
-  const totalRowIndex = rows.findIndex((r: any) => r.is_total)
-  if (totalRowIndex < 0) return
-  // 纵向合计：所有非合计行的同列求和
-  let sum = 0
-  for (let i = 0; i < rows.length; i++) {
-    if (rows[i].is_total) continue
-    const vals = rows[i].values || []
-    sum += parseFloat(vals[colIndex]) || 0
+function onLabelChange(rowIndex: number, newValue: string) {
+  if (!currentNote.value || !activeTableData.value) return
+  try {
+    currentNote.value.table_data = applyProjectedLabel(
+      currentNote.value.table_data,
+      activeTableData.value,
+      rowIndex,
+      newValue,
+    )
+    markEditDirty()
+    autoSave.markDirty()
+  } catch (error) {
+    if (error instanceof NoteTableWritebackError) ElMessage.error(error.message)
   }
-  if (!rows[totalRowIndex].values) rows[totalRowIndex].values = []
-  rows[totalRowIndex].values[colIndex] = sum
-  // 横向公式
-  recalcHorizontalFormula(rowIndex)
 }
 
-function recalcHorizontalFormula(rowIndex: number) {
-  const row = currentNote.value?.table_data?.rows?.[rowIndex]
-  if (!row || !row.formula_type) return
-  if (row.formula_type === 'opening_plus_changes') {
-    const vals = row.values || []
-    if (vals.length >= 3) {
-      const opening = parseFloat(vals[0]) || 0
+function commitProjectedCellValue(table: any, rowIndex: number, colIndex: number, value: unknown): boolean {
+  if (!currentNote.value) return false
+  try {
+    currentNote.value.table_data = applyProjectedCell(
+      currentNote.value.table_data,
+      table,
+      rowIndex,
+      colIndex,
+      value,
+    )
+    return true
+  } catch (error) {
+    if (error instanceof NoteTableWritebackError) ElMessage.error(error.message)
+    return false
+  }
+}
+
+function onCellValueChange(rowIndex: number, colIndex: number, newValue: number | null | undefined) {
+  const table = activeTableData.value
+  if (!table || !currentNote.value) return
+  markEditDirty()
+  autoSave.markDirty()
+  if (!commitProjectedCellValue(table, rowIndex, colIndex, newValue)) return
+
+  // 纵向合计：仅在当前显示表内计算，再按合计行自己的源坐标写回。
+  const refreshed = activeTableData.value
+  const rows = refreshed?.rows || []
+  const totalRowIndex = rows.findIndex((row: any) => row.is_total)
+  if (totalRowIndex >= 0) {
+    const sum = rows.reduce((total: number, row: any) => {
+      if (row.is_total) return total
+      const value = Number(row.values?.[colIndex])
+      return total + (Number.isFinite(value) ? value : 0)
+    }, 0)
+    const totalValue = sum
+    commitProjectedCellValue(refreshed, totalRowIndex, colIndex, totalValue)
+  }
+
+  // 横向公式：没有合计行时也必须执行；只提交实际变更的结果。
+  const formulaTable = activeTableData.value
+  const formulaRow = formulaTable?.rows?.[rowIndex]
+  if (formulaRow?.formula_type === 'opening_plus_changes') {
+    const values = Array.isArray(formulaRow.values) ? formulaRow.values : []
+    if (values.length >= 3) {
+      const opening = Number(values[0]) || 0
+      const endingIndex = values.length - 1
       let changes = 0
-      for (let i = 1; i < vals.length - 1; i++) changes += parseFloat(vals[i]) || 0
-      vals[vals.length - 1] = opening + changes
+      for (let index = 1; index < endingIndex; index++) changes += Number(values[index]) || 0
+      const ending = opening + changes
+      if (values[endingIndex] !== ending) {
+        values[endingIndex] = ending
+        commitProjectedCellValue(formulaTable, rowIndex, endingIndex, ending)
+      }
     }
   }
 }
 
+function recalcHorizontalFormula(rowIndex: number) {
+  // 保留旧函数名供局部调用方兼容；实际提交由 onCellValueChange 完成。
+  const row = activeTableData.value?.rows?.[rowIndex]
+  if (!row || row.formula_type !== 'opening_plus_changes') return
+  const values = Array.isArray(row.values) ? row.values : []
+  if (values.length < 3) return
+  const ending = (Number(values[0]) || 0) + values.slice(1, -1).reduce((sum: number, value: any) => sum + (Number(value) || 0), 0)
+  values[values.length - 1] = ending
+}
+
+
 function isFormulaMismatch(row: any, colIdx: number): boolean {
-  if (!row.is_total || !currentNote.value?.table_data?.rows) return false
-  const rows = currentNote.value.table_data.rows
+  if (!row?.is_total) return false
+  const rows = activeTableData.value?.rows
+  if (!Array.isArray(rows)) return false
   let expected = 0
-  for (let i = 0; i < rows.length; i++) {
-    if (rows[i].is_total) continue
-    const vals = rows[i].values || []
+  for (const candidate of rows) {
+    if (candidate?.is_total) continue
+    const vals = Array.isArray(candidate?.values) ? candidate.values : []
     expected += parseFloat(vals[colIdx]) || 0
   }
-  const actual = parseFloat((row.values || [])[colIdx]) || 0
+  const actual = parseFloat((Array.isArray(row.values) ? row.values : [])[colIdx]) || 0
   return Math.abs(expected - actual) > 0.01
 }
 
@@ -2167,12 +2266,14 @@ async function onFormulaApplied() {
   if (currentNote.value) await fetchDetailFresh(currentNote.value.note_section)
 }
 
-// 将当前附注表格数据转为公式管理器需要的行格式
+// 将当前显示表的行转为公式管理器需要的行格式；workpaper 多表必须使用 activeTableData，
+// legacy 单表也通过同一入口保持兼容。
 const currentNoteFormulaRows = computed(() => {
-  if (!currentNote.value?.table_data?.rows) return []
-  return currentNote.value.table_data.rows.map((r: any, i: number) => ({
+  const rows = activeTableData.value?.rows
+  if (!Array.isArray(rows)) return []
+  return rows.map((r: any, i: number) => ({
     id: `note_row_${i}`,
-    row_code: `${currentNote.value!.note_section}-R${i + 1}`,
+    row_code: `${currentNote.value!.note_section}-T${activeTableTab.value}-R${i + 1}`,
     row_name: r.label || `第${i + 1}行`,
     formula: '',
     formula_category: r.is_total ? 'auto_calc' : '',
@@ -2241,7 +2342,7 @@ function onInsertPageBreak(sectionIndex: number) {
 
 async function onClearAllFormulas() {
   // 一键清除公式：将所有 auto 单元格切换为 manual 模式
-  if (!currentNote.value?.table_data?.rows) return
+  if (!currentNote.value?.table_data) return
   try {
     const { default: http } = await import('@/utils/http')
     await http.post(
@@ -2250,17 +2351,19 @@ async function onClearAllFormulas() {
     ElMessage.success('公式已清除，所有单元格切换为手动编辑模式')
     await fetchDetailFresh(currentNote.value.note_section)
   } catch {
-    // 降级：前端直接修改模式标记
-    for (const row of currentNote.value.table_data.rows) {
+    // 降级：仅修改当前活动表可见行的模式，不假定 legacy 首表结构。
+    const rows = activeTableData.value?.rows
+    if (!Array.isArray(rows)) return
+    for (const row of rows) {
       if (row._cell_modes) {
         for (const key of Object.keys(row._cell_modes)) {
-          if (row._cell_modes[key] === 'auto') {
-            row._cell_modes[key] = 'manual'
-          }
+          if (row._cell_modes[key] === 'auto') row._cell_modes[key] = 'manual'
         }
       }
     }
-    ElMessage.success('公式已清除（本地模式）')
+    markEditDirty()
+    autoSave.markDirty()
+    ElMessage.success('公式已清除（当前表本地模式）')
   }
 }
 
@@ -2683,6 +2786,14 @@ const { saveLoading, justSaved, onSave: _rawSave } = useNotePersist({
   clearEditDirty,
   autoSaveClearDirty: () => autoSave.clearDirty(),
   clearAutoSaveDraft,
+  prepareTableData: (tableData) => {
+    try {
+      return prepareNoteTableData(tableData, currentNoteTables.value)
+    } catch (error) {
+      if (error instanceof NoteTableWritebackError) ElMessage.error(error.message)
+      throw error
+    }
+  },
 })
 
 // ── Task #11：保存状态指示器 ──
@@ -2743,22 +2854,26 @@ function onShortcutSave() {
 
 // ─── 表格结构编辑操作 (Req 38.1-38.6) ─────────────────────────────────────
 const canDeleteRow = computed(() => {
-  const table = activeTableData.value
+  const table = structureEditState.value.table
   if (!table) return false
   // Must have at least one non-total row to delete
   return table.rows.some((r: any) => !r.is_total) && table.rows.filter((r: any) => !r.is_total).length > 1
 })
 
 const canDeleteColumn = computed(() => {
-  const table = activeTableData.value
+  const table = structureEditState.value.table
   if (!table) return false
   // Must have more than 1 value column (headers[0] is label column)
   return table.headers.length > 2
 })
 
+function warnStructureEditUnavailable() {
+  if (structureEditDisabledReason.value) ElMessage.info(structureEditDisabledReason.value)
+}
+
 function onStructureAddRow() {
-  const table = activeTableData.value
-  if (!table) return
+  const table = structureEditState.value.table
+  if (!table) { warnStructureEditUnavailable(); return }
   // Insert before the last total row, or at end
   const totalIdx = table.rows.findIndex((r: any) => r.is_total)
   const insertIdx = totalIdx >= 0 ? totalIdx : table.rows.length
@@ -2766,8 +2881,8 @@ function onStructureAddRow() {
 }
 
 function onStructureDeleteRow() {
-  const table = activeTableData.value
-  if (!table) return
+  const table = structureEditState.value.table
+  if (!table) { warnStructureEditUnavailable(); return }
   // Delete the last non-total row
   for (let i = table.rows.length - 1; i >= 0; i--) {
     if (!table.rows[i].is_total) {
@@ -2778,22 +2893,24 @@ function onStructureDeleteRow() {
 }
 
 function onStructureAddColumn() {
-  const table = activeTableData.value
-  if (!table) return
+  const table = structureEditState.value.table
+  if (!table) { warnStructureEditUnavailable(); return }
   const colCount = table.headers.length - 1 // exclude label column
   const name = `列${colCount + 1}`
   noteTableStructure.addColumn(colCount, name)
 }
 
 function onStructureDeleteColumn() {
-  const table = activeTableData.value
-  if (!table) return
+  const table = structureEditState.value.table
+  if (!table) { warnStructureEditUnavailable(); return }
   const colCount = table.headers.length - 1
   if (colCount <= 1) return
   noteTableStructure.deleteColumn(colCount - 1)
 }
 
 async function onRestoreTemplateStructure() {
+  const table = structureEditState.value.table
+  if (!table) { warnStructureEditUnavailable(); return }
   if (!currentNote.value) return
   const section = currentNote.value.note_section
   try {
@@ -2938,12 +3055,12 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 const { isFullscreen: deFullscreen, toggleFullscreen: toggleDeFullscreen } = useFullscreen()
 
 function copyNoteTable() {
-  const note = currentNote.value
-  if (!note?.table_data?.rows?.length) { ElMessage.warning('当前章节无表格数据'); return }
-  const headers = note.table_data.headers || []
-  const rows = note.table_data.rows || []
-  const text = [headers.join('\t'), ...rows.map((r: any) => (r.values || []).join('\t'))].join('\n')
-  const html = `<table border="1"><tr>${headers.map((h: string) => `<th>${h}</th>`).join('')}</tr>${rows.map((r: any) => `<tr>${(r.values || []).map((v: any) => `<td>${v ?? ''}</td>`).join('')}</tr>`).join('')}</table>`
+  const table = activeTableData.value
+  if (!table?.rows?.length) { ElMessage.warning('当前章节无表格数据'); return }
+  const headers = table.headers || []
+  const rows = table.rows || []
+  const text = [headers.join('\t'), ...rows.map((r: any) => [r.label ?? '', ...(r.values || [])].join('\t'))].join('\n')
+  const html = `<table border="1"><tr>${headers.map((h: string) => `<th>${h}</th>`).join('')}</tr>${rows.map((r: any) => `<tr><td>${r.label ?? ''}</td>${(r.values || []).map((v: any) => `<td>${v ?? ''}</td>`).join('')}</tr>`).join('')}</table>`
   try {
     navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })])
     ElMessage.success(`已复制 ${rows.length} 行，可粘贴到 Word/Excel`)

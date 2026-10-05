@@ -139,12 +139,25 @@ class EventBus:
     def _build_dedup_key(self, payload: EventPayload) -> str:
         """构建 debounce 去重键。
 
-        说明：
-        - 同项目不同年度的事件不应互相合并。
-        - year=None 视为“全年/未知年度”事件，单独归并。
+        同项目、同年度、同事件类型是基础范围；底稿保存与发布确认还需保留
+        ``extra.wp_id`` / ``extra.publish_token`` 身份，避免不同底稿或确认互相覆盖。
+        未携带非空身份字段的事件保持原有去重键。
         """
         year_key = payload.year if payload.year is not None else "ALL_YEARS"
-        return f"{payload.event_type.value}:{payload.project_id}:{year_key}"
+        base_key = f"{payload.event_type.value}:{payload.project_id}:{year_key}"
+        extra = payload.extra or {}
+        identity = []
+        for field in ("wp_id", "publish_token"):
+            value = extra.get(field)
+            if value is None:
+                continue
+            value_text = str(value)
+            if value_text:
+                identity.append((field, value_text))
+        if not identity:
+            return base_key
+        identity_key = json.dumps(identity, ensure_ascii=False, separators=(",", ":"))
+        return f"{base_key}:{identity_key}"
 
     def subscribe(self, event_type: EventType, handler: EventHandler) -> None:
         """注册事件处理器"""

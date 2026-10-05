@@ -66,7 +66,8 @@ async def load_tb_audited(db, project_id: UUID, year: int, codes: Collection[str
             if (r.standard_account_code or "").startswith(c):
                 audited[c] += r.audited_amount or Decimal("0")
                 opening[c] += r.opening_balance or Decimal("0")
-    tb_data = {c: {"期末余额": audited[c], "年初余额": opening[c]} for c in wanted}
+    tb_data = {c: {"期末余额": audited[c], "年初余额": opening[c],
+                   "本期发生额": audited[c] - opening[c]} for c in wanted}
     return TbAuditedSnapshot(
         tb_data=tb_data,
         available=bool(company_rows),
@@ -118,6 +119,9 @@ async def load_hall_adjustments(db, project_id: UUID, year: int, codes: Collecti
 class FormulaSources:
     """一次推送用到的公式上下文素材。"""
 
+    #: context_for / unavailable_reason 共用的试算表口径名集合（新增口径只改这里）
+    _TB_CONTEXTS: frozenset[str] = frozenset({"trial_balance_audited", "trial_balance_audited_occurrence"})
+
     tb: TbAuditedSnapshot | None = None
     hall_adj: dict[str, dict[str, Decimal]] = field(default_factory=dict)
 
@@ -125,7 +129,7 @@ class FormulaSources:
         """按规则声明的 context 组装 FormulaContext（未声明的维度不给数据）。"""
         tb_data: dict[str, dict[str, Decimal]] = {}
         adj_data: dict[str, dict[str, Decimal]] = {}
-        if context.get("tb") == "trial_balance_audited":
+        if context.get("tb") in self._TB_CONTEXTS:
             if self.tb is None:
                 raise RuntimeError("试算表审定口径未加载")
             tb_data = {k: dict(v) for k, v in self.tb.tb_data.items()}
@@ -135,6 +139,6 @@ class FormulaSources:
 
     def unavailable_reason(self, context: Mapping[str, str]) -> str | None:
         """规则所需上下文无从取数时的中文原因；None = 可求值。"""
-        if context.get("tb") == "trial_balance_audited" and (self.tb is None or not self.tb.available):
+        if context.get("tb") in self._TB_CONTEXTS and (self.tb is None or not self.tb.available):
             return "试算表尚未生成（四表导入并重算试算表后推送）"
         return None

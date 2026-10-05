@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest'
 import type { ConsolTreeNode } from '@/services/consolidationApi'
 import {
   canEnterProject,
+  currentConsolEntityForNode,
   directSubsidiaryMembers,
   findConsolNodeByProject,
   findNodeByCompany,
@@ -71,6 +72,17 @@ describe('consolTreeView', () => {
   it('工作底稿企业列回退：只取子公司类成员（合并子公司 + 单户子公司），排除合并差额 / 母公司 / 分公司', () => {
     expect(directSubsidiaryMembers(sampleTree()).map((c) => c.code)).toEqual(['A', 'M', 'S'])
     expect(directSubsidiaryMembers(null)).toEqual([])
+  })
+
+  it('组织树节点转换为报表和附注共享实体，并以 node_key 区分同企业不同角色', () => {
+    const tree = sampleTree()
+    const selectedParent = findNodeByKey(tree, 'G:parent')!
+    expect(currentConsolEntityForNode(selectedParent)).toEqual({
+      code: 'G',
+      name: '某集团（母公司）',
+      nodeKey: 'G:parent',
+    })
+    expect(currentConsolEntityForNode(findNodeByKey(tree, 'G:consol')!).nodeKey).toBe('G:consol')
   })
 
   it('进入项目只对有项目的节点；标记与间接持有文案为中文', () => {

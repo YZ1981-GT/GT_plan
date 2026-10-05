@@ -526,3 +526,68 @@ mounts 245→244 / hosts 154。86 失 / 85 得 共涉 **45** 个宿主文件，�
 索引、不动工作树文件**：入库的是自洽快照（clean checkout 上判据全绿），他们的工作树原样
 保留，且他们的重生成**已把这 9 条 override 吃进去**（现算 9/9 在册、`reason` 是本轮写的
 那段、`review_basis` 的链从 `c2d6926a…` 接上去）⇒ 后续他们提交时这 9 条不会丢。
+
+---
+
+## 2026-10-04 Task 20a 受控 OO 9.4 roundtrip 实测：卡在 published artifact footer 几何漂移（仍 `[ ]*`）
+
+### 这一轮做了什么
+补了 provider 协议回归守卫 `backend/tests/workpaper_sync/test_registry_provider_protocol.py`
+（5 passed）：真实 `WorkpaperSyncAdapterRegistry.register_from_manifest()` 下覆盖
+同步 / 异步 provider、`session=` 转发、`SyncDomainError` 按 entry 隔离、provider 内部
+真实 `TypeError` **不被吞**而继续上抛；外加 E1 `attach_pilot_adapters(session=…)` 回归。
+
+然后按既有 `verify_l1_oo94_roundtrip.py` / `verify_n4_oo94_roundtrip.py` 的
+`ConvertService.ashx` 范式，对 H9 做了一次**受控 OO 9.4 roundtrip 评估**。
+
+🔴 **本轮探针与 L1/N4 验收脚本的关键区别（如实声明，未冒充生产注册）**：
+L1/N4 的 ① 步走生产 `attach_adapters()`，那条路径要 manifest `capability==bidirectional`。
+H9 当前 manifest `capability=single_onlyoffice` / `adapter_id=None`（generated manifest，
+前端读的就是它）⇒ `phase5_h9.attach_pilot_adapters()` 必返回空元组。故探针
+`backend/scripts/e2e/_h9_oo94_roundtrip_probe.py` **不翻 capability、不手改 manifest、
+不冒充 `register_from_manifest` 注册成功**，改为直接用 H9 真实 published representation 的
+冻结定义（`resolve_published_frozen_definitions`）+ 生产 `build_excel_adapter(direction=
+'html_to_oo')` 组装 adapter 实例，仅做**文件级** roundtrip（真 OO 9.4 xlsx→xlsx 重存）。
+
+### 实测逐环结果（真实数据、只读、不写 PG）
+| 环 | 结果 |
+|---|---|
+| [0] 真库载荷 | `H9-2-rows` 1 行 / remark **819 B / 2 行**；lessor=`测试出租方_549786` / `测试出租方_E2E`（🔴 **E2E seed**，非真实业务录入） |
+| [①] published representation | `46f12d1f` / bundle `aa821fd3` ✓ |
+| [②] 冻结定义 + adapter | `resolve_published_frozen_definitions` OK，contract_digest `419c1729af5b`，`build_excel_adapter` 组装 `ExcelSyncAdapter` ✓ |
+| [③] substrate artifact | `000000001-6e527d7572f2.xlsx` 59891 B ✓ |
+| [④] baseline extract + overlay | `overlay_store_on_baseline_projection` 成功，projection values=28 / rows=2 ✓ |
+| [⑤] materialize | 🔴 **`FooterAnchorDriftError`**：published artifact footer marker `合计` 实测在 **R16**，契约冻结 `GT_FOOTER_ROW=14` —— 生产写入侧 **fail-closed** |
+
+openpyxl 直读该 artifact 的 `租赁负债明细表H9-2` 复核：受管表数据区 **R9-13 全空**，
+2 行真实数据落在 **R14 / R15**，footer「合计」在 **R16**（R17 起是说明文字）。
+⇒ 这份 published representation 的几何与契约冻结的模板几何（数据区 R9-13、footer R14）
+**不一致**。
+
+### 结论：这是真实供给态漂移，不是 20a 的通过证据
+1. **链路到 extract 全通**（①②③④全绿）证明：H9 契约 + 真实冻结定义 + 真实 artifact +
+   真实载荷在真 OO 9.4 引擎前的组装与反读是对的。
+2. **materialize fail-closed 是生产门在正确工作**：它拦住「按契约 static_row（R14）反读、
+   跟着 marker（R16）写」会造成的静默错值。这不是契约 bug，也不是守卫 bug。
+3. **根因是 published representation artifact 的布局漂移**：该 representation 的受管表没有
+   保留模板空白基线（R9-13 应为可写数据区），而是把 2 行数据写在 R14/R15、把 footer 顶到
+   R16。要让 roundtrip 通过，必须有一份 footer 几何 == 契约冻结值（R14）的 published
+   representation —— 这需要经 `ContentMutationService.commit(...)` 以**正确基线**重出首版，
+   属真实录入 / 发布链动作，**不能在不写库、不改契约的前提下绕过**。
+4. 载荷 lessor 含「E2E seed」字样 ⇒ 现有这份 representation 是测试种子产物，更坐实它不是
+   可用于 20a 验收的真实业务 published representation。
+
+⇒ **Task 20a* 保持 `[ ]*`**；欠账描述从 2026-10-01 的「门已开，卡 published representation
+供给 + 平台级挂载组件不唯一」**进一步具体化**为：published representation 已存在且 attach
+能走过 representation 门，真正卡住的是 **materialize footer 门** —— 现有 representation 的
+artifact footer 几何（R16）与契约冻结（R14）不一致，需以正确基线重出首版 representation。
+
+### Task 20b* 同步说明（仍 `[ ]*`）
+本轮未触达人工审核契约 / approved bundle 发布链：真库虽有 `bundle_state='approved'` 的
+bundle（`aa821fd3`），但那是发布链机械产物，**不等于**正式人工业务审核完成（审核 actor /
+审核事件链 / approved 发布授权均缺）。不把数据库 `approved` 状态解释为人工审核完成。
+
+### 一次性探针去留
+`backend/scripts/e2e/_h9_oo94_roundtrip_probe.py` 是本轮一次性受控评估脚本（`_` 前缀，
+用完即删），交付时删除；结论已固化在本节。`backend/scripts/analyze/_h9_runtime_probe.py`
+（更早的只读 registration 探针）一并删除。

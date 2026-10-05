@@ -509,6 +509,19 @@ export interface ConsolNoteFillResult {
 export type ConsolNodeRole = 'consol' | 'consol_elim' | 'parent' | 'hq' | 'branch_elim' | 'subsidiary' | 'branch'
 /** 节点类型：aggregate = Σ 直接子节点；elim = 归属本节点的已审批分录；data = 单户审定数 */
 export type ConsolNodeKind = 'aggregate' | 'elim' | 'data'
+
+/**
+ * 当前选中合并主体（树节点）的上下文身份。
+ * nodeKey 是必需的节点唯一身份（`{企业代码}:{角色}`），
+ * 附注和报表的读写、缓存分区都以此为键。
+ * 设计：consol-node-key-isolation-and-shared-context §七
+ */
+export interface CurrentConsolEntity {
+  code: string
+  name: string
+  /** 树节点唯一键，必需。同企业不同角色（合并/母公司/本部）各有独立 nodeKey。 */
+  nodeKey: string
+}
 /** 合并方式识别：母子合并 / 总分汇总 / 两者并存 / 未识别到下级 */
 export type ConsolMode = 'subsidiary' | 'branch' | 'mixed' | 'none'
 
@@ -1010,9 +1023,13 @@ export async function getConsolReports(projectId: string, year: number): Promise
   return api.get(`${P.reports.list(projectId, year)}?report_type=balance_sheet`)
 }
 
-export async function getConsolReport(projectId: string, reportType: string, period: string): Promise<ConsolReportData> {
+export async function getConsolReport(
+  projectId: string, reportType: string, period: string, nodeKey?: string | null,
+): Promise<ConsolReportData> {
   const year = parseInt(period) || new Date().getFullYear() - 1
-  const rows = await api.get(`${P.reports.list(projectId, year)}?report_type=${reportType}`)
+  const params: Record<string, string | number> = { report_type: reportType }
+  if (nodeKey) params.node_key = nodeKey
+  const rows = await api.get(`${P.reports.list(projectId, year)}`, { params })
   return { rows: Array.isArray(rows) ? rows : [], report_type: reportType }
 }
 
@@ -1217,11 +1234,20 @@ export async function getConsolNoteBreakdown(
   return api.get(P_cn.breakdown(projectId, year, sectionId), { params })
 }
 
-/** 按公式填入：合并数写入章节数据（手工单元格保留并列出；清除待更新标记；合并锁定时 423） */
+/**
+ * 按公式填入：合并数写入章节数据（手工单元格保留并列出；清除待更新标记；合并锁定时 423）。
+ * nodeKey 可选：新版合并页面传入当前树节点，后端按节点行写入；旧调用省略时走 NULL 兼容路径。
+ * 设计：consol-node-key-isolation-and-shared-context §四
+ */
 export async function fillConsolNoteByFormula(
-  projectId: string, year: number, sectionId: string, standard?: string | null,
+  projectId: string, year: number, sectionId: string,
+  standard?: string | null, nodeKey?: string | null,
 ): Promise<ConsolNoteFillResult> {
   const url = P_cn.fillByFormula(projectId, year, sectionId)
+  const qs = new URLSearchParams()
+  if (standard) qs.set('standard', standard)
+  if (nodeKey) qs.set('node_key', nodeKey)
+  const qstr = qs.toString()
   // 400（模板口径不匹配）/ 423（合并锁定）须由附注页带具体操作语境展示，抑制全局重复 toast
-  return api.post(standard ? `${url}?standard=${standard}` : url, undefined, { _silent: true } as any)
+  return api.post(qstr ? `${url}?${qstr}` : url, undefined, { _silent: true } as any)
 }

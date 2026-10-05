@@ -36,6 +36,7 @@ router = APIRouter(prefix="/api/projects/{project_id}/formula-push", tags=["form
 class RunBody(BaseModel):
     year: int = Field(..., ge=2000, le=2100)
     dry_run: bool = False
+    wp_codes: list[str] | None = Field(None, max_length=50)
 
 
 class AdoptBody(BaseModel):
@@ -110,10 +111,16 @@ async def run_push(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
+    if body.wp_codes is not None:
+        cleaned = [c.strip() for c in body.wp_codes if c and c.strip()]
+        if not cleaned:
+            raise HTTPException(status_code=400, detail="wp_codes 不能为空列表（省略该参数表示全量推送）")
+        body.wp_codes = cleaned
     try:
         result = await engine.run_and_commit(
             db, project_id=project_id, year=body.year, trigger=engine.MANUAL,
             triggered_by=current_user.id, dry_run=body.dry_run,
+            codes=body.wp_codes,
         )
     except engine.PushActionError as exc:
         raise _bad_request(exc) from exc
@@ -124,13 +131,14 @@ async def run_push(
 async def latest(
     project_id: UUID,
     year: int = Query(..., ge=2000, le=2100),
+    wp_code: str | None = Query(None, max_length=16),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    run = await panel.latest_run(db, project_id=project_id, year=year)
+    run = await panel.latest_run(db, project_id=project_id, year=year, wp_code=wp_code)
     return {
-        "run": panel.run_view(run),
-        "state_counts": await panel.state_counts(db, project_id=project_id, year=year),
+        "run": panel.run_view(run, wp_code=wp_code),
+        "state_counts": await panel.state_counts(db, project_id=project_id, year=year, wp_code=wp_code),
     }
 
 
@@ -139,12 +147,13 @@ async def states(
     project_id: UUID,
     year: int = Query(..., ge=2000, le=2100),
     state: str | None = Query(None),
+    wp_code: str | None = Query(None, max_length=16),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
     if state is not None and state not in PUSH_STATES:
         raise HTTPException(status_code=400, detail=f"未知状态 {state}（可选：{'、'.join(PUSH_STATES)}）")
-    rows = await panel.list_states(db, project_id=project_id, year=year, state=state)
+    rows = await panel.list_states(db, project_id=project_id, year=year, state=state, wp_code=wp_code)
     return {"states": [panel.state_view(r) for r in rows]}
 
 

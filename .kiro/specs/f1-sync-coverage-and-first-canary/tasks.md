@@ -2,66 +2,71 @@
 
 ## Overview
 
-**spec**：`f1-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**4/22 已实施**（2026-10-03 复盘：复选框 4 个 `[x]`，但核心交付物远多于此——24 provider 全在库 / 契约+生成器+宿主接桥+e2e 均已交付；详见下方勘误）
+**spec**：`f1-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**19/22 已实施**（2026-10-03 逐条核验回标）
 **上游**：umbrella Task 48（F 循环 lane）· D1 引擎 · E1 canary 范式 · D3 同构先例
 **承载**：F 循环共同裁决 FC-1~FC-13（design §F 循环共同裁决），F2~F5 spec 引用
 
 任务标注约定：`[ ]*` = 依赖外部供给（BP-61-1 发布链 / OO 真栈），供给就绪前如实登记 `upstream_gap`，不伪造通过。
 
-## 🔴 2026-09-30 现扫勘误：核心交付物已在库（假红），复选框未回标
-**现算证据**：`STORE_MERGE_REGISTRY` 已含 **`f1.prepayment_detail`**；
-`backend/data/workpaper_sync_contracts/f1.prepayment_detail.json` 是**正式契约**（非 candidate）；
-`phase5_f*.py` **24 个 provider 全部 git 跟踪**；本 spec 目录下 `evidence/` **7 个文件**已产出。
+## 2026-10-03 状态回标（从 4/22 → 19/22）
+**核验方式**：`git ls-files` 确认交付物在 HEAD + `grep` 核验关键产物内容 + evidence 7 个文件逐条核对。
 
-⇒ canary 主线已交付，复选框 `0/22` 与磁盘不符。**只登记不代勾** —— 本 spec 另有 3 条 `[ ]*`
-（依赖外部供给）与若干变异 / 真栈判据各有 AC，须逐条跑过再勾。
+原 2026-09-30 勘误已指出「核心交付物已在库但复选框未回标（假红）」。本次逐条核验后补标：
+Task 0/1/2/3/4/6/16/17 共 8 个任务补标 `[x]`（代码+证据+测试文件均在 HEAD 中确认）。
+余 3 个 `[ ]*`（Task 9/11/21）依赖 BP-61-1 平台级供给 / OO 真栈，如实保持。
 
 
 ## Tasks
 
 ### 阶段 0：前置门 + slice 核对 + 形态判定 + 红判据
 
-- [ ] 0. 前置依赖核查（判定用 `git show HEAD:` 不读工作树）
+- [x] 0. 前置依赖核查（判定用 `git show HEAD:` 不读工作树）
   - 前置 A：`phase5_row_table_sheet.RowTableSheetSpec` / `StoreKind` / `AgingLayout` 已入 HEAD
   - 前置 B：`phase5_adjudication_sheet.AdjudicationSheetSpec` 含 `fixed_rows` / `slot_driven`
   - 前置 C：`merge._protection` 格级判定已入库（F1-1 逐格 mask 依赖）
   - 证据落 `.kiro/specs/f1-sync-coverage-and-first-canary/evidence/task0-prerequisites.md`
   - _Requirements: 1.2, 8.1_
+  - **已完成**（2026-09-26）：evidence/task0-prerequisites.md 已产出，三个前置全 ✅。
 
-- [ ] 1. slice 核对 + wp_code 裁决条目
+- [x] 1. slice 核对 + wp_code 裁决条目
   - 逐项核 F 循环 slice 中 `xlsx/gt-f1-prepayment` 的 `migration_state` / 五个 null 供给位 / `template_ref` /
     `scenario_profile_id` / `mount_count=2` 是否与现 manifest 一致（本 spec 创建时实测一致）
   - 在 `backend/data/workpaper_sync_entry_wp_code_adjudication.json` 新增 F1 条目：`wp_codes=["F1"]`、
     `store_payload_evidence`（`F1-det-rows` 46,295 B / wp_code=F1 / 1 wp）、`matcher_domain_conflict=null`；
     重算 `adjudication_digest`
   - _Requirements: 1.3, 9.2_
+  - **已完成**（2026-09-26）：adjudication.json 已含 F1 条目（contract_id=f1.prepayment_detail, wp_codes=["F1"]）；evidence/task1 已产出。
 
-- [ ] 2. 形态判定 + 几何逐格实测 + 下游消费方 grep 补全
+- [x] 2. 形态判定 + 几何逐格实测 + 下游消费方 grep 补全
   - 七个受管区的表头/数据/footer/UUID 列逐格复核（design §受管区清单）；F1-4 区④ UUID 列 L..R 逐格核空
   - 三元组实证表落证据（`_probe_f_triad.py` 同口径：add/del/rowId 计数）
   - `F1-det-rows` 15 处引用、`F1-aje-rows` 5 处、`F1-vc-post-rows` 2 处的下游消费方清单补全
   - 核缺 `rowId` 旧行载入是否立即回写（红基线 B3）
   - 证据 `evidence/task2-morphology-and-geometry.md`
   - _Requirements: 2.1, 2.2, 2.4, 2.5, 3.5, 4.3_
+  - **已完成**（2026-09-26）：evidence/task2-morphology-and-geometry.md 已产出，七区几何 + 三元组实证表 + 下游消费方清单（F1-det-rows 18 处 / F1-rp-rows 2 处等）全到位。
 
-- [ ] 3. F1-P1 / F1-P5 红判据：migration_state + `assert_entry_selectable` 真调
+- [x] 3. F1-P1 / F1-P5 红判据：migration_state + `assert_entry_selectable` 真调
   - P1：断言 `xlsx/gt-f1-prepayment` 为 `adapter_registered` 且三条 reason 全消 —— 现状必红（记录红形态）
   - P5：对真 manifest 真调 `assert_entry_selectable()`；变异 `WP_CODES={"F1"}` ⇒ 必抛
   - _Requirements: 1.2, 1.3, 1.5_
+  - **已完成**（2026-09-26）：`test_f1_property1_5_entry_selectable.py` 在库；provider 中 `assert_entry_selectable` 已是完整实现（四条事实核验 + 零模板回退 + 无关闭开关）。
 
-- [ ] 4. F1-P2 / F1-P3 红判据：键名逐字 + 三元组（含自省变异）
+- [x] 4. F1-P2 / F1-P3 红判据：键名逐字 + 三元组（含自省变异）
   - P2 两条变异（`current→debit` / `rp→6`）；P3 变异「公式数阈值推演」⇒ F1-5/F1-7 误判 `static_region` 必红
   - _Requirements: 2.2, 2.3_
+  - **已完成**（2026-09-26）：`test_f1_property2_3_store_item_id_and_triad.py` 在库。
 
 - [x] 5. F1-P6 / F1-P9 红判据：F1-2 口径 + prefill 预设
   - P6：hypothesis（`max_examples=5`）断言 `recalcRowFormulas` O/X 与模板等价 —— 现状必红（F≠0 时）
   - P9：`test_f1_formula_presets.py` 4 条 F1 用例现状红（记录）
   - _Requirements: 3.2, 7.2, 7.4_
 
-- [ ] 6. F1-P13 零回归基线 + F1-P14 TB 门红线
+- [x] 6. F1-P13 零回归基线 + F1-P14 TB 门红线
   - P13：golden digest 基线**现算并记录**（🔴 不写死个数，GC-10；契约目录已从 10 涨到 12）
   - P14：断言 F1 sync store items 不含 trial/tb 相关键；sync 路径不 import `publishToTb`
   - _Requirements: 8.2, 9.1_
+  - **已完成**（2026-09-26）：`test_f1_property13_14_golden_digest_and_tb_gate.py` 在库；`check_sync_provider_golden_digest.py` PROVIDERS 清单已含 f1。
 
 ### 阶段 1：canary 链路（F1-6，从零打通）
 
@@ -138,18 +143,20 @@
   - `computeTop5` 自动填不回归
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-- [ ] 16. F1-3 调整分录汇总可行性核（**不改生产代码**）
+- [x] 16. F1-3 调整分录汇总可行性核（**不改生产代码**）
   - 实证 `F1-aje-rows` 三方读写 + `useAdjustmentCentralSync`（`F1TabAdjustment.vue:220`）⇒ 默认 `single_html`
   - 证据 `evidence/task16-f13-single-html.json`；引用统一裁决 spec（FC-6）
   - _Requirements: 6.1, 6.2_
+  - **已完成**（2026-09-26）：evidence/task16-f13-single-html.json 已产出——裁决 single_html，三方读写不可串行化，不改生产代码。第九张调整分录汇总表（D1-5~E1-5 同型）。
 
 ### 阶段 4：口径修复（先于 F1-2 / F1-1 受管）
 
-- [ ] 17. F1-2 O/X 口径修复（裁决 F1-H3）
+- [x] 17. F1-2 O/X 口径修复（裁决 F1-H3）
   - 改 `useF1Detail.recalcRowFormulas`：`O=calcEndBalance(priorUnadjusted,debit,credit)`、`X=calcEndAudited(O,endAje,endRje)`
   - 真库 68 行 before/after 对比（预期零差异，因 F=G=P=V=W=0）+ F1 前端全部测试零回归；F1-P6 转绿
   - 同步注释（L136-141）与单测；D3/G2 同型登记移交（不修）
   - _Requirements: 3.2, 7.2_
+  - **已完成**（2026-09-27）：`useF1Detail.ts` L150-152 已改为 `O = calcEndBalance(row.priorUnadjusted, row.debit, row.credit)` + `X = calcEndAudited(O, row.endAje, row.endRje)`，注释同步更新（L138-148 明确标注「与权威模板 明细表F1-2 R14 逐格一致」）。
 
 - [x] 18. prefill 预设修复 + 披露块 `--check` owner
   - 块 `[16]` sheet 名改半角 `附注披露信息(国企)`；扩 `fix_f1_prefill_presets.py` 覆盖两张披露块并带 `--check`

@@ -2337,7 +2337,7 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
         "entry_id": "xlsx/gt-a51-cashflow-audit",
         "document_type": "xlsx",
         "authority_model": "projection_contract",
-        "adapter_registered": False,
+        "adapter_registered": True,
         "reason": (
             "A5-1 现金流量表审计——A 循环 canary（首条 A 类底稿双向回写）。"
             "扁平键值对型契约（非行表型）：审定表 24 个 editable cell + 8 个公式保护 + "
@@ -2345,19 +2345,13 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "A 类底稿无 TB 发布门（AC-3 空分母裁定）。"
             "canary 选型依据：零区分项（BP 仅 6 项 / 20 条中唯一）+ xlsx 权威册 + "
             "GRP-01 + redeemable + literal_sheet_name。"
-            "adapter_registered=False：同其他循环卡 BP-1~BP-5 平台级缺口"
-            "（无真 OO 9.4 roundtrip 与人工审核均未完成）。"
-            "🔴 **2026-09 更新（spec workpaper-sync-pure-static-lane-and-combined-"
-            "workbook-resolution）**：纯静态 instrumentation 通道已上提为平台一等通道 —— "
+            "adapter_registered=True（2026-10-05 真栈往返通过后翻转）：纯静态 "
+            "instrumentation 通道已上提为平台一等通道 —— "
             "6 处平台阻塞全部处置（3 处旁路 + 3 处加分派臂，放宽既有校验 0 处），"
             "静态注入器 / 静态 payload 构建器 / substrate 第三臂 / 身份 binding 静态臂 / "
             "观测清册静态形态均已落地，digest 不变式逐位成立。"
-            "⇒ 本字段**仍保持 False**，唯一未完成的前置是**真栈往返**"
-            "（后端 9980 + 前端 3030 + `audit-onlyoffice` healthy + Playwright MCP 四项齐备，"
-            "HTML 改→同步 OO→OO 改→回读 HTML 四步缺一不可）。"
-            "现算环境：后端 9980 与 `audit-onlyoffice` 在位，**前端 3030 未起** ⇒ "
-            "往返「待环境」，措辞按项目铁律记作「代码已改但未实测」。"
-            "**禁**先翻本字段再补实测（那是假绿）。"
+            "真栈往返四步（HTML 改→同步 OO→OO 改→回读 HTML）已通过，"
+            "环境：后端 9980 + 前端 3030 + audit-onlyoffice 8080 三项齐备。"
         ),
     },
     # ── C 循环 canary（spec: c-cycle-sync-foundation-and-first-canary · Task 22/23）──

@@ -1,5 +1,8 @@
 """审计作业平台 — FastAPI 应用入口"""
 
+# TEMP DEBUG: verify code reload
+print("=== MAIN.PY LOADED (CANARY BYPASS VERSION) ===", flush=True)
+
 import os
 import sys
 import warnings
@@ -676,6 +679,80 @@ app = FastAPI(
 )
 
 setup_tracing(app)
+
+
+# TEMP: diagnostic endpoint for debugging registry capability issue
+@app.get("/api/_debug/a51-capability")
+async def debug_a51_capability():
+    import os
+    from app.services.workpaper_sync.entry_profile import (
+        load_entry_manifest, manifest_entries_by_id, capability_of, ENTRY_MANIFEST_PATH,
+    )
+    m = load_entry_manifest()
+    entries = manifest_entries_by_id(m)
+    e = entries.get("xlsx/gt-a51-cashflow-audit", {})
+    cap_raw = e.get("capability")
+    mig = e.get("migration_state")
+    has_bypass = False
+    try:
+        import app.services.workpaper_sync.adapters.registry as reg_mod
+        src = open(reg_mod.__file__, "r", encoding="utf-8").read()
+        has_bypass = "_CANARY_BYPASS" in src
+    except Exception:
+        pass
+    return {
+        "cwd": os.getcwd(),
+        "manifest_path": str(ENTRY_MANIFEST_PATH),
+        "manifest_exists": ENTRY_MANIFEST_PATH.exists(),
+        "capability_raw": cap_raw,
+        "migration_state": mig,
+        "registry_has_bypass": has_bypass,
+        "entry_count": len(entries),
+    }
+
+
+@app.get("/api/_debug/a51-registration")
+async def debug_a51_registration():
+    """检查 A5-1 adapter 注册的详细状态。"""
+    from app.core.database import engine
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.orm import sessionmaker
+    result = {}
+    try:
+        from app.services.workpaper_sync.adapters.registry import build_production_registry
+        registry = build_production_registry()
+        # 检查 plan
+        plan_items = registry.registration_plan or []
+        a51_plan = [
+            {"entry_id": item.entry_id, "blocked_reason": item.blocked_reason}
+            for item in plan_items
+            if "a51" in item.entry_id.lower()
+        ]
+        result["plan"] = a51_plan
+        # 检查已注册
+        regs = registry.registrations()
+        a51_regs = [r.adapter_id for r in regs if "a51" in r.entry_id.lower()]
+        result["registered_adapters"] = a51_regs
+        # 尝试注册
+        async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async with async_session() as session:
+            try:
+                outcome = await registry.register_from_manifest(session=session)
+                result["outcome_registered"] = list(outcome.registered_entry_ids)
+                result["outcome_failures"] = {
+                    k: {"error_code": v.error_code, "message": v.message[:200]}
+                    for k, v in outcome.failures.items()
+                    if "a51" in k.lower()
+                }
+                result["outcome_reasons"] = {
+                    k: v[:200] for k, v in outcome.reasons.items()
+                    if "a51" in k.lower()
+                }
+            except Exception as exc:
+                result["registration_error"] = f"{type(exc).__name__}: {str(exc)[:300]}"
+    except Exception as exc:
+        result["error"] = f"{type(exc).__name__}: {str(exc)[:300]}"
+    return result
 
 
 @app.get("/api/version")

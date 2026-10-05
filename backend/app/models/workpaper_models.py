@@ -903,6 +903,10 @@ class WpFormula(Base):
         PG_UUID(as_uuid=True), nullable=True
     )
 
+    # 公式来源范围与可审阅绑定（V178）；与页面分类 formula_scope_query 解耦。
+    source_scope: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    binding: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
     # ── V163 稳定键（P0-项1 d4-dual-mode-formula-governance）──────────────
     # 目标 identity = (wp_id, stable_sheet_key, row_key, field_key)；preset_version 不入。
     # 旧列 sheet_name/target_cell + 旧唯一索引保留一版过渡（双写共存）。
@@ -1054,6 +1058,11 @@ class DraftRefreshSnapshot(Base):
     after_value: Mapped[dict | list | None] = mapped_column(JSONB, nullable=True)
     before_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
     after_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # 公式 Runtime 追踪字段（V178）：公式来源与本次绑定范围快照
+    source_formula_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    source_scope: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     restored_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True), nullable=True
     )

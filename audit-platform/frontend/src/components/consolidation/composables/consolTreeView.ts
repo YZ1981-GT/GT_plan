@@ -10,6 +10,7 @@ import type {
   ConsolNodeRole,
   ConsolTreeDiagnostic,
   ConsolTreeNode,
+  CurrentConsolEntity,
 } from '@/services/consolidationApi'
 import { relationLabel } from '@/utils/groupRelation'
 
@@ -52,6 +53,15 @@ export interface FlagTag {
 
 export function nodeLabel(node: Pick<ConsolTreeNode, 'display_name' | 'company_name' | 'company_code'>): string {
   return node.display_name || node.company_name || node.company_code || ''
+}
+
+/** 将组织树节点转换为报表与附注共用的当前实体上下文。 */
+export function currentConsolEntityForNode(node: ConsolTreeNode): CurrentConsolEntity {
+  return {
+    code: node.company_code,
+    name: nodeLabel(node),
+    nodeKey: node.node_key,
+  }
 }
 
 export function roleLabel(role: string | null | undefined): string {

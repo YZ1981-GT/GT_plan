@@ -1,0 +1,73 @@
+{
+  "script": "e2e/g5-1-d1-unified-path.spec.ts",
+  "captured_at": "2026-10-04T15:12:18.323Z",
+  "scope": {
+    "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "wp_id": "68c7740e-dc48-4787-a788-2e77f8560673",
+    "entry_id": "xlsx/gt-d1-notes-receivable"
+  },
+  "predicates": {
+    "user_sync_requests": [
+      {
+        "method": "GET",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/68c7740e-dc48-4787-a788-2e77f8560673/sync/entries/xlsx/gt-d1-notes-receivable/store-projection",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/68c7740e-dc48-4787-a788-2e77f8560673/sync/entries/xlsx/gt-d1-notes-receivable/pending-mutations",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/68c7740e-dc48-4787-a788-2e77f8560673/sync/entries/xlsx/gt-d1-notes-receivable/materialize",
+        "status": 200
+      }
+    ],
+    "forcesave_hits": [],
+    "d2_sync_hits": 0,
+    "callback_url_keys": [
+      "doc_key",
+      "generation",
+      "room_id",
+      "route_credential_id",
+      "route_token"
+    ],
+    "callback_url_redacted": "http://host.docker.internal:9980/api/workpaper-sync/rooms/84a220aa-9f68-4cf8-accf-2c47c0f653f2/onlyoffice-callback?room_id=%3Credacted%3E&generation=%3Credacted%3E&doc_key=%3Credacted%3E&route_credential_id=%3Credacted%3E&route_token=%3Credacted%3E",
+    "host_mounted": true,
+    "confirm_descriptor_200": false,
+    "forcesave_clicked": false,
+    "oo_cell_dirty_attempted": false,
+    "host_dirty_before_forcesave": false,
+    "forcesave_cs_error": null,
+    "forcesave_cs_outcome": null,
+    "forcesave_http_status": null,
+    "forcesave_body_keys": null,
+    "materialize_room_id": "84a220aa-9f68-4cf8-accf-2c47c0f653f2",
+    "materialize_has_jwt_token": true,
+    "doc_editor_called": false,
+    "doc_editor_has_root_token": false,
+    "doc_editor_document_mutable": false,
+    "host_status": "OnlyOffice 内核脚本载入失败，未创建编辑器：http://localhost:8080/web-apps/apps/api/documents/api.js",
+    "host_error": "OnlyOffice 内核脚本载入失败，未创建编辑器：http://localhost:8080/web-apps/apps/api/documents/api.js",
+    "confirm_forcesave_error": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeTruthy\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mfalse\u001b[39m\n\nCall Log:\n- Timeout 180000ms exceeded while waiting on the predicate",
+    "html_dom_roundtrip": {
+      "attempted": false,
+      "marker": null,
+      "switched_to_html": false,
+      "marker_visible": false
+    },
+    "oo_write_target": "A11",
+    "oo_cell_edit_probe": null
+  },
+  "notes": [
+    "token/JWT/route_credential 值已脱敏",
+    "OO 写格：Asc.editor 写受管 A11(customer_name)；权威判据是 forcesave 响应 cs_error（0=有变更，4=no_changes）",
+    "application applied / revision+1 由同目录 DB 核查脚本补齐（tmp_d1_e2e_db_verify.py）",
+    "§9.6 条件 6：切回结构化视图后 D1TabDetailCustomer DOM 应出现 marker（getByText / input.value，排除搜索框）",
+    "Phase 5 首个非 pilot canary：走 harness 无关的独立 entry 双向路径（phase5_d1_notes_receivable）"
+  ],
+  "auth_probe": {
+    "has_token": true
+  }
+}

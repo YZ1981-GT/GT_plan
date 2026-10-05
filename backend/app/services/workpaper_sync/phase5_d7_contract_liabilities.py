@@ -255,26 +255,6 @@ FORMULA_MASK: Final[tuple[str, ...]] = SPEC_D72.formula_mask
 _BACKEND_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 
 
-def excel_carrier_gate() -> ExcelIdentityCarrierGate:
-    return ExcelIdentityCarrierGate.load()
-
-
-def authoritative_template_path() -> Path:
-    return excel_carrier_gate().assert_template_under_authority(TEMPLATE_RELATIVE_PATH)
-
-
-def read_authoritative_template() -> bytes:
-    path = authoritative_template_path()
-    data = path.read_bytes()
-    digest = hashlib.sha256(data).hexdigest()
-    if digest != TEMPLATE_SHA256:
-        raise EntrySelectionError(
-            f"权威模板字节已变: {TEMPLATE_RELATIVE_PATH} 实测 sha256={digest}，"
-            f"冻结哨兵={TEMPLATE_SHA256} —— `backend/wp_templates/` 运行时只读（Requirement 9.9）"
-        )
-    return data
-
-
 # ═══════════════════════════════════════════════════════════════════════════
 # 3. 选型必要条件（真实 manifest / 真实 resolver，不经封闭枚举）
 # ═══════════════════════════════════════════════════════════════════════════
@@ -285,118 +265,6 @@ class TemplateResolutionFacts:
     by_wp_code: Mapping[str, Sequence[Any]]
     parent_code: str
     parent_resolved_path: Any
-
-
-def assert_no_implicit_template_fallback(
-    resolution: TemplateResolutionFacts, *, wp_codes: frozenset[str]
-) -> None:
-    missing = sorted(wp_codes - set(resolution.by_wp_code))
-    if missing:
-        raise EntrySelectionError(
-            f"缺少 wp_code {missing} 的 finder 实测结果 —— 零回退判据不得对未观测的码放行"
-        )
-    leaked = {
-        code: [str(item) for item in hits if item]
-        for code, hits in resolution.by_wp_code.items()
-        if any(hits)
-    }
-    if leaked:
-        raise EntrySelectionError(
-            f"wp_code {sorted(leaked)} 在 `wp_template_finder` 上解析到了 {leaked} —— "
-            "本 canary 的零回退判据要求它们全部解析不到任何文件"
-        )
-    resolved = resolution.parent_resolved_path
-    if resolved is None or Path(str(resolved)).resolve() != authoritative_template_path().resolve():
-        raise EntrySelectionError(
-            f"父码 {resolution.parent_code!r} 的 canonical resolver 落在 {resolved} —— "
-            f"与冻结的权威模板 {TEMPLATE_RELATIVE_PATH!r} 不是同一份文件"
-        )
-
-
-def assert_entry_selectable(
-    *,
-    resolution: TemplateResolutionFacts,
-    manifest: Mapping[str, Any] | None = None,
-) -> Mapping[str, Any]:
-    payload = manifest if manifest is not None else load_entry_manifest()
-    entries = manifest_entries_by_id(payload)
-    entry = entries.get(ENTRY_ID)
-    if entry is None:
-        raise EntrySelectionError(
-            f"冻结的 canary entry {ENTRY_ID!r} 不在 source-backed manifest 里 —— 宿主挂载点已变"
-        )
-    if str(entry.get("document_type") or "") != "xlsx":
-        raise EntrySelectionError(f"{ENTRY_ID!r} document_type 非 xlsx")
-    if not entry.get("independent_entry"):
-        raise EntrySelectionError(
-            f"{ENTRY_ID!r} independent_entry={entry.get('independent_entry')!r} —— 重复入口不得注册"
-        )
-    profile_id = str((entry.get("scenario_profile") or {}).get("profile_id") or "")
-    if profile_id != EXPECTED_PROFILE_ID:
-        raise EntrySelectionError(
-            f"{ENTRY_ID!r} profile_id={profile_id!r} 与冻结的 {EXPECTED_PROFILE_ID!r} 不符"
-        )
-    codes = {str(c) for c in (entry.get("wp_match") or {}).get("wp_code_patterns") or ()}
-    if codes != set(WP_CODES):
-        raise EntrySelectionError(
-            f"{ENTRY_ID!r} wp_code_patterns={sorted(codes)} 与冻结的 {sorted(WP_CODES)} 不一致"
-        )
-    assert_no_implicit_template_fallback(resolution, wp_codes=frozenset(codes))
-    return entry
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# 4. instrumentation spec 与 definition payloads
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-def instrumentation_spec() -> ExcelInstrumentationSpec:
-    return ExcelInstrumentationSpec(
-        entry_id=ENTRY_ID,
-        template_id=TEMPLATE_ID,
-        template_relative_path=TEMPLATE_RELATIVE_PATH,
-        managed_sheet=MANAGED_SHEET,
-        first_data_row=FIRST_DATA_ROW,
-        last_data_row=LAST_DATA_ROW,
-        footer_row=FOOTER_ROW,
-        managed_last_col=MANAGED_LAST_COL,
-        uuid_col=UUID_COL,
-        table_name=TABLE_NAME,
-    )
-
-
-def template_definition_payload() -> dict[str, Any]:
-    data = read_authoritative_template()
-    return build_template_payload(
-        spec=instrumentation_spec(),
-        template_sha256=TEMPLATE_SHA256,
-        structure_hash=normalized_structure_hash(data),
-    )
-
-
-def instrumentation_definition_payload() -> dict[str, Any]:
-    return build_instrumentation_payload(
-        spec=instrumentation_spec(),
-        template_definition_sha256=canonical_digest(template_definition_payload()),
-        template_sha256=TEMPLATE_SHA256,
-        gate=excel_carrier_gate(),
-    )
-
-
-def authority_model_payload() -> dict[str, Any]:
-    return {
-        "schema_version": "authority-model-definition:v1",
-        "authority_model": AUTHORITY_MODEL.value,
-        "content_authority": "structured_projection",
-        "merge_model": "stable_field_three_way",
-        "required_slots": [
-            BundleSlot.template.value,
-            BundleSlot.instrumentation.value,
-            BundleSlot.contract.value,
-        ],
-        "entry_id": ENTRY_ID,
-        "pilot_class": PHASE5_WAVE,
-    }
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -540,28 +408,6 @@ def build_contract_payload() -> dict[str, Any]:
             "reviewed_basis": _REVIEWED_BASIS,
         },
     }
-
-
-def contract_file_path() -> Path:
-    return contract_path_for(ADAPTER_ID)
-
-
-def load_contract_from_disk() -> SyncContract:
-    return load_contract(ADAPTER_ID)
-
-
-def assert_contract_file_matches_source() -> SyncContract:
-    expected = build_contract_payload()
-    on_disk = load_contract_from_disk()
-    if canonical_digest(on_disk.canonical_payload) != canonical_digest(expected):
-        raise EntrySelectionError(
-            "磁盘 per-entry contract 与本模块现算 payload 不一致 —— "
-            f"disk={canonical_digest(on_disk.canonical_payload)} source={canonical_digest(expected)}；"
-            "请用 `& d:/GT_plan/.venv/Scripts/python.exe "
-            "backend/scripts/gen/generate_phase5_d7_contract.py --apply` 重生成"
-        )
-    parse_contract(expected, adapter_id=ADAPTER_ID)
-    return on_disk
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -271,7 +271,6 @@ import http from '@/utils/http'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
 import { collectChecklistResponses, toChecklistPatch } from '@/composables/workpaper/checklistPersistenceHelpers'
-import { k1SaveItemIds } from './composables/k1BackendOwnedKeys'
 import { k1PushNotice, k1PushedRows, type K1PushNotice } from './composables/k1FormulaPushNotice'
 import { subscribeProjectEvent } from '@/services/sse/projectEventStream'
 import { autoSeedK1DetailFromAux } from './composables/useK1DetailAutoSeed'
@@ -559,16 +558,13 @@ const currentSheet = computed(() => {
 // ─── 子组件 save 回调（统一 Persistence Adapter） ─────────────────────────────
 async function handleChildSave(itemId: string, value: unknown): Promise<void> {
   if (!props.wpId) return
-  const [persistableItemId] = k1SaveItemIds([itemId])
-  // 后端独占键仍保留在 allResponses 内供页面实时计算，但不能被普通保存回写。
-  if (!persistableItemId) return
   try {
-    await persistence.save(persistableItemId, toChecklistPatch(value))
+    await persistence.save(itemId, toChecklistPatch(value))
     runtime?.version.scheduleAutoSnapshot()
     emit('save')
   } catch (error) {
-    ElMessage.error(persistence.stateOf(persistableItemId).lastError || '保存失败，数据已保留在本地，请稍后重试')
-    console.warn(`[GtK1OtherReceivables] save failed: ${persistableItemId}`, error)
+    ElMessage.error(persistence.stateOf(itemId).lastError || '保存失败，数据已保留在本地，请稍后重试')
+    console.warn(`[GtK1OtherReceivables] save failed: ${itemId}`, error)
   }
 }
 
