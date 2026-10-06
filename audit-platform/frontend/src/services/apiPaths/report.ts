@@ -224,6 +224,25 @@ export const wordExports = {
     `/api/projects/${pid}/word-exports/jobs/${jobId}/retry`,
 } as const
 
+// ─── 三件套正式出具（chain-closure-phase4-deliverable-center-trio） ──────────
+
+export const trioDeliverables = {
+  readiness: (pid: string) =>
+    `/api/projects/${pid}/deliverables/trio/readiness`,
+  create: (pid: string) =>
+    `/api/projects/${pid}/deliverables/trio`,
+  jobDetail: (pid: string, jobId: string) =>
+    `/api/projects/${pid}/deliverables/trio/jobs/${jobId}`,
+  retry: (pid: string, jobId: string) =>
+    `/api/projects/${pid}/deliverables/trio/jobs/${jobId}/retry`,
+  itemAttempts: (pid: string, itemId: string) =>
+    `/api/projects/${pid}/deliverables/trio/items/${itemId}/attempts`,
+  itemDownload: (pid: string, itemId: string) =>
+    `/api/projects/${pid}/deliverables/trio/items/${itemId}/download`,
+  history: (pid: string) =>
+    `/api/projects/${pid}/deliverables/trio/history`,
+} as const
+
 // ─── 导出 ───────────────────────────────────────────────────────────────────
 
 export const exportTask = {

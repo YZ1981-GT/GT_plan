@@ -1302,3 +1302,23 @@ backend/app/services/workpaper_sync/store_item_registry.py  998
 
 # D4 营业收入渲染策略（Phase 3 indicator_prefill + _fetch_indicator_tb_amounts + _fetch_total_assets 新增）
 backend/app/routers/wp_render_strategies/_d4_operating_revenue.py  810
+
+# ═══════════════════════════════════════════════════════════════════════════
+# spec: chain-closure-phase4-deliverable-center-trio（2026-10-06 入库）
+#
+# 生产代码 3 个（改动前就已超限或接近上限，本轮扩展后越过）：
+#   deliverable.py —— 已是全交付中心聚合路由（改动前 1496 行），本轮三件套端点 +389 行。
+#   export_job_service.py —— 本轮 retry_failed_trio + 查询 + 恢复接口扩展超 800。
+#   full_deliverables_executor.py —— 本轮 run_trio + savepoint + attempt 扩展超 800。
+# 守卫测试 5 个（phase4 全链测试矩阵：readiness / endpoints / full_chain / pg / attempt）：
+#   拆分方向按 Property 分组，不塞进本 spec。
+# baseline 取当前真实行数（splitlines 口径），门禁继续拦膨胀 >5%。
+# ═══════════════════════════════════════════════════════════════════════════
+backend/app/routers/deliverable.py  1885
+backend/app/services/export_job_service.py  807
+backend/app/services/full_deliverables_executor.py  808
+backend/tests/test_phase4_attempt_history.py  915
+backend/tests/test_phase4_endpoints.py  1121
+backend/tests/test_phase4_full_chain.py  907
+backend/tests/test_phase4_pg_schema.py  829
+backend/tests/test_phase4_readiness.py  834
