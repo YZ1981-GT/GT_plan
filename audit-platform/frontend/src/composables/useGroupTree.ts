@@ -22,6 +22,7 @@
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { api } from '@/services/apiProxy'
+import { isRequestCancelled } from '@/utils/http'
 
 // ─── 类型定义（与后端 consol_tree_service.to_dict_v2 输出对齐，camelCase）─────────
 
@@ -328,11 +329,14 @@ export function useGroupTree(year?: Ref<number | null>) {
       if (y != null) params.year = y
       if (scope && scope !== 'all') params.scope = scope
 
-      const data = await api.get<GroupTreeResponse>(TREE_ENDPOINT, { params })
+      const data = await api.get<GroupTreeResponse>(TREE_ENDPOINT, { params, _dedupe: false } as any)
       const normalized = normalizeForestResponse(data || { trees: [], independents: [] })
       trees.value = normalized.trees
       independents.value = normalized.independents
     } catch (e: any) {
+      // GET 去重导致的 cancel（axios abort）不是真正的失败——静默忽略，
+      // 后发的请求会带回正确数据。只对非 cancel 错误设置 error 状态。
+      if (isRequestCancelled(e)) return
       error.value = e?.message || '加载集团架构树失败'
       trees.value = []
       independents.value = []

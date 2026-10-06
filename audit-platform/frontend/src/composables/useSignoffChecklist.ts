@@ -6,6 +6,7 @@
  */
 import { ref, computed, readonly } from 'vue'
 import { api } from '@/services/apiProxy'
+import { isRequestCancelled } from '@/utils/http'
 import type { LinkageContract } from '@/types/linkageContract'
 
 /** 检查结果严重级别 */
@@ -90,6 +91,7 @@ export function useSignoffChecklist(projectId: string) {
       )
       checklist.value = data as SignoffChecklist
     } catch (e: any) {
+      if (isRequestCancelled(e)) return
       error.value = e?.message || '获取清单失败'
       checklist.value = null
     } finally {

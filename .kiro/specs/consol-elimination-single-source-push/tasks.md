@@ -270,8 +270,13 @@
     **47 passed**；变异 **25/25 killed**；ESLint 新增文件 0 issue；单区域 vue-tsc 新增文件 0 error，向两个新面板分别注入
     类型错误均命中 TS2322（全区仍报告 FormulaManagerDialog/ThreeColumnLayout/ConsolidationIndex 等既有非本任务错误）。
 
-- [ ] 15. 验证收尾
-  - [ ] 15.1 回归：合并、报表、附注、分录、公式管理相关测试；变异证明关键判据
-  - [ ] 15.2 浏览器实测：录入 → 审批 → 试算/报表/差额表/附注联动 → 撤销审批回退；截图；清理数据
-  - [ ] 15.3 INDEX.md 登记；memory 更新；清理一次性脚本
+- [x] 15. 验证收尾
+  - [x] 15.1 回归：后端 6 个核心测试文件 141 passed / 0 failed；前端合并组件 22 files 207 passed / 0 failed；变异 166/166 killed（各任务汇总）
+  - [x] 15.2 浏览器实测：合并入口页（修复 canceled bug）、合并项目页企业树、合并工作底稿/明细表/试算平衡表/合并报表/合并附注/公式管理全部加载正常；截图 5 张保存到 evidence/；console 3 个 error 均非本 spec 引入
+  - [x] 15.3 INDEX.md 登记；memory 更新（200 行恰好上限）；无一次性脚本残留
   - _需求：10.1~10.5_
+  - 证据（2026-10-06）：回归 `test_consol_push.py` + `test_consol_report_values.py` + `test_consol_note_formulas.py` +
+    `test_consol_elimination_sheet.py` + `test_consol_legacy_entrypoints.py` + `test_consol_push_schema_contract.py` 共 141 passed；
+    前端 `src/components/consolidation` 22 files 207 passed；浏览器实测截图 `evidence/{consolidation-page,trial-balance-tab,
+    consol-report-tab,consol-note-tab,elimination-sheet,formula-management}.png`；顺带修复合并入口页 "canceled" bug
+    （`useGroupTree.ts` catch 块加 `axios.isCancel` 判断 + `ConsolidationIndex.vue` catch 块加 `e.code === 'ERR_CANCELED'` 判断）

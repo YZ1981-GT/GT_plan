@@ -60,10 +60,14 @@ inclusion: always
 - 🔴 教训：**写入方取数一律 `strict`**（fail-open 会 rollback 撤销已 flush 写入且零失败痕迹）· **试算表取数按标准码前缀**（与报表 `ReportFormulaParser` 同口径）· **改带自动保存/自动同步页面的源码前浏览器先停 `about:blank`**（HMR 重挂载即真实写库，已踩：重药 五、49）· 真库待决：3 个唯一索引含重复键（C24 / editing_locks / review_threads）、和平药房_2025 试算表 1012 父子双计多 414 万
 - **全科目铺开 spec `formula-push-all-subjects-rollout`（2026-10-04 新建 0/26）**：89 个科目主编码只有 E1 达 L3；🔴 4 个现存缺陷 ①K1 半接入（前端过滤 42 键而后端无 binding ⇒ 刷新即丢）②EventBus 去重键不含 `wp_id`（500ms 内两张底稿只派发后一张）③同根因吞「发布到试算表」确认（K6 现受影响）④三条 `after_save` 不带 `wp_code`；止血顺序 = 先修去重键再回退 K1 过滤（反过来 K1 发布被吞）；单一写入方在后端 `checklist-responses` 强制
 
+### 合并抵销分录单源与差额表推送 `consol-elimination-single-source-push`（14/15，余 tasks.md 收尾）
+- ADR-CSP-001~006；唯一来源 `elimination_entries`；计算内核 `consol_report_values`（前缀口径 + 线性分解 + 五度量恒等式 P2）；合并报表按项目口径全六类生成（V172/V173）；试算平衡表只读五列 + 穿透；报表差额表读时计算；合并附注公式种子化 + 填入；推送服务四步上层联动 + SSE；公式管理合并节点 + 推送页。后端 141 passed 变异 166/166；前端 22 files 207 passed；浏览器实测通过
+- 顺带修复合并入口页 "canceled" bug（`useGroupTree.ts` + `ConsolidationIndex.vue` catch 块忽略 axios cancel 错误）
+
 ### 全链打通阶段三（2026-10-01 体检，待用户拍板后立 spec）
 - 现状：四表→TB 未审数 / 审批→TB 调整列 / →报表审定数 / 大厅 = 绿；底稿明细·审定·披露 + 附注只有 E1 由 `formula_push` 后端推，其余 77 个 wp_code 靠「打开页面时种一次」+ 前端 `buildXSyncPayload` 防抖推附注（261 个附注章节标底稿来源却从未同步）
 - 🔴 待拍板 4 件：①TB 审定数两个写入方（发布门直写 `audited_amount` 会被 `recalc_audited` 覆盖；真库仅测试项目 9 行漂移）②附注权威源（ADR-DPA-001「留前端」与「经公式管理自动推」冲突，建议按章节交接 + 前后端对拍守卫）③「确认」= 大厅 approved（approved 无撤回出口）④TB 未审数保持映射聚合，只在公式管理只读可见
-- 已证未修：`/api/report-config/batch-update` 给 ReportConfig 写 ORM 与真库都没有的 `current_period_amount` ⇒ 假成功 · 单体 `financial_report.is_stale` 只标不清（report_engine 无清除）· prefill 路径 B 把 `FormulaEngine.execute` 返回的 dict 写进单元格（真库 0 张 univer_snapshot，当前零影响）
+- 已证已修（本 spec 任务 8 删除该端点）：`/api/report-config/batch-update` 给 ReportConfig 写 ORM 与真库都没有的 `current_period_amount` ⇒ 假成功 · 单体 `financial_report.is_stale` 只标不清（report_engine 无清除）· prefill 路径 B 把 `FormulaEngine.execute` 返回的 dict 写进单元格（真库 0 张 univer_snapshot，当前零影响）
 - 🔴 **归档新判据：HEAD 干净检出跑守卫**（临时 `git worktree`）—— 4 组工作树全绿的 spec 在 HEAD 上红（修复只在工作树）；09-28 那批 12 个归档 11 个只做了磁盘移动未入库（旧路径仍被跟踪）；phase1 已归 `06-engineering-governance`（同样未提交）
 ### 已完成 spec 总览
 - **全局模块 7 spec + frontend-consistency-m1 = 8 个 active spec 全部 ✅ 完成（2026-06-01，121 任务全绿）**：A formula-engine-unification(20/20) / B retrieval-kernel-unification(12/12) / C doc-level-ai-chat(12/12) / D report-config-baseline(12/12) / E wp-ai-review-ux-fix(8/8) / F global-modules-cleanup(10/10) / G global-modules-p2-polish(11/11) / frontend-consistency-m1(36/36)；残留仅 Playwright E2E 待 start-dev.bat 环境

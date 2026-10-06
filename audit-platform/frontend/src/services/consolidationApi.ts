@@ -1059,7 +1059,7 @@ export async function checkConsolBalance(projectId: string, year: number): Promi
 
 /** 合并企业树（三码推导）+ 合并方式识别 + 诊断 + 年度 */
 export async function getWorksheetTree(projectId: string): Promise<ConsolTreeResponse> {
-  return api.get(`${P.worksheet.tree}?project_id=${projectId}`)
+  return api.get(`${P.worksheet.tree}?project_id=${projectId}`, { _dedupe: false } as any)
 }
 
 /** 差额录入可选科目：本树数据叶子试算表科目 ∪ 本树分录明细行科目 */

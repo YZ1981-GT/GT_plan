@@ -623,7 +623,7 @@ import { createConsolRequestGuard } from '@/components/consolidation/composables
 import ReportEquityTable from '@/components/report/ReportEquityTable.vue'
 import { useReportColumns } from '@/views/composables/useReportColumns'
 import { handleApiError } from '@/utils/errorHandler'
-import { downloadFile } from '@/utils/http'
+import { downloadFile, isRequestCancelled } from '@/utils/http'
 import { useNavigationStack } from '@/composables/useNavigationStack'
 import { useProjectEvents } from '@/composables/useProjectEvents'
 import {
@@ -1272,7 +1272,10 @@ async function loadGroupTree(): Promise<boolean> {
     treeDiagnostics.value = Array.isArray(res?.diagnostics) ? res.diagnostics : []
     diagnosticsDismissed.value = false
     groupTreeLoaded.value = true
-  } catch {
+  } catch (e: any) {
+    // GET 去重导致的 cancel（axios abort）不是真正的失败——静默忽略，
+    // 后发的请求会带回正确数据（http.ts addPending GET 去重机制）。
+    if (isRequestCancelled(e)) return false
     groupTree.value = []
     treeMode.value = null
     treeModeLabel.value = null

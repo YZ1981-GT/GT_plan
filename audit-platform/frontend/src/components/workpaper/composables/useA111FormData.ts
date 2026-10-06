@@ -15,6 +15,7 @@
 import { ref, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { isRequestCancelled } from '@/utils/http'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -127,6 +128,7 @@ export function useA111FormData(wpId: Ref<string>, projectId: Ref<string>) {
       await Promise.all([loadResponses(), loadProjectContext()])
       applyAutoFill()
     } catch (e: any) {
+      if (isRequestCancelled(e)) return
       error.value = e?.message || '数据加载失败'
     } finally {
       loading.value = false
