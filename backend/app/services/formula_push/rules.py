@@ -103,16 +103,29 @@ class PushTarget:
     fields: tuple[str, ...] = ()
     section_by_template: tuple[tuple[str, str], ...] = ()
     table: str | None = None
+    table_by_template: tuple[tuple[str, str], ...] = ()
 
     @property
     def sections(self) -> dict[str, str]:
         return dict(self.section_by_template)
 
+    @property
+    def tables_by_template(self) -> dict[str, str]:
+        return dict(self.table_by_template)
+
+    def resolve_table(self, template_type: str | None) -> str | None:
+        """按准则变体选表名：``table_by_template[template_type]`` 优先，回退 ``table``。"""
+        if template_type and self.table_by_template:
+            tbl = dict(self.table_by_template).get(template_type)
+            if tbl:
+                return tbl
+        return self.table
+
     def identity(self) -> tuple:
         """「写同一目标」判重键。"""
         if self.domain == "workpaper":
             return ("workpaper", self.wp_code, self.item_id)
-        return ("note", self.table, self.section_by_template)
+        return ("note", self.table, self.table_by_template, self.section_by_template)
 
 
 @dataclass(frozen=True)
@@ -269,8 +282,22 @@ def _check_target(rid: str, wp_code: str | None, raw: Any, errors: list[str]) ->
     if not all(isinstance(v, str) and v for v in sections.values()):
         errors.append(f"{rid}: section_by_template 章节号必须是非空字符串")
     table = raw.get("table")
-    if not isinstance(table, str) or not table:
-        errors.append(f"{rid}: 附注目标缺 table")
+    # table_by_template（可选）：上市/国企主表名不同时按变体声明
+    table_by_tmpl = raw.get("table_by_template")
+    if table_by_tmpl is not None:
+        if not isinstance(table_by_tmpl, Mapping) or not table_by_tmpl:
+            errors.append(f"{rid}: table_by_template 必须是非空对象")
+            table_by_tmpl = {}
+        bad_tkeys = sorted(set(table_by_tmpl) - set(TEMPLATE_TYPES))
+        if bad_tkeys:
+            errors.append(f"{rid}: table_by_template 键 {bad_tkeys} 不在 {TEMPLATE_TYPES}")
+        if not all(isinstance(v, str) and v for v in table_by_tmpl.values()):
+            errors.append(f"{rid}: table_by_template 表名必须是非空字符串")
+    else:
+        table_by_tmpl = {}
+    # table 在无 table_by_template 时必填；有 table_by_template 时可选（兼容回退）
+    if not table_by_tmpl and (not isinstance(table, str) or not table):
+        errors.append(f"{rid}: 附注目标缺 table（无 table_by_template 时 table 必填）")
     from app.services.formula_push import note_writer
 
     unknown_fields = sorted(set(fields) - set(note_writer.NOTE_FIELDS))
@@ -280,7 +307,8 @@ def _check_target(rid: str, wp_code: str | None, raw: Any, errors: list[str]) ->
             f"（可选 {sorted(note_writer.NOTE_FIELDS)}）"
         )
     return PushTarget(domain=domain, rows=rows, fields=tuple(fields), table=table,
-                      section_by_template=tuple(sorted(sections.items())))
+                      section_by_template=tuple(sorted(sections.items())),
+                      table_by_template=tuple(sorted(table_by_tmpl.items())))
 
 
 def _check_source(

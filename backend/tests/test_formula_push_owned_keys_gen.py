@@ -38,17 +38,21 @@ def _run_gen(tmp_path: Path, *, rules: dict | None = None, check: bool = False) 
     return subprocess.run(args, capture_output=True, encoding="utf-8", errors="replace", env=env, timeout=30)
 
 
-def test_real_rules_generate_51_keys(tmp_path: Path):
-    """真实规则清单生成 51 个独占键（E1 27 + K1 3 + Tier A 21）。"""
+def test_real_rules_generate_current_keys(tmp_path: Path):
+    """真实规则清单生成当前全部独占键，数量由规则清单现算。"""
+    from scripts.gen.gen_formula_push_owned_keys import compute_owned
+
     result = _run_gen(tmp_path)
     assert result.returncode == 0, result.stderr
-    assert "51 个键" in result.stdout
+    expected = compute_owned(RULES_PATH)
+    expected_count = sum(len(items) for items in expected.values())
+    assert f"{expected_count} 个键" in result.stdout
     output = (tmp_path / "output.ts").read_text("utf-8")
     assert "FORMULA_PUSH_OWNED" in output
     assert "'E1-adj-tb-amount-ending'" in output
     assert "'E1-adj-total-1001'" in output
     assert "'K1-1-audited-receivable'" in output
-    # Tier A 锚点
+    # 当前批次锚点
     assert "'D1-adj-tb-amount'" in output
     assert "'I1-1-tb-cost'" in output
 

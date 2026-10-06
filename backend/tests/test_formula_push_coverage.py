@@ -42,21 +42,43 @@ def test_l3_codes_equal_registered_codes():
     assert l3_codes == registered, f"L3 {l3_codes} != 注册表 {registered}"
 
 
+def test_coverage_rule_counts_and_note_flags_match_registry_rules():
+    """清册的规则统计必须与规则清单逐编码一致。"""
+    from app.services.formula_push.bindings import supported_wp_codes
+    from app.services.formula_push.rules import load_rules
+
+    coverage = json.loads(COVERAGE_PATH.read_text("utf-8"))
+    entries = {entry["wp_code"]: entry for entry in coverage["entries"]}
+    rules = load_rules()
+    by_code: dict[str, list] = {code: [] for code in supported_wp_codes()}
+    for rule in rules:
+        by_code.setdefault(rule.wp_code, []).append(rule)
+
+    assert set(by_code) == set(supported_wp_codes())
+    assert set(entries) == set(supported_wp_codes())
+    assert all(by_code[code] for code in supported_wp_codes())
+    for code in supported_wp_codes():
+        entry = entries[code]
+        code_rules = by_code[code]
+        assert entry["rule_count"] == len(code_rules), code
+        assert entry["has_note_rules"] == any(rule.target.domain == "note" for rule in code_rules), code
+
+
 def test_no_item_id_belongs_to_two_wp_codes():
     """每个推送目标 item_id 只属于一个 wp_code（不跨批次）。"""
-    from app.services.formula_push.rules import RULES_PATH, load_rules
+    from app.services.formula_push.rules import load_rules
 
     rules = load_rules()
     seen: dict[str, str] = {}
-    for r in rules:
-        if r.target.domain != "workpaper":
+    for rule in rules:
+        if rule.target.domain != "workpaper":
             continue
-        item = r.target.item_id
+        item = rule.target.item_id
         if item in seen:
-            assert seen[item] == r.wp_code, (
-                f"item_id {item} 被 {seen[item]} 和 {r.wp_code} 两个批次的规则写"
+            assert seen[item] == rule.wp_code, (
+                f"item_id {item} 被 {seen[item]} 和 {rule.wp_code} 两个批次的规则写"
             )
-        seen[item] = r.wp_code
+        seen[item] = rule.wp_code
 
 
 def test_check_mode_idempotent():

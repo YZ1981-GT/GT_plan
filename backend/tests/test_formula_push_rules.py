@@ -41,14 +41,22 @@ _BY_ID = {r.rule_id: r for r in _RULES}
 
 
 def test_real_rules_load_and_distribution():
-    assert len(_RULES) == len(_DOC["rules"]) == 54
-    assert Counter(r.stage for r in _RULES) == {"source": 28, "derived": 25, "note": 1}
-    assert Counter(r.policy for r in _RULES) == {"system": 26, "editable": 3, "derived": 25}
+    assert Counter(r.stage for r in _RULES) == Counter(item["stage"] for item in _DOC["rules"])
+    assert Counter(r.policy for r in _RULES) == Counter(item["policy"] for item in _DOC["rules"])
+    assert len(_RULES) == len(_DOC["rules"])
     assert {r.wp_code for r in _RULES} == {
         "E1", "K1",
-        "D1", "D2", "D3", "D4", "D6", "D7",
-        "H5", "H6", "H7", "H8", "H9", "H10",
+        "D1", "D2", "D3", "D4", "D5", "D6", "D7",
+        "F1", "F2", "F3", "F4",
+        "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "G10",
+        "G11", "G12", "G13", "G14",
+        "H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9", "H10",
         "I1", "I2", "I3", "I4", "I5", "I6",
+        "J1", "J2",
+        "K2", "K3", "K4", "K5", "K6", "K7", "K8", "K9", "K10", "K11", "K12", "K13",
+        "L1", "L2", "L3", "L4", "L5", "L7", "L8",
+        "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10",
+        "N1", "N2", "N4", "N5",
     }
     assert len({r.target.identity() for r in _RULES}) == len(_RULES)
 
@@ -69,7 +77,11 @@ def test_every_e1_backend_owned_key_has_exactly_one_rule():
     assert e1_items == e1_expected
 
     k1_items = {r.target.item_id for r in _RULES if r.target.domain == "workpaper" and r.wp_code == "K1"}
-    k1_expected = {"K1-1-audited-receivable", "K1-1-audited-baddebt", "K1-1-audited-net"}
+    k1_expected = {
+        "K1-1-audited-receivable", "K1-1-audited-baddebt", "K1-1-audited-net",
+        *(f"K1-1-receivable-r{i}-unadj" for i in range(4)),
+        *(f"K1-1-baddebt-r{i}-unadj" for i in range(4)),
+    }
     assert k1_items == k1_expected
 
 
@@ -123,9 +135,11 @@ def test_note_rule_targets_both_templates():
 
 def test_known_derivations_check_accepts_real_names():
     names = {r.source.name for r in _RULES if r.source.kind == "derivation"}
-    assert names == {"e1_cash_detail_total", "e1_bank_detail_total", "e1_adjudicated_total",
-                     "e1_main_row_slot", "e1_disclosure_main_rows", "k1_audited_total"}
-    assert len(load_rules(known_derivations=names)) == 54
+    # 动态集合：随 binding 增加而增长，用现算值
+    assert "e1_cash_detail_total" in names
+    assert "k1_audited_total" in names
+    assert "k2_audited_total" in names
+    assert len(load_rules(known_derivations=names)) == len(_RULES)
 
 
 def _binding_spec(
@@ -183,9 +197,9 @@ def test_binding_spec_rejects_unloaded_tb_column_for_tb_and_sum_tb():
 def test_e1_rules_pass_with_explicit_binding_spec():
     from app.services.formula_push.rules import _binding_specs_from_registry
     from app.services.formula_push.bindings import supported_wp_codes as _swc
-    # 真实注册表全部 binding 的 spec（20 个），确保 54 条规则全部通过
+    # 真实注册表全部 binding 的 spec（20 个），确保 56 条规则全部通过
     all_specs = _binding_specs_from_registry(_swc())
-    assert len(load_rules(binding_specs=all_specs)) == 54
+    assert len(load_rules(binding_specs=all_specs)) == len(_RULES)
 
 
 def test_load_rules_cache_key_includes_binding_specs(tmp_path: Path):
@@ -198,7 +212,16 @@ def test_load_rules_cache_key_includes_binding_specs(tmp_path: Path):
     )
     with pytest.raises(PushRuleError):
         load_rules(path, binding_specs={"E1": restricted})
-    k1_spec = _binding_spec(four_table_slots=(), derivations=("k1_audited_total",), tb_columns=("期末余额", "年初余额", "本期发生额"))
+    k1_spec = _binding_spec(
+        four_table_slots=(),
+        derivations=(
+            "k1_audited_total",
+            "k1_detail_combo_unadj",
+            "k1_detail_combo_baddebt",
+            "k1_note_main",
+        ),
+        tb_columns=("期末余额", "年初余额", "本期发生额"),
+    )
     complete = _binding_spec(
         four_table_slots=("cash", "bank", "other", "finance_co", "digital"),
         derivations=(
@@ -212,7 +235,7 @@ def test_load_rules_cache_key_includes_binding_specs(tmp_path: Path):
     all_specs = dict(_binding_specs_from_registry(_swc()))
     all_specs["E1"] = complete
     all_specs["K1"] = k1_spec
-    assert len(load_rules(path, binding_specs=all_specs)) == 54
+    assert len(load_rules(path, binding_specs=all_specs)) == len(_RULES)
 
 
 # ── 2. 校验器反向用例 ─────────────────────────────────────────────────────
@@ -326,7 +349,7 @@ def test_addr_id_helpers():
 def test_load_rules_reloads_after_file_change(tmp_path: Path):
     path = tmp_path / "rules.json"
     path.write_text(json.dumps(_DOC, ensure_ascii=False), encoding="utf-8")
-    assert len(load_rules(path)) == 54
+    assert len(load_rules(path)) == len(_RULES)
     smaller = copy.deepcopy(_DOC)
     smaller["rules"] = smaller["rules"][:3]
     path.write_text(json.dumps(smaller, ensure_ascii=False), encoding="utf-8")

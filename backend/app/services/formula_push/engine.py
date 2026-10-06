@@ -565,7 +565,10 @@ async def _push_note(
     """附注主表推送；返回有写入的章节号。"""
     from app.models.report_models import DisclosureNote
 
-    table_name = rule.target.table
+    table_name = rule.target.resolve_table(sources.template_type) or rule.target.table
+    # section_title 校验用的名称：table_by_template 场景下子表名可能不等于章节标题
+    # （如国企 八、4 章节标题"应收票据"、子表名"应收票据分类"），此时用 rule.target.table（章节级）比较
+    _title_check_name = rule.target.table if rule.target.table_by_template else table_name
     template_type = sources.template_type
     section = rule.target.sections.get(template_type) if template_type else None
     if section is None:
@@ -584,7 +587,7 @@ async def _push_note(
     reason = None
     if note is None:
         reason = f"附注尚未生成「{section} {table_name}」章节（在附注模块生成后下次推送纳入）"
-    elif (note.section_title or "").strip() != table_name:
+    elif (note.section_title or "").strip() != _title_check_name:
         reason = f"附注 {section} 是「{note.section_title}」章节，不是「{table_name}」，未推送"
     elif str(_enum_value(note.status)) in FROZEN_NOTE_STATUSES:
         reason = "附注章节已确认，公式推送不改写"
@@ -605,7 +608,8 @@ async def _push_note(
                 ctx.skip(rule.rule_id, "note", "note", section_addr,
                          f"附注 {section} 章节已有自定义数据（{blocked}），建骨架会遮挡原数据，跳过")
                 return None
-            skeleton = note_writer.build_main_skeleton(template_type, section, table_name)
+            skeleton = note_writer.build_main_skeleton(template_type, section, table_name,
+                                                       fields=rule.target.fields)
             if skeleton is None:
                 ctx.skip(rule.rule_id, "note", "note", section_addr,
                          f"附注模板「{template_type}」中没有「{table_name}」表定义，无法建骨架")

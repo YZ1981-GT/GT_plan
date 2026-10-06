@@ -1503,6 +1503,24 @@ jobs:
         run: |
           node backend/scripts/check/runtime_import_smoke.mjs
 
+  formula-push-coverage-drift:
+    # 公式推送 P0：注册表、规则清单和提交的 coverage 清册必须同源一致。
+    # 生成器为只读 --check；禁止在 CI 中 --write + git diff，避免时间戳/生成副作用把
+    # 永远失败误当成治理信号。守卫自身的规则统计测试同时锁住 H1 等新增 binding。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install formula push dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Check formula push coverage ledger
+        run: python backend/scripts/gen/gen_formula_push_coverage.py --check
+      - name: Run formula push coverage guard tests
+        run: python -m pytest backend/tests/test_formula_push_coverage.py -q
+
   coverage-drift-check:
     # P0-3: Coverage Ledger 漂移守卫（STRICT 模式）
     # 检测底稿能力接线覆盖率漂移

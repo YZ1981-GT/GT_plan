@@ -74,7 +74,18 @@ def _find_template_table(
 NOTE_FIELDS: dict[str, tuple[str, str]] = {
     "end_amount": ("ending", "end"),
     "prior_amount": ("opening", "prior"),
+    # ── D1~D7 应收票据族六字段（batch-e Task 1~2） ─────────────────────
+    # value_key = 字段名本身（六字段每个取不同值，不像 end_amount/prior_amount 只有两个值）
+    "end_balance": ("end_balance", "end"),       # 期末余额
+    "end_provision": ("end_provision", "end"),   # 期末坏账准备
+    "end_book_value": ("end_book_value", "end"), # 期末账面价值
+    "prior_balance": ("prior_balance", "prior"),       # 期初余额
+    "prior_provision": ("prior_provision", "prior"),   # 期初坏账准备
+    "prior_book_value": ("prior_book_value", "prior"), # 期初账面价值
 }
+
+#: 默认骨架字段——不指定 fields 时 build_main_skeleton 沿用此列表（E1 等旧规则向后兼容）。
+_DEFAULT_SKELETON_FIELDS: list[str] = ["end_amount", "prior_amount"]
 
 
 @dataclass(frozen=True)
@@ -84,10 +95,14 @@ class MainSkeleton:
     columns: list[dict]
 
 
-def build_main_skeleton(template_type: str, section: str, table_name: str) -> MainSkeleton | None:
+def build_main_skeleton(
+    template_type: str, section: str, table_name: str,
+    fields: Sequence[str] | None = None,
+) -> MainSkeleton | None:
     """按规则声明的附注章节和表名构建主表骨架。
 
-    产出 rows = [{label, *NOTE_FIELDS: None, is_total?}]，columns 与模板定义一致。
+    产出 rows = [{label, *fields: None, is_total?}]，columns 与模板定义一致。
+    ``fields`` 指定时只为这些字段建列（D1 六字段等），为 None 时用旧默认（end_amount/prior_amount）。
     找不到模板类型、章节或表返回 None；章节不再由模板类型隐式推导。
 
     spec: formula-push-all-subjects-rollout · design §六 6.3 · 需求 5.2
@@ -99,11 +114,13 @@ def build_main_skeleton(template_type: str, section: str, table_name: str) -> Ma
         return None
     if tbl_def is None:
         return None
+    # 确定要建的字段列表
+    field_names = list(fields) if fields else _DEFAULT_SKELETON_FIELDS
     rows: list[dict] = []
     for row_def in tbl_def.get("rows") or []:
         label = row_def.get("label", "")
         row: dict = {"label": label}
-        row.update({field_name: None for field_name in NOTE_FIELDS})
+        row.update({fn: None for fn in field_names})
         if row_def.get("is_total"):
             row["is_total"] = True
         rows.append(row)

@@ -5,10 +5,33 @@
     "D2",
     "D3",
     "D4",
+    "D5",
     "D6",
     "D7",
     "E1",
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "G1",
+    "G10",
+    "G11",
+    "G12",
+    "G13",
+    "G14",
+    "G2",
+    "G3",
+    "G4",
+    "G5",
+    "G6",
+    "G7",
+    "G8",
+    "G9",
+    "H1",
     "H10",
+    "H2",
+    "H3",
+    "H4",
     "H5",
     "H6",
     "H7",
@@ -20,7 +43,42 @@
     "I4",
     "I5",
     "I6",
-    "K1"
+    "J1",
+    "J2",
+    "K1",
+    "K10",
+    "K11",
+    "K12",
+    "K13",
+    "K2",
+    "K3",
+    "K4",
+    "K5",
+    "K6",
+    "K7",
+    "K8",
+    "K9",
+    "L1",
+    "L2",
+    "L3",
+    "L4",
+    "L5",
+    "L7",
+    "L8",
+    "M1",
+    "M10",
+    "M2",
+    "M3",
+    "M4",
+    "M5",
+    "M6",
+    "M7",
+    "M8",
+    "M9",
+    "N1",
+    "N2",
+    "N4",
+    "N5"
   ],
   "entries": [
     {
@@ -30,9 +88,9 @@
         "1121",
         "1231-01"
       ],
-      "rule_count": 1,
+      "rule_count": 2,
       "owned_key_count": 1,
-      "has_note_rules": false
+      "has_note_rules": true
     },
     {
       "wp_code": "D2",
@@ -41,9 +99,9 @@
         "1122",
         "1231-02"
       ],
-      "rule_count": 1,
+      "rule_count": 2,
       "owned_key_count": 1,
-      "has_note_rules": false
+      "has_note_rules": true
     },
     {
       "wp_code": "D3",
@@ -51,9 +109,9 @@
       "account_prefixes": [
         "2203"
       ],
-      "rule_count": 1,
+      "rule_count": 2,
       "owned_key_count": 1,
-      "has_note_rules": false
+      "has_note_rules": true
     },
     {
       "wp_code": "D4",
@@ -62,9 +120,19 @@
         "6001",
         "6051"
       ],
-      "rule_count": 2,
+      "rule_count": 3,
       "owned_key_count": 2,
-      "has_note_rules": false
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "D5",
+      "level": "L3",
+      "account_prefixes": [
+        "1124"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
     },
     {
       "wp_code": "D6",
@@ -72,9 +140,9 @@
       "account_prefixes": [
         "1141"
       ],
-      "rule_count": 1,
+      "rule_count": 2,
       "owned_key_count": 1,
-      "has_note_rules": false
+      "has_note_rules": true
     },
     {
       "wp_code": "D7",
@@ -82,9 +150,9 @@
       "account_prefixes": [
         "2205"
       ],
-      "rule_count": 1,
+      "rule_count": 2,
       "owned_key_count": 1,
-      "has_note_rules": false
+      "has_note_rules": true
     },
     {
       "wp_code": "E1",
@@ -99,14 +167,241 @@
       "has_note_rules": true
     },
     {
+      "wp_code": "F1",
+      "level": "L3",
+      "account_prefixes": [
+        "1123"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "F2",
+      "level": "L3",
+      "account_prefixes": [
+        "1401",
+        "1402",
+        "1403",
+        "1405",
+        "1408",
+        "1461"
+      ],
+      "rule_count": 7,
+      "owned_key_count": 6,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "F3",
+      "level": "L3",
+      "account_prefixes": [
+        "2201"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "F4",
+      "level": "L3",
+      "account_prefixes": [
+        "2202"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G1",
+      "level": "L3",
+      "account_prefixes": [
+        "1101"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G10",
+      "level": "L3",
+      "account_prefixes": [
+        "2101"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G11",
+      "level": "L3",
+      "account_prefixes": [
+        "6111"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G12",
+      "level": "L3",
+      "account_prefixes": [
+        "6103"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G13",
+      "level": "L3",
+      "account_prefixes": [
+        "6101"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G14",
+      "level": "L3",
+      "account_prefixes": [
+        "6702"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G2",
+      "level": "L3",
+      "account_prefixes": [
+        "1132"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G3",
+      "level": "L3",
+      "account_prefixes": [
+        "1131"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G4",
+      "level": "L3",
+      "account_prefixes": [
+        "1504"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G5",
+      "level": "L3",
+      "account_prefixes": [
+        "1531"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G6",
+      "level": "L3",
+      "account_prefixes": [
+        "1503"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G7",
+      "level": "L3",
+      "account_prefixes": [
+        "1511"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G8",
+      "level": "L3",
+      "account_prefixes": [
+        "1503"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G9",
+      "level": "L3",
+      "account_prefixes": [
+        "1519"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "H1",
+      "level": "L3",
+      "account_prefixes": [
+        "1601",
+        "1602",
+        "1603"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 2,
+      "has_note_rules": false
+    },
+    {
       "wp_code": "H10",
       "level": "L3",
       "account_prefixes": [
         "6115"
       ],
-      "rule_count": 1,
-      "owned_key_count": 1,
+      "rule_count": 3,
+      "owned_key_count": 3,
       "has_note_rules": false
+    },
+    {
+      "wp_code": "H2",
+      "level": "L3",
+      "account_prefixes": [
+        "1604"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "H3",
+      "level": "L3",
+      "account_prefixes": [
+        "1521"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "H4",
+      "level": "L3",
+      "account_prefixes": [
+        "1605"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
     },
     {
       "wp_code": "H5",
@@ -114,18 +409,18 @@
       "account_prefixes": [
         "1631"
       ],
-      "rule_count": 1,
-      "owned_key_count": 1,
+      "rule_count": 3,
+      "owned_key_count": 3,
       "has_note_rules": false
     },
     {
       "wp_code": "H6",
       "level": "L3",
       "account_prefixes": [
-        "1606"
+        "1606B"
       ],
-      "rule_count": 1,
-      "owned_key_count": 1,
+      "rule_count": 3,
+      "owned_key_count": 3,
       "has_note_rules": false
     },
     {
@@ -134,8 +429,8 @@
       "account_prefixes": [
         "1621"
       ],
-      "rule_count": 1,
-      "owned_key_count": 1,
+      "rule_count": 3,
+      "owned_key_count": 3,
       "has_note_rules": false
     },
     {
@@ -144,18 +439,18 @@
       "account_prefixes": [
         "1901"
       ],
-      "rule_count": 1,
-      "owned_key_count": 1,
+      "rule_count": 3,
+      "owned_key_count": 3,
       "has_note_rules": false
     },
     {
       "wp_code": "H9",
       "level": "L3",
       "account_prefixes": [
-        "2205"
+        "2802"
       ],
-      "rule_count": 1,
-      "owned_key_count": 1,
+      "rule_count": 3,
+      "owned_key_count": 3,
       "has_note_rules": false
     },
     {
@@ -164,20 +459,20 @@
       "account_prefixes": [
         "1701",
         "1702",
-        "1703"
+        "1703B"
       ],
-      "rule_count": 3,
-      "owned_key_count": 3,
+      "rule_count": 5,
+      "owned_key_count": 5,
       "has_note_rules": false
     },
     {
       "wp_code": "I2",
       "level": "L3",
       "account_prefixes": [
-        "1717"
+        "1704"
       ],
-      "rule_count": 1,
-      "owned_key_count": 1,
+      "rule_count": 3,
+      "owned_key_count": 3,
       "has_note_rules": false
     },
     {
@@ -186,9 +481,9 @@
       "account_prefixes": [
         "1711"
       ],
-      "rule_count": 1,
-      "owned_key_count": 1,
-      "has_note_rules": false
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
     },
     {
       "wp_code": "I4",
@@ -196,18 +491,18 @@
       "account_prefixes": [
         "1801"
       ],
-      "rule_count": 1,
-      "owned_key_count": 1,
+      "rule_count": 3,
+      "owned_key_count": 3,
       "has_note_rules": false
     },
     {
       "wp_code": "I5",
       "level": "L3",
       "account_prefixes": [
-        "1911"
+        "1901"
       ],
-      "rule_count": 1,
-      "owned_key_count": 1,
+      "rule_count": 3,
+      "owned_key_count": 3,
       "has_note_rules": false
     },
     {
@@ -221,15 +516,366 @@
       "has_note_rules": false
     },
     {
+      "wp_code": "J1",
+      "level": "L3",
+      "account_prefixes": [
+        "2211"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "J2",
+      "level": "L3",
+      "account_prefixes": [
+        "2611"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
       "wp_code": "K1",
       "level": "L3",
       "account_prefixes": [
         "1221",
         "1231"
       ],
-      "rule_count": 3,
+      "rule_count": 12,
       "owned_key_count": 3,
-      "has_note_rules": false
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K10",
+      "level": "L3",
+      "account_prefixes": [
+        "6117"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K11",
+      "level": "L3",
+      "account_prefixes": [
+        "6701"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K12",
+      "level": "L3",
+      "account_prefixes": [
+        "6301"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K13",
+      "level": "L3",
+      "account_prefixes": [
+        "6711"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K2",
+      "level": "L3",
+      "account_prefixes": [
+        "1901"
+      ],
+      "rule_count": 5,
+      "owned_key_count": 4,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K3",
+      "level": "L3",
+      "account_prefixes": [
+        "2241"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K4",
+      "level": "L3",
+      "account_prefixes": [
+        "2261"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K5",
+      "level": "L3",
+      "account_prefixes": [
+        "2801"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K6",
+      "level": "L3",
+      "account_prefixes": [
+        "1481",
+        "2245"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K7",
+      "level": "L3",
+      "account_prefixes": [
+        "2401"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K8",
+      "level": "L3",
+      "account_prefixes": [
+        "6601"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K9",
+      "level": "L3",
+      "account_prefixes": [
+        "6602"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "L1",
+      "level": "L3",
+      "account_prefixes": [
+        "2001"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "L2",
+      "level": "L3",
+      "account_prefixes": [
+        "2231"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "L3",
+      "level": "L3",
+      "account_prefixes": [
+        "2501"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "L4",
+      "level": "L3",
+      "account_prefixes": [
+        "2502"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "L5",
+      "level": "L3",
+      "account_prefixes": [
+        "2701"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "L7",
+      "level": "L3",
+      "account_prefixes": [
+        "2801"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "L8",
+      "level": "L3",
+      "account_prefixes": [
+        "6603"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M1",
+      "level": "L3",
+      "account_prefixes": [
+        "2232"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M10",
+      "level": "L3",
+      "account_prefixes": [
+        "4501"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M2",
+      "level": "L3",
+      "account_prefixes": [
+        "4001"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M3",
+      "level": "L3",
+      "account_prefixes": [
+        "4002"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M4",
+      "level": "L3",
+      "account_prefixes": [
+        "4101"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M5",
+      "level": "L3",
+      "account_prefixes": [
+        "4103"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M6",
+      "level": "L3",
+      "account_prefixes": [
+        "4104"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M7",
+      "level": "L3",
+      "account_prefixes": [
+        "4201"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M8",
+      "level": "L3",
+      "account_prefixes": [
+        "4301"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M9",
+      "level": "L3",
+      "account_prefixes": [
+        "4401"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "N1",
+      "level": "L3",
+      "account_prefixes": [
+        "1811"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "N2",
+      "level": "L3",
+      "account_prefixes": [
+        "2221"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "N4",
+      "level": "L3",
+      "account_prefixes": [
+        "6403"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "N5",
+      "level": "L3",
+      "account_prefixes": [
+        "6801"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
     }
   ]
 }
