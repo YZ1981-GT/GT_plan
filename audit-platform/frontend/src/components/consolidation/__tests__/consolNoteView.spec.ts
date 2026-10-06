@@ -156,7 +156,7 @@ describe('ConsolNoteTab 生产接线守卫', () => {
   })
 
   it('重新汇总走真实 consolidation 路由，回载事件传模板准则而非企业代码', () => {
-    expect(component).toContain('P_consol.notes.reaggregate(props.projectId, props.year)')
+    expect(component).toContain('P_consol.notes.reaggregate(')
     expect(component).not.toContain('/api/disclosure-notes/${props.projectId}/${props.year}/reaggregate')
     const body = component.slice(component.indexOf('async function handleReaggregate'), component.indexOf('function addNoteRow'))
     expect(body).toContain('standard: props.standard')
@@ -170,17 +170,16 @@ describe('ConsolNoteTab 生产接线守卫', () => {
     expect(component).toContain('getConsolNoteBreakdown(')
     expect(component).toContain('@input="onNoteCellInput(row, hi)"')
     expect(component).toContain('notePayload(sec.savedData, sec.headers, sec.editRows)')
-    expect(component).toContain('toEditRows(headers, rows, (savedContent as any).manual_cells)')
+    expect(component).toContain('toEditRows(headers, rows, savedContent.manual_cells)')
     expect(component).not.toContain('P_cn.applyFormulas(')
     expect(component).not.toContain('P_cn.refresh(')
   })
 
   it('合并页按企业树年度传给附注，并让顶部“查看”调用新附注差额而非旧汇总估算', () => {
-    expect(index).toContain(':year="treeYear ?? projectInfo.year"')
+    expect(index).toContain(':year="effectiveConsolYear()"')
     expect(index).toContain("if (activeTab.value === 'consol_note')")
     expect(index).toContain('noteTab.openNoteBreakdownForSelection()')
     expect(index).toContain('<ConsolReportBreakdownView')
-    expect(index).toContain(':year="treeYear"')
   })
 
   it('400/423 由附注页显示后端具体原因，服务层抑制全局重复提示', () => {

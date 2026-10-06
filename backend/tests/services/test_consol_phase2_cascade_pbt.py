@@ -105,9 +105,14 @@ def _patch_all(
 
 
 def _make_db() -> AsyncMock:
-    """构造带 AsyncMock commit 的 db 替身。"""
+    """构造带 commit 和项目模板查询结果的 db 替身。"""
     db = AsyncMock()
     db.commit = AsyncMock(return_value=None)
+    # 级联开启 notes 后会解析项目真实 Listed/SOE 模板；为编排器测试提供
+    # 一个确定的项目口径，避免把未配置的 AsyncMock 协程当作字符串。
+    template_result = MagicMock()
+    template_result.scalar_one_or_none.return_value = "soe_consolidated"
+    db.execute.return_value = template_result
     return db
 
 
@@ -318,7 +323,7 @@ class TestCascadeUnit:
 
     @pytest.mark.asyncio
     async def test_notes_flag_disabled_skips_v2_but_marks_step(self):
-        """CONSOL_NOTES_V2_ENABLED=False → 不调 V2，notes 仍记为完成（skipped 终态）。"""
+        """CONSOL_NOTES_V2_ENABLED=False → 不调 V2，notes 进 steps_skipped（非 steps_completed）。"""
         patchers = _patch_all(node_count=2, notes_v2_enabled=False)
         v2_mock = AsyncMock(return_value=[])
         patchers["generate_full_consol_notes"] = patch(
@@ -330,7 +335,8 @@ class TestCascadeUnit:
                 patchers["settings"]:
             result = await refresh_all(_make_db(), uuid4(), 2025)
 
-        assert STEP_NOTES in result.steps_completed
+        assert STEP_NOTES not in result.steps_completed
+        assert STEP_NOTES in result.steps_skipped
         v2_mock.assert_not_awaited()
 
     @pytest.mark.asyncio

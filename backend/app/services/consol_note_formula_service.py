@@ -185,19 +185,38 @@ def report_rows_by_name(rows: Iterable[ReportRow]) -> tuple[dict[str, ReportRow]
     return unique, ambiguous
 
 
-def value_column(headers: Sequence[Any], report_type: str) -> tuple[int | None, str | None]:
-    """取数列：资产负债表项目取唯一期末列，利润表项目取唯一本期列。表头有空列名（多级表头未展开）⇒ 不确定。"""
+def value_column(
+    headers: Sequence[Any],
+    report_type: str,
+    column_groups: Sequence[dict] | None = None,
+) -> tuple[int | None, str | None]:
+    """取数列：资产负债表项目取唯一期末列，利润表项目取唯一本期列。
+
+    优先按 ``_column_groups`` 分组名定位（与单体附注同结构），
+    降级到 ``headers`` 关键词匹配。多级表头有 ``_column_groups`` 后不再因空列名拒绝。
+    """
+    what = "期末" if report_type == "balance_sheet" else "本期"
+    wanted_groups = CLOSING_HEADERS if report_type == "balance_sheet" else PERIOD_HEADERS
+
+    # ── 路径 A：按 _column_groups 定位 ──
+    if column_groups:
+        hits = [g for g in column_groups if header_key(g.get("group", "")) in wanted_groups]
+        if len(hits) == 1:
+            return hits[0]["start"], None
+        if len(hits) > 1:
+            return None, f"_column_groups 中{what}分组不止一个"
+        # 无命中 ⇒ 降级到路径 B
+
+    # ── 路径 B：按 headers 关键词匹配 ──
     keys = [header_key(h) for h in headers]
     if any(not k for k in keys[1:]):
         return None, "表头有空列名（多级表头未展开），列不确定"
-    wanted = CLOSING_HEADERS if report_type == "balance_sheet" else PERIOD_HEADERS
-    hits = [i for i, k in enumerate(keys) if i and k in wanted]
-    what = "期末" if report_type == "balance_sheet" else "本期"
-    if not hits:
+    hits_idx = [i for i, k in enumerate(keys) if i and k in wanted_groups]
+    if not hits_idx:
         return None, f"没有{what}列（表头：{'、'.join(keys[1:])}）"
-    if len(hits) > 1:
+    if len(hits_idx) > 1:
         return None, f"{what}列不止一个"
-    return hits[0], None
+    return hits_idx[0], None
 
 
 def total_row(rows: Sequence[Any]) -> tuple[int | None, str | None]:
@@ -283,7 +302,7 @@ def plan_seed(
             continue
         # (a) 主表（该章第一张表）合计行 ⇒ 报表行
         main = members[0]
-        col, why_col = value_column(main.get("headers") or [], row.report_type)
+        col, why_col = value_column(main.get("headers") or [], row.report_type, main.get("_column_groups"))
         total, why_total = total_row(main.get("rows") or [])
         if col is None or total is None:
             skip(main, why_col or why_total or "")
@@ -300,7 +319,7 @@ def plan_seed(
                 continue
             codes_of = {label_key(r.get("label")): r.get("account_codes") or []
                         for r in source.get("rows") or [] if isinstance(r, dict)}
-            col, why_col = value_column(table.get("headers") or [], row.report_type)
+            col, why_col = value_column(table.get("headers") or [], row.report_type, table.get("_column_groups"))
             for i, cells in enumerate(table.get("rows") or []):
                 codes = codes_of.get(label_key(_first_cell(cells)))
                 if not codes:
@@ -636,15 +655,24 @@ async def note_cell_values(
     return out
 
 
-async def _project_template(db: AsyncSession, project_id: UUID, standard: str | None) -> str:
-    """附注模板随项目口径（与合并报表同一判定）；调用方显式传了不同的模板 ⇒ 400（两套模板行结构不同，混用即错位）。"""
+async def resolve_note_template_type(
+    db: AsyncSession, project_id: UUID, requested: str | None = None,
+) -> str:
+    """解析项目实际合并附注模板，并拒绝显式口径冲突。"""
     from app.services.consol_report_values import resolve_consol_standard
 
-    tt = note_template_type(await resolve_consol_standard(db, project_id))
-    if standard and note_template_type(standard) != tt:
-        raise NoteFormulaError(f"本项目合并附注按{('上市版' if tt == 'listed' else '国企版')}模板（{tt}），"
-                               f"不能按 {standard} 取数")
-    return tt
+    actual = note_template_type(await resolve_consol_standard(db, project_id))
+    if requested and note_template_type(requested) != actual:
+        label = "上市版" if actual == "listed" else "国企版"
+        raise NoteFormulaError(
+            f"本项目合并附注按{label}模板（{actual}），不能按 {requested} 取数"
+        )
+    return actual
+
+
+async def _project_template(db: AsyncSession, project_id: UUID, standard: str | None) -> str:
+    """附注模板随项目口径；保留内部旧名称供现有调用方使用。"""
+    return await resolve_note_template_type(db, project_id, standard)
 
 
 async def _active_formulas(db: AsyncSession, template_type: str, section_id: str) -> list[ConsolNoteFormula]:
@@ -742,8 +770,12 @@ async def note_breakdown(
     db: AsyncSession, project_id: UUID, year: int | None, section_id: str, *,
     node_key: str | None = None, standard: str | None = None,
     _include_internal_scope: bool = False,
+    _view_context: "ViewContext | None" = None,
 ) -> dict:
-    """某章节有公式的单元格：个别数汇总 / 调整 / 抵销 / 合并数，及所选汇总节点各直接子节点的贡献（需求 6.3）。"""
+    """某章节有公式的单元格：个别数汇总 / 调整 / 抵销 / 合并数，及所选汇总节点各直接子节点的贡献（需求 6.3）。
+
+    ``_view_context``: 预构建的合并计算上下文（批量场景传入避免逐章节重建树）。
+    """
     from app.services.consol_report_view_service import ViewError, find_node
 
     tt = await _project_template(db, project_id, standard)
@@ -751,7 +783,7 @@ async def note_breakdown(
     if table is None:
         raise NoteFormulaError(f"合并附注模板（{tt}）中没有表格 {section_id}", status=404)
     await ensure_seeded(db, tt)
-    ctx = await _context(db, project_id, year)
+    ctx = _view_context if _view_context is not None else await _context(db, project_id, year)
     try:
         node = find_node(ctx.basis.tree, node_key)
     except ViewError as exc:
@@ -795,18 +827,35 @@ async def note_breakdown(
 
 
 def _manual_cells(data: dict) -> set[tuple[int, int]]:
+    """解析人工保护坐标；保护元数据损坏时必须让调用方可观察。"""
+    raw = data.get("manual_cells")
+    if raw is None:
+        return set()
+    if not isinstance(raw, list):
+        raise NoteFormulaError("manual_cells 必须是数组")
+
     out: set[tuple[int, int]] = set()
-    for item in data.get("manual_cells") or []:
+    for index, item in enumerate(raw):
         try:
             if isinstance(item, dict):
-                out.add((int(item["row"]), int(item["col"])))
+                if "row" not in item or "col" not in item:
+                    raise ValueError("缺少 row 或 col")
+                row_value, col_value = item["row"], item["col"]
             elif isinstance(item, (list, tuple)) and len(item) == 2:
-                out.add((int(item[0]), int(item[1])))
-            elif isinstance(item, str) and ":" in item:
-                r, c = item.split(":", 1)
-                out.add((int(r), int(c)))
-        except (KeyError, TypeError, ValueError):
-            continue
+                row_value, col_value = item
+            elif isinstance(item, str) and item.count(":") == 1:
+                row_value, col_value = item.split(":", 1)
+            else:
+                raise ValueError("应为 {row, col}、[row, col] 或 row:col")
+
+            if isinstance(row_value, bool) or isinstance(col_value, bool):
+                raise ValueError("行列坐标不能是布尔值")
+            row, col = int(row_value), int(col_value)
+            if row < 0 or col < 0:
+                raise ValueError("行列坐标不能为负数")
+        except (KeyError, TypeError, ValueError) as exc:
+            raise NoteFormulaError(f"manual_cells 第 {index + 1} 项无效：{exc}") from exc
+        out.add((row, col))
     return out
 
 
@@ -907,11 +956,21 @@ def fill_rows(
 async def fill_by_formula(
     db: AsyncSession, project_id: UUID, year: int, section_id: str, *,
     node_key: str | None = None, standard: str | None = None,
+    template_type: str | None = None,
+    _view_context: "ViewContext | None" = None,
 ) -> dict:
-    """「按公式填入」：按节点把合并数写入 ``consol_note_data``；旧调用不带节点键时使用项目级兼容行。"""
+    """「按公式填入」：按节点把合并数写入 ``consol_note_data``；旧调用不带节点键时使用项目级兼容行。
+
+    ``_view_context``: 预构建的合并计算上下文（批量场景传入避免逐章节重建树）。
+    """
+    if standard and template_type and note_template_type(standard) != note_template_type(template_type):
+        raise NoteFormulaError(
+            f"standard={standard} 与 template_type={template_type} 指向不同附注模板"
+        )
+    requested_template = template_type or standard
     breakdown = await note_breakdown(
-        db, project_id, year, section_id, node_key=node_key, standard=standard,
-        _include_internal_scope=True,
+        db, project_id, year, section_id, node_key=node_key, standard=requested_template,
+        _include_internal_scope=True, _view_context=_view_context,
     )
     tt = breakdown["template_type"]
     is_root_consol = bool(breakdown.get("_is_root_consol")) and breakdown["node_key"] == node_key
@@ -938,10 +997,11 @@ async def fill_by_formula(
     data.update({"headers": headers, "rows": new_rows})
     now = datetime.now(timezone.utc)
     if record is None:
-        db.add(ConsolNoteData(
+        record = ConsolNoteData(
             project_id=project_id, year=breakdown["year"], section_id=section_id,
             node_key=node_key, data=data, is_stale=False, updated_at=now,
-        ))
+        )
+        db.add(record)
     else:
         record.data = data
         record.is_stale = False
@@ -951,9 +1011,79 @@ async def fill_by_formula(
         "project_id": str(project_id),
         "year": breakdown["year"],
         "section_id": section_id,
-        "node_key": node_key,
+        "node_key": record.node_key,
+        "legacy_null": record.node_key is None,
         "template_type": tt,
+        "status": "persisted",
+        "record_id": str(record.id) if record.id else None,
         **summary,
         "is_stale": False,
         "data": data,
+    }
+
+
+async def fill_note_sections(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    section_ids: Sequence[str],
+    *,
+    node_key: str | None = None,
+    standard: str | None = None,
+    template_type: str | None = None,
+) -> dict:
+    """逐章节调用 ``fill_by_formula``，以 SAVEPOINT 隔离单章失败。
+
+    该编排器只负责节点/章节结果和事务边界，金额计算与行形状处理仍全部由
+    ``fill_by_formula`` 完成；调用方在拿到结果后统一 commit。
+    """
+    if standard and template_type and note_template_type(standard) != note_template_type(template_type):
+        raise NoteFormulaError(
+            f"standard={standard} 与 template_type={template_type} 指向不同附注模板"
+        )
+    requested_template = template_type or standard
+    resolved_template = await resolve_note_template_type(db, project_id, requested_template)
+
+    # 预构建合并计算上下文，逐章节循环复用，避免 N 次重建企业树（性能根因修复）。
+    # 构建失败时降级为 None（每章节各自构建），不阻断编排。
+    view_ctx = None
+    try:
+        view_ctx = await _context(db, project_id, year)
+    except Exception:  # noqa: BLE001 - 预构建失败不致命，fill_by_formula 会自行构建
+        pass
+
+    results: list[dict] = []
+    failures: list[dict] = []
+
+    for section_id in dict.fromkeys(section_ids):
+        try:
+            async with db.begin_nested():
+                result = await fill_by_formula(
+                    db,
+                    project_id,
+                    year,
+                    section_id,
+                    node_key=node_key,
+                    standard=resolved_template,
+                    _view_context=view_ctx,
+                )
+            results.append(result)
+        except Exception as exc:  # noqa: BLE001 - 单章节失败不能污染其余章节
+            failures.append({
+                "section_id": section_id,
+                "status": "failed",
+                "error": str(exc),
+            })
+
+    return {
+        "project_id": str(project_id),
+        "year": year,
+        "node_key": node_key,
+        "legacy_null": node_key is None,
+        "template_type": resolved_template,
+        "status": "persisted" if results and not failures else "failed" if failures else "skipped",
+        "results": results,
+        "failures": failures,
+        "sections_processed": len(results) + len(failures),
+        "sections_updated": len(results),
     }

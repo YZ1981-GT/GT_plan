@@ -91,6 +91,9 @@
           </template>
           <template #right-extra>
             <el-button size="small" type="primary" :loading="refreshAllLoading" @click="onRefreshAll">🔄 一键刷新全部</el-button>
+            <span v-if="refreshState.note === 'failed' || refreshState.note === 'skipped'" class="gt-consol-refresh-note-status" data-testid="consol-note-refresh-status">
+              附注{{ refreshState.note === 'failed' ? '刷新失败' : '已跳过' }}：{{ refreshState.noteReason }}
+            </span>
             <span v-if="refreshProgress.visible && refreshProgress.total" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin: 0 8px;">
               {{ refreshProgress.current }}/{{ refreshProgress.total }} {{ refreshProgress.step }}
             </span>
@@ -360,7 +363,7 @@
           ref="consolNoteTabRef"
           :project-id="projectId"
           :year="effectiveConsolYear()"
-          :standard="consolReportTemplateType"
+          :standard="consolNoteTemplateType"
           :current-entity="currentConsolEntity"
           :group-tree="groupTree"
           :consol-note-tree="consolNoteTree"
@@ -739,20 +742,24 @@ function bindConsolPushEvents() {
 }
 
 // ─── F3 一键刷新全部 + 重新汇总附注（需求 9 / Phase 2 A5 + V2 接线）──────────────
+import {
+  useConsolRefreshTracking,
+  type RefreshContext,
+  type RefreshPartStatus,
+} from '@/components/consolidation/composables/useConsolRefreshTracking'
+
 const refreshAllLoading = ref(false)
 const reaggregateLoading = ref(false)
-const refreshProgress = reactive({ visible: false, step: '', current: 0, total: 0, node: '' })
-// 一键刷新进度 SSE 连接（用 createSSE 直接订阅 events/stream，按 project_id/year 过滤 consol.refresh.* 事件；
-// 全局 ThreeColumnLayout 的 SSE 处理器会丢弃 broadcast_raw 的无 event_type 裸事件，故此处独立订阅）
-let refreshSubs: ProjectEventSubscription[] = []
-let refreshPollTimer: ReturnType<typeof setTimeout> | null = null
 
-/** 关闭一键刷新进度 SSE 订阅 + 轮询兜底 */
-function _stopRefreshTracking() {
-  for (const s of refreshSubs) s.close()
-  refreshSubs = []
-  if (refreshPollTimer) { clearTimeout(refreshPollTimer); refreshPollTimer = null }
-}
+const refreshTracking = useConsolRefreshTracking({
+  reloadReportView: () => reloadConsolReportView(),
+  loadGroupTree: () => loadGroupTree(),
+  reloadNoteForRefresh: (ctx) => reloadNoteForRefresh(ctx),
+  captureRefreshContext: () => captureRefreshContext(),
+  getActiveTab: () => activeTab.value,
+})
+const refreshState = refreshTracking.state
+const refreshProgress = refreshTracking.progress
 
 /**
  * 一键级联刷新全部（需求 9 / Phase 2 A5）。
@@ -767,109 +774,60 @@ async function onRefreshAll() {
     refreshProgress.visible = false
     return
   }
+  // 冻结刷新上下文：完成回调只向该快照提交（设计 §六 / 需求 6.1）
+  const context = captureRefreshContext()
   refreshAllLoading.value = true
   refreshProgress.visible = true
   refreshProgress.step = ''
   refreshProgress.current = 0
   refreshProgress.total = 0
   refreshProgress.node = ''
-  let jobId = ''
   try {
-    const res: any = await api.post(P_consol.refreshAll(projectId.value, effectiveYear))
-    jobId = res?.job_id || ''
+    const res: any = await api.post(P_consol.refreshAll(context.projectId, context.year))
+    const jobId = res?.job_id || ''
+    const resPid = String(res?.project_id || '')
+    const resYear = Number(res?.year || 0)
+    // 校验后端返回的项目/年度与冻结上下文一致
+    if (!jobId || (resPid && resPid !== context.projectId) || (resYear && resYear !== context.year)) {
+      refreshAllLoading.value = false
+      refreshProgress.visible = false
+      refreshState.tree = 'failed'
+      refreshState.treeReason = '刷新任务返回异常'
+      refreshState.note = 'failed'
+      refreshState.noteReason = '刷新任务返回异常'
+      ElMessage.error('一键刷新返回数据异常，请重试')
+      return
+    }
     ElMessage.success('已开始一键刷新，正在更新整棵树的报表与附注…')
-    _startRefreshTracking(jobId)
+    refreshTracking.start(jobId, context)
   } catch (e) {
     refreshAllLoading.value = false
     refreshProgress.visible = false
+    refreshState.tree = 'failed'
+    refreshState.treeReason = '请求失败'
+    refreshState.note = 'failed'
+    refreshState.noteReason = '请求失败'
     handleApiError(e, '一键刷新全部')
   }
 }
 
-/** 订阅 SSE 进度；同时启动轮询兜底（SSE 断开时仍能感知完成）。 */
-function _startRefreshTracking(jobId: string) {
-  _stopRefreshTracking()
-
-  const finish = (ok: boolean, msg?: string) => {
-    _stopRefreshTracking()
-    refreshAllLoading.value = false
-    refreshProgress.visible = false
-    if (ok) {
-      ElMessage.success(msg || '一键刷新完成')
-      // 刷新当前 tab 数据
-      if (activeTab.value === 'consol_report') reloadConsolReportView()
-      else if (activeTab.value === 'consol_note') loadConsolNoteTree(true)
-      eventBus.emit('consol-refresh-done', { projectId: projectId.value, year: effectiveConsolYear() })
-    } else if (msg) {
-      ElMessage.error(msg)
-    }
-  }
-
-  // SSE 进度订阅：迁移到项目事件流单例总线（frontend-sse-connection-consolidation）；
-  // 订阅共享连接的 consol.refresh.* 事件，按 job_id 客户端过滤（不再自建连接；
-  // 原 URL 的 ?year= 服务端过滤由 job_id 唯一性替代）。
-  try {
-    const onConsolEvent = (data: any, event?: string) => {
-      if (!data || (data.job_id && jobId && data.job_id !== jobId)) return
-      if (event === 'consol.refresh.progress') {
-        refreshProgress.step = data.step || ''
-        refreshProgress.current = data.current || 0
-        refreshProgress.total = data.total || 0
-        refreshProgress.node = data.current_node || ''
-      } else if (event === 'consol.refresh.completed') {
-        const errCount = Array.isArray(data.errors) ? data.errors.length : 0
-        finish(true, errCount > 0 ? `一键刷新完成（${errCount} 步部分失败，请检查）` : '一键刷新完成')
-      } else if (event === 'consol.refresh.error') {
-        finish(false, `一键刷新失败：${data.error || '未知错误'}`)
-      }
-    }
-    for (const ev of ['consol.refresh.progress', 'consol.refresh.completed', 'consol.refresh.error']) {
-      refreshSubs.push(subscribeProjectEvent(projectId.value, ev, onConsolEvent))
-    }
-  } catch {
-    // 订阅失败不致命，靠轮询兜底
-  }
-
-  // 轮询兜底（EH6）：SSE 断开也能感知最终状态
-  if (!jobId) return
-  let polls = 0
-  const poll = async () => {
-    polls += 1
-    try {
-      const st: any = await api.get(P_consol.refreshStatus(projectId.value, effectiveConsolYear(), jobId))
-      if (st?.status === 'completed') {
-        const errCount = Array.isArray(st.errors) ? st.errors.length : 0
-        finish(true, errCount > 0 ? `一键刷新完成（${errCount} 步部分失败，请检查）` : '一键刷新完成')
-        return
-      }
-      if (st?.status === 'failed') {
-        const errMsg = Array.isArray(st.errors) && st.errors.length ? st.errors[st.errors.length - 1]?.error : ''
-        finish(false, `一键刷新失败：${errMsg || '未知错误'}`)
-        return
-      }
-    } catch {
-      // 单次轮询失败忽略，继续下一轮
-    }
-    if (polls < 120 && refreshAllLoading.value) {
-      refreshPollTimer = setTimeout(poll, 3000)
-    } else if (refreshAllLoading.value) {
-      // 超时保护：停止 loading（结果可经 SSE 或手动刷新查看）
-      refreshAllLoading.value = false
-      refreshProgress.visible = false
-    }
-  }
-  refreshPollTimer = setTimeout(poll, 3000)
-}
-
 /**
- * 重新汇总合并附注（需求 9 / V2 接线）。
- * POST notes/reaggregate 消费子公司单体附注重新汇总，完成后切到附注 tab 并刷新。
+ * 重新汇总合并附注（需求 9 / V2 接线 / 需求 6.5）。
+ * POST notes/reaggregate 消费子公司单体附注重新汇总；成功后重读当前章节，
+ * 只有当前章节持久化 GET 返回 done 才清除 consolStale。
  */
 async function onReaggregateNotes() {
   if (reaggregateLoading.value) return
   reaggregateLoading.value = true
+  const context = captureRefreshContext()
   try {
-    const res: any = await api.post(P_consol.notes.reaggregate(projectId.value, effectiveConsolYear()))
+    const body: Record<string, unknown> = {
+      section_ids: context.sectionId ? [context.sectionId] : [],
+      node_key: context.nodeKey || null,
+      standard: consolNoteTemplateType.value,
+      template_type: consolNoteTemplateType.value,
+    }
+    const res: any = await api.post(P_consol.notes.reaggregate(context.projectId, context.year), body)
     const updated = res?.sections_updated ?? res?.sections_processed ?? 0
     const errCount = Array.isArray(res?.errors) ? res.errors.length : 0
     if (errCount > 0) {
@@ -877,9 +835,17 @@ async function onReaggregateNotes() {
     } else {
       ElMessage.success(`附注重新汇总完成（更新 ${updated} 个章节）`)
     }
-    consolStale.value = false
     activeTab.value = 'consol_note'
-    loadConsolNoteTree(true)
+    await loadConsolNoteTree(true)
+    // 持久化重读当前章节作为完成证据
+    const noteResult = await reloadNoteForRefresh(context)
+    if (noteResult?.status === 'done') {
+      consolStale.value = false
+    } else {
+      // POST 成功但章节重读不是 done → 保持 stale
+      const reason = noteResult?.reason || '附注章节重读未完成'
+      ElMessage.warning(`重新汇总完成，但章节重读${noteResult?.status === 'failed' ? '失败' : '跳过'}：${reason}`)
+    }
   } catch (e) {
     handleApiError(e, '重新汇总附注')
   } finally {
@@ -1282,19 +1248,19 @@ function onConsolScopeChanged(evt: { event_type: string }) {
 }
 
 /**
- * F5 6A.3：立即重新汇总快捷入口 → 跳合并附注 Tab 并触发重新汇总（Phase 2 一键刷新）。
- * 复用 ConsolNoteTab 的"重新汇总"链路（consol-catalog-select 事件 + reaggregate 端点）。
+ * F5 6A.3：立即重新汇总快捷入口 → 跳合并附注 Tab 并真正调用重新汇总 API（需求 6.5）。
  */
-function onReaggregateNow() {
-  consolStale.value = false
+async function onReaggregateNow() {
   activeTab.value = 'consol_note'
+  await nextTick()
+  await onReaggregateNotes()
 }
 
 /**
  * 读取企业树（三码推导）+ 合并方式 + 诊断 + 年度。
  * 不再回退 listChildProjects：项目列表接口不支持按上级项目过滤，回退结果是全部可见项目（F13）。
  */
-async function loadGroupTree() {
+async function loadGroupTree(): Promise<boolean> {
   groupTreeLoaded.value = false
   try {
     const res = await getWorksheetTree(projectId.value)
@@ -1313,6 +1279,7 @@ async function loadGroupTree() {
     treeDiagnostics.value = []
     treeMessage.value = '加载企业树失败，请稍后重试'
     groupTreeLoaded.value = false
+    return false
   }
   // 树变化后刷新选中节点与面板节点的引用（节点可能已消失）
   const root = groupTree.value[0]
@@ -1324,6 +1291,7 @@ async function loadGroupTree() {
   if (!currentConsolEntity.value.nodeKey || currentConsolEntity.value.nodeKey === ROOT_CONSOL_NODE_KEY) {
     currentConsolEntity.value.nodeKey = root?.node_key || ROOT_CONSOL_NODE_KEY
   }
+  return true
 }
 
 function onTreeNodeClick(data: ConsolTreeNode) {
@@ -1335,9 +1303,13 @@ function onTreeNodeClick(data: ConsolTreeNode) {
   currentConsolEntity.value = currentConsolEntityForNode(data)
   if (activeTab.value === 'consol_report') reloadConsolReportView()
   else if (activeTab.value === 'consol_note') {
+    // 切换节点后重读当前章节（不只刷新目录）
     const section = consolNoteTabRef.value?.selectedNoteSection
-    if (section?.section_id) consolNoteTabRef.value?.onNoteNodeClick(section)
-    else loadConsolNoteTree()
+    if (section?.section_id) {
+      consolNoteTabRef.value?.onNoteNodeClick({ section_id: section.section_id, title: section.title })
+    } else {
+      loadConsolNoteTree()
+    }
   }
 }
 
@@ -1436,6 +1408,42 @@ function effectiveEntityYear(): number {
 
 function currentEntityNodeKey(): string {
   return currentConsolEntity.value.nodeKey || groupTree.value[0]?.node_key || ROOT_CONSOL_NODE_KEY
+}
+
+function captureRefreshContext(): RefreshContext {
+  return {
+    projectId: String(projectId.value || ''),
+    year: effectiveConsolYear(),
+    nodeKey: currentEntityNodeKey(),
+    sectionId: String(consolNoteTabRef.value?.selectedNoteSection?.section_id || ''),
+  }
+}
+
+function isRefreshBaseContextCurrent(context: RefreshContext): boolean {
+  return String(projectId.value || '') === context.projectId
+    && effectiveConsolYear() === context.year
+    && currentEntityNodeKey() === context.nodeKey
+    && String(consolNoteTabRef.value?.selectedNoteSection?.section_id || '') === context.sectionId
+}
+
+async function reloadNoteForRefresh(context: RefreshContext): Promise<any> {
+  if (!context.sectionId) {
+    return { status: 'skipped', reason: '刷新开始时未选择附注章节' }
+  }
+  if (!isRefreshBaseContextCurrent(context)) {
+    return { status: 'skipped', reason: '刷新期间合并节点已切换' }
+  }
+  await nextTick()
+  const child = consolNoteTabRef.value
+  if (!child?.reloadCurrentSectionAfterRefresh) {
+    return { status: 'failed', reason: '附注组件未提供持久化重读方法' }
+  }
+  return child.reloadCurrentSectionAfterRefresh({
+    projectId: context.projectId,
+    year: context.year,
+    nodeKey: context.nodeKey,
+    sectionId: context.sectionId,
+  })
 }
 
 const reportNavItems = [
@@ -1872,7 +1880,15 @@ function onConsolTreeSelect(data: ConsolTreeSelectPayload) {
     }
     // 刷新当前 tab 数据
     if (activeTab.value === 'consol_report') reloadConsolReportView()
-    else if (activeTab.value === 'consol_note') loadConsolNoteTree()
+    else if (activeTab.value === 'consol_note') {
+      // 企业节点切换：重读当前章节，不只刷新目录
+      const section = consolNoteTabRef.value?.selectedNoteSection
+      if (section?.section_id) {
+        consolNoteTabRef.value?.onNoteNodeClick({ section_id: section.section_id, title: section.title })
+      } else {
+        loadConsolNoteTree()
+      }
+    }
   }
 }
 
@@ -1927,7 +1943,7 @@ onUnmounted(() => {
   eventBus.off('consol-tree-select', onConsolTreeSelect)
   eventBus.off('consol-catalog-select', onConsolCatalogSelect)
   eventBus.off('consol-refresh-entity', onConsolRefreshEntity)
-  _stopRefreshTracking()
+  refreshTracking.stop()
   stopConsolPushEvents()
 })
 
@@ -1956,11 +1972,16 @@ function onConsolRefreshEntity(detail: ConsolRefreshEntityPayload) {
   }
   if (types.includes('notes')) {
     loadConsolNoteTree(true)
+    // 同时重读当前章节（不只刷新目录）
+    const section = consolNoteTabRef.value?.selectedNoteSection
+    if (section?.section_id) {
+      consolNoteTabRef.value?.onNoteNodeClick({ section_id: section.section_id, title: section.title })
+    }
   }
 }
 
 // 监听四栏 catalog 选择事件
-function onConsolCatalogSelect(data: ConsolCatalogSelectPayload) {
+async function onConsolCatalogSelect(data: ConsolCatalogSelectPayload) {
   if (!data) return
   if (data.type === 'report' && data.reportType) {
     activeTab.value = 'consol_report'
@@ -1973,18 +1994,23 @@ function onConsolCatalogSelect(data: ConsolCatalogSelectPayload) {
     // 直接加载该章节详情
     onNoteNodeClick({ section_id: data.sectionId, title: data.title })
   } else if (data.type === 'refresh-all') {
-    // 全部刷新
+    // 全部刷新：报表+目录+当前章节
     reloadConsolReportView()
-    loadConsolNoteTree()
+    await loadConsolNoteTree()
+    const section = consolNoteTabRef.value?.selectedNoteSection
+    if (section?.section_id) {
+      consolNoteTabRef.value?.onNoteNodeClick({ section_id: section.section_id, title: section.title })
+    }
   } else if (data.type === 'refresh-report' && data.reportType) {
     // 刷新单个报表
     consolReportType.value = data.reportType
     activeTab.value = 'consol_report'
     reloadConsolReportView()
   } else if (data.type === 'refresh-note' && data.sectionId) {
-    // 刷新单个附注
+    // 刷新单个附注：加载目录后重读指定章节
     activeTab.value = 'consol_note'
-    loadConsolNoteTree()
+    await loadConsolNoteTree()
+    onNoteNodeClick({ section_id: data.sectionId, title: data.title })
   }
 }
 
