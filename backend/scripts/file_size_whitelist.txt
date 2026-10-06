@@ -1299,3 +1299,6 @@ audit-platform/frontend/src/layouts/ThreeColumnLayout.vue 1515
 #     拆分轴是按循环字母拆到 `_registry_{cycle}.py` 子模块，但注册表的「一眼看全局」
 #     价值在于 grep 一处能找到全部 adapter，拆分后需要 re-export 聚合层。暂不拆。
 backend/app/services/workpaper_sync/store_item_registry.py  998
+
+# D4 营业收入渲染策略（Phase 3 indicator_prefill + _fetch_indicator_tb_amounts + _fetch_total_assets 新增）
+backend/app/routers/wp_render_strategies/_d4_operating_revenue.py  810

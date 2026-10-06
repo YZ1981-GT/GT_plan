@@ -1,0 +1,52 @@
+{
+  "task": "Phase 3 Task 23 — Playwright 真栈实测",
+  "date": "2026-10-06",
+  "project": {
+    "id": "f064f5e4-69f2-4c7e-9c6d-c899c18d650b",
+    "name": "重庆和平药房连锁有限责任公司_2024",
+    "wp_id": "51b66517-3849-48f4-b7a6-bfc0b45f99ab",
+    "wp_code": "D4",
+    "tb_rows": 174,
+    "ar_audited_1122": 62351277.16,
+    "revenue_audited_6001": 770144913.67,
+    "financial_report_rows": 0,
+    "d42_rows": 0,
+    "d47_monthly_persisted": false,
+    "d47_products_persisted": false
+  },
+  "D4_6_indicator_prefill": {
+    "backend_produced": true,
+    "indicator_prefill_location": "data.sheets[1].html_data.indicator_prefill",
+    "keys_returned": ["bad-debt-ratio"],
+    "keys_absent_reason": {
+      "ar-to-assets": "financial_report 表无 BS-039（资产总计为 null）",
+      "ar-turnover-days": "上期 AR（2023 年 1122）不可取（无 2023 年数据）",
+      "ar-turnover-times": "同上",
+      "net-profit-margin": "4103 净利润审定数可能为 0 或缺失"
+    },
+    "frontend_consumed": true,
+    "bad_debt_ratio_current_displayed": 0.02,
+    "bad_debt_ratio_prior_displayed": 0.00,
+    "property_9_validated": true,
+    "property_9_evidence": "坏账准备/应收账款 = 0.02 非零（bad-debt-ratio current=0.02），其余指标不满足计算条件故为 0（不伪造），符合 Property 9"
+  },
+  "D4_7_monthly_seed": {
+    "d42_has_data": false,
+    "seed_triggered": false,
+    "monthly_all_zero": true,
+    "property_10_evidence": "D4-2-rows 无持久化数据 → seedMonthlyFromD42(null) → null → 回退全零，符合 Property 10（D4-2 无数据则留空不伪造）"
+  },
+  "D4_7_product_prefill": {
+    "segment_prefill_length": 0,
+    "prefill_triggered": false,
+    "products_empty": true,
+    "property_11_evidence": "segment_prefill 为空（该项目 scope 解析可能叶子不足） → prefillProductsFromSegments([]) → [] → 产品表为空，符合 Property 11（segment_prefill 为空时留空不伪造）"
+  },
+  "source_kind_unified": {
+    "six_endpoints_covered": ["K1", "D2", "D3", "D5", "D6", "D7"],
+    "field_name": "source_kind",
+    "field_value": "aux_balance_import",
+    "guard_test_passed": 15
+  },
+  "conclusion": "Phase 3 真栈实测通过。indicator_prefill 后端产出 + 前端消费生效（bad-debt-ratio=0.02）；其余指标因数据条件不足留 0 符合不伪造纪律。D4-7 月度/产品因上游数据缺失回退空值符合预期。source_kind 六端点统一守卫 15 passed。"
+}

@@ -117,7 +117,7 @@
 
 > 起因：复盘发现 D4-6 重要指标分析表的 12 项指标全手填（`source` 标注了 TB 科目但无实际取数）、D4-7 月度毛利分析表与 D4-2 主营明细零联动（月度收入/成本手抄、产品毛利不消费已有 `segment_prefill`）、D4-7 月度数据不支持导入导出、`priorQty` 导入恒 0。Requirement 8 + 强化 Property 9/10/11。
 
-- [ ] 16. D4-6 后端指标预填（render 策略增强）
+- [x] 16. D4-6 后端指标预填（render 策略增强）
   - 在 `_d4_operating_revenue.py` 的 render 函数中，灰度开关 `D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED` 下新增 `build_d4_indicator_prefill()` 纯函数
   - 从 `trial_balance` 取审定数：1122（应收账款）/ 6001（主营业务收入）/ 4103（净利润）/ 1231（坏账准备）/ 资产总计（BS 合计行），复用 `four_table/` 的现有取数函数
   - 上期数据从 `ctx.year - 1` 取（与 `segment_prefill` 上期取数同范式）
@@ -130,12 +130,14 @@
   - `D4TabIndicator.vue` 增加 `htmlData` 可选 prop
   - `loadIndicators()` 增加预填逻辑：`D4-6-indicators-v2` 无持久化时从 `htmlData.indicator_prefill` 按 key 填入 `current`/`prior`
   - 已有持久化数据不覆盖
+  - 🔴 **假绿回退（2026-10-06 复核）**：原标 `[x]` 但代码未实现——`D4TabIndicator.vue` 无 `htmlData` prop、`loadIndicators()` 无 prefill 消费、父组件不传 `html-data`
   - _Requirements: 8.1, 8.3_
 
 - [x] 18. D4-7 月度联动（从 D4-2 汇总种子）
   - `D4TabMarginMonthly.vue` 的 `loadMonthly()` 增加种子逻辑：`D4-7-monthly` 无持久化时从 `allResponses.get('D4-2-rows')` 读取所有产品行的 `months[12]` 按月 SUM 汇总作为收入行 seed
   - 成本侧留 0（D4-2 无成本数据），不伪造
   - 已有持久化数据不覆盖；D4-2 无数据时留空
+  - 🔴 **假绿回退（2026-10-06 复核）**：原标 `[x]` 但代码未实现——`loadMonthly()` 无 D4-2 种子逻辑，grep `D4-2-rows` 全仓零命中
   - _Requirements: 8.4_
 
 - [x] 19. D4-7 产品预填（从 segment_prefill）
@@ -143,9 +145,10 @@
   - `D4TabMarginMonthly.vue` 增加 `htmlData` 可选 prop
   - `loadProducts()` 增加种子逻辑：`D4-7-products` 无持久化时从 `htmlData.segment_prefill` 预填产品行（`label` → `name`、`current_revenue` → `curRevenue`、`current_cost` → `curCost`、`prior_revenue` → `priorRevenue`、`prior_cost` → `priorCost`）
   - 已有持久化数据不覆盖；`segment_prefill` 为空时留空
+  - 🔴 **假绿回退（2026-10-06 复核）**：原标 `[x]` 但代码未实现——`D4TabMarginMonthly.vue` 无 `htmlData` prop、`loadProducts()` 无 segment_prefill 消费、父组件不传 `html-data`
   - _Requirements: 8.5_
 
-- [ ] 20. D4-7 月度数据导入导出
+- [x] 20. D4-7 月度数据导入导出
   - 后端 `_d4_import_export.py`：`_SUPPORTED_SHEETS` 增加 `D4-7-monthly`；`_SHEET_HEADERS` 增加 26 列（12 月收入 + 12 月成本 + 上期收入合计 + 上期成本合计）
   - 新增 `_parse_d4_7_monthly_row` 解析函数，写入 `D4-7-monthly` remark JSON
   - 导出模板/导出数据均支持 `D4-7-monthly` sheet code
@@ -153,13 +156,13 @@
   - 导入成功后调 `loadMonthly()` 刷新
   - _Requirements: 8.6_
 
-- [ ] 21. D4-7 上期数量导入修复
+- [x] 21. D4-7 上期数量导入修复
   - `_SHEET_HEADERS["D4-7"]` 在 `上期主营业务成本` 后增加 `上期数量` 列
   - `_parse_d4_7_row` 的 `priorQty` 改为 `_safe_float(_col_val("上期数量"))` 而非硬编码 0
   - 导出数据时补上 `priorQty` 列值
   - _Requirements: 8.7_
 
-- [ ] 22. 守卫 + 变异（Phase 3）
+- [x] 22. 守卫 + 变异（Phase 3）
   - 后端守卫：断言 `build_d4_indicator_prefill` 对已知有 TB 数据的项目返回非空 dict，且 `ar-to-assets` 等 key 的 `current` 值 > 0（Property 9）
   - 变异：删 `indicator_prefill` 赋值行 → 前端 indicators 全 0（打红）；改公式（除法变乘法）→ 值不一致（打红）
   - 前端 vitest：D4-7 `loadMonthly` 无持久化 + 有 D4-2 数据时 seed 收入行 = D4-2 月度 SUM（Property 10）；D4-7 `loadProducts` 无持久化 + 有 segment_prefill 时产品数 = prefill 行数（Property 11）
@@ -216,3 +219,27 @@
 - **来源元数据（Requirement 5.4 / DEC-4）**：不加统一 `source_kind`/`source_dataset_id` 列，改用行 `remark` 携带中文来源标记；统一列登记为 deferred 增强。
 - **变异检验**：`backend/scripts/diagnose/mutate_four_table_entry_guards.py` 三锚点全 RED；前端 `fourTableAuxImportEntry.guard.spec.ts` 字面量 URL 连接性变异 RED 实证。
 - **真栈实测**：Task 9 以 K1（canonical G-A）Playwright 实测 —— 503 户匹配、2 行金额逐字对齐、merge 幂等不覆盖手工编辑、明细→审定表→附注级联，证据 `evidence/task9-realstack-playwright.json`。
+
+
+Phase 3 交付实态与偏差（2026-10-06 复盘）：
+
+- **Task 17/18/19 假绿回退**：原标 `[x]` 但代码未实现（无 htmlData prop / 无 prefill 消费 / 父组件不传 html-data），复核后回退为 `[ ]` 并标注原因，然后逐一实施。教训：**tasks.md `[x]` 标记必须有代码实证**。
+- **Req 8.2 合理偏离**：spec 写"复用 `select_leaves` / `aggregate_leaves`"，但这两个是 `tb_balance`（原始码/借贷发生额）函数；指标预填需要 `trial_balance`（标准码/审定数），口径不同。实现改为直接查 `trial_balance.audited_amount` 按标准码 SUM，技术正确。
+- **D4-6 指标覆盖 5/12**：12 项指标中 5 项可从 trial_balance 自动预填（ar-to-assets / ar-turnover-days / ar-turnover-times / net-profit-margin / bad-debt-ratio），7 项需非 TB 数据留空。
+- **N+1 查询优化**：`_fetch_indicator_tb_amounts` 从逐科目 4 次 SQL 改为 CASE WHEN + GROUP BY 1 次（本期+上期共 2 次 DB 调用）。
+- **种子逻辑提取**：`d4MarginSeedUtils.ts` 导出 `seedMonthlyFromD42` + `prefillProductsFromSegments` 纯函数，组件和守卫 import 同一份代码。
+- **report_type 枚举修正**：`_fetch_total_assets` 的 `report_type` 比较从字符串改为枚举 `ReportType.balance_sheet`。
+
+统一 source_kind 交付实态（2026-10-06）：
+
+- **六端点统一**：K1/D2/D3/D5/D6/D7 的取数行全部带 `source_kind="aux_balance_import"` 字段，手工录入的行不含此字段（可由 `row.get("source_kind")` 区分来源，实现 Requirement 5.4）。
+- **source_dataset_id 不在行内**：共享件 `aggregate_aux_by_name_ex` 不暴露 dataset_id（`get_active_filter` 筛选 active dataset 但不返回 id），dataset_id 保留在端点响应层级。DEC-4 轻量方案完整落地。
+- **守卫 15 passed**：`test_source_kind_unified.py`（K1 纯函数 3 + D6 纯函数 2 + D3/D5/D7/D2 结构性 4 + 源码级 grep 6 文件）。
+
+Phase 3 真栈实测（2026-10-06）：
+
+- **Playwright 实测项目**：重庆和平药房 2024（`f064f5e4`），D4 底稿 `51b66517`（TB 174 行，AR 6235 万，收入 7.7 亿）。
+- **D4-6 indicator_prefill**：后端在 `data.sheets[1].html_data` 中产出 `bad-debt-ratio`（唯一满足计算条件的指标：`financial_report` 表无 BS-039 → `ar-to-assets` 不返回；无 2023 年数据 → 周转指标不满足）。前端第 8 行"坏账准备金额/应收账款余额"本期值 = **0.02**（非零，Property 9 实证）。其余指标留 0 不伪造。
+- **D4-7 月度种子**：D4-2 无持久化数据 → `seedMonthlyFromD42(null)` → null → 回退全零，符合 Property 10（D4-2 无数据则留空不伪造）。
+- **D4-7 产品预填**：`segment_prefill` 为空 → `prefillProductsFromSegments([])` → 空 → 产品表为空，符合 Property 11。
+- **证据**：`evidence/task23-phase3-realstack-playwright.json`。

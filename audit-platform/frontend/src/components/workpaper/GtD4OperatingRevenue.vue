@@ -73,8 +73,8 @@
       <!-- D4-5 政策检查 -->
       <D4TabPolicyCheck v-else-if="currentSheet === 'D4-5'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
       <!-- D4-6 ~ D4-11 分析程序 -->
-      <D4TabIndicator v-else-if="currentSheet === 'D4-6'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
-      <D4TabMarginMonthly v-else-if="currentSheet === 'D4-7'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabIndicator v-else-if="currentSheet === 'D4-6'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" :html-data="props.htmlData" />
+      <D4TabMarginMonthly v-else-if="currentSheet === 'D4-7'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" :html-data="props.htmlData" />
       <D4TabProductMargin v-else-if="currentSheet === 'D4-8'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
       <D4TabCustomerStructure v-else-if="currentSheet === 'D4-9'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
       <D4TabCustomerPrice v-else-if="currentSheet === 'D4-10'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
