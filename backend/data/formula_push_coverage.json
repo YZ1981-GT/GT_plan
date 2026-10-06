@@ -63,6 +63,7 @@
     "L3",
     "L4",
     "L5",
+    "L6",
     "L7",
     "L8",
     "M1",
@@ -77,6 +78,7 @@
     "M9",
     "N1",
     "N2",
+    "N3",
     "N4",
     "N5"
   ],
@@ -718,6 +720,16 @@
       "has_note_rules": true
     },
     {
+      "wp_code": "L6",
+      "level": "L3",
+      "account_prefixes": [
+        "2711"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
       "wp_code": "L7",
       "level": "L3",
       "account_prefixes": [
@@ -852,6 +864,16 @@
       "level": "L3",
       "account_prefixes": [
         "2221"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "N3",
+      "level": "L3",
+      "account_prefixes": [
+        "2901"
       ],
       "rule_count": 2,
       "owned_key_count": 1,

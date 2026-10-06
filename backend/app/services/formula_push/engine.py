@@ -186,13 +186,25 @@ async def _find_workpapers(db, project_id: UUID, wp_code: str) -> list[_Paper]:
     return [_Paper(id=UUID(str(r[0])), status=_enum_value(r[1]), paper_code=wp_code) for r in rows]
 
 
-async def _read_entries(db, wp_id: UUID, wp_code: str) -> dict[str, tuple[Any, str]]:
-    """条目快照 ``item_id → (remark, CAS 版本)``。"""
-    rows = (await db.execute(
-        sa.text(
+async def _read_entries(
+    db, wp_id: UUID, wp_code: str, storage_field: str = "remark",
+) -> dict[str, tuple[Any, str]]:
+    """条目快照 ``item_id → (column_value, CAS 版本)``。
+
+    ``storage_field`` 选择从 ``remark`` 或 ``conclusion`` 列读取。
+    """
+    if storage_field == "conclusion":
+        sql = (
+            "SELECT item_id, conclusion, updated_at FROM checklist_responses "
+            "WHERE wp_id = :wp_id AND item_id LIKE :prefix"
+        )
+    else:
+        sql = (
             "SELECT item_id, remark, updated_at FROM checklist_responses "
             "WHERE wp_id = :wp_id AND item_id LIKE :prefix"
-        ),
+        )
+    rows = (await db.execute(
+        sa.text(sql),
         {"wp_id": str(wp_id), "prefix": f"{wp_code}-%"},
     )).all()
     return {r[0]: (r[1], _version_from_timestamp(r[2])) for r in rows}
@@ -460,8 +472,10 @@ async def _push_workpaper(
     sources = await binding.load_sources(ctx.db, ctx.project_id, ctx.year, paper.id)
     for text in sources.warnings:
         result.add_warning(text)
-    snapshot = await _read_entries(ctx.db, paper.id, wp_code)
-    entries = {item: remark for item, (remark, _) in snapshot.items()}
+    # 从 binding 获取存储列（默认 remark，N3 等使用 conclusion）
+    storage_field = getattr(binding, "storage_field", "remark")
+    snapshot = await _read_entries(ctx.db, paper.id, wp_code, storage_field=storage_field)
+    entries = {item: col_val for item, (col_val, _) in snapshot.items()}
     overlay: dict[str, Any] = dict(entries)
     pending: list[tuple[str, PushItem, _StateWrite]] = []
     effective_items: set[str] = set()
@@ -493,7 +507,10 @@ async def _push_workpaper(
         result.add_warning(text)
 
     changed = sorted(effective_items)
-    conflict = await _write_entries(ctx, paper.id, paper_code, changed, overlay, snapshot)
+    conflict = await _write_entries(
+        ctx, paper.id, paper_code, changed, overlay, snapshot,
+        storage_field=storage_field,
+    )
     if conflict is not None:
         reason = f"并发修改：条目「{conflict}」在推送期间被保存，本底稿本次未写入（下次推送重新计算）"
         for _, item, _ in pending:
@@ -531,6 +548,7 @@ async def _push_workpaper(
 async def _write_entries(
     ctx: _Ctx, wp_id: UUID, paper_code: str, changed: list[str],
     overlay: Mapping[str, Any], snapshot: Mapping[str, tuple[Any, str]],
+    storage_field: str = "remark",
 ) -> str | None:
     """逐条目 CAS 写回；返回冲突条目 id（None = 全部成功）。``paper_code`` 用于地址首段。"""
     if not changed:
@@ -543,7 +561,10 @@ async def _write_entries(
             target = CanonicalFormulaTarget(
                 domain="workpaper", project_id=ctx.project_id, year=ctx.year,
                 addr_id=f"{paper_code}/*/{item_id}",
-                locator={"wp_id": str(wp_id), "item": item_id, "cell": RAW_CELL},
+                locator={
+                    "wp_id": str(wp_id), "item": item_id, "cell": RAW_CELL,
+                    "storage_field": storage_field,
+                },
                 wp_id=wp_id,
             )
             await adapter.apply_many([FormulaMutation(

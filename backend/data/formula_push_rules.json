@@ -6706,6 +6706,114 @@
         "manual"
       ],
       "description": "所得税费用附注主表推送（listed 三、所得税费用 / soe 八、78）期末 / 期初数；批 D 附注直推族 binding"
+    },
+    {
+      "rule_id": "L6.tb_amount",
+      "page_key": "workpaper:L6",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "L6",
+        "sheet_code": "L6-1",
+        "item_id": "L6-L6-1-total-audited"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('2711','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "专项应付款审定表锚点「L6-L6-1-total-audited」= TB('2711','期末余额')；附注直推族 binding"
+    },
+    {
+      "rule_id": "L6.note.main",
+      "page_key": "workpaper:L6",
+      "stage": "note",
+      "policy": "editable",
+      "target": {
+        "domain": "note",
+        "section_by_template": {
+          "listed": "五、40",
+          "soe": "八、40"
+        },
+        "table": "专项应付款",
+        "rows": "l6_note_main",
+        "fields": [
+          "end_amount",
+          "prior_amount"
+        ]
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "l6_note_main",
+        "params": {},
+        "formula_text": "专项应付款附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "专项应付款附注主表（期末/期初），从试算表 2711 取审定数"
+    },
+    {
+      "rule_id": "N3.tb_amount",
+      "page_key": "workpaper:N3",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "N3",
+        "sheet_code": "N3-1",
+        "item_id": "N3-1-end-balance-total"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('2901','期末余额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "递延所得税负债审定表锚点「N3-1-end-balance-total」= TB('2901','期末余额')；conclusion 列 binding"
+    },
+    {
+      "rule_id": "N3.note.main",
+      "page_key": "workpaper:N3",
+      "stage": "note",
+      "policy": "editable",
+      "target": {
+        "domain": "note",
+        "section_by_template": {
+          "listed": "五、22",
+          "soe": "八、22"
+        },
+        "table": "递延所得税负债",
+        "rows": "n3_note_main",
+        "fields": [
+          "end_amount",
+          "prior_amount"
+        ]
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "n3_note_main",
+        "params": {},
+        "formula_text": "递延所得税负债附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "递延所得税负债附注主表（期末/期初），从试算表 2901 取审定数"
     }
   ]
 }

@@ -19,7 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Mapping
 from uuid import UUID, uuid4
 
 from sqlalchemy import text
@@ -77,6 +77,17 @@ def _version_from_timestamp(ts: datetime | str | None) -> str:
 
 #: remark 原文模式（见模块 docstring）
 RAW_CELL = "@raw"
+
+#: 允许的 checklist_responses 落库列白名单（防 SQL 注入）
+_ALLOWED_STORAGE_FIELDS = frozenset({"remark", "conclusion"})
+
+
+def _storage_field(locator: Mapping[str, str]) -> str:
+    """从 locator 获取落库列名，白名单校验。默认 ``"remark"`` 兼容所有既有调用。"""
+    sf = locator.get("storage_field", "remark")
+    if sf not in _ALLOWED_STORAGE_FIELDS:
+        raise ValueError(f"非法 storage_field: {sf!r}，允许值: {sorted(_ALLOWED_STORAGE_FIELDS)}")
+    return sf
 
 
 def _cell_read(remark_json: str | None, cell: str) -> Any:
@@ -169,14 +180,26 @@ class WorkpaperMutationAdapter:
         if actual_pid != project_id:
             raise OwnershipViolation(wp_id, project_id, actual_pid)
 
-    async def _read_row(self, wp_id: UUID, item_id: str) -> tuple[str | None, datetime | None]:
-        """读取 checklist_responses 中的 remark 和 updated_at。"""
-        result = await self._session.execute(
-            text(
+    async def _read_row(
+        self, wp_id: UUID, item_id: str, storage_col: str = "remark",
+    ) -> tuple[str | None, datetime | None]:
+        """读取 checklist_responses 中的指定列和 updated_at。
+
+        ``storage_col`` 必须已经过 ``_storage_field()`` 白名单校验。
+        """
+        # 白名单已在 _storage_field 校验；此处用固定分支避免 f-string 拼列名
+        if storage_col == "conclusion":
+            sql = (
+                "SELECT conclusion, updated_at FROM checklist_responses "
+                "WHERE wp_id = :wp_id AND item_id = :item_id"
+            )
+        else:
+            sql = (
                 "SELECT remark, updated_at FROM checklist_responses "
                 "WHERE wp_id = :wp_id AND item_id = :item_id"
-            ),
-            {"wp_id": str(wp_id), "item_id": item_id},
+            )
+        result = await self._session.execute(
+            text(sql), {"wp_id": str(wp_id), "item_id": item_id},
         )
         row = result.fetchone()
         if row is None:
@@ -195,6 +218,7 @@ class WorkpaperMutationAdapter:
             wp_id_str = locator.get("wp_id")
             item_id = locator.get("item")
             cell = locator.get("cell", ".")
+            storage_col = _storage_field(locator)
             if not wp_id_str or not item_id:
                 continue
 
@@ -202,8 +226,8 @@ class WorkpaperMutationAdapter:
             # ownership check during prepare
             await self._verify_ownership(wp_id, target.project_id)
 
-            remark, updated_at = await self._read_row(wp_id, item_id)
-            before_value = _cell_read(remark, cell)
+            col_value, updated_at = await self._read_row(wp_id, item_id, storage_col)
+            before_value = _cell_read(col_value, cell)
             version = _version_from_timestamp(updated_at)
 
             # after_value 来自 values dict, key 为 addr_id
@@ -233,41 +257,48 @@ class WorkpaperMutationAdapter:
             wp_id = UUID(locator["wp_id"])
             item_id = locator["item"]
             cell = locator.get("cell", ".")
+            storage_col = _storage_field(locator)
 
             # 再次校验归属
             await self._verify_ownership(wp_id, mutation.target.project_id)
 
             # 版本校验 (CAS)
-            remark, updated_at = await self._read_row(wp_id, item_id)
+            col_value, updated_at = await self._read_row(wp_id, item_id, storage_col)
             current_version = _version_from_timestamp(updated_at)
             if mutation.expected_version is not None and current_version != mutation.expected_version:
                 raise VersionConflict(mutation.target, mutation.expected_version, current_version)
 
             # 写入新值
-            new_remark = _cell_write(remark, cell, mutation.after_value)
+            new_value = _cell_write(col_value, cell, mutation.after_value)
 
-            # UPSERT
-            # 🔴 修复前只写 (wp_id, item_id, remark, updated_at)：真库 `project_id NOT NULL`
-            #    无默认 ⇒ 新行与冲突行（PG 对 INSERT 先校验 NOT NULL 再判冲突）两种情况都抛
-            #    NotNullViolation；`updated_at` 传 isoformat 字符串，asyncpg 对 timestamptz
-            #    严格拒收 str。单测建表 project_id 可空 ⇒ 长期假绿。
-            #    id 显式生成（不依赖 PG 默认值，SQLite 同样成立）；content_version 按 V161
-            #    「每次成功写入 +1」语义推进。
-            await self._session.execute(
-                text(
+            # UPSERT — 按 storage_col 选列写入
+            # 白名单分支避免 f-string 拼列名
+            if storage_col == "conclusion":
+                upsert_sql = (
+                    "INSERT INTO checklist_responses "
+                    "(id, project_id, wp_id, item_id, conclusion, created_at, updated_at, content_version) "
+                    "VALUES (:id, :project_id, :wp_id, :item_id, :col_value, :created_at, :updated_at, 1) "
+                    "ON CONFLICT (wp_id, item_id) DO UPDATE "
+                    "SET conclusion = EXCLUDED.conclusion, updated_at = EXCLUDED.updated_at, "
+                    "content_version = checklist_responses.content_version + 1"
+                )
+            else:
+                upsert_sql = (
                     "INSERT INTO checklist_responses "
                     "(id, project_id, wp_id, item_id, remark, created_at, updated_at, content_version) "
-                    "VALUES (:id, :project_id, :wp_id, :item_id, :remark, :created_at, :updated_at, 1) "
+                    "VALUES (:id, :project_id, :wp_id, :item_id, :col_value, :created_at, :updated_at, 1) "
                     "ON CONFLICT (wp_id, item_id) DO UPDATE "
                     "SET remark = EXCLUDED.remark, updated_at = EXCLUDED.updated_at, "
                     "content_version = checklist_responses.content_version + 1"
-                ),
+                )
+            await self._session.execute(
+                text(upsert_sql),
                 {
                     "id": str(uuid4()),
                     "project_id": str(mutation.target.project_id),
                     "wp_id": str(wp_id),
                     "item_id": item_id,
-                    "remark": new_remark,
+                    "col_value": new_value,
                     "created_at": now,
                     "updated_at": now,
                 },
@@ -300,12 +331,13 @@ class WorkpaperMutationAdapter:
             wp_id = UUID(locator["wp_id"])
             item_id = locator["item"]
             cell = locator.get("cell", ".")
+            storage_col = _storage_field(locator)
 
             # 归属校验
             await self._verify_ownership(wp_id, snapshot.target.project_id)
 
             # Optimistic version check
-            remark, updated_at = await self._read_row(wp_id, item_id)
+            col_value, updated_at = await self._read_row(wp_id, item_id, storage_col)
             current_version = _version_from_timestamp(updated_at)
 
             conflict = False
@@ -325,19 +357,28 @@ class WorkpaperMutationAdapter:
                 )
                 continue
 
-            # 恢复 before_value
-            new_remark = _cell_write(remark, cell, snapshot.before_value)
-            await self._session.execute(
-                text(
+            # 恢复 before_value — 按 storage_col 选列
+            new_value = _cell_write(col_value, cell, snapshot.before_value)
+            if storage_col == "conclusion":
+                update_sql = (
                     "UPDATE checklist_responses "
-                    "SET remark = :remark, updated_at = :updated_at, "
+                    "SET conclusion = :col_value, updated_at = :updated_at, "
                     "content_version = content_version + 1 "
                     "WHERE wp_id = :wp_id AND item_id = :item_id"
-                ),
+                )
+            else:
+                update_sql = (
+                    "UPDATE checklist_responses "
+                    "SET remark = :col_value, updated_at = :updated_at, "
+                    "content_version = content_version + 1 "
+                    "WHERE wp_id = :wp_id AND item_id = :item_id"
+                )
+            await self._session.execute(
+                text(update_sql),
                 {
                     "wp_id": str(wp_id),
                     "item_id": item_id,
-                    "remark": new_remark,
+                    "col_value": new_value,
                     "updated_at": now,
                 },
             )

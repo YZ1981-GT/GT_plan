@@ -283,8 +283,8 @@ async def test_concurrent_save_rolls_back_whole_workpaper_and_skips_note(env, mo
     await env.add_note("五、1", _f2_note())
     real_read = push._read_entries
 
-    async def read_then_user_saves(db, wp_id, wp_code):
-        snap = await real_read(db, wp_id, wp_code)
+    async def read_then_user_saves(db, wp_id, wp_code, **kwargs):
+        snap = await real_read(db, wp_id, wp_code, **kwargs)
         # 同一连接内改版本号，等价于「快照读取后另一个请求已提交」（改的是本次要写的条目）
         await db.execute(sa.text(
             "UPDATE checklist_responses SET updated_at = '2026-09-30 10:00:00.000000+00:00' "

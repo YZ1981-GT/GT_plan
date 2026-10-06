@@ -16,7 +16,13 @@ from typing import Any, Protocol, runtime_checkable
 
 @dataclass(frozen=True)
 class WorkpaperTarget:
-    """一个底稿目标。``row_id``/``field`` 为空 = 单值键（写 remark）。"""
+    """一个底稿目标。``row_id``/``field`` 为空 = 单值键。
+
+    ``storage_field`` 指定 ``checklist_responses`` 的落库列：
+    - ``"remark"``（默认）—— E1/K1/L6 等大部分底稿
+    - ``"conclusion"`` —— N3 等递延所得税类底稿（前端 ``setField`` 写 conclusion）
+    值会传入 locator 供 adapter/snapshot/restore 链路感知。
+    """
 
     rule_id: str
     policy: str
@@ -27,6 +33,7 @@ class WorkpaperTarget:
     row_id: str | None = None
     field: str | None = None
     mirror_field: str | None = None
+    storage_field: str = "remark"
 
 
 @dataclass(frozen=True)
@@ -133,6 +140,8 @@ _REGISTRY: dict[str, str | BindingFactory] = {
     "L5": "app.services.formula_push.bindings.note_direct:note_direct_for('L5')",
     "L7": "app.services.formula_push.bindings.note_direct:note_direct_for('L7')",
     "L8": "app.services.formula_push.bindings.note_direct:note_direct_for('L8')",
+    # ── L 循环（筹资）· L6 专项应付款 ──
+    "L6": "app.services.formula_push.bindings.note_direct:note_direct_for('L6')",
     # ── 批 D 附注直推族 binding · M 循环（股东权益） ──
     "M1": "app.services.formula_push.bindings.note_direct:note_direct_for('M1')",
     "M2": "app.services.formula_push.bindings.note_direct:note_direct_for('M2')",
@@ -149,6 +158,8 @@ _REGISTRY: dict[str, str | BindingFactory] = {
     "N2": "app.services.formula_push.bindings.note_direct:note_direct_for('N2')",
     "N4": "app.services.formula_push.bindings.note_direct:note_direct_for('N4')",
     "N5": "app.services.formula_push.bindings.note_direct:note_direct_for('N5')",
+    # ── N 循环 · N3 递延所得税负债（conclusion 列） ──
+    "N3": "app.services.formula_push.bindings.n3:n3_binding",
 }
 _METHOD_ARITY = {"load_sources": 4, "workpaper_targets": 3, "apply": 3, "note_rows": 3, "entry_warnings": 1}
 _CODE_RE = re.compile(r"^[A-Z]\d+$")

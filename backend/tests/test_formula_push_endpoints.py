@@ -75,7 +75,7 @@ async def test_rules_listing_is_readonly_and_chinese(api):
     assert r.status_code == 200, r.text
     payload = r.json()
     assert "E1" in payload["supported_wp_codes"] and "K1" in payload["supported_wp_codes"]
-    assert len(payload["supported_wp_codes"]) == 20  # E1 + K1 + 18 Tier A
+    assert len(payload["supported_wp_codes"]) >= 80  # 80+ 主编码（随注册表增长）
     rules = payload["rules"]
     assert len(rules) == 30 and {x["wp_code"] for x in rules} == {"E1"}  # wp_code 过滤只返回 E1 的 30 条
     tb = next(x for x in rules if x["rule_id"] == "E1.tb_amount.ending")
@@ -110,13 +110,19 @@ async def test_bindings_listing_tracks_temporary_registry_registration_and_revok
 
     c, base = api["client"], api["base"]
     api["as"]("reader")
+
+    # 获取注册前的数量
+    r0 = await c.get(f"{base}/bindings")
+    assert r0.status_code == 200
+    permanent_count = len(r0.json()["supported_wp_codes"])
+
     revoke = register_binding("Z9", FakeBinding)
     try:
         r = await c.get(f"{base}/bindings")
         assert r.status_code == 200
         codes_with_z9 = r.json()["supported_wp_codes"]
         assert "Z9" in codes_with_z9
-        assert len(codes_with_z9) == 21  # 20 permanent + Z9
+        assert len(codes_with_z9) == permanent_count + 1  # permanent + Z9
         assert r.json()["bindings"][-1] == {"wp_code": "Z9", "account_prefixes": ["9901"]}
     finally:
         revoke()
@@ -125,7 +131,7 @@ async def test_bindings_listing_tracks_temporary_registry_registration_and_revok
     assert r.status_code == 200
     codes_after = r.json()["supported_wp_codes"]
     assert "Z9" not in codes_after
-    assert len(codes_after) == 20
+    assert len(codes_after) == permanent_count
 
 
 @pytest.mark.asyncio
