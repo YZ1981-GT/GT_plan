@@ -1272,3 +1272,8 @@ backend/tests/test_module_cell_resolver.py 835
 audit-platform/frontend/src/views/DisclosureEditor.vue 3165
 audit-platform/frontend/src/components/consolidation/worksheets/ConsolWorksheetTabs.vue 1543
 backend/app/main.py 816
+
+# test_formula_push_batch_e_note.py — 2026-10-06 入册。
+#   Batch E 附注推送六字段测试（D1~D7 分类+坏账聚合 + Tier A 多科目行），
+#   测试矩阵覆盖 8 个科目 × 多场景 = 1355 行；拆分降低测试可读性。
+backend/tests/test_formula_push_batch_e_note.py 1355
