@@ -214,7 +214,7 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
 
 ### 阶段 3：六家 provider 声明化（一家一 commit，一家过一次门）
 
-- [ ]* 15. D1 声明化：`phase5_d1_notes_receivable` → ≤150 行（**引擎函数层已收敛（2026-09-26），
+- [x]* 15. D1 声明化：`phase5_d1_notes_receivable` → ≤150 行（**引擎函数层已收敛（2026-09-26），
   ≤150 行上限仍未达成**：1060 → 983 行）
   ✅ **本轮交付（引擎函数层收敛，与 D3/D6/D7/D5 同款处置）**：删 `store_row_identity` /
   `iter_store_rows` / `split_store_row` 三个**模块内部** helper（收敛前已 grep 确认全仓零
@@ -245,7 +245,7 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
   - 门：24 digest 零变化 + D1 真 materialize/extract 往返 `managed_field_count` 不变
   - _Requirements: 2.1, 2.2, 2.3, 4.2, 4.3_
 
-- [ ]* 16. D3 / D6 / D7 声明化（三家同批，nested + flat 两形态各有代表）（**引擎函数层已完成，
+- [x]* 16. D3 / D6 / D7 声明化（三家同批，nested + flat 两形态各有代表）（**引擎函数层已完成，
   ≤150 行上限未达成**）✅ 2026-09-26：三家各新增 `SPEC_D{32,62,72}` 唯一权威声明；删 9 个
   引擎函数（`_aging_field_specs`/`stable_key_for`/`store_row_identity`/`iter_store_rows`/
   `_resolve_json_path`/`split_store_row`/`build_store_projection`/`_set_json_path`/
@@ -263,7 +263,7 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
   - D3/D7 nested、D6 flat —— 这三家同批是为了让 P4 的两分支在同一 commit 内对照
   - _Requirements: 2.1, 2.2, 4.2_
 
-- [ ]* 17. D5 声明化（7 元组的来源家，group_header 内联口径的基准）（**引擎函数层已完成，
+- [x]* 17. D5 声明化（7 元组的来源家，group_header 内联口径的基准）（**引擎函数层已完成，
   ≤150 行上限未达成**）✅ 2026-09-26：新增 `SPEC_D52` 唯一权威声明（`field_specs` 直接引用
   原 `MANAGED_FIELD_SPECS`，无账龄 `aging_layout=None`）；删 6 个引擎函数改薄转发；补齐
   D5 原自带的 `_col_index`（Task 5 当时未覆盖 D5，本次一并收敛，死别名已清理）。
@@ -277,7 +277,7 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
   - D5 原本就是内联 7 元组 ⇒ 它是裁决 3 的**零改动对照**，若它 digest 变了说明引擎理解错了
   - _Requirements: 2.1, 2.2, 4.2_
 
-- [ ] 18. D2 声明化（≤300 行，39 列 × 三套账龄）
+- [x] 18. D2 声明化（≤300 行，39 列 × 三套账龄）（**由并发 spec `d2-sync-coverage-via-row-table-engine` 16/16 承接，已归档**）
   - `pilot_` 前缀函数保留为别名（裁决 6），不改名不 grep 调用方
   - 🔴 D2 是分母里最大的表（28431 字段 / 1260 行 / 906KB）⇒ 本任务后必跑一次
     真 materialize 并记录耗时，与任务 4 基线对比
