@@ -833,6 +833,18 @@
         "账面余额",
         "坏账准备"
       ]
+    ],
+    "_column_groups": [
+      {
+        "group": "期末数",
+        "start": 1,
+        "span": 1
+      },
+      {
+        "group": "期初数",
+        "start": 2,
+        "span": 3
+      }
     ]
   },
   {
@@ -976,6 +988,18 @@
         "预期信用损失率(%)",
         ""
       ]
+    ],
+    "_column_groups": [
+      {
+        "group": "期末数",
+        "start": 1,
+        "span": 5
+      },
+      {
+        "group": "期初数",
+        "start": 6,
+        "span": 5
+      }
     ]
   },
   {
@@ -2122,6 +2146,18 @@
         "账面余额",
         "坏账准备"
       ]
+    ],
+    "_column_groups": [
+      {
+        "group": "期末数",
+        "start": 1,
+        "span": 1
+      },
+      {
+        "group": "期初数",
+        "start": 2,
+        "span": 3
+      }
     ]
   },
   {
@@ -11173,6 +11209,53 @@
         "",
         ""
       ]
+    ],
+    "_column_groups": [
+      {
+        "group": "期初余额",
+        "start": 1,
+        "span": 1
+      },
+      {
+        "group": "本期新增补助金额",
+        "start": 2,
+        "span": 1
+      },
+      {
+        "group": "本期计入损益金额",
+        "start": 3,
+        "span": 1
+      },
+      {
+        "group": "本期计入损益的列报项目",
+        "start": 4,
+        "span": 1
+      },
+      {
+        "group": "本期返还的金额",
+        "start": 5,
+        "span": 1
+      },
+      {
+        "group": "其他<br/>变动",
+        "start": 6,
+        "span": 1
+      },
+      {
+        "group": "期末<br/>余额",
+        "start": 7,
+        "span": 1
+      },
+      {
+        "group": "与资产相关/与收益相关",
+        "start": 8,
+        "span": 1
+      },
+      {
+        "group": "本期返还的原因",
+        "start": 9,
+        "span": 1
+      }
     ]
   },
   {

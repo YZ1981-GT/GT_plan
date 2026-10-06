@@ -702,9 +702,12 @@ def consol_standard(template_type: str | None) -> str:
 async def resolve_consol_standard(db: AsyncSession, project_id: UUID) -> str:
     from app.models.core import Project
 
-    template_type = (await db.execute(
+    raw_template_type = (await db.execute(
         sa.select(Project.template_type).where(Project.id == project_id)
     )).scalar_one_or_none()
+    # 数据库字段按字符串存储；非字符串只视为未配置，避免 mock/损坏数据把
+    # coroutine 或任意对象带入模板解析并产生不可观察的 SOE/Listed 误判。
+    template_type = raw_template_type if isinstance(raw_template_type, str) else None
     return consol_standard(template_type)
 
 

@@ -1277,3 +1277,4 @@ backend/app/main.py 816
 #   Batch E 附注推送六字段测试（D1~D7 分类+坏账聚合 + Tier A 多科目行），
 #   测试矩阵覆盖 8 个科目 × 多场景 = 1355 行；拆分降低测试可读性。
 backend/tests/test_formula_push_batch_e_note.py 1355
+backend/app/services/consol_disclosure_service.py 1985

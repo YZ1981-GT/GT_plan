@@ -64,25 +64,35 @@ def resolve_requested_node_key(
     query_node_key: str | None,
     body: dict | None = None,
 ) -> str | None:
-    """query 参数优先，兼容旧 body 中的 node_key。
+    """解析节点键：query 与兼容 body 必须一致，query 作为唯一有效来源。
 
-    空字符串是无效输入（不降级为省略）：调用方传了空 node_key 应立即拒绝，
-    而不是静默当作 ``None`` 走 legacy 路径。
+    旧客户端可能把 ``node_key`` 放在 JSON body；新客户端放在 query。两者
+    同时存在时，显式冲突直接拒绝，避免“query 优先”掩盖调用方把两个节点
+    混在一起的错误。空字符串同样是无效输入，不降级为 legacy NULL 作用域。
     """
-    if isinstance(query_node_key, str):
-        if not query_node_key:
-            raise NodeScopeError(
-                "node_key 不能为空字符串；省略参数表示 legacy 模式，传入则必须是当前企业树中的完整节点键"
-            )
+    body_value = body.get("node_key") if isinstance(body, dict) else None
+    query_present = query_node_key is not None
+    # Pydantic 的可选字段在 model_dump() 中会带 None；None 表示旧请求省略，
+    # 只有非 None 值才构成 body 侧的显式 node_key。
+    body_present = isinstance(body, dict) and body.get("node_key") is not None
+
+    if query_present and (not isinstance(query_node_key, str) or not query_node_key):
+        raise NodeScopeError(
+            "node_key 不能为空字符串；省略参数表示 legacy 模式，传入则必须是当前企业树中的完整节点键"
+        )
+    if body_present and (not isinstance(body_value, str) or not body_value):
+        raise NodeScopeError(
+            "node_key 不能为空字符串；省略参数表示 legacy 模式，传入则必须是当前企业树中的完整节点键"
+        )
+    if query_present and body_present and query_node_key != body_value:
+        raise NodeScopeError(
+            "query 参数 node_key 与请求体 node_key 冲突，请只提交同一个企业树节点",
+            status=400,
+        )
+    if query_present:
         return query_node_key
-    if isinstance(body, dict):
-        val = body.get("node_key")
-        if isinstance(val, str):
-            if not val:
-                raise NodeScopeError(
-                    "node_key 不能为空字符串；省略参数表示 legacy 模式，传入则必须是当前企业树中的完整节点键"
-                )
-            return val
+    if body_present:
+        return body_value
     return None
 
 

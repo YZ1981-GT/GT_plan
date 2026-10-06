@@ -905,6 +905,7 @@ async def generate_consol_notes_with_flag(
     db: AsyncSession,
     project_id: UUID,
     year: int,
+    template_type: str | None = None,
 ) -> list[ConsolDisclosureSection]:
     """合并附注生成统一入口（feature flag 灰度，ADR-CONSOL-202）.
 
@@ -916,14 +917,19 @@ async def generate_consol_notes_with_flag(
 
     返回结构契约与老版一致（list[ConsolDisclosureSection]，属性 S4）。
     """
+    from app.services.consol_note_formula_service import resolve_note_template_type
     from app.services.consol_note_gray_service import is_consol_note_v2_enabled
+
+    resolved_template_type = await resolve_note_template_type(db, project_id, template_type)
 
     # 灰度按项目：全局 CONSOL_NOTES_V2_ENABLED=True 或该项目 opt-in → 走 V2（读端 schema
     # 不携带穿透 provenance，P1-A(a)；穿透明细走 Step 8 落库 + consol-breakdown 端点）；
     # 否则老版 7 骨架章节（零回归）。
     if await is_consol_note_v2_enabled(db, project_id):
         try:
-            v2_sections = await generate_full_consol_notes(db, project_id, year)
+            v2_sections = await generate_full_consol_notes(
+                db, project_id, year, template_type=resolved_template_type,
+            )
             return _adapt_v2_sections_to_schema(v2_sections)
         except Exception as err:  # EH3/R2：V2 失败回退老版兼容
             logger.warning(
