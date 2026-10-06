@@ -458,6 +458,10 @@ def _register_phase_handlers() -> None:
         register_stale_handler(event_bus)              # NOTE_UPDATED → 合并附注 stale
         register_consol_trial_stale_handler(event_bus)  # TRIAL_BALANCE_UPDATED → 合并 trial stale（P1）
         register_consol_elimination_recalc_handler(event_bus)  # ELIMINATION_APPROVED → worksheet + trial 重算（衔接2）
+        from app.services.consol_note_formula_refresh_handler import (
+            register_consol_note_formula_refresh_handler,
+        )
+        register_consol_note_formula_refresh_handler(event_bus)  # TB → 节点附注公式持久化
     except Exception as e:
         _log.getLogger("audit_platform").warning(
             "[启动] 合并 stale handler 注册失败: %s", e
@@ -709,6 +713,22 @@ async def debug_a51_capability():
         "registry_has_bypass": has_bypass,
         "entry_count": len(entries),
     }
+
+
+@app.get("/api/_debug/a51-content-revision")
+async def debug_a51_content_revision(wp_id: str = "2246b5c0-19c3-4d66-bfb2-72d9afdc2996"):
+    """返回指定底稿的 content_revision（canary 临时端点，无需认证）。"""
+    import sqlalchemy as sa
+    from app.core.database import engine
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.orm import sessionmaker
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with async_session() as session:
+        rev = (await session.execute(
+            sa.text("SELECT content_revision FROM working_paper WHERE id = :wp"),
+            {"wp": wp_id},
+        )).scalar_one_or_none()
+    return {"content_revision": int(rev) if rev is not None else 0}
 
 
 @app.get("/api/_debug/a51-registration")

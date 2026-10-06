@@ -320,10 +320,17 @@ const {
   flushHtml: async () => {
     // 🔴 A5-1 不是 store-backed entry（后端 provider 无 STORE_ITEM_ID），
     // 不能走 readStoreProjection（会 422 entry_not_store_backed）。
-    // 参照 B22A：flush pending saves，返回空 projection + expectedRevision=0，
-    // 后端 adapter 从 checklist_responses 自行读取并构造投影。
+    // 从后端 _debug 端点获取 content_revision（临时方案，正式应由 store-projection 统一）。
     flushPendingAndProject()
-    return { expectedRevision: 0, projection: null, sheetKey: A51_SHEET_KEY }
+    let expectedRevision = 0
+    try {
+      const resp = await fetch(`/api/_debug/a51-content-revision?wp_id=${props.wpId}`)
+      if (resp.ok) {
+        const d = await resp.json()
+        expectedRevision = (d.data?.content_revision ?? d.content_revision) || 0
+      }
+    } catch { /* fallback to 0 */ }
+    return { expectedRevision, projection: { values: {} }, sheetKey: A51_SHEET_KEY }
   },
   reloadHtml: async () => { await reloadA51() },
 })
