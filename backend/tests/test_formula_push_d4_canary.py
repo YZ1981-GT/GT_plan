@@ -49,8 +49,8 @@ FIXTURE: dict = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
 # ── 常量 ─────────────────────────────────────────────────────────────────
 
 D4_TB_DATA: dict[str, dict[str, Decimal]] = {
-    "6001": {"期末余额": Decimal("2000000"), "年初余额": Decimal("1500000")},
-    "6051": {"期末余额": Decimal("300000"), "年初余额": Decimal("200000")},
+    "6001": {"期末余额": Decimal("2000000"), "年初余额": Decimal("1500000"), "本期发生额": Decimal("500000")},
+    "6051": {"期末余额": Decimal("300000"), "年初余额": Decimal("200000"), "本期发生额": Decimal("100000")},
 }
 
 D4_ADDR_6001 = "D4/D4-1/D4-1-adj-tb-6001"
@@ -82,30 +82,31 @@ class TestD4RulesAndBinding:
         assert b.wp_code == "D4"
         assert b.paper_codes == ("D4",)
         assert set(b.account_prefixes) == {"6001", "6051"}
-        assert b.derivations == frozenset()
+        from app.services.formula_push.bindings.tier_a import _NOTE_DERIVATIONS
+        assert b.derivations == _NOTE_DERIVATIONS.get("D4", frozenset())
         assert b.four_table_slots == frozenset()
 
     def test_d4_has_exactly_2_rules(self):
         rules = load_rules()
-        d4_rules = rules_for(rules, wp_code="D4")
+        d4_rules = [r for r in rules_for(rules, wp_code="D4") if r.stage != "note"]
         assert len(d4_rules) == 2
 
     def test_d4_rule_ids_match_fixture(self):
         rules = load_rules()
-        d4_rules = rules_for(rules, wp_code="D4")
+        d4_rules = [r for r in rules_for(rules, wp_code="D4") if r.stage != "note"]
         rule_ids = {r.rule_id for r in d4_rules}
         fixture_ids = {a["rule_id"] for a in FIXTURE["anchors"]}
         assert rule_ids == fixture_ids
 
     def test_d4_target_item_ids_are_unique(self):
         rules = load_rules()
-        d4_rules = rules_for(rules, wp_code="D4")
+        d4_rules = [r for r in rules_for(rules, wp_code="D4") if r.stage != "note"]
         item_ids = [r.target.item_id for r in d4_rules]
         assert len(item_ids) == len(set(item_ids)), "D4 目标 item_id 必须唯一"
 
     def test_d4_all_rules_are_source_formula_system(self):
         rules = load_rules()
-        d4_rules = rules_for(rules, wp_code="D4")
+        d4_rules = [r for r in rules_for(rules, wp_code="D4") if r.stage != "note"]
         for r in d4_rules:
             assert r.source.kind == "formula", f"{r.rule_id} 应为 formula 来源"
             assert r.policy == "system", f"{r.rule_id} 应为 system 策略"
@@ -115,13 +116,13 @@ class TestD4RulesAndBinding:
         binding = binding_for("D4")
         sources = _make_d4_sources()
         rules = load_rules()
-        d4_rules = rules_for(rules, wp_code="D4")
+        d4_rules = [r for r in rules_for(rules, wp_code="D4") if r.stage != "note"]
         for rule in d4_rules:
             targets, skips = binding.workpaper_targets(rule, {}, sources)
             assert len(skips) == 0, f"{rule.rule_id} 不应跳过"
             assert len(targets) == 1, f"{rule.rule_id} 应恰好 1 个目标"
             t = targets[0]
-            expected = float(D4_TB_DATA[rule.source.expression.split("'")[1]]["期末余额"])
+            expected = float(D4_TB_DATA[rule.source.expression.split("'")[1]]["本期发生额"])
             assert t.formula_value == pytest.approx(expected), (
                 f"{rule.rule_id} 推送值 {t.formula_value} ≠ 期望 {expected}"
             )
@@ -130,7 +131,7 @@ class TestD4RulesAndBinding:
         binding = binding_for("D4")
         sources = _make_d4_sources()
         rules = load_rules()
-        d4_rules = rules_for(rules, wp_code="D4")
+        d4_rules = [r for r in rules_for(rules, wp_code="D4") if r.stage != "note"]
         addrs = set()
         for rule in d4_rules:
             targets, _ = binding.workpaper_targets(rule, {}, sources)
@@ -236,12 +237,10 @@ async def test_d4_push_writes_both_anchors(d4_env):
     result = await d4_env.push()
     d4_saved = await _d4_entries(d4_env)
 
-    # 6001 → 2000000
-    assert d4_saved["D4-1-adj-tb-6001"] == "2000000"
-    # 6051 → 300000
-    assert d4_saved["D4-1-adj-tb-6051"] == "300000"
-
-    # 运行状态应包含 D4 的 2 个状态
+    # 6001 → 本期发生额 500000（= 2000000 − 1500000）
+    assert d4_saved["D4-1-adj-tb-6001"] == "500000"
+    # 6051 → 本期发生额 100000（= 300000 − 200000）
+    assert d4_saved["D4-1-adj-tb-6051"] == "100000"    # 运行状态应包含 D4 的 2 个状态
     states = await d4_env.states()
     d4_states = {k: v for k, v in states.items() if v.rule_id.startswith("D4.")}
     assert len(d4_states) == 2
@@ -266,7 +265,7 @@ async def test_d4_second_push_idempotent(d4_env):
     after = await _d4_entries(d4_env)
     assert before == after
 
-    d4_items = [i for i in result.items if i.rule_id.startswith("D4.")]
+    d4_items = [i for i in result.items if i.rule_id.startswith("D4.") and not i.rule_id.endswith(".note.main")]
     assert all(i.action == "unchanged" for i in d4_items)
 
 
@@ -329,8 +328,8 @@ async def test_d4_selective_push_only_d4(d4_env):
 
     # D4 条目应存在
     d4_saved = await _d4_entries(d4_env)
-    assert d4_saved["D4-1-adj-tb-6001"] == "2000000"
-    assert d4_saved["D4-1-adj-tb-6051"] == "300000"
+    assert d4_saved["D4-1-adj-tb-6001"] == "500000"
+    assert d4_saved["D4-1-adj-tb-6051"] == "100000"
 
     # 运行记录只含 D4
     runs = await d4_env.runs()
@@ -376,8 +375,8 @@ class TestD4Mutations:
         binding = binding_for("D4")
         # 构建含错误科目的 TB 数据
         bad_tb = TbAuditedSnapshot(
-            tb_data={"9999": {"期末余额": Decimal("0"), "年初余额": Decimal("0")},
-                     "6051": {"期末余额": Decimal("300000"), "年初余额": Decimal("200000")}},
+            tb_data={"9999": {"期末余额": Decimal("0"), "年初余额": Decimal("0"), "本期发生额": Decimal("0")},
+                     "6051": {"期末余额": Decimal("300000"), "年初余额": Decimal("200000"), "本期发生额": Decimal("100000")}},
             available=True, company_codes=("001",),
         )
         bad_sources = TierASources(formula=FormulaSources(tb=bad_tb))
@@ -386,25 +385,27 @@ class TestD4Mutations:
         targets, skips = binding.workpaper_targets(r6001, {}, bad_sources)
         # 如果源数据缺 6001，公式引擎会对缺失科目返回 0
         if targets:
-            assert targets[0].formula_value != 2000000.0, "科目码错误时不应得到正确值"
+            assert targets[0].formula_value != 500000.0, "科目码错误时不应得到正确值"
 
     def test_mutation_tb_unavailable_produces_skip(self):
-        """变异：试算表不可用 ⇒ 全部跳过而非返回 0。"""
+        """变异：试算表不可用 ⇒ 全部底稿规则跳过而非返回 0。"""
         binding = binding_for("D4")
         sources = _make_d4_sources(available=False)
-        rules = rules_for(load_rules(), wp_code="D4")
+        rules = [r for r in rules_for(load_rules(), wp_code="D4") if r.stage != "note"]
         for rule in rules:
             targets, skips = binding.workpaper_targets(rule, {}, sources)
             assert targets == [], f"{rule.rule_id} 不应有目标"
             assert len(skips) >= 1, f"{rule.rule_id} 应有跳过记录"
 
-    def test_mutation_no_note_rules_for_d4(self):
-        """D4 Tier A 无附注规则（note_rows 返回空列表）。"""
+    def test_mutation_note_rows_empty_without_tb_data(self):
+        """D4 附注行在 TB 未加载时为空列表。"""
         binding = binding_for("D4")
+        # _last_tb_data 为 None（未调 load_sources），note_rows 返空
         rules = rules_for(load_rules(), wp_code="D4")
         for rule in rules:
-            assert binding.note_rows({}, "listed", rule) == []
-            assert binding.note_rows({}, "soe", rule) == []
+            if rule.stage == "note":
+                assert binding.note_rows({}, "listed", rule) == []
+                assert binding.note_rows({}, "soe", rule) == []
 
     def test_mutation_d4_not_in_registry_raises(self):
         """变异：若 D4 未注册则 get_binding 抛 KeyError。"""
@@ -424,9 +425,9 @@ class TestD4Mutations:
         assert FIXTURE["wp_code"] == "D4"
         assert FIXTURE["paper_codes"] == ["D4"]
         assert len(FIXTURE["anchors"]) == 2
-        # 确认两条锚点的 rule_id 与注册表规则一致
+        # 确认两条锚点的 rule_id 与注册表底稿规则（排除附注）一致
         rules = load_rules()
-        d4_rules = rules_for(rules, wp_code="D4")
+        d4_rules = [r for r in rules_for(rules, wp_code="D4") if r.stage != "note"]
         fixture_rule_ids = {a["rule_id"] for a in FIXTURE["anchors"]}
         actual_rule_ids = {r.rule_id for r in d4_rules}
         assert fixture_rule_ids == actual_rule_ids

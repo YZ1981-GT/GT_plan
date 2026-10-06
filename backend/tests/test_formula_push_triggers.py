@@ -48,15 +48,27 @@ def saved(wp_code="E1", wp_id=WP, year=2025) -> EventPayload:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("codes, fires, selected", [
+@pytest.mark.parametrize("codes, fires, must_include", [
     (None, True, None), ([], True, None),                         # 全量重算
-    (["1002"], True, ("E1",)), (["1001.01"], True, ("E1",)),
-    (["6601", "1012.03"], True, ("E1",)),
-    (["6601", "2202"], False, None), (["10"], False, None), (["01001"], False, None),
+    (["1002"], True, {"E1"}), (["1001.01"], True, {"E1"}),
+    (["6601", "1012.03"], True, {"E1"}),
+    (["6601", "2202"], True, {"F4", "K8"}),  # 6601→F4（存货）, 2202→K8（应付职工薪酬）
+    (["10"], False, None), (["01001"], False, None),
 ])
-async def test_trial_balance_updated_fires_only_when_cash_accounts_touched(calls, codes, fires, selected):
+async def test_trial_balance_updated_fires_only_when_cash_accounts_touched(calls, codes, fires, must_include):
     await triggers.on_trial_balance_updated(tb(codes))
-    assert calls == ([(PID, 2025, "TRIAL_BALANCE_UPDATED", None, selected)] if fires else [])
+    if not fires:
+        assert calls == []
+    else:
+        assert len(calls) == 1
+        _, _, _, _, selected = calls[0]
+        if must_include is None:
+            assert selected is None, "全量重算 codes 应为 None"
+        else:
+            assert selected is not None, f"应有选中的 codes，但得到 None"
+            assert must_include <= set(selected), (
+                f"应至少包含 {must_include}，实得 {set(selected)}"
+            )
 
 
 @pytest.mark.asyncio
@@ -257,3 +269,41 @@ def test_main_registers_formula_push_handlers():
     tree = ast.parse(inspect.getsource(main._register_phase_handlers))
     names = {n.func.id for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
     assert "register_formula_push_handlers" in names
+
+
+# ── Tier A 科目前缀联动（Task 10 · 需求 B10） ──────────────────────────
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("account_code, expected_code", [
+    ("6001",  "D4"),   # D4 主营业务收入
+    ("6051",  "D4"),   # D4 其他业务收入
+    ("1121",  "D1"),   # D1 应收票据
+    ("1122",  "D2"),   # D2 应收账款
+    ("6602",  "I6"),   # I6 研发费用
+    ("1701",  "I1"),   # I1 无形资产原值
+    ("6115",  "H10"),  # H10 资产处置损益
+    ("1631",  "H5"),   # H5 油气资产
+])
+async def test_tier_a_tb_updated_selects_correct_binding(calls, account_code, expected_code):
+    """试算表更新指定科目码时，对应 Tier A binding 被选中推送。"""
+    await triggers.on_trial_balance_updated(tb([account_code]))
+    assert len(calls) == 1
+    _, _, _, _, codes = calls[0]
+    assert expected_code in codes, f"科目码 {account_code} 应选中 {expected_code}，实得 {codes}"
+
+
+@pytest.mark.asyncio
+async def test_tier_a_unrelated_code_not_fired(calls):
+    """试算表更新无关科目码（9999）时，Tier A 不触发。"""
+    await triggers.on_trial_balance_updated(tb(["9999"]))
+    assert calls == [], "科目码 9999 不应命中任何 binding"
+
+
+@pytest.mark.asyncio
+async def test_tier_a_full_rebuild_fires(calls):
+    """试算表全量重算（无科目码）时，codes=None 触发全部推送。"""
+    await triggers.on_trial_balance_updated(tb(None))
+    assert len(calls) == 1
+    _, _, _, _, codes = calls[0]
+    assert codes is None, "全量重算 codes 应为 None"

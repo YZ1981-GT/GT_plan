@@ -1,32 +1,32 @@
 {
-  "_comment": "D4 canary 双侧夹具：2 条 Tier A 锚点的期望值。spec: formula-push-all-subjects-rollout Task 23",
-  "_canary_justification": "D4 首选：①真库唯一有锚点数据的科目 ②损益类 2 条锚点正好覆盖「审定数」→「期末余额」改写 ③items 落在主编码册 D4（sheet_code D4-1 只是地址命名空间） ④paper_codes=('D4',) 缺省即可",
+  "_comment": "D4 canary 双侧夹具：2 条 Tier A 锚点的期望值。spec: formula-push-income-stmt-batch-d Task 3",
+  "_canary_justification": "D4 首选：①真库唯一有锚点数据的科目 ②损益类 2 条锚点正好覆盖「审定数」→「本期发生额」改写 ③items 落在主编码册 D4（sheet_code D4-1 只是地址命名空间） ④paper_codes=('D4',) 缺省即可",
   "wp_code": "D4",
   "paper_codes": ["D4"],
   "test_tb_data": {
-    "6001": {"期末余额": "2000000", "年初余额": "1500000"},
-    "6051": {"期末余额": "300000", "年初余额": "200000"}
+    "6001": {"期末余额": "2000000", "年初余额": "1500000", "本期发生额": "500000"},
+    "6051": {"期末余额": "300000", "年初余额": "200000", "本期发生额": "100000"}
   },
   "anchors": [
     {
       "rule_id": "D4.1_adj_tb_6001",
       "item_id": "D4-1-adj-tb-6001",
       "sheet_code": "D4-1",
-      "expression": "TB('6001','期末余额')",
+      "expression": "TB('6001','本期发生额')",
       "original_expression": "TB('6001','审定数')",
-      "rewrite_reason": "损益类科目 6001 主营业务收入，audited_amount 存审定发生额；trial_balance_audited 上下文 '期末余额' 映射到 audited_amount，语义等价",
-      "expected_float": 2000000.0,
-      "expected_js_string": "2000000"
+      "rewrite_reason": "损益类科目 6001 主营业务收入，本期发生额 = audited_amount − opening_balance；批 D 改写列名从 '期末余额' 到 '本期发生额'，上下文从 trial_balance_audited 到 trial_balance_audited_occurrence",
+      "expected_float": 500000.0,
+      "expected_js_string": "500000"
     },
     {
       "rule_id": "D4.1_adj_tb_6051",
       "item_id": "D4-1-adj-tb-6051",
       "sheet_code": "D4-1",
-      "expression": "TB('6051','期末余额')",
+      "expression": "TB('6051','本期发生额')",
       "original_expression": "TB('6051','审定数')",
-      "rewrite_reason": "损益类科目 6051 其他业务收入，audited_amount 存审定发生额；trial_balance_audited 上下文 '期末余额' 映射到 audited_amount，语义等价",
-      "expected_float": 300000.0,
-      "expected_js_string": "300000"
+      "rewrite_reason": "损益类科目 6051 其他业务收入，本期发生额 = audited_amount − opening_balance；批 D 改写列名从 '期末余额' 到 '本期发生额'，上下文从 trial_balance_audited 到 trial_balance_audited_occurrence",
+      "expected_float": 100000.0,
+      "expected_js_string": "100000"
     }
   ]
 }

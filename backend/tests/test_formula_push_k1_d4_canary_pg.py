@@ -291,11 +291,11 @@ def test_k1_d4_canary_real_pg(monkeypatch):
         r[1]: r[2] for r in snap["rows_after_push"]
         if r[0] == snap["d4_wp"]
     }
-    assert d4_items.get("D4-1-adj-tb-6001") == "2000000", (
-        f"D4 6001 期末余额推送值错误：{d4_items.get('D4-1-adj-tb-6001')!r}"
+    assert d4_items.get("D4-1-adj-tb-6001") == "500000", (
+        f"D4 6001 本期发生额推送值错误：{d4_items.get('D4-1-adj-tb-6001')!r}"
     )
-    assert d4_items.get("D4-1-adj-tb-6051") == "300000", (
-        f"D4 6051 期末余额推送值错误：{d4_items.get('D4-1-adj-tb-6051')!r}"
+    assert d4_items.get("D4-1-adj-tb-6051") == "100000", (
+        f"D4 6051 本期发生额推送值错误：{d4_items.get('D4-1-adj-tb-6051')!r}"
     )
 
     # ── K1 审定合计 3 键 ──

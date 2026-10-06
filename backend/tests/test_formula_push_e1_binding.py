@@ -26,7 +26,7 @@ from app.services.formula_push.sources import FormulaSources, TbAuditedSnapshot
 
 from app.services.formula_push.bindings.k1 import DERIVATIONS as K1_DERIVATIONS
 
-RULES = {r.rule_id: r for r in load_rules(known_derivations=DERIVATIONS | K1_DERIVATIONS)}
+RULES = {r.rule_id: r for r in load_rules()}
 B = E1Binding()
 
 
@@ -62,7 +62,7 @@ def test_registry_and_derivations_cover_rules():
     with pytest.raises(KeyError, match="尚未接入"):
         get_binding("Z9")
     names = {r.source.name for r in RULES.values() if r.source.kind == "derivation"}
-    assert names == set(DERIVATIONS | K1_DERIVATIONS)
+    assert set(DERIVATIONS | K1_DERIVATIONS) <= names, "E1+K1 的全部 derivation 必须在规则中"
 
 
 # ── 行目标 ────────────────────────────────────────────────────────────────

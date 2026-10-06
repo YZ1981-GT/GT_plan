@@ -1,7 +1,7 @@
 """K1（其他应收款）公式推送引擎集成测试（Task 19 · 需求 1.2~1.4, 9.3）。
 
-SQLite 真 ORM：K1 底稿 + 条目 → 推送 → 审定合计 3 键写入。
-当前 K1 只有 3 条 derived 规则（审定合计），editable 规则待后续补充。
+SQLite 真 ORM：K1-2 明细 JSON → K1-1 组合未审数 → 审定合计 3 键写入。
+覆盖 WORKPAPER_SAVED 事件链、editable 手工值保护、非法来源整批跳过和幂等行为。
 """
 from __future__ import annotations
 
@@ -128,9 +128,13 @@ async def test_k1_second_push_idempotent(env):
     result = await env.push()
     after = await _k1_entries(env)
     assert before == after
-    # K1 的 3 项应全是 unchanged
-    k1_items = [i for i in result.items if i.rule_id.startswith("K1.")]
-    assert all(i.action == "unchanged" for i in k1_items)
+    # K1 底稿阶段的 3 项 derived 结果应全是 unchanged；明细来源缺失的 source 规则会显式 skip
+    k1_wp_items = [
+        i for i in result.items
+        if i.rule_id.startswith("K1.audited_total.") and i.domain == "workpaper"
+    ]
+    assert len(k1_wp_items) == 3
+    assert all(i.action == "unchanged" for i in k1_wp_items)
 
 
 @pytest.mark.asyncio
@@ -150,3 +154,131 @@ async def test_k1_frozen_workpaper_is_skipped(env):
     k1_saved = await _k1_entries(env)
     # 审定合计不应被写入
     assert "K1-1-audited-receivable" not in k1_saved
+
+
+async def _detail_rows_payload(rows: list[dict]) -> str:
+    return json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
+
+
+async def _push_k1_workpaper(env: Env):
+    return await env.push(trigger="WORKPAPER_SAVED", wp_id=env.k1_wp_id, codes={"K1"})
+
+
+@pytest.mark.asyncio
+async def test_k1_detail_json_updates_combo_unadjusted_and_derived_totals(env):
+    """K1-2 明细真实 JSON 经 source overlay 写 K1-1 组合数并驱动同轮审定合计。"""
+    rows = [
+        {"id": "d1", "endBalance": 120.126, "badDebtProvision": 12.126, "stage": 3, "nature": "往来款"},
+        {"id": "d2", "endBalance": 50.12, "badDebtProvision": 5.01, "stage": 1, "nature": "保证金"},
+        {"id": "d3", "endBalance": 30, "badDebtProvision": 3, "stage": 2, "nature": "其他"},
+    ]
+    await _seed_k1_entries(env, {
+        "K1-2-detail-rows": await _detail_rows_payload(rows),
+        "K1-1-receivable-r0-aje": "10",
+        "K1-1-baddebt-r1-rje": "1",
+    })
+
+    first = await _push_k1_workpaper(env)
+    saved_entries = await _k1_entries(env)
+
+    assert saved_entries["K1-1-receivable-r0-unadj"] == "120.13"
+    assert saved_entries["K1-1-receivable-r1-unadj"] == "80.12"
+    assert saved_entries["K1-1-receivable-r2-unadj"] == "0"
+    assert saved_entries["K1-1-receivable-r3-unadj"] == "0"
+    assert saved_entries["K1-1-baddebt-r0-unadj"] == "12.13"
+    assert saved_entries["K1-1-baddebt-r1-unadj"] == "8.01"
+    assert saved_entries["K1-1-baddebt-r2-unadj"] == "0"
+    assert saved_entries["K1-1-baddebt-r3-unadj"] == "0"
+    assert saved_entries["K1-1-audited-receivable"] == "210.25"
+    assert saved_entries["K1-1-audited-baddebt"] == "21.14"
+    assert saved_entries["K1-1-audited-net"] == "189.11"
+
+    second = await _push_k1_workpaper(env)
+    assert await _k1_entries(env) == saved_entries
+    combo_items = [item for item in second.items if item.rule_id.startswith("K1.detail_combo.")]
+    assert len(combo_items) == 8
+    assert all(item.action == "unchanged" for item in combo_items)
+    assert first.status == "succeeded"
+
+
+@pytest.mark.asyncio
+async def test_k1_detail_push_preserves_existing_manual_combo_values(env):
+    """首推时已有非空且来源不明的组合数按 editable 策略保留待确认。"""
+    rows = [{"id": "d1", "endBalance": 100, "badDebtProvision": 10, "stage": 3}]
+    await _seed_k1_entries(env, {
+        "K1-2-detail-rows": await _detail_rows_payload(rows),
+        "K1-1-receivable-r0-unadj": "777",
+        "K1-1-baddebt-r0-unadj": "77",
+    })
+
+    result = await _push_k1_workpaper(env)
+    saved_entries = await _k1_entries(env)
+    assert saved_entries["K1-1-receivable-r0-unadj"] == "777"
+    assert saved_entries["K1-1-baddebt-r0-unadj"] == "77"
+    actions = {
+        item.addr_id.rsplit("/", 1)[-1]: item.action
+        for item in result.items
+        if item.rule_id.startswith("K1.detail_combo.")
+    }
+    assert actions["K1-1-receivable-r0-unadj"] == "keep_pending"
+    assert actions["K1-1-baddebt-r0-unadj"] == "keep_pending"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "payload",
+    [
+        pytest.param("{bad-json", id="malformed-json"),
+        pytest.param("[]", id="empty-array"),
+        pytest.param(
+            json.dumps([
+                {"id": "valid", "endBalance": 100, "badDebtProvision": 10, "stage": 3},
+                {"id": "invalid", "endBalance": "oops", "badDebtProvision": 2, "stage": 1},
+            ]),
+            id="mixed-valid-and-invalid-rows",
+        ),
+    ],
+)
+async def test_k1_detail_missing_or_invalid_rows_do_not_zero_existing_targets(env, payload):
+    """非法、空或混合来源只跳过 editable 目标，不以零或部分汇总覆盖既有组合数。"""
+    await _seed_k1_entries(env, {
+        "K1-2-detail-rows": payload,
+        "K1-1-receivable-r0-unadj": "321",
+        "K1-1-baddebt-r0-unadj": "32",
+    })
+
+    result = await _push_k1_workpaper(env)
+    saved_entries = await _k1_entries(env)
+    assert saved_entries["K1-1-receivable-r0-unadj"] == "321"
+    assert saved_entries["K1-1-baddebt-r0-unadj"] == "32"
+    skips = [item for item in result.items if item.rule_id.startswith("K1.detail_combo.")]
+    assert len(skips) == 8
+    assert all(item.action == "skipped" and item.reason for item in skips)
+
+
+@pytest.mark.asyncio
+async def test_k1_workpaper_saved_k1_2_event_runs_real_push_for_its_wp(env, monkeypatch):
+    """WORKPAPER_SAVED(K1-2) 走事件 handler、只對事件 wp_id 執行 SQLite 實際推送。"""
+    import app.core.database as database
+    from app.models.audit_platform_schemas import EventPayload, EventType
+    from app.services.formula_push import triggers
+
+    rows = [{"id": "d1", "endBalance": 45, "badDebtProvision": 4.5, "stage": 3}]
+    await _seed_k1_entries(env, {"K1-2-detail-rows": await _detail_rows_payload(rows)})
+    monkeypatch.setattr(database, "async_session", env.factory)
+    payload = EventPayload(
+        event_type=EventType.WORKPAPER_SAVED,
+        project_id=env.pid,
+        year=YEAR,
+        extra={"wp_code": "K1-2", "wp_id": str(env.k1_wp_id), "trigger": "checklist_response_save"},
+    )
+
+    await triggers.on_workpaper_saved(payload)
+    saved_entries = await _k1_entries(env)
+    assert saved_entries["K1-1-receivable-r0-unadj"] == "45"
+    assert saved_entries["K1-1-baddebt-r0-unadj"] == "4.5"
+    assert saved_entries["K1-1-audited-receivable"] == "45"
+    assert saved_entries["K1-1-audited-baddebt"] == "4.5"
+    assert saved_entries["K1-1-audited-net"] == "40.5"
+    runs = await env.runs()
+    assert len(runs) == 1 and runs[0].trigger_source == "WORKPAPER_SAVED"
