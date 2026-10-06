@@ -1292,3 +1292,10 @@ backend/app/services/consol_disclosure_service.py 1985
 #   （12 行 CSS 动画 + 3 行 computed + 模板 class 绑定）。
 #   拆分应在布局组件整体重构时一并做，不塞进本 spec。
 audit-platform/frontend/src/layouts/ThreeColumnLayout.vue 1515
+
+#   store_item_registry.py —— 2026-10-06 入册。STORE_MERGE_REGISTRY 字典是全平台
+#     adapter 注册表的单一真源（69 条），每条包含 adapter_id / provider_module /
+#     store item 声明 / 中性化函数。本轮增 I1~I6(6条) + K2~K7(6条) = 12 条带注释声明。
+#     拆分轴是按循环字母拆到 `_registry_{cycle}.py` 子模块，但注册表的「一眼看全局」
+#     价值在于 grep 一处能找到全部 adapter，拆分后需要 re-export 聚合层。暂不拆。
+backend/app/services/workpaper_sync/store_item_registry.py  998

@@ -457,6 +457,19 @@
         "review_status": "published_representation_verified",
         "legacy_reasons": []
       }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_j1_short_term",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "j1.accrual_check_short_term",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
     }
   ]
 }

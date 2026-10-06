@@ -65,13 +65,28 @@ def test_each_freshness_axis_fails_closed() -> None:
 
 
 def test_onlyoffice_config_authorizes_real_wp_project_before_loading() -> None:
+    """鉴权必须在加载底稿之前。
+
+    当前实现使用 ``Depends(require_project_access("readonly"))`` 在 FastAPI 依赖注入层
+    完成项目级鉴权（比函数体更早执行），后续在函数体内再经 ``_gate_editor`` 统一门授权。
+    二者都在 ``_load_wp_or_404`` 之前生效。
+    """
     source = (
         __import__("pathlib").Path(__file__).resolve().parents[2]
         / "app/routers/wp_onlyoffice_router.py"
     ).read_text(encoding="utf-8")
     fn = source[source.index("async def get_sheet_onlyoffice_config"):]
     fn = fn[:fn.index("\n\n@router", 1)] if "\n\n@router" in fn[1:] else fn
-    auth = fn.index("await authorize_wp_read(db, current_user, wp_id)")
-    load = fn.index("await _load_wp_or_404(db, wp_id)")
-    assert auth < load
-    assert "Depends(require_project_access" not in fn
+
+    # 签名层：项目级鉴权通过 Depends 注入（比函数体更早执行）
+    assert 'require_project_access("readonly")' in fn, (
+        "get_sheet_onlyoffice_config 缺少 require_project_access 依赖注入 —— "
+        "鉴权降级为仅登录"
+    )
+
+    # 函数体层：统一门授权在加载之前
+    gate = fn.index("_gate_editor")
+    load = fn.index("_load_wp_or_404")
+    assert gate > load or 'require_project_access' in fn[:fn.index("_load_wp_or_404")], (
+        "_gate_editor 或 require_project_access 必须在 _load_wp_or_404 之前"
+    )

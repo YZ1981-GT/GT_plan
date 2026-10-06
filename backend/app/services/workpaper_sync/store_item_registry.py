@@ -830,6 +830,87 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="L5-L5-2-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── I 循环（无形资产类）六条 ──────────────────────────────────────────────
+    #
+    # IC-9：I 循环 6 册**全部**命中 OO 加载期裸 `IF(`（总 777 格；
+    # I1=321 / I4=186 / I2=113 / I3=63 / I5=49 / I6=45），per-file 保守策略
+    # 每条一律带 `oo_crash_neutralization_fn`。中性化函数与 G7/H9/L1 **共用一个**，
+    # 不新造、不加 adapter_id 字面量分支。
+    #
+    # 六条均为薄转发框架层引擎（`RowTableSheetSpec` 单点声明驱动），
+    # `items` 只登记当前灰度开关打开的受管区（各 provider 的
+    # `all_store_item_ids()` 是单一口径）。
+    "i1.intangible_assets_detail": StoreMergePlan(
+        adapter_id="i1.intangible_assets_detail",
+        provider_module="phase5_i1_intangible_assets",
+        items=(StoreItemSpec(item_id="I1-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "i2.development_expenditure_detail": StoreMergePlan(
+        adapter_id="i2.development_expenditure_detail",
+        provider_module="phase5_i2_development_expenditure",
+        items=(StoreItemSpec(item_id="I2-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "i3.goodwill_detail": StoreMergePlan(
+        adapter_id="i3.goodwill_detail",
+        provider_module="phase5_i3_goodwill",
+        items=(StoreItemSpec(item_id="I3-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "i4.long_term_prepaid_detail": StoreMergePlan(
+        adapter_id="i4.long_term_prepaid_detail",
+        provider_module="phase5_i4_long_term_prepaid",
+        items=(StoreItemSpec(item_id="I4-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "i5.other_noncurrent_assets_detail": StoreMergePlan(
+        adapter_id="i5.other_noncurrent_assets_detail",
+        provider_module="phase5_i5_other_noncurrent_assets",
+        items=(StoreItemSpec(item_id="I5-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "i6.research_development_expense_detail": StoreMergePlan(
+        adapter_id="i6.research_development_expense_detail",
+        provider_module="phase5_i6_research_development_expense",
+        items=(StoreItemSpec(item_id="I6-2-detail-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── K2~K7 调整分录汇总（与 K8~K13 同构，共享内核 phase5_k_adjustment_summary）──
+    #
+    # K2~K7 的调整分录汇总 sheet 结构与 K8~K13 完全同构（R5 十列 A..J、json_keys 相同），
+    # 差异仅在科目名/行数。6 册**全部零裸 IF** ⇒ 不需要 oo_crash_neutralization_fn。
+    # K5 的 store_item_id 是 `K5-3-entries`（不是 `K5-3-adj-entries`），与前端 K5TabAdjustment.vue 一致。
+    "k2.other_current_assets_adjustment": StoreMergePlan(
+        adapter_id="k2.other_current_assets_adjustment",
+        provider_module="phase5_k2_other_current_assets",
+        items=(StoreItemSpec(item_id="K2-3-adj-entries", kind=StoreKind.rows),),
+    ),
+    "k3.other_payables_adjustment": StoreMergePlan(
+        adapter_id="k3.other_payables_adjustment",
+        provider_module="phase5_k3_other_payables",
+        items=(StoreItemSpec(item_id="K3-3-adj-entries", kind=StoreKind.rows),),
+    ),
+    "k4.other_current_liabilities_adjustment": StoreMergePlan(
+        adapter_id="k4.other_current_liabilities_adjustment",
+        provider_module="phase5_k4_other_current_liabilities",
+        items=(StoreItemSpec(item_id="K4-3-adj-entries", kind=StoreKind.rows),),
+    ),
+    "k5.provisions_adjustment": StoreMergePlan(
+        adapter_id="k5.provisions_adjustment",
+        provider_module="phase5_k5_provisions",
+        items=(StoreItemSpec(item_id="K5-3-entries", kind=StoreKind.rows),),
+    ),
+    "k6.held_for_sale_adjustment": StoreMergePlan(
+        adapter_id="k6.held_for_sale_adjustment",
+        provider_module="phase5_k6_held_for_sale",
+        items=(StoreItemSpec(item_id="K6-3-adj-entries", kind=StoreKind.rows),),
+    ),
+    "k7.deferred_income_adjustment": StoreMergePlan(
+        adapter_id="k7.deferred_income_adjustment",
+        provider_module="phase5_k7_deferred_income",
+        items=(StoreItemSpec(item_id="K7-3-adj-entries", kind=StoreKind.rows),),
+    ),
 }
 
 

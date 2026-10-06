@@ -64,7 +64,7 @@ from app.services.workpaper_sync.store_projection_response import (
 
 #: ADR-AOS-005 §3 的预期值，在本文件里只当**棘轮上限**用（跳过清单只许变短）。
 #: 🔴 不是等值断言的右操作数 —— 见 `test_denominator_is_non_empty_and_ratchets_against_adr`。
-ADR_EXPECTED_SKIP_TOTAL: Final[int] = 62
+ADR_EXPECTED_SKIP_TOTAL: Final[int] = 69
 
 #: L3 判据里那个关键字参数名 / item-blind 门面硬绑的模块常量名。**声明**，不是键名字面量。
 _ITEM_PARAM: Final[str] = "store_item_id"

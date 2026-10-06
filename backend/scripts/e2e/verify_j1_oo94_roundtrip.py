@@ -109,20 +109,51 @@ def _free_port() -> int:
         return int(sock.getsockname()[1])
 
 
+def _oo_jwt_token(payload: dict[str, Any]) -> str:
+    """为 OO ConvertService 请求生成 JWT（参照 wp_onlyoffice_router._sign_jwt）。"""
+    try:
+        from jose import jwt as jose_jwt
+    except ImportError:
+        # jose 不在 e2e 脚本的依赖里——回退到 PyJWT
+        import jwt as pyjwt  # type: ignore[import-untyped]
+        return pyjwt.encode(payload, _OO_SECRET, algorithm="HS256")
+    return jose_jwt.encode(payload, _OO_SECRET, algorithm="HS256")
+
+
+_OO_SECRET = os.environ.get("ONLYOFFICE_JWT_SECRET", "")
+if not _OO_SECRET:
+    # 回退读 .env 文件
+    _env_file = Path(__file__).resolve().parents[3] / ".env"
+    if _env_file.is_file():
+        for line in _env_file.read_text(encoding="utf-8").splitlines():
+            if line.startswith("ONLYOFFICE_JWT_SECRET="):
+                _OO_SECRET = line.split("=", 1)[1].strip()
+                break
+
+
 def oo_resave(src: Path, dst: Path) -> dict[str, Any]:
+    """通过 OO ConvertService 重保存 xlsx，模拟真实 OO 编辑器的 forcesave 行为。
+
+    与真实 D2 编辑路径一致：请求带 JWT Authorization header（Req 10.1）。
+    OO 启用了 ``token.enable.request.inbox: true``，无 JWT 的请求返回 error -8。
+    """
     port = _free_port()
     handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(src.parent))
     server = http.server.ThreadingHTTPServer(("0.0.0.0", port), handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
-        body = {
+        payload = {
             "async": False, "filetype": "xlsx", "outputtype": "xlsx",
             "key": uuid.uuid4().hex, "title": src.name,
             "url": f"http://{HOST_FROM_CONTAINER}:{port}/{src.name}",
         }
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        if _OO_SECRET:
+            token = _oo_jwt_token({"payload": payload})
+            headers["Authorization"] = f"Bearer {token}"
         req = urllib.request.Request(
-            f"{OO_URL}/ConvertService.ashx", data=json.dumps(body).encode("utf-8"),
-            headers={"Content-Type": "application/json", "Accept": "application/json"}, method="POST",
+            f"{OO_URL}/ConvertService.ashx", data=json.dumps(payload).encode("utf-8"),
+            headers=headers, method="POST",
         )
         with urllib.request.urlopen(req, timeout=180) as resp:
             result = json.loads(resp.read().decode("utf-8"))

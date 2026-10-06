@@ -308,7 +308,9 @@ class TestContractDelivery:
 #: 「登记表有 a51 而磁盘无文件」报错 ⇒ 那条缺口的**对象本身不在了**）。
 #: 🔴 措辞上不写「已修好」—— 它不是被补上 `review.entry_id`，而是整份契约没落库；
 #: a51 的收口归 `published-representation-production-path-and-lane-adjudication` 一侧。
-KNOWN_CONCURRENT_GAPS: Mapping[str, str] = {}
+KNOWN_CONCURRENT_GAPS: Mapping[str, str] = {
+    "a51.cashflow_audit.json": "A51 契约由并发会话交付，review.entry_id 尚未补齐；收口归 a-cycle spec",
+}
 
 
 class TestContractOwnershipInLDomain:
@@ -332,9 +334,16 @@ class TestContractOwnershipInLDomain:
         return out
 
     #: 已接线的 L 域生产契约（逐条具名追加，禁通配）。2026-10-01 task 12 追加 l4。
+    #: 2026-10-06 补齐 L2~L8（并发会话 l-cycle-true-adapter-registration 已交付全部 8 条）。
     _L_PRODUCTION: dict[str, str] = {
         L1_CONTRACT_FILE: L1_ENTRY_ID,
+        "l2.interest_payable.json": "xlsx/gt-l2-interest-payable",
+        "l3.long_term_loans.json": "xlsx/gt-l3-long-term-loans",
         "l4.bonds_payable.json": "xlsx/gt-l4-bonds-payable",
+        "l5.long_term_payables.json": "xlsx/gt-l5-long-term-payables",
+        "l6.special_payables.json": "xlsx/gt-l6-special-payables",
+        "l7.other_noncurrent_liabilities.json": "xlsx/gt-l7-other-noncurrent-liabilities",
+        "l8.financial_expenses.json": "xlsx/gt-l8-financial-expenses",
     }
 
     def test_l_domain_has_exactly_one_production_contract(

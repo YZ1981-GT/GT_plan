@@ -35,7 +35,7 @@
     {
       "label": "d2",
       "adapter_id": "d2.receivable_detail",
-      "contract_payload_sha256": "cb9656db1ff912d1fe1f47abea5a5a3fa555d86ebe7f27498ad7f4f62c13b09a",
+      "contract_payload_sha256": "e0f17538b585dbe8cc5aebc420ce9d19a2b403dc9d994b7412f78246ebecb287",
       "sheet_digests": {
         "d22-managed": "31f1458f39fb568773512a06177e9a40b375a9baee2277b6058176dc05eb5957",
         "d23-managed": "b5b8f846bfb6d3edb41f30f0160090fa071a1fe69e9ccebfa3ffb2e63451c677",
@@ -160,12 +160,12 @@
     {
       "label": "f1",
       "adapter_id": "f1.prepayment_detail",
-      "contract_payload_sha256": "db8ccd1b5695fbc7446f2f455ec3475afd8048a430beb6aa6f1e3d5269989f10",
+      "contract_payload_sha256": "c76e69facdc729cb1f2f27d9d0303a27a9bf628c40d96b5b496ba3fe0752ce2e",
       "sheet_digests": {
-        "f16-managed": "f4da0e2703bcb12759da7e98c9c0958fbd650f9c4fa70417e6a786839405cfd4"
+        "f16-managed": "7d05de4652a205d4ac12f2bf22be7ca7334d3f87fb5e93192391aadab34a0d39"
       },
       "store_projection_sha256": "9377429bbc14be64e9cc547379dd68bc0a51fe417fe2ed9050c1fea749d802dd",
-      "instrumentation_sha256": "2c1357915f0bb8c5b5ffd39a1e46e9d51838b123b77db613a28707579107eeb4"
+      "instrumentation_sha256": "3d86f3a7cb4ac6e4a23d662c22ba02201f2ef7206a360e9b46af9859c40e2ac8"
     },
     {
       "label": "g2",
@@ -402,12 +402,12 @@
     {
       "label": "g5",
       "adapter_id": "g5.long_term_receivable_detail",
-      "contract_payload_sha256": "36bd2bfedd977c7117b6c6c8bf918fc09c1ee35df5df265183cbcba4db802540",
+      "contract_payload_sha256": "292d60775aeb71c2f3a5745e1619b905f083668665e7faf415a7c87af1ddd7fd",
       "sheet_digests": {
-        "g502-managed": "09dbf060c5e55ae47f5359d01735f496e9f052434c1e6ba143ec7ec7b0b8b8d9"
+        "g502-managed": "c730eb2b7ec1db259d35f6214226e0fc51c2349b3d028ad615ce3793361463c0"
       },
       "store_projection_sha256": "fb8c6a1393ca241d5ec330dbc2eda2b5937151a095e48a715bfd1e5295d97093",
-      "instrumentation_sha256": "abef2d5b0405eb541dd9ec54cc26e6bdca0a8de94f7913f0f930e497acf3379f"
+      "instrumentation_sha256": "43601cd18a09ef6e7bde1766f50afca5c19431bcfa13d4ccb691baf342d28d58"
     }
   ],
   "skipped": []
