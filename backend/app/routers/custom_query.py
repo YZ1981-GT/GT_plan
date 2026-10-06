@@ -455,7 +455,10 @@ async def _build_disclosure_tree(template_type: str) -> list[dict]:
 
 
 def _load_disclosure_sections(template_type: str) -> list[dict]:
-    """读 backend/data/consol_note_sections_{template_type}.json（带模块级缓存）"""
+    """读 backend/data/consol_note_sections_{template_type}.json（带模块级缓存）。
+
+    自动将 multi_header 转换为 _column_groups。
+    """
     if template_type in _DISCLOSURE_CACHE:
         return _DISCLOSURE_CACHE[template_type]
     data_path = Path(__file__).resolve().parent.parent.parent / "data" / f"consol_note_sections_{template_type}.json"
@@ -465,7 +468,26 @@ def _load_disclosure_sections(template_type: str) -> list[dict]:
     try:
         with data_path.open("r", encoding="utf-8") as f:
             sections = json.load(f)
-        _DISCLOSURE_CACHE[template_type] = sections if isinstance(sections, list) else []
+        sections = sections if isinstance(sections, list) else []
+        # 补齐 _column_groups + columns + _row_types
+        from app.services.consol_note_formula_service import (
+            multi_header_to_column_groups,
+            _ensure_columns,
+            _ensure_row_types,
+        )
+
+        for section in sections:
+            if not isinstance(section, dict):
+                continue
+            if not section.get("_column_groups"):
+                mh = section.get("multi_header")
+                if mh:
+                    groups = multi_header_to_column_groups(mh)
+                    if groups:
+                        section["_column_groups"] = groups
+            _ensure_columns(section)
+            _ensure_row_types(section)
+        _DISCLOSURE_CACHE[template_type] = sections
     except Exception:
         _DISCLOSURE_CACHE[template_type] = []
     return _DISCLOSURE_CACHE[template_type]

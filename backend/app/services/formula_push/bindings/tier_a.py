@@ -470,6 +470,7 @@ _NOTE_DERIVATIONS: dict[str, frozenset[str]] = {
     "D6": frozenset({"d6_note_main"}),
     "D7": frozenset({"d7_note_main"}),
     "I3": frozenset({"i3_note_main"}),
+    "I6": frozenset({"i6_note_main"}),
 }
 
 

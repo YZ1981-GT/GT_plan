@@ -1566,11 +1566,15 @@ class DisclosureEngine:
 
                 values.append(val)
                 cell_modes[str(col_index)] = mode
-                cell_meta[str(col_index)] = {
+                meta_entry: dict = {
                     "manual_value": None,
                     "semantic": semantic,
                     "binding_id": f"{section_number}.{label}.{semantic}",
                 }
+                # 标记 auto 模式下 resolver 返回 None 的单元格（取数失败/数据缺失）
+                if mode == "auto" and val is None:
+                    meta_entry["resolve_failed"] = True
+                cell_meta[str(col_index)] = meta_entry
 
             output_rows.append({
                 "label": label,
@@ -2157,14 +2161,11 @@ class DisclosureEngine:
             # 4a. 底稿同步来源（_source=workpaper/workpaper_html）的章节：
             # 表格结构（sub_table_data 推送的 rows/headers）由底稿披露表拥有，
             # 刷新不得覆盖其 cell 值——底稿是该章节表格数据的唯一真源。
-            # 仅 binding 取数单元格（如 TB 科目期末余额）允许被 refill 更新，
-            # 但当前这类章节的 rows 通常无 binding 匹配（workpaper 推送的行
-            # 无 _cell_meta semantic），自然跳过；显式 guard 以防 binding 模板
-            # 意外命中 label 导致底稿推送的真实金额被 TB 值覆盖。
+            # 但对有 binding sidecar（_cell_meta/semantic）的单元格仍允许重算
+            # （如合计行、试算表引用格），没有 sidecar 的行自然跳过。
+            # 同时标记来源以便 refill 循环中做更细粒度的保护。
             _note_source = td.get("_source")
-            if _note_source in ("workpaper", "workpaper_html"):
-                report.text_only_sections.append(section)
-                continue
+            _is_workpaper_source = _note_source in ("workpaper", "workpaper_html")
 
             # 4. 获取 binding + 计算待刷新的表清单
             sec_binding = get_binding_for_section(section)
@@ -2299,6 +2300,14 @@ class DisclosureEngine:
                             if legacy_refill:
                                 cell_modes[str(col_idx)] = "auto"
                                 row["_cell_modes"] = cell_modes
+                            # 更新 resolve_failed 标记
+                            meta_entry = cell_meta.get(str(col_idx))
+                            if isinstance(meta_entry, dict):
+                                if new_val is None and mode == "auto":
+                                    meta_entry["resolve_failed"] = True
+                                else:
+                                    meta_entry.pop("resolve_failed", None)
+                                row["_cell_meta"] = cell_meta
                             table_touched = True
                             section_touched = True
                             report.cells_updated += 1

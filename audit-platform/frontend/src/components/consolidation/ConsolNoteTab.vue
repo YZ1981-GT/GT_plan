@@ -51,6 +51,7 @@
             :header-cell-style="{ background: '#f0edf5', fontSize: '13px', padding: '4px 0' }"
             :cell-style="{ padding: '2px 6px', fontSize: '13px', lineHeight: '1.4' }"
             :cell-class-name="noteCellClassName"
+            :row-class-name="noteRowClassName"
             @selection-change="onNoteSelectionChange"
             @cell-click="onNoteCellClick"
             @cell-contextmenu="onNoteCellContextMenu">
@@ -240,7 +241,8 @@
             :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
             :header-cell-style="{ background: '#f0edf5', fontSize: '11px', padding: '2px 0' }"
             :cell-style="{ padding: '0 4px', fontSize: '11px', lineHeight: '1.2' }"
-            @selection-change="onNoteSelectionChange">
+            @selection-change="onNoteSelectionChange"
+            :row-class-name="noteRowClassName">
             <el-table-column v-if="noteEditMode" type="selection" width="36" />
             <!-- 全屏模式：多行合并表头 -->
             <template v-if="parsedMultiHeader">
@@ -1303,6 +1305,62 @@ function fmtAmt(v: any): string {
 function onNoteCellInput(row: NoteEditRow, col: number) {
   markManual(row, col)
   markNoteDirty()
+  // 自动刷新合计行
+  recalcTotalRows()
+}
+
+/** 重算合计行：遍历 editRows，对 total/subtotal 行的空值列自动求和 */
+function recalcTotalRows() {
+  const sec = selectedNoteSection.value
+  if (!sec?.editRows?.length) return
+  const rows = sec.editRows as NoteEditRow[]
+  const types: string[] | null = sec.rowTypes
+  const width = sec.headers?.length || 0
+
+  for (let ri = 0; ri < rows.length; ri++) {
+    const rtype = types && ri < types.length
+      ? types[ri]
+      : _inferRowType(rows[ri])
+    if (rtype !== 'total' && rtype !== 'subtotal') continue
+
+    // 向上找数据行范围
+    let dataStart = ri
+    for (let j = ri - 1; j >= 0; j--) {
+      const jtype = types && j < types.length
+        ? types[j]
+        : _inferRowType(rows[j])
+      if (jtype === 'total' || jtype === 'subtotal') break
+      dataStart = j
+    }
+
+    // 对每个数值列求和回填
+    for (let ci = 1; ci < width; ci++) {
+      let sum = 0
+      let hasData = false
+      for (let j = dataStart; j < ri; j++) {
+        const v = _parseNum(rows[j]?.[ci])
+        if (v !== null) { sum += v; hasData = true }
+      }
+      if (hasData) {
+        rows[ri][ci] = sum === Math.floor(sum) ? String(sum) : String(sum)
+      }
+    }
+  }
+}
+
+function _inferRowType(row: NoteEditRow): string {
+  const label = String(row?.[0] || '').trim().replace(/\s+/g, '')
+  if (label === '合计') return 'total'
+  if (label === '小计') return 'subtotal'
+  return 'data'
+}
+
+function _parseNum(val: any): number | null {
+  if (val == null || val === '') return null
+  const s = String(val).trim().replace(/,/g, '').replace(/，/g, '')
+  if (!s) return null
+  const n = Number(s)
+  return isNaN(n) ? null : n
 }
 
 /** 删除行后手工标记随行对象一起移动；保存时重新按当前行号序列化 */
@@ -1322,6 +1380,26 @@ function restoreSelectedFormula() {
 }
 
 // ─── 单元格选中与右键菜单 ──────────────────────────────────────────────────
+/** 合计行/小计行 CSS class（基于后端 _row_types 推导，或行首列文本匹配） */
+function noteRowClassName({ rowIndex }: { row: any; rowIndex: number }): string {
+  const sec = selectedNoteSection.value
+  if (!sec) return ''
+  // 优先使用后端推导的 _row_types
+  const types: string[] | null = sec.rowTypes
+  if (types && rowIndex < types.length) {
+    if (types[rowIndex] === 'total') return 'gt-note-total-row'
+    if (types[rowIndex] === 'subtotal') return 'gt-note-subtotal-row'
+    return ''
+  }
+  // 降级：从行首列文本判断
+  const rows = sec.editRows
+  if (!rows || rowIndex >= rows.length) return ''
+  const label = String(rows[rowIndex]?.[0] || '').trim().replace(/\s+/g, '')
+  if (label === '合计') return 'gt-note-total-row'
+  if (label === '小计') return 'gt-note-subtotal-row'
+  return ''
+}
+
 function noteCellClassName({ rowIndex, columnIndex }: any) {
   const sec = selectedNoteSection.value
   const sheetKey = sec?.section_id || ''
@@ -2327,6 +2405,8 @@ async function onNoteNodeClick(
       // Req 20.4：以 ACNR NOTE 地址标识源单体附注 section（reaggregate 溯源），
       // 与统一寻址体系一致，可追溯；仅为标识，不参与计算。
       noteAddr: sourceNoteAddr(sec.section_id),
+      // P3-a 补齐的行类型（total/subtotal/data），供合计行加粗渲染
+      rowTypes: Array.isArray(sec._row_types) ? sec._row_types : null,
     }
     cellComments.loadComments(sec.section_id)
     return noteRefreshResult(
@@ -2557,6 +2637,10 @@ defineExpose({
 .gt-note-compact-table :deep(.el-table__row td) { height: 32px; }
 .gt-note-compact-table :deep(.el-table__header th) { height: 34px; }
 .gt-note-compact-table :deep(.el-input__inner) { height: 28px; font-size: var(--gt-font-size-sm); }
+
+/* 合计行加粗 + 浅色底 */
+.gt-note-compact-table :deep(.gt-note-total-row td) { font-weight: 700; background: #f5f3fa !important; }
+.gt-note-compact-table :deep(.gt-note-subtotal-row td) { font-weight: 600; }
 
 /* 手工单元格：按公式填入时后端保留；视觉上用麦田黄提示保护状态 */
 .gt-note-cell-manual { background: var(--gt-color-wheat-light) !important; }

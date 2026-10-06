@@ -100,10 +100,182 @@ def _load_json(path: Path) -> Any:
     return data
 
 
+def multi_header_to_column_groups(
+    multi_header: list[list[str]] | None,
+) -> list[dict] | None:
+    """从 multi_header 推导 _column_groups（与单体附注模板同格式）。
+
+    算法：第一行的非空连续区间 = 一个分组（空字符串表示被同组合并）。
+    第一列（标签列）跳过。包含 span=1 的分组（与单体附注模板一致）。
+    无 multi_header 或只有一行 ⇒ 返回 None。
+
+    >>> multi_header_to_column_groups([
+    ...     ["账  龄", "期末数", "", "期初数", ""],
+    ...     ["", "账面余额", "坏账准备", "账面余额", "坏账准备"],
+    ... ])
+    [{'group': '期末数', 'start': 1, 'span': 2}, {'group': '期初数', 'start': 3, 'span': 2}]
+    """
+    if not multi_header or len(multi_header) < 2:
+        return None
+    row0 = multi_header[0]
+    groups: list[dict] = []
+    i = 1  # 跳过标签列（col 0）
+    while i < len(row0):
+        text = (row0[i] or "").strip()
+        if text:
+            span = 1
+            while i + span < len(row0) and not (row0[i + span] or "").strip():
+                span += 1
+            groups.append({"group": text, "start": i, "span": span})
+            i += span
+        else:
+            i += 1
+    return groups if groups else None
+
+
+_TOTAL_PATTERN = re.compile(r"^(合\s*计|小\s*计|合\s+计|小\s+计)$")
+_SUBTOTAL_KEYWORDS = {"小  计", "小 计", "小计"}
+
+
+def _infer_row_type(label: str) -> str:
+    """从行首列文本推导 row_type（data/total/subtotal）。"""
+    text = (label or "").strip()
+    if not text:
+        return "data"
+    if _TOTAL_PATTERN.match(text):
+        return "total"
+    if text in _SUBTOTAL_KEYWORDS or text.startswith("小计"):
+        return "subtotal"
+    return "data"
+
+
+def _ensure_columns(section: dict) -> None:
+    """自动从 headers 生成 columns 列元数据（如果缺失）。"""
+    if section.get("columns"):
+        return
+    headers = section.get("headers")
+    if not isinstance(headers, list) or not headers:
+        return
+    cols = []
+    for i, h in enumerate(headers):
+        col: dict = {"key": h, "label": h}
+        if i == 0:
+            col["is_label"] = True
+            col["flat"] = True
+        cols.append(col)
+    section["columns"] = cols
+
+
+def _ensure_row_types(section: dict) -> None:
+    """自动为 rows 中的每一行推导 _row_type（不改原数组结构，附加到 section）。"""
+    rows = section.get("rows")
+    if not isinstance(rows, list) or not rows:
+        return
+    # 如果已有 _row_types 则不覆盖
+    if section.get("_row_types"):
+        return
+    row_types = []
+    for row in rows:
+        if isinstance(row, list) and row:
+            row_types.append(_infer_row_type(str(row[0])))
+        else:
+            row_types.append("data")
+    section["_row_types"] = row_types
+
+
+def _safe_float(val: Any) -> float | None:
+    """安全转 float，空串/非数字返 None。"""
+    if val is None:
+        return None
+    if isinstance(val, (int, float)):
+        return float(val)
+    s = str(val).strip().replace(",", "").replace("，", "")
+    if not s:
+        return None
+    try:
+        return float(s)
+    except (ValueError, TypeError):
+        return None
+
+
+def backfill_total_rows(
+    rows: list[list],
+    row_types: list[str] | None = None,
+) -> bool:
+    """对合计行（total/subtotal）自动按同列数据行求和回填。
+
+    row_types 与 rows 等长，标识每行类型。未提供时从行首列文本推导。
+    返回是否有值被回填。
+
+    算法：遇到 total/subtotal 行时，向上搜索该行之前的连续 data 行（遇到
+    上一个 total/subtotal 停止），对每列求和写入合计行。
+    只回填空值（空串或 None），已有值的单元格不覆盖。
+    """
+    if not rows:
+        return False
+    if not row_types:
+        row_types = [_infer_row_type(str(r[0]) if r else "") for r in rows]
+
+    changed = False
+    for ri, rtype in enumerate(row_types):
+        if rtype not in ("total", "subtotal"):
+            continue
+        row = rows[ri]
+        # 向上收集数据行范围（从 ri-1 向上到上一个 total/subtotal 或行首）
+        data_start = ri
+        for j in range(ri - 1, -1, -1):
+            if row_types[j] in ("total", "subtotal"):
+                break
+            data_start = j
+
+        # 对每个数值列（跳过首列标签）求和
+        num_cols = len(row)
+        for ci in range(1, num_cols):
+            # 只回填空值单元格
+            existing = row[ci] if ci < len(row) else ""
+            if _safe_float(existing) is not None:
+                continue  # 已有值，不覆盖
+            col_sum = 0.0
+            has_data = False
+            for j in range(data_start, ri):
+                if j >= len(rows):
+                    break
+                dr = rows[j]
+                if ci >= len(dr):
+                    continue
+                v = _safe_float(dr[ci])
+                if v is not None:
+                    col_sum += v
+                    has_data = True
+            if has_data:
+                # 写入合计值（格式化为字符串，与模板格式一致）
+                while len(row) <= ci:
+                    row.append("")
+                row[ci] = str(col_sum) if col_sum != int(col_sum) else str(int(col_sum))
+                changed = True
+
+    return changed
+
+
 def consol_note_tables(template_type: str) -> list[dict]:
     """合并附注表格模板（``consol_note_sections_{tt}.json``，一项一张表）。调用方不得修改返回值。"""
     data = _load_json(DATA_DIR / f"consol_note_sections_{template_type}.json")
-    return data if isinstance(data, list) else []
+    sections = data if isinstance(data, list) else []
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        # 自动补齐 _column_groups
+        if not section.get("_column_groups"):
+            mh = section.get("multi_header")
+            if mh:
+                groups = multi_header_to_column_groups(mh)
+                if groups:
+                    section["_column_groups"] = groups
+        # 自动补齐 columns 列元数据
+        _ensure_columns(section)
+        # 自动推导 _row_types
+        _ensure_row_types(section)
+    return sections
 
 
 def single_note_sections(template_type: str) -> list[dict]:

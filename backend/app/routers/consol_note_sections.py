@@ -38,7 +38,10 @@ _cache: dict[str, tuple[float, list[dict]]] = {}
 
 
 def _load_sections(standard: str) -> list[dict]:
-    """从 JSON 文件加载章节数据（带内存缓存，文件变更时自动刷新）"""
+    """从 JSON 文件加载章节数据（带内存缓存，文件变更时自动刷新）。
+
+    自动将 multi_header 转换为 _column_groups（使前端渲染路径统一）。
+    """
     json_path = DATA_DIR / f"consol_note_sections_{standard}.json"
     if not json_path.exists():
         return []
@@ -49,6 +52,26 @@ def _load_sections(standard: str) -> list[dict]:
         return cached[1]
 
     data = json.loads(json_path.read_text(encoding="utf-8"))
+
+    # 补齐 _column_groups + columns + _row_types
+    from app.services.consol_note_formula_service import (
+        multi_header_to_column_groups,
+        _ensure_columns,
+        _ensure_row_types,
+    )
+
+    for section in data:
+        if not isinstance(section, dict):
+            continue
+        if not section.get("_column_groups"):
+            mh = section.get("multi_header")
+            if mh:
+                groups = multi_header_to_column_groups(mh)
+                if groups:
+                    section["_column_groups"] = groups
+        _ensure_columns(section)
+        _ensure_row_types(section)
+
     _cache[standard] = (mtime, data)
     return data
 
@@ -188,6 +211,10 @@ async def get_section_detail(standard: str, section_id: str):
             }
             if sec.get("_column_groups"):
                 result["_column_groups"] = sec["_column_groups"]
+            if sec.get("columns"):
+                result["columns"] = sec["columns"]
+            if sec.get("_row_types"):
+                result["_row_types"] = sec["_row_types"]
             return result
     return {"error": "章节不存在", "section_id": section_id}
 
@@ -354,6 +381,13 @@ async def save_note_data(
     payload = body.get("data", {})
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="附注数据格式无效")
+
+    # 自动回填合计行（对用户保存的数据，合计行空值自动求和）
+    from app.services.consol_note_formula_service import backfill_total_rows
+    save_rows = payload.get("rows")
+    if isinstance(save_rows, list) and save_rows:
+        backfill_total_rows(save_rows)
+
     now = datetime.now(timezone.utc)
     try:
         await _save_note_record(db, scope, payload, now=now)

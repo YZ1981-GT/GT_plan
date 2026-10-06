@@ -539,6 +539,10 @@
                   <span>此表当前无业务数据。如有需要可直接编辑填写。</span>
                 </el-alert>
               </div>
+              <!-- 单表场景：表名标题（多表时由 Tab 标签承载，单表需独立显示） -->
+              <div v-if="currentNoteTables.length === 1 && singleTableTitle" class="gt-de-single-table-title">
+                {{ singleTableTitle }}
+              </div>
               <el-table ref="deTableRef" v-if="activeTableData?.rows?.length || activeTableData?.headers?.length" :data="activeTableData.rows || []"
                 border size="small" class="gt-de-note-table gt-compact-table" style="margin-bottom: 12px"
                 :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
@@ -547,6 +551,8 @@
                 :cell-class-name="deCellClassName"
                 @cell-click="onDeCellClick"
                 @cell-contextmenu="onDeCellContextMenu">
+                <!-- 序号列：显式标记 auto_index 或表名含"前五名/前十名"时自动显示 -->
+                <el-table-column v-if="showAutoIndex" label="序号" type="index" width="50" align="center" />
                 <!-- ━━━ 两级分组表头渲染（有 _column_groups 时） ━━━ -->
                 <template v-if="activeTableColumns">
                   <template v-for="(col, ci) in activeTableColumns" :key="ci">
@@ -568,7 +574,7 @@
                           <span v-else :class="{ 'total-label': row.is_total }">{{ row.label }}</span>
                         </template>
                         <template v-else>
-                          <div class="gt-cell-wrapper" :class="{ 'gt-cell-auto-fill': getCellMode(row, col.headerIdx - 1) === 'auto' }">
+                          <div class="gt-cell-wrapper" :class="{ 'gt-cell-auto-fill': getCellMode(row, col.headerIdx - 1) === 'auto', 'gt-cell-resolve-failed': isCellResolveFailed(row, col.headerIdx - 1) }">
                             <el-input-number v-if="editMode && !row.is_total && isActiveCellEditing($index, col.headerIdx - 1)"
                               v-model="row.values[col.headerIdx - 1]" :controls="false" :precision="2"
                               size="small" style="width: 100%; height: 22px"
@@ -588,7 +594,7 @@
                       <el-table-column v-for="child in col.children" :key="child.headerIdx"
                         :label="child.label" :min-width="120" align="right" resizable>
                         <template #default="{ row, $index }">
-                          <div class="gt-cell-wrapper" :class="{ 'gt-cell-auto-fill': getCellMode(row, child.headerIdx - 1) === 'auto' }">
+                          <div class="gt-cell-wrapper" :class="{ 'gt-cell-auto-fill': getCellMode(row, child.headerIdx - 1) === 'auto', 'gt-cell-resolve-failed': isCellResolveFailed(row, child.headerIdx - 1) }">
                             <el-input-number v-if="editMode && !row.is_total && isActiveCellEditing($index, child.headerIdx - 1)"
                               v-model="row.values[child.headerIdx - 1]" :controls="false" :precision="2"
                               size="small" style="width: 100%; height: 22px"
@@ -633,7 +639,7 @@
                         effect="dark"
                       >
                       <CommentTooltip :comment="deComments.getComment(activeTableData?.section_id || currentNote?.note_section || 'default', $index, Number(hiRaw))">
-                      <div class="gt-cell-wrapper" :class="{ 'gt-cell-auto-fill': getCellMode(row, Number(hiRaw) - 1) === 'auto', 'gt-cell-validation-error': !!getCellValidationError($index, Number(hiRaw) - 1) }">
+                      <div class="gt-cell-wrapper" :class="{ 'gt-cell-auto-fill': getCellMode(row, Number(hiRaw) - 1) === 'auto', 'gt-cell-validation-error': !!getCellValidationError($index, Number(hiRaw) - 1), 'gt-cell-resolve-failed': isCellResolveFailed(row, Number(hiRaw) - 1) }">
                         <el-input-number v-if="editMode && !row.is_total && isActiveCellEditing($index, Number(hiRaw) - 1)"
                           v-model="row.values[Number(hiRaw) - 1]" :controls="false" :precision="2"
                           size="small" style="width: 100%; height: 22px"
@@ -2082,6 +2088,32 @@ const noteTableStructure = useNoteTableStructure({
   markDirty: () => { if (editMode.value) { markEditDirty(); autoSave.markDirty() } },
 })
 
+/** 单表场景的表名标题（表名有意义时显示，无意义则不显示） */
+const singleTableTitle = computed<string>(() => {
+  if (currentNoteTables.value.length !== 1) return ''
+  const tbl = currentNoteTables.value[0]
+  if (!tbl) return ''
+  const name = (tbl.name || '').trim()
+  if (!name) return ''
+  // 跳过与章节标题相同的表名（避免重复显示）
+  const sectionTitle = (currentNote.value?.section_title || '').trim()
+  if (name === sectionTitle) return ''
+  // 跳过无意义的表头名
+  const genericNames = new Set(['项  目', '项 目', '项目', '类  别', '类别'])
+  if (genericNames.has(name)) return ''
+  return name
+})
+
+/** 序号列：显式 auto_index 标记或表名含"前五名/前十名"关键词时自动显示 */
+const _AUTO_INDEX_RE = /前[五十5]名|前\d+名/
+const showAutoIndex = computed<boolean>(() => {
+  const td = activeTableData.value
+  if (!td) return false
+  if (td.auto_index) return true
+  const name = (td.name || '').trim()
+  return _AUTO_INDEX_RE.test(name)
+})
+
 // 表格Tab标签：避免显示无意义的"项 目"等表头值
 const _GENERIC_NAMES = new Set(['项  目', '项 目', '项目', '类  别', '类别', ''])
 const _TABLE_SUFFIX_RE = /[（(]表\d+[）)]/
@@ -2128,7 +2160,18 @@ function getCellMode(row: any, colIdx: number): string {
   const cells = row.cells || row.values || []
   const cell = cells[colIdx]
   if (cell && typeof cell === 'object') return cell.mode || 'auto'
+  // _cell_modes sidecar（binding 路径产出）
+  const modes = row._cell_modes
+  if (modes && typeof modes === 'object') return modes[String(colIdx)] || ''
   return ''
+}
+
+/** 判断 auto 模式的单元格是否取数失败（resolver 返回 None）。 */
+function isCellResolveFailed(row: any, colIdx: number): boolean {
+  const meta = row._cell_meta
+  if (!meta || typeof meta !== 'object') return false
+  const entry = meta[String(colIdx)]
+  return !!(entry && entry.resolve_failed)
 }
 
 function onLabelChange(rowIndex: number, newValue: string) {

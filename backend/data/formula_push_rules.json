@@ -4385,6 +4385,346 @@
       "description": "工程物资附注主表推送（listed 五、23 / soe 八、23）期末 / 期初数；批 D 附注直推族 binding"
     },
     {
+      "rule_id": "H1.note.main",
+      "page_key": "workpaper:H1",
+      "stage": "note",
+      "policy": "editable",
+      "target": {
+        "domain": "note",
+        "section_by_template": {
+          "listed": "五、22",
+          "soe": "八、22"
+        },
+        "table": "固定资产",
+        "rows": "h1_note_main",
+        "fields": [
+          "end_amount",
+          "prior_amount"
+        ]
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "h1_note_main",
+        "params": {},
+        "formula_text": "固定资产附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "固定资产附注主表推送（listed 五、22 / soe 八、22）期末 / 期初数"
+    },
+    {
+      "rule_id": "H5.note.main",
+      "page_key": "workpaper:H5",
+      "stage": "note",
+      "policy": "editable",
+      "target": {
+        "domain": "note",
+        "section_by_template": {
+          "soe": "八、25"
+        },
+        "table": "油气资产",
+        "rows": "h5_note_main",
+        "fields": [
+          "end_amount",
+          "prior_amount"
+        ]
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "h5_note_main",
+        "params": {},
+        "formula_text": "油气资产附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "油气资产附注主表推送（soe 八、25）期末 / 期初数；仅国企版（上市版无独立章节）"
+    },
+    {
+      "rule_id": "H7.note.main",
+      "page_key": "workpaper:H7",
+      "stage": "note",
+      "policy": "editable",
+      "target": {
+        "domain": "note",
+        "section_by_template": {
+          "listed": "五、24",
+          "soe": "八、24"
+        },
+        "table": "生产性生物资产",
+        "rows": "h7_note_main",
+        "fields": [
+          "end_amount",
+          "prior_amount"
+        ]
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "h7_note_main",
+        "params": {},
+        "formula_text": "生产性生物资产附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "生产性生物资产附注主表推送（listed 五、24 / soe 八、24）期末 / 期初数"
+    },
+    {
+      "rule_id": "H8.note.main",
+      "page_key": "workpaper:H8",
+      "stage": "note",
+      "policy": "editable",
+      "target": {
+        "domain": "note",
+        "section_by_template": {
+          "listed": "五、25",
+          "soe": "八、26"
+        },
+        "table": "使用权资产",
+        "rows": "h8_note_main",
+        "fields": [
+          "end_amount",
+          "prior_amount"
+        ]
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "h8_note_main",
+        "params": {},
+        "formula_text": "使用权资产附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "使用权资产附注主表推送（listed 五、25 / soe 八、26）期末 / 期初数"
+    },
+    {
+      "rule_id": "H9.note.main",
+      "page_key": "workpaper:H9",
+      "stage": "note",
+      "policy": "editable",
+      "target": {
+        "domain": "note",
+        "section_by_template": {
+          "listed": "五、47",
+          "soe": "八、52"
+        },
+        "table": "租赁负债",
+        "rows": "h9_note_main",
+        "fields": [
+          "end_amount",
+          "prior_amount"
+        ]
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "h9_note_main",
+        "params": {},
+        "formula_text": "租赁负债附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "租赁负债附注主表推送（listed 五、47 / soe 八、52）期末 / 期初数"
+    },
+    {
+      "rule_id": "I1.note.main",
+      "page_key": "workpaper:I1",
+      "stage": "note",
+      "policy": "editable",
+      "target": {
+        "domain": "note",
+        "section_by_template": {
+          "listed": "五、26",
+          "soe": "八、27"
+        },
+        "table": "无形资产",
+        "rows": "i1_note_main",
+        "fields": [
+          "end_amount",
+          "prior_amount"
+        ]
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "i1_note_main",
+        "params": {},
+        "formula_text": "无形资产附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "无形资产附注主表推送（listed 五、26 / soe 八、27）期末 / 期初数"
+    },
+    {
+      "rule_id": "I2.note.main",
+      "page_key": "workpaper:I2",
+      "stage": "note",
+      "policy": "editable",
+      "target": {
+        "domain": "note",
+        "section_by_template": {
+          "listed": "五、27",
+          "soe": "八、28"
+        },
+        "table": "开发支出",
+        "rows": "i2_note_main",
+        "fields": [
+          "end_amount",
+          "prior_amount"
+        ]
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "i2_note_main",
+        "params": {},
+        "formula_text": "开发支出附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "开发支出附注主表推送（listed 五、27 / soe 八、28）期末 / 期初数"
+    },
+    {
+      "rule_id": "I4.note.main",
+      "page_key": "workpaper:I4",
+      "stage": "note",
+      "policy": "editable",
+      "target": {
+        "domain": "note",
+        "section_by_template": {
+          "listed": "五、29",
+          "soe": "八、30"
+        },
+        "table": "长期待摊费用",
+        "rows": "i4_note_main",
+        "fields": [
+          "end_amount",
+          "prior_amount"
+        ]
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "i4_note_main",
+        "params": {},
+        "formula_text": "长期待摊费用附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "长期待摊费用附注主表推送（listed 五、29 / soe 八、30）期末 / 期初数"
+    },
+    {
+      "rule_id": "I5.note.main",
+      "page_key": "workpaper:I5",
+      "stage": "note",
+      "policy": "editable",
+      "target": {
+        "domain": "note",
+        "section_by_template": {
+          "listed": "五、31",
+          "soe": "八、32"
+        },
+        "table": "其他非流动资产",
+        "rows": "i5_note_main",
+        "fields": [
+          "end_amount",
+          "prior_amount"
+        ]
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "i5_note_main",
+        "params": {},
+        "formula_text": "其他非流动资产附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "其他非流动资产附注主表推送（listed 五、31 / soe 八、32）期末 / 期初数"
+    },
+    {
+      "rule_id": "I6.note.main",
+      "page_key": "workpaper:I6",
+      "stage": "note",
+      "policy": "editable",
+      "target": {
+        "domain": "note",
+        "section_by_template": {
+          "listed": "五、66",
+          "soe": "八、67"
+        },
+        "table": "研发费用",
+        "rows": "i6_note_main",
+        "fields": [
+          "end_amount",
+          "prior_amount"
+        ]
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "i6_note_main",
+        "params": {},
+        "formula_text": "研发费用附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "研发费用附注主表推送（listed 五、66 / soe 八、67）期末 / 期初数"
+    },
+    {
+      "rule_id": "H10.note.main",
+      "page_key": "workpaper:H10",
+      "stage": "note",
+      "policy": "editable",
+      "target": {
+        "domain": "note",
+        "section_by_template": {
+          "listed": "五、46",
+          "soe": "八、75"
+        },
+        "table": "资产处置收益",
+        "rows": "h10_note_main",
+        "fields": [
+          "end_amount",
+          "prior_amount"
+        ]
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "h10_note_main",
+        "params": {},
+        "formula_text": "资产处置收益附注主表推送：本期 = TB 审定数（损益类取本期发生额），上期 = TB 上期发生额"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "资产处置收益附注主表推送（listed 五、46 / soe 八、75）本期 / 上期发生额"
+    },
+    {
       "rule_id": "H1.audited_total.receivable",
       "page_key": "workpaper:H1",
       "stage": "derived",
