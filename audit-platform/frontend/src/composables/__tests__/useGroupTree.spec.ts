@@ -89,7 +89,7 @@ describe('useGroupTree.fetchTree', () => {
 
     await fetchTree()
 
-    expect(mockGet).toHaveBeenCalledWith('/api/projects/tree', { params: {} })
+    expect(mockGet).toHaveBeenCalledWith('/api/projects/tree', { _dedupe: false, params: {} })
     expect(trees.value).toHaveLength(1)
     expect(trees.value[0].ultimateName).toBe('母公司集团')
     expect(independents.value).toHaveLength(1)
@@ -105,6 +105,7 @@ describe('useGroupTree.fetchTree', () => {
     await fetchTree('consolidated')
 
     expect(mockGet).toHaveBeenCalledWith('/api/projects/tree', {
+      _dedupe: false,
       params: { year: 2025, scope: 'consolidated' },
     })
   })

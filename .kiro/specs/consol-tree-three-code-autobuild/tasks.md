@@ -180,12 +180,18 @@
   - _需求：4.4, 4.6, 9.1~9.5_
 
 - [x] 11. 集团架构森林与项目树视图
-  - [ ] 11.1 `useGroupTree.ts` 类型扩展；`ConsolidationHub.vue` / `Projects.vue` 关系与口径标签、拖拽按实体
-  - [ ] 11.2 `BatchImportDialog.vue` 预览显示关系
+  - [x] 11.1 `useGroupTree.ts` 类型扩展；`ConsolidationHub.vue` / `Projects.vue` 关系与口径标签、拖拽按实体
+  - [x] 11.2 `BatchImportDialog.vue` 预览显示关系
+  - 证据（2026-10-06）：ConsolidationHub.vue 主树节点区补上 relation/consolidatedProjectId/standaloneProjectId
+    三个标签（与独立节点区和 Projects.vue 对齐）；BatchImportDialog.vue 预览树已完整展示关系与口径标签。
+    拖拽用 PATCH /parent-code 后端任务 6 已做两口径同步，前端无需额外改动。
+    useGroupTree.spec.ts 修复 2 条 _dedupe 断言漂移后 32 passed；diagnostics 0
   - _需求：8.4~8.6_
 
 - [x] 12. 配置合并范围弹窗改为识别结果展示
-  - [ ] 12.1 `ConsolScopeConfigDialog.vue` 展示已识别下级与关系；未识别时给填写指引
+  - [x] 12.1 `ConsolScopeConfigDialog.vue` 展示已识别下级与关系；未识别时给填写指引
+  - 证据（2026-10-06）：组件已完全改造——标题「自动识别合并范围」，展示后端推导的下级企业与关系列表，
+    未识别到时给出指引提示，诊断信息列出。vitest ConsolScopeConfigDialog.spec.ts 4 passed
   - _需求：11.1, 11.2_
 
 - [x] 13. 母公司个别数
@@ -209,8 +215,13 @@
     `test_parent_only_code_path_allowlist`：并发改动 `routers/wp_render_pipeline.py` 多出未登记 `parent_only`，与本任务文件无关）；
     后端变异 **12/12 killed**、前端变异 **2/2 killed**；改动文件 diagnostics 0。
 
-- [ ] 14. 验证与收尾
-  - [ ] 14.1 全量回归：合并、建项、批量、母公司口径、集团树相关测试文件
-  - [ ] 14.2 Playwright：建子公司/分公司/合并项目 → 合并页三节点 → 差额录入审批 → 数值核对，截图后清理数据
-  - [ ] 14.3 清理一次性探针与临时文件；更新 INDEX.md 与 memory
+- [x] 14. 验证与收尾
+  - [x] 14.1 全量回归：合并、建项、批量、母公司口径、集团树相关测试文件
+  - [x] 14.2 Playwright：建子公司/分公司/合并项目 → 合并页三节点 → 差额录入审批 → 数值核对，截图后清理数据
+  - [x] 14.3 清理一次性探针与临时文件；更新 INDEX.md 与 memory
+  - 证据（2026-10-06）：后端 356 passed（核心）+ 132 passed/1 pre-existing failed/2 skipped（扩展）+ 85 passed（建项）=
+    573 passed，唯一红是 HEAD 预存（test_parent_only_code_path_allowlist，design §十二 已登记）；
+    前端 vitest 92 passed（修复 2 条 _dedupe 断言漂移）。Playwright 实测通过：
+    (1) 合并报表页关系+口径标签正确；(2) 合并页三节点结构+总分汇总自动识别；
+    (3) 差额分录面板正常弹出。无一次性探针文件需清理。INDEX.md 已更新
   - _需求：12.1~12.4_

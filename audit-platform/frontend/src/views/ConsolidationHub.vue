@@ -134,6 +134,9 @@
                 <span class="ch-node" :class="nodeClass(data)">
                   <span class="ch-node-name"><template v-for="(seg, i) in hlSegs(data.companyName || data.label)" :key="i"><span v-if="seg.match" class="gt-hl">{{ seg.text }}</span><template v-else>{{ seg.text }}</template></template></span>
                   <span class="ch-node-code"><template v-for="(seg, i) in hlSegs(data.companyCode || '—')" :key="i"><span v-if="seg.match" class="gt-hl">{{ seg.text }}</span><template v-else>{{ seg.text }}</template></template></span>
+                  <el-tag v-if="data.relation" size="small" effect="plain" round>{{ data.relation === 'branch' ? '分公司' : '子公司' }}</el-tag>
+                  <el-tag v-if="data.consolidatedProjectId" size="small" type="primary" effect="plain" round>合并</el-tag>
+                  <el-tag v-if="data.standaloneProjectId" size="small" type="success" effect="plain" round>单户</el-tag>
                   <el-tag
                     :type="statusType(data.status)"
                     size="small"
