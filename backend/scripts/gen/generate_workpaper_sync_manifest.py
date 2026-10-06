@@ -438,6 +438,7 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
     entries: list[dict[str, Any]] = []
     matched_rule_ids: Counter[tuple[str, int]] = Counter()
     seen_entry_ids: set[str] = set()
+    unreviewed_sync_hosts: list[str] = []
     used_expectations: dict[str, dict[str, set[str]]] = {}
     for group in _group_source_facts(discovery):
         source_file = group[0]["file"]
@@ -532,6 +533,17 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
         capability = value.get("capability")
         if capability not in _CAPABILITIES:
             raise ManifestGenerationError(f"invalid capability for {entry_id}: {capability!r}")
+
+        # 🔴 卡点：WorkpaperSyncEditorHost 的独立 entry 必须有 override 或 parent/unreachable
+        # 裁决，不得只靠 defaults_by_component 的 bidirectional 蒙混。
+        if (
+            component == "WorkpaperSyncEditorHost"
+            and independent
+            and not matching_overrides
+        ):
+            unreviewed_sync_hosts.append(
+                f"  {entry_id} — {source_file}"
+            )
         evidence = value.get("evidence")
         if not isinstance(evidence, dict) or not evidence.get("review_status"):
             raise ManifestGenerationError(f"entry evidence is not reviewed: {entry_id}")
@@ -598,6 +610,16 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
     # `sync_host_entry_rules` 的命中数在 L3 解析阶段就记下了（它发生在分组之前）
     for index in range(len(sync_host_entry_rules)):
         matched_rule_ids[("sync_host_entry_rules", index)] += sync_rule_hits[index]
+
+    # 🔴 卡点：WorkpaperSyncEditorHost 独立 entry 不得只靠 default 的 bidirectional 蒙混。
+    # 缺 override 意味着该 entry 的 capability 从未被人工审核，虚假绿灯比没有门禁更糟。
+    if unreviewed_sync_hosts:
+        raise ManifestGenerationError(
+            f"{len(unreviewed_sync_hosts)} independent WorkpaperSyncEditorHost "
+            f"entry(ies) have no reviewed override — defaults_by_component alone "
+            f"would assign capability='bidirectional' without adjudication. "
+            f"Add an override for each:\n" + "\n".join(unreviewed_sync_hosts)
+        )
 
     for section_name, rules in (
         ("parent_rules", parent_rules),

@@ -2328,6 +2328,46 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "（无真 OO 9.4 ⇒ roundtrip 与人工审核均未完成）。"
         ),
     },
+    # ── J2 设定受益计划（J2/J3 双向回写实施 · 阶段1）──────────────────────
+    {
+        "contract_id": "j2.defined_benefit_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_j2_defined_benefit",
+        "delivered_by_task": "J2J3-bidirectional-step4",
+        "pilot_class": "phase5_j2_defined_benefit_main",
+        "entry_id": "xlsx/j2/gt-j2-defined-benefit-plan",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "J/J2 长期应付职工薪酬-设定受益计划净资产.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "J2 设定受益计划明细表主区（R13-R17 增减四栏 14 列）。"
+            "多分区结构（6 业务区），本批仅接分区 A 主表。"
+            "行身份用 `key`（前端 `AdjRow.key`），不是 UUID。"
+            "5 个公式列 F=C+D-E J=C+G K=D+H L=E+I M=J+K-L。"
+            "真库 J2-2-main 1101 B 有载荷。"
+            "adapter_registered=False：卡 BP-1~BP-3 平台级缺口"
+            "（无真 OO 9.4 ⇒ roundtrip 与人工审核均未完成）。"
+        ),
+    },
+    # ── J3 股份支付（J2/J3 双向回写实施 · 阶段2）──────────────────────────
+    {
+        "contract_id": "j3.share_based_payment_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_j3_share_based_payment",
+        "delivered_by_task": "J2J3-bidirectional-step10",
+        "pilot_class": "phase5_j3_share_based_payment",
+        "entry_id": "xlsx/j3/gt-j3-share-based-payment",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "J/J3 股份支付.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "J3 股份支付情况表 J3-1 明细区（R21-R27，14 列全文本 editable，零公式）。"
+            "J3 无独立科目（费用走 K8/K9，权益走 M4），无审定表，无 TB 发布门。"
+            "行身份用 `key`（前端 PlanRow.key）。"
+            "真库 J3-1-plans 251 B。"
+            "adapter_registered=False：卡 BP-1~BP-3 平台级缺口。"
+        ),
+    },
     # ── A 循环 canary（spec: a-cycle-sync-foundation-and-first-canary）──────────
     {
         "contract_id": "a51.cashflow_audit",

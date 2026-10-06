@@ -1,0 +1,273 @@
+{
+  "schema_version": "contract-definition:v1",
+  "contract_id": "j3.share_based_payment_detail",
+  "semantic_version": "1.0.0",
+  "review_status": "reviewed",
+  "document_type": "xlsx",
+  "template_definition_sha256": "ff198e1532ebc3213c100e5d412cbe4a6ad5a49eb0cfd7690b69ffdcefd48c1d",
+  "instrumentation_definition_sha256": "f2f4245fed9fd80d558db8cb20710fc539ff0ca51229d2844007ec922a135ff3",
+  "template": {
+    "relative_path": "J/J3 股份支付.xlsx",
+    "template_sha256": "d2e9d7eb236b6476ccdc6edde1fadbd7119476bb2769bd95c9c9cc1699621bb4",
+    "normalized_structure_hash": "82002ac78042c3723de54b4fec8a00a239d0f96ef2915cf78f235d5409625e7b"
+  },
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "sheets": [
+    {
+      "sheet_key": "j31-plans-managed",
+      "excel_name": "股份支付情况表J3-1",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "tables": [
+        {
+          "table_key": "share_based_payment_plans",
+          "anchor": "A20",
+          "header_rows": 1,
+          "row_identity": {
+            "kind": "field",
+            "json_pointer": "/rows/*/id"
+          },
+          "delete_policy": "tombstone",
+          "formula_mask": [],
+          "fields": [
+            {
+              "stable_field_key": "share_based_payment_plans/{row_uuid}/name",
+              "json_pointer": "/rows/{row_uuid}/name",
+              "column_key": "name",
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!股份支付情况表J3-1!A21",
+              "header_source_ref": "源xlsx!股份支付情况表J3-1!A20",
+              "store_item_id": "J3-1-plans",
+              "header_text": "股份支付项目名称"
+            },
+            {
+              "stable_field_key": "share_based_payment_plans/{row_uuid}/type",
+              "json_pointer": "/rows/{row_uuid}/type",
+              "column_key": "type",
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!股份支付情况表J3-1!B21",
+              "header_source_ref": "源xlsx!股份支付情况表J3-1!B20",
+              "store_item_id": "J3-1-plans",
+              "header_text": "类型"
+            },
+            {
+              "stable_field_key": "share_based_payment_plans/{row_uuid}/grant_date",
+              "json_pointer": "/rows/{row_uuid}/grantDate",
+              "column_key": "grant_date",
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!股份支付情况表J3-1!C21",
+              "header_source_ref": "源xlsx!股份支付情况表J3-1!C20",
+              "store_item_id": "J3-1-plans",
+              "header_text": "授予日"
+            },
+            {
+              "stable_field_key": "share_based_payment_plans/{row_uuid}/approval_dept",
+              "json_pointer": "/rows/{row_uuid}/approvalDept",
+              "column_key": "approval_dept",
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!股份支付情况表J3-1!D21",
+              "header_source_ref": "源xlsx!股份支付情况表J3-1!D20",
+              "store_item_id": "J3-1-plans",
+              "header_text": "批准部门"
+            },
+            {
+              "stable_field_key": "share_based_payment_plans/{row_uuid}/exercise_date",
+              "json_pointer": "/rows/{row_uuid}/exerciseDate",
+              "column_key": "exercise_date",
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!股份支付情况表J3-1!E21",
+              "header_source_ref": "源xlsx!股份支付情况表J3-1!E20",
+              "store_item_id": "J3-1-plans",
+              "header_text": "行权日"
+            },
+            {
+              "stable_field_key": "share_based_payment_plans/{row_uuid}/instrument_qty",
+              "json_pointer": "/rows/{row_uuid}/instrumentQty",
+              "column_key": "instrument_qty",
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!股份支付情况表J3-1!F21",
+              "header_source_ref": "源xlsx!股份支付情况表J3-1!F20",
+              "store_item_id": "J3-1-plans",
+              "header_text": "权益工具数量"
+            },
+            {
+              "stable_field_key": "share_based_payment_plans/{row_uuid}/vesting_period",
+              "json_pointer": "/rows/{row_uuid}/vestingPeriod",
+              "column_key": "vesting_period",
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!股份支付情况表J3-1!G21",
+              "header_source_ref": "源xlsx!股份支付情况表J3-1!G20",
+              "store_item_id": "J3-1-plans",
+              "header_text": "等待期"
+            },
+            {
+              "stable_field_key": "share_based_payment_plans/{row_uuid}/fv_method",
+              "json_pointer": "/rows/{row_uuid}/fvMethod",
+              "column_key": "fv_method",
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!股份支付情况表J3-1!H21",
+              "header_source_ref": "源xlsx!股份支付情况表J3-1!H20",
+              "store_item_id": "J3-1-plans",
+              "header_text": "公允价值确定方法和数据来源"
+            },
+            {
+              "stable_field_key": "share_based_payment_plans/{row_uuid}/agreement_change",
+              "json_pointer": "/rows/{row_uuid}/agreementChange",
+              "column_key": "agreement_change",
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!股份支付情况表J3-1!I21",
+              "header_source_ref": "源xlsx!股份支付情况表J3-1!I20",
+              "store_item_id": "J3-1-plans",
+              "header_text": "协议变更/取消情况"
+            },
+            {
+              "stable_field_key": "share_based_payment_plans/{row_uuid}/bs_update",
+              "json_pointer": "/rows/{row_uuid}/bsUpdate",
+              "column_key": "bs_update",
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!股份支付情况表J3-1!J21",
+              "header_source_ref": "源xlsx!股份支付情况表J3-1!J20",
+              "store_item_id": "J3-1-plans",
+              "header_text": "资产负债表日估计更新情况"
+            },
+            {
+              "stable_field_key": "share_based_payment_plans/{row_uuid}/remaining_period",
+              "json_pointer": "/rows/{row_uuid}/remainingPeriod",
+              "column_key": "remaining_period",
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!股份支付情况表J3-1!K21",
+              "header_source_ref": "源xlsx!股份支付情况表J3-1!K20",
+              "store_item_id": "J3-1-plans",
+              "header_text": "剩余等待期限"
+            },
+            {
+              "stable_field_key": "share_based_payment_plans/{row_uuid}/agreement_index",
+              "json_pointer": "/rows/{row_uuid}/agreementIndex",
+              "column_key": "agreement_index",
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!股份支付情况表J3-1!L21",
+              "header_source_ref": "源xlsx!股份支付情况表J3-1!L20",
+              "store_item_id": "J3-1-plans",
+              "header_text": "协议索引号"
+            },
+            {
+              "stable_field_key": "share_based_payment_plans/{row_uuid}/calc_table_index",
+              "json_pointer": "/rows/{row_uuid}/calcTableIndex",
+              "column_key": "calc_table_index",
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!股份支付情况表J3-1!M21",
+              "header_source_ref": "源xlsx!股份支付情况表J3-1!M20",
+              "store_item_id": "J3-1-plans",
+              "header_text": "股份支付计算表索引号"
+            },
+            {
+              "stable_field_key": "share_based_payment_plans/{row_uuid}/conclusion",
+              "json_pointer": "/rows/{row_uuid}/conclusion",
+              "column_key": "conclusion",
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!股份支付情况表J3-1!N21",
+              "header_source_ref": "源xlsx!股份支付情况表J3-1!N20",
+              "store_item_id": "J3-1-plans",
+              "header_text": "结论"
+            }
+          ],
+          "uuid_col": "S"
+        }
+      ]
+    }
+  ],
+  "review": {
+    "entry_id": "xlsx/j3/gt-j3-share-based-payment",
+    "pilot_class": "phase5_j3_share_based_payment",
+    "authority_root": "backend/wp_templates",
+    "html_store": {
+      "table": "checklist_responses",
+      "item_ids": [
+        "J3-1-plans"
+      ],
+      "shape": "json_array_of_row_objects",
+      "payload_column": "remark",
+      "payload_column_mode": "remark_only",
+      "payload_column_source": "audit-platform/frontend/src/components/workpaper/j3/core/J3TabDetail.vue — item_id J3-1-plans，checklist_responses.remark JSON 数组",
+      "note": "J3 股份支付情况表 J3-1 明细行数据存成 checklist_responses.remark JSON 数组（item_id J3-1-plans）。14 列全文本 editable，零公式。行身份用 `key`（前端 PlanRow.key），不是 UUID。真库 J3-1-plans 251 B。"
+    },
+    "reviewed_basis": "openpyxl 逐格实测 J/J3 股份支付.xlsx 的 `股份支付情况表J3-1`（max_row=43 / max_column=18 / merged=8 / protection=False / 公式 7 全部引用底稿目录（零业务公式） / definedName 502（断链 479，跨循环复制残留，不删） / 单级表头 R20（14 列：项目名称/类型/授予日/批准部门/行权日/数量/等待期/公允价值方法/协议变更/资产负债表日估计/剩余等待期/协议索引/计算表索引/结论） / 数据区 R21-R27（7 行） / 无 footer 合计行（R28 是「三、审计说明：」） / 全文本 editable 零公式 / UUID 放 S 列 / 真库 J3-1-plans 251 B）",
+    "tb_publish_gate": null
+  }
+}

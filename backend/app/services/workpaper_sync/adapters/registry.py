@@ -1153,6 +1153,8 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         #    🔴 manifest 里 J 只有 2 条 entry（1 独立 + 1 parent_duplicate）
         #    ⇒ 本循环恒 1 条 provider。
         "app.services.workpaper_sync.phase5_j1_employee_compensation",
+        "app.services.workpaper_sync.phase5_j2_defined_benefit",
+        "app.services.workpaper_sync.phase5_j3_share_based_payment",
         # ── A 循环 canary（spec: a-cycle-sync-foundation-and-first-canary）────
         "app.services.workpaper_sync.phase5_a51_cashflow_audit",
         # ── C 循环 canary（spec: c-cycle-sync-foundation-and-first-canary · Task 22）──

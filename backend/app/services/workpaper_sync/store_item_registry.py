@@ -714,6 +714,20 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="J1-6-short-term", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
+    # ── J2 设定受益计划主明细表（增减四栏 R13-R17）───────────────────────
+    "j2.defined_benefit_detail": StoreMergePlan(
+        adapter_id="j2.defined_benefit_detail",
+        provider_module="phase5_j2_defined_benefit",
+        items=(StoreItemSpec(item_id="J2-2-main", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── J3 股份支付情况表（零公式 14 列全文本 R21-R27）─────────────────────
+    "j3.share_based_payment_detail": StoreMergePlan(
+        adapter_id="j3.share_based_payment_detail",
+        provider_module="phase5_j3_share_based_payment",
+        items=(StoreItemSpec(item_id="J3-1-plans", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
     # ── K1-9 单 dict item / 同 sheet 双区（专用 merge，保留未受管标量）──
     "k1.baddebt_reversal_writeoff_check": StoreMergePlan(
         adapter_id="k1.baddebt_reversal_writeoff_check",
