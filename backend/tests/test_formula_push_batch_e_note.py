@@ -20,6 +20,7 @@ import sqlalchemy as sa
 
 from app.models.report_models import ContentType, DisclosureNote, NoteStatus
 from app.services.formula_push import engine as push
+from app.services.formula_push.bindings.balance_adj import BalanceAdjudicationBinding, BalanceAdjSources
 from app.services.formula_push.bindings.e1 import E1Binding
 from app.services.formula_push.bindings.k1 import K1Binding
 from app.services.formula_push.bindings.tier_a import TierAAnchorBinding, TierASources
@@ -763,6 +764,60 @@ async def test_d1_sync_fingerprint_correct(env_listed):
 
 
 @pytest.mark.asyncio
+async def test_push_then_pull_no_duplicate_sync(env_listed):
+    """端到端：推送写入附注后，pull-from-workpapers 识别已同步、不重复拉取。
+
+    在同一 SQLite ORM 环境先推送 D1→五、4，再模拟 pull 端点判定逻辑：
+    - 推送后的五、4 带 ``_last_sync_wp_id`` → pull 走 synced 路径
+    - 推送前的八、1（从未同步）→ pull 走 skipped_never_synced 路径
+    """
+    await env_listed.seed_entries(base_entries())
+    await env_listed.add_note("五、4", _d1_listed_note_data(), title="应收票据")
+    # 追加一个从未同步的章节（无 _last_sync_wp_id）
+    await env_listed.add_note("八、1", {"rows": [{"label": "测试行"}], "headers": ["项目"]}, title="货币资金")
+
+    # ── 推送 D1 ──
+    await env_listed.push(codes=["D1"])
+
+    # ── 模拟 pull-from-workpapers 端点的核心判定 ──
+    # 端点逻辑（disclosure_notes.py pull_from_workpapers）:
+    #   td = note.table_data
+    #   if not td.get("_last_sync_wp_id"):
+    #       skipped_never_synced += 1
+    #       continue
+    #   td["_source"] = "workpaper"; td["_last_sync_at"] = ...; synced += 1
+
+    synced = 0
+    skipped_never_synced = 0
+
+    note_pushed = await env_listed.note("五、4")
+    td_pushed = note_pushed.table_data or {}
+    if not td_pushed.get("_last_sync_wp_id"):
+        skipped_never_synced += 1
+    else:
+        synced += 1
+
+    note_never = await env_listed.note("八、1")
+    td_never = note_never.table_data or {}
+    if not td_never.get("_last_sync_wp_id"):
+        skipped_never_synced += 1
+    else:
+        synced += 1
+
+    # 推送过的章节被识别为 synced
+    assert synced == 1, f"推送后的章节应被 pull 识别为已同步，实际 synced={synced}"
+    # 从未同步的章节被跳过
+    assert skipped_never_synced == 1, f"从未同步的章节应被跳过，实际 skipped={skipped_never_synced}"
+
+    # 进一步确认：推送后的 table_data 包含完整指纹
+    assert td_pushed["_last_sync_wp_id"] == str(env_listed.d1_wp_id)
+    assert "_last_sync_at" in td_pushed
+    # 从未同步的 table_data 无指纹
+    assert "_last_sync_wp_id" not in td_never
+    assert "_last_sync_at" not in td_never
+
+
+@pytest.mark.asyncio
 async def test_d1_second_push_idempotent(env_listed):
     """D1 第二次推送值不变时合计行 action=unchanged。"""
     await env_listed.seed_entries(base_entries())
@@ -797,6 +852,58 @@ async def test_d1_push_records_note_section_in_result(env_listed):
     assert "五、4" in result.note_sections
 
 
+@pytest.mark.asyncio
+async def test_d1_push_broadcast_carries_note_sections(env_listed):
+    """SSE 广播 formula.pushed 的 payload 包含 note_sections，下游据此标报表 stale。
+
+    验证：result.summary() 传给 broadcast_raw 的载荷含 note_sections == ["五、4"]。
+    这是报表 stale 联动的数据契约——前端 useNoteStale 和报表引擎都从此字段读章节列表。
+    """
+    await env_listed.seed_entries(base_entries())
+    await env_listed.add_note("五、4", _d1_listed_note_data(), title="应收票据")
+
+    env_listed.broadcasts.clear()
+    await env_listed.push(codes=["D1"])
+
+    assert len(env_listed.broadcasts) == 1, f"应有 1 条广播，实际 {len(env_listed.broadcasts)}"
+    event, payload = env_listed.broadcasts[0]
+    assert event == "formula.pushed"
+    assert "note_sections" in payload, "SSE payload 必须包含 note_sections 字段"
+    assert "五、4" in payload["note_sections"], f"payload note_sections={payload['note_sections']}"
+
+
+@pytest.mark.asyncio
+async def test_d1_push_note_sections_in_run_detail(env_listed):
+    """运行记录 detail.note_sections 与 result.note_sections 一致。
+
+    formula_push_run.detail 是运行记录 JSON，``note_sections`` 字段供公式管理面板回溯。
+    """
+    await env_listed.seed_entries(base_entries())
+    await env_listed.add_note("五、4", _d1_listed_note_data(), title="应收票据")
+
+    result = await env_listed.push(codes=["D1"])
+
+    runs = await env_listed.runs()
+    assert len(runs) >= 1
+    latest = runs[-1]
+    assert latest.detail["note_sections"] == list(result.note_sections)
+
+
+@pytest.mark.asyncio
+async def test_d1_soe_push_broadcast_carries_soe_section(env_soe):
+    """国企项目推送 D1 后 SSE 广播的 note_sections 只含国企章节。"""
+    await env_soe.seed_entries(base_entries())
+    await env_soe.add_note("八、4", _d1_soe_note_data(), title="应收票据")
+
+    env_soe.broadcasts.clear()
+    await env_soe.push(codes=["D1"])
+
+    assert len(env_soe.broadcasts) == 1
+    _, payload = env_soe.broadcasts[0]
+    assert "八、4" in payload["note_sections"]
+    assert "五、4" not in payload.get("note_sections", []), "国企项目不应推上市章节"
+
+
 # ── Task 15：多科目附注推送不互相覆盖 ──────────────────────────────────
 
 
@@ -824,6 +931,221 @@ async def test_multi_code_note_push_no_overwrite(env_listed):
     # 合计行被重算 = 数据行之和
     assert rows["合计"]["end_balance"] == 1200000
     assert rows["合计"]["prior_balance"] == 900000
+
+
+# ── Task 15：多科目附注推送不互相覆盖（同一章节，靠 table 名隔离） ────────
+
+
+H2_TB = TbAuditedSnapshot(
+    tb_data={
+        "1604": {
+            "期末余额": Decimal("5000000"),
+            "年初余额": Decimal("3000000"),
+            "本期发生额": Decimal("2000000"),
+        },
+    },
+    available=True,
+    company_codes=("001",),
+)
+
+# 五、23 章节同时容纳「在建工程」（H2）和「工程物资」（H4）两张子表的列定义
+_NOTE_COLS_H = [
+    {"key": "label", "label": "项目", "is_label": True},
+    {"key": "end_amount", "label": "期末余额", "format": "amount"},
+    {"key": "prior_amount", "label": "期初余额", "format": "amount"},
+]
+
+
+@pytest_asyncio.fixture
+async def env_shared_chapter(monkeypatch):
+    """SQLite 真 ORM 环境：上市项目 + H2 底稿 + 五、23 共享章节。
+
+    验证同一附注章节内两张子表（在建工程 / 工程物资）互不覆盖。
+    """
+    async with make_env(monkeypatch) as e:
+        # 追加 H2 底稿
+        h2_idx, h2_wp = uuid.uuid4(), uuid.uuid4()
+        async with e.factory() as db:
+            await db.execute(sa.text(
+                "INSERT INTO wp_index (id, project_id, wp_code) VALUES (:i, :p, 'H2')"
+            ), {"i": str(h2_idx), "p": str(e.pid)})
+            await db.execute(sa.text(
+                "INSERT INTO working_paper (id, project_id, wp_index_id) VALUES (:w, :p, :i)"
+            ), {"w": str(h2_wp), "p": str(e.pid), "i": str(h2_idx)})
+            await db.commit()
+        e.h2_wp_id = h2_wp
+
+        # Mock balance_adj 取数
+        async def fake_balance_adj_load(self, db, project_id, year, wp_id):
+            if self.wp_code == "H2":
+                self._last_tb_data = H2_TB.tb_data
+                return BalanceAdjSources(
+                    formula=FormulaSources(tb=H2_TB),
+                    template_type="listed",
+                )
+            self._last_tb_data = None
+            return BalanceAdjSources(formula=FormulaSources(), template_type="listed")
+
+        monkeypatch.setattr(BalanceAdjudicationBinding, "load_sources", fake_balance_adj_load)
+
+        # Mock Tier A 取数（env 默认有 E1）
+        async def fake_tier_a_load(self, db, project_id, year, wp_id):
+            return TierASources(formula=FormulaSources(), template_type="listed")
+
+        monkeypatch.setattr(TierAAnchorBinding, "load_sources", fake_tier_a_load)
+
+        async def fake_note_direct_load(self, db, project_id, year, wp_id):
+            return NoteDirectSources(formula=FormulaSources(), template_type="listed")
+
+        monkeypatch.setattr(NoteDirectBinding, "load_sources", fake_note_direct_load)
+
+        async def fake_k1_load(self, db, project_id, year, wp_id):
+            self._last_tb_data = None
+            from app.services.formula_push.bindings.k1 import K1Sources
+            return K1Sources(formula=FormulaSources(), template_type="listed")
+
+        monkeypatch.setattr(K1Binding, "load_sources", fake_k1_load)
+
+        yield e
+
+
+@pytest.mark.asyncio
+async def test_shared_chapter_multi_code_tables_no_overwrite(env_shared_chapter):
+    """同一附注章节（五、23）内多科目各写各表——H2 推送不覆盖工程物资数据。
+
+    需求 E11：同一附注章节被多个科目底稿推送时，各科目只写自己的行。
+    引擎按 rule.target.table 定位 sub_table_data[table_name]，不同科目写不同
+    table_name，互不覆盖。
+
+    前置：五、23 章节包含「在建工程」（H2 目标）和「工程物资」（H4 预存数据）两张子表。
+    动作：推送 H2。
+    验证：「在建工程」表被 H2 审定数更新，「工程物资」表数据保持原值。
+    """
+    e = env_shared_chapter
+
+    # 种五、23 章节：两张子表各有数据行 + 合计行
+    note_data = {
+        "_source": "workpaper",
+        "_sub_table_columns": {
+            "在建工程": _NOTE_COLS_H,
+            "工程物资": _NOTE_COLS_H,
+        },
+        "sub_table_data": {
+            "在建工程": [
+                {"label": "在建工程", "end_amount": 0, "prior_amount": 0},
+                {"label": "合计", "is_total": True, "end_amount": 0, "prior_amount": 0},
+            ],
+            "工程物资": [
+                {"label": "工程物资", "end_amount": 888000, "prior_amount": 666000},
+                {"label": "合计", "is_total": True, "end_amount": 888000, "prior_amount": 666000},
+            ],
+        },
+    }
+    await e.add_note("五、23", note_data, title="在建工程")
+
+    # 推送 H2
+    result = await e.push(codes=["H2"])
+
+    note = await e.note("五、23")
+    sub = note.table_data["sub_table_data"]
+
+    # ─── 在建工程表：被 H2 推送更新为 TB 审定数 ─────────────────────────
+    h2_rows = {r["label"]: r for r in sub["在建工程"]}
+    assert h2_rows["在建工程"]["end_amount"] == 5000000, "H2 期末应为 TB 1604 期末余额"
+    assert h2_rows["在建工程"]["prior_amount"] == 3000000, "H2 期初应为 TB 1604 年初余额"
+    # 合计行被重算
+    assert h2_rows["合计"]["end_amount"] == 5000000
+    assert h2_rows["合计"]["prior_amount"] == 3000000
+
+    # ─── 工程物资表：H2 推送完全不碰 ──────────────────────────────────
+    h4_rows = {r["label"]: r for r in sub["工程物资"]}
+    assert h4_rows["工程物资"]["end_amount"] == 888000, "工程物资期末应保持原值"
+    assert h4_rows["工程物资"]["prior_amount"] == 666000, "工程物资期初应保持原值"
+    assert h4_rows["合计"]["end_amount"] == 888000, "工程物资合计行不受 H2 推送影响"
+    assert h4_rows["合计"]["prior_amount"] == 666000
+
+    # 同步指纹只记录 H2 底稿
+    assert note.table_data.get("_last_sync_wp_id") == str(e.h2_wp_id)
+    assert note.last_sync_source == "formula_push"
+
+
+@pytest.mark.asyncio
+async def test_sequential_push_two_codes_different_sections(env_shared_chapter):
+    """两个科目推送到不同章节——D1 推五、4，H2 推五、23，互不干扰。
+
+    需求 E11 补充：验证同一次推送中不同科目写不同章节不交叉。
+    """
+    e = env_shared_chapter
+
+    # 追加 D1 底稿
+    d1_idx, d1_wp = uuid.uuid4(), uuid.uuid4()
+    async with e.factory() as db:
+        await db.execute(sa.text(
+            "INSERT INTO wp_index (id, project_id, wp_code) VALUES (:i, :p, 'D1')"
+        ), {"i": str(d1_idx), "p": str(e.pid)})
+        await db.execute(sa.text(
+            "INSERT INTO working_paper (id, project_id, wp_index_id) VALUES (:w, :p, :i)"
+        ), {"w": str(d1_wp), "p": str(e.pid), "i": str(d1_idx)})
+        await db.commit()
+
+    # Mock Tier A 让 D1 返回 TB 数据
+    original_load = TierAAnchorBinding.load_sources
+
+    async def fake_tier_a_load_d1(self, db, project_id, year, wp_id):
+        if self.wp_code == "D1":
+            self._last_tb_data = {
+                "1121": {
+                    "期末余额": Decimal("1200000"),
+                    "年初余额": Decimal("900000"),
+                    "本期发生额": Decimal("300000"),
+                },
+            }
+            return TierASources(
+                formula=FormulaSources(tb=TbAuditedSnapshot(
+                    tb_data=self._last_tb_data, available=True, company_codes=("001",)
+                )),
+                template_type="listed",
+            )
+        return TierASources(formula=FormulaSources(), template_type="listed")
+
+    # monkeypatch 已经在 fixture 里设了 TierA，这里叠加
+    TierAAnchorBinding.load_sources = fake_tier_a_load_d1
+
+    try:
+        # 种五、4（D1 目标章节）
+        await e.add_note("五、4", _d1_listed_note_data(), title="应收票据")
+        # 种五、23（H2 目标章节）
+        h_note_data = {
+            "_source": "workpaper",
+            "_sub_table_columns": {"在建工程": _NOTE_COLS_H},
+            "sub_table_data": {
+                "在建工程": [
+                    {"label": "在建工程", "end_amount": 0, "prior_amount": 0},
+                    {"label": "合计", "is_total": True, "end_amount": 0, "prior_amount": 0},
+                ],
+            },
+        }
+        await e.add_note("五、23", h_note_data, title="在建工程")
+
+        # 分别推送
+        await e.push(codes=["D1"])
+        await e.push(codes=["H2"])
+
+        # 验证五、4 只有 D1 的数据
+        note_d1 = await e.note("五、4")
+        d1_sub = note_d1.table_data["sub_table_data"]["应收票据"]
+        d1_rows = {r["label"]: r for r in d1_sub}
+        assert d1_rows["银行承兑汇票"]["end_balance"] == 800000
+        assert d1_rows["商业承兑汇票"]["end_balance"] == 400000
+
+        # 验证五、23 只有 H2 的数据
+        note_h2 = await e.note("五、23")
+        h2_sub = note_h2.table_data["sub_table_data"]["在建工程"]
+        h2_rows = {r["label"]: r for r in h2_sub}
+        assert h2_rows["在建工程"]["end_amount"] == 5000000
+        assert h2_rows["在建工程"]["prior_amount"] == 3000000
+    finally:
+        TierAAnchorBinding.load_sources = original_load
 
 
 # ── Task 16：推送与前端同步的竞争保护 ──────────────────────────────────

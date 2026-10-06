@@ -54,9 +54,9 @@ def test_real_rules_load_and_distribution():
         "I1", "I2", "I3", "I4", "I5", "I6",
         "J1", "J2",
         "K2", "K3", "K4", "K5", "K6", "K7", "K8", "K9", "K10", "K11", "K12", "K13",
-        "L1", "L2", "L3", "L4", "L5", "L7", "L8",
+        "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8",
         "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10",
-        "N1", "N2", "N4", "N5",
+        "N1", "N2", "N3", "N4", "N5",
     }
     assert len({r.target.identity() for r in _RULES}) == len(_RULES)
 

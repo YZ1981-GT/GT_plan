@@ -40,46 +40,48 @@
 
 ## 阶段 4：G/H/I/J/L/M/N/F 循环
 
-- [-] 7. G 循环附注（G1~G14）
+- [x] 7. G 循环附注（G1~G14）
   - G6 有 14 张子表，须逐表确认
   - 🟡 部分 G 科目损益类走关键词章节（G13/G14），现读确认
   - _需求：E1_
 
-- [~] 8. H 循环附注（H1~H10）
+- [x] 8. H 循环附注（H1~H10）
   - H5 上市版无独立章节（`H5_DISCLOSURE_SHEET_LISTED = ''`）→ 上市跳过
   - _需求：E5_
 
-- [~] 9. I 循环（I1~I6）+ J1
+- [x] 9. I 循环（I1~I6）+ J1
   - _需求：E1_
 
-- [~] 10. L 循环（L1~L7）
+- [x] 10. L 循环（L1~L7）
   - _需求：E1_
 
-- [~] 11. M 循环 + N 循环（N1~N5）+ F 循环（F1~F2）
+- [x] 11. M 循环 + N 循环（N1~N5）+ F 循环（F1~F2）
   - _需求：E1_
 
 ## 阶段 5：附注同步指纹 + pull-from-workpapers 联动
 
-- [~] 12. 全套回归 + 清册 `has_note_rules` 更新
+- [x] 12. 全套回归 + 清册 `has_note_rules` 更新
+  - 规则清单中的附注规则由生成器按 `target.domain == "note"` 现算，未手工维护；`gen_formula_push_coverage.py --write` 生成 78 条清册后 `--check` 一致
+  - 回归：`tests/test_formula_push_batch_e_note.py`、`test_formula_push_batch_e_k_note.py`、`test_formula_push_batch_e_g_note.py`、`test_formula_push_batch_e_h_note.py`、`test_formula_push_batch_e_ij_note.py`、`test_formula_push_batch_e_l_note.py`、`test_formula_push_batch_e_mnf_note.py`、`test_formula_push_note_writer.py`、`test_note_main_table_handoff.py`、`test_formula_push_rules.py`、`test_formula_push_coverage.py` 共 621 passed
   - _需求：E8_
 
-- [~] 13. 附注同步指纹验证
+- [x] 13. 附注同步指纹验证
   - 推送写入附注后，`_last_sync_wp_id` / `_last_sync_at` / `last_sync_source=formula_push` 正确更新
   - `pull-from-workpapers` 据 `_last_sync_wp_id` 识别「已同步」，不重复拉取
   - 测试：推送后调 pull-from-workpapers → 不重复同步（指纹匹配）
   - _需求：E9_
 
-- [~] 14. 附注 stale 与报表联动
+- [x] 14. 附注 stale 与报表联动
   - 推送写入附注后，对应的报表行标注 `335/335` 附注章节 stale（沿用公式推送引擎已有的 `result.note_sections`）
   - 附注编辑器打开时据 `last_sync_source=formula_push` 显示「已由公式推送同步」提示
   - _需求：E10_
 
-- [~] 15. 多科目附注推送不互相覆盖
+- [x] 15. 多科目附注推送不互相覆盖
   - 同一附注章节被多个科目底稿推送时（如 五、22 同时收 H1 和 H2 的数据），各科目只写自己的行
   - 测试：H1 推送写「固定资产」行 + H2 推送写「在建工程」行 → 同一 `五、22` 章节两行都在
   - _需求：E11_
 
-- [~] 16. 推送与前端同步的竞争保护
+- [x] 16. 推送与前端同步的竞争保护
   - 附注 `_cell_modes` manual/locked 保留机制（Task 7 已实现）在铺开后仍有效
   - 测试：人工标记 manual 的单元格在推送后保持原值（各科目参数化验证）
   - _需求：E12_

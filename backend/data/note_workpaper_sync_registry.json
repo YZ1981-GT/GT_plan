@@ -515,6 +515,14 @@
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/l5NoteSectionMap.ts"
     },
     {
+      "wp_code": "L6",
+      "listed": "五、40",
+      "soe": "八、40",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国企）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/l6NoteSectionMap.ts"
+    },
+    {
       "wp_code": "L7",
       "listed": "五、52",
       "soe": "八、57",
@@ -625,6 +633,14 @@
       "sheet_listed": "附注披露信息（上市公司）",
       "sheet_soe": "附注披露信息（国企）",
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/n2NoteSectionMap.ts"
+    },
+    {
+      "wp_code": "N3",
+      "listed": "五、22",
+      "soe": "八、22",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国企）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/n3NoteSectionMap.ts"
     },
     {
       "wp_code": "N4",
