@@ -868,3 +868,119 @@ async def test_incremental_regeneration_clears_only_affected_rows(
     assert rows["BS-002"].is_stale is False
     assert rows["BS-010"].is_stale is False
     assert rows["BS-003"].is_stale is True
+
+
+@pytest.mark.asyncio
+async def test_recalculate_stale_rows_writes_value_before_clearing_stale(
+    db_session: AsyncSession, seeded_db
+):
+    """stale 行成功重算后写入新金额并清除 stale 标记。"""
+    import sqlalchemy as sa
+
+    engine = ReportEngine(db_session)
+    await engine.generate_all_reports(
+        FAKE_PROJECT_ID, 2025, applicable_standard=TEST_STANDARD
+    )
+    await db_session.commit()
+
+    await db_session.execute(
+        sa.update(FinancialReport)
+        .where(
+            FinancialReport.project_id == FAKE_PROJECT_ID,
+            FinancialReport.year == 2025,
+            FinancialReport.report_type == FinancialReportType.balance_sheet,
+            FinancialReport.row_code == "BS-002",
+        )
+        .values(is_stale=True)
+    )
+    tb_row = (
+        await db_session.execute(
+            sa.select(TrialBalance).where(
+                TrialBalance.project_id == FAKE_PROJECT_ID,
+                TrialBalance.year == 2025,
+                TrialBalance.standard_account_code == "1001",
+            )
+        )
+    ).scalar_one()
+    tb_row.audited_amount = Decimal("60000")
+    await db_session.flush()
+
+    outcome = await engine.recalculate_stale_rows(
+        FAKE_PROJECT_ID, 2025, applicable_standard=TEST_STANDARD
+    )
+    await db_session.commit()
+
+    row = (
+        await db_session.execute(
+            sa.select(FinancialReport).where(
+                FinancialReport.project_id == FAKE_PROJECT_ID,
+                FinancialReport.year == 2025,
+                FinancialReport.report_type == FinancialReportType.balance_sheet,
+                FinancialReport.row_code == "BS-002",
+            )
+        )
+    ).scalar_one()
+    assert outcome["stale_count"] == 1
+    assert outcome["recalculated_count"] == 1
+    assert outcome["failed_count"] == 0
+    assert row.current_period_amount == Decimal("1160000")
+    assert row.is_stale is False
+
+
+@pytest.mark.asyncio
+async def test_recalculate_stale_rows_keeps_stale_when_formula_fails(
+    db_session: AsyncSession, seeded_db
+):
+    """公式被拦截/失败时保留旧金额和 stale 标记，并返回失败明细。"""
+    import sqlalchemy as sa
+
+    engine = ReportEngine(db_session)
+    await engine.generate_all_reports(
+        FAKE_PROJECT_ID, 2025, applicable_standard=TEST_STANDARD
+    )
+    await db_session.commit()
+
+    config = (
+        await db_session.execute(
+            sa.select(ReportConfig).where(
+                ReportConfig.applicable_standard == TEST_STANDARD,
+                ReportConfig.row_code == "BS-003",
+                ReportConfig.is_deleted == sa.false(),
+            )
+        )
+    ).scalar_one()
+    config.formula = "INVALID_FUNC('x')"
+    await db_session.execute(
+        sa.update(FinancialReport)
+        .where(
+            FinancialReport.project_id == FAKE_PROJECT_ID,
+            FinancialReport.year == 2025,
+            FinancialReport.report_type == FinancialReportType.balance_sheet,
+            FinancialReport.row_code == "BS-003",
+        )
+        .values(is_stale=True)
+    )
+    await db_session.flush()
+
+    outcome = await engine.recalculate_stale_rows(
+        FAKE_PROJECT_ID, 2025, applicable_standard=TEST_STANDARD
+    )
+    await db_session.commit()
+
+    row = (
+        await db_session.execute(
+            sa.select(FinancialReport).where(
+                FinancialReport.project_id == FAKE_PROJECT_ID,
+                FinancialReport.year == 2025,
+                FinancialReport.report_type == FinancialReportType.balance_sheet,
+                FinancialReport.row_code == "BS-003",
+            )
+        )
+    ).scalar_one()
+    assert outcome["stale_count"] == 1
+    assert outcome["recalculated_count"] == 0
+    assert outcome["failed_count"] == 1
+    assert outcome["failed_rows"][0]["row_code"] == "BS-003"
+    assert outcome["failed_rows"][0]["state"] == "blocked"
+    assert row.current_period_amount == Decimal("200000")
+    assert row.is_stale is True

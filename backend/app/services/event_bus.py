@@ -140,18 +140,24 @@ class EventBus:
         """构建 debounce 去重键。
 
         同项目、同年度、同事件类型是基础范围；底稿保存与发布确认还需保留
-        ``extra.wp_id`` / ``extra.publish_token`` 身份，避免不同底稿或确认互相覆盖。
-        未携带非空身份字段的事件保持原有去重键。
+        ``extra.wp_id`` / ``extra.publish_token`` 身份，调整事件还需保留
+        ``entry_group_id``，避免不同底稿、确认或调整组互相覆盖。
+        ``entry_group_id`` 的新载荷位置是顶层字段；旧发布方仍可从 ``extra`` 回退。
+        未携带非空身份字段的事件保持原有去重键，不把缺失值序列化成 ``None``。
         """
         year_key = payload.year if payload.year is not None else "ALL_YEARS"
         base_key = f"{payload.event_type.value}:{payload.project_id}:{year_key}"
         extra = payload.extra or {}
         identity = []
-        for field in ("wp_id", "publish_token"):
-            value = extra.get(field)
+        for field in ("wp_id", "publish_token", "entry_group_id"):
+            # entry_group_id 已有顶层字段；extra 只为兼容旧发布方提供回退。
+            value = getattr(payload, field, None) if field == "entry_group_id" else extra.get(field)
+            if value is None or not str(value).strip():
+                if field == "entry_group_id":
+                    value = extra.get(field)
             if value is None:
                 continue
-            value_text = str(value)
+            value_text = str(value).strip()
             if value_text:
                 identity.append((field, value_text))
         if not identity:

@@ -517,7 +517,7 @@ def _attach_is_derived_movement(
 # _safe_eval_expr: 薄 re-export，委托 L1 内核 formula_engine.safe_eval_expr
 # （保留导出名以兼容 test_formula_engine_baseline / test_consol_report_formula_eval 的 import）
 # ---------------------------------------------------------------------------
-from app.services.formula_engine import safe_eval_expr as _safe_eval_expr  # noqa: E402
+from app.services.formula_engine import FormulaResult, safe_eval_expr as _safe_eval_expr  # noqa: E402
 
 
 class ReportFormulaParser:
@@ -676,28 +676,42 @@ class ReportFormulaParser:
         """AmountResolver Protocol 公开方法：委托内部 _resolve_sum_tb。"""
         return await self._resolve_sum_tb(code_range, column_name)
 
+    async def execute_with_status(
+        self,
+        formula: str | None,
+        row_cache: dict[str, Decimal],
+    ) -> FormulaResult:
+        """执行公式并保留 ``FormulaResult``，供 stale 重算判断成功状态。"""
+        if not formula or not formula.strip():
+            return FormulaResult()
+
+        adj_data = None
+        if "ADJ(" in formula:
+            adj_data = await self._get_adj_data()
+
+        return await evaluate_formula_result(
+            formula, resolver=self, row_cache=row_cache, adj_data=adj_data,
+        )
+
     async def execute(
         self,
         formula: str | None,
         row_cache: dict[str, Decimal],
     ) -> Decimal:
-        """解析并执行公式，返回计算结果。
-
-        委托模块级 evaluate_formula（L1 内核路径），以 self 作为 resolver。
-        保留原有取数语义（含 _use_unadjusted 未审模式）。
-        """
-        if not formula or not formula.strip():
-            return Decimal("0")
-
+        """解析并执行公式，返回计算结果。"""
+        # 保留 Decimal 兼容入口自身的按需预载守卫：不含 ADJ() 的公式不能
+        # 触发调整额批量查询。execute_with_status() 使用同一口径供 stale 重算。
         adj_data = None
-        if "ADJ(" in formula:
-            # 只在公式真的用 ADJ 时才取数（绝大多数报表公式不用），
-            # 取到后按实例缓存供后续行复用。
+        if formula and "ADJ(" in formula:
             adj_data = await self._get_adj_data()
-
-        return await evaluate_formula(
-            formula, resolver=self, row_cache=row_cache, adj_data=adj_data
-        )
+        return (
+            await evaluate_formula_result(
+                formula,
+                resolver=self,
+                row_cache=row_cache,
+                adj_data=adj_data,
+            )
+        ).value
 
     async def _get_adj_data(self) -> dict[str, dict[str, Decimal]]:
         """惰性批量载入调整额实时汇总（供 ``ADJ()``），按实例缓存。
@@ -772,13 +786,13 @@ class ReportFormulaParser:
         return [m.group(1) for m in _ROW_PATTERN.finditer(formula)]
 
 
-async def evaluate_formula(
+async def evaluate_formula_result(
     formula: str | None,
     *,
     resolver: AmountResolver,
     row_cache: dict[str, Decimal] | None = None,
     adj_data: dict[str, dict[str, Decimal]] | None = None,
-) -> Decimal:
+) -> FormulaResult:
     """L2 编排层：预载数据 → 构建 FormulaContext → 委托 L1 内核 execute → 返回 Decimal。
 
     签名向后兼容（reports + consol 调用方零改）。
@@ -801,7 +815,7 @@ async def evaluate_formula(
     from app.services.formula_engine import execute as fe_execute, FormulaContext
 
     if not formula or not formula.strip():
-        return Decimal("0")
+        return FormulaResult()
 
     # ── L2 编排：经 resolver 预载数据 token → 构建 FormulaContext → 委托 L1 内核 ──
     row_values = row_cache or {}
@@ -821,12 +835,53 @@ async def evaluate_formula(
         val = await resolver.resolve_tb(account_code, col)
         expression = expression.replace(match.group(0), str(val), 1)
 
-    # PREV/NOTE/WP/AUX — 报表域默认置 0（与原行为一致）
+    # PREV/AUX — 报表域默认置 0（与原行为一致）
     for match in _PREV_PATTERN.finditer(formula):
         expression = expression.replace(match.group(0), "0", 1)
-    for pattern in [_NOTE_PATTERN, _WP_PATTERN, _AUX_PATTERN]:
+    for pattern in [_AUX_PATTERN]:
         for match in pattern.finditer(formula):
             expression = expression.replace(match.group(0), "0", 1)
+
+    # ── WP/NOTE 跨引用预载（spec: formula-push-user-custom-cross-module T7）──
+    # 不再硬替换为 0，而是预载数据到 FormulaContext，让 L1 handler 求值。
+    from app.services.formula_engine import (
+        _extract_wp_refs, _extract_note_refs,
+        WPExecutor, NOTEExecutor,
+    )
+    wp_data: dict[str, dict] = {}
+    note_data: dict[str, dict] = {}
+
+    wp_refs = _extract_wp_refs(formula)
+    if wp_refs and hasattr(resolver, 'db') and hasattr(resolver, 'project_id'):
+        seen_wp: set[tuple[str, str]] = set()
+        for wc, col in wp_refs:
+            if (wc, col) in seen_wp:
+                continue
+            seen_wp.add((wc, col))
+            if wc not in wp_data:
+                wp_data[wc] = {}
+            try:
+                val = await WPExecutor.execute(resolver.db, resolver.project_id, wc, col)
+                wp_data[wc][col] = Decimal(str(val)) if val is not None else Decimal("0")
+            except Exception:
+                wp_data[wc][col] = Decimal("0")
+
+    note_refs = _extract_note_refs(formula)
+    if note_refs and hasattr(resolver, 'db') and hasattr(resolver, 'project_id') and hasattr(resolver, 'year'):
+        seen_note: set[tuple[str, str]] = set()
+        for section, field_name in note_refs:
+            if (section, field_name) in seen_note:
+                continue
+            seen_note.add((section, field_name))
+            if section not in note_data:
+                note_data[section] = {}
+            try:
+                val = await NOTEExecutor.execute(resolver.db, resolver.project_id, resolver.year, section, field_name)
+                note_data[section][field_name] = Decimal(str(val)) if val is not None else Decimal("0")
+            except Exception:
+                note_data[section][field_name] = Decimal("0")
+
+    # WP/NOTE token 不再预替换——留给 L1 handler 消费 wp_data/note_data
 
     # Step 2: 构建 FormulaContext（ROW 数据；TB/SUM_TB 已预替换为数值无需再入 ctx）
     #
@@ -839,10 +894,29 @@ async def evaluate_formula(
         row_cache={k: Decimal(str(v)) for k, v in row_values.items()},
         prior_tb_data={},
         adj_data=adj_data or {},
+        wp_data=wp_data,
+        note_data=note_data,
     )
 
     # Step 3: 委托 L1 内核求值（expression 中只剩 ROW/SUM_ROW/REPORT + 算术 + 内置函数）
     result = fe_execute(expression, ctx)
+    return result
+
+
+async def evaluate_formula(
+    formula: str | None,
+    *,
+    resolver: AmountResolver,
+    row_cache: dict[str, Decimal] | None = None,
+    adj_data: dict[str, dict[str, Decimal]] | None = None,
+) -> Decimal:
+    """兼容入口：执行公式并只返回 Decimal 值。"""
+    result = await evaluate_formula_result(
+        formula,
+        resolver=resolver,
+        row_cache=row_cache,
+        adj_data=adj_data or {},
+    )
     return result.value
 
 
@@ -1850,6 +1924,152 @@ class ReportEngine:
             )
 
         return expression
+
+    async def recalculate_stale_rows(
+        self,
+        project_id: UUID,
+        year: int,
+        applicable_standard: str | None = None,
+        mode: str = "audited",
+    ) -> dict[str, Any]:
+        """重算当前项目年度标记为 stale 的报表行。
+
+        只有公式执行结果 ``FormulaResult.ok`` 且金额已经成功 flush 后，才清除
+        ``is_stale``。公式错误、blocked 或缺少配置的行保留原金额和 stale 标记，
+        并在返回值的 ``failed_rows`` 中给出可定位的失败原因。
+
+        ``applicable_standard=None`` 时按项目真实配置解析准则，避免默认
+        ``enterprise`` 导致配置零命中而静默返回成功。
+        """
+        if applicable_standard is None:
+            from app.services.report_config_service import ReportConfigService
+
+            applicable_standard = await ReportConfigService.resolve_applicable_standard(
+                self.db, project_id,
+            )
+
+        stale_result = await self.db.execute(
+            sa.select(FinancialReport)
+            .where(
+                FinancialReport.project_id == project_id,
+                FinancialReport.year == year,
+                FinancialReport.is_stale == sa.true(),
+                FinancialReport.is_deleted == sa.false(),
+            )
+            .order_by(FinancialReport.report_type, FinancialReport.row_code)
+        )
+        stale_rows = list(stale_result.scalars().all())
+        stale_by_key = {(row.report_type, row.row_code): row for row in stale_rows}
+
+        configs = await self._load_report_configs(applicable_standard)
+        all_rows_result = await self.db.execute(
+            sa.select(FinancialReport).where(
+                FinancialReport.project_id == project_id,
+                FinancialReport.year == year,
+                FinancialReport.is_deleted == sa.false(),
+            )
+        )
+        row_cache: dict[str, Decimal] = {
+            row.row_code: row.current_period_amount
+            for row in all_rows_result.scalars().all()
+            if row.current_period_amount is not None
+        }
+
+        type_order = [
+            FinancialReportType.balance_sheet,
+            FinancialReportType.income_statement,
+            FinancialReportType.cash_flow_statement,
+            FinancialReportType.equity_statement,
+            FinancialReportType.cash_flow_supplement,
+            FinancialReportType.impairment_provision,
+        ]
+        now = datetime.now(timezone.utc)
+        recalculated_rows: list[dict[str, str]] = []
+        failed_rows: list[dict[str, str]] = []
+        successful_models: list[FinancialReport] = []
+        handled_keys: set[tuple[FinancialReportType, str]] = set()
+
+        for report_type in type_order:
+            parser = ReportFormulaParser(self.db, project_id, year)
+            if mode == "unadjusted":
+                parser._use_unadjusted = True
+
+            for config in sorted(configs.get(report_type, []), key=lambda r: r.row_number):
+                key = (report_type, config.row_code)
+                row = stale_by_key.get(key)
+                if row is None:
+                    continue
+                handled_keys.add(key)
+
+                try:
+                    formula_result = await parser.execute_with_status(
+                        config.formula, row_cache,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    failed_rows.append({
+                        "report_type": report_type.value,
+                        "row_code": config.row_code,
+                        "error": str(exc),
+                        "state": "error",
+                    })
+                    continue
+
+                if not formula_result.ok:
+                    error = "; ".join(formula_result.errors)
+                    if not error and formula_result.blocked:
+                        error = "公式被拦截"
+                    failed_rows.append({
+                        "report_type": report_type.value,
+                        "row_code": config.row_code,
+                        "error": error or "公式执行失败",
+                        "state": formula_result.state,
+                    })
+                    continue
+
+                # 先写入金额及其来源元数据；stale 标记在 flush 成功后再清除。
+                row.current_period_amount = formula_result.value
+                row.row_name = config.row_name
+                row.formula_used = config.formula
+                row.source_accounts = parser.extract_account_codes(config.formula) or None
+                row.generated_at = now
+                row.indent_level = config.indent_level
+                row.is_total_row = config.is_total_row
+                row_cache[config.row_code] = formula_result.value
+                successful_models.append(row)
+                recalculated_rows.append({
+                    "report_type": report_type.value,
+                    "row_code": config.row_code,
+                })
+
+        # stale 行必须有对应的当前准则配置；缺配置时不能把 stale 静默清掉。
+        for row in stale_rows:
+            key = (row.report_type, row.row_code)
+            if key not in handled_keys:
+                failed_rows.append({
+                    "report_type": row.report_type.value,
+                    "row_code": row.row_code,
+                    "error": "当前报表准则缺少对应配置",
+                    "state": "missing_config",
+                })
+
+        # 分两次 flush，明确保证「金额已经写入」发生在「清 stale」之前。
+        if successful_models:
+            await self.db.flush()
+            for row in successful_models:
+                row.is_stale = False
+            await self.db.flush()
+            await self._invalidate_report_cache(project_id)
+
+        return {
+            "project_id": str(project_id),
+            "year": year,
+            "applicable_standard": applicable_standard,
+            "stale_count": len(stale_rows),
+            "recalculated_count": len(recalculated_rows),
+            "failed_count": len(failed_rows),
+            "recalculated_rows": recalculated_rows,
+            "failed_rows": failed_rows,
+        }
 
     # ------------------------------------------------------------------
     # 增量更新

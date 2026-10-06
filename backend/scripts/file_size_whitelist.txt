@@ -721,7 +721,7 @@ backend/app/services/workpaper_sync/phase5_d4_customer_structure.py  953
 #     🔴 依赖 monkeypatch 符号或共享 dialogSession 闭包的 handler 不能搬走（同
 #     custom_query.py 登记时记录的约束），故不为凑行数扭曲接线。
 #     spec: workpaper-page-formula-toolbar-closure（F-SHELL 交付）
-audit-platform/frontend/src/components/formula/FormulaManagerDialog.vue  3985
+audit-platform/frontend/src/components/formula/FormulaManagerDialog.vue  4268
 
 # ═══════════════════════════════════════════════════════════════════════════
 # spec: four-table-extraction-entry-completion（2026-09-12 入库）
@@ -836,7 +836,7 @@ backend/app/routers/wp_render_strategies/_d4_import_export.py  4101
 #     check_consol_lock）+ P0-项4 checklist_responses 乐观锁 CAS（_upsert_checklist_response + base_version）。
 #     该文件的瘦身属独立 spec（whitelist 已有登记说明），不与 P0 安全修复同批。
 #     spec: d4-dual-mode-formula-governance P0-项4/项5
-backend/app/services/formula_engine.py  1964
+backend/app/services/formula_engine.py  2137
 backend/tests/test_cycle_linkage_handlers_integration.py  1205
 
 # spec: tb-writeback-explicit-publish-gate（Task 13 I 循环入库，2026）
@@ -1153,7 +1153,7 @@ backend/app/services/ledger_penetration_service.py  942
 #   届时必须先拆分。
 #   登记为待办：report_engine 的 ReportFormulaParser（取数缓存 + 列名映射）
 #   与模块级 evaluate_formula（L2 编排）是两个关注点，可按此切分。
-backend/app/services/report_engine.py  2226
+backend/app/services/report_engine.py  2551
 backend/app/services/consol_report_service.py  1008
 
 # ── 2026-09-28 spec d1-sync-row-table-engine-and-d1-coverage · X2 ────────────
@@ -1221,7 +1221,7 @@ audit-platform/frontend/src/views/Adjustments.vue  1932
 backend/app/services/wp_disclosure_sync_service.py  1589
 #   test_report_engine.py —— **改动前即 847 行已超 800 上限**。本次净增 +23 行：
 #     report_engine 联动测试修正（cycle_linkage 事件触发断言更新）。
-backend/tests/test_report_engine.py  871
+backend/tests/test_report_engine.py  986
 
 #   consol_note_sections.py —— **改动前即 982 行已超 800 上限**。本次净增 +56 行：
 #     合并附注节点隔离 key + 共享上下文接线。拆分方向：把 AI 填充端点组抽为伴生模块。
@@ -1261,7 +1261,7 @@ backend/app/services/workpaper_sync/phase5_e1_monetary_fund.py  924
 #     spec: a-cycle-sync-foundation-and-first-canary
 backend/tests/workpaper_sync/test_a_cycle_foundation_canary.py  1689
 backend/tests/workpaper_sync/test_phase5_e1_sheet_specs.py
-backend/tests/test_event_bus.py 806
+backend/tests/test_event_bus.py 904
 backend/app/services/report_config_service.py 803
 backend/app/services/formula_push/engine.py 823
 audit-platform/frontend/src/components/consolidation/ConsolNoteTab.vue 2550

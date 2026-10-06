@@ -804,3 +804,101 @@ class TestAdjustmentServiceEventPublishing:
         assert len(published_events) == 1
         evt = published_events[0]
         assert evt.event_type == EventType.ADJUSTMENT_DELETED
+
+    @pytest.mark.asyncio
+    async def test_debounce_keeps_distinct_entry_groups_separate(self):
+        """同项目同年度同事件的不同调整组必须分别派发。"""
+        bus = EventBus(debounce_ms=50)
+        handler = AsyncMock()
+        bus.subscribe(EventType.ADJUSTMENT_APPROVED, handler)
+        project_id = uuid.uuid4()
+        groups = [uuid.uuid4(), uuid.uuid4()]
+
+        for group_id in groups:
+            await bus.publish(EventPayload(
+                event_type=EventType.ADJUSTMENT_APPROVED,
+                project_id=project_id,
+                year=2025,
+                entry_group_id=group_id,
+            ))
+
+        await asyncio.sleep(0.12)
+        assert handler.await_count == 2
+        assert {call.args[0].entry_group_id for call in handler.await_args_list} == set(groups)
+
+    @pytest.mark.asyncio
+    async def test_debounce_merges_same_entry_group(self):
+        """同一调整组仍合并，并保留 account_codes 的稳定并集。"""
+        bus = EventBus(debounce_ms=50)
+        handler = AsyncMock()
+        bus.subscribe(EventType.ADJUSTMENT_APPROVED, handler)
+        project_id = uuid.uuid4()
+        group_id = uuid.uuid4()
+
+        await bus.publish(EventPayload(
+            event_type=EventType.ADJUSTMENT_APPROVED,
+            project_id=project_id,
+            year=2025,
+            account_codes=["1001"],
+            entry_group_id=group_id,
+        ))
+        await bus.publish(EventPayload(
+            event_type=EventType.ADJUSTMENT_APPROVED,
+            project_id=project_id,
+            year=2025,
+            account_codes=["6001", "1001"],
+            entry_group_id=group_id,
+        ))
+
+        await asyncio.sleep(0.12)
+        handler.assert_awaited_once()
+        merged = handler.await_args.args[0]
+        assert merged.entry_group_id == group_id
+        assert merged.account_codes == ["1001", "6001"]
+
+    def test_entry_group_identity_prefers_top_level_and_supports_legacy_extra(self):
+        """顶层 entry_group_id 优先，旧 extra 位置仍能构成同一身份。"""
+        bus = EventBus(debounce_ms=0)
+        project_id = uuid.uuid4()
+        top_group = uuid.uuid4()
+        extra_group = uuid.uuid4()
+
+        top = EventPayload(
+            event_type=EventType.ADJUSTMENT_APPROVED,
+            project_id=project_id,
+            year=2025,
+            entry_group_id=top_group,
+            extra={"entry_group_id": str(extra_group)},
+        )
+        top_without_extra = EventPayload(
+            event_type=EventType.ADJUSTMENT_APPROVED,
+            project_id=project_id,
+            year=2025,
+            entry_group_id=top_group,
+        )
+        legacy = EventPayload(
+            event_type=EventType.ADJUSTMENT_APPROVED,
+            project_id=project_id,
+            year=2025,
+            extra={"entry_group_id": str(extra_group)},
+        )
+        assert bus._build_dedup_key(top) == bus._build_dedup_key(top_without_extra)
+        assert bus._build_dedup_key(top) != bus._build_dedup_key(legacy)
+
+    def test_missing_or_blank_entry_group_does_not_change_legacy_key(self):
+        """缺失、None 和空白调整组不应制造共享的 None 身份。"""
+        bus = EventBus(debounce_ms=0)
+        project_id = uuid.uuid4()
+        base = EventPayload(
+            event_type=EventType.ADJUSTMENT_APPROVED,
+            project_id=project_id,
+            year=2025,
+        )
+        blank = EventPayload(
+            event_type=EventType.ADJUSTMENT_APPROVED,
+            project_id=project_id,
+            year=2025,
+            entry_group_id=None,
+            extra={"entry_group_id": "   "},
+        )
+        assert bus._build_dedup_key(base) == bus._build_dedup_key(blank)

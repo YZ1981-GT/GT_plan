@@ -1484,6 +1484,36 @@ def _extract_formula_codes(formula: str) -> set[str]:
     return codes
 
 
+def _extract_wp_refs(formula: str) -> list[tuple[str, str]]:
+    """从公式中提取 WP() 引用的 (wp_code, column) 参数对。
+
+    用于 FormulaEngine.execute 的 L2 预载：提取后按 wp_code 分组批量查库。
+    spec: formula-push-user-custom-cross-module Task 5
+    """
+    import re as _re
+    refs: list[tuple[str, str]] = []
+    for m in _re.finditer(r"WP\(\s*'([^']+)'\s*(?:,\s*'([^']+)')?\s*\)", formula):
+        wp_code = m.group(1)
+        column = m.group(2) or "审定数"
+        refs.append((wp_code, column))
+    return refs
+
+
+def _extract_note_refs(formula: str) -> list[tuple[str, str]]:
+    """从公式中提取 NOTE() 引用的 (section, field_name) 参数对。
+
+    用于 FormulaEngine.execute 的 L2 预载：提取后按 section 分组批量查库。
+    spec: formula-push-user-custom-cross-module Task 5
+    """
+    import re as _re
+    refs: list[tuple[str, str]] = []
+    for m in _re.finditer(r"NOTE\(\s*'([^']+)'\s*(?:,\s*'([^']+)')?\s*(?:,\s*'([^']+)')?\s*\)", formula):
+        section = m.group(1)
+        field_name = m.group(2) or "合计"
+        refs.append((section, field_name))
+    return refs
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # FormulaEngine 类（向后兼容 formula.py 路由）
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1652,7 +1682,50 @@ class FormulaEngine:
             db, project_id=project_id, year=year, formula=formula_str,
             account_codes=set(tb_map.keys()), exclude_origins=frozenset(),
         )
-        val = execute_formula(formula_str, tb_map, {}, adj_map=adj_map)
+
+        # ── WP() / NOTE() 跨引用预载（spec: formula-push-user-custom-cross-module T5）──
+        wp_data: dict[str, dict[str, Decimal]] = {}
+        note_data: dict[str, dict[str, Decimal]] = {}
+
+        wp_refs = _extract_wp_refs(formula_str)
+        if wp_refs:
+            # 去重：同一 (wp_code, col) 只查一次库
+            seen_wp: set[tuple[str, str]] = set()
+            for wc, col in wp_refs:
+                if (wc, col) in seen_wp:
+                    continue
+                seen_wp.add((wc, col))
+                if wc not in wp_data:
+                    wp_data[wc] = {}
+                try:
+                    val = await WPExecutor.execute(db, project_id, wc, col)
+                    wp_data[wc][col] = Decimal(str(val)) if val is not None else Decimal("0")
+                except Exception as exc:
+                    logger.warning("FormulaEngine 预载 WP('%s','%s') 失败: %s", wc, col, exc)
+                    wp_data[wc][col] = Decimal("0")
+
+        note_refs = _extract_note_refs(formula_str)
+        if note_refs:
+            seen_note: set[tuple[str, str]] = set()
+            for section, field_name in note_refs:
+                if (section, field_name) in seen_note:
+                    continue
+                seen_note.add((section, field_name))
+                if section not in note_data:
+                    note_data[section] = {}
+                try:
+                    val = await NOTEExecutor.execute(db, project_id, year, section, field_name)
+                    note_data[section][field_name] = Decimal(str(val)) if val is not None else Decimal("0")
+                except Exception as exc:
+                    logger.warning("FormulaEngine 预载 NOTE('%s','%s') 失败: %s", section, field_name, exc)
+                    note_data[section][field_name] = Decimal("0")
+
+        # 构建完整 FormulaContext（含 wp_data / note_data）
+        ctx = FormulaContext.from_simple_map(tb_map, {}, adj_map=adj_map)
+        ctx.wp_data = wp_data
+        ctx.note_data = note_data
+        formula_result = execute(formula_str, ctx)
+        val = formula_result.value
 
         # ── 父子双算显式告警（R7.5：不改口径但必须让调用方知道） ──────────────
         warnings: list[str] = []
@@ -1706,6 +1779,8 @@ __all__ = [
     "FunctionRegistry", "FunctionHandler", "_REGISTRY",
     # Task 17: AddressValidator Protocol
     "AddressValidator", "_extract_formula_codes",
+    # spec: formula-push-user-custom-cross-module Task 5
+    "_extract_wp_refs", "_extract_note_refs",
 ]
 
 

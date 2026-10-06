@@ -243,7 +243,15 @@
           <el-table-column prop="row_name" label="项目" min-width="180" show-overflow-tooltip />
           <el-table-column label="公式" min-width="260">
             <template #default="{ row }">
-              <el-input v-if="editingId === row.id" v-model="editFormula" size="small" placeholder="如 TB('1001','期末余额') 或 ROW('BS-001')+ROW('BS-002')" />
+              <div v-if="editingId === row.id" style="display: flex; flex-direction: column; gap: 2px;">
+                <el-input v-model="editFormula" size="small" placeholder="如 TB('1001','期末余额') 或 WP('D2','审定数')" />
+                <div style="display: flex; gap: 2px; flex-wrap: wrap;">
+                  <el-button size="small" link style="font-size: 10px; padding: 0 2px;" @click.stop="editFormula += `TB('','')`" title="试算表取数">TB</el-button>
+                  <el-button size="small" link style="font-size: 10px; padding: 0 2px;" @click.stop="editFormula += `WP('','')`" title="底稿取数">WP</el-button>
+                  <el-button size="small" link style="font-size: 10px; padding: 0 2px;" @click.stop="editFormula += `NOTE('','','')`" title="附注取数">NOTE</el-button>
+                  <el-button size="small" link style="font-size: 10px; padding: 0 2px;" @click.stop="editFormula += `ROW('')`" title="行次引用">ROW</el-button>
+                </div>
+              </div>
               <code v-else-if="row.formula" @dblclick="startEdit(row)" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular); word-break: break-all; cursor: pointer;" :title="'双击编辑公式'">{{ row.formula }}</code>
               <span v-else @click="startEdit(row)" style="color: var(--gt-color-text-placeholder); cursor: pointer; font-size: var(--gt-font-size-xs); border: 1px dashed var(--gt-color-border-light); padding: 2px 8px; border-radius: 4px;" title="点击添加公式">
                 + 点击添加公式
@@ -313,7 +321,10 @@
           </el-table-column>
           <el-table-column label="操作" width="80" align="center">
             <template #default="{ row }">
-              <el-button v-if="editingId !== row.id" size="small" link type="primary" @click.stop="startEdit(row)">编辑</el-button>
+              <el-tooltip v-if="_isRowOwnedByPush(row)" content="此单元格由系统公式推送维护，不可编辑" placement="top">
+                <el-button size="small" link disabled>编辑</el-button>
+              </el-tooltip>
+              <el-button v-else-if="editingId !== row.id" size="small" link type="primary" @click.stop="startEdit(row)">编辑</el-button>
               <el-button v-else size="small" link @click.stop="saveEdit(row)" style="color: var(--gt-color-success);">保存</el-button>
             </template>
           </el-table-column>
@@ -327,7 +338,10 @@
         <div v-if="isCrossCheckMode" style="flex: 1;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <span style="font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text-primary);">{{ selectedPath }}</span>
-            <el-button size="small" type="primary" @click="onAddCrossRule">+ 新增规则</el-button>
+            <div style="display: flex; gap: 6px;">
+              <el-button size="small" @click="onRunCrossCheck" :loading="crossCheckRunning">▶ 执行校验</el-button>
+              <el-button size="small" type="primary" @click="onAddCrossRule">+ 新增规则</el-button>
+            </div>
           </div>
           <el-table :data="crossCheckRulesForCurrent" size="small" border style="width: 100%;"
             max-height="calc(100vh - 300px)"
@@ -341,14 +355,27 @@
             <el-table-column label="左侧（源）" min-width="180">
               <template #default="{ row }">
                 <code style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">{{ row.left_ref || '—' }}</code>
+                <div v-if="row._leftVal != null" style="font-size: 10px; color: var(--gt-color-text-tertiary);">= {{ row._leftVal }}</div>
               </template>
             </el-table-column>
             <el-table-column label="关系" width="60" align="center">
-              <template #default><span style="font-size: var(--gt-font-size-sm);">=</span></template>
+              <template #default="{ row }">
+                <span v-if="row._checked && row._pass" style="font-size: var(--gt-font-size-sm); color: var(--gt-color-success);">✅</span>
+                <span v-else-if="row._checked && !row._pass" style="font-size: var(--gt-font-size-sm); color: var(--gt-color-danger);">❌</span>
+                <span v-else style="font-size: var(--gt-font-size-sm);">=</span>
+              </template>
             </el-table-column>
             <el-table-column label="右侧（目标）" min-width="180">
               <template #default="{ row }">
                 <code style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">{{ row.right_ref || '—' }}</code>
+                <div v-if="row._rightVal != null" style="font-size: 10px; color: var(--gt-color-text-tertiary);">= {{ row._rightVal }}</div>
+              </template>
+            </el-table-column>
+            <el-table-column label="差额" width="100" align="right">
+              <template #default="{ row }">
+                <span v-if="row._checked" :style="{ fontSize: '11px', fontWeight: 600, color: row._pass ? 'var(--gt-color-success)' : 'var(--gt-color-danger)' }">
+                  {{ row._diff != null ? row._diff.toFixed(2) : '—' }}
+                </span>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="120" align="center">
@@ -760,6 +787,7 @@ import {
   formulaPush,
 } from '@/services/apiPaths/formula'
 import { fmtAmount } from '@/utils/formatters'
+import { isOwnedKey } from '@/generated/formulaPushOwnedKeys'
 import FormulaEditDialog from './FormulaEditDialog.vue'
 import FormulaHistoryTab from './FormulaHistoryTab.vue'
 import FormulaPushPanel from './FormulaPushPanel.vue'
@@ -2735,6 +2763,76 @@ function onRemoveCrossRule(index: number) {
   crossCheckRulesMap.value[key]?.splice(index, 1)
 }
 
+// ── 表间审核执行校验（spec: formula-push-user-custom-cross-module T9）──
+const crossCheckRunning = ref(false)
+
+async function onRunCrossCheck() {
+  const rules = crossCheckRulesForCurrent.value
+  if (!rules.length) {
+    ElMessage.info('当前节点没有校验规则')
+    return
+  }
+  if (!props.projectId || !props.year) {
+    ElMessage.warning('缺少项目信息')
+    return
+  }
+
+  crossCheckRunning.value = true
+  try {
+    // 收集左右两侧所有公式，批量执行
+    const allFormulas: { row_code: string; formula: string }[] = []
+    for (let i = 0; i < rules.length; i++) {
+      if (rules[i].left_ref) allFormulas.push({ row_code: `_ccL${i}`, formula: rules[i].left_ref })
+      if (rules[i].right_ref) allFormulas.push({ row_code: `_ccR${i}`, formula: rules[i].right_ref })
+    }
+
+    const data = await api.post(P_rc.executeFormulasBatch, {
+      project_id: props.projectId,
+      year: props.year,
+      formulas: allFormulas,
+    }, { validateStatus: (s: number) => s < 600 })
+
+    const resultMap = new Map<string, number>()
+    for (const r of (data?.results || [])) {
+      if (r.row_code && r.value != null && r.error == null) {
+        resultMap.set(r.row_code, Number(r.value))
+      }
+    }
+
+    // 写回校验结果
+    let passCount = 0
+    let failCount = 0
+    for (let i = 0; i < rules.length; i++) {
+      const leftVal = resultMap.get(`_ccL${i}`) ?? null
+      const rightVal = resultMap.get(`_ccR${i}`) ?? null
+      rules[i]._leftVal = leftVal
+      rules[i]._rightVal = rightVal
+      rules[i]._checked = leftVal != null && rightVal != null
+      if (rules[i]._checked) {
+        const diff = (leftVal ?? 0) - (rightVal ?? 0)
+        rules[i]._diff = diff
+        const op = rules[i].operator || '='
+        rules[i]._pass = op === '=' ? Math.abs(diff) < 0.01
+          : op === '<=' ? diff <= 0.01
+          : op === '>=' ? diff >= -0.01
+          : Math.abs(diff) < 0.01
+        if (rules[i]._pass) passCount++
+        else failCount++
+      }
+    }
+
+    if (failCount > 0) {
+      ElMessage.warning(`校验完成：${passCount} 条通过，${failCount} 条差异`)
+    } else {
+      ElMessage.success(`全部 ${passCount} 条校验通过`)
+    }
+  } catch (e: any) {
+    handleApiError(e, '表间审核执行失败')
+  } finally {
+    crossCheckRunning.value = false
+  }
+}
+
 // ── 分类筛选 ──
 const activeCategory = ref('all')
 
@@ -2822,6 +2920,19 @@ function getRowClassName({ row }: { row: any }) {
 function isPresetFormula(row: any): boolean {
   const src = row.formula_source || ''
   return src.startsWith('check_presets.') || src === '试算表审定数' || src === '报表行次引用'
+}
+
+/**
+ * 判断行是否由系统公式推送独占（policy=system/derived）。
+ * 独占行不允许用户在公式管理面板中编辑自定义公式。
+ * spec: formula-push-user-custom-cross-module T6
+ */
+function _isRowOwnedByPush(row: any): boolean {
+  const wpCode = pushWpCode.value || (props.wpCode || '').split('-')[0].toUpperCase()
+  if (!wpCode) return false
+  const itemId = row.row_code || row.cell_key || ''
+  if (!itemId) return false
+  return isOwnedKey(wpCode, itemId)
 }
 
 function onBatchApplyCategory(cat: string) {

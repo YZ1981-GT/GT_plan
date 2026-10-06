@@ -677,3 +677,59 @@ def register_cycle_linkage_handlers() -> None:
     logger.debug(
         "Cycle linkage handlers registered (C/F/D~N + confirmation + disclosure stale)"
     )
+
+    # WP() 跨底稿引用 stale 传播（spec: formula-push-user-custom-cross-module T10）
+    # 底稿保存 → 扫描 wp_formula 中引用该底稿的用户公式 → 标引用方 stale
+    event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_workpaper_saved_wp_formula_stale)
+    logger.debug("WP() cross-workpaper stale propagation handler registered")
+
+
+async def _on_workpaper_saved_wp_formula_stale(payload: EventPayload) -> None:
+    """WORKPAPER_SAVED → 扫描 wp_formula 中 WP() 引用该底稿的公式 → 标引用方 stale。
+
+    spec: formula-push-user-custom-cross-module Task 10（跨科目依赖）。
+
+    当底稿 D2 保存后，如果 K1 的用户公式里有 WP('D2','审定数')，
+    则标记 K1 的 working_paper.prefill_stale=true + 公式 lifecycle_state='stale'。
+    """
+    extra = payload.extra or {}
+    wp_code = extra.get("wp_code")
+    project_id = payload.project_id
+    year = payload.year or 0
+
+    if not wp_code or not project_id:
+        return
+
+    try:
+        from app.services.wp_formula_linkage_service import propagate_custom_wp_cell_change
+        from app.core.database import async_session as async_session_factory
+
+        async with async_session_factory() as db:
+            result = await propagate_custom_wp_cell_change(
+                db,
+                project_id=_to_uuid(project_id),
+                year=year,
+                wp_code=str(wp_code),
+                sheet_name="",  # 底稿级传播（不限 sheet）
+                cell_ref="",    # 底稿级传播（不限单元格）
+            )
+            await db.commit()
+            dynamic_count = result.get("dynamic_marked", 0)
+            if dynamic_count:
+                logger.info(
+                    "[wp_formula_stale] WORKPAPER_SAVED(%s) → %d 个引用方标记 stale",
+                    wp_code, dynamic_count,
+                )
+    except Exception:
+        logger.warning(
+            "[wp_formula_stale] propagate failed for wp_code=%s project=%s",
+            wp_code, project_id, exc_info=True,
+        )
+
+
+def _to_uuid(value: Any) -> "uuid.UUID":
+    """字符串或 UUID → UUID。"""
+    import uuid as _uuid
+    if isinstance(value, _uuid.UUID):
+        return value
+    return _uuid.UUID(str(value))
