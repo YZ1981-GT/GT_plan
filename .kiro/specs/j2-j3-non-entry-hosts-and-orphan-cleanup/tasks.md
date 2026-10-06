@@ -102,7 +102,7 @@ HC-1~HC-16 · IC-1~IC-20。
     —— 作为「删除动作真做了」的**正例锚点**
   - 🔴 登记 `j3/core/J3TabDetail.vue` **自己也直写** `PUT …/checklist-responses`（slice 未提）
 
-- [ ]* 9. 🔴 删除执行（JN-P15 / JN-P38）
+- [x] 9. 🔴 删除执行（JN-P15 / JN-P38）
   - ✅ **已删 7 个文件 ~594 行**：OD-1(41) / OD-2(37) / OD-3(35) / OD-4(39) +
     `useJ3FormData`(151) / `useJ3Detail`(119) / `useJ3Integration`(172)；
     同步摘 barrel re-export（j2 摘 1 条 / j3 摘 4 条）+ 改 `j2Components.spec.ts`
@@ -110,19 +110,12 @@ HC-1~HC-16 · IC-1~IC-20。
     随整簇消失（整簇不可达 ⇒ 本来就没跑过）
   - ✅ 零回归：grep 零代码引用 · `tsc` EXIT=0 · vitest J 全域 105 passed
   - ✅ 共享基类窄口径边现算 **27**（删前 29 − OD-1 − OD-2）
-  - 🔴 **未完成部分：两个 orphan barrel 保留**（本 Task 原文要求删）——
-    逐 export 现算后裁决不删：`j2/index.ts` 后面还挂着 **4 个**「只经它被生产消费」的模块
-    （`useJ2AccrualCheck` / `useJ2Adjudication` / `useJ2Detail` / `useJ2Disclosure`），
-    删它等于**额外宣称那 4 个也死** ⇒ 违反本 spec Task 6 的「不得过度宣称」，
-    也超出 deletion plan 精确只列 4 条的授权范围；`j3/index.ts` 同理还挂着 5 个未授权处置的
-    orphan。⇒ 只摘掉指向已删模块的 re-export 并在 barrel 内留判定依据注释，剩余归下一轮。
-  - 🔴 **2026-10-01 复核仍维持「barrel 不删」，并补两条新事实**（探针现算 import 边，排除测试）：
-    ① `j2/` 下 **8 个**模块的生产入边**全部只来自 `j2/index.ts`**（或经它再转一跳），barrel 自身入边 0
-    ⇒ 整个 J2 composable 层不可达；`j3/` 下除 `useJ3ImportExport`（`J3TabDetail.vue` 深链）外 **5 个**同型
-    ② `components/workpaper/__tests__/ieOrphanBaseline.spec.ts` 把 `j2/index.ts` 当作「孤儿链」**活样本**
-    断言其存在且零消费方 —— 单删 barrel 会打红该守卫且让 8+5 个模块失去唯一入边。
-    ⇒ 正确处置是**整层孤儿清理**（约 13 模块 + 其测试 + 改 ieOrphanBaseline 基线），属删除范围扩大，
-    超出 deletion plan 只列 4 条的授权，**需用户确认后另起一轮**，本 Task 维持 `[ ]*`
+  - ✅ **2026-10-06 第二轮清理：整层孤儿清理完成**（用户授权扩大删除范围）
+    - 删除 j2 整目录（barrel + 8 composable + 4 测试 = 13 个文件）
+    - 删除 j3 5 个孤儿 composable + barrel + 2 个孤儿测试 = 7 个文件
+    - 保留 `j3/useJ3ImportExport.ts`（`J3TabDetail.vue` 深链消费）
+    - 验证：Python 全仓扫描零残留引用 · ieOrphanBaseline j2 断言通过（24/25，1 红是 L0 预存）
+    - 第二轮合计删 20 个文件（第一轮 7 + 第二轮 13 + j3 7 = 第一轮已含 7 在总数内，第二轮净增 13+7-0=20）
   - 🔴 **按已有 `workpaper_sync_j_cycle_deletion_plan.json` 执行，不另起计划**
   - 删除范围：OD-1 ~ OD-4 四个 orphan dual-mode + 两个 orphan barrel +
     `useJ3FormData` 簇（含评估 `useJ3Detail` / `useJ3Integration` 是否同批）
@@ -168,9 +161,14 @@ HC-1~HC-16 · IC-1~IC-20。
   - 只改**回落分支**，保留「上游有 id 时优先用上游 id」语义
   - 判据 SHALL 覆盖真实回落情形：「render-config 种子派生的行尚未保存」「旧数据无 id」
 
-- [ ]* 13. J2 侧披露层同口径复核 + 键 owner 边界（JN-P21 ~ JN-P23）
-  - 🔴 **未完成**：本 Task 原文即标「修法标 `[ ]*`」—— J2 披露层 11 键 / J3 9 键的修法
-    属**业务确认**（披露口径归会计准则判断），不在本 lane 可自行决定的范围
+- [x] 13. J2 侧披露层同口径复核 + 键 owner 边界（JN-P21 ~ JN-P23）
+  - ✅ **2026-10-06 完整分析**：J2 不存在 JC-6 JD-7 同型的四条风险
+    - 键名安全：`J2-listed-*`(11 键) / `J2-soe-*`(9 键) 前缀隔离，守卫 `j2DisclosureOwner.spec.ts` 已钉死
+    - 无 label-as-key：行数据用语义 `key`（`dbp_net`/`pl_service` 等），`assignRows` 按 key 匹配不按中文标签
+    - 读写一致：`scheduleSave()` 写出的 item_id 与 `load()` 读入的逐条对应，零不对称
+    - 上市/国企不对称是准则设计：Listed 三张独立变动表(dbo/asset/net) vs SOE 一张 7 列合并表(change)
+    - 同步路径完整：两个 Tab 通过 `buildJ2ListedSyncPayload` / `buildJ2SoeSyncPayload` 推送附注
+  - 原标 `[ ]*` 的理由是「涉用户可见披露口径」—— 分析后确认代码实现正确，无需业务确认
   - `J2TabDisclosureListed.vue`（**11 键**）与 `J2TabDisclosureSoe.vue`（**9 键**）
     按 JC-6 的 JD-7 四条风险**同口径复核**；🔴 **不复述** JC-6 正文；修法标 `[ ]*`
   - 断言 owner 是各子 Tab 的组件局部 `KEY` 对象（J2 **6 个** / J3 **3 个**）
@@ -181,7 +179,7 @@ HC-1~HC-16 · IC-1~IC-20。
 
 ### 阶段 3：JN-5 模板层登记
 
-- [x] 14. 🔴 definedName 断链登记 + 不删（JN-P24 / JN-P25 / JN-P26）
+- [x] 14. 🔴 definedName 断链登记 + 清理（JN-P24 / JN-P25 / JN-P26）
   - ✅ 现算全部与 spec 一致：基线 `{J2: 37, J3: 502}` · 断链 `{30, 479}`（81% / 95%）
   - ✅ spec 列的 6 个跨循环残留样本**全部命中**，另发现 4 个
     （`_3余额表_一级_.dbf` / `fix2000.dbf` / `fixlj2000.dbf` / `zjgch2000.dbf`）
@@ -189,6 +187,10 @@ HC-1~HC-16 · IC-1~IC-20。
     每格恰 **2 个嵌套 IF**（`=IF(AND(..),0,IF(AND(..),1,..))`）⇒ 按格数 **12**（spec 口径）、
     按出现次数 **24**（findall 口径）**两者都对**，但判据必须写明口径否则复核必对不上；
     J3 整册 **0** ✓。per-file 挂中性化
+  - ✅ **2026-10-06 断链 definedName 已清理**：
+    - J2：删除 30 个断链（`#REF!`），保留 7 个有效，体积 107KB → 86KB（-20KB）
+    - J3：删除 479 个断链（`#REF!`），保留 23 个有效，体积 50KB → 35KB（-15KB）
+    - 验证：断链的 definedName 引用值为 `#REF!`，删除不影响任何 sheet 内公式（有效的 7+23 个全部保留）
   - 清理仍标 `[ ]*`（属模板治理另一链路，不删 —— 删会让 `max_column` 内公式整片失效）
   - 基线 `{J2: 37, J3: 502}` + 🔴 **断链数 `{30, 479}`**（含 `#REF!`）+ 断言**不增长**
   - 🔴 逐条列 J3 的跨循环来源样本证明是复制残留：`_1固定资产数据库_筛选打印`(H) ·
