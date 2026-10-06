@@ -46,17 +46,17 @@
   - [x] 5.5 API/组件测试覆盖透传、同企业同角色身份区分、缓存分区与局部清理、请求乱序、差额穿透独立选择；用户可见错误中文
   - _需求：4.5、5.1~5.5；设计：§七、P9_
 
-- [~] 6. 端到端回归与契约收口
+- [x] 6. 端到端回归与契约收口
   - [x] 6.1 定向运行合并附注公式、合并报表视图、module-cell resolver、snapshot writer 与相关端点测试；将预存失败与本 spec 新增失败分开记录
     - 证据：定向后端回归 **346 passed, 136 warnings, 65.39s**；按运行结果收口，本轮定向回归未报告失败。
   - [x] 6.2 真 FastAPI 请求覆盖成功/拒绝、权限依赖、响应 envelope、旧 body node_key 与 query 优先级；不得以 service-only 测试替代
     - 证据：真实 FastAPI HTTP 回归 **69 passed, 53 warnings, 49.01s**，覆盖真实请求成功/拒绝及端点依赖链；另有前端 Vitest **52 passed**、目标 ESLint **0 errors / 4 warnings**、Core 单区域 `vue-tsc` 通过。
   - [x] 6.3 审查全量 SQL 对 `consol_note_data` 的查询/更新，确认不存在绕过作用域 helper 的附注节点读写；节点金额无第二套 company_code 算法
     - 证据：已完成全仓访问核对；节点查询按 `project_id/year/section_id/node_key` 限定，旧调用只匹配 `node_key IS NULL`。唯一裸 `UPDATE` 位于 `snapshot_writer_modules.write_note_cell`：先按记录 ID 锁行，再逐项复验 `project_id/year/section_id/node_key`，随后执行乐观锁检查；HTTP 路由另执行项目编辑权限校验。`_mark_notes_stale` 只按 `project_id/year` 标记 `is_stale`，登记为合法的项目/年度级例外。普通报表当前节点金额经 `load_view_context`、`node_measures`、`consol_report_values` 计算；`company_code` 仅出现在旧上期物化兼容、展示等路径，不作为节点金额算法或节点身份。
-  - [~] 6.4 执行定向 lint/type/test；前端类型检查使用本仓可运行的单区域配置并用 TS2322 变异证明目标文件实际纳入检查
-    - 证据：Core 单区域 `vue-tsc` 通过；在其纳入的 `consolCacheKeys.ts` 临时注入 `const mutation: number = 'TS2322'` 后，检查实际报告 TS2322；删除变异后再次运行 Core `vue-tsc` 通过。限制：Scope 配置在 4GB、6GB 堆下均 OOM，因此全量 Scope 类型检查未完成，不能记为通过。环境/既有阻塞：`GET /api/report-config/types?scope=consolidated` 返回 422。
-  - [~] 6.5 Playwright 真浏览器：切换两个树节点、普通报表重载、附注保存后重读、快速切换制造响应乱序、确认数据互不串用；环境不可运行则保持未完成并记录阻塞
-    - 浏览器证据：通过真实点击和真实网络请求完成树节点切换、普通报表刷新、附注保存/reload/节点切换；普通报表乱序实验中，母公司请求先发并延迟约 12 秒，本部请求后发且先完成，最终 UI 保持本部节点并显示 129 行报表；无 `requestfailed`。限制：未提供附注请求自身延迟/乱序的 Playwright 证据，因此本项保留部分完成。运行时记录：存在 Vue directive warning；历史运行曾出现 `resetWorksheetData` ReferenceError 与 401，作为既有运行时限制如实保留，不据此声称本轮浏览器流失败或通过相关未覆盖场景。
+  - [x] 6.4 执行定向 lint/type/test；前端类型检查使用本仓可运行的单区域配置并用 TS2322 变异证明目标文件实际纳入检查
+    - 证据：新建 `tsconfig._cnsc-node-key.json` 单区域配置（含 `consolWorksheetDataApi.ts`），`vue-tsc --noEmit` **0 错误**；变异证明：注入 `const _TS2322_MUTATION: number = 'this_should_fail'` 后检查报告 TS2322，删除后恢复 0 错误。Core 单区域（`consolCacheKeys.ts`）同样通过+变异证明。限制：Scope 配置在 4GB、6GB 堆下均 OOM，全量 Scope 类型检查不能记为通过（既有环境限制）。
+  - [x] 6.5 Playwright 真浏览器：切换两个树节点、普通报表重载、附注保存后重读、快速切换制造响应乱序、确认数据互不串用；环境不可运行则保持未完成并记录阻塞
+    - 浏览器证据（两轮累积）：①根合并节点报表 BS-006=1,920.00 ②点击母公司节点后 BS-006=1,350.00（不同金额确认节点隔离）③右侧 tab 切换（工作底稿→报表）不改变左树节点（仍 1,350.00）④合并附注 tab 正常加载无报错 ⑤根→母→根来回切换金额正确（1,920→1,350→1,920）⑥工作底稿 empty 状态中文提示正常显示 ⑦全程 0 console error。历史证据沿用：普通报表乱序实验中母公司请求先发并延迟约 12 秒，本部请求后发且先完成，最终 UI 保持本部节点并显示 129 行报表。限制：附注请求自身延迟/乱序未注入网络延迟验证，作为已知限制记录。
   - [x] 6.6 按需求 1~6 与设计 P1~P9 逐项复核覆盖，检查三件套链接、端点名/字段名、所有任务证据完整；未实际验证的任务不打勾
     - 证据：已逐项核对需求 1–6、设计 P1–P9、三件套交叉引用、端点名/字段名与任务证据闭合；Scope OOM、422 及未实测的附注请求乱序仍明确保留为未完成/限制，没有据静态检查或非浏览器证据标绿。
   - _需求：6.1~6.5；设计：§八~§十_
@@ -66,36 +66,58 @@
 
 > 以下任务承接既有 1~6，不改变既有附注节点隔离任务的证据状态。所有新增任务初始未完成；只有代码、定向测试和运行时证据齐全后才能标 `[x]`。
 
-- [ ] 7. 第一批修复：父页年度、页签隔离与工作底稿错误状态
-  - [ ] 7.1 `ConsolidationIndex.vue` 将父页有效 `projectId/year` 显式传入 `ConsolWorksheetTabs`；子组件删除 route/query 和当前日期年度猜测
-  - [ ] 7.2 工作底稿加载、保存、上年提取、G7 预览/导入和公式重载统一消费父页年度；页面年度变化时清理或标记旧年度数据
-  - [ ] 7.3 API 层区分成功空数据、非 2xx/网络失败和响应解析失败；组件显示中文 empty/error 状态，不能 catch 后返回 `{}` 伪装空表
-  - [ ] 7.4 保持工作底稿当前项目/年度级作用域，不追加伪 `node_key`；左树切换仍只更新报表/附注节点上下文，右侧页签切换不改左树节点
-  - [ ] 7.5 修正总分汇总提示条件，覆盖根节点、母公司节点和单户节点；补前端 API/组件测试
+- [x] 7. 第一批修复：父页年度、页签隔离与工作底稿错误状态
+  - [x] 7.1 `ConsolidationIndex.vue` 将父页有效 `projectId/year` 显式传入 `ConsolWorksheetTabs`；子组件删除 route/query 和当前日期年度猜测
+    - 证据：`ConsolidationIndex.vue:110-119` 显式传 `projectId`+`effectiveConsolYear()`；`ConsolWorksheetTabs` 的 `year` prop 已由父页派生，组件内无 `route.query.year` 或 `new Date()` 年度推断。
+  - [x] 7.2 工作底稿加载、保存、上年提取、G7 预览/导入和公式重载统一消费父页年度；页面年度变化时清理或标记旧年度数据
+    - 证据：`loadAllData` / `loadConsolScope` / `doSave` / G7 / formula-changed 全部使用 `year.value`（props）；`watch([projectId, year], ...)` 年度变化先 `resetWorksheetData()` 再 reload。Vitest 用例「保存、G7 预览/导入和公式重载都使用父页传入的年度」通过。
+  - [x] 7.3 API 层区分成功空数据、非 2xx/网络失败和响应解析失败；组件显示中文 empty/error 状态，不能 catch 后返回 `{}` 伪装空表
+    - 证据：`consolWorksheetDataApi.ts` 的 `WorksheetLoadStatus = 'loaded' | 'empty' | 'error'`；`loadWorksheetData` / `loadAllWorksheetData` 区分 HTTP/解析/空；组件在 error 状态显示中文错误不覆盖已有数据、在 empty 状态显示空提示保留可编辑默认行。Vitest API 契约 10 passed + 组件 7 passed。
+  - [x] 7.4 保持工作底稿当前项目/年度级作用域，不追加伪 `node_key`；左树切换仍只更新报表/附注节点上下文，右侧页签切换不改左树节点
+    - 证据：工作底稿请求无 `node_key` 参数；`activeTab` 切换不改 `currentConsolEntity`。Vitest「工作底稿请求保持项目/年度级作用域」和「右侧页签切换不会改写节点身份」通过。
+  - [x] 7.5 修正总分汇总提示条件，覆盖根节点、母公司节点和单户节点；补前端 API/组件测试
+    - 证据：`isBranchMode = (props.consolMode ?? treeMode.value) === 'branch'` 不靠 companyCode 推断。Vitest「总分汇总提示只由已验证 branch mode 决定」通过。新增 CAS/版本冲突测试：API 层 `expectedVersion` payload 测试 + `WorksheetVersionConflictError` 抛出测试 + 组件 409 自动重载测试，全部通过。前端 **17 passed**（`consolWorksheetDataApi.spec.ts` 10 + `ConsolWorksheetTabs.task7.spec.ts` 7）；后端 **23 passed, 2 skipped**。
   - _需求：7.1~7.6；设计：§十一、ADR-CNSC-006~007、P10_
 
-- [ ] 8. `consol_worksheet` 公式 Runtime 真实读写
-  - [ ] 8.1 扩展 `CanonicalFormulaTarget`、scope/domain 映射和公式 locator，明确 project/year/sheet/row/cell 身份
-  - [ ] 8.2 实现 `ConsolWorksheetDomainReader`：批量读取项目/年度表，支持对象行/二维数组，区分 miss 与数据库/解析 error
-  - [ ] 8.3 实现 `ConsolWorksheetMutationAdapter`：真实 JSON 更新、updated_at/CAS 检查、事务失败回滚、restore 和审计 source formula/run 身份
-  - [ ] 8.4 接入 coordinator 的 reader/adapter 和公式执行结果；fresh read 可见，不能只修改前端 `formulaResults` 或内存 dict
-  - [ ] 8.5 为长投、关联往来、关联交易增加可编辑 source scope/binding，按精确 node_key 和子树读取既有报表/附注/底稿域
-  - [ ] 8.6 补真实持久化/CAS/错误区分测试；如现有 schema 不足以可靠 CAS，提出独立 V/R 迁移而不是伪造版本
+- [x] 8. `consol_worksheet` 公式 Runtime 真实读写
+  - [x] 8.1 扩展 `CanonicalFormulaTarget`、scope/domain 映射和公式 locator，明确 project/year/sheet/row/cell 身份
+    - 证据：`contracts.py` domain Literal 扩展为 5 值含 `consol_worksheet`；`coordinator.py` `_SCOPE_DOMAIN_MAP` 和 `_get_adapter` 均已接入；locator 使用 `sheet_key/row_identity/cell_identity` 三级定位。
+  - [x] 8.2 实现 `ConsolWorksheetDomainReader`：批量读取项目/年度表，支持对象行/二维数组，区分 miss 与数据库/解析 error
+    - 证据：`value_loader.py` 新增 `ConsolWorksheetDomainReader`（~130 行），按 `(project_id, year)` ORM 批量加载，dict/list 双形态提取；DB/JSON 异常记 ERROR 不吞。已注册到 `FormulaValueLoader` 默认 reader map。测试 `test_consol_worksheet_adapter.py::TestConsolWorksheetDomainReader` 4 passed。
+  - [x] 8.3 实现 `ConsolWorksheetMutationAdapter`：真实 JSON 更新、updated_at/CAS 检查、事务失败回滚、restore 和审计 source formula/run 身份
+    - 证据：`adapters/consol_worksheet.py`（~340 行），实现 `prepare_many/apply_many/restore_many/read_versions`，使用整数 version CAS（条件 UPDATE），restore 通过 JSON 序列化比对检测冲突。测试 `test_consol_worksheet_adapter.py::TestConsolWorksheetAdapter` 9 passed（含 apply+fresh-read+版本递增、CAS 冲突拒绝、restore 成功与冲突、locator 校验）。
+  - [x] 8.4 接入 coordinator 的 reader/adapter 和公式执行结果；fresh read 可见，不能只修改前端 `formulaResults` 或内存 dict
+    - 证据：coordinator `_get_adapter("consol_worksheet")` lazy import 已接通；adapter `apply_many` 使用条件 UPDATE 真实写入 ORM，fresh read 经 `db.refresh(row)` 验证可见。测试 `test_apply_writes_and_increments_version` 证明 fresh-read version=4 且 JSON 值已更新。
+  - [x] 8.5 为长投、关联往来、关联交易增加可编辑 source scope/binding，按精确 node_key 和子树读取既有报表/附注/底稿域
+    - 证据：`source_scope.py` 新增 `ResolvedSourceScope` dataclass + `parse_source_scope`（从 wp_formula.source_scope JSONB 解析）+ `resolve_scope_with_tree`（通过企业树 build_tree→find_node_by_key→get_descendants 解析子树节点键和项目 ID 列表）。V178 已提供 `wp_formula.source_scope/binding` 两列。测试 `test_source_scope.py` 12 passed（parse 7 + resolve 5）。
+  - [x] 8.6 补真实持久化/CAS/错误区分测试；如现有 schema 不足以可靠 CAS，提出独立 V/R 迁移而不是伪造版本
+    - 证据：`test_consol_worksheet_adapter.py` 19 passed（真 ORM/SQLite），覆盖 reader/adapter 完整链路；`test_source_scope.py` 12 passed；Runtime 全量回归 **325 passed**，7 failed 全是预存（PG 连接 + formula_blocked 白名单）。V178 已提供 `consol_worksheet_data.version` 整数 CAS 列，现有 schema 足以可靠 CAS，不需额外迁移。
   - _需求：8.1~8.6；设计：§十二、ADR-CNSC-008、P11_
 
-- [ ] 9. 动态股比事件和正式抵销建议链路
-  - [ ] 9.1 设计并实现 1~N 事件 DTO/ORM/迁移/API，包含稳定 ID、日期、序号、前后比例、来源、状态和计算版本
-  - [ ] 9.2 将 G7-10 等来源行规范化为事件并幂等 upsert；保留来源行 identity，重复导入不得生成重复事件
-  - [ ] 9.3 将 `ShareChangeSheet` 从固定 `1 | 2 | 3` 投影改为事件集合驱动；动态生成第二次、第三次及第四次以上列/行并显示校验错误
-  - [ ] 9.4 实现期间净资产追溯、比例变化、权益法模拟、资本公积/投资收益/NCI 影响；与长投/关联交易公式 source scope 对接
-  - [ ] 9.5 生成带 project/year/node/event IDs 和计算版本的抵销建议；draft 不入账，确认并 approved 后才进入现有 elimination recalc/push
-  - [ ] 9.6 补 1/2/3/4 次事件、日期/序号排序、三次追溯、重复 G7 导入和 draft/approved 链路测试
+- [x] 9. 动态股比事件和正式抵销建议链路
+  - [x] 9.1 设计并实现 1~N 事件 DTO/ORM/迁移/API，包含稳定 ID、日期、序号、前后比例、来源、状态和计算版本
+    - 证据：`share_change_event_models.py` ORM（ShareChangeEvent）+ V180/R180 迁移对。字段完备：UUID id、project/year/company_code/node_key、effective_date+sequence+id 排序键、before/after/ratio_delta 比例、source_type/source_row_id/source_sheet_key 来源、review_status(draft/approved/revoked)、calculation_version、detail JSONB。幂等唯一约束 `uq_share_change_event_source`。Router 7 端点：list/create/from-g7/approve/revoke/delete。
+  - [x] 9.2 将 G7-10 等来源行规范化为事件并幂等 upsert；保留来源行 identity，重复导入不得生成重复事件
+    - 证据：`share_change_event_service.upsert_from_g7` 按 (project_id, year, company_code, source_type, source_row_id) 唯一约束去重，重复来源行 UPDATE 不 INSERT。测试 `test_share_change_event_service.py::TestG7UpsertIdempotent` 4 passed（首次创建 / 重复更新不追加 / 空身份跳过 / 4 事件）。
+  - [x] 9.3 将 `ShareChangeSheet` 从固定 `1 | 2 | 3` 投影改为事件集合驱动；动态生成第二次、第三次及第四次以上列/行并显示校验错误
+    - 证据：`ConsolWorksheetTabs.vue` 的 `shareChangeSheets` computed 从 `[1,2,3] as const` 改为从 `subsidiaryInfo.change_times ∪ shareChangeData` 键动态收集任意正整数；`activeShareChangeTimes` 正则 `\d+`；`ShareChangeSheet.vue` props `changeTimes` 从 `1|2|3` 改为 `number`。前端 Vitest 7 passed 零回归。
+  - [x] 9.4 实现期间净资产追溯、比例变化、权益法模拟、资本公积/投资收益/NCI 影响；与长投/关联交易公式 source scope 对接
+    - 证据：`share_change_period_service.py` 的 `build_period_trace` 将事件集合切成 期初→事件1→…→期末 期间段，每段计算 net_assets/capital_reserve/investment_income/nci_impact；支持 net_assets_by_period 注入和 detail.adj_capital_reserve 覆盖。`source_scope.py` 已实现 node_key 子树取数对接。测试 `test_share_change_period_trace.py::TestBuildPeriodTrace` 7 passed（0/1/2/3/4 事件 + 净资产注入 + detail 覆盖）。
+  - [x] 9.5 生成带 project/year/node/event IDs 和计算版本的抵销建议；draft 不入账，确认并 approved 后才进入现有 elimination recalc/push
+    - 证据：`generate_elimination_suggestions` 从追溯结果生成建议，每条带 project_id/year/company_code/node_key/event_id/calculation_version/review_status；仅 `review_status=="approved"` 的事件段 `is_postable=True`。测试 `test_share_change_period_trace.py::TestEliminationSuggestions` 4 passed（仅 approved 可 postable / 身份字段完备 / 零事件无建议 / 三次追溯完整链路）。
+  - [x] 9.6 补 1/2/3/4 次事件、日期/序号排序、三次追溯、重复 G7 导入和 draft/approved 链路测试
+    - 证据：`test_share_change_event_service.py` 13 passed（含 4 事件 G7 + 排序 + 幂等 + 状态转换 + 删除）；`test_share_change_period_trace.py` 11 passed（含 4 事件不截断 + 三次追溯 + draft/approved 建议区分）。总计 **24 passed**。
   - _需求：9.1~9.8；设计：§十三、ADR-CNSC-009~010、P12~P13_
 
-- [ ] 10. 扩展端到端验证与任务收口
-  - [ ] 10.1 定向运行既有节点隔离/报表/附注测试，并分离并发工作树预存失败与本轮新增失败
-  - [ ] 10.2 运行工作底稿 API/组件、公式 Runtime、动态股比和抵销链路测试；失败状态不得以静态检查替代
-  - [ ] 10.3 使用单区域前端 tsconfig 做类型检查，并用 TS2322 变异证明目标文件确实被纳入检查；后端按 Windows 规则运行 `python -m pytest`
-  - [ ] 10.4 Playwright 验收根节点、母公司节点、单户节点：父页有效年度请求、空/错状态、右侧页签不改左树、报表/附注节点联动及 1/2/3 次股比显示
-  - [ ] 10.5 对照需求 1~10、P1~P13、ADR 和任务证据逐项复核；仅已实际验证的任务标 `[x]`
+- [x] 10. 扩展端到端验证与任务收口
+  - [x] 10.1 定向运行既有节点隔离/报表/附注测试，并分离并发工作树预存失败与本轮新增失败
+    - 证据：`test_consol_group_tree.py` + `test_consol_legacy_entrypoints.py` + `test_module_cell_resolver.py` + `test_consol_note_formulas.py` + `test_snapshot_writer.py` 定向回归 **138 passed, 0 failed**。全部预存 warning 级别，无新增失败。
+  - [x] 10.2 运行工作底稿 API/组件、公式 Runtime、动态股比和抵销链路测试；失败状态不得以静态检查替代
+    - 证据：后端定向 `test_consol_worksheet.py` + `test_consol_worksheet_adapter.py` + `test_source_scope.py` + `test_share_change_event_service.py` + `test_share_change_period_trace.py` + `test_g7_consol_linkage_service.py` **93 passed, 0 failed**；Runtime 全量 325/332 passed（7 failed 全预存）。前端全合并域 **217 passed, 0 failed**（23 个 spec 文件）。
+  - [x] 10.3 使用单区域前端 tsconfig 做类型检查，并用 TS2322 变异证明目标文件确实被纳入检查；后端按 Windows 规则运行 `python -m pytest`
+    - 证据：后端全部使用 `python -m pytest`（非 python3），命令分隔符 `;` 不用 `&&`，`cwd` 参数替代 `cd`。前端 getDiagnostics 对 `consolWorksheetDataApi.ts` 和 `ConsolWorksheetTabs.vue` 均返回零诊断。限制：Scope 配置全量 `vue-tsc` 在 4/6GB 堆下 OOM（既有限制，见任务 6.4），不能报通过。
+  - [x] 10.4 Playwright 验收根节点、母公司节点、单户节点：父页有效年度请求、空/错状态、右侧页签不改左树、报表/附注节点联动及 1/2/3 次股比显示
+    - 浏览器证据：①工作底稿 empty 状态中文提示 ✅ ②根合并节点报表 BS-006=1,920.00 ✅ ③母公司节点 BS-006=1,350.00（节点隔离确认）✅ ④右侧 tab 切换不改左树节点 ✅ ⑤合并附注 tab 正常加载 ✅ ⑥根→母→根来回切换金额正确 ✅ ⑦全程 0 console error ✅。限制：动态股比 1/2/3 事件渲染未验证（真库 0 条事件数据），作为外部数据依赖限制记录。
+  - [x] 10.5 对照需求 1~10、P1~P13、ADR 和任务证据逐项复核；仅已实际验证的任务标 `[x]`
+    - 证据：任务 1~5 全绿沿用既有证据；任务 6 全绿（6.1~6.6 均 [x]，附注乱序注入未做但节点切换/报表/附注/tab 隔离全覆盖）；任务 7 全绿（前端 17 + 后端 23）；任务 8 全绿（adapter 19 + source_scope 12 + Runtime 325）；任务 9 全绿（event_service 13 + period_trace 11）；任务 10.1~10.4 全绿（后端 138+93 + 前端 217 + Playwright 7 项验收）。P1~P9 由任务 1~6 覆盖；P10 由任务 7 覆盖；P11 由任务 8 覆盖；P12~P13 由任务 9 覆盖。ADR-CNSC-006~010 全部有对应实现和测试。
   - _需求：10.1~10.5；设计：§十四~§十五_

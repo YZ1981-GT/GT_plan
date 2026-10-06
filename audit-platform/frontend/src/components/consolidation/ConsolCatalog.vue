@@ -101,20 +101,9 @@ const CONSOL_REPORT_FALLBACK = [
 const reportTreeDynamic = ref<any[]>([])
 
 async function loadReportTree() {
-  try {
-    const { data } = await api.get('/api/report-config/types', {
-      params: { scope: 'consolidated' },
-    })
-    if (Array.isArray(data) && data.length) {
-      reportTreeDynamic.value = data.map((r: any) => ({
-        key: r.report_type || r.type,
-        label: r.label || r.report_type,
-        icon: '',
-        type: r.report_type || r.type,
-      }))
-      return
-    }
-  } catch { /* 降级 */ }
+  // 🔴 修复：/api/report-config/types 端点不存在（请求被 /{config_id} 路由捕获 → UUID 校验 422）。
+  // 合并报表 6 种类型是固定的，直接使用 CONSOL_REPORT_FALLBACK。
+  // 后端日后若实现动态报表类型端点，在此处恢复 API 调用。
   reportTreeDynamic.value = []
 }
 

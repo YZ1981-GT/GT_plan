@@ -92,6 +92,7 @@ import app.models.qc_rule_models  # noqa: E402, F401  — Round 6
 import app.models.wp_optimization_models  # noqa: E402, F401  — 底稿深度优化
 import app.models.custom_query_models  # noqa: E402, F401  — template-library-coordination Sprint 6
 import app.models.v3_refinement_models  # noqa: E402, F401  — V3 收官增强：ai_content_log / cross_module_conflicts / time_machine_snapshots
+import app.models.share_change_event_models  # noqa: E402, F401  — 动态股比变动事件
 
 # Stub for 'workpapers' table referenced by AI models FK
 import sqlalchemy as _sa

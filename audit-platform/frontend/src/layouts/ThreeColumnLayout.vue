@@ -78,8 +78,12 @@
         <div class="gt-topbar-divider" />
 
         <!-- 视图切换按钮（三栏/四栏） -->
-        <el-tooltip :content="fourColumnMode ? '切换三栏视图' : '切换四栏视图'" placement="bottom">
-          <div class="gt-topbar-btn" @click="fourColumnMode = !fourColumnMode">
+        <el-tooltip :content="fourColumnMode ? '切换三栏视图' : '切换四栏视图（点击显示附注章节树）'" placement="bottom">
+          <div
+            class="gt-topbar-btn"
+            :class="{ 'gt-topbar-btn--pulse': !fourColumnMode && isConsolNotePage }"
+            @click="fourColumnMode = !fourColumnMode"
+          >
             <el-icon :size="18"><Grid v-if="!fourColumnMode" /><Menu v-else /></el-icon>
           </div>
         </el-tooltip>
@@ -550,6 +554,12 @@ function onDshMessageCount(count: number) {
 const catalogWidth = ref(280)
 const catalogCollapsed = ref(false)
 const fourColumnMode = ref(false)
+
+/** 当前是否在合并附注页面——用于四栏切换按钮的脉冲提示 */
+const isConsolNotePage = computed(() =>
+  route.path.match(/^\/projects\/[^/]+\/consolidation/) != null
+  && !fourColumnMode.value
+)
 const fullscreen = ref(false)
 const showFormulaManager = ref(false)
 const formulaContext = ref<OpenFormulaManagerPayload>()
@@ -1047,6 +1057,46 @@ onUnmounted(() => {
 }
 .gt-topbar-btn:hover { background: rgba(255, 255, 255, 0.12); }
 .gt-topbar-btn--active { background: rgba(255, 255, 255, 0.2); color: #fff; }
+.gt-topbar-btn--pulse {
+  animation: gt-pulse-hint 1.5s ease-in-out infinite;
+  position: relative;
+}
+.gt-topbar-btn--pulse::after {
+  content: '';
+  position: absolute;
+  top: 1px; right: 1px;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #f56c6c;
+  border: 2px solid #fff;
+  animation: gt-dot-ping 1.2s ease-in-out infinite;
+}
+.gt-topbar-btn--pulse::before {
+  content: '点击显示附注树';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 11px;
+  color: #e6a23c;
+  font-weight: 700;
+  margin-top: 4px;
+  animation: gt-label-fade 2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes gt-pulse-hint {
+  0%, 100% { background: transparent; }
+  50% { background: rgba(255, 200, 100, 0.35); }
+}
+@keyframes gt-dot-ping {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.6); opacity: 0.4; }
+}
+@keyframes gt-label-fade {
+  0%, 100% { opacity: 0; }
+  30%, 70% { opacity: 1; }
+}
 .gt-dsh-badge :deep(.el-badge__content) { top: 2px; right: 4px; }
 .gt-theme-toggle {
   font-size: 16px;

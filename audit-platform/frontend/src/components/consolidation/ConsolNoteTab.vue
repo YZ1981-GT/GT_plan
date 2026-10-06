@@ -166,7 +166,9 @@
           <p>在左侧附注栏选择章节开始编辑，或使用批量功能一键导入全部数据</p>
           <div class="gt-note-empty-actions">
             <el-button size="small" @click="showNoteBatchDialog = true">📦 批量导入导出</el-button>
-            <el-button size="small" @click="switchToFourCol">🔲 切换四栏视图显示附注树</el-button>
+            <el-button size="small" type="warning" class="gt-four-col-pulse" @click="switchToFourCol">
+              👉 点击此处切换四栏视图显示附注树 👈
+            </el-button>
           </div>
         </div>
         <div class="gt-note-empty-steps">
@@ -2462,7 +2464,33 @@ defineExpose({
 }
 .gt-note-empty-hero { text-align: center; }
 .gt-note-empty-hero p { margin: 0 0 12px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-tertiary); }
-.gt-note-empty-actions { display: flex; gap: 8px; justify-content: center; }
+.gt-note-empty-actions { display: flex; gap: 8px; justify-content: center; align-items: center; }
+.gt-four-col-pulse {
+  animation: gt-four-col-glow 1.5s ease-in-out infinite, gt-four-col-bounce 1.5s ease-in-out infinite;
+  font-weight: 700 !important;
+  position: relative;
+}
+.gt-four-col-pulse::before {
+  content: '⬇';
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 16px;
+  animation: gt-arrow-bounce 1s ease-in-out infinite;
+}
+@keyframes gt-four-col-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(230, 162, 60, 0.6); }
+  50% { box-shadow: 0 0 0 10px rgba(230, 162, 60, 0); }
+}
+@keyframes gt-four-col-bounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+@keyframes gt-arrow-bounce {
+  0%, 100% { transform: translateX(-50%) translateY(0); opacity: 1; }
+  50% { transform: translateX(-50%) translateY(4px); opacity: 0.5; }
+}
 .gt-note-empty-steps {
   display: flex; gap: 12px; width: 100%;
 }

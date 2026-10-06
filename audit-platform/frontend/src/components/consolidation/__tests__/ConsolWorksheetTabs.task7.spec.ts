@@ -25,13 +25,17 @@ const { worksheetApi, scopeApi, eventBus, formulaHandlers } = vi.hoisted(() => {
   }
 })
 
-vi.mock('@/services/consolWorksheetDataApi', () => ({
-  loadAllWorksheetData: (...args: unknown[]) => worksheetApi.loadAllWorksheetData(...args),
-  loadWorksheetData: (...args: unknown[]) => worksheetApi.loadWorksheetData(...args),
-  saveWorksheetData: (...args: unknown[]) => worksheetApi.saveWorksheetData(...args),
-  previewG7Linkage: (...args: unknown[]) => worksheetApi.previewG7Linkage(...args),
-  importG7Linkage: (...args: unknown[]) => worksheetApi.importG7Linkage(...args),
-}))
+vi.mock('@/services/consolWorksheetDataApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/consolWorksheetDataApi')>()
+  return {
+    ...actual,
+    loadAllWorksheetData: (...args: unknown[]) => worksheetApi.loadAllWorksheetData(...args),
+    loadWorksheetData: (...args: unknown[]) => worksheetApi.loadWorksheetData(...args),
+    saveWorksheetData: (...args: unknown[]) => worksheetApi.saveWorksheetData(...args),
+    previewG7Linkage: (...args: unknown[]) => worksheetApi.previewG7Linkage(...args),
+    importG7Linkage: (...args: unknown[]) => worksheetApi.importG7Linkage(...args),
+  }
+})
 vi.mock('@/services/consolidationApi', () => ({
   getConsolScope: (...args: unknown[]) => scopeApi.getConsolScope(...args),
   getWorksheetTree: (...args: unknown[]) => scopeApi.getWorksheetTree(...args),
@@ -144,9 +148,9 @@ function setupData(wrapper: ReturnType<typeof mountTabs>) {
 }
 
 beforeEach(() => {
-  worksheetApi.loadAllWorksheetData.mockReset().mockResolvedValue({ status: 'empty', data: {} })
-  worksheetApi.loadWorksheetData.mockReset().mockResolvedValue({ status: 'empty', data: {} })
-  worksheetApi.saveWorksheetData.mockReset().mockResolvedValue(true)
+  worksheetApi.loadAllWorksheetData.mockReset().mockResolvedValue({ status: 'empty', data: {}, versions: {} })
+  worksheetApi.loadWorksheetData.mockReset().mockResolvedValue({ status: 'empty', data: {}, versions: {} })
+  worksheetApi.saveWorksheetData.mockReset().mockResolvedValue({ ok: true, version: 1 })
   worksheetApi.previewG7Linkage.mockReset().mockResolvedValue(emptyPreview)
   worksheetApi.importG7Linkage.mockReset().mockResolvedValue({ imported: {}, unresolved_companies: [] })
   scopeApi.getConsolScope.mockReset().mockResolvedValue([])
@@ -175,13 +179,14 @@ describe('ConsolWorksheetTabs 任务7：年度、状态和页签上下文', () =
     worksheetApi.loadAllWorksheetData.mockResolvedValueOnce({
       status: 'loaded',
       data: { info: { rows: [{ company_code: 'LOADED' }] } },
+      versions: { info: 1 },
     })
     const wrapper = mountTabs()
     await flushPromises()
     expect(setupData(wrapper).subsidiaryInfo[0].company_code).toBe('LOADED')
 
     worksheetApi.loadAllWorksheetData.mockResolvedValueOnce({
-      status: 'error', data: {}, errorMessage: '后端暂时不可用',
+      status: 'error', data: {}, versions: {}, errorMessage: '后端暂时不可用',
     })
     await (wrapper.vm as any).reload()
     await flushPromises()
@@ -208,9 +213,9 @@ describe('ConsolWorksheetTabs 任务7：年度、状态和页签上下文', () =
     expect(worksheetApi.loadAllWorksheetData).toHaveBeenNthCalledWith(2, 'project-7', 2026)
     expect(worksheetApi.loadAllWorksheetData.mock.calls.flat()).not.toContain('node_key')
 
-    resolveNew({ status: 'loaded', data: { info: { rows: [{ company_code: 'NEW_YEAR' }] } } })
+    resolveNew({ status: 'loaded', data: { info: { rows: [{ company_code: 'NEW_YEAR' }] } }, versions: { info: 2 } })
     await flushPromises()
-    resolveOld({ status: 'loaded', data: { info: { rows: [{ company_code: 'OLD_YEAR' }] } } })
+    resolveOld({ status: 'loaded', data: { info: { rows: [{ company_code: 'OLD_YEAR' }] } }, versions: { info: 1 } })
     await flushPromises()
 
     expect(setupData(wrapper).subsidiaryInfo[0].company_code).toBe('NEW_YEAR')
@@ -223,7 +228,7 @@ describe('ConsolWorksheetTabs 任务7：年度、状态和页签上下文', () =
     await wrapper.find('[data-testid="info-save"]').trigger('click')
     await flushPromises()
     expect(worksheetApi.saveWorksheetData).toHaveBeenCalledWith(
-      'project-parent', 2031, 'info', { rows: [{ company_code: 'A' }] },
+      'project-parent', 2031, 'info', { rows: [{ company_code: 'A' }] }, 0,
     )
 
     await (wrapper.vm as any).openG7Linkage()
@@ -267,5 +272,39 @@ describe('ConsolWorksheetTabs 任务7：年度、状态和页签上下文', () =
     const nonBranch = mountTabs({ consolMode: 'subsidiary', isRootSelection: false })
     await flushPromises()
     expect(nonBranch.find('[data-testid="cw-branch-notice"]').exists()).toBe(false)
+  })
+
+  it('保存遇到版本冲突（409）时自动重载数据并提示用户', async () => {
+    // 首次加载带版本号
+    worksheetApi.loadAllWorksheetData.mockResolvedValueOnce({
+      status: 'loaded',
+      data: { info: { rows: [{ company_code: 'V1' }] } },
+      versions: { info: 5 },
+    })
+    const wrapper = mountTabs()
+    await flushPromises()
+    expect(setupData(wrapper).subsidiaryInfo[0].company_code).toBe('V1')
+
+    // 模拟保存时后端返回 409 版本冲突
+    const { WorksheetVersionConflictError } = await import('@/services/consolWorksheetDataApi')
+    worksheetApi.saveWorksheetData.mockRejectedValueOnce(
+      new WorksheetVersionConflictError(5, 6, '工作底稿已被其他操作修改'),
+    )
+    // 重载时返回新版本数据
+    worksheetApi.loadAllWorksheetData.mockResolvedValueOnce({
+      status: 'loaded',
+      data: { info: { rows: [{ company_code: 'V2_RELOADED' }] } },
+      versions: { info: 6 },
+    })
+
+    await wrapper.find('[data-testid="info-save"]').trigger('click')
+    await flushPromises()
+
+    // 409 后应自动重载，展示新版本数据
+    expect(setupData(wrapper).subsidiaryInfo[0].company_code).toBe('V2_RELOADED')
+    // saveWorksheetData 被调用时应传入版本号 5
+    expect(worksheetApi.saveWorksheetData).toHaveBeenCalledWith(
+      'project-7', 2025, 'info', { rows: [{ company_code: 'A' }] }, 5,
+    )
   })
 })

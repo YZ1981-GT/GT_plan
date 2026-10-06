@@ -17,6 +17,7 @@ import {
   loadWorksheetData,
   previewG7Linkage,
   saveWorksheetData,
+  WorksheetVersionConflictError,
 } from '../consolWorksheetDataApi'
 
 const projectId = 'project-7'
@@ -31,21 +32,24 @@ beforeEach(() => {
 describe('consolWorksheetData API 契约', () => {
   it('区分单表 loaded、empty 和响应解析失败', async () => {
     httpMock.get
-      .mockResolvedValueOnce({ data: { content: { rows: [{ company_code: 'A' }] } } })
-      .mockResolvedValueOnce({ data: { content: {} } })
+      .mockResolvedValueOnce({ data: { content: { rows: [{ company_code: 'A' }] }, version: 3 } })
+      .mockResolvedValueOnce({ data: { content: {}, version: 0 } })
       .mockResolvedValueOnce({ data: { content: [] } })
 
     await expect(loadWorksheetData(projectId, year, 'info')).resolves.toEqual({
       status: 'loaded',
       data: { rows: [{ company_code: 'A' }] },
+      versions: { info: 3 },
     })
     await expect(loadWorksheetData(projectId, year, 'cost')).resolves.toEqual({
       status: 'empty',
       data: {},
+      versions: { cost: 0 },
     })
     await expect(loadWorksheetData(projectId, year, 'net_asset')).resolves.toEqual({
       status: 'error',
       data: {},
+      versions: {},
       errorMessage: '工作底稿响应格式无法识别',
     })
     expect(httpMock.get).toHaveBeenNthCalledWith(
@@ -57,10 +61,10 @@ describe('consolWorksheetData API 契约', () => {
   it('批量响应支持数组和统一信封，空内容仍保持 empty', async () => {
     httpMock.get
       .mockResolvedValueOnce({
-        data: [{ sheet_key: 'info', content: { rows: [{ company_code: 'A' }] } }],
+        data: [{ sheet_key: 'info', content: { rows: [{ company_code: 'A' }] }, version: 2 }],
       })
       .mockResolvedValueOnce({
-        data: { content: [{ sheet_key: 'cost', content: {} }] },
+        data: { content: [{ sheet_key: 'cost', content: {}, version: 0 }] },
       })
       .mockResolvedValueOnce({
         data: [{ sheet_key: 'broken', content: [] }],
@@ -69,14 +73,17 @@ describe('consolWorksheetData API 契约', () => {
     await expect(loadAllWorksheetData(projectId, year)).resolves.toEqual({
       status: 'loaded',
       data: { info: { rows: [{ company_code: 'A' }] } },
+      versions: { info: 2 },
     })
     await expect(loadAllWorksheetData(projectId, year)).resolves.toEqual({
       status: 'empty',
       data: { cost: {} },
+      versions: { cost: 0 },
     })
     await expect(loadAllWorksheetData(projectId, year)).resolves.toEqual({
       status: 'error',
       data: {},
+      versions: {},
       errorMessage: '工作底稿批量响应包含无法解析的表数据',
     })
   })
@@ -89,23 +96,68 @@ describe('consolWorksheetData API 契约', () => {
     await expect(loadWorksheetData(projectId, year, 'info')).resolves.toEqual({
       status: 'error',
       data: {},
+      versions: {},
       errorMessage: '没有工作底稿权限',
     })
     await expect(loadAllWorksheetData(projectId, year)).resolves.toEqual({
       status: 'error',
       data: {},
+      versions: {},
       errorMessage: '网络断开',
     })
   })
-  it('保存使用 PUT、父页年度和稳定请求体', async () => {
-    httpMock.put.mockResolvedValueOnce({ status: 200, data: { ok: true } })
 
-    await expect(saveWorksheetData(projectId, year, 'info', { rows: [{ company_code: 'A' }] })).resolves.toBe(true)
+  it('保存使用 PUT、父页年度和稳定请求体，返回版本号', async () => {
+    httpMock.put.mockResolvedValueOnce({ status: 200, data: { ok: true, version: 1 } })
+
+    const result = await saveWorksheetData(projectId, year, 'info', { rows: [{ company_code: 'A' }] })
+    expect(result).toEqual({ ok: true, version: 1 })
 
     expect(httpMock.put).toHaveBeenCalledWith(
       '/api/consol-worksheet-data/project-7/2025/info',
       { sheet_key: 'info', data: { rows: [{ company_code: 'A' }] } },
     )
+  })
+
+  it('保存传入 expectedVersion 时 payload 包含 expected_version', async () => {
+    httpMock.put.mockResolvedValueOnce({ status: 200, data: { version: 4 } })
+
+    const result = await saveWorksheetData(projectId, year, 'info', { rows: [] }, 3)
+    expect(result).toEqual({ ok: true, version: 4 })
+
+    expect(httpMock.put).toHaveBeenCalledWith(
+      '/api/consol-worksheet-data/project-7/2025/info',
+      { sheet_key: 'info', data: { rows: [] }, expected_version: 3 },
+    )
+  })
+
+  it('保存 409 版本冲突抛出 WorksheetVersionConflictError', async () => {
+    const conflictResponse = {
+      response: {
+        status: 409,
+        data: {
+          detail: {
+            code: 'worksheet_version_conflict',
+            message: '工作底稿已被其他操作修改，请重新加载后再保存',
+            expected_version: 2,
+            actual_version: 3,
+          },
+        },
+      },
+    }
+
+    httpMock.put.mockRejectedValueOnce(conflictResponse)
+    await expect(saveWorksheetData(projectId, year, 'info', { rows: [] }, 2))
+      .rejects.toThrow(WorksheetVersionConflictError)
+
+    httpMock.put.mockRejectedValueOnce(conflictResponse)
+    try {
+      await saveWorksheetData(projectId, year, 'info', { rows: [] }, 2)
+    } catch (err) {
+      expect(err).toBeInstanceOf(WorksheetVersionConflictError)
+      expect((err as WorksheetVersionConflictError).expectedVersion).toBe(2)
+      expect((err as WorksheetVersionConflictError).actualVersion).toBe(3)
+    }
   })
 
   it('G7 预览和导入都使用父页年度，导入载荷原样传递', async () => {
@@ -163,6 +215,7 @@ describe('consolWorksheetData API 契约', () => {
     await expect(loadPriorYearWorksheetData(projectId, year, 'info_opening'))
       .rejects.toThrow('上年工作底稿响应格式无法识别')
   })
+
   it('保存遇到非 2xx 响应会抛出错误', async () => {
     httpMock.put.mockResolvedValueOnce({ status: 409, data: { detail: '版本冲突' } })
 

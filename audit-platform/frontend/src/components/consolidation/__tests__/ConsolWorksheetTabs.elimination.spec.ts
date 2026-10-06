@@ -105,9 +105,9 @@ const ARAP_ROWS = [{
 describe('ConsolWorksheetTabs → 合并抵消分录明细表', () => {
   beforeEach(() => {
     Object.values(apiProxy).forEach((f) => f.mockReset())
-    wsApi.saveWorksheetData.mockReset().mockResolvedValue(true)
-    worksheetApi.loadAllWorksheetData.mockReset().mockResolvedValue({ status: 'empty', data: {} })
-    worksheetApi.loadWorksheetData.mockReset().mockResolvedValue({ status: 'empty', data: {} })
+    wsApi.saveWorksheetData.mockReset().mockResolvedValue({ ok: true, version: 1 })
+    worksheetApi.loadAllWorksheetData.mockReset().mockResolvedValue({ status: 'empty', data: {}, versions: {} })
+    worksheetApi.loadWorksheetData.mockReset().mockResolvedValue({ status: 'empty', data: {}, versions: {} })
     worksheetApi.previewG7Linkage.mockReset()
     worksheetApi.importG7Linkage.mockReset()
     saved.value = {}
@@ -118,7 +118,7 @@ describe('ConsolWorksheetTabs → 合并抵消分录明细表', () => {
       internal_arap: { rows: ARAP_ROWS },
       elimination: { rows: [{ _custom: true, source: '', direction: '借', subject: '应付账款', amount: 99 }] },
     }
-    worksheetApi.loadAllWorksheetData.mockResolvedValueOnce({ status: 'loaded', data: saved.value })
+    worksheetApi.loadAllWorksheetData.mockResolvedValueOnce({ status: 'loaded', data: saved.value, versions: {} })
     const wrapper = mountTabs()
     await flushPromises()
     await openSheet(wrapper, 'elimination')
@@ -159,7 +159,7 @@ describe('ConsolWorksheetTabs → 合并抵消分录明细表', () => {
     await openSheet(wrapper, 'internal_arap')
     wrapper.findComponent(ArApStub).vm.$emit('save', [])
     await flushPromises()
-    expect(wsApi.saveWorksheetData).toHaveBeenCalledWith('p-g', 2025, 'internal_arap', { rows: [] })
+    expect(wsApi.saveWorksheetData).toHaveBeenCalledWith('p-g', 2025, 'internal_arap', { rows: [] }, 0)
     await openSheet(wrapper, 'elimination')
     elim = wrapper.findComponent(ElimStub)
     expect(elim.props('sourceGroups')).toEqual([])

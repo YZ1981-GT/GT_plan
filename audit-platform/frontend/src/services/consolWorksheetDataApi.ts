@@ -100,6 +100,8 @@ export type WorksheetLoadStatus = 'loaded' | 'empty' | 'error'
 export interface WorksheetLoadResult<T extends Record<string, any> = Record<string, any>> {
   status: WorksheetLoadStatus
   data: T
+  /** 各表当前版本号映射（sheet_key → version），用于后续 CAS 保存。 */
+  versions: Record<string, number>
   errorMessage?: string
 }
 
@@ -116,7 +118,7 @@ function errorMessage(error: any, fallback: string): string {
 }
 
 function loadError<T extends Record<string, any>>(message: string): WorksheetLoadResult<T> {
-  return { status: 'error', data: {} as T, errorMessage: message }
+  return { status: 'error', data: {} as T, versions: {}, errorMessage: message }
 }
 
 /** 加载某张表的数据；成功空表与 HTTP/解析错误保持可区分。 */
@@ -130,27 +132,73 @@ export async function loadWorksheetData(
       return loadError('工作底稿响应格式无法识别')
     }
     const content = payload.content
+    const version = typeof payload.version === 'number' ? payload.version : 0
     return {
       status: Object.keys(content).length ? 'loaded' : 'empty',
       data: content,
+      versions: { [sheetKey]: version },
     }
   } catch (error) {
     return loadError(errorMessage(error, '工作底稿加载失败'))
   }
 }
 
-/** 保存某张表的数据；非 2xx 或网络异常向调用方抛出，不伪装成空数据。 */
-export async function saveWorksheetData(
-  projectId: string, year: number, sheetKey: string, sheetData: Record<string, any>
-): Promise<boolean> {
-  const response = await http.put(
-    P.get(projectId, year, sheetKey),
-    { sheet_key: sheetKey, data: sheetData },
-  )
-  if (typeof response.status === 'number' && (response.status < 200 || response.status >= 300)) {
-    throw new Error(`工作底稿保存失败（HTTP ${response.status}）`)
+/** 工作底稿版本冲突错误（后端 409 worksheet_version_conflict）。 */
+export class WorksheetVersionConflictError extends Error {
+  readonly code = 'worksheet_version_conflict' as const
+  readonly expectedVersion: number | null
+  readonly actualVersion: number | null
+
+  constructor(expectedVersion: number | null, actualVersion: number | null, message?: string) {
+    super(message || '工作底稿已被其他操作修改，请重新加载后再保存')
+    this.name = 'WorksheetVersionConflictError'
+    this.expectedVersion = expectedVersion
+    this.actualVersion = actualVersion
   }
-  return true
+}
+
+export interface WorksheetSaveResult {
+  ok: boolean
+  version: number
+}
+
+/**
+ * 保存某张表的数据；返回保存后的新版本号。
+ *
+ * - `expectedVersion` 传入时启用 CAS：后端校验当前版本 == expectedVersion，
+ *   不匹配返回 409（抛 WorksheetVersionConflictError）。
+ * - `expectedVersion` 省略时走兼容 upsert（首次创建或无版本保护覆盖）。
+ */
+export async function saveWorksheetData(
+  projectId: string,
+  year: number,
+  sheetKey: string,
+  sheetData: Record<string, any>,
+  expectedVersion?: number,
+): Promise<WorksheetSaveResult> {
+  const body: Record<string, any> = { sheet_key: sheetKey, data: sheetData }
+  if (expectedVersion !== undefined) {
+    body.expected_version = expectedVersion
+  }
+  try {
+    const response = await http.put(P.get(projectId, year, sheetKey), body)
+    if (typeof response.status === 'number' && (response.status < 200 || response.status >= 300)) {
+      throw new Error(`工作底稿保存失败（HTTP ${response.status}）`)
+    }
+    const version = typeof response.data?.version === 'number' ? response.data.version : 0
+    return { ok: true, version }
+  } catch (err: any) {
+    const status = err?.response?.status
+    const detail = err?.response?.data?.detail
+    if (status === 409 && detail?.code === 'worksheet_version_conflict') {
+      throw new WorksheetVersionConflictError(
+        detail.expected_version ?? null,
+        detail.actual_version ?? null,
+        detail.message,
+      )
+    }
+    throw err
+  }
 }
 
 /** 批量加载项目所有表的数据；成功零行返回 empty，异常返回 error。 */
@@ -169,14 +217,16 @@ export async function loadAllWorksheetData(
     if (!items) return loadError('工作底稿批量响应格式无法识别')
 
     const result: Record<string, Record<string, any>> = {}
+    const versions: Record<string, number> = {}
     for (const item of items) {
       if (!isRecord(item) || typeof item.sheet_key !== 'string' || !isRecord(item.content)) {
         return loadError('工作底稿批量响应包含无法解析的表数据')
       }
       result[item.sheet_key] = item.content
+      versions[item.sheet_key] = typeof item.version === 'number' ? item.version : 0
     }
     const hasContent = Object.values(result).some((content) => Object.keys(content).length > 0)
-    return { status: hasContent ? 'loaded' : 'empty', data: result }
+    return { status: hasContent ? 'loaded' : 'empty', data: result, versions }
   } catch (error) {
     return loadError(errorMessage(error, '工作底稿批量加载失败'))
   }

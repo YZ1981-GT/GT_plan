@@ -1283,3 +1283,9 @@ backend/tests/test_formula_push_batch_e_note.py 1678
 #   stage/rows/table/binding/sync_registry/TB 不可用）= 829 行；按循环拆会丢跨循环共性测试。
 backend/tests/test_formula_push_batch_e_mnf_note.py 829
 backend/app/services/consol_disclosure_service.py 1985
+
+# ThreeColumnLayout.vue —— 2026-10-06 入册。
+#   增量来源：consol-node-key-isolation-and-shared-context 四栏入口视觉引导
+#   （12 行 CSS 动画 + 3 行 computed + 模板 class 绑定）。
+#   拆分应在布局组件整体重构时一并做，不塞进本 spec。
+audit-platform/frontend/src/layouts/ThreeColumnLayout.vue 1515

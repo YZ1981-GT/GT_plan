@@ -407,6 +407,7 @@ import {
   loadWorksheetData,
   previewG7Linkage,
   saveWorksheetData,
+  WorksheetVersionConflictError,
   type G7LinkageFieldDiff,
   type G7LinkagePreview,
   type WorksheetLoadStatus,
@@ -643,15 +644,27 @@ const staticSheets = [
 ]
 
 // 从基本信息表提取有股比变动的企业，动态生成导航项
+// 设计 §十三.2：不限于 1|2|3，从事件集合（或已保存的 share_change_N 键）动态生成
 const shareChangeSheets = computed(() => {
   const sheets: any[] = []
   const changedCompanies = data.subsidiaryInfo.filter(
     (r: SubsidiaryInfoRow) => r.share_changed === '是' && r.change_times > 0 && r.company_name
   )
-  // 按变动次数分组
-  for (const times of [1, 2, 3] as const) {
+  // 收集所有出现过的变动次数（含已保存数据中超过 3 次的 share_change_N 键）
+  const timesSet = new Set<number>()
+  for (const r of changedCompanies) {
+    if (r.change_times > 0) timesSet.add(r.change_times)
+  }
+  // 补充已加载数据中的 share_change_N 键（后端可能有 4 次以上的保存数据）
+  for (const key of Object.keys(shareChangeData)) {
+    const match = key.match(/^share_change_(\d+)$/)
+    if (match) timesSet.add(Number(match[1]))
+  }
+  // 按次数升序生成导航项
+  const sortedTimes = [...timesSet].sort((a, b) => a - b)
+  for (const times of sortedTimes) {
     const companies = changedCompanies.filter((r: SubsidiaryInfoRow) => r.change_times === times)
-    if (companies.length > 0) {
+    if (companies.length > 0 || shareChangeData[`share_change_${times}`]) {
       const names = companies.map((r: SubsidiaryInfoRow) => r.company_name).join('、')
       sheets.push({
         key: `share_change_${times}`,
@@ -1003,6 +1016,11 @@ async function loadAllData() {
     internalRows.arap = Array.isArray(saved.internal_arap?.rows) ? saved.internal_arap.rows : null
     internalRows.trade = Array.isArray(saved.internal_trade?.rows) ? saved.internal_trade.rows : null
     savedSheetKeys.value = new Set(Object.keys(saved))
+    // 记录各表版本号（CAS 保存用）
+    Object.keys(sheetVersions).forEach((k) => delete sheetVersions[k])
+    if (result.versions) {
+      Object.assign(sheetVersions, result.versions)
+    }
     if (Array.isArray(saved.capital?.rows)) data.capitalReserve = saved.capital.rows
     // G7 建议草稿（只读；由 G7 联动勾选建议写入）
     const draft = saved.g7_suggestions
@@ -1215,6 +1233,7 @@ function resetWorksheetData(options: { clearScope?: boolean; resetView?: boolean
   internalRows.arap = null
   internalRows.trade = null
   savedSheetKeys.value = new Set()
+  Object.keys(sheetVersions).forEach((k) => delete sheetVersions[k])
   g7SuggestionDraft.rows = []
   g7SuggestionDraft.note = ''
   g7SuggestionDraft.importedAt = ''
@@ -1281,8 +1300,8 @@ const elimSummaryForCapital = computed(() => {
 
 // ─── 股比变动（内联表，非弹窗） ─────────────────────────────────────────────
 const activeShareChangeTimes = computed(() => {
-  const m = activeSheet.value.match(/share_change_(\d)/)
-  return m ? (Number(m[1]) as 1|2|3) : 1
+  const m = activeSheet.value.match(/share_change_(\d+)/)
+  return m ? Number(m[1]) : 1
 })
 const activeShareChangeCompanies = computed(() => {
   const times = activeShareChangeTimes.value
@@ -1321,15 +1340,26 @@ async function onSave(sheet: string, payload: any) {
 async function doSave(sheetKey: string, payload: any) {
   if (!projectId.value) { ElMessage.warning('项目ID缺失'); return }
   try {
-    const ok = await saveWorksheetData(projectId.value, year.value, sheetKey, { rows: payload })
-    if (!ok) {
+    // 传入已知版本号启用 CAS；首次保存用 0（首次创建语义，后端验证当前不存在）。
+    const currentVersion = sheetVersions[sheetKey] ?? 0
+    const result = await saveWorksheetData(
+      projectId.value, year.value, sheetKey, { rows: payload }, currentVersion,
+    )
+    if (!result.ok) {
       ElMessage.error(`${sheetKey} 保存失败，请检查后端服务`)
       return
     }
+    // 更新本地版本号，下次保存用新版本做 CAS
+    sheetVersions[sheetKey] = result.version
     // 已保存 ⇒ 该表数据已知，生成草稿分录时由它负责（其中不再产出的来源键可删草稿）
     savedSheetKeys.value = new Set([...savedSheetKeys.value, sheetKey])
     ElMessage.success(`${sheetKey} 已保存`)
   } catch (err: any) {
+    if (err instanceof WorksheetVersionConflictError) {
+      ElMessage.warning('工作底稿已被其他操作修改，正在重新加载……')
+      await loadAllData()
+      return
+    }
     handleApiError(err, `${sheetKey} 保存`)
   }
 }
@@ -1428,7 +1458,9 @@ async function handleImportFile(e: Event) {
 
     // 保存到后端
     try {
-      await saveWorksheetData(projectId.value, year.value, activeSheet.value, { rows: mapped })
+      const currentVersion = sheetVersions[activeSheet.value] ?? 0
+      const saveResult = await saveWorksheetData(projectId.value, year.value, activeSheet.value, { rows: mapped }, currentVersion)
+      sheetVersions[activeSheet.value] = saveResult.version
       ElMessage.success(`已导入 ${mapped.length} 行到「${activeSheetLabel.value}」`)
       // 触发前端数据刷新
       await loadAllData()
@@ -1447,6 +1479,8 @@ async function handleImportFile(e: Event) {
 const internalRows = reactive<{ arap: any[] | null; trade: any[] | null }>({ arap: null, trade: null })
 /** 已保存过数据的表（sheet_key）：这些来源的数据已知，生成时由明细表声明负责 */
 const savedSheetKeys = ref<Set<string>>(new Set())
+/** 每个 sheet_key 当前已知的后端版本号（加载/保存后更新），用于 CAS 保存。 */
+const sheetVersions = reactive<Record<string, number>>({})
 
 const sourceGroupsByOriginMap = computed(() => sourceGroupsByOrigin({
   equitySimRows: data.equitySimDirect,
