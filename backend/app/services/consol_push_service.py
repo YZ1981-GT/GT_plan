@@ -185,7 +185,8 @@ async def _mark_notes_stale(db: AsyncSession, project_id: UUID, year: int) -> in
     return int(result.rowcount or 0)
 
 
-async def _push_one(db: AsyncSession, project_id: UUID, year: int, steps: list[dict], warnings: list[str]) -> bool:
+async def _push_one(db: AsyncSession, project_id: UUID, year: int, steps: list[dict], warnings: list[str],
+                    *, context=None, tree=None) -> bool:
     """推送一个合并项目的四步；返回是否全部成功。每步独立事务，失败回滚该步并留痕。"""
     from app.services.consol_report_service import ConsolReportService
     from app.services.consol_trial_service import recalculate_trial
@@ -218,7 +219,16 @@ async def _push_one(db: AsyncSession, project_id: UUID, year: int, steps: list[d
         return f"报表 {len(results)} 张 {total} 行" + (f"，留空 {blank} 行" if blank else "")
 
     async def notes() -> str:
-        return f"附注 {await _mark_notes_stale(db, project_id, year)} 章标记待更新"
+        count = await _mark_notes_stale(db, project_id, year)
+        parts = [f"附注 {count} 章标记待更新"]
+        if context is not None:
+            fp = getattr(context, "tree_fingerprint", None)
+            tt = getattr(context, "template_type", None)
+            if fp:
+                parts.append(f"tree_fingerprint={fp[:12]}")
+            if tt:
+                parts.append(f"template={tt}")
+        return "，".join(parts)
 
     bodies = {STEP_WORKSHEET: worksheet, STEP_TRIAL: trial, STEP_REPORT: report, STEP_NOTES: notes}
     all_ok = True
@@ -278,9 +288,40 @@ async def push(
     pushed: list[str] = []
     failed_projects = 0
     aborted = False
+
+    # 为 source 项目建一次上下文，每个 target 派生自己的上下文
+    from app.services.consol_context_service import build_consol_context
+    from app.services.consol_tree_service import build_tree
+
+    source_context = None
+    source_tree = None
+    try:
+        source_tree = await build_tree(db, project_id)
+        if source_tree is not None:
+            source_context = await build_consol_context(db, project_id, year, tree=source_tree)
+    except Exception as exc:  # noqa: BLE001 — context 构建失败不阻断推送
+        logger.warning("合并推送 source context 构建失败（降级无 context）：%s", exc)
+
     try:
         for target in await push_targets(db, project_id):
-            if not await _push_one(db, target, year, steps, warnings):
+            # 每个 target 重新解析树和上下文
+            target_context = None
+            target_tree = None
+            if source_context is not None:
+                try:
+                    from app.services.consol_context_service import build_target_consol_context
+
+                    target_tree = await build_tree(db, target)
+                    target_context = await build_target_consol_context(
+                        db, source_context, target, year, tree=target_tree,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("合并推送 target=%s context 构建失败（降级无 context）：%s", target, exc)
+
+            if not await _push_one(
+                db, target, year, steps, warnings,
+                context=target_context, tree=target_tree,
+            ):
                 failed_projects += 1
             # 报表已写入（哪怕附注标记失败）⇒ 该项目的页面需要刷新
             if any(s["project_id"] == str(target) and s["step"] == STEP_REPORT and s["status"] == "succeeded"

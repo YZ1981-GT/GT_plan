@@ -154,7 +154,12 @@ async def handle_consol_note_formula_refresh(event: EventPayload) -> dict[str, o
             fill_note_sections,
             resolve_note_template_type,
         )
+        from app.services.consol_context_service import (
+            build_consol_context,
+            validate_context,
+        )
         from app.services.consol_note_gray_service import is_consol_note_v2_enabled
+        from app.services.consol_report_view_service import load_view_context
         from app.services.consol_tree_service import build_tree, iter_nodes
 
         # 这里新开会话，明确与发布事件的业务会话隔离。即使下游失败，也不会把上游
@@ -198,6 +203,30 @@ async def handle_consol_note_formula_refresh(event: EventPayload) -> dict[str, o
                 logger.info("合并附注自动刷新无树：%s", base)
                 return base
 
+            event_context = event.resolved_context()
+            if event_context is None:
+                context = await build_consol_context(
+                    db,
+                    project_id,
+                    year,
+                    tree=tree,
+                )
+            else:
+                validate_context(event_context, project_id, year, tree=tree)
+                context = event_context
+            view_context = await load_view_context(
+                db,
+                project_id,
+                year,
+                context=context,
+                tree=tree,
+            )
+            if view_context is None:
+                base["skipped"].append({"scope": "event", "reason": "无法加载合并计算上下文"})
+                base["ended_at"] = _now()
+                logger.info("合并附注自动刷新无视图上下文：%s", base)
+                return base
+
             seen: set[str] = set()
             nodes = []
             for node in iter_nodes(tree):
@@ -224,6 +253,9 @@ async def handle_consol_note_formula_refresh(event: EventPayload) -> dict[str, o
                         section_ids,
                         node_key=node_key,
                         template_type=template_type,
+                        context=context,
+                        tree=tree,
+                        view_context=view_context,
                     )
                     # 一个节点的成功章节先提交；后续节点失败不能撤销已完成节点。
                     if result.get("results"):

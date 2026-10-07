@@ -17,10 +17,13 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
+
+if TYPE_CHECKING:
+    from app.schemas.consol_context import ConsolContext
 
 from app.services.consol_calc_basis import (
     ADJUSTMENT_ENTRY_TYPE,
@@ -330,20 +333,47 @@ class ViewContext:
     year: int
 
 
-async def load_view_context(db: AsyncSession, project_id: UUID, year: int | None = None) -> ViewContext | None:
-    """合并项目的计算口径 + 报表配置（按项目口径）；项目不存在或不是合并项目返回 None。"""
+async def load_view_context(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int | None = None,
+    *,
+    context: "ConsolContext | None" = None,
+    tree: TreeNode | None = None,
+) -> ViewContext | None:
+    """合并项目的计算口径 + 报表配置（按项目口径）；项目不存在或不是合并项目返回 None。
+
+    级联/批量入口传入 ``tree`` 时直接复用该树，避免同一轮计算重新推导企业范围。
+    ``context`` 只负责身份边界校验，``ViewContext`` 继续承载计算 basis、报表行、准则和年度。
+    """
+    from app.services.consol_context_service import validate_context
     from app.services.consol_group_tree import ROLE_CONSOL, build_group_tree
 
-    result = await build_group_tree(db, project_id)
-    if result is None or result.root is None or result.root.role != ROLE_CONSOL:
+    resolved_tree = tree
+    resolved_year = year
+    if resolved_tree is None:
+        result = await build_group_tree(db, project_id)
+        if result is None or result.root is None or result.root.role != ROLE_CONSOL:
+            return None
+        resolved_tree = result.root
+        if resolved_year is None:
+            resolved_year = result.year
+    elif getattr(resolved_tree, "role", None) != ROLE_CONSOL:
         return None
-    effective_year = year if year is not None else result.year
-    if effective_year is None:
+
+    if resolved_year is None:
         return None
-    basis = await load_calc_basis(db, project_id, effective_year, tree=result.root)
-    assert basis is not None
+    validate_context(context, project_id, resolved_year, tree=resolved_tree)
+    basis = await load_calc_basis(db, project_id, resolved_year, tree=resolved_tree)
+    if basis is None:
+        return None
     standard = await resolve_consol_standard(db, project_id)
-    return ViewContext(basis=basis, rows=await load_report_rows(db, standard), standard=standard, year=effective_year)
+    return ViewContext(
+        basis=basis,
+        rows=await load_report_rows(db, standard),
+        standard=standard,
+        year=resolved_year,
+    )
 
 
 async def load_entry_drill(

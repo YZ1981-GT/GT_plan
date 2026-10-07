@@ -7,7 +7,7 @@ Listed/SOE 传递，以及公式服务的 legacy copy-on-write / manual_cells �
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -24,6 +24,7 @@ import app.services.consol_tree_service as tree_service
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.base import Base
 from app.models.consol_note_data_models import ConsolNoteData
+from app.schemas.consol_context import ConsolContext
 from app.services.event_bus import EventBus
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
@@ -45,6 +46,15 @@ class _RecordingSession:
 
     async def rollback(self) -> None:
         self.rollback_count += 1
+
+    async def get(self, _model, _identity):
+        return SimpleNamespace(
+            is_deleted=False,
+            audit_year=_YEAR,
+            audit_period_end=None,
+            template_type="soe",
+            report_scope="consolidated",
+        )
 
 
 class _SessionContext:
@@ -72,11 +82,13 @@ def _event(
     *,
     extra: dict | None = None,
     year: int | None = _YEAR,
+    context: ConsolContext | None = None,
 ) -> EventPayload:
     return EventPayload(
         event_type=event_type,
         project_id=_PROJECT_ID,
         year=year,
+        context=context,
         extra=extra or {},
     )
 
@@ -97,8 +109,20 @@ def runtime(monkeypatch: pytest.MonkeyPatch):
     enabled = AsyncMock(return_value=True)
     resolve_template = AsyncMock(return_value="soe")
     build_tree = AsyncMock()
+    build_context = AsyncMock(return_value=ConsolContext.legacy(_PROJECT_ID, _YEAR))
+    validate_context = MagicMock()
+    load_view = AsyncMock(return_value=SimpleNamespace())
     fill_sections = AsyncMock()
 
+    monkeypatch.setattr(
+        "app.services.consol_context_service.build_consol_context", build_context,
+    )
+    monkeypatch.setattr(
+        "app.services.consol_context_service.validate_context", validate_context,
+    )
+    monkeypatch.setattr(
+        "app.services.consol_report_view_service.load_view_context", load_view,
+    )
     monkeypatch.setattr(
         "app.services.consol_note_gray_service.is_consol_note_v2_enabled", enabled,
     )
@@ -121,6 +145,9 @@ def runtime(monkeypatch: pytest.MonkeyPatch):
         enabled=enabled,
         resolve_template=resolve_template,
         build_tree=build_tree,
+        build_context=build_context,
+        validate_context=validate_context,
+        load_view=load_view,
         fill_sections=fill_sections,
     )
 
@@ -349,6 +376,14 @@ async def test_real_session_commit_keeps_successful_nodes_after_a_later_failure(
     following = _node("B:subsidiary")
     root.children = [failed, following]
     monkeypatch.setattr(tree_service, "build_tree", AsyncMock(return_value=root))
+    monkeypatch.setattr(
+        "app.services.consol_context_service.build_consol_context",
+        AsyncMock(return_value=ConsolContext.legacy(_PROJECT_ID, _YEAR)),
+    )
+    monkeypatch.setattr(
+        "app.services.consol_report_view_service.load_view_context",
+        AsyncMock(return_value=SimpleNamespace()),
+    )
 
     async def write_and_fail_on_a(db, project_id, year, section_ids, **kwargs):
         node_key = kwargs["node_key"]
@@ -387,6 +422,14 @@ async def test_fill_note_sections_savepoint_rolls_back_bad_section_and_keeps_nei
     async with note_db() as session:
         monkeypatch.setattr(
             formula_service, "resolve_note_template_type", AsyncMock(return_value="soe"),
+        )
+        monkeypatch.setattr(
+            "app.services.consol_context_service.build_consol_context",
+            AsyncMock(return_value=ConsolContext.legacy(_PROJECT_ID, _YEAR)),
+        )
+        monkeypatch.setattr(
+            "app.services.consol_report_view_service.load_view_context",
+            AsyncMock(return_value=SimpleNamespace()),
         )
 
         async def fill_one(db, project_id, year, section_id, **kwargs):
@@ -511,3 +554,89 @@ async def test_invalid_event_is_failed_without_opening_a_database_session(runtim
     assert result["status"] == "failed"
     assert result["failed"][0]["retry"] is False
     assert runtime.contexts == []
+
+
+# ---------------------------------------------------------------------------
+# ConsolContext 共享身份 — typed vs legacy 事件分支防御测试
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_typed_event_reuses_context_without_calling_build_consol_context(runtime):
+    """typed 事件携带 resolved_context 时直接复用，不调 build_consol_context。"""
+    ctx = ConsolContext.legacy(_PROJECT_ID, _YEAR)
+    root = _node("G:consol")
+    runtime.build_tree.return_value = root
+    runtime.fill_sections.return_value = _persisted_result([_SECTIONS[0]])
+
+    result = await refresh_handler.handle_consol_note_formula_refresh(
+        _event(context=ctx),
+    )
+
+    assert result["status"] == "persisted"
+    # typed 事件不应再调 build_consol_context
+    runtime.build_context.assert_not_awaited()
+    # 但 validate_context 应被调用
+    runtime.validate_context.assert_called()
+    # fill_sections 收到的 context 就是事件上携带的那个
+    fill_call = runtime.fill_sections.await_args
+    assert fill_call.kwargs["context"] is ctx
+
+
+@pytest.mark.asyncio
+async def test_legacy_event_builds_context_exactly_once(runtime):
+    """legacy 事件（无 context）应恰好调一次 build_consol_context。"""
+    root = _node("G:consol")
+    child = _node("A:subsidiary")
+    root.children = [child]
+    runtime.build_tree.return_value = root
+    runtime.fill_sections.return_value = _persisted_result([_SECTIONS[0]])
+
+    result = await refresh_handler.handle_consol_note_formula_refresh(_event())
+
+    assert result["status"] == "persisted"
+    # legacy 事件只建一次 context
+    assert runtime.build_context.await_count == 1
+    # 两个节点共享同一个 context 对象
+    calls = runtime.fill_sections.await_args_list
+    assert len(calls) == 2
+    ctx_a = calls[0].kwargs["context"]
+    ctx_b = calls[1].kwargs["context"]
+    assert ctx_a is ctx_b
+
+
+@pytest.mark.asyncio
+async def test_all_nodes_share_same_view_context(runtime):
+    """所有节点必须共享同一份 view_context 和 tree 对象。"""
+    root = _node("G:consol")
+    child = _node("A:subsidiary")
+    root.children = [child]
+    runtime.build_tree.return_value = root
+    runtime.fill_sections.return_value = _persisted_result([_SECTIONS[0]])
+
+    await refresh_handler.handle_consol_note_formula_refresh(_event())
+
+    calls = runtime.fill_sections.await_args_list
+    assert len(calls) == 2
+    # view_context 是同一个对象
+    vc_a = calls[0].kwargs["view_context"]
+    vc_b = calls[1].kwargs["view_context"]
+    assert vc_a is vc_b
+    # tree 也是同一个对象
+    tree_a = calls[0].kwargs["tree"]
+    tree_b = calls[1].kwargs["tree"]
+    assert tree_a is tree_b
+
+
+@pytest.mark.asyncio
+async def test_load_view_context_called_exactly_once(runtime):
+    """无论节点数多少，load_view_context 只调一次。"""
+    root = _node("G:consol")
+    root.children = [_node("A:sub"), _node("B:sub"), _node("C:sub")]
+    runtime.build_tree.return_value = root
+    runtime.fill_sections.return_value = _persisted_result([_SECTIONS[0]])
+
+    await refresh_handler.handle_consol_note_formula_refresh(_event())
+
+    assert runtime.load_view.await_count == 1
+    assert runtime.fill_sections.await_count == 4  # G + A + B + C

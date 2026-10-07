@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -37,6 +38,10 @@ from app.models.consolidation_schemas import ConsolDisclosureSection, ConsolDisc
 from app.models.report_models import DisclosureNote, ContentType, SourceTemplate, NoteStatus
 from app.services.goodwill_service import get_goodwill_list
 from app.services.minority_interest_service import get_mi_list
+
+if TYPE_CHECKING:
+    from app.schemas.consol_context import ConsolContext
+    from app.services.consol_tree_service import TreeNode
 
 logger = logging.getLogger(__name__)
 
@@ -906,6 +911,9 @@ async def generate_consol_notes_with_flag(
     project_id: UUID,
     year: int,
     template_type: str | None = None,
+    *,
+    context: "ConsolContext | None" = None,
+    tree: "TreeNode | None" = None,
 ) -> list[ConsolDisclosureSection]:
     """合并附注生成统一入口（feature flag 灰度，ADR-CONSOL-202）.
 
@@ -917,6 +925,7 @@ async def generate_consol_notes_with_flag(
 
     返回结构契约与老版一致（list[ConsolDisclosureSection]，属性 S4）。
     """
+    from app.services.consol_context_service import ConsolContextError
     from app.services.consol_note_formula_service import resolve_note_template_type
     from app.services.consol_note_gray_service import is_consol_note_v2_enabled
 
@@ -928,9 +937,16 @@ async def generate_consol_notes_with_flag(
     if await is_consol_note_v2_enabled(db, project_id):
         try:
             v2_sections = await generate_full_consol_notes(
-                db, project_id, year, template_type=resolved_template_type,
+                db,
+                project_id,
+                year,
+                template_type=resolved_template_type,
+                context=context,
+                tree=tree,
             )
             return _adapt_v2_sections_to_schema(v2_sections)
+        except ConsolContextError:
+            raise
         except Exception as err:  # EH3/R2：V2 失败回退老版兼容
             logger.warning(
                 "generate_full_consol_notes (V2) failed, falling back to legacy "
@@ -962,6 +978,9 @@ async def generate_full_consol_notes(
     parent_project_id: UUID,
     year: int,
     template_type: str = "soe",
+    *,
+    context: "ConsolContext | None" = None,
+    tree: "TreeNode | None" = None,
 ) -> list[dict]:
     """合并附注完整生成（173 共有 + 7 合并专用 = 180 章节）.
 
@@ -983,8 +1002,23 @@ async def generate_full_consol_notes(
     Returns:
         list[dict]: 180 章节结构列表
     """
-    # Step 1: B.1.3 子公司清单实时拉取
-    subsidiaries = await _fetch_subsidiary_list(db, parent_project_id)
+    # Step 1: B.1.3 子公司清单实时拉取；传入树时直接复用。
+    # 旧入口不传 context/tree 时由 helper 自行建树，保留其兼容调用和现有单测桩。
+    resolved_tree = tree
+    if context is not None:
+        if resolved_tree is None:
+            from app.services.consol_tree_service import build_tree
+
+            resolved_tree = await build_tree(db, parent_project_id)
+        from app.services.consol_context_service import validate_context
+
+        validate_context(context, parent_project_id, year, tree=resolved_tree)
+    subsidiaries = await _fetch_subsidiary_list(
+        db,
+        parent_project_id,
+        context=context,
+        tree=resolved_tree,
+    )
 
     # Step 2: 加载章节映射
     section_mapping = _load_section_mapping()
@@ -1019,7 +1053,12 @@ async def generate_full_consol_notes(
     all_sections = _render_text_paragraphs_v2(all_sections, consol_vars)
 
     # Step 7: B.1.6 写 lineage
-    lineage_chain = await _write_lineage_v2(db, parent_project_id)
+    lineage_chain = await _write_lineage_v2(
+        db,
+        parent_project_id,
+        context=context,
+        tree=resolved_tree,
+    )
     for section in all_sections:
         section["lineage"] = lineage_chain
 
@@ -1409,6 +1448,9 @@ def _subsidiary_entities(subsidiaries: list[dict]) -> list[dict]:
 async def _fetch_subsidiary_list(
     db: AsyncSession,
     parent_project_id: UUID,
+    *,
+    context: "ConsolContext | None" = None,
+    tree: "TreeNode | None" = None,
 ) -> list[dict]:
     """用企业树实时拉取合并附注的数据叶子清单（B.1.3）。
 
@@ -1420,14 +1462,17 @@ async def _fetch_subsidiary_list(
     """
     from app.models.core import Project
     from app.services.consol_calc_basis import data_leaves, entity_kinds
+    from app.services.consol_context_service import validate_context
     from app.services.consol_tree_service import build_tree
 
-    tree = await build_tree(db, parent_project_id)
-    if tree is None:
+    resolved_tree = tree if tree is not None else await build_tree(db, parent_project_id)
+    if context is not None:
+        validate_context(context, parent_project_id, context.year, tree=resolved_tree)
+    if resolved_tree is None:
         return []
 
-    leaves = data_leaves(tree)
-    kinds = entity_kinds(tree)
+    leaves = data_leaves(resolved_tree)
+    kinds = entity_kinds(resolved_tree)
 
     # 批量读取各数据叶子 Project.template_type（国企/上市 跨模板翻译用，ADR-CONSOL-204）。
     # build_tree 的 TreeNode 不带 template_type，这里单独一次性 IN 查询补齐，
@@ -1783,12 +1828,20 @@ def _generate_consol_only_sections_v2(
 async def _write_lineage_v2(
     db: AsyncSession,
     parent_project_id: UUID,
+    *,
+    context: "ConsolContext | None" = None,
+    tree: "TreeNode | None" = None,
 ) -> list[str]:
-    """调 get_lineage_chain 获取多层合并 lineage.
+    """调 get_lineage_chain 获取多层合并 lineage，并校验共享上下文边界。
 
-    B.1.6 实现。
+    ``tree`` 仅用于校验本次生成使用的树；lineage 仍由
+    ``get_lineage_chain`` 读取项目关系，避免把树层级误当成 lineage 语义。
     """
+    from app.services.consol_context_service import validate_context
     from app.services.consol_note_aggregation_service import get_lineage_chain
+
+    if context is not None:
+        validate_context(context, parent_project_id, context.year, tree=tree)
 
     chain = await get_lineage_chain(parent_project_id, db=db)
     return [str(pid) for pid in chain]

@@ -22,8 +22,12 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from app.schemas.consol_context import ConsolContext
+    from app.services.consol_tree_service import TreeNode
 
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
@@ -855,10 +859,28 @@ async def _active_formulas(db: AsyncSession, template_type: str, section_id: str
     ).order_by(ConsolNoteFormula.row_index, ConsolNoteFormula.col_index))).scalars().all())
 
 
-async def _context(db: AsyncSession, project_id: UUID, year: int | None):
+async def _context(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int | None,
+    *,
+    context: "ConsolContext | None" = None,
+    tree: "TreeNode | None" = None,
+):
+    from app.services.consol_context_service import validate_context
     from app.services.consol_report_view_service import load_view_context
 
-    ctx = await load_view_context(db, project_id, year)
+    if context is not None:
+        if year is None:
+            year = context.year
+        validate_context(context, project_id, year, tree=tree)
+    ctx = await load_view_context(
+        db,
+        project_id,
+        year,
+        context=context,
+        tree=tree,
+    )
     if ctx is None:
         raise NoteFormulaError("只有合并报表项目有合并附注差额（项目不存在、不是合并项目或没有审计年度）", status=404)
     return ctx
@@ -943,6 +965,8 @@ async def note_breakdown(
     node_key: str | None = None, standard: str | None = None,
     _include_internal_scope: bool = False,
     _view_context: "ViewContext | None" = None,
+    context: "ConsolContext | None" = None,
+    tree: "TreeNode | None" = None,
 ) -> dict:
     """某章节有公式的单元格：个别数汇总 / 调整 / 抵销 / 合并数，及所选汇总节点各直接子节点的贡献（需求 6.3）。
 
@@ -955,7 +979,11 @@ async def note_breakdown(
     if table is None:
         raise NoteFormulaError(f"合并附注模板（{tt}）中没有表格 {section_id}", status=404)
     await ensure_seeded(db, tt)
-    ctx = _view_context if _view_context is not None else await _context(db, project_id, year)
+    ctx = (
+        _view_context
+        if _view_context is not None
+        else await _context(db, project_id, year, context=context, tree=tree)
+    )
     try:
         node = find_node(ctx.basis.tree, node_key)
     except ViewError as exc:
@@ -1130,6 +1158,8 @@ async def fill_by_formula(
     node_key: str | None = None, standard: str | None = None,
     template_type: str | None = None,
     _view_context: "ViewContext | None" = None,
+    context: "ConsolContext | None" = None,
+    tree: "TreeNode | None" = None,
 ) -> dict:
     """「按公式填入」：按节点把合并数写入 ``consol_note_data``；旧调用不带节点键时使用项目级兼容行。
 
@@ -1142,7 +1172,10 @@ async def fill_by_formula(
     requested_template = template_type or standard
     breakdown = await note_breakdown(
         db, project_id, year, section_id, node_key=node_key, standard=requested_template,
-        _include_internal_scope=True, _view_context=_view_context,
+        _include_internal_scope=True,
+        _view_context=_view_context,
+        context=context,
+        tree=tree,
     )
     tt = breakdown["template_type"]
     is_root_consol = bool(breakdown.get("_is_root_consol")) and breakdown["node_key"] == node_key
@@ -1203,6 +1236,9 @@ async def fill_note_sections(
     node_key: str | None = None,
     standard: str | None = None,
     template_type: str | None = None,
+    context: "ConsolContext | None" = None,
+    tree: "TreeNode | None" = None,
+    view_context: "ViewContext | None" = None,
 ) -> dict:
     """逐章节调用 ``fill_by_formula``，以 SAVEPOINT 隔离单章失败。
 
@@ -1216,13 +1252,21 @@ async def fill_note_sections(
     requested_template = template_type or standard
     resolved_template = await resolve_note_template_type(db, project_id, requested_template)
 
-    # 预构建合并计算上下文，逐章节循环复用，避免 N 次重建企业树（性能根因修复）。
-    # 构建失败时降级为 None（每章节各自构建），不阻断编排。
-    view_ctx = None
     try:
-        view_ctx = await _context(db, project_id, year)
-    except Exception:  # noqa: BLE001 - 预构建失败不致命，fill_by_formula 会自行构建
-        pass
+        view_ctx = view_context
+        if view_ctx is None:
+            view_ctx = await _context(
+                db,
+                project_id,
+                year,
+                context=context,
+                tree=tree,
+            )
+    except Exception:
+        if context is not None or tree is not None:
+            raise
+        # 旧入口保留原有兼容语义：预构建失败时由每个章节自行解析。
+        view_ctx = None
 
     results: list[dict] = []
     failures: list[dict] = []
@@ -1238,6 +1282,8 @@ async def fill_note_sections(
                     node_key=node_key,
                     standard=resolved_template,
                     _view_context=view_ctx,
+                    context=context,
+                    tree=tree,
                 )
             results.append(result)
         except Exception as exc:  # noqa: BLE001 - 单章节失败不能污染其余章节
