@@ -165,6 +165,15 @@ KNOWN_UNWIRED: dict[str, str] = {
         "归属 lane：h3-h5-h7-variant-axis-and-dynamic-column-paradigm。声明 2 / 可见 1"
         "（H7-2-fair-rows 不可见）。"
     ),
+    # ── F2/F4 灰度开关扩容后声明面 > 单数 STORE_ITEM_ID ──
+    "f2.inventory_valuation": (
+        "归属 lane：f2-sync-coverage-four-entry-lanes。声明 2 / 可见 1"
+        "（F247 灰度打开后 all_store_item_ids() 返回 2 个，但缺复数常量 + build_combined）。"
+    ),
+    "f4.accounts_payable_detail": (
+        "归属 lane：f4-sync-coverage-and-first-canary。声明 13 / 可见 1"
+        "（F401~F408 全开后 all_store_item_ids() 返回 13 个，但缺复数常量 + build_combined）。"
+    ),
     # ── 唯一「两方向不等」的一家 ──
     "d2.receivable_detail": (
         "归属 lane：d2-sync-coverage-via-row-table-engine。**全仓唯一两方向不等**"

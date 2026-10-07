@@ -191,11 +191,12 @@ class FieldMode(str, Enum):
     formula = "formula"
     auto_source = "auto_source"
     word_only = "word_only"
+    cross_sheet = "cross_sheet"
 
 
 #: 受保护模式：默认只读，OO 侧修改 SHALL 产生受保护字段冲突（Requirement 6.6）。
 PROTECTED_MODES: Final[frozenset[FieldMode]] = frozenset(
-    {FieldMode.formula, FieldMode.auto_source}
+    {FieldMode.formula, FieldMode.auto_source, FieldMode.cross_sheet}
 )
 
 #: 模板预置骨架行的身份形态（spec workpaper-sync-managed-row-convergence）。
@@ -1269,15 +1270,20 @@ def _parse_table(
             )
 
     # CS-13：formula 模式字段的列必须落在已声明的 formula_mask 内。
+    # 🔴 审定表（AdjudicationSheetSpec）用逐格 `cell_mask` 替代列向 `formula_mask`：
+    #    审定表的公式不是整列向的（同列不同行有的是公式有的可编辑），所以用逐格声明。
+    #    当 table 有 `cell_mask` 时，CS-13 的 formula_mask 列向检查由 cell_mask 等效满足。
+    cell_mask = raw.get("cell_mask") or []
+    has_cell_mask = isinstance(cell_mask, list) and len(cell_mask) > 0
     for spec in fields:
         if spec.mode is not FieldMode.formula or spec.cell is None:
             continue
-        if not formula_mask:
+        if not formula_mask and not has_cell_mask:
             raise ContractSchemaError(
                 f"{where}: 字段 {spec.stable_field_key!r} 声明 mode=formula，但 table 未声明 "
-                "`formula_mask` —— 受保护单元格必须显式登记只读区域（Requirement 6.6）"
+                "`formula_mask` 或 `cell_mask` —— 受保护单元格必须显式登记只读区域（Requirement 6.6）"
             )
-        if not column_in_ranges(spec.cell.column, formula_mask):
+        if formula_mask and not column_in_ranges(spec.cell.column, formula_mask):
             raise ContractSchemaError(
                 f"{where}: 字段 {spec.stable_field_key!r} 的列 {spec.cell.column} 不在 "
                 f"formula_mask {list(formula_mask)} 覆盖的列跨度内 —— formula 字段必须被"

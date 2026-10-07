@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "f00f0023b04dc13f5da9665f023eb172e1cb42a171330ff105300fa8199126ba",
+  "instrumentation_definition_sha256": "c32f173fc8e0bbff4c5b6d5d74d84b4f94e562fe0f768828e397fb95b3d569ca",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-g5-long-term-receivable",
@@ -1451,9 +1451,9 @@
             "search_column": "A"
           },
           "formula_mask": [
-            "G34:G38",
-            "J34:J38",
-            "M34:M38"
+            "G34:G37",
+            "J34:J37",
+            "M34:M37"
           ],
           "header_rows": 2,
           "row_identity": {
@@ -4288,6 +4288,1537 @@
           "uuid_col": "W"
         }
       ]
+    },
+    {
+      "excel_name": "审定表G5-1",
+      "footer": {
+        "diff_row": 76,
+        "marker": "合计",
+        "tb_row": 75
+      },
+      "formula_mask": [
+        "D76",
+        "G76"
+      ],
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "g51-managed",
+      "tables": [
+        {
+          "anchor": "A7",
+          "cell_mask": [
+            "B18",
+            "B19",
+            "B20",
+            "C18",
+            "C19",
+            "C20",
+            "D10",
+            "D11",
+            "D12",
+            "D13",
+            "D14",
+            "D15",
+            "D16",
+            "D17",
+            "D18",
+            "D19",
+            "D20",
+            "D9",
+            "E18",
+            "E19",
+            "E20",
+            "F18",
+            "F19",
+            "F20",
+            "G10",
+            "G11",
+            "G12",
+            "G13",
+            "G14",
+            "G15",
+            "G16",
+            "G17",
+            "G18",
+            "G19",
+            "G20",
+            "G9",
+            "H10",
+            "H11",
+            "H12",
+            "H13",
+            "H14",
+            "H15",
+            "H16",
+            "H17",
+            "H18",
+            "H19",
+            "H20",
+            "H9",
+            "I10",
+            "I11",
+            "I12",
+            "I13",
+            "I14",
+            "I15",
+            "I16",
+            "I17",
+            "I18",
+            "I19",
+            "I20",
+            "I9"
+          ],
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": 9
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!审定表G5-1!A5",
+              "header_text": "项目",
+              "json_pointer": "/balance_1/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!A9",
+              "stable_field_key": "g51_adj_balance_1/item_name",
+              "store_item_id": "",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 9
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!审定表G5-1!B5",
+              "header_text": "未审数",
+              "json_pointer": "/balance_1/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!B9",
+              "stable_field_key": "g51_adj_balance_1/prior_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 9
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!审定表G5-1!C5",
+              "header_text": "审计调整数",
+              "json_pointer": "/balance_1/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!C9",
+              "stable_field_key": "g51_adj_balance_1/prior_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 9
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!审定表G5-1!D5",
+              "header_text": "审定数",
+              "json_pointer": "/balance_1/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!D9",
+              "stable_field_key": "g51_adj_balance_1/prior_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 9
+              },
+              "column_key": "current_unadjusted",
+              "header_source_ref": "源xlsx!审定表G5-1!E5",
+              "header_text": "未审数",
+              "json_pointer": "/balance_1/currentUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!E9",
+              "stable_field_key": "g51_adj_balance_1/current_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 9
+              },
+              "column_key": "current_aje",
+              "header_source_ref": "源xlsx!审定表G5-1!F5",
+              "header_text": "审计调整数",
+              "json_pointer": "/balance_1/currentAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!F9",
+              "stable_field_key": "g51_adj_balance_1/current_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 9
+              },
+              "column_key": "current_audited",
+              "header_source_ref": "源xlsx!审定表G5-1!G5",
+              "header_text": "审定数",
+              "json_pointer": "/balance_1/currentAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!G9",
+              "stable_field_key": "g51_adj_balance_1/current_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 9
+              },
+              "column_key": "change_amount",
+              "header_source_ref": "源xlsx!审定表G5-1!H5",
+              "header_text": "增减变动额",
+              "json_pointer": "/balance_1/changeAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!H9",
+              "stable_field_key": "g51_adj_balance_1/change_amount",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 9
+              },
+              "column_key": "change_rate",
+              "header_source_ref": "源xlsx!审定表G5-1!I5",
+              "header_text": "增减变动率",
+              "json_pointer": "/balance_1/changeRate",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!I9",
+              "stable_field_key": "g51_adj_balance_1/change_rate",
+              "store_item_id": "",
+              "value_type": "ratio"
+            }
+          ],
+          "first_data_row": 9,
+          "footer_row": 20,
+          "header_rows": 2,
+          "last_data_row": 20,
+          "row_mode": "fixed_rows",
+          "table_key": "adj_balance_1_rows"
+        },
+        {
+          "anchor": "A21",
+          "cell_mask": [
+            "B31",
+            "B32",
+            "B33",
+            "C31",
+            "C32",
+            "C33",
+            "D22",
+            "D23",
+            "D24",
+            "D25",
+            "D26",
+            "D27",
+            "D28",
+            "D29",
+            "D30",
+            "D31",
+            "D32",
+            "D33",
+            "E31",
+            "E32",
+            "E33",
+            "F31",
+            "F32",
+            "F33",
+            "G22",
+            "G23",
+            "G24",
+            "G25",
+            "G26",
+            "G27",
+            "G28",
+            "G29",
+            "G30",
+            "G31",
+            "G32",
+            "G33",
+            "H22",
+            "H23",
+            "H24",
+            "H25",
+            "H26",
+            "H27",
+            "H28",
+            "H29",
+            "H30",
+            "H31",
+            "H32",
+            "H33",
+            "I22",
+            "I23",
+            "I24",
+            "I25",
+            "I26",
+            "I27",
+            "I28",
+            "I29",
+            "I30",
+            "I31",
+            "I32",
+            "I33"
+          ],
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": 22
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!审定表G5-1!A5",
+              "header_text": "项目",
+              "json_pointer": "/bad_debt_1/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!A22",
+              "stable_field_key": "g51_adj_bad_debt_1/item_name",
+              "store_item_id": "",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 22
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!审定表G5-1!B5",
+              "header_text": "未审数",
+              "json_pointer": "/bad_debt_1/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!B22",
+              "stable_field_key": "g51_adj_bad_debt_1/prior_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 22
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!审定表G5-1!C5",
+              "header_text": "审计调整数",
+              "json_pointer": "/bad_debt_1/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!C22",
+              "stable_field_key": "g51_adj_bad_debt_1/prior_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 22
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!审定表G5-1!D5",
+              "header_text": "审定数",
+              "json_pointer": "/bad_debt_1/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!D22",
+              "stable_field_key": "g51_adj_bad_debt_1/prior_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 22
+              },
+              "column_key": "current_unadjusted",
+              "header_source_ref": "源xlsx!审定表G5-1!E5",
+              "header_text": "未审数",
+              "json_pointer": "/bad_debt_1/currentUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!E22",
+              "stable_field_key": "g51_adj_bad_debt_1/current_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 22
+              },
+              "column_key": "current_aje",
+              "header_source_ref": "源xlsx!审定表G5-1!F5",
+              "header_text": "审计调整数",
+              "json_pointer": "/bad_debt_1/currentAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!F22",
+              "stable_field_key": "g51_adj_bad_debt_1/current_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 22
+              },
+              "column_key": "current_audited",
+              "header_source_ref": "源xlsx!审定表G5-1!G5",
+              "header_text": "审定数",
+              "json_pointer": "/bad_debt_1/currentAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!G22",
+              "stable_field_key": "g51_adj_bad_debt_1/current_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 22
+              },
+              "column_key": "change_amount",
+              "header_source_ref": "源xlsx!审定表G5-1!H5",
+              "header_text": "增减变动额",
+              "json_pointer": "/bad_debt_1/changeAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!H22",
+              "stable_field_key": "g51_adj_bad_debt_1/change_amount",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 22
+              },
+              "column_key": "change_rate",
+              "header_source_ref": "源xlsx!审定表G5-1!I5",
+              "header_text": "增减变动率",
+              "json_pointer": "/bad_debt_1/changeRate",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!I22",
+              "stable_field_key": "g51_adj_bad_debt_1/change_rate",
+              "store_item_id": "",
+              "value_type": "ratio"
+            }
+          ],
+          "first_data_row": 22,
+          "footer_row": 33,
+          "header_rows": 2,
+          "last_data_row": 33,
+          "row_mode": "fixed_rows",
+          "table_key": "adj_bad_debt_1_rows"
+        },
+        {
+          "anchor": "A34",
+          "cell_mask": [
+            "B35",
+            "B36",
+            "B37",
+            "B38",
+            "B39",
+            "B40",
+            "B41",
+            "B42",
+            "B43",
+            "B44",
+            "B45",
+            "B46",
+            "C35",
+            "C36",
+            "C37",
+            "C38",
+            "C39",
+            "C40",
+            "C41",
+            "C42",
+            "C43",
+            "C44",
+            "C45",
+            "C46",
+            "D35",
+            "D36",
+            "D37",
+            "D38",
+            "D39",
+            "D40",
+            "D41",
+            "D42",
+            "D43",
+            "D44",
+            "D45",
+            "D46",
+            "E35",
+            "E36",
+            "E37",
+            "E38",
+            "E39",
+            "E40",
+            "E41",
+            "E42",
+            "E43",
+            "E44",
+            "E45",
+            "E46",
+            "F35",
+            "F36",
+            "F37",
+            "F38",
+            "F39",
+            "F40",
+            "F41",
+            "F42",
+            "F43",
+            "F44",
+            "F45",
+            "F46",
+            "G35",
+            "G36",
+            "G37",
+            "G38",
+            "G39",
+            "G40",
+            "G41",
+            "G42",
+            "G43",
+            "G44",
+            "G45",
+            "G46",
+            "H35",
+            "H36",
+            "H37",
+            "H38",
+            "H39",
+            "H40",
+            "H41",
+            "H42",
+            "H43",
+            "H44",
+            "H45",
+            "H46",
+            "I35",
+            "I36",
+            "I37",
+            "I38",
+            "I39",
+            "I40",
+            "I41",
+            "I42",
+            "I43",
+            "I44",
+            "I45",
+            "I46"
+          ],
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": 35
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!审定表G5-1!A5",
+              "header_text": "项目",
+              "json_pointer": "/net_1/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!A35",
+              "stable_field_key": "g51_adj_net_1/item_name",
+              "store_item_id": "",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 35
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!审定表G5-1!B5",
+              "header_text": "未审数",
+              "json_pointer": "/net_1/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!B35",
+              "stable_field_key": "g51_adj_net_1/prior_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 35
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!审定表G5-1!C5",
+              "header_text": "审计调整数",
+              "json_pointer": "/net_1/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!C35",
+              "stable_field_key": "g51_adj_net_1/prior_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 35
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!审定表G5-1!D5",
+              "header_text": "审定数",
+              "json_pointer": "/net_1/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!D35",
+              "stable_field_key": "g51_adj_net_1/prior_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 35
+              },
+              "column_key": "current_unadjusted",
+              "header_source_ref": "源xlsx!审定表G5-1!E5",
+              "header_text": "未审数",
+              "json_pointer": "/net_1/currentUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!E35",
+              "stable_field_key": "g51_adj_net_1/current_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 35
+              },
+              "column_key": "current_aje",
+              "header_source_ref": "源xlsx!审定表G5-1!F5",
+              "header_text": "审计调整数",
+              "json_pointer": "/net_1/currentAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!F35",
+              "stable_field_key": "g51_adj_net_1/current_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 35
+              },
+              "column_key": "current_audited",
+              "header_source_ref": "源xlsx!审定表G5-1!G5",
+              "header_text": "审定数",
+              "json_pointer": "/net_1/currentAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!G35",
+              "stable_field_key": "g51_adj_net_1/current_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 35
+              },
+              "column_key": "change_amount",
+              "header_source_ref": "源xlsx!审定表G5-1!H5",
+              "header_text": "增减变动额",
+              "json_pointer": "/net_1/changeAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!H35",
+              "stable_field_key": "g51_adj_net_1/change_amount",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 35
+              },
+              "column_key": "change_rate",
+              "header_source_ref": "源xlsx!审定表G5-1!I5",
+              "header_text": "增减变动率",
+              "json_pointer": "/net_1/changeRate",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!I35",
+              "stable_field_key": "g51_adj_net_1/change_rate",
+              "store_item_id": "",
+              "value_type": "ratio"
+            }
+          ],
+          "first_data_row": 35,
+          "footer_row": 46,
+          "header_rows": 2,
+          "last_data_row": 46,
+          "row_mode": "fixed_rows",
+          "table_key": "adj_net_1_rows"
+        },
+        {
+          "anchor": "A47",
+          "cell_mask": [
+            "B50",
+            "B54",
+            "B55",
+            "B56",
+            "C50",
+            "C54",
+            "C55",
+            "C56",
+            "D49",
+            "D50",
+            "D51",
+            "D52",
+            "D53",
+            "D54",
+            "D55",
+            "D56",
+            "E50",
+            "E54",
+            "E55",
+            "E56",
+            "F50",
+            "F54",
+            "F55",
+            "F56",
+            "G49",
+            "G50",
+            "G51",
+            "G52",
+            "G53",
+            "G54",
+            "G55",
+            "G56",
+            "H49",
+            "H50",
+            "H51",
+            "H52",
+            "H53",
+            "H54",
+            "H55",
+            "H56",
+            "I49",
+            "I50",
+            "I51",
+            "I52",
+            "I53",
+            "I54",
+            "I55",
+            "I56"
+          ],
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": 49
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!审定表G5-1!A5",
+              "header_text": "项目",
+              "json_pointer": "/balance_2/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!A49",
+              "stable_field_key": "g51_adj_balance_2/item_name",
+              "store_item_id": "",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 49
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!审定表G5-1!B5",
+              "header_text": "未审数",
+              "json_pointer": "/balance_2/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!B49",
+              "stable_field_key": "g51_adj_balance_2/prior_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 49
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!审定表G5-1!C5",
+              "header_text": "审计调整数",
+              "json_pointer": "/balance_2/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!C49",
+              "stable_field_key": "g51_adj_balance_2/prior_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 49
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!审定表G5-1!D5",
+              "header_text": "审定数",
+              "json_pointer": "/balance_2/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!D49",
+              "stable_field_key": "g51_adj_balance_2/prior_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 49
+              },
+              "column_key": "current_unadjusted",
+              "header_source_ref": "源xlsx!审定表G5-1!E5",
+              "header_text": "未审数",
+              "json_pointer": "/balance_2/currentUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!E49",
+              "stable_field_key": "g51_adj_balance_2/current_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 49
+              },
+              "column_key": "current_aje",
+              "header_source_ref": "源xlsx!审定表G5-1!F5",
+              "header_text": "审计调整数",
+              "json_pointer": "/balance_2/currentAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!F49",
+              "stable_field_key": "g51_adj_balance_2/current_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 49
+              },
+              "column_key": "current_audited",
+              "header_source_ref": "源xlsx!审定表G5-1!G5",
+              "header_text": "审定数",
+              "json_pointer": "/balance_2/currentAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!G49",
+              "stable_field_key": "g51_adj_balance_2/current_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 49
+              },
+              "column_key": "change_amount",
+              "header_source_ref": "源xlsx!审定表G5-1!H5",
+              "header_text": "增减变动额",
+              "json_pointer": "/balance_2/changeAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!H49",
+              "stable_field_key": "g51_adj_balance_2/change_amount",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 49
+              },
+              "column_key": "change_rate",
+              "header_source_ref": "源xlsx!审定表G5-1!I5",
+              "header_text": "增减变动率",
+              "json_pointer": "/balance_2/changeRate",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!I49",
+              "stable_field_key": "g51_adj_balance_2/change_rate",
+              "store_item_id": "",
+              "value_type": "ratio"
+            }
+          ],
+          "first_data_row": 49,
+          "footer_row": 56,
+          "header_rows": 2,
+          "last_data_row": 56,
+          "row_mode": "fixed_rows",
+          "table_key": "adj_balance_2_rows"
+        },
+        {
+          "anchor": "A57",
+          "cell_mask": [
+            "B63",
+            "B64",
+            "B65",
+            "C63",
+            "C64",
+            "C65",
+            "D58",
+            "D59",
+            "D60",
+            "D61",
+            "D62",
+            "D63",
+            "D64",
+            "D65",
+            "E63",
+            "E64",
+            "E65",
+            "F63",
+            "F64",
+            "F65",
+            "G58",
+            "G59",
+            "G60",
+            "G61",
+            "G62",
+            "G63",
+            "G64",
+            "G65",
+            "H58",
+            "H59",
+            "H60",
+            "H61",
+            "H62",
+            "H63",
+            "H64",
+            "H65",
+            "I58",
+            "I59",
+            "I60",
+            "I61",
+            "I62",
+            "I63",
+            "I64",
+            "I65"
+          ],
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": 58
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!审定表G5-1!A5",
+              "header_text": "项目",
+              "json_pointer": "/bad_debt_2/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!A58",
+              "stable_field_key": "g51_adj_bad_debt_2/item_name",
+              "store_item_id": "",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 58
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!审定表G5-1!B5",
+              "header_text": "未审数",
+              "json_pointer": "/bad_debt_2/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!B58",
+              "stable_field_key": "g51_adj_bad_debt_2/prior_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 58
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!审定表G5-1!C5",
+              "header_text": "审计调整数",
+              "json_pointer": "/bad_debt_2/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!C58",
+              "stable_field_key": "g51_adj_bad_debt_2/prior_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 58
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!审定表G5-1!D5",
+              "header_text": "审定数",
+              "json_pointer": "/bad_debt_2/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!D58",
+              "stable_field_key": "g51_adj_bad_debt_2/prior_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 58
+              },
+              "column_key": "current_unadjusted",
+              "header_source_ref": "源xlsx!审定表G5-1!E5",
+              "header_text": "未审数",
+              "json_pointer": "/bad_debt_2/currentUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!E58",
+              "stable_field_key": "g51_adj_bad_debt_2/current_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 58
+              },
+              "column_key": "current_aje",
+              "header_source_ref": "源xlsx!审定表G5-1!F5",
+              "header_text": "审计调整数",
+              "json_pointer": "/bad_debt_2/currentAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!F58",
+              "stable_field_key": "g51_adj_bad_debt_2/current_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 58
+              },
+              "column_key": "current_audited",
+              "header_source_ref": "源xlsx!审定表G5-1!G5",
+              "header_text": "审定数",
+              "json_pointer": "/bad_debt_2/currentAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!G58",
+              "stable_field_key": "g51_adj_bad_debt_2/current_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 58
+              },
+              "column_key": "change_amount",
+              "header_source_ref": "源xlsx!审定表G5-1!H5",
+              "header_text": "增减变动额",
+              "json_pointer": "/bad_debt_2/changeAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!H58",
+              "stable_field_key": "g51_adj_bad_debt_2/change_amount",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 58
+              },
+              "column_key": "change_rate",
+              "header_source_ref": "源xlsx!审定表G5-1!I5",
+              "header_text": "增减变动率",
+              "json_pointer": "/bad_debt_2/changeRate",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!I58",
+              "stable_field_key": "g51_adj_bad_debt_2/change_rate",
+              "store_item_id": "",
+              "value_type": "ratio"
+            }
+          ],
+          "first_data_row": 58,
+          "footer_row": 65,
+          "header_rows": 2,
+          "last_data_row": 65,
+          "row_mode": "fixed_rows",
+          "table_key": "adj_bad_debt_2_rows"
+        },
+        {
+          "anchor": "A66",
+          "cell_mask": [
+            "B67",
+            "B68",
+            "B69",
+            "B70",
+            "B71",
+            "B72",
+            "B73",
+            "B74",
+            "C67",
+            "C68",
+            "C69",
+            "C70",
+            "C71",
+            "C72",
+            "C73",
+            "C74",
+            "D67",
+            "D68",
+            "D69",
+            "D70",
+            "D71",
+            "D72",
+            "D73",
+            "D74",
+            "E67",
+            "E68",
+            "E69",
+            "E70",
+            "E71",
+            "E72",
+            "E73",
+            "E74",
+            "F67",
+            "F68",
+            "F69",
+            "F70",
+            "F71",
+            "F72",
+            "F73",
+            "F74",
+            "G67",
+            "G68",
+            "G69",
+            "G70",
+            "G71",
+            "G72",
+            "G73",
+            "G74",
+            "H67",
+            "H68",
+            "H69",
+            "H70",
+            "H71",
+            "H72",
+            "H73",
+            "H74",
+            "I67",
+            "I68",
+            "I69",
+            "I70",
+            "I71",
+            "I72",
+            "I73",
+            "I74"
+          ],
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": 67
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!审定表G5-1!A5",
+              "header_text": "项目",
+              "json_pointer": "/net_2/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!A67",
+              "stable_field_key": "g51_adj_net_2/item_name",
+              "store_item_id": "",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 67
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!审定表G5-1!B5",
+              "header_text": "未审数",
+              "json_pointer": "/net_2/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!B67",
+              "stable_field_key": "g51_adj_net_2/prior_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 67
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!审定表G5-1!C5",
+              "header_text": "审计调整数",
+              "json_pointer": "/net_2/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!C67",
+              "stable_field_key": "g51_adj_net_2/prior_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 67
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!审定表G5-1!D5",
+              "header_text": "审定数",
+              "json_pointer": "/net_2/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!D67",
+              "stable_field_key": "g51_adj_net_2/prior_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 67
+              },
+              "column_key": "current_unadjusted",
+              "header_source_ref": "源xlsx!审定表G5-1!E5",
+              "header_text": "未审数",
+              "json_pointer": "/net_2/currentUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!E67",
+              "stable_field_key": "g51_adj_net_2/current_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 67
+              },
+              "column_key": "current_aje",
+              "header_source_ref": "源xlsx!审定表G5-1!F5",
+              "header_text": "审计调整数",
+              "json_pointer": "/net_2/currentAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G5-1!F67",
+              "stable_field_key": "g51_adj_net_2/current_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 67
+              },
+              "column_key": "current_audited",
+              "header_source_ref": "源xlsx!审定表G5-1!G5",
+              "header_text": "审定数",
+              "json_pointer": "/net_2/currentAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!G67",
+              "stable_field_key": "g51_adj_net_2/current_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 67
+              },
+              "column_key": "change_amount",
+              "header_source_ref": "源xlsx!审定表G5-1!H5",
+              "header_text": "增减变动额",
+              "json_pointer": "/net_2/changeAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!H67",
+              "stable_field_key": "g51_adj_net_2/change_amount",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 67
+              },
+              "column_key": "change_rate",
+              "header_source_ref": "源xlsx!审定表G5-1!I5",
+              "header_text": "增减变动率",
+              "json_pointer": "/net_2/changeRate",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G5-1!I67",
+              "stable_field_key": "g51_adj_net_2/change_rate",
+              "store_item_id": "",
+              "value_type": "ratio"
+            }
+          ],
+          "first_data_row": 67,
+          "footer_row": 74,
+          "header_rows": 2,
+          "last_data_row": 74,
+          "row_mode": "fixed_rows",
+          "table_key": "adj_net_2_rows"
+        }
+      ]
+    },
+    {
+      "excel_name": "长期应收款三阶段划分G5-9",
+      "locator": {
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_G509"
+      },
+      "region_boundary_locator": {
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_G509",
+        "range": "$G$11:$J$24"
+      },
+      "sheet_key": "g509-managed",
+      "tables": [
+        {
+          "anchor": "G10",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!长期应收款三阶段划分G5-9!A10:B10",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/investName",
+              "mode": "editable",
+              "source_ref": "源xlsx!长期应收款三阶段划分G5-9!G10:J10",
+              "stable_field_key": "lt_receivable_ecl_stage_transposed/{row_uuid}/investname",
+              "transposed_row": 10,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!长期应收款三阶段划分G5-9!A11:B11",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/internalPriceIndicator",
+              "mode": "editable",
+              "source_ref": "源xlsx!长期应收款三阶段划分G5-9!G11:J11",
+              "stable_field_key": "lt_receivable_ecl_stage_transposed/{row_uuid}/internalpriceindicator",
+              "transposed_row": 11,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!长期应收款三阶段划分G5-9!A12:B12",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/rateOrTermChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!长期应收款三阶段划分G5-9!G12:J12",
+              "stable_field_key": "lt_receivable_ecl_stage_transposed/{row_uuid}/rateortermchange",
+              "transposed_row": 12,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!长期应收款三阶段划分G5-9!A13:B13",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/externalMarketIndicator",
+              "mode": "editable",
+              "source_ref": "源xlsx!长期应收款三阶段划分G5-9!G13:J13",
+              "stable_field_key": "lt_receivable_ecl_stage_transposed/{row_uuid}/externalmarketindicator",
+              "transposed_row": 13,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!长期应收款三阶段划分G5-9!A14:B14",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/creditRatingChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!长期应收款三阶段划分G5-9!G14:J14",
+              "stable_field_key": "lt_receivable_ecl_stage_transposed/{row_uuid}/creditratingchange",
+              "transposed_row": 14,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!长期应收款三阶段划分G5-9!A15:B15",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/debtorBizFinanceChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!长期应收款三阶段划分G5-9!G15:J15",
+              "stable_field_key": "lt_receivable_ecl_stage_transposed/{row_uuid}/debtorbizfinancechange",
+              "transposed_row": 15,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!长期应收款三阶段划分G5-9!A16:B16",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/debtorOperatingResult",
+              "mode": "editable",
+              "source_ref": "源xlsx!长期应收款三阶段划分G5-9!G16:J16",
+              "stable_field_key": "lt_receivable_ecl_stage_transposed/{row_uuid}/debtoroperatingresult",
+              "transposed_row": 16,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!长期应收款三阶段划分G5-9!A17:B17",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/debtorRegulatoryChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!长期应收款三阶段划分G5-9!G17:J17",
+              "stable_field_key": "lt_receivable_ecl_stage_transposed/{row_uuid}/debtorregulatorychange",
+              "transposed_row": 17,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!长期应收款三阶段划分G5-9!A18:B18",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/otherInstrumentCreditChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!长期应收款三阶段划分G5-9!G18:J18",
+              "stable_field_key": "lt_receivable_ecl_stage_transposed/{row_uuid}/otherinstrumentcreditchange",
+              "transposed_row": 18,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!长期应收款三阶段划分G5-9!A19:B19",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/guaranteeCreditChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!长期应收款三阶段划分G5-9!G19:J19",
+              "stable_field_key": "lt_receivable_ecl_stage_transposed/{row_uuid}/guaranteecreditchange",
+              "transposed_row": 19,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!长期应收款三阶段划分G5-9!A20:B20",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/repaymentMechanismChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!长期应收款三阶段划分G5-9!G20:J20",
+              "stable_field_key": "lt_receivable_ecl_stage_transposed/{row_uuid}/repaymentmechanismchange",
+              "transposed_row": 20,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!长期应收款三阶段划分G5-9!A21:B21",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/contractTermChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!长期应收款三阶段划分G5-9!G21:J21",
+              "stable_field_key": "lt_receivable_ecl_stage_transposed/{row_uuid}/contracttermchange",
+              "transposed_row": 21,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!长期应收款三阶段划分G5-9!A22:B22",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/overduePerformanceChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!长期应收款三阶段划分G5-9!G22:J22",
+              "stable_field_key": "lt_receivable_ecl_stage_transposed/{row_uuid}/overdueperformancechange",
+              "transposed_row": 22,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!长期应收款三阶段划分G5-9!A23:B23",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/creditMgmtMethodChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!长期应收款三阶段划分G5-9!G23:J23",
+              "stable_field_key": "lt_receivable_ecl_stage_transposed/{row_uuid}/creditmgmtmethodchange",
+              "transposed_row": 23,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!长期应收款三阶段划分G5-9!A24:B24",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/overdueInfo",
+              "mode": "editable",
+              "source_ref": "源xlsx!长期应收款三阶段划分G5-9!G24:J24",
+              "stable_field_key": "lt_receivable_ecl_stage_transposed/{row_uuid}/overdueinfo",
+              "transposed_row": 24,
+              "value_type": "text"
+            }
+          ],
+          "header_rows": 1,
+          "layout": "customer_columns",
+          "protected_regions": {
+            "footer_rows": [
+              25,
+              25
+            ],
+            "label_columns": "A:B",
+            "static_prompt": "A50:XFD1048576"
+          },
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "lt_receivable_ecl_stage_transposed",
+          "transposed_columns": {
+            "identity": "id",
+            "identity_prefix": "GT-G5ECL-",
+            "identity_row": 10,
+            "source_ref": "源xlsx!长期应收款三阶段划分G5-9!G10:J10"
+          }
+        }
+      ],
+      "template_id": "G509"
     }
   ],
   "template": {
