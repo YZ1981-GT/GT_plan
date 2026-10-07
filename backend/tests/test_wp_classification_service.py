@@ -48,11 +48,11 @@ class TestDeriveComponentType:
     """Test derive_component_type covers all 9 classes → componentType whitelist."""
 
     def test_a_program_console(self):
-        result = derive_component_type(_make_classification("A-程序表", wp_code="A3"))
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A3"), ignore_wp_code_override=True)
         assert result == "a-program-console"
 
     def test_a_any_subclass(self):
-        result = derive_component_type(_make_classification("A-替代程序", wp_code="A3"))
+        result = derive_component_type(_make_classification("A-替代程序", wp_code="A3"), ignore_wp_code_override=True)
         assert result == "a-program-console"
 
     def test_b_index(self):

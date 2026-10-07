@@ -315,7 +315,8 @@ onBeforeUnmount(() => {
 
 .mode-toggle-bar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 8px;
 }
 </style>

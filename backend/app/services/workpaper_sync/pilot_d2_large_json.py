@@ -838,6 +838,21 @@ def assert_dynamic_family_is_unreachable_for_xlsx_entries(
     return {"dynamic": tuple(dynamic), "xlsx_dynamic": (), "total": len(entries)}
 
 
+# ─── 上游欠账登记 ───────────────────────────────────────────────────────────
+
+UPSTREAM_DEBT_DYNAMIC_FAMILY_GATED_ON_MOUNT_CARDINALITY: Final[str] = (
+    "Task 41 欠账（本任务首次登记）："
+    "`evidence.derive_for_manifest_entry` 只在 "
+    '`scenario_profile.mount_cardinality == "dynamic"` 时追加 DYNAMIC_SCENARIOS，而该'
+    "字段量的是**前端宿主挂载基数**（v-for 挂几个 OO 编辑器），不是「受管表有没有动态"
+    "行」。实测全 manifest 186 条里只有 1 条为 dynamic 且是 docx ⇒ "
+    "`dynamic_row_add_delete_reorder_copy`（AC 6.9）对**任何 xlsx entry** 都进不了"
+    " required set，包括本 D2 pilot。"
+    "修法需要把 contract 的 row_identity 声明喂进 required-set 推导"
+    "（即「有 row_identity ⇒ 动态族可达」），但那是 evidence 引擎的改动。"
+)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 4. instrumentation spec 与 definition payloads
 # ═══════════════════════════════════════════════════════════════════════════

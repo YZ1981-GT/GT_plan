@@ -86,7 +86,7 @@ DETAIL_FIELDS: Final[tuple[MFieldSpec, ...]] = (
 
 DETAIL_SHEET: Final[MSheetConfig] = MSheetConfig(
     sheet_name="明细表M1-2",
-    sheet_key="m1-detail",
+    sheet_key="m101-managed",
     table_key="m1_detail_rows",
     header_rows=2, first_data_row=14, last_data_row=22, footer_row=23,
     anchor_row=12, fields=DETAIL_FIELDS,
@@ -99,7 +99,7 @@ CONFIG: Final[MEntryConfig] = MEntryConfig(
     template_relative_path=TEMPLATE_RELATIVE_PATH, template_sha256=TEMPLATE_SHA256,
     account_code=ACCOUNT_CODE, account_nature="负债类",
     item_prefix=ITEM_PREFIX, determination_sheet_name="审定表M1-1",
-    sheets=(DETERMINATION_SHEET, DETAIL_SHEET),
+    sheets=(DETAIL_SHEET,),
     reviewed_basis="openpyxl 逐 sheet 直读权威模板 M/M1 应付股利（利润）.xlsx。审定表 M1-1（56r×12c / 92 公式）：A~K 列全公式（含 A=底稿目录引用），只有 L 列 editable。明细表 M1-2（38r×27c / 141 公式）：16 editable + 5 formula + 股东信息列 R~U。🔴 M1 是负债类（2232），TB 回写方向与权益类相反。",
     html_store_note="M1 ITEM_PREFIX='M1-'，唯一负债类 entry。明细表有额外股东信息列。",
 )

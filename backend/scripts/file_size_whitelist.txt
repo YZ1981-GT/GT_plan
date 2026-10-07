@@ -1333,3 +1333,4 @@ backend/tests/procedure_delegation_visibility/test_task17_capacity_and_role_acce
 #     共享身份防御测试（8 例）。原 33 例 + 新增 8 例 context integration = 864 行 > 800 上限。
 #     拆分方向：按 B.1.x 测试类拆为 test_consol_disclosure_v2_{topic}.py，属独立打磨。
 backend/tests/services/test_consol_disclosure_v2.py  865
+backend/tests/workpaper_sync/test_a_entry_connection_blockers.py

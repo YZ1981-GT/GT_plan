@@ -5,7 +5,7 @@
   "review_status": "reviewed",
   "document_type": "xlsx",
   "template_definition_sha256": "f97e383dc0333a2cdd8b4f03408d1959904ee25e3b60cef137e24f02c09807a1",
-  "instrumentation_definition_sha256": "572fcdcc3b38785619707c7428023bf9c3b5d3f53c6d9b33394622cf2ebdf800",
+  "instrumentation_definition_sha256": "06c06738407553e5cde2981b84b91949b51a9deb2f5e10fe8f9bfccac7367471",
   "template": {
     "relative_path": "M/M8 一般风险准备.xlsx",
     "template_sha256": "248a8bb72f1b3c2f8ec28950f718138462ec26a33b6e46c58884a47a74cbbcc1",
@@ -19,222 +19,8 @@
   ],
   "sheets": [
     {
-      "excel_name": "审定表M8-1",
-      "sheet_key": "m8-determination",
-      "locator": {
-        "anchor": "excel_table_sheet_association"
-      },
-      "tables": [
-        {
-          "table_key": "m8_determination_summary",
-          "anchor": "A5",
-          "header_rows": 2,
-          "fields": [
-            {
-              "stable_field_key": "m8_determination_summary/project_name",
-              "column_key": "project_name",
-              "json_pointer": "/m8_determination_summary/projectName",
-              "mode": "formula",
-              "value_type": "text",
-              "source_ref": "源xlsx!审定表M8-1!A7",
-              "header_source_ref": "源xlsx!审定表M8-1!A5",
-              "header_text": "项目名称",
-              "store_item_id": "placeholder",
-              "cell": {
-                "column": "A",
-                "row_from": 7
-              }
-            },
-            {
-              "stable_field_key": "m8_determination_summary/prior_unadjusted",
-              "column_key": "prior_unadjusted",
-              "json_pointer": "/m8_determination_summary/priorUnadjusted",
-              "mode": "formula",
-              "value_type": "amount",
-              "source_ref": "源xlsx!审定表M8-1!B7",
-              "header_source_ref": "源xlsx!审定表M8-1!B5",
-              "header_text": "未审数",
-              "store_item_id": "placeholder",
-              "cell": {
-                "column": "B",
-                "row_from": 7
-              }
-            },
-            {
-              "stable_field_key": "m8_determination_summary/prior_aje",
-              "column_key": "prior_aje",
-              "json_pointer": "/m8_determination_summary/priorAje",
-              "mode": "formula",
-              "value_type": "amount",
-              "source_ref": "源xlsx!审定表M8-1!C7",
-              "header_source_ref": "源xlsx!审定表M8-1!C5",
-              "header_text": "账项调整",
-              "store_item_id": "placeholder",
-              "cell": {
-                "column": "C",
-                "row_from": 7
-              }
-            },
-            {
-              "stable_field_key": "m8_determination_summary/prior_rje",
-              "column_key": "prior_rje",
-              "json_pointer": "/m8_determination_summary/priorRje",
-              "mode": "formula",
-              "value_type": "amount",
-              "source_ref": "源xlsx!审定表M8-1!D7",
-              "header_source_ref": "源xlsx!审定表M8-1!D5",
-              "header_text": "重分类调整",
-              "store_item_id": "placeholder",
-              "cell": {
-                "column": "D",
-                "row_from": 7
-              }
-            },
-            {
-              "stable_field_key": "m8_determination_summary/prior_audited",
-              "column_key": "prior_audited",
-              "json_pointer": "/m8_determination_summary/priorAudited",
-              "mode": "formula",
-              "value_type": "amount",
-              "source_ref": "源xlsx!审定表M8-1!E7",
-              "header_source_ref": "源xlsx!审定表M8-1!E5",
-              "header_text": "审定数",
-              "store_item_id": "placeholder",
-              "cell": {
-                "column": "E",
-                "row_from": 7
-              }
-            },
-            {
-              "stable_field_key": "m8_determination_summary/current_unadjusted",
-              "column_key": "current_unadjusted",
-              "json_pointer": "/m8_determination_summary/currentUnadjusted",
-              "mode": "formula",
-              "value_type": "amount",
-              "source_ref": "源xlsx!审定表M8-1!F7",
-              "header_source_ref": "源xlsx!审定表M8-1!F5",
-              "header_text": "未审数",
-              "store_item_id": "placeholder",
-              "cell": {
-                "column": "F",
-                "row_from": 7
-              }
-            },
-            {
-              "stable_field_key": "m8_determination_summary/current_aje",
-              "column_key": "current_aje",
-              "json_pointer": "/m8_determination_summary/currentAje",
-              "mode": "formula",
-              "value_type": "amount",
-              "source_ref": "源xlsx!审定表M8-1!G7",
-              "header_source_ref": "源xlsx!审定表M8-1!G5",
-              "header_text": "账项调整",
-              "store_item_id": "placeholder",
-              "cell": {
-                "column": "G",
-                "row_from": 7
-              }
-            },
-            {
-              "stable_field_key": "m8_determination_summary/current_rje",
-              "column_key": "current_rje",
-              "json_pointer": "/m8_determination_summary/currentRje",
-              "mode": "formula",
-              "value_type": "amount",
-              "source_ref": "源xlsx!审定表M8-1!H7",
-              "header_source_ref": "源xlsx!审定表M8-1!H5",
-              "header_text": "重分类调整",
-              "store_item_id": "placeholder",
-              "cell": {
-                "column": "H",
-                "row_from": 7
-              }
-            },
-            {
-              "stable_field_key": "m8_determination_summary/current_audited",
-              "column_key": "current_audited",
-              "json_pointer": "/m8_determination_summary/currentAudited",
-              "mode": "formula",
-              "value_type": "amount",
-              "source_ref": "源xlsx!审定表M8-1!I7",
-              "header_source_ref": "源xlsx!审定表M8-1!I5",
-              "header_text": "审定数",
-              "store_item_id": "placeholder",
-              "cell": {
-                "column": "I",
-                "row_from": 7
-              }
-            },
-            {
-              "stable_field_key": "m8_determination_summary/change_amount",
-              "column_key": "change_amount",
-              "json_pointer": "/m8_determination_summary/changeAmount",
-              "mode": "formula",
-              "value_type": "amount",
-              "source_ref": "源xlsx!审定表M8-1!J7",
-              "header_source_ref": "源xlsx!审定表M8-1!J5",
-              "header_text": "变动额",
-              "store_item_id": "placeholder",
-              "cell": {
-                "column": "J",
-                "row_from": 7
-              }
-            },
-            {
-              "stable_field_key": "m8_determination_summary/change_rate",
-              "column_key": "change_rate",
-              "json_pointer": "/m8_determination_summary/changeRate",
-              "mode": "formula",
-              "value_type": "rate",
-              "source_ref": "源xlsx!审定表M8-1!K7",
-              "header_source_ref": "源xlsx!审定表M8-1!K5",
-              "header_text": "变动率",
-              "store_item_id": "placeholder",
-              "cell": {
-                "column": "K",
-                "row_from": 7
-              }
-            },
-            {
-              "stable_field_key": "m8_determination_summary/reason_analysis",
-              "column_key": "reason_analysis",
-              "json_pointer": "/m8_determination_summary/reasonAnalysis",
-              "mode": "editable",
-              "value_type": "text",
-              "source_ref": "源xlsx!审定表M8-1!L7",
-              "header_source_ref": "源xlsx!审定表M8-1!L5",
-              "header_text": "原因分析",
-              "store_item_id": "placeholder",
-              "cell": {
-                "column": "L",
-                "row_from": 7
-              }
-            }
-          ],
-          "formula_mask": [
-            "A7:A12",
-            "B7:B12",
-            "C7:C12",
-            "D7:D12",
-            "E7:E12",
-            "F7:F12",
-            "G7:G12",
-            "H7:H12",
-            "I7:I12",
-            "J7:J12",
-            "K7:K12"
-          ],
-          "footer_anchor": {
-            "marker": "合计",
-            "search_column": "A",
-            "carries_total_formula": true
-          }
-        }
-      ]
-    },
-    {
       "excel_name": "明细表M8-2",
-      "sheet_key": "m8-detail",
+      "sheet_key": "m801-managed",
       "locator": {
         "anchor": "excel_table_sheet_association"
       },
@@ -517,11 +303,11 @@
           ],
           "delete_policy": "reject",
           "formula_mask": [
-            "E10:E14",
-            "L10:L14",
-            "M10:M14",
-            "N10:N14",
-            "O10:O14"
+            "E10:E16",
+            "L10:L16",
+            "M10:M16",
+            "N10:N16",
+            "O10:O16"
           ],
           "row_identity": {
             "kind": "template_row_key",

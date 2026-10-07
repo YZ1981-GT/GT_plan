@@ -81,7 +81,7 @@ DETAIL_FIELDS: Final[tuple[MFieldSpec, ...]] = (
     MFieldSpec("current_rje_tax", "O", "formula", "amount", "currentRjeTax", "减：所得税费用", "重分类调整"),
     MFieldSpec("audited_opening", "P", "formula", "amount", "auditedOpening", "期初数", "审定数"),
     MFieldSpec("audited_pretax", "Q", "formula", "amount", "auditedPretax", "本期所得税前发生额", "审定数"),
-    MFieldSpec("audited_transfer", "R", "editable", "amount", "auditedTransfer", "减：前期计入其他综合收益当期转入损益/留存收益", "审定数"),
+    MFieldSpec("audited_transfer", "R", "formula", "amount", "auditedTransfer", "减：前期计入其他综合收益当期转入损益/留存收益", "审定数"),
     MFieldSpec("audited_tax", "S", "formula", "amount", "auditedTax", "减：所得税费用", "审定数"),
     MFieldSpec("audited_closing", "T", "formula", "amount", "auditedClosing", "期末数", "审定数"),
     MFieldSpec("remark", "U", "editable", "text", "remark", "备注"),
@@ -89,9 +89,9 @@ DETAIL_FIELDS: Final[tuple[MFieldSpec, ...]] = (
 
 DETAIL_SHEET: Final[MSheetConfig] = MSheetConfig(
     sheet_name="明细表M9-2",
-    sheet_key="m9-detail",
+    sheet_key="m901-managed",
     table_key="m9_detail_rows",
-    header_rows=2, first_data_row=10, last_data_row=27, footer_row=28,
+    header_rows=2, first_data_row=10, last_data_row=26, footer_row=27,
     anchor_row=8, fields=DETAIL_FIELDS,
     row_identity_kind="template_row_key",
     footer_carries_total=True, delete_policy="reject",
@@ -102,7 +102,7 @@ CONFIG: Final[MEntryConfig] = MEntryConfig(
     template_relative_path=TEMPLATE_RELATIVE_PATH, template_sha256=TEMPLATE_SHA256,
     account_code=ACCOUNT_CODE, account_nature="权益类",
     item_prefix=ITEM_PREFIX, determination_sheet_name="审定表M9-1",
-    sheets=(DETERMINATION_SHEET, DETAIL_SHEET),
+    sheets=(DETAIL_SHEET,),
     reviewed_basis="openpyxl 逐 sheet 直读权威模板 M/M9 其他综合收益.xlsx。审定表 M9-1（47r×12c / 41 公式）：A/L 列 editable，B~K 公式。明细表 M9-2（46r×30c / 145 公式 / 宽表）：仅 3 列 editable（A 项目类别 / R 转损益 / U 备注），其余 17 列全公式。🔴 M9 是唯一无模式切换开关的 entry。明细表含分组结构（不能重分类 / 能重分类两段）。",
     html_store_note="M9 ITEM_PREFIX='M9-'，唯一 carrier.kind='none' entry。明细表 30 列宽表大部分公式。",
 )

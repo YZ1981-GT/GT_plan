@@ -322,9 +322,16 @@ def build_m_provider(cfg: MEntryConfig) -> types.SimpleNamespace:
     def build_contract_payload() -> dict[str, Any]:
         return build_m_contract_payload(cfg, orch=holder.get("orch"))
 
-    # 构建编排面（template / instrumentation / authority / publish / register）
-    # 使用第一个受管 sheet 的几何参数
-    primary = cfg.sheets[0]
+    # 使用带 row_identity 的 sheet（明细表）的几何参数作为主 binding
+    # 审定表是全公式 sheet，不做 instrumentation
+    detail_sheet = next((s for s in cfg.sheets if s.row_identity_kind), cfg.sheets[-1])
+    primary = detail_sheet
+
+    # 动态计算 managed_last_col 和 uuid_col（取明细表最右的字段列+1）
+    from openpyxl.utils import get_column_letter, column_index_from_string
+    max_col_idx = max(column_index_from_string(f.column) for f in primary.fields)
+    managed_last_col = get_column_letter(max_col_idx)
+    uuid_col = get_column_letter(max_col_idx + 1)
     orch = build_orchestration(
         Phase5EntryConfig(
             phase5_wave=cfg.pilot_class,
@@ -341,8 +348,8 @@ def build_m_provider(cfg: MEntryConfig) -> types.SimpleNamespace:
             first_data_row=primary.first_data_row,
             last_data_row=primary.last_data_row,
             footer_row=primary.footer_row,
-            managed_last_col="L",  # 审定表最右列
-            uuid_col="M",  # 隐藏身份列
+            managed_last_col=managed_last_col,
+            uuid_col=uuid_col,
             table_name=f"GT_{cfg.template_id}_ROWS",
             authority_model=AuthorityModel.projection_contract,
             footer_marker=primary.footer_marker,
@@ -360,8 +367,73 @@ def build_m_provider(cfg: MEntryConfig) -> types.SimpleNamespace:
         on_disk = orch.load_contract_from_disk()
         return on_disk
 
-    def _build_store_projection(store_payload: Any, *, contract: Any = None) -> dict[str, Any]:
-        return build_flat_store_projection(cfg, cfg.item_prefix, store_payload)
+    def _build_store_projection(store_payload: Any, *, contract: Any = None) -> Any:
+        """把 store_payload 转成 Projection 对象。M 循环空 store 返回空 Projection。"""
+        from app.services.workpaper_sync.adapters.base import FieldValue, Projection as _Proj
+        from app.services.workpaper_sync.contracts import FieldMode, ValueType
+        import json as _json
+
+        # 空 store → 空 Projection
+        if not store_payload or store_payload in ("[]", b"[]", "null", "{}"):
+            return _Proj(
+                contract_id=cfg.adapter_id,
+                semantic_version="1.0.0",
+                document_type="xlsx",
+                values={},
+            )
+
+        # 解析 store_payload
+        if isinstance(store_payload, (str, bytes)):
+            try:
+                data = _json.loads(store_payload)
+            except (ValueError, TypeError):
+                data = []
+        else:
+            data = store_payload
+
+        # 从 contract 建字段索引
+        field_index: dict[str, dict] = {}
+        if contract:
+            cp = getattr(contract, "canonical_payload", None) or {}
+            for sheet in (cp.get("sheets") or ()):
+                for table in (sheet.get("tables") or ()):
+                    for field in (table.get("fields") or ()):
+                        sfk = field.get("stable_field_key") or ""
+                        if sfk:
+                            field_index[sfk] = field
+
+        values: dict[str, FieldValue] = {}
+        # JSON 数组形态 → 逐行解析
+        if isinstance(data, list):
+            for row in data:
+                if isinstance(row, dict) and "item_id" in row:
+                    iid = row["item_id"]
+                    if iid.startswith(cfg.item_prefix):
+                        spec = field_index.get(iid)
+                        mode = FieldMode(spec["mode"]) if spec else FieldMode.editable
+                        vt = ValueType(spec.get("value_type", "text")) if spec else ValueType.text
+                        val = row.get("conclusion") or row.get("remark")
+                        values[iid] = FieldValue(
+                            stable_key=iid, value=str(val) if val else None,
+                            value_type=vt, mode=mode,
+                        )
+        elif isinstance(data, dict):
+            for iid, val in data.items():
+                if iid.startswith(cfg.item_prefix):
+                    spec = field_index.get(iid)
+                    mode = FieldMode(spec["mode"]) if spec else FieldMode.editable
+                    vt = ValueType(spec.get("value_type", "text")) if spec else ValueType.text
+                    values[iid] = FieldValue(
+                        stable_key=iid, value=str(val) if val else None,
+                        value_type=vt, mode=mode,
+                    )
+
+        return _Proj(
+            contract_id=cfg.adapter_id,
+            semantic_version="1.0.0",
+            document_type="xlsx",
+            values=values,
+        )
 
     def _merge_projection(projection: Mapping[str, Any], existing: Mapping[str, Any]) -> dict[str, Any]:
         return merge_flat_projection_into_store(cfg, projection, existing)

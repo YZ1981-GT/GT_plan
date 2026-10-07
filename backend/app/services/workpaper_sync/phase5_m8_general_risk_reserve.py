@@ -77,9 +77,9 @@ DETAIL_FIELDS: Final[tuple[MFieldSpec, ...]] = (
 
 DETAIL_SHEET: Final[MSheetConfig] = MSheetConfig(
     sheet_name="明细表M8-2",
-    sheet_key="m8-detail",
+    sheet_key="m801-managed",
     table_key="m8_detail_rows",
-    header_rows=2, first_data_row=10, last_data_row=14, footer_row=15,
+    header_rows=2, first_data_row=10, last_data_row=16, footer_row=17,
     anchor_row=8, fields=DETAIL_FIELDS,
     row_identity_kind="template_row_key",
     footer_carries_total=True, delete_policy="reject",
@@ -90,7 +90,7 @@ CONFIG: Final[MEntryConfig] = MEntryConfig(
     template_relative_path=TEMPLATE_RELATIVE_PATH, template_sha256=TEMPLATE_SHA256,
     account_code=ACCOUNT_CODE, account_nature="权益类",
     item_prefix=ITEM_PREFIX, determination_sheet_name="审定表M8-1",
-    sheets=(DETERMINATION_SHEET, DETAIL_SHEET),
+    sheets=(DETAIL_SHEET,),
     reviewed_basis="openpyxl 逐 sheet 直读权威模板 M/M8 一般风险准备.xlsx。审定表 M8-1（25r×12c / 84 公式）：A~K 全公式，只有 L 列 editable。明细表 M8-2（24r×18c / 56 公式）：13 editable + 5 formula。🔴 「针对性测试M8-5-删除」和 Q8A 修订前历史 sheet 不在受管范围。",
     html_store_note="M8 ITEM_PREFIX='M8-'，金融企业专属科目。",
 )

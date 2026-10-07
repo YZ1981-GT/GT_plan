@@ -11388,26 +11388,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "f2.inventory_main",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-f2-inventory-main",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtF2InventoryMain.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_f2_inventory_main_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -11639,26 +11635,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "f2.inventory_special",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-f2-inventory-special",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtF2InventorySpecial.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_f2_inventory_special_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -11890,26 +11882,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "f2.inventory_valuation",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-f2-inventory-valuation",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtF2InventoryValuation.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_f2_inventory_valuation_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -12141,26 +12129,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "f2.stocktake_bundle",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-f2-stocktake-bundle",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_f2_stocktake_bundle_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -26213,26 +26197,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "m1.dividends_payable",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-m1-dividends-payable",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtM1DividendsPayable.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_m1_detail_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet"
       ],
@@ -27078,26 +27058,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "m5.surplus_reserve",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-m5-surplus-reserve",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtM5SurplusReserve.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_m5_detail_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet"
       ],
@@ -27597,26 +27573,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "m8.general_risk_reserve",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-m8-general-risk-reserve",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtM8GeneralRiskReserve.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_m8_detail_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet"
       ],
@@ -27770,26 +27742,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "m9.other_comprehensive_income",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-m9-other-comprehensive-income",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtM9OtherComprehensiveIncome.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_m9_detail_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet"
       ],
@@ -33780,8 +33748,8 @@
       }
     }
   ],
-  "manifest_digest": "73df4097d515b4391ef7ccbb2d34c4223138b6afc660197edf8cfb43ba52305a",
-  "overlay_digest": "c4b8305503bc786087ae3d9211feb66f8cf019a9783190e2b3c9af55d3c66727",
+  "manifest_digest": "9c35aa01535f92b33a4107a618a2584c377d32cdf74dbe855b3718cfbfa1c8b4",
+  "overlay_digest": "5da0f27b9ec96f05993e7c398a66038a44ec243417cc799758f069a34c84f2eb",
   "profile_source_digest": "22ac2db00ce8cc5854feb1e0bdfac5619ca93f1517764050f3b73c31ee022436",
   "schema_version": 1,
   "source_digest": "4d1a6d47ddd8aec7f103c732ac28562a01402d857590c741e4a131e204ccaef2",
@@ -33793,9 +33761,9 @@
       "WorkpaperWordEditor": 4
     },
     "capability_counts": {
-      "bidirectional": 84,
+      "bidirectional": 92,
       "single_html": 5,
-      "single_onlyoffice": 107,
+      "single_onlyoffice": 99,
       "unreachable": 1
     },
     "dispatcher_count": 1,
@@ -33806,7 +33774,7 @@
     "entry_count": 197,
     "host_count": 196,
     "independent_entry_count": 144,
-    "legacy_fake_bidirectional_count": 99,
+    "legacy_fake_bidirectional_count": 91,
     "mount_count": 338,
     "parent_duplicate_count": 52,
     "room_model_counts": {
@@ -33822,7 +33790,7 @@
       "xlsx.editable.shared.single.room_service_wired.v1": 189,
       "xlsx.unreachable.none.single.room_service_wired.v1": 1
     },
-    "unadjudicated_count": 94,
+    "unadjudicated_count": 86,
     "unreachable_count": 1
   }
 }

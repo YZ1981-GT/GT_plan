@@ -752,6 +752,110 @@
         "review_status": "published_representation_verified",
         "legacy_reasons": []
       }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtF2InventoryMain.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_f2_inventory_main_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "f2.inventory_main",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_f2_stocktake_bundle_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "f2.stocktake_bundle",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtF2InventoryValuation.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_f2_inventory_valuation_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "f2.inventory_valuation",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtF2InventorySpecial.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_f2_inventory_special_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "f2.inventory_special",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtM1DividendsPayable.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_m1_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "m1.dividends_payable",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtM5SurplusReserve.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_m5_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "m5.surplus_reserve",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtM8GeneralRiskReserve.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_m8_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "m8.general_risk_reserve",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtM9OtherComprehensiveIncome.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_m9_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "m9.other_comprehensive_income",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
     }
   ]
 }

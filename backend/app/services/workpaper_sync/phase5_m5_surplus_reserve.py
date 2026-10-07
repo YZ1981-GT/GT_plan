@@ -97,7 +97,7 @@ DETAIL_FIELDS: Final[tuple[MFieldSpec, ...]] = (
 
 DETAIL_SHEET: Final[MSheetConfig] = MSheetConfig(
     sheet_name="明细表M5-2",
-    sheet_key="m5-detail",
+    sheet_key="m501-managed",
     table_key="m5_detail_rows",
     header_rows=3,
     first_data_row=12,
@@ -125,7 +125,7 @@ CONFIG: Final[MEntryConfig] = MEntryConfig(
     account_nature="权益类",
     item_prefix=ITEM_PREFIX,
     determination_sheet_name="审定表M5-1",
-    sheets=(DETERMINATION_SHEET, DETAIL_SHEET),
+    sheets=(DETAIL_SHEET,),
     reviewed_basis=(
         "openpyxl 逐 sheet 直读权威模板 M/M5 盈余公积.xlsx 的 10 张 sheet。"
         "审定表 M5-1（48r×12c / 59 公式）：两级表头 R5-R6，数据区 R7-R10（4 行固定科目），"
