@@ -2739,4 +2739,72 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
                   "candidate + provider 已就位，definition 链待 DAG 发布。",
     },
 
+    # ── M 循环 lane 2（spec: m2-m3-m4-m7-m10-bidirectional-pipeline）──────
+    {
+        "contract_id": "m2.paid_in_capital",
+        "provider_module": "app.services.workpaper_sync.phase5_m2_paid_in_capital",
+        "delivered_by_task": "m2-m3-m4-m7-m10-bidirectional-pipeline",
+        "pilot_class": "phase5_m2_equity",
+        "entry_id": "xlsx/gt-m2-paid-in-capital",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "M/M2 实收资本（股本）.xlsx",
+        "adapter_registered": False,
+        "reason": "M2 实收资本（权益类 4001）。两张同码明细表（上市/非上市），"
+                  "contract 各给一份字段映射（36e+24f=60 字段）。"
+                  "definition DAG 已发布，待首版 representation。",
+    },
+    {
+        "contract_id": "m3.treasury_stock",
+        "provider_module": "app.services.workpaper_sync.phase5_m3_treasury_stock",
+        "delivered_by_task": "m2-m3-m4-m7-m10-bidirectional-pipeline",
+        "pilot_class": "phase5_m3_equity",
+        "entry_id": "xlsx/gt-m3-treasury-stock",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "M/M3 库存股.xlsx",
+        "adapter_registered": False,
+        "reason": "M3 库存股（权益类 4102，借方减）。明细表 14e+5f=19 字段。"
+                  "definition DAG 已发布，待首版 representation。",
+    },
+    {
+        "contract_id": "m4.capital_reserve",
+        "provider_module": "app.services.workpaper_sync.phase5_m4_capital_reserve",
+        "delivered_by_task": "m2-m3-m4-m7-m10-bidirectional-pipeline",
+        "pilot_class": "phase5_m4_equity",
+        "entry_id": "xlsx/gt-m4-capital-reserve",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "M/M4 资本公积.xlsx",
+        "adapter_registered": False,
+        "reason": "M4 资本公积（权益类 4002）。明细表两级分组结构，12e+5f=17 字段。"
+                  "definition DAG 已发布，待首版 representation。",
+    },
+    {
+        "contract_id": "m7.special_reserve",
+        "provider_module": "app.services.workpaper_sync.phase5_m7_special_reserve",
+        "delivered_by_task": "m2-m3-m4-m7-m10-bidirectional-pipeline",
+        "pilot_class": "phase5_m7_equity",
+        "entry_id": "xlsx/gt-m7-special-reserve",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "M/M7 专项储备.xlsx",
+        "adapter_registered": False,
+        "reason": "M7 专项储备（权益类 4301）。明细表 13e+5f=18 字段。"
+                  "definition DAG 已发布，待首版 representation。",
+    },
+    {
+        "contract_id": "m10.other_equity_instruments",
+        "provider_module": "app.services.workpaper_sync.phase5_m10_other_equity_instruments",
+        "delivered_by_task": "m2-m3-m4-m7-m10-bidirectional-pipeline",
+        "pilot_class": "phase5_m10_equity",
+        "entry_id": "xlsx/gt-m10-other-equity-instruments",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "M/M10 其他权益工具.xlsx",
+        "adapter_registered": False,
+        "reason": "M10 其他权益工具（权益类 4001）。明细表 30 列三段式宽表，24e+6f=30 字段。"
+                  "definition DAG 已发布，待首版 representation。",
+    },
+
 )

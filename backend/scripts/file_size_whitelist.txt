@@ -1044,7 +1044,7 @@ backend/tests/workpaper_sync/test_f5_canary_and_contract.py  1311
 #     判据面不因此放松：新条目仍要过 test_contract_directory_matches_the_delivery_ledger
 #     与 test_delivered_slice_contracts_pass_property_20_21_field_level 的双向核验。
 backend/tests/workpaper_sync/test_h_foundation_hc_guards.py  1149
-backend/app/services/workpaper_sync/adapters/delivered_contracts_ledger.py  2655
+backend/app/services/workpaper_sync/adapters/delivered_contracts_ledger.py  2810
 
 
 # ── I/J 循环 + e1 修复 + 守卫口径升级（2026-09-27）──────────────────────

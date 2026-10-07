@@ -30,6 +30,7 @@ TEMPLATE_RELATIVE_PATH: Final[str] = "M/M5 盈余公积.xlsx"
 TEMPLATE_SHA256: Final[str] = "0e32a0567e4e3a36e137fa2f2d8ae66a0b1d5eaf266dfd57f9ffd1ce24ae2316"
 ACCOUNT_CODE: Final[str] = "4101"
 ITEM_PREFIX: Final[str] = "M5-"
+STORE_ITEM_ID: Final[str] = "M5-"
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 
 # ═══════════════════════════════════════════════════════════════════════════

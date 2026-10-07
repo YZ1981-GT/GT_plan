@@ -14,20 +14,27 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
-      <!-- 双模式切换（结构化 / OnlyOffice，健康门控"拉取成功才切"） -->
+      <!-- 双模式切换（结构化 / OnlyOffice，sync bridge 真双向） -->
       <div v-if="currentSheet !== 'index' && currentSheet !== 'procedure'" class="mode-toggle-bar">
         <el-segmented
-          :model-value="dualMode.mode.value"
-          :options="modeToggleOptions"
+          :model-value="renderMode"
+          :options="renderModeOptions"
           size="small"
-          @change="dualMode.switchMode"
+          @change="(v: any) => { renderMode = v }"
         />
-          <!-- BP-7 MC-12: 未接入双向回写的 notice -->
-          <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-m8-general-risk-reserve" />
+          <GtEntrySyncCapabilityNotice :entry-id="M8_SYNC_ENTRY_ID" />
+      </div>
+
+      <div v-if="renderMode === 'onlyoffice' && isM8SyncedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
       </div>
 
       <!-- HTML 结构化模式 -->
-      <template v-if="dualMode.mode.value === 'html'">
+      <template v-else>
         <!-- M8 底稿目录 -->
         <M8TabIndex
           v-if="currentSheet === 'index'"
@@ -101,14 +108,6 @@
           style="height: 100%; min-height: 600px"
         />
       </template>
-
-      <!-- OnlyOffice 在线编辑模式 -->
-      <GtOnlyOfficeSheet
-        v-else
-        :wp-id="props.wpId"
-        :sheet-name="dualMode.resolveOoSheetName()"
-        style="height: 100%; min-height: 600px"
-      />
     </template>
 
   </div>
@@ -138,7 +137,10 @@
 import { ref, computed, inject, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
-import { useM8EntryDualMode } from './composables/useM8EntryDualMode'
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 
@@ -257,25 +259,61 @@ const currentSheet = computed(() => {
   return name
 })
 
-// ─── 双模式（HTML ↔ OnlyOffice，健康门控"拉取成功才切"，对齐 M1/D4 范式） ───
-// index/procedure 不参与双模式；其余 HTML sheet 上方显示 segmented 切换栏。
-const dualMode = useM8EntryDualMode({
-  wpId: toRef(props, 'wpId') as any,
-  currentSheet,
-  reloadAllResponses: async () => {
-    // 各子组件在 mount 时自加载各自 formData；此处仅重跑 render-config 预热。
-    await selfLoad()
+// ─── sync bridge（HTML ↔ OnlyOffice 真双向，参照 D2 统一路径） ──────────────
+// 后端 contract 仅声明 1 个受管 sheet：明细表M8-2 → m801-managed（现读 contract 确认）。
+
+const M8_SYNC_ENTRY_ID = 'xlsx/gt-m8-general-risk-reserve'
+const M8_MANAGED_SHEET_KEYS: Record<string, string> = { 'M8-2': 'm801-managed' }
+
+const isM8SyncedSheet = computed(() => currentSheet.value in M8_MANAGED_SHEET_KEYS)
+const syncEntryId = ref(M8_SYNC_ENTRY_ID)
+const syncSheetKey = computed(() => M8_MANAGED_SHEET_KEYS[currentSheet.value] ?? 'm801-managed')
+const syncSwitching = ref(false)
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(syncEntryId.value),
+  flushHtml: async () => {
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: syncEntryId.value })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: syncSheetKey.value }
   },
+  reloadHtml: async (_minimumRevision: number) => { await selfLoad() },
 })
 
-const modeToggleOptions = computed(() => [
-  { label: '结构化', value: 'html' as const },
-  {
-    label: dualMode.ooAvailable.value ? 'OnlyOffice（拉取成功）' : 'OnlyOffice（不可用）',
-    value: 'onlyoffice' as const,
-    disabled: !dualMode.ooAvailable.value,
-  },
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+type M8RenderMode = 'html' | 'onlyoffice'
+
+const renderMode = computed({
+  get: (): M8RenderMode => (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html'),
+  set: (v: M8RenderMode) => { void switchRenderMode(v) },
+})
+
+const renderModeOptions = computed(() => [
+  { label: '结构化视图', value: 'html' as const },
+  { label: '在线编辑', value: 'onlyoffice' as const, disabled: !isM8SyncedSheet.value || isReadonly.value },
 ])
+
+async function switchRenderMode(target: M8RenderMode): Promise<void> {
+  if (target === renderMode.value) return
+  if (target === 'onlyoffice') {
+    if (!isM8SyncedSheet.value) return
+    syncSwitching.value = true
+    try { await syncBridge.switchToOnlyOffice() } catch { /* lastError 已由桥写入 */ } finally { syncSwitching.value = false }
+    return
+  }
+  if (syncBridge.mode.value !== 'oo') { syncBridge.persistMode('html'); return }
+  syncSwitching.value = true
+  try {
+    if (String(syncBridge.state.value) === 'applied') { await syncBridge.reloadAfterApplied() }
+    else if (syncBridge.mode.value === 'oo' && !syncBridge.dirty.value) { await syncBridge.leaveWithoutSaving() }
+    else if (syncBridge.canForcesave.value && syncEditorHostRef.value) { await syncEditorHostRef.value.forceSave() }
+    else { syncBridge.persistMode('html') }
+  } catch { /* 保持 OO */ } finally { syncSwitching.value = false }
+}
 
 // ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI/displayPrefs + 挂真实 Host） ───
 // 复核对话与版本历史由 Runtime Boundary 统一 provide('openReviewDialog') + version 承载，
@@ -357,5 +395,10 @@ onBeforeUnmount(() => {
   gap: 12px;
   margin-bottom: 12px;
   padding: 0 4px;
+}
+
+.oo-container {
+  height: 80vh;
+  min-height: 600px;
 }
 </style>

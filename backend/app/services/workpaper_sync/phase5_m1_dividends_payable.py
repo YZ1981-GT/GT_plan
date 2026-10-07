@@ -23,6 +23,7 @@ TEMPLATE_RELATIVE_PATH: Final[str] = "M/M1 应付股利（利润）.xlsx"
 TEMPLATE_SHA256: Final[str] = "0a3697a485d16b843be7870db54fa92a732a39c5d7edea92d03585ef6695115d"
 ACCOUNT_CODE: Final[str] = "2232"
 ITEM_PREFIX: Final[str] = "M1-"
+STORE_ITEM_ID: Final[str] = "M1-"
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -1197,6 +1197,12 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_m5_surplus_reserve",
         "app.services.workpaper_sync.phase5_m8_general_risk_reserve",
         "app.services.workpaper_sync.phase5_m9_other_comprehensive_income",
+        # ── M 循环 lane 2（spec: m2-m3-m4-m7-m10-bidirectional-pipeline）──
+        "app.services.workpaper_sync.phase5_m2_paid_in_capital",
+        "app.services.workpaper_sync.phase5_m3_treasury_stock",
+        "app.services.workpaper_sync.phase5_m4_capital_reserve",
+        "app.services.workpaper_sync.phase5_m7_special_reserve",
+        "app.services.workpaper_sync.phase5_m10_other_equity_instruments",
     }
 )
 

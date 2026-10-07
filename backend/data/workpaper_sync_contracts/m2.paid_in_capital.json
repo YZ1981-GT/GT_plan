@@ -1,0 +1,432 @@
+{
+  "schema_version": "contract-definition:v1",
+  "contract_id": "m2.paid_in_capital",
+  "semantic_version": "1.0.0",
+  "review_status": "reviewed",
+  "document_type": "xlsx",
+  "template_definition_sha256": "082fad8963e06956879d0e97d24dc06570f7c0a9cc370379ef8465ff9e86e495",
+  "instrumentation_definition_sha256": "6f80e7dd52945021d23dbb9a80dd54ab6161d7b08aa51d47681345f99e95a87c",
+  "template": {
+    "relative_path": "M/M2 实收资本（股本）.xlsx",
+    "template_sha256": "9fb504204d6ab731d85c67ba43fdfc7ccda92787bc0a6d95bc83d14c74ffe15b",
+    "normalized_structure_hash": "0a594ec2e6a9aaafeca15c3c3ffd105f8a4e1a3819bb4f2ca7f5b9560dd03a73"
+  },
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "sheets": [
+    {
+      "excel_name": "明细表（非上市公司）M2-2",
+      "sheet_key": "m201-unlisted-managed",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "tables": [
+        {
+          "table_key": "m2_unlisted_detail_rows",
+          "anchor": "A10",
+          "header_rows": 3,
+          "fields": [
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/investor_name",
+              "column_key": "investor_name",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/investorName",
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!A13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!A10",
+              "header_text": "投资方名称",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/invest_method",
+              "column_key": "invest_method",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/investMethod",
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!B13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!B10",
+              "header_text": "出资方式",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/invest_amount",
+              "column_key": "invest_amount",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/investAmount",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!C13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!C10",
+              "header_text": "出资金额",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/invest_ratio",
+              "column_key": "invest_ratio",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/investRatio",
+              "mode": "formula",
+              "value_type": "rate",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!D13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!D10",
+              "header_text": "比例%",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/increase_amount",
+              "column_key": "increase_amount",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/increaseAmount",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!E13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!E10",
+              "header_text": "出资金额",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/increase_method",
+              "column_key": "increase_method",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/increaseMethod",
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!F13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!F10",
+              "header_text": "出资方式",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/decrease_amount",
+              "column_key": "decrease_amount",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/decreaseAmount",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!G13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!G10",
+              "header_text": "本期减少",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/closing_amount",
+              "column_key": "closing_amount",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/closingAmount",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!H13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!H10",
+              "header_text": "出资金额",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/closing_ratio",
+              "column_key": "closing_ratio",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/closingRatio",
+              "mode": "formula",
+              "value_type": "rate",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!I13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!I10",
+              "header_text": "比例%",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/prior_adj_aje",
+              "column_key": "prior_adj_aje",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/priorAdjAje",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!J13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!J10",
+              "header_text": "账项调整",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/prior_adj_rje",
+              "column_key": "prior_adj_rje",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/priorAdjRje",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!K13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!K10",
+              "header_text": "重分类调整",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/current_aje_increase",
+              "column_key": "current_aje_increase",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/currentAjeIncrease",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!L13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!L10",
+              "header_text": "本期增加",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/current_aje_decrease",
+              "column_key": "current_aje_decrease",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/currentAjeDecrease",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!M13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!M10",
+              "header_text": "本期减少",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/current_rje_increase",
+              "column_key": "current_rje_increase",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/currentRjeIncrease",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!N13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!N10",
+              "header_text": "本期增加",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/current_rje_decrease",
+              "column_key": "current_rje_decrease",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/currentRjeDecrease",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!O13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!O10",
+              "header_text": "本期减少",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/audited_opening",
+              "column_key": "audited_opening",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/auditedOpening",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!P13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!P10",
+              "header_text": "出资金额",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/audited_opening_ratio",
+              "column_key": "audited_opening_ratio",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/auditedOpeningRatio",
+              "mode": "formula",
+              "value_type": "rate",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!Q13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!Q10",
+              "header_text": "比例%",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/audited_increase",
+              "column_key": "audited_increase",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/auditedIncrease",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!R13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!R10",
+              "header_text": "本期增加",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "R",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/audited_decrease",
+              "column_key": "audited_decrease",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/auditedDecrease",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!S13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!S10",
+              "header_text": "本期减少",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "S",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/audited_closing",
+              "column_key": "audited_closing",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/auditedClosing",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!T13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!T10",
+              "header_text": "出资金额",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "T",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/audited_closing_ratio",
+              "column_key": "audited_closing_ratio",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/auditedClosingRatio",
+              "mode": "formula",
+              "value_type": "rate",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!U13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!U10",
+              "header_text": "比例%",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "U",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/verified",
+              "column_key": "verified",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/verified",
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!V13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!V10",
+              "header_text": "是否经过验资",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "V",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/verification_ref",
+              "column_key": "verification_ref",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/verificationRef",
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!W13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!W10",
+              "header_text": "验资报告索引号",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "W",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m2_unlisted_detail_rows/{row_uuid}/remark",
+              "column_key": "remark",
+              "json_pointer": "/m2_unlisted_detail_rows/{row_uuid}/remark",
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!明细表（非上市公司）M2-2!X13",
+              "header_source_ref": "源xlsx!明细表（非上市公司）M2-2!X10",
+              "header_text": "备注",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "X",
+                "row_from": "row_identity"
+              }
+            }
+          ],
+          "delete_policy": "reject",
+          "formula_mask": [
+            "D13:D22",
+            "H13:H22",
+            "I13:I22",
+            "P13:P22",
+            "Q13:Q22",
+            "R13:R22",
+            "S13:S22",
+            "T13:T22",
+            "U13:U22"
+          ],
+          "row_identity": {
+            "kind": "template_row_key",
+            "template_row_key": "m2_unlisted_detail_rows_template"
+          },
+          "footer_anchor": {
+            "marker": "合计",
+            "search_column": "A",
+            "carries_total_formula": true
+          }
+        }
+      ]
+    }
+  ],
+  "review": {
+    "entry_id": "xlsx/gt-m2-paid-in-capital",
+    "pilot_class": "phase5_m2_equity",
+    "authority_root": "backend/wp_templates",
+    "html_store": {
+      "table": "checklist_responses",
+      "item_id": "M2-",
+      "row_identity_key": "rowId",
+      "shape": "flat_key_value",
+      "note": "M2 的业务内容由 useM2FormData.ts 承载：ITEM_PREFIX='M2-'，命名 M2-{sheet}-{field}。M2 有两张同码明细表（上市/非上市），审定表全公式引用非上市明细表。BP-8 判别位：sheet_key 用 m201-unlisted / m202-listed 区分。"
+    },
+    "reviewed_basis": "openpyxl 逐 sheet 直读权威模板 M/M2 实收资本（股本）.xlsx 的 11 张 sheet。审定表 M2-1（49r×12c / 129 公式）：两级表头 R5-R6，数据区 R7-R16（10 行），R17 合计 SUM。A~K 全公式引用明细表（非上市公司）。明细表（非上市公司）M2-2（37r×24c / 115 公式）：三级表头 R10-R12，数据区 R13-R22，R23 合计。15 editable + 9 formula = 24 列。明细表（上市公司）M2-2（38r×36c / 187 公式）：三级表头 R10-R12，数据区 R13-R22，R23 合计。21 editable + 15 formula = 36 列（M 全域最宽 sheet）。🔴 两张同码明细表结构不同不是简单复制（裸 IF 相同但公式格不同）。科目码 4001 实收资本（贷方/权益类）。"
+  }
+}

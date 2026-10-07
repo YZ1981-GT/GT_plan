@@ -24,6 +24,7 @@ TEMPLATE_RELATIVE_PATH: Final[str] = "M/M8 一般风险准备.xlsx"
 TEMPLATE_SHA256: Final[str] = "248a8bb72f1b3c2f8ec28950f718138462ec26a33b6e46c58884a47a74cbbcc1"
 ACCOUNT_CODE: Final[str] = "4104"
 ITEM_PREFIX: Final[str] = "M8-"
+STORE_ITEM_ID: Final[str] = "M8-"
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 
 # 审定表 M8-1（25r×12c / 84 公式）—— A~K 全公式，只有 L 列 editable

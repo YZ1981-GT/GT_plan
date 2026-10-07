@@ -25,6 +25,7 @@ TEMPLATE_RELATIVE_PATH: Final[str] = "M/M9 其他综合收益.xlsx"
 TEMPLATE_SHA256: Final[str] = "0cfdc95ce3f9410610037b684f50a07f874df1cab4cebe09aa63c6461b6fbc66"
 ACCOUNT_CODE: Final[str] = "4103"
 ITEM_PREFIX: Final[str] = "M9-"
+STORE_ITEM_ID: Final[str] = "M9-"
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 
 # ═══════════════════════════════════════════════════════════════════════════

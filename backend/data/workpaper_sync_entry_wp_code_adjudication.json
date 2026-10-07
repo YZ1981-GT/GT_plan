@@ -1,5 +1,5 @@
 {
-  "adjudication_digest": "791b10a6e7b49d68ab2e42e315d557a077fca987ee02f2927000e088c2456f74",
+  "adjudication_digest": "bcc167549fc3ca35b1216093efde85f4d6808db71f747ee8a699dbf2c5a9f9ec",
   "adjudication_digest_algorithm": "sha256(json.dumps(adjudications, sort_keys=True, ensure_ascii=False, separators=(',',':')).encode('utf-8')).hexdigest()",
   "adjudication_digest_note": "🔴 2026-09-04：原 digest 的算法全仓无处记载（只有它自己出现一次），无法复算 ⇒ 改文件后留着它就是把错值当基线锁死。已换成算法自带的形态，见 `adjudication_digest_algorithm`。原值 c8b2bc2031e4041b143e6df973ee3d87ef641a23c28a5289b0da799ab3606125",
   "adjudications": [
@@ -2045,6 +2045,136 @@
         "max_payload_bytes": 0,
         "measured_at": "2026-10-07",
         "why_null": "真库 M9 仅 1 行 M9-2-detail-rows 但 remark=NULL。"
+      }
+    },
+    {
+      "contract_id": "m2.paid_in_capital",
+      "entry_id": "xlsx/gt-m2-paid-in-capital",
+      "wp_codes": [
+        "M2"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "template_relative_path": "M/M2 实收资本（股本）.xlsx",
+        "managed_excel_name": "明细表（非上市公司）M2-2",
+        "heuristic_would_say": [
+          "M2P"
+        ],
+        "heuristic_is_wrong_because": "M2P 是宿主反推码；M2 命中底稿。",
+        "wp_index_evidence": "wp_index.wp_code=M2 匹配，M2P 匹配 0 行。"
+      },
+      "store_payload_evidence": {
+        "store_item_id": "M2-",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0,
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-07",
+        "why_null": "真库 M2 域载荷极少。"
+      }
+    },
+    {
+      "contract_id": "m3.treasury_stock",
+      "entry_id": "xlsx/gt-m3-treasury-stock",
+      "wp_codes": [
+        "M3"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "template_relative_path": "M/M3 库存股.xlsx",
+        "managed_excel_name": "明细表M3-2",
+        "heuristic_would_say": [
+          "M3T"
+        ],
+        "heuristic_is_wrong_because": "M3T 是宿主反推码。",
+        "wp_index_evidence": "wp_index.wp_code=M3 匹配。"
+      },
+      "store_payload_evidence": {
+        "store_item_id": "M3-",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0,
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-07",
+        "why_null": "真库 M3 为 0 行。"
+      }
+    },
+    {
+      "contract_id": "m4.capital_reserve",
+      "entry_id": "xlsx/gt-m4-capital-reserve",
+      "wp_codes": [
+        "M4"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "template_relative_path": "M/M4 资本公积.xlsx",
+        "managed_excel_name": "明细表M4-2",
+        "heuristic_would_say": [
+          "M4C"
+        ],
+        "heuristic_is_wrong_because": "M4C 是宿主反推码。",
+        "wp_index_evidence": "wp_index.wp_code=M4 匹配。"
+      },
+      "store_payload_evidence": {
+        "store_item_id": "M4-",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0,
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-07",
+        "why_null": "真库 M4 为 0 行。"
+      }
+    },
+    {
+      "contract_id": "m7.special_reserve",
+      "entry_id": "xlsx/gt-m7-special-reserve",
+      "wp_codes": [
+        "M7"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "template_relative_path": "M/M7 专项储备.xlsx",
+        "managed_excel_name": "明细表M7-2",
+        "heuristic_would_say": [
+          "M7S"
+        ],
+        "heuristic_is_wrong_because": "M7S 是宿主反推码。",
+        "wp_index_evidence": "wp_index.wp_code=M7 匹配。"
+      },
+      "store_payload_evidence": {
+        "store_item_id": "M7-",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0,
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-07",
+        "why_null": "真库 M7 载荷极少。"
+      }
+    },
+    {
+      "contract_id": "m10.other_equity_instruments",
+      "entry_id": "xlsx/gt-m10-other-equity-instruments",
+      "wp_codes": [
+        "M10"
+      ],
+      "resolvable_for_provisioning": true,
+      "matcher_domain_conflict": null,
+      "basis": {
+        "template_relative_path": "M/M10 其他权益工具.xlsx",
+        "managed_excel_name": "明细表M10-2",
+        "heuristic_would_say": [
+          "M10O"
+        ],
+        "heuristic_is_wrong_because": "M10O 是宿主反推码。",
+        "wp_index_evidence": "wp_index.wp_code=M10 匹配。"
+      },
+      "store_payload_evidence": {
+        "store_item_id": "M10-",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0,
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-07",
+        "why_null": "真库 M10 为 0 行。"
       }
     }
   ],
