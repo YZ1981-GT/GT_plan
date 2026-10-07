@@ -240,6 +240,7 @@ def build_orchestration(cfg: Phase5EntryConfig) -> types.SimpleNamespace:
             managed_last_col=cfg.managed_last_col,
             uuid_col=cfg.uuid_col,
             table_name=cfg.table_name,
+            sheet_key=cfg.sheet_key,
         )
 
     def template_definition_payload() -> dict[str, Any]:

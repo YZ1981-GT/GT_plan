@@ -5,7 +5,7 @@
   "review_status": "reviewed",
   "document_type": "xlsx",
   "template_definition_sha256": "082fad8963e06956879d0e97d24dc06570f7c0a9cc370379ef8465ff9e86e495",
-  "instrumentation_definition_sha256": "6f80e7dd52945021d23dbb9a80dd54ab6161d7b08aa51d47681345f99e95a87c",
+  "instrumentation_definition_sha256": "6f82f4d7438336638c1754b135f5d651d21a1f2946683695cb2bc5580ecdf3d5",
   "template": {
     "relative_path": "M/M2 实收资本（股本）.xlsx",
     "template_sha256": "9fb504204d6ab731d85c67ba43fdfc7ccda92787bc0a6d95bc83d14c74ffe15b",

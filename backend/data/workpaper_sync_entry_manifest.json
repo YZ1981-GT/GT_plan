@@ -26410,9 +26410,9 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "m10.other_equity_instruments",
+      "canonical_resolver": "sync_router",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-m10-other-equity-instruments",
@@ -26429,7 +26429,7 @@
       "host_path": "audit-platform/frontend/src/components/workpaper/GtM10OtherEquityInstruments.vue",
       "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "bidirectional",
       "mount_components": [
         "GtOnlyOfficeSheet"
       ],
@@ -26583,26 +26583,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "m2.paid_in_capital",
+      "canonical_resolver": "sync_router",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-m2-paid-in-capital",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
+        "legacy_reasons": [],
         "review_status": "source_inventory_reviewed"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtM2PaidInCapital.vue",
-      "html_store": "unresolved",
+      "html_store": "projection",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "bidirectional",
       "mount_components": [
         "GtOnlyOfficeSheet"
       ],
@@ -26756,9 +26752,9 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "m3.treasury_stock",
+      "canonical_resolver": "sync_router",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-m3-treasury-stock",
@@ -26775,7 +26771,7 @@
       "host_path": "audit-platform/frontend/src/components/workpaper/GtM3TreasuryStock.vue",
       "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "bidirectional",
       "mount_components": [
         "GtOnlyOfficeSheet"
       ],
@@ -26929,9 +26925,9 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "m4.capital_reserve",
+      "canonical_resolver": "sync_router",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-m4-capital-reserve",
@@ -26948,7 +26944,7 @@
       "host_path": "audit-platform/frontend/src/components/workpaper/GtM4CapitalReserve.vue",
       "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "bidirectional",
       "mount_components": [
         "GtOnlyOfficeSheet"
       ],
@@ -27440,9 +27436,9 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "m7.special_reserve",
+      "canonical_resolver": "sync_router",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-m7-special-reserve",
@@ -27459,7 +27455,7 @@
       "host_path": "audit-platform/frontend/src/components/workpaper/GtM7SpecialReserve.vue",
       "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "bidirectional",
       "mount_components": [
         "GtOnlyOfficeSheet"
       ],

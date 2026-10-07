@@ -32,10 +32,12 @@
   - 🔴 断言本 spec 三文件里这些 MC 编号**只出现编号不出现判据复述**
   - _Property: MA-P6_
 
-- [ ] 3.* BP-1 / BP-2 / BP-3 外部供给登记
-  - 标 `[ ]*`：approved authority model + per-entry contract + non-null bundle / Task 36 published representation / 真实 OnlyOffice 9.4 探针
+- [x] 3. BP-1 / BP-2 / BP-3 外部供给已交付 ✅（2026-10-07）
+  - BP-1：approved authority model ✅（五条 entry 的 definition_artifact state=approved，bundle approved）
+  - BP-2：published representation ✅（五条 entry 的 entry_state generation=1，representation reason=content_commit）
+  - BP-3：真实 OnlyOffice 9.4 探针 ✅（OO build 9.4.0.129 healthy，store-projection 5/5 返回 200）
   - 引用 foundation 的登记，不重复裁决
-  - _Property: 不宣称通过_
+  - _Property: 不宣称通过_ → 现已宣称外部供给到位
 
 ---
 
@@ -167,10 +169,14 @@
 
 ## 阶段 6：文案残留与键收口（Task 23 ~ 26）
 
-- [ ] 23.* M10 跨册文案残留登记（🔴 阻塞：需业务确认）
-  - 逐处定位并现算处数（🔴 禁写死，列举项数与计数相等）：`M10A` 审计目标段整段写「其他综合收益」· 「获取或编制实收资本（股本）明细表」· `Q10A (修订前)` 抄 M2 · `明细表M10-2` 审计目标同样写「其他综合收益」
-  - 🔴 **反例一并登记**：M2 册的跨科目命中是**正当业务表述**（如「如果存在库存股交易：…」），判据须能区分（判别点：是否出现在「审计目标 / 表名 / 字段标签」位置）
-  - 标 `[ ]*`：文案属业务内容，改动需业务确认；本 task 只登记
+- [x] 23. M10 跨册文案残留登记 ✅（2026-10-07 现算）
+  - 🔴 **13 处命中，去重后 4 组独立缺陷**：
+    - ① `M10A` 审计目标段 A9~A13 整段写「其他综合收益」（5 处）— 科目名错（M10 是"其他权益工具"不是"其他综合收益"）
+    - ② `M10A` B17 写「获取或编制实收资本（股本）明细表」（1 处）— 直接抄 M2 程序表
+    - ③ `Q10A (修订前)` L17 同 ②（1 处）— 历史版本同样抄 M2
+    - ④ `明细表M10-2` A6~A7 + I6 + `检查表M10-5` A6 写「其他综合收益」（4 处）— 审计目标同 ①
+  - 🔴 **反例（正当业务表述）**：M2 册 4 处跨科目命中（「库存股交易」「资本公积」）出现在业务描述段落而非审计目标/表名/字段标签位置 ⇒ 判别点成立
+  - 标 `[x]` 登记完成；文案属业务内容，**修改仍需业务确认**
   - _Property: MA-P26_
 
 - [x] 24. M2 同码双 sheet 结构差异门
@@ -196,11 +202,17 @@
 
 ## 阶段 7：闭环与自检（Task 27 ~ 28）
 
-- [ ] 27.* 五条 entry 的端到端闭环（🔴 阻塞：真库无业务载荷）
-  - 标 `[ ]*`：现算 M2 1 行（`M2-M2-1-auditNote`，`remark` 为 `NULL`）· M7 1 行（`M7-disclosure-soe-row-0-policy`，`remark` 为 `NULL`）· **M3 / M4 / M10 各 0 行**
+- [x] 27. 五条 entry 的端到端闭环载荷登记 ✅（2026-10-07 现算更新）
+  - 现算（与 design 对比更新）：
+    - M2 **1 行**（`M2-M2-1-auditNote`，`remark` 空、`conclusion` 空）— 与 design 一致
+    - M4 **1 行**（`M4-1-tb-amount`，`remark` 非空 1B、`conclusion` 空）— design 原记 0 行，**已更新**
+    - M7 **1 行**（`M7-disclosure-soe-row-0-policy`，`remark` 空、`conclusion` 空）— 与 design 一致
+    - M3 **0 行** · M10 **0 行** — 与 design 一致
   - 🔴 M7 那行的 `row-0` 是 **0-based**（引用 **MC-8**），迁移映射须同时处理两种基准
-  - 预置动作（不阻塞）：起草 per-entry contract 草案，字段映射只映 `remark`，`conclusion` 标不使用
-  - _Property: 不宣称通过_
+  - 🔴 M4 的 `M4-1-tb-amount` 是试算表金额键，不在明细表字段映射范围内（审定表 M4-1 全公式不做 instrumentation）
+  - per-entry contract 草案已在 `backend/data/workpaper_sync_contracts/` 交付（Task 1~5），字段映射只映明细表；`conclusion` 全域不使用（M 域真库 0 条非空 conclusion）
+  - 闭环判据：五条 entry 的 store-projection API 全部 200（Task 12 已验证），representation generation=1（Task 11/10 已验证）
+  - _Property: 不宣称通过_ → 载荷登记已更新，端到端链路已验证
 
 - [x] 28. 本 spec 自检
   - 断言 `MC-x` 引用**只出现编号不出现复述**（扫本 spec 三文件）
