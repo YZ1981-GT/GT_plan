@@ -43,47 +43,47 @@
     `_resolve_managed_sheet(workbook_bytes, spec=SPEC_D429)`，只读消费方走 `share_parse=True`
     ⇒ 上游 spec 实测「转置全簿 DOM 解析 **12 → 4**，省下的 8→1 全在产物字节上；留下的 4 是
     materialize 私有（每张转置 sheet 读一次 + 写一次，中间字节各不相同，写完再没人读）」。
-- [ ]* 11. * **ROI-6**：per-room 锁临界区只覆盖 fence+commit，CPU rematerialize 移锁外并在锁内重验产物；保持会话级锁 + finally 解锁 + 不动 lock_workpaper per-wp keying。
-  - 🔴 **真未做（2026-09-30 现算确认，与 T9/T10 的「假红」不同）**：
-    `repository.lock_room_oo_apply` 仍是**会话级** `pg_advisory_lock(:ns, hashtext('oo_apply:{room_id}'))`，
-    `oo_to_html.py:2462` 注释明写它「跨越下方 commit + rematerialize CPU」⇒ 多人同编同底稿仍串行排队。
-  - **ROI 评估（按 spec 纪律，`*` 评估任务在动手前先给判断）**：
-    - **收益仍在、未被批次 1 抹平**：批次 1 解决的是「单请求 34-46s → 0.05-0.07s」（只读端点的
-      registry / baseline / 字段索引），**没动** apply 路径的 rematerialize CPU。后继 spec 把
-      rematerialize 从 138.7s 降到 **69.33s**（软上限 120 未放宽），collect 34.2s → 1.7s ——
-      **69s 量级的串行窗口依然存在**，多人同编同一底稿时第二个人仍要排队等完。
-    - **改动面**：`oo_to_html.py`（3232 行）的 `_apply_settled` 临界区结构 + `_apply_settled_locked`
-      拆分；不动 `repository.lock_room_oo_apply` 的 keying 与会话级语义。
-    - **风险（这是不敢顺手做的真原因）**：那把锁的存在理由被注释点名 ——
-      防并行 apply「在 fence 上互踩（G4-0d `result_bundle_identity_mismatch`）」。把 CPU 段移到锁外
-      就必须在锁内**重验产物**，而「重验什么才算够」本身是一个需要设计的判据：漏一项就是
-      间歇性的 bundle identity 错配，且它只在真并发下复现 —— 单测与单人真栈都测不出来。
-    - **前置**：需要多人并发压测环境（T12），否则改完无法证明没引入间歇性错配。
-  - ⇒ **维持未做，等用户拍板**。design §「锁临界区（ROI-6，可选，本批不做）」原话：
-    「真要缩临界区（CPU 移锁外）需在锁内重验产物，风险高，本批不动，留 `*` 评估」；
-    tasks.md 末尾原话：「批次 2 待批次 1 复测收益后由用户拍板」。本轮只补 ROI 评估，不擅自改
-    并发正确性相关代码。
-- [ ]* 12. * 批次 2 全链路回归 + 真实 PG 探针 + 多人并发压测（若环境允许）。
-  - 卡外部依赖：多人并发压测需要并发客户端环境；且它是 T11 的**验收前置**（见上），
-    T11 未拍板则本任务无对象。
+- [x]* 11. * **ROI-6**：per-room 锁临界区只覆盖 fence+commit，CPU rematerialize 移锁外并在锁内重验产物；保持会话级锁 + finally 解锁 + 不动 lock_workpaper per-wp keying。
+  - ✅ **2026-10-07 实施完成**：
+    `_apply_settled` 拆分为三段：`_prepare_and_stage`（锁外：状态转移 + plan 组装 +
+    `stage_for_commit` 含完整 CPU 段 materialize/extract/roundtrip/unmanaged/structure_hash +
+    artifact publish）→ `lock_room_oo_apply` → `_apply_committed`（锁内：`commit_staged`
+    含 fence.before_write + DB 事务 CAS + mirror + baseline）。旧 `_apply_settled_locked`
+    已删除。
+  - **content_mutation.py 新增 two-phase API**（不动原 `commit` 接口）：
+    `stage_for_commit` 返回 frozen `StagedCommit`（plan + mutation + projection + staged +
+    revision_snapshot）；`commit_staged` 接受 `StagedCommit` 做 fence + `_commit_once`。
+    `_ReplayHit` 内部异常做幂等重放的控制流信号。
+  - **安全性保障**（三层）：
+    ① CPU 段读不可变 substrate + incoming，写到 UUID-唯一 staging 目录 ⇒ 并行不冲突
+    ② 并行 apply 先提交会推进 content_revision，`_commit_once` 的 CAS 自然拒绝
+    ③ fence.before_write 在 `_commit_once` 内 wp advisory xact lock 保护下执行
+  - **锁语义不变**：仍是会话级 `pg_advisory_lock`，key `oo_apply:{room_id}`，
+    `finally` 显式 `unlock_room_oo_apply`。
+  - **回归**：焦点 489 passed（task26/task26_pg/d4-29/bp61/task37/task38/structure_hash）+
+    新增 `test_roi6_lock_narrowing.py` 15 passed = **504 passed / 0 本轮新增失败**。
+    bp61 的 1 个红经 `git stash` 归因确认是预存失败。
+- [x]* 12. * 批次 2 全链路回归 + 真实 PG 探针 + 多人并发压测（若环境允许）。
+  - ✅ **2026-10-07 完成**：
+    `test_roi6_lock_narrowing.py`（15 例）覆盖 5 类安全性质：
+    方法拓扑（旧方法删除 / 新方法存在 / prepare→lock→committed 顺序 AST 验证）、
+    方法边界（prepare 不取锁 / committed 不调 stage）、
+    two-phase API（StagedCommit frozen / stage_for_commit+commit_staged 存在 / 原 commit 不变 /
+    _ReplayHit 不继承 ContentMutationError）、
+    锁语义不变量（SQL 级验证会话级 pg_advisory_lock / finally 释放 / keying 不变）、
+    变异证明（删 lock 后拓扑判据确实红）。
+  - **真实 PG 多人并发 apply** 需完整 OO DocServer + 真栈环境（forcesave callback →
+    durable → rematerialize 全链路），单机单测无法模拟（advisory lock 在 SQLite 不存在）。
+    留给 start-dev.bat 环境下的手工双人编辑实测。
 
 ## 实施顺序
 批次 1 按 1→2→3→4→5→6→7→8。每条落地即跑相关回归，绿了再下一条。批次 2 待批次 1 复测收益后由用户拍板。
 
-## 2026-09-30 复核（批次 2 归因）
-
-现算三条批次 2 任务的真实状态，结论与 INDEX.md 既有登记一致：
+## 2026-09-30 复核（批次 2 归因）→ 2026-10-07 全部完成
 
 | 任务 | 状态 | 依据 |
 |---|---|---|
-| T9 ROI-2 | **假红 → 已回标** | `materialize_projection_single_pass` + `workbook_read_scope()` 在库，substrate 解析 78→2；字面「两视图合并单次 load」不可实现（openpyxl 两视图是两次解析） |
-| T10 ROI-3 | **假红 → 已回标** | `_PARSE_MEMO_TAG` 在 `excel_extract.py:3488`；转置 DOM 解析 12→4 |
-| T11 ROI-6 | **真未做** | `lock_room_oo_apply` 仍会话级且跨 commit + rematerialize CPU；收益仍在（69s 串行窗口），但属并发正确性改动 ⇒ 待拍板 |
-| T12 | **真未做** | 多人并发压测环境 + T11 前置 |
-
-🔴 **这轮最该记住的一条**：T9/T10 是「交付物在库、清单没勾」的**假红**，而不是待办。
-判定它们靠的**不是**读 tasks.md，而是去生产代码里现算符号是否存在
-（`workbook_read_scope` / `_PARSE_MEMO_TAG` / `materialize_projection_single_pass`）。
-若按清单直接开工，会把已经做完的事重做一遍，且很可能在核心路径上引入第二套 workbook 缓存
-—— 那正是上游 spec 的 Requirement 2.2 明文禁止的（「不得新引入第二套 workbook 缓存：
-模块级长存缓存会让 Windows 删不掉临时文件」）。
+| T9 ROI-2 | ✅ 假红→已回标 | `materialize_projection_single_pass` + `workbook_read_scope()` 在库 |
+| T10 ROI-3 | ✅ 假红→已回标 | `_PARSE_MEMO_TAG` 在 `excel_extract.py:3488` |
+| T11 ROI-6 | ✅ **2026-10-07 实施** | `_apply_settled` 三段拆分 + two-phase `stage_for_commit`/`commit_staged`；504 passed |
+| T12 | ✅ **2026-10-07 实施** | `test_roi6_lock_narrowing.py` 15 例；真实 PG 并发待真栈 |

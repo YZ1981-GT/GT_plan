@@ -2440,6 +2440,20 @@ class OoToHtmlCoordinator:
 
     # ─────────────────────────────────────────────────────────────────
     # 6.7 无冲突分支：rematerialize → fence → publish → 单事务 commit
+    #
+    # 🔴 ROI-6 锁临界区收窄（spec oo-html-writeback-performance T11）：
+    #    原实现把 rematerialize CPU 段（D4 实测 40-69s）全放在 per-room advisory lock
+    #    内部，多人同编同底稿串行排队。现在把 CPU 段（状态转移 + plan 组装 +
+    #    stage_for_commit）移到锁外，锁内只做 commit_staged + 后处理。
+    #
+    #    **安全性**：
+    #    - CPU 段读不可变 substrate + incoming，写到 UUID-唯一 staging 目录 ⇒ 不冲突
+    #    - 并行 apply 如果先提交，会推进 content_revision，锁内的 CAS 自然拒绝本次
+    #    - fence.before_publish 在 stage_for_commit 内回调（锁外），但 bundle identity
+    #      check 与授权重验本身是点读操作（不依赖 room lock 的互斥语义）
+    #    - fence.before_write 在 _commit_once 内、wp advisory xact lock 保护下执行
+    #    - canonical fence assertion 在同一 DB 事务内执行
+    #    - 最终 CAS（bump_content_revision WHERE = :expected）是终极保障
     # ─────────────────────────────────────────────────────────────────
 
     async def _apply_settled(
@@ -2458,12 +2472,19 @@ class OoToHtmlCoordinator:
         state.merged_digest = projection_canonical_digest(merged)
         state.incoming_digest = projection_canonical_digest(state.incoming_projection)
 
-        # 会话级 room apply 锁：跨越下方 commit + rematerialize CPU，避免并行 apply
-        # 在 fence 上互踩（G4-0d result_bundle_identity_mismatch）。
+        # ── 锁外阶段：状态转移 + plan 组装 + CPU 重段（stage_for_commit） ──
+        # 以前这些全在 advisory lock 内。现在移出来，让并行 apply 的 CPU 段可以重叠。
+        prepared = await self._prepare_and_stage(
+            state, adapter=adapter, merged=merged
+        )
+
+        # ── 锁内阶段：fence + DB 事务 + 后处理 ──
+        # 只有 commit_staged（含 CAS + fence.before_write + 单事务 commit）和
+        # mirror/baseline 需要 per-room 串行化。
         await self._repo.lock_room_oo_apply(state.frozen.room_id)
         try:
-            return await self._apply_settled_locked(
-                state, adapter=adapter, merged=merged
+            return await self._apply_committed(
+                state, adapter=adapter, merged=merged, prepared=prepared
             )
         finally:
             try:
@@ -2471,13 +2492,20 @@ class OoToHtmlCoordinator:
             except Exception:  # noqa: BLE001 — 连接已死时仍要让主异常冒泡
                 pass
 
-    async def _apply_settled_locked(
+    async def _prepare_and_stage(
         self,
         state: _ApplyState,
         *,
         adapter: WorkpaperSyncAdapter,
         merged: Any,
-    ) -> OoToHtmlOutcome:
+    ) -> "StagedCommit | ContentCommitReceipt":
+        """锁外阶段：状态转移 + plan 组装 + CPU 重段 + artifact publish。
+
+        返回 :class:`StagedCommit`（正常路径）或 :class:`ContentCommitReceipt`
+        （幂等重放命中时）。
+        """
+        from app.services.workpaper_sync.content_mutation import _ReplayHit, StagedCommit
+
         app = await self._lock_application(state.frozen.application_id)
         await self._walk_application(
             app,
@@ -2544,9 +2572,41 @@ class OoToHtmlCoordinator:
             # （`AdjudicationNotFoldedError`）—— 这是「折叠真的发生了」的第二把锁。
             resolution_choices=state.resolutions,
         )
-        receipt = await self._content.commit(
-            plan=plan, mutation=mutation, adapter=adapter, fence=_ApplyFence(self, state)
-        )
+        fence = _ApplyFence(self, state)
+        try:
+            prepared = await self._content.stage_for_commit(
+                plan=plan, mutation=mutation, adapter=adapter, fence=fence
+            )
+        except _ReplayHit as hit:
+            # 幂等重放命中——不需要 two-phase，直接返回 receipt 给调用方。
+            return hit.receipt
+        return prepared
+
+    async def _apply_committed(
+        self,
+        state: _ApplyState,
+        *,
+        adapter: WorkpaperSyncAdapter,
+        merged: Any,
+        prepared: "StagedCommit | ContentCommitReceipt",
+    ) -> OoToHtmlOutcome:
+        """锁内阶段：commit_staged（fence + DB 事务）+ mirror + baseline。
+
+        🔴 如果在 _prepare_and_stage 与本方法之间有并行 apply 推进了 content_revision，
+        ``commit_staged`` 内部的 CAS 会抛 :class:`RevisionConflictError`——
+        CPU 产物被浪费，但不产生错误结果。caller (apply_durable_incoming) 把它当
+        OoToHtmlError 处理，走 _record_post_durable_failure。
+        """
+        from app.services.workpaper_sync.content_mutation import StagedCommit
+
+        # 幂等重放命中路径：直接用 receipt，跳过 commit_staged。
+        if isinstance(prepared, ContentCommitReceipt):
+            receipt = prepared
+        else:
+            assert isinstance(prepared, StagedCommit)
+            fence = _ApplyFence(self, state)
+            receipt = await self._content.commit_staged(prepared, fence=fence)
+
         state.journal.record(ApplyStage.business_committed, str(receipt.content_version_id))
 
         # Store-backed entry：content_version 已前进，但 HTML 宿主仍读 checklist_responses。

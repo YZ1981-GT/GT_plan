@@ -373,6 +373,18 @@ class HtmlOnlyEntryHasRepresentationError(ContentMutationError):
     error_code = "html_only_entry_has_representation"
 
 
+class _ReplayHit(Exception):
+    """``stage_for_commit`` 内部 sentinel：幂等重放命中，不需要走 two-phase。
+
+    不继承 :class:`ContentMutationError`——它不是业务错误，只是控制流信号。
+    ``_apply_settled`` 的 ``except _ReplayHit`` 把 ``receipt`` 取出后正常返回。
+    """
+
+    def __init__(self, receipt: "ContentCommitReceipt"):
+        super().__init__()
+        self.receipt = receipt
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 1. 常量
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1025,6 +1037,27 @@ class _StagedContent:
     extracted_key_count: int
 
 
+@dataclass(frozen=True)
+class StagedCommit:
+    """``stage_for_commit`` 的返回值：CPU 重段已完成，等待 ``commit_staged`` 落库。
+
+    公开暴露是为了让 ``OoToHtmlCoordinator._apply_settled`` 能在 room advisory lock
+    **外**完成 CPU 重段（materialize + extract + roundtrip + unmanaged verify +
+    structure_hash + artifact publish），然后在锁**内**只做 fence + DB 事务，缩小
+    per-room 串行窗口（ROI-6 spec ``oo-html-writeback-performance``）。
+
+    本类不可变、不含会话/连接引用、所有字段都是可序列化的纯数据或已 publish 到磁盘的
+    artifact 路径 ⇒ 跨 advisory lock 边界传递安全。
+    """
+
+    plan: "ContentCommitPlan"
+    mutation: "BusinessMutation"
+    projection: "Projection | None"
+    staged: _StagedContent
+    #: ``plan.expected_revision`` 的快照（与 ``_commit_once`` 里的 CAS 比对用同一个值）。
+    revision_snapshot: int
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 5. 服务
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1116,6 +1149,81 @@ class ContentMutationService:
         )
         return await self._commit_once(
             plan=plan, mutation=mutation, projection=projection, staged=staged, fence=fence
+        )
+
+    # ─────────────────────────────────────────────────────────────────
+    # 5.1a  two-phase commit（ROI-6 锁临界区收窄）
+    # ─────────────────────────────────────────────────────────────────
+
+    async def stage_for_commit(
+        self,
+        *,
+        plan: ContentCommitPlan,
+        mutation: BusinessMutation,
+        adapter: Any = None,
+        fence: CommitFenceHook | None = None,
+    ) -> StagedCommit:
+        """``commit`` 的前半段：验证 + settle + CPU 重段 + artifact publish。
+
+        返回不可变的 :class:`StagedCommit`，调用方可以在 advisory lock **外**执行本方法
+        （CPU 重段是纯文件操作 + 写到 UUID-唯一的 staging 目录，不与并行调用冲突），
+        然后在锁**内**调 :meth:`commit_staged` 完成 fence + DB 事务。
+
+        如果在 stage 与 commit_staged 之间有并行 apply 推进了 ``content_revision``，
+        ``commit_staged`` 内部的 ``expected_revision`` CAS 会自然拒绝，caller 收到
+        :class:`RevisionConflictError` —— CPU 产物被浪费，但不会产生错误结果。
+
+        🔴 本方法的存在是为了 ``oo_to_html._apply_settled`` 的锁收窄场景。
+        其他调用方（HTML→OO / upload / rollback）应继续用 :meth:`commit`——
+        它们不需要 two-phase 的复杂性。
+        """
+        ctx = self._build_context(plan)
+        ctx.assert_frozen_identity_consistent()
+        assert_bundle_snapshot_finalizable(plan.bundle)
+        assert_substrate_usable(
+            role=plan.substrate_role,
+            artifact_kind=plan.substrate_kind,
+            artifact_state=plan.substrate_state,
+        )
+        self._assert_authority_shape(plan, mutation, adapter)
+
+        replay = await self._replay_if_committed(plan)
+        if replay is not None:
+            # 幂等重放不需要走 two-phase，直接返回一个带 replay 标记的 StagedCommit
+            # 不行——caller 需要 ContentCommitReceipt。用 sentinel 类型区分。
+            raise _ReplayHit(replay)
+
+        projection = self._settle_projection(plan, mutation)
+        staged = await self._stage_and_verify(
+            plan=plan, mutation=mutation, projection=projection, adapter=adapter, fence=fence
+        )
+        return StagedCommit(
+            plan=plan,
+            mutation=mutation,
+            projection=projection,
+            staged=staged,
+            revision_snapshot=plan.expected_revision,
+        )
+
+    async def commit_staged(
+        self,
+        prepared: StagedCommit,
+        *,
+        fence: CommitFenceHook | None = None,
+    ) -> ContentCommitReceipt:
+        """``commit`` 的后半段：fence + DB 事务 + 单次 commit。
+
+        接受 :meth:`stage_for_commit` 返回的 :class:`StagedCommit`，在调用方持有的
+        advisory lock 内执行。内部的 ``expected_revision`` CAS（``_commit_once``）是
+        产物重验的最终保障：如果并行 apply 在 stage → commit_staged 之间推进了
+        revision，CAS 失败抛 :class:`RevisionConflictError`。
+        """
+        return await self._commit_once(
+            plan=prepared.plan,
+            mutation=prepared.mutation,
+            projection=prepared.projection,
+            staged=prepared.staged,
+            fence=fence,
         )
 
     # ─────────────────────────────────────────────────────────────────
