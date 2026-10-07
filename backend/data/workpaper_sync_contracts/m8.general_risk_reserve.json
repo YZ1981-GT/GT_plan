@@ -4,12 +4,12 @@
   "semantic_version": "1.0.0",
   "review_status": "reviewed",
   "document_type": "xlsx",
-  "template_definition_sha256": "90330c32487baaf160e478d9237208cbf5ad8df28b25f6caeaeb802ccd2d57b8",
-  "instrumentation_definition_sha256": "724c390b30e3016b34ce916d7482d1038b46c99ca0dba0e0226dda4b9dd32e3a",
+  "template_definition_sha256": "f97e383dc0333a2cdd8b4f03408d1959904ee25e3b60cef137e24f02c09807a1",
+  "instrumentation_definition_sha256": "572fcdcc3b38785619707c7428023bf9c3b5d3f53c6d9b33394622cf2ebdf800",
   "template": {
     "relative_path": "M/M8 一般风险准备.xlsx",
-    "template_sha256": "6ea4da1f3a9ba741633f89edab167f9dc21c9f8bcccf95ebcbb1fda5c779f8c6",
-    "normalized_structure_hash": "fe87f5e82d177e903be93314c74a4342751c8ca5b5df3c684552601b186b5db1"
+    "template_sha256": "248a8bb72f1b3c2f8ec28950f718138462ec26a33b6e46c58884a47a74cbbcc1",
+    "normalized_structure_hash": "fc44e270d09a361d2671614488b9a8b76168689d2c186cd42f8d824f586d4cc1"
   },
   "identity_carriers": [
     "hidden_sheet",
@@ -245,9 +245,9 @@
           "header_rows": 2,
           "fields": [
             {
-              "stable_field_key": "m8_detail_rows/item_name",
+              "stable_field_key": "m8_detail_rows/{row_uuid}/item_name",
               "column_key": "item_name",
-              "json_pointer": "/m8_detail_rows/itemName",
+              "json_pointer": "/m8_detail_rows/{row_uuid}/itemName",
               "mode": "editable",
               "value_type": "text",
               "source_ref": "源xlsx!明细表M8-2!A10",
@@ -256,13 +256,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "A",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m8_detail_rows/prior_opening",
+              "stable_field_key": "m8_detail_rows/{row_uuid}/prior_opening",
               "column_key": "prior_opening",
-              "json_pointer": "/m8_detail_rows/priorOpening",
+              "json_pointer": "/m8_detail_rows/{row_uuid}/priorOpening",
               "mode": "editable",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M8-2!B10",
@@ -271,13 +271,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "B",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m8_detail_rows/increase_amount",
+              "stable_field_key": "m8_detail_rows/{row_uuid}/increase_amount",
               "column_key": "increase_amount",
-              "json_pointer": "/m8_detail_rows/increaseAmount",
+              "json_pointer": "/m8_detail_rows/{row_uuid}/increaseAmount",
               "mode": "editable",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M8-2!C10",
@@ -286,13 +286,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "C",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m8_detail_rows/decrease_amount",
+              "stable_field_key": "m8_detail_rows/{row_uuid}/decrease_amount",
               "column_key": "decrease_amount",
-              "json_pointer": "/m8_detail_rows/decreaseAmount",
+              "json_pointer": "/m8_detail_rows/{row_uuid}/decreaseAmount",
               "mode": "editable",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M8-2!D10",
@@ -301,13 +301,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "D",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m8_detail_rows/closing_balance",
+              "stable_field_key": "m8_detail_rows/{row_uuid}/closing_balance",
               "column_key": "closing_balance",
-              "json_pointer": "/m8_detail_rows/closingBalance",
+              "json_pointer": "/m8_detail_rows/{row_uuid}/closingBalance",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M8-2!E10",
@@ -316,13 +316,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "E",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m8_detail_rows/prior_adj_aje",
+              "stable_field_key": "m8_detail_rows/{row_uuid}/prior_adj_aje",
               "column_key": "prior_adj_aje",
-              "json_pointer": "/m8_detail_rows/priorAdjAje",
+              "json_pointer": "/m8_detail_rows/{row_uuid}/priorAdjAje",
               "mode": "editable",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M8-2!F10",
@@ -331,13 +331,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "F",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m8_detail_rows/prior_adj_rje",
+              "stable_field_key": "m8_detail_rows/{row_uuid}/prior_adj_rje",
               "column_key": "prior_adj_rje",
-              "json_pointer": "/m8_detail_rows/priorAdjRje",
+              "json_pointer": "/m8_detail_rows/{row_uuid}/priorAdjRje",
               "mode": "editable",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M8-2!G10",
@@ -346,13 +346,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "G",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m8_detail_rows/current_aje_increase",
+              "stable_field_key": "m8_detail_rows/{row_uuid}/current_aje_increase",
               "column_key": "current_aje_increase",
-              "json_pointer": "/m8_detail_rows/currentAjeIncrease",
+              "json_pointer": "/m8_detail_rows/{row_uuid}/currentAjeIncrease",
               "mode": "editable",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M8-2!H10",
@@ -361,13 +361,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "H",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m8_detail_rows/current_aje_decrease",
+              "stable_field_key": "m8_detail_rows/{row_uuid}/current_aje_decrease",
               "column_key": "current_aje_decrease",
-              "json_pointer": "/m8_detail_rows/currentAjeDecrease",
+              "json_pointer": "/m8_detail_rows/{row_uuid}/currentAjeDecrease",
               "mode": "editable",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M8-2!I10",
@@ -376,13 +376,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "I",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m8_detail_rows/current_rje_increase",
+              "stable_field_key": "m8_detail_rows/{row_uuid}/current_rje_increase",
               "column_key": "current_rje_increase",
-              "json_pointer": "/m8_detail_rows/currentRjeIncrease",
+              "json_pointer": "/m8_detail_rows/{row_uuid}/currentRjeIncrease",
               "mode": "editable",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M8-2!J10",
@@ -391,13 +391,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "J",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m8_detail_rows/current_rje_decrease",
+              "stable_field_key": "m8_detail_rows/{row_uuid}/current_rje_decrease",
               "column_key": "current_rje_decrease",
-              "json_pointer": "/m8_detail_rows/currentRjeDecrease",
+              "json_pointer": "/m8_detail_rows/{row_uuid}/currentRjeDecrease",
               "mode": "editable",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M8-2!K10",
@@ -406,13 +406,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "K",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m8_detail_rows/audited_opening",
+              "stable_field_key": "m8_detail_rows/{row_uuid}/audited_opening",
               "column_key": "audited_opening",
-              "json_pointer": "/m8_detail_rows/auditedOpening",
+              "json_pointer": "/m8_detail_rows/{row_uuid}/auditedOpening",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M8-2!L10",
@@ -421,13 +421,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "L",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m8_detail_rows/audited_increase",
+              "stable_field_key": "m8_detail_rows/{row_uuid}/audited_increase",
               "column_key": "audited_increase",
-              "json_pointer": "/m8_detail_rows/auditedIncrease",
+              "json_pointer": "/m8_detail_rows/{row_uuid}/auditedIncrease",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M8-2!M10",
@@ -436,13 +436,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "M",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m8_detail_rows/audited_decrease",
+              "stable_field_key": "m8_detail_rows/{row_uuid}/audited_decrease",
               "column_key": "audited_decrease",
-              "json_pointer": "/m8_detail_rows/auditedDecrease",
+              "json_pointer": "/m8_detail_rows/{row_uuid}/auditedDecrease",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M8-2!N10",
@@ -451,13 +451,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "N",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m8_detail_rows/audited_closing",
+              "stable_field_key": "m8_detail_rows/{row_uuid}/audited_closing",
               "column_key": "audited_closing",
-              "json_pointer": "/m8_detail_rows/auditedClosing",
+              "json_pointer": "/m8_detail_rows/{row_uuid}/auditedClosing",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M8-2!O10",
@@ -466,13 +466,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "O",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m8_detail_rows/doc_reference",
+              "stable_field_key": "m8_detail_rows/{row_uuid}/doc_reference",
               "column_key": "doc_reference",
-              "json_pointer": "/m8_detail_rows/docReference",
+              "json_pointer": "/m8_detail_rows/{row_uuid}/docReference",
               "mode": "editable",
               "value_type": "text",
               "source_ref": "源xlsx!明细表M8-2!P10",
@@ -481,13 +481,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "P",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m8_detail_rows/ref_index",
+              "stable_field_key": "m8_detail_rows/{row_uuid}/ref_index",
               "column_key": "ref_index",
-              "json_pointer": "/m8_detail_rows/refIndex",
+              "json_pointer": "/m8_detail_rows/{row_uuid}/refIndex",
               "mode": "editable",
               "value_type": "text",
               "source_ref": "源xlsx!明细表M8-2!Q10",
@@ -496,13 +496,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "Q",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m8_detail_rows/remark",
+              "stable_field_key": "m8_detail_rows/{row_uuid}/remark",
               "column_key": "remark",
-              "json_pointer": "/m8_detail_rows/remark",
+              "json_pointer": "/m8_detail_rows/{row_uuid}/remark",
               "mode": "editable",
               "value_type": "text",
               "source_ref": "源xlsx!明细表M8-2!R10",
@@ -511,10 +511,11 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "R",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             }
           ],
+          "delete_policy": "reject",
           "formula_mask": [
             "E10:E14",
             "L10:L14",
@@ -522,6 +523,10 @@
             "N10:N14",
             "O10:O14"
           ],
+          "row_identity": {
+            "kind": "template_row_key",
+            "template_row_key": "m8_detail_rows_template"
+          },
           "footer_anchor": {
             "marker": "合计",
             "search_column": "A",

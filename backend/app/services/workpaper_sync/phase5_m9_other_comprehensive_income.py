@@ -22,9 +22,10 @@ ENTRY_ID: Final[str] = "xlsx/gt-m9-other-comprehensive-income"
 ADAPTER_ID: Final[str] = "m9.other_comprehensive_income"
 WP_CODES: Final[frozenset[str]] = frozenset({"M9O"})
 TEMPLATE_RELATIVE_PATH: Final[str] = "M/M9 其他综合收益.xlsx"
-TEMPLATE_SHA256: Final[str] = "2c77bf890323715055433e3d2b5a80574c6ac0258c7fde9bd418f09b37127576"
+TEMPLATE_SHA256: Final[str] = "0cfdc95ce3f9410610037b684f50a07f874df1cab4cebe09aa63c6461b6fbc66"
 ACCOUNT_CODE: Final[str] = "4103"
 ITEM_PREFIX: Final[str] = "M9-"
+EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 审定表 M9-1（47r×12c / 41 公式）
@@ -92,7 +93,7 @@ DETAIL_SHEET: Final[MSheetConfig] = MSheetConfig(
     table_key="m9_detail_rows",
     header_rows=2, first_data_row=10, last_data_row=27, footer_row=28,
     anchor_row=8, fields=DETAIL_FIELDS,
-    row_identity_kind="",
+    row_identity_kind="template_row_key",
     footer_carries_total=True, delete_policy="reject",
 )
 

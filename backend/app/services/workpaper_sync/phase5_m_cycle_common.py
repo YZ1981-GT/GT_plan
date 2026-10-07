@@ -73,7 +73,7 @@ class MSheetConfig:
     anchor_row: int          # 表头起始行
     fields: tuple[MFieldSpec, ...]
     #: 行身份方式："template_row_key"（固定行）或 "field"（动态行）
-    row_identity_kind: str = "template_row_key"
+    row_identity_kind: str = ""
     #: footer 是否带合计公式
     footer_carries_total: bool = True
     #: footer 文本
@@ -253,32 +253,35 @@ def build_m_contract_payload(cfg: MEntryConfig, orch: Any = None) -> dict[str, A
 
 def build_flat_store_projection(
     cfg: MEntryConfig,
-    store_item_id: str,
-    rows: Sequence[Mapping[str, Any]],
+    item_prefix: str,
+    store_payload: Any,
 ) -> dict[str, Any]:
-    """把 contract 定义的字段 + 数据行转成 flat_key_value 的 store projection。
+    """把 store_payload（JSON 字符串或空列表）转成 flat_key_value 的 store projection。
 
-    每个 (sheet, field) 组合对应一个 checklist_responses 行：
-      item_id = f"{cfg.item_prefix}{sheet_code}-{field_key}"
-      conclusion = field_value（字符串化）
-      remark = None（业务文本走 remark，公式值走 conclusion）
+    M 循环的 store 是 flat_key_value 形态（每个 item_id 一行 checklist_responses），
+    空 store 返回空 dict。first_publication 用这个来获取首版 projection。
     """
-    items: dict[str, Any] = {}
-    for row in rows:
-        row_key = row.get("rowKey", "")
-        for sheet in cfg.sheets:
-            for f in sheet.fields:
-                if f.mode == "formula":
-                    continue  # 公式格不写 store
-                value = row.get(f.json_key)
-                if value is not None:
-                    item_key = f"{cfg.item_prefix}{sheet.sheet_key}-{f.column_key}"
-                    items[item_key] = {
-                        "item_id": item_key,
-                        "conclusion": str(value) if not isinstance(value, str) else value,
-                        "remark": None,
-                    }
-    return items
+    import json as _json
+
+    if store_payload is None or store_payload == "[]" or store_payload == b"[]":
+        return {}
+    if isinstance(store_payload, (str, bytes)):
+        try:
+            data = _json.loads(store_payload)
+        except _json.JSONDecodeError:
+            return {}
+    else:
+        data = store_payload
+    if isinstance(data, list):
+        # JSON 数组形态 [{"item_id": ..., "conclusion": ..., "remark": ...}, ...]
+        items = {}
+        for row in data:
+            if isinstance(row, dict) and "item_id" in row:
+                iid = row["item_id"]
+                if iid.startswith(item_prefix):
+                    items[iid] = row
+        return items
+    return {}
 
 
 def merge_flat_projection_into_store(
@@ -357,8 +360,8 @@ def build_m_provider(cfg: MEntryConfig) -> types.SimpleNamespace:
         on_disk = orch.load_contract_from_disk()
         return on_disk
 
-    def _build_store_projection(store_item_id: str, rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-        return build_flat_store_projection(cfg, store_item_id, rows)
+    def _build_store_projection(store_payload: Any, *, contract: Any = None) -> dict[str, Any]:
+        return build_flat_store_projection(cfg, cfg.item_prefix, store_payload)
 
     def _merge_projection(projection: Mapping[str, Any], existing: Mapping[str, Any]) -> dict[str, Any]:
         return merge_flat_projection_into_store(cfg, projection, existing)

@@ -218,7 +218,7 @@ async def test_refresh_worker_uses_independent_session_and_commits_report_step(t
     await _persist_projects(task15_factory, project)
     job = create_job(project.id, Y)
 
-    async def fake_report(db, project_id, year):
+    async def fake_report(db, project_id, year, *args, **kwargs):
         db.add(FinancialReport(
             project_id=project_id,
             year=year,

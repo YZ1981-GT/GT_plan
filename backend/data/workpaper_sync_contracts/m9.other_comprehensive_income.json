@@ -4,12 +4,12 @@
   "semantic_version": "1.0.0",
   "review_status": "reviewed",
   "document_type": "xlsx",
-  "template_definition_sha256": "ab064e1f888c401367535ad01d77ce201c064ca856f9c18c3193fe3527d30a91",
-  "instrumentation_definition_sha256": "e3c4476aec0198d8fae55345f3600e2336d5f701b481973b014ffa9bfdb6cbd3",
+  "template_definition_sha256": "b934f244d34c97c79cbd7a64633ff2c628462c3a0c3ef189e1110c82a8d97c8d",
+  "instrumentation_definition_sha256": "4bc66f1230c242e7b04d3e8c85b5a9d7486cbbd7f0d6f04ad09082899e5ac418",
   "template": {
     "relative_path": "M/M9 其他综合收益.xlsx",
-    "template_sha256": "bc9994a0828b0b61c701363b01cf23779595075ea249accb31f03c46bcea794e",
-    "normalized_structure_hash": "d2549f40a0893f8249e0d03fdf562e885335f6b39e7e86d2592d1b259f72caef"
+    "template_sha256": "0cfdc95ce3f9410610037b684f50a07f874df1cab4cebe09aa63c6461b6fbc66",
+    "normalized_structure_hash": "b874621911f3683118b86bf8efbd9af4880b850c414b558f9d4c659137a16451"
   },
   "identity_carriers": [
     "hidden_sheet",
@@ -244,9 +244,9 @@
           "header_rows": 2,
           "fields": [
             {
-              "stable_field_key": "m9_detail_rows/item_category",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/item_category",
               "column_key": "item_category",
-              "json_pointer": "/m9_detail_rows/itemCategory",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/itemCategory",
               "mode": "editable",
               "value_type": "text",
               "source_ref": "源xlsx!明细表M9-2!A10",
@@ -255,13 +255,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "A",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/prior_opening",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/prior_opening",
               "column_key": "prior_opening",
-              "json_pointer": "/m9_detail_rows/priorOpening",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/priorOpening",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M9-2!C10",
@@ -270,13 +270,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "C",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/current_pretax",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/current_pretax",
               "column_key": "current_pretax",
-              "json_pointer": "/m9_detail_rows/currentPretax",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/currentPretax",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M9-2!D10",
@@ -285,13 +285,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "D",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/transfer_to_pnl",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/transfer_to_pnl",
               "column_key": "transfer_to_pnl",
-              "json_pointer": "/m9_detail_rows/transferToPnl",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/transferToPnl",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M9-2!E10",
@@ -300,13 +300,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "E",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/income_tax",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/income_tax",
               "column_key": "income_tax",
-              "json_pointer": "/m9_detail_rows/incomeTax",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/incomeTax",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M9-2!F10",
@@ -315,13 +315,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "F",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/closing_balance",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/closing_balance",
               "column_key": "closing_balance",
-              "json_pointer": "/m9_detail_rows/closingBalance",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/closingBalance",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M9-2!G10",
@@ -330,13 +330,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "G",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/prior_adj_aje",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/prior_adj_aje",
               "column_key": "prior_adj_aje",
-              "json_pointer": "/m9_detail_rows/priorAdjAje",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/priorAdjAje",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M9-2!H10",
@@ -345,13 +345,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "H",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/prior_adj_rje",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/prior_adj_rje",
               "column_key": "prior_adj_rje",
-              "json_pointer": "/m9_detail_rows/priorAdjRje",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/priorAdjRje",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M9-2!I10",
@@ -360,13 +360,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "I",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/current_aje_pretax",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/current_aje_pretax",
               "column_key": "current_aje_pretax",
-              "json_pointer": "/m9_detail_rows/currentAjePretax",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/currentAjePretax",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M9-2!J10",
@@ -375,13 +375,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "J",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/current_aje_transfer",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/current_aje_transfer",
               "column_key": "current_aje_transfer",
-              "json_pointer": "/m9_detail_rows/currentAjeTransfer",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/currentAjeTransfer",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M9-2!K10",
@@ -390,13 +390,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "K",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/current_aje_tax",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/current_aje_tax",
               "column_key": "current_aje_tax",
-              "json_pointer": "/m9_detail_rows/currentAjeTax",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/currentAjeTax",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M9-2!L10",
@@ -405,13 +405,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "L",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/current_rje_pretax",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/current_rje_pretax",
               "column_key": "current_rje_pretax",
-              "json_pointer": "/m9_detail_rows/currentRjePretax",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/currentRjePretax",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M9-2!M10",
@@ -420,13 +420,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "M",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/current_rje_transfer",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/current_rje_transfer",
               "column_key": "current_rje_transfer",
-              "json_pointer": "/m9_detail_rows/currentRjeTransfer",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/currentRjeTransfer",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M9-2!N10",
@@ -435,13 +435,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "N",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/current_rje_tax",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/current_rje_tax",
               "column_key": "current_rje_tax",
-              "json_pointer": "/m9_detail_rows/currentRjeTax",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/currentRjeTax",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M9-2!O10",
@@ -450,13 +450,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "O",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/audited_opening",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/audited_opening",
               "column_key": "audited_opening",
-              "json_pointer": "/m9_detail_rows/auditedOpening",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/auditedOpening",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M9-2!P10",
@@ -465,13 +465,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "P",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/audited_pretax",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/audited_pretax",
               "column_key": "audited_pretax",
-              "json_pointer": "/m9_detail_rows/auditedPretax",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/auditedPretax",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M9-2!Q10",
@@ -480,13 +480,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "Q",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/audited_transfer",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/audited_transfer",
               "column_key": "audited_transfer",
-              "json_pointer": "/m9_detail_rows/auditedTransfer",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/auditedTransfer",
               "mode": "editable",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M9-2!R10",
@@ -495,13 +495,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "R",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/audited_tax",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/audited_tax",
               "column_key": "audited_tax",
-              "json_pointer": "/m9_detail_rows/auditedTax",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/auditedTax",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M9-2!S10",
@@ -510,13 +510,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "S",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/audited_closing",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/audited_closing",
               "column_key": "audited_closing",
-              "json_pointer": "/m9_detail_rows/auditedClosing",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/auditedClosing",
               "mode": "formula",
               "value_type": "amount",
               "source_ref": "源xlsx!明细表M9-2!T10",
@@ -525,13 +525,13 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "T",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             },
             {
-              "stable_field_key": "m9_detail_rows/remark",
+              "stable_field_key": "m9_detail_rows/{row_uuid}/remark",
               "column_key": "remark",
-              "json_pointer": "/m9_detail_rows/remark",
+              "json_pointer": "/m9_detail_rows/{row_uuid}/remark",
               "mode": "editable",
               "value_type": "text",
               "source_ref": "源xlsx!明细表M9-2!U10",
@@ -540,10 +540,11 @@
               "store_item_id": "placeholder",
               "cell": {
                 "column": "U",
-                "row_from": 10
+                "row_from": "row_identity"
               }
             }
           ],
+          "delete_policy": "reject",
           "formula_mask": [
             "C10:C27",
             "D10:D27",
@@ -563,6 +564,10 @@
             "S10:S27",
             "T10:T27"
           ],
+          "row_identity": {
+            "kind": "template_row_key",
+            "template_row_key": "m9_detail_rows_template"
+          },
           "footer_anchor": {
             "marker": "合计",
             "search_column": "A",

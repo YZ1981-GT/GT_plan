@@ -23,6 +23,7 @@ TEMPLATE_RELATIVE_PATH: Final[str] = "M/M1 应付股利（利润）.xlsx"
 TEMPLATE_SHA256: Final[str] = "0a3697a485d16b843be7870db54fa92a732a39c5d7edea92d03585ef6695115d"
 ACCOUNT_CODE: Final[str] = "2232"
 ITEM_PREFIX: Final[str] = "M1-"
+EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 审定表 M1-1（56r×12c / 92 公式）
@@ -89,7 +90,7 @@ DETAIL_SHEET: Final[MSheetConfig] = MSheetConfig(
     table_key="m1_detail_rows",
     header_rows=2, first_data_row=14, last_data_row=22, footer_row=23,
     anchor_row=12, fields=DETAIL_FIELDS,
-    row_identity_kind="",
+    row_identity_kind="template_row_key",
     footer_carries_total=True, delete_policy="reject",
 )
 

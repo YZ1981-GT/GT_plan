@@ -21,9 +21,10 @@ ENTRY_ID: Final[str] = "xlsx/gt-m8-general-risk-reserve"
 ADAPTER_ID: Final[str] = "m8.general_risk_reserve"
 WP_CODES: Final[frozenset[str]] = frozenset({"M8G"})
 TEMPLATE_RELATIVE_PATH: Final[str] = "M/M8 一般风险准备.xlsx"
-TEMPLATE_SHA256: Final[str] = "8464542bbb9c7d192e2c66ba6bc47c77bc10c6816538f131b5f823682750f114"
+TEMPLATE_SHA256: Final[str] = "248a8bb72f1b3c2f8ec28950f718138462ec26a33b6e46c58884a47a74cbbcc1"
 ACCOUNT_CODE: Final[str] = "4104"
 ITEM_PREFIX: Final[str] = "M8-"
+EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 
 # 审定表 M8-1（25r×12c / 84 公式）—— A~K 全公式，只有 L 列 editable
 DETERMINATION_FIELDS: Final[tuple[MFieldSpec, ...]] = (
@@ -80,7 +81,7 @@ DETAIL_SHEET: Final[MSheetConfig] = MSheetConfig(
     table_key="m8_detail_rows",
     header_rows=2, first_data_row=10, last_data_row=14, footer_row=15,
     anchor_row=8, fields=DETAIL_FIELDS,
-    row_identity_kind="",
+    row_identity_kind="template_row_key",
     footer_carries_total=True, delete_policy="reject",
 )
 

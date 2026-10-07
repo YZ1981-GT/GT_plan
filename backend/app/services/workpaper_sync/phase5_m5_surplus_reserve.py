@@ -27,9 +27,10 @@ ENTRY_ID: Final[str] = "xlsx/gt-m5-surplus-reserve"
 ADAPTER_ID: Final[str] = "m5.surplus_reserve"
 WP_CODES: Final[frozenset[str]] = frozenset({"M5S"})
 TEMPLATE_RELATIVE_PATH: Final[str] = "M/M5 盈余公积.xlsx"
-TEMPLATE_SHA256: Final[str] = "9607dcf7d79a4a38bb726907a06f8f75c5cd94968d058a8a522c113559ba5f93"
+TEMPLATE_SHA256: Final[str] = "0e32a0567e4e3a36e137fa2f2d8ae66a0b1d5eaf266dfd57f9ffd1ce24ae2316"
 ACCOUNT_CODE: Final[str] = "4101"
 ITEM_PREFIX: Final[str] = "M5-"
+EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 审定表 M5-1 字段（48r×12c / 59 公式）
@@ -104,7 +105,7 @@ DETAIL_SHEET: Final[MSheetConfig] = MSheetConfig(
     footer_row=16,
     anchor_row=9,
     fields=DETAIL_FIELDS,
-    row_identity_kind="",
+    row_identity_kind="template_row_key",
     footer_carries_total=True,
     delete_policy="reject",
 )

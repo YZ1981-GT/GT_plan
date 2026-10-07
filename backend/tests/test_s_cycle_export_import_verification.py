@@ -128,8 +128,8 @@ class TestP0Registration:
 
     @pytest.mark.parametrize("wp_code", _PROGRAM_CODES)
     def test_program_tables_are_a_program_console(self, wp_code):
-        """S 类程序表式底稿映射为 a-program-console。"""
-        assert _WP_CODE_OVERRIDE[wp_code] == "a-program-console"
+        """S 类程序表式底稿均在 _WP_CODE_OVERRIDE 中注册（部分有专属 componentType）。"""
+        assert wp_code in _WP_CODE_OVERRIDE, f"{wp_code} 未在 _WP_CODE_OVERRIDE 中注册"
 
     @pytest.mark.parametrize("wp_code", _AUDIT_SHEET_CODES)
     def test_audit_sheets_are_audit_sheet(self, wp_code):
@@ -148,15 +148,17 @@ class TestP0Registration:
             assert ct != "confirmation-hub", f"S 类 '{code}' 不应映射 confirmation-hub"
 
     def test_type_distribution(self):
-        """S 类 componentType 分布：7 程序表 + 78 检查表 + 2 计算表 + 3 文档 = 90。"""
+        """S 类 componentType 分布：程序表 + 检查表 + 计算表 + 文档 + 专属类型 = 90。"""
         s_codes = {code: ct for code, ct in _WP_CODE_OVERRIDE.items() if code.startswith("S")}
         type_counts: dict[str, int] = {}
         for ct in s_codes.values():
             type_counts[ct] = type_counts.get(ct, 0) + 1
-        assert type_counts.get("a-program-console", 0) == 7
+        assert type_counts.get("a-program-console", 0) == 5  # S1/S2/S8/S10/S11（S3/S13 已各自专属）
         assert type_counts.get("d-form-table", 0) == 78
         assert type_counts.get("audit-sheet", 0) == 2
         assert type_counts.get("word-template", 0) == 3
+        assert type_counts.get("s3-policy-change", 0) == 1
+        assert type_counts.get("s13-mgmt-expert", 0) == 1
 
     def test_s_class_no_account_codes(self, s_class_entries):
         """S 类底稿不对应 GL 科目（account_codes 为空数组）。"""
