@@ -1334,3 +1334,7 @@ backend/tests/procedure_delegation_visibility/test_task17_capacity_and_role_acce
 #     拆分方向：按 B.1.x 测试类拆为 test_consol_disclosure_v2_{topic}.py，属独立打磨。
 backend/tests/services/test_consol_disclosure_v2.py  865
 backend/tests/workpaper_sync/test_a_entry_connection_blockers.py
+
+#   phase5_g5_long_term_receivable.py —— 2026-10-07 G5-9 转置接入 entry 层后 801 行
+#     801 = 800+1（仅超 1 行），拆分收益极低。归档完毕后可在下一轮拆伴生模块。
+backend/app/services/workpaper_sync/phase5_g5_long_term_receivable.py 801

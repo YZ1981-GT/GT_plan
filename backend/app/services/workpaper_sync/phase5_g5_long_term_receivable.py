@@ -194,6 +194,8 @@ def assert_entry_selectable(
 _INCLUDE_G902: Final[bool] = True
 #: 审定表G5-1（AdjudicationSheetSpec，已实施）
 _INCLUDE_G901: Final[bool] = True
+#: 转置表G5-9（三阶段划分，16384 列）
+_INCLUDE_G909: Final[bool] = True
 
 
 def managed_row_table_specs() -> tuple[Any, ...]:
@@ -222,6 +224,7 @@ def all_store_item_ids() -> tuple[str, ...]:
     """本 entry 全部 store item（**单一口径**，出/回两方向都从它取）。
 
     三段共享一个键 ⇒ 去重后长度是 **1**（不是 3）。
+    🔴 G5-9 转置表走 transposed_registry 独立路径，不在此列。
     """
     items: list[str] = []
     for spec in managed_row_table_specs():
@@ -249,6 +252,14 @@ def all_managed_sheet_names() -> tuple[str, ...]:
     adj = adjudication_spec()
     if adj is not None and adj.managed_sheet not in seen:
         names.append(adj.managed_sheet)
+        seen.add(adj.managed_sheet)
+    # G5-9 转置表
+    if _INCLUDE_G909:
+        from app.services.workpaper_sync.phase5_g5_09_ecl_stage import (
+            MANAGED_SHEET as G509_MANAGED_SHEET,
+        )
+        if G509_MANAGED_SHEET not in seen:
+            names.append(G509_MANAGED_SHEET)
     return tuple(names)
 
 
@@ -355,6 +366,13 @@ def _sheets_payload() -> list[dict[str, Any]]:
             static_sheet_payload_for_adjudication,
         )
         sheets.append(static_sheet_payload_for_adjudication(adj))
+
+    # 转置表 G5-9（三阶段划分，16384 列）
+    if _INCLUDE_G909:
+        from app.services.workpaper_sync.phase5_g5_09_ecl_stage import (
+            sheet_payload as g509_sheet_payload,
+        )
+        sheets.append(g509_sheet_payload())
 
     return sheets
 

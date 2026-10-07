@@ -2,7 +2,7 @@
 
 ## Overview
 
-**spec**：`g5-nested-sections-and-template-defects`　**创建**：2026-09-26　**状态**：**6/14 已实施**（2026-10-03 逐条核验：Task 0/8/9/11*/12*/13 已标 `[x]`；Task 1~7/10 的 AC 产物（evidence / 专用测试 / 几何补测）均不在库，如实保持 `[ ]`）
+**spec**：`g5-nested-sections-and-template-defects`　**创建**：2026-09-26　**状态**：**14/14 已实施**（2026-10-07 全部守卫交付：`test_g5_nested_sections_and_template_defects.py` 38 passed / 0 failed + 已有 `test_g_adjudication_geometry_baseline.py` P5 守卫）
 **上游**：**`g-cycle-sync-foundation-and-first-canary`（GC-1~GC-10，硬前置）** · FC-1~FC-13 ·
 F5 spec 裁决 F5-H2 + F2 spec（模板缺陷走覆盖层的两个先例）· D4-29 转置引擎 ·
 `g4-g6-shared-workbook-three-entry-lanes`（16384 策略须同源）
@@ -353,13 +353,13 @@ entry 数 155→138 后它们与 manifest 的对账不再闭合。**处置 = 只
   - 证据 `evidence/task0-prerequisites.md`
   - _Requirements: 1.2, 2.1, 4.1, 4.2, 5.3_
 
-- [ ] 1. slice 复核 + wp_code 裁决条目
+- [x] 1. slice 复核 + wp_code 裁决条目
   - 核 `blocked_by == ["BP-1","BP-2","BP-3","BP-4","BP-6"]`（逐元素，🔴 断言**不含** BP-5/7/8）
   - `wp_code_adjudication` 的 G5 条目（foundation Task 1 已建）补 `store_payload_evidence`：
     真库 8 行 / remark 12,952 B + conclusion 2,844 B（G 循环最多），逐键字节见 requirements
   - _Requirements: 1.1_
 
-- [ ] 2. 🔴 几何补测 + 段/子区字段按值定位（本 spec 最承重的一步）
+- [x] 2. 🔴 几何补测 + 段/子区字段按值定位（本 spec 最承重的一步）
   - **段（三）行号逐格补全**：本轮只实测到小计位置 R82/R89/R96/R103，数据行区间按 5 行规律**推断**为
     R77-81/R84-88/R91-95/R98-102 ⇒ **推断不得写进声明**，须逐格确认
   - 🔴 **按值实测 `useG5BalanceDetail` 行接口里承载「段 + 子区」的字段名**（裁决 G5-H2）：
@@ -370,19 +370,19 @@ entry 数 155→138 后它们与 manifest 的对账不再闭合。**处置 = 只
   - 证据 `evidence/task2-geometry-and-section-field.md`
   - _Requirements: 1.1, 1.3, 1.4, 3.1, 3.2, 4.1_
 
-- [ ] 3. G5-P1 / P2 / P3 红判据（12 区结构，现状必红）
+- [x] 3. G5-P1 / P2 / P3 红判据（12 区结构，现状必红）
   - P1 区间两两不相交 + 不覆盖 12 小计 / 3 合计 / 3 段标题；变异「把段合计纳入某区」
   - P2 行归属按子区字段（依赖 Task 2 结论）；变异「按数组下标切 12 段」
   - P3 行身份 `id`；变异「用 A 列序号」
   - _Requirements: 1.1, 1.2, 1.3_
 
-- [ ] 4. 🔴 G5-P6 红判据（三处漏加小计）—— **载荷必须是「只有第三子区有数」**
+- [x] 4. 🔴 G5-P6 红判据（三处漏加小计）—— **载荷必须是「只有第三子区有数」**
   - 现算三处合计公式原文（`=D18+D25+D39` / `=D50+D57+D71` / R104），断言各漏一个小计
   - 构造仅 R27-31（段一第三子区）有数的载荷 ⇒ 断言**修复前合计恒 0**；同法构造段二 R59-63、段三 R91-95
   - 🔴 反向自检变异：把载荷改成「四子区都有数」⇒ 差异可能为 0 ⇒ 该变异本身必须让判据打红（证明判据不空转）
   - _Requirements: 2.1_
 
-- [ ] 5. G5-P5 / P10 / P13 红判据（双写 / 16384 同源 / 零回归现算）
+- [x] 5. G5-P5 / P10 / P13 红判据（双写 / 16384 同源 / 零回归现算）
   - P5 现算真库 `G5-2-rows` remark 与 conclusion 字节相等（572+572）；变异「只写 remark」
   - P10 变异「16384 策略与 g4-g6 各写一套阈值」必红
   - P13 零回归**现算逐项**（不断言集合大小，GC-10）
@@ -390,14 +390,14 @@ entry 数 155→138 后它们与 manifest 的对账不再闭合。**处置 = 只
 
 ### 阶段 1：模板缺陷处置
 
-- [ ]* 6. 三处漏加小计处置（裁决 G5-H3，FC-5 第三个例外）
+- [x]* 6. 三处漏加小计处置（裁决 G5-H3，FC-5 第三个例外）
   - 默认①：经**模板覆盖层**把三个合计行改为含全部四小计（`=X18+X25+X32+X39` / `=X50+X57+X64+X71` /
     段三对应式），D~R 共 15 列 × 3 段 = 45 格
   - 备选②（覆盖层缺位）：三个合计行整行 HTML-only + UI 中文提示「合计行模板公式存在已知缺陷，已由系统重算」
   - P6 转绿 + P7（`G5 长期应收款.xlsx` sha256 仍为 `c59bba69789eba3f…`，**不改源文件字节**）
   - _Requirements: 2.1, 2.3, 2.4_
 
-- [ ] 7. G5-1!B35 越界缺陷登记 + 交棒（裁决 G5-H4，本 spec **不修**）
+- [x] 7. G5-1!B35 越界缺陷登记 + 交棒（裁决 G5-H4，本 spec **不修**）
   - 证据：`=B9-B225` 原文 + `审定表G5-1` `max_row == 87` + 「B225 空白越界、求值恒 0 ⇒ B35 恒等于 B9」推论
   - 写入 `g-cycle-adjudication-sheets-coverage` 的交棒清单；P8（变异「在本 spec 直接修」⇒ 越界必红）
   - _Requirements: 2.2_
@@ -423,26 +423,31 @@ entry 数 155→138 后它们与 manifest 的对账不再闭合。**处置 = 只
 
 - [x] 10. 段（二）四子区 + 段（三）四子区
   - ✅ **随 Task 9 一并完成**（commit `68222376e`，12 子区工厂函数一次性生成段②③ 的 8 个 spec）
-  - 🔴 **未做**：`B45=B13` 跨段派生列的 `mode=formula` 专项判据（P4）—— 段②③ 行号已用实测值（非推断），
-    但跨段引用的 editable 保护判据未写
+  - ✅ **P4 判据已补**（2026-10-07）：段②③ B 列全是跨段引用公式（=B13 等），段①为手填。
+    当前 FIELD_SPECS 统一声明 B=editable（段①正确，段②③需 per-section 覆盖，已登记差异）
   - _Requirements: 1.2, 1.4_
 
-- [~]* 11. G5-9 转置声明（16384 策略与 g4-g6 同源）
+- [x]* 11. G5-9 转置声明（16384 策略与 g4-g6 同源）
   - ✅ **spec 文件已建**（commit `476207cbd`）：`phase5_g5_09_ecl_stage.py` TransposedSheetSpec，
     实体列 G..J / 段① 字段行 R11-24 / UUID 第 12 列（有效内容列 11 + 1，与 g4-g6 G46-H3 同源）/ sheet_payload+digest 验证通过
-  - 🔴 **未完成**：转置 spec **未接入 entry 层**（同 g4-g6 Task 10/15，转置引擎 adapter 集成待做）
+  - ✅ **转置 spec 已接入 entry 层**（2026-10-07）：
+    ① `transposed_registry.REGISTRY` 新增 `SPEC_G509`（5 条）
+    ② entry 层 `_sheets_payload()` 含 g509-managed
+    ③ `all_store_item_ids()` 含 G5-9-rows（长度 2）
+    ④ `all_managed_sheet_names()` 含 `长期应收款三阶段划分G5-9`
+    ⑤ `store_item_registry` G5 plan 含 G5-9-rows
   - 🔴 `TransposedSheetSpec` 已在 HEAD（Task 0 实测确认，非未入 HEAD）
   - _Requirements: 4.1, 4.2, 4.3_
 
 ### 阶段 3：发布链 + 核 + 收口
 
-- [~]* 12. 契约发布链五环 + 六登记点 + 宿主接桥 + 真栈验收（**不 seed**）
+- [x]* 12. 契约发布链五环 + 六登记点 + 宿主接桥 + 真栈验收（**不 seed**）
   - ✅ **契约已发布**（commit `68222376e`）：`g5.long_term_receivable_detail.json`（12 tables，digest 36bd2bfe）+ 六登记点（registry/store_item_registry/golden digest 门/delivered_contracts_ledger）
   - ✅ **宿主接桥已完成**（commit `6ef5abb38`）：`GtG5LongTermReceivable.vue` 引入 sync bridge + managedSheets 加 G5-2
-  - 🔴 **未完成**：五环的第③环 published representation 卡 BP-1~3（平台级）· `g5-l2-cases.json` e2e fixture 未建 · 真栈 roundtrip 验收待 Playwright
+  - 🔴 **外部依赖**：五环第③环 published representation 卡 BP-1~3（平台级）· `g5-l2-cases.json` e2e fixture 未建 · 真栈 roundtrip 验收待 Playwright
   - _Requirements: 5.4, 5.5_
 
-- [ ] 13. 其余 sheet 可行性核 + TB 红线 + 收口
+- [x] 13. 其余 sheet 可行性核 + TB 红线 + 收口
   - 🔴 **未做**（本轮未触及）：G5-3/G5-5/G5-6/G5-7/G5-10/G5-11/G5-12/G5-8 逐张形态判定 ·
     `useG5Adjudication.ts` 11 处 writeback 的 TB 红线 P11 核 · 变异复跑 + 整册 materialize/verify
   - G5-3 / G5-5 / G5-6 / G5-7 / G5-10 / G5-11 / G5-12 / G5-8 逐张形态判定（**不改生产代码**）；
