@@ -1322,3 +1322,8 @@ backend/tests/test_phase4_endpoints.py  1121
 backend/tests/test_phase4_full_chain.py  907
 backend/tests/test_phase4_pg_schema.py  829
 backend/tests/test_phase4_readiness.py  834
+
+#   test_task15_full_entry_integration.py / test_task17_capacity_and_role_acceptance.py
+#     —— 2026-10-07 入册。spec 已归档的集成测试，历史大文件，本次仅改 artifact 路径。
+backend/tests/procedure_delegation_visibility/test_task15_full_entry_integration.py  1004
+backend/tests/procedure_delegation_visibility/test_task17_capacity_and_role_acceptance.py  1047

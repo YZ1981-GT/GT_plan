@@ -40,7 +40,7 @@
 > 🔴 **自查纠正：我发明了一条不存在的基准**。前端守卫首版断言「dedicated 列表与 legacy 禁入名单**不得有交集**」—— 实际 `D4-5` 刻意同时在两处（`d4Constants.ts` 注释明说它是「历史冗余项，已接子组件桥 `d45-managed`，故实际不可能命中 legacy 分支」）。发明一条不存在的基准会把**有意设计判成缺陷**。⇒ 收窄为只断言 D4-4 的迁移完成，D4-5 走**带反向断言的显式豁免**（不只写理由文本 —— 那是加一行就变绿的后门 ——而是断言它声称的条件真的成立：`D4TabPolicyCheck.vue` 确实 `useD4SyncMode` + `d45-managed`）。
 > 🔴 **同一条铁律的正反两向在一天内都踩到**（「判断代码是否真做了 X 一律用 AST，禁文本匹配」）：**反向**是此前 docstring 写「权限：`require_project_access`」冒充真实现⇒ 漏报；**正向**是本轮我在 provider docstring 里写了禁令**反例**「写 `assert rowId.startswith('d4a-')` 之类断言会…被拒」，而首版探针用文本匹配查「有无 rowId 格式断言」⇒ 把这段**说明文字**当成真断言 ⇒ 假阳。⇒ 改用 AST（只看 `Call` 节点；docstring 是 `Expr(Constant)`、`#` 注释不进 AST）+ 变异反证（对真实 `rid.startswith('d4a-')` 必须命中，证明判据非恒绿）。另一处同型：前端守卫的 `stripComments` 自检首版用单字母样本 `c`，而保留内容 `code` 里就含 `c` ⇒ 断言自撞打红 —— **判据本身写错了**，不是被测对象有问题。
 >
-**统计**：Active **23**（2026-10-06 归档后现扫；其中 2 个为 evidence 空壳被生产代码硬读：`procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening`，三件套已在 `_archive/06-engineering-governance/`） `.kiro/specs/*/tasks.md` 口径；目录数 **64**，3 个无 tasks.md） / Archived **626**（`_archive/*/*` 实扫）
+**统计**：Active **23**（2026-10-07 清理 evidence 空壳后现扫） `.kiro/specs/*/tasks.md` 口径；目录数 **62**，1 个无 tasks.md） / Archived **626**（`_archive/*/*` 实扫）
 
 > ⏱ **2026-09-28 第十六次现扫（新建 B 线 spec）**：Active **65 → 66**（+1 = 本轮新建 `workpaper-sync-row-deletion-multi-region-propagation`）。现扫目录 **69**、无 tasks.md **3** 个、Archived **589**、任务总量 **953 / 1752**（`[ ]*` 阻塞 **150**）。🔴 **同时更正下一条（A 线那次现扫）的口径**：它记「无 tasks.md 3 → 4」，而本轮现扫得 **3** —— 差额是它自己的 tasks.md 在那条记号写下之后才落地；现扫三个无 tasks.md 目录为 `procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening` / `workpaper-page-formula-toolbar-closure`。记号从「第十五次」改为「第十六次」是因为并发会话已占用前者。
 > 🔴 **本轮最重教训 —— 同一个扫描器在错的 population 上会给出完全相反的结论**：数「同 sheet 多受管区」在 `backend/wp_templates/` 上得 **0**（351 份模板 / 2722 个 worksheet / 解析失败 0），在 `backend/storage/` 的 931 份已 instrumentation artifact 上得 **18 组**。根因是 GT_* 受管 Excel Table 由 `excel_instrumentation` 在运行期写入，模板里本就没有。若照模板口径下结论会写成「平台没有同 sheet 多受管区」⇒ 整条兄弟收缩判据被判为不必要。⇒ 「结构性零须配变异证明」这条铁律的触发点不只是解析失败，**扫错 population 是第二种**。
@@ -812,7 +812,7 @@ _archive/
 | b-class-orphan-carrier-and-host-inline-lanes | 23/27 | `16-workpaper-sync-cycle-lanes` · B 类孤儿载体 + 宿主内联 5 条 entry；余 4 条 `[ ]*` 全外部依赖 |
 | c-cycle-sync-foundation-and-first-canary | 28/37 | `16-workpaper-sync-cycle-lanes` · C 循环地基 + gt-c-control-test canary；余 9 条 `[ ]*` = BP 平台阻塞 + `-2` 册模板业务重做 + C22 真库 0 行 |
 | c22-itgc-no-switch-and-domain-code-sheet-lane | 13/17 | `16-workpaper-sync-cycle-lanes` · C22 ITGC 单 entry；余 4 条 `[ ]*` = 平台阻塞 + 真库 0 行 + 方案 B 待业务确认 |
-| j2-j3-non-entry-hosts-and-orphan-cleanup | 16/18 | `16-workpaper-sync-cycle-lanes` · J2/J3 非 entry 宿主与孤儿清理；Task 9 删除归档前现查 3 文件确已不存在（仅 barrel 注释提及），Task 13 待业务确认披露口径 |
+| j2-j3-non-entry-hosts-and-orphan-cleanup | 18/18 ✅ | `16-workpaper-sync-cycle-lanes` · J2/J3 非 entry 宿主与孤儿清理（全部完成，2026-10-07 归档） |
 | workpaper-sync-registration-isolation-and-d2-republish | 14/14 | `15-workpaper-sync-engine-hardening` · 注册按 entry 隔离 + D2 重发布（此前未在 Active 表登记） |
 | disclosure-payload-authority-source | 25/26 | `08-disclosure-notes` · 载荷权威源留前端；余 1 条 `[ ]*` = Playwright 需 start-dev.bat |
 | voucher-sampling-account-scope-and-attach-closure | 59/61 | `05-business-features` · 抽凭科目范围与附件闭环；余 2 条 `[ ]*` = Playwright 需 start-dev.bat |
