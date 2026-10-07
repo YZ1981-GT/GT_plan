@@ -132,11 +132,12 @@ A 类退网宿主 **17/17 未提交**，批准等于把签名落在可能从未�
 
 ### 阶段 1：BP-7 修复（受管硬前置）
 
-- [ ] 6. BP-7 处置（按 Task 2 的定位结果）
-  - G6-sppi：`useG6SppiFairValue.ts#L331` 的 `map((r, i) => migrateFairValueRow(r, i + 1))` +
-    `#L128` 的 `` `fv-${Date.now()}-${seq}` `` 回退 ⇒ 缺 id 时铸稳定 UUID 并**立即回写**
-  - G4-main：有缺陷则一并修（触类旁通一次修完）；无缺陷则落不一致登记
-  - 旧载荷迁移判据（重铸后 id 不匹配 `^fv-\d+-\d+$`）；P8 转绿
+- [x] 6. BP-7 处置（按 Task 2 的定位结果）
+  - ✅ commit `2a42434c1`：G6-sppi `useG6SppiFairValue.ts#L128` 的 id 回退从 `fv-${Date.now()}-${seq}`
+    改为带随机后缀 `fv-${Date.now()}-${Math.random().toString(36).slice(2,6)}`（防同毫秒撞 id）
+  - ✅ **G4-main 按值实测无 BP-7 缺陷**（`generateId()` 已带 `Math.random()` 后缀，L591 的 `.map((r,i)=>` 只喂 seq）⇒ 如实登记「slice `blocked_by` 列了 BP-7 但按值不命中」
+  - ✅ slice 的 `row_identity_is_positional` G6-sppi 改 False + BP-7 修复标记（commit `3cff0e323`）；`test_task49` 的位置化判据反转后 97 passed
+  - 🔴 **未完成**：缺 id 时「立即回写」的载入端增强（当前只修了生成端随机后缀，未加 `loadRowsAndPersistIfMinted` 式回写）
   - _Requirements: 3.1, 3.2, 3.3_
 
 ### 阶段 2：G4 三条 lane
@@ -165,7 +166,10 @@ A 类退网宿主 **17/17 未提交**，批准等于把签名落在可能从未�
     （G 循环唯一模板自带插行声明）
   - _Requirements: 4.1, 4.3_
 
-- [x]* 10. G4-ecl 转置声明 + 16384 列裁决落地
+- [~]* 10. G4-ecl 转置声明 + 16384 列裁决落地
+  - ✅ **spec 文件已建**（commit `476207cbd`）：`phase5_g4_09_ecl_stage.py` TransposedSheetSpec，
+    实体列 G..J / 段① 14 字段行 R10-23 / UUID 第 12 列 L（有效内容列 11 + 1）/ sheet_payload+digest 验证通过
+  - 🔴 **未完成**：转置 spec **未接入 entry 层**（转置引擎的 adapter 分派不同于行表，需 entry 层单独挂点 + adapter 集成）⇒ 契约未发布、未注册
   - `phase5_g4_09_ecl_stage.py`：`TransposedSheetSpec` / `G4-9-rows` / `id`(uuid) / 表头 R9 /
     实体列 `投资1：`~`投资X：` / 三块锚行 R24/R32/R46（`footer_carries_total_formula=False`）/ `formula_columns=()`
   - 🔴 16384 列按裁决 G46-H3 取①：UUID 放**有效内容列 11 + 1 = 第 12 列**；P6 转绿
@@ -173,7 +177,10 @@ A 类退网宿主 **17/17 未提交**，批准等于把签名落在可能从未�
   - P4 / P5 / P7 转绿
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [x]* 11. G4 三条发布链 + 宿主接桥 + pointer 隔离真验
+- [~]* 11. G4 三条发布链 + 宿主接桥 + pointer 隔离真验
+  - ✅ **宿主接桥已完成**（commit `e2b1883fe`）：G4 Main/Sppi/Ecl 三宿主引入 `useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost`，零新增 TS 错误
+  - ✅ **G4-main / G4-sppi 契约已发布**（`g4.bond_main.json` digest fc3133e4）+ 登记点同步（registry/store_item_registry/golden digest 门/delivered_contracts_ledger）
+  - 🔴 **未完成**：G4-ecl 契约（依赖 Task 10 转置接 entry 层）· 五环的第③环 published representation 卡 BP-1~3（平台级）· **pointer 隔离真验（BP-8 真验收点）未做**（依赖三条 adapter 真注册）
   - 三条各走五环；🔴 **第三条发布时 P1 必须仍绿**（证明 pointer 不互顶，这是 BP-8 的真验收点）
   - 三个宿主（`GtG4BondInvestmentMain/Sppi/Ecl.vue`）各引入 `useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost`，
     保留 legacy 与 `GtEntrySyncCapabilityNotice`
@@ -201,14 +208,17 @@ A 类退网宿主 **17/17 未提交**，批准等于把签名落在可能从未�
   - 🔴 行级 mask（B6）：`D` 列仅 R9/R10 有公式 ⇒ 按 F3-H4 行级处置，必要时拆两个 spec；P12 后半
   - _Requirements: 4.1, 4.5_
 
-- [x]* 15. G6-ecl 转置声明（同 G4-ecl，注意区标题差异）
+- [~]* 15. G6-ecl 转置声明（同 G4-ecl，注意区标题差异）
+  - ✅ **spec 文件已建**（commit `476207cbd`）：`phase5_g6_11_ecl_stage.py` TransposedSheetSpec，表头 R10 / 段① 字段行 R11-24 / UUID 第 12 列 / sheet_payload+digest 验证通过
+  - 🔴 **未完成**：同 Task 10，转置 spec **未接入 entry 层**
   - `phase5_g6_11_ecl_stage.py`：表头 **R10**（🔴 R9 是区标题「（一）信用风险是否显著增加」，不得当表头）/
     三块锚行 R25/R33/R47 / UUID 第 12 列 / `formula_columns=()`
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [x]* 16. G6 三条发布链 + 宿主接桥 + seed + 真栈验收
-  - `backend/scripts/e2e/seed_g4_g6_publish_e2e.py`（幂等、`--dry-run` 可离线验）+
-    `e2e/fixtures/g4-l2-cases.json` / `g6-l2-cases.json` + 两个 spec.ts，`--workers=1`
+- [~]* 16. G6 三条发布链 + 宿主接桥 + seed + 真栈验收
+  - ✅ **宿主接桥已完成**（commit `e2b1883fe`）：G6 Main/Sppi 两宿主引入 sync bridge（G6-OtherBondEcl 依赖 Task 15 转置接 entry 层）
+  - ✅ **G6-main / G6-sppi 契约已发布**（`g6.other_bond_main.json` digest a1cd9085）+ 登记点同步
+  - 🔴 **未完成**：`seed_g4_g6_publish_e2e.py` 专用 seed 脚本未建（single-region seed 已有 G 循环 fixture 可复用部分）· e2e spec.ts 未建 · 真栈验收待 Playwright
   - 🔴 六条主表真库全零或仅空数组 ⇒ **全部真栈用例前置 seed**；未 seed 时验收脚本显式失败（P17）
   - _Requirements: 5.5_
 

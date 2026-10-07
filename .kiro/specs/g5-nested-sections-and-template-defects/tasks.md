@@ -414,34 +414,37 @@ entry 数 155→138 后它们与 manifest 的对账不再闭合。**处置 = 只
   - _Requirements: 5.3_
 
 - [x] 9. `phase5_g5_02_balance_detail.py` 段（一）四子区（首批，验通嵌套声明）
-  - `g502-s1r1`~`s1r4`：R13-17 / R20-24 / R27-31 / R34-38，各自 footer 指本子区小计（R18/R25/R32/R39）
-  - 共享 `store_item_id="G5-2-rows"`；行身份 `id`(uuid)；`formula_columns=("G","J","M")`
-    （`G=D+E+F` · `J=D+H-I` · `M=J+K+L`）；表头 R10/R11（R11 是 N-R 账龄段）
-  - payload **双写**（`remark` + `conclusion` 逐字相同）；P1 / P2 / P3 / P5 转绿
+  - ✅ commit `68222376e`：**一次性做了全三段 × 四子区 = 12 个 RowTableSheetSpec**（不只段①），
+    工厂函数 `_build_spec()` 生成，`row_section_field="sectionKey"` 过滤 12 段
+  - `g5_2_s1r1`~`s3r4`：段① R13-17/R20-24/R27-31/R34-38 · 段② R45-49/R52-56/R59-63/R66-70 · 段③ R77-81/R84-88/R91-95/R98-102
+  - 共享 `store_item_id="G5-2-rows"`；行身份 `id`；`formula_columns=("G","J","M")`；有效列 22（A..V）uuid W
+  - payload **dual_write**；三处漏加小计登记在 `MISSING_SUBTOTAL_IN_TOTALS_G502=(32,64,96)`
   - _Requirements: 1.1, 1.2, 1.3, 1.5_
 
-- [ ] 10. 段（二）四子区 + 段（三）四子区
-  - 段（二）R45-49 / R52-56 / R59-63 / R66-70，小计 R50/R57/R64/R71；🔴 `B45=B13` 跨段派生列
-    判 `mode=formula` 不得 editable（P4）
-  - 段（三）行号取 Task 2 逐格补测结果（**不用推断值**），小计 R82/R89/R96/R103
+- [x] 10. 段（二）四子区 + 段（三）四子区
+  - ✅ **随 Task 9 一并完成**（commit `68222376e`，12 子区工厂函数一次性生成段②③ 的 8 个 spec）
+  - 🔴 **未做**：`B45=B13` 跨段派生列的 `mode=formula` 专项判据（P4）—— 段②③ 行号已用实测值（非推断），
+    但跨段引用的 editable 保护判据未写
   - _Requirements: 1.2, 1.4_
 
-- [x]* 11. G5-9 转置声明（16384 策略与 g4-g6 同源）
-  - `phase5_g5_09_ecl_stage.py`：`TransposedSheetSpec`，实体列/三块锚行取 Task 2 实测值
-  - 🔴 UUID 放**有效内容列 +1**，与 `g4-g6` 裁决 G46-H3 **引用同一条规则**（P10）
-  - `TransposedSheetSpec` 未入 HEAD ⇒ 登记 HTML-only + 解锁条件
+- [~]* 11. G5-9 转置声明（16384 策略与 g4-g6 同源）
+  - ✅ **spec 文件已建**（commit `476207cbd`）：`phase5_g5_09_ecl_stage.py` TransposedSheetSpec，
+    实体列 G..J / 段① 字段行 R11-24 / UUID 第 12 列（有效内容列 11 + 1，与 g4-g6 G46-H3 同源）/ sheet_payload+digest 验证通过
+  - 🔴 **未完成**：转置 spec **未接入 entry 层**（同 g4-g6 Task 10/15，转置引擎 adapter 集成待做）
+  - 🔴 `TransposedSheetSpec` 已在 HEAD（Task 0 实测确认，非未入 HEAD）
   - _Requirements: 4.1, 4.2, 4.3_
 
 ### 阶段 3：发布链 + 核 + 收口
 
-- [x]* 12. 契约发布链五环 + 六登记点 + 宿主接桥 + 真栈验收（**不 seed**）
-  - `generate_phase5_g5_contract.py --apply` → `g5.long_term_receivable_detail.json` → 五环
-  - `GtG5LongTermReceivable.vue` 引入 `useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost`，保留 legacy(4) + notice(3)
-  - `e2e/fixtures/g5-l2-cases.json`，`--workers=1`；🔴 真库已有 572+572 B ⇒ **不交付 seed**，
-    但先断言「roundtrip 行数 > 0 且来自真库」+「两列字节相等」（P5 / P13）
+- [~]* 12. 契约发布链五环 + 六登记点 + 宿主接桥 + 真栈验收（**不 seed**）
+  - ✅ **契约已发布**（commit `68222376e`）：`g5.long_term_receivable_detail.json`（12 tables，digest 36bd2bfe）+ 六登记点（registry/store_item_registry/golden digest 门/delivered_contracts_ledger）
+  - ✅ **宿主接桥已完成**（commit `6ef5abb38`）：`GtG5LongTermReceivable.vue` 引入 sync bridge + managedSheets 加 G5-2
+  - 🔴 **未完成**：五环的第③环 published representation 卡 BP-1~3（平台级）· `g5-l2-cases.json` e2e fixture 未建 · 真栈 roundtrip 验收待 Playwright
   - _Requirements: 5.4, 5.5_
 
-- [x] 13. 其余 sheet 可行性核 + TB 红线 + 收口
+- [ ] 13. 其余 sheet 可行性核 + TB 红线 + 收口
+  - 🔴 **未做**（本轮未触及）：G5-3/G5-5/G5-6/G5-7/G5-10/G5-11/G5-12/G5-8 逐张形态判定 ·
+    `useG5Adjudication.ts` 11 处 writeback 的 TB 红线 P11 核 · 变异复跑 + 整册 materialize/verify
   - G5-3 / G5-5 / G5-6 / G5-7 / G5-10 / G5-11 / G5-12 / G5-8 逐张形态判定（**不改生产代码**）；
     真库有载荷的 G5-3(254+254) / G5-5(798+798) 优先给接入可行性结论；G5-4 照 FC-6；
     `g5NoteSectionMap` 披露 sheet 名不回归（P9）
