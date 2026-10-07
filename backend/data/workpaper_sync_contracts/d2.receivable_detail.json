@@ -1186,7 +1186,14 @@
     {
       "excel_name": "审定表D2-1",
       "locator": {
-        "anchor": "excel_table_sheet_association"
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_D21"
+      },
+      "region_boundary_locator": {
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_D21",
+        "range": "$B$10:$D$11",
+        "region_kind": "static"
       },
       "sheet_key": "d21-managed",
       "tables": [
@@ -1334,7 +1341,8 @@
           "header_rows": 2,
           "table_key": "adjudication_cells"
         }
-      ]
+      ],
+      "template_id": "D21"
     }
   ],
   "template": {
