@@ -12,7 +12,8 @@
     "wp_data",
     "formula",
     "prior_year_note",
-    "manual"
+    "manual",
+    "consol_aggregation"
   ],
   "valid_modes": [
     "auto",

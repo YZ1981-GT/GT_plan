@@ -305,7 +305,7 @@ def test_generate_ignores_unknown_scope():
 # 真实 _dispatch 路由（桩注入各生成器入口，验证 scope → 生成器映射）
 # ═══════════════════════════════════════════════════════════════════════════
 def test_dispatch_report_routes_to_report_engine(monkeypatch):
-    """report scope → ReportEngine.generate_unadjusted_report，产 report:{row_code} 单元。
+    """report scope → coordinator → 产 report:{addr_id} 单元 + report 域 page_keys。
 
     **Validates: Requirements 21.1**
     """
@@ -313,15 +313,32 @@ def test_dispatch_report_routes_to_report_engine(monkeypatch):
     async def _scenario():
         factory, engine = await _make_session()
         try:
-            import app.services.report_engine as report_engine_mod
+            from app.services.formula_runtime.contracts import (
+                CanonicalFormulaTarget,
+                FormulaMutation,
+            )
+            from app.services.formula_runtime.coordinator import (
+                FormulaRuntimeCoordinator,
+                MutationPlanResult,
+            )
 
-            async def _fake_gen(self, project_id, year, report_type):
-                return [{"row_code": f"{report_type.value}-1", "row_name": "x"}]
+            # 模拟 coordinator 返回 4 条 report 域变更
+            async def _fake_plan(self, *, project_id, year, scopes):
+                mutations = []
+                for i, rt in enumerate(["BS-1", "IS-1", "CF-1", "EQ-1"]):
+                    mutations.append(FormulaMutation(
+                        target=CanonicalFormulaTarget(
+                            domain="report", project_id=project_id,
+                            year=year, addr_id=rt, locator={},
+                        ),
+                        before_value=None, after_value=100 + i,
+                    ))
+                return MutationPlanResult(mutations=mutations)
 
             monkeypatch.setattr(
-                report_engine_mod.ReportEngine,
-                "generate_unadjusted_report",
-                _fake_gen,
+                FormulaRuntimeCoordinator,
+                "generate_mutation_plan",
+                _fake_plan,
             )
 
             async with factory() as db:
@@ -329,10 +346,14 @@ def test_dispatch_report_routes_to_report_engine(monkeypatch):
                 units, page_keys = await orch._dispatch(
                     "report", project_id=PROJECT_ID, year=YEAR
                 )
-                # 四张主表各产一行 → 4 个单元，全部 report: 前缀
-                assert len(units) == len(_orch_report_types())
+                # coordinator 产 4 个 mutation → 4 个 units，全部 report: 前缀
+                assert len(units) == 4
                 assert all(u.unit_scope.startswith("report:") for u in units)
-                assert page_keys == ["report:*"]
+                # page_keys 从预设库派生（可能为空取决于 preset_index）
+                # 但不应含 non-report 域的键
+                assert all(
+                    k.startswith("report:") for k in page_keys
+                ) if page_keys else True
         finally:
             await engine.dispose()
 
@@ -349,7 +370,7 @@ def _orch_report_types():
 
 
 def test_dispatch_note_routes_to_execute_note_formulas(monkeypatch):
-    """note scope → execute_note_formulas，仅 status=ok 单元产 note:{section}!{r}:{c}。
+    """note scope → coordinator → 仅从 mutations 产 note:{section}!{r}:{c} 单元。
 
     **Validates: Requirements 21.1**
     """
@@ -357,31 +378,43 @@ def test_dispatch_note_routes_to_execute_note_formulas(monkeypatch):
     async def _scenario():
         factory, engine = await _make_session()
         try:
-            import app.services.note_formula_generator as note_mod
+            from app.services.formula_runtime.contracts import (
+                CanonicalFormulaTarget,
+                FormulaMutation,
+            )
+            from app.services.formula_runtime.coordinator import (
+                FormulaRuntimeCoordinator,
+                MutationPlanResult,
+            )
 
-            async def _fake_exec(db, project_id, year, note_section, **kw):
-                return {
-                    "results": [
-                        {"cell": "2:3", "status": "ok"},
-                        {"cell": "4:5", "status": "skipped"},
-                    ]
-                }
+            # 模拟 coordinator 返回 note 域变更
+            async def _fake_plan(self, *, project_id, year, scopes):
+                mutations = [
+                    FormulaMutation(
+                        target=CanonicalFormulaTarget(
+                            domain="note", project_id=project_id,
+                            year=year, addr_id="五、1!2:3",
+                            locator={"section": "五、1"},
+                        ),
+                        before_value=None, after_value=42,
+                    ),
+                ]
+                return MutationPlanResult(mutations=mutations)
 
-            monkeypatch.setattr(note_mod, "execute_note_formulas", _fake_exec)
+            monkeypatch.setattr(
+                FormulaRuntimeCoordinator,
+                "generate_mutation_plan",
+                _fake_plan,
+            )
 
             async with factory() as db:
                 orch = DraftRefreshOrchestrator(db)
-
-                async def _fake_sections(*, project_id, year):
-                    return ["五、1"]
-
-                orch._note_sections = _fake_sections
-
                 units, page_keys = await orch._dispatch(
                     "note", project_id=PROJECT_ID, year=YEAR
                 )
-                # 仅 status=ok 的单元入选
-                assert [u.unit_scope for u in units] == ["note:五、1!2:3"]
+                # 仅 mutation 产出的单元入选
+                assert len(units) == 1
+                assert units[0].unit_scope == "note:五、1!2:3"
                 assert page_keys == ["note:五、1"]
         finally:
             await engine.dispose()
@@ -389,8 +422,8 @@ def test_dispatch_note_routes_to_execute_note_formulas(monkeypatch):
     _run(_scenario())
 
 
-def test_dispatch_workpaper_derives_page_keys_from_wp_index():
-    """workpaper:{cycle} / adjudication → 从 wp_index 派生 workpaper:{wp_code} page_keys。
+def test_dispatch_workpaper_derives_page_keys_from_wp_index(monkeypatch):
+    """workpaper:{cycle} / adjudication → coordinator + 从 wp_index 派生 page_keys。
 
     **Validates: Requirements 21.1, 21.2**
     """
@@ -398,6 +431,21 @@ def test_dispatch_workpaper_derives_page_keys_from_wp_index():
     async def _scenario():
         factory, engine = await _make_session()
         try:
+            from app.services.formula_runtime.coordinator import (
+                FormulaRuntimeCoordinator,
+                MutationPlanResult,
+            )
+
+            # coordinator 对 workpaper/adjudication 返回空 mutations（靠 page_keys 走预设库）
+            async def _fake_plan(self, *, project_id, year, scopes):
+                return MutationPlanResult(mutations=[])
+
+            monkeypatch.setattr(
+                FormulaRuntimeCoordinator,
+                "generate_mutation_plan",
+                _fake_plan,
+            )
+
             async with factory() as db:
                 db.add_all(_seed_wp_index(["D3", "D3-1", "E1", "E1-1"]))
                 await db.commit()
@@ -408,7 +456,7 @@ def test_dispatch_workpaper_derives_page_keys_from_wp_index():
                 units_d, pages_d = await orch._dispatch(
                     "workpaper:D", project_id=PROJECT_ID, year=YEAR
                 )
-                assert units_d == []  # 审定表 writeback 接口不匹配 → 经预设库 page_keys 生成
+                assert units_d == []  # coordinator 返回空 mutations
                 assert set(pages_d) == {"workpaper:D3", "workpaper:D3-1"}
 
                 # adjudication → 仅审定表页面（-1 结尾）

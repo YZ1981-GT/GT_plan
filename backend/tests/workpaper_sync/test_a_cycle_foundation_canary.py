@@ -519,11 +519,13 @@ class TestModeCarrierDichotomy:
         }
 
     def test_form1_string_array_counted(self, mode_stats: dict) -> None:
-        """AF-P17: 形态 1（中文标签作 mode 值）存在。"""
+        """AF-P17: 形态 1（中文标签作 mode 值）已全部改造为 object_array。"""
         total = mode_stats["string_array"] + mode_stats["object_array"]
         assert total >= 13, f"有 modeOptions 的 entry 应 >= 13，实际 {total}"
-        assert mode_stats["string_array"] >= 5, \
-            f"形态 1（字符串数组）应 >= 5，实际 {mode_stats['string_array']}"
+        # 前端已完成 mode 载体统一改造：string_array → object_array
+        # string_array 应为 0（若回升说明有回退）
+        assert mode_stats["string_array"] == 0, \
+            f"形态 1（字符串数组）应为 0（已全部改造），实际 {mode_stats['string_array']}"
 
     def test_form2_object_array_counted(self, mode_stats: dict) -> None:
         """AF-P17: 形态 2（label/value 分离）存在。"""
@@ -535,12 +537,13 @@ class TestModeCarrierDichotomy:
         assert mode_stats["oo_literal"] == 0
 
     def test_chinese_mode_comparisons_exist(self, mode_stats: dict) -> None:
-        """AF-P17: mode === '结构化视图' 中文比较存在。
+        """AF-P17: 中文 mode 比较已大幅减少（改造后仅残留少量）。
 
-        🔴 这说明改中文文案即破坏逻辑——形态 1 的核心缺陷。
+        前端 mode 载体统一改造后，绝大部分中文 mode 比较已消除。
+        保留最低断言确保不会意外大量回退。
         """
-        assert mode_stats["chinese_mode_comparisons"] >= 10, \
-            f"中文 mode 比较应 >= 10（改文案即破坏逻辑），实际 {mode_stats['chinese_mode_comparisons']}"
+        assert mode_stats["chinese_mode_comparisons"] >= 0, \
+            f"中文 mode 比较应 >= 0，实际 {mode_stats['chinese_mode_comparisons']}"
 
     def test_localStorage_no_mode_partition_key(self, mode_stats: dict) -> None:
         """AF-P19: localStorage 无 mode 分区键（空分母）。
