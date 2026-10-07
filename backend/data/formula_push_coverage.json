@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "registered_codes": [
     "D1",
     "D2",
@@ -361,9 +361,9 @@
         "1602",
         "1603"
       ],
-      "rule_count": 2,
+      "rule_count": 3,
       "owned_key_count": 2,
-      "has_note_rules": false
+      "has_note_rules": true
     },
     {
       "wp_code": "H10",
@@ -371,9 +371,9 @@
       "account_prefixes": [
         "6115"
       ],
-      "rule_count": 3,
+      "rule_count": 4,
       "owned_key_count": 3,
-      "has_note_rules": false
+      "has_note_rules": true
     },
     {
       "wp_code": "H2",
@@ -411,9 +411,9 @@
       "account_prefixes": [
         "1631"
       ],
-      "rule_count": 3,
+      "rule_count": 4,
       "owned_key_count": 3,
-      "has_note_rules": false
+      "has_note_rules": true
     },
     {
       "wp_code": "H6",
@@ -431,9 +431,9 @@
       "account_prefixes": [
         "1621"
       ],
-      "rule_count": 3,
+      "rule_count": 4,
       "owned_key_count": 3,
-      "has_note_rules": false
+      "has_note_rules": true
     },
     {
       "wp_code": "H8",
@@ -441,9 +441,9 @@
       "account_prefixes": [
         "1901"
       ],
-      "rule_count": 3,
+      "rule_count": 4,
       "owned_key_count": 3,
-      "has_note_rules": false
+      "has_note_rules": true
     },
     {
       "wp_code": "H9",
@@ -451,9 +451,9 @@
       "account_prefixes": [
         "2802"
       ],
-      "rule_count": 3,
+      "rule_count": 4,
       "owned_key_count": 3,
-      "has_note_rules": false
+      "has_note_rules": true
     },
     {
       "wp_code": "I1",
@@ -463,9 +463,9 @@
         "1702",
         "1703B"
       ],
-      "rule_count": 5,
+      "rule_count": 6,
       "owned_key_count": 5,
-      "has_note_rules": false
+      "has_note_rules": true
     },
     {
       "wp_code": "I2",
@@ -473,9 +473,9 @@
       "account_prefixes": [
         "1704"
       ],
-      "rule_count": 3,
+      "rule_count": 4,
       "owned_key_count": 3,
-      "has_note_rules": false
+      "has_note_rules": true
     },
     {
       "wp_code": "I3",
@@ -493,9 +493,9 @@
       "account_prefixes": [
         "1801"
       ],
-      "rule_count": 3,
+      "rule_count": 4,
       "owned_key_count": 3,
-      "has_note_rules": false
+      "has_note_rules": true
     },
     {
       "wp_code": "I5",
@@ -503,9 +503,9 @@
       "account_prefixes": [
         "1901"
       ],
-      "rule_count": 3,
+      "rule_count": 4,
       "owned_key_count": 3,
-      "has_note_rules": false
+      "has_note_rules": true
     },
     {
       "wp_code": "I6",
@@ -513,9 +513,9 @@
       "account_prefixes": [
         "6602"
       ],
-      "rule_count": 1,
+      "rule_count": 2,
       "owned_key_count": 1,
-      "has_note_rules": false
+      "has_note_rules": true
     },
     {
       "wp_code": "J1",
@@ -898,6 +898,511 @@
       "rule_count": 2,
       "owned_key_count": 1,
       "has_note_rules": true
+    }
+  ],
+  "not_applicable": [
+    {
+      "wp_code": "A1",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A10",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A11",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A12",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A13",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A14",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A15",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A16",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A17",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A18",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A2",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A21",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A22",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A23",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A24",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A25",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A26",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A27",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A28",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A3",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A30",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A31",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A4",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A5",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A6",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A7",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A8",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A9",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B1",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B10",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B11",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B12",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B13",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B15",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B18",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B19",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B2",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B23",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B3",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B30",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B40",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B5",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B50",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B51",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B52",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B60",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C1",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C10",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C11",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C12",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C13",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C14",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C15",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C2",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C21",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C22",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C23",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C24",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C25",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C26",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C3",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C4",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C5",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C6",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C7",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C8",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C9",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "D0",
+      "reason": "函证中心底稿（应收函证），数据来自询证程序结果而非试算表公式推送",
+      "account_codes": [
+        "1121",
+        "1122"
+      ]
+    },
+    {
+      "wp_code": "E0",
+      "reason": "函证中心底稿（银行函证），数据来自询证程序结果而非试算表公式推送",
+      "account_codes": [
+        "1002"
+      ]
+    },
+    {
+      "wp_code": "F0",
+      "reason": "函证中心底稿（委外加工函证），数据来自询证程序结果而非试算表公式推送",
+      "account_codes": [
+        "1401"
+      ]
+    },
+    {
+      "wp_code": "F5",
+      "reason": "有科目码（6401,6402），后续可接入候选",
+      "account_codes": [
+        "6401",
+        "6402"
+      ]
+    },
+    {
+      "wp_code": "G0",
+      "reason": "函证中心底稿（证券/股权函证），数据来自询证程序结果而非试算表公式推送",
+      "account_codes": [
+        "1101",
+        "1511"
+      ]
+    },
+    {
+      "wp_code": "H0",
+      "reason": "函证中心底稿（固定资产循环函证），数据来自询证程序结果而非试算表公式推送",
+      "account_codes": [
+        "1601"
+      ]
+    },
+    {
+      "wp_code": "J3",
+      "reason": "有科目码（2711），后续可接入候选",
+      "account_codes": [
+        "2711"
+      ]
+    },
+    {
+      "wp_code": "K0",
+      "reason": "函证中心底稿（其他应收/应付函证），数据来自询证程序结果而非试算表公式推送",
+      "account_codes": [
+        "1221",
+        "2241"
+      ]
+    },
+    {
+      "wp_code": "L0",
+      "reason": "函证中心底稿（借款函证），数据来自询证程序结果而非试算表公式推送",
+      "account_codes": [
+        "2001",
+        "2501"
+      ]
+    },
+    {
+      "wp_code": "S1",
+      "reason": "S 循环专项考虑（违反法规行为的考虑），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S10",
+      "reason": "S 循环专项考虑（环境事项考虑），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S11",
+      "reason": "S 循环专项考虑（利用服务机构），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S12",
+      "reason": "S 循环专项考虑（利用专家工作），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S13",
+      "reason": "S 循环专项考虑（利用管理层专家），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S14",
+      "reason": "S 循环专项考虑（会计估计和相关披露），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S15",
+      "reason": "S 循环专项考虑（每股收益和净资产收益率），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S16",
+      "reason": "S 循环专项考虑（套期活动），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S17",
+      "reason": "S 循环专项考虑（非经常性损益），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S2",
+      "reason": "S 循环专项考虑（首次接受委托期初余额），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S20",
+      "reason": "S 循环专项考虑（营业收入扣除情况核查），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S21",
+      "reason": "S 循环专项考虑（数据资产），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S3",
+      "reason": "S 循环专项考虑（会计政策变更/前期差错/估计变更），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S32",
+      "reason": "S 循环专项考虑（S32），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S35",
+      "reason": "S 循环专项考虑（S35），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S4",
+      "reason": "S 循环专项考虑（非货币性资产交换），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S5",
+      "reason": "S 循环专项考虑（债务重组），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S6",
+      "reason": "S 循环专项考虑（大股东资金占用/违规担保），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S8",
+      "reason": "S 循环专项考虑（租赁），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S9",
+      "reason": "S 循环专项考虑（电子商务考虑），无科目码关联，文档/分析类底稿",
+      "account_codes": []
     }
   ]
 }

@@ -29,11 +29,13 @@ from app.services.consol_group_tree import (
     MODE_MIXED,
     MODE_NONE,
     MODE_SUBSIDIARY,
+    ROLE_BRANCH,
     ROLE_BRANCH_ELIM,
     ROLE_CONSOL,
     ROLE_CONSOL_ELIM,
     ROLE_HQ,
     ROLE_PARENT,
+    ROLE_SUBSIDIARY,
     ProjectRecord,
     derive_group_tree,
     derive_parent_links,
@@ -117,7 +119,32 @@ class TestExamples:
         assert sub_a.project_id == a.id and sub_a.relation == "subsidiary" and sub_a.kind == KIND_DATA
         assert root.mode == MODE_MIXED
 
-    def test_parent_without_branch_is_data_node(self):
+    def test_role_matrix_has_stable_node_keys_and_elim_hosts(self):
+        """实体角色与计算差额角色共存时，节点键和分录承载项目必须可区分。"""
+        g_c, g_s = consol("G", "某集团"), rec("G", "某集团")
+        branch = rec("B", "某集团上海分公司", parent="G", relation="branch")
+        subsidiary = rec("S", "乙公司", parent="G", relation="subsidiary")
+        root = tree_of([g_c, g_s, branch, subsidiary], g_c)
+
+        nodes = list(iter_nodes(root))
+        assert [node.node_key for node in nodes] == [
+            "G:consol", "G:consol_elim", "G:parent", "G:branch_elim", "G:hq",
+            "B:branch", "S:subsidiary",
+        ]
+        assert len({node.node_key for node in nodes}) == len(nodes)
+        assert {node.role for node in nodes} == {
+            ROLE_CONSOL, ROLE_CONSOL_ELIM, ROLE_PARENT, ROLE_BRANCH_ELIM,
+            ROLE_HQ, ROLE_BRANCH, ROLE_SUBSIDIARY,
+        }
+
+        consol_elim = find_node_by_key(root, "G:consol_elim")
+        branch_elim = find_node_by_key(root, "G:branch_elim")
+        assert consol_elim is not None and consol_elim.project_id is None
+        assert branch_elim is not None and branch_elim.project_id is None
+        assert consol_elim.host_project_id == g_c.id
+        assert branch_elim.host_project_id == g_c.id
+        assert root.mode == MODE_MIXED
+
         g_c, g_s = consol("G", "某集团"), rec("G", "某集团")
         a = rec("A", "甲公司", parent="G", relation="subsidiary")
         root = tree_of([g_c, g_s, a], g_c)

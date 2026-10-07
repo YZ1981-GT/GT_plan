@@ -14,7 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.consolidation_models import ConsolTrial
 
 if TYPE_CHECKING:
+    from app.schemas.consol_context import ConsolContext
     from app.services.consol_calc_basis import CalcBasis
+    from app.services.consol_tree_service import TreeNode
 
 
 async def get_trial_balance(db: AsyncSession, project_id: UUID, year: int) -> list[ConsolTrial]:
@@ -133,7 +135,14 @@ async def sync_trial_rows(
     return list(by_code.values())
 
 
-async def recalculate_trial(db: AsyncSession, project_id: UUID, year: int) -> list[ConsolTrial]:
+async def recalculate_trial(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    *,
+    context: "ConsolContext | None" = None,
+    tree: "TreeNode | None" = None,
+) -> list[ConsolTrial]:
     """重新计算合并试算表（spec consol-tree-three-code-autobuild 任务 7.4）。
 
     ``consol_amount = individual_sum + consol_adjustment + consol_elimination``：
@@ -147,8 +156,16 @@ async def recalculate_trial(db: AsyncSession, project_id: UUID, year: int) -> li
     只 flush 不 commit。
     """
     from app.services.consol_calc_basis import load_calc_basis, trial_amounts
+    from app.services.consol_context_service import validate_context
 
-    basis = await load_calc_basis(db, project_id, year)
+    resolved_tree = tree
+    if resolved_tree is None and context is not None:
+        from app.services.consol_tree_service import build_tree
+
+        resolved_tree = await build_tree(db, project_id)
+    validate_context(context, project_id, year, tree=resolved_tree)
+
+    basis = await load_calc_basis(db, project_id, year, tree=resolved_tree)
     if basis is None:
         raise ValueError(f"企业树构建失败：找不到合并母项目 {project_id}")
     amounts = trial_amounts(basis)
@@ -164,6 +181,7 @@ async def recalculate_trial(db: AsyncSession, project_id: UUID, year: int) -> li
         trial.consolidation_breakdown = {
             "by_company": a.by_company if a is not None else [],
             "individual_sum": str(trial.individual_sum),
+            "source_entry_ids": a.source_entry_ids if a is not None else [],
             "computed_at": computed_at,
         }
         trial.is_stale = False  # 重算后清除陈旧标记（P1）

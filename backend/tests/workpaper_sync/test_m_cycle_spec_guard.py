@@ -1580,3 +1580,261 @@ class TestLane3Remaining:
         assert counts[5] == 10
         assert counts[8] == 11
         assert counts[9] == 9
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Task 18（lane 3, MB-P23）：M1 真库 AI 会话记录行处置
+# ════════════════════════════════════════════════════════════════════════════
+# 引用 MC-18 / MC-15 / MF-P22 / MF-P23。
+# 守卫只断言现状事实（行数、键形态、定性），不动真库数据。
+# 处置裁定：只登记不动，标 [ ]*（动生产数据需业务确认）。
+
+_M1_PG_AVAILABLE = False
+try:
+    import psycopg2 as _m1_psycopg2
+    _m1_conn = _m1_psycopg2.connect(
+        dbname="audit_platform", user="postgres", password="postgres",
+        host="localhost", port=5432, connect_timeout=3,
+    )
+    _m1_conn.close()
+    _M1_PG_AVAILABLE = True
+except Exception:
+    pass
+
+
+def _m1_pg_query(sql: str) -> list[dict]:
+    import psycopg2
+    import psycopg2.extras
+    conn = psycopg2.connect(
+        dbname="audit_platform", user="postgres", password="postgres",
+        host="localhost", port=5432,
+    )
+    conn.autocommit = True
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql)
+            return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+@pytest.mark.skipif(not _M1_PG_AVAILABLE, reason="PG 不可达（CI 环境或 Docker 未启动）")
+class TestM1RealDbAiSessionRecord:
+    """Task 18（MB-P23）：M1 真库 AI 会话记录行定性与命名空间检查。
+
+    🔴 处置裁定：只登记不动（动生产数据需业务确认）。
+    守卫断言「现状事实」，不断言「已修复」。
+    引用 MC-18（真库零业务载荷）/ MC-15（三段式命名）/ MF-P22 / MF-P23。
+    """
+
+    def test_m1_real_db_row_count(self):
+        """MF-P22 / MB-P23：M1 真库恰 2 行。"""
+        rows = _m1_pg_query(
+            "SELECT item_id, LENGTH(remark) AS remark_len, "
+            "LENGTH(conclusion) AS conclusion_len "
+            "FROM checklist_responses WHERE item_id LIKE 'M1-%' ORDER BY item_id"
+        )
+        assert len(rows) == 2, f"M1 真库行数 {len(rows)}，预期 2"
+
+    def test_m1_first_row_is_full_data_null(self):
+        """MB-P23：第 1 行 M1-M1-2-full-data 的 remark 与 conclusion 都为 NULL。"""
+        rows = _m1_pg_query(
+            "SELECT item_id, remark, conclusion "
+            "FROM checklist_responses WHERE item_id = 'M1-M1-2-full-data'"
+        )
+        assert len(rows) == 1, "M1-M1-2-full-data 应存在"
+        assert rows[0]["remark"] is None, "M1-M1-2-full-data.remark 应为 NULL"
+        assert rows[0]["conclusion"] is None, "M1-M1-2-full-data.conclusion 应为 NULL"
+
+    def test_m1_second_row_is_ai_review_session(self):
+        """MF-P23 / MB-P23：第 2 行是 AI 复核会话记录（含 session_id），不是业务数据。"""
+        rows = _m1_pg_query(
+            "SELECT item_id, remark, conclusion "
+            "FROM checklist_responses WHERE item_id LIKE 'M1-review-session-%'"
+        )
+        assert len(rows) == 1, f"M1-review-session-* 应恰 1 行，实得 {len(rows)}"
+        row = rows[0]
+        assert row["item_id"] == "M1-review-session-20260725075149"
+        # remark 是 JSON，内含 session_id ⇒ 定性为 AI 复核会话记录
+        assert row["remark"] is not None
+        remark_len = len(row["remark"])
+        assert 200 < remark_len < 400, f"remark 长度 {remark_len}，预期约 261"
+        assert "session_id" in row["remark"], "remark 应含 session_id"
+        assert "wp_code_prefix" in row["remark"], "remark 应含 wp_code_prefix"
+        # 🔴 结论：不得用于闭环验证，不得据此宣称「M1 有真载荷」
+        assert row["conclusion"] is None, "AI 会话行的 conclusion 应为 NULL"
+
+    def test_m1_review_session_key_violates_three_segment_naming(self):
+        """MB-P23 / MC-15：M1-review-session-* 不符合 ITEM_PREFIX + sheet 段 + field 段三段式命名。
+
+        正常格式：M1-{sheet}-{field}，如 M1-M1-1-audited_amount。
+        实际键：M1-review-session-20260725075149 —— 'review-session' 不是册名，
+        '20260725075149' 不是字段名 ⇒ 命名空间被非业务用途借用。
+        """
+        rows = _m1_pg_query(
+            "SELECT item_id FROM checklist_responses WHERE item_id LIKE 'M1-review-session-%'"
+        )
+        assert len(rows) == 1
+        key = rows[0]["item_id"]
+        # 三段式要求：M1-{sheet_segment}-{field_segment}
+        # sheet 段应匹配 M1 的已知 sheet 编码（M1-1, M1-2, M1A 等）
+        known_sheets = {"M1-1", "M1-2", "M1A", "M1-3", "M1-4"}
+        # review-session 不匹配任何已知 sheet 编码
+        segment_after_prefix = key[len("M1-"):]  # "review-session-20260725075149"
+        sheet_segment = segment_after_prefix.split("-")[0]  # "review"
+        assert sheet_segment not in {s.split("-")[-1] if "-" in s else s[2:] for s in known_sheets}, (
+            f"review-session 键的 sheet 段 '{sheet_segment}' 不应匹配已知 sheet"
+        )
+
+    def test_m_domain_conclusion_all_null(self):
+        """MC-18：全 M 域 conclusion 非空 == 0 ⇒ contract 字段映射只映 remark。"""
+        rows = _m1_pg_query(
+            "SELECT COUNT(*) AS n FROM checklist_responses "
+            "WHERE item_id LIKE 'M%' AND conclusion IS NOT NULL AND conclusion != ''"
+        )
+        assert rows[0]["n"] == 0, f"M 域 conclusion 非空 {rows[0]['n']}，预期 0"
+
+    def test_m1_ai_session_row_disposition_is_register_only(self):
+        """MB-P23 处置裁定：只登记不动。
+
+        理由：
+        1. 该行是 AI 复核会话摘要写入 checklist_responses 的产物
+        2. 迁移到专用表需要后端改写写入方 + 数据迁移脚本 + 业务确认
+        3. 只登记不动是最安全的处置（不破坏任何现有功能）
+        4. 该行不影响底稿双向回写功能（不在 FormData 的 load 路径里）
+
+        🔴 标 [ ]* ：动生产数据需业务确认。
+        """
+        # 验证该行不在 FormData 的 load 路径里：
+        # useM1FormData.ts 用 item_id.startsWith('M1-') 过滤
+        # M1-review-session-* 会被加载，但 loadResponses 只是放到 map 里
+        # 不会被 getField('sheet', 'field') 匹配到（因为 sheet 不存在）
+        fm = COMPOSABLES / "useM1FormData.ts"
+        text = fm.read_text(encoding="utf-8")
+        # 确认 ITEM_PREFIX 仍为 'M1-'
+        assert "const ITEM_PREFIX = 'M1-'" in text, "M1 ITEM_PREFIX 应为 'M1-'"
+        # 确认 getField 用 `${ITEM_PREFIX}${sheet}-${field}` 格式
+        assert "${ITEM_PREFIX}${sheet}-${field}" in text, (
+            "getField 应用三段式 itemId 格式"
+        )
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Task 25（lane 3, MB-P30）：四条 entry 端到端闭环
+# ════════════════════════════════════════════════════════════════════════════
+# 🔴 阻塞：真库无业务载荷 ⇒ 标 [ ]*，守卫只断言「闭环前提不成立」。
+# 预置动作（不阻塞）：contract 草案字段映射 + BP-1/BP-2/BP-3 引用 foundation。
+# 引用 MC-18（零业务载荷）/ MF-P33（BP 外部供给）/ MF-P34（canary 闭环同理）。
+
+_LANE3_EXPECTED_ROWS = {
+    "M1": 2,   # M1-M1-2-full-data(NULL) + M1-review-session-*(AI 会话)
+    "M5": 0,
+    "M8": 0,
+    "M9": 1,   # M9-2-detail-rows(NULL)
+}
+
+
+@pytest.mark.skipif(not _M1_PG_AVAILABLE, reason="PG 不可达（CI 环境或 Docker 未启动）")
+class TestLane3EndToEndClosure:
+    """Task 25（MB-P30）：四条 entry 端到端闭环。
+
+    🔴 闭环标 [ ]*：四条均无有效业务载荷 ⇒ 无法验证真实业务数据的完整往返。
+    守卫断言「闭环前提不成立」（行数 + 无有效载荷），不断言「闭环通过」。
+    """
+
+    def test_lane3_real_db_row_counts(self):
+        """MB-P30：四条 entry 真库行数与 design 声明一致。"""
+        for code, expected in _LANE3_EXPECTED_ROWS.items():
+            rows = _m1_pg_query(
+                f"SELECT COUNT(*) AS n FROM checklist_responses "
+                f"WHERE item_id LIKE '{code}-%'"
+                # M1 不会误匹配 M10（M10- 前缀不以 M1- 开头）
+            )
+            actual = rows[0]["n"]
+            assert actual == expected, (
+                f"{code} 真库行数 {actual}，预期 {expected}"
+            )
+
+    def test_lane3_no_effective_business_payload(self):
+        """MB-P30：四条 entry 均无有效业务载荷（remark 非空且非 AI 会话的行 == 0）。"""
+        rows = _m1_pg_query(
+            "SELECT item_id, LENGTH(remark) AS remark_len "
+            "FROM checklist_responses "
+            "WHERE item_id ~ '^M[1589]-' "
+            "  AND item_id NOT LIKE 'M10-%' "
+            "  AND remark IS NOT NULL AND remark != ''"
+        )
+        # 唯一非空行应是 M1 的 AI 会话记录
+        assert len(rows) <= 1, f"非空 remark 行数 {len(rows)}，预期至多 1（AI 会话）"
+        if rows:
+            assert rows[0]["item_id"].startswith("M1-review-session-"), (
+                f"唯一非空 remark 行应是 AI 会话记录，实得 {rows[0]['item_id']}"
+            )
+
+    def test_lane3_m9_single_row_is_null(self):
+        """MB-P30：M9 唯一行 M9-2-detail-rows 的 remark 与 conclusion 都为 NULL。"""
+        rows = _m1_pg_query(
+            "SELECT item_id, remark, conclusion "
+            "FROM checklist_responses WHERE item_id LIKE 'M9-%'"
+        )
+        assert len(rows) == 1, f"M9 行数 {len(rows)}"
+        assert rows[0]["item_id"] == "M9-2-detail-rows"
+        assert rows[0]["remark"] is None, "M9-2-detail-rows.remark 应为 NULL"
+        assert rows[0]["conclusion"] is None, "M9-2-detail-rows.conclusion 应为 NULL"
+
+    def test_lane3_m5_m8_zero_rows(self):
+        """MB-P30：M5 与 M8 各 0 行。"""
+        for code in ("M5", "M8"):
+            rows = _m1_pg_query(
+                f"SELECT COUNT(*) AS n FROM checklist_responses "
+                f"WHERE item_id LIKE '{code}-%'"
+            )
+            assert rows[0]["n"] == 0, f"{code} 真库行数 {rows[0]['n']}，预期 0"
+
+
+class TestLane3ContractDraftFieldMapping:
+    """Task 25 预置动作（不阻塞）：contract 草案字段映射。
+
+    字段映射只映 remark，conclusion 标不使用（全域 conclusion 非空 == 0）。
+    这是代码层断言，不需要 PG 连接。
+    """
+
+    def test_contract_maps_remark_only(self):
+        """MB-P30：contract 草案应只映 remark。
+
+        依据：
+        1. 全域 conclusion 非空 == 0（MC-18 现算，Task 18 已守卫）
+        2. useM{n}FormData.ts 的 saveField 同时传 conclusion 与 remark，
+           但 setField（业务入口）只写 conclusion（值字段）
+        3. debouncedSave 只写 remark（文本字段）
+        ⇒ conclusion 是「值」通道（表单选择/计算结果），remark 是「文本」通道（自由描述/JSON）
+        ⇒ contract 映射只映 remark（业务载荷通道），conclusion 标不使用
+        """
+        for n in (1, 5, 8, 9):
+            fm = COMPOSABLES / f"useM{n}FormData.ts"
+            text = fm.read_text(encoding="utf-8")
+            # setField 写 conclusion
+            assert "conclusion" in text, f"M{n} FormData 应含 conclusion 通道"
+            # debouncedSave / saveField 写 remark
+            assert "remark" in text, f"M{n} FormData 应含 remark 通道"
+
+    def test_contract_bp_references_foundation(self):
+        """MB-P30 / MF-P33：BP-1/BP-2/BP-3 引用 foundation 的登记。
+
+        验证 slice 中三个 BP 的 entries 都包含 lane 3 的四条 entry。
+        """
+        sl = json.loads(SLICE_PATH.read_bytes())
+        lane3_patterns = {"M1D", "M5S", "M8G", "M9O"}
+        lane3_eids = set()
+        for e in sl["independent_entries"]:
+            if e["wp_code_pattern"] in lane3_patterns:
+                lane3_eids.add(e["entry_id"])
+        assert len(lane3_eids) == 4, f"Lane 3 entry 数 {len(lane3_eids)}"
+
+        bp_map = {bp["id"]: bp for bp in sl["blocking_preconditions"]}
+        for bp_id in ("BP-1", "BP-2", "BP-3"):
+            bp = bp_map[bp_id]
+            for eid in lane3_eids:
+                assert eid in bp["entries"], (
+                    f"{eid} 不在 {bp_id} 的 entries 列表中"
+                )

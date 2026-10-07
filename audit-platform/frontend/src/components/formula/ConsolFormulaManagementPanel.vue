@@ -218,11 +218,19 @@ async function load() {
         params: { report_type: props.reportType, applicable_standard: consolidatedStandard.value },
       })
     } else {
-      const [groups, formulas] = await Promise.all([
+      // 章节列表（静态模板）和公式列表（按需种子化）独立容错：
+      // 公式加载可能因报表配置不全而失败，此时章节导航仍可用。
+      let groups: any[] = []
+      let formulas: { sections: any[] } = { sections: [] }
+      const [groupsResult, formulasResult] = await Promise.allSettled([
         api.get<any[]>(P_cn.list(templateType.value)),
         listConsolNoteFormulas(templateType.value),
       ])
       if (seq !== loadSeq) return
+      if (groupsResult.status === 'fulfilled') groups = groupsResult.value ?? []
+      if (formulasResult.status === 'fulfilled') formulas = formulasResult.value ?? { sections: [] }
+      else console.warn('[ConsolFormulaPanel] 公式加载失败（章节导航仍可用）', formulasResult.reason)
+
       const options: Array<{ section_id: string; title: string | null }> = []
       for (const group of groups || []) {
         for (const section of group.children || []) {

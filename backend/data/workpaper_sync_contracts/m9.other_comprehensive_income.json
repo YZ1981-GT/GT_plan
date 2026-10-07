@@ -1,0 +1,588 @@
+{
+  "schema_version": "contract-definition:v1",
+  "contract_id": "m9.other_comprehensive_income",
+  "semantic_version": "1.0.0",
+  "review_status": "reviewed",
+  "document_type": "xlsx",
+  "template_definition_sha256": "ab064e1f888c401367535ad01d77ce201c064ca856f9c18c3193fe3527d30a91",
+  "instrumentation_definition_sha256": "e3c4476aec0198d8fae55345f3600e2336d5f701b481973b014ffa9bfdb6cbd3",
+  "template": {
+    "relative_path": "M/M9 其他综合收益.xlsx",
+    "template_sha256": "bc9994a0828b0b61c701363b01cf23779595075ea249accb31f03c46bcea794e",
+    "normalized_structure_hash": "d2549f40a0893f8249e0d03fdf562e885335f6b39e7e86d2592d1b259f72caef"
+  },
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "sheets": [
+    {
+      "excel_name": "审定表M9-1",
+      "sheet_key": "m9-determination",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "tables": [
+        {
+          "table_key": "m9_determination_summary",
+          "anchor": "A5",
+          "header_rows": 2,
+          "fields": [
+            {
+              "stable_field_key": "m9_determination_summary/project_name",
+              "column_key": "project_name",
+              "json_pointer": "/m9_determination_summary/projectName",
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!审定表M9-1!A7",
+              "header_source_ref": "源xlsx!审定表M9-1!A5",
+              "header_text": "项目名称",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "A",
+                "row_from": 7
+              }
+            },
+            {
+              "stable_field_key": "m9_determination_summary/prior_unadjusted",
+              "column_key": "prior_unadjusted",
+              "json_pointer": "/m9_determination_summary/priorUnadjusted",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!审定表M9-1!B7",
+              "header_source_ref": "源xlsx!审定表M9-1!B5",
+              "header_text": "未审数",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "B",
+                "row_from": 7
+              }
+            },
+            {
+              "stable_field_key": "m9_determination_summary/prior_aje",
+              "column_key": "prior_aje",
+              "json_pointer": "/m9_determination_summary/priorAje",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!审定表M9-1!C7",
+              "header_source_ref": "源xlsx!审定表M9-1!C5",
+              "header_text": "账项调整",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "C",
+                "row_from": 7
+              }
+            },
+            {
+              "stable_field_key": "m9_determination_summary/prior_rje",
+              "column_key": "prior_rje",
+              "json_pointer": "/m9_determination_summary/priorRje",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!审定表M9-1!D7",
+              "header_source_ref": "源xlsx!审定表M9-1!D5",
+              "header_text": "重分类调整",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "D",
+                "row_from": 7
+              }
+            },
+            {
+              "stable_field_key": "m9_determination_summary/prior_audited",
+              "column_key": "prior_audited",
+              "json_pointer": "/m9_determination_summary/priorAudited",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!审定表M9-1!E7",
+              "header_source_ref": "源xlsx!审定表M9-1!E5",
+              "header_text": "审定数",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "E",
+                "row_from": 7
+              }
+            },
+            {
+              "stable_field_key": "m9_determination_summary/current_unadjusted",
+              "column_key": "current_unadjusted",
+              "json_pointer": "/m9_determination_summary/currentUnadjusted",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!审定表M9-1!F7",
+              "header_source_ref": "源xlsx!审定表M9-1!F5",
+              "header_text": "未审数",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "F",
+                "row_from": 7
+              }
+            },
+            {
+              "stable_field_key": "m9_determination_summary/current_aje",
+              "column_key": "current_aje",
+              "json_pointer": "/m9_determination_summary/currentAje",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!审定表M9-1!G7",
+              "header_source_ref": "源xlsx!审定表M9-1!G5",
+              "header_text": "账项调整",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "G",
+                "row_from": 7
+              }
+            },
+            {
+              "stable_field_key": "m9_determination_summary/current_rje",
+              "column_key": "current_rje",
+              "json_pointer": "/m9_determination_summary/currentRje",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!审定表M9-1!H7",
+              "header_source_ref": "源xlsx!审定表M9-1!H5",
+              "header_text": "重分类调整",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "H",
+                "row_from": 7
+              }
+            },
+            {
+              "stable_field_key": "m9_determination_summary/current_audited",
+              "column_key": "current_audited",
+              "json_pointer": "/m9_determination_summary/currentAudited",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!审定表M9-1!I7",
+              "header_source_ref": "源xlsx!审定表M9-1!I5",
+              "header_text": "审定数",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "I",
+                "row_from": 7
+              }
+            },
+            {
+              "stable_field_key": "m9_determination_summary/change_amount",
+              "column_key": "change_amount",
+              "json_pointer": "/m9_determination_summary/changeAmount",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!审定表M9-1!J7",
+              "header_source_ref": "源xlsx!审定表M9-1!J5",
+              "header_text": "变动额",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "J",
+                "row_from": 7
+              }
+            },
+            {
+              "stable_field_key": "m9_determination_summary/change_rate",
+              "column_key": "change_rate",
+              "json_pointer": "/m9_determination_summary/changeRate",
+              "mode": "formula",
+              "value_type": "rate",
+              "source_ref": "源xlsx!审定表M9-1!K7",
+              "header_source_ref": "源xlsx!审定表M9-1!K5",
+              "header_text": "变动率",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "K",
+                "row_from": 7
+              }
+            },
+            {
+              "stable_field_key": "m9_determination_summary/reason_analysis",
+              "column_key": "reason_analysis",
+              "json_pointer": "/m9_determination_summary/reasonAnalysis",
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!审定表M9-1!L7",
+              "header_source_ref": "源xlsx!审定表M9-1!L5",
+              "header_text": "原因分析",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "L",
+                "row_from": 7
+              }
+            }
+          ],
+          "formula_mask": [
+            "B7:B9",
+            "C7:C9",
+            "D7:D9",
+            "E7:E9",
+            "F7:F9",
+            "G7:G9",
+            "H7:H9",
+            "I7:I9",
+            "J7:J9",
+            "K7:K9"
+          ],
+          "footer_anchor": {
+            "marker": "合计",
+            "search_column": "A",
+            "carries_total_formula": true
+          }
+        }
+      ]
+    },
+    {
+      "excel_name": "明细表M9-2",
+      "sheet_key": "m9-detail",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "tables": [
+        {
+          "table_key": "m9_detail_rows",
+          "anchor": "A8",
+          "header_rows": 2,
+          "fields": [
+            {
+              "stable_field_key": "m9_detail_rows/item_category",
+              "column_key": "item_category",
+              "json_pointer": "/m9_detail_rows/itemCategory",
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!明细表M9-2!A10",
+              "header_source_ref": "源xlsx!明细表M9-2!A8",
+              "header_text": "项目类别",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "A",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/prior_opening",
+              "column_key": "prior_opening",
+              "json_pointer": "/m9_detail_rows/priorOpening",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M9-2!C10",
+              "header_source_ref": "源xlsx!明细表M9-2!C8",
+              "header_text": "期初数",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "C",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/current_pretax",
+              "column_key": "current_pretax",
+              "json_pointer": "/m9_detail_rows/currentPretax",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M9-2!D10",
+              "header_source_ref": "源xlsx!明细表M9-2!D8",
+              "header_text": "本期所得税前发生额",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "D",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/transfer_to_pnl",
+              "column_key": "transfer_to_pnl",
+              "json_pointer": "/m9_detail_rows/transferToPnl",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M9-2!E10",
+              "header_source_ref": "源xlsx!明细表M9-2!E8",
+              "header_text": "减：前期计入其他综合收益当期转入损益/留存收益",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "E",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/income_tax",
+              "column_key": "income_tax",
+              "json_pointer": "/m9_detail_rows/incomeTax",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M9-2!F10",
+              "header_source_ref": "源xlsx!明细表M9-2!F8",
+              "header_text": "减：所得税费用",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "F",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/closing_balance",
+              "column_key": "closing_balance",
+              "json_pointer": "/m9_detail_rows/closingBalance",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M9-2!G10",
+              "header_source_ref": "源xlsx!明细表M9-2!G8",
+              "header_text": "期末数",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "G",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/prior_adj_aje",
+              "column_key": "prior_adj_aje",
+              "json_pointer": "/m9_detail_rows/priorAdjAje",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M9-2!H10",
+              "header_source_ref": "源xlsx!明细表M9-2!H8",
+              "header_text": "账项调整",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "H",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/prior_adj_rje",
+              "column_key": "prior_adj_rje",
+              "json_pointer": "/m9_detail_rows/priorAdjRje",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M9-2!I10",
+              "header_source_ref": "源xlsx!明细表M9-2!I8",
+              "header_text": "重分类调整",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "I",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/current_aje_pretax",
+              "column_key": "current_aje_pretax",
+              "json_pointer": "/m9_detail_rows/currentAjePretax",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M9-2!J10",
+              "header_source_ref": "源xlsx!明细表M9-2!J8",
+              "header_text": "本期所得税前发生额",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "J",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/current_aje_transfer",
+              "column_key": "current_aje_transfer",
+              "json_pointer": "/m9_detail_rows/currentAjeTransfer",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M9-2!K10",
+              "header_source_ref": "源xlsx!明细表M9-2!K8",
+              "header_text": "减：前期计入其他综合收益当期转入损益/留存收益",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "K",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/current_aje_tax",
+              "column_key": "current_aje_tax",
+              "json_pointer": "/m9_detail_rows/currentAjeTax",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M9-2!L10",
+              "header_source_ref": "源xlsx!明细表M9-2!L8",
+              "header_text": "减：所得税费用",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "L",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/current_rje_pretax",
+              "column_key": "current_rje_pretax",
+              "json_pointer": "/m9_detail_rows/currentRjePretax",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M9-2!M10",
+              "header_source_ref": "源xlsx!明细表M9-2!M8",
+              "header_text": "本期所得税前发生额",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "M",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/current_rje_transfer",
+              "column_key": "current_rje_transfer",
+              "json_pointer": "/m9_detail_rows/currentRjeTransfer",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M9-2!N10",
+              "header_source_ref": "源xlsx!明细表M9-2!N8",
+              "header_text": "减：前期计入其他综合收益当期转入损益/留存收益",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "N",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/current_rje_tax",
+              "column_key": "current_rje_tax",
+              "json_pointer": "/m9_detail_rows/currentRjeTax",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M9-2!O10",
+              "header_source_ref": "源xlsx!明细表M9-2!O8",
+              "header_text": "减：所得税费用",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "O",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/audited_opening",
+              "column_key": "audited_opening",
+              "json_pointer": "/m9_detail_rows/auditedOpening",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M9-2!P10",
+              "header_source_ref": "源xlsx!明细表M9-2!P8",
+              "header_text": "期初数",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "P",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/audited_pretax",
+              "column_key": "audited_pretax",
+              "json_pointer": "/m9_detail_rows/auditedPretax",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M9-2!Q10",
+              "header_source_ref": "源xlsx!明细表M9-2!Q8",
+              "header_text": "本期所得税前发生额",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "Q",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/audited_transfer",
+              "column_key": "audited_transfer",
+              "json_pointer": "/m9_detail_rows/auditedTransfer",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M9-2!R10",
+              "header_source_ref": "源xlsx!明细表M9-2!R8",
+              "header_text": "减：前期计入其他综合收益当期转入损益/留存收益",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "R",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/audited_tax",
+              "column_key": "audited_tax",
+              "json_pointer": "/m9_detail_rows/auditedTax",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M9-2!S10",
+              "header_source_ref": "源xlsx!明细表M9-2!S8",
+              "header_text": "减：所得税费用",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "S",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/audited_closing",
+              "column_key": "audited_closing",
+              "json_pointer": "/m9_detail_rows/auditedClosing",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M9-2!T10",
+              "header_source_ref": "源xlsx!明细表M9-2!T8",
+              "header_text": "期末数",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "T",
+                "row_from": 10
+              }
+            },
+            {
+              "stable_field_key": "m9_detail_rows/remark",
+              "column_key": "remark",
+              "json_pointer": "/m9_detail_rows/remark",
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!明细表M9-2!U10",
+              "header_source_ref": "源xlsx!明细表M9-2!U8",
+              "header_text": "备注",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "U",
+                "row_from": 10
+              }
+            }
+          ],
+          "formula_mask": [
+            "C10:C27",
+            "D10:D27",
+            "E10:E27",
+            "F10:F27",
+            "G10:G27",
+            "H10:H27",
+            "I10:I27",
+            "J10:J27",
+            "K10:K27",
+            "L10:L27",
+            "M10:M27",
+            "N10:N27",
+            "O10:O27",
+            "P10:P27",
+            "Q10:Q27",
+            "S10:S27",
+            "T10:T27"
+          ],
+          "footer_anchor": {
+            "marker": "合计",
+            "search_column": "A",
+            "carries_total_formula": true
+          }
+        }
+      ]
+    }
+  ],
+  "review": {
+    "entry_id": "xlsx/gt-m9-other-comprehensive-income",
+    "pilot_class": "phase5_m9_equity",
+    "authority_root": "backend/wp_templates",
+    "html_store": {
+      "table": "checklist_responses",
+      "item_id": "M9-",
+      "row_identity_key": "rowId",
+      "shape": "flat_key_value",
+      "note": "M9 ITEM_PREFIX='M9-'，唯一 carrier.kind='none' entry。明细表 30 列宽表大部分公式。"
+    },
+    "reviewed_basis": "openpyxl 逐 sheet 直读权威模板 M/M9 其他综合收益.xlsx。审定表 M9-1（47r×12c / 41 公式）：A/L 列 editable，B~K 公式。明细表 M9-2（46r×30c / 145 公式 / 宽表）：仅 3 列 editable（A 项目类别 / R 转损益 / U 备注），其余 17 列全公式。🔴 M9 是唯一无模式切换开关的 entry。明细表含分组结构（不能重分类 / 能重分类两段）。"
+  }
+}

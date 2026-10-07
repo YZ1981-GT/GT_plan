@@ -469,11 +469,25 @@ async def test_note_section_follows_note_module_template_type(chain, template_ty
     await env.add_note("五、1", generated_note())
     await env.add_note("八、1", generated_note())
 
+    # 推送前标 stale（模拟底稿变化触发的 stale 标记），推送后验证被清除
+    async with env.factory() as db:
+        from app.models.report_models import DisclosureNote as DN
+        notes = (await db.execute(sa.select(DN).where(DN.project_id == env.pid))).scalars().all()
+        for n in notes:
+            n.is_stale = True
+            n.stale_source = "workpaper_saved"
+        await db.commit()
+
     await tb_updated(env)
 
     assert note_rows(await env.note(section))["库存现金"]["end_amount"] == 376.73
     assert (await env.note(other)).table_data == generated_note(), "另一版附注不动"
     assert (await env.runs())[-1].detail["note_sections"] == [section]
+    # 推送成功后 stale 应被清除（Task 4: stale 自动清除）
+    pushed_note = await env.note(section)
+    assert pushed_note.is_stale is False, "推送成功后 is_stale 应为 False"
+    assert pushed_note.stale_source is None, "推送成功后 stale_source 应清空"
+    assert pushed_note.last_sync_source == "formula_push"
 
 
 # ── 取数失败隔离到底稿（strict）：失败底稿回滚，运行 partial ────────────────

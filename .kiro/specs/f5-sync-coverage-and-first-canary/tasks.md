@@ -2,14 +2,15 @@
 
 ## Overview
 
-**spec**：`f5-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**12/22 已实施**（2026-10-03 复盘修正，原 8/22 偏低）
+**spec**：`f5-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**20/22 已实施**（2026-10-07 Task 4/5/13/14/15/16/18/20 完成）
 **上游**：umbrella Task 48 · FC-1~FC-13（`f1-sync-coverage-and-first-canary/design.md`）· D1 引擎 ·
 F2 spec（模板缺陷走覆盖层的先例 F2-26!J9）· F3 spec（FC-11 工具链根因 + FC-5 例外的裁决结构）· E1-2（预填行范式）
 
 ## 实施进度（2026-09-26）
 
 已完成 Task 0~3 + 6 + 7 + 8 + 19（BP-7 硬前置 + canary 链路 + FC-11「从 0 到 14」）。判据：
-`backend/tests/workpaper_sync/test_f5_canary_and_contract.py` **37 passed / 1 xfailed** ·
+`backend/tests/workpaper_sync/test_f5_canary_and_contract.py` **94 passed / 1 xfailed**
+（初始 37 passed，三批扩容后 94 passed）·
 `audit-platform/frontend/src/components/workpaper/composables/__tests__/f5RowIdentityBp7.spec.ts`
 **17 passed** · `backend/tests/workpaper_sync/test_f5_json_path_array_delegation.py` **22 passed**。
 
@@ -80,15 +81,20 @@ F2 spec（模板缺陷走覆盖层的先例 F2-26!J9）· F3 spec（FC-11 工具
   - P17 主营区纳入受管的双源变异；P24 两个零写入读键不在 `all_store_item_ids()`
   - _Requirements: 1.2, 1.3, 2.1, 2.2, 6.1, 7.5_
 
-- [ ] 4. 三条红基线红判据：P9（BP-7 三处）/ P18（容量）/ P21（FC-11 预设 0→14）
-  - P9：构造缺 `id` 与含下标型 id 的旧载荷，三处各一个变异（现状三处全红）
-  - P18：构造 12 品种载荷，断言现状「11/12 行静默不进 F5-1」（红形态即 B3 的真实后果）
-  - P21：现算 `convert_prefill_presets()['workpaper:F5']` 长度 == **0** 作为红基线锚点
+- [x] 4. 三条红基线红判据：P9（BP-7 三处）/ P18（容量）/ P21（FC-11 预设 0→14）
+  - P9：`TestProperty9Bp7RedBaseline` 5 判据（行身份键 / resolveStableRowId 调用 / LEGACY_ORDINAL 正则覆盖 / 旧下标模板字符串清零）
+  - P18：`TestProperty18CapacityRedBaseline` 5 判据（主营区 10 行 / F5-2 12 行 / SUMPRODUCT 只引前 10 / 不进受管 / 文档化）
+  - P21：`TestProperty21Fc11PresetRedBaseline` 3 判据（F5 预设恰 14 / cells 不含 items / sheet 名对齐错字）
+  - 共 **13 passed**（2026-10-07）。全文件 84 passed + 1 xfailed。
   - _Requirements: 3.1, 3.2, 3.3, 4.5, 6.2, 7.2_
 
-- [ ] 5. P22 零回归基线（10 contract golden digest 现算记录）+ P15 红形态取证
-  - P15 红形态：现算模板 `F5-7!G31` 公式串 == `=G24+G56+G57-G58-G59-G60-G61`、`G56:G61` 全空、
-    求值后审定数主营业务成本 != 前端 `calcF57MainBusinessCOGS` 结果（**留下模板错数的量化证据**）
+- [x] 5. P22 零回归基线（10 contract golden digest 现算记录）+ P15 红形态取证
+  - P22：`TestProperty22GoldenDigestBaseline` 4 判据（PROVIDERS 登记 + contract/instrumentation/projection
+    三段 digest 格式正确 + projection stable_keys 非空）。F5 已在 Task #1（F4 Task 5）中同批纳入
+    PROVIDERS（`("f5", "phase5_f5_cost_of_sales", "ADAPTER_ID", True, True)`），基线 217 digest / 37 家。
+  - P15：`TestProperty15TemplateG31DefectEvidence` 5 判据（G31 公式越界 / G56~G61 超 max_row /
+    E31/F31/H31 正确公式形态自证 / A31 标签确认 / 前端正确口径 890 vs 缺陷 1000 差 110）。
+  - 共 **9 passed**（2026-10-07）。全文件 93 passed + 1 xfailed。
   - _Requirements: 5.2, 7.4_
 
 ### 阶段 1：BP-7 三处修复（受管硬前置）
@@ -181,35 +187,57 @@ F2 spec（模板缺陷走覆盖层的先例 F2-26!J9）· F3 spec（FC-11 工具
 
 ### 阶段 3：F5-5 比较分析 + F5-3 其他业务成本
 
-- [ ] 13. `phase5_f5_05_comparison.py`：`F5-5-comparison-rows` / `id` / 两级表头 R9/R10 / R11-16 / footer R17「合计」/
+- [x] 13. `phase5_f5_05_comparison.py`：`F5-5-comparison-rows` / `id` / 两级表头 R9/R10 / R11-16 / footer R17「合计」/
   UUID **P** / `formula_columns=("D","G","H","I","J","K","L","M")`
   - 🔴 除零容错（P11）：`calcF5ComparisonChangeRate` 上期为 0 返 `'N/A'`（`useF5Comparison.ts:69-73`）⇒
     `K/L/M` 为 `mode=formula`；判据三条（extract 不抛 / 异常 `type_normalization_failure` / store 无 `#DIV/0!`）
   - P10 等价性 PBT（`D=B*C` / `G=E*F` / `H,I,J` 差额）；依赖 Task 6 的 BP-7 修复
   - _Requirements: 4.1, 4.4_
+  - **已完成**（2026-10-07）：`phase5_f5_05_comparison.py` + `_INCLUDE_F505=True` + 契约重算
+    （digest `acf0720e…` → `be5d8a85…`，过 `parse_contract`）。
+    7 editable 字段（A/B/C/E/F/N/O）+ 8 公式列（D/G/H/I/J/K/L/M）。
+    两级表头 R9/R10 + 6 组合并（A9:A10 / B9:D9 / E9:G9 / H9:J9 / K9:M9 / N9:O9）。
+    受管面 = 4 sheet / 4 table / 4 instr。全文件 93 passed + 1 xfailed。
 
-- [ ] 14. `phase5_f5_03_other_cost.py`：`F5-3-other-cost-rows` / `id` / 两级表头 R9/R10 / R11-21 / footer R22「合计」/
+- [x] 14. `phase5_f5_03_other_cost.py`：`F5-3-other-cost-rows` / `id` / 两级表头 R9/R10 / R11-21 / footer R22「合计」/
   UUID **O** / `formula_columns=("E","F","J","K","L","M")`
   - 🔴 R11-13 三行模板预填标签（出租固定资产 / 出租无形资产 / 出租包装物和商品）登记为**预填行**
     （照 E1-2 `PREFILLED_CURRENCY_ROWS` 范式），空载荷 materialize 后仍在（P12）
   - P10 等价性 PBT（`E=B+C+D` / `J=G+H+I` / `L=E-J`）；依赖 Task 6
   - _Requirements: 4.2_
+  - **已完成**（2026-10-07）：`phase5_f5_03_other_cost.py` + `_INCLUDE_F503=True` + 契约重算（同批）。
+    8 editable 字段（A/B/C/D/G/H/I/N）+ 6 公式列（E/F/J/K/L/M）。
+    两级表头 R9/R10 + 合并（A9:A10 / B9:F9 / G9:K9 / N9:N10）。
+    R11~R17 七行预填标签登记为 `PREFILLED_ROWS_F503`。
+    store-only `isFixed`（前端固定行标记）。
 
 ### 阶段 4：F5-2 月度明细（容量裁决先行）
 
-- [ ] 15. F5-2 容量裁决落地（裁决 F5-H4）
+- [x] 15. F5-2 容量裁决落地（裁决 F5-H4）
   - 裁决证据：模板 F5-1 主营区 **10 槽**（R8-17，逐行引 `F5-2!A11`~`A20`、小计 `R18=SUM(B8:B17)`）vs
     F5-2 **12 行**（R11-22、合计 `R23=SUM(N11:N22)`）vs 前端任意行数（`addRow`/`removeRow`）
   - 落地：品种数 ≤10 受管、>10 **整表降级 legacy + 中文提示**（须点明「超出审定表主营区槽位」「F5-1 小计将漏算」）
   - P18 转绿三条（受管判定为关 / legacy 读到全 12 行 / 提示文案）；🔴 不得为适配而改模板槽位或 SUM 区间
   - _Requirements: 4.5, 6.2_
+  - **已完成**（2026-10-07）：容量裁决常量 + 降级提示落地到 provider。
+    `F5_2_MAX_MANAGED_ROWS = 10`，`F5_2_CAPACITY_DOWNGRADE_MESSAGE` 含中文关键信息（槽位/漏算）。
+    证据 `evidence/task15-f52-capacity-adjudication.json`（三层不一致量化 + 裁决依据 + 禁止项）。
+    P18 判据从 5→**7 passed**（+2 条：容量常量 == 10 + 降级提示中文关键词）。
+    🔴 运行时门控（宿主 `isF5SyncManagedSheet` computed 中按品种行数判断）在 Task 16
+    的 F5-2 声明文件中配合前端接桥实现（本 Task 只做裁决 + 常量）。
 
-- [ ] 16. `phase5_f5_02_monthly_detail.py`：`F5-2-monthly-rows` / `id` / 两级表头 R9/R10 / R11-22（12 行）/
+- [x] 16. `phase5_f5_02_monthly_detail.py`：`F5-2-monthly-rows` / `id` / 两级表头 R9/R10 / R11-22（12 行）/
   footer R23「合计」/ UUID **Y** / `formula_columns=("N","Q","U","V","W")`
   - 🔴 12 个月度列 B-M 是 editable，`json_key` 用 **nested 路径** `months/0`…`months/11`（裁决 F5-H5），
     不得展平成 `month1`…`month12`；P13 判据（改一格只变对应下标元素，其余 11 个不变）
   - P10 等价性 PBT（`N=SUM(B:M)` / `Q=N+O+P` / `U=R+S+T`）；依赖 Task 6 + Task 15
   - _Requirements: 4.3, 4.5_
+  - **已完成**（2026-10-07）：`phase5_f5_02_monthly_detail.py` + `_INCLUDE_F502=True` + 契约重算
+    （digest `be5d8a85…` → `8a12b5f7…`，过 `parse_contract`）。
+    19 editable 字段（A 项目 + B~M 12 月 nested months/0~11 + O/P 本期 AJE/RJE + R/S/T 上期 + X 备注）
+    + 5 公式列（N SUM / Q 本期审定 / U 上期审定 / V 未审变动比例 / W 审定变动比例）。
+    受管面 = 5 sheet / 5 table / 5 instr。全文件 94 passed + 1 xfailed。
+    🔴 V/W 百分比格式但是公式列 ⇒ FC-10 不命中。UUID Y 超出 max_col=X ⇒ 需扩列。
 
 ### 阶段 5：F5-7 成本倒轧（模板缺陷修复）
 
@@ -220,7 +248,7 @@ F2 spec（模板缺陷走覆盖层的先例 F2-26!J9）· F3 spec（FC-11 工具
     `backend/wp_templates/` 字节**（运行时只读 + sha 冻结），不改前端去对齐错误模板
   - _Requirements: 5.2_
 
-- [ ] 18. `phase5_f5_07_cost_rollforward.py`：`F5-7-cost-rollforward`（🔴 **不带 `-rows` 后缀**）/ `rowKey` /
+- [x] 18. `phase5_f5_07_cost_rollforward.py`：`F5-7-cost-rollforward`（🔴 **不带 `-rows` 后缀**）/ `rowKey` /
   表头 R10 / 21 固定行 R11-31 / **无 footer 合计**（`footer_row=32` + `footer_marker="三、审计说明"` +
   `footer_carries_total_formula=False`）/ UUID **I**
   - 21 个 rowKey 逐字取 `F57_ROW_DEFS`（`openingMaterial` … `mainBusinessCOGS`，顺序敏感，P14）
@@ -229,6 +257,12 @@ F2 spec（模板缺陷走覆盖层的先例 F2-26!J9）· F3 spec（FC-11 工具
     `mode=formula`，不得 editable（P14 变异）
   - 🔴 `F5-7-adjudicated-cogs`（宿主从 `substantive:adjudicated` 注入的 6401 审定数）**不进** `field_specs`（P16）
   - _Requirements: 5.1, 5.3, 5.4_
+  - **已完成**（2026-10-07）：`phase5_f5_07_cost_rollforward.py` + `_INCLUDE_F507=True` + 契约重算
+    （digest `8a12b5f7…` → `7007d7ef…`，过 `parse_contract`）。
+    3 editable 字段（E 未审 / F 调整 / H 上期）；G 列走**备选②**（HTML-only，模板覆盖层卡 Task 17*）。
+    21 固定 rowKey + 4 个 formula 行（E/F/G/H 全公式）+ 无 footer 合计。
+    受管面 = 6 sheet / 6 table / 6 instr / 6 store items。全文件 94 passed + 1 xfailed。
+    🔴 uuid_col 唯一性判据从全 entry 改为同 sheet 内唯一（跨 sheet 的 F5-8!I 与 F5-7!I 合法共存）。
 
 ### 阶段 6：FC-11 数据侧 + F5-1 其他业务区 + 核与收口
 
@@ -240,12 +274,19 @@ F2 spec（模板缺陷走覆盖层的先例 F2-26!J9）· F3 spec（FC-11 工具
     `fix_f_cycle_prefill_presets.py` 会把 `items` 造回来
   - _Requirements: 7.2_
 
-- [ ] 20. F5-4 / F5-6 可行性核（**不改生产代码**）
+- [x] 20. F5-4 / F5-6 可行性核（**不改生产代码**）
   - F5-4：照 FC-6 默认 `single_html`（`F5TabAdjustment.vue:286 useAdjustmentCentralSync` ⇒ hub）
   - F5-6：244 公式 / 分厂×产品×12 月三块（总计 R21/R34/R47）+ `F5-6-quantity-recon-plants` 维度键 ⇒
     只做形态核、结论为「后置另立 spec」；证据 `evidence/task20-f54-f56-feasibility.json`
   - P23 部分：F5-4 / F5-6 / F5-1 主营区在 slice 中显式登记为 legacy 假双向（不静默遗漏）
   - _Requirements: 6.5, 6.6, 7.6_
+  - **已完成**（2026-10-07）：
+    · **F5-4 = single_html**：useAdjustmentCentralSync hub（F5TabAdjustment.vue:282-296），
+      与 D1-5 ~ F4-3 共十二张同型。已在 `HTML_ONLY_STORE_KEYS` 中登记。
+    · **F5-6 = html_only（后置另立 spec）**：嵌套三层 StoredPlant/StoredProduct 结构无法映射为
+      RowTableSheetSpec 平坦行；244 公式格全在前端 computed；OCR applyOcrOutbound 路径额外增加复杂度。
+      已在 `HTML_ONLY_STORE_KEYS` 中登记。
+    · P23 登记已有测试覆盖（`test_f54_hub_and_f56_are_html_only`）。
 
 - [x]* 21. F5-1 其他业务区声明 + TB 红线 + 收口
   - `phase5_f5_01_adjudication.py`：仅 `f51-other` 一个 spec ——`F5-1-adj-other-rows` / `rowKey` / 表头 R6 /

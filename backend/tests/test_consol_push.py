@@ -334,9 +334,22 @@ class TestPush:
         a_bs, g_bs = await _report(db, group["A"]), await _report(db, group["G"])
         assert a_bs["BS-006"].current_period_amount == D("73.00")   # A1 80 − 7
         assert g_bs["BS-006"].current_period_amount == D("393.00")  # 400 − 7（上层纳入下级抵销）
-        note = (await db.execute(sa.select(ConsolNoteData))).scalar_one()
-        await db.refresh(note)
-        assert note.is_stale is True
+        # 原始手插的附注行 section_id="五-1" 不在模板里，不会被刷新 → is_stale 仍为 True
+        original_note = (await db.execute(
+            sa.select(ConsolNoteData).where(
+                ConsolNoteData.project_id == group["G"].id,
+                ConsolNoteData.section_id == "五-1",
+                ConsolNoteData.node_key.is_(None),
+            )
+        )).scalar_one()
+        await db.refresh(original_note)
+        assert original_note.is_stale is True
+        # notes 步骤返回了分口径统计
+        g_notes_step = next(
+            s for s in result.steps if s["project_id"] == str(group["G"].id) and s["step"] == "notes"
+        )
+        assert g_notes_step["status"] == "succeeded"
+        assert "附注状态=" in g_notes_step["detail"]
         events = [(c.args[0], c.args[1]["project_id"]) for c in sse.call_args_list]
         assert events == [("consol.pushed", str(group["A"].id)), ("consol.pushed", str(group["G"].id))]
         (run,) = await _runs(factory, group["A"].id)

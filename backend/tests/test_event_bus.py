@@ -37,6 +37,7 @@ from app.models.audit_platform_schemas import (
     EventPayload,
     EventType,
 )
+from app.schemas.consol_context import ConsolContext
 from app.models.core import Project, ProjectStatus, ProjectType
 from app.services.event_bus import EventBus
 from app.services.trial_balance_service import TrialBalanceService
@@ -902,3 +903,77 @@ class TestAdjustmentServiceEventPublishing:
             extra={"entry_group_id": "   "},
         )
         assert bus._build_dedup_key(base) == bus._build_dedup_key(blank)
+
+    def test_consol_context_changes_dedup_key_but_random_run_ids_do_not(self):
+        """合并上下文的业务身份分桶，随机运行 ID 不影响同身份合并。"""
+        bus = EventBus(debounce_ms=0)
+        project_id = uuid.uuid4()
+        base = dict(
+            event_type=EventType.TRIAL_BALANCE_UPDATED,
+            project_id=project_id,
+            year=2025,
+        )
+        first = EventPayload(
+            **base,
+            context=ConsolContext(
+                project_id=project_id,
+                year=2025,
+                node_key="G:consol",
+                tree_fingerprint="tree-1",
+                source_version="source-1",
+                formula_version="formula-1",
+                template_version="template-1",
+            ),
+        )
+        same_identity = EventPayload(
+            **base,
+            context=ConsolContext(
+                project_id=project_id,
+                year=2025,
+                node_key="G:consol",
+                tree_fingerprint="tree-1",
+                source_version="source-1",
+                formula_version="formula-1",
+                template_version="template-1",
+            ),
+        )
+        changed_node = EventPayload(
+            **base,
+            context=first.context.with_resolution(node_key="G:consol_elim"),
+        )
+        changed_source = EventPayload(
+            **base,
+            context=first.context.with_resolution(source_version="source-2"),
+        )
+
+        assert bus._build_dedup_key(first) == bus._build_dedup_key(same_identity)
+        assert bus._build_dedup_key(first) != bus._build_dedup_key(changed_node)
+        assert bus._build_dedup_key(first) != bus._build_dedup_key(changed_source)
+
+    @pytest.mark.asyncio
+    async def test_debounce_keeps_distinct_consol_contexts_separate(self):
+        """同项目同年度事件的不同 node_key 必须分别派发。"""
+        bus = EventBus(debounce_ms=50)
+        handler = AsyncMock()
+        bus.subscribe(EventType.TRIAL_BALANCE_UPDATED, handler)
+        project_id = uuid.uuid4()
+
+        for node_key in ("G:consol", "G:consol_elim"):
+            await bus.publish(EventPayload(
+                event_type=EventType.TRIAL_BALANCE_UPDATED,
+                project_id=project_id,
+                year=2025,
+                context=ConsolContext(
+                    project_id=project_id,
+                    year=2025,
+                    node_key=node_key,
+                    tree_fingerprint="tree-1",
+                    source_version="source-1",
+                ),
+            ))
+
+        await asyncio.sleep(0.12)
+        assert handler.await_count == 2
+        assert {call.args[0].context.node_key for call in handler.await_args_list} == {
+            "G:consol", "G:consol_elim",
+        }

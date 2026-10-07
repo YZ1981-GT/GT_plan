@@ -61,6 +61,7 @@ class TbRow:
     account_name: str | None
     account_category: Any
     audited_amount: Decimal | None
+    company_code: str | None = None  # TB 原始 company_code（供身份映射溯源）
 
 
 @dataclass(frozen=True)
@@ -154,13 +155,14 @@ class NodeAmounts:
 
 @dataclass(frozen=True)
 class TrialAmounts:
-    """合并试算一行：个别数汇总 + 调整 + 抵销 = 合并数，外加个别数溯源。"""
+    """合并试算一行：个别数汇总 + 调整 + 抵销 = 合并数，外加个别数溯源和分录溯源。"""
 
     individual_sum: Decimal
     consol_adjustment: Decimal
     consol_elimination: Decimal
     consol_amount: Decimal
     by_company: list[dict]
+    source_entry_ids: list[str]  # 贡献了调整/抵销的已审批分录 UUID（provenance）
 
 
 @dataclass(frozen=True)
@@ -183,6 +185,10 @@ class CalcBasis:
     elim_totals: dict[str, dict[str, ElimTotals]]         # 差额节点 node_key → {科目: 原始借贷}
     attributed: dict[UUID, str] = field(default_factory=dict)  # 分录 id → 归属差额节点
     orphans: list[OrphanEntry] = field(default_factory=list)
+    # 科目 → 贡献了调整/抵销的已审批分录 id（provenance，供 trial breakdown 溯源）
+    entry_accounts: dict[str, set[UUID]] = field(default_factory=dict)
+    # 数据叶子 node_key → TB 原始 company_code 集合（身份映射溯源）
+    leaf_tb_codes: dict[str, set[str]] = field(default_factory=dict)
 
 
 class EntryDataError(ValueError):
@@ -451,6 +457,8 @@ def build_calc_basis(
     names: dict[str, str] = {}
     categories: dict[str, Any] = {}
     leaf_amounts: dict[str, dict[str, Decimal]] = {leaf.node_key: {} for leaf in leaves}
+    # 记录每个叶子从 TB 取到的原始 company_code（身份映射溯源）
+    leaf_tb_codes: dict[str, set[str]] = {leaf.node_key: set() for leaf in leaves}
     for leaf, row in _canonical_tb_rows(leaves, tb_rows):
         code = (row.account_code or "").strip()
         if not code:
@@ -458,6 +466,8 @@ def build_calc_basis(
         accounts.add(code)
         bucket = leaf_amounts[leaf.node_key]
         bucket[code] = bucket.get(code, ZERO) + to_cents(row.audited_amount)
+        if row.company_code:
+            leaf_tb_codes[leaf.node_key].add(row.company_code)
         if row.account_name and code not in names:
             names[code] = row.account_name
         if row.account_category is not None and code not in categories:
@@ -465,6 +475,7 @@ def build_calc_basis(
 
     elim_totals: dict[str, dict[str, ElimTotals]] = {}
     attributed: dict[UUID, str] = {}
+    entry_accounts: dict[str, set[UUID]] = {}
     pairs, orphans = attribute_entries(entries, index, invalid_entries)
     for entry, key in pairs:
         attributed[entry.id] = key
@@ -472,6 +483,7 @@ def build_calc_basis(
         for line in entry.lines:
             node_bucket.setdefault(line.account_code, ElimTotals()).add(entry.entry_type, line.debit, line.credit)
             accounts.add(line.account_code)
+            entry_accounts.setdefault(line.account_code, set()).add(entry.id)
             if line.account_name and line.account_code not in names:
                 names[line.account_code] = line.account_name
 
@@ -490,6 +502,8 @@ def build_calc_basis(
         elim_totals=elim_totals,
         attributed=attributed,
         orphans=orphans,
+        entry_accounts=entry_accounts,
+        leaf_tb_codes=leaf_tb_codes,
     )
 
 
@@ -677,10 +691,27 @@ def leaf_meta(leaf: TreeNode, entity_kind: str) -> dict:
     }
 
 
+def _enrich_by_company(by_company: list[dict], leaf_tb_codes: dict[str, set[str]]) -> list[dict]:
+    """给 by_company 条目补上 TB 原始 company_code（身份映射溯源）。
+
+    返回新列表（浅拷贝各条目 dict），不修改原始 by_company。
+    """
+    enriched = []
+    for item in by_company:
+        nk = item.get("node_key")
+        if nk and nk in leaf_tb_codes:
+            new_item = {**item, "source_tb_company_codes": sorted(leaf_tb_codes[nk])}
+        else:
+            new_item = dict(item)
+        enriched.append(new_item)
+    return enriched
+
+
 def trial_amounts(basis: CalcBasis) -> dict[str, TrialAmounts]:
     """合并试算逐科目：个别数汇总（全部数据叶子）+ 调整 + 抵销 = 合并数（需求 5.9 / P8）。
 
     溯源 ``by_company`` 按数据叶子逐行记录（金额 0 不写），合计恒等于个别数汇总。
+    ``source_entry_ids`` 列出贡献了调整/抵销的分录 UUID（provenance，可从附注/报表反查分录）。
     """
     kinds = entity_kinds(basis.tree)
     acc, prov = aggregate_leaf_amounts(
@@ -696,12 +727,17 @@ def trial_amounts(basis: CalcBasis) -> dict[str, TrialAmounts]:
             adj, elim = elim_net(basis, key, a)
             adjustment += adj
             elimination += elim
+        # 从 entry_accounts 收集该科目的分录 provenance
+        entry_ids = sorted(str(eid) for eid in basis.entry_accounts.get(a, set()))
+        # 给 by_company 补上 TB 原始 company_code（身份映射溯源）
+        enriched = _enrich_by_company(list(prov.get(a, [])), basis.leaf_tb_codes)
         out[a] = TrialAmounts(
             individual_sum=individual,
             consol_adjustment=adjustment,
             consol_elimination=elimination,
             consol_amount=individual + adjustment + elimination,
-            by_company=prov.get(a, []),
+            by_company=enriched,
+            source_entry_ids=entry_ids,
         )
     return out
 
@@ -790,13 +826,14 @@ async def load_tb_rows(db: AsyncSession, project_ids: Iterable[UUID], year: int)
             TrialBalance.account_name,
             TrialBalance.account_category,
             TrialBalance.audited_amount,
+            TrialBalance.company_code,
         ).where(
             TrialBalance.project_id.in_(ids),
             TrialBalance.year == year,
             TrialBalance.is_deleted == sa.false(),
         )
     )
-    return [TbRow(r[0], r[1], r[2], r[3], r[4]) for r in result.all()]
+    return [TbRow(r[0], r[1], r[2], r[3], r[4], r[5]) for r in result.all()]
 
 
 async def load_tree_entries(

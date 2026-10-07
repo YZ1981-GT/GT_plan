@@ -11141,26 +11141,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "f1.prepayment_detail",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-f1-prepayment",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtF1Prepayment.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_f1_prepayment_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -12336,26 +12332,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "f3.notes_payable_detail",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-f3-notes-payable",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtF3NotesPayable.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_f3_notes_payable_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -12587,26 +12579,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "f4.accounts_payable_detail",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-f4-accounts-payable",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtF4AccountsPayable.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_f4_accounts_payable_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -12838,26 +12826,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "f5.cost_of_sales_detail",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-f5-cost-of-sales",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtF5CostOfSales.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_f5_cost_of_sales_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -33796,8 +33780,8 @@
       }
     }
   ],
-  "manifest_digest": "053ed68d6475ebcb9a09f8beced8826bfb9147a0c165e8176e92c76780f384d6",
-  "overlay_digest": "a60495853bfe9ea652d890bf2a26a7a21a96a584db1bdf9de60dc242a12b300e",
+  "manifest_digest": "73df4097d515b4391ef7ccbb2d34c4223138b6afc660197edf8cfb43ba52305a",
+  "overlay_digest": "c4b8305503bc786087ae3d9211feb66f8cf019a9783190e2b3c9af55d3c66727",
   "profile_source_digest": "22ac2db00ce8cc5854feb1e0bdfac5619ca93f1517764050f3b73c31ee022436",
   "schema_version": 1,
   "source_digest": "4d1a6d47ddd8aec7f103c732ac28562a01402d857590c741e4a131e204ccaef2",
@@ -33809,9 +33793,9 @@
       "WorkpaperWordEditor": 4
     },
     "capability_counts": {
-      "bidirectional": 80,
+      "bidirectional": 84,
       "single_html": 5,
-      "single_onlyoffice": 111,
+      "single_onlyoffice": 107,
       "unreachable": 1
     },
     "dispatcher_count": 1,
@@ -33822,7 +33806,7 @@
     "entry_count": 197,
     "host_count": 196,
     "independent_entry_count": 144,
-    "legacy_fake_bidirectional_count": 103,
+    "legacy_fake_bidirectional_count": 99,
     "mount_count": 338,
     "parent_duplicate_count": 52,
     "room_model_counts": {
@@ -33838,7 +33822,7 @@
       "xlsx.editable.shared.single.room_service_wired.v1": 189,
       "xlsx.unreachable.none.single.room_service_wired.v1": 1
     },
-    "unadjudicated_count": 98,
+    "unadjudicated_count": 94,
     "unreachable_count": 1
   }
 }

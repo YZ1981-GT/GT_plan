@@ -2268,6 +2268,8 @@ declare module 'vue' {
     TrimmingOverview: typeof import('./components/dashboard/TrimmingOverview.vue')['default']
     TrimmingSummaryPanel: typeof import('./components/workpaper/TrimmingSummaryPanel.vue')['default']
     TrimReasonDialog: typeof import('./components/workpaper/TrimReasonDialog.vue')['default']
+    TrioAttemptHistory: typeof import('./components/deliverable/TrioAttemptHistory.vue')['default']
+    TrioRetryButton: typeof import('./components/deliverable/TrioRetryButton.vue')['default']
     TrustFormulaTab: typeof import('./components/trust/TrustFormulaTab.vue')['default']
     TrustScorePanel: typeof import('./components/trust/TrustScorePanel.vue')['default']
     TsjReviewFindings: typeof import('./components/workpaper/TsjReviewFindings.vue')['default']

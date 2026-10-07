@@ -1166,6 +1166,75 @@ class TestAdjudicationLegality:
                 )
             assert gate["mounts_ac14_notice"] == facts["mounts_ac14_notice"]
 
+    # ── Task 3（lane 3, MB-P5）：BP-1 / BP-2 / BP-3 外部供给登记 ──────────
+    # 引用 foundation MF-P33：标 [ ]*，守卫只断言「前提不成立」不断言通过。
+    # BP-1 = approved authority model / per-entry contract / non-null bundle
+    # BP-2 = Task 36 published representation
+    # BP-3 = 真实 OnlyOffice 9.4 探针
+    # 本测试覆盖 lane 3 的四条 entry（M1/M5/M8/M9），断言它们全含这三个 BP
+    # 且对应前提字段仍为 null（= 前提不成立）。
+
+    _LANE3_CODES = ("M1", "M5", "M8", "M9")
+
+    def test_lane3_entries_all_carry_bp1_bp2_bp3(self, manifest_slice: dict) -> None:
+        """MB-P5：四条 entry 的 blocked_by 均含 BP-1/BP-2/BP-3。"""
+        required = {"BP-1", "BP-2", "BP-3"}
+        for code in self._LANE3_CODES:
+            entry = _entry_of(manifest_slice, code)
+            blocked = set(entry["capability_target_blocked_by"])
+            missing = required - blocked
+            assert not missing, (
+                f"{entry['entry_id']} 的 blocked_by 缺少 {missing}"
+            )
+
+    def test_lane3_bp1_prerequisites_are_null(self, manifest_slice: dict) -> None:
+        """MB-P5 / MF-P33：BP-1 前提不成立——authority_model / definition_bundle 为 null。"""
+        for code in self._LANE3_CODES:
+            entry = _entry_of(manifest_slice, code)
+            assert entry["authority_model"] is None, (
+                f"{entry['entry_id']}.authority_model 应为 null（BP-1 前提不成立）"
+            )
+            assert entry["definition_bundle"] is None, (
+                f"{entry['entry_id']}.definition_bundle 应为 null（BP-1 前提不成立）"
+            )
+
+    def test_lane3_bp2_prerequisites_are_null(self, manifest_slice: dict) -> None:
+        """MB-P5 / MF-P33：BP-2 前提不成立——instrumentation_candidate / published_representation 为 null。"""
+        for code in self._LANE3_CODES:
+            entry = _entry_of(manifest_slice, code)
+            assert entry["instrumentation_candidate"] is None, (
+                f"{entry['entry_id']}.instrumentation_candidate 应为 null（BP-2 前提不成立）"
+            )
+            assert entry["published_representation"] is None, (
+                f"{entry['entry_id']}.published_representation 应为 null（BP-2 前提不成立）"
+            )
+
+    def test_lane3_bp3_prerequisites_are_null(self, manifest_slice: dict) -> None:
+        """MB-P5 / MF-P33：BP-3 前提不成立——evidence 里无 test run / scenario digest。"""
+        for code in self._LANE3_CODES:
+            entry = _entry_of(manifest_slice, code)
+            ev = entry["evidence"]
+            assert ev["verification_state"] == "UNVERIFIABLE", (
+                f"{entry['entry_id']} 应为 UNVERIFIABLE（BP-3 前提不成立）"
+            )
+            assert ev["sync_test_run_id"] is None, (
+                f"{entry['entry_id']}.sync_test_run_id 应为 null（BP-3：无 OO 探针）"
+            )
+
+    def test_lane3_bp1_bp2_bp3_are_in_blocking_preconditions(self, manifest_slice: dict) -> None:
+        """MB-P5：三条 BP 在 slice 级 blocking_preconditions 里存在且 status == open。"""
+        bp_map = {bp["id"]: bp for bp in manifest_slice["blocking_preconditions"]}
+        lane3_eids = {_entry_of(manifest_slice, c)["entry_id"] for c in self._LANE3_CODES}
+        for bp_id in ("BP-1", "BP-2", "BP-3"):
+            assert bp_id in bp_map, f"blocking_preconditions 里缺 {bp_id}"
+            bp = bp_map[bp_id]
+            assert bp["status"] == "open", f"{bp_id} 应为 open"
+            # 四条 entry 都在该 BP 的 entries 里
+            for eid in lane3_eids:
+                assert eid in bp["entries"], (
+                    f"{eid} 不在 {bp_id} 的 entries 列表中"
+                )
+
 
 # ════════════════════════════════════════════════════════════════════════════
 # 判据三：HTML 对端 source-backed

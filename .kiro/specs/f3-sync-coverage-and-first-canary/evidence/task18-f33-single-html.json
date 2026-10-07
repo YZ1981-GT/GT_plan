@@ -1,0 +1,51 @@
+{
+  "task": 18,
+  "sheet": "调整分录汇总F3-3",
+  "store_item_id": "F3-3-rows",
+  "default_verdict": "single_html",
+  "fc_ref": "FC-6",
+  "unified_spec_ref": "cycle-adjustment-sheets-single-html-adjudication",
+  "prior_art": [
+    "D1-5", "D2-4", "D3-3", "D4-4", "D5-3", "D6-4", "D7-3", "E1-5", "F1-3"
+  ],
+  "three_party_readers": {
+    "useF3Adjustment": {
+      "file": "useF3Adjustment.ts",
+      "role": "primary owner",
+      "item_id": "F3-3-rows",
+      "persist_event": "f3:save-items"
+    },
+    "f3AdjustmentInject.injectF3Adjustments": {
+      "file": "f3AdjustmentInject.ts",
+      "role": "injection writer (F3-5 逾期重分类 / F3-4 利息补提的自动生成分录)",
+      "reads": "F3-3-rows",
+      "writes": "F3-3-rows",
+      "idempotent_by": "sourceKind"
+    },
+    "useAdjustmentCentralSync (reader)": {
+      "file": "F3TabAdjustment.vue:40-53",
+      "role": "reader (构建 buildLineItems payload 发到后端集中登记)",
+      "reads": "F3-3-rows"
+    }
+  },
+  "central_sync": {
+    "composable": "useAdjustmentCentralSync",
+    "mount_point": "F3TabAdjustment.vue:40",
+    "hub_store": "F3-3-rows",
+    "wp_code": "F3"
+  },
+  "eventbus_emission": {
+    "event": "adjustment:created",
+    "condition": "isBalanced",
+    "emitter": "useF3Adjustment.flushSave"
+  },
+  "import_export": {
+    "backend": "_f3_import_export.py",
+    "item_id": "F3-3-rows",
+    "columns": 10
+  },
+  "verdict": "single_html",
+  "verdict_reason": "F3-3-rows 有两方写入（useF3Adjustment 用户编辑 + f3AdjustmentInject 幂等注入）+ 中央调整登记 hub（useAdjustmentCentralSync）。两写方不可串行化：f3AdjustmentInject 在 F3-5/F3-4 tab 操作时注入行到 F3-3-rows，与 useF3Adjustment 的用户编辑可并发。这是 D 循环全部调整分录汇总表（D1-5 ~ E1-5 共 9 张）的第十张同型底稿。",
+  "production_code_changes": "none",
+  "evidence_date": "2026-10-07"
+}

@@ -96,7 +96,7 @@
           :year="year"
           :template-type="fmTemplateType"
           :report-type="activeConsolReportType || 'balance_sheet'"
-          :note-section="props.noteSection"
+          :note-section="consolNoteSelectedSection || props.noteSection"
         />
 
         <!-- 分类 Tab -->
@@ -1112,8 +1112,85 @@ const selectedPath = ref('报表 > 资产负债表')
 
 /** 合并报表 / 合并附注使用独立 CRUD 面板，禁止落入单体 report_config / note preset 分支。 */
 const activeConsolReportType = computed(() => consolReportTypeOfNode(selectedNodeKey.value))
-const isConsolNoteNode = computed(() => selectedNodeKey.value === 'consol_note')
+const isConsolNoteNode = computed(() => {
+  const k = selectedNodeKey.value
+  // 合并附注根节点、或具体科目子节点（排除章级节点 consol_note_chapter_* 和加载占位）
+  return k === 'consol_note'
+    || (k.startsWith('consol_note_') && !k.startsWith('consol_note_chapter_') && k !== 'consol_note_loading')
+})
 const isConsolFormulaNode = computed(() => !!activeConsolReportType.value || isConsolNoteNode.value)
+
+// ── 合并附注树（动态加载，按章 → 科目分组，与单体附注树同构） ──
+const consolNoteTreeChildren = ref<any[]>([])
+const consolNoteTreeLoaded = ref(false)
+/** 用户在合并附注树上选中的 section_id（如 "五、1"），传递给 ConsolFormulaManagementPanel */
+const consolNoteSelectedSection = ref('')
+
+async function loadConsolNoteTree() {
+  if (consolNoteTreeLoaded.value) return
+  try {
+    const data = await api.get<any[]>(P_cn.list(fmTemplateType.value), {
+      validateStatus: (s: number) => s < 600,
+    })
+    const groups: any[] = data ?? []
+    if (!Array.isArray(groups) || !groups.length) return
+
+    const CHAPTER_ORDER = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十',
+      '十一', '十二', '十三', '十四', '十五', '十六', '十七']
+    const chapterMap: Record<string, { label: string; children: any[] }> = {}
+
+    for (const group of groups) {
+      for (const section of group.children || []) {
+        const sectionId: string = section.section_id || ''
+        const title: string = section.title || sectionId
+        const chMatch = sectionId.match(/^([一二三四五六七八九十]+(?:[一二三四五六七八九十])?)/)
+        const chapter = chMatch ? chMatch[1] : '其他'
+
+        if (!chapterMap[chapter]) {
+          const chapterLabels: Record<string, string> = {
+            '一': '一、公司概况', '二': '二、编制基础', '三': '三、会计政策',
+            '四': '四、税项', '五': '五、报表科目注释', '六': '六、其他',
+            '七': '七、关联方', '八': '八、或有事项', '九': '九、承诺',
+            '十': '十、日后事项',
+          }
+          chapterMap[chapter] = {
+            label: chapterLabels[chapter] || group.label || `${chapter}、其他`,
+            children: [],
+          }
+        }
+        chapterMap[chapter].children.push({
+          key: `consol_note_${sectionId}`,
+          label: title.length > 24 ? title.slice(0, 24) + '…' : title,
+          icon: '',
+          _sectionId: sectionId,
+          _sectionTitle: title,
+        })
+      }
+    }
+
+    const result: any[] = []
+    for (const ch of CHAPTER_ORDER) {
+      if (chapterMap[ch]) {
+        result.push({
+          key: `consol_note_chapter_${ch}`,
+          label: chapterMap[ch].label,
+          icon: '',
+          children: chapterMap[ch].children,
+        })
+      }
+    }
+    if (chapterMap['其他']?.children.length) {
+      result.push({
+        key: 'consol_note_chapter_other',
+        label: '其他',
+        icon: '',
+        children: chapterMap['其他'].children,
+      })
+    }
+    consolNoteTreeChildren.value = result
+    consolNoteTreeLoaded.value = true
+  } catch { /* 降级：保持空子节点 */ }
+}
 
 /**
  * 节点 key → 报表类型（`balance_sheet` 等），非报表类节点返回 ''。
@@ -1156,7 +1233,10 @@ function onFmTemplateChange() {
   allRowsMap.value = {}
   noteTreeLoaded.value = false
   noteTreeChildren.value = []
+  consolNoteTreeLoaded.value = false
+  consolNoteTreeChildren.value = []
   loadNoteTree()
+  loadConsolNoteTree()
   loadRowsForNode(selectedNodeKey.value)
 }
 
@@ -1627,6 +1707,9 @@ const treeData = computed(() => {
   // 合并附注公式（模板级单元格公式，独立于单体附注校验预设）
   acnrDrivenTree.push({
     key: 'consol_note', label: '合并附注', icon: '📝',
+    children: consolNoteTreeChildren.value.length
+      ? consolNoteTreeChildren.value
+      : [{ key: 'consol_note_loading', label: '加载中…', icon: '⏳' }],
   })
 
   // 合并工作底稿
@@ -2195,10 +2278,43 @@ async function applyConsolReportTarget() {
 
 /** 合并附注入口：独立单元格公式面板，章节由 noteSection 传入面板定位。 */
 async function applyConsolNoteTarget() {
-  selectedNodeKey.value = 'consol_note'
-  selectedPath.value = props.noteSectionTitle ? `合并附注 > ${props.noteSectionTitle}` : '合并附注'
+  // 先加载合并附注树数据
+  await loadConsolNoteTree()
   await nextTick()
-  try { fmTreeRef.value?.setCurrentKey('consol_note') } catch { /* ignore */ }
+
+  const sectionId = (props.noteSection || '').trim()
+  if (sectionId && consolNoteTreeChildren.value.length) {
+    // 尝试定位到具体章节节点
+    const targetKey = `consol_note_${sectionId}`
+    consolNoteSelectedSection.value = sectionId
+
+    // 查找父章节 key 以便展开
+    let parentChapterKey = ''
+    for (const chapter of consolNoteTreeChildren.value) {
+      if (chapter.children?.some((c: any) => c.key === targetKey)) {
+        parentChapterKey = chapter.key
+        break
+      }
+    }
+
+    selectedNodeKey.value = targetKey
+    selectedPath.value = props.noteSectionTitle
+      ? `合并附注 > ${props.noteSectionTitle}`
+      : `合并附注 > ${sectionId}`
+    const keysToExpand = ['consol_note']
+    if (parentChapterKey) keysToExpand.push(parentChapterKey)
+    expandedKeys.value = [...new Set([...expandedKeys.value, ...keysToExpand])]
+    await nextTick()
+    try { fmTreeRef.value?.setCurrentKey(targetKey) } catch { /* ignore */ }
+  } else {
+    // 无具体章节：展开合并附注根节点
+    selectedNodeKey.value = 'consol_note'
+    consolNoteSelectedSection.value = ''
+    selectedPath.value = props.noteSectionTitle ? `合并附注 > ${props.noteSectionTitle}` : '合并附注'
+    expandedKeys.value = [...new Set([...expandedKeys.value, 'consol_note'])]
+    await nextTick()
+    try { fmTreeRef.value?.setCurrentKey('consol_note') } catch { /* ignore */ }
+  }
 }
 
 // 初始加载当前报表的数据
@@ -2288,6 +2404,8 @@ watch([visible, () => props.wpId, () => props.wpCode, () => props.projectId, () 
     loadScopeFormulas()
     // 加载动态附注树
     loadNoteTree()
+    // 加载合并附注树（按章节分组）
+    loadConsolNoteTree()
     // 加载 ACNR 五域导航树（底稿域动态从 catalog 构建）
     loadAcnrTree()
     // 加载报表类型（项目级动态）
@@ -2384,8 +2502,10 @@ function onTreeNodeClick(data: any) {
       selectedPath.value = `报表 > ${data.label}`
     } else if (consolReportTypeOfNode(data.key)) {
       selectedPath.value = `合并报表 > ${data.label}`
-    } else if (data.key === 'consol_note') {
-      selectedPath.value = '合并附注'
+    } else if (data.key.startsWith('consol_note_') && data._sectionId) {
+      // 合并附注科目子节点：设置选中的 section_id，面板通过 prop 响应切换
+      consolNoteSelectedSection.value = data._sectionId
+      selectedPath.value = `合并附注 > ${data._sectionTitle || data.label}`
     } else if (data.key.startsWith('note_')) {
       selectedPath.value = `附注 > ${data._sectionTitle || data.label}`
       if (!notePresetFormulas.value.length) {

@@ -201,6 +201,13 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     ("g4", "phase5_g4_bond_investment", "ADAPTER_ID", True, True),
     ("g6", "phase5_g6_other_bond", "ADAPTER_ID", True, True),
     ("g5", "phase5_g5_long_term_receivable", "ADAPTER_ID", True, True),
+    # ── F 循环（spec: f3/f4/f5-sync-coverage-and-first-canary）──────────────
+    #    🔴 三家都有 `instrumentation_specs`（复数）⇒ `plural_instr=True`。
+    #    `build_store_projection` 的 `store_item_id` 是 KEYWORD_ONLY ⇒ 不触发
+    #    首位位置参数分派（只有 f1 是 POSITIONAL_OR_KEYWORD）。
+    ("f3", "phase5_f3_notes_payable", "ADAPTER_ID", True, True),
+    ("f4", "phase5_f4_accounts_payable", "ADAPTER_ID", True, True),
+    ("f5", "phase5_f5_cost_of_sales", "ADAPTER_ID", True, True),
     # ── N4 canary 条目随 N 循环 provider 入库时补回（phase5_n4 尚未提交）──
 )
 

@@ -143,6 +143,8 @@ class EventBus:
         ``extra.wp_id`` / ``extra.publish_token`` 身份，调整事件还需保留
         ``entry_group_id``，避免不同底稿、确认或调整组互相覆盖。
         ``entry_group_id`` 的新载荷位置是顶层字段；旧发布方仍可从 ``extra`` 回退。
+        携带 typed ``ConsolContext`` 时，再把节点、模板、树和输入版本纳入身份，
+        避免同一项目同一年度的不同合并计算上下文在防抖窗口内互相覆盖。
         未携带非空身份字段的事件保持原有去重键，不把缺失值序列化成 ``None``。
         """
         year_key = payload.year if payload.year is not None else "ALL_YEARS"
@@ -160,9 +162,15 @@ class EventBus:
             value_text = str(value).strip()
             if value_text:
                 identity.append((field, value_text))
+        if payload.context is not None:
+            # project_id/year 已在 base_key 中，其他字段是合并上下文的稳定身份。
+            context_identity = payload.context.identity_dict()
+            context_identity.pop("project_id", None)
+            context_identity.pop("year", None)
+            identity.append(("consol_context", context_identity))
         if not identity:
             return base_key
-        identity_key = json.dumps(identity, ensure_ascii=False, separators=(",", ":"))
+        identity_key = json.dumps(identity, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
         return f"{base_key}:{identity_key}"
 
     def subscribe(self, event_type: EventType, handler: EventHandler) -> None:

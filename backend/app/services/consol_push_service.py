@@ -5,10 +5,12 @@
     ① 重算差额表（``recalc_full``，内部 commit）
     ② 重算合并试算（``recalculate_trial``）+ commit
     ③ 生成合并报表（``generate_consol_reports``，按项目口径，全部报表类型）+ commit
-    ④ 标记合并附注数据待更新（``consol_note_data.is_stale = true``）+ commit
+    ④ 标记合并附注待更新 + **真正调用 fill_note_sections 刷新附注公式** + commit
 
 - 关键步（①②）失败 ⇒ 该项目后续步骤跳过，**上层照常推送**（上层按库内下层现有结果计算，不会读到半写的数）；
   ③④ 失败记入步骤与警告，不影响其他项目。
+- 步骤④的运行摘要区分 stale_marked（行数）/ distinct_section_count（章节数）/ node_count（节点数）/
+  refreshed_count（成功刷新数）/ failed_count（失败数），不再用一个"N 章"同时表示行数和章节数。
 - 并发：每个目标项目同进程 ``asyncio.Lock`` + PG 事务级咨询锁（跨进程）⇒ 两个下级同时推送时共同的上层
   逐项目串行；同一触发项目的后台推送排队期内再次请求只保留一次（``request_push``）。
 - 结果：一行 ``consol_push_run``（``running → succeeded / partial / failed``，逐项目逐步骤 + 警告）；
@@ -56,7 +58,7 @@ STEP_LABELS = {
     STEP_WORKSHEET: "重算差额表",
     STEP_TRIAL: "重算合并试算",
     STEP_REPORT: "生成合并报表",
-    STEP_NOTES: "标记合并附注待更新",
+    STEP_NOTES: "刷新合并附注",
 }
 _CRITICAL = frozenset({STEP_WORKSHEET, STEP_TRIAL})
 
@@ -185,6 +187,125 @@ async def _mark_notes_stale(db: AsyncSession, project_id: UUID, year: int) -> in
     return int(result.rowcount or 0)
 
 
+async def _refresh_notes(
+    db: AsyncSession, project_id: UUID, year: int, *, context=None, tree=None,
+) -> dict:
+    """标记 stale → 真正刷新附注 → 返回分口径统计。
+
+    先标记所有 ``consol_note_data`` 行 stale，再按节点逐章节调用
+    ``fill_note_sections`` 执行公式刷新并清除 ``is_stale``。
+    返回值区分 section / node_instance / refreshed / failed / skipped 五种计数。
+    """
+    from app.models.consol_note_data_models import ConsolNoteData
+    from app.services.consol_note_formula_service import (
+        consol_note_tables,
+        fill_note_sections,
+        resolve_note_template_type,
+    )
+    from app.services.consol_tree_service import build_tree, iter_nodes
+
+    # ── 1. 标记 stale ──
+    stale_count = await _mark_notes_stale(db, project_id, year)
+    await db.commit()
+
+    stats: dict = {
+        "stale_marked": stale_count,
+        "distinct_section_count": 0,
+        "node_count": 0,
+        "refreshed_count": 0,
+        "failed_count": 0,
+        "skipped_count": 0,
+        "note_status": "skipped",  # 附注子状态：persisted / partial / failed / skipped
+    }
+
+    # ── 2. 解析模板与章节 ──
+    try:
+        template_type = await resolve_note_template_type(db, project_id)
+    except Exception:
+        # 无法解析模板（项目无 consolidation_type 等）⇒ 只标 stale 不刷新
+        logger.warning("合并推送附注刷新跳过：无法解析项目模板类型，project=%s", project_id)
+        return stats
+
+    tables = [t for t in consol_note_tables(template_type) if t.get("enabled", True) is not False]
+    section_ids = list(dict.fromkeys(
+        str(t.get("section_id")) for t in tables if t.get("section_id")
+    ))
+    stats["distinct_section_count"] = len(section_ids)
+    if not section_ids:
+        return stats
+
+    # ── 3. 构建企业树 ──
+    resolved_tree = tree if tree is not None else await build_tree(db, project_id)
+    if resolved_tree is None:
+        logger.info("合并推送附注刷新跳过：无企业树，project=%s", project_id)
+        return stats
+
+    # ── 4. 构建合并计算上下文 ──
+    view_ctx = None
+    resolved_context = context
+    try:
+        if resolved_context is None:
+            from app.services.consol_context_service import build_consol_context
+            resolved_context = await build_consol_context(db, project_id, year, tree=resolved_tree)
+        from app.services.consol_report_view_service import load_view_context
+        view_ctx = await load_view_context(db, project_id, year, context=resolved_context, tree=resolved_tree)
+    except Exception as exc:
+        logger.warning("合并推送附注刷新上下文构建失败（降级只标 stale）：%s", exc)
+        return stats
+
+    # ── 5. 遍历节点逐章刷新 ──
+    seen: set[str] = set()
+    nodes = []
+    for node in iter_nodes(resolved_tree):
+        nk = str(getattr(node, "node_key", "") or "").strip()
+        if nk and nk not in seen:
+            seen.add(nk)
+            nodes.append(node)
+    stats["node_count"] = len(nodes)
+
+    total_persisted = 0
+    total_failed = 0
+    total_skipped = 0
+
+    for node in nodes:
+        node_key = str(node.node_key)
+        try:
+            result = await fill_note_sections(
+                db, project_id, year, section_ids,
+                node_key=node_key,
+                template_type=template_type,
+                context=resolved_context,
+                tree=resolved_tree,
+                view_context=view_ctx,
+            )
+            if result.get("results"):
+                await db.commit()
+            persisted = len(result.get("results") or [])
+            failed = len(result.get("failures") or [])
+            total_persisted += persisted
+            total_failed += failed
+            total_skipped += max(0, len(section_ids) - persisted - failed)
+        except Exception as exc:
+            await db.rollback()
+            logger.warning("合并推送附注刷新节点 %s 失败：%s", node_key, exc)
+            total_failed += len(section_ids)
+
+    stats["refreshed_count"] = total_persisted
+    stats["failed_count"] = total_failed
+    stats["skipped_count"] = total_skipped
+
+    if total_failed and total_persisted:
+        stats["note_status"] = "partial"
+    elif total_failed:
+        stats["note_status"] = "failed"
+    elif total_persisted:
+        stats["note_status"] = "persisted"
+    else:
+        stats["note_status"] = "skipped"
+
+    return stats
+
+
 async def _push_one(db: AsyncSession, project_id: UUID, year: int, steps: list[dict], warnings: list[str],
                     *, context=None, tree=None) -> bool:
     """推送一个合并项目的四步；返回是否全部成功。每步独立事务，失败回滚该步并留痕。"""
@@ -219,15 +340,23 @@ async def _push_one(db: AsyncSession, project_id: UUID, year: int, steps: list[d
         return f"报表 {len(results)} 张 {total} 行" + (f"，留空 {blank} 行" if blank else "")
 
     async def notes() -> str:
-        count = await _mark_notes_stale(db, project_id, year)
-        parts = [f"附注 {count} 章标记待更新"]
-        if context is not None:
-            fp = getattr(context, "tree_fingerprint", None)
-            tt = getattr(context, "template_type", None)
-            if fp:
-                parts.append(f"tree_fingerprint={fp[:12]}")
-            if tt:
-                parts.append(f"template={tt}")
+        stats = await _refresh_notes(db, project_id, year, context=context, tree=tree)
+        parts = []
+        stale = stats.get("stale_marked", 0)
+        sections = stats.get("distinct_section_count", 0)
+        nodes = stats.get("node_count", 0)
+        refreshed = stats.get("refreshed_count", 0)
+        failed = stats.get("failed_count", 0)
+        note_status = stats.get("note_status", "skipped")
+
+        if stale:
+            parts.append(f"标记 {stale} 行待更新")
+        parts.append(f"{sections} 个章节 × {nodes} 个节点")
+        parts.append(f"刷新 {refreshed}")
+        if failed:
+            parts.append(f"失败 {failed}")
+            warnings.append(f"「{name}」附注刷新有 {failed} 个章节×节点失败")
+        parts.append(f"附注状态={note_status}")
         return "，".join(parts)
 
     bodies = {STEP_WORKSHEET: worksheet, STEP_TRIAL: trial, STEP_REPORT: report, STEP_NOTES: notes}

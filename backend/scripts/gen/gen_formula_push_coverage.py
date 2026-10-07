@@ -24,6 +24,7 @@ if str(ROOT) not in sys.path:
 
 def compute_coverage(rules_path: Path = RULES_PATH) -> dict:
     """从规则清单 + 注册表计算接入等级清册。"""
+    import re
     from app.services.formula_push.bindings import supported_wp_codes, get_binding
     from app.services.formula_push.owned_keys import owned_item_ids
 
@@ -54,10 +55,51 @@ def compute_coverage(rules_path: Path = RULES_PATH) -> dict:
             ),
         })
 
+    # ── 不适用码登记 ──────────────────────────────────────────────────────
+    mapping_path = ROOT / "data" / "wp_account_mapping.json"
+    mapping_raw = json.loads(mapping_path.read_text("utf-8"))
+    primary_re = re.compile(r"^[A-Z]\d+$")
+    all_primary: dict[str, dict] = {}
+    for item in mapping_raw.get("mappings", []):
+        c = item.get("wp_code", "")
+        if primary_re.fullmatch(c) and c not in all_primary:
+            all_primary[c] = item
+
+    registered_set = set(codes)
+    not_applicable: list[dict] = []
+    for code in sorted(set(all_primary) - registered_set):
+        item = all_primary[code]
+        accts = item.get("account_codes", [])
+        name = item.get("account_name", "")
+        cycle = code[0]
+        # 分类判定
+        if cycle == "A":
+            reason = "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求"
+        elif cycle == "B":
+            reason = "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算"
+        elif cycle == "C":
+            reason = "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿"
+        elif code.endswith("0") and accts and cycle in "DEFGHKL":
+            reason = f"函证中心底稿（{name}），数据来自询证程序结果而非试算表公式推送"
+        elif cycle == "S" and not accts:
+            reason = f"S 循环专项考虑（{name or code}），无科目码关联，文档/分析类底稿"
+        elif cycle == "S" and accts:
+            reason = f"S 循环专项（{name}），有前端 FormulaEngine 但不需要后端推送"
+        elif accts:
+            reason = f"有科目码（{','.join(accts)}），后续可接入候选"
+        else:
+            reason = f"无科目码关联（{name or code}），文档/管理类底稿"
+        not_applicable.append({
+            "wp_code": code,
+            "reason": reason,
+            "account_codes": accts,
+        })
+
     return {
-        "version": 1,
+        "version": 2,
         "registered_codes": codes,
         "entries": entries,
+        "not_applicable": not_applicable,
     }
 
 
@@ -82,7 +124,7 @@ def main() -> None:
         sys.exit(2)
 
     OUTPUT_PATH.write_text(content, encoding="utf-8")
-    print(f"已生成 {OUTPUT_PATH}（{len(coverage['entries'])} 条）")
+    print(f"已生成 {OUTPUT_PATH}（{len(coverage['entries'])} 条已注册 + {len(coverage.get('not_applicable', []))} 条不适用）")
 
 
 if __name__ == "__main__":

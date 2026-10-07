@@ -221,13 +221,13 @@ def assert_entry_selectable(
 #: canary：F5-8 重大调整核查表（裁决 F5-H1：数据区零公式 / 无 BP-7 / 无 footer 锚行首验）
 _INCLUDE_F508: Final[bool] = True
 #: F5-5 与上年度比较分析表（含除零变动率列；依赖 Task 6 的 BP-7 修复）
-_INCLUDE_F505: Final[bool] = False
+_INCLUDE_F505: Final[bool] = True
 #: F5-3 其他业务成本明细表（R11-13 三行模板预填标签）
-_INCLUDE_F503: Final[bool] = False
+_INCLUDE_F503: Final[bool] = True
 #: F5-2 主营业务成本月度明细表（12 行 × 12 月列，nested `months/0`…`months/11`）
-_INCLUDE_F502: Final[bool] = False
+_INCLUDE_F502: Final[bool] = True
 #: F5-7 成本倒轧表（21 固定 rowKey；G 列处置依赖模板覆盖层）
-_INCLUDE_F507: Final[bool] = False
+_INCLUDE_F507: Final[bool] = True
 #: F5-1 其他业务区（**仅 other 区**；主营区不可受管 —— 九列全公式零可编辑格，裁决 F5-H3）
 #: 🔴 Task 20 实测后开启：行身份 `rowKey`（非 id）、uuid_col K（spec 记 J 有误，J 非全空）、
 #: footer R26 小计携带合计公式、无 BP-7（载入不按下标重算 rowKey）。
@@ -296,6 +296,16 @@ def _spec_of_store_item(store_item_id: str) -> Any:
         f"当前受管: {list(all_store_item_ids())}"
     )
 
+
+#: 🔴 F5-2 容量裁决（裁决 F5-H4 · Task 15）：F5-1 主营区 10 个模板公式槽位
+#: 只引 F5-2 的前 10 行（A11~A20），第 11~12 行品种不进主营区汇总 ⇒ 审定数静默少计。
+#: 品种数 ≤ 10 受管，> 10 整表降级 legacy + 中文提示。
+#: 🔴 不得改模板 SUM 区间 / 不得截断超限行 / 不得改 F5-2 last_data_row。
+F5_2_MAX_MANAGED_ROWS: Final[int] = 10
+F5_2_CAPACITY_DOWNGRADE_MESSAGE: Final[str] = (
+    "品种数超出 F5-1 审定表主营区的 10 个槽位，"
+    "F5-1 的小计行将漏算超出部分。请在 HTML 模式下编辑。"
+)
 
 #: 🔴 判定为 HTML-only 的区（裁决 F5-H3 / FC-6 / 后置）—— 登记以证明"不是漏声明"。
 #: 判据（F5-P17 / P23）断言这些键**不在** `all_store_item_ids()`。

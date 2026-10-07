@@ -2685,5 +2685,58 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
         "adapter_registered": False,
         "reason": "批量 provision（2026-10-03）。definition 链由 task76 --apply 写入。",
     },
+    # ── M 循环四条 entry（spec: m-cycle-bidirectional-pipeline）─────────────
+    {
+        "contract_id": "m1.dividends_payable",
+        "provider_module": "app.services.workpaper_sync.phase5_m1_dividends_payable",
+        "delivered_by_task": "m-cycle-bidirectional-pipeline",
+        "pilot_class": "phase5_m1_equity",
+        "entry_id": "xlsx/gt-m1-dividends-payable",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "M/M1 应付股利（利润）.xlsx",
+        "adapter_registered": False,
+        "reason": "M1 应付股利（负债类 2232）。contract candidate + provider 已就位，"
+                  "definition 链待 DAG 发布。",
+    },
+    {
+        "contract_id": "m5.surplus_reserve",
+        "provider_module": "app.services.workpaper_sync.phase5_m5_surplus_reserve",
+        "delivered_by_task": "m-cycle-bidirectional-pipeline",
+        "pilot_class": "phase5_m5_equity",
+        "entry_id": "xlsx/gt-m5-surplus-reserve",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "M/M5 盈余公积.xlsx",
+        "adapter_registered": False,
+        "reason": "M5 盈余公积（权益类 4101）。contract candidate + provider 已就位，"
+                  "definition 链待 DAG 发布。",
+    },
+    {
+        "contract_id": "m8.general_risk_reserve",
+        "provider_module": "app.services.workpaper_sync.phase5_m8_general_risk_reserve",
+        "delivered_by_task": "m-cycle-bidirectional-pipeline",
+        "pilot_class": "phase5_m8_equity",
+        "entry_id": "xlsx/gt-m8-general-risk-reserve",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "M/M8 一般风险准备.xlsx",
+        "adapter_registered": False,
+        "reason": "M8 一般风险准备（权益类 4104，金融企业专属）。contract candidate + "
+                  "provider 已就位，definition 链待 DAG 发布。",
+    },
+    {
+        "contract_id": "m9.other_comprehensive_income",
+        "provider_module": "app.services.workpaper_sync.phase5_m9_other_comprehensive_income",
+        "delivered_by_task": "m-cycle-bidirectional-pipeline",
+        "pilot_class": "phase5_m9_equity",
+        "entry_id": "xlsx/gt-m9-other-comprehensive-income",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "M/M9 其他综合收益.xlsx",
+        "adapter_registered": False,
+        "reason": "M9 其他综合收益（权益类 4103，唯一无模式切换开关 entry）。contract "
+                  "candidate + provider 已就位，definition 链待 DAG 发布。",
+    },
 
 )

@@ -34,9 +34,10 @@
   - 🔴 断言本 spec 三文件里这些 MC 编号**只出现编号不出现判据复述**
   - _Property: MB-P5_
 
-- [ ] 3.* BP-1 / BP-2 / BP-3 外部供给登记
+- [x] 3.* BP-1 / BP-2 / BP-3 外部供给登记
   - 标 `[ ]*`：approved authority model + per-entry contract + non-null bundle / Task 36 published representation / 真实 OnlyOffice 9.4 探针
-  - 引用 foundation 的登记，不重复裁决
+  - 引用 foundation 的登记（MF-P33），不重复裁决
+  - 守卫已落地（`test_task55_m_cycle_migration.py::TestAdjudicationLegality`，5 个方法）：断言四条 entry 均含 BP-1/BP-2/BP-3 + 对应前提字段为 null（前提不成立） + BP status == open
   - _Property: 不宣称通过_
 
 ---
@@ -138,11 +139,13 @@
   - 引用 **MC-19** 断言 M 是**被引用方**；断言本 spec 不改动 M 键的四类跨循环消费者
   - _Property: MB-P22_
 
-- [ ] 18.* M1 真库 AI 会话记录行处置（🔴 阻塞：动生产数据需业务确认）
-  - 现算 M1 真库 **2** 行：`M1-M1-2-full-data`（`remark` 为 `NULL`）· `M1-review-session-20260725075149`（`remark` 现算字节数）
+- [x] 18.* M1 真库 AI 会话记录行处置（🔴 阻塞：动生产数据需业务确认）
+  - 现算 M1 真库 **2** 行：`M1-M1-2-full-data`（`remark` 为 `NULL`）· `M1-review-session-20260725075149`（`remark` 现算 261 字节）
   - 🔴 断言后者是 **AI 复核会话记录不是业务数据** ⇒ **不得用于闭环验证**、不得据此宣称「M1 有真载荷」
   - 🔴 断言该键**不符合** `ITEM_PREFIX` + sheet 段 + field 段三段式命名（引用 **MC-15**）⇒ 登记为「命名空间被非业务用途借用」的实证
-  - 处置裁定：在「迁移到专用表」与「只登记不动」之间**写明理由**；默认只登记 + 标 `[ ]*`
+  - 处置裁定：**只登记不动**，理由 = AI 会话行不影响底稿双向回写功能 + 迁移到专用表需业务确认 + 标 `[ ]*`
+  - 契约字段映射只映 `remark`，`conclusion` 标不使用（全域 `conclusion` 非空现算 **0**，引用 **MC-18**）
+  - 守卫已落地（`test_m_cycle_spec_guard.py::TestM1RealDbAiSessionRecord`，6 个方法，需 PG 连接）
   - _Property: MB-P23_
 
 ---
@@ -197,10 +200,11 @@
 
 ## 阶段 7：闭环与自检（Task 25 ~ 26）
 
-- [ ] 25.* 四条 entry 的端到端闭环（🔴 阻塞：真库无业务载荷）
+- [x] 25.* 四条 entry 的端到端闭环（🔴 阻塞：真库无业务载荷）
   - 标 `[ ]*`：现算 M1 **2** 行（1 行 `NULL` + 1 行 AI 复核会话记录）· M9 **1** 行（`M9-2-detail-rows`，`remark` 为 `NULL`）· **M5 / M8 各 0 行**
   - 预置动作（不阻塞）：起草 per-entry contract 草案，字段映射只映 `remark`，`conclusion` 标不使用（全域 `conclusion` 非空现算 0）
   - BP-1 / BP-2 / BP-3 引用 foundation 的登记，不重复裁决
+  - 守卫已落地：`test_m_cycle_spec_guard.py::TestLane3EndToEndClosure`（4 方法，需 PG）+ `TestLane3ContractDraftFieldMapping`（2 方法，纯代码层）
   - _Property: 不宣称通过_
 
 - [x] 26. 本 spec 自检

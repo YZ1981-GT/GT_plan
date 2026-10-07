@@ -174,6 +174,43 @@ async def handle_consol_note_formula_refresh(event: EventPayload) -> dict[str, o
                 logger.info("合并附注自动刷新跳过 V2 关闭项目：%s", base)
                 return base
 
+            # ── 归口短路：push 内联 _refresh_notes 已刷新完毕时跳过 ──
+            # push 的 notes 步骤先标 stale 再刷新并清除 stale。如果此时
+            # 没有任何 stale 行，说明 push 已经完成了刷新，handler 无需重复执行。
+            # 这避免审批 → push → TB 事件 → handler 的双重刷新。
+            try:
+                import sqlalchemy as sa
+                from app.models.consol_note_data_models import ConsolNoteData as _CND
+
+                stale_count = (await db.execute(
+                    sa.select(sa.func.count()).select_from(_CND).where(
+                        _CND.project_id == project_id,
+                        _CND.year == year,
+                        _CND.is_stale == sa.true(),
+                    )
+                )).scalar_one()
+                if stale_count == 0:
+                    note_total = (await db.execute(
+                        sa.select(sa.func.count()).select_from(_CND).where(
+                            _CND.project_id == project_id,
+                            _CND.year == year,
+                        )
+                    )).scalar_one()
+                    if note_total > 0:
+                        base["skipped"].append({
+                            "scope": "event",
+                            "reason": "附注数据已全部刷新（无 stale 行），跳过重复刷新",
+                        })
+                        base["ended_at"] = _now()
+                        logger.info(
+                            "合并附注自动刷新短路跳过（push 已刷新）：project=%s year=%s stale=0 total=%d",
+                            project_id, year, note_total,
+                        )
+                        return base
+            except Exception:
+                # session 不支持 execute（如测试 mock）时跳过短路检查，继续正常刷新
+                pass
+
             template_type = await resolve_note_template_type(db, project_id)
             base["template_type"] = template_type
             tables = [

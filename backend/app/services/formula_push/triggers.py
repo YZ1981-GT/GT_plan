@@ -145,10 +145,40 @@ async def _lookup_wp_code(project_id: UUID, wp_id: UUID) -> str | None:
         return None
 
 
+async def _is_consolidated_project(project_id: UUID, *, _session_factory=None) -> bool:
+    """快捷判断：合并项目（report_scope='consolidated'）的 TB 变更由 consol_push 处理，
+    formula_push 只服务单体项目，合并项目跳过避免空转。
+
+    ``_session_factory`` 仅供测试注入；生产代码不传。
+    """
+    from app.models.core import Project
+
+    session_factory = _session_factory
+    if session_factory is None:
+        from app.core.database import async_session
+        session_factory = async_session
+
+    try:
+        async with session_factory() as db:
+            row = (await db.execute(
+                sa.select(Project.report_scope).where(
+                    Project.id == project_id,
+                    Project.is_deleted == sa.false(),
+                )
+            )).first()
+            return row is not None and (row[0] or "").strip().lower() == "consolidated"
+    except Exception:  # noqa: BLE001
+        return False  # 查不到 → 不跳过，让引擎正常判断
+
+
 async def on_trial_balance_updated(payload: Any) -> None:
     project_id, year = _as_uuid(getattr(payload, "project_id", None)), getattr(payload, "year", None)
     if project_id is None or not year:
         logger.warning("formula_push: TRIAL_BALANCE_UPDATED 缺 project_id / year，未推送")
+        return
+    # 合并项目的 TB 变更由 consol_push 处理，formula_push 跳过
+    if await _is_consolidated_project(project_id):
+        logger.debug("formula_push: 跳过合并项目 %s 的 TRIAL_BALANCE_UPDATED", project_id)
         return
     account_codes = getattr(payload, "account_codes", None)
     account_codes = tuple(account_codes or ())
@@ -164,6 +194,10 @@ async def on_workpaper_saved(payload: Any) -> None:
     wp_id = _as_uuid(extra.get("wp_id"))
     if project_id is None or not year or wp_id is None:
         logger.warning("formula_push: WORKPAPER_SAVED(%s) 缺 project_id / year / wp_id，未推送", extra.get("wp_code"))
+        return
+    # 合并项目的底稿保存由 consol_push 处理
+    if await _is_consolidated_project(project_id):
+        logger.debug("formula_push: 跳过合并项目 %s 的 WORKPAPER_SAVED", project_id)
         return
 
     raw_code = extra.get("wp_code")

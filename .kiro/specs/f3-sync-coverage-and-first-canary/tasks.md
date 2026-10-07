@@ -2,15 +2,15 @@
 
 ## Overview
 
-**spec**：`f3-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**14/20 已实施**（2026-10-03 复盘修正，原 10/20 偏低）
+**spec**：`f3-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**17/20 已实施**（2026-10-07 Task 6/15/18 完成）
 **上游**：umbrella Task 48 · FC-1~FC-13（`f1-sync-coverage-and-first-canary/design.md`；**FC-11 由本 spec 提出**）·
 D1 引擎 · D1 应收票据镜像先例 · D2-1 稳定 rowKey 固定行先例
 
 ## 实施进度（2026-09-26）
 
 已完成 Task 0~8 + 17（canary 链路 + FC-11 全链路）。判据
-`backend/tests/workpaper_sync/test_f3_canary_and_contract.py` **32 passed / 2 xfailed**
-（2 个 xfail 是 BP-61-1 卡点的如实标记）；`backend/tests/test_f345_fc11_prefill_cells_invariant.py`
+`backend/tests/workpaper_sync/test_f3_canary_and_contract.py` **84 passed / 2 xfailed**
+（2 个 xfail 是 BP-61-1 卡点的如实标记；初始 32 passed，三批扩容后 84 passed）；`backend/tests/test_f345_fc11_prefill_cells_invariant.py`
 **25 passed**。
 
 🔴 **实施中实测修正 spec 的四处**（详见 `evidence/task2-morphology-and-geometry.md`）：
@@ -66,15 +66,15 @@ D1 引擎 · D1 应收票据镜像先例 · D2-1 稳定 rowKey 固定行先例
   - P12 四条子判据（items 键数 / `_ensure_cells` 源码 / `--check` 变异 / 预设数增长）；P13 累加器键集合 + 附注口径
   - _Requirements: 7.2, 7.4_
 
-- [ ]* 6. F3-P15 零回归基线（10 contract golden digest 现算记录）
-  - 🔴 **卡外部**：`check_sync_provider_golden_digest.py` 当前**整体红** —— 并发会话已把 F1 加进
-    `PROVIDERS`，而 F1 的 `build_contract_payload()` 过不了 `parse_contract`
-    （`table anchor 必须是 A1 单元格，实得 None`，手写 payload 缺必填字段）⇒ 该门在 F1 修好前
-    无法产出基线。已登记移交 `f1-sync-coverage-and-first-canary`。
-  - 替代验证（已做）：F3 契约自身的 `canonical_digest=4530e9050bb891b7199c7297604fbf5567d94a990793906870ad143323a9197a`
-    + `assert_contract_file_matches_source()` 无漂移 + 生成器 `--check` OK；
-    `test_platform_contract_disk_byte_stability` 的「仅在磁盘」已清空（三份契约均已登记）。
+- [x] 6. F3-P15 零回归基线（10 contract golden digest 现算记录）
   - _Requirements: 7.5_
+  - **已完成**（2026-10-07 补标）：原阻塞「F1 的 `build_contract_payload()` 过不了 `parse_contract`」
+    已在第一批次修复（F1 Task 10 接管修复 `_rows_table_payload` 改走框架层）。
+    F3 已在 `check_sync_provider_golden_digest.py` PROVIDERS 中登记
+    （`("f3", "phase5_f3_notes_payable", "ADAPTER_ID", True, True)`，同批纳入 F4/F5）。
+    基线 **226 digest / 37 家 / 零漂移 / 零跳过**。
+  - 替代验证（原文已记）仍有效：F3 契约 `canonical_digest` + `assert_contract_file_matches_source()` +
+    生成器 `--check` OK + `test_platform_contract_disk_byte_stability` 无仅在磁盘条目。
 
 ### 阶段 1：canary 链路（F3-5）
 
@@ -240,10 +240,17 @@ D1 引擎 · D1 应收票据镜像先例 · D2-1 稳定 rowKey 固定行先例
 
 ### 阶段 3：F3-2 明细 + F3-4 利息测算
 
-- [ ] 15. `phase5_f3_02_detail.py`：两级表头 R13/R14 / R15-30 / footer R31「合␠␠计」/ UUID **X** /
+- [x] 15. `phase5_f3_02_detail.py`：两级表头 R13/R14 / R15-30 / footer R31「合␠␠计」/ UUID **X** /
   `formula_columns=("O","R")`；派生列按 FC-7 判 `auto_source`（`termDays`/`maturityBucket`/`isOverdue`）；
   J/U 两列 FC-10 暂 HTML-only；下游 6 处消费方回写后重算
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
+  - **已完成**（2026-10-07）：`phase5_f3_02_detail.py` + `_INCLUDE_F302=True` + 契约重算
+    （digest `6585ab47…` → `3771d636…`，过 `parse_contract`）。
+    18 editable 字段（A~W 减去 O/R 公式列 + I/J/U HTML-only 列）+ 2 公式列（O=L+M-N / R=O+P+Q）。
+    两级表头 R13/R14 + 17 组合并。footer 双空格 `合  计`（D6-9 先例同型）。UUID **X**。
+    受管面 = 4 sheet / 6 table / 6 instr。全文件 84 passed + 2 xfailed。
+    🔴 HTML-only 三列已登记：I（FC-7 auto_source 期限天数）/ J（FC-10 百分比票面利率）/ U（FC-10 百分比保证金比例）。
+    store-only：seq（前端序号）。
 
 - [ ]* 16. `phase5_f3_04_interest.py` + F3-4 口径三方向裁决（F3-H2）
   - 默认方向③（H 列 `mode=formula` 不受管 + UI 中文提示两侧算法差异）；出业务影响评估证据；方向①②登记 follow-up
@@ -257,10 +264,14 @@ D1 引擎 · D1 应收票据镜像先例 · D2-1 稳定 rowKey 固定行先例
     （块 `cells` 非空 / sheet 名 ∈ 模板 tab）；`test_sheet_exists_in_source_xlsx[F3]` 转绿；F3-P12 转绿
   - _Requirements: 7.2_
 
-- [ ] 18. F3-3 调整分录汇总可行性核（**不改生产代码**）
+- [x] 18. F3-3 调整分录汇总可行性核（**不改生产代码**）
   - 实证 `F3-3-rows` 三方读写（`useF3Adjustment` / `f3AdjustmentInject` / `F3TabAdjustment`）+
-    `useAdjustmentCentralSync`（`F3TabAdjustment.vue:36`）⇒ 默认 `single_html`（FC-6）；证据 `evidence/task18-f33-single-html.json`
+    `useAdjustmentCentralSync`（`F3TabAdjustment.vue:40`）⇒ 默认 `single_html`（FC-6）；证据 `evidence/task18-f33-single-html.json`
   - _Requirements: 2.1_
+  - **已完成**（2026-10-07）：裁决 **single_html**。F3-3-rows 有两方写入（useF3Adjustment +
+    f3AdjustmentInject 幂等注入）+ useAdjustmentCentralSync hub。与 D1-5 ~ F1-3 共十张同型。
+    三方写入不可串行化（f3AdjustmentInject 按 sourceKind 在 F3-5/F3-4 操作时注入行）。
+    证据落 `evidence/task18-f33-single-html.json`。
 
 ### 阶段 5：F3-1 审定表（两处硬前置）
 

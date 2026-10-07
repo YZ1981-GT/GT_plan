@@ -22,7 +22,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.audit_platform_models import (
     AccountCategory,
@@ -34,6 +34,7 @@ from app.models.audit_platform_models import (
     ReviewStatus,
 )
 from app.schemas._common import AmountDecimal, OptionalAmountDecimal
+from app.schemas.consol_context import ConsolContext
 
 
 # ===================================================================
@@ -974,7 +975,25 @@ class EventPayload(BaseModel):
     account_codes: list[str] | None = None
     batch_id: UUID | None = None
     entry_group_id: UUID | None = None
-    extra: dict[str, Any] = {}
+    context: ConsolContext | None = None
+    extra: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _validate_context_boundary(self) -> "EventPayload":
+        """typed context 存在时必须与事件 envelope 的项目/年度一致。"""
+        if self.context is None:
+            return self
+        if self.context.project_id != self.project_id:
+            raise ValueError("事件项目与 ConsolContext.project_id 不一致")
+        if self.year is None:
+            raise ValueError("携带 ConsolContext 的事件必须携带顶层年度")
+        if self.context.year != self.year:
+            raise ValueError("事件年度与 ConsolContext.year 不一致")
+        return self
+
+    def resolved_context(self) -> ConsolContext | None:
+        """返回 typed context；旧事件仍返回 None，由入口按业务边界显式 legacy 化。"""
+        return self.context
 
 
 # ===================================================================

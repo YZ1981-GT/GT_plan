@@ -1,5 +1,5 @@
 {
-  "digest_count": 202,
+  "digest_count": 226,
   "providers": [
     {
       "label": "b60",
@@ -408,6 +408,48 @@
       },
       "store_projection_sha256": "fb8c6a1393ca241d5ec330dbc2eda2b5937151a095e48a715bfd1e5295d97093",
       "instrumentation_sha256": "43601cd18a09ef6e7bde1766f50afca5c19431bcfa13d4ccb691baf342d28d58"
+    },
+    {
+      "label": "f3",
+      "adapter_id": "f3.notes_payable_detail",
+      "contract_payload_sha256": "3771d6363daf05b930b9f0f6791b0cd61fe18cd9b543c26d91bad849b2f4b08a",
+      "sheet_digests": {
+        "f35-managed": "7fba4dc22ac87e8b1485057ffa376fd6cf64d79ebd4c31ff1aff800178f2a33e",
+        "f36-managed": "34118045f15318f5b8ed0a5da9235eee510b2940e7228db64c99183392d9b545",
+        "f37-managed": "3f24a8978bc45b844b98d459fd294708ac2fb14a76ec362dc4cf3d247ea805a7",
+        "f32-managed": "af5ad06625479914c0bda87bbe827f75f2a5957506af48778268a30481400526"
+      },
+      "store_projection_sha256": "5588c70d44410196b25548b505bbbd0d76c5978704ecbeb5933510f669d0b13e",
+      "instrumentation_sha256": "d7a92104fe6a8f9ef556cd2190cf57ebeef70a9679e7d2ded01f87aefa1e528c"
+    },
+    {
+      "label": "f4",
+      "adapter_id": "f4.accounts_payable_detail",
+      "contract_payload_sha256": "894fa9392c66136b953957824a228c68d44c8b2b319d15e0fff9ec911a3ebedb",
+      "sheet_digests": {
+        "f46-managed": "9c32a11b8602e924a0fdadf973177fa0ee6ea8737ebe8d53a9044b5e2121529a",
+        "f45-managed": "afe60e15ae242f596157a4beaf2c36f6becb6d5f5457af4db9e51e4964565840",
+        "f48-managed": "55c118bb94c92ee1e3adc733bb4668105f0e7bb872fcb649faa7d45e1daa6e62",
+        "f47-managed": "dc4f75afa0737ed9bf76d7ab0853c5ff6b5c15029a9d03e7c9753ac0d8e294a4",
+        "f42-managed": "449207bced43672e5f39ff0dcf81e685028a6fccd1b479c0bbf52280eb92d9d1"
+      },
+      "store_projection_sha256": "4295e6b7e9ab117bc9eaa1302ebc40212e98f65a89a64092a28f26816b5043e1",
+      "instrumentation_sha256": "a3dc2c6a8fac64c1caa5568b6294d60d96e7454e79c5c585c067af70bbf0d021"
+    },
+    {
+      "label": "f5",
+      "adapter_id": "f5.cost_of_sales_detail",
+      "contract_payload_sha256": "7007d7efc8647425a524b90f37972118d6c1a10dcdbd41faa8a5b7d8a79bc666",
+      "sheet_digests": {
+        "f58-managed": "9a1ae458346d59c7cae8026bf62c570a7a8f2ca99232c9c7a6ea04716305265f",
+        "f55-managed": "25042240ecaa32e3afe09e1207ab956e4c38a40b47ad13c60cd73e883143653c",
+        "f53-managed": "c8335ec8d392b9a02657c2c648c5d4495c63c3f35640ed0370392e6af9fc5180",
+        "f52-managed": "dca2e1993b119104da2afe586c515bd9a0cc34a7cb5e68e6ef2947c49e3f65b6",
+        "f57-managed": "4c2e46a221f86e85e5923168a1f405ec8bc0c13cd1e72d184ad92cf128973125",
+        "f51-managed": "e96e1b4851c5eab81ebf60b6cec84abf79b04bdfacb2c081cb6ef952c13c7565"
+      },
+      "store_projection_sha256": "b05391e3656ad5909a21d1c40a73331d4fdb207f173ff83bc9f4c1fdc278676b",
+      "instrumentation_sha256": "e3de13899ed5004a7b3d2168043a18b429a1c23564d6e18c5b203ea1a8a31573"
     }
   ],
   "skipped": []

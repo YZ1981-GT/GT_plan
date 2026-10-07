@@ -2,7 +2,7 @@
 
 ## Overview
 
-**spec**：`f2-sync-coverage-four-entry-lanes`　**创建**：2026-09-26　**状态**：**20/27 已实施**（2026-10-03 复盘修正，原标头 0/27 严重过时）
+**spec**：`f2-sync-coverage-four-entry-lanes`　**创建**：2026-09-26　**状态**：**21/27 已实施**（2026-10-07 Task 0 补标）
 **上游**：umbrella Task 48 · F 循环共同裁决 FC-1~FC-13（`f1-sync-coverage-and-first-canary/design.md`）· D1-7 dict 子数组先例 ·
 G7 RG-3 先例 · 模板覆盖层 spec
 **结构**：Wave 0 共用前置 + 四条 lane（M main / S stocktake / V valuation / P special），lane 之间互不阻塞（Wave 0 之后可并行）
@@ -13,9 +13,12 @@ G7 RG-3 先例 · 模板覆盖层 spec
 
 ### Wave 0：共用前置（四 lane 共同阻塞项）
 
-- [ ] 0. 前置依赖核查（`git show HEAD:`）：框架层 `RowTableSheetSpec` / `AdjudicationSheetSpec` / `merge._protection`；
+- [x] 0. 前置依赖核查（`git show HEAD:`）：框架层 `RowTableSheetSpec` / `AdjudicationSheetSpec` / `merge._protection`；
   D1-7 dict 门面可复用；模板覆盖层 spec 的交付状态（决定 F2-26 区一能否接）
   - _Requirements: 3.3, 7.3_
+  - **已完成**（2026-10-07 补标）：`git ls-files` 确认三个前置文件均在 HEAD 中跟踪
+    （`phase5_row_table_sheet.py` / `phase5_adjudication_sheet.py` / `merge.py`）。
+    后续 Task 1~23 共 20 个已跳过本任务直接实施完成，隐含确认了前置。
 
 - [x] 1. slice 核对 + store 落点实测 + 四条 wp_code 裁决条目
   - 四个 entry 的 slice 事实与现 manifest 逐项比对；真库 F2 载荷落点清单落证据（父码 `F2` 35 键 + `2aa00f57` 子码 3 键）

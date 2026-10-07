@@ -700,6 +700,58 @@
       "capability": "bidirectional",
       "migration_state": "adapter_registered",
       "reason": "J3 股份支付从 legacy GtOnlyOfficeSheet 迁到 WorkpaperSyncEditorHost 真双向 sync bridge。受管 sheet = 股份支付情况表J3-1（j31-plans-managed）。adapter_id = j3.share_based_payment_detail（phase5_j3_share_based_payment.py）。J3 无审定表，无 TB 发布门。"
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtF1Prepayment.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_f1_prepayment_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "f1.prepayment_detail",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtF3NotesPayable.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_f3_notes_payable_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "f3.notes_payable_detail",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtF4AccountsPayable.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_f4_accounts_payable_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "f4.accounts_payable_detail",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtF5CostOfSales.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_f5_cost_of_sales_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "f5.cost_of_sales_detail",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
     }
   ]
 }

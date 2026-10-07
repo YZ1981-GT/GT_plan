@@ -2,14 +2,15 @@
 
 ## Overview
 
-**spec**：`f4-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**10/20 已实施**（2026-10-03 复盘修正，原 8/20 偏低）
+**spec**：`f4-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**17/20 已实施**（2026-10-07 Task 5/12/13/14/15/16/17 完成）
 **上游**：umbrella Task 48 · FC-1~FC-13（`f1-sync-coverage-and-first-canary/design.md`）· D1 引擎 ·
 F1 spec（借贷镜像同构 + 三家审定表统一口径裁决）· F3 spec（FC-11 工具链根因）
 
 ## 实施进度（2026-09-26）
 
 已完成 Task 0~4 + 6 + 7 + 18（canary 链路 + F4A 撞码隔离 + FC-11 数据侧）。判据
-`backend/tests/workpaper_sync/test_f4_canary_and_contract.py` **30 passed / 1 xfailed**。
+`backend/tests/workpaper_sync/test_f4_canary_and_contract.py` **34 passed / 1 xfailed**
+（初始 30 passed，三批扩容后 34 passed）。
 
 🔴 **实施中实测修正 spec 的三处**（详见 `evidence/task2-morphology-and-geometry.md`）：
 
@@ -66,8 +67,13 @@ F1 spec（借贷镜像同构 + 三家审定表统一口径裁决）· F3 spec（
 - [x] 4. F4-P15 / P16 / P18 红判据：FC-11 数据侧 + FC-10 不命中 + 零写入键
   - _Requirements: 2.4, 7.2, 7.6_
 
-- [ ] 5. F4-P17 零回归基线（10 contract golden digest 现算记录）
+- [x] 5. F4-P17 零回归基线（10 contract golden digest 现算记录）
   - _Requirements: 7.4_
+  - **已完成**（2026-10-07）：F4 已纳入 `check_sync_provider_golden_digest.py` PROVIDERS
+    （`("f4", "phase5_f4_accounts_payable", "ADAPTER_ID", True, True)`）。同批纳入 F3/F5。
+    基线更新后 **217 个 digest、37 家、零漂移**。判据
+    `TestProperty17GoldenDigestBaseline` 4 passed（PROVIDERS 登记 + contract/instrumentation/projection
+    三段 digest 格式正确 + projection stable_keys 非空）。
 
 ### 阶段 1：canary 链路（F4-6）
 
@@ -132,35 +138,77 @@ F1 spec（借贷镜像同构 + 三家审定表统一口径裁决）· F3 spec（
 
 ### 阶段 2：F4-5 + F4-8 双区 + F4-7 五区
 
-- [ ] 12. `phase5_f4_05_long_outstanding.py`：`F4-5-rows` / 表头 R8 / R9-14 / footer R15 / UUID **L** /
+- [x] 12. `phase5_f4_05_long_outstanding.py`：`F4-5-rows` / 表头 R8 / R9-14 / footer R15 / UUID **L** /
   `formula_columns=()`；I 列按 Task 2 的 FC-7 结论处置（`auto_source` 或 editable）
   - _Requirements: 4.1_
+  - **已完成**（2026-10-07）：`phase5_f4_05_long_outstanding.py` + `_INCLUDE_F405=True` + 契约重算
+    （digest `20e67ca2…` → `db76b98f4eb7…`，过 `parse_contract`）。
+    11 个 editable 字段（A~K 逐列对齐 `StoredLongOutstandingRow`），数据区零公式。
+    store-only 4 键（seq/attSlot/sourceRowId/disposalConclusion）。
+    受管面 = 2 sheet / 2 table（F4-6 + F4-5），instrumentation 2 条。
+    全文件 34 passed + 1 xfailed（P3 store_item_ids 已更新适应扩容）。
 
-- [ ] 13. `phase5_f4_08_voucher_check.py` 两区声明 + 兄弟 Table ref 首验（F4-P5 部分）
-  - 两区列集按 Task 2 实测各自声明；UUID **S**；两个零写入读键不进 field_specs
+- [x] 13. `phase5_f4_08_voucher_check.py` 两区声明 + 兄弟 Table ref 首验（F4-P5 部分）
+  - 两区列集按 Task 2 实测各自声明；UUID **S/T**；两个零写入读键不进 field_specs
   - _Requirements: 2.4, 4.2, 4.5_
+  - **已完成**（2026-10-07）：`phase5_f4_08_voucher_check.py` + `_INCLUDE_F408=True` + 契约重算
+    （digest `db76b98f…` → `95a58fe4…`，过 `parse_contract`）。
+    区① 15 editable（A~O，借方金额检查）/ 区② 17 editable（A~Q，贷方金额检查），两区零公式。
+    两区证据组列集不同（区① 5 列 vs 区② 7 列），逐格实测确认。
+    受管面 = 3 sheet / 4 table（含 F4-8 双区）/ 4 instr。
+    store-only 4 键（seq/attSlot/issueDesc/sampleSource）。全文件 34 passed + 1 xfailed。
 
-- [ ] 14. `phase5_f4_07_unrecorded.py` **五区**声明 + 除零判据
+- [x] 14. `phase5_f4_07_unrecorded.py` **五区**声明 + 除零判据
   - 五份独立 `field_specs`（裁决 F4-H3）；`formula_columns` 区①`("F","G","I")` / 区②`("F",)` / 区③④⑤`()`；
-    UUID **L**；F4-P5 + F4-P6（除零三条子判据）
+    UUID **L/M/N/O/P**；F4-P5 + F4-P6（除零三条子判据）
   - _Requirements: 4.3, 4.4, 4.5_
+  - **已完成**（2026-10-07）：`phase5_f4_07_unrecorded.py` + `_INCLUDE_F407=True` + 契约重算
+    （digest `95a58fe4…` → `666015aa…`，过 `parse_contract`）。
+    五区各自独立 `field_specs`（7/9/9/9/9 editable 字段）+ 独立公式列 + 独立 UUID 列。
+    五区共享 `sheet_key="f47-managed"`，单 sheet 5 tables。
+    受管面 = 4 sheet / 9 table / 9 instr / 9 store items。
+    全文件 34 passed + 1 xfailed。golden digest 基线 223 digest。
+    🔴 区① 除零列 G=365/(E/F)：前端 `averagePaymentDays` 返 `null`（贷方为零时），
+    模板公式 `=365/(E/F)` 会产 `#DIV/0!`——受管后 materialize 会按模板公式覆盖前端的
+    null ⇒ 该列实质为 mode=formula（模板有公式 + 前端有 computed），两侧口径一致（FC-5）。
 
 ### 阶段 3：F4-2 明细 + F4-9 / F4-4 / F4-3 核
 
-- [ ] 15. `phase5_f4_02_detail.py`：两级表头 R9/R10 / R11-31 / footer R32 / UUID **AB** /
+- [x] 15. `phase5_f4_02_detail.py`：两级表头 R9/R10 / R11-31 / footer R32 / UUID **AB** /
   `formula_columns=("H","K","M","T")` / nested 账龄两组（N-Q 未审 / U-X 审定）；仅 THREE_YEAR 启用（F4-P8）；
   F4-P7（前端已对齐，预期直接绿，作 F1-2 参照）；下游 9 处消费方回写后重算
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
+  - **已完成**（2026-10-07）：`phase5_f4_02_detail.py` + `_INCLUDE_F402=True` + 契约重算
+    （digest `666015aa…` → `894fa939…`，过 `parse_contract`）。
+    23 fields（15 editable + 8 nested 账龄列 within1/y1to2/y2to3/over3 × 2 组）
+    + 4 公式列（H/K/M/T）。两组 nested 账龄 `agingUnadjusted`(N~Q) / `agingAudited`(U~X)。
+    🔴 账龄是动态枚举（THREE_YEAR/FIVE_YEAR/CUSTOM），模板物理列固定 4 段。
+    仅 THREE_YEAR 启用，非 THREE_YEAR 时整表降级 legacy + 中文提示
+    （`F402_AGING_DOWNGRADE_MESSAGE`，照 F1-2 先例）。
+    受管面 = 5 sheet / 10 table / 10 instr / 10 store items。
+    全文件 34 passed + 1 xfailed。golden digest 226 digest。
 
-- [ ] 16. F4-9 容量裁决（F4-H4）+ 限额内声明
+- [x] 16. F4-9 容量裁决（F4-H4）+ 限额内声明
   - 裁决证据：模板 3 组 × 4 行 + 合计三小计相加 vs 前端任意组/行；限额内受管、超限降级（F4-P9）；
     `rowId` + `groupId` 双身份；组小计行不受管
   - _Requirements: 5.1, 5.2, 5.3_
+  - **已完成**（2026-10-07）：裁决 **html_only**（分组表形态需引擎层扩展）。
+    证据 `evidence/task16-f49-capacity-adjudication.json`。
+    阻塞因素：①数据区中间有小计行（R16/R21/R26）⇒ RowTableSheetSpec 连续区间不适用；
+    ②三组小计 SUM 区间固定不随扩行位移；③合计行 `F27=F26+F21+F16` 是三小计相加非 SUM 区间
+    ⇒ 增减组数时不自动适配；④`groupId` 是动态分组键非固定枚举 ⇒ `row_section_field` 不适用。
+    **不建 provider 声明文件**，在 provider 中登记 HTML_ONLY 即可。后续另立 spec 扩展引擎层。
 
-- [ ] 17. F4-4 两区可行性核 + F4-3 可行性核（**均不改生产代码**）
-  - F4-4：区① `static_region` 候选 / 区② 派生只读 + 局部覆盖，默认 HTML-only（F4-P10）；
-    F4-3：FC-6 默认 `single_html`；证据 `evidence/task17-f44-f43-feasibility.json`
+- [x] 17. F4-4 两区可行性核 + F4-3 可行性核（**均不改生产代码**）
+  - F4-4：区① `static_region` 候选（dict 包 9 固定行，非行数组 ⇒ RowTableSheetSpec 不适用）/
+    区② 派生只读 + 局部覆盖（权威数据在 F4-2），默认 HTML-only（F4-P10）；
+    F4-3：FC-6 默认 `single_html`（useAdjustmentCentralSync hub）；
+    证据 `evidence/task17-f44-f43-feasibility.json`
   - _Requirements: 5.4, 6.5_
+  - **已完成**（2026-10-07）：
+    · **F4-3 = single_html**：useAdjustmentCentralSync hub（F4TabAdjustment.vue:97-111），与 D1-5 ~ F3-3 共十一张同型。
+    · **F4-4 = html_only**：付款期区是 dict 包 + 9 固定行（`StoredTurnover`），非动态行数组 ⇒ RowTableSheetSpec 不适用；
+      前十名区不是独立存储而是从 F4-2 动态聚合后只开放 reason 覆写列；跨 sheet 读取 F4-2/F4-1 数据。
 
 - [x] 18. FC-11 数据侧修复（F4 三块）
   - `[224]` / `[225]` / `[307]` 的 `items` 迁 `cells`；删全角重复块 `[225]`、保留半角 `[307]`；
@@ -202,6 +250,11 @@ F1 spec（借贷镜像同构 + 三家审定表统一口径裁决）· F3 spec（
        （`formula1=$N$7:$N$14` 而 N 列全空）同类但更严重。处置走模板覆盖层。
   - 阻塞（未做）：取数口径依赖 **F1 spec 需求 7.3 三家统一裁决**（未出结论）；行身份 F4-P11 的
     `custom-${index}` 修复属前端 BP-7 同型，可独立先做。
+  - **行身份修复已完成**（2026-10-07）：`useF4Adjudication.ts:230` 的 `custom-${index}` 改为
+    `custom-${crypto.randomUUID()}`（稳定 UUID）。判据 `TestProperty11RowIdentityNoOrdinal` 2 passed
+    （活代码不含旧下标模板字符串 + 兜底键用 crypto.randomUUID()）。F4 全文件 36 passed + 1 xfailed。
+    🔴 实际危害为零（固定行表 `defaults.map` 会丢弃不在 defaults 里的键），修复属防御性。
+    **其余部分（声明/口径/收口）仍卡三家统一裁决**。
 
 ## Task Dependency Graph
 

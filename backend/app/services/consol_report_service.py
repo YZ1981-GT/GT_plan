@@ -34,6 +34,9 @@ from app.models.audit_platform_models import TrialBalance
 from app.services.ledger_import.sign_convention_types import BALANCE_TOLERANCE
 from app.models.report_models import FinancialReport
 from app.models.report_models import FinancialReportType
+from app.schemas.consol_context import ConsolContext
+from app.services.consol_context_service import validate_context
+from app.services.consol_tree_service import TreeNode
 from app.models.consolidation_schemas import (
     ConsolTrialRow,
     BalanceCheckResult,
@@ -108,6 +111,9 @@ class ConsolReportService:
         project_id: UUID,
         year: int,
         applicable_standard: str | None = None,
+        *,
+        context: ConsolContext | None = None,
+        tree: TreeNode | None = None,
     ) -> dict[str, list[dict]]:
         """生成合并报表并落库 ``financial_report``（spec consol-elimination-single-source-push §4.5）。
 
@@ -127,6 +133,8 @@ class ConsolReportService:
         只 flush 不 commit。Returns ``{report_type: [row_dict]}``。
         """
         from app.services.consol_calc_basis import MEASURE_CONSOLIDATED, load_calc_basis, node_measures
+        from app.services.consol_context_service import validate_context
+        from app.services.consol_tree_service import build_tree
         from app.services.consol_report_values import (
             CONSOL_STANDARDS,
             load_report_rows,
@@ -138,7 +146,11 @@ class ConsolReportService:
             await resolve_consol_standard(self.db, project_id)
         )
         rows = await load_report_rows(self.db, standard)
-        basis = await load_calc_basis(self.db, project_id, year)
+        resolved_tree = tree
+        if resolved_tree is None and context is not None:
+            resolved_tree = await build_tree(self.db, project_id)
+        validate_context(context, project_id, year, tree=resolved_tree)
+        basis = await load_calc_basis(self.db, project_id, year, tree=resolved_tree)
         if basis is None:
             raise ValueError(f"企业树构建失败：找不到合并项目 {project_id}")
         values = await report_values(
@@ -992,10 +1004,19 @@ async def generate_consol_reports_sync(
     project_id: UUID,
     year: int,
     applicable_standard: str | None = None,
+    *,
+    context: ConsolContext | None = None,
+    tree: TreeNode | None = None,
 ) -> dict[str, list[dict]]:
     """生成合并报表（async；口径不传或不是合并口径时按项目模板类型解析）。"""
     service = ConsolReportService(db)
-    return await service.generate_consol_reports(project_id, year, applicable_standard)
+    return await service.generate_consol_reports(
+        project_id,
+        year,
+        applicable_standard,
+        context=context,
+        tree=tree,
+    )
 
 
 async def verify_balance_sync(

@@ -1198,19 +1198,55 @@ async def fill_by_formula(
     data = dict(record.data or {}) if record is not None and isinstance(record.data, dict) else {}
     headers = data.get("headers") or table.get("headers") or []
     rows = data.get("rows") if isinstance(data.get("rows"), list) and data.get("rows") else table.get("rows") or []
-    new_rows, summary = fill_rows(headers, rows, breakdown["cells"], _manual_cells(data), table.get("rows") or [])
+    # V182：locked 行整体跳过；locked_cells 合并进 manual 保护集合
+    if record is not None and getattr(record, "cell_state", "auto") == "locked":
+        return {
+            "project_id": str(project_id),
+            "year": breakdown["year"],
+            "section_id": section_id,
+            "node_key": getattr(record, "node_key", node_key),
+            "legacy_null": getattr(record, "node_key", node_key) is None,
+            "template_type": tt,
+            "status": "skipped_locked",
+            "record_id": str(record.id) if record.id else None,
+            "reason": "整节被锁定（cell_state=locked），公式刷新不改写",
+            "filled": [],
+            "kept_manual": [],
+            "kept_manual_count": 0,
+            "blank": [],
+            "is_stale": record.is_stale,
+            "data": data,
+        }
+    manual_set = _manual_cells(data)
+    # 把 locked_cells 列表中的坐标也加入保护集合
+    if record is not None:
+        for lc in getattr(record, "locked_cells", None) or []:
+            if isinstance(lc, dict) and "row_index" in lc and "col_index" in lc:
+                manual_set.add((int(lc["row_index"]), int(lc["col_index"])))
+    new_rows, summary = fill_rows(headers, rows, breakdown["cells"], manual_set, table.get("rows") or [])
     data.update({"headers": headers, "rows": new_rows})
     now = datetime.now(timezone.utc)
+    # V182：保存公式值快照（用于"当前值 vs 公式值"对比）
+    formula_snapshot = {
+        "cells": [
+            {"row_index": c["row_index"], "col_index": c["col_index"], "value": c.get(MEASURE_CONSOLIDATED)}
+            for c in breakdown.get("cells", [])
+            if c.get(MEASURE_CONSOLIDATED) is not None
+        ],
+        "computed_at": now.isoformat(),
+    }
     if record is None:
         record = ConsolNoteData(
             project_id=project_id, year=breakdown["year"], section_id=section_id,
             node_key=node_key, data=data, is_stale=False, updated_at=now,
+            last_formula_value=formula_snapshot,
         )
         db.add(record)
     else:
         record.data = data
         record.is_stale = False
         record.updated_at = now
+        record.last_formula_value = formula_snapshot
     await db.flush()
     return {
         "project_id": str(project_id),

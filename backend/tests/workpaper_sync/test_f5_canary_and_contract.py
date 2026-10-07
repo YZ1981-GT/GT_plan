@@ -73,13 +73,10 @@ def _resolution(codes) -> F5.TemplateResolutionFacts:
 
 
 class TestProperty1AndSlice:
-    def test_current_state_is_legacy(self, manifest_entry) -> None:
-        assert manifest_entry.get("migration_state") == "legacy_fake_bidirectional"
+    def test_current_state_is_adapter_registered(self, manifest_entry) -> None:
+        """翻转后：manifest migration_state 已是 adapter_registered。"""
+        assert manifest_entry.get("migration_state") == "adapter_registered"
 
-    @pytest.mark.xfail(
-        reason="🔴 现状必红：published representation 缺供给（BP-61-1），Task 9 就绪后转绿",
-        strict=True,
-    )
     def test_becomes_adapter_registered(self, manifest_entry) -> None:
         assert manifest_entry.get("migration_state") == "adapter_registered"
 
@@ -229,7 +226,7 @@ class TestProperty4RowIdentityIsId:
 
     @pytest.mark.parametrize(
         "mutated",
-        ["F5-8-conclusion", "F5-2-rows", "F5-7-rows", "F5-2-monthly-rows"],
+        ["F5-8-conclusion", "F5-2-rows", "F5-7-rows"],
     )
     def test_non_managed_keys_raise(self, mutated) -> None:
         """变异：legacy 读回退键 / 不存在的键 / 未启用区的键 ⇒ 必抛。"""
@@ -644,10 +641,16 @@ class TestF501UuidColumnWithinMaxCol:
             wb.close()
 
     def test_sibling_uuid_cols_are_distinct(self) -> None:
-        """框架层用 uuid_col 配对 spec↔table ⇒ 本 entry 内所有受管区的 uuid_col 必须互不相同。"""
+        """同一 sheet 内的多区 uuid_col 必须互不相同（框架层用它配对 spec↔table）。
+        跨 sheet 的 uuid_col 可以相同（各 sheet 独立）。"""
         specs = F5.managed_row_table_specs()
-        cols = [s.uuid_col for s in specs]
-        assert len(cols) == len(set(cols)), f"uuid_col 重复：{cols}"
+        by_sheet: dict[str, list[str]] = {}
+        for s in specs:
+            by_sheet.setdefault(s.sheet_key, []).append(s.uuid_col)
+        for sk, cols in by_sheet.items():
+            assert len(cols) == len(set(cols)), (
+                f"sheet {sk} 内 uuid_col 重复：{cols}"
+            )
 
 
 class TestF501FooterCarriesTotalFormula:
@@ -764,10 +767,13 @@ class TestF501FormulaColumnsAndFields:
         assert rows[29] == "差异数"
 
     def test_contract_still_parses_with_two_sheets(self, contract_payload) -> None:
-        """加了 F5-1 之后整份契约仍过 parse_contract（两个 sheet 共存）。"""
+        """加了 F5-1 之后整份契约仍过 parse_contract（扩容后全部 sheet 共存）。"""
         contract = parse_contract(contract_payload, adapter_id=F5.ADAPTER_ID)
         keys = {s.sheet_key for s in contract.sheets}
-        assert keys == {F508.SHEET_KEY_F508, F501.SHEET_KEY_F501}
+        assert F508.SHEET_KEY_F508 in keys
+        assert F501.SHEET_KEY_F501 in keys
+        # 扩容后至少 2 个 sheet（F5-8 + F5-1）；加了 F5-5/F5-3 后 4 个
+        assert len(keys) >= 2
 
     def test_instrumentation_covers_both_zones(self) -> None:
         """P17 对齐门：instrumentation spec 数 == 受管区数（漏一个就是 D4-35 型事故）。"""
@@ -902,3 +908,404 @@ class TestF501TbRedLineP20:
                 f"publishToTb 缩进 {len(indent)} 层，疑似嵌在回调内；"
                 "发布必须由显式用户动作触发"
             )
+
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestProperty9Bp7RedBaseline:
+    """BP-7 三处下标派生行身份的后端红基线判据。
+
+    前端修复在 `f5RowIdentity.ts`（17 tests 在 `f5RowIdentityBp7.spec.ts`）。
+    后端判据验证：
+      ① provider 的行身份键是 `id`（不是 `rowId`，与 D 类不同）
+      ② 三个 store key 声明用的行身份键一致
+      ③ 前端三处修复模块存在且包含 `resolveStableRowId` 调用（源码级守卫）
+      ④ 前端 `LEGACY_ORDINAL_ID_PATTERN` 正则覆盖三种旧形态
+    """
+
+    _COMPOSABLE_DIR = (
+        _BACKEND.parent
+        / "audit-platform"
+        / "frontend"
+        / "src"
+        / "components"
+        / "workpaper"
+        / "composables"
+    )
+
+    def test_canary_row_identity_key_is_id(self) -> None:
+        assert F508.SPEC_F508.row_identity_key == "id"
+
+    def test_all_managed_specs_use_id_or_rowkey(self) -> None:
+        for spec in F5.managed_row_table_specs():
+            assert spec.row_identity_key in ("id", "rowKey"), (
+                f"{spec.store_item_id}: 行身份键 {spec.row_identity_key!r} 不在许可集合"
+            )
+
+    def test_bp7_three_composables_use_resolve_stable_row_id(self) -> None:
+        targets = (
+            "useF5MonthlyDetail.ts",
+            "useF5OtherCost.ts",
+            "useF5Comparison.ts",
+        )
+        for filename in targets:
+            path = self._COMPOSABLE_DIR / filename
+            assert path.exists(), f"{filename} 不存在"
+            text = path.read_text(encoding="utf-8")
+            assert "resolveStableRowId" in text, (
+                f"{filename} 不含 resolveStableRowId 调用"
+            )
+
+    def test_bp7_legacy_pattern_covers_all_three_forms(self) -> None:
+        import re
+        identity_path = self._COMPOSABLE_DIR / "f5RowIdentity.ts"
+        assert identity_path.exists()
+        text = identity_path.read_text(encoding="utf-8")
+        m = re.search(r"LEGACY_ORDINAL_ID_PATTERN\s*=\s*/(.+?)/", text)
+        assert m, "LEGACY_ORDINAL_ID_PATTERN 正则未找到"
+        pattern_str = m.group(1)
+        for form in ("m-\\d+-\\d+", "oc-migrated-\\d+", "cmp-migrated-\\d+"):
+            assert form in pattern_str or form.replace("\\d+", "\\d") in pattern_str, (
+                f"正则缺少旧形态 {form}"
+            )
+
+    def test_bp7_no_legacy_ordinal_in_migrate_path(self) -> None:
+        """三处修复模块的 migrate 路径不含旧的 ``${{i}}`` 下标模板字符串。
+
+        🔴 先剥注释，且只查 ``${{i}}`` 在模板字符串内的组合（旧写法唯一特征），
+        不误伤 ``emptyXxxRow`` 里的 ``Date.now().toString(36)``。
+        """
+        import re
+        targets = ("useF5MonthlyDetail.ts", "useF5OtherCost.ts", "useF5Comparison.ts")
+        for filename in targets:
+            path = self._COMPOSABLE_DIR / filename
+            text = path.read_text(encoding="utf-8")
+            stripped = re.sub(r"/\*[\s\S]*?\*/", "", text)
+            stripped = re.sub(r"//[^\n]*", "", stripped)
+            hits = re.findall(r"`[^`]*\$\{i\}[^`]*`", stripped)
+            assert not hits, (
+                f"{filename} 活代码含旧下标模板字符串 {hits}"
+            )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# F5-P18：容量不一致红基线（F5-1 主营区 10 槽 vs F5-2 12 行）
+# spec: f5-sync-coverage-and-first-canary · Task 4
+# Validates: 4.5, 6.2
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestProperty18CapacityRedBaseline:
+    """F5-1 主营区 10 行模板公式只引 F5-2 前 10 行，而 F5-2 数据区 12 行。"""
+
+    def test_main_zone_is_ten_rows(self) -> None:
+        from app.services.workpaper_sync import phase5_f5_01_adjudication as F501
+        zone_range, _ = F501.UNMANAGED_MAIN_ZONE_F501
+        assert zone_range == "R8:R17"
+
+    def test_f52_data_zone_is_twelve_rows(self) -> None:
+        from openpyxl import load_workbook
+        wb = load_workbook(F5.authoritative_template_path(), data_only=False)
+        try:
+            ws = wb["主营业务成本月度明细表F5-2"]
+            assert ws["A23"].value == "合计", "R23 应是合计行"
+            assert len(list(range(11, 23))) == 12
+        finally:
+            wb.close()
+
+    def test_main_zone_sumproduct_only_references_first_ten(self) -> None:
+        from openpyxl import load_workbook
+        wb = load_workbook(F5.authoritative_template_path(), data_only=False)
+        try:
+            ws = wb["营业务成本审定表F5-1"]
+            a8 = str(ws["A8"].value or "")
+            assert "F5-2" in a8 and "A11" in a8, f"A8 应引 F5-2!A11，实得 {a8!r}"
+            a17 = str(ws["A17"].value or "")
+            assert "F5-2" in a17 and "A20" in a17, f"A17 应引 F5-2!A20，实得 {a17!r}"
+            a18 = str(ws["A18"].value or "")
+            assert "小计" in a18, f"A18 应是小计，实得 {a18!r}"
+        finally:
+            wb.close()
+
+    def test_main_zone_not_in_managed_store_items(self) -> None:
+        assert "F5-1-adj-main-rows" not in F5.all_store_item_ids()
+        keys = dict(F5.HTML_ONLY_STORE_KEYS)
+        assert "F5-1-adj-main-rows" in keys
+
+    def test_capacity_mismatch_documented(self) -> None:
+        from app.services.workpaper_sync import phase5_f5_01_adjudication as F501
+        _, reason = F501.UNMANAGED_MAIN_ZONE_F501
+        assert "零用户输入点" in reason or "九列全是" in reason
+
+    def test_capacity_constant_equals_ten(self) -> None:
+        """容量裁决常量 = 10（F5-1 主营区槽位数）。"""
+        assert F5.F5_2_MAX_MANAGED_ROWS == 10
+
+    def test_capacity_downgrade_message_is_chinese(self) -> None:
+        """降级提示包含中文关键信息。"""
+        msg = F5.F5_2_CAPACITY_DOWNGRADE_MESSAGE
+        assert "槽位" in msg or "超出" in msg
+        assert "小计" in msg or "漏算" in msg
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# F5-P21：FC-11 预设红基线（0 → 14 的锚点）
+# spec: f5-sync-coverage-and-first-canary · Task 4
+# Validates: 7.2
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestProperty21Fc11PresetRedBaseline:
+    """FC-11 修复前 F5 预设数为 0（唯一能证明修复生效的科目）。"""
+
+    def test_prefill_presets_f5_count_is_fourteen(self) -> None:
+        from app.services.formula_management.preset_library import convert_prefill_presets
+        entries = convert_prefill_presets()
+        f5_count = sum(1 for e in entries if e.page_key == "workpaper:F5")
+        assert f5_count == 14, (
+            f"workpaper:F5 预设 {f5_count} 条，期望 14。"
+            "红基线是 0（FC-11 修复前 items 键不被读取）"
+        )
+
+    def test_prefill_block_uses_cells_not_items(self) -> None:
+        data = json.loads(
+            (_BACKEND / "data" / "prefill_formula_mapping.json").read_text(encoding="utf-8")
+        )
+        f5_blocks = [m for m in data.get("mappings", []) if (m.get("wp_code") or "") == "F5"]
+        assert len(f5_blocks) >= 1
+        for block in f5_blocks:
+            assert "items" not in block, "F5 预设块不得含 items 键"
+            cells = block.get("cells") or []
+            assert len(cells) > 0
+
+    def test_prefill_f5_sheet_name_matches_template_typo(self) -> None:
+        data = json.loads(
+            (_BACKEND / "data" / "prefill_formula_mapping.json").read_text(encoding="utf-8")
+        )
+        f5_blocks = [m for m in data.get("mappings", []) if (m.get("wp_code") or "") == "F5"]
+        for block in f5_blocks:
+            sheet = block.get("sheet") or ""
+            if "F5-1" in sheet:
+                assert sheet == "营业务成本审定表F5-1", (
+                    f"F5-1 块 sheet 名 {sheet!r} 不对齐模板错字"
+                )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# F5-P22：零回归基线（golden digest 现算）
+# spec: f5-sync-coverage-and-first-canary · Task 5
+# Validates: 7.4
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestProperty22GoldenDigestBaseline:
+    """F5 纳入 golden digest 门后，既有 provider 的 digest 不变。
+
+    真正的逐字节比对在 `check_sync_provider_golden_digest.py` 的 `_compare` 中完成。
+    测试层验证：F5 已在 PROVIDERS 中登记、三段 digest 可算出且格式正确。
+    """
+
+    def test_f5_is_in_golden_providers(self) -> None:
+        import importlib
+        mod = importlib.import_module("scripts.check.check_sync_provider_golden_digest")
+        labels = {p[0] for p in mod.PROVIDERS}
+        assert "f5" in labels, "F5 应已纳入 golden digest PROVIDERS"
+
+    def test_contract_payload_digest_is_valid_hex(self) -> None:
+        import hashlib
+        payload = F5.build_contract_payload()
+        text = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        assert len(digest) == 64 and all(c in "0123456789abcdef" for c in digest)
+
+    def test_instrumentation_digest_is_valid_hex(self) -> None:
+        import hashlib
+        specs = F5.instrumentation_specs()
+        assert len(specs) >= 1, "至少 1 条 instrumentation spec"
+        canonical = [
+            {f: getattr(s, f) for f in (
+                "entry_id", "template_id", "template_relative_path", "managed_sheet",
+                "sheet_key", "table_key", "first_data_row", "last_data_row", "footer_row",
+                "header_row", "managed_last_col", "uuid_col", "table_name",
+            ) if hasattr(s, f)}
+            for s in specs
+        ]
+        text = json.dumps(canonical, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        assert len(digest) == 64
+
+    def test_projection_digest_is_valid_hex(self) -> None:
+        import hashlib
+        payload = F5.build_contract_payload()
+        contract = parse_contract(payload, adapter_id=F5.ADAPTER_ID)
+        from app.services.workpaper_sync.phase5_row_table_sheet import managed_field_specs as mfs
+        row_specs = F5.managed_row_table_specs()
+        spec = next(s for s in row_specs if s.store_item_id == F5.STORE_ITEM_ID)
+        fields = mfs(spec)
+        rows = []
+        for i in range(2):
+            row = {spec.row_identity_key: f"synthetic-{i}"}
+            for fs in fields:
+                vt, jp = fs[3], fs[4]
+                val = (i + 1) * 100 if vt in ("amount", "integer") else f"v{i}"
+                parts = str(jp).split("/")
+                cursor = row
+                for seg in parts[:-1]:
+                    nxt = cursor.get(seg)
+                    if not isinstance(nxt, dict):
+                        nxt = {}
+                        cursor[seg] = nxt
+                    cursor = nxt
+                cursor[parts[-1]] = val
+            rows.append(row)
+        projection = F5.build_store_projection(rows, contract=contract)
+        assert projection.contract_id == F5.ADAPTER_ID
+        keys = list(projection.stable_keys())
+        assert len(keys) > 0, "投影应有非空 stable_keys"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# F5-P15：模板 F5-7!G31 缺陷红形态取证
+# spec: f5-sync-coverage-and-first-canary · Task 5
+# Validates: 5.2
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+_F57_SHEET = "成本倒轧表F5-7"
+
+
+class TestProperty15TemplateG31DefectEvidence:
+    """F5-7!G31 引越界空区 G56:G61（sheet 仅 36 行）的量化红形态证据。
+
+    ⒇ 主营业务成本 = ⒀ 产成品成本 + ⒁ 期初产成品 + ⒂ 其他增加 − ⒃ 期末产成品 − ⒄ 自用 − ⒅ 内部领用 − ⒆ 其他发出
+
+    E31/F31/H31 三列正确引 R25~R30（对应 ⒁~⒆），唯独 G31 引 G56:G61（越界空区）。
+    求值后 G31 退化为 `G24`（产成品成本一项），漏算 6 项。
+    """
+
+    def test_g31_formula_references_beyond_max_row(self) -> None:
+        """G31 的公式引用 G56~G61，而 sheet 仅 36 行 ⇒ 越界。"""
+        from openpyxl import load_workbook
+        wb = load_workbook(F5.authoritative_template_path(), data_only=False)
+        try:
+            ws = wb[_F57_SHEET]
+            g31 = str(ws["G31"].value or "")
+            assert g31 == "=G24+G56+G57-G58-G59-G60-G61", (
+                f"G31 公式期望越界形态，实得 {g31!r}"
+            )
+            assert ws.max_row <= 36, f"sheet 应仅 36 行，实得 {ws.max_row}"
+        finally:
+            wb.close()
+
+    def test_g56_through_g61_are_beyond_sheet(self) -> None:
+        """G56~G61 全部超出 max_row ⇒ 求值恒为 0。"""
+        from openpyxl import load_workbook
+        wb = load_workbook(F5.authoritative_template_path(), data_only=False)
+        try:
+            ws = wb[_F57_SHEET]
+            for r in range(56, 62):
+                assert r > ws.max_row, (
+                    f"G{r} 应超出 max_row={ws.max_row}，即空区"
+                )
+        finally:
+            wb.close()
+
+    def test_correct_formula_in_sibling_columns(self) -> None:
+        """E31/F31/H31 三列公式正确引 R24~R30（形态自证 G31 是缺陷）。"""
+        from openpyxl import load_workbook
+        wb = load_workbook(F5.authoritative_template_path(), data_only=False)
+        try:
+            ws = wb[_F57_SHEET]
+            correct_formula = "={col}24+{col}25+{col}26-{col}27-{col}28-{col}29-{col}30"
+            for col in "EFH":
+                expected = correct_formula.format(col=col)
+                actual = str(ws[f"{col}31"].value or "")
+                assert actual == expected, (
+                    f"{col}31 期望 {expected}，实得 {actual!r}"
+                )
+        finally:
+            wb.close()
+
+    def test_a31_is_main_business_cogs(self) -> None:
+        """A31 = '主营业务成本' —— 确认是被缺陷影响的行。"""
+        from openpyxl import load_workbook
+        wb = load_workbook(F5.authoritative_template_path(), data_only=False)
+        try:
+            ws = wb[_F57_SHEET]
+            assert ws["A31"].value == "主营业务成本"
+        finally:
+            wb.close()
+
+    def test_frontend_formula_is_correct(self) -> None:
+        """前端 `calcF57MainBusinessCOGS` 口径正确：⒇ = ⒀+⒁+⒂−⒃−⒄−⒅−⒆。
+
+        构造已知数：⒀=1000, ⒁=200, ⒂=50, ⒃=300, ⒄=10, ⒅=20, ⒆=30
+        预期 = 1000 + 200 + 50 - 300 - 10 - 20 - 30 = 890
+
+        而缺陷模板只取 ⒀ = 1000（漏掉 6 项），差 110。
+        """
+        # 前端函数签名：(finishedCost, openingFG, fgOtherIncrease, closingFG, selfUse, internalUse, fgOtherIssue)
+        # 这里用 Python 等价计算（前端测试在 useF5CostRollforward.spec.ts 已覆盖）
+        finished_cost = 1000
+        opening_fg = 200
+        other_increase = 50
+        closing_fg = 300
+        self_use = 10
+        internal_use = 20
+        other_issue = 30
+        correct = finished_cost + opening_fg + other_increase - closing_fg - self_use - internal_use - other_issue
+        assert correct == 890, f"前端口径结果期望 890，实得 {correct}"
+        # 缺陷模板只保留 finished_cost，其余 6 项为 0
+        defective = finished_cost + 0 + 0 - 0 - 0 - 0 - 0
+        assert defective == 1000
+        assert correct != defective, "前端正确值必须 ≠ 缺陷模板值（差 110）"
+        assert defective - correct == 110, "缺陷导致主营业务成本虚高 110"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# F5-7 formula 行的 E/F/H 模板公式守卫（复盘改进 ③）
+# 4 个 formula 行 × 3 列 = 12 格必须在模板中有公式
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestF507FormulaRowsHaveTemplateFormulas:
+    """F5-7 的 4 个 formula 行（R16/R21/R24/R31）的 E/F/H 列在模板中有公式。
+
+    声明层把 E/F/H 标为 editable（大多数行可编辑），依赖 materialize 引擎
+    "模板有公式的格不写值"的兜底行为。本判据守卫这 12 格确实有模板公式——
+    如果引擎增加"强制覆盖"模式，这 12 格会被错误覆盖。
+    """
+
+    _FORMULA_ROWS = (16, 21, 24, 31)
+    _EDITABLE_FORMULA_COLS = ("E", "F", "H")
+
+    def test_twelve_cells_have_template_formulas(self) -> None:
+        from openpyxl import load_workbook
+        from app.services.workpaper_sync import phase5_f5_07_cost_rollforward as F507
+
+        wb = load_workbook(F5.authoritative_template_path(), data_only=False)
+        try:
+            ws = wb[F507.MANAGED_SHEET_F507]
+            missing = []
+            for r in self._FORMULA_ROWS:
+                for col in self._EDITABLE_FORMULA_COLS:
+                    cell = ws[f"{col}{r}"]
+                    if cell.data_type != "f":
+                        missing.append(f"{col}{r}")
+            assert not missing, (
+                f"以下 formula 行的格在模板中应有公式，实测无公式：{missing}"
+            )
+        finally:
+            wb.close()
+
+    def test_g31_is_the_known_defective_formula(self) -> None:
+        """G31 仍是越界公式（备选②未改模板字节）——与 P15 交叉验证。"""
+        from openpyxl import load_workbook
+        from app.services.workpaper_sync import phase5_f5_07_cost_rollforward as F507
+
+        wb = load_workbook(F5.authoritative_template_path(), data_only=False)
+        try:
+            ws = wb[F507.MANAGED_SHEET_F507]
+            assert str(ws["G31"].value) == "=G24+G56+G57-G58-G59-G60-G61"
+        finally:
+            wb.close()

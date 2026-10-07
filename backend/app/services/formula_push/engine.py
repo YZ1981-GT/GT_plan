@@ -687,6 +687,8 @@ async def _push_note(
     note.last_sync_wp_id = paper.id
     note.last_sync_at = ctx.now
     note.last_sync_user_id = ctx.triggered_by
+    note.is_stale = False  # 推送成功 → 清除 stale（与 sync-from-workpaper 同语义）
+    note.stale_source = None
     note.updated_by = ctx.triggered_by
     note.updated_at = ctx.now
     await ctx.db.flush()

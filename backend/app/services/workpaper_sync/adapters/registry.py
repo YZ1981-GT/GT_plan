@@ -1191,6 +1191,12 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_k13_non_operating_expense",
         # ── K/L/N 批量 provision（2026-10-03）──────────────────────────
         "app.services.workpaper_sync.phase5_n4_taxes_and_surcharges",
+        # ── M 循环四条（spec: m-cycle-bidirectional-pipeline）──────────────────
+        #    🔴 M1 是负债类（2232），其余三条权益类。走 phase5_m_cycle_common 骨架。
+        "app.services.workpaper_sync.phase5_m1_dividends_payable",
+        "app.services.workpaper_sync.phase5_m5_surplus_reserve",
+        "app.services.workpaper_sync.phase5_m8_general_risk_reserve",
+        "app.services.workpaper_sync.phase5_m9_other_comprehensive_income",
     }
 )
 
