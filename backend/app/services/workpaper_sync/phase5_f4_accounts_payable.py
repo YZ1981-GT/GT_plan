@@ -225,8 +225,8 @@ _INCLUDE_F407: Final[bool] = True
 _INCLUDE_F402: Final[bool] = True
 #: F4-9 供应商融资检查表（分组表，容量裁决后限额受管）
 _INCLUDE_F409: Final[bool] = False
-#: F4-1 审定表两区（性质区 + 账龄区；取数口径依赖 F1 spec 的三家统一裁决）
-_INCLUDE_F401: Final[bool] = False
+#: F4-1 审定表三区（性质区 + 账龄种子区 + 账龄空槽区；2026-10-07 完成）
+_INCLUDE_F401: Final[bool] = True
 
 
 def managed_row_table_specs() -> tuple[Any, ...]:
@@ -267,7 +267,7 @@ def managed_row_table_specs() -> tuple[Any, ...]:
     if _INCLUDE_F401:
         from app.services.workpaper_sync import phase5_f4_01_adjudication as _f401
 
-        specs.extend((_f401.SPEC_F401_NATURE, _f401.SPEC_F401_AGING))
+        specs.extend((_f401.SPEC_F401_NATURE, _f401.SPEC_F401_AGING_SEED, _f401.SPEC_F401_AGING_SLOT))
     return tuple(specs)
 
 

@@ -7,14 +7,15 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "f346042dd5fe1841020b179cdad2ff37e3b856a759e8e1d67eb6445937c81f46",
+  "instrumentation_definition_sha256": "e4f49f61db93756352e2c0c01a95983adf0d4066968b713ebe2b067733cafe61",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-f2-stocktake-bundle",
     "html_store": {
       "item_ids": [
         "F2-25-rows",
-        "F2-25-floor-rows"
+        "F2-25-floor-rows",
+        "F2-26-after-rows"
       ],
       "note": "F2 stocktake 册行数据存成 checklist_responses 的 remark JSON 数组。F2-25 双区 F2-25-rows + F2-25-floor-rows，F2-26 双区 F2-26-rows + F2-26-after-rows。",
       "shape": "json_array_of_row_objects",
@@ -32,7 +33,7 @@
       "locator": {
         "anchor": "excel_table_sheet_association"
       },
-      "sheet_key": "f225-exist",
+      "sheet_key": "f225-managed",
       "tables": [
         {
           "anchor": "A14",
@@ -266,16 +267,7 @@
           },
           "table_key": "stocktake_sample_exist_rows",
           "uuid_col": "Q"
-        }
-      ]
-    },
-    {
-      "excel_name": "抽盘结果汇总表F2-25",
-      "locator": {
-        "anchor": "excel_table_sheet_association"
-      },
-      "sheet_key": "f225-floor",
-      "tables": [
+        },
         {
           "anchor": "A29",
           "delete_policy": "tombstone",
@@ -507,15 +499,257 @@
             "kind": "field"
           },
           "table_key": "stocktake_sample_floor_rows",
-          "uuid_col": "Q"
+          "uuid_col": "R"
+        }
+      ]
+    },
+    {
+      "excel_name": "盘点倒轧表F2-26",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "f226-managed",
+      "tables": [
+        {
+          "anchor": "A7",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "item_code",
+              "header_source_ref": "源xlsx!盘点倒轧表F2-26!A7",
+              "header_text": "存货编号",
+              "json_pointer": "/rows/{row_uuid}/itemCode",
+              "mode": "editable",
+              "source_ref": "源xlsx!盘点倒轧表F2-26!A8",
+              "stable_field_key": "stocktake_rollforward_after_rows/{row_uuid}/item_code",
+              "store_item_id": "F2-26-after-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!盘点倒轧表F2-26!B7",
+              "header_text": "存货名称",
+              "json_pointer": "/rows/{row_uuid}/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!盘点倒轧表F2-26!B8",
+              "stable_field_key": "stocktake_rollforward_after_rows/{row_uuid}/item_name",
+              "store_item_id": "F2-26-after-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "spec",
+              "header_source_ref": "源xlsx!盘点倒轧表F2-26!C7",
+              "header_text": "规格型号",
+              "json_pointer": "/rows/{row_uuid}/spec",
+              "mode": "editable",
+              "source_ref": "源xlsx!盘点倒轧表F2-26!C8",
+              "stable_field_key": "stocktake_rollforward_after_rows/{row_uuid}/spec",
+              "store_item_id": "F2-26-after-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "unit",
+              "header_source_ref": "源xlsx!盘点倒轧表F2-26!D7",
+              "header_text": "计量单位",
+              "json_pointer": "/rows/{row_uuid}/unit",
+              "mode": "editable",
+              "source_ref": "源xlsx!盘点倒轧表F2-26!D8",
+              "stable_field_key": "stocktake_rollforward_after_rows/{row_uuid}/unit",
+              "store_item_id": "F2-26-after-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "book_qty",
+              "header_source_ref": "源xlsx!盘点倒轧表F2-26!E7",
+              "header_text": "账面数量",
+              "json_pointer": "/rows/{row_uuid}/bookQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!盘点倒轧表F2-26!E8",
+              "stable_field_key": "stocktake_rollforward_after_rows/{row_uuid}/book_qty",
+              "store_item_id": "F2-26-after-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "book_amt",
+              "header_source_ref": "源xlsx!盘点倒轧表F2-26!F7",
+              "header_text": "账面金额",
+              "json_pointer": "/rows/{row_uuid}/bookAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!盘点倒轧表F2-26!F8",
+              "stable_field_key": "stocktake_rollforward_after_rows/{row_uuid}/book_amt",
+              "store_item_id": "F2-26-after-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "count_date_qty",
+              "header_source_ref": "源xlsx!盘点倒轧表F2-26!G7",
+              "header_text": "监盘日实存数量",
+              "json_pointer": "/rows/{row_uuid}/countDateQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!盘点倒轧表F2-26!G8",
+              "stable_field_key": "stocktake_rollforward_after_rows/{row_uuid}/count_date_qty",
+              "store_item_id": "F2-26-after-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "in_qty",
+              "header_source_ref": "源xlsx!盘点倒轧表F2-26!H7",
+              "header_text": "入库数量",
+              "json_pointer": "/rows/{row_uuid}/inQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!盘点倒轧表F2-26!H8",
+              "stable_field_key": "stocktake_rollforward_after_rows/{row_uuid}/in_qty",
+              "store_item_id": "F2-26-after-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "out_qty",
+              "header_source_ref": "源xlsx!盘点倒轧表F2-26!I7",
+              "header_text": "出库数量",
+              "json_pointer": "/rows/{row_uuid}/outQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!盘点倒轧表F2-26!I8",
+              "stable_field_key": "stocktake_rollforward_after_rows/{row_uuid}/out_qty",
+              "store_item_id": "F2-26-after-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "bs_date_qty",
+              "header_source_ref": "源xlsx!盘点倒轧表F2-26!J7",
+              "header_text": "资产负债表日实存数量",
+              "json_pointer": "/rows/{row_uuid}/bsDateQty",
+              "mode": "formula",
+              "source_ref": "源xlsx!盘点倒轧表F2-26!J8",
+              "stable_field_key": "stocktake_rollforward_after_rows/{row_uuid}/bs_date_qty",
+              "store_item_id": "F2-26-after-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "unit_cost",
+              "header_source_ref": "源xlsx!盘点倒轧表F2-26!K7",
+              "header_text": "单位成本",
+              "json_pointer": "/rows/{row_uuid}/unitCost",
+              "mode": "editable",
+              "source_ref": "源xlsx!盘点倒轧表F2-26!K8",
+              "stable_field_key": "stocktake_rollforward_after_rows/{row_uuid}/unit_cost",
+              "store_item_id": "F2-26-after-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "bs_date_amt",
+              "header_source_ref": "源xlsx!盘点倒轧表F2-26!L7",
+              "header_text": "资产负债表日实存金额",
+              "json_pointer": "/rows/{row_uuid}/bsDateAmt",
+              "mode": "formula",
+              "source_ref": "源xlsx!盘点倒轧表F2-26!L8",
+              "stable_field_key": "stocktake_rollforward_after_rows/{row_uuid}/bs_date_amt",
+              "store_item_id": "F2-26-after-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "diff_amt",
+              "header_source_ref": "源xlsx!盘点倒轧表F2-26!M7",
+              "header_text": "差异金额",
+              "json_pointer": "/rows/{row_uuid}/diffAmt",
+              "mode": "formula",
+              "source_ref": "源xlsx!盘点倒轧表F2-26!M8",
+              "stable_field_key": "stocktake_rollforward_after_rows/{row_uuid}/diff_amt",
+              "store_item_id": "F2-26-after-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "reason",
+              "header_source_ref": "源xlsx!盘点倒轧表F2-26!N7",
+              "header_text": "差异原因",
+              "json_pointer": "/rows/{row_uuid}/reason",
+              "mode": "editable",
+              "source_ref": "源xlsx!盘点倒轧表F2-26!N8",
+              "stable_field_key": "stocktake_rollforward_after_rows/{row_uuid}/reason",
+              "store_item_id": "F2-26-after-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "（二）资产负债表日前盘点倒轧表",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "J8:J14",
+            "L8:L14",
+            "M8:M14"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "stocktake_rollforward_after_rows",
+          "uuid_col": "P"
         }
       ]
     }
   ],
   "template": {
-    "normalized_structure_hash": "3a4fcf12672810d78f24d6f3f84bb2912de15530c52efffcb66e77fc9b880070",
+    "normalized_structure_hash": "cdc0441ff25f381894ca3a42fd43ed71d1490cfc796f1c52b1abe1b12d57da1d",
     "relative_path": "F/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx",
-    "template_sha256": "bdfdcf8a804aab1c11db1cc2cd2deaac4f5bbf94c6a60e43a04108f178079bc7"
+    "template_sha256": "da258bbc2e9813885afee3eeca90d1531599b8def14aa8d9635a86227fdb3e72"
   },
-  "template_definition_sha256": "b889711a244625a47d356206fc9ecf9834ca2e7e9b2596581f9ac4a4613feb3c"
+  "template_definition_sha256": "136c2ecad01a9c32ce6e3c673353427f619401fd29aca33c118d6a9ad313249a"
 }

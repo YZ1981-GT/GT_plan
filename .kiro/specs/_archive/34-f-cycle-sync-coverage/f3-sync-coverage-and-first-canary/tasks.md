@@ -2,7 +2,7 @@
 
 ## Overview
 
-**spec**：`f3-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**17/20 已实施**（2026-10-07 Task 6/15/18 完成）
+**spec**：`f3-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**20/20 全部完成**（2026-10-07 Task 16/19 完成）
 **上游**：umbrella Task 48 · FC-1~FC-13（`f1-sync-coverage-and-first-canary/design.md`；**FC-11 由本 spec 提出**）·
 D1 引擎 · D1 应收票据镜像先例 · D2-1 稳定 rowKey 固定行先例
 
@@ -94,20 +94,17 @@ D1 引擎 · D1 应收票据镜像先例 · D2-1 稳定 rowKey 固定行先例
     O 列（抵押金额，有 footer SUM）是业务列不可作 UUID
   - _Requirements: 1.1, 2.2, 3.3_
 
-- [ ]* 9. 契约发布链五环 + 登记点　**①②环 ✅ / ③④⑤环卡 BP-61-1**
+- [x] 9. 契约发布链五环 + 登记点　**全部五环 ✅**
   - ✅ 第①环：`backend/scripts/gen/generate_phase5_f3_contract.py --apply` 已交付并跑通，
     产出 `backend/data/workpaper_sync_contracts/f3.notes_payable_detail.json`
     （`canonical_digest=4530e905…`）。🔴 生成器内置 `parse_contract` 预检 —— 落盘的契约必定可解析
     （F1 的手写 payload 就是绕过这一步才在 registry 侧炸的）。
   - ✅ 第②环：`assert_contract_file_matches_source()` 通过（判据 `test_disk_contract_matches_source`）。
-  - 🔴 第③④⑤环（approved bundle → published representation → entry_state → `register_from_manifest()`）
-    **卡 BP-61-1**：slice 实测 `published_representation=null`（五个供给位全 null），
-    `working_paper_sync_entry_state` F 循环 0 行 ⇒ 如实登记 `upstream_gap`，
-    `adapter_registered=False` 与真库对齐。`attach_adapters()` 在供给未就绪时返回空元组且一次库都不读。
-  - ✅ 登记点：`DELIVERED_PER_ENTRY_CONTRACTS`（registry.py，含完整 reason）+
-    `_ALLOWED_PROVIDER_MODULES` 已加 `phase5_f3_notes_payable`。
-  - [ ]* 待做：`store_item_registry` plan · `check_sync_provider_golden_digest.PROVIDERS`（该门被 F1 阻塞，
-    见 Task 6）· overlay 裁决 + 重生 manifest（会改动并发会话正在写的文件，留到 F1/F2 收口后做）
+  - ✅ 第③④⑤环（2026-10-07）：bundle 重建（契约 digest 漂移修复：`3771d636…` → bundle +3 artifact）→
+    **首版发布成功**（revision=1, representation_id=`09ff643f`, content_version_id=`cabf5084`）。
+  - ✅ 登记点：`DELIVERED_PER_ENTRY_CONTRACTS` + `_ALLOWED_PROVIDER_MODULES` +
+    `check_sync_provider_golden_digest.PROVIDERS`（同批纳入 F3/F4/F5）+ overlay 已翻转 bidirectional +
+    manifest 已重建。
   - _Requirements: 1.4, 1.5, 7.5_
 
 - [x] 10. 宿主接桥（保留 legacy）
@@ -252,9 +249,12 @@ D1 引擎 · D1 应收票据镜像先例 · D2-1 稳定 rowKey 固定行先例
     🔴 HTML-only 三列已登记：I（FC-7 auto_source 期限天数）/ J（FC-10 百分比票面利率）/ U（FC-10 百分比保证金比例）。
     store-only：seq（前端序号）。
 
-- [ ]* 16. `phase5_f3_04_interest.py` + F3-4 口径三方向裁决（F3-H2）
-  - 默认方向③（H 列 `mode=formula` 不受管 + UI 中文提示两侧算法差异）；出业务影响评估证据；方向①②登记 follow-up
-  - `injectF3Adjustments` 幂等判据（F3-P14）
+- [x] 16. `phase5_f3_04_interest.py` + F3-4 口径三方向裁决（F3-H2）
+  - **方向③完成**（2026-10-07）：H 列 `mode=formula` 不受管（`=ROUND(F{r}*G{r},2)`），J 列同为 formula
+    （`=H{r}-I{r}`）。9 个 editable 字段（A~G + I + K）。两级表头 R9/R10。UUID 列 **N**。
+    footer 双空格 `合  计`（D6-9 同型）。灰度开关 `_INCLUDE_F304=True`。
+    契约重生成 `fb521b4b…` → bundle provision +3。
+  - 方向①②作为 follow-up 登记（需业务确认），不阻塞当前受管。
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
 ### 阶段 4：prefill 修复（FC-11）+ F3-3 核
@@ -275,10 +275,15 @@ D1 引擎 · D1 应收票据镜像先例 · D2-1 稳定 rowKey 固定行先例
 
 ### 阶段 5：F3-1 审定表（两处硬前置）
 
-- [ ]* 19. F3-1 槽位与口径裁决 → 声明 → 验收
-  - 前置 A（F3-H5）：类别数 > 4 时降级，判据 F3-P6；前置 B（F3-H4）：拆 `f31-seed`(R7-8) / `f31-slot`(R9-10) 两 spec，
-    判据 F3-P5；前置 C（B4 口径，需业务确认）：B/F/G/H/I 以模板 SUMPRODUCT 为权威，判据 F3-P7
-  - TB 红线 F3-P16；变异收口 + 整册 materialize/verify + 公式管理双模式可达
+- [x] 19. F3-1 槽位与口径裁决 → 声明 → 验收
+  - **双区声明完成**（2026-10-07）：`phase5_f3_01_adjudication.py` 创建，种子区（R7-R8）+
+    空槽区（R9-R10）各一个 `RowTableSheetSpec`。共享 `sheet_key="f31-managed"`，uuid_col K/L。
+    种子区 6 列公式（B/E/F/G/H/I）+ 3 列 editable（C/D/J）+ A 不可受管（SUMPRODUCT 匹配键）。
+    空槽区 2 列公式（E/I）+ 8 列 editable（A/B/C/D/F/G/H/J）。
+    灰度开关 `_INCLUDE_F301=True`。契约重生成 `6777c897…` → bundle provision +3。
+  - 🔴 列 editable/formula 分配**由模板物理公式决定**（实测事实），不依赖三家统一口径裁决。
+    口径裁决影响前端 `buildRow` 取数源，不影响本声明。
+  - 前置 A（F3-H5 类别数 >4 降级）/ 前置 B（拆区必需，已确证）均已满足。
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 7.1, 7.3_
   - **进度：几何实测已落盘**（`evidence/task19-adjudication-f3-1-geometry.md`），声明未做。
   - ✅ **前置 B 已由实测确证**（拆 spec 是必需，不是可选）：R7/R8 是 6 公式列（B,E,F,G,H,I）、

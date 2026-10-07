@@ -228,10 +228,10 @@ _INCLUDE_F306: Final[bool] = True
 _INCLUDE_F307: Final[bool] = True
 #: F3-2 明细表（两级表头；J/U 两列卡 FC-10）
 _INCLUDE_F302: Final[bool] = True
-#: F3-4 利息测算表（H 列口径分歧，裁决 F3-H2 默认方向③不受管 H）
-_INCLUDE_F304: Final[bool] = False
-#: F3-1 审定表（槽位容量 + 取数口径两处硬前置，最后接）
-_INCLUDE_F301: Final[bool] = False
+#: F3-4 利息测算表（H 列方向③：mode=formula 不受管，2026-10-07 完成）
+_INCLUDE_F304: Final[bool] = True
+#: F3-1 审定表（双区声明完成，2026-10-07）
+_INCLUDE_F301: Final[bool] = True
 
 
 def managed_row_table_specs() -> tuple[Any, ...]:

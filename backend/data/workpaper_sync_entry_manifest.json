@@ -15416,26 +15416,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "g4.bond_main",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-g4-bond-investment-main",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentMain.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_g4_bond_main_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -16344,17 +16340,18 @@
       "independent_entry": true,
       "migration_state": "legacy_fake_bidirectional",
       "mount_components": [
-        "GtOnlyOfficeSheet"
+        "GtOnlyOfficeSheet",
+        "WorkpaperSyncEditorHost"
       ],
       "mounts": [
         {
           "attributes": [
             {
               "argument": null,
-              "expression": "isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'",
+              "expression": "isOoMode",
               "kind": "directive",
-              "name": "if",
-              "raw": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\""
+              "name": "else-if",
+              "raw": "v-else-if=\"isOoMode\""
             },
             {
               "argument": "wp-id",
@@ -16394,23 +16391,23 @@
           ],
           "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
           "component": "GtOnlyOfficeSheet",
-          "condition": "v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\"",
+          "condition": "v-else-if=\"isOoMode\"",
           "documentType": "xlsx",
           "file": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondInvestmentEcl.vue",
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_9ddb40e8b3f5a44798f7",
+          "mountId": "mount_80686a3ff6a8d0a301ca",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || ''\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 40,
+            "endLine": 51,
             "startColumn": 7,
-            "startLine": 33
+            "startLine": 44
           },
-          "templateNodeOrdinal": 16,
+          "templateNodeOrdinal": 20,
           "wpExpression": ":wp-id=\"props.wpId\""
         },
         {
@@ -16466,18 +16463,73 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_5d389b3ff00986a54d88",
+          "mountId": "mount_e0c4952072d8703c4018",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || ''\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 98,
+            "endLine": 109,
             "startColumn": 7,
-            "startLine": 91
+            "startLine": 102
           },
-          "templateNodeOrdinal": 22,
+          "templateNodeOrdinal": 26,
           "wpExpression": ":wp-id=\"props.wpId\""
+        },
+        {
+          "attributes": [
+            {
+              "argument": null,
+              "expression": "syncOoDescriptor",
+              "kind": "directive",
+              "name": "if",
+              "raw": "v-if=\"syncOoDescriptor\""
+            },
+            {
+              "argument": null,
+              "expression": "syncEditorHostRef",
+              "kind": "attribute",
+              "name": "ref",
+              "raw": "ref=\"syncEditorHostRef\""
+            },
+            {
+              "argument": "descriptor",
+              "expression": "syncOoDescriptor",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":descriptor=\"syncOoDescriptor\""
+            },
+            {
+              "argument": "bridge",
+              "expression": "syncBridge",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":bridge=\"syncBridge\""
+            }
+          ],
+          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue",
+          "component": "WorkpaperSyncEditorHost",
+          "condition": "v-if=\"syncOoDescriptor\"",
+          "documentType": "xlsx",
+          "documentTypeSource": "sibling_mount",
+          "entryIdDeclaration": "xlsx/gt-g6-other-bond-investment-ecl",
+          "file": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondInvestmentEcl.vue",
+          "importKind": "static",
+          "localName": "WorkpaperSyncEditorHost",
+          "loop": null,
+          "mountId": "mount_0978ade63f1cb07aa799",
+          "needsOverlayRule": false,
+          "runtimeCardinality": "single",
+          "sheetExpression": null,
+          "sourceKind": "template_ast",
+          "sourceSpan": {
+            "endColumn": 11,
+            "endLine": 41,
+            "startColumn": 9,
+            "startLine": 36
+          },
+          "templateNodeOrdinal": 18,
+          "wpExpression": null
         }
       ],
       "parent_entry_id": null,
@@ -16489,8 +16541,8 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtG6OtherBondInvestmentEcl.vue#L33",
-          "audit-platform/frontend/src/components/workpaper/GtG6OtherBondInvestmentEcl.vue#L91",
+          "audit-platform/frontend/src/components/workpaper/GtG6OtherBondInvestmentEcl.vue#L102",
+          "audit-platform/frontend/src/components/workpaper/GtG6OtherBondInvestmentEcl.vue#L44",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L736"
         ]
@@ -16511,7 +16563,7 @@
         "room_service_state": "room_service_wired",
         "schema_version": 1
       },
-      "sync_editor_host_mounted": false,
+      "sync_editor_host_mounted": true,
       "wp_match": {
         "component_types": [],
         "sheet_expressions": [
@@ -16525,26 +16577,22 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "g6.other_bond_main",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-g6-other-bond-main",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondMain.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_g6_other_bond_main_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -26214,7 +26262,8 @@
       "independent_entry": true,
       "migration_state": "adapter_registered",
       "mount_components": [
-        "GtOnlyOfficeSheet"
+        "GtOnlyOfficeSheet",
+        "WorkpaperSyncEditorHost"
       ],
       "mounts": [
         {
@@ -26256,70 +26305,66 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_13c6997644eaf81ff581",
+          "mountId": "mount_5a7d0497726d5e42dcbf",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 13,
-            "endLine": 112,
+            "endLine": 120,
             "startColumn": 11,
-            "startLine": 107
+            "startLine": 115
           },
-          "templateNodeOrdinal": 20,
+          "templateNodeOrdinal": 22,
           "wpExpression": ":wp-id=\"props.wpId\""
         },
         {
           "attributes": [
             {
               "argument": null,
-              "expression": null,
-              "kind": "directive",
-              "name": "else",
-              "raw": "v-else"
-            },
-            {
-              "argument": "wp-id",
-              "expression": "props.wpId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":wp-id=\"props.wpId\""
-            },
-            {
-              "argument": "sheet-name",
-              "expression": "dualMode.resolveOoSheetName()",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":sheet-name=\"dualMode.resolveOoSheetName()\""
-            },
-            {
-              "argument": null,
-              "expression": "height: 100%; min-height: 600px",
+              "expression": "syncEditorHostRef",
               "kind": "attribute",
-              "name": "style",
-              "raw": "style=\"height: 100%; min-height: 600px\""
+              "name": "ref",
+              "raw": "ref=\"syncEditorHostRef\""
+            },
+            {
+              "argument": "descriptor",
+              "expression": "syncOoDescriptor",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":descriptor=\"syncOoDescriptor\""
+            },
+            {
+              "argument": "bridge",
+              "expression": "syncBridge",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":bridge=\"syncBridge\""
             }
           ],
-          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
-          "component": "GtOnlyOfficeSheet",
-          "condition": "v-else",
+          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue",
+          "component": "WorkpaperSyncEditorHost",
+          "condition": null,
           "documentType": "xlsx",
+          "documentTypeSource": "sibling_mount",
+          "entryIdDeclaration": null,
           "file": "audit-platform/frontend/src/components/workpaper/GtM1DividendsPayable.vue",
-          "importKind": "dynamic",
-          "localName": "GtOnlyOfficeSheet",
+          "importKind": "static",
+          "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_2b1d65c5a71fd3c8336c",
+          "mountId": "mount_912f304157d636148b46",
+          "needsOverlayRule": false,
           "runtimeCardinality": "single",
-          "sheetExpression": ":sheet-name=\"dualMode.resolveOoSheetName()\"",
+          "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
-            "endColumn": 11,
-            "endLine": 121,
-            "startColumn": 9,
-            "startLine": 116
+            "endColumn": 13,
+            "endLine": 45,
+            "startColumn": 11,
+            "startLine": 41
           },
-          "templateNodeOrdinal": 21,
-          "wpExpression": ":wp-id=\"props.wpId\""
+          "templateNodeOrdinal": 12,
+          "wpExpression": null
         }
       ],
       "parent_entry_id": null,
@@ -26344,18 +26389,17 @@
         "editability": "editable",
         "host_reachable": true,
         "mount_cardinality": "single",
-        "mount_count": 2,
+        "mount_count": 1,
         "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
         "readonly_binding": "absent",
         "room_model": "shared",
         "room_service_state": "room_service_wired",
         "schema_version": 1
       },
-      "sync_editor_host_mounted": false,
+      "sync_editor_host_mounted": true,
       "wp_match": {
         "component_types": [],
         "sheet_expressions": [
-          ":sheet-name=\"dualMode.resolveOoSheetName()\"",
           ":sheet-name=\"props.sheetName\""
         ],
         "sheet_literals": [],
@@ -27075,7 +27119,8 @@
       "independent_entry": true,
       "migration_state": "adapter_registered",
       "mount_components": [
-        "GtOnlyOfficeSheet"
+        "GtOnlyOfficeSheet",
+        "WorkpaperSyncEditorHost"
       ],
       "mounts": [
         {
@@ -27117,70 +27162,66 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_ec80fa13605a0e521c47",
+          "mountId": "mount_7b87d38235957d9e2c1f",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 13,
-            "endLine": 105,
+            "endLine": 114,
             "startColumn": 11,
-            "startLine": 100
+            "startLine": 109
           },
-          "templateNodeOrdinal": 19,
+          "templateNodeOrdinal": 21,
           "wpExpression": ":wp-id=\"props.wpId\""
         },
         {
           "attributes": [
             {
               "argument": null,
-              "expression": null,
-              "kind": "directive",
-              "name": "else",
-              "raw": "v-else"
-            },
-            {
-              "argument": "wp-id",
-              "expression": "props.wpId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":wp-id=\"props.wpId\""
-            },
-            {
-              "argument": "sheet-name",
-              "expression": "dualMode.resolveOoSheetName()",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":sheet-name=\"dualMode.resolveOoSheetName()\""
-            },
-            {
-              "argument": null,
-              "expression": "height: 100%; min-height: 600px",
+              "expression": "syncEditorHostRef",
               "kind": "attribute",
-              "name": "style",
-              "raw": "style=\"height: 100%; min-height: 600px\""
+              "name": "ref",
+              "raw": "ref=\"syncEditorHostRef\""
+            },
+            {
+              "argument": "descriptor",
+              "expression": "syncOoDescriptor",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":descriptor=\"syncOoDescriptor\""
+            },
+            {
+              "argument": "bridge",
+              "expression": "syncBridge",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":bridge=\"syncBridge\""
             }
           ],
-          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
-          "component": "GtOnlyOfficeSheet",
-          "condition": "v-else",
+          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue",
+          "component": "WorkpaperSyncEditorHost",
+          "condition": null,
           "documentType": "xlsx",
+          "documentTypeSource": "sibling_mount",
+          "entryIdDeclaration": null,
           "file": "audit-platform/frontend/src/components/workpaper/GtM5SurplusReserve.vue",
-          "importKind": "dynamic",
-          "localName": "GtOnlyOfficeSheet",
+          "importKind": "static",
+          "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_0089c144c312da06d6b7",
+          "mountId": "mount_770667159a3efe2723ea",
+          "needsOverlayRule": false,
           "runtimeCardinality": "single",
-          "sheetExpression": ":sheet-name=\"dualMode.resolveOoSheetName()\"",
+          "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
-            "endColumn": 11,
-            "endLine": 114,
-            "startColumn": 9,
-            "startLine": 109
+            "endColumn": 13,
+            "endLine": 46,
+            "startColumn": 11,
+            "startLine": 42
           },
-          "templateNodeOrdinal": 20,
-          "wpExpression": ":wp-id=\"props.wpId\""
+          "templateNodeOrdinal": 12,
+          "wpExpression": null
         }
       ],
       "parent_entry_id": null,
@@ -27205,18 +27246,17 @@
         "editability": "editable",
         "host_reachable": true,
         "mount_cardinality": "single",
-        "mount_count": 2,
+        "mount_count": 1,
         "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
         "readonly_binding": "absent",
         "room_model": "shared",
         "room_service_state": "room_service_wired",
         "schema_version": 1
       },
-      "sync_editor_host_mounted": false,
+      "sync_editor_host_mounted": true,
       "wp_match": {
         "component_types": [],
         "sheet_expressions": [
-          ":sheet-name=\"dualMode.resolveOoSheetName()\"",
           ":sheet-name=\"props.sheetName\""
         ],
         "sheet_literals": [],
@@ -27590,7 +27630,8 @@
       "independent_entry": true,
       "migration_state": "adapter_registered",
       "mount_components": [
-        "GtOnlyOfficeSheet"
+        "GtOnlyOfficeSheet",
+        "WorkpaperSyncEditorHost"
       ],
       "mounts": [
         {
@@ -27632,70 +27673,66 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_996aa22f727ecd183941",
+          "mountId": "mount_b8da63b44cb7ae209be9",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 11,
-            "endLine": 102,
+            "endLine": 110,
             "startColumn": 9,
-            "startLine": 97
+            "startLine": 105
           },
-          "templateNodeOrdinal": 20,
+          "templateNodeOrdinal": 22,
           "wpExpression": ":wp-id=\"props.wpId\""
         },
         {
           "attributes": [
             {
               "argument": null,
-              "expression": null,
-              "kind": "directive",
-              "name": "else",
-              "raw": "v-else"
-            },
-            {
-              "argument": "wp-id",
-              "expression": "props.wpId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":wp-id=\"props.wpId\""
-            },
-            {
-              "argument": "sheet-name",
-              "expression": "dualMode.resolveOoSheetName()",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":sheet-name=\"dualMode.resolveOoSheetName()\""
-            },
-            {
-              "argument": null,
-              "expression": "height: 100%; min-height: 600px",
+              "expression": "syncEditorHostRef",
               "kind": "attribute",
-              "name": "style",
-              "raw": "style=\"height: 100%; min-height: 600px\""
+              "name": "ref",
+              "raw": "ref=\"syncEditorHostRef\""
+            },
+            {
+              "argument": "descriptor",
+              "expression": "syncOoDescriptor",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":descriptor=\"syncOoDescriptor\""
+            },
+            {
+              "argument": "bridge",
+              "expression": "syncBridge",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":bridge=\"syncBridge\""
             }
           ],
-          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
-          "component": "GtOnlyOfficeSheet",
-          "condition": "v-else",
+          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue",
+          "component": "WorkpaperSyncEditorHost",
+          "condition": null,
           "documentType": "xlsx",
+          "documentTypeSource": "sibling_mount",
+          "entryIdDeclaration": null,
           "file": "audit-platform/frontend/src/components/workpaper/GtM8GeneralRiskReserve.vue",
-          "importKind": "dynamic",
-          "localName": "GtOnlyOfficeSheet",
+          "importKind": "static",
+          "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_7b91ffb93d6032e84527",
+          "mountId": "mount_c0bd338818d36e67d91c",
+          "needsOverlayRule": false,
           "runtimeCardinality": "single",
-          "sheetExpression": ":sheet-name=\"dualMode.resolveOoSheetName()\"",
+          "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
-            "endColumn": 9,
-            "endLine": 111,
-            "startColumn": 7,
-            "startLine": 106
+            "endColumn": 11,
+            "endLine": 34,
+            "startColumn": 9,
+            "startLine": 30
           },
-          "templateNodeOrdinal": 21,
-          "wpExpression": ":wp-id=\"props.wpId\""
+          "templateNodeOrdinal": 12,
+          "wpExpression": null
         }
       ],
       "parent_entry_id": null,
@@ -27720,18 +27757,17 @@
         "editability": "editable",
         "host_reachable": true,
         "mount_cardinality": "single",
-        "mount_count": 2,
+        "mount_count": 1,
         "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
         "readonly_binding": "absent",
         "room_model": "shared",
         "room_service_state": "room_service_wired",
         "schema_version": 1
       },
-      "sync_editor_host_mounted": false,
+      "sync_editor_host_mounted": true,
       "wp_match": {
         "component_types": [],
         "sheet_expressions": [
-          ":sheet-name=\"dualMode.resolveOoSheetName()\"",
           ":sheet-name=\"props.sheetName\""
         ],
         "sheet_literals": [],
@@ -27759,7 +27795,8 @@
       "independent_entry": true,
       "migration_state": "adapter_registered",
       "mount_components": [
-        "GtOnlyOfficeSheet"
+        "GtOnlyOfficeSheet",
+        "WorkpaperSyncEditorHost"
       ],
       "mounts": [
         {
@@ -27801,18 +27838,66 @@
           "importKind": "dynamic",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_9e4f25f79c6c34807237",
+          "mountId": "mount_74190aaa6ef9509b17f2",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
-            "endColumn": 9,
-            "endLine": 83,
-            "startColumn": 7,
-            "startLine": 78
+            "endColumn": 13,
+            "endLine": 104,
+            "startColumn": 11,
+            "startLine": 99
           },
-          "templateNodeOrdinal": 15,
+          "templateNodeOrdinal": 20,
           "wpExpression": ":wp-id=\"props.wpId\""
+        },
+        {
+          "attributes": [
+            {
+              "argument": null,
+              "expression": "syncEditorHostRef",
+              "kind": "attribute",
+              "name": "ref",
+              "raw": "ref=\"syncEditorHostRef\""
+            },
+            {
+              "argument": "descriptor",
+              "expression": "syncOoDescriptor",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":descriptor=\"syncOoDescriptor\""
+            },
+            {
+              "argument": "bridge",
+              "expression": "syncBridge",
+              "kind": "directive",
+              "name": "bind",
+              "raw": ":bridge=\"syncBridge\""
+            }
+          ],
+          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue",
+          "component": "WorkpaperSyncEditorHost",
+          "condition": null,
+          "documentType": "xlsx",
+          "documentTypeSource": "sibling_mount",
+          "entryIdDeclaration": null,
+          "file": "audit-platform/frontend/src/components/workpaper/GtM9OtherComprehensiveIncome.vue",
+          "importKind": "static",
+          "localName": "WorkpaperSyncEditorHost",
+          "loop": null,
+          "mountId": "mount_2d9501c44ced75adcc3f",
+          "needsOverlayRule": false,
+          "runtimeCardinality": "single",
+          "sheetExpression": null,
+          "sourceKind": "template_ast",
+          "sourceSpan": {
+            "endColumn": 13,
+            "endLine": 45,
+            "startColumn": 11,
+            "startLine": 41
+          },
+          "templateNodeOrdinal": 12,
+          "wpExpression": null
         }
       ],
       "parent_entry_id": null,
@@ -27844,7 +27929,7 @@
         "room_service_state": "room_service_wired",
         "schema_version": 1
       },
-      "sync_editor_host_mounted": false,
+      "sync_editor_host_mounted": true,
       "wp_match": {
         "component_types": [],
         "sheet_expressions": [
@@ -33748,22 +33833,22 @@
       }
     }
   ],
-  "manifest_digest": "9c35aa01535f92b33a4107a618a2584c377d32cdf74dbe855b3718cfbfa1c8b4",
-  "overlay_digest": "5da0f27b9ec96f05993e7c398a66038a44ec243417cc799758f069a34c84f2eb",
-  "profile_source_digest": "22ac2db00ce8cc5854feb1e0bdfac5619ca93f1517764050f3b73c31ee022436",
+  "manifest_digest": "bd82d64d6bc39541b6a2f0dfa29d31a0da53dcfaa544df5d0aa2d5ea0e3b37c9",
+  "overlay_digest": "6014b66024b6546a527c882911c672ceddf2c8c71f3eb4ee86fadc5b2736fd70",
+  "profile_source_digest": "b57febf756741307dc0a7d551cb298ba2f87cdd788982320406a264a273bca14",
   "schema_version": 1,
-  "source_digest": "4d1a6d47ddd8aec7f103c732ac28562a01402d857590c741e4a131e204ccaef2",
+  "source_digest": "d5ffc34f74601a4d0a07a0df50b701b789c958bd3350f0de5ef2f73807f2c8ee",
   "stats": {
     "by_component": {
-      "GtOnlyOfficeSheet": 228,
+      "GtOnlyOfficeSheet": 225,
       "OnlyOfficeWordDialog": 2,
-      "WorkpaperSyncEditorHost": 104,
+      "WorkpaperSyncEditorHost": 109,
       "WorkpaperWordEditor": 4
     },
     "capability_counts": {
-      "bidirectional": 92,
+      "bidirectional": 94,
       "single_html": 5,
-      "single_onlyoffice": 99,
+      "single_onlyoffice": 97,
       "unreachable": 1
     },
     "dispatcher_count": 1,
@@ -33774,8 +33859,8 @@
     "entry_count": 197,
     "host_count": 196,
     "independent_entry_count": 144,
-    "legacy_fake_bidirectional_count": 91,
-    "mount_count": 338,
+    "legacy_fake_bidirectional_count": 89,
+    "mount_count": 340,
     "parent_duplicate_count": 52,
     "room_model_counts": {
       "exclusive": 6,
@@ -33790,7 +33875,7 @@
       "xlsx.editable.shared.single.room_service_wired.v1": 189,
       "xlsx.unreachable.none.single.room_service_wired.v1": 1
     },
-    "unadjudicated_count": 86,
+    "unadjudicated_count": 84,
     "unreachable_count": 1
   }
 }

@@ -78,12 +78,15 @@ TEMPLATE_RELATIVE_PATH: Final[str] = (
     "F/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx"
 )
 TEMPLATE_SHA256: Final[str] = (
-    "bdfdcf8a804aab1c11db1cc2cd2deaac4f5bbf94c6a60e43a04108f178079bc7"
+    "da258bbc2e9813885afee3eeca90d1531599b8def14aa8d9635a86227fdb3e72"
 )
 
 STORE_ITEM_ID: Final[str] = "F2-25-rows"
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 ROW_IDENTITY_STORE_KEY: Final[str] = "id"
+
+#: 多区主 table（first publication binding 唯一性所需）
+ROWS_TABLE_KEY: Final[str] = "stocktake_sample_exist_rows"
 
 _BACKEND_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 
@@ -137,8 +140,8 @@ def assert_entry_selectable(
 _INCLUDE_F225: Final[bool] = True
 #: F2-26 区二（日前 F2-26-rows）
 _INCLUDE_F226_BEFORE: Final[bool] = False
-#: F2-26 区一（日后 F2-26-after-rows，依赖模板覆盖层修 J9）
-_INCLUDE_F226_AFTER: Final[bool] = False
+#: F2-26 区一（日后 F2-26-after-rows，J9 已修）
+_INCLUDE_F226_AFTER: Final[bool] = True
 
 
 def managed_row_table_specs() -> tuple[Any, ...]:
@@ -253,11 +256,18 @@ def build_contract_payload() -> dict[str, Any]:
     row_specs = managed_row_table_specs()
     if not row_specs:
         raise EntrySelectionError("F2 stocktake 当前无受管 sheet")
-    sheets: list[dict[str, Any]] = []
+    # 🔴 同 sheet_key 的多区必须合并成一个 sheet 条目（多 table），不可产生重复 sheet_key
+    sheets_by_key: dict[str, dict[str, Any]] = {}
     for spec in row_specs:
         sheet_payload = spec_to_contract_sheet_payload(spec)
         sheet_payload["locator"] = {"anchor": TABLE_SHEET_ANCHOR}
-        sheets.append(sheet_payload)
+        key = sheet_payload["sheet_key"]
+        if key in sheets_by_key:
+            # 合并 table 到已有 sheet 条目
+            sheets_by_key[key]["tables"].extend(sheet_payload["tables"])
+        else:
+            sheets_by_key[key] = sheet_payload
+    sheets = list(sheets_by_key.values())
     return {
         "schema_version": CONTRACT_SCHEMA_VERSION, "contract_id": ADAPTER_ID,
         "semantic_version": "1.0.0", "review_status": "reviewed", "document_type": "xlsx",
@@ -312,13 +322,15 @@ def _spec_of_store_item(store_item_id: str) -> Any:
         f"store item {store_item_id!r} 不在 F2 stocktake 受管清单里"
     )
 
-def build_store_projection(store_item_id: str, payload: str | bytes | Sequence[Any],
-                           *, contract: SyncContract, limits: Any | None = None) -> Any:
+def build_store_projection(payload: str | bytes | Sequence[Any],
+                           *, contract: SyncContract, limits: Any | None = None,
+                           store_item_id: str = STORE_ITEM_ID) -> Any:
     from app.services.workpaper_sync.phase5_row_table_sheet import build_store_projection as _engine
     return _engine(_spec_of_store_item(store_item_id), payload, contract=contract, limits=limits)
 
-def merge_projection_into_store_rows(store_item_id: str, *, projection: Any,
-                                     base_rows: list[Mapping[str, Any]]) -> tuple[list[dict[str, Any]], int, int, set[str]]:
+def merge_projection_into_store_rows(*, projection: Any,
+                                     base_rows: list[Mapping[str, Any]],
+                                     store_item_id: str = STORE_ITEM_ID) -> tuple[list[dict[str, Any]], int, int, set[str]]:
     from app.services.workpaper_sync.phase5_row_table_sheet import merge_projection_into_store_rows as _engine_merge
     return _engine_merge(_spec_of_store_item(store_item_id), projection=projection, base_rows=base_rows)
 

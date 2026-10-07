@@ -455,7 +455,7 @@ _LINE_ENDING_PAIRS: Final[tuple[tuple[str, str], ...]] = (("\r\n", "\n"), ("\r",
 _ZERO_WIDTH_BOM: Final[str] = "\ufeff"
 
 _DECIMAL_TYPES: Final[frozenset[ValueType]] = frozenset(
-    {ValueType.amount, ValueType.rate, ValueType.ratio}
+    {ValueType.amount, ValueType.rate, ValueType.ratio, ValueType.percent_points}
 )
 
 

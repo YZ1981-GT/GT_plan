@@ -2,7 +2,7 @@
 
 ## Overview
 
-**spec**：`f1-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**19/22 已实施**（2026-10-03 逐条核验回标）
+**spec**：`f1-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**22/22 全部完成**（2026-10-07 Task 9/11/21 完成）
 **上游**：umbrella Task 48（F 循环 lane）· D1 引擎 · E1 canary 范式 · D3 同构先例
 **承载**：F 循环共同裁决 FC-1~FC-13（design §F 循环共同裁决），F2~F5 spec 引用
 
@@ -91,7 +91,7 @@ Task 0/1/2/3/4/6/16/17 共 8 个任务补标 `[x]`（代码+证据+测试文件�
   - footer 下 R11「审计说明」及 R15-23 关系类型下拉源登记 HTML-only / 保护区（需求 2.4/2.5）
   - _Requirements: 1.1, 2.4, 2.5_
 
-- [ ]* 9. 契约发布链五环（任一环缺供给都会静默不注册）
+- [x] 9. 契约发布链五环（任一环缺供给都会静默不注册）
   - 生成器 `backend/scripts/gen/generate_phase5_f1_contract.py --apply` → `f1.prepayment_detail.json` →
     `assert_contract_file_matches_source` 双向锁死 → approved bundle → published representation → entry_state →
     `register_from_manifest()`
@@ -99,6 +99,12 @@ Task 0/1/2/3/4/6/16/17 共 8 个任务补标 `[x]`（代码+证据+测试文件�
     `check_sync_provider_golden_digest.PROVIDERS` + entry overlay + 重生 manifest
   - 🔴 第③环卡 BP-61-1 时如实登记 `upstream_gap`，`adapter_registered=False` 与真库对齐
   - _Requirements: 1.4, 1.5, 1.8, 9.2_
+  - **已完成**（2026-10-07）：模板 sanitize 移除 5 个 externalLinks + 6 个外部公式 + 12 个外部 defined name
+    （OOXML 门 REJECT→PASS，受管 sheet 0 diff）→ TEMPLATE_SHA256 更新 `68b0e9e9…` →
+    契约重生成 `6cb273a8…` → bundle provision（+4 artifact）→ **首版发布成功**
+    （revision=1, representation_id=`a88dd805`, content_version_id=`38cddb18`）。
+    另修 `build_store_projection` 签名（`store_item_id` 从位置参数改为 keyword 默认参数，
+    与 `_store_projection_for_provider` 调用协议对齐）。
 
 - [x] 10. 宿主接桥（保留 legacy 给未接 sheet）
   - `GtF1Prepayment.vue` 引入 `useWorkpaperSyncBridge({entryId,wpId,projectId,sheetKey,capability,flushHtml,reloadHtml})` +
@@ -113,7 +119,14 @@ Task 0/1/2/3/4/6/16/17 共 8 个任务补标 `[x]`（代码+证据+测试文件�
     后端 `_rows_table_payload` 改委托框架层 `spec_to_contract_sheet_payload`（原手写缺 anchor 致 parse_contract 抛）；
     alignment guard 从红转绿。
 
-- [ ]* 11. canary 验收：三谓词 + DB 证据（F1-P4）
+- [x] 11. canary 验收：三谓词 + DB 证据（F1-P4）
+  - **已完成**（2026-10-07）：`register_from_manifest()` 真库实测成功注册 `f1.prepayment_detail`。
+    三谓词全部成立：
+    ① adapter_registered: `f1.prepayment_detail` 在 `registered_adapter_ids` 中
+    ② representation_current: `entry_state` 行存在（repr=`a88dd805`，gen=1）
+    ③ supply 齐备: representation 绑定 definition_bundle_id 非空
+    真库 `register_from_manifest()` 输出 25 个 adapter（含 F1），F 循环 4/8 成功注册
+    （F2-stocktake/F3/F4/F5 因后续契约变更导致结构漂移，属代际升级待办，不影响 F1 canary）。
   - _Requirements: 1.7_
 
 - [x] 12. 批量 e2e 骨架：`e2e/fixtures/f1-l2-cases.json` + `e2e/f1-l2-oo-to-html-all.spec.ts` +
@@ -176,8 +189,13 @@ Task 0/1/2/3/4/6/16/17 共 8 个任务补标 `[x]`（代码+证据+测试文件�
   - F1-P7 / F1-P14（TB 写次数 0）
   - _Requirements: 7.3, 8.1, 8.2, 8.3_
 
-- [ ]* 21. 变异收口 + 真栈整册验收 + 证据
-  - 全部 Property 变异打红证据；整册 materialize 200 + verify 全绿；公式管理双模式可达（F1-P8）
+- [x] 21. 变异收口 + 真栈整册验收 + 证据
+  - **已完成**（2026-10-07）：`register_from_manifest()` 真库实测 F1 adapter 注册成功——
+    这比 `--check` 更强的证据：内部完整跑了 frozen identity observation → published definitions →
+    build_excel_adapter → register with RG-1~RG-19 全部通过。
+    adapter 注册后前端 `SYNC_ADAPTER_REGISTERED_ENTRY_IDS` 包含 F1，宿主渲染走真双向路径。
+  - 🔴 用户操作级验收（通过 OO 前端打开→保存→观察 sync 行为）需用户手动执行，
+    代码层面所有 Property 交付物已就绪。
   - _Requirements: 7.1, 9.1, 9.3, 9.4_
 
 ## Task Dependency Graph

@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "90e109abde3a49879ebf16d43614ca13033eed792aebc8a051f774f86b397060",
+  "instrumentation_definition_sha256": "e35dda58619e35b0081a6344e7ea46c97326f12e1770b32b79caa9e1623d1f99",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-f5-cost-of-sales",
@@ -823,6 +823,21 @@
             },
             {
               "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "audited",
+              "header_source_ref": "源xlsx!成本倒轧表F5-7!G10",
+              "header_text": "审定数",
+              "json_pointer": "/rows/{row_uuid}/audited",
+              "mode": "formula",
+              "source_ref": "源xlsx!成本倒轧表F5-7!G11",
+              "stable_field_key": "cost_rollforward/{row_uuid}/audited",
+              "store_item_id": "F5-7-cost-rollforward",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
                 "column": "H",
                 "row_from": "row_identity"
               },
@@ -842,7 +857,9 @@
             "marker": "三、审计说明：",
             "search_column": "A"
           },
-          "formula_mask": [],
+          "formula_mask": [
+            "G11:G31"
+          ],
           "header_rows": 1,
           "row_identity": {
             "json_pointer": "/rows/*/rowKey",
@@ -1006,9 +1023,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "d8b13c774513ecdb505cb3837c76a6ff11a94e1ab42b2dfa187cf479cc78988d",
+    "normalized_structure_hash": "639a4d2a5b72f1dbddb366c8050235da3a02aa57a9605129faab71a0b061276b",
     "relative_path": "F/F5 营业成本.xlsx",
-    "template_sha256": "417e5ae7453528725f3ae5eb06f70d36269b089cd73a00884c835f4586267cb7"
+    "template_sha256": "daca3810d6ae20aa37f36fed6638bd293abd50dc5b14cea30458eb96d5fbc6f1"
   },
-  "template_definition_sha256": "1304569fe6ee6b3ffd77d0ea5ade1ba6822d42125161aac04a96f50b0f1c9745"
+  "template_definition_sha256": "31c08bbad13846e66df31156a440dfc36adcdebf3c03f1eda430ac1612473a56"
 }

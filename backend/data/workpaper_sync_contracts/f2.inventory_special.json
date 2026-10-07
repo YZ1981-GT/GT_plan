@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "7714d07ebd7e2147f682568127cbea388ee003fc01a4d09af415928d673aeeda",
+  "instrumentation_definition_sha256": "c1411a261218f33cbb8dbba30e843cfeb45eb202afddc9921e297712c371c3b8",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-f2-inventory-special",
@@ -255,9 +255,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "8750eee8f4efcf805fb07e4f3f6d49befe5a4639639fd65d5ea15edba2e770a1",
+    "normalized_structure_hash": "279f424438b3109ff338e2622294634ac2999d5a0a4c6af31ec9929f75880442",
     "relative_path": "F/F2-55至F2-58 合同履约成本.xlsx",
-    "template_sha256": "b9ea248198217827a7b3d142dccca9ab5769c17867d1454ffd9105eaa9cb6c21"
+    "template_sha256": "9d9348fa69acdff3f96d8171efe8b3177a11e0e7f9ed9f20ec242c69b1074b36"
   },
-  "template_definition_sha256": "640094143b7e887057e50f97aaec681a82c81e331ca8a4cbaf654b0121d6a63c"
+  "template_definition_sha256": "a8545bee753c71dbab2f59b01bd7845de4656385d1ae1f5153507058b6d44867"
 }

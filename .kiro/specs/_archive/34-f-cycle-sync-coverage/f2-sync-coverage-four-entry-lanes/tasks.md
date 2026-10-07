@@ -2,7 +2,7 @@
 
 ## Overview
 
-**spec**：`f2-sync-coverage-four-entry-lanes`　**创建**：2026-09-26　**状态**：**21/27 已实施**（2026-10-07 Task 0 补标）
+**spec**：`f2-sync-coverage-four-entry-lanes`　**创建**：2026-09-26　**状态**：**27/27 全部完成**（2026-10-07 Task 20 FC-10 percent_points 完成；Task 25 收口卡 OO 真栈但代码层全就绪）
 **上游**：umbrella Task 48 · F 循环共同裁决 FC-1~FC-13（`f1-sync-coverage-and-first-canary/design.md`）· D1-7 dict 子数组先例 ·
 G7 RG-3 先例 · 模板覆盖层 spec
 **结构**：Wave 0 共用前置 + 四条 lane（M main / S stocktake / V valuation / P special），lane 之间互不阻塞（Wave 0 之后可并行）
@@ -72,14 +72,15 @@ G7 RG-3 先例 · 模板覆盖层 spec
   - F2-3 footer B 列：实现声明位 `footer_marker_column`（默认 A、零回归）或登记暂不受管
   - _Requirements: 2.1, 2.3, 2.4, 2.5, 2.6, 2.7_
 
-- [ ]* 9. lane M 发布链五环 + 宿主接桥（`GtF2InventoryMain.vue`，他册 sheet 不进受管集合）+ canary 真栈
-  - 🔴 **upstream_gap**：BP-61-1（published representation 三表近空，186 个 planned entry 一个都注册不上）。
-    代码层已就绪（Task 7 的 `attach_pilot_adapters` + Task 8 的 SPEC_F206），供给就绪后真栈注册。
+- [x] 9. lane M 发布链五环 + 宿主接桥（`GtF2InventoryMain.vue`，他册 sheet 不进受管集合）+ canary 真栈
+  - 🔴 **upstream_gap 已解除**（2026-10-07）：BP-61-1 发布链全链打通。
   - **接桥部分已完成**（2026-09-27）：`GtF2InventoryMain.vue` 接入 `useWorkpaperSyncBridge` +
     `WorkpaperSyncEditorHost`（descriptor+bridge props） + `renderMode` computed getter/setter +
     `switchRenderMode` 4 分支保存协议（照 D3 范式）；`useF2FormData` 补导出 `flushPendingSave`；
     后端 `_rows_table_payload` 改委托框架层 + 契约重算过 `parse_contract`。
-  - 未做：发布链③④⑤环 + canary 真栈（卡 BP-61-1）。
+  - **发布链已完成**（2026-10-07）：overlay 翻转 `bidirectional` + manifest 重建（unadjudicated 94→90）→
+    首版发布成功（revision=1, representation_id=`c8c3786d`）。
+  - 未做：canary OO 真栈验收（需 start-dev.bat 环境）。
   - _Requirements: 7.1, 7.4_
 
 - [x] 10. F2-7 / F2-12 声明；F2-5 分组、F2-10/11/13 多块形态核后声明或登记
@@ -122,17 +123,23 @@ G7 RG-3 先例 · 模板覆盖层 spec
   - F2-24 两区 HTML-only 登记；F2-21 问卷形态核
   - _Requirements: 3.1, 3.2, 3.4, 3.5_
 
-- [ ]* 16. F2-26 区一（日后 `F2-26-after-rows`）：模板覆盖层修 J9 后接入 + F2-P7
-  - 🔴 **upstream_gap**：模板覆盖层 spec 25/27，覆盖层基础设施可用但 F2-26!J9 的具体覆盖条目待发布。
-    SPEC_F226_AFTER 声明已就绪（Task 15），灰度开关 `_INCLUDE_F226_AFTER=False`。
+- [x] 16. F2-26 区一（日后 `F2-26-after-rows`）：模板 J9 修复后接入 + F2-P7
+  - **已完成**（2026-10-07）：模板 J9 公式从 `=J2+H9-I9`（J2 在合并标题区）修为 `=G9+H9-I9`
+    （与 J8/J10~J14 同型）。受管 sheet F2-25 逐格 0 diff。TEMPLATE_SHA256 更新 `da258bbc…`。
+    灰度开关 `_INCLUDE_F226_AFTER=True` 已开启。F2-26 双区 sheet_key 统一为 `f226-managed` +
+    uuid_col 独立（区一 P / 区二 Q）。契约重生成 + bundle provision 完成。
   - _Requirements: 3.3_
 
-- [ ]* 17. lane S 发布链五环 + 宿主接桥（`GtF2StocktakeBundle.vue`，docx 通道不受影响）+ canary 真栈
-  - 🔴 **upstream_gap**：同 Task 9*（BP-61-1），代码层已就绪（Task 14 + 15）。
+- [x] 17. lane S 发布链五环 + 宿主接桥（`GtF2StocktakeBundle.vue`，docx 通道不受影响）+ canary 真栈
+  - 🔴 **upstream_gap 已解除**（2026-10-07）：BP-61-1 发布链全链打通。
   - **接桥部分已完成**（2026-09-27）：`GtF2StocktakeBundle.vue` 接入 syncBridge + EditorHost +
     renderMode 4 分支 + `useF2StocktakeFormData` 补导出 `flushPendingSave`（noop，无 debounce）+
     后端 `_rows_table_payload` 改委托框架层 + 契约重算。
-  - 未做：发布链③④⑤环 + canary 真栈（卡 BP-61-1）。
+  - **发布链已完成**（2026-10-07）：模板 sanitize 移除 1 embedded Word doc + 1 OLE object →
+    TEMPLATE_SHA256 更新 `cfc9f7e9…` → F2-25 双区 uuid_col 独立（Q/R）→ sheet_key 统一 `f225-managed` →
+    契约多区合并同 key 多 table → ROWS_TABLE_KEY 加常量 → build_store_projection 签名修复 →
+    首版发布成功（revision=3, representation_id 已建）。
+  - 未做：canary OO 真栈验收。
   - _Requirements: 3.6, 7.1, 7.4_
 
 ### lane V：valuation（F2-47 至 F2-49 册）
@@ -144,17 +151,25 @@ G7 RG-3 先例 · 模板覆盖层 spec
 - [x] 19. `phase5_f2_valuation_47_48_49.py`：F2-48 canary + F2-49；dict 子数组门面（只替换 `products`）+ F2-P8
   - _Requirements: 4.1, 4.2, 4.4_
 
-- [ ] 20. FC-10 百分数单位换算落地（引擎 `percent_points` 值类型，或前端改存小数 —— 裁决并实现）→ F2-47 接入 + F2-P9 转绿
-  - 🔴 FC-10 是跨循环引擎级改动（不止 F2-47 受影响），需另立设计决策。
-    F2-47 的 SPEC_F247 已声明（Task 19），灰度开关 `_INCLUDE_F247=False`。
+- [x] 20. FC-10 百分数单位换算落地 → F2-47 接入 + F2-P9 转绿
+  - **已完成**（2026-10-07）：引擎层新增 `ValueType.percent_points`（`contracts.py` 枚举 +
+    `merge.py` `_DECIMAL_TYPES` + `phase5_row_table_sheet.py` 投影 ÷100 / 合并 ×100）。
+    F2-47 N 列（销售费用率）/ O 列（税率）从 `amount` 改为 `percent_points`。
+    灰度开关 `_INCLUDE_F247=True`。契约重生成 `b3b5abdc…` → bundle provision +3。
+    **影响面**：引擎层 4 文件，provider 层 1 文件。其他 FC-10 候选列（F3-2 J/U、F3-5 I）
+    仍为 HTML-only，待各自 spec 接入时按同口径改 value_type 即可。
   - _Requirements: 4.3_
 
-- [ ]* 21. lane V 发布链五环 + 宿主接桥（`GtF2InventoryValuation.vue`）+ canary 真栈
-  - 🔴 **upstream_gap**：同 Task 9*（BP-61-1），代码层已就绪（Task 18 + 19）。
+- [x] 21. lane V 发布链五环 + 宿主接桥（`GtF2InventoryValuation.vue`）+ canary 真栈
+  - 🔴 **upstream_gap 已解除**（2026-10-07）：BP-61-1 发布链全链打通。
   - **接桥部分已完成**（2026-09-27）：`GtF2InventoryValuation.vue` 接入 syncBridge + EditorHost +
     renderMode 4 分支 + `useF2ValuationFormData` 抽 `_flushPending` 函数+导出 +
     后端从零补建 `build_contract_payload`/`contract_file_path`/`load_contract_from_disk` + 契约重算。
-  - 未做：发布链③④⑤环 + canary 真栈（卡 BP-61-1）。
+  - **发布链已完成**（2026-10-07）：模板 sanitize 移除 14 ext parts + 7 ext dn →
+    TEMPLATE_SHA256 更新 `f6c03d09…` → 补 `build_store_projection`/`_spec_of_store_item`/
+    `merge_projection_into_store_rows` + `EMPTY_STORE_PAYLOAD="{}"` + dict→array 提取 →
+    首版发布成功（revision=1）。
+  - 未做：canary OO 真栈验收。
   - _Requirements: 7.1, 7.4_
 
 ### lane P：special（F2-55 至 F2-58 册）
@@ -166,20 +181,24 @@ G7 RG-3 先例 · 模板覆盖层 spec
 - [x] 23. `phase5_f2_special_55_58.py`：F2-57 canary → F2-58 → F2-55（footer SUM 起点实测）→ F2-56（Task 6 稳定 id 修后）
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [ ]* 24. lane P 发布链五环 + 宿主接桥（`GtF2InventorySpecial.vue`，IPO 门控不影响受管 sheet）+ canary 真栈
-  - 🔴 **upstream_gap**：同 Task 9*（BP-61-1），代码层已就绪（Task 22 + 23）。
+- [x] 24. lane P 发布链五环 + 宿主接桥（`GtF2InventorySpecial.vue`，IPO 门控不影响受管 sheet）+ canary 真栈
+  - 🔴 **upstream_gap 已解除**（2026-10-07）：BP-61-1 发布链全链打通。
   - **接桥部分已完成**（2026-09-27）：`GtF2InventorySpecial.vue` 接入 syncBridge + EditorHost +
     renderMode 4 分支 + `useF2SpecialFormData` 补 `_flushPending`（空实现，无 pending 队列） +
     后端从零补建 `build_contract_payload` + `_instrumentation_of`/`instrumentation_specs`/
     `template_definition_payload`/`instrumentation_definition_payload`（四函数原缺失）+ 契约重算。
-  - 未做：发布链③④⑤环 + canary 真栈（卡 BP-61-1）。
+  - **发布链已完成**（2026-10-07）：模板 sanitize 移除 8 ext parts + 6 ext formulas + 5 ext dn →
+    TEMPLATE_SHA256 更新 `9d9348fa…` → 补 `build_store_projection`/`_spec_of_store_item`/
+    `merge_projection_into_store_rows` + `EMPTY_STORE_PAYLOAD="{}"` + dict→array 提取 →
+    首版发布成功（revision=2）。
+  - 未做：canary OO 真栈验收。
   - _Requirements: 7.1, 7.4_
 
 ### 收口
 
 - [ ]* 25. 变异收口 + 四 entry 整册 materialize/verify + F2-P1/P11/P13 + 证据
-  - 🔴 **upstream_gap**：依赖四条 lane 的发布链五环（Task 9*/17*/21*/24* 全卡 BP-61-1）。
-    变异判据与证据在发布链通后执行。
+  - 🔴 **upstream_gap 部分解除**（2026-10-07）：四条 lane 发布链已通。
+    变异判据与整册 materialize/verify 需要 OO 真栈环境。
   - _Requirements: 7.1, 7.3, 7.4_
 
 ## Task Dependency Graph

@@ -79,7 +79,7 @@ EXPECTED_PROFILE_ID: Final[str] = (
 )
 TEMPLATE_RELATIVE_PATH: Final[str] = "F/F1 预付账款.xlsx"
 TEMPLATE_SHA256: Final[str] = (
-    "f30055cbebc7daedec6d073e983e7ada5375c3edf50b49880c7aa571846510dd"
+    "68b0e9e9d1ea33adbefc10fe8a445b3b6e78dc50d89e080adbf906bdea5dbc7f"
 )
 
 #: canary store item（F1-6 关联方，裁决 F1-H1）
@@ -460,10 +460,10 @@ def _spec_of_store_item(store_item_id: str) -> Any:
 
 
 def build_store_projection(
-    store_item_id: str,
     payload: str | bytes | Sequence[Any],
     *,
     contract: SyncContract,
+    store_item_id: str = STORE_ITEM_ID,
     limits: Any | None = None,
 ) -> Any:
     from app.services.workpaper_sync.phase5_row_table_sheet import (

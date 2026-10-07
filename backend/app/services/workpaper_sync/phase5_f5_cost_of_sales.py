@@ -92,7 +92,7 @@ EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wire
 TEMPLATE_RELATIVE_PATH: Final[str] = "F/F5 营业成本.xlsx"
 #: openpyxl 实测（187,721 B）。
 TEMPLATE_SHA256: Final[str] = (
-    "417e5ae7453528725f3ae5eb06f70d36269b089cd73a00884c835f4586267cb7"
+    "daca3810d6ae20aa37f36fed6638bd293abd50dc5b14cea30458eb96d5fbc6f1"
 )
 
 STORE_ITEM_ID: Final[str] = "F5-8-rows"

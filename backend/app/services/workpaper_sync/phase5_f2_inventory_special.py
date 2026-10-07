@@ -50,9 +50,10 @@ ADAPTER_ID: Final[str] = "f2.inventory_special"
 WP_CODES: Final[frozenset[str]] = frozenset({"F2I"})
 TEMPLATE_RELATIVE_PATH: Final[str] = "F/F2-55至F2-58 合同履约成本.xlsx"
 TEMPLATE_SHA256: Final[str] = (
-    "b9ea248198217827a7b3d142dccca9ab5769c17867d1454ffd9105eaa9cb6c21"
+    "9d9348fa69acdff3f96d8171efe8b3177a11e0e7f9ed9f20ec242c69b1074b36"
 )
 STORE_ITEM_ID: Final[str] = "F2-57-rows"
+EMPTY_STORE_PAYLOAD: Final[str] = "{}"
 ROW_IDENTITY_STORE_KEY: Final[str] = "id"
 _BACKEND_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 
@@ -116,6 +117,61 @@ def all_store_item_ids() -> tuple[str, ...]:
 
 def all_managed_sheet_keys() -> frozenset[str]:
     return frozenset(s.sheet_key for s in managed_row_table_specs())
+
+
+def _spec_of_store_item(store_item_id: str) -> Any:
+    for spec in managed_row_table_specs():
+        if spec.store_item_id == store_item_id:
+            return spec
+    raise EntrySelectionError(
+        f"store item {store_item_id!r} 不在 F2 special 受管清单里；"
+        f"已受管：{sorted(all_store_item_ids())}"
+    )
+
+
+def build_store_projection(
+    payload: str | bytes | Sequence[Any],
+    *,
+    contract: SyncContract,
+    limits: Any | None = None,
+    store_item_id: str | None = None,
+) -> Any:
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        build_store_projection as _engine,
+    )
+    import json as _json
+    spec = _spec_of_store_item(store_item_id or STORE_ITEM_ID)
+    # dict 形态（StoreKind.dict）：载荷是 {"products": [...]} 或 "{}"
+    # 引擎期望纯数组 → 提取子数组，空 dict 时给空数组
+    if isinstance(payload, (str, bytes, bytearray)):
+        text = payload.decode("utf-8") if isinstance(payload, (bytes, bytearray)) else payload
+        parsed = _json.loads(text) if text.strip() else {}
+    else:
+        parsed = payload
+    if isinstance(parsed, dict):
+        rows = []
+        for v in parsed.values():
+            if isinstance(v, list):
+                rows = v
+                break
+        payload = rows
+    return _engine(spec, payload, contract=contract, limits=limits)
+
+
+def merge_projection_into_store_rows(
+    *,
+    projection: Any,
+    base_rows: list[Mapping[str, Any]],
+    store_item_id: str | None = None,
+) -> tuple[list[dict[str, Any]], int, int, set[str]]:
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        merge_projection_into_store_rows as _engine_merge,
+    )
+    spec = _spec_of_store_item(store_item_id or STORE_ITEM_ID)
+    return _engine_merge(
+        spec, projection=projection, base_rows=base_rows
+    )
+
 
 def _managed_last_col_of(spec: Any) -> str:
     return max((r[1] for r in spec.field_specs), key=col_index) if spec.field_specs else "A"

@@ -57,9 +57,10 @@ TEMPLATE_RELATIVE_PATH: Final[str] = (
     "F/F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx"
 )
 TEMPLATE_SHA256: Final[str] = (
-    "bab0abc099cfed3efdde3095bed510b3bbe7422ce32431054811034f6e6d5cd5"
+    "f6c03d09605da7e9e9457a0d2219530e4e761d7abfbbe849867f5569dc5e97cb"
 )
 STORE_ITEM_ID: Final[str] = "F2-48-rows"
+EMPTY_STORE_PAYLOAD: Final[str] = "{}"
 ROW_IDENTITY_STORE_KEY: Final[str] = "id"
 _BACKEND_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 
@@ -98,7 +99,7 @@ def assert_entry_selectable(*, manifest: Mapping[str, Any] | None = None) -> Map
 
 _INCLUDE_F248: Final[bool] = True   # canary
 _INCLUDE_F249: Final[bool] = False
-_INCLUDE_F247: Final[bool] = False  # FC-10 换算落地后
+_INCLUDE_F247: Final[bool] = True   # FC-10 percent_points 换算已落地（2026-10-07）
 
 
 def managed_row_table_specs() -> tuple[Any, ...]:
@@ -123,6 +124,61 @@ def all_store_item_ids() -> tuple[str, ...]:
 
 def all_managed_sheet_keys() -> frozenset[str]:
     return frozenset(s.sheet_key for s in managed_row_table_specs())
+
+
+def _spec_of_store_item(store_item_id: str) -> Any:
+    for spec in managed_row_table_specs():
+        if spec.store_item_id == store_item_id:
+            return spec
+    raise EntrySelectionError(
+        f"store item {store_item_id!r} 不在 F2 valuation 受管清单里；"
+        f"已受管：{sorted(all_store_item_ids())}"
+    )
+
+
+def build_store_projection(
+    payload: str | bytes | Sequence[Any],
+    *,
+    contract: SyncContract,
+    limits: Any | None = None,
+    store_item_id: str | None = None,
+) -> Any:
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        build_store_projection as _engine,
+    )
+    import json as _json
+    spec = _spec_of_store_item(store_item_id or STORE_ITEM_ID)
+    # dict 形态（StoreKind.dict）：载荷是 {"products": [...]} 或 "{}"
+    # 引擎期望纯数组 → 提取子数组，空 dict 时给空数组
+    if isinstance(payload, (str, bytes, bytearray)):
+        text = payload.decode("utf-8") if isinstance(payload, (bytes, bytearray)) else payload
+        parsed = _json.loads(text) if text.strip() else {}
+    else:
+        parsed = payload
+    if isinstance(parsed, dict):
+        # 从 dict 中找第一个值为 list 的键作为行数组
+        rows = []
+        for v in parsed.values():
+            if isinstance(v, list):
+                rows = v
+                break
+        payload = rows
+    return _engine(spec, payload, contract=contract, limits=limits)
+
+
+def merge_projection_into_store_rows(
+    *,
+    projection: Any,
+    base_rows: list[Mapping[str, Any]],
+    store_item_id: str | None = None,
+) -> tuple[list[dict[str, Any]], int, int, set[str]]:
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        merge_projection_into_store_rows as _engine_merge,
+    )
+    spec = _spec_of_store_item(store_item_id or STORE_ITEM_ID)
+    return _engine_merge(
+        spec, projection=projection, base_rows=base_rows
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════

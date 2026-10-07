@@ -12,14 +12,13 @@ spec: f5-sync-coverage-and-first-canary · Task 18 · Requirements 5.1, 5.3, 5.4
 21 固定行 **R11~R31**（`rowKey` 行身份），**无 footer 合计**。
 R32 = `三、审计说明：`（锚行 footer，`footer_carries_total_formula=False`）。
 
-═══ G 列处置（备选②：HTML-only）═══
+═══ G 列处置（默认①：模板修复，G31 已修）═══
 
-🔴 G31 公式 `=G24+G56+G57-G58-G59-G60-G61` 引越界空区（sheet 仅 36 行）⇒
+🔴 G31 原公式 `=G24+G56+G57-G58-G59-G60-G61` 引越界空区（sheet 仅 36 行）⇒
 审定数列的主营业务成本漏掉 6 项（P15 已量化取证）。
 
-Task 17*（模板覆盖层修 G31）卡外部阻塞 ⇒ 走**备选②**：
-G 列整列 HTML-only，不进 field_specs。前端 `calcF57*` 函数口径正确，
-G 列值由前端 computed 计算并展示，不写入 OO 侧。
+2026-10-07 Task 17 完成：模板 G31 已修为 `=G24+G25+G26-G27-G28-G29-G30`（与 E/F/H 三列同型）。
+G 列现为 `mode=formula`（审定数 = 未审 + 调整），受管不可编辑。
 
 ═══ 公式分布（行级差异）═══
 
@@ -72,7 +71,6 @@ __all__ = [
     "MANAGED_SHEET_F507",
     "STORE_ITEM_ID_F507",
     "FORMULA_ROW_KEYS_F507",
-    "HTML_ONLY_COLUMN_G_F507",
 ]
 
 MANAGED_SHEET_F507: Final[str] = "成本倒轧表F5-7"
@@ -101,21 +99,17 @@ FORMULA_ROW_KEYS_F507: Final[tuple[str, ...]] = (
     "mainBusinessCOGS",        # R31 ⒇=⒀+⒁+⒂−⒃−⒄−⒅−⒆
 )
 
-#: G 列 HTML-only（备选②：模板 G31 越界公式未修，Task 17* 卡覆盖层）。
-HTML_ONLY_COLUMN_G_F507: Final[tuple[str, str]] = (
-    "G",
-    "G31 公式引越界空区 G56:G61（sheet 仅 36 行），审定数列主营业务成本漏算 6 项。"
-    "模板覆盖层修复后可接入（Task 17），当前走备选②：HTML-only。",
-)
+#: G 列现已受管（模板 G31 越界公式已修，Task 17）。
+#: G = 审定数 = E(未审) + F(调整)，整列公式。
 
-#: 3 个受管 editable 字段（G 列 HTML-only 不声明）。
+#: 4 个受管字段（G 列模板 G31 修复后加入，mode=formula）。
 #: E/F/H 在 input 行可编辑、在 formula 行由模板公式覆盖（引擎自动跳过有公式的格）。
 FIELD_SPECS_F507: Final[
     tuple[tuple[str, str, str, str, str, str, str], ...]
 ] = (
     ("unadjusted", "E", "editable", "amount", "unadjusted", "未审数", ""),
     ("aje", "F", "editable", "amount", "aje", "审计调整", ""),
-    # G 列 HTML-only（审定数）
+    ("audited", "G", "formula", "amount", "audited", "审定数", ""),
     ("prior", "H", "editable", "amount", "prior", "上期数", ""),
 )
 
@@ -135,7 +129,7 @@ SPEC_F507: Final[RowTableSheetSpec] = RowTableSheetSpec(
     row_identity_key=ROW_IDENTITY_STORE_KEY_F507,
     store_kind=StoreKind.rows,
     field_specs=FIELD_SPECS_F507,
-    formula_columns=(),  # 不做列级 formula_mask（E/F/H 在行级有差异，由模板公式兜底）
+    formula_columns=("G",),  # G 列审定数 = 模板公式（Task 17 修 G31 后接入）
     formula_templates={},
     footer_marker=FOOTER_MARKER_F507,
     footer_carries_total_formula=False,

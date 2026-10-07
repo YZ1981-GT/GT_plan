@@ -240,6 +240,7 @@ class ValueType(str, Enum):
     boolean = "boolean"
     enum = "enum"
     json = "json"
+    percent_points = "percent_points"
 
 
 class RowIdentityKind(str, Enum):

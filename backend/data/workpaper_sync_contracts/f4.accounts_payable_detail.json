@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "b8abed13dee8c6dc1c1ee40fc583f69bfd1badcf2c70c24e514ec086cba162a3",
+  "instrumentation_definition_sha256": "c0338eba41f60336d81fcd8a9ffcd01f12bc8838a04f4e3f2f5d2cff6dba0ed3",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-f4-accounts-payable",
@@ -22,7 +22,10 @@
         "F4-7-unprocessed-invoice-rows",
         "F4-7-subsequent-payment-rows",
         "F4-7-subsequent-increase-rows",
-        "F4-2-rows"
+        "F4-2-rows",
+        "F4-1-adj-nature-rows",
+        "F4-1-adj-aging-seed-rows",
+        "F4-1-adj-aging-slot-rows"
       ],
       "note": "F4 应付账款的结构化 Tab 行数据存成 checklist_responses 的 remark JSON 数组，一张 sheet 一条 item。本契约按 stable field + rowId 拆开，禁止把整 JSON 当一个字段。",
       "shape": "json_array_of_row_objects",
@@ -2095,6 +2098,602 @@
           },
           "table_key": "payable_detail_rows",
           "uuid_col": "AB"
+        }
+      ]
+    },
+    {
+      "excel_name": "审定表F4-1",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "f41-managed",
+      "tables": [
+        {
+          "anchor": "A6",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!审定表F4-1!B7",
+              "header_text": "期初未审数",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F4-1!B8",
+              "stable_field_key": "adjudication_nature_rows/{row_uuid}/prior_unadjusted",
+              "store_item_id": "F4-1-adj-nature-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!审定表F4-1!C7",
+              "header_text": "期初账项调整",
+              "json_pointer": "/rows/{row_uuid}/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F4-1!C8",
+              "stable_field_key": "adjudication_nature_rows/{row_uuid}/prior_aje",
+              "store_item_id": "F4-1-adj-nature-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_rje",
+              "header_source_ref": "源xlsx!审定表F4-1!D7",
+              "header_text": "期初重分类调整",
+              "json_pointer": "/rows/{row_uuid}/priorRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F4-1!D8",
+              "stable_field_key": "adjudication_nature_rows/{row_uuid}/prior_rje",
+              "store_item_id": "F4-1-adj-nature-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!审定表F4-1!E7",
+              "header_text": "期初审定数",
+              "json_pointer": "/rows/{row_uuid}/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F4-1!E8",
+              "stable_field_key": "adjudication_nature_rows/{row_uuid}/prior_audited",
+              "store_item_id": "F4-1-adj-nature-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_unadjusted",
+              "header_source_ref": "源xlsx!审定表F4-1!F7",
+              "header_text": "期末未审数",
+              "json_pointer": "/rows/{row_uuid}/endUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F4-1!F8",
+              "stable_field_key": "adjudication_nature_rows/{row_uuid}/end_unadjusted",
+              "store_item_id": "F4-1-adj-nature-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_aje",
+              "header_source_ref": "源xlsx!审定表F4-1!G7",
+              "header_text": "期末账项调整",
+              "json_pointer": "/rows/{row_uuid}/endAje",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F4-1!G8",
+              "stable_field_key": "adjudication_nature_rows/{row_uuid}/end_aje",
+              "store_item_id": "F4-1-adj-nature-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_rje",
+              "header_source_ref": "源xlsx!审定表F4-1!H7",
+              "header_text": "期末重分类调整",
+              "json_pointer": "/rows/{row_uuid}/endRje",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F4-1!H8",
+              "stable_field_key": "adjudication_nature_rows/{row_uuid}/end_rje",
+              "store_item_id": "F4-1-adj-nature-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_audited",
+              "header_source_ref": "源xlsx!审定表F4-1!I7",
+              "header_text": "期末审定数",
+              "json_pointer": "/rows/{row_uuid}/endAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F4-1!I8",
+              "stable_field_key": "adjudication_nature_rows/{row_uuid}/end_audited",
+              "store_item_id": "F4-1-adj-nature-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "change_amount",
+              "header_source_ref": "源xlsx!审定表F4-1!J7",
+              "header_text": "变动额",
+              "json_pointer": "/rows/{row_uuid}/changeAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F4-1!J8",
+              "stable_field_key": "adjudication_nature_rows/{row_uuid}/change_amount",
+              "store_item_id": "F4-1-adj-nature-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "change_rate",
+              "header_source_ref": "源xlsx!审定表F4-1!K7",
+              "header_text": "变动率",
+              "json_pointer": "/rows/{row_uuid}/changeRate",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F4-1!K8",
+              "stable_field_key": "adjudication_nature_rows/{row_uuid}/change_rate",
+              "store_item_id": "F4-1-adj-nature-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "reason",
+              "header_source_ref": "源xlsx!审定表F4-1!L7",
+              "header_text": "原因分析",
+              "json_pointer": "/rows/{row_uuid}/reason",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F4-1!L8",
+              "stable_field_key": "adjudication_nature_rows/{row_uuid}/reason",
+              "store_item_id": "F4-1-adj-nature-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "E8:E12",
+            "F8:F12",
+            "G8:G12",
+            "H8:H12",
+            "I8:I12",
+            "J8:J12",
+            "K8:K12"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowKey",
+            "kind": "field"
+          },
+          "table_key": "adjudication_nature_rows",
+          "uuid_col": "M"
+        },
+        {
+          "anchor": "A15",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!审定表F4-1!B16",
+              "header_text": "期初未审数",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F4-1!B17",
+              "stable_field_key": "adjudication_aging_seed_rows/{row_uuid}/prior_unadjusted",
+              "store_item_id": "F4-1-adj-aging-seed-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!审定表F4-1!C16",
+              "header_text": "期初账项调整",
+              "json_pointer": "/rows/{row_uuid}/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F4-1!C17",
+              "stable_field_key": "adjudication_aging_seed_rows/{row_uuid}/prior_aje",
+              "store_item_id": "F4-1-adj-aging-seed-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_rje",
+              "header_source_ref": "源xlsx!审定表F4-1!D16",
+              "header_text": "期初重分类调整",
+              "json_pointer": "/rows/{row_uuid}/priorRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F4-1!D17",
+              "stable_field_key": "adjudication_aging_seed_rows/{row_uuid}/prior_rje",
+              "store_item_id": "F4-1-adj-aging-seed-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!审定表F4-1!E16",
+              "header_text": "期初审定数",
+              "json_pointer": "/rows/{row_uuid}/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F4-1!E17",
+              "stable_field_key": "adjudication_aging_seed_rows/{row_uuid}/prior_audited",
+              "store_item_id": "F4-1-adj-aging-seed-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_unadjusted",
+              "header_source_ref": "源xlsx!审定表F4-1!F16",
+              "header_text": "期末未审数",
+              "json_pointer": "/rows/{row_uuid}/endUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F4-1!F17",
+              "stable_field_key": "adjudication_aging_seed_rows/{row_uuid}/end_unadjusted",
+              "store_item_id": "F4-1-adj-aging-seed-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_aje",
+              "header_source_ref": "源xlsx!审定表F4-1!G16",
+              "header_text": "期末账项调整",
+              "json_pointer": "/rows/{row_uuid}/endAje",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F4-1!G17",
+              "stable_field_key": "adjudication_aging_seed_rows/{row_uuid}/end_aje",
+              "store_item_id": "F4-1-adj-aging-seed-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_rje",
+              "header_source_ref": "源xlsx!审定表F4-1!H16",
+              "header_text": "期末重分类调整",
+              "json_pointer": "/rows/{row_uuid}/endRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F4-1!H17",
+              "stable_field_key": "adjudication_aging_seed_rows/{row_uuid}/end_rje",
+              "store_item_id": "F4-1-adj-aging-seed-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_audited",
+              "header_source_ref": "源xlsx!审定表F4-1!I16",
+              "header_text": "期末审定数",
+              "json_pointer": "/rows/{row_uuid}/endAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F4-1!I17",
+              "stable_field_key": "adjudication_aging_seed_rows/{row_uuid}/end_audited",
+              "store_item_id": "F4-1-adj-aging-seed-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "change_amount",
+              "header_source_ref": "源xlsx!审定表F4-1!J16",
+              "header_text": "变动额",
+              "json_pointer": "/rows/{row_uuid}/changeAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F4-1!J17",
+              "stable_field_key": "adjudication_aging_seed_rows/{row_uuid}/change_amount",
+              "store_item_id": "F4-1-adj-aging-seed-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "change_rate",
+              "header_source_ref": "源xlsx!审定表F4-1!K16",
+              "header_text": "变动率",
+              "json_pointer": "/rows/{row_uuid}/changeRate",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F4-1!K17",
+              "stable_field_key": "adjudication_aging_seed_rows/{row_uuid}/change_rate",
+              "store_item_id": "F4-1-adj-aging-seed-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "reason",
+              "header_source_ref": "源xlsx!审定表F4-1!L16",
+              "header_text": "原因分析",
+              "json_pointer": "/rows/{row_uuid}/reason",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F4-1!L17",
+              "stable_field_key": "adjudication_aging_seed_rows/{row_uuid}/reason",
+              "store_item_id": "F4-1-adj-aging-seed-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "E17:E20",
+            "F17:F20",
+            "G17:G20",
+            "I17:I20",
+            "J17:J20",
+            "K17:K20"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowKey",
+            "kind": "field"
+          },
+          "table_key": "adjudication_aging_seed_rows",
+          "uuid_col": "N"
+        },
+        {
+          "anchor": "A15",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "category",
+              "header_source_ref": "源xlsx!审定表F4-1!A16",
+              "header_text": "项目",
+              "json_pointer": "/rows/{row_uuid}/category",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F4-1!A21",
+              "stable_field_key": "adjudication_aging_slot_rows/{row_uuid}/category",
+              "store_item_id": "F4-1-adj-aging-slot-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!审定表F4-1!B16",
+              "header_text": "期初未审数",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F4-1!B21",
+              "stable_field_key": "adjudication_aging_slot_rows/{row_uuid}/prior_unadjusted",
+              "store_item_id": "F4-1-adj-aging-slot-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!审定表F4-1!C16",
+              "header_text": "期初账项调整",
+              "json_pointer": "/rows/{row_uuid}/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F4-1!C21",
+              "stable_field_key": "adjudication_aging_slot_rows/{row_uuid}/prior_aje",
+              "store_item_id": "F4-1-adj-aging-slot-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_rje",
+              "header_source_ref": "源xlsx!审定表F4-1!D16",
+              "header_text": "期初重分类调整",
+              "json_pointer": "/rows/{row_uuid}/priorRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F4-1!D21",
+              "stable_field_key": "adjudication_aging_slot_rows/{row_uuid}/prior_rje",
+              "store_item_id": "F4-1-adj-aging-slot-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!审定表F4-1!E16",
+              "header_text": "期初审定数",
+              "json_pointer": "/rows/{row_uuid}/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F4-1!E21",
+              "stable_field_key": "adjudication_aging_slot_rows/{row_uuid}/prior_audited",
+              "store_item_id": "F4-1-adj-aging-slot-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_unadjusted",
+              "header_source_ref": "源xlsx!审定表F4-1!F16",
+              "header_text": "期末未审数",
+              "json_pointer": "/rows/{row_uuid}/endUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F4-1!F21",
+              "stable_field_key": "adjudication_aging_slot_rows/{row_uuid}/end_unadjusted",
+              "store_item_id": "F4-1-adj-aging-slot-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_aje",
+              "header_source_ref": "源xlsx!审定表F4-1!G16",
+              "header_text": "期末账项调整",
+              "json_pointer": "/rows/{row_uuid}/endAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F4-1!G21",
+              "stable_field_key": "adjudication_aging_slot_rows/{row_uuid}/end_aje",
+              "store_item_id": "F4-1-adj-aging-slot-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_rje",
+              "header_source_ref": "源xlsx!审定表F4-1!H16",
+              "header_text": "期末重分类调整",
+              "json_pointer": "/rows/{row_uuid}/endRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F4-1!H21",
+              "stable_field_key": "adjudication_aging_slot_rows/{row_uuid}/end_rje",
+              "store_item_id": "F4-1-adj-aging-slot-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_audited",
+              "header_source_ref": "源xlsx!审定表F4-1!I16",
+              "header_text": "期末审定数",
+              "json_pointer": "/rows/{row_uuid}/endAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F4-1!I21",
+              "stable_field_key": "adjudication_aging_slot_rows/{row_uuid}/end_audited",
+              "store_item_id": "F4-1-adj-aging-slot-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "change_amount",
+              "header_source_ref": "源xlsx!审定表F4-1!J16",
+              "header_text": "变动额",
+              "json_pointer": "/rows/{row_uuid}/changeAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F4-1!J21",
+              "stable_field_key": "adjudication_aging_slot_rows/{row_uuid}/change_amount",
+              "store_item_id": "F4-1-adj-aging-slot-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "change_rate",
+              "header_source_ref": "源xlsx!审定表F4-1!K16",
+              "header_text": "变动率",
+              "json_pointer": "/rows/{row_uuid}/changeRate",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F4-1!K21",
+              "stable_field_key": "adjudication_aging_slot_rows/{row_uuid}/change_rate",
+              "store_item_id": "F4-1-adj-aging-slot-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "reason",
+              "header_source_ref": "源xlsx!审定表F4-1!L16",
+              "header_text": "原因分析",
+              "json_pointer": "/rows/{row_uuid}/reason",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F4-1!L21",
+              "stable_field_key": "adjudication_aging_slot_rows/{row_uuid}/reason",
+              "store_item_id": "F4-1-adj-aging-slot-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "E21:E21",
+            "I21:I21",
+            "J21:J21",
+            "K21:K21"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowKey",
+            "kind": "field"
+          },
+          "table_key": "adjudication_aging_slot_rows",
+          "uuid_col": "O"
         }
       ]
     }

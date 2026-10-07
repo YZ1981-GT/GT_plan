@@ -40,21 +40,21 @@ export interface WorkpaperSyncManifestEntry {
   hasBrowserEvidence: boolean
 }
 
-export const WORKPAPER_SYNC_MANIFEST_DIGEST = "9c35aa01535f92b33a4107a618a2584c377d32cdf74dbe855b3718cfbfa1c8b4"
+export const WORKPAPER_SYNC_MANIFEST_DIGEST = "bd82d64d6bc39541b6a2f0dfa29d31a0da53dcfaa544df5d0aa2d5ea0e3b37c9"
 
-export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "22ac2db00ce8cc5854feb1e0bdfac5619ca93f1517764050f3b73c31ee022436"
+export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "b57febf756741307dc0a7d551cb298ba2f87cdd788982320406a264a273bca14"
 
 export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "by_component": {
-    "GtOnlyOfficeSheet": 228,
+    "GtOnlyOfficeSheet": 225,
     "OnlyOfficeWordDialog": 2,
-    "WorkpaperSyncEditorHost": 104,
+    "WorkpaperSyncEditorHost": 109,
     "WorkpaperWordEditor": 4
   },
   "capability_counts": {
-    "bidirectional": 92,
+    "bidirectional": 94,
     "single_html": 5,
-    "single_onlyoffice": 99,
+    "single_onlyoffice": 97,
     "unreachable": 1
   },
   "dispatcher_count": 1,
@@ -65,8 +65,8 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "entry_count": 197,
   "host_count": 196,
   "independent_entry_count": 144,
-  "legacy_fake_bidirectional_count": 91,
-  "mount_count": 338,
+  "legacy_fake_bidirectional_count": 89,
+  "mount_count": 340,
   "parent_duplicate_count": 52,
   "room_model_counts": {
     "exclusive": 6,
@@ -81,7 +81,7 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
     "xlsx.editable.shared.single.room_service_wired.v1": 189,
     "xlsx.unreachable.none.single.room_service_wired.v1": 1
   },
-  "unadjudicated_count": 86,
+  "unadjudicated_count": 84,
   "unreachable_count": 1
 } as const
 
@@ -2891,7 +2891,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-g4-bond-investment-main",
@@ -2899,13 +2899,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentMain.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -3046,7 +3042,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-g6-other-bond-main",
@@ -3054,13 +3050,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondMain.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -4371,7 +4363,6 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
-        ":sheet-name=\"dualMode.resolveOoSheetName()\"",
         ":sheet-name=\"props.sheetName\""
       ],
       "sheet_literals": [],
@@ -4527,7 +4518,6 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
-        ":sheet-name=\"dualMode.resolveOoSheetName()\"",
         ":sheet-name=\"props.sheetName\""
       ],
       "sheet_literals": [],
@@ -4619,7 +4609,6 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
-        ":sheet-name=\"dualMode.resolveOoSheetName()\"",
         ":sheet-name=\"props.sheetName\""
       ],
       "sheet_literals": [],

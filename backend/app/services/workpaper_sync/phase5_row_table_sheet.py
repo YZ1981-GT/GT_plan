@@ -39,7 +39,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping
 
-from app.services.workpaper_sync.contracts import is_template_skeleton_identity
+from app.services.workpaper_sync.contracts import ValueType, is_template_skeleton_identity
 from app.services.workpaper_sync.excel_extract import BindingKind
 from app.services.workpaper_sync.sheet_geometry import col_index, snake
 
@@ -503,9 +503,21 @@ def split_store_row(
     """
     for column_key, _column, _mode, _vt, json_path, _label, _group in managed_field_specs(spec):
         field_spec = contract.field_by_stable_key(stable_key_for(spec, column_key))
+        raw_value = resolve_json_path(row, json_path)
+        # FC-10：percent_points 类型的值在 store 里是百分数（3.5 = 3.5%），
+        # Excel 期望小数（0.035）⇒ 投影时 ÷100。对称的 ×100 在 merge_projection_into_store_rows 里。
+        if (
+            raw_value is not None
+            and field_spec.value_type is ValueType.percent_points
+        ):
+            try:
+                from decimal import Decimal as _D
+                raw_value = _D(str(raw_value)) / _D("100")
+            except Exception:
+                pass  # 非数值保持原值，normalize_value 会拒绝
         yield (
             stable_key_for(spec, column_key, row_identity),
-            resolve_json_path(row, json_path),
+            raw_value,
             field_spec,
         )
 
@@ -731,6 +743,18 @@ def merge_projection_into_store_rows(
             continue
         visited += 1
         new_val = getattr(fv, "value", None)
+        # FC-10：percent_points 反向换算（Excel 0.035 → store 3.5），与 split_store_row 的 ÷100 对称
+        vtype = getattr(fv, "value_type", None)
+        if (
+            new_val is not None
+            and vtype is not None
+            and str(vtype) == ValueType.percent_points.value
+        ):
+            try:
+                from decimal import Decimal as _D
+                new_val = float(_D(str(new_val)) * _D("100"))
+            except Exception:
+                pass
         if set_json_path(target, json_path, new_val):
             applied += 1
             touched_rows.add(str(rid))

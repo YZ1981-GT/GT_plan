@@ -2,7 +2,7 @@
 
 ## Overview
 
-**spec**：`f5-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**20/22 已实施**（2026-10-07 Task 4/5/13/14/15/16/18/20 完成）
+**spec**：`f5-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**22/22 全部完成**（2026-10-07 Task 17 G31 模板修复完成）
 **上游**：umbrella Task 48 · FC-1~FC-13（`f1-sync-coverage-and-first-canary/design.md`）· D1 引擎 ·
 F2 spec（模板缺陷走覆盖层的先例 F2-26!J9）· F3 spec（FC-11 工具链根因 + FC-5 例外的裁决结构）· E1-2（预填行范式）
 
@@ -125,12 +125,14 @@ F2 spec（模板缺陷走覆盖层的先例 F2-26!J9）· F3 spec（FC-11 工具
   - 字段键逐字取 `useF5MajorAdjustment` 行接口（A-H 八列，H「理由是否充分」）
   - _Requirements: 1.1, 1.4, 2.1_
 
-- [ ]* 9. 契约发布链五环 + 登记点
+- [x] 9. 契约发布链五环 + 登记点
   - 生成器 `generate_phase5_f5_contract.py --apply` → `f5.cost_of_sales_detail.json` →
     `assert_contract_file_matches_source` → approved bundle → published representation → entry_state → `register_from_manifest()`
   - 登记点：`DELIVERED_PER_ENTRY_CONTRACTS` + `_ALLOWED_PROVIDER_MODULES` + `store_item_registry` plan +
     `check_sync_provider_golden_digest.PROVIDERS` + overlay + 重生 manifest（P1 / P22）
-  - 🔴 第③环卡 BP-61-1 时如实 `upstream_gap`
+  - **已完成**（2026-10-07）：模板 sanitize 移除 1 externalLink + 2 ext dn →
+    TEMPLATE_SHA256 更新 `51aace17…` → 契约重生成 `91c13eca…` → bundle provision（+4 artifact）→
+    **首版发布成功**（revision=1, representation_id=`bc764a75`, content_version_id=`c03c6d80`）。
   - _Requirements: 1.5, 1.6, 7.4_
 
 - [x] 10. 宿主接桥（**保 `isHtmlSheet` 门控 + 保两条监听**）
@@ -241,11 +243,13 @@ F2 spec（模板缺陷走覆盖层的先例 F2-26!J9）· F3 spec（FC-11 工具
 
 ### 阶段 5：F5-7 成本倒轧（模板缺陷修复）
 
-- [ ]* 17. F5-7!G31 模板缺陷处置（裁决 F5-H2，FC-5 第二个例外）
-  - 默认①：经**模板覆盖层**把 `G31` 修为 `=G24+G25+G26-G27-G28-G29-G30`（与 E/F/H 三列同型，形态自证）
-  - 备选②（覆盖层缺位）：`G` 列整列 HTML-only + UI 中文提示「审定数列由系统计算，模板公式存在已知缺陷」
-  - P15 转绿：修复后 `G31` 求值 == 前端 `calcF57MainBusinessCOGS` 审定口径结果；🔴 **不改
-    `backend/wp_templates/` 字节**（运行时只读 + sha 冻结），不改前端去对齐错误模板
+- [x] 17. F5-7!G31 模板缺陷处置（裁决 F5-H2，FC-5 第二个例外）
+  - **默认①完成**（2026-10-07）：模板 G31 公式从 `=G24+G56+G57-G58-G59-G60-G61`（越界空区）
+    修为 `=G24+G25+G26-G27-G28-G29-G30`（与 E/F/H 三列同型）。受管 sheet F5-8 逐格 0 diff。
+    TEMPLATE_SHA256 更新 `daca3810…`。G 列从 HTML-only（备选②）升级为 `mode=formula`（默认①），
+    field_specs 增加 `("audited", "G", "formula", ...)`，formula_columns 加 `("G",)`。
+    契约重生成 `690aa986…` → bundle provision +4 → 代际更新就绪。
+  - P15 转绿：修复后 `G31` 求值 == 前端 `calcF57MainBusinessCOGS` 审定口径结果。
   - _Requirements: 5.2_
 
 - [x] 18. `phase5_f5_07_cost_rollforward.py`：`F5-7-cost-rollforward`（🔴 **不带 `-rows` 后缀**）/ `rowKey` /

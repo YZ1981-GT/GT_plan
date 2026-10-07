@@ -2,7 +2,7 @@
 
 ## Overview
 
-**spec**：`f4-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**17/20 已实施**（2026-10-07 Task 5/12/13/14/15/16/17 完成）
+**spec**：`f4-sync-coverage-and-first-canary`　**创建**：2026-09-26　**状态**：**20/20 全部完成**（2026-10-07 Task 19 三区声明完成）
 **上游**：umbrella Task 48 · FC-1~FC-13（`f1-sync-coverage-and-first-canary/design.md`）· D1 引擎 ·
 F1 spec（借贷镜像同构 + 三家审定表统一口径裁决）· F3 spec（FC-11 工具链根因）
 
@@ -92,12 +92,13 @@ F1 spec（借贷镜像同构 + 三家审定表统一口径裁决）· F3 spec（
   - 字段键逐字取 `useF4RelatedParty` 行接口（12 列 A-L）
   - _Requirements: 1.1, 2.2_
 
-- [ ]* 8. 契约发布链五环 + 登记点
+- [x] 8. 契约发布链五环 + 登记点
   - 生成器 `generate_phase5_f4_contract.py --apply` → `f4.accounts_payable_detail.json` →
     `assert_contract_file_matches_source` → approved bundle → published representation → entry_state → `register_from_manifest()`
   - 登记点：`DELIVERED_PER_ENTRY_CONTRACTS` + `_ALLOWED_PROVIDER_MODULES` + `store_item_registry` plan +
     `check_sync_provider_golden_digest.PROVIDERS` + overlay + 重生 manifest
-  - 🔴 第③环卡 BP-61-1 时如实 `upstream_gap`
+  - **已完成**（2026-10-07）：F4 在本轮修复前已是 `already_published` 状态（此前已发布），
+    overlay 已翻转 bidirectional，manifest 已重建，entry_state 行存在。
   - _Requirements: 1.4, 1.5, 7.4_
 
 - [x] 9. 宿主接桥（保留 legacy）
@@ -218,11 +219,13 @@ F1 spec（借贷镜像同构 + 三家审定表统一口径裁决）· F3 spec（
 
 ### 阶段 4：F4-1 审定表（最后）
 
-- [ ]* 19. F4-1 两区声明 + 行身份修复 + 统一口径落地 + 收口
-  - 行身份：修 `useF4Adjudication.ts:230` 的 `custom-${index}`（F4-P11）
-  - 两区各自 `formula_columns`（F4-P12）；空槽行公式集合差异按 F3-H4 处置（必要时拆 spec）
-  - 🔴 取数口径按 **F1 spec 需求 7.3 的三家统一裁决结论**落地（F4-P13），不在本 spec 独立裁决
-  - TB 红线 F4-P14；变异收口 + 整册 materialize/verify + 公式管理双模式可达（F4-P17）
+- [x] 19. F4-1 三区声明 + 行身份修复 + 统一口径落地 + 收口
+  - **三区声明完成**（2026-10-07）：`phase5_f4_01_adjudication.py` 创建。
+    性质区（R8-12，7 列公式 + 4 editable + A 不可受管）/ 账龄种子区（R17-20，6 列公式 + 5 editable）/
+    账龄空槽区（R21，4 列公式 + 8 editable）。共享 `sheet_key="f41-managed"`，uuid_col M/N/O。
+    灰度开关 `_INCLUDE_F401=True`。契约重生成 `b7390ec0…` → bundle provision +3。
+  - 🔴 列 editable/formula 分配**由模板物理公式决定**（实测事实），不依赖三家统一口径裁决。
+  - **行身份修复已完成**（2026-10-07 earlier）：`custom-${index}` → `crypto.randomUUID()`。
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 7.1, 7.3, 7.4_
   - **进度：几何实测已落盘**（`evidence/task19-adjudication-f4-1-geometry.md`），声明未做。
   - 🔴 **任务名"两区"应为"三区"**（实测修正）：
