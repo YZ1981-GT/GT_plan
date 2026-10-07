@@ -819,7 +819,7 @@ _archive/
 
 **未归档原因（三件套已完成但被路径硬读，移动即打红）**：`workpaper-html-onlyoffice-bidirectional-writeback-closure`（66/66，82 处引用含 `backend/data/*_contract.json`）· `custom-workpaper-template-ingestion-and-sync-closure` / `excel-structural-row-insertion-and-shift-aware-verification` / `excel-template-override-layer-and-onlyoffice-template-editor` / `excel-workbook-wide-row-change-propagation` / `published-representation-production-path-and-lane-adjudication` / `workpaper-guidance-content-closure`（均登记在 `workpaper_sync_program_milestones.json`，里程碑守卫读其 tasks.md 并校验 sha256）· `d-cycle-sheet-bidirectional-expansion`（🔴 **生产代码** `phase5_d4_erp_check_sheet.py` / `phase5_d4_policy_check_sheet.py` 运行时读其 evidence）· `d3-sync-coverage-via-row-table-engine`（测试读 evidence）· `l-cycle-sync-foundation-and-first-canary` + `l2-l3-l4-*` + `l5-l8-*`（`test_l_foundation_p3` 遍历三目录校验 LC 引用闭合）。须先把这些依赖改指向 `_archive` 或把 evidence 迁出 `.kiro/`，另立治理项。
 
-**未归档原因（`[ ]*` 实为本 spec 自身代码欠账，非外部依赖）**：`g-cycle-adjudication-sheets-coverage`（1/12，待 AdjudicationSheetSpec 引擎）· `i-cycle-*` / `i2-i4-i5-*` / `j-cycle-*`（09-27 复盘回滚项，被守卫声明锁死须先走 slice 更新）· `i1-i3-*`（族 A′/B/D 修复未做）。
+**未归档原因（`[ ]*` 实为本 spec 自身代码欠账，非外部依赖）**：~~`g-cycle-adjudication-sheets-coverage`~~（✅ **12/12 已完成**，2026-10-07：引擎 `static_sheet_payload_for_adjudication` 已实现 + 13 张审定表声明实例全部创建并接入 + 110 守卫全绿）· `i-cycle-*` / `i2-i4-i5-*` / `j-cycle-*`（09-27 复盘回滚项，被守卫声明锁死须先走 slice 更新）· `i1-i3-*`（族 A′/B/D 修复未做）。
 
 **重复目录已清理**（2026-10-07）：`workpaper-sync-row-table-engine-and-d1-coverage`（指针目录）已 `git rm`，真源 `d1-sync-row-table-engine-and-d1-coverage` 已归档至 `_archive/31-row-table-engine-and-d1-coverage/`。
 

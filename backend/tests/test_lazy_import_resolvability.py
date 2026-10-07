@@ -37,19 +37,10 @@ _APP = _BACKEND / "app"
 # 🔴 一旦某个 flag 翻成 True 而目标模块仍不存在 → 它会从这里"掉进"分类二并打红，
 #    这正是我们要的行为（守卫 test_flag_gated_entries_are_really_gated 钉死）。
 _FLAG_GATED_PLACEHOLDERS: frozenset[tuple[str, str, str]] = frozenset({
-    ("app/services/workpaper_sync/phase5_f3_notes_payable.py", "app.services.workpaper_sync", "phase5_f3_01_adjudication"),
-    ("app/services/workpaper_sync/phase5_f3_notes_payable.py", "app.services.workpaper_sync", "phase5_f3_02_detail"),
-    ("app/services/workpaper_sync/phase5_f3_notes_payable.py", "app.services.workpaper_sync", "phase5_f3_04_interest"),
-    ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_01_adjudication"),
-    ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_02_detail"),
-    ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_05_long_outstanding"),
-    ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_07_unrecorded"),
-    ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_08_voucher_check"),
-    ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_09_supplier_financing"),
-    ("app/services/workpaper_sync/phase5_f5_cost_of_sales.py", "app.services.workpaper_sync", "phase5_f5_02_monthly_detail"),
-    ("app/services/workpaper_sync/phase5_f5_cost_of_sales.py", "app.services.workpaper_sync", "phase5_f5_03_other_cost"),
-    ("app/services/workpaper_sync/phase5_f5_cost_of_sales.py", "app.services.workpaper_sync", "phase5_f5_05_comparison"),
-    ("app/services/workpaper_sync/phase5_f5_cost_of_sales.py", "app.services.workpaper_sync", "phase5_f5_07_cost_rollforward"),
+    # ── F 循环：flag 仍 False 且模块不存在的条目（2026-10-07 现算精简）────
+    # 🔴 f3_01_adjudication / f3_04_interest / f4_01_adjudication / f4_09_supplier_financing
+    #    flag 已翻 True 但模块仍不存在 ⇒ 移入 _KNOWN_UNRESOLVED_BASELINE。
+    # 🔴 其余 9 条 flag 已翻 True 且模块已存在 ⇒ 直接删除（非 zombie）。
 })
 
 # ---------------------------------------------------------------------------
@@ -65,9 +56,7 @@ _FLAG_GATED_PLACEHOLDERS: frozenset[tuple[str, str, str]] = frozenset({
 #   权威确认，该表走裸 SQL）⇒ 需新建模型或改裸 SQL
 # - TbAccount / TbAdjustment：全仓无定义，同模块无相近名
 # - save_formula_batch / populate_parsed_data：同上
-# - static_sheet_payload_for_adjudication ×3：**flag=True 会真执行**，
-#   `phase5_adjudication_sheet` 只导出 4 个类 + col_index，无此函数。
-#   属正在进行的 workpaper-sync-* spec 工作区，交该 spec 处置。
+# - static_sheet_payload_for_adjudication ×3：✅ 已实现（2026-10-07），已从基线删除。
 _KNOWN_UNRESOLVED_BASELINE: frozenset[tuple[str, str, str]] = frozenset({
     ("app/routers/adjustments.py", "app.models.audit_platform_models", "ChecklistResponse"),
     ("app/routers/import_templates.py", "app.services.cell_formula_evaluator", "save_formula_batch"),
@@ -76,10 +65,9 @@ _KNOWN_UNRESOLVED_BASELINE: frozenset[tuple[str, str, str]] = frozenset({
     ("app/services/contract_analysis_service.py", "app.models.audit_platform_models", "TbAdjustment"),
     ("app/services/m8_general_risk_reserve_service.py", "app.models.audit_platform_models", "ChecklistResponse"),
     ("app/services/s_estimate_import_export_service.py", "app.models.audit_platform_models", "ChecklistResponse"),
-    # flag=True，会真执行 —— 属 workpaper-sync-* spec 工作区
-    ("app/services/workpaper_sync/phase5_d5_expansion.py", "app.services.workpaper_sync.phase5_adjudication_sheet", "static_sheet_payload_for_adjudication"),
-    ("app/services/workpaper_sync/phase5_d6_expansion.py", "app.services.workpaper_sync.phase5_adjudication_sheet", "static_sheet_payload_for_adjudication"),
-    ("app/services/workpaper_sync/phase5_d7_expansion.py", "app.services.workpaper_sync.phase5_adjudication_sheet", "static_sheet_payload_for_adjudication"),
+    # ── F 循环：flag=True 但模块不存在（从 _FLAG_GATED_PLACEHOLDERS 移入，2026-10-07）
+    ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_01_adjudication"),
+    ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_09_supplier_financing"),
 })
 
 # ---------------------------------------------------------------------------
@@ -128,27 +116,7 @@ _CHECKOUT_DEPENDENT_UNRESOLVED: frozenset[tuple[str, str, str]] = frozenset({
         "app.models.audit_platform_models",
         "ProjectAssignment",
     ),
-    # 归属 lane：d3-sync-coverage（4 个 sheet 子模块文件尚未入库）
-    (
-        "app/services/workpaper_sync/phase5_d3_expansion.py",
-        "app.services.workpaper_sync",
-        "phase5_d3_04_analysis",
-    ),
-    (
-        "app/services/workpaper_sync/phase5_d3_expansion.py",
-        "app.services.workpaper_sync",
-        "phase5_d3_05_long_term",
-    ),
-    (
-        "app/services/workpaper_sync/phase5_d3_expansion.py",
-        "app.services.workpaper_sync",
-        "phase5_d3_06_related_party",
-    ),
-    (
-        "app/services/workpaper_sync/phase5_d3_expansion.py",
-        "app.services.workpaper_sync",
-        "phase5_d3_07_voucher_check",
-    ),
+    # 🔴 d3 的 4 条已入库（2026-10-07 现算），已删除。
 })
 
 # 守卫允许的全集 = 未实现占位 ∪ 待修工单 ∪ 检出相关

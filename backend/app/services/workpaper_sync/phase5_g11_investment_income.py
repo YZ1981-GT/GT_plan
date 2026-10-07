@@ -259,8 +259,8 @@ def assert_entry_selectable(
 
 #: 明细分析表G11-2（单区 R11-R20）
 _INCLUDE_G1102: Final[bool] = True
-#: 审定表G11-1（AdjudicationSheetSpec，归后置 spec）
-_INCLUDE_G1101: Final[bool] = False
+#: 审定表G11-1（AdjudicationSheetSpec，已实施）
+_INCLUDE_G1101: Final[bool] = True
 
 
 def managed_row_table_specs() -> tuple[Any, ...]:
@@ -283,13 +283,11 @@ def all_store_item_ids() -> tuple[str, ...]:
 
 
 def adjudication_spec() -> Any:
-    """G11-1 审定表 —— 归后置 spec，本 spec 恒 None（GF-H5）。"""
+    """G11-1 审定表。"""
     if not _INCLUDE_G1101:
         return None
-    raise EntrySelectionError(
-        "G11-1 审定表归后置 spec `g-cycle-adjudication-sheets-coverage`（裁决 GF-H5）；"
-        "本 spec 不交付其 AdjudicationSheetSpec"
-    )
+    from app.services.workpaper_sync.phase5_g11_01_adjudication import SPEC_G1101
+    return SPEC_G1101
 
 
 def all_managed_sheet_names() -> tuple[str, ...]:
@@ -415,6 +413,15 @@ def _sheets_payload() -> list[dict[str, Any]]:
             sheets.append(produced)
         else:
             existing["tables"].extend(produced["tables"])
+
+    # 审定表（独立 sheet，不进行表引擎）
+    adj = adjudication_spec()
+    if adj is not None:
+        from app.services.workpaper_sync.phase5_adjudication_sheet import (
+            static_sheet_payload_for_adjudication,
+        )
+        sheets.append(static_sheet_payload_for_adjudication(adj))
+
     return sheets
 
 

@@ -240,8 +240,8 @@ _INCLUDE_G206: Final[bool] = False
 #: G2-8 凭证检查表（🔴 它是 FC-8 的 OCR 第二写入方所在 sheet —— 纳管前须先处置
 #: `G2TabVoucherCheck.vue` 的 `d4/contract-ocr` 写入路径，见 GF-P1 的重裁）
 _INCLUDE_G208: Final[bool] = False
-#: G2-1 审定表（AdjudicationSheetSpec，归后置 spec）
-_INCLUDE_G201: Final[bool] = False
+#: G2-1 审定表（AdjudicationSheetSpec，已实施）
+_INCLUDE_G201: Final[bool] = True
 
 
 def managed_row_table_specs() -> tuple[Any, ...]:
@@ -264,13 +264,11 @@ def all_store_item_ids() -> tuple[str, ...]:
 
 
 def adjudication_spec() -> Any:
-    """G2-1 审定表 —— 归后置 spec，本 spec 恒 None（GF-H5）。"""
+    """G2-1 审定表。"""
     if not _INCLUDE_G201:
         return None
-    raise EntrySelectionError(
-        "G2-1 审定表归后置 spec `g-cycle-adjudication-sheets-coverage`（裁决 GF-H5）；"
-        "本 spec 不交付其 AdjudicationSheetSpec"
-    )
+    from app.services.workpaper_sync.phase5_g2_01_adjudication import SPEC_G201
+    return SPEC_G201
 
 
 def all_managed_sheet_names() -> tuple[str, ...]:
@@ -394,6 +392,15 @@ def _sheets_payload() -> list[dict[str, Any]]:
             sheets.append(produced)
         else:
             existing["tables"].extend(produced["tables"])
+
+    # 审定表（独立 sheet，不进行表引擎）
+    adj = adjudication_spec()
+    if adj is not None:
+        from app.services.workpaper_sync.phase5_adjudication_sheet import (
+            static_sheet_payload_for_adjudication,
+        )
+        sheets.append(static_sheet_payload_for_adjudication(adj))
+
     return sheets
 
 
