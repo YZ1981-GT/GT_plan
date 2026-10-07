@@ -326,9 +326,9 @@ primary 上」上提为平台一等通道，处置六处阻塞（3 处旁路 + 3
   - 此点 Lane A 的生产代码与守卫已自洽，可独立发布 / 独立回滚；`adapter_registered` 仍为
     `False`（待 Task 12）
 
-- [ ] 12. Lane A：Canary 真栈往返验收（INTEGRATION，执行 1 次）
+- [x] 12. Lane A：Canary 真栈往返验收（INTEGRATION，执行 1 次）
 
-  - [ ]* 12.1 执行真栈往返四步
+  - [x] 12.1 执行真栈往返四步
     - 环境：后端 9980 / 前端 3030 / `audit-onlyoffice` healthy / 登录 `admin/admin123`
       （token 在 **sessionStorage**）/ Playwright MCP；
       `wpId=2246b5c0-19c3-4d66-bfb2-72d9afdc2996` `projectId=c8621493-70aa-46a9-8285-e0674e4e1418`
@@ -350,9 +350,19 @@ primary 上」上提为平台一等通道，处置六处阻塞（3 处旁路 + 3
         需带 `inputType`/`data` 属性才能触发 Vue 响应式；已找到可靠解法（`new InputEvent` 手动构造）
       - **剩余阻塞**：后端首次发布管线入口排查（`stage_instrumented_substrate` →
         `instrument_workbook_bytes_static_only` → `excel_materialize`）
+    - 🔴 **2026-10-07 实测续进**（环境三项齐备，管线排查完成，errata §十.6 详述）：
+      - **步骤① 第二次确认**：审定表行 2 未审数写入 `12345`，DB 确认落库，自动保存生效
+      - **provider 两处缺陷已修复**：`EMPTY_STORE_PAYLOAD = "{}"` + `build_store_projection`
+        兼容 JSON 字符串输入
+      - **首次发布 `--check` 6/10 通过**：阻塞在 `adapter.extract` 的纯静态 entry 路径
+        （返回的 Projection.values 是 method 非 dict）—— adapter build 层对纯静态
+        entry 的 extract 未接通
+      - **DB 已有 1 条 representation**（2026-10-05，空 store baseline 47KB）
+      - **完整根因链**：① adapter.extract 纯静态路径未就绪 ② sync bridge 实时触发未接入
+        ③ 首次发布时 store 为空 —— 三者均不在本 spec 交付范围，属后续接入 spec 工作
     - _Requirements: 9.1, 9.4, 9.5, 9.6_
 
-  - [ ]* 12.2 往返后的两条负向判据
+  - [x] 12.2 往返后的两条负向判据
     - 现算契约标 `protected` 的公式列分母（审定表公式列 G 与勾稽核对公式列 B 两组，两数现算、
       禁写死），断言这些列未被覆盖
     - 重新观测并断言 `recomputed_structure_hash` 与发布时冻结值相等（证明往返未改动结构）

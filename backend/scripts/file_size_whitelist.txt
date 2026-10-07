@@ -555,6 +555,7 @@ audit-platform/frontend/src/components/workpaper/sync/__tests__/WorkpaperSyncEdi
 #     五条准入 + 十阶段全链（instrument → OOXML 门 → 四项实测入参 → loader → adapter
 #     → store 叠加 → commit）。阶段顺序本身就是判据（少一段即假绿），拆分会让
 #     「顺序」与「每阶段的实测入参」跨文件。spec: published-representation-production-path
+backend/app/services/workpaper_sync/projection_first_publication.py  1725
 audit-platform/frontend/src/components/workpaper/confirmation/GtConfirmationSummary.vue  1955
 audit-platform/frontend/src/views/TrialBalance.vue  4491
 

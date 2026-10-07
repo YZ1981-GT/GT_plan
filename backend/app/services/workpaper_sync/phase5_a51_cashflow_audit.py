@@ -100,6 +100,11 @@ IDENTITY_CARRIERS: Final[tuple[str, ...]] = ("defined_name", "hidden_sheet")
 #: 静态区只用 `defined_name_ref`（`excel_table_sheet_association` 是动态表专用）。
 IDENTITY_ANCHORS: Final[tuple[str, ...]] = ("defined_name_ref",)
 
+#: A5-1 的 store 是扁平键值对（`checklist_responses` 的多行 `item_id`，非单一 JSON 数组），
+#: 空载荷是空字典的 JSON 序列化。首次发布宿主 `fix_projection_first_publication` 要求
+#: provider 显式声明该常量，否则 fail-closed（不替 provider 猜形态）。
+EMPTY_STORE_PAYLOAD: Final[str] = "{}"
+
 _BACKEND_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -432,14 +437,26 @@ def assert_contract_file_matches_source() -> SyncContract:
 
 
 def build_store_projection(
-    responses: Mapping[str, str],
+    responses: Mapping[str, str] | str,
     *,
     contract: SyncContract | None = None,
 ) -> dict[str, Any]:
     """HTML store (checklist_responses 键值对) → Excel cell 投影。
 
     遍历 AUDIT_FIELD_MAP 中的 editable 字段，生成 {sheet_key: {cell_ref: value}} 形态。
+
+    ``responses`` 可以是 ``Mapping[str, str]``（运行时宿主直接传字典），也可以是
+    JSON 文本字符串（首次发布宿主 ``fix_projection_first_publication`` 从
+    ``checklist_responses.remark`` 读出的原文 / ``EMPTY_STORE_PAYLOAD``）。
     """
+    import json as _json
+
+    if isinstance(responses, str):
+        parsed = _json.loads(responses)
+        if not isinstance(parsed, Mapping):
+            parsed = {}
+        responses = parsed
+
     projection: dict[str, dict[str, Any]] = {}
 
     # 审定表

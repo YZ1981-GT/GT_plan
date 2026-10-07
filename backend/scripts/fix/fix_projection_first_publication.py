@@ -677,8 +677,10 @@ async def run_check(
                             adapter=adapter,
                             contract=plan.contract,
                             substrate=staged.staged_path,
-                            store_projection=provider.build_store_projection(
-                                store_payload, contract=plan.contract
+                            store_projection=F2._store_projection_for_provider(
+                                provider=provider,
+                                store_payload=store_payload,
+                                contract=plan.contract,
                             ),
                         )
                         settlement.stages["projection_composed"] = True

@@ -1373,17 +1373,54 @@ def _store_projection_for_provider(
             "不得用权威 OOXML 字节代替（Requirement 2.11 的反面）"
         )
     result = provider.build_store_projection(store_payload, contract=contract)
-    # 纯静态扁平型 provider（如 A5-1）的 build_store_projection 返回 cell 映射 dict
-    # 而非 Projection 对象。此时用空 Projection 代替（纯静态 entry 的首次发布不需要
-    # store 覆盖——substrate 基线已经是干净模板，store 内容通过 materialize 端点在
-    # 用户切换到 OO 时才真正投影）。
-    from app.services.workpaper_sync.adapters.base import Projection as _Proj
+    # 纯静态扁平型 provider（如 A5-1）的 build_store_projection 返回
+    # {"entry_id": ..., "sheets": {"sheet_key": {"cell_ref": value}}} 而非 Projection。
+    # 把 store payload 里的 item_id 直接用作 stable_field_key（与 contract 声明的
+    # json_pointer 同源）构建 FieldValue。
+    from app.services.workpaper_sync.adapters.base import FieldValue, Projection as _Proj
+    from app.services.workpaper_sync.contracts import FieldMode, ValueType
     if not isinstance(result, _Proj):
+        values: dict[str, FieldValue] = {}
+        # 从 contract 的 fields 建立 stable_field_key → field_spec 的索引
+        field_index: dict[str, dict] = {}
+        if contract:
+            for sheet in (contract.canonical_payload.get("sheets") or ()):
+                for table in (sheet.get("tables") or ()):
+                    for field in (table.get("fields") or ()):
+                        sfk = field.get("stable_field_key") or ""
+                        if sfk:
+                            field_index[sfk] = field
+        # 把 store_payload（JSON 字符串或 dict）解析成 item_id → value
+        import json as _json
+        if isinstance(store_payload, str):
+            try:
+                store_dict = _json.loads(store_payload)
+            except (ValueError, TypeError):
+                store_dict = {}
+        elif isinstance(store_payload, Mapping):
+            store_dict = dict(store_payload)
+        else:
+            store_dict = {}
+        # 按 contract field 索引构建 FieldValue
+        for item_id, val in store_dict.items():
+            spec = field_index.get(item_id)
+            if spec and spec.get("mode") == "editable":
+                vt = spec.get("value_type", "text")
+                try:
+                    value_type = ValueType(vt)
+                except ValueError:
+                    value_type = ValueType.text
+                values[item_id] = FieldValue(
+                    stable_key=item_id,
+                    value=str(val) if val is not None else None,
+                    value_type=value_type,
+                    mode=FieldMode.editable,
+                )
         return _Proj(
             contract_id=contract.contract_id if contract else "",
             semantic_version=getattr(contract, "semantic_version", "1.0.0"),
             document_type=getattr(contract, "document_type", "xlsx"),
-            values={},
+            values=values,
         )
     return result
 

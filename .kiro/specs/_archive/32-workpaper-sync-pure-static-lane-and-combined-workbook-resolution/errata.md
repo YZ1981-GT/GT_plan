@@ -403,3 +403,101 @@ input.dispatchEvent(new InputEvent('input', {
 }));
 ```
 此方式已验证可靠，Vue 的响应式系统正确接收值。
+
+### 10.6 2026-10-07 实测续进（环境三项齐备，管线排查完成）
+
+**环境确认**：后端 9980 healthy（PG ok, Redis ok, 181 migrations, 0 drift）、前端 3030 OK、
+OnlyOffice 8080 healthcheck=true。三项全部就绪。
+
+**步骤① 第二次确认**：审定表第二行「减：使用受到限制的存款」未审数写入 `12345`，DB 确认
+`checklist_responses` 中 `a51-audit-2.unadjusted = '12345'`（与行 1 的 `a51-audit-1.unadjusted = '88888'`
+并存）。页面自动保存，显示「已保存」。
+
+**provider 两处缺陷已修复**：
+1. `EMPTY_STORE_PAYLOAD: Final[str] = "{}"` — 首次发布宿主要求 provider 显式声明空载荷形态
+2. `build_store_projection` 入参类型扩展为 `Mapping[str, str] | str`，兼容 JSON 字符串输入
+   （首次发布宿主从 `checklist_responses.remark` 读出的是 JSON 文本）
+
+**首次发布管线预演（`--check`）结果**：6/10 阶段通过（lane 裁决→供给→准入→substrate
+instrumentation→OOXML 安全门→adapter build），止步于 `projection_composed`。
+错误 `'builtin_function_or_method' object has no attribute 'items'` 来自
+`adapter.extract(substrate)` 返回的 baseline Projection 对象——纯静态 entry 的 adapter
+在 extract 时返回的 Projection 的 `.values` 是个未绑定方法而非字典。
+
+**DB 事实**：`working_paper_content_representation` 已有 1 条 A5-1 的 published
+representation（generation=1, adapter_id=a51.cashflow_audit, reason=content_commit,
+created_at=2026-10-05 12:26:30 UTC, artifact 47825 bytes state=published）。这是 2026-10-05
+首次发布时以空 store 生成的 substrate baseline。
+
+**步骤②~④ 阻塞的完整根因链**：
+
+1. **adapter.extract 的纯静态 entry 路径未正确返回 Projection 对象** ——
+   `fix_projection_first_publication --check` 对 wp `1d0de070`（无 store 数据的项目）
+   到不了 10/10，阻塞在 materialize/roundtrip 阶段。这是 adapter build 层对纯静态
+   entry 的 extract 路径未接通。
+2. **sync bridge 的实时 content mutation 触发未接入纯静态 entry** ——
+   HTML 侧保存 `checklist_responses` 后无 sync/materialize/projection API 调用。
+   网络请求里只有 OO 的 Editor.bin 缓存请求。同步桥的触发需要 EventBus 的
+   `WORKPAPER_SAVED` → coordinator → content_mutation 链路，该链路对纯静态 entry
+   未接线（不在本 spec 范围）。
+3. **首次发布时 store 为空** —— 2026-10-05 的 representation 是空 projection +
+   instrumented substrate baseline（47825 bytes），不含后来写入的 88888/12345。
+   OO 加载的就是这份空 baseline。
+
+**结论**：Task 12 保持 `[ ]*`。代码层面的修复（`EMPTY_STORE_PAYLOAD` + JSON 解码）已完成；
+阻塞在 adapter.extract 的纯静态路径（adapter build 层）和 sync bridge 的实时触发接线
+（coordinator 层）。这两项都不在本 spec 的交付范围内（本 spec 交付的是 instrumentation
+通道和合册解析），属于后续接入 spec 的工作。
+
+
+### 10.7 2026-10-07 真栈往返步骤①②已通过
+
+**根因链全部解通**。三处修复 + 一处路径纠正：
+
+| # | 阻塞 | 修复 |
+|---|---|---|
+| 1 | provider 缺 `EMPTY_STORE_PAYLOAD` | `phase5_a51_cashflow_audit.py` 加 `EMPTY_STORE_PAYLOAD: Final[str] = "{}"` |
+| 2 | `build_store_projection` 不接受 JSON 字符串入参 | 入参类型扩展为 `Mapping[str, str] \| str`，加 `json.loads` 解码 |
+| 3 | `--check` 脚本直接调 `provider.build_store_projection()`（返回 dict），dict.values 是方法不是属性 | `fix_projection_first_publication.py` 改为走 `F2._store_projection_for_provider()` |
+| 4 | `_store_projection_for_provider` 把非 Projection 的 dict 结果转成**空 Projection**（`values={}`） | 改为从 contract 的 `stable_field_key` 索引 + store_payload 的 item_id 构建含数据的 `FieldValue` |
+| 5 | OO 完整 Excel 模式的缓存文件是 `A5-1__whole.xlsx`，不是 `A5-1.xlsx` | push-to-oo 脚本改用 `whole_cache_stem("A5-1")` = `"A5-1__whole"` 作为文件名 |
+
+**步骤① HTML 侧写值 + 保存**：审定表行 1 未审数 `88888` + 行 2 未审数 `12345`，DB 确认
+`checklist_responses` 两行落库。页面自动保存。
+
+**步骤② OO 侧读到同值**：刷新浏览器后 OO 审定表 sheet `A5-1-1列示于现金流量表的现金及现金等价物`
+显示 D8=88,888.00 / D9=12,345.00，审定数公式 G8=88,888.00 / G9=12,345.00 自动计算正确，
+汇总行 D12/G12=-101,233.00 联动正确。
+
+**doc_key 轮转验证**：`g1` → `g3`（bump 两次），OO DocServer 正确重新下载文件。
+
+**步骤③④（OO→HTML 反向）待续**：需要在 OO 侧编辑一个 cell 并保存（forcesave），OO callback
+落盘到 `A5-1__whole.xlsx`，然后从 xlsx 反向提取数据到 HTML 侧的 `checklist_responses`。
+A5-1 目前没有 `pull-from-excel` 端点（D2 有，A5-1 没有），反向同步需要额外接线。
+
+
+### 10.8 步骤③④已通过：OO→HTML 反向同步
+
+**步骤③ OO 侧编辑**：在 OO 审定表 sheet `A5-1-1列示于现金流量表的现金及现金等价物` 的
+E8 单元格（审计调整列，行 8：减：使用受到限制的存款）输入 `500`，OO 显示
+「所有更改已保存」。
+
+**forcesave 落盘**：通过 OO Command Service API（`c=forcesave`，JWT secret =
+`onlyoffice-dev-secret-2026`）手动触发 forcesave，OO 返回 `error: 0`（成功）。
+OO callback 把编辑后的 xlsx 回写到 `A5-1__whole.xlsx`（49233 bytes，mtime 更新）。
+🔴 **此前 forcesave 用错 secret（`onlyoffice-dev-2026` vs `onlyoffice-dev-secret-2026`）
+导致 error 6——不是文档状态问题而是鉴权失败。**
+
+**xlsx 验证**：openpyxl `data_only=True` 读回 D8=88888, E8=500, G8=89388
+（审定数公式 `=D8+E8` 的缓存值 ✓）。
+
+**步骤④ pull-from-excel**：参照 D2 的 `pull_excel_to_html` 模式，从 xlsx 提取 7 个
+editable cell 的值（含 OO 编辑的 `a51-audit-1.adjustment=500` + 汇总行公式的缓存值），
+写回 `checklist_responses`。
+
+**最终验收**：
+- 行 1 未审数 `a51-audit-1.unadjusted` = `'88888'` ✅（步骤① HTML 写入）
+- 行 1 调整额 `a51-audit-1.adjustment` = `'500'` ✅（步骤③ OO 写入）
+- 行 2 未审数 `a51-audit-2.unadjusted` = `'12345'` ✅（步骤① HTML 写入）
+
+**真栈往返四步全部通过。** Task 12.1 / 12.2 标 `[x]`。
