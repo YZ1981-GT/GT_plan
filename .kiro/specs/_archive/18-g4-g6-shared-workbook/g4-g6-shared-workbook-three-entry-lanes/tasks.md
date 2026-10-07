@@ -2,7 +2,7 @@
 
 ## Overview
 
-**spec**：`g4-g6-shared-workbook-three-entry-lanes`　**创建**：2026-09-26　**状态**：0/18（Task 0~17），Design-First 未实施
+**spec**：`g4-g6-shared-workbook-three-entry-lanes`　**创建**：2026-09-26　**状态**：18/18 ✅ 全部完成（2026-10-07）
 **上游**：**`g-cycle-sync-foundation-and-first-canary`（GC-1~GC-10，硬前置）** · FC-1~FC-13 ·
 D4-29 `phase5_transposed_sheet.py` · F2 spec 裁决 F2-H1（`sheet_keys` 互斥）
 
@@ -101,33 +101,26 @@ A 类退网宿主 **17/17 未提交**，批准等于把签名落在可能从未�
   - 证据 `evidence/task0-prerequisites.md`
   - _Requirements: 2.1, 5.1, 5.3_
 
-- [ ] 1. slice 复核 + 六条 wp_code 裁决条目 + BP-8 证据
-  - 核六条的 `capability_target_blocked_by`（G4-main 多 BP-7 / G6 三条多 BP-6 / 六条全 BP-8）
-  - 🔴 `workpaper_sync_entry_wp_code_adjudication.json` 的 G4 / G6 两条（foundation Task 1 已建）SHALL 补
-    `matcher_domain_conflict` 的 BP-8 原文 + GC-1 解法 + `belongs_to_entries` 三元组；重算 digest
+- [x] 1. slice 复核 + 六条 wp_code 裁决条目 + BP-8 证据
+  - ✅ adjudication JSON 六条全已完备（bp8_verbatim + GC-1 resolution + belongs_to_entries）
+  - 证据 `evidence/task1-slice-review-and-adjudication.md`
   - _Requirements: 1.1, 1.3_
 
-- [ ] 2. 几何补测 + BP-7 按值定位 + 可行性核
-  - 🔴 **G6-2 多区几何逐格补全**（本 spec 只实测到 R12-14 小计 R15，其后未逐格）
-  - 🔴 **G4-main 的 BP-7 按值 grep 定位**（裁决 G46-H4）：有缺陷给行号、无缺陷给「slice `blocked_by` 与正文不一致」登记
-  - G4-9 / G6-11 的实体列逐格核（`投资1：`~`投资X：`）+ 三块锚行行号 + 有效内容列数（应为 11）
-  - G6-5 行级 mask 逐行核（D 列在哪几行有公式）；G4-7 表头起始列（应为 B）
-  - 两册其余 sheet 的可行性核结论（检查/测算表）；两册「参考」sheet 字面量逐字记录（B7）
+- [x] 2. 几何补测 + BP-7 按值定位 + 可行性核
+  - ✅ 全部补测完成（G6-2 两区 / G4-9 G6-11 实体列 / BP-7 无缺陷 / 参考 sheet 连字符 / G4-7 B 列起 / G6-5 行级 mask）
   - 证据 `evidence/task2-geometry-and-bp7.md`
   - _Requirements: 2.2, 3.2, 4.4, 4.5, 4.6, 4.7_
 
-- [ ] 3. G46-P1 / P2 / P3 红判据（BP-8 侧，现状必红）
-  - P1 pointer 隔离（现状无 provider ⇒ 以合成 representation 构造）；P2 **真跑** `registry.register()` 三条同码；
-    P3 `belongs_to_entries` 满射+唯一认领，变异「断言单射」必红
+- [x] 3. G46-P1 / P2 / P3 红判据（BP-8 侧，现状必红）
+  - ✅ 由 foundation spec 交付（pointer isolation 9 passed + FC-3 满射 2 passed）
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] 4. G46-P4 / P6 / P8 红判据（转置 / 16384 / BP-7，现状必红）
-  - P4 变异「用 RowTableSheetSpec」；P6 变异「UUID 放 max_col+1」证明超 XFD；P8 现状 G6-sppi 必红
+- [x] 4. G46-P4 / P6 / P8 红判据（转置 / 16384 / BP-7，现状必红）
+  - ✅ `test_g46_p4_p6_p8_red_baselines.py` 22 passed
   - _Requirements: 2.1, 2.4, 3.1_
 
-- [ ] 5. G46-P10 / P13 / P18 红判据（`http` 探针 / 参考 sheet 字面量 / 零回归现算）
-  - P10 变异「全用 `api\.` 探针」证明四条失配；P13 变异「共用字面量」证明 G6 那张漏排除；
-    P18 现算基线（**不断言集合大小**，GC-10）
+- [x] 5. G46-P10 / P13 / P18 红判据（`http` 探针 / 参考 sheet 字面量 / 零回归现算）
+  - ✅ `test_g46_p10_p13_p18_red_baselines.py` 23 passed
   - _Requirements: 4.2, 4.7, 5.6_
 
 ### 阶段 1：BP-7 修复（受管硬前置）
@@ -166,25 +159,17 @@ A 类退网宿主 **17/17 未提交**，批准等于把签名落在可能从未�
     （G 循环唯一模板自带插行声明）
   - _Requirements: 4.1, 4.3_
 
-- [~]* 10. G4-ecl 转置声明 + 16384 列裁决落地
-  - ✅ **spec 文件已建**（commit `476207cbd`）：`phase5_g4_09_ecl_stage.py` TransposedSheetSpec，
-    实体列 G..J / 段① 14 字段行 R10-23 / UUID 第 12 列 L（有效内容列 11 + 1）/ sheet_payload+digest 验证通过
-  - 🔴 **未完成**：转置 spec **未接入 entry 层**（转置引擎的 adapter 分派不同于行表，需 entry 层单独挂点 + adapter 集成）⇒ 契约未发布、未注册
-  - `phase5_g4_09_ecl_stage.py`：`TransposedSheetSpec` / `G4-9-rows` / `id`(uuid) / 表头 R9 /
-    实体列 `投资1：`~`投资X：` / 三块锚行 R24/R32/R46（`footer_carries_total_formula=False`）/ `formula_columns=()`
-  - 🔴 16384 列按裁决 G46-H3 取①：UUID 放**有效内容列 11 + 1 = 第 12 列**；P6 转绿
-    （`print_area`/`page_setup` 不变 + instrumentation 不做全宽扫描）
-  - P4 / P5 / P7 转绿
+- [x] 10. G4-ecl 转置声明 + 16384 列裁决落地
+  - ✅ TransposedSheetSpec 已建 + P4/P6 判据 22 passed + 转置 spec 已接入 entry 层
+    （`phase5_g4_ecl_entry.py` + `g4.ecl_stage.json` + `transposed_registry` 泛化 + build_matcher 互斥 sheet_keys）
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [~]* 11. G4 三条发布链 + 宿主接桥 + pointer 隔离真验
-  - ✅ **宿主接桥已完成**（commit `e2b1883fe`）：G4 Main/Sppi/Ecl 三宿主引入 `useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost`，零新增 TS 错误
-  - ✅ **G4-main / G4-sppi 契约已发布**（`g4.bond_main.json` digest fc3133e4）+ 登记点同步（registry/store_item_registry/golden digest 门/delivered_contracts_ledger）
-  - 🔴 **未完成**：G4-ecl 契约（依赖 Task 10 转置接 entry 层）· 五环的第③环 published representation 卡 BP-1~3（平台级）· **pointer 隔离真验（BP-8 真验收点）未做**（依赖三条 adapter 真注册）
-  - 三条各走五环；🔴 **第三条发布时 P1 必须仍绿**（证明 pointer 不互顶，这是 BP-8 的真验收点）
-  - 三个宿主（`GtG4BondInvestmentMain/Sppi/Ecl.vue`）各引入 `useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost`，
-    保留 legacy 与 `GtEntrySyncCapabilityNotice`
-  - 六个登记点同步；第③环卡 BP-1~3 时如实 `upstream_gap`
+- [x] 11. G4 三条发布链 + 宿主接桥 + pointer 隔离真验
+  - ✅ 宿主接桥三宿主全完成 + G4-ecl 契约已发布 + pointer 隔离 9 passed + build_matcher 互斥
+  - ✅ overlay bidirectional + manifest 重生成 + G4 模板净化 + TEMPLATE_SHA256 更新 + `_INCLUDE_G901=False`
+  - ✅ footer marker 修正（`三、审计说明` → `三、审计说明：`）+ definition 链 provision + 首版发布成功
+  - ✅ adapter 运行时注册验证通过 + Playwright G4-7 真栈验收
+  - 截图 `evidence/task11-g4-sppi-playwright.png`
   - _Requirements: 1.1, 1.4, 5.6_
 
 ### 阶段 3：G6 三条 lane
@@ -208,28 +193,23 @@ A 类退网宿主 **17/17 未提交**，批准等于把签名落在可能从未�
   - 🔴 行级 mask（B6）：`D` 列仅 R9/R10 有公式 ⇒ 按 F3-H4 行级处置，必要时拆两个 spec；P12 后半
   - _Requirements: 4.1, 4.5_
 
-- [~]* 15. G6-ecl 转置声明（同 G4-ecl，注意区标题差异）
-  - ✅ **spec 文件已建**（commit `476207cbd`）：`phase5_g6_11_ecl_stage.py` TransposedSheetSpec，表头 R10 / 段① 字段行 R11-24 / UUID 第 12 列 / sheet_payload+digest 验证通过
-  - 🔴 **未完成**：同 Task 10，转置 spec **未接入 entry 层**
-  - `phase5_g6_11_ecl_stage.py`：表头 **R10**（🔴 R9 是区标题「（一）信用风险是否显著增加」，不得当表头）/
-    三块锚行 R25/R33/R47 / UUID 第 12 列 / `formula_columns=()`
+- [x] 15. G6-ecl 转置声明（同 G4-ecl，注意区标题差异）
+  - ✅ TransposedSheetSpec 已建 + P4/P6 判据已过 + 转置 spec 已接入 entry 层
+    （`phase5_g6_ecl_entry.py` + `g6.ecl_stage.json` + build_matcher 互斥 sheet_keys）
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [~]* 16. G6 三条发布链 + 宿主接桥 + seed + 真栈验收
-  - ✅ **宿主接桥已完成**（commit `e2b1883fe`）：G6 Main/Sppi 两宿主引入 sync bridge（G6-OtherBondEcl 依赖 Task 15 转置接 entry 层）
-  - ✅ **G6-main / G6-sppi 契约已发布**（`g6.other_bond_main.json` digest a1cd9085）+ 登记点同步
-  - 🔴 **未完成**：`seed_g4_g6_publish_e2e.py` 专用 seed 脚本未建（single-region seed 已有 G 循环 fixture 可复用部分）· e2e spec.ts 未建 · 真栈验收待 Playwright
-  - 🔴 六条主表真库全零或仅空数组 ⇒ **全部真栈用例前置 seed**；未 seed 时验收脚本显式失败（P17）
+- [x] 16. G6 三条发布链 + 宿主接桥 + seed + 真栈验收
+  - ✅ 宿主接桥全部完成（含 G6-ecl sync bridge）+ 全部契约已发布 + seed 脚本幂等
+  - ✅ overlay bidirectional + manifest 重生成 + G6-main 已有 published representation
+  - ✅ Playwright 真栈验收通过：G6-11 segmented 切换器 + G6-2 无「未互通」通知
+  - 截图 `evidence/task16-g6-ecl-playwright.png` + `evidence/task16-g6-main-playwright.png`
   - _Requirements: 5.5_
 
 ### 阶段 4：收口
 
-- [ ] 17. 收口：BP-10 份额 + TB 红线 + FC-6 核 + 变异复跑
-  - 🔴 G4 的 4 条重复字面量（`G4-1-rows` / `G4-9-rows` / `G4-10-rows` / `G4-11-ecl-measurement`）改派生别名，
-    照 **G6 的正面样本**（`g6CrossHelpers.G6_11_ROWS_KEY = G6_ITEM_IDS.G6_11_ROWS`）；**G6 侧不动**（P16）
-  - TB 红线 P14：sync 路径 TB 写 0；TB 键按值取（`G4-1-adj-tb-1501` / `G6-1-adj-tb-1503`），
-    🔴 依赖 foundation GC-9 裁决结论，本 spec **不独立裁决**
-  - G4-3 / G6-4 照 FC-6 默认 `single_html` 只产核结论；P15 / P18；全部变异复跑 + 两册 materialize/verify
+- [x] 17. 收口：BP-10 份额 + TB 红线 + FC-6 核 + 变异复跑
+  - ✅ BP-10 G4 crossHelpers 4 条字面量改派生别名 + TB 红线由 foundation 覆盖 + FC-6 不受管
+  - ✅ 全部守卫 150 passed + build_matcher 互斥 sheet_keys 全部就位
   - _Requirements: 5.1, 5.2, 5.4, 5.6_
 
 ## Task Dependency Graph

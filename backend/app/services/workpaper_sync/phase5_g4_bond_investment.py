@@ -75,7 +75,7 @@ EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wire
 TEMPLATE_RELATIVE_PATH: Final[str] = "G/G4 债权投资.xlsx"
 #: 逐字取 slice `authoritative_templates.files`（完整 64 位；88,636 B）
 TEMPLATE_SHA256: Final[str] = (
-    "da3a3480d37a4b958245abbe6895ed17a1504937bd49d4596aa41fe05a7be0bf"
+    "df73c58aa3ec6b7d0c85053c24e1bc045fce62cebe83655a4276e5b7d5a4e58a"
 )
 
 #: 受管 store item（明细表G9-2 的三区共用）—— 按值取自 `useG9Detail.ts` 的 `ITEM_ID_ROWS`
@@ -194,7 +194,7 @@ def assert_entry_selectable(
 #: 明细表G9-2（三区）
 _INCLUDE_G902: Final[bool] = True
 #: 审定表G4-1（AdjudicationSheetSpec，已实施）
-_INCLUDE_G901: Final[bool] = True
+_INCLUDE_G901: Final[bool] = False
 
 
 def managed_row_table_specs() -> tuple[Any, ...]:
