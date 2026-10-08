@@ -170,21 +170,47 @@ def _ensure_columns(section: dict) -> None:
     section["columns"] = cols
 
 
+def _is_embedded_header_row(row: list, headers: list) -> bool:
+    """检测 rows 中的一行是否是嵌入的子表头（而非数据行）。
+
+    判据：row[0] 与 headers[0] 文字相同（去空白和 HTML 标签后），
+    说明 rows 把 headers 列名重复了一遍作为子表头行。
+    """
+    if not isinstance(row, list) or not row or not headers:
+        return False
+    import re
+    clean = lambda s: re.sub(r"<br\s*/?>", "", re.sub(r"[\s\u3000]+", "", str(s or "")))
+    return clean(row[0]) == clean(headers[0]) and bool(clean(row[0]))
+
+
 def _ensure_row_types(section: dict) -> None:
-    """自动为 rows 中的每一行推导 _row_type（不改原数组结构，附加到 section）。"""
+    """自动为 rows 中的每一行推导 _row_type（不改原数组结构，附加到 section）。
+
+    CP-04 扩展：检测 rows 前几行是否是嵌入的子表头（合并附注模板的常见形态），
+    标注为 ``header`` 类型，同时记录 ``_header_row_indexes`` 供前端分离渲染。
+    """
     rows = section.get("rows")
     if not isinstance(rows, list) or not rows:
         return
     # 如果已有 _row_types 则不覆盖
     if section.get("_row_types"):
         return
+    headers = section.get("headers", [])
     row_types = []
-    for row in rows:
+    header_row_indexes = []
+    for i, row in enumerate(rows):
         if isinstance(row, list) and row:
-            row_types.append(_infer_row_type(str(row[0])))
+            # 只检查前 3 行，且必须从第 0 行连续开始
+            if i <= 2 and i == len(header_row_indexes) and _is_embedded_header_row(row, headers):
+                row_types.append("header")
+                header_row_indexes.append(i)
+            else:
+                row_types.append(_infer_row_type(str(row[0])))
         else:
             row_types.append("data")
     section["_row_types"] = row_types
+    if header_row_indexes:
+        section["_header_row_indexes"] = header_row_indexes
 
 
 def _safe_float(val: Any) -> float | None:
