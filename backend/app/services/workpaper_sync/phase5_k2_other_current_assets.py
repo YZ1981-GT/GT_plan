@@ -33,8 +33,8 @@ TEMPLATE_SHA256: Final[str] = "5ae401411039385e70766635dc9eeb9c0a79c6da4f8c1af31
 MANAGED_SHEET: Final[str] = "调整分录汇总K2-3"
 STORE_ITEM_ID: Final[str] = "K2-3-adj-entries"
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
-LAST_DATA_ROW: Final[int] = 21
-FOOTER_ROW: Final[int] = 22
+LAST_DATA_ROW: Final[int] = 20  # R21 空行 XML 无 <row> 标签
+FOOTER_ROW: Final[int] = 22  # R22 注释行
 
 CONFIG: Final[KAdjustmentEntryConfig] = KAdjustmentEntryConfig(
     n=2,

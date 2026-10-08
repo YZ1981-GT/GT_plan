@@ -6,7 +6,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "d7c9e28a626b0f3023d7a4b7aefc32a67cebff662ebfd45355b7052624bf156a",
+  "instrumentation_definition_sha256": "6535b7c9953c08d952bd4bede14c0f37a6cfb83affdc120d4120fda20868be63",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-k4-other-current-liabilities",
@@ -207,9 +207,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "b992ed921fdc369f0cca181ab340d68065243aed30b3909f2113b80e0b4ff8e8",
+    "normalized_structure_hash": "24a642c4b5f033255f43a665c46fcd99c5016bf665eb5d5cb2750f593595d60f",
     "relative_path": "K/K4 其他流动负债.xlsx",
-    "template_sha256": "28c77f8fdfe3064806f7f8a79ee74dac6f91874248a447a4f40688c113d32111"
+    "template_sha256": "eba8df02b32f2da217b0211481517ef41a6ecd54e98a2ba0c659fa1a29dd3612"
   },
-  "template_definition_sha256": "4170d5ec95dd0b5a773b43e5160c4c25d515f144f1a6a29c0e0a64554a9bb685"
+  "template_definition_sha256": "187ad4176084ba06aa73cfc5ea3cf06e9d2f65b37d31e0c18584818a3664f736"
 }

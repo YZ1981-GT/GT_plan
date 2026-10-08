@@ -6,7 +6,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "b015251c18a04aeda8ba5027204944b4ff3bbcd87e3c7b61deff7721f4df5d88",
+  "instrumentation_definition_sha256": "a9b5d254653208c12e1801f9155ac53e7c3e003a4d675df39cf3fd79d4deb375",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-k2-other-current-assets",
@@ -189,6 +189,11 @@
               "value_type": "text"
             }
           ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "提示：本底稿适用于调整分录较多、较复杂的项目，且仅列示与本报表项目相关的审计调整。项目组可根据项目实际情况选择是否使用该底稿。",
+            "search_column": "A"
+          },
           "formula_mask": [],
           "header_rows": 1,
           "row_identity": {
@@ -202,9 +207,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "00be175b2a782dee220d3193810acbf3b4e8751b90cacb166e528d1426624758",
+    "normalized_structure_hash": "69c94467d6f0126ed1779d37c87c61c4d42fb4e968ed628e90ead795b4df02e0",
     "relative_path": "K/K2 其他流动资产.xlsx",
-    "template_sha256": "e7b963e3c1710ffcf01860070e688fe2aa0fd615975807e54caa4328df7823ed"
+    "template_sha256": "5ae401411039385e70766635dc9eeb9c0a79c6da4f8c1af316b2ad1430589162"
   },
-  "template_definition_sha256": "24409e799fe04dbc64965548beaf249b43ccea920b93247bc5aa94419edaf52f"
+  "template_definition_sha256": "705941303ff91cfb17dab41693108ada498c1b8574c199d3edc74ee2fd81531e"
 }

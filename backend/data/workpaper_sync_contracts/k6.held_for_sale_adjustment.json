@@ -6,7 +6,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "1503a77edc81332c835ff71b46769852964ba7a8c2c8e18f072157848c3fe586",
+  "instrumentation_definition_sha256": "d3d75dfce317ee672bff5254f6753ecfcd0a9e69f66e3d8397e9b7d243bfc014",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-k6-held-for-sale",
@@ -209,7 +209,7 @@
   "template": {
     "normalized_structure_hash": "f97a156be960510265a631dee3fd783d70c828c631d7f44f3d5b2257e6bb8284",
     "relative_path": "K/K6 持有待售资产和负债.xlsx",
-    "template_sha256": "228881d21c3680726c7e4453ba1b8e6425f42bf2c4558463cae19af0cde80bc6"
+    "template_sha256": "f75f730e959f711c3cd8a7f0d8e33637cc32b6e1f034c103f3b8d88ff0b6076b"
   },
-  "template_definition_sha256": "eb0ce132637b2fd06ed703ef8cebfec6a1399178a2b3ee75202da3290492ce69"
+  "template_definition_sha256": "c24481d83fc6b8e6654969376b0334fd191998c5d5a3939c40beb23039eb66d3"
 }
