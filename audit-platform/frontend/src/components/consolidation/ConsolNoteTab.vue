@@ -649,7 +649,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -780,8 +780,11 @@ const parsedMultiHeader = computed<MultiHeaderCol[] | null>(() => {
   if (!sec) return null
 
   // ── 路径 A：按 _column_groups 构建分组表头（与单体附注 DisclosureEditor 同结构） ──
+  // CP-04：当 multi_header 有 3+ 行时跳过 Path A（只能建两层），让 Path B 递归处理三层
   const cg: Array<{ group: string; start: number; span: number }> | null = sec.columnGroups
-  if (cg && Array.isArray(cg) && cg.length > 0) {
+  const mhRows: string[][] | null = sec?.multiHeader
+  const hasThreeOrMoreHeaderRows = mhRows && Array.isArray(mhRows) && mhRows.length >= 3
+  if (cg && Array.isArray(cg) && cg.length > 0 && !hasThreeOrMoreHeaderRows) {
     const headers: string[] = sec.headers || []
     const mhForLabels: string[][] | null = sec.multiHeader
     // 子列标签优先从 multi_header 末行取（最底层真实标签），降级到 headers 拆分最后一段
@@ -2431,6 +2434,17 @@ async function onNoteNodeClick(
 function switchToFourCol() {
   eventBus.emit('four-col-switch', { tab: 'notes' })
 }
+
+// CP-05：模板切换（国企↔上市）时重新加载当前已选章节，不保留旧配置
+watch(() => props.standard, (newStd, oldStd) => {
+  if (newStd && oldStd && newStd !== oldStd && selectedNoteSection.value) {
+    const currentSection = selectedNoteSection.value
+    // 清除旧配置
+    selectedNoteSection.value = null
+    // 用新模板重新加载同一章节
+    onNoteNodeClick({ section_id: currentSection.section_id, title: currentSection.title })
+  }
+})
 
 // ─── 生命周期 ────────────────────────────────────────────────────────────────
 function onDocClick(e: MouseEvent) {
