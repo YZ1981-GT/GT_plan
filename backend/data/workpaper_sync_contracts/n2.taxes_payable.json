@@ -6,7 +6,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "3ace36aad8d0c1c6516c1c1fdfd87b33237430752d4a314ac6d1aad400ded751",
+  "instrumentation_definition_sha256": "874d0193427a05270b0158c955d2e7224c2a5c388e7aa994b8fd96396daf59aa",
   "review": {
     "authority_root": "backend/wp_templates",
     "derived_readonly_sheet": {
@@ -322,7 +322,7 @@
   "template": {
     "normalized_structure_hash": "0eae440ed5a9def1c2e7daa4991d7d92e3dc00e8ec350a4f64c1dab430795eb9",
     "relative_path": "N/N2 应交税费.xlsx",
-    "template_sha256": "131fe78f0df40eb8438dbabcb64e5f8a425be882b722f50d6d819811952d7b2a"
+    "template_sha256": "ec6e6712cc4b52edaf5bcaa794f90cd9345edd8c0273473f21b8c5d31e542f43"
   },
-  "template_definition_sha256": "ef7ae8082db95720eaaff5ac0c02a1f21f916fcbe2b40117ce708c36a3f126c0"
+  "template_definition_sha256": "26d030a62107aad8f23dab55d3bbc30d55276652c00d8c07050a0073efc810ed"
 }

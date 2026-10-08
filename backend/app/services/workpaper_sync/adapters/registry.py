@@ -1189,6 +1189,12 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_k11_asset_impairment_loss",
         "app.services.workpaper_sync.phase5_k12_non_operating_income",
         "app.services.workpaper_sync.phase5_k13_non_operating_expense",
+        "app.services.workpaper_sync.phase5_k7_deferred_income",
+        "app.services.workpaper_sync.phase5_k6_held_for_sale",
+        "app.services.workpaper_sync.phase5_k5_provisions",
+        "app.services.workpaper_sync.phase5_k4_other_current_liabilities",
+        "app.services.workpaper_sync.phase5_k3_other_payables",
+        "app.services.workpaper_sync.phase5_k2_other_current_assets",
         # ── K/L/N 批量 provision（2026-10-03）──────────────────────────
         "app.services.workpaper_sync.phase5_n4_taxes_and_surcharges",
         # ── N 循环续（N1/N2/N3/N5）+ M6 ──
