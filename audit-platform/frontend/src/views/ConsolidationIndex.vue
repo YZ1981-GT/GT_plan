@@ -134,6 +134,7 @@
             <div class="gt-ctb-toolbar-right">
               <!-- 自动建树 5.4：手动刷新树兜底（CONSOL_SCOPE_CHANGED 事件丢失时，EH4） -->
               <el-button size="small" :loading="treeRefreshing" @click="refreshGroupTree">🔄 刷新树</el-button>
+              <el-button size="small" type="warning" @click="showScopeConfirmDialog = true" data-testid="scope-confirm-entry">📋 确认合并范围</el-button>
               <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);margin-left:8px">{{ orgNodeCount }} 个节点 · 最大 {{ orgMaxDepth }} 层</span>
             </div>
           </div>
@@ -200,6 +201,7 @@
           :project-id="projectId"
           :year="effectiveConsolYear()"
           :tree="groupTree[0] || null"
+          :selected-node-key="currentEntityNodeKey"
           @audit="onTbAudit"
           @cell-context-menu="onTbCellContextMenu"
         />
@@ -242,6 +244,7 @@
             :year="effectiveConsolYear()"
             :report-type="consolReportType"
             :tree="groupTree[0] || null"
+            :selected-node-key="currentEntityNodeKey"
           />
           <!-- 权益变动表 — 与单户 ReportEquityTable 共用 eq_matrix 契约 -->
           <div v-else-if="consolReportType === 'equity_statement' && consolReportRows.length" v-loading="consolReportLoading" class="gt-consol-equity-matrix">
@@ -553,6 +556,13 @@
       @changed="onElimChanged"
     />
 
+    <!-- D5 合并范围确认弹窗 -->
+    <ConsolScopeConfigDialog
+      v-model="showScopeConfirmDialog"
+      :project-id="projectId"
+      @confirmed="onScopeConfirmed"
+    />
+
   </div>
 </template>
 
@@ -576,6 +586,7 @@ import { projects as P_proj, reportConfig as P_rc, reportMapping as P_rm, consol
 import { subscribeProjectEvent, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import ConsolWorksheetTabs from '@/components/consolidation/worksheets/ConsolWorksheetTabs.vue'
 import ConsolNoteTab from '@/components/consolidation/ConsolNoteTab.vue'
+import ConsolScopeConfigDialog from '@/components/wizard/ConsolScopeConfigDialog.vue'
 import ConsolTrialBalanceTab from '@/components/consolidation/ConsolTrialBalanceTab.vue'
 import ConsolReportBreakdownView from '@/components/consolidation/ConsolReportBreakdownView.vue'
 import OrgNode from '@/components/consolidation/OrgNode.vue'
@@ -647,6 +658,15 @@ const year = computed(() => Number(route.query.year) || new Date().getFullYear()
 const consolComments = useCellComments(() => projectId.value, effectiveConsolYear, 'consol_report')
 
 const activeTab = ref('worksheets')
+
+// D5 合并范围确认弹窗
+const showScopeConfirmDialog = ref(false)
+function onScopeConfirmed() {
+  showScopeConfirmDialog.value = false
+  // 确认后刷新企业树以反映最新状态
+  refreshGroupTree()
+  ElMessage.success('合并范围已确认，正在刷新企业树')
+}
 const projectInfoLoaded = ref(false)
 const groupTreeLoaded = ref(false)
 const worksheetContextReady = computed(() => (
@@ -1409,15 +1429,15 @@ function effectiveEntityYear(): number {
   return treeYear.value ?? projectInfo.year ?? year.value
 }
 
-function currentEntityNodeKey(): string {
+const currentEntityNodeKey = computed((): string => {
   return currentConsolEntity.value.nodeKey || groupTree.value[0]?.node_key || ROOT_CONSOL_NODE_KEY
-}
+})
 
 function captureRefreshContext(): RefreshContext {
   return {
     projectId: String(projectId.value || ''),
     year: effectiveConsolYear(),
-    nodeKey: currentEntityNodeKey(),
+    nodeKey: currentEntityNodeKey.value,
     sectionId: String(consolNoteTabRef.value?.selectedNoteSection?.section_id || ''),
   }
 }
@@ -1425,7 +1445,7 @@ function captureRefreshContext(): RefreshContext {
 function isRefreshBaseContextCurrent(context: RefreshContext): boolean {
   return String(projectId.value || '') === context.projectId
     && effectiveConsolYear() === context.year
-    && currentEntityNodeKey() === context.nodeKey
+    && currentEntityNodeKey.value === context.nodeKey
     && String(consolNoteTabRef.value?.selectedNoteSection?.section_id || '') === context.sectionId
 }
 
@@ -1520,15 +1540,15 @@ const {
 const reportCache = new Map<string, any[]>()
 const noteCache = new Map<string, any[]>()
 
-function cacheScopeKey(nodeKey = currentEntityNodeKey()): string {
+function cacheScopeKey(nodeKey = currentEntityNodeKey.value): string {
   return _cacheScopeKey(projectId.value, effectiveEntityYear(), nodeKey)
 }
 
 function reportCacheKey(): string {
-  return _reportCacheKey(projectId.value, effectiveEntityYear(), currentEntityNodeKey(), consolReportType.value, consolReportTemplateType.value)
+  return _reportCacheKey(projectId.value, effectiveEntityYear(), currentEntityNodeKey.value, consolReportType.value, consolReportTemplateType.value)
 }
 function noteCacheKey(): string {
-  return _noteCacheKey(projectId.value, effectiveEntityYear(), currentEntityNodeKey(), consolNoteTemplateType.value)
+  return _noteCacheKey(projectId.value, effectiveEntityYear(), currentEntityNodeKey.value, consolNoteTemplateType.value)
 }
 /** 清除指定树节点的缓存（刷新时调用；不能按企业代码清理同企业的其他角色节点） */
 function clearEntityCache(nodeKey: string, types?: string[]) {
@@ -1540,7 +1560,7 @@ function clearEntityCache(nodeKey: string, types?: string[]) {
 const reportRequestGuard = createConsolRequestGuard(() => ({
   projectId: projectId.value,
   year: effectiveEntityYear(),
-  nodeKey: currentEntityNodeKey(),
+  nodeKey: currentEntityNodeKey.value,
 }))
 
 function consolReportRowClass({ row }: { row: any }) {
@@ -1677,7 +1697,7 @@ async function loadConsolReport(forceRefresh = false) {
   const ticket = reportRequestGuard.startRequest()
   consolReportLoading.value = true
   try {
-    const nodeKey = currentEntityNodeKey()
+    const nodeKey = currentEntityNodeKey.value
     const rows = await api.get(
       P_consol.reports.list(projectId.value, effectiveEntityYear()),
       { params: { report_type: consolReportType.value, node_key: nodeKey } },
@@ -1883,6 +1903,7 @@ function onConsolTreeSelect(data: ConsolTreeSelectPayload) {
     }
     // 刷新当前 tab 数据
     if (activeTab.value === 'consol_report') reloadConsolReportView()
+    else if (activeTab.value === 'consol_tb') consolTbTabRef.value?.load()
     else if (activeTab.value === 'consol_note') {
       // 企业节点切换：重读当前章节，不只刷新目录
       const section = consolNoteTabRef.value?.selectedNoteSection
@@ -1937,6 +1958,7 @@ onMounted(async () => {
   eventBus.on('consol-tree-select', onConsolTreeSelect)
   eventBus.on('consol-catalog-select', onConsolCatalogSelect)
   eventBus.on('consol-refresh-entity', onConsolRefreshEntity)
+  eventBus.on('consol-open-scope-confirm' as any, () => { showScopeConfirmDialog.value = true })
   // 自动建树 5.3：监听 CONSOL_SCOPE_CHANGED（SSE）→ 自动刷新企业树（ADR-CONSOL-303）
   consolEvents.onAnyEvent(onConsolScopeChanged)
 })
@@ -1946,6 +1968,7 @@ onUnmounted(() => {
   eventBus.off('consol-tree-select', onConsolTreeSelect)
   eventBus.off('consol-catalog-select', onConsolCatalogSelect)
   eventBus.off('consol-refresh-entity', onConsolRefreshEntity)
+  eventBus.off('consol-open-scope-confirm' as any)
   refreshTracking.stop()
   stopConsolPushEvents()
 })

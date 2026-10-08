@@ -154,6 +154,11 @@ from app.models.consol_push_models import (  # noqa: F401
     ConsolNoteFormula,
     ConsolPushRun,
 )
+# D5 合并范围用户确认快照（迁移 V183）
+from app.models.consol_scope_confirmation_models import (  # noqa: F401
+    ConsolScopeConfirmation,
+    ConsolScopeConfirmationNode,
+)
 # 底稿 HTML ↔ OnlyOffice 双向回写同步域（迁移 V151 的 28 张表）
 from app.models.workpaper_sync_models import (  # noqa: F401
     WORKPAPER_SYNC_TABLES,

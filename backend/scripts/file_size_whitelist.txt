@@ -1345,3 +1345,8 @@ backend/app/services/workpaper_sync/phase5_g5_long_term_receivable.py 801
 #     componentType 白名单覆盖。本轮仅加 pytest.skip 保护（3 行），已接近上限。
 #     拆分轴：按 TestClass 拆成 schema_smoke / export_e2e / whitelist 三个文件。
 backend/tests/integration/test_render_pipeline_e2e.py 927
+
+# consol_calc_basis.py — 合并计算口径（差额表与试算两条路径唯一共用），本轮加确认门调用（+7行）
+backend/app/services/consol_calc_basis.py 1005
+# note_word_exporter.py — Word 附注导出，CP-02 修改 valid_indices 逻辑（+5行）
+backend/app/services/note_word_exporter.py 1706

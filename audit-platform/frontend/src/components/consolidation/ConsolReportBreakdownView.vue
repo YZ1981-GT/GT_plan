@@ -147,6 +147,8 @@ const props = defineProps<{
   reportType: string
   /** 企业树（页面已加载）：汇总节点下拉取自它，与合并试算平衡表同一来源 */
   tree?: ConsolTreeNode | null
+  /** CP-01：父级选中的节点键；左树选择变化时传入，同步到内部 nodeKey 并刷新 */
+  selectedNodeKey?: string | null
 }>()
 
 const nodeKey = ref<string | null>(null)
@@ -221,6 +223,14 @@ watch(() => [props.projectId, props.year] as const, ([pid, y], old) => {
   if (!pid || !old || (old[0] === pid && old[1] === y)) return
   nodeKey.value = null
   if (loaded) load()
+})
+
+// CP-01：父级选中节点变化时同步到内部 nodeKey 并刷新（左树点击传播）
+watch(() => props.selectedNodeKey, (newKey) => {
+  if (newKey != null && newKey !== nodeKey.value) {
+    nodeKey.value = newKey
+    if (loaded) load()
+  }
 })
 
 // ─── 差额列穿透 ──────────────────────────────────────────────────────────────

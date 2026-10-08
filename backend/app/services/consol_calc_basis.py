@@ -934,10 +934,17 @@ async def load_node_amounts(
 
 async def load_calc_basis(
     db: AsyncSession, project_id: UUID, year: int, *, tree: TreeNode | None = None,
+    allow_legacy_read: bool = False,
 ) -> CalcBasis | None:
     """以合并项目为根装载计算口径；项目不存在返回 None。树可由调用方传入以免重复推导。"""
     if tree is None:
         tree = await build_tree(db, project_id)
+    if tree is None:
+        return None
+
+    from app.services.consol_scope_confirmation_service import require_confirmed_scope
+
+    tree = await require_confirmed_scope(db, project_id, year, tree=tree, allow_legacy_read=allow_legacy_read)
     if tree is None:
         return None
     leaves = data_leaves(tree)

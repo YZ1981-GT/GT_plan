@@ -357,7 +357,8 @@ async def _push_one(db: AsyncSession, project_id: UUID, year: int, steps: list[d
             parts.append(f"失败 {failed}")
             warnings.append(f"「{name}」附注刷新有 {failed} 个章节×节点失败")
         parts.append(f"附注状态={note_status}")
-        return "，".join(parts)
+        # CP-03：返回 (detail, note_status) 元组，让 for 循环消费结构化状态
+        return ("，".join(parts), note_status)
 
     bodies = {STEP_WORKSHEET: worksheet, STEP_TRIAL: trial, STEP_REPORT: report, STEP_NOTES: notes}
     all_ok = True
@@ -365,7 +366,7 @@ async def _push_one(db: AsyncSession, project_id: UUID, year: int, steps: list[d
         for i, step in enumerate(STEP_ORDER):
             try:
                 await _advisory_lock(db, project_id, year)
-                detail = await bodies[step]()
+                result = await bodies[step]()
                 await db.commit()
             except Exception as exc:  # noqa: BLE001 —— 失败留痕，不静默（需求 8.6）
                 await db.rollback()
@@ -378,7 +379,20 @@ async def _push_one(db: AsyncSession, project_id: UUID, year: int, steps: list[d
                         record(later, "skipped", f"{STEP_LABELS[step]}失败，跳过")
                     break
                 continue
-            record(step, "succeeded", detail)
+
+            # CP-03：notes 步骤返回 (detail, note_status) 元组；
+            # partial/failed 降级步骤状态，skipped 当没有可刷新目标也不算成功
+            if isinstance(result, tuple):
+                detail, note_status = result
+                if note_status in ("partial", "failed"):
+                    record(step, note_status, detail)
+                    all_ok = False
+                elif note_status == "skipped":
+                    record(step, "succeeded", detail)  # skipped = 合法无可刷新目标，不降级
+                else:
+                    record(step, "succeeded", detail)
+            else:
+                record(step, "succeeded", result)
     return all_ok
 
 

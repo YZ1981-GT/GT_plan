@@ -5,6 +5,9 @@
       <el-tooltip content="重新读取企业树（按各项目的企业代码、上级代码与与上级关系自动生成）" placement="bottom">
         <el-button size="small" :loading="loading" data-testid="cm-reload" @click="loadTree">🔄 刷新</el-button>
       </el-tooltip>
+      <el-tooltip content="确认当前合并范围（确认后才可进行合并计算）" placement="bottom">
+        <el-button size="small" type="warning" data-testid="cm-scope-confirm" @click="eventBus.emit('consol-open-scope-confirm' as any)">📋 确认范围</el-button>
+      </el-tooltip>
     </div>
     <div v-if="modeText" class="cm-nav-mode" data-testid="cm-mode">合并方式：{{ modeText }}</div>
 
