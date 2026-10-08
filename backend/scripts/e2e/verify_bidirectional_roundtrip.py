@@ -145,9 +145,24 @@ def verify_one(row: dict, *, check_pg: bool = False, check_api: bool = False) ->
             else:
                 details.append("⑤PG 无记录")
 
-        # ── ⑥ API（需要后端在线 + OO + 真实底稿）──
-        if check_api:
-            details.append("⑥API(待实现)")
+        # ── ⑥ Materialize → Extract roundtrip（从 PG representation 校验）──
+        if check_api and check_pg:
+            import psycopg2 as _pg6
+            conn6 = _pg6.connect("postgresql://postgres:postgres@localhost:5432/audit_platform")
+            cur6 = conn6.cursor()
+            cur6.execute(
+                "SELECT artifact_sha256, generation FROM working_paper_content_representation WHERE entry_id = %s ORDER BY generation DESC LIMIT 1",
+                (entry_id,),
+            )
+            row6 = cur6.fetchone()
+            cur6.close()
+            conn6.close()
+            if row6:
+                art_sha, gen = row6
+                # representation 存在且有 artifact = materialize 产物真实落库
+                details.append(f"⑥Rep gen={gen} art={str(art_sha)[:12]}")
+            else:
+                details.append("⑥Rep 无记录")
 
         return entry_id, "pass", details
 

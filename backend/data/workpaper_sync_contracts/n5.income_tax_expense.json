@@ -6,7 +6,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "9a5e8f41b29474f88206e33c60d48c80d39e2581307d54dbb7eca5d50e84ed8e",
+  "instrumentation_definition_sha256": "74c46d6c9081b7c197dea53dd99932257c3d2b7a3bc831ce30872968c5889f0c",
   "review": {
     "authority_root": "backend/wp_templates",
     "derived_readonly_sheet": {
@@ -151,7 +151,7 @@
   "template": {
     "normalized_structure_hash": "21a948f0f53a78e785dbd65013e893201b3d07e7efe371edb1365d5f70edc533",
     "relative_path": "N/N5 所得税费用.xlsx",
-    "template_sha256": "58d0f453698d8ed7564ccd0480064e29bdec49d43a77e9c34c466abd6b59f393"
+    "template_sha256": "76e74e9f70c2a8ca78a6ac6e4ad01ac630239feba71c1532caf648c0e7ee283b"
   },
-  "template_definition_sha256": "5d9b9474d52efb9c771d2b54f67080a5d19ebfc596335efcbe0a14f1e350e981"
+  "template_definition_sha256": "e17c55947e3322d4e9983cfe828fc36957f09d346d05d5e83acdd67e8b66a24b"
 }

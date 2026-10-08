@@ -6,7 +6,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "de00187bf5334b2fc45b4ece2af25b8f7d74d383edd5e5ea25b5eaab1d128d9e",
+  "instrumentation_definition_sha256": "fba82b8f0d1ed9012e8a3346804e2d07fa504d3da34f7687d12778486b986cdf",
   "review": {
     "authority_root": "backend/wp_templates",
     "derived_readonly_sheet": {
@@ -277,7 +277,7 @@
   "template": {
     "normalized_structure_hash": "e54a38583ad73f58d1c8f95d0559157301926873aae8677bfff58d4e940122fc",
     "relative_path": "N/N3 递延所得税负债.xlsx",
-    "template_sha256": "abd34241612f53a78f5aa3d144a303c4b7f813e5bea85cbea95ab295d79028d0"
+    "template_sha256": "013639910374db5c061f8d548a2040c684f8daba51cabc42c88a696b45df6e4c"
   },
-  "template_definition_sha256": "d7697f8e6728fb0852b220e729730251cac47434c7eeb426e87e16737a965d92"
+  "template_definition_sha256": "201b7ab444773a54c3c463060bcd7a4167d22940fe4743d318f9fe5e2151b4c8"
 }

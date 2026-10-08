@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "447ee4f4ec06bd2d56e9d82cb440568f1905129d0a00fd0d428662bdd74a3db3",
+  "instrumentation_definition_sha256": "07a8c6b0bcdf49d752fe18d0a3a71aeb2192a2df34432c449b2181e7f5906ee8",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-m6-retained-earnings",
@@ -224,7 +224,7 @@
   "template": {
     "normalized_structure_hash": "69b5b515bf81bbf8608533bc1b6812eb2f7f98088ac6c6f4f6016a65b232ea44",
     "relative_path": "M/M6 未分配利润.xlsx",
-    "template_sha256": "07870914ae4d37094ed2fd81cf764e271de77d76770b9d81a1a0ed8f49a6e47a"
+    "template_sha256": "834fcd429660e983be06e7de065ec4d8af4e16ef80b6de01661da636c1ff3ccc"
   },
-  "template_definition_sha256": "d10ce2d68df774f474d00dfde59e0bc96b00556e6b4a239a1b227eb44d13522c"
+  "template_definition_sha256": "2bd3ed27ca9687ce00d80a22b6a902f195c38c64f76797b0ed6eccff78ccea01"
 }

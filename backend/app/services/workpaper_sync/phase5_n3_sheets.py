@@ -34,7 +34,7 @@ WP_CODES: Final[frozenset[str]] = frozenset({"N3D"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "N/N3 递延所得税负债.xlsx"
 TEMPLATE_SHA256: Final[str] = (
-    "abd34241612f53a78f5aa3d144a303c4b7f813e5bea85cbea95ab295d79028d0"
+    "013639910374db5c061f8d548a2040c684f8daba51cabc42c88a696b45df6e4c"
 )
 MANAGED_SHEET: Final[str] = "递延所得税负债明细表N3-2"
 DERIVED_SHEET: Final[str] = "递延所得税负债审定表N3-1"
