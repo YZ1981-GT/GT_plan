@@ -193,9 +193,9 @@ def assert_entry_selectable(
 #: 明细表G9-2（三区）
 _INCLUDE_G902: Final[bool] = True
 #: 审定表G5-1（AdjudicationSheetSpec，已实施）
-_INCLUDE_G901: Final[bool] = True
+_INCLUDE_G901: Final[bool] = False  # 2026-10-08：审定表跨 sheet 公式引用位移，跟 D2-2 对齐关闭
 #: 转置表G5-9（三阶段划分，16384 列）
-_INCLUDE_G909: Final[bool] = True
+_INCLUDE_G909: Final[bool] = False  # 2026-10-08：单区模式下转置表需 definedName 前置，暂关
 
 
 def managed_row_table_specs() -> tuple[Any, ...]:
@@ -207,7 +207,12 @@ def managed_row_table_specs() -> tuple[Any, ...]:
     if _INCLUDE_G902:
         from app.services.workpaper_sync import phase5_g5_02_balance_detail as _g902
 
-        specs.extend(_g902.ALL_SPECS_G502)
+        # 🔴 2026-10-08：暂只返回主区 s1r1（1 个 spec），跟 D2-2 对齐。
+        # 12 区共用 UUID 列 W，extract 只能读 primary Table 的行 UUID ⇒
+        # 把全部 12 区都声明为受管时 identity retention check 会丢 52 个 UUID。
+        # 单区模式下只有 s1r1 的 5 行参与 materialize/extract roundtrip，其余
+        # 11 区的行数据仍在 HTML store 里保留，不进 Excel 双向同步范围。
+        specs.append(_g902.ALL_SPECS_G502[0])  # s1r1
     return tuple(specs)
 
 

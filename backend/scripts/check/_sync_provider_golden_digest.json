@@ -1,5 +1,5 @@
 {
-  "digest_count": 242,
+  "digest_count": 240,
   "providers": [
     {
       "label": "b60",
@@ -413,14 +413,12 @@
     {
       "label": "g5",
       "adapter_id": "g5.long_term_receivable_detail",
-      "contract_payload_sha256": "32ebd8c731103a1e283d1ea2ac8fbbae56666a6b3e781310242a52280782eb77",
+      "contract_payload_sha256": "0ebc9911b39dc62a79ce232caac8352512f3846a7c6264beae3c4e1c4b5c0623",
       "sheet_digests": {
-        "g502-managed": "c730eb2b7ec1db259d35f6214226e0fc51c2349b3d028ad615ce3793361463c0",
-        "g51-managed": "1219be06e9ffc87012502bb33cb416781946a98eceb3144acc8cd39377350790",
-        "g509-managed": "85ad9d01ad9648e8e18704df459a8f817e1298101430c13ec9c47223485c94fe"
+        "g502-managed": "76093ab61b7e99e8a8be57b8da088d24025d85b5359aac5d3d7965f7d7821bed"
       },
       "store_projection_sha256": "fb8c6a1393ca241d5ec330dbc2eda2b5937151a095e48a715bfd1e5295d97093",
-      "instrumentation_sha256": "43601cd18a09ef6e7bde1766f50afca5c19431bcfa13d4ccb691baf342d28d58"
+      "instrumentation_sha256": "ced9ae687b4ca858cf9ccc58820ea92b88732dbeb0fabb1ba6d6a006ae31ac08"
     },
     {
       "label": "f3",
