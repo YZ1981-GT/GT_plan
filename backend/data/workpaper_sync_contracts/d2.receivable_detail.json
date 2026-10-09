@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "9e88e86b67ff11ceae71045bd2a68c3e50f4c9570958f88e79bec33f7153ce90",
+  "instrumentation_definition_sha256": "46f3c617175503757310f97e953a5c4d6e8e4c007e210949902500c5c452e694",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d2-accounts-receivable",
@@ -1186,7 +1186,14 @@
     {
       "excel_name": "审定表D2-1",
       "locator": {
-        "anchor": "excel_table_sheet_association"
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_D21"
+      },
+      "region_boundary_locator": {
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_D21",
+        "range": "$B$10:$D$11",
+        "region_kind": "static"
       },
       "sheet_key": "d21-managed",
       "tables": [
@@ -1334,7 +1341,8 @@
           "header_rows": 2,
           "table_key": "adjudication_cells"
         }
-      ]
+      ],
+      "template_id": "D21"
     }
   ],
   "template": {

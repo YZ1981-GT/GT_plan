@@ -1,0 +1,1 @@
+{"authority_model":"projection_contract","content_authority":"structured_projection","entry_id":"xlsx/gt-l7-other-noncurrent-liabilities","merge_model":"stable_field_three_way","pilot_class":"l_cycle_other_noncurrent_liabilities","required_slots":["template","instrumentation","contract"],"schema_version":"authority-model-definition:v1"}

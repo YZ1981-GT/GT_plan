@@ -557,6 +557,104 @@ class TestGhostRowAnchorIndex:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# 模板骨架行跳过（L8-D1：HTML 不管理的模板预置行不被 merge fabricate 成 store 新行）
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestTemplateSkeletonRowNotFabricated:
+    """`merge_projection_into_store_rows` 对「extract 回来、但 base_rows 没发、且是模板骨架身份
+    `GTROW-<tpl>-NNNN`」的行**不新建 target**（与删除路径同用 contracts.is_template_skeleton_identity）。
+
+    背景（L8-D1）：L8-2 的 3 个派生行 R11/R13/R20 是模板计算只读行，HTML 有意不发它们；但它们
+    有物理 substrate 行 + editable B~M（缓存值），extract 会读回来。若 merge 为它们 fabricate 新
+    target，①嵌套数组路径（monthly/0）会在无 list 占位的新 target 上 fail-closed，②模板行会被塞进
+    HTML 载荷。本类钉住「模板骨架身份 + 不在 base_rows ⇒ 跳过」，同时保证「用户真新增行照常建」。
+    """
+
+    def _spec(self) -> RowTableSheetSpec:
+        # 模拟 L8：首列 item_name 文本锚点 + 一个 editable 数值列（够触发 target 新建分支即可）。
+        field_specs = (
+            ("item_name", "A", "editable", "text", "itemName", "项目", ""),
+            ("amount", "B", "editable", "amount", "amount", "金额", ""),
+        )
+        return RowTableSheetSpec(
+            managed_sheet="x", sheet_key="x", table_key="tbl", template_id="L82",
+            table_name="x", uuid_col="x", first_data_row=1, last_data_row=5, footer_row=6,
+            field_specs=field_specs, ghost_row_anchor_index=0,
+            row_identity_key="key",  # L8 用 key（非默认 rowId）
+        )
+
+    def _proj(self, values: dict):
+        class _FV:
+            def __init__(self, value, row_key):
+                self.value = value
+                self.row_key = row_key
+                self.is_protected = False
+
+        class _Proj:
+            def __init__(self, v):
+                self._v = v
+
+            def stable_keys(self):
+                return list(self._v)
+
+            def get(self, k):
+                return self._v.get(k)
+
+        return _Proj({k: _FV(v, rid) for k, (v, rid) in values.items()})
+
+    def test_template_skeleton_row_not_in_base_rows_is_skipped(self) -> None:
+        """GTROW-L82-0011（派生行）不在 base_rows + 是模板骨架身份 ⇒ 不被 fabricate 成新行。"""
+        from app.services.workpaper_sync.phase5_row_table_sheet import (
+            merge_projection_into_store_rows,
+        )
+
+        spec = self._spec()
+        rid = "GTROW-L82-0011"
+        proj = self._proj({
+            f"tbl/{rid}/item_name": ("利息费用", rid),
+            f"tbl/{rid}/amount": (700, rid),
+        })
+        merged, applied, visited, touched = merge_projection_into_store_rows(
+            spec, projection=proj, base_rows=[]
+        )
+        assert merged == [], "模板骨架身份 + 不在 base_rows ⇒ 应跳过，不塞进 store"
+
+    def test_template_skeleton_row_already_in_base_rows_is_backfilled(self) -> None:
+        """GTROW-L82-0009（输入行，HTML 已发）在 base_rows 里 ⇒ 正常回填，不受跳过影响。"""
+        from app.services.workpaper_sync.phase5_row_table_sheet import (
+            merge_projection_into_store_rows,
+        )
+
+        spec = self._spec()
+        rid = "GTROW-L82-0009"
+        base = [{"key": rid, "itemName": "利息费用总额", "amount": 0}]
+        proj = self._proj({f"tbl/{rid}/amount": (12000, rid)})
+        merged, applied, visited, touched = merge_projection_into_store_rows(
+            spec, projection=proj, base_rows=base
+        )
+        assert len(merged) == 1 and merged[0]["amount"] == 12000, "已存在的输入骨架行应被回填"
+
+    def test_user_minted_row_not_in_base_rows_is_still_created(self) -> None:
+        """🔴 对照：非模板身份（用户自铸 l82det-* / 运行期 MINTED）即便不在 base_rows 也照常建，
+        跳过只针对模板骨架身份 —— 否则会误删用户在 OO 侧新增的真实行。"""
+        from app.services.workpaper_sync.phase5_row_table_sheet import (
+            merge_projection_into_store_rows,
+        )
+
+        spec = self._spec()
+        rid = "l82det-abc-123"
+        proj = self._proj({
+            f"tbl/{rid}/item_name": ("用户新增项目", rid),
+            f"tbl/{rid}/amount": (450, rid),
+        })
+        merged, applied, visited, touched = merge_projection_into_store_rows(
+            spec, projection=proj, base_rows=[]
+        )
+        assert len(merged) == 1 and merged[0]["itemName"] == "用户新增项目", "用户自铸行应正常建"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # D5 零改动对照（Task 17 声明化，design 裁决 3 的验证点）
 # ═══════════════════════════════════════════════════════════════════════════
 

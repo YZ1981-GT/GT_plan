@@ -1,0 +1,61 @@
+{
+  "label": "task34-d1-endpoints-recheck",
+  "measured_at": "2026-10-04T07:08:11.511291+00:00",
+  "spec": "d1-sync-row-table-engine-and-d1-coverage",
+  "task": "4",
+  "requirements": [
+    "8.1",
+    "8.4"
+  ],
+  "host": {
+    "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "wp_id": "68c7740e-dc48-4787-a788-2e77f8560673",
+    "entry_id": "xlsx/gt-d1-notes-receivable",
+    "representation_generation": 1
+  },
+  "platform": {
+    "python": "3.12.8",
+    "machine": "AMD64",
+    "system": "Windows"
+  },
+  "store_item_count": 17,
+  "store_items_with_payload": 16,
+  "repeat": 7,
+  "endpoints": {
+    "store_projection": {
+      "samples": 7,
+      "min_s": 0.009,
+      "median_s": 0.01,
+      "max_s": 0.361
+    },
+    "pending_mutations_projection_segment": {
+      "samples": 7,
+      "min_s": 0.001,
+      "median_s": 0.001,
+      "max_s": 0.002
+    },
+    "materialize": {
+      "samples": 7,
+      "min_s": 4.681,
+      "median_s": 4.903,
+      "max_s": 5.385
+    },
+    "extract": {
+      "samples": 7,
+      "min_s": 0.395,
+      "median_s": 0.609,
+      "max_s": 0.699
+    },
+    "verify_unmanaged_regions": {
+      "samples": 7,
+      "min_s": 0.328,
+      "median_s": 0.455,
+      "max_s": 0.574
+    }
+  },
+  "materialize_last_run": {
+    "extracted_values": 360,
+    "extracted_tables": 18
+  },
+  "caliber_note": "量的是服务层核心计算段，不是 HTTP 端点墙钟（guard/auth/room/revision 推进为 I/O，run-to-run 漂且与引擎重构无关）。pending-mutations 只量其与 materialize 共享的 projection 解析段（不含落库）。此 JSON 为 Task 34 收尾复测的对照分母。"
+}

@@ -136,33 +136,74 @@ class TestKFP1EntrySetEquality:
 class TestKFP2ManifestOriginalValues:
     """🔴 manifest 原值是 overlay 默认值机械展开的结果，不是逐 entry 裁决。"""
 
+    # 🔴 2026-10-01 晋级后：原「13 条全 single_onlyoffice / unresolved / null」只对
+    #    **未晋级**的 8 条成立；晋级的 5 条（K_BIDIRECTIONAL_ENTRIES）必须恰好是
+    #    bidirectional + 具名 html_store + adapter_id == K_REVIEWED_CONTRACTS[n]。
+    #    两侧都精确等值 ⇒ 多晋级 / 少晋级 / 晋级到别的 adapter 都会打红。
+    @staticmethod
+    def _split(full_manifest: dict) -> tuple[dict[int, dict], dict[int, dict]]:
+        from tests.workpaper_sync.k_foundation_facts import K_BIDIRECTIONAL_ENTRIES
+
+        by_n: dict[int, dict] = {}
+        for e in _k_prefixed_xlsx_independent(full_manifest):
+            m = re.match(r"^xlsx/gt-k(1[0-3]|[1-9])-", e["entry_id"])
+            assert m, e["entry_id"]
+            by_n[int(m.group(1))] = e
+        promoted = {n: e for n, e in by_n.items() if n in K_BIDIRECTIONAL_ENTRIES}
+        rest = {n: e for n, e in by_n.items() if n not in K_BIDIRECTIONAL_ENTRIES}
+        return promoted, rest
+
     def test_all_13_capability_is_single_onlyoffice_in_manifest(
         self, full_manifest: dict
     ) -> None:
-        """manifest 原值 capability 全 single_onlyoffice。"""
+        """未晋级 8 条仍 single_onlyoffice；晋级 5 条恰为 bidirectional。"""
+        from tests.workpaper_sync.k_foundation_facts import K_BIDIRECTIONAL_ENTRIES
+
         ks = _k_prefixed_xlsx_independent(full_manifest)
         assert len(ks) == 13
-        for e in ks:
+        promoted, rest = self._split(full_manifest)
+        assert sorted(promoted) == sorted(K_BIDIRECTIONAL_ENTRIES)
+        for n, e in rest.items():
             assert e["capability"] == "single_onlyoffice", (
-                f"{e['entry_id']}: manifest capability={e['capability']!r}"
+                f"K{n}: manifest capability={e['capability']!r}"
             )
+        bidir = sorted(
+            n for n, e in {**promoted, **rest}.items()
+            if e["capability"] == "bidirectional"
+        )
+        assert bidir == sorted(K_BIDIRECTIONAL_ENTRIES)
 
     def test_all_13_html_store_is_unresolved_in_manifest(
         self, full_manifest: dict
     ) -> None:
-        ks = _k_prefixed_xlsx_independent(full_manifest)
-        for e in ks:
+        promoted, rest = self._split(full_manifest)
+        for n, e in rest.items():
             assert e["html_store"] == "unresolved", (
-                f"{e['entry_id']}: manifest html_store={e['html_store']!r}"
+                f"K{n}: manifest html_store={e['html_store']!r}"
+            )
+        for n, e in promoted.items():
+            expected = (
+                "checklist_responses_k1_writeoff_dict"
+                if n == 1
+                else rf"checklist_responses_k{n}_adjustment_(entries|rows)"
+            )
+            assert re.fullmatch(expected, e["html_store"]), (
+                f"K{n}: 晋级后 html_store={e['html_store']!r}"
             )
 
     def test_all_13_adapter_id_is_null_in_manifest(
         self, full_manifest: dict
     ) -> None:
-        ks = _k_prefixed_xlsx_independent(full_manifest)
-        for e in ks:
+        from tests.workpaper_sync.k_foundation_facts import K_REVIEWED_CONTRACTS
+
+        promoted, rest = self._split(full_manifest)
+        for n, e in rest.items():
             assert e["adapter_id"] is None, (
-                f"{e['entry_id']}: manifest adapter_id={e['adapter_id']!r}"
+                f"K{n}: manifest adapter_id={e['adapter_id']!r}"
+            )
+        for n, e in promoted.items():
+            assert e["adapter_id"] == K_REVIEWED_CONTRACTS[n], (
+                f"K{n}: adapter_id={e['adapter_id']!r}"
             )
 
     def test_zero_entries_have_capability_target_field_in_manifest(
@@ -184,8 +225,10 @@ class TestKFP2ManifestOriginalValues:
         defaults = overlay.get("defaults_by_component", {}).get("GtOnlyOfficeSheet", {})
         assert defaults.get("capability") == "single_onlyoffice"
         assert defaults.get("html_store") == "unresolved"
-        ks = _k_prefixed_xlsx_independent(full_manifest)
-        for e in ks:
+        # 晋级的 6 条由 overlay 的逐 entry override 驱动（不再是默认值），其余 7 条仍是默认值
+        _promoted, rest = TestKFP2ManifestOriginalValues._split(full_manifest)
+        assert len(rest) == 7
+        for e in rest.values():
             assert e["capability"] == defaults["capability"]
             assert e["html_store"] == defaults["html_store"]
 

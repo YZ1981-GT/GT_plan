@@ -42,6 +42,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import importlib
+import inspect
 import json
 import os
 import sys
@@ -101,6 +102,39 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     #    🔴 H9 是首个 `header_rows` 域扩容（3→4）之后落地的契约 —— 它本身是 2 级，
     #    但同循环的 H2/H4/H5/H7/H8 是 4 级；本门的 digest 会在扩容被回退时打红。
     ("h9", "phase5_h9_lease_liabilities", "ADAPTER_ID", True, True),
+    # ── 覆盖面补齐（2026-09-30，spec h-cycle-sync-foundation-and-first-canary）──────
+    #    🔴 缘起：翻 H 的 capability 前置第⑤项「golden digest 覆盖且零漂移」现算只覆盖
+    #    h9 一家。把台账（51 条 / 48 family）与本表（当时 24 家）对一遍，发现**24 个
+    #    family 从未进过基线** —— 门对它们恒绿，因为没有东西可比。这与 f1 曾被 `[SKIP]`
+    #    吞掉是同类不同机制：f1 是「登记了但跑挂被跳过」，这些是「**压根没登记**」，
+    #    连 stderr 都不会有一行。详见 `test_golden_digest_coverage_ratchet.py`。
+    #
+    #    🔴 本批先补 **已上线 bidirectional 却在门外**的两家 + H 循环 8 家：
+    #    `g7` / `h1` 是早期 pilot（`pilot_*` 命名），当初按 `phase5_*` 收录时漏掉，
+    #    而它们**正在被用户使用**，优先级高于尚未翻门的 H。
+    #
+    #    五元组按**现场 introspect** 定，不照抄不靠猜（`inspect.signature` 实打实看过）：
+    #      · `g7`/`h1` 用 `PILOT_ADAPTER_ID`，且只有 `instrumentation_spec`（单数）
+    #        ⇒ `plural_instr=False`；
+    #      · H 八家用 `ADAPTER_ID`，都有 `instrumentation_specs`（复数）⇒ `True`
+    #        （H2/H4/H5/H7/H8 是四级表头，留 False 会让扩容面对本门不可见）。
+    #
+    #    🔴 `g7` 的 `has_projection=False` 是**照脚本自己的处置说明**关掉那一段，不是偷懒：
+    #    `pilot_g7_two_level_dynamic` 既无 `MANAGED_FIELD_SPECS` 也无
+    #    `managed_row_table_specs()`，`_synthetic_rows()` 造不出合成 payload 而**直接抛**
+    #    RuntimeError（它刻意不返回空清单 —— 空清单会让 digest 算得出来却什么都没覆盖到）。
+    #    文件头注释写明：真不适用某一段就关那一段的开关（B60 同样处理），
+    #    不要让它整家抛异常然后被跳过。g7 仍核 contract + instrumentation 两段。
+    ("g7", "pilot_g7_two_level_dynamic", "PILOT_ADAPTER_ID", False, False),
+    ("h1", "pilot_h1_grouped_dynamic", "PILOT_ADAPTER_ID", True, False),
+    ("h2", "phase5_h2_construction_in_progress", "ADAPTER_ID", True, True),
+    ("h3", "phase5_h3_investment_property", "ADAPTER_ID", True, True),
+    ("h4", "phase5_h4_engineering_materials", "ADAPTER_ID", True, True),
+    ("h5", "phase5_h5_oil_gas_assets", "ADAPTER_ID", True, True),
+    ("h6", "phase5_h6_asset_disposal_clearing", "ADAPTER_ID", True, True),
+    ("h7", "phase5_h7_biological_assets", "ADAPTER_ID", True, True),
+    ("h8", "phase5_h8_right_of_use_assets", "ADAPTER_ID", True, True),
+    ("h10", "phase5_h10_asset_disposal_income", "ADAPTER_ID", True, True),
     # ── G9（spec: g-cycle-single-region-detail-lanes · Task 8 / C-5）────────
     #    🔴 全库**首个「一个 store 键 × 三个受管区」** provider：`明细表G9-2` 的
     #    R12-16 / R19-23 / R26-28 三区行都存在同一个 `G9-detail-rows` 数组里，区归属由
@@ -167,6 +201,14 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     ("g4", "phase5_g4_bond_investment", "ADAPTER_ID", True, True),
     ("g6", "phase5_g6_other_bond", "ADAPTER_ID", True, True),
     ("g5", "phase5_g5_long_term_receivable", "ADAPTER_ID", True, True),
+    # ── F 循环（spec: f3/f4/f5-sync-coverage-and-first-canary）──────────────
+    #    🔴 三家都有 `instrumentation_specs`（复数）⇒ `plural_instr=True`。
+    #    `build_store_projection` 的 `store_item_id` 是 KEYWORD_ONLY ⇒ 不触发
+    #    首位位置参数分派（只有 f1 是 POSITIONAL_OR_KEYWORD）。
+    ("f3", "phase5_f3_notes_payable", "ADAPTER_ID", True, True),
+    ("f4", "phase5_f4_accounts_payable", "ADAPTER_ID", True, True),
+    ("f5", "phase5_f5_cost_of_sales", "ADAPTER_ID", True, True),
+    # ── N4 canary 条目随 N 循环 provider 入库时补回（phase5_n4 尚未提交）──
 )
 
 
@@ -287,7 +329,30 @@ def _digests_for(label: str, module_name: str, adapter_const: str,
 
         contract = parse_contract(contract_payload, adapter_id=adapter_id)
         rows = _synthetic_rows(mod)
-        projection = mod.build_store_projection(rows, contract=contract)
+        # 🔴 f1 的签名多一个**首位位置参数** `store_item_id`。此前门按其余家的形态调它
+        #    ⇒ TypeError ⇒ 被 `run()` 的 except 吞成 `[SKIP] f1`，而 `[SKIP]` 只打到 stderr
+        #    且**不影响退出码** ⇒ **f1 整家从未进过基线**（2026-09-30 现算：登记 24 家 /
+        #    基线 23 家，f1 的 contract、sheet、instrumentation 三段全缺）。
+        #    照本门既有的「provider 命名差异照实处理、不强行统一」原则（D2 用
+        #    `PILOT_ADAPTER_ID`、D4 取复数 instrumentation），按签名分派而不是改 f1 的公开签名。
+        #
+        # 🔴 分派条件必须看参数的 **kind**，不能只看名字在不在：现算 24 家里有 **15 家**
+        #    把 `store_item_id` 声明为 **KEYWORD_ONLY**（`(payload, *, contract, limits,
+        #    store_item_id)`），它们本来就该按 `(rows, contract=…)` 调。首版用
+        #    `"store_item_id" in parameters` 判 ⇒ 给那 15 家多传了一个位置参数，
+        #    当场把 8 家打成 TypeError。**f1 是唯一**把它放在首位位置的那一家。
+        _params = inspect.signature(mod.build_store_projection).parameters
+        _positional = [
+            n
+            for n, p in _params.items()
+            if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+        ]
+        if _positional[:1] == ["store_item_id"]:
+            projection = mod.build_store_projection(
+                mod.STORE_ITEM_ID, rows, contract=contract
+            )
+        else:
+            projection = mod.build_store_projection(rows, contract=contract)
         # Projection 的 canonical 形态：按 stable_key 排序的 (key, value, value_type, mode, row_key)
         proj_canonical = {
             "contract_id": projection.contract_id,
@@ -355,12 +420,20 @@ def _instr_to_dict(spec: Any) -> dict[str, Any]:
 
 def run() -> dict[str, Any]:
     entries: list[dict[str, Any]] = []
+    skipped: list[dict[str, str]] = []
     for (label, mod, const, hp, pl) in PROVIDERS:
         try:
             entries.append(_digests_for(label, mod, const, hp, pl))
         except Exception as exc:  # noqa: BLE001
+            # 🔴 skip 不再只打 stderr 就算完（2026-09-30 修）：原来 `print("[SKIP] …")` + `continue`
+            #    让 f1 **整家**从基线里消失了，而门照样 exit 0 —— `_compare` 只遍历
+            #    `current["providers"]`，某家缺失时它的基线条目根本不会被比对，
+            #    「登记了 24 家」与「实际核了 23 家」的差被吞掉。
+            #    现在把 skip 带进结果，由 `main()` 判为**失败**（见那里的理由）。
             import sys
+
             print(f"[SKIP] {label}: {exc}", file=sys.stderr)
+            skipped.append({"label": label, "error": f"{type(exc).__name__}: {exc}"})
             continue
     # digest 总数：每家 contract + instrumentation（必有）+ projection（B60 无）
     #   + 🔴 P1-4 sheet 粒度 digest（第二轮复盘问题 5 修复：此前 sheet_digests 字段已被
@@ -373,7 +446,7 @@ def run() -> dict[str, Any]:
         + len(e.get("sheet_digests") or {})
         for e in entries
     )
-    return {"digest_count": total, "providers": entries}
+    return {"digest_count": total, "providers": entries, "skipped": skipped}
 
 
 def _load_baseline() -> dict[str, Any] | None:
@@ -439,9 +512,50 @@ def main() -> int:
         print("❌ 未找到基线文件 —— 请先 --update 取抽取前基线")
         return 1
 
+    # ── 🔴 两道「覆盖面」判据（2026-09-30 新增）──────────────────────────────
+    #
+    # 缘起：`[SKIP] f1` 长期打在 stderr 上而**不影响退出码** ⇒ f1 整家从未进过基线
+    #（现算当时：登记 24 家 / 基线 23 家 / f1 的 contract、sheet、instrumentation 三段全缺）。
+    # `_compare` 只遍历 `current["providers"]`，某家缺失时它的基线条目根本不会被比对，
+    # 于是「门是绿的」与「门在核 24 家」是两回事 —— 这正是本仓反复登记的
+    #「门在但对某一家不生效」。下面两条把覆盖面本身变成会打红的事实。
+    #
+    # 刻意**不设** skip 白名单：白名单只需要加一行就能让下一个签名漂移的 provider 隐身。
+    # provider 真的不适用某一段时，正确做法是在 `PROVIDERS` 里把那一段的开关关掉
+    #（`has_projection=False`，B60 就是这么处理的），而不是让它整家抛异常然后被跳过。
+    if current.get("skipped"):
+        print("❌ 有 provider 被跳过 —— 它们的 digest **一个都没核**（门对它们不生效）：")
+        for s in current["skipped"]:
+            print(f"   [{s['label']}] {s['error']}")
+        print(
+            "\n处置：修调用/签名让它能跑；若某一段真的不适用，"
+            "在 PROVIDERS 里关掉那一段的开关（如 has_projection=False），不要让它整家抛异常。"
+        )
+        return 1
+
+    registered = {p[0] for p in PROVIDERS}
+    measured = {e["label"] for e in current["providers"]}
+    in_baseline = {p["label"] for p in baseline.get("providers", [])}
+    if registered != measured:
+        print(
+            f"❌ 登记 {len(registered)} 家、实际算出 {len(measured)} 家 —— "
+            f"差集 {sorted(registered ^ measured)}"
+        )
+        return 1
+    if not registered <= in_baseline:
+        print(
+            f"❌ 以下已登记 provider 在**基线里没有条目** ⇒ 它们的漂移永远不会被发现："
+            f"{sorted(registered - in_baseline)}\n"
+            "   处置：确认它们现在能算出 digest 后 `--update` 补进基线。"
+        )
+        return 1
+
     drift = _compare(current, baseline)
     if not drift:
-        print(f"✅ golden digest 零回归：{current['digest_count']} 个 digest 逐个不变")
+        print(
+            f"✅ golden digest 零回归：{current['digest_count']} 个 digest 逐个不变"
+            f"（覆盖 {len(measured)} 家，零跳过）"
+        )
         return 0
 
     print("❌ golden digest 发生漂移（引擎抽取改变了已交付 contract 的行为，"
@@ -449,10 +563,22 @@ def main() -> int:
     for d in drift:
         print(f"   [{d['label']}] {d['field']}: 基线={d['disk'][:16]} 现算={d['source'][:16]}")
     print("\n排查顺序：")
-    print("  1. `git status --porcelain -- app/services/workpaper_sync/<该 provider 模块>.py`")
-    print("     —— 若该文件有非你本次改动的未提交改动（并发会话），基线本身已过期，")
-    print("        应先 `--update` 重取真实当前基线，再验证你自己的改动是否零回归。")
-    print("  2. 若该 provider 正是你本次改动的对象，落全量 diff 排查：对比抽取前后的")
+    print("  1. 🔴 查的是**整个 import 闭包**，不是 PROVIDERS 里登记的那一个模块文件：")
+    print("     `git status --porcelain -- backend/app/services/workpaper_sync/`")
+    print("     —— 实测教训（2026-09-30）：`[d4] sheet[d44-managed]` 漂移时，登记模块")
+    print("        `phase5_d4_revenue_detail.py` **无任何未提交改动**，真因在它 import 的")
+    print("        兄弟模块 `phase5_d4_adjustment_sheet.py`（`FOOTER_MARKER_D44` 从前缀")
+    print("        改成完整文本）。只查登记模块会得出「它没改 ⇒ 走第 2 条 ⇒ 这是真实回归」")
+    print("        的错误结论。按 sheet_key 反查产出它的模块：")
+    print("        `grep -rn '<该 sheet_key>' backend/app/services/workpaper_sync/`")
+    print("  2. 若闭包内有非你本次改动的未提交改动（并发会话），基线本身已过期 ——")
+    print("     该改动的作者负责 `--update`；**你不要替他们更新**（那会把未提交状态固化")
+    print("     进基线，他们回退时门会反向打红且归因丢失）。")
+    print("  3. 要证明「我的改动与本漂移无因果」，用行级 trace 而不是看文件名：")
+    print("     `sys.settrace` 包住 build_contract_payload/instrumentation_specs，")
+    print("     断言你改的那个文件**零行被执行**（import 过不算 —— lazy import 会把它")
+    print("     装进 sys.modules 造成假阳）。")
+    print("  4. 若该 provider 的闭包正是你本次改动的对象，落全量 diff 排查：对比抽取前后的")
     print("     build_contract_payload/build_store_projection/instrumentation_spec 输出")
     print("     （Requirement 4.2）—— 这才是真实回归。")
     return 1

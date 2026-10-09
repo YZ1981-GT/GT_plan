@@ -241,8 +241,12 @@ import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildK5SyncPayload, K5_NOTE_SECTION } from '../../composables/k5NoteSectionMap'
 import { newRowIdentity } from '../../composables/shared/rowIdentity'
+// 🔴 科目码走单一真源，原硬编码 '2701'（长期应付款）—— 预计负债是 '2801'。
+//    本文件监听/发布 substantive:adjudicated 事件，而 K5TabAdjudication 已改用
+//    k5AccountCode()（兜底 2801）发事件 ⇒ 口径不一致会使附注自动同步**静默失效**。
+import { K5_FALLBACK_STANDARD } from '../../composables/k5AccountScope'
 
-const K5_ACCOUNT_CODE = '2701'
+const K5_ACCOUNT_CODE = K5_FALLBACK_STANDARD
 
 const props = defineProps<{
   wpId: string
@@ -498,7 +502,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
-      wpCode: 'K5', variant: 'soe', accountCode: '2701',
+      wpCode: 'K5', variant: 'soe', accountCode: K5_ACCOUNT_CODE,
       projectId: props.projectId, sectionIds: [K5_NOTE_SECTION.soe],
     })
     ElMessage.success('已同步到附注')

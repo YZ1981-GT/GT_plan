@@ -24,6 +24,7 @@ import {
   resolveE1PrefillWrites,
   type E1AdjudicationPrefill,
 } from '../e1AdjudicationPrefill'
+import { e1AdjudicationSaveItemIds } from '../e1BackendOwnedKeys'
 
 const COMPOSABLE = resolve(__dirname, '../useE1Adjudication.ts')
 
@@ -180,8 +181,16 @@ describe('🔴 跨 sheet 键与 useE1Adjudication 交叉锁死', () => {
 
   it('composable 暴露了 applyFourTablePrefill 且显式提交这些键（flushSave 只收 E1-adj-）', () => {
     expect(src).toContain('applyFourTablePrefill')
-    // flushSave 的过滤条件仍只收 E1-adj-（故跨 sheet 键必须另行提交）
-    expect(src).toMatch(/startsWith\(['"]E1-adj-['"]\)/)
+    // flushSave 的过滤条件仍只收 E1-adj-（故跨 sheet 键必须另行提交）。
+    // 过滤谓词已抽到 e1BackendOwnedKeys（另排除后端独占键，公式推送 spec 任务 13）：
+    // 先钉 flushSave 确实经由该谓词取保存集合，再钉谓词本身仍是 E1-adj- 前缀口径。
+    const flush = src.slice(src.indexOf('function flushSave'))
+    expect(flush.slice(0, 600)).toMatch(/e1AdjudicationSaveItemIds\(/)
+    const predicate = readFileSync(resolve(__dirname, '../e1BackendOwnedKeys.ts'), 'utf-8')
+    expect(predicate).toMatch(/startsWith\(['"]E1-adj-['"]\)/)
+    expect(e1AdjudicationSaveItemIds(['E1-cash-detail-total-unaudited', 'E1-adj-cash-note'])).toEqual([
+      'E1-adj-cash-note',
+    ])
     // applyFourTablePrefill 内必须真的 await 保存
     const body = src.slice(src.indexOf('async function applyFourTablePrefill'))
     expect(body.slice(0, 900)).toContain('debouncedSave')

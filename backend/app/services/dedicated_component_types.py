@@ -21,6 +21,12 @@ DEDICATED_COMPONENT_TYPES: frozenset[str] = frozenset(
         "a15-bundle",
         "a16-bundle",
         "a17-bundle",
+        # A5-1 xianjinliuliang (A cycle canary): 8-sheet whole-book routing to
+        # a5-1-cashflow-audit; frontend GtA51CashflowAudit dispatches by sheetName.
+        # Without this entry the sheets fall back to class_code -> univer ->
+        # onlyoffice-sheet, so the dedicated component never mounts.
+        # spec: a-cycle-sync-foundation-and-first-canary
+        "a5-1-cashflow-audit",
         "b2-bundle",
         "b13-bundle",
         "b19-bundle",

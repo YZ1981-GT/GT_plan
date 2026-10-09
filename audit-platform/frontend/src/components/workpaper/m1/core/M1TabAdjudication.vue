@@ -617,7 +617,8 @@ onUnmounted(() => {
 
 function _restoreRows(): M1AdjudicationRow[] {
   const restored: M1AdjudicationRow[] = []
-  const prefix = 'M1-M1-1-row-'
+  // BP-10 迁移兼容：匹配旧 row-N 格式和新熵键格式
+  const prefix = 'M1-M1-1-'
   for (const [key, resp] of formData.allResponses.value.entries()) {
     if (key.startsWith(prefix) && key.endsWith('-data') && resp.remark) {
       try {

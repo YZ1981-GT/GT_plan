@@ -58,8 +58,10 @@ _DETAIL_SHEETS = (
 
 #: 已存在于平台但**未注册进 `formula_engine._REGISTRY`** 的 prefill 专属词汇。
 #: `LEDGER`/`LEDGER_DETAIL` 是 F2 盘点/计价测试系列既有条目（改造前已存在，
-#: 不属本 spec Wave 4 范围），与 F1 spec 的 `ADJ`/`TB_SUM` 豁免同款处理。
-_PREFILL_ONLY_FUNCS = ("ADJ", "TB_SUM", "LEDGER_DETAIL", "LEDGER")
+#: 不属本 spec Wave 4 范围），与 F1 spec 的 `TB_SUM` 豁免同款处理。
+#: 🔴 `ADJ` 已于 2026-09-28 注册（spec tb-adjustment-column-formula-closure
+#: Phase 1 Task 1.3）⇒ 按 `test_prefill_only_vocab_still_unregistered` 的指示移除。
+_PREFILL_ONLY_FUNCS = ("TB_SUM", "LEDGER_DETAIL", "LEDGER")
 
 #: 编码语义在两个标准科目表变体间冲突的「具体分类」码（不含区间边界 1499、
 #: 不含跌价准备 1416/1461——那两个是显式二选一豁免）。

@@ -252,8 +252,26 @@ class ExportJobStatus(str, enum.Enum):
     running = "running"
     partial_failed = "partial_failed"
     succeeded = "succeeded"
+    partial = "partial"  # phase4 trio: 部分步骤失败
     failed = "failed"
+    blocked = "blocked"  # phase4 trio: readiness 阻断
     cancelled = "cancelled"
+
+
+class ExportJobItemStatus(str, enum.Enum):
+    """后台导出任务明细状态（phase4 trio 细化）"""
+    queued = "queued"
+    running = "running"
+    succeeded = "succeeded"
+    failed = "failed"
+    blocked = "blocked"          # 前置依赖失败
+    skipped = "skipped"
+
+class ExportJobAttemptStatus(str, enum.Enum):
+    """attempt 状态"""
+    running = "running"
+    succeeded = "succeeded"
+    failed = "failed"
 
 
 # ---------------------------------------------------------------------------
@@ -261,7 +279,7 @@ class ExportJobStatus(str, enum.Enum):
 # ---------------------------------------------------------------------------
 
 class ExportJob(Base):
-    """后台导出任务（全套导出/批量渲染/重试）"""
+    """后台导出任务（全套导出/批量渲染/重试/三件套）"""
 
     __tablename__ = "export_jobs_v2"
 
@@ -286,6 +304,21 @@ class ExportJob(Base):
     updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), onupdate=func.now()
     )
+
+    # ── V181 phase4 trio 扩展 ──────────────────────────────────────
+    snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    kind: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    year: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    trio_total: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("3"), nullable=False
+    )
+    trio_succeeded: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("0"), nullable=False
+    )
+    started_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     __table_args__ = (
         Index("idx_export_jobs_v2_project", "project_id", "status"),
@@ -316,6 +349,109 @@ class ExportJobItem(Base):
     error_message: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
+    # ── V181 phase4 trio 扩展 ──────────────────────────────────────
+    step_key: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    sequence: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    version_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    file_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    file_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    attempt_count: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("0"), nullable=False
+    )
+    last_attempt_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+
     __table_args__ = (
         Index("idx_export_job_items_v2_job", "job_id", "status"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# deliverable_snapshots — 不可变交付快照（V181）
+# ---------------------------------------------------------------------------
+
+class DeliverableSnapshot(Base):
+    """不可变交付快照。
+
+    digest 不含生成时间和本机绝对路径（design §五 / 需求 1.5）。
+    三件套 job 的每个 item 必须引用同一个 snapshot。
+    """
+
+    __tablename__ = "deliverable_snapshots"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id"), nullable=False
+    )
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    digest: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+
+    __table_args__ = (
+        Index("ix_deliverable_snapshots_project_year", "project_id", "year"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# export_job_attempts — append-only 不可变历史（V181）
+# ---------------------------------------------------------------------------
+
+class ExportJobAttempt(Base):
+    """后台导出任务 attempt 历史。
+
+    同一 item 的 attempt_no 唯一递增。失败 attempt 永不覆盖；
+    重试只能新增 attempt 并更新 item 的当前投影。
+    """
+
+    __tablename__ = "export_job_attempts"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("export_jobs_v2.id"), nullable=False
+    )
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("export_job_items_v2.id"), nullable=False
+    )
+    attempt_no: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(30), server_default=text("'running'"), nullable=False
+    )
+    started_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    error_type: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    diagnostic_detail: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    file_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    file_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    version_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    trigger_source: Mapped[str | None] = mapped_column(String(30), nullable=True)
+
+    __table_args__ = (
+        sa.UniqueConstraint("item_id", "attempt_no", name="uq_export_job_attempts_item_no"),
+        Index("ix_export_job_attempts_job", "job_id"),
+        Index("ix_export_job_attempts_item", "item_id", "attempt_no"),
     )

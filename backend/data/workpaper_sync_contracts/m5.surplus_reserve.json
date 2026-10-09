@@ -1,0 +1,323 @@
+{
+  "schema_version": "contract-definition:v1",
+  "contract_id": "m5.surplus_reserve",
+  "semantic_version": "1.0.0",
+  "review_status": "reviewed",
+  "document_type": "xlsx",
+  "template_definition_sha256": "8212340a38e681a8b4e6a0462066eb68dc9d1870cee42ad43b3403dcb8d031fd",
+  "instrumentation_definition_sha256": "c67a6473f662b7b0c9ddfaa416ea201935c3fd8089c37c4a52d07b540e7d42ef",
+  "template": {
+    "relative_path": "M/M5 盈余公积.xlsx",
+    "template_sha256": "0e32a0567e4e3a36e137fa2f2d8ae66a0b1d5eaf266dfd57f9ffd1ce24ae2316",
+    "normalized_structure_hash": "e982f6d94d087730b7755bf4431663dcd2f9dd610c748000b77dd6a9037d5844"
+  },
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "sheets": [
+    {
+      "excel_name": "明细表M5-2",
+      "sheet_key": "m501-managed",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "tables": [
+        {
+          "table_key": "m5_detail_rows",
+          "anchor": "A9",
+          "header_rows": 3,
+          "fields": [
+            {
+              "stable_field_key": "m5_detail_rows/{row_uuid}/item_name",
+              "column_key": "item_name",
+              "json_pointer": "/m5_detail_rows/{row_uuid}/itemName",
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!明细表M5-2!A12",
+              "header_source_ref": "源xlsx!明细表M5-2!A9",
+              "header_text": "明细项目",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m5_detail_rows/{row_uuid}/prior_opening",
+              "column_key": "prior_opening",
+              "json_pointer": "/m5_detail_rows/{row_uuid}/priorOpening",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M5-2!B12",
+              "header_source_ref": "源xlsx!明细表M5-2!B9",
+              "header_text": "期初数",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m5_detail_rows/{row_uuid}/increase_amount",
+              "column_key": "increase_amount",
+              "json_pointer": "/m5_detail_rows/{row_uuid}/increaseAmount",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M5-2!C12",
+              "header_source_ref": "源xlsx!明细表M5-2!C9",
+              "header_text": "金额",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m5_detail_rows/{row_uuid}/increase_method",
+              "column_key": "increase_method",
+              "json_pointer": "/m5_detail_rows/{row_uuid}/increaseMethod",
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!明细表M5-2!D12",
+              "header_source_ref": "源xlsx!明细表M5-2!D9",
+              "header_text": "增加方式",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m5_detail_rows/{row_uuid}/decrease_amount",
+              "column_key": "decrease_amount",
+              "json_pointer": "/m5_detail_rows/{row_uuid}/decreaseAmount",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M5-2!E12",
+              "header_source_ref": "源xlsx!明细表M5-2!E9",
+              "header_text": "金额",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m5_detail_rows/{row_uuid}/decrease_method",
+              "column_key": "decrease_method",
+              "json_pointer": "/m5_detail_rows/{row_uuid}/decreaseMethod",
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!明细表M5-2!F12",
+              "header_source_ref": "源xlsx!明细表M5-2!F9",
+              "header_text": "减少方式",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m5_detail_rows/{row_uuid}/closing_balance",
+              "column_key": "closing_balance",
+              "json_pointer": "/m5_detail_rows/{row_uuid}/closingBalance",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M5-2!G12",
+              "header_source_ref": "源xlsx!明细表M5-2!G9",
+              "header_text": "期末数",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m5_detail_rows/{row_uuid}/prior_adj_aje",
+              "column_key": "prior_adj_aje",
+              "json_pointer": "/m5_detail_rows/{row_uuid}/priorAdjAje",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M5-2!H12",
+              "header_source_ref": "源xlsx!明细表M5-2!H9",
+              "header_text": "账项调整",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m5_detail_rows/{row_uuid}/prior_adj_rje",
+              "column_key": "prior_adj_rje",
+              "json_pointer": "/m5_detail_rows/{row_uuid}/priorAdjRje",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M5-2!I12",
+              "header_source_ref": "源xlsx!明细表M5-2!I9",
+              "header_text": "重分类调整",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m5_detail_rows/{row_uuid}/current_aje_increase",
+              "column_key": "current_aje_increase",
+              "json_pointer": "/m5_detail_rows/{row_uuid}/currentAjeIncrease",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M5-2!J12",
+              "header_source_ref": "源xlsx!明细表M5-2!J9",
+              "header_text": "本期增加",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m5_detail_rows/{row_uuid}/current_aje_decrease",
+              "column_key": "current_aje_decrease",
+              "json_pointer": "/m5_detail_rows/{row_uuid}/currentAjeDecrease",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M5-2!K12",
+              "header_source_ref": "源xlsx!明细表M5-2!K9",
+              "header_text": "本期减少",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m5_detail_rows/{row_uuid}/current_rje_increase",
+              "column_key": "current_rje_increase",
+              "json_pointer": "/m5_detail_rows/{row_uuid}/currentRjeIncrease",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M5-2!L12",
+              "header_source_ref": "源xlsx!明细表M5-2!L9",
+              "header_text": "本期增加",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m5_detail_rows/{row_uuid}/current_rje_decrease",
+              "column_key": "current_rje_decrease",
+              "json_pointer": "/m5_detail_rows/{row_uuid}/currentRjeDecrease",
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M5-2!M12",
+              "header_source_ref": "源xlsx!明细表M5-2!M9",
+              "header_text": "本期减少",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m5_detail_rows/{row_uuid}/audited_opening",
+              "column_key": "audited_opening",
+              "json_pointer": "/m5_detail_rows/{row_uuid}/auditedOpening",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M5-2!N12",
+              "header_source_ref": "源xlsx!明细表M5-2!N9",
+              "header_text": "期初数",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m5_detail_rows/{row_uuid}/audited_increase",
+              "column_key": "audited_increase",
+              "json_pointer": "/m5_detail_rows/{row_uuid}/auditedIncrease",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M5-2!O12",
+              "header_source_ref": "源xlsx!明细表M5-2!O9",
+              "header_text": "本期增加",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m5_detail_rows/{row_uuid}/audited_decrease",
+              "column_key": "audited_decrease",
+              "json_pointer": "/m5_detail_rows/{row_uuid}/auditedDecrease",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M5-2!P12",
+              "header_source_ref": "源xlsx!明细表M5-2!P9",
+              "header_text": "本期减少",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              }
+            },
+            {
+              "stable_field_key": "m5_detail_rows/{row_uuid}/audited_closing",
+              "column_key": "audited_closing",
+              "json_pointer": "/m5_detail_rows/{row_uuid}/auditedClosing",
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表M5-2!Q12",
+              "header_source_ref": "源xlsx!明细表M5-2!Q9",
+              "header_text": "期末数",
+              "store_item_id": "placeholder",
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              }
+            }
+          ],
+          "delete_policy": "reject",
+          "formula_mask": [
+            "G12:G15",
+            "N12:N15",
+            "O12:O15",
+            "P12:P15",
+            "Q12:Q15"
+          ],
+          "row_identity": {
+            "kind": "template_row_key",
+            "template_row_key": "m5_detail_rows_template"
+          },
+          "footer_anchor": {
+            "marker": "合计",
+            "search_column": "A",
+            "carries_total_formula": true
+          }
+        }
+      ]
+    }
+  ],
+  "review": {
+    "entry_id": "xlsx/gt-m5-surplus-reserve",
+    "pilot_class": "phase5_m5_equity",
+    "authority_root": "backend/wp_templates",
+    "html_store": {
+      "table": "checklist_responses",
+      "item_id": "M5-",
+      "row_identity_key": "rowId",
+      "shape": "flat_key_value",
+      "note": "M5 的业务内容由 useM5FormData.ts 承载：ITEM_PREFIX='M5-'，命名 M5-{sheet}-{field}。审定表几乎全是公式，真正数据入口在明细表。"
+    },
+    "reviewed_basis": "openpyxl 逐 sheet 直读权威模板 M/M5 盈余公积.xlsx 的 10 张 sheet。审定表 M5-1（48r×12c / 59 公式）：两级表头 R5-R6，数据区 R7-R10（4 行固定科目），R11 合计 SUM。B~K 列全公式引用明细表，A 列项目名称 + L 列原因分析为 editable。明细表 M5-2（38r×17c / 41 公式）：三级表头 R9-R11，数据区 R12-R15（4 行固定），R16 合计公式。Editable 12 列 + Formula 5 列。科目码 4101 盈余公积（贷方/权益类）。"
+  }
+}

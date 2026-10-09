@@ -199,17 +199,54 @@ async def seed(plan: GroupPlan) -> dict:
         TradeType,
     )
     from app.models.core import Project, User
+    from app.services.group_relation import normalize_relation
 
-    stats = {"created": [], "skipped": []}
-
-    async def _get_project_by_name(db, name: str) -> "Project | None":
+    async def _get_project_by_name(db, name: str, year: int) -> "Project | None":
         res = await db.execute(
             sa.select(Project).where(
                 Project.client_name == name,
                 Project.is_deleted == sa.false(),
             )
         )
-        return res.scalars().first()
+        projects = list(res.scalars().all())
+        if not projects:
+            return None
+        # 同名项目可能来自不同年度：优先选择目标年度；没有目标年度时只允许
+        # 唯一的一条记录进入后续年度冲突检查，避免随机复用另一年度项目。
+        target = [project for project in projects if project.audit_year == year]
+        if len(target) == 1:
+            return target[0]
+        if len(target) > 1:
+            raise ValueError(f"seed 项目「{name}」在年度 {year} 存在重复项目，无法确定唯一记录")
+        if len(projects) > 1:
+            years = sorted({project.audit_year for project in projects}, key=lambda value: (value is not None, value))
+            raise ValueError(f"seed 项目「{name}」存在多个非目标年度/未定年度项目（{years}），拒绝复用")
+        return projects[0]
+
+    def _ensure_seed_year(project: "Project", label: str) -> None:
+        if project.audit_year is None:
+            project.audit_year = plan.year
+            stats["updated"].append(f"{label}/audit_year")
+            return
+        if project.audit_year != plan.year:
+            raise ValueError(
+                f"seed 项目「{project.client_name}」已有 audit_year={project.audit_year}，"
+                f"不能复用为年度 {plan.year}"
+            )
+
+    def _ensure_seed_relation(project: "Project", label: str) -> None:
+        relation = normalize_relation(project.relation_to_parent)
+        if relation is None:
+            project.relation_to_parent = "subsidiary"
+            stats["updated"].append(f"{label}/relation_to_parent")
+            return
+        if relation != "subsidiary":
+            raise ValueError(
+                f"seed 子项目「{project.client_name}」已有 relation_to_parent={relation!r}，"
+                "不会静默改为 subsidiary"
+            )
+
+    stats = {"created": [], "updated": [], "skipped": []}
 
     async with async_session() as db:
         # ── 0) 造一个 UAT 负责人 user（幂等：按 username）────────────────────
@@ -231,7 +268,7 @@ async def seed(plan: GroupPlan) -> dict:
             stats["skipped"].append(f"user:{uat_username}")
 
         # ── 1) 母项目（幂等：按 client_name）─────────────────────────────────
-        parent = await _get_project_by_name(db, plan.parent_name)
+        parent = await _get_project_by_name(db, plan.parent_name, plan.year)
         if parent is None:
             parent = Project(
                 id=uuid.uuid4(),
@@ -239,6 +276,7 @@ async def seed(plan: GroupPlan) -> dict:
                 client_name=plan.parent_name,
                 company_code=plan.parent_code,
                 ultimate_company_code=plan.parent_code,
+                audit_year=plan.year,
                 report_scope="consolidated",
                 consolidation_type="subsidiary",
                 consol_level=2,
@@ -248,20 +286,23 @@ async def seed(plan: GroupPlan) -> dict:
             await db.flush()
             stats["created"].append(f"parent_project:{plan.parent_name}")
         else:
+            _ensure_seed_year(parent, f"parent_project:{plan.parent_name}")
             stats["skipped"].append(f"parent_project:{plan.parent_name}")
 
         # ── 2) 子项目 + trial_balance（幂等）─────────────────────────────────
         for child_spec in plan.children:
-            child = await _get_project_by_name(db, child_spec.name)
+            child = await _get_project_by_name(db, child_spec.name, plan.year)
             if child is None:
                 child = Project(
                     id=uuid.uuid4(),
                     name=child_spec.name,
                     client_name=child_spec.name,
                     company_code=child_spec.company_code,
+                    audit_year=plan.year,
                     parent_company_code=plan.parent_code,
                     ultimate_company_code=plan.parent_code,
                     parent_project_id=parent.id,
+                    relation_to_parent="subsidiary",
                     report_scope="standalone",
                     consol_level=1,
                     manager_id=user.id,
@@ -270,9 +311,12 @@ async def seed(plan: GroupPlan) -> dict:
                 await db.flush()
                 stats["created"].append(f"child_project:{child_spec.name}")
             else:
+                _ensure_seed_year(child, f"child_project:{child_spec.name}")
+                _ensure_seed_relation(child, f"child_project:{child_spec.name}")
                 # 确保父子关系正确（修正历史脏数据）
                 if child.parent_project_id != parent.id:
                     child.parent_project_id = parent.id
+                    stats["updated"].append(f"child_project:{child_spec.name}/parent_project_id")
                 stats["skipped"].append(f"child_project:{child_spec.name}")
 
             # trial_balance 行（按唯一键去重）
@@ -370,6 +414,9 @@ def _print_result(result: dict) -> None:
     print(f"新建 ({len(stats['created'])}):")
     for c in stats["created"]:
         print(f"  + {c}")
+    print(f"更新 ({len(stats.get('updated', []))}):")
+    for u in stats.get("updated", []):
+        print(f"  ~ {u}")
     print(f"跳过/已存在 ({len(stats['skipped'])}):")
     for s in stats["skipped"]:
         print(f"  = {s}")

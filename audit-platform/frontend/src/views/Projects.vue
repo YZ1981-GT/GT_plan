@@ -46,7 +46,7 @@
       :header-cell-style="{ fontWeight: 600, background: 'var(--gt-color-primary-bg, #f4f0fa)' }"
       empty-text="暂无项目，点击上方「新建项目」开始"
       style="width: 100%"
-      @row-click="(row) => openProject(row.id)"
+      @row-click="(row: any) => openProject(row.id)"
       :row-style="{ cursor: 'pointer' }"
     >
       <el-table-column prop="name" label="项目名称" min-width="220">
@@ -145,22 +145,22 @@
 
         <template v-else>
           <!-- 每个 ultimate 分组一棵集团树 -->
-          <div v-for="tree in trees" :key="tree.ultimateCode" class="gt-tree-card">
+          <div v-for="tree in trees" :key="tree.key || `${tree.ultimateCode}@${tree.year || ''}`" class="gt-tree-card">
             <div class="gt-tree-root">
               <div class="gt-tree-root-avatar">
                 <el-icon :size="18"><OfficeBuilding /></el-icon>
               </div>
-              <div class="gt-tree-root-info">
+            <div class="gt-tree-root-info">
                 <span class="gt-tree-root-name">{{ tree.ultimateName || '最终控制方' }}</span>
-                <span class="gt-tree-root-code">{{ tree.ultimateCode || '—' }}</span>
+                <span class="gt-tree-root-code">{{ tree.ultimateCode || '—' }} · {{ tree.year || '年度未解析' }}</span>
               </div>
               <el-tag size="small" effect="light" round>最终控制方</el-tag>
             </div>
             <el-tree
-              :ref="(el: any) => registerTreeRef(tree.ultimateCode, el)"
+              :ref="(el: any) => registerTreeRef(tree.key || `${tree.ultimateCode}@${tree.year || ''}`, el)"
               class="gt-tree"
               :data="tree.children"
-              node-key="id"
+              node-key="nodeKey"
               :props="treeProps"
               :filter-node-method="filterNodeMethod"
               :expand-on-click-node="false"
@@ -171,6 +171,9 @@
                 <span class="gt-node" :class="nodeClass(data)">
                   <span class="gt-node-name"><template v-for="(seg, i) in hlSegs(data.companyName || data.label)" :key="i"><span v-if="seg.match" class="gt-hl">{{ seg.text }}</span><template v-else>{{ seg.text }}</template></template></span>
                   <span class="gt-node-code"><template v-for="(seg, i) in hlSegs(data.companyCode || '—')" :key="i"><span v-if="seg.match" class="gt-hl">{{ seg.text }}</span><template v-else>{{ seg.text }}</template></template></span>
+                  <el-tag v-if="data.relation" size="small" effect="plain" round>{{ data.relation === 'branch' ? '分公司' : '子公司' }}</el-tag>
+                  <el-tag v-if="data.consolidatedProjectId" size="small" type="primary" effect="plain" round>合并</el-tag>
+                  <el-tag v-if="data.standaloneProjectId" size="small" type="success" effect="plain" round>单户</el-tag>
                   <el-tag :type="getStatusTag(data.status)" size="small" effect="plain" round>
                     {{ getStatusLabel(data.status) }}
                   </el-tag>
@@ -209,6 +212,9 @@
                 <span class="gt-node">
                   <span class="gt-node-name"><template v-for="(seg, i) in hlSegs(data.companyName || data.label)" :key="i"><span v-if="seg.match" class="gt-hl">{{ seg.text }}</span><template v-else>{{ seg.text }}</template></template></span>
                   <span class="gt-node-code"><template v-for="(seg, i) in hlSegs(data.companyCode || '—')" :key="i"><span v-if="seg.match" class="gt-hl">{{ seg.text }}</span><template v-else>{{ seg.text }}</template></template></span>
+                  <el-tag v-if="data.relation" size="small" effect="plain" round>{{ data.relation === 'branch' ? '分公司' : '子公司' }}</el-tag>
+                  <el-tag v-if="data.consolidatedProjectId" size="small" type="primary" effect="plain" round>合并</el-tag>
+                  <el-tag v-if="data.standaloneProjectId" size="small" type="success" effect="plain" round>单户</el-tag>
                   <el-tag :type="getStatusTag(data.status)" size="small" effect="plain" round>
                     {{ getStatusLabel(data.status) }}
                   </el-tag>

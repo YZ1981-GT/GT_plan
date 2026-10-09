@@ -7,16 +7,27 @@ GET /api/consol-note-sections/{project_id}/{year}/{section_id}/data — 加载�
 """
 
 import json
+from dataclasses import replace as _replace
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy import text
+import sqlalchemy as sa
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import require_project_access
+from app.deps import check_consol_lock, require_project_access
+from app.models.consol_note_data_models import ConsolNoteData
 from app.models.core import User
+from app.services.consol_node_scope import (
+    NodeScope,
+    NodeScopeError,
+    load_scoped_note_record,
+    load_scoped_note_records,
+    resolve_node_scope,
+    resolve_requested_node_key,
+    save_scoped_note_record,
+)
 
 router = APIRouter(prefix="/api/consol-note-sections", tags=["consol-note-sections"])
 
@@ -27,7 +38,10 @@ _cache: dict[str, tuple[float, list[dict]]] = {}
 
 
 def _load_sections(standard: str) -> list[dict]:
-    """从 JSON 文件加载章节数据（带内存缓存，文件变更时自动刷新）"""
+    """从 JSON 文件加载章节数据（带内存缓存，文件变更时自动刷新）。
+
+    自动将 multi_header 转换为 _column_groups（使前端渲染路径统一）。
+    """
     json_path = DATA_DIR / f"consol_note_sections_{standard}.json"
     if not json_path.exists():
         return []
@@ -38,8 +52,116 @@ def _load_sections(standard: str) -> list[dict]:
         return cached[1]
 
     data = json.loads(json_path.read_text(encoding="utf-8"))
+
+    # 补齐 _column_groups + columns + _row_types
+    from app.services.consol_note_formula_service import (
+        multi_header_to_column_groups,
+        _ensure_columns,
+        _ensure_row_types,
+    )
+
+    for section in data:
+        if not isinstance(section, dict):
+            continue
+        if not section.get("_column_groups"):
+            mh = section.get("multi_header")
+            if mh:
+                groups = multi_header_to_column_groups(mh)
+                if groups:
+                    section["_column_groups"] = groups
+        _ensure_columns(section)
+        _ensure_row_types(section)
+
     _cache[standard] = (mtime, data)
     return data
+
+
+# ─── 附注差额与「按公式填入」（spec consol-elimination-single-source-push 任务 7）──────────────
+# 固定前缀路径（breakdown / fill-by-formula）声明在 ``/{standard}/{section_id}`` 之前，免得被当成模板名。
+
+
+def _note_error(exc: Exception) -> HTTPException:
+    return HTTPException(status_code=getattr(exc, "status", 400), detail=str(exc))
+
+
+def _requested_note_template(body: dict) -> str | None:
+    """读取标准/模板请求，并拒绝两个字段指向不同模板。"""
+    from app.services.consol_note_formula_service import note_template_type
+
+    standard = body.get("standard")
+    template_type = body.get("template_type")
+    if standard and template_type and note_template_type(standard) != note_template_type(template_type):
+        raise _note_error(
+            ValueError(
+                f"standard={standard} 与 template_type={template_type} 指向不同附注模板"
+            )
+        )
+    return template_type or standard
+
+
+async def _resolve_requested_template(
+    db: AsyncSession,
+    project_id: UUID,
+    body: dict,
+) -> str:
+    """按项目真实标准解析模板；显式标准/模板只用于一致性校验。"""
+    from app.services.consol_note_formula_service import NoteFormulaError, resolve_note_template_type
+
+    requested = _requested_note_template(body)
+    try:
+        return await resolve_note_template_type(db, project_id, requested)
+    except NoteFormulaError as exc:
+        raise _note_error(exc) from exc
+
+
+@router.get("/breakdown/{project_id}/{year}/{section_id}")
+async def get_note_breakdown(
+    project_id: UUID, year: int, section_id: str,
+    node_key: str | None = Query(None, description="汇总节点；默认根合并节点"),
+    standard: str | None = Query(None, description="附注模板（soe / listed）；不传按项目口径"),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("readonly")),
+):
+    """有公式的单元格：个别数汇总 / 调整 / 抵销 / 合并数，及所选汇总节点各直接子节点贡献（需求 6.3）。"""
+    from app.services.consol_note_formula_service import NoteFormulaError, note_breakdown
+
+    try:
+        result = await note_breakdown(db, project_id, year, section_id, node_key=node_key, standard=standard)
+    except NoteFormulaError as e:
+        await db.rollback()
+        raise _note_error(e) from e
+    await db.commit()  # 只可能写了按需种子（模板级派生配置），不写项目数据
+    return result
+
+
+@router.post("/fill-by-formula/{project_id}/{year}/{section_id}")
+async def fill_note_by_formula(
+    project_id: UUID, year: int, section_id: str,
+    node_key: str | None = Query(None, description="企业树节点；根节点允许读取历史兼容行但写入节点专属行"),
+    standard: str | None = Query(None, description="附注标准（soe / listed）；不传按项目口径"),
+    template_type: str | None = Query(None, description="合并附注模板（soe / listed）；不传按项目口径"),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
+):
+    """把合并数写入该章节已保存数据；按项目标准解析模板并清除待更新标记。"""
+    from app.services.consol_note_formula_service import NoteFormulaError, fill_by_formula
+
+    try:
+        result = await fill_by_formula(
+            db,
+            project_id,
+            year,
+            section_id,
+            node_key=node_key,
+            standard=standard,
+            template_type=template_type,
+        )
+    except NoteFormulaError as e:
+        await db.rollback()
+        raise _note_error(e) from e
+    await db.commit()
+    return result
 
 
 @router.get("/{standard}")
@@ -59,6 +181,7 @@ async def get_all_sections(standard: str):
             "title": sec["title"],
             "seq": sec["seq"],
             "parent_seq": sec.get("parent_seq", 0),
+            "continuation_of": sec.get("continuation_of"),
         })
 
     tree = []
@@ -79,7 +202,7 @@ async def get_section_detail(standard: str, section_id: str):
     sections = _load_sections(standard)
     for sec in sections:
         if sec["section_id"] == section_id:
-            return {
+            result = {
                 "section_id": sec["section_id"],
                 "title": sec["title"],
                 "parent_section": sec.get("parent_section", ""),
@@ -87,56 +210,313 @@ async def get_section_detail(standard: str, section_id: str):
                 "rows": sec.get("rows", []),
                 "multi_header": sec.get("multi_header"),
             }
+            if sec.get("_column_groups"):
+                result["_column_groups"] = sec["_column_groups"]
+            if sec.get("columns"):
+                result["columns"] = sec["columns"]
+            if sec.get("_row_types"):
+                result["_row_types"] = sec["_row_types"]
+            return result
     return {"error": "章节不存在", "section_id": section_id}
 
 
-# ─── 用户数据存储（按项目+年度+章节） ─────────────────────────────────────────
+# ─── 用户数据存储（按项目+年度+章节+节点） ───────────────────────────────────
+
+
+def _requested_node_key(query_node_key: str | None, body: dict | None = None) -> str | None:
+    """兼容旧 body 调用，并把 query/body 冲突转换成当前路由的 4xx。"""
+    try:
+        return resolve_requested_node_key(query_node_key, body)
+    except NodeScopeError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
+
+
+async def _resolve_note_scope(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    node_key: str | None,
+    section_id: str | None = None,
+) -> NodeScope:
+    """把共享作用域错误转换成当前路由的 HTTP 错误。"""
+    try:
+        return await resolve_node_scope(db, project_id, year, node_key, section_id)
+    except NodeScopeError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
+
+
+async def _load_saved_note_data(
+    db: AsyncSession,
+    scope: NodeScope,
+) -> dict[str, dict]:
+    """读取已验证作用域的附注数据；根节点才允许逐章节回退 legacy。"""
+    records = await load_scoped_note_records(db, scope)
+    return {
+        record.section_id: record.data if isinstance(record.data, dict) else {}
+        for record in records
+    }
+
+
+async def _load_note_record(
+    db: AsyncSession,
+    scope: NodeScope,
+    *,
+    allow_root_legacy_fallback: bool = True,
+) -> ConsolNoteData | None:
+    """按已验证作用域读取附注行。"""
+    return await load_scoped_note_record(
+        db, scope, allow_root_legacy_fallback=allow_root_legacy_fallback,
+    )
+
+
+async def _save_note_record(
+    db: AsyncSession,
+    scope: NodeScope,
+    data: dict,
+    *,
+    now=None,
+) -> ConsolNoteData:
+    """按已验证作用域写入附注行，统一处理 legacy 复制与并发。"""
+    try:
+        return await save_scoped_note_record(db, scope, data, now=now)
+    except NodeScopeError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
+
+
+async def _load_tb_map(
+    db: AsyncSession,
+    scope: NodeScope,
+) -> dict[str, dict[str, float]]:
+    """从共享合并上下文构建节点科目金额，不按 company_code 自行汇总。
+
+    ``audited`` 是所选节点的合并数；``opening`` 使用上一审计年度同一 node_key
+    的共享合并数，避免把项目级根公司余额误当作子节点/汇总节点金额。
+    """
+    from app.services.consol_calc_basis import MEASURE_CONSOLIDATED, node_measures
+    from app.services.consol_report_view_service import (
+        ViewError,
+        find_node,
+        load_view_context,
+    )
+
+    ctx = await load_view_context(db, scope.project_id, scope.year)
+    if ctx is None:
+        raise ValueError("无法加载当前年度合并计算上下文")
+    try:
+        node = find_node(ctx.basis.tree, scope.node_key)
+    except ViewError as exc:
+        raise ValueError(str(exc)) from exc
+
+    node_values = node_measures(ctx.basis)
+    current = node_values.get(node.node_key)
+    if current is None:
+        raise ValueError(f"节点 {node.node_key} 缺少当前年度金额")
+    audited_by_code = current.get(MEASURE_CONSOLIDATED, {})
+
+    # 附注模板的“期初/年初”沿用同一共享节点口径，以上一有效审计年度审定数表示。
+    # 若上一年度或节点不存在，opening 保持 0（与旧映射的空期初兼容）。
+    opening_by_code: dict[str, object] = {}
+    prior_ctx = await load_view_context(db, scope.project_id, scope.year - 1)
+    if prior_ctx is not None:
+        try:
+            prior_node = find_node(prior_ctx.basis.tree, node.node_key)
+        except ViewError:
+            prior_node = None
+        if prior_node is not None:
+            prior_values = node_measures(prior_ctx.basis).get(prior_node.node_key, {})
+            opening_by_code = prior_values.get(MEASURE_CONSOLIDATED, {})
+
+    names = dict(ctx.basis.names)
+    if prior_ctx is not None:
+        for code, name in prior_ctx.basis.names.items():
+            names.setdefault(code, name)
+
+    tb_map: dict[str, dict[str, float]] = {}
+    for code in set(audited_by_code) | set(opening_by_code):
+        name = names.get(code)
+        if not name:
+            continue
+        tb_map[name] = {
+            "audited": float(audited_by_code.get(code, 0)),
+            "opening": float(opening_by_code.get(code, 0)),
+        }
+    return tb_map
 
 
 @router.get("/data/{project_id}/{year}/{section_id}")
 async def get_note_data(
     project_id: UUID, year: int, section_id: str,
+    node_key: str | None = Query(None, description="企业树节点；不传读取项目级兼容行"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
-    """加载用户已保存的附注数据"""
-    result = await db.execute(
-        text("SELECT data, updated_at FROM consol_note_data WHERE project_id = :pid AND year = :y AND section_id = :sid"),
-        {"pid": project_id, "y": year, "sid": section_id},
-    )
-    row = result.fetchone()
-    if not row:
-        return {"content": {}, "updated_at": None}
-    return {"content": row[0] if isinstance(row[0], dict) else {}, "updated_at": str(row[1]) if row[1] else None}
+    """加载用户已保存的附注数据。根节点无专属行时兼容读取历史项目级行。"""
+    try:
+        scope = await _resolve_note_scope(db, project_id, year, node_key, section_id)
+        record = await _load_note_record(db, scope)
+    except HTTPException:
+        raise
+    if record is None:
+        return {"content": {}, "updated_at": None, "node_key": node_key}
+    return {
+        "content": record.data if isinstance(record.data, dict) else {},
+        "updated_at": str(record.updated_at) if record.updated_at else None,
+        "node_key": record.node_key if record.node_key is not None else node_key,
+    }
 
 
 @router.put("/data/{project_id}/{year}/{section_id}")
 async def save_note_data(
     project_id: UUID, year: int, section_id: str,
     body: dict,
+    node_key: str | None = Query(None, description="企业树节点；不传保存项目级兼容行"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
 ):
-    """保存用户编辑的附注数据"""
-    import uuid
+    """保存用户编辑的附注数据，带节点键时只写节点专属行。"""
     from datetime import datetime, timezone
+
+    resolved_node_key = _requested_node_key(node_key, body)
+    scope = await _resolve_note_scope(db, project_id, year, resolved_node_key, section_id)
+    payload = body.get("data", {})
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="附注数据格式无效")
+
+    # 自动回填合计行（对用户保存的数据，合计行空值自动求和）
+    from app.services.consol_note_formula_service import backfill_total_rows
+    save_rows = payload.get("rows")
+    if isinstance(save_rows, list) and save_rows:
+        backfill_total_rows(save_rows)
+
     now = datetime.now(timezone.utc)
-    data_json = json.dumps(body.get("data", {}), ensure_ascii=False)
     try:
-        await db.execute(
-            text("""
-                INSERT INTO consol_note_data (id, project_id, year, section_id, data, updated_at)
-                VALUES (:id, :pid, :y, :sid, CAST(:data AS jsonb), :now)
-                ON CONFLICT (project_id, year, section_id)
-                DO UPDATE SET data = CAST(:data AS jsonb), updated_at = :now
-            """),
-            {"id": str(uuid.uuid4()), "pid": project_id, "y": year, "sid": section_id, "data": data_json, "now": now},
-        )
+        await _save_note_record(db, scope, payload, now=now)
         await db.commit()
-        return {"ok": True, "updated_at": str(now)}
+        return {"ok": True, "updated_at": str(now), "node_key": scope.node_key}
+    except HTTPException:
+        await db.rollback()
+        raise
     except Exception as e:
         await db.rollback()
-        return {"ok": False, "error": str(e)}
+        return {"ok": False, "error": str(e), "node_key": scope.node_key}
+
+
+# ─── 列定位辅助（spec consol-note-refresh-multi-header-fix） ─────────────────
+
+# 期末/本期 关键词
+_ENDING_KEYWORDS = ("期末", "本期")
+# 期初/年初/上年 关键词
+_OPENING_KEYWORDS = ("期初", "年初", "上期", "上年")
+# 变动类排除词（含这些词的列是变动列，不应被当作期末/期初写入目标）
+_CHANGE_EXCLUDE = ("增加", "减少", "计提", "转回", "转销", "核销", "摊销", "偿还", "发行", "转入", "变动")
+
+
+def _header_root(h: str) -> str:
+    """取斜杠路径表头的首段；无斜杠时原样返回。"""
+    return h.split("/", 1)[0] if "/" in h else h
+
+
+def _is_ending_label(label: str) -> bool:
+    """判断 label 是否表示"期末/本期"类（排除变动列如"本期增加""本期减少"）。"""
+    if not any(k in label for k in _ENDING_KEYWORDS):
+        return False
+    # 含变动类关键词的列排除（"本期增加"不是期末值列）
+    if any(k in label for k in _CHANGE_EXCLUDE):
+        return False
+    return True
+
+
+def _is_opening_label(label: str) -> bool:
+    """判断 label 是否表示"期初/年初/上年"类。"""
+    return any(k in label for k in _OPENING_KEYWORDS)
+
+
+def _classify_header(h: str) -> str | None:
+    """单列表头分类：返回 ``'audited'`` / ``'opening'`` / ``None``。
+
+    用于审计校验等需要**逐列判断**的场景（不同于 _resolve_value_columns 只取第一列）。
+    对斜杠路径只看首段，排除变动列。
+    """
+    h_clean = h.replace(" ", "").replace("\u3000", "")
+    if not h_clean:
+        return None
+    root = _header_root(h_clean)
+    if _is_ending_label(root):
+        return "audited"
+    if _is_opening_label(root):
+        return "opening"
+    return None
+
+
+def _resolve_value_columns(
+    template: dict,
+) -> dict[str, list[int]]:
+    """从模板解析数值列映射：``{'audited': [col_indices], 'opening': [col_indices]}``。
+
+    策略分三层（逐层降级）：
+
+    1. ``_column_groups``（P2 产出）存在时，按组名定位到组内第一列。
+    2. ``multi_header`` 非 null 时，按 multi_header 第一行的顶级分组名匹配，
+       对每个分组只取**起始列**（即叶子列第一个）。
+    3. 扁平表头：用首段关键词匹配，多列命中**只取第一个**（保守策略）。
+
+    对"本期增加""本期减少"等变动列不写入（刷新只推合计值到期末/期初列）。
+    """
+    headers = template.get("headers", [])
+    column_groups = template.get("_column_groups")
+
+    # ── 策略 1：_column_groups（P2 就绪后走此路径） ──
+    if column_groups:
+        audited_cols: list[int] = []
+        opening_cols: list[int] = []
+        for g in column_groups:
+            group_name = str(g.get("group", ""))
+            start = int(g.get("start", 0))
+            if _is_ending_label(group_name):
+                audited_cols.append(start)
+            elif _is_opening_label(group_name):
+                opening_cols.append(start)
+        return {"audited": audited_cols[:1], "opening": opening_cols[:1]}
+
+    # ── 策略 2：multi_header 非 null ──
+    multi_header = template.get("multi_header")
+    if multi_header and len(multi_header) >= 2:
+        # multi_header[0] 是顶级分组行，如 ["账龄", "期末数", "期初数", "", ""]
+        top_row = multi_header[0]
+        audited_cols = []
+        opening_cols = []
+        # 从顶级行识别"期末"/"期初"分组的起始列
+        for ci, cell in enumerate(top_row):
+            if ci == 0:
+                continue
+            cell_clean = str(cell).replace(" ", "").replace("\u3000", "")
+            if not cell_clean:
+                continue  # 空白 = 前一个分组的延续列
+            if _is_ending_label(cell_clean):
+                audited_cols.append(ci)
+            elif _is_opening_label(cell_clean):
+                opening_cols.append(ci)
+        return {"audited": audited_cols[:1], "opening": opening_cols[:1]}
+
+    # ── 策略 3：扁平表头降级 ──
+    audited_cols = []
+    opening_cols = []
+    for ci, h in enumerate(headers):
+        if ci == 0:
+            continue
+        h_clean = str(h).replace(" ", "").replace("\u3000", "")
+        if not h_clean:
+            continue
+        # 取首段做匹配，避免斜杠路径里"账面余额"误命中
+        root = _header_root(h_clean)
+        if _is_ending_label(root):
+            audited_cols.append(ci)
+        elif _is_opening_label(root):
+            opening_cols.append(ci)
+    # 多列命中只取第一个（保守：变动表"本期增加/本期减少/期末余额"只取期末余额不现实，
+    # 故只取第一个命中列——通常就是期末余额列）
+    return {"audited": audited_cols[:1], "opening": opening_cols[:1]}
 
 
 # ─── 公式刷新：根据项目数据重新计算附注表格 ──────────────────────────────────
@@ -145,114 +525,41 @@ async def save_note_data(
 async def refresh_note_by_formula(
     project_id: UUID, year: int, section_id: str,
     body: dict,
+    node_key: str | None = Query(None, description="企业树节点；根节点按 node_key 读取对应企业试算表"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
 ):
-    """根据公式从项目试算表/报表数据重新计算附注表格内容
-    
-    逻辑：
-    1. 加载该章节的模板结构（headers + 模板行）
-    2. 查找该章节关联的公式规则
-    3. 从项目试算表/报表中提取对应科目数据
-    4. 按公式计算填充每行每列
-    """
-    standard = body.get("standard", "soe")
-    company_code = body.get("company_code", "")
-    
-    # 加载章节模板
-    sections = _load_sections(standard)
-    template = None
-    for sec in sections:
-        if sec["section_id"] == section_id:
-            template = sec
-            break
-    
-    if not template:
-        return {"rows": [], "message": "章节不存在"}
-    
-    headers = template.get("headers", [])
-    template_rows = template.get("rows", [])
-    
-    # 尝试从试算表提取数据
+    """刷新并持久化当前节点章节，保留旧 rows/message 字段兼容客户端。"""
+    from app.services.consol_note_formula_service import NoteFormulaError, fill_by_formula
+
+    resolved_node_key = _requested_node_key(node_key, body)
+    # 节点作用域完整校验（项目/年度/企业树/节点定位）
+    scope = await _resolve_note_scope(db, project_id, year, resolved_node_key, section_id)
+    template_type = await _resolve_requested_template(db, project_id, body)
+
     try:
-        # 查询该企业的试算表数据
-        params = {"pid": project_id, "y": year}
-        query = "SELECT account_code, account_name, opening_balance, closing_balance, debit_amount, credit_amount FROM trial_balance WHERE project_id = :pid AND year = :y"
-        if company_code:
-            query += " AND company_code = :cc"
-            params["cc"] = company_code
-        
-        result = await db.execute(text(query), params)
-        tb_rows = result.fetchall()
-        
-        if not tb_rows:
-            return {"rows": template_rows, "message": "未找到试算表数据，返回模板默认值"}
-        
-        # 构建科目索引
-        tb_map = {}
-        for r in tb_rows:
-            tb_map[r[1]] = {  # account_name as key
-                "code": r[0], "name": r[1],
-                "opening": float(r[2] or 0), "closing": float(r[3] or 0),
-                "debit": float(r[4] or 0), "credit": float(r[5] or 0),
-            }
-        
-        # 按模板行匹配科目名称填充数据
-        filled_rows = []
-        for row in template_rows:
-            if not row:
-                filled_rows.append(row)
-                continue
-            item_name = row[0] if row else ""
-            # 清理项目名称用于匹配
-            clean_name = item_name.strip().lstrip("△▲*#").strip()
-            
-            matched = tb_map.get(clean_name) or tb_map.get(item_name.strip())
-            
-            # 如果精确匹配失败，尝试从映射表查找
-            if not matched:
-                try:
-                    map_result = await db.execute(
-                        text("SELECT account_name, mapping_type FROM account_note_mapping WHERE project_id = :pid AND section_id = :sid AND row_name = :rn LIMIT 1"),
-                        {"pid": project_id, "sid": section_id, "rn": clean_name},
-                    )
-                    map_row = map_result.fetchone()
-                    if map_row:
-                        mapped_account = map_row[0]
-                        matched = tb_map.get(mapped_account)
-                except Exception:
-                    pass
-            
-            # 如果映射表也没有，尝试模糊匹配（包含关系）
-            if not matched and len(clean_name) >= 2:
-                for acc_name, acc_data in tb_map.items():
-                    if clean_name in acc_name or acc_name in clean_name:
-                        matched = acc_data
-                        break
-            if matched:
-                new_row = list(row)
-                # 按表头匹配填充：期末余额、期初余额、本期发生额等
-                for ci, h in enumerate(headers):
-                    if ci == 0:
-                        continue  # 项目名列不填
-                    h_lower = h.replace(" ", "").replace("　", "")
-                    if "期末" in h_lower or "本期" in h_lower or "账面余额" in h_lower:
-                        new_row[ci] = str(matched["closing"]) if matched["closing"] else ""
-                    elif "期初" in h_lower or "年初" in h_lower:
-                        new_row[ci] = str(matched["opening"]) if matched["opening"] else ""
-                    elif "借方" in h_lower or "增加" in h_lower:
-                        new_row[ci] = str(matched["debit"]) if matched["debit"] else ""
-                    elif "贷方" in h_lower or "减少" in h_lower:
-                        new_row[ci] = str(matched["credit"]) if matched["credit"] else ""
-                filled_rows.append(new_row)
-            else:
-                filled_rows.append(row)
-        
-        return {"rows": filled_rows, "message": f"已从试算表匹配 {len([r for r in filled_rows if r != template_rows])} 行"}
-    
-    except Exception as e:
-        # 试算表不存在或查询失败，返回模板默认值
-        return {"rows": template_rows, "message": f"数据提取失败: {str(e)}，返回模板默认值"}
+        result = await fill_by_formula(
+            db,
+            project_id,
+            year,
+            section_id,
+            node_key=resolved_node_key,
+            template_type=template_type,
+        )
+        await db.commit()
+    except NoteFormulaError as exc:
+        await db.rollback()
+        raise _note_error(exc) from exc
+    except Exception:
+        await db.rollback()
+        raise
+
+    return {
+        **result,
+        "rows": result["data"].get("rows", []),
+        "message": f"附注章节已持久化刷新（保留人工单元格 {result['kept_manual_count']} 个）",
+    }
 
 
 # ─── 全审：对所有附注表格执行公式审核 ─────────────────────────────────────────
@@ -261,76 +568,70 @@ async def refresh_note_by_formula(
 async def audit_all_notes(
     project_id: UUID, year: int,
     body: dict,
+    node_key: str | None = Query(None, description="企业树节点；不传读取项目级兼容行"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
     """对所有附注表格执行公式审核
-    
+
     审核规则：
     1. 合计行校验：合计行 = 明细行之和
-    2. 期末 = 期初 + 增加 - 减少（如适用）
-    3. 借贷平衡校验
-    4. 与试算表数据交叉校验
+    2. 与试算表数据交叉校验（使用 ORM 真实列 audited_amount / opening_balance）
     """
-    standard = body.get("standard", "soe")
-    company_code = body.get("company_code", "")
-    
-    sections = _load_sections(standard)
-    results = []
-    
-    # 加载用户已保存的数据
-    saved_data = {}
     try:
-        rows = await db.execute(
-            text("SELECT section_id, data FROM consol_note_data WHERE project_id = :pid AND year = :y"),
-            {"pid": project_id, "y": year},
-        )
-        for r in rows.fetchall():
-            saved_data[r[0]] = r[1] if isinstance(r[1], dict) else {}
-    except Exception:
-        pass
-    
-    # 加载试算表数据用于交叉校验
-    tb_map = {}
+        resolved_node_key = _requested_node_key(node_key, body)
+        template_type = await _resolve_requested_template(db, project_id, body)
+    except HTTPException:
+        await db.rollback()
+        raise
+
+    scope = await _resolve_note_scope(db, project_id, year, resolved_node_key)
+
+    sections = _load_sections(template_type)
+    results: list[dict] = []
+
+    # 加载用户已保存的数据；带节点键时严格隔离，根合并节点允许兼容读取 legacy 行
+    saved_data: dict[str, dict] = {}
+    saved_data_error: str | None = None
     try:
-        params = {"pid": project_id, "y": year}
-        query = "SELECT account_name, closing_balance, opening_balance FROM trial_balance WHERE project_id = :pid AND year = :y"
-        if company_code:
-            query += " AND company_code = :cc"
-            params["cc"] = company_code
-        tb_result = await db.execute(text(query), params)
-        for r in tb_result.fetchall():
-            tb_map[r[0]] = {"closing": float(r[1] or 0), "opening": float(r[2] or 0)}
-    except Exception:
-        pass
-    
+        saved_data = await _load_saved_note_data(db, scope)
+    except Exception as e:
+        saved_data_error = f"加载已保存数据失败: {e}"
+
+    # 加载试算表数据用于交叉校验（ORM 真实列）
+    tb_map: dict[str, dict[str, float]] = {}
+    tb_error: str | None = None
+    try:
+        tb_map = await _load_tb_map(db, scope)
+    except Exception as e:
+        tb_error = f"加载试算表失败: {e}"
+
     audited_sections = 0
-    
+
     for sec in sections:
-        section_id = sec["section_id"]
+        sec_id = sec["section_id"]
         title = sec.get("title", "")
         headers = sec.get("headers", [])
-        
+
         # 获取用户数据或模板数据
-        user_data = saved_data.get(section_id, {})
+        user_data = saved_data.get(sec_id, {})
         data_rows = user_data.get("rows", sec.get("rows", []))
-        
+
         if not headers or not data_rows:
             continue
-        
+
         audited_sections += 1
-        
+
         # 规则1：合计行校验
         total_row_idx = None
         for ri, row in enumerate(data_rows):
             if row and row[0] and ("合" in str(row[0]) and "计" in str(row[0])):
                 total_row_idx = ri
                 break
-        
+
         if total_row_idx is not None:
             total_row = data_rows[total_row_idx]
             for ci in range(1, len(headers)):
-                # 计算明细行之和
                 detail_sum = 0
                 has_data = False
                 for ri in range(total_row_idx):
@@ -344,15 +645,15 @@ async def audit_all_notes(
                             has_data = True
                     except (ValueError, IndexError):
                         pass
-                
+
                 if not has_data:
                     continue
-                
+
                 try:
                     total_val = float(str(total_row[ci]).replace(",", "").replace("，", "")) if ci < len(total_row) and total_row[ci] else 0
                 except (ValueError, IndexError):
                     total_val = 0
-                
+
                 diff = round(total_val - detail_sum, 2)
                 if abs(diff) > 0.01:
                     results.append({
@@ -362,7 +663,7 @@ async def audit_all_notes(
                         "expected": f"{detail_sum:,.2f}",
                         "actual": f"{total_val:,.2f}",
                         "difference": f"{diff:,.2f}",
-                        "message": f"合计行与明细行之和不一致",
+                        "message": "合计行与明细行之和不一致",
                     })
                 else:
                     results.append({
@@ -374,7 +675,7 @@ async def audit_all_notes(
                         "difference": "",
                         "message": "通过",
                     })
-        
+
         # 规则2：与试算表交叉校验（按第一列科目名匹配）
         if tb_map:
             for ri, row in enumerate(data_rows):
@@ -384,23 +685,24 @@ async def audit_all_notes(
                 tb_entry = tb_map.get(item_name)
                 if not tb_entry:
                     continue
-                
+
                 for ci in range(1, min(len(headers), len(row))):
                     h = headers[ci].replace(" ", "")
                     try:
                         cell_val = float(str(row[ci]).replace(",", "").replace("，", "")) if row[ci] else 0
                     except ValueError:
                         continue
-                    
+
                     if cell_val == 0:
                         continue
-                    
+
                     expected = None
-                    if "期末" in h or "本期" in h:
-                        expected = tb_entry["closing"]
-                    elif "期初" in h or "年初" in h:
+                    col_type = _classify_header(h)
+                    if col_type == "audited":
+                        expected = tb_entry["audited"]
+                    elif col_type == "opening":
                         expected = tb_entry["opening"]
-                    
+
                     if expected is not None:
                         diff = round(cell_val - expected, 2)
                         if abs(diff) > 0.01:
@@ -413,11 +715,20 @@ async def audit_all_notes(
                                 "difference": f"{diff:,.2f}",
                                 "message": f"与试算表 {item_name} 数据不一致",
                             })
-    
-    return {
+
+    response: dict = {
         "total_sections": audited_sections,
         "results": results,
     }
+    # 暴露数据加载层错误，不吞异常
+    errors: list[str] = []
+    if saved_data_error:
+        errors.append(saved_data_error)
+    if tb_error:
+        errors.append(tb_error)
+    if errors:
+        response["load_errors"] = errors
+    return response
 
 
 # ─── 单表审核：对指定附注表格执行公式审核 ─────────────────────────────────────
@@ -426,17 +737,23 @@ async def audit_all_notes(
 async def audit_single_note(
     project_id: UUID, year: int, section_id: str,
     body: dict,
+    node_key: str | None = Query(None, description="企业树节点；不传读取项目级兼容行"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
     """对指定附注表格执行公式审核（前端传入当前编辑的数据）"""
-    standard = body.get("standard", "soe")
-    company_code = body.get("company_code", "")
+    try:
+        resolved_node_key = _requested_node_key(node_key, body)
+        template_type = await _resolve_requested_template(db, project_id, body)
+    except HTTPException:
+        await db.rollback()
+        raise
+    scope = await _resolve_note_scope(db, project_id, year, resolved_node_key, section_id)
     headers = body.get("headers", [])
     data_rows = body.get("rows", [])
 
     # 加载模板获取标题
-    sections = _load_sections(standard)
+    sections = _load_sections(template_type)
     title = section_id
     for sec in sections:
         if sec["section_id"] == section_id:
@@ -447,7 +764,7 @@ async def audit_single_note(
                 data_rows = sec.get("rows", [])
             break
 
-    results = []
+    results: list[dict] = []
 
     if not headers or not data_rows:
         return {"results": [], "message": "无数据可审核"}
@@ -460,7 +777,6 @@ async def audit_single_note(
         if "合计" not in cell0 and "小计" not in cell0:
             continue
 
-        # 找到合计行，计算上方明细行之和
         for ci in range(1, len(headers)):
             detail_sum = 0
             has_data = False
@@ -510,16 +826,18 @@ async def audit_single_note(
                 })
 
     # 规则2：期末 = 期初 + 增加 - 减少（如表头包含这些列）
-    col_map = {}
+    col_map: dict = {}
     for ci, h in enumerate(headers):
-        h_clean = h.replace(" ", "").replace("　", "")
-        if "期末" in h_clean or "本期" in h_clean:
+        h_clean = h.replace(" ", "").replace("\u3000", "")
+        root = _header_root(h_clean)
+        col_type = _classify_header(h)
+        if col_type == "audited":
             col_map["closing"] = ci
-        elif "期初" in h_clean or "年初" in h_clean:
+        elif col_type == "opening":
             col_map["opening"] = ci
-        elif "增加" in h_clean or "计提" in h_clean:
+        elif "增加" in root or "计提" in root:
             col_map.setdefault("increase", []).append(ci) if isinstance(col_map.get("increase"), list) else col_map.update({"increase": [ci]})
-        elif "减少" in h_clean or "转回" in h_clean or "转销" in h_clean:
+        elif "减少" in root or "转回" in root or "转销" in root:
             col_map.setdefault("decrease", []).append(ci) if isinstance(col_map.get("decrease"), list) else col_map.update({"decrease": [ci]})
 
     if "closing" in col_map and "opening" in col_map:
@@ -571,22 +889,16 @@ async def audit_single_note(
                     "expected": f"{expected_closing:,.2f}",
                     "actual": f"{closing:,.2f}",
                     "difference": f"{diff:,.2f}",
-                    "message": f"期末 ≠ 期初 + 增加 - 减少",
+                    "message": "期末 ≠ 期初 + 增加 - 减少",
                 })
 
-    # 规则3：与试算表交叉校验
-    tb_map = {}
+    # 规则3：与试算表交叉校验（ORM 真实列）
+    tb_map: dict[str, dict[str, float]] = {}
+    tb_error: str | None = None
     try:
-        params = {"pid": project_id, "y": year}
-        query = "SELECT account_name, closing_balance, opening_balance FROM trial_balance WHERE project_id = :pid AND year = :y"
-        if company_code:
-            query += " AND company_code = :cc"
-            params["cc"] = company_code
-        tb_result = await db.execute(text(query), params)
-        for r in tb_result.fetchall():
-            tb_map[r[0]] = {"closing": float(r[1] or 0), "opening": float(r[2] or 0)}
-    except Exception:
-        pass
+        tb_map = await _load_tb_map(db, scope)
+    except Exception as e:
+        tb_error = f"加载试算表失败: {e}"
 
     if tb_map:
         for ri, row in enumerate(data_rows):
@@ -605,9 +917,10 @@ async def audit_single_note(
                 if cell_val == 0:
                     continue
                 expected = None
-                if "期末" in h or "本期" in h:
-                    expected = tb_entry["closing"]
-                elif "期初" in h or "年初" in h:
+                col_type = _classify_header(h)
+                if col_type == "audited":
+                    expected = tb_entry["audited"]
+                elif col_type == "opening":
                     expected = tb_entry["opening"]
                 if expected is not None:
                     diff = round(cell_val - expected, 2)
@@ -619,10 +932,9 @@ async def audit_single_note(
                             "expected": f"{expected:,.2f}",
                             "actual": f"{cell_val:,.2f}",
                             "difference": f"{diff:,.2f}",
-                            "message": f"与试算表数据不一致",
+                            "message": "与试算表数据不一致",
                         })
 
-    # 如果没有任何审核结果，说明全部通过
     if not results:
         results.append({
             "section_title": title,
@@ -634,7 +946,10 @@ async def audit_single_note(
             "message": "所有校验规则通过",
         })
 
-    return {"results": results}
+    response: dict = {"results": results}
+    if tb_error:
+        response["load_errors"] = [tb_error]
+    return response
 
 
 # ─── 一键取数计算：对所有附注表格执行公式取数 ─────────────────────────────────
@@ -643,95 +958,52 @@ async def audit_single_note(
 async def apply_all_formulas(
     project_id: UUID, year: int,
     body: dict,
+    node_key: str | None = Query(None, description="企业树节点；不传写入项目级兼容行"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
 ):
-    """对所有附注表格执行公式取数计算，从试算表提取数据填充"""
-    standard = body.get("standard", "soe")
-    company_code = body.get("company_code", "")
+    """逐章节按共享公式内核刷新所有附注，并隔离单章节失败。"""
+    from app.services.consol_note_aggregation_service import validate_lineage_dag
+    from app.services.consol_note_formula_service import (
+        NoteFormulaError,
+        consol_note_tables,
+        fill_note_sections,
+        resolve_note_template_type,
+    )
 
-    sections = _load_sections(standard)
+    resolved_node_key = _requested_node_key(node_key, body)
+    # 节点作用域完整校验（项目/年度/企业树/节点定位）
+    await _resolve_note_scope(db, project_id, year, resolved_node_key)
+    # DAG 校验（合并层级链不能有循环引用）
+    if not await validate_lineage_dag(project_id, db):
+        raise HTTPException(status_code=400, detail="合并层级链存在循环引用，无法批量刷新")
 
-    # 加载试算表数据
-    tb_map = {}
     try:
-        params = {"pid": project_id, "y": year}
-        query = "SELECT account_name, opening_balance, closing_balance, debit_amount, credit_amount FROM trial_balance WHERE project_id = :pid AND year = :y"
-        if company_code:
-            query += " AND company_code = :cc"
-            params["cc"] = company_code
-        result = await db.execute(text(query), params)
-        for r in result.fetchall():
-            tb_map[r[0]] = {
-                "opening": float(r[1] or 0), "closing": float(r[2] or 0),
-                "debit": float(r[3] or 0), "credit": float(r[4] or 0),
-            }
-    except Exception:
-        return {"updated_sections": 0, "message": "无法加载试算表数据"}
-
-    if not tb_map:
-        return {"updated_sections": 0, "message": "试算表无数据"}
-
-    updated = 0
-    import uuid as _uuid
-    from datetime import datetime as _dt
-
-    for sec in sections:
-        headers = sec.get("headers", [])
-        template_rows = sec.get("rows", [])
-        if not headers or not template_rows:
-            continue
-
-        filled = False
-        new_rows = []
-        for row in template_rows:
-            if not row or not row[0]:
-                new_rows.append(row)
-                continue
-            item_name = str(row[0]).strip().lstrip("△▲*#").strip()
-            matched = tb_map.get(item_name)
-            if not matched:
-                new_rows.append(row)
-                continue
-
-            new_row = list(row)
-            for ci, h in enumerate(headers):
-                if ci == 0:
-                    continue
-                h_clean = h.replace(" ", "").replace("　", "")
-                if "期末" in h_clean or "本期" in h_clean or "账面余额" in h_clean:
-                    if matched["closing"]:
-                        new_row[ci] = f"{matched['closing']:.2f}"
-                        filled = True
-                elif "期初" in h_clean or "年初" in h_clean:
-                    if matched["opening"]:
-                        new_row[ci] = f"{matched['opening']:.2f}"
-                        filled = True
-            new_rows.append(new_row)
-
-        if filled:
-            # 保存到数据库
-            now = _dt.utcnow()
-            data_json = json.dumps({"headers": headers, "rows": new_rows}, ensure_ascii=False)
-            try:
-                await db.execute(
-                    text("""
-                        INSERT INTO consol_note_data (id, project_id, year, section_id, data, updated_at)
-                        VALUES (:id, :pid, :y, :sid, CAST(:data AS jsonb), :now)
-                        ON CONFLICT (project_id, year, section_id)
-                        DO UPDATE SET data = CAST(:data AS jsonb), updated_at = :now
-                    """),
-                    {"id": str(_uuid.uuid4()), "pid": project_id, "y": year,
-                     "sid": sec["section_id"], "data": data_json, "now": now},
-                )
-                updated += 1
-            except Exception:
-                pass
-
-    if updated:
+        requested_template = body.get("template_type") or body.get("standard")
+        template_type = await resolve_note_template_type(db, project_id, requested_template)
+        section_ids = [str(sec.get("section_id")) for sec in consol_note_tables(template_type) if sec.get("section_id")]
+        result = await fill_note_sections(
+            db,
+            project_id,
+            year,
+            section_ids,
+            node_key=resolved_node_key,
+            template_type=template_type,
+        )
         await db.commit()
+    except NoteFormulaError as exc:
+        await db.rollback()
+        raise _note_error(exc) from exc
+    except Exception:
+        await db.rollback()
+        raise
 
-    return {"updated_sections": updated, "message": f"已更新 {updated} 个附注表格"}
+    return {
+        **result,
+        "updated_sections": result["sections_updated"],
+        "message": f"已持久化刷新 {result['sections_updated']} 个附注表格",
+    }
 
 
 # ─── 数据汇总：按单位汇总附注/报表数据 ───────────────────────────────────────
@@ -740,61 +1012,59 @@ async def apply_all_formulas(
 async def aggregate_data(
     project_id: UUID, year: int,
     body: dict,
+    node_key: str | None = Query(None, description="当前汇总节点；不传保持旧 company_code 语义"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
     """汇总指定单位的数据到目标单元格
-    
-    mode=direct: 汇总当前节点的直接下级企业
+
+    mode=direct: 汇总当前节点的直接下级企业（从企业树获取）
     mode=custom: 汇总用户选择的企业列表
     """
+    from app.services.consol_node_scope import scope_for_tree_node
+
     section_id = body.get("section_id", "")
     row_idx = body.get("row_idx", 0)
     col_idx = body.get("col_idx", 1)
     mode = body.get("mode", "direct")
-    company_code = body.get("company_code", "")
     company_codes = body.get("company_codes", [])
-    standard = body.get("standard", "soe")
-    source = body.get("source", "same")
+    resolved_node_key = _requested_node_key(node_key, body)
+    template_type = await _resolve_requested_template(db, project_id, body)
+    scope = await _resolve_note_scope(db, project_id, year, resolved_node_key, section_id)
 
-    # 获取目标企业列表
-    target_codes = []
+    # 获取目标子节点列表
+    child_scopes: list[NodeScope] = []
     if mode == "direct":
-        # 从基本信息表获取直接下级
-        try:
-            result = await db.execute(
-                text("SELECT data FROM consol_worksheet_data WHERE project_id = :pid AND year = :y AND sheet_key = 'info'"),
-                {"pid": project_id, "y": year},
-            )
-            row = result.fetchone()
-            if row and isinstance(row[0], dict):
-                info_rows = row[0].get("rows", [])
-                for r in info_rows:
-                    if r.get("company_code") and r.get("company_name"):
-                        # 直接下级 = parent_code 等于当前节点
-                        if not company_code or r.get("parent_code") == company_code:
-                            target_codes.append(r["company_code"])
-        except Exception:
-            pass
+        # 从已验证的企业树获取直接下级节点
+        if scope.node is not None and scope.node.children:
+            for child in scope.node.children:
+                if child.node_key:
+                    child_scopes.append(scope_for_tree_node(scope, child, section_id))
     else:
-        target_codes = company_codes
+        # 用户指定企业列表 — 用 company_codes 在树中定位节点
+        if scope.tree is not None:
+            from app.services.consol_tree_service import find_node_by_key as _fnbk
 
-    if not target_codes:
+            for code in company_codes:
+                for suffix in (":consol", ":parent", ":hq"):
+                    child_node = _fnbk(scope.tree, f"{code}{suffix}")
+                    if child_node is not None:
+                        child_scopes.append(scope_for_tree_node(scope, child_node, section_id))
+                        break
+
+    if not child_scopes:
         return {"value": None, "count": 0, "message": "无下级企业"}
 
-    # 从各企业的已保存数据中提取同位置的值并汇总
-    total = 0
+    # 从各子节点的已保存数据中提取同位置的值并汇总
+    total = 0.0
     count = 0
-    for code in target_codes:
+    child_errors: list[dict] = []
+    for child_scope in child_scopes:
         try:
-            # 查询该企业的附注数据
-            result = await db.execute(
-                text("SELECT data FROM consol_note_data WHERE project_id = :pid AND year = :y AND section_id = :sid"),
-                {"pid": project_id, "y": year, "sid": f"{section_id}_{code}"},
-            )
-            row = result.fetchone()
-            if row and isinstance(row[0], dict):
-                rows = row[0].get("rows", [])
+            record = await _load_note_record(db, child_scope)
+            if record is not None:
+                data = record.data if isinstance(record.data, dict) else {}
+                rows = data.get("rows", [])
                 if row_idx < len(rows) and col_idx < len(rows[row_idx]):
                     val = rows[row_idx][col_idx]
                     try:
@@ -803,17 +1073,13 @@ async def aggregate_data(
                         count += 1
                     except (ValueError, TypeError):
                         pass
-        except Exception:
-            pass
+        except Exception as e:
+            child_errors.append({"node_key": child_scope.node_key, "error": str(e)})
 
     # 如果没有从附注数据中找到，尝试从试算表提取
     if count == 0:
-        sections = _load_sections(standard)
-        template = None
-        for sec in sections:
-            if sec["section_id"] == section_id:
-                template = sec
-                break
+        sections = _load_sections(template_type)
+        template = next((sec for sec in sections if sec["section_id"] == section_id), None)
 
         if template:
             item_name = ""
@@ -821,185 +1087,69 @@ async def aggregate_data(
                 item_name = template["rows"][row_idx][0] if template["rows"][row_idx] else ""
 
             if item_name:
-                for code in target_codes:
+                for child_scope in child_scopes:
                     try:
-                        params = {"pid": project_id, "y": year, "cc": code, "name": item_name.strip()}
-                        result = await db.execute(
-                            text("SELECT closing_balance, opening_balance FROM trial_balance WHERE project_id = :pid AND year = :y AND company_code = :cc AND account_name = :name"),
-                            params,
-                        )
-                        row = result.fetchone()
-                        if row:
+                        child_tb = await _load_tb_map(db, child_scope)
+                        entry = child_tb.get(item_name.strip())
+                        if entry:
                             headers = template.get("headers", [])
                             col_header = headers[col_idx] if col_idx < len(headers) else ""
                             h_clean = col_header.replace(" ", "")
-                            val = 0
-                            if "期末" in h_clean or "本期" in h_clean:
-                                val = float(row[0] or 0)
-                            elif "期初" in h_clean or "年初" in h_clean:
-                                val = float(row[1] or 0)
+                            val = 0.0
+                            col_type = _classify_header(col_header)
+                            if col_type == "audited":
+                                val = entry["audited"]
+                            elif col_type == "opening":
+                                val = entry["opening"]
                             if val:
                                 total += val
                                 count += 1
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        child_errors.append({"node_key": child_scope.node_key, "error": f"试算表加载失败: {e}"})
 
-    return {
+    response: dict = {
         "value": round(total, 2) if count > 0 else None,
         "count": count,
         "message": f"已汇总 {count} 家企业",
     }
+    if child_errors:
+        response["child_errors"] = child_errors
+    return response
 
 
-# ─── 合并试算平衡表：自动填充汇总数和抵消调整数 ──────────────────────────────
 
-@router.post("/fill-tb/{project_id}/{year}")
-async def fill_trial_balance(
-    project_id: UUID, year: int,
-    body: dict,
+# ─── 跨表勾稽校验 ──────────────────────────────────────────────────────────────
+# spec: note-sub-table-formula-and-cross-check Phase 0
+
+
+@router.get("/check-rules/{project_id}/{year}/{section_id}")
+async def get_check_rules(
+    project_id: UUID,
+    year: int,
+    section_id: str,
+    template_type: str = Query("soe", description="soe 或 listed"),
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_project_access("edit")),
+    _user: User = Depends(require_project_access("readonly")),
 ):
-    """自动填充合并试算平衡表
-    
-    1. 审定汇总：从各子企业试算表按科目汇总
-    2. 权益抵消/往来抵消/报表调整：从合并工作底稿抵消分录提取
-    """
-    report_type = body.get("report_type", "balance_sheet")
-    period = body.get("period", "closing")  # closing / opening
-    company_code = body.get("company_code", "")
-    standard = body.get("standard", "soe")
+    """返回指定章节的 check_rules 声明 + 执行结果。"""
+    from app.services.note_check_rules import _load_check_rules, check_note_cross_rules
 
-    # 1. 获取合并范围内的子企业列表
-    child_codes = []
-    try:
-        result = await db.execute(
-            text("SELECT data FROM consol_worksheet_data WHERE project_id = :pid AND year = :y AND sheet_key = 'info'"),
-            {"pid": project_id, "y": year},
-        )
-        row = result.fetchone()
-        if row and isinstance(row[0], dict):
-            for r in row[0].get("rows", []):
-                if r.get("company_code"):
-                    child_codes.append(r["company_code"])
-    except Exception:
-        pass
+    rules = _load_check_rules(template_type, section_id)
+    if not rules:
+        return {"section_id": section_id, "template_type": template_type, "rules": [], "results": []}
 
-    # 2. 从各子企业试算表汇总
-    summary_map = {}  # account_name -> amount
-    balance_field = "closing_balance" if period == "closing" else "opening_balance"
-    
-    if child_codes:
-        try:
-            for code in child_codes:
-                result = await db.execute(
-                    text(f"SELECT account_name, {balance_field} FROM trial_balance WHERE project_id = :pid AND year = :y AND company_code = :cc"),
-                    {"pid": project_id, "y": year, "cc": code},
-                )
-                for r in result.fetchall():
-                    name = r[0]
-                    val = float(r[1] or 0)
-                    summary_map[name] = summary_map.get(name, 0) + val
-        except Exception:
-            pass
-    else:
-        # 没有子企业代码，尝试不按企业筛选
-        try:
-            result = await db.execute(
-                text(f"SELECT account_name, SUM({balance_field}) FROM trial_balance WHERE project_id = :pid AND year = :y GROUP BY account_name"),
-                {"pid": project_id, "y": year},
-            )
-            for r in result.fetchall():
-                summary_map[r[0]] = float(r[1] or 0)
-        except Exception:
-            pass
-
-    # 3. 从合并工作底稿提取抵消分录
-    elim_map = {}  # account_name -> { equity_dr, equity_cr, trade_dr, trade_cr, adj_dr, adj_cr }
-    try:
-        result = await db.execute(
-            text("SELECT data FROM consol_worksheet_data WHERE project_id = :pid AND year = :y AND sheet_key = 'elimination'"),
-            {"pid": project_id, "y": year},
-        )
-        row = result.fetchone()
-        if row and isinstance(row[0], dict):
-            rows_data = row[0].get("rows", {})
-            # 权益抵消
-            for r in rows_data.get("equity", []):
-                name = r.get("subject", "")
-                if not name:
-                    continue
-                if name not in elim_map:
-                    elim_map[name] = {"equity_dr": 0, "equity_cr": 0, "trade_dr": 0, "trade_cr": 0, "adj_dr": 0, "adj_cr": 0}
-                direction = r.get("direction", "")
-                total = float(r.get("total", 0) or 0)
-                if direction == "借":
-                    elim_map[name]["equity_dr"] += total
-                elif direction == "贷":
-                    elim_map[name]["equity_cr"] += total
-            # 损益抵消（归入往来交易抵消）
-            for r in rows_data.get("income", []):
-                name = r.get("subject", "")
-                if not name:
-                    continue
-                if name not in elim_map:
-                    elim_map[name] = {"equity_dr": 0, "equity_cr": 0, "trade_dr": 0, "trade_cr": 0, "adj_dr": 0, "adj_cr": 0}
-                direction = r.get("direction", "")
-                total = float(r.get("total", 0) or 0)
-                if direction == "借":
-                    elim_map[name]["trade_dr"] += total
-                elif direction == "贷":
-                    elim_map[name]["trade_cr"] += total
-    except Exception:
-        pass
-
-    # 4. 加载报表行结构
-    try:
-        applicable_standard = f"{standard}_consolidated"
-        from app.models.report_models import ReportConfig, FinancialReportType
-        import sqlalchemy as sa
-        rt = FinancialReportType(report_type)
-        result = await db.execute(
-            sa.select(ReportConfig)
-            .where(
-                ReportConfig.report_type == rt,
-                ReportConfig.applicable_standard == applicable_standard,
-                ReportConfig.is_deleted == sa.false(),
-            )
-            .order_by(ReportConfig.row_number)
-        )
-        report_rows = result.scalars().all()
-    except Exception:
-        report_rows = []
-
-    # 5. 构建填充结果
-    filled = []
-    for r in report_rows:
-        name = r.row_name.strip() if r.row_name else ""
-        clean_name = name.lstrip("△▲*# ").strip()
-        
-        summary_val = summary_map.get(clean_name) or summary_map.get(name) or None
-        elim = elim_map.get(clean_name) or elim_map.get(name) or {}
-        
-        filled.append({
-            "row_code": r.row_code,
-            "row_name": r.row_name,
-            "summary": round(summary_val, 2) if summary_val else None,
-            "equity_dr": round(elim.get("equity_dr", 0), 2) or None,
-            "equity_cr": round(elim.get("equity_cr", 0), 2) or None,
-            "trade_dr": round(elim.get("trade_dr", 0), 2) or None,
-            "trade_cr": round(elim.get("trade_cr", 0), 2) or None,
-            "adj_dr": None,
-            "adj_cr": None,
-        })
-
-    matched_summary = len([f for f in filled if f["summary"]])
-    matched_elim = len([f for f in filled if f["equity_dr"] or f["equity_cr"] or f["trade_dr"] or f["trade_cr"]])
-
+    results = await check_note_cross_rules(db, project_id, year, section_id, template_type)
     return {
-        "rows": filled,
-        "matched_summary": matched_summary,
-        "matched_elim": matched_elim,
-        "total_rows": len(filled),
-        "child_count": len(child_codes),
+        "section_id": section_id,
+        "template_type": template_type,
+        "rules": [
+            {
+                "check_id": r.check_id,
+                "peer_section_id": r.peer_section_id,
+                "relation": r.relation,
+                "description": r.description,
+            }
+            for r in rules
+        ],
+        "results": [r.to_dict() for r in results],
     }

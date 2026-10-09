@@ -1328,22 +1328,64 @@ class TestHtmlCounterpartIsSourceBacked:
             "entries_with_runtime_sheet_name_expression"]
 
     def test_template_resolution_uses_the_real_impl_resolver(self, manifest_slice: dict) -> None:
-        """🔴 三边锁第三边：声明的册必须与 impl resolver 现算一致。"""
+        """🔴 三边锁第三边：声明的册必须与 impl resolver 现算一致。
+
+        🔴 **新增第三分支（spec workpaper-sync-pure-static-lane-and-combined-workbook-
+        resolution）**：存在 `workbook` 已钉住、但 `sheet_name_literal` **不是**裸 wp_code
+        的 entry（现算 a38：字面量是中文 sheet 名 `A3-8商誉减值测试`）。
+
+        这类 entry 的两步状态**不同**，三边锁必须分开表达，否则会把「第一步已修」误判成
+        「声明与 impl 不一致」：
+        * **第一步（解析层，已修）**：按 `wp_code_patterns` 里的**裸 wp_code** 解析，
+          必须等于声明的 `workbook`；
+        * **第二步（宿主层，未做，登记为后继）**：按中文字面 sheet 名解析仍为 `None`
+          —— 宿主还没改成传 wp_code。
+
+        少了这条分支，要么把 a38 的 `workbook` 退回假事实 `null`，要么把整条判据删掉；
+        两者都是弱化。
+        """
         finder = _load_module("_t57_finder", TEMPLATE_FINDER)
+        bare_code = re.compile(r"^[A-Z]+\d+(?:-\d+)*$")
+        two_step_pending: list[str] = []
         for e in manifest_slice["independent_entries"]:
             tr = e["template_ref"]
             if tr["resolution_kind"] != "literal_sheet_name":
                 continue
-            got = finder.find_template_file_any(tr["sheet_name_literal"])
+            literal = str(tr["sheet_name_literal"])
             expected = tr.get("workbook")
+            got = finder.find_template_file_any(literal)
             if expected is None:
                 assert got is None, (
                     f"{e['entry_id']}: 声明解析为 None，impl 现算得到 {got}")
-            else:
-                assert got is not None, f"{e['entry_id']}: impl 现算为 None"
-                assert got.relative_to(TEMPLATE_DIR).as_posix() == expected, (
-                    f"{e['entry_id']}: 声明 {expected} != impl 现算 "
-                    f"{got.relative_to(TEMPLATE_DIR).as_posix()}")
+                continue
+            if not bare_code.match(literal):
+                # 第二步未做：字面量不是 wp_code ⇒ 按它解析必为 None
+                assert got is None, (
+                    f"{e['entry_id']}: 字面量 {literal!r} 不是裸 wp_code 却解析到 {got} "
+                    f"⇒ 宿主层第二步的状态判断失效，请复核")
+                # 第一步已修：按裸 wp_code 解析必等于声明的册
+                codes = [c for c in (e.get("wp_code_patterns") or [])
+                         if bare_code.match(str(c))]
+                assert codes, f"{e['entry_id']}: 没有裸 wp_code 可用于第一步核验"
+                resolved = [finder.find_template_file_any(c) for c in codes]
+                hits = [p for p in resolved if p is not None]
+                assert hits, (
+                    f"{e['entry_id']}: 全部裸 wp_code {codes} 都解析不到册 ⇒ "
+                    f"解析层（第一步）可能被回退")
+                assert any(
+                    p.relative_to(TEMPLATE_DIR).as_posix() == expected for p in hits
+                ), (
+                    f"{e['entry_id']}: 声明 {expected} 不在裸 wp_code 的解析结果里 "
+                    f"{[p.relative_to(TEMPLATE_DIR).as_posix() for p in hits]}")
+                two_step_pending.append(e["entry_id"])
+                continue
+            assert got is not None, f"{e['entry_id']}: impl 现算为 None"
+            assert got.relative_to(TEMPLATE_DIR).as_posix() == expected, (
+                f"{e['entry_id']}: 声明 {expected} != impl 现算 "
+                f"{got.relative_to(TEMPLATE_DIR).as_posix()}")
+        # 分母登记（现算，禁写死）：这些 entry 的第二步是后继任务
+        assert two_step_pending == ["xlsx/gt-a38-goodwill-impairment"], (
+            f"「第一步已修、第二步未做」的成员集漂移: {two_step_pending}")
 
     def test_authoritative_template_enumeration_matches_disk(self, manifest_slice: dict) -> None:
         tpl = manifest_slice["authoritative_templates"]
@@ -2346,10 +2388,44 @@ class TestFormDifferences:
         assert v["abcs_letter_hits"] - v["excluded_pilot"] + v["pattern_less_shared"] == v["this_slice"]
 
     def test_ad10_shared_base_edges_are_recomputed_not_copied(self, manifest_slice: dict) -> None:
-        """🔴 每轮现算，禁照抄（M=29 / N=27）。"""
+        """🔴 每轮现算，禁照抄（M=29 / N=27）。
+
+        ═══ 2026-09-28：全局 `production` 从「严格等式」改为「差额须被逐条解释」═══
+
+        冻结 **26**、现算 **23**，差 3。逐条查清（都不是 A 域的回归）：
+
+        * **1 条**来自 `useM9EntryDualMode.ts` 被删 —— M 循环 slice 自己把它登记为
+          orphan（OD-11，`first_order`）并写明「M9 的两个孪生都是死桩」，删它是计划内动作；
+        * **2 条**是**本 slice 记录时口径偏松**：`GtG2InterestReceivable.vue` 与
+          `GtN2TaxesPayable.vue` 对 `useWorkpaperEntryDualMode` 的提及**只在注释里**
+          （现读实测，且两文件相对 HEAD **无 diff** ⇒ 与工作树改动无关），
+          而 `_statement_edges_to` 只数 statement 位置 ⇒ 这 2 个从来不该计入。
+          另已核对：K 循环 6 个 DualMode 虽被并发 lane 重写（各 +85/-14），
+          但它们在 HEAD 侧对基类的 statement 边本来就是 **0**，不贡献差额。
+
+        ⇒ 全局边数是**跨 lane 的移动目标**（任何循环增删一个消费方都会变），
+        对它做严格等式只会把「平台在长大」报成回归。真正稳的是**本 slice 作用域内**
+        那部分：`in_scope` / `in_scope_hosts` / `test` 三项冻结值与现算**逐值一致**
+        （实测 5 / 同名 5 个 B 宿主 / 1），它们保持严格等式。
+
+        全局项改为「差额 == 已登记原因之和」：任何**新增**漂移都会打红，
+        而不是每次别的 lane 动一下就红。
+        """
         d = next(x for x in manifest_slice["abcs_form_differences"] if x["id"] == "AD-10")
         prod, test = _statement_edges_to(SHARED_BASE)
-        assert d["value"]["production"] == len(prod)
+
+        #: 差额分解（见 docstring）：1 = 计划内删除的 M9 孪生；2 = slice 记录时把注释提及算进去了。
+        _AD10_GAP_PLANNED_DELETION = 1
+        _AD10_GAP_SLICE_OVERCOUNT = 2
+        gap = d["value"]["production"] - len(prod)
+        assert gap == _AD10_GAP_PLANNED_DELETION + _AD10_GAP_SLICE_OVERCOUNT, (
+            f"共享基类生产边差额现算 {gap}，已登记原因只解释 "
+            f"{_AD10_GAP_PLANNED_DELETION + _AD10_GAP_SLICE_OVERCOUNT} 条 —— "
+            "出现了新的未解释漂移，请查是哪个 lane 增删了基类消费方（不要直接改这里的常量）"
+        )
+        assert len(prod) >= d["value"]["in_scope"], (
+            f"生产边总数 {len(prod)} 小于本 slice 作用域内的 {d['value']['in_scope']} 条 ⇒ 扫描口径坏了"
+        )
         assert d["value"]["test"] == len(test)
         hosts = {e["host_path"] for e in manifest_slice["independent_entries"]}
         in_scope = [r for r in prod if r.split("#")[0] in hosts]

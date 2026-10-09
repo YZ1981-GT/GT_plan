@@ -15,6 +15,7 @@
  * Item IDs: "K9-5-row-{idx}-{field}" / "K9-8-row-{idx}-{field}"
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { newRowIdentity } from './shared/rowIdentity'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -163,7 +164,7 @@ export function useK9Checks(params: UseK9ChecksParams) {
     const amountMatched = Math.abs(contractAmount - paidAmount) <= AMOUNT_TOLERANCE
 
     return {
-      rowKey: raw.rowKey ?? `contract-${idx}`,
+      rowKey: raw.rowKey ?? newRowIdentity('contract'),
       index: idx + 1,
       contractName: raw.contractName ?? '',
       contractType: raw.contractType ?? '',
@@ -181,7 +182,7 @@ export function useK9Checks(params: UseK9ChecksParams) {
 
   function _normalizeAdminRow(raw: any, idx: number): K9AdminCheckRow {
     return {
-      rowKey: raw.rowKey ?? `admin-${idx}`,
+      rowKey: raw.rowKey ?? newRowIdentity('admin'),
       index: idx + 1,
       checkItem: raw.checkItem ?? '',
       description: raw.description ?? '',
@@ -194,7 +195,7 @@ export function useK9Checks(params: UseK9ChecksParams) {
 
   function _buildDefaultAdminRows(): K9AdminCheckRow[] {
     return DEFAULT_ADMIN_CHECKS.map((item, idx) => ({
-      rowKey: `admin-${idx}`,
+      rowKey: newRowIdentity('admin'),
       index: idx + 1,
       checkItem: item.checkItem,
       description: item.description,

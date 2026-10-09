@@ -12,7 +12,7 @@ import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
-from app.services.knowledge_index_service import KnowledgeIndexService
+from app.services.knowledge_index_service import KnowledgeIndexService, _chunk_text
 from app.models.ai_models import KnowledgeSourceType
 
 
@@ -25,7 +25,7 @@ class TestKnowledgeIndexService:
         mock_db = AsyncMock()
         service = KnowledgeIndexService(mock_db)
         assert service is not None
-        assert service.db is mock_db
+        assert service._db is mock_db
 
     @pytest.mark.asyncio
     async def test_knowledge_source_type_enum(self):
@@ -41,13 +41,13 @@ class TestKnowledgeIndexService:
         """测试文本分块辅助函数"""
         # 测试短文本不需要分块
         short_text = "这是一段较短的文本内容"
-        chunks = KnowledgeIndexService._chunk_text(short_text)
+        chunks = _chunk_text(short_text)
         assert len(chunks) == 1
         assert chunks[0] == short_text
 
         # 测试长文本分块
         long_text = "测试内容 " * 500
-        chunks = KnowledgeIndexService._chunk_text(long_text, chunk_size=200)
+        chunks = _chunk_text(long_text, chunk_size=200)
         assert len(chunks) > 1
         # 验证每块大小不超过chunk_size
         for chunk in chunks:

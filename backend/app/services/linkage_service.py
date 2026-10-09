@@ -697,14 +697,36 @@ class LinkageService:
         for r in adj_rows:
             acct_adj[r[0]] = {"debit": float(r[1]), "credit": float(r[2])}
 
+        # Get wp_adjustment (底稿调整分量) by account from trial_balance
+        wp_adj_query = text("""
+            SELECT standard_account_code, COALESCE(wp_adjustment, 0) AS wp_adj
+            FROM trial_balance
+            WHERE project_id = :project_id
+              AND year = :year
+              AND is_deleted = false
+        """)
+        try:
+            wp_adj_result = await self.db.execute(
+                wp_adj_query,
+                {"project_id": str(project_id), "year": year},
+            )
+            wp_adj_rows = wp_adj_result.fetchall()
+        except Exception:
+            wp_adj_rows = []
+
+        acct_wp_adj: dict[str, float] = {}
+        for r in wp_adj_rows:
+            acct_wp_adj[r[0]] = float(r[1])
+
         # Calculate full values per row_code
         for row_code, accounts in row_to_accounts.items():
             total = 0.0
             for acct in accounts:
                 unadj = acct_balances.get(acct, 0.0)
                 adj = acct_adj.get(acct, {"debit": 0.0, "credit": 0.0})
-                # audited = unadjusted + aje_dr - aje_cr
-                audited = unadj + adj["debit"] - adj["credit"]
+                wp_adj = acct_wp_adj.get(acct, 0.0)
+                # audited = unadjusted + aje_dr - aje_cr + wp_adjustment
+                audited = unadj + adj["debit"] - adj["credit"] + wp_adj
                 total += audited
             full_values[row_code] = total
 

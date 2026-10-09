@@ -48,6 +48,7 @@ def build_d6_detail_rows_from_aux(
     *,
     row_limit: int = DEFAULT_ROW_LIMIT,
     row_id_factory: Callable[[], str] | None = None,
+    source_kind: str = "aux_balance_import",
 ) -> list[dict]:
     """纯函数：把 1141 归集结果构建为 D6-2 明细行 dict 列表（**只写录入列**）.
 
@@ -79,6 +80,7 @@ def build_d6_detail_rows_from_aux(
                 "contractName": name,
                 "customerName": name,
                 "priorUnadjusted": prior_bal,
+                "source_kind": source_kind,
             }
         )
     return rows_data

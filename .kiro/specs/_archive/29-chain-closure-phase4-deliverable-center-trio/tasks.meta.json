@@ -1,0 +1,294 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. 基线与入口清册": [
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791285531490
+      },
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791285543198
+      },
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791286045917
+      }
+    ],
+    "2. readiness 基线与硬/软闸门": [
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791285531561
+      },
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791286051537
+      },
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791286606879
+      }
+    ],
+    "3. 快照与 schema/ORM 三层一致": [
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791285531594
+      },
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791286612779
+      },
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791287142144
+      }
+    ],
+    "4. 文件指纹与版本 fail-closed": [
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791285531627
+      },
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791287147427
+      },
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791287880664
+      }
+    ],
+    "5. executor 固定顺序与步骤依赖": [
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791285531661
+      },
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791287887959
+      },
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791288374236
+      }
+    ],
+    "6. savepoint 隔离与事务边界": [
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791285531716
+      },
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791288379930
+      },
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791288928555
+      }
+    ],
+    "7. job/item/attempt 不可变历史": [
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791285531748
+      },
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791288936738
+      },
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791289656734
+      }
+    ],
+    "8. 真正重试失败步骤": [
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791285531777
+      },
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791289668271
+      },
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791290384264
+      }
+    ],
+    "9. readiness/生成/重试/下载端点与权限": [
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791285531815
+      },
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791290394421
+      },
+      {
+        "executionId": "400df97f-e6f6-4c6b-b83b-84921469a809",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791291428667
+      }
+    ],
+    "11. 前端失败项重试与历史": [
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791285531858
+      },
+      {
+        "executionId": "400df97f-e6f6-4c6b-b83b-84921469a809",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791291468127
+      },
+      {
+        "executionId": "400df97f-e6f6-4c6b-b83b-84921469a809",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791292040779
+      }
+    ],
+    "12. SQLite 真 ORM/文件故障全链回归": [
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791285531919
+      },
+      {
+        "executionId": "400df97f-e6f6-4c6b-b83b-84921469a809",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791292080738
+      },
+      {
+        "executionId": "400df97f-e6f6-4c6b-b83b-84921469a809",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791293174077
+      }
+    ],
+    "13. 真 PG 临时 schema 与事务回滚": [
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791285531949
+      },
+      {
+        "executionId": "400df97f-e6f6-4c6b-b83b-84921469a809",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791293220932
+      },
+      {
+        "executionId": "400df97f-e6f6-4c6b-b83b-84921469a809",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791295300244
+      }
+    ],
+    "17. clean HEAD 对照与冲突归因": [
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791285531990
+      },
+      {
+        "executionId": "400df97f-e6f6-4c6b-b83b-84921469a809",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791295374025
+      },
+      {
+        "executionId": "400df97f-e6f6-4c6b-b83b-84921469a809",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791295811646
+      },
+      {
+        "executionId": "6c5ac7d1-a3db-4778-b635-27418fad5073",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791301786423
+      }
+    ],
+    "18. 收尾与追溯": [
+      {
+        "executionId": "39a7084a-66b6-4c42-95a6-7168b78f2491",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791285532045
+      },
+      {
+        "executionId": "400df97f-e6f6-4c6b-b83b-84921469a809",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791295822553
+      }
+    ],
+    "14. 真实项目事务内 dry-run": [
+      {
+        "executionId": "6c5ac7d1-a3db-4778-b635-27418fad5073",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791299067672
+      },
+      {
+        "executionId": "6c5ac7d1-a3db-4778-b635-27418fad5073",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791299116535
+      },
+      {
+        "executionId": "6c5ac7d1-a3db-4778-b635-27418fad5073",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791299742637
+      }
+    ],
+    "15. Playwright 真实浏览器验证": [
+      {
+        "executionId": "6c5ac7d1-a3db-4778-b635-27418fad5073",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791299074859
+      },
+      {
+        "executionId": "6c5ac7d1-a3db-4778-b635-27418fad5073",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791299750537
+      },
+      {
+        "executionId": "6c5ac7d1-a3db-4778-b635-27418fad5073",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791300274095
+      }
+    ],
+    "16. 真实出具三件套写库验收": [
+      {
+        "executionId": "6c5ac7d1-a3db-4778-b635-27418fad5073",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791299099894
+      },
+      {
+        "executionId": "6c5ac7d1-a3db-4778-b635-27418fad5073",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791300449997
+      },
+      {
+        "executionId": "6c5ac7d1-a3db-4778-b635-27418fad5073",
+        "chatSessionId": "sess_3d33a619-9807-4174-89e6-a2a6862c68a4",
+        "timestamp": 1791301687880
+      }
+    ]
+  }
+}

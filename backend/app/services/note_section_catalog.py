@@ -128,6 +128,40 @@ def note_applies_to_report_scope(
     return section_applies_to_scope({"scope": scope}, rs)
 
 
+def section_allowed_for_project(
+    note_section: str | None,
+    template_type: str | None,
+    report_scope: str | None,
+) -> bool:
+    """该章节能否出现在**这个项目**的附注里（写入口与读入口共用的单一判据）。
+
+    与 :func:`note_applies_to_report_scope` 的区别只在两处兜底，都是为了**不误杀**：
+
+    * ``template_type`` 不是 ``soe`` / ``listed``（空、``custom`` 等）⇒ 不猜变体，放行。
+      🔴 不能交给 ``normalize_template_type``：它把一切未知值补成 soe，会拿国企编号去裁
+      上市 / 自定义模板项目（两套编号同号不同义，如 soe 十二 = 母公司章、listed 十二 = 股份支付）。
+    * ``report_scope`` 为空 ⇒ 视为 standalone（与生成链 ``normalize_report_scope`` 一致）
+
+    2026-09-30 抽出：附注生成（``DisclosureEngine.generate_notes``）早已按模板 scope
+    过滤，但**另两条写入口**（底稿披露同步 ``sync_from_workpaper`` / ``sync_from_html``）
+    与**读入口**（目录树 ``get_notes_tree``）都不过滤 ⇒ 单体项目里长出了合并专属章节
+    （真库实测 19 行，全部来自这些旁路）。三处改为同调本函数。
+    """
+    variant = (template_type or "").strip().lower()
+    if variant not in ("soe", "listed"):
+        return True
+    return section_applies_to_scope(
+        {
+            "scope": section_scope_for_code(
+                note_section or "",
+                load_section_scope_map(variant),
+                template_type=variant,
+            )
+        },
+        normalize_report_scope(report_scope),
+    )
+
+
 def filter_tree_by_report_scope(
     tree: list[dict[str, Any]],
     template_type: str | None,

@@ -33,6 +33,8 @@
             size="small"
             @change="dualMode.switchMode"
           />
+          <!-- BP-7 MC-12: 未接入双向回写的 notice -->
+          <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-m4-capital-reserve" />
         </div>
 
         <!-- 结构化视图（HTML sheet 分支） -->
@@ -132,6 +134,7 @@ import { ref, computed, inject, onMounted, provide, toRef, defineAsyncComponent 
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useM4EntryDualMode } from './composables/useM4EntryDualMode'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
@@ -290,7 +293,8 @@ onMounted(() => {
 
 .mode-toggle-bar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 8px;
 }
 </style>

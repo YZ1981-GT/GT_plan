@@ -757,6 +757,16 @@ class TrialBalance(Base):
     audited_amount: Mapped[Decimal | None] = mapped_column(
         sa.Numeric(20, 2), nullable=True
     )
+    # 底稿发布产生的增量分量：重导入/调整重算时保留，避免覆盖发布结果。
+    wp_adjustment: Mapped[Decimal] = mapped_column(
+        sa.Numeric(20, 2), server_default=text("0"), nullable=False
+    )
+    wp_publish_base: Mapped[Decimal | None] = mapped_column(
+        sa.Numeric(20, 2), nullable=True
+    )
+    wp_published_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
     opening_balance: Mapped[Decimal | None] = mapped_column(
         sa.Numeric(20, 2), nullable=True
     )

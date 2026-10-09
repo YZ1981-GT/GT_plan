@@ -96,9 +96,8 @@ export function calcPriorAudited(unadjusted: number, adjustment: number, reclass
 // ─── 借方科目期末余额 ───────────────────────────────────────────────────────
 
 /**
- * 期末余额（借方科目/资产类）= 期初审定 + 借方发生 - 贷方发生
- *
- * F1-2 明细表 O列 = H + M - N（预付账款 1123）。
+ * 通用函数接收起算余额并加减借贷发生额；F1-2 权威模板的调用方传入期初未审 E，
+ * 因此 O 列口径为 E + M - N。
  */
 export function calcEndUnadjustedDebit(priorAudited: number, debit: number, credit: number): number {
   return priorAudited + debit - credit

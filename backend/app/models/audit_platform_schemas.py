@@ -22,7 +22,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.audit_platform_models import (
     AccountCategory,
@@ -34,6 +34,7 @@ from app.models.audit_platform_models import (
     ReviewStatus,
 )
 from app.schemas._common import AmountDecimal, OptionalAmountDecimal
+from app.schemas.consol_context import ConsolContext
 
 
 # ===================================================================
@@ -99,11 +100,15 @@ class BasicInfoSchema(BaseModel):
     custom_template_name: str | None = None
     custom_template_version: str | None = None
     report_scope: str | None = None  # 报表类型：standalone（单户）/ consolidated（合并）
-    consolidation_type: str | None = None  # 合并类型：subsidiary（母子合并）/ branch（母分汇总）
-    parent_company_name: str | None = None  # 上级企业名称（合并报表时填写）
-    parent_company_code: str | None = None  # 上级企业代码
+    # 集团架构（consol-tree-three-code-autobuild 需求 1）：所有报表类型都可填写，
+    # 企业树由这组字段自动推导。规范化与校验见 app.services.group_links.normalize_group_fields。
+    # 「合并类型」字段已移除：合并方式由下级企业的与上级关系自动识别（需求 4），
+    # 旧客户端仍发送该键时按 pydantic 默认 extra=ignore 忽略。
+    parent_company_name: str | None = None  # 上级企业名称
+    parent_company_code: str | None = None  # 上级企业代码（统一社会信用代码，可空）
+    relation_to_parent: str | None = None  # 与上级关系：subsidiary（子公司）/ branch（分公司）
     ultimate_company_name: str | None = None  # 最终控制方名称
-    ultimate_company_code: str | None = None  # 最终控制方代码
+    ultimate_company_code: str | None = None  # 最终控制方代码（统一社会信用代码，可空）
     signing_partner_id: UUID | None = None
     manager_id: UUID | None = None
 
@@ -143,6 +148,14 @@ class WizardState(BaseModel):
     completed: bool = False
 
 
+class WizardStepSaveResponse(WizardState):
+    """保存向导步骤的响应：向导状态 + 给用户看的说明（如集团关系已同步到同企业另一口径项目）。
+
+    notices 只随响应返回，不写入 projects.wizard_state。
+    """
+    notices: list[str] = []
+
+
 class ProjectCreateResponse(BaseModel):
     """项目创建响应"""
     model_config = ConfigDict(from_attributes=True)
@@ -159,12 +172,21 @@ class ProjectCreateResponse(BaseModel):
     # audit-report-template-integration 需求 1.5/14.2：企业子类型 type_a/b/c/d 读写往返
     company_subtype: str | None = None
     report_scope: str | None = None
+    # 集团架构（consol-tree-three-code-autobuild 需求 1.6）：详情回填与树视图用
+    parent_company_name: str | None = None
+    parent_company_code: str | None = None
+    relation_to_parent: str | None = None
+    ultimate_company_name: str | None = None
+    ultimate_company_code: str | None = None
+    # 派生值（ADR-CTREE-001）：直接消费本项目的合并项目
     parent_project_id: UUID | None = None
     consol_level: int = 1
     # 合并锁定态（Phase 0 consol_lock 列）：子公司被母项目锁定后单体不可改
     # 前端合并项目列表据此显示"🔒 已锁定"标签（Phase 3 需求 4.3）
     consol_lock: bool = False
     created_at: datetime
+    # 本次请求产生的说明（仅创建/保存时非空），如「已从同企业的合并项目带入集团关系」
+    notices: list[str] = []
 
 
 # ===================================================================
@@ -883,6 +905,8 @@ class EventType(str, enum.Enum):
     # 调整分录复核通过 → 下游重算/stale/SSE
     # payload: {project_id, year, account_codes: [...], entry_group_id}
     ADJUSTMENT_APPROVED = "adjustment.approved"
+    # 调整分录撤回复核 → 与审批通过走同一套下游链路
+    ADJUSTMENT_REVIEW_REVOKED = "adjustment.review_revoked"
 
     # Sprint 10: 底稿深度优化事件
     WORKPAPER_AUDITED_CONFIRMED = "workpaper.audited_confirmed"
@@ -924,8 +948,12 @@ class EventType(str, enum.Enum):
     CONSOL_SCOPE_CHANGED = "consol.scope_changed"
 
     # consol-phase1-arch-lock 需求 2.3: 抵销分录审批 → worksheet + trial 重算
+    # consol-elimination-single-source-push 需求 8.1 起改为触发合并推送（差额表 → 试算 → 报表 → 附注标记）
     # payload: {project_id, year, extra: {entry_id}}
     ELIMINATION_APPROVED = "elimination.approved"
+    # consol-elimination-single-source-push 需求 8.2: 撤销审批（已审批 → 草稿）→ 同样触发合并推送
+    # payload: {project_id, year, extra: {entry_id}}
+    ELIMINATION_REVOKED = "elimination.revoked"
 
     # report-config-baseline 需求 2.1: 主模板更新 → 克隆项目 stale 通知
     # payload: {project_id (placeholder), extra: {standard, report_type, row_code, config_id}}
@@ -947,7 +975,25 @@ class EventPayload(BaseModel):
     account_codes: list[str] | None = None
     batch_id: UUID | None = None
     entry_group_id: UUID | None = None
-    extra: dict[str, Any] = {}
+    context: ConsolContext | None = None
+    extra: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _validate_context_boundary(self) -> "EventPayload":
+        """typed context 存在时必须与事件 envelope 的项目/年度一致。"""
+        if self.context is None:
+            return self
+        if self.context.project_id != self.project_id:
+            raise ValueError("事件项目与 ConsolContext.project_id 不一致")
+        if self.year is None:
+            raise ValueError("携带 ConsolContext 的事件必须携带顶层年度")
+        if self.context.year != self.year:
+            raise ValueError("事件年度与 ConsolContext.year 不一致")
+        return self
+
+    def resolved_context(self) -> ConsolContext | None:
+        """返回 typed context；旧事件仍返回 None，由入口按业务边界显式 legacy 化。"""
+        return self.context
 
 
 # ===================================================================

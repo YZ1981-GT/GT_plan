@@ -1,0 +1,209 @@
+{
+  "schema_version": "contract-definition:v1",
+  "contract_id": "j2.defined_benefit_detail",
+  "semantic_version": "1.0.0",
+  "review_status": "reviewed",
+  "document_type": "xlsx",
+  "template_definition_sha256": "0f6409803c6b92637635742e73e62027b0008a6de3a1f2608a19cd93f0ebe962",
+  "instrumentation_definition_sha256": "c3aa6e980cc004715822c9fc1dd9b4a796420d5163a284f6a7027fa99d1585bf",
+  "template": {
+    "relative_path": "J/J2 长期应付职工薪酬-设定受益计划净资产.xlsx",
+    "template_sha256": "10c0518352105d5efd5256a6245b78123b57f4c9af9673ceeee97f63125541e8",
+    "normalized_structure_hash": "79cad5e593007bce0145f423298d2224ad208f6c79df8a2217e2d626c6c0f4ba"
+  },
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "sheets": [
+    {
+      "sheet_key": "j22-main-managed",
+      "excel_name": "明细表J2-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "tables": [
+        {
+          "table_key": "defined_benefit_main_rows",
+          "anchor": "A11",
+          "header_rows": 2,
+          "row_identity": {
+            "kind": "field",
+            "json_pointer": "/rows/*/key"
+          },
+          "delete_policy": "tombstone",
+          "formula_mask": [
+            "F13:F17",
+            "J13:J17",
+            "K13:K17",
+            "L13:L17",
+            "M13:M17"
+          ],
+          "fields": [
+            {
+              "stable_field_key": "defined_benefit_main_rows/{row_uuid}/seq",
+              "json_pointer": "/rows/{row_uuid}/seq",
+              "column_key": "seq",
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!明细表J2-2!A13",
+              "header_source_ref": "源xlsx!明细表J2-2!A12",
+              "store_item_id": "J2-2-main",
+              "header_text": "序号"
+            },
+            {
+              "stable_field_key": "defined_benefit_main_rows/{row_uuid}/label",
+              "json_pointer": "/rows/{row_uuid}/label",
+              "column_key": "label",
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!明细表J2-2!B13",
+              "header_source_ref": "源xlsx!明细表J2-2!B12",
+              "store_item_id": "J2-2-main",
+              "header_text": "项目名称"
+            },
+            {
+              "stable_field_key": "defined_benefit_main_rows/{row_uuid}/begin_unadj",
+              "json_pointer": "/rows/{row_uuid}/beginUnadj",
+              "column_key": "begin_unadj",
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表J2-2!C13",
+              "header_source_ref": "源xlsx!明细表J2-2!C12",
+              "store_item_id": "J2-2-main",
+              "header_text": "期初数"
+            },
+            {
+              "stable_field_key": "defined_benefit_main_rows/{row_uuid}/inc_unadj",
+              "json_pointer": "/rows/{row_uuid}/incUnadj",
+              "column_key": "inc_unadj",
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表J2-2!D13",
+              "header_source_ref": "源xlsx!明细表J2-2!D12",
+              "store_item_id": "J2-2-main",
+              "header_text": "本期增加"
+            },
+            {
+              "stable_field_key": "defined_benefit_main_rows/{row_uuid}/dec_unadj",
+              "json_pointer": "/rows/{row_uuid}/decUnadj",
+              "column_key": "dec_unadj",
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表J2-2!E13",
+              "header_source_ref": "源xlsx!明细表J2-2!E12",
+              "store_item_id": "J2-2-main",
+              "header_text": "本期减少"
+            },
+            {
+              "stable_field_key": "defined_benefit_main_rows/{row_uuid}/open_adjust",
+              "json_pointer": "/rows/{row_uuid}/openAdjust",
+              "column_key": "open_adjust",
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表J2-2!G13",
+              "header_source_ref": "源xlsx!明细表J2-2!G12",
+              "store_item_id": "J2-2-main",
+              "header_text": "账项调整"
+            },
+            {
+              "stable_field_key": "defined_benefit_main_rows/{row_uuid}/inc_adjust",
+              "json_pointer": "/rows/{row_uuid}/incAdjust",
+              "column_key": "inc_adjust",
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表J2-2!H13",
+              "header_source_ref": "源xlsx!明细表J2-2!H12",
+              "store_item_id": "J2-2-main",
+              "header_text": "本期增加"
+            },
+            {
+              "stable_field_key": "defined_benefit_main_rows/{row_uuid}/dec_adjust",
+              "json_pointer": "/rows/{row_uuid}/decAdjust",
+              "column_key": "dec_adjust",
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!明细表J2-2!I13",
+              "header_source_ref": "源xlsx!明细表J2-2!I12",
+              "store_item_id": "J2-2-main",
+              "header_text": "本期减少"
+            },
+            {
+              "stable_field_key": "defined_benefit_main_rows/{row_uuid}/remark",
+              "json_pointer": "/rows/{row_uuid}/remark",
+              "column_key": "remark",
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "mode": "editable",
+              "value_type": "text",
+              "source_ref": "源xlsx!明细表J2-2!N13",
+              "header_source_ref": "源xlsx!明细表J2-2!N12",
+              "store_item_id": "J2-2-main",
+              "header_text": "备注"
+            }
+          ],
+          "footer_anchor": {
+            "marker": "合计",
+            "search_column": "A",
+            "carries_total_formula": true
+          },
+          "uuid_col": "O"
+        }
+      ]
+    }
+  ],
+  "review": {
+    "entry_id": "xlsx/j2/gt-j2-defined-benefit-plan",
+    "pilot_class": "phase5_j2_defined_benefit_main",
+    "authority_root": "backend/wp_templates",
+    "html_store": {
+      "table": "checklist_responses",
+      "item_ids": [
+        "J2-2-main"
+      ],
+      "shape": "json_array_of_row_objects",
+      "payload_column": "remark",
+      "payload_column_mode": "remark_only",
+      "payload_column_source": "audit-platform/frontend/src/components/workpaper/j2/J2TabDetail.vue — item_id J2-2-main，checklist_responses.remark JSON 数组",
+      "note": "J2 设定受益计划的主明细表数据存成 checklist_responses.remark JSON 数组（item_id J2-2-main）。增减四栏结构（14 列）与 J1 同构。🔴 行身份用 `key`（稳定业务键），不是 UUID。分区 A：R13-R17（5 行含 agg），R18 合计 footer。"
+    },
+    "reviewed_basis": "openpyxl 逐格实测 J/J2 长期应付职工薪酬-设定受益计划净资产.xlsx 的 `明细表J2-2`（多分区结构 6 业务区 / max_row=90 / max_column=14 / merged=30 / protection=False / 公式 221 / definedName 0 / 无 Excel Table / 分区 A 主表 R11-R18 两级表头 R11/R12 + 数据 R13-R17 + footer R18 合计 / 5 个公式列 F=C+D-E J=C+G K=D+H L=E+I M=J+K-L / R13 是 agg 行 C13=C14+C15 等 / R18 是 footer 行 C18=C13+C16-C17 等 / 9 个受管字段 + 5 个公式列 = 14 列(A~N) / UUID 放 O 列 / 真库 J2-2-main 1101 B 有载荷）",
+    "tb_publish_gate": null
+  }
+}

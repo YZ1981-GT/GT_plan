@@ -1,9 +1,7 @@
 {
   "browser_lane": {
-    "all_roles_ok": true,
-    "present": true,
-    "revocation_within_1s": true,
-    "status": "executed_passed"
+    "present": false,
+    "status": "GAP_deferred"
   },
   "feature": "visibility-isolation-go-live-hardening",
   "gate_level": {

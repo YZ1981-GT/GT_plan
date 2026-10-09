@@ -90,6 +90,14 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         adapter_id="d1.notes_receivable_detail",
         provider_module="phase5_d1_notes_receivable",
         items=(StoreItemSpec(item_id="D1-cust-rows", kind=StoreKind.rows),),
+        # 🔴 2026-09-28：D1 扩容面（12 张受管 sheet / 18 个 item）接入两方向装配链。
+        #    此前 `dual_store_fn` 为空 ⇒ 回方向走单 item 路径、只镜像 `bridge.STORE_ITEM_ID`
+        #    那 1 个，伴生模块 `phase5_d1_expansion.all_store_item_ids()` 没有任何生产代码
+        #    调用（实测确认）。形态同 D4-35 恒空，但断口在「entry ↔ 伴生模块」之间。
+        #    `dual_store_fn` 只需非空即触发 `_mirror_dual_stores`；真正被按名调用的是
+        #    `merge_all_fn`（D1 按 spec 泛化，不是 D4 那种逐 item 手写清单）。
+        dual_store_fn="_mirror_dual_stores",
+        merge_all_fn="merge_projection_into_all_d1_stores",
         dedicated_items=(
             DedicatedStoreItem(
                 item_id_const="STORE_ITEM_ID_D107",
@@ -687,6 +695,235 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         provider_module="phase5_l1_short_term_loans",
         items=(StoreItemSpec(item_id="L1-2-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── J1（spec: j-cycle-sync-foundation-and-first-canary · 参照 D/H/L 真双向注册）──
+    #
+    # 受管 sheet = `计提情况检查表J1-6` 短期薪酬区（R17:R35，19 行），canary 键
+    # `J1-6-short-term`（真库 3473 B，全 J 最大）。行身份字段是 **`id`**（不是 `rowId`）。
+    #
+    # 🔴 `items` 只登记本轮真受管的一条：同 Tab 兄弟键 `J1-6-post-employment`
+    #    （structured_row_array）/ `J1-6-questions`（free_text_array）/
+    #    `J1-6-conclusion`（free_text_scalar）**不预登记**；primary table
+    #    `J1-2-detail-*` 三键真库全空，归后续批次。
+    #
+    # 🔴 GC-2：J1 册裸 IF **224 格**，**受管表零命中** ⇒ per-file 保守策略照挂，
+    #    中性化函数与 G7/H9/L1 **共用一个**，不新造、不加 adapter_id 字面量分支。
+    "j1.accrual_check_short_term": StoreMergePlan(
+        adapter_id="j1.accrual_check_short_term",
+        provider_module="phase5_j1_employee_compensation",
+        items=(StoreItemSpec(item_id="J1-6-short-term", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── J2 设定受益计划主明细表（增减四栏 R13-R17）───────────────────────
+    "j2.defined_benefit_detail": StoreMergePlan(
+        adapter_id="j2.defined_benefit_detail",
+        provider_module="phase5_j2_defined_benefit",
+        items=(StoreItemSpec(item_id="J2-2-main", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── J3 股份支付情况表（零公式 14 列全文本 R21-R27）─────────────────────
+    "j3.share_based_payment_detail": StoreMergePlan(
+        adapter_id="j3.share_based_payment_detail",
+        provider_module="phase5_j3_share_based_payment",
+        items=(StoreItemSpec(item_id="J3-1-plans", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── K1-9 单 dict item / 同 sheet 双区（专用 merge，保留未受管标量）──
+    "k1.baddebt_reversal_writeoff_check": StoreMergePlan(
+        adapter_id="k1.baddebt_reversal_writeoff_check",
+        provider_module="phase5_k1_baddebt_reversal_writeoff",
+        items=(),
+        dedicated_items=(
+            DedicatedStoreItem(
+                item_id_const="STORE_ITEM_ID",
+                merge_fn="merge_k1_from_projection",
+                base_kind="dict",
+                provider_module="phase5_k1_baddebt_reversal_writeoff",
+            ),
+        ),
+    ),
+    # ── K 循环调整分录汇总六条（per-file 中性化同 G7/H9/L1，共用一个函数）──
+    "k8.selling_expenses_adjustment": StoreMergePlan(
+        adapter_id="k8.selling_expenses_adjustment",
+        provider_module="phase5_k8_selling_expenses",
+        items=(StoreItemSpec(item_id="K8-3-adj-entries", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "k9.admin_expenses_adjustment": StoreMergePlan(
+        adapter_id="k9.admin_expenses_adjustment",
+        provider_module="phase5_k9_admin_expenses",
+        items=(StoreItemSpec(item_id="K9-3-adj-entries", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "k10.other_income_adjustment": StoreMergePlan(
+        adapter_id="k10.other_income_adjustment",
+        provider_module="phase5_k10_other_income",
+        items=(StoreItemSpec(item_id="K10-3-entries", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "k11.asset_impairment_loss_adjustment": StoreMergePlan(
+        adapter_id="k11.asset_impairment_loss_adjustment",
+        provider_module="phase5_k11_asset_impairment_loss",
+        items=(StoreItemSpec(item_id="K11-3-adj-entries", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "k12.non_operating_income_adjustment": StoreMergePlan(
+        adapter_id="k12.non_operating_income_adjustment",
+        provider_module="phase5_k12_non_operating_income",
+        items=(StoreItemSpec(item_id="K12-3-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "k13.non_operating_expense_adjustment": StoreMergePlan(
+        adapter_id="k13.non_operating_expense_adjustment",
+        provider_module="phase5_k13_non_operating_expense",
+        items=(StoreItemSpec(item_id="K13-3-adj-entries", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── L4（spec: l-cycle-true-adapter-registration · Task 12）──
+    #
+    # 受管 sheet = `划分为金融负债的其他金融工具明细表L4-3`，store = `L4-3-rows`
+    # （行身份 `rowId`）。只登记这一条：L4-2/L4-5/L4-6 等 JSON 键属后续批次，不预登记。
+    # 🔴 GC-2：受管表零裸 IF，但同册其他 sheet 有（现算见 test_l4_adapter_registration）
+    #    ⇒ per-file 策略照挂，与 G7/H9/L1 共用同一个中性化函数。
+    "l4.bonds_payable": StoreMergePlan(
+        adapter_id="l4.bonds_payable",
+        provider_module="phase5_l4_bonds_payable",
+        items=(StoreItemSpec(item_id="L4-3-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── L3（task 12）：受管 L3-9；criteria/note/conclusion 不预登记 ──
+    "l3.long_term_loans": StoreMergePlan(
+        adapter_id="l3.long_term_loans",
+        provider_module="phase5_l3_long_term_loans",
+        items=(StoreItemSpec(item_id="L3-L3-9-voucher-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── L2（task 12 最后一条）：受管 L2-4 应付利息检查表（L3-9 孪生）；
+    #    criteria/note/conclusion 不预登记 ──
+    "l2.interest_payable": StoreMergePlan(
+        adapter_id="l2.interest_payable",
+        provider_module="phase5_l2_interest_payable",
+        items=(StoreItemSpec(item_id="L2-L2-4-voucher-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── L7（spec l7-true-bidirectional）：受管 明细表L7-2（整册唯一数据录入源）；
+    #    sibling L7-L7-2-rows / -row-N-end_balance 不预登记。受管表零裸 IF，整册裸 IF 仅
+    #    审定表L7-1 6 格 ⇒ per-file 中性化照挂 ──
+    "l7.other_noncurrent_liabilities": StoreMergePlan(
+        adapter_id="l7.other_noncurrent_liabilities",
+        provider_module="phase5_l7_other_noncurrent_liabilities",
+        items=(StoreItemSpec(item_id="L7-L7-2-full-data", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── L6（spec l6-true-bidirectional）：受管 明细表L6-2（科目 2711，整册唯一数据录入源）；
+    #    store 单键 `L6-L6-2-rows`（非 L7 的 -full-data）；sibling L6-L6-2-row-N-end_balance
+    #    不预登记。受管表零裸 IF，整册裸 IF 仅 审定表L6-1 11 格 ⇒ per-file 中性化照挂 ──
+    "l6.special_payables": StoreMergePlan(
+        adapter_id="l6.special_payables",
+        provider_module="phase5_l6_special_payables",
+        items=(StoreItemSpec(item_id="L6-L6-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── L8（spec l8-true-bidirectional）：受管 明细表L8-2（科目 6603 财务费用，损益类，整册唯一数据录入源）；
+    #    store 单键 `L8-2-full-data`（🔴 单前缀 L8-2- 非 L5/L6/L7 双前缀）；身份字段 key（非 rowId）。
+    #    sibling L8-2-row-N-data / -row-N-audited / -netFinExpense 不预登记。受管 sheet 自身 28 裸 IF
+    #    （R 列占比 + R23 各月比例，与 L1~L7「受管表零裸 IF」相反）⇒ per-file 中性化照挂 ──
+    "l8.financial_expenses": StoreMergePlan(
+        adapter_id="l8.financial_expenses",
+        provider_module="phase5_l8_financial_expenses",
+        items=(StoreItemSpec(item_id="L8-2-full-data", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── L5（spec l5-true-bidirectional）：受管 L5-2（科目 2701 长期应付款），两区同键 + flat 账龄 ──
+    #    store 单键 `L5-L5-2-rows`（双前缀）、身份字段 key；两区共享此键、section 字段分区
+    #    （售后租回/分期付款）；R24 其他占位续行作静态骨架不受管；融资属性 + HTML 旧标量退 html_only 不预登记为独立键。
+    #    受管表 明细表L5-2 零裸 IF，整册裸 IF 仅 审定表L5-1 12 格 ⇒ per-file 中性化照挂。
+    "l5.long_term_payables": StoreMergePlan(
+        adapter_id="l5.long_term_payables",
+        provider_module="phase5_l5_long_term_payables",
+        items=(StoreItemSpec(item_id="L5-L5-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── I 循环（无形资产类）六条 ──────────────────────────────────────────────
+    #
+    # IC-9：I 循环 6 册**全部**命中 OO 加载期裸 `IF(`（总 777 格；
+    # I1=321 / I4=186 / I2=113 / I3=63 / I5=49 / I6=45），per-file 保守策略
+    # 每条一律带 `oo_crash_neutralization_fn`。中性化函数与 G7/H9/L1 **共用一个**，
+    # 不新造、不加 adapter_id 字面量分支。
+    #
+    # 六条均为薄转发框架层引擎（`RowTableSheetSpec` 单点声明驱动），
+    # `items` 只登记当前灰度开关打开的受管区（各 provider 的
+    # `all_store_item_ids()` 是单一口径）。
+    "i1.intangible_assets_detail": StoreMergePlan(
+        adapter_id="i1.intangible_assets_detail",
+        provider_module="phase5_i1_intangible_assets",
+        items=(StoreItemSpec(item_id="I1-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "i2.development_expenditure_detail": StoreMergePlan(
+        adapter_id="i2.development_expenditure_detail",
+        provider_module="phase5_i2_development_expenditure",
+        items=(StoreItemSpec(item_id="I2-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "i3.goodwill_detail": StoreMergePlan(
+        adapter_id="i3.goodwill_detail",
+        provider_module="phase5_i3_goodwill",
+        items=(StoreItemSpec(item_id="I3-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "i4.long_term_prepaid_detail": StoreMergePlan(
+        adapter_id="i4.long_term_prepaid_detail",
+        provider_module="phase5_i4_long_term_prepaid",
+        items=(StoreItemSpec(item_id="I4-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "i5.other_noncurrent_assets_detail": StoreMergePlan(
+        adapter_id="i5.other_noncurrent_assets_detail",
+        provider_module="phase5_i5_other_noncurrent_assets",
+        items=(StoreItemSpec(item_id="I5-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "i6.research_development_expense_detail": StoreMergePlan(
+        adapter_id="i6.research_development_expense_detail",
+        provider_module="phase5_i6_research_development_expense",
+        items=(StoreItemSpec(item_id="I6-2-detail-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    # ── K2~K7 调整分录汇总（与 K8~K13 同构，共享内核 phase5_k_adjustment_summary）──
+    #
+    # K2~K7 的调整分录汇总 sheet 结构与 K8~K13 完全同构（R5 十列 A..J、json_keys 相同），
+    # 差异仅在科目名/行数。6 册**全部零裸 IF** ⇒ 不需要 oo_crash_neutralization_fn。
+    # K5 的 store_item_id 是 `K5-3-entries`（不是 `K5-3-adj-entries`），与前端 K5TabAdjustment.vue 一致。
+    "k2.other_current_assets_adjustment": StoreMergePlan(
+        adapter_id="k2.other_current_assets_adjustment",
+        provider_module="phase5_k2_other_current_assets",
+        items=(StoreItemSpec(item_id="K2-3-adj-entries", kind=StoreKind.rows),),
+    ),
+    "k3.other_payables_adjustment": StoreMergePlan(
+        adapter_id="k3.other_payables_adjustment",
+        provider_module="phase5_k3_other_payables",
+        items=(StoreItemSpec(item_id="K3-3-adj-entries", kind=StoreKind.rows),),
+    ),
+    "k4.other_current_liabilities_adjustment": StoreMergePlan(
+        adapter_id="k4.other_current_liabilities_adjustment",
+        provider_module="phase5_k4_other_current_liabilities",
+        items=(StoreItemSpec(item_id="K4-3-adj-entries", kind=StoreKind.rows),),
+    ),
+    "k5.provisions_adjustment": StoreMergePlan(
+        adapter_id="k5.provisions_adjustment",
+        provider_module="phase5_k5_provisions",
+        items=(StoreItemSpec(item_id="K5-3-entries", kind=StoreKind.rows),),
+    ),
+    "k6.held_for_sale_adjustment": StoreMergePlan(
+        adapter_id="k6.held_for_sale_adjustment",
+        provider_module="phase5_k6_held_for_sale",
+        items=(StoreItemSpec(item_id="K6-3-adj-entries", kind=StoreKind.rows),),
+    ),
+    "k7.deferred_income_adjustment": StoreMergePlan(
+        adapter_id="k7.deferred_income_adjustment",
+        provider_module="phase5_k7_deferred_income",
+        items=(StoreItemSpec(item_id="K7-3-adj-entries", kind=StoreKind.rows),),
     ),
 }
 

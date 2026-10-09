@@ -39,6 +39,11 @@
                 🔄 刷新
               </el-button>
             </el-tooltip>
+            <el-tooltip content="对所有已接入底稿执行公式推送（审定表/明细表/附注），不打开底稿即可刷新全部公式计算结果" placement="bottom">
+              <el-button @click="onFormulaRefreshAll" :loading="formulaRefreshLoading" size="small">
+                ⚡ 刷新全部公式
+              </el-button>
+            </el-tooltip>
             <el-tooltip content="选择模板集 → 配置裁剪范围 → 批量创建本项目底稿" placement="bottom">
               <el-button type="success" size="small" @click="onGenerateWorkpapers" :loading="generateLoading">
                 ⬇️ 生成底稿
@@ -322,6 +327,7 @@ const showCustomBatch = ref(false)
 const showBatchAssign = ref(false)
 const downloadLoading = ref(false)
 const generateLoading = ref(false)
+const formulaRefreshLoading = ref(false)
 const showTrimDialog = ref(false)
 const trimDialogResolve = ref<((codes: string[]) => void) | null>(null)
 const trimDialogReject = ref<(() => void) | null>(null)
@@ -605,6 +611,25 @@ const batchAssignWpList = computed(() => {
 
 function onBatchAssigned() {
   fetchWpIndex()
+}
+
+/** 刷新全部公式：调 formula-push/run 全量推送（不打开底稿也能刷新审定表/明细表/附注） */
+async function onFormulaRefreshAll() {
+  formulaRefreshLoading.value = true
+  try {
+    const res: any = await api.post(
+      `/api/projects/${projectId.value}/formula-push/run`,
+      { year: currentYear.value, dry_run: false },
+    )
+    const written = res?.written_count ?? 0
+    const kept = res?.kept_count ?? 0
+    const skipped = res?.skipped_count ?? 0
+    ElMessage.success(`公式推送完成：写入 ${written} 项，保留 ${kept} 项，跳过 ${skipped} 项`)
+  } catch (e: any) {
+    handleApiError(e, '刷新全部公式')
+  } finally {
+    formulaRefreshLoading.value = false
+  }
 }
 
 async function onGenerateWorkpapers() {

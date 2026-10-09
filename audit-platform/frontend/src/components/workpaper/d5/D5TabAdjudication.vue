@@ -124,6 +124,13 @@
           >
             {{ fmtAmount(row.currentUnadjusted) }}
           </span>
+          <!-- 逐格四态覆盖徽标（Task 20）：S2/S4 才渲染，S1/S3 无条目 -->
+          <DerivedCellOverrideBadge
+            :overrides="row.cellOverrides"
+            field="currentUnadjusted"
+            :readonly="isReadonly"
+            @restore="restoreDerivedValue(row.rowKey, 'currentUnadjusted')"
+          />
         </template>
       </el-table-column>
 
@@ -252,6 +259,7 @@ import { ref, computed, inject, toRef, type Ref } from 'vue'
 import { InfoFilled, Download } from '@element-plus/icons-vue'
 import { isChangeRateExceeding } from '../composables/useD5FormulaEngine'
 import { useD5Adjudication } from '../composables/useD5Adjudication'
+import DerivedCellOverrideBadge from '../shared/DerivedCellOverrideBadge.vue'
 import { useD5AiGenerate } from '../composables/useD5AiGenerate'
 import { useD5TabImportExport } from '../composables/useD5TabImportExport'
 import { useAuditContext } from '@/composables/useAuditContext'
@@ -305,6 +313,8 @@ const {
   trialBalanceDiff,
   auditNotes,
   updateCell,
+  // Task 20：逐格四态的「恢复取数」入口（DerivedCellOverrideBadge 的 @restore 调它）
+  restoreDerivedValue,
 } = useD5Adjudication({
   allResponses: allResponsesRef,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,

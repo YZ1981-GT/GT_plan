@@ -294,14 +294,16 @@ class TestNoBindingNoOp:
 
 
 class TestFlagOffBypass:
-    def test_flag_default_false(self):
+    def test_flag_default_true(self):
         from app.core.config import settings
 
-        assert settings.DISCLOSURE_NOTE_FORMULA_ENABLED is False
+        assert settings.DISCLOSURE_NOTE_FORMULA_ENABLED is True
 
     @pytest.mark.asyncio
-    async def test_formula_cell_untouched_when_flag_off(self):
-        # 不开开关：resolve_formula 内部返 None → evaluate_table 保留原值（零回归）
+    async def test_formula_cell_untouched_when_flag_off(self, monkeypatch):
+        # 显式关闭开关：resolve_formula 内部返 None → evaluate_table 保留原值（零回归）
+        from app.core import config
+        monkeypatch.setattr(config.settings, "DISCLOSURE_NOTE_FORMULA_ENABLED", False, raising=False)
         td = _sum_table()
         ev = NoteFormulaEvaluator()
         out = await ev.evaluate_table(td, _base_ctx())

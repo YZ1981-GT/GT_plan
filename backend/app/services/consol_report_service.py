@@ -34,6 +34,9 @@ from app.models.audit_platform_models import TrialBalance
 from app.services.ledger_import.sign_convention_types import BALANCE_TOLERANCE
 from app.models.report_models import FinancialReport
 from app.models.report_models import FinancialReportType
+from app.schemas.consol_context import ConsolContext
+from app.services.consol_context_service import validate_context
+from app.services.consol_tree_service import TreeNode
 from app.models.consolidation_schemas import (
     ConsolTrialRow,
     BalanceCheckResult,
@@ -71,6 +74,20 @@ def _safe_float(v) -> float:
         return 0.0
 
 
+def _enum_text(value) -> str:
+    return str(getattr(value, "value", value) or "")
+
+
+def _source_accounts(formula: str | None) -> list[str]:
+    """公式直接取数的科目（``TB`` 前缀）与区间（``SUM_TB`` 写作 ``起~止``），供报表行溯源。"""
+    from app.services.consol_report_values import analyze_formula
+
+    if not (formula or "").strip():
+        return []
+    shape = analyze_formula(formula)
+    return sorted({*shape.tb_codes, *(f"{a}~{b}" for a, b in shape.tb_ranges)})
+
+
 # ============================================================================
 # 合并报表服务
 # ============================================================================
@@ -78,8 +95,8 @@ def _safe_float(v) -> float:
 class ConsolReportService:
     """合并报表服务
 
-    复用 Phase 1 Report_Engine 公式解析逻辑，
-    数据源从 trial_balance 切换为 consol_trial。
+    报表生成复用 ``report_engine.evaluate_formula``（与单体同一编排与 L1 内核），取数为计算口径的合并数
+    （``consol_report_values.BasisResolver``），与合并试算平衡表页、报表差额表同一个行求值函数。
     """
 
     def __init__(self, db: AsyncSession):
@@ -93,122 +110,138 @@ class ConsolReportService:
         self,
         project_id: UUID,
         year: int,
-        applicable_standard: str = "enterprise",
+        applicable_standard: str | None = None,
+        *,
+        context: ConsolContext | None = None,
+        tree: TreeNode | None = None,
     ) -> dict[str, list[dict]]:
+        """生成合并报表并落库 ``financial_report``（spec consol-elimination-single-source-push §4.5）。
+
+        - 取数：计算口径（``consol_calc_basis``，与差额表 / 合并试算同一套取数、归属、符号）根节点的合并数，
+          经 ``consol_report_values.report_values`` 逐行求值 —— 与试算平衡表页、报表差额表同一个求值函数
+          （ADR-CSP-002 / ADR-CSP-003）。不再读 ``consol_trial`` 落库值（``ConsolTrialResolver`` 已由它取代）。
+        - 口径：``applicable_standard`` 为 ``soe_consolidated`` / ``listed_consolidated`` 时照用，
+          其余（未传、``enterprise``、``CAS``）按项目模板类型解析（上市版 ⇒ listed，其余 ⇒ soe）。
+        - 范围：配置里的全部报表类型（资产负债表、利润表、现金流量表、权益变动表、补充资料、减值准备）。
+        - 留空：取不到数的行 ``current_period_amount = NULL`` 并在 ``blank_reason`` 写明原因（需求 3.5）。
+        - 上期：取上年同一企业合并项目已生成的同行本期值；没有 ⇒ NULL（不按本年口径臆造上年数）。
+
+        🔴 **不取单体调整额**：``ADJ()`` 取的是单体 ``adjustments`` / ``adjustment_entries``，合并域的调整与抵销
+        是 ``consol_adjustment`` / ``consol_elimination``（合并数 = 个别数汇总 + 差额表），两者是不同会计概念，
+        喂进来会把同一笔调整计两次 ⇒ 本路径**不传 adj_data**，``ADJ()`` 在合并口径按「不取数的函数」留空并说明。
+
+        只 flush 不 commit。Returns ``{report_type: [row_dict]}``。
         """
-        生成合并报表（资产负债表、利润表）。
-
-        A1/A2：复用 report_engine.evaluate_formula 公式解析逻辑，
-        经注入 ConsolTrialResolver 把取数源切换为 consol_trial.consol_amount。
-        单体/合并公式语义完全一致（仅取数源不同，关联属性 Q1）。
-
-        Returns:
-            dict: {report_type: [row_dicts]}
-        """
-        from app.models.report_models import ReportConfig
-        from app.services.report_engine import evaluate_formula, ReportFormulaParser
-        from app.services.amount_resolver import ConsolTrialResolver
-
-        # 加载报表配置
-        result = await self.db.execute(
-            sa.select(ReportConfig)
-            .where(
-                ReportConfig.applicable_standard == applicable_standard,
-                ReportConfig.is_deleted.is_(False),
-            )
-            .order_by(ReportConfig.report_type, ReportConfig.row_number)
+        from app.services.consol_calc_basis import MEASURE_CONSOLIDATED, load_calc_basis, node_measures
+        from app.services.consol_context_service import validate_context
+        from app.services.consol_tree_service import build_tree
+        from app.services.consol_report_values import (
+            CONSOL_STANDARDS,
+            load_report_rows,
+            report_values,
+            resolve_consol_standard,
         )
-        configs = list(result.scalars().all())
 
-        # 按报表类型分组
-        configs_by_type: dict[FinancialReportType, list[ReportConfig]] = {}
-        for cfg in configs:
-            configs_by_type.setdefault(cfg.report_type, []).append(cfg)
-
-        results: dict[str, list[dict]] = {}
-        global_row_cache: dict[str, Decimal] = {}
+        standard = applicable_standard if applicable_standard in CONSOL_STANDARDS else (
+            await resolve_consol_standard(self.db, project_id)
+        )
+        rows = await load_report_rows(self.db, standard)
+        resolved_tree = tree
+        if resolved_tree is None and context is not None:
+            resolved_tree = await build_tree(self.db, project_id)
+        validate_context(context, project_id, year, tree=resolved_tree)
+        basis = await load_calc_basis(self.db, project_id, year, tree=resolved_tree)
+        if basis is None:
+            raise ValueError(f"企业树构建失败：找不到合并项目 {project_id}")
+        values = await report_values(
+            rows, node_measures(basis)[basis.tree.node_key][MEASURE_CONSOLIDATED], categories=basis.categories,
+        )
+        prior = await self._prior_year_amounts(project_id, year)
+        # 含已软删的行：唯一索引 (project_id, year, report_type, row_code) 不带 is_deleted 谓词，
+        # 同键只能复用原行（软删后重新出现的行次 INSERT 会撞唯一约束）
+        existing = {
+            (_enum_text(r.report_type), r.row_code): r
+            for r in (await self.db.execute(
+                sa.select(FinancialReport).where(
+                    FinancialReport.project_id == project_id, FinancialReport.year == year,
+                )
+            )).scalars().all()
+        }
         now = datetime.now(timezone.utc)
-
-        # 注入合并数据源（current = 本年，prior = 上年）
-        resolver_current = ConsolTrialResolver(self.db, project_id, year)
-        resolver_prior = ConsolTrialResolver(self.db, project_id, year - 1)
-        # 纯函数提取器（extract_account_codes 不触 DB）
-        extractor = ReportFormulaParser(self.db, project_id, year)
-
-        # 处理顺序（支持跨报表 ROW() 引用）
-        type_order = [
-            FinancialReportType.balance_sheet,
-            FinancialReportType.income_statement,
-        ]
-
-        for report_type in type_order:
-            config_rows = configs_by_type.get(report_type, [])
-            if not config_rows:
-                continue
-
-            report_rows = []
-            for config in sorted(config_rows, key=lambda r: r.row_number):
-                # 执行公式（合并数据源，复用统一引擎）
-                current_amount = await evaluate_formula(
-                    config.formula, resolver=resolver_current, row_cache=global_row_cache,
+        results: dict[str, list[dict]] = {}
+        wanted: set[tuple[str, str]] = set()
+        for row in rows:
+            key = (row.report_type, row.row_code)
+            wanted.add(key)
+            value = values[row.row_code]
+            prior_amount = prior.get(key)
+            source = _source_accounts(row.formula)
+            record = existing.get(key)
+            if record is None:
+                record = FinancialReport(
+                    project_id=project_id, year=year, report_type=FinancialReportType(row.report_type),
+                    row_code=row.row_code,
                 )
-                prior_amount = await evaluate_formula(
-                    config.formula, resolver=resolver_prior, row_cache={},
-                )
-
-                # 更新全局行缓存
-                global_row_cache[config.row_code] = current_amount
-
-                # 提取源科目
-                source_accounts = extractor.extract_account_codes(config.formula)
-
-                # 写入/更新 financial_report 表
-                existing_result = await self.db.execute(
-                    sa.select(FinancialReport).where(
-                        FinancialReport.project_id == project_id,
-                        FinancialReport.year == year,
-                        FinancialReport.report_type == report_type,
-                        FinancialReport.row_code == config.row_code,
-                        FinancialReport.is_deleted.is_(False),
-                    )
-                )
-                existing = existing_result.scalar_one_or_none()
-
-                if existing:
-                    existing.row_name = config.row_name
-                    existing.current_period_amount = current_amount
-                    existing.prior_period_amount = prior_amount
-                    existing.formula_used = config.formula
-                    existing.source_accounts = source_accounts if source_accounts else None
-                    existing.generated_at = now
-                else:
-                    fr = FinancialReport(
-                        project_id=project_id,
-                        year=year,
-                        report_type=report_type,
-                        row_code=config.row_code,
-                        row_name=config.row_name,
-                        current_period_amount=current_amount,
-                        prior_period_amount=prior_amount,
-                        formula_used=config.formula,
-                        source_accounts=source_accounts if source_accounts else None,
-                        generated_at=now,
-                    )
-                    self.db.add(fr)
-
-                report_rows.append({
-                    "row_code": config.row_code,
-                    "row_name": config.row_name,
-                    "current_period_amount": str(current_amount),
-                    "prior_period_amount": str(prior_amount),
-                    "formula_used": config.formula,
-                    "source_accounts": source_accounts,
-                })
-
-            results[report_type.value] = report_rows
-
+                self.db.add(record)
+            record.is_deleted = False
+            record.row_name = row.row_name
+            # 无公式的行按 0 写（与合计行求值口径一致，合计 = 各行之和）；手工填数不在派生报表里保留
+            record.current_period_amount = value.amount
+            record.prior_period_amount = prior_amount
+            record.formula_used = row.formula
+            # 字典形态的 source_accounts 是权益变动表矩阵 / 减值表分列等人工编辑载荷 ⇒ 保留，只刷新科目清单形态
+            if not isinstance(record.source_accounts, dict):
+                record.source_accounts = source or None
+            record.generated_at = now
+            record.indent_level = row.indent_level
+            record.is_total_row = row.is_total_row
+            record.is_stale = False
+            record.blank_reason = value.reason
+            results.setdefault(row.report_type, []).append({
+                "row_code": row.row_code,
+                "row_name": row.row_name,
+                "current_period_amount": None if value.amount is None else str(value.amount),
+                "prior_period_amount": None if prior_amount is None else str(prior_amount),
+                "formula_used": row.formula,
+                "source_accounts": source,
+                "blank_reason": value.reason,
+                "has_formula": value.has_formula,
+            })
+        # 当前口径里已不存在的行次（改了模板类型 / 配置删了行）软删，避免报表页混入另一口径的行
+        for key, record in existing.items():
+            if key not in wanted and not record.is_deleted:
+                record.is_deleted = True
         await self.db.flush()
         return results
+
+    async def _prior_year_amounts(self, project_id: UUID, year: int) -> dict[tuple[str, str], Decimal | None]:
+        """上年同一企业合并项目已生成的合并报表本期值 ⇒ 本年上期值（没有上年合并项目或未生成 ⇒ 空）。"""
+        from app.models.core import Project
+
+        company_code = (await self.db.execute(
+            sa.select(Project.company_code).where(Project.id == project_id)
+        )).scalar_one_or_none()
+        if not company_code:
+            return {}
+        prior_ids = [pid for (pid,) in (await self.db.execute(
+            sa.select(Project.id).where(
+                Project.company_code == company_code,
+                Project.report_scope == "consolidated",
+                Project.audit_year == year - 1,
+                Project.is_deleted.is_(False),
+            ).order_by(Project.created_at, Project.id)
+        )).all()]
+        if not prior_ids:
+            return {}
+        result = await self.db.execute(
+            sa.select(FinancialReport.report_type, FinancialReport.row_code, FinancialReport.current_period_amount)
+            .where(
+                FinancialReport.project_id == prior_ids[0],
+                FinancialReport.year == year - 1,
+                FinancialReport.is_deleted.is_(False),
+            )
+        )
+        return {(_enum_text(t), code): amount for t, code, amount in result.all()}
 
 
     # ------------------------------------------------------------------
@@ -970,11 +1003,20 @@ async def generate_consol_reports_sync(
     db: AsyncSession,
     project_id: UUID,
     year: int,
-    applicable_standard: str = "enterprise",
+    applicable_standard: str | None = None,
+    *,
+    context: ConsolContext | None = None,
+    tree: TreeNode | None = None,
 ) -> dict[str, list[dict]]:
-    """生成合并报表（async）"""
+    """生成合并报表（async；口径不传或不是合并口径时按项目模板类型解析）。"""
     service = ConsolReportService(db)
-    return await service.generate_consol_reports(project_id, year, applicable_standard)
+    return await service.generate_consol_reports(
+        project_id,
+        year,
+        applicable_standard,
+        context=context,
+        tree=tree,
+    )
 
 
 async def verify_balance_sync(

@@ -1750,6 +1750,7 @@ async def d2_import_aux_balance(
             "priorUnadjusted": entry.opening,
             "debitOccurrence": entry.debit,
             "creditOccurrence": entry.credit,
+            "source_kind": "aux_balance_import",
         })
 
     # merge：已存在客户名不重复导入（手工优先，不覆盖）

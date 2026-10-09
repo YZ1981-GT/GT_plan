@@ -33,6 +33,7 @@ Feature: dsh-agent-panel-integration（Task 2 / Req 3.6, 3.7）
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 from collections.abc import Awaitable, Callable
@@ -120,6 +121,20 @@ class ChatContext:
     project_summary: str                    # 项目摘要
     citations: list[Citation]               # 引用来源（可追溯）
     token_estimate: int                     # token 估算（Task 2 管理预算）
+
+
+def _to_search_hit(r: dict) -> SearchHit:
+    """检索内核结果 dict → SearchHit（``source_name`` 取内核附带的 ``document_name``）。"""
+    return SearchHit(
+        source_type=r.get("source_type", "unknown"),
+        source_id=r.get("source_id", ""),
+        content=r.get("content") or "",
+        score=float(r.get("score") or 0.0),
+        chunk_index=r.get("chunk_index"),
+        source_name=r.get("document_name") or "",
+        doc_version=r.get("doc_version"),
+        is_stale=bool(r.get("is_stale", False)),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -308,26 +323,13 @@ class ContextBuilder:
                 # 预算不够放完整 hit，尝试放部分
                 remaining_tokens = max_tokens - used_tokens
                 if remaining_tokens > 50:  # 至少 50 token 才值得放
-                    truncated_content = content[: remaining_tokens * 2]
-                    result.append(SearchHit(
-                        source_type=hit.source_type,
-                        source_id=hit.source_id,
-                        content=truncated_content,
-                        score=hit.score,
-                        chunk_index=hit.chunk_index,
-                        source_name=hit.source_name,
-                    ))
+                    # dataclasses.replace 保留全部字段：旧实现逐字段重建时漏了
+                    # doc_version / is_stale ⇒ 截断后的引用丢失版本与过期标记（P2-2.1）
+                    result.append(dataclasses.replace(hit, content=content[: remaining_tokens * 2]))
                 break
 
             # 放入截断后的 hit
-            result.append(SearchHit(
-                source_type=hit.source_type,
-                source_id=hit.source_id,
-                content=content,
-                score=hit.score,
-                chunk_index=hit.chunk_index,
-                source_name=hit.source_name,
-            ))
+            result.append(dataclasses.replace(hit, content=content))
             used_tokens += hit_tokens
 
         return result
@@ -516,32 +518,16 @@ class ContextBuilder:
         if not query.strip():
             return []
 
-        raw_results: list[dict] = []
-        if project_id is not None:
-            try:
-                raw_results = await self._knowledge_svc.semantic_search(
-                    project_id=project_id,
-                    query=query,
-                    top_k=10,
-                )
-            except Exception as e:
-                logger.warning(f"semantic_search 失败: {e}")
-                raw_results = []
+        # 项目宿主：项目内检索（向量可选 + 文档正文词法，按 user ∩ 当前项目范围判定）；
+        # 受限全局知识模式（project_id is None）：只检索非项目组的可读文档，不猜项目（Req 3.4）。
+        # spec knowledge-base-retrieval-and-authz-closure 5.4：此前全局模式完全不检索、
+        # 且不传 user —— 用户自己的私有资料从来进不了上下文。
+        raw_results = await self._kernel_search(project_id=project_id, query=query, user=user, top_k=10)
 
         # 转换为 SearchHit（确保每条都有可定位 source — D3）
-        hits: list[SearchHit] = []
-        for r in raw_results:
-            hits.append(SearchHit(
-                source_type=r.get("source_type", "unknown"),
-                source_id=r.get("source_id", ""),
-                content=r.get("content", ""),
-                score=r.get("score", 0.0),
-                chunk_index=r.get("chunk_index"),
-                doc_version=r.get("doc_version"),
-                is_stale=r.get("is_stale", False),
-            ))
+        hits = [_to_search_hit(r) for r in raw_results]
 
-        # extra_scopes：额外检索指定文件夹下的知识文档
+        # extra_scopes：额外检索指定文件夹（含子树）下的知识文档
         if extra_scopes:
             extra_hits = await self._search_extra_scopes(
                 project_id=project_id,
@@ -551,12 +537,43 @@ class ContextBuilder:
             )
             hits.extend(extra_hits)
 
-        # D2 权限过滤：只保留 user 有权访问的知识文件
+        # D2 权限过滤（纵深防御）：只保留 user 有权访问、且未被删除的知识文件
         hits = await self._filter_hits_by_permission(hits, user)
 
-        # 按相关性排序
-        hits.sort(key=lambda h: h.score, reverse=True)
-        return hits
+        # 同一来源同一段落只保留一条（主检索与额外范围可能命中同一段）
+        seen: set[tuple[str, str, int | None]] = set()
+        unique: list[SearchHit] = []
+        for h in sorted(hits, key=lambda h: h.score, reverse=True):
+            key = (h.source_type, h.source_id, h.chunk_index)
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(h)
+        return unique
+
+    async def _kernel_search(
+        self,
+        *,
+        project_id: UUID | None,
+        query: str,
+        user: Any,
+        top_k: int,
+        restrict_to: list[UUID] | None = None,
+    ) -> list[dict]:
+        """统一走检索内核；失败返回空（上下文构建不因知识检索失败而中断）。"""
+        try:
+            if project_id is not None:
+                kwargs: dict[str, Any] = {"project_id": project_id, "query": query, "top_k": top_k, "user": user}
+                if restrict_to:
+                    kwargs["scope"] = "knowledge_doc"
+                    kwargs["restrict_to"] = restrict_to
+                return await self._knowledge_svc.semantic_search(**kwargs)
+            return await self._knowledge_svc.search_global_knowledge(
+                query, user=user, top_k=top_k, restrict_to=restrict_to
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("知识检索失败（本次无关联知识）：%s: %s", type(e).__name__, e)
+            return []
 
     async def _search_extra_scopes(
         self,
@@ -566,56 +583,40 @@ class ContextBuilder:
         folder_ids: list[str],
         user: Any,
     ) -> list[SearchHit]:
-        """检索额外指定文件夹范围的知识文档（D2：权限过滤走公共 policy）"""
-        subject = await self._knowledge_subject(user)
+        """检索用户额外指定的文件夹（含子树）内的知识文档。
 
-        hits: list[SearchHit] = []
-        for folder_id_str in folder_ids:
+        spec knowledge-base-retrieval-and-authz-closure 5.4：旧实现取「每个文件夹前 5 篇、
+        固定 0.5 分」，与提问无关、且不含子文件夹。现改为同一检索内核 + ``restrict_to``：
+        先按提问做相关性检索；范围内一条都不相关时，退回该范围内最近更新的文档（保持
+        「用户点名的范围一定出现在上下文里」的旧语义，分数沿用中等相关性 0.5）。
+        判定走内核的单一判定面（project 宿主再与当前项目求交），此处不再自行判权。
+        """
+        restrict: list[UUID] = []
+        for raw in folder_ids:
             try:
-                folder_id = UUID(folder_id_str)
+                restrict.append(UUID(str(raw)))
             except (ValueError, TypeError):
                 continue
+        if not restrict:
+            return []
 
-            # D2: 先判文件夹权限（只取判权三元组，不读 name/正文）
-            folder = await KnowledgeAccessPolicy.load_folder_permission(self._db, folder_id)
-            if folder is None or not KnowledgeAccessPolicy.can_read(subject, folder):
-                continue
-
-            result = await self._db.execute(
-                sa.select(
-                    KnowledgeDocument.id,
-                    KnowledgeDocument.name,
-                    KnowledgeDocument.content_text,
-                    KnowledgeDocument.access_level,
-                    KnowledgeDocument.project_ids,
-                    KnowledgeDocument.created_by,
-                )
-                .where(
-                    KnowledgeDocument.folder_id == folder_id,
-                    KnowledgeDocument.is_deleted == sa.false(),
-                    KnowledgeDocument.content_text.isnot(None),
-                )
-                .limit(5)
+        results = await self._kernel_search(
+            project_id=project_id, query=query, user=user, top_k=5, restrict_to=restrict
+        )
+        listed = False
+        if not results:
+            results = await self._kernel_search(
+                project_id=project_id, query="", user=user, top_k=5, restrict_to=restrict
             )
-            rows = result.all()
-            for doc_id, doc_name, content_text, doc_access_level, doc_project_ids, doc_created_by in rows:
-                # D2: 文档级权限（access_level 为 None 时继承已判定的文件夹）
-                if not KnowledgeAccessPolicy.can_read_document(
-                    subject,
-                    KnowledgeResource.of_row(doc_access_level, doc_project_ids, doc_created_by),
-                    folder,
-                ):
-                    continue
-
-                if content_text:
-                    hits.append(SearchHit(
-                        source_type="knowledge_doc",
-                        source_id=str(doc_id),
-                        content=content_text[:500],
-                        score=0.5,  # extra_scope 默认中等相关性
-                        chunk_index=0,
-                        source_name=doc_name,
-                    ))
+            listed = True
+        hits = [
+            _to_search_hit(r)
+            for r in results
+            if r.get("source_type") == "knowledge_doc"
+        ]
+        if listed:
+            for h in hits:
+                h.score = max(h.score, 0.5)  # extra_scope 默认中等相关性
         return hits
 
     # -------------------------------------------------------------------------
@@ -682,7 +683,12 @@ class ContextBuilder:
                 KnowledgeFolder.created_by.label("folder_created_by"),
             )
             .join(KnowledgeFolder, KnowledgeDocument.folder_id == KnowledgeFolder.id)
-            .where(KnowledgeDocument.id.in_(doc_ids))
+            .where(
+                KnowledgeDocument.id.in_(doc_ids),
+                # 已删除文档 / 所在文件夹已删除：不得再进入对话上下文（旧实现漏滤）
+                KnowledgeDocument.is_deleted == sa.false(),
+                KnowledgeFolder.is_deleted == sa.false(),
+            )
         )
         doc_permissions = {row[0]: row for row in result.all()}
 

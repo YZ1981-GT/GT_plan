@@ -4622,3 +4622,1048 @@ rows_unchanged       ✅ 恒定 756 行（明细行未受影响）
 * **`_split_narrative` 绝不截断丢字**：超出容量的行**全部并入最后一行**。审计说明是审计证据，丢内容比排版难看严重得多。
 * **pull 只回写叙述块、不回写表头**（越权 + 会被下次渲染覆盖）；`status` 端点如实标注 `header_sync: "one_way_to_excel"`，避免前端误以为能从 Excel 改编制人。
 * **`_write_narratives` 只写内容真变了的项**：无谓 UPDATE 会刷 `updated_at`，让复核看到假的「刚被改过」。
+
+- **✅ `voucher-sampling-account-scope-and-attach-closure` 已实施（2026-09-28，36 文件 / 前端31+文档5+后端0，114 passed + 2 条刻意保留红 + 6.6* Playwright 未实测）**：起因是用户连问「凭证查询是否只查1月的0075」→「凭证与科目如何关联」。**发现链**：①凭证号不唯一（真实库 8 项目 7 个跨月跨日重复，单号最多对应 **83 个日期**；`(voucher_date,voucher_no)` 才唯一 —— 陕西华氏 29162 组合借贷 **100% 平衡** 实证）⇒ 先修 `get_voucher_entries`/`get_voucher_detail` 加 month+voucher_date 过滤（某项目 0075 号原返 **66 张凭证 5918 行、借方虚增到 3.7 亿**）②挂凭链路三缺陷（去重键缺 wp_id 致先挂D2再挂E1覆盖 / `scalar_one_or_none` 遇引擎批次多行抛 500 / 弹窗用 `wp_index_id` 兜底致永远拉不回）+ V166 补 `voucher_date` 列并把手工去重索引细化到 `(project,year,no,COALESCE(date),COALESCE(wp_id))`（**关键修正：一凭证一底稿是 V140 的 DB 唯一索引强制的，非代码漏写**；真实 PG 实跑+6 场景语义验证+幂等）③K5 抽凭科目错 `2701`（长期应付款 L5）而非 `2801`（预计负债）④触类旁通全扫 **70 处静态挂载点 → 25 处与真源不一致，且双向都有错**。**spec 定位 = 两个已完成 spec 的缝隙**：`semantic-account-resolver-full-rollout`(31/31) 主题就是「消除科目硬编码」但 `抽凭`/`GtVoucherSamplingEngine`/`account-code`/`AccountScope` 关键词命中**全为 0**（只管后端 render 策略），`voucher-sampling-hardening`(40/40) 管引擎本身但不管它拿到的科目码对不对 ⇒ 交叉点无人负责，这正是 25 处错码长期存活且测试全绿的原因。**关键前提**：平台已有 **42 个前端 `*AccountScope.ts` + 11 个后端 `*_account_scope.py`** 真源，本 spec 只接线不重新裁决科目。**修复**：K5 6 处(`2701`→`2801`，含 Disclosure 两处 EventBus 口径不一致致附注静默失同步)/G1 2 处(`1501` 持有至到期→`1101`，衍生品页改用 `g1DerivativeCode()` `1102` BS-004)/I2 9 挂载点(`1717` 全库零命中→`1704`)/I6 5 挂载点(`6602` 管理费用 K9→`6604` 研发费用)/E1(抽凭只写 `1002` 而挂凭前缀是三码，同组件两路径口径不一致)/K10·K12·H5(值本就对但接真源防「照 json 改坏」)/I5·K4·F2合同履约成本(真源判宁缺勿造空码→新建通用 `useSamplingAccountGate` 四态降级：禁用+tooltip+不发请求)。**路径B收口**：删 `if(picked.length===0) picked=lines`（挂错底稿时整张凭证所有科目分录被静默灌入），改三级 ①底稿前缀→②挂凭意图 `rec.account_code`→③判挂错进 `misattached`（不产样本+ElNotification 列实际科目），穿透失败仍产占位样本与③区分。**🔴 三条方法论教训**：①**查科目码定义必须用 `account_chart`，不能用 `tb_balance/tb_ledger` 的 `MIN(account_name)` 聚合** —— 我据后者误判 `6604`=勘探费用并怀疑真源有错，实则 account_chart 7 条中 6 条是「研发费用」（另1条某项目自定义），差点改坏正确的真源；顺带修 `i6AccountScope` 自相矛盾的文件头标题「I6 管理费用」②**脚本批量改 .vue 的 import 锚点**：`^import[^\n]*\n` 匹配不了多行 import 会插进语句中间（已回滚），改用「最后一个 `from '...'` 行」+ 插入点安全校验；**验证用 `@vue/compiler-sfc` 而非 vue-tsc**（后者在本仓 OOM，报「无错」不可信）③**守卫判据必须剔注释**（说明「为什么不能用 2701」的注释含被禁字面量，首版误报 3 个已修好的文件；剔除器本身要有自检防剔过度）。**副产品**：既有守卫 `samplingHostMethodologyCoverage` 的「allowlist 只减不增」抓到 `I5TabTargetedCheck.vue.fields` 豁免已满足并按其指示删除 —— 这类「修好即报红」的守卫设计值得推广。**刻意保留 2 条红**：剩 39 处挂载点取值正确但仍是字面量（R1.5 防漂移）+ `F2ValuationTestSheet` 的 `valuationAccountCodes` 常量硬编码；不清完是因每处都要读宿主判断该用 `QueryCodes` 全集还是 `FALLBACK` 单值（E1 两处就分别取了全集与单值 `1002`，不能机械替换），守卫已固定清单不会增长。**未改 `wp_account_mapping.json` 的 3 处错**（K10 `6301`→应 `6117`/K12 `6001`→应 `6301`/H5 `1606`→应 `1631`），消费面含附注模板绑定生成/地址库V1 wp域/账龄分桶/种子校验/行名对齐 ⇒ 登记 `docs/reference/wp-account-mapping-errata-2026-09-28.md` 待独立 spec。
+
+- **✅ 同批追加①：抽凭科目字面量全清（2026-09-28，两守卫 36/36 全绿零保留红，回归 236 passed）**：上一条「刻意保留 2 条红」已清零。**🔴 更正上一条的结论「剩 39 处取值全部正确」** —— 接线前用探针把「真源兜底值」与「组件现值」逐个比对，抓到**第 26 处错码 G4**（组件 `1501` 实为持有至到期投资 → 真源 `1504` 债权投资，`report_config` 的 `BS-021 债权投资 = TB('1504','期末余额')` 佐证），且 `wp_account_mapping.json` 的 G4 同样错 ⇒ 该 json 累计 4 处错。**教训：不可按「值正确」机械替换，接线前必须逐个比对真源值**；若按上一条判断直接替换，G4 会被当成「值正确」漏掉。同批发现 **F1 在 `dCycleAccountScope` 未登记**（`dCycleScope('F1')` 返 `null` —— F1 属 F 循环采购与付款而非 D 循环，强行用会退化成空科目）。**产出**：新建 4 个缺位真源 `f1AccountScope`(预付账款 `1123`)/`m1AccountScope`(应付股利 `2232`)/`m2AccountScope`(实收资本 `4001`)/`n2AccountScope`(应交税费 `2221`)，均含 `account_chart` + `report_config` 实证表；接线 39 文件 41 挂载点（D1/D2/D3/D5/D6/D7 · G2/G3/G4 · F1 · H1×2/H2×2/H4×2/H6/H10 · I1×2/I3/I4 · J1 · K1/K3×3/K7/K8×3/K9/K13 · F3/F4/F5 · M1/M2/N2）；修 `F2ValuationTestSheet` 的「换地方硬编码」（`'1401,…,1411'.split(',')` → `F2_INVENTORY_ACCOUNT_CODES`，真源含 `1412` 覆盖更全）。**`m2AccountScope` 记录一处科目表歧义**：`account_chart` 的 `4001` 有**实收资本 14 条 / 生产成本 5 条**两种定义（2006 年前旧科目表用法），兜底取多数口径但在那 5 个项目里以 `4001` 抽凭会抽到生产成本凭证 —— 已写入文件头，这正是「运行态必须优先 `tb_source_codes`、兜底码只兜界面」的价值。**验证**：`@vue/compiler-sfc` 编译全部 **79** 个抽凭宿主 0 失败 / 0 残留静态字面量 / 0「绑定但缺声明」。
+
+- **✅ 同批追加②：`wp_account_mapping.json` 勘误就地处置（2026-09-28，37 项 / diff 37+37- / 后端零回归 + 前端 65 passed）**：**未另起 spec** —— 按「改动前先 spec 三件套」的三条阈值逐条判定（>500 行文件 / 3+ 组件 / 跨前后端）**均不触发**（单 json 文件、零组件、纯后端数据），按最小批次直接执行。**🔴 规模从登记的 4 处扩为 5 族 37 项**：登记的 4 条只是**主条目**，每族另有 `{code}-1`…`-n` 同族子条目沿用同一错码（G4 8 个 / H3 6 / H5 4 / K10 4 / K12 4），且**漏登了第 5 族 H3**（投资性房地产，与 G4 撞同一错码 `1501`；登记时逐 wp 对账只覆盖抽凭宿主涉及的底稿，H3 不在其中）；外加 `report_row` 连带 6 项 ⇒ 31 + 6 = 37。**修复值**：G4 `1501`→`1504` 债权投资 · H3 `1501`→`1521` 投资性房地产 · H5 `1606` 固定资产清理→`1631` 油气资产 · K10 `6301`(K12 的营业外收入)→`6117` 其他收益 · K12 `6001`(D4 的主营业务收入)→`6301` 营业外收入；`report_row` 6 项 = G4 `BS-030`→`BS-021` · H3+H3-1 `BS-026`→`BS-027` · K10 `None`→`IS-010` · K12 `None`→`IS-020` · **H5 `BS-031`→`None`**（`report_config` 无资产负债表「油气资产」行，与前端 `H5_ACCOUNT_DEF.reportRowCode = null` 一致 ⇒ **宁缺勿造，不编码**）。**🔴 H3 族的发现路径不是 grep 错码，而是产物 diff 的不对称**：改完 4 族主条目后重新生成 `note_template_bindings.json`，diff **只有新增、没有删除** ⇒ 旧码 `1501` 仍被别处引用 ⇒ 回查旧码才挖出 G4 的 8 个子条目与整个 H3 族。**「只增不删」是错码残留的可靠信号**，比逐条 grep 更早暴露问题。**🔴 零回归用差集法证**（本仓工作树有 **277 个预存失败**来自前序未完工作，直接看「有没有 failed」会被噪声淹没）：同一组 21 个测试文件 924 test 跑两遍（`git show HEAD:backend/data/wp_account_mapping.json` 取基线 vs 当前修复版），比较 failed **测试 ID 集合**的差集 —— 两版均 `277 failed / 647 passed` 且 **failed ID 逐条完全相同**（新增 0、修好 0）。前端抽凭真源 4 spec **65 passed**；`scripts/validate_seed_files.py` → `PASS`；`--check` 幂等复验 OK。**🔴 下游产物用隔离实验而非直接生成**：`note_template_bindings.json` 直接重新生成得 **3662+/7672-** 巨大 diff，但那绝大部分是**产物自身陈旧**（上游 json 多轮变更而产物未再生）与本次 37 项无关 ⇒ 改为基线 json / 修复版 json 各生成一份产物再互相 diff，测得本次真实影响仅 **54 行**（新增 `1504`×10 `1521`×10 `1631`×8 `6301`×4；删除 `1501`×10 `1606`×8 `6001`×4），全部为预期修正。**产物已 `git checkout --` 复原、未随本次提交**（拒绝把「产物陈旧」这笔无关历史欠账混进本次 diff，应另起独立提交）⇒ ⚠️ **运行态仍读旧产物，需重新生成 + 重启后端才生效**。**工具**：`backend/scripts/fix/fix_wp_account_mapping_wrong_codes.py` 保留供复验 —— 幂等（已是新值则 skip）· 现值既非期望原值也非期望新值时报 `[BAD]` 并以退出码 2 中止（**拒绝盲目覆盖**）· `assert` 保护 `wp_name`/`account_name` 不被改（5 族的名称字段本就正确，防「改错码时顺手把对的名字也改了」）。**顺带发现**：`WpAccountMappingEntry.report_row` 的 schema 类型是 `str | None` **无格式校验**（不拦 `BS-xxx` 形态错误）⇒ 种子校验通过不代表值对，这是本次错误能长期存活的原因之一；另 `test_note_report_row_code_alignment.py` 有 **6 个预存失败**（`note_template_{listed,soe}.json` 残留 95/23 处陈旧 `report_row_code`），基线同样红、与本次无关，属另一笔欠账（入口 `remap_note_report_row_codes.py --apply`）。
+---
+
+## 2026-09-28 · `disclosure-payload-authority-source` 实施 + 二轮复盘加固
+
+披露表 → 附注同步载荷的权威源归属裁定。**第一产出是方案裁定不是代码**。
+25/26（余 1 个 `[ ]*` Playwright 待 `start-dev.bat`）。
+
+### 四方案 ROI 结论
+
+| 方案 | 裁定 | 依据 |
+|---|---|---|
+| A 后端重建载荷 | **否决** | 要在后端重写 109 个构造器等价逻辑，双写必然漂移；该结论 `disclosure_stale_marker.py` 文件头已记录在案 |
+| B 载荷规则下沉为声明式配置 | **否决（技术不可行）** | 载荷是**计算**不是常量（含条件分支/聚合/按名合并补 0/`fmtPct` 比率换算/变体逐字列头/`_removed_table_keys`），声明式化 = 发明 DSL，表达力不足时必出逃逸钩子退化回双写 |
+| **C 前端主导 + 补齐可靠性与可见性** | **采纳** | 不迁移逻辑 ⇒ 零双写风险；守卫可全量扫描 + 双向变异 |
+| D 离屏批量重放 | **延后** | 技术可行（构造器是纯函数）但需 109 个签名适配 + 装载层解耦，且必须以 C 为前置，否则把未知缺陷放大 109 倍 |
+
+**方案 B 撤回依据**：B 是前序对话中我本人的建议。撤回理由 = 现读实证
+「章节映射能下沉恰恰因为它是**字面量常量**（正则可提取），而载荷是计算结果」。
+两者不同型，`gen_note_wp_sync_registry.py` 的成功模式**不能**外推到载荷结构。
+
+### 覆盖率基线数字（实施期现算）
+
+`disclosure_notes` 总 **1052** / `last_sync_at` 非空 **93**（8.8%）/ `is_stale` **225** / 从未同步 **959**。
+按 `source_template`：soe 858（同步 69 / stale 41）· listed 185（同步 15 / stale **181**）。
+规模基数：`buildXSyncPayload` **109** · `syncToDisclosureNotes` 宿主 **112** ·
+`useDisclosureAutoSync` 实现 **1** / 调用点 **144**。
+
+### 🔴 二轮复盘抓到的 3 个真实缺陷
+
+首版交付报「35 passed 全绿」，复盘发现其中 13 个测试是结构性/恒绿的，
+四条判据（Q6/Q7/Q8/Q10）与需求 3.4 实质未覆盖。逐项修复过程中抓到：
+
+**① 共享章节被重复计数**（覆盖率 service 实现 bug）
+现算 **8 个 `note_section` 被多 `wp_code` 共用**（`五、8` ← G2/G3/K1 · `五、22` ← H1/H6 ·
+`五、23` ← H2/H4 · `五、42` ← K3/M1/L2 · 各含 soe 对侧）。原实现按**职责行**计数（157 行），
+而这些章节在 `disclosure_notes` 里**只有一行** ⇒ 同一行被计 2~3 次。
+真库实测 `synced` service **17** vs 直接 SQL **13**（差 4）、`stale` **78** vs **73**（差 5）。
+验算闭合：157 职责行 − 145 去重章节 = 12 = Σ(owner 数 − 1) ✓
+修复 = 汇总按 `note_section` 去重 + 新增 `duty_rows` 字段保留职责行数供诊断。
+前端未同步列表同步去重（多 owner 合并展示 `G2/G3/K1`）。
+
+**② committed 注册表漂移**（补齐 Q10 守卫后立即抓到）
+committed 停在 **76** entries 而前端真源已 **78** —— 缺 `L2` 应付利息（五、42/八、42）
+与 `L4` 应付债券（五、46/八、50）⇒ 这两个底稿的附注章节**长期不在覆盖率视野内**。
+重跑 `--write` 修正后分母 143 → **145**、`stale` 73 → **74**（L4 章节确处过期态）。
+
+**③ 需求 5.1 / Q8 本身写错**（非实现 bug）
+源码明载 **2026-08-16 用户裁决**：「底稿不做准则门控，允许在国企项目编辑上市版披露
+（合并场景：集团国企含上市子公司），entity 冲突降级为 warning 放行，不再 hard block」。
+探针穷举 **162** 组 `(project_entity × requested)` 确认 `detect_standard_conflict`
+**恒返回 None** ⇒ `_guard_standard_matches_project` 的 `raise StandardMismatchError`
+是**死代码**。修正 = 如实断言「放行但必留 `cross-entity` WARNING」+ 同主体不得产警告 +
+`xfail(strict=True)` 钉住原始诉求（实现若收紧则 XPASS 报错，强制回来更新 spec）。
+
+### 口径勘误两条
+
+* **Q10「JSON 字节无 diff」不可能成立** —— 生成脚本写 `generated_at=datetime.now()`
+  ⇒ 整文件字节全等永不成立。可执行口径 = 除 `generated_at` 外 `entries` 逐值相等。
+* **章节号 10 字符截断是既有约定非缺陷** —— 7 个利润表科目走「三、」编号，其中 4 条
+  在括号处截断（`三、资产处置收益（损`）。核实：前端真源常量就这么写、真库
+  `note_section` 同样截到 10 字符 ⇒ 两侧口径一致匹配成功。**禁补全**。
+
+### 流程铁律（8 条，下轮必带）
+
+| # | 教训 |
+|---|---|
+| T1 | 写了 service 却**从未调用其主函数**的测试 = 假绿。判据涉及 DB 口径时，纯函数结构检查不算覆盖 |
+| T2 | `import subprocess` 却不调用、docstring 声称「重跑对比」= **docstring 撒谎**。声明的动作必须真的发生 |
+| T3 | 创建组件 ≠ 接入。死代码（仅出现在自动生成的 `components.d.ts`）不满足「前端可见」 |
+| T4 | 测试通不过时**先查是判据错还是实现错**，不要把断言降级成恒绿（Q8 首版即此错，改成「调用不抛就 pass」掩盖了需求与设计的冲突） |
+| T5 | 百分比阈值（如 ≥80%）是拍脑袋数字、允许静默退化；**例外一律逐条白名单**，并配「白名单无失效条目」检查 |
+| T6 | **SQLite 内存库测不出真库的数据分布问题** —— 共享章节重复计数只有真库对账才暴露。口径类判据必须拿真实项目逐值对账 |
+| T7 | 已有记载的坑仍会再踩：注释未剔除导致扫描器误报，`j1DisclosureSyncWiring.spec.ts` 文件头早已写明「首版守卫即因此误报」 |
+| T8 | 🔴 **工具「0 errors」先查是否崩溃** —— 全量 `vue-tsc` 在本仓库 4GB/8GB 堆均 OOM，stdout 里 `error TS` 计数为 0 但实为 `FATAL ERROR: heap out of memory`。差点报成「类型检查通过」。本仓库已有 `tsconfig._g-single-region.json` 先例，改单区域 tsconfig 后真跑通并配变异证明（注入 `number = string` → TS2322） |
+
+### 归因纪律
+
+跑既有回归时 `test_note_e1_structure.py` 报 **28 failed**。用 `git stash` 回滚本轮
+registry 改动后**同样 28 failed** ⇒ 与本轮无关（预存失败，根因 `note_template_*.json`
+缺「受限制的货币资金明细」表 + 残留章节号 `五、81`）。
+**不把他人的红算到自己头上，也不把自己的红推给别人。**
+registry 消费方（`note_readiness_service` / `disclosure_stale_marker` /
+`note_wp_mapping_service`）回归 **102 passed** 确认加 L2/L4 未破坏。
+
+### 交付物
+
+后端 `disclosure_sync_coverage_service.py`（注册表派生分母 + 去重汇总）·
+`routers/disclosure_sync_coverage.py`（`report.py` §104 注册）·
+前端 `DisclosureSyncCoveragePanel.vue`（接入 `DisclosureEditor.vue` 左树上方 +
+点未同步项经 ACNR 解析 `wp_id` 跳底稿）·
+守卫 `disclosureSyncWiringAll.spec.ts`（112 宿主动态扫描，两类缺陷现算命中 **0**
+—— 前几轮已修完，本轮价值在锁死防回退）·
+`test_disclosure_sync_coverage.py`（20 例，含 14 例真 ORM 落库对账）·
+`test_disclosure_sync_invariants.py`（32 例 + 1 xfail）·
+`DisclosureSyncCoveragePanel.spec.ts`（15 例，含 5 条接入守卫）。
+累计 **7 次变异注入**验证守卫非恒绿（红点数逐次精准命中）。
+
+---
+
+## 2026-09-28 · 项目级端点鉴权欠账清零（6 处 IDOR）
+
+承接 `disclosure-payload-authority-source` 第三轮复盘的触类旁通结果。
+**未建 spec，用户指示逐一修复。**
+
+### 缘起
+
+自查发现新写的 `disclosure-sync-coverage` 端点只挂 `Depends(get_db)` 零鉴权
+⇒ 任意 `project_id` 可未授权读项目数据（IDOR）。按「发现一处反模式立即 grep 全仓」
+纪律扫描「路径含 `{project_id}` 却无鉴权」，得真实欠账 **6** 处。
+
+### 逐处修复（对齐既有权限基准，不自造）
+
+| 端点 | 原状 | 修为 | 依据 |
+|---|---|---|---|
+| `formula_audit_log` `GET /{pid}/{year}` | 无鉴权，可读任意项目公式变更史（含 `old_formula`/`new_formula`） | `require_project_access("readonly")` | 与 `disclosure_notes` 全部只读端点同级 |
+| `formula_audit_log` `POST /{pid}/{year}` | 无鉴权 + `user_id` 写死全零 ⇒ **审计留痕可伪造** | `require_project_access("edit")` + `user_id=current_user.id` | 写的是该项目留痕 |
+| `formula_audit_log` `POST /{pid}/{year}/rollback` | 无鉴权 `UPDATE report_config SET formula` | `require_role(["admin","partner","manager"])` + 真实 `user_id` | `report_config` 是**全局表**（无 `project_id` 列），一次回滚影响全平台 ⇒ 项目级权限保护不了全局资源；对齐 `report_config.populate-formulas`（同改全局公式用 `require_role(["admin"])`） |
+| `t_accounts` `GET .../t-accounts` | 无鉴权 | `get_current_user` | 同文件另 **7** 个端点全有，只此一处漏 |
+| `metabase` `DELETE /cache/{pid}` | 无鉴权 | `get_current_user` | 该 router 内唯一有写副作用的端点；其余为读静态配置，本次不动 |
+| `disclosure_notes` `POST /{pid}/upload-history` | — | **归入桩端点豁免** | 🔴 第三轮**误判为欠账**：它恒返回 501，docstring 明确写「端点不声明 DB / 文件 / 后台任务依赖 —— 未实现的能力不应该占用连接池」⇒ 加鉴权反而违背有意设计 |
+
+🔴 `rollback_formula` 是**权限收紧**（此前任何人可调）。前端调用方 `FormulaHistoryTab.vue`
+的「一键回滚」带二次确认，纳入 manager 档保证日常可用。
+
+**改动前先查调用方**：前端 `formulaAuditLog.*` / `tAccounts.list` 都在 `apiPaths` 有登记
+（走 `api` 封装会带 token）；`upload-history` / `metabase cache` 前端零调用；
+既有测试用 `tests/_test_auth_helper.override_auth` 注入 **admin** 角色
+（`assert_project_permission` 对 admin 跳过项目检查）⇒ 加鉴权不打断。
+`test_formula_audit_log_get.py` 直调路由函数且不使用 `current_user`，同样不受影响。
+
+### 🔴 最讽刺的发现：我写的鉴权守卫自己漏报
+
+基线守卫首版用**文本 `in` 匹配** `_AUTH_TOKENS` 判断端点有无鉴权。
+逐处变异（摘掉鉴权依赖）实测：**6 处里 3 处仍全绿**（`coverage` / `rollback` / `metabase`）。
+
+根因：我在这些端点的 **docstring 里写了**「权限：`require_project_access("readonly")`
+—— 与其余只读端点同级」这类说明文字，被文本匹配数成真实鉴权 ⇒ **漏报**。
+
+这正是同一 spec 第三轮刚总结的 T7 教训（「注释未剔除导致扫描器误报」）的**反向形态**：
+上次是把注释数成缺陷（误报），这次是把注释数成合规（漏报）。**同一个坑正反各踩一次。**
+
+修法 = 改**纯 AST 分析**：
+* 签名 `defaults` / `kw_defaults` 里的 `Depends(X)` / `Depends(X(...))`
+* 函数体语句的 `Name` / `Attribute` 引用（docstring 是 `Expr(Constant)` 不产生 `Name`，
+  `#` 注释根本不进 AST ⇒ 两者天然被排除）
+* 同族命名走前缀匹配（`require_project_delegator` ∪ `require_project_delegator_pid`）
+
+改后 **6/6 变异全部命中**。并补 4 条扫描器自检：docstring-only 不算鉴权 ·
+函数体内显式调用算 · 前缀族匹配 · 无鉴权样本必命中。
+
+### 另一处口径缺陷（第三轮已记，此处闭环）
+
+`_AUTH_TOKENS` 首版只列 10 个 token，漏 `require_project_delegator` /
+`require_project_delegator_pid` / `require_wp_edit_permission` /
+`require_query_builder_access` / `dedicated_wp_gate` ⇒ 把 4 个**有鉴权的活端点**
+误判成欠账。正确清单由现算全仓 `Depends(...)` 被依赖名逐个甄别得出（18 个）。
+
+### 产出
+
+`backend/tests/test_project_endpoint_authorization_baseline.py`（18 例）：
+* `test_no_new_unauthorized_project_endpoint` —— 新增无鉴权端点即红
+* `test_known_gaps_is_empty` —— 欠账已清零且不得回填（回填须在 spec 登记）
+* `test_fixed_endpoint_stays_authorized[6 参数化]` —— 本轮 6 处逐个钉死防回退
+* `test_audit_log_writes_real_user_id` —— 禁回到写死全零 `user_id`（含剔注释自检）
+* `test_stub_endpoints_really_are_stubs` —— 桩端点豁免须真的只 raise 且不触达数据
+* `test_stub_list_has_no_stale_entries` —— 豁免名单无失效条目
+* 扫描器自检 5 例（含上述 docstring 漏报防回归）
+* `test_scanner_denominator_is_sane` —— 分母现算 ≥300（编写时 **381**）防扫描路径错
+
+回归：基线 18 · `t_accounts` + `formula_audit_log_get` 27 · `metabase_attachments` 44 ·
+覆盖率与不变量 108（含 1 xfail）全绿。
+
+### 教训
+
+| # | 教训 |
+|---|---|
+| T12 | **给代码写「这里有鉴权」的 docstring，会让文本匹配型守卫漏报自己** ⇒ 判断「代码是否真的做了 X」一律用 AST，不用文本 `in`。注释/docstring 正反两个方向都会骗过扫描器 |
+| T13 | **守卫写完必须逐处变异**（本轮 6 处逐个摘依赖），不能只跑一次全绿就收 —— 3 处漏报正是靠逐处变异才暴露 |
+| T14 | **「同文件其余 N 处都有、只此一处没有」是最高价值的缺陷信号** ⇒ 值得专门扫「同文件一致性断裂」（`t_accounts` 7:1、`metabase` 唯一写端点） |
+| T15 | **桩端点（501/410 且不触达数据）不该加鉴权** —— 给它加依赖会违背「未实现的能力不应占用连接池」的有意设计；正确处置是显式登记豁免 + 断言它真的是桩 |
+
+---
+
+## 2026-09-28 · 第四轮：跨项目隔离（发现上一轮"修复"本身是错的）
+
+### 🔴 上一轮的修复犯了方法论错误
+
+第三轮给 `t_accounts.list_t_accounts` 补 `get_current_user` 就当"修完"，
+理由是「**对齐同文件另 7 个端点**」。这个理由**本身是错的**：
+
+* `get_current_user` 只保证「登录了」，**不含项目维度**
+* 那 7 个端点本身全是跨项目 IDOR，**基准自己有缺陷**
+
+⇒ **把「对齐既有基准」当正确性依据 = 把缺陷正当化。基准必须先被验证。**
+
+### 真实缺陷：`project_id` 是装饰
+
+```python
+# router：project_id 在路径上
+async def get_t_account(project_id, t_account_id, ..., current_user = Depends(get_current_user)):
+    result = await svc.get_t_account(db, t_account_id)   # ← project_id 根本没传下去
+```
+
+`t_account_service` **5 个方法全不按 project_id 过滤**。后果：
+任何登录用户传任意 `t_account_id` 可读他人项目 T 型账户；
+`add_entry` 是**写路径**、同样不校验归属 ⇒ 可往他人项目塞分录（篡改审计数据）。
+
+这正是 `disclosure_notes.py` 注释早已警告的形态：
+「调用方可以传一个自己有权的项目，却对另一个项目的对象动手（门禁校验了无关对象）」。
+
+### RLS 覆盖率实测：4 / 217
+
+查到 `assert_project_permission` 里有 `set_rls_context` ⇒ 怀疑平台有 DB 层兜底。
+**必须先查清，否则会把有意设计当成 900 处漏洞误报。** 实测：
+
+| 事实 | 值 |
+|---|---|
+| `V005__enable_rls.sql` 覆盖表 | **4**（`working_paper` / `adjustments` / `tb_balance` / `review_records`） |
+| 真实 PG 确认启用 RLS 的表 | **4**（与迁移一致） |
+| 真实 PG 带 `project_id` 列的表 | **217** |
+| 其中受 RLS 保护 | **3**（第 4 张靠 `working_paper_id` 间接关联）≈ **1.8%** |
+
+RLS policy 是 `USING (project_id::text = current_setting('app.current_project_id', true))`
+⇒ 未 `set_rls_context` 时返回 NULL、比较结果非 true ⇒ **fail-closed**（读不到任何行），
+这一点设计是好的。但覆盖面只有 4 张表，`t_account` 不在内 ⇒ **无 DB 层兜底**。
+
+### 平台级现状量化（**非本轮引入，也非本轮修复目标**）
+
+| 维度 | 命中 / 总数 |
+|---|---|
+| 路径含 `{project_id}` 却**完全无鉴权** | 0 / 381（第三轮已清零） |
+| 路径含 `{project_id}` 但**仅登录不校项目** | **227 / 381（60%）** |
+| 路径只有对象 id、**无项目级鉴权** | **678 / 781（87%）** |
+
+900+ 端点 / 214 张无 RLS 保护的表 ⇒ 属**架构决策**范围（推 RLS 覆盖 vs 逐端点补门禁
+vs 收紧默认依赖，涉及性能与角色模型），不由单轮修复决定。
+本轮只**冻结棘轮**：`_IDENTITY_ONLY_BASELINE = 227`，不得增加，且基线虚高 >20 判红
+（只许向下）。
+
+### 本轮实际修复（我碰过的部分，两层同时补）
+
+`t_accounts` 8 个端点：
+* **门禁**：`get_current_user` → `require_project_access("readonly")` 读 / `("edit")` 写
+* **隔离**：service 5 个方法加 `project_id` 关键字参数做归属过滤，
+  router 全部显式传；归属不符按 **404** 处理（不透露他人对象存在性）
+* `add_entry` 写路径**先校验归属再写**，拒绝时**零写入**
+* `create_t_account` 顺带补上 `created_by=current_user.id`（原先丢了创建人）
+
+⚠️ 这是权限收紧：此前任何登录用户可读写任意项目的 T 型账户。
+
+### 前端同步（上一轮漏的）
+
+`rollback_formula` 收紧到 `require_role(["admin","partner","manager"])` 后，
+前端 `FormulaHistoryTab.vue` 的「一键回滚」按钮对无权角色**仍显示**，点了必 403
+——「能点但必失败」是坏体验且让用户以为系统坏了。已加 `ROLLBACK_ROLES` 角色门控，
+并写 `formulaHistoryRollbackGate.spec.ts` 守卫**前后端角色集合逐值一致**
+（任一侧改动令另一侧判红）。
+
+### 守卫口径收紧
+
+`test_project_endpoint_authorization_baseline.py` 把 token 分两档：
+* `_PROJECT_LEVEL_TOKENS`（14 个）—— 真能保证「该用户对该项目/对象有权」
+* `_IDENTITY_ONLY_TOKENS`（4 个）—— 仅身份/角色，**不算项目隔离**
+
+原先把 `get_current_user` 算作「有鉴权」⇒ 227 个只登录不校项目的端点全被判合规，
+口径过宽。现新增第二维度断言与 `t_accounts` 回归钉子。
+
+### 教训
+
+| # | 教训 |
+|---|---|
+| T16 | 🔴 **「对齐既有基准」不是正确性依据** —— 基准本身可能是缺陷（`t_accounts` 7 个端点全是 IDOR，我对齐了它们）。引用基准前必须先验证基准成立 |
+| T17 | **路径参数 ≠ 隔离** —— `project_id` 在路径上但 service 不用它，等于装饰；判「有无隔离」要看**数据层查询条件**，不是看签名 |
+| T18 | **怀疑「系统性缺陷」时先找兜底机制**（RLS / 中间件 / 网关），否则会把有意设计当漏洞误报。但兜底机制**要量化覆盖率**（本轮 4/217 ⇒ 兜底存在但几乎不覆盖） |
+| T19 | **规模超出单轮能力时冻结棘轮而非硬修** —— 记录现算基线 + 断言「不得增加」+ 断言「基线不得虚高」，既阻止恶化又不阻塞交付 |
+| T20 | **权限收紧必须同步前端** —— 否则按钮可见但必 403。且两侧角色集合要有守卫钉死，防单侧漂移 |
+| T21 | 取代码段的两个高频坑：`split(anchor)[0]` 取的是 anchor **之前**的内容（要 `[1]`）；含嵌套括号时 `split(")")` 会提前截断（要**括号配平**）。本轮各踩一次，都是守卫自己抓出来的 |
+
+---
+
+## 2026-09-30 无主欠账清理三连（模板库去重 / 索引生命周期 / 附注 report_row_code 纠错）
+
+三个 commit，都不属任何 active spec —— 是「测试已入库、实现或数据从未跟上」的存量欠账。
+分支 `work/2026-09-28-voucher-sampling-account-scope`。
+
+| commit | 内容 |
+|---|---|
+| `54e431fc3` | 删 D4 整册重复本（352,950 B 未净化那份）+ 把仍以它为权威的 6 处记录逐处改正 |
+| `ba30b6940` | 补齐 `_index.json` 生命周期实现，`test_wp_template_index_lifecycle.py` 7 条从未跑过的判据转绿 |
+| （本轮） | 附注模板 129 行 `report_row_code` 纠错 + 裁决表 + allowlist 可伪证化 |
+
+### 一、模板库 D4 重复本
+
+`D4收入底稿.xlsx`（无空格 352,950 B，36 个 externalLink 部件）与 `D4 收入底稿.xlsx`
+（带空格 199,176 B，已净化）sheet 名序列逐字相同，是同一底稿重复入库。按用户裁定删未净化那份。
+
+`EXPECTED_TOTAL_BYTES` 与快照文件**本就互相矛盾 17,852 B**（常量 50,343,134 / 快照逐份加总
+50,325,282），两条断言各自对着一个不同的事实。重算后 −902,367 B 逐份归因：D4 去重 −153,774
+＋ D3/D5/D6/D7/L5/L6 净化 −748,593（后者在 `1a0b55651` / `3036967ea` **早已提交**，只是基线
+一直没回填）。新增 `WORKTREE_DRIFT_ALLOWLIST` + 可伪证判据（查 `git status`，条目一旦不再是
+未提交改动就打红），M10 那份别 lane 的 openpyxl 有损往返改写**不代提交也不固化进基线**。
+
+### 二、`_index.json` 生命周期
+
+`test_wp_template_index_lifecycle.py`（`d3b3d80d9` 2026-09-14 入库）断言的
+`SPECIAL_ENTRY_ROLES` / `render_index` / `build_index` / `validate_index` / `main(argv)`
+在 `setup_wp_templates_dir.py` 里**从来不存在**（该文件 152 行、顶层函数只有 3 个，
+最后一次改动 `3979f46cc` 2026-05-29）—— 测试先于实现入库、实现一直没来。
+
+🔴 补实现顺带修掉一个**会静默毁掉运行时权威**的缺陷：原 `main()` 只有一个模式（从致同源目录
+拷文件），且**只为「本次真的拷过去的文件」追加索引条目**，最后无条件覆盖写 `_index.json`。
+第二次运行时所有文件都命中 `if target_path.exists(): skipped; continue` ⇒ 条目为空 ⇒ 把 476 条
+索引**整体写成 0 条**。这正是 `generated-artifact-drift.md` 里那句「**绝不能跑**」的由来；
+现在默认只检查不落盘，拷贝要显式 `--sync-from-source`。
+
+实现按仓库**已有**的变异驱动 `mutate_wp_template_index_lifecycle_guards.py` 的锚点写
+（`unexpected = set(disk) - set(indexed)` / `remaining_by_stem` + `_stem_identity` /
+`_is_bundle_entry` / `fingerprint = hashlib.sha256(raw).hexdigest()`），锚点 4/4、变异 4/4 KILLED
+—— 不是另起一套再去改驱动（那等于把验证工具改成迁就实现）。
+
+### 三、附注 `report_row_code`：118 行陈旧 + 8 处确定错绑定
+
+`remap_note_report_row_codes.py --apply` 先修 118 行陈旧编号（95 listed + 23 soe）。
+随后逐条对照候选集，发现**更严重的一类**：
+
+🔴 原实现对「标签映射到多个编号」一律判 `ambiguous` 并原样保留，却**从不检查现绑定是否在
+候选集里**。实测两份模板全部待人工条目：**8 条现绑定连候选都不是**，而「候选内的真歧义」**0 条**：
+
+| 章节 | 标签 | 原绑定（实际含义） | 纠为 |
+|---|---|---|---|
+| listed 三、… | 资本公积 | BS-052 = 一年内到期的非流动负债 | BS-083 |
+| soe 八、18 | 其他综合收益 | BS-053 = 其他流动负债 | BS-085 |
+| soe 八、53 | 长期应付款 | BS-044 = 应付票据 | BS-064 |
+| soe 八、81 / 91 / 92 | 短期借款 | BS-031 = 使用权资产 | BS-041 |
+| soe 八、91 | 其他应付款 | BS-037 = 其他非流动资产 | BS-050 |
+| soe 八、93 | 存货 | BS-008 = 预付款项 | BS-010 |
+
+其中 5 条**登记在 allowlist 里**，理由写着「ambiguous：BS-041/BS-055 两码同名『短期借款』」
+—— 这句话描述的是**标签**的歧义，是真的；但键里那个 `BS-031` 根本不在那两个候选里。
+守卫看到「有理由、已登记」就放过，于是一个把「短期借款」绑到「使用权资产」的错绑定被合法化了
+半年。`soe 八、93 存货` 还是**回归**：restricted-assets spec 当年已按公式实证选过 BS-010。
+
+裁决依据是结构性的、可复核：`report_config` 同名两码中，行号小且落在本段语义位置内的是主表行；
+行号大的那个一律位于某个 `is_total_row` 合计行**之后**、与 `△`/`▲` 金融企业专用行相邻，属扩展块。
+
+修法：`AMBIGUOUS_ADJUDICATION` 裁决表（逐条带结构证据）＋ `ambiguous` 拆成
+`ambiguous`（现绑定在候选集内，安全）/ `foreign`（不在候选集内 ⇒ 确定错），`--check` 对 `foreign`
+也失败。共 129 行改写（96 listed + 33 soe），改后每条绑定的目标行名与标签一致。
+
+防复发：新增 `test_allowlist_codes_are_real_candidates` —— 每条 ambiguous 型 allowlist 条目的编号
+**必须在候选集内**，把「有理由就放过」换成可伪证断言；`test_adjudication_table_targets_are_valid_candidates`
+防裁错码。另把既有反向自检 `test_resolve_doc_ambiguous_and_not_found_unchanged` 拆成三分类
+—— 🔴 **那个自检自己就在为混淆背书**：它的 fixture「多义行」现绑定 `BS-999` 不在候选集
+`['BS-001','BS-002']` 内（即 `foreign` 样本），却断言成 `ambiguous`。真实数据里 8 条错绑定
+能藏半年，与这里的口径是同一个根。变异 4/4 打红（allowlist 塞非候选 / `foreign` 退回
+`ambiguous` / 数据改回错码 / 错码＋清空裁决表）。
+
+### 教训
+
+| # | 教训 |
+|---|---|
+| T22 | 🔴 **allowlist 的理由句必须是对"那个具体值"的断言，不能是对"这类情形"的描述** —— 「两码同名」是真的，但它不证明你登记的那个码是对的。可伪证化的做法：断言登记值 ∈ 候选集，而不是要求写一段话 |
+| T23 | 🔴 **反向自检的 fixture 也要按新口径重审** —— 本轮那 8 条错绑定之所以能长期不被发现，是因为「反向自检」用的样本本身就是错绑定形态却被断言成安全态。加强分类时，先看既有自检的 fixture 落在新分类的哪一格 |
+| T24 | **`--dry-run` 必须真的不写盘** —— `fix_note_m_equity_structure.py` 的 `--dry-run` 会执行 `_ensure_soe_m8_section()` 真写文件（它只在 `--check` 下跳过）。我按「干跑安全」的预期跑了一次，模板就被改了 |
+| T25 | **大批红先做 HEAD 基线再下结论** —— note 套件 109 文件 679 红看着像灾难，取 10 文件对照得 HEAD 147 红 / 改后 141 红（修 6 破 0），绝大多数是预存模板结构欠账 |
+| T26 | **改动前先查文件归属** —— `errata.md`（记着这 9 条红的台账）与 `pure-static` spec 目录整体是 `??` 未跟踪 = 别 lane 在写，不能代改；完成记录改落 `dev-history.md`（clean、且是指定的 append-only 归档处） |
+
+### 本轮**未**做（需决策，非遗漏）
+
+* **soe 附注缺整章「母公司财务报表的主要项目附注」** —— soe 模板 14 个 level-1 章节里没有它，
+  致 `test_variant_matrix.py` 6 条 fixture 直接 error。建整章＋其 level-2 子节属审计内容，不能凭空编。
+* **`fix_note_m_equity_structure.py --check` 现算 93 项欠账**（11 个 M 循环章节的
+  headers/columns/rows/guidance 未对齐，含 soe `八、94 一般风险准备` 整章缺失）。那是 M 循环
+  spec 的工作面，且一次改写两份运行时权威模板的 11 个章节，blast radius 需拍板。
+* `test_x3_column_alignment` / `test_note_text_hygiene` 等其余预存红同属上述模板结构欠账。
+
+## 2026-09-30 母公司附注章回退 + M 循环 92 项欠账清零 + 两条脚本级安全缺陷
+
+lane `work/2026-09-28-voucher-sampling-account-scope`。承接上一轮「本轮**未**做（需决策）」
+三条：soe 缺整章 / 93 项欠账 / `--dry-run` 写盘。**三条全部收口**，另修一条顺手发现的
+GBK 崩溃。
+
+### 一、soe「母公司财务报表的主要项目附注」不是缺内容，是改名覆盖的回归
+
+用户问「这章是不是只有合并附注才有」。**确认：是合并口径专属**，但 soe 侧的问题不是缺内容
+—— 是 `56acf363d`（feat(g-foundation)）把这一章**改名覆盖**了：
+
+| | `section_title` | `section_id` |
+|---|---|---|
+| `56acf363d^` | 母公司财务报表的主要项目附注 | `chapter-12-mu-gong-si-...-fu-zhu` |
+| `56acf363d`~HEAD | 股份支付 | `chapter-12-gu-fen-zhi-fu` |
+
+判定为「覆盖」而非「本来没有」的三方证据：① soe 章数前后均 14，被移除标题恰
+`['母公司财务报表的主要项目附注']`、新增恰 `['股份支付']`；② 该章 6 个子节是
+应收账款/其他应收款/长期股权投资/营业收入与营业成本/投资收益/现金流量表补充资料
+（全 `scope=consolidated_only`）—— 与「股份支付」毫无关系；③ soe 另有两处**真**股份支付
+（`四、股份支付` 政策章、`八、83` 带 3 张表），章十二 `tables=0` 是第三个重名空壳。
+listed 侧被该提交零改动，结构本就正确（`十六` 母公司章 + 6 子节）。
+
+⇒ 用既有专用脚本 `fix_note_parent_company_chapter.py --apply` 回退（Task 3 正是此事），
+**没有另写脚本**。结果：标题/`account_name`/`section_id` 复原、旧 slug 进 `legacy_aliases`、
+6 子节归属同步、补源 docx 章首 5 段说明，悬空引用 0，`sort_index` 仍 12。
+
+🔴 **`scope` 一律未动**：该 spec 需求 2.5 明令不动。我原打算把两侧母公司章
+`scope: both → consolidated_only`（依据 `parent_company_note_sections.py:177` 的注释），
+**已撤回** —— 那是推翻既有裁决，且属超出回退的行为变更。**留作待决**（见第五节）。
+
+### 二、一个 `<br/>` 卡住整章 82 处变更（真正的堵点）
+
+`--apply` 跑完**静默不落盘**。根因链条比表面深两层：
+
+`soe/长期股权投资` 表[1] 第 7 格现值 `'减值准备<br/>期末余额'`，目标列标签
+`'减值准备期末余额'` ⇒ `_apply_own_table` 在 `rebuild_headers=False` 分支用逐字 `!=`
+比较 ⇒ 告警跳过 ⇒ 该表恒缺 `columns`/`guidance` ⇒ `_checks` 恒留 2 条欠账 ⇒
+而写盘条件是 `changes and not dry_run and **not errs**` ⇒ **两个变体合计 82 处已算好的
+变更一个都写不进去**。
+
+`<br/>` 是展示层换行、不是语义内容（`rebuild_headers=False` 的契约就是 headers 逐字保留、
+`columns.label` 承载语义），故在**比较时**归一（`_norm_header` / `_headers_correspond`），
+**写入时不动 headers**。这与该文件已有的 `_norm_ws`（容全角空格）是同一类归一。
+
+第二个堵点：round-trip 自检 `_dump(json.loads(raw)) != raw` 对 listed exit 2。现算差异
+**恰 1 字节**——listed 尾部缺一个 `\n`（正文 671698 字符逐字相同）。尾换行不是「全文件重排」，
+故只放行「去掉尾换行后逐字相等」这一种情形，其余任何差异仍 exit 2，并打印 `[note]` 说明。
+
+### 三、M 循环 92 项欠账清零
+
+`fix_note_m_equity_structure.py` 无标记执行：**61 处变更 / 0 问题**，含 soe `八、94
+一般风险准备` **整章补建**（源模板有、模板 JSON 整张缺失）。`--check` 从 92 → **0**，
+且幂等复跑 0 变更、sha256 不变。覆盖 listed+soe 全 11 个键（用户明确「国企和上市都要修」）。
+
+### 四、两条脚本级安全缺陷（本轮顺手，均配变异证明）
+
+**① `--dry-run` 真写盘**（承接上轮 T24）：实测有**两处**写盘只判了 `not check`
+—— `_ensure_soe_m8_section()`（新建整章）与 header_label 假行删除。改为
+`writable = not check and not dry_run`，干跑改打印意图。验证：dry-run 后两模板 sha256 未变。
+
+**② 门判红时崩在打印诊断那一行**：`check_staged_tree_self_consistency.py` 成功分支的
+`✅`(U+2705) 恰好能被 GBK 编码、失败分支的 `❌`(U+274C) 不能 ⇒
+`UnicodeEncodeError: 'gbk' codec can't encode character '\u274c'`。后果不是少个图标，而是
+**整份诊断全丢**，pre-push 只剩一句失败。修法用**就地** `reconfigure(encoding='utf-8',
+errors='replace')` —— 不新建 `TextIOWrapper`（那会夺 `buffer` 所有权、回收时关底层 buffer，
+正是 `setup_wp_templates_dir.py` 让 pytest 崩在 teardown 的同一个坑）。
+
+**③ 顺带咬出一个假绿**：`test_note_m_equity_structure.py::test_check_exit_zero` 用
+`capture_output=True, text=True`（不指定 encoding）⇒ 子进程中文 stdout 按 GBK 解码失败 ⇒
+读取线程抛 `UnicodeDecodeError`，但**这不会让 `subprocess.run()` 失败**，只把 `result.stdout`
+变 `None` + 留一条 `PytestUnhandledThreadExceptionWarning`。该测试只断言 `returncode`
+⇒ stdout 从没被真正读到，且 `--check` 真报欠账时打的是 `None`。已按三件套修
+（`env` 传 `PYTHONIOENCODING` + 显式 `encoding/errors` + **断言 stdout 有预期内容**）。
+
+新守卫 `backend/tests/test_script_dry_run_and_console_safety.py`（6 例），每条都配**反向断言**：
+写盘路径真的可达（否则「没写盘」是空转）、不调修复时真的崩（否则「修好了」无从证明）。
+逐处变异 **2/2 KILLED**。
+
+### 五、归因与残留
+
+全量对照（所有读这两份模板 JSON 的测试文件，HEAD 基线 vs 改后）：
+
+| | HEAD | 改后 |
+|---|---|---|
+| failed | 790 | 661 |
+| passed | 1917 | 2052 |
+| errors | 17 | 11 |
+
+**修好 130 / 新破 1 / 仍红 659**。659 条是别 spec 的预存模板结构欠账（d1 89 / d2 93 /
+i-cycle 91 …），与本轮无关。
+
+🔴 **唯一那 1 条新红是真阳性，且不是内容回退**，两条证据：
+① 测试侧 `PARENT_CHAPTER_SID['soe']` 写的是**正确**新 slug，而 HEAD 模板还是旧 slug ⇒
+`_children()` 返回 `[]` ⇒ `test_all_parent_tables_have_columns[soe]` 在**空集**上断言 = 空分母假绿；
+② 逐值实测 `columns` 数量：HEAD 0/31、现在 0/35，母公司章与**合并章**两侧都是 0
+⇒ 没有把「本来有 columns 的表」换成没有的（Task 6 是按合并章复制，合并章本身就缺）。
+真因 = **合并章 `五、4/5/8/62`、`八、5/9/64` 缺 `columns`**，且该判据**按设计不可豁免**
+（`upstream_exempt` 只豁免 flat/group 并存，`columns 缺失` 明文不豁免）。
+
+### 本轮**未**做（需决策，非遗漏）
+
+* **合并章 columns 欠账**（上述真因）：要为两侧约 90 张表按源 docx 补列元数据，属独立 spec
+  工作面，需审计口径裁决。它同时是 `test_columns_present_and_explicit` 7 例与
+  `test_every_parent_table_has_columns_and_guidance` 2 例的共同根因。
+* **两侧母公司章 `scope` 是否改 `consolidated_only`**：现值 `both` 而 6 个子节全
+  `consolidated_only` ⇒ 单体报告会渲染**空章标题**。改它与该 spec 需求 2.5 冲突，须用户拍板。
+* `test_census_matches_registered_baseline` 2 例 / `test_upstream_conflict_registry_still_reproduces`
+  / `test_soe_table1_and_table2_rows_untouched_by_task5`：同属该 spec 未完成任务的既有基线，
+  本轮只修堵点未动其基线（**不代改别 spec 的登记值**）。
+* `.kiro/steering/memory.md` 工作树改动属别 lane（formula-push / 知识库），**未代提交**。
+
+### 本轮教训（接上轮 T26）
+
+| # | 教训 |
+|---|---|
+| T27 | 🔴 **「脚本跑了」≠「脚本写了」** —— `--apply` exit 0 也可能因内部门控静默不落盘。判「改没改」一律**前后 sha256**，别看退出码 |
+| T28 | 🔴 **一个展示层字符能卡住整批变更** —— `<br/>` 让 1 张表缺 columns，再经「有欠账就不写盘」放大成 82 处全不落盘。凡「全有或全无」的写盘门，排障要先找**那一条**残留欠账，而不是怀疑整批逻辑 |
+| T29 | **round-trip/哈希类自检要区分「重排」与「1 字节尾换行」** —— 一刀切 `!=` 会把无害差异判成灾难并拒写；放行也必须**只放行那一种**，其余仍 exit 2 |
+| T30 | 🔴 **green→red 先问「HEAD 那个绿是不是空分母」** —— 本轮 `[soe]` 从绿变红，真相是测试按正确 slug 找章、HEAD 模板还是旧 slug ⇒ 一直在空集上断言。判据修对了反而会新增红，这类红是**资产不是负债**，但必须逐值证明「不是内容回退」（我用 columns 0/31 vs 0/35 两侧对照证明） |
+| T31 | **`subprocess` 解码失败不会让 `run()` 失败** —— 只让 `stdout` 变 `None` + 一条 `PytestUnhandledThreadExceptionWarning`。只断言 `returncode` 的测试必假绿；验证手段 `-W error::pytest.PytestUnhandledThreadExceptionWarning` 复跑 |
+| T32 | **PowerShell 的 `>` 重定向写 UTF-16** —— 我用它存 `--check` 输出，再按 utf-8 解析得「欠账 0 条」的错结论。捕获脚本输出一律走 Python `subprocess` + 显式解码 |
+| T33 | **逐字节变异脚本必须处理 CRLF** —— 模式里写 `\n` 在 CRLF 文件上「找不到片段」，会被误当成「代码不是这样写的」而放弃变异 |
+
+### 六、补记两项（收尾阶段新发现）
+
+**① `八、94` 建章时挂错父节 —— 三个字段全是错的硬编码值**
+
+上面第三节建出 `八、94` 后复核悬空引用，发现全模板**唯一一条**悬空正是它。
+`_ensure_soe_m8_section()` 把三个字段写死，与同级 93 个节全部不符：
+
+| 字段 | `八、93`（同级真值） | 原写死值 |
+|---|---|---|
+| `parent_section_id` | `chapter-08-cai-wu-bao-biao-**zhu-yao-**xiang-mu-zhu-shi` | 少了 `zhu-yao-` ⇒ **悬空** |
+| `section_id` 前缀 | 父 slug + 尾段 | 同上，前缀错 |
+| `sort_order` | 892（紧接 891 递增） | **594** ⇒ 排到第 8 章中段 |
+
+⇒ 改为**全部从现有数据推导**（父章按 `section_number=='八'` + `level==1` 现场解析，
+`sort_order`/`sort_index` 取 `八、93` +1），找不到父章则硬失败而不是写出悬空引用；
+并让函数**幂等自愈**（原实现「已存在就 return」会让上一版写出的错值永远留在模板里）。
+复核：悬空 0，`八、94` 的 parent/sort_order(893)/sort_index(93) 与同级完全一致。
+
+🔴 这条差点漏掉：`--check` 全绿（0 欠账）、`八、94 存在=True`，**两个既有判据都说没问题**
+—— 悬空引用不在任何一条判据的视野里。是我在复核时顺手多算了一次「全模板悬空 parent 数」
+才撞出来。**「脚本自己的 --check 绿」不等于「写出的数据是对的」**。
+
+**② 并发 lane 在同一分支上清掉了我未提交的工作树改动**
+
+收尾 `git add` 时发现 3 个文件「与 HEAD 字节相同」—— 两份模板 JSON 的落盘结果与
+`fix_note_parent_company_chapter.py` 的改动**全部消失**。`git reflog` 显示 HEAD 已从
+我开工时的 `6dd1002be` 前移三个提交到 `e019b5a88`（另一 lane 并发提交），
+且 HEAD 侧模板字节数也变了（soe 569169 → 553422）⇒ 是别的 lane 在动工作树。
+
+已提交进 index 的 5 个文件毫发无损，丢的恰好是**只在工作树里的那 3 个**。
+两项均可复现（改动重打一遍 + 重跑两个脚本），重跑后 82 / 61 处变更逐值一致。
+
+教训：**在共享分支上做「生成物落盘」类改动，产出一批就立刻提交**，不要攒到一轮结束；
+以及**`git status` 报某路径干净时，先怀疑「是不是被别人revert了」而不是「我是不是没改」**。
+
+| # | 教训 |
+|---|---|
+| T34 | 🔴 **「脚本 --check 绿」≠「写出的数据结构正确」** —— 判据只看它自己声明的那几项。新建节/新建行这类**结构性写入**，必须额外校验通用不变量（悬空外键 / 排序序列连续 / 与同级节字段约定一致），这些通常不在任何单个 spec 的判据里 |
+| T35 | **写死 slug 是复发源** —— 本会话恰好亲历 slug 漂移（并发 lane 改写模板），写死的 `chapter-08-...` 当场变悬空。凡引用另一条记录的标识，一律**现场解析 + 找不到就硬失败** |
+| T36 | 🔴 **共享分支上未提交的工作树改动会被并发 lane 清掉** —— index 里的活下来了，只在工作树的全丢。产出一批立刻提交；`git status` 说干净先查 `reflog` 是否 HEAD 变动，别以为是自己没改 |
+| T37 | **幂等必须含「自愈」** —— 「已存在就 return」会把上一版写出的错值永久固化。幂等的正确含义是「收敛到目标态」，不是「不重复动作」 |
+
+### 七、续轮：母公司章守卫的陈旧登记清理（17 红 → 14 红）
+
+上一节把残留 17 红归因为「16 预存 + 1 真阳性」后，逐条查了其中**非** columns 根因的
+那 6 条。结论：**全部 6 条的实测值 HEAD 与现在逐字相同**（我的 apply 一个都没碰），
+但其中 3 条是**守卫自身的陈旧登记/判据缺陷**，可据证据直接修；另 3 条属他人设计决策，
+本轮不代改。
+
+**先做了一件事实核查：合并章到底有没有被 apply 改坏。**
+`test_merged_chapter_bold_left_untouched` 那两条看着像「我把合并章的粗体弄丢了」
+（Task 6 的复制管道确实会剥离粗体）。做了比该测试更强的验证 —— 对全部 **7 个**被复制的
+源章节（listed 五、4/5/8/62 + soe 八、5/9/64）做**规范化 JSON 全等**比较（含
+tables/rows/columns/guidance 一切字段），HEAD vs 现在 **7/7 哈希全等** ⇒
+「合并章禁改」契约成立，剥离只发生在写入母公司侧的副本上。
+
+#### 已修 3 条
+
+**① `_norm` 不认 `<br/>` ⇒ 把排版记号差异报成「Task 5 越界改了 headers」**
+
+`test_soe_table1_and_table2_rows_untouched_by_task5` 用
+`"".join(str(x).split())` 归一后与源 docx 比对。soe 表 2 第 7 格模板现值是
+`'减值准备<br/>期末余额'`，源 docx 同格是 `'减值准备 期末余额'`（docx 里是**两行单元格**，
+被提取器 `_norm_space` 折成一个空格）—— 只差一个 `<br/>`。
+
+🔴 决定「改判据还是改数据」的是**规模实测**：两份模板表头里共 **129 处** `<br/>`
+（listed 52 / soe 77，合并章亦有），源 docx 侧 **0 处** ⇒ `<br/>` 是平台既有的两行表头
+写法，不是这一格的孤例。删这一格的 `<br/>` 会让它与其余 128 处不一致 ⇒ **归一属于判据**。
+改完与 `fix_note_parent_company_chapter._norm_header` 同口径（同一性质两侧同判据，防漂移）。
+
+**② 普查登记 2 条错值**：`listed/其他应收款` (21,21)→(18,18)、`soe/应收账款` (13,13)→(11,11)。
+12 条里只有这 2 条漂移、其余 10 条实测全中。三条证据表明 21/13 是**登记时算错**而不是
+「合并章丢了表」：源 docx 的合并章对应科目实测正是 18 / 11；模板合并章 `五、8` 现 18 张、
+`八、5` 现 11 张且 `check_isomorphic`（母公司侧与合并章深相等）0 欠账；**原注释把「替换前」
+写成 18/11，而 18/11 恰好是替换后的实测值** —— 即当初把前后两个数抄反了（同注释另两条
+15→17、15→19 抄对了，实测正是 17/19）。该常量语义由其 docstring 明确为「锚定现状规模而非
+目标态，Task 6 完成后只需更新常量」⇒ 对齐实测正是它要的动作。
+
+变异 3/3 KILLED，其中**最关键的是 M2**：把那一格表头改成**真的不同**的值，判据必须仍然打红
+—— 证明加了 `<br/>` 归一**没有把断言变空**（只撤归一也红 = M1，两个方向都咬住）。
+
+#### 未做 3 条（属他人设计决策，已备齐证据）
+
+* `test_merged_chapter_bold_left_untouched` 2 条：两个登记项指向的表**在合并章里都不存在了**
+  （listed 五、8 无「应收政府补助情况」，18 张表名全不匹配）或**粗体已消失**
+  （soe 八、9「按账龄披露其他应收款项」guidance 无 `**`），且 **HEAD 侧就已如此**。
+  它是 Property 28 的**正面**断言（「合并章仍有粗体」+「母公司侧无粗体」并存才证明剥离
+  口径正确）。登记项删空会让它 parametrize 出 0 个用例，而相邻还有一条专门防这种空转的
+  断言 ⇒ 怎么重建这个正面判据是该 spec 的设计决策，不代改。
+* `test_upstream_conflict_registry_still_reproduces` 1 条：两个登记项引用的合并章表名
+  （五、62「营业收入、营业成本按分解信息」/ 八、64「营业收入分解信息」）**都不存在**。
+  按该测试自己的提示应「从 `UPSTREAM_MERGED_COLUMN_CONFLICTS` 移除该登记项」，
+  但 `test_upstream_exemption_only_covers_flat_group_conflict` 拿**生产登记表**当夹具
+  （用那个 ident/name 造合成表验证豁免机制）⇒ 删空登记表会让这条自检失效，
+  需要改成合成登记表才行。属该 spec 的判据重构，不代改。
+
+#### 剩余 14 红的根因分布
+
+11 条是同一个根因（**合并章缺 `columns`**：`五、4/5/8/62`、`八、5/9/64`）—— 母公司侧按
+Task 6 忠实复制，所以连带红；该判据**按设计不可豁免**（`upstream_exempt` 只放行
+flat/group 并存，`columns 缺失` 明文不豁免）。另 3 条即上述未做项。
+
+| # | 教训 |
+|---|---|
+| T38 | 🔴 **「改判据还是改数据」要先量规模** —— 同一个 `<br/>`，孤例就该改数据、129 处就该改判据。不量就会按「哪个改起来快」决定，把平台既有约定改成孤例 |
+| T39 | **放宽判据必须配「仍能抓真缺陷」的正向变异** —— 撤掉归一会红（M1）只证明归一有作用，不证明归一没把断言变空；必须再做一次「真的改坏」看它还红不红（M2）。两个方向缺一个就可能交付一条空转判据 |
+| T40 | **陈旧登记值先分清「登记错了」还是「数据退化了」** —— 两者都表现为「实测 ≠ 登记」，但处置相反（改登记 vs 修数据）。本轮靠源 docx + 同族 10 条全中 + 原注释把前后数抄反三条证据才敢改登记 |
+| T41 | **自检夹具引用生产登记表时，登记表不能被清空** —— 「按提示删除陈旧登记项」会连带废掉那条自检。删登记前先看有没有测试把它当夹具用 |
+
+## 2026-09-30（续二）附注模板「陈旧副本整体覆盖」事故：定位、按章恢复、撤回两轮错修
+
+### 一、真相：不是「合并章缺 columns」，是 `56acf363d` 把两份模板整体换成了陈旧副本
+
+上两节把残留红归因为「合并章 五、4/5/8/62 · 八、5/9/64 缺 `columns`，需独立 spec 补列」。
+**那个结论是错的。** 逐章做 git 历史指纹后：这 7 个节在 7 月底就已补齐 columns
+（f5debfa48 / a6f093e2a / 5783c4ffe / 962f1c710），是 `56acf363d` 让它们归零的。
+
+`56acf363d feat(g-foundation): G循环foundation spec 19/19`（2026-09-27）实测：
+
+| | `56acf363d^` | `56acf363d` |
+|---|---|---|
+| listed 带 columns 的表 | **411** | **11** |
+| listed 带 guidance 的表 | 393 | 18 |
+| soe 带 columns 的表 | **260** | **3** |
+| soe 带 guidance 的表 | 251 | 19 |
+| 表头 `<br/>` | 0 / 0 | 67 / 77 |
+
+覆盖后的 listed 与 `833a37fa5`（07-26）**201/204 个章节逐字相同**、soe 185/187 ⇒ 模板被退回
+7 月下旬，抹掉 07-30~09-26 约十个 spec 的附注结构对齐成果。判定「非有意」：该 spec 文档
+与提交信息**零处**提及附注模板；同提交另 44 个文件**无一**是 blob 级回退（只有这两份）；
+`disclosure_engine.py` 那 1 行改动与模板结构无关。soe 母公司章被改名成「股份支付」、
+`八、94` 整章被删，都是这次覆盖的一部分。
+
+**它为什么活了三天**：note 相关 67 个测试文件当场从 **43 红涨到 1258 红**，其中
+`test_note_columns_coverage` 的防回退棘轮直接红了 —— 但这些测试不在 pre-push 门里，
+CI 的 governance-checks 虽然跑它们，红了也没有拦住任何人。
+
+### 二、🔴 我前两轮的修复有两处是把守卫往陈旧数据上凑（已撤回）
+
+| 改动 | 当时的理由 | 事实 |
+|---|---|---|
+| `_norm` / `_norm_header` 容 `<br/>` | 「模板里有 129 处 `<br/>`，是平台两行表头约定，归一属于判据」 | 覆盖前 **0 处** —— 是陈旧副本带回来的残留，原逐字判据是对的 |
+| `PARENT_TABLE_CENSUS` 21→18、13→11 | 「源 docx 是 18/11，原注释把前后数抄反了」 | 覆盖前实测**正是 21 / 13**，原登记值是对的；18/11 是陈旧副本的值 |
+
+两处都已撤回：测试文件逐字回到 `cace65a9f`、脚本删掉 `_norm_header`/`_headers_correspond`
+（只保留尾换行放行 —— 那条与覆盖无关、独立成立）。上一节里「T38 改判据还是改数据先量规模」
+这条教训本身没错，**错在量的是被污染的数据**：129 这个数字是事故现场，不是平台约定。
+
+### 三、恢复：按章节三方比较，不整文件 checkout
+
+新脚本 `backend/scripts/fix/restore_note_templates_from_stale_overwrite.py`。
+`56acf363d` 之后还有**合法**改动落在同样两个文件上（`6dd1002be` report_row_code 纠错 /
+`cace65a9f` 母公司章等），整文件 checkout 会一起抹掉。逐章 good / bad / cur 三方分类：
+
+* **纯回退**（cur == 陈旧副本）listed 113 / soe 99 章 → 恢复为 good
+* **冲突**（覆盖后又被改过）listed 32 / soe 15 章 → 逐叶子实测差异**只有三类**：
+  report_row_code（listed 96 / soe 33 处）+ M 循环章 + 母公司章，三类都有幂等 owner 脚本
+  ⇒ 恢复为 good 后按序重放 `fix_note_parent_company_chapter` / `fix_note_m_equity_structure`
+  / `remap_note_report_row_codes`。实测三个脚本在 good 底座上都是 **0 处变更**
+  —— good 本来就对齐好了，所谓「M 循环 93 项欠账」「母公司章缺整章」同样是覆盖造成的
+* 两处必须特判的键：soe 十二家族被 bad **改了 section_id**（按 id 找不到 ⇒ 回退到唯一
+  section_number 配对，首版漏了这一类）；`八、94` good 侧挂载字段本身是错的（悬空），
+  保留 cur 的修正版
+
+**无损验证**（按 section_id 逐叶子）：恢复后与 `56acf363d^` 相比，差异**只有**
+report_row_code（listed 1 / soe 3 处，remap 的既有裁决）与 `八、94` 的挂载四字段 ⇒ LOSSLESS。
+
+### 四、归因（67 个读模板的测试文件，全量）
+
+| | failed | passed |
+|---|---|---|
+| committed HEAD | 1255 | 2050 |
+| **本次恢复后** | **41** | **3342** |
+| `56acf363d^`（完整 worktree） | 43 | 3331 |
+
+修好 **1226**。「新破」9 条经完整 worktree 对照**全部在 `56acf363d^` 就是红的**（预存，
+覆盖把它们连带变成了另一种红而已），不是恢复引入。恢复后比覆盖前还少 2 红，多出的
+2 条 j-cycle 红是 `3c10c0279` 在覆盖期间按陈旧状态重写了测试口径所致（未代改）。
+
+另两处随恢复同步：`note_soe_listed_diff.json` 按其生成器重算（仅 `八、94` 的 id 两行）；
+row-code allowlist 在恢复后的模板上逐条重导（移出 3 条陈旧副本自带的错码，补入 4 条
+恢复后才出现的行，每条附候选集与主表位置证据）。
+
+### 五、防复发
+
+* `backend/tests/test_note_template_stale_overwrite_guard.py`：只锁不可能是有意改动的宏观
+  棘轮 —— columns/guidance 覆盖率只增不减、表头 `<br/>` 为 0、零悬空 parent。反向自检用
+  **事故现场真实数值**喂判据必须红；变异：把 `56acf363d` 的真实陈旧副本放回工作树，4 条红。
+  已进 governance-checks（`note-template-stale-overwrite-guard`）。
+* `backend/scripts/check/check_note_template_ratchet.py` + pre-commit 第 4 步：**判暂存内容**，
+  只在暂存了附注模板时才有开销。这个事故的真实形态是「无关文件搭车进了提交」，提交时就该拦。
+  变异 3/3：未暂存 → 0 / 暂存恢复版 → 0 / 暂存陈旧副本 → 1。
+
+| # | 教训 |
+|---|---|
+| T42 | 🔴🔴 **「大批红」先查是不是某一次提交造成的** —— 1258 红里 1215 条来自同一个提交。逐测试修只会越修越偏：我前两轮就把判据和登记值往事故现场上凑了两次。第一步永远是「这批红从哪个 commit 开始的」 |
+| T43 | 🔴 **「规模实测」要先确认量的不是事故现场** —— 129 处 `<br/>` 看着像平台约定，实际是陈旧副本带回的残留（覆盖前 0）。量规模之前先看这个数在历史上是不是一直如此 |
+| T44 | **HEAD 基线法有盲区：HEAD 本身可能就是坏的** —— 前两轮都用「HEAD vs 改后」证明「修 N 破 0」，但 HEAD 是事故后状态，这个对照证明不了任何「正确」。要用**已知好的历史点**做第三方对照（本轮用完整 git worktree 跑 `56acf363d^`） |
+| T45 | **恢复被覆盖的文件要按章/按块三方合并，不要整文件 checkout** —— 覆盖之后的合法改动会被一起抹掉；冲突块要逐叶子实测差异类型，确认都能由幂等脚本重放才恢复 |
+| T46 | **守卫红了没人被拦 = 守卫不存在** —— 事故当场 67 个文件的守卫全红，但不在拦截路径上。防复发必须放在**提交时**（pre-commit 判暂存内容），而不是只加一条会被同样忽略的 CI 测试 |
+
+> **勘误（同日，紧接上条）**：上条第四节说「多出的 2 条 j-cycle 红是 `3c10c0279` 在覆盖期间
+> 按陈旧状态重写了测试口径所致」—— **这个归因未经验证，且与失败信息不符，撤回。**
+> 两条红的断言对象是**前端源码**，与附注模板无关：`test_second_write_path_sites_are_all_real`
+> 报 `J1TabGeneralCheck.vue#L469 不是 http.put 站点`（行号锚点漂移）；
+> `test_shared_base_consumer_counts_are_recomputed_both_ways` 报「窄口径现算 26 != 期望 27」
+> （共享基类消费方计数）。两条在 committed HEAD 上同样是红的，与本次恢复无关；
+> 它们在 `56acf363d^` 上是绿的，只是因为那时前端代码与测试文件都还是旧版。未代改。
+
+## 2026-09-30 单体附注不得出现合并专属章节 —— scope 真源改判 Word + 三条旁路收口 + 存量清理
+
+**用户诉求**：「单体报告是没有母公司章的，彻底修；顺带修 2 条 j-cycle 红」。
+
+### 一、根因：合成的一级章硬编码 `scope="both"`，而 scope 过滤逐节扁平
+
+`section_applies_to_scope` **按节判、不继承父章** ⇒ 章自身的 scope 决定去留。现算出 4 个
+「章 `both` 而子节全 `consolidated_only`」的一级章，全部由
+`scripts/migrate/migrate_note_template_section_id.py`（`aab3d49ee`，05-28）合成时硬编码
+`"scope": "both"` + `_synthesized: True`：
+
+| 变体 | 章 | JSON 标题 | Word 权威册实测 | 裁决 |
+| --- | --- | --- | --- | --- |
+| listed | 十六 | 母公司财务报表主要项目注释 | 合并册有、单体册 16 个 H1 里**没有** | 章+后代 → `consolidated_only` |
+| soe | 七 | 合并范围的变化（Word 里叫「企业合并及合并财务报表」） | 单体册 11 个 H1 里**没有** | 同上 |
+| soe | 十二 | 母公司财务报表的主要项目附注 | 单体册**没有** | 同上 |
+| listed | 十七 | 补充资料 | 单体册**有**，3 个子标题齐全 | **反向缺陷**：子节 → `both` |
+
+🔴 **判据真源定为 Word 权威册**（`backend/data/audit_report_templates/disclosure_notes/*.docx`
+里该 Heading 1 在单体册有没有），不是标题启发式。新脚本
+`backend/scripts/fix/fix_note_chapter_scope.py` 把两张登记表
+（`CHAPTER_ONLY_IN_CONSOLIDATED` / `CHAPTER_IN_BOTH`）在**每次 `--check` 时重读 docx** 复核，
+Word 或登记表任一改动即红。共 6 处 scope 改动，二次 apply 零变更，diff 恰 6 行。
+
+🔴 **章号对上 ≠ 对的是同一章**：soe 七 的 JSON 标题「合并范围的变化」与 Word 的
+「企业合并及合并财务报表」**不同名**，只能靠子节标题过半命中来证明是同一章 ⇒
+`check_word_facts()` 第二层判据就是这个（防「登记表指错章」）。
+
+### 二、三条从不按口径过滤的旁路（生成链一直是过滤的，问题全在旁路）
+
+| 路径 | 原行为 | 改法 |
+| --- | --- | --- |
+| `sync_from_workpaper`（底稿披露同步） | 不看口径，直接新建 | 无 active 行时先判口径，跳过并返回 `reason=section_not_applicable_to_report_scope` |
+| `WpDisclosureSyncService.sync_from_html` | 同上 | 同上 |
+| `DisclosureEngine.get_notes_tree`（读侧） | 直接返回 DB 全部未删行 | 按同一判据过滤 |
+
+三处收敛到单一判据 `note_section_catalog.section_allowed_for_project()`，与 Word 导出
+（`note_applies_to_report_scope`）、生成（`filter_template_sections`）同源。
+
+🔴 **守卫必须在「软删行复活」之前**：唯一索引 `uq_disclosure_notes_project_year_section`
+**不含 `is_deleted`** ⇒ 无 active 行时「复活软删行」是必经分支。守卫若放在复活之后，
+存量清理刚软删的章节会被下一次底稿保存原样复活（`is_deleted = False`），清理等于白做。
+首版正是放在复活之后的，自查时改正，并补了源码级位置判据 + 行为判据（复活对象的
+`is_deleted` 必须仍为 True）。
+
+🔴 **变体必须取 `projects.template_type` / `report_scope` 两列，不是
+`applicable_standard_v2.entity_type`**：真库项目 `0ec33ac9`（重药控股安徽_2025）两者
+**不一致**（列 `listed` / v2 `soe`）。按 v2 取就会拿国企编号裁上市项目 —— 而两套编号
+**同号不同义**：soe 十二 = 母公司章（合并专属），listed 十二 = 股份支付（单体也有，真库 1074 字）；
+soe 七 = 合并范围的变化，listed 七 = 在其他主体中的权益（真库 1582 字）。首版误用 v2，
+由变异检验 M10 抓出（见第五节）。为此新增 `_resolve_project_sync_facts()` 在**同一次查询**里
+多返两列，`_resolve_project_sync_context()` 的 `(year, std)` 契约保持不变（既有测试断言它）。
+
+🔴 **读侧口径源不能自己查 `Project.report_scope`**：`test_parent_company_note_sourcing`
+的 Property 20 用**源码文本**断言 `disclosure_engine` 不得自拼
+`(company_code, audit_year, report_scope)` 三条件。首版在引擎里写了
+`sa.select(Project.template_type, Project.report_scope)` ⇒ 该守卫红。改为复用引擎**已有的**
+`_get_project_basic_info()`（wizard `basic_info`，与 `_load_templates` /
+`_get_active_template_type` 同源；真库 5 个正式项目两个源逐项一致），不新增查询、不碰该列。
+
+### 三、存量清理：19 行软删（按项目自身变体，绝不合并两套编号）
+
+`fix_standalone_consolidated_only.py` **原实现把 soe + listed 的 consolidated_only 编号并成
+一个集合**、不分项目变体 ⇒ soe 七/十二 改判后会**误删 listed 单体项目的** 十二（股份支付）
+与 七（在其他主体中的权益）等 14 行真内容。改为逐变体 `load_consolidated_only_sections()`
++ 纯函数 `select_rows_to_delete(rows, sections_by_variant)`。
+
+🔴 **该脚本此前从未跑过**：`DATA_DIR` / `sys.path` 用 `parents[3]` 指到不存在的
+`backend/scripts/data`，一跑就 `ModuleNotFoundError: No module named 'app'`（已改 `parents[2]`）。
+
+真库执行结果（软删，回收站可恢复）：19 行 / 4 个单体项目 / `template_type` 为空跳过 0。
+含正文的 4 行**逐行人工确认过**，全部是 LLM 占位草稿（`[待补充：具体金额]`、`status=draft`、
+`updated_by=NULL`、`last_sync_source=NULL`），无人工录入内容：
+
+- `5610b688` listed 十六 母公司财务报表主要项目注释 1841 字（项目 0ec33ac9）
+- `36c3098d` / `61921dda` soe 十二 **标题却是「股份支付」** 1371 / 1073 字 —— 跨变体误号的历史推送
+- `5b446539` soe 七 合并范围的变化 607 字
+
+清理后真库校验：soe 单体的 七(3) / 七、*(12) / 十二(3) 全部 `is_deleted=true`；
+**listed 单体的 七 / 七、* / 十二 全部保留**；soe 合并项目一行未动。
+
+### 四、真库端到端（调真实 service，不是 mock）
+
+`get_notes_tree` 逐项目实跑：3 个 soe 单体项目 scope 敏感章 **0**；listed 单体 334 节里
+**十六 已消失**、七/七、*/十二 15 节按 listed 口径保留。
+
+🔴 **唯一的合并项目（首汽租车 df5b8403）自身 `is_deleted=true`** ⇒ 取不到口径、走 fail-open，
+只能证明「不误杀」，**证明不了「合并口径会保留」**。故用它的**真库 173 行** + 注入口径跑两侧：
+注入 `soe/consolidated` → 173 节、13 个 scope 敏感章保留；注入 `soe/standalone` → 146 节、
+scope 敏感章 0。同一批真实数据上的双向对照。
+
+### 五、变异检验 15 条全杀，其中 M10 抓出一条真假绿
+
+`backend/scripts/diagnose/mutate_note_standalone_scope_guards.py`（种子 scope 回退 ×3 /
+判据兜底 / 读侧过滤 / 读侧 fail-open 反转 / 写侧守卫位置 / 写侧守卫失效 ×2 / 变体取数源 /
+J 锚点 / J 消费边口径 / J 清单删条 / 行码回退 / 联动模块 import）。
+
+🔴 **M10 首轮 SURVIVED** —— 把变体取数源从 `template_type` 列换成 v2 准则后，32 条判据一条
+不红。原因：所有 fake 都让两个源**取值一致**，于是「换源」在语义上没有可观测差异 =
+典型的「mock 只验接线不验语义」。补两条用例（照真库 `0ec33ac9` 让两源**故意冲突**，
+并补对偶方向防「永远放行」也通过）后 M10 KILLED。
+
+🔴 两个把变异脚本本身变成永假门禁的坑，已写进脚本注释：① 本仓 `core.autocrlf=true` ⇒
+**.py / .json 磁盘上都是 CRLF**，按 `\n` 写锚点必 0 命中（首轮 15 条里 12 条「锚点命中 0 次」
+被当成存活）⇒ 文本变异统一在 LF 归一副本上做、恢复时写回原始字节；② 解释器路径
+**不能写死 `.venv/Scripts/python.exe`**（Windows 专有），CI 上会让脚本以 traceback 退出 ⇒
+改 `sys.executable` + 显式断言解释器存在。③ 章节标题不能凭记忆写（soe 七 是「合并范围的变化」
+不是「企业合并及合并财务报表」；listed 十六 是「母公司财务报表主要项目注释」不是
+「公司财务报表主要项目注释」）⇒ 种子 scope 类变异改走 JSON 按 `section_number` 定位。
+
+### 六、全量归因：289 个附注/披露测试文件两侧对跑
+
+用 `_probe_run_surface.py` 在**工作树**与**干净 HEAD worktree** 上跑同一份 289 文件清单，
+对失败集合求差（而不是只跑几个文件名 grep 命中的）：两侧都红 **102**（预存，与本轮无关），
+本轮转绿 3，本轮新增红 **3** —— 且三条全部处理完毕：
+
+1. `test_parent_company_note_sourcing::...locator_conditions` —— 我引入，见第二节末，已改 fail 源。
+2. `test_task23_zero_regression::test_existing_chain_file_bytes_equal_head[disclosure_engine.py]`
+   —— 该判据比「工作树 vs HEAD 字节相等」，本轮确实改了该文件。按它自己的失败提示在测试类
+   文档串里**如实登记**了改动与理由，并补了一条**不随提交自愈**的判据
+   `test_existing_chain_never_imports_linkage_module`（既有链路十个模块都不 import 联动模块 ⇒
+   联动仍是纯加法式）。🔴 原判据一提交就自动变绿，它能抓「现在有人在改」，抓不到「已经改进 HEAD」。
+3. j-cycle 那条 —— 见第七节（对跑快照早于修复）。
+
+顺带修了同族的**预存**红 `test_linkage_module_is_new_not_a_rewrite`（在 102 之列）：它断言
+联动模块**不在** HEAD，而模块早已随该 spec 落 commit ⇒ 前提从那一刻起永假、长期红。按它
+自己的提示改成「还没进 HEAD 就放行；已进则与 HEAD 逐字节对照」。**与上一条是同一个病的两面**：
+拿「相对 HEAD 的状态」当不变量，会随提交动作翻面。
+
+### 七、两条 j-cycle 红：都不是附注模板引起的
+
+**红 1 `test_second_write_path_sites_are_all_real`**：`78b9c1ee5` 在
+`J1TabGeneralCheck.vue` 旧 297 行后插入 11 行 ⇒ slice 锚点集体后移。以 slice 末次提交
+`edfbd0612` 的文件内容为基准逐条对照，确认是**纯位移、内容逐字节相同**：
+L324→335 / L464→475 / L467→478 / L469→480（L27 在插入点之前，未动），共 8 处引用已改。
+🔴 **只改这一份文件的锚点**：全 slice 102 个锚点现算 OK 69 / MOVED 12 / EDITED 9 /
+MOVED_AMBIGUOUS 4 / FILE_DELETED 8，其余陈旧锚点（J2TabDisclosure* / useJ*EntryDualMode 等）
+属**他 lane 未提交**的改动，按它们当前行号落盘等于把不稳定状态写进已提交台账。
+
+**红 2 `test_shared_base_consumer_counts_are_recomputed_both_ways`**：期望值算法是
+「声明 29 − 已删的 **J** 贡献」，而现算的窄口径是**全循环**消费边总数 ⇒ M 循环删掉
+`useM9EntryDualMode.ts` 后现算 26、期望 27。**这是真实潜伏缺陷**：与 J 循环毫无关系的
+跨循环假红，且 M lane 一提交就会在干净 HEAD 上复现。改为扣「已删的**任一**已声明消费方」。
+
+为此给 slice 的 `shared_base` 补 additive 键 `statement_position_consumer_sites`（29 条
+机器可读清单）。🔴 **不能在测试里用 git 现算盘点期内容**：CI 的 `actions/checkout@v4`
+没设 `fetch-depth` ⇒ 浅克隆，`git show edfbd0612:...` 在 CI 上必失败（本机绿、CI 红）。
+清单在 `edfbd0612` 上按守卫**同一窄口径**现算得 29 条，与 `statement_position_consumers: 29`
+及 `preserved_because` 的文字枚举（B22A/B22B×2/B22C/B50 五宿主 + D1/D3/D4/D5/D6/D7 六 wrapper
++ G2 + M1..M10 十个 + N2 + 2 个 vi.mock 测试 + 1 个自测 = 26，加 J 的 3 条 = 29）**逐项对得上**。
+测试同时断言「清单条数 == 声明值」「J 的 3 条是全量清单子集」，两个 key 漂移当场红。
+
+### 八、`test_disclosure_row_level_merge` 2 条红：`6dd1002be` 改对了模板、没改测试
+
+`TestTableLevelTotalRowSurvives` 的 soe 八、91 参数写 `BS-037`，报
+`owner_row_code_not_in_template`。归因：`6dd1002be`（附注 129 行 report_row_code 纠错）把
+该表「其他应付款」从 `BS-037` 改成 `BS-050`。真库 `report_config`（soe_standalone /
+soe_consolidated 两侧一致）BS-050 = 其他应付款、BS-037 = 其他非流动资产 ⇒ **改模板是对的、
+测试参数是陈旧期望**。双向实证：在 `6dd1002be^` 上这 2 个参数**绿**，在 `6dd1002be` 及之后**红**。
+与两份附注模板的陈旧覆盖（`56acf363d` / `68d73bd26`）无关。
+
+🔴 **顺带纠正一处会导致误判的取样**：soe 的 `八、90` / `八、91`（资产负债表中列报项目）
+种子里**本来就是** `consolidated_only`（实测自 `e2d6ab449` 起一路如此）。我第一版用它当
+「普通章」样本，得出「判据全拦」的错结论。样本改用实测 `both` 的 `八、81`。
+
+### 九、CI 卡点（并入 `parent-company-note-chapter` job）
+
+- `python backend/scripts/fix/fix_note_chapter_scope.py --check`（重读 docx，登记表过期即红）
+- `python -m pytest backend/tests/test_note_standalone_consolidated_only_scope.py -q`（35 条）
+- `python backend/scripts/diagnose/mutate_note_standalone_scope_guards.py`（15 条变异必须全死）
+
+### 十、需要用户拍板/知悉
+
+1. 🔴 **建议 `git stash drop stash@{0}`**（2026-07-29「WIP on work/2026-05-30-wp-specs: 72b42405」）：
+   其模板 blob 与 `56acf363d` 那份陈旧副本**逐字节相同**（listed `4f2caf3ba619` / soe `58513f12fc87`），
+   它就是那次整体覆盖的来源，且**仍在栈上**。删除是破坏性操作，未经同意未执行。
+2. 🔴 **后端需重启**：`load_section_scope_map` 带 `lru_cache`，改了种子 JSON 不重启读不到。
+3. 本轮超出字面诉求的两处改动（均有 Word 实证）：soe 七 一并改判 `consolidated_only`；
+   listed 十七「补充资料」子节**反向**改回 `both`（单体册有这章，原样会少内容）。
+4. 预存的 102 条附注/披露红（两侧都红）本轮未处理，仅逐条归因为「与本轮无关」。
+
+## 2026-10-01 知识库上传健壮性与下游消费方接线（spec `knowledge-upload-robustness-and-consumer-wiring`，10/10 ✅，随本次知识库单一提交入库）
+
+缘起：用户报「新建文件夹后上传不了文档，走不下去；后面很多模块要调用知识库文档」。
+
+### 一、根因（真库 + Playwright 实证）
+- 用户所见 = 原生 XHR 自读 localStorage，而 token 早已迁 sessionStorage；本次已改走 `utils/authToken` 并随知识库单一提交入库。
+- 另 9 类上传缺陷：UTF-16 / 含 NUL 文本与「扩展名」超 20 字 ⇒ 整个请求 500；逐文件 `try/except` 挡不住 flush 失败 ⇒ 单文件问题放大为整批丢失并留孤儿文件；GBK 静默存成乱码；扫描件无正文无提示；失败原因只在控制台；拖拽目录超 100 个静默丢失且层级被压平；XHR 超时整批卡死。
+- 下游：7 个 RAG 入口经词法层可召回；但「📚 知识库」选取器调不存在的 `/api/knowledge/search`（404 被吞成「未找到」）、续写 / 改写的 `knowledge_context` 被后端丢弃、`ai/complete` 双注册（query 版遮蔽 body 版）致续写恒 422、审计报告的「已加载 N 篇参考文档」无任何消费方。
+
+### 二、改动（详见 spec 三件套）
+- 后端：每文件 SAVEPOINT + 写库失败删盘 + `failed[{filename, reason}]`（SQLSTATE → 中文原因）；ORM `@validates` 剔 NUL + `normalize_file_type`；`decode_text_bytes`；列表 `has_text`；`note_ai` 删 query 版、`knowledge_doc_ids` 经 `load_documents` 逐篇判权、`require_project_access("readonly")`、回 `knowledge_count`。
+- 前端：`utils/knowledgeUpload.ts`（拖拽读尽 + 保留层级 + 跳过临时文件 / 回执解析 / 结束汇总 / 无正文区分扫描件）；选取器接 `/api/knowledge-library/search`；`useNoteAi` 只传文档 ID；审计报告按钮标开发中；A17-3 显示后端原因；删 5 个指向不存在路由的 commonApi 函数与 apiPaths 死路径。
+
+### 三、守卫与证据
+- 后端新守卫 5 文件 71 例：纯函数 34 / 真库 scratch 14 / note_ai 端点 12 / 重复路由棘轮 5（基线 10 组只许减）/ 前端知识库路径存在性 6；平台鉴权棘轮 227 → 224。前端：knowledgeUpload 46 · KnowledgeBase 页 21 · useKnowledge 8 · A17-3 +2 · useNoteAi +5。
+- 变异 M1–M23 全 KILLED，每条还原 sha256 一致、失败形态逐条核对。
+- Playwright 真栈：9 个问题文件一次上传全入库、文本类预览逐字正确；CDP 真实拖入目录保留层级、跳过 3 个临时文件；拦截 `200 + failed[]` 显示中文原因；选取器命中 GBK / UTF-16 文件；UI 续写 `knowledge_count=1`「参考了 1/2 篇」且附注 sha256 不变；新建文件夹后上传 docx / xlsx 可检索；扫描件 PDF 与空白 txt 分开提示。测试数据经产品删除端点清理，用户文件夹「1」未受影响。
+- 回归：后端 35 文件 434 例 = 430 过 / 4 红（`test_knowledge_index` ×2 过期断言；另 2 条是并发会话 workpaper_sync 的未入库测试与未缩的棘轮）；前端 23 文件 552 例 = 551 过 / 1 红（`components.d.ts` 被自动登记他人 `_head_*.vue`）。eslint 0 error；单区域 vue-tsc 本 spec 无新增（配故意类型错误探针证明该配置确在检查）。
+
+### 四、教训
+1. **守卫的故障注入替换了被测函数本身 ⇒ 守卫测的是拷贝**：真库守卫原把 `_insert_document_isolated` 换成测试里的 SAVEPOINT 拷贝，删生产 `begin_nested` 仍全绿（M1 首跑存活）。改为在 service 层注故障 + `production_path` 自检。
+2. **比例判据要配绝对下限**：UTF-16 启发式只按「0 字节占比 ≥10%」判，19 字节含 1 个 NUL 的 UTF-8 恰好 1/9 被误判；纯函数样本多 4 个 ASCII 字符侥幸没暴露，真库样本抓到。
+3. **测试样本只覆盖了实现想到的情形**：R4.2 写了「区分扫描件」，首版对所有无正文文件都提示开 OCR，而单测样本恰好只有 PDF ⇒ 全绿；真浏览器上传空白 txt 才看出来。⇒ 用例从需求的每个分支推（扫描件 / 非扫描件），不从实现推。
+4. vitest `beforeEach(() => spy.mockReset())` 表达式体被当 teardown（全仓同类 3 处已修）；渲染上下文外的 `h()` 无 scopeId，通知正文 scoped 样式失效（改内联）。
+5. 环境：Docker 重启后 vpnkit 端口转发陈旧 ⇒ health 503 / 登录 500 而容器本身健康；`auth_service` 对 Redis 不可达无降级。
+6. 自己记的数也要现算：tasks.md 首记「纯函数 35 例」，`--collect-only` 现算为 34。
+
+### 五、待用户拍板
+向量/扩展（`audit-vllm-embed` + pgvector）· 其余 10 组重复路由 · MinerU · 旧 `knowledge_base.py` 与 `KnowledgeBasePanel` 死链 · `auth_service` Redis 降级。
+
+## 2026-10-01 H 循环 capability 正向门打开 + golden 门补齐 10 家 + 修好一条堵了三天的 P0
+
+本轮 4 个 commit：`88397deb5`（golden 门 24→34 家）· `4209a7897`（b60 块注释 P0）·
+`33e2a049b`（H 九条翻门 + 两组产物重算）· `9d9385495`（11 条判据翻面）。
+
+### 一、找到并修掉一条「把整条重算链堵了三天」的 P0
+`GtB60HourBudgetPanel.vue` 的 `<script setup>` 文件头注释里写了 `` `/rows/*/rowUuid` ``，
+其中 `*/` **提前闭合块注释**。esbuild 两版对跑（有区分力）：HEAD 版 exit 1
+（`Expected ";" but found "json_pointer"` at 18:47）· 修复版 exit 0 ⇒ 该底稿面在 HEAD 上
+**编译不过**。连带后果才是大头：discoverer 对它报 `Vue AST parse failed` 后**整个 mount
+discovery [FAIL]** ⇒ `generate_workpaper_sync_manifest.py --check/--apply` 自 2026-09-28
+（`8d7a52059`）起一次都跑不了、manifest 无法回灌，`test_workpaper_sync_manifest_contract.py`
+在 HEAD 上是 **6 errors**（全部 ERROR at setup，同一条 discovery 失败），而 CI 的
+backend-tests 是 `pytest backend/tests/ -x` ⇒ 整个 job 从这里断。
+期间 **16 个 commit / 45 个宿主文件**的接桥改动因此全部灌不进 manifest（累计 171 条 mount 落后）。
+
+### 二、golden 零回归门：24 家 → 34 家
+翻 H capability 的前置第⑤项要「golden digest 覆盖且零漂移」，现算只覆盖 **h9 一家**。
+把台账（51 条 / 48 family）与 `PROVIDERS`（24 家）对一遍 ⇒ **24 个 family 从未进过基线**，
+门对它们恒绿（没有东西可比）。这与 f1 曾被 `[SKIP]` 吞掉是同类不同机制：f1 是「登记了但
+跑挂被跳过」，这些是「**压根没登记**」，连 stderr 都没有一行。
+本批补 10 家：`g7`/`h1`（**已 bidirectional 上线、正在被用户使用却在门外**，pilot_* 命名
+当初按 phase5_* 收录时漏掉）+ H 八家。五元组按 `inspect.signature` 现场 introspect 定。
+`g7` 置 `has_projection=False` 是照脚本文件头自己的处置说明关掉那一段
+（`_synthetic_rows()` 对它直接抛 RuntimeError），代价如实记账：g7 只覆盖 2/3 段。
+自测里写死的 `if p["label"] == "b60"` 改成可伪证的 `_NO_PROJECTION_LABELS` 登记表 +
+与 `PROVIDERS.has_projection` **双向对账**的反向判据。
+
+🔴 基线取自 **HEAD 纯净 worktree**，不是本地脏树：工作树有并发会话未提交的
+`phase5_d3/d4/d567`，在脏树 `--update` 会把 d3 的 `d34~d37-managed` 与 d4 的
+`d44-managed` 写进基线 —— 那是给未入库代码背书，clean checkout / CI 上必打红且无人能解释。
+实测纯净树 198 digest / 34 家 / 零跳过 / 自测 11 passed；主脏树自测 10 passed + 1 failed，
+唯一的红就是 `[d4] sheet[d44-managed]`，归因于并发会话那个 +16 行。
+另记门语义：`_compare` **不比** `contract_payload_sha256`，只比 projection /
+instrumentation / 基线里**已有**的 sheet 粒度 digest（新增 sheet 是 additive）。
+
+### 三、H 九条 capability 翻门（h1 + 本轮九条 = H 十条全在门内）
+六项前置逐条现算 9/9（证据写进每条 override 的 `reason`）；宿主改线另算 9/9，
+反向对照 `GtI1IntangibleAssets.vue` 三项全 0 ⇒ 扫描器有区分力。
+`html_store` 按口径机械推导（`checklist_responses_` + 契约 `review.html_store.item_ids`
+逐个小写、`-`→`_`），已翻 7 家逐条验证符合；**h3/h7 各有两个 item_id**（成本/公允两段）
+⇒ 得到 `checklist_responses_h3_2_cost_rows__h3_2_fair_rows` 这种双段名，全仓首例。
+`approved_source_digest` `b6291b9f…`→`c2d6926a…` 的 mount diff 已**逐文件**归因：
+86 失 / 85 得 共 45 个宿主，`git log -1` 查下来全部落在已入库 commit，零未提交代码参与。
+
+**顺带修好 16 条预存红**（纯净 worktree 串行归因）：S1（仅 b60 修复）18 红 → S2 2 红，
+新引入 0；修好的是 manifest_contract 6 + legacy_baseline 1 + task73_entry_profile 9。
+重做 S2 幂等（digest 两次均 `bbd486f5…`）。
+
+### 四、🔴 本轮最值得记的三条教训
+1. **归因脚本不能与别的探针并发跑同一棵 worktree**。第一版把归因脚本和另一个还在跑的
+   探针并行启动，两者都在同一个 worktree 里 `git checkout`，结果归因脚本保存的「S2 产物」
+   其实是 HEAD 内容 ⇒ 跑出来的「新引入 0」是**拿 HEAD 跟 HEAD 比**，不构成证据。
+   改成单进程串行，并加两条自检断言（「S1 必须只有 h1 一条 bidirectional」「S2' 必须与
+   S2 digest 相同」）—— 判据自己要能发现自己被污染。
+2. **归因的覆盖面本身要先核**。只在 4 个文件上做 S1→S2 得「新引入 0」，换成 broad 子集
+   立刻抓出 **11 条真的新红**（H 的 canary 与 foundation 守卫都在
+   `tests/workpaper_sync/` 下，而那 4 个文件一个都不含）。那 4 个文件不是「抽样」，
+   是**漏掉了判据主场**。
+3. **pytest 的「绿」与「没跑」在摘要里长得一样**。`-k "h_ or manifest or …"` 把
+   `test_hosts_do_not_claim_bidirectional_writeback` 整条过滤掉了（名字里没有任何关键词），
+   于是它在两轮 broad 跑里都显示「S1 绿」；整文件跑才看清它在 S1 **就是红的**。
+   这是「结构性零须配变异证明」的测试选择器版本。
+
+### 五、🔴 如实记账：capability 门开了，但 runtime 注册仍 0/9
+`register_from_manifest()` 真 session 实证：九条 H **注册成功 0/9**。
+`blocked_reason` 已全 `None`（capability 门确实开了），卡在下一环 `_describe_entry_supply`：
+「该 entry 还没有 current published representation（`working_paper_sync_entry_state` 无行）」
+—— 要 `ContentMutationService.commit(...)` 产出首版 content version，属真实录入。
+更要紧的是**已翻门的 5 条（d1/d2/d4/g7/h1）同样注册不上**，报
+`entry_source_fact_unavailable: 挂载组件不唯一 ['GtOnlyOfficeSheet','WorkpaperSyncEditorHost']`
+⇒ 平台级预存缺陷，正是并发会话 spec `sync-editor-host-discovery-contract-closure` 在修的。
+⇒ 四份 H spec 仍 **72/80**，8 条 `[ ]*` 全是外部依赖，但欠账描述已从「BP-1~BP-3 门关着」
+更新为上面这两条更精确的卡点。
+
+接口勘误（三份 lane spec 的 AC 都写错，以现读为准、不回填 AC 正文）：
+`register_from_manifest` 不是自由函数而是 `WorkpaperSyncAdapterRegistry` 的 **async 方法**
+且需 `session=`（生产构造点 `build_production_registry()`）· `frozen_key` / `frozen_reason`
+字段**在实现里不存在**，实际机制是生产者侧 `review.frozen_cross_ref`（h6 的 `H6-2-rows`
+→ 3 个消费方、h9 的 `H9-2-rows` → 2 个消费方）· `forbidden_keys` 两份契约里都没有 ·
+`migrated_entry_ids()` 在 `backend/tests/workpaper_sync/h_migration_progress.py` 而不在 app 下。
+按猜的路径跑前置六项得「0/9」—— **一个全假的红**。
+
+### 六、并发写同一批文件的提交手法
+并发会话在我核验期间重生成了主树 overlay/manifest（entries 138→189、overrides 20→30、
+`approved_source_digest` `c2d6926a…`→`24a1b89a…`）。直接 `git add` 会提交他们**未提交**的
+那一版。故用 `git hash-object -w` + `git update-index --cacheinfo` **只把纯净 worktree 的
+5 件产物放进索引、不动工作树文件**：入库的是自洽快照，他们的工作树原样保留，且他们的重生成
+**已把这 9 条 override 吃进去**（现算 9/9 在册、reason 是本轮写的那段、`review_basis` 的链
+从 `c2d6926a…` 接上去）⇒ 后续他们提交时这 9 条不会丢。
+
+### 七、登记的预存欠账（不属本轮作业面）
+`test_task46_d_cycle_migration.py` 整文件 S1/S2 逐条相同的 **4 条**预存红：
+`test_hosts_do_not_claim_bidirectional_writeback`（`GtD4OperatingRevenue.vue` tooltip 写
+「本表尚未接入双向同步」，守卫禁 `双向同步` 子串而**分不清否定句**，是守卫侧假阳）·
+`test_no_d_entry_has_a_registered_adapter_and_pilot_evidence_exists` ·
+`test_authoritative_templates_digests_recompute` ·
+`test_every_entry_template_ref_is_registered_with_digest`。
+另：`test_workpaper_writer_inventory.py` 2 条（inventory source digest 过期，S1 就红）。
+另：台账 `adapter_registered` 字段**整体滞后** —— 全台账 `True` 只有 4 条（d2/d4/g7/h1），
+而 live manifest 已 bidirectional 18→28 条。平台级字段失修，已做成「登记 flag=True 的
+**集合**（不写条数）+ 双向对账 + flag 不得跑在 manifest 前面」的判据，不照它对齐
+（铁律㉗：对齐缺陷 = 把缺陷正当化）。
+
+## 2026-10-01 — d44-managed golden 红精准收口（用户授权）
+
+前序记录“不在脏树 `--update`”仍是正确历史裁定；本次用户明确要求修复 d44 红后，重新完成五方对账：
+模板 A21 完整 63 字 = `FOOTER_MARKER_D44` = 磁盘 contract marker；引擎 `_find_marker_row` 用
+`text.strip() == marker` 全等；D4-4 真栈 rematerialize 已 31.8s 收敛；契约测试 48 passed。
+
+严禁全量 `--update`：current vs baseline 全字段递归 diff 有 **14** 路径，会旁带 D3 新增
+`d34~d37-managed`、6 家 provider 整体 digest 与 `digest_count 198→202`。本次只更新
+`_sync_provider_golden_digest.json` 的 d4 两项：overall contract `90f9add7…→3121e56a…` +
+`d44-managed` `a367bf8b…→1fa82f83…`。更新后严格 diff 剩 **12** 且 d4 差异为 0；主门
+**202 digest / 34 家 / 零跳过**，自测 **11 passed**。联跑另有 a51 coverage ratchet 1 红，
+是 `sync-editor-host-discovery-contract-closure` 已交棒欠账，与 d44 无关，未借本次基线修复掩盖。
+
+新纪律：**既有 sheet 的行为变更获准后，sheet digest 与 provider overall digest成对更新；但先列出
+全量 `--update` 将改的每个路径，只接受有因果链的字段。**

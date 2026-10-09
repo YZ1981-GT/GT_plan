@@ -3,7 +3,7 @@
 
 覆盖：
 - (a) 更新 parent_company_code 成功 + 字段已变更
-- (b) 自引用（设为自身 company_code）→ 400 拒绝
+- (b) 自引用（设为自身 company_code）→ 200：本企业就是上级企业（口径更正见下）
 - (c) 循环引用（A→B→A）→ 400 拒绝
 - (d) parent 指向不存在的代码 → 允许（脱挂，200）
 - (e) 端点已挂载
@@ -11,6 +11,12 @@
 测试用内存 SQLite + ASGITransport。app_audit_log 是 PG 专用表
 （gen_random_uuid/::jsonb），SQLite 上 INSERT 会失败，但端点 try/except 吞掉，
 故主更新仍返回 200。
+
+口径变更（consol-tree-three-code-autobuild，2026-09-29）：
+- 代码须为合法统一社会信用代码（非法 ⇒ 422），原常量是非法代码，已换为按校验位现算的合法值；
+- 自引用不再 400：需求 1.5 用户更正为「本企业就是上级企业」（顶层企业，不建自环）；
+- ``parent_project_id`` 改为按三码推导的派生值（ADR-CTREE-001）：没有集内上级（清空或脱挂）的企业
+  按最终控制方挂到其合并项目，故 (d) 与「脱挂到顶层」的链接是集团合并项目而不再是 None。
 """
 
 from __future__ import annotations
@@ -38,9 +44,9 @@ test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 
 USER_ID = uuid.uuid4()
 
-ULTIMATE = "91110000000000000U"
-CODE_A = "9111000000000000AA"
-CODE_B = "9111000000000000BB"
+ULTIMATE = "91110000100000000R"
+CODE_A = "911100002000000005"
+CODE_B = "91110000300000000G"
 
 
 class _FakeUser:
@@ -152,7 +158,7 @@ async def test_update_parent_code_success(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_update_parent_code_detach_to_top(db_session: AsyncSession):
-    """空字符串 → 脱挂到顶层（parent_company_code=None, parent_project_id=None）。"""
+    """空字符串 → 脱挂到顶层：parent_company_code=None；链接按最终控制方挂到集团合并项目。"""
     ids = await _seed(db_session)
     app = _make_app(db_session)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
@@ -164,12 +170,12 @@ async def test_update_parent_code_detach_to_top(db_session: AsyncSession):
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["parent_company_code"] is None
-    assert data["parent_project_id"] is None
+    assert data["parent_project_id"] == str(ids[ULTIMATE])
 
 
 @pytest.mark.asyncio
-async def test_self_parent_rejected(db_session: AsyncSession):
-    """(b) 设为自身 company_code → 400。"""
+async def test_self_parent_accepted_as_top(db_session: AsyncSession):
+    """(b) 设为自身 company_code → 200（需求 1.5：本企业就是上级企业，不建自环）。"""
     ids = await _seed(db_session)
     app = _make_app(db_session)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
@@ -178,7 +184,23 @@ async def test_self_parent_rejected(db_session: AsyncSession):
             json={"parent_company_code": CODE_A},
         )
 
-    assert resp.status_code == 400, resp.text
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["parent_company_code"] == CODE_A
+
+
+@pytest.mark.asyncio
+async def test_invalid_uscc_rejected(db_session: AsyncSession):
+    """非法统一社会信用代码 → 422（与建项表单同一规则）。"""
+    ids = await _seed(db_session)
+    app = _make_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        resp = await ac.patch(
+            f"/api/projects/{ids[CODE_B]}/parent-code",
+            json={"parent_company_code": "9111000000000000AA"},
+        )
+
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["detail"].startswith("上级企业代码：")
 
 
 @pytest.mark.asyncio
@@ -202,10 +224,10 @@ async def test_cycle_rejected(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_parent_nonexistent_code_allowed(db_session: AsyncSession):
-    """(d) parent 指向不存在的代码 → 允许（脱挂，200，parent_project_id=None）。"""
+    """(d) parent 指向不存在的代码 → 允许（脱挂，200）；链接按最终控制方挂到集团合并项目。"""
     ids = await _seed(db_session)
     app = _make_app(db_session)
-    ghost_code = "9111000000000000ZZ"  # 不存在
+    ghost_code = "911100005000000007"  # 合法代码，但本年度没有该企业的项目
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         resp = await ac.patch(
             f"/api/projects/{ids[CODE_B]}/parent-code",
@@ -215,8 +237,7 @@ async def test_parent_nonexistent_code_allowed(db_session: AsyncSession):
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["parent_company_code"] == ghost_code
-    # 指向不存在企业 → 脱挂，parent_project_id 置 None
-    assert data["parent_project_id"] is None
+    assert data["parent_project_id"] == str(ids[ULTIMATE])
 
 
 @pytest.mark.asyncio

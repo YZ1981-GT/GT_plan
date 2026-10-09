@@ -440,7 +440,12 @@ class TestTableLevelTotalRowSurvives:
         # 「续：」已由 restricted-assets-note-row-scope-rollout Task 3 正名
         (VARIANT_LISTED, "五、32", "所有权或使用权受到限制的资产（续：上年年末）", "BS-032", "合计"),
         (VARIANT_LISTED, "五、71", "资产负债表中的列报项目和相关信息", "BS-050", "合计"),
-        (VARIANT_SOE, "八、91", "资产负债表中的列报项目和相关信息", "BS-037", "合计"),
+        # 🔴 2026-09-30 勘误：原写 `BS-037`，自 `6dd1002be`（附注 129 行 report_row_code
+        # 纠错）起该参数红。真库 report_config（soe_standalone / soe_consolidated 两侧一致）
+        # BS-050=其他应付款、BS-037=其他非流动资产 ⇒ 改模板是对的、本参数是陈旧期望：
+        # 该表末段 owner 就是「其他应付款」。归因实证：在 `6dd1002be^` 上这 2 个参数绿、
+        # 在 `6dd1002be` 及之后红，与两份附注模板的陈旧覆盖（56acf363d/68d73bd26）无关。
+        (VARIANT_SOE, "八、91", "资产负债表中的列报项目和相关信息", "BS-050", "合计"),
         (VARIANT_SOE, "八、81", "筹资活动产生的各项负债的变动情况", "BS-063", "合计"),
     ]
 

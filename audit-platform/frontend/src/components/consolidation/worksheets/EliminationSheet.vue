@@ -1,276 +1,643 @@
 <template>
-  <div ref="sheetRef" class="ws-sheet" :class="{ 'gt-fullscreen': isFullscreen }">
+  <!--
+    合并抵消分录明细表（spec consol-elimination-single-source-push 任务 10 / 需求 1~2）
+    唯一来源 = elimination_entries：列出本企业树全部未删分录的明细行（含下级合并项目承载的，只读），
+    新增 / 修改与差额节点面板同一表单（ConsolElimEntryForm，归属节点下拉）；按状态提交审批 / 审批 / 驳回 / 撤销审批 / 删除。
+    工作底稿（模拟权益法 / 内部往来 / 内部交易）的计算结果在「待生成」区预演，点「生成草稿分录」才写成草稿；
+    旧版自定义行（consol_worksheet_data['elimination']）只提示与转入，不再参与任何计算。
+  -->
+  <div ref="sheetRef" class="ws-sheet" :class="{ 'gt-fullscreen': isFullscreen }" data-testid="elim-sheet">
     <div class="ws-sheet-header">
       <h3>合并抵消分录明细表</h3>
       <div class="ws-sheet-actions">
-        <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
+        <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏查看'" placement="top">
           <el-button size="small" @click="toggleFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
-        <el-button size="small" @click="$emit('open-formula', 'consol_elimination')">ƒx 公式</el-button>
-        <el-button size="small" @click="exportTemplate">📥 导出模板</el-button>
-        <el-button size="small" @click="exportData">📤 导出数据</el-button>
-        <el-button size="small" @click="fileInputRef?.click()">📤 导入Excel</el-button>
-        <el-button size="small" type="warning" @click="refreshAutoEntries">🔄 刷新</el-button>
-        <el-button size="small" type="primary" @click="addCustomRow">+ 新增行</el-button>
-        <el-button size="small" type="danger" :disabled="!selectedCustomRows.length" @click="batchDeleteCustom">
-          删除{{ selectedCustomRows.length ? `(${selectedCustomRows.length})` : '' }}
-        </el-button>
-        <el-button size="small" @click="$emit('save', allEntries)">💾 保存</el-button>
+        <el-button size="small" @click="emit('open-formula', 'consol_elimination')">ƒx 公式</el-button>
+        <el-button size="small" :disabled="!rows.length" @click="exportSheet">📤 导出</el-button>
+        <el-button size="small" :loading="loading" data-testid="elim-sheet-refresh" @click="reload">🔄 刷新</el-button>
+        <el-button size="small" type="primary" :disabled="!hostedNodes.length" data-testid="elim-sheet-new"
+          @click="openCreate">+ 新增分录</el-button>
       </div>
     </div>
+
+    <el-alert v-if="legacy && legacy.custom_row_count > 0" type="warning" :closable="false" show-icon
+      class="elim-legacy" data-testid="elim-legacy-banner">
+      <template #title>
+        <span>{{ legacy.message }}。</span>
+        <span v-if="legacy.pending > 0">可转为草稿分录（共 {{ legacy.group_count }} 组，按借贷平衡处切分），审批后计入合并数。</span>
+        <span v-else>已全部转为草稿分录。</span>
+        <el-button v-if="legacy.pending > 0" size="small" type="warning" link :loading="converting"
+          data-testid="elim-legacy-convert" @click="convertLegacy">转为草稿分录</el-button>
+        <el-button size="small" link @click="legacyDetailVisible = !legacyDetailVisible">
+          {{ legacyDetailVisible ? '收起明细' : '查看明细' }}
+        </el-button>
+      </template>
+      <ul v-if="legacyDetailVisible" class="elim-legacy-list" data-testid="elim-legacy-list">
+        <li v-for="g in legacy.groups" :key="g.origin_key">
+          <el-tag size="small" :type="actionTagType(g.action)">{{ actionLabel(g.action, !g.entry_id) }}</el-tag>
+          {{ g.description }}（借 {{ fmt(g.debit_total) }} / 贷 {{ fmt(g.credit_total) }}）
+          <span v-for="(r, i) in g.reasons" :key="i" class="elim-reason">{{ r }}</span>
+        </li>
+      </ul>
+    </el-alert>
+
     <div class="ws-tip" v-show="!isFullscreen">
-      <span>统一汇总表：自动拉取的分录（灰色背景）来自
-        <a class="ws-link" @click="$emit('goto-sheet', 'equity_sim')">模拟权益法</a>、
-        <a class="ws-link" @click="$emit('goto-sheet', 'internal_arap')">内部往来</a>、
-        <a class="ws-link" @click="$emit('goto-sheet', 'internal_trade')">内部交易</a>、
-        <a class="ws-link" @click="$emit('goto-sheet', 'internal_cashflow')">内部现金流</a>，
-        <b>不可直接编辑，需到源表修改后点"🔄 刷新"</b>。白色行为自定义分录，可自由编辑增删。
-      </span>
+      <span>分录只有一个来源：这里与企业树「差额节点」面板是同一批分录，<b>审批后才计入合并数</b>，并自动推送到合并试算、合并报表与附注。
+        工作底稿算出的抵销先在下方「待生成」预览，确认后生成草稿分录；来源数据变化后再次生成会更新草稿，已提交审批的不改。</span>
     </div>
 
-    <el-table :data="allEntries" border size="small" class="ws-table"
+    <el-table v-loading="loading" :data="rows" border size="small" class="ws-table" data-testid="elim-sheet-table"
       :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
-      :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 280px)'"
-      :header-cell-style="headerStyle" :cell-style="entryCellStyle"
-      :row-class-name="entryRowClass"
-      @selection-change="onSelChange">
-      <el-table-column type="selection" width="36" fixed align="center" :selectable="(row: any) => row._custom" />
-      <el-table-column type="index" label="序号" width="50" fixed align="center" class-name="ws-col-index" />
-      <el-table-column prop="source" label="来源" width="90" align="center">
+      :max-height="isFullscreen ? 'calc(100vh - 160px)' : 'calc(100vh - 380px)'"
+      :span-method="spanMethod" :row-class-name="rowClass" empty-text="暂无分录">
+      <el-table-column label="编号" width="110" fixed>
         <template #default="{ row }">
-          <el-tag v-if="row.source" :type="(sourceTagType(row.source)) || undefined" size="small" effect="plain">{{ row.source }}</el-tag>
-          <el-tag v-else type="info" size="small" effect="light">自定义</el-tag>
+          <span :data-testid="`elim-row-${row.entry_no}`">{{ row.entry_no }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="direction" label="借贷" width="70" align="center">
+      <el-table-column label="来源" width="96" align="center">
         <template #default="{ row }">
-          <div v-if="row._custom" @click.stop @mousedown.stop>
-            <el-select v-model="row.direction" size="small" style="width:100%">
-              <el-option label="借" value="借" /><el-option label="贷" value="贷" />
-            </el-select>
-          </div>
-          <el-tag v-else :type="row.direction === '借' ? 'danger' : 'success'" size="small" effect="plain">{{ row.direction }}</el-tag>
+          <el-tag size="small" effect="plain" :type="row.origin ? 'success' : 'info'">{{ row.origin_label }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="subject" label="科目" width="180">
+      <el-table-column label="归属节点" min-width="150" show-overflow-tooltip>
         <template #default="{ row }">
-          <div v-if="row._custom" @click.stop @mousedown.stop>
-            <el-tree-select v-model="row.subject" :data="subjectTree" size="small" style="width:100%"
-              placeholder="选择科目" filterable check-strictly :render-after-expand="false"
-              popper-class="ws-subject-popper"
-              :props="{ label: 'label', children: 'children', disabled: 'disabled' }" />
-          </div>
-          <span v-else>{{ row.subject }}</span>
+          <span v-if="row.node_label">{{ row.node_label }}</span>
+          <el-tooltip v-else-if="row.orphan_reason" :content="row.orphan_reason" placement="top">
+            <span class="elim-orphan">未归属</span>
+          </el-tooltip>
+          <span v-else>—</span>
         </template>
       </el-table-column>
-      <el-table-column prop="detail" label="二级明细" width="140">
+      <el-table-column label="类型" width="110">
+        <template #default="{ row }">{{ row.entry_type_label }}</template>
+      </el-table-column>
+      <el-table-column label="科目" min-width="170" show-overflow-tooltip>
         <template #default="{ row }">
-          <el-input v-if="row._custom" v-model="row.detail" size="small" placeholder="明细" />
-          <span v-else>{{ row.detail || '' }}</span>
+          <span v-if="row.account_code">{{ row.account_code }} {{ row.account_name || '' }}</span>
+          <span v-else class="elim-orphan">明细无法识别</span>
         </template>
       </el-table-column>
-      <el-table-column prop="amount" label="金额" width="140" align="right">
+      <el-table-column label="借方" width="130" align="right">
+        <template #default="{ row }"><GtAmountCell :value="row.debit" /></template>
+      </el-table-column>
+      <el-table-column label="贷方" width="130" align="right">
+        <template #default="{ row }"><GtAmountCell :value="row.credit" /></template>
+      </el-table-column>
+      <el-table-column label="说明" min-width="160" show-overflow-tooltip>
+        <template #default="{ row }">{{ row.description || '' }}</template>
+      </el-table-column>
+      <el-table-column label="状态" width="84" align="center">
         <template #default="{ row }">
-          <el-input-number v-if="row._custom" v-model="row.amount" size="small" :precision="2" :controls="false" style="width:100%" />
-          <span v-else class="ws-computed">{{ fmt(row.amount) }}</span>
+          <el-tag size="small" :type="statusTagType(row.review_status)" :data-testid="`elim-sheet-status-${row.entry_no}`">
+            {{ row.review_status_label }}
+          </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="desc" label="说明" min-width="180">
+      <el-table-column label="计入" width="60" align="center">
         <template #default="{ row }">
-          <el-input v-if="row._custom" v-model="row.desc" size="small" placeholder="说明" />
-          <span v-else style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">{{ row.desc || '' }}</span>
+          <span :class="row.counted ? 'elim-counted' : 'elim-not-counted'">{{ row.counted ? '是' : '否' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="200" fixed="right">
+        <template #default="{ row }">
+          <template v-if="row.readonly">
+            <span class="elim-host">由「{{ row.host_project_name || '其他合并项目' }}」承载</span>
+            <el-button size="small" link type="primary" :data-testid="`elim-sheet-goto-${row.entry_no}`"
+              @click="goHost(row)">前往</el-button>
+          </template>
+          <template v-else>
+            <el-button v-if="canEdit(row)" size="small" link type="primary" @click="openEdit(row)">修改</el-button>
+            <el-button v-if="canSubmit(row)" size="small" link type="primary" :data-testid="`elim-sheet-submit-${row.entry_no}`"
+              @click="act(row, 'submit')">提交审批</el-button>
+            <el-button v-if="canApprove(row)" size="small" link type="success" :data-testid="`elim-sheet-approve-${row.entry_no}`"
+              @click="act(row, 'approve')">审批</el-button>
+            <el-button v-if="canApprove(row)" size="small" link type="warning" @click="rejectEntry(row)">驳回</el-button>
+            <el-button v-if="canRevoke(row)" size="small" link type="warning" :data-testid="`elim-sheet-revoke-${row.entry_no}`"
+              @click="revokeEntry(row)">撤销审批</el-button>
+            <el-button v-if="canEdit(row)" size="small" link type="danger" :data-testid="`elim-sheet-delete-${row.entry_no}`"
+              @click="removeEntry(row)">删除</el-button>
+          </template>
         </template>
       </el-table-column>
     </el-table>
 
-    <!-- 借贷平衡校验 -->
-    <div class="ws-balance-check">
-      <span>借方合计: <b class="ws-computed">{{ fmt(totalDebit) }}</b></span>
-      <span style="margin:0 12px">贷方合计: <b class="ws-computed">{{ fmt(totalCredit) }}</b></span>
-      <span :class="elimBalanceDiff !== 0 ? 'ws-diff-warn' : ''" style="font-weight:600">
-        差额: {{ fmt(elimBalanceDiff) }}
-        <span v-if="elimBalanceDiff === 0" style="color: var(--gt-color-success);margin-left:4px">✓ 平衡</span>
-        <span v-else style="color: var(--gt-color-wheat);margin-left:4px">⚠ 不平衡</span>
-      </span>
+    <!-- 合计三行：全部分录 / 已审批 / 实际计入合并数（已审批且归属成功） -->
+    <div class="ws-balance-check" data-testid="elim-sheet-totals">
+      <div v-for="t in totalRows" :key="t.key" class="elim-total-row" :data-testid="`elim-total-${t.key}`">
+        <span class="elim-total-label">{{ t.label }}（{{ t.value.entry_count }} 笔）</span>
+        <span>借方 <b class="ws-computed">{{ fmt(t.value.debit) }}</b></span>
+        <span>贷方 <b class="ws-computed">{{ fmt(t.value.credit) }}</b></span>
+        <span :class="isZeroAmount(t.value.difference) ? '' : 'ws-diff-warn'">
+          差额 {{ fmt(t.value.difference) }}
+          <span v-if="isZeroAmount(t.value.difference)" class="elim-balanced">✓ 平衡</span>
+          <span v-else class="elim-unbalanced">⚠ 不平衡</span>
+        </span>
+      </div>
     </div>
-    <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
+
+    <!-- 待生成：工作底稿计算结果的预演（不写库） -->
+    <div class="ws-section elim-pending" data-testid="elim-pending">
+      <div class="ws-section-title elim-pending-title">
+        <span>待生成（来自
+          <a class="ws-link" @click="emit('goto-sheet', 'equity_sim')">模拟权益法</a>、
+          <a class="ws-link" @click="emit('goto-sheet', 'internal_arap')">内部往来</a>、
+          <a class="ws-link" @click="emit('goto-sheet', 'internal_trade')">内部交易</a>）</span>
+        <span style="flex:1" />
+        <el-button size="small" :loading="previewing" data-testid="elim-pending-preview" @click="preview">重新预览</el-button>
+        <el-button size="small" type="primary" :loading="generating" :disabled="!summary.actionable"
+          data-testid="elim-pending-generate" @click="generate">生成草稿分录</el-button>
+      </div>
+      <p class="elim-pending-summary" data-testid="elim-pending-summary">{{ previewError || summaryText }}</p>
+      <p v-if="missingOriginsText" class="elim-pending-summary elim-warn-text" data-testid="elim-pending-missing">
+        {{ missingOriginsText }}
+      </p>
+      <el-alert v-for="(w, i) in previewWarnings" :key="`w${i}`" type="warning" :closable="false" :title="w"
+        class="elim-pending-warning" />
+      <el-table v-if="pendingRows.length" :data="pendingRows" border size="small" class="ws-table" max-height="320"
+        :span-method="pendingSpan" data-testid="elim-pending-table">
+        <el-table-column label="来源" width="96" align="center">
+          <template #default="{ row }">{{ row.group.origin_label }}</template>
+        </el-table-column>
+        <el-table-column label="说明" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.group.description }}</template>
+        </el-table-column>
+        <el-table-column label="结果" width="130" align="center">
+          <template #default="{ row }">
+            <el-tag size="small" :type="actionTagType(row.group.action)" :data-testid="`elim-pending-action-${row.groupIndex}`">
+              {{ actionLabel(row.group.action, true) }}
+            </el-tag>
+            <div v-if="row.group.entry_no" class="elim-pending-entry">{{ row.group.entry_no }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="来源科目" min-width="150" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.line ? lineLabel(row.line) : '—' }}</template>
+        </el-table-column>
+        <el-table-column label="入账科目" min-width="170">
+          <template #default="{ row }">
+            <template v-if="row.line">
+              <span v-if="row.line.account_code" :class="{ 'elim-warn-text': !row.line.in_report }">
+                {{ row.line.account_code }} {{ row.line.account_name || '' }}
+              </span>
+              <span v-else class="elim-bad-text">未映射</span>
+              <div v-if="row.line.reason" class="elim-bad-text elim-small">{{ row.line.reason }}</div>
+              <div v-else-if="row.line.warning" class="elim-warn-text elim-small">{{ row.line.warning }}</div>
+              <div v-else-if="row.line.note" class="elim-small">{{ row.line.note }}</div>
+            </template>
+          </template>
+        </el-table-column>
+        <el-table-column label="借方" width="120" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.line?.direction === 'debit' ? row.line.amount : null" /></template>
+        </el-table-column>
+        <el-table-column label="贷方" width="120" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.line?.direction === 'credit' ? row.line.amount : null" /></template>
+        </el-table-column>
+        <el-table-column label="原因" min-width="160" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span class="elim-bad-text">{{ groupReasons(row.group).join('；') }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <ul v-if="reviewNotes.length" class="elim-review-notes" data-testid="elim-pending-review-notes">
+        <li v-for="n in reviewNotes" :key="n.entry_id">{{ n.entry_no }}：{{ n.reason }}</li>
+      </ul>
+    </div>
+
+    <ConsolElimEntryForm
+      v-model="formVisible"
+      :project-id="projectId"
+      :year="year"
+      :targets="hostedNodes"
+      :accounts="accounts"
+      :entry="editingEntry"
+      @saved="onSaved"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { confirmBatch } from '@/utils/confirm'
+import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import ConsolElimEntryForm from '@/components/consolidation/ConsolElimEntryForm.vue'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
-import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
-import { useDecimalCalc } from '@/composables/useDecimalCalc'
-import { useConsolSubjectSource } from '../composables/useConsolSubjectSource'
+import { exportData } from '@/composables/useExcelIO'
+import { confirmDangerous, confirmDelete, promptRejectReason } from '@/utils/confirm'
+import {
+  convertLegacyEliminationSheet,
+  deleteElimination,
+  generateEliminationsFromWorksheet,
+  getEliminationTreeLines,
+  getLegacyEliminationSheet,
+  getWorksheetAccounts,
+  reviewElimination,
+  type ConsolAccountOption,
+  type ElimHostedNode,
+  type ElimLineTotals,
+  type ElimTreeLine,
+  type EliminationEntry,
+  type GenerateFromWorksheetResult,
+  type GenerateGroupResult,
+  type GeneratePlannedLine,
+  type LegacySheetResult,
+  type WorksheetOrigin,
+  type WorksheetSourceGroup,
+} from '@/services/consolidationApi'
+import {
+  canApprove,
+  canEdit,
+  canRevoke,
+  canSubmit,
+  statusTagType,
+} from '@/components/consolidation/composables/elimNodePanel'
+import {
+  actionLabel,
+  actionTagType,
+  deletionConfirmText,
+  entryFromLines,
+  entrySpan,
+  EXPORT_COLUMNS,
+  exportRows,
+  generateResultText,
+  groupReasons,
+  linesOfEntry,
+  pendingSummary,
+  pendingSummaryText,
+} from '@/components/consolidation/composables/elimSheet'
+import { WORKSHEET_ORIGINS } from '@/components/consolidation/composables/elimSourceGroups'
 
-interface CompanyCol { name: string; code?: string; ratio: number }
-interface EntryRow {
-  source: string; direction: string; subject: string; detail: string
-  amount: number | null; desc: string; _custom?: boolean
-}
+defineOptions({ name: 'EliminationSheet' })
 
-const props = defineProps<{
-  companies: CompanyCol[]
-  equityRows: any[]; incomeRows: any[]; crossRows: any[]
-  importedEntries?: any[]
-}>()
-
-defineEmits<{
-  (e: 'save', data: EntryRow[]): void
+const props = withDefaults(defineProps<{
+  projectId: string
+  year: number | null
+  /** 工作底稿来源分组（ConsolWorksheetTabs 按模拟权益法 / 内部往来 / 内部交易算出） */
+  sourceGroups?: ReadonlyArray<WorksheetSourceGroup>
+  /**
+   * 本次负责的来源（其数据已知：已保存或本次打开过）。只有这些来源里不再产出的来源键才删除草稿 ——
+   * 某张表的数据本次没加载，就不能当成「它算出来是空的」去删它以前生成的草稿。
+   */
+  sourceOrigins?: ReadonlyArray<WorksheetOrigin>
+}>(), {
+  sourceGroups: () => [],
+  sourceOrigins: () => [...WORKSHEET_ORIGINS],
+})
+const emit = defineEmits<{
   (e: 'open-formula', key: string): void
   (e: 'goto-sheet', key: string): void
+  /** 分录有增删改或状态变化（父组件可据此刷新依赖合并数的视图） */
+  (e: 'changed'): void
 }>()
 
+const router = useRouter()
 const { isFullscreen, toggleFullscreen } = useFullscreen()
 const displayPrefs = useDisplayPrefsStore()
-const fmt = (v: any) => displayPrefs.fmt(v)
+const fmt = (v: unknown) => displayPrefs.fmt(v)
 const sheetRef = ref<HTMLElement | null>(null)
-const fileInputRef = ref<HTMLInputElement | null>(null)
-const selectedCustomRows = ref<EntryRow[]>([])
-const n = (v: any) => Number(v) || 0
-const { sum: decSum, sub: decSub } = useDecimalCalc()
 
-// 科目树形选项（Req 19.1）：名称真源来自 ACNR-backed TB 域（useConsolSubjectSource）。
-// 保留 disabled 父节点分组骨架 + 叶子科目名；registry 空/不可用时自动回退硬编码（Req 19.5）。
-// 叶子 value === 科目名字符串，subject 值契约不变，buildAutoEntries / Excel 逻辑无需改动（Req 19.7）。
-const { subjectTree } = useConsolSubjectSource()
+// ─── 明细行 ──────────────────────────────────────────────────────────────────
+const loading = ref(false)
+const rows = ref<ElimTreeLine[]>([])
+const hostedNodes = ref<ElimHostedNode[]>([])
+const accounts = ref<ConsolAccountOption[]>([])
+const EMPTY_TOTALS: ElimLineTotals = { debit: '0.00', credit: '0.00', difference: '0.00', entry_count: 0 }
+const totals = ref<{ all: ElimLineTotals; approved: ElimLineTotals; counted: ElimLineTotals }>({
+  all: EMPTY_TOTALS, approved: EMPTY_TOTALS, counted: EMPTY_TOTALS,
+})
+const totalRows = computed(() => [
+  { key: 'all', label: '全部分录', value: totals.value.all },
+  { key: 'approved', label: '已审批', value: totals.value.approved },
+  { key: 'counted', label: '计入合并数', value: totals.value.counted },
+])
 
-// ─── 自动拉取的分录（只读） ──────────────────────────────────────────────────
-function buildAutoEntries(): EntryRow[] {
-  const entries: EntryRow[] = []
-  // 权益抵消
-  for (const r of (props.equityRows || [])) {
-    const amt = r.values ? r.values.reduce((s: number, v: any) => s + n(v), 0) : n(r.total)
-    if (amt) entries.push({ source: '权益抵消', direction: r.direction, subject: r.subject, detail: r.detail || '', amount: amt, desc: '' })
-  }
-  // 损益抵消
-  for (const r of (props.incomeRows || [])) {
-    const amt = r.values ? r.values.reduce((s: number, v: any) => s + n(v), 0) : n(r.total)
-    if (amt) entries.push({ source: '损益抵消', direction: r.direction, subject: r.subject, detail: r.detail || '', amount: amt, desc: '' })
-  }
-  // 交叉持股
-  for (const r of (props.crossRows || [])) {
-    if (n(r.total)) entries.push({ source: '交叉持股', direction: r.direction, subject: r.subject, detail: '', amount: n(r.total), desc: '' })
-  }
-  // 内部抵消（从 importedEntries）
-  for (const r of (props.importedEntries || [])) {
-    if (n(r.amount)) entries.push({ source: r.source || '内部抵消', direction: r.direction, subject: r.subject, detail: '', amount: n(r.amount), desc: r.desc || '' })
-  }
-  return entries
+function isZeroAmount(v: string | null | undefined): boolean {
+  return !v || /^-?0+(\.0+)?$/.test(String(v).trim())
 }
 
-const autoEntries = ref<EntryRow[]>(buildAutoEntries())
-
-function refreshAutoEntries() {
-  autoEntries.value = buildAutoEntries()
-  ElMessage.success(`已刷新，共 ${autoEntries.value.length} 条自动分录`)
-}
-
-// 监听 props 变化自动刷新
-watch([() => props.equityRows, () => props.incomeRows, () => props.crossRows, () => props.importedEntries], () => {
-  autoEntries.value = buildAutoEntries()
-}, { deep: true })
-
-// ─── 自定义分录（可编辑） ────────────────────────────────────────────────────
-const customEntries = reactive<EntryRow[]>([])
-
-function addCustomRow() {
-  const nr: EntryRow = { source: '', direction: '借', subject: '', detail: '', amount: null, desc: '', _custom: true }
-  if (selectedCustomRows.value.length > 0) {
-    const last = selectedCustomRows.value[selectedCustomRows.value.length - 1]
-    const idx = customEntries.indexOf(last)
-    if (idx >= 0) { customEntries.splice(idx + 1, 0, nr); return }
-  }
-  customEntries.push(nr)
-}
-
-async function batchDeleteCustom() {
-  if (!selectedCustomRows.value.length) return
+async function loadLines() {
+  if (!props.projectId) return
+  loading.value = true
   try {
-    await confirmBatch('删除', selectedCustomRows.value.length)
-    const del = new Set(selectedCustomRows.value)
-    const remaining = customEntries.filter(r => !del.has(r))
-    customEntries.length = 0; customEntries.push(...remaining)
-    selectedCustomRows.value = []
-  } catch {}
+    const res = await getEliminationTreeLines(props.projectId, props.year)
+    rows.value = res?.rows || []
+    hostedNodes.value = res?.hosted_nodes || []
+    totals.value = res?.totals || { all: EMPTY_TOTALS, approved: EMPTY_TOTALS, counted: EMPTY_TOTALS }
+  } catch {
+    rows.value = []
+    hostedNodes.value = []
+  } finally {
+    loading.value = false
+  }
 }
 
-function onSelChange(sel: any[]) {
-  selectedCustomRows.value = sel.filter((r: EntryRow) => r._custom)
+async function loadAccounts() {
+  try {
+    const res = await getWorksheetAccounts(props.projectId, props.year)
+    accounts.value = res?.accounts || []
+  } catch {
+    accounts.value = []
+  }
 }
 
-// ─── 合并所有分录 ────────────────────────────────────────────────────────────
-const allEntries = computed(() => [...autoEntries.value, ...customEntries])
+async function loadLegacy() {
+  try {
+    legacy.value = await getLegacyEliminationSheet(props.projectId, props.year)
+  } catch {
+    legacy.value = null
+  }
+}
 
-const totalDebit = computed(() => Number(decSum(...allEntries.value.filter(r => r.direction === '借').map(r => String(n(r.amount))))))
-const totalCredit = computed(() => Number(decSum(...allEntries.value.filter(r => r.direction === '贷').map(r => String(n(r.amount))))))
-const elimBalanceDiff = computed(() => Number(decSub(String(totalDebit.value), String(totalCredit.value))))
+async function reload() {
+  await Promise.all([loadLines(), preview(), loadLegacy()])
+}
 
-// ─── 导出/导入 ───────────────────────────────────────────────────────────────
-const { exportTemplate: _exportTemplate, exportData: _exportData, onFileSelected: _onFileSelected } = useExcelIO()
+/** 分录有变化：刷新明细与预演（来源键对应的分录状态变了，预演结果也随之变） */
+async function afterChange() {
+  await Promise.all([loadLines(), preview()])
+  emit('changed')
+}
 
-const ELIM_COLS: ExcelColumn[] = [
-  { key: 'source', header: '来源', width: 10 },
-  { key: 'direction', header: '借贷', width: 8 },
-  { key: 'subject', header: '科目', width: 20 },
-  { key: 'detail', header: '二级明细', width: 16 },
-  { key: 'amount', header: '金额', width: 16 },
-  { key: 'desc', header: '说明', width: 24 },
-]
+function spanMethod({ row, column }: { row: ElimTreeLine; column: { label?: string } }) {
+  // 科目、借方、贷方逐行显示；其余是分录级信息，跨该分录的明细行合并
+  if (['科目', '借方', '贷方'].includes(column.label || '')) return { rowspan: 1, colspan: 1 }
+  return entrySpan(row)
+}
 
-async function exportTemplate() {
-  await _exportTemplate({
-    columns: ELIM_COLS,
-    fileName: '合并抵消分录_模板.xlsx',
-    includeNoteRow: false,
-    existingData: allEntries.value.map(r => [r.source || '自定义', r.direction, r.subject, r.detail, r.amount ?? '', r.desc]),
+function rowClass({ row }: { row: ElimTreeLine }) {
+  if (row.readonly) return 'elim-row-readonly'
+  return row.counted ? '' : 'elim-row-uncounted'
+}
+
+// ─── 新增 / 修改（与差额节点面板同一表单）────────────────────────────────────
+const formVisible = ref(false)
+const editingEntry = ref<EliminationEntry | null>(null)
+let accountsFor = ''
+
+function ensureAccounts() {
+  const scope = `${props.projectId}:${props.year ?? ''}`
+  if (accountsFor === scope) return
+  accountsFor = scope
+  loadAccounts()
+}
+
+function openCreate() {
+  editingEntry.value = null
+  ensureAccounts()
+  formVisible.value = true
+}
+
+function openEdit(row: ElimTreeLine) {
+  editingEntry.value = entryFromLines(linesOfEntry(rows.value, row.entry_id), props.year)
+  ensureAccounts()
+  formVisible.value = true
+}
+
+async function onSaved() {
+  await afterChange()
+}
+
+// ─── 状态操作（规则与差额节点面板一致）──────────────────────────────────────
+async function act(row: ElimTreeLine, action: 'submit' | 'approve') {
+  try {
+    await reviewElimination(row.entry_id, props.projectId, { action })
+    ElMessage.success(action === 'submit' ? '已提交审批' : '已审批，合并试算、报表与附注将自动推送')
+    await afterChange()
+  } catch {
+    /* 由 http 拦截器提示（如归属节点已不在企业树中） */
+  }
+}
+
+async function rejectEntry(row: ElimTreeLine) {
+  let reason = ''
+  try {
+    reason = await promptRejectReason(`分录 ${row.entry_no}`)
+  } catch {
+    return
+  }
+  try {
+    await reviewElimination(row.entry_id, props.projectId, { action: 'reject', rejection_reason: reason || undefined })
+    ElMessage.success('已驳回')
+    await afterChange()
+  } catch {
+    /* 由 http 拦截器提示 */
+  }
+}
+
+async function revokeEntry(row: ElimTreeLine) {
+  try {
+    await confirmDangerous({
+      title: '撤销审批',
+      message: `撤销分录 ${row.entry_no} 的审批？撤销后分录回到草稿，合并试算、报表与附注将重新推送。`,
+      confirmText: '撤销审批',
+    })
+  } catch {
+    return
+  }
+  try {
+    await reviewElimination(row.entry_id, props.projectId, { action: 'revoke' })
+    ElMessage.success('已撤销审批，合并数将自动重算')
+    await afterChange()
+  } catch {
+    /* 由 http 拦截器提示（如合并已锁定） */
+  }
+}
+
+async function removeEntry(row: ElimTreeLine) {
+  try {
+    await confirmDelete(`分录 ${row.entry_no}`)
+  } catch {
+    return
+  }
+  try {
+    await deleteElimination(row.entry_id, props.projectId)
+    ElMessage.success('分录已删除')
+    await afterChange()
+  } catch {
+    /* 由 http 拦截器提示 */
+  }
+}
+
+function goHost(row: ElimTreeLine) {
+  router.push({
+    path: `/projects/${row.host_project_id}/consolidation`,
+    query: props.year ? { year: String(props.year) } : undefined,
   })
 }
 
-async function exportData() {
-  await _exportData({
-    data: allEntries.value.map(r => ({ ...r, source: r.source || '自定义' })),
-    columns: ELIM_COLS,
-    sheetName: '合并抵消分录',
-    fileName: '合并抵消分录_数据.xlsx',
-  })
+// ─── 待生成：预演与生成 ──────────────────────────────────────────────────────
+const previewing = ref(false)
+const generating = ref(false)
+const previewResult = ref<GenerateFromWorksheetResult | null>(null)
+const previewError = ref('')
+const summary = computed(() => pendingSummary(previewResult.value))
+const summaryText = computed(() => pendingSummaryText(summary.value))
+const previewWarnings = computed(() => previewResult.value?.warnings || [])
+const reviewNotes = computed(() => previewResult.value?.changed_after_review || [])
+
+interface PendingRow {
+  group: GenerateGroupResult
+  groupIndex: number
+  line: GeneratePlannedLine | null
+  first: boolean
+  span: number
 }
 
-async function onFileSelected(e: Event) {
-  await _onFileSelected(e, (result) => {
-    let cnt = 0
-    for (const r of result.rows) {
-      if (!r['科目']) continue
-      customEntries.push({
-        source: '', direction: String(r['借贷'] || '借'), subject: String(r['科目'] || ''),
-        detail: String(r['二级明细'] || ''), amount: r['金额'] != null ? Number(r['金额']) : null,
-        desc: String(r['说明'] || ''), _custom: true,
-      })
-      cnt++
+/** 预演结果展开为行（每组的来源行各一行；分组级列跨行合并）；无变化与无金额的组不占行 */
+const pendingRows = computed<PendingRow[]>(() => {
+  const out: PendingRow[] = []
+  ;(previewResult.value?.groups || []).forEach((group, groupIndex) => {
+    if (group.action === 'unchanged' || group.action === 'empty') return
+    const lines = group.lines.length ? group.lines : [null]
+    lines.forEach((line, i) => out.push({ group, groupIndex, line, first: i === 0, span: lines.length }))
+  })
+  return out
+})
+
+const GROUP_COLUMNS = new Set(['来源', '说明', '结果', '原因'])
+
+function pendingSpan({ row, column }: { row: PendingRow; column: { label?: string } }) {
+  if (!GROUP_COLUMNS.has(column.label || '')) return { rowspan: 1, colspan: 1 }
+  return row.first ? { rowspan: row.span, colspan: 1 } : { rowspan: 0, colspan: 0 }
+}
+
+function lineLabel(line: GeneratePlannedLine): string {
+  return line.detail ? `${line.subject}-${line.detail}` : line.subject
+}
+
+const ORIGIN_NAMES: Record<WorksheetOrigin, string> = {
+  ws_equity_sim: '模拟权益法',
+  ws_internal_arap: '内部往来',
+  ws_internal_trade: '内部交易',
+}
+
+/** 本次没纳入的来源（数据未加载）：提示用户，其已生成的草稿本次不动 */
+const missingOriginsText = computed(() => {
+  const names = WORKSHEET_ORIGINS.filter((o) => !props.sourceOrigins.includes(o)).map((o) => ORIGIN_NAMES[o])
+  return names.length
+    ? `${names.join('、')}表尚无已保存的数据，本次不参与生成（其已生成的草稿保持不变）；请先打开该表填写并保存`
+    : ''
+})
+
+function requestBody(dryRun: boolean) {
+  const origins = [...props.sourceOrigins]
+  return {
+    year: props.year as number,
+    groups: props.sourceGroups.filter((g) => origins.includes(g.origin)),
+    // 显式声明负责的来源：其中某张表本次一组都没算出时，它以前生成的草稿也随之删除（需求 2.5）
+    origins,
+    dry_run: dryRun,
+  }
+}
+
+let previewSeq = 0
+
+async function preview() {
+  if (!props.projectId || !props.year) return
+  const seq = ++previewSeq
+  previewing.value = true
+  previewError.value = ''
+  try {
+    const res = await generateEliminationsFromWorksheet(props.projectId, requestBody(true), { silent: true })
+    if (seq === previewSeq) previewResult.value = res
+  } catch (e: any) {
+    if (seq === previewSeq) {
+      previewResult.value = null
+      const status = e?.response?.status
+      const detail = e?.response?.data?.detail
+      const why = typeof detail === 'string' ? detail.trim() : ''
+      previewError.value = status === 403
+        ? '需要本项目的编辑权限才能预览与生成草稿分录'
+        : `预览失败${why ? `：${why}` : ''}，请稍后点「重新预览」`
     }
-    ElMessage.success(`已导入 ${cnt} 条自定义分录`)
-  }, { skipRows: 1 })
+  } finally {
+    if (seq === previewSeq) previewing.value = false
+  }
 }
 
-
-function sourceTagType(source: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
-  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { '权益抵消': '', '损益抵消': 'warning', '交叉持股': 'info', '内部往来': 'success', '内部交易': 'success', '内部现金流': 'success' }
-  return map[source] || 'info'
+async function generate() {
+  if (!props.projectId || !props.year || generating.value) return
+  const dry = previewResult.value
+  if (dry?.deleted_entries?.length) {
+    try {
+      await confirmDangerous({ title: '删除草稿分录', message: deletionConfirmText(dry), confirmText: '确认生成' })
+    } catch {
+      return
+    }
+  }
+  generating.value = true
+  try {
+    const res = await generateEliminationsFromWorksheet(props.projectId, requestBody(false))
+    ElMessage.success(generateResultText(res))
+    await afterChange()
+  } catch {
+    /* 由 http 拦截器提示（409 并发 / 400 请求错误） */
+  } finally {
+    generating.value = false
+  }
 }
 
-const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }
-function entryCellStyle({ row }: any) {
-  const base: any = { padding: '3px 6px', fontSize: '12px' }
-  if (!row._custom) { base.background = '#f9f9f9'; base.color = '#666' }
-  return base
+// 来源数据变化 ⇒ 重新预演（去抖：工作底稿逐格编辑时不逐键请求）
+let previewTimer: ReturnType<typeof setTimeout> | null = null
+watch(() => [props.sourceGroups, props.sourceOrigins], () => {
+  if (previewTimer) clearTimeout(previewTimer)
+  previewTimer = setTimeout(() => { previewTimer = null; preview() }, 600)
+}, { deep: true })
+onBeforeUnmount(() => { if (previewTimer) clearTimeout(previewTimer) })
+
+// ─── 旧版明细表 ──────────────────────────────────────────────────────────────
+const legacy = ref<LegacySheetResult | null>(null)
+const legacyDetailVisible = ref(false)
+const converting = ref(false)
+
+async function convertLegacy() {
+  if (!props.year || converting.value) return
+  try {
+    await confirmDangerous({
+      title: '转为草稿分录',
+      message: `把旧版明细表的 ${legacy.value?.custom_row_count || 0} 条自定义行按借贷平衡处切分转为草稿分录（默认类型「其他调整」，`
+        + '审批前请逐笔确认类型与归属）。转入后旧版数据不再使用，重复点击不会重复转入。',
+      confirmText: '转为草稿分录',
+    })
+  } catch {
+    return
+  }
+  converting.value = true
+  try {
+    const res = await convertLegacyEliminationSheet(props.projectId, props.year)
+    legacy.value = res
+    const blocked = res.blocked?.length || 0
+    ElMessage.success(`已转入 ${res.created} 笔草稿分录${blocked ? `，${blocked} 组不能转入，原因见明细` : ''}`)
+    if (blocked) legacyDetailVisible.value = true
+    await afterChange()
+  } catch {
+    /* 由 http 拦截器提示 */
+  } finally {
+    converting.value = false
+  }
 }
-function entryRowClass({ row }: any) { return row._custom ? '' : 'ws-row-auto' }
 
+// ─── 导出 ────────────────────────────────────────────────────────────────────
+async function exportSheet() {
+  await exportData({
+    data: exportRows(rows.value),
+    columns: EXPORT_COLUMNS.map((c) => ({ ...c })),
+    sheetName: '合并抵消分录',
+    fileName: `合并抵消分录明细_${props.year ?? ''}.xlsx`,
+  })
+}
 
+watch(() => [props.projectId, props.year] as const, ([pid], old) => {
+  if (!pid || (old && old[0] === pid && old[1] === props.year)) return
+  accountsFor = ''
+  reload()
+})
+
+onMounted(reload)
+
+defineExpose({ reload })
 </script>
 
 <style scoped>
@@ -278,52 +645,36 @@ function entryRowClass({ row }: any) { return row._custom ? '' : 'ws-row-auto' }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
 .ws-sheet-header h3 { margin: 0; font-size: var(--gt-font-size-base); color: var(--gt-color-text-primary); }
 .ws-sheet-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: var(--gt-color-bg); border-radius: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); line-height: 1.5; }
+.ws-tip { padding: 6px 10px; margin-bottom: 10px; background: var(--gt-color-bg); border-radius: 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); line-height: 1.5; }
 .ws-tip b { color: var(--gt-color-primary); }
 .ws-link { color: var(--gt-color-primary); cursor: pointer; text-decoration: underline; font-weight: 500; }
-.ws-link:hover { color: var(--gt-color-primary); }
 .ws-computed { color: var(--gt-color-primary); font-weight: 500; }
-.ws-bold { font-weight: 700; }
 .ws-diff-warn { color: var(--gt-color-wheat) !important; font-weight: 700 !important; }
+.ws-section { margin-top: 14px; }
+.ws-section-title { font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-primary); padding: 6px 10px; background: var(--gt-color-primary-bg); border-radius: 4px; }
 .ws-balance-check {
   margin-top: 10px; padding: 8px 14px; background: var(--gt-color-bg); border-radius: 6px;
-  border: 1px solid var(--gt-color-border-light); font-size: var(--gt-font-size-sm); display: flex; align-items: center;
+  border: 1px solid var(--gt-color-border-light); font-size: var(--gt-font-size-sm); display: flex; flex-direction: column; gap: 4px;
 }
-.ws-table :deep(.el-input__inner) { text-align: right; font-size: var(--gt-font-size-xs); }
-.ws-table :deep(.el-table__body .ws-col-index .cell) { white-space: nowrap; }
-.ws-table :deep(.ws-row-auto td) { background: var(--gt-color-bg) !important; }
-</style>
-
-<style>
-/* 科目树形下拉面板样式 */
-.ws-subject-popper {
-  min-width: 240px !important;
-}
-.ws-subject-popper .el-tree-node__content {
-  height: 26px;
-  font-size: var(--gt-font-size-xs);
-}
-.ws-subject-popper .el-tree-node__label {
-  font-size: var(--gt-font-size-xs);
-}
-.ws-subject-popper .el-tree-node__expand-icon {
-  font-size: var(--gt-font-size-xs);
-}
-/* 父节点（disabled）灰色斜体，仅作分类标题 */
-.ws-subject-popper .el-tree-node.is-disabled > .el-tree-node__content {
-  cursor: default;
-  opacity: 1;
-}
-.ws-subject-popper .el-tree-node.is-disabled > .el-tree-node__content .el-tree-node__label {
-  color: var(--gt-color-text-tertiary);
-  font-weight: 600;
-  font-size: var(--gt-font-size-xs);
-}
-/* 叶子节点正常可选 */
-.ws-subject-popper .el-tree-node:not(.is-disabled) > .el-tree-node__content:hover {
-  background: var(--gt-color-primary-bg);
-}
-.ws-subject-popper .el-tree-node:not(.is-disabled) > .el-tree-node__content .el-tree-node__label {
-  color: var(--gt-color-text-primary);
-}
+.elim-total-row { display: flex; gap: 16px; align-items: center; }
+.elim-total-label { min-width: 150px; color: var(--gt-color-text-secondary); }
+.elim-balanced { color: var(--gt-color-success); margin-left: 4px; }
+.elim-unbalanced { color: var(--gt-color-wheat); margin-left: 4px; }
+.elim-legacy { margin-bottom: 10px; }
+.elim-legacy-list { margin: 6px 0 0; padding-left: 18px; font-size: var(--gt-font-size-xs); line-height: 1.8; }
+.elim-reason { margin-left: 6px; color: var(--gt-color-coral, #e6443e); }
+.elim-orphan { color: var(--gt-color-coral, #e6443e); }
+.elim-host { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-right: 4px; }
+.elim-counted { color: var(--gt-color-success); }
+.elim-not-counted { color: var(--gt-color-text-tertiary); }
+.elim-pending-title { display: flex; align-items: center; gap: 6px; }
+.elim-pending-summary { margin: 6px 0; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); }
+.elim-pending-warning { margin-bottom: 4px; }
+.elim-pending-entry { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
+.elim-review-notes { margin: 6px 0 0; padding-left: 18px; font-size: var(--gt-font-size-xs); color: var(--gt-color-wheat); }
+.elim-bad-text { color: var(--gt-color-coral, #e6443e); }
+.elim-warn-text { color: var(--gt-color-wheat); }
+.elim-small { font-size: var(--gt-font-size-xs); line-height: 1.4; }
+.ws-table :deep(.elim-row-readonly td) { background: var(--gt-color-bg) !important; color: var(--gt-color-text-secondary); }
+.ws-table :deep(.elim-row-uncounted td) { color: var(--gt-color-text-secondary); }
 </style>

@@ -33,6 +33,8 @@
             size="small"
             @change="dualMode.switchMode"
           />
+          <!-- BP-7 MC-12: 未接入双向回写的 notice -->
+          <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-m10-other-equity-instruments" />
         </div>
 
         <!-- 结构化视图（HTML sheet 分支） -->
@@ -139,6 +141,7 @@ import { ref, computed, inject, onMounted, onBeforeUnmount, provide, toRef, defi
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useM10EntryDualMode } from './composables/useM10EntryDualMode'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
@@ -205,8 +208,8 @@ const isReadonly = computed(() => !!props.readonly)
  *   调整分录汇总M10-3                      → M10-3             → M10TabAdjustment
  *   负债与权益区分检查表M10-4              → M10-4             → M10TabClassificationCheck（CAS37核心）
  *   其他权益工具检查表M10-5                → M10-5             → M10TabInstrumentCheck
- *   附注披露信息（上市公司）               → disclosure-listed → M10TabDisclosureListed
- *   附注披露信息（国有企业）               → disclosure-soe    → M10TabDisclosureSoe
+ *   附注披露信息核对（上市公司）            → disclosure-listed → M10TabDisclosureListed
+ *   附注披露信息核对（国企）                → disclosure-soe    → M10TabDisclosureSoe
  *   Q10A修订前 / 参考                      → OO fallback       → GtOnlyOfficeSheet
  */
 const currentSheet = computed(() => {
@@ -219,12 +222,9 @@ const currentSheet = computed(() => {
   // 程序表 M10A
   if (name.match(/M10A/) || name.includes('实质性程序表')) return 'procedure'
 
-  // 附注特殊匹配
+  // 附注特殊匹配（🔴 MC-25 修正：M10 真名用「核对」非「披露信息」，国企用「国企」非「国有企业」）
   if (name.includes('上市公司')) return 'disclosure-listed'
-  if (name.includes('国有企业')) return 'disclosure-soe'
-
-  // Q10A修订前 → OO fallback（skip）
-  if (name.includes('修订前') || name.includes('Q10A')) return name
+  if (name.includes('国企')) return 'disclosure-soe'
 
   // 底稿目录（默认）
   if (name.includes('底稿目录') || name === 'M10' || name === '') return 'index'
@@ -312,7 +312,8 @@ onBeforeUnmount(() => {
 
 .mode-toggle-bar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 8px;
 }
 </style>

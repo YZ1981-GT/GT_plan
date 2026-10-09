@@ -171,7 +171,11 @@ export function useN1LossCheck(options: UseN1LossCheckOptions) {
   // ─── State ───────────────────────────────────────────────────────────────
 
   const _rawRows = ref<N1LossRow[]>([])
-  const _leadRows = ref<Record<N1LossLeadKey, N1LossLeadRow>>({ ...DEFAULT_LEAD_ROWS })
+  // 深复制两行，避免任一行编辑污染模块级 DEFAULT_LEAD_ROWS（跨组件实例串数据）
+  const _leadRows = ref<Record<N1LossLeadKey, N1LossLeadRow>>({
+    retainedEarnings: { ...DEFAULT_LEAD_ROWS.retainedEarnings },
+    deductibleLoss: { ...DEFAULT_LEAD_ROWS.deductibleLoss },
+  })
 
   // ─── Hydrate (one-time guard) ──────────────────────────────────────────────
 
@@ -203,9 +207,10 @@ export function useN1LossCheck(options: UseN1LossCheckOptions) {
     if (leadEntry) {
       const parsed = _parseJsonSafe<Record<N1LossLeadKey, N1LossLeadRow>>(leadEntry)
       if (parsed && typeof parsed === 'object') {
+        // 逐字段合并默认值：旧载荷可能只有部分字段，直接采用会让金额计算得到 NaN
         _leadRows.value = {
-          retainedEarnings: parsed.retainedEarnings ?? DEFAULT_LEAD_ROWS.retainedEarnings,
-          deductibleLoss: parsed.deductibleLoss ?? DEFAULT_LEAD_ROWS.deductibleLoss,
+          retainedEarnings: { ...DEFAULT_LEAD_ROWS.retainedEarnings, ...(parsed.retainedEarnings ?? {}) },
+          deductibleLoss: { ...DEFAULT_LEAD_ROWS.deductibleLoss, ...(parsed.deductibleLoss ?? {}) },
         }
       }
     }
@@ -247,15 +252,18 @@ export function useN1LossCheck(options: UseN1LossCheckOptions) {
 
   // ─── Computed: lead rows ───────────────────────────────────────────────────
 
-  const leadRows: ComputedRef<N1LossLeadComputed[]> = computed(() => {
-    const keys: N1LossLeadKey[] = ['retainedEarnings', 'deductibleLoss']
-    return keys.map((key) => {
+  // 🔴 组件按稳定业务键读取 `leadRows.value.retainedEarnings / deductibleLoss`。
+  //    旧实现类型和运行值都是数组，组件读取必得 undefined，N1-5 打开即 ErrorBoundary。
+  const leadRows: ComputedRef<Record<N1LossLeadKey, N1LossLeadComputed>> = computed(() => {
+    const result = {} as Record<N1LossLeadKey, N1LossLeadComputed>
+    for (const key of ['retainedEarnings', 'deductibleLoss'] as const) {
       const r = _leadRows.value[key]
-      return {
+      result[key] = {
         ...r,
         auditedAmount: _round2(r.bookAmount + r.auditAdjustment),
       }
-    })
+    }
+    return result
   })
 
   // ─── Computed: totals ──────────────────────────────────────────────────────

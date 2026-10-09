@@ -222,7 +222,7 @@
  * 功能：
  * - 26列拆为3区段Tab切换：基础(6列)|分析(5列)|检查(7列)
  * - 动态行（max 200）+ 按来源分行
- * - 行级OCR（📎列 POST /d4/contract-ocr → ElMessageBox确认 → merge）
+ * - 行级OCR（📎列 POST /api/workpapers/{wpId}/d4/contract-ocr → ElMessageBox确认 → merge）
  * - GtIndexChip跨底稿引用（K12-1 / K12-4）
  * - 合计行（show-summary）
  */
@@ -403,7 +403,7 @@ async function handleAiAssist(): Promise<void> {
   }
 }
 
-// ─── 行级OCR（📎附件列 → POST /d4/contract-ocr → ElMessageBox确认 → merge） ─
+// ─── 行级OCR（📎附件列 → POST /api/workpapers/{wpId}/d4/contract-ocr → ElMessageBox确认 → merge） ─
 
 const ocrFileInput = ref<HTMLInputElement | null>(null)
 let currentOcrRowKey = ''
@@ -424,7 +424,7 @@ async function handleOcrFileSelected(event: Event): Promise<void> {
     formData.append('file', file)
 
     ElMessage.info('正在OCR识别...')
-    const res = await http.post('/api/d4/contract-ocr', formData, {
+    const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     const ocrData = res.data?.data || res.data || {}

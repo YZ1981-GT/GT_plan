@@ -661,12 +661,12 @@
       </ol>
     </details>
 
-    <el-dialog v-model="showSamplingDialog" title="抽凭引擎（科目 1701 增加）" width="720px" destroy-on-close>
+    <el-dialog v-model="showSamplingDialog" title="抽凭引擎（科目 ${samplingAccountCode} 增加）" width="720px" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && wpId && projectId"
         :project-id="projectId"
         :workpaper-id="wpId"
-        account-code="1701"
+        :account-code="samplingAccountCode"
         phase="final"
         :year="year ?? new Date().getFullYear()"
         @filled="onSampleFilled"
@@ -696,6 +696,17 @@ import { isI1VatMismatch } from '../../composables/i1AdditionCheckModel'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import http from '@/utils/http'
+
+/**
+ * 抽凭科目码取自单一真源 `i1AccountScope`（I1 无形资产）。原为模板内字面量；
+ * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
+ * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ */
+import { i1GrossQueryCodes } from '../../composables/i1AccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = i1GrossQueryCodes().join(',')
 
 /** 是/否/不适用 下拉（内联小组件） */
 const YnSelect = defineComponent({

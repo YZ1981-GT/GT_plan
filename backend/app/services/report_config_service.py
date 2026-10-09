@@ -138,6 +138,9 @@ class ReportConfigService:
                     formula_category=row.get("formula_category"),
                     formula_description=row.get("formula_description"),
                     formula_source=row.get("formula_source"),
+                    # V179: 调整列公式
+                    aje_formula=row.get("aje_formula"),
+                    rje_formula=row.get("rje_formula"),
                     applicable_standard=standard,
                     is_total_row=row.get("is_total_row", False),
                     parent_row_code=row.get("parent_row_code"),
@@ -236,6 +239,9 @@ class ReportConfigService:
                 formula_category=src.formula_category,
                 formula_description=src.formula_description,
                 formula_source=src.formula_source,
+                # V179: 调整列公式同步克隆
+                aje_formula=src.aje_formula,
+                rje_formula=src.rje_formula,
                 applicable_standard=project_standard,
                 is_total_row=src.is_total_row,
                 parent_row_code=src.parent_row_code,
@@ -371,6 +377,8 @@ class ReportConfigService:
                     hit.formula_category = src.formula_category
                     hit.formula_description = src.formula_description
                     hit.formula_source = src.formula_source
+                    hit.aje_formula = src.aje_formula
+                    hit.rje_formula = src.rje_formula
                     updated += 1
                 else:
                     skipped += 1
@@ -386,6 +394,8 @@ class ReportConfigService:
                     formula_category=src.formula_category,
                     formula_description=src.formula_description,
                     formula_source=src.formula_source,
+                    aje_formula=src.aje_formula,
+                    rje_formula=src.rje_formula,
                     applicable_standard=project_standard,
                     is_total_row=src.is_total_row,
                     parent_row_code=src.parent_row_code,
@@ -419,7 +429,7 @@ class ReportConfigService:
 
         # 记录变更前的值（审计留痕）
         old_values = {}
-        allowed_fields = {"row_name", "indent_level", "formula", "is_total_row", "parent_row_code", "formula_category", "formula_description", "formula_source"}
+        allowed_fields = {"row_name", "indent_level", "formula", "is_total_row", "parent_row_code", "formula_category", "formula_description", "formula_source", "aje_formula", "rje_formula"}
         for key, value in updates.items():
             if key in allowed_fields:
                 old_values[key] = getattr(row, key, None)
@@ -461,6 +471,9 @@ class ReportConfigService:
                 from app.models.audit_platform_schemas import EventPayload, EventType
                 from app.services.event_bus import event_bus
 
+                # project_id 是占位（主模板无项目维度），真正的作用对象由 handler 按
+                # extra.standard/report_type/row_code 反查克隆项目。该事件类型不在
+                # EventBus 的年度补齐范围内（YEAR_SCOPED_EVENT_TYPES），占位 id 不会被当项目查年度。
                 await event_bus.publish(EventPayload(
                     event_type=EventType.REPORT_CONFIG_MASTER_UPDATED,
                     project_id=user_id or config_id,  # fallback: config_id as UUID placeholder
@@ -757,6 +770,8 @@ class ReportConfigService:
                     row_name=master_row.row_name,
                     indent_level=master_row.indent_level,
                     formula=master_row.formula,
+                    aje_formula=master_row.aje_formula,
+                    rje_formula=master_row.rje_formula,
                     applicable_standard=project_standard,
                     is_total_row=master_row.is_total_row,
                     parent_row_code=master_row.parent_row_code,
@@ -775,6 +790,8 @@ class ReportConfigService:
                 if not keep_local or proj_row.formula == master_row.formula:
                     # 非本地覆盖 或 公式相同（可能其他字段变了）→ 同步
                     proj_row.formula = master_row.formula
+                    proj_row.aje_formula = master_row.aje_formula
+                    proj_row.rje_formula = master_row.rje_formula
                     proj_row.row_name = master_row.row_name
                     proj_row.indent_level = master_row.indent_level
                     proj_row.is_total_row = master_row.is_total_row

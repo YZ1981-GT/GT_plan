@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import select
 from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -26,6 +27,7 @@ from app.models.audit_platform_models import (
     MappingType,
     ReviewStatus,
     TbBalance,
+    TbPublishAck,
     TrialBalance,
 )
 from app.models.audit_platform_schemas import (
@@ -35,6 +37,7 @@ from app.models.audit_platform_schemas import (
     EventPayload,
     EventType,
 )
+from app.schemas.consol_context import ConsolContext
 from app.models.core import Project, ProjectStatus, ProjectType
 from app.services.event_bus import EventBus
 from app.services.trial_balance_service import TrialBalanceService
@@ -293,6 +296,202 @@ class TestEventBus:
         merged_payload = handler.await_args.args[0]
         assert merged_payload.year == 2025
         assert merged_payload.account_codes == ["1001", "6001"]
+
+    @pytest.mark.asyncio
+    async def test_debounce_keeps_different_workpapers_separate(self):
+        """防抖窗口内不同 wp_id 必须分别派发。"""
+        bus = EventBus(debounce_ms=50)
+        handler = AsyncMock()
+        bus.subscribe(EventType.WORKPAPER_SAVED, handler)
+        project_id = uuid.uuid4()
+
+        for wp_id, wp_code in ((uuid.uuid4(), "K1-1"), (uuid.uuid4(), "E1-1")):
+            await bus.publish(EventPayload(
+                event_type=EventType.WORKPAPER_SAVED,
+                project_id=project_id,
+                year=2025,
+                extra={"wp_id": str(wp_id), "wp_code": wp_code},
+            ))
+
+        await asyncio.sleep(0.12)
+        assert handler.await_count == 2
+        dispatched = {call.args[0].extra["wp_id"]: call.args[0].extra["wp_code"] for call in handler.await_args_list}
+        assert len(dispatched) == 2
+        assert set(dispatched.values()) == {"K1-1", "E1-1"}
+
+    @pytest.mark.asyncio
+    async def test_debounce_merges_same_workpaper_and_preserves_account_codes(self):
+        """同一 wp_id 的重复保存仍合并，account_codes 仍稳定并集。"""
+        bus = EventBus(debounce_ms=50)
+        handler = AsyncMock()
+        bus.subscribe(EventType.WORKPAPER_SAVED, handler)
+        project_id = uuid.uuid4()
+        wp_id = str(uuid.uuid4())
+
+        await bus.publish(EventPayload(
+            event_type=EventType.WORKPAPER_SAVED,
+            project_id=project_id,
+            year=2025,
+            account_codes=["1001"],
+            extra={"wp_id": wp_id, "wp_code": "K1-1", "revision": 1},
+        ))
+        await bus.publish(EventPayload(
+            event_type=EventType.WORKPAPER_SAVED,
+            project_id=project_id,
+            year=2025,
+            account_codes=["6001", "1001"],
+            extra={"wp_id": wp_id, "wp_code": "K1-1", "revision": 2},
+        ))
+
+        await asyncio.sleep(0.12)
+        handler.assert_awaited_once()
+        merged = handler.await_args.args[0]
+        assert merged.extra["revision"] == 2
+        assert merged.account_codes == ["1001", "6001"]
+
+    @pytest.mark.asyncio
+    async def test_debounce_keeps_distinct_publish_tokens_separate(self):
+        """两个发布 token 不因缺少 wp_id 而共享防抖 bucket。"""
+        bus = EventBus(debounce_ms=50)
+        handler = AsyncMock()
+        bus.subscribe(EventType.WORKPAPER_SAVED, handler)
+        project_id = uuid.uuid4()
+
+        for token in ("publish-a", "publish-b"):
+            await bus.publish(EventPayload(
+                event_type=EventType.WORKPAPER_SAVED,
+                project_id=project_id,
+                year=2025,
+                extra={"publish_token": token, "publish_confirmed": True},
+            ))
+
+        await asyncio.sleep(0.12)
+        assert handler.await_count == 2
+        assert {call.args[0].extra["publish_token"] for call in handler.await_args_list} == {
+            "publish-a", "publish-b",
+        }
+
+    @pytest.mark.asyncio
+    async def test_debounce_merges_repeated_same_publish_token(self):
+        """同一发布确认 token 重复提交仍合并。"""
+        bus = EventBus(debounce_ms=50)
+        handler = AsyncMock()
+        bus.subscribe(EventType.WORKPAPER_SAVED, handler)
+        project_id = uuid.uuid4()
+
+        for audited_amount in (100, 200):
+            await bus.publish(EventPayload(
+                event_type=EventType.WORKPAPER_SAVED,
+                project_id=project_id,
+                year=2025,
+                extra={
+                    "publish_token": "publish-same",
+                    "publish_confirmed": True,
+                    "parsed_data": {"rows": [{"account_code": "1001", "audited_amount": audited_amount}]},
+                },
+            ))
+
+        await asyncio.sleep(0.12)
+        handler.assert_awaited_once()
+        merged = handler.await_args.args[0]
+        assert merged.extra["parsed_data"]["rows"][0]["audited_amount"] == 200
+
+    @pytest.mark.asyncio
+    async def test_debounce_keeps_distinct_assigned_workpapers_separate(self):
+        """批量委派里的不同 wp_id 应各自派发，避免只处理最后一张。"""
+        bus = EventBus(debounce_ms=50)
+        handler = AsyncMock()
+        bus.subscribe(EventType.WORKPAPER_ASSIGNED, handler)
+        project_id = uuid.uuid4()
+        wp_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
+
+        for wp_id in wp_ids:
+            await bus.publish(EventPayload(
+                event_type=EventType.WORKPAPER_ASSIGNED,
+                project_id=project_id,
+                extra={"wp_id": wp_id, "assigned_to": str(FAKE_USER_ID)},
+            ))
+
+        await asyncio.sleep(0.12)
+        assert handler.await_count == 2
+        assert {call.args[0].extra["wp_id"] for call in handler.await_args_list} == set(wp_ids)
+
+    @pytest.mark.asyncio
+    async def test_publish_confirmation_survives_following_workpaper_save(
+        self, db_session: AsyncSession, seeded_db: uuid.UUID, caplog,
+    ):
+        """发布确认后 50ms 的普通保存必须各自派发，确认 handler 落 TB 并写真实 ACK。"""
+        import sqlalchemy as sa
+
+        from app.services import event_handlers_cycle_linkage as linkage
+
+        project_id = seeded_db
+        confirmed_by = FAKE_USER_ID
+        wp_id = str(uuid.uuid4())
+        token = f"event-bus-confirm-{uuid.uuid4()}"
+        existing_tb = await db_session.scalar(select(TrialBalance).where(
+            TrialBalance.project_id == project_id,
+            TrialBalance.year == 2025,
+            TrialBalance.standard_account_code == "1001",
+        ))
+        assert existing_tb is not None
+        existing_tb.audited_amount = Decimal("80")
+        await db_session.flush()
+
+        test_factory = async_sessionmaker(
+            test_engine, class_=AsyncSession, expire_on_commit=False,
+        )
+        original_factory = linkage.async_session_factory
+        original_permission_check = linkage._publisher_can_publish
+        linkage.async_session_factory = test_factory
+
+        async def allow_publish(_session, _confirmed_by):
+            return True
+
+        linkage._publisher_can_publish = allow_publish
+        bus = EventBus(debounce_ms=100)
+        bus.subscribe(EventType.WORKPAPER_SAVED, linkage._on_d_audit_determination_saved)
+        dispatched = AsyncMock()
+        bus.subscribe(EventType.WORKPAPER_SAVED, dispatched)
+        original_publish_immediate = linkage.event_bus.publish_immediate
+
+        async def no_downstream(_payload):
+            return None
+
+        linkage.event_bus.publish_immediate = no_downstream
+        try:
+            await bus.publish(EventPayload(
+                event_type=EventType.WORKPAPER_SAVED,
+                project_id=project_id,
+                year=2025,
+                extra={
+                    "wp_code": "D2-1",
+                    "publish_confirmed": True,
+                    "confirmed_by": str(confirmed_by),
+                    "publish_token": token,
+                    "parsed_data": {"rows": [{"account_code": "1001", "audited_amount": 125}]},
+                },
+            ))
+            await asyncio.sleep(0.05)
+            await bus.publish(EventPayload(
+                event_type=EventType.WORKPAPER_SAVED,
+                project_id=project_id,
+                year=2025,
+                extra={"wp_id": wp_id, "wp_code": "D2-1", "trigger": "checklist_save"},
+            ))
+            await asyncio.sleep(0.22)
+        finally:
+            linkage.async_session_factory = original_factory
+            linkage._publisher_can_publish = original_permission_check
+            linkage.event_bus.publish_immediate = original_publish_immediate
+
+        assert dispatched.await_count == 2
+        await db_session.refresh(existing_tb)
+        assert existing_tb.audited_amount == Decimal("125.00")
+        ack = await db_session.scalar(sa.select(TbPublishAck).where(TbPublishAck.publish_token == token))
+        assert ack is not None
+        assert ack.accounts_updated == 1
+        assert "[D→TB] Failed to publish audited_amount" not in caplog.text
 
     @pytest.mark.asyncio
     async def test_debounce_does_not_merge_cross_year_events(self):
@@ -606,3 +805,175 @@ class TestAdjustmentServiceEventPublishing:
         assert len(published_events) == 1
         evt = published_events[0]
         assert evt.event_type == EventType.ADJUSTMENT_DELETED
+
+    @pytest.mark.asyncio
+    async def test_debounce_keeps_distinct_entry_groups_separate(self):
+        """同项目同年度同事件的不同调整组必须分别派发。"""
+        bus = EventBus(debounce_ms=50)
+        handler = AsyncMock()
+        bus.subscribe(EventType.ADJUSTMENT_APPROVED, handler)
+        project_id = uuid.uuid4()
+        groups = [uuid.uuid4(), uuid.uuid4()]
+
+        for group_id in groups:
+            await bus.publish(EventPayload(
+                event_type=EventType.ADJUSTMENT_APPROVED,
+                project_id=project_id,
+                year=2025,
+                entry_group_id=group_id,
+            ))
+
+        await asyncio.sleep(0.12)
+        assert handler.await_count == 2
+        assert {call.args[0].entry_group_id for call in handler.await_args_list} == set(groups)
+
+    @pytest.mark.asyncio
+    async def test_debounce_merges_same_entry_group(self):
+        """同一调整组仍合并，并保留 account_codes 的稳定并集。"""
+        bus = EventBus(debounce_ms=50)
+        handler = AsyncMock()
+        bus.subscribe(EventType.ADJUSTMENT_APPROVED, handler)
+        project_id = uuid.uuid4()
+        group_id = uuid.uuid4()
+
+        await bus.publish(EventPayload(
+            event_type=EventType.ADJUSTMENT_APPROVED,
+            project_id=project_id,
+            year=2025,
+            account_codes=["1001"],
+            entry_group_id=group_id,
+        ))
+        await bus.publish(EventPayload(
+            event_type=EventType.ADJUSTMENT_APPROVED,
+            project_id=project_id,
+            year=2025,
+            account_codes=["6001", "1001"],
+            entry_group_id=group_id,
+        ))
+
+        await asyncio.sleep(0.12)
+        handler.assert_awaited_once()
+        merged = handler.await_args.args[0]
+        assert merged.entry_group_id == group_id
+        assert merged.account_codes == ["1001", "6001"]
+
+    def test_entry_group_identity_prefers_top_level_and_supports_legacy_extra(self):
+        """顶层 entry_group_id 优先，旧 extra 位置仍能构成同一身份。"""
+        bus = EventBus(debounce_ms=0)
+        project_id = uuid.uuid4()
+        top_group = uuid.uuid4()
+        extra_group = uuid.uuid4()
+
+        top = EventPayload(
+            event_type=EventType.ADJUSTMENT_APPROVED,
+            project_id=project_id,
+            year=2025,
+            entry_group_id=top_group,
+            extra={"entry_group_id": str(extra_group)},
+        )
+        top_without_extra = EventPayload(
+            event_type=EventType.ADJUSTMENT_APPROVED,
+            project_id=project_id,
+            year=2025,
+            entry_group_id=top_group,
+        )
+        legacy = EventPayload(
+            event_type=EventType.ADJUSTMENT_APPROVED,
+            project_id=project_id,
+            year=2025,
+            extra={"entry_group_id": str(extra_group)},
+        )
+        assert bus._build_dedup_key(top) == bus._build_dedup_key(top_without_extra)
+        assert bus._build_dedup_key(top) != bus._build_dedup_key(legacy)
+
+    def test_missing_or_blank_entry_group_does_not_change_legacy_key(self):
+        """缺失、None 和空白调整组不应制造共享的 None 身份。"""
+        bus = EventBus(debounce_ms=0)
+        project_id = uuid.uuid4()
+        base = EventPayload(
+            event_type=EventType.ADJUSTMENT_APPROVED,
+            project_id=project_id,
+            year=2025,
+        )
+        blank = EventPayload(
+            event_type=EventType.ADJUSTMENT_APPROVED,
+            project_id=project_id,
+            year=2025,
+            entry_group_id=None,
+            extra={"entry_group_id": "   "},
+        )
+        assert bus._build_dedup_key(base) == bus._build_dedup_key(blank)
+
+    def test_consol_context_changes_dedup_key_but_random_run_ids_do_not(self):
+        """合并上下文的业务身份分桶，随机运行 ID 不影响同身份合并。"""
+        bus = EventBus(debounce_ms=0)
+        project_id = uuid.uuid4()
+        base = dict(
+            event_type=EventType.TRIAL_BALANCE_UPDATED,
+            project_id=project_id,
+            year=2025,
+        )
+        first = EventPayload(
+            **base,
+            context=ConsolContext(
+                project_id=project_id,
+                year=2025,
+                node_key="G:consol",
+                tree_fingerprint="tree-1",
+                source_version="source-1",
+                formula_version="formula-1",
+                template_version="template-1",
+            ),
+        )
+        same_identity = EventPayload(
+            **base,
+            context=ConsolContext(
+                project_id=project_id,
+                year=2025,
+                node_key="G:consol",
+                tree_fingerprint="tree-1",
+                source_version="source-1",
+                formula_version="formula-1",
+                template_version="template-1",
+            ),
+        )
+        changed_node = EventPayload(
+            **base,
+            context=first.context.with_resolution(node_key="G:consol_elim"),
+        )
+        changed_source = EventPayload(
+            **base,
+            context=first.context.with_resolution(source_version="source-2"),
+        )
+
+        assert bus._build_dedup_key(first) == bus._build_dedup_key(same_identity)
+        assert bus._build_dedup_key(first) != bus._build_dedup_key(changed_node)
+        assert bus._build_dedup_key(first) != bus._build_dedup_key(changed_source)
+
+    @pytest.mark.asyncio
+    async def test_debounce_keeps_distinct_consol_contexts_separate(self):
+        """同项目同年度事件的不同 node_key 必须分别派发。"""
+        bus = EventBus(debounce_ms=50)
+        handler = AsyncMock()
+        bus.subscribe(EventType.TRIAL_BALANCE_UPDATED, handler)
+        project_id = uuid.uuid4()
+
+        for node_key in ("G:consol", "G:consol_elim"):
+            await bus.publish(EventPayload(
+                event_type=EventType.TRIAL_BALANCE_UPDATED,
+                project_id=project_id,
+                year=2025,
+                context=ConsolContext(
+                    project_id=project_id,
+                    year=2025,
+                    node_key=node_key,
+                    tree_fingerprint="tree-1",
+                    source_version="source-1",
+                ),
+            ))
+
+        await asyncio.sleep(0.12)
+        assert handler.await_count == 2
+        assert {call.args[0].context.node_key for call in handler.await_args_list} == {
+            "G:consol", "G:consol_elim",
+        }

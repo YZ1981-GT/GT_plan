@@ -161,7 +161,7 @@
           title="说明"
           type="info"
           :closable="false"
-          description="将只结转未解决的事项（状态不为"已解决"）"
+          description="将只结转未解决的事项（状态不为「已解决」）"
           show-icon
         />
       </el-form>

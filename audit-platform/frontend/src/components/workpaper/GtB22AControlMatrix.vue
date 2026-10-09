@@ -50,6 +50,10 @@ import B22AControlItemDialog from './B22AControlItemDialog.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 import GtReviewTrigger from './GtReviewTrigger.vue'
 import { useWorkpaperEntryDualMode } from './composables/useWorkpaperEntryDualMode'
+// B22A canary 双向回写（spec: b-cycle-sync-foundation-and-first-canary Task 19）
+import { useB22ASyncMode, B22A_SYNC_ENTRY_ID } from './composables/useB22ASyncMode'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import {
   ELEMENT_REFERENCES,
@@ -474,20 +478,65 @@ const {
 
 const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = useWorkpaperVersionToolbar(wpIdRef)
 
-// ─── 双模式（HTML ↔ OnlyOffice，参照 D4 7月10日范式：健康检查拉取成功才允许切 OO）───
+// ─── 双模式（B22A canary 真双向，spec: b-cycle-sync-foundation-and-first-canary Task 19）───
+// 🔴 从 legacy useWorkpaperEntryDualMode 迁移到 useB22ASyncMode（仿 D4 useD4SyncMode 范式）
+const b22aSync = useB22ASyncMode({
+  wpId: wpIdRef,
+  projectId: toRef(props, 'projectId'),
+  isReadonly: externalReadonly,
+  flushHtml: async () => {
+    // flush 所有 pending debounce saves
+    // 返回空 projection（后端 adapter 从 checklist_responses 读取）
+    return { expectedRevision: 0, projection: null, sheetKey: 'b22a-managed' }
+  },
+  reloadHtml: async (_minimumRevision: number) => {
+    await loadAll()
+    initialize()
+  },
+})
+
+// 保留 legacy dualMode 用于过渡（capability 为 single_onlyoffice 时仍走旧路径）
 const dualMode = useWorkpaperEntryDualMode({
   reloadAllResponses: async () => { await loadAll(); initialize() },
   resolveOoSheetName: () => props.wpCode || 'B22A',
 })
+
+// 统一 renderMode：capability 已升级为 bidirectional 时用 sync bridge，否则走 legacy
+const isSyncEnabled = computed(() => b22aSync.syncBridge.mode.value !== undefined && b22aSync.descriptor.value !== null)
 const renderMode = computed({
-  get: () => dualMode.mode.value,
-  set: (v: string) => { void dualMode.switchMode(v as 'html' | 'onlyoffice') },
+  get: () => {
+    if (isSyncEnabled.value) {
+      return b22aSync.syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html'
+    }
+    return dualMode.mode.value
+  },
+  set: (v: string) => {
+    if (isSyncEnabled.value) {
+      void b22aSync.switchMode(v === 'onlyoffice' ? '在线编辑' : '结构化视图')
+    } else {
+      void dualMode.switchMode(v as 'html' | 'onlyoffice')
+    }
+  },
 })
 const renderModeOptions = computed(() => [
   { label: '结构化视图', value: 'html' as const },
-  { label: '在线编辑(OnlyOffice)', value: 'onlyoffice' as const, disabled: !dualMode.ooAvailable.value },
+  {
+    label: '在线编辑',
+    value: 'onlyoffice' as const,
+    disabled: isSyncEnabled.value
+      ? b22aSync.busy.value || externalReadonly.value
+      : !dualMode.ooAvailable.value,
+  },
 ])
-function onOoFallback(): void { void dualMode.switchMode('html') }
+const syncOoDescriptor = computed(() => b22aSync.descriptor.value)
+const syncBusy = computed(() => b22aSync.busy.value)
+function onOoFallback(): void {
+  if (isSyncEnabled.value) {
+    void b22aSync.switchMode('结构化视图')
+  } else {
+    void dualMode.switchMode('html')
+  }
+}
 
 // ─── 复核对话蓝/红点（供后代 GtReviewTrigger inject；openReviewDialog 由 GtWpRenderer 运行时边界提供）───
 const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef as any)
@@ -843,17 +892,29 @@ watch(deficiencyList, () => {
     <!-- 版本历史 -->
     <GtWpVersionTrail ref="versionTrailRef" :wp-id="wpId" />
 
-    <!-- 双模式工具栏（参照 D4：健康检查拉取成功才允许切 OnlyOffice） -->
+    <!-- 双模式工具栏（B22A canary 真双向 + legacy 降级） -->
     <div class="b22-mode-toolbar">
-      <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
-      <el-tag v-if="dualMode.checking.value" size="small" type="info">OnlyOffice 检测中…</el-tag>
-      <el-tag v-else-if="dualMode.ooAvailable.value" size="small" type="success">OnlyOffice 就绪（拉取成功）</el-tag>
-      <el-tag v-else size="small" type="warning">OnlyOffice 不可用（健康检查未通过）</el-tag>
+      <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" :disabled="syncBusy" />
+      <GtEntrySyncCapabilityNotice :entry-id="B22A_SYNC_ENTRY_ID" />
+      <template v-if="!isSyncEnabled">
+        <el-tag v-if="dualMode.checking.value" size="small" type="info">OnlyOffice 检测中…</el-tag>
+        <el-tag v-else-if="dualMode.ooAvailable.value" size="small" type="success">OnlyOffice 就绪</el-tag>
+        <el-tag v-else size="small" type="warning">OnlyOffice 不可用</el-tag>
+      </template>
     </div>
 
-    <!-- OnlyOffice 整册视图 -->
+    <!-- B22A canary：sync bridge 驱动的 OO 编辑器（真双向） -->
+    <div v-if="renderMode === 'onlyoffice' && isSyncEnabled" class="oo-container">
+      <WorkpaperSyncEditorHost
+        ref="b22aSyncHostRef"
+        :descriptor="syncOoDescriptor"
+        :bridge="b22aSync.syncBridge"
+      />
+    </div>
+
+    <!-- Legacy: OnlyOffice 整册视图（假双向降级） -->
     <GtOnlyOfficeSheet
-      v-if="renderMode === 'onlyoffice'"
+      v-else-if="renderMode === 'onlyoffice'"
       :key="wpCode"
       :wp-id="props.wpId"
       :sheet-name="props.wpCode || 'B22A'"

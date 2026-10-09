@@ -39,6 +39,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping
 
+from app.services.workpaper_sync.contracts import ValueType, is_template_skeleton_identity
 from app.services.workpaper_sync.excel_extract import BindingKind
 from app.services.workpaper_sync.sheet_geometry import col_index, snake
 
@@ -190,6 +191,21 @@ class RowTableSheetSpec:
     row_section_field: str = ""
     row_section_value: str = ""
 
+    #: 受管行收敛方式 —— `"clear"`（默认）只清 editable 字面值格，`"delete"` 删物理行。
+    #:
+    #: spec: workpaper-sync-row-deletion-multi-region-propagation（契约逐表 opt-in，CS-21）
+    #:
+    #: 🔴 默认值不得改成 `"delete"`：那会让**全部**走本引擎的 spec 在一次部署里同时开始
+    #: 删物理行，而删行是**不可逆的数据丢失**。开表一律逐表显式声明，并且开表前必须先跑
+    #: `backend/scripts/check/check_row_deletion_readiness.py --table <table_key>`
+    #: 确认该表受管区的可删行比例与锁死原因（悬空引用会让门面 fail-closed，
+    #: 症状是用户点保存报错而不是静默）。
+    #:
+    #: 🔴 只在 **非默认**时才写进契约 payload（见 `spec_to_contract_sheet_payload`）——
+    #: 无条件写会让全部既有契约 JSON 的 content-address 一起变，把「一张表开表」变成
+    #: 「62 份契约全体变更」，golden digest 门禁届时无法区分「谁真的改了」。
+    row_convergence: str = "clear"
+
     @property
     def formula_mask(self) -> tuple[str, ...]:
         """七家实测形态：全为列向区间 `{COL}{FIRST}:{COL}{LAST}`。取代 provider 侧手写 mask 字面量。
@@ -326,6 +342,11 @@ def spec_to_contract_sheet_payload(spec: RowTableSheetSpec) -> dict:
         "formula_mask": list(spec.formula_mask),
         "fields": fields,
     }
+    # 🔴 `row_convergence` **只在非默认时**写进 payload（Requirement 8.1/8.2 的
+    #    「未声明即 clear」）。无条件写会让 62 份既有契约的 canonical payload 同时变化 ⇒
+    #    golden digest 门禁一次报 62 家全红，届时分不出「谁真的改了收敛方式」。
+    if spec.row_convergence != "clear":
+        table_payload["row_convergence"] = spec.row_convergence
     # footer_anchor 只在有 marker 时声明（A 列无标记的 footer 行不声明，
     # assert_footer_anchor_stable 对不含 footer_anchor 的 table 跳过校验）。
     if spec.footer_marker:
@@ -482,9 +503,21 @@ def split_store_row(
     """
     for column_key, _column, _mode, _vt, json_path, _label, _group in managed_field_specs(spec):
         field_spec = contract.field_by_stable_key(stable_key_for(spec, column_key))
+        raw_value = resolve_json_path(row, json_path)
+        # FC-10：percent_points 类型的值在 store 里是百分数（3.5 = 3.5%），
+        # Excel 期望小数（0.035）⇒ 投影时 ÷100。对称的 ×100 在 merge_projection_into_store_rows 里。
+        if (
+            raw_value is not None
+            and field_spec.value_type is ValueType.percent_points
+        ):
+            try:
+                from decimal import Decimal as _D
+                raw_value = _D(str(raw_value)) / _D("100")
+            except Exception:
+                pass  # 非数值保持原值，normalize_value 会拒绝
         yield (
             stable_key_for(spec, column_key, row_identity),
-            resolve_json_path(row, json_path),
+            raw_value,
             field_spec,
         )
 
@@ -690,6 +723,15 @@ def merge_projection_into_store_rows(
             continue
         target = by_id.get(str(rid))
         if target is None:
+            # 🔴 模板骨架行「不在 store 的 row_keys 里」是常态（spec workpaper-sync-managed-row-
+            #    convergence · contracts.is_template_skeleton_identity）：HTML 侧有意不管理的
+            #    模板预置行（如 L8-2 的派生行 R11/R13/R20，值由模板跨行公式算），extract 仍会把它们
+            #    的 editable 列（B~M 缓存值）读回来 —— 但它们**不该被 fabricate 成 store 新行**，
+            #    否则 ①merge 新建的 `{key}` 无 monthly list ⇒ set_json_path 'monthly/0' fail-closed，
+            #    ②即便过了也会把模板行塞进 HTML 载荷。与删除路径用同一真源对称跳过。
+            #    只跳过「本次 base_rows 没发、且是模板骨架身份」的行；用户真新增行（minted/自铸）照常建。
+            if is_template_skeleton_identity(str(rid)):
+                continue
             target = {identity_key: str(rid)}
             if section_field:
                 target[section_field] = section_value
@@ -701,6 +743,18 @@ def merge_projection_into_store_rows(
             continue
         visited += 1
         new_val = getattr(fv, "value", None)
+        # FC-10：percent_points 反向换算（Excel 0.035 → store 3.5），与 split_store_row 的 ÷100 对称
+        vtype = getattr(fv, "value_type", None)
+        if (
+            new_val is not None
+            and vtype is not None
+            and str(vtype) == ValueType.percent_points.value
+        ):
+            try:
+                from decimal import Decimal as _D
+                new_val = float(_D(str(new_val)) * _D("100"))
+            except Exception:
+                pass
         if set_json_path(target, json_path, new_val):
             applied += 1
             touched_rows.add(str(rid))

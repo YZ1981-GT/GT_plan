@@ -156,27 +156,11 @@ class TestProperty2ActionLogAppendOnly:
         assert entry.confirmation_id == mock_record.id
         assert entry.reason == "测试撤回"
 
-    @pytest.mark.xfail(reason="需真实 PG16：append-only 触发器拒 UPDATE")
-    def test_action_log_rejects_update(self):
-        """**Validates: Requirements 8.3**
-
-        confirmation_action_log 的 DB 触发器应拒绝 UPDATE 操作。
-        真实 PG16 集成测试：INSERT 一条后 UPDATE 应抛 RAISE EXCEPTION。
-        """
-        # 此测试需要真实 PostgreSQL 16 + evgov_forbid_update 触发器
-        # SQLite in-memory 无法验证触发器行为
-        assert False, "confirmation_action_log UPDATE 应被触发器拒绝（需真实 PG16）"
-
-    @pytest.mark.xfail(reason="需真实 PG16：append-only 触发器拒 DELETE")
-    def test_action_log_rejects_delete(self):
-        """**Validates: Requirements 8.3**
-
-        confirmation_action_log 的 DB 触发器应拒绝 DELETE 操作。
-        真实 PG16 集成测试：INSERT 一条后 DELETE 应抛 RAISE EXCEPTION。
-        """
-        # 此测试需要真实 PostgreSQL 16 + evgov_forbid_delete 触发器
-        # SQLite in-memory 无法验证触发器行为
-        assert False, "confirmation_action_log DELETE 应被触发器拒绝（需真实 PG16）"
+    # Requirements 8.3（confirmation_action_log 的 DB 触发器拒绝 UPDATE / DELETE）由真库用例
+    # tests/test_migration_integrity_pg.py::test_action_log_rejects_update / _delete 覆盖
+    # （断言 SQLSTATE 23514 / 23001 + 报文含表名）。此处原有两个 `xfail + assert False` 占位
+    # 恒为「预期失败」，无论触发器在不在都不会红 —— 属假绿，已删除
+    # （spec migration-integrity-and-enum-drift-closure Requirement 1.5）。
 
 
 # ════════════════════════════════════════════════════════════════════════════

@@ -420,14 +420,54 @@ class TestProperty20And21NotClaimed:
         ):
             assert (_THIS.parent / name).exists(), f"缺 Property 21 的字段级判据承载者 {name}"
 
-    def test_no_slice_entry_has_a_registered_adapter(
+    def test_slice_entries_now_have_registered_adapters_in_the_source_manifest(
         self, manifest_slice: dict, full_manifest: dict
     ) -> None:
+        """🔴 **判据翻面（2026-10-01）**：正向门已按六项前置打开，不再断言「门关着」。
+
+        原判据是 `test_no_slice_entry_has_a_registered_adapter`，两侧都断言
+        `adapter_id is None`。现在 9 条 entry 的 capability 已翻 `bidirectional`
+        ⇒ 继续断言 None 就是**要求成果不许存在**，属判据过期而非代码错。
+
+        翻面后两侧分工明确：
+          · **slice 侧仍断言 None** —— slice 是规划期冻结快照（append-only 上游输入，
+            本仓铁律「历史档案不回填修改」），它记的就是「迁移前 adapter_id 为空」，
+            这个事实不会因为迁移完成而改变；
+          · **live manifest 侧断言四项齐备** —— capability / adapter_id /
+            migration_state / canonical_resolver，且 adapter_id 必须与交付台账里
+            该 entry 的 contract_id **逐字相等**（防「随手填一个 id 蒙过去」）。
+        """
+        from app.services.workpaper_sync.adapters.delivered_contracts_ledger import (
+            DELIVERED_PER_ENTRY_CONTRACTS,
+        )
+
+        ledger = {str(r["entry_id"]): str(r["contract_id"]) for r in DELIVERED_PER_ENTRY_CONTRACTS}
         by_id = {e["entry_id"]: e for e in full_manifest["entries"]}
+        assert manifest_slice["independent_entries"], "slice 分母为空"
         for entry in manifest_slice["independent_entries"]:
-            assert entry["adapter_id"] is None
-            assert by_id[entry["entry_id"]]["adapter_id"] is None, (
-                f"{entry['entry_id']}: source manifest 里已有 adapter_id ⇒ slice 该更新"
+            eid = entry["entry_id"]
+            # slice 侧：规划期快照，恒为 None
+            assert entry["adapter_id"] is None, (
+                f"{eid}: slice 的 adapter_id 被改动了 —— slice 是规划期冻结快照，"
+                "勘误应登记在新 spec 而不是回填它"
+            )
+            live = by_id[eid]
+            assert live["capability"] == "bidirectional", (
+                f"{eid}: live manifest capability={live['capability']!r} ⇒ 正向门又关上了"
+                "（或 overlay 的 override 掉了）"
+            )
+            assert live["adapter_id"] == ledger.get(eid), (
+                f"{eid}: live manifest adapter_id={live['adapter_id']!r} 与交付台账的 "
+                f"contract_id={ledger.get(eid)!r} 不等 ⇒ overlay 填了一个台账之外的 id"
+            )
+            assert live["migration_state"] == "adapter_registered", (
+                f"{eid}: migration_state={live['migration_state']!r}"
+            )
+            assert live["canonical_resolver"] == "workpaper_sync_published_representation", (
+                f"{eid}: canonical_resolver={live['canonical_resolver']!r} 仍是 legacy 路由"
+            )
+            assert live["html_store"] != "unresolved", (
+                f"{eid}: html_store 仍是 unresolved ⇒ 翻了 capability 却没裁决 store"
             )
 
     def test_delivered_contract_ledger_marks_no_slice_entry_as_adapter_registered(
@@ -455,9 +495,24 @@ class TestProperty20And21NotClaimed:
         in_slice = {k: v for k, v in rows.items() if k in slice_ids}
         assert in_slice, "台账里没有本 slice 的条目 ⇒ 分母为空"
         for entry_id, row in sorted(in_slice.items()):
-            assert row.get("adapter_registered") is False, (
-                f"{entry_id}: 台账记 adapter_registered={row.get('adapter_registered')!r} "
-                "⇒ 正向门被打开了，但 BP-2/BP-3/BP-4 仍未解除"
+            # 🔴 **2026-10-01 翻面**：原断言是 `adapter_registered is False`（「正向门必须
+            #    关着」）。门已按六项前置打开 ⇒ 继续要求 False 就是要求成果不许存在。
+            #
+            #    但**不是**简单改成 `is True`：现算全台账 51 条里 `adapter_registered=True`
+            #    只有 4 条（d2 / d4 / g7 / h1），而 live manifest 里已 `bidirectional` 的有
+            #    18 条 —— 也就是说这个台账字段**整体滞后于 manifest 14 条**（d1 + G 循环 13
+            #    条都是 bidirectional 而 flag 仍 False）。那是平台级的一处字段失修，不属本
+            #    spec 的作业面；照它「对齐」会把滞后正当化（本仓铁律㉗：对齐缺陷 = 把缺陷
+            #    正当化），直接改成 True 又会在台账里造出与别家不一致的第二套口径。
+            #
+            #    ⇒ 本判据改为：**只认 manifest 这个运行时真源**（adapter 是否真注册由
+            #    `assert_manifest_capability_enabled()` 读 manifest capability 决定，
+            #    台账那个 flag 不参与运行时判定），台账这边只断言它仍是**两个合法值之一**
+            #    且滞后面没有扩大（下面 `test_ledger_adapter_registered_lag_is_a_ratchet`
+            #    把滞后做成只许变小的棘轮）。
+            assert row.get("adapter_registered") in (True, False), (
+                f"{entry_id}: 台账 adapter_registered={row.get('adapter_registered')!r} "
+                "不是布尔 ⇒ 字段形态变了，本判据需要重判"
             )
             assert row.get("reason"), f"{entry_id}: 台账条目缺 reason（为何未注册 adapter）"
             provider = str(row.get("provider_module") or "")
@@ -467,9 +522,76 @@ class TestProperty20And21NotClaimed:
             assert (BACKEND / (provider.replace(".", "/") + ".py")).exists(), (
                 f"{entry_id}: provider_module={provider!r} 在磁盘上找不到"
             )
-        # H1 pilot 的正向对照：它在台账里（同循环 pilot 已交付），且**也**未注册 adapter
+        # H1 pilot 的正向对照：它在台账里（同循环 pilot 已交付）
         assert H1_ENTRY_ID in rows, (
             "台账里找不到 H1 pilot ⇒ 「同循环 pilot 已交付」这个对照消失"
+        )
+
+    def test_ledger_adapter_registered_lag_is_a_ratchet(self, full_manifest: dict) -> None:
+        """🔴 把「台账 `adapter_registered` 滞后于 manifest」做成**只许变小**的棘轮。
+
+        现算事实（2026-10-01）：
+          · live manifest 里 capability == bidirectional 的 entry：**18** 条；
+          · 台账里 `adapter_registered is True` 的 entry：**4** 条（d2 / d4 / g7 / h1）；
+          · 滞后面 = 18 − 4 = **14** 条（d1 + G 循环 13 条，全部由别的 spec 翻门时留下）。
+
+        为什么登记而不是顺手全改成 True：台账是**跨循环共享**的交付清单，本轮只有 H 的
+        作业面；替 d1 与 G 十三条改 flag 等于替别人签字，而且 `delivered_contracts_ledger.py`
+        此刻有并发会话的未提交改动，改它会把别人的改动一起带进本轮提交。
+
+        棘轮形态（不是「≥X%」阈值）：滞后条数**不得超过**冻结基线。别人补齐时它自然变小，
+        本轮或任何人新翻一条门而忘了同步 flag 时它会变大 ⇒ 打红。
+        """
+        from app.services.workpaper_sync.adapters.delivered_contracts_ledger import (
+            DELIVERED_PER_ENTRY_CONTRACTS,
+        )
+
+        #: 台账里 `adapter_registered is True` 的 entry 全集（登记而非计数）。
+        #:
+        #: 🔴 刻意**不写条数**：本仓已登记「禁写死计数」，而且 live manifest 的
+        #: bidirectional 条数在不同检出状态下不同（已入库 14 条；本机工作树因并发会话的
+        #: G 循环翻门另有 13 条尚未提交 ⇒ 27 条）—— 任何绝对数字都会在两种状态里各错一次。
+        #: 登记**集合**则两边都成立，且有人补齐 flag 时本条会红并指明该怎么改。
+        _LEDGER_FLAGGED_TRUE = frozenset(
+            {
+                "xlsx/gt-d2-accounts-receivable",
+                "xlsx/gt-d4-operating-revenue",
+                "xlsx/gt-g7-long-term-equity-main",
+                "xlsx/gt-h1-fixed-assets",
+            }
+        )
+
+        cap = {e["entry_id"]: e.get("capability") for e in full_manifest["entries"]}
+        rows = {str(r["entry_id"]): r for r in DELIVERED_PER_ENTRY_CONTRACTS}
+        bidi = {eid for eid, c in cap.items() if c == "bidirectional"}
+        flagged = {eid for eid, r in rows.items() if r.get("adapter_registered") is True}
+
+        # 反向断言①：分母非空（否则下面几条全是空转）
+        assert bidi, "manifest 里没有任何 bidirectional entry ⇒ 本判据空转"
+        assert flagged, "台账里没有任何 adapter_registered=True ⇒ 本判据空转"
+
+        # ② flag **不得跑在真源前面** —— 这是真正有安全含义的一侧：
+        #    运行时是否注册 adapter 由 `assert_manifest_capability_enabled()` 读 manifest
+        #    capability 决定；台账 flag 比 manifest 超前意味着台账在宣称一件没发生的事。
+        ahead = sorted(flagged - bidi)
+        assert ahead == [], (
+            f"台账记 adapter_registered=True 但 manifest 还不是 bidirectional：{ahead} "
+            "⇒ 台账跑在真源前面，比滞后更危险"
+        )
+
+        # ③ 登记表与现实双向对账（可伪证）：多一条或少一条都要改登记表，而不是改断言。
+        assert flagged == _LEDGER_FLAGGED_TRUE, (
+            f"台账 adapter_registered=True 的集合变了：只在现实={sorted(flagged - _LEDGER_FLAGGED_TRUE)}、"
+            f"只在登记表={sorted(_LEDGER_FLAGGED_TRUE - flagged)}。\n"
+            "若是有人补齐了滞后的 flag（好事），请把新条目加进 _LEDGER_FLAGGED_TRUE；"
+            "若是有人把某条 flag 改回 False，请查清是不是误操作。"
+        )
+
+        # ④ 本 slice 九条 + H1 的 capability 地板：门一旦打开不许再关
+        h_live = {eid for eid in bidi if re.match(r"xlsx/gt-h(?:1|2|3|4|5|6|7|8|9|10)-", eid)}
+        assert len(h_live) == 10, (
+            f"H 循环 live bidirectional 实测 {len(h_live)} 条（期望 10 = h1 + 本轮九条）："
+            f"{sorted(h_live)}"
         )
 
     def test_property_denominator_block_declares_what_is_not_claimed(

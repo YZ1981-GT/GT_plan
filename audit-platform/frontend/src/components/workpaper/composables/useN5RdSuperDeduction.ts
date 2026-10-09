@@ -22,6 +22,14 @@ import { computed, type ComputedRef, type Ref } from 'vue'
 import { calcRdSuperDeduction } from './useN5IncomeTaxEngine'
 import { calcSubtotal, parseNum } from './useN5FormulaEngine'
 import type { ChecklistResponse } from './useN5FormData'
+import {
+  withStableRowKeys,
+  generatedRowKey,
+  removeRowByKey,
+  updateRowByKey,
+  type StableRowKey,
+} from './shared/stableRowIdentity'
+import { payloadJson } from './shared/checklistPayload'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -30,7 +38,12 @@ export type RdExpenseCategory = '人员人工' | '直接投入' | '折旧费用'
 
 /** 研发项目行 */
 export interface N5RdProjectRow {
-  /** 行序号 */
+  /**
+   * 稳定行身份（随行落库）。🔴 原按下标增删改，而界面把费用化/资本化分两张表渲染 ——
+   * 子表的行下标 ≠ 全量数组下标 ⇒ 在资本化子表里改第 1 行，实际改的是全量第 1 行（费用化）。
+   */
+  rowKey: StableRowKey
+  /** 行序号（仅展示） */
   index: number
   /** 研发项目名称 */
   projectName: string
@@ -101,15 +114,12 @@ export function useN5RdSuperDeduction(options: UseN5RdSuperDeductionOptions) {
 
   const rows: ComputedRef<N5RdProjectRow[]> = computed(() => {
     const itemId = 'N5-6-1-rd-projects'
-    const resp = allResponses.value.get(itemId)
-    let raw: any[] = []
-    if (resp?.conclusion) {
-      try { raw = JSON.parse(resp.conclusion) } catch { raw = [] }
-    }
+    const parsed = payloadJson(itemId, allResponses.value.get(itemId))
+    const raw: any[] = Array.isArray(parsed) ? parsed : []
 
     if (raw.length === 0) return []
 
-    return raw.map((r: any, i: number) => {
+    return withStableRowKeys(raw, (r: any) => r?.projectName).map(({ raw: r, rowKey }: { raw: any; rowKey: StableRowKey }, i: number) => {
       const personnelCost = parseNum(r.personnelCost)
       const directInput = parseNum(r.directInput)
       const depreciation = parseNum(r.depreciation)
@@ -118,6 +128,7 @@ export function useN5RdSuperDeduction(options: UseN5RdSuperDeductionOptions) {
       const totalExpense = calcSubtotal([personnelCost, directInput, depreciation, amortization, otherExpense])
 
       return {
+        rowKey,
         index: i + 1,
         projectName: r.projectName || `研发项目${i + 1}`,
         personnelCost,
@@ -204,15 +215,12 @@ export function useN5RdSuperDeduction(options: UseN5RdSuperDeductionOptions) {
    * 更新指定行字段
    */
   async function updateRow(
-    rowIndex: number,
+    rowKey: StableRowKey,
     field: keyof Pick<N5RdProjectRow, 'projectName' | 'personnelCost' | 'directInput' | 'depreciation' | 'amortization' | 'otherExpense' | 'isExpensed'>,
     value: number | string | boolean,
   ): Promise<void> {
-    const currentRows = rows.value.map(r => ({ ...r }))
-    if (rowIndex >= 0 && rowIndex < currentRows.length) {
-      ;(currentRows[rowIndex] as any)[field] = value
-      await _saveRows(currentRows)
-    }
+    if (!rows.value.some(r => r.rowKey === rowKey)) return
+    await _saveRows(updateRowByKey(rows.value, rowKey, r => ({ ...r, [field]: value })))
   }
 
   /**
@@ -221,6 +229,8 @@ export function useN5RdSuperDeduction(options: UseN5RdSuperDeductionOptions) {
   async function addProject(projectName: string): Promise<void> {
     const currentRows = rows.value.map(r => ({ ...r }))
     currentRows.push({
+      // 研发项目名可重名 ⇒ 新增一律熵键（不用名称语义键）
+      rowKey: generatedRowKey(),
       index: currentRows.length + 1,
       projectName,
       personnelCost: 0,
@@ -237,9 +247,8 @@ export function useN5RdSuperDeduction(options: UseN5RdSuperDeductionOptions) {
   /**
    * 删除指定行
    */
-  async function removeProject(rowIndex: number): Promise<void> {
-    const currentRows = rows.value.filter((_, i) => i !== rowIndex)
-    await _saveRows(currentRows)
+  async function removeProject(rowKey: StableRowKey): Promise<void> {
+    await _saveRows(removeRowByKey(rows.value, rowKey))
   }
 
   /**

@@ -1066,6 +1066,745 @@
           "uuid_col": "AI"
         }
       ]
+    },
+    {
+      "excel_name": "审定表G3-1",
+      "footer": {
+        "marker": "合计"
+      },
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "g31-managed",
+      "tables": [
+        {
+          "anchor": "A7",
+          "cell_mask": [
+            "B10",
+            "B8",
+            "B9",
+            "C10",
+            "C8",
+            "C9",
+            "D10",
+            "D8",
+            "D9",
+            "E10",
+            "E8",
+            "E9",
+            "F10",
+            "F8",
+            "F9",
+            "G10",
+            "G8",
+            "G9",
+            "H10",
+            "H8",
+            "H9",
+            "I10",
+            "I8",
+            "I9",
+            "J10",
+            "J8",
+            "J9",
+            "K10",
+            "K8",
+            "K9",
+            "L10",
+            "L8",
+            "L9"
+          ],
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": 8
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!审定表G3-1!A5",
+              "header_text": "项目",
+              "json_pointer": "/balance/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G3-1!A8",
+              "stable_field_key": "g31_adj_balance/item_name",
+              "store_item_id": "",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 8
+              },
+              "column_key": "opening_balance",
+              "header_source_ref": "源xlsx!审定表G3-1!B5",
+              "header_text": "期初余额",
+              "json_pointer": "/balance/openingBalance",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!B8",
+              "stable_field_key": "g31_adj_balance/opening_balance",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 8
+              },
+              "column_key": "increase",
+              "header_source_ref": "源xlsx!审定表G3-1!C5",
+              "header_text": "本期增加",
+              "json_pointer": "/balance/increase",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!C8",
+              "stable_field_key": "g31_adj_balance/increase",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 8
+              },
+              "column_key": "transfer_in",
+              "header_source_ref": "源xlsx!审定表G3-1!D5",
+              "header_text": "其中转入",
+              "json_pointer": "/balance/transferIn",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!D8",
+              "stable_field_key": "g31_adj_balance/transfer_in",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 8
+              },
+              "column_key": "audited_opening",
+              "header_source_ref": "源xlsx!审定表G3-1!E5",
+              "header_text": "审定数-期初",
+              "json_pointer": "/balance/auditedOpening",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G3-1!E8",
+              "stable_field_key": "g31_adj_balance/audited_opening",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 8
+              },
+              "column_key": "decrease",
+              "header_source_ref": "源xlsx!审定表G3-1!F5",
+              "header_text": "本期减少",
+              "json_pointer": "/balance/decrease",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!F8",
+              "stable_field_key": "g31_adj_balance/decrease",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 8
+              },
+              "column_key": "increase_end",
+              "header_source_ref": "源xlsx!审定表G3-1!G5",
+              "header_text": "本期增加-期末",
+              "json_pointer": "/balance/increaseEnd",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!G8",
+              "stable_field_key": "g31_adj_balance/increase_end",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 8
+              },
+              "column_key": "transfer_in_end",
+              "header_source_ref": "源xlsx!审定表G3-1!H5",
+              "header_text": "其中转入-期末",
+              "json_pointer": "/balance/transferInEnd",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!H8",
+              "stable_field_key": "g31_adj_balance/transfer_in_end",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 8
+              },
+              "column_key": "audited_closing",
+              "header_source_ref": "源xlsx!审定表G3-1!I5",
+              "header_text": "审定数-期末",
+              "json_pointer": "/balance/auditedClosing",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G3-1!I8",
+              "stable_field_key": "g31_adj_balance/audited_closing",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 8
+              },
+              "column_key": "change_amount",
+              "header_source_ref": "源xlsx!审定表G3-1!J5",
+              "header_text": "变动额",
+              "json_pointer": "/balance/changeAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G3-1!J8",
+              "stable_field_key": "g31_adj_balance/change_amount",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 8
+              },
+              "column_key": "change_rate",
+              "header_source_ref": "源xlsx!审定表G3-1!K5",
+              "header_text": "变动率",
+              "json_pointer": "/balance/changeRate",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G3-1!K8",
+              "stable_field_key": "g31_adj_balance/change_rate",
+              "store_item_id": "",
+              "value_type": "ratio"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 8
+              },
+              "column_key": "impairment_related",
+              "header_source_ref": "源xlsx!审定表G3-1!L5",
+              "header_text": "减值准备",
+              "json_pointer": "/balance/impairmentRelated",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!L8",
+              "stable_field_key": "g31_adj_balance/impairment_related",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 8
+              },
+              "column_key": "note_ref",
+              "header_source_ref": "源xlsx!审定表G3-1!M5",
+              "header_text": "附注",
+              "json_pointer": "/balance/noteRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G3-1!M8",
+              "stable_field_key": "g31_adj_balance/note_ref",
+              "store_item_id": "",
+              "value_type": "text"
+            }
+          ],
+          "first_data_row": 8,
+          "footer_row": 10,
+          "header_rows": 2,
+          "last_data_row": 9,
+          "row_mode": "fixed_rows",
+          "table_key": "adj_balance_rows"
+        },
+        {
+          "anchor": "A11",
+          "cell_mask": [
+            "A12",
+            "A13",
+            "B12",
+            "B13",
+            "B14",
+            "C12",
+            "C13",
+            "C14",
+            "D12",
+            "D13",
+            "D14",
+            "E12",
+            "E13",
+            "E14",
+            "F12",
+            "F13",
+            "F14",
+            "G12",
+            "G13",
+            "G14",
+            "H12",
+            "H13",
+            "H14",
+            "I12",
+            "I13",
+            "I14",
+            "J12",
+            "J13",
+            "J14",
+            "K12",
+            "K13",
+            "K14",
+            "L12",
+            "L13",
+            "L14"
+          ],
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": 12
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!审定表G3-1!A5",
+              "header_text": "项目",
+              "json_pointer": "/impairment/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G3-1!A12",
+              "stable_field_key": "g31_adj_impairment/item_name",
+              "store_item_id": "",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 12
+              },
+              "column_key": "opening_balance",
+              "header_source_ref": "源xlsx!审定表G3-1!B5",
+              "header_text": "期初余额",
+              "json_pointer": "/impairment/openingBalance",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!B12",
+              "stable_field_key": "g31_adj_impairment/opening_balance",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 12
+              },
+              "column_key": "increase",
+              "header_source_ref": "源xlsx!审定表G3-1!C5",
+              "header_text": "本期增加",
+              "json_pointer": "/impairment/increase",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!C12",
+              "stable_field_key": "g31_adj_impairment/increase",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 12
+              },
+              "column_key": "transfer_in",
+              "header_source_ref": "源xlsx!审定表G3-1!D5",
+              "header_text": "其中转入",
+              "json_pointer": "/impairment/transferIn",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!D12",
+              "stable_field_key": "g31_adj_impairment/transfer_in",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 12
+              },
+              "column_key": "audited_opening",
+              "header_source_ref": "源xlsx!审定表G3-1!E5",
+              "header_text": "审定数-期初",
+              "json_pointer": "/impairment/auditedOpening",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G3-1!E12",
+              "stable_field_key": "g31_adj_impairment/audited_opening",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 12
+              },
+              "column_key": "decrease",
+              "header_source_ref": "源xlsx!审定表G3-1!F5",
+              "header_text": "本期减少",
+              "json_pointer": "/impairment/decrease",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!F12",
+              "stable_field_key": "g31_adj_impairment/decrease",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 12
+              },
+              "column_key": "increase_end",
+              "header_source_ref": "源xlsx!审定表G3-1!G5",
+              "header_text": "本期增加-期末",
+              "json_pointer": "/impairment/increaseEnd",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!G12",
+              "stable_field_key": "g31_adj_impairment/increase_end",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 12
+              },
+              "column_key": "transfer_in_end",
+              "header_source_ref": "源xlsx!审定表G3-1!H5",
+              "header_text": "其中转入-期末",
+              "json_pointer": "/impairment/transferInEnd",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!H12",
+              "stable_field_key": "g31_adj_impairment/transfer_in_end",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 12
+              },
+              "column_key": "audited_closing",
+              "header_source_ref": "源xlsx!审定表G3-1!I5",
+              "header_text": "审定数-期末",
+              "json_pointer": "/impairment/auditedClosing",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G3-1!I12",
+              "stable_field_key": "g31_adj_impairment/audited_closing",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 12
+              },
+              "column_key": "change_amount",
+              "header_source_ref": "源xlsx!审定表G3-1!J5",
+              "header_text": "变动额",
+              "json_pointer": "/impairment/changeAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G3-1!J12",
+              "stable_field_key": "g31_adj_impairment/change_amount",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 12
+              },
+              "column_key": "change_rate",
+              "header_source_ref": "源xlsx!审定表G3-1!K5",
+              "header_text": "变动率",
+              "json_pointer": "/impairment/changeRate",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G3-1!K12",
+              "stable_field_key": "g31_adj_impairment/change_rate",
+              "store_item_id": "",
+              "value_type": "ratio"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 12
+              },
+              "column_key": "impairment_related",
+              "header_source_ref": "源xlsx!审定表G3-1!L5",
+              "header_text": "减值准备",
+              "json_pointer": "/impairment/impairmentRelated",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!L12",
+              "stable_field_key": "g31_adj_impairment/impairment_related",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 12
+              },
+              "column_key": "note_ref",
+              "header_source_ref": "源xlsx!审定表G3-1!M5",
+              "header_text": "附注",
+              "json_pointer": "/impairment/noteRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G3-1!M12",
+              "stable_field_key": "g31_adj_impairment/note_ref",
+              "store_item_id": "",
+              "value_type": "text"
+            }
+          ],
+          "first_data_row": 12,
+          "footer_row": 14,
+          "header_rows": 2,
+          "last_data_row": 13,
+          "row_mode": "fixed_rows",
+          "table_key": "adj_impairment_rows"
+        },
+        {
+          "anchor": "A15",
+          "cell_mask": [
+            "A16",
+            "A17",
+            "B16",
+            "B17",
+            "B18",
+            "C16",
+            "C17",
+            "C18",
+            "D16",
+            "D17",
+            "D18",
+            "E16",
+            "E17",
+            "E18",
+            "F16",
+            "F17",
+            "F18",
+            "G16",
+            "G17",
+            "G18",
+            "H16",
+            "H17",
+            "H18",
+            "I16",
+            "I17",
+            "I18",
+            "J16",
+            "J17",
+            "J18",
+            "K16",
+            "K17",
+            "K18",
+            "L16",
+            "L17",
+            "L18"
+          ],
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": 16
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!审定表G3-1!A5",
+              "header_text": "项目",
+              "json_pointer": "/carrying/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G3-1!A16",
+              "stable_field_key": "g31_adj_carrying/item_name",
+              "store_item_id": "",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 16
+              },
+              "column_key": "opening_balance",
+              "header_source_ref": "源xlsx!审定表G3-1!B5",
+              "header_text": "期初余额",
+              "json_pointer": "/carrying/openingBalance",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!B16",
+              "stable_field_key": "g31_adj_carrying/opening_balance",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 16
+              },
+              "column_key": "increase",
+              "header_source_ref": "源xlsx!审定表G3-1!C5",
+              "header_text": "本期增加",
+              "json_pointer": "/carrying/increase",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!C16",
+              "stable_field_key": "g31_adj_carrying/increase",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 16
+              },
+              "column_key": "transfer_in",
+              "header_source_ref": "源xlsx!审定表G3-1!D5",
+              "header_text": "其中转入",
+              "json_pointer": "/carrying/transferIn",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!D16",
+              "stable_field_key": "g31_adj_carrying/transfer_in",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 16
+              },
+              "column_key": "audited_opening",
+              "header_source_ref": "源xlsx!审定表G3-1!E5",
+              "header_text": "审定数-期初",
+              "json_pointer": "/carrying/auditedOpening",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G3-1!E16",
+              "stable_field_key": "g31_adj_carrying/audited_opening",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 16
+              },
+              "column_key": "decrease",
+              "header_source_ref": "源xlsx!审定表G3-1!F5",
+              "header_text": "本期减少",
+              "json_pointer": "/carrying/decrease",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!F16",
+              "stable_field_key": "g31_adj_carrying/decrease",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 16
+              },
+              "column_key": "increase_end",
+              "header_source_ref": "源xlsx!审定表G3-1!G5",
+              "header_text": "本期增加-期末",
+              "json_pointer": "/carrying/increaseEnd",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!G16",
+              "stable_field_key": "g31_adj_carrying/increase_end",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 16
+              },
+              "column_key": "transfer_in_end",
+              "header_source_ref": "源xlsx!审定表G3-1!H5",
+              "header_text": "其中转入-期末",
+              "json_pointer": "/carrying/transferInEnd",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!H16",
+              "stable_field_key": "g31_adj_carrying/transfer_in_end",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 16
+              },
+              "column_key": "audited_closing",
+              "header_source_ref": "源xlsx!审定表G3-1!I5",
+              "header_text": "审定数-期末",
+              "json_pointer": "/carrying/auditedClosing",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G3-1!I16",
+              "stable_field_key": "g31_adj_carrying/audited_closing",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 16
+              },
+              "column_key": "change_amount",
+              "header_source_ref": "源xlsx!审定表G3-1!J5",
+              "header_text": "变动额",
+              "json_pointer": "/carrying/changeAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G3-1!J16",
+              "stable_field_key": "g31_adj_carrying/change_amount",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 16
+              },
+              "column_key": "change_rate",
+              "header_source_ref": "源xlsx!审定表G3-1!K5",
+              "header_text": "变动率",
+              "json_pointer": "/carrying/changeRate",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G3-1!K16",
+              "stable_field_key": "g31_adj_carrying/change_rate",
+              "store_item_id": "",
+              "value_type": "ratio"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 16
+              },
+              "column_key": "impairment_related",
+              "header_source_ref": "源xlsx!审定表G3-1!L5",
+              "header_text": "减值准备",
+              "json_pointer": "/carrying/impairmentRelated",
+              "mode": "cross_sheet",
+              "source_ref": "源xlsx!审定表G3-1!L16",
+              "stable_field_key": "g31_adj_carrying/impairment_related",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 16
+              },
+              "column_key": "note_ref",
+              "header_source_ref": "源xlsx!审定表G3-1!M5",
+              "header_text": "附注",
+              "json_pointer": "/carrying/noteRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G3-1!M16",
+              "stable_field_key": "g31_adj_carrying/note_ref",
+              "store_item_id": "",
+              "value_type": "text"
+            }
+          ],
+          "first_data_row": 16,
+          "footer_row": 18,
+          "header_rows": 2,
+          "last_data_row": 17,
+          "row_mode": "fixed_rows",
+          "table_key": "adj_carrying_rows"
+        }
+      ]
     }
   ],
   "template": {

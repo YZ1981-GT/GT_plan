@@ -40,13 +40,18 @@
       "document_type": "xlsx",
       "host": "GtD1NotesReceivable.vue",
       "host_path": "audit-platform/frontend/src/components/workpaper/GtD1NotesReceivable.vue",
-      "capability": "bidirectional",
-      "capability_verdict_stage": "adapter_registered_d1_coverage_spec_2026_09_26",
+      "capability": null,
+      "capability_verdict_stage": "adapter_registered_in_manifest_pending_ac_12_1_closure",
       "capability_target": "bidirectional",
-      "capability_target_blocked_by": [],
-      "capability_enum_note": "D1 声明层全 21 张 sheet 封顶（d1-sync-row-table-engine-and-d1-coverage spec），per-entry override 启用 bidirectional。",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-3",
+        "BP-4",
+        "BP-5"
+      ],
+      "capability_enum_note": "D1 声明层全 21 张 sheet 封顶（d1-sync-row-table-engine-and-d1-coverage spec），per-entry override 已在 **manifest** 侧启用 bidirectional 且 adapter 已注册。但 AC 1.3 的四个枚举值在**本 slice 的冻结口径**下仍无一成立 ⇒ 不填枚举值而记 null + `capability_verdict_stage`，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段里四个仍为 null —— 它们是 DB 运行时产物，冻结 slice 静态不可知；现算全仓 manifest 6 条 bidirectional entry 这四项全为 null）。与 d2 / d4 同口径：manifest 已注册 ≠ slice 已裁决。 🔴 **`adapter_id` 记 null 的理由**：待裁决态 entry 挂 `adapter_id` 须有生产账本（`DELIVERED_PER_ENTRY_CONTRACTS`）`adapter_registered=True` 背书，而本 entry 账本仍是 **False**（其 reason 明写前置为「发布链产出 approved bundle + current published representation 之后方可注册」，该三件供给在真库的状态需实测）。事实（契约已发布 `d1.notes_receivable_detail` / manifest 已 override 为 bidirectional / provider 已登记白名单）仍完整保留在 manifest 与生产账本里；**冻结 slice 不替账本背书**。账本转 True 后应同步把本字段填回。",
       "migration_state": "adapter_registered",
-      "adapter_id": "d1.notes_receivable_detail",
+      "adapter_id": null,
       "authority_model": null,
       "definition_bundle": null,
       "instrumentation_candidate": null,
@@ -56,7 +61,7 @@
       "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
       "editability": "editable",
       "room_model": "shared",
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "canonical_resolver": "workpaper_sync_published_representation",
       "html_counterpart_verdict": "exists",
       "html_counterpart": {
         "store": "checklist_responses",
@@ -101,14 +106,10 @@
         "backend/wp_templates/D/D1 应收票据.xlsx!原值明细表（按客户）D1-3!A10 = '客户名称'"
       ],
       "manifest_mirror": {
-        "capability": "single_onlyoffice",
-        "html_store": "unresolved",
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致：manifest 侧仍是 overlay 的组件级默认值（GtOnlyOfficeSheet ⇒ single_onlyoffice / unresolved），本 slice 按 AC 12.8 实测有 HTML 对端故记 null（未裁决）。见 BP-6"
+        "capability": "bidirectional",
+        "html_store": "checklist_responses_d1_notes_receivable_rows",
+        "legacy_reasons": [],
+        "divergence_from_slice": "方向已反转：manifest 侧本 entry 已是 capability='bidirectional' + migration_state='adapter_registered' + adapter_id='d1.notes_receivable_detail'（overlay 的 per-entry override，并由 registry.py#DELIVERED_PER_ENTRY_CONTRACTS 独立印证），本 slice 的 capability 仍记 null。分歧的是**裁决闸门**而非事实：AC 12.1 的六件前置尚未逐条交付（见 BP-1 / BP-3 / BP-4 / BP-5），故本 slice 不把 bidirectional 写成已裁决。见 BP-6。🔴 本节原记 `single_onlyoffice` + 三条 legacy_reasons，是 commit 1ec6a1050 改 manifest 后**未同步 slice** 留下的过期快照，本次按现算真值更正。"
       },
       "adjudication": {
         "honest_capability": null,
@@ -835,8 +836,8 @@
       },
       {
         "name": "D1 应收票据.xlsx",
-        "size": 138008,
-        "sha256": "e6e8dcf28ba6e7f6fdf9867c3ac43b2f1a72e1a1b6f2aa477f58dfca39097577",
+        "size": 120156,
+        "sha256": "efa8e23d3531294ed7d4f30cc207339634b83ce58335ebf885a402e7263571ef",
         "belongs_to_entry": "xlsx/gt-d1-notes-receivable",
         "read_with": "openpyxl data_only"
       },

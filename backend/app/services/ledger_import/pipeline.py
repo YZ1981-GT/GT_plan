@@ -703,7 +703,7 @@ async def execute_pipeline(
     logger.info("Pipeline %s phase=activate_dataset %s", job_id, staging_dataset_id)
     await _progress(90, "激活数据集")
     async with async_session() as act_db:
-        await activate_dataset(
+        activated_dataset = await activate_dataset(
             act_db,
             dataset_id=staging_dataset_id,
             activated_by=created_by,
@@ -722,6 +722,34 @@ async def execute_pipeline(
         )
         await act_db.commit()
     _mark("activate_dataset_done")
+
+    # ── 发布 LEDGER_DATASET_ACTIVATED（提交之后，内联投递）──
+    # 🔴 修复前：v2 路径激活后只 commit，从不发布事件 —— outbox 行一直 pending，
+    #    下游（auto_match 建科目映射 → 试算表未审数 → 报表 → 附注 stale → 底稿 stale）
+    #    全靠 outbox_replay_worker 轮询补发：最坏 30s 延迟，且
+    #    LEDGER_IMPORT_OUTBOX_REPLAY_ENABLED=False 时整条链静默不触发（导入显示成功、
+    #    试算表为空、无任何报错）。真库 import_event_outbox 的 17 条激活事件
+    #    attempt_count 全是 1 = 无一次内联发布，全部由 worker 补发。
+    # 与旧引擎 smart_import_engine 同一写法：publish_dataset_activated 经
+    # _activation_outbox_id 走 publish_one（outbox 行标 published ⇒ worker 不会重发）；
+    # 投递失败时行转 failed，由 worker 按既有退避策略重放 ⇒ 至少一次不变。
+    # 放在 rebuild_aux_summary 之前：试算表重算只依赖 tb_balance，不依赖辅助汇总；
+    # 且 _mark 之后才发布，resume 从 activate_dataset_done 恢复时不会重复发布
+    # （outbox 行已 published，publish_one 对 published 行直接返回 False）。
+    # 失败不阻断导入：数据已激活落库，事件缺失由 worker 兜底。
+    try:
+        from app.services.dataset_service import DatasetService as _DatasetService
+        await _DatasetService.publish_dataset_activated(activated_dataset)
+        logger.info(
+            "Pipeline %s LEDGER_DATASET_ACTIVATED 已内联发布: project=%s year=%s dataset=%s",
+            job_id, project_id, import_year, staging_dataset_id,
+        )
+    except Exception:  # noqa: BLE001
+        logger.warning(
+            "Pipeline %s LEDGER_DATASET_ACTIVATED 内联发布失败（outbox 行保留，"
+            "由 outbox_replay_worker 重放）: dataset=%s",
+            job_id, staging_dataset_id, exc_info=True,
+        )
 
     # ── Rebuild aux summary ──
     logger.info("Pipeline %s phase=rebuild_aux_summary", job_id)

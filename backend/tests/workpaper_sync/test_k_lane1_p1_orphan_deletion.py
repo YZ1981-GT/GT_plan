@@ -448,29 +448,37 @@ class TestDownstreamAbcsCensusAttribution:
             f"缺口 {gap} 不大于 K 份额 {len(k_gone)} ⇒ 并发份额算成 0，归因表该重写"
         )
 
-    #: K 循环交付的契约草案（foundation 1 + lane2 5 + lane1 2）
-    EXPECTED_K_CONTRACTS = {
-        "k1.baddebt_reversal_writeoff_check.candidate.json",
+    #: K 循环仍是草案的契约（lane1 2 份；foundation 1 + lane2 5 已于 2026-10-01 晋级 reviewed，
+    #: 草案原件归档到 lane2 spec 的 evidence/superseded-candidate-contracts/）
+    EXPECTED_K_CANDIDATES = {
         "k2.adjudication_derived.candidate.json",
-        "k8.selling_expenses_adjustment.candidate.json",
-        "k9.admin_expenses_adjustment.candidate.json",
-        "k10.other_income_adjustment.candidate.json",
-        "k11.asset_impairment_loss_adjustment.candidate.json",
-        "k12.non_operating_income_adjustment.candidate.json",
-        "k13.non_operating_expense_adjustment.candidate.json",
     }
 
     def test_k_contracts_stay_candidate_so_ownership_predicates_hold(self) -> None:
-        """🔴 K 的契约全是 candidate + `entry_id=null`（决策 7）。
+        """🔴 K 的契约 = 2 份 candidate（`entry_id=null`）+ 晋级账本 6 份 reviewed。
 
         断言**名单**而不是光断言个数 —— 个数对得上但换了文件同样是漂移。
+        reviewed 的 `review.entry_id` 必须精确指向本 entry（不再是 null）。
         """
+        from tests.workpaper_sync.k_foundation_facts import (
+            K_ENTRY_ID_BY_INDEX,
+            K_REVIEWED_CONTRACTS,
+        )
+
+        reviewed = {f"{cid}.json": n for n, cid in K_REVIEWED_CONTRACTS.items()}
         ks = sorted(CONTRACT_DIR.glob("k*.json"))
-        assert {p.name for p in ks} == self.EXPECTED_K_CONTRACTS, [p.name for p in ks]
+        assert {p.name for p in ks} == self.EXPECTED_K_CANDIDATES | set(reviewed), [
+            p.name for p in ks
+        ]
         for p in ks:
             doc = json.loads(p.read_text(encoding="utf-8"))
+            owner = (doc.get("review") or {}).get("entry_id")
+            if p.name in reviewed:
+                assert doc.get("review_status") == "reviewed", p.name
+                assert owner == K_ENTRY_ID_BY_INDEX[reviewed[p.name]], (p.name, owner)
+                continue
             assert p.name.endswith(".candidate.json"), p.name
             assert doc.get("review_status") == "candidate", p.name
-            assert (doc.get("review") or {}).get("entry_id") is None, (
+            assert owner is None, (
                 f"{p.name} 的 review.entry_id 非 null ⇒ 打破 task53 的两条归属判据"
             )

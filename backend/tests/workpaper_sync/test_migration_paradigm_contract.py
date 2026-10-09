@@ -706,11 +706,49 @@ def validate_slice_against_schema(
                     identity = table.get("row_identity")
                     if not need(identity, row_fields, f"{tlabel}.row_identity"):
                         continue
+                    # ── NC-33：区分「声明存在」与「实际使用」两种语义 ───────────
+                    # 旧判据只有一行 `if kind in forbidden`（对列表是**裸相等**成员检查）。
+                    # 它的问题不是误伤——裸相等本就放行描述性复合词（如
+                    # `fixed_skeleton_in_memory_positional_index_in_store`）——而是**只堵了
+                    # 一半**：它既不要求 DEFECT 表如实点名所违反的禁用值，也不校验点名的
+                    # 值是否真实存在。于是「把缺陷藏进一个含糊干净词」这条出路**对校验器
+                    # 完全无感**（校验器放行，缺陷无人登记）。NC-33 的正解是把「诚实声明」
+                    # 这件事从「校验器碰巧容忍」升级成「校验器主动强制」，按三条正交语义判：
+                    #   (a) 实际使用（必拒）：`kind` **恰等于**某个 forbidden 字面值 —— 直接
+                    #       拿下标/序号当身份且连描述都不加，最赤裸的违规；也是反向自检变异
+                    #       （把 kind 改成 `array_index`）要钉住的形态。
+                    #   (c) 缺陷未声明（必拒）：`verdict == "DEFECT"` 却缺
+                    #       `violates_forbidden_identity_kind` —— 这正是「改成含糊词把缺陷
+                    #       藏起来」的那条出路，强制它必须如实点名。
+                    #   (d) 点名须真实：`violates_forbidden_identity_kind` 若出现，必须是
+                    #       `forbidden_identity_kinds` 里真实存在的值（不许编一个假禁用值糊弄）。
+                    #   反之：复合描述词 + 如实声明 = 放行（DEFECT 另由 registered_as 的 BP
+                    #   承接）。🔴 **不**按「kind 含 forbidden 子串」判——F/G/H/I/J 多张 CLEAN
+                    #   表的 kind 本就含 `array_index`/`position` 作 fallback 描述，按子串判会
+                    #   把它们全误伤（本轮实测会多报 10 条），那是把一个洞换成十个洞。
                     forbidden = body.get("forbidden_identity_kinds") or []
-                    if identity.get("kind") in forbidden:
+                    kind = identity.get("kind")
+                    violates = identity.get("violates_forbidden_identity_kind")
+                    verdict = table.get("verdict")
+                    if kind in forbidden:
+                        # (a) 裸相等：无条件拒（连「如实点名」都救不了直接拿禁用值当 kind）
                         v.append(
-                            f"{tlabel}.row_identity: kind={identity.get('kind')!r} 在 "
-                            f"forbidden_identity_kinds 里（行身份不得用下标/序号）"
+                            f"{tlabel}.row_identity: kind={kind!r} 恰为 "
+                            f"forbidden_identity_kinds 字面值（禁止直接拿下标/序号当身份；"
+                            f"若确为缺陷请用描述性 kind + violates_forbidden_identity_kind 如实声明）"
+                        )
+                    elif verdict == "DEFECT" and not violates:
+                        # (c) 判了缺陷却不点名所违反的禁用值 ⇒ 藏缺陷
+                        v.append(
+                            f"{tlabel}.row_identity: verdict=DEFECT 却缺 "
+                            f"violates_forbidden_identity_kind（缺陷必须如实点名它违反的禁用值，"
+                            f"不得用含糊 kind 把缺陷藏起来）"
+                        )
+                    # (d) 点名的禁用值须真实存在
+                    if violates is not None and violates not in forbidden:
+                        v.append(
+                            f"{tlabel}.row_identity: violates_forbidden_identity_kind="
+                            f"{violates!r} 不在 forbidden_identity_kinds 里（点名的禁用值须真实存在）"
                         )
 
     # ── effective_from_task_48 ─────────────────────────────────────────────
@@ -1261,6 +1299,71 @@ class TestSliceSchemaPositiveExample:
             f"{slice_rel} 通不过范式自己的 slice_schema（{len(problems)} 条）：\n"
             + "\n".join("  !! " + p for p in problems)
         )
+
+
+class TestNC33ForbiddenIdentityDisclosure:
+    """**Validates: Requirements 6.5, 12.4** —— NC-33：区分「声明存在」与「实际使用」。
+
+    旧判据只有裸相等 `kind in forbidden`，它放行描述性复合词、却**既不强制 DEFECT 表如实
+    点名所违反的禁用值、也不校验点名的值是否真实存在** —— 于是「把缺陷藏进含糊干净词」这条
+    出路对校验器完全无感（N1-1 的 `why_kind_is_compound` 正是作者被逼出来的现实选择）。本类
+    把三条语义逐一钉成**可伪证**判据：honest 复合词放行、裸禁用值拒、DEFECT 不点名拒、点名
+    假禁用值拒。N 循环 slice 有真实的 DEFECT 动态行表（n1/n2/n5），是本判据唯一的真实分母。
+    """
+
+    N_SLICE = "backend/data/workpaper_sync_n_cycle_manifest_slice.json"
+
+    def _n_slice(self) -> dict:
+        return json.loads((ROOT / self.N_SLICE).read_text(encoding="utf-8"))
+
+    def _first_defect_idx(self, doc: dict) -> int:
+        tables = doc["dynamic_row_identity"]["tables"]
+        for i, t in enumerate(tables):
+            if t.get("verdict") == "DEFECT":
+                return i
+        raise AssertionError("N slice 里没有 DEFECT 动态行表 —— 本判据失去真实分母")
+
+    def test_honest_compound_kind_with_disclosure_passes(self) -> None:
+        """正例：复合描述性 kind + 如实 `violates_` 点名 ⇒ 放行（这是 NC-33 要保住的事）。"""
+        doc = self._n_slice()
+        i = self._first_defect_idx(doc)
+        rid = doc["dynamic_row_identity"]["tables"][i]["row_identity"]
+        assert rid["kind"] not in doc["dynamic_row_identity"]["forbidden_identity_kinds"], (
+            "前提失效：该 DEFECT 表的 kind 竟是裸禁用值 —— 它本应是复合描述词"
+        )
+        assert rid.get("violates_forbidden_identity_kind"), "前提失效：该表未如实点名"
+        assert validate_slice_against_schema(doc) == [], (
+            "如实声明的 N slice 被校验器拒 ⇒ NC-33 正例侧回退（又在反向激励藏缺陷）"
+        )
+
+    def test_bare_forbidden_literal_is_rejected(self) -> None:
+        """(a) kind 恰为禁用字面值 ⇒ 拒（连如实点名也救不了）。"""
+        doc = self._n_slice()
+        i = self._first_defect_idx(doc)
+        doc["dynamic_row_identity"]["tables"][i]["row_identity"]["kind"] = "array_index"
+        problems = validate_slice_against_schema(doc)
+        assert any("恰为" in p and "array_index" in p for p in problems), problems
+
+    def test_defect_without_disclosure_is_rejected(self) -> None:
+        """(c) verdict=DEFECT 却抽掉 `violates_` ⇒ 拒（堵死「含糊 kind 藏缺陷」出路）。"""
+        doc = self._n_slice()
+        i = self._first_defect_idx(doc)
+        doc["dynamic_row_identity"]["tables"][i]["row_identity"].pop(
+            "violates_forbidden_identity_kind", None
+        )
+        problems = validate_slice_against_schema(doc)
+        assert any("verdict=DEFECT" in p and "violates_forbidden_identity_kind" in p
+                   for p in problems), problems
+
+    def test_fabricated_violated_value_is_rejected(self) -> None:
+        """(d) 点名一个不存在的禁用值 ⇒ 拒（不许编假禁用值糊弄诚实判据）。"""
+        doc = self._n_slice()
+        i = self._first_defect_idx(doc)
+        doc["dynamic_row_identity"]["tables"][i]["row_identity"][
+            "violates_forbidden_identity_kind"
+        ] = "not_a_real_forbidden_kind"
+        problems = validate_slice_against_schema(doc)
+        assert any("不在 forbidden_identity_kinds 里" in p for p in problems), problems
 
 
 # ════════════════════════════════════════════════════════════════════════════

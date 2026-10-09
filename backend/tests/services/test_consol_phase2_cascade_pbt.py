@@ -24,6 +24,8 @@ from uuid import uuid4
 import pytest
 from hypothesis import given, settings, strategies as st
 
+from app.schemas.consol_context import ConsolContext
+from app.services.consol_context_service import context_from_tree, tree_fingerprint, validate_context
 from app.services.consol_cascade_refresh_service import (
     STEP_NOTES,
     STEP_RECONCILE,
@@ -67,7 +69,16 @@ def _fake_tree(node_count: int):
     refresh_all 用 `1 + len(get_descendants(tree))` 统计 nodes_refreshed，
     因此我们让 get_descendants 返回 node_count-1 个占位后代。
     """
-    return SimpleNamespace(company_code="ROOT", project_id=uuid4())
+    return SimpleNamespace(
+        company_code="ROOT",
+        project_id=uuid4(),
+        node_key="ROOT:consol",
+        role="consol",
+        kind="aggregate",
+        host_project_id=None,
+        report_scope="consolidated",
+        children=[],
+    )
 
 
 def _patch_all(
@@ -77,38 +88,81 @@ def _patch_all(
 ):
     """统一 patch 编排器的全部底层依赖。返回 (patchers_cm, mocks_dict)。
 
-    - build_tree: AsyncMock 返回 fake tree
+    - build_tree: AsyncMock 返回同一棵 fake tree
+    - build_consol_context: 只构造一次 typed context，供所有步骤共享
     - get_descendants: MagicMock 返回 node_count-1 个占位后代
     - recalc_full / recalculate_trial / reconcile / generate_consol_reports_sync / generate_full_consol_notes: AsyncMock
     - settings.CONSOL_NOTES_V2_ENABLED: 控制 notes 是否真正执行 V2
     """
     descendants = [object()] * max(node_count - 1, 0)
     fake_settings = SimpleNamespace(CONSOL_NOTES_V2_ENABLED=notes_v2_enabled)
+    tree = _fake_tree(node_count)
+    context_box: list[ConsolContext] = []
 
+    async def _build_context(_db, project_id, year, *, tree=None):
+        context = context_from_tree(project_id, year, tree)
+        context_box.append(context)
+        return context
+
+    build_context_mock = AsyncMock(side_effect=_build_context)
+    recalc_full_mock = AsyncMock(return_value=None)
+    recalculate_trial_mock = AsyncMock(return_value=None)
+    reconcile_mock = AsyncMock(return_value=MagicMock())
+    report_mock = AsyncMock(return_value=None)
+    notes_mock = AsyncMock(return_value=[])
     patchers = {
-        "build_tree": patch(f"{_MODULE}.build_tree", new=AsyncMock(return_value=_fake_tree(node_count))),
+        "tree": tree,
+        "context_box": context_box,
+        "build_tree": patch(f"{_MODULE}.build_tree", new=AsyncMock(return_value=tree)),
+        "build_consol_context": patch(f"{_MODULE}.build_consol_context", new=build_context_mock),
+        "build_context_mock": build_context_mock,
         "get_descendants": patch(f"{_MODULE}.get_descendants", new=MagicMock(return_value=descendants)),
-        "recalc_full": patch(f"{_MODULE}.recalc_full", new=AsyncMock(return_value=None)),
-        "recalculate_trial": patch(f"{_MODULE}.recalculate_trial", new=AsyncMock(return_value=None)),
+        "recalc_full": patch(f"{_MODULE}.recalc_full", new=recalc_full_mock),
+        "recalc_full_mock": recalc_full_mock,
+        "recalculate_trial": patch(f"{_MODULE}.recalculate_trial", new=recalculate_trial_mock),
+        "recalculate_trial_mock": recalculate_trial_mock,
         "reconcile_worksheet_vs_trial": patch(
-            f"{_MODULE}.reconcile_worksheet_vs_trial", new=AsyncMock(return_value=MagicMock())
+            f"{_MODULE}.reconcile_worksheet_vs_trial", new=reconcile_mock
         ),
+        "reconcile_mock": reconcile_mock,
         "generate_consol_reports_sync": patch(
-            f"{_MODULE}.generate_consol_reports_sync", new=AsyncMock(return_value=None)
+            f"{_MODULE}.generate_consol_reports_sync", new=report_mock
         ),
+        "report_mock": report_mock,
         "generate_full_consol_notes": patch(
-            f"{_MODULE}.generate_full_consol_notes", new=AsyncMock(return_value=[])
+            f"{_MODULE}.generate_full_consol_notes", new=notes_mock
         ),
+        "notes_mock": notes_mock,
         "settings": patch(f"{_MODULE}.settings", new=fake_settings),
     }
     return patchers
 
 
 def _make_db() -> AsyncMock:
-    """构造带 AsyncMock commit 的 db 替身。"""
+    """构造带 commit 和项目模板查询结果的 db 替身。"""
     db = AsyncMock()
     db.commit = AsyncMock(return_value=None)
+    # 级联开启 notes 后会解析项目真实 Listed/SOE 模板；为编排器测试提供
+    # 一个确定的项目口径，避免把未配置的 AsyncMock 协程当作字符串。
+    template_result = MagicMock()
+    template_result.scalar_one_or_none.return_value = "soe_consolidated"
+    db.execute.return_value = template_result
     return db
+
+
+def _assert_shared_identity(patchers, *steps: str) -> None:
+    """断言级联只构造一次上下文，并把同一 tree/context 透传给各阶段。"""
+    assert patchers["build_context_mock"].await_count == 1
+    assert len(patchers["context_box"]) == 1
+    context = patchers["context_box"][0]
+    tree = patchers["tree"]
+    assert context.tree_fingerprint == tree_fingerprint(tree)
+    for step in steps:
+        mock = patchers[f"{step}_mock"]
+        assert mock.await_count == 1, step
+        call = mock.await_args
+        assert call.kwargs["tree"] is tree, step
+        assert call.kwargs["context"] is context, step
 
 
 class _ProgressRecorder:
@@ -147,7 +201,7 @@ class TestS1DagOrder:
         """随机有效节点数 → steps_completed 顺序恒为 [tree,worksheet,trial,reconcile,report,notes]。"""
         patchers = _patch_all(node_count=node_count, notes_v2_enabled=True)
         recorder = _ProgressRecorder()
-        with patchers["build_tree"], patchers["get_descendants"], patchers["recalc_full"], \
+        with patchers["build_tree"], patchers["build_consol_context"], patchers["get_descendants"], patchers["recalc_full"], \
                 patchers["recalculate_trial"], patchers["reconcile_worksheet_vs_trial"], \
                 patchers["generate_consol_reports_sync"], patchers["generate_full_consol_notes"], \
                 patchers["settings"]:
@@ -161,6 +215,13 @@ class TestS1DagOrder:
         assert result.nodes_refreshed == node_count
         # progress_cb 收到的成功步骤同序
         assert recorder.completed_steps_in_order() == _EXPECTED_ORDER
+        _assert_shared_identity(
+            patchers,
+            "recalc_full",
+            "recalculate_trial",
+            "report",
+            "notes",
+        )
 
     @given(node_count=st.integers(min_value=1, max_value=8))
     @settings(max_examples=10)
@@ -168,7 +229,7 @@ class TestS1DagOrder:
     async def test_notes_after_report_after_trial(self, node_count):
         """关键 DAG 偏序：notes 必在 report 后，report 必在 trial 后。"""
         patchers = _patch_all(node_count=node_count, notes_v2_enabled=True)
-        with patchers["build_tree"], patchers["get_descendants"], patchers["recalc_full"], \
+        with patchers["build_tree"], patchers["build_consol_context"], patchers["get_descendants"], patchers["recalc_full"], \
                 patchers["recalculate_trial"], patchers["reconcile_worksheet_vs_trial"], \
                 patchers["generate_consol_reports_sync"], patchers["generate_full_consol_notes"], \
                 patchers["settings"]:
@@ -177,6 +238,13 @@ class TestS1DagOrder:
         steps = result.steps_completed
         assert steps.index(STEP_TRIAL) < steps.index(STEP_REPORT) < steps.index(STEP_NOTES)
         assert steps.index(STEP_WORKSHEET) < steps.index(STEP_TRIAL)
+        _assert_shared_identity(
+            patchers,
+            "recalc_full",
+            "recalculate_trial",
+            "report",
+            "notes",
+        )
 
 
 # ===========================================================================
@@ -201,7 +269,7 @@ class TestS2FailureIsolation:
         boom = AsyncMock(side_effect=RuntimeError(f"{critical_step} boom"))
         patchers[symbol] = patch(f"{_MODULE}.{symbol}", new=boom)
 
-        with patchers["build_tree"], patchers["get_descendants"], patchers["recalc_full"], \
+        with patchers["build_tree"], patchers["build_consol_context"], patchers["get_descendants"], patchers["recalc_full"], \
                 patchers["recalculate_trial"], patchers["reconcile_worksheet_vs_trial"], \
                 patchers["generate_consol_reports_sync"], patchers["generate_full_consol_notes"], \
                 patchers["settings"]:
@@ -231,7 +299,7 @@ class TestS2FailureIsolation:
         boom = AsyncMock(side_effect=RuntimeError(f"{downstream_step} boom"))
         patchers[symbol] = patch(f"{_MODULE}.{symbol}", new=boom)
 
-        with patchers["build_tree"], patchers["get_descendants"], patchers["recalc_full"], \
+        with patchers["build_tree"], patchers["build_consol_context"], patchers["get_descendants"], patchers["recalc_full"], \
                 patchers["recalculate_trial"], patchers["reconcile_worksheet_vs_trial"], \
                 patchers["generate_consol_reports_sync"], patchers["generate_full_consol_notes"], \
                 patchers["settings"]:
@@ -276,7 +344,7 @@ class TestS6Idempotency:
 
         async def _run_once():
             patchers = _patch_all(node_count=node_count, notes_v2_enabled=True)
-            with patchers["build_tree"], patchers["get_descendants"], patchers["recalc_full"], \
+            with patchers["build_tree"], patchers["build_consol_context"], patchers["get_descendants"], patchers["recalc_full"], \
                     patchers["recalculate_trial"], patchers["reconcile_worksheet_vs_trial"], \
                     patchers["generate_consol_reports_sync"], patchers["generate_full_consol_notes"], \
                     patchers["settings"]:
@@ -307,7 +375,7 @@ class TestCascadeUnit:
         def _boom_cb(*_args, **_kwargs):
             raise ValueError("progress cb boom")
 
-        with patchers["build_tree"], patchers["get_descendants"], patchers["recalc_full"], \
+        with patchers["build_tree"], patchers["build_consol_context"], patchers["get_descendants"], patchers["recalc_full"], \
                 patchers["recalculate_trial"], patchers["reconcile_worksheet_vs_trial"], \
                 patchers["generate_consol_reports_sync"], patchers["generate_full_consol_notes"], \
                 patchers["settings"]:
@@ -318,19 +386,20 @@ class TestCascadeUnit:
 
     @pytest.mark.asyncio
     async def test_notes_flag_disabled_skips_v2_but_marks_step(self):
-        """CONSOL_NOTES_V2_ENABLED=False → 不调 V2，notes 仍记为完成（skipped 终态）。"""
+        """CONSOL_NOTES_V2_ENABLED=False → 不调 V2，notes 进 steps_skipped（非 steps_completed）。"""
         patchers = _patch_all(node_count=2, notes_v2_enabled=False)
         v2_mock = AsyncMock(return_value=[])
         patchers["generate_full_consol_notes"] = patch(
             f"{_MODULE}.generate_full_consol_notes", new=v2_mock
         )
-        with patchers["build_tree"], patchers["get_descendants"], patchers["recalc_full"], \
+        with patchers["build_tree"], patchers["build_consol_context"], patchers["get_descendants"], patchers["recalc_full"], \
                 patchers["recalculate_trial"], patchers["reconcile_worksheet_vs_trial"], \
                 patchers["generate_consol_reports_sync"], patchers["generate_full_consol_notes"], \
                 patchers["settings"]:
             result = await refresh_all(_make_db(), uuid4(), 2025)
 
-        assert STEP_NOTES in result.steps_completed
+        assert STEP_NOTES not in result.steps_completed
+        assert STEP_NOTES in result.steps_skipped
         v2_mock.assert_not_awaited()
 
     @pytest.mark.asyncio
@@ -338,7 +407,7 @@ class TestCascadeUnit:
         """build_tree 返回 None → nodes_refreshed=0，tree 步仍完成，但下游正常跑。"""
         patchers = _patch_all(node_count=1, notes_v2_enabled=True)
         patchers["build_tree"] = patch(f"{_MODULE}.build_tree", new=AsyncMock(return_value=None))
-        with patchers["build_tree"], patchers["get_descendants"], patchers["recalc_full"], \
+        with patchers["build_tree"], patchers["build_consol_context"], patchers["get_descendants"], patchers["recalc_full"], \
                 patchers["recalculate_trial"], patchers["reconcile_worksheet_vs_trial"], \
                 patchers["generate_consol_reports_sync"], patchers["generate_full_consol_notes"], \
                 patchers["settings"]:

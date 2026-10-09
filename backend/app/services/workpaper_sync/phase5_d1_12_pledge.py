@@ -44,10 +44,17 @@ _FIELD_SPECS_D112: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] =
     ("index_ref", "P", "editable", "text", "indexRef", "索引号", ""),
 )
 
-_FORMULA_COLUMNS_D112: Final[tuple[str, ...]] = ("H", "J")
-_FORMULA_TEMPLATES_D112: Final[dict[str, str]] = {
-    "H": "=SUM(H12:H{r})",
-    "J": "=SUM(J12:J{r})",
+# 🔴 2026-09-28 修正：footer SUM 列不进 `formula_columns`（数据区逐格实测零公式）。
+#    `formula_mask` 现算为 `{col}{first_data_row}:{col}{last_data_row}`，覆盖不到 footer；
+#    填进去只会让 H/J 两列的整个数据区被 `merge._protection` 判 `read_only_masked_cell`，
+#    OO 侧改「票据金额 / 质押金额」永远写不回 store。
+_FORMULA_COLUMNS_D112: Final[tuple[str, ...]] = ()
+_FORMULA_TEMPLATES_D112: Final[dict[str, str]] = {}
+
+#: footer 行 SUM 公式（`{last}` = last_data_row）。纯实测证据，不进 spec。
+FOOTER_SUM_TEMPLATES_D112: Final[dict[str, str]] = {
+    "H": "=SUM(H12:H{last})",
+    "J": "=SUM(J12:J{last})",
 }
 
 SPEC_D112: Final[RowTableSheetSpec] = RowTableSheetSpec(

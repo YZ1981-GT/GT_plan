@@ -84,37 +84,21 @@ class TestProperty1MigrationState:
     def test_f3_entry_exists_in_manifest(self, manifest_entry) -> None:
         assert manifest_entry, f"{F3_ENTRY_ID} 不在 source-backed manifest 里"
 
-    def test_current_state_is_legacy_fake_bidirectional(self, manifest_entry) -> None:
-        """红基线锚点：现状就是 legacy 假双向（记录红形态，供转绿时对比）。"""
-        assert manifest_entry.get("migration_state") == "legacy_fake_bidirectional"
+    def test_current_state_is_adapter_registered(self, manifest_entry) -> None:
+        """翻转后：manifest migration_state 已是 adapter_registered。"""
+        assert manifest_entry.get("migration_state") == "adapter_registered"
 
-    @pytest.mark.xfail(
-        reason=(
-            "🔴 现状必红：F3 adapter 未注册 —— 发布链第③环 published representation 缺供给"
-            "（slice 实测 published_representation=null，umbrella BP-61-1）。"
-            "Task 9 供给就绪后转绿"
-        ),
-        strict=True,
-    )
     def test_migration_state_becomes_adapter_registered(self, manifest_entry) -> None:
         assert manifest_entry.get("migration_state") == "adapter_registered"
 
-    @pytest.mark.xfail(
-        reason="🔴 现状必红：三条 legacy_reasons 尚未消除（同上，卡 BP-61-1）",
-        strict=True,
-    )
     def test_legacy_reasons_all_cleared(self, manifest_entry) -> None:
         reasons = (manifest_entry.get("evidence") or {}).get("legacy_reasons") or []
         assert reasons == []
 
-    def test_legacy_reasons_are_the_three_known_ones(self, manifest_entry) -> None:
-        """红形态取证：三条 reason 逐字（转绿时这三条必须全消，不能只消一两条）。"""
+    def test_legacy_reasons_cleared_after_flip(self, manifest_entry) -> None:
+        """翻转后 legacy_reasons 应为空。"""
         reasons = set((manifest_entry.get("evidence") or {}).get("legacy_reasons") or [])
-        assert reasons == {
-            "template_only_open",
-            "no_durable_forcesave_ack",
-            "missing_adapter",
-        }, f"legacy_reasons 实得 {sorted(reasons)}"
+        assert reasons == set()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -135,6 +119,7 @@ class TestProperty2StoreItemId:
             "F3-7-debit-rows",
             "F3-7-credit-rows",
             "F3-7-subsequent-rows",
+            "F3-2-rows",
         )
 
     @pytest.mark.parametrize(
@@ -799,10 +784,11 @@ class TestF306FieldsAndFc10:
             F305.SHEET_KEY_F305,
             F306.SHEET_KEY_F306,
             F307.SHEET_KEY_F307,
+            "f32-managed",
         }
-        # F3-7 三区共享一个 sheet_key ⇒ sheet 数 3、table 数 5
+        # F3-7 三区共享一个 sheet_key ⇒ sheet 数 4、table 数 6（含 F3-2）
         tables = [t for s in contract.sheets for t in s.tables]
-        assert len(tables) == len(F3.managed_row_table_specs()) == 5
+        assert len(tables) == len(F3.managed_row_table_specs())
 
     def test_instrumentation_covers_both_sheets(self) -> None:
         specs = F3.instrumentation_specs()
@@ -1186,9 +1172,9 @@ class TestF307StoreKeysAndFooter:
 
     def test_instrumentation_covers_all_five_tables(self) -> None:
         specs = F3.instrumentation_specs()
-        assert len(specs) == len(F3.managed_row_table_specs()) == 5
-        # 三区共享 sheet_key ⇒ resolved_sheet_key 去重后只有 3 个
-        assert len({str(s.resolved_sheet_key) for s in specs}) == 3
+        assert len(specs) == len(F3.managed_row_table_specs())
+        # 三区共享 sheet_key + F3-2 独立 sheet_key ⇒ resolved_sheet_key 去重后 4 个
+        assert len({str(s.resolved_sheet_key) for s in specs}) == 4
 
     def test_html_only_anchor_rows_registered(self) -> None:
         rows = dict(F307.HTML_ONLY_ANCHOR_ROWS_F307)
@@ -1197,3 +1183,31 @@ class TestF307StoreKeysAndFooter:
         assert rows[60] == "3.资产负债表日后借方检查"
         assert rows[81] == "四、审计说明："
         assert rows[88] == "五、审计结论："
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# F3-2 I 列（期限天数）模板无公式守卫（复盘改进 ①）
+# FC-7 auto_source 列：模板 I 列必须为空（前端 termDays 是 computed 派生）
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestF302ColumnIHasNoTemplateFormula:
+    """I 列（期限天数）在模板中应无公式（FC-7 auto_source）。
+
+    如果将来有人给模板 I 列加公式，本判据打红——防止 editable/formula 混淆。
+    """
+
+    def test_i_column_empty_in_data_area(self) -> None:
+        from openpyxl import load_workbook
+        from app.services.workpaper_sync import phase5_f3_02_detail as F302
+
+        wb = load_workbook(F3.authoritative_template_path(), data_only=False)
+        try:
+            ws = wb[F302.MANAGED_SHEET_F302]
+            for r in range(F302.FIRST_DATA_ROW_F302, F302.LAST_DATA_ROW_F302 + 1):
+                cell = ws[f"I{r}"]
+                assert cell.value is None and cell.data_type != "f", (
+                    f"I{r} 应为空（FC-7 auto_source），实得 value={cell.value!r} dtype={cell.data_type}"
+                )
+        finally:
+            wb.close()

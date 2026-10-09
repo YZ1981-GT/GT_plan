@@ -298,16 +298,40 @@ _SEGMENT_EXCLUSIONS: tuple[str, ...] = (
 
 def _replica_fidelity() -> dict[str, Any]:
     """「脚本计时的步骤」与「生产 CPU 段真实调用的步骤」逐条对账。"""
+    import ast
     import inspect
+    import textwrap
 
-    from app.services.workpaper_sync.content_mutation import ContentMutationService
+    from app.services.workpaper_sync.content_mutation import (
+        ContentMutationService,
+        assert_roundtrip_equivalent,
+    )
 
     scoped = inspect.getsource(ContentMutationService._stage_cpu_segment_scoped)
     outer = inspect.getsource(ContentMutationService._stage_cpu_segment)
-    roundtrip = inspect.getsource(ContentMutationService._assert_roundtrip_equivalent)
+
     # 脚本以 `self=None` 调它（生产里它不碰实例状态）。哪天它开始用 `self.`，这条会亮，
     # 而不是让脚本在 `NoneType` 上炸一个看不懂的 AttributeError。
-    uses_self = "self." in roundtrip
+    #
+    # 🔴 两条纪律都必须守（删行 spec 复盘实测）：
+    # ① **跟随间接层** —— `_assert_roundtrip_equivalent` 现在是薄壳，真实现搬到了模块级
+    #    `assert_roundtrip_equivalent`。只看薄壳会恒得 `False`，这盏灯就从「会亮」退化成
+    #    **永绿的装饰**。故两段一起看。
+    # ② **禁文本 `in` 匹配，用 AST**（铁律 ㉖）—— 薄壳的 docstring 里就写着 `self.xxx`
+    #    这个反例字样，`"self." in src` 当场误报「开始消费 self 了」。docstring 是
+    #    `Expr(Constant)`、`#` 注释根本不进 AST ⇒ 只数真实的属性访问天然不会被骗。
+    uses_self = False
+    for fn in (
+        ContentMutationService._assert_roundtrip_equivalent,
+        assert_roundtrip_equivalent,
+    ):
+        tree = ast.parse(textwrap.dedent(inspect.getsource(fn)))
+        uses_self = uses_self or any(
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "self"
+            for node in ast.walk(tree)
+        )
     return {
         "production_function": "ContentMutationService._stage_cpu_segment_scoped",
         "timed_steps_found_in_production": [

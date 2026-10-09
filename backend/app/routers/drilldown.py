@@ -121,12 +121,20 @@ async def get_voucher_detail(
     project_id: UUID,
     voucher_no: str,
     year: int = Query(..., description="审计年度"),
+    month: int | None = Query(None, ge=1, le=12, description="凭证月份（1~12）；粗粒度，同月内仍可能多张同号凭证"),
+    voucher_date: str | None = Query(None, description="凭证日期 YYYY-MM-DD；与凭证号组合唯一定位一张凭证（推荐）"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ) -> dict:
-    """按凭证号查询完整分录（借贷明细+合计+平衡状态）"""
+    """按凭证号查询完整分录（借贷明细+合计+平衡状态）
+
+    ⚠️ voucher_no 在真实数据中不唯一（实测 8 个项目里 7 个跨月/跨日重复）。
+    不传 voucher_date 时返回的是全年同号凭证的合计，is_balanced 不代表单张凭证。
+    """
     svc = DrilldownService(db)
-    return await svc.get_voucher_detail(project_id, year, voucher_no)
+    return await svc.get_voucher_detail(
+        project_id, year, voucher_no, month=month, voucher_date=voucher_date,
+    )
 
 
 @router.get("/vouchers")

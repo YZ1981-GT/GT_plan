@@ -1,0 +1,1 @@
+{"authority_model":"projection_contract","content_authority":"structured_projection","entry_id":"xlsx/gt-k11-asset-impairment-loss","merge_model":"stable_field_three_way","pilot_class":"k11_adjustment_summary","required_slots":["template","instrumentation","contract"],"schema_version":"authority-model-definition:v1"}

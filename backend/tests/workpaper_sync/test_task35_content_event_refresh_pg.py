@@ -667,7 +667,14 @@ def test_failed_row_keeps_the_full_payload_for_replay(snap: dict[str, Any]) -> N
     "没有静默丢失"这句话只在行数上成立。
     """
     rows = snap["dispatch_failure_then_replay"]["rows_final"]
-    replayed = rows[-1]["payload"]
+    # 🔴 按身份定位重放行，不按 `rows[-1]`：rows 是 `ORDER BY created_at`（DEFAULT now()），
+    #    而本机 Docker PG 的 VM 时钟会回拨（2026-09-29 实测 6 分钟 18 次、每次 0.5~2.5s），
+    #    跨事务插入的后一行可能 created_at 更早 ⇒ `rows[-1]` 偶发取到场景 B 的 revision=13 行，
+    #    报 `assert 13 == 14`（与本判据要验的「payload 完整」无关）。场景 D 入队的是 revision=14，
+    #    按 revision 取即与时钟无关。
+    matching = [r for r in rows if r["payload"].get("revision") == 14]
+    assert len(matching) == 1, f"场景 D 的重放行应恰有 1 条，实际 {len(matching)}: {rows}"
+    replayed = matching[0]["payload"]
     assert replayed["revision"] == 14
     for key in ("wp_id", "project_id", "operation_id", "source", "adapter_id", "file_sha256"):
         assert key in replayed, f"重放行的 payload 缺 {key}"

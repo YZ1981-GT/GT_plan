@@ -309,7 +309,12 @@ class TestProfileFieldsExistOnEveryEntry:
                 target = lines[int(line) - 1]
                 assert re.search(
                     r"readonly|onlyoffice-config|doc_key|document_key|props\.mode|GtOnlyOfficeSheet|"
-                    r"OnlyOfficeWordDialog|WorkpaperWordEditor|documentKey",
+                    r"OnlyOfficeWordDialog|WorkpaperWordEditor|documentKey|"
+                    # 🔴 同步载体（`WorkpaperSyncEditorHost`）的两条证据形态，
+                    # spec: sync-editor-host-discovery-contract-closure
+                    #   ① 可编辑性由桥的状态机门控（它没有 readonly / mode prop）
+                    #   ② room/docKey 来自服务端签发的 descriptor（它刻意不请求 config）
+                    r"bridge\.state\.value|descriptor\.roomId|descriptor\.docKey",
                     target,
                 ), f"provenance {ref} 指向的行与该事实无关: {target.strip()[:90]!r}"
 

@@ -50,14 +50,14 @@
   "D4": [
     {
       "anchor": "D4-1-adj-tb-6001",
-      "expression": "TB('6001','审定数')",
+      "expression": "TB('6001','本期发生额')",
       "sheet_name": "D4-1",
       "formula_type": "auto_calc",
       "description": "试算表 6001 主营业务收入审定发生额，供 D4-1 审定表主营小计 TB↔审定核对行（D4-1-adj-tb-6001）。损益类科目 trial_balance.audited_amount 存审定发生额（期末余额=审定数 同映射 audited_amount）。可表达为单条 TB 公式（Tier A）可编辑；求值经 get_active_filter 数据集版本读取，与 Tier B prefill 同口径。审定表主营明细行按产品由 D4-2 明细（D4-2-rows，序时账 6001 贷方按产品×月归集）SUMIF 聚合、非 TB 按产品维度拆分（宁缺勿造 R3.4），不在此。"
     },
     {
       "anchor": "D4-1-adj-tb-6051",
-      "expression": "TB('6051','审定数')",
+      "expression": "TB('6051','本期发生额')",
       "sheet_name": "D4-1",
       "formula_type": "auto_calc",
       "description": "试算表 6051 其他业务收入审定发生额，供 D4-1 审定表其他小计 TB↔审定核对行（D4-1-adj-tb-6051）。损益类 audited_amount 存审定发生额。可表达为单条 TB 公式（Tier A）可编辑；求值经 get_active_filter 数据集版本读取，与 Tier B prefill 同口径。其他收入明细行由 D4-3 明细（D4-3-rows）聚合、非 TB 按维度拆分（宁缺勿造 R3.4），不在此。"
@@ -92,7 +92,7 @@
     {"anchor": "H9-1-tb-amount", "expression": "TB('2205','期末余额')", "sheet_name": "H9-1", "formula_type": "auto_calc", "description": "试算表 2205 租赁负债期末余额（审定数），供 H9-1 审定表 TB↔审定核对行。负债类贷方科目。"}
   ],
   "H10": [
-    {"anchor": "H10-1-tb-amount", "expression": "TB('6115','审定数')", "sheet_name": "H10-1", "formula_type": "auto_calc", "description": "试算表 6115 资产处置损益审定发生额（损益类，audited_amount 存发生额），供 H10-1 审定表 TB↔审定核对行。"}
+    {"anchor": "H10-1-tb-amount", "expression": "TB('6115','本期发生额')", "sheet_name": "H10-1", "formula_type": "auto_calc", "description": "试算表 6115 资产处置损益审定发生额（损益类，本期发生额 = audited_amount − opening_balance），供 H10-1 审定表 TB↔审定核对行。"}
   ],
   "I1": [
     {"anchor": "I1-1-tb-cost", "expression": "TB('1701','期末余额')", "sheet_name": "I1-1", "formula_type": "auto_calc", "description": "试算表 1701 无形资产原值期末余额（审定数），供 I1-1 审定表原值段 TB核对。"},
@@ -112,6 +112,6 @@
     {"anchor": "I5-1-tb-amount", "expression": "TB('1911','期末余额')", "sheet_name": "I5-1", "formula_type": "auto_calc", "description": "试算表 1911 其他非流动资产期末余额（审定数），供 I5-1 审定表 TB↔审定核对行。"}
   ],
   "I6": [
-    {"anchor": "I6-1-tb-amount", "expression": "TB('6602','审定数')", "sheet_name": "I6-1", "formula_type": "auto_calc", "description": "试算表 6602 研发费用审定发生额（损益类借方，audited_amount 存发生额），供 I6-1 审定表 TB↔审定核对行。"}
+    {"anchor": "I6-1-tb-amount", "expression": "TB('6602','本期发生额')", "sheet_name": "I6-1", "formula_type": "auto_calc", "description": "试算表 6602 研发费用审定发生额（损益类借方，本期发生额 = audited_amount − opening_balance），供 I6-1 审定表 TB↔审定核对行。"}
   ]
 }

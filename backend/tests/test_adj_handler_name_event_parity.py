@@ -15,7 +15,7 @@ Validates: Requirements 5.1, 5.2, 5.3
 """
 from __future__ import annotations
 
-import re
+import ast
 from pathlib import Path
 
 _IMPL_FILE = (
@@ -32,25 +32,139 @@ class TestHandlerNameEventParity:
 
     @staticmethod
     def _parse_subscription_pairs() -> list[tuple[str, str]]:
-        """从 _impl.py 源码解析 (handler_name, event_value) 对。
+        """用 AST 解析 ``event_bus.subscribe(EventType.X, handler)`` 对。"""
+        source = _IMPL_FILE.read_bytes().decode("utf-8")
+        tree = ast.parse(source, filename=str(_IMPL_FILE))
+        pairs: list[tuple[str, str]] = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if not (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "subscribe"
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "event_bus"
+                and len(node.args) == 2
+            ):
+                continue
+            event_arg, handler_arg = node.args
+            if not (
+                isinstance(event_arg, ast.Attribute)
+                and isinstance(event_arg.value, ast.Name)
+                and event_arg.value.id == "EventType"
+                and isinstance(handler_arg, ast.Name)
+                and handler_arg.id.startswith("on_event_")
+            ):
+                continue
+            pairs.append((event_arg.attr, handler_arg.id))
+        return pairs
 
-        扫描 ``event_bus.subscribe(EventType.X, handler_func)`` 模式，
-        返回 [(handler_func_name, EventType_member_name), ...].
+    @staticmethod
+    def _parse_all_subscription_pairs() -> list[tuple[str, str]]:
+        """解析所有显式 ``event_bus.subscribe(EventType.X, handler)`` 调用。"""
+        source = _IMPL_FILE.read_bytes().decode("utf-8")
+        tree = ast.parse(source, filename=str(_IMPL_FILE))
+        pairs: list[tuple[str, str]] = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if not (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "subscribe"
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "event_bus"
+                and len(node.args) == 2
+            ):
+                continue
+            event_arg, handler_arg = node.args
+            if (
+                isinstance(event_arg, ast.Attribute)
+                and isinstance(event_arg.value, ast.Name)
+                and event_arg.value.id == "EventType"
+                and isinstance(handler_arg, ast.Name)
+            ):
+                pairs.append((event_arg.attr, handler_arg.id))
+        return pairs
 
-        只提取显式命名的 handler（有 ``on_event_`` 前缀的函数），
-        跳过 _make_handler / _make_tb_handler 产生的匿名闭包。
-        """
-        from pathlib import Path
+    @classmethod
+    def _adjustment_downstream_event_sets(cls) -> dict[str, set[str]]:
+        """按下游职责归并审批/撤回订阅，避免用文本邻近关系判定。"""
+        pairs = cls._parse_all_subscription_pairs()
+        categories = {
+            "workpaper_stale": {"_mark_workpapers_stale_by_account"},
+            "adjustment_sse": {"_notify_adjustment_event_sse"},
+            "report_and_note_stale": {"_mark_reports_stale_on_adjustment"},
+            "disclosure_note_stale": {
+                "on_event_adjustment_approved",
+                "on_event_adjustment_review_revoked",
+            },
+        }
+        return {
+            category: {
+                event_name
+                for event_name, handler_name in pairs
+                if handler_name in handler_names
+            }
+            for category, handler_names in categories.items()
+        }
 
-        impl_path = Path(__file__).resolve().parents[1] / "app" / "services" / "event_handlers" / "_impl.py"
-        source = impl_path.read_text(encoding="utf-8")
+    def test_approved_and_revoked_events_have_equal_downstream_subscriptions(self):
+        """审批与撤回必须逐类命中同一组四类下游订阅。"""
+        event_sets = self._adjustment_downstream_event_sets()
+        required = {"ADJUSTMENT_APPROVED", "ADJUSTMENT_REVIEW_REVOKED"}
+        for category, subscribed in event_sets.items():
+            assert required <= subscribed, (
+                f"{category} 未同时订阅审批和撤回事件：{sorted(subscribed)}"
+            )
 
-        # 匹配 event_bus.subscribe(EventType.XXX, on_event_yyy)
-        # 只要 handler 参数以 on_event_ 开头的行
-        pattern = re.compile(
-            r"event_bus\.subscribe\(\s*EventType\.(\w+)\s*,\s*(on_event_\w+)\s*\)"
+        approved_categories = {
+            category for category, subscribed in event_sets.items()
+            if "ADJUSTMENT_APPROVED" in subscribed
+        }
+        revoked_categories = {
+            category for category, subscribed in event_sets.items()
+            if "ADJUSTMENT_REVIEW_REVOKED" in subscribed
+        }
+        assert approved_categories == revoked_categories == set(event_sets), (
+            "审批与撤回下游订阅集合不相等："
+            f"approved={sorted(approved_categories)}, "
+            f"revoked={sorted(revoked_categories)}"
         )
-        return pattern.findall(source)
+
+    def test_ast_subscription_scanner_detects_multiline_mutation(self):
+        """变异证明：AST 能识别多行 subscribe，且不依赖注释/字符串文本。"""
+        source = """
+from app.models.audit_platform_schemas import EventType
+
+def register(event_bus, handler):
+    event_bus.subscribe(
+        EventType.ADJUSTMENT_REVIEW_REVOKED,
+        handler,
+    )
+# event_bus.subscribe(EventType.ADJUSTMENT_APPROVED, fake_handler)
+"""
+        tree = ast.parse(source)
+        calls = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if not (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "subscribe"
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "event_bus"
+                and len(node.args) == 2
+            ):
+                continue
+            event_arg, handler_arg = node.args
+            if (
+                isinstance(event_arg, ast.Attribute)
+                and isinstance(event_arg.value, ast.Name)
+                and event_arg.value.id == "EventType"
+                and isinstance(handler_arg, ast.Name)
+            ):
+                calls.append((event_arg.attr, handler_arg.id))
+        assert calls == [("ADJUSTMENT_REVIEW_REVOKED", "handler")]
 
     def test_approved_handler_subscribes_to_approved_event(self):
         """P10: handler 名含 'approved' → 订阅事件值含 'approved'。

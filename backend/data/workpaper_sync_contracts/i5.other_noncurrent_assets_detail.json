@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "eb393abc21bf6145c0796ef297ec06f06761a935b93fb03ee3df9983bfdf2267",
+  "instrumentation_definition_sha256": "22d68cb9c22bddaeef1c0cdaf676e288c975fc227a18c780c8ae7cc83b51f968",
   "review": {
     "authority_root": "backend/wp_templates",
     "builtin_row_delete_semantics": "reset_in_place",
@@ -366,11 +366,11 @@
             "search_column": "A"
           },
           "formula_mask": [
-            "E11:E21",
-            "L11:L21",
-            "M11:M21",
-            "N11:N21",
-            "O11:O21"
+            "E11:E20",
+            "L11:L20",
+            "M11:M20",
+            "N11:N20",
+            "O11:O20"
           ],
           "header_rows": 2,
           "row_identity": {
@@ -535,12 +535,12 @@
             "search_column": "A"
           },
           "formula_mask": [
-            "A24:A34",
-            "E24:E34",
-            "L24:L34",
-            "M24:M34",
-            "N24:N34",
-            "O24:O34"
+            "A24:A33",
+            "E24:E33",
+            "L24:L33",
+            "M24:M33",
+            "N24:N33",
+            "O24:O33"
           ],
           "header_rows": 2,
           "row_identity": {
@@ -548,15 +548,15 @@
             "kind": "field"
           },
           "table_key": "other_noncurrent_impairment_rows",
-          "uuid_col": "R"
+          "uuid_col": "S"
         }
       ]
     }
   ],
   "template": {
-    "normalized_structure_hash": "414b32228e10f9dfa4b39c6feecaf82af16ae8ff4d224c2ad610eb607164036f",
+    "normalized_structure_hash": "982e936e83bf9346517e468044c8dac3c37d16b743c026550c4a7be3c5cd3a81",
     "relative_path": "I/I5 其他非流动资产.xlsx",
-    "template_sha256": "7e8ec9c22580e05daf7803362f1ab83ca39d452a56c009833b05d6f6a1393860"
+    "template_sha256": "dacd18184ef82195b489d014ac2dc7a4dc5edb9df5306d85f7ceb433be56068f"
   },
-  "template_definition_sha256": "df6cb10c9d2205d467703d45546dd4b01eaa3981b977217ba3baf4e32c29c5bf"
+  "template_definition_sha256": "b5a8e69525357a3e16b4d4fe714c580a4b3d07d1aa96403c5a291e31ec3ae6f6"
 }

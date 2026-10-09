@@ -503,7 +503,7 @@
   <!-- 抽凭引擎弹窗（dialog-mode，科目 2203） -->
   <el-dialog
     v-model="showSampling"
-    title="⚡ 抽凭引擎（科目 2203 预收账款）"
+    title="⚡ 抽凭引擎（科目 ${samplingAccountCode} 预收账款）"
     width="880px"
     :close-on-click-modal="false"
     append-to-body
@@ -518,7 +518,7 @@
     </div>
     <GtVoucherSamplingEngine
       v-if="showSampling && wpId && projectId"
-      account-code="2203"
+      :account-code="samplingAccountCode"
       :phase="phase"
       default-method="random"
       :workpaper-id="wpId"
@@ -836,6 +836,17 @@ const {
 // ─── D3-2 Z列合计交叉验证 ───────────────────────────────────────────────────
 import { useD3CrossSheet } from '../composables/useD3CrossSheet'
 import { parseNum } from '../composables/useD3FormulaEngine'
+
+/**
+ * 抽凭科目码取自单一真源 `dCycleAccountScope`（D3 预收账款）。
+ * 原为模板内字面量；接真源后科目口径与该循环的取数/回写共用同一定义，
+ * 避免各处独立硬编码而漂移。本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2
+ */
+import { dCycleScope } from '../composables/dCycleAccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = dCycleScope('D3')?.queryCodes().join(',') ?? ''
 
 const crossSheet = useD3CrossSheet({ allResponses: allResponsesRef })
 

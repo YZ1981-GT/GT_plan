@@ -1,0 +1,439 @@
+{
+  "contract_id": "l8.financial_expenses",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "1a07b8919cf8701638b3b3984c3caaec72d736512d6bf6be9f47a5862faf17bd",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "derived_readonly_sheet": {
+      "excel_name": "审定表L8-1",
+      "reason": "R7~R16 全部是跨 sheet SUMIF 聚合 明细表L8-2 的下游视图，非录入表；受管表选 L8-2"
+    },
+    "entry_id": "xlsx/gt-l8-financial-expenses",
+    "html_store": {
+      "html_only_keys": [],
+      "item_id": "L8-2-full-data",
+      "note": "整张 L8-2 明细表存成 `L8-2-full-data` 的 remark JSON 数组（useL8Detail 的 _triggerSave 写 JSON.stringify(detailRows)）；🔴 单前缀 `L8-2-`（非 L5/L6/L7 的 L8-L8-2- 双前缀）。每行身份字段是 `key`（非 L6/L7 的 rowId，2026-10-01 把私有 Date.now+Math.random 生成器换成平台共享 newRowIdentity('l82det')，已有 key 优先不重铸）。契约按 stable field + row key 拆开。月度列 B~M 对应 HTML 的 `monthly[0..11]` 数组 ⇒ json_key 用 `monthly/0`…`monthly/11`。sibling 键 `L8-2-row-N-data` / `L8-2-row-N-audited` / `L8-2-netFinExpense` 本轮不受管、不预登记。真库 `L8-2-%` 现算 0 行，零迁移负担。A..W 23 列全部映射到 L8DetailRow ⇒ 无 HTML-only 字段。",
+      "row_identity_key": "key",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "l_cycle_financial_expenses",
+    "reviewed_basis": "2026-10-01 openpyxl 逐格实测 L/L8 财务费用.xlsx（10 sheet，sha d915e309…）：受管 明细表L8-2 单级表头 r8（项目/1月~12月/本期未审合计/账项调整/重分类调整/本期审定金额/各项目占比/与相关科目勾稽/上期未审金额/账项调整/重分类调整/上期审定金额）、数据区 R9~R21（13 行）、footer A22「合计」（B22~Q22 签名小计 =B13+B14-B15+B16+B20+B21）、R23「各月比例」作模板静态行（在 footer 之下不受管）、A..W 23 字段与前端 L8DetailRow 对齐；物理 max_column=W(23) ⇒ UUID=X。formula 列 N=SUM(B:M) / Q=N+O+P / W=T+U+V（本行算术，往返幸存）+ R=IF(Q=0,0,Q/$Q$22)（各项目占比裸 IF，materialize 前被 neutralize_oo_crash_if_formulas 摘 <f> 成纯值 ⇒ 不做公式幸存断言，NEUTRALIZED_COLUMNS=('R',)）。🔴 B~M 列为 editable（不进 formula_columns）：跨行派生行 R11=R9-R10（利息费用）/ R13=R11-R12（利息净支出）/ R20=R17-R18-R19（汇兑净损失）的 B~M 预置公式作模板预置格幸存（HTML 12 默认项缺「汇兑净损失」R20，往返按稳定 key 对齐不靠行序，这三「净额」行B~M 不属任何受管 editable 字段回填目标 ⇒ projection 不产 FieldValue ⇒ materialize 不写 ⇒ 公式幸存）。受管 sheet 自身 28 裸 IF（R 列占比 + R23 各月比例），与 L1~L7「受管表零裸 IF」相反。🔴 损益类（科目 6603 财务费用）：取数=本期发生额、兜底 tb_balance.debit_amount 本身（非 debit−credit，含年末结转损益全年账上恒 0），回写 amount_kind='occurrence'；受管改线不碰回写逻辑，L8-2 本身不直接回写 TB（回写在下游 L8-1 发布门取 L8-2 合计 Q22）。报表行次 IS-007（上市）/IS-025（国企）。canary 不选 审定表L8-1（R7~R16 全跨 sheet SUMIF 聚合 明细表L8-2 的下游视图，非录入表）。manifest 幻影码 L8F finder 零命中。真库 `L8-2-%` 现算 0 行，零迁移负担。",
+    "template_defects_registered": {
+      "amount_kind": {
+        "account_code": "6603",
+        "note": "科目 6603 财务费用（损益类），取数=本期发生额、兜底 tb_balance.debit_amount 本身；受管改线不碰回写逻辑，L8-2 本身不直接回写 TB（回写在下游 L8-1 发布门取 L8-2 合计 Q22）",
+        "value": "occurrence"
+      },
+      "bare_if": {
+        "managed_sheet_bare_if": 28,
+        "neutralized_columns": [
+          "R"
+        ],
+        "note": "受管 sheet 本身 28 个裸 IF（R 列占比 + R23 各月比例），per-file neutralize_oo_crash_if_formulas 摘 <f>；N/Q/W 非 IF 公式往返幸存",
+        "sheet": "明细表L8-2 + 审定表L8-1"
+      },
+      "derived_rows": {
+        "note": "跨行派生行 R11=R9-R10 / R13=R11-R12 / R20=R17-R18-R19 的 B~M 作模板预置公式幸存，不受管（B~M 列 editable，HTML 12 项缺 R20 汇兑净损失，往返按稳定 key 对齐）",
+        "rows": [
+          "R11",
+          "R13",
+          "R20"
+        ]
+      }
+    }
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "明细表L8-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "l82-managed",
+      "tables": [
+        {
+          "anchor": "A8",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!明细表L8-2!A8",
+              "header_text": "项目",
+              "json_pointer": "/rows/{row_uuid}/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!A9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/item_name",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_1",
+              "header_source_ref": "源xlsx!明细表L8-2!B8",
+              "header_text": "1月",
+              "json_pointer": "/rows/{row_uuid}/monthly/0",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!B9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/month_1",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_2",
+              "header_source_ref": "源xlsx!明细表L8-2!C8",
+              "header_text": "2月",
+              "json_pointer": "/rows/{row_uuid}/monthly/1",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!C9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/month_2",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_3",
+              "header_source_ref": "源xlsx!明细表L8-2!D8",
+              "header_text": "3月",
+              "json_pointer": "/rows/{row_uuid}/monthly/2",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!D9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/month_3",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_4",
+              "header_source_ref": "源xlsx!明细表L8-2!E8",
+              "header_text": "4月",
+              "json_pointer": "/rows/{row_uuid}/monthly/3",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!E9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/month_4",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_5",
+              "header_source_ref": "源xlsx!明细表L8-2!F8",
+              "header_text": "5月",
+              "json_pointer": "/rows/{row_uuid}/monthly/4",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!F9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/month_5",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_6",
+              "header_source_ref": "源xlsx!明细表L8-2!G8",
+              "header_text": "6月",
+              "json_pointer": "/rows/{row_uuid}/monthly/5",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!G9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/month_6",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_7",
+              "header_source_ref": "源xlsx!明细表L8-2!H8",
+              "header_text": "7月",
+              "json_pointer": "/rows/{row_uuid}/monthly/6",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!H9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/month_7",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_8",
+              "header_source_ref": "源xlsx!明细表L8-2!I8",
+              "header_text": "8月",
+              "json_pointer": "/rows/{row_uuid}/monthly/7",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!I9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/month_8",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_9",
+              "header_source_ref": "源xlsx!明细表L8-2!J8",
+              "header_text": "9月",
+              "json_pointer": "/rows/{row_uuid}/monthly/8",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!J9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/month_9",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_10",
+              "header_source_ref": "源xlsx!明细表L8-2!K8",
+              "header_text": "10月",
+              "json_pointer": "/rows/{row_uuid}/monthly/9",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!K9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/month_10",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_11",
+              "header_source_ref": "源xlsx!明细表L8-2!L8",
+              "header_text": "11月",
+              "json_pointer": "/rows/{row_uuid}/monthly/10",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!L9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/month_11",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_12",
+              "header_source_ref": "源xlsx!明细表L8-2!M8",
+              "header_text": "12月",
+              "json_pointer": "/rows/{row_uuid}/monthly/11",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!M9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/month_12",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "period_unadjusted",
+              "header_source_ref": "源xlsx!明细表L8-2!N8",
+              "header_text": "本期未审合计",
+              "json_pointer": "/rows/{row_uuid}/periodUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表L8-2!N9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/period_unadjusted",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "aje",
+              "header_source_ref": "源xlsx!明细表L8-2!O8",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/aje",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!O9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/aje",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              },
+              "column_key": "rje",
+              "header_source_ref": "源xlsx!明细表L8-2!P8",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/rje",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!P9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/rje",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              },
+              "column_key": "period_audited",
+              "header_source_ref": "源xlsx!明细表L8-2!Q8",
+              "header_text": "本期审定金额",
+              "json_pointer": "/rows/{row_uuid}/periodAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表L8-2!Q9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/period_audited",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "R",
+                "row_from": "row_identity"
+              },
+              "column_key": "ratio",
+              "header_source_ref": "源xlsx!明细表L8-2!R8",
+              "header_text": "各项目占比",
+              "json_pointer": "/rows/{row_uuid}/ratio",
+              "mode": "auto_source",
+              "source_ref": "源xlsx!明细表L8-2!R9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/ratio",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "S",
+                "row_from": "row_identity"
+              },
+              "column_key": "cross_ref",
+              "header_source_ref": "源xlsx!明细表L8-2!S8",
+              "header_text": "与相关科目勾稽",
+              "json_pointer": "/rows/{row_uuid}/crossRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!S9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/cross_ref",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "T",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!明细表L8-2!T8",
+              "header_text": "上期未审金额",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!T9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/prior_unadjusted",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "U",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!明细表L8-2!U8",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!U9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/prior_aje",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "V",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_rje",
+              "header_source_ref": "源xlsx!明细表L8-2!V8",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/priorRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表L8-2!V9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/prior_rje",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "W",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!明细表L8-2!W8",
+              "header_text": "上期审定金额",
+              "json_pointer": "/rows/{row_uuid}/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表L8-2!W9",
+              "stable_field_key": "financial_expense_detail_rows/{row_uuid}/prior_audited",
+              "store_item_id": "L8-2-full-data",
+              "value_type": "amount"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "N9:N21",
+            "Q9:Q21",
+            "W9:W21"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/key",
+            "kind": "field"
+          },
+          "table_key": "financial_expense_detail_rows",
+          "uuid_col": "X"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "eddc68d1a02fe6b9167041c524612234e9ba99f999d215fd2b19b8640b74a370",
+    "relative_path": "L/L8 财务费用.xlsx",
+    "template_sha256": "f56843b02c3a34a443107d69207904b363187e887d2a359163fd2175381a368c"
+  },
+  "template_definition_sha256": "7319c423b593bdb6a78d49029e56897a1e295c443c56e7079bc24d7a8e6e249e"
+}

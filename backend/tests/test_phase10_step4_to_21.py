@@ -352,9 +352,16 @@ class TestConsolLockService:
 
     @pytest.mark.asyncio
     async def test_lock_project(self):
+        from unittest.mock import MagicMock
         from app.services.consol_enhanced_service import ConsolLockService
         db = AsyncMock()
-        db.execute = AsyncMock()
+        fake_project = MagicMock()
+        fake_project.consol_lock = False
+        fake_project.consol_lock_by = None
+        fake_project.consol_lock_at = None
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = fake_project
+        db.execute = AsyncMock(return_value=mock_result)
         db.flush = AsyncMock()
         svc = ConsolLockService()
         result = await svc.lock_project(db, uuid4(), uuid4())
@@ -362,9 +369,16 @@ class TestConsolLockService:
 
     @pytest.mark.asyncio
     async def test_unlock_project(self):
+        from unittest.mock import MagicMock
         from app.services.consol_enhanced_service import ConsolLockService
         db = AsyncMock()
-        db.execute = AsyncMock()
+        fake_project = MagicMock()
+        fake_project.consol_lock = True
+        fake_project.consol_lock_by = uuid4()
+        fake_project.consol_lock_at = None
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = fake_project
+        db.execute = AsyncMock(return_value=mock_result)
         db.flush = AsyncMock()
         svc = ConsolLockService()
         result = await svc.unlock_project(db, uuid4())

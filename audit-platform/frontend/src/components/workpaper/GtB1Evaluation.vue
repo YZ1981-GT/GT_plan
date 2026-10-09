@@ -221,6 +221,9 @@ import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { useB1Evaluation, EVAL_JUDGE_OPTIONS, type EvalRenderData } from './composables/useB1Evaluation'
 import { useWpDualMode } from './composables/useWpDualMode'
+import { useB1OrphanSyncMode } from './composables/useB1OrphanSyncMode'
+
+const B1_EVAL_ENTRY_ID = 'xlsx/gt-b1-evaluation'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import GtReviewTrigger from './GtReviewTrigger.vue'
@@ -255,7 +258,26 @@ const {
 })
 
 // 双模式：健康检查 + 切换前 flush（对齐 D4/GtB14 gold 范式）
-const { mode, modeOptions, checkOOHealth } = useWpDualMode({ flush: flushPendingSaves })
+// legacy 降级路径（capability 未升级时用）
+const { mode: legacyMode, modeOptions: legacyModeOptions, checkOOHealth } = useWpDualMode({ flush: flushPendingSaves })
+
+// B1 孤儿载体真双向改线（spec: b-class-orphan-carrier-and-host-inline-lanes Task 2）
+// 🔴 改线完成 + UAT 通过后 useWpDualMode.ts 成孤儿须删除
+const b1Sync = useB1OrphanSyncMode({
+  entryId: B1_EVAL_ENTRY_ID,
+  sheetKey: 'b1-eval-managed',
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  isReadonly: computed(() => false),
+  flushHtml: async () => { await flushPendingSaves(); return { expectedRevision: 0, projection: null, sheetKey: 'b1-eval-managed' } },
+  reloadHtml: async () => { await loadData() },
+})
+// sync ready（capability=bidirectional）时用 sync，否则降级 legacy
+const mode = computed<string>({
+  get: () => (b1Sync.descriptorReady.value ? b1Sync.mode.value : legacyMode.value),
+  set: (v: string) => { if (b1Sync.descriptorReady.value) b1Sync.switchMode(v); else legacyMode.value = v },
+})
+const modeOptions = computed(() => (b1Sync.descriptorReady.value ? b1Sync.modeOptions.value.map(o => o.value) : legacyModeOptions.value))
 
 const judgeOptions = EVAL_JUDGE_OPTIONS
 

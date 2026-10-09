@@ -1,19 +1,19 @@
 {
-  "profile": "correctness",
-  "is_completion_evidence": true,
-  "target_examples_per_property": 100,
+  "profile": "fast",
+  "is_completion_evidence": false,
+  "target_examples_per_property": 5,
   "smoke_max_examples": 5,
   "correctness_max_examples": 100,
   "valid_example_counts": {
-    "P10": 100,
-    "P12": 100,
-    "P15": 100,
-    "P16": 100,
-    "P18": 100,
-    "P19": 100,
-    "P20": 100,
-    "P9": 100,
-    "same_source_demo": 100
+    "P10": 5,
+    "P12": 5,
+    "P15": 5,
+    "P16": 5,
+    "P18": 5,
+    "P19": 5,
+    "P20": 5,
+    "P9": 5,
+    "same_source_demo": 5
   },
   "prompt_to_design_property_map": {
     "prompt P1 分类/scope": "P1",

@@ -15,9 +15,12 @@ export interface BasicInfo {
   custom_template_name: string
   custom_template_version: string
   report_scope: string
-  consolidation_type: string
+  // 集团架构（consol-tree-three-code-autobuild 需求 1）：所有报表类型都填写，企业树由此自动推导。
+  // 「合并类型」已移除：合并方式按下级企业的与上级关系自动识别（需求 4）。
   parent_company_name: string
   parent_company_code: string
+  /** 与上级关系：'subsidiary' 子公司 / 'branch' 分公司 / '' 未填（上级代码为空时恒为空） */
+  relation_to_parent: string
   ultimate_company_name: string
   ultimate_company_code: string
   signing_partner_id: string | null
@@ -69,6 +72,27 @@ export const CONFIRMATION_REQUIRED_STEPS: StepKey[] = [
   'basic_info',
 ]
 
+/** 集团关系字段（与后端 group_links.GROUP_FIELDS 同序） */
+export const GROUP_FIELDS = [
+  'parent_company_name',
+  'parent_company_code',
+  'relation_to_parent',
+  'ultimate_company_name',
+  'ultimate_company_code',
+] as const
+
+type GroupField = (typeof GROUP_FIELDS)[number]
+
+/** 从项目详情/创建响应取集团关系字段（null → ''，便于直接回填表单） */
+export function pickGroupFields(source: Record<string, unknown> | null | undefined): Record<GroupField, string> {
+  const out = {} as Record<GroupField, string>
+  for (const key of GROUP_FIELDS) {
+    const value = source?.[key]
+    out[key] = typeof value === 'string' ? value : ''
+  }
+  return out
+}
+
 export const useWizardStore = defineStore('wizard', {
   state: () => ({
     projectId: null as string | null,
@@ -77,6 +101,8 @@ export const useWizardStore = defineStore('wizard', {
     stepData: {} as Record<string, Record<string, unknown>>,
     completedSteps: {} as Record<string, boolean>,
     loading: false,
+    /** 最近一次建项/保存基本信息时后端给出的说明（如「已同步集团关系到同企业的合并项目」） */
+    lastNotices: [] as string[],
   }),
 
   getters: {
@@ -146,11 +172,10 @@ export const useWizardStore = defineStore('wizard', {
         if (basicInfo.report_scope) {
           payload.report_scope = basicInfo.report_scope
         }
-        if (basicInfo.report_scope === 'consolidated') {
-          if (basicInfo.parent_company_name) payload.parent_company_name = basicInfo.parent_company_name
-          if (basicInfo.parent_company_code) payload.parent_company_code = basicInfo.parent_company_code
-          if (basicInfo.ultimate_company_name) payload.ultimate_company_name = basicInfo.ultimate_company_name
-          if (basicInfo.ultimate_company_code) payload.ultimate_company_code = basicInfo.ultimate_company_code
+        // 集团架构对所有报表类型发送（需求 1.6）：单户子公司/分公司正是企业树的叶子
+        for (const key of GROUP_FIELDS) {
+          const value = (basicInfo[key] ?? '').trim()
+          if (value) payload[key] = value
         }
         if (basicInfo.signing_partner_id) {
           payload.signing_partner_id = basicInfo.signing_partner_id
@@ -168,8 +193,10 @@ export const useWizardStore = defineStore('wizard', {
         const { data } = await http.post('/api/projects', payload)
         const project = data
         this.projectId = project.id
-        this.stepData.basic_info = { ...basicInfo }
+        // 后端可能补齐了集团关系（按名称默认关系、继承同企业另一口径项目、按上级补控制方），以响应为准
+        this.stepData.basic_info = { ...basicInfo, ...pickGroupFields(project) }
         this.completedSteps.basic_info = true
+        this.lastNotices = Array.isArray(project?.notices) ? project.notices : []
         return project
       } finally {
         this.loading = false
@@ -220,6 +247,8 @@ export const useWizardStore = defineStore('wizard', {
           accounting_standard: 'CAS',
           template_type: proj.template_type || 'soe',
           report_scope: proj.report_scope || 'standalone',
+          // 需求 1.6：批量导入项目的兜底回填也要恢复集团关系
+          ...pickGroupFields(proj),
         }
         this.completedSteps.basic_info = true
       } catch {
@@ -233,8 +262,9 @@ export const useWizardStore = defineStore('wizard', {
       this.loading = true
       try {
         const { data } = await http.put(`/api/projects/${this.projectId}/wizard/${step}`, stepData)
-        const state: WizardState = data
+        const state = data as WizardState & { notices?: string[] }
         this.applyWizardState(state)
+        this.lastNotices = Array.isArray(state?.notices) ? state.notices : []
       } finally {
         this.loading = false
       }
@@ -295,6 +325,7 @@ export const useWizardStore = defineStore('wizard', {
       this.stepData = {}
       this.completedSteps = {}
       this.loading = false
+      this.lastNotices = []
     },
   },
 })

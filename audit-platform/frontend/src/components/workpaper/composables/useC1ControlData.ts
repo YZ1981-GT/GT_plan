@@ -25,6 +25,7 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { isRequestCancelled } from '@/utils/http'
 import { canPersistApplicability } from './useC1SectionEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -89,6 +90,7 @@ export function useC1ControlData(wpId: Ref<string>, options: UseC1ControlDataOpt
       }
       responses.value = map
     } catch (e: any) {
+      if (isRequestCancelled(e)) return
       error.value = e?.message || '数据加载失败'
       ElMessage.warning('C1 数据加载失败，可手动填写')
     } finally {

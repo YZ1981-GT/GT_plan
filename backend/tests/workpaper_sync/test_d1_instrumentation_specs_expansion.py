@@ -39,16 +39,35 @@ from app.services.workpaper_sync.excel_instrumentation import (
 )
 
 
+#: 静态第三区（D1-4 票据种类小计）当前是否进受管面。
+#:
+#: 🔴 T7 裁决 A（2026-09-28）把它撤回了 —— 不是删代码，而是把
+#: `_INCLUDE_D104_NOTETYPE_STATIC` 翻 False，整条静态通路同源空转。
+#: 本文件里**跟静态区有关的期望值**一律从这个常量派生，不写死，
+#: 这样开关翻回 True 时判据自动跟着复活，不需要再改一遍。
+#:
+#: 开关状态本身的权威断言（含失效条目反向检查）在
+#: `test_d104_static_region_excluded.py` —— 本文件不重复那个判断，
+#: 否则就是两处各写一份「开关现在是什么」，翻开关要改两地。
+_STATIC_ON = P._INCLUDE_D104_NOTETYPE_STATIC
+
+#: 全量 store item 数：动态区 17 个 + 静态区 1 个（仅当静态区开启）。
+_EXPECTED_STORE_ITEMS = 18 if _STATIC_ON else 17
+
+
 def test_switches_off_equals_current_state() -> None:
-    """全部灰度开关已 ON（2026-09-26 D1 adapter 注册后全量开启）。"""
+    """两个动态灰度开关已永久 ON；静态第三区按 T7 裁决 A 处于撤回态。"""
     assert P._INCLUDE_D102_CATEGORY is True
     assert P._INCLUDE_D104_BAD_DEBT is True
-    assert P._INCLUDE_D104_NOTETYPE_STATIC is True
 
     specs = P.instrumentation_specs()
-    assert len(specs) == 18  # D1-3 + 11 expansion sheets (some dual-region = 17 tables)
+    # 🔴 静态区寄生在首个动态 spec 的 `static_sheets` 上，**不产生独立 spec** ⇒
+    #    spec 数与静态开关无关，恒 18（D1-3 + 11 扩容 sheet 上的 18 张行表）。
+    #    这条与 `_EXPECTED_STORE_ITEMS` 的可变性形成对照：一个不随开关变，一个随。
+    assert len(specs) == 18
     items = P.all_store_item_ids()
     assert len(items) == len(set(items)), f"store item 重复：{items}"
+    assert len(items) == _EXPECTED_STORE_ITEMS, items
 
 
 def test_enabling_d102_adds_one_managed_region(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -67,7 +86,21 @@ def test_enabling_d104_adds_two_dynamic_regions(monkeypatch: pytest.MonkeyPatch)
     assert keys.count(D104.SHEET_KEY_D104) == 2  # individual + portfolio
     items = set(P.all_store_item_ids())
     assert {"D1-bd-individual-rows", "D1-bd-portfolio-rows"} <= items
-    assert "D1-notetype-rows" in items  # 第三区 static 也已开
+    # 🔴 2026-09-28：本断言原写 `D1-notetype-rows`，把声明层的键名错误钉成了断言
+    #    （前端真源 `d1AdjudicationModel.D1_BD_NOTETYPE_KEY` / `prefill_anchor_map` /
+    #     `d_cycle_extraction.presets` 三处都是 `D1-bd-notetype-rows`，真库亦然）。
+    #    三键统一 `D1-bd-` 前缀，判据不得再给错键背书。
+    #
+    # 🔴 同日 T7 裁决 A 撤回静态第三区 ⇒ 这条改成**双向**断言：开着必须在、
+    #    关着必须不在。只断言「开着必须在」的话，撤回态下它是红的；
+    #    只断言「关着必须不在」的话，开关翻回 True 时它又变成假绿。
+    if _STATIC_ON:
+        assert "D1-bd-notetype-rows" in items
+    else:
+        assert "D1-bd-notetype-rows" not in items, (
+            "静态第三区已按 T7 裁决 A 撤回，但 store item 清单里还有它 —— "
+            "说明存在绕过 `_INCLUDE_D104_NOTETYPE_STATIC` 的第二个装配点"
+        )
 
 
 def test_enabling_static_third_region_parasites_on_primary(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -81,8 +114,8 @@ def test_enabling_static_third_region_parasites_on_primary(monkeypatch: pytest.M
     assert static["region_kind"] == "static"
     assert static["defined_name"] == D104.SPEC_D104_NOTETYPE.defined_name
     assert (static["first_data_row"], static["last_data_row"]) == (23, 24)
-    # store item 清单含第三区
-    assert "D1-notetype-rows" in P.all_store_item_ids()
+    # store item 清单含第三区（键名见上方 2026-09-28 勘误注释）
+    assert "D1-bd-notetype-rows" in P.all_store_item_ids()
 
 
 def test_third_region_cannot_be_a_dynamic_instrumentation_spec() -> None:
@@ -131,7 +164,7 @@ def test_translation_preserves_geometry(row_spec) -> None:
 def test_store_item_ids_have_no_duplicates(monkeypatch: pytest.MonkeyPatch) -> None:
     items = P.all_store_item_ids()
     assert len(items) == len(set(items)), f"store item 重复：{items}"
-    assert len(items) == 18, items  # all sheets enabled
+    assert len(items) == _EXPECTED_STORE_ITEMS, items
 
 
 def test_alignment_guard_reports_exact_diff(monkeypatch: pytest.MonkeyPatch) -> None:

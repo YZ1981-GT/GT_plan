@@ -164,6 +164,9 @@ import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { useB1KaaCheck, KAA_CHOICE_OPTIONS, type KaaRenderData } from './composables/useB1KaaCheck'
 import { useWpDualMode } from './composables/useWpDualMode'
+import { useB1OrphanSyncMode } from './composables/useB1OrphanSyncMode'
+
+const B1_KAA_ENTRY_ID = 'xlsx/gt-b1-kaa-check'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -193,8 +196,22 @@ const {
   onAfterSave: () => scheduleAutoSnapshot?.(),
 })
 
-// 双模式：健康检查 + 切换前 flush（对齐 D4/GtB14 gold 范式）
-const { mode, modeOptions, checkOOHealth } = useWpDualMode({ flush: flushPendingSaves })
+// 双模式：legacy 降级 + B1 孤儿载体真双向（spec: b-class-orphan-carrier-and-host-inline-lanes）
+const { mode: legacyMode, modeOptions: legacyModeOptions, checkOOHealth } = useWpDualMode({ flush: flushPendingSaves })
+const b1Sync = useB1OrphanSyncMode({
+  entryId: B1_KAA_ENTRY_ID,
+  sheetKey: 'b1-kaa-managed',
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  isReadonly: computed(() => false),
+  flushHtml: async () => { await flushPendingSaves(); return { expectedRevision: 0, projection: null, sheetKey: 'b1-kaa-managed' } },
+  reloadHtml: async () => { await loadData() },
+})
+const mode = computed<string>({
+  get: () => (b1Sync.descriptorReady.value ? b1Sync.mode.value : legacyMode.value),
+  set: (v: string) => { if (b1Sync.descriptorReady.value) b1Sync.switchMode(v); else legacyMode.value = v },
+})
+const modeOptions = computed(() => (b1Sync.descriptorReady.value ? b1Sync.modeOptions.value.map(o => o.value) : legacyModeOptions.value))
 
 // 复核线程蓝/红点（供后代 GtReviewTrigger/GtReviewDot inject）
 const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId') as any)

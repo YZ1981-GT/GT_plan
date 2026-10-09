@@ -7,9 +7,31 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
+      <div v-if="isProcedureSheet" class="l3-procedure-toolbar">
+        <el-segmented
+          :model-value="procedureDualMode.currentMode.value"
+          :options="procedureDualMode.modeOptions.value"
+          size="small"
+          @change="procedureDualMode.onModeChange"
+        />
+        <!-- BP-7 / AC 1.4：能力诚实披露。文案真源在 sync/workpaperEntrySyncNotice.ts，
+             已注册 bidirectional 的 entry 自动返 null 不渲染 ⇒ 无需本地条件。 -->
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-l3-long-term-loans" />
+        <el-tag v-if="!procedureDualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+      </div>
+
+      <GtOnlyOfficeSheet
+        v-if="isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :sheet-name="props.sheetName || 'L3A'"
+        :readonly="isReadonly"
+        style="height: calc(100vh - 180px)"
+      />
+
       <!-- L3 主sheet 底稿目录 -->
       <L3TabIndex
-        v-if="currentSheet === 'L3'"
+        v-else-if="currentSheet === 'L3'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
@@ -148,6 +170,7 @@ import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './comp
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useL3FormData } from './composables/useL3FormData'
 import { useL3CrossSheet } from './composables/useL3CrossSheet'
+import { useCycleHtmlOoDualMode } from './composables/useCycleHtmlOoDualMode'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -172,6 +195,7 @@ const L3TabLtLoanCheck = defineAsyncComponent(() => import('./l3/inspection/L3Ta
 // Shared
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtAProgramConsole.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -222,6 +246,12 @@ const currentSheet = computed(() => {
   if (name.includes('上市')) return '附注上市'
   if (name.includes('国企')) return '附注国企'
   return name
+})
+
+const isProcedureSheet = computed(() => currentSheet.value === 'L3A')
+const procedureDualMode = useCycleHtmlOoDualMode({
+  wpId: toRef(props, 'wpId') as any,
+  storagePrefix: 'l3-proc:',
 })
 
 // ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI/displayPrefs + 挂真实 Host） ───
@@ -277,5 +307,13 @@ onMounted(() => {
 
 .loading-container {
   padding: 24px;
+}
+
+.l3-procedure-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 </style>

@@ -224,12 +224,13 @@ export function useM2Adjudication(
    * 现只保存，TB 回写收敛为用户显式确认动作（publishToTb）。
    */
   async function saveAdjudication(): Promise<void> {
-    const items = computedRows.value.map((row, i) => {
-      const n = i + 1
+    const items = computedRows.value.map((row) => {
+      // BP-10 去位置化：用 row.key（熵键）替代 ${k}（位置下标）
+      const k = row.key
       return [
-        { itemId: `M2-M2-1-row-${n}-name`, data: { remark: row.investorName } },
-        { itemId: `M2-M2-1-row-${n}-beginAudited`, data: { remark: String(row.beginAudited) } },
-        { itemId: `M2-M2-1-row-${n}-endAudited`, data: { remark: String(row.endAudited) } },
+        { itemId: `M2-M2-1-${k}-name`, data: { remark: row.investorName } },
+        { itemId: `M2-M2-1-${k}-beginAudited`, data: { remark: String(row.beginAudited) } },
+        { itemId: `M2-M2-1-${k}-endAudited`, data: { remark: String(row.endAudited) } },
       ]
     }).flat()
 
@@ -312,8 +313,9 @@ export function useM2Adjudication(
   function _triggerSave(rowIndex: number): void {
     const row = rows.value[rowIndex]
     if (!row) return
-    const n = rowIndex + 1
-    debouncedSave(`M2-M2-1-row-${n}-data`, {
+    // BP-10 去位置化
+    const k = row.key
+    debouncedSave(`M2-M2-1-${k}-data`, {
       remark: JSON.stringify({
         key: row.key,
         investorName: row.investorName,

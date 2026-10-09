@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import require_project_access
+from app.deps import check_consol_lock, require_project_access
 from app.core.database import get_db
 from app.models.consolidation_schemas import ConsolDisclosureSection
 from app.services.consol_disclosure_service import (
@@ -106,16 +106,27 @@ async def save_consol_notes(
 
 
 class ReaggregateRequest(BaseModel):
-    """重新汇总请求"""
-    section_ids: list[str] | None = None  # None = 全部章节
-    force: bool = False  # True = 忽略 stale 状态强制重算
+    """节点感知的重新汇总请求；旧客户端可省略新增字段。"""
+    section_ids: list[str] | None = None  # None = 当前附注模板的全部章节
+    node_key: str | None = None
+    standard: str | None = None
+    template_type: str | None = None
+    force: bool = False  # True = 忽略 stale 状态强制重算（共享公式内核始终按请求执行）
 
 
 class ReaggregateResponse(BaseModel):
-    """重新汇总响应"""
+    """重新汇总响应，保留旧计数字段并暴露逐章节持久化证据。"""
     success: bool
+    status: str
+    project_id: UUID
+    year: int
+    node_key: str | None = None
+    legacy_null: bool = False
+    template_type: str
     sections_processed: int
     sections_updated: int
+    results: list[dict] = []
+    failures: list[dict] = []
     errors: list[str] = []
 
 
@@ -127,56 +138,79 @@ async def reaggregate_consol_notes(
     project_id: UUID,
     year: int,
     request: ReaggregateRequest | None = None,
+    node_key: str | None = Query(None, description="企业树节点；与 body.node_key 同时传入时必须一致"),
     db: AsyncSession = Depends(get_db),
     user=Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
 ):
-    """重新汇总合并附注（同步版，SSE 留 Phase 2 B.1 完善）.
-
-    从子公司单体附注重新聚合数据到合并附注。
-    可指定 section_ids 部分重算，或全部重算。
-    """
-    from app.services.consol_note_aggregation_service import (
-        aggregate_section,
-        validate_lineage_dag,
+    """兼容旧按钮的节点级公式刷新入口；不把单体聚合结果冒充 V2 表格载荷。"""
+    from app.services.consol_note_aggregation_service import validate_lineage_dag
+    from app.services.consol_note_formula_service import (
+        NoteFormulaError,
+        consol_note_tables,
+        fill_note_sections,
+        note_template_type,
+        resolve_note_template_type,
+    )
+    from app.services.consol_node_scope import (
+        NodeScopeError,
+        resolve_node_scope,
+        resolve_requested_node_key,
     )
 
     request = request or ReaggregateRequest()
-
-    # CI-16: 校验 lineage 无环
-    is_dag_valid = await validate_lineage_dag(project_id, db)
-    if not is_dag_valid:
-        raise HTTPException(
-            status_code=400,
-            detail="合并层级链存在循环引用，无法汇总",
+    try:
+        resolved_node_key = resolve_requested_node_key(
+            node_key,
+            request.model_dump(exclude_none=True),
         )
-
-    # 确定要处理的章节
-    section_ids = request.section_ids
-    if not section_ids:
-        # 从 CSV 映射加载所有章节
-        section_ids = _load_mapped_section_ids()
-
-    errors: list[str] = []
-    updated = 0
-
-    for sid in section_ids:
-        try:
-            result = await aggregate_section(
-                consol_project_id=project_id,
-                section_id=sid,
-                year=year,
-                db=db,
+        scope = await resolve_node_scope(db, project_id, year, resolved_node_key)
+        if not await validate_lineage_dag(project_id, db):
+            raise HTTPException(status_code=400, detail="合并层级链存在循环引用，无法汇总")
+        if request.standard and request.template_type and note_template_type(request.standard) != note_template_type(request.template_type):
+            raise NoteFormulaError(
+                f"standard={request.standard} 与 template_type={request.template_type} 指向不同附注模板"
             )
-            if result:
-                updated += 1
-        except Exception as err:
-            errors.append(f"{sid}: {err!s}")
+        requested_template = request.template_type or request.standard
+        template_type = await resolve_note_template_type(db, project_id, requested_template)
+        section_ids = request.section_ids or [
+            str(sec.get("section_id"))
+            for sec in consol_note_tables(template_type)
+            if sec.get("section_id")
+        ]
+        result = await fill_note_sections(
+            db,
+            project_id,
+            year,
+            section_ids,
+            node_key=scope.node_key,
+            template_type=template_type,
+        )
+        await db.commit()
+    except HTTPException:
+        await db.rollback()
+        raise
+    except (NoteFormulaError, NodeScopeError) as exc:
+        await db.rollback()
+        raise HTTPException(status_code=getattr(exc, "status", 400), detail=str(exc)) from exc
+    except Exception:
+        await db.rollback()
+        raise
 
+    errors = [f"{item['section_id']}: {item['error']}" for item in result["failures"]]
     return ReaggregateResponse(
-        success=len(errors) == 0,
-        sections_processed=len(section_ids),
-        sections_updated=updated,
-        errors=errors[:10],  # 最多返回 10 个错误
+        success=not result["failures"],
+        status=result["status"],
+        project_id=project_id,
+        year=year,
+        node_key=scope.node_key,
+        legacy_null=scope.node_key is None,
+        template_type=result["template_type"],
+        sections_processed=result["sections_processed"],
+        sections_updated=result["sections_updated"],
+        results=result["results"],
+        failures=result["failures"],
+        errors=errors[:10],
     )
 
 

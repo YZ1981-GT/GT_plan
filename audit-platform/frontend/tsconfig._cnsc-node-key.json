@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", "module": "ESNext", "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true, "strict": true, "skipLibCheck": true,
+    "noEmit": true, "isolatedModules": true, "moduleDetection": "force",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "paths": { "@/*": ["./src/*"] }, "baseUrl": "."
+  },
+  "include": [
+    "src/services/consolWorksheetDataApi.ts",
+    "src/env.d.ts"
+  ]
+}

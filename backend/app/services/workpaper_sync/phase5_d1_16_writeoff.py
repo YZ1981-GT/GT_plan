@@ -71,13 +71,21 @@ _FIELD_SPECS_WRITEOFF: Final[tuple[tuple[str, str, str, str, str, str, str], ...
     ("index_ref", "H", "editable", "text", "indexRef", "索引号", ""),
 )
 
-_FORMULA_COLUMNS_REVERSAL: Final[tuple[str, ...]] = ("E", "F")
-_FORMULA_TEMPLATES_REVERSAL: Final[dict[str, str]] = {
-    "E": "=SUM(E12:E{r})", "F": "=SUM(F12:F{r})",
-}
+# 🔴 2026-09-28 修正：footer SUM 列不进 `formula_columns`（数据区逐格实测零公式）。
+#    `formula_mask` 现算为 `{col}{first_data_row}:{col}{last_data_row}`，覆盖不到 footer；
+#    填进去只会让这些列的数据区被 `merge._protection` 判 `read_only_masked_cell`，
+#    OO 侧改动写不回 store。footer 公式文本移到 `FOOTER_SUM_TEMPLATES_*` 作实测证据。
+_FORMULA_COLUMNS_REVERSAL: Final[tuple[str, ...]] = ()
+_FORMULA_TEMPLATES_REVERSAL: Final[dict[str, str]] = {}
 
-_FORMULA_COLUMNS_WRITEOFF: Final[tuple[str, ...]] = ("C",)
-_FORMULA_TEMPLATES_WRITEOFF: Final[dict[str, str]] = {"C": "=SUM(C18:C{r})"}
+_FORMULA_COLUMNS_WRITEOFF: Final[tuple[str, ...]] = ()
+_FORMULA_TEMPLATES_WRITEOFF: Final[dict[str, str]] = {}
+
+#: footer 行 SUM 公式（`{last}` = 该区 last_data_row）。纯实测证据，不进 spec。
+FOOTER_SUM_TEMPLATES_REVERSAL: Final[dict[str, str]] = {
+    "E": "=SUM(E12:E{last})", "F": "=SUM(F12:F{last})",
+}
+FOOTER_SUM_TEMPLATES_WRITEOFF: Final[dict[str, str]] = {"C": "=SUM(C18:C{last})"}
 
 
 SPEC_D116_REVERSAL: Final[RowTableSheetSpec] = RowTableSheetSpec(

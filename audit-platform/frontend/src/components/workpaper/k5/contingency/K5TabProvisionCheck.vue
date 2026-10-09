@@ -293,19 +293,19 @@
         <li>样本选取：测试总体扣除特定样本得抽样总体；大额计提/转销、诉讼相关、异常款项应全部测试</li>
         <li><b>本期发生额检查（核心）：</b>
           <ul style="padding-left:16px;margin:2px 0">
-            <li>计提凭证(贷方2701)：核对是否有充分计提依据(律师函/合同/评估)+金额是否=最佳估计数+对方科目恰当(6711/6602)</li>
-            <li>转销凭证(借方2701)：核对是否基于义务解除客观证据(判决/和解/保修到期)+对方科目恰当(1002/6301)</li>
+            <li>计提凭证(贷方{{ samplingAccountCode }})：核对是否有充分计提依据(律师函/合同/评估)+金额是否=最佳估计数+对方科目恰当(6711/6602)</li>
+            <li>转销凭证(借方{{ samplingAccountCode }})：核对是否基于义务解除客观证据(判决/和解/保修到期)+对方科目恰当(1002/6301)</li>
           </ul>
         </li>
         <li><b>期后检查：</b>截止日后实际支付/判决金额 vs 期末计提金额对比，差异较大评估是否需追溯调整（CAS13§16期后事项考虑）</li>
         <li>检查比例 = 检查金额 / 账面金额；比例偏低（&lt;30%）须扩样或说明</li>
         <li>期末余额合理性通过 K5-4(质保测算)/K5-5(弃置现值)/K5-6(诉讼评估) 专项底稿验证</li>
-        <li>科目 2701 预计负债（贷方/负债类）：贷方=计提增加，借方=转销减少</li>
+        <li>科目 {{ samplingAccountCode }} {{ K5_ACCOUNT_NAME }}（贷方/负债类）：贷方=计提增加，借方=转销减少</li>
       </ul>
     </details>
 
-    <el-dialog v-model="samplingVisible" title="抽凭引擎 — 预计负债(2701)" width="90%" top="5vh" destroy-on-close>
-      <GtVoucherSamplingEngine v-if="samplingVisible" account-code="2701" phase="final" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
+    <el-dialog v-model="samplingVisible" :title="`抽凭引擎 — ${K5_ACCOUNT_NAME}(${samplingAccountCode})`" width="90%" top="5vh" destroy-on-close>
+      <GtVoucherSamplingEngine v-if="samplingVisible" :account-code="samplingAccountCode" phase="final" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
     </el-dialog>
   </div>
 </template>
@@ -322,6 +322,13 @@ import { MagicStick, WarningFilled, InfoFilled } from '@element-plus/icons-vue'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
+
+// 🔴 科目码走单一真源 k5AccountScope，禁硬编码 —— 原写 account-code="2701"，
+//    而 `2701` 一律是长期应付款（L5 循环），预计负债是 `2801`。详见 k5AccountScope.ts 文件头。
+import { K5_ACCOUNT_NAME, K5_FALLBACK_STANDARD } from '../../composables/k5AccountScope'
+
+/** 抽凭科目码：本组件无 tbSourceCodes prop，取真源兜底标准码 2801。 */
+const samplingAccountCode = K5_FALLBACK_STANDARD
 
 const props = defineProps<{
   wpId: string

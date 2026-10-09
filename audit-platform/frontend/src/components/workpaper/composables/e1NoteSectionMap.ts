@@ -207,6 +207,7 @@ export function buildE1SyncPayload(
   wpId: string,
   applicableStandards: readonly string[] | null | undefined,
   snapshot: E1DisclosureSnapshot,
+  options?: { mainTable?: boolean },
 ): E1SyncPayload {
   // 🔴 附注行标签走 **docx 口径**（`noteLabel`），底稿 UI 保留 xlsx 口径（`label`）。
   // soe 首行底稿是「现金」而附注模板是「库存现金」—— 直接推 `label` 会产生孤儿行
@@ -224,15 +225,19 @@ export function buildE1SyncPayload(
     ...(isTotalKey(r.key) ? { is_total: true } : {}),
   })
 
+  // 🔴 options.mainTable === false 时前端不推主表（主表由后端公式推送写入，需求 5.4）；
+  // 缺省仍产出主表（契约测试与覆盖率扫描不变）。
+  const includeMainTable = options?.mainTable !== false
+
   const subTableData: Record<string, unknown> = {
-    [E1_MAIN_TABLE]: snapshot.mainRows.map(mainRow),
+    ...(includeMainTable ? { [E1_MAIN_TABLE]: snapshot.mainRows.map(mainRow) } : {}),
     _note_texts: buildNoteTexts(variant, snapshot),
   }
 
   // 列定义单一真源 = 零参 builder（契约测试与覆盖率 sweep 读的也是它，禁在此另写一份）
   const allColumns = variant === 'soe' ? buildE1SoeColumns() : buildE1ListedColumns()
   const columns: Record<string, ColumnDef[]> = {
-    [E1_MAIN_TABLE]: allColumns[E1_MAIN_TABLE],
+    ...(includeMainTable ? { [E1_MAIN_TABLE]: allColumns[E1_MAIN_TABLE] } : {}),
   }
 
   // ② 受限制的货币资金明细 —— **两变体都推**（用户裁决）。

@@ -1,0 +1,1 @@
+{"authority_model":"projection_contract","content_authority":"structured_projection","entry_id":"xlsx/gt-g2-interest-receivable","merge_model":"stable_field_three_way","pilot_class":"phase5","reason":"xlsx/gt-g2-interest-receivable：结构化 Tab（HTML store）与 OnlyOffice 共写同一份权威模板，投影契约是唯一权威 —— 与 D1~D7 / E1 / F3~F5 同型","schema_version":"authority-model-definition:v1"}

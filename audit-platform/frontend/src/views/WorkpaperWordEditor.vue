@@ -105,6 +105,7 @@ import EditorSharedToolbar from '@/components/workpaper/EditorSharedToolbar.vue'
 import { api as httpApi } from '@/services/apiProxy'
 import { workpapers as P_wp } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
+import { getAuthHeaders } from '@/utils/authToken'
 import { useWpDetailGuard } from '@/composables/useWpDetailGuard'
 import type { WorkpaperDetail } from '@/services/workpaperApi'
 
@@ -237,10 +238,9 @@ async function tryLoadUniver(): Promise<boolean> {
 async function tryLoadTipTapFromDocx(): Promise<boolean> {
   try {
     // 拉原始 docx blob
-    const token = sessionStorage.getItem('token') || localStorage.getItem('token') || ''
     const resp = await fetch(
       `/api/projects/${props.projectId}/workpapers/${props.wpId}/template-file`,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: getAuthHeaders() },
     )
     if (!resp.ok) return false
     const blob = await resp.blob()

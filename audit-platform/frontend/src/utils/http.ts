@@ -584,3 +584,13 @@ export function createCancelToken() {
 }
 
 export default http
+
+/**
+ * 判断错误是否由 GET 请求去重（`addPending` 的 `AbortController.abort()`）导致的取消。
+ *
+ * 调用方的 catch 块应优先检查此函数——取消不是真正的失败，后发请求会带回正确数据。
+ * 导出此函数是为了让全仓 composable 不必各自 `import axios` 再调 `axios.isCancel`。
+ */
+export function isRequestCancelled(error: unknown): boolean {
+  return axios.isCancel(error)
+}

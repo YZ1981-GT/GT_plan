@@ -25,6 +25,30 @@ spec: adj-formula-repair-and-approval-gate-wiring · 设计 §三 组件 1
 差异通过 include_statuses / exclude_origins **显式参数**体现在调用点，
 不再靠注释声称一致而实际不同。
 
+## 两个公式写法的语义差异（**不要混用**）
+
+spec tb-adjustment-column-formula-closure Phase 1 Task 1.12。
+平台有两种在公式里取调整额的写法，读的是**不同的东西**：
+
+| 写法 | 数据源 | 语义 | 何时用 |
+|------|--------|------|--------|
+| ``TB(code,'AJE调整')``  | ``trial_balance.aje_adjustment`` | **持久化快照** —— 由 ``recalc_adjustments`` 落列，是上一次重算的结果 | 需要与试算表展示值、审定数计算逐字一致时 |
+| ``ADJ(code,'aje_net')`` | ``adj_net_batch``（现算） | **实时汇总** —— 按当前 approved 分录即时聚合 | 需要反映"此刻的分录状态"时 |
+
+两者**可以不等**，不等即说明快照过期（新分录已确认但尚未重算）。
+
+🔴 这不是缺陷而是设计：``recalc_adjustments`` 是显式触发的（事件驱动 +
+``ADJUSTMENT_APPROVED`` handler），不在每次读取时重算。真库现状就是
+持久化列全 0 而实时值非 0。
+
+差异由 ``consistency_check_service._check_adjustment_snapshot_vs_realtime``
+（``check_full_chain`` 第 6 项）**显式报告**，不静默取其中一个、也不自动重算
+（需求 3.3）。守卫见 ``tests/test_adj_snapshot_drift_signal.py``。
+
+``ADJ()`` 只暴露归一净额（``*_net``），**不给** ``*_dr``/``*_cr``：
+公式引擎属计算域，取原始借贷参与算式会对贷方正常类方向反掉（Phase 0 的 B4 缺陷）。
+``ADJ(code,'aje_dr')`` 走 ``normalize_adj_type`` 归一失败路径报错，而非静默返回借方合计。
+
 ADR-ADJ-001: 科目列统一走 adjustment_entries.standard_account_code + JOIN adjustments
 ADR-ADJ-005: 展示用原始借贷（未归一）与计算用归一净额并存，见 adj_net_batch 返回值
 """

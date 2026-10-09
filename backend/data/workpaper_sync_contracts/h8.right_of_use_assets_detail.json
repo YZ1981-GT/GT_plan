@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "a4526d4d6e5384518d58c5ca6a54795ed0fb82f3a72cdf44b58c7bc1cf0b7502",
+  "instrumentation_definition_sha256": "81f6c5ddb42a23c63e2f09c8f649e90ed12cc6d05b9fb16eb512c5e78bd1f658",
   "review": {
     "authority_root": "backend/wp_templates",
     "carrier": {
@@ -1030,9 +1030,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "84604d74008be9037587a8601410ef67f1576473545cad279408464edaa1add7",
+    "normalized_structure_hash": "0bda5f024b5430ee84783d9a5264beb0603e123d90cc05af8073965c860f3012",
     "relative_path": "H/H8 使用权资产.xlsx",
-    "template_sha256": "112053f0681642c371572998a559e4c5362f518265897a36fc90d7f84e666782"
+    "template_sha256": "05abaabbc46fe8861e171ea35b580fe7c69659363ab6d85e3be096a1e23747e9"
   },
-  "template_definition_sha256": "6bf4e3e1751a171d1ab004ca52c60edd4d7e20622f493f44e41b189f6284b4ee"
+  "template_definition_sha256": "2ef4e1ad7501c10d876942e774fa580b058bb4a9c897de977b9ff8c4b04356c7"
 }

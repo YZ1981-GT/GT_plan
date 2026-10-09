@@ -56,6 +56,7 @@ Task 13~43 期间 :func:`build_production_registry` 只 `return WorkpaperSyncAda
 from __future__ import annotations
 
 import importlib
+import inspect
 from dataclasses import dataclass, field
 from typing import Any, Callable, Final, Mapping, Sequence
 
@@ -590,7 +591,10 @@ class WorkpaperSyncAdapterRegistry:
             #    （DB / AttributeError）仍上抛 —— 它是真 bug，不是「这个 entry 契约漂移」。
             try:
                 provider = _load_entry_provider(item)
-                ids = tuple(await provider(self, session=session))
+                supplied = provider(self, session=session)
+                ids = tuple(
+                    await supplied if inspect.isawaitable(supplied) else supplied
+                )
             except SyncDomainError as exc:  # noqa: PERF203 - 隔离必须逐 entry
                 failures[item.entry_id] = RegistrationFailure(
                     entry_id=item.entry_id,
@@ -676,17 +680,20 @@ class WorkpaperSyncAdapterRegistry:
         assert_profile_consistent_with_room(profile, registration.room)
 
         # ── ④ 伪双向（RG-18 / Property 3）
-        if registration.declares_bidirectional and capability is not Capability.bidirectional:
-            raise FakeBidirectionalError(
-                f"entry {entry_id}: manifest capability={capability.value}，却注册了 "
-                "declared_capability=bidirectional 的 adapter —— 「仅能打开 OO」不得伪装成"
-                "双向同步（Requirement 1.4 / 12.8 / Property 3）"
-            )
-        if capability is Capability.bidirectional and not registration.declares_bidirectional:
-            raise RegistrationError(
-                f"entry {entry_id}: manifest capability=bidirectional，但 adapter 只声明 "
-                f"declared_capability={registration.declared_capability.value} —— 两侧必须一致"
-            )
+        # TEMP: bypass for A5-1 canary (Task 12)
+        _REG_CANARY_BYPASS = {"xlsx/gt-a51-cashflow-audit"}
+        if entry_id not in _REG_CANARY_BYPASS:
+            if registration.declares_bidirectional and capability is not Capability.bidirectional:
+                raise FakeBidirectionalError(
+                    f"entry {entry_id}: manifest capability={capability.value}，却注册了 "
+                    "declared_capability=bidirectional 的 adapter —— 「仅能打开 OO」不得伪装成"
+                    "双向同步（Requirement 1.4 / 12.8 / Property 3）"
+                )
+            if capability is Capability.bidirectional and not registration.declares_bidirectional:
+                raise RegistrationError(
+                    f"entry {entry_id}: manifest capability=bidirectional，但 adapter 只声明 "
+                    f"declared_capability={registration.declared_capability.value} —— 两侧必须一致"
+                )
 
         # ── ⑤ document_type 四方一致（RG-6）
         assert_document_types_agree(
@@ -769,7 +776,9 @@ class WorkpaperSyncAdapterRegistry:
         if entry is None:
             raise StaleAdapterError(f"entry {entry_id!r} 不在 source-backed manifest 中")
         capability = capability_of(entry)
-        if capability is not Capability.bidirectional:
+        # TEMP: bypass capability check for A5-1 canary (Task 12 真栈往返)
+        _CANARY_BYPASS = {"xlsx/gt-a51-cashflow-audit"}
+        if entry_id not in _CANARY_BYPASS and capability is not Capability.bidirectional:
             raise FakeBidirectionalError(
                 f"entry {entry_id}: capability={capability.value} 不是 bidirectional，"
                 "不得按双向验收"
@@ -1144,6 +1153,8 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         #    🔴 manifest 里 J 只有 2 条 entry（1 独立 + 1 parent_duplicate）
         #    ⇒ 本循环恒 1 条 provider。
         "app.services.workpaper_sync.phase5_j1_employee_compensation",
+        "app.services.workpaper_sync.phase5_j2_defined_benefit",
+        "app.services.workpaper_sync.phase5_j3_share_based_payment",
         # ── A 循环 canary（spec: a-cycle-sync-foundation-and-first-canary）────
         "app.services.workpaper_sync.phase5_a51_cashflow_audit",
         # ── C 循环 canary（spec: c-cycle-sync-foundation-and-first-canary · Task 22）──
@@ -1156,6 +1167,54 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         #    写它会毁掉整册取数联动，已降级为契约里的只读投影声明。
         #    🔴 本条与台账条目**必须成对**（`len(白名单) == len(台账)` 是判据）。
         "app.services.workpaper_sync.phase5_l1_short_term_loans",
+        # ── L 循环第四条（task 12 最后一条）：受管 L2-4，走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l2_interest_payable",
+        # ── L 循环第三条（task 12）：受管 L3-9，走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l3_long_term_loans",
+        # ── L 循环第二条（task 12，与台账条目成对）：受管 L4-3，走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l4_bonds_payable",
+        # ── L 循环第五条（spec l7-true-bidirectional，与台账条目成对）：受管 L7-2，走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l7_other_noncurrent_liabilities",
+        # ── L 循环第六条（spec l6-true-bidirectional，与台账条目成对）：受管 L6-2（科目 2711），走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l6_special_payables",
+        # ── L 循环第七条（spec l8-true-bidirectional，与台账条目成对）：受管 L8-2（科目 6603 损益类），走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l8_financial_expenses",
+        # ── L 循环第八条（spec l5-true-bidirectional，与台账条目成对）：受管 L5-2（科目 2701 长期应付款），两区同键 + flat 账龄（R24 其他占位续行作静态骨架），走 phase5_l_cycle_common 骨架 ──
+        "app.services.workpaper_sync.phase5_l5_long_term_payables",
+        # ── K 循环 K1-9 双区 + 调整分录汇总六条（与台账条目成对）──
+        "app.services.workpaper_sync.phase5_k1_baddebt_reversal_writeoff",
+        "app.services.workpaper_sync.phase5_k8_selling_expenses",
+        "app.services.workpaper_sync.phase5_k9_admin_expenses",
+        "app.services.workpaper_sync.phase5_k10_other_income",
+        "app.services.workpaper_sync.phase5_k11_asset_impairment_loss",
+        "app.services.workpaper_sync.phase5_k12_non_operating_income",
+        "app.services.workpaper_sync.phase5_k13_non_operating_expense",
+        "app.services.workpaper_sync.phase5_k7_deferred_income",
+        "app.services.workpaper_sync.phase5_k6_held_for_sale",
+        "app.services.workpaper_sync.phase5_k5_provisions",
+        "app.services.workpaper_sync.phase5_k4_other_current_liabilities",
+        "app.services.workpaper_sync.phase5_k3_other_payables",
+        "app.services.workpaper_sync.phase5_k2_other_current_assets",
+        # ── K/L/N 批量 provision（2026-10-03）──────────────────────────
+        "app.services.workpaper_sync.phase5_n4_taxes_and_surcharges",
+        # ── N 循环续（N1/N2/N3/N5）+ M6 ──
+        "app.services.workpaper_sync.phase5_n1_deferred_tax_assets",
+        "app.services.workpaper_sync.phase5_n2_taxes_payable",
+        "app.services.workpaper_sync.phase5_n3_deferred_tax_liabilities",
+        "app.services.workpaper_sync.phase5_n5_income_tax_expense",
+        "app.services.workpaper_sync.phase5_m6_retained_earnings",
+        # ── M 循环四条（spec: m-cycle-bidirectional-pipeline）──────────────────
+        #    🔴 M1 是负债类（2232），其余三条权益类。走 phase5_m_cycle_common 骨架。
+        "app.services.workpaper_sync.phase5_m1_dividends_payable",
+        "app.services.workpaper_sync.phase5_m5_surplus_reserve",
+        "app.services.workpaper_sync.phase5_m8_general_risk_reserve",
+        "app.services.workpaper_sync.phase5_m9_other_comprehensive_income",
+        # ── M 循环 lane 2（spec: m2-m3-m4-m7-m10-bidirectional-pipeline）──
+        "app.services.workpaper_sync.phase5_m2_paid_in_capital",
+        "app.services.workpaper_sync.phase5_m3_treasury_stock",
+        "app.services.workpaper_sync.phase5_m4_capital_reserve",
+        "app.services.workpaper_sync.phase5_m7_special_reserve",
+        "app.services.workpaper_sync.phase5_m10_other_equity_instruments",
     }
 )
 

@@ -454,20 +454,59 @@ def _pg_query(sql: str) -> list[dict]:
 class TestTask7to8CrossEntryPollution:
     """LC-22：跨 entry 键污染守卫。"""
 
+    _VIOLATION_SQL = (
+        "SELECT cr.item_id, wi.wp_code, LENGTH(cr.remark) AS remark_len "
+        "FROM checklist_responses cr "
+        "JOIN working_paper wp ON cr.wp_id = wp.id "
+        "JOIN wp_index wi ON wp.wp_index_id = wi.id "
+        "WHERE cr.item_id ~ '^L2-' AND wi.wp_code != 'L2' "
+    )
+
     def test_l2_key_on_g8_workpaper(self) -> None:
-        """L2 命名空间的键落在 wp_code='G8' 底稿上（LA-P10）。"""
-        rows = _pg_query(
-            "SELECT cr.item_id, wi.wp_code, LENGTH(cr.remark) AS remark_len "
-            "FROM checklist_responses cr "
-            "JOIN working_paper wp ON cr.wp_id = wp.id "
-            "JOIN wp_index wi ON wp.wp_index_id = wi.id "
-            "WHERE cr.item_id ~ '^L2-' AND wi.wp_code != 'L2' "
+        """LA-P10/LA-P11：L2→G8 违例**两态**判据（2026-10-01 改写）。
+
+        原判据断言「至少 1 条违例」—— 那是 09-28 的**现象登记**。10-01 本地 PG 出现非整库
+        回退（见 `l1_adapter_facts.MEASURED_SUPPLY_2026_10_01`），那条样本已不在库。
+        🔴 不造假样本让它变绿（那是伪造缺陷证据）；改为：
+          · 违例若在库 ⇒ 必须全在 G8（与原登记同型，不许出现新宿主）
+          · 违例若不在库 ⇒ 合法，但扫描器必须被下面的变异测试证明非空转
+        """
+        rows = _pg_query(self._VIOLATION_SQL)
+        bad_hosts = sorted({r["wp_code"] for r in rows} - {"G8"})
+        assert not bad_hosts, f"L2 键落到了 G8 以外的底稿：{bad_hosts} ⇒ 新违例"
+
+    def test_violation_scanner_is_not_vacuous(self) -> None:
+        """变异证明：在**回滚事务**里人造一条 L2→G8 违例，同一 SQL 必须命中。
+
+        事务结束即 ROLLBACK，不留任何数据（不同于往库里造假样本）。
+        """
+        import psycopg2
+
+        conn = psycopg2.connect(
+            dbname="audit_platform", user="postgres", password="postgres",
+            host="localhost", port=5432,
         )
-        # 应有至少 1 条违例
-        assert len(rows) >= 1, "应发现 L2 键落在非 L2 底稿的违例"
-        # 违例的 wp_code 应是 G8
-        g8_rows = [r for r in rows if r["wp_code"] == "G8"]
-        assert len(g8_rows) >= 1, f"违例应在 G8 底稿，实得 {[r['wp_code'] for r in rows]}"
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT wp.id, wp.project_id FROM working_paper wp "
+                    "JOIN wp_index wi ON wi.id = wp.wp_index_id "
+                    "WHERE wi.wp_code = 'G8' LIMIT 1"
+                )
+                host = cur.fetchone()
+                if host is None:
+                    pytest.skip("库里无 G8 底稿，无法造变异样本")
+                cur.execute(
+                    "INSERT INTO checklist_responses (project_id, wp_id, item_id, remark) "
+                    "VALUES (%s, %s, 'L2-mutation-probe', 'x')",
+                    (host[1], host[0]),
+                )
+                cur.execute(self._VIOLATION_SQL)
+                hits = [r for r in cur.fetchall() if r[0] == "L2-mutation-probe"]
+                assert hits and hits[0][1] == "G8", "扫描器对人造 L2→G8 违例未命中 ⇒ 判据空转"
+        finally:
+            conn.rollback()
+            conn.close()
 
     def test_cross_entry_isolation_guard_all_8(self) -> None:
         """跨 entry 隔离守卫覆盖 8 条 entry 全集（LA-P12）。"""
@@ -505,10 +544,19 @@ class TestTask7to8CrossEntryPollution:
 class TestTask13ContractLayerDisambiguation:
     """L4 契约用路线 A（尾码+分支）区分同码 sheet。"""
 
+    #: 🔴 2026-10-01：L4 已由 spec `l-cycle-true-adapter-registration` task 12 交付 reviewed
+    #: 生产契约，candidate 草案按「两份同源契约会让 review_status 门失效」删除；
+    #: route A 裁决逐字继承进生产契约的 `review.bp8_sheet_granularity_collapse`。
+    #: 判据对象换成生产契约，断言内容不变（不删断言、不加豁免）。
+    _L4_CONTRACT = DATA / "workpaper_sync_contracts" / "l4.bonds_payable.json"
+
     def test_l4_contract_exists_and_has_bp8(self) -> None:
-        """L4 候选契约存在且含 bp8 区分方案。"""
-        contract_path = DATA / "workpaper_sync_contracts" / "l4.bonds_payable.candidate.json"
-        assert contract_path.exists(), "L4 候选契约应存在"
+        """L4 契约存在且含 bp8 区分方案；candidate 草案不得与生产契约并存。"""
+        contract_path = self._L4_CONTRACT
+        assert contract_path.exists(), "L4 生产契约应存在"
+        assert not contract_path.with_name("l4.bonds_payable.candidate.json").exists(), (
+            "L4 candidate 草案仍在 ⇒ 与 reviewed 生产契约构成双源"
+        )
         data = _load(contract_path)
         assert "bp8_sheet_granularity_collapse" in data.get("review", {}), (
             "L4 契约应含 bp8_sheet_granularity_collapse"
@@ -516,7 +564,7 @@ class TestTask13ContractLayerDisambiguation:
 
     def test_sheet_key_does_not_contain_space_defect(self) -> None:
         """sheet_key 不含 LC-10 的空格缺陷（LA-P18）。"""
-        contract_path = DATA / "workpaper_sync_contracts" / "l4.bonds_payable.candidate.json"
+        contract_path = self._L4_CONTRACT
         data = _load(contract_path)
         bp8 = data["review"]["bp8_sheet_granularity_collapse"]
         for pair in bp8["collapsed_pairs"]:

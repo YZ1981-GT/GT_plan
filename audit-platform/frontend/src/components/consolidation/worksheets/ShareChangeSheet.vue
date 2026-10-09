@@ -202,7 +202,7 @@ interface NARow { item: string; vals: (number | null)[]; indent?: number; bold?:
 interface SimRow { subject: string; detail: string; dc: (number | null)[]; isSection?: boolean; isSubtotal?: boolean; isRatio?: boolean }
 
 const props = defineProps<{
-  changeTimes: 1 | 2 | 3
+  changeTimes: number
   companies: CompanyInfo[]
   allCompanies: { name: string; code?: string; ratio: number }[]
   indirectCompanies?: { name: string; code?: string; ratio: number; indirectHolder?: string }[]

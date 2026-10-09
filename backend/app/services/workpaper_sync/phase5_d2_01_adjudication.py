@@ -293,8 +293,13 @@ def sheet_payload_d21() -> dict[str, Any]:
     （`cell.row_from=静态行号` / `row_scoped=False` / 无 row_identity / 无 delete_policy），
     与 D4-9 `totals_table_payload` 同型。SUMIF 派生格 + 派生列 + 小计/合计行落 formula_mask，
     普通值投影不覆盖。fixed 4 行的 rowKey 是稳定键（D4-6 范式），不注入 UUID 列。
+
+    🔴 locator 必须是 ``defined_name_ref``（静态区范式，照 D4-13），**不是**
+    ``excel_table_sheet_association``——D2-1 没有 Excel Table，instrumentation 只注入
+    definedName ``GT_MANAGED_REGION_D21``。用 Table 锚点会让 ``observe_structure_inventory``
+    在 ``collect_workbook_structure`` 里找不到物理 sheet ⇒ 全部 6 字段从观测清册消失 ⇒
+    ``assert_no_structure_drift`` 报漂移。
     """
-    from app.services.workpaper_sync.excel_extract import TABLE_SHEET_ANCHOR
 
     def _src(cell: str) -> str:
         return f"源xlsx!{MANAGED_SHEET_D21}!{cell}"
@@ -321,7 +326,17 @@ def sheet_payload_d21() -> dict[str, Any]:
     return {
         "sheet_key": SHEET_KEY_D21,
         "excel_name": MANAGED_SHEET_D21,
-        "locator": {"anchor": TABLE_SHEET_ANCHOR},
+        "template_id": TEMPLATE_ID_D21,
+        "locator": {
+            "anchor": "defined_name_ref",
+            "defined_name": GT_MANAGED_REGION_D21,
+        },
+        "region_boundary_locator": {
+            "anchor": "defined_name_ref",
+            "defined_name": GT_MANAGED_REGION_D21,
+            "range": _STATIC_REGION_RANGE_D21,
+            "region_kind": "static",
+        },
         "tables": [
             {
                 "table_key": TABLE_KEY_D21,

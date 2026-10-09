@@ -1166,6 +1166,75 @@ class TestAdjudicationLegality:
                 )
             assert gate["mounts_ac14_notice"] == facts["mounts_ac14_notice"]
 
+    # ── Task 3（lane 3, MB-P5）：BP-1 / BP-2 / BP-3 外部供给登记 ──────────
+    # 引用 foundation MF-P33：标 [ ]*，守卫只断言「前提不成立」不断言通过。
+    # BP-1 = approved authority model / per-entry contract / non-null bundle
+    # BP-2 = Task 36 published representation
+    # BP-3 = 真实 OnlyOffice 9.4 探针
+    # 本测试覆盖 lane 3 的四条 entry（M1/M5/M8/M9），断言它们全含这三个 BP
+    # 且对应前提字段仍为 null（= 前提不成立）。
+
+    _LANE3_CODES = ("M1", "M5", "M8", "M9")
+
+    def test_lane3_entries_all_carry_bp1_bp2_bp3(self, manifest_slice: dict) -> None:
+        """MB-P5：四条 entry 的 blocked_by 均含 BP-1/BP-2/BP-3。"""
+        required = {"BP-1", "BP-2", "BP-3"}
+        for code in self._LANE3_CODES:
+            entry = _entry_of(manifest_slice, code)
+            blocked = set(entry["capability_target_blocked_by"])
+            missing = required - blocked
+            assert not missing, (
+                f"{entry['entry_id']} 的 blocked_by 缺少 {missing}"
+            )
+
+    def test_lane3_bp1_prerequisites_are_null(self, manifest_slice: dict) -> None:
+        """MB-P5 / MF-P33：BP-1 前提不成立——authority_model / definition_bundle 为 null。"""
+        for code in self._LANE3_CODES:
+            entry = _entry_of(manifest_slice, code)
+            assert entry["authority_model"] is None, (
+                f"{entry['entry_id']}.authority_model 应为 null（BP-1 前提不成立）"
+            )
+            assert entry["definition_bundle"] is None, (
+                f"{entry['entry_id']}.definition_bundle 应为 null（BP-1 前提不成立）"
+            )
+
+    def test_lane3_bp2_prerequisites_are_null(self, manifest_slice: dict) -> None:
+        """MB-P5 / MF-P33：BP-2 前提不成立——instrumentation_candidate / published_representation 为 null。"""
+        for code in self._LANE3_CODES:
+            entry = _entry_of(manifest_slice, code)
+            assert entry["instrumentation_candidate"] is None, (
+                f"{entry['entry_id']}.instrumentation_candidate 应为 null（BP-2 前提不成立）"
+            )
+            assert entry["published_representation"] is None, (
+                f"{entry['entry_id']}.published_representation 应为 null（BP-2 前提不成立）"
+            )
+
+    def test_lane3_bp3_prerequisites_are_null(self, manifest_slice: dict) -> None:
+        """MB-P5 / MF-P33：BP-3 前提不成立——evidence 里无 test run / scenario digest。"""
+        for code in self._LANE3_CODES:
+            entry = _entry_of(manifest_slice, code)
+            ev = entry["evidence"]
+            assert ev["verification_state"] == "UNVERIFIABLE", (
+                f"{entry['entry_id']} 应为 UNVERIFIABLE（BP-3 前提不成立）"
+            )
+            assert ev["sync_test_run_id"] is None, (
+                f"{entry['entry_id']}.sync_test_run_id 应为 null（BP-3：无 OO 探针）"
+            )
+
+    def test_lane3_bp1_bp2_bp3_are_in_blocking_preconditions(self, manifest_slice: dict) -> None:
+        """MB-P5：三条 BP 在 slice 级 blocking_preconditions 里存在且 status == open。"""
+        bp_map = {bp["id"]: bp for bp in manifest_slice["blocking_preconditions"]}
+        lane3_eids = {_entry_of(manifest_slice, c)["entry_id"] for c in self._LANE3_CODES}
+        for bp_id in ("BP-1", "BP-2", "BP-3"):
+            assert bp_id in bp_map, f"blocking_preconditions 里缺 {bp_id}"
+            bp = bp_map[bp_id]
+            assert bp["status"] == "open", f"{bp_id} 应为 open"
+            # 四条 entry 都在该 BP 的 entries 里
+            for eid in lane3_eids:
+                assert eid in bp["entries"], (
+                    f"{eid} 不在 {bp_id} 的 entries 列表中"
+                )
+
 
 # ════════════════════════════════════════════════════════════════════════════
 # 判据三：HTML 对端 source-backed
@@ -1298,16 +1367,76 @@ class TestMCycleFormDifferences:
         for p in modules:
             prod, test = _statement_edges_to(p)
             (orphan if not prod and not test else live).append(p)
-        assert len(modules) == d["counters"]["module_files_total"]
-        assert len(orphan) == d["counters"]["orphan"]
-        assert len(live) == d["counters"]["live"]
+        # ── 冻结计数须按「已执行的 orphan 删除」折算（2026-09-28 修正）──────────
+        #
+        # 🔴 原断言直接拿 slice 冻结的 `module_files_total`（20）比现算，于是
+        #    **orphan 删除计划一执行本条必红**：`useM9DualMode.ts` 与
+        #    `useM9EntryDualMode.ts` 已被删（工作树实测），现算 18。
+        #    而删这两个正是本 slice 自己声明的动作 —— `orphan_dual_mode_inventory.modules`
+        #    里的 OD-10 / OD-11 都标 `orphan_order=first_order`，且
+        #    `m_cycle_specific_note` 明写「M9 的**两个**孪生都是死桩」
+        #    ⇒ 红的是判据没跟上、不是生产回归（另 grep 确认 M9 宿主无残留 import，只剩文档注释）。
+        #
+        #    改法不是把 20 改成 18（那会在别的 orphan 被删时又红一次，且删掉 live 模块
+        #    也照样绿）。正解：按**声明的 orphan 里有哪些已不存在**折算期望值，
+        #    并额外断言「被删的必须是声明过的 orphan」—— 删 live 模块仍会红。
+        declared_orphans = {
+            (ROOT / m["file"])
+            for m in manifest_slice["orphan_dual_mode_inventory"]["modules"]
+        }
+        deleted = sorted(p for p in declared_orphans if not p.exists())
+        frozen = d["counters"]
+        assert len(modules) == frozen["module_files_total"] - len(deleted), (
+            f"现算 {len(modules)} 个模块文件，冻结 {frozen['module_files_total']} 减去"
+            f"已删的声明 orphan {len(deleted)} 个 —— 对不上说明有**未登记**的增删"
+        )
+        assert len(orphan) == frozen["orphan"] - len(deleted), (
+            f"orphan 现算 {len(orphan)}，冻结 {frozen['orphan']} - 已删 {len(deleted)}"
+        )
+        # live 数不受 orphan 删除影响；它变了就是真回归（删到活模块 / 活模块失去消费方）
+        assert len(live) == frozen["live"], (
+            f"live 现算 {len(live)} ≠ 冻结 {frozen['live']} —— 删到活模块或活模块失去消费方"
+        )
         assert set(orphan) & set(live) == set()
         assert set(orphan) | set(live) == set(modules)
-        assert len(modules) == 2 * len(manifest_slice["independent_entries"]), (
-            "M 的孪生形态要求文件数 == entry 数 × 2"
+        assert len(modules) + len(deleted) == 2 * len(manifest_slice["independent_entries"]), (
+            "M 的孪生形态要求「现存文件数 + 已删的声明 orphan 数」== entry 数 × 2"
         )
-        assert sum(len(_cached_text(p).splitlines()) for p in orphan) == d["counters"]["orphan_lines"]
-        assert sum(len(_cached_text(p).splitlines()) for p in live) == d["counters"]["live_lines"]
+        # orphan 行数同样要折算：用 slice 自己给每个 orphan 声明的 `lines`
+        # （实测已删的 OD-10 186 行 + OD-11 43 行 = 229，恰是 1911 与现算 1682 之差）。
+        deleted_lines = sum(
+            int(m["lines"])
+            for m in manifest_slice["orphan_dual_mode_inventory"]["modules"]
+            if not (ROOT / m["file"]).exists()
+        )
+        assert sum(len(_cached_text(p).splitlines()) for p in orphan) == (
+            frozen["orphan_lines"] - deleted_lines
+        ), (
+            f"orphan 行数现算 {sum(len(_cached_text(p).splitlines()) for p in orphan)}，"
+            f"冻结 {frozen['orphan_lines']} - 已删声明行数 {deleted_lines}"
+        )
+        # ── live 行数：从「冻结等式」改为「一侧棘轮 + 集合恒等式」（2026-09-28）──────
+        #
+        # 🔴 冻结活文件的**总行数**这件事本身不成立：这些文件正在被修
+        #    （实测 M2/M3/M4/M7/M10 五个 Entry 封装相对 HEAD 净 +9 行，恰是
+        #     405 与冻结 396 之差；改动形态是 MC-23 的 `M{n}_SHEET_MAP` 错映射修正 ——
+        #     slice 自己的 BP 里就写着那 11 对错映射要修）。
+        #    每修一处就红一次的断言不是零回归信号，是噪声。
+        #
+        #    保留的是两条**仍然能抓到东西**的：
+        #      ① 一侧棘轮：活模块行数只许增不许减 —— 变少意味着被删/被掏空（真回归方向）；
+        #      ② 集合恒等式：live 集合必须恰等于「现存模块 − slice 声明的 orphan」，
+        #         这条与行数无关、不受修复影响，却能抓住「把活模块误判成 orphan」。
+        live_lines_now = sum(len(_cached_text(p).splitlines()) for p in live)
+        assert live_lines_now >= frozen["live_lines"], (
+            f"活模块行数现算 {live_lines_now} < 冻结 {frozen['live_lines']} ⇒ "
+            "活模块被删或被掏空（修复只会加行，不会减到基线以下）"
+        )
+        assert set(live) == set(modules) - declared_orphans, (
+            "live 集合 ≠ 现存模块 − 声明 orphan ⇒ 有活模块被误判成 orphan（或反之）："
+            f"多={sorted(set(live) - (set(modules) - declared_orphans))} "
+            f"少={sorted((set(modules) - declared_orphans) - set(live))}"
+        )
 
     def test_md2_inert_is_zero_and_the_scanner_is_not_stuck(self, manifest_slice: dict) -> None:
         d = self._diff(manifest_slice, "MD-2")

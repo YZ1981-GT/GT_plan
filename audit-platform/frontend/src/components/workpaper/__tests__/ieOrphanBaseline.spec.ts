@@ -65,15 +65,9 @@ const SRC_ROOT = resolve(REPO_ROOT, 'audit-platform/frontend/src')
  *    一条新缺陷模式：**registry 登记了 ≠ composable 被消费**（能力对用户可达，
  *    但这份 composable 是并存的第二条路，无人使用）。
  *
- * ② 多出 `useJ2ImportExport` —— 它**有**直接 import 方（`composables/workpaper/j2/index.ts`），
- *    所以按「直接被 import」判会漏掉它。但那个 barrel 自己零消费方：J2 目录下
- *    10 个 `.vue`（`GtJ2DefinedBenefitPlan` / `J2Tab*`）**一个都没 import 它**。
- *    实测整个 `composables/workpaper/j2/` 的 **11 个 composable 全部只被该 barrel 消费**
- *    ⇒ 这是一条完整的孤儿链（R5.6 的活样本），而非单点孤儿。
- *
- * 本 spec 只处置其中的 I/E composable（`useJ2ImportExport`）；同链的另外 10 个
- * （`useJ2ActuarialEngine` / `useJ2FormulaEngine` / …）不属本 spec 半径，
- * 已在 tasks.md §Notes 登记为平台级线索。
+ * ② J2 整条孤儿链已由 `j1-post-publish-semantic-and-evidence-closure` 删除：零入边 barrel
+ *    + 后挂 8 个 composable + 仅测试这些死模块的用例一并移除；不再作为“活样本”占基线。
+ *    J3 同型链删除 5 个，仅保留被 `J3TabDetail.vue` 真实深链消费的 `useJ3ImportExport`。
  */
 const ORPHAN_BASELINE: readonly string[] = [
   // ── Task 16 已删除（基线 12 → 9）───────────────────────────────────────
@@ -155,15 +149,6 @@ const ORPHAN_BASELINE: readonly string[] = [
   'components/workpaper/confirmation/k0-confirmation/composables/useK0ImportExport.ts',
   'components/workpaper/confirmation/l0-confirmation/composables/useL0ImportExport.ts',
 
-  /**
-   * `useJ2ImportExport` 是孤儿**链**（R5.6 活样本）：它被 `j2/index.ts` barrel
-   * 直接 import，但 barrel 自己零消费方 —— J2 目录 10 个 `.vue` 一个都没 import 它。
-   * 整个 `composables/workpaper/j2/` 的 11 个 composable 全部只被该 barrel 消费。
-   *
-   * 且 registry 无 j2 前缀。删单个 composable 不解决链问题，接线又缺 sheet 映射
-   * ⇒ 需整链裁决，属独立任务。
-   */
-  'composables/workpaper/j2/useJ2ImportExport.ts',
 ]
 
 /** 基线条目数上限 —— 只许减不许增（R5.7） */
@@ -444,10 +429,9 @@ describe('孤儿基线', () => {
     expect(stale, `基线条目在磁盘上不存在（已删或改名，须同步下调基线）: ${stale.join(', ')}`).toEqual([])
   })
 
-  it('基线为 6（立项记 10，实测 12，Task 16 删 3、Task 17 删 3 后为 6）', () => {
-    // 立项漏记的 `useJ2ImportExport`：有直接 import 方但整条链不可达渲染宿主（R5.6）
-    expect(ORPHAN_BASELINE.some((p) => p.endsWith('j2/useJ2ImportExport.ts'))).toBe(true)
-    expect(ORPHAN_BASELINE.length).toBe(6)
+  it('基线为 5（J2 孤儿链整链删除后从 6 收缩为 5）', () => {
+    expect(ORPHAN_BASELINE.some((p) => p.includes('/j2/'))).toBe(false)
+    expect(ORPHAN_BASELINE.length).toBe(5)
   })
 
   it('Task 16 / 17 删除组确已不在磁盘（防"标了删实际没删"）', () => {
@@ -490,28 +474,6 @@ describe('孤儿基线', () => {
     ).toEqual([])
   })
 
-  /**
-   * 🔴 J2 孤儿链是 R5.6 的**真实样本**，必须钉死：
-   * 若判据退化成「直接被 import 即非孤儿」，这条断言会打红。
-   */
-  it('J2 链：useJ2ImportExport 有直接 import 方，但整条链不可达渲染宿主', () => {
-    const g = buildGraph()
-    const key = 'composables/workpaper/j2/useJ2ImportExport'
-    const direct = g.consumers.get(key) ?? new Set<string>()
-
-    // 有直接消费方 —— 所以「直接被 import」判据会漏掉它
-    expect(direct.size, 'useJ2ImportExport 应有直接 import 方（barrel）').toBeGreaterThan(0)
-    expect([...direct]).toContain('composables/workpaper/j2/index.ts')
-
-    // 但 barrel 自己零消费方 ⇒ 递归判据仍判孤儿
-    const barrelConsumers = g.consumers.get('composables/workpaper/j2/index') ?? new Set()
-    expect(
-      [...barrelConsumers],
-      'j2/index.ts 若被 .vue 消费了，须同步下调基线',
-    ).toEqual([])
-    expect(reachesRenderHost(key, g)).toBe(false)
-  })
-
   it('当前孤儿集合 ⊆ 基线（不得新增孤儿）', () => {
     const cur = currentOrphans()
     const added = cur.filter((p) => !ORPHAN_BASELINE.includes(p))
@@ -527,8 +489,8 @@ describe('孤儿基线', () => {
    *   · useK1WriteoffImportExport 纯客户端 Excel，dropdown 替代不了，缺 K1-9 宿主
    *   · useL4ImportExport         l4 后端不接受 sheet 参数，分段能力待裁决
    *   · useK0 / useL0             函证族，sheet ↔ 区域映射待核（l0 在 GAP_REGISTRY 豁免）
-   *   · useJ2ImportExport         孤儿链，需整链裁决
    *
+   * J2 孤儿链已整链删除，不再占基线。
    * 它保持红色是有意的：转绿要么靠真处置，要么靠往 `ORPHAN_EXEMPTIONS` 写明理由
    * （该表上限 3，且有 stale 检测：豁免项一旦接上渲染宿主立即打红）。
    * 直接改成 `toBeLessThanOrEqual(6)` 会让"剩 6 个"变成新常态 —— 不做。

@@ -311,7 +311,8 @@
  * - 公式列: 虚线下划线 + cursor:help + tooltip showing formula source
  * - TB回写: 审定数变化 → writebackTB(2801)
  * - EventBus: subscribe 'adjustment:created' → refresh AJE/RJE columns
- * - el-segmented 双模式(HTML/OO) at top using useL7DualMode
+ * - 顶部能力提示走 GtEntrySyncCapabilityNotice（BP-4 路线②：原 el-segmented 双模式开关
+ *   是死开关 —— 切到 OnlyOffice 不渲染任何 OO 宿主，已连同 `useL7DualMode` 一并摘除）
  * - GtIndexChip for cross-references
  * - Font 13px, formula columns with dashed-underline style
  * - 方法论上下文: amber left-border block
