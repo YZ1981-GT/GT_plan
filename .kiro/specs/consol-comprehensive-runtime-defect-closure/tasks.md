@@ -134,7 +134,7 @@ P1-P3 新增表对公式的影响：
 - 后端：test_consol_note_column_groups / test_consol_note_formulas / test_note_template_word_alignment / test_consol_no_double_count / test_note_word_export_d1 / test_note_word_export_cp02_leaf_columns
 - 前端：useGroupTree / useGroupTreeAutobuild / consolidationPushAndFormulaApi / sseConsolidationGuard / sseEventTypes
 
-### 2026-10-09 第四轮（附注表格样式全量治理，6 commits d59512f33..f78a6f44d）
+### 2026-10-09 第四轮（附注表格样式全量治理 + 子表勾稽 + 全科目铺开前置，7 commits d59512f33..a011ee303）
 
 **CP-04 表格样式全量治理**（7 commit 已推送 work 分支）
 - `<br/>` 标签清理：35 张 102 处，recalc column_groups
@@ -154,8 +154,11 @@ P1-P3 新增表对公式的影响：
 - `value_column()` 根源修复：对侧表头降级（五-64-1 col=1 正确）
 - 后端 121 测试全绿 + Playwright 验证通过
 
-**全科目铺开前置调查**
+**全科目铺开前置调查与首步实施（commit a011ee303）**
 - memory 记录的 4 个现存缺陷已确认全部已修或有效降级（EventBus 去重/K1 半接入/发布确认吞/after_save 缺 wp_code）
 - 后端 `_REGISTRY` 80 码（D~N 全覆盖），A/B/C/S 不需要公式推送
 - 种子覆盖 soe 51→57（+6 张新识别期末列）
-- L6/N3 在 `_REGISTRY` 有但 `formulaPushOwnedKeys.ts` 漏生成（2 码待补）
+- L6/N3 `formulaPushOwnedKeys.ts` 已补齐（重跑 `gen_formula_push_owned_keys.py`）
+- F5 binding 注册（`TierAAnchorBinding`，已在 `formula-push-all-subjects-rollout` 归档 spec 完成）
+- S 类科目裁决：S1~S10 均为专项底稿，无标准科目映射，不需要公式推送 binding
+- 待补：L6/N3 前端 owned-keys → ✅ 已完成（本 commit）；余 `formula-push-all-subjects-rollout` 的 26 个任务待铺开

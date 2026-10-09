@@ -58,7 +58,7 @@ inclusion: always
 ### 公式推送引擎 `chain-closure-phase2-formula-push-engine`（18/18；T17 真实立即推送 2026-10-04 用户授权完成，真库 run 1 / state 38，全 E1）
 - 链条：四表入库 / 调整审批 → `TRIAL_BALANCE_UPDATED` → `formula_push.engine.run` → E1 明细 / 审定表 / 披露表 → 附注（上市 五、1 / 国企 八、1）；规则 `backend/data/formula_push_rules.json`；公式管理「📤 公式推送」页
 - 🔴 教训：**写入方取数一律 `strict`**（fail-open 会 rollback 撤销已 flush 写入且零失败痕迹）· **试算表取数按标准码前缀**（与报表 `ReportFormulaParser` 同口径）· **改带自动保存/自动同步页面的源码前浏览器先停 `about:blank`**（HMR 重挂载即真实写库，已踩：重药 五、49）· 真库待决：3 个唯一索引含重复键（C24 / editing_locks / review_threads）、和平药房_2025 试算表 1012 父子双计多 414 万
-- **全科目铺开 spec `formula-push-all-subjects-rollout`**：后端 `_REGISTRY` 80 码（D~N 全覆盖），A/B/C/S 不需公式推送；种子 soe 51→57；✅ 原 memory 记录的 4 个缺陷已全部确认修复或有效降级（EventBus 去重/K1 半接入/发布确认吞/after_save 缺 wp_code）；**待补 L6/N3 前端 owned-keys 生成**（2 码）
+- **全科目铺开 spec `formula-push-all-subjects-rollout`**：后端 `_REGISTRY` 80 码（D~N 全覆盖），A/B/C/S 不需公式推送；种子 soe 51→57；✅ 原 memory 记录的 4 个缺陷已全部确认修复或有效降级（EventBus 去重/K1 半接入/发布确认吞/after_save 缺 wp_code）；✅ L6/N3 前端 owned-keys 已补齐（commit a011ee303）+ F5 binding 已注册 + S 类裁决完成（S1~S10 无标准科目映射不需 binding）
 
 ### 合并抵销分录单源与差额表推送 `consol-elimination-single-source-push`（14/15，余 tasks.md 收尾）
 - ADR-CSP-001~006；唯一来源 `elimination_entries`；计算内核 `consol_report_values`（前缀口径 + 线性分解 + 五度量恒等式 P2）；合并报表按项目口径全六类生成（V172/V173）；试算平衡表只读五列 + 穿透；报表差额表读时计算；合并附注公式种子化 + 填入；推送服务四步上层联动 + SSE；公式管理合并节点 + 推送页。后端 141 passed 变异 166/166；前端 22 files 207 passed；浏览器实测通过
@@ -75,7 +75,7 @@ inclusion: always
 - **✅ `consol-comprehensive-runtime-defect-closure`（12/14，2026-10-09）**：CP-01~05 全修（节点联动/Word 叶子列/推送状态/三层表头/模板切换 dirty）+ 防双计恒等式 + AbortController 竞态守卫；余 CP-07（依赖全科目铺开）+ CP-14（真实 PG UAT）；后端 113 + 前端 65 = 178 测试全绿
 - **✅ `note-template-full-alignment-with-word-authority`（16/16）**：合并模板 soe 221→321 / listed 282→432 + mh 4→37 / 13→115 + 工具 `sync_note_templates_from_word.py`（长期可重跑）
 - **✅ `note-sub-table-formula-and-cross-check`（26/26）**：117 条勾稽 check_rules（A 跨表 38 + B 列平衡 55 + CT 跨期 24）+ 续表标记 179 张 + 子表种子 + value_column 根源修 + 前端续表展示
-- **附注表格样式全量治理（6 commits，2026-10-09 推送）**：214 张 mh 表 8 维 grid 验证全通过 + 820 张单体结构检查 + Path B colspan/rowspan 修复 + trimTrailingEmptyRows + `<br/>` 清理 35 张 + 子表头提升 77 张
+- **附注表格样式全量治理（7 commits，2026-10-09 推送）**：214 张 mh 表 8 维 grid 验证全通过 + 820 张单体结构检查 + Path B colspan/rowspan 修复 + trimTrailingEmptyRows + `<br/>` 清理 35 张 + 子表头提升 77 张
 - **✅ `adj-formula-repair-and-approval-gate-wiring` 已完成（2026-09-28，39/39 全绿含真实环境实测）**：修 ADJ() ImportError + 类型归一 + 三套口径收敛 adj_net + ADJUSTMENT_APPROVED 事件 + 重算 handler + review_status==approved 过滤；**151 测试全绿**；真库实测通过（draft 不进 TB → approved 后 aje=+10000 借贷两类均正号 + 不变式 gap 0 + 报表 1/1 与附注 335/335 标 stale + 三处口径逐值全等，实测数据已清理复原）
 - 🔴 **该 spec 复盘抓到 5 类「守卫假绿」教训（详见其 design §九补）**：①mock/spy 只验接线不验语义——删掉 adj_net 的 type/status/origin 过滤后原守卫**零打红**，必须真 DB 落多类数据 ②冒烟守卫入参不足会被 `if len(args)<N: return` 早退吞掉——因此漏掉 **AUX/TB_AUX 与 ADJ 同源的 ImportError** 数轮 ③registry 中值为 `None` 的成员（TB_AUX）遍历会跳过，需独立用例 ④**「修好 import」≠「跑通」**：AUX 修完 import 又撞 `get_active_filter` 传 ORM 类而非 `__table__`（5 处，坐实这些 resolver 从未真执行）⑤静态扫描须三层排除（TYPE_CHECKING → try/except → feature flag 字面值）才是真结论，误报会从 36 降到 13
 - **lazy import 守卫已建**（`test_lazy_import_resolvability.py`）：全仓扫 4374 条函数体内 `from app.*`，13 条 flag=False 占位与 10 条待修幽灵引用分两张清单 + 「flag 真的关着」钉死断言（flag 翻 True 即打红逼迫搬移）；已修 11 处真缺陷（ADJ/AUX×2/TB_AUX/prefill WpIndex/attachments Attachment×4/database 错名×3）
