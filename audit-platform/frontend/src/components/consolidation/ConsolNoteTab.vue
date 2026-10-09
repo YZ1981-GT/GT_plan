@@ -888,17 +888,33 @@ const parsedMultiHeader = computed<MultiHeaderCol[] | null>(() => {
     }
   }
 
-  // 标记被合并的单元格：横向（同行左边非空→右边空=colspan）
+  // 标记被合并的单元格：横向（非空列向右吞并连续空列 = colspan）
+  // 注意：如果空列上方有非空内容，说明它可能是纵向合并的一部分，不横向吞并
   for (let r = 0; r < rowCount; r++) {
-    for (let c = colCount - 1; c >= 1; c--) {
-      if (grid[r][c].text === '') {
-        // 向左找最近的非空
-        let anchor = c - 1
-        while (anchor >= 0 && grid[r][anchor].text === '' && grid[r][anchor].occupied) anchor--
-        if (anchor >= 0 && grid[r][anchor].text !== '') {
-          grid[r][anchor].colspan++
-          grid[r][c].occupied = true
+    let c = 0
+    while (c < colCount) {
+      if (grid[r][c].text !== '') {
+        // 向右找连续空列（排除可能是纵向合并的空位）
+        let end = c + 1
+        while (end < colCount && grid[r][end].text === '') {
+          // 检查上方是否有非空内容（纵向合并优先）
+          let hasAbove = false
+          for (let rr = r - 1; rr >= 0; rr--) {
+            if (grid[rr][end].text !== '' && !grid[rr][end].occupied) {
+              hasAbove = true
+              break
+            }
+          }
+          if (hasAbove) break  // 这个空位留给纵向合并
+          end++
         }
+        if (end > c + 1) {
+          grid[r][c].colspan = end - c
+          for (let cc = c + 1; cc < end; cc++) grid[r][cc].occupied = true
+        }
+        c = end
+      } else {
+        c++
       }
     }
   }
@@ -907,11 +923,12 @@ const parsedMultiHeader = computed<MultiHeaderCol[] | null>(() => {
   for (let c = 0; c < colCount; c++) {
     for (let r = rowCount - 1; r >= 1; r--) {
       if (grid[r][c].text === '' && !grid[r][c].occupied) {
+        // 向上找最近的非空锚点（跳过所有空列）
         let anchor = r - 1
-        while (anchor >= 0 && grid[anchor][c].text === '' && grid[anchor][c].occupied) anchor--
+        while (anchor >= 0 && grid[anchor][c].text === '') anchor--
         if (anchor >= 0 && grid[anchor][c].text !== '') {
-          grid[anchor][c].rowspan++
-          grid[r][c].occupied = true
+          grid[anchor][c].rowspan = r - anchor + 1
+          for (let rr = anchor + 1; rr <= r; rr++) grid[rr][c].occupied = true
         }
       }
     }
