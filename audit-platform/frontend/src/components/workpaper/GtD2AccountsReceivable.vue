@@ -150,7 +150,8 @@
         :project-id="props.projectId"
         :all-responses="allResponses"
         :is-readonly="isReadonly"
-      />
+          :applicable-standards="applicableStandards"
+        />
 
       <!-- 附注披露（国企） -->
       <D2TabDisclosure
@@ -160,7 +161,8 @@
         :project-id="props.projectId"
         :all-responses="allResponses"
         :is-readonly="isReadonly"
-      />
+          :applicable-standards="applicableStandards"
+        />
 
       <!-- 分析程序 -->
       <D2TabAnalysis
@@ -328,6 +330,7 @@ import { normalizeD2SheetName } from './composables/d2Constants'
 import D2TabIndex from './d2/D2TabIndex.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 const D2TabProcedure = defineAsyncComponent(() => import('./d2/D2TabProcedure.vue'))
 const D2TabAdjudication = defineAsyncComponent(() => import('./d2/D2TabAdjudication.vue'))
@@ -362,6 +365,7 @@ const emit = defineEmits<{
 }>()
 
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 
 const formData = useD2FormData(toRef(props, 'wpId'), toRef(props, 'projectId'), toRef(props, 'htmlData'))

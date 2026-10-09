@@ -278,6 +278,7 @@ import { api } from '@/services/apiProxy'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import G11ImportExportDropdown from '../G11ImportExportDropdown.vue'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   variant: 'listed' | 'soe'
@@ -346,8 +347,8 @@ async function syncToNotes(): Promise<void> {
       rows += Number(data?.rows_synced ?? 0)
     }
     ElMessage.success(`已同步 ${rows} 行到附注「${noteSectionId.value} 投资收益」`)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

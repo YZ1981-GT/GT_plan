@@ -55,6 +55,7 @@ import WpAmountInput from '../shared/WpAmountInput.vue'
 // 金额格式单一真源（与 D1 其余 15 个 Tab 同款 provide/inject + store 兜底）
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { handleDisclosureSyncError } from '../composables/disclosureSyncError'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -64,6 +65,7 @@ const props = withDefaults(defineProps<{
   wpId: string
   projectId: string
   isReadonly?: boolean
+  applicableStandards?: string[]
 }>(), { isReadonly: false })
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -1071,8 +1073,8 @@ async function syncToDisclosureNotes(): Promise<void> {
     ElMessage.success(`已同步 ${rows} 行到附注模块「${D1_NOTE_SECTION[props.variant]} 应收票据」`)
     await syncRestrictedAssetsToNote()
     await checkNoteConsistency(true)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

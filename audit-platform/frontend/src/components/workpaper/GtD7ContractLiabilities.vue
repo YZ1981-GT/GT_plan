@@ -135,6 +135,7 @@
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
           variant="listed"
+          :applicable-standards="applicableStandards"
         />
 
         <D7TabDisclosure
@@ -146,6 +147,7 @@
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
           variant="soe"
+          :applicable-standards="applicableStandards"
         />
 
         <D7TabIndex
@@ -194,6 +196,7 @@ import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWo
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 const D7TabAdjudication = defineAsyncComponent(() => import('./d7/D7TabAdjudication.vue'))
 const D7TabDetail = defineAsyncComponent(() => import('./d7/D7TabDetail.vue'))
@@ -221,6 +224,7 @@ const emit = defineEmits<{
 }>()
 
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 
 const {
   allResponses,

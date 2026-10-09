@@ -302,6 +302,7 @@ import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { dispatchG6SaveItems } from '../../composables/g6CrossHelpers'
 import type { ColumnDef } from '../../composables/disclosureColumnDefs'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 interface BalanceRow {
   item: string
@@ -335,6 +336,7 @@ const props = defineProps<{
   projectId: string
   isReadonly: boolean
   allResponses?: Map<string, ChecklistResponse>
+  applicableStandards?: string[]
 }>()
 
 const ACCOUNT_CODE = '1503'
@@ -752,8 +754,8 @@ async function syncToDisclosureNotes(): Promise<void> {
     )
     const data = result?.data ?? result
     ElMessage.success(`已同步 ${Number(data?.rows_synced ?? 0)} 行到附注模块“${noteSection.value} 其他债权投资”`)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

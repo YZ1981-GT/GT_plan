@@ -74,6 +74,7 @@
           />
           <!-- 附注披露信息（上市公司） -->
           <M4TabDisclosureListed
+          :applicable-standards="applicableStandards"
             v-else-if="currentSheet === 'disclosure-listed'"
             :wp-id="props.wpId"
             :project-id="props.projectId"
@@ -82,6 +83,7 @@
           />
           <!-- 附注披露信息（国有企业） -->
           <M4TabDisclosureSoe
+          :applicable-standards="applicableStandards"
             v-else-if="currentSheet === 'disclosure-soe'"
             :wp-id="props.wpId"
             :project-id="props.projectId"
@@ -136,6 +138,7 @@ import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './comp
 import { useM4EntryDualMode } from './composables/useM4EntryDualMode'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -185,6 +188,7 @@ function handleNavigate(sheetName: string) {
 
 const isLoading = ref(true)
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 
 // ─── sheetName → 子组件分发 ──────────────────────────────────────────────────
 

@@ -195,7 +195,12 @@ import { eventBus } from '@/utils/eventBus'
 import { calcEquityEndBalance, calcSubtotal } from '../../composables/useM8FormulaEngine'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 
-const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
+const props = defineProps<{
+  wpId: string
+  projectId: string
+  isReadonly: boolean
+  applicableStandards?: string[]
+}>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void }>()
 
 // ─── Inject复核对话 + AI ─────────────────────────────────────────────────────

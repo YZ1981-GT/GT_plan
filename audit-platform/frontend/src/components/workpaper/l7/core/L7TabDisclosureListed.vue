@@ -147,11 +147,13 @@ import { useL7FormData } from '../../composables/useL7FormData'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { L7_NOTE_SECTION, buildL7SyncPayload } from '../../composables/l7NoteSectionMap'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -265,8 +267,8 @@ async function syncToDisclosureNotes(): Promise<void> {
       projectId: props.projectId,
       sectionIds: [L7_NOTE_SECTION.listed],
     })
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

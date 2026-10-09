@@ -256,6 +256,7 @@ import { G1_NOTE_SECTION, resolveG1NoteSectionTarget } from '../../composables/g
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G1AuditTextCards from '../G1AuditTextCards.vue'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = withDefaults(defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -355,8 +356,8 @@ async function syncToDisclosureNotes() {
       rows += Number(data?.rows_synced ?? 0)
     }
     ElMessage.success(`已同步 ${rows} 行到附注模块「八、2 交易性金融资产 / 八、3 衍生金融资产」`)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

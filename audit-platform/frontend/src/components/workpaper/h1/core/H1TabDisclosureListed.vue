@@ -572,6 +572,7 @@ import {
   type VehicleRow,
   type BuildingRow,
 } from '../../composables/useH1TitleCheck'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   wpId: string
@@ -1275,8 +1276,8 @@ async function syncToNotes() {
     ElMessage.success(`已同步 ${rows} 行到附注「${noteSectionId}」`)
     // 受限资产共享表的「固定资产」段（跨循环共享表，只替换本段、他段原样保留）
     await syncRestrictedAssets()
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

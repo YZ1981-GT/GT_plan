@@ -167,6 +167,7 @@
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
           variant="listed"
+          :applicable-standards="applicableStandards"
         />
 
         <D6TabDisclosure
@@ -178,6 +179,7 @@
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
           variant="soe"
+          :applicable-standards="applicableStandards"
         />
 
         <D6TabIndex
@@ -226,6 +228,7 @@ import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 const D6TabAdjudication = defineAsyncComponent(() => import('./d6/D6TabAdjudication.vue'))
 const D6TabDetail = defineAsyncComponent(() => import('./d6/D6TabDetail.vue'))
@@ -255,6 +258,7 @@ const emit = defineEmits<{
 }>()
 
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 
 const {
   allResponses,

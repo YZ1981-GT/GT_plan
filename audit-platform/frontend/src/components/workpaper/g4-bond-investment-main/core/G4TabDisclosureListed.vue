@@ -694,6 +694,7 @@ import {
   type G4StageMethod,
 
 } from '../../composables/g4ListedStageDisclosure'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 
 
@@ -1360,9 +1361,9 @@ async function syncToDisclosureNotes(): Promise<void> {
 
     ElMessage.success(`已同步 ${rows} 行到附注模块「${G4_NOTE_SECTION.listed} 债权投资」`)
 
-  } catch {
+  } catch (err) {
 
-    ElMessage.warning('同步附注失败，请稍后重试')
+    handleDisclosureSyncError(err)
 
   } finally {
 

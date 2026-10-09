@@ -125,6 +125,7 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
 
 defineEmits<{ (e: 'navigate', sheetName: string): void }>()

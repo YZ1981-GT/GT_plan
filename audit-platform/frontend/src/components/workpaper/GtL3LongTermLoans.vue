@@ -123,6 +123,7 @@
       />
       <!-- 附注（上市/国企） -->
       <L3TabDisclosureListed
+          :applicable-standards="applicableStandards"
         v-else-if="currentSheet === '附注上市'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
@@ -130,6 +131,7 @@
         @navigate="handleNavigate"
       />
       <L3TabDisclosureSoe
+          :applicable-standards="applicableStandards"
         v-else-if="currentSheet === '附注国企'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
@@ -196,6 +198,7 @@ const L3TabLtLoanCheck = defineAsyncComponent(() => import('./l3/inspection/L3Ta
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtAProgramConsole.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -227,6 +230,7 @@ function handleNavigate(sheetName: string) {
 
 const isLoading = ref(true)
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 
 // ─── sheetName → 子组件分发 ──────────────────────────────────────────────────
 

@@ -80,7 +80,13 @@ import { buildH5Checks } from '../../composables/h5DisclosureConsistency'
 import { useHCycleDisclosureAi } from '../../composables/useHCycleDisclosureAi'
 import { H_CYCLE_NOTE_AI_SECTIONS } from '../../composables/hCycleNoteAiSections'
 
-const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
+const props = defineProps<{
+  wpId: string
+  projectId: string
+  allResponses: Map<string, any>
+  isReadonly: boolean
+  applicableStandards?: string[]
+}>()
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 const router = useRouter()
 const { year: auditYear } = useAuditContext()

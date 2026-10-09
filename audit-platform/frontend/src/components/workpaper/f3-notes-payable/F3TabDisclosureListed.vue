@@ -15,6 +15,7 @@ import WpAmountInput from '../shared/WpAmountInput.vue'
 // （get_diagnostics 与 vitest 全绿，只有浏览器暴露）。
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { handleDisclosureSyncError } from '../composables/disclosureSyncError'
 const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const props = defineProps<{
@@ -86,8 +87,8 @@ async function syncToDisclosureNotes(): Promise<void> {
     )
     const data = result?.data ?? result
     ElMessage.success(`已同步 ${Number(data?.rows_synced ?? 0)} 行到附注模块「${noteSectionId} 应付票据」`)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

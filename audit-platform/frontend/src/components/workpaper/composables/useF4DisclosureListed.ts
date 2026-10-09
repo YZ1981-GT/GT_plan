@@ -25,6 +25,7 @@ import {
 import type { ChecklistResponse } from './useF4FormData'
 import { PRESET_SEGMENTS, type AgingSegment } from '@/composables/useAgingConfig'
 import { f4AgingLabel } from './f4AgingModel'
+import { handleDisclosureSyncError } from './disclosureSyncError'
 
 export interface UseF4DisclosureListedOptions {
   wpId: Ref<string>
@@ -458,8 +459,8 @@ export function useF4DisclosureListed(options: UseF4DisclosureListedOptions) {
           text: disclosureText.value,
         },
       }))
-    } catch {
-      ElMessage.warning('同步附注失败，请稍后重试')
+    } catch (err) {
+      handleDisclosureSyncError(err)
     } finally {
       isSyncing.value = false
     }

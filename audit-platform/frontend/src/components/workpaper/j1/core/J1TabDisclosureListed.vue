@@ -229,6 +229,7 @@ const props = defineProps<{
   allResponses?: Map<string, ChecklistItem>
   isReadonly?: boolean
   saveImmediate?: (items: ChecklistItem[]) => Promise<void>
+  applicableStandards?: string[]
 }>()
 
 const isReadonly = props.isReadonly ?? false

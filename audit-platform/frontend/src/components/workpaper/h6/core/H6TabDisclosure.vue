@@ -228,6 +228,7 @@ import {
   type H6ClearingRow,
 } from '../../composables/h6DisclosureModel'
 import { useH6Disclosure } from '../../composables/useH6Disclosure'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   variant: H6DisclosureVariant
@@ -236,6 +237,7 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
   sheetName?: string
+  applicableStandards?: string[]
 }>()
 
 const isReadonly = computed(() => props.isReadonly)
@@ -454,8 +456,8 @@ async function syncToNotes() {
       section: noteSectionId.value,
       sectionIds: [noteSectionId.value],
     })
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

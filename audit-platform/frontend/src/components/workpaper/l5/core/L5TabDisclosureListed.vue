@@ -152,11 +152,13 @@ import { calcNetPayable } from '../../composables/useL5FormulaEngine'
 import { L5_NOTE_SECTION, buildL5SyncPayload } from '../../composables/l5NoteSectionMap'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -259,8 +261,8 @@ async function syncToDisclosureNotes(): Promise<void> {
       projectId: props.projectId,
       sectionIds: [L5_NOTE_SECTION.listed],
     })
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

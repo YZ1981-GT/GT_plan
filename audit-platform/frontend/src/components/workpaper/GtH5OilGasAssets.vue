@@ -269,6 +269,7 @@
 
         <!-- 附注披露（上市） -->
         <H5TabDisclosureListed
+          :applicable-standards="applicableStandards"
           v-else-if="currentSheet === '附注上市'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -278,6 +279,7 @@
 
         <!-- 附注披露（国企） -->
         <H5TabDisclosureSoe
+          :applicable-standards="applicableStandards"
           v-else-if="currentSheet === '附注国企'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -335,6 +337,7 @@ const H5_SYNC_ENTRY_ID = 'xlsx/gt-h5-oil-gas-assets'
 
 // core — H5TabIndex 非 lazy（底稿目录轻量，首屏必显）
 import H5TabIndex from './h5/core/H5TabIndex.vue'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 const H5TabAdjudication = defineAsyncComponent(() => import('./h5/core/H5TabAdjudication.vue'))
 const H5TabDetail = defineAsyncComponent(() => import('./h5/core/H5TabDetail.vue'))
 const H5TabAdjustment = defineAsyncComponent(() => import('./h5/core/H5TabAdjustment.vue'))
@@ -396,6 +399,7 @@ function checkIndustryApplicability() {
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 const isLoading = ref(true)
 const allResponses = ref<Map<string, any>>(new Map())
 const depletionBranch = ref<'noImpair' | 'withImpair'>('noImpair')

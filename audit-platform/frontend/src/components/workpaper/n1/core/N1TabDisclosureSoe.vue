@@ -307,6 +307,7 @@ const props = defineProps<{
   projectId: string
   isReadonly: boolean
   year?: number
+  applicableStandards?: string[]
 }>()
 
 defineEmits<{ (e: 'navigate', sheetName: string): void }>()

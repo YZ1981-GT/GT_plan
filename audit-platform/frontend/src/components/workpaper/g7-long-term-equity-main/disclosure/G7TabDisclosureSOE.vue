@@ -465,6 +465,7 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
 
 /** 四表取数溯源（宿主 provide）→ 科目码 */

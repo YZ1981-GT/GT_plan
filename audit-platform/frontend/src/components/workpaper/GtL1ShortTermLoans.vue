@@ -122,6 +122,7 @@
       />
       <!-- 附注（上市/国企） -->
       <L1TabDisclosureListed
+          :applicable-standards="applicableStandards"
         v-else-if="currentSheet === '附注上市'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
@@ -129,6 +130,7 @@
         @navigate="handleNavigate"
       />
       <L1TabDisclosureSoe
+          :applicable-standards="applicableStandards"
         v-else-if="currentSheet === '附注国企'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
@@ -195,6 +197,7 @@ const L1TabStLoanCheck = defineAsyncComponent(() => import('./l1/inspection/L1Ta
 // Shared
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -226,6 +229,7 @@ function handleNavigate(sheetName: string) {
 
 const isLoading = ref(true)
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 
 // ─── FormData (provide/inject pattern for child components) ──────────────────
 

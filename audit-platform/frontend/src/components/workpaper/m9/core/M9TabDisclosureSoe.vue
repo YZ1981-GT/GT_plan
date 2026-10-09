@@ -309,6 +309,7 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{

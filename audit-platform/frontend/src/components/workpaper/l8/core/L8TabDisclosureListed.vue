@@ -170,11 +170,13 @@ import {
   type L8InputKey,
   type L8PeriodValues,
 } from '../../composables/l8NoteSectionMap'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -266,8 +268,8 @@ async function syncToDisclosureNotes(): Promise<void> {
       projectId: props.projectId,
       sectionIds: [L8_NOTE_SECTION.listed],
     })
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

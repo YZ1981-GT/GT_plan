@@ -102,6 +102,7 @@
 
         <!-- 附注披露信息（上市公司） -->
         <H6TabDisclosureListed
+          :applicable-standards="applicableStandards"
           v-else-if="currentSheet === '附注上市'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -111,6 +112,7 @@
 
         <!-- 附注披露信息（国有企业） -->
         <H6TabDisclosureSoe
+          :applicable-standards="applicableStandards"
           v-else-if="currentSheet === '附注国企'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -197,6 +199,7 @@ const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 import { readStoreProjection } from './sync/workpaperSyncApi'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 /** H6 entry id（manifest 冻结值，与 `phase5_h6_asset_disposal_clearing.ENTRY_ID` 逐字一致）。 */
 const H6_SYNC_ENTRY_ID = 'xlsx/gt-h6-asset-disposal-clearing'
@@ -229,6 +232,7 @@ const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navig
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 const isLoading = ref(true)
 const allResponses = ref<Map<string, any>>(new Map())
 

@@ -133,15 +133,18 @@ def detect_standard_conflict(
     if requested_entity == project_entity:
         return None  # R4.3：仅 scope 维度不同 → 放行（调用方另记 warning）
 
-    # 🔴 用户裁决（2026-08-16）：底稿不做准则门控，允许在国企项目编辑上市版披露
-    # （合并模块场景：集团国企，下属有上市子公司）。entity 冲突降级为 warning 放行，
-    # 不再 hard block。附注侧仍按项目准则选模板，此处只控制"能否写入"。
-    logger.warning(
-        "standard_conflict: cross-entity sync allowed (user override) "
-        "project_entity=%s requested_entity=%s requested=%s",
-        project_entity, requested_entity, requested,
-    )
-    return None
+    # 🔴 2026-08-16 用户裁决：底稿*编辑*不做准则门控（合并模块场景：集团国企含上市
+    # 子公司，允许在国企项目查看/编辑上市版披露 Tab）。但*同步写入附注*必须拦截：
+    # sync_from_workpaper 的定位键只有 (project_id, year, note_section)，国企的
+    # "五、xx"是另一套压缩编号 → listed payload 会写进不匹配的章节 → 串表。
+    # 2026-10-09：恢复冲突返回，由 _guard_standard_matches_project 拦截写入。
+    return {
+        "project_standard": str(project_standard),
+        "requested_standard": requested,
+        "project_entity": project_entity,
+        "requested_entity": requested_entity,
+        "allowed": allowed,
+    }
 
 
 class StandardUnificationService:

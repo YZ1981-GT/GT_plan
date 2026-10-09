@@ -148,6 +148,7 @@
         />
 
         <F4TabDisclosureListed
+          :applicable-standards="applicableStandards"
           v-else-if="currentSheet === '附注上市'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -156,6 +157,7 @@
         />
 
         <F4TabDisclosureSOE
+          :applicable-standards="applicableStandards"
           v-else-if="currentSheet === '附注国企'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -205,6 +207,7 @@ import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWo
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 const F4TabAdjudication = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabAdjudication.vue'))
 const F4TabDetail = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabDetail.vue'))
 const F4TabAdjustment = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabAdjustment.vue'))
@@ -233,6 +236,7 @@ const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
 const formData = useF4FormData({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 const allResponses = computed(() => formData.allResponses.value)
 const auditYear = computed(() => {
   if (props.year) return props.year

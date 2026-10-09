@@ -105,6 +105,7 @@
           :all-responses="allResponses"
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
+          :applicable-standards="applicableStandards"
         />
 
         <D5TabDisclosure
@@ -115,6 +116,7 @@
           :all-responses="allResponses"
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
+          :applicable-standards="applicableStandards"
         />
 
         <D5TabIndex
@@ -163,6 +165,7 @@ import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWo
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 const D5TabAdjudication = defineAsyncComponent(() => import('./d5/D5TabAdjudication.vue'))
 const D5TabDetail = defineAsyncComponent(() => import('./d5/D5TabDetail.vue'))
@@ -187,6 +190,7 @@ const emit = defineEmits<{
 }>()
 
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 
 const {
   allResponses,

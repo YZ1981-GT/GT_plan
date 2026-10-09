@@ -121,7 +121,12 @@ import { L1_NOTE_SECTION, buildL1SyncPayload } from '../../composables/l1NoteSec
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
-const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
+const props = defineProps<{
+  wpId: string
+  projectId: string
+  isReadonly: boolean
+  applicableStandards?: string[]
+}>()
 defineEmits<{ (e: 'navigate', sheetName: string): void }>()
 
 const formData = inject<ReturnType<typeof useL1FormData>>('l1FormData')!

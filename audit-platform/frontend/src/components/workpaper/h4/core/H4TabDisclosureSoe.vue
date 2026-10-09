@@ -188,6 +188,7 @@ import {
   readH2CipSnapshot,
   type H2CipAdjudicatedSnapshot,
 } from '../../composables/h2CipBridge'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   wpId: string
@@ -195,6 +196,7 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
   sheetName?: string
+  applicableStandards?: string[]
 }>()
 
 const isReadonly = computed(() => props.isReadonly)
@@ -328,8 +330,8 @@ async function syncToNotes(): Promise<void> {
       section: H2_NOTE_SECTION.soe,
       sectionIds: [H2_NOTE_SECTION.soe],
     })
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

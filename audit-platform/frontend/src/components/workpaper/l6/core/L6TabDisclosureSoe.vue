@@ -139,11 +139,13 @@ import { useL6FormData } from '../../composables/useL6FormData'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import { L5_NOTE_SECTION, buildL6SyncPayload } from '../../composables/l5NoteSectionMap'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -264,8 +266,8 @@ async function syncToDisclosureNotes(): Promise<void> {
       projectId: props.projectId,
       sectionIds: [L5_NOTE_SECTION.soe],
     })
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

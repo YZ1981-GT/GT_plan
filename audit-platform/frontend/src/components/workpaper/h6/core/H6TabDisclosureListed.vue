@@ -12,5 +12,6 @@ defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
   sheetName?: string
+  applicableStandards?: string[]
 }>()
 </script>

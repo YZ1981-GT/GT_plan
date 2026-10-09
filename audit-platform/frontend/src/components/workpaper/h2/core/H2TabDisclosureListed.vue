@@ -470,12 +470,14 @@ import {
   type ListedProjectRow,
   type ListedSummaryRow,
 } from '../../composables/h2ListedDisclosureModel'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
 
 const isReadonly = computed(() => props.isReadonly)
@@ -889,8 +891,8 @@ async function syncToNotes() {
       rows += Number(data?.rows_synced ?? 0)
     }
     ElMessage.success(`已同步 ${rows} 行到附注「${noteSectionId}」`)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

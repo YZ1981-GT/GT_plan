@@ -113,6 +113,7 @@
 
         <!-- 附注披露信息（上市公司） -->
         <H9TabDisclosureListed
+          :applicable-standards="applicableStandards"
           v-else-if="currentSheet === '附注上市'"
           @save="persistResponse"
           :wp-id="props.wpId"
@@ -123,6 +124,7 @@
 
         <!-- 附注披露信息（国企） -->
         <H9TabDisclosureSoe
+          :applicable-standards="applicableStandards"
           v-else-if="currentSheet === '附注国企'"
           @save="persistResponse"
           :wp-id="props.wpId"
@@ -229,6 +231,7 @@ import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { useHSyncMode } from './composables/useHSyncMode'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 /** H9 entry id（manifest 冻结值，与 `phase5_h9_lease_liabilities.ENTRY_ID` 逐字一致）。 */
 const H9_SYNC_ENTRY_ID = 'xlsx/gt-h9-lease-liabilities'
@@ -269,6 +272,7 @@ const emit = defineEmits<{
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 const isLoading = ref(true)
 const allResponses = ref<Map<string, any>>(new Map())
 

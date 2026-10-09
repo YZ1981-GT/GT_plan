@@ -20,6 +20,7 @@ import { F2_NOTE_SECTION } from '../../composables/f2NoteSectionMap'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   wpId: string
@@ -151,8 +152,8 @@ async function syncToDisclosureNotes(): Promise<void> {
     )
     const data = result?.data ?? result
     ElMessage.success(`已同步 ${Number(data?.rows_synced ?? 0)} 行到附注模块「${noteSectionId} 存货」`)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

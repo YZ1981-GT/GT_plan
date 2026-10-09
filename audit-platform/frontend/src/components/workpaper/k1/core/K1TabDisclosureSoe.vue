@@ -893,6 +893,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -948,6 +949,7 @@ const dis = useK1DisclosureSoe({
   allResponses: allResponsesRef,
   isReadonly: toRef(props, 'isReadonly'),
   onSave: (itemId, value) => emit('save', itemId, { remark: typeof value === 'string' ? value : JSON.stringify(value) }),
+  applicableStandards: () => props.applicableStandards,
 })
 
 const trace = useK1DisclosureTrace('soe', allResponsesRef)

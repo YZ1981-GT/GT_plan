@@ -204,6 +204,8 @@
 
         :is-readonly="props.readonly ?? false"
 
+        :applicable-standards="applicableStandards"
+
       />
 
       <D1TabDisclosure
@@ -219,6 +221,8 @@
         :project-id="props.projectId"
 
         :is-readonly="props.readonly ?? false"
+
+        :applicable-standards="applicableStandards"
 
       />
 
@@ -528,6 +532,7 @@ import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 
 
@@ -785,6 +790,7 @@ const D1_MANAGED_SHEET_KEY = 'd13-managed'
 const isD1DetailSheet = computed(() => currentSheet.value === 'D1-3')
 
 const isReadonly = computed(() => props.readonly ?? false)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 
 const syncSwitching = ref(false)
 

@@ -171,6 +171,7 @@
 
         <!-- 附注披露（上市） -->
         <K8TabDisclosureListed
+          :applicable-standards="applicableStandards"
           v-else-if="currentSheet === '附注上市'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -180,6 +181,7 @@
 
         <!-- 附注披露（国企） -->
         <K8TabDisclosureSoe
+          :applicable-standards="applicableStandards"
           v-else-if="currentSheet === '附注国企'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -253,6 +255,7 @@ const K8TabSellingCheck = defineAsyncComponent(() => import('./k8/inspection/K8T
 // ─── 双模式 composable ──────────────────────────────────────────────────────
 import { useK8DualMode } from './composables/useK8DualMode'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 const props = defineProps<{
   wpId: string
@@ -272,6 +275,7 @@ const emit = defineEmits<{
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed<string | undefined>(() => props.projectId || undefined)

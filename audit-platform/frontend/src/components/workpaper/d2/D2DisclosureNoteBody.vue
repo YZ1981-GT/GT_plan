@@ -36,6 +36,7 @@ import { dataTableNames } from '../composables/disclosureSyncedTables'
 import { D2_DISCLOSURE_SHEET_NAME } from '../composables/d2NoteSectionMap'
 import { useRestrictedAssetsSync } from '../composables/useRestrictedAssetsSync'
 import WpAmountInput from '@/components/workpaper/shared/WpAmountInput.vue'
+import { handleDisclosureSyncError } from '../composables/disclosureSyncError'
 
 const props = withDefaults(defineProps<{
   variant: D2DisclosureVariant
@@ -499,8 +500,8 @@ async function syncToDisclosureNotes(): Promise<void> {
     // 受限资产共享表的「应收账款」段（跨循环共享表，只替换本段、他段原样保留）
     await syncRestrictedAssets()
     await checkNoteConsistency(true)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

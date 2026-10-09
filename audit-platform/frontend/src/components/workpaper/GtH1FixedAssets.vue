@@ -290,6 +290,7 @@
 
         <!-- 附注披露（上市） -->
         <H1TabDisclosureListed
+          :applicable-standards="applicableStandards"
           v-else-if="currentSheet === '附注上市'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -301,6 +302,7 @@
 
         <!-- 附注披露（国企） -->
         <H1TabDisclosureSoe
+          :applicable-standards="applicableStandards"
           v-else-if="currentSheet === '附注国企'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -422,6 +424,7 @@ provide('h1OpenVersionHistory', openVersionHistory)
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 const isLoading = ref(true)
 const allResponses = ref<Map<string, any>>(new Map())
 /** 合并 props.htmlData 与 selfLoad 的 render 元数据（含 TB 分类预填） */
@@ -720,6 +723,7 @@ provide('saveResponse', persistResponse)
 
 // 复核圆点：GtReviewTrigger 依赖 getThreadDot/getRowDot 才渲染蓝/红点
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
 provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)

@@ -95,6 +95,7 @@ import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import { useHostApplicableStandards } from '../composables/hostApplicableStandards'
+import { handleDisclosureSyncError } from '../composables/disclosureSyncError'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -1108,7 +1109,7 @@ async function syncFxSectionToNote(year: number | undefined): Promise<void> {
     }
   } catch (err: any) {
     if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || err?.__CANCEL__) return
-    ElMessage.warning('外币货币性项目同步附注失败，请稍后重试')
+    handleDisclosureSyncError(err)
   }
 }
 
@@ -1175,7 +1176,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   } catch (err: any) {
     // 重复点击被请求去重取消（axios cancel / ERR_CANCELED）：首个请求仍在进行，静默忽略不吓用户
     if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || err?.__CANCEL__) return
-    ElMessage.warning('同步附注失败，请稍后重试')
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }
@@ -1245,7 +1246,7 @@ async function syncRestrictedAssetsToNote(year: number | undefined): Promise<voi
       }
     } catch (err: any) {
       if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || err?.__CANCEL__) return
-      ElMessage.warning('受限资产同步附注失败，请稍后重试')
+      handleDisclosureSyncError(err)
       return
     }
   }

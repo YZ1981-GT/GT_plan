@@ -214,6 +214,7 @@ import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { api } from '@/services/apiProxy'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   variant: 'listed' | 'soe'
@@ -300,8 +301,8 @@ async function syncToNotes(): Promise<void> {
       }
     }
     ElMessage.success(`已同步 ${rows} 行到附注「${noteSectionLabel}」`)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

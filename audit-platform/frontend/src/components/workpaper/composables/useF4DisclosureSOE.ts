@@ -34,6 +34,7 @@ import {
   type AgingSegment,
 } from '@/composables/useAgingConfig'
 import { overOneYearRowKeys } from './f4AgingModel'
+import { handleDisclosureSyncError } from './disclosureSyncError'
 
 export interface UseF4DisclosureSOEOptions {
   wpId: Ref<string>
@@ -360,8 +361,8 @@ export function useF4DisclosureSOE(options: UseF4DisclosureSOEOptions) {
         `已同步 ${Number(data?.rows_synced ?? 0)} 行到附注「${F4_NOTE_SECTION.soe} 应付账款」`,
       )
       publishNoteTextUpdated(disclosureText.value)
-    } catch {
-      ElMessage.warning('同步附注失败，请稍后重试')
+    } catch (err) {
+      handleDisclosureSyncError(err)
     } finally {
       isSyncing.value = false
     }

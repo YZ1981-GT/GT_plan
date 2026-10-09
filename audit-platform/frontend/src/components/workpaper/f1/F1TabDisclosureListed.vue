@@ -382,6 +382,7 @@ import {
 } from '../composables/f1DisclosureSyncPayload'
 import { buildF1ConsistencyChecks } from '../composables/f1DisclosureConsistency'
 import type { AgingSegment } from '@/composables/useAgingConfig'
+import { handleDisclosureSyncError } from '../composables/disclosureSyncError'
 
 // 列头字面单一真源（源 xlsx 逐格实证，含空格）—— 与同步载荷 columns 同源
 const AGING_LABEL_COL = F1_AGING_LABEL_COL
@@ -646,8 +647,8 @@ async function syncToDisclosureNotes() {
     )
     const data = result?.data ?? result
     ElMessage.success(`已同步 ${Number(data?.rows_synced ?? 0)} 行到附注模块「${noteSectionId} 预付款项」`)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

@@ -27,6 +27,7 @@ defineProps<{
   allResponses?: Map<string, any>
   isReadonly?: boolean
   year?: number
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void }>()

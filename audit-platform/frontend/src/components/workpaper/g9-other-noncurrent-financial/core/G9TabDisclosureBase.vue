@@ -182,6 +182,7 @@ import { buildG9SyncPayload } from '../../composables/g9DisclosureSyncPayload'
 import { G9_NOTE_SECTION } from '../../composables/g9NoteSectionMap'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { api } from '@/services/apiProxy'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   variant: 'listed' | 'soe'
@@ -223,8 +224,8 @@ async function syncToDisclosureNotes(): Promise<void> {
     ElMessage.success(
       `已同步 ${rows} 行到附注模块「${G9_NOTE_SECTION[props.variant]} 其他非流动金融资产」`,
     )
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

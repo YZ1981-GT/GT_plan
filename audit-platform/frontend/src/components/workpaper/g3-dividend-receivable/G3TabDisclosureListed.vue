@@ -203,6 +203,7 @@ import {
   resolveG3NoteSectionTarget,
 } from '../composables/g3NoteSectionMap'
 import type { ChecklistResponse } from '../composables/useF1FormData'
+import { handleDisclosureSyncError } from '../composables/disclosureSyncError'
 
 interface DisclosureTableRow {
   id: string
@@ -384,8 +385,8 @@ async function syncToDisclosureNotes() {
       rows += Number(data?.rows_synced ?? 0)
     }
     ElMessage.success(`已同步 ${rows} 行到附注模块「五、8 其他应收款（应收股利）」`)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

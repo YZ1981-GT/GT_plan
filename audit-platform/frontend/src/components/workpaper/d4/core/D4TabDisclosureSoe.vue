@@ -42,6 +42,7 @@ import {
   deriveSegmentCell,
   segmentRowAcrossCategories,
 } from '../../composables/d4RevenueSegmentColumns'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   wpId: string
@@ -314,8 +315,8 @@ async function syncToDisclosureNotes(): Promise<void> {
     // 静默校对附注合计一致性
     const pageTotal = Number(section1Total.value?.currentRevenue || 0)
     checkNoteConsistencyGeneric(props.projectId, auditYear.value, D4_NOTE_SECTION[VARIANT], pageTotal, true)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

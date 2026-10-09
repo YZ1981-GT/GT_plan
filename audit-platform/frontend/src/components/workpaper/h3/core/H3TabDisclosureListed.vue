@@ -507,6 +507,7 @@ const props = defineProps<{
   allResponses: Map<string, any>
   measurementModel: 'cost' | 'fair_value'
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{

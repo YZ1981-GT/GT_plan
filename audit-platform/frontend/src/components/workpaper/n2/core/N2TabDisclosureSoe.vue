@@ -157,6 +157,7 @@ const props = defineProps<{
    * 🔴 国企版本期应交/已交只存在于 N2-2 明细表，N2-2 未填时至少带出「期初余额」。
    */
   htmlData?: any
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void }>()

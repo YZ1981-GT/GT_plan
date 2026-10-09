@@ -224,6 +224,7 @@ import {
 import { buildH8ListedSyncPayloads } from '../../composables/h8DisclosureSyncPayload'
 import { H8_NOTE_SECTION } from '../../composables/h8NoteSectionMap'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   wpId: string
@@ -360,8 +361,8 @@ async function syncToNotes() {
       sheet: payloads[0].sheet_name,
     })
     ElMessage.success(`已同步 ${rows} 行到附注「${noteSectionId}」`)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

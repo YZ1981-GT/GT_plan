@@ -67,13 +67,15 @@ def test_p4_same_entity_always_allowed(project_entity, project_scope, requested_
 @pytest.mark.parametrize("project_entity", VALID_ENTITY_TYPES)
 @pytest.mark.parametrize("requested_entity", VALID_ENTITY_TYPES)
 @pytest.mark.parametrize("requested_scope", VALID_SCOPES)
-def test_p4_cross_entity_allowed_after_user_override(project_entity, requested_entity, requested_scope):
-    """用户裁决（2026-08-16）：跨 entity 降级为 warning 放行，不再 hard block。"""
+def test_p4_cross_entity_blocked(project_entity, requested_entity, requested_scope):
+    """2026-10-09 恢复门控：跨 entity 返回冲突详情（非 None）。"""
     conflict = detect_standard_conflict(
         _std(project_entity), f"{requested_entity}_{requested_scope}"
     )
-    # 所有组合都放行（返回 None）
-    assert conflict is None
+    if project_entity == requested_entity:
+        assert conflict is None  # 同 entity 始终放行
+    else:
+        assert conflict is not None  # 跨 entity 拦截
 
 
 @pytest.mark.parametrize("requested", ["soe", "standalone", "consolidated", "SOE_Standalone"])
@@ -83,16 +85,18 @@ def test_p4_dimension_values_allowed_for_soe_project(requested):
 
 
 @pytest.mark.parametrize("requested", ["listed", "listed_standalone", "LISTED_CONSOLIDATED"])
-def test_p4_listed_request_on_soe_project_allowed(requested):
-    """用户裁决：跨 entity 放行（合并模块场景）。"""
+def test_p4_listed_request_on_soe_project_blocked(requested):
+    """2026-10-09 恢复门控：国企项目拒绝 listed 请求。"""
     conflict = detect_standard_conflict(_std("soe"), requested)
-    assert conflict is None
+    assert conflict is not None
+    assert conflict["project_entity"] == "soe"
 
 
-def test_p4_soe_request_on_listed_project_allowed():
-    """用户裁决：跨 entity 放行。"""
+def test_p4_soe_request_on_listed_project_blocked():
+    """2026-10-09 恢复门控：上市项目拒绝 soe 请求。"""
     conflict = detect_standard_conflict(_std("listed", "consolidated"), "soe_standalone")
-    assert conflict is None
+    assert conflict is not None
+    assert conflict["project_entity"] == "listed"
 
 
 # ─── Property 5：fail-open ───────────────────────────────────────────────────
@@ -122,13 +126,10 @@ def test_p5_illegal_project_entity_allows():
 # ─── 服务层守卫 ──────────────────────────────────────────────────────────────
 
 
-def test_guard_allows_cross_entity_after_user_override(caplog):
-    """用户裁决：跨 entity 放行不再抛 StandardMismatchError。"""
-    with caplog.at_level("WARNING"):
+def test_guard_rejects_cross_entity(caplog):
+    """跨 entity 同步被拦截（2026-10-09 恢复门控，防串表）。"""
+    with pytest.raises(StandardMismatchError):
         _guard_standard_matches_project(PROJECT_ID, _std("soe"), "listed_standalone", "五、30")
-    # 不抛异常，仅记 warning
-    assert any("cross-entity sync allowed" in rec.message or "scope mismatch" in rec.message
-               for rec in caplog.records)
 
 
 def test_guard_scope_mismatch_logs_but_allows(caplog):
@@ -184,16 +185,13 @@ async def test_resolve_context_db_error_fails_open():
 
 
 @pytest.mark.asyncio
-async def test_p6_cross_entity_sync_allowed_proceeds():
-    """用户裁决后跨 entity 同步放行（不再抛 StandardMismatchError）。"""
+async def test_p6_cross_entity_sync_rejected():
+    """跨 entity 同步被拦截，抛 StandardMismatchError（2026-10-09 恢复门控）。"""
     db = _project_row_db(v2={"entity_type": "soe", "scope": "standalone"})
     user = MagicMock()
     user.id = USER_ID
 
-    # 不再抛异常；会继续执行到查 disclosure_notes（execute_count > 1）
-    # 因为 mock db 没有完整的 disclosure_notes 行，会在后续环节失败或返回空，
-    # 但不会抛 StandardMismatchError
-    try:
+    with pytest.raises(StandardMismatchError):
         await sync_from_workpaper(
             db,
             PROJECT_ID,
@@ -204,10 +202,6 @@ async def test_p6_cross_entity_sync_allowed_proceeds():
             current_standard="listed_standalone",
             user=user,
         )
-    except StandardMismatchError:
-        pytest.fail("不应再抛 StandardMismatchError（用户裁决已放行）")
-    except Exception:
-        pass  # 后续步骤因 mock 不完整可能出其他错，不是本测试关注点
 
 
 @pytest.mark.asyncio

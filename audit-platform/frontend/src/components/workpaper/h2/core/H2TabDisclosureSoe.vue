@@ -336,12 +336,14 @@ import {
   type SoeProjectRow,
   type SoeSummaryRow,
 } from '../../composables/h2SoeDisclosureModel'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
 
 const router = useRouter()
@@ -676,8 +678,8 @@ async function syncToNotes() {
     ElMessage.success(`已同步 ${rows} 行到附注「${noteSectionId}」`)
     // 受限资产共享表的「在建工程」段（跨循环共享表，只替换本段、他段原样保留）
     await syncRestrictedAssets()
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

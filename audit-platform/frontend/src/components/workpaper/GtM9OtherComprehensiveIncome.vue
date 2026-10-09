@@ -74,6 +74,7 @@
             @navigate="handleNavigate"
           />
           <M9TabDisclosureListed
+          :applicable-standards="applicableStandards"
             v-else-if="currentSheet === 'disclosure-listed'"
             :wp-id="props.wpId"
             :project-id="props.projectId"
@@ -81,6 +82,7 @@
             @navigate="handleNavigate"
           />
           <M9TabDisclosureSoe
+          :applicable-standards="applicableStandards"
             v-else-if="currentSheet === 'disclosure-soe'"
             :wp-id="props.wpId"
             :project-id="props.projectId"
@@ -129,6 +131,7 @@ import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -177,6 +180,7 @@ function handleNavigate(sheetName: string) {
 
 const isLoading = ref(true)
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 
 // ─── sheetName → 子组件分发 ──────────────────────────────────────────────────
 

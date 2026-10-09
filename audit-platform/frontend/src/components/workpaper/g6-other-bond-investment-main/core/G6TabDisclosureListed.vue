@@ -472,6 +472,7 @@ import { G6_LISTED_SUBTABLE, G6_NOTE_SECTION } from '../../composables/g6NoteSec
 import { buildG6ListedSyncPayload } from '../../composables/g6DisclosureSyncPayload'
 import { useG6DisclosureListed } from '../../composables/useG6DisclosureListed'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = withDefaults(
   defineProps<{
@@ -759,8 +760,8 @@ async function syncToDisclosureNotes(): Promise<void> {
     ElMessage.success(
       `已同步 ${rows} 行到附注模块「${G6_NOTE_SECTION.listed} 其他债权投资」`,
     )
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

@@ -472,6 +472,7 @@ import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G1AuditTextCards from '../G1AuditTextCards.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -582,8 +583,8 @@ async function syncToNotes() {
     const data = result?.data ?? result
     ElMessage.success(`已同步 ${Number(data?.rows_synced ?? 0)} 行到附注「${noteSectionId} 交易性金融资产」`)
     autoSync.scheduleAutoSync(syncToNotes)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

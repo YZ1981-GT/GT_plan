@@ -88,6 +88,7 @@
 
       <!-- 附注（上市）—— 🔴 必须传 projectId，否则同步按钮永久锁死 -->
       <N4TabDisclosureListed
+          :applicable-standards="applicableStandards"
         v-else-if="currentSheet === N4_SHEET_DISCLOSURE_LISTED"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
@@ -99,6 +100,7 @@
 
       <!-- 附注（国企）—— 源模板此节为「无」→ 本版不适用说明页 -->
       <N4TabDisclosureSoe
+          :applicable-standards="applicableStandards"
         v-else-if="currentSheet === N4_SHEET_DISCLOSURE_SOE"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
@@ -158,6 +160,7 @@ import {
   isN4HtmlSheet,
   normalizeN4SheetName,
 } from './composables/n4SheetRouting'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 const props = defineProps<{
@@ -191,6 +194,7 @@ const projectIdRef = computed(() => props.projectId)
 const allResponses = ref<Map<string, any>>(new Map())
 const allResponsesRef = computed(() => allResponses.value)
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 // ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI + 挂真实 Host） ───
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 

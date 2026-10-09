@@ -47,6 +47,7 @@ import {
   resolveK1NoteSectionTarget,
 } from './k1NoteSectionMap'
 import type { K1StageMovementRow } from './useK1BadDebt'
+import { handleDisclosureSyncError } from './disclosureSyncError'
 
 function uid(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
@@ -528,8 +529,8 @@ export function useK1DisclosureSoe(opts: {
         rows += Number(data?.rows_synced ?? 0)
       }
       ElMessage.success(`已同步 ${rows} 行到附注模块「${noteTarget.value.sectionId} 其他应收款」`)
-    } catch {
-      ElMessage.warning('同步附注失败，请稍后重试')
+    } catch (err) {
+      handleDisclosureSyncError(err)
     } finally {
       isSyncing.value = false
     }

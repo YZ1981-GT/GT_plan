@@ -54,37 +54,32 @@ class TestCrossEntityGuard:
         strict 模式下 XPASS **算失败** ⇒ 强制回来更新 spec，不会静默漂移。
     """
 
-    def test_conflict_detector_never_blocks_by_design(self):
-        """如实断言：entity 冲突不被拦截（2026-08-16 用户裁决的放行设计）。"""
+    def test_conflict_detector_blocks_cross_entity(self):
+        """如实断言：entity 冲突被拦截（2026-10-09 恢复门控，防串表）。"""
         from app.services.standard_unification_service import detect_standard_conflict
 
-        # 国企项目请求上市口径 —— 真实污染场景，但按裁决放行
-        assert detect_standard_conflict({"entity_type": "soe"}, "listed_standalone") is None
-        assert detect_standard_conflict({"entity_type": "listed"}, "soe_standalone") is None
+        # 国企项目请求上市口径 → 冲突
+        result = detect_standard_conflict({"entity_type": "soe"}, "listed_standalone")
+        assert result is not None
+        assert result["project_entity"] == "soe"
+        assert result["requested_entity"] == "listed"
 
-    def test_cross_entity_must_leave_warning_log(self, caplog):
-        """🔴 放行但**必须留痕**：跨主体调用须产出 warning 日志。
+        result2 = detect_standard_conflict({"entity_type": "listed"}, "soe_standalone")
+        assert result2 is not None
+        assert result2["project_entity"] == "listed"
+        assert result2["requested_entity"] == "soe"
 
-        这是当前设计下唯一可验证的实质不变量 —— 放行可以，静默不行
-        （审计场景必须能事后追溯谁在国企项目写了上市章节）。
-        """
+    def test_cross_entity_raises_standard_mismatch(self):
+        """🔴 跨主体同步被拦截（2026-10-09 恢复门控）：必须抛 StandardMismatchError。"""
         from app.services.wp_disclosure_sync_service import (
+            StandardMismatchError,
             _guard_standard_matches_project,
         )
 
-        caplog.clear()
-        with caplog.at_level(logging.WARNING):
+        with pytest.raises(StandardMismatchError):
             _guard_standard_matches_project(
                 uuid4(), {"entity_type": "soe"}, "listed_standalone", "五、4"
             )
-        cross_entity_warnings = [
-            r for r in caplog.records
-            if r.levelno >= logging.WARNING and "cross-entity" in r.getMessage()
-        ]
-        assert cross_entity_warnings, (
-            "跨主体同步被放行却未留 warning 日志 ⇒ 静默污染无法事后追溯。"
-            f"实际日志：{[r.getMessage() for r in caplog.records]}"
-        )
 
     def test_same_entity_produces_no_cross_entity_warning(self, caplog):
         """双向变异：同主体调用**不得**产出 cross-entity 警告（防上条恒绿）。"""
@@ -100,11 +95,10 @@ class TestCrossEntityGuard:
         cross = [r for r in caplog.records if "cross-entity" in r.getMessage()]
         assert not cross, f"同主体同步误报跨主体警告：{[r.getMessage() for r in cross]}"
 
-    def test_conflict_detector_is_exhaustively_permissive(self):
-        """死代码证明：穷举全部 entity 组合，detect_standard_conflict 恒返回 None。
+    def test_conflict_detector_blocks_cross_entity_exhaustively(self):
+        """穷举：跨 entity 组合全部被拦截，同 entity 组合全部放行。
 
-        这条锁住「raise StandardMismatchError 是死代码」这一事实。
-        若未来收紧门控，本测试会失败 ⇒ 提醒同步更新 spec 需求 5.1 与 Q8。
+        2026-10-09 恢复门控后，detect_standard_conflict 对跨 entity 返回冲突详情。
         """
         import itertools
 
@@ -113,28 +107,20 @@ class TestCrossEntityGuard:
             detect_standard_conflict,
         )
 
-        non_none = []
+        missed_blocks = []
+        false_blocks = []
         for pe, re_ in itertools.product(VALID_ENTITY_TYPES, VALID_ENTITY_TYPES):
             for scope in ("standalone", "consolidated"):
                 r = detect_standard_conflict({"entity_type": pe}, f"{re_}_{scope}")
-                if r is not None:
-                    non_none.append((pe, f"{re_}_{scope}", r))
-        assert not non_none, (
-            "detect_standard_conflict 开始拦截了 ⇒ 门控设计已变更，"
-            f"请更新 spec 需求 5.1 / Q8 与本测试类 docstring。命中：{non_none}"
-        )
+                if pe != re_ and r is None:
+                    missed_blocks.append((pe, f"{re_}_{scope}"))
+                elif pe == re_ and r is not None:
+                    false_blocks.append((pe, f"{re_}_{scope}", r))
+        assert not missed_blocks, f"跨 entity 未拦截：{missed_blocks}"
+        assert not false_blocks, f"同 entity 误拦截：{false_blocks}"
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "spec 需求 5.1 / Q8 要求「跨主体 SHALL 被拒绝且零写入」，"
-            "但 2026-08-16 用户裁决改为 warning 放行（合并场景：国企集团含上市子公司）。"
-            "需求与实现冲突，已在 spec §勘误 登记。"
-            "strict=True：若实现改回 hard block 则本测试 XPASS 并报错，强制更新 spec。"
-        ),
-    )
-    def test_requirement_5_1_hard_block_not_implemented(self):
-        """需求 5.1 的原始诉求（hard block）—— 当前**未实现**，xfail 钉住。"""
+    def test_requirement_5_1_hard_block_implemented(self):
+        """需求 5.1 已实现（2026-10-09 恢复门控）：跨主体同步 hard block。"""
         from app.services.wp_disclosure_sync_service import (
             StandardMismatchError,
             _guard_standard_matches_project,

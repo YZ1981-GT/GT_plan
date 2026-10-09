@@ -122,6 +122,7 @@ import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './comp
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 // ─── defineAsyncComponent lazy 加载子组件 ────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const N3TabIndex = defineAsyncComponent(() => import('./n3/core/N3TabIndex.vue'))
@@ -161,6 +162,7 @@ const projectIdRef = computed(() => props.projectId)
 const allResponses = ref<Map<string, any>>(new Map())
 const allResponsesRef = computed(() => allResponses.value)
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 // ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI + 挂真实 Host） ───
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 

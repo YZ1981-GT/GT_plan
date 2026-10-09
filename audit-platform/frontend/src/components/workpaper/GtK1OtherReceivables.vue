@@ -216,6 +216,7 @@
 
         <!-- 附注披露（上市） -->
         <K1TabDisclosureListed
+          :applicable-standards="applicableStandards"
           v-else-if="currentSheet === '附注上市'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -227,6 +228,7 @@
 
         <!-- 附注披露（国企） -->
         <K1TabDisclosureSoe
+          :applicable-standards="applicableStandards"
           v-else-if="currentSheet === '附注国企'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -295,6 +297,7 @@ import {
   workpaperSyncModeKey,
   type WorkpaperSyncStoredMode,
 } from './sync/workpaperSyncModeStorage'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 
@@ -346,6 +349,7 @@ provide('getRowDot', getRowDot)
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 const isLoading = ref(true)
 
 /** B19 关联方清单：后端 render 注入，供 K1-2/K1-11 完整性校验 */

@@ -21,6 +21,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -52,6 +53,7 @@ const {
   projectId: toRef(props, 'projectId') as Ref<string>,
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+  applicableStandards: () => props.applicableStandards,
 })
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF4AiGenerate(

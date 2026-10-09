@@ -80,6 +80,7 @@
 
         <!-- 附注披露信息（上市公司） -->
         <H4TabDisclosureListed
+          :applicable-standards="applicableStandards"
           v-else-if="currentSheet === '附注上市'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -89,6 +90,7 @@
 
         <!-- 附注披露信息（国有企业） -->
         <H4TabDisclosureSoe
+          :applicable-standards="applicableStandards"
           v-else-if="currentSheet === '附注国企'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -280,6 +282,7 @@ const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navig
 
 // ─── FormData（加载/保存/TB/回写） ────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 const formData = useH4FormData({
   wpId: toRef(props, 'wpId') as any,
   projectId: toRef(props, 'projectId') as any,
@@ -403,6 +406,7 @@ provide('saveResponse', persistResponse)
 
 // 复核圆点：GtReviewTrigger 依赖 getThreadDot/getRowDot 才渲染蓝/红点
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 const { getThreadDot: h4GetThreadDot, getRowDot: h4GetRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
 provide('getThreadDot', h4GetThreadDot)
 provide('getRowDot', h4GetRowDot)

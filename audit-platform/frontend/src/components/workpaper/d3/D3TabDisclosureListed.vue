@@ -266,6 +266,7 @@ import GtWpDisclosureSyncBar from '../GtWpDisclosureSyncBar.vue'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
+import { handleDisclosureSyncError } from '../composables/disclosureSyncError'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -424,8 +425,8 @@ async function syncToDisclosureNotes(): Promise<void> {
     // 静默校对附注合计一致性
     const pageTotal = section1Subtotal.value?.current ?? 0
     checkNoteConsistencyGeneric(props.projectId, auditYear.value, D3_NOTE_SECTION.listed, pageTotal, true)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

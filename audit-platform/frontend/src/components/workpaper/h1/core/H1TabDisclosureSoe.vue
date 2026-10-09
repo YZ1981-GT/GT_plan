@@ -448,6 +448,7 @@ import {
   type H1SoeIdleRow,
   type H1SoeFullyDepRow,
 } from '../../composables/h1SoeDisclosureModel'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   wpId: string
@@ -890,8 +891,8 @@ async function syncToNotes() {
     })
     // 受限资产共享表的「固定资产」段（跨循环共享表，只替换本段、他段原样保留）
     await syncRestrictedAssets()
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

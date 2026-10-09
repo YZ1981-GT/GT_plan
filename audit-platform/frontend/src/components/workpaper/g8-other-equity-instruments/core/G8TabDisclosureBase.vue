@@ -326,6 +326,7 @@ import { buildG8SyncPayload } from '../../composables/g8DisclosureSyncPayload'
 import { G8_NOTE_SECTION } from '../../composables/g8NoteSectionMap'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { api } from '@/services/apiProxy'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   variant: 'listed' | 'soe'
@@ -382,8 +383,8 @@ async function syncToDisclosureNotes(): Promise<void> {
     ElMessage.success(
       `已同步 ${rows} 行到附注模块「${G8_NOTE_SECTION[props.variant]} 其他权益工具投资」`,
     )
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

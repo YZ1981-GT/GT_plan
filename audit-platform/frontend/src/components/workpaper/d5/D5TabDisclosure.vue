@@ -507,6 +507,7 @@ const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   crossSheet: ReturnType<typeof useD5CrossSheet>
+  applicableStandards?: string[]
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
@@ -519,6 +520,7 @@ const { year: auditYear } = useAuditContext()
  * 🔴 `useDisplayPrefsStore` 是 setup 作用域 composable，写进函数体会静默失效；
  * 且 `fmtAmount` 是 store **成员**不是模块级导出（写
  * `import { fmtAmount } from '@/stores/displayPrefs'` 会让整页崩成
+import { handleDisclosureSyncError } from '../composables/disclosureSyncError'
  * 「页面渲染出错」，而 get_diagnostics 与 vitest 都查不出）。
  */
 const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
@@ -761,8 +763,8 @@ async function syncToDisclosureNotes(): Promise<void> {
     // 静默校对附注合计一致性
     const pageTotal = snapshot.mainTotal?.endAmount ?? 0
     checkNoteConsistencyGeneric(props.projectId, auditYear.value, D5_NOTE_SECTION[variant], pageTotal, true)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

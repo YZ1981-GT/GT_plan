@@ -76,12 +76,14 @@
       />
       <!-- 附注（上市/国企） -->
       <L2TabDisclosureListed
+          :applicable-standards="applicableStandards"
         v-else-if="currentSheet === '附注上市'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
       />
       <L2TabDisclosureSoe
+          :applicable-standards="applicableStandards"
         v-else-if="currentSheet === '附注国企'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
@@ -138,6 +140,7 @@ const L2TabInterestCheck = defineAsyncComponent(() => import('./l2/inspection/L2
 // Shared
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -169,6 +172,7 @@ function handleNavigate(sheetName: string) {
 
 const isLoading = ref(true)
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 
 /**
  * 当前激活的 sheet（由外层 GtWpRenderer 通过 sheetName prop 控制）。

@@ -725,6 +725,7 @@ import { G5_SOE_PROVISION_METHOD_PLACEHOLDER } from '../../composables/g5SoeDisc
 import type { G5MethodRow } from '../../composables/g5ListedDisclosureRows'
 import type { G5AgingPreset } from '../../composables/g5AgingScheme'
 import { api } from '@/services/apiProxy'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   htmlData?: unknown
@@ -776,8 +777,8 @@ async function syncToDisclosureNotes(): Promise<void> {
     )
     const rows = Number((res?.data ?? res)?.rows_synced ?? 0)
     ElMessage.success(`已同步 ${rows} 行到附注模块「${G5_NOTE_SECTION.soe} 长期应收款」`)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

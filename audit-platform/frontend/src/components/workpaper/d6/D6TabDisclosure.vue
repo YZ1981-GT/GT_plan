@@ -639,6 +639,7 @@ import GtIndexChip from '../GtIndexChip.vue'
 import GtWpDisclosureSyncBar from '../GtWpDisclosureSyncBar.vue'
 // 🔴 可编辑金额千分符只能用 el-input（EP 2.13.6 的 el-input-number 无 formatter prop）
 import WpAmountInput from '../shared/WpAmountInput.vue'
+import { handleDisclosureSyncError } from '../composables/disclosureSyncError'
 
 const props = defineProps<{
   wpId: string
@@ -648,6 +649,7 @@ const props = defineProps<{
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   crossSheet: ReturnType<typeof useD6CrossSheet>
   variant: 'listed' | 'soe'
+  applicableStandards?: string[]
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
@@ -928,8 +930,8 @@ async function syncToDisclosureNotes(): Promise<void> {
     ElMessage.success(`已同步 ${rows} 行到附注模块「${D6_NOTE_SECTION[variant]} 合同资产」`)
     // 静默校对附注合计一致性
     checkNoteConsistencyGeneric(props.projectId, auditYear.value, D6_NOTE_SECTION[variant], 0, true)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

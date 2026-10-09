@@ -37,6 +37,7 @@ const props = defineProps<{
   allResponses?: Map<string, RespItem>
   isReadonly?: boolean
   saveImmediate?: (items: RespItem[]) => Promise<void> | void
+  applicableStandards?: string[]
 }>()
 const isReadonly = computed(() => props.isReadonly ?? false)
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')

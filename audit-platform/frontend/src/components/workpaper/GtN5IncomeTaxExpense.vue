@@ -159,6 +159,7 @@
 
       <!-- 附注（上市）—— 🔴 必须传 projectId，否则同步按钮永久锁死 -->
       <N5TabDisclosureListed
+          :applicable-standards="applicableStandards"
         v-else-if="currentSheet === N5_SHEET_DISCLOSURE_LISTED"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
@@ -169,6 +170,7 @@
 
       <!-- 附注（国企）—— 源模板 tab 名缺右括号 `附注披露信息（国企`，判定用「包含国企」 -->
       <N5TabDisclosureSoe
+          :applicable-standards="applicableStandards"
         v-else-if="currentSheet === N5_SHEET_DISCLOSURE_SOE"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
@@ -225,6 +227,7 @@ import {
   isN5HtmlSheet,
   normalizeN5SheetName,
 } from './composables/n5SheetRouting'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 // calc/
 const N5TabCurrentTaxCalc = defineAsyncComponent(() => import('./n5/calc/N5TabCurrentTaxCalc.vue'))
@@ -271,6 +274,7 @@ const yearRef = computed(() => props.year || new Date().getFullYear())
 const allResponses = ref<Map<string, any>>(new Map())
 const allResponsesRef = computed(() => allResponses.value)
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 // ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI + 挂真实 Host） ───
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 

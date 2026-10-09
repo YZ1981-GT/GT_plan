@@ -125,6 +125,7 @@ import GCycleDisclosureExtras from '../shared/GCycleDisclosureExtras.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 import WpAmountInput from '../shared/WpAmountInput.vue'
+import { handleDisclosureSyncError } from '../composables/disclosureSyncError'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -184,8 +185,8 @@ async function syncToNotes(): Promise<void> {
     }
     dis.publishNoteUpdate()
     ElMessage.success(`已同步 ${rows} 行到附注「${noteSectionId}」`)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

@@ -52,6 +52,7 @@ import {
   deriveSegmentCell,
   segmentRowAcrossCategories,
 } from '../../composables/d4RevenueSegmentColumns'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   wpId: string
@@ -357,8 +358,8 @@ async function syncToDisclosureNotes(): Promise<void> {
     }))
     ElMessage.success(`已同步 ${rows} 行到附注模块「${D4_NOTE_SECTION[VARIANT]} 营业收入和营业成本」`)
     await checkNoteConsistency(true)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

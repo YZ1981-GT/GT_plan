@@ -769,6 +769,7 @@ import {
 import type { G5MethodRow } from '../../composables/g5ListedDisclosureRows'
 import type { G5AgingPreset } from '../../composables/g5AgingScheme'
 import { api } from '@/services/apiProxy'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   htmlData?: unknown
@@ -840,8 +841,8 @@ async function syncToDisclosureNotes(): Promise<void> {
       remark: serializeSyncedTableNames(pushed),
     })
     ElMessage.success(`已同步 ${rows} 行到附注模块「${G5_NOTE_SECTION.listed} 长期应收款」`)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

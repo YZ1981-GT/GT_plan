@@ -185,6 +185,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildMEquitySyncPayload, M_EQUITY_CONFIG } from '../../composables/mEquityChangeNoteSectionMap'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -192,6 +193,7 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -308,8 +310,8 @@ async function syncToDisclosureNotes(): Promise<void> {
       projectId: props.projectId,
       sectionIds: [M_EQUITY_CONFIG.M4.section.soe],
     })
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

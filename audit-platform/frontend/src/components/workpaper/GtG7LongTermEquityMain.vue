@@ -108,6 +108,7 @@
 
       <!-- 附注披露信息（上市公司） -->
       <G7TabDisclosureListed
+          :applicable-standards="applicableStandards"
         v-else-if="currentSheet === 'disclosureListed'"
         :html-data="resolvedHtmlData"
         :wp-id="props.wpId"
@@ -121,6 +122,7 @@
         （该 Tab 是 `G7-main-disclosure-soe-v2` 的唯一写入方，防抖 600ms）。
       -->
       <G7TabDisclosureSOE
+          :applicable-standards="applicableStandards"
         v-else-if="currentSheet === 'disclosureSOE'"
         ref="soeTabRef"
         :html-data="resolvedHtmlData"

@@ -285,6 +285,7 @@ const props = defineProps<{
   isReadonly: boolean
   /** 审计年度（决定亏损到期年度骨架；缺省回退审计上下文/当前年） */
   year?: number
+  applicableStandards?: string[]
 }>()
 
 defineEmits<{ (e: 'navigate', sheetName: string): void }>()

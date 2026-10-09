@@ -10,6 +10,7 @@ defineProps<{
   projectId?: string
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  applicableStandards?: string[]
 }>()
 const emit = defineEmits<{ imported: [] }>()
 </script>

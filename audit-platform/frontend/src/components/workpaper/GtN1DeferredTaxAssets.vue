@@ -62,6 +62,7 @@
       />
       <!-- 附注披露信息（上市公司） -->
       <N1TabDisclosureListed
+          :applicable-standards="applicableStandards"
         v-else-if="currentSheet === 'disclosure-listed'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
@@ -71,6 +72,7 @@
       />
       <!-- 附注披露信息（国企） -->
       <N1TabDisclosureSoe
+          :applicable-standards="applicableStandards"
         v-else-if="currentSheet === 'disclosure-soe'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
@@ -157,6 +159,7 @@ import { useN1DualMode } from './composables/useN1DualMode'
 import { isN1HtmlSheet, normalizeN1SheetName } from './composables/n1SheetRouting'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
 // Core
@@ -205,6 +208,7 @@ function handleNavigate(sheetName: string) {
 
 const isLoading = ref(true)
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 
 /**
  * 审计年度：props.year 优先，回退 htmlData.project_context.audit_year。

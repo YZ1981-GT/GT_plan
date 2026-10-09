@@ -120,6 +120,7 @@
 
         <!-- 附注披露（上市） -->
         <K10TabDisclosureListed
+          :applicable-standards="applicableStandards"
           v-else-if="currentSheet === '附注上市'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -130,6 +131,7 @@
 
         <!-- 附注披露（国企） -->
         <K10TabDisclosureSoe
+          :applicable-standards="applicableStandards"
           v-else-if="currentSheet === '附注国企'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -179,6 +181,7 @@ import {
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useK10DualMode } from './composables/useK10DualMode'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 
@@ -214,6 +217,7 @@ const emit = defineEmits<{
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed<string | undefined>(() => props.projectId || undefined)

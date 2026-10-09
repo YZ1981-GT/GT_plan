@@ -175,6 +175,7 @@ const props = defineProps<{
    * 🔴 缺它则审定表未保存时披露表全空（四表→披露链路断裂，2026-08-01 实测）。
    */
   htmlData?: any
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void }>()

@@ -57,7 +57,12 @@ audit-platform/frontend/src/components/workpaper/g4-bond-investment-ecl/impairme
 #     连把文件改小的提交也被拒）。同批登记的 G7TabDisclosureSOE.vue 已于 7b65c77b9 补过数字，这两条漏了。
 #     E1 取 2012 = chain-closure-phase2-formula-push-engine 把主表取数抽到 e1DisclosureMainRows.ts 后的
 #     行数（HEAD 2063 → 2012）。守卫：test_check_file_size_gate_cannot_be_bypassed.py 层 3。
-audit-platform/frontend/src/components/workpaper/e1/E1TabDisclosure.vue  2012
+audit-platform/frontend/src/components/workpaper/e1/E1TabDisclosure.vue  2015
+#   D1TabDisclosure.vue / D2DisclosureNoteBody.vue —— 历史大文件，本次仅加 applicableStandards
+#     prop 声明（+1 行）+ handleDisclosureSyncError import（+1 行）+ catch 替换。
+#     baseline 取当前真实行数。
+audit-platform/frontend/src/components/workpaper/d1/D1TabDisclosure.vue  2527
+audit-platform/frontend/src/components/workpaper/d2/D2DisclosureNoteBody.vue  2191
 audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclosure/G7TabDisclosureSOE.vue  1667
 audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclosure/g7SoeDisclosureModel.ts  1670
 

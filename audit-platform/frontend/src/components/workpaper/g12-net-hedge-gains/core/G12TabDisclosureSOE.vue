@@ -114,6 +114,7 @@ import GCycleDisclosureExtras from '../../shared/GCycleDisclosureExtras.vue'
 import GCycleGuideStrip from '../../shared/GCycleGuideStrip.vue'
 import G12CoreWorkflowChecklist from '../shared/G12CoreWorkflowChecklist.vue'
 import { api } from '@/services/apiProxy'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -152,8 +153,8 @@ async function syncToDisclosureNotes(): Promise<void> {
     )
     const rows = Number((res?.data ?? res)?.rows_synced ?? 0)
     ElMessage.success(`已同步 ${rows} 行到附注模块「${G12_NOTE_SECTION.soe} 净敞口套期收益」`)
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

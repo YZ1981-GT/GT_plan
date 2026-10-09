@@ -130,8 +130,14 @@ import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaf
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildMEquitySyncPayload, M_EQUITY_CONFIG } from '../../composables/mEquityChangeNoteSectionMap'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
+import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
-const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
+const props = defineProps<{
+  wpId: string
+  projectId: string
+  isReadonly: boolean
+  applicableStandards?: string[]
+}>()
 
 // ─── Inject复核对话 ──────────────────────────────────────────────────────────
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
@@ -242,8 +248,8 @@ async function syncToDisclosureNotes(): Promise<void> {
       projectId: props.projectId,
       sectionIds: [M_EQUITY_CONFIG.M7.section.listed],
     })
-  } catch {
-    ElMessage.warning('同步附注失败，请稍后重试')
+  } catch (err) {
+    handleDisclosureSyncError(err)
   } finally {
     isSyncing.value = false
   }

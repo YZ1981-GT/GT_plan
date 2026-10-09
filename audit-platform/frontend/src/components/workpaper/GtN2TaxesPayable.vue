@@ -173,6 +173,7 @@
       <!-- 附注（上市）—— 🔴 必须传 projectId，否则同步（含自动同步）永久静默失败
            🔴 也必须传 htmlData：披露表靠 `adjudication_prefill` 在审定表未落库时预填四表数 -->
       <N2TabDisclosureListed
+          :applicable-standards="applicableStandards"
         v-else-if="currentSheet === N2_SHEET_DISCLOSURE_LISTED"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
@@ -184,6 +185,7 @@
 
       <!-- 附注（国企） -->
       <N2TabDisclosureSoe
+          :applicable-standards="applicableStandards"
         v-else-if="currentSheet === N2_SHEET_DISCLOSURE_SOE"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
@@ -228,6 +230,7 @@ import {
 import { useN2DualMode, type N2RenderMode } from './composables/useN2DualMode'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 // ─── defineAsyncComponent lazy 加载子组件 ────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const N2TabIndex = defineAsyncComponent(() => import('./n2/core/N2TabIndex.vue'))
@@ -276,6 +279,7 @@ const projectIdRef = computed(() => props.projectId)
 const allResponses = ref<Map<string, any>>(new Map())
 const allResponsesRef = computed(() => allResponses.value)
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 
 // ─── Year 提取（供子组件抽凭/TB用） ────────────────────────────────────────
 const n2Year = computed(() => {
