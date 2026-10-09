@@ -190,3 +190,27 @@ P1-P3 新增表对公式的影响：
 2. dict rows 全标 data：`_ensure_row_types` 只认 list rows → 新增 `infer_row_types_from_dict_rows`
 3. _row_types 全 data 时截断降级链 → 改为 data 不截断，继续检查 is_total/label
 4. headers 未对齐模板列数 → `_align_table_to_template` 根本修复（扩展 headers + values）
+
+### 2026-10-09 第六轮（CP-14 真实 PG 只读验收）
+
+**真实 PG 项目数据盘点**
+- 首汽租车（df5b8403，soe，2025）：173 章节，0 条推送状态，纯生成数据
+- 和平药房（2aa00f57，soe，2025）：199 章节，5 条推送状态（G6+M4），底稿同步数据
+- 重药安徽（0ec33ac9，**listed**，2025）：334 章节，**38 条推送状态（全 E1）**，真实推送数据
+- 合成集团（80b4355b，consolidated，2098）：合成数据，合并验收用
+
+**重药安徽 E1 推送逐值验证（listed 上市版）**
+- 38 条 formula_push_states：workpaper 30 条 + note 8 条，全部 state=auto
+- workpaper 域：E1-adj-tb-amount 期末 9,182,572.99 / 期初 28,944,907.27；E1-adj-total-1001/1002/1012 逐科目有值
+- note 域：五、1 货币资金 4 行 × 2 期（库存现金/银行存款/其他货币资金/合计），期末+期初 8 个值
+- Playwright 逐值对比：页面显示的 库存现金 376.73/286.73、银行存款 4,703,056.26/22,944,619.45、其他货币资金 4,479,140.00/6,000,001.09、合计 9,182,572.99/28,944,907.27 **与推送 state 逐值完全一致**
+- 合计行加粗（fontWeight 700）✅、Tab 标签正确（"货币资金"/"受限制的货币资金明细"）✅
+
+**和平药房存货表验证（soe 国企版）**
+- 两行分组表头正确：项目 | 期末数(colspan=3) | 期初数(colspan=3) → 账面余额/合同履约成本减值准备/账面价值
+- 7 列 × 12 行，Tab 标签 3 张表名正确
+- 截图：`screenshots/cp14-soe-inventory-verified.png`
+
+**CP-14 现状总结**
+- ✅ 已完成：真实 PG 只读验证（3 个项目、2 种模板、推送逐值对比）
+- 仍待授权：真实项目写路径执行（公式推送 dry_run=false）/ 完整 Word 导出 API / 真实集团全科目 UAT / 6000 并发压测
