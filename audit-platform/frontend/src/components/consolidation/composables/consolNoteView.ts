@@ -75,7 +75,24 @@ export function toEditRows(headers: ReadonlyArray<unknown>, rows: ReadonlyArray<
   return out
 }
 
-/** 编辑行 → 行数据 + 手工标记（按当前行号） */
+/** 查看模式用：裁掉尾部全空行（MIN_EDIT_ROWS 补的占位行不该在查看模式下显示） */
+export function trimTrailingEmptyRows(rows: ReadonlyArray<NoteEditRow>): NoteEditRow[] {
+  const out = [...rows]
+  while (out.length > 0) {
+    const last = out[out.length - 1]
+    // 每个单元格都是空/'-'/'--' 才算空行（跳过 __manual 等内部属性）
+    const isEmpty = Object.keys(last).every((k) => {
+      if (k === '__manual' || k.startsWith('__')) return true
+      const v = (last as Record<string, unknown>)[k]
+      if (typeof v !== 'string') return true
+      const s = v.trim()
+      return s === '' || s === '-' || s === '--'
+    })
+    if (isEmpty) out.pop()
+    else break
+  }
+  return out
+}
 export function fromEditRows(
   headers: ReadonlyArray<unknown>, editRows: ReadonlyArray<NoteEditRow>,
 ): { rows: string[][]; manual_cells: ManualCell[] } {

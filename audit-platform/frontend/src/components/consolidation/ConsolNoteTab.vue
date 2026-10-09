@@ -66,7 +66,7 @@
 
         <!-- 当前表格 -->
         <div v-if="selectedNoteSection.headers?.length" class="gt-note-table-wrap">
-          <el-table ref="noteTableRef" :data="selectedNoteSection.editRows" border size="small"
+          <el-table ref="noteTableRef" :data="noteEditMode ? selectedNoteSection.editRows : trimTrailingEmptyRows(selectedNoteSection.editRows || [])" border size="small"
             :max-height="noteFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 260px)'"
             style="width:100%" class="gt-note-compact-table"
             :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
@@ -176,7 +176,7 @@
             </template>
             <span v-else style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">💡 查看模式下可选中复制，粘贴到 Word/Excel 保持格式</span>
             <span style="flex:1" />
-            <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">共 {{ selectedNoteSection.editRows?.length || 0 }} 行</span>
+            <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">共 {{ noteEditMode ? (selectedNoteSection.editRows?.length || 0) : trimTrailingEmptyRows(selectedNoteSection.editRows || []).length }} 行</span>
           </div>
 
           <!-- 选中区域状态栏 -->
@@ -258,7 +258,7 @@
           </div>
         </div>
         <div v-if="selectedNoteSection.headers?.length" style="flex:1;min-height:0">
-          <el-table :data="selectedNoteSection.editRows" border size="small"
+          <el-table :data="noteEditMode ? selectedNoteSection.editRows : trimTrailingEmptyRows(selectedNoteSection.editRows || [])" border size="small"
             max-height="calc(100vh - 100px)" style="width:100%" class="gt-note-compact-table"
             :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
             :header-cell-style="{ background: '#f0edf5', fontSize: '11px', padding: '2px 0' }"
@@ -702,6 +702,7 @@ import {
   notePayload,
   sectionIdsWithFormulas,
   toEditRows,
+  trimTrailingEmptyRows,
   type FillDetailRow,
   type NoteEditRow,
 } from '@/components/consolidation/composables/consolNoteView'
