@@ -53,7 +53,63 @@ def _load_template_tables_index(
     return index
 
 
-# ─── 模板表名 + multi_header + _column_groups 回填 ───────────────────────────
+# ─── 模板结构回填（表名 + headers + values + multi_header + _column_groups）─
+
+
+def _align_table_to_template(tbl: dict, tpl_tbl: dict) -> None:
+    """把单个 _tables 项对齐到模板结构（不写库，只改内存中的 dict）。
+
+    回填内容：name / headers / multi_header / _column_groups。
+    当模板列数 > 数据列数时，同时扩展 rows[].values / _cell_meta / _cell_modes。
+    """
+    tpl_name = str(tpl_tbl.get("name") or "").strip()
+    tpl_headers: list[str] = tpl_tbl.get("headers") or []
+    tpl_h0 = str(tpl_headers[0]).strip() if tpl_headers else ""
+
+    data_headers: list[str] = tbl.get("headers") or []
+    data_h0 = str(data_headers[0]).strip() if data_headers else ""
+    current_name = str(tbl.get("name") or "").strip()
+
+    # 交叉校验：首列标签去空白后一致，才认为是同一张表
+    if not (_norm_label(data_h0) == _norm_label(tpl_h0) or _norm_label(current_name) == _norm_label(data_h0)):
+        return
+
+    # 1. 回填表名
+    if tpl_name:
+        tbl["name"] = tpl_name
+
+    # 2. 回填 headers（模板列数 ≥ 数据列数时替换）
+    tpl_col_count = len(tpl_headers)
+    data_col_count = len(data_headers)
+    if tpl_col_count > 0 and tpl_col_count >= data_col_count:
+        tbl["headers"] = list(tpl_headers)  # 拷贝
+        # 扩展 rows 中的 values 到模板列数
+        tpl_value_count = tpl_col_count - 1  # headers[0] 是标签列
+        _expand_rows_values(tbl, tpl_value_count)
+
+    # 3. 回填 multi_header / _column_groups
+    if not tbl.get("multi_header") and tpl_tbl.get("multi_header"):
+        tbl["multi_header"] = tpl_tbl["multi_header"]
+    if not tbl.get("_column_groups") and tpl_tbl.get("_column_groups"):
+        tbl["_column_groups"] = tpl_tbl["_column_groups"]
+
+
+def _expand_rows_values(tbl: dict, target_value_count: int) -> None:
+    """把 rows 中每行的 values 扩展到 target_value_count（不足补 None）。
+
+    同时扩展 _cell_meta 和 _cell_modes sidecar（键是 "0","1",... 字符串索引）。
+    """
+    rows = tbl.get("rows")
+    if not isinstance(rows, list):
+        return
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        values = row.get("values")
+        if isinstance(values, list):
+            while len(values) < target_value_count:
+                values.append(None)
+        # _cell_meta / _cell_modes 不需要扩展——缺键时前端按空处理
 
 
 def carry_template_table_names(
@@ -61,7 +117,11 @@ def carry_template_table_names(
     source_template: str | None,
     section_number: str | None,
 ) -> None:
-    """按模板位序回填 ``_tables`` 中缺失的业务表名、multi_header、_column_groups（不写库）。"""
+    """按模板位序回填 ``_tables`` 的完整结构（不写库）。
+
+    回填：表名 / headers / multi_header / _column_groups / rows.values 扩展。
+    只在 headers[0] 交叉校验通过时才操作（防止位序错位导致串表）。
+    """
     if not table_data or not isinstance(table_data, dict):
         return
     tables = table_data.get("_tables")
@@ -90,18 +150,7 @@ def carry_template_table_names(
         tpl_tbl = tpl_tables[i]
         if not isinstance(tpl_tbl, dict):
             continue
-        tpl_name = str(tpl_tbl.get("name") or "").strip()
-        if not tpl_name:
-            continue
-        current_name = str(tbl.get("name") or "").strip()
-        tbl_h0 = str((tbl.get("headers") or [""])[0]).strip() if tbl.get("headers") else ""
-        tpl_h0 = str((tpl_tbl.get("headers") or [""])[0]).strip() if tpl_tbl.get("headers") else ""
-        if _norm_label(tbl_h0) == _norm_label(tpl_h0) or _norm_label(current_name) == _norm_label(tbl_h0):
-            tbl["name"] = tpl_name
-        if not tbl.get("multi_header") and tpl_tbl.get("multi_header"):
-            tbl["multi_header"] = tpl_tbl["multi_header"]
-        if not tbl.get("_column_groups") and tpl_tbl.get("_column_groups"):
-            tbl["_column_groups"] = tpl_tbl["_column_groups"]
+        _align_table_to_template(tbl, tpl_tbl)
 
 
 # ─── dict 格式 rows 的 _row_types 推导 ──────────────────────────────────────
