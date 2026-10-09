@@ -72,7 +72,7 @@ inclusion: always
 ### 已完成 spec 总览
 - **全局模块 7 spec + frontend-consistency-m1 = 8 个 active spec 全部 ✅ 完成（2026-06-01，121 任务全绿）**：A formula-engine-unification(20/20) / B retrieval-kernel-unification(12/12) / C doc-level-ai-chat(12/12) / D report-config-baseline(12/12) / E wp-ai-review-ux-fix(8/8) / F global-modules-cleanup(10/10) / G global-modules-p2-polish(11/11) / frontend-consistency-m1(36/36)；残留仅 Playwright E2E 待 start-dev.bat 环境
 - active 仅剩 `consol-note-three-level-drilldown`（stub 无 tasks.md，待真实合并数据）；**合并四阶段已归档 `_archive/09-consolidation-phases/`**
-- **✅ `consol-comprehensive-runtime-defect-closure`（13/14，2026-10-09）**：CP-01~05 全修（节点联动/Word 叶子列/推送状态/三层表头/模板切换 dirty）+ 防双计恒等式 + AbortController 竞态守卫 + CP-07 差集全通（80 码三件套 + 117 条勾稽）；余 CP-14（真实 PG UAT）；后端 113 + 前端 65 = 178 测试全绿
+- **✅ `consol-comprehensive-runtime-defect-closure`（13/14，2026-10-09）**：CP-01~05 全修（节点联动/Word 叶子列/推送状态/三层表头/模板切换 dirty）+ 防双计恒等式 + AbortController 竞态守卫 + CP-07 差集全通（80 码三件套 + 117 条勾稽）+ **P2 单体附注表格对齐**（`note_table_enrichment.py` 读时增强：模板表名/headers/values/cg/row_types 回填，soe 304 张 302 一致 / listed 516 全一致，公式推送写入路径不受影响）；余 CP-14（真实 PG UAT）
 - **✅ `note-template-full-alignment-with-word-authority`（16/16）**：合并模板 soe 221→321 / listed 282→432 + mh 4→37 / 13→115 + 工具 `sync_note_templates_from_word.py`（长期可重跑）
 - **✅ `note-sub-table-formula-and-cross-check`（26/26）**：117 条勾稽 check_rules（A 跨表 38 + B 列平衡 55 + CT 跨期 24）+ 续表标记 179 张 + 子表种子 + value_column 根源修 + 前端续表展示
 - **附注表格样式全量治理（7 commits，2026-10-09 推送）**：214 张 mh 表 8 维 grid 验证全通过 + 820 张单体结构检查 + Path B colspan/rowspan 修复 + trimTrailingEmptyRows + `<br/>` 清理 35 张 + 子表头提升 77 张

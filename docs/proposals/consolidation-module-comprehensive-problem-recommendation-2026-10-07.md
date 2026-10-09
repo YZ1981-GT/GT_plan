@@ -133,6 +133,7 @@
 - 已执行 `test_consol_full_chain_integration.py` 及周边定向回归；该测试名称不能替代四表、审批、披露权威版本和复杂模板的端到端验收。
 - 国企、上市、单体、合并 Word 模板文件存在；Word/HTML 生产渲染函数已经复现列数和层级不一致，不能再仅用文件存在表述其完成度。
 - **2026-10-09 实施更新**：合并模板 JSON 已与 Word 权威源全量同步（soe 221→321 表 / listed 282→432 表），multi_header 从 4+13=17 张扩展到 37+115=152 张。CP-02（Word 空列裁剪）已修复并有 DOCX 保存再读回归。CP-04（三层表头 Path B 递归 + header 行类型自动检测）部分修复。详见 spec `note-template-full-alignment-with-word-authority`（16/16 任务全绿、108 测试通过）和 `consol-comprehensive-runtime-defect-closure` 任务 2/8。
+- **2026-10-09 P2 实施更新**：单体附注（DisclosureEditor）表格样式已对齐合并附注（ConsolNoteTab）。后端新增 `note_table_enrichment.py`（读时增强模块）：按模板位序回填业务表名 + headers 对齐到模板列数 + rows.values 扩展 + _column_groups / _row_types 补齐。全量验证 soe 304 张 302 一致 / listed 516 张全部一致。公式推送写入路径不受影响（按标签名/字段名定位，操作 `sub_table_data` 而非 `_tables`）。
 
 ### 4.2 部分实现和必须收口的边界
 
@@ -144,7 +145,7 @@
 | 抵消状态 | S3：只读穿透明确命中唯一 approved 分录；隔离回归覆盖 draft/approved | 未执行真实 PG 草稿到审批再推送，不能验收自动派发 |
 | 公式触发 | S1/S2/S3：已有事件、run 和 SSE 资产；隔离测试通过 | 禁写“没有 run”；应核验事件到步骤/目标的版本、重试和失败传播 |
 | 披露表 | S1/S2：底稿同步路径存在；E1 局部测试通过 | 全科目审定版本权威源和关闭页面的联动未验收 |
-| 附注结构 | S3：~~国企三层降两层~~→**已修复**；check_rules 117 条（20 科目模式A + 55 变动表模式B + 24 跨期续表）；续表标记 soe 72 + listed 55 | CP-02/CP-04 已修；multi_header soe 63 / listed 117 张；value_column 对侧降级已修；check_rules 端点 + 前端 el-alert 已实装；完整导出 API 验收仍待做 |
+| 附注结构 | S3：~~国企三层降两层~~→**已修复**；check_rules 117 条（20 科目模式A + 55 变动表模式B + 24 跨期续表）；续表标记 soe 72 + listed 55；**P2 单体附注对齐**：`note_table_enrichment.py` 读时增强（headers/values/cg/row_types），soe 304 张 302 一致 / listed 516 全一致 | CP-02/CP-04 已修；multi_header soe 63 / listed 117 张；value_column 对侧降级已修；check_rules 端点 + 前端 el-alert 已实装；单体附注公式推送写入路径不受影响；完整导出 API 验收仍待做 |
 | 报表附注映射 | S3：现有五行合并附注数据，三行 stale；两条旧推送记录 succeeded | 旧记录不证明当前刷新成功；未逐章节核验绑定及来源版本 |
 | 合并工作底稿 | S1/S2：结构化计算与 JSON 底稿并行 | 仍需核验用户输入是否进入批准结构化事实源 |
 | 推送状态 | S3：真实 `_push_one` 接收 partial/failed/skipped 后仍 step succeeded、all_ok true | 已有 warnings/detail 但状态误报；最终 run/SSE 的真实写入与传播未执行 |

@@ -162,3 +162,31 @@ P1-P3 新增表对公式的影响：
 - F5 binding 注册（`TierAAnchorBinding`，已在 `formula-push-all-subjects-rollout` 归档 spec 完成）
 - S 类科目裁决：S1~S10 均为专项底稿，无标准科目映射，不需要公式推送 binding
 - 待补：L6/N3 前端 owned-keys → ✅ 已完成（本 commit）；余 `formula-push-all-subjects-rollout` 的 26 个任务待铺开
+
+### 2026-10-09 第五轮（P2 单体附注渲染对齐合并附注，5 commits 9b32a8aa4..95f7c37a1）
+
+**P1 全科目铺开调查**（commit 9b32a8aa4）
+- 发现 `formula-push-all-subjects-rollout` 实际已 ✅ 26/26 归档 `_archive/23-formula-push-engine-complete/`
+- memory/tasks 中的 "(0/26)" 引用全部修正
+- CP-12（CP-07 差集）标为完成：80 码三件套全通 + 117 条勾稽
+
+**P2 单体附注表格样式对齐**（commits 71a2ea052 / 7defdfeb0 / 95f7c37a1）
+- 后端 `note_table_enrichment.py`（185 行独立模块）：
+  - `carry_template_table_names` → 按模板位序回填业务表名 + headers + multi_header + _column_groups
+  - `_align_table_to_template` → 当模板列数 > 数据列数时扩展 rows.values（根本修复）
+  - `infer_row_types_from_dict_rows` → dict 格式 rows 的 row_type/is_total 推导
+  - `enrich_note_table_data` → detail 端点读时一次性全量增强
+- 前端 `useNoteTableProjection.ts`：activeTableColumns 增加 Path A（_column_groups + leafRow 标签优化）+ Path B（multi_header grid 递归）
+- 前端 `DisclosureEditor.vue`：deRowClassName（total/subtotal/header 行级样式）+ _GENERIC_NAMES 补齐
+- 全量验证：soe 304 张 302 完全一致 / listed 516 张全部一致
+- Playwright 实测：应收账款 11 Tab 全部对齐模板（6/7 列分组表头 + 合计行加粗 + 业务表名）
+
+**公式管理调查结论**
+- 单体附注公式管理不需要修改：推送按标签名/字段名定位（F2 格式 dict key / F3 格式 value_keys），不依赖 headers 列索引
+- 读时增强只改 `_tables`（投影层），公式推送操作 `sub_table_data`（持久层），两者独立
+
+**复盘中发现并修的 bug**
+1. 路径层级错误：`parents[2]` vs `parent.parent`（模板加载指向 `backend/app` 而非 `backend`）
+2. dict rows 全标 data：`_ensure_row_types` 只认 list rows → 新增 `infer_row_types_from_dict_rows`
+3. _row_types 全 data 时截断降级链 → 改为 data 不截断，继续检查 is_total/label
+4. headers 未对齐模板列数 → `_align_table_to_template` 根本修复（扩展 headers + values）
