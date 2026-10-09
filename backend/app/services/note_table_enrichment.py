@@ -70,8 +70,14 @@ def _align_table_to_template(tbl: dict, tpl_tbl: dict) -> None:
     data_h0 = str(data_headers[0]).strip() if data_headers else ""
     current_name = str(tbl.get("name") or "").strip()
 
-    # 交叉校验：首列标签去空白后一致，才认为是同一张表
-    if not (_norm_label(data_h0) == _norm_label(tpl_h0) or _norm_label(current_name) == _norm_label(data_h0)):
+    # 交叉校验：首列标签去空白后一致（或互为前缀），才认为是同一张表
+    norm_dh0 = _norm_label(data_h0)
+    norm_th0 = _norm_label(tpl_h0)
+    norm_name = _norm_label(current_name)
+    h0_match = (norm_dh0 == norm_th0
+                or norm_name == norm_dh0
+                or (norm_dh0 and norm_th0 and (norm_dh0.startswith(norm_th0) or norm_th0.startswith(norm_dh0))))
+    if not h0_match:
         return
 
     # 1. 回填表名
