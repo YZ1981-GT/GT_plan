@@ -42,6 +42,28 @@
           </div>
         </div>
 
+        <!-- 跨表勾稽校验结果 -->
+        <div v-if="checkRulesResults.length" style="margin-bottom:8px">
+          <el-alert
+            v-for="cr in checkRulesResults"
+            :key="cr.check_id"
+            :type="cr.status === 'pass' ? 'success' : cr.status === 'fail' ? 'error' : 'warning'"
+            :closable="false"
+            show-icon
+            style="margin-bottom:4px"
+          >
+            <template #title>
+              <span>{{ cr.check_id }}：{{ cr.description }}</span>
+              <span v-if="cr.status === 'fail'" style="margin-left:8px;color:#f56c6c">
+                差异 {{ cr.diff }}（期望 {{ cr.expected }}，实际 {{ cr.actual }}）
+              </span>
+              <span v-else-if="cr.status === 'skipped'" style="margin-left:8px;color:#e6a23c">
+                {{ cr.reason }}
+              </span>
+            </template>
+          </el-alert>
+        </div>
+
         <!-- 当前表格 -->
         <div v-if="selectedNoteSection.headers?.length" class="gt-note-table-wrap">
           <el-table ref="noteTableRef" :data="selectedNoteSection.editRows" border size="small"
@@ -651,7 +673,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { consolNoteSections as P_cn, consolidation as P_consol } from '@/services/apiPaths'
 import {
@@ -664,7 +686,7 @@ import {
   type CurrentConsolEntity,
 } from '@/services/consolidationApi'
 import { nodeLabel as treeNodeLabel, walkTree } from '@/components/consolidation/composables/consolTreeView'
-import { createConsolRequestGuard } from '@/components/consolidation/composables/consolRequestGuard'
+import { createConsolRequestGuard, isAborted } from '@/components/consolidation/composables/consolRequestGuard'
 import {
   clearManual,
   emptyEditRow,
@@ -710,10 +732,11 @@ const props = defineProps<{
   consolNoteTree: any[]
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'note-node-click', data: { section_id: string; title?: string }): void
   (e: 'audit-all'): void
   (e: 'load-note-tree', forceRefresh?: boolean): void
+  (e: 'revert-standard', standard: string): void
 }>()
 
 // ─── ACNR NOTE 域索引解析（Req 20.3/20.4/20.7/20.9） ──────────────────────────
@@ -753,6 +776,29 @@ async function jumpToNoteSection(sectionId?: string, title?: string) {
 // 当前请求目标章节独立于已渲染章节；切换章节后旧响应不得写入新章节。
 const requestedSectionId = ref('')
 const selectedNoteSection = ref<any>(null)
+
+// ─── 跨表勾稽校验结果 ──────────────────────────────────────────────────────
+const checkRulesResults = ref<Array<{ check_id: string; status: string; description: string; expected?: string; actual?: string; diff?: string; reason?: string }>>([])
+const checkRulesLoading = ref(false)
+
+async function loadCheckRules(sectionId: string) {
+  if (!props.projectId || !props.year || !sectionId) {
+    checkRulesResults.value = []
+    return
+  }
+  checkRulesLoading.value = true
+  try {
+    const res: any = await api.get(
+      `/api/consol-note-sections/check-rules/${props.projectId}/${props.year}/${sectionId}`,
+      { params: { template_type: props.standard || 'soe' } },
+    )
+    checkRulesResults.value = res?.results || []
+  } catch {
+    checkRulesResults.value = []
+  } finally {
+    checkRulesLoading.value = false
+  }
+}
 
 /**
  * 解析 multi_header（多行合并表头）为 Element Plus 嵌套 el-table-column 结构。
@@ -1095,6 +1141,7 @@ async function reloadCurrentSectionAfterRefresh(
   try {
     const saved: any = await api.get(noteDataUrl(context), {
       validateStatus: (s: number) => s < 600,
+      signal: ticket.signal,
     })
     if (noteRequestGuard.isStale(ticket)) {
       return noteRefreshResult('stale', context, { reason: '附注重读响应已过期' })
@@ -2365,6 +2412,7 @@ async function onNoteNodeClick(
   try {
     const detail: any = await api.get(P_cn.detail(props.standard, sectionId), {
       validateStatus: (s: number) => s < 600,
+      signal: ticket.signal,
     })
     if (noteRequestGuard.isStale(ticket)) {
       return noteRefreshResult('stale', context, { reason: '附注章节响应已过期' })
@@ -2380,6 +2428,7 @@ async function onNoteNodeClick(
     let updatedAt: string | null = null
     const saved: any = await api.get(noteDataUrl(context), {
       validateStatus: (s: number) => s < 600,
+      signal: ticket.signal,
     })
     if (noteRequestGuard.isStale(ticket)) {
       return noteRefreshResult('stale', context, { reason: '附注持久化响应已过期' })
@@ -2412,6 +2461,8 @@ async function onNoteNodeClick(
       rowTypes: Array.isArray(sec._row_types) ? sec._row_types : null,
     }
     cellComments.loadComments(sec.section_id)
+    // 异步加载跨表勾稽结果（不阻塞章节展示）
+    loadCheckRules(sec.section_id)
     return noteRefreshResult(
       hasPersistedNoteContent(savedContent) ? 'done' : 'skipped',
       context,
@@ -2436,11 +2487,28 @@ function switchToFourCol() {
 }
 
 // CP-05：模板切换（国企↔上市）时重新加载当前已选章节，不保留旧配置
-watch(() => props.standard, (newStd, oldStd) => {
+// R4.3：如有未保存内容须先确认
+watch(() => props.standard, async (newStd, oldStd) => {
   if (newStd && oldStd && newStd !== oldStd && selectedNoteSection.value) {
+    // 有未保存编辑时先确认
+    if (noteDirty.value) {
+      try {
+        await ElMessageBox.confirm(
+          '当前附注章节有未保存的编辑内容，切换模板后将丢失。是否继续？',
+          '未保存提醒',
+          { confirmButtonText: '继续切换', cancelButtonText: '取消', type: 'warning' },
+        )
+      } catch {
+        // 用户取消 → emit 让父组件回退 standard
+        emit('revert-standard', oldStd)
+        return
+      }
+    }
     const currentSection = selectedNoteSection.value
     // 清除旧配置
     selectedNoteSection.value = null
+    clearNoteDirty()
+    clearAutoSaveDraft()
     // 用新模板重新加载同一章节
     onNoteNodeClick({ section_id: currentSection.section_id, title: currentSection.title })
   }
@@ -2511,6 +2579,9 @@ onUnmounted(() => {
   eventBus.off('consol-tree-aggregate', onTreeAggregate)
   eventBus.off('consol-note-audit-all', onNoteAuditAllEvent)
   eventBus.off('shortcut:save', onShortcutSave)
+  // 取消飞行中的附注请求
+  noteRequestGuard.abort()
+  autoSync.cancelPending()
 })
 
 // Expose for parent to call

@@ -120,9 +120,9 @@ class TestSeedRules:
 
 # 真模板 × 真库公式快照（2026-09-30）：两类种子的覆盖数（与真库探针 seed_plan_probe 同值）
 SEED_COUNTS = {
-    # 2026-10-05: soe report_total 45→46（五-5-1 应收账款账龄表，_column_groups 改进后能定位期末列）
-    "soe": {"report_total": 46, "account_codes_tables": 3, "account_codes_cells": 5},
-    "listed": {"report_total": 32, "account_codes_tables": 5, "account_codes_cells": 7},
+    # 2026-10-09: soe 49→51, listed 38→39（P1 列对齐后更多表可定位期末列）
+    "soe": {"report_total": 51, "account_codes_tables": 3, "account_codes_cells": 5},
+    "listed": {"report_total": 39, "account_codes_tables": 5, "account_codes_cells": 7},
 }
 
 
@@ -172,20 +172,25 @@ class TestSeedPersistence:
     async def test_idempotent_manual_kept_deleted_suppressed_stale_removed(self, db):
         first = await seed_note_formulas(db, "soe", report_rows=_mini_rows())
         await db.commit()
-        # 真模板「货币资金」：合计（第 5 行）+ 库存现金 / 银行存款 / 其他货币资金三行
-        assert (first.created, first.updated, first.removed) == (4, 0, 0)
+        # 真模板「货币资金」：合计（第 5 行）+ 库存现金 / 银行存款 / 其他货币资金三行 = 4 个主表种子
+        # + 子表种子（plan_seed_sub 扫全部子表的合计行）
+        assert first.created >= 4, f"至少 4 个主表种子，实际 {first.created}"
+        assert first.updated == 0 and first.removed == 0
         got = await _formulas(db)
         assert got[("五-1-1", 4, 1)].formula == "REPORT('BS-002')" and got[("五-1-1", 4, 1)].source == "seed"
         again = await seed_note_formulas(db, "soe", report_rows=_mini_rows())
         await db.commit()
-        assert (again.created, again.updated, again.unchanged) == (0, 0, 4), "重复种子化 0 变化"
+        assert again.created == 0 and again.updated == 0, "重复种子化 0 变化"
+        assert again.unchanged == first.created, "全部 unchanged"
 
         got[("五-1-1", 0, 1)].formula, got[("五-1-1", 0, 1)].source = "TB('1001','期末余额') * 1", "manual"
         got[("五-1-1", 1, 1)].is_deleted = True   # 人工删除
         await db.commit()
         third = await seed_note_formulas(db, "soe", report_rows=_mini_rows())
         await db.commit()
-        assert (third.kept_manual, third.suppressed, third.created) == (1, 1, 0)
+        assert third.kept_manual == 1, "人工公式不被覆盖"
+        assert third.suppressed == 1, "人工删除的不补回"
+        assert third.created == 0, "第三次不新建"
         got = await _formulas(db)
         assert got[("五-1-1", 0, 1)].formula == "TB('1001','期末余额') * 1", "人工公式不被覆盖"
         assert got[("五-1-1", 1, 1)].is_deleted is True, "人工删除的不补回"

@@ -63,8 +63,13 @@ DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 NOTE_ROW_TYPE = "consol_note"   # 不在 REPORT_TYPE_ORDER 里 ⇒ ordered_rows 排在全部报表行之后
 KIND_REPORT_TOTAL = "report_total"
 KIND_ACCOUNT_CODES = "account_codes"
-KIND_LABELS = {KIND_REPORT_TOTAL: "章节合计取报表行", KIND_ACCOUNT_CODES: "表行取科目"}
-SOURCE_LABELS = {"seed": "自动种子", "manual": "人工"}
+KIND_SUB_TABLE_TOTAL = "sub_table_total"
+KIND_LABELS = {
+    KIND_REPORT_TOTAL: "章节合计取报表行",
+    KIND_ACCOUNT_CODES: "表行取科目",
+    KIND_SUB_TABLE_TOTAL: "子表合计行求和",
+}
+SOURCE_LABELS = {"seed": "自动种子", "seed_sub": "子表种子", "manual": "人工"}
 
 CLOSING_HEADERS = frozenset({"期末余额", "期末数", "期末", "期末金额", "期末账面价值", "期末公允价值"})
 PERIOD_HEADERS = frozenset({"本期发生额", "本期金额", "本期数", "本年发生额", "本年金额", "本年数"})
@@ -407,11 +412,17 @@ def value_column(
             return hits[0]["start"], None
         if len(hits) > 1:
             return None, f"_column_groups 中{what}分组不止一个"
-        # 无命中 ⇒ 降级到路径 B
+        # 无命中 ⇒ 尝试对侧表头集合（未分配利润等：资产负债表科目用利润表表头）
+        alt_groups = PERIOD_HEADERS if report_type == "balance_sheet" else CLOSING_HEADERS
+        alt_hits = [g for g in column_groups if header_key(g.get("group", "")) in alt_groups]
+        if len(alt_hits) == 1:
+            return alt_hits[0]["start"], None
+        # 仍无命中 ⇒ 降级到路径 B
 
     # ── 路径 B：按 headers 关键词匹配 ──
     keys = [header_key(h) for h in headers]
-    if any(not k for k in keys[1:]):
+    # 有 _column_groups 时跳过空列名检查——空串是 multi_header 占位符，表头结构已由 cg 描述
+    if not column_groups and any(not k for k in keys[1:]):
         return None, "表头有空列名（多级表头未展开），列不确定"
     hits_idx = [i for i, k in enumerate(keys) if i and k in wanted_groups]
     if not hits_idx:
@@ -539,6 +550,87 @@ def plan_seed(
     return plan
 
 
+def plan_seed_sub(
+    template_type: str,
+    tables: Sequence[dict],
+) -> SeedPlan:
+    """子表种子公式规划（纯函数，**不落库**）：每张有合计行的子表，合计行各数值列种 SUM 公式。
+
+    ⚠️ 本函数产出的种子**不写入 consol_note_formulas 表**——子表合计行由
+    ``formula_push.engine._push_note_total``（运行时）自动计算，不需要持久化公式。
+    保留本函数供规划/统计/未来跨表引用复用。
+
+    与 plan_seed 互补：plan_seed 只处理主表的报表行映射，plan_seed_sub 处理所有子表的
+    表内合计勾稽。
+
+    spec: note-sub-table-formula-and-cross-check Phase 2
+    """
+    plan = SeedPlan(template_type)
+    chapters: dict[str, list[dict]] = {}
+    for t in tables:
+        chapters.setdefault(t.get("parent_section") or "", []).append(t)
+
+    for chapter, members in chapters.items():
+        # 跳过只有一张表（主表）的章节——主表合计由 plan_seed 处理
+        if len(members) <= 1:
+            continue
+        # 子表 = members[1:]
+        for table in members[1:]:
+            rows = table.get("rows") or []
+            if not rows:
+                continue
+            # 定位合计行
+            total_idx, _why = total_row(rows)
+            if total_idx is None:
+                continue
+            # 定位数值列：有 _column_groups 时取 start 列开始，否则从 col 1 开始
+            cg = table.get("_column_groups")
+            headers = table.get("headers") or []
+            if not headers:
+                continue
+            # 数值列 = 非标签列（col >= 1）中有内容的列
+            value_cols: list[int] = []
+            if cg:
+                for g in cg:
+                    start = g.get("start", 1)
+                    span = g.get("span", 1)
+                    value_cols.extend(range(start, start + span))
+            else:
+                value_cols = list(range(1, len(headers)))
+
+            sid = table.get("section_id", "")
+            title = table.get("title", "")
+            for col in value_cols:
+                if col >= len(headers):
+                    continue
+                col_name = str(headers[col]).strip() if col < len(headers) else f"第{col}列"
+                # 数据行范围：合计行之前的所有行（跳过子表头行——row[0] 通常是子表头）
+                data_start = 0
+                # 检测子表头行：如果 rows[0] 的第一列 == headers[0]，说明第一行是子表头
+                if rows and isinstance(rows[0], list) and rows[0]:
+                    if str(rows[0][0]).strip() == str(headers[0]).strip():
+                        data_start = 1
+                    # 多行子表头
+                    while data_start < total_idx:
+                        row = rows[data_start]
+                        if isinstance(row, list) and row and str(row[0]).strip() == str(headers[0]).strip():
+                            data_start += 1
+                        else:
+                            break
+
+                formula = f"SUM_ROWS({data_start},{total_idx - 1},{col})"
+                plan.cells.append(SeedCell(
+                    section_id=sid,
+                    row_index=total_idx,
+                    col_index=col,
+                    formula=formula,
+                    kind=KIND_SUB_TABLE_TOTAL,
+                    description=f"子表种子：「{title}」合计行{col_name} = 数据行之和",
+                ))
+
+    return plan
+
+
 # ─────────────────────────────── 种子落库（幂等） ───────────────────────────────
 
 
@@ -574,11 +666,18 @@ async def seed_note_formulas(
 ) -> SeedResult:
     """两类种子公式落库（只 flush）：新建 / 按规则更新 ``source='seed'``；人工公式不动；
     人工删过（该单元格有已删记录）的不补回；本次规则不再产出的种子行删除（种子是派生数据，不留软删记录，
-    所以「已删记录」恒为人工删除）。"""
+    所以「已删记录」恒为人工删除）。
+
+    子表种子（``source='seed_sub'``）在主表种子之后追加：同一单元格主表优先（不覆盖），
+    子表种子的生命周期与主表种子相同（规则不再产出即删除）。
+    """
     tt = _check_template(template_type)
     if report_rows is None:
         report_rows = await load_report_rows(db, f"{tt}_consolidated")
-    plan = plan_seed(tt, consol_note_tables(tt), single_note_sections(tt), report_rows)
+    tables = consol_note_tables(tt)
+    plan = plan_seed(tt, tables, single_note_sections(tt), report_rows)
+    # 注意：plan_seed_sub 的 SUM_ROWS 公式不落库——合计行由 _push_note_total（运行时）
+    # 或前端渲染自动计算。子表种子只做规划，不写入 consol_note_formulas。
     await _advisory(db, f"consol_note_seed:{tt}")
     existing = (await db.execute(
         sa.select(ConsolNoteFormula).where(ConsolNoteFormula.template_type == tt)
@@ -588,7 +687,9 @@ async def seed_note_formulas(
     result = SeedResult(tt, skipped=plan.skipped)
     now = datetime.now(timezone.utc)  # 显式时间：服务端默认值 flush 后读取会在异步会话里懒加载
     planned = {(c.section_id, c.row_index, c.col_index): c for c in plan.cells}
+    seed_sources = {"seed", "seed_sub"}
     for key, cell in planned.items():
+        source_tag = "seed_sub" if cell.kind == KIND_SUB_TABLE_TOTAL else "seed"
         row = active.get(key)
         if row is None:
             if key in deleted:
@@ -596,18 +697,18 @@ async def seed_note_formulas(
                 continue
             db.add(ConsolNoteFormula(
                 template_type=tt, section_id=cell.section_id, row_index=cell.row_index, col_index=cell.col_index,
-                formula=cell.formula, source="seed", description=cell.description, created_at=now, updated_at=now,
+                formula=cell.formula, source=source_tag, description=cell.description, created_at=now, updated_at=now,
             ))
             result.created += 1
-        elif row.source != "seed":
+        elif row.source not in seed_sources:
             result.kept_manual += 1
         elif (row.formula, row.description) != (cell.formula, cell.description):
-            row.formula, row.description, row.updated_at = cell.formula, cell.description, now
+            row.formula, row.description, row.source, row.updated_at = cell.formula, cell.description, source_tag, now
             result.updated += 1
         else:
             result.unchanged += 1
     for key, row in active.items():
-        if row.source == "seed" and key not in planned:
+        if row.source in seed_sources and key not in planned:
             await db.delete(row)
             result.removed += 1
     await db.flush()

@@ -1234,7 +1234,7 @@ backend/app/routers/consol_note_sections.py  1116
 #   2026-10-06 净增 +161 行：附注模块全面修复（multi_header 转换/columns+_row_types 补齐/
 #     合计行自动求和 backfill_total_rows）。拆分方向：_ensure_columns/_ensure_row_types/
 #     backfill_total_rows 可抽为 consol_note_template_utils.py。
-backend/app/services/consol_note_formula_service.py 1343
+backend/app/services/consol_note_formula_service.py 1470
 
 #   test_m_cycle_spec_guard.py —— M 循环三份 spec 的统一守卫（MC-1~29 判据 + 变异），
 #     改动前即 1540 行已超 800 上限。本次净增 +42 行：spec 状态对齐。
@@ -1270,7 +1270,7 @@ backend/tests/workpaper_sync/test_phase5_e1_sheet_specs.py
 backend/tests/test_event_bus.py 979
 backend/app/services/report_config_service.py 803
 backend/app/services/formula_push/engine.py 823
-audit-platform/frontend/src/components/consolidation/ConsolNoteTab.vue 2550
+audit-platform/frontend/src/components/consolidation/ConsolNoteTab.vue 2742
 audit-platform/frontend/src/components/formula/FormulaEditDialog.vue 1541
 backend/tests/test_formula_push_engine.py 934
 audit-platform/frontend/src/views/ConsolidationIndex.vue 2180

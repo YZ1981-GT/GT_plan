@@ -35,7 +35,7 @@
           @node-click="onNoteClick">
           <template #default="{ data }">
             <span class="cc-tree-node">
-              <span class="cc-tree-node-label">{{ data.label }}</span>
+              <span class="cc-tree-node-label" :style="data.is_continuation ? { color: 'var(--gt-color-text-tertiary)', fontSize: 'var(--gt-font-size-xs)' } : {}">{{ data.label }}</span>
               <el-tag v-if="data.children_count" size="small" type="success" style="margin-left:4px;font-size: var(--gt-font-size-xs)">{{ data.children_count }}家</el-tag>
               <el-tag v-if="data.is_consol_only" size="small" type="warning" style="margin-left:4px;font-size: var(--gt-font-size-xs)">仅合并</el-tag>
               <el-tag v-if="data.is_stale" size="small" type="danger" style="margin-left:2px;font-size: var(--gt-font-size-xs)">待汇总</el-tag>
@@ -131,10 +131,11 @@ async function loadData() {
       table_count: g.table_count,
       children: (g.children || []).map((c: any) => ({
         key: c.section_id,
-        label: c.title,
+        label: c.continuation_of ? `  ↳ ${c.title}` : c.title,
         section_id: c.section_id,
         title: c.title,
         table_count: 1,
+        is_continuation: !!c.continuation_of,
       })),
     }))
   } catch { noteTree.value = [] }

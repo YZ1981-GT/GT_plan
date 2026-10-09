@@ -25,7 +25,7 @@ from app.models.base import Base
 #: 推送运行状态。改动须同步 V172 的 CHECK。
 PUSH_RUN_STATUSES: tuple[str, ...] = ("running", "succeeded", "partial", "failed")
 #: 合并附注公式来源：seed = 自动种子；manual = 人工维护（种子不覆盖人工）。
-NOTE_FORMULA_SOURCES: tuple[str, ...] = ("seed", "manual")
+NOTE_FORMULA_SOURCES: tuple[str, ...] = ("seed", "seed_sub", "manual")
 #: 合并附注模板类型。
 NOTE_TEMPLATE_TYPES: tuple[str, ...] = ("soe", "listed")
 

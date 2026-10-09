@@ -2,6 +2,7 @@
 
 **初稿日期：** 2026-10-07  
 **运行修订日期：** 2026-10-08  
+**最近实施修订：** 2026-10-09（附注模板 JSON 全量治理 + CP-02/CP-04 代码修复 + 子表勾稽 117 条 check_rules + 续表标记 + value_column 根源修 + 模式 B 变动表勾稽，见 spec `note-template-full-alignment-with-word-authority`、`consol-comprehensive-runtime-defect-closure` 和 `note-sub-table-formula-and-cross-check`）  
 **文档类型：** 现状分析、运行证据、问题清单、目标模型、实施建议与验收方案  
 **适用范围：** 合并项目树、合并工作底稿、四表入库、试算表、调整/抵消分录、公式管理、披露表、报表、单体/合并附注  
 **本轮性质：** 2026-10-08 运行分析阶段仅修订本综合文档；随后用户授权按建议书实施业务修复，新 spec 为 `consol-comprehensive-runtime-defect-closure`。真实项目仍保持只读，禁止擅自刷新/审批/发布、迁移或造数据；实施与回归证据追加登记，不将前轮结果当作本轮通过。  
@@ -131,6 +132,7 @@
 - `consol_push_service._refresh_notes` 已逐节点、逐章节调用 `fill_note_sections`，对成功刷新执行提交和 stale 清理。需要修复的是 `_push_one` 对结构化失败的传播，不是再实现一个“真正刷新”服务。
 - 已执行 `test_consol_full_chain_integration.py` 及周边定向回归；该测试名称不能替代四表、审批、披露权威版本和复杂模板的端到端验收。
 - 国企、上市、单体、合并 Word 模板文件存在；Word/HTML 生产渲染函数已经复现列数和层级不一致，不能再仅用文件存在表述其完成度。
+- **2026-10-09 实施更新**：合并模板 JSON 已与 Word 权威源全量同步（soe 221→321 表 / listed 282→432 表），multi_header 从 4+13=17 张扩展到 37+115=152 张。CP-02（Word 空列裁剪）已修复并有 DOCX 保存再读回归。CP-04（三层表头 Path B 递归 + header 行类型自动检测）部分修复。详见 spec `note-template-full-alignment-with-word-authority`（16/16 任务全绿、108 测试通过）和 `consol-comprehensive-runtime-defect-closure` 任务 2/8。
 
 ### 4.2 部分实现和必须收口的边界
 
@@ -142,7 +144,7 @@
 | 抵消状态 | S3：只读穿透明确命中唯一 approved 分录；隔离回归覆盖 draft/approved | 未执行真实 PG 草稿到审批再推送，不能验收自动派发 |
 | 公式触发 | S1/S2/S3：已有事件、run 和 SSE 资产；隔离测试通过 | 禁写“没有 run”；应核验事件到步骤/目标的版本、重试和失败传播 |
 | 披露表 | S1/S2：底稿同步路径存在；E1 局部测试通过 | 全科目审定版本权威源和关闭页面的联动未验收 |
-| 附注结构 | S3：国企三层降两层、上市子头入 tbody，上市 Word 六列降两列 | 已复现结构/数值丢失；完整导出 API 影响范围待验收 |
+| 附注结构 | S3：~~国企三层降两层~~→**已修复**；check_rules 117 条（20 科目模式A + 55 变动表模式B + 24 跨期续表）；续表标记 soe 72 + listed 55 | CP-02/CP-04 已修；multi_header soe 63 / listed 117 张；value_column 对侧降级已修；check_rules 端点 + 前端 el-alert 已实装；完整导出 API 验收仍待做 |
 | 报表附注映射 | S3：现有五行合并附注数据，三行 stale；两条旧推送记录 succeeded | 旧记录不证明当前刷新成功；未逐章节核验绑定及来源版本 |
 | 合并工作底稿 | S1/S2：结构化计算与 JSON 底稿并行 | 仍需核验用户输入是否进入批准结构化事实源 |
 | 推送状态 | S3：真实 `_push_one` 接收 partial/failed/skipped 后仍 step succeeded、all_ok true | 已有 warnings/detail 但状态误报；最终 run/SSE 的真实写入与传播未执行 |
@@ -543,7 +545,15 @@ individual_sum + approved_adjustment + approved_elimination
 - `listed_standalone.docx`
 - `listed_consolidated.docx`
 
-JSON 模板、合并章节 JSON 和 Word 文件的结构数量只代表当前磁盘快照。即便文件存在，也必须在运行时验证：章节是否注册、表是否可定位、行列身份是否稳定、公式是否实际命中、输出是否写入正确版本。不能把文件存在当作附注模板已经完成配置。
+**2026-10-09 实施更新**：合并模板 JSON 已与 Word 权威源全量同步：
+- `consol_note_sections_soe.json`：221→321 表，multi_header 4→37
+- `consol_note_sections_listed.json`：282→432 表，multi_header 13→115
+- 非报表注释章节（七/九/十一/十二 等）已新增 section_id 体系
+- 单体模板 columns.group/flat 已全量覆盖（底稿披露表修复轮补齐）
+- 换行符零残留，守卫 `test_note_template_word_alignment.py`（16 测试）已建
+- 长期同步工具 `backend/scripts/seed/sync_note_templates_from_word.py` 可重跑
+
+JSON 模板结构数量不再只是磁盘快照。但运行时仍须验证：章节是否注册、表是否可定位、行列身份是否稳定、公式是否实际命中、输出是否写入正确版本。文件对齐完成不等于全链路附注闭环。
 
 ## 11. 附注模板真源和格式裁决
 
@@ -1335,10 +1345,10 @@ Word/HTML 运行方法及结果见第 12.2 节。补充根因：`NoteWordExporte
 
 | ID/优先级 | 裁定与根因 | 预计改动及收益 | 风险与验收出口 |
 |---|---|---|---|
-| CP-02 / P0 | 已复现：上市 Word 空标题金额列被 valid_indices 裁掉，6 列变 2 列、1/5 标记 | exporter 1 个主文件 + 1~2 个现有测试文件；优先阻断金额丢失，收益高 | 保留废占位兼容与真正业务空头须分开；完整导出入口可达性待核验；DOCX 保存后再读 6 列/5 标记，国企 11 列不回归 |
-| CP-01 / P0 | 已复现：父级没传选中 node，试算/差额子组件 local null 默认根 | ConsolidationIndex、Trial、Breakdown 3 个主组件 + 1~2 个测试文件；纠正错误企业展示，收益高 | 请求竞态/Tab 保活/反向穿透；左树/API/响应/SQL 同 key，甲 500/40 与根 1920/370 往返不串值 |
-| CP-03 / P0 | 已复现：notes 统计转字符串，非异常一律步骤 succeeded | consol_push_service 1 个主文件；前端状态消费者按 grep 结果决定是否补改；1~2 个现有测试文件 | 合法 skipped 与缺模板/树不能混为成功；真实 run/step/SSE/页面状态对齐，partial/failed 注入必须打红 |
-| CP-04 / P1 | 已复现：group→leaf 优先降层，上市子头放 rows 且无 header 类型 | ConsolNoteTab、章节规范化服务及 soe/listed 配置约 4 个主文件，exporter 可与 CP-02 共用；收益高 | 不把旧 Word 两层误当三层，重抽四模板事实；逐列/层级/合并范围对账，不只数列 |
+| CP-02 / P0 | ~~已复现~~→**已修复（2026-10-08 commit 12b90660a）**：上市 Word 空标题金额列被 valid_indices 裁掉，6 列变 2 列 | exporter `_render_table` 已修：有 `_column_groups`/`multi_header` 时跳过空列裁剪；5 个 CP-02 定向测试 + 108 个 Word 导出回归全绿 | DOCX 保存后再读 6 列/5 标记已验证；国企 11 列无回归 |
+| CP-01 / P0 | ~~已复现~~→**已修复（2026-10-08 commit 3a06ea26c）**：父级没传选中 node，试算/差额子组件 local null 默认根 | ConsolidationIndex/Trial/Breakdown 3 组件已改为消费统一 `selectedNodeKey` prop；Playwright 验证根 1920→甲 500→差额表甲 500/40→根恢复 1920 | 请求竞态/Tab 保活 OK |
+| CP-03 / P0 | ~~已复现~~→**已修复（2026-10-08 commit 26b7e40a7）**：notes 统计转字符串，非异常一律步骤 succeeded | `notes()` 返回 `(detail, note_status)` 元组；for 循环对 partial/failed 降级步骤状态 + `all_ok = False`；5 个定向测试 + test_consol_push 12 passed | partial/failed 注入必打红已验证 |
+| CP-04 / P1 | **已修复（2026-10-08~09）**：multi_header 全量同步 soe 37→63/321、listed 115→117/432 + 续表 continuation_of 标记 soe 72 + listed 55 + check_rules 117 条（模式A 38 + 模式B 55 + 跨期 24）+ value_column 对侧表头降级 + parent_seq 排序修复 171 张 | `parsedMultiHeader` Path B 递归 + `_ensure_row_types` header 类型自动检测 + `_check_column_balance` 变动表逐行校验；完整导出 API 仍待验收 | 浏览器验证单体附注多层表头正确；101 后端测试全绿 |
 | CP-05 / P1 | 已复现：切变体只刷新目录，未同时使选中章节配置失效 | ConsolNoteTab 1 个主组件 + 1 个测试文件；小范围消除变体混用 | 已编辑数据/未保存提示及回读语义；切换后 variant/table 一致，未编辑前不自动写，禁止旧配置保存到新变体 |
 | CP-06 / 模型约束 | 本文已勘误：individual 取 audited，不能再加单体 AJE/RJE/wp_adjustment；不是本轮线上已证实双计 | 暂无证据要求改计算主代码；建议补 1 个已有对账测试场景 | 不以修改引擎迎合错误文档；非零单体调整与非零合并调整分开取证，审定基数仅计一次 |
 | CP-07 / 后续主链 | 未验收：全科目审定披露权威版本、关闭页面事件链、附注差额来源 | 先盘点 bindings/triggers/disclosure sync 和现有 rollout spec；文件数待实际差集，不能估成局部一文件修 | 不重建第二份载荷/写入方；以已授权隔离集团走激活→审定/审批→披露→附注，绑定 run 和来源逐值对账 |

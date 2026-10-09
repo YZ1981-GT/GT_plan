@@ -6292,3 +6292,18 @@ jobs:
         run: python -m pip install pytest==8.4.2
       - name: Run lazy import resolvability guard
         run: python -m pytest backend/tests/test_lazy_import_resolvability.py -q
+
+
+  note-template-sync-check:
+    # 附注模板 JSON 与 Word 权威源同步检查（spec: note-template-full-alignment-with-word-authority）
+    # 检测 JSON 是否与 Word 一致，不一致 exit 2
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install python-docx
+        run: pip install python-docx lxml
+      - name: Check note template sync
+        run: python backend/scripts/seed/sync_note_templates_from_word.py --check

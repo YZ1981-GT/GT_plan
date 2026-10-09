@@ -108,3 +108,76 @@ describe('createConsolRequestGuard', () => {
     expect(guard.isStale(t3)).toBe(false)
   })
 })
+
+// ─── 2026-10-09：AbortController 集成测试 ─────────────────────────────────────
+
+import { isAborted } from '../composables/consolRequestGuard'
+
+describe('AbortController 集成', () => {
+  it('startRequest 返回的 ticket 包含 signal', () => {
+    const guard = createConsolRequestGuard(() => ({ x: 1 }))
+    const ticket = guard.startRequest()
+    expect(ticket.signal).toBeInstanceOf(AbortSignal)
+    expect(ticket.signal.aborted).toBe(false)
+  })
+
+  it('第二次 startRequest 自动 abort 第一次的 signal', () => {
+    const guard = createConsolRequestGuard(() => ({ x: 1 }))
+    const t1 = guard.startRequest()
+    expect(t1.signal.aborted).toBe(false)
+    const t2 = guard.startRequest()
+    expect(t1.signal.aborted).toBe(true) // 第一次被 abort
+    expect(t2.signal.aborted).toBe(false) // 第二次仍活跃
+  })
+
+  it('三次快速切换：前两个都被 abort', () => {
+    const guard = createConsolRequestGuard(() => ({ x: 1 }))
+    const t1 = guard.startRequest()
+    const t2 = guard.startRequest()
+    const t3 = guard.startRequest()
+    expect(t1.signal.aborted).toBe(true)
+    expect(t2.signal.aborted).toBe(true)
+    expect(t3.signal.aborted).toBe(false)
+  })
+
+  it('abort() 取消当前飞行中的请求', () => {
+    const guard = createConsolRequestGuard(() => ({ x: 1 }))
+    const ticket = guard.startRequest()
+    expect(ticket.signal.aborted).toBe(false)
+    guard.abort()
+    expect(ticket.signal.aborted).toBe(true)
+  })
+
+  it('abort() 后再 startRequest 正常工作', () => {
+    const guard = createConsolRequestGuard(() => ({ x: 1 }))
+    const t1 = guard.startRequest()
+    guard.abort()
+    expect(t1.signal.aborted).toBe(true)
+    const t2 = guard.startRequest()
+    expect(t2.signal.aborted).toBe(false)
+  })
+})
+
+describe('isAborted 辅助函数', () => {
+  it('axios ERR_CANCELED 识别为 abort', () => {
+    expect(isAborted({ code: 'ERR_CANCELED' })).toBe(true)
+  })
+
+  it('fetch AbortError 识别为 abort', () => {
+    expect(isAborted({ name: 'AbortError' })).toBe(true)
+  })
+
+  it('普通错误不是 abort', () => {
+    expect(isAborted(new Error('网络失败'))).toBe(false)
+  })
+
+  it('null/undefined 不是 abort', () => {
+    expect(isAborted(null)).toBe(false)
+    expect(isAborted(undefined)).toBe(false)
+  })
+
+  it('非对象不是 abort', () => {
+    expect(isAborted('ERR_CANCELED')).toBe(false)
+    expect(isAborted(42)).toBe(false)
+  })
+})

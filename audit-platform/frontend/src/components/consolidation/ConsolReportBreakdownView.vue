@@ -113,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import { exportMultiSheetData } from '@/composables/useExcelIO'
@@ -162,6 +162,7 @@ const serverNodes = ref<Array<{ node_key: string; label: string }>>([])
 /** 已加载过：报表类型 / 年度 / 树变化时才需要重读；没打开过本视图就不读 */
 let loaded = false
 let loadSeq = 0
+let loadAbort: AbortController | null = null
 
 /** 汇总节点（树序；与后端 aggregate_nodes 同一判定：kind = aggregate） */
 const nodeOptions = computed(() => {
@@ -177,11 +178,14 @@ async function load() {
   if (!props.projectId) return
   loaded = true
   const seq = ++loadSeq
+  // 取消前一个飞行中的请求
+  if (loadAbort) loadAbort.abort()
+  loadAbort = new AbortController()
   loading.value = true
   loadError.value = ''
   try {
     const res = await getConsolReportBreakdown(props.projectId, {
-      reportType: props.reportType, nodeKey: nodeKey.value, year: props.year,
+      reportType: props.reportType, nodeKey: nodeKey.value, year: props.year, signal: loadAbort!.signal,
     })
     if (seq !== loadSeq) return
     rows.value = res?.rows || []
@@ -191,6 +195,7 @@ async function load() {
     if (!nodeKey.value && res?.node_key) nodeKey.value = res.node_key
   } catch (e: any) {
     if (seq !== loadSeq) return
+    if (e?.code === 'ERR_CANCELED' || e?.name === 'AbortError') return
     rows.value = []
     columns.value = []
     const detail = e?.response?.data?.detail
@@ -286,6 +291,12 @@ function rowClassName({ row }: { row: ConsolReportBreakdownRow }): string {
   if (!row.has_formula) return 'gt-cm-category'
   return ''
 }
+
+// 组件卸载时取消飞行中的请求
+onBeforeUnmount(() => {
+  if (loadAbort) loadAbort.abort()
+  loadSeq += 1
+})
 
 defineExpose({ load, rows, columns, nodeKey, loading })
 </script>

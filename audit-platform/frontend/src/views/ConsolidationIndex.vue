@@ -370,6 +370,7 @@
           :current-entity="currentConsolEntity"
           :group-tree="groupTree"
           :consol-note-tree="consolNoteTree"
+          @revert-standard="consolNoteTemplateType = $event"
         />
       </el-tab-pane>
     </el-tabs>

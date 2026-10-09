@@ -117,7 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import { exportMultiSheetData } from '@/composables/useExcelIO'
@@ -186,16 +186,21 @@ const aggregateNodes = computed(() => {
 })
 
 let loadSeq = 0
+let loadAbort: AbortController | null = null
 
 async function load() {
   if (!props.projectId) return
   loaded = true
   const seq = ++loadSeq
+  // 取消前一个飞行中的请求
+  if (loadAbort) loadAbort.abort()
+  loadAbort = new AbortController()
+  const signal = loadAbort.signal
   loading.value = true
   loadError.value = ''
   try {
     const res = await getConsolReportTrial(props.projectId, {
-      reportType: reportType.value, nodeKey: nodeKey.value, year: props.year,
+      reportType: reportType.value, nodeKey: nodeKey.value, year: props.year, signal,
     })
     if (seq !== loadSeq) return
     rows.value = res?.rows || []
@@ -204,6 +209,8 @@ async function load() {
     if (!nodeKey.value && res?.node_key) nodeKey.value = res.node_key
   } catch (e: any) {
     if (seq !== loadSeq) return
+    // 被 abort 的请求不算错误
+    if (e?.code === 'ERR_CANCELED' || e?.name === 'AbortError') return
     rows.value = []
     const detail = e?.response?.data?.detail
     loadError.value = typeof detail === 'string' && detail ? detail : '加载合并试算平衡表失败'
@@ -338,6 +345,12 @@ watch(() => [props.projectId, props.year] as const, ([pid, y], old) => {
   if (!pid || !old || (old[0] === pid && old[1] === y)) return
   nodeKey.value = null
   if (loaded) load()
+})
+
+// 组件卸载时取消飞行中的请求
+onBeforeUnmount(() => {
+  if (loadAbort) loadAbort.abort()
+  loadSeq += 1
 })
 
 defineExpose({ load, rows, reportType, loading, nodeKey })

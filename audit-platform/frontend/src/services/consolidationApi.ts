@@ -1141,32 +1141,32 @@ function viewParams(projectId: string, opts: { reportType?: string; nodeKey?: st
 
 /** 合并试算平衡表页：某汇总节点按报表行次的五列净额（审定汇总 / 权益抵销 / 往来交易抵销 / 报表调整 / 合并审定数） */
 export async function getConsolReportTrial(
-  projectId: string, opts: { reportType: string; nodeKey?: string | null; year?: number | null },
+  projectId: string, opts: { reportType: string; nodeKey?: string | null; year?: number | null; signal?: AbortSignal },
 ): Promise<ConsolReportTrialResponse> {
-  return api.get(P.worksheet.reportTrial, { params: viewParams(projectId, opts) })
+  return api.get(P.worksheet.reportTrial, { params: viewParams(projectId, opts), signal: opts.signal })
 }
 
 /** 报表差额表：汇总节点的直接子节点各一列 + 合计（= 该节点合并数） */
 export async function getConsolReportBreakdown(
-  projectId: string, opts: { reportType: string; nodeKey?: string | null; year?: number | null },
+  projectId: string, opts: { reportType: string; nodeKey?: string | null; year?: number | null; signal?: AbortSignal },
 ): Promise<ConsolReportBreakdownResponse> {
-  return api.get(P.worksheet.reportBreakdown, { params: viewParams(projectId, opts) })
+  return api.get(P.worksheet.reportBreakdown, { params: viewParams(projectId, opts), signal: opts.signal })
 }
 
 /** 报表行某列 → 构成它的分录明细（只计已审批；贡献之和 = 该行该列） */
 export async function drillConsolRowEntries(
   projectId: string,
-  opts: { rowCode: string; measure: ConsolDrillMeasure; nodeKey?: string | null; year?: number | null },
+  opts: { rowCode: string; measure: ConsolDrillMeasure; nodeKey?: string | null; year?: number | null; signal?: AbortSignal },
 ): Promise<ConsolEntryDrillResponse> {
   const params = viewParams(projectId, opts)
   params.row_code = opts.rowCode
   params.measure = opts.measure
-  return api.get(P.worksheet.drillEntries, { params })
+  return api.get(P.worksheet.drillEntries, { params, signal: opts.signal })
 }
 
 /** 报表行审定汇总列 → 各数据节点的个别数 */
 export async function drillConsolRowIndividual(
-  projectId: string, opts: { rowCode: string; nodeKey?: string | null; year?: number | null },
+  projectId: string, opts: { rowCode: string; nodeKey?: string | null; year?: number | null; signal?: AbortSignal },
 ): Promise<{ year: number; row_code: string; rows: ConsolIndividualDrillRow[] }> {
   const params = viewParams(projectId, opts)
   params.row_code = opts.rowCode

@@ -263,7 +263,8 @@ class TestMultiHeaderSeedEndToEnd:
         cg_sections = {t["section_id"] for t in tables if t.get("_column_groups")}
         skipped_for_col = [
             s for s in plan.skipped
-            if s.get("section_id") in cg_sections and "列不确定" in (s.get("reason") or "")
+            if s.get("section_id") in cg_sections
+            and "列不确定" in (s.get("reason") or "")
         ]
         assert skipped_for_col == [], (
             f"有 _column_groups 的表不应因'列不确定'被跳过: {skipped_for_col}"

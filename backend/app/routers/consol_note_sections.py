@@ -181,6 +181,7 @@ async def get_all_sections(standard: str):
             "title": sec["title"],
             "seq": sec["seq"],
             "parent_seq": sec.get("parent_seq", 0),
+            "continuation_of": sec.get("continuation_of"),
         })
 
     tree = []
@@ -1114,3 +1115,41 @@ async def aggregate_data(
     if child_errors:
         response["child_errors"] = child_errors
     return response
+
+
+
+# ─── 跨表勾稽校验 ──────────────────────────────────────────────────────────────
+# spec: note-sub-table-formula-and-cross-check Phase 0
+
+
+@router.get("/check-rules/{project_id}/{year}/{section_id}")
+async def get_check_rules(
+    project_id: UUID,
+    year: int,
+    section_id: str,
+    template_type: str = Query("soe", description="soe 或 listed"),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_project_access("readonly")),
+):
+    """返回指定章节的 check_rules 声明 + 执行结果。"""
+    from app.services.note_check_rules import _load_check_rules, check_note_cross_rules
+
+    rules = _load_check_rules(template_type, section_id)
+    if not rules:
+        return {"section_id": section_id, "template_type": template_type, "rules": [], "results": []}
+
+    results = await check_note_cross_rules(db, project_id, year, section_id, template_type)
+    return {
+        "section_id": section_id,
+        "template_type": template_type,
+        "rules": [
+            {
+                "check_id": r.check_id,
+                "peer_section_id": r.peer_section_id,
+                "relation": r.relation,
+                "description": r.description,
+            }
+            for r in rules
+        ],
+        "results": [r.to_dict() for r in results],
+    }
