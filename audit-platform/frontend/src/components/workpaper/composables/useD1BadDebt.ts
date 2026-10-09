@@ -593,29 +593,24 @@ export function useD1BadDebt(options: UseD1BadDebtOptions) {
 
   // ─── 按票据种类小计块（源模板 R23/R24，喂 D1-1 审定表坏账区块）────────────
 
-  /** 新增票据种类行（名称由调用方先 prompt 取得，空名不创建）。 */
-  function addNoteTypeRow(noteType: string): boolean {
-    const name = String(noteType ?? '').trim()
-    if (!name || isReadonly.value) return false
-    noteTypeRows.value = [
-      ...noteTypeRows.value,
-      recalcNoteTypeRow({
-        rowId: `nt-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
-        noteType: name,
-        isFixed: false,
-        priorUnadjusted: 0,
-        priorAje: 0,
-        priorRje: 0,
-        priorAudited: 0,
-        currentUnadjusted: 0,
-        currentAje: 0,
-        currentRje: 0,
-        currentAudited: 0,
-      }),
-    ]
-    scheduleSave()
-    return true
-  }
+  // ═══════════════════════════════════════════════════════════════════════
+  // 🔴 2026-09-28 裁决 A1：`addNoteTypeRow` 已删除（原可无限新增票据种类行）
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // 源模板 `坏账准备明细表D1-4` 的票据种类小计**只有 R23/R24 两行**，紧接 R25 就是
+  // 「三、审计说明」—— 上下零余量（openpyxl 现读实测）。同步层把该区声明为
+  // `static_region`（`phase5_d1_04_bad_debt.SPEC_D104_NOTETYPE`，
+  // first_data_row=23 / last_data_row=24），设计上**绕开位移链**、不会自动插行
+  // ⇒ 新增的第三行在 Excel 侧无处可去，OO 往返时静默丢失。
+  //
+  // 真库实测：该键全库只有 2 个元素（`fixed-bank` / `fixed-commercial`），
+  // 即此入口从未被真正使用过 ⇒ 删除不涉及数据迁移。
+  //
+  // 要支持第三种票据种类（如供应链票据）须先改源模板留行、再把本区改判为动态行区
+  // （涉及框架层 `footer_row > last_data_row` 约束，因为该区在 footer R22 **之下**）。
+  // 详见 `.kiro/specs/d1-sync-row-table-engine-and-d1-coverage/tasks.md` K 节。
+  //
+  // `removeNoteTypeRow` 保留：它只允许删非 `isFixed` 行，用于清理历史遗留自定义行。
 
   function removeNoteTypeRow(rowId: string): void {
     if (isReadonly.value) return
@@ -736,7 +731,7 @@ export function useD1BadDebt(options: UseD1BadDebtOptions) {
     noteTypeRows,
     noteTypeSubtotal,
     noteTypeCheck,
-    addNoteTypeRow,
+    // 🔴 裁决 A1：`addNoteTypeRow` 已删除，不再导出
     removeNoteTypeRow,
     updateNoteTypeCell,
   }

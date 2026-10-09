@@ -2,46 +2,50 @@
  * useKnowledge — 全局知识库调用 composable [R3.7]
  *
  * 提供统一的知识库交互能力：
- * - search(query, category?)：搜索知识库文档
- * - getDocContent(category, docId)：获取文档内容
+ * - search(query, context?)：带权限的知识库全文搜索（文档名 / 正文 / 标签）
+ * - getDocContent(docId)：读取文档正文（预览接口，不可读与不存在同构 404）
  * - pickDocuments()：打开 KnowledgePickerDialog 选择文档
- * - buildContext(selectedDocs)：将选中文档构建为 AI 上下文字符串
  *
  * 用法：
- *   const { search, pickDocuments, buildContext } = useKnowledge()
+ *   const { pickDocuments } = useKnowledge()
  *   const docs = await pickDocuments()
- *   const context = await buildContext(docs)
+ *   // 把 docs.map(d => d.id) 交给后端，由后端逐篇判权后读正文注入 AI（见 useNoteAi）
+ *
+ * 🔴 2026-09-30 修复（spec knowledge-upload-robustness-and-consumer-wiring R6）：
+ * 旧实现调 `/api/knowledge/search` 与 `/api/knowledge/{分类}/{id}` —— 后端**从未有过**这两条路由，
+ * 附注 / 审计报告编辑器的「📚 知识库」恒显示「未找到匹配的文档」（404 被 catch 吞成空列表）。
+ * 旧 `buildContext` 在前端拼正文交给 AI 的做法同时废弃：客户端文本不可信，
+ * 且它依赖的取正文接口同样不存在（实际只把 200 字片段当成了全文）。
  *
  * @module composables/useKnowledge
  * @see R3.7
  */
 import { ref, shallowRef } from 'vue'
 import { api } from '@/services/apiProxy'
-import { knowledge as P_kb } from '@/services/apiPaths'
+import { knowledgeLibrary as P_kl } from '@/services/apiPaths'
 
 // ── 类型定义 ──
 
+/** 知识库搜索结果（`GET /api/knowledge-library/search` 的行） */
 export interface KnowledgeDoc {
   id: string
   name: string
-  category?: string
   folder_id?: string
   folder_name?: string
+  /** 所在文件夹路径（`/根/…/当前`） */
+  folder_path?: string
   file_type?: string
   file_size?: number
   created_at?: string
-  /** 搜索结果中的摘要片段 */
+  /** 命中片段（≤200 字） */
   snippet?: string
-  /** 文档正文内容（getDocContent 后填充） */
-  content?: string
+  score?: number
 }
 
 export interface PickDocumentsOptions {
-  /** 限定分类（可选） */
-  category?: string
   /** 弹窗标题 */
   title?: string
-  /** 最大可选数量，默认 5 */
+  /** 最大可选数量，默认 5（与后端 knowledge_doc_ids 上限一致） */
   maxSelect?: number
 }
 
@@ -90,19 +94,18 @@ export function useKnowledge() {
   const searchResults = ref<KnowledgeDoc[]>([])
 
   /**
-   * 搜索知识库
+   * 搜索知识库（后端按当前用户可读过滤）
    * @param query 搜索关键词
-   * @param category 可选分类过滤
+   * @param context 上下文词（底稿编码 / 科目名），只参与排序加分，不参与召回
    */
-  async function search(query: string, category?: string, context?: string): Promise<KnowledgeDoc[]> {
+  async function search(query: string, context?: string): Promise<KnowledgeDoc[]> {
     if (!query.trim()) return []
     searching.value = true
     try {
-      const params: Record<string, string> = { q: query }
-      if (category) params.category = category
+      const params: Record<string, string> = { q: query.trim() }
       if (context) params.context = context
-      const data = await api.get<any>(P_kb.search, { params })
-      const results: KnowledgeDoc[] = Array.isArray(data) ? data : data?.results || []
+      const data = await api.get<any>(P_kl.search, { params })
+      const results: KnowledgeDoc[] = Array.isArray(data) ? data : []
       searchResults.value = results
       return results
     } catch {
@@ -114,14 +117,13 @@ export function useKnowledge() {
   }
 
   /**
-   * 获取文档内容
-   * @param category 文档分类
+   * 读取文档正文；非文本类（无抽取正文）或不可读时返回空串
    * @param docId 文档 ID
    */
-  async function getDocContent(category: string, docId: string): Promise<string> {
+  async function getDocContent(docId: string): Promise<string> {
     try {
-      const data = await api.get<any>(P_kb.doc(category, docId))
-      return data?.content || data?.text || (typeof data === 'string' ? data : '')
+      const data = await api.get<any>(P_kl.documentPreview(docId), { _silent: true } as any)
+      return data?.preview_type === 'text' ? String(data?.content || '') : ''
     } catch {
       return ''
     }
@@ -140,39 +142,11 @@ export function useKnowledge() {
     }).catch(() => [])
   }
 
-  /**
-   * 将选中的文档构建为 AI 上下文字符串
-   * 格式：每个文档以 --- 分隔，包含标题和内容
-   */
-  async function buildContext(docs: KnowledgeDoc[]): Promise<string> {
-    if (!docs.length) return ''
-
-    const parts: string[] = []
-    for (const doc of docs) {
-      let content = doc.content || ''
-      // 如果文档没有内容，尝试获取
-      if (!content && doc.category && doc.id) {
-        content = await getDocContent(doc.category, doc.id)
-      }
-      // 如果还是没有内容但有 snippet，用 snippet
-      if (!content && doc.snippet) {
-        content = doc.snippet
-      }
-      if (content) {
-        parts.push(`【${doc.name}】\n${content}`)
-      }
-    }
-
-    if (!parts.length) return ''
-    return `--- 知识库参考资料 ---\n${parts.join('\n\n---\n\n')}\n--- 参考资料结束 ---`
-  }
-
   return {
     searching,
     searchResults,
     search,
     getDocContent,
     pickDocuments,
-    buildContext,
   }
 }

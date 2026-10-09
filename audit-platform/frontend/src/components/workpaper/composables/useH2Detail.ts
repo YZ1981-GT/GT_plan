@@ -66,7 +66,13 @@ export interface H2DetailRow {
   transferAmount: number
   /** 其他减少（报废/转让等，非转固） */
   decrease: number
-  /** @deprecated 并入 decrease；读取时兼容累加 */
+  /**
+   * @deprecated 已在 `_normalizeRow` 载入期**一次性并进 `decrease`**，此后恒 0。
+   *
+   * 🔴 不要再往它写值，也不要在任何口径里累加它 —— 「其他减少」的唯一真源是
+   * `decrease`（见 `_otherDecrease`）。字段本身保留（恒 0）并继续落库，只为不破坏
+   * 可能存在的旧读取方；它与模板 `O 其他减少` 的双向回写无关。
+   */
   transferOut: number
   /** 转出累计资本化利息 */
   interestDec: number
@@ -250,9 +256,17 @@ function _str(val: any): string {
   return val == null ? '' : String(val)
 }
 
-/** 其他减少口径：decrease + 旧字段 transferOut */
-function _otherDecrease(row: Pick<H2DetailRow, 'decrease' | 'transferOut'>): number {
-  return _getNum(row.decrease) + _getNum(row.transferOut)
+/**
+ * 其他减少口径 —— **单一字段** `decrease`。
+ *
+ * 🔴 原实现是 `decrease + transferOut`。`transferOut` 已在 `_normalizeRow` 的载入期
+ * 一次性并进 `decrease`（见那里的三条依据），此后恒 0 ⇒ 这里不再累加。
+ *
+ * 保留本函数而不内联，是因为「其他减少」是审计口径名词：模板 `O 其他减少` 与双向回写
+ * 契约都按这个口径取值，留一个命名入口让口径只有一处定义。
+ */
+function _otherDecrease(row: Pick<H2DetailRow, 'decrease'>): number {
+  return _getNum(row.decrease)
 }
 
 function _createEmptyRow(name: string): H2DetailRow {
@@ -451,8 +465,28 @@ function _normalizeRow(raw: any): H2DetailRow {
   row.increaseInterest = _getNum(raw.increaseInterest)
   row.increaseOther = _getNum(raw.increaseOther)
   row.transferAmount = _getNum(raw.transferAmount ?? raw.decreaseTransfer)
-  row.decrease = _getNum(raw.decrease ?? raw.decreaseOther ?? raw.decreaseDisposal)
-  row.transferOut = _getNum(raw.transferOut)
+  // 🔴 载入期把 @deprecated 的 `transferOut` **一次性并进** `decrease`（幂等）。
+  //
+  // 为什么在这里做而不是「读取时累加」：`transferOut` 原本靠 `_otherDecrease()` 在
+  // 每次读取时与 `decrease` 相加，于是「其他减少」这个口径同时存在两个字段 ——
+  // 双向回写时模板只有 `O 其他减少` 一格，投影只能落一个字段，另一个字段的金额会
+  // 静默消失在两侧差额里（H2-GAP-2）。
+  //
+  // 归并的三条依据（不是猜）：
+  //   ① 该字段自带 `@deprecated 并入 decrease`，代码自己已宣布要合并；
+  //   ② 全仓按值 grep：**零 UI 写入点** —— 只在 `_normalizeRow` 读回、`_persist` 原样写出，
+  //      没有任何 v-model / 导入 / 预填会给它赋值；
+  //   ③ 真库现算：`H2-2-rows` **0 行**，且全表 `remark LIKE '%transferOut%'` 只命中
+  //      G1 与 H3 披露两处同名字段（均为 0 / 空串），H2 上下文零数据。
+  //
+  // ⇒ 归并后 `transferOut` 恒 0，`其他减少 == decrease` 单一口径，
+  //   模板 `O` 与 `decrease` 变成 1:1，H2-GAP-2 从根上消失（不是被文档绕开）。
+  //   仍保留字段本身（恒 0）并继续落库，是为了不破坏可能存在的旧读取方；
+  //   若某个环境真有历史非零值，这里会把它**加进** `decrease` 而不是丢掉。
+  row.decrease =
+    _getNum(raw.decrease ?? raw.decreaseOther ?? raw.decreaseDisposal)
+    + _getNum(raw.transferOut)
+  row.transferOut = 0
   row.interestDec = _getNum(raw.interestDec)
 
   row.adjustBegin = _getNum(raw.adjustBegin)
@@ -485,6 +519,21 @@ function _normalizeRow(raw: any): H2DetailRow {
 
   _recalcFormulas(row)
   return row
+}
+
+/**
+ * 纯归一化入口（供判据调用）—— 把 store 里的原始行数组归一成 `H2DetailRow[]`。
+ *
+ * 🔴 导出它的唯一理由是让 **H2-GAP-2 的根治不变量可被单测钉住**：
+ * `transferOut` 载入期并进 `decrease` 且置 0、幂等、期末余额只吃并好的 `decrease`。
+ * 这三件事都发生在 `_normalizeRow` 内，不导出就只能靠构造整个 composable + mock
+ * `allResponses` 去间接验证 —— 那样判据会被 store 读写细节稀释。
+ * 同循环 `useH6Detail` 也以同样方式导出纯函数 `applyH62BalanceFormulas`。
+ *
+ * 本函数**不碰 store、不发请求**，是 `_normalizeRow` 的薄封装。
+ */
+export function normalizeH2DetailRows(raws: readonly unknown[]): H2DetailRow[] {
+  return raws.map((r) => _normalizeRow(r))
 }
 
 function _emptySubtotal(): H2DetailRow {

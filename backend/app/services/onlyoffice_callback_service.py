@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
@@ -96,12 +95,21 @@ class OnlyOfficeCallbackService:
             logger.error("OnlyOffice callback 安全日志写入失败: %s", exc)
 
     async def health_check(self) -> bool:
-        """探测 OnlyOffice /healthcheck"""
+        """探测 OnlyOffice /healthcheck
+
+        🔴 2026-09-22 修复：此前用 `urllib.request.urlopen`（同步阻塞 IO），标了
+        `async def` 却在方法体内真阻塞事件循环最多 `timeout` 秒——调用方
+        `wp_onlyoffice_router.get_onlyoffice_health` 是 D4 每次切换底稿都会打的
+        无鉴权探针（见 `useD4SyncMode.ts` mount 期 `void checkOoHealth()`），一次
+        阻塞会连累同进程内**所有**并发请求（同 batch1 教训：纯 CPU/阻塞 IO 必须
+        offload，否则一人的慢请求拖累所有人的轮询）。改用本文件已有的
+        `httpx.AsyncClient`（真异步，非阻塞），不引入新依赖。
+        """
         base = settings.ONLYOFFICE_URL.rstrip("/")
         try:
-            req = urllib.request.Request(f"{base}/healthcheck", method="GET")
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                return resp.status == 200
+            async with httpx.AsyncClient(timeout=3) as client:
+                resp = await client.get(f"{base}/healthcheck")
+                return resp.status_code == 200
         except Exception as exc:
             logger.debug("OnlyOffice healthcheck 不可用: %s", exc)
             return False

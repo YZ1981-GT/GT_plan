@@ -175,6 +175,7 @@ import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 import { useH7DetailCost } from '../../composables/useH7DetailCost'
+import { trackHPendingWrite } from '../../sync/hPendingWrites'
 
 const props = defineProps<{
   wpId: string
@@ -261,14 +262,23 @@ async function loadOwn() {
   void getNum
 }
 
+/**
+ * 立即写入（本 Tab 是 `per_tab_self_persisting` 载体：无防抖，每次变更直接 PUT）。
+ *
+ * 🔴 `trackHPendingWrite` 是接桥所需：原本 `void persist(...)` 把 promise 丢掉，
+ * 宿主双向桥切「在线编辑」时无从 await 最后一次 PUT —— materialize 可能跑在它前面，
+ * 出来的 xlsx 少掉那次改动且毫无提示。追踪后桥的 `flushHtml` 能等它落地。
+ */
 async function persist(itemId: string, value: any) {
   const remark = value == null ? null : (typeof value === 'string' ? value : JSON.stringify(value))
   localResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark })
   try {
-    await api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion: null, remark }],
-    })
+    await trackHPendingWrite(
+      api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+        project_id: props.projectId,
+        items: [{ item_id: itemId, conclusion: null, remark }],
+      }),
+    )
   } catch { ElMessage.error('保存失败，请稍后重试') }
 }
 

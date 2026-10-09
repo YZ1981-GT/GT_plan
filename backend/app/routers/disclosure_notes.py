@@ -52,6 +52,7 @@ from app.services.note_validation_engine import NoteValidationEngine
 
 logger = logging.getLogger(__name__)
 
+
 router = APIRouter(
     prefix="/api/disclosure-notes",
     tags=["disclosure-notes"],
@@ -507,12 +508,13 @@ async def pull_from_workpapers(
     """附注主动从底稿拉取最新数据（刷新/生成时调用）。
 
     对有底稿映射（registry）的章节：
-    - 已同步过（`_source=workpaper`）：刷新 `_last_sync_at` 标记 + 确保 refill 跳过表格
-    - 从未同步过：标记 `_source=workpaper`（让后续 refill 跳过表格覆盖）并保留现有数据
+    - 表格确由底稿同步过（`table_data._last_sync_wp_id` 存在）：刷新 `_last_sync_at` +
+      确保 refill 跳过表格（底稿是这些章节表格的唯一真源）
+    - 从未同步过：**不改动**，仍由模板取数刷新（计入 `skipped_never_synced`）
 
     如果传 note_section：只处理该章节（单页刷新）；不传：处理全部有映射的章节（全部刷新）。
 
-    返回 { synced: int, skipped: int }
+    返回 { synced: int, skipped: int, skipped_never_synced: int }
     """
     from datetime import datetime, timezone
 
@@ -544,6 +546,7 @@ async def pull_from_workpapers(
     now = datetime.now(timezone.utc)
     synced = 0
     skipped = 0
+    skipped_never_synced = 0
 
     for section in target_sections:
         # 查该章节是否存在
@@ -567,6 +570,18 @@ async def pull_from_workpapers(
         if not isinstance(td, dict):
             td = {}
 
+        # 🔴 只标记「表格内容确实来自底稿同步」的章节。
+        #    判据 = table_data 带同步指纹 `_last_sync_wp_id`（sync_from_workpaper /
+        #    sync_from_html 写表格时必写；仅写列 last_sync_wp_id 的「被人工覆盖拦截」
+        #    路径不改表格，不算）。
+        #    修复前从未同步的章节也被打上 `_source=workpaper` ⇒ 模板刷新（refill /
+        #    update_note_values）从此永久跳过它 —— 而它的数据本来就来自模板取数，
+        #    底稿侧根本没有要保护的内容。本端点在附注生成 / 刷新前**每次**都调，
+        #    且 HEAD 之前一直 500 未生效过，不修则一上线就批量扩大死区。
+        if not td.get("_last_sync_wp_id"):
+            skipped_never_synced += 1
+            continue
+
         td["_source"] = "workpaper"
         td["_last_sync_at"] = now.isoformat()
         note.table_data = td
@@ -576,7 +591,12 @@ async def pull_from_workpapers(
         synced += 1
 
     await db.commit()
-    return {"synced": synced, "skipped": skipped}
+    return {
+        "synced": synced,
+        "skipped": skipped,
+        # 从未由底稿同步过的章节保持原样（仍由模板取数刷新）
+        "skipped_never_synced": skipped_never_synced,
+    }
 
 
 @router.get("/{project_id}/{year}/wp-sync-status")
@@ -856,6 +876,13 @@ async def get_note_detail(
             "get_note_detail: header projection failed section=%s", note_section,
             exc_info=True,
         )
+    # 读时增强 table_data（模板表名回填 + _column_groups + _row_types），不写库。
+    from app.services.note_table_enrichment import enrich_note_table_data
+    enrich_note_table_data(
+        detail.table_data,
+        getattr(detail, "source_template", None),
+        note_section,
+    )
     return detail
 
 

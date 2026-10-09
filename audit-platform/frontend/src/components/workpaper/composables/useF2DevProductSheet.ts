@@ -88,6 +88,11 @@ function emptyNotes(): DevProductNotePack {
   }
 }
 
+/** BP-7 修复：稳定行身份生成器。 */
+function generateF2RowId(): string {
+  return `f2-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+}
+
 function emptyRow(id: string): DevProductRow {
   return {
     id,
@@ -140,7 +145,8 @@ export function normalizeDevProductRow(
   partial: Partial<DevProductRow> & { id?: string },
 ): DevProductRow {
   const migrated = migrateLegacy(partial as Record<string, unknown>)
-  return { ...emptyRow(partial.id || '1'), ...migrated, id: partial.id || '1' }
+  const resolvedId = partial.id || generateF2RowId()
+  return { ...emptyRow(resolvedId), ...migrated, id: resolvedId }
 }
 
 export function enrichRow(r: DevProductRow): DevProductEnriched {
@@ -204,13 +210,13 @@ export function sumDevProductMovement(rows: Array<Partial<DevProductRow> & Recor
 
 function loadRows(map: Map<string, ChecklistResponse>): DevProductRow[] {
   const raw = readRowJson(map.get(ROWS_KEY))
-  if (!raw) return [emptyRow('1')]
+  if (!raw) return [emptyRow(generateF2RowId())]
   try {
     const parsed = JSON.parse(raw) as Partial<DevProductRow>[]
-    if (!Array.isArray(parsed) || !parsed.length) return [emptyRow('1')]
-    return parsed.map((r, i) => normalizeDevProductRow({ ...r, id: r.id || String(i + 1) }))
+    if (!Array.isArray(parsed) || !parsed.length) return [emptyRow(generateF2RowId())]
+    return parsed.map((r) => normalizeDevProductRow({ ...r, id: r.id || generateF2RowId() }))
   } catch {
-    return [emptyRow('1')]
+    return [emptyRow(generateF2RowId())]
   }
 }
 

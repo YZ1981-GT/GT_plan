@@ -133,6 +133,29 @@ async def test_wp_formula_crud_roundtrip():
                             )
                             assert del_resp.status_code == 200
 
+                            # 🔴 2026-09-22 补判据：**必须回读确认真的删掉了**。
+                            # 此前这里只断言 `status_code == 200` 就收工，而真实缺陷恰恰是
+                            # 「返回 200 但一行未删」—— router 调
+                            # `wp_formula_service.delete(db, formula_id)` 时漏传
+                            # `project_id`，服务层 ownership 门（Req 10.6：project_id 为
+                            # None 即 return False）直接拒绝，router 又忽略返回值、无条件
+                            # 回 `{"deleted": ...}`。真栈实测：DELETE 200 之后
+                            # GET /formulas 仍返回该条。只看状态码的守卫对此恒绿。
+                            #
+                            # 变异反证：把 delete 调用改回不传 project_id（或去掉
+                            # `if not deleted: 404`），下面两条立刻打红。
+                            after_resp = await client.get(
+                                f"/api/workpapers/{wp_id}/formulas"
+                            )
+                            assert after_resp.status_code == 200
+                            after_items = after_resp.json()["items"]
+                            assert after_items == [], (
+                                f"DELETE 返回 200 但公式仍在列表里（假成功）：{after_items}"
+                            )
+                            assert not any(
+                                i.get("id") == saved_id for i in after_items
+                            ), "被删 id 仍可读回"
+
     await engine.dispose()
 
 

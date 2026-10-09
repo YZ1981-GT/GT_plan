@@ -113,9 +113,24 @@ def _stable_json(payload: Any) -> str:
 
 
 def _read_lines(path: Path) -> list[str]:
+    """Split a spec document into LF-canonical lines.
+
+    🔴 CRLF 归一化不是洁癖，是解析正确性：仓库 ``core.autocrlf=true`` 且 ``.gitattributes``
+    未对 ``*.md`` 强制 ``eol=lf``，故 Windows 工作树里三份 spec 文档是 CRLF。裸
+    ``read_bytes().decode().split("\n")`` 会把 ``\r`` 留在每行行尾，于是以字面量收尾的
+    锚点（``_VALIDATES_RE`` 的 ``\\*\\*$``、oracle 表头行的整行相等）全部失配，而以
+    ``.*$`` 收尾的锚点（``_PROP_HEAD_RE``）却把 ``\r`` 吞进 title 照常匹配 —— 这种
+    不对称使「Property 1 明明有 Validates 行」被报成「没有 Validates 行」，把一个
+    **解析缺陷**伪装成**文档缺陷**。
+    行号语义保持与 LF 规范形一致（先归一化再按 ``\n`` 切，不用 ``splitlines()``：后者
+    还会在 ``\x0b``/``\x0c``/``\u2028`` 处断行，导致行号与文档不符）。
+    只归一化**读取侧**；``_document_digests`` 仍摘原始字节，EOL 捕获口径的统一属
+    另案（D-EOL-1），不在此处夹带。
+    """
     if not path.is_file():
         raise CoverageMatrixError(f"missing spec document: {path}")
-    return path.read_bytes().decode("utf-8").split("\n")
+    text = path.read_bytes().decode("utf-8")
+    return text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
 
 
 # --------------------------------------------------------------------------- parsing

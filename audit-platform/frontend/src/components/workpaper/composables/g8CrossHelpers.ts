@@ -184,46 +184,24 @@ export function dispatchG8FairValueUpdated(source = 'G8-4'): void {
   } catch { /* silent */ }
 }
 
-/** 将 G8-4 审定结果回写 G8-2：层次 / 数量 / 单价 / 公允价值合计 / 估值方法 */
+/**
+ * 🔴 **已停用**（C-8，spec `g-cycle-single-region-detail-lanes`）：方向错。
+ *
+ * 原实现把 G8-4 的层次 / 数量 / 单价 / 公允价值合计 / 估值方法回写 G8-2。这五列的
+ * **权威来源就是 G8-4 本表**，而 `明细表G8-2` 按权威模板重构后（23 列 A..W）根本没有
+ * 这五列 —— 回写等于在 G8-2 里造第二个真源。与 G9 的 `pushG9FvToDetail`、G10 的
+ * `pushG10FvToDetail` 同族错误，同批处置。
+ *
+ * 保留导出与签名以免打断调用方（`useG8FairValueTest.pushToDetail`），
+ * **恒返 0 且不写任何 store**。G8-4 → G8-5 的层次同步（`pushG8FvToDesignation`）
+ * 方向是对的，不受影响。
+ */
 export function pushG8FvToDetail(
-  responses: Map<string, ChecklistResponse>,
-  debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void,
-  fvRows: G8FvPushDetailSource[],
+  _responses: Map<string, ChecklistResponse>,
+  _debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void,
+  _fvRows: G8FvPushDetailSource[],
 ): number {
-  const raw = responses.get(G8_DETAIL_KEY)?.remark
-  if (!raw) return 0
-  let details: Record<string, unknown>[]
-  try {
-    details = JSON.parse(raw)
-    if (!Array.isArray(details)) return 0
-  } catch {
-    return 0
-  }
-
-  const byKey = new Map(
-    fvRows
-      .filter((r) => r.investeeName?.trim())
-      .map((r) => [matchG8InvesteeKey(r.investeeName), r]),
-  )
-  let n = 0
-  const next = details.map((d) => {
-    const hit = byKey.get(matchG8InvesteeKey(String(d.investeeName ?? '')))
-    if (!hit) return d
-    n += 1
-    return {
-      ...d,
-      fairValueLevel: hit.fairValueLevel || d.fairValueLevel,
-      valuationMethod: hit.valuationMethod || d.valuationMethod,
-      shareCount: hit.closingAuditedQty,
-      pricePerShare: hit.closingAuditedPrice,
-      fairValueTotal: hit.closingAuditedFV,
-    }
-  })
-  if (n) {
-    debouncedSave(G8_DETAIL_KEY, { remark: JSON.stringify(next) })
-    dispatchG8FairValueUpdated('G8-4→G8-2')
-  }
-  return n
+  return 0
 }
 
 /**

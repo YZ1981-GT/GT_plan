@@ -57,19 +57,24 @@ async def _stream_wp_chat(
 
             ks = KnowledgeIndexService(db)
             search_text = f"{wp_code} {query}"
+            # 传 user：结果按当前用户可读 ∩ 当前项目范围判定（含其本人私有资料）
             hits = await ks.semantic_search(
-                project_id, search_text, scope="knowledge_doc", top_k=5
+                project_id, search_text, scope="knowledge_doc", top_k=5, user=user
             )
             if hits:
                 rag_parts: list[str] = []
                 for hit in hits[:5]:
-                    text = hit.get("content", "")[:1000]  # 500 tokens ≈ 1000 chars
-                    source = hit.get("source_name", "")
+                    text = (hit.get("content") or "")[:1000]  # 500 tokens ≈ 1000 chars
+                    # 检索内核结果的键是 document_name / source_id（旧代码读 source_name / id，
+                    # 引用恒为空名、空 ID —— spec knowledge-base-retrieval-and-authz-closure 5.3）
+                    source = hit.get("document_name") or "知识库文档"
                     rag_parts.append(f"[{source}] {text}")
                     citations.append({
                         "source_type": "knowledge_doc",
-                        "source_id": hit.get("id", ""),
+                        "source_id": hit.get("source_id", ""),
                         "source_name": source,
+                        "folder_path": hit.get("folder_path"),
+                        "chunk_index": hit.get("chunk_index"),
                     })
                 rag_context = "\n\n相关知识库参考：\n" + "\n---\n".join(rag_parts)
         except Exception as e:

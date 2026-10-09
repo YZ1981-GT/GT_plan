@@ -65,6 +65,11 @@ function emptyAging(segments: AgingSegment[]): AgingData {
   return a
 }
 
+/** BP-7 修复：稳定行身份生成器。 */
+function generateF2RowId(): string {
+  return `f2-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+}
+
 function emptyRow(id: string, segments: AgingSegment[]): ContractPerfRow {
   return {
     id,
@@ -112,7 +117,8 @@ export function normalizeContractPerfRow(
   segments: AgingSegment[] = PRESET_SEGMENTS.THREE_YEAR,
 ): ContractPerfRow {
   const migrated = migrateLegacy(partial as Record<string, unknown>, segments)
-  const base = { ...emptyRow(partial.id || '1', segments), ...migrated, id: partial.id || '1' }
+  const resolvedId = partial.id || generateF2RowId()
+  const base = { ...emptyRow(resolvedId, segments), ...migrated, id: resolvedId }
   base.aging = migrateAging(base, segments)
   return base
 }
@@ -148,13 +154,13 @@ export function sumContractPerfMovement(rows: Array<Partial<ContractPerfRow>>) {
 
 function loadRows(map: Map<string, ChecklistResponse>, segments: AgingSegment[]): ContractPerfRow[] {
   const raw = readRowJson(map.get(ROWS_KEY))
-  if (!raw) return [emptyRow('1', segments)]
+  if (!raw) return [emptyRow(generateF2RowId(), segments)]
   try {
     const parsed = JSON.parse(raw) as Partial<ContractPerfRow>[]
-    if (!Array.isArray(parsed) || !parsed.length) return [emptyRow('1', segments)]
-    return parsed.map((r, i) => normalizeContractPerfRow({ ...r, id: r.id || String(i + 1) }, segments))
+    if (!Array.isArray(parsed) || !parsed.length) return [emptyRow(generateF2RowId(), segments)]
+    return parsed.map((r) => normalizeContractPerfRow({ ...r, id: r.id || generateF2RowId() }, segments))
   } catch {
-    return [emptyRow('1', segments)]
+    return [emptyRow(generateF2RowId(), segments)]
   }
 }
 

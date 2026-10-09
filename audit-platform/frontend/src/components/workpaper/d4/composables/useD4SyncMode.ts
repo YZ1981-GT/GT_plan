@@ -25,13 +25,26 @@
  * 形态（`views` 给几个 HTML 视图就有几个），后续可让 interview 组件迁到本 composable。
  */
 import { computed, ref, toRef, type Ref } from 'vue'
-import http from '@/utils/http'
 import {
   useWorkpaperSyncBridge,
   WP_BRIDGE_IN_FLIGHT_STATES,
   type WorkpaperSyncFlushResult,
 } from '../../sync/useWorkpaperSyncBridge'
 import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
+/**
+ * 🔴 健康探针实现已上提到 `sync/onlyOfficeHealth.ts`（全平台单一真源）。
+ *
+ * 搬家原因：留在本文件里时，别的循环要复用就得反向 import `d4/composables/…`，
+ * 实际结果是没人 import、各自再抄一遍（G4/L1/L3 仍有 5 处未走本实现）。提到 `sync/`
+ * 公共层后 H 循环等可平行引用。本文件**继续 re-export 这两个符号**，对外 API 一字未改
+ * （`useD4SyncMode.spec.ts` 仍从这里取它们，模块级缓存也仍是同一份实例）。
+ */
+export {
+  fetchOnlyOfficeHealthy,
+  __resetOoHealthCacheForTests,
+  OO_HEALTH_TTL_MS,
+} from '../../sync/onlyOfficeHealth'
+import { fetchOnlyOfficeHealthy } from '../../sync/onlyOfficeHealth'
 
 /** D4 全部 dedicated sync 底稿共享同一 entry（并入 phase5_d4_revenue_detail）。 */
 export const D4_SYNC_ENTRY_ID = 'xlsx/gt-d4-operating-revenue'
@@ -39,21 +52,6 @@ export const D4_SYNC_ENTRY_ID = 'xlsx/gt-d4-operating-revenue'
 /** 在线编辑视图标签（统一常量，避免各组件字面量漂移）。 */
 export const D4_ONLINE_EDIT_LABEL = '在线编辑'
 
-/**
- * OnlyOffice 健康检查的**唯一正确端点 + 唯一正确字段**。
- *
- * 🔴 单一真源：此前 5 处组件误用 `/api/onlyoffice/health`（404）并读 `status==='healthy'`。
- *    正确端点是 `/api/workpapers/onlyoffice/health`，返回 `{ data: { healthy: boolean } }`。
- *    所有 D4 sync 组件必须经本函数取健康，禁止各自再 http.get 一遍。
- */
-export async function fetchOnlyOfficeHealthy(): Promise<boolean> {
-  try {
-    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    return (res.data?.data?.healthy ?? res.data?.healthy ?? false) as boolean
-  } catch {
-    return false
-  }
-}
 
 export interface UseD4SyncModeOptions {
   /** 本 sheet 的 sync sheet_key（如 `d424-managed`）。 */
@@ -80,11 +78,14 @@ export function useD4SyncMode(options: UseD4SyncModeOptions) {
   const views = options.views.length ? [...options.views] : ['表格视图']
 
   const ooHealthy = ref(false)
-  async function checkOoHealth(): Promise<boolean> {
-    ooHealthy.value = await fetchOnlyOfficeHealthy()
+  /** `forceRefresh`：仅 `switchMode` 竞态兜底传 true——用户已点击，需要绕过缓存确认
+   *  最新状态；mount 期首探（下方 `void checkOoHealth()`）用默认值走缓存，命中即返回。 */
+  async function checkOoHealth(forceRefresh = false): Promise<boolean> {
+    ooHealthy.value = await fetchOnlyOfficeHealthy(forceRefresh)
     return ooHealthy.value
   }
-  // mount 期先探一次（异步；switchMode 内还会兜底 await，见下）。
+  // mount 期先探一次（异步；switchMode 内还会兜底 await，见下）。命中模块级缓存时
+  // 这一步几乎零成本，不再是「切一次底稿打一次请求」。
   void checkOoHealth()
 
   const syncSwitching = ref(false)
@@ -108,6 +109,20 @@ export function useD4SyncMode(options: UseD4SyncModeOptions) {
       || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
   )
 
+  /**
+   * `applied` 在 in-flight 集合里是为了拦离开/刷新（HTML 还没按 result revision 重载）。
+   * 但切回表格视图**正是**完成那次重载的路径（`reloadAfterApplied`）。若 busy 连这项
+   * 一起锁死，用户永远点不回表单 —— 真栈 D4-1 override：operation 已 `applied`、
+   * store 已是新值，分段器「表格视图」却是 `is-disabled`，e2e 卡死到超时。
+   */
+  function isAppliedHtmlReturn(target: string): boolean {
+    return (
+      views.includes(target)
+      && syncBridge.mode.value === 'oo'
+      && String(syncBridge.state.value) === 'applied'
+    )
+  }
+
   const htmlView = ref(views[0])
 
   const editorMode = computed<string>({
@@ -122,19 +137,24 @@ export function useD4SyncMode(options: UseD4SyncModeOptions) {
     [...views, D4_ONLINE_EDIT_LABEL].map(value => ({
       label: value,
       value,
-      disabled: busy.value || (value === D4_ONLINE_EDIT_LABEL && options.isReadonly.value),
+      disabled:
+        (busy.value && !isAppliedHtmlReturn(value))
+        || (value === D4_ONLINE_EDIT_LABEL && options.isReadonly.value),
     })),
   )
 
   async function switchMode(target: string): Promise<void> {
-    if (busy.value) return
+    // applied→HTML 是完成重载的合法出口，不得被 busy 短路（见 isAppliedHtmlReturn）。
+    if (busy.value && !isAppliedHtmlReturn(target)) return
     if (target === D4_ONLINE_EDIT_LABEL) {
       if (options.isReadonly.value) return
       if (syncBridge.mode.value === 'oo') return
       // 🔴 竞态兜底（bug ②）：点击可能早于 mount 期 checkOoHealth() 响应到达，此时
       //    ooHealthy 仍为初始 false。健康未就绪则**当场 await 一次**再判定，OO 真不可用
       //    才 return（fail-visible 由桥/后端给），绝不因「健康还没探到」静默吞掉点击。
-      if (!ooHealthy.value) await checkOoHealth()
+      //    forceRefresh=true：绕过 TTL 缓存直接问最新状态——不能信一个可能刚好过期
+      //    边界的旧值挡住用户这次真实点击。
+      if (!ooHealthy.value) await checkOoHealth(true)
       if (!ooHealthy.value) return
       syncSwitching.value = true
       // 🔴 桥的 switchToOnlyOffice/switchToHtml 失败时会先把错误写进 `syncBridge.lastError`
@@ -152,6 +172,14 @@ export function useD4SyncMode(options: UseD4SyncModeOptions) {
       syncSwitching.value = true
       try {
         if (String(syncBridge.state.value) === 'applied') await syncBridge.reloadAfterApplied()
+        // 🔴 一个字都没改就点「结构化视图」⇒ clean close 直接回表单，**不**发强制保存。
+        //    改这一处之前，这条最常见的路径必然走到：冻结 forcesave → Command Service
+        //    返回码 4（无改动）→ `forcesave_frozen` → 界面一条红字「文档没有检测到改动…」，
+        //    而人还留在 OO 里（真栈实测形态）。那不是错误，是「未改动直接返回」这条路
+        //    以前不存在。
+        //    `dirty` 为真时**不走**这条：桥里 `leaveWithoutSaving()` 会 refuse，
+        //    这里也显式留给下面的 `switchToHtml()` 真保存 —— 绝不静默丢弃编辑。
+        else if (!syncBridge.dirty.value) await syncBridge.leaveWithoutSaving()
         else await syncBridge.switchToHtml()
       } catch { /* 已记入 lastError，见上 switchToOnlyOffice 分支同款说明 */ }
       finally { syncSwitching.value = false }

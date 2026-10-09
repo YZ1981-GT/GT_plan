@@ -21,6 +21,7 @@ import {
   type K6FairValueRow,
   type K6ImpairmentRow,
 } from './k6NoteSectionMap'
+import { newRowIdentity } from './shared/rowIdentity'
 
 /** 带行 id 的减值准备变动行（`id` 只用于表格 track / 编辑定位，不进载荷） */
 export interface K6ImpairmentUiRow extends K6ImpairmentRow {
@@ -73,7 +74,7 @@ function touchKey(variant: K6DisclosureVariant, wpId: string): string {
 
 function normImpairment(raw: any, idx: number): K6ImpairmentUiRow {
   return {
-    id: String(raw?.id || `imp-${idx}`),
+    id: String(raw?.id || newRowIdentity('imp')),
     project: String(raw?.project ?? ''),
     priorAmount: num(raw?.priorAmount),
     increase: num(raw?.increase),
@@ -84,7 +85,7 @@ function normImpairment(raw: any, idx: number): K6ImpairmentUiRow {
 
 function normFairValue(raw: any, idx: number, prefix: string): K6FairValueUiRow {
   return {
-    id: String(raw?.id || `${prefix}-${idx}`),
+    id: String(raw?.id || newRowIdentity(prefix)),
     project: String(raw?.project ?? ''),
     endBook: num(raw?.endBook),
     endFairValue: num(raw?.endFairValue),
@@ -95,7 +96,7 @@ function normFairValue(raw: any, idx: number, prefix: string): K6FairValueUiRow 
 
 function normListedLiability(raw: any, idx: number): K6ListedLiabilityUiRow {
   return {
-    id: String(raw?.id || `liab-${idx}`),
+    id: String(raw?.id || newRowIdentity('liab')),
     project: String(raw?.project ?? ''),
     endAmount: num(raw?.endAmount),
     priorAmount: num(raw?.priorAmount),

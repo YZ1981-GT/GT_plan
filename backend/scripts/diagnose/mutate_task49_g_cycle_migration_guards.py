@@ -55,6 +55,9 @@ WP = f"{FE}/components/workpaper"
 NOTICE_TS = f"{WP}/sync/workpaperEntrySyncNotice.ts"
 NOTICE_VUE = f"{WP}/sync/GtEntrySyncCapabilityNotice.vue"
 REGISTRY_TS = f"{WP}/htmlRendererRegistry.ts"
+#: 🔴 2026-09-27：`htmlRendererRegistry.ts` 已拆分重构（commit 82f58ea44，1465→361 行），
+#: 组件登记移到 `registry/entries/*.ts`。G6-ecl 的登记在 specialized 子模块里。
+SPECIALIZED_ENTRIES_TS = f"{WP}/registry/entries/specialized.ts"
 HOST_G1 = f"{WP}/GtG1TradingFinancialAssets.vue"
 HOST_G14 = f"{WP}/GtG14CreditImpairmentLoss.vue"
 HOST_G6ECL = f"{WP}/GtG6OtherBondInvestmentEcl.vue"
@@ -549,11 +552,14 @@ MUTATIONS: list[Mutation] = [
         tags=("html", "source"),
     ),
     Mutation(
+        # 🔴 2026-09-27 基数 80 → 79（spec `g-cycle-sync-foundation-and-first-canary`
+        #    Task 13 把 `G2-2-detail-rows` 的 5 处重复字面量收敛成 storage contract 单一真源
+        #    ⇒ 它不再计入「多模块重复」，现扫从 80 降到 79）。变异语义不变：把规模数字改小。
         id="M26", side="be", path=SLICE, kind="replace",
-        anchor='    "duplicated_item_id_literals_in_g_cycle": 80,',
+        anchor='    "duplicated_item_id_literals_in_g_cycle": 79,',
         new='    "duplicated_item_id_literals_in_g_cycle": 12,',
         want=f"{_HTML}::test_duplicated_item_id_literal_scale_is_recomputable",
-        why="BP-10 的规模数字改小仍绿 ⇒ 「80 个 item_id 多处重复」这条规模结论不是现扫复算的，"
+        why="BP-10 的规模数字改小仍绿 ⇒ 「79 个 item_id 多处重复」这条规模结论不是现扫复算的，"
             "而是自由文本；收敛进度也就无从判断",
         scope_check=_top_path_is(
             12, "honest_adjudication_summary", "duplicated_item_id_literals_in_g_cycle"
@@ -625,14 +631,18 @@ MUTATIONS: list[Mutation] = [
         tags=("property28", "data"),
     ),
     Mutation(
+        # 🔴 2026-09-27 **方向反转**（spec g-cycle-sync-foundation-and-first-canary Task 5/9）：
+        #    BP-5 已修（5 条错名改成模板真名），原变异「把错的改对，看守卫是否逼作者改 status」
+        #    的 anchor（不带空格的旧值）**已不存在** ⇒ 变异恒失效。
+        #    反转成「把对的改回错的」：现在要锁的是「修复不得被回退」。
         id="M32", side="be", path=G1_LABELS, kind="replace",
-        anchor="  G1A: '交易性金融资产实质性程序表G1A',",
-        new="  G1A: '交易性金融资产实质性程序表G1A ',",
+        anchor="  G1A: '交易性金融资产实质性程序表G1A ',",
+        new="  G1A: '交易性金融资产实质性程序表G1A',",
         want=f"{_P28}::test_bp5_g1_fallback_sheet_labels_point_at_nonexistent_tabs",
-        why="把 BP-5 的 5 条错标签之一修对（补上权威 tab 名尾部那个空格）仍绿 ⇒ BP-5 的双向锁"
-            "只锁了「缺陷存在」，修好后不会逼作者回来改 status，登记会永久停在 "
-            "REGISTERED_NOT_FIXED",
-        scope_check=_text_contains("G1A: '交易性金融资产实质性程序表G1A ',"),
+        why="把已修好的 G1A 兜底标签**去掉尾部那个空格**（回退成 BP-5 的原缺陷）仍绿 ⇒ "
+            "18/18 命中的判据没有真的逐字比对，尾部空格这一半（全 G 循环唯一带空格的 tab）"
+            "会无声回退，而它正是 BP-5 五条里最隐蔽的一条",
+        scope_check=_text_contains("G1A: '交易性金融资产实质性程序表G1A',"),
         tags=("property28", "source", "bp5"),
     ),
     # ═══════════════════════════════════════════════════════════════════════
@@ -776,14 +786,20 @@ MUTATIONS: list[Mutation] = [
         tags=("counters", "data"),
     ),
     Mutation(
+        # 🔴 2026-09-27 反向重指向（spec `g-cycle-sync-foundation-and-first-canary` Task 5/18）。
+        #    原变异是「把 status 从 REGISTERED_NOT_FIXED 谎报成 FIXED」——
+        #    Task 5 已真修 G1 兜底标签表 5 条错名，slice 的 status 已合法地变成 FIXED，
+        #    原 anchor 在文件里不存在了（--check-anchors 实测 MISS）。
+        #    变异方向随之取反：现在谎报的是「其实修了却登记成没修」，
+        #    上游守卫已按修复后形态断言 `status == 'FIXED'`，故仍能打红。
         id="M45", side="be", path=SLICE, kind="replace",
         scope='      "id": "BP-5",', offset=9,
-        anchor='      "status": "REGISTERED_NOT_FIXED",',
-        new='      "status": "FIXED",',
+        anchor='      "status": "FIXED",',
+        new='      "status": "REGISTERED_NOT_FIXED",',
         want=f"{_P28}::test_bp5_g1_fallback_sheet_labels_point_at_nonexistent_tabs",
-        why="把 BP-5 的 status 谎报成已修（G1 兜底标签表其实一条没改）仍绿 ⇒ 阻断项状态与"
-            "源码实况脱钩，「只登记不修」会变成「登记了就算修了」",
-        scope_check=_bp_field("BP-5", "status", "FIXED"),
+        why="把 BP-5 的 status 从已修谎报回未修仍绿 ⇒ 阻断项状态与源码实况脱钩，"
+            "「修好了但登记没跟上」会让下游按错误前提排期（与原方向同一条不变式的另一侧）",
+        scope_check=_bp_field("BP-5", "status", "REGISTERED_NOT_FIXED"),
         tags=("counters", "data"),
     ),
     # ═══════════════════════════════════════════════════════════════════════
@@ -814,14 +830,20 @@ MUTATIONS: list[Mutation] = [
         tags=("deletion", "data", "ac17"),
     ),
     Mutation(
-        id="M48", side="be", path=REGISTRY_TS, kind="replace",
-        anchor="const GtG6OtherBondEcl = defineAsyncComponent(() => import('./GtG6OtherBondInvestmentEcl.vue'))",
-        new="const GtG6OtherBondEcl = defineAsyncComponent(() => import('./GtG6OtherBondEcl.vue'))",
+        # 🔴 2026-09-27 **重指向**（spec g-cycle-sync-foundation-and-first-canary Task 9）：
+        #    `htmlRendererRegistry.ts` 已被拆分重构（commit 82f58ea44，1465→361 行），
+        #    组件登记移到 `registry/entries/*.ts`，原同名别名
+        #    `const GtG6OtherBondEcl = …` **已不存在** ⇒ 旧 anchor 恒失配、变异恒失效。
+        #    改指向现行登记处 `registry/entries/specialized.ts` 的**直接 import**。
+        id="M48", side="be", path=SPECIALIZED_ENTRIES_TS, kind="replace",
+        anchor="    component: defineAsyncComponent(() => import('../../GtG6OtherBondInvestmentEcl.vue')),",
+        new="    component: defineAsyncComponent(() => import('../../GtG6OtherBondEcl.vue')),",
         want=f"{_P70}::test_unreachable_stub_is_registered_and_still_has_zero_inbound_edges",
-        why="把 registry 的别名真的接到旧桩文件上（= 救活旧桩，这才是真入边）仍绿 ⇒ "
-            "AC 1.7 的裁决对象可以在无人察觉时变成活组件；这条同时反证「按模块边判」比"
-            "「按符号名判」强：符号名两侧都在，只有 import 路径变了",
-        scope_check=_text_contains("import('./GtG6OtherBondEcl.vue')"),
+        why="把 registry 的 g6-other-bond-investment-ecl 登记真的接到旧桩文件上"
+            "（= 救活旧桩，这才是真入边）仍绿 ⇒ AC 1.7 的裁决对象可以在无人察觉时变成活组件；"
+            "这条同时反证「按模块边判」比「按符号名判」强：componentType 与变量名都没变，"
+            "只有 import 路径变了",
+        scope_check=_text_contains("import('../../GtG6OtherBondEcl.vue')"),
         tags=("deletion", "source", "ac17"),
     ),
     Mutation(
@@ -945,13 +967,22 @@ MUTATIONS: list[Mutation] = [
         tags=("ac14", "source"),
     ),
     Mutation(
+        # 🔴 2026-09-27 **重指向**（既存漂移，非本轮引入）：
+        #    该常量已从「手工空清单 `= []`」改成**派生值**
+        #    （`WORKPAPER_SYNC_MANIFEST.filter(e => e.capability === 'bidirectional')`），
+        #    旧 anchor 恒失配 ⇒ 变异恒失效、AC 1.4 的真源无自省。
+        #    改成在派生表达式后面**追加**一个没有 adapter 的 entry —— 等价于原变异的语义
+        #    （前端谎报某 entry 已注册），且对派生形态同样有效。
+        #    锚点必须**单行**（工作树 CRLF，跨行锚点必 MISS —— 脚本自带该自检）。
+        #    取 filter 谓词那一行：把它放宽成「全都算已注册」，语义等价于原变异
+        #    （前端把没有 adapter 的 entry 登记成已注册），且一行搞定。
         id="M59", side="be", path=NOTICE_TS, kind="replace",
-        anchor="export const SYNC_ADAPTER_REGISTERED_ENTRY_IDS: readonly string[] = []",
-        new="export const SYNC_ADAPTER_REGISTERED_ENTRY_IDS: readonly string[] = ['xlsx/gt-g1-trading-financial-assets']",
+        anchor="    WORKPAPER_SYNC_MANIFEST.filter((e) => e.capability === 'bidirectional').map(",
+        new="    WORKPAPER_SYNC_MANIFEST.filter((e) => e.capability !== '__never__').map(",
         want=f"{_AC14}::test_registered_entry_ids_agree_with_the_slice",
         why="前端把没有 adapter 的 entry 登记成已注册仍绿 ⇒ 界面会以「已双向」呈现，"
             "正是 AC 1.4 前半句禁止的事；而这份 TS 是 AC 1.4 的单一真源",
-        scope_check=_text_contains("['xlsx/gt-g1-trading-financial-assets']"),
+        scope_check=_text_contains("e.capability !== '__never__'"),
         tags=("ac14", "source"),
     ),
     Mutation(
@@ -1003,6 +1034,14 @@ if __name__ == "__main__":
                 "-p",
                 "no:randomly",
             ],
-            baseline_backend_passed=96,
+            # 🔴 96 → 97（2026-09-27，spec `g-cycle-sync-foundation-and-first-canary`
+            #    Task 18 收口）。来源：交付 canary 契约
+            #    `g2.interest_receivable_detail.json` 后，原「本 slice contract 数 = 0」
+            #    的空分母前提不再成立，按该判据留下的指引把它拆成两条 ——
+            #      · test_slice_contract_delivery_is_exactly_the_declared_set（改写，非新增）
+            #      · test_delivered_slice_contracts_pass_property_20_21_field_level（**新增**）
+            #    ⇒ 净 +1 条。同时 test_registry_delivered_contracts_contain_no_slice_entry
+            #    改名为 ..._match_the_declared_slice_delivery（改写，不计数）。
+            baseline_backend_passed=97,
         )
     )

@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-9",
+  "title": "D4-9 重要客户结构分析 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "列示本期/上期 Top 客户的销售金额及占比，分析客户集中度及其变化，评估收入对少数客户的依赖风险和大客户交易的真实性。",
+      "source_refs": []
+    },
+    {
+      "key": "data_sources",
+      "title": "二、数据来源",
+      "content": "从 D4-2 主营明细或 ERP 客户销售明细按客户汇总。「期间」列填「本期」或「上期」区分两期；客户名称为「本期销售总额」「上期销售总额」的行视为总额行。",
+      "source_refs": []
+    },
+    {
+      "key": "formulas",
+      "title": "三、计算公式",
+      "content": "销售金额占比 = 客户销售金额 / 当期销售总额 × 100%（自动计算，导入忽略）\n销售数量占比 = 客户销售数量 / 当期销售数量合计 × 100%\n上期排名用于对比客户地位变化。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 前10大客户合计占比 >50% 须关注客户集中度风险。\n2. 新增大客户或排名骤升客户：结合 D4-28/D4-29 核查客户真实性。\n3. 客户结构与行业特征背离：关注是否存在虚构客户。\n4. 本表 Top 客户是 D4-10 客户价格分析的选样依据。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "66bce62a28c07fd98d0ee2d5d57ed758891d814e8f86d687c6c0949da0e248c6",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "29089638de9f588d6775c733bb002375dc7839936d496a8b7ce8812ed5d46aed"
+  }
+}

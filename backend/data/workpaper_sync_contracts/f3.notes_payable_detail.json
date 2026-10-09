@@ -1,0 +1,2102 @@
+{
+  "contract_id": "f3.notes_payable_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "9a22492718716167fbf7ae6016624feeabebd6d520303281a35d92225794ec61",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-f3-notes-payable",
+    "html_store": {
+      "item_ids": [
+        "F3-5-rows",
+        "F3-6-rows",
+        "F3-7-debit-rows",
+        "F3-7-credit-rows",
+        "F3-7-subsequent-rows",
+        "F3-2-rows",
+        "F3-4-rows",
+        "F3-1-adj-seed-rows",
+        "F3-1-adj-slot-rows"
+      ],
+      "note": "F3 应付票据的结构化 Tab 行数据存成 checklist_responses 的 remark JSON 数组，一张 sheet 一条 item。本契约按 stable field + rowId 拆开，禁止把整 JSON 当一个字段。",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "phase5_notes_payable",
+    "reviewed_basis": "openpyxl 逐格实测 F/F3 应付票据.xlsx（12 sheets）+ 前端 useF3*.ts 按值 grep + 真库 checklist_responses 载荷实测（F3-5-rows 675 B / 2 行全带 rowId）"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "逾期票据检查F3-5",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "f35-managed",
+      "tables": [
+        {
+          "anchor": "A5",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "note_type",
+              "header_source_ref": "源xlsx!逾期票据检查F3-5!A6",
+              "header_text": "票据类别",
+              "json_pointer": "/rows/{row_uuid}/noteType",
+              "mode": "editable",
+              "source_ref": "源xlsx!逾期票据检查F3-5!A7",
+              "stable_field_key": "overdue_notes_rows/{row_uuid}/note_type",
+              "store_item_id": "F3-5-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "ticket_no",
+              "header_source_ref": "源xlsx!逾期票据检查F3-5!B6",
+              "header_text": "票据号",
+              "json_pointer": "/rows/{row_uuid}/ticketNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!逾期票据检查F3-5!B7",
+              "stable_field_key": "overdue_notes_rows/{row_uuid}/ticket_no",
+              "store_item_id": "F3-5-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "drawer",
+              "header_source_ref": "源xlsx!逾期票据检查F3-5!C6",
+              "header_text": "出票人",
+              "json_pointer": "/rows/{row_uuid}/drawer",
+              "mode": "editable",
+              "source_ref": "源xlsx!逾期票据检查F3-5!C7",
+              "stable_field_key": "overdue_notes_rows/{row_uuid}/drawer",
+              "store_item_id": "F3-5-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "acceptor",
+              "header_source_ref": "源xlsx!逾期票据检查F3-5!D6",
+              "header_text": "承兑人",
+              "json_pointer": "/rows/{row_uuid}/acceptor",
+              "mode": "editable",
+              "source_ref": "源xlsx!逾期票据检查F3-5!D7",
+              "stable_field_key": "overdue_notes_rows/{row_uuid}/acceptor",
+              "store_item_id": "F3-5-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "payee",
+              "header_source_ref": "源xlsx!逾期票据检查F3-5!E6",
+              "header_text": "收款人",
+              "json_pointer": "/rows/{row_uuid}/payee",
+              "mode": "editable",
+              "source_ref": "源xlsx!逾期票据检查F3-5!E7",
+              "stable_field_key": "overdue_notes_rows/{row_uuid}/payee",
+              "store_item_id": "F3-5-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "issue_date",
+              "header_source_ref": "源xlsx!逾期票据检查F3-5!F6",
+              "header_text": "出票日",
+              "json_pointer": "/rows/{row_uuid}/issueDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!逾期票据检查F3-5!F7",
+              "stable_field_key": "overdue_notes_rows/{row_uuid}/issue_date",
+              "store_item_id": "F3-5-rows",
+              "value_type": "date"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "due_date",
+              "header_source_ref": "源xlsx!逾期票据检查F3-5!G6",
+              "header_text": "到期日",
+              "json_pointer": "/rows/{row_uuid}/dueDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!逾期票据检查F3-5!G7",
+              "stable_field_key": "overdue_notes_rows/{row_uuid}/due_date",
+              "store_item_id": "F3-5-rows",
+              "value_type": "date"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "term_days",
+              "header_source_ref": "源xlsx!逾期票据检查F3-5!H6",
+              "header_text": "期限",
+              "json_pointer": "/rows/{row_uuid}/termDays",
+              "mode": "auto_source",
+              "source_ref": "源xlsx!逾期票据检查F3-5!H7",
+              "stable_field_key": "overdue_notes_rows/{row_uuid}/term_days",
+              "store_item_id": "F3-5-rows",
+              "value_type": "integer"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "face_value",
+              "header_source_ref": "源xlsx!逾期票据检查F3-5!J6",
+              "header_text": "票面金额",
+              "json_pointer": "/rows/{row_uuid}/faceValue",
+              "mode": "editable",
+              "source_ref": "源xlsx!逾期票据检查F3-5!J7",
+              "stable_field_key": "overdue_notes_rows/{row_uuid}/face_value",
+              "store_item_id": "F3-5-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "post_payment_amount",
+              "header_source_ref": "源xlsx!逾期票据检查F3-5!K6",
+              "header_text": "期后支付金额",
+              "json_pointer": "/rows/{row_uuid}/postPaymentAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!逾期票据检查F3-5!K7",
+              "stable_field_key": "overdue_notes_rows/{row_uuid}/post_payment_amount",
+              "store_item_id": "F3-5-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "loan_conditions",
+              "header_source_ref": "源xlsx!逾期票据检查F3-5!L6",
+              "header_text": "借款条件",
+              "json_pointer": "/rows/{row_uuid}/loanConditions",
+              "mode": "editable",
+              "source_ref": "源xlsx!逾期票据检查F3-5!L7",
+              "stable_field_key": "overdue_notes_rows/{row_uuid}/loan_conditions",
+              "store_item_id": "F3-5-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "is_adjusted",
+              "header_source_ref": "源xlsx!逾期票据检查F3-5!M6",
+              "header_text": "是否调整",
+              "json_pointer": "/rows/{row_uuid}/isAdjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!逾期票据检查F3-5!M7",
+              "stable_field_key": "overdue_notes_rows/{row_uuid}/is_adjusted",
+              "store_item_id": "F3-5-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "collateral_name",
+              "header_source_ref": "源xlsx!逾期票据检查F3-5!N6",
+              "header_text": "物品名称",
+              "json_pointer": "/rows/{row_uuid}/collateralName",
+              "mode": "editable",
+              "source_ref": "源xlsx!逾期票据检查F3-5!N7",
+              "stable_field_key": "overdue_notes_rows/{row_uuid}/collateral_name",
+              "store_item_id": "F3-5-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "collateral_amount",
+              "header_source_ref": "源xlsx!逾期票据检查F3-5!O6",
+              "header_text": "金额",
+              "json_pointer": "/rows/{row_uuid}/collateralAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!逾期票据检查F3-5!O7",
+              "stable_field_key": "overdue_notes_rows/{row_uuid}/collateral_amount",
+              "store_item_id": "F3-5-rows",
+              "value_type": "amount"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "overdue_notes_rows",
+          "uuid_col": "P"
+        }
+      ]
+    },
+    {
+      "excel_name": "关联方及交易检查表F3-6",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "f36-managed",
+      "tables": [
+        {
+          "anchor": "A6",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "party_name",
+              "header_source_ref": "源xlsx!关联方及交易检查表F3-6!A6",
+              "header_text": "关联方名称",
+              "json_pointer": "/rows/{row_uuid}/partyName",
+              "mode": "editable",
+              "source_ref": "源xlsx!关联方及交易检查表F3-6!A7",
+              "stable_field_key": "related_party_rows/{row_uuid}/party_name",
+              "store_item_id": "F3-6-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "relationship",
+              "header_source_ref": "源xlsx!关联方及交易检查表F3-6!B6",
+              "header_text": "关联关系",
+              "json_pointer": "/rows/{row_uuid}/relationship",
+              "mode": "editable",
+              "source_ref": "源xlsx!关联方及交易检查表F3-6!B7",
+              "stable_field_key": "related_party_rows/{row_uuid}/relationship",
+              "store_item_id": "F3-6-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "note_type",
+              "header_source_ref": "源xlsx!关联方及交易检查表F3-6!C6",
+              "header_text": "票据类别",
+              "json_pointer": "/rows/{row_uuid}/noteType",
+              "mode": "editable",
+              "source_ref": "源xlsx!关联方及交易检查表F3-6!C7",
+              "stable_field_key": "related_party_rows/{row_uuid}/note_type",
+              "store_item_id": "F3-6-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "opening_balance",
+              "header_source_ref": "源xlsx!关联方及交易检查表F3-6!D6",
+              "header_text": "期初余额",
+              "json_pointer": "/rows/{row_uuid}/openingBalance",
+              "mode": "editable",
+              "source_ref": "源xlsx!关联方及交易检查表F3-6!D7",
+              "stable_field_key": "related_party_rows/{row_uuid}/opening_balance",
+              "store_item_id": "F3-6-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "debit_movement",
+              "header_source_ref": "源xlsx!关联方及交易检查表F3-6!E6",
+              "header_text": "借方发生",
+              "json_pointer": "/rows/{row_uuid}/debitMovement",
+              "mode": "editable",
+              "source_ref": "源xlsx!关联方及交易检查表F3-6!E7",
+              "stable_field_key": "related_party_rows/{row_uuid}/debit_movement",
+              "store_item_id": "F3-6-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "credit_movement",
+              "header_source_ref": "源xlsx!关联方及交易检查表F3-6!F6",
+              "header_text": "贷方发生",
+              "json_pointer": "/rows/{row_uuid}/creditMovement",
+              "mode": "editable",
+              "source_ref": "源xlsx!关联方及交易检查表F3-6!F7",
+              "stable_field_key": "related_party_rows/{row_uuid}/credit_movement",
+              "store_item_id": "F3-6-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging",
+              "header_source_ref": "源xlsx!关联方及交易检查表F3-6!H6",
+              "header_text": "账龄",
+              "json_pointer": "/rows/{row_uuid}/aging",
+              "mode": "editable",
+              "source_ref": "源xlsx!关联方及交易检查表F3-6!H7",
+              "stable_field_key": "related_party_rows/{row_uuid}/aging",
+              "store_item_id": "F3-6-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "pricing_policy",
+              "header_source_ref": "源xlsx!关联方及交易检查表F3-6!I6",
+              "header_text": "定价政策",
+              "json_pointer": "/rows/{row_uuid}/pricingPolicy",
+              "mode": "editable",
+              "source_ref": "源xlsx!关联方及交易检查表F3-6!I7",
+              "stable_field_key": "related_party_rows/{row_uuid}/pricing_policy",
+              "store_item_id": "F3-6-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "transaction_reason",
+              "header_source_ref": "源xlsx!关联方及交易检查表F3-6!J6",
+              "header_text": "发生原因（款项性质）",
+              "json_pointer": "/rows/{row_uuid}/transactionReason",
+              "mode": "editable",
+              "source_ref": "源xlsx!关联方及交易检查表F3-6!J7",
+              "stable_field_key": "related_party_rows/{row_uuid}/transaction_reason",
+              "store_item_id": "F3-6-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "subsequent_payment_amount",
+              "header_source_ref": "源xlsx!关联方及交易检查表F3-6!K6",
+              "header_text": "期后付款金额",
+              "json_pointer": "/rows/{row_uuid}/subsequentPaymentAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!关联方及交易检查表F3-6!K7",
+              "stable_field_key": "related_party_rows/{row_uuid}/subsequent_payment_amount",
+              "store_item_id": "F3-6-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_no",
+              "header_source_ref": "源xlsx!关联方及交易检查表F3-6!L6",
+              "header_text": "索引号",
+              "json_pointer": "/rows/{row_uuid}/indexNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!关联方及交易检查表F3-6!L7",
+              "stable_field_key": "related_party_rows/{row_uuid}/index_no",
+              "store_item_id": "F3-6-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "remark",
+              "header_source_ref": "源xlsx!关联方及交易检查表F3-6!M6",
+              "header_text": "备注",
+              "json_pointer": "/rows/{row_uuid}/remark",
+              "mode": "editable",
+              "source_ref": "源xlsx!关联方及交易检查表F3-6!M7",
+              "stable_field_key": "related_party_rows/{row_uuid}/remark",
+              "store_item_id": "F3-6-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "G7:G12"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "related_party_rows",
+          "uuid_col": "N"
+        }
+      ]
+    },
+    {
+      "excel_name": "应付票据检查表F3-7",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "f37-managed",
+      "tables": [
+        {
+          "anchor": "A15",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_date",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!A16",
+              "header_text": "日期",
+              "json_pointer": "/rows/{row_uuid}/voucherDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!A17",
+              "stable_field_key": "voucher_debit_rows/{row_uuid}/voucher_date",
+              "store_item_id": "F3-7-debit-rows",
+              "value_type": "date"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_no",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!B16",
+              "header_text": "凭证编号",
+              "json_pointer": "/rows/{row_uuid}/voucherNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!B17",
+              "stable_field_key": "voucher_debit_rows/{row_uuid}/voucher_no",
+              "store_item_id": "F3-7-debit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "business_content",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!C16",
+              "header_text": "业务内容",
+              "json_pointer": "/rows/{row_uuid}/businessContent",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!C17",
+              "stable_field_key": "voucher_debit_rows/{row_uuid}/business_content",
+              "store_item_id": "F3-7-debit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "counter_account",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!D16",
+              "header_text": "对方科目",
+              "json_pointer": "/rows/{row_uuid}/counterAccount",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!D17",
+              "stable_field_key": "voucher_debit_rows/{row_uuid}/counter_account",
+              "store_item_id": "F3-7-debit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "detail_account",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!E16",
+              "header_text": "明细科目",
+              "json_pointer": "/rows/{row_uuid}/detailAccount",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!E17",
+              "stable_field_key": "voucher_debit_rows/{row_uuid}/detail_account",
+              "store_item_id": "F3-7-debit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "amount",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!F16",
+              "header_text": "借方金额",
+              "json_pointer": "/rows/{row_uuid}/amount",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!F17",
+              "stable_field_key": "voucher_debit_rows/{row_uuid}/amount",
+              "store_item_id": "F3-7-debit-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "note_type",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!G16",
+              "header_text": "票据类别",
+              "json_pointer": "/rows/{row_uuid}/noteType",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!G17",
+              "stable_field_key": "voucher_debit_rows/{row_uuid}/note_type",
+              "store_item_id": "F3-7-debit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "approval_date_no",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!H16",
+              "header_text": "日期/编号",
+              "json_pointer": "/rows/{row_uuid}/approvalDateNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!H17",
+              "stable_field_key": "voucher_debit_rows/{row_uuid}/approval_date_no",
+              "store_item_id": "F3-7-debit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "approval_proper",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!I16",
+              "header_text": "是否经过恰当审批",
+              "json_pointer": "/rows/{row_uuid}/approvalProper",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!I17",
+              "stable_field_key": "voucher_debit_rows/{row_uuid}/approval_proper",
+              "store_item_id": "F3-7-debit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "bank_receipt_date",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!J16",
+              "header_text": "日期",
+              "json_pointer": "/rows/{row_uuid}/bankReceiptDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!J17",
+              "stable_field_key": "voucher_debit_rows/{row_uuid}/bank_receipt_date",
+              "store_item_id": "F3-7-debit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "bank_payee",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!K16",
+              "header_text": "收款方",
+              "json_pointer": "/rows/{row_uuid}/bankPayee",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!K17",
+              "stable_field_key": "voucher_debit_rows/{row_uuid}/bank_payee",
+              "store_item_id": "F3-7-debit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "bank_amount",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!L16",
+              "header_text": "金额",
+              "json_pointer": "/rows/{row_uuid}/bankAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!L17",
+              "stable_field_key": "voucher_debit_rows/{row_uuid}/bank_amount",
+              "store_item_id": "F3-7-debit-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "other_evidence",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!M16",
+              "header_text": "……",
+              "json_pointer": "/rows/{row_uuid}/otherEvidence",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!M17",
+              "stable_field_key": "voucher_debit_rows/{row_uuid}/other_evidence",
+              "store_item_id": "F3-7-debit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_no",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!N16",
+              "header_text": "索引号",
+              "json_pointer": "/rows/{row_uuid}/indexNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!N17",
+              "stable_field_key": "voucher_debit_rows/{row_uuid}/index_no",
+              "store_item_id": "F3-7-debit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "is_abnormal",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!O16",
+              "header_text": "是否异常",
+              "json_pointer": "/rows/{row_uuid}/isAbnormal",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!O17",
+              "stable_field_key": "voucher_debit_rows/{row_uuid}/is_abnormal",
+              "store_item_id": "F3-7-debit-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "voucher_debit_rows",
+          "uuid_col": "S"
+        },
+        {
+          "anchor": "A39",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_date",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!A40",
+              "header_text": "日期",
+              "json_pointer": "/rows/{row_uuid}/voucherDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!A41",
+              "stable_field_key": "voucher_credit_rows/{row_uuid}/voucher_date",
+              "store_item_id": "F3-7-credit-rows",
+              "value_type": "date"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_no",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!B40",
+              "header_text": "凭证编号",
+              "json_pointer": "/rows/{row_uuid}/voucherNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!B41",
+              "stable_field_key": "voucher_credit_rows/{row_uuid}/voucher_no",
+              "store_item_id": "F3-7-credit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "business_content",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!C40",
+              "header_text": "业务内容",
+              "json_pointer": "/rows/{row_uuid}/businessContent",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!C41",
+              "stable_field_key": "voucher_credit_rows/{row_uuid}/business_content",
+              "store_item_id": "F3-7-credit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "counter_account",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!D40",
+              "header_text": "对方科目",
+              "json_pointer": "/rows/{row_uuid}/counterAccount",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!D41",
+              "stable_field_key": "voucher_credit_rows/{row_uuid}/counter_account",
+              "store_item_id": "F3-7-credit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "detail_account",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!E40",
+              "header_text": "明细科目",
+              "json_pointer": "/rows/{row_uuid}/detailAccount",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!E41",
+              "stable_field_key": "voucher_credit_rows/{row_uuid}/detail_account",
+              "store_item_id": "F3-7-credit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "amount",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!F40",
+              "header_text": "贷方金额",
+              "json_pointer": "/rows/{row_uuid}/amount",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!F41",
+              "stable_field_key": "voucher_credit_rows/{row_uuid}/amount",
+              "store_item_id": "F3-7-credit-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "note_type",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!G40",
+              "header_text": "票据类别",
+              "json_pointer": "/rows/{row_uuid}/noteType",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!G41",
+              "stable_field_key": "voucher_credit_rows/{row_uuid}/note_type",
+              "store_item_id": "F3-7-credit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "receipt_date_no",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!H40",
+              "header_text": "日期/编号",
+              "json_pointer": "/rows/{row_uuid}/receiptDateNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!H41",
+              "stable_field_key": "voucher_credit_rows/{row_uuid}/receipt_date_no",
+              "store_item_id": "F3-7-credit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "receipt_product",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!I40",
+              "header_text": "品名",
+              "json_pointer": "/rows/{row_uuid}/receiptProduct",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!I41",
+              "stable_field_key": "voucher_credit_rows/{row_uuid}/receipt_product",
+              "store_item_id": "F3-7-credit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "receipt_unit",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!J40",
+              "header_text": "单位",
+              "json_pointer": "/rows/{row_uuid}/receiptUnit",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!J41",
+              "stable_field_key": "voucher_credit_rows/{row_uuid}/receipt_unit",
+              "store_item_id": "F3-7-credit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "receipt_qty",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!K40",
+              "header_text": "数量",
+              "json_pointer": "/rows/{row_uuid}/receiptQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!K41",
+              "stable_field_key": "voucher_credit_rows/{row_uuid}/receipt_qty",
+              "store_item_id": "F3-7-credit-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "invoice_date_no",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!L40",
+              "header_text": "日期/编号",
+              "json_pointer": "/rows/{row_uuid}/invoiceDateNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!L41",
+              "stable_field_key": "voucher_credit_rows/{row_uuid}/invoice_date_no",
+              "store_item_id": "F3-7-credit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "invoice_counterparty",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!M40",
+              "header_text": "对手方名称",
+              "json_pointer": "/rows/{row_uuid}/invoiceCounterparty",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!M41",
+              "stable_field_key": "voucher_credit_rows/{row_uuid}/invoice_counterparty",
+              "store_item_id": "F3-7-credit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "invoice_amount",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!N40",
+              "header_text": "金额",
+              "json_pointer": "/rows/{row_uuid}/invoiceAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!N41",
+              "stable_field_key": "voucher_credit_rows/{row_uuid}/invoice_amount",
+              "store_item_id": "F3-7-credit-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "other_evidence",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!O40",
+              "header_text": "……",
+              "json_pointer": "/rows/{row_uuid}/otherEvidence",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!O41",
+              "stable_field_key": "voucher_credit_rows/{row_uuid}/other_evidence",
+              "store_item_id": "F3-7-credit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_no",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!P40",
+              "header_text": "索引号",
+              "json_pointer": "/rows/{row_uuid}/indexNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!P41",
+              "stable_field_key": "voucher_credit_rows/{row_uuid}/index_no",
+              "store_item_id": "F3-7-credit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              },
+              "column_key": "is_abnormal",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!Q40",
+              "header_text": "是否异常",
+              "json_pointer": "/rows/{row_uuid}/isAbnormal",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!Q41",
+              "stable_field_key": "voucher_credit_rows/{row_uuid}/is_abnormal",
+              "store_item_id": "F3-7-credit-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "voucher_credit_rows",
+          "uuid_col": "T"
+        },
+        {
+          "anchor": "A61",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_date",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!A62",
+              "header_text": "日期",
+              "json_pointer": "/rows/{row_uuid}/voucherDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!A63",
+              "stable_field_key": "voucher_subsequent_rows/{row_uuid}/voucher_date",
+              "store_item_id": "F3-7-subsequent-rows",
+              "value_type": "date"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_no",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!B62",
+              "header_text": "凭证编号",
+              "json_pointer": "/rows/{row_uuid}/voucherNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!B63",
+              "stable_field_key": "voucher_subsequent_rows/{row_uuid}/voucher_no",
+              "store_item_id": "F3-7-subsequent-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "business_content",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!C62",
+              "header_text": "业务内容",
+              "json_pointer": "/rows/{row_uuid}/businessContent",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!C63",
+              "stable_field_key": "voucher_subsequent_rows/{row_uuid}/business_content",
+              "store_item_id": "F3-7-subsequent-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "counter_account",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!D62",
+              "header_text": "对方科目",
+              "json_pointer": "/rows/{row_uuid}/counterAccount",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!D63",
+              "stable_field_key": "voucher_subsequent_rows/{row_uuid}/counter_account",
+              "store_item_id": "F3-7-subsequent-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "detail_account",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!E62",
+              "header_text": "明细科目",
+              "json_pointer": "/rows/{row_uuid}/detailAccount",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!E63",
+              "stable_field_key": "voucher_subsequent_rows/{row_uuid}/detail_account",
+              "store_item_id": "F3-7-subsequent-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "amount",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!F62",
+              "header_text": "借方金额",
+              "json_pointer": "/rows/{row_uuid}/amount",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!F63",
+              "stable_field_key": "voucher_subsequent_rows/{row_uuid}/amount",
+              "store_item_id": "F3-7-subsequent-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "note_type",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!G62",
+              "header_text": "票据类别",
+              "json_pointer": "/rows/{row_uuid}/noteType",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!G63",
+              "stable_field_key": "voucher_subsequent_rows/{row_uuid}/note_type",
+              "store_item_id": "F3-7-subsequent-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "approval_date_no",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!H62",
+              "header_text": "日期/编号",
+              "json_pointer": "/rows/{row_uuid}/approvalDateNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!H63",
+              "stable_field_key": "voucher_subsequent_rows/{row_uuid}/approval_date_no",
+              "store_item_id": "F3-7-subsequent-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "approval_proper",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!I62",
+              "header_text": "是否经过恰当审批",
+              "json_pointer": "/rows/{row_uuid}/approvalProper",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!I63",
+              "stable_field_key": "voucher_subsequent_rows/{row_uuid}/approval_proper",
+              "store_item_id": "F3-7-subsequent-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "bank_receipt_date",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!J62",
+              "header_text": "日期",
+              "json_pointer": "/rows/{row_uuid}/bankReceiptDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!J63",
+              "stable_field_key": "voucher_subsequent_rows/{row_uuid}/bank_receipt_date",
+              "store_item_id": "F3-7-subsequent-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "bank_payee",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!K62",
+              "header_text": "收款方",
+              "json_pointer": "/rows/{row_uuid}/bankPayee",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!K63",
+              "stable_field_key": "voucher_subsequent_rows/{row_uuid}/bank_payee",
+              "store_item_id": "F3-7-subsequent-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "bank_amount",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!L62",
+              "header_text": "金额",
+              "json_pointer": "/rows/{row_uuid}/bankAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!L63",
+              "stable_field_key": "voucher_subsequent_rows/{row_uuid}/bank_amount",
+              "store_item_id": "F3-7-subsequent-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "other_evidence",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!M62",
+              "header_text": "……",
+              "json_pointer": "/rows/{row_uuid}/otherEvidence",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!M63",
+              "stable_field_key": "voucher_subsequent_rows/{row_uuid}/other_evidence",
+              "store_item_id": "F3-7-subsequent-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_no",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!N62",
+              "header_text": "索引号",
+              "json_pointer": "/rows/{row_uuid}/indexNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!N63",
+              "stable_field_key": "voucher_subsequent_rows/{row_uuid}/index_no",
+              "store_item_id": "F3-7-subsequent-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "is_abnormal",
+              "header_source_ref": "源xlsx!应付票据检查表F3-7!O62",
+              "header_text": "是否异常",
+              "json_pointer": "/rows/{row_uuid}/isAbnormal",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据检查表F3-7!O63",
+              "stable_field_key": "voucher_subsequent_rows/{row_uuid}/is_abnormal",
+              "store_item_id": "F3-7-subsequent-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "voucher_subsequent_rows",
+          "uuid_col": "U"
+        }
+      ]
+    },
+    {
+      "excel_name": "明细表F3-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "f32-managed",
+      "tables": [
+        {
+          "anchor": "A13",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "ticket_no",
+              "header_source_ref": "源xlsx!明细表F3-2!A14",
+              "header_text": "票据号",
+              "json_pointer": "/rows/{row_uuid}/ticketNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表F3-2!A15",
+              "stable_field_key": "note_detail_rows/{row_uuid}/ticket_no",
+              "store_item_id": "F3-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "note_type",
+              "header_source_ref": "源xlsx!明细表F3-2!B14",
+              "header_text": "票据类别",
+              "json_pointer": "/rows/{row_uuid}/noteType",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表F3-2!B15",
+              "stable_field_key": "note_detail_rows/{row_uuid}/note_type",
+              "store_item_id": "F3-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "related_party_type",
+              "header_source_ref": "源xlsx!明细表F3-2!C14",
+              "header_text": "关联方类型",
+              "json_pointer": "/rows/{row_uuid}/relatedPartyType",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表F3-2!C15",
+              "stable_field_key": "note_detail_rows/{row_uuid}/related_party_type",
+              "store_item_id": "F3-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "drawer",
+              "header_source_ref": "源xlsx!明细表F3-2!D14",
+              "header_text": "出票人",
+              "json_pointer": "/rows/{row_uuid}/drawer",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表F3-2!D15",
+              "stable_field_key": "note_detail_rows/{row_uuid}/drawer",
+              "store_item_id": "F3-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "acceptor",
+              "header_source_ref": "源xlsx!明细表F3-2!E14",
+              "header_text": "承兑人",
+              "json_pointer": "/rows/{row_uuid}/acceptor",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表F3-2!E15",
+              "stable_field_key": "note_detail_rows/{row_uuid}/acceptor",
+              "store_item_id": "F3-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "payee",
+              "header_source_ref": "源xlsx!明细表F3-2!F14",
+              "header_text": "收款人",
+              "json_pointer": "/rows/{row_uuid}/payee",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表F3-2!F15",
+              "stable_field_key": "note_detail_rows/{row_uuid}/payee",
+              "store_item_id": "F3-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "issue_date",
+              "header_source_ref": "源xlsx!明细表F3-2!G14",
+              "header_text": "出票日",
+              "json_pointer": "/rows/{row_uuid}/issueDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表F3-2!G15",
+              "stable_field_key": "note_detail_rows/{row_uuid}/issue_date",
+              "store_item_id": "F3-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "due_date",
+              "header_source_ref": "源xlsx!明细表F3-2!H14",
+              "header_text": "到期日",
+              "json_pointer": "/rows/{row_uuid}/dueDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表F3-2!H15",
+              "stable_field_key": "note_detail_rows/{row_uuid}/due_date",
+              "store_item_id": "F3-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "is_accepted",
+              "header_source_ref": "源xlsx!明细表F3-2!K14",
+              "header_text": "是否承兑",
+              "json_pointer": "/rows/{row_uuid}/isAccepted",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表F3-2!K15",
+              "stable_field_key": "note_detail_rows/{row_uuid}/is_accepted",
+              "store_item_id": "F3-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "opening_balance",
+              "header_source_ref": "源xlsx!明细表F3-2!L14",
+              "header_text": "期初余额",
+              "json_pointer": "/rows/{row_uuid}/openingBalance",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表F3-2!L15",
+              "stable_field_key": "note_detail_rows/{row_uuid}/opening_balance",
+              "store_item_id": "F3-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_issued",
+              "header_source_ref": "源xlsx!明细表F3-2!M14",
+              "header_text": "本期开票",
+              "json_pointer": "/rows/{row_uuid}/currentIssued",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表F3-2!M15",
+              "stable_field_key": "note_detail_rows/{row_uuid}/current_issued",
+              "store_item_id": "F3-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_accepted",
+              "header_source_ref": "源xlsx!明细表F3-2!N14",
+              "header_text": "本期承兑",
+              "json_pointer": "/rows/{row_uuid}/currentAccepted",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表F3-2!N15",
+              "stable_field_key": "note_detail_rows/{row_uuid}/current_accepted",
+              "store_item_id": "F3-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              },
+              "column_key": "aje",
+              "header_source_ref": "源xlsx!明细表F3-2!P14",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/aje",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表F3-2!P15",
+              "stable_field_key": "note_detail_rows/{row_uuid}/aje",
+              "store_item_id": "F3-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              },
+              "column_key": "rje",
+              "header_source_ref": "源xlsx!明细表F3-2!Q14",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/rje",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表F3-2!Q15",
+              "stable_field_key": "note_detail_rows/{row_uuid}/rje",
+              "store_item_id": "F3-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "S",
+                "row_from": "row_identity"
+              },
+              "column_key": "accrued_interest",
+              "header_source_ref": "源xlsx!明细表F3-2!S14",
+              "header_text": "已计利息",
+              "json_pointer": "/rows/{row_uuid}/accruedInterest",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表F3-2!S15",
+              "stable_field_key": "note_detail_rows/{row_uuid}/accrued_interest",
+              "store_item_id": "F3-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "T",
+                "row_from": "row_identity"
+              },
+              "column_key": "is_confirmed",
+              "header_source_ref": "源xlsx!明细表F3-2!T14",
+              "header_text": "是否函证",
+              "json_pointer": "/rows/{row_uuid}/isConfirmed",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表F3-2!T15",
+              "stable_field_key": "note_detail_rows/{row_uuid}/is_confirmed",
+              "store_item_id": "F3-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "V",
+                "row_from": "row_identity"
+              },
+              "column_key": "deposit_amount",
+              "header_source_ref": "源xlsx!明细表F3-2!V14",
+              "header_text": "保证金金额",
+              "json_pointer": "/rows/{row_uuid}/depositAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表F3-2!V15",
+              "stable_field_key": "note_detail_rows/{row_uuid}/deposit_amount",
+              "store_item_id": "F3-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "W",
+                "row_from": "row_identity"
+              },
+              "column_key": "remark",
+              "header_source_ref": "源xlsx!明细表F3-2!W14",
+              "header_text": "备注",
+              "json_pointer": "/rows/{row_uuid}/remark",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表F3-2!W15",
+              "stable_field_key": "note_detail_rows/{row_uuid}/remark",
+              "store_item_id": "F3-2-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合  计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "O15:O30",
+            "R15:R30"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "note_detail_rows",
+          "uuid_col": "X"
+        }
+      ]
+    },
+    {
+      "excel_name": "应付票据（带息）利息测算表F3-4",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "f34-managed",
+      "tables": [
+        {
+          "anchor": "A9",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "note_type",
+              "header_source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!A10",
+              "header_text": "票据类别",
+              "json_pointer": "/rows/{row_uuid}/noteType",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!A11",
+              "stable_field_key": "interest_accrual_rows/{row_uuid}/note_type",
+              "store_item_id": "F3-4-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "note_number",
+              "header_source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!B10",
+              "header_text": "票据号",
+              "json_pointer": "/rows/{row_uuid}/noteNumber",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!B11",
+              "stable_field_key": "interest_accrual_rows/{row_uuid}/note_number",
+              "store_item_id": "F3-4-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "issue_date",
+              "header_source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!C10",
+              "header_text": "出票日",
+              "json_pointer": "/rows/{row_uuid}/issueDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!C11",
+              "stable_field_key": "interest_accrual_rows/{row_uuid}/issue_date",
+              "store_item_id": "F3-4-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "maturity_date",
+              "header_source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!D10",
+              "header_text": "到期日",
+              "json_pointer": "/rows/{row_uuid}/maturityDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!D11",
+              "stable_field_key": "interest_accrual_rows/{row_uuid}/maturity_date",
+              "store_item_id": "F3-4-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "term",
+              "header_source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!E10",
+              "header_text": "期限",
+              "json_pointer": "/rows/{row_uuid}/term",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!E11",
+              "stable_field_key": "interest_accrual_rows/{row_uuid}/term",
+              "store_item_id": "F3-4-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "face_amount",
+              "header_source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!F10",
+              "header_text": "票面金额",
+              "json_pointer": "/rows/{row_uuid}/faceAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!F11",
+              "stable_field_key": "interest_accrual_rows/{row_uuid}/face_amount",
+              "store_item_id": "F3-4-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "interest_rate",
+              "header_source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!G10",
+              "header_text": "票面利率",
+              "json_pointer": "/rows/{row_uuid}/interestRate",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!G11",
+              "stable_field_key": "interest_accrual_rows/{row_uuid}/interest_rate",
+              "store_item_id": "F3-4-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "accrued_interest",
+              "header_source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!H10",
+              "header_text": "应计利息",
+              "json_pointer": "/rows/{row_uuid}/accruedInterest",
+              "mode": "formula",
+              "source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!H11",
+              "stable_field_key": "interest_accrual_rows/{row_uuid}/accrued_interest",
+              "store_item_id": "F3-4-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "book_interest",
+              "header_source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!I10",
+              "header_text": "账面已计利息",
+              "json_pointer": "/rows/{row_uuid}/bookInterest",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!I11",
+              "stable_field_key": "interest_accrual_rows/{row_uuid}/book_interest",
+              "store_item_id": "F3-4-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "diff",
+              "header_source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!J10",
+              "header_text": "差异",
+              "json_pointer": "/rows/{row_uuid}/diff",
+              "mode": "formula",
+              "source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!J11",
+              "stable_field_key": "interest_accrual_rows/{row_uuid}/diff",
+              "store_item_id": "F3-4-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "remark",
+              "header_source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!K10",
+              "header_text": "说明",
+              "json_pointer": "/rows/{row_uuid}/remark",
+              "mode": "editable",
+              "source_ref": "源xlsx!应付票据（带息）利息测算表F3-4!K11",
+              "stable_field_key": "interest_accrual_rows/{row_uuid}/remark",
+              "store_item_id": "F3-4-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合  计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "H11:H31",
+            "J11:J31"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "interest_accrual_rows",
+          "uuid_col": "N"
+        }
+      ]
+    },
+    {
+      "excel_name": "审定表F3-1",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "f31-managed",
+      "tables": [
+        {
+          "anchor": "A5",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!审定表F3-1!B6",
+              "header_text": "期初未审数",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F3-1!B7",
+              "stable_field_key": "adjudication_seed_rows/{row_uuid}/prior_unadjusted",
+              "store_item_id": "F3-1-adj-seed-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!审定表F3-1!C6",
+              "header_text": "期初账项调整",
+              "json_pointer": "/rows/{row_uuid}/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F3-1!C7",
+              "stable_field_key": "adjudication_seed_rows/{row_uuid}/prior_aje",
+              "store_item_id": "F3-1-adj-seed-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_rje",
+              "header_source_ref": "源xlsx!审定表F3-1!D6",
+              "header_text": "期初重分类调整",
+              "json_pointer": "/rows/{row_uuid}/priorRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F3-1!D7",
+              "stable_field_key": "adjudication_seed_rows/{row_uuid}/prior_rje",
+              "store_item_id": "F3-1-adj-seed-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!审定表F3-1!E6",
+              "header_text": "期初审定数",
+              "json_pointer": "/rows/{row_uuid}/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F3-1!E7",
+              "stable_field_key": "adjudication_seed_rows/{row_uuid}/prior_audited",
+              "store_item_id": "F3-1-adj-seed-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_unadjusted",
+              "header_source_ref": "源xlsx!审定表F3-1!F6",
+              "header_text": "期末未审数",
+              "json_pointer": "/rows/{row_uuid}/endUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F3-1!F7",
+              "stable_field_key": "adjudication_seed_rows/{row_uuid}/end_unadjusted",
+              "store_item_id": "F3-1-adj-seed-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_aje",
+              "header_source_ref": "源xlsx!审定表F3-1!G6",
+              "header_text": "期末账项调整",
+              "json_pointer": "/rows/{row_uuid}/endAje",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F3-1!G7",
+              "stable_field_key": "adjudication_seed_rows/{row_uuid}/end_aje",
+              "store_item_id": "F3-1-adj-seed-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_rje",
+              "header_source_ref": "源xlsx!审定表F3-1!H6",
+              "header_text": "期末重分类调整",
+              "json_pointer": "/rows/{row_uuid}/endRje",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F3-1!H7",
+              "stable_field_key": "adjudication_seed_rows/{row_uuid}/end_rje",
+              "store_item_id": "F3-1-adj-seed-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_audited",
+              "header_source_ref": "源xlsx!审定表F3-1!I6",
+              "header_text": "期末审定数",
+              "json_pointer": "/rows/{row_uuid}/endAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F3-1!I7",
+              "stable_field_key": "adjudication_seed_rows/{row_uuid}/end_audited",
+              "store_item_id": "F3-1-adj-seed-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_ref",
+              "header_source_ref": "源xlsx!审定表F3-1!J6",
+              "header_text": "索引",
+              "json_pointer": "/rows/{row_uuid}/indexRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F3-1!J7",
+              "stable_field_key": "adjudication_seed_rows/{row_uuid}/index_ref",
+              "store_item_id": "F3-1-adj-seed-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "B7:B8",
+            "E7:E8",
+            "F7:F8",
+            "G7:G8",
+            "H7:H8",
+            "I7:I8"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowKey",
+            "kind": "field"
+          },
+          "table_key": "adjudication_seed_rows",
+          "uuid_col": "K"
+        },
+        {
+          "anchor": "A5",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "category",
+              "header_source_ref": "源xlsx!审定表F3-1!A6",
+              "header_text": "项目",
+              "json_pointer": "/rows/{row_uuid}/category",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F3-1!A9",
+              "stable_field_key": "adjudication_slot_rows/{row_uuid}/category",
+              "store_item_id": "F3-1-adj-slot-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!审定表F3-1!B6",
+              "header_text": "期初未审数",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F3-1!B9",
+              "stable_field_key": "adjudication_slot_rows/{row_uuid}/prior_unadjusted",
+              "store_item_id": "F3-1-adj-slot-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!审定表F3-1!C6",
+              "header_text": "期初账项调整",
+              "json_pointer": "/rows/{row_uuid}/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F3-1!C9",
+              "stable_field_key": "adjudication_slot_rows/{row_uuid}/prior_aje",
+              "store_item_id": "F3-1-adj-slot-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_rje",
+              "header_source_ref": "源xlsx!审定表F3-1!D6",
+              "header_text": "期初重分类调整",
+              "json_pointer": "/rows/{row_uuid}/priorRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F3-1!D9",
+              "stable_field_key": "adjudication_slot_rows/{row_uuid}/prior_rje",
+              "store_item_id": "F3-1-adj-slot-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!审定表F3-1!E6",
+              "header_text": "期初审定数",
+              "json_pointer": "/rows/{row_uuid}/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F3-1!E9",
+              "stable_field_key": "adjudication_slot_rows/{row_uuid}/prior_audited",
+              "store_item_id": "F3-1-adj-slot-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_unadjusted",
+              "header_source_ref": "源xlsx!审定表F3-1!F6",
+              "header_text": "期末未审数",
+              "json_pointer": "/rows/{row_uuid}/endUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F3-1!F9",
+              "stable_field_key": "adjudication_slot_rows/{row_uuid}/end_unadjusted",
+              "store_item_id": "F3-1-adj-slot-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_aje",
+              "header_source_ref": "源xlsx!审定表F3-1!G6",
+              "header_text": "期末账项调整",
+              "json_pointer": "/rows/{row_uuid}/endAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F3-1!G9",
+              "stable_field_key": "adjudication_slot_rows/{row_uuid}/end_aje",
+              "store_item_id": "F3-1-adj-slot-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_rje",
+              "header_source_ref": "源xlsx!审定表F3-1!H6",
+              "header_text": "期末重分类调整",
+              "json_pointer": "/rows/{row_uuid}/endRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F3-1!H9",
+              "stable_field_key": "adjudication_slot_rows/{row_uuid}/end_rje",
+              "store_item_id": "F3-1-adj-slot-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_audited",
+              "header_source_ref": "源xlsx!审定表F3-1!I6",
+              "header_text": "期末审定数",
+              "json_pointer": "/rows/{row_uuid}/endAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表F3-1!I9",
+              "stable_field_key": "adjudication_slot_rows/{row_uuid}/end_audited",
+              "store_item_id": "F3-1-adj-slot-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_ref",
+              "header_source_ref": "源xlsx!审定表F3-1!J6",
+              "header_text": "索引",
+              "json_pointer": "/rows/{row_uuid}/indexRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表F3-1!J9",
+              "stable_field_key": "adjudication_slot_rows/{row_uuid}/index_ref",
+              "store_item_id": "F3-1-adj-slot-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "E9:E10",
+            "I9:I10"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowKey",
+            "kind": "field"
+          },
+          "table_key": "adjudication_slot_rows",
+          "uuid_col": "L"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "fdff274c6a2bd39361dbfeeb5a1429f283aa33d8516a3a8e305108eb135b79cc",
+    "relative_path": "F/F3 应付票据.xlsx",
+    "template_sha256": "06de707ba4d4f8d91534e872c7d135b9576cc3a012e3877b1f60db59ce6b3a6b"
+  },
+  "template_definition_sha256": "617faffcc916e26b64fda92fe73b9da46c919c788db7d92af68646615de4f704"
+}

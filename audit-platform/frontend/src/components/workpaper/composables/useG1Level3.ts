@@ -10,6 +10,7 @@ import { ref, computed, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { parseNum, calcSubtotal } from './useG1TraFinFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
+import { G1_ITEM_IDS } from './g1StorageContract'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -107,7 +108,7 @@ export const G1_LEVEL3_COLUMNS: Level3Column[] = [
 const DATA_KEY = 'G1-7-rows'
 const CONCLUSION_KEY = 'G1-7-conclusion'
 const FV_DATA_KEY = 'G1-6-rows'
-const DETAIL_DATA_KEY = 'G1-2-rows'
+const DETAIL_DATA_KEY = G1_ITEM_IDS.G1_2_ROWS
 
 export const G1_LEVEL3_FORMULA_HINT =
   '期末 = 期初 + 转入 − 转出 + 公允变动损益 + 投资收益 + 购买 + 发行 − 出售 − 结算'

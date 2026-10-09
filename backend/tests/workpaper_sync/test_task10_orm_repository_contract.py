@@ -244,20 +244,117 @@ def test_operation_has_nullable_unique_application_and_direct_self_fk(
     assert fk_targets["application_id"] == {"working_paper_content_application.id"}
 
 
+#: repository 里**唯一**被允许的 SAVEPOINT 宿主 → 允许的条数。
+#:
+#: 为什么 `begin_nested` 不与 `commit` / `begin` 同罪：SAVEPOINT **不是事务边界** ——
+#: 它无法让任何东西持久化，父事务的 commit/rollback 仍然只归 router（项目铁律保护的
+#: 原子性一点没动）。而在这里它是**正确性必需**：PG 里一条语句报错（23505 唯一键冲突）
+#: 会把**整个**事务置为 aborted，之后任何语句都是 25P02。不套 SAVEPOINT，
+#: `record_or_get_delivery` 的「撞 `delivery_key` → 读回赢家那行」根本读不出来，而且
+#: router 事务里此前所有写入会一起废掉（平台踩过同款：一条 UndefinedColumn 让事务
+#: aborted、后续全 500）。DocServer 对 500 不重投 ⇒ 静默丢件。
+#:
+#: 🔴 这不是「把 `begin_nested` 从黑名单里删掉」（那才是弱化判据）。三件事同时成立：
+#:   * `commit` / `begin` 仍然**一律**打红，一处都不许；
+#:   * `begin_nested` 只在本表登记的函数里允许，出现在别处 ⇒ 打红；
+#:   * 豁免必须**挣来** —— savepoint 必须包在 catch `IntegrityError` 的 try 里，
+#:     即它确实是那条「唯一键冲突 → 读回」的保护，而不是一个没有理由的嵌套事务；
+#:   * 条数被钉死，登记的宿主消失/改名/多出一处 ⇒ 打红（stale 豁免方向）。
+_SAVEPOINT_ALLOWED_HOSTS: dict[str, int] = {
+    "WorkpaperSyncRepository.record_or_get_delivery": 1,
+}
+
+
+def _enclosing_qualname(tree: ast.Module, target: ast.AST) -> str:
+    """target 所在的最内层 def/class 链（`Class.method` 形态）。"""
+    chain: list[str] = []
+
+    def walk(node: ast.AST, stack: list[str]) -> bool:
+        for child in ast.iter_child_nodes(node):
+            new_stack = stack
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                new_stack = [*stack, child.name]
+            if child is target:
+                chain.extend(new_stack)
+                return True
+            if walk(child, new_stack):
+                return True
+        return False
+
+    walk(tree, [])
+    return ".".join(chain)
+
+
+def _handler_names(handler: ast.ExceptHandler) -> list[str]:
+    node = handler.type
+    elts = node.elts if isinstance(node, ast.Tuple) else [node]
+    out: list[str] = []
+    for elt in elts:
+        if isinstance(elt, ast.Name):
+            out.append(elt.id)
+        elif isinstance(elt, ast.Attribute):
+            out.append(elt.attr)
+    return out
+
+
+def _savepoint_is_earned(tree: ast.Module, target: ast.Call) -> bool:
+    """savepoint 必须包在一个 catch `IntegrityError` 的 `try` 里。
+
+    这条把豁免从「名单上有名字」变成「结构上确实是那个必需场景」：把 `except
+    IntegrityError` 删掉（或改成别的异常），豁免当场自失效。
+    """
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Try):
+            continue
+        if not any(inner is target for inner in ast.walk(node)):
+            continue
+        for handler in node.handlers:
+            if "IntegrityError" in _handler_names(handler):
+                return True
+    return False
+
+
 def test_repository_never_commits() -> None:
     """repository 只 flush 不 commit —— AST 判据（真实行为判据在 PG 守卫的 rollback 场景）。
 
     用 AST 而不是 grep：`# commit` 注释、字符串里的 "commit" 不该打红，而
     `await self._session.commit()` 必须打红。
+
+    `begin_nested`（SAVEPOINT）走 :data:`_SAVEPOINT_ALLOWED_HOSTS` 的**登记 + 挣来**
+    双判据，不是无条件放行；理由见该表的注释。
     """
     tree = ast.parse(_REPOSITORY_SRC.read_text(encoding="utf-8"))
     offenders: list[str] = []
+    savepoints: dict[str, list[int]] = {}
     for node in ast.walk(tree):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-            if node.func.attr in ("commit", "begin", "begin_nested"):
-                offenders.append(f"line {node.lineno}: .{node.func.attr}()")
+            attr = node.func.attr
+            if attr in ("commit", "begin"):
+                offenders.append(f"line {node.lineno}: .{attr}()")
+            elif attr == "begin_nested":
+                host = _enclosing_qualname(tree, node) or "<module>"
+                if host not in _SAVEPOINT_ALLOWED_HOSTS:
+                    offenders.append(
+                        f"line {node.lineno}: .begin_nested() 出现在未登记的宿主 {host}"
+                    )
+                elif not _savepoint_is_earned(tree, node):
+                    offenders.append(
+                        f"line {node.lineno}: .begin_nested() 在 {host} 里没有 "
+                        "`except IntegrityError` 兜底 —— 豁免未挣来"
+                    )
+                else:
+                    savepoints.setdefault(host, []).append(node.lineno)
     assert not offenders, (
         "repository 出现事务边界调用（只 flush 不 commit）: " + "; ".join(offenders)
+    )
+    stale = {
+        host: savepoints.get(host, [])
+        for host, expected in _SAVEPOINT_ALLOWED_HOSTS.items()
+        if len(savepoints.get(host, [])) != expected
+    }
+    assert not stale, (
+        f"SAVEPOINT 豁免登记与源码不符（登记 {_SAVEPOINT_ALLOWED_HOSTS}，实测 {stale}）"
+        " —— 宿主被删/改名或多出一处 savepoint，豁免必须随之重判"
     )
     flushes = sum(
         1

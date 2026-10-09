@@ -838,7 +838,8 @@ class TestCrashBeforePublishNoStaleAllow:
 # ═══════════════════════════════════════════════════════════════════════════
 _ARTIFACT = (
     Path(__file__).resolve().parents[3]
-    / ".kiro" / "specs" / "procedure-delegation-visibility-isolation"
+    / ".kiro" / "specs" / "_archive" / "06-engineering-governance"
+    / "procedure-delegation-visibility-isolation"
     / "evidence" / "artifacts" / "task15" / "explain_plans.txt"
 )
 

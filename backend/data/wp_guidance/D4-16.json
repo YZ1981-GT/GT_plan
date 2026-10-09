@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-16",
+  "title": "D4-16 出口收入电子口岸系统核对 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "将出口收入的账面金额与电子口岸结关数据、纳税申报外营收入交叉核对，验证出口收入的真实性与完整性。",
+      "source_refs": []
+    },
+    {
+      "key": "data_sources",
+      "title": "二、数据来源",
+      "content": "账面出口收入取自明细账；口岸结关金额从中国电子口岸系统导出；申报外营收入取自增值税纳税申报表附列资料。三方按期间对应核对。",
+      "source_refs": []
+    },
+    {
+      "key": "formulas",
+      "title": "三、计算公式",
+      "content": "口岸差异 = 账面出口收入 − 口岸结关金额\n申报差异 = 账面出口收入 − 申报外营收入\n差异须逐项查明原因。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 账面 > 口岸/申报：关注是否虚构出口收入。\n2. 差异原因常见于汇率折算、确认时点差异、退运——须有单据支撑。\n3. 结合报关单、提单、收汇水单验证出口业务真实性。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "3274ea62d295810b5c7d113103f7f498322e2e9fe889d0bd465b999d4b88ba0e",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "b41ba4e23ab0de282ffef220f8350d80b23a9a3c1ae1e6736e0299a2be7e3c69"
+  }
+}

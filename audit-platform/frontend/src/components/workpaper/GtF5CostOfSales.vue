@@ -16,19 +16,33 @@
       <div class="f5-cost-of-sales-toolbar">
         <el-segmented
           v-if="isHtmlSheet"
-          :model-value="dualMode.currentMode.value"
+          v-model="renderMode"
           :options="dualMode.modeOptions"
           size="small"
-          @change="dualMode.onModeChange"
+          :disabled="isF5SyncManagedSheet && syncBusy"
         />
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isF5SyncManagedSheet && syncBusy" size="small" type="info">同步中…</el-tag>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-f5-cost-of-sales" />
       </div>
 
-      <!-- 双模式：HTML sheet 切到 OnlyOffice -->
+      <!-- 双模式：HTML sheet 切到在线编辑；受管 sheet 走 WorkpaperSyncEditorHost（真双向） -->
+      <!-- F5-8 canary 真双向路径（spec: f5-sync-coverage-and-first-canary） -->
+      <div
+        v-if="isF5SyncManagedSheet && renderMode === 'onlyoffice'"
+        class="oo-container"
+      >
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+      </div>
+
+      <!-- 非受管 HTML sheet 保留 legacy GtOnlyOfficeSheet（假双向，如实登记） -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
+        v-else-if="isHtmlSheet && renderMode === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -164,6 +178,11 @@ import type { ChecklistResponse } from './composables/useF1FormData'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+// F5-8 canary 真双向（spec: f5-sync-coverage-and-first-canary）
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 const F5TabAdjudication = defineAsyncComponent(() => import('./f5-cost-of-sales/F5TabAdjudication.vue'))
 const F5TabMonthlyDetail = defineAsyncComponent(() => import('./f5-cost-of-sales/F5TabMonthlyDetail.vue'))
 const F5TabOtherCost = defineAsyncComponent(() => import('./f5-cost-of-sales/F5TabOtherCost.vue'))
@@ -241,6 +260,98 @@ const isHtmlSheet = computed(() => {
   const s = currentSheet.value
   return s === 'F5A' || /^F5-\d+$/.test(s)
 })
+
+// ─── F5-8 canary：useWorkpaperSyncBridge 真双向 ───────────────────────────────
+//
+// 🔴 只覆盖 F5-8「重大成本调整事项」（manifest entry 的受管 sheet = f58-managed）。
+// 其余 sheet 仍走 legacy GtOnlyOfficeSheet（假双向），如实登记不假装已接。
+// F5 是单册、一 entry ⇒ 受管 sheet 共用同一 entry_id，具体 sheet 由 flushHtml 回传的
+// sheetKey 告知后端。
+const F5_SYNC_ENTRY_ID = 'xlsx/gt-f5-cost-of-sales'
+/** 受管 sheet 清单：wp sheet code → 契约 sheet_key（与 provider 受管清单一致）。 */
+const F5_SHEET_KEY_BY_CODE: Record<string, string> = {
+  'F5-8': 'f58-managed',
+}
+/**
+ * 当前 sheet 是否走 syncBridge 真双向路径。
+ *
+ * 🔴 必须与 `isHtmlSheet` 取交集：F5 宿主的 OO 切换本来就只对 HTML 专属 sheet 开放
+ * （非 HTML sheet 走底部 v-else 兜底，没有模式开关），受管判定不能绕过该门控。
+ */
+const isF5SyncManagedSheet = computed(
+  () => isHtmlSheet.value && currentSheet.value in F5_SHEET_KEY_BY_CODE,
+)
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const syncEntryId = ref(F5_SYNC_ENTRY_ID)
+const syncSheetKey = computed(() => F5_SHEET_KEY_BY_CODE[currentSheet.value] || 'f58-managed')
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(F5_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    // 🔴 顺序不可换：先 flush 掉 2s debounce 未落库的编辑，再读 store projection，
+    // 否则读到旧快照，切到 OO 侧会用旧值覆盖 HTML 侧刚写的编辑。
+    formData.flushPendingSave()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: F5_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: syncSheetKey.value,
+    }
+  },
+  reloadHtml: async (_minimumRevision: number) => {
+    await formData.loadAll()
+  },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncSwitching = ref(false)
+const syncBusy = computed(() =>
+  syncSwitching.value
+  || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+
+// ─── 受管 sheet 的 4 分支保存协议（照 D3 switchRenderMode）───────────────────
+type F5RenderMode = 'html' | 'onlyoffice'
+
+const renderMode = computed({
+  get: (): F5RenderMode =>
+    isF5SyncManagedSheet.value
+      ? (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html')
+      : dualMode.currentMode.value,
+  set: (v: F5RenderMode) => {
+    if (isF5SyncManagedSheet.value) void switchRenderMode(v)
+    else void dualMode.switchMode(v)
+  },
+})
+
+async function switchRenderMode(target: F5RenderMode): Promise<void> {
+  if (target === renderMode.value) return
+  if (target === 'onlyoffice') {
+    if (!isF5SyncManagedSheet.value) return
+    syncSwitching.value = true
+    try { await syncBridge.switchToOnlyOffice() } catch { /* 桥已记 lastError */ } finally { syncSwitching.value = false }
+    return
+  }
+  if (syncBridge.mode.value !== 'oo') { syncBridge.persistMode('html'); return }
+  syncSwitching.value = true
+  try {
+    if (String(syncBridge.state.value) === 'applied') {
+      await syncBridge.reloadAfterApplied()
+    } else if (syncBridge.mode.value === 'oo' && !syncBridge.dirty.value) {
+      await syncBridge.leaveWithoutSaving()
+    } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
+      await syncEditorHostRef.value.forceSave()
+    } else {
+      syncBridge.persistMode('html')
+    }
+  } catch { /* 保持 OO */ } finally { syncSwitching.value = false }
+}
 
 const dualMode = useF5CosOfDualMode({
   wpId: wpIdRef,
@@ -320,6 +431,8 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .f5-cost-of-sales { padding: 12px; }
+/* F5-8 canary：WorkpaperSyncEditorHost 自身不带高度，容器须给足否则编辑器塌成 0 高 */
+.oo-container { min-height: 600px; height: calc(100vh - 200px); }
 .loading-container { padding: 24px; }
 .f5-cost-of-sales-toolbar { margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
 </style>

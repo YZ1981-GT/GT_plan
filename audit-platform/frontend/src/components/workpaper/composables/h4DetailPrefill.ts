@@ -7,6 +7,7 @@
  * @module h4DetailPrefill
  * Requirements: 1 (H4-2 从 tb_balance 叶子自动种子)
  */
+import { buildHSeedRowIds } from './hSeedRowIdentity'
 
 export interface H4PrefillItem {
   category: string
@@ -46,8 +47,9 @@ export function buildH4DetailSeedRows(
     return null
   }
 
+  const seedRowIds = buildHSeedRowIds(prefill.map((item) => item.accountCode))
   return prefill.map((item, idx) => ({
-    rowId: `seed-${idx}`,
+    rowId: seedRowIds[idx],
     category: item.category || '其他',
     name: item.name || '',
     spec: '',

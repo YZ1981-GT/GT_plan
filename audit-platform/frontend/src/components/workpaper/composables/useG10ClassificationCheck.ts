@@ -25,6 +25,7 @@ import {
   G10_CLASSIFICATION_DRAFT_REVIEWED_EVENT,
 } from './g10ClassificationCross'
 import { commitG10AdjustmentWritebackFromRows } from './g10CrossHelpers'
+import { G10_ITEM_IDS } from './g10StorageContract'
 import {
   buildG10ClassificationProcedureSummary,
   G10A_CLASSIFICATION_MARK_KEY,
@@ -37,7 +38,7 @@ export { G10_YN_OPTIONS, emptyClassificationRow, hasClassificationBasis, classif
 
 const DATA_KEY = 'G10-classification-rows'
 const CONCLUSION_KEY = 'G10-classification-conclusion'
-const DETAIL_KEY = 'G10-detail-rows'
+const DETAIL_KEY = G10_ITEM_IDS.G10_DETAIL_ROWS
 const ADJ_ROWS_KEY = 'G10-aje-rows'
 
 /** 旧版 28 行问卷行特征 */

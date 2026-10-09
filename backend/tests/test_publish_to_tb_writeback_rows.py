@@ -19,6 +19,10 @@ patch 取数/year/event_bus.publish，断言真实端点逻辑而非重实现。
 
 from __future__ import annotations
 
+import hashlib
+import json
+import subprocess
+import sys
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -45,14 +49,28 @@ def _scalar(value):
     return res
 
 
-def _admin_db():
-    """mock db：authorize_wp_edit(admin) 查底稿 → project_id；consol_lock → 未锁。"""
+def _admin_db(*, audited_amounts=None):
+    """mock db：权限/锁查询 + token 的发布前 TB 读取。"""
     db = AsyncMock()
+    audited_amounts = audited_amounts or {}
 
     def _side(stmt, *a, **k):
         sql = str(getattr(stmt, "text", stmt)).lower()
         if "consol_lock" in sql:
             return _scalar(False)
+        if "trial_balance" in sql:
+            rows = []
+            for code, amount in audited_amounts.items():
+                row = MagicMock()
+                row.standard_account_code = code
+                row.audited_amount = amount
+                row.is_deleted = False
+                rows.append(row)
+            result = MagicMock()
+            scalars = MagicMock()
+            scalars.all.return_value = rows
+            result.scalars.return_value = scalars
+            return result
         return _scalar(_PROJECT_ID)
 
     db.execute = AsyncMock(side_effect=_side)
@@ -226,6 +244,128 @@ async def test_writeback_rows_empty_list_falls_back_and_400(_patch_deps):
         await _call(UserRole.admin, {"sheet_name": "审定表K12-1", "writeback_rows": []})
     assert ei.value.status_code == 400
     assert _patch_deps == []
+
+
+@pytest.mark.asyncio
+async def test_auto_token_is_order_independent_and_cross_process_stable(_patch_deps):
+    """自动 token 对行顺序不敏感，并与独立 Python 进程计算结果一致。"""
+    from app.routers.wp_html_save import _build_publish_token
+
+    body_rows = [
+        {"account_code": "6301", "audited_amount": 100.0},
+        {"account_code": "6302", "audited_amount": 200.0},
+    ]
+    target_amounts = {"6301": "10.00", "6302": "20.00"}
+
+    first = await _call(
+        UserRole.admin,
+        {"sheet_name": "审定表K12-1", "writeback_rows": body_rows},
+        db=_admin_db(audited_amounts=target_amounts),
+    )
+    second = await _call(
+        UserRole.admin,
+        {
+            "sheet_name": "审定表K12-1",
+            "writeback_rows": list(reversed(body_rows)),
+        },
+        db=_admin_db(audited_amounts=target_amounts),
+    )
+    assert first.publish_token == second.publish_token
+
+    normalized_rows = [
+        {"account_code": "6301", "audited_amount": "100.00"},
+        {"account_code": "6302", "audited_amount": "200.00"},
+    ]
+    canonical_payload = {
+        "project_id": str(_PROJECT_ID),
+        "year": 2025,
+        "wp_code": "K12-1",
+        "rows": normalized_rows,
+        "target_state": [
+            {"account_code": "6301", "audited_amounts": ["10.00"]},
+            {"account_code": "6302", "audited_amounts": ["20.00"]},
+        ],
+    }
+    canonical = json.dumps(
+        canonical_payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    expected = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:24]
+    script = (
+        "import hashlib,json,sys; "
+        "payload=json.loads(sys.argv[1]); "
+        "canonical=json.dumps(payload,sort_keys=True,separators=(',',':'),ensure_ascii=False); "
+        "print(hashlib.sha256(canonical.encode('utf-8')).hexdigest()[:24])"
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", script, json.dumps(canonical_payload, ensure_ascii=False)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.stdout.strip() == expected
+    assert first.publish_token == expected
+
+
+@pytest.mark.asyncio
+async def test_auto_token_changes_when_target_audited_amount_changes(_patch_deps):
+    """发布前目标行审定值变化后，即使发布内容相同也必须生成新 token。"""
+    body = {
+        "sheet_name": "审定表K12-1",
+        "writeback_rows": [{"account_code": "6301", "audited_amount": 100.0}],
+    }
+    first = await _call(
+        UserRole.admin,
+        body,
+        db=_admin_db(audited_amounts={"6301": "10.00"}),
+    )
+    second = await _call(
+        UserRole.admin,
+        body,
+        db=_admin_db(audited_amounts={"6301": "11.00"}),
+    )
+    assert first.publish_token != second.publish_token
+
+
+@pytest.mark.asyncio
+async def test_explicit_publish_token_is_not_rehashed(_patch_deps):
+    """显式 token 原样透传，不被自动摘要逻辑改写。"""
+    explicit = "caller-token-A-B"
+    response = await _call(
+        UserRole.admin,
+        {
+            "publish_token": explicit,
+            "writeback_rows": [{"account_code": "6301", "audited_amount": 1.0}],
+        },
+        db=_admin_db(audited_amounts={"6301": "10.00"}),
+    )
+    assert response.publish_token == explicit
+    assert _patch_deps[-1].extra["publish_token"] == explicit
+
+
+@pytest.mark.asyncio
+async def test_token_helper_binds_current_target_state():
+    """直接验证 token helper 的目标状态字段确实参与摘要。"""
+    from app.routers.wp_html_save import _build_publish_token
+
+    rows = [{"account_code": "6301", "audited_amount": 100}]
+    first = _build_publish_token(
+        project_id=_PROJECT_ID,
+        year=2025,
+        wp_code="K12-1",
+        rows=rows,
+        current_audited_amounts={"6301": ["10.00"]},
+    )
+    second = _build_publish_token(
+        project_id=_PROJECT_ID,
+        year=2025,
+        wp_code="K12-1",
+        rows=rows,
+        current_audited_amounts={"6301": ["10.01"]},
+    )
+    assert first != second
 
 
 @pytest.mark.asyncio

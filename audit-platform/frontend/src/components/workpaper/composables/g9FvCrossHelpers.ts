@@ -111,48 +111,24 @@ export function selectG9FvDiffTargets(input: G9FvDiffSelectInput): {
   return { targets, skipped, threshold }
 }
 
-/** 回写 G9-2：层次 / 估值方法 / 持有数量 */
+/**
+ * 🔴 **已停用**（spec `g-cycle-single-region-detail-lanes` C-3）。
+ *
+ * 原实现把 `公允价值测试表G9-4` 的「层次 / 估值方法 / 持有数量」回写进 `明细表G9-2` ——
+ * 方向错：这三列的**权威来源就是 G9-4**（第三层次另有 G9-5 调节表），
+ * 而 G9-2 按权威模板重构后（28 列 A..AB）根本没有这三列，回写只会造出第二个真源。
+ *
+ * 需要按层次汇总 G9-2 的金额时走 `g9CrossHelpers.sumG9DetailLevel3Closing`
+ * （已改为「从 G9-4 取 Level3 资产名 → 筛 G9-2 行求和」）。
+ *
+ * 保留导出与签名以免打断调用方，**恒返 0 且不写任何 store**。
+ */
 export function pushG9FvToDetail(
-  responses: Map<string, ChecklistResponse>,
-  debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void,
-  fvRows: G9FvPushDetailSource[],
+  _responses: Map<string, ChecklistResponse>,
+  _debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void,
+  _fvRows: G9FvPushDetailSource[],
 ): number {
-  const raw = responses.get(G9_DETAIL_KEY)?.remark
-  if (!raw) return 0
-  let details: Record<string, unknown>[]
-  try {
-    details = JSON.parse(raw)
-    if (!Array.isArray(details)) return 0
-  } catch {
-    return 0
-  }
-
-  const byKey = new Map(
-    fvRows
-      .filter((r) => r.assetName?.trim())
-      .map((r) => [matchG9AssetKey(r.assetName), r]),
-  )
-  let n = 0
-  const next = details.map((d) => {
-    const hit = byKey.get(matchG9AssetKey(String(d.assetName ?? '')))
-    if (!hit) return d
-    n += 1
-    return {
-      ...d,
-      fairValueLevel: hit.fairValueLevel || d.fairValueLevel,
-      valuationMethod: hit.valuationMethod || d.valuationMethod,
-      holdingQuantity: hit.closingAuditedQty || d.holdingQuantity,
-    }
-  })
-  if (n) {
-    debouncedSave(G9_DETAIL_KEY, { remark: JSON.stringify(next) })
-    try {
-      window.dispatchEvent(new CustomEvent('g9:fair-value-updated', {
-        detail: { source: 'G9-4→G9-2', timestamp: Date.now() },
-      }))
-    } catch { /* silent */ }
-  }
-  return n
+  return 0
 }
 
 /**

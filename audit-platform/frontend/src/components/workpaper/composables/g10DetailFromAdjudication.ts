@@ -105,9 +105,11 @@ export function buildG10DetailRowsFromAdjudication(
     if (!hasAmount(book.opening, book.closing) && !hasAmount(init.opening, init.closing)) continue
 
     filled += 1
+    // 🔴 C-7：`liabilityType` / `isDerivative` / `remark` 已随权威模板重构移除
+    //    （类别走 A 列、细分与来源走 B 列文本与 S 列索引；衍生属性权威源是 G10-8）。
+    //    ⇒ 匹配键从「类型 + 类别」改成「类别 + 名称」，名称是模板 B 列的受管值。
     const matchIdx = next.findIndex(
-      (r) => r.liabilityType === meta.liabilityType
-        && r.liabilityCategory === meta.liabilityCategory
+      (r) => r.liabilityCategory === meta.liabilityCategory
         && (!r.liabilityName.trim() || r.liabilityName === meta.defaultName),
     )
 
@@ -116,14 +118,12 @@ export function buildG10DetailRowsFromAdjudication(
 
     const patch: Partial<G10DetailRow> = {
       liabilityCategory: meta.liabilityCategory,
-      liabilityType: meta.liabilityType,
       liabilityName: meta.defaultName,
-      isDerivative: !!meta.isDerivative,
       openingInitialAmount: init.opening,
       openingFvAccum: fv.opening,
       movementInitialAmount,
       movementFvChange,
-      remark: '由 G10-1 分项带入',
+      issuanceDocIndex: '由 G10-1 分项带入',
     }
 
     if (matchIdx >= 0) {

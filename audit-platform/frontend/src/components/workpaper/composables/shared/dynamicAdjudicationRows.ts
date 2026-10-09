@@ -37,6 +37,19 @@ export interface DynamicAdjRow {
   source: DynamicRowSource
   /** 仅 `source==='tb'` 时有值，供溯源展示 */
   accountCode?: string
+  /**
+   * 派生行（`source==='tb'`）最近一次由上游派生写入 store 的各字段值（选项 b 覆盖状态机的
+   * 第三个量 `snap`，见 spec d4-html-to-oo-store-contract-alignment 裁决 D4）。
+   * `resolveCellState`（Task 13）用 `stored`/`snap`/`derived` 三者判 S1~S4。
+   */
+  derivedSnapshot?: Record<string, number | null>
+  /**
+   * 随行落库的金额值（Task 8 起，仅 `serializeRows(rows, {reader})` 形态写入）——
+   * **平铺在行对象顶层**（如 `currentUnadjusted: 153431246.16`），与后端契约一致：
+   * `build_store_projection_d41` 读的正是 `row.get(store_key)` 顶层键。既有四键形态下不出现。
+   * 用索引签名承载这些动态字段（字段名 = `spec.valueFields`）。
+   */
+  [field: string]: unknown
 }
 
 /** 四表库预填候选（后端 `adjudication_prefill` 的形态） */
@@ -144,15 +157,75 @@ export function nextRowId(
 // ─── 序列化 / 反序列化 ───────────────────────────────────────────────────────
 
 /** 行清单 → 持久化字符串（只落 4 个字段，派生列一律读时推导） */
-export function serializeRows(rows: readonly DynamicAdjRow[]): string {
+/**
+ * 序列化时把 `valueFields` 一并落进行对象所需的读取器。
+ *
+ * 组件传入（共享件不认识 `allResponses`，保持它对存储介质无知）：给定 rowId + field，
+ * 返回该格当前值（`number | null`）。返回 `null`（或 undefined）表示该格无值、不落该键。
+ *
+ * spec: d4-html-to-oo-store-contract-alignment · Task 8 · 裁决 D2/D3
+ */
+export interface SerializeRowsValueReader {
+  /** 读某行某金额字段的当前值。`null`/`undefined` = 该格无值。 */
+  readField(rowId: string, field: string): number | null | undefined
+  /**
+   * 可选：把行的 `derivedSnapshot`（最近一次由派生写入 store 的各字段值）一并落库。
+   * 仅 `source==='tb'` 的派生行需要（选项 b 覆盖状态机的第三个量，见 spec 裁决 D4）。
+   * 返回 `null` 表示该行无快照、不落 `derivedSnapshot` 键。
+   */
+  readDerivedSnapshot?(rowId: string): Record<string, number | null> | null
+}
+
+/**
+ * 行清单 → 持久化字符串。
+ *
+ * **两种调用形态**（Task 8 起）：
+ *
+ * * `serializeRows(rows)` —— **既有行为，逐字节不变**：只落 `{rowId,label,source,accountCode}`
+ *   四键，派生列读时推导。D1/J1 等自带另一套 serialize 的消费方与本形态无关；K2 若不需要
+ *   金额落库也走这条。P10 基线（`dynamicAdjRowsBackcompatBaseline.spec.ts`）冻结这条路径。
+ *
+ * * `serializeRows(rows, { readField, readDerivedSnapshot? })` —— **金额随行落库**（D4-1 选项 b
+ *   的存储载体）：在四键基础上，为 `spec.valueFields` 每个字段追加 `number` 值键（值经
+ *   `readField` 取、`null`/`undefined` 的字段不落键）；`source==='tb'` 且提供了
+ *   `readDerivedSnapshot` 时追加 `derivedSnapshot`。
+ *
+ * 🔴 金额写成 `number`（不是字符串）：per-field item 是纯文本 remark，但行对象里的金额是
+ * 结构化 JSON 值，后端 `merge.normalize_value` 对 amount 接受数字、对 text 拒绝数字。写入前
+ * 用 `Number()` 归一（与 `readNum` 同源口径），非有限值落 `null` 而非 `NaN`/字符串。
+ */
+export function serializeRows(
+  rows: readonly DynamicAdjRow[],
+  options?: { spec?: DynamicRowsSpec; reader?: SerializeRowsValueReader },
+): string {
+  const reader = options?.reader
+  const valueFields = options?.spec?.valueFields ?? []
   return JSON.stringify(
     (rows || []).map((r) => {
-      const out: DynamicAdjRow = {
+      const out: DynamicAdjRow & Record<string, unknown> = {
         rowId: r.rowId,
         label: normalizeLabel(r.label),
         source: r.source,
       }
       if (r.accountCode) out.accountCode = r.accountCode
+      if (reader) {
+        for (const field of valueFields) {
+          const raw = reader.readField(r.rowId, field)
+          if (raw == null) continue
+          const n = Number(raw)
+          if (Number.isFinite(n)) out[field] = n
+        }
+        if (r.source === 'tb' && reader.readDerivedSnapshot) {
+          const snap = reader.readDerivedSnapshot(r.rowId)
+          if (snap && Object.keys(snap).length > 0) {
+            const clean: Record<string, number | null> = {}
+            for (const [k, v] of Object.entries(snap)) {
+              clean[k] = v == null || !Number.isFinite(Number(v)) ? null : Number(v)
+            }
+            out.derivedSnapshot = clean
+          }
+        }
+      }
       return out
     }),
   )
@@ -175,6 +248,8 @@ export function deserializeRows(raw: unknown): DynamicAdjRow[] {
   if (!Array.isArray(parsed)) return []
   const out: DynamicAdjRow[] = []
   const seen = new Set<string>()
+  /** 行对象的**结构性**键（非金额值键）——透传金额时跳过它们。 */
+  const STRUCT_KEYS = new Set(['rowId', 'label', 'source', 'accountCode', 'derivedSnapshot'])
   for (const item of parsed) {
     if (!item || typeof item !== 'object') continue
     const rec = item as Record<string, unknown>
@@ -193,6 +268,22 @@ export function deserializeRows(raw: unknown): DynamicAdjRow[] {
     }
     const code = String(rec.accountCode ?? '').trim()
     if (code) row.accountCode = code
+    // 🔴 透传随行落库的金额值（Task 8 起）：任何非结构键且值为有限数字的字段原样带出，
+    //    供 Task 9 的单源读优先命中。既有四键形态下无这些键，行为不变。
+    for (const [k, v] of Object.entries(rec)) {
+      if (STRUCT_KEYS.has(k)) continue
+      const n = Number(v)
+      if (v != null && Number.isFinite(n)) row[k] = n
+    }
+    // derivedSnapshot（派生行的 snap；只对象形态才带）。
+    const snap = rec.derivedSnapshot
+    if (snap && typeof snap === 'object' && !Array.isArray(snap)) {
+      const clean: Record<string, number | null> = {}
+      for (const [k, v] of Object.entries(snap as Record<string, unknown>)) {
+        clean[k] = v == null || !Number.isFinite(Number(v)) ? null : Number(v)
+      }
+      row.derivedSnapshot = clean
+    }
     out.push(row)
   }
   return out
@@ -221,6 +312,182 @@ export function readNum(
 ): number {
   const n = Number(readRaw(responses, itemId))
   return Number.isFinite(n) ? n : 0
+}
+
+/**
+ * 单源读某行某金额字段：**行对象顶层值优先，缺则回落 per-field item**。
+ *
+ * spec: d4-html-to-oo-store-contract-alignment · Task 9 · 裁决 D3 · Requirement 4.1/4.2
+ *
+ * ═══ 为什么行对象优先（不是 per-field 优先）═══
+ *
+ * Task 8 起 `D4-1-rows` 的行对象可携带金额（选项 b 的存储载体，也是 OO 回写的落点：
+ * `merge_projection_into_d41_rows` 写进行对象）。若反过来 per-field 优先，OO 侧改的值会
+ * 永远被旧 per-field 值盖住（缺陷 A2 的反向翻版）。所以行对象值一旦存在即为权威。
+ *
+ * ═══ 为什么必须有 per-field 回落（不是直接只读行对象）═══
+ *
+ * 既有项目的金额只落在 per-field item `{prefix}-{rowId}-{field}`（行对象里没有金额键）。
+ * 双写迁移期（裁决 D3）行对象值渐次补齐，未补齐的行必须回落 per-field，否则旧项目金额归零
+ * （需求 4.2 的迁移不归零）。回落读用 `readNum`（非数/空 → 0）保持既有语义。
+ *
+ * 判定「行对象是否有该字段值」：顶层键存在且为**有限数字**。写成 `null` 的字段（序列化时
+ * 显式落 null 的极少数场景）视为"无值"、回落 per-field —— 与 serializeRows 的 `raw==null`
+ * 不落键口径对称。
+ */
+export function readRowFieldWithFallback(
+  row: DynamicAdjRow | null | undefined,
+  responses: Map<string, unknown> | null | undefined,
+  spec: DynamicRowsSpec,
+  field: string,
+): number {
+  if (row) {
+    const direct = (row as Record<string, unknown>)[field]
+    if (direct != null) {
+      const n = Number(direct)
+      if (Number.isFinite(n)) return n
+    }
+  }
+  const rid = row?.rowId ?? ''
+  if (!rid) return 0
+  return readNum(responses, rowFieldItemId(spec, rid, field))
+}
+
+// ─── 选项 b 逐格覆盖状态机（Task 13）───────────────────────────────────────────
+
+/** 派生行某格的四态（spec d4-html-to-oo-store-contract-alignment 裁决 D4 / 需求 6.2）。 */
+export type DerivedCellState = 'S1' | 'S2' | 'S3' | 'S4'
+
+/** 金额相等判定的容差（与前端 BALANCE_TOLERANCE / 后端 0.005 同口径）。 */
+export const CELL_VALUE_TOLERANCE = 0.005
+
+function _finiteOrNull(v: number | null | undefined): number | null {
+  if (v == null) return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+/**
+ * 两个量在容差内是否相等。**null 语义**：两者都为 null 视为相等（都"无值"）；
+ * 一方 null 一方有值视为不等（出现/消失也是一种变化）。
+ */
+function _eq(a: number | null, b: number | null): boolean {
+  if (a == null && b == null) return true
+  if (a == null || b == null) return false
+  return Math.abs(a - b) <= CELL_VALUE_TOLERANCE
+}
+
+/**
+ * 派生行某格的四态解析（选项 b 覆盖状态机的**唯一**判定实现）。
+ *
+ * spec: d4-html-to-oo-store-contract-alignment · Task 13 · Requirement 6.1/6.2 · Property 11/12
+ *
+ * 三个量（见裁决 D4）：
+ *   - `stored`  = 行对象/per-field 里该格当前值（可能被 OO 回写改过）；
+ *   - `snap`    = derivedSnapshot 里该字段值（最近一次由派生写入 store 的值）；
+ *   - `derived` = 当前现算派生值（crossSheet computed）。
+ *
+ * | 态 | stored vs snap | snap vs derived | 含义 |
+ * |---|---|---|---|
+ * | S1 | = | = | 纯派生（显示 derived，无标记） |
+ * | S2 | ≠ | = | 人工覆盖、上游未变（显示 stored + 「已人工覆盖」） |
+ * | S3 | = | ≠ | 无覆盖、上游已变（自动跟随，把 stored/snap 推到 derived） |
+ * | S4 | ≠ | ≠ | 覆盖 且 上游已变（双值可见 + 恢复取数） |
+ *
+ * 🔴 覆盖判定基于 `stored vs snap`（**不是** `stored vs derived`）—— 需求 6.1 明令：
+ * 用 `stored ≠ derived` 判覆盖会在上游一变时把**所有**纯派生格误判成人工覆盖。
+ * 本函数以 snap 为"上一次派生的锚点"，故上游变化（snap≠derived）与人工覆盖
+ * （stored≠snap）是两个正交维度，四态穷举封闭、无第五态。
+ */
+export function resolveCellState(
+  stored: number | null | undefined,
+  snap: number | null | undefined,
+  derived: number | null | undefined,
+): DerivedCellState {
+  const s = _finiteOrNull(stored)
+  const p = _finiteOrNull(snap)
+  const d = _finiteOrNull(derived)
+  const overridden = !_eq(s, p) // stored ≠ snap ⇒ 被人工覆盖
+  const upstreamChanged = !_eq(p, d) // snap ≠ derived ⇒ 上游已变
+  if (!overridden && !upstreamChanged) return 'S1'
+  if (overridden && !upstreamChanged) return 'S2'
+  if (!overridden && upstreamChanged) return 'S3'
+  return 'S4'
+}
+
+/**
+ * 某格应当**显示**的值（按四态）：S1/S3 用 derived（跟随上游），S2/S4 用 stored（覆盖值）。
+ *
+ * 注意 S3 显示 derived 是"自动跟随"的**显示侧**语义；把 stored/snap 真正推到 derived 的
+ * **落库**动作由调用方（syncDerivedRowsIntoStore）幂等完成，二者一致。
+ */
+export function displayValueForCellState(
+  state: DerivedCellState,
+  stored: number | null | undefined,
+  derived: number | null | undefined,
+): number {
+  const s = _finiteOrNull(stored)
+  const d = _finiteOrNull(derived)
+  if (state === 'S2' || state === 'S4') return s ?? 0
+  return d ?? 0
+}
+
+/** 逐格（per-cell）派生格四态解析结果 —— 含 `snap === null` 降级。 */
+export interface PerCellDerivedResolution {
+  state: DerivedCellState
+  /** 应显示值（S1/S3 = derived，S2/S4 = stored）。 */
+  display: number
+  stored: number | null
+  snap: number | null
+  derived: number
+}
+
+/**
+ * 逐格派生格四态解析（**带 `snap === null` 降级**）——D5-1 / D6-1 / D7-1 三家审定表共用。
+ *
+ * 🔴🔴 为什么必须有降级、且必须是**共享一份**：
+ *
+ * `snap === null` 表示「该格从未由派生写入过」——迁移前就存过值的格，或同步器还没跑过一轮。
+ * 此时**不能**直接把三个量丢给 `resolveCellState`：
+ *   `resolveCellState(0, null, 100)` ⇒ `overridden = !_eq(0, null) = true` ⇒ **S4**
+ *   ⇒ `displayValueForCellState('S4', 0, 100)` 取 stored ⇒ **上游值 100 被显示成 0**。
+ * 这是 D1 实测踩到的回归（`useD1DisclosureDerived.spec.ts` 的 `endBalance` 期望 140 实得 0，
+ * 见 `d1AdjudicationModel.resolveD1AdjCell` 同段注释）。
+ *
+ * 在 per-cell 形态下还**更严重**：同步器判 S2/S4 后会**跳过写 snap**（为了冻结 snap 让 S4 可达），
+ * 于是 `snap` 永远为 `null` ⇒ 该格永久显示 0 且永久标「已覆盖」，**不可自愈**。
+ *
+ * 降级依据（与 D1 逐字同规则）：按 stored 是否非零二分 ——
+ *   * stored 非零 ⇒ 迁移前就存在手工值 ⇒ 判 **S2**（已覆盖、上游未变），显示 stored
+ *     （这正是「cross_sheet 不再无条件盖掉手工值」要修的那一半）；
+ *   * stored 为零/缺失 ⇒ 无手工录入 ⇒ 判 **S1**（纯派生），显示 derived，与修前行为一致。
+ * 同步器跑过一轮后 snap 不再为 null，四态即完整（含 S3/S4 的「上游已变」维度）。
+ *
+ * 🔴 读侧（rows computed）与写侧（syncDerivedCellsIntoStore）**必须都调本函数**：
+ *    只在读侧降级、写侧用裸 `resolveCellState`，snap 依旧永不落地，降级就成了每次重算的补丁。
+ */
+export function resolvePerCellDerivedState(
+  stored: number | null | undefined,
+  snap: number | null | undefined,
+  derived: number | null | undefined,
+): PerCellDerivedResolution {
+  const s = _finiteOrNull(stored)
+  const p = _finiteOrNull(snap)
+  const d = _finiteOrNull(derived) ?? 0
+
+  if (p === null) {
+    const overridden = s !== null && Math.abs(s) > CELL_VALUE_TOLERANCE
+    return {
+      state: overridden ? 'S2' : 'S1',
+      display: overridden ? (s as number) : d,
+      stored: s,
+      snap: p,
+      derived: d,
+    }
+  }
+
+  const state = resolveCellState(s, p, d)
+  return { state, display: displayValueForCellState(state, s, d), stored: s, snap: p, derived: d }
 }
 
 // ─── 历史固定行迁移 ──────────────────────────────────────────────────────────
@@ -435,4 +702,78 @@ export function resolveInitialRows(
   if (stored.length > 0) return { rows: stored, migrated: false }
   const migrated = migrateLegacyFixedRows(spec, responses)
   return { rows: migrated, migrated: migrated.length > 0 }
+}
+
+// ─── 孤儿 per-row 键扫描 ─────────────────────────────────────────────────────
+
+/**
+ * 孤儿 per-row 键扫描结果。
+ *
+ * 🔴 **为什么分两桶而不是一把删干净**：孤儿键既可能是「行被删掉但字段键没跟着清」
+ * 的残渣（值必为空，删掉零损失），也可能是「行清单被覆盖/迁移出错」导致**真金额
+ * 被孤立**。后者一旦静默删除就是不可逆的数据丢失，必须留给人工确认。
+ */
+export interface OrphanRowKeyScan {
+  /** 孤儿 **且值为空** ⇒ 可安全清理 */
+  prunable: string[]
+  /** 🔴 孤儿 **但有值** ⇒ 不得静默删除，交人工确认 */
+  retainedWithValue: string[]
+}
+
+/** 动态 rowId 形态（与 `nextRowId` 同源：`r-{base36}`） */
+const DYNAMIC_ROW_ID_RX = /^(r-[0-9a-z]+)-(.+)$/
+
+function _isBlank(v: unknown): boolean {
+  if (v === null || v === undefined) return true
+  if (typeof v === 'object') {
+    const remark = (v as { remark?: unknown }).remark
+    return remark === null || remark === undefined || String(remark).trim() === ''
+  }
+  return String(v).trim() === ''
+}
+
+/**
+ * 扫描 `responses` 里 rowId 已不在 `rows` 中的 per-row 键（KC-20 判据的实现）。
+ *
+ * 判据：**per-row 键的 rowId 集合 ⊆ 行清单 rowId 集合**。违反者即孤儿。
+ *
+ * 🔴 **只认可识别的行身份**（动态 `r-{base36}` 或 `spec.legacyRows` 里的固定行 key），
+ * 其余键（如 `{prefix}-audit-note` / `{prefix}-rows`）一律不碰 —— 宁可漏扫，
+ * 不可误伤同前缀的非行键。
+ */
+export function scanOrphanRowKeys(
+  spec: DynamicRowsSpec,
+  rows: readonly DynamicAdjRow[],
+  responses: Map<string, unknown> | null | undefined,
+): OrphanRowKeyScan {
+  const live = new Set((rows || []).map((r) => r.rowId))
+  const legacyKeys = (spec.legacyRows || []).map((r) => r.key)
+  const prefix = `${spec.prefix}-`
+  const rowsKey = rowsItemId(spec)
+  const prunable: string[] = []
+  const retainedWithValue: string[] = []
+
+  for (const key of responses?.keys() ?? []) {
+    if (typeof key !== 'string') continue
+    if (key === rowsKey || !key.startsWith(prefix)) continue
+    const rest = key.slice(prefix.length)
+
+    let rowId: string | null = null
+    const m = DYNAMIC_ROW_ID_RX.exec(rest)
+    if (m) {
+      rowId = m[1]
+    } else {
+      for (const k of legacyKeys) {
+        if (rest.startsWith(`${k}-`) && rest.length > k.length + 1) {
+          rowId = k
+          break
+        }
+      }
+    }
+    if (rowId === null || live.has(rowId)) continue
+
+    if (_isBlank(responses?.get(key))) prunable.push(key)
+    else retainedWithValue.push(key)
+  }
+  return { prunable: prunable.sort(), retainedWithValue: retainedWithValue.sort() }
 }

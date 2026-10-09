@@ -12,12 +12,15 @@
       </div>
 
       <!-- G5-1 D6-2 canary：统一双向路径（descriptor → WorkpaperSyncEditorHost） -->
-      <WorkpaperSyncEditorHost
-        v-if="renderMode === 'onlyoffice' && isD6DetailSheet"
-        ref="syncEditorHostRef"
-        :descriptor="syncOoDescriptor"
-        :bridge="syncBridge"
-      />
+      <!-- 🔴 必须包在带确定高度的容器里，否则 host 的 height:100% 解析成 auto、
+           编辑区被压扁（见 workpaperSyncEditorHostSizing 守卫）。 -->
+      <div v-if="renderMode === 'onlyoffice' && isD6DetailSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+      </div>
 
       <!-- 其余 sheet 的在线编辑仍走 legacy GtOnlyOfficeSheet -->
       <GtOnlyOfficeSheet
@@ -206,6 +209,7 @@ import { useD6FormData } from './composables/useD6FormData'
 import { useD6CrossSheet } from './composables/useD6CrossSheet'
 import { useD6EntryDualMode, type D6RenderMode } from './composables/useD6EntryDualMode'
 import { resolveD6SheetCode } from './composables/useD6SheetRouting'
+import { managedSheetsForEntry } from './sync/workpaperSyncManagedSheets.generated'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
 import { eventBus } from '@/utils/eventBus'
 import GtWpReviewRail from './GtWpReviewRail.vue'
@@ -358,12 +362,25 @@ const ooSheetName = computed(() =>
 // flushHtml 先 flushPendingSave（flush 掉 debounce 未落库的行）再 readStoreProjection。
 // 账龄 FLAT（agePrior1y/ageEnd1y）由服务端 store-projection + phase5_d6 处理。
 const D6_SYNC_ENTRY_ID = 'xlsx/gt-d6-contract-assets'
-const D6_MANAGED_SHEET_KEY = 'd62-managed'
-const isD6DetailSheet = computed(() => currentSheet.value === 'D6-2')
+
+/**
+ * 受管 sheet 集合 —— **从 provider 派生**（Property 15），不再写死单张。
+ * D6 provider 侧受管区是 **7 张**（d61/d62/d63/d65/d66/d68/d69），改造前前端只认 d62。
+ * 🔴 键换算走后端权威 `excelName` + 前端 `resolveD6SheetCode`，不做字符串推演（裁决 G3）。
+ */
+const D6_MANAGED_SHEET_BY_CODE: ReadonlyMap<string, string> = new Map(
+  managedSheetsForEntry(D6_SYNC_ENTRY_ID).map(
+    (s) => [resolveD6SheetCode(s.excelName), s.sheetKey] as const,
+  ),
+)
+const isD6DetailSheet = computed(() => D6_MANAGED_SHEET_BY_CODE.has(currentSheet.value))
 const syncSwitching = ref(false)
 const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
 const syncEntryId = ref(D6_SYNC_ENTRY_ID)
-const syncSheetKey = ref(D6_MANAGED_SHEET_KEY)
+/** 🔴 computed 而非一次性 ref（Property 15）：否则切 sheet 后仍指向 d62-managed。 */
+const syncSheetKey = computed(
+  () => D6_MANAGED_SHEET_BY_CODE.get(currentSheet.value) ?? '',
+)
 const syncBridge = useWorkpaperSyncBridge({
   entryId: syncEntryId,
   wpId: toRef(props, 'wpId'),
@@ -380,7 +397,8 @@ const syncBridge = useWorkpaperSyncBridge({
     return {
       expectedRevision: snap.expectedRevision,
       projection: snap.projection,
-      sheetKey: D6_MANAGED_SHEET_KEY,
+      // 🔴 桥内 `flushed.sheetKey ?? sheetKey()` flushed 优先 ⇒ 必须回传当前 sheet 的键。
+      sheetKey: syncSheetKey.value,
     }
   },
   reloadHtml: async (_minimumRevision: number) => {
@@ -438,6 +456,14 @@ async function switchRenderMode(target: D6RenderMode): Promise<void> {
   try {
     if (String(syncBridge.state.value) === 'applied') {
       await syncBridge.reloadAfterApplied()
+    } else if (syncBridge.mode.value === 'oo' && !syncBridge.dirty.value) {
+      // 🔴 一个字都没改就点「结构化视图」⇒ clean close 直接回表单，**不**发强制保存。
+      // 改这一处之前，这条最常见的路径必然走到：冻结 forcesave → Command Service 返回
+      // 码 4（无改动）→ `forcesave_frozen` → 界面一条红字「文档没有检测到改动…」，而人
+      // 还留在 OO 里（真栈实测形态）。那不是错误，是「未改动直接返回」这条路以前不存在。
+      // `dirty` 为真时**不走**这条（桥里也会 refuse），留给下面的 forceSave 真保存 ——
+      // 绝不静默丢弃编辑。
+      await syncBridge.leaveWithoutSaving()
     } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
       await syncEditorHostRef.value.forceSave()
     } else {
@@ -495,5 +521,16 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+/* 🔴 在线编辑区必须拿到**视口相关的确定高度**：`WorkpaperSyncEditorHost` 根元素是
+   height:100% + flex 列，父级为 auto 高度时编辑区被压扁，OnlyOffice 在页面上只剩一条
+   （2026-09-22 用户真栈实测，D4-2 同款缺陷；本文件由 workpaperSyncEditorHostSizing
+   守卫一并抓出）。数值与 D4 全部子 tab 的 `.oo-container` 逐字同款。 */
+.oo-container {
+  min-height: 600px;
+  height: calc(100vh - 280px);
+  overflow: hidden;
+  border-radius: 8px;
 }
 </style>

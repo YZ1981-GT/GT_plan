@@ -19,6 +19,20 @@
  */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useB22AFormData'
+// BC-53 稳定行身份改造：行数组存储层（含 legacy 自动迁移）
+import { useB22ARowStore } from './useB22ARowStore'
+import {
+  B22A_ROW_FIELDS,
+  makeRowId,
+  migrateLegacyPrefixedRows,
+  parseRows,
+  prefixedLegacyCountItemId,
+  prefixedRowsItemId,
+  prefixScope,
+  resequence,
+  serializeRows,
+  type B22ARow,
+} from './b22aRowIdentity'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -163,13 +177,9 @@ export function generateItemId(
   return `B22A-T${tab}-item-${index}-${field}`
 }
 
-/** Generate count item_id */
-function countItemId(tab: TabNumber, subPanel?: ITSubPanel): string {
-  if (subPanel) {
-    return `B22A-T${tab}-IT-${subPanel}-count`
-  }
-  return `B22A-T${tab}-count`
-}
+// 🔴 BC-53 改造后 count 键不再作为行数真源（行数组长度即行数），原 countItemId()
+//    已无调用方故删除。legacy count 键仅在 useB22ARowStore 迁移路径回读一次
+//    （见 b22aRowIdentity.legacyCountItemId）。
 
 /** Generate score item_id */
 function scoreItemId(tab: TabNumber): string {
@@ -208,6 +218,17 @@ export function useB22AControlMatrix(
 ) {
   const priorYearData = ref<Map<string, ChecklistResponse>>(new Map())
   const itDependency = ref<ITDependency>('中')
+
+  /**
+   * 稳定行身份存储层（BC-53 改造）。
+   *
+   * 🔴 对外 API 仍用 `index`（显示序号），内部解析为 rowId 后落进行数组。
+   *    组件层 2661 行的 `row.index` 调用**零改动**。
+   */
+  const rowStore = useB22ARowStore({
+    allResponses: allResponses as any,
+    saveImmediate: saveImmediate as any,
+  })
   const overallConclusion = ref<ElementScore | null>(null)
 
   /** 文本类字段保存：优先 debounce（若提供），否则退回即时保存 */
@@ -223,70 +244,88 @@ export function useB22AControlMatrix(
     return allResponses.value.get(itemId)
   }
 
+  /**
+   * 行数（BC-53 改造后取自行数组实际长度，不再读 count 键）。
+   *
+   * 🔴 legacy count 键与实际行数可能脱钩（静默丢行，BC-54）；行数组形态下
+   *    长度即行数，不可能不一致。
+   */
   function getCount(tab: TabNumber, subPanel?: ITSubPanel): number {
-    const item = getResponseValue(countItemId(tab, subPanel))
-    const n = parseInt(item?.remark || '0', 10)
-    return isNaN(n) ? 0 : n
+    return rowStore.rowCount(tab, subPanel)
   }
 
-  function buildCheckItem(tab: TabNumber, index: number, subPanel?: ITSubPanel): CheckItem {
-    const pointItem = getResponseValue(generateItemId(tab, index, 'point', subPanel))
-    const descItem = getResponseValue(generateItemId(tab, index, 'desc', subPanel))
-    const methodItem = getResponseValue(generateItemId(tab, index, 'method', subPanel))
-    const conclusionItem = getResponseValue(generateItemId(tab, index, 'conclusion', subPanel))
-    const refItem = getResponseValue(generateItemId(tab, index, 'ref', subPanel))
-    const nochangeItem = getResponseValue(generateItemId(tab, index, 'nochange', subPanel))
-
-    const conclusion = (conclusionItem?.conclusion as Conclusion | null) || null
-    const methods: UnderstandingMethod[] = methodItem?.remark
-      ? (methodItem.remark.split(',').filter(m => UNDERSTANDING_METHODS.includes(m as UnderstandingMethod)) as UnderstandingMethod[])
+  /** 把行对象转成组件层消费的 CheckItem（index = 显示序号）。 */
+  function rowToCheckItem(
+    row: B22ARow,
+    index: number,
+    tab: TabNumber,
+    subPanel?: ITSubPanel,
+  ): CheckItem {
+    const conclusion = (row.conclusion as Conclusion | null) || null
+    const rawMethods = typeof row.method === 'string' ? row.method : ''
+    const methods: UnderstandingMethod[] = rawMethods
+      ? (rawMethods
+          .split(',')
+          .filter((m) =>
+            UNDERSTANDING_METHODS.includes(m as UnderstandingMethod),
+          ) as UnderstandingMethod[])
       : []
 
-    // Prior year conclusion
-    const priorItemId = generateItemId(tab, index, 'conclusion', subPanel)
-    const priorItem = priorYearData.value.get(priorItemId)
-    const priorYearConclusion = (priorItem?.conclusion as Conclusion | null) || null
+    // 上年结论仍按 legacy 键读（上年数据是历史快照，不迁移）
+    const priorItem = priorYearData.value.get(
+      generateItemId(tab, index, 'conclusion', subPanel),
+    )
+    const priorYearConclusion =
+      (priorItem?.conclusion as Conclusion | null) || null
 
     return {
       index,
-      controlPoint: pointItem?.remark || '',
-      description: descItem?.remark || '',
+      controlPoint: typeof row.point === 'string' ? row.point : '',
+      description: typeof row.desc === 'string' ? row.desc : '',
       methods,
       conclusion,
-      reference: refItem?.remark || '',
+      reference: typeof row.ref === 'string' ? row.ref : '',
       isPreset: false, // preset detection handled by component layer
       isDeficiency: conclusion === '设计无效' || conclusion === '未实施',
       priorYearConclusion,
-      noChangeConfirmed: nochangeItem?.conclusion === 'Y',
-      noChangeConfirmer: nochangeItem?.remark || null,
-      noChangeDate: nochangeItem?.wp_ref || null,
+      noChangeConfirmed: row.nochange === 'Y',
+      noChangeConfirmer:
+        typeof row.nochangeConfirmer === 'string' ? row.nochangeConfirmer : null,
+      noChangeDate:
+        typeof row.nochangeDate === 'string' ? row.nochangeDate : null,
     }
+  }
+
+  function buildCheckItem(tab: TabNumber, index: number, subPanel?: ITSubPanel): CheckItem {
+    const row = rowStore.rowAt(tab, index, subPanel)
+    if (!row) {
+      return {
+        index,
+        controlPoint: '',
+        description: '',
+        methods: [],
+        conclusion: null,
+        reference: '',
+        isPreset: false,
+        isDeficiency: false,
+        priorYearConclusion: null,
+        noChangeConfirmed: false,
+        noChangeConfirmer: null,
+        noChangeDate: null,
+      }
+    }
+    return rowToCheckItem(row, index, tab, subPanel)
   }
 
   // ─── Check Items CRUD ──────────────────────────────────────────────────
 
   function getCheckItems(tab: TabNumber, subPanel?: ITSubPanel): CheckItem[] {
-    const count = getCount(tab, subPanel)
-    const items: CheckItem[] = []
-    for (let i = 1; i <= count; i++) {
-      items.push(buildCheckItem(tab, i, subPanel))
-    }
-    return items
+    const rows = rowStore.readRows(tab, subPanel)
+    return rows.map((row, i) => rowToCheckItem(row, i + 1, tab, subPanel))
   }
 
   function addCheckItem(tab: TabNumber, subPanel?: ITSubPanel): void {
-    const currentCount = getCount(tab, subPanel)
-    const newCount = currentCount + 1
-    const countId = countItemId(tab, subPanel)
-
-    allResponses.value.set(countId, {
-      item_id: countId,
-      conclusion: null,
-      remark: String(newCount),
-      wp_ref: null,
-    })
-
-    saveImmediate([{ item_id: countId, conclusion: null, remark: String(newCount), wp_ref: null }])
+    rowStore.appendRow(tab, subPanel)
   }
 
   /**
@@ -295,21 +334,12 @@ export function useB22AControlMatrix(
    */
   function addPresetCheckItems(tab: TabNumber, examples: string[], subPanel?: ITSubPanel): void {
     if (!examples || examples.length === 0) return
-    const currentCount = getCount(tab, subPanel)
-    const itemsToSave: ChecklistItem[] = []
-    for (let k = 0; k < examples.length; k++) {
-      const idx = currentCount + k + 1
-      const pointId = generateItemId(tab, idx, 'point', subPanel)
-      const item: ChecklistItem = { item_id: pointId, conclusion: null, remark: examples[k], wp_ref: null }
-      allResponses.value.set(pointId, item)
-      itemsToSave.push(item)
-    }
-    const newCount = currentCount + examples.length
-    const countId = countItemId(tab, subPanel)
-    const countItem: ChecklistItem = { item_id: countId, conclusion: null, remark: String(newCount), wp_ref: null }
-    allResponses.value.set(countId, countItem)
-    itemsToSave.push(countItem)
-    saveImmediate(itemsToSave)
+    // 每条示例一行，控制要点写 point；不覆盖已有行（追加语义与 legacy 一致）
+    rowStore.appendRows(
+      tab,
+      examples.map((text) => ({ point: text })),
+      subPanel,
+    )
   }
 
   /**
@@ -322,22 +352,14 @@ export function useB22AControlMatrix(
     attrs: Record<string, unknown>,
     subPanel?: ITSubPanel
   ): void {
-    const prefix = subPanel ? `B22A-T${tab}-IT-${subPanel}` : `B22A-T${tab}-item`
-    const itemId = `${prefix}-${index}-attrs`
-    const item: ChecklistItem = { item_id: itemId, conclusion: null, remark: JSON.stringify(attrs), wp_ref: null }
-    allResponses.value.set(itemId, item)
-    saveImmediate([item])
+    rowStore.patchRowAt(tab, index, { attrs }, subPanel)
   }
 
   function getControlAttrs(tab: TabNumber, index: number, subPanel?: ITSubPanel): Record<string, any> {
-    const prefix = subPanel ? `B22A-T${tab}-IT-${subPanel}` : `B22A-T${tab}-item`
-    const item = getResponseValue(`${prefix}-${index}-attrs`)
-    if (!item?.remark) return {}
-    try {
-      return JSON.parse(item.remark)
-    } catch {
-      return {}
-    }
+    const row = rowStore.rowAt(tab, index, subPanel)
+    const attrs = row?.attrs
+    if (attrs && typeof attrs === 'object') return attrs as Record<string, any>
+    return {}
   }
 
   // ─── 管理层凌驾于控制之上（B22A-2，反舞弊特别风险 CAS 1141） ───────────────
@@ -379,77 +401,34 @@ export function useB22AControlMatrix(
     saveImmediate([ansItem, noteItem])
   }
 
+  /**
+   * 删行（BC-53 改造：摘除行对象，**不搬迁任何字段值**）。
+   *
+   * ═══ 改造前的缺陷（已删除的实现）═══════════════════════════════════════
+   *
+   * 旧实现是「整块 shift 搬迁」：删第 3 行时把第 4..N 行的每个字段值逐个往前挪
+   * 一格、再清空末行。两类真缺陷：
+   *   ① OO 侧插/删行不走这套 shift ⇒ 两侧行号立刻脱钩，双向回写必错位
+   *   ② 行身份是下标 ⇒ 指向「第 n 行」的外部引用（B22B 带入的控制点、复核线程
+   *      锚点）删行后指向**别人的内容**而非失效 —— 静默错配
+   *
+   * 现在行身份是行对象内的稳定 `rowId`，删行只从数组摘除该对象，剩余行的
+   * 身份 ↔ 内容绑定关系完全不变。
+   */
   function removeCheckItem(tab: TabNumber, index: number, subPanel?: ITSubPanel): void {
-    const currentCount = getCount(tab, subPanel)
-    if (index < 1 || index > currentCount) return
-
-    // Shift items down: move index+1..count into index..count-1
-    const itemsToSave: ChecklistItem[] = []
-    const fields: Array<'point' | 'desc' | 'method' | 'conclusion' | 'ref' | 'nochange'> = ['point', 'desc', 'method', 'conclusion', 'ref', 'nochange']
-
-    for (let i = index; i < currentCount; i++) {
-      for (const field of fields) {
-        const srcId = generateItemId(tab, i + 1, field, subPanel)
-        const dstId = generateItemId(tab, i, field, subPanel)
-        const srcItem = getResponseValue(srcId)
-        const newItem: ChecklistItem = {
-          item_id: dstId,
-          conclusion: srcItem?.conclusion ?? null,
-          remark: srcItem?.remark ?? null,
-          wp_ref: srcItem?.wp_ref ?? null,
-        }
-        allResponses.value.set(dstId, newItem)
-        itemsToSave.push(newItem)
-      }
-    }
-
-    // Clear last row
-    for (const field of fields) {
-      const lastId = generateItemId(tab, currentCount, field, subPanel)
-      allResponses.value.delete(lastId)
-      itemsToSave.push({ item_id: lastId, conclusion: null, remark: null, wp_ref: null })
-    }
-
-    // Update count
-    const newCount = currentCount - 1
-    const countId = countItemId(tab, subPanel)
-    allResponses.value.set(countId, {
-      item_id: countId,
-      conclusion: null,
-      remark: String(newCount),
-      wp_ref: null,
-    })
-    itemsToSave.push({ item_id: countId, conclusion: null, remark: String(newCount), wp_ref: null })
-
-    saveImmediate(itemsToSave)
+    rowStore.removeRowAt(tab, index, subPanel)
   }
 
   // ─── Conclusion ────────────────────────────────────────────────────────
 
   function setConclusion(tab: TabNumber, index: number, conclusion: Conclusion, subPanel?: ITSubPanel): void {
-    const itemId = generateItemId(tab, index, 'conclusion', subPanel)
-    const item: ChecklistItem = {
-      item_id: itemId,
-      conclusion,
-      remark: null,
-      wp_ref: null,
-    }
-    allResponses.value.set(itemId, item)
-    saveImmediate([item])
+    rowStore.patchRowAt(tab, index, { conclusion }, subPanel)
   }
 
   // ─── Understanding Method ──────────────────────────────────────────────
 
   function setUnderstandingMethod(tab: TabNumber, index: number, methods: UnderstandingMethod[], subPanel?: ITSubPanel): void {
-    const itemId = generateItemId(tab, index, 'method', subPanel)
-    const item: ChecklistItem = {
-      item_id: itemId,
-      conclusion: null,
-      remark: methods.join(','),
-      wp_ref: null,
-    }
-    allResponses.value.set(itemId, item)
-    saveImmediate([item])
+    rowStore.patchRowAt(tab, index, { method: methods.join(',') }, subPanel)
   }
 
   // ─── Element Score ─────────────────────────────────────────────────────
@@ -709,32 +688,23 @@ export function useB22AControlMatrix(
       String(today.getDate()).padStart(2, '0'),
     ].join('-')
 
-    const itemId = generateItemId(tab, index, 'nochange', subPanel)
-    const item: ChecklistItem = {
-      item_id: itemId,
-      conclusion: 'Y',
-      remark: confirmer,
-      wp_ref: dateStr,
-    }
-    allResponses.value.set(itemId, item)
-
-    // Also carry forward prior year conclusion if available
-    const conclusionId = generateItemId(tab, index, 'conclusion', subPanel)
-    const priorConclusionItem = priorYearData.value.get(conclusionId)
-    const itemsToSave: ChecklistItem[] = [item]
-
-    if (priorConclusionItem?.conclusion && !getResponseValue(conclusionId)?.conclusion) {
-      const carryItem: ChecklistItem = {
-        item_id: conclusionId,
-        conclusion: priorConclusionItem.conclusion,
-        remark: null,
-        wp_ref: null,
-      }
-      allResponses.value.set(conclusionId, carryItem)
-      itemsToSave.push(carryItem)
+    // BC-53 改造：写进行数组（legacy 写 `-nochange` 单条记录，读路径已不再看它）
+    const patch: Partial<B22ARow> = {
+      nochange: 'Y',
+      nochangeConfirmer: confirmer,
+      nochangeDate: dateStr,
     }
 
-    saveImmediate(itemsToSave)
+    // 沿用上年结论：本年该行结论为空时才带入（不覆盖已填）
+    const priorConclusionItem = priorYearData.value.get(
+      generateItemId(tab, index, 'conclusion', subPanel),
+    )
+    const current = rowStore.rowAt(tab, index, subPanel)
+    if (priorConclusionItem?.conclusion && !current?.conclusion) {
+      patch.conclusion = priorConclusionItem.conclusion
+    }
+
+    rowStore.patchRowAt(tab, index, patch, subPanel)
   }
 
   // ─── 控制矩阵登记册（B22B 源模板：全部控制 + 属性汇总）──────────────────
@@ -849,56 +819,96 @@ export function useB22AControlMatrix(
 
   // ─── IT 详细结构化：通用键控动态行表 ────────────────────────────────────
 
-  function _rowCount(prefix: string): number {
-    const n = parseInt(getResponseValue(`${prefix}-count`)?.remark || '0', 10)
-    return isNaN(n) ? 0 : n
-  }
+  // 🔴 BC-53 同型改造：IT 子区三表（-it-summary / -it-system / -it-sod）原用
+  //    `{prefix}-{index}-{field}` 下标键 + shift 搬迁删行，与 COSO tab 同型缺陷。
+  //    现统一走行数组 + 稳定 rowId（含 legacy 自动迁移，幂等）。
 
-  function _getRows(prefix: string, fields: readonly string[]): ItRow[] {
-    const count = _rowCount(prefix)
-    const rows: ItRow[] = []
-    for (let i = 1; i <= count; i++) {
-      const row: ItRow = { index: i }
-      for (const f of fields) {
-        row[f] = getResponseValue(`${prefix}-${i}-${f}`)?.remark ?? ''
+  /** 已迁移的前缀集合（防重复迁移）。 */
+  const _migratedPrefixes = new Set<string>()
+
+  function _readPrefixRows(prefix: string, fields: readonly string[]): B22ARow[] {
+    const rowsId = prefixedRowsItemId(prefix)
+    const scope = prefixScope(prefix)
+    const rec = getResponseValue(rowsId)
+    if (rec?.remark) return parseRows(rec.remark, scope)
+
+    if (!_migratedPrefixes.has(prefix)) {
+      _migratedPrefixes.add(prefix)
+      const reader = {
+        getCount: (p: string) => {
+          const n = parseInt(
+            getResponseValue(prefixedLegacyCountItemId(p))?.remark || '0', 10,
+          )
+          return Number.isNaN(n) ? 0 : n
+        },
+        getField: (id: string) => getResponseValue(id),
       }
-      rows.push(row)
+      if (reader.getCount(prefix) > 0) {
+        const migrated = migrateLegacyPrefixedRows(reader, prefix, fields)
+        if (migrated.length > 0) {
+          _writePrefixRows(prefix, migrated)
+          return migrated
+        }
+      }
     }
-    return rows
+    return []
   }
 
-  function _addRow(prefix: string): void {
-    const n = _rowCount(prefix) + 1
-    const item: ChecklistItem = { item_id: `${prefix}-count`, conclusion: null, remark: String(n), wp_ref: null }
+  function _writePrefixRows(prefix: string, rows: readonly B22ARow[]): void {
+    const item: ChecklistItem = {
+      item_id: prefixedRowsItemId(prefix),
+      conclusion: null,
+      remark: serializeRows(resequence(rows)),
+      wp_ref: null,
+    }
     allResponses.value.set(item.item_id, item)
     saveImmediate([item])
   }
 
-  function _removeRow(prefix: string, index: number, fields: readonly string[]): void {
-    const count = _rowCount(prefix)
-    if (index < 1 || index > count) return
-    const batch: ChecklistItem[] = []
-    for (let i = index; i < count; i++) {
+  function _rowCount(prefix: string, fields: readonly string[] = []): number {
+    return _readPrefixRows(prefix, fields).length
+  }
+
+  function _getRows(prefix: string, fields: readonly string[]): ItRow[] {
+    return _readPrefixRows(prefix, fields).map((row, i) => {
+      const out: ItRow = { index: i + 1 }
       for (const f of fields) {
-        const src = getResponseValue(`${prefix}-${i + 1}-${f}`)
-        const it: ChecklistItem = { item_id: `${prefix}-${i}-${f}`, conclusion: null, remark: src?.remark ?? null, wp_ref: null }
-        allResponses.value.set(it.item_id, it)
-        batch.push(it)
+        out[f] = typeof row[f] === 'string' ? (row[f] as string) : ''
       }
+      return out
+    })
+  }
+
+  function _addRow(prefix: string, fields: readonly string[] = []): void {
+    const rows = _readPrefixRows(prefix, fields)
+    const row: B22ARow = {
+      rowId: makeRowId(prefixScope(prefix)),
+      seq: rows.length + 1,
     }
-    for (const f of fields) {
-      const id = `${prefix}-${count}-${f}`
-      allResponses.value.delete(id)
-      batch.push({ item_id: id, conclusion: null, remark: null, wp_ref: null })
-    }
-    const cItem: ChecklistItem = { item_id: `${prefix}-count`, conclusion: null, remark: String(count - 1), wp_ref: null }
-    allResponses.value.set(cItem.item_id, cItem)
-    batch.push(cItem)
-    saveImmediate(batch)
+    _writePrefixRows(prefix, [...rows, row])
+  }
+
+  /** 删行：摘除行对象，**不搬迁任何字段值**（剩余行身份 ↔ 内容绑定不变）。 */
+  function _removeRow(prefix: string, index: number, fields: readonly string[]): void {
+    const rows = _readPrefixRows(prefix, fields)
+    if (index < 1 || index > rows.length) return
+    _writePrefixRows(prefix, rows.filter((_, i) => i !== index - 1))
   }
 
   function _setRowField(prefix: string, index: number, field: string, value: string, debounce = false): void {
-    const item: ChecklistItem = { item_id: `${prefix}-${index}-${field}`, conclusion: null, remark: value, wp_ref: null }
+    if (index < 1) return
+    const rows = _readPrefixRows(prefix, [field])
+    const next = [...rows]
+    while (next.length < index) {
+      next.push({ rowId: makeRowId(prefixScope(prefix)), seq: next.length + 1 })
+    }
+    next[index - 1] = { ...next[index - 1], [field]: value }
+    const item: ChecklistItem = {
+      item_id: prefixedRowsItemId(prefix),
+      conclusion: null,
+      remark: serializeRows(resequence(next)),
+      wp_ref: null,
+    }
     allResponses.value.set(item.item_id, item)
     if (debounce) _saveText(item)
     else saveImmediate([item])

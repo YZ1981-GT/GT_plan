@@ -1,0 +1,129 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. 现读附注模板，确认 10 个目标科目在 soe/listed 两版的章节编号和主表名": [
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791209492744
+      },
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791209504685
+      },
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791209851300
+      }
+    ],
+    "2. `TierAAnchorBinding` 加 `note_rows()` 实现": [
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791209492816
+      },
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791209861419
+      },
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791210534340
+      }
+    ],
+    "3. K1 附注推送能力（`K1Binding.note_rows()` 实现）": [
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791209492847
+      },
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791210540185
+      },
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791211103746
+      }
+    ],
+    "4. 在 `formula_push_rules.json` 中追加 10 条附注规则": [
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791209492879
+      },
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791211110768
+      },
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791211703134
+      }
+    ],
+    "5. 独占键生成器重生成 + 回归": [
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791209492912
+      },
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791211708223
+      },
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791212387105
+      }
+    ],
+    "6. 每个科目的 SQLite 真 ORM 附注推送测试": [
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791209492939
+      },
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791212392967
+      },
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791212975481
+      }
+    ],
+    "7. 回归归因": [
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791209492970
+      },
+      {
+        "executionId": "ecabad6b-970a-42f7-9e2c-dfbcf6cafba4",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791212982151
+      },
+      {
+        "executionId": "90897a46-1d42-48aa-aba5-a8ee9dd6de95",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791213851884
+      },
+      {
+        "executionId": "7a9c0fca-e0d6-430e-828d-291cf6d34073",
+        "chatSessionId": "sess_8428a181-9ef9-432a-9cb3-c2df4eef14cd",
+        "timestamp": 1791214235631
+      }
+    ]
+  }
+}

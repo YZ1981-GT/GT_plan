@@ -31,7 +31,7 @@ describe('g10CrossHelpers', () => {
     const rows = [
       enrichG10DetailRow({
         rowId: 'a',
-        liabilityType: '交易性债券',
+        liabilityName: '交易性债券',
         openingInitialAmount: 100,
         openingFvAccum: 10,
         movementInitialAmount: 0,
@@ -39,12 +39,11 @@ describe('g10CrossHelpers', () => {
       }, 1),
       enrichG10DetailRow({
         rowId: 'b',
-        liabilityType: '衍生金融负债',
+        liabilityName: '衍生金融负债利率互换',
         openingInitialAmount: 50,
         openingFvAccum: 5,
         movementInitialAmount: 0,
         movementFvChange: 0,
-        isDerivative: true,
       }, 2),
     ]
     const buckets = aggregateG10DetailBuckets(rows)
@@ -61,7 +60,7 @@ describe('g10CrossHelpers', () => {
     const rows = [
       enrichG10DetailRow({
         rowId: 'a',
-        liabilityType: '其他',
+        liabilityName: '其他',
         openingInitialAmount: 100,
         openingFvAccum: 0,
         movementInitialAmount: 0,
@@ -111,22 +110,22 @@ describe('g10CrossHelpers', () => {
     expect(row.closingAdjusted).toBe(130)
   })
 
-  it('G10-5 回写 G10-2 层次/估值方法', () => {
-    const responses = new Map<string, any>([[G10_DETAIL_ROWS_KEY, {
-      remark: JSON.stringify([
-        { rowId: 'd1', liabilityName: '债券A', fairValueLevel: 'Level2', valuationMethod: '' },
-      ]),
-    }]])
+  // 🔴 C-7（spec g-cycle-single-region-detail-lanes）：`pushG10FvToDetail` 已停用。
+  //    层次 / 估值方法的权威源就是 `公允价值测试表G10-5`（第三层次另有 G10-6），
+  //    而 `明细表G10-2` 按权威模板重构后（19 列 A..S）没有这两列 ⇒ 回写会造第二真源。
+  //    与 G9 的 `pushG9FvToDetail`（G9-4→G9-2）同族错误，同批处置。
+  it('pushG10FvToDetail 已停用：恒 0 且不写 store（方向错）', () => {
+    const before = JSON.stringify([{ rowId: 'd1', liabilityName: '债券A' }])
+    const responses = new Map<string, any>([[G10_DETAIL_ROWS_KEY, { remark: before }]])
     const saves: Array<{ id: string; data: any }> = []
     const n = pushG10FvToDetail(
       responses,
       (id, data) => { saves.push({ id, data }) },
       [{ liabilityName: '债券A', fairValueLevel: 'Level3', valuationMethod: '市场法' }],
     )
-    expect(n).toBe(1)
-    const next = JSON.parse(saves[0].data.remark)
-    expect(next[0].fairValueLevel).toBe('Level3')
-    expect(next[0].valuationMethod).toBe('市场法')
+    expect(n).toBe(0)
+    expect(saves).toEqual([])
+    expect(responses.get(G10_DETAIL_ROWS_KEY)?.remark).toBe(before)
   })
 })
 

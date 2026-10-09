@@ -1,0 +1,66 @@
+{
+  "contract_id": "l4.bonds_payable",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "json_field_id",
+    "hidden_uuid_column"
+  ],
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "bp8_sheet_granularity_collapse": {
+      "collapsed_pairs": [
+        {
+          "frontend_discriminator": "bondBranch (provide/inject, el-segmented)",
+          "sheet_keys": {
+            "bullet": "L4-7#到期一次还本付息",
+            "installment": "L4-7#分期付息到期一次还本"
+          },
+          "sheet_names": [
+            "应付债券后续计量(到期一次还本付息)L4-7",
+            "应付债券后续计量(分期付息到期一次还本)L4-7"
+          ],
+          "tail_code": "L4-7"
+        },
+        {
+          "frontend_discriminator": "bondBranch (synced via provide/inject from L4-7)",
+          "note": "🔴 sheet[1] 名含内部空格（'分期付息到期一次还本) L4-8'），sheet_key 不含该缺陷（路线 A 用 bondBranch 值而非 sheet 名）。",
+          "sheet_keys": {
+            "bullet": "L4-8#到期一次还本付息",
+            "installment": "L4-8#分期付息到期一次还本"
+          },
+          "sheet_names": [
+            "应付债券账面核对(到期一次还本付息)L4-8",
+            "应付债券账面核对(分期付息到期一次还本) L4-8"
+          ],
+          "tail_code": "L4-8"
+        }
+      ],
+      "problem": "16 权威 sheet → 13 dispatch code。L4-7 一对（后续计量）+ L4-8 一对（账面核对）同尾码。解析器对同时 endswith 的两张取第一个 → 第二版 sheet 永不可达。",
+      "resolve_target_sheet_note": "🔴 解析层 resolve_target_sheet 须以 strict=True 调用。L4-7/L4-8 在 strict 下返回 None（歧义），调用方必须额外带 bondBranch 参数。无歧义尾码（L4-1 等）不受影响。",
+      "resolve_target_sheet_strict": true,
+      "solution": "路线 A：sheet_key = 尾码#bondBranch 值（契约层区分），不改模板 sheet 名。",
+      "template_rename_excluded": "🔴 改名会打断既有 render schema 与 prefill 的 sheet 名匹配，须另立 spec。本契约只在契约层与解析层区分。"
+    },
+    "carrier": {
+      "read": "formdata_composable_bare_endpoint",
+      "tb_publish_gate": "useL4FormData.ts",
+      "write": "per_cycle_formdata_direct_api"
+    },
+    "draft_target_entry_id": "xlsx/gt-l4-bonds-payable",
+    "entry_id": null,
+    "field_mapping": {
+      "conclusion_reason": "L 域真库 conclusion 非空 == 0（LC-24 第 9 项）",
+      "conclusion_status": "not_used"
+    },
+    "html_store": {
+      "item_id_namespace": "L4-{sheet}-{field}",
+      "payload_column": "remark",
+      "shape": "flat_per_field_items",
+      "table": "checklist_responses"
+    },
+    "why_entry_id_is_null": "🔴 candidate 契约。"
+  },
+  "review_status": "candidate",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "0.1.0-draft"
+}

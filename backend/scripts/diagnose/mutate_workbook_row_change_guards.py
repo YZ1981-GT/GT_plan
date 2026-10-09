@@ -171,13 +171,26 @@ MUTATIONS: list[Mutation] = [
     # `test_d2_is_the_only_entry_with_propagation_demand` 内，整行唯一。
     # 该守卫基线此前一度为红（清册 D2 已 `propagated`、守卫仍断言 `blocked`），
     # C 于 09-05 收口后转绿（三文件合计 49 passed / 1 skipped），故本条得以入清单。
+    #
+    # 🔴 **本条锚点第二次更换（2026-xx 决策包 2）。** 旧锚
+    # `assert with_demand == {"d2.receivable_detail": 52}, (` 所在的守卫
+    # `test_d2_is_the_only_entry_with_propagation_demand` 已被**重裁并改名**为
+    # `test_d2_remains_the_sole_maximal_propagation_carrier`：phase5 交付 6 份 D 循环契约后
+    # 有传播需求的 entry 变成 5 个（d2=52/d3=51/d5=24/d6=3/d7=3），「D2 是唯一」这个事实
+    # 已不成立，那条等式连同旧锚点一起不存在了 ⇒ 沿用旧锚必然「锚点漂移」。
+    # 新锚落在重裁后的**严格唯一最大 fan-in** 断言上，整行唯一。
+    # ⚠ 注意本条的变异对象**换了口径**：旧锚打的是「处数分母写错」，新锚打的是
+    #   「载体的 fan-in 优势被要求得更强而实际达不到」。两者同属「改严格且不成立 ⇒ 必红」，
+    #   但新口径刻意**不再**打处数 —— D2 对 D3 只领先 1 处（52 vs 51），按处数设的判据
+    #   会被 D3 模板的琐碎改动翻掉，那种脆判据迟早被人放宽成假绿。
     Mutation(
         id="M07", side="be", path=REACH, kind="replace",
-        anchor='    assert with_demand == {"d2.receivable_detail": 52}, (',
-        new='    assert with_demand == {"d2.receivable_detail": 999}, (',
-        want="test_d2_is_the_only_entry_with_propagation_demand",
-        why="把 D2 的传播需求处数（Wave 0 复算值 **52**）改成 999 ⇒ 分母断言必须打红。"
-            "🔴 注意方向：把分母改**宽松**（`>= 0` 那类）不会有任何测试失败 ⇒ GREEN ⇒ "
+        anchor="    assert margin > 0, (",
+        new="    assert margin > 99, (  # mutated: 要求 fan-in 领先 99 张 sheet",
+        want="test_d2_remains_the_sole_maximal_propagation_carrier",
+        why="把「D2 的引用侧 sheet 张数严格大于其它有需求 entry 的最大值」改成「须领先 99 张」"
+            "⇒ 实测领先 2 张（4 vs 2），更严格且不成立 ⇒ 载体裁决判据必须打红。"
+            "🔴 注意方向：把它改**宽松**（`>= 0` 那类）不会有任何测试失败 ⇒ GREEN ⇒ "
             "那是无效变异。只有改成「更严格且不成立」才能证明该断言真的在跑、不是一行装饰。"
             "design.md 分母表、清册 JSON、现算三方互锁，任一侧漂移都该红",
     ),

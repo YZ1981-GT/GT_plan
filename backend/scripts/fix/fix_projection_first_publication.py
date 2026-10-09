@@ -93,6 +93,12 @@ CHECK_ENTRY_STATES: Final[tuple[str, ...]] = (
     # store 里**有**内容但形态不符（`sync_pilot_store_payload_invalid`）。
     # 与上一格严格区分：这里数据真的坏了或版本对不上，有明确解除方。
     "blocked_store_payload_shape",
+    # substrate 暂存阶段失败（instrumentation 读取/注入出错）
+    "blocked_substrate_staging",
+    # provider 能力结构性缺陷（主 binding 不唯一等）
+    "blocked_provider_capability",
+    # Python 运行时错误（AttributeError / TypeError 等 provider 代码 bug）
+    "blocked_runtime_error",
     # 🔴 兜底格，语义 = **词表要扩**（不是「某种已知阻塞」）。它必须长得一眼就不对劲，
     #    才不会像 `blocked_contract_not_reviewed` 那样被当成一个正常结论读过去。
     "blocked_unregistered_failure_shape",
@@ -137,6 +143,13 @@ _ERROR_CODE_TO_STATE: Final[Mapping[str, str]] = {
     #    `blocked_unregistered_failure_shape`，把一个有明确解除方的情形报成
     #    「词表要扩」。它与「还没录」是两件事：这里是**数据真的坏了或形态不对**。
     "sync_pilot_store_payload_invalid": "blocked_store_payload_shape",
+    # ── substrate 暂存阶段失败（instrumentation 抛错等非安全类失败）──
+    "substrate_staging_failed": "blocked_substrate_staging",
+    # ── provider 能力缺失（主 binding 不唯一等结构性问题）──────────
+    "provider_capability_missing": "blocked_provider_capability",
+    # ── Python 运行时错误（AttributeError / TypeError 等）────────
+    "AttributeError": "blocked_runtime_error",
+    "TypeError": "blocked_runtime_error",
 }
 
 #: 结算格 → 解除方与解除动作。报告里必须写出来 —— 「卡住了」不带「谁能解」的
@@ -178,6 +191,18 @@ _STATE_UNBLOCK_OWNER: Final[Mapping[str, str]] = {
         "store 载荷形态裁决：`remark` 里有内容但不符合该 pilot 的 store schema"
         "（根形态错 / state version 对不上 / 必填结构缺失）—— "
         "解除方是前端 store 写入侧或数据修复，**不是**放宽 provider 的校验"
+    ),
+    "blocked_substrate_staging": (
+        "substrate 暂存阶段失败（instrumentation 读取或注入出错）—— "
+        "解除方：检查模板/契约/instrumentation 产物一致性"
+    ),
+    "blocked_provider_capability": (
+        "provider 能力结构性缺陷（如主 binding 不唯一 / 契约多 table 匹配）—— "
+        "解除方：修改 provider 的 instrumentation spec 或契约的 table 声明"
+    ),
+    "blocked_runtime_error": (
+        "provider 代码运行时错误（AttributeError / TypeError 等）—— "
+        "解除方：修复 provider 模块的接口缺失或参数错误"
     ),
     "blocked_unregistered_failure_shape": (
         "🔴 词表要扩：把该 error_code 登记进 `_ERROR_CODE_TO_STATE` 并给出解除方"
@@ -383,14 +408,26 @@ async def _read_store_payload(
     return _empty_store_payload_for(provider, entry_id=entry_id)
 
 
-def _build_plan_rows() -> list[Mapping[str, Any]]:
-    """从 `DELIVERED_PER_ENTRY_CONTRACTS` × provider 常量现算目标清单。"""
+def _build_plan_rows(*, only_entry: str | None = None) -> list[Mapping[str, Any]]:
+    """从 `DELIVERED_PER_ENTRY_CONTRACTS` × provider 常量现算目标清单。
+
+    🔴 `only_entry` **必须在这里生效，不能只在调用方事后 filter**
+    （spec `l-cycle-true-adapter-registration` Task 7 实测）：本函数对每条 entry 调
+    `_adjudicated_wp_codes()`，而它是 fail-closed 的 —— 任何一条 entry 缺 wp_code 裁决
+    就整体抛 `HostError`。过滤留在调用方时，`--entry xlsx/gt-l1-short-term-loans` 会因
+    **另一条无关 entry**（实测 `xlsx/gt-e1-monetary-fund` 在交付登记表里但不在裁决表里）
+    而连只读预演都跑不起来。语义上 `--entry` 就是「只处理这条」，在此前移完全等价，
+    且不再让单 entry 操作被他人的缺口连坐。
+    """
     import importlib
 
     from app.services.workpaper_sync.adapters import registry as registry_module
 
     rows: list[Mapping[str, Any]] = []
     for row in registry_module.DELIVERED_PER_ENTRY_CONTRACTS:
+        entry_id = str(row["entry_id"])
+        if only_entry and entry_id != only_entry:
+            continue
         module_path = str(row["provider_module"])
         if module_path not in registry_module._ALLOWED_PROVIDER_MODULES:
             raise HostError(
@@ -398,7 +435,6 @@ def _build_plan_rows() -> list[Mapping[str, Any]]:
                 "宿主不放宽该判据"
             )
         provider = importlib.import_module(module_path)
-        entry_id = str(row["entry_id"])
         rows.append(
             {
                 "entry_id": entry_id,
@@ -492,7 +528,7 @@ async def run_check(
     results: list[EntrySettlement] = []
 
     try:
-        for row in _build_plan_rows():
+        for row in _build_plan_rows(only_entry=only_entry):
             entry_id = row["entry_id"]
             if only_entry and entry_id != only_entry:
                 continue
@@ -641,8 +677,10 @@ async def run_check(
                             adapter=adapter,
                             contract=plan.contract,
                             substrate=staged.staged_path,
-                            store_projection=provider.build_store_projection(
-                                store_payload, contract=plan.contract
+                            store_projection=F2._store_projection_for_provider(
+                                provider=provider,
+                                store_payload=store_payload,
+                                contract=plan.contract,
                             ),
                         )
                         settlement.stages["projection_composed"] = True
@@ -736,7 +774,7 @@ async def run_apply(*, only_entry: str | None = None) -> list[EntrySettlement]:
     results: list[EntrySettlement] = []
 
     try:
-        for row in _build_plan_rows():
+        for row in _build_plan_rows(only_entry=only_entry):
             entry_id = row["entry_id"]
             if only_entry and entry_id != only_entry:
                 continue

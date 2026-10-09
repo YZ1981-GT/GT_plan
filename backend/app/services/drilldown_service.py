@@ -496,14 +496,34 @@ class DrilldownService:
     # ------------------------------------------------------------------
 
     async def get_voucher_detail(
-        self, project_id: UUID, year: int, voucher_no: str
+        self, project_id: UUID, year: int, voucher_no: str,
+        *,
+        month: int | None = None,
+        voucher_date: str | None = None,
     ) -> dict:
         """按凭证号查询完整分录，包含借贷合计和平衡状态。
 
         返回该凭证的所有分录行 + 借方合计 + 贷方合计 + 是否平衡。
+
+        🔴 voucher_no 单独并不唯一。真实库实测（8 个项目）：7 个项目的凭证号
+        跨月甚至跨日重复，单个号最多对应 83 个不同日期。唯一定位一张凭证的键是
+        ``(voucher_date, voucher_no)`` —— 该粒度下借贷 100% 平衡，证明其恰好
+        对应一张完整凭证。不传日期时 ``is_balanced`` 反映的是全年同号凭证合计，
+        并非单张凭证的平衡状态。
+
+        Args:
+            month: 月份过滤（1~12）。粗粒度，同月内仍可能有多张同号凭证。
+            voucher_date: 凭证日期（YYYY-MM-DD）。与 voucher_no 组合唯一定位
+                          一张凭证，是推荐的精确过滤方式。
         """
         tbl = TbLedger.__table__
         active_filter = await get_active_filter(self.db, tbl, project_id, year)
+
+        conditions = [active_filter, tbl.c.voucher_no == voucher_no]
+        if voucher_date:
+            conditions.append(tbl.c.voucher_date == voucher_date)
+        elif month is not None:
+            conditions.append(sa.extract("month", tbl.c.voucher_date) == month)
 
         stmt = (
             sa.select(
@@ -518,10 +538,7 @@ class DrilldownService:
                 tbl.c.summary,
                 tbl.c.preparer,
             )
-            .where(
-                active_filter,
-                tbl.c.voucher_no == voucher_no,
-            )
+            .where(*conditions)
             .order_by(tbl.c.account_code)
         )
         result = await self.db.execute(stmt)

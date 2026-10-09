@@ -177,15 +177,18 @@ export function useG10L3Reconciliation(opts: {
   /** G10-6 行 → G10-2 / G10-5 逐行链接状态 */
   const linkByRowId = computed(() => {
     const map = new Map<string, { hasDetail: boolean; hasFv: boolean }>()
-    const detailByKey = new Map(
-      parseG10DetailRows(opts.allResponses.value.get(G10_DETAIL_ROWS_KEY)?.remark)
-        .filter((d) => isLevel3(d.fairValueLevel) && d.liabilityName.trim())
-        .map((d) => [matchG10LiabilityKey(d.liabilityName), d]),
-    )
     const fvByKey = new Map(
       parseFvRows(opts.allResponses.value.get(G10_FV_KEY)?.remark)
         .filter((r) => isLevel3(r.fairValueLevel) && String(r.liabilityName ?? '').trim())
         .map((r) => [matchG10LiabilityKey(String(r.liabilityName)), r]),
+    )
+    // 🔴 C-7：层次的权威源是 G10-5（上面那个 `fvByKey`）。G10-2 按权威模板重构后
+    //    没有 `fairValueLevel` 列 ⇒ 改为「先由 G10-5 定 Level3 名单，再筛 G10-2 行」。
+    //    与 g9CrossHelpers.sumG9DetailLevel3Closing / g10DisclosureCross 同一范式。
+    const detailByKey = new Map(
+      parseG10DetailRows(opts.allResponses.value.get(G10_DETAIL_ROWS_KEY)?.remark)
+        .filter((d) => d.liabilityName.trim() && fvByKey.has(matchG10LiabilityKey(d.liabilityName)))
+        .map((d) => [matchG10LiabilityKey(d.liabilityName), d]),
     )
     for (const row of rows.value) {
       const key = matchG10LiabilityKey(row.liabilityName)
@@ -289,25 +292,37 @@ export function useG10L3Reconciliation(opts: {
 
   /**
    * 从 G10-2 明细带入 Level3 行。
-   * 映射：期初审定→期初；本期初始确认→新增；本期减少→终止；FV变动/利息；期末审定→企业期末。
+   * 映射：期初审定→期初；本期初始确认→新增；FV变动/利息；期末审定→企业期末。
+   *
+   * 🔴 C-7 两处改动（权威模板 19 列 A..S）：
+   * ① **Level3 名单由 G10-5 定**（G10-2 没有层次列），不再读 `src.fairValueLevel`；
+   * ② **没有「本期减少」列** —— 模板 H 是净额列（增加"+"/减少"—"），
+   *    原先映射的 `currentDecrease` 是自研列已移除 ⇒ `currentTerminated` 留空由用户填
+   *    （净额无法拆出终止确认金额，猜一个数会让 G10-6 的滚动表错）。
    */
   function pullFromDetail(): void {
     if (opts.isReadonly.value) return
+    const level3Keys = new Set(
+      parseFvRows(opts.allResponses.value.get(G10_FV_KEY)?.remark)
+        .filter((r) => isLevel3(r.fairValueLevel) && String(r.liabilityName ?? '').trim())
+        .map((r) => matchG10LiabilityKey(String(r.liabilityName))),
+    )
     const list = parseG10DetailRows(opts.allResponses.value.get(G10_DETAIL_ROWS_KEY)?.remark)
-    const l3 = list.filter((r) => isLevel3(r.fairValueLevel) && r.liabilityName.trim())
+    const l3 = list.filter(
+      (r) => r.liabilityName.trim() && level3Keys.has(matchG10LiabilityKey(r.liabilityName)),
+    )
     if (!l3.length) {
-      ElMessage.info('G10-2 中暂无公允价值层次为 Level3 的项目')
+      ElMessage.info('G10-5 中暂无 Level3 项目，或 G10-2 里没有同名明细行')
       return
     }
     const mapped: G10L3Row[] = l3.map((src, i) => enrichG10L3Row({
       ...emptyRow(src.liabilityName, i + 1, src.rowId ? `d2-${src.rowId}` : undefined),
       openingBalance: parseNum(src.openingAdjusted) || parseNum(src.openingFairValue),
       currentNew: parseNum(src.movementInitialAmount),
-      currentTerminated: parseNum(src.currentDecrease),
       fairValueChange: parseNum(src.movementFvChange),
       interestExpense: parseNum(src.interestExpense),
-      reportedClosing: parseNum(src.closingAdjusted) || parseNum(src.closingBalance),
-      remark: '自 G10-2 Level3 带入',
+      reportedClosing: parseNum(src.closingAdjusted) || parseNum(src.closingFairValue),
+      remark: '自 G10-2 带入（Level3 名单取自 G10-5）；终止确认金额请按凭证填列',
     }))
     mergeByLiabilityName(mapped, 'G10-2')
   }

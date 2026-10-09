@@ -25,11 +25,18 @@ import {
 
 // ─── Helper: 创建 composable 实例 ─────────────────────────────────────────────
 
-function createComposable(initialResponses: Record<string, any> = {}) {
+function createComposable(
+  initialResponses: Record<string, any> = {},
+  opts: { ooSessionActive?: boolean; isReadonly?: boolean } = {},
+) {
   const map = new Map<string, any>(Object.entries(initialResponses))
   const allResponses = ref(map)
   const saveImmediate = vi.fn().mockResolvedValue(undefined)
   const saveDebouncedText = vi.fn()
+  // P17：`ooSessionActive` 是**必填**项 —— 本 helper 原先不传，改成必填后本文件立刻打红，
+  // 那正是「必填逼出接线」的证据，不是要绕开的麻烦。
+  const ooSessionActive = ref(opts.ooSessionActive ?? false)
+  const isReadonly = ref(opts.isReadonly ?? false)
 
   const result = useD1WriteoffCheck({
     allResponses: allResponses as any,
@@ -37,10 +44,11 @@ function createComposable(initialResponses: Record<string, any> = {}) {
     projectId: ref('proj-1'),
     saveImmediate,
     saveDebouncedText,
-    isReadonly: ref(false),
+    isReadonly,
+    ooSessionActive,
   })
 
-  return { ...result, allResponses, saveImmediate, saveDebouncedText }
+  return { ...result, allResponses, saveImmediate, saveDebouncedText, ooSessionActive, isReadonly }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -226,7 +234,7 @@ describe('跨Spec差异计算', () => {
     const api = createComposable({
       'D1-writeoff-reversal-rows': { item_id: 'D1-writeoff-reversal-rows', conclusion: null, remark: JSON.stringify(rows) },
     })
-    ;(api as any).syncReversalToD14()
+    expect((api as any).syncReversalToD14()).toEqual({ ok: true })
     const written = (api as any).allResponses.value.get('D1-bd-portfolio-rows')
     expect(written).toBeTruthy()
     const parsed = JSON.parse(written.remark)

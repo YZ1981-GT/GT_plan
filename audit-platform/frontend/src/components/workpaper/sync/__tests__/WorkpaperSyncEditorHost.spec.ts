@@ -349,6 +349,8 @@ type HostProps = {
   docsApiLoader?: (() => Promise<WorkpaperSyncDocsApi>) | null
   /** Task 35 追加：内容刷新协调器。给了才渲染刷新条。 */
   contentRefresh?: WorkpaperContentRefresh | null
+  /** 2026-09-22 追加：forcesave 之后自动追踪 operation（默认开，仅测试隔离时关）。 */
+  trackOperation?: boolean
 }
 
 function mountHost(props: HostProps): VueWrapper {
@@ -1380,6 +1382,150 @@ describe('内容刷新协调器（Task 35）', () => {
     expect(wrapper.get('[data-testid="wp-content-refresh-failure-code"]').text()).toContain(
       'content_refresh_reload_failed',
     )
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 10b. forcesave 之后必须自己把 operation 推到落地（修「永久转圈」）
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('forcesave 之后宿主自行推进 operation 直到落地', () => {
+  /**
+   * 🔴 2026-09-22 真栈缺陷的回归守卫。
+   *
+   * 用户点「保存并回到表单模式」后，UI 永久停在「已发送强制保存，等待 OnlyOffice 回传
+   * 文件」，而服务端早已把 operation/application 推到 `applied`（DB 侧 `state=applied` /
+   * `result_revision` 正常递增）。根因是**两边都没接推进器**：桥 `switchToHtml()` 止于
+   * `apply('shell_tracking_started')`；`waiting_application` 的确定性出边只有「close 失权」
+   * 与「HTTP 失败」；唯一能推进它的 `operation_observed` 需要外部喂快照，而喂快照的
+   * `bridge.refreshOperation()` 与 `WorkpaperSyncOperationTracker` 在生产代码里零调用方。
+   *
+   * 本组的关键形态：**全程不调 `bridge.refreshOperation()`**。只要宿主自己不去取快照，
+   * 这三条就必然红 —— 这正是修复前的状态。
+   */
+  const APPLIED = () =>
+    snapshot({
+      state: 'applied',
+      shape: 'primary',
+      applicationId: UUID(9),
+      resultRevision: 12,
+      durableAt: '2026-09-22T00:00:00Z',
+      terminal: true,
+    })
+
+  it('不需要外部喂快照，状态自己走到 applied（修复前此处恒停在 waiting_application）', async () => {
+    // 用假定时器：本用例要证的正是**定时器在驱动**。首读拿到还没 durable 的 shell，
+    // 第二读（轮询）才 applied —— 与真实时序一致；若宿主不轮询，推进时钟也到不了 applied。
+    vi.useFakeTimers()
+    try {
+      const h = harness({
+        getOperation: vi
+          .fn<[], Promise<WorkpaperSyncOperationSnapshot>>()
+          .mockResolvedValueOnce(snapshot())
+          .mockResolvedValue(APPLIED()),
+      })
+      const { wrapper } = await openEditor(h)
+      await hostApi(wrapper).forceSave()
+      await vi.advanceTimersByTimeAsync(0)
+      // 首读之后应停在等待态（durable_at 仍为 null）
+      expect(h.bridge.state.value).toBe('waiting_application')
+      expect(h.api.getOperation, '宿主必须自己去取 operation 快照').toHaveBeenCalled()
+
+      // 推进一个轮询周期（后端给的 poll_after_ms=800）
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(h.bridge.state.value).toBe('applied')
+      expect(status(wrapper).kind).toBe('success')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('落地后停止轮询 —— 不留常态流量', async () => {
+    vi.useFakeTimers()
+    try {
+      const h = harness({ getOperation: vi.fn(async () => APPLIED()) })
+      const { wrapper } = await openEditor(h)
+      await hostApi(wrapper).forceSave()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(h.bridge.state.value).toBe('applied')
+      const callsAtSettle = h.api.getOperation.mock.calls.length
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(
+        h.api.getOperation.mock.calls.length,
+        '已落地还在轮询 = 每个保存过的底稿都留一条常态流量',
+      ).toBe(callsAtSettle)
+      void wrapper
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('超过追踪窗口仍未落地 ⇒ fail-visible，不无限转圈（Task 34「不得无限等待」）', async () => {
+    vi.useFakeTimers()
+    try {
+      // 永远停在 pre_correlation：模拟 callback 始终不到（OO 不可达 / 回调网络不通）。
+      const h = harness({ getOperation: vi.fn(async () => snapshot()) })
+      const { wrapper } = await openEditor(h)
+      await hostApi(wrapper).forceSave()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(h.bridge.state.value).toBe('waiting_application')
+
+      // 推过 3 分钟窗口
+      await vi.advanceTimersByTimeAsync(190_000)
+      expect(hostErrorText(wrapper)).toContain('等待 OnlyOffice 回传结果超时')
+      expect(hostErrorText(wrapper), '必须给下一步动作').toContain('重试回写')
+      const callsAfterDeadline = h.api.getOperation.mock.calls.length
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(
+        h.api.getOperation.mock.calls.length,
+        '超时之后必须真的停掉，不能继续轮询',
+      ).toBe(callsAfterDeadline)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('trackOperation=false 时确实不追踪 —— 隔离开关不是装饰', async () => {
+    const h = harness()
+    const { wrapper } = await openEditor(h, { trackOperation: false })
+    await hostApi(wrapper).forceSave()
+    await flushPromises()
+    await flushPromises()
+
+    expect(h.api.getOperation).not.toHaveBeenCalled()
+    // 这一行就是修复前的真实症状：停在等待文案上不动。
+    expect(h.bridge.state.value).toBe('waiting_application')
+    expect(status(wrapper).text).toContain('等待 OnlyOffice 回传文件')
+  })
+
+  it('后端说 callback_expected=false（no_changes）时不进等待态，而是给出人话原因', async () => {
+    // 后端 `request_forcesave` 对 CS 的 `no_changes`(cs_error=4) 已就地终结 request+shell
+    // 并回传 `callback_expected=false`，源码注释写的就是「避免前端无限等 status 6」。
+    // 修复前前端不解析这三个字段 ⇒ 照样进 waiting_application 干等不会来的 callback，
+    // 「进 OO 什么都没改直接点保存」必然永久转圈。
+    const h = harness({
+      requestForcesave: vi.fn(async () => ({
+        forcesaveRequestId: UUID(29),
+        operationId: UUID(30),
+        requestSequence: 7,
+        state: 'accepted' as const,
+        pollAfterMs: 800,
+        replayed: false,
+        dispatchError: null,
+        csError: 4,
+        csOutcome: 'no_changes',
+        callbackExpected: false,
+      })),
+    })
+    const { wrapper } = await openEditor(h)
+    await hostApi(wrapper).forceSave()
+    await flushPromises()
+
+    expect(h.bridge.state.value).not.toBe('waiting_application')
+    expect(h.bridge.state.value).toBe('forcesave_frozen')
+    expect(h.api.getOperation, '不会有 callback 时不该去轮询').not.toHaveBeenCalled()
+    // 文案必须说清「没改动」，不能是笼统的「未被受理」——用户要知道下一步怎么做。
+    expect(status(wrapper).text).toContain('没有检测到改动')
   })
 })
 

@@ -1,19 +1,22 @@
 """合并试算表服务 — 异步 ORM"""
 
+from __future__ import annotations
+
+from collections.abc import Callable
+from datetime import datetime, timezone
 from decimal import Decimal
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
-from typing import Any
 
 import sqlalchemy as sa
-from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.consolidation_models import (
-    ConsolTrial,
-    EliminationEntry,
-    ReviewStatusEnum,
-)
-from app.models.consolidation_schemas import ConsolTrialRow, ConsolTrialResponse
+from app.models.consolidation_models import ConsolTrial
+
+if TYPE_CHECKING:
+    from app.schemas.consol_context import ConsolContext
+    from app.services.consol_calc_basis import CalcBasis
+    from app.services.consol_tree_service import TreeNode
 
 
 async def get_trial_balance(db: AsyncSession, project_id: UUID, year: int) -> list[ConsolTrial]:
@@ -74,72 +77,117 @@ async def upsert_trial_row(
     return trial
 
 
-async def recalculate_trial(db: AsyncSession, project_id: UUID, year: int) -> list[ConsolTrial]:
-    """重新计算合并试算表
+async def sync_trial_rows(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    basis: "CalcBasis",
+    fill: Callable[[ConsolTrial, str | None], None],
+) -> list[ConsolTrial]:
+    """按本树科目集合同步合并试算行（需求 5.6）。
 
-    B1 接入：先汇总各子公司本体审定数到 individual_sum（之前完全缺失这一步，
-    导致 consol_amount 实际只剩抵销额），再叠加 consol_adjustment + consol_elimination，
-    落实合并恒等式 consol_amount == individual_sum + consol_adjustment + consol_elimination。
-
-    母分合并（consolidation_type == "branch"）：直接加总，无抵销，
-    consol_amount = individual_sum（跳过 elimination 步骤）。
+    - 集合内的科目：没有行就建（名称、类别取口径 —— 试算表优先，只在分录里出现的取分录行名称），
+      再 ``fill(row, 科目)``；
+    - 已有行但科目不在集合内（数据叶子与分录都不再有该科目）：``fill(row, None)`` 由调用方清零；
+    - 同科目重复的有效行（历史脏数据）只保留一行，其余软删，防止报表取数重复计。
+    只 flush 不 commit。
     """
-    # ① B1：先汇总各子公司本体审定数写入 individual_sum + consolidation_breakdown。
-    #    延迟 import 打破与 consol_individual_sum_service 的循环依赖。
-    from app.services.consol_individual_sum_service import aggregate_individual_sum
-
-    await aggregate_individual_sum(db, project_id, year)
-
-    # ② 重新加载试算表，确保拿到 aggregate 刚写入的 individual_sum
-    trials = await get_trial_balance(db, project_id, year)
-
-    # ③ 判断合并类型：母分汇总（branch）跳过抵销
-    from app.models.core import Project
-    proj_result = await db.execute(
-        sa.select(Project.consolidation_type).where(Project.id == project_id)
-    )
-    consolidation_type = proj_result.scalar_one_or_none()
-
-    if consolidation_type == "branch":
-        # 母分汇总：直接加总，无调整无抵销
-        for trial in trials:
-            trial.consol_adjustment = Decimal("0")
-            trial.consol_elimination = Decimal("0")
-            trial.consol_amount = trial.individual_sum
-            trial.is_stale = False  # 重算后清除陈旧标记（P1）
-    else:
-        # 母子合并（默认）：叠加已审批抵销
-        result = await db.execute(
-            sa.select(EliminationEntry).where(
-                EliminationEntry.project_id == project_id,
-                EliminationEntry.year == year,
-                EliminationEntry.review_status == ReviewStatusEnum.approved,
-                EliminationEntry.is_deleted.is_(False),
-            )
+    existing = (await db.execute(
+        sa.select(ConsolTrial).where(
+            ConsolTrial.project_id == project_id,
+            ConsolTrial.year == year,
+            ConsolTrial.is_deleted.is_(False),
         )
-        elim_entries = list(result.scalars().all())
+    )).scalars().all()
+    by_code: dict[str, ConsolTrial] = {}
+    for row in sorted(existing, key=lambda r: str(r.id)):
+        if row.standard_account_code in by_code:
+            row.soft_delete()
+        else:
+            by_code[row.standard_account_code] = row
 
-        # 按科目代码汇总抵消金额
-        elim_debits: dict[str, Decimal] = {}
-        elim_credits: dict[str, Decimal] = {}
-        for entry in elim_entries:
-            for line in (entry.lines or []):
-                code = line.get("account_code", "")
-                debit = Decimal(str(line.get("debit_amount") or 0))
-                credit = Decimal(str(line.get("credit_amount") or 0))
-                if code:
-                    elim_debits[code] = elim_debits.get(code, Decimal("0")) + debit
-                    elim_credits[code] = elim_credits.get(code, Decimal("0")) + credit
-
-        for trial in trials:
-            code = trial.standard_account_code
-            trial.consol_adjustment = Decimal("0")
-            trial.consol_elimination = (elim_debits.get(code, Decimal("0")) - elim_credits.get(code, Decimal("0")))
-            trial.consol_amount = trial.individual_sum + trial.consol_adjustment + trial.consol_elimination
-            trial.is_stale = False  # 重算后清除陈旧标记（P1）
-
+    for code in basis.accounts:
+        row = by_code.get(code)
+        name = basis.names.get(code)
+        category = basis.categories.get(code)
+        if row is None:
+            zero = Decimal("0")
+            # 金额列与陈旧标记显式给值：只靠库默认值时 flush 后属性过期，异步会话里再读会触发隐式 IO
+            row = ConsolTrial(
+                project_id=project_id, year=year, standard_account_code=code,
+                account_name=name, account_category=category,
+                individual_sum=zero, consol_adjustment=zero, consol_elimination=zero,
+                consol_amount=zero, is_stale=False,
+            )
+            db.add(row)
+            by_code[code] = row
+        else:
+            if name:
+                row.account_name = name
+            if row.account_category is None and category is not None:
+                row.account_category = category
+        fill(row, code)
+    wanted = set(basis.accounts)
+    for code, row in by_code.items():
+        if code not in wanted:
+            fill(row, None)
     await db.flush()
-    return trials
+    return list(by_code.values())
+
+
+async def recalculate_trial(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    *,
+    context: "ConsolContext | None" = None,
+    tree: "TreeNode | None" = None,
+) -> list[ConsolTrial]:
+    """重新计算合并试算表（spec consol-tree-three-code-autobuild 任务 7.4）。
+
+    ``consol_amount = individual_sum + consol_adjustment + consol_elimination``：
+    - 个别数汇总 = 企业树全部数据叶子的审定数（含母公司本体、各级本部与分公司）；
+    - 调整 / 抵销 = 已归属分录明细行按科目自然方向归一（``sign(a)·(借−贷)``），
+      「其他调整」进调整列，其余进抵销列；孤儿分录不计入；
+    - 取数、归属、符号与差额表引擎同一函数（``consol_calc_basis``），根节点合并数逐科目相等（P8）。
+
+    口径变更（有意）：删除按 ``projects.consolidation_type == "branch"`` 整体跳过抵销的分支 ——
+    合并方式由下级关系推导（ADR-CTREE-004），母分差额分录与合并差额分录各自计入（需求 4.2 / 4.3）。
+    只 flush 不 commit。
+    """
+    from app.services.consol_calc_basis import load_calc_basis, trial_amounts
+    from app.services.consol_context_service import validate_context
+
+    resolved_tree = tree
+    if resolved_tree is None and context is not None:
+        from app.services.consol_tree_service import build_tree
+
+        resolved_tree = await build_tree(db, project_id)
+    validate_context(context, project_id, year, tree=resolved_tree)
+
+    basis = await load_calc_basis(db, project_id, year, tree=resolved_tree)
+    if basis is None:
+        raise ValueError(f"企业树构建失败：找不到合并母项目 {project_id}")
+    amounts = trial_amounts(basis)
+    computed_at = datetime.now(timezone.utc).isoformat()
+    zero = Decimal("0")
+
+    def fill(trial: ConsolTrial, account: str | None) -> None:
+        a = amounts.get(account) if account is not None else None
+        trial.individual_sum = a.individual_sum if a is not None else zero
+        trial.consol_adjustment = a.consol_adjustment if a is not None else zero
+        trial.consol_elimination = a.consol_elimination if a is not None else zero
+        trial.consol_amount = a.consol_amount if a is not None else zero
+        trial.consolidation_breakdown = {
+            "by_company": a.by_company if a is not None else [],
+            "individual_sum": str(trial.individual_sum),
+            "source_entry_ids": a.source_entry_ids if a is not None else [],
+            "computed_at": computed_at,
+        }
+        trial.is_stale = False  # 重算后清除陈旧标记（P1）
+
+    await sync_trial_rows(db, project_id, year, basis, fill)
+    return await get_trial_balance(db, project_id, year)
 
 
 async def check_trial_consistency(db: AsyncSession, project_id: UUID, year: int) -> dict[str, Any]:

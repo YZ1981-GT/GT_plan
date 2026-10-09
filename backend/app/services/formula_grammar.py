@@ -29,8 +29,19 @@ NOTE_PATTERN = re.compile(r"NOTE\('([^']+)','([^']+)','([^']+)'\)")
 WP_PATTERN = re.compile(r"WP\('([^']+)','([^']+)'(?:,'([^']+)')?\)")
 PREV_PATTERN = re.compile(r"PREV\('([^']+)','([^']+)'(?:,'([^']+)')?\)")
 AUX_PATTERN = re.compile(r"AUX\('([^']+)','([^']*?)','([^']+)'\)")
+ADJ_PATTERN = re.compile(r"ADJ\('([^']+)','([^']+)'\)")
 
 # 有序 token 列表（SUM_ROW/SUM_TB 必须在 ROW/TB 之前以避免部分匹配）
+#
+# 🔴 **新 token 一律追加到末尾**。`formula_engine.get_formula_account_codes`
+# 按**硬编码下标**取 pattern（`_TOKEN_PATTERNS[1]` = SUM_TB、`[2]` = TB），
+# 在前部插入会让它静默取到错误的 pattern。该下标契约由
+# `test_adj_formula_function.test_token_patterns_index_contract` 钉住。
+#
+# 🔴 加入本列表的 token **必须**在 `formula_engine._execute_regex` 里有对应
+# `elif token_name == ...` 分支 —— 该函数的 `val` 初值是 `Decimal("0")` 且循环
+# 末尾无条件替换，缺分支的 token 会被**静默替换成 0**（与 report_engine 的
+# 「PREV/NOTE/WP/AUX 一律置 0」是同一类陷阱，但那处是有意的、这处是失手）。
 TOKEN_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("SUM_ROW", SUM_ROW_PATTERN),
     ("SUM_TB", SUM_TB_PATTERN),
@@ -41,6 +52,7 @@ TOKEN_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("AUX", AUX_PATTERN),
     ("NOTE", NOTE_PATTERN),
     ("WP", WP_PATTERN),
+    ("ADJ", ADJ_PATTERN),
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -57,6 +69,20 @@ RELAXED_FORMULA_PATTERNS: dict[str, re.Pattern[str]] = {
     'WP': re.compile(r"WP\(\s*'([^']+)'\s*,\s*'([^']+)'\s*(?:,\s*'([^']+)')?\s*\)"),
     'AUX': re.compile(r"AUX\(\s*'([^']+)'\s*,\s*'([^']+)'\s*(?:,\s*'([^']+)')?\s*\)"),
     'PREV': re.compile(r"PREV\(\s*'([^']+)'\s*,\s*'([^']+)'\s*(?:,\s*'([^']+)')?\s*\)"),
+    # 🔴 **ADJ 刻意不在本表内**（2026-09-28 实测后撤回，
+    #    spec tb-adjustment-column-formula-closure Phase 1 Task 1.7）。
+    #
+    #    本表不只是「宽松正则」——它同时是 **ACNR 地址域函数集**：
+    #    `address_registry.formula_ref_to_uri` 遍历它做公式↔URI 互转，
+    #    `acnr/formula_validation._NON_WP_FUNCS` 由它派生。
+    #    而 ADJ **没有 ACNR URI 等价**（`formula_ref_to_uri` 的 if/elif 链无 ADJ
+    #    分支 ⇒ 返 None）：调整额是按 `(科目, 调整类型)` 聚合的实时汇总，
+    #    不是一个可寻址的坐标。加进来只会让 ADJ 白跑两条 ACNR 消费路径。
+    #
+    #    ADJ 的求值靠 `TOKEN_PATTERNS` 里的严格 `ADJ_PATTERN`（上方），
+    #    与本表无关。若将来给 ADJ 设计了地址语义，加进本表时**必须同步**
+    #    给 `formula_ref_to_uri` 加分支，否则 `validate_formula_refs` 会对
+    #    每条 ADJ 公式报「悬空引用」（uri=None 时才不报）。
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════

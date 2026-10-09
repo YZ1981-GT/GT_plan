@@ -58,8 +58,10 @@ from app.services.workpaper_sync.excel_extract import (
     ExcelIdentityBinding,
     assert_engine_entry_definitions,
     extract_projection,
+    release_scoped_workbooks,
     resolve_managed_region,
     verify_unmanaged_regions,
+    workbook_read_scope,
 )
 from app.services.workpaper_sync.excel_materialize import (
     ExcelWriteCapability,
@@ -67,6 +69,10 @@ from app.services.workpaper_sync.excel_materialize import (
 )
 from app.services.workpaper_sync.limits import SyncLimits, load_limits
 from app.services.workpaper_sync.models import ArtifactKind, ArtifactState
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "ExcelAdapterIdentityError",
@@ -83,6 +89,80 @@ class ExcelAdapterIdentityError(AdapterProtocolError):
     """传进来的 contract 与 adapter 冻结的 contract 不是同一份（跨 entry 串台）。"""
 
     error_code = "excel_adapter_contract_identity_mismatch"
+
+
+# ─── OO 加载期崩溃中性化：解析层已抽到伴生模块 ────────────────────────────────
+#
+# 🔴 原实现在本文件里只查 provider 模块并 `getattr(..., None)` **软跳过**，而中性化函数
+#    只定义在 `g7_oo_crash_if_neutralize`、只有 G7 的 provider re-export 了它 ⇒ 注册表
+#    21 条声明里 **20 条运行时解析恒 None**（G 11 + H 9），中性化从未执行，而所有门全绿。
+#    修法（两段解析 + fail-closed）与实测账落在
+#    `workpaper_sync/oo_crash_neutralization.py` 的模块 docstring。
+#
+# 抽出的另一个原因：本文件已在行数 whitelist 里（改动前 1027 行 > 800 上限），
+# 新增 80 行会顶破 +5% 容差 —— 按门禁「优先拆分或抽伴生模块」处置。
+from app.services.workpaper_sync.oo_crash_neutralization import (  # noqa: E402,F401
+    OoCrashNeutralizationFnUnresolvedError,
+    resolve_oo_crash_neutralization_fn as _resolve_oo_crash_neutralization_fn,
+)
+
+
+def _sheet_cumulative_shift(
+    per_table_shift: Mapping[str, tuple[Any, Any]],
+    *,
+    sheet_of_table: Mapping[str, str],
+    sheet_part: str,
+) -> tuple[Any, tuple[int, ...]]:
+    """某张 sheet 上**全部趟**的累积位移声明 + 合并后的合计行集合。
+
+    ═══ 为什么不能按 `region.table_key` 取单趟 ═══
+
+    同 sheet 多受管区（D4-1 主营/其他、D4-9 本期/上期、D4-20 三区、D4-34、D4-36）在
+    **逐趟链式** materialize 下会让**同一个 sheet part 被插多次行**（D4-1 实测：主营 7 行 +
+    其他 2 行）。verify 的归一化是「把 after 行号反向映射回 before」，而两次插行的复合映射
+    **不是**单个 `(insert_at, count)` 能表达的 ⇒ 原先按 `per_table_shift.get(table_key)`
+    取单趟，归一化后两侧仍不等 ⇒ 与计划一致的插行被判 `adapter_unmanaged_region_drift`
+    （实测 `managed_sheet_unmanaged_cells` 280 → 340）。
+
+    **顺序即正确性**：`per_table_shift` 是 dict，键序 = `_materialize_within_scope` 里
+    `for index, binding in enumerate(bindings)` 的**逐趟顺序**（Python 3.7+ 保序）。
+    `CompositeRowShift` 依赖这个顺序做链式 unshift（逆序还原），故本函数按 `per_table_shift`
+    的原生迭代序收集，**不**排序。
+
+    单趟时返回**原 `RowShiftPlan`**（不包 composite）⇒ 单 sheet / Word / 旧调用方逐字节
+    行为不变（纯增量纪律）。
+    """
+    from app.services.workpaper_sync.excel_row_shift import CompositeRowShift
+
+    plans: list[Any] = []
+    totals: list[int] = []
+    seen_totals: set[int] = set()
+    for table_key, entry in per_table_shift.items():
+        if sheet_of_table.get(table_key) != sheet_part:
+            continue
+        shift, table_totals = entry
+        # 🔴 **每趟的 `total_formula_rows` 是「它自己那趟的位移前」口径，不是最初 before**。
+        #    第 2 趟看到的 substrate 已经被第 1 趟插过行：D4-1 其他区合计行在最初模板是 18，
+        #    但其他区那趟声明的是 **25**（= 18 + 主营插的 7）。而 verify 的
+        #    `_is_total_row` 拿的是**完全归一化回最初 before** 的坐标 ⇒ 用 25 去比永远不中
+        #    ⇒ 其他区合计公式的扩张不被还原 ⇒ `managed_sheet_unmanaged_cells` 仍判 drift
+        #    （项数已对齐、只有内容不等，正是这个形态）。
+        #    故把本趟 totals 经**已收集的前序趟** unshift 逆序映射回最初 before 口径。
+        prior = tuple(plans)
+        for row in table_totals or ():
+            normalised = int(row)
+            for plan in reversed(prior):
+                normalised = plan.unshift(normalised)
+            if normalised not in seen_totals:
+                seen_totals.add(normalised)
+                totals.append(normalised)
+        if shift is not None:
+            plans.append(shift)
+    if not plans:
+        return None, ()
+    if len(plans) == 1:
+        return plans[0], tuple(totals)
+    return CompositeRowShift(plans=tuple(plans)), tuple(totals)
 
 
 @dataclass(frozen=True)
@@ -265,6 +345,38 @@ class ExcelSyncAdapter:
         repaired: Path | None = None
         substrate_for_write = substrate
         g7_sanitized: Path | None = None
+        # 🔴 多 binding 底稿的写盘路径里也有「同一个文件被解析多遍」：每趟
+        # `materialize_projection` 内部要反读**同一个**输入文件的两个视图
+        # （data_only True/False）。D4-营业收入实测 39 趟 ⇒ `openpyxl.load_workbook`
+        # 90 次、累计 40.3s，占 `adapter.materialize` 42.8s 的绝大部分。
+        # 作用域让每趟的两个视图共享一次解析（78 → 39 次真实解析）。
+        # 趟与趟之间**不共享**：链式中间产物各是不同文件（缓存键含 mtime/size），
+        # 因此不存在「读到上一趟旧字节」的可能。
+        # 🔴 下面每一处 `unlink` 之前都必须 `release_scoped_workbooks`，否则缓存里的
+        # zip 句柄会让 Windows 删不掉临时文件。
+        with workbook_read_scope():
+            return self._materialize_within_scope(
+                substrate=substrate,
+                projection=projection,
+                output=output,
+                contract=contract,
+                repaired=repaired,
+                substrate_for_write=substrate_for_write,
+                g7_sanitized=g7_sanitized,
+            )
+
+    def _materialize_within_scope(
+        self,
+        *,
+        substrate: Path,
+        projection: Projection,
+        output: Path,
+        contract: SyncContract,
+        repaired: Path | None,
+        substrate_for_write: Path,
+        g7_sanitized: Path | None,
+    ) -> MaterializeResult:
+        """:meth:`materialize` 的本体。拆出来只为让作用域包住整趟，不改任何判据。"""
         try:
             # OO→HTML：OnlyOffice 可能保留 `_GT_SYNC` 清册却掏空 sheetData。从冻结的
             # base representation 重注到临时 xlsx；durable incoming 本体一字不动（AC 8.10）。
@@ -286,20 +398,21 @@ class ExcelSyncAdapter:
                 )
                 if repaired is not None:
                     substrate_for_write = repaired
-            # G7：OnlyOffice 对部分 IF() 在加载期 tocBool 崩溃（error -82）。在 substrate
+            # OO 加载期公式崩溃中性化（如 G7 的 IF() tocBool 崩溃 error -82）：在 substrate
             # 副本上中性化后再 materialize，使 before/after 公式集一致、哈希自洽。
-            if self.adapter_id == "g7.soe_subsidiary_disclosure":
+            # 🔴 Task 13 收敛（需求 3.1/7.1）：原字面量分支 `if self.adapter_id ==
+            # "g7.soe_subsidiary_disclosure"` 改走注册表声明 `oo_crash_neutralization_fn`
+            # （requirements.md 现状红基线「adapters/excel 2 处」）。哪家需要这个 workaround
+            # 由 provider 侧在注册表里显式登记，框架层不再认识具体 adapter_id 字符串。
+            _neutralize_fn = _resolve_oo_crash_neutralization_fn(self.adapter_id)
+            if _neutralize_fn is not None:
                 import shutil
-
-                from app.services.workpaper_sync.pilot_g7_two_level_dynamic import (
-                    neutralize_oo_crash_if_formulas,
-                )
 
                 g7_sanitized = substrate_for_write.with_name(
                     substrate_for_write.name + ".g7-noif.xlsx"
                 )
                 shutil.copy2(substrate_for_write, g7_sanitized)
-                neutralize_oo_crash_if_formulas(g7_sanitized)
+                _neutralize_fn(g7_sanitized)
                 substrate_for_write = g7_sanitized
 
             bindings = self._all_bindings()
@@ -358,6 +471,30 @@ class ExcelSyncAdapter:
                 merge_workbook_row_change_propagations,
             )
 
+            # 🔴 单趟写入优先（spec oo-single-pass-materialize-and-room-leave）：全部 binding
+            #    的计划只解析一次 substrate、写入合成一趟。它在「任一 binding 需插行 / 用
+            #    openpyxl 全量重写 / 两 binding 写同一格**且 payload 不同**」时**显式 decline**，
+            #    回落下面的逐趟链式路径（语义与改动前逐字相同，只是慢）。
+            #    ⚠️ 第三条不是「同 sheet」也不是「坐标相交」：同格但 payload 逐字段相同是恒等
+            #    覆盖（D4 的 sheet14 C24/E24/C38/E38 四格），按坐标 decline 会把 D4 挡在单趟
+            #    之外 —— 而 D4 正是需求 1.5 指名的 entry。判据见
+            #    `excel_materialize._cross_binding_payload_conflicts`。
+            #    decline 而非静默回落：真库上要能统计回落比例（Requirement 3）。
+            #    🔴 下面那条逐趟链式路径**不是死代码**：它是 decline 三条（插行 / openpyxl
+            #    全量重写 / payload 冲突）的正式回落路径，被 `single_pass is None` 真实到达。
+            single_pass = self._try_single_pass_materialize(
+                bindings=bindings,
+                substrate_for_write=substrate_for_write,
+                projection=projection,
+                output=output,
+                contract=contract,
+                role=role,
+                kind=kind,
+                state=state,
+            )
+            if single_pass is not None:
+                return single_pass
+
             current = substrate_for_write
             primary_result: MaterializeResult | None = None
             last_result: MaterializeResult | None = None
@@ -412,6 +549,8 @@ class ExcelSyncAdapter:
                     current = target
             finally:
                 for path in tmp_paths:
+                    # 先释放作用域内可能持有的 zip 句柄，再删（Windows 上顺序反了就删不掉）。
+                    release_scoped_workbooks(path)
                     path.unlink(missing_ok=True)
             assert last_result is not None
             assert primary_result is not None
@@ -448,9 +587,112 @@ class ExcelSyncAdapter:
             )
         finally:
             if repaired is not None:
+                release_scoped_workbooks(repaired)
                 repaired.unlink(missing_ok=True)
             if g7_sanitized is not None:
+                release_scoped_workbooks(g7_sanitized)
                 g7_sanitized.unlink(missing_ok=True)
+
+    def _try_single_pass_materialize(
+        self,
+        *,
+        bindings: tuple[ExcelIdentityBinding, ...],
+        substrate_for_write: Path,
+        projection: Projection,
+        output: Path,
+        contract: SyncContract,
+        role: SubstrateRole,
+        kind: ArtifactKind,
+        state: ArtifactState,
+    ) -> "MaterializeResult | None":
+        """尝试单趟物化；不适用返回 `None`（调用方回落逐趟链式路径）。
+
+        spec: oo-single-pass-materialize-and-room-leave · Requirement 1 / 2
+
+        产出的 `MaterializeResult` 与逐趟路径的返回**逐字段同构**：主 binding 的完整
+        result + 全部 binding 的字段数累加 + 全部趟 workbook 位移声明并集。`per_table_shift`
+        在单趟路径恒为 `None`（单趟在任一 binding 需插行时就已 decline）。
+        """
+        import dataclasses
+        import hashlib
+
+        from app.services.workpaper_sync.excel_materialize import (
+            SinglePassDeclined,
+            materialize_projection_single_pass,
+        )
+        from app.services.workpaper_sync.excel_workbook_row_change import (
+            merge_workbook_row_change_propagations,
+        )
+
+        try:
+            outcome = materialize_projection_single_pass(
+                substrate=substrate_for_write,
+                projection=projection,
+                output=output,
+                definitions=self.definitions,
+                bindings=bindings,
+                primary_table_key=self.binding.table_key,
+                substrate_role=role,
+                substrate_kind=kind,
+                substrate_state=state,
+                capability=self.capability,
+                limits=self._limits,
+            )
+        except SinglePassDeclined as exc:
+            # 🔴 仍然**不在这里** emit metrics：metrics 是注册制契约（`METRICS_BY_NAME` +
+            #    归因维度 + 治理 gate），且 platform 级指标必须带 project_id/wp_id ——
+            #    engine 层是纯计算、拿不到 scope，编一个 scope 就是假归因。
+            #    Task 10（requirements 3.3「回落原因统计」）的做法是**登记分型**：engine 只说
+            #    「发生了哪一类回落」，emit 与归因由持有 scope 的 router 完成。作用域之外
+            #    `record_single_pass_decline` 是安全空操作，所以这行不会让任何既有调用路径变化。
+            from app.services.workpaper_sync.materialize_reuse_verdict import (
+                record_single_pass_decline,
+            )
+
+            decline_class = record_single_pass_decline(exc.reason)
+            logger.info(
+                "[single_pass] 回落逐趟链式（entry=%s，class=%s）：%s",
+                self.adapter_id,
+                decline_class.value,
+                exc.reason,
+            )
+            return None
+
+        logger.info(
+            "[single_pass] 单趟物化命中（entry=%s，binding=%d）",
+            self.adapter_id,
+            len(bindings),
+        )
+        result = outcome.primary.result
+        from app.services.workpaper_sync.phase5_transposed_sheet import (
+            materialize_file as _transposed_materialize_file,
+        )
+        from app.services.workpaper_sync.transposed_registry import (
+            resolve_transposed_specs,
+        )
+
+        specs = resolve_transposed_specs(contract)
+        if specs:
+            # 转置写盘后只刷新 artifact 字节摘要；structure_hash 由
+            # ContentMutationService._projection_structure_hash（与观测器同构）覆盖。
+            for spec in specs:
+                _transposed_materialize_file(output, projection, spec=spec)
+            result = dataclasses.replace(
+                result,
+                artifact_sha256=hashlib.sha256(output.read_bytes()).hexdigest(),
+            )
+
+        merged_change = merge_workbook_row_change_propagations(
+            list(outcome.workbook_row_changes)
+        )
+        return dataclasses.replace(
+            result,
+            managed_field_count=int(result.managed_field_count),
+            output_path=output,
+            workbook_row_change=merged_change,
+            # 单趟在任一 binding 需插行时就 decline ⇒ 到这里必然全无插行。
+            per_table_shift=None,
+        )
 
     def extract(self, *, artifact: Path, contract: SyncContract) -> Projection:
         """反读受管 projection。
@@ -472,26 +714,33 @@ class ExcelSyncAdapter:
         if role is SubstrateRole.published_representation:
             baseline, baseline_formulas = (None, None)
         parts: list[Projection] = []
-        for binding in self._all_bindings():
-            parts.append(
-                extract_projection(
-                    artifact=artifact,
-                    definitions=self.definitions,
-                    binding=binding,
-                    substrate_role=role,
-                    artifact_kind=kind,
-                    artifact_state=state,
-                    baseline=baseline,
-                    baseline_formulas=baseline_formulas,
-                    limits=self._limits,
-                    # 冻结 inventory 只锁主 sheet；sibling 表列跨度不同，不得拿主表期望比对。
-                    retain_identity_inventory=binding.table_key == self.binding.table_key,
-                ).projection
-            )
-        from app.services.workpaper_sync.phase5_transposed_sheet import extract_file as _transposed_extract_file
-        from app.services.workpaper_sync.transposed_registry import resolve_transposed_specs
-        for spec in resolve_transposed_specs(contract):
-            parts.append(_transposed_extract_file(artifact, contract, spec=spec))
+        # 🔴 多 binding 底稿（D4-营业收入实测 39 个 binding）每个 binding 都要读同一个
+        # artifact 的两个视图（data_only True/False）⇒ 78 次全簿 openpyxl 解析、cProfile
+        # 累计 60.8s，这是 store-projection 首请求十秒量级的主项。作用域内同一
+        # (文件身份, data_only) 只解析一次；退出时 finally 关闭全部句柄（Windows 上
+        # staged/repaired 临时文件随后要 unlink，不能有残留句柄）。
+        # 只改「解析几次」不改「解析出什么」——作用域外行为与优化前逐字节相同。
+        with workbook_read_scope():
+            for binding in self._all_bindings():
+                parts.append(
+                    extract_projection(
+                        artifact=artifact,
+                        definitions=self.definitions,
+                        binding=binding,
+                        substrate_role=role,
+                        artifact_kind=kind,
+                        artifact_state=state,
+                        baseline=baseline,
+                        baseline_formulas=baseline_formulas,
+                        limits=self._limits,
+                        # 冻结 inventory 只锁主 sheet；sibling 表列跨度不同，不得拿主表期望比对。
+                        retain_identity_inventory=binding.table_key == self.binding.table_key,
+                    ).projection
+                )
+            from app.services.workpaper_sync.phase5_transposed_sheet import extract_file as _transposed_extract_file
+            from app.services.workpaper_sync.transposed_registry import resolve_transposed_specs
+            for spec in resolve_transposed_specs(contract):
+                parts.append(_transposed_extract_file(artifact, contract, spec=spec))
         return self._merge_projections(parts)
 
     def _substrate_shape_of(
@@ -589,7 +838,11 @@ class ExcelSyncAdapter:
                 after_bytes = after.read_bytes()
                 any_projected = False
                 for spec in specs:
-                    after_rows = _transposed_extract(after_bytes, spec=spec)
+                    # `share_parse=True`：after 字节与 `extract` / `structure_hash` 读的是
+                    # 同一份产物 ⇒ 全簿解析在 `workbook_read_scope()` 里共用一次（需求 2.1）。
+                    # 复用的只是**解析结果**：下面的中性化、逐 binding digest 比对、
+                    # `assert_equivalent` 一条都没省（需求 2.3）。
+                    after_rows = _transposed_extract(after_bytes, spec=spec, share_parse=True)
                     # 🔴 空转置表跳过中性化（否则假 drift）：`materialize_transposed_workbook`
                     #    经 openpyxl `wb.save()` 重序列化目标 sheet part，即便**零实体**也会
                     #    产出字节不同的 XML。而 materialize 侧对空转置表是 no-op
@@ -605,18 +858,16 @@ class ExcelSyncAdapter:
                 if any_projected:
                     d429_before.write_bytes(projected)
                     before_for_compare = d429_before
-            if self.adapter_id == "g7.soe_subsidiary_disclosure":
+            # 同上：注册表声明取代字面量分支（Task 13 收敛）。
+            _neutralize_fn_before = _resolve_oo_crash_neutralization_fn(self.adapter_id)
+            if _neutralize_fn_before is not None:
                 import shutil
-
-                from app.services.workpaper_sync.pilot_g7_two_level_dynamic import (
-                    neutralize_oo_crash_if_formulas,
-                )
 
                 g7_before_sanitized = before.with_name(
                     before.name + ".g7-noif-before.xlsx"
                 )
                 shutil.copy2(before, g7_before_sanitized)
-                neutralize_oo_crash_if_formulas(g7_before_sanitized)
+                _neutralize_fn_before(g7_before_sanitized)
                 before_for_compare = g7_before_sanitized
             with zipfile.ZipFile(after) as zf:
                 regions_by_binding: list[tuple[ExcelIdentityBinding, Any]] = []
@@ -634,6 +885,13 @@ class ExcelSyncAdapter:
             all_managed_parts = frozenset(
                 region.sheet_part for _binding, region in regions_by_binding
             )
+            #: `table_key → sheet_part` —— 判定「哪些趟落在同一张 sheet」的唯一依据。
+            #  不按 sheet_key 猜（同 sheet 双区共享一个 sheet_key，但那是契约概念；
+            #  物理归组必须用 region 解析出的真实 part）。
+            sheet_of_table: dict[str, str] = {
+                region.table_key: region.sheet_part
+                for _binding, region in regions_by_binding
+            }
             # 🔴 转置 sheet（D4-29 customer_detail / D4-12 contract_inspection）是**受管
             #    sheet**，但走 carrier-row 身份机制、**没有 ExcelIdentityBinding**（不在
             #    instrumentation_specs 的受管表清单里）。若不显式登记，它们的 sheet part 不在
@@ -660,8 +918,33 @@ class ExcelSyncAdapter:
                 )
                 all_managed_parts = all_managed_parts | transposed_parts
             last_report: UnmanagedRegionReport | None = None
+            # 同 sheet 多受管区：每个 binding 的受管坐标先算好，校验时把**同 sheet 兄弟区**
+            # 的坐标并进 extra_managed_coords。否则 OO→HTML rematerialize 改写兄弟区格
+            # （sharedString→inlineStr / 浮点规整）会被本 binding 当成 unmanaged drift。
+            from app.services.workpaper_sync.excel_extract import _managed_coordinates
+
+            coords_by_table: dict[str, frozenset[str]] = {
+                binding.table_key: _managed_coordinates(
+                    contract=self.definitions.contract,
+                    region=region,
+                    binding=binding,
+                    scan=None,
+                )
+                for binding, region in regions_by_binding
+            }
             for binding, region in regions_by_binding:
                 extra = all_managed_parts - {region.sheet_part}
+                sibling_coord_sets = [
+                    coords_by_table[other.table_key]
+                    for other, other_region in regions_by_binding
+                    if other_region.sheet_part == region.sheet_part
+                    and other.table_key != binding.table_key
+                ]
+                sibling_coords = (
+                    frozenset().union(*sibling_coord_sets)
+                    if sibling_coord_sets
+                    else frozenset()
+                )
                 # 🔴 每张 sheet 的 shift-aware 归一化必须用**它自己那趟**的 row_shift /
                 #    total_formula_rows。多 sheet 场景里主 binding 不一定是插行的 sheet
                 #    （真实：D4-2 未插、D4-22/D4-23 插）——只按 "是否主 binding" 分派会把
@@ -669,8 +952,17 @@ class ExcelSyncAdapter:
                 #    per_table_shift 给了就按 region.table_key 取本表声明；没给（Word/单 sheet
                 #    /旧调用方）则回退旧口径（主 binding 标量 + sibling None），纯增量。
                 if per_table_shift is not None:
-                    this_shift, this_total = per_table_shift.get(
-                        region.table_key, (None, ())
+                    # 🔴 **同 sheet 多趟插行必须按累积位移归一化**（D4-1 主营 7 行 + 其他
+                    #    2 行落在同一张 sheet）。逐趟链式路径下同一个 sheet part 会被插多次，
+                    #    而单趟 `row_shift` 表达不了累积映射 ⇒ 与计划一致的插行仍被判
+                    #    `adapter_unmanaged_region_drift`（实测 managed_sheet_unmanaged_cells
+                    #    280 → 340）。合成 `CompositeRowShift`（链式 unshift / inserted_rows
+                    #    并集 / 合计扩张逐趟精确还原），单趟时**仍传原 plan** ⇒ 单 sheet 与
+                    #    Word 路径逐字节行为不变。
+                    this_shift, this_total = _sheet_cumulative_shift(
+                        per_table_shift,
+                        sheet_of_table=sheet_of_table,
+                        sheet_part=region.sheet_part,
                     )
                 else:
                     is_primary = binding.table_key == self.binding.table_key
@@ -689,6 +981,7 @@ class ExcelSyncAdapter:
                     total_formula_rows=this_total,
                     propagation=propagation,
                     extra_managed_sheet_parts=extra,
+                    extra_managed_coords=sibling_coords,
                 )
                 last_report.assert_equivalent()
             assert last_report is not None

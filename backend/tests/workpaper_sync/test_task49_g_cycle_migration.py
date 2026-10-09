@@ -58,6 +58,9 @@ from typing import Any, Callable
 
 import pytest
 
+#: AC 1.4 通知真源的**单一解析器**（真源可为字面量数组或 manifest 现算，见该模块 docstring）。
+from tests.workpaper_sync.entry_sync_notice_source import registered_entry_ids
+
 # ────────────────────────────────────────────────────────────────────────────
 # Paths
 # ────────────────────────────────────────────────────────────────────────────
@@ -120,6 +123,30 @@ G7_ENTRY_IDS = frozenset(
         "xlsx/gt-g7-equity-subsidiary",
     }
 )
+#: 本 slice **已发布 per-entry contract** 的 entry → 契约文件名（`entry_id: filename`）。
+#: 🔴 它是 Property 20 / 21 字段级判据的**分母**，随 lane 增长。两条规矩：① 新交付一条必须同时登记，
+#:   否则 `test_slice_contract_delivery_is_exactly_the_declared_set` 红（磁盘有、登记无）；② 每条都被
+#:   `test_delivered_slice_contracts_pass_property_20_21_field_level` 逐字段核验 ⇒ 「悄悄交付一条没过
+#:   字段级判据的契约」这条路被封死。
+#: 2026-09-27：foundation 交付 G2 首条；`g-cycle-single-region-detail-lanes` Task 8/9/9b/10/11 依次交付
+#:   G9（一键三区）/G10/G8（FVOCI）/G14（固定行集+布尔列）/G11（单级表头 + 两列 auto_source）。
+SLICE_DELIVERED_CONTRACTS: dict[str, str] = {
+    "xlsx/gt-g2-interest-receivable": "g2.interest_receivable_detail.json",
+    "xlsx/gt-g9-other-noncurrent-financial": "g9.other_noncurrent_detail.json",
+    "xlsx/gt-g10-trading-financial-liabilities": "g10.trading_liabilities_detail.json",
+    "xlsx/gt-g8-other-equity-instruments": "g8.other_equity_detail.json",
+    "xlsx/gt-g14-credit-impairment-loss": "g14.credit_impairment_detail.json",
+    "xlsx/gt-g11-investment-income": "g11.investment_income_detail.json",
+    "xlsx/gt-g13-fair-value-changes": "g13.fair_value_changes_detail.json",
+    "xlsx/gt-g12-net-hedge-gains": "g12.net_hedge_detail.json",
+    "xlsx/gt-g1-trading-financial-assets": "g1.trading_financial_assets_detail.json",
+    "xlsx/gt-g3-dividend-receivable": "g3.dividend_receivable_detail.json",
+    # 🔴 g4-g6 / g5 spec 的契约也落在同一 G 循环 slice 分母里（整个 G 循环共享一个 slice）
+    "xlsx/gt-g4-bond-investment-main": "g4.bond_main.json",
+    "xlsx/gt-g5-long-term-receivable": "g5.long_term_receivable_detail.json",
+    "xlsx/gt-g6-other-bond-main": "g6.other_bond_main.json",
+}
+
 #: 不可达旧桩（AC 1.7）——它的 independent_entry=false，不进 slice。
 UNREACHABLE_STUB_ENTRY_ID = "xlsx/gt-g6-other-bond-ecl"
 
@@ -1308,18 +1335,20 @@ class TestHtmlCounterpartIsSourceBacked:
                     f"{entry['entry_id']} 声称位置化却没写 row_identity_positional_defect"
                 )
                 flagged.append(entry["entry_id"])
-        assert set(flagged) == {"xlsx/gt-g6-other-bond-sppi"}, (
-            f"位置化缺陷 entry 集合实测为 {sorted(flagged)}，与冻结结论不符"
+        # 🟢 BP-7 已修（g4-g6 spec Task 6，2026-09-27）：G6-sppi 的 id 回退加了随机后缀
+        #    ⇒ 不再是位置化缺陷。冻结结论从「唯一 positional = G6-sppi」翻成「无 positional」。
+        assert set(flagged) == set(), (
+            f"位置化缺陷 entry 集合实测为 {sorted(flagged)} —— BP-7 修复后应为空集"
         )
-        # 另一侧：该缺陷的载入路径逐字可复现
+        # 另一侧：该缺陷的载入路径已改为带随机后缀（BP-7 修复的逐字可复现）
         sppi = _strip_ts_comments(
             (COMPOSABLES / "useG6SppiFairValue.ts").read_text(encoding="utf-8")
         )
-        assert "data.rows.map((r, i) => migrateFairValueRow(r, i + 1))" in sppi, (
-            "BP-7 的载入路径已变 —— 若已修好请更新 slice 与本判据"
+        assert "Math.random().toString(36).slice(2, 4)" in sppi or "Math.random().toString(36).slice(2, 6)" in sppi or "Math.random().toString(36).slice(2, 5)" in sppi, (
+            "BP-7 修复的随机后缀表达式已变 —— G6-sppi 的 id 回退应带 Math.random() 后缀"
         )
-        assert "`fv-${Date.now()}-${seq}`" in sppi, (
-            "BP-7 的下标派生表达式已变 —— 若已修好请更新 slice 与本判据"
+        assert "`fv-${Date.now()}-${seq}`" not in sppi, (
+            "BP-7 的旧下标派生表达式 `fv-${Date.now()}-${seq}` 复活了 —— 修复被回退"
         )
 
     def test_primary_table_identity_cell_matches_the_authoritative_template(
@@ -1378,28 +1407,39 @@ class TestProperty20And21NotClaimedPassingForThisSlice:
     「本 slice 里没有 contract，所以 Property 20 / 21 通过」是重言式（同 spec 的 Task 20
     专门写代码拒绝这种论证）。诚实的写法是区分三件事：
 
-    * **本 slice 无适用分母的部分** —— 本 slice 17 条 entry 已发布的 per-entry contract 数
-      = 0（可复核事实：逐文件读 `review.entry_id`），**不宣称 Property 20 / 21 在这 17 条
-      entry 上通过**，只断言前提成立且承载者真存在。
-    * **本循环内有真分母的部分** —— G 循环有一份真实生产契约
-      `g7.soe_subsidiary_disclosure.json`（G7 pilot 产物，entry_id 属**已排除**的 G7）。
-      本类在它上面做 Property 20 的**正向**核验：逐字段有非空 stable key + source_ref，
-      且没有 `col_[a-z]+` 无语义占位。这不是把 G7 算进本 slice，而是「本循环唯一能承载
-      字段级判据的实体」——把它写清楚，后来者才知道 G 循环的 contract 长什么样。
+    * **已发布 per-entry contract 的部分** —— 见 :data:`SLICE_DELIVERED_CONTRACTS`。
+      🔴 **2026-09-27 起本节不再是空分母**：spec
+      `g-cycle-sync-foundation-and-first-canary`（Task 11~14）给 canary
+      `xlsx/gt-g2-interest-receivable` 发布了 `g2.interest_receivable_detail.json`。
+      原判据当时明写「若本 slice 出现契约，**必须在此补齐字段级判据**
+      （stable_field_key / json_pointer / mode / value_type / source_ref 与 col_ 占位拒绝）」
+      —— 按该指引落地为 `test_delivered_slice_contracts_pass_property_20_21_field_level`。
+      这些 entry 上 Property 20 / 21 是**真的核验过**，不是宣称。
+    * **仍无分母的部分** —— slice 其余 entry（17 − 已交付数）的 per-entry contract 数仍为 0，
+      **不宣称** Property 20 / 21 在它们上面通过，只断言前提成立且承载者真存在。
+    * **本循环内另一个真分母** —— `g7.soe_subsidiary_disclosure.json`（G7 pilot 产物，
+      entry_id 属**已排除**的 G7）。本类在它上面另做一遍 Property 20 正向核验：
+      它是「G 循环 contract 长什么样」的参照，与本 slice 的交付互为对照。
     * **有真分母的其余部分** —— 见 Property 28 / 69 / 70 三个类。
     """
 
-    def test_no_slice_entry_has_a_contract_and_the_g7_pilot_is_the_only_g_contract(
+    def test_slice_contract_delivery_is_exactly_the_declared_set(
         self, manifest_slice: dict
     ) -> None:
-        """分母为 0 这件事本身要被证实，并证明 G7 那条契约确实**不属**本 slice。"""
+        """本 slice 的契约交付面必须**逐条显式登记**，且 G7 那条仍不属本 slice。
+
+        🔴 形态从「数 = 0」改成「== 显式登记集合」（2026-09-27）：交付 G2 canary 契约后
+        「数 = 0」不再成立，但**不能**放宽成「有契约也行」—— 那样悄悄多出来一条契约
+        （比如某 lane 半路交付却没过字段级判据）就没人发现。两侧都咬：
+        登记了却没文件 ⇒ 红；有文件却没登记 ⇒ 红。
+        """
         slice_ids = {e["entry_id"] for e in manifest_slice["independent_entries"]}
         assert slice_ids, "slice entry 集合为空 ⇒ 本判据无分母"
 
         contract_files = sorted(CONTRACT_DIR.glob("*.json"))
         assert len(contract_files) >= 4, (
             f"契约目录只有 {len(contract_files)} 个文件 —— 分母可疑，"
-            "「本 slice 没有契约」这个结论必须建立在真的读过全部契约之上"
+            "本 slice 的契约交付面必须建立在真的读过全部契约之上"
         )
         owners: dict[str, str] = {}
         for path in contract_files:
@@ -1410,29 +1450,107 @@ class TestProperty20And21NotClaimedPassingForThisSlice:
                 owners[path.name] = entry_id
         assert owners, "读不出任何契约的 review.entry_id ⇒ 判据失去分母"
 
-        leaked = {name: eid for name, eid in owners.items() if eid in slice_ids}
-        assert not leaked, (
-            f"契约 {leaked} 归属本 slice 的 entry，「本 slice contract 数 = 0」这个前提不再成立 "
-            "⇒ 必须在此补齐字段级判据（stable_field_key / json_pointer / mode / "
-            "value_type / source_ref 与 col_ 占位拒绝）"
+        on_disk = {eid: name for name, eid in owners.items() if eid in slice_ids}
+        assert on_disk == SLICE_DELIVERED_CONTRACTS, (
+            "本 slice 的契约交付面与显式登记不符：\n"
+            f"  磁盘现算 {on_disk}\n  登记     {SLICE_DELIVERED_CONTRACTS}\n"
+            "新交付一条契约时，必须同时把它加进 SLICE_DELIVERED_CONTRACTS —— 那张表是"
+            "字段级判据的分母，漏登记等于绕过 Property 20 / 21"
         )
-        # G 循环内确实有一条契约，且它属**已排除**的 G7 —— 这条前提必须为真，
-        # 否则「本循环唯一能承载字段级判据的实体」这句话没有分母。
+        # 未交付的那些仍必须真的没有契约（「其余为 0」这半句也要可复核）
+        undelivered = slice_ids - set(SLICE_DELIVERED_CONTRACTS)
+        assert undelivered, (
+            "slice 全部 entry 都已交付契约 ⇒ 本类「仍无分母的部分」这段说明要重写"
+        )
+        assert not (undelivered & set(owners.values())), (
+            f"未登记交付的 entry 却在契约目录里有归属：{sorted(undelivered & set(owners.values()))}"
+        )
+
+        # G 循环内另一条契约属**已排除**的 G7 —— 这条前提必须为真，
+        # 否则「G7 是本循环的参照实体」这句话没有分母。
         g_owners = {n: e for n, e in owners.items() if re.match(r"^xlsx/(gt-)?g\d", e)}
-        assert g_owners, (
-            "契约目录里一条 G 循环契约都没有 ⇒ 下面的 Property 20 正向核验将无分母，"
-            "本类会退化成纯重言式"
+        g7_owners = {n: e for n, e in g_owners.items() if e in G7_ENTRY_IDS}
+        assert g7_owners, (
+            "契约目录里一条 G7 契约都没有 ⇒ 下面的 Property 20 参照核验将无分母"
         )
-        assert set(g_owners.values()) <= G7_ENTRY_IDS, (
-            f"G 循环契约的归属 {g_owners} 不全在 G7 三条排除项里 ⇒ 本 slice 的排除边界要重算"
+        non_g7 = {n: e for n, e in g_owners.items() if e not in G7_ENTRY_IDS}
+        assert non_g7 == {
+            name: eid for eid, name in SLICE_DELIVERED_CONTRACTS.items()
+        }, (
+            f"G 循环里非 G7 的契约 {non_g7} 不等于本 slice 已登记交付面 ⇒ 排除边界要重算"
         )
         excluded_text = json.dumps(
             manifest_slice["slice_scope"]["excluded_from_slice"], ensure_ascii=False
         )
-        for eid in g_owners.values():
+        for eid in g7_owners.values():
             assert eid in excluded_text, (
                 f"契约归属 {eid} 未在 excluded_from_slice 里显式排除 ⇒ 排除边界不可复核"
             )
+
+    def test_delivered_slice_contracts_pass_property_20_21_field_level(self) -> None:
+        """🔴 Property 20 / 21 的**字段级**核验（按原判据留下的指引落地）。
+
+        逐字段锁六件事：`stable_field_key` 非空且非 `col_[a-z]+` 无语义占位、
+        `json_pointer` 是合法 JSON Pointer、`mode` / `value_type` 在允许集合内、
+        `source_ref` 非空。形态要求与 G7 pilot 契约一致（那是本循环的参照）。
+        """
+        assert SLICE_DELIVERED_CONTRACTS, "已交付集合为空 ⇒ 本判据无分母"
+        # 🔴 `mode` / `value_type` 的允许集合从**引擎枚举现读**，不在判据里自造 —— 手抄一份
+        #    就是第二真源（本条首版抄成 read_write/read_only/write_only，与真实的
+        #    editable/formula/auto_source/word_only 完全不搭，判据直接自造红）。
+        from app.services.workpaper_sync.contracts import (  # type: ignore
+            FieldMode,
+            ValueType,
+        )
+
+        allowed_modes = {m.value for m in FieldMode}
+        allowed_value_types = {v.value for v in ValueType}
+        assert "editable" in allowed_modes, "FieldMode 枚举已变 ⇒ 本判据的前提要重核"
+        placeholder = re.compile(r"^col_[a-z]+$")
+        total_fields = 0
+        for entry_id, filename in sorted(SLICE_DELIVERED_CONTRACTS.items()):
+            path = CONTRACT_DIR / filename
+            assert path.is_file(), f"{entry_id} 登记的契约文件不存在：{path}"
+            contract = _load(path)
+            assert contract.get("review_status") == "reviewed", (
+                f"{filename} 顶层 review_status={contract.get('review_status')!r}，"
+                "非 reviewed 的契约不得注册生产 adapter（step 6 约束）"
+            )
+            assert (contract.get("review") or {}).get("entry_id") == entry_id, (
+                f"{filename} 的 review.entry_id 与登记的 {entry_id!r} 不符"
+            )
+            for sheet in contract["sheets"]:
+                for table in sheet["tables"]:
+                    for field in table["fields"]:
+                        total_fields += 1
+                        key = field.get("stable_field_key")
+                        assert isinstance(key, str) and key.strip(), (
+                            f"{filename} 有字段缺 stable_field_key: {field}"
+                        )
+                        assert not placeholder.match(key), (
+                            f"{filename} 出现无语义列占位 stable_field_key={key!r} "
+                            "⇒ Property 20 违规"
+                        )
+                        ptr = field.get("json_pointer")
+                        assert isinstance(ptr, str) and ptr.startswith("/"), (
+                            f"{filename} 字段 {key!r} 的 json_pointer={ptr!r} 不是合法指针"
+                        )
+                        mode = field.get("mode")
+                        assert mode in allowed_modes, (
+                            f"{filename} 字段 {key!r} 的 mode={mode!r} 不在 {sorted(allowed_modes)}"
+                        )
+                        vt = field.get("value_type")
+                        assert vt in allowed_value_types, (
+                            f"{filename} 字段 {key!r} 的 value_type={vt!r} "
+                            f"不在 {sorted(allowed_value_types)}"
+                        )
+                        src = field.get("source_ref")
+                        assert isinstance(src, str) and src.strip(), (
+                            f"{filename} 字段 {key!r} 缺 source_ref ⇒ Property 21 违规"
+                        )
+        assert total_fields >= 10, (
+            f"已交付契约只解析出 {total_fields} 个字段 ⇒ 分母可疑，判据会近似恒真"
+        )
 
     def test_g7_pilot_contract_has_no_generated_col_placeholder(self) -> None:
         """Property 20 的正向核验（真分母）：生产契约里不得有 `col_[a-z]+` 无语义占位。
@@ -1505,26 +1623,34 @@ class TestProperty20And21NotClaimedPassingForThisSlice:
             f"source manifest 里只找到 {seen}/{len(slice_ids)} 条 slice entry ⇒ slice 与 manifest 脱钩"
         )
 
-    def test_registry_delivered_contracts_contain_no_slice_entry(
+    def test_registry_delivered_contracts_match_the_declared_slice_delivery(
         self, manifest_slice: dict
     ) -> None:
-        """registry 的 DELIVERED_PER_ENTRY_CONTRACTS 登记表里不得出现本 slice 的 entry。"""
-        source = REGISTRY.read_text(encoding="utf-8")
-        block = re.search(
-            r"DELIVERED_PER_ENTRY_CONTRACTS[^=]*=\s*\(([\s\S]*?)\n\)\n", source
-        )
-        assert block, "找不到 DELIVERED_PER_ENTRY_CONTRACTS 的声明 ⇒ 判据无分母"
-        declared = re.findall(r"\"entry_id\":\s*\"([^\"]+)\"", block.group(1))
+        """registry 的 `DELIVERED_PER_ENTRY_CONTRACTS` 里出现的本 slice entry 必须**恰是**已登记交付面。
+
+        🔴 形态从「不得出现本 slice 的 entry」改成「== 已登记交付面」（2026-09-27）：
+        G2 canary 交付后它**应当**在 registry 里（否则 provider 注册不了）。
+        但不能放宽成「出现也行」—— registry 里多出一条没过字段级判据的 entry 必须打红。
+
+        🔴 取数改**模块属性现读**：台账已抽到 `delivered_contracts_ledger.py`，源码正则失配成 0 条。
+        """
+        from app.services.workpaper_sync.adapters import registry as _RG
+
+        declared = [str(row["entry_id"]) for row in _RG.DELIVERED_PER_ENTRY_CONTRACTS]
         assert len(declared) >= 4, (
-            f"登记表只解析出 {len(declared)} 条 entry_id ⇒ 正则失配，判据会恒真"
+            f"登记表只解析出 {len(declared)} 条 entry_id ⇒ 取数失配，判据会恒真"
         )
         slice_ids = {e["entry_id"] for e in manifest_slice["independent_entries"]}
-        leaked = [e for e in declared if e in slice_ids]
-        assert not leaked, f"DELIVERED_PER_ENTRY_CONTRACTS 里出现本 slice 的 entry: {leaked}"
-        # 反向：G7 那条**应当**在登记表里（它是 pilot）—— 若不在，说明我们读错了表
-        g_declared = [e for e in declared if re.match(r"^xlsx/(gt-)?g\d", e)]
-        assert set(g_declared) <= G7_ENTRY_IDS, (
-            f"登记表里的 G 循环条目 {g_declared} 不全属 G7 ⇒ 排除边界要重算"
+        from_slice = sorted({e for e in declared if e in slice_ids})
+        assert from_slice == sorted(SLICE_DELIVERED_CONTRACTS), (
+            f"registry 登记的本 slice entry {from_slice} 与已登记交付面 "
+            f"{sorted(SLICE_DELIVERED_CONTRACTS)} 不符 ⇒ 要么漏登记契约文件、"
+            "要么 registry 里多挂了未过字段级判据的 entry"
+        )
+        # 反向：G 循环条目只能是「G7 pilot」∪「本 slice 已交付面」
+        g_declared = {e for e in declared if re.match(r"^xlsx/(gt-)?g\d", e)}
+        assert g_declared <= (G7_ENTRY_IDS | set(SLICE_DELIVERED_CONTRACTS)), (
+            f"登记表里的 G 循环条目 {sorted(g_declared)} 既不属 G7 也不在已交付面 ⇒ 排除边界要重算"
         )
 
     def test_property_denominator_block_declares_what_is_not_claimed(
@@ -1762,13 +1888,28 @@ class TestProperty28DefinitionDriftFailClosed:
     def test_bp5_g1_fallback_sheet_labels_point_at_nonexistent_tabs(
         self, manifest_slice: dict
     ) -> None:
-        """BP-5 双向锁：G1 兜底标签表**真的**有 5 条不是权威模板 tab（不是猜的）。
+        """BP-5 双向锁：G1 兜底标签表 18/18 逐字命中权威模板 tab。
 
-        🔴 这条既锁缺陷存在，也锁修复后必须回来改 slice：把 5 条改对之后它会打红，
-        逼作者把 BP-5 的 status 从 REGISTERED_NOT_FIXED 改掉。
+        🔴 **2026-09-27 本判据已按「修复后」形态改写**（spec
+        `g-cycle-sync-foundation-and-first-canary` Task 5 + Task 9）。
+
+        改写前它断言「**真的**有 5 条不是权威 tab」并要求 `status ==
+        'REGISTERED_NOT_FIXED'`，且在断言消息里写明「若已修好，请更新 BP-5 的 status
+        与本判据」。Task 5 已把 5 条改成模板真名（含 `…G1A ` 的**尾部空格**），
+        故按该指引同步改写：`status` 改断言 `'FIXED'`、错名集合改断言**空集**。
+
+        缺陷的触发路径（`resolveOoSheetName` → `resolveG1SheetLabel` → 兜底表回落）
+        逐字断言**保留不动** —— 那条路径仍然存在，只是兜底表的值现在是对的；
+        删掉它会让「将来有人把值改错」重新变成无声缺陷。
         """
         bp5 = next(bp for bp in manifest_slice["blocking_preconditions"] if bp["id"] == "BP-5")
-        assert bp5["status"] == "REGISTERED_NOT_FIXED"
+        assert bp5["status"] == "FIXED", (
+            f"BP-5.status 实测 {bp5['status']!r}。若标签表又被改错 ⇒ 先修标签表；"
+            "若是有意回退登记 ⇒ 本判据与 "
+            "`tests/workpaper_sync/test_g_foundation_p4_p8_p17_p18_red_baselines.py::"
+            "TestGfP4Bp5G1SheetLabels` 要一起改"
+        )
+        assert bp5.get("fixed_note"), "BP-5 标 FIXED 但没有 fixed_note ⇒ 修复无溯源"
         real = _sheet_names(TEMPLATE_DIR / "G" / "G1 交易性金融资产.xlsx")
         assert len(real) == 18, f"G1 权威模板实测 {len(real)} 个 tab，冻结结论是 18"
         source = _strip_ts_comments(G1_SHEET_LABELS.read_text(encoding="utf-8"))
@@ -1779,9 +1920,13 @@ class TestProperty28DefinitionDriftFailClosed:
         pairs = re.findall(r"(?m)^\s*'?([^':\s]+)'?:\s*'([^']*)',", block.group(1))
         assert len(pairs) == 18, f"兜底标签表解析出 {len(pairs)} 条，应为 18 ⇒ 正则失配"
         mismatched = {code: label for code, label in pairs if label not in real}
-        assert set(mismatched) == {"G1A", "G1-8", "G1-10", "G1-12", "附注国企"}, (
-            f"兜底标签与权威 tab 不符的集合实测为 {sorted(mismatched)}，与 BP-5 冻结结论不符。"
-            "若已修好，请更新 BP-5 的 status 与本判据"
+        assert mismatched == {}, (
+            f"兜底标签仍有 {len(mismatched)} 条不是权威 tab: {mismatched} ⇒ BP-5 回退了"
+        )
+        # 🔴 正向锁住空格那一半：`G1A` 的真名带尾部空格，strip 后比较会把它放过
+        by_code = dict(pairs)
+        assert by_code["G1A"] == "交易性金融资产实质性程序表G1A ", (
+            f"G1A 标签 {by_code['G1A']!r} 丢了尾部空格 —— 空格是源模板事实"
         )
         # 缺陷的触发路径必须逐字可复现（否则 BP-5 的 consequence 是散文）
         dual = _strip_ts_comments(G1_DUAL_MODE.read_text(encoding="utf-8"))
@@ -2605,39 +2750,57 @@ class TestProperty70NoCrossEntryReuse:
         assert UNREACHABLE_STUB.is_file(), (
             "GtG6OtherBondEcl.vue 已不在磁盘上 ⇒ BP-11 已被处理，请更新 slice 与清册"
         )
-        registry = _strip_ts_comments(HTML_RENDERER_REGISTRY.read_text(encoding="utf-8"))
         # 🔴 判「旧桩是否被救活」只能按**模块边**（import 的路径），不能按符号名。
-        # 实测事实：htmlRendererRegistry#L378 有一个**同名局部别名**
+        #
+        # 【历史】重构前 `htmlRendererRegistry.ts#L378` 有一个**同名局部别名**
         #   `const GtG6OtherBondEcl = defineAsyncComponent(() => import('./GtG6OtherBondInvestmentEcl.vue'))`
         # —— 名字叫 GtG6OtherBondEcl，指向的却是真正在用的 GtG6OtherBondInvestmentEcl.vue。
-        # 按名字判会把这个别名当成「引用了旧桩」（Task 49 首轮就是这么红的，且
-        # `registry.replace("GtG6OtherBondInvestmentEcl", "")` 这种先消长名再查短名的写法
-        # 反而正好把别名声明行留成 `const GtG6OtherBondEcl = … import('./.vue')`）。
-        # 旧桩文件的真实入边数 = 0：全仓没有任何 import 指向 `GtG6OtherBondEcl.vue`，
-        # 也没有任何模板用 `<GtG6OtherBondEcl` / `<gt-g6-other-bond-ecl` 标签
-        # （后者会经 unplugin-vue-components 的全局注册解析到该文件）。
-        alias = stub["registry_homonymous_alias"]
-        assert alias["declared_in"].endswith("htmlRendererRegistry.ts"), (
-            "清册必须登记同名别名所在文件 —— 否则下一个人还会按名字判一次"
+        # 按名字判会把它当成「引用了旧桩」（Task 49 首轮就是这么红的）。
+        #
+        # 【现状 2026-09-27】`htmlRendererRegistry.ts` 已被**拆分重构**（commit 82f58ea44，
+        # 1465 行 → 361 行）：组件登记移到 `registry/entries/{core,forms,programs,
+        # confirmations,reports,specialized}.ts`，该同名别名随之消失
+        # （现算：`htmlRendererRegistry.ts` 全文 `GtG6OtherBond` 零命中）。
+        # G6-ecl 现在在 `specialized.ts` 以**直接 import** 登记 ⇒ 这个特定误报源已消除。
+        # 本判据按「拆分后」形态改写（spec g-cycle-sync-foundation-and-first-canary Task 9），
+        # 但**不改回按符号名** —— `components.d.ts` 与 `workpaperSyncManifest.generated.ts`
+        # 里仍有该字符串，按符号名判照样误报。
+        registry_dir = HTML_RENDERER_REGISTRY.parent / "registry" / "entries"
+        registry = "\n".join(
+            _strip_ts_comments(p.read_text(encoding="utf-8"))
+            for p in sorted(registry_dir.glob("*.ts"))
         )
+        assert registry.strip(), (
+            f"{registry_dir} 下没有 entries 子模块 ⇒ registry 形态又变了，本判据要重算"
+        )
+        alias = stub["registry_homonymous_alias"]
         assert alias["alias_name"] == "GtG6OtherBondEcl"
         assert alias["resolves_to"] == "GtG6OtherBondInvestmentEcl.vue"
         assert alias["is_an_inbound_edge_to_the_stub"] is False
+        assert alias["alias_still_exists"] is False, (
+            "清册声称同名别名仍存在 ⇒ 与现算矛盾（htmlRendererRegistry.ts 已零命中）"
+        )
+        assert len(alias["removed_by"]) > 60, "别名消失的归因须写明（防下一个人再查一遍）"
         assert len(alias["why_name_based_probes_misfire"]) > 60
-        alias_decl = re.search(
-            r"const\s+GtG6OtherBondEcl\s*=\s*defineAsyncComponent\(\s*\(\)\s*=>\s*"
-            r"import\(\s*'\./([A-Za-z0-9_.\-]+)'\s*\)\s*\)",
-            registry,
+        assert "GtG6OtherBond" not in _strip_ts_comments(
+            HTML_RENDERER_REGISTRY.read_text(encoding="utf-8")
+        ), (
+            "htmlRendererRegistry.ts 里又出现 GtG6OtherBond ⇒ 同名别名可能复活，"
+            "清册的 alias_still_exists 与本判据都要重算"
         )
-        assert alias_decl, (
-            "htmlRendererRegistry 里找不到登记的同名别名声明 ⇒ 别名形态已变，"
-            "本判据与清册的 registry_homonymous_alias 都要重算"
+        live = alias["live_registration_now"]
+        live_path = ROOT / live["file"]
+        assert live_path.is_file(), f"清册登记的现行登记处不存在: {live['file']}"
+        live_src = _strip_ts_comments(live_path.read_text(encoding="utf-8"))
+        assert live["component_type"] in live_src, (
+            f"{live['file']} 里找不到 componentType {live['component_type']!r}"
         )
-        assert alias_decl.group(1) == alias["resolves_to"], (
-            f"同名别名实际指向 {alias_decl.group(1)!r}，清册登记 {alias['resolves_to']!r}"
+        assert f"import('{live['import_specifier']}')" in live_src, (
+            f"{live['file']} 里找不到直接 import {live['import_specifier']!r} ⇒ "
+            "G6-ecl 的渲染登记形态已变"
         )
         assert "GtG6OtherBondInvestmentEcl" in registry, (
-            "htmlRendererRegistry 里找不到真正在用的 GtG6OtherBondInvestmentEcl ⇒ 判据无分母"
+            "entries 子模块里找不到真正在用的 GtG6OtherBondInvestmentEcl ⇒ 判据无分母"
         )
         # 全仓按模块边扫：没有任何生产模块 import 旧桩文件，也没有模板用它的标签。
         # 🔴 探针只认**模块说明符**（`from '…'` / `import('…')` / `require('…')`），不认
@@ -2834,14 +2997,16 @@ class TestAc14HonestModeVisibility:
             )
 
     def test_registered_entry_ids_agree_with_the_slice(self, manifest_slice: dict) -> None:
-        """双向锁：slice 的 adapter_id 与前端登记表必须互相印证。"""
-        source = _strip_ts_comments(NOTICE_MODULE.read_text(encoding="utf-8"))
-        block = re.search(
-            r"SYNC_ADAPTER_REGISTERED_ENTRY_IDS:\s*readonly\s+string\[\]\s*=\s*\[([\s\S]*?)\]",
-            source,
-        )
-        assert block, "找不到 SYNC_ADAPTER_REGISTERED_ENTRY_IDS 的声明"
-        registered = set(re.findall(r"['\"]([^'\"]+)['\"]", block.group(1)))
+        """双向锁：slice 的 adapter_id 与前端登记表必须互相印证。
+
+        🔴 2026-09-22 修检测器方向。原实现用 `=\\s*\\[` 假定真源是字面量数组，真源改成
+        `WORKPAPER_SYNC_MANIFEST.filter(...).map(...)` 现算之后正则恒 `None`，于是报
+        「找不到 SYNC_ADAPTER_REGISTERED_ENTRY_IDS 的声明」—— 把「形态变了」误报成
+        「东西没了」。解析逻辑收敛到 `entry_sync_notice_source`（一份），仍 fail closed。
+        """
+        registered = set(registered_entry_ids())
+        assert registered, "已注册集合为空 ⇒ 「已注册 ⇒ 不挂通知」分支没有真实分母"
+        assert all("/" in rid for rid in registered), f"集合里有不像 entry_id 的项：{registered}"
         for entry in manifest_slice["independent_entries"]:
             if entry.get("adapter_id") is None:
                 assert entry["entry_id"] not in registered, (

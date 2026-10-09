@@ -1,0 +1,294 @@
+- generic [ref=f34e4]:
+  - banner [ref=f34e5]:
+    - generic "折叠/展开导航" [ref=f34e7] [cursor=pointer]:
+      - img "Grant Thornton 致同" [ref=f34e8]
+      - generic [ref=f34e9]: 审计平台
+    - navigation "面包屑" [ref=f34e11]:
+      - generic [ref=f34e12]:
+        - link "首页" [ref=f34e13]
+        - text: /
+      - link "项目" [ref=f34e15]
+    - generic [ref=f34e16]:
+      - generic [ref=f34e17] [cursor=pointer]
+      - generic [ref=f34e22]:
+        - generic [ref=f34e23] [cursor=pointer]
+        - superscript [ref=f34e28]: "78"
+      - generic "显示设置" [ref=f34e29] [cursor=pointer]: Aa
+      - generic [ref=f34e32] [cursor=pointer]
+      - generic [ref=f34e36] [cursor=pointer]
+      - generic [ref=f34e40] [cursor=pointer]
+      - link "复核收件箱" [ref=f34e45] [cursor=pointer]:
+        - /url: /review-inbox
+      - button "EQCR" [ref=f34e55] [cursor=pointer]
+      - button "打开 AI 助手" [ref=f34e64] [cursor=pointer]
+      - generic "金额单位" [ref=f34e69] [cursor=pointer]: 元
+      - generic [ref=f34e71] [cursor=pointer]: 🌙
+      - button "A admin" [ref=f34e74] [cursor=pointer]:
+        - generic [ref=f34e75]: A
+        - generic [ref=f34e76]: admin
+  - generic [ref=f34e80]:
+    - navigation [ref=f34e81]:
+      - navigation [ref=f34e82]:
+        - generic "仪表盘" [ref=f34e83] [cursor=pointer]
+        - generic "项目" [ref=f34e89] [cursor=pointer]
+        - generic "人员档案" [ref=f34e93] [cursor=pointer]
+        - generic "工时" [ref=f34e97] [cursor=pointer]
+        - generic "看板" [ref=f34e103] [cursor=pointer]
+        - generic "合并" [ref=f34e107] [cursor=pointer]
+        - generic "函证" [ref=f34e112] [cursor=pointer]
+        - generic "归档" [ref=f34e116] [cursor=pointer]
+        - generic "附件" [ref=f34e122] [cursor=pointer]
+        - generic "模板库" [ref=f34e126] [cursor=pointer]
+        - generic "账号权限" [ref=f34e130] [cursor=pointer]
+        - generic "知识库" [ref=f34e134] [cursor=pointer]
+        - generic "私人库" [ref=f34e139] [cursor=pointer]
+        - generic "AI 模型" [ref=f34e144] [cursor=pointer]
+        - generic "公式管理" [ref=f34e149] [cursor=pointer]: ƒx
+        - generic "高级查询" [ref=f34e151] [cursor=pointer]
+        - generic "折叠" [ref=f34e155] [cursor=pointer]
+    - main [ref=f34e160]:
+      - generic [ref=f34e161]:
+        - generic [ref=f34e162]:
+          - generic [ref=f34e163]: ⚠️
+          - generic "账套数据更新后，依赖该数据的试算表、报表或附注尚未同步更新" [ref=f34e164]:
+            - text: 当前项目有
+            - strong [ref=f34e165]: "7"
+            - text: 处数据过期
+          - button "一键重算" [ref=f34e166] [cursor=pointer]
+          - button "查看详情" [ref=f34e168] [cursor=pointer]
+          - button "×" [ref=f34e170] [cursor=pointer]
+        - generic [ref=f34e172]:
+          - generic [ref=f34e174]:
+            - generic [ref=f34e175]:
+              - button "← 返回" [ref=f34e176] [cursor=pointer]
+              - heading "重药控股安徽有限公司_2025 — 底稿管理" [level=2] [ref=f34e178]
+            - generic [ref=f34e179]:
+              - generic [ref=f34e181]:
+                - radiogroup "radio-group" [ref=f34e182]:
+                  - generic [ref=f34e183]:
+                    - radio "生命周期" [ref=f34e184]
+                    - generic [ref=f34e185] [cursor=pointer]: 生命周期
+                  - generic [ref=f34e186]:
+                    - radio "工作台" [checked] [ref=f34e187]
+                    - generic [ref=f34e188] [cursor=pointer]: 工作台
+                  - generic [ref=f34e189]:
+                    - radio "列表" [ref=f34e190]
+                    - generic [ref=f34e191] [cursor=pointer]: 列表
+                  - generic [ref=f34e192]:
+                    - radio "手册" [ref=f34e193]
+                    - generic [ref=f34e194] [cursor=pointer]: 手册
+                - button "更多视图" [ref=f34e196] [cursor=pointer]
+              - generic [ref=f34e201]:
+                - button "🔄 刷新" [ref=f34e202] [cursor=pointer]
+                - button "⬇️ 生成底稿" [ref=f34e204] [cursor=pointer]
+                - button "📥 导入导出" [ref=f34e207] [cursor=pointer]
+                - button "📋 模板复制" [ref=f34e212] [cursor=pointer]
+                - button "➕ 批量自定义底稿" [ref=f34e214] [cursor=pointer]
+                - button "👥 批量委派 (0)" [disabled] [ref=f34e216]
+          - generic [ref=f34e219]:
+            - alert [ref=f34e220]:
+              - generic [ref=f34e224]:
+                - generic [ref=f34e225]: 推荐编制顺序：B 承接计划 → C 控制测试 → D~N 实质性程序 → A 完成报告
+                - generic [ref=f34e226] [cursor=pointer]
+            - generic [ref=f34e229]:
+              - generic [ref=f34e230]: 循环进度概览
+              - button "收起 ▲" [ref=f34e231] [cursor=pointer]
+            - generic [ref=f34e233]:
+              - generic [ref=f34e234] [cursor=pointer]:
+                - generic [ref=f34e235]:
+                  - generic [ref=f34e236]: A
+                  - generic [ref=f34e237]: 完成阶段
+                - progressbar [ref=f34e238]:
+                  - generic [ref=f34e241]: 0%
+                - generic [ref=f34e242]: 0/101 完成
+              - generic [ref=f34e243] [cursor=pointer]:
+                - generic [ref=f34e244]:
+                  - generic [ref=f34e245]: B
+                  - generic [ref=f34e246]: 计划阶段
+                - progressbar [ref=f34e247]:
+                  - generic [ref=f34e250]: 0%
+                - generic [ref=f34e251]: 0/61 完成
+              - generic [ref=f34e252] [cursor=pointer]:
+                - generic [ref=f34e253]:
+                  - generic [ref=f34e254]: C
+                  - generic [ref=f34e255]: 控制测试
+                - progressbar [ref=f34e256]:
+                  - generic [ref=f34e259]: 0%
+                - generic [ref=f34e260]: 0/36 完成
+              - generic [ref=f34e261] [cursor=pointer]:
+                - generic [ref=f34e262]:
+                  - generic [ref=f34e263]: D
+                  - generic [ref=f34e264]: 收入循环
+                - progressbar [ref=f34e265]:
+                  - generic [ref=f34e268]: 0%
+                - generic [ref=f34e269]: 0/17 完成
+              - generic [ref=f34e270] [cursor=pointer]:
+                - generic [ref=f34e271]:
+                  - generic [ref=f34e272]: E
+                  - generic [ref=f34e273]: 货币资金
+                - progressbar [ref=f34e274]:
+                  - generic [ref=f34e277]: 0%
+                - generic [ref=f34e278]: 0/5 完成
+              - generic [ref=f34e279] [cursor=pointer]:
+                - generic [ref=f34e280]:
+                  - generic [ref=f34e281]: F
+                  - generic [ref=f34e282]: 存货
+                - progressbar [ref=f34e283]:
+                  - generic [ref=f34e286]: 0%
+                - generic [ref=f34e287]: 0/9 完成
+              - generic [ref=f34e288] [cursor=pointer]:
+                - generic [ref=f34e289]:
+                  - generic [ref=f34e290]: G
+                  - generic [ref=f34e291]: 投资
+                - progressbar [ref=f34e292]:
+                  - generic [ref=f34e295]: 0%
+                - generic [ref=f34e296]: 0/17 完成
+              - generic [ref=f34e297] [cursor=pointer]:
+                - generic [ref=f34e298]:
+                  - generic [ref=f34e299]: H
+                  - generic [ref=f34e300]: 固定资产
+                - progressbar [ref=f34e301]:
+                  - generic [ref=f34e304]: 0%
+                - generic [ref=f34e305]: 0/14 完成
+              - generic [ref=f34e306] [cursor=pointer]:
+                - generic [ref=f34e307]:
+                  - generic [ref=f34e308]: I
+                  - generic [ref=f34e309]: 无形资产
+                - progressbar [ref=f34e310]:
+                  - generic [ref=f34e313]: 0%
+                - generic [ref=f34e314]: 0/8 完成
+              - generic [ref=f34e315] [cursor=pointer]:
+                - generic [ref=f34e316]:
+                  - generic [ref=f34e317]: J
+                  - generic [ref=f34e318]: 职工薪酬
+                - progressbar [ref=f34e319]:
+                  - generic [ref=f34e322]: 0%
+                - generic [ref=f34e323]: 0/4 完成
+              - generic [ref=f34e324] [cursor=pointer]:
+                - generic [ref=f34e325]:
+                  - generic [ref=f34e326]: K
+                  - generic [ref=f34e327]: 管理/费用
+                - progressbar [ref=f34e328]:
+                  - generic [ref=f34e331]: 0%
+                - generic [ref=f34e332]: 0/21 完成
+              - generic [ref=f34e333] [cursor=pointer]:
+                - generic [ref=f34e334]:
+                  - generic [ref=f34e335]: L
+                  - generic [ref=f34e336]: 债务
+                - progressbar [ref=f34e337]:
+                  - generic [ref=f34e340]: 0%
+                - generic [ref=f34e341]: 0/11 完成
+              - generic [ref=f34e342] [cursor=pointer]:
+                - generic [ref=f34e343]:
+                  - generic [ref=f34e344]: M
+                  - generic [ref=f34e345]: 权益
+                - progressbar [ref=f34e346]:
+                  - generic [ref=f34e349]: 0%
+                - generic [ref=f34e350]: 0/10 完成
+              - generic [ref=f34e351] [cursor=pointer]:
+                - generic [ref=f34e352]:
+                  - generic [ref=f34e353]: "N"
+                  - generic [ref=f34e354]: 税金
+                - progressbar [ref=f34e355]:
+                  - generic [ref=f34e358]: 0%
+                - generic [ref=f34e359]: 0/5 完成
+              - generic [ref=f34e360] [cursor=pointer]:
+                - generic [ref=f34e361]:
+                  - generic [ref=f34e362]: S
+                  - generic [ref=f34e363]: 特定项目
+                - progressbar [ref=f34e364]:
+                  - generic [ref=f34e367]: 0%
+                - generic [ref=f34e368]: 0/21 完成
+            - generic [ref=f34e369]:
+              - generic [ref=f34e371] [cursor=pointer]:
+                - generic [ref=f34e372]: +
+                - generic [ref=f34e373]: B
+                - generic [ref=f34e374]: 计划阶段
+                - generic [ref=f34e375]: 0/61
+                - progressbar [ref=f34e377]
+              - generic [ref=f34e381] [cursor=pointer]:
+                - generic [ref=f34e382]: +
+                - generic [ref=f34e383]: C
+                - generic [ref=f34e384]: 控制测试
+                - generic [ref=f34e385]: 0/36
+                - progressbar [ref=f34e387]
+              - generic [ref=f34e391] [cursor=pointer]:
+                - generic [ref=f34e392]: +
+                - generic [ref=f34e393]: D
+                - generic [ref=f34e394]: 收入循环
+                - generic [ref=f34e395]: 0/17
+                - progressbar [ref=f34e397]
+              - generic [ref=f34e401] [cursor=pointer]:
+                - generic [ref=f34e402]: +
+                - generic [ref=f34e403]: E
+                - generic [ref=f34e404]: 货币资金
+                - generic [ref=f34e405]: 0/5
+                - progressbar [ref=f34e407]
+              - generic [ref=f34e411] [cursor=pointer]:
+                - generic [ref=f34e412]: +
+                - generic [ref=f34e413]: F
+                - generic [ref=f34e414]: 存货
+                - generic [ref=f34e415]: 0/9
+                - progressbar [ref=f34e417]
+              - generic [ref=f34e421] [cursor=pointer]:
+                - generic [ref=f34e422]: +
+                - generic [ref=f34e423]: G
+                - generic [ref=f34e424]: 投资
+                - generic [ref=f34e425]: 0/17
+                - progressbar [ref=f34e427]
+              - generic [ref=f34e431] [cursor=pointer]:
+                - generic [ref=f34e432]: +
+                - generic [ref=f34e433]: H
+                - generic [ref=f34e434]: 固定资产
+                - generic [ref=f34e435]: 0/14
+                - progressbar [ref=f34e437]
+              - generic [ref=f34e441] [cursor=pointer]:
+                - generic [ref=f34e442]: +
+                - generic [ref=f34e443]: I
+                - generic [ref=f34e444]: 无形资产
+                - generic [ref=f34e445]: 0/8
+                - progressbar [ref=f34e447]
+              - generic [ref=f34e451] [cursor=pointer]:
+                - generic [ref=f34e452]: +
+                - generic [ref=f34e453]: J
+                - generic [ref=f34e454]: 职工薪酬
+                - generic [ref=f34e455]: 0/4
+                - progressbar [ref=f34e457]
+              - generic [ref=f34e461] [cursor=pointer]:
+                - generic [ref=f34e462]: +
+                - generic [ref=f34e463]: K
+                - generic [ref=f34e464]: 管理/费用
+                - generic [ref=f34e465]: 0/21
+                - progressbar [ref=f34e467]
+              - generic [ref=f34e471] [cursor=pointer]:
+                - generic [ref=f34e472]: +
+                - generic [ref=f34e473]: L
+                - generic [ref=f34e474]: 债务
+                - generic [ref=f34e475]: 0/11
+                - progressbar [ref=f34e477]
+              - generic [ref=f34e481] [cursor=pointer]:
+                - generic [ref=f34e482]: +
+                - generic [ref=f34e483]: M
+                - generic [ref=f34e484]: 权益
+                - generic [ref=f34e485]: 0/10
+                - progressbar [ref=f34e487]
+              - generic [ref=f34e491] [cursor=pointer]:
+                - generic [ref=f34e492]: +
+                - generic [ref=f34e493]: "N"
+                - generic [ref=f34e494]: 税金
+                - generic [ref=f34e495]: 0/5
+                - progressbar [ref=f34e497]
+              - generic [ref=f34e501] [cursor=pointer]:
+                - generic [ref=f34e502]: +
+                - generic [ref=f34e503]: S
+                - generic [ref=f34e504]: 特定项目
+                - generic [ref=f34e505]: 0/21
+                - progressbar [ref=f34e507]
+              - generic [ref=f34e511] [cursor=pointer]:
+                - generic [ref=f34e512]: +
+                - generic [ref=f34e513]: A
+                - generic [ref=f34e514]: 完成阶段
+                - generic [ref=f34e515]: 0/101
+                - progressbar [ref=f34e517]
+    - button "打开 AI 助手" [ref=f34e520] [cursor=pointer]:
+      - generic [ref=f34e526]: AI

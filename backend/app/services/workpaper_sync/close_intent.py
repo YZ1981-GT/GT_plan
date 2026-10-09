@@ -614,8 +614,6 @@ class CloseIntentService:
         participant_id: uuid.UUID,
         idempotency_key: str,
         client_edit_epoch: int,
-        adapter_build_digest: str,
-        contributor_snapshot_digest: str,
         contributor_user_ids: Iterable[uuid.UUID | str] = (),
         expected_write_fence_epoch: int | None = None,
         expected_bundle: FrozenBundleIdentity | None = None,
@@ -685,12 +683,7 @@ class CloseIntentService:
                 actor_id=actor_id,
             )
 
-        reconcile = await self.reconcile(
-            scope,
-            room_id=room_id,
-            adapter_build_digest=adapter_build_digest,
-            contributor_snapshot_digest=contributor_snapshot_digest,
-        )
+        reconcile = await self.reconcile(scope, room_id=room_id)
         return CloseIntentOpened(
             intent_id=intent.id,
             intent_sequence=int(intent.intent_sequence),
@@ -701,19 +694,14 @@ class CloseIntentService:
         )
 
     async def _count_active_editors(self, room_id: uuid.UUID) -> int:
-        """仍在 `active` 的 participant 数。`closing` **不计入**（AC 4.10）。"""
-        return int(
-            (
-                await self._session.execute(
-                    sa.select(sa.func.count())
-                    .select_from(WorkpaperOoParticipant)
-                    .where(
-                        WorkpaperOoParticipant.room_id == room_id,
-                        WorkpaperOoParticipant.state == ParticipantState.active.value,
-                    )
-                )
-            ).scalar_one()
-        )
+        """仍在 `active` 的 participant 数（AC 4.10）。
+
+        🔴 委托 :meth:`RoomService.count_active_editors` —— 口径（`closing` 不计入）只有
+        一份实现。本方法留着是因为它是本模块的调用面，改成直接内联 `count(*)` 就等于
+        把同一个口径写第二遍；2026-09-22 participant-leave 那条路径也要用它，正是那次
+        发现这里原本有一份**逐字重复**的实现。
+        """
+        return await self._rooms.count_active_editors(room_id)
 
     async def _create_and_dispatch_predecessor(
         self,
@@ -787,8 +775,6 @@ class CloseIntentService:
         scope: RoomScope,
         *,
         room_id: uuid.UUID,
-        adapter_build_digest: str,
-        contributor_snapshot_digest: str,
     ) -> CloseReconcileServiceOutcome:
         """可重入 reconcile（AC 4.10）。快照与仲裁在**同一个 room lock** 内。
 
@@ -810,8 +796,6 @@ class CloseIntentService:
             wp_id=scope.wp_id,
             entry_id=scope.entry_id,
             room_id=room_id,
-            adapter_build_digest=adapter_build_digest,
-            contributor_snapshot_digest=contributor_snapshot_digest,
         )
         assert_leader_matches_prediction(
             prediction=prediction,

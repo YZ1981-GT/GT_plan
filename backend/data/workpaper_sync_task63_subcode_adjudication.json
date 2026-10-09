@@ -39,8 +39,8 @@
           "docx/gt-a16-bundle",
           "docx/gt-a17-bundle"
         ],
-        "manifest_entry_total": 186,
-        "manifest_sha256": "f0ec376201a1013568e79e8e7bbd12a8e013ef21ee730fb04f5753142bf22a03"
+        "manifest_entry_total": 155,
+        "manifest_sha256": "53292ce85bcace7d1a6d64c75ea5a18d10acefa319b7831912311bdcf2f0d2e2"
       },
       "must_fix_before": "为任一 B 子码装载生产契约 / 注册 adapter",
       "numbering_note": "续接 F2 lane 的 BP-1..BP-15（本记录消费它们、不改它们）。",
@@ -69,8 +69,8 @@
         "candidate_state_hardwired": "awaiting_contract",
         "candidate_targets_hardwired_none": true,
         "criterion": "① `assert_may_publish` 的定义处仍在 `word_sdt_engine.py`，且其守卫条件仍是「非 bundle_bound 或 bundle is None ⇒ 抛」；② candidate 登记处仍把 `target_contract_definition_id` / `target_definition_bundle_id` 双双写死 None。两条同时成立 ⇒ 本 lane 无论如何都到不了 published representation。",
-        "word_instrumentation_sha256": "8dd415624a494aaf50794d54983a04be5d68e608008e08fb3ea59e5046e3525d",
-        "word_sdt_engine_sha256": "20eca15665c1432b4c652e1a8748e7025d826b5691a0a5ad6034d7eaf3d0c827"
+        "word_instrumentation_sha256": "bb8d7660baea754dfc13662cce8c73614c5cbf00092958ee6be2130db1a6c151",
+        "word_sdt_engine_sha256": "d3932213c53d9c42f51535db3a545fe02889847b6022bc215069234badb5263d"
       },
       "must_fix_before": "Task 77 WordEntryFinalizeGate.finalize_candidate 可被调用",
       "observable_consequences": [
@@ -102,7 +102,7 @@
         ],
         "forbidden_paths_all_absent": true,
         "real_target_is_listed": true,
-        "registry_sha256": "e82ef5b69e8c08685a13027e5125fe6ba0edfdb755e7e94ecdb95132f87e1eb9"
+        "registry_sha256": "56da019e2b0c429738aa045d799b1951fa0ad522fb55f16686b202b00b707219"
       },
       "must_fix_before": "把任一 B 子码的 capability 从 null 改成 bidirectional",
       "observable_consequences": [
@@ -817,7 +817,7 @@
     }
   ],
   "generated_by": "backend/scripts/gen/generate_workpaper_task63_subcode_adjudication.py",
-  "record_digest": "dcad86c8194ab1f0ee8f07e030b3ed315bbd5abe7bc0310b020f2c47ef0f1b60",
+  "record_digest": "04bd8d0e22d971562a4309c7f8df51c5c4ffaab1be4ecb15327a12f249d1fa37",
   "residency_reverification": {
     "date": "2026-09-04",
     "not_advanced_because": "四条全部 still_open。其中 BP-20（字段身份基础）的解除动作是**业务输入**而非编码：需底稿模板编制方为这 9 份 DOCX 引入 `${token}`，或逐份裁定每个 `××` 的业务语义。只要 BP-20 未解除，就不存在合法的 stable_field_key，任何 per-entry contract 都不得发布 —— 即便 BP-16（manifest entry）将来因 Task 67 重生成而解除，9 个 entry 仍是 UNVERIFIABLE。",
@@ -888,7 +888,7 @@
   "sources": {
     "adapter_registry": {
       "path": "backend/app/services/workpaper_sync/adapters/registry.py",
-      "sha256": "e82ef5b69e8c08685a13027e5125fe6ba0edfdb755e7e94ecdb95132f87e1eb9"
+      "sha256": "56da019e2b0c429738aa045d799b1951fa0ad522fb55f16686b202b00b707219"
     },
     "adjudication_ledger": {
       "path": "backend/data/workpaper_word_template_adjudication.json",
@@ -900,7 +900,7 @@
     },
     "entry_manifest": {
       "path": "backend/data/workpaper_sync_entry_manifest.json",
-      "sha256": "f0ec376201a1013568e79e8e7bbd12a8e013ef21ee730fb04f5753142bf22a03"
+      "sha256": "53292ce85bcace7d1a6d64c75ea5a18d10acefa319b7831912311bdcf2f0d2e2"
     },
     "template_index": {
       "path": "backend/wp_templates/_index.json",
@@ -908,11 +908,11 @@
     },
     "word_instrumentation": {
       "path": "backend/app/services/workpaper_sync/word_instrumentation.py",
-      "sha256": "8dd415624a494aaf50794d54983a04be5d68e608008e08fb3ea59e5046e3525d"
+      "sha256": "bb8d7660baea754dfc13662cce8c73614c5cbf00092958ee6be2130db1a6c151"
     },
     "word_sdt_engine": {
       "path": "backend/app/services/workpaper_sync/word_sdt_engine.py",
-      "sha256": "20eca15665c1432b4c652e1a8748e7025d826b5691a0a5ad6034d7eaf3d0c827"
+      "sha256": "d3932213c53d9c42f51535db3a545fe02889847b6022bc215069234badb5263d"
     }
   },
   "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",

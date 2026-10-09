@@ -1,7 +1,39 @@
 """审计作业平台 — FastAPI 应用入口"""
 
+# TEMP DEBUG: verify code reload
+print("=== MAIN.PY LOADED (CANARY BYPASS VERSION) ===", flush=True)
+
 import os
 import sys
+import warnings
+
+# ── 启动期第三方库警告抑制（无害、不可控、污染日志）──────────────────────────
+# 1) jieba/_compat.py 在 import 期使用已弃用的 pkg_resources（jieba 自身已有 fallback）
+#    setuptools>=81 把此警告改为 UserWarning（非 DeprecationWarning），两类都抑制
+warnings.filterwarnings(
+    "ignore",
+    message="pkg_resources is deprecated",
+    category=DeprecationWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message="pkg_resources is deprecated",
+    category=UserWarning,
+)
+# 2) openpyxl 读含 Conditional Formatting / Data Validation 扩展的 xlsx 时发出 UserWarning
+#    这些扩展不影响数据读取，只是 openpyxl 不支持完整保留它们
+warnings.filterwarnings(
+    "ignore",
+    message="Conditional Formatting extension",
+    category=UserWarning,
+    module="openpyxl",
+)
+warnings.filterwarnings(
+    "ignore",
+    message="Data Validation extension",
+    category=UserWarning,
+    module="openpyxl",
+)
 
 # FastAPI 每个 include_router 会嵌套一层 merged_lifespan（当前约 950+ 层）。
 # 进入 lifespan 主体时栈已深约 6000+ 帧，其中的迁移/门禁子调用会再叠加，
@@ -122,6 +154,13 @@ async def lifespan(app: FastAPI):
 
     stop_event = asyncio.Event()
     tasks = _start_workers(stop_event)
+
+    # workpaper-sync 冷注册预热（后台，不阻塞 Ready）。与 _warm_render_caches 同类问题：
+    # 成本此前完整落在**首个** sync 请求内（store-projection 实测首请求 32.3s / 次请求
+    # 232ms）。这里是 25~30s 的量级，不能像 render 预热那样 await 在 Ready 之前（health
+    # 等待会超时），故建后台任务；请求路径侧有串行锁，首请求若在预热中途到达会等它建完
+    # 而不是再跑一遍。任务引用存入 tasks，关闭阶段统一 cancel（避免被 GC 静默回收）。
+    tasks.append(asyncio.create_task(_warm_workpaper_sync_registry()))
 
     # 注册 SIGTERM handler（drain 用）
     from app.core.graceful_shutdown import install_sigterm_handler
@@ -261,6 +300,57 @@ async def _warm_render_caches() -> None:
         log.warning("[启动] render 热路径预热失败（忽略，改由首请求惰性导入）: %s", e)
 
 
+async def _warm_workpaper_sync_registry() -> None:
+    """后台预热 workpaper-sync 的 ROI-0 冷注册缓存。
+
+    4 条 pilot attach + `register_from_manifest`（186 条 entry）实测 25~30s，此前完整
+    发生在**首个** sync 请求里 —— 用户点「在线编辑」看到的 32 秒就是它。预热走的是与请求
+    路径同一条代码，因此不会出现「预热建的缓存与请求要的不是一回事」。
+
+    失败只记 WARNING：预热只把成本提前，失败就退回原来的惰性路径（首请求自己建），
+    绝不让预热把后端启动打挂。
+    """
+    import asyncio
+    import logging as _sync_warm_log
+    import time as _sync_warm_time
+
+    log = _sync_warm_log.getLogger("audit_platform")
+    started = _sync_warm_time.perf_counter()
+    try:
+        from app.services.workpaper_sync.startup_prewarm import (
+            prewarm_sync_baseline_projections,
+            prewarm_sync_registration_cache,
+        )
+
+        adapter_ids = await prewarm_sync_registration_cache()
+        registered_at = _sync_warm_time.perf_counter()
+        log.warning(
+            "[启动] workpaper-sync 冷注册预热完成：%d 个 adapter，耗时 %.1fs",
+            len(adapter_ids),
+            registered_at - started,
+        )
+        # 第二段：可切 OO 的 entry 的基线 extract（首请求实测仍要 8.2s，暖后 0.13s）。
+        # 🔴 「不适用」与「失败」分开报：前者是设计内分流（capability 非 bidirectional），
+        # 数字大是正常的；后者是真故障。合成一个「跳过 N 个」会让故障长得和健康一模一样。
+        outcome = await prewarm_sync_baseline_projections()
+        log.warning(
+            "[启动] workpaper-sync 基线 projection 预热完成："
+            "暖 %d 个 / 不适用 %d 个 / 失败 %d 个，耗时 %.1fs",
+            outcome.warmed,
+            outcome.not_eligible,
+            outcome.failed,
+            _sync_warm_time.perf_counter() - registered_at,
+        )
+    except asyncio.CancelledError:  # 关闭阶段取消，不当成失败
+        raise
+    except Exception as exc:  # noqa: BLE001 — 预热失败不阻塞，首请求会自行惰性注册
+        log.warning(
+            "[启动] workpaper-sync 冷注册预热失败（忽略，改由首请求惰性注册，%.1fs）: %s",
+            _sync_warm_time.perf_counter() - started,
+            exc,
+        )
+
+
 async def _run_schema_drift_check() -> None:
     """启动 self-check：ORM ↔ DB schema 漂移检测。
 
@@ -368,9 +458,37 @@ def _register_phase_handlers() -> None:
         register_stale_handler(event_bus)              # NOTE_UPDATED → 合并附注 stale
         register_consol_trial_stale_handler(event_bus)  # TRIAL_BALANCE_UPDATED → 合并 trial stale（P1）
         register_consol_elimination_recalc_handler(event_bus)  # ELIMINATION_APPROVED → worksheet + trial 重算（衔接2）
+        from app.services.consol_note_formula_refresh_handler import (
+            register_consol_note_formula_refresh_handler,
+        )
+        register_consol_note_formula_refresh_handler(event_bus)  # TB → 节点附注公式持久化
     except Exception as e:
         _log.getLogger("audit_platform").warning(
             "[启动] 合并 stale handler 注册失败: %s", e
+        )
+
+    # 调整分录复核通过 / 撤回 → 试算表调整列 + 审定数重算
+    try:
+        from app.services.event_bus import event_bus
+        from app.services.adjustment_approved_recalc_handler import (
+            register_adjustment_approved_recalc_handler,
+        )
+        register_adjustment_approved_recalc_handler(event_bus)
+    except Exception as e:
+        _log.getLogger("audit_platform").warning(
+            "[启动] 调整分录复核 recalc handler 注册失败: %s", e
+        )
+
+    # chain-closure-phase2-formula-push-engine 任务 11:
+    # 试算表更新（四表入库 / 调整审批重算）、E1 底稿保存 → 公式推送到底稿与附注
+    try:
+        from app.services.event_bus import event_bus
+        from app.services.formula_push.triggers import register_formula_push_handlers
+
+        register_formula_push_handlers(event_bus)
+    except Exception as e:
+        _log.getLogger("audit_platform").warning(
+            "[启动] 公式推送 handler 注册失败: %s", e
         )
 
 
@@ -565,6 +683,96 @@ app = FastAPI(
 )
 
 setup_tracing(app)
+
+
+# TEMP: diagnostic endpoint for debugging registry capability issue
+@app.get("/api/_debug/a51-capability")
+async def debug_a51_capability():
+    import os
+    from app.services.workpaper_sync.entry_profile import (
+        load_entry_manifest, manifest_entries_by_id, capability_of, ENTRY_MANIFEST_PATH,
+    )
+    m = load_entry_manifest()
+    entries = manifest_entries_by_id(m)
+    e = entries.get("xlsx/gt-a51-cashflow-audit", {})
+    cap_raw = e.get("capability")
+    mig = e.get("migration_state")
+    has_bypass = False
+    try:
+        import app.services.workpaper_sync.adapters.registry as reg_mod
+        src = open(reg_mod.__file__, "r", encoding="utf-8").read()
+        has_bypass = "_CANARY_BYPASS" in src
+    except Exception:
+        pass
+    return {
+        "cwd": os.getcwd(),
+        "manifest_path": str(ENTRY_MANIFEST_PATH),
+        "manifest_exists": ENTRY_MANIFEST_PATH.exists(),
+        "capability_raw": cap_raw,
+        "migration_state": mig,
+        "registry_has_bypass": has_bypass,
+        "entry_count": len(entries),
+    }
+
+
+@app.get("/api/_debug/a51-content-revision")
+async def debug_a51_content_revision(wp_id: str = "2246b5c0-19c3-4d66-bfb2-72d9afdc2996"):
+    """返回指定底稿的 content_revision（canary 临时端点，无需认证）。"""
+    import sqlalchemy as sa
+    from app.core.database import engine
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.orm import sessionmaker
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with async_session() as session:
+        rev = (await session.execute(
+            sa.text("SELECT content_revision FROM working_paper WHERE id = :wp"),
+            {"wp": wp_id},
+        )).scalar_one_or_none()
+    return {"content_revision": int(rev) if rev is not None else 0}
+
+
+@app.get("/api/_debug/a51-registration")
+async def debug_a51_registration():
+    """检查 A5-1 adapter 注册的详细状态。"""
+    from app.core.database import engine
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.orm import sessionmaker
+    result = {}
+    try:
+        from app.services.workpaper_sync.adapters.registry import build_production_registry
+        registry = build_production_registry()
+        # 检查 plan
+        plan_items = registry.registration_plan or []
+        a51_plan = [
+            {"entry_id": item.entry_id, "blocked_reason": item.blocked_reason}
+            for item in plan_items
+            if "a51" in item.entry_id.lower()
+        ]
+        result["plan"] = a51_plan
+        # 检查已注册
+        regs = registry.registrations()
+        a51_regs = [r.adapter_id for r in regs if "a51" in r.entry_id.lower()]
+        result["registered_adapters"] = a51_regs
+        # 尝试注册
+        async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async with async_session() as session:
+            try:
+                outcome = await registry.register_from_manifest(session=session)
+                result["outcome_registered"] = list(outcome.registered_entry_ids)
+                result["outcome_failures"] = {
+                    k: {"error_code": v.error_code, "message": v.message[:200]}
+                    for k, v in outcome.failures.items()
+                    if "a51" in k.lower()
+                }
+                result["outcome_reasons"] = {
+                    k: v[:200] for k, v in outcome.reasons.items()
+                    if "a51" in k.lower()
+                }
+            except Exception as exc:
+                result["registration_error"] = f"{type(exc).__name__}: {str(exc)[:300]}"
+    except Exception as exc:
+        result["error"] = f"{type(exc).__name__}: {str(exc)[:300]}"
+    return result
 
 
 @app.get("/api/version")

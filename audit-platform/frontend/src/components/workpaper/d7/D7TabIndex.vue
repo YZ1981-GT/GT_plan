@@ -5,7 +5,7 @@
 import { computed, inject, ref, onMounted, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
-import { D7_INDEX_ROWS, resolveD7SheetLabel } from '../composables/d7SheetLabels'
+import { D7_INDEX_ROWS, resolveD7SheetLabel, isD7SheetComplete } from '../composables/d7SheetLabels'
 import { loadCycleWorkpaperCards, type CycleWpCard } from '@/services/cycleDirectory'
 
 const D7PreparationHandbookDialog = defineAsyncComponent(() => import('./D7PreparationHandbookDialog.vue'))
@@ -25,42 +25,9 @@ const indexRows = computed(() =>
   })),
 )
 
-function hasJsonRows(m: Map<string, any>, key: string): boolean {
-  const raw = m.get(key)?.remark
-  if (!raw) return false
-  try {
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) && parsed.length > 0
-  } catch {
-    return false
-  }
-}
-
-function isSheetComplete(code: string, m: Map<string, any>): boolean {
-  switch (code) {
-    case 'D7A':
-      return [...m.keys()].some(k => k.startsWith('D7-proc-'))
-    case 'D7-1':
-      return [...m.keys()].some(k => k.startsWith('D7-1-adj-'))
-    case 'D7-2':
-      return hasJsonRows(m, 'D7-2-rows')
-    case 'D7-3':
-      return hasJsonRows(m, 'D7-3-rows')
-    case 'D7-4':
-      return hasJsonRows(m, 'D7-4-rows')
-    case 'D7-5':
-      return hasJsonRows(m, 'D7-5-rows')
-    case 'D7-6':
-      return hasJsonRows(m, 'D7-6-rows')
-    case 'D7-7':
-      return hasJsonRows(m, 'D7-7-rows')
-    case 'D7-附注上市':
-    case 'D7-附注国企':
-      return [...m.keys()].some(k => k.startsWith('D7-note-'))
-    default:
-      return false
-  }
-}
+// 完成度判定已提取为纯函数 isD7SheetComplete（d7SheetLabels.ts），供判据直接驱动。
+// 模板里 <template #default="{ row }"> 处仍以 isSheetComplete 名字调用，此处做本地别名。
+const isSheetComplete = isD7SheetComplete
 
 const applicableRows = computed(() => indexRows.value.filter(r => r.applicable))
 

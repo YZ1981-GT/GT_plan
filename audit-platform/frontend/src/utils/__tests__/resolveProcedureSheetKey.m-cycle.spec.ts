@@ -68,21 +68,21 @@ describe('resolveProcedureSheetKey - M 循环路由 (M-F5 Task 2.4)', () => {
     expect(resolveProcedureSheetKey('m10')).toBe('m10a')
   })
 
-  // M1/M3/M7/M8 无专属程序表，fallback 到 e1a
-  it('M1 → e1a（应付股利无专属程序表，fallback）', () => {
-    expect(resolveProcedureSheetKey('M1')).toBe('e1a')
+  // MC-28 补全：M1/M3/M7/M8 现已有专属程序表路由
+  it('M1 → m1a（应付股利，MC-28 补全）', () => {
+    expect(resolveProcedureSheetKey('M1')).toBe('m1a')
   })
 
-  it('M3 → e1a（库存股无专属程序表，fallback）', () => {
-    expect(resolveProcedureSheetKey('M3')).toBe('e1a')
+  it('M3 → m3a（库存股，MC-28 补全）', () => {
+    expect(resolveProcedureSheetKey('M3')).toBe('m3a')
   })
 
-  it('M7 → e1a（专项储备无专属程序表，fallback）', () => {
-    expect(resolveProcedureSheetKey('M7')).toBe('e1a')
+  it('M7 → m7a（专项储备，MC-28 补全）', () => {
+    expect(resolveProcedureSheetKey('M7')).toBe('m7a')
   })
 
-  it('M8 → e1a（一般风险准备无专属程序表，fallback）', () => {
-    expect(resolveProcedureSheetKey('M8')).toBe('e1a')
+  it('M8 → m8a（一般风险准备，MC-28 补全）', () => {
+    expect(resolveProcedureSheetKey('M8')).toBe('m8a')
   })
 })
 

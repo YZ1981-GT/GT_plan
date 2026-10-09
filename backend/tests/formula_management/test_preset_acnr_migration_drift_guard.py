@@ -103,13 +103,23 @@ def test_canonical_grammar_recognized_as_migrated() -> None:
         "=NOTE('I2-6','项目启动日期','value')",
         "=ROW('assets_total')",
         "=AUX('1122','客户','TOP1','期末余额')",
+        # 🔴 ADJ 于 2026-09-28 从 pending 迁入 migrated
+        # （spec tb-adjustment-column-formula-closure Phase 1 Task 1.3）：
+        # 已注册进 `_REGISTRY`，grammar_v1 等价就是它自己。
+        "=ADJ('1121','aje_net')",
+        "=ADJ('1121','rje_net')",
     ]:
         assert normalize_ref(expr).status == STATUS_MIGRATED, expr
 
 
 def test_hardcoded_old_format_is_pending() -> None:
-    """无 ACNR 等价的旧格式/裸坐标/占位判为 pending（待迁移，Req 24.4）。"""
-    assert normalize_ref("=ADJ('1121','aje_net')").status == STATUS_PENDING
+    """无 ACNR 等价的旧格式/裸坐标/占位判为 pending（待迁移，Req 24.4）。
+
+    🔴 原第一条 `=ADJ('1121','aje_net')` 已移至
+    `test_canonical_grammar_recognized_as_migrated` —— ADJ 已注册进 L1 内核。
+    本测试保留的 4 条仍是真实 pending（LEDGER 无 ACNR 等价、裸坐标、None、空串），
+    分母非空故不是空转。
+    """
     assert normalize_ref("=LEDGER('1001','借','全年')").status == STATUS_PENDING
     assert normalize_ref("A5").status == STATUS_PENDING  # 裸坐标
     assert normalize_ref(None).status == STATUS_PENDING  # 占位

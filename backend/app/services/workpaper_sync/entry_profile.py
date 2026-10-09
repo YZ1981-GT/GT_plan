@@ -366,7 +366,7 @@ def assert_profile_consistent_with_room(profile: EntryProfile, room: RoomFacts) 
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-@lru_cache(maxsize=1)
+# @lru_cache(maxsize=1)  # temporarily disabled for manifest hot-reload
 def load_entry_manifest() -> Mapping[str, Any]:
     """只读加载 Task 1 的 manifest。本模块永不写它。"""
     try:
@@ -381,6 +381,11 @@ def load_entry_manifest() -> Mapping[str, Any]:
     if not isinstance(payload, dict) or not payload.get("entries"):
         raise EntryProfileError(f"入口清册结构非法（缺 entries）: {ENTRY_MANIFEST_PATH}")
     return payload
+
+
+# 兼容测试中的 load_entry_manifest.cache_clear() 调用
+load_entry_manifest.cache_clear = lambda: None  # no-op when cache is disabled
+load_entry_manifest.cache_info = lambda: None  # no-op
 
 
 def manifest_entries_by_id(manifest: Mapping[str, Any] | None = None) -> dict[str, Mapping[str, Any]]:

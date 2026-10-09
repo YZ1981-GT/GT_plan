@@ -13,12 +13,12 @@
 
     <template v-else>
       <div v-if="currentSheet !== 'H7'" class="h7-header-toolbar">
-        <el-segmented
-          :model-value="currentMode"
-          :options="modeOptions"
-          size="small"
-          @change="onModeChange"
-        />
+        <!--
+          🔴 切换器改 `v-model` 且**不带 `:disabled`**：健康检查是 mount 期异步，
+          disabled 在未就绪时会把「在线编辑」锁死、点击被彻底吞掉 —— D4 已实证的 bug ③。
+          健康门禁移进 `useHSyncMode.switchMode`（await 兜底），切换器保持可点。
+        -->
+        <el-segmented v-model="currentMode" :options="modeOptions" size="small" />
         <!-- 计量模式切换 -->
         <el-segmented
           v-if="currentMode === 'html'"
@@ -29,15 +29,31 @@
           @change="onMeasurementModelChange"
         />
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h7-biological-assets" />
+        <span class="h7-oo-tag" :class="`h7-oo-tag--${hSync.syncStateTag.value.type}`">
+          {{ hSync.syncStateTag.value.text }}
+        </span>
       </div>
 
-      <!-- OnlyOffice 模式 -->
+      <!--
+        受管 sheet（H7-2 两个计量模式各一张）的在线编辑 —— 统一双向宿主。
+        🔴 `.oo-container` 必须有**确定高度**（D4 踩过 height:100% 被压成一条）。
+      -->
+      <div v-if="currentMode === 'onlyoffice' && isH7SyncManagedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="hSync.descriptor.value"
+          :bridge="hSync.syncBridge"
+        />
+      </div>
+
+      <!-- 非受管 sheet 的 OnlyOffice 模式（legacy 只读视图，无双向回写） -->
       <GtOnlyOfficeSheet
-        v-if="currentMode === 'onlyoffice'"
+        v-else-if="currentMode === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
         :readonly="isReadonly"
+        @fallback="onOoLoadFailed"
         style="height: calc(100vh - 180px)"
       />
 
@@ -364,6 +380,7 @@
  * selfLoad: 当 htmlData prop 为 null 时自行调 render-config。
  * 行业守卫: applicable_when industry IN ['agriculture','forestry','livestock','fishery']。
  * useVersionTrail: autoSnapshot on save。
+ * useHSyncMode: HTML↔OnlyOffice 统一双向接桥（替代宿主内联的 currentMode/onModeChange）。
  *
  * Spec: .kiro/specs/h7-biological-assets/ Task 1.1
  * Requirements: 1.1-1.9, 1.11, 1.13
@@ -379,6 +396,13 @@ import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { useHSyncMode } from './composables/useHSyncMode'
+import { registerHPendingFlusher, trackHPendingWrite, flushHPendingWrites } from './sync/hPendingWrites'
+
+/** H7 entry id（manifest 冻结值，与 `phase5_h7_biological_assets.ENTRY_ID` 逐字一致）。 */
+const H7_SYNC_ENTRY_ID = 'xlsx/gt-h7-biological-assets'
 const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 // core
@@ -468,12 +492,6 @@ const applicableStandards = useHostApplicableStandards({
 function onDisclosureSave(itemId: string, value: any): void {
   allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: value })
 }
-const currentMode = ref<'html' | 'onlyoffice'>('html')
-const modeOptions = [
-  { label: '结构化视图', value: 'html' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
-
 // 计量模式
 const measurementModel = ref<'cost' | 'fair_value'>('cost')
 const measurementOptions = [
@@ -503,9 +521,67 @@ const currentSheet = computed(() => {
   return ''
 })
 
-// ─── 双模式切换 ──────────────────────────────────────────────────────────────
-function onModeChange(mode: string | number) {
-  currentMode.value = mode as 'html' | 'onlyoffice'
+/**
+ * 受管判定用的 sheet 短码 —— **变体轴归一**（同 H3）。
+ *
+ * 🔴 `currentSheet` 只从 sheetName 解析出 `H7-2`，但模板里 `H7-2` 是**两张**表
+ *    （成本模式 51 列四级表头 / 公允价值模式 28 列三级表头），各有独立持久化键与独立
+ *    `sheet_key`。受管清单 `H_MANAGED_SHEETS` 以短码为主键且撞码即抛 ⇒ 两张必须在短码上
+ *    就分开（`H7-2-cost` / `H7-2-fair`）。
+ *
+ * 🔴 只对 `H7-2` 补后缀：`H7-1`/`H7-6`/`H7-7` 同样是双版本 sheet，但**尚未进受管面**。
+ *    提前给它们编造带后缀的码会让 `hManagedOf` 查不到而白跑一趟，且将来接线时短码口径
+ *    可能与届时的清单不一致。
+ */
+const h7SyncCode = computed(() => {
+  const code = currentSheet.value
+  if (code !== 'H7-2') return code
+  return measurementModel.value === 'fair_value' ? 'H7-2-fair' : 'H7-2-cost'
+})
+
+// ─── 双模式切换（统一接桥，替代宿主内联的第二份实现）──────────────────────────
+//
+// 原实现是宿主内联的 `currentMode` ref + `modeOptions` 常量 + `onModeChange`（deletion plan
+// 的 `host_inlined_second_implementation` 四条之一）。它**不建桥** ⇒ OO 侧编辑回不到 HTML。
+//
+// 🔴 H7 的映射面同样很窄（成本 5/51、公允 3/28）：`DetailRow` 只 11 字段、`FairDetailRow`
+//    只 9 字段，累计折旧/减值/审定段前端都不建模。回写只动两侧真正对齐的那几格，其余由
+//    Excel 自己算。缺口见契约 `review.declared_coverage_gaps`。
+const hSync = useHSyncMode({
+  entryId: H7_SYNC_ENTRY_ID,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  currentCode: computed(() => h7SyncCode.value),
+  isReadonly,
+  flushHtml: async () => {
+    // 🔴 H7 是 `per_tab_self_persisting` 载体：`H7TabDetailCost/Fair.vue` 直接
+    //    `void persist(...)`（**无防抖**但 promise 被 void 丢掉），宿主无从 await。
+    //    两族都经 `sync/hPendingWrites` 登记：Tab 的在途 PUT + 本宿主 800ms 防抖的
+    //    checklist 写入，一次 flush 全等到。
+    await flushHPendingWrites()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: H7_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: hSync.sheetKey.value,
+    }
+  },
+  reloadHtml: async () => { await selfLoad() },
+})
+
+/** 模板 `ref="syncEditorHostRef"` 的落点 —— 直接复用桥里的 ref。 */
+const syncEditorHostRef = hSync.syncHostRef
+const isH7SyncManagedSheet = computed(() => hSync.isManagedSheet.value)
+const modeOptions = hSync.modeOptions
+const currentMode = hSync.renderMode
+
+/** legacy OO 组件加载失败的兜底（只对**非受管** sheet 生效）。 */
+function onOoLoadFailed(): void {
+  void hSync.switchMode('html')
 }
 
 function onMeasurementModelChange(val: string | number) {
@@ -585,6 +661,24 @@ async function selfLoad(): Promise<void> {
 // 子组件契约：saveResponse(itemId, value)。value 为字符串或对象（对象序列化进 remark）。
 // 防抖 800ms 批量 PUT /checklist-responses，并乐观更新本地 Map 供 selfLoad/跨表读取。
 const _saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+/**
+ * 还在防抖窗口里、尚未发出的载荷（item_id → payload）。
+ *
+ * 🔴 原实现把载荷**只**闭包在 timer 回调里 ⇒ `clearTimeout` 之后无从重建，
+ *    flush 只能丢弃。这里显式留一份，`flushHostPendingResponses` 才能「清防抖 + 立即发」。
+ */
+const _pendingResponsePayloads = new Map<string, { item_id: string; conclusion: any; remark: any }>()
+
+function _putResponses(items: Array<{ item_id: string; conclusion: any; remark: any }>): Promise<unknown> {
+  // 经 `trackHPendingWrite` 登记在途 promise：双向桥 flush 时能 await 到写完
+  return trackHPendingWrite(
+    http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items,
+    }).catch((err: unknown) => console.warn('[GtH7] persistResponse failed:', err)),
+  )
+}
+
 function persistResponse(itemId: string, value: any): void {
   if (!itemId || !props.wpId) return
   const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
@@ -592,16 +686,32 @@ function persistResponse(itemId: string, value: any): void {
   const updated = { ...existing, item_id: itemId, remark: strVal }
   allResponses.value.set(itemId, updated)
   if (isReadonly.value) return
+  const payload = { item_id: itemId, conclusion: updated.conclusion ?? null, remark: updated.remark ?? null }
+  _pendingResponsePayloads.set(itemId, payload)
   const prev = _saveTimers.get(itemId)
   if (prev) clearTimeout(prev)
   _saveTimers.set(itemId, setTimeout(() => {
     _saveTimers.delete(itemId)
-    http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion: updated.conclusion ?? null, remark: updated.remark ?? null }],
-    }).catch((err: unknown) => console.warn('[GtH7] persistResponse failed:', itemId, err))
+    _pendingResponsePayloads.delete(itemId)
+    void _putResponses([payload])
   }, 800))
 }
+
+/**
+ * 清防抖 + 立即落库，**await 到真正写完** —— 切「在线编辑」前的宿主侧 flush。
+ *
+ * 登记进 `sync/hPendingWrites` 的模块级注册表（随 effect scope 自动注销），宿主的双向桥
+ * 只调一次 `flushHPendingWrites()` 就把「Tab 在途 PUT + 本宿主防抖」一并等完。
+ */
+async function flushHostPendingResponses(): Promise<void> {
+  for (const timer of _saveTimers.values()) clearTimeout(timer)
+  _saveTimers.clear()
+  if (_pendingResponsePayloads.size === 0) return
+  const items = [..._pendingResponsePayloads.values()]
+  _pendingResponsePayloads.clear()
+  await _putResponses(items)
+}
+registerHPendingFlusher(flushHostPendingResponses)
 
 // ─── provide for child components ────────────────────────────────────────────
 function openReviewDialog(sectionId: string, sectionLabel?: string): void {
@@ -650,6 +760,30 @@ onMounted(() => {
   gap: 12px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+/*
+ * 🔴 类名跟随 `useHSyncMode.syncStateTag.type`（`success|info|warning|danger`），
+ *    写成别的枚举会让标签变成无样式裸文本（D4 踩过的样式孤儿）。
+ */
+.h7-oo-tag {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.h7-oo-tag--success { background: #f0f9eb; color: #67c23a; }
+.h7-oo-tag--info { background: #f4f4f5; color: #909399; }
+.h7-oo-tag--warning { background: #fdf6ec; color: #e6a23c; }
+.h7-oo-tag--danger { background: #fef0f0; color: #f56c6c; }
+
+/*
+ * 🔴 `height: 100%` 会被父级压成一条（D4 踩过）：OnlyOffice iframe 需要
+ *    **确定**高度才撑得开，min-height 兜住父级无高度时的退化。
+ */
+.oo-container {
+  width: 100%;
+  min-height: 600px;
+  height: calc(100vh - 200px);
 }
 
 .h7-mode-hint {

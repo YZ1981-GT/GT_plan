@@ -165,6 +165,70 @@ def _relative(path: Path) -> str:
         raise ProgramMilestoneError(f"path escapes repository root: {path}") from exc
 
 
+def _with_archive_fallback(path: Path) -> Path:
+    """路径不存在且形如 `.kiro/specs/<name>/...` 时，回退到 `_archive/*/<name>/...`。
+
+    🔴 与 :func:`_resolve_spec_tasks` 同一病因：spec 归档后，定义 JSON 里写的
+       `.kiro/specs/<name>/evidence/...` 字面路径全部失效，生成器整体抛
+       `required input does not exist`（实测 `workpaper-page-formula-toolbar-closure`
+       的 `evidence/F-SHELL/contract.json` / `envelope.json` 两条）。
+
+    非 spec 路径、已存在的路径一律原样返回（对其余调用点是 no-op）。
+    """
+    if path.exists():
+        return path
+    try:
+        rel = path.resolve().relative_to(_SPECS_ROOT.resolve()).parts
+    except ValueError:
+        return path
+    if len(rel) < 2 or rel[0] == "_archive":
+        return path
+    spec_name, tail = rel[0], rel[1:]
+    candidates = sorted(
+        p
+        for p in _SPECS_ROOT.glob(f"_archive/*/{spec_name}/{'/'.join(tail)}")
+        if p.exists()
+    )
+    if len(candidates) == 1:
+        return candidates[0]
+    if len(candidates) > 1:
+        raise ProgramMilestoneError(
+            f"归档下有多份 {spec_name}/{'/'.join(tail)}："
+            f"{[_relative(p) for p in candidates]} —— 先合并归档副本"
+        )
+    return path
+
+
+def _resolve_spec_tasks(spec_name: str) -> Path:
+    """解析一个 spec 的 `tasks.md`，**归档后仍能找到**。
+
+    🔴 2026-09-28：原来是硬拼 `.kiro/specs/{name}/tasks.md`，于是一个 spec 被归档到
+       `.kiro/specs/_archive/<分类>/{name}/` 之后，本生成器（及其守卫
+       `test_workpaper_sync_program_milestones.py`）就整体报
+       `required input does not exist` —— 实测 `workpaper-page-formula-toolbar-closure`
+       已随 commit `f8ab1ebfd`「闭合并归档」移走，活动路径下只剩一个空的 `basis/` 残留目录。
+
+       归档在本仓库是**常规操作**（`_archive/` 下按 01~16 分类），所以正解不是改一次名单，
+       而是让解析带归档回退：先活动路径，再 `_archive/*/{name}/tasks.md`。
+       命中多个归档副本时 fail closed（同名 spec 在两个分类下各一份 ⇒ digest 取谁都不对）。
+    """
+    active = _SPECS_ROOT / spec_name / "tasks.md"
+    if active.is_file():
+        return active
+    archived = sorted(
+        p for p in _SPECS_ROOT.glob(f"_archive/*/{spec_name}/tasks.md") if p.is_file()
+    )
+    if len(archived) == 1:
+        return archived[0]
+    if len(archived) > 1:
+        raise ProgramMilestoneError(
+            f"spec {spec_name!r} 在 _archive 下有多份 tasks.md："
+            f"{[_relative(p) for p in archived]} —— 取哪一份都可能错，先合并归档副本"
+        )
+    # 两处都没有：让 `_record_input` 抛出原来那条带路径的错（信息量更高）
+    return active
+
+
 def _read_json(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -614,7 +678,7 @@ def collect_spec_facts(
 ) -> dict[str, dict[str, Any]]:
     facts: dict[str, dict[str, Any]] = {}
     for spec_name in definitions["specs"]:
-        path = _SPECS_ROOT / spec_name / "tasks.md"
+        path = _resolve_spec_tasks(spec_name)
         digest = _record_input(inputs, path)
         text = path.read_text(encoding="utf-8")
         tasks = parse_tasks(text, source=_relative(path))
@@ -1083,47 +1147,59 @@ async def _collect_database_catalog() -> dict[str, Any]:
     try:
         import sqlalchemy as sa
 
-        from app.core.database import async_session
+        from app.core.database import async_session, engine
 
         relations: set[str] = set()
         columns: dict[str, set[str]] = defaultdict(set)
         constraints: dict[str, set[str]] = defaultdict(set)
-        async with async_session() as session:
-            phase = "connect"
-            await session.connection()
+        # collect_database_probe_facts 每次调用都 asyncio.run（自建并关闭事件循环），
+        # 但 app.core.database.engine 是模块级常驻连接池，asyncpg 连接绑定在创建它的
+        # 循环上。若不在同一循环内 dispose，下一次探测会取到上一循环的连接，在
+        # phase="connect" 抛 RuntimeError('Event loop is closed')，表现为「隔次失败」
+        # → 同一棵树两次运行给出两份不同 projection。谁开循环谁清池。
+        try:
+            async with async_session() as session:
+                phase = "connect"
+                await session.connection()
+                try:
+                    phase = "set_read_only"
+                    await session.execute(sa.text(_DATABASE_CONTROL_SQL["set_read_only"]))
+                    phase = "verify_read_only"
+                    read_only = (
+                        await session.execute(sa.text(_DATABASE_CONTROL_SQL["verify_read_only"]))
+                    ).scalar_one()
+                    if str(read_only).strip().lower() not in {"on", "true", "1"}:
+                        raise RuntimeError("transaction_read_only_not_enabled")
+
+                    phase = "query:relations"
+                    rows = (
+                        await session.execute(sa.text(_DATABASE_FACT_SQL["relations"]))
+                    ).mappings().all()
+                    relations = {str(row["table_name"]) for row in rows}
+
+                    phase = "query:columns"
+                    rows = (
+                        await session.execute(sa.text(_DATABASE_FACT_SQL["columns"]))
+                    ).mappings().all()
+                    for row in rows:
+                        columns[str(row["table_name"])].add(str(row["column_name"]))
+
+                    phase = "query:constraints"
+                    rows = (
+                        await session.execute(sa.text(_DATABASE_FACT_SQL["constraints"]))
+                    ).mappings().all()
+                    for row in rows:
+                        constraints[str(row["table_name"])].add(
+                            str(row["constraint_name"])
+                        )
+                finally:
+                    await session.rollback()
+        finally:
             try:
-                phase = "set_read_only"
-                await session.execute(sa.text(_DATABASE_CONTROL_SQL["set_read_only"]))
-                phase = "verify_read_only"
-                read_only = (
-                    await session.execute(sa.text(_DATABASE_CONTROL_SQL["verify_read_only"]))
-                ).scalar_one()
-                if str(read_only).strip().lower() not in {"on", "true", "1"}:
-                    raise RuntimeError("transaction_read_only_not_enabled")
-
-                phase = "query:relations"
-                rows = (
-                    await session.execute(sa.text(_DATABASE_FACT_SQL["relations"]))
-                ).mappings().all()
-                relations = {str(row["table_name"]) for row in rows}
-
-                phase = "query:columns"
-                rows = (
-                    await session.execute(sa.text(_DATABASE_FACT_SQL["columns"]))
-                ).mappings().all()
-                for row in rows:
-                    columns[str(row["table_name"])].add(str(row["column_name"]))
-
-                phase = "query:constraints"
-                rows = (
-                    await session.execute(sa.text(_DATABASE_FACT_SQL["constraints"]))
-                ).mappings().all()
-                for row in rows:
-                    constraints[str(row["table_name"])].add(
-                        str(row["constraint_name"])
-                    )
-            finally:
-                await session.rollback()
+                await engine.dispose()
+            except Exception:
+                phase = "dispose"
+                raise
     except Exception as exc:
         status = "database_unavailable" if phase == "connect" else "query_failed"
         raise DatabaseProbeReadError(status, phase, type(exc).__name__) from exc
@@ -1199,7 +1275,7 @@ def _source_ref(path: str, digest: str) -> dict[str, str]:
 def _repo_input_path(raw_path: str) -> Path:
     if not raw_path or Path(raw_path).is_absolute():
         raise ProgramMilestoneError(f"reviewed input path must be repository-relative: {raw_path!r}")
-    path = (_REPO / raw_path).resolve()
+    path = _with_archive_fallback((_REPO / raw_path).resolve())
     try:
         path.relative_to(_REPO.resolve())
     except ValueError as exc:
@@ -2090,7 +2166,8 @@ def evaluate_evidence_bundle(
     documents: list[tuple[Path, dict[str, Any]]] = []
     source_refs: list[dict[str, str]] = []
     for raw_path in paths:
-        path = _REPO / str(raw_path)
+        # 归档回退：spec 被归档后这些字面路径会失效（见 `_with_archive_fallback`）
+        path = _with_archive_fallback(_REPO / str(raw_path))
         digest = _record_input(inputs, path)
         source_refs.append(_source_ref(_relative(path), digest))
         documents.append((path, _read_json(path)))

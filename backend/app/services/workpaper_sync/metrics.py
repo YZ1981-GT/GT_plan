@@ -61,6 +61,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Final, Mapping
 
+from app.services.workpaper_sync.materialize_reuse_verdict import (
+    REUSE_METRIC,
+    REUSE_RESULT_DOMAIN,
+    SINGLE_PASS_DECLINE_DOMAIN,
+    SINGLE_PASS_DECLINE_METRIC,
+)
 from app.services.workpaper_sync.models import SyncDomainError
 
 
@@ -342,6 +348,29 @@ METRIC_CATALOG: Final[tuple[MetricDefinition, ...]] = (
         "template/instrumentation/contract/bundle digest 漂移 ⇒ fail closed",
         alert_required=True,
         result_domain=("template", "instrumentation", "contract", "bundle", "authority_model"),
+    ),
+    # ── materialize 复用可观测（spec oo-single-pass-materialize-and-room-leave）──
+    #
+    # 归因等级刻意是 `platform_scoped`（project+wp，emit 侧再补 entry）：复用判定是
+    # **内容身份**事实 —— 它只取决于 (projection digest, bundle, substrate)，与「谁在问」
+    # 「哪个 room」无关。materialize 那一刻 room/participant 甚至可能还不存在（复用命中时
+    # 复用的正是既有 room）。按 room_scoped 记就必须填 participant，而那与本模块 route 级
+    # 指标的 docstring 说的「此时填 participant 就是编造」同构。
+    _M(
+        REUSE_METRIC, _C, _PLAT, "3.1",
+        "materialize 的业务身份复用判定：命中 / 同 token 重放 / 四类未命中原因各一格。"
+        "上一轮「digest 口径分叉 ⇒ 复用恒不命中」之所以能活下来，就是因为「未命中」在观测"
+        "面上与「用户真改了内容」长得一模一样（两者都只是走了全量）。"
+        "`miss_digest_representation_drift` 是**缺陷**类而非合法回落，CI 门见 "
+        "scripts/check/check_materialize_reuse_digest_caliber.py",
+        result_domain=REUSE_RESULT_DOMAIN,
+    ),
+    _M(
+        SINGLE_PASS_DECLINE_METRIC, _C, _PLAT, "3.3",
+        "单趟写入回落逐趟链式的原因分型（requirements 3.3 的「回落原因统计」）。"
+        "与复用判定**分开**的第二个维度：复用未命中答「要不要物化」，本指标答「既然要"
+        "物化、用哪条写盘路径」—— 折进同一个 result 域会毁掉复用命中率的分母",
+        result_domain=SINGLE_PASS_DECLINE_DOMAIN,
     ),
     # ── 平台级后台 ─────────────────────────────────────────────────────
     _M(

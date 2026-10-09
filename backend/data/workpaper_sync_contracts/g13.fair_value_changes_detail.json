@@ -1,0 +1,495 @@
+{
+  "contract_id": "g13.fair_value_changes_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "e6e3a7e2607095c4b64234090edaddae6a87b2ffc5a04eff765adc501d16681d",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-g13-fair-value-changes",
+    "html_store": {
+      "item_ids": [
+        "G13-detail-skeleton"
+      ],
+      "note": "G13-2 的受管行存成 checklist_responses 的 **remark** JSON 数组（FD-1）。🔴 item_id 是 **`G13-detail-skeleton`**（分类骨架，落库形态见前端 `g13SkeletonStore.ts`）而**不是**工具明细键 `G13-detail-rows` —— 后者存动态增删的金融工具级明细，与模板的固定 10 个损益表项目不同构，本轮保持 HTML-only 平台增强、不受管。真库实证两键 remark 均 2 B（空数组）/ conclusion 0 B ⇒ roundtrip 判据一律用合成行；同册 `G13-disclosure-listed`(940 B) / `G13-disclosure-soe`(661 B) 有真实载荷，但那属附注披露 sheet、不在本 sheet 受管面。固定 10 行 R11-R20 ⇒ 契约里一条 `tables[]`、`html_store.item_ids` 一条 `G13-detail-skeleton`。🔴 行身份键是 **`rowKey`**（业务键，同 G14）—— 按值取自 `g13SkeletonStore.G13_SKELETON_ROW_KEYS`（其单一真源是 `g13Constants.G13_ADJUDICATION_ITEMS`），**不是**工具明细的 `rowId`。🔴 骨架落库行带 `manualOverride` 控制位：有标记的行用存库值、不被工具明细汇总重算冲掉（否则 OO 回流会被立刻覆盖 = 回流无效）；它不是模板列，不受管。",
+      "payload_column": "remark",
+      "payload_column_mode": "remark_only",
+      "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts —— 写入点为 debouncedSave(ITEM_ID_SKELETON, { remark: JSON.stringify(list) })",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "phase5_fair_value_changes_detail",
+    "reviewed_basis": "openpyxl + sheet XML 逐格实测 G/G13 公允价值变动收益.xlsx 的 `明细表G13-2`（两级表头 R9/R10：横向组 `B9:D9` 本期数 · **`F9:J9`** 对应科目-公允价值变动（🔴 含 J 列，而 J10=「计入损益」语义上不属该组 —— evidence §7.1 写作 F9:I10 不准确）；纵向合并 A9:A10 / E9:E10 / K9:K10 / L9:L10 / 数据区 R11-R20 是**固定 10 个损益表项目**（三层父子：父行 R11/R14/R17 · 子行 R12/R13/R15/R16/R18 · 无子行的顶层行 R19/R20）/ footer R21 **三种约定混行**（枚举相加 B/C/D 加的是五个顶层行 + 纯 SUM I/J + 🔴 布尔 K21=J21=D21）/ 有效内容列 12 即 A-L **恰等于 max_column**（无空尾列）/ 0 个 definedName / 🔴 **受管表零裸 IF**（整册 11 格全在别的 sheet）⇒ 中性化不动本表，与 G9/G10/G8/G14 同族、与 G11 的 44 格相反 / 🔴 B/C 只有 **3 格**有公式（父行汇总，逐行不同形：=B12+B13 / =B15+B16 / **=B18** 单子行）且是**普通公式、不是 shared 主格** ⇒ 判 `editable`（列级 mode 对「3 行公式 + 7 行空」无解，拆多 spec 因父行非连续要 7 份）/ D/I/J/K 的 shared 主格在 **R12** 不在 R11，两者逐行同形 ⇒ 四列都进 formula_templates) + 前端 `useG13Detail.ts` / `g13SkeletonStore.ts` / `g13Constants.G13_ADJUDICATION_ITEMS` 按值 grep（ITEM_ID_SKELETON / 行身份键 **rowKey** / 10 项固定行集的 rowKey·label·kind·indent 与模板 R11-R20 逐行对应 —— 这推翻 Task 2「发现 I：前端无骨架无父子字段」） + 真库 checklist_responses 实测（`G13-detail-rows` 与 `G13-detail-skeleton` 均 2 B 空数组 ⇒ 骨架落库零存量迁移风险） + 模板编制思路见 spec evidence/task8-c6-remaining-eight-template-logic.md §7（与 G14 同一张骨架，差别只在明细块：G14 是准备金滚动、G13 是公允价值三分量 / TB 口径是**本期发生额**，科目 6101 损益类）"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "明细表G13-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "g1302-managed",
+      "tables": [
+        {
+          "anchor": "A9",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "item_label",
+              "header_source_ref": "源xlsx!明细表G13-2!A10",
+              "header_text": "项目",
+              "json_pointer": "/rows/{row_uuid}/label",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G13-2!A11",
+              "stable_field_key": "g13_detail_skeleton/{row_uuid}/item_label",
+              "store_item_id": "G13-detail-skeleton",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_unadjusted",
+              "header_source_ref": "源xlsx!明细表G13-2!B10",
+              "header_text": "未审数",
+              "json_pointer": "/rows/{row_uuid}/currentUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G13-2!B11",
+              "stable_field_key": "g13_detail_skeleton/{row_uuid}/current_unadjusted",
+              "store_item_id": "G13-detail-skeleton",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "adjustment",
+              "header_source_ref": "源xlsx!明细表G13-2!C10",
+              "header_text": "调整数",
+              "json_pointer": "/rows/{row_uuid}/adjustment",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G13-2!C11",
+              "stable_field_key": "g13_detail_skeleton/{row_uuid}/adjustment",
+              "store_item_id": "G13-detail-skeleton",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_audited",
+              "header_source_ref": "源xlsx!明细表G13-2!D10",
+              "header_text": "审定数",
+              "json_pointer": "/rows/{row_uuid}/currentAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表G13-2!D11",
+              "stable_field_key": "g13_detail_skeleton/{row_uuid}/current_audited",
+              "store_item_id": "G13-detail-skeleton",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "belong_label",
+              "header_source_ref": "源xlsx!明细表G13-2!E10",
+              "header_text": "对应科目",
+              "json_pointer": "/rows/{row_uuid}/belongLabel",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G13-2!E11",
+              "stable_field_key": "g13_detail_skeleton/{row_uuid}/belong_label",
+              "store_item_id": "G13-detail-skeleton",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost",
+              "header_source_ref": "源xlsx!明细表G13-2!F10",
+              "header_text": "成本",
+              "json_pointer": "/rows/{row_uuid}/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G13-2!F11",
+              "stable_field_key": "g13_detail_skeleton/{row_uuid}/cost",
+              "store_item_id": "G13-detail-skeleton",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "period_fv_change",
+              "header_source_ref": "源xlsx!明细表G13-2!G10",
+              "header_text": "本期公允价值变动",
+              "json_pointer": "/rows/{row_uuid}/periodFvChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G13-2!G11",
+              "stable_field_key": "g13_detail_skeleton/{row_uuid}/period_fv_change",
+              "store_item_id": "G13-detail-skeleton",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "cumulative_fv_change",
+              "header_source_ref": "源xlsx!明细表G13-2!H10",
+              "header_text": "累计公允价值变动",
+              "json_pointer": "/rows/{row_uuid}/cumulativeFvChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G13-2!H11",
+              "stable_field_key": "g13_detail_skeleton/{row_uuid}/cumulative_fv_change",
+              "store_item_id": "G13-detail-skeleton",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "fair_value",
+              "header_source_ref": "源xlsx!明细表G13-2!I10",
+              "header_text": "公允价值",
+              "json_pointer": "/rows/{row_uuid}/fairValue",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表G13-2!I11",
+              "stable_field_key": "g13_detail_skeleton/{row_uuid}/fair_value",
+              "store_item_id": "G13-detail-skeleton",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "amount_in_pl",
+              "header_source_ref": "源xlsx!明细表G13-2!J10",
+              "header_text": "计入损益",
+              "json_pointer": "/rows/{row_uuid}/amountInPl",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表G13-2!J11",
+              "stable_field_key": "g13_detail_skeleton/{row_uuid}/amount_in_pl",
+              "store_item_id": "G13-detail-skeleton",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "cross_check",
+              "header_source_ref": "源xlsx!明细表G13-2!K10",
+              "header_text": "核对",
+              "json_pointer": "/rows/{row_uuid}/plReconciled",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表G13-2!K11",
+              "stable_field_key": "g13_detail_skeleton/{row_uuid}/cross_check",
+              "store_item_id": "G13-detail-skeleton",
+              "value_type": "boolean"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "source_index",
+              "header_source_ref": "源xlsx!明细表G13-2!L10",
+              "header_text": "索引号",
+              "json_pointer": "/rows/{row_uuid}/sourceIndex",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G13-2!L11",
+              "stable_field_key": "g13_detail_skeleton/{row_uuid}/source_index",
+              "store_item_id": "G13-detail-skeleton",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "D11:D20",
+            "I11:I20",
+            "J11:J20",
+            "K11:K20"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowKey",
+            "kind": "field"
+          },
+          "table_key": "g13_detail_skeleton",
+          "uuid_col": "M"
+        }
+      ]
+    },
+    {
+      "excel_name": "审定表G13-1",
+      "footer": {
+        "diff_row": 19,
+        "marker": "合计",
+        "tb_row": 18,
+        "total_row": 17
+      },
+      "formula_mask": [
+        "D19",
+        "G19"
+      ],
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "g131-managed",
+      "tables": [
+        {
+          "anchor": "A7",
+          "cell_mask": [
+            "B10",
+            "B11",
+            "B12",
+            "B13",
+            "B14",
+            "B15",
+            "B16",
+            "B17",
+            "B7",
+            "B8",
+            "B9",
+            "C10",
+            "C11",
+            "C12",
+            "C13",
+            "C14",
+            "C15",
+            "C16",
+            "C17",
+            "C7",
+            "C8",
+            "C9",
+            "D10",
+            "D11",
+            "D12",
+            "D13",
+            "D14",
+            "D15",
+            "D16",
+            "D17",
+            "D7",
+            "D8",
+            "D9",
+            "E17",
+            "F17",
+            "G10",
+            "G11",
+            "G12",
+            "G13",
+            "G14",
+            "G15",
+            "G16",
+            "G17",
+            "G7",
+            "G8",
+            "G9",
+            "H10",
+            "H11",
+            "H12",
+            "H13",
+            "H14",
+            "H15",
+            "H16",
+            "H17",
+            "H7",
+            "H8",
+            "H9",
+            "I10",
+            "I11",
+            "I12",
+            "I13",
+            "I14",
+            "I15",
+            "I16",
+            "I17",
+            "I7",
+            "I8",
+            "I9"
+          ],
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": 7
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!审定表G13-1!A5",
+              "header_text": "项目",
+              "json_pointer": "/main/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G13-1!A7",
+              "stable_field_key": "g131_adj_main/item_name",
+              "store_item_id": "",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 7
+              },
+              "column_key": "prior_unadjusted",
+              "group_source_ref": "源xlsx!审定表G13-1!B5",
+              "header_source_ref": "源xlsx!审定表G13-1!B5",
+              "header_text": "未审数",
+              "json_pointer": "/main/priorUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G13-1!B7",
+              "stable_field_key": "g131_adj_main/prior_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 7
+              },
+              "column_key": "prior_aje",
+              "group_source_ref": "源xlsx!审定表G13-1!B5",
+              "header_source_ref": "源xlsx!审定表G13-1!C5",
+              "header_text": "审计调整数",
+              "json_pointer": "/main/priorAje",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G13-1!C7",
+              "stable_field_key": "g131_adj_main/prior_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 7
+              },
+              "column_key": "prior_audited",
+              "group_source_ref": "源xlsx!审定表G13-1!B5",
+              "header_source_ref": "源xlsx!审定表G13-1!D5",
+              "header_text": "审定数",
+              "json_pointer": "/main/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G13-1!D7",
+              "stable_field_key": "g131_adj_main/prior_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 7
+              },
+              "column_key": "current_unadjusted",
+              "group_source_ref": "源xlsx!审定表G13-1!E5",
+              "header_source_ref": "源xlsx!审定表G13-1!E5",
+              "header_text": "未审数",
+              "json_pointer": "/main/currentUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G13-1!E7",
+              "stable_field_key": "g131_adj_main/current_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 7
+              },
+              "column_key": "current_aje",
+              "group_source_ref": "源xlsx!审定表G13-1!E5",
+              "header_source_ref": "源xlsx!审定表G13-1!F5",
+              "header_text": "审计调整数",
+              "json_pointer": "/main/currentAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G13-1!F7",
+              "stable_field_key": "g131_adj_main/current_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 7
+              },
+              "column_key": "current_audited",
+              "group_source_ref": "源xlsx!审定表G13-1!E5",
+              "header_source_ref": "源xlsx!审定表G13-1!G5",
+              "header_text": "审定数",
+              "json_pointer": "/main/currentAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G13-1!G7",
+              "stable_field_key": "g131_adj_main/current_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 7
+              },
+              "column_key": "change_amount",
+              "group_source_ref": "源xlsx!审定表G13-1!H5",
+              "header_source_ref": "源xlsx!审定表G13-1!H5",
+              "header_text": "增减变动额",
+              "json_pointer": "/main/changeAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G13-1!H7",
+              "stable_field_key": "g131_adj_main/change_amount",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 7
+              },
+              "column_key": "change_rate",
+              "group_source_ref": "源xlsx!审定表G13-1!H5",
+              "header_source_ref": "源xlsx!审定表G13-1!I5",
+              "header_text": "增减变动率",
+              "json_pointer": "/main/changeRate",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G13-1!I7",
+              "stable_field_key": "g131_adj_main/change_rate",
+              "store_item_id": "",
+              "value_type": "ratio"
+            }
+          ],
+          "first_data_row": 7,
+          "footer_row": 17,
+          "header_rows": 2,
+          "last_data_row": 16,
+          "row_mode": "fixed_rows",
+          "table_key": "adj_main_rows"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "6719b934c661f5d19a047690af463a505a822c8c0d2dcf1a48e12bf8881b8ddd",
+    "relative_path": "G/G13 公允价值变动收益.xlsx",
+    "template_sha256": "fd5e5e9eeca7b392d59ca54beac51e96bb1575894113c0f3e69f05a234b0f099"
+  },
+  "template_definition_sha256": "f766460b6c90f45d548af8ae5b9fa9f02c3f74a93a67458bc7df8859e273a21e"
+}

@@ -1,0 +1,504 @@
+{
+  "contract_id": "g14.credit_impairment_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "ffdf1c6e85fecaac910f99c75e067083936aabd219a77b89f011315f0ef3c6e4",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-g14-credit-impairment-loss",
+    "html_store": {
+      "item_ids": [
+        "G14-detail-rows"
+      ],
+      "note": "G14 信用减值损失的明细行存成 checklist_responses 的 **remark** JSON 数组（真库实证 remark 2 B 即空数组 / conclusion 0 B ⇒ roundtrip 判据一律用合成行）。固定 9 行 R11-R19 ⇒ 契约里一条 `tables[]`、`html_store.item_ids` 一条 `G14-detail-rows`。🔴 行身份是 **`rowKey`**（`stable_template_row_key`）—— 全 G 循环唯一一家不用生成式 id 的，GC-6 裁决它是**最稳**的一族（源模板固定行集，插行/改名都不漂移）。照抄 F 循环的 `row_identity_key in ('rowId','id')` 白名单会把它判违规。🔴 前端另有三个**不是模板列**的试算对账派生字段（tbClosing / tbClosingMatched / tbClosingVariance）与一个独立 store 键 `G14-detail-provision-tb`（试算取数缓存），都不属本 sheet 的受管面。",
+      "payload_column": "remark",
+      "payload_column_mode": "remark_only",
+      "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts —— 写入点为 debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(list) })",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "phase5_credit_impairment_detail",
+    "reviewed_basis": "openpyxl 逐格实测 G/G14 信用减值损失.xlsx 的 `明细表G14-2`（两级表头 R9 组 / R10 叶子 / R9 横向合并区恰两个 B9:D9 本期数·F9:K9 对应科目-减值准备 / **固定 9 行** R11-R19（行集由模板 A 列写死）/ footer R20 逐列 =SUM(x11:x19) 且 L20 例外是布尔 =D20=K20 / 有效内容列 13 即 A-M **恰等于 max_column**（无空尾列）/ 0 个 definedName / 受管表零裸 IF，整册 11 格裸 IF 全在 审定表G14-1 / 🔴 模板缺陷：K 列 =G+H 把「本期转回」当成增加损益，而同表 J 的 -H 要求 H 填正数 ⇒ 会计正确应为 =G-H（信用减值损失 = 计提 − 转回）) + 前端 `useG14Detail.ts` 按值 grep（ITEM_ID_ROWS / rowKey 不生成也不派生自位置 / G14DetailRow 前 13 字段与模板列序 A..M 逐列对应 / 固定行集 G14_LINE_ITEMS 9 项） + 模板编制思路见 spec evidence/task8-c6-remaining-eight-template-logic.md §4（损益表项 + 减值准备滚动表双向勾稽 / 核对列 L 验证 审定数 == 计入损益 / TB 口径是**本期发生额**（科目 6702 损益类）而不是余额）"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "明细表G14-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "g1402-managed",
+      "tables": [
+        {
+          "anchor": "A9",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "line_label",
+              "header_source_ref": "源xlsx!明细表G14-2!A10",
+              "header_text": "项目",
+              "json_pointer": "/rows/{row_uuid}/label",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G14-2!A11",
+              "stable_field_key": "g14_detail_rows/{row_uuid}/line_label",
+              "store_item_id": "G14-detail-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_unadjusted",
+              "header_source_ref": "源xlsx!明细表G14-2!B10",
+              "header_text": "未审数",
+              "json_pointer": "/rows/{row_uuid}/currentUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G14-2!B11",
+              "stable_field_key": "g14_detail_rows/{row_uuid}/current_unadjusted",
+              "store_item_id": "G14-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_adjustment",
+              "header_source_ref": "源xlsx!明细表G14-2!C10",
+              "header_text": "调整数",
+              "json_pointer": "/rows/{row_uuid}/currentAdjustment",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G14-2!C11",
+              "stable_field_key": "g14_detail_rows/{row_uuid}/current_adjustment",
+              "store_item_id": "G14-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_audited",
+              "header_source_ref": "源xlsx!明细表G14-2!D10",
+              "header_text": "审定数",
+              "json_pointer": "/rows/{row_uuid}/currentAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表G14-2!D11",
+              "stable_field_key": "g14_detail_rows/{row_uuid}/current_audited",
+              "store_item_id": "G14-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "provision_account",
+              "header_source_ref": "源xlsx!明细表G14-2!E10",
+              "header_text": "对应科目",
+              "json_pointer": "/rows/{row_uuid}/provisionAccount",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G14-2!E11",
+              "stable_field_key": "g14_detail_rows/{row_uuid}/provision_account",
+              "store_item_id": "G14-detail-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "opening_provision",
+              "header_source_ref": "源xlsx!明细表G14-2!F10",
+              "header_text": "期初余额",
+              "json_pointer": "/rows/{row_uuid}/openingProvision",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G14-2!F11",
+              "stable_field_key": "g14_detail_rows/{row_uuid}/opening_provision",
+              "store_item_id": "G14-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_provision",
+              "header_source_ref": "源xlsx!明细表G14-2!G10",
+              "header_text": "本期计提",
+              "json_pointer": "/rows/{row_uuid}/currentProvision",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G14-2!G11",
+              "stable_field_key": "g14_detail_rows/{row_uuid}/current_provision",
+              "store_item_id": "G14-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_reversal",
+              "header_source_ref": "源xlsx!明细表G14-2!H10",
+              "header_text": "本期转回",
+              "json_pointer": "/rows/{row_uuid}/currentReversal",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G14-2!H11",
+              "stable_field_key": "g14_detail_rows/{row_uuid}/current_reversal",
+              "store_item_id": "G14-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_writeoff",
+              "header_source_ref": "源xlsx!明细表G14-2!I10",
+              "header_text": "本期转销",
+              "json_pointer": "/rows/{row_uuid}/currentWriteoff",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G14-2!I11",
+              "stable_field_key": "g14_detail_rows/{row_uuid}/current_writeoff",
+              "store_item_id": "G14-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "closing_provision",
+              "header_source_ref": "源xlsx!明细表G14-2!J10",
+              "header_text": "期末余额",
+              "json_pointer": "/rows/{row_uuid}/closingProvision",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表G14-2!J11",
+              "stable_field_key": "g14_detail_rows/{row_uuid}/closing_provision",
+              "store_item_id": "G14-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "profit_loss",
+              "header_source_ref": "源xlsx!明细表G14-2!K10",
+              "header_text": "计入损益",
+              "json_pointer": "/rows/{row_uuid}/profitLoss",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表G14-2!K11",
+              "stable_field_key": "g14_detail_rows/{row_uuid}/profit_loss",
+              "store_item_id": "G14-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "reconcile_check",
+              "header_source_ref": "源xlsx!明细表G14-2!L10",
+              "header_text": "核对",
+              "json_pointer": "/rows/{row_uuid}/reconciled",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表G14-2!L11",
+              "stable_field_key": "g14_detail_rows/{row_uuid}/reconcile_check",
+              "store_item_id": "G14-detail-rows",
+              "value_type": "boolean"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_ref",
+              "header_source_ref": "源xlsx!明细表G14-2!M10",
+              "header_text": "索引号",
+              "json_pointer": "/rows/{row_uuid}/indexRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表G14-2!M11",
+              "stable_field_key": "g14_detail_rows/{row_uuid}/index_ref",
+              "store_item_id": "G14-detail-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "D11:D19",
+            "J11:J19",
+            "K11:K19",
+            "L11:L19"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowKey",
+            "kind": "field"
+          },
+          "table_key": "g14_detail_rows",
+          "uuid_col": "N"
+        }
+      ]
+    },
+    {
+      "excel_name": "审定表G14-1",
+      "footer": {
+        "diff_row": 18,
+        "marker": "合计",
+        "tb_row": 17,
+        "total_row": 16
+      },
+      "formula_mask": [
+        "D18",
+        "G18"
+      ],
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "g141-managed",
+      "tables": [
+        {
+          "anchor": "A7",
+          "cell_mask": [
+            "B10",
+            "B11",
+            "B12",
+            "B13",
+            "B14",
+            "B15",
+            "B16",
+            "B7",
+            "B8",
+            "B9",
+            "C10",
+            "C11",
+            "C12",
+            "C13",
+            "C14",
+            "C15",
+            "C16",
+            "C7",
+            "C8",
+            "C9",
+            "D10",
+            "D11",
+            "D12",
+            "D13",
+            "D14",
+            "D15",
+            "D16",
+            "D7",
+            "D8",
+            "D9",
+            "E16",
+            "F16",
+            "G10",
+            "G11",
+            "G12",
+            "G13",
+            "G14",
+            "G15",
+            "G16",
+            "G7",
+            "G8",
+            "G9",
+            "H10",
+            "H11",
+            "H12",
+            "H13",
+            "H14",
+            "H15",
+            "H16",
+            "H7",
+            "H8",
+            "H9",
+            "I10",
+            "I11",
+            "I12",
+            "I13",
+            "I14",
+            "I15",
+            "I16",
+            "I7",
+            "I8",
+            "I9"
+          ],
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": 7
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!审定表G14-1!A5",
+              "header_text": "项目",
+              "json_pointer": "/main/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G14-1!A7",
+              "stable_field_key": "g141_adj_main/item_name",
+              "store_item_id": "",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 7
+              },
+              "column_key": "prior_unadjusted",
+              "group_source_ref": "源xlsx!审定表G14-1!B5",
+              "header_source_ref": "源xlsx!审定表G14-1!B5",
+              "header_text": "未审数",
+              "json_pointer": "/main/priorUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G14-1!B7",
+              "stable_field_key": "g141_adj_main/prior_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 7
+              },
+              "column_key": "prior_aje",
+              "group_source_ref": "源xlsx!审定表G14-1!B5",
+              "header_source_ref": "源xlsx!审定表G14-1!C5",
+              "header_text": "审计调整数",
+              "json_pointer": "/main/priorAje",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G14-1!C7",
+              "stable_field_key": "g141_adj_main/prior_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 7
+              },
+              "column_key": "prior_audited",
+              "group_source_ref": "源xlsx!审定表G14-1!B5",
+              "header_source_ref": "源xlsx!审定表G14-1!D5",
+              "header_text": "审定数",
+              "json_pointer": "/main/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G14-1!D7",
+              "stable_field_key": "g141_adj_main/prior_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 7
+              },
+              "column_key": "current_unadjusted",
+              "group_source_ref": "源xlsx!审定表G14-1!E5",
+              "header_source_ref": "源xlsx!审定表G14-1!E5",
+              "header_text": "未审数",
+              "json_pointer": "/main/currentUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G14-1!E7",
+              "stable_field_key": "g141_adj_main/current_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 7
+              },
+              "column_key": "current_aje",
+              "group_source_ref": "源xlsx!审定表G14-1!E5",
+              "header_source_ref": "源xlsx!审定表G14-1!F5",
+              "header_text": "审计调整数",
+              "json_pointer": "/main/currentAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G14-1!F7",
+              "stable_field_key": "g141_adj_main/current_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 7
+              },
+              "column_key": "current_audited",
+              "group_source_ref": "源xlsx!审定表G14-1!E5",
+              "header_source_ref": "源xlsx!审定表G14-1!G5",
+              "header_text": "审定数",
+              "json_pointer": "/main/currentAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G14-1!G7",
+              "stable_field_key": "g141_adj_main/current_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 7
+              },
+              "column_key": "change_amount",
+              "group_source_ref": "源xlsx!审定表G14-1!H5",
+              "header_source_ref": "源xlsx!审定表G14-1!H5",
+              "header_text": "增减变动额",
+              "json_pointer": "/main/changeAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G14-1!H7",
+              "stable_field_key": "g141_adj_main/change_amount",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 7
+              },
+              "column_key": "change_rate",
+              "group_source_ref": "源xlsx!审定表G14-1!H5",
+              "header_source_ref": "源xlsx!审定表G14-1!I5",
+              "header_text": "增减变动率",
+              "json_pointer": "/main/changeRate",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G14-1!I7",
+              "stable_field_key": "g141_adj_main/change_rate",
+              "store_item_id": "",
+              "value_type": "ratio"
+            }
+          ],
+          "first_data_row": 7,
+          "footer_row": 16,
+          "header_rows": 2,
+          "last_data_row": 15,
+          "row_mode": "fixed_rows",
+          "table_key": "adj_main_rows"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "2b2f65f65d0ab76c4bc3c275e38015a33f8aacb3b0456694d3947caa3a949c0b",
+    "relative_path": "G/G14 信用减值损失.xlsx",
+    "template_sha256": "5ca770907cfd3723159f4eb45871102f1cee382255e391f3aca0b1d57a287dc6"
+  },
+  "template_definition_sha256": "88e8327536231073c1ff7fb364b5fc4ed9f9ef83c26f2d4e2163e243a9b311cd"
+}

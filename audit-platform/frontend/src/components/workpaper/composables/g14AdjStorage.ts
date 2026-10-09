@@ -102,7 +102,8 @@ export function inferG14AdjudicationRowKey(row: G14AdjustmentEntryLike): string 
     row.description, row.summary, row.noteItem, row.remark, row.accountName,
   ].map((x) => String(x || '')).join(' ')
 
-  if (/合同资产/.test(text)) return 'ca'
+  // 🔴 C-9：模板无「合同资产减值损失」专行 ⇒ 合同资产的调整分录归「其他」行（R19）
+  if (/合同资产/.test(text)) return 'other'
   if (/应收票据|票据坏账/.test(text)) return 'notes'
   if (/其他应收/.test(text)) return 'othar'
   if (/应收款项融资/.test(text)) return 'rfin'

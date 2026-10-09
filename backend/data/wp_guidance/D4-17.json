@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-17",
+  "title": "D4-17 营业收入截止测试（账到单据）编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "测试期末收入是否存在跨期确认，方向为账簿→支持单据：选取资产负债表日前后的收入凭证，追溯到发货/签收单据，确认收入确认时点是否正确归属于本期。",
+      "source_refs": []
+    },
+    {
+      "key": "materials",
+      "title": "二、样本选取",
+      "content": "选取资产负债表日前后 N 天的收入凭证，逐笔追溯到发货单/签收单/验收单，比对凭证与单据的品名、数量、金额，判断收入应确认的期间。",
+      "source_refs": []
+    },
+    {
+      "key": "formulas",
+      "title": "三、跨期判定",
+      "content": "凭证日期 ≤ 截止日 < 单据日期 → 判定为跨期（本期账、次期货）。「是否跨期」列标注，跨期天数 >5天 须进一步关注并评估是否需截止调整。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 本期确认但单据显示次年才发货/签收：提前确认收入（虚增本期）。\n2. 跨期金额重大：须做截止调整分录（录入 D4-4）。\n3. 与 D4-18 单据到账测试互补：本表查「账早于货」，D4-18 查「货早于账」。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "ce94c6839006befe8a8fa50120e6a71b0357e1487430eb05b53974840600041a",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "46c7fbd335730aaf7f123a8d6a79b01cb8e08f523b13a2ba59e1d3c89335c44d"
+  }
+}

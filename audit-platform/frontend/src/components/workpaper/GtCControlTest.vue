@@ -89,11 +89,23 @@
           />
         </template>
 
-        <!-- 在线编辑 (OnlyOffice) -->
+        <!-- 在线编辑 -->
+        <!-- 🔴 双向回写接线（Task 22-23）：capability=bidirectional 时经 sync bridge 走真双向
+             （WorkpaperSyncEditorHost）；否则降级到 GtOnlyOfficeSheet 只读展示。
+             C canary 当前 capability=single_onlyoffice（BP 阻塞），走降级分支；
+             后端裁决 bidirectional 后自动切到 sync bridge。 -->
         <template v-else>
           <div class="cct-oo-container">
+            <!-- 真双向：sync bridge editor host（capability 就绪时） -->
+            <WorkpaperSyncEditorHost
+              v-if="canUseSyncBridge && cSyncBridge.mode.value === 'oo'"
+              ref="cSyncEditorHostRef"
+              :descriptor="cSyncDescriptor"
+              :bridge="cSyncBridge"
+            />
+            <!-- 降级：只读 OO 展示（capability 未裁决 bidirectional 时） -->
             <GtOnlyOfficeSheet
-              v-if="wpId"
+              v-else-if="wpId"
               :wp-id="wpId"
               :project-id="projectId"
               :sheet-name="sheetName || ''"
@@ -486,6 +498,12 @@ import { createEmptyState, type DecisionTreeState } from '@/composables/useDevia
 import { CYCLE_CONFIG } from './composables/useCControlTest'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import GtOnlyOfficeSheet from '@/components/workpaper/GtOnlyOfficeSheet.vue'
+// C canary 双向回写接线（spec c-cycle-sync-foundation-and-first-canary Task 22-23）：
+// 参照 D4 模式接入 useWorkpaperSyncBridge + WorkpaperSyncEditorHost，经 capabilityForEntry 门控。
+// capability 未裁决为 bidirectional 时优雅降级到 GtOnlyOfficeSheet 只读展示（BP 阻塞解除后自动启用真双向）。
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 import CControlTestSummaryTable from './cControlTest/CControlTestSummaryTable.vue'
 import CControlTestSubPage from './cControlTest/CControlTestSubPage.vue'
 import CControlTestDecisionTree from './cControlTest/CControlTestDecisionTree.vue'
@@ -734,6 +752,114 @@ const deviationModeOptions = [
   { label: '结构化视图', value: 'structured' },
   { label: '在线编辑', value: 'online-edit' },
 ]
+
+// ─── C canary 双向回写桥（spec c-cycle-sync-foundation-and-first-canary Task 22-23）───
+// 参照 D4：偏差评价 online-edit 从纯 GtOnlyOfficeSheet（只读展示）升级为经 sync bridge 的双向。
+// 🔴 capability 门控：C canary manifest 当前 capability=single_onlyoffice（未裁决 bidirectional，
+//    后端 adapter/contract 是 BP 阻塞项）。capability 非 bidirectional 时 canUseSyncBridge=false，
+//    降级到 GtOnlyOfficeSheet 展示；BP 阻塞解除、后端裁决 bidirectional 后自动启用真双向。
+const C_CANARY_ENTRY_ID = 'xlsx/gt-c-control-test'
+const cSyncCapability = capabilityForEntry(C_CANARY_ENTRY_ID)
+/**
+ * capability 裁决为 bidirectional 才走 sync bridge（否则降级 OO 展示）。
+ *
+ * 🔴 **本判断是唯一防线，禁削弱**：bridge 内部的 `switchToOnlyOffice()` 只校验
+ * `supportedModesForCapability(capability).includes('oo')`，而
+ * `CAPABILITY_MODES.single_onlyoffice = ['oo']` **包含 `'oo'`** ⇒ 当前 capability
+ * （`single_onlyoffice`）下 bridge **不会 refuse**，会照常尝试进 OO 并打后端
+ * pending-mutation / materialize 端点 —— 而 C 域后端 adapter / contract 尚未交付
+ * （BP-1 ~ BP-5、BP-7）⇒ 必然 422。故必须在**宿主侧**显式按 `=== 'bidirectional'` 拦住，
+ * 不能依赖 bridge 自校验。
+ */
+const canUseSyncBridge = computed(() => cSyncCapability === 'bidirectional')
+
+const cSyncEntryId = ref(C_CANARY_ENTRY_ID)
+// sheetKey 按当前偏差循环编号（Cx-2）区分：c{n}-deviation-managed
+const cSyncSheetKey = computed(() => `c${cycleNum.value}-deviation-managed`)
+const cSyncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const cSyncSwitching = ref(false)
+
+const cSyncBridge = useWorkpaperSyncBridge({
+  entryId: cSyncEntryId,
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+  sheetKey: cSyncSheetKey,
+  capability: cSyncCapability,
+  flushHtml: async () => {
+    // 先落盘结构化视图未保存的编辑，再交回 projection 与 expected revision。
+    await flushPendingSaves()
+    const snap = await readCStoreProjection()
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: cSyncSheetKey.value,
+    }
+  },
+  reloadHtml: async () => {
+    // OO→HTML 后重载结构化数据（selfLoad 经 composable 重新拉底稿响应）。
+    await selfLoad()
+    syncDeviationViewState()
+  },
+  // 🔴 降级态不得引入改造前不存在的副作用：bridge 构造时会无条件
+  //    `window.addEventListener('beforeunload', ...)`。capability 未裁决 bidirectional 时
+  //    永不进 OO ⇒ 该监听器恒早退（dirty 为假），但仍是多余的全局监听 ⇒ 显式关掉。
+  //    裁决为 bidirectional 后自动装上（届时确实需要它阻断脏数据离开）。
+  installBeforeUnload: cSyncCapability === 'bidirectional',
+})
+
+const cSyncDescriptor = computed(() => cSyncBridge.descriptor.value)
+const cSyncBusy = computed(
+  () =>
+    cSyncSwitching.value
+    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(cSyncBridge.state.value)),
+)
+
+/** 读取当前 entry 的 store projection（BP 阻塞期后端未就绪时返回空投影，桥自会降级）。 */
+async function readCStoreProjection(): Promise<{ expectedRevision: number; projection: unknown }> {
+  try {
+    const { readStoreProjection } = await import('./sync/workpaperSyncApi')
+    const snap = await readStoreProjection({
+      projectId: projectIdRef.value,
+      wpId: wpIdRef.value,
+      entryId: C_CANARY_ENTRY_ID,
+    } as any)
+    return { expectedRevision: (snap as any).expectedRevision, projection: (snap as any).projection }
+  } catch {
+    // 后端 projection 端点未就绪（BP 阻塞期）→ 返回空投影，桥拒绝进 OO 并降级。
+    return { expectedRevision: 0, projection: null }
+  }
+}
+
+/** 偏差 online-edit 时切换到 OO（经 sync bridge，仅 capability=bidirectional 时生效）。 */
+async function switchDeviationToOnlineEdit(): Promise<void> {
+  if (!canUseSyncBridge.value) return
+  cSyncSwitching.value = true
+  try {
+    await cSyncBridge.switchToOnlyOffice()
+  } catch {
+    // 失败保持结构化视图；错误已由桥写入 lastError/feedback。
+    deviationViewMode.value = 'structured'
+  } finally {
+    cSyncSwitching.value = false
+  }
+}
+
+// deviationViewMode 变化时驱动 sync bridge（仅当 capability 就绪）。
+watch(deviationViewMode, (mode) => {
+  if (!canUseSyncBridge.value) return
+  if (mode === 'online-edit') {
+    void switchDeviationToOnlineEdit()
+  } else if (cSyncBridge.mode.value === 'oo') {
+    // 切回结构化：clean close（未改动）或强制保存后回表单。
+    if (!cSyncBridge.dirty.value) {
+      void cSyncBridge.leaveWithoutSaving()
+    } else if (cSyncBridge.canForcesave.value && cSyncEditorHostRef.value) {
+      void cSyncEditorHostRef.value.forceSave()
+    } else {
+      cSyncBridge.persistMode('html')
+    }
+  }
+})
 
 /** 偏差评价引导步骤（可点击跳转） */
 const deviationGuidanceSteps = [

@@ -66,6 +66,15 @@ async def save_assignments(
             },
         )
     await db.commit()
+
+    # 委派落库后失效程序表 auto_data 缓存（A1 看板 review_dashboard_status 读
+    # project_assignments 取五级复核人员姓名，TTL 30s 内会显示旧人员）。
+    # 🔴 修复前靠 save_assignments 冒充 DATA_IMPORTED 顺带清缓存；去掉伪事件后
+    #    必须显式失效，否则委派后看板仍显示旧复核人。放在 commit 之后：
+    #    commit 失败则不失效（缓存仍与库一致），不会出现「缓存已清、库未变」。
+    from app.services.procedure_table_auto_service import invalidate_auto_cache
+
+    invalidate_auto_cache(project_id)
     return {
         "message": f"已委派 {len(created)} 名成员",
         "count": len(created),

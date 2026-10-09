@@ -182,3 +182,7 @@ backend/scripts/diagnose/_mutation_reports/
 
 # 🔴 注意：`backend/scripts/fix/_ledgers/` **不在**忽略列表内 —— 那是
 # 模板库解引用迁移（Task 19）的台账，是 `--rollback` 的唯一依据，必须入库。
+
+# 临时 commit message 文件（PowerShell 下长中文 commit message 只能走 -F <file>；
+# 2026-09-22 实测 `git add -A` 会抢在 `git commit -F` 读取之前把它一起提交进去）
+_commit_msg.tmp

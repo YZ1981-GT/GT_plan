@@ -488,8 +488,34 @@ class TestAdmissionIsRealReadback:
             assert signals.adapter_registered is False
             assert signals.approved_bundle_present is False
             assert signals.published_representation_present is False
-            # 载体门本身是通过的 —— 阻断项不是 Task 6
-            assert signals.carrier.really_passed is True
+            # ── 阻断项不是 Task 6：载体裁决本身没变 ──────────────────────────
+            # 🔴 判据从 `carrier.really_passed is True` 换成下面三条（2026-09-07）。
+            #    `really_passed` 是「新鲜 **且** 裁决通过」的合取，而它的新鲜度轴之一是
+            #    「记录的 source_commit == 当前 HEAD」—— 那条轴**每 commit 都会失效**。
+            #    本条测的是「F2 未准入的原因是供给，不是载体门」，所以要断言的是载体裁决
+            #    的**实体结论**未变，而不是它的环境指纹还新鲜。
+            #    「载体证据相对 HEAD 已 stale」这件事没有被吞掉：gate 自己把它记成
+            #    `carrier_gate_not_really_passed` 阻断项并把 stale_reasons 写进 notes
+            #    （见 check_task61 的 `evaluate_probe`），重采属外部依赖（要真实 OO 9.4 +
+            #    真浏览器跑 `scripts/diagnose/probe_oo94_word_sdt.py`），见 §五 owner。
+            carrier = signals.carrier
+            # ① 三类载体与 w:tag 锚点的裁决逐字未变（改动任一项 ⇒ 本条打红）。
+            assert set(carrier.carriers_allowed) == {
+                "field_sdt_inline",
+                "field_sdt_block",
+                "sdt_external_body",
+            }, carrier.carriers_allowed
+            assert "row_sdt" in carrier.carriers_blocked
+            assert carrier.anchors_allowed == ("w_tag",)
+            # ② probe 模板一个都没漂 —— digest 漂移属于真实失效，必须继续打红。
+            drift = [(p, r, o) for p, r, o in carrier.template_digests if r != o]
+            assert drift == [], drift
+            assert carrier.recorded_oo_build == carrier.observed_oo_build
+            # ③ 唯一的 stale 轴只许是「记录 commit ≠ HEAD」这条环境指纹轴。
+            #    多出任何一条（模板不存在 / digest 漂移 / OO build 变化）即真实失效。
+            assert [r for r in carrier.stale_reasons if not r.startswith("source_commit 变化")] == [], (
+                carrier.stale_reasons
+            )
 
     @pytest.mark.parametrize(
         "flipped",

@@ -1001,6 +1001,67 @@ def assert_no_second_lane_decision_site() -> Mapping[str, tuple[str, ...]]:
 #: 任一 provider 改了后缀而这里没跟，守卫打红 —— 而不是让判据 A 静默恒假。
 _AUTHORITY_MODEL_LOGICAL_SUFFIX: Final[str] = ".authority-model"
 
+#: 🔴 **尚未实现 `publish_definitions()` 发布编排的 provider 欠账清单**（2026-09-27 现算登记）。
+#:
+#: 背景：`assert_authority_logical_suffix_matches_providers()` 原先要求白名单里
+#: **每个** provider 都有 `publish_definition(kind=DefinitionKind.authority_model, …)`
+#: 调用，否则打红。但白名单的真实语义是「**允许从交付台账 import 的 provider**」
+#: （防动态加载面，见 `adapters/registry.py#_ALLOWED_PROVIDER_MODULES`），
+#: **不是**「已实现发布编排的清单」—— 两者被当成同一件事，导致这条守卫长期整体打红：
+#: 实测 37 条白名单里只有 **16** 条有编排（D 循环 6 条 + F3/F4/F5 + E1 + 4 个 pilot + …），
+#: 其余 **21** 条（F1/F2×4 / G×6 / H×5 / I×6 / J1 里尚未补的那些）都没有。
+#:
+#: 🔴 **为什么不是「补 21 个编排」**：这些 entry 全部卡在 BP-1~BP-3 平台级缺口
+#: （instrumentation candidate / 人工审核契约 / approved bundle 三缺），发布链第②环
+#: 走不通 —— 补一个跑不起来的编排函数是**假绿**，比显式登记欠账更糟。
+#:
+#: 🔴 **为什么清单不能现算**：现算（= 白名单的补集）会让「新 provider 忘写编排」静默通过。
+#: 写成显式常量后，新 provider 要么实现编排、要么在此登记并写明卡点，**两条路都留痕**。
+#: 反向自检由 `TestAuthorityLogicalSuffixMatchesProviders` 的分母判据守住
+#: （已核对数 `checked` 必须 ≥ 4，且清单里的每条都必须真在白名单里）。
+_PROVIDERS_WITHOUT_PUBLISH_ORCHESTRATION: Final[frozenset[str]] = frozenset(
+    {
+        # ── F 循环（spec: f1-… / f2-…）卡 BP-1~BP-3 ────────────────────────────
+        "app.services.workpaper_sync.phase5_f1_prepayment",
+        "app.services.workpaper_sync.phase5_f2_inventory_main",
+        "app.services.workpaper_sync.phase5_f2_inventory_special",
+        "app.services.workpaper_sync.phase5_f2_inventory_valuation",
+        "app.services.workpaper_sync.phase5_f2_stocktake_bundle",
+        # ── G 循环（spec: g-cycle-… 四份）卡 BP-1~BP-3 ─────────────────────────
+        "app.services.workpaper_sync.phase5_g2_interest_receivable",
+        "app.services.workpaper_sync.phase5_g8_other_equity",
+        "app.services.workpaper_sync.phase5_g9_other_noncurrent",
+        "app.services.workpaper_sync.phase5_g10_trading_liabilities",
+        "app.services.workpaper_sync.phase5_g11_investment_income",
+        "app.services.workpaper_sync.phase5_g14_credit_impairment",
+        # ── H 循环（spec: h-cycle-… 四份）卡 BP-1~BP-3 ─────────────────────────
+        "app.services.workpaper_sync.phase5_h2_construction_in_progress",
+        "app.services.workpaper_sync.phase5_h4_engineering_materials",
+        "app.services.workpaper_sync.phase5_h6_asset_disposal_clearing",
+        "app.services.workpaper_sync.phase5_h8_right_of_use_assets",
+        "app.services.workpaper_sync.phase5_h9_lease_liabilities",
+        # ── I 循环（spec: i-cycle-… 三份）卡 BP-1~BP-4 ─────────────────────────
+        "app.services.workpaper_sync.phase5_i1_intangible_assets",
+        "app.services.workpaper_sync.phase5_i2_development_expenditure",
+        "app.services.workpaper_sync.phase5_i3_goodwill",
+        "app.services.workpaper_sync.phase5_i4_long_term_prepaid",
+        "app.services.workpaper_sync.phase5_i5_other_noncurrent_assets",
+        "app.services.workpaper_sync.phase5_i6_research_development_expense",
+        # ── J 循环（spec: j-cycle-sync-foundation-and-first-canary）卡 BP-2~BP-4 ─
+        "app.services.workpaper_sync.phase5_j1_employee_compensation",
+        "app.services.workpaper_sync.phase5_j2_defined_benefit",
+        "app.services.workpaper_sync.phase5_j3_share_based_payment",
+        # ── G/H 循环并发会话新增（2026-09-27 补漏）卡 BP-1~BP-3 ──────────────
+        "app.services.workpaper_sync.phase5_g1_trading_financial_assets",
+        "app.services.workpaper_sync.phase5_g12_net_hedge_gains",
+        "app.services.workpaper_sync.phase5_g13_fair_value_changes",
+        "app.services.workpaper_sync.phase5_h3_investment_property",
+        "app.services.workpaper_sync.phase5_h5_oil_gas_assets",
+        "app.services.workpaper_sync.phase5_h7_biological_assets",
+        "app.services.workpaper_sync.phase5_h10_asset_disposal_income",
+    }
+)
+
 
 def authority_model_logical_id(contract_id: str) -> str:
     """该 contract 对应的 authority model definition 的 ``logical_id``。"""
@@ -1058,9 +1119,18 @@ def assert_authority_logical_suffix_matches_providers() -> tuple[str, ...]:
             break
 
         if found_suffix is None:
+            # 🔴 2026-09-27 口径修正：见 _PROVIDERS_WITHOUT_PUBLISH_ORCHESTRATION 的说明。
+            # 未实现发布编排的 provider 不打红，但**必须**在显式欠账清单里登记 ——
+            # 新 provider 忘写编排又忘登记时仍然打红。
+            if module_path in _PROVIDERS_WITHOUT_PUBLISH_ORCHESTRATION:
+                continue
             raise OpaqueLaneCoverageDriftError(
-                f"{module_path}: 找不到 authority model 的 publish_definition 调用 —— "
-                "判据 A 的反向查询 key 无从核对"
+                f"{module_path}: 找不到 authority model 的 publish_definition 调用，"
+                "且**未**登记在 `_PROVIDERS_WITHOUT_PUBLISH_ORCHESTRATION` 欠账清单里 —— "
+                "要么实现 `publish_definitions()` 编排（照 D1/D3/D5/D6/D7/E1 口径，"
+                "`logical_id` 写成 f-string `f\"{ADAPTER_ID}.authority-model\"`），"
+                "要么把本模块加进那张清单并写明卡在哪个平台级缺口。"
+                "两条路都不走 = 判据 A 的反向查询 key 无从核对。"
             )
         if found_suffix != _AUTHORITY_MODEL_LOGICAL_SUFFIX:
             raise OpaqueLaneCoverageDriftError(

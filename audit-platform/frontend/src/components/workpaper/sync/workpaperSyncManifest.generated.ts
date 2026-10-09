@@ -40,47 +40,48 @@ export interface WorkpaperSyncManifestEntry {
   hasBrowserEvidence: boolean
 }
 
-export const WORKPAPER_SYNC_MANIFEST_DIGEST = "5c55208f01c0560612438aa005895c533c719f16c7834021958a8df0a74f517e"
+export const WORKPAPER_SYNC_MANIFEST_DIGEST = "cd42e7db2de961115b409f852df47f69dc4965c32f942a5e8991301ec4c77cfc"
 
-export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "10f015fcc14c41d76c5433e0013fc30701faa73433c84cd1a89b262ab1de0afe"
+export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "4f50c870b90432950c4eb74640452d965f4001ec2a70707f7ccd102e72496dcf"
 
 export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "by_component": {
-    "GtOnlyOfficeSheet": 259,
+    "GtOnlyOfficeSheet": 225,
     "OnlyOfficeWordDialog": 2,
+    "WorkpaperSyncEditorHost": 108,
     "WorkpaperWordEditor": 4
   },
   "capability_counts": {
-    "bidirectional": 4,
+    "bidirectional": 100,
     "single_html": 5,
-    "single_onlyoffice": 166,
+    "single_onlyoffice": 91,
     "unreachable": 1
   },
   "dispatcher_count": 1,
   "editability_counts": {
-    "editable": 175,
+    "editable": 196,
     "unreachable": 1
   },
-  "entry_count": 176,
-  "host_count": 175,
-  "independent_entry_count": 142,
-  "legacy_fake_bidirectional_count": 137,
-  "mount_count": 265,
-  "parent_duplicate_count": 33,
+  "entry_count": 197,
+  "host_count": 196,
+  "independent_entry_count": 144,
+  "legacy_fake_bidirectional_count": 83,
+  "mount_count": 339,
+  "parent_duplicate_count": 52,
   "room_model_counts": {
     "exclusive": 6,
     "none": 1,
-    "shared": 169
+    "shared": 190
   },
   "room_service_state": "room_service_wired",
   "scenario_profile_counts": {
     "docx.editable.exclusive.dynamic.room_service_wired.v1": 1,
     "docx.editable.exclusive.single.room_service_wired.v1": 5,
     "docx.editable.shared.single.room_service_wired.v1": 1,
-    "xlsx.editable.shared.single.room_service_wired.v1": 168,
+    "xlsx.editable.shared.single.room_service_wired.v1": 189,
     "xlsx.unreachable.none.single.room_service_wired.v1": 1
   },
-  "unadjudicated_count": 132,
+  "unadjudicated_count": 78,
   "unreachable_count": 1
 } as const
 
@@ -381,7 +382,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/analysis/d4-tab-customer-price",
@@ -391,31 +392,22 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"重要客户销售价格分析D4-10\""
-      ],
-      "sheet_literals": [
-        "重要客户销售价格分析D4-10"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabCustomerPrice.vue",
       "wp_code_patterns": [
-        "D4-10",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/analysis/d4-tab-customer-structure",
@@ -425,31 +417,22 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"重要客户结构分析D4-9\""
-      ],
-      "sheet_literals": [
-        "重要客户结构分析D4-9"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabCustomerStructure.vue",
       "wp_code_patterns": [
-        "D4-9",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/analysis/d4-tab-indicator",
@@ -459,31 +442,22 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"重要指标分析D4-6\""
-      ],
-      "sheet_literals": [
-        "重要指标分析D4-6"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabIndicator.vue",
       "wp_code_patterns": [
-        "D4-6",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/analysis/d4-tab-margin-monthly",
@@ -493,31 +467,47 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"毛利率分析表D4-7\""
-      ],
-      "sheet_literals": [
-        "毛利率分析表D4-7"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabMarginMonthly.vue",
       "wp_code_patterns": [
-        "D4-7",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/d4/analysis/d4-tab-product-margin",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabProductMargin.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-d4-operating-revenue",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabProductMargin.vue",
+      "wp_code_patterns": [
+        "D4T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/analysis/d4-tab-product-price",
@@ -527,31 +517,72 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"产品销售价格分析D4-11\""
-      ],
-      "sheet_literals": [
-        "产品销售价格分析D4-11"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabProductPrice.vue",
       "wp_code_patterns": [
-        "D4-11",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/d4/core/d4-tab-adjudication",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/d4/core/D4TabAdjudication.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-d4-operating-revenue",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/d4/core/D4TabAdjudication.vue",
+      "wp_code_patterns": [
+        "D4T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/d4/core/d4-tab-adjustment",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/d4/core/D4TabAdjustment.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-d4-operating-revenue",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/d4/core/D4TabAdjustment.vue",
+      "wp_code_patterns": [
+        "D4T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/inspection/d4-tab-completeness",
@@ -561,31 +592,22 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"营业收入完整性检查表D4-15\""
-      ],
-      "sheet_literals": [
-        "营业收入完整性检查表D4-15"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabCompleteness.vue",
       "wp_code_patterns": [
-        "D4-15",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/inspection/d4-tab-contract",
@@ -595,31 +617,22 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"合同检查表D4-12\""
-      ],
-      "sheet_literals": [
-        "合同检查表D4-12"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabContract.vue",
       "wp_code_patterns": [
-        "D4-12",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/inspection/d4-tab-cutoff-backward",
@@ -629,31 +642,22 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"营业收入截止测试（单据到账）D4-18\""
-      ],
-      "sheet_literals": [
-        "营业收入截止测试（单据到账）D4-18"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabCutoffBackward.vue",
       "wp_code_patterns": [
-        "D4-18",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/inspection/d4-tab-cutoff-forward",
@@ -663,31 +667,22 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"营业收入截止测试（账到单据）D4-17\""
-      ],
-      "sheet_literals": [
-        "营业收入截止测试（账到单据）D4-17"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabCutoffForward.vue",
       "wp_code_patterns": [
-        "D4-17",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/inspection/d4-tab-discount",
@@ -697,31 +692,22 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"销售折扣与折让检查D4-19\""
-      ],
-      "sheet_literals": [
-        "销售折扣与折让检查D4-19"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabDiscount.vue",
       "wp_code_patterns": [
-        "D4-19",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/inspection/d4-tab-erp-check",
@@ -731,31 +717,22 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"营业收入账面金额与ERP系统核对记录D4-13\""
-      ],
-      "sheet_literals": [
-        "营业收入账面金额与ERP系统核对记录D4-13"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabErpCheck.vue",
       "wp_code_patterns": [
-        "D4-13",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/inspection/d4-tab-export",
@@ -765,31 +742,22 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"出口收入电子口岸系统核对D4-16\""
-      ],
-      "sheet_literals": [
-        "出口收入电子口岸系统核对D4-16"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabExport.vue",
       "wp_code_patterns": [
-        "D4-16",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/inspection/d4-tab-occurrence",
@@ -799,31 +767,22 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"营业收入发生检查表D4-14\""
-      ],
-      "sheet_literals": [
-        "营业收入发生检查表D4-14"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabOccurrence.vue",
       "wp_code_patterns": [
-        "D4-14",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/inspection/d4-tab-return",
@@ -833,31 +792,172 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"销售退货检查表 D4-20\""
-      ],
-      "sheet_literals": [
-        "销售退货检查表 D4-20"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabReturn.vue",
       "wp_code_patterns": [
-        "D4-20",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/d4/ipo/d4-tab-customer-checklist",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabCustomerChecklist.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-d4-operating-revenue",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabCustomerChecklist.vue",
+      "wp_code_patterns": [
+        "D4T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/d4/ipo/d4-tab-customer-detail",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabCustomerDetail.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-d4-operating-revenue",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabCustomerDetail.vue",
+      "wp_code_patterns": [
+        "D4T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/d4/ipo/d4-tab-dealer",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabDealer.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-d4-operating-revenue",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabDealer.vue",
+      "wp_code_patterns": [
+        "D4T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/d4/ipo/d4-tab-fund-flow",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabFundFlow.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-d4-operating-revenue",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabFundFlow.vue",
+      "wp_code_patterns": [
+        "D4T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/d4/ipo/d4-tab-interview-detail",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInterviewDetail.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-d4-operating-revenue",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInterviewDetail.vue",
+      "wp_code_patterns": [
+        "D4T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/d4/ipo/d4-tab-interview-summary",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInterviewSummary.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-d4-operating-revenue",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInterviewSummary.vue",
+      "wp_code_patterns": [
+        "D4T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/ipo/d4-tab-invoice-compare",
@@ -867,31 +967,22 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"收入与开具发票金额比较分析D4-23\""
-      ],
-      "sheet_literals": [
-        "收入与开具发票金额比较分析D4-23"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInvoiceCompare.vue",
       "wp_code_patterns": [
-        "D4-23",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/ipo/d4-tab-ipo-indicator",
@@ -901,31 +992,47 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"重要指标分析表D4-22\""
-      ],
-      "sheet_literals": [
-        "重要指标分析表D4-22"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabIpoIndicator.vue",
       "wp_code_patterns": [
-        "D4-22",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/d4/ipo/d4-tab-overseas",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabOverseas.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-d4-operating-revenue",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabOverseas.vue",
+      "wp_code_patterns": [
+        "D4T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/ipo/d4-tab-third-party",
@@ -935,31 +1042,72 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"第三方回款检查D4-24\""
-      ],
-      "sheet_literals": [
-        "第三方回款检查D4-24"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabThirdParty.vue",
       "wp_code_patterns": [
-        "D4-24",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/d4/ipo/d4-tab-undisclosed-rp",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabUndisclosedRp.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-d4-operating-revenue",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabUndisclosedRp.vue",
+      "wp_code_patterns": [
+        "D4T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/d4/other/d4-tab-other-check",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherCheck.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-d4-operating-revenue",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherCheck.vue",
+      "wp_code_patterns": [
+        "D4T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/other/d4-tab-other-contract",
@@ -969,31 +1117,22 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"其他业务收入合同测算表D4-34\""
-      ],
-      "sheet_literals": [
-        "其他业务收入合同测算表D4-34"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherContract.vue",
       "wp_code_patterns": [
-        "D4-34",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/other/d4-tab-other-cutoff",
@@ -1003,31 +1142,22 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"其他业务收入截止性测试D4-36\""
-      ],
-      "sheet_literals": [
-        "其他业务收入截止性测试D4-36"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherCutoff.vue",
       "wp_code_patterns": [
-        "D4-36",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/other/d4-tab-other-margin",
@@ -1037,31 +1167,47 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"其他业务毛利率分析表D4-33\""
-      ],
-      "sheet_literals": [
-        "其他业务毛利率分析表D4-33"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherMargin.vue",
       "wp_code_patterns": [
-        "D4-33",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/d4/policy/d4-tab-policy-check",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/d4/policy/D4TabPolicyCheck.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-d4-operating-revenue",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/d4/policy/D4TabPolicyCheck.vue",
+      "wp_code_patterns": [
+        "D4T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/d4/related/d4-tab-related-price",
@@ -1071,31 +1217,22 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"关联方销售情况及价格分析D4-21\""
-      ],
-      "sheet_literals": [
-        "关联方销售情况及价格分析D4-21"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/d4/related/D4TabRelatedPrice.vue",
       "wp_code_patterns": [
-        "D4-21",
         "D4T"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-a101-governance-communication",
@@ -1103,33 +1240,24 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA101GovernanceCommunication.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"A10-1\""
-      ],
-      "sheet_literals": [
-        "A10-1"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtA101GovernanceCommunication.vue",
       "wp_code_patterns": [
-        "A10-1",
         "A101G"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-a111-subsequent-events-inquiry",
@@ -1137,27 +1265,18 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA111SubsequentEventsInquiry.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"A11-1\""
-      ],
-      "sheet_literals": [
-        "A11-1"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtA111SubsequentEventsInquiry.vue",
       "wp_code_patterns": [
-        "A11-1",
         "A111S"
       ]
     }
@@ -1231,7 +1350,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-a121-legal-confirmation",
@@ -1239,33 +1358,24 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA121LegalConfirmation.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"A12-1\""
-      ],
-      "sheet_literals": [
-        "A12-1"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtA121LegalConfirmation.vue",
       "wp_code_patterns": [
-        "A12-1",
         "A121L"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-a171-audit-summary",
@@ -1273,33 +1383,24 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA171AuditSummary.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"A17-1\""
-      ],
-      "sheet_literals": [
-        "A17-1"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtA171AuditSummary.vue",
       "wp_code_patterns": [
-        "A17-1",
         "A171A"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-a1721-kam",
@@ -1307,33 +1408,24 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA1721Kam.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"A17-2-1\""
-      ],
-      "sheet_literals": [
-        "A17-2-1"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtA1721Kam.vue",
       "wp_code_patterns": [
-        "A17-2-1",
         "A1721K"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-a173-consultation-record",
@@ -1341,33 +1433,24 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA173ConsultationRecord.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"A17-3\""
-      ],
-      "sheet_literals": [
-        "A17-3"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtA173ConsultationRecord.vue",
       "wp_code_patterns": [
-        "A17-3",
         "A173C"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-a1731-consultation-execution",
@@ -1375,33 +1458,24 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA1731ConsultationExecution.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"A17-3-1\""
-      ],
-      "sheet_literals": [
-        "A17-3-1"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtA1731ConsultationExecution.vue",
       "wp_code_patterns": [
-        "A17-3-1",
         "A1731C"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-a174-disagreement-record",
@@ -1409,33 +1483,24 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA174DisagreementRecord.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"A17-4\""
-      ],
-      "sheet_literals": [
-        "A17-4"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtA174DisagreementRecord.vue",
       "wp_code_patterns": [
-        "A17-4",
         "A174D"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-a176-closing-meeting",
@@ -1443,33 +1508,24 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA176ClosingMeeting.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"A17-6\""
-      ],
-      "sheet_literals": [
-        "A17-6"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtA176ClosingMeeting.vue",
       "wp_code_patterns": [
-        "A17-6",
         "A176C"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-a177-independence-declaration",
@@ -1477,21 +1533,15 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA177IndependenceDeclaration.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        ":sheet-name=\"variant === 'team' ? 'A17-7' : 'A17-7A'\""
-      ],
+      "sheet_expressions": [],
       "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtA177IndependenceDeclaration.vue",
       "wp_code_patterns": [
@@ -1500,7 +1550,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-a181-regulatory-submission",
@@ -1508,33 +1558,24 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA181RegulatorySubmission.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"A18-1\""
-      ],
-      "sheet_literals": [
-        "A18-1"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtA181RegulatorySubmission.vue",
       "wp_code_patterns": [
-        "A18-1",
         "A181R"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-a182-regulatory-communication",
@@ -1542,33 +1583,24 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA182RegulatoryCommunication.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"A18-2\""
-      ],
-      "sheet_literals": [
-        "A18-2"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtA182RegulatoryCommunication.vue",
       "wp_code_patterns": [
-        "A18-2",
         "A182R"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-a271-it-audit-memo",
@@ -1576,33 +1608,24 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA271ItAuditMemo.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"A27-1\""
-      ],
-      "sheet_literals": [
-        "A27-1"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtA271ItAuditMemo.vue",
       "wp_code_patterns": [
-        "A27-1",
         "A271I"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-a3-consolidation-console",
@@ -1610,27 +1633,18 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"A3-3\""
-      ],
-      "sheet_literals": [
-        "A3-3"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue",
       "wp_code_patterns": [
-        "A3-3",
         "A3C"
       ]
     }
@@ -1657,10 +1671,10 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
-        "sheet-name=\"A3-8商誉减值测试\""
+        "sheet-name=\"A3-8\""
       ],
       "sheet_literals": [
-        "A3-8商誉减值测试"
+        "A3-8"
       ],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtA38GoodwillImpairment.vue",
       "wp_code_patterns": [
@@ -1670,7 +1684,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-a51-cashflow-audit",
@@ -1678,33 +1692,24 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA51CashflowAudit.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"A5-1\""
-      ],
-      "sheet_literals": [
-        "A5-1"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtA51CashflowAudit.vue",
       "wp_code_patterns": [
-        "A5-1",
         "A51C"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-a81-other-info-representation",
@@ -1712,33 +1717,24 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA81OtherInfoRepresentation.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"A8-1\""
-      ],
-      "sheet_literals": [
-        "A8-1"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtA81OtherInfoRepresentation.vue",
       "wp_code_patterns": [
-        "A8-1",
         "A81O"
       ]
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-a91-deficiency-letter",
@@ -1746,27 +1742,18 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtA91DeficiencyLetter.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
-      "sheet_expressions": [
-        "sheet-name=\"A9-1\""
-      ],
-      "sheet_literals": [
-        "A9-1"
-      ],
+      "sheet_expressions": [],
+      "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtA91DeficiencyLetter.vue",
       "wp_code_patterns": [
-        "A9-1",
         "A91D"
       ]
     }
@@ -2132,7 +2119,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
-        ":sheet-name=\"activeDocTab.wpCode || ''\""
+        ":sheet-name=\"activeDocTab.ooSheetName || ''\""
       ],
       "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtC22ItgcBundle.vue",
@@ -2170,7 +2157,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-d1-notes-receivable",
@@ -2178,13 +2165,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtD1NotesReceivable.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -2411,7 +2394,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-f1-prepayment",
@@ -2419,13 +2402,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtF1Prepayment.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -2442,7 +2421,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-f2-inventory-main",
@@ -2450,13 +2429,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtF2InventoryMain.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -2473,7 +2448,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-f2-inventory-special",
@@ -2481,13 +2456,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtF2InventorySpecial.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -2504,7 +2475,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-f2-inventory-valuation",
@@ -2512,13 +2483,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtF2InventoryValuation.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -2535,7 +2502,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-f2-stocktake-bundle",
@@ -2543,13 +2510,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -2566,7 +2529,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-f3-notes-payable",
@@ -2574,13 +2537,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtF3NotesPayable.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -2597,7 +2556,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-f4-accounts-payable",
@@ -2605,13 +2564,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtF4AccountsPayable.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -2628,7 +2583,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-f5-cost-of-sales",
@@ -2636,13 +2591,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtF5CostOfSales.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -2940,7 +2891,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-g4-bond-investment-main",
@@ -2948,13 +2899,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentMain.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -3095,7 +3042,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-g6-other-bond-main",
@@ -3103,13 +3050,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondMain.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -3800,7 +3743,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-k1-other-receivables",
@@ -3808,13 +3751,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -3862,7 +3801,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-k11-asset-impairment-loss",
@@ -3870,13 +3809,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -3893,7 +3828,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-k12-non-operating-income",
@@ -3901,13 +3836,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -3924,7 +3855,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-k13-non-operating-expense",
@@ -3932,13 +3863,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -3955,7 +3882,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-k2-other-current-assets",
@@ -3963,13 +3890,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -3986,7 +3909,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-k3-other-payables",
@@ -3994,13 +3917,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -4017,7 +3936,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-k4-other-current-liabilities",
@@ -4025,13 +3944,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -4048,7 +3963,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-k5-provisions",
@@ -4056,13 +3971,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -4079,7 +3990,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-k6-held-for-sale",
@@ -4087,13 +3998,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -4110,7 +4017,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-k7-deferred-income",
@@ -4118,13 +4025,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -4141,7 +4044,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-k8-selling-expenses",
@@ -4149,13 +4052,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -4172,7 +4071,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-k9-admin-expenses",
@@ -4180,13 +4079,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -4203,7 +4098,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-l1-short-term-loans",
@@ -4211,13 +4106,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtL1ShortTermLoans.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -4235,7 +4126,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-l2-interest-payable",
@@ -4243,13 +4134,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -4267,7 +4154,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-l3-long-term-loans",
@@ -4275,19 +4162,16 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtL3LongTermLoans.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
+        ":sheet-name=\"props.sheetName || 'L3A'\"",
         ":sheet-name=\"props.sheetName\""
       ],
       "sheet_literals": [],
@@ -4298,7 +4182,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-l4-bonds-payable",
@@ -4306,19 +4190,16 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtL4BondsPayable.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
+        ":sheet-name=\"props.sheetName || 'L4A'\"",
         ":sheet-name=\"props.sheetName\""
       ],
       "sheet_literals": [],
@@ -4329,7 +4210,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-l5-long-term-payables",
@@ -4337,19 +4218,16 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtL5LongTermPayables.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
+        ":sheet-name=\"props.sheetName || 'L5A'\"",
         ":sheet-name=\"props.sheetName\""
       ],
       "sheet_literals": [],
@@ -4360,7 +4238,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-l6-special-payables",
@@ -4368,19 +4246,16 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtL6SpecialPayables.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
+        ":sheet-name=\"props.sheetName || 'L6A'\"",
         ":sheet-name=\"props.sheetName\""
       ],
       "sheet_literals": [],
@@ -4391,7 +4266,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-l7-other-noncurrent-liabilities",
@@ -4399,19 +4274,16 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtL7OtherNoncurrentLiabilities.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
+        ":sheet-name=\"props.sheetName || 'L7A'\"",
         ":sheet-name=\"props.sheetName\""
       ],
       "sheet_literals": [],
@@ -4422,7 +4294,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-l8-financial-expenses",
@@ -4430,19 +4302,16 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtL8FinancialExpenses.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
+        ":sheet-name=\"props.sheetName || 'L8A'\"",
         ":sheet-name=\"props.sheetName\""
       ],
       "sheet_literals": [],
@@ -4453,7 +4322,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-m1-dividends-payable",
@@ -4461,20 +4330,15 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtM1DividendsPayable.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
-        ":sheet-name=\"dualMode.resolveOoSheetName()\"",
         ":sheet-name=\"props.sheetName\""
       ],
       "sheet_literals": [],
@@ -4613,7 +4477,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-m5-surplus-reserve",
@@ -4621,20 +4485,15 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtM5SurplusReserve.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
-        ":sheet-name=\"dualMode.resolveOoSheetName()\"",
         ":sheet-name=\"props.sheetName\""
       ],
       "sheet_literals": [],
@@ -4709,7 +4568,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-m8-general-risk-reserve",
@@ -4717,20 +4576,15 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtM8GeneralRiskReserve.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
-        ":sheet-name=\"dualMode.resolveOoSheetName()\"",
         ":sheet-name=\"props.sheetName\""
       ],
       "sheet_literals": [],
@@ -4741,7 +4595,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-m9-other-comprehensive-income",
@@ -4749,13 +4603,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtM9OtherComprehensiveIncome.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -4793,8 +4643,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "wpMatch": {
       "component_types": [],
       "sheet_expressions": [
-        ":sheet-name=\"props.sheetName || ''\"",
-        ":sheet-name=\"props.sheetName\""
+        ":sheet-name=\"props.sheetName || ''\""
       ],
       "sheet_literals": [],
       "source_host": "audit-platform/frontend/src/components/workpaper/GtN1DeferredTaxAssets.vue",
@@ -4866,7 +4715,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-n4-taxes-and-surcharges",
@@ -4874,13 +4723,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -5114,7 +4959,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/j1/gt-j1-employee-compensation",
@@ -5122,13 +4967,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -5175,6 +5016,206 @@ export const WORKPAPER_SYNC_MANIFEST = [
       "wp_code_patterns": [
         "J1-8",
         "J1T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/j2/gt-j2-defined-benefit-plan",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/j2/GtJ2DefinedBenefitPlan.vue",
+    "independentEntry": true,
+    "migrationState": "adapter_registered",
+    "parentEntryId": null,
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/j2/GtJ2DefinedBenefitPlan.vue",
+      "wp_code_patterns": [
+        "J2D"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/j3/gt-j3-share-based-payment",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/j3/GtJ3ShareBasedPayment.vue",
+    "independentEntry": true,
+    "migrationState": "adapter_registered",
+    "parentEntryId": null,
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/j3/GtJ3ShareBasedPayment.vue",
+      "wp_code_patterns": [
+        "J3S"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/k1/inspection/k1-tab-writeoff-check",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/k1/inspection/K1TabWriteoffCheck.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-k1-other-receivables",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/k1/inspection/K1TabWriteoffCheck.vue",
+      "wp_code_patterns": [
+        "K1T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/k11/core/k11-tab-adjustment",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/k11/core/K11TabAdjustment.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-k11-asset-impairment-loss",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/k11/core/K11TabAdjustment.vue",
+      "wp_code_patterns": [
+        "K11T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/k12/core/k12-tab-adjustment",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/k12/core/K12TabAdjustment.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-k12-non-operating-income",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/k12/core/K12TabAdjustment.vue",
+      "wp_code_patterns": [
+        "K12T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/k13/core/k13-tab-adjustment",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/k13/core/K13TabAdjustment.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-k13-non-operating-expense",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/k13/core/K13TabAdjustment.vue",
+      "wp_code_patterns": [
+        "K13T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/k8/core/k8-tab-adjustment",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/k8/core/K8TabAdjustment.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-k8-selling-expenses",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/k8/core/K8TabAdjustment.vue",
+      "wp_code_patterns": [
+        "K8T"
+      ]
+    }
+  },
+  {
+    "capability": "bidirectional",
+    "documentType": "xlsx",
+    "editability": "editable",
+    "entryId": "xlsx/k9/core/k9-tab-adjustment",
+    "hasBrowserEvidence": false,
+    "hasContractEvidence": false,
+    "hostPath": "audit-platform/frontend/src/components/workpaper/k9/core/K9TabAdjustment.vue",
+    "independentEntry": false,
+    "migrationState": "parent_duplicate",
+    "parentEntryId": "xlsx/gt-k9-admin-expenses",
+    "reasonCodes": [],
+    "roomModel": "shared",
+    "roomServiceState": "room_service_wired",
+    "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
+    "wpMatch": {
+      "component_types": [],
+      "sheet_expressions": [],
+      "sheet_literals": [],
+      "source_host": "audit-platform/frontend/src/components/workpaper/k9/core/K9TabAdjustment.vue",
+      "wp_code_patterns": [
+        "K9T"
       ]
     }
   },

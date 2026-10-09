@@ -19,6 +19,7 @@ from hypothesis import strategies as st
 
 from app.services.knowledge_index_service import KnowledgeIndexService, _chunk_text
 from app.models.ai_models import KnowledgeSourceType
+from tests._kb_mock_session import make_retrieval_session
 
 
 # ---------------------------------------------------------------------------
@@ -82,14 +83,40 @@ def _make_chunk(source_type: KnowledgeSourceType, content: str):
 
 
 # ===========================================================================
-# R1: 召回降级 — 向量失败时 ilike 兜底
+# R1: 召回降级 — 向量失败时每种 scope 都有对应的兜底来源
+#
+# spec knowledge-base-retrieval-and-authz-closure Req 4.2：knowledge_doc 部分只用文档正文
+# 词法层（不再从索引分块兜底）；project_data 部分沿用 BM25 / ILIKE。
 # ===========================================================================
 
-class TestR1RecallFallback:
-    """PBT R1: 向量召回失败时降级 ilike 返回非空
 
-    **Validates: Requirements 5.2**
-    属性: R1
+def _doc_hit(content: str, doc_id: UUID | None = None):
+    """构造一条文档词法层命中（DocHit），供 patch ``_doc_search.search`` 使用。"""
+    from app.services.knowledge_access_policy import KnowledgeResource
+    from app.services.knowledge_doc_search import DocHit, DocMeta
+    from app.models.knowledge_models import KnowledgeAccessLevel
+
+    public = KnowledgeResource(
+        access_level=KnowledgeAccessLevel.public, project_ids=frozenset(), created_by=None
+    )
+    meta = DocMeta(
+        doc_id=doc_id or uuid4(), folder_id=uuid4(), name="准则.md", file_type="md",
+        file_size=len(content), version=1, tags=(), created_by=None, created_at=None,
+        updated_at=None, document=public, folder=public,
+    )
+    return DocHit(meta=meta, score=0.9, snippet=content, chunk_index=0, matched_terms=())
+
+
+def _doc_meta(doc_id: UUID, name: str = "文档.md"):
+    import dataclasses
+
+    return dataclasses.replace(_doc_hit("x", doc_id).meta, name=name)
+
+
+class TestR1RecallFallback:
+    """PBT R1: 向量召回失败时降级，且 scope 决定兜底来源
+
+    **Validates: Requirements 5.2 / spec knowledge-base-retrieval-and-authz-closure 4.2**
     """
 
     @settings(max_examples=5)
@@ -102,43 +129,41 @@ class TestR1RecallFallback:
     async def test_fallback_returns_results_when_matching_content_exists(
         self, project_id: UUID, query: str, scope: str
     ):
-        """
-        R1: embedding 服务不可用时，semantic_search 降级 ilike，
-        若数据库中存在匹配内容则返回非空结果。
-
-        **Validates: Requirements 5.2**
-        """
-        mock_db = AsyncMock()
-
-        matching_chunk = _make_chunk(
-            KnowledgeSourceType.trial_balance,
-            f"包含查询 {query} 的内容",
-        )
-
+        mock_db = make_retrieval_session()
+        business_chunk = _make_chunk(KnowledgeSourceType.trial_balance, f"包含查询 {query} 的内容")
         mock_result = MagicMock()
-        mock_scalars = MagicMock()
-        mock_scalars.all.return_value = [matching_chunk]
-        mock_result.scalars.return_value = mock_scalars
+        mock_result.scalars.return_value = MagicMock(all=MagicMock(return_value=[business_chunk]))
+        mock_result.all.return_value = []
         mock_db.execute = AsyncMock(return_value=mock_result)
 
         service = KnowledgeIndexService(mock_db)
+        doc = _doc_hit(f"知识文档 {query}")
 
         with patch.object(
             service._ai_svc, "embedding", new_callable=AsyncMock
-        ) as mock_embed:
+        ) as mock_embed, patch.object(
+            service._doc_search, "search", new_callable=AsyncMock, return_value=[doc]
+        ) as mock_doc_search:
             mock_embed.side_effect = RuntimeError("Embedding service unavailable")
 
             results = await service.semantic_search(
-                project_id=project_id,
-                query=query,
-                top_k=10,
-                scope=scope,
+                project_id=project_id, query=query, top_k=10, scope=scope,
             )
 
-        # R1: 降级后返回非空
-        assert len(results) > 0
-        # ilike 降级时 score 为 0.0
-        assert results[0]["score"] == 0.0
+        retrievals = {r["retrieval"] for r in results}
+        source_types = {r["source_type"] for r in results}
+        assert results, "向量失败后任何 scope 都必须有兜底命中"
+        if scope in ("knowledge_doc", "all"):
+            mock_doc_search.assert_awaited()
+            assert "lexical" in retrievals and "knowledge_doc" in source_types
+        else:
+            mock_doc_search.assert_not_awaited()
+        if scope in ("project_data", "all"):
+            assert "trial_balance" in source_types
+            assert retrievals & {"bm25", "ilike"}
+        else:
+            # knowledge_doc：索引分块不再参与兜底（它是文档正文的旧副本）
+            assert "trial_balance" not in source_types
 
     @settings(max_examples=5)
     @given(
@@ -150,19 +175,13 @@ class TestR1RecallFallback:
     async def test_fallback_never_raises(
         self, project_id: UUID, query: str, scope: str
     ):
-        """
-        R1 补充: 无论向量/ilike 是否有匹配，semantic_search 绝不抛异常。
+        """R1 补充: 向量、词法、兜底全部失败时 semantic_search 也不抛异常（返回空列表）。"""
+        from app.services import knowledge_index_service as kis
 
-        **Validates: Requirements 5.2**
-        """
-        mock_db = AsyncMock()
-
-        # ilike 也无匹配
-        mock_result = MagicMock()
-        mock_scalars = MagicMock()
-        mock_scalars.all.return_value = []
-        mock_result.scalars.return_value = mock_scalars
-        mock_db.execute = AsyncMock(return_value=mock_result)
+        # BM25 进程级缓存（TTL 60s）会把上一例的命中带进来 —— 本例要看的是「全部失败」
+        kis._BM25_CACHE.clear()
+        mock_db = make_retrieval_session()
+        mock_db.execute = AsyncMock(side_effect=RuntimeError("DB down"))
 
         service = KnowledgeIndexService(mock_db)
 
@@ -172,152 +191,68 @@ class TestR1RecallFallback:
             mock_embed.side_effect = RuntimeError("Embedding service unavailable")
 
             results = await service.semantic_search(
-                project_id=project_id,
-                query=query,
-                top_k=10,
-                scope=scope,
+                project_id=project_id, query=query, top_k=10, scope=scope,
             )
 
-        assert isinstance(results, list)
+        assert results == []
 
 
 # ===========================================================================
-# R2: 权限隔离 — 只返回 user 有权访问的知识文件
+# R2: 权限隔离 — 向量层的 knowledge_doc 命中必须经单一判定面
 # ===========================================================================
 
 class TestR2PermissionIsolation:
-    """PBT R2: semantic_search 带 user 时只返回有权访问的知识文件
+    """PBT R2: 向量命中按 ``visible_documents``（KnowledgeAccessPolicy.can_retrieve）过滤
 
-    **Validates: Requirements 5.2**
-    属性: R2
+    判定本身由 test_knowledge_retrieval_visibility_pbt 全组合穷举、并在真库验证；
+    这里钉住「内核真的用判定结果裁剪了向量命中」。
     """
+
+    async def _run(self, project_id: UUID, visible: dict, user):
+        mock_db = make_retrieval_session()
+        doc_chunk = _make_chunk(KnowledgeSourceType.knowledge_doc, "文档片段")
+        mock_result = MagicMock()
+        mock_result.scalars.return_value = MagicMock(all=MagicMock(return_value=[doc_chunk]))
+        mock_result.all.return_value = []
+        mock_db.execute = AsyncMock(return_value=mock_result)
+        service = KnowledgeIndexService(mock_db)
+        visible_map = {doc_chunk.source_id: _doc_meta(doc_chunk.source_id, "可见文档.md")} if visible else {}
+
+        with patch.object(
+            service._ai_svc, "embedding", new_callable=AsyncMock, return_value=[0.5] * 768
+        ), patch.object(
+            service._doc_search, "search", new_callable=AsyncMock, return_value=[]
+        ), patch.object(
+            service._doc_search, "visible_documents", new_callable=AsyncMock, return_value=visible_map
+        ) as mock_visible:
+            results = await service.semantic_search(
+                project_id=project_id, query="文档", top_k=10, scope="knowledge_doc", user=user,
+            )
+        return results, mock_visible
 
     @settings(max_examples=5)
     @given(project_id=uuid_strategy())
     @pytest.mark.asyncio
     async def test_private_docs_invisible_to_non_owner(self, project_id: UUID):
-        """
-        R2: private 文档只对创建者可见，其他用户看不到。
-
-        **Validates: Requirements 5.2**
-        """
-        mock_db = AsyncMock()
-        owner_id = uuid4()
-        other_user_id = uuid4()
-
-        doc_chunk = _make_chunk(KnowledgeSourceType.knowledge_doc, "私有文档")
-
-        # 向量搜索返回该 chunk
-        mock_vector_result = MagicMock()
-        mock_vector_scalars = MagicMock()
-        mock_vector_scalars.all.return_value = [doc_chunk]
-        mock_vector_result.scalars.return_value = mock_vector_scalars
-
-        # 权限查询返回 private + owner
-        mock_perm_row = (
-            doc_chunk.source_id,
-            MagicMock(value="private"),
-            None,
-            owner_id,
-            MagicMock(value="public"),
-            None,
-        )
-        mock_perm_result = MagicMock()
-        mock_perm_result.all.return_value = [mock_perm_row]
-
-        call_count = [0]
-
-        async def execute_side_effect(stmt, *args, **kwargs):
-            call_count[0] += 1
-            if call_count[0] == 1:
-                return mock_vector_result
-            else:
-                return mock_perm_result
-
-        mock_db.execute = execute_side_effect
-
-        service = KnowledgeIndexService(mock_db)
-
         other_user = MagicMock()
-        other_user.id = other_user_id
-
-        with patch.object(
-            service._ai_svc, "embedding", new_callable=AsyncMock
-        ) as mock_embed:
-            mock_embed.return_value = [0.5] * 768
-
-            results = await service.semantic_search(
-                project_id=project_id,
-                query="文档",
-                top_k=10,
-                scope="knowledge_doc",
-                user=other_user,
-            )
-
-        # R2: 非创建者看不到 private 文档
-        assert len(results) == 0
+        other_user.id = uuid4()
+        results, mock_visible = await self._run(project_id, visible=False, user=other_user)
+        assert results == []
+        kwargs = mock_visible.await_args.kwargs
+        assert kwargs["project_id"] == project_id
+        assert kwargs["subject"] is not None and kwargs["subject"].user_id == other_user.id
 
     @settings(max_examples=5)
     @given(project_id=uuid_strategy())
     @pytest.mark.asyncio
     async def test_public_docs_visible_to_any_user(self, project_id: UUID):
-        """
-        R2: public 文档对所有用户可见。
-
-        **Validates: Requirements 5.2**
-        """
-        mock_db = AsyncMock()
-
-        doc_chunk = _make_chunk(KnowledgeSourceType.knowledge_doc, "公开文档")
-
-        mock_vector_result = MagicMock()
-        mock_vector_scalars = MagicMock()
-        mock_vector_scalars.all.return_value = [doc_chunk]
-        mock_vector_result.scalars.return_value = mock_vector_scalars
-
-        mock_perm_row = (
-            doc_chunk.source_id,
-            MagicMock(value="public"),
-            None,
-            uuid4(),
-            MagicMock(value="public"),
-            None,
-        )
-        mock_perm_result = MagicMock()
-        mock_perm_result.all.return_value = [mock_perm_row]
-
-        call_count = [0]
-
-        async def execute_side_effect(stmt, *args, **kwargs):
-            call_count[0] += 1
-            if call_count[0] == 1:
-                return mock_vector_result
-            else:
-                return mock_perm_result
-
-        mock_db.execute = execute_side_effect
-
-        service = KnowledgeIndexService(mock_db)
-
         any_user = MagicMock()
         any_user.id = uuid4()
-
-        with patch.object(
-            service._ai_svc, "embedding", new_callable=AsyncMock
-        ) as mock_embed:
-            mock_embed.return_value = [0.5] * 768
-
-            results = await service.semantic_search(
-                project_id=project_id,
-                query="文档",
-                top_k=10,
-                scope="knowledge_doc",
-                user=any_user,
-            )
-
-        # R2: public 文档对所有用户可见
+        results, _ = await self._run(project_id, visible=True, user=any_user)
         assert len(results) == 1
-        assert results[0]["content"] == "公开文档"
+        assert results[0]["content"] == "文档片段"
+        assert results[0]["document_name"] == "可见文档.md"
+        assert results[0]["retrieval"] == "vector"
 
 
 # ===========================================================================
@@ -472,14 +407,15 @@ class TestR3IdempotentUpdate:
 
 
 # ===========================================================================
-# ai_chat_service 零回归：C 现有消费方调用 search 无 scope/user
+# search 别名 + 无用户调用（旧消费方 ai_chat_service 已删除，契约见 spec design §十 C1）
 # ===========================================================================
 
 class TestAIChatServiceRegression:
-    """ai_chat_service 既有行为零回归 — 调用 search() 无 scope/user 参数
+    """``search(project_id, query)`` 别名与 ``user=None`` 调用的契约。
 
-    **Validates: Requirements 5.2**
-    NFR-1: ai_chat_service（C 现有消费方）行为不变
+    🔁 C1（spec knowledge-base-retrieval-and-authz-closure Req 3.8）：旧契约「无 user 时
+    knowledge_doc 不过滤」服务的 ``ai_chat_service`` 已不存在；旧行为会把索引到全局哨兵的
+    私有文档暴露给任何调用方。现为 project 模式无用户判定（public + 当前项目组）。
     """
 
     @settings(max_examples=5)
@@ -491,36 +427,22 @@ class TestAIChatServiceRegression:
     async def test_search_alias_works_without_scope_user(
         self, project_id: UUID, query: str
     ):
-        """
-        零回归: ai_chat_service 调用 service.search(project_id, query)
-        等价于 semantic_search(project_id, query, top_k=10, scope='all', user=None)。
-
-        **Validates: Requirements 5.2**
-        """
-        mock_db = AsyncMock()
-
+        """业务数据命中不受知识文档判定影响（scope=all，user=None）。"""
+        mock_db = make_retrieval_session()
         chunk = _make_chunk(KnowledgeSourceType.trial_balance, f"业务数据 {query}")
         mock_result = MagicMock()
-        mock_scalars = MagicMock()
-        mock_scalars.all.return_value = [chunk]
-        mock_result.scalars.return_value = mock_scalars
+        mock_result.scalars.return_value = MagicMock(all=MagicMock(return_value=[chunk]))
         mock_db.execute = AsyncMock(return_value=mock_result)
 
         service = KnowledgeIndexService(mock_db)
 
         with patch.object(
-            service._ai_svc, "embedding", new_callable=AsyncMock
-        ) as mock_embed:
-            mock_embed.return_value = [0.5] * 768
+            service._ai_svc, "embedding", new_callable=AsyncMock, return_value=[0.5] * 768
+        ), patch.object(
+            service._doc_search, "search", new_callable=AsyncMock, return_value=[]
+        ):
+            results = await service.search(project_id=project_id, query=query, top_k=10)
 
-            # ai_chat_service 的调用方式：search(project_id, query)
-            results = await service.search(
-                project_id=project_id,
-                query=query,
-                top_k=10,
-            )
-
-        # 零回归：返回所有类型（scope=all），无权限过滤（user=None）
         assert len(results) == 1
         assert results[0]["source_type"] == "trial_balance"
 
@@ -528,39 +450,33 @@ class TestAIChatServiceRegression:
     @given(
         project_id=uuid_strategy(),
         query=query_strategy(),
+        visible=st.booleans(),
     )
     @pytest.mark.asyncio
-    async def test_search_without_user_returns_knowledge_docs_unfiltered(
-        self, project_id: UUID, query: str
+    async def test_search_without_user_filters_knowledge_docs_by_project_scope(
+        self, project_id: UUID, query: str, visible: bool
     ):
-        """
-        零回归: 无 user 时 knowledge_doc 类型结果也不被过滤。
-
-        **Validates: Requirements 5.2**
-        """
-        mock_db = AsyncMock()
-
+        """无 user 时 knowledge_doc 命中按 project 无用户判定裁剪（主体为 None，而非不过滤）。"""
+        mock_db = make_retrieval_session()
         doc_chunk = _make_chunk(KnowledgeSourceType.knowledge_doc, f"知识文档 {query}")
         mock_result = MagicMock()
-        mock_scalars = MagicMock()
-        mock_scalars.all.return_value = [doc_chunk]
-        mock_result.scalars.return_value = mock_scalars
+        mock_result.scalars.return_value = MagicMock(all=MagicMock(return_value=[doc_chunk]))
+        mock_result.all.return_value = []
         mock_db.execute = AsyncMock(return_value=mock_result)
 
         service = KnowledgeIndexService(mock_db)
+        visible_map = {doc_chunk.source_id: _doc_meta(doc_chunk.source_id)} if visible else {}
 
         with patch.object(
-            service._ai_svc, "embedding", new_callable=AsyncMock
-        ) as mock_embed:
-            mock_embed.return_value = [0.5] * 768
+            service._ai_svc, "embedding", new_callable=AsyncMock, return_value=[0.5] * 768
+        ), patch.object(
+            service._doc_search, "search", new_callable=AsyncMock, return_value=[]
+        ), patch.object(
+            service._doc_search, "visible_documents", new_callable=AsyncMock, return_value=visible_map
+        ) as mock_visible:
+            results = await service.search(project_id=project_id, query=query, top_k=10)
 
-            # 无 user 参数
-            results = await service.search(
-                project_id=project_id,
-                query=query,
-                top_k=10,
-            )
-
-        # 零回归：knowledge_doc 也返回（无权限过滤）
-        assert len(results) == 1
-        assert results[0]["source_type"] == "knowledge_doc"
+        kwargs = mock_visible.await_args.kwargs
+        assert kwargs["subject"] is None, "无用户调用必须以『无主体』判定，而不是跳过判定"
+        assert kwargs["project_id"] == project_id
+        assert len(results) == (1 if visible else 0)

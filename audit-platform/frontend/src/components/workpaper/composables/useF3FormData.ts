@@ -265,6 +265,10 @@ export function useF3FormData(options: UseF3FormDataOptions) {
     saveBatch,
     saveItemsFromEvent,
     debouncedSave,
+    // F3-5 canary：syncBridge 的 flushHtml 第一步须 flush 掉 2s debounce 未落库的行，
+    // 否则 readStoreProjection 读到的是旧快照，OO 侧会覆盖掉刚在 HTML 侧的编辑。
+    // 实现早已存在（onScopeDispose 复用同一函数），此前仅未对外导出。
+    flushPendingSave: _flushPending,
   }
 }
 

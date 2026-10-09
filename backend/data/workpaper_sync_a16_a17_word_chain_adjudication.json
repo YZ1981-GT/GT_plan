@@ -1254,6 +1254,12 @@
   },
   "registry_facts": {
     "allowed_provider_modules": [
+      "app.services.workpaper_sync.phase5_d1_notes_receivable",
+      "app.services.workpaper_sync.phase5_d3_prepaid_receipts",
+      "app.services.workpaper_sync.phase5_d4_revenue_detail",
+      "app.services.workpaper_sync.phase5_d5_receivables_financing",
+      "app.services.workpaper_sync.phase5_d6_contract_assets",
+      "app.services.workpaper_sync.phase5_d7_contract_liabilities",
       "app.services.workpaper_sync.pilot_d2_large_json",
       "app.services.workpaper_sync.pilot_g7_two_level_dynamic",
       "app.services.workpaper_sync.pilot_h1_grouped_dynamic",
@@ -1261,11 +1267,17 @@
     ],
     "available_contract_ids": [
       "b60.hour_budget",
+      "d1.notes_receivable_detail",
       "d2.receivable_detail",
+      "d3.prepaid_receipts_detail",
+      "d4.revenue_detail",
+      "d5.receivables_financing_detail",
+      "d6.contract_assets_detail",
+      "d7.contract_liabilities_detail",
       "g7.soe_subsidiary_disclosure",
       "h1.disposal_check"
     ],
-    "delivered_per_entry_contract_count": 4,
+    "delivered_per_entry_contract_count": 10,
     "delivered_per_entry_contracts": [
       {
         "adapter_registered": false,
@@ -1274,22 +1286,58 @@
         "entry_id": "xlsx/b60/gt-b60-bundle"
       },
       {
-        "adapter_registered": false,
+        "adapter_registered": true,
         "contract_id": "d2.receivable_detail",
         "delivered_by_task": "41",
         "entry_id": "xlsx/gt-d2-accounts-receivable"
       },
       {
-        "adapter_registered": false,
+        "adapter_registered": true,
         "contract_id": "h1.disposal_check",
         "delivered_by_task": "42",
         "entry_id": "xlsx/gt-h1-fixed-assets"
       },
       {
-        "adapter_registered": false,
+        "adapter_registered": true,
         "contract_id": "g7.soe_subsidiary_disclosure",
         "delivered_by_task": "43",
         "entry_id": "xlsx/gt-g7-long-term-equity-main"
+      },
+      {
+        "adapter_registered": false,
+        "contract_id": "d1.notes_receivable_detail",
+        "delivered_by_task": "G5-1",
+        "entry_id": "xlsx/gt-d1-notes-receivable"
+      },
+      {
+        "adapter_registered": false,
+        "contract_id": "d7.contract_liabilities_detail",
+        "delivered_by_task": "G5-1",
+        "entry_id": "xlsx/gt-d7-contract-liabilities"
+      },
+      {
+        "adapter_registered": false,
+        "contract_id": "d3.prepaid_receipts_detail",
+        "delivered_by_task": "G5-1",
+        "entry_id": "xlsx/gt-d3-prepaid-accounts"
+      },
+      {
+        "adapter_registered": false,
+        "contract_id": "d6.contract_assets_detail",
+        "delivered_by_task": "G5-1",
+        "entry_id": "xlsx/gt-d6-contract-assets"
+      },
+      {
+        "adapter_registered": false,
+        "contract_id": "d5.receivables_financing_detail",
+        "delivered_by_task": "G5-1",
+        "entry_id": "xlsx/gt-d5-receivables-financing"
+      },
+      {
+        "adapter_registered": true,
+        "contract_id": "d4.revenue_detail",
+        "delivered_by_task": "G5-1",
+        "entry_id": "xlsx/gt-d4-operating-revenue"
       }
     ],
     "pending_docx_adapter_forbidden_paths": [

@@ -219,6 +219,11 @@ async def restore_item(
     row.is_deleted = False
     if hasattr(row, "deleted_at"):
         row.deleted_at = None
+    if item_type == "project":
+        # consol-tree-three-code-autobuild 需求 7.2：恢复项目后按三码重算本年度派生链接
+        from app.services.group_links import sync_group_links_for
+
+        await sync_group_links_for(db, row)
     await db.commit()
 
     return {"message": f"{label}已恢复", "id": str(item_id)}

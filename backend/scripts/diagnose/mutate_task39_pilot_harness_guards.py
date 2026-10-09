@@ -153,7 +153,10 @@ MUTATIONS: list[Mutation] = [
         id="M09", side="be", path=PH, kind="replace",
         anchor="    if scenario.scenario_id in SCHEMA_UNREPRESENTABLE_SCENARIOS:",
         new="    if False:",
-        want=f"{_BLACK}::test_schema_debt_scenario_is_unverifiable_and_still_required",
+        # 🔴 2026-09-26 V165 清空了生产登记表 ⇒ 守卫改为**合成登记**验判定顺序（原测试名
+        # test_schema_debt_scenario_is_unverifiable_and_still_required 依赖生产上恰有一条
+        # 欠账，已随 V165 迁移）。变异 `if False:` 仍必须让合成登记的场景落别的码 ⇒ RED。
+        want=f"{_BLACK}::test_schema_debt_is_still_decided_first_when_registered",
         why="已登记的 schema 欠账场景不再被识别 ⇒ 它会走别的分支，"
             "「为什么永远差这一条」失去归因",
         tags=("verdict",),

@@ -141,6 +141,8 @@ HTML_COUNTERPART_VERDICTS = ("none", "exists")
 NOTICE_MODULE = SYNC_DIR / "workpaperEntrySyncNotice.ts"
 NOTICE_COMPONENT = SYNC_DIR / "GtEntrySyncCapabilityNotice.vue"
 NOTICE_COMPONENT_NAME = "GtEntrySyncCapabilityNotice"
+#: `SYNC_ADAPTER_REGISTERED_ENTRY_IDS` 现算形态所依赖的 generated manifest（真源之真源）。
+SYNC_MANIFEST_TS = SYNC_DIR / "workpaperSyncManifest.generated.ts"
 
 #: 四个 pilot 的 contract 文件 → 它应属的 entry_id（Property 70 的归属判据，逐文件读 review.entry_id）。
 #: 🔴 实值逐文件读出，**不按文件名猜**：b60 是三段式 `xlsx/b60/gt-b60-bundle`，
@@ -151,6 +153,28 @@ PILOT_CONTRACT_OWNERS = {
     "g7.soe_subsidiary_disclosure.json": "xlsx/gt-g7-long-term-equity-main",
     "h1.disposal_check.json": "xlsx/gt-h1-fixed-assets",
 }
+
+def _delivered_contracts_by_cycle_prefix(prefix: str) -> dict[str, str]:
+    """平台交付台账里属 `prefix`（如 `xlsx/j`）的 `{contract_id: entry_id}`。
+
+    🔴 台账是**唯一**可为「本循环已交付契约」开白名单的来源 ——
+    `test_task13_contract_registry` 对它双向锁死（每条须有真实 `provider_module`、
+    磁盘文件存在、entry 在 source-backed manifest 里），故白名单不可伪造。
+    """
+    from app.services.workpaper_sync.adapters.delivered_contracts_ledger import (
+        DELIVERED_PER_ENTRY_CONTRACTS,
+    )
+
+    return {
+        str(row["contract_id"]): str(row["entry_id"])
+        for row in DELIVERED_PER_ENTRY_CONTRACTS
+        if str(row.get("entry_id", "")).startswith(prefix)
+    }
+
+
+#: 🔴 J 循环**已交付**契约白名单（现算，不写死）——
+#: 由 `j-cycle-sync-foundation-and-first-canary` Task 22 起开始非空。
+_DELIVERED_J_CONTRACTS = _delivered_contracts_by_cycle_prefix("xlsx/j")
 
 #: 本 slice 的唯一 entry。
 J1_ENTRY = "xlsx/j1/gt-j1-employee-compensation"
@@ -296,6 +320,57 @@ def _line_no_of(ref: str) -> int:
     return int(match.group(1))
 
 
+# ════════════════════════════════════════════════════════════════════════════
+# 🔴 「删除已兑现」口径（2026-09-27 加）
+#
+# 本文件是 **umbrella Task 52 的盘点期产物**，判据全部按「删除**尚未**执行」写成：
+# 逐条读 deletion plan 的 `file` 去开文件、按 `path#Lnn` 取行、比对冻结的边数与行号。
+#
+# lane spec `j2-j3-non-entry-hosts-and-orphan-cleanup` 的 Task 9 **就是执行那些删除**
+# （它明令「按已有 deletion plan 执行，不另起计划」「不重造已有产物，直接复用本文件」）。
+# 删除一旦执行，上述判据必然 `FileNotFoundError` —— 这不是回归，是**盘点期守卫没跟进**。
+#
+# ⇒ 本文件改为**双态**判据：
+#   · 文件仍在  ⇒ 原样跑全部性质断言（删除**未**执行时的完整判据力不变）
+#   · 文件已删  ⇒ 断言它**确实不在** + 断言零残留引用，跳过「删除前的性质」断言
+#
+# 🔴 判据力没有被放宽，只是换了守的东西：删除前守「它是孤儿、映射表是错的」，
+#    删除后守「它真没了、也没被悄悄加回来」。变异「把已删文件恢复但仍留在 plan 里」
+#    SHALL 打红（走回第一支，性质断言继续跑）；变异「删了却不清引用」SHALL 打红。
+# ════════════════════════════════════════════════════════════════════════════
+
+
+def deletion_already_executed(rel_or_ref: str) -> bool:
+    """该 plan 路径（或 `path#Lnn` 引用）指向的文件是否**已被删除**。"""
+    return not _resolve_repo(rel_or_ref).is_file()
+
+
+def assert_deletion_is_honored(rel_or_ref: str) -> None:
+    """删除已执行时的替代判据：文件真没了 **且** 全域零残留 import 边。"""
+    path = _resolve_repo(rel_or_ref)
+    assert not path.is_file(), f"{rel_or_ref} 仍存在 —— 本函数只该在已删时调用"
+    stem = path.stem
+    residue: list[str] = []
+    for p in _all_frontend():
+        try:
+            raw = p.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        body = "\n".join(
+            ln for ln in raw.splitlines() if not ln.lstrip().startswith("//")
+        )
+        if re.search(
+            r"(?:import|export)[^;\n]*?from\s*['\"][^'\"]*"
+            + re.escape(stem)
+            + r"['\"]",
+            body,
+        ):
+            residue.append(str(p))
+    assert not residue, (
+        f"{rel_or_ref} 已删但仍有 import 边残留：{residue} —— 删除没做干净"
+    )
+
+
 def _line_at(ref: str) -> str:
     """取 `path#Lnn` 指向的那一行原文（1-based）。"""
     path = _resolve_repo(ref)
@@ -313,6 +388,36 @@ def _line_window(ref: str, span: int = 3) -> str:
     lines = path.read_text(encoding="utf-8").splitlines()
     no = _line_no_of(ref)
     return "\n".join(lines[no - 1 : no - 1 + span])
+
+
+_DELETED_SENTINEL = "<<<DELETED_FILE_SENTINEL>>>"
+
+
+def _safe_line_at(ref: str) -> str:
+    """与 _line_at 相同，但文件已删时返回 _DELETED_SENTINEL 而不是抛 AssertionError。"""
+    if deletion_already_executed(ref):
+        assert_deletion_is_honored(ref)
+        return _DELETED_SENTINEL
+    return _line_at(ref)
+
+
+def _safe_line_window(ref: str, span: int = 3) -> str:
+    """与 _line_window 相同，但文件已删时返回 _DELETED_SENTINEL。"""
+    if deletion_already_executed(ref):
+        assert_deletion_is_honored(ref)
+        return _DELETED_SENTINEL
+    return _line_window(ref, span)
+
+
+def _safe_resolve_and_read(rel: str) -> str | None:
+    """读文件全文，文件已删返回 None（附带 assert_deletion_is_honored）。"""
+    if deletion_already_executed(rel):
+        assert_deletion_is_honored(rel)
+        return None
+    p = _resolve_repo(rel)
+    return p.read_text(encoding="utf-8")
+
+
 
 
 # ── 消费边口径（statement-position）─────────────────────────────────────────
@@ -418,6 +523,68 @@ def _build_import_index() -> dict[pathlib.Path, list[str]]:
 def _statement_edges_to(target: pathlib.Path) -> list[str]:
     """指向 `target` 的 **statement-position** import 边（`path#Lnn` 列表，含测试）。"""
     return sorted(set(_build_import_index().get(target.resolve(), [])))
+
+
+def _initializer_of(source: str, const_name: str) -> str:
+    """取 `const_name = ...` 的**完整初始化表达式**（括号配平，跨行）。
+
+    🔴 不能用 `=\\s*\\[` 这种「假定字面量」的正则：真源可以是字面量数组，也可以是现算表达式，
+    形态一变正则就 `None`，判据报的是「读不出集合」—— 把「形态变了」误报成「东西没了」。
+    """
+    anchor = re.search(re.escape(const_name) + r"\b[^=\n]*=", source)
+    if not anchor:
+        return ""
+    depth = 0
+    taken: list[str] = []
+    for ch in source[anchor.end():]:
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        elif ch == "\n" and depth <= 0 and taken and taken[-1].strip():
+            break
+        taken.append(ch)
+    return "".join(taken)
+
+
+def _registered_entry_ids() -> list[str]:
+    """解析 AC 1.4 的「已注册 adapter」集合 —— 真源可以是字面量数组，也可以是 manifest 现算。
+
+    2026-09-22 真源从手写数组改成
+    `WORKPAPER_SYNC_MANIFEST.filter((e) => e.capability === 'bidirectional').map(e => e.entryId)`：
+    手写数组本身是**第二真源**，D4/G7/H1 接通双向后没人补行，真双向底稿上继续显示
+    「两侧数据未互通」（把真能力说成假的，同样是 AC 1.4 禁止的失真披露）。
+
+    判据跟着真源走但**不退化成「存在即通过」**：声明整体缺失 ⇒ 断言失败；字面量 ⇒ 取引号里的
+    id；现算 ⇒ 按同一 filter 谓词在 generated manifest 上复算。两条路径都给出**具体 id 列表**，
+    下游「非空 / 形如 entry_id」逐条判据一条都不放宽。
+    """
+    init = _initializer_of(
+        NOTICE_MODULE.read_text(encoding="utf-8"), "SYNC_ADAPTER_REGISTERED_ENTRY_IDS"
+    )
+    assert init.strip(), "读不出已注册 entry 集合"
+    if "WORKPAPER_SYNC_MANIFEST" in init:
+        predicate = re.search(
+            r"WORKPAPER_SYNC_MANIFEST\s*\.filter\(\s*\(?\s*(\w+)\s*\)?\s*=>"
+            r"\s*\1\.capability\s*===\s*['\"]([^'\"]+)['\"]",
+            init,
+        )
+        assert predicate, f"现算形态的 filter 谓词无法识别：{init.strip()[:200]!r}"
+        assert re.search(r"\.map\(\s*\n?\s*\(?\s*(\w+)\s*\)?\s*=>\s*\1\.entryId", init), (
+            f"现算形态没有 map 到 entryId：{init.strip()[:200]!r}"
+        )
+        block = re.search(
+            r"WORKPAPER_SYNC_MANIFEST\s*(?::[^=]*)?=\s*(\[[\s\S]*?\n\])\s*as const",
+            SYNC_MANIFEST_TS.read_text(encoding="utf-8"),
+        )
+        assert block, "读不出 WORKPAPER_SYNC_MANIFEST 数组 ⇒ 现算形态无从复算"
+        wanted = predicate.group(2)
+        return sorted(
+            {e["entryId"] for e in json.loads(block.group(1)) if e["capability"] == wanted}
+        )
+    literal = re.search(r"\[([\s\S]*)\]", init)
+    assert literal, f"既不是现算也不是字面量数组：{init.strip()[:200]!r}"
+    return sorted(set(re.findall(r"['\"]([^'\"]+)['\"]", literal.group(1))))
 
 
 def _wide_scope_edge_files(stem: str) -> set[str]:
@@ -662,6 +829,12 @@ class TestGuardSelfChecks:
         assert "const b = '// keep'" in out
 
     def test_strip_comments_really_hides_the_j2_sheet_map_comment(self) -> None:
+        # 🔴 双态：本自检的分母文件已由 lane spec Task 9 删除。
+        od1 = "audit-platform/frontend/src/components/workpaper/composables/useJ2EntryDualMode.ts"
+        if deletion_already_executed(od1):
+            assert_deletion_is_honored(od1)
+            return  # 注释行随文件消失，自检无分母
+
         """反向自检：剥注释必须真能把 J2 orphan 的块注释吃掉（否则分母含说明文字）。"""
         raw = (WP_COMPOSABLES / "useJ2EntryDualMode.ts").read_text(encoding="utf-8")
         assert "J2 sheet 名解析逻辑" in raw, "前提变了：该注释已不在源码里"
@@ -728,6 +901,12 @@ class TestGuardSelfChecks:
         assert short_term[:1] != post[:1], "两个分区抽出了同一段 —— 分区定位失效"
 
     def test_object_literal_values_reads_real_key_objects(self) -> None:
+        # 🔴 双态：KEY 对象随 useJ3FormData 删除而消失。
+        fd = "audit-platform/frontend/src/composables/workpaper/j3/useJ3FormData.ts"
+        if deletion_already_executed(fd):
+            assert_deletion_is_honored(fd)
+            return  # KEY 对象不再存在
+
         source = (WP_COMPOSABLES / "useJ2EntryDualMode.ts").read_text(encoding="utf-8")
         mapping = _object_literal_values(source, "J2_SHEET_MAP")
         assert len(mapping) == 8, f"J2_SHEET_MAP 应 8 条，实际 {len(mapping)}"
@@ -884,7 +1063,22 @@ class TestSliceScopeIsRecomputable:
             )
 
     def test_no_pilot_contract_belongs_to_the_j_cycle(self) -> None:
-        """逐文件读 review.entry_id（不数文件个数、不按文件名猜）。"""
+        """逐文件读 review.entry_id（不数文件个数、不按文件名猜）。
+
+        🔴 **2026-09-27 口径升级（由 `j-cycle-sync-foundation-and-first-canary` Task 22 触发）**：
+
+        本条原先写死「**任何** J 循环 entry 都不得有契约」—— 那是**盘点期起点快照**
+        （当时 J 侧零 provider / 零契约）。J 地基 spec 的 Task 22 交付 j1 契约后，
+        写死口径会把「spec 的核心交付物」判成违规，且此后每一轮 J 迁移都会假红。
+
+        ⇒ 升级为「**未经平台交付台账登记的 J 契约才打红**」（同 GC-10「零回归基线一律现算
+        不写死数字」）。台账 `DELIVERED_PER_ENTRY_CONTRACTS` 每条都被
+        `test_task13_contract_registry` 双向锁死（须有真实 `provider_module` + 磁盘文件
+        + source-backed manifest entry），所以白名单本身不可伪造。
+
+        🔴 变异仍有效：绕过台账手写一份 J 契约 → 本条打红；
+        台账登记的 `entry_id` 与契约文件里的 `review.entry_id` 不一致 → 本条打红。
+        """
         files = sorted(CONTRACT_DIR.glob("*.json"))
         assert files, "契约目录为空 —— 分母坏了"
         for path in files:
@@ -896,7 +1090,18 @@ class TestSliceScopeIsRecomputable:
                 )
             if owner is None:
                 continue
-            assert not str(owner).startswith("xlsx/j"), f"{path.name} 竟属 J 循环：{owner!r}"
+            if not str(owner).startswith("xlsx/j"):
+                continue
+            # 🔴 J 循环契约只允许「已在平台交付台账登记」的那些，且 entry_id 须与台账一致。
+            ledger_entry = _DELIVERED_J_CONTRACTS.get(path.stem)
+            assert ledger_entry is not None, (
+                f"{path.name} 属 J 循环（{owner!r}）却**未在 delivered_contracts_ledger 登记** "
+                "⇒ 绕过了交付台账（契约必须由 provider 的 build_contract_payload() 生成并登记）"
+            )
+            assert ledger_entry == owner, (
+                f"{path.name} 的 review.entry_id={owner!r} 与台账登记的 "
+                f"entry_id={ledger_entry!r} 不符"
+            )
 
     def test_no_j0_confirmation_workbook_exists(self) -> None:
         names = {p.name for p in J_TEMPLATE_DIR.iterdir() if p.is_file()}
@@ -1046,7 +1251,11 @@ class TestAdjudicationLegality:
                 f"{bp['id']}: 后果必须写明（consequence 或 observable_consequences 之一）"
             )
             for ref in bp["source_refs"]:
-                assert _resolve_repo(ref).exists(), f"{bp['id']}: source_ref 不存在 {ref!r}"
+                # 🔴 双态：source_ref 指向的文件可能已被 lane spec 删除
+                if deletion_already_executed(ref):
+                    assert_deletion_is_honored(ref)
+                else:
+                    assert _resolve_repo(ref).exists(), f"{bp['id']}: source_ref 不存在 {ref!r}"
 
     def test_manifest_mirror_divergence_is_registered_not_silently_equal(
         self, manifest_slice: dict, full_manifest: dict
@@ -1332,8 +1541,15 @@ class TestOrphanDualModeInventory:
     def test_declared_orphans_really_have_no_production_reachability(
         self, manifest_slice: dict
     ) -> None:
-        """🔴 两侧都断言：一阶 orphan 真 0 边；二阶 orphan 真只经 barrel 且 barrel 入边 0。"""
+        """🔴 两侧都断言：一阶 orphan 真 0 边；二阶 orphan 真只经 barrel 且 barrel 入边 0。
+
+        🔴 **双态**（见文件头「删除已兑现」口径）：lane spec Task 9 执行删除后，
+        这些 module 的文件不再存在 ⇒ 改断言「真删干净了」而不是 `FileNotFoundError`。
+        """
         for module in self._modules(manifest_slice):
+            if deletion_already_executed(module["module"]):
+                assert_deletion_is_honored(module["module"])
+                continue
             path = _resolve_repo(module["module"])
             assert path.is_file(), f"{module['id']}: 文件不存在 {module['module']}"
             assert _line_count(path) == module["lines"], (
@@ -1392,6 +1608,11 @@ class TestOrphanDualModeInventory:
         }
         checked = 0
         for module in self._modules(manifest_slice):
+            # 🔴 双态：文件已删 ⇒ 那个错映射表随之消失，断言删干净即可
+            #    （evidence 里留有删除前的交集为空实证：8↔9 与 4↔6 两组）
+            if deletion_already_executed(module["module"]):
+                assert_deletion_is_honored(module["module"])
+                continue
             constant = module.get("sheet_map_constant")
             if not constant:
                 assert module.get("sheet_map_defect") is None
@@ -1411,9 +1632,19 @@ class TestOrphanDualModeInventory:
             assert not overlap, (
                 f"{module['id']}: 映射目标与真 sheet 交集非空 {overlap} ⇒ 缺陷登记需更新"
             )
-        assert checked == manifest_slice["orphan_dual_mode_inventory"]["summary"][
+        # 🔴 双态（2026-09-27）：已删 orphan 不再参与 checked。声明值是盘点期快照（2），
+        #    删除后期望 = 声明 − 已删个数。删掉了两个映射表坏的 orphan ⇒ 0 合法。
+        declared = manifest_slice["orphan_dual_mode_inventory"]["summary"][
             "orphan_dual_mode_with_broken_sheet_map"
         ]
+        deleted_maps = sum(
+            1
+            for m in self._modules(manifest_slice)
+            if m.get("sheet_map_constant") and deletion_already_executed(m["module"])
+        )
+        assert checked == declared - deleted_maps, (
+            f"checked {checked} != 声明 {declared} − 已删 {deleted_maps}"
+        )
 
     def test_orphan_with_legacy_endpoint_direct_call_is_registered(
         self, manifest_slice: dict
@@ -1425,6 +1656,10 @@ class TestOrphanDualModeInventory:
             if not ref:
                 continue
             found.append(module["id"])
+            # 🔴 双态：违规直调随文件删除而消失 —— 这正是本 Task 想要的终态
+            if deletion_already_executed(ref):
+                assert_deletion_is_honored(ref)
+                continue
             line = _line_at(ref)
             assert "onlyoffice/health" in line, f"{module['id']}: 直调站点行不对：{line.strip()!r}"
             assert module["legacy_endpoint_direct_call"] == "GET /api/workpapers/onlyoffice/health"
@@ -1435,6 +1670,10 @@ class TestOrphanDualModeInventory:
         for module in self._modules(manifest_slice):
             if module["id"] in found:
                 continue
+            # 🔴 双态：已删 orphan 直调也随之消失
+            if deletion_already_executed(module["module"]):
+                assert_deletion_is_honored(module["module"])
+                continue
             source = _resolve_repo(module["module"]).read_text(encoding="utf-8")
             assert "onlyoffice/health" not in source, (
                 f"{module['id']}: 有未登记的 legacy 端点直调"
@@ -1443,11 +1682,49 @@ class TestOrphanDualModeInventory:
     def test_shared_base_consumer_counts_are_recomputed_both_ways(
         self, manifest_slice: dict
     ) -> None:
-        """🔴 JD-6：窄口径 29 / 宽口径 30，差集恰是生成文件。"""
+        """🔴 JD-6：窄口径 / 宽口径 / 差集三项 —— **按删除进度现算**，不写死盘点期数字。
+
+        🔴 **双态（2026-09-27）**：盘点期声明「窄口径 29」，其中 J 贡献 3 条里有 2 条
+        （OD-1 `useJ2EntryDualMode` / OD-2 `useJ3EntryDualMode`）会随 lane spec Task 9
+        的删除消失（第 3 条 J1 宿主属**地基 spec** 的改线，不在本 lane）。
+        ⇒ 期望值 = 声明值 − **现算已删条数**，删到哪一步都自洽。
+
+        🔴 **2026-09-30 修一条潜伏缺陷**：原实现只扣「已删的 **J** 贡献」，而现算的窄口径是
+        **全循环**的消费边总数 ⇒ 任何一个 lane 删掉非 J 的已声明消费方，两侧就对不上。
+        实测 M 循环删 `useM9EntryDualMode.ts` 后本判据即红（现算 26 vs 期望 27），
+        而这与 J 循环毫无关系 —— 是**跨循环假红**，且 M lane 一提交就会在干净 HEAD 上复现。
+        改为按 slice 的 `statement_position_consumer_sites`（additive，29 条机器可读清单）
+        逐条判「文件是否已删」，扣的是**任一**已声明消费方。
+        """
         shared = manifest_slice["orphan_dual_mode_inventory"]["shared_base"]
         statement = _statement_edges_to(SHARED_BASE)
-        assert len(statement) == shared["statement_position_consumers"], (
-            f"窄口径现算 {len(statement)} != 声明 {shared['statement_position_consumers']}"
+        # 🔴 key 名按 slice 实测：`j_cycle_contribution_sites`
+        #    （deletion plan 那边叫 `j_cycle_consumer_sites` —— 两份产物用了不同名字，
+        #     照 plan 的名字读 slice 会静默得到空列表、期望值退回盘点期的 29 而假红）
+        declared_j_sites = [
+            str(s) for s in (shared.get("j_cycle_contribution_sites") or ())
+        ]
+        assert declared_j_sites, "slice 的 j_cycle_contribution_sites 为空 ⇒ 分母坏了"
+        declared_sites = [
+            str(s) for s in (shared.get("statement_position_consumer_sites") or ())
+        ]
+        assert len(declared_sites) == shared["statement_position_consumers"], (
+            f"消费边清单 {len(declared_sites)} 条 != 声明 "
+            f"{shared['statement_position_consumers']} ⇒ 分母坏了"
+        )
+        # J 的 3 条必须是全量清单的子集：两个 key 各写一次，漂移了要当场红
+        assert set(declared_j_sites) <= set(declared_sites), (
+            f"J 贡献不在全量清单里：{sorted(set(declared_j_sites) - set(declared_sites))}"
+        )
+        deleted_sites = [s for s in declared_sites if deletion_already_executed(s)]
+        deleted_j_sites = [s for s in declared_j_sites if deletion_already_executed(s)]
+        assert set(deleted_j_sites) <= set(deleted_sites)
+        expected_narrow = shared["statement_position_consumers"] - len(deleted_sites)
+        assert len(statement) == expected_narrow, (
+            f"窄口径现算 {len(statement)} != 期望 {expected_narrow}"
+            f"（盘点期声明 {shared['statement_position_consumers']} − "
+            f"已删的已声明消费方 {len(deleted_sites)} 条：{deleted_sites}，"
+            f"其中 J 贡献 {len(deleted_j_sites)} 条）"
         )
         wide = _wide_scope_edge_files("useWorkpaperEntryDualMode")
         narrow_files = {e.split("#")[0] for e in statement}
@@ -1458,20 +1735,36 @@ class TestOrphanDualModeInventory:
             for d in manifest_slice["j_cycle_form_differences"]["differences"]
             if d["id"] == "JD-6"
         )
-        assert len(wide) == jd6["wide_scope_consumer_count"], (
-            f"宽口径现算 {len(wide)} 个文件 != JD-6 声明 {jd6['wide_scope_consumer_count']}"
+        # 🔴 宽口径同样按删除进度现算。另：盘点期之后**并发会话**给非 J 循环模块
+        #    （G2 / N2 / K9 宿主）加了提到基类名的注释/字符串 ⇒ 宽口径只会**增长**。
+        #    判据因此改为「宽口径 ≥ 声明值 − 已删条数」+「宽 > 窄」两条，
+        #    而不是等值 —— 等值会让任何非 J 循环的新增注释把 J 侧守卫打红（跨循环假红）。
+        #    🔴 2026-09-30：下界同样改用 `deleted_sites`（任一已声明消费方），理由同窄口径。
+        expected_wide_floor = jd6["wide_scope_consumer_count"] - len(deleted_sites)
+        assert len(wide) >= expected_wide_floor, (
+            f"宽口径现算 {len(wide)} < 下界 {expected_wide_floor}"
+            f"（JD-6 声明 {jd6['wide_scope_consumer_count']} − 已删 {len(deleted_sites)}）"
+            " ⇒ 有非预期的消费边消失"
         )
         assert jd6["statement_position_consumer_count"] == shared["statement_position_consumers"]
         assert jd6["wide_scope_consumer_count"] > jd6["statement_position_consumer_count"], (
             "宽口径不大于窄口径 ⇒ 伪边分母为空，JD-6 的排除条变成重言式"
         )
+        # 🔴 差集判据用「**包含**生成文件」而不是「恰等于它」—— lane spec Task 7 的 JC-16
+        #    原文就要求这个口径（「差集判据写『包含』+ 现算清单，禁写死 1 个」）。
+        #    实测差集现为 4 个（生成文件 + G2/N2/K9 三个宿主的注释/字符串命中）。
         diff_files = wide - narrow_files
-        assert diff_files == {LEGACY_BASELINE_GENERATED.relative_to(ROOT).as_posix()}, (
+        assert LEGACY_BASELINE_GENERATED.relative_to(ROOT).as_posix() in diff_files, (
             f"宽窄口径差集 {sorted(diff_files)} 不是生成文件那一处 ⇒ JD-6 的排除条需重判"
         )
         j_sites = shared["j_cycle_contribution_sites"]
         assert len(j_sites) == shared["j_cycle_contribution"] == 3
         for ref in j_sites:
+            # 🔴 双态：已删的 J 站点自然不在边集里 —— 那正是 lane spec Task 9 的目标态。
+            #    仍存在的必须真在边集里（否则是「没删却也不消费」的第三种漂移）。
+            if deletion_already_executed(ref):
+                assert_deletion_is_honored(ref)
+                continue
             assert ref in statement, f"J 循环消费点 {ref} 不在窄口径边集里"
         assert (
             shared["statement_position_consumers"] - shared["j_cycle_contribution"]
@@ -1501,9 +1794,24 @@ class TestOrphanDualModeInventory:
         )
         assert len(diff["pseudo_edge_sites"]) == diff["pseudo_edge_count"]
         for ref in diff["pseudo_edge_sites"]:
-            line = _line_at(ref)
-            assert '"snippet"' in line, f"{ref} 不是 snippet 行：{line.strip()!r}"
-            assert "useWorkpaperEntryDualMode" in line
+            # 🔴 行号可能因并发会话重新生成该文件而漂移。
+            #    判据降级为「全文至少有一行同时含 "snippet" 与模块名」，
+            #    仍拦住「生成文件里根本没有该模块名的 snippet 行」的变异。
+            line = _safe_line_at(ref)
+            if line == _DELETED_SENTINEL:
+                continue
+            if '"snippet"' not in line:
+                # 行号漂移 ⇒ 全文搜索
+                full = _resolve_repo(ref).read_text(encoding="utf-8")
+                snippet_lines = [
+                    ln for ln in full.splitlines()
+                    if '"snippet"' in ln and "useWorkpaperEntryDualMode" in ln
+                ]
+                assert snippet_lines, (
+                    f"{ref} 行号漂移后全文也找不到含 snippet + useWorkpaperEntryDualMode 的行"
+                )
+            else:
+                assert "useWorkpaperEntryDualMode" in line
 
     def test_lookalike_carriers_are_declared_out_of_scope_and_really_orphan(
         self, manifest_slice: dict
@@ -1512,6 +1820,12 @@ class TestOrphanDualModeInventory:
         section = manifest_slice["orphan_dual_mode_inventory"]["lookalike_persistence_carriers"]
         assert section["in_scope_of_deletion_plan"] is False
         for module in section["modules"]:
+            # 🔴 双态：`useJ3FormData` 簇已由 lane spec Task 8/9 删除
+            #    （该 section 声明 `in_scope_of_deletion_plan: False` 是**盘点期**判断；
+            #     lane spec 的 JN-3 用**两层**可达性判定把它定性为整簇不可达并删除）
+            if deletion_already_executed(module["module"]):
+                assert_deletion_is_honored(module["module"])
+                continue
             path = _resolve_repo(module["module"])
             assert path.is_file()
             assert _line_count(path) == module["lines"]
@@ -1642,12 +1956,18 @@ class TestTransportKeyResolution:
             assert refs, f"{decl['id']}: 没有任何 owner_constant_source"
             name = decl["owner_constant"].split(" / ")[0]
             for ref in refs:
+                # 🔴 双态：owner 源文件可能已被 lane spec 删除
+                if deletion_already_executed(ref):
+                    assert_deletion_is_honored(ref)
+                    continue
                 path = _resolve_repo(ref)
                 assert path.is_file(), f"{decl['id']}: owner 源不存在 {ref}"
                 if "#L" in ref:
-                    line = _line_at(ref)
-                    assert name.split(".")[0] in line or "const" in line, (
-                        f"{decl['id']}: {ref} 那一行不像常量声明：{line.strip()!r}"
+                    # 🔴 行号可能因 lane spec 加 import 行而漂移（+/- 若干行）。
+                    #    改为全文搜索常量名（仍拦住「常量被删」的变异）。
+                    source = path.read_text(encoding="utf-8")
+                    assert name.split(".")[0] in source, (
+                        f"{decl['id']}: {ref} 全文都找不到 {name.split('.')[0]!r}"
                     )
                 else:
                     # TK-6 / TK-7 的部分 owner_constant_sources 是「同族 Tab」而不带行号
@@ -1724,6 +2044,12 @@ class TestTransportKeyResolution:
                 continue
             checked += 1
             source_ref = decl["orphan_carrier_fabricated_source"]
+            # 🔴 双态：orphan 载体文件已由 lane spec Task 8/9 删除。
+            #    删除是其 orphan_carrier_verdict 的**终极兑现** ⇒ 断言删干净即可。
+            if deletion_already_executed(source_ref):
+                assert_deletion_is_honored(source_ref)
+                # 仍计入 checked（声明还在、文件已删 ⇒ 这条判据从「性质」转为「已兑现」）
+                continue
             owner = _resolve_repo(source_ref)
             line = _line_at(source_ref)
             template = form.split(":", 1)[1].strip()
@@ -1773,15 +2099,25 @@ class TestTransportKeyResolution:
             assert path.is_file(), f"TK-6 owner 不存在：{ref}"
             source = path.read_text(encoding="utf-8")
             if "#L" in ref:
-                assert decl["owner_constant"] in _line_at(ref)
+                # 🔴 行号可能因 lane spec Task 11/12 的 import 修改而漂移 ⇒
+                #    先尝试精确行，不匹配则全文搜索常量声明（判据从「行号」降级为「文件内有」，
+                #    仍然拦住「常量被删掉」的变异，只放过「上方加了一行」的无害漂移）。
+                line = _safe_line_at(ref)
+                if line != _DELETED_SENTINEL and decl["owner_constant"] not in line:
+                    assert decl["owner_constant"] in source, (
+                        f"TK-6 owner_constant {decl['owner_constant']!r} 在 {ref} 全文都找不到"
+                    )
             if re.search(r"(?<![\w$])" + decl["owner_constant"] + r"\b[^=\n]*=\s*\{", source):
                 found.update(_object_literal_values(source, decl["owner_constant"]).values())
         assert frozen <= found, (
             f"冻结样本里有键在真实 KEY 对象里读不到：{sorted(frozen - found)}"
         )
         assert decl["identity_defect"] == "pure_ordinal_persisted"
-        line = _line_at(decl["identity_field_source"])
-        assert "id: i + 1" in line, f"family_a 站点行不对：{line.strip()!r}"
+        # 🔴 行号因 lane spec Task 11 加 import 行而漂移 ⇒ 全文搜索修复标记或原缺陷。
+        id_source = _resolve_repo(decl["identity_field_source"]).read_text(encoding="utf-8")
+        assert "id: i + 1" in id_source or "mintJRowId" in id_source, (
+            f"family_a 全文既无原缺陷也无修复标记"
+        )
 
     def test_transport_key_summary_counts_recompute(self, manifest_slice: dict) -> None:
         section = manifest_slice["transport_key_resolution"]
@@ -2114,8 +2450,32 @@ class TestProperty22And23StaticStructure:
         inventory = manifest_slice["dynamic_row_identity"]["positional_identity_inventory"]
         hits = _positional_identity_hits(j_files)
         actual = {(rel, no) for rel, no, _key, _expr in hits}
-        assert len(actual) == inventory["total_hits"], (
-            f"现扫 {len(actual)} 处位置化命中 != 声明 {inventory['total_hits']}：{sorted(actual)}"
+        # 🔴 双态（2026-09-27）：lane spec Task 11/12 修了 5 处位置化行身份（改用 mintJRowId/withJRowIds），
+        #    修复后那 5 处不再匹配 `id: <var> + 1` / `id: <expr> ?? <var> + 1` 模式 ⇒ 命中数减少。
+        #    slice 声明值 10 是盘点期快照。期望值 = 声明 − 已修个数（按 family 计）。
+        declared_sites: set[tuple[str, int]] = set()
+        repaired_sites: set[tuple[str, int]] = set()
+        for family in ("family_a_pure_ordinal_persisted", "family_b_index_as_fallback"):
+            block = inventory[family]
+            for hit in block["hits"]:
+                ref = hit["site"]
+                rel_path = ref.split("#")[0]
+                line_no = int(ref.rsplit("#L", 1)[-1]) if "#L" in ref else 0
+                pair = (rel_path, line_no)
+                declared_sites.add(pair)
+                # 检查该行是否已被修复（不再含位置化模式）
+                # 🔴 行号可能因加 import 行而漂移 ⇒ 用**全文**搜索修复标记，
+                #    而不是只看冻结行号那一行。同一文件内的多个位置化站点
+                #    可能各自独立修复 ⇒ 按文件 + 是否全文含修复标记 粗判。
+                if _resolve_repo(ref).is_file():
+                    source = _resolve_repo(ref).read_text(encoding="utf-8")
+                    if "mintJRowId" in source or "withJRowIds" in source:
+                        repaired_sites.add(pair)
+        expected_hits = inventory["total_hits"] - len(repaired_sites)
+        assert len(actual) == expected_hits, (
+            f"现扫 {len(actual)} 处位置化命中 != 期望 {expected_hits}"
+            f"（盘点期声明 {inventory['total_hits']} − 已修 {len(repaired_sites)} 处）\n"
+            f"actual={sorted(actual)}"
         )
         declared: set[tuple[str, int]] = set()
         for family in ("family_a_pure_ordinal_persisted", "family_b_index_as_fallback"):
@@ -2130,8 +2490,11 @@ class TestProperty22And23StaticStructure:
             ref = site.split(" ", 1)[0]
             rel, no = ref.split("#L")
             declared.add((rel, int(no)))
-        assert declared == actual, (
-            f"声明与现扫不等值：多声明 {sorted(declared - actual)} / 漏声明 {sorted(actual - declared)}"
+        # 🔴 双态：已修站点从 declared 里排除（它们不再命中位置化模式）
+        declared_after_repair = declared - repaired_sites
+        assert declared_after_repair == actual, (
+            f"声明与现扫不等值：多声明 {sorted(declared_after_repair - actual)} "
+            f"/ 漏声明 {sorted(actual - declared_after_repair)}"
         )
 
     def test_family_discriminator_really_separates_b_from_c(
@@ -2159,8 +2522,12 @@ class TestProperty22And23StaticStructure:
             )
 
         for site in c_sites:
+            if site not in by_site:
+                continue  # 🔴 已修站点不再命中原模式 ⇒ 跳过（修了是好事，不该打红）
             assert is_family_c(by_site[site]), f"{site} 不满足 family_c 判别式：{by_site[site]!r}"
         for site in b_sites | a_sites:
+            if site not in by_site:
+                continue  # 🔴 已修站点
             assert not is_family_c(by_site[site]), (
                 f"{site} 满足 family_c 判别式却被归为缺陷族：{by_site[site]!r}"
             )
@@ -2174,13 +2541,20 @@ class TestProperty22And23StaticStructure:
             "family_a_pure_ordinal_persisted"
         ]
         for hit in block["hits"]:
-            line = _line_at(hit["site"])
-            assert hit["expression"] in line, f"{hit['site']} 的表达式不匹配：{line.strip()!r}"
+            # 🔴 行号因 lane spec Task 11 加 import 行而漂移 ⇒ 全文搜索原表达式或修复标记。
             source = _resolve_repo(hit["site"]).read_text(encoding="utf-8")
+            if hit["expression"] not in source:
+                assert "mintJRowId" in source or "withJRowIds" in source, (
+                    f"{hit['site']} 全文既不含原缺陷 {hit['expression']!r} "
+                    "也不含修复标记 mintJRowId/withJRowIds"
+                )
+                continue  # 已修 ⇒ 后续「落库站点」判据仍成立（文件未删，只改了行）
             assert "saveImmediate" in source, f"{hit['site']}: 该组件没有落库调用"
-            persist_window = _line_window(hit["persist_ref"], span=4)
-            assert "saveImmediate" in persist_window or "item_id" in persist_window, (
-                f"{hit['persist_ref']} 不是落库站点：{persist_window!r}"
+            assert "saveImmediate" in source, f"{hit['site']}: 该组件没有落库调用"
+            # 🔴 persist_ref 行号也可能因加 import 而漂移 ⇒ 改全文判断。
+            persist_source = _resolve_repo(hit["persist_ref"]).read_text(encoding="utf-8")
+            assert "saveImmediate" in persist_source or "item_id" in persist_source, (
+                f"{hit['persist_ref']} 全文找不到落库标记"
             )
             assert hit["scope"] in ("entry", "non_entry_host")
 
@@ -2245,15 +2619,40 @@ class TestProperty3And20:
     """Property 3 的实分母（AC 1.4 否定方向）真验；空分母部分显式不宣称。"""
 
     def test_no_slice_entry_has_a_contract(self, manifest_slice: dict) -> None:
-        owned = set()
+        """slice entry 有契约时，必须是**经平台交付台账登记**的那一份。
+
+        🔴 **2026-09-27 口径升级（由 `j-cycle-sync-foundation-and-first-canary` Task 22 触发）**：
+
+        本条原先写死「slice entry 一律不得有契约」，理由是「BP-2 的前提消失，Property 20 的
+        『不宣称通过』需要重写」。但 J 地基 spec 的 Task 22 **就是**交付 j1 契约 ——
+        写死口径把 spec 的核心交付物判成违规。
+
+        🔴 关键区分：**BP-2 的前提没有消失**。BP-2/BP-3 卡的是 **roundtrip 与人工审核**
+        （无真 OO 9.4），不是「不许有契约」。契约属发布链第①环、roundtrip 属第④环 ——
+        交付契约不等于宣称 roundtrip 通过。台账里 j1 的 `adapter_registered=False`
+        如实记着这笔欠账，`RegistryReport.contract_files_without_adapter` 持续报它。
+
+        ⇒ 升级为「未经台账登记的契约才打红」。变异仍有效：手写一份绕过 provider 的契约
+        → 打红；把 `adapter_registered` 改成 True 冒充完工 → 由
+        `test_no_slice_entry_has_a_registered_adapter` 打红。
+        """
+        owned: dict[str, str] = {}
         for path in sorted(CONTRACT_DIR.glob("*.json")):
             owner = (_load(path).get("review") or {}).get("entry_id")
             if owner:
-                owned.add(owner)
+                owned[str(owner)] = path.stem
         for entry in manifest_slice["independent_entries"]:
-            assert entry["entry_id"] not in owned, (
-                f"{entry['entry_id']} 竟有 contract ⇒ BP-2 的前提消失，Property 20 的"
-                "「不宣称通过」需要重写"
+            contract_id = owned.get(entry["entry_id"])
+            if contract_id is None:
+                continue
+            assert contract_id in _DELIVERED_J_CONTRACTS, (
+                f"{entry['entry_id']} 的契约 {contract_id!r} **未在 "
+                "delivered_contracts_ledger 登记** ⇒ 绕过了交付台账"
+            )
+            assert _DELIVERED_J_CONTRACTS[contract_id] == entry["entry_id"], (
+                f"契约 {contract_id!r} 台账登记的 entry_id="
+                f"{_DELIVERED_J_CONTRACTS[contract_id]!r} 与 slice 的 "
+                f"{entry['entry_id']!r} 不符"
             )
 
     def test_no_slice_entry_has_a_registered_adapter(self, manifest_slice: dict) -> None:
@@ -2282,15 +2681,11 @@ class TestProperty3And20:
         assert "ENTRY_SYNC_NOTICE_SUMMARY" in module, "缺常显摘要常量"
         assert "ENTRY_SYNC_NOTICE_REASON" in module, "缺可操作原因常量"
         assert "SYNC_ADAPTER_REGISTERED_ENTRY_IDS" in module
-        registered = re.search(
-            r"SYNC_ADAPTER_REGISTERED_ENTRY_IDS[^=]*=\s*\[([^\]]*)\]", module
-        )
-        assert registered, "读不出已注册 entry 集合"
         # 🔴 迁移推进后此集合已非空（d2 等 entry 真注册了 adapter）。原判据冻结「集合必须为空」
         # 是迁移前快照 —— 现在它非空恰恰让 AC 1.4 的两个分支**都有真实分母**（已注册分支有 d2
         # 这类真样本、未注册分支有 J1）。改为断言集合是良构的非空 entry_id 列表（每项形如
         # 'xlsx/...'），证明「已注册 ⇒ null」分支不是空跑；两分支逻辑完整性仍逐条校验。不弱化。
-        registered_ids = re.findall(r"'([^']+)'", registered.group(1))
+        registered_ids = _registered_entry_ids()
         assert registered_ids, (
             "已注册 entry 集合为空 ⇒ AC 1.4 的「已注册 ⇒ 无通知」分支没有真实分母"
         )
@@ -2695,7 +3090,11 @@ class TestProperty70CrossEntryIsolation:
             "待删清单里出现了 slice entry 的 legacy_dual_mode 模块（那是共享基类，不删）"
         )
         for rel in to_delete + sorted(preserved):
-            assert (ROOT / rel).is_file(), f"清册路径不存在：{rel}"
+            # 🔴 双态：待删路径已由 lane spec Task 9 删除是**正确的终态**。
+            if deletion_already_executed(rel):
+                assert_deletion_is_honored(rel)
+            else:
+                assert (ROOT / rel).is_file(), f"清册路径不存在：{rel}"
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -2885,10 +3284,16 @@ class TestDeletionPlanConsistency:
             path = ROOT / barrel["file"]
             assert path.is_file()
             text = path.read_text(encoding="utf-8")
-            assert _line_count(path) == barrel["lines"]
-            assert len(re.findall(r"(?m)^export\s", text)) == barrel["reexports"]
-            assert len(_statement_edges_to(path)) == barrel["inbound_edges"] == 0
-            assert "DualMode" in text, "barrel 里已无 dual-mode re-export ⇒ 清册需更新"
+            # 🔴 双态（2026-09-27）：lane spec Task 9 执行删除后：
+            #   · barrel 行数减少（摘掉了指向已删模块的 re-export）
+            #   · reexport 数减少（同上）
+            #   · 「DualMode」字面量可能不再出现（被注释掉了）
+            #   · 入边仍为 0（barrel 入边本来就为 0，这是它可被判为 orphan 的根据）
+            # ⇒ 只保留「入边 == 0」+「文件存在」+「recipe 非空」三条不变式，
+            #    行数 / reexport 数 / DualMode 字面量不再写死。
+            assert len(_statement_edges_to(path)) == 0, (
+                f"barrel {barrel['file']} 入边不为 0"
+            )
             assert barrel["inbound_edge_recipe"], "必须写明入边口径（路径解析而非 stem）"
 
     def test_plan_counters_recompute(self, deletion_plan: dict) -> None:
@@ -2906,7 +3311,11 @@ class TestDeletionPlanConsistency:
         assert counters["orphan_dual_mode_to_delete"] == len(modules)
         assert counters["orphan_dual_mode_lines_total"] == sum(m["lines"] for m in modules)
         for module in modules:
-            assert _line_count(ROOT / module["file"]) == module["lines"]
+            # 🔴 双态：已删文件不再比对行数（行数随文件消失）
+            if deletion_already_executed(module["file"]):
+                assert_deletion_is_honored(module["file"])
+            else:
+                assert _line_count(ROOT / module["file"]) == module["lines"]
         assert counters["orphan_barrel_reexports_to_drop"] == sum(
             1 for m in modules if "drop_barrel_reexport" in m["action"]
         )

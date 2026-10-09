@@ -1,0 +1,472 @@
+{
+  "contract_id": "i3.goodwill_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "aa6fec6ea9b75f087af4d268f57f1566e487980541e11bf1284f5e4e8bce263d",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "carrier": {
+      "force_component_type": "i3-goodwill",
+      "gate_layer": "composable",
+      "host_checklist_get_hits": 0,
+      "mounts": 4,
+      "read": "host_inline_render_config_refetch",
+      "tb_publish_gate": "composables/useI3Adjudication.ts#L402 + i3/core/I3TabAdjudication.vue#L708",
+      "write": "host_inline",
+      "write_client": "http"
+    },
+    "classification": {
+      "impl_constant": null,
+      "source_ref": null,
+      "status": "clean",
+      "verdict": "SOURCE_ITSELF_DERIVES_FROM_DETAIL"
+    },
+    "defined_name_baseline": 0,
+    "defined_name_baseline_note": "本册 **0**。🔴 但判据仍须用「基线不增长」口径而非「断言全 0」—— 同一套判据到 lane 2 的 I4(476)/I5(334) 会直接假红。",
+    "derived_total_keys": [],
+    "derived_total_keys_note": "现算 **0** 个。IC-18 已裁 I3/I4/I5 皆 0 **不是漏扫**（I1 8 / I2 2 / I6 3）⇒ 按 IC-20 空分母纪律断言「现算 0」但不宣称该维度通过。",
+    "effective_columns": 30,
+    "empty_data_columns": [
+      {
+        "column": "B",
+        "reason": "从表头到数据区全空（间隔列）"
+      },
+      {
+        "column": "C",
+        "reason": "C11='发生日期' 只是表头，数据区 C14..C22 全 None"
+      }
+    ],
+    "entry_id": "xlsx/gt-i3-goodwill",
+    "excluded_sheets": [
+      "参考－商誉减值测试示例",
+      "市场平均收益率2017",
+      "GT_Custom"
+    ],
+    "excluded_sheets_reasons": {
+      "GT_Custom": "hidden —— 平台自用隐藏页",
+      "参考－商誉减值测试示例": "🔴 **全角连字符 `－`**（U+FF0D）· **非 hidden** · 104 行 / 114 公式 —— 是**示例数据不是项目数据**，同步会把示例数字当审定数。🔴 变异「用半角连字符 `参考-商誉减值测试示例` 匹配」SHALL 找不到而打红。",
+      "市场平均收益率2017": "hidden，167 行 —— **固定年份的基准表**，不随项目变"
+    },
+    "footer_convention_split": true,
+    "footer_kind": "row_formula_applied",
+    "footer_kind_note": "🔴 照 I1/I2 的 `pure_sum` 口径去验本表 R23 会因「不是 SUM 开头」而**假红** —— 同一 footer 行混了三种形态（14 格纯 SUM + 5 格套用行公式 + 4 格引错区间）。",
+    "footer_shape_facts": {
+      "convention_split": true,
+      "defect_columns": [
+        "AA",
+        "AB",
+        "AC",
+        "AD"
+      ],
+      "kind": "row_formula_applied",
+      "note": "🔴 **三种形态混在同一 footer 行**：14 格纯 SUM + 5 格套用行公式 + 4 格引错区间（缺陷①）。照 I1/I2 的 `pure_sum` 口径去验本表 R23 会因「不是 SUM 开头」而**假红**。",
+      "pure_sum_columns": [
+        "E",
+        "G",
+        "J",
+        "K",
+        "L",
+        "R",
+        "S",
+        "T",
+        "U",
+        "V",
+        "W",
+        "X",
+        "Y",
+        "Z"
+      ],
+      "row_formula_applied_columns": [
+        "I",
+        "M",
+        "N",
+        "O",
+        "P"
+      ],
+      "row_formula_applied_detail": {
+        "I23": "=SUM(D23:E23)-G23",
+        "M23": "=D23+J23",
+        "N23": "=E23+K23",
+        "O23": "=G23+L23",
+        "P23": "=M23+N23-O23"
+      }
+    },
+    "html_store": {
+      "item_ids": [
+        "I3-2-rows"
+      ],
+      "note": "I3 商誉的结构化 Tab 行数据存成 checklist_responses 的 **remark** JSON 数组。本契约按 stable field + 行身份 `rowId` 拆开。🔴 **左右两表同一行**：左表 A..P 是商誉原值滚动、右表 Q..AD 是减值准备滚动，`Q` 列是**镜像** `=A{r}`（右表的被投资单位名称镜像左表）⇒ 进 formula_columns 且**不映射 store 字段**（同 I5 区② A 列口径）。🔴 12 个受管字段；11 个公式列（I/M/N/O/P/Q/W/AA/AB/AC/AD）是前端按同一套公式重算的派生值或镜像 ⇒ 只进 formula_columns 不进 field_specs。🔴 `AB`/`AC` 的口径是**三项相加**（本期增加 = S+Y+T / 本期减少 = U+Z+V），抄成两项（S+Y / U+Z）会漏掉「其他增加 T」与「其他减少 V」。🔴 **B/C 两列在数据区全空**（B 是间隔列；C11='发生日期' 只是表头）⇒ 两列都不进 field_specs。`I3DetailRow` 的 Section 2/3（入账测算 + 基础信息共 30+ 字段）属 I3-4/I3-6/I3-7 三张后置 sheet，**不进本契约**。",
+      "payload_column": "remark",
+      "payload_column_mode": "remark_only",
+      "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useI3Detail.ts —— `_persist()` 经宿主 onSave 写 { item_id: 'I3-2-rows', remark: JSON.stringify(rows) }",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "known_template_quirks": [
+      {
+        "actual": "=SUM(<列>27:<列>30)",
+        "assertion_payload_requirement": "🔴 判据载荷必须是「**只有减值准备区（R14:R22 的 AA:AD）有数、其他区为 0**」—— 用「全区都有数」时修复前后合计都非 0（R27:R30 可能被别的公式带出值）⇒ 判据**假绿**；用「全区都是 0」则恒真。同时断言 R23 的**非 AA:AD 列**在覆盖层前后取值**不变**（不误伤）。",
+        "cells": [
+          "明细表I3-2!AA23",
+          "明细表I3-2!AB23",
+          "明细表I3-2!AC23",
+          "明细表I3-2!AD23"
+        ],
+        "effect": "🔴 减值准备区审定数四列（期初数/本期增加/本期减少/期末数）合计恒 0",
+        "evidence_of_copy_paste": "同行左侧 S23..Z23 全部正确 =SUM(x14:x22) ⇒ 四格错法一致",
+        "expected": "=SUM(<列>14:<列>22)",
+        "handling": "overlay_fixed",
+        "handling_note": "🔴 走**模板覆盖层**（FC-5 的**第 5 个**例外；前四个 F2-26!J9 / F5-7!G31 / G5-2 45 格 / G5-1!B35）。`backend/wp_templates/` 字节**不动** —— 模板是审计准则产物，改字节会破坏与纸质底稿的对应关系，且 sha256 变了会让 6 条 I entry 的 source_ref 全失效。覆盖层**只替换这 4 格**，R23 其余列一个都不碰。",
+        "overlay_formulas": {
+          "AA23": "=SUM(AA14:AA22)",
+          "AB23": "=SUM(AB14:AB22)",
+          "AC23": "=SUM(AC14:AC22)",
+          "AD23": "=SUM(AD14:AD22)"
+        },
+        "root_cause": "R27-29 是**编制说明文本行**（B27='编制说明：' / B28 / B29 是说明文字）；R30 **超出 max_row(29)** ⇒ 引用区间完全落在数据区（R14-22）之外。"
+      },
+      {
+        "actual": null,
+        "cells": [
+          "明细表I3-2!I14"
+        ],
+        "effect": "首行的「商誉原值未审期末」不会自动计算",
+        "expected": "=SUM(D14:E14)-G14",
+        "handling": "registered_not_fixed",
+        "handling_note": "🔴 与缺陷① 的 `overlay_fixed` 是**两种处置，不得混写**。理由：它不是金额算错而是**首行漏公式**，前端 `useI3Detail` 的 `costEnding` 本就按同一套公式重算并落库 ⇒ merge 时该格由 `formula_columns` 的模板重新写入，**实际不影响回写正确性**。但仍须登记 —— 否则后来者会以为「I 列公式逐行齐全」。",
+        "root_cause": "I15..I18 逐行都有该公式，唯**数据区首行 I14 是 None** ⇒ 首行漏公式"
+      }
+    ],
+    "known_template_quirks_note": "🔴 **两处缺陷两种处置**：①`AA23:AD23` 四格引错区间 ⇒ `overlay_fixed`（FC-5 第 **5** 个例外；减值准备区审定数四列合计恒 0，是真金额错误）②`I14` 缺公式 ⇒ `registered_not_fixed`（首行漏公式；前端 costEnding 本就重算并落库，merge 时由 formula_columns 重新写入 ⇒ 不影响回写正确性，但须登记）。**不得混写** —— 把②也标 overlay_fixed 会开一个不必要的覆盖层例外。",
+    "legacy_positional_id_pattern": "^(cgu|bv|imp|perf|ap|tc-i18)-\\d+$",
+    "legacy_positional_ids_grandfathered": true,
+    "max_column": 30,
+    "mounts_note": "🔴 **4 个挂载点（全 I 唯一 ≠2）**⇒ `force_component_type` 判据 SHALL 覆盖**全部 4 个**；变异「只验 1 个」SHALL 打红 —— 这是「分母为空的重言式」的**反面**：分母是 4 却只验 1，同样是假绿。",
+    "oo_flags": {
+      "http_import": 1,
+      "isOoAvailable": 2,
+      "legacyOO": 6,
+      "structured_only_switch": 1
+    },
+    "oo_flags_note": "`legacyOO`=**6** 是全 I 最多（对应 mount=4）。断言注册 adapter 后 legacyOO 分支**不再被走到**，但**不删代码**（删它会牵动 OO 不可用时的降级路径）。",
+    "pilot_class": "phase5_goodwill_detail",
+    "positional_identity_fix_status": "fixed_out_of_sheet",
+    "positional_identity_note": "🔴 全 I 8 处位置化 site 里 **I3 占 7**，但全在 `useI3Disclosure.ts`（族 A′ #L488 `cgu-${i}` 1 + 族 B #L441/#L463/#L503 3 + 族 D #L665/#L725 2）与 `i3/impairment/I3TabRecoverableTest.vue#L686`（族 B 1）—— **披露层 / 减值测试层**。本 sheet（明细表I3-2）的行身份是 `useI3Detail.ts` 的 rowId（`row-${Date.now()}-${random}` 族 A 安全生成）⇒ 本契约 sites 为空，🔴 但**不得**据此推断「I3 无位置化问题」—— 那 7 处的修复归 lane 1 的 Task 3~9。",
+    "positional_identity_persist_chain": "useI3Disclosure pullFromDetailRows → _persistSection('cgu_allocation') → options.onSave(`${prefix}-cgu_allocation-rows`) → GtI3Goodwill.vue http.put；键 I3-disc-{listed|soe}-cgu_allocation-rows（修复未改键名）",
+    "positional_identity_sites": [],
+    "reviewed_basis": "openpyxl 逐格实测 I/I3 商誉.xlsx 的 `明细表I3-2`（🔴 **四级**表头 R10/R11/R12/R13 ⇒ header_rows=**4**（平台上界，H9 那轮从 3 扩来，结清 Task 42 的 UPSTREAM_DEBT_FOUR_LEVEL_HEADER_NOT_EXPRESSIBLE 欠账）/ 数据 R14-22 九行 / footer R23 🔴 **三形态混行**（14 格纯 SUM E·G·J·K·L·R..Z + **5 格套用行公式** I23=SUM(D23:E23)-G23 · M23=D23+J23 · N23=E23+K23 · O23=G23+L23 · P23=M23+N23-O23 + **4 格引错区间** AA23:AD23）/ 公式列 11 个 I·M·N·O·P·Q·W·AA·AB·AC·AD（Q 是镜像 =A{r}；AB/AC 是**三项相加**口径）/ 🔴 **B/C 两列数据区全空** / 有效内容列 30 == max_column 30（无空列间隙）⇒ UUID 放 AE / 133 公式 / merged 47 / definedName 0 / 裸 IF 63 / 无 Excel Table / ws.protection.sheet=False ⇒ locked 全惰性） + 🔴 **两处模板真实缺陷逐格实证**：①`AA23:AD23` 四格 =SUM(<列>27:<列>30) 应为 =SUM(<列>14:<列>22)（R27-29 是编制说明文本行 B27='编制说明：'、R30 超 max_row(29)）⇒ 减值准备区审定数四列合计恒 0，同行左侧 S23..Z23 全部正确 ⇒ 复制粘贴错误 ⇒ **overlay_fixed** ②**本轮新发现** `I14` 是 None 而 I15..I18 逐行都有 =SUM(Dx:Ex)-Gx ⇒ 数据区首行漏公式 ⇒ **registered_not_fixed**（前端 costEnding 本就重算落库，merge 时由 formula_columns 重写） + 前端 `useI3Detail.ts` 按值 grep（ITEM_ID_ROWS='I3-2-rows' / 身份 rowId 族 A 安全生成 / 🔴 removeRow(rowIndex: number) 属**下标族** / I3DetailRow 的核心 12 字段 + Section 2/3 的 30+ 字段属后置 sheet） + 宿主 `GtI3Goodwill.vue` 按值 grep（🔴 **mount=4 全 I 唯一**、legacyOO=6 全 I 最多、checklist GET=0） + 真库现算（checklist_responses.item_id='I3-2-rows' **无行** ⇒ roundtrip 只能合成载荷）",
+    "row_delete_api": {
+      "kind": "index",
+      "note": "🔴 **lane 1 两条 entry 100% 下标族**（I1 `removeRow(rowIndex)` / I3 同），而 lane 2 是 1:2 跨两族（I2 index / I4+I5 identity）⇒ 两 lane **不得复用同一签名断言**。🔴 **本 lane 是唯一「下标族删行 × 位置化行身份」双重叠** ⇒ lane 1 有一条组合判据「删中间一行后剩余行 rowId 集合不变」，两个单独判据都抓不到。",
+      "signature": "removeRow(rowIndex: number)",
+      "site": "composables/useI3Detail.ts#L580"
+    },
+    "store_only_fields": [],
+    "store_only_note": "`I3DetailRow` 的 Section 2（入账测算 mergerCost / netAssetFairValue / entryGoodwillCalc / minorityInterest / …）与 Section 3（基础信息 acquisitionDate / shareholding / cguName / recoverableAmount / …）**模板本表无对应列** —— 它们属 `入账价值测算表I3-4` / `商誉减值测试I3-6` / `可收回金额测试I3-7` 三张后置 sheet，**不进本 sheet 契约**（Requirement 6.1 禁止无来源自造字段）。",
+    "tb_publish_gate": "composables/useI3Adjudication.ts#L402 + i3/core/I3TabAdjudication.vue#L708",
+    "template_cell_lock_facts": {
+      "note": "ws.protection.sheet=False ⇒ locked 惰性；mode 按「该格逐行有没有真公式」判。",
+      "sheet_protection_enabled": false
+    },
+    "template_only_columns": [
+      {
+        "column": "I",
+        "header_text": "期末数（原值未审）= SUM(D:E)-G　🔴 R14 缺失见缺陷②"
+      },
+      {
+        "column": "M",
+        "header_text": "期初数（原值审定）= D+J"
+      },
+      {
+        "column": "N",
+        "header_text": "本期增加（原值审定）= E+K"
+      },
+      {
+        "column": "O",
+        "header_text": "本期减少（原值审定）= G+L"
+      },
+      {
+        "column": "P",
+        "header_text": "期末数（原值审定）= M+N-O"
+      },
+      {
+        "column": "Q",
+        "header_text": "被投资单位名称（🔴 **镜像列** =A{r}，不映射 store 字段）"
+      },
+      {
+        "column": "W",
+        "header_text": "期末数（减值未审）= R+S+T-U-V"
+      },
+      {
+        "column": "AA",
+        "header_text": "期初数（减值审定）= R+X"
+      },
+      {
+        "column": "AB",
+        "header_text": "本期增加（减值审定）= S+Y+T"
+      },
+      {
+        "column": "AC",
+        "header_text": "本期减少（减值审定）= U+Z+V"
+      },
+      {
+        "column": "AD",
+        "header_text": "期末数（减值审定）= AA+AB-AC"
+      }
+    ],
+    "uuid_column": "AE",
+    "uuid_column_note": "有效 30 + 1 = AE。🔴 本表 `max_column` **也是 30** ⇒ 两者相等、无空列间隙（与 I2 的 20/61 差 41 列、I6 的 26/65 差 39 列形成对照）。",
+    "variant_axis": null
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "明细表I3-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "i32-managed",
+      "tables": [
+        {
+          "anchor": "A10",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "investee",
+              "header_source_ref": "源xlsx!明细表I3-2!A13",
+              "header_text": "被投资单位名称或形成商誉的事项",
+              "json_pointer": "/rows/{row_uuid}/investee",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I3-2!A14",
+              "stable_field_key": "goodwill_detail_rows/{row_uuid}/investee",
+              "store_item_id": "I3-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_opening",
+              "header_source_ref": "源xlsx!明细表I3-2!D13",
+              "header_text": "期初数",
+              "json_pointer": "/rows/{row_uuid}/costOpening",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I3-2!D14",
+              "stable_field_key": "goodwill_detail_rows/{row_uuid}/cost_opening",
+              "store_item_id": "I3-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_increase",
+              "header_source_ref": "源xlsx!明细表I3-2!E13",
+              "header_text": "金额",
+              "json_pointer": "/rows/{row_uuid}/costIncrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I3-2!E14",
+              "stable_field_key": "goodwill_detail_rows/{row_uuid}/cost_increase",
+              "store_item_id": "I3-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_increase_method",
+              "header_source_ref": "源xlsx!明细表I3-2!F13",
+              "header_text": "增加方式",
+              "json_pointer": "/rows/{row_uuid}/costIncreaseMethod",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I3-2!F14",
+              "stable_field_key": "goodwill_detail_rows/{row_uuid}/cost_increase_method",
+              "store_item_id": "I3-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_decrease",
+              "header_source_ref": "源xlsx!明细表I3-2!G13",
+              "header_text": "金额",
+              "json_pointer": "/rows/{row_uuid}/costDecrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I3-2!G14",
+              "stable_field_key": "goodwill_detail_rows/{row_uuid}/cost_decrease",
+              "store_item_id": "I3-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_decrease_reason",
+              "header_source_ref": "源xlsx!明细表I3-2!H13",
+              "header_text": "减少方式",
+              "json_pointer": "/rows/{row_uuid}/costDecreaseReason",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I3-2!H14",
+              "stable_field_key": "goodwill_detail_rows/{row_uuid}/cost_decrease_reason",
+              "store_item_id": "I3-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_aje",
+              "header_source_ref": "源xlsx!明细表I3-2!J13",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/costAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I3-2!J14",
+              "stable_field_key": "goodwill_detail_rows/{row_uuid}/cost_aje",
+              "store_item_id": "I3-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "R",
+                "row_from": "row_identity"
+              },
+              "column_key": "imp_opening",
+              "header_source_ref": "源xlsx!明细表I3-2!R13",
+              "header_text": "期初数",
+              "json_pointer": "/rows/{row_uuid}/impOpening",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I3-2!R14",
+              "stable_field_key": "goodwill_detail_rows/{row_uuid}/imp_opening",
+              "store_item_id": "I3-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "S",
+                "row_from": "row_identity"
+              },
+              "column_key": "imp_increase",
+              "header_source_ref": "源xlsx!明细表I3-2!S13",
+              "header_text": "本期计提",
+              "json_pointer": "/rows/{row_uuid}/impIncrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I3-2!S14",
+              "stable_field_key": "goodwill_detail_rows/{row_uuid}/imp_increase",
+              "store_item_id": "I3-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "T",
+                "row_from": "row_identity"
+              },
+              "column_key": "imp_increase_method",
+              "header_source_ref": "源xlsx!明细表I3-2!T13",
+              "header_text": "其他增加",
+              "json_pointer": "/rows/{row_uuid}/impIncreaseMethod",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I3-2!T14",
+              "stable_field_key": "goodwill_detail_rows/{row_uuid}/imp_increase_method",
+              "store_item_id": "I3-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "U",
+                "row_from": "row_identity"
+              },
+              "column_key": "imp_decrease",
+              "header_source_ref": "源xlsx!明细表I3-2!U13",
+              "header_text": "处置",
+              "json_pointer": "/rows/{row_uuid}/impDecrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I3-2!U14",
+              "stable_field_key": "goodwill_detail_rows/{row_uuid}/imp_decrease",
+              "store_item_id": "I3-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "V",
+                "row_from": "row_identity"
+              },
+              "column_key": "imp_decrease_reason",
+              "header_source_ref": "源xlsx!明细表I3-2!V13",
+              "header_text": "其他减少",
+              "json_pointer": "/rows/{row_uuid}/impDecreaseReason",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I3-2!V14",
+              "stable_field_key": "goodwill_detail_rows/{row_uuid}/imp_decrease_reason",
+              "store_item_id": "I3-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "X",
+                "row_from": "row_identity"
+              },
+              "column_key": "imp_aje",
+              "header_source_ref": "源xlsx!明细表I3-2!X13",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/impAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表I3-2!X14",
+              "stable_field_key": "goodwill_detail_rows/{row_uuid}/imp_aje",
+              "store_item_id": "I3-2-rows",
+              "value_type": "amount"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "I14:I22",
+            "M14:M22",
+            "N14:N22",
+            "O14:O22",
+            "P14:P22",
+            "Q14:Q22",
+            "W14:W22",
+            "AA14:AA22",
+            "AB14:AB22",
+            "AC14:AC22",
+            "AD14:AD22"
+          ],
+          "header_rows": 4,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "goodwill_detail_rows",
+          "uuid_col": "AE"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "30d8ec32aab6a3a9bac8dc3a23fabfaffb4d44bbf856d7d273e0c2219ace4589",
+    "relative_path": "I/I3 商誉.xlsx",
+    "template_sha256": "99512b340ccb79bf884d9f3362010f302bd8aaf45be0f3b082c99899f5253085"
+  },
+  "template_definition_sha256": "60fb5dbe87ad4c73fa7805069c041ce83add30b2140abc75fc76adf30da5f9b4"
+}

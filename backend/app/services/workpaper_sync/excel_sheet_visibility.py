@@ -244,7 +244,12 @@ def read_sheet_entries(path: Path | str) -> tuple[SheetEntry, ...]:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def resolve_target_sheet(names: Sequence[str], target: str) -> str | None:
+def resolve_target_sheet(
+    names: Sequence[str],
+    target: str,
+    *,
+    strict: bool = False,
+) -> str | None:
     """按「精确 → 包含 / 后缀」解析目标 sheet 名；解析不到返回 None。
 
     🔴 规则**刻意与原 `_hide_non_target_sheets` 逐条一致**（精确匹配优先，
@@ -252,16 +257,29 @@ def resolve_target_sheet(names: Sequence[str], target: str) -> str | None:
     `backend/tests/workpaper_sync/test_task54_l_cycle_migration.py` 的
     `_router_matches` 复刻了这套规则并现读源码交叉锁死；本次只换实现不动语义，
     所以匹配规则一个字也不能改 —— 否则 L 循环的 sheet 落位判据会整片失真。
+
+    🔴 BP-8（L4 粒度折叠）：当 `strict=True` 且模糊匹配命中 **多张** sheet 时
+    返回 None（fail-closed），而非静默取第一个。这让调用方知道歧义存在，
+    须额外带分支参数（如 bondBranch）区分。默认 `strict=False` 保持向后兼容，
+    无歧义 entry（L1/L2 等）不受影响。
     """
     if not target:
         return None
+    # 精确匹配优先（无歧义）
     for name in names:
         if name == target:
             return name
-    for name in names:
-        if target in name or name.endswith(target):
-            return name
-    return None
+    # 模糊匹配：contains / endswith
+    fuzzy_hits = [
+        name for name in names
+        if target in name or name.endswith(target)
+    ]
+    if not fuzzy_hits:
+        return None
+    if strict and len(fuzzy_hits) > 1:
+        # BP-8 fail-closed：多张命中时不静默取第一个
+        return None
+    return fuzzy_hits[0]
 
 
 # ═══════════════════════════════════════════════════════════════════════════

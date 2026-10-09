@@ -1,0 +1,301 @@
+# -*- coding: utf-8 -*-
+"""判据：D1-8/D1-16 四区声明几何正确 + 灰度零回归 + 自动发现进位移判据清单。
+
+spec: d1-sync-row-table-engine-and-d1-coverage · Task 27 · Requirements 5.1 / 5.4
+"""
+from __future__ import annotations
+
+import io
+import os
+import sys
+import warnings
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+_REPO = Path(__file__).resolve().parents[3]
+_BACKEND = _REPO / "backend"
+if str(_BACKEND) not in sys.path:  # pragma: no cover
+    sys.path.insert(0, str(_BACKEND))
+os.environ.setdefault("DB_DISABLE_SSL", "True")
+warnings.filterwarnings("ignore")
+
+from app.services.workpaper_sync import phase5_d1_08_endorsement as D108  # noqa: E402
+from app.services.workpaper_sync import phase5_d1_16_writeoff as D116  # noqa: E402
+from app.services.workpaper_sync import phase5_d1_expansion as D1E  # noqa: E402
+from app.services.workpaper_sync import phase5_d1_notes_receivable as D1  # noqa: E402
+from app.services.workpaper_sync.excel_extract import BindingKind  # noqa: E402
+from app.services.workpaper_sync.phase5_row_table_sheet import StoreKind  # noqa: E402
+
+
+@pytest.fixture(scope="module")
+def workbook() -> Any:
+    import openpyxl
+    return openpyxl.load_workbook(io.BytesIO(D1.read_authoritative_template()), data_only=False)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# D1-8 贴现/背书 双区
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestD108DiscountSpec:
+    """区一：贴现 R14-R21。"""
+
+    def test_managed_sheet_matches_real_tab_name(self, workbook: Any) -> None:
+        assert D108.MANAGED_SHEET_D108 in workbook.sheetnames
+
+    def test_geometry(self) -> None:
+        s = D108.SPEC_D108_DISCOUNT
+        assert s.first_data_row == 14
+        assert s.last_data_row == 21
+        assert s.footer_row == 22
+        assert s.uuid_col == "Q"
+        assert s.row_identity_key == "rowId"
+        assert s.store_kind is StoreKind.rows
+
+    def test_field_count_matches_template_columns(self) -> None:
+        assert len(D108.SPEC_D108_DISCOUNT.field_specs) == 16  # A-P
+
+    def test_store_key_matches_frontend(self) -> None:
+        assert D108.SPEC_D108_DISCOUNT.store_item_id == "D1-endorse-discount-rows"
+
+    def test_formula_mask_is_empty_because_data_region_has_no_formula(self) -> None:
+        """🔴 2026-09-28 改判：本判据原名 `test_formula_mask_covers_footer_sum_columns`，
+        断言 mask **应当**覆盖 E/F/L/M —— 那是把缺陷钉成了断言。
+
+        `formula_mask` 现算为 `{col}{first_data_row}:{col}{last_data_row}`（需求 1.2），
+        覆盖的是**数据区**、**覆盖不到 footer 行**。本 sheet 数据区逐格实测零公式，
+        公式只在 footer R22 的 SUM ⇒ 把 footer 列填进 `formula_columns` 对保护 footer
+        毫无作用，只会让 E/F/L/M 四列的整个数据区被 `merge._protection` 判
+        `read_only_masked_cell`，OO 侧改这些金额格永远写不回 store
+        （与 D4-1 修前同型，需求 1.5 在后端不可达）。
+
+        footer 的 SUM 公式由模板自带、materialize 不覆盖公式格、由 OO 重算 ⇒ 不需要 mask。
+        公式文本作为实测证据保留在 `FOOTER_SUM_TEMPLATES_DISCOUNT` 里。
+        """
+        assert D108.SPEC_D108_DISCOUNT.formula_mask == ()
+        assert D108.SPEC_D108_DISCOUNT.formula_columns == ()
+        assert set(D108.FOOTER_SUM_TEMPLATES_DISCOUNT) == {"E", "F", "L", "M"}
+        # 反面钉子：这四列在 field_specs 里必须仍是 editable（它们是用户录入的金额）。
+        by_col = {r[1]: r[2] for r in D108.SPEC_D108_DISCOUNT.field_specs}
+        for col in ("E", "F", "L", "M"):
+            assert by_col[col] == "editable", f"{col} 应为 editable（数据区无公式）"
+
+    def test_footer_marker_codepoints(self) -> None:
+        assert D108.FOOTER_MARKER_D108 == "合计"
+        assert [hex(ord(c)) for c in D108.FOOTER_MARKER_D108] == ["0x5408", "0x8ba1"]
+
+    def test_footer_marker_matches_template(self, workbook: Any) -> None:
+        ws = workbook[D108.MANAGED_SHEET_D108]
+        assert ws.cell(row=22, column=1).value == D108.FOOTER_MARKER_D108
+
+    def test_header_text_matches_template(self, workbook: Any) -> None:
+        ws = workbook[D108.MANAGED_SHEET_D108]
+        for _key, col, _mode, _vt, _jk, label, _gh in D108.SPEC_D108_DISCOUNT.field_specs:
+            from openpyxl.utils import column_index_from_string
+            ci = column_index_from_string(col)
+            real = ws.cell(row=12, column=ci).value
+            assert real is not None, f"R12/{col} 应有表头文字，实得 None（字段 {_key}）"
+
+
+class TestD108TransferSpec:
+    """区二：背书 R26-R33。"""
+
+    def test_geometry(self) -> None:
+        s = D108.SPEC_D108_TRANSFER
+        assert s.first_data_row == 26
+        assert s.last_data_row == 33
+        assert s.footer_row == 34
+        assert s.uuid_col == "R"
+        assert s.row_identity_key == "rowId"
+
+    def test_field_count_matches_template_columns(self) -> None:
+        assert len(D108.SPEC_D108_TRANSFER.field_specs) == 16  # A-P
+
+    def test_store_key_matches_frontend(self) -> None:
+        assert D108.SPEC_D108_TRANSFER.store_item_id == "D1-endorse-transfer-rows"
+
+    def test_formula_mask_is_empty_because_data_region_has_no_formula(self) -> None:
+        """改判理由同 `TestD108DiscountSpec` 的同名判据（2026-09-28）。"""
+        assert D108.SPEC_D108_TRANSFER.formula_mask == ()
+        assert D108.SPEC_D108_TRANSFER.formula_columns == ()
+        assert set(D108.FOOTER_SUM_TEMPLATES_TRANSFER) == {"E"}
+        by_col = {r[1]: r[2] for r in D108.SPEC_D108_TRANSFER.field_specs}
+        assert by_col["E"] == "editable"
+
+    def test_shared_sheet_key(self) -> None:
+        """同 sheet 双区必须共享 sheet_key（同 D1-4 先例）。"""
+        assert D108.SPEC_D108_DISCOUNT.sheet_key == D108.SPEC_D108_TRANSFER.sheet_key
+
+    def test_different_uuid_cols(self) -> None:
+        """同 sheet 双区必须各用不同 UUID 列（D4-1 教训）。"""
+        assert D108.SPEC_D108_DISCOUNT.uuid_col != D108.SPEC_D108_TRANSFER.uuid_col
+
+    def test_different_table_names(self) -> None:
+        assert D108.SPEC_D108_DISCOUNT.table_name != D108.SPEC_D108_TRANSFER.table_name
+
+    def test_k_l_m_columns_differ_between_regions(self) -> None:
+        """K/L/M 三列两区语义不同（贴现银行 vs 背书转让单位）——column_key 必须不同。"""
+        disc_keys = {s[0] for s in D108.SPEC_D108_DISCOUNT.field_specs if s[1] in ("K", "L", "M")}
+        xfer_keys = {s[0] for s in D108.SPEC_D108_TRANSFER.field_specs if s[1] in ("K", "L", "M")}
+        assert disc_keys.isdisjoint(xfer_keys), (
+            f"K/L/M 的 column_key 在两区间应互不相同：贴现={disc_keys} 背书={xfer_keys}"
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# D1-16 转回/核销 双区
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestD116ReversalSpec:
+    """区一：转回 R12-R14。"""
+
+    def test_managed_sheet_matches_real_tab_name(self, workbook: Any) -> None:
+        assert D116.MANAGED_SHEET_D116 in workbook.sheetnames
+
+    def test_geometry(self) -> None:
+        s = D116.SPEC_D116_REVERSAL
+        assert s.first_data_row == 12
+        assert s.last_data_row == 14
+        assert s.footer_row == 15
+        assert s.uuid_col == "I"
+        assert s.row_identity_key == "id"  # 🔴 非 rowId
+        assert s.store_kind is StoreKind.rows
+
+    def test_field_count_matches_template_columns(self) -> None:
+        assert len(D116.SPEC_D116_REVERSAL.field_specs) == 8  # A-H
+
+    def test_store_key_matches_frontend(self) -> None:
+        assert D116.SPEC_D116_REVERSAL.store_item_id == "D1-writeoff-reversal-rows"
+
+    def test_formula_mask_is_empty_because_data_region_has_no_formula(self) -> None:
+        """改判理由同 `TestD108DiscountSpec` 的同名判据（2026-09-28）。"""
+        assert D116.SPEC_D116_REVERSAL.formula_mask == ()
+        assert D116.SPEC_D116_REVERSAL.formula_columns == ()
+        assert set(D116.FOOTER_SUM_TEMPLATES_REVERSAL) == {"E", "F"}
+        by_col = {r[1]: r[2] for r in D116.SPEC_D116_REVERSAL.field_specs}
+        for col in ("E", "F"):
+            assert by_col[col] == "editable"
+
+    def test_row_identity_key_is_id_not_rowId(self) -> None:
+        """D1-16 前端用 `id` 而非 `rowId`——声明必须照前端逐字匹配。"""
+        assert D116.SPEC_D116_REVERSAL.row_identity_key == "id"
+        assert D116.SPEC_D116_WRITEOFF.row_identity_key == "id"
+
+
+class TestD116WriteoffSpec:
+    """区二：核销 R18-R20。"""
+
+    def test_geometry(self) -> None:
+        s = D116.SPEC_D116_WRITEOFF
+        assert s.first_data_row == 18
+        assert s.last_data_row == 20
+        assert s.footer_row == 21
+        assert s.uuid_col == "J"
+
+    def test_field_count_matches_template_columns(self) -> None:
+        assert len(D116.SPEC_D116_WRITEOFF.field_specs) == 8  # A-H
+
+    def test_store_key_matches_frontend(self) -> None:
+        assert D116.SPEC_D116_WRITEOFF.store_item_id == "D1-writeoff-writeoff-rows"
+
+    def test_formula_mask_is_empty_because_data_region_has_no_formula(self) -> None:
+        """改判理由同 `TestD108DiscountSpec` 的同名判据（2026-09-28）。"""
+        assert D116.SPEC_D116_WRITEOFF.formula_mask == ()
+        assert D116.SPEC_D116_WRITEOFF.formula_columns == ()
+        assert set(D116.FOOTER_SUM_TEMPLATES_WRITEOFF) == {"C"}
+        by_col = {r[1]: r[2] for r in D116.SPEC_D116_WRITEOFF.field_specs}
+        assert by_col["C"] == "editable"
+
+    def test_shared_sheet_key(self) -> None:
+        assert D116.SPEC_D116_REVERSAL.sheet_key == D116.SPEC_D116_WRITEOFF.sheet_key
+
+    def test_different_uuid_cols(self) -> None:
+        assert D116.SPEC_D116_REVERSAL.uuid_col != D116.SPEC_D116_WRITEOFF.uuid_col
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 灰度开关零回归
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestExpansionGrayScaleZeroRegression:
+    """全部灰度开关已 ON（2026-09-26 D1 adapter 注册后全量开启）。"""
+
+    def test_all_switches_are_on(self) -> None:
+        assert D1E._INCLUDE_D108_ENDORSEMENT is True
+        assert D1E._INCLUDE_D116_WRITEOFF is True
+
+    def test_instrumentation_specs_count_with_all_on(self) -> None:
+        specs = D1E.instrumentation_specs()
+        assert len(specs) == 18  # D1-3 + 11 expansion sheets (some dual-region)
+
+    def test_store_item_ids_count_with_all_on(self) -> None:
+        # 🔴 期望值按静态第三区开关派生，不写死：T7 裁决 A（2026-09-28）把
+        #    `_INCLUDE_D104_NOTETYPE_STATIC` 翻 False，store item 从 18 掉到 17。
+        #    写死 18 会让本条在撤回态假红；写死 17 则会在开关翻回时假绿。
+        #    开关状态本身的权威断言在 `test_d104_static_region_excluded.py`。
+        expected = 18 if D1E._INCLUDE_D104_NOTETYPE_STATIC else 17
+        items = D1E.all_store_item_ids()
+        assert len(items) == expected, items
+        assert len(items) == len(set(items)), f"store item 重复：{items}"
+
+
+class TestExpansionWithD108D116On:
+    """D1-8/D1-16 在全量开启下正确贡献 spec。"""
+
+    def test_d108_and_d116_present_in_full_expansion(self) -> None:
+        specs = D1E.instrumentation_specs()
+        sheets = [str(s.managed_sheet) for s in specs]
+        assert sheets.count(D108.MANAGED_SHEET_D108) == 2  # 贴现+背书
+        assert sheets.count(D116.MANAGED_SHEET_D116) == 2  # 转回+核销
+
+    def test_store_items_include_d108_d116(self) -> None:
+        items = D1E.all_store_item_ids()
+        assert "D1-endorse-discount-rows" in items
+        assert "D1-endorse-transfer-rows" in items
+        assert "D1-writeoff-reversal-rows" in items
+        assert "D1-writeoff-writeoff-rows" in items
+
+    def test_d1_8_auto_enters_multi_region_parametrized_coverage(self) -> None:
+        """Task 24 参数化判据的变异反证：D1-8 开关翻转后自动进入 `_multi_region_sheets()`。"""
+        original = D1E._INCLUDE_D108_ENDORSEMENT
+        try:
+            D1E._INCLUDE_D108_ENDORSEMENT = True
+            # 复用 Task 24 写的 _multi_region_sheets 逻辑
+            sys.path.insert(0, str(_BACKEND / "scripts" / "check"))
+            try:
+                from check_sync_provider_golden_digest import PROVIDERS  # noqa: F401
+            finally:
+                sys.path.remove(str(_BACKEND / "scripts" / "check"))
+            from tests.workpaper_sync.test_sibling_table_ref_row_shift import (
+                _multi_region_sheets,
+            )
+            multi = _multi_region_sheets()
+            assert D108.MANAGED_SHEET_D108 in multi, (
+                f"D1-8 开关翻转后应自动进入多区覆盖清单，实得 {sorted(multi)}"
+            )
+            assert len(multi[D108.MANAGED_SHEET_D108]) == 2
+        finally:
+            D1E._INCLUDE_D108_ENDORSEMENT = original
+
+    def test_d1_16_auto_enters_multi_region_parametrized_coverage(self) -> None:
+        """同 D1-8：D1-16 开关翻转后也应自动进入多区覆盖清单。"""
+        original = D1E._INCLUDE_D116_WRITEOFF
+        try:
+            D1E._INCLUDE_D116_WRITEOFF = True
+            sys.path.insert(0, str(_BACKEND / "scripts" / "check"))
+            try:
+                from check_sync_provider_golden_digest import PROVIDERS  # noqa: F401
+            finally:
+                sys.path.remove(str(_BACKEND / "scripts" / "check"))
+            from tests.workpaper_sync.test_sibling_table_ref_row_shift import (
+                _multi_region_sheets,
+            )
+            multi = _multi_region_sheets()
+            assert D116.MANAGED_SHEET_D116 in multi, (
+                f"D1-16 开关翻转后应自动进入多区覆盖清单，实得 {sorted(multi)}"
+            )
+            assert len(multi[D116.MANAGED_SHEET_D116]) == 2
+        finally:
+            D1E._INCLUDE_D116_WRITEOFF = original

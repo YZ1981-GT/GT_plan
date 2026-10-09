@@ -1,7 +1,16 @@
 ﻿/**
  * useH10DualMode — H10 HTML ↔ OnlyOffice 双模式
  *
- * 对齐 K10/K12/F2 范式：
+ * @deprecated 已被 `composables/useHSyncMode` 取代（spec
+ * `h2-h6-h10-pilot-cross-reference-lanes`）。`GtH10AssetDisposalIncome.vue` 于 H10 接桥时
+ * 改用统一双向宿主，本模块现算**零生产消费**。
+ *
+ * 🔴 为什么不直接删：`backend/tests/workpaper_sync/test_h_foundation_hc_guards.py` 的
+ * localStorage 判据（HC-10）逐字列了 `useH{2,3,4,6,8,9,10}DualMode.ts` 七个文件 ——
+ * 那条判据守的是「只有 H10 的载体用 localStorage 草稿、其余不得出现」这个 HD-6 事实。
+ * 删文件要与该判据同批处置，归 BP-8 收口批次（同 useH2DualMode / useH3DualMode）。
+ *
+ * 原设计（保留以备复核）：对齐 K10/K12/F2 范式：
  * - 切 OO 前先 GET onlyoffice-config **拉取成功** 才置 currentMode
  * - 失败回退 html，不全局禁用 OO
  * - el-segmented 必须 :model-value + @change（v-model 先改值使 switchMode 短路）

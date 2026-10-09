@@ -63,6 +63,7 @@ from app.services.workpaper_sync.entry_profile import (  # noqa: E402
     EntryProfile,
     RoomModel,
     ScenarioProfile,
+    capability_of,
     load_entry_manifest,
     manifest_entries_by_id,
 )
@@ -1187,39 +1188,62 @@ class TestNoRealOnlyOfficeMeansUnverifiable:
         for scenario_id in EV.FIELD_LEVEL_SCENARIOS:
             assert not PH.SCENARIO_ORACLES[scenario_id].needs_black_box, scenario_id
 
-    def test_upstream_gap_scenarios_are_failed_not_unverifiable(
-        self, contract: C.SyncContract
-    ) -> None:
-        """🔴 上游实现缺口判 `failed`，**不是** `unverifiable`。
+    def test_no_scenario_carries_an_unfilled_upstream_debt(self) -> None:
+        """🔴 Task 32 两条欠账已补 ⇒ 现在**不得**再有任何 oracle 带 upstream_debt。
 
-        判定顺序不可交换：若黑盒判定排在缺口判定之前，这两条会在没有 OO 的环境里显示成
-        `unverifiable`，于是"接了 OO 就会自动变绿"—— 而它们其实永远不会通过（生产上根本
-        没有那道校验）。
+        历史：`same_application_higher_sequence_fold` 与
+        `wrong_prior_confirmation_bundle_fence_contributor_rejected` 曾各带一条
+        `debt=UPSTREAM_DEBT_*`，让它们 fail closed。2026-09-25 两条实现补齐
+        （claim expected_* 校验 + fold 读侧 _fold_observability_facts）后 debt 移除。
+
+        本守卫**反向**锁死：任何人再给 oracle 加 `debt=` 而不补实现，这条立刻红 ——
+        「登记欠账让场景 fail closed」是允许的，但登记完必须真的补，不能长期挂着。
+        谁要重新登记欠账，应在这里显式列出并说明缘由（而不是让它悄悄回来）。
         """
         gaps = [sid for sid, o in PH.SCENARIO_ORACLES.items() if o.upstream_debt]
-        assert sorted(gaps) == [
+        assert gaps == [], (
+            f"以下 oracle 仍挂 upstream_debt（Task 32 两条已补，不应再有）：{sorted(gaps)}"
+        )
+
+    def test_formerly_debted_scenarios_are_now_evaluatable(
+        self, contract: C.SyncContract
+    ) -> None:
+        """曾经 fail-closed 的两条场景，去 debt 后必须变成**可评估**（不再恒 failed/upstream_gap）。
+
+        「可评估」= 喂全 observation 后 oracle 不再走 `upstream_gap` 分支。它此刻可能是
+        passed 或因缺某类具体证据而 unverifiable，但**绝不能**再是「实现缺失」的 failed ——
+        那正是 debt 被真实解除的判据。
+        """
+        for scenario_id in (
             "same_application_higher_sequence_fold",
             "wrong_prior_confirmation_bundle_fence_contributor_rejected",
-        ], gaps
-        for scenario_id in gaps:
+        ):
+            oracle = PH.SCENARIO_ORACLES[scenario_id]
+            assert oracle.upstream_debt is None, scenario_id
             scenario = {s.scenario_id: s for s in PH.all_declared_scenarios()}[scenario_id]
             verdict = PH.run_scenario_oracle(
                 scenario=scenario,
-                oracle=PH.SCENARIO_ORACLES[scenario_id],
+                oracle=oracle,
                 observation=_full_obs(scenario_id, contract=contract),
                 onlyoffice_build="OnlyOffice 9.4.0.42",
                 browser_build="Chrome/131.0.0.0",
             )
-            assert verdict.outcome is PH.OracleOutcome.failed, verdict
-            assert verdict.error_code == "upstream_gap", verdict
-            assert "Task 32" in "".join(verdict.notes)
+            assert verdict.error_code != "upstream_gap", (scenario_id, verdict)
 
-    def test_schema_debt_scenario_is_unverifiable_and_still_required(
+    def test_formerly_schema_debted_scenario_now_really_passes(
         self, contract: C.SyncContract
     ) -> None:
-        """已登记的 schema 欠账场景：`unverifiable` + 仍在 required set 里。"""
-        scenario_id, = EV.SCHEMA_UNREPRESENTABLE_SCENARIOS
+        """V165 解除 schema 欠账后，quarantined 场景必须能**真的** passed，且仍在 required set。
+
+        🔴 断言 `passed` 而不只是「不再是 schema 码」：它 requires 只有 `db_entities`、无黑盒、
+        无 timeline/merge/close ⇒ 证据齐全时 oracle 必须走到末尾的「结构判据全部满足」。若它
+        卡在别的码上，说明 V165 只是把欠账换了个名字，而没有真的让它可被验收。
+        """
+        scenario_id = "quarantined_rejects_application_and_engine"
+        assert EV.SCHEMA_UNREPRESENTABLE_SCENARIOS == {}, "V165 应已清空 schema 欠账表"
         scenario = {s.scenario_id: s for s in PH.all_declared_scenarios()}[scenario_id]
+        assert scenario.kind is EV.ScenarioKind.authorization_reject
+        assert scenario.schema_representable_as_passed is True
         verdict = PH.run_scenario_oracle(
             scenario=scenario,
             oracle=PH.SCENARIO_ORACLES[scenario_id],
@@ -1227,9 +1251,38 @@ class TestNoRealOnlyOfficeMeansUnverifiable:
             onlyoffice_build="OnlyOffice 9.4.0.42",
             browser_build="Chrome/131.0.0.0",
         )
-        assert verdict.outcome is PH.OracleOutcome.unverifiable
-        assert verdict.error_code == "scenario_kind_unrepresentable"
+        assert verdict.outcome is PH.OracleOutcome.passed, verdict
+        assert verdict.error_code is None, verdict
+        # 登记欠账从来不等于移出必需集合 —— 解除后同样不得被摘走
         assert scenario_id in {s.scenario_id for s in EV.PROJECTION_BASE_SCENARIOS}
+
+    def test_schema_debt_is_still_decided_first_when_registered(
+        self, contract: C.SyncContract, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """排序不变量：**若**某场景登记为 schema 欠账，它必须先于一切落 `unverifiable`。
+
+        生产上该表已空（V165），故用**合成登记**验判定顺序 —— 与 upstream_debt 的
+        synthetic-debt 排序测同范式。选一个需黑盒的场景 + 喂全证据 + 真实 OO build：若
+        schema 判据不是第一条，它会被后面的分支吞掉而落别的码。
+        """
+        scenario_id = "oo_to_html"
+        oracle = PH.SCENARIO_ORACLES[scenario_id]
+        assert oracle.needs_black_box is True
+        monkeypatch.setattr(
+            PH,
+            "SCHEMA_UNREPRESENTABLE_SCENARIOS",
+            {scenario_id: "合成 schema 欠账（仅测判定顺序）"},
+        )
+        scenario = {s.scenario_id: s for s in PH.all_declared_scenarios()}[scenario_id]
+        verdict = PH.run_scenario_oracle(
+            scenario=scenario,
+            oracle=oracle,
+            observation=_full_obs(scenario_id, contract=contract),
+            onlyoffice_build="OnlyOffice 9.4.0.42",
+            browser_build="Chrome/131.0.0.0",
+        )
+        assert verdict.outcome is PH.OracleOutcome.unverifiable, verdict
+        assert verdict.error_code == "scenario_kind_unrepresentable", verdict
 
     def test_a_merge_scenario_without_three_way_input_is_unverifiable(self) -> None:
         """字段级场景缺三方 projection ⇒ `unverifiable` + `merge_evidence_missing`。
@@ -1775,11 +1828,32 @@ class TestPilotClassCoverage:
             )
 
     def test_no_class_is_verified_today_because_there_is_no_bidirectional_entry(self) -> None:
-        """今天的事实：0 个 bidirectional entry ⇒ 四类全 UNVERIFIABLE。"""
+        """今天的事实：**没有任何 entry 通过服务端 evidence 重算** ⇒ 四类全 UNVERIFIABLE。
+
+        🔴 判据已换（2026-09-07）：原文钉的是「0 个 bidirectional entry」。那个
+        population 已经过期 —— reviewed overlay 已把 `xlsx/gt-d2-accounts-receivable` /
+        `xlsx/gt-h1-fixed-assets` / `xlsx/gt-g7-long-term-equity-main` 裁决为
+        bidirectional（manifest 实测 4 条 bidirectional）。
+
+        **不变量一个字都没变**：`capability=bidirectional` 这个旗标本身**不产生**
+        verified —— 只有 `verified_entry_ids` 非空（= 服务端 evidence 重算真通过）才算。
+        因此 bidirectional 集合改成**活体双源派生**（测试侧直接用 `capability_of` 现读
+        manifest，与生产的 `assess_pilot_classes` 互为对照），牙齿落在
+        `verified_entry_ids == ()` 这条真正的判据上：谁把 `status` 接到 capability 旗标
+        上，这条立刻打红。
+        """
+        entries = manifest_entries_by_id(load_entry_manifest())
         assessments = PH.assess_pilot_classes()
         for pilot_class, assessment in sorted(assessments.items(), key=lambda kv: kv[0].value):
             assert assessment.status is PH.PilotClassStatus.unverifiable, pilot_class
-            assert assessment.bidirectional_entry_ids == (), assessment
+            # 活体派生（不是冻结 population）：bidirectional 子集必须**就是** manifest 现说的那些
+            assert assessment.bidirectional_entry_ids == tuple(
+                eid
+                for eid in assessment.candidate_entry_ids
+                if capability_of(entries[eid]) is Capability.bidirectional
+            ), assessment
+            # 🔴 真正的牙齿：一条都没通过服务端重算 ⇒ 四类必须全 UNVERIFIABLE
+            assert assessment.verified_entry_ids == (), assessment
             assert assessment.reasons, f"{pilot_class.value}: UNVERIFIABLE 却没给理由"
         assert PH.pilot_coverage_summary(assessments)["all_verified"] is False
 

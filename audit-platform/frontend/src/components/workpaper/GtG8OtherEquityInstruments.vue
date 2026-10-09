@@ -3,20 +3,39 @@
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
       <div v-if="currentSheet !== '底稿目录'" class="g8-toolbar">
+        <!--
+          🔴 原先绑 legacy `dualMode.currentMode` / `dualMode.onModeChange`（本地 ref）⇒ 桥的
+          mode 永远不动、descriptor 恒 null，受管 sheet 切「在线编辑」后永远停在「正在打开…」。
+          现在统一走 `switchRenderMode`：受管 sheet 经桥（四分支保存协议），非受管委派 legacy。
+        -->
         <el-segmented
           v-if="isHtmlSheet"
-          :model-value="dualMode.currentMode.value"
-          :options="dualMode.modeOptions"
+          :model-value="renderMode"
+          :options="syncModeOptions"
           size="small"
-          @change="dualMode.onModeChange"
+          @change="switchRenderMode"
         />
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g8-other-equity-instruments" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
-        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value && !isG8SyncManagedSheet" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isG8SyncManagedSheet && syncBusy" size="small" type="info">同步中…</el-tag>
+        <el-tag v-if="syncSwitching" size="small" type="info">切换中…</el-tag>
       </div>
 
+      <!-- G8-2 明细表受管 sheet 走 WorkpaperSyncEditorHost 真双向 -->
+      <div v-if="isOoMode && isG8SyncManagedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          v-if="syncOoDescriptor"
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+        <div v-else class="oo-loading">正在打开 G8-2 同步编辑器…</div>
+      </div>
+
+      <!-- 非受管 sheet 保留 legacy GtOnlyOfficeSheet -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
+        v-else-if="isOoMode"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -165,7 +184,7 @@
  * GtG8OtherEquityInstruments — G8 其他权益工具投资底稿主入口
  * 对齐 G5/G6：formData + g8:save-items + 附注路由 + 双模式 reload
  */
-import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject } from 'vue'
+import { ref, computed, toRef, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject } from 'vue'
 import { useG8FormData } from './composables/useG8FormData'
 import { useG8DualMode } from './composables/useG8DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -174,6 +193,13 @@ import type { ChecklistResponse } from './composables/useF1FormData'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+// ── G8 sync bridge（spec: g-cycle-single-region-detail-lanes · Task 15）──
+import { isGSingleRegionManagedSheet, gSingleRegionSheetKeyOf } from './sync/gSingleRegionManagedSheets'
+import { useGRenderModeSwitch } from './sync/useGRenderModeSwitch'
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 
 const G8TabProcedure = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabProcedure.vue'))
 const G8TabAdjudication = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabAdjudication.vue'))
@@ -276,6 +302,50 @@ async function reloadAll() {
   await formData.loadAll()
 }
 
+// ── G8 sync bridge 接线（Task 15 · Requirements 4.7）───────────────────────
+const G8_SYNC_ENTRY_ID = 'xlsx/gt-g8-other-equity-instruments'
+const isG8SyncManagedSheet = computed(() => isGSingleRegionManagedSheet(currentSheet.value))
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const syncEntryId = ref(G8_SYNC_ENTRY_ID)
+const syncSheetKey = computed(() => gSingleRegionSheetKeyOf(currentSheet.value) ?? 'g802-managed')
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(G8_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    formData.flushPending()
+    return await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: G8_SYNC_ENTRY_ID,
+    })
+  },
+  reloadHtml: () => formData.loadAll(),
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(() => WP_BRIDGE_IN_FLIGHT_STATES.includes(syncBridge.state.value))
+
+// 🔴 受管 sheet 必须经桥切换 —— 桥建好了但没人调 `switchToOnlyOffice()` 就是空壳：
+//    `WorkpaperSyncEditorHost` 自己不 materialize，descriptor 只能由那个方法产出，
+//    于是用户切「在线编辑」后永远停在「正在打开…」，而所有静态门都是绿的。
+const {
+  renderMode,
+  modeOptions: syncModeOptions,
+  switching: syncSwitching,
+  switchRenderMode,
+} = useGRenderModeSwitch({
+  bridge: syncBridge,
+  legacy: dualMode,
+  isManagedSheet: isG8SyncManagedSheet,
+  editorHostRef: syncEditorHostRef,
+})
+
+const isOoMode = computed(
+  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && renderMode.value === 'onlyoffice',
+)
+
 onMounted(async () => {
   window.addEventListener('g8:save-items', handleG8SaveItems)
   await formData.loadAll()
@@ -293,4 +363,11 @@ onBeforeUnmount(() => {
 .loading-container { padding: 24px; }
 .g8-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .g8-index-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+
+/* ─── 同步编辑器容器 ─── */
+/* 🔴 必须带**视口相关的确定高度**：`WorkpaperSyncEditorHost` 根元素是 height:100% + flex 列，
+   父级 auto 高度会把编辑区（flex:1; min-height:0）压扁，OnlyOffice 在页面上只剩一条
+   （2026-09-22 D4 真栈实证）。模板里用了 `.oo-container` 却不定义它就是这个后果。 */
+.oo-container { min-height: 600px; height: calc(100vh - 280px); overflow: hidden; border-radius: 8px; }
+.oo-loading { padding: 40px 20px; text-align: center; color: #909399; font-size: 14px; }
 </style>

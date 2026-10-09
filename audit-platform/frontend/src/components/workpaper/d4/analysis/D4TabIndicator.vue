@@ -22,6 +22,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  htmlData?: any
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -112,11 +113,17 @@ function loadIndicators() {
   if (resp?.remark) {
     try { const p = JSON.parse(resp.remark); if (Array.isArray(p) && p.length) { indicators.value = p; return } } catch {}
   }
-  indicators.value = DEFAULT_INDICATORS.map(d => ({
-    key: d.key, name: d.name, formula: d.formula, source: d.source,
-    current: 0, prior: 0, diff1: null, analysis1: '',
-    industryAvg: null, diff2: null, analysis2: '',
-  }))
+  // 无持久化数据 → 用 DEFAULT_INDICATORS 初始化，并从 indicator_prefill 预填（Req 8.1）
+  const prefill = props.htmlData?.indicator_prefill ?? {}
+  indicators.value = DEFAULT_INDICATORS.map(d => {
+    const p = prefill[d.key]
+    return {
+      key: d.key, name: d.name, formula: d.formula, source: d.source,
+      current: p?.current ?? 0, prior: p?.prior ?? 0,
+      diff1: null, analysis1: '',
+      industryAvg: null, diff2: null, analysis2: '',
+    }
+  })
 }
 watch(() => props.allResponses.get('D4-6-indicators-v2')?.remark, () => loadIndicators(), { immediate: true })
 
@@ -276,6 +283,13 @@ function handleImportUpload(file: File): boolean {
   })
   return false
 }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) handleImportUpload(f) }
+  input.click()
+}
 
 // ─── 持久化 ──────────────────────────────────────────────────────────
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -297,6 +311,8 @@ function flushSave() {
   window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items } }))
 }
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 
@@ -342,25 +358,7 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
       <!-- 工具栏（与D4-3一致：下拉导入导出 + AI一键填充） -->
       <div class="table-toolbar">
         <div class="toolbar-left">
-          <el-dropdown size="small" trigger="click" :disabled="isReadonly">
-            <el-button size="small">导入导出 ▾</el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-                <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-                <el-dropdown-item>
-                  <el-upload
-                    :show-file-list="false"
-                    accept=".xlsx,.xls"
-                    :before-upload="handleImportUpload"
-                    :disabled="importing"
-                  >
-                    <span>{{ importing ? '导入中...' : '导入数据' }}</span>
-                  </el-upload>
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
+          
           <el-tag size="small" type="info">共 {{ indicators.length }} 项指标</el-tag>
         </div>
         <div class="toolbar-right">

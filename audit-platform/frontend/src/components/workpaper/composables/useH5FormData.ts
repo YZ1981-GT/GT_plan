@@ -22,6 +22,10 @@
  * 例：H5-1-audited-cost, H5-2-detail-row-1, H5-12-depletion-total
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
+import {
+  registerHPendingFlusher,
+  trackHPendingWrite,
+} from '../sync/hPendingWrites'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 
@@ -188,9 +192,35 @@ export function useH5FormData(opts: {
     _debounceTimers.set(itemId, setTimeout(() => {
       _debounceTimers.delete(itemId)
       _pendingItems.delete(itemId)
-      void _doSave([data])
+      void trackHPendingWrite(_doSave([data]))
     }, DEBOUNCE_MS))
   }
+
+  /**
+   * 清防抖 + 立即落库，**await 到真正写完**。切「在线编辑」前的必经一步。
+   *
+   * 🔴 本 composable 是 `per_tab_formdata_instance` 载体：`H5TabDetail.vue` 自己 new 一份，
+   * 宿主拿不到这个实例的引用 ⇒ 无从直接 flush。所以把 flush **登记到**
+   * `sync/hPendingWrites` 的模块级注册表，宿主的双向桥调 `flushHPendingWrites()`
+   * 时一并执行（登记随 effect scope 自动注销，见该模块 docstring）。
+   *
+   * 🔴 防抖窗口是 **2s**（`DEBOUNCE_MS`）—— 漏 flush 就会丢最多 2 秒的编辑，
+   * 而 materialize 出的 xlsx 不会有任何提示。
+   */
+  async function flushPendingSaves(): Promise<void> {
+    for (const timer of _debounceTimers.values()) clearTimeout(timer)
+    _debounceTimers.clear()
+    if (_pendingItems.size === 0) return
+    const items: ChecklistItem[] = []
+    for (const itemId of _pendingItems) {
+      const resp = allResponses.value.get(itemId)
+      if (resp) items.push(resp)
+    }
+    _pendingItems.clear()
+    if (items.length > 0) await _doSave(items)
+  }
+
+  registerHPendingFlusher(flushPendingSaves)
 
   // ─── saveBatch（原子性批量保存） ───────────────────────────────────────────
 
@@ -395,6 +425,8 @@ export function useH5FormData(opts: {
     saveResponse,
     debouncedSave,
     saveBatch,
+    //: 也登记进了 `sync/hPendingWrites` 的模块级注册表（宿主双向桥用）。
+    flushPendingSaves,
     // Load
     selfLoad,
     loadTbData,

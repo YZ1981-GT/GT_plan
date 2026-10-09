@@ -75,7 +75,10 @@ export function useF2StocktakeFormData(options: { wpId: Ref<string>; projectId: 
     })
   }
 
-  return { allResponses, isLoading, projectContext, loadAll, saveItemsFromEvent }
+  /** F2 stocktake 无 debounce 队列（PUT 即发），flush 为空操作（与 E1 同款理由）。 */
+  function _flushPending(): void { /* noop */ }
+
+  return { allResponses, isLoading, projectContext, loadAll, saveItemsFromEvent, flushPendingSave: _flushPending }
 }
 
 export default useF2StocktakeFormData

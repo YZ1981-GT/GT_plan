@@ -1,15 +1,16 @@
 """SQL Schema 漂移检测器（migration-runner-resilience spec / Sprint 2）
 
-启动时对比 ORM `Base.metadata` 与实际 PG schema，发现以下 4 类漂移并写入
+启动时对比 ORM `Base.metadata` 与实际 PG schema，发现以下 5 类漂移并写入
 `schema_drift_log` 表：
 
 - ``orm_extra``：ORM 定义了但 DB 缺失的列/表（最高优先，业务接口运行时会 500）
 - ``db_extra``：DB 有但 ORM 没定义的列/表（INFO 级，多为历史残留）
 - ``type_mismatch``：列存在但类型/可空性不一致（WARN 级，可能数据不一致）
-- ``enum_mismatch``：PG enum 缺少 Python Enum 中定义的值（WARN，运行时插入会爆）
+- ``enum_mismatch``：ORM 原生枚举列与 public 实际列类型 / 标签不符（运行时查询或插入会爆）
+- ``checksum_drift``：已应用迁移被事后编辑且未在 ``migration_drift_ledger`` 逐条登记
 
-`/api/health` 端点消费 `schema_drift_log`，drift>0 → status=degraded → 前端
-DegradedBanner 暴露给运维（避免业务 500 才发现）。
+`/api/health` 端点消费 `schema_drift_log`，critical 漂移（:data:`CRITICAL_DRIFT_TYPES`，
+单一真源）>0 → status=degraded → 前端 DegradedBanner 暴露给运维（避免业务 500 才发现）。
 
 设计原则：
 - 纯检测，不自动修复（避免误删 / 误改）
@@ -21,17 +22,22 @@ DegradedBanner 暴露给运维（避免业务 500 才发现）。
 from __future__ import annotations
 
 import asyncio
-import enum as _enum_mod
 import logging
 from dataclasses import dataclass
-from typing import Iterable, Literal
+from typing import Iterable, Literal, Mapping
 
+import sqlalchemy as sa
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 logger = logging.getLogger("audit_platform.schema_drift")
 
-DriftType = Literal["orm_extra", "db_extra", "type_mismatch", "enum_mismatch"]
+DriftType = Literal["orm_extra", "db_extra", "type_mismatch", "enum_mismatch", "checksum_drift"]
+
+#: 会让业务接口运行时失败（或让「已应用迁移的编辑」静默丢失）的漂移类型 —— health degraded 判定与
+#: 启动日志的 critical 计数**只**引用这里（spec migration-integrity-and-enum-drift-closure 3.3）。
+#: INFO 级 db_extra 与 WARN 级 type_mismatch 只作可观测展示，否则共库残留噪音会让 health 永远 degraded。
+CRITICAL_DRIFT_TYPES: frozenset[str] = frozenset({"orm_extra", "enum_mismatch", "checksum_drift"})
 
 
 @dataclass(frozen=True)
@@ -40,6 +46,113 @@ class DriftItem:
     column: str | None
     drift_type: DriftType
     detail: str
+
+
+def count_critical(items: Iterable[DriftItem]) -> int:
+    return sum(1 for it in items if it.drift_type in CRITICAL_DRIFT_TYPES)
+
+
+# ---------------------------------------------------------------------------
+# 枚举漂移：按「列」判定（spec migration-integrity-and-enum-drift-closure Requirement 4）
+# ---------------------------------------------------------------------------
+#
+# 旧实现按 Python 枚举**类名** snake_case 猜 PG 类型名、比较 ``member.value``、查 pg_type 不限 schema，
+# 三处各自致错：漏配 / 错配（同模块两个同名 ApprovalStatus 后者遮蔽前者）、把 SQLAlchemy 实际发送的
+# **成员名**（``Enum.enums``）当成缺失值误报、把 tmp_* 残留 schema 的同名类型标签并进来。
+# 现在的判据只取 SQLAlchemy 自己会发给 DB 的东西：列上声明的类型名与 ``Enum.enums``。
+
+@dataclass(frozen=True)
+class OrmEnumColumn:
+    table: str
+    column: str
+    #: 列类型上声明的 PG 枚举类型名（``sa.Enum(name=...)``；传枚举类时 SQLAlchemy 默认取类名小写）
+    type_name: str
+    #: SQLAlchemy 实际发送的标签（``Enum.enums``：默认是成员**名**，设了 values_callable 才是值）
+    labels: frozenset[str]
+
+
+def collect_orm_enum_columns(metadata: sa.MetaData) -> list[OrmEnumColumn]:
+    """metadata 中所有 public 表上 ``native_enum=True`` 的枚举列（非原生枚举按 VARCHAR 绑定，不参与）。"""
+    out: list[OrmEnumColumn] = []
+    for table in metadata.tables.values():
+        if table.schema not in (None, "public"):
+            continue
+        for col in table.columns:
+            t = col.type
+            if isinstance(t, sa.Enum) and t.native_enum and t.name:
+                out.append(OrmEnumColumn(table.name, col.name, t.name, frozenset(t.enums)))
+    return sorted(out, key=lambda c: (c.table, c.column))
+
+
+def diff_enum_columns(
+    orm_columns: Iterable[OrmEnumColumn],
+    db_columns: Mapping[tuple[str, str], tuple[str, str, str]],
+    db_enums: Mapping[str, frozenset[str]],
+) -> list[DriftItem]:
+    """纯函数判定。
+
+    * ``db_columns``：public 列 ``(table, column) -> (data_type, udt_schema, udt_name)``
+      （information_schema.columns）
+    * ``db_enums``：**public** 下枚举类型名 -> 标签集合（pg_enum ⋈ pg_type ⋈ pg_namespace）
+
+    列在 DB 不存在 → 不报（归 orm_extra）；列不是 public 下的同名枚举类型（含 varchar）→ 报；
+    否则 ORM 标签 − DB 标签 非空 → 报。
+    """
+    items: list[DriftItem] = []
+    for c in orm_columns:
+        actual = db_columns.get((c.table, c.column))
+        if actual is None:
+            continue
+        data_type, udt_schema, udt_name = actual
+        if data_type != "USER-DEFINED" or udt_schema != "public" or udt_name != c.type_name:
+            shown = udt_name if data_type == "USER-DEFINED" else data_type
+            items.append(DriftItem(
+                table=c.table, column=c.column, drift_type="enum_mismatch",
+                detail=(
+                    f"ORM 声明原生枚举 {c.type_name}，DB 列类型是 {udt_schema}.{shown} —— "
+                    f"asyncpg 按 ::{c.type_name} 绑定参数，按该列查询 / 写入会失败"
+                ),
+            ))
+            continue
+        missing = c.labels - db_enums.get(udt_name, frozenset())
+        if missing:
+            items.append(DriftItem(
+                table=c.table, column=c.column, drift_type="enum_mismatch",
+                detail=(
+                    f"public.{udt_name} 缺少 ORM 会写入的标签 {sorted(missing)} "
+                    f"（SQLAlchemy 发送 Enum.enums，写入这些值会 invalid input value）"
+                ),
+            ))
+    return items
+
+
+_ENUM_COLUMN_SQL = """
+    SELECT table_name, column_name, data_type, udt_schema, udt_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+"""
+
+#: 🔴 必须限定 public：tmp_* 残留 schema 里的同名类型会把标签并进来，掩盖真缺口
+_PUBLIC_ENUM_LABEL_SQL = """
+    SELECT t.typname, e.enumlabel
+    FROM pg_type t
+    JOIN pg_enum e ON e.enumtypid = t.oid
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+"""
+
+
+async def fetch_public_enum_catalog(conn) -> tuple[
+    dict[tuple[str, str], tuple[str, str, str]], dict[str, frozenset[str]]
+]:
+    """在给定连接上读取 :func:`diff_enum_columns` 需要的两份 public 目录（真库守卫在回滚事务里复用）。"""
+    col_rows = (await conn.execute(text(_ENUM_COLUMN_SQL))).fetchall()
+    label_rows = (await conn.execute(text(_PUBLIC_ENUM_LABEL_SQL))).fetchall()
+    db_columns = {(r[0], r[1]): (r[2], r[3], r[4]) for r in col_rows}
+    labels: dict[str, set[str]] = {}
+    for typname, label in label_rows:
+        labels.setdefault(typname, set()).add(label)
+    return db_columns, {k: frozenset(v) for k, v in labels.items()}
 
 
 class SchemaDriftDetector:
@@ -241,7 +354,7 @@ class SchemaDriftDetector:
     # ------------------------------------------------------------------
 
     async def scan(self) -> list[DriftItem]:
-        """扫描所有 4 类 drift 并返回（已过滤 allowlist）。"""
+        """扫描全部 5 类 drift 并返回（db_extra 已按 allowlist / 外部租户过滤）。"""
         # 仅 PG 支持 information_schema 完整查询；其他方言（SQLite 测试环境）退化
         if self._engine.dialect.name != "postgresql":
             logger.debug("[SchemaDrift] 非 PG 方言，跳过 schema diff（dialect=%s）",
@@ -255,14 +368,31 @@ class SchemaDriftDetector:
         items.extend(self._diff_tables(orm_tables, db_tables))
         items.extend(self._diff_columns(orm_tables, db_tables))
         items.extend(await self._diff_enums())
+        items = self._apply_suppressions(items, frozenset(orm_tables))
+        # checksum 漂移的 table 是迁移版本号（V128），与表名过滤无关，不进过滤
+        items.extend(await self._diff_checksums())
+        return items
 
-        # 过滤 allowlist + 外部租户表（Metabase/Quartz 共库污染）+ 列级 allowlist
-        return [
-            it for it in items
-            if it.table not in self.KNOWN_ALLOWLIST
-            and not self._is_external_tenant_table(it.table)
-            and (it.table, it.column) not in self.KNOWN_COLUMN_ALLOWLIST
-        ]
+    def _apply_suppressions(
+        self, items: Iterable[DriftItem], orm_table_names: frozenset[str],
+    ) -> list[DriftItem]:
+        """三张过滤名单只描述「DB 有、ORM 无」的对象（系统表 / 裸 SQL 表 / 共库租户表 / 弃用列），
+        所以**只**作用于 db_extra。
+
+        🔴 ORM 表上的 orm_extra / type_mismatch / enum_mismatch 一律不过滤：此前外部租户前缀
+        ``notification`` 命中 ORM 表 ``notifications``，该表的全部漂移（含 critical 的 orm_extra）
+        被静默吞掉。外部租户前缀同理只作用于**不在 ORM 里**的表。
+        """
+        kept: list[DriftItem] = []
+        for it in items:
+            if it.drift_type == "db_extra" and (
+                it.table in self.KNOWN_ALLOWLIST
+                or (it.table not in orm_table_names and self._is_external_tenant_table(it.table))
+                or (it.table, it.column) in self.KNOWN_COLUMN_ALLOWLIST
+            ):
+                continue
+            kept.append(it)
+        return kept
 
     async def write_log(self, items: list[DriftItem]) -> None:
         """覆盖式写入 schema_drift_log（DELETE + INSERT），保证仅保留当前快照。
@@ -521,82 +651,53 @@ class SchemaDriftDetector:
         return False
 
     async def _diff_enums(self) -> list[DriftItem]:
-        """对比 PG enum 类型 vs Python Enum 类。
+        """ORM 原生枚举列 ↔ public 实际列类型与标签（判定见 :func:`diff_enum_columns`）。
 
-        策略：找所有继承 ``(str, enum.Enum)`` 的类，按类名 snake_case 推断 PG enum 名，
-        若 PG 中存在该 enum 类型，对比值集合。
+        采集失败不 fail-open 成「无漂移」：返回一条可见的 enum_mismatch，让 health 暴露扫描本身坏了。
         """
-        items: list[DriftItem] = []
-
-        # 收集 Python enum
-        python_enums: dict[str, set[str]] = {}
         try:
-            import app.models  # noqa: F401
-            for module_name in dir(__import__("app.models", fromlist=["*"])):
-                pass  # __init__.py 已经触发 import
+            self._import_all_models()
+            from app.models.base import Base
 
-            # 遍历 sys.modules 里以 app.models 开头的模块，找 Enum 子类
-            import sys
-            for mod_name, mod in list(sys.modules.items()):
-                if not mod_name.startswith("app.models"):
-                    continue
-                if mod is None:
-                    continue
-                for attr_name in dir(mod):
-                    obj = getattr(mod, attr_name, None)
-                    if (
-                        isinstance(obj, type)
-                        and issubclass(obj, _enum_mod.Enum)
-                        and obj is not _enum_mod.Enum
-                        and obj.__module__.startswith("app.models")
-                    ):
-                        # 类名（如 OpinionTypeEnum）→ 推断 PG enum 名
-                        # 简单策略：保留原类名 + camel→snake 两版都试
-                        class_name = obj.__name__
-                        pg_candidates = {
-                            class_name,
-                            self._camel_to_snake(class_name),
-                            self._camel_to_snake(class_name).replace("_enum", ""),
-                        }
-                        values = {m.value for m in obj}
-                        for cand in pg_candidates:
-                            python_enums[cand] = values
-        except Exception as e:
-            logger.warning("[SchemaDrift] 收集 Python Enum 失败: %s", e)
-            return items
+            orm_columns = collect_orm_enum_columns(Base.metadata)
+            async with self._engine.begin() as conn:
+                db_columns, db_enums = await fetch_public_enum_catalog(conn)
+        except Exception as e:  # noqa: BLE001 — 扫描失败要可见，不能静默
+            logger.warning("[SchemaDrift] 枚举漂移扫描失败: %s", e)
+            return [DriftItem(
+                table="(enum_scan)", column=None, drift_type="enum_mismatch",
+                detail=f"枚举漂移扫描失败，结果不可信：{type(e).__name__}: {e}"[:500],
+            )]
+        return diff_enum_columns(orm_columns, db_columns, db_enums)
 
-        if not python_enums:
-            return items
+    async def _diff_checksums(self) -> list[DriftItem]:
+        """已应用迁移被事后编辑、且未在 ``migration_drift_ledger`` 逐条（三元组）登记的漂移。
 
-        # 查 PG 所有 enum 类型 + 值
-        async with self._engine.begin() as conn:
-            rows = await conn.execute(text("""
-                SELECT t.typname, e.enumlabel
-                FROM pg_type t
-                JOIN pg_enum e ON t.oid = e.enumtypid
-                ORDER BY t.typname, e.enumsortorder
-            """))
-            db_enums: dict[str, set[str]] = {}
-            for row in rows.fetchall():
-                name = row[0]
-                val = row[1]
-                if name not in db_enums:
-                    db_enums[name] = set()
-                db_enums[name].add(val)
+        复用本检测器的引擎（``MigrationRunner(engine=...)`` 不持有、不关闭它）。采集失败同样返回一条
+        可见项，而不是当作「无漂移」。
+        """
+        from app.core.migration_drift_ledger import unexplained_checksum_drift
+        from app.core.migration_runner import MigrationRunner
 
-        # 对比：仅在 Python 和 DB 都存在的 enum 名上做 diff
-        for name, py_vals in python_enums.items():
-            if name not in db_enums:
-                continue
-            db_vals = db_enums[name]
-            missing_in_db = py_vals - db_vals
-            if missing_in_db:
-                items.append(DriftItem(
-                    table=name, column=None,
-                    drift_type="enum_mismatch",
-                    detail=f"PG enum {name} 缺少 Python Enum 值: {sorted(missing_in_db)}",
-                ))
-        return items
+        try:
+            drifts = await MigrationRunner(engine=self._engine).detect_checksum_drift()
+        except Exception as e:  # noqa: BLE001 — 扫描失败要可见，不能静默
+            logger.warning("[SchemaDrift] checksum 漂移扫描失败: %s", e)
+            return [DriftItem(
+                table="(checksum_scan)", column=None, drift_type="checksum_drift",
+                detail=f"迁移 checksum 漂移扫描失败，结果不可信：{type(e).__name__}: {e}"[:500],
+            )]
+        return [
+            DriftItem(
+                table=f"V{d.version}", column=None, drift_type="checksum_drift",
+                detail=(
+                    f"{d.filename} 应用后被编辑（登记 {d.stored_checksum[:12]}… / 当前 "
+                    f"{(d.current_checksum or '文件缺失')[:12]}…），编辑内容不会在已有库上执行："
+                    "现查真库确认效果、缺则写补齐迁移，再登记到 app/core/migration_drift_ledger.py"
+                ),
+            )
+            for d in unexplained_checksum_drift(drifts)
+        ]
 
     @staticmethod
     def _camel_to_snake(s: str) -> str:

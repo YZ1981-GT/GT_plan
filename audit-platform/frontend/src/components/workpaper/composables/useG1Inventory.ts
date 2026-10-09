@@ -14,6 +14,7 @@ import type { ChecklistResponse } from './useF1FormData'
 import type { TradingDetailRow } from './useG1Detail'
 import type { G1SecuritiesCountRow } from './useG1SecuritiesCount'
 import { createEmptyG1AdjustmentRow, type G1AdjustmentRow } from './useG1Adjustment'
+import { G1_ITEM_IDS } from './g1StorageContract'
 
 /** 外部证据源：对账单 / 函证 / 仅监盘（②） */
 export type G1InventoryEvidenceSource = 'auto' | 'statement' | 'confirmation' | 'stocktake'
@@ -53,7 +54,7 @@ export interface G1InventoryRow {
 
 const DATA_KEY = 'G1-4-rows'
 const CONCLUSION_KEY = 'G1-4-conclusion'
-const DETAIL_KEY = 'G1-2-rows'
+const DETAIL_KEY = G1_ITEM_IDS.G1_2_ROWS
 const COUNT_KEY = 'G1-11-rows'
 const ADJ_KEY = 'G1-3-rows'
 const RECON_KEY = 'G1-12-rows'

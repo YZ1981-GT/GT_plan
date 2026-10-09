@@ -15,6 +15,7 @@
  * Requirements: 23.1-23.6
  */
 import { ref, onMounted, type Ref } from 'vue'
+import { getAuthHeaders } from '@/utils/authToken'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -137,8 +138,10 @@ export function useD4DualMode(options: UseD4DualModeOptions) {
     if (target === 'onlyoffice') {
       try {
         const sheetName = getSheetNameFromTab(activeTab?.value || 'adjudication')
+        // 🔴 原生 fetch 不经 http.ts 拦截器 ⇒ 必须自带鉴权头（否则恒 401，被下方 catch 成「OO 不可用」）
         const response = await fetch(
-          `/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sheetName)}/onlyoffice-config`
+          `/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sheetName)}/onlyoffice-config`,
+          { headers: getAuthHeaders() },
         )
         if (response.ok) {
           const result = await response.json()

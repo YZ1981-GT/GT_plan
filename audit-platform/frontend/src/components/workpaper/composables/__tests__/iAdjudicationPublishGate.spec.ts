@@ -83,6 +83,17 @@ async function buildI1(): Promise<{ publishToTb: () => Promise<void> }> {
   const c = useI1Adjudication(ref('wp-i1'), ref('p'), ref(new Map()), { onSave: () => {} })
   return { publishToTb: c.publishToTb }
 }
+async function buildI2(): Promise<{ publishToTb: () => Promise<void> }> {
+  const { useI2Adjudication } = await import('../useI2Adjudication')
+  const c = useI2Adjudication({
+    allResponses: ref(new Map()),
+    tbData: ref({ unadjusted1717: 0, audited1717: 0, aje1717: 0, rje1717: 0 }),
+    wpId: ref('wp-i2'),
+    accountCode: ref('1717'),
+    saveResponses: vi.fn().mockResolvedValue(undefined),
+  })
+  return { publishToTb: c.publishToTb }
+}
 async function buildI3(): Promise<{ publishToTb: () => Promise<void> }> {
   const { useI3Adjudication } = await import('../useI3Adjudication')
   const c = useI3Adjudication(ref('wp-i3'), ref('p'), ref(new Map()), { onSave: () => {} })
@@ -112,6 +123,7 @@ async function buildI6(): Promise<{ publishToTb: () => Promise<void> }> {
 
 const cases: Case[] = [
   { wp: 'I1', wpId: 'wp-i1', sheetCode: /I1-1/, accounts: ['1701', '1702', '1703'], amountKind: 'balance', multi: true, build: buildI1 },
+  { wp: 'I2', wpId: 'wp-i2', sheetCode: /I2-1/, accounts: ['1717'], amountKind: 'balance', build: buildI2 },
   { wp: 'I3', wpId: 'wp-i3', sheetCode: /I3-1/, accounts: ['1711'], amountKind: 'balance', build: buildI3 },
   { wp: 'I4', wpId: 'wp-i4', sheetCode: /I4-1/, accounts: ['1801'], amountKind: 'balance', build: buildI4 },
   { wp: 'I5', wpId: 'wp-i5', sheetCode: /I5-1/, accounts: ['1911'], amountKind: 'balance', build: buildI5 },

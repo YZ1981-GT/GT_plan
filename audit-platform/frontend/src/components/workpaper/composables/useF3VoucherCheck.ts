@@ -9,6 +9,11 @@
  */
 import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
 import { calcSubtotal, parseNum } from './useF3FormulaEngine'
+import {
+  F3_ROW_ID_PREFIX,
+  resolveF3RowId,
+  type F3RowIdentityMintStats,
+} from './f3RowIdentity'
 import type { UseF3BaseOptions } from './useF3Adjudication'
 import type { SampledVoucher, FillMode } from './useSamplingAlgorithms'
 import { rowClosingAdjusted, rowPeriodCredit, rowPeriodDebit } from './useF3CrossSheet'
@@ -151,7 +156,12 @@ export function evaluateF3VoucherEvidence(
   return checks
 }
 
-function migrateRow(raw: any, i: number, section: F3VoucherSection): F3VoucherCheckRow {
+function migrateRow(
+  raw: any,
+  i: number,
+  section: F3VoucherSection,
+  stats?: F3RowIdentityMintStats,
+): F3VoucherCheckRow {
   const base = emptyVoucherRow(i + 1, Number(raw.attSlot) || i + 1)
   const legacyIssue = [
     raw.purchaseContractCheck ? `采购合同核对：${raw.purchaseContractCheck}` : '',
@@ -165,7 +175,8 @@ function migrateRow(raw: any, i: number, section: F3VoucherSection): F3VoucherCh
     : raw.auditConclusion === '无异常' ? '否' : ''
   return {
     ...base,
-    rowId: raw.rowId || raw.id || generateRowId(),
+    // 🔴 缺 rowId 时铸新并记数（委托 f3RowIdentity 单源）；`loadSection` 据此立即回写。
+    rowId: resolveF3RowId(raw, F3_ROW_ID_PREFIX.voucher, stats),
     seq: raw.seq ?? i + 1,
     voucherDate: String(raw.voucherDate || ''),
     voucherNo: String(raw.voucherNo || ''),
@@ -197,12 +208,13 @@ function migrateRow(raw: any, i: number, section: F3VoucherSection): F3VoucherCh
 export function safeParseVoucherRows(
   jsonStr: string | null | undefined,
   section: F3VoucherSection,
+  stats?: F3RowIdentityMintStats,
 ): F3VoucherCheckRow[] {
   if (!jsonStr) return []
   try {
     const parsed = JSON.parse(jsonStr)
     if (!Array.isArray(parsed)) return []
-    const rows = parsed.map((raw, i) => migrateRow(raw, i, section))
+    const rows = parsed.map((raw, i) => migrateRow(raw, i, section, stats))
     const pruned = rows.filter((row) => !isBlankVoucherRow(row))
     const kept = pruned.length ? pruned : rows.slice(0, 1)
     return kept.map((row, i) => ({ ...row, seq: i + 1 }))
@@ -245,9 +257,20 @@ export function useF3VoucherCheck(options: UseF3BaseOptions) {
   const auditConclusion = ref('')
 
   function loadSection(section: F3VoucherSection): void {
+    // 🔴 铸了新行身份就立即回写（spec f3-sync-coverage-and-first-canary Task 14）：
+    // 不回写则下次载入再铸新 rowId，行身份每次都变，破坏 OO↔HTML roundtrip。
+    const stats: F3RowIdentityMintStats = { minted: 0 }
     const target = stored[section]
-    target.value = safeParseVoucherRows(allResponses.value.get(ITEM_KEYS[section])?.remark, section)
-    if (!target.value || target.value.length === 0) target.value = [emptyVoucherRow(1)]
+    target.value = safeParseVoucherRows(
+      allResponses.value.get(ITEM_KEYS[section])?.remark,
+      section,
+      stats,
+    )
+    if (!target.value || target.value.length === 0) {
+      target.value = [emptyVoucherRow(1)]
+      return
+    }
+    if (stats.minted > 0 && !readonly.value) persistRows()
   }
 
   for (const section of ['debit', 'credit', 'subsequent'] as F3VoucherSection[]) {

@@ -3,6 +3,8 @@
  */
 import { parseNum, calcSubtotal } from './useG13FormulaEngine'
 import { G13_FV_SOURCES, type G13FvSource } from './gCycleExternalCross'
+import { G1_ITEM_IDS } from './g1StorageContract'
+import { G10_ITEM_IDS } from './g10StorageContract'
 
 export const G_CYCLE_SOURCE_FV_EVENT = 'g-cycle:source-fv'
 
@@ -62,9 +64,9 @@ export function sumFvFromChecklistRemark(
 
 /** 源科目明细 checklist itemId */
 export const G13_SOURCE_DETAIL_ITEM_IDS: Record<G13FvSource, string> = {
-  G1: 'G1-2-rows',
+  G1: G1_ITEM_IDS.G1_2_ROWS,
   G8: 'G8-detail-rows',
   G9: 'G9-detail-rows',
-  G10: 'G10-detail-rows',
+  G10: G10_ITEM_IDS.G10_DETAIL_ROWS,
   H3: 'H3-2-fair-rows',
 }

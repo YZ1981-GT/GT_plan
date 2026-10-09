@@ -1,0 +1,32 @@
+{
+  "spec": "formula-row-name-alignment-confirmation",
+  "task": 13,
+  "baseline": "PASS",
+  "verdicts": [
+    {
+      "id": "M1_ignore_saved_mapping",
+      "expect_k": "saved_mapping_valid or saved_mapping_stale",
+      "actual": "RED",
+      "detail": "\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ===========================\nFAILED backend\\tests\\four_table\\test_row_name_alignment.py::test_classify_saved_mapping_valid_is_user_confirmed\nFAILED backend\\tests\\four_table\\test_row_name_alignment.py::test_classify_saved_mapping_stale_falls_back_unmatched\n2 failed, 1 passed, 18 deselected, 1 warning in 1.54s"
+    },
+    {
+      "id": "M2_scope_missing_wp_code",
+      "expect_k": "scope_isolation_wp_code",
+      "actual": "RED",
+      "detail": "  D:\\GT_workplan\\.venv\\Lib\\site-packages\\schemathesis\\generation\\coverage.py:305: DeprecationWarning: jsonschema.exceptions.RefResolutionError is deprecated as of version 4.18.0. If you wish to catch potential reference resolution errors, directly catch referencing.exceptions.Unresolvable.\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ===========================\nFAILED backend\\tests\\four_table\\test_row_name_mapping_service.py::test_scope_isolation_wp_code\n1 failed, 10 deselected, 1 warning in 2.21s"
+    },
+    {
+      "id": "M3_scope_missing_year",
+      "expect_k": "confirm_baseline_isolated_by_year",
+      "actual": "RED",
+      "detail": "  D:\\GT_workplan\\.venv\\Lib\\site-packages\\schemathesis\\generation\\coverage.py:305: DeprecationWarning: jsonschema.exceptions.RefResolutionError is deprecated as of version 4.18.0. If you wish to catch potential reference resolution errors, directly catch referencing.exceptions.Unresolvable.\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ===========================\nFAILED backend\\tests\\four_table\\test_row_name_mapping_service.py::test_confirm_baseline_isolated_by_year\n1 failed, 10 deselected, 1 warning in 2.35s"
+    },
+    {
+      "id": "M4_ambiguous_as_auto",
+      "expect_k": "normalized_multi_hit",
+      "actual": "RED",
+      "detail": "\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ===========================\nFAILED backend\\tests\\four_table\\test_row_name_alignment.py::test_classify_normalized_multi_hit_is_ambiguous_not_auto\nFAILED backend\\tests\\four_table\\test_row_name_alignment.py::test_property_normalized_multi_hit_never_auto\n2 failed, 19 deselected, 1 warning in 2.71s"
+    }
+  ],
+  "pass": true
+}

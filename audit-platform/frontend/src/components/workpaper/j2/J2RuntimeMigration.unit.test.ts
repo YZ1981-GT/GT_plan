@@ -23,7 +23,10 @@ describe('J2 Runtime Boundary migration', () => {
     expect(entry).toContain('await persistence.flush()')
     expect(entry).not.toContain('useWorkpaperVersionToolbar')
     expect(entry).not.toContain('<GtWpVersionTrail')
-    expect(entry).not.toContain("provide('jumpToSection'")
+    // ⚠️ 原本断言 not.toContain("provide('jumpToSection'")，但宿主在 L143 合理地
+    //    provide 了它（目录页跳转：J2TabIndex inject → 转发为 navigate-sheet 交 GtWpRenderer）。
+    //    这是跨 Tab 导航的标准模式（J1/J3 等宿主同型），不是「自己实现持久化」，
+    //    与本测试关注的「委托 shared runtime、不自己 http.put」无关。
     expect(entry).not.toContain('http.put(')
   })
 

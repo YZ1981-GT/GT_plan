@@ -42,7 +42,10 @@ export interface K5LitigationRow {
   shouldDisclose: boolean      // 是否需披露（possible→附注）
   lawyerLetterRef: string      // 律师函编号/附件路径（律师函联动）
   ocrAttachment: string        // OCR附件（行级OCR）
-  voucherRef: string           // 抽凭凭证号
+  voucherRef: string           // 抽凭凭证号（纯号，与平台其余底稿 voucherRef 口径一致）
+  // 🔴 凭证号在真实数据中跨日重复（实测单号最多对应 83 个不同日期），只存号无法回溯
+  //    是哪一张。与 voucherRef 组合才唯一定位一张凭证（同 useI5Detail 的字段模式）。
+  voucherDate: string          // 抽凭凭证日期 YYYY-MM-DD
   remark: string
 }
 
@@ -122,6 +125,8 @@ export function useK5Litigation(params: UseK5LitigationParams) {
       lawyerLetterRef: raw.lawyerLetterRef ?? '',
       ocrAttachment: raw.ocrAttachment ?? '',
       voucherRef: raw.voucherRef ?? '',
+      // 向后兼容：V166 前存的行没有该字段 → 默认空串，退化为「只有凭证号」
+      voucherDate: raw.voucherDate ?? '',
       remark: raw.remark ?? '',
     }
   }
@@ -222,7 +227,13 @@ export function useK5Litigation(params: UseK5LitigationParams) {
 
   // ─── Dynamic Row Add ───────────────────────────────────────────────────────
 
-  async function addRow(caseName?: string): Promise<void> {
+  /**
+   * 新增诉讼行。传 ``caseName`` 时不弹 prompt（供抽凭回填等批量场景使用）。
+   *
+   * @returns 新建的行引用；用户取消 prompt 或名称为空时返回 ``null``
+   *          —— 调用方据此判断是否继续填充该行，不要假设一定成功。
+   */
+  async function addRow(caseName?: string): Promise<K5LitigationRow | null> {
     let name = caseName
     if (!name) {
       try {
@@ -238,10 +249,10 @@ export function useK5Litigation(params: UseK5LitigationParams) {
         )
         name = value?.trim()
       } catch {
-        return
+        return null
       }
     }
-    if (!name) return
+    if (!name) return null
 
     const newRow: K5LitigationRow = {
       rowId: `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -260,10 +271,12 @@ export function useK5Litigation(params: UseK5LitigationParams) {
       lawyerLetterRef: '',
       ocrAttachment: '',
       voucherRef: '',
+      voucherDate: '',
       remark: '',
     }
     litigationRows.value.push(newRow)
     _persist()
+    return newRow
   }
 
   // ─── Remove Row ────────────────────────────────────────────────────────────

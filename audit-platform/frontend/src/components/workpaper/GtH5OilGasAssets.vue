@@ -12,22 +12,35 @@
     />
 
     <template v-else>
+      <!--
+        🔴 切换器改 `v-model` 且**不再带 `:disabled`**：原 `modeOptions` 里
+        `disabled: !isOoAvailable.value` 在健康检查（mount 期异步）未就绪时把「在线编辑」
+        锁死、点击被彻底吞掉 —— D4 已实证的 bug ③。健康门禁移进
+        `useHSyncMode.switchMode`（await 兜底），切换器保持可点。
+      -->
       <div v-if="showHtmlToolbar && currentSheet !== 'H5'" class="h5-header-toolbar">
-        <el-segmented
-          :model-value="currentMode"
-          :options="modeOptions"
-          size="small"
-          @change="switchMode"
-        />
+        <el-segmented v-model="currentMode" :options="modeOptions" size="small" />
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h5-oil-gas-assets" />
-        <span v-if="ooHealthStatus" class="h5-oo-tag" :class="'h5-oo-tag--' + ooHealthStatus">
-          {{ ooHealthStatus === 'ready' ? 'OnlyOffice 拉取成功' : ooHealthStatus === 'fetching' ? '正在拉取...' : ooHealthStatus === 'checking' ? '检测中...' : '仅结构化视图' }}
+        <span class="h5-oo-tag" :class="`h5-oo-tag--${hSync.syncStateTag.value.type}`">
+          {{ hSync.syncStateTag.value.text }}
         </span>
       </div>
 
-      <!-- OnlyOffice 模式 -->
+      <!--
+        受管 sheet（H5-2）的在线编辑 —— 统一双向宿主。
+        🔴 `.oo-container` 必须有**确定高度**（D4 踩过 height:100% 被压成一条）。
+      -->
+      <div v-if="currentMode === 'onlyoffice' && isH5SyncManagedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="hSync.descriptor.value"
+          :bridge="hSync.syncBridge"
+        />
+      </div>
+
+      <!-- 非受管 sheet 的 OnlyOffice 模式（legacy 只读视图，无双向回写） -->
       <GtOnlyOfficeSheet
-        v-if="currentMode === 'onlyoffice'"
+        v-else-if="currentMode === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -311,6 +324,13 @@ import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { useHSyncMode } from './composables/useHSyncMode'
+import { flushHPendingWrites } from './sync/hPendingWrites'
+
+/** H5 entry id（manifest 冻结值，与 `phase5_h5_oil_gas_assets.ENTRY_ID` 逐字一致）。 */
+const H5_SYNC_ENTRY_ID = 'xlsx/gt-h5-oil-gas-assets'
 // 版本 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载
 
 // core — H5TabIndex 非 lazy（底稿目录轻量，首屏必显）
@@ -378,61 +398,49 @@ function checkIndustryApplicability() {
 const isReadonly = computed(() => !!props.readonly)
 const isLoading = ref(true)
 const allResponses = ref<Map<string, any>>(new Map())
-const currentMode = ref<'html' | 'onlyoffice'>('html')
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'html' },
-  { label: '在线编辑', value: 'onlyoffice', disabled: !isOoAvailable.value },
-])
 const depletionBranch = ref<'noImpair' | 'withImpair'>('noImpair')
 
-// ─── 双模式：拉取成功门控 ─────────────────────────────────────────────────
-const isOoAvailable = ref(false)
-const ooHealthStatus = ref<'checking' | 'ready' | 'fetching' | 'unavailable'>('checking')
-
-async function checkOoHealth(): Promise<void> {
-  ooHealthStatus.value = 'checking'
-  try {
-    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    const data = res?.data?.data ?? res?.data ?? res
-    isOoAvailable.value = !!data?.healthy
-    ooHealthStatus.value = data?.healthy ? 'ready' : 'unavailable'
-  } catch {
-    isOoAvailable.value = false
-    ooHealthStatus.value = 'unavailable'
-  }
-}
-
-async function switchMode(mode: string | number): Promise<void> {
-  const target = mode as 'html' | 'onlyoffice'
-  if (target === currentMode.value) return
-  if (target === 'onlyoffice') {
-    if (!isOoAvailable.value) return
-    // 预拉 config 成功才切
-    ooHealthStatus.value = 'fetching'
-    try {
-      const sheetName = props.sheetName || ''
-      const res = await http.get(`/api/workpapers/${props.wpId}/sheets/${encodeURIComponent(sheetName)}/onlyoffice-config`, {
-        params: { project_id: props.projectId },
-        _silent: true,
-      } as any)
-      const config = res?.data?.data ?? res?.data
-      if (!config || Object.keys(config).length === 0) {
-        ooHealthStatus.value = 'unavailable'
-        return
-      }
-      ooHealthStatus.value = 'ready'
-    } catch {
-      ooHealthStatus.value = 'unavailable'
-      return
+// ─── 双模式切换（统一接桥，替代宿主内联的第二份实现）──────────────────────────
+//
+// 原实现是宿主内联的 `currentMode` ref + `checkOoHealth` + `switchMode`（deletion plan 的
+// `host_inlined_second_implementation` 四条之一）。它**不建桥** ⇒ OO 侧编辑回不到 HTML。
+//
+// 🔴 H5 的映射面很窄（10/54）：契约里 44 列判 template-only（前端 `H5DetailRow` 只 17 字段、
+//    无减值也无审定口径）。接桥不改变这一点 —— 回写只动两侧真正对齐的那 10 格，
+//    其余由 Excel 自己算。三条缺口见契约 `review.declared_coverage_gaps`。
+const hSync = useHSyncMode({
+  entryId: H5_SYNC_ENTRY_ID,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  currentCode: computed(() => currentSheet.value),
+  isReadonly,
+  flushHtml: async () => {
+    // 🔴 H5 是 `per_tab_formdata_instance` 载体：`H5TabDetail.vue` 自己 new 一份
+    //    `useH5FormData`，宿主拿不到那个实例 ⇒ 只能走模块级注册表。
+    //    防抖窗口 **2s**（全 H 与 H3 并列最长），漏 flush 会静默丢最多 2 秒的编辑。
+    await flushHPendingWrites()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: H5_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: hSync.sheetKey.value,
     }
-  }
-  currentMode.value = target
-}
+  },
+  reloadHtml: async () => { await selfLoad() },
+})
 
+const syncEditorHostRef = hSync.syncHostRef
+const isH5SyncManagedSheet = computed(() => hSync.isManagedSheet.value)
+const modeOptions = hSync.modeOptions
+const currentMode = hSync.renderMode
+
+/** legacy OO 组件加载失败的兜底（只对**非受管** sheet 生效）。 */
 function onOoLoadFailed(): void {
-  isOoAvailable.value = false
-  ooHealthStatus.value = 'unavailable'
-  currentMode.value = 'html'
+  void hSync.switchMode('html')
 }
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''
@@ -512,7 +520,6 @@ provide('h5OpenVersionHistory', openVersionHistory)
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
   checkIndustryApplicability()
-  void checkOoHealth()
   void selfLoad()
 })
 </script>
@@ -540,10 +547,25 @@ onMounted(() => {
   padding: 2px 8px;
   border-radius: 4px;
 }
-.h5-oo-tag--ready { background: #f0f9eb; color: #67c23a; }
-.h5-oo-tag--fetching { background: #fdf6ec; color: #e6a23c; }
-.h5-oo-tag--checking { background: #f4f4f5; color: #909399; }
-.h5-oo-tag--unavailable { background: #fef0f0; color: #f56c6c; }
+/*
+ * 🔴 类名跟随 `useHSyncMode.syncStateTag.type`（`success|info|warning|danger`），
+ *    不是原宿主内联实现的 `ready|fetching|checking|unavailable` —— 后者在接桥后
+ *    一个都不会命中，标签会变成无样式裸文本（D4 踩过的样式孤儿）。
+ */
+.h5-oo-tag--success { background: #f0f9eb; color: #67c23a; }
+.h5-oo-tag--info { background: #f4f4f5; color: #909399; }
+.h5-oo-tag--warning { background: #fdf6ec; color: #e6a23c; }
+.h5-oo-tag--danger { background: #fef0f0; color: #f56c6c; }
+
+/*
+ * 🔴 `height: 100%` 会被父级压成一条（D4 踩过）：OnlyOffice iframe 需要
+ *    **确定**高度才撑得开，min-height 兜住父级无高度时的退化。
+ */
+.oo-container {
+  width: 100%;
+  min-height: 600px;
+  height: calc(100vh - 200px);
+}
 
 .depletion-branch-selector {
   padding: 8px 16px;

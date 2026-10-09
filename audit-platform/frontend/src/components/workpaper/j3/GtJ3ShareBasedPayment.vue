@@ -5,67 +5,95 @@
       <el-skeleton :rows="8" animated />
     </div>
 
-    <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
-      <!-- 底稿目录（默认页） -->
-      <J3TabIndex
-        v-if="!currentSheet || currentSheet === 'J3'"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="props.isReadonly"
-        :all-responses="allResponses"
-        @navigate-sheet="handleNavigateSheet"
-      />
-
-      <!-- J3A 程序表（整册专属组件内分发，对齐 H1A/L1A） -->
-      <CycleTabProcedure
-        v-else-if="currentSheet === 'J3A'"
-        sheet-code="J3A"
-        :html-data="props.htmlData"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="props.isReadonly"
-      />
-
-      <!-- J3-1 股份支付情况表 -->
-      <J3TabDetail
-        v-else-if="currentSheet === 'J3-1'"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :year="props.year"
-        :html-data="props.htmlData"
-        :all-responses="allResponses"
-        :is-readonly="props.isReadonly"
-        :save-immediate="handleChildSave"
-      />
-
-      <!-- J3-2 股份支付检查表 -->
-      <J3TabCheck
-        v-else-if="currentSheet === 'J3-2'"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :year="props.year"
-        :html-data="props.htmlData"
-        :all-responses="allResponses"
-        :is-readonly="props.isReadonly"
-        :save-immediate="handleChildSave"
-      />
-
-      <!-- IPO 股份支付监管审计要点（整合页，两个 sheet 共用） -->
-      <J3TabIpoFocus
-        v-else-if="currentSheet === 'J3-IPO'"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :html-data="props.htmlData"
-        :all-responses="allResponses"
-        :is-readonly="props.isReadonly"
-        :save-immediate="handleChildSave"
-      />
-
-      <!-- 兜底 OnlyOffice -->
-      <div v-else class="j3-sheet-placeholder">
-        <el-empty :description="`J3 未识别的 sheet: ${currentSheet}（将使用 OnlyOffice）`" />
+      <!-- 双模式工具栏（目录页 / 程序表不显示） -->
+      <div v-if="showModeToolbar" class="j3-mode-toolbar">
+        <el-segmented
+          v-model="renderMode"
+          :options="renderModeOptions"
+          size="small"
+        />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/j3/gt-j3-share-based-payment" />
+        <el-tag v-if="syncBusy" type="warning" size="small">同步中…</el-tag>
+        <el-tooltip v-else-if="syncUnavailableReason" :content="syncUnavailableReason" placement="bottom">
+          <el-tag type="danger" size="small">在线编辑不可用</el-tag>
+        </el-tooltip>
+        <el-tooltip v-else-if="syncFeedbackOk" :content="syncFeedbackOk" placement="bottom">
+          <el-tag type="success" size="small">已同步</el-tag>
+        </el-tooltip>
       </div>
+
+      <!-- OnlyOffice 在线编辑（sync bridge 统一路径） -->
+      <div v-if="renderMode === 'onlyoffice' && isJ3SyncedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+      </div>
+
+      <!-- HTML 结构化视图 -->
+      <template v-else>
+        <!-- 底稿目录（默认页） -->
+        <J3TabIndex
+          v-if="!currentSheet || currentSheet === 'J3'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :is-readonly="props.isReadonly"
+          :all-responses="allResponses"
+          @navigate-sheet="handleNavigateSheet"
+        />
+
+        <!-- J3A 程序表 -->
+        <CycleTabProcedure
+          v-else-if="currentSheet === 'J3A'"
+          sheet-code="J3A"
+          :html-data="props.htmlData"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :is-readonly="props.isReadonly"
+        />
+
+        <!-- J3-1 股份支付情况表 -->
+        <J3TabDetail
+          v-else-if="currentSheet === 'J3-1'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :year="props.year"
+          :html-data="props.htmlData"
+          :all-responses="allResponses"
+          :is-readonly="props.isReadonly"
+          :save-immediate="handleChildSave"
+        />
+
+        <!-- J3-2 股份支付检查表 -->
+        <J3TabCheck
+          v-else-if="currentSheet === 'J3-2'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :year="props.year"
+          :html-data="props.htmlData"
+          :all-responses="allResponses"
+          :is-readonly="props.isReadonly"
+          :save-immediate="handleChildSave"
+        />
+
+        <!-- IPO 股份支付监管审计要点 -->
+        <J3TabIpoFocus
+          v-else-if="currentSheet === 'J3-IPO'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :html-data="props.htmlData"
+          :all-responses="allResponses"
+          :is-readonly="props.isReadonly"
+          :save-immediate="handleChildSave"
+        />
+
+        <!-- 兜底 -->
+        <div v-else class="j3-sheet-placeholder">
+          <el-empty :description="`J3 未识别的 sheet: ${currentSheet}`" />
+        </div>
+      </template>
     </template>
   </div>
 </template>
@@ -75,9 +103,8 @@
  * GtJ3ShareBasedPayment — J3 股份支付主入口组件
  *
  * J3 无独立科目（费用端走 K8/K9，权益端走 M4，现金端走 J1）。
+ * 真双向回写：useWorkpaperSyncBridge + WorkpaperSyncEditorHost（参照 D2/J2 接线模式）。
  * persistence三连环：selfLoad + allResponses Map + handleChildSave
- *
- * Spec: .kiro/specs/j3-share-based-payment/
  */
 import { computed, ref, onMounted, onBeforeUnmount, defineAsyncComponent, toRef, inject, provide, watch } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -88,6 +115,12 @@ import {
 import { collectChecklistResponses } from '@/composables/workpaper/checklistPersistenceHelpers'
 import { WorkpaperRuntimeContextKey } from '../composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from '../composables/useWorkpaperReviewThreads'
+// ── sync bridge 真双向 ──────────────────────────────────────────────────────
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from '../sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from '../sync/workpaperSyncApi'
+import { capabilityForEntry } from '../sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from '../sync/WorkpaperSyncEditorHost.vue'
+import GtEntrySyncCapabilityNotice from '../sync/GtEntrySyncCapabilityNotice.vue'
 import CycleTabProcedure from '../shared/CycleTabProcedure.vue'
 
 // defineAsyncComponent 懒加载
@@ -95,6 +128,18 @@ const J3TabIndex = defineAsyncComponent(() => import('./core/J3TabIndex.vue'))
 const J3TabDetail = defineAsyncComponent(() => import('./core/J3TabDetail.vue'))
 const J3TabCheck = defineAsyncComponent(() => import('./core/J3TabCheck.vue'))
 const J3TabIpoFocus = defineAsyncComponent(() => import('./core/J3TabIpoFocus.vue'))
+
+// ── J3 sync 常量 ────────────────────────────────────────────────────────────
+type J3RenderMode = 'html' | 'onlyoffice'
+const J3_SYNC_ENTRY_ID = 'xlsx/j3/gt-j3-share-based-payment'
+/**
+ * J3 受管 sheet 集合：当前 canary 仅接 J3-1 股份支付情况表（14 列全文本，零公式）。
+ * J3 无审定表，无 TB 发布门。
+ */
+const J3_MANAGED_SHEET_KEYS: Record<string, string> = {
+  'J3-1': 'j31-plans-managed',
+}
+const J3_DEFAULT_SHEET_KEY = 'j31-plans-managed'
 
 const props = defineProps<{
   wpId: string
@@ -112,13 +157,19 @@ const emit = defineEmits<{
   'navigate-sheet': [sheetName: string]
 }>()
 
-const isLoading = ref(true)
+/** 目录页跳转 */
+provide('jumpToSection', (sheetName: string) => emit('navigate-sheet', sheetName))
 
-/** 当前 sheet 名（从 props.sheetName 提取编码） */
+const isLoading = ref(true)
+const syncSwitching = ref(false)
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+
+/** 当前 sheet 名 */
 const currentSheet = computed(() => {
   const sn = props.sheetName || ''
   if (/\bJ3A\b/.test(sn) || sn.includes('实质性程序表')) return 'J3A'
-  // IPO 监管要点 + 首发问答二 → 整合页
   if (sn.includes('IPO') || sn.includes('股权激励工具') || sn.includes('首发')) return 'J3-IPO'
   const m = sn.match(/(J3-\d+)/)
   if (m) return m[1]
@@ -126,8 +177,105 @@ const currentSheet = computed(() => {
   return sn
 })
 
-// ─── Runtime Boundary + Persistence Adapter ─────────────────────────────────
-const runtime = inject(WorkpaperRuntimeContextKey, null)
+const isJ3SyncedSheet = computed(() => currentSheet.value in J3_MANAGED_SHEET_KEYS)
+const currentSyncSheetKey = computed(
+  () => J3_MANAGED_SHEET_KEYS[currentSheet.value] ?? J3_DEFAULT_SHEET_KEY,
+)
+const isHtmlSheet = computed(() => currentSheet.value !== 'J3')
+const showModeToolbar = computed(() => isHtmlSheet.value && currentSheet.value !== 'J3A')
+
+// ─── sync bridge 真双向 ─────────────────────────────────────────────────────
+const syncEntryId = ref(J3_SYNC_ENTRY_ID)
+const syncSheetKey = computed(() => currentSyncSheetKey.value)
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(syncEntryId.value),
+  flushHtml: async () => {
+    await persistence.flush()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: syncEntryId.value,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: syncSheetKey.value,
+    }
+  },
+  reloadHtml: async (_minimumRevision: number) => {
+    await selfLoad()
+  },
+})
+
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+
+const syncBusy = computed(
+  () =>
+    syncSwitching.value
+    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+const syncUnavailableReason = computed(() => {
+  if (!isJ3SyncedSheet.value) {
+    return '在线编辑仅开放 J3-1 股份支付情况表；当前底稿走结构化视图'
+  }
+  const err = syncBridge.lastError.value
+  return err ? `${err.errorCode}: ${err.message}` : ''
+})
+const syncFeedbackOk = computed(() => {
+  const fb = syncBridge.feedback.value
+  return fb.kind === 'success' ? fb.message : ''
+})
+
+const renderMode = computed({
+  get: (): J3RenderMode => (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html'),
+  set: (v: J3RenderMode) => { void switchRenderMode(v) },
+})
+
+const renderModeOptions = computed(() => [
+  { label: '结构化视图', value: 'html' as const },
+  {
+    label: '在线编辑',
+    value: 'onlyoffice' as const,
+    disabled: !isJ3SyncedSheet.value || !!props.isReadonly,
+  },
+])
+
+async function switchRenderMode(target: J3RenderMode): Promise<void> {
+  if (target === renderMode.value) return
+  if (target === 'onlyoffice') {
+    if (!isJ3SyncedSheet.value) return
+    syncSwitching.value = true
+    try {
+      await syncBridge.switchToOnlyOffice()
+    } catch { /* lastError / feedback 已由桥写入 */ }
+    finally { syncSwitching.value = false }
+    return
+  }
+  // → html
+  if (syncBridge.mode.value !== 'oo') {
+    syncBridge.persistMode('html')
+    return
+  }
+  syncSwitching.value = true
+  try {
+    if (String(syncBridge.state.value) === 'applied') {
+      await syncBridge.reloadAfterApplied()
+    } else if (syncBridge.mode.value === 'oo' && !syncBridge.dirty.value) {
+      await syncBridge.leaveWithoutSaving()
+    } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
+      await syncEditorHostRef.value.forceSave()
+    } else {
+      syncBridge.persistMode('html')
+    }
+  } catch { /* 保持 OO */ }
+  finally { syncSwitching.value = false }
+}
+
+// ─── Persistence Adapter ────────────────────────────────────────────────────
 const persistence = useChecklistPersistence({
   wpId: toRef(props, 'wpId'),
   projectId: computed(() => props.projectId || undefined),
@@ -136,7 +284,6 @@ const persistence = useChecklistPersistence({
 })
 const allResponses = persistence.responses
 
-// 复核圆点：子 tab 的 GtReviewTrigger 通过 inject 取得蓝/红点
 const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
 provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)
@@ -161,10 +308,8 @@ async function selfLoad(): Promise<void> {
   persistence.hydrate(merged)
 }
 
-/**
- * 子 tab 已完成业务序列化；统一交给 Adapter 管理逐 item debounce/flush/error。
- * 返回 Promise 以兼容子 composable 的 `saveImmediate(items).catch(...)` 契约。
- */
+provide('reloadWorkpaperData', selfLoad)
+
 async function handleChildSave(items: ChecklistResponse[]): Promise<void> {
   for (const { item_id, ...patch } of items) {
     persistence.saveDebounced(item_id, patch)
@@ -175,7 +320,6 @@ function handleNavigateSheet(sheetName: string) {
   emit('navigate-sheet', sheetName)
 }
 
-// sheet 切换时主动 flush 待保存 section。
 watch(currentSheet, async (nextSheet, prevSheet) => {
   if (nextSheet === prevSheet) return
   try {
@@ -195,11 +339,24 @@ onMounted(async () => {
 
 <style scoped>
 .j3-share-based-payment {
-  padding: 16px;
+  padding: 0;
   min-height: 400px;
 }
 .loading-container {
   padding: 24px;
+}
+.j3-mode-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.oo-container {
+  min-height: 600px;
+  height: calc(100vh - 280px);
+  overflow: hidden;
+  border-radius: 8px;
 }
 .j3-sheet-placeholder {
   display: flex;

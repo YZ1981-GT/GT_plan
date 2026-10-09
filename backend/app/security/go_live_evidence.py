@@ -27,7 +27,7 @@ _THIS = Path(__file__).resolve()
 _REPO_ROOT = _THIS.parents[3]
 
 SPEC_NAME = "visibility-isolation-go-live-hardening"
-SPEC_DIR = _REPO_ROOT / ".kiro" / "specs" / SPEC_NAME
+SPEC_DIR = _REPO_ROOT / ".kiro" / "specs" / "_archive" / "06-engineering-governance" / SPEC_NAME
 EVIDENCE_DIR = SPEC_DIR / "evidence"
 MANIFEST_PATH = EVIDENCE_DIR / "manifest.json"
 SCHEMA_PATH = EVIDENCE_DIR / "manifest.schema.json"

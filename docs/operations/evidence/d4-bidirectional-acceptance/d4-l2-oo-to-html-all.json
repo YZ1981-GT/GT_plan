@@ -1,0 +1,881 @@
+{
+  "captured_at": "2026-09-24T22:22:10.331Z",
+  "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+  "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
+  "entry": "xlsx/gt-d4-operating-revenue",
+  "n_cases": 35,
+  "n_typed": 34,
+  "n_locate_fail": 0,
+  "n_type_fail": 1,
+  "edits": [
+    {
+      "code": "D4-1",
+      "excel_name": "营业收入审定表D4-1",
+      "table_key": "adjudication_main_rows",
+      "edit_key": "current_unadjusted",
+      "edit_vt": "amount",
+      "target_ref": "B12",
+      "old_value": 153443591.73,
+      "new_value": 153455937.4,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "prefer_value",
+        "activeSheet": "营业收入审定表D4-1",
+        "sampleField": "adjudication_main_rows/xsheet-main-营业收入_批发_分销/current_unadjusted"
+      }
+    },
+    {
+      "code": "D4-2",
+      "excel_name": "主营业务收入明细表D4-2",
+      "table_key": "revenue_detail_rows",
+      "edit_key": "prior_unadjusted",
+      "edit_vt": "amount",
+      "target_ref": "Q11",
+      "old_value": 6337159.68,
+      "new_value": 6349505.35,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "first_nonempty",
+        "activeSheet": "主营业务收入明细表D4-2",
+        "sampleField": "revenue_detail_rows/d4r-mtl69x8j-v9xhgtr/month_01"
+      }
+    },
+    {
+      "code": "D4-3",
+      "excel_name": "其他业务收入明细表D4-3",
+      "table_key": "other_revenue_detail_rows",
+      "edit_key": "current_unadjusted",
+      "edit_vt": "amount",
+      "target_ref": "B11",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "first_nonempty",
+        "activeSheet": "其他业务收入明细表D4-3",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-5",
+      "excel_name": "营业收入会计政策检查D4-5",
+      "table_key": "d45_policy_groups",
+      "edit_key": "revenue_policy",
+      "edit_vt": "text",
+      "target_ref": "B8",
+      "old_value": "销售商品收入",
+      "new_value": "L2MARK-D4-5-3a0q",
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "blank_first_row",
+        "activeSheet": "营业收入会计政策检查D4-5",
+        "sampleField": "d45_policy_groups/GTROW-D45-0018/biz_name"
+      }
+    },
+    {
+      "code": "D4-6",
+      "excel_name": "重要指标分析D4-6",
+      "table_key": "d4_6_indicators",
+      "edit_key": "current",
+      "edit_vt": "amount",
+      "target_ref": "B13",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "blank_first_row",
+        "activeSheet": "重要指标分析D4-6",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-7",
+      "excel_name": "毛利率分析表D4-7",
+      "table_key": "d4_7_products",
+      "edit_key": "cur_qty",
+      "edit_vt": "amount",
+      "target_ref": "B26",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "first_nonempty",
+        "activeSheet": "毛利率分析表D4-7",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-8",
+      "excel_name": "重要产品毛利分析D4-8",
+      "table_key": "d4_8_matrix",
+      "edit_key": "m0_cur_rev_qty",
+      "edit_vt": "amount",
+      "target_ref": "B13",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "first_nonempty",
+        "activeSheet": "重要产品毛利分析D4-8",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-9",
+      "excel_name": "重要客户结构分析D4-9",
+      "table_key": "customer_current_rows",
+      "edit_key": "sales_amount",
+      "edit_vt": "amount",
+      "target_ref": "C23",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "first_nonempty",
+        "activeSheet": "重要客户结构分析D4-9",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-10",
+      "excel_name": "重要客户销售价格分析D4-10",
+      "table_key": "d4_10_rows",
+      "edit_key": "amount",
+      "edit_vt": "amount",
+      "target_ref": "D13",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "blank_first_row",
+        "activeSheet": "重要客户销售价格分析D4-10",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-11",
+      "excel_name": "产品销售价格分析D4-11",
+      "table_key": "d4_11_rows",
+      "edit_key": "unit_price",
+      "edit_vt": "amount",
+      "target_ref": "D12",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "blank_first_row",
+        "activeSheet": "产品销售价格分析D4-11",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-12",
+      "excel_name": "合同检查表D4-12",
+      "table_key": "contract_inspection_transposed",
+      "edit_key": null,
+      "edit_vt": "amount",
+      "target_ref": "B8",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": false,
+      "locate_detail": {
+        "hitKind": "blank_first_row",
+        "activeSheet": "合同检查表D4-12",
+        "sampleField": null
+      },
+      "skip_reason": "type/verify failed: mismatch"
+    },
+    {
+      "code": "D4-13",
+      "excel_name": "营业收入账面金额与ERP系统核对记录D4-13",
+      "table_key": "d413_erp_check_fixed",
+      "edit_key": "process",
+      "edit_vt": "text",
+      "target_ref": "A15",
+      "old_value": "二、核对结论",
+      "new_value": "L2MARK-D4-13-3qd9",
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "first_nonempty",
+        "activeSheet": "营业收入账面金额与ERP系统核对记录D4-13",
+        "sampleField": "d413_erp_check_fixed/process"
+      }
+    },
+    {
+      "code": "D4-14",
+      "excel_name": "营业收入发生检查表D4-14",
+      "table_key": "walkthrough_transactions",
+      "edit_key": "voucher_amount",
+      "edit_vt": "amount",
+      "target_ref": "G15",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "blank_first_row",
+        "activeSheet": "营业收入发生检查表D4-14",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-15",
+      "excel_name": "营业收入完整性检查表D4-15",
+      "table_key": "completeness_check_rows",
+      "edit_key": "delivery_amount",
+      "edit_vt": "amount",
+      "target_ref": "F13",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "blank_first_row",
+        "activeSheet": "营业收入完整性检查表D4-15",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-16",
+      "excel_name": "出口收入电子口岸系统核对D4-16",
+      "table_key": "export_customs_check_rows",
+      "edit_key": "book_amount",
+      "edit_vt": "amount",
+      "target_ref": "A16",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "first_nonempty",
+        "activeSheet": "出口收入电子口岸系统核对D4-16",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-17",
+      "excel_name": "营业收入截止测试（账到单据）D4-17",
+      "table_key": "d4_17_rows",
+      "edit_key": "voucher_amount",
+      "edit_vt": "amount",
+      "target_ref": "E13",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "blank_first_row",
+        "activeSheet": "营业收入截止测试（账到单据）D4-17",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-18",
+      "excel_name": "营业收入截止测试（单据到账）D4-18",
+      "table_key": "d4_18_rows",
+      "edit_key": "delivery_amount",
+      "edit_vt": "amount",
+      "target_ref": "E13",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "blank_first_row",
+        "activeSheet": "营业收入截止测试（单据到账）D4-18",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-19",
+      "excel_name": "销售折扣与折让检查D4-19",
+      "table_key": "d4_19_rows",
+      "edit_key": "revenue_amount",
+      "edit_vt": "amount",
+      "target_ref": "C13",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "blank_first_row",
+        "activeSheet": "销售折扣与折让检查D4-19",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-20",
+      "excel_name": "销售退货检查表 D4-20",
+      "table_key": "d4_20_summary",
+      "edit_key": "current_return_0",
+      "edit_vt": "amount",
+      "target_ref": "B32",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "first_nonempty",
+        "activeSheet": "销售退货检查表 D4-20",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-21",
+      "excel_name": "关联方销售情况及价格分析D4-21",
+      "table_key": "related_party_price_rows",
+      "edit_key": "qty",
+      "edit_vt": "amount",
+      "target_ref": "D15",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "first_nonempty",
+        "activeSheet": "关联方销售情况及价格分析D4-21",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-22",
+      "excel_name": "重要指标分析表D4-22",
+      "table_key": "key_indicator_rows",
+      "edit_key": "current_period",
+      "edit_vt": "amount",
+      "target_ref": "B11",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "first_nonempty",
+        "activeSheet": "重要指标分析表D4-22",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-23",
+      "excel_name": "收入与开具发票金额比较分析D4-23",
+      "table_key": "invoice_compare_rows",
+      "edit_key": "main_revenue",
+      "edit_vt": "amount",
+      "target_ref": "B10",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "first_nonempty",
+        "activeSheet": "收入与开具发票金额比较分析D4-23",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-24",
+      "excel_name": "第三方回款检查D4-24",
+      "table_key": "third_party_receipt_rows",
+      "edit_key": "annual_sales",
+      "edit_vt": "amount",
+      "target_ref": "C14",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "first_nonempty",
+        "activeSheet": "第三方回款检查D4-24",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-25",
+      "excel_name": "经销商检查D4-25",
+      "table_key": "dealer_check_rows",
+      "edit_key": "sales_qty",
+      "edit_vt": "amount",
+      "target_ref": "D12",
+      "old_value": 1,
+      "new_value": 12346.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "blank_first_row",
+        "activeSheet": "经销商检查D4-25",
+        "sampleField": "dealer_check_rows/GTROW-D425-0012/seq"
+      }
+    },
+    {
+      "code": "D4-26",
+      "excel_name": "境外销售收入检查D4-26",
+      "table_key": "overseas_sales_rows",
+      "edit_key": "sales_amount",
+      "edit_vt": "amount",
+      "target_ref": "E13",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "blank_first_row",
+        "activeSheet": "境外销售收入检查D4-26",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-27",
+      "excel_name": "识别未披露的关联方D4-27",
+      "table_key": "undisclosed_rp_rows",
+      "edit_key": "annual_sales",
+      "edit_vt": "amount",
+      "target_ref": "P15",
+      "old_value": 942.91,
+      "new_value": 13288.58,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "prefer_value",
+        "activeSheet": "识别未披露的关联方D4-27",
+        "sampleField": "undisclosed_rp_rows/GTROW-D427-0015/annual_sales"
+      }
+    },
+    {
+      "code": "D4-28",
+      "excel_name": "客户信息核查清单D4-28",
+      "table_key": "customer_checklist_rows",
+      "edit_key": "sales_amount",
+      "edit_vt": "amount",
+      "target_ref": "D14",
+      "old_value": 76613350.78,
+      "new_value": 76625696.45,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "prefer_value",
+        "activeSheet": "客户信息核查清单D4-28",
+        "sampleField": "customer_checklist_rows/GTROW-D428-0014/sales_amount"
+      }
+    },
+    {
+      "code": "D4-29",
+      "excel_name": "客户信息检查表D4-29",
+      "table_key": "customer_detail_transposed",
+      "edit_key": null,
+      "edit_vt": "text",
+      "target_ref": "C10",
+      "old_value": "回写闭环客户PROBE-1789361019",
+      "new_value": "L2MARK-D4-29-4mmu",
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "prefer_text",
+        "activeSheet": "客户信息检查表D4-29",
+        "sampleField": "customer_detail_transposed/cust-mu0j7ovb-1v1v/name"
+      }
+    },
+    {
+      "code": "D4-30",
+      "excel_name": "客户访谈记录汇总表D4-30",
+      "table_key": "d4_30_customers",
+      "edit_key": "amount_match",
+      "edit_vt": "text",
+      "target_ref": "O6",
+      "old_value": "发行人第X大客户/本期新增客户/采购价格异常客户/……",
+      "new_value": "L2MARK-D4-30-4oxe",
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "blank_first_row",
+        "activeSheet": "客户访谈记录汇总表D4-30",
+        "sampleField": "d4_30_customers/GTROW-D430-0007/name"
+      }
+    },
+    {
+      "code": "D4-31",
+      "excel_name": "客户访谈记录 D4-31",
+      "table_key": "d4_31_interview",
+      "edit_key": "q3d_return_amount",
+      "edit_vt": "text",
+      "target_ref": "H5",
+      "old_value": "访谈对象：",
+      "new_value": "L2MARK-D4-31-4r89",
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "blank_first_row",
+        "activeSheet": "客户访谈记录 D4-31",
+        "sampleField": "d4_31_interview/GTROW-D431-0005/target"
+      }
+    },
+    {
+      "code": "D4-32",
+      "excel_name": "客户、供应商等资金流水检查D4-32",
+      "table_key": "d4_32_groups",
+      "edit_key": "amount",
+      "edit_vt": "amount",
+      "target_ref": "C13",
+      "old_value": 1,
+      "new_value": 12346.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "blank_first_row",
+        "activeSheet": "客户、供应商等资金流水检查D4-32",
+        "sampleField": "d4_32_groups/GTROW-D432-0013/group_label"
+      }
+    },
+    {
+      "code": "D4-33",
+      "excel_name": "其他业务毛利率分析表D4-33",
+      "table_key": "d4_33_matrix",
+      "edit_key": "s0_m0_revenue",
+      "edit_vt": "amount",
+      "target_ref": "E10",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "first_nonempty",
+        "activeSheet": "其他业务毛利率分析表D4-33",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-34",
+      "excel_name": "其他业务收入合同测算表D4-34",
+      "table_key": "d4_34_rentals",
+      "edit_key": "unit_price",
+      "edit_vt": "amount",
+      "target_ref": "E19",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "first_nonempty",
+        "activeSheet": "其他业务收入合同测算表D4-34",
+        "sampleField": null
+      }
+    },
+    {
+      "code": "D4-35",
+      "excel_name": "其他业务收入检查表D4-35",
+      "table_key": "other_revenue_check_rows",
+      "edit_key": "amount",
+      "edit_vt": "amount",
+      "target_ref": "F26",
+      "old_value": 50000,
+      "new_value": 62345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "prefer_value",
+        "activeSheet": "其他业务收入检查表D4-35",
+        "sampleField": "other_revenue_check_rows/GTROW-D435-9001/amount"
+      }
+    },
+    {
+      "code": "D4-36",
+      "excel_name": "其他业务收入截止性测试D4-36",
+      "table_key": "d4_36_forward",
+      "edit_key": "voucher_amount",
+      "edit_vt": "amount",
+      "target_ref": "E16",
+      "old_value": 0,
+      "new_value": 12345.67,
+      "locate_ok": true,
+      "typed_ok": true,
+      "locate_detail": {
+        "hitKind": "blank_first_row",
+        "activeSheet": "其他业务收入截止性测试D4-36",
+        "sampleField": null
+      }
+    }
+  ],
+  "forcesave": {
+    "forcesave_request_id": "648a7ca4-388d-4c73-be7b-35289bb70760",
+    "operation_id": "b48ee835-a0d2-4004-afbb-9908a99c7670",
+    "request_sequence": 1,
+    "state": "accepted",
+    "poll_after_ms": 500,
+    "replayed": false,
+    "dispatch_error": null,
+    "cs_error": 0,
+    "cs_outcome": "accepted",
+    "callback_expected": true
+  },
+  "operation_id": "b48ee835-a0d2-4004-afbb-9908a99c7670",
+  "operation_state_trail": [
+    "created",
+    "application_bound",
+    "error"
+  ],
+  "operation_final_state": "error",
+  "operation_payload": {
+    "state": "error",
+    "error_code": null
+  },
+  "store_checks": [
+    {
+      "code": "D4-1",
+      "fieldKey": "adjudication_main_rows/xsheet-main-营业收入_批发_分销/current_unadjusted",
+      "want": 153455937.4,
+      "got": 153443591.73,
+      "ok": false
+    },
+    {
+      "code": "D4-2",
+      "fieldKey": "revenue_detail_rows/d4r-mtl69x8j-v9xhgtr/month_01",
+      "want": 6349505.35,
+      "got": 6337159.68,
+      "ok": false
+    },
+    {
+      "code": "D4-3",
+      "fieldKey": "other_revenue_detail_rows/GTROW-D43-0013/current_unadjusted",
+      "want": 12345.67,
+      "got": 0,
+      "ok": false
+    },
+    {
+      "code": "D4-5",
+      "fieldKey": null,
+      "want": "L2MARK-D4-5-3a0q",
+      "got": null,
+      "ok": false
+    },
+    {
+      "code": "D4-6",
+      "fieldKey": null,
+      "want": 12345.67,
+      "got": null,
+      "ok": false
+    },
+    {
+      "code": "D4-7",
+      "fieldKey": "d4_7_products/pm-mudzldsc-1p3bn/cur_qty",
+      "want": 12345.67,
+      "got": 0,
+      "ok": false
+    },
+    {
+      "code": "D4-8",
+      "fieldKey": "d4_8_matrix/m0_cur/rev_qty",
+      "want": 12345.67,
+      "got": 0,
+      "ok": false
+    },
+    {
+      "code": "D4-9",
+      "fieldKey": "customer_current_rows/GTROW-D49C-0013/amount_ratio",
+      "want": 12345.67,
+      "got": 0,
+      "ok": false
+    },
+    {
+      "code": "D4-10",
+      "fieldKey": "d4_10_rows/GTROW-D410-0013/unit_price",
+      "want": 12345.67,
+      "got": 0,
+      "ok": false
+    },
+    {
+      "code": "D4-11",
+      "fieldKey": null,
+      "want": 12345.67,
+      "got": null,
+      "ok": false
+    },
+    {
+      "code": "D4-13",
+      "fieldKey": null,
+      "want": "L2MARK-D4-13-3qd9",
+      "got": null,
+      "ok": false
+    },
+    {
+      "code": "D4-14",
+      "fieldKey": null,
+      "want": 12345.67,
+      "got": null,
+      "ok": false
+    },
+    {
+      "code": "D4-15",
+      "fieldKey": null,
+      "want": 12345.67,
+      "got": null,
+      "ok": false
+    },
+    {
+      "code": "D4-16",
+      "fieldKey": null,
+      "want": 12345.67,
+      "got": null,
+      "ok": false
+    },
+    {
+      "code": "D4-17",
+      "fieldKey": null,
+      "want": 12345.67,
+      "got": null,
+      "ok": false
+    },
+    {
+      "code": "D4-18",
+      "fieldKey": null,
+      "want": 12345.67,
+      "got": null,
+      "ok": false
+    },
+    {
+      "code": "D4-19",
+      "fieldKey": null,
+      "want": 12345.67,
+      "got": null,
+      "ok": false
+    },
+    {
+      "code": "D4-20",
+      "fieldKey": "d4_20_summary/row0/current_return",
+      "want": 12345.67,
+      "got": 0,
+      "ok": false
+    },
+    {
+      "code": "D4-21",
+      "fieldKey": null,
+      "want": 12345.67,
+      "got": null,
+      "ok": false
+    },
+    {
+      "code": "D4-22",
+      "fieldKey": null,
+      "want": 12345.67,
+      "got": null,
+      "ok": false
+    },
+    {
+      "code": "D4-23",
+      "fieldKey": null,
+      "want": 12345.67,
+      "got": null,
+      "ok": false
+    },
+    {
+      "code": "D4-24",
+      "fieldKey": null,
+      "want": 12345.67,
+      "got": null,
+      "ok": false
+    },
+    {
+      "code": "D4-25",
+      "fieldKey": "dealer_check_rows/D4-25-mu7pmpfy-hx9l/sales_amount",
+      "want": 12346.67,
+      "got": 5000,
+      "ok": false
+    },
+    {
+      "code": "D4-26",
+      "fieldKey": "overseas_sales_rows/D4-26-mu88u8xn-w2zt/product_type",
+      "want": 12345.67,
+      "got": 0,
+      "ok": false
+    },
+    {
+      "code": "D4-27",
+      "fieldKey": "undisclosed_rp_rows/GTROW-D427-0015/annual_sales",
+      "want": 13288.58,
+      "got": 942.91,
+      "ok": false
+    },
+    {
+      "code": "D4-28",
+      "fieldKey": "customer_checklist_rows/GTROW-D428-0014/sales_amount",
+      "want": 76625696.45,
+      "got": 76613350.78,
+      "ok": false
+    },
+    {
+      "code": "D4-29",
+      "fieldKey": null,
+      "want": "L2MARK-D4-29-4mmu",
+      "got": null,
+      "ok": false
+    },
+    {
+      "code": "D4-30",
+      "fieldKey": null,
+      "want": "L2MARK-D4-30-4oxe",
+      "got": null,
+      "ok": false
+    },
+    {
+      "code": "D4-31",
+      "fieldKey": null,
+      "want": "L2MARK-D4-31-4r89",
+      "got": null,
+      "ok": false
+    },
+    {
+      "code": "D4-32",
+      "fieldKey": "d4_32_groups/GTROW-D432-0017/group_label",
+      "want": 12346.67,
+      "got": 5,
+      "ok": false
+    },
+    {
+      "code": "D4-33",
+      "fieldKey": "d4_33_matrix/slot0_m0/revenue",
+      "want": 12345.67,
+      "got": 0,
+      "ok": false
+    },
+    {
+      "code": "D4-34",
+      "fieldKey": null,
+      "want": 12345.67,
+      "got": null,
+      "ok": false
+    },
+    {
+      "code": "D4-35",
+      "fieldKey": "other_revenue_check_rows/GTROW-D435-9001/amount",
+      "want": 62345.67,
+      "got": 50000,
+      "ok": false
+    },
+    {
+      "code": "D4-36",
+      "fieldKey": null,
+      "want": 12345.67,
+      "got": null,
+      "ok": false
+    }
+  ],
+  "store_ok_count": 0,
+  "sync_errors": [],
+  "console_errors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ]
+}

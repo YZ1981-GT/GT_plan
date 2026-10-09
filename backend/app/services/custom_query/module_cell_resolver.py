@@ -16,11 +16,12 @@ Source URI 格式：
   tb     → A=account_code, B=account_name, C=opening_balance, D=debit_amount, E=credit_amount, F=closing_balance, G=audited_amount
 """
 
+import json
 import logging
 import re
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -322,32 +323,77 @@ async def _query_note_cells(
     year: int | None,
     section_id: str,
     cell_range: str,
+    *,
+    node_key: str | None = None,
 ) -> list[dict]:
     """从 consol_note_data.data JSONB 提取 cell。
 
     虚拟 sheet 列映射：A=code, B=name, C=year_end, D=year_begin, E=formula
+
+    按 ``project_id``、``year``、``section_id`` 与精确 ``node_key`` 过滤。
+    结果按主键 ``id`` 稳定排序。
+
+    Args:
+        node_key: 合并节点键。有值时精确匹配 ``node_key = :nk``；
+                  无值时只匹配 ``node_key IS NULL``（legacy 行）。
+                  不套用根节点 legacy fallback（ADR-CNSC-004）。
     """
+    from app.models.consol_note_data_models import ConsolNoteData
+
     sheet_name = f"note_{section_id}"
 
     if not project_id or not year:
         return []
 
+    # ORM 列是 UUID 类型；调用方传 str（hex 或带连字符），需转换以匹配 SQLAlchemy 类型
     try:
-        result = await db.execute(text("""
-            SELECT data FROM consol_note_data
-            WHERE project_id = :pid AND year = :y AND section_id = :sid
-            LIMIT 1
-        """), {"pid": project_id, "y": year, "sid": section_id})
-        note_row = result.first()
+        import uuid as _uuid_mod
+        pid = _uuid_mod.UUID(project_id) if not isinstance(project_id, _uuid_mod.UUID) else project_id
+    except (ValueError, AttributeError):
+        return []
+
+    try:
+        stmt = (
+            select(ConsolNoteData.data)
+            .where(
+                ConsolNoteData.project_id == pid,
+                ConsolNoteData.year == year,
+                ConsolNoteData.section_id == section_id,
+            )
+            .order_by(ConsolNoteData.id)
+            .limit(1)
+        )
+        # ADR-CNSC-004: 精确匹配 node_key，不套用根 legacy fallback
+        if node_key is not None:
+            stmt = stmt.where(ConsolNoteData.node_key == node_key)
+        else:
+            stmt = stmt.where(ConsolNoteData.node_key.is_(None))
+
+        result = await db.execute(stmt)
+        note_row = result.scalar_one_or_none()
     except Exception as e:
         logger.warning("_query_note_cells failed: %s", e)
         return []
 
-    if not note_row or not isinstance(note_row[0], dict):
+    if note_row is None:
         return []
 
-    data = note_row[0]
-    rows_arr = data.get("rows") if isinstance(data, dict) else None
+    # ORM JSONB 通常返回 dict；raw SQL/SQLite 可能返回 JSON 字符串
+    data: dict | None = None
+    if isinstance(note_row, dict):
+        data = note_row
+    elif isinstance(note_row, str):
+        try:
+            parsed = json.loads(note_row)
+            if isinstance(parsed, dict):
+                data = parsed
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    if data is None:
+        return []
+
+    rows_arr = data.get("rows")
     if not isinstance(rows_arr, list):
         return []
 
@@ -443,13 +489,13 @@ async def _query_tb_cells(
         return []
 
     # trial_balance 表使用 standard_account_code 作为 account_code
-    # closing_balance 需要计算：unadjusted_amount + aje_adjustment + rje_adjustment
+    # closing_balance 需要计算：unadjusted_amount + aje_adjustment + rje_adjustment + wp_adjustment
     try:
         result = await db.execute(text("""
             SELECT standard_account_code, account_name, opening_balance,
                    COALESCE(aje_adjustment, 0) + COALESCE(rje_adjustment, 0) as debit_amount,
                    0 as credit_amount,
-                   COALESCE(unadjusted_amount, 0) + COALESCE(aje_adjustment, 0) + COALESCE(rje_adjustment, 0) as closing_balance,
+                   COALESCE(unadjusted_amount, 0) + COALESCE(aje_adjustment, 0) + COALESCE(rje_adjustment, 0) + COALESCE(wp_adjustment, 0) as closing_balance,
                    audited_amount
             FROM trial_balance
             WHERE project_id = :pid AND year = :y AND is_deleted = false
@@ -493,8 +539,14 @@ class ModuleCellResolver:
         source: str,
         project_id: str | None,
         year: int | None = None,
+        *,
+        filters: dict | None = None,
     ) -> dict:
         """按 source 命名空间路由到 4 个 _query_*_cells。
+
+        Args:
+            filters: 业务视图过滤条件（来自 QueryRequest.filters）。
+                     ``filters.node_key`` 会被传入附注取数器以实现节点隔离。
 
         Returns:
             {rows: [...], columns: [...], total: int, source: str, module: str}
@@ -518,7 +570,12 @@ class ModuleCellResolver:
         if module == "report":
             cells = await _query_report_cells(db, project_id, year, qualifier, cell_range)
         elif module == "note":
-            cells = await _query_note_cells(db, project_id, year, qualifier, cell_range)
+            effective_filters = filters or {}
+            node_key = effective_filters.get("node_key")
+            cells = await _query_note_cells(
+                db, project_id, year, qualifier, cell_range,
+                node_key=node_key,
+            )
         elif module == "adj":
             cells = await _query_adj_cells(db, project_id, year, qualifier, cell_range)
         elif module == "tb":

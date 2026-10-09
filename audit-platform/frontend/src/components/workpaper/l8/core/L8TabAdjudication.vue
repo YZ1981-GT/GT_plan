@@ -11,12 +11,8 @@
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon> 带入调整
         </el-button>
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
+        <!-- BP-7 / AC 1.4：能力诚实披露（BP-4 inert 开关已摘除） -->
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-l8-financial-expenses" />
         <el-button size="small" @click="handleAI('adjudication')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -280,7 +276,7 @@ import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { useL8FormData } from '../../composables/useL8FormData'
-import { useL8DualMode } from '../../composables/useL8DualMode'
+import GtEntrySyncCapabilityNotice from '../../sync/GtEntrySyncCapabilityNotice.vue'
 import {
   useL8Adjudication,
   L8_ADJUDICATION_ITEMS,
@@ -312,10 +308,6 @@ const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => vo
 const formData = useL8FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
-})
-
-const dualMode = useL8DualMode({
-  wpId: computed(() => props.wpId),
 })
 
 // ─── 审定表行数据（10个费用项目行） ─────────────────────────────────────────

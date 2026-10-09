@@ -30,6 +30,15 @@ import { eventBus } from '@/utils/eventBus'
 import { calcSurtax } from './useN2MultiTaxEngine'
 import { calcSubtotal, calcDiff } from './useN2FormulaEngine'
 import type { ChecklistResponse } from './useN2FormData'
+import {
+  assignStableRowKeys,
+  generatedRowKey,
+  removeRowByKey,
+  semanticRowKey,
+  updateRowByKey,
+  type StableRowKey,
+} from './shared/stableRowIdentity'
+import { payloadJson } from './shared/checklistPayload'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -78,6 +87,12 @@ export interface CalcRow {
 
 /** 手工行持久化模型 */
 export interface ManualTaxRow {
+  /**
+   * 稳定行身份（随行落库）。🔴 BP-8：原先持久化身份是数组位置（`updateManualRow(index)`），
+   * 渲染投影上另有一条 `key: manual-${idx}` 位置化死声明。默认 4 税种用税种语义键。
+   * spec: n2-n5-json-table-identity-and-cross-entry-readonly Task 4
+   */
+  rowKey: StableRowKey
   taxType: string
   taxItem: string
   taxBase: number
@@ -159,10 +174,9 @@ export function useN2OtherTaxCalc(options: UseN2OtherTaxCalcOptions) {
   const { allResponses, saveField, getField } = options
 
   // ─── 读取 JSON conclusion 辅助 ─────────────────────────────────────────────
+  // NC-34：实际非空列优先（原写法只读 conclusion，载荷落 remark 时整表丢失）
   function readJson(itemId: string): any {
-    const resp = allResponses.value.get(itemId)
-    if (!resp?.conclusion) return null
-    try { return JSON.parse(resp.conclusion) } catch { return resp.conclusion }
+    return payloadJson(itemId, allResponses.value.get(itemId))
   }
 
   // ─── 1. 城建税地区 ─────────────────────────────────────────────────────────
@@ -190,19 +204,25 @@ export function useN2OtherTaxCalc(options: UseN2OtherTaxCalcOptions) {
     const parsed = readJson(MANUAL_ROWS_ITEM_ID)
     if (Array.isArray(parsed)) stored = parsed
 
-    // 以默认税种为骨架合并保存值；保存值中多出的行 (addManualRow) 追加保留
+    // 以默认税种为骨架合并保存值；保存值中多出的行 (addManualRow) 追加保留。
+    // 匹配顺序：已落库身份 > 税种名（旧数据无身份时）> 位置（仅旧数据兜底，首次保存后即固定身份）
     const base = DEFAULT_MANUAL_TAX_TYPES.map((taxType, idx) => {
-      const saved = stored[idx] || stored.find(r => r?.taxType === taxType)
-      return normalizeManualRow(saved, taxType)
+      const key = semanticRowKey(taxType)
+      const saved =
+        stored.find(r => r?.rowKey === key) ??
+        stored.find(r => !r?.rowKey && r?.taxType === taxType) ??
+        (stored[idx] && !stored[idx].rowKey ? stored[idx] : undefined)
+      return normalizeManualRow(saved, taxType, key)
     })
-    const extras = stored
-      .slice(DEFAULT_MANUAL_TAX_TYPES.length)
-      .map(r => normalizeManualRow(r, r?.taxType || '其他税种'))
+    const extrasRaw = stored.slice(DEFAULT_MANUAL_TAX_TYPES.length)
+    const extraKeys = assignStableRowKeys(extrasRaw, () => null)
+    const extras = extrasRaw.map((r, i) => normalizeManualRow(r, r?.taxType || '其他税种', extraKeys[i]))
     return [...base, ...extras]
   })
 
-  function normalizeManualRow(saved: any, taxType: string): ManualTaxRow {
+  function normalizeManualRow(saved: any, taxType: string, rowKey: StableRowKey): ManualTaxRow {
     return {
+      rowKey,
       taxType: (saved?.taxType as string) || taxType,
       taxItem: (saved?.taxItem as string) ?? '',
       taxBase: parseNum(saved?.taxBase),
@@ -271,10 +291,11 @@ export function useN2OtherTaxCalc(options: UseN2OtherTaxCalcOptions) {
 
   // ─── 7. 手工行 → CalcRow ───────────────────────────────────────────────────
   const manualCalcRows: ComputedRef<CalcRow[]> = computed(() => {
-    return manualRows.value.map((r, idx) => {
+    return manualRows.value.map((r) => {
       const computedAmt = r.amountManual > 0 ? round2(r.amountManual) : round2(r.taxBase * r.rate)
       return {
-        key: `manual-${idx}`,
+        // 渲染投影的 key 与持久化身份同源（原 `manual-${idx}` 是位置化死声明）
+        key: r.rowKey,
         taxType: r.taxType,
         taxItem: r.taxItem,
         kind: 'manual' as const,
@@ -326,9 +347,9 @@ export function useN2OtherTaxCalc(options: UseN2OtherTaxCalcOptions) {
     const v = parseNum(value)
     await saveField(CONSUMPTION_TAX_ITEM_ID, { conclusion: JSON.stringify(v) })
     // 同步到 消费税 手工行的 amountManual，保持表格一致
-    const idx = manualRows.value.findIndex(r => r.taxType === '消费税')
-    if (idx >= 0) {
-      await updateManualRow(idx, 'amountManual', v)
+    const row = manualRows.value.find(r => r.taxType === '消费税')
+    if (row) {
+      await updateManualRow(row.rowKey, 'amountManual', v)
     }
   }
 
@@ -340,20 +361,20 @@ export function useN2OtherTaxCalc(options: UseN2OtherTaxCalcOptions) {
       await saveField(AUTO_BOOK_ITEM_ID, { conclusion: JSON.stringify(next) })
       return
     }
-    const idx = manualRows.value.findIndex(r => r.taxType === taxType)
-    if (idx >= 0) await updateManualRow(idx, 'bookAccrued', value)
+    const row = manualRows.value.find(r => r.taxType === taxType)
+    if (row) await updateManualRow(row.rowKey, 'bookAccrued', value)
   }
 
-  /** 更新手工行字段 */
-  async function updateManualRow(index: number, field: keyof ManualTaxRow, value: any): Promise<void> {
-    const current = manualRows.value.map(r => ({ ...r }))
-    if (!current[index]) return
-    if (field === 'taxType' || field === 'taxItem' || field === 'remark') {
-      current[index][field] = String(value ?? '')
-    } else {
-      current[index][field] = parseNum(value) as never
-    }
-    await saveField(MANUAL_ROWS_ITEM_ID, { conclusion: JSON.stringify(current) })
+  /** 更新手工行字段（按稳定身份寻址） */
+  async function updateManualRow(rowKey: StableRowKey, field: keyof ManualTaxRow, value: any): Promise<void> {
+    if (field === 'rowKey') return // 身份不可经此改写
+    if (!manualRows.value.some(r => r.rowKey === rowKey)) return
+    const text = field === 'taxType' || field === 'taxItem' || field === 'remark'
+    const next = updateRowByKey(manualRows.value, rowKey, r => ({
+      ...r,
+      [field]: text ? String(value ?? '') : parseNum(value),
+    }))
+    await saveField(MANUAL_ROWS_ITEM_ID, { conclusion: JSON.stringify(next) })
   }
 
   /** @deprecated 旧命名，使用 updateManualRow */
@@ -362,8 +383,20 @@ export function useN2OtherTaxCalc(options: UseN2OtherTaxCalcOptions) {
   /** 追加一个手工行 */
   async function addManualRow(taxType = '其他税种'): Promise<void> {
     const current = manualRows.value.map(r => ({ ...r }))
-    current.push({ taxType, taxItem: '', taxBase: 0, rate: 0, amountManual: 0, bookAccrued: 0, remark: '' })
+    current.push({
+      rowKey: generatedRowKey(),
+      taxType, taxItem: '', taxBase: 0, rate: 0, amountManual: 0, bookAccrued: 0, remark: '',
+    })
     await saveField(MANUAL_ROWS_ITEM_ID, { conclusion: JSON.stringify(current) })
+  }
+
+  /** 删除手工行（默认 4 税种不可删；追加行按稳定 rowKey 删除） */
+  async function removeManualRow(rowKey: StableRowKey): Promise<void> {
+    const defaults = new Set(DEFAULT_MANUAL_TAX_TYPES.map(semanticRowKey))
+    if (defaults.has(rowKey)) return
+    const next = removeRowByKey(manualRows.value, rowKey)
+    if (next.length === manualRows.value.length) return
+    await saveField(MANUAL_ROWS_ITEM_ID, { conclusion: JSON.stringify(next) })
   }
 
   /** 触发从 N2-6 重新读取 (vatPayable 为响应式 computed，此处仅占位) */
@@ -380,11 +413,13 @@ export function useN2OtherTaxCalc(options: UseN2OtherTaxCalcOptions) {
     await saveField('N2-8-surtax-total', { conclusion: JSON.stringify(s.totalSurtax) })
     eventBus.emit('tax-accrual:updated', {
       wpCode: 'N2',
-      source: 'N2-8',
-      urbanTax: s.urbanTax,
-      educationTax: s.educationTax,
-      localEducationTax: s.localEducationTax,
-      total: s.totalSurtax,
+      accruals: [
+        { tax: '城建税', amount: s.urbanTax },
+        { tax: '教育费附加', amount: s.educationTax },
+        { tax: '地方教育附加', amount: s.localEducationTax },
+      ],
+      totalAccrual: s.totalSurtax,
+      timestamp: Date.now(),
     })
   }
 
@@ -414,6 +449,7 @@ export function useN2OtherTaxCalc(options: UseN2OtherTaxCalcOptions) {
     updateManualRow,
     setManualRow,
     addManualRow,
+    removeManualRow,
     importFromN26,
     syncToAdjudication,
   }

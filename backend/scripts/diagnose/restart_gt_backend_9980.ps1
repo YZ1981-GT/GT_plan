@@ -28,7 +28,19 @@ foreach ($procId in $pids) {
             Write-Host "Skip non-GT PID $procId path=$path"
         }
     } catch {
+        # 🔴 监听 PID 已不存在，但端口仍 LISTENING —— 真实反复踩到的孤儿态：
+        # uvicorn 父进程死了，它的 multiprocessing 子进程继承了监听 socket 继续服务，
+        # 于是请求打到**旧代码**上，而 `Get-Process/taskkill` 对那个父 PID 都报 not found。
+        # 子进程的命令行里带 `spawn_main(parent_pid=<父 PID>`，按它精确找出来杀掉。
+        # 不这么做的后果很具体：改完代码重启「成功」（health 200），但行为一点没变，
+        # 会被误读成「改动无效」而去改别的地方。
         Write-Host "Skip PID $procId : $_"
+        $orphans = Get-CimInstance Win32_Process -Filter "name='python.exe'" |
+            Where-Object { $_.CommandLine -and $_.CommandLine -like "*parent_pid=$procId*" }
+        foreach ($orphan in $orphans) {
+            Write-Host "Stopping orphaned child PID $($orphan.ProcessId) (parent_pid=$procId)"
+            Stop-Process -Id $orphan.ProcessId -Force -ErrorAction Continue
+        }
     }
 }
 

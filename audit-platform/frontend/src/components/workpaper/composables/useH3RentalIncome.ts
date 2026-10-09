@@ -145,7 +145,7 @@ export function buildRentalDisplayRows(rows: RentalContractRow[]): RentalDisplay
     const sub = _summarizeRows(catIndices.map((i) => rows[i]))
     result.push({
       rowKind: 'categorySubtotal',
-      rowId: `subtotal-${cat}`,
+      rowId: `subtotal-${cat}-${Math.random().toString(36).slice(2, 7)}`,
       label: `${RENTAL_CATEGORY_LABEL[cat]} 小计`,
       category: cat,
       ...sub,

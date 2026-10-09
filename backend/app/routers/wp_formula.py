@@ -220,6 +220,22 @@ class FormulaSaveRequest(BaseModel):
     hint_text: str | None = Field(
         None, description="reasonability 触发时的提示文案"
     )
+    formula_source: str = Field(
+        "custom", description="公式来源 preset / custom / reference"
+    )
+    reference_formula_id: UUID | None = Field(
+        None, description="reference 来源对应的源公式 ID"
+    )
+    source_scope: dict | None = Field(
+        None,
+        description=(
+            "结构化来源范围：project_id/year/node_key/include_descendants/domains"
+        ),
+    )
+    binding: dict | None = Field(
+        None,
+        description="可审阅的公式来源绑定模板与参数",
+    )
 
 
 class FormulaItemResponse(BaseModel):
@@ -234,6 +250,16 @@ class FormulaItemResponse(BaseModel):
     created_by: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
+    formula_type: str = "auto_calc"
+    lifecycle_state: str = "saved"
+    definition_version: int = 1
+    formula_source: str = "custom"
+    reference_formula_id: str | None = None
+    refs: list | dict = Field(default_factory=list)
+    issue_description: str | None = None
+    hint_text: str | None = None
+    source_scope: dict | None = None
+    binding: dict | None = None
 
 
 def _formula_to_dict(f: WpFormula) -> dict:
@@ -254,9 +280,14 @@ def _formula_to_dict(f: WpFormula) -> dict:
         "lifecycle_state": f.lifecycle_state,
         "definition_version": f.definition_version,
         "formula_source": f.formula_source,
+        "reference_formula_id": (
+            str(f.reference_formula_id) if f.reference_formula_id else None
+        ),
         "refs": f.refs,
         "issue_description": f.issue_description,
         "hint_text": f.hint_text,
+        "source_scope": getattr(f, "source_scope", None),
+        "binding": getattr(f, "binding", None),
         "last_computed_at": (
             f.last_computed_at.isoformat() if f.last_computed_at else None
         ),
@@ -264,6 +295,39 @@ def _formula_to_dict(f: WpFormula) -> dict:
         "created_at": f.created_at.isoformat() if f.created_at else None,
         "updated_at": f.updated_at.isoformat() if f.updated_at else None,
     }
+
+
+def _formula_issue_error_code(issues: list[dict]) -> str:
+    """把 service 校验 issue 映射为稳定的 API 错误码。
+
+    ``FORMULA_REF_NOT_FOUND`` 只表示 ACNR/引用解析确实找不到目标；其余
+    source_scope、binding、公式状态和 ownership 错误不能伪装成悬空引用，
+    否则前端无法给出正确的修复提示。
+    """
+    statuses = {
+        str(issue.get("status") or issue.get("reason") or "").strip()
+        for issue in issues
+        if isinstance(issue, dict)
+    }
+    if statuses and statuses <= {"not_found", "missing", "ref_not_found"}:
+        return "FORMULA_REF_NOT_FOUND"
+    if any(status.startswith("source_scope_") for status in statuses) or "invalid_source_scope" in statuses:
+        return "FORMULA_SOURCE_SCOPE_INVALID"
+    if "invalid_binding" in statuses:
+        return "FORMULA_BINDING_INVALID"
+    if "invalid_formula_type" in statuses:
+        return "FORMULA_TYPE_INVALID"
+    if "invalid_formula_source" in statuses:
+        return "FORMULA_SOURCE_INVALID"
+    if "reference_dangling" in statuses:
+        return "FORMULA_REFERENCE_DANGLING"
+    if "formula_damaged" in statuses:
+        return "FORMULA_DAMAGED"
+    if "formula_blocked" in statuses:
+        return "FORMULA_BLOCKED"
+    if any(status in {"ownership_denied", "project_id_required"} for status in statuses):
+        return "FORMULA_OWNERSHIP_DENIED"
+    return "FORMULA_SAVE_REJECTED"
 
 
 async def _load_wp(db: AsyncSession, wp_id: UUID) -> WorkingPaper:
@@ -646,11 +710,18 @@ async def save_formula(
         refs=body.refs,
         issue_description=body.issue_description,
         hint_text=body.hint_text,
+        formula_source=body.formula_source,
+        reference_formula_id=body.reference_formula_id,
+        source_scope=body.source_scope,
+        binding=body.binding,
     )
     if issues:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"error_code": "FORMULA_REF_NOT_FOUND", "issues": issues},
+            detail={
+                "error_code": _formula_issue_error_code(issues),
+                "issues": issues,
+            },
         )
 
     wp_code: str | None = None
@@ -849,7 +920,20 @@ async def delete_formula(
     _target_cell = existing.target_cell
     _sheet_name = existing.sheet_name
 
-    await wp_formula_service.delete(db, formula_id)
+    # 🔴 2026-09-22 修复：必须传 project_id。`wp_formula_service.delete` 的第一道 ownership
+    #    门是「project_id 为 None 即拒绝并 return False」（Req 10.6），此前这里不传 ⇒ 服务层
+    #    永不执行 `db.delete(obj)`，而本函数又忽略返回值、无条件返回 `{"deleted": ...}` ⇒
+    #    **恒假成功**：前端显示删除成功，刷新后公式仍在（真栈实测：DELETE 200 之后
+    #    GET /formulas 仍返回该条，is_deleted 为 None）。
+    #    同款缺陷在 `list_by_wp` 路径上已修过（见上方 `list_formulas` 的注释「此前缺
+    #    project_id 恒空」），delete 是当时漏掉的最后一处。
+    deleted = await wp_formula_service.delete(
+        db, formula_id, project_id=wp.project_id
+    )
+    if not deleted:
+        # 上面已按 (id, wp_id) 校验过存在性，走到这里只可能是 project 归属不匹配。
+        # 不得再返回 200「已删除」—— 那正是本次修复要消灭的假成功。
+        raise HTTPException(status_code=404, detail="公式不存在")
     await db.commit()
     # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
 

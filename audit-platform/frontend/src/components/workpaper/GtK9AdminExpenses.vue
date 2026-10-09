@@ -5,13 +5,17 @@
     </div>
 
     <template v-else>
-      <div v-if="isHtmlSheet && currentSheet !== 'K9'" class="k9-header-toolbar">
+      <div v-if="isHtmlSheet && currentSheet !== 'K9' && !isSyncManagedSheet" class="k9-header-toolbar">
         <el-segmented
           :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions.value"
           size="small"
           @change="dualMode.onModeChange"
         />
+        <!-- BP-7 / AC 1.4：能力诚实披露。文案真源在 sync/workpaperEntrySyncNotice.ts，
+             宿主里**不得**内联任何提示中文；已注册 bidirectional 的 entry
+             由组件自己返 null 不渲染 ⇒ 无需本地 v-if。 -->
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-k9-admin-expenses" />
         <!-- OnlyOffice 状态：必须「拉取成功」才进入在线编辑（对齐 D4 范式） -->
         <el-tag v-if="dualMode.currentMode.value === 'onlyoffice'" size="small" type="success">OnlyOffice 拉取成功</el-tag>
         <el-tag v-else-if="dualMode.fetchingConfig.value" size="small" type="warning">OnlyOffice 拉取中…</el-tag>
@@ -22,7 +26,7 @@
 
       <!-- OnlyOffice 模式 -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
+        v-if="isHtmlSheet && !isSyncManagedSheet && dualMode.currentMode.value === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -32,7 +36,7 @@
       />
 
       <!-- HTML 结构化视图 -->
-      <template v-else-if="dualMode.currentMode.value === 'html'">
+      <template v-else-if="isSyncManagedSheet || dualMode.currentMode.value === 'html'">
         <!-- 跨表勾稽提示（仅失衡时显示；K9-1 自带详细勾稽故排除） -->
         <el-alert
           v-if="crossSheetAlerts.length > 0 && currentSheet !== 'K9-1'"
@@ -216,6 +220,7 @@ import {
   type WorkpaperRuntimeContext,
 } from './composables/useWorkpaperScaffold'
 import { useK9DualMode } from './composables/useK9DualMode'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useK9CrossSheet } from './composables/useK9CrossSheet'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
@@ -297,6 +302,12 @@ const dualMode = useK9DualMode({
 
 /** 当前 sheet 是否为 HTML 可渲染（有匹配子组件） */
 const isHtmlSheet = computed(() => currentSheet.value !== '')
+
+/**
+ * `K9-3` 调整分录汇总已接平台真双向桥（Tab 内自带「结构化视图 / 在线编辑」切换，
+ * 后端 `phase5_k9_*`）⇒ 本宿主的 legacy 单向 OO 切换在这张 sheet 上让位，避免两套切换器同屏。
+ */
+const isSyncManagedSheet = computed(() => currentSheet.value === 'K9-3')
 
 /**
  * 从 sheetName 提取编码 (K9/K9A/K9-1~K9-8/附注)

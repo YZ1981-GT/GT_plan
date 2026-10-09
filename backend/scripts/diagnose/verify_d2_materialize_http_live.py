@@ -8,7 +8,9 @@ Requirements: 4.2, 4.3 · Property 9
     python backend/scripts/diagnose/verify_d2_materialize_http_live.py
     python backend/scripts/diagnose/verify_d2_materialize_http_live.py \\
         --base http://127.0.0.1:9980 \\
-        --out .kiro/specs/workpaper-sync-materialize-large-table-performance/evidence/http-materialize-live.json
+        --out .kiro/specs/_archive/15-workpaper-sync-engine-hardening/workpaper-sync-materialize-large-table-performance/evidence/http-materialize-live.json
+
+（该 spec 已于 2026-09-25 归档；`--out` 无默认值，照抄旧 active 路径会 `FileNotFoundError`。）
 
 判据：materialize 在软上限内返回带 room_id / document 的 descriptor；
 数字现场实测，不手抄。失败 exit 1（无法连库/后端 → exit 2）。

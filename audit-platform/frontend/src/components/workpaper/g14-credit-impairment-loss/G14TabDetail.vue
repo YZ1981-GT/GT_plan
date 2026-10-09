@@ -8,14 +8,6 @@
         <el-button
           v-if="!isReadonly"
           size="small"
-          data-testid="g14-fill-closing"
-          @click="detail.fillClosingFromRollForward()"
-        >
-          推算期末
-        </el-button>
-        <el-button
-          v-if="!isReadonly"
-          size="small"
           data-testid="g14-fill-unaudited"
           @click="detail.fillUnauditedFromProfitLoss()"
         >
@@ -32,10 +24,10 @@
         <el-button
           v-if="!isReadonly"
           size="small"
-          data-testid="g14-apply-tb-closing"
-          @click="detail.applyTbClosingToProvision()"
+          data-testid="g14-apply-tb-opening"
+          @click="detail.applyTbClosingToOpening()"
         >
-          写入期末
+          按试算倒推期初
         </el-button>
         <CycleImportExportDropdown :wp-id="wpId" api-prefix="g14" sheet="G14-2"
           :disabled="isReadonly" @imported="emit('imported')" />
@@ -56,11 +48,10 @@
 
     <el-alert v-if="detail.detailTotalMismatch.value" type="error" :closable="false" show-icon
       title="明细表合计审定数与计入损益合计不一致，请核查各行核对列" style="margin-bottom:8px" />
-    <el-alert v-if="detail.anyRollForwardUnbalanced.value" type="warning" :closable="false" show-icon
-      title="存在减值准备滚动不平衡行（期末≠期初+计提−转回−转销+其他变动），期末单元格已标红"
-      style="margin-bottom:8px" data-testid="g14-rollforward-warn" />
+    <!-- 🔴 C-9 删「滚动不平衡」提示：期末余额 J 已改为模板公式 =F+G-H-I，恒自洽，
+         不可能不平衡（原实现把 J 当录入列、另设推算列再校验两者一致，那是双源）。 -->
     <el-alert v-if="detail.anyTbClosingMismatch.value" type="warning" :closable="false" show-icon
-      title="存在期末余额与试算准备/OCI 期末不一致的行，「试算期末」列已标红"
+      title="存在期末余额（=期初+计提−转回−转销）与试算准备/OCI 期末不一致的行，「试算期末」列已标红"
       style="margin-bottom:8px" data-testid="g14-tb-closing-warn" />
 
     <el-alert
@@ -164,24 +155,16 @@
               <span v-else>{{ fmt(row.currentWriteoff) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="其他变动" width="88" align="right">
-            <template #default="{ row }">
-              <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.otherMovement"
-                size="small" :controls="false" style="width:100%"
-                title="合并转入/转出、重分类等不影响损益的准备变动"
-                @update:model-value="(v: number) => detail.updateCell(row.rowKey, 'otherMovement', v ?? 0)" />
-              <span v-else>{{ fmt(row.otherMovement) }}</span>
-            </template>
-          </el-table-column>
+          <!-- 🔴 C-9 删「其他变动」列：权威模板 J 是 `=F+G-H-I`，**不含**其他变动项 ——
+               自研这一列会让录入值在 Excel 侧凭空消失。 -->
           <el-table-column label="期末余额" width="96" align="right">
             <template #default="{ row }">
-              <WpAmountInput v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.closingProvision"
-                size="small" style="width:100%"
-                :class="{ 'cell-error': !row.rollForwardBalanced || (row.tbClosing != null && !row.tbClosingMatched) }"
+              <!-- 🔴 C-9 改为只读公式格：模板 J 本身就是 `=F+G-H-I` 推算式，无录入空间 -->
+              <span
+                class="formula-cell"
+                :class="{ 'cell-error': row.tbClosing != null && !row.tbClosingMatched }"
                 :title="closingTitle(row)"
-                @update:model-value="(v: number) => detail.updateCell(row.rowKey, 'closingProvision', v ?? 0)" />
-              <span v-else :class="{ 'cell-error': !row.rollForwardBalanced || (row.tbClosing != null && !row.tbClosingMatched) }"
-                :title="closingTitle(row)">
+              >
                 {{ fmt(row.closingProvision) }}
               </span>
             </template>
@@ -249,10 +232,11 @@
     <details class="compile-hint">
       <summary>📋 编制提示（二、审计过程）</summary>
       <p>1. 默认「全表」视图对齐致同 xlsx：损益侧本期数与资产侧减值准备滚动同屏，核对列验证 <b>审定数 = 计入损益</b>。</p>
-      <p>2. 公式：计入损益 = 计提 − 转回（转回正数）；期末 = 期初 + 计提 − 转回 − 转销 + 其他变动。</p>
-      <p>3. 「合同资产减值损失」单独成行（1142）；「取数对账」从试算拉取准备/OCI/预计负债期末，「写入期末」可回填。</p>
+      <p>2. 模板公式（4 列自动重算、UI 只读）：审定数 <code>D=B+C</code>；期末余额 <code>J=F+G−H−I</code>；计入损益 <code>K=计提−转回</code>（转回填正数）；核对 <code>L=D=K</code>。「其他变动」不是模板列，已移除。</p>
+      <p>3. 行集是权威模板的固定 <b>9 行</b>，不可增删。<b>「合同资产减值损失」模板无专行</b>，其 ECL（1142）填在「其他」行 —— D6 的 ECL 事件与含「合同资产」的调整分录也都落该行。</p>
       <p>4. 带 OCI 标签的行（其他债权投资）：对方计入其他综合收益-信用减值准备，而非坏账准备贷方。</p>
-      <p>5. 建议路径：取数对账 → 填计提/转回 → 推算期末 → 回填未审 → 与 D1/D2/D5/D6/F1/G4/G5/G6 ECL 交叉。</p>
+      <p>5. 建议路径：取数对账 → 填期初/计提/转回/转销 → 回填未审 → 与 D1/D2/D5/D6/F1/G4/G5/G6 ECL 交叉。期末与试算不符时查这四个录入项，可用「按试算倒推期初」辅助定位。</p>
+      <p>6. <b>与 Excel 的已知差异</b>：权威模板「计入损益」列写的是 <code>=计提+转回</code>，与同表「期末=期初+计提−转回−转销」对转回的符号约定矛盾（模板缺陷）。本页按会计口径 <code>计提−转回</code> 算，因此有转回时 Excel 侧该列会比本页多 2×转回，模板自带的核对列也会显示不平。请以本页为准。</p>
     </details>
   </div>
 </template>
@@ -327,7 +311,8 @@ onMounted(() => {
 
 function rowClassName({ row }: { row: G14DetailRow }): string {
   if (row.rowKey === 'total') return 'g14-row-total'
-  if (row.reconciled === false || row.rollForwardBalanced === false) return 'g14-row-warn'
+  // 🔴 C-9 去掉 rollForwardBalanced 判定：期末余额已是模板公式，恒自洽
+  if (row.reconciled === false) return 'g14-row-warn'
   if (row.tbClosing != null && !row.tbClosingMatched) return 'g14-row-warn'
   return ''
 }
@@ -346,14 +331,11 @@ function ociHint(rowKey: string): string {
 }
 
 function closingTitle(row: G14DetailRow): string {
-  const parts: string[] = []
-  if (!row.rollForwardBalanced) {
-    parts.push(`滚动差 ${fmt(row.rollForwardVariance)}（推算 ${fmt(row.closingComputed)}）`)
-  }
+  const base = '期末余额 J = 期初 + 计提 − 转回 − 转销（模板公式，只读）'
   if (row.tbClosing != null && !row.tbClosingMatched) {
-    parts.push(`与试算差 ${fmt(row.tbClosingVariance)}`)
+    return `${base}；与试算差 ${fmt(row.tbClosingVariance)}`
   }
-  return parts.join('；') || '与滚动公式及试算准备期末对账'
+  return base
 }
 </script>
 

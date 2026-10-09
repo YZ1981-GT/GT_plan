@@ -39,7 +39,7 @@ import json
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Final, Iterator, Mapping, Sequence
+from typing import Any, Final, Mapping, Sequence
 
 from app.services.workpaper_sync.adapters.registry import (
     AdapterRegistration,
@@ -48,7 +48,6 @@ from app.services.workpaper_sync.adapters.registry import (
 )
 from app.services.workpaper_sync.contracts import (
     CONTRACT_SCHEMA_VERSION,
-    FieldSpec,
     SyncContract,
     contract_path_for,
     load_contract,
@@ -68,6 +67,7 @@ from app.services.workpaper_sync.excel_instrumentation import (
     ExcelInstrumentationSpec,
     InstrumentationError,
     build_instrumentation_payload,
+    build_instrumentation_payload_for_sheets,
     build_template_payload,
     normalized_structure_hash,
 )
@@ -115,8 +115,16 @@ EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wire
 TEMPLATE_RELATIVE_PATH: Final[str] = "D/D1 应收票据.xlsx"
 
 #: 权威模板字节哨兵（Requirement 9.9：`backend/wp_templates/` 运行时只读）。
+#: 🔴 2026-09-28 更新（`e6e8dcf28ba6e7f6…` → 本值）：修 D1-7「贴现息」列的数字格式。
+#: 该列（`应收票据备查簿核对D1-7` 的 N 列，银行承兑 R13-17 + 商业承兑 R19-23）在模板里
+#: 带 `mm-dd-yy` 日期格式，而契约声明 `amount` ⇒ 写入金额被 openpyxl 反读成
+#: `datetime.time(0, 0)`，G1 roundtrip 门以 `ValueNormalizationError` 拒收整册
+#: materialize；且该错**审计师肉眼可见**（贴现息 5000 显示成日期）。
+#: 修复走 zip 级精修（`backend/scripts/fix/fix_d1_template_amount_number_format.py`），
+#: 只动 `xl/styles.xml` 与该 sheet 的 XML，新建一个「只换 numFmtId」的 cellXfs 条目 ——
+#: 全簿其余 number_format 与全部单元格值逐项不变（脚本内三道前置校验钉死）。
 TEMPLATE_SHA256: Final[str] = (
-    "e6e8dcf28ba6e7f6fdf9867c3ac43b2f1a72e1a1b6f2aa477f58dfca39097577"
+    "efa8e23d3531294ed7d4f30cc207339634b83ce58335ebf885a402e7263571ef"
 )
 
 #: 受管 sheet 的真实 tab 名（构建期选择器；运行时定位一律走 identity 锚点）。
@@ -359,6 +367,39 @@ def instrumentation_spec() -> ExcelInstrumentationSpec:
     )
 
 
+def instrumentation_specs() -> tuple[ExcelInstrumentationSpec, ...]:
+    """本 entry **全部** 受管行表的 instrumentation 声明（薄转发伴生模块）。
+
+    🔴 为什么必须有这个复数入口（本段是一个已实测的整册发布阻塞的根因修复）：
+
+    `projection_first_publication.stage_instrumented_substrate` 与
+    `anchors_from_instrumentation_specs` **只读 entry 模块**（registry 解析
+    `xlsx/gt-d1-notes-receivable` 得到的就是本模块），分派顺序是
+    「先看 `instrumentation_specs`，没有才回落单数 `instrumentation_spec`」。
+
+    本模块此前只暴露单数入口，于是：
+
+      * `stage_instrumented_substrate` 落进回落臂 → `instrument_workbook_bytes`
+        只注 1 张 Table（`GT_D13_ROWS`），实测 substrate 里 **18 张声明表只剩 1 张**；
+      * `structure_anchors` 同样只拿到 1 组锚点 → `collect_workbook_structure` 只认
+        1 张受管 sheet → `observe_structure_inventory` 相对契约声明的 248 字段
+        少给绝大部分 → `assert_no_structure_drift` 抛 `ContractDriftError`
+        （首个点名位置 `d110-managed / inventory_count_rows/{row_uuid}/acceptor`）。
+
+    也就是说整册 representation 发布在**结构上从来不可能成功**，而不是数据没准备好。
+    扩容面（12 受管 sheet / 18 行表）一直声明在 `phase5_d1_expansion`，本模块已为
+    `all_store_item_ids` 补过同款薄转发（见下方「修的是什么」注释段），
+    instrumentation 这一条是当时漏掉的同类欠账。
+
+    单向引用：清单只在 `phase5_d1_expansion` 存在一份，本处不复制。
+    `specs()[0]` 与单数 `instrumentation_spec()` 必须同值（主表 `GT_D13_ROWS`），
+    由判据 `test_d1_instrumentation_specs_forwarder.py` 逐字段钉死。
+    """
+    from app.services.workpaper_sync import phase5_d1_expansion as _exp
+
+    return tuple(_exp.instrumentation_specs())
+
+
 def template_definition_payload() -> dict[str, Any]:
     """template definition 的 canonical payload（发布 DAG 第一段）。"""
     data = read_authoritative_template()
@@ -370,9 +411,24 @@ def template_definition_payload() -> dict[str, Any]:
 
 
 def instrumentation_definition_payload() -> dict[str, Any]:
-    """instrumentation definition 的 canonical payload（单向引用 template digest）。"""
-    return build_instrumentation_payload(
-        spec=instrumentation_spec(),
+    """instrumentation definition 的 canonical payload（单向引用 template digest）。
+
+    🔴 走**复数**入口 `build_instrumentation_payload_for_sheets`（照 D2 先例
+    `pilot_d2_large_json.instrumentation_definition_payload` 的 Requirement 3.2）：
+
+    这份 payload 就是**请求时刻**锚点的唯一来源（`load_frozen_structure_anchors` →
+    `frozen_anchors_from_instrumentation`）。若这里只投单数主 spec，而发布时刻的
+    `structure_anchors` 来自 `instrumentation_specs()`（18 组），两个时刻算出的
+    `structure_hash` 就不可比 —— 那正是 BP-30 本身。实测形态：整册发布本身成功，
+    但请求时刻观测抛 `ContractDriftError`（首个点名 `d110-managed /
+    inventory_count_rows/{row_uuid}/acceptor`），因为 observer 只认到 1 张受管 sheet。
+
+    单 spec 时 `build_instrumentation_payload_for_sheets([单spec])` 与
+    `build_instrumentation_payload(单spec)` 由框架层委托关系保证逐字节等价，
+    因此本改造对 digest 的影响**只来自 spec 数量本身**（1 → 18）。
+    """
+    return build_instrumentation_payload_for_sheets(
+        specs=instrumentation_specs(),
         template_definition_sha256=canonical_digest(template_definition_payload()),
         template_sha256=TEMPLATE_SHA256,
         gate=excel_carrier_gate(),
@@ -406,9 +462,29 @@ def _src(cell: str) -> str:
     return f"源xlsx!{MANAGED_SHEET}!{cell}"
 
 
+def _spec_d103() -> Any:
+    """延迟取 D1-3 的 `RowTableSheetSpec` 声明（Task 15 收敛用）。
+
+    🔴 **必须延迟 import**：`phase5_d1_03_customer` 在模块级 `import phase5_d1_notes_receivable`
+    （它的几何数字全从本模块的冻结常量引用，避免两处各写一份而漂移）⇒ 本模块反向做模块级
+    import 会成环。函数内 import 是唯一解，且与 D5/D6/D7 收敛时的引擎 import 同款写法。
+    """
+    from app.services.workpaper_sync.phase5_d1_03_customer import SPEC_D103
+
+    return SPEC_D103
+
+
 def stable_key_for(column_key: str, row_identity: str = "{row_uuid}") -> str:
-    """`notes_receivable_detail_rows/{row_uuid}/{column_key}` 的唯一拼装处。"""
-    return f"{ROWS_TABLE_KEY}/{row_identity}/{column_key}"
+    """薄转发框架层同名函数（Task 15 声明化，逐字节等价）。
+
+    等价性：引擎返回 `f"{spec.table_key}/{row_identity}/{column_key}"`，而
+    `SPEC_D103.table_key` 就是本模块的 :data:`ROWS_TABLE_KEY` ⇒ 输出逐字符相同。
+    """
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        stable_key_for as _engine_stable_key_for,
+    )
+
+    return _engine_stable_key_for(_spec_d103(), column_key, row_identity)
 
 
 def _rows_table_payload() -> dict[str, Any]:
@@ -449,6 +525,52 @@ def _rows_table_payload() -> dict[str, Any]:
     }
 
 
+def _expansion_sheet_payloads() -> list[dict[str, Any]]:
+    """从 expansion 模块的已启用 specs 自动派生 contract sheet payloads。
+
+    🔴 同一 sheet_key 下多个 table（如 D1-4 个别/组合两区、D1-8 贴现/背书两区）被合并
+    进同一个 sheet payload 的 `tables` 数组——契约 schema 要求 `sheet_key` 唯一。
+    """
+    from app.services.workpaper_sync.phase5_d1_expansion import managed_row_table_specs
+    from app.services.workpaper_sync.phase5_row_table_sheet import spec_to_contract_sheet_payload
+
+    by_sheet_key: dict[str, dict[str, Any]] = {}
+    for spec in managed_row_table_specs():
+        if spec.sheet_key == SHEET_KEY:
+            continue  # D1-3 already in the main sheets list
+        payload = spec_to_contract_sheet_payload(spec)
+        sk = payload["sheet_key"]
+        if sk in by_sheet_key:
+            # Same sheet, additional table (dual/triple region)
+            by_sheet_key[sk]["tables"].extend(payload["tables"])
+        else:
+            by_sheet_key[sk] = payload
+
+    # ── 静态受管区（`static_tables`）─────────────────────────────────────
+    #
+    # 🔴 `managed_row_table_specs()` 只翻**动态**（`excel_table`）spec ——
+    #    静态 spec 的 `row_identity_key` 为空，行表引擎会拒它（`store_row_identity` 抛错）。
+    #    静态区的契约 table 由各自模块的专用 payload 函数给出（同 D4-13 / D4-33 的做法）。
+    #
+    # 当前唯一项：D1-4 第三区（票据种类小计 R23-24，在 footer R22 **之下**）。
+    # 它挂进 `d14-managed` 这张已有 sheet 的 `tables` 数组作第三个 table ——
+    # 同 sheet 动静并列，`managed_tables_of` 会把不带 `row_identity` 的那个归入 `static_tables`，
+    # 因此**不需要**独立 binding（详见 `phase5_d1_04_bad_debt` 该段注释）。
+    from app.services.workpaper_sync.phase5_d1_expansion import static_region_table_payloads
+
+    for sheet_key, table_payload in static_region_table_payloads():
+        host = by_sheet_key.get(sheet_key)
+        if host is None:
+            raise ValueError(
+                f"静态受管区声明在 sheet_key={sheet_key!r}，但该 sheet 没有任何动态 table —— "
+                "同 sheet 动静并列的形态要求宿主 sheet 已存在；整张 sheet 都是静态的 entry "
+                "（如 D4-13/D4-33）走独立 sheet payload + `_static_region_bindings`，不走这里"
+            )
+        host["tables"].append(table_payload)
+
+    return list(by_sheet_key.values())
+
+
 def build_contract_payload() -> dict[str, Any]:
     """本 entry 自己的 per-entry contract canonical payload（两个 digest 现算，单向引用）。"""
     from app.services.workpaper_sync.excel_extract import TABLE_SHEET_ANCHOR
@@ -481,7 +603,8 @@ def build_contract_payload() -> dict[str, Any]:
                 "excel_name": MANAGED_SHEET,
                 "locator": {"anchor": TABLE_SHEET_ANCHOR},
                 "tables": [_rows_table_payload()],
-            }
+            },
+            *_expansion_sheet_payloads(),
         ],
         "review": {
             "entry_id": ENTRY_ID,
@@ -555,60 +678,11 @@ def assert_contract_file_matches_source() -> SyncContract:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def store_row_identity(row: Mapping[str, Any], *, ordinal: int) -> str:
-    """取一行的稳定行身份。空/非字符串即抛 —— **绝不**退回数组下标。"""
-    raw = row.get(ROW_IDENTITY_STORE_KEY)
-    if not isinstance(raw, str) or not raw.strip():
-        raise StorePayloadError(
-            f"{STORE_ITEM_ID} 第 {ordinal} 行缺少稳定行身份 "
-            f"{ROW_IDENTITY_STORE_KEY!r}（实得 {raw!r}）—— 不得退回数组下标作身份"
-            "（Requirement 6.5 / Property 23）"
-        )
-    return raw.strip()
-
-
-def iter_store_rows(
-    payload: str | bytes | Sequence[Any],
-) -> Iterator[tuple[str, Mapping[str, Any]]]:
-    """流式 yield `(row_identity, row)`；重复身份即抛。"""
-    if isinstance(payload, (str, bytes, bytearray)):
-        text = payload.decode("utf-8") if isinstance(payload, (bytes, bytearray)) else payload
-        try:
-            rows: Any = json.loads(text)
-        except ValueError as exc:
-            raise StorePayloadError(
-                f"{STORE_ITEM_ID} 的 remark 不是合法 JSON: {exc}"
-            ) from exc
-    else:
-        rows = payload
-    if not isinstance(rows, list):
-        raise StorePayloadError(
-            f"{STORE_ITEM_ID} 的载荷必须是行对象数组，实得 {type(rows).__name__} —— "
-            "整张表被存成别的形态时必须 fail closed，不得静默当成零行"
-        )
-    seen: set[str] = set()
-    for ordinal, row in enumerate(rows):
-        if not isinstance(row, Mapping):
-            raise StorePayloadError(
-                f"{STORE_ITEM_ID} 第 {ordinal} 项不是对象，实得 {type(row).__name__}"
-            )
-        identity = store_row_identity(row, ordinal=ordinal)
-        if identity in seen:
-            raise StorePayloadError(
-                f"{STORE_ITEM_ID} 出现重复行身份 {identity!r}（第 {ordinal} 项）—— "
-                "复制产生的重复 UUID 默认是结构冲突，不得静默合并成一行（Requirement 6.15）"
-            )
-        seen.add(identity)
-        yield identity, row
-
-
-def split_store_row(
-    row: Mapping[str, Any], *, row_identity: str, contract: SyncContract
-) -> Iterator[tuple[str, Any, FieldSpec]]:
-    """一行 → 15 条 `(stable_key, value, spec)`。`spec` 从 contract 取（未登记键即抛）。"""
-    for column_key, _column, _mode, _vt, json_key, _label in MANAGED_FIELD_SPECS:
-        spec = contract.field_by_stable_key(stable_key_for(column_key))
-        yield stable_key_for(column_key, row_identity), row.get(json_key), spec
+#: 🔴 Task 15 声明化：`store_row_identity` / `iter_store_rows` / `split_store_row` 三个
+#: **模块内部** helper 已收敛进框架层 `phase5_row_table_sheet`（收敛前已 grep 确认全仓零
+#: 模块外调用方，与 D5/D6/D7 同款处置）。`build_store_projection` /
+#: `merge_projection_into_store_rows` 保留同名薄转发（它们是 provider 的公开门面，
+#: `store_projection_response` / `oo_to_html` 按名调用）。
 
 
 def build_store_projection(
@@ -617,37 +691,150 @@ def build_store_projection(
     contract: SyncContract,
     limits: Any | None = None,
 ) -> Any:
-    """把 HTML store 的 JSON 载荷拆成按 stable field key 索引的 :class:`Projection`。"""
-    from app.services.workpaper_sync.adapters.base import FieldValue, Projection
-    from app.services.workpaper_sync.excel_extract import StreamingProjectionBudget
-    from app.services.workpaper_sync.limits import load_limits
+    """薄转发框架层 `build_store_projection(SPEC_D103, ...)`（逐字节等价）。
 
-    lim = limits or load_limits()
-    budget = StreamingProjectionBudget(lim)
-    values: dict[str, FieldValue] = {}
-    row_keys: list[str] = []
-    for identity, row in iter_store_rows(payload):
-        budget.add_row(ROWS_TABLE_KEY)
-        row_keys.append(identity)
-        for stable_key, value, spec in split_store_row(
-            row, row_identity=identity, contract=contract
-        ):
-            budget.add_field()
-            values[stable_key] = FieldValue(
-                stable_key=stable_key,
-                value=value,
-                value_type=spec.value_type,
-                mode=spec.mode,
-                row_key=identity,
-            )
-    return Projection(
-        contract_id=contract.contract_id,
-        semantic_version=contract.semantic_version,
-        document_type=contract.document_type,
-        values=values,
-        row_keys={ROWS_TABLE_KEY: tuple(row_keys)},
+    🔴 **必须转译引擎异常**：引擎抛 `RowTableStorePayloadError(Exception)` 非 domain 错误，
+    直接冒泡会被 `wp_sync_router` 当未知异常 ⇒ **opaque 500**；而本函数收敛前抛
+    `StorePayloadError(SyncDomainError)` 带 `error_code` ⇒ 映射 **4xx**。畸形 store 载荷是
+    用户侧数据问题（OCR/导入/手改都能写出非数组），必须保持 4xx。
+    D3/D5/D6/D7 在 Task 16/17 收敛时**漏了这一步**、四家一起从 4xx 退化成 500（2026-09-26
+    实测确认并修复），本家收敛一开始就带上转译，不重犯。
+    判据：`test_store_payload_error_stays_domain_error.py`（D1 在其正式参数化清单内）。
+    """
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        RowTableStorePayloadError,
+        build_store_projection as _engine_build_store_projection,
     )
 
+    try:
+        return _engine_build_store_projection(
+            _spec_d103(), payload, contract=contract, limits=limits
+        )
+    except RowTableStorePayloadError as exc:
+        raise StorePayloadError(str(exc)) from exc
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 多 store item 装配面（2026-09-28 新增）—— 让扩容声明真正进入两方向装配链
+#
+# 🔴 修的是什么：扩容面（12 张受管 sheet / 18 个 store item）声明在伴生模块
+#    `phase5_d1_expansion` 里，而**两个方向都只读 entry 模块**：
+#      * 出方向 `store_projection_response` 的门槛是 `len(STORE_ITEM_IDS) > 1`
+#        （复数常量）+ `hasattr(provider, "build_combined_store_projection")`；
+#      * 回方向 `store_mirror` 的分派点是 `plan.dual_store_fn`。
+#    本模块此前两样都没有 ⇒ 两方向各自只看得到单数 `STORE_ITEM_ID` 那 1 个，
+#    伴生模块的 `all_store_item_ids()` **没有任何生产代码调用**（实测确认）。
+#    形态同 D4-35 恒空 / D4-13 写不进 OO，但断口在「entry ↔ 伴生模块」之间，
+#    per-sheet 判据 / instrumentation 判据 / golden digest 全覆盖不到这条边。
+#
+# 🔴 为什么用 PEP 562 模块级 `__getattr__` 而不是真的模块级 tuple：伴生模块在**模块级**
+#    `from phase5_d1_notes_receivable import ADAPTER_ID, ...`，本模块若也在模块级 import 它
+#    就是循环 import。`__getattr__` 只在运行时属性查找失败后触发（那时两个模块都已执行完），
+#    既避开循环又保持**单源**（清单只在伴生模块存在一份）。同款延迟写法已用于 `_spec_d103()`。
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def all_store_item_ids() -> tuple[str, ...]:
+    """本 entry 全部 store item（**单一口径**，出/回两方向都从它取，需求 3.3）。
+
+    薄转发伴生模块 —— 清单只在 `phase5_d1_expansion` 存在一份，本处不复制。
+    """
+    from app.services.workpaper_sync import phase5_d1_expansion as _exp
+
+    return _exp.all_store_item_ids()
+
+
+def __getattr__(name: str) -> Any:  # PEP 562
+    """延迟暴露 `STORE_ITEM_IDS`（复数）—— 出方向的 combined 分支门槛读它。"""
+    if name == "STORE_ITEM_IDS":
+        return all_store_item_ids()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+#: ✅ **2026-09-28 已清空**：`D1-bd-notetype-rows` 的静态受管区通路已建成 ——
+#:    契约里有它的 static table（`bad_debt_notetype_rows`，2 固定行 × 9 列 = 18 field），
+#:    投影/回写走 `phase5_d1_04_bad_debt.build_notetype_store_projection` /
+#:    `merge_projection_into_notetype_rows`（行表引擎会拒静态 spec，故自带一对）。
+#:    本常量保留为**空元组**并配反向断言：若将来又出现「声明了但无契约 table」的 item，
+#:    必须显式登记在这里，不得藏在一个 `continue` 里。
+#:
+#: ── 以下为历史记录（该断口已修复）────────────────────────────────────────
+#: `D1-bd-notetype-rows`（D1-4 第三区，票据种类小计 R23-24）走 `static_region`：
+#: 契约装配层现算实测 **12 张 sheet / 17 个 table，static_tables 全为空** —— 该区的
+#: `RowTableSheetSpec` 声明存在、`_static_sheet_declarations()` 也产出它，但它**没有进契约**
+#: ⇒ 没有任何 stable field key 可投影，`build_combined_store_projection` 必须跳过它，
+#: 否则 `contract.field_by_stable_key` 会抛。
+#:
+#: ⇒ 这是与「扩容面未接装配链」**并列的第四个断口**，归后续批次（需先让契约装配层产出
+#:    static_tables 段）。本常量让它可见、可被判据断言，而不是藏在一个 `continue` 里。
+STORE_ITEM_IDS_WITHOUT_CONTRACT_TABLE: Final[tuple[str, ...]] = ()
+
+
+def _static_region_projection_builders() -> tuple[tuple[str, Any], ...]:
+    """静态受管区的 `(store_item_id, build_fn)` 清单（受同一灰度开关控制）。
+
+    与 `phase5_d1_expansion.static_region_table_payloads()` **同源同开关** ——
+    契约里有这张 static table 就必须有对应的投影函数，反之亦然；
+    判据 `test_static_region_contract_and_projection_are_paired` 钉死这个双射。
+    """
+    from app.services.workpaper_sync import phase5_d1_expansion as _exp
+
+    if not _exp.static_region_table_payloads():
+        return ()
+    from app.services.workpaper_sync import phase5_d1_04_bad_debt as _d104
+
+    return (
+        (_d104.SPEC_D104_NOTETYPE.store_item_id, _d104.build_notetype_store_projection),
+    )
+
+
+def _static_region_merge_handlers() -> tuple[tuple[str, Any], ...]:
+    """静态受管区的 `(store_item_id, merge_fn)` 清单（与投影侧成对）。"""
+    from app.services.workpaper_sync import phase5_d1_expansion as _exp
+
+    if not _exp.static_region_table_payloads():
+        return ()
+    from app.services.workpaper_sync import phase5_d1_04_bad_debt as _d104
+
+    return (
+        (_d104.SPEC_D104_NOTETYPE.store_item_id, _d104.merge_projection_into_notetype_rows),
+    )
+
+
+def build_combined_store_projection(
+    payloads: Mapping[str, str | bytes | Sequence[Any]],
+    *,
+    contract: SyncContract,
+    limits: Any | None = None,
+) -> Any:
+    """把**全部**受管 store item 的载荷合成一个 Projection —— 薄转发伴生模块。
+
+    真源与「三条通路（rows / dict / 静态受管区）」的完整说明在
+    `phase5_d1_combined_store`，本处不复制第二份。
+    """
+    from app.services.workpaper_sync.phase5_d1_combined_store import (
+        build_combined_store_projection as _impl,
+    )
+
+    return _impl(payloads, contract=contract, limits=limits)
+
+
+def merge_projection_into_all_d1_stores(
+    *,
+    projection: Any,
+    base_by_item: Mapping[str, Any],
+) -> dict[str, tuple[list[dict[str, Any]], int, int, set[str]]]:
+    """把反读回来的 Projection 分派回各 store item —— 薄转发伴生模块。
+
+    真源在 `phase5_d1_combined_store`。签名（全关键字参数）与返回形态逐项照抄真源，
+    **不按命名习惯推** —— 首版我把 `base_by_item` 写成了 `base_payloads` 并多加了
+    `contract`，20 条判据当场以 `TypeError: unexpected keyword argument` 打红。
+    """
+    from app.services.workpaper_sync.phase5_d1_combined_store import (
+        merge_projection_into_all_d1_stores as _impl,
+    )
+
+    return _impl(projection=projection, base_by_item=base_by_item)
 
 def merge_projection_into_store_rows(
     *,
@@ -658,44 +845,24 @@ def merge_projection_into_store_rows(
 
     🔴 field_id（契约侧 snake column_key）→ store json 键（前端 camelCase）的映射由
     :data:`MANAGED_FIELD_SPECS` 的第 0/4 列给出，两侧不可能各写一份而脱钩。
+
+    🔴 幽灵行防护（D4-2 同源缺陷，2026-09-22 用户实测）：Excel Table 边界被扩展时，
+    若新行只有一个杂散的 editable 格非空（公式列已由 is_protected 挡掉），这一个
+    字段就会让 identity 通过 shell 创建关卡，而 customer_name（该行的业务名称，
+    契约首列）因从未在 Excel 里写入内容、根本不产出 FieldValue，永久停在空值——
+    用户在结构化视图里看到的正是「有 rowId、没数据」的行。只对**本次新增**的
+    identity 加这道门：已存在的行永不受影响（清空是合法编辑）。
+
+    🔴 Task 15 声明化：本体已收敛进框架层，此处只薄转发。幽灵行防护锚点取
+    `SPEC_D103.ghost_row_anchor_index`（默认 0 = `customer_name`，与收敛前的
+    `MANAGED_FIELD_SPECS[0][4]` 逐字同一列）—— D1 首列就是自由文本业务名称，
+    不需要 D5/D6 那样的非零锚点例外。
     """
-    field_to_store = {spec[0]: spec[4] for spec in MANAGED_FIELD_SPECS}
-    by_id: dict[str, dict[str, Any]] = {}
-    order: list[str] = []
-    for row in base_rows:
-        rid = str(row.get(ROW_IDENTITY_STORE_KEY) or "").strip()
-        if not rid:
-            continue
-        by_id[rid] = dict(row)
-        order.append(rid)
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        merge_projection_into_store_rows as _engine_merge,
+    )
 
-    applied = 0
-    visited = 0
-    touched_rows: set[str] = set()
-    for key in projection.stable_keys():
-        fv = projection.get(key)
-        if fv is None or getattr(fv, "is_protected", False):
-            continue
-        rid = getattr(fv, "row_key", None)
-        if not rid:
-            continue
-        target = by_id.get(str(rid))
-        if target is None:
-            target = {ROW_IDENTITY_STORE_KEY: str(rid)}
-            by_id[str(rid)] = target
-            order.append(str(rid))
-        field_id = str(key).rsplit("/", 1)[-1]
-        store_key = field_to_store.get(field_id)
-        if not store_key:
-            continue
-        visited += 1
-        new_val = getattr(fv, "value", None)
-        if target.get(store_key) != new_val:
-            target[store_key] = new_val
-            applied += 1
-            touched_rows.add(str(rid))
-
-    return [by_id[rid] for rid in order], applied, visited, touched_rows
+    return _engine_merge(_spec_d103(), projection=projection, base_rows=base_rows)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -962,11 +1129,42 @@ async def attach_adapters(
         session=session, representation=representation, contract=contract
     )
     definitions = observation.definitions
+    # 🔴 attach 侧必须补 sibling binding，否则本 entry 的 **12 张受管 sheet / 18 张行表**
+    #    在读写两个方向都只剩主表 `GT_D13_ROWS`。
+    #
+    #    机理：`ExcelSyncAdapter.sibling_bindings` 默认 `()`，而 `_all_bindings()` 在它为空时
+    #    直接返回 `(self.binding,)`；`materialize` 与 `extract` 都以 `_all_bindings()` 为
+    #    唯一遍历面（`adapters/excel.py` 的 `bindings = self._all_bindings()` /
+    #    `for binding in self._all_bindings()`）。因此漏传一个参数会同时让两个方向静默退化成
+    #    单表 —— 不报错、不告警，`verify_unmanaged_regions` 也照样 `equivalent=True`
+    #    （它只管未受管区有没有被动，对「受管字段有没有往返成功」不发一言）。
+    #    实测退化形态：输入 projection 18 表 / 231 值，extract 只反读回 1 表 / 52 值。
+    #
+    #    `attach_sibling_bindings` 是框架层为**本 spec Task 10** 泛化出来的通用件
+    #    （Requirements 1.5 / 2.4），内部复用 publish 侧同一对齐内核
+    #    `_align_specs_to_sibling_tables` + `_static_region_bindings`，
+    #    所以两条路径的 binding 不会漂移。**不要在此另写一份对齐逻辑。**
+    #
+    #    它只认 provider 的**复数** `instrumentation_specs()`（单数入口一律返回空 sibling），
+    #    这正是本模块上方那个薄转发存在的第二个理由。
+    import sys as _sys
+
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        attach_sibling_bindings,
+    )
+
+    sibling_bindings = attach_sibling_bindings(
+        provider=_sys.modules[__name__],
+        primary=observation.identity_binding,
+        contract=contract,
+        dynamic_bindings=observation.identity_binding.dynamic_column_columns,
+    )
     register_adapter(
         registry,
         adapter=build_excel_adapter(
             definitions=definitions,
             binding=observation.identity_binding,
+            sibling_bindings=sibling_bindings,
             direction="html_to_oo",
         ),
         bundle=bundle,

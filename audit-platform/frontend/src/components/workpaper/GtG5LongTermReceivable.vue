@@ -12,23 +12,42 @@
     </div>
     <template v-else>
       <div class="g5-long-term-receivable-toolbar">
+        <!--
+          🔴 原先 `@change` 直接 `dualMode.switchMode(v)`（legacy 本地 ref）⇒ 桥的 mode 永远
+          不动、descriptor 恒 null，受管 sheet G5-2 切「在线编辑」后永远停在「正在打开…」。
+          顺带修掉 `:options="dualMode.modeOptions"` 漏 `.value`（把 ComputedRef 当数组传）。
+        -->
         <el-segmented
           v-if="isHtmlSheet"
           :model-value="renderMode"
-          :options="dualMode.modeOptions"
+          :options="syncModeOptions"
           size="small"
-          @change="(v: any) => dualMode.switchMode(v)"
+          @change="switchRenderMode"
         />
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g5-long-term-receivable" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
           📖 编制手册
         </el-button>
-        <el-tag v-if="isHtmlSheet && !isOoAvailable" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isHtmlSheet && !isOoAvailable && !isG5SyncManagedSheet" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isG5SyncManagedSheet && syncBusy" size="small" type="info">同步中…</el-tag>
+        <el-tag v-if="syncSwitching" size="small" type="info">切换中…</el-tag>
       </div>
 
+      <!-- G5-2 受管 sheet 走 WorkpaperSyncEditorHost 真双向 -->
+      <div v-if="isOoMode && isG5SyncManagedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          v-if="syncOoDescriptor"
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+        <div v-else class="oo-loading">正在打开 G5-2 同步编辑器…</div>
+      </div>
+
+      <!-- 非受管 sheet 保留 legacy GtOnlyOfficeSheet -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && renderMode === 'onlyoffice'"
+        v-else-if="isOoMode"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -188,7 +207,7 @@
  * GtG5LongTermReceivable.vue — G5 长期应收款底稿主入口
  * 对齐 G2/G3/G4：formData + g5:save-items + 附注路由 + 双模式 reload
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, toRef, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useG5DualMode } from './composables/useG5DualMode'
 import { useG5LonRecFormData, G5FormDataKey } from './composables/useG5LonRecFormData'
@@ -200,6 +219,13 @@ import { extractG5SheetCode, resolveG5SheetLabel } from './composables/g5SheetLa
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+// ── G5 sync bridge（spec: g5-nested-sections-and-template-defects · Task 12）──
+import { isGSingleRegionManagedSheet, gSingleRegionSheetKeyOf } from './sync/gSingleRegionManagedSheets'
+import { useGRenderModeSwitch } from './sync/useGRenderModeSwitch'
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const G5TabProcedure = defineAsyncComponent(() => import('./g5-long-term-receivable/core/G5TabProcedure.vue'))
@@ -305,11 +331,9 @@ const dualMode = useG5DualMode({
   reloadAll: () => formData.loadAll(),
 })
 
-/** 对齐 G1：computed getter/setter 安全包装 dualMode ref 避免模板嵌套 .value */
-const renderMode = computed({
-  get: () => dualMode.currentMode.value,
-  set: (v: string) => { void dualMode.switchMode(v as any) },
-})
+// 🔴 原先这里有个 `renderMode` computed（get/set 包 legacy `dualMode`），setter 直接
+//    `dualMode.switchMode(v)` ⇒ 受管 sheet 也只翻 legacy 本地 ref，桥的 mode 永远不动。
+//    现在 `renderMode` 由下方 `useGRenderModeSwitch` 提供（受管以桥为真源）。
 const isOoAvailable = computed(() => dualMode.isOoAvailable.value)
 
 const runtime = inject(WorkpaperRuntimeContextKey, null)
@@ -408,6 +432,48 @@ async function retrySelfLoad(): Promise<void> {
   isLoading.value = false
 }
 
+// ── G5 sync bridge 接线 ────────────────────────────────
+const G5_SYNC_ENTRY_ID = 'xlsx/gt-g5-long-term-receivable'
+const isG5SyncManagedSheet = computed(() => isGSingleRegionManagedSheet(currentSheet.value))
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const syncEntryId = ref(G5_SYNC_ENTRY_ID)
+const syncSheetKey = computed(() => gSingleRegionSheetKeyOf(currentSheet.value) ?? 'g502-managed')
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(G5_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    formData.flushPending()
+    return await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: G5_SYNC_ENTRY_ID,
+    })
+  },
+  reloadHtml: () => formData.loadAll(),
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(() => WP_BRIDGE_IN_FLIGHT_STATES.includes(syncBridge.state.value))
+
+// 🔴 受管 sheet 必须经桥切换 —— 桥建好了但没人调 `switchToOnlyOffice()` 就是空壳。
+const {
+  renderMode,
+  modeOptions: syncModeOptions,
+  switching: syncSwitching,
+  switchRenderMode,
+} = useGRenderModeSwitch({
+  bridge: syncBridge,
+  legacy: dualMode,
+  isManagedSheet: isG5SyncManagedSheet,
+  editorHostRef: syncEditorHostRef,
+})
+
+const isOoMode = computed(
+  () => isHtmlSheet.value && currentSheet.value !== '底稿目录' && renderMode.value === 'onlyoffice',
+)
+
 onMounted(async () => {
   window.addEventListener('g5:save-items', handleG5SaveItems)
   window.addEventListener('substantive:adjudicated', handleAdjudicated)
@@ -428,4 +494,11 @@ onBeforeUnmount(() => {
 .error-container { padding: 24px; }
 .g5-long-term-receivable-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
 .g5-index-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+
+/* ─── 同步编辑器容器 ─── */
+/* 🔴 必须带**视口相关的确定高度**：`WorkpaperSyncEditorHost` 根元素是 height:100% + flex 列，
+   父级 auto 高度会把编辑区（flex:1; min-height:0）压扁，OnlyOffice 在页面上只剩一条
+   （2026-09-22 D4 真栈实证）。模板里用了 `.oo-container` 却不定义它就是这个后果。 */
+.oo-container { min-height: 600px; height: calc(100vh - 280px); overflow: hidden; border-radius: 8px; }
+.oo-loading { padding: 40px 20px; text-align: center; color: #909399; font-size: 14px; }
 </style>

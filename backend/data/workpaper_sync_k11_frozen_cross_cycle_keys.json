@@ -1,0 +1,105 @@
+{
+  "schema_version": "frozen-cross-cycle-keys:v1",
+  "spec": "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub",
+  "task": "Task 8",
+  "owner_entry_id": "xlsx/gt-k11-asset-impairment-loss",
+  "why_this_file_exists": "🔴 KC-8：K11 是**跨循环枢纽** —— 它的 9 个 checklist 键被 H1 pilot / H3 / H8 / I1 四个非 K 循环消费。改名会静默打断这些消费方（它们读不到键就取空而不报错）。本文件是冻结清单的**唯一真源**，守卫按它现算比对。\n\n与 J 循环的完全反向：JC-17 在 J 是「完全自闭」（J 键无一被非 J 消费）⇒ J 轮结论是「改键无跨循环风险」。**照抄 J 的自闭结论会漏掉整条跨循环风险。**",
+  "frozen_keys": [
+    {
+      "key": "K11-2-detail-rows",
+      "consumers": [
+        "h3ImpairmentCrossSheet.ts",
+        "useH1Impairment.ts",
+        "useH8Impairment.ts",
+        "useI1Impairment.ts"
+      ],
+      "consumer_count": 4,
+      "includes_registered_pilot": true,
+      "note": "🔴 **4 方消费，含 H1 pilot**（H1 的 adapter_id 现算非空、契约 h1.disposal_check.json 已 reviewed）⇒ 改它必触发 H1 golden 回归。"
+    },
+    {
+      "key": "K11-2-fixed-asset-occurrence",
+      "consumers": ["useH1Impairment.ts"],
+      "consumer_count": 1,
+      "includes_registered_pilot": true,
+      "note": "H1 pilot 消费 —— 固定资产减值本期发生额。"
+    },
+    {
+      "key": "K11-2-rou-occurrence",
+      "consumers": ["useH8Impairment.ts"],
+      "consumer_count": 1,
+      "includes_registered_pilot": false,
+      "note": "H8 使用权资产减值本期发生额。"
+    },
+    {
+      "key": "K11-2-intangible-occurrence",
+      "consumers": ["useI1Impairment.ts"],
+      "consumer_count": 1,
+      "includes_registered_pilot": false,
+      "note": "I1 无形资产减值本期发生额。"
+    },
+    {
+      "key": "K11-2-intangible-source-amount",
+      "consumers": ["useI1Impairment.ts"],
+      "consumer_count": 1,
+      "includes_registered_pilot": false,
+      "note": "I1 侧回传的源金额（双向耦合的另一半）。"
+    },
+    {
+      "key": "K11-source-H1-amount",
+      "consumers": ["useH1Impairment.ts"],
+      "consumer_count": 1,
+      "includes_registered_pilot": true,
+      "note": "H1 → K11 的来源金额。"
+    },
+    {
+      "key": "K11-source-H3-amount",
+      "consumers": ["h3ImpairmentCrossSheet.ts"],
+      "consumer_count": 1,
+      "includes_registered_pilot": false,
+      "note": "H3 → K11 的来源金额。"
+    },
+    {
+      "key": "K11-source-H8-amount",
+      "consumers": ["useH8Impairment.ts"],
+      "consumer_count": 1,
+      "includes_registered_pilot": false,
+      "note": "H8 → K11 的来源金额。"
+    },
+    {
+      "key": "K11-source-I1-amount",
+      "consumers": ["useI1Impairment.ts"],
+      "consumer_count": 1,
+      "includes_registered_pilot": false,
+      "note": "I1 → K11 的来源金额。"
+    }
+  ],
+  "regression_hook": {
+    "trigger": "任何触及本清单 9 个键的改动（改名 / 删除 / 语义变更）",
+    "required_action": "触发 H1 pilot golden 回归",
+    "why_h1": "H1 是**已注册 adapter 的 pilot**（`adapter_id` 现算非空、契约 `h1.disposal_check.json` 的 `review_status == reviewed`）⇒ 它是唯一能真跑 golden 的消费方。",
+    "🔴 golden_payload_source": "H1 **自己的**载荷 —— 不能指望 K11 侧有数据（`K11-%` 真库行数为 0，见 `no_live_payload_risk`）。",
+    "guard": "backend/tests/workpaper_sync/test_k_lane2_p1_cross_cycle_hub.py"
+  },
+  "no_live_payload_risk": {
+    "k11_live_row_count": 0,
+    "verdict": "🔴 **有消费方但无载荷**",
+    "what_happens": "4 个跨循环消费方读 K11 键时**恒取空而不报错** —— checklist 查不到 item_id 就返回空，消费方按空值继续算，结果是「减值本期发生额恒为 0」这种静默错值。",
+    "same_type_as": "H 循环 BP-12 的「猜键回退链」（猜出的键生产命中 0 + 真库零载荷 ⇒ 静默取空）",
+    "detection_criterion": "消费方读跨循环键取空时 SHALL **告警而非静默** —— 当前实现是静默，登记为待修。",
+    "roundtrip_strategy": "K11 自己的 roundtrip 用**合成载荷**并标 `synthetic_payload_no_live_db_baseline`，不得宣称有真库实证。"
+  },
+  "reverse_direction": {
+    "note": "🔴 K11 ↔ H1 是**双向**耦合：`useK11Detail.ts` 反向引用 H1 的键。",
+    "k_domain_references_non_k_keys": [
+      "H1-14-supplement-total",
+      "H1-14-calc-rows"
+    ],
+    "referencing_file": "useK11Detail.ts"
+  },
+  "global_counters": {
+    "non_k_files_consuming_k_keys": 57,
+    "k_domain_referencing_non_k_keys": 4,
+    "note": "全局现算口径见 `test_k_foundation_p6_cross_cycle_and_template.py`。🔴 **57 不是 70**：design.md 的 70 含 `cycleImportExportRegistry.generated.ts` 里的大量 **sheet 码**（如 `K1-9`、`K8-6`），那些是 sheet 标识不是 checklist 键。本清单按「`K{n}-` 前缀的 checklist 键字面量」现算得 57。两个口径都对，混用会算错。"
+  }
+}

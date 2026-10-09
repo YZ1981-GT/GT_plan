@@ -84,17 +84,17 @@
         "payload_column": "conclusion",
         "payload_column_mode": "conclusion_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 conclusion（remark 留给纯文本说明）",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L653",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L740",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
-        "transport_key_kind": "literal_item_id",
+        "transport_key_kind": "storage_contract_member_item_id",
         "transport_key_shape": "G1-2-rows",
         "row_identity_key": "id",
         "row_identity_kind": "generated_timestamp_string",
         "row_identity_generator": "inline template literal",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L704",
-        "row_identity_generator_form": "`row-${Date.now()}`",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L482",
+        "row_identity_generator_form": "`g1d-${mintRowIdSuffix()}`",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
           "array_index",
@@ -108,9 +108,9 @@
         "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 另有 G1-1（审定表 4 键）/ G1-3 调整分录 / G1-4 结存 / G1-5 收益测算（5 键）/ G1-6 公允价值测试 / G1-7 三层次 / G1-8 业务模式（6 键）/ G1-9 分类适当性 / G1-10 SPPI / G1-11 监盘 / G1-12 倒轧 / G1-13 凭证 / G1-14 衍生（7 键）与两份附注披露的各自键。逐字段 contract 属 step 6 的活，本次不伪造。",
         "primary_table": {
           "item_id": "G1-2-rows",
-          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts",
-          "owner_constant": "DATA_KEY",
-          "owner_declaration_kind": "module_constant",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/g1StorageContract.ts",
+          "owner_constant": "G1_ITEM_IDS.G1_2_ROWS",
+          "owner_declaration_kind": "storage_contract_member",
           "what_it_holds": "交易性金融资产明细（G1-2）整表 —— 类别/投资项目/期初余额三联（成本·累计公允价值变动·公允价值）/期初账项调整/本期变动/期末审定",
           "template_relative_path": "G/G1 交易性金融资产.xlsx",
           "template_sheet": "明细表G1-2",
@@ -209,16 +209,16 @@
         "payload_column": "remark",
         "payload_column_mode": "remark_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 remark，conclusion 置 null",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG2Detail.ts#L517",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG2Detail.ts#L519",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
-        "transport_key_kind": "literal_item_id",
+        "transport_key_kind": "storage_contract_member_item_id",
         "transport_key_shape": "G2-2-detail-rows",
         "row_identity_key": "id",
         "row_identity_kind": "generated_prefixed_opaque_string",
         "row_identity_generator": "generateId()",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG2Detail.ts#L146",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG2Detail.ts#L150",
         "row_identity_generator_form": "`detail-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
@@ -233,9 +233,9 @@
         "table_keys_note": "这里只登记 primary managed table。本 entry 另有 G2-1 审定表（新旧各 4 键，共 8 个 item_id）/ G2-3 坏账准备 / G2-4 调整分录 / G2-5 利息测算 / G2-6 长期未收回 / G2-7 ECL 测算 / G2-8 凭证检查与两份附注披露的各自键。逐字段 contract 属 step 6 的活，本次不伪造。",
         "primary_table": {
           "item_id": "G2-2-detail-rows",
-          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useG2Detail.ts",
-          "owner_constant": "STORAGE_KEY",
-          "owner_declaration_kind": "module_constant",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/g2StorageContract.ts",
+          "owner_constant": "G2_ITEM_IDS.G2_2_DETAIL_ROWS",
+          "owner_declaration_kind": "storage_contract_object_member",
           "what_it_holds": "应收利息明细（G2-2）整表 —— 投资种类/投资项目/期初余额/期初调整数/期初余额审定数/借贷方发生/期末余额 + 账龄分段",
           "template_relative_path": "G/G2 应收利息.xlsx",
           "template_sheet": "明细表G2-2",
@@ -335,7 +335,7 @@
         "payload_column": "conclusion",
         "payload_column_mode": "conclusion_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 conclusion（remark 留给纯文本说明）",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG3Detail.ts#L336",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG3Detail.ts#L514",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
@@ -344,8 +344,8 @@
         "row_identity_key": "id",
         "row_identity_kind": "generated_timestamp_string",
         "row_identity_generator": "inline template literal",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG3Detail.ts#L358",
-        "row_identity_generator_form": "`row-${Date.now()}`",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG3Detail.ts#L428",
+        "row_identity_generator_form": "`g3d-${mintRowIdSuffix()}`",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
           "array_index",
@@ -1096,7 +1096,7 @@
         "row_identity_generator": "inline template literal",
         "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG6SppiFairValue.ts#L278",
         "row_identity_generator_form": "`fv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`",
-        "row_identity_is_positional": true,
+        "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
           "array_index",
           "ordinal",
@@ -1119,8 +1119,8 @@
           "identity_text": "投资项目"
         },
         "html_persistence_composable": "audit-platform/frontend/src/components/workpaper/composables/useG6SppiFormData.ts#L176(GET)/#L286(PUT)",
-        "row_identity_positional_defect": "🔴 载入路径 `useG6SppiFairValue.ts#L331` 写的是 `data.rows.map((r, i) => migrateFairValueRow(r, i + 1))`，而 `migrateFairValueRow`（#L128）在 `raw.id` 缺失时用 ``String(raw.id || `fv-${Date.now()}-${seq}`)`` —— seq 即**数组下标 i+1**，属 forbidden_row_identity_kinds 的 array_index。已登记 BP-7，本任务不改（改法会动既存持久化数据）。",
-        "payload_null_placeholder_columns": []
+        "payload_null_placeholder_columns": [],
+        "row_identity_bp7_fix_note": "🟢 BP-7 已修（g4-g6 spec Task 6，2026-09-27）：useG6SppiFairValue.ts#L128 的 id 回退从 `fv-${Date.now()}-${seq}` 改为 `fv-${Date.now()}-${Math.random().toString(36).slice(2,6)}`，不再用数组下标 seq 作身份 ⇒ 实测行身份构造表达式无位置化命中。"
       },
       "html_counterpart_source_refs": [
         "audit-platform/frontend/src/components/workpaper/GtG6OtherBondSppi.vue",
@@ -1336,7 +1336,7 @@
         "payload_column": "remark",
         "payload_column_mode": "remark_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 remark，conclusion 置 null",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG8Detail.ts#L400",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG8Detail.ts#L533",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
@@ -1345,7 +1345,7 @@
         "row_identity_key": "rowId",
         "row_identity_kind": "generated_prefixed_opaque_string",
         "row_identity_generator": "genId()",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG8Detail.ts#L76",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG8Detail.ts#L198",
         "row_identity_generator_form": "`g8d-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
@@ -1459,7 +1459,7 @@
         "payload_column": "remark",
         "payload_column_mode": "remark_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 remark，conclusion 置 null",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG9Detail.ts#L322",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG9Detail.ts#L553",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
@@ -1468,7 +1468,7 @@
         "row_identity_key": "rowId",
         "row_identity_kind": "generated_prefixed_opaque_string",
         "row_identity_generator": "genId()",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG9Detail.ts#L82",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG9Detail.ts#L278",
         "row_identity_generator_form": "`g9d-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
@@ -1583,16 +1583,16 @@
         "payload_column": "remark",
         "payload_column_mode": "remark_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 remark，conclusion 置 null",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG10Detail.ts#L382",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG10Detail.ts#L462",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
-        "transport_key_kind": "literal_item_id",
+        "transport_key_kind": "storage_contract_member_item_id",
         "transport_key_shape": "G10-detail-rows",
         "row_identity_key": "rowId",
         "row_identity_kind": "generated_prefixed_opaque_string",
         "row_identity_generator": "genId()",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG10Detail.ts#L109",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG10Detail.ts#L176",
         "row_identity_generator_form": "`g10d-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
@@ -1607,9 +1607,9 @@
         "table_keys_note": "这里只登记 primary managed table。本 entry 另有 G10-1 审定表（4 键 + G10-1-adjudicated-amount）/ G10-3 调整分录（G10-aje-rows + G10-adj-writeback overlay）/ G10-4 分类适当性 / G10-5 公允价值测试 / G10-6 三层次调节 / G10-7 凭证检查（3 键）/ G10-8 衍生工具核查（3 键）/ 8 个 G10A-*-complete 程序表标记键与两份附注披露键。逐字段 contract 属 step 6 的活，本次不伪造。",
         "primary_table": {
           "item_id": "G10-detail-rows",
-          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useG10Detail.ts",
-          "owner_constant": "ITEM_ID_ROWS",
-          "owner_declaration_kind": "module_constant",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/g10StorageContract.ts",
+          "owner_constant": "G10_ITEM_IDS.G10_DETAIL_ROWS",
+          "owner_declaration_kind": "storage_contract_member",
           "what_it_holds": "交易性金融负债明细（G10-2）整表 —— 类别/项目 + 期初余额（初始确认金额·累计公允价值变动·公允价值）/期初调整数/期初审定数与期末同构列",
           "template_relative_path": "G/G10 交易性金融负债.xlsx",
           "template_sheet": "明细表G10-2",
@@ -1716,7 +1716,7 @@
         "row_identity_key": "id",
         "row_identity_kind": "generated_prefixed_opaque_string",
         "row_identity_generator": "generateId()",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG11DetailAnalysis.ts#L71",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG11DetailAnalysis.ts#L72",
         "row_identity_generator_form": "`g11d-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
@@ -1831,7 +1831,7 @@
         "payload_column": "remark",
         "payload_column_mode": "remark_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 remark，conclusion 置 null",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG12HedgeDetail.ts#L138",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG12HedgeDetail.ts#L175",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
@@ -1840,7 +1840,7 @@
         "row_identity_key": "rowId",
         "row_identity_kind": "generated_prefixed_opaque_string",
         "row_identity_generator": "genId()",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG12HedgeDetail.ts#L40",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG12HedgeDetail.ts#L62",
         "row_identity_generator_form": "`g12h-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
@@ -1955,7 +1955,7 @@
         "payload_column": "remark",
         "payload_column_mode": "remark_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 remark，conclusion 置 null",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts#L185",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts#L212",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
@@ -1964,7 +1964,7 @@
         "row_identity_key": "rowId",
         "row_identity_kind": "generated_prefixed_opaque_string",
         "row_identity_generator": "generateRowId()",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts#L65",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts#L85",
         "row_identity_generator_form": "`g13d-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
@@ -1995,7 +1995,7 @@
         "audit-platform/frontend/src/components/workpaper/GtG13FairValueChanges.vue",
         "audit-platform/frontend/src/components/workpaper/composables/useG13FormData.ts",
         "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts",
-        "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts#L185",
+        "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts#L212",
         "backend/app/routers/checklist_responses.py#L84",
         "backend/app/routers/checklist_responses.py#L132",
         "backend/wp_templates/G/G13 公允价值变动收益.xlsx!明细表G13-2!A9 = '项目'"
@@ -2078,7 +2078,7 @@
         "payload_column": "remark",
         "payload_column_mode": "remark_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 remark，conclusion 置 null",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L199",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L295",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
@@ -2087,7 +2087,7 @@
         "row_identity_key": "rowKey",
         "row_identity_kind": "stable_template_row_key",
         "row_identity_generator": "createDefaultRows() / G14_LINE_ITEMS",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L61",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L151",
         "row_identity_generator_form": "stable_template_row_key（行集由 G14_LINE_ITEMS 固定，rowKey 不生成也不派生自位置；合计行 rowKey='total'）",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
@@ -2588,7 +2588,7 @@
         "row_identity": {
           "kind": "generated_prefixed_opaque_string",
           "identity_field": "rowId",
-          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useG12HedgeDetail.ts#L40"
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useG12HedgeDetail.ts#L62"
         }
       },
       {
@@ -2598,7 +2598,7 @@
         "row_identity": {
           "kind": "generated_prefixed_opaque_string",
           "identity_field": "rowId",
-          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts#L65"
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts#L84"
         }
       },
       {
@@ -2678,7 +2678,7 @@
         "E1 宿主（GtE1MonetaryFund.vue#L549）把 `availableSheets` 写成 `computed(() => [])`，**永远**走兜底路径；E1 目前躲过这个缺陷只是因为 `G1_SHEET_LABEL_MAP` 里没有 E1 的键、于是回落到 `fallbackSheetName ?? code`（即原样透传 sheetName）—— 是巧合正确，不是设计正确",
         "`extractG1SheetCode`（g1SheetLabels.ts#L32）把任何含「调整分录」的 sheet 名归一成 `G1-3` ⇒ 跨循环命名空间碰撞（E1-5「调整分录汇总」也会被归一），E 循环已把这条写成 e1SyncEntryRowIdentity.spec.ts 的实况断言"
       ],
-      "status": "REGISTERED_NOT_FIXED",
+      "status": "FIXED",
       "why_not_fixed_here": "修法有两条，都超出本任务范围：① 把 5 条兜底标签改成权威 tab 名 —— 但 `G1A ` 带尾随空格，改成带空格的值会让所有按「编码紧贴表名、无空格」约定写的比对（含 resolveG1SheetLabel 的 `${code}\\s*$` 正则、导入导出的 resolveG1ImportableSheet）行为改变，属跨模块改动；② 把兜底表整体换成 render-config 下发的真实 sheets 列表 —— 那是把 sheet 解析下沉到后端，影响所有走整册码/兜底路径的循环（D/E/F/G/…），任务正文明令「不要顺手修跨循环的解析器」。本任务的义务是把它查出来、落成可复核判据并阻断 bidirectional。",
       "must_fix_before": "把 xlsx/gt-g1-trading-financial-assets 标 bidirectional 或注册 adapter 之前（也在为它发布 contract 之前 —— 契约的 source_ref 要写 sheet 名）",
       "owner_task": "待立项（与 D slice 的 BP-5、F slice 的 BP-5、E slice 的 G1 sheet 解析缺陷同型，四处应并为一个 spec）",
@@ -2688,7 +2688,8 @@
         "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue",
         "audit-platform/frontend/src/components/workpaper/GtE1MonetaryFund.vue",
         "backend/wp_templates/G/G1 交易性金融资产.xlsx"
-      ]
+      ],
+      "fixed_note": "🔴 2026-09-27 已修（spec `g-cycle-sync-foundation-and-first-canary` Task 5）：`g1SheetLabels.G1_SHEET_LABEL_MAP` 的 5 条错名逐条改为模板真名 —— `G1A → '交易性金融资产实质性程序表G1A '`（**保留尾部空格**，空格是源模板事实）、`G1-8 → '业务模式分析G1-8'`、`G1-10 → '合同现金流量特征分析G1-10'`、`G1-12 → '有价证券盘点倒轧表G1-12'`、`附注国企 → '附注披露信息（国企）'`；其余 13 条改前即命中。原 `why_not_fixed_here` 的理由①（「改成带空格的值会让按『编码紧贴表名、无空格』约定写的比对行为改变」）经按值复核**不成立**：`resolveG1SheetLabel` 的正则是 `new RegExp(`${escaped}\\\\s*$`)`，本就容忍尾随空白；`extractG1SheetCode` 用 `sheetName.match(/(G1A|G1-\\\\d+)/i)`，对 `…G1A ` 照样返回 `G1A`。另有平台级旁证：ACNR 权威目录 `backend/data/acnr/global_catalog.json` 早已把这三个错名（`合同现金流量特征测试表G1-10` / `业务模式评估问卷G1-8` / `盘点倒轧表G1-12`）登记为 `sheet_name_aliases`、真名登记为 `sheet_name` ⇒ 平台命名真源与修后值一致，`g1SheetLabels.ts` 是唯一偏离方。理由②（把兜底表换成 render-config 下发）仍未做，但它是**另一条**更彻底的修法，不是本条的阻塞。守卫见 `tests/workpaper_sync/test_g_foundation_p4_p8_p17_p18_red_baselines.py::TestGfP4Bp5G1SheetLabels`。"
     },
     {
       "id": "BP-6",
@@ -2784,7 +2785,8 @@
         "audit-platform/frontend/src/components/workpaper/composables/g6StorageContract.ts",
         "audit-platform/frontend/src/components/workpaper/composables/g6CrossHelpers.ts",
         "audit-platform/frontend/src/components/workpaper/composables/g1CrossHelpers.ts"
-      ]
+      ],
+      "partial_progress": "🔴 2026-09-27 **部分收敛**（spec `g-cycle-sync-foundation-and-first-canary` Task 13）：`G2-2-detail-rows` 从 5 处各写一份字面量（`g2CrossHelpers.G2_DETAIL_STORAGE_KEY` / `useG2Detail.STORAGE_KEY` / `useG2DisclosureListed.ITEM_DETAIL` / `useG2DisclosureSoe.ITEM_DETAIL` / `useG2InterestCalc.DETAIL_KEY`）收敛成 `composables/g2StorageContract.ts` 的 `G2_ITEM_IDS.G2_2_DETAIL_ROWS` 单一真源，五处改**派生别名**（保留原常量名以免动调用方签名）；范式照既有正面样本 G5/G6 的 `g*StorageContract.ts`。`status` 仍为 REGISTERED_NOT_FIXED —— 现扫剩 79 条多模块重复字面量未收敛，本 spec 只按 canary 需要动了 G2 的主受管键（发布 per-entry contract 的硬前置），其余按 lane 逐个跟进，**不因动了一条就把整条阻断项标已修**。"
     },
     {
       "id": "BP-11",
@@ -2845,9 +2847,9 @@
     "finalized_published_representations": 0,
     "entries_left_unverifiable": 17,
     "transport_key_kind_counts": {
-      "literal_item_id": 13,
+      "storage_contract_member_item_id": 5,
+      "literal_item_id": 10,
       "literal_item_id_duplicated_across_modules": 1,
-      "storage_contract_member_item_id": 2,
       "per_sheet_literal_declared_in_the_consuming_sfc": 1
     },
     "payload_column_mode_counts": {
@@ -2867,9 +2869,9 @@
       "generated_opaque_string_with_array_index_fallback": 1,
       "stable_template_row_key": 1
     },
-    "entries_with_positional_row_identity_defect": 1,
+    "entries_with_positional_row_identity_defect": 0,
     "templates_serving_multiple_entries": 2,
-    "duplicated_item_id_literals_in_g_cycle": 80,
+    "duplicated_item_id_literals_in_g_cycle": 81,
     "reason": "17 条 entry 逐条实测都有 HTML 对端（checklist_responses + 逐 entry 各自的 payload 列与传输键形态），按 AC 12.8 一条都不能标 single_onlyoffice；OO 侧有真实业务价值且入口可达（17 个 componentType 在 htmlRendererRegistry 有真实入边，manifest 的 inbound_reference_count 均为 1），故也不是 single_html / unreachable；AC 12.1 的六件前置一件未交付（G 循环唯一的生产契约 g7.soe_subsidiary_disclosure 属已排除的 G7），故不得标 bidirectional。四个枚举值当下都不成立 ⇒ capability 记 null 并如实计入 unadjudicated=17。**unadjudicated=17 不是欠账新增，而是「本 slice 有 17 条 entry 的 capability 终态尚未确定」的实况**：缺什么已逐条落在 blocking_preconditions（BP-1..BP-4 是共性前置，BP-5/BP-7/BP-8/BP-9/BP-10 是本次新查出的 G 循环形态缺陷，BP-6 与 D/F 同型）。",
     "slice_counters": {
       "unadjudicated": 17,

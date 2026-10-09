@@ -24,7 +24,7 @@ Properties: **P24** / **P25** / **P36**
 ═══ AC 6.5：宿主模板不按 sheet 名定位 ═══
 
 判据落在**行为**上而不是「代码里没有某个字符串」：
-`test_host_binding_is_content_addressed` 断言 4 份契约的 `template_sha256` 与磁盘现算逐份相符
+`test_host_binding_is_content_addressed` 断言全部已交付契约的 `template_sha256` 与磁盘现算逐份相符
 （只有内容寻址才可能成立），并同时断言「G7 契约声明的 sheet 名在全库出现在 >1 份模板里」——
 即按名定位本会歧义，而实际绑定唯一。
 """
@@ -54,6 +54,33 @@ import generate_row_change_reachability as G  # noqa: E402
 DESIGN_MD: Path = (
     _REPO / ".kiro" / "specs" / "excel-workbook-wide-row-change-propagation" / "design.md"
 )
+
+#: 已交付 per-entry 契约数（`DELIVERED_PER_ENTRY_CONTRACTS` 的分母）。
+#:
+#: 🔴 这是**防空集恒真**的显式分母，不是可以随手抬的天花板：`verify_contract_template_binding()`
+#: 自己 hash 磁盘模板逐份比契约冻结 digest，若哪天 `DELIVERED_PER_ENTRY_CONTRACTS` 变空，
+#: `problems` 也会是空 ⇒ 守卫恒真。所以必须有一个人会意识到自己在改的数字。
+#:
+#: 2026-xx 由 4 抬到 10：phase5 D 循环（d1/d3/d4/d5/d6/d7）6 份契约交付并注册 adapter，
+#: 实测 10/10 契约的 `template_sha256` 与磁盘（净化后的）字节相符、`problems=0` ⇒ 分母是
+#: **变大**的，守卫覆盖面随之变大而非缩小。抬这个数之前必须先确认 `problems` 仍为空。
+_DELIVERED_CONTRACTS = 10
+
+#: Wave 2 的首要判据载体（design.md「判据分层」第 2 条）。
+#:
+#: 🔴 这是一个**裁决**，不是一个从数据里读出来的值 —— 所以它写在这里而不是从清册现取。
+#: `test_d2_remains_the_sole_maximal_propagation_carrier` 的职责就是验证「这个裁决在今天
+#: 的真实数据上仍然站得住」。改它 = 改载体裁决，必须同步改 design.md。
+_PRIMARY_CARRIER = "d2.receivable_detail"
+
+#: 参与「fan-in 严格唯一最大」比较的 entry 数**下界**。
+#:
+#: 🔴 这是**地板不是天花板**：`max(others)` 在 `others` 为空时抛、在单元素时"最大"不是比出来的。
+#: 2026-xx 实测有传播需求的 entry 是 5 个（d2/d3/d5/d6/d7）⇒ 下界 2 有充足余量。
+#: 🔴 **刻意不写成 `== 5`**：那五个数字已由 `test_inventory_matches_current_computation`
+#: 逐字锁住（`diff_inventory` 比对整个 `contracted_entries` 块），在这里再写一遍等于把
+#: 判据降级成清册内容的复述 —— 零新增保护，且每次交付新契约都要来改一次。
+_MIN_DEMAND_COHORT = 2
 
 _DENOMINATOR_HEADER = "| key | 分母 | 值 | 定义（判据必须按此口径复算） |"
 _MARKER_HEADER = "| key | 标记 | 命中 sheet | 命中模板 |"
@@ -116,7 +143,7 @@ def design_markers() -> dict[str, dict[str, int]]:
 def verify_contract_template_binding(
     load: Any = None,
 ) -> tuple[list[str], int]:
-    """独立校验 4 份契约的「宿主 = contract.template.relative_path + sha256」绑定。
+    """独立校验全部已交付契约的「宿主 = contract.template.relative_path + sha256」绑定。
 
     刻意**不读**生成器写下的 `template_sha256_matches` —— 那等于让守卫核对自己写的数字。
     这里自己 hash 磁盘文件，与契约冻结的 digest 逐份比。
@@ -291,7 +318,7 @@ def test_uncontracted_templates_are_blocked_with_gate1_reason(
     no_contract = [r for r in rows if r["reason"] == "no_projection_contract"]
     assert len(no_contract) > len(rows) * 0.9, (
         f"仅 {len(no_contract)}/{len(rows)} 份受影响模板以 no_projection_contract 阻塞 —— "
-        "与 Gate 1 的裁决（覆盖面 = 4 个已发契约 entry）不符，需重新审裁决"
+        f"与 Gate 1 的裁决（覆盖面 = {_DELIVERED_CONTRACTS} 个已发契约 entry）不符，需重新审裁决"
     )
 
 
@@ -324,7 +351,7 @@ def test_extremes_are_registered_with_perf_data(stored: dict[str, Any]) -> None:
 
 
 def test_host_binding_is_content_addressed(stored: dict[str, Any]) -> None:
-    """🔴 4 份契约的 `template_sha256` 与磁盘现算逐份相符。
+    """🔴 全部已交付契约（`_DELIVERED_CONTRACTS` 份）的 `template_sha256` 与磁盘现算逐份相符。
 
     只有沿 `contract.template.relative_path` + `template_sha256` 绑定才可能全部成立；
     按 sheet 名或 manifest 的 `wp_code_patterns` 猜出来的宿主不会恰好都对上 digest。
@@ -336,10 +363,12 @@ def test_host_binding_is_content_addressed(stored: dict[str, Any]) -> None:
     时，读布尔值的写法判 GREEN（守卫在核对自己写的数字，假绿第②源）。
     """
     rows = {r["entry_id"]: r for r in stored["contracted_entries"]}
-    assert len(rows) == stored["denominators"]["delivered_contract_entries"] == 4
+    assert len(rows) == stored["denominators"]["delivered_contract_entries"] == _DELIVERED_CONTRACTS
 
     problems, checked = verify_contract_template_binding()
-    assert checked == 4, f"只独立校验了 {checked} 份契约，应为 4（防空集恒真）"
+    assert checked == _DELIVERED_CONTRACTS, (
+        f"只独立校验了 {checked} 份契约，应为 {_DELIVERED_CONTRACTS}（防空集恒真）"
+    )
     assert not problems, "契约 ↔ 权威模板的内容寻址绑定不成立：\n  " + "\n  ".join(problems)
 
     for entry_id, row in rows.items():
@@ -374,7 +403,7 @@ def test_binding_verifier_detects_injected_digest_drift(
         "generate_row_change_reachability.load_contract", _drifted, raising=False
     )
     problems, checked = verify_contract_template_binding(load=_drifted)
-    assert checked == 4
+    assert checked == _DELIVERED_CONTRACTS
     assert any("d2.receivable_detail" in p or "gt-d2" in p for p in problems), (
         f"注入的 digest 漂移没被报出来 —— 校验器没在真的 hash。实得 {problems}"
     )
@@ -421,34 +450,111 @@ def test_sheet_name_lookup_would_have_been_ambiguous(
     assert ambiguity[g7_sheet]["other_hosts_sample"], "冲突样本里应能列出别的宿主"
 
 
-def test_d2_is_the_only_entry_with_propagation_demand(stored: dict[str, Any]) -> None:
-    """Gate 1 的核心结论：4 个契约 entry 里只有 D2 有真实传播需求。
+def test_d2_remains_the_sole_maximal_propagation_carrier(stored: dict[str, Any]) -> None:
+    """🔴 Wave 2 的判据载体**有且只有一个**，证据不会被摊薄到多个 entry 上。
 
-    这条决定了 Wave 2 的首要判据载体。若哪天不止 D2，Task 10 / 11 的载体选择要重审。
+    ═══ 本条是从 `test_d2_is_the_only_entry_with_propagation_demand` 重裁而来 ═══
+
+    原断言是 `with_demand == {"d2.receivable_detail": 52}`，它把**三件事**焊成一条等式：
+
+    ① **普查口径**「契约 entry 只有 4 个」 —— 今天是 **10** 个（phase5 交付 d1/d3/d4/d5/d6/d7）。
+       这一条已由 `delivered_contract_entries` 分母 + `_DELIVERED_CONTRACTS` 各自钉住，
+       在本条里重述属重复。
+    ② **精确处数集合**`{d2: 52}` —— 今天是 `{d2:52, d3:51, d5:24, d6:3, d7:3}`。
+       🔴 **不把它改写成新的五元等式**：`test_inventory_matches_current_computation` 已经
+       拿 `diff_inventory()` 把整个 `contracted_entries` 块与现算逐字比对，那五个数字**已经
+       被锁住了**。在这里再抄一遍 = 把一条有意义的不变量降级成「清册内容的复述」，
+       零新增保护，且下次契约交付时又得改一次数字。
+    ③ 🔴 **载体裁决**「Wave 2 的判据落在 D2 身上」 —— **这一条今天仍然成立，是本条要保护的**。
+
+    ═══ 为什么不能再用「处数最多」支撑 ③ ═══
+
+    实测 D2 = 52 处、D3 = **51** 处 —— 领先 **1 处（1.9%）**，且 D2 只占全部需求的 39.1%。
+    任何对 `D/D3 预收账款.xlsx` 的琐碎改动都能翻转排名，而那与「谁适合当载体」**毫无关系**。
+    按处数设的守卫会在无意义的时刻打红 ⇒ 下一个人只会把它放宽掉（`>= 0` 那种），
+    那正是本仓反复出现的假绿形态。
+
+    ═══ 真正让 D2 成为载体的是 fan-in（引用侧 sheet 张数）═══
+
+    | entry | demand | 引用侧 sheet 张数 | 被引用的不同行数 |
+    |---|---:|---:|---:|
+    | `d2.receivable_detail` | 52 | **4** | 3 |
+    | `d3.prepaid_receipts_detail` | 51 | 2 | 3 |
+    | `d5.receivables_financing_detail` | 24 | 1 | 2 |
+    | `d6.contract_assets_detail` | 3 | 1 | 1 |
+    | `d7.contract_liabilities_detail` | 3 | 1 | 1 |
+
+    一次插行要出错，出错的地方是「多张引用侧 sheet 之间不一致」；`d5` 那种 24 处全挤在
+    **单张** sheet 上的是**重复**样本而不是**广**样本。D2 的 fan-in 是次席的 2 倍、
+    其余的 4 倍 ⇒ 它是唯一能把 AC 2.2/2.3/2.4/2.6 一次压满的样本。
+    design.md 的载体理由本来写的就是这个（「被 **4 张 sheet** 的 52 处公式引用」）。
+
+    ═══ 断言形态 ═══
+
+    「fan-in 严格唯一最大」既**可被真实世界推翻**（某个 entry 涨到 4 张、或 D2 掉下来 ⇒ 红，
+    而那时载体**确实**该重裁），又**不能靠放宽通过**（多列几个 entry 只会让它更难成立）。
+    「严格 >」+「达到最大值的只有一个」这两半合起来才是「证据不被摊薄」：
+    两个 entry 并列最大 = 判据被劈成两半 ⇒ 必须红。
     """
     rows = {r["contract_id"]: r for r in stored["contracted_entries"]}
     with_demand = {
         cid: r["propagation_demand_sites"]
         for cid, r in rows.items() if r["propagation_demand_sites"] > 0
     }
-    assert with_demand == {"d2.receivable_detail": 52}, (
-        f"有传播需求的契约 entry 集合变了：{with_demand} —— "
-        "Wave 2 的首要判据载体（D2）需重新裁定"
+
+    # ── 反空集 / 反真空下界 ────────────────────────────────────────────
+    # 🔴 `_MIN_DEMAND_COHORT` 不是天花板而是**地板**：下面的「严格唯一最大」在比较集为空时
+    #    会真空成立。必须至少有 2 个 entry 参与比较，D2 的"最大"才是被比出来的。
+    assert _PRIMARY_CARRIER in with_demand, (
+        f"首要判据载体 {_PRIMARY_CARRIER} 已没有传播需求 —— Wave 2 的载体裁决必须重做。"
+        f"实得有需求的 entry：{with_demand}"
     )
-    for cid, row in rows.items():
-        if cid == "d2.receivable_detail":
-            # 🔴 **不写死具体状态值**：D2 的状态随传播能力落地而合法翻转
-            #    （Task 29：`blocked/pending_implementation` → `propagated/implemented`）。
-            #    首版这里硬写了 `blocked`，Task 29 翻转后本条漏改而打红 —— 那是判据
-            #    与「会随进度变的事实」耦合。改为只断言「有需求 ⇒ 落在两个合法态之一」，
-            #    「恰好是哪一态」由 `test_only_d2_flipped_to_propagated` 单独钉死。
-            assert (row["state"], row["reason"]) in {
-                ("blocked", "pending_implementation"),
-                ("propagated", "implemented"),
-            }, f"D2 有传播需求却落在意外状态: {row['state']}/{row['reason']}"
+    assert len(with_demand) >= _MIN_DEMAND_COHORT, (
+        f"只有 {len(with_demand)} 个 entry 有传播需求（下界 {_MIN_DEMAND_COHORT}）—— "
+        "「严格唯一最大」会在比较集为空/单元素时真空成立，判据失去意义"
+    )
+
+    # ── ③ 载体裁决：fan-in 严格唯一最大 ──────────────────────────────
+    fan_in = {
+        cid: len({s for m in rows[cid]["managed_sheets"] for s in m["referencing_sheets"]})
+        for cid in with_demand
+    }
+    others = {cid: n for cid, n in fan_in.items() if cid != _PRIMARY_CARRIER}
+    best_other = max(others.values())
+    margin = fan_in[_PRIMARY_CARRIER] - best_other
+    # 🔴 `best_other` 取的是**其它全部**有需求 entry 的 fan-in 最大值，所以「严格 >」
+    #    一条就同时表达了「最大」与「唯一」：并列最大 ⇒ margin == 0 ⇒ 红。
+    #    首版这里还跟了一条 `at_max == [_PRIMARY_CARRIER]`，实测它被上一条**严格蕴含**
+    #    （margin > 0 ⟹ 任何 other 都 < D2 ⟹ at_max 必为单元素）⇒ 那是一行装饰性断言，
+    #    永远不可能单独打红。按本仓「变异用例的唯一保护性」口径已删除，不留恒真断言。
+    assert margin > 0, (
+        f"{_PRIMARY_CARRIER} 的引用侧 sheet 张数 {fan_in[_PRIMARY_CARRIER]} 已不再**严格大于**"
+        f"其它有需求 entry 的最大值 {best_other} —— 判据载体不再唯一，证据会被摊薄到多个 "
+        f"entry 上，Wave 2 的首要判据载体需重新裁定。"
+        f"实测 fan-in：{dict(sorted(fan_in.items(), key=lambda kv: -kv[1]))}"
+    )
+
+    # ── ④ demand ⟺ state/reason 的双条件耦合（原断言的 (b)/(c) 两支的诚实推广）──
+    # 🔴 **不写死具体状态值**：D2 的状态随传播能力落地而合法翻转
+    #    （Task 29：`blocked/pending_implementation` → `propagated/implemented`）。
+    #    首版这里硬写了 `blocked`，Task 29 翻转后本条漏改而打红 —— 那是判据
+    #    与「会随进度变的事实」耦合。
+    #    原断言只对「D2 之外」要求 `out_of_scope`，那在「只有 D2 有需求」时才等价于双条件；
+    #    今天 5 个 entry 有需求，诚实的推广是对**全部** entry 断言双向蕴含。
+    legal_with_demand = {
+        ("blocked", "pending_implementation"),
+        ("propagated", "implemented"),
+    }
+    for cid, row in sorted(rows.items()):
+        pair = (row["state"], row["reason"])
+        if row["propagation_demand_sites"] > 0:
+            assert pair in legal_with_demand, (
+                f"{cid} 有 {row['propagation_demand_sites']} 处传播需求却落在意外状态: {pair}"
+            )
         else:
-            assert row["state"] == "out_of_scope"
-            assert row["reason"] == "no_propagation_demand"
+            assert pair == ("out_of_scope", "no_propagation_demand"), (
+                f"{cid} 无传播需求却不是 out_of_scope/no_propagation_demand: {pair}"
+            )
 
 
 def test_two_denominator_conventions_are_both_registered(stored: dict[str, Any]) -> None:

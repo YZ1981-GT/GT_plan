@@ -129,7 +129,7 @@ async def get_checklist_responses(
 # ---------------------------------------------------------------------------
 
 
-@router.put("", response_model=list[ChecklistResponseOut])
+@router.put("")
 async def batch_save_checklist_responses(
     wp_id: uuid.UUID,
     body: BatchSaveRequest,
@@ -200,6 +200,51 @@ async def batch_save_checklist_responses(
         locked, _, _ = await check_sign_lock(db, resolved_project_id, wp_code_val)
         if locked:
             raise HTTPException(status_code=403, detail="复核表已锁定")
+
+    # ── 公式推送独占键剔除（spec: formula-push-all-subjects-rollout · Task 12 · 需求 4.3）──
+    # 已接入推送的底稿，item_id 属于独占集合的条目从本批剔除、不落库。
+    # 推送引擎经 WorkpaperMutationAdapter 写入（不经本端点），不受影响。
+    skipped_owned_keys: list[str] = []
+    if wp_code_val and body.items:
+        import re as _re
+
+        _primary_match = _re.match(r"^([A-Z]\d+)", wp_code_val)
+        if _primary_match:
+            _primary_code = _primary_match.group(1)
+            try:
+                from app.services.formula_push.owned_keys import owned_item_ids
+
+                _owned_for_code = owned_item_ids(_primary_code)
+            except Exception:
+                _owned_for_code = frozenset()
+            if _owned_for_code:
+                # 宽限期：该项目从未成功推送过 → 跳过独占键剔除，允许前端双写
+                # spec: formula-push-all-subjects-rollout · design §5.3 风险缓解
+                try:
+                    from app.services.formula_push.owned_keys import has_any_push_run
+
+                    _has_run = await has_any_push_run(db, resolved_project_id)
+                except Exception:
+                    _has_run = True  # 查询异常 → 安全侧，执行剔除
+                if not _has_run:
+                    logger.debug(
+                        "checklist_save: 项目 %s 的 %s 尚未推送过，宽限独占键剔除",
+                        resolved_project_id, _primary_code,
+                    )
+                    _owned_for_code = frozenset()  # 跳过剔除
+
+                kept_items = []
+                for item in body.items:
+                    if item.item_id in _owned_for_code:
+                        skipped_owned_keys.append(item.item_id)
+                    else:
+                        kept_items.append(item)
+                if skipped_owned_keys:
+                    logger.info(
+                        "checklist_save: 剔除 %d 个公式推送独占键 wp_id=%s wp_code=%s keys=%s",
+                        len(skipped_owned_keys), wp_id, wp_code_val, skipped_owned_keys[:5],
+                    )
+                    body.items = kept_items
 
     try:
         existing_versions = await _lock_and_check_versions(db, wp_id, body.items)
@@ -275,6 +320,8 @@ async def batch_save_checklist_responses(
         year=context.audit_year,
         item_ids=[item.item_id for item in body.items],
     )
+    if skipped_owned_keys:
+        return {"items": results, "skipped_owned_keys": skipped_owned_keys}
     return results
 
 

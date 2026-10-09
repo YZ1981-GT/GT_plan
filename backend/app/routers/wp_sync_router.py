@@ -92,6 +92,7 @@ from app.services.workpaper_sync.endpoint_payloads import (
     build_resolution_choices,
     build_resolve_fence,
 )
+from app.services.workpaper_sync.failure_wording import describe_sync_failure_code
 from app.services.workpaper_sync.endpoint_guard import (
     GuardedScope,
     ScopeClaimCodec,
@@ -111,6 +112,7 @@ from app.services.workpaper_sync.materialize_coordinator import (
 )
 from app.services.workpaper_sync.models import (
     OperationShape,
+    ParticipantState,
     RequestKind,
     ScopeResourceKind,
     SyncDomainError,
@@ -120,11 +122,24 @@ from app.services.workpaper_sync.oo_to_html import (
     OoToHtmlCoordinator,
     OoToHtmlResult,
 )
+from app.services.workpaper_sync.materialize_reuse_verdict import (
+    REUSE_METRIC,
+    SINGLE_PASS_DECLINE_METRIC,
+    single_pass_decline_scope,
+)
 from app.services.workpaper_sync.metrics import sync_metrics
 from app.services.workpaper_sync.repository import WorkpaperSyncRepository
 from app.services.workpaper_sync.request_application import RequestApplicationService
 from app.services.workpaper_sync.resolution import CanonicalResolutionService
 from app.services.workpaper_sync.rooms import RoomScope, RoomService
+from app.services.workpaper_sync.adopt_substrate_response import (
+    AdoptPlanDigestMismatchError,
+    AdoptPlanVerificationError,
+    AdoptRevisionConflictError,
+    AdoptSubstrateError,
+    AdoptSubstrateNotPublishedError,
+    compute_adopt_substrate,
+)
 from app.services.workpaper_sync.store_projection_response import (
     compute_store_projection_response,
 )
@@ -319,11 +334,20 @@ _WRITE_ACTIONS: frozenset[str] = frozenset(
         "confirm_descriptor",
         "forcesave",
         "close_intent",
+        # spec oo-single-pass-materialize-and-room-leave Requirement 4：
+        # 「participant 主动离开」是**写** action（它改 participant 状态），所以在
+        # `workflow_locked`（归档 / 复核通过）下与 forcesave 一样被拒 —— 归档底稿上根本
+        # 不会有活着的 room，放它进只读名单只会多一条永不被走到的放行路径。
+        "leave_room",
         "claim_recovery_case",
         "download_only",
         "resolve_conflicts",
         "retry_apply",
         "rollback",
+        # spec workpaper-sync-managed-row-convergence Requirement 2：反向收敛覆盖 store，
+        # 是**写** action（`workflow_locked` 下与其它写一样被拒 —— 归档/复核通过的底稿
+        # 不该被 adopt 覆盖）。dry_run 分支虽只读，但同一端点同一 action，按写登记从严。
+        "adopt_substrate",
     }
 )
 
@@ -528,7 +552,104 @@ def _entry_scope(scope: GuardedScope) -> RoomScope:
     )
 
 
-async def _attach_pilot_adapters(svc: _SyncServices) -> tuple[str, ...]:
+@dataclass(frozen=True)
+class _RegistrationWarmupContext:
+    """启动预热用的最小上下文。
+
+    注册路径（:func:`_attach_pilot_adapters` / :func:`_registration_state_fingerprint`）
+    只用到 ``session`` 与 ``registry`` 两项 —— 不碰 guard / user / probe。预热发生在没有
+    HTTP 请求的启动阶段，构不出真正的 :class:`_SyncServices`（它要 user_id 与可见性探针），
+    因此这里给一个**同形但最小**的上下文，而不是把 guard 依赖伪造成匿名用户。
+    """
+
+    session: Any
+    registry: WorkpaperSyncAdapterRegistry
+
+
+#: 冷注册串行锁。
+#
+# 冷注册（4 条 pilot attach + register_from_manifest）实测 25~30s。没有这把锁时，
+# 进程刚起来那一批并发请求（前端打开底稿会并发打 store-projection / materialize /
+# timeline 多个 sync 端点）会**各自完整跑一遍**同一份 30s 注册：CPU 抢占让每个都更慢，
+# 且 openpyxl 全簿解析 ×N 份内存。有锁后第一个建、其余等它建完直接命中 ROI-0 缓存。
+#
+# 锁只护「建缓存」这段；缓存命中路径（绝大多数请求）完全不进锁。
+_REGISTRATION_BUILD_LOCK: "asyncio.Lock | None" = None
+
+
+def _registration_build_lock() -> "asyncio.Lock":
+    """惰性建锁：模块导入时还没有 running loop（`asyncio.Lock()` 不再绑 loop，但保持惰性
+    以免测试里跨 loop 复用同一把锁）。"""
+    global _REGISTRATION_BUILD_LOCK
+    if _REGISTRATION_BUILD_LOCK is None:
+        _REGISTRATION_BUILD_LOCK = asyncio.Lock()
+    return _REGISTRATION_BUILD_LOCK
+
+
+def _replay_cached_registrations(
+    svc: "_SyncServices | _RegistrationWarmupContext",
+    cached: "_RegistrationSnapshot",
+) -> tuple[str, ...]:
+    """把缓存的注册原样重放进本请求的新 registry（`register()` 仍跑全部 RG 判据）。"""
+    already = {reg.entry_id for reg in svc.registry.registrations()}
+    for reg in cached.registrations:
+        if reg.entry_id not in already:
+            svc.registry.register(reg)
+    return cached.adapter_ids
+
+
+async def _isolated_pilot_attach(
+    svc: "_SyncServices | _RegistrationWarmupContext",
+    *,
+    attach_pilot_adapters,
+    attach_d2,
+    attach_h1,
+    attach_g7,
+) -> tuple[str, ...]:
+    """逐条 pilot attach 并隔离 ``SyncDomainError``（如 ``ContractDriftError``）。
+
+    **根因修复（2026-10-04）**：此前四条 pilot attach 串行直调，D2 的
+    ``ContractDriftError``（contract 新增 adjudication_cells 但 representation 未重发）
+    会穿到 ``_ensure_adapters_ready`` 的 try/except → **所有** entry 的 sync 端点都 422。
+    而 ``register_from_manifest`` 内部已有 per-entry 隔离（spec
+    ``workpaper-sync-registration-isolation-and-d2-republish``），pilot attach 却没有。
+
+    修法与 ``register_from_manifest`` 同一模式：``SyncDomainError`` 记日志并跳过，
+    非域异常仍上抛（那是真 bug，不能吞）。
+    """
+    import logging
+
+    logger = logging.getLogger("workpaper_sync.pilot_attach")
+    adapters: list[str] = []
+
+    attach_fns = [
+        ("b60/simple_checklist", attach_pilot_adapters),
+        ("d2/large_json", attach_d2),
+        ("h1/grouped_dynamic", attach_h1),
+        ("g7/two_level_dynamic", attach_g7),
+    ]
+
+    for label, fn in attach_fns:
+        try:
+            result = await fn(svc.registry, session=svc.session)
+            adapters.extend(result)
+        except SyncDomainError as exc:
+            # 🔴 隔离：只记日志，不阻塞其他 pilot。与 register_from_manifest 里
+            # `except SyncDomainError` 的 blast radius 收敛逻辑同型。
+            error_code = str(getattr(exc, "error_code", "unknown"))
+            logger.warning(
+                "pilot attach [%s] 失败（隔离，不阻塞其他 entry）: %s — %s",
+                label,
+                error_code,
+                str(exc)[:300],
+            )
+
+    return tuple(adapters)
+
+
+async def _attach_pilot_adapters(
+    svc: "_SyncServices | _RegistrationWarmupContext",
+) -> tuple[str, ...]:
     """Task 40 起的**生产接线点**：把已 finalize 的 pilot entry 接进 registry。
 
     放在这里（而不是 `build_sync_services`）的唯一原因是它必须读库：bundle 快照只能按
@@ -570,32 +691,45 @@ async def _attach_pilot_adapters(svc: _SyncServices) -> tuple[str, ...]:
     fingerprint = await _registration_state_fingerprint(svc)
     cached = _REGISTRATION_CACHE.get(fingerprint)
     if cached is not None:
-        already = {reg.entry_id for reg in svc.registry.registrations()}
-        for reg in cached.registrations:
-            if reg.entry_id not in already:
-                svc.registry.register(reg)
-        return cached.adapter_ids
+        return _replay_cached_registrations(svc, cached)
 
-    explicit = (
-        await attach_pilot_adapters(svc.registry, session=svc.session)
-        + await attach_d2_pilot_adapters(svc.registry, session=svc.session)
-        + await attach_h1_pilot_adapters(svc.registry, session=svc.session)
-        + await attach_g7_pilot_adapters(svc.registry, session=svc.session)
-    )
-    # Task 75 追加（只加不动）：manifest 驱动的注册 —— 覆盖**全部** 186 条 entry，
-    # 并为每条未注册 entry 给出显式原因（`outcome.reasons`）。四条 pilot attach 保留在
-    # 上面：计划里每个 entry 仍派发到它**自己**的 attach（不共用），本次 pass 会发现它们
-    # 已注册并原样计入。零注册不再是「没人来注册」，而是可读的供给原因。
-    outcome = await svc.registry.register_from_manifest(session=svc.session)
-    adapter_ids = tuple(dict.fromkeys((*explicit, *outcome.registered_adapter_ids)))
-    _REGISTRATION_CACHE.put(
-        fingerprint,
-        _RegistrationSnapshot(
-            registrations=svc.registry.registrations(),
-            adapter_ids=adapter_ids,
-        ),
-    )
-    return adapter_ids
+    # 🔴 冷路径串行化：并发首请求不得各跑一遍 30s 注册（见 _REGISTRATION_BUILD_LOCK）。
+    async with _registration_build_lock():
+        # 拿到锁后**重查**：等锁期间别的请求很可能已经把缓存建好了。
+        cached = _REGISTRATION_CACHE.get(fingerprint)
+        if cached is not None:
+            return _replay_cached_registrations(svc, cached)
+
+        # 🔴 源码事实首算挪到工作线程（spec startup-prewarm-event-loop-unblocking Requirement 1）：
+        #    下面各 attach 在事件循环上调 `observe_descriptor_facts` / `observe_room_facts`，首算要扫
+        #    5000+ 个前端文件与全部路由（现场实测连续 7.9s 不让出循环 ⇒ 这段时间整个后端不响应）。
+        #    放在锁内：并发首请求若先拿到锁，同样不会在循环上首算。首算失败不在这里报 —— 原调用点
+        #    会以原错误 fail closed（见 `warm_source_fact_caches` docstring）。
+        from app.services.workpaper_sync.entry_source_facts import warm_source_fact_caches
+
+        await asyncio.to_thread(warm_source_fact_caches)
+
+        explicit = await _isolated_pilot_attach(
+            svc,
+            attach_pilot_adapters=attach_pilot_adapters,
+            attach_d2=attach_d2_pilot_adapters,
+            attach_h1=attach_h1_pilot_adapters,
+            attach_g7=attach_g7_pilot_adapters,
+        )
+        # Task 75 追加（只加不动）：manifest 驱动的注册 —— 覆盖**全部** 186 条 entry，
+        # 并为每条未注册 entry 给出显式原因（`outcome.reasons`）。四条 pilot attach 保留在
+        # 上面：计划里每个 entry 仍派发到它**自己**的 attach（不共用），本次 pass 会发现它们
+        # 已注册并原样计入。零注册不再是「没人来注册」，而是可读的供给原因。
+        outcome = await svc.registry.register_from_manifest(session=svc.session)
+        adapter_ids = tuple(dict.fromkeys((*explicit, *outcome.registered_adapter_ids)))
+        _REGISTRATION_CACHE.put(
+            fingerprint,
+            _RegistrationSnapshot(
+                registrations=svc.registry.registrations(),
+                adapter_ids=adapter_ids,
+            ),
+        )
+        return adapter_ids
 
 
 @dataclass(frozen=True)
@@ -758,6 +892,91 @@ async def read_store_projection(
         raise _domain_error(exc, status=422) from exc
 
 
+@router.post(USER_SYNC_PREFIX + "/adopt-substrate")
+async def adopt_substrate(
+    project_id: uuid.UUID,
+    wp_id: uuid.UUID,
+    entry_id: str,
+    payload: Mapping[str, Any] = Body(default_factory=dict),
+    svc: _SyncServices = Depends(_services),
+) -> dict[str, Any]:
+    """反向收敛：以**已发布** substrate 为准，覆盖本 entry 的 HTML store。
+
+    spec workpaper-sync-managed-row-convergence（Requirement 2/3）。用于打破死锁——
+    当 materialize 因 `roundtrip_projection_mismatch` 恒 500 时，让 store 认领 substrate
+    现有行集（`extra→0`），materialize 随即恢复。**不删任何数据**，多余行显示在 HTML 侧
+    供审计师手工处理。
+
+    body:
+      - `dry_run`: True 只算差异不落库（返回完整 Overwrite_Plan：两侧逐表行数 + 逐 item
+        三清单与四个计数 + `plan_digest` + 显式跳过清单）
+      - `expected_revision`: 并发保护；与服务端当前 content_revision 不符 → 409
+      - `plan_digest`: 从 dry_run 拿到并回传；与服务端重算值不符 → 409
+        （spec adopt-overwrite-and-refresh-source Requirement 3.4 —— 用户确认的那份差异
+        摘要必须就是将执行的那份；revision 管「表单整体版本」，它管「那份增删清单」）
+
+    🔴 破坏性写操作：覆盖前留存被改 item 原值（可回滚）+ 写 hash-chain 审计。
+    业务住伴生 service（`adopt_substrate_response`），本端点只 guard + 映射状态码。
+    """
+    scope = await _guard(
+        svc,
+        project_id=project_id,
+        wp_id=wp_id,
+        entry_id=entry_id,
+        action="adopt_substrate",
+    )
+    registration = await _registration(svc, scope)
+    dry_run = bool(payload.get("dry_run", False))
+    raw_rev = payload.get("expected_revision")
+    expected_revision = int(raw_rev) if raw_rev is not None else None
+    raw_digest = payload.get("plan_digest")
+    expected_plan_digest = str(raw_digest).strip() if raw_digest is not None else None
+    try:
+        return await compute_adopt_substrate(
+            session=svc.session,
+            project_id=project_id,
+            wp_id=wp_id,
+            entry_id=scope.entry_id,
+            registration=registration,
+            resolution=svc.resolution,
+            expected_revision=expected_revision,
+            dry_run=dry_run,
+            expected_plan_digest=expected_plan_digest,
+        )
+    except AdoptRevisionConflictError as exc:
+        # 并发冲突：客户端应刷新后重试。
+        raise HTTPException(
+            status_code=409,
+            detail={"error_code": exc.error_code, "message": str(exc)},
+        ) from exc
+    except AdoptPlanDigestMismatchError as exc:
+        # 计划已过期：两侧在用户看摘要与按确认之间变化过 ⇒ 让前端重取 dry_run。
+        raise HTTPException(
+            status_code=409,
+            detail={"error_code": exc.error_code, "message": str(exc)},
+        ) from exc
+    except AdoptSubstrateNotPublishedError as exc:
+        # 无已发布底稿可采纳 —— fail visible，绝不空覆盖。
+        raise HTTPException(
+            status_code=409,
+            detail={"error_code": exc.error_code, "message": str(exc)},
+        ) from exc
+    except AdoptPlanVerificationError as exc:
+        # 提交前复读与计划不符 ⇒ service 已回滚整个事务。这是**服务端自身不一致**
+        # （声明漂移 / merge 语义变化 / 并发删除），不是用户改输入能重试的事 ⇒ 500。
+        # 🔴 本分支必须排在兜底 `except AdoptSubstrateError` **之前**：它是后者的子类，
+        #    放到后面永远进不去，会被静默映成 422（spec 6.3 / design § Error Handling）。
+        raise HTTPException(
+            status_code=500,
+            detail={"error_code": exc.error_code, "message": str(exc)},
+        ) from exc
+    except AdoptSubstrateError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"error_code": exc.error_code, "message": str(exc)},
+        ) from exc
+
+
 @router.post(USER_SYNC_PREFIX + "/materialize")
 async def materialize(
     project_id: uuid.UUID,
@@ -806,9 +1025,46 @@ async def materialize(
 
     try:
         authorized = await coordinator.authorize(mat_request)
-        outcome = await coordinator.materialize(authorized)
+        # requirements 3.3：单趟写入的回落原因要能统计。engine 层拿不到 scope，所以它只
+        # **登记分型**（`record_single_pass_decline`），归因与 emit 在这里 —— 这是本请求
+        # 唯一同时握有 project_id/wp_id/entry_id 与「物化真的跑过」这两件事的地方。
+        with single_pass_decline_scope() as declines:
+            outcome = await coordinator.materialize(authorized)
     except SyncDomainError as exc:
         raise _domain_error(exc, status=classify_materialize_rejection(exc)) from exc
+
+    # requirements 3.1：复用判定必须落进既有 metrics 而不是只写日志。
+    # `result` 从 `outcome.reuse_verdict` **显式**取（`metric_result` 是封闭域的唯一构造处）——
+    # 不用 `getattr(..., default)`：默认值会把「字段名写错」变成「永远记成命中」，而四层静态
+    # 检查全绿（本 spec 反复踩过的形态）。
+    sync_metrics.record_outcome(
+        REUSE_METRIC,
+        result=outcome.reuse_verdict.metric_result,
+        landed=True,
+        project_id=project_id,
+        wp_id=wp_id,
+        entry_id=scope.entry_id,
+    )
+    if outcome.reuse_verdict.is_defect:
+        # 缺陷类**不**在这里抛：物化已经成功，用户该拿到 descriptor（正确性没问题，
+        # 只是白付了一趟全量）。可见性由日志 + 指标 + CI 门三层承担，CI 门见
+        # scripts/check/check_materialize_reuse_digest_caliber.py。
+        logger.error(
+            "[reuse_verdict] 🔴 缺陷类未命中 %s（wp=%s entry=%s）：%s",
+            outcome.reuse_verdict.metric_result,
+            wp_id,
+            scope.entry_id,
+            " ｜ ".join(outcome.reuse_verdict.differences),
+        )
+    for decline_class in declines:
+        sync_metrics.record_outcome(
+            SINGLE_PASS_DECLINE_METRIC,
+            result=decline_class.value,
+            landed=True,
+            project_id=project_id,
+            wp_id=wp_id,
+            entry_id=scope.entry_id,
+        )
     if outcome.descriptor is None:
         raise HTTPException(
             status_code=422,
@@ -930,6 +1186,10 @@ async def _attach_launch_urls(
             ),
         ),
         secret=secret,
+        # 同一个 target_sheet 走两条腿：签进 contents token（DS 下载时的 activeTab 字节）
+        # 与进 config 的 actionLink（客户端每次打开都执行的定位）。DS 命中缓存时只有后者
+        # 还在起作用 —— 两条腿缺一，「复用 generation 再打开」就会停在上一张 sheet。
+        target_sheet=target_sheet,
     )
     return out
 
@@ -1346,8 +1606,11 @@ async def create_close_intent(
             participant_id=participant_id,
             idempotency_key=str(idempotency_key),
             client_edit_epoch=int(payload.get("client_edit_epoch") or 0),
-            adapter_build_digest=str(payload.get("adapter_build_digest") or ""),
-            contributor_snapshot_digest=str(payload.get("contributor_snapshot_digest") or ""),
+            # 🔴 **不从 body 取** adapter_build_digest / contributor_snapshot_digest：
+            # 两者都是服务端事实（representation 的代码身份、room 的 contributor 快照），
+            # 客户端拿不到 —— 曾经的 `str(payload.get(...) or "")` 让每一次真实 clean close
+            # 都带着空 digest 进 fingerprint，稳定 422 `invalid_identity`。派生点在
+            # `reconcile_close_intents()` 的 room lock 内。
             contributor_user_ids=tuple(payload.get("contributor_user_ids") or ()),
             expected_write_fence_epoch=_int_or_none(payload.get("expected_write_fence_epoch")),
             created_by=scope.user_id,
@@ -1380,6 +1643,84 @@ async def create_close_intent(
         # exactly-one close-capture 的可观测事实（`>1` 由 Task 24 在锁内即抛）。
         "open_capture_count": int(opened.reconcile.open_capture_count),
         "live_intent_count": int(opened.reconcile.live_intent_count),
+    }
+
+
+@router.post(
+    USER_SYNC_PREFIX + "/rooms/{room_id}/participants/{participant_id}/leave"
+)
+async def leave_room(
+    project_id: uuid.UUID,
+    wp_id: uuid.UUID,
+    entry_id: str,
+    room_id: uuid.UUID,
+    participant_id: uuid.UUID,
+    payload: Mapping[str, Any] = Body(default={}),
+    svc: _SyncServices = Depends(_services),
+) -> dict[str, Any]:
+    """participant **主动离开**：只释放这一条 lease（`active/closing → left`）。
+
+    spec: oo-single-pass-materialize-and-room-leave · Requirement 4.1~4.5
+
+    🔴 **不是** `close-intents` 的同义词，两条路径必须分开（AC 4.1）。close-intent 是
+    close barrier 仲裁：推 `closing`、选 leader、提升一条 `kind=close_capture` 写请求。
+    对**未改动**的文档那条 capture 永远等不到 OO 回调 —— 真栈实测 room
+    `03bbcad8-70ef-4462-8a37-68af4fc0d1fa` 停在 `state=close_barrier` / participant
+    `closing` / capture `state=frozen`，该 room 此后**再也进不去**（下次打开
+    confirm-descriptor 仍 200，紧接着「同步失败，请重试」）。前端的「未改动点结构化视图」
+    正是这条路，所以它需要的是本端点而不是那一条。
+
+    刻意**没有** `Idempotency-Key`：本端点的幂等不来自键，而来自**终态**
+    （`ParticipantState.left` 是 `PARTICIPANT_EDGES` 的终态，重复离开由 service 的显式
+    状态分支返回同一结果）。声明一个没人用它去合并请求的必填 header 只会让调用方以为
+    「换个 key 就能再离开一次」。
+
+    刻意**没有** 202：它不派发任何出站命令，返回时状态迁移已经落库（router 这一次
+    `commit`）—— 202 会让前端以为还要轮询。
+    """
+    scope = await _guard(
+        svc,
+        project_id=project_id,
+        wp_id=wp_id,
+        entry_id=entry_id,
+        action="leave_room",
+        # 🔴 **两个** ref 都声明：room 与 participant 各自过一遍 scope index 的
+        # 「同 project/wp/entry」交叉比对（阶段 ③）。只声明 room 时，「拿别处的
+        # participant_id 配上自己可见的 room」会一路走到 service —— 那时唯一的防线是
+        # service 的归属判据，而 404 oracle 就只剩一条腿。
+        refs=declared_refs(
+            (
+                (ScopeResourceKind.room, room_id),
+                (ScopeResourceKind.participant, participant_id),
+            )
+        ),
+    )
+    try:
+        outcome = await svc.rooms.leave_participant(
+            room_id=room_id,
+            participant_id=participant_id,
+            # 归属判据的另一半 —— scope index 里没有「这条 lease 属于谁」这个事实。
+            actor_user_id=scope.user_id,
+            # 🔴 客户端**自报**的 dirty（服务端无从独立核实 OO 编辑器的内存态）。
+            # 取值刻意是「缺省即 False」而不是必填：前端在 dirty 时压根不会发出这个请求
+            # （`canLeave` 硬门），必填只会把一个正确的调用变成 422。说谎的客户端由
+            # in-flight 门与 close barrier 各自的判据承担。
+            client_reports_dirty=bool(payload.get("dirty") or False),
+        )
+        # service 只 flush；事务边界由 router 持有（本域惯例）。
+        await svc.session.commit()
+    except SyncDomainError as exc:
+        await svc.session.rollback()
+        raise _sync_http(exc) from exc
+    return {
+        "participant_id": str(outcome.participant_id),
+        "state": ParticipantState.left.value,
+        # 幂等重放（本次零写入）。前端照样返回表单，不当成失败。
+        "replayed": bool(outcome.already_left),
+        "left_at": outcome.left_at.isoformat(),
+        # AC 4.3 的可观测面：仍有其他 active editor 时 room 必须**保持** active。
+        "remaining_active_editors": int(outcome.remaining_active_editors),
+        "room_state": str(outcome.room_state),
     }
 
 
@@ -1629,6 +1970,11 @@ async def claim_recovery_case(
         svc, room_id=indexed_room, generation=scope.generation_of(case_ref)
     )
     try:
+        # 🔴 客户端提交的 expected_* 透传给服务端逐项核对（Task 32 欠账修复）。
+        # 前端 `buildClaimRequestBody` 一直在发这三项，此前服务端丢弃不校验 ⇒「错误
+        # bundle/fence/generation 的 claim」被静默接受。透传后由 repository 在建三实体
+        # 之前 fail-closed 拒绝。给出即校验、缺省（None）即跳过，不改既有正确路径。
+        _expected_bundle = payload.get("expected_definition_bundle_sha256")
         outcome = await svc.requests.claim_recovery(
             case_id=case_id,
             claiming_participant_id=_uuid_field(payload, "participant_id"),
@@ -1638,6 +1984,11 @@ async def claim_recovery_case(
             adapter_build_digest=adapter_build_digest,
             contributor_snapshot_digest=contributor_digest,
             current_revision=int(payload.get("expected_current_revision") or 0),
+            expected_generation=_int_or_none(payload.get("expected_generation")),
+            expected_write_fence=_int_or_none(payload.get("expected_write_fence")),
+            expected_definition_bundle_sha256=(
+                str(_expected_bundle) if _expected_bundle not in (None, "") else None
+            ),
             actor_id=scope.user_id,
         )
         await svc.session.commit()
@@ -1879,6 +2230,107 @@ def _operation_ref(operation_id: uuid.UUID) -> ScopeRef:
     )
 
 
+async def _application_failure_facts(
+    svc: _SyncServices, *, application_id: uuid.UUID
+) -> dict[str, Any]:
+    """把 application 事件流里的失败真因投影给前端（**只读**，不改任何状态）。
+
+    为什么必须从事件流读：`apply_durable_incoming` 在 durable 之后刻意不抛
+    （AC 5.7/5.8），失败只表现为 `result.result`，落库落在
+    `working_paper_content_application_event.error_code` 上；
+    `working_paper_sync_operation.error_code` 在这条路径上恒为 NULL。
+
+    中文说明取后端**已有的单源词表**（`excel_materialize.FAILURE_KINDS` 等），
+    不在前端再抄一份码→文案的映射：抄一份就必然与后端漂移，而漂移的表现是
+    「用户看到一个没人维护的旧措辞」。查不到登记时**不编**，只回码本身。
+    """
+    from app.models.workpaper_sync_models import WorkpaperContentApplicationEvent
+
+    row = (
+        await svc.session.execute(
+            sa.select(
+                WorkpaperContentApplicationEvent.error_code,
+                WorkpaperContentApplicationEvent.to_state,
+            )
+            .where(
+                WorkpaperContentApplicationEvent.application_id == application_id,
+                WorkpaperContentApplicationEvent.error_code.isnot(None),
+            )
+            .order_by(WorkpaperContentApplicationEvent.sequence_no.desc())
+            .limit(1)
+        )
+    ).first()
+    if row is None:
+        return {
+            "application_error_code": None,
+            "application_error_stage": None,
+            "application_error_message": None,
+        }
+    code = str(row[0])
+    return {
+        "application_error_code": code,
+        "application_error_stage": (None if row[1] is None else str(row[1])),
+        "application_error_message": describe_sync_failure_code(code),
+    }
+
+
+async def _fold_observability_facts(
+    svc: _SyncServices,
+    *,
+    application: Any,
+    room_id: uuid.UUID | None,
+) -> dict[str, Any]:
+    """same-application higher-sequence fold 的只读投影（Task 32 欠账修复）。
+
+    暴露三组事实，让 `same_application_higher_sequence_fold` 场景可观测：
+      · application 的 `origin_request_sequence`（不可变身份成分）与
+        `effective_request_sequence`（只 GREATEST 单调提升）；
+      · room 的 `latest_durable_application_id` / `latest_durable_sequence`
+        （canonical fence 指针）；
+      · 派生 `same_application_fold`：room 的 canonical 指针**仍指向本 application**
+        （`origin` 未被改写、没有 self-supersede）。
+
+    纯读、不改任何领域状态。room_id 为空（未绑定 room 的 operation）时三组均 None。
+    """
+    origin_seq = int(application.origin_request_sequence)
+    effective_seq = int(application.effective_request_sequence)
+    facts: dict[str, Any] = {
+        "origin_request_sequence": origin_seq,
+        "effective_request_sequence": effective_seq,
+        # effective 单调 ≥ origin 是 fold 的不变量（GREATEST，从不回退）。
+        "effective_ge_origin": effective_seq >= origin_seq,
+        "room_latest_durable_application_id": None,
+        "room_latest_durable_sequence": None,
+        "same_application_fold": None,
+    }
+    if room_id is None:
+        return facts
+    from app.models.workpaper_sync_models import WorkpaperOoRoom
+
+    room_row = (
+        await svc.session.execute(
+            sa.select(
+                WorkpaperOoRoom.latest_durable_application_id,
+                WorkpaperOoRoom.latest_durable_sequence,
+            ).where(WorkpaperOoRoom.id == room_id)
+        )
+    ).first()
+    if room_row is None:
+        return facts
+    latest_app_id, latest_seq = room_row[0], room_row[1]
+    facts["room_latest_durable_application_id"] = (
+        None if latest_app_id is None else str(latest_app_id)
+    )
+    facts["room_latest_durable_sequence"] = (
+        None if latest_seq is None else int(latest_seq)
+    )
+    # canonical fence 仍指向本 application ⇒ 更高 sequence 只 fold、未 self-stale。
+    facts["same_application_fold"] = (
+        latest_app_id is not None and str(latest_app_id) == str(application.id)
+    )
+    return facts
+
+
 @router.get(USER_SYNC_PREFIX + "/operations/{operation_id}")
 async def get_operation(
     project_id: uuid.UUID,
@@ -1921,6 +2373,18 @@ async def get_operation(
         "authority_model_definition_sha256": None,
         "durable_at": None,
         "finished_at": None,
+        # 🔴 2026-09-22：post-durable 失败的真因**不在** operation 行上。
+        # `apply_durable_incoming` 在 durable 之后刻意不抛（AC 5.7/5.8），失败只落在
+        # application 的事件流里（`working_paper_content_application_event.error_code`），
+        # 而 `working_paper_sync_operation.error_code` 保持 NULL。于是前端拿到的快照
+        # 里 error_code 是 null，界面只能显示裸的「同步失败」。
+        # 真栈实测：往金额列写了一段文本 → `excel_materialize_editable_write_failed`
+        # 全程只进了后端日志，用户完全看不出「这一列要数字」。
+        # 这里按**读侧投影**补上（不改任何领域状态、不动 oo_to_html），
+        # 措辞取后端已有的单源词表，前端只负责显示。
+        "application_error_code": None,
+        "application_error_stage": None,
+        "application_error_message": None,
     }
     if op.application_id is not None:
         from app.models.workpaper_sync_models import WorkpaperContentApplication
@@ -1950,6 +2414,18 @@ async def get_operation(
                 ),
                 "durable_at": row.durable_at.isoformat() if row.durable_at else None,
                 "finished_at": row.finished_at.isoformat() if row.finished_at else None,
+                **await _application_failure_facts(svc, application_id=row.id),
+                # 🔴 same-application higher-sequence fold 的**可观测读侧**（Task 32 欠账修复）。
+                # 写侧（Task 23 的 advance_room_durable_fence）一直在维护 application 的
+                # origin/effective sequence 与 room 的 latest-durable application/sequence，
+                # 但此前**无任何读路由暴露它们** ⇒「same-application fold 不 self-stale、
+                # origin 不改写」的结果无从观测（same_application_higher_sequence_fold 场景
+                # 因此只能落 failed）。这里在既有 get_operation 响应上补投影（不新建路由、
+                # 不改 generated contract）：读 application 的两条 sequence + room 的
+                # latest-durable 指针，并派生 `same_application_fold` 观测。
+                **await _fold_observability_facts(
+                    svc, application=row, room_id=op.room_id
+                ),
             }
     return {
         "requested_operation_id": str(canonical.requested_operation.id),
@@ -2723,20 +3199,33 @@ def _build_error_code_status(
         OperationScopeNotVisibleError,
         ScopeAuthorizationDeniedError,
     )
+    from app.services.workpaper_sync.rooms import (
+        ParticipantDirtyLeaveError,
+        ParticipantLeaveInFlightError,
+        ParticipantScopeNotVisibleError,
+    )
 
     production_spec: tuple[tuple[int, tuple[type, ...]], ...] = (
         # 404 —— 统一 oracle（`_sync_http` 把它们全部换成 `_not_found()`）。
+        #
+        # `ParticipantScopeNotVisibleError` 在内：「拿别人的 participant_id 去 leave」
+        # 与「那条 lease 不存在」必须逐字节同响应，否则 409/422 与 404 的差异就是一个
+        # 存在性预言机（Property 45）。
         (404, (ContentVersionNotFoundError, OperationScopeNotVisibleError,
-               MaterializeScopeNotVisibleError)),
+               MaterializeScopeNotVisibleError, ParticipantScopeNotVisibleError)),
         # 403 —— scope 可见但当前授权/工作流不允许。
         (403, (ScopeAuthorizationDeniedError, MaterializeAuthorizationError,
                ResolveAuthorizationStaleError, FinalFenceError)),
         # 409 —— 乐观锁/身份陈旧/幂等冲突/状态机不允许。
+        #
+        # 两条 leave 拒绝在内且**各有独立 code**：前端据 code 决定提示「先保存」还是
+        # 「稍等」。压成一个 code 会让 UI 只能说一句笼统的话，而这两件事的补救动作不同。
         (409, (IdempotencyConflictError, RevisionConflictError,
                DescriptorStaleIdentityError, DescriptorSubstrateStaleError,
                ResolveFenceRejectedError, ResolveSupersededError,
                ResolveRebaseRequiredError, StateTransitionError,
-               ReapplyForbiddenError, RollbackRevisionRewindError)),
+               ReapplyForbiddenError, RollbackRevisionRewindError,
+               ParticipantDirtyLeaveError, ParticipantLeaveInFlightError)),
         # 422 —— 请求本身不适配（客户端可读的拒绝）。
         (422, (QuarantinedIncomingError, QuarantinedOperationForbiddenError,
                RecoveryCaseRetryForbiddenError, ResolveWithoutConflictError,

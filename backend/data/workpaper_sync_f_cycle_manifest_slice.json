@@ -1458,15 +1458,18 @@
     {
       "id": "BP-5",
       "blocks": "single_onlyoffice 与 bidirectional 的 sheet 定位可靠性",
-      "what": "F2 的整册码回落会打开错工作簿：`find_template_file('F2')` 在索引里筛出 11 条 wp_code=='F2' 的候选后，按「文件名含『审定表』或『常规程序』」优先，而索引顺序里第一个命中的是 `F2-16 存货及跌价准备-会计政策（Leap-常规程序）.xlsx`（14,532 字节的单 sheet 会计政策册）—— 不是承载审定表与 11 张分类明细表的 `F2-1至F2-14 …审定明细表类（Leap-常规程序）.xlsx`。实测 `find_template_file_any('F2')` 与 `find_template_file('F2')` 都返回会计政策册。",
+      "what": "F2 的整册码回落会打开错工作簿：`find_template_file('F2')` 在索引里筛出 10 条 wp_code=='F2' 的候选后（**订正**：原写 11 条，2026-09-23 实测为 10 条全 xlsx；`_index.json` 自 71ca5f233 未改动，故这是当时的笔误而非漂移。BP-8 与本文件另 3 处「11 条命中」同此笔误，留给 BP-8 owner 一并订正），按「文件名含『审定表』或『常规程序』」优先，而索引顺序里第一个命中的是 `F2-16 存货及跌价准备-会计政策（Leap-常规程序）.xlsx`（14,532 字节的单 sheet 会计政策册）—— 不是承载审定表与 11 张分类明细表的 `F2-1至F2-14 …审定明细表类（Leap-常规程序）.xlsx`。实测 `find_template_file_any('F2')` 与 `find_template_file('F2')` 都返回会计政策册。",
       "consequence": "F2 的四个 xlsx entry（核心组 / 特殊组 / 计价减值组 / 监盘组）在 sheet 尾码提不出独立子码而回落整册码 F2 时，OO 侧打开的是会计政策册 ⇒ 该路径上的 OO 通道不可靠，既不能作为 bidirectional 的 materialize 基底，也让「切到在线编辑看到的是本表」这个用户预期在回落时不成立。",
       "observable_consequences": [
         "宿主未传 sheetName（或 sheet 名尾码提不出 F2-n）时，OO 侧打开的是「会计政策、核算流程F2-16」那一个 sheet 的册子，与用户当前所在的 F2-1/F2-3/F2-47/F2-55/F2-21 全都无关",
         "sheet 名尾码能提出独立子码时解析正确（实测 F2-1→审定明细表类、F2-21→盘点类、F2-38→计价测试、F2-47→跌价准备测试、F2-16→会计政策册），故该缺陷只在回落路径暴露 —— 是巧合正确，不是设计正确",
         "「优先含审定表或常规程序」这条规则在 F2 上被 4 本同时命中的册子稀释：F2-16（会计政策·常规程序）、F2-1至F2-14（审定明细表类·常规程序）、F2-52（关联交易·常规程序）三本都含关键词，胜出者只由索引顺序决定"
       ],
-      "status": "REGISTERED_NOT_FIXED",
-      "why_not_fixed_here": "与 Task 46 登记的 D4 BP-5 完全同型（同一个 `_sheet_wp_code` 回落 + 同一个 `find_template_file` 优先级链）。修它要给 F2 的约 60 个 sheet 建一份 sheet→模板映射（或把解析下沉到 render-config 下发的真实 sheets 列表），影响所有走整册码回落的循环（D/E/F/G/…）。任务正文明令「不要顺手修跨循环的解析器」，故只登记不修。",
+      "status": "PARTIALLY_FIXED_WHOLE_CODE_FALLBACK_NOW_RESOLVES_CORRECTLY",
+      "status_amendment_2026_09_23": "🔴 原 status 为 `REGISTERED_NOT_FIXED`。C9 分诊实测：`what` 描述的「整册码回落打开**错**工作簿」这一半**已被真修**，故不能再按未修登记。修复来自 `82f58ea44`（2026-09-13 feat(d4-ipo)）在 `wp_template_finder.py` 引入的 `_PRIMARY_TEMPLATE_TIERS = ('审定', '常规程序')` + `_pick_by_tier`：把「审定」抬成**严格高于**「常规程序」的独立一层。F2 的 10 个候选里含「审定」的**只有 1 条**（`F2-1至F2-14 …审定明细表类…`）⇒ 胜出者由语义唯一确定，不再由索引顺序决定。实测 `find_template_file('F2')` 现返回 `F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx`，与本 slice 里 `xlsx/gt-f2-inventory-main` 的 `template_ref` **一致**。该 commit 的生产注释原文点名「F2 同理拿到了「会计政策」」并专门为 F2 把 token 从「审定表」放宽成「审定」⇒ 是**有意修复**，不是副作用。注意：这与同一 commit 的 `_PROGRAM_TABLE_CODE_RE`（程序表码 `H2A`/`D4A` 回落主册）**是两个独立机制**，`'F2'` 不带尾字母 A 不匹配后者 —— 本条与那条「已发布特性撞已发布守卫」的碰撞无关。证据：`docs/operations/evidence/suite-triage/corpus-and-store-shape.md` §C9-5。",
+      "still_not_fixed": "**结构性缺口仍在**，故是 PARTIALLY 而非 FIXED：整册码回落这条**路径本身**依然存在，F2 的约 60 个 sheet 仍**没有** sheet→模板映射。回落现在落在审定明细表类册（含 F2-1~F2-14），但用户若正处在 F2-21（盘点类）/F2-38（计价测试）/F2-47（跌价准备测试）而 sheet 名尾码提不出子码，OO 侧打开的仍然不是本表 —— 只是「错得没那么远」（不再是 14,532 字节的单 sheet 会计政策册）。`consequence` 里「切到在线编辑看到的是本表」这个用户预期在回落路径上**仍不成立**。",
+      "latent_regression_shape": "新行为依赖「第一层『审定』在 F2 候选集里恰好只命中 1 条」。一旦 F2 再入库第二本含「审定」的册子，第一层内部就又回到 `(len(name), name)` 排序决定胜负 = BP-5 的潜伏形态复发。守卫判据 `test_bp5_whole_code_fallback_is_fixed_and_unambiguous` 已把「第一层命中数 == 1」写成断言，正是为此。",
+      "why_not_fixed_here": "与 Task 46 登记的 D4 BP-5 完全同型（同一个 `_sheet_wp_code` 回落 + 同一个 `find_template_file` 优先级链）。修它要给 F2 的约 60 个 sheet 建一份 sheet→模板映射（或把解析下沉到 render-config 下发的真实 sheets 列表），影响所有走整册码回落的循环（D/E/F/G/…）。任务正文明令「不要顺手修跨循环的解析器」，故只登记不修。【2026-09-23 补注：`82f58ea44` 已在**优先级链**这一侧动手并修好了「选错册」，但 sheet→模板映射这一侧仍未做，所以本条只降级不销号。】",
       "must_fix_before": "把任一 F2 entry 标 bidirectional 或注册 adapter 之前",
       "owner_task": "待立项（与 D slice 的 BP-5、E slice 的 G1 sheet 解析缺陷同型，三处应并为一个 spec）",
       "source_refs": [

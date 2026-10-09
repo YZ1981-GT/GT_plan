@@ -1,0 +1,16 @@
+-- V168: knowledge_source_type_enum 补回 'knowledge_doc'（修复 V042 以空文件被登记为已应用）
+--
+-- 背景（2026-09-29 真库实证）：
+--   schema_version 中 V042 的 checksum = e3b0c442...b855 = sha256(空串)，
+--   即 V042 被执行、登记时文件是**空的**；ALTER TYPE 语句是之后才补进文件的。
+--   runner 按版本号判重、不会重跑已登记版本 ⇒ public.knowledge_source_type_enum
+--   至今没有 'knowledge_doc'（残留的 tmp_task* 测试 schema 里的同名 enum 反而有，
+--   把漂移检测掩盖了）。
+--
+-- 后果：凡以 knowledge_doc 读写 knowledge_index 的语句都报
+--   invalid input value for enum knowledge_source_type_enum: "knowledge_doc"
+--   —— 知识文档索引写不进、按 knowledge_doc 过滤的检索恒失败；
+--   删除文档的索引清理钩子失败后还让主事务 aborted，删除被静默回滚。
+--
+-- 幂等：ADD VALUE IF NOT EXISTS（PG 9.3+）；同一迁移内不使用新值（PG 要求提交后才可用）。
+ALTER TYPE knowledge_source_type_enum ADD VALUE IF NOT EXISTS 'knowledge_doc';

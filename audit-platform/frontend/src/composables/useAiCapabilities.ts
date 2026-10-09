@@ -10,7 +10,7 @@
  */
 
 import { ref, computed, type Ref } from 'vue'
-import http from '@/utils/http'
+import http, { isRequestCancelled } from '@/utils/http'
 
 // ---------------------------------------------------------------------------
 // Types (从服务端 capability_endpoint.py 投影)
@@ -153,6 +153,7 @@ export function useAiCapabilities(options: UseAiCapabilitiesOptions = {}) {
 
       return null
     } catch (e: any) {
+      if (isRequestCancelled(e)) return null
       error.value = e?.message || '能力查询失败'
       // fail-closed: 保持 safe defaults（tools/subagents 禁用）
       capabilities.value = { ...SAFE_DEFAULTS }

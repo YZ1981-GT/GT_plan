@@ -1,0 +1,98 @@
+{
+  "_note": "L 循环位置化键的新旧映射登记（Lane3 Task 18）。_ 前缀 = 非生产契约，仅文档化。真库 L6/L7/L8 为 0 行 ⇒ 迁移无存量数据风险。",
+  "L5": {
+    "status": "no_positional_keys",
+    "note": "L5 已用 JSON 整表存储（L5-L5-*-rows），无位置化行键。"
+  },
+  "L6": {
+    "positional_keys": [
+      {
+        "module": "useL6Adjudication.ts",
+        "pattern": "L6-L6-1-row-${n}-{field}",
+        "index_var": "n",
+        "base": "1-based",
+        "fields": ["name", "beginAudited", "endAudited", "data"],
+        "target": "L6-L6-1-row-${rowId}-{field}",
+        "rowId_source": "复用 useL2Detail 的 Date.now+random 正面样板"
+      },
+      {
+        "module": "useL6Detail.ts",
+        "pattern": "L6-L6-2-row-${rowIndex + 1}-end_balance",
+        "index_var": "rowIndex + 1",
+        "base": "1-based (computed from 0-based)",
+        "target": "L6-L6-2-row-${rowId}-end_balance"
+      },
+      {
+        "module": "L6TabDisclosureListed.vue / L6TabDisclosureSoe.vue",
+        "pattern": "L6-L6-2-row${i}-{field}",
+        "separator": "row${i} 无连字符（与 composable 侧 row-${n} 不同）",
+        "index_var": "i",
+        "base": "1-based (for i=1..20)",
+        "fields": ["project", "audited_begin", "audited_increase", "audited_settle", "audited_return", "audited_end"],
+        "target": "L6-L6-2-row-${rowId}-{field}",
+        "note": "🔴 读写键不闭合：Disclosure 读侧用 row${i}，Detail 写侧用 row-${rowIndex+1}——分隔符和变量名都不同。两套键各管不同 field ⇒ 登记为「两套键并存」而非 bug（LB-P18 结论 B）。"
+      },
+      {
+        "module": "useL6SpecialCheck.ts",
+        "pattern": "L6-L6-4-row-${n}-{field}",
+        "index_var": "n",
+        "base": "1-based",
+        "fields": ["project", "voucher", "content", "counter", "debit", "credit", "checks", "abnormal", "ref", "data"],
+        "target": "L6-L6-4-row-${rowId}-{field}"
+      }
+    ]
+  },
+  "L7": {
+    "positional_keys": [
+      {
+        "module": "useL7Adjudication.ts",
+        "pattern": "L7-L7-1-row-${n}-{field}",
+        "index_var": "n (and i+1)",
+        "base": "1-based",
+        "fields": ["name", "beginAudited", "endAudited", "data"],
+        "target": "L7-L7-1-row-${rowId}-{field}"
+      },
+      {
+        "module": "useL7Detail.ts",
+        "pattern": "L7-L7-2-row-${rowIndex + 1}-end_balance",
+        "index_var": "rowIndex + 1",
+        "base": "1-based",
+        "target": "L7-L7-2-row-${rowId}-end_balance"
+      }
+    ]
+  },
+  "L8": {
+    "positional_keys": [
+      {
+        "module": "useL8CutoffTest.ts",
+        "pattern": "L8-5-${section}-row-${rowIndex}",
+        "index_var": "rowIndex",
+        "base": "0-based",
+        "target": "L8-5-${section}-row-${rowId}"
+      },
+      {
+        "module": "useL8Detail.ts",
+        "pattern": "L8-2-row-${rowIndex}-{field}",
+        "index_var": "rowIndex",
+        "base": "0-based",
+        "fields": ["audited", "data"],
+        "target": "L8-2-row-${rowId}-{field}"
+      },
+      {
+        "module": "useL8NonFinInterest.ts",
+        "pattern": "L8-4-row-${rowIndex}-data",
+        "index_var": "rowIndex",
+        "base": "0-based",
+        "target": "L8-4-row-${rowId}-data"
+      }
+    ],
+    "already_stable": [
+      {
+        "module": "useL8Adjudication.ts",
+        "pattern": "L8-1-row-${row.key}-{field}",
+        "note": "row.key 是固定的业务键（interest_expense 等），非位置索引——已是稳定键。"
+      }
+    ]
+  },
+  "legacy_compat": "旧键保留只读兼容期。迁移策略：读侧按 rowId 优先、缺则按旧 index 回退；写侧只写 rowId 键。真库 L6/L7/L8 为 0 行 ⇒ 无回退需求。"
+}

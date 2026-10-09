@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-19",
+  "title": "D4-19 销售折扣与折让检查 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "检查销售折扣、折让、退回的真实性与合理性，验证其会计处理是否符合 CAS14（是否作为可变对价冲减收入），防止通过折让科目调节收入。",
+      "source_refs": []
+    },
+    {
+      "key": "materials",
+      "title": "二、样本选取",
+      "content": "选取本期发生的折扣/折让/退回交易，填写客户、折扣类型（商业折扣/现金折扣/销售折让/销售退回）、收入金额、折扣金额、原因，以及对应凭证、科目、审批信息。",
+      "source_refs": []
+    },
+    {
+      "key": "formulas",
+      "title": "三、计算公式",
+      "content": "折扣比例 = 折扣金额 / 收入金额（收入或折扣≤0返0）\n借贷金额须与凭证一致。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 折扣比例异常偏高（>10%）：关注是否为掩盖退货或虚增前期收入。\n2. 审批流程完整性：审批人、审批日期不得为空，无审批的大额折让存疑。\n3. 年末集中发生的折让：关注是否冲减前期虚增收入。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "fc33df39ac9ac9a5b92c638838f8425934e9f24dd4cac7f941ee6dee12d477fb",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "911f1fc43a632433ab5621a70eeeecdfb9f5664f6972ff6b61d92352fa35507d"
+  }
+}

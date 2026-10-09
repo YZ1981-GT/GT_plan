@@ -15,7 +15,10 @@ job_type=``full_deliverables``：在单个 ``ExportJob`` 内同步顺序生成
 from __future__ import annotations
 
 import logging
+import traceback
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Protocol
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -24,6 +27,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.core import Project
 from app.models.phase13_models import (
     ExportJob,
+    ExportJobAttempt,
+    ExportJobAttemptStatus,
+    ExportJobItem,
+    ExportJobItemStatus,
     ExportJobStatus,
     WordExportDocType,
 )
@@ -39,6 +46,21 @@ FULL_DELIVERABLES_STEPS: list[str] = [
     "disclosure_notes",
     "report_body",
 ]
+
+# ── Phase4 正式三件套固定顺序（design §六 / 需求 2.1）──────────────
+# 名称严格对齐 design spec：financial_report → disclosure_notes → audit_report
+# financial_report_unadjusted 仅辅助，不计入 trio 完成数
+TRIO_STEPS: list[dict[str, str | int]] = [
+    {"key": "financial_report", "sequence": 1},
+    {"key": "disclosure_notes", "sequence": 2},
+    {"key": "audit_report", "sequence": 3},
+]
+
+# 正式 trio step_key 集合（快速判断是否正式项）
+TRIO_STEP_KEYS: frozenset[str] = frozenset(s["key"] for s in TRIO_STEPS)
+
+# audit_report 的前置依赖：financial_report 和 disclosure_notes 必须成功
+AUDIT_REPORT_DEPENDENCIES: frozenset[str] = frozenset(["financial_report", "disclosure_notes"])
 
 # 报告正文 OPT 兜底默认（design §14 第 4 步）
 _OPT_HARDCODED_FALSE = (
@@ -107,6 +129,51 @@ class FullDeliverablesResult:
     resolved_optional_sections: dict[str, bool] | None = None
 
 
+class TrioStepRunner(Protocol):
+    """三件套步骤执行回调协议（design §六）。
+
+    测试可替换为桩实现，生产由 executor 自身提供。
+    """
+    async def run_step(self, step_key: str, snapshot_id: UUID) -> UUID | None:
+        """执行一个步骤，返回 task_id 或 None。"""
+        ...
+
+
+def aggregate_trio_status(
+    item_statuses: list[str],
+    *,
+    has_blockers: bool = False,
+) -> str:
+    """根据正式三件套 item 状态聚合 job 状态（design §六 / 需求 4.4）。
+
+    只统计正式三项（financial_report/disclosure_notes/audit_report），
+    辅助步骤（financial_report_unadjusted）不参与。
+
+    规则：
+    - has_blockers 为 True → ``blocked``
+    - 三项均 ``succeeded`` → ``succeeded``
+    - 三项均 ``failed`` 或 ``blocked`` → ``failed``
+    - 部分成功部分失败 → ``partial``
+    """
+    if has_blockers:
+        return ExportJobStatus.blocked.value
+
+    if not item_statuses:
+        return ExportJobStatus.failed.value
+
+    succeeded_count = sum(1 for s in item_statuses if s == ExportJobItemStatus.succeeded.value)
+    failed_or_blocked = sum(
+        1 for s in item_statuses
+        if s in (ExportJobItemStatus.failed.value, ExportJobItemStatus.blocked.value)
+    )
+
+    if succeeded_count == len(item_statuses):
+        return ExportJobStatus.succeeded.value
+    if failed_or_blocked == len(item_statuses):
+        return ExportJobStatus.failed.value
+    return ExportJobStatus.partial.value
+
+
 class FullDeliverablesExecutor:
     """全套交付件同步执行器（job_type=full_deliverables）。"""
 
@@ -143,7 +210,198 @@ class FullDeliverablesExecutor:
         return (result.scalar_one() or 0) > 0
 
     # ------------------------------------------------------------------
-    # 主执行流程
+    # Phase4 三件套编排（design §六 / 需求 2.1–2.6, 4.4）
+    # ------------------------------------------------------------------
+    async def run_trio(
+        self,
+        *,
+        job: ExportJob,
+        snapshot_id: UUID,
+        step_runner: "TrioStepRunner",
+    ) -> FullDeliverablesResult:
+        """按固定顺序执行正式三件套，支持步骤依赖和状态聚合。
+
+        Args:
+            job: 已创建的 ExportJob（kind=deliverable_trio）。
+            snapshot_id: 不可变交付快照 ID，三件套共享。
+            step_runner: 步骤执行回调，提供 ``run_step(step_key, snapshot_id)``。
+                         测试可替换为桩实现。
+
+        行为（design §六 / 需求 4.1–4.3, 4.5）：
+        - 按 TRIO_STEPS 固定顺序（1→2→3）执行；
+        - 每步在独立 begin_nested() 保存点内执行，服务仅 flush；
+        - 步骤失败时保存点回滚业务写入，但失败 attempt/item 记录写在保存点外保留；
+        - audit_report（步骤 3）在前置失败时标 blocked_by_dependency；
+        - trio_succeeded 只统计正式三项；
+        - 最终由 aggregate_trio_status 聚合 job 状态。
+        """
+        outcomes: list[StepOutcome] = []
+        # 按 step_key 记录每步 item 状态，用于依赖检查
+        item_results: dict[str, str] = {}
+
+        for step_def in TRIO_STEPS:
+            step_key: str = step_def["key"]  # type: ignore[assignment]
+            sequence: int = step_def["sequence"]  # type: ignore[assignment]
+
+            # 创建 item（绑定 step_key / sequence / snapshot_id）
+            item = ExportJobItem(
+                job_id=job.id,
+                step_key=step_key,
+                sequence=sequence,
+                snapshot_id=snapshot_id,
+                status=ExportJobItemStatus.queued.value,
+                attempt_count=0,
+            )
+            self.db.add(item)
+            await self.db.flush()
+
+            # ── 依赖检查：audit_report 需要前两步均成功 ──
+            if step_key == "audit_report":
+                dep_failed = [
+                    dep for dep in AUDIT_REPORT_DEPENDENCIES
+                    if item_results.get(dep) != ExportJobItemStatus.succeeded.value
+                ]
+                if dep_failed:
+                    reason = (
+                        f"前置步骤未成功（{', '.join(dep_failed)}），"
+                        f"审计报告正文无法生成"
+                    )
+                    item.status = ExportJobItemStatus.blocked.value
+                    item.error_message = reason
+                    await self.db.flush()
+                    item_results[step_key] = ExportJobItemStatus.blocked.value
+                    outcomes.append(StepOutcome(
+                        step=step_key,
+                        item_id=item.id,
+                        succeeded=False,
+                        error_message=reason,
+                    ))
+                    continue
+
+            # ── 创建 attempt（保存点外，保留不可变历史）──
+            attempt = ExportJobAttempt(
+                job_id=job.id,
+                item_id=item.id,
+                attempt_no=item.attempt_count + 1,
+                status=ExportJobAttemptStatus.running.value,
+                snapshot_id=snapshot_id,
+                trigger_source="initial",
+                started_at=datetime.now(timezone.utc),
+            )
+            self.db.add(attempt)
+            item.attempt_count += 1
+            item.status = ExportJobItemStatus.running.value
+            await self.db.flush()
+
+            # ── 在 begin_nested() 保存点内执行步骤 ──
+            try:
+                async with self.db.begin_nested():
+                    result = await step_runner.run_step(step_key, snapshot_id)
+                    # 成功：更新 item 和 attempt（在保存点内 flush）
+                    item.status = ExportJobItemStatus.succeeded.value
+                    item.error_message = None
+                    item.last_attempt_id = attempt.id
+                    attempt.status = ExportJobAttemptStatus.succeeded.value
+                    attempt.finished_at = datetime.now(timezone.utc)
+
+                    # P0 fix: 从 word_export_task 回填文件元数据到 item
+                    if isinstance(result, UUID):
+                        from app.models.phase13_models import (
+                            WordExportTask,
+                            WordExportTaskVersion,
+                        )
+                        task_row = (await self.db.execute(
+                            sa.select(WordExportTask).where(
+                                WordExportTask.id == result,
+                            )
+                        )).scalar_one_or_none()
+                        if task_row:
+                            item.file_path = task_row.file_path
+                            item.file_size = task_row.file_size
+                            item.word_export_task_id = result
+                            # 取最新 version 的 file_hash
+                            latest_ver = (await self.db.execute(
+                                sa.select(WordExportTaskVersion)
+                                .where(
+                                    WordExportTaskVersion.word_export_task_id == result,
+                                )
+                                .order_by(WordExportTaskVersion.version_no.desc())
+                                .limit(1)
+                            )).scalar_one_or_none()
+                            if latest_ver:
+                                item.file_sha256 = latest_ver.file_hash
+                                item.version_id = latest_ver.id
+
+                    await self.db.flush()
+
+                item_results[step_key] = ExportJobItemStatus.succeeded.value
+                outcomes.append(StepOutcome(
+                    step=step_key,
+                    item_id=item.id,
+                    succeeded=True,
+                    task_id=result if isinstance(result, UUID) else None,
+                ))
+            except Exception as exc:  # noqa: BLE001
+                # 保存点已自动回滚业务写入（包括 item/attempt 状态变更）
+                # 在保存点外重新写入失败记录，这些记录会保留
+                logger.warning(
+                    "[TRIO] step=%s failed job=%s: %s",
+                    step_key, job.id, exc,
+                )
+                now = datetime.now(timezone.utc)
+                error_type = type(exc).__name__
+                error_msg = str(exc)[:500] if str(exc) else "生成失败"
+                diag = traceback.format_exception_only(type(exc), exc)
+                diag_text = "".join(diag).strip()[:2000]
+
+                # attempt 失败记录（保存点外，保留历史）
+                attempt.status = ExportJobAttemptStatus.failed.value
+                attempt.finished_at = now
+                attempt.error_type = error_type
+                attempt.error_message = error_msg
+                attempt.diagnostic_detail = diag_text
+
+                # item 失败状态
+                item.status = ExportJobItemStatus.failed.value
+                item.error_message = error_msg
+                item.last_attempt_id = attempt.id
+                await self.db.flush()
+
+                item_results[step_key] = ExportJobItemStatus.failed.value
+                outcomes.append(StepOutcome(
+                    step=step_key,
+                    item_id=item.id,
+                    succeeded=False,
+                    error_message=str(exc),
+                ))
+
+        # ── 聚合 trio 状态 ──
+        trio_statuses = [
+            item_results[s["key"]]  # type: ignore[index]
+            for s in TRIO_STEPS
+            if s["key"] in item_results  # type: ignore[operator]
+        ]
+        job_status = aggregate_trio_status(trio_statuses)
+        trio_succeeded = sum(
+            1 for s in trio_statuses
+            if s == ExportJobItemStatus.succeeded.value
+        )
+
+        job.status = job_status
+        job.trio_succeeded = trio_succeeded
+        job.trio_total = len(TRIO_STEPS)  # 固定 3
+        await self.db.flush()
+
+        return FullDeliverablesResult(
+            job_id=job.id,
+            status=job_status,
+            done=trio_succeeded,
+            failed=len(TRIO_STEPS) - trio_succeeded,
+            outcomes=outcomes,
+        )
+
+    # ------------------------------------------------------------------
+    # 主执行流程（旧兼容入口）
     # ------------------------------------------------------------------
     async def run(
         self,

@@ -160,6 +160,7 @@ import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { buildK7SyncPayload, K7_NOTE_SECTION } from '../../composables/k7NoteSectionMap'
+import { newRowIdentity } from '../../composables/shared/rowIdentity'
 
 const K7_ACCOUNT_CODE = '2401'
 
@@ -206,7 +207,7 @@ function initDefaultRows(): void {
   const incomeDefaults = ['研发费用补助', '稳岗补贴', '产业扶持资金', '出口退税补贴', '其他与收益相关补助']
 
   assetRelatedRows.value = assetDefaults.map((name, idx) => ({
-    id: `asset-${idx}`,
+    id: newRowIdentity('asset'),
     project: name,
     beginBalance: 0,
     increase: 0,
@@ -215,7 +216,7 @@ function initDefaultRows(): void {
   }))
 
   incomeRelatedRows.value = incomeDefaults.map((name, idx) => ({
-    id: `income-${idx}`,
+    id: newRowIdentity('income'),
     project: name,
     beginBalance: 0,
     increase: 0,

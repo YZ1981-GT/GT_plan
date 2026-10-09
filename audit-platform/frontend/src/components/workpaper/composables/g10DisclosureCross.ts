@@ -7,6 +7,7 @@ import type { G10DiscMovementPair } from './g10DisclosureFromAdj'
 import { G10_LISTED_MOVEMENT_ROWS } from './g10SchemaRows'
 import { G10_DETAIL_ROWS_KEY } from './g10CrossHelpers'
 import { G10_FV_KEY } from './g10FvCrossHelpers'
+import { matchG10LiabilityKey } from './g10AccountMatch'
 import type { ChecklistResponse } from './useF1FormData'
 
 export const G10_L3_KEY = 'G10-l3-rows'
@@ -59,11 +60,29 @@ export function sumG10L3ReportedClosing(responses: Map<string, ChecklistResponse
   )
 }
 
+/**
+ * G10-2 明细中属**第三层次**的期末审定数合计。
+ *
+ * 🔴 **C-7 根治读错源**（spec `g-cycle-single-region-detail-lanes`）：
+ * 改造前直接从 G10-2 读 `fairValueLevel` —— 而公允价值层次的**权威来源是
+ * `公允价值测试表G10-5`**，G10-2 按权威模板重构后（19 列 A..S）**没有层次列**。
+ * 现改为：先从 G10-5 取 Level3 的项目名集合，再据此筛 G10-2 的行求和。
+ * 与 `g9CrossHelpers.sumG9DetailLevel3Closing` 同一范式。
+ */
 export function sumG10DetailLevel3Closing(responses: Map<string, ChecklistResponse>): number {
+  const level3Keys = new Set(
+    parseJsonArray(responses.get(G10_FV_KEY)?.remark)
+      .filter((r) => isG10Level3(r.fairValueLevel))
+      .map((r) => matchG10LiabilityKey(String(r.liabilityName ?? '')))
+      .filter((k) => k),
+  )
+  if (!level3Keys.size) return 0
   return calcSubtotal(
     parseJsonArray(responses.get(G10_DETAIL_ROWS_KEY)?.remark)
-      .filter((r) => isG10Level3(r.fairValueLevel))
-      .map((r) => parseNum(r.closingAdjusted ?? r.closingFairValue ?? r.closingBalance)),
+      .filter((r) => level3Keys.has(matchG10LiabilityKey(String(r.liabilityName ?? ''))))
+      .map((r) =>
+        parseNum(r.closingAdjusted) || parseNum(r.closingFairValue) || parseNum(r.closingBalance),
+      ),
   )
 }
 

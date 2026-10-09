@@ -16,7 +16,10 @@ export const G14_SOURCE_TO_ROW_KEY: Record<string, string> = {
   G4: 'debt',
   G6: 'othdebt',
   G5: 'ltar',
-  D6: 'ca',
+  // 🔴 C-9（spec g-cycle-single-region-detail-lanes）：权威模板 `明细表G14-2` 的固定行集
+  //    只有 9 行、**没有**「合同资产减值损失」专行（原前端自研第 10 行 `ca`）。合同资产的
+  //    ECL 按 CAS22 仍计入 6702 ⇒ 落点改为模板 R19「其他」行，口径不丢。
+  D6: 'other',
 }
 
 /** G14 rowKey → 默认索引（与 G14_ECL_CROSS_REF 一致） */

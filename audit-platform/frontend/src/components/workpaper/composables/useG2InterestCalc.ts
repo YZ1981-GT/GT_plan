@@ -17,6 +17,7 @@ import {
 } from './useG2IntRecFormulaEngine'
 import { extractAdjAmounts } from './g2SoeDisclosureRows'
 import type { ChecklistResponse } from './useF1FormData'
+import { G2_ITEM_IDS } from './g2StorageContract'
 
 /** 存储行（不含公式计算字段） */
 export interface StoredInterestCalcRow {
@@ -90,10 +91,11 @@ export interface InterestCalcAdjTieOut {
   hasAdjData: boolean
 }
 
-const STORAGE_KEY = 'G2-5-interest-calc-rows'
-const DETAIL_KEY = 'G2-2-detail-rows'
-const ADJ_KEY = 'G2-1-rows'
-const ADJ_KEY_LEGACY = 'G2-1-adj-rows'
+// 🔴 以下四个派生自单一真源 `g2StorageContract.G2_ITEM_IDS`（Task 13 / BP-10）
+const STORAGE_KEY = G2_ITEM_IDS.G2_5_INTEREST_CALC_ROWS
+const DETAIL_KEY = G2_ITEM_IDS.G2_2_DETAIL_ROWS
+const ADJ_KEY = G2_ITEM_IDS.G2_1_ROWS
+const ADJ_KEY_LEGACY = G2_ITEM_IDS.G2_1_ROWS_LEGACY
 const ADJ_NOTE_KEY = 'G2-1-note'
 const ADJ_NOTE_KEY_LEGACY = 'G2-1-adj-note'
 export const G2_INTEREST_VARIANCE_THRESHOLD = 100

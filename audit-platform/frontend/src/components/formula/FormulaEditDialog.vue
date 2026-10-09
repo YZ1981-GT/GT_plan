@@ -70,6 +70,7 @@
               <el-button size="small" title="跨表引用其他报表行金额，如 REPORT('BS-002','期末')" @click="insertRef(idx, 'REPORT')">REPORT</el-button>
               <el-button size="small" title="从辅助余额表按维度取数，如 AUX('1122','客户A','期末')" @click="insertRef(idx, 'AUX')">AUX</el-button>
               <el-button size="small" title="取上年同期数据，如 PREV('BS-002','期末') 取上年期末" @click="insertRef(idx, 'PREV')">PREV</el-button>
+              <el-button size="small" title="取调整分录净额，如 ADJ('6001','aje_net') 取审计调整净额" @click="insertRef(idx, 'ADJ')">ADJ</el-button>
             </div>
             <div class="gt-fe-quick-btns">
               <span class="gt-fe-btn-label">比较:</span>
@@ -158,6 +159,10 @@
           <div class="gt-fe-help-item">
             <code>WP('E1-1','审定数')</code>
             <span>引用底稿审定表数据</span>
+          </div>
+          <div class="gt-fe-help-item">
+            <code>ADJ('6001','aje_net')</code>
+            <span>取某科目审计调整净额（aje_net/rje_net）</span>
           </div>
 
           <div class="gt-fe-help-group">➕ 求和公式（当前行 = 公式结果）</div>
@@ -577,6 +582,7 @@ function insertRef(idx: number, fn: string) {
     'TOLERANCE': "TOLERANCE(, , 1)",
     'YOY_RATE': "YOY_RATE('')",
     'RATIO': "RATIO('', '')",
+    'ADJ': "ADJ('','aje_net')",
   }
   const tpl = templates[fn] || fn + '()'
   const f = formulas.value[idx]

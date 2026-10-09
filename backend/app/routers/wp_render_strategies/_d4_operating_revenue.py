@@ -248,7 +248,218 @@ def build_d4_segment_prefill(
     return result
 
 
-# IPO/舞弊组可见性关键字
+# ─── D4-6 指标预填（Requirement 8.1~8.3）─────────────────────────────────────
+# spec: four-table-extraction-entry-completion Phase 3 Task 16
+#
+# 从 trial_balance 取审定数 → 按公式计算每项指标的 current/prior。
+# 涉及非 TB 数据的指标（员工总数、原材料采购、折扣/折让/退货月度明细）留空不伪造。
+
+#: 指标 key → 所需标准码前缀 + 计算函数
+#: 每项返回 (current, prior) 或 None（数据不足）
+_INDICATOR_ACCOUNT_CODES = {
+    "1122": "1122",      # 应收账款
+    "6001": "6001",      # 主营业务收入
+    "4103": "4103",      # 净利润
+    "1231": "1231",      # 坏账准备
+}
+
+
+def build_d4_indicator_prefill(
+    tb_current: dict[str, float | None],
+    tb_prior: dict[str, float | None],
+    total_assets_current: float | None,
+    total_assets_prior: float | None,
+) -> dict[str, dict[str, float | None]]:
+    """D4-6 重要指标自动预填（纯函数，无 DB 依赖）。
+
+    Args:
+        tb_current: 本期各科目审定数 ``{"1122": x, "6001": y, ...}``。
+        tb_prior: 上期各科目审定数（同结构）。
+        total_assets_current: 本期资产总计（来自 financial_report BS-039）。
+        total_assets_prior: 上期资产总计。
+
+    Returns:
+        ``{key: {"current": float|None, "prior": float|None}}``；
+        任一分子/分母为 None 则该指标不出现（不伪造 0）。
+
+    **Validates: Requirements 8.1, 8.2, 8.3; Property 9**
+    """
+    result: dict[str, dict[str, float | None]] = {}
+
+    def _get(tb: dict, code: str) -> float | None:
+        v = tb.get(code)
+        return v if v is not None else None
+
+    # ── ar-to-assets: 应收账款 / 资产总计 ──
+    ar_cur = _get(tb_current, "1122")
+    ar_prior = _get(tb_prior, "1122")
+    if ar_cur is not None and total_assets_current and total_assets_current != 0:
+        cur_val = round(ar_cur / total_assets_current, 6)
+    else:
+        cur_val = None
+    if ar_prior is not None and total_assets_prior and total_assets_prior != 0:
+        pri_val = round(ar_prior / total_assets_prior, 6)
+    else:
+        pri_val = None
+    if cur_val is not None or pri_val is not None:
+        result["ar-to-assets"] = {"current": cur_val, "prior": pri_val}
+
+    # ── ar-turnover-days: (期初AR+期末AR)/2 / (收入/365) ──
+    # 期初AR ≈ 上期期末AR；期末AR = 本期AR
+    rev_cur = _get(tb_current, "6001")
+    rev_prior = _get(tb_prior, "6001")
+    if ar_cur is not None and ar_prior is not None and rev_cur and rev_cur != 0:
+        avg_ar = (ar_prior + ar_cur) / 2
+        cur_val = round(avg_ar / (rev_cur / 365), 2)
+    else:
+        cur_val = None
+    # 上期周转天数需要更早期数据（前年 AR），此处不可取 → 留空
+    result_entry: dict[str, float | None] = {"current": cur_val, "prior": None}
+    if cur_val is not None:
+        result["ar-turnover-days"] = result_entry
+
+    # ── ar-turnover-times: 收入 / (期初AR+期末AR)/2 ──
+    if ar_cur is not None and ar_prior is not None and rev_cur is not None:
+        avg_ar = (ar_prior + ar_cur) / 2
+        if avg_ar != 0:
+            cur_val = round(rev_cur / avg_ar, 2)
+        else:
+            cur_val = None
+    else:
+        cur_val = None
+    if cur_val is not None:
+        result["ar-turnover-times"] = {"current": cur_val, "prior": None}
+
+    # ── net-profit-margin: 净利润 / 收入 ──
+    profit_cur = _get(tb_current, "4103")
+    profit_prior = _get(tb_prior, "4103")
+    if profit_cur is not None and rev_cur and rev_cur != 0:
+        cur_val = round(profit_cur / rev_cur, 6)
+    else:
+        cur_val = None
+    if profit_prior is not None and rev_prior and rev_prior != 0:
+        pri_val = round(profit_prior / rev_prior, 6)
+    else:
+        pri_val = None
+    if cur_val is not None or pri_val is not None:
+        result["net-profit-margin"] = {"current": cur_val, "prior": pri_val}
+
+    # ── bad-debt-ratio: 坏账准备 / 应收账款 ──
+    bd_cur = _get(tb_current, "1231")
+    bd_prior = _get(tb_prior, "1231")
+    if bd_cur is not None and ar_cur and ar_cur != 0:
+        cur_val = round(bd_cur / ar_cur, 6)
+    else:
+        cur_val = None
+    if bd_prior is not None and ar_prior and ar_prior != 0:
+        pri_val = round(bd_prior / ar_prior, 6)
+    else:
+        pri_val = None
+    if cur_val is not None or pri_val is not None:
+        result["bad-debt-ratio"] = {"current": cur_val, "prior": pri_val}
+
+    # ── 非 TB 指标留空不伪造 ──
+    # revenue-per-employee / profit-per-employee: 需 project_info 员工数
+    # last-quarter-ratio / discount-ratio / allowance-ratio / return-ratio / sales-to-material:
+    #   需月度明细 / 折扣折让退货细分，细粒度 > trial_balance 一级科目
+
+    return result
+
+
+async def _fetch_indicator_tb_amounts(
+    db, project_id: str, year: int,
+) -> dict[str, float | None]:
+    """从 trial_balance 一次查询取 D4-6 指标所需全部科目的审定数。
+
+    改进：把 4 次逐科目 SQL 合为 1 次（按前缀 LIKE OR 组合 + GROUP BY 左前缀），
+    消除 N+1 查询（复盘修复项 1）。
+
+    Returns:
+        ``{"1122": float, "6001": float, ...}``；科目无数据则该键不出现。
+    """
+    codes = list(_INDICATOR_ACCOUNT_CODES.values())  # ["1122", "6001", "4103", "1231"]
+    if not codes:
+        return {}
+    try:
+        # 构建 OR 前缀条件
+        like_clauses = " OR ".join(
+            f"standard_account_code LIKE :p{i}" for i in range(len(codes))
+        )
+        params: dict = {
+            f"p{i}": f"{c}%" for i, c in enumerate(codes)
+        }
+        params["pid"] = str(project_id)
+        params["year"] = int(year or 0)
+
+        # CASE WHEN 按前缀分桶（取最短匹配前缀），SUM 各桶审定数
+        case_branches = " ".join(
+            f"WHEN standard_account_code LIKE :p{i} THEN :lbl{i}"
+            for i in range(len(codes))
+        )
+        for i, c in enumerate(codes):
+            params[f"lbl{i}"] = c
+
+        result = await db.execute(
+            sa.text(
+                f"SELECT CASE {case_branches} END AS prefix_key, "
+                f"COALESCE(SUM(audited_amount), 0) AS audited "
+                f"FROM trial_balance "
+                f"WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                f"AND ({like_clauses}) "
+                f"GROUP BY prefix_key"
+            ),
+            params,
+        )
+        out: dict[str, float | None] = {}
+        for row in result.fetchall():
+            if row.prefix_key:
+                out[row.prefix_key] = float(row.audited)
+        return out
+    except Exception:  # noqa: BLE001 — fail-open
+        logger.warning(
+            "D4 render: indicator TB 批量取数失败 project=%s year=%s",
+            project_id, year,
+        )
+        try:
+            await db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return {}
+
+
+async def _fetch_total_assets(
+    db, project_id: str, year: int,
+) -> float | None:
+    """从 financial_report 取资产总计（BS-039 / 兼容 BS-021）。"""
+    try:
+        from app.models.audit_platform_models import FinancialReport, ReportType
+        row = await db.execute(
+            sa.select(FinancialReport.current_period_amount).where(
+                FinancialReport.project_id == project_id,
+                FinancialReport.year == year,
+                FinancialReport.report_type == ReportType.balance_sheet,
+                FinancialReport.row_code == "BS-039",
+                FinancialReport.is_deleted == sa.false(),
+            )
+        )
+        val = row.scalar_one_or_none()
+        if val is not None:
+            return float(val)
+        # 兼容旧 row_code
+        row = await db.execute(
+            sa.select(FinancialReport.current_period_amount).where(
+                FinancialReport.project_id == project_id,
+                FinancialReport.year == year,
+                FinancialReport.report_type == ReportType.balance_sheet,
+                FinancialReport.row_code == "BS-021",
+                FinancialReport.is_deleted == sa.false(),
+            )
+        )
+        val = row.scalar_one_or_none()
+        return float(val) if val is not None else None
+    except Exception:  # noqa: BLE001
+        logger.warning("D4 render: 资产总计查询失败 project=%s year=%s", project_id, year)
+        return None
 _IPO_KEYWORDS = ("ipo", "listed", "neeq", "restructuring", "fraud_risk")
 
 
@@ -498,6 +709,25 @@ async def render(ctx: RenderContext) -> dict | None:
                         row.setdefault("prior_cost", None)
 
             html_data["segment_prefill"] = segment_prefill
+
+            # ─── D4-6 指标预填（Phase 3 Task 16）─────────────────────────────
+            try:
+                pid = str(ctx.project_id)
+                cur_year = int(ctx.year or 0)
+                prior_year = cur_year - 1 if cur_year > 0 else 0
+
+                tb_cur = await _fetch_indicator_tb_amounts(db, pid, cur_year)
+                tb_pri = await _fetch_indicator_tb_amounts(db, pid, prior_year) if prior_year > 0 else {}
+                assets_cur = await _fetch_total_assets(db, pid, cur_year)
+                assets_pri = await _fetch_total_assets(db, pid, prior_year) if prior_year > 0 else None
+
+                indicator_prefill = build_d4_indicator_prefill(
+                    tb_cur, tb_pri, assets_cur, assets_pri,
+                )
+                if indicator_prefill:
+                    html_data["indicator_prefill"] = indicator_prefill
+            except Exception as e:  # noqa: BLE001 — fail-open
+                logger.warning("D4 render: indicator_prefill 异常（fail-open）: %s", e)
 
             # tb_source_codes → project_context（踩坑铁律：在 html_data.project_context 里，
             # 以便每个 sheet 都能访问；非 html_data 顶层）

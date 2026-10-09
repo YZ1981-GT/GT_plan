@@ -29,6 +29,8 @@ from app.services.deliverable_capabilities import (
 )
 from app.services.deliverable_hash_service import DeliverableHashService
 from app.services.deliverable_snapshot_service import DeliverableSnapshotService
+# file_fingerprint_service: 延迟 import（render_and_store 方法内），
+# 避免 clean checkout 缺此文件时整个 deliverable_service 模块加载失败。
 
 logger = logging.getLogger(__name__)
 
@@ -426,8 +428,17 @@ class DeliverableService(ExportTaskService):
         inherit_snapshot_refs: bool = False,
         edited_by: UUID | None = None,
         edited_at: datetime | None = None,
+        snapshot_id: UUID | None = None,
     ) -> StoreResult:
-        """落盘一个新版本。
+        """落盘一个新版本 — **四阶段 fail-closed**。
+
+        阶段 1: 生成文件内容（读 docx_path 或使用 docx_bytes）
+        阶段 2: 通过临时文件 + 原子移动落盘到最终路径
+        阶段 3: 对最终路径执行 is_file、可读、st_size > 0、SHA-256
+        阶段 4: 全部校验通过后才创建版本记录并绑定指纹
+
+        **失败行为**：清理本次 attempt 的临时/最终文件（不删旧有效版本），
+        抛出 ``FileFingerprintError`` 子类，**不创建版本**。
 
         Args:
             inherit_snapshot_refs: 为 True 时**继承上一版**的 ``source_snapshot_refs``
@@ -443,7 +454,13 @@ class DeliverableService(ExportTaskService):
             edited_by / edited_at: 实际编辑人与编辑时间（需求 7.2/7.3）。
                 解析不出时传 None（如实记为未知），**禁止**回退 ``task.created_by``。
 
+            snapshot_id: phase4 trio 快照 ID（需求 3.2），绑定到版本链。
+
         三个参数均为 additive，默认值 ⇒ 与引入前逐字节等价。
+
+        Raises:
+            FileFingerprintError: 文件落盘或校验失败（子类标明具体阶段）
+            ValueError: 交付物不存在
         """
         task = await self.get_task(task_id)
         if task is None:
@@ -468,70 +485,78 @@ class DeliverableService(ExportTaskService):
         file_path = out_dir / fname
         html_path = out_dir / f"{task.doc_type}_v{next_no}.html"
 
-        platform_persist_failed = False
-        try:
-            if docx_path and docx_path.exists():
-                file_path.write_bytes(docx_path.read_bytes())
-            elif docx_bytes:
-                file_path.write_bytes(docx_bytes)
-            else:
-                raise ValueError("无文件内容可存储")
+        # ── 阶段 1: 准备文件字节内容 ──
+        content: bytes | None = None
+        if docx_path and docx_path.exists():
+            content = docx_path.read_bytes()
+        elif docx_bytes:
+            content = docx_bytes
 
-            if html_content:
+        # ── 阶段 2 + 3: 四阶段 fail-closed 落盘与校验 ──
+        # 失败会抛 FileFingerprintError，不创建版本。
+        from app.services.file_fingerprint_service import persist_file_fail_closed
+        fp = persist_file_fail_closed(
+            content=content,
+            final_path=file_path,
+            delivery_root=STORAGE_ROOT / DELIVERABLE_SUBDIR,
+        )
+
+        # HTML 辅助文件（不影响主流程成功判定）
+        html_written = False
+        if html_content:
+            try:
                 html_path.write_text(html_content, encoding="utf-8")
-            file_size = file_path.stat().st_size
-        except Exception as exc:
-            logger.error("平台存储写入失败 task=%s: %s", task_id, exc)
-            platform_persist_failed = True
-            file_size = len(docx_bytes) if docx_bytes else 0
-            file_path = None
-            html_path = None
+                html_written = True
+            except Exception as exc:
+                logger.warning("HTML 辅助文件写入失败: %s", exc)
 
+        # ── 阶段 4: 全部校验通过后才创建版本 ──
         version = await self.create_version(
             task_id,
-            file_path=str(file_path) if file_path else None,
-            html_path=str(html_path) if html_path and html_path.exists() else None,
+            file_path=str(file_path),
+            html_path=str(html_path) if html_written else None,
             user_id=user_id,
             source_snapshot_refs=source_snapshot_refs,
             selected_sections=selected_sections,
-            file_size=file_size if not platform_persist_failed else None,
+            file_size=fp.size,
             created_via=created_via,
             edited_by=edited_by,
             edited_at=edited_at,
         )
 
-        if not platform_persist_failed and file_path and file_path.exists():
-            await DeliverableHashService(self.db).bind_version_hash(
-                version, task, user_id
-            )
+        # 绑定 SHA-256 到版本记录
+        version.file_hash = fp.sha256
+        await DeliverableHashService(self.db).bind_version_hash(
+            version, task, user_id
+        )
 
-        if not platform_persist_failed:
-            task.file_path = str(file_path)
-            task.html_path = str(html_path) if html_path and html_path.exists() else None
-            task.file_size = file_size
-            # 需求 7.1：继承模式下**不覆盖** task 级快照绑定。
-            # 覆盖会让 stale 判定基准漂移到「最后一次人工编辑的时刻」，
-            # 而该版本内容并未按当时的试算表重算 → staleness 被静默洗白。
-            if not inherit_snapshot_refs:
-                task.source_snapshot_refs = source_snapshot_refs
-            task.selected_sections = selected_sections
-            # 渲染完成并落盘 → 交付物进入 generated 态。
-            # 既覆盖 draft 直接生成，也覆盖经 generating 中间态的标准渲染流程
-            # （draft→generating→generated→editing），避免任务卡在 generating。
-            if task.status in (
-                WordExportStatus.draft.value,
-                WordExportStatus.generating.value,
-            ):
-                task.status = WordExportStatus.generated.value
-            await self.db.flush()
+        # 更新 task 投影
+        task.file_path = str(file_path)
+        task.html_path = str(html_path) if html_written else None
+        task.file_size = fp.size
+        # 需求 7.1：继承模式下**不覆盖** task 级快照绑定。
+        # 覆盖会让 stale 判定基准漂移到「最后一次人工编辑的时刻」，
+        # 而该版本内容并未按当时的试算表重算 → staleness 被静默洗白。
+        if not inherit_snapshot_refs:
+            task.source_snapshot_refs = source_snapshot_refs
+        task.selected_sections = selected_sections
+        # 渲染完成并落盘 → 交付物进入 generated 态。
+        # 既覆盖 draft 直接生成，也覆盖经 generating 中间态的标准渲染流程
+        # （draft→generating→generated→editing），避免任务卡在 generating。
+        if task.status in (
+            WordExportStatus.draft.value,
+            WordExportStatus.generating.value,
+        ):
+            task.status = WordExportStatus.generated.value
+        await self.db.flush()
 
         download_url = f"/api/projects/{task.project_id}/deliverables/{task_id}/versions/{version.version_no}/download"
         return StoreResult(
             version=version,
             download_url=download_url,
-            platform_persist_failed=platform_persist_failed,
-            file_path=str(file_path) if file_path else None,
-            html_path=str(html_path) if html_path and html_path.exists() else None,
+            platform_persist_failed=False,
+            file_path=str(file_path),
+            html_path=str(html_path) if html_written else None,
         )
 
     async def list_deliverables(

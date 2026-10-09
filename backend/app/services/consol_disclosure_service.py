@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -37,6 +38,10 @@ from app.models.consolidation_schemas import ConsolDisclosureSection, ConsolDisc
 from app.models.report_models import DisclosureNote, ContentType, SourceTemplate, NoteStatus
 from app.services.goodwill_service import get_goodwill_list
 from app.services.minority_interest_service import get_mi_list
+
+if TYPE_CHECKING:
+    from app.schemas.consol_context import ConsolContext
+    from app.services.consol_tree_service import TreeNode
 
 logger = logging.getLogger(__name__)
 
@@ -905,6 +910,10 @@ async def generate_consol_notes_with_flag(
     db: AsyncSession,
     project_id: UUID,
     year: int,
+    template_type: str | None = None,
+    *,
+    context: "ConsolContext | None" = None,
+    tree: "TreeNode | None" = None,
 ) -> list[ConsolDisclosureSection]:
     """合并附注生成统一入口（feature flag 灰度，ADR-CONSOL-202）.
 
@@ -916,15 +925,28 @@ async def generate_consol_notes_with_flag(
 
     返回结构契约与老版一致（list[ConsolDisclosureSection]，属性 S4）。
     """
+    from app.services.consol_context_service import ConsolContextError
+    from app.services.consol_note_formula_service import resolve_note_template_type
     from app.services.consol_note_gray_service import is_consol_note_v2_enabled
+
+    resolved_template_type = await resolve_note_template_type(db, project_id, template_type)
 
     # 灰度按项目：全局 CONSOL_NOTES_V2_ENABLED=True 或该项目 opt-in → 走 V2（读端 schema
     # 不携带穿透 provenance，P1-A(a)；穿透明细走 Step 8 落库 + consol-breakdown 端点）；
     # 否则老版 7 骨架章节（零回归）。
     if await is_consol_note_v2_enabled(db, project_id):
         try:
-            v2_sections = await generate_full_consol_notes(db, project_id, year)
+            v2_sections = await generate_full_consol_notes(
+                db,
+                project_id,
+                year,
+                template_type=resolved_template_type,
+                context=context,
+                tree=tree,
+            )
             return _adapt_v2_sections_to_schema(v2_sections)
+        except ConsolContextError:
+            raise
         except Exception as err:  # EH3/R2：V2 失败回退老版兼容
             logger.warning(
                 "generate_full_consol_notes (V2) failed, falling back to legacy "
@@ -956,6 +978,9 @@ async def generate_full_consol_notes(
     parent_project_id: UUID,
     year: int,
     template_type: str = "soe",
+    *,
+    context: "ConsolContext | None" = None,
+    tree: "TreeNode | None" = None,
 ) -> list[dict]:
     """合并附注完整生成（173 共有 + 7 合并专用 = 180 章节）.
 
@@ -977,8 +1002,23 @@ async def generate_full_consol_notes(
     Returns:
         list[dict]: 180 章节结构列表
     """
-    # Step 1: B.1.3 子公司清单实时拉取
-    subsidiaries = await _fetch_subsidiary_list(db, parent_project_id)
+    # Step 1: B.1.3 子公司清单实时拉取；传入树时直接复用。
+    # 旧入口不传 context/tree 时由 helper 自行建树，保留其兼容调用和现有单测桩。
+    resolved_tree = tree
+    if context is not None:
+        if resolved_tree is None:
+            from app.services.consol_tree_service import build_tree
+
+            resolved_tree = await build_tree(db, parent_project_id)
+        from app.services.consol_context_service import validate_context
+
+        validate_context(context, parent_project_id, year, tree=resolved_tree)
+    subsidiaries = await _fetch_subsidiary_list(
+        db,
+        parent_project_id,
+        context=context,
+        tree=resolved_tree,
+    )
 
     # Step 2: 加载章节映射
     section_mapping = _load_section_mapping()
@@ -1013,7 +1053,12 @@ async def generate_full_consol_notes(
     all_sections = _render_text_paragraphs_v2(all_sections, consol_vars)
 
     # Step 7: B.1.6 写 lineage
-    lineage_chain = await _write_lineage_v2(db, parent_project_id)
+    lineage_chain = await _write_lineage_v2(
+        db,
+        parent_project_id,
+        context=context,
+        tree=resolved_tree,
+    )
     for section in all_sections:
         section["lineage"] = lineage_chain
 
@@ -1215,8 +1260,9 @@ async def _aggregate_common_section(
     if elimination_rule:
         elimination_rules = [{"rule_type": elimination_rule}]
 
+    sources = _source_projects(subsidiaries)
     child_filter = {
-        "subsidiaries": [s["project_id"] for s in subsidiaries],
+        "subsidiaries": [s["project_id"] for s in sources],
     }
 
     result = await aggregate_section(
@@ -1234,7 +1280,7 @@ async def _aggregate_common_section(
         result = {
             "rows": [],
             "method": method,
-            "child_count": len(subsidiaries),
+            "child_count": len(sources),
             "section_id": section_id,
             "elimination_applied": bool(elimination_rule),
         }
@@ -1376,29 +1422,64 @@ def _sum_row_numeric_values(values: dict) -> Decimal:
 # ---------------------------------------------------------------------------
 
 
+def _source_projects(subsidiaries: list[dict]) -> list[dict]:
+    """有单体项目的数据叶子 = 合并附注的取数来源（没有单户项目的企业不取数）。"""
+    return [s for s in subsidiaries if s.get("project_id") is not None]
+
+
+def _subsidiary_entities(subsidiaries: list[dict]) -> list[dict]:
+    """数据叶子清单 → 子公司企业清单（按企业代码去重；母公司/本部与分公司不计子公司家数）。
+
+    旧调用方传入的清单没有 ``entity_kind``，按旧语义（全部是子公司）处理。
+    """
+    seen: set[str] = set()
+    out: list[dict] = []
+    for s in subsidiaries:
+        if s.get("entity_kind", "subsidiary") != "subsidiary":
+            continue
+        key = str(s.get("company_code") or s.get("project_id"))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(s)
+    return out
+
+
 async def _fetch_subsidiary_list(
     db: AsyncSession,
     parent_project_id: UUID,
+    *,
+    context: "ConsolContext | None" = None,
+    tree: "TreeNode | None" = None,
 ) -> list[dict]:
-    """用 consol_tree_service.build_tree 实时拉取子公司清单.
+    """用企业树实时拉取合并附注的数据叶子清单（B.1.3）。
 
-    B.1.3 实现。
+    口径变更（spec consol-tree-three-code-autobuild 任务 7.5，有意）：旧实现返回根的全部后代，
+    三码树里含差额与汇总节点（没有单体附注）且漏了母公司本体；现返回全部**数据叶子**——
+    母公司/本部、分公司、子公司各一行，``entity_kind`` 标企业类型（parent/branch/subsidiary），
+    ``project_id`` 为空表示该企业本年度没有单户项目（不参与附注取数，仍计入子公司家数）。
+    取数来源用 ``_source_projects``，子公司家数用 ``_subsidiary_entities``。
     """
-    from app.services.consol_tree_service import build_tree, get_descendants
     from app.models.core import Project
+    from app.services.consol_calc_basis import data_leaves, entity_kinds
+    from app.services.consol_context_service import validate_context
+    from app.services.consol_tree_service import build_tree
 
-    tree = await build_tree(db, parent_project_id)
-    if tree is None:
+    resolved_tree = tree if tree is not None else await build_tree(db, parent_project_id)
+    if context is not None:
+        validate_context(context, parent_project_id, context.year, tree=resolved_tree)
+    if resolved_tree is None:
         return []
 
-    descendants = get_descendants(tree)
+    leaves = data_leaves(resolved_tree)
+    kinds = entity_kinds(resolved_tree)
 
-    # 批量读取各子公司 Project.template_type（国企/上市 跨模板翻译用，ADR-CONSOL-204）。
+    # 批量读取各数据叶子 Project.template_type（国企/上市 跨模板翻译用，ADR-CONSOL-204）。
     # build_tree 的 TreeNode 不带 template_type，这里单独一次性 IN 查询补齐，
     # 失败时降级为 None（视为未知 → 翻译路径按"同模板"处理，不丢章节）。
     template_type_map: dict[UUID, str | None] = {}
     try:
-        node_ids = [node.project_id for node in descendants]
+        node_ids = [node.project_id for node in leaves if node.project_id is not None]
         if node_ids:
             rows = await db.execute(
                 sa.select(Project.id, Project.template_type).where(
@@ -1420,8 +1501,12 @@ async def _fetch_subsidiary_list(
             "company_name": node.company_name,
             "consol_level": node.consol_level,
             "template_type": template_type_map.get(node.project_id),
+            "node_key": node.node_key,
+            "role": node.role,
+            "entity_kind": kinds.get(node.company_code, "subsidiary"),
+            "display_name": node.display_name or node.company_name,
         }
-        for node in descendants
+        for node in leaves
     ]
 
 
@@ -1548,8 +1633,9 @@ async def _maybe_apply_cross_template(
         return None
 
     # 仅当存在跨模板子公司时才介入（同模板集团跳过，零开销）
+    sources = _source_projects(subsidiaries)
     differing = [
-        s for s in subsidiaries
+        s for s in sources
         if (s.get("template_type") or consol_type) != consol_type
     ]
     if not differing:
@@ -1557,10 +1643,10 @@ async def _maybe_apply_cross_template(
 
     section_id = mapping.get("section_id", "")
 
-    # 读取各子公司该章节的单体附注数据（与 aggregation_service 同源 disclosure_notes）
+    # 读取各数据叶子该章节的单体附注数据（与 aggregation_service 同源 disclosure_notes）
     children: list[dict] = []
     try:
-        for sub in subsidiaries:
+        for sub in sources:
             section_data = await _load_child_section_data(
                 db, sub["project_id"], year, section_id,
             )
@@ -1660,8 +1746,9 @@ def _generate_consol_only_sections_v2(
 ) -> list[dict]:
     """生成 7 个合并专用章节（wp_data 强化版）.
 
-    B.1.5 + B.1.9 实现。
+    B.1.5 + B.1.9 实现。家数只数子公司企业（母公司/本部与分公司不计，同一子公司只计一次）。
     """
+    subsidiary_count = len(_subsidiary_entities(subsidiaries))
     consol_sections = [
         {
             "section_id": "consol_scope",
@@ -1670,7 +1757,7 @@ def _generate_consol_only_sections_v2(
             "scope": "consolidated",
             "level": 2,
             "auto_numbering": True,
-            "table_data": {"rows": [], "summary": f"纳入合并范围子公司 {len(subsidiaries)} 家"},
+            "table_data": {"rows": [], "summary": f"纳入合并范围子公司 {subsidiary_count} 家"},
         },
         {
             "section_id": "important_subsidiaries",
@@ -1679,7 +1766,7 @@ def _generate_consol_only_sections_v2(
             "scope": "consolidated",
             "level": 2,
             "auto_numbering": True,
-            "table_data": {"rows": [], "summary": f"共有 {len(subsidiaries)} 家重要子公司"},
+            "table_data": {"rows": [], "summary": f"共有 {subsidiary_count} 家重要子公司"},
         },
         {
             "section_id": "scope_change",
@@ -1741,12 +1828,20 @@ def _generate_consol_only_sections_v2(
 async def _write_lineage_v2(
     db: AsyncSession,
     parent_project_id: UUID,
+    *,
+    context: "ConsolContext | None" = None,
+    tree: "TreeNode | None" = None,
 ) -> list[str]:
-    """调 get_lineage_chain 获取多层合并 lineage.
+    """调 get_lineage_chain 获取多层合并 lineage，并校验共享上下文边界。
 
-    B.1.6 实现。
+    ``tree`` 仅用于校验本次生成使用的树；lineage 仍由
+    ``get_lineage_chain`` 读取项目关系，避免把树层级误当成 lineage 语义。
     """
+    from app.services.consol_context_service import validate_context
     from app.services.consol_note_aggregation_service import get_lineage_chain
+
+    if context is not None:
+        validate_context(context, parent_project_id, context.year, tree=tree)
 
     chain = await get_lineage_chain(parent_project_id, db=db)
     return [str(pid) for pid in chain]
@@ -1764,11 +1859,12 @@ def _build_consol_paragraph_vars(
     """构建合并版文字段落变量.
 
     B.1.7 实现。包含 subsidiary_count / consolidated_revenue /
-    controlled_subsidiaries 等合并专用变量。
+    controlled_subsidiaries 等合并专用变量（家数只数子公司企业，见 ``_subsidiary_entities``）。
     """
-    controlled = [s for s in subsidiaries if s.get("consol_level", 1) <= 2]
+    entities = _subsidiary_entities(subsidiaries)
+    controlled = [s for s in entities if s.get("consol_level", 1) <= 2]
     return {
-        "subsidiary_count": len(subsidiaries),
+        "subsidiary_count": len(entities),
         "controlled_subsidiaries": len(controlled),
         "consolidated_revenue": None,  # 需从合并试算表取，此处占位
         "year": year,
@@ -1777,7 +1873,7 @@ def _build_consol_paragraph_vars(
         "has_consolidation": True,
         "subsidiaries": [
             {"name": s.get("company_name", ""), "company_code": s.get("company_code", "")}
-            for s in subsidiaries
+            for s in entities
         ],
     }
 

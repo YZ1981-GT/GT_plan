@@ -1,17 +1,16 @@
 """合并工作底稿数据存储 API — 通用 JSON 存储，支持所有 16 张表的保存/加载"""
 
-import json
-import uuid
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import text
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import require_project_access
+from app.models.consol_worksheet_data_models import ConsolWorksheetData
 from app.models.core import User
 from app.services.g7_consol_linkage_service import (
     G7LinkageConfigError,
@@ -25,17 +24,20 @@ router = APIRouter(prefix="/api/consol-worksheet-data", tags=["consolidation-wor
 
 
 class WorksheetDataSave(BaseModel):
-    """保存请求"""
-    sheet_key: str  # info / cost / equity_inv / net_asset / equity_sim / elimination / capital / share_change_1 / ...
-    data: dict  # 整张表的 JSON 数据
+    """保存请求。"""
+    sheet_key: str  # info / cost / equity_inv / net_asset / equity_sim / elimination / share_change_1 / ...
+    data: dict | list
+    # 传入时启用可靠的整数 CAS；省略时保持旧人工整表 PUT 的兼容 upsert 语义。
+    expected_version: int | None = Field(default=None, ge=0)
 
 
 class WorksheetDataResponse(BaseModel):
-    """响应"""
+    """响应。"""
     project_id: str
     year: int
     sheet_key: str
-    content: dict
+    content: dict | list
+    version: int = 0
     updated_at: str | None = None
 
 
@@ -139,6 +141,37 @@ async def apply_g7_linkage_import(
         raise HTTPException(status_code=500, detail=f"G7 linkage import failed: {exc}") from exc
 
 
+# ─── worksheet response helpers ───────────────────────────────────────────────
+def _worksheet_content(value: object) -> dict | list:
+    """保留数据库中的 JSON 对象/数组形状；损坏的 ORM 值由调用方显式报错。"""
+    if isinstance(value, (dict, list)):
+        return value
+    raise ValueError("工作底稿 JSON 不是对象或数组")
+
+
+def _worksheet_response(row: ConsolWorksheetData | None, *, project_id: UUID, year: int, sheet_key: str) -> WorksheetDataResponse:
+    if row is None:
+        return WorksheetDataResponse(
+            project_id=str(project_id),
+            year=year,
+            sheet_key=sheet_key,
+            content={},
+            version=0,
+        )
+    try:
+        content = _worksheet_content(row.data)
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return WorksheetDataResponse(
+        project_id=str(project_id),
+        year=year,
+        sheet_key=sheet_key,
+        content=content,
+        version=int(row.version or 0),
+        updated_at=row.updated_at.isoformat() if row.updated_at else None,
+    )
+
+
 # ─── GET: 加载某张表的数据 ────────────────────────────────────────────────────
 @router.get("/{project_id}/{year}/{sheet_key}", response_model=WorksheetDataResponse)
 async def get_worksheet_data(
@@ -146,23 +179,21 @@ async def get_worksheet_data(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
-    result = await db.execute(
-        text("SELECT data, updated_at FROM consol_worksheet_data WHERE project_id = :pid AND year = :y AND sheet_key = :sk"),
-        {"pid": str(project_id), "y": year, "sk": sheet_key},
-    )
-    row = result.fetchone()
-    if not row:
-        return WorksheetDataResponse(
-            project_id=str(project_id), year=year, sheet_key=sheet_key, content={},
+    row = (
+        await db.execute(
+            select(ConsolWorksheetData).where(
+                ConsolWorksheetData.project_id == project_id,
+                ConsolWorksheetData.year == year,
+                ConsolWorksheetData.sheet_key == sheet_key,
+            )
         )
-    return WorksheetDataResponse(
-        project_id=str(project_id), year=year, sheet_key=sheet_key,
-        content=row[0] if isinstance(row[0], dict) else {},
-        updated_at=str(row[1]) if row[1] else None,
+    ).scalar_one_or_none()
+    return _worksheet_response(
+        row, project_id=project_id, year=year, sheet_key=sheet_key
     )
 
 
-# ─── PUT: 保存某张表的数据（upsert） ─────────────────────────────────────────
+# ─── PUT: 保存某张表的数据（兼容整表 upsert + 可选 CAS） ───────────────────────
 @router.put("/{project_id}/{year}/{sheet_key}", response_model=WorksheetDataResponse)
 async def save_worksheet_data(
     project_id: UUID, year: int, sheet_key: str,
@@ -170,29 +201,102 @@ async def save_worksheet_data(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("edit")),
 ):
+    if body.sheet_key != sheet_key:
+        raise HTTPException(status_code=422, detail="请求体 sheet_key 与路径不一致")
+
     now = datetime.now(timezone.utc)
     try:
-        await db.execute(
-            text("""
-                INSERT INTO consol_worksheet_data (id, project_id, year, sheet_key, data, created_at, updated_at)
-                VALUES (:id, :pid, :y, :sk, CAST(:data AS jsonb), :now, :now)
-                ON CONFLICT (project_id, year, sheet_key)
-                DO UPDATE SET data = CAST(:data AS jsonb), updated_at = :now
-            """),
-            {
-                "id": str(uuid.uuid4()), "pid": str(project_id), "y": year,
-                "sk": sheet_key, "data": json.dumps(body.data, ensure_ascii=False),
-                "now": now,
-            },
-        )
+        row = (
+            await db.execute(
+                select(ConsolWorksheetData).where(
+                    ConsolWorksheetData.project_id == project_id,
+                    ConsolWorksheetData.year == year,
+                    ConsolWorksheetData.sheet_key == sheet_key,
+                )
+            )
+        ).scalar_one_or_none()
+
+        if row is None:
+            # 空表的逻辑版本为 0；expected_version=0 允许首次 CAS 创建。
+            if body.expected_version not in (None, 0):
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "worksheet_version_conflict",
+                        "message": "工作底稿尚不存在，期望版本必须为 0",
+                        "expected_version": body.expected_version,
+                        "actual_version": None,
+                    },
+                )
+            row = ConsolWorksheetData(
+                project_id=project_id,
+                year=year,
+                sheet_key=sheet_key,
+                data=body.data,
+                version=0,
+                created_at=now,
+                updated_at=now,
+                created_by=getattr(user, "id", None),
+            )
+            db.add(row)
+            await db.flush()
+        else:
+            current_version = int(row.version or 0)
+            if (
+                body.expected_version is not None
+                and current_version != body.expected_version
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "worksheet_version_conflict",
+                        "message": "工作底稿已被其他操作修改，请重新加载后再保存",
+                        "expected_version": body.expected_version,
+                        "actual_version": current_version,
+                    },
+                )
+
+            # Runtime/CAS 写入必须把版本条件放在 UPDATE 中，避免先读后写覆盖并发用户值。
+            conditions = [ConsolWorksheetData.id == row.id]
+            if body.expected_version is not None:
+                conditions.append(ConsolWorksheetData.version == body.expected_version)
+            result = await db.execute(
+                update(ConsolWorksheetData)
+                .where(*conditions)
+                .values(data=body.data, updated_at=now, version=current_version + 1)
+            )
+            if result.rowcount != 1:
+                actual = (
+                    await db.execute(
+                        select(ConsolWorksheetData.version).where(
+                            ConsolWorksheetData.id == row.id
+                        )
+                    )
+                ).scalar_one_or_none()
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "worksheet_version_conflict",
+                        "message": "工作底稿已被其他操作修改，请重新加载后再保存",
+                        "expected_version": body.expected_version,
+                        "actual_version": int(actual) if actual is not None else None,
+                    },
+                )
+            row.data = body.data
+            row.version = current_version + 1
+            row.updated_at = now
+
         await db.commit()
-    except Exception as e:
+        await db.refresh(row)
+        return _worksheet_response(
+            row, project_id=project_id, year=year, sheet_key=sheet_key
+        )
+    except HTTPException:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Save failed: {str(e)}")
-    return WorksheetDataResponse(
-        project_id=str(project_id), year=year, sheet_key=sheet_key,
-        content=body.data, updated_at=str(now),
-    )
+        raise
+    except Exception as exc:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"工作底稿保存失败：{exc}") from exc
 
 
 # ─── GET: 加载项目所有表的数据（批量） ────────────────────────────────────────
@@ -202,18 +306,21 @@ async def get_all_worksheet_data(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
-    result = await db.execute(
-        text("SELECT sheet_key, data, updated_at FROM consol_worksheet_data WHERE project_id = :pid AND year = :y"),
-        {"pid": str(project_id), "y": year},
-    )
-    rows = result.fetchall()
-    return [
-        WorksheetDataResponse(
-            project_id=str(project_id), year=year, sheet_key=r[0],
-            content=r[1] if isinstance(r[1], dict) else {},
-            updated_at=str(r[2]) if r[2] else None,
+    rows = (
+        await db.execute(
+            select(ConsolWorksheetData)
+            .where(
+                ConsolWorksheetData.project_id == project_id,
+                ConsolWorksheetData.year == year,
+            )
+            .order_by(ConsolWorksheetData.sheet_key)
         )
-        for r in rows
+    ).scalars().all()
+    return [
+        _worksheet_response(
+            row, project_id=project_id, year=year, sheet_key=row.sheet_key
+        )
+        for row in rows
     ]
 
 
@@ -233,21 +340,36 @@ async def get_prior_year_data(
     prior_year = year - 1
     prior_key = sheet_key.replace('_opening', '_closing')
 
-    result = await db.execute(
-        text("SELECT data, updated_at FROM consol_worksheet_data WHERE project_id = :pid AND year = :y AND sheet_key = :sk"),
-        {"pid": str(project_id), "y": prior_year, "sk": prior_key},
-    )
-    row = result.fetchone()
+    row = (
+        await db.execute(
+            select(
+                ConsolWorksheetData.data,
+                ConsolWorksheetData.updated_at,
+                ConsolWorksheetData.version,
+            )
+            .where(
+                ConsolWorksheetData.project_id == project_id,
+                ConsolWorksheetData.year == prior_year,
+                ConsolWorksheetData.sheet_key == prior_key,
+            )
+        )
+    ).first()
     if not row:
         return {
             "found": False,
             "message": f"未找到 {prior_year} 年度的期末数据（{prior_key}）",
             "content": {},
+            "version": 0,
         }
+    try:
+        content = _worksheet_content(row[0])
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     return {
         "found": True,
         "source_year": prior_year,
         "source_key": prior_key,
-        "content": row[0] if isinstance(row[0], dict) else {},
-        "updated_at": str(row[1]) if row[1] else None,
+        "content": content,
+        "version": int(row[2] or 0),
+        "updated_at": row[1].isoformat() if row[1] else None,
     }

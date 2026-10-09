@@ -155,6 +155,42 @@ export const WP_BRIDGE_EVENTS = [
   'close_authorization_lost',
   'close_successor_applied',
   'close_no_successor',
+  /**
+   * 未改动的 clean close 完成（AC 4.10 的 clean close，非仲裁路径）。
+   *
+   * 🔴 2026-09-22 补这条边之前，`oo_editing` 的**唯一**自愿出边是 `forcesave_started`
+   * —— 即「想离开 OO 必须先发一次强制保存」。于是用户一个字都没改就点「结构化视图」时：
+   * 冻结 forcesave → Command Service 返回码 4（无改动）→ 落 `forcesave_frozen` →
+   * 界面一条红字「文档没有检测到改动…」，人还留在 OO 里。那不是错误，是**这条路不存在**。
+   *
+   * 判据没有被放宽：本事件只在 `dirty === false` 时可发（`leaveWithoutSaving()` 的门），
+   * 而 `dirty` 正是 `leaveBlockReason` 判「离开会不会丢东西」用的同一个信号 ——
+   * 平台早就用它挡 beforeunload/路由离开，这里只是让「不会丢东西」这一结论
+   * 也能用在「省掉那次必然返回『无改动』的往返」上。
+   *
+   * 🔴 它**恰发一个请求**，而且必须是 `leaveRoom`（`POST …/rooms/{id}/participants/{id}/leave`）
+   * 而不是 `close-intents`。首版在这里发 close-intent，真库实测是误用：服务端的
+   * close-intent 不是「我走了」而是 **close barrier 仲裁** —— 把 participant 推成
+   * `closing`、选 leader、并提升一条 `kind=close_capture` 写请求。未改动文档的那条 capture
+   * 永远等不到 OO 回调：实测 room `03bbcad8` 停在 `state=close_barrier` / participant
+   * `closing` / capture `state=frozen`，该 room 此后再也进不去（下次打开 confirm-descriptor
+   * 仍 200，紧接着「同步失败，请重试」）。
+   *
+   * 之后有一段时间它退回**纯本地**转换（一个请求都不发），因为「我走了」这条服务端路径
+   * 当时根本不存在：`ParticipantState.left` 在 `PARTICIPANT_EDGES` 里是合法终态
+   * （`active → left` / `closing → left`），却全仓没有任何 service/端点会写它，lease 只能
+   * 等 `expires_at` 自然过期。spec `oo-single-pass-materialize-and-room-leave`
+   * Requirement 4 把那条路径补上之后，`leaveWithoutSaving()` 改为调用它 ——
+   * 判据面同步从「零请求」变成「**恰一次 leave、零次 forcesave、零次 close-intent**」
+   * （AC 4.5 明文要求的切换）。
+   *
+   * leave 与 close-intent 的差别就是这条边存在的理由，逐条写在服务端
+   * `rooms.RoomService.leave_participant` 的 docstring 里：不建任何 request、不选 leader、
+   * 不推 barrier、不改 room 状态、不旋转 generation（AC 4.1 / Property P7）。
+   * leave 请求**失败也不阻断**本转换（失败只是退回「等 lease 过期」那个旧形态，
+   * 拿它挡住用户返回表单会重新制造本 spec 起因的那种红字）。
+   */
+  'clean_close_completed',
   'recovery_case_observed',
   'recovery_claim_started',
   'recovery_claim_failed',
@@ -318,6 +354,8 @@ const DETERMINISTIC_EDGES: Readonly<Record<WorkpaperSyncBridgeState, EdgeMap>> =
     },
     oo_editing: {
       forcesave_started: 'forcesave_requesting',
+      // 未改动时的 clean close：直接回 HTML，不走 forcesave（见事件处的说明）。
+      clean_close_completed: 'html_idle',
       close_authorization_lost: 'close_authorization_stale',
       recovery_case_observed: 'recovery_pending',
       sync_failed: 'error',

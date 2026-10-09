@@ -9,8 +9,8 @@
  * - debounce 2s 文本字段保存（per item_id 独立计时器）
  * - 结论/状态/选择类字段立即保存（saveImmediate）
  * - 批量保存（saveBatch）
- * - 组件卸载时 flush 未保存数据（onScopeDispose）
- * - trial_balance 回写：writebackTrialBalance（科目1123）
+ * - 切换前严格等待保存；组件卸载时非阻塞 flush（onScopeDispose）
+ * - TB 回写由审定表显式发布门承载，本数据层不写 trial_balance
  * - selfLoad逻辑（render-config?force_component_type=f1-prepayment）
  * - 关联方清单加载：loadRelatedParties
  */
@@ -41,8 +41,13 @@ export function useF1FormData(options: UseF1FormDataOptions) {
 
   // Per-item debounce timers
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
-  // Track pending items for flush
+  // 只有当前版本真正落库后才清 pending；旧请求完成不得确认较新的编辑。
   const _pendingItems = new Set<string>()
+  const _itemVersions = new Map<string, number>()
+  const _queuedVersions = new Map<string, number>()
+  const _saveFailures = new Map<string, unknown>()
+  // 即时、批量、debounce 共用串行队列，防止旧请求后到覆盖新值。
+  let _saveTail: Promise<void> = Promise.resolve()
 
   // ─── Load ────────────────────────────────────────────────────────────────
 
@@ -107,11 +112,11 @@ export function useF1FormData(options: UseF1FormDataOptions) {
 
   // ─── Save ────────────────────────────────────────────────────────────────
 
-  async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {
-    if (!wpId.value || items.length === 0) return
+  async function _doSave(items: ChecklistResponse[], targetWpId: string, targetProjectId: string): Promise<void> {
     try {
-      await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, {
-        project_id: projectId.value,
+      if (!targetWpId) throw new Error('底稿编号缺失，F1 数据尚未保存')
+      await api.put(`/api/workpapers/${targetWpId}/checklist-responses`, {
+        project_id: targetProjectId,
         items: items.map((item) => ({
           item_id: item.item_id,
           conclusion: item.conclusion || null,
@@ -121,31 +126,72 @@ export function useF1FormData(options: UseF1FormDataOptions) {
     } catch (err: any) {
       const msg = err?.message || ''
       if (msg !== 'canceled' && err?.code !== 'ERR_CANCELED') {
-        ElMessage.error('保存失败，请稍后重试')
+        ElMessage.error('保存失败，编辑已保留，请重试')
       }
+      throw err
     }
   }
 
-  /** 立即保存指定 item（结论/状态/选择类字段触发） */
-  async function saveImmediate(itemId: string, data: Partial<ChecklistResponse>): Promise<void> {
-    // 取消该 item 的 debounce 定时器
-    const timer = _debounceTimers.get(itemId)
-    if (timer) {
-      clearTimeout(timer)
-      _debounceTimers.delete(itemId)
-    }
-    _pendingItems.delete(itemId)
+  /** 调用时冻结值和版本；所有写入方共用队列，失败不清 pending。 */
+  function _queuePending(itemIds: Iterable<string>): Promise<void> {
+    const entries = [...new Set(itemIds)].flatMap((itemId) => {
+      const version = _itemVersions.get(itemId)
+      const response = allResponses.value.get(itemId)
+      if (!response || version === undefined || _queuedVersions.get(itemId) === version) return []
+      _queuedVersions.set(itemId, version)
+      return [{ itemId, version, response: { ...response } }]
+    })
+    if (entries.length === 0) return _saveTail
+    const targetWpId = wpId.value
+    const targetProjectId = projectId.value
+    const request = _saveTail.then(async () => {
+      try {
+        await _doSave(entries.map((entry) => entry.response), targetWpId, targetProjectId)
+        for (const { itemId, version } of entries) {
+          if (_itemVersions.get(itemId) === version) {
+            _pendingItems.delete(itemId)
+            _saveFailures.delete(itemId)
+          }
+        }
+      } catch (error) {
+        for (const { itemId, version } of entries) {
+          if (_itemVersions.get(itemId) === version) _saveFailures.set(itemId, error)
+        }
+        throw error
+      } finally {
+        for (const { itemId, version } of entries) {
+          if (_queuedVersions.get(itemId) === version) _queuedVersions.delete(itemId)
+        }
+      }
+    })
+    // 队列自身始终可继续；strict flush 从失败清册拒绝，不把后台拒绝留作 unhandled。
+    _saveTail = request.catch(() => undefined)
+    return request
+  }
 
-    // 合并到 allResponses
+  function _stageItem(itemId: string, data: Partial<ChecklistResponse>): void {
     const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
-    const updated: ChecklistResponse = {
+    allResponses.value.set(itemId, {
       ...existing,
       ...(data.conclusion !== undefined ? { conclusion: data.conclusion } : {}),
       ...(data.remark !== undefined ? { remark: data.remark } : {}),
-    }
-    allResponses.value.set(itemId, updated)
+    })
+    _itemVersions.set(itemId, (_itemVersions.get(itemId) ?? 0) + 1)
+    _pendingItems.add(itemId)
+    _saveFailures.delete(itemId)
+  }
 
-    await _doSave([updated])
+  function _cancelDebounce(itemId: string): void {
+    const timer = _debounceTimers.get(itemId)
+    if (timer !== undefined) clearTimeout(timer)
+    _debounceTimers.delete(itemId)
+  }
+
+  /** 保留既有 Promise<void> 非抛错契约（有 void 调用方）；严格失败交由 flush 报告。 */
+  async function saveImmediate(itemId: string, data: Partial<ChecklistResponse>): Promise<void> {
+    _cancelDebounce(itemId)
+    _stageItem(itemId, data)
+    await _queuePending([itemId]).catch(() => undefined)
   }
 
   /** 批量保存多个 items */
@@ -154,49 +200,20 @@ export function useF1FormData(options: UseF1FormDataOptions) {
     //    （联动回写常见：先写整表 JSON、再写其中某个汇总字段）。
     //    同 itemId 多次传入时后写覆盖先写，与「用户最后一次输入」语义一致。
     const deduped = [...new Map(items.map((it) => [it.itemId, it])).values()]
-    const toSave: ChecklistResponse[] = []
     for (const { itemId, data } of deduped) {
-      // 取消 debounce
-      const timer = _debounceTimers.get(itemId)
-      if (timer) {
-        clearTimeout(timer)
-        _debounceTimers.delete(itemId)
-      }
-      _pendingItems.delete(itemId)
-
-      const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
-      const updated: ChecklistResponse = {
-        ...existing,
-        ...(data.conclusion !== undefined ? { conclusion: data.conclusion } : {}),
-        ...(data.remark !== undefined ? { remark: data.remark } : {}),
-      }
-      allResponses.value.set(itemId, updated)
-      toSave.push(updated)
+      _cancelDebounce(itemId)
+      _stageItem(itemId, data)
     }
-
-    await _doSave(toSave)
+    await _queuePending(deduped.map((item) => item.itemId)).catch(() => undefined)
   }
 
   /** debounce 2s 文本字段保存（per item_id 独立计时器） */
   function debouncedSave(itemId: string, data: Partial<ChecklistResponse>): void {
-    // 合并到 allResponses
-    const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
-    const updated: ChecklistResponse = {
-      ...existing,
-      ...(data.conclusion !== undefined ? { conclusion: data.conclusion } : {}),
-      ...(data.remark !== undefined ? { remark: data.remark } : {}),
-    }
-    allResponses.value.set(itemId, updated)
-    _pendingItems.add(itemId)
-
-    // 重置该 item 的定时器
-    const prevTimer = _debounceTimers.get(itemId)
-    if (prevTimer) clearTimeout(prevTimer)
-
+    _cancelDebounce(itemId)
+    _stageItem(itemId, data)
     const timer = setTimeout(() => {
       _debounceTimers.delete(itemId)
-      _pendingItems.delete(itemId)
-      _doSave([updated])
+      void _queuePending([itemId]).catch(() => undefined)
     }, 2000)
     _debounceTimers.set(itemId, timer)
   }
@@ -208,31 +225,29 @@ export function useF1FormData(options: UseF1FormDataOptions) {
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────
 
-  function _flushPending(): void {
-    // 清除所有 debounce 定时器
-    for (const timer of _debounceTimers.values()) {
-      clearTimeout(timer)
-    }
-    _debounceTimers.clear()
-
-    // 保存所有 pending items
-    if (_pendingItems.size > 0) {
-      const items: ChecklistResponse[] = []
+  /** 等待全部在途写入及等待期间的新编辑；任一当前版本失败则拒绝切到 OO。 */
+  async function _flushPending(): Promise<void> {
+    do {
+      for (const timer of _debounceTimers.values()) clearTimeout(timer)
+      _debounceTimers.clear()
+      // flush 开始前的失败可重试；本次新失败不无限重试、不谎报成功。
+      await _queuePending(_pendingItems).catch(() => undefined)
+      let tail: Promise<void>
+      do {
+        tail = _saveTail
+        await tail
+      } while (tail !== _saveTail)
       for (const itemId of _pendingItems) {
-        const resp = allResponses.value.get(itemId)
-        if (resp) items.push(resp)
+        if (_saveFailures.has(itemId)) throw _saveFailures.get(itemId)
       }
-      _pendingItems.clear()
-      if (items.length > 0) {
-        _doSave(items)
-      }
-    }
+    } while (_pendingItems.size > 0)
   }
 
   // ─── Lifecycle ───────────────────────────────────────────────────────────
 
   onScopeDispose(() => {
-    _flushPending()
+    // 卸载钩子不能 await；失败已留痕并保留编辑，不能制造后台 unhandled rejection。
+    void _flushPending().catch(() => undefined)
   })
 
   return {
@@ -243,6 +258,8 @@ export function useF1FormData(options: UseF1FormDataOptions) {
     saveImmediate,
     saveBatch,
     debouncedSave,
+    // syncBridge 须 await：等所有保存落库才允许读投影；失败保留 pending 并拒绝切 OO。
+    flushPendingSave: _flushPending,
   }
 }
 

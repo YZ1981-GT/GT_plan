@@ -33,6 +33,7 @@ import {
   calcNetValue,
   calcChangeRate,
 } from './useI1FormulaEngine'
+import { I1_DEFAULT_CATEGORIES as _I1_CATEGORY_SLOTS } from './i1CategoryScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -101,20 +102,12 @@ export type I1BlockType = 'cost' | 'amort' | 'impairment'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** 对齐 Excel 审定表分类（含住房使用权/矿产权/数据资源） */
-export const I1_DEFAULT_CATEGORIES = [
-  '土地使用权',
-  '住房使用权',
-  '专利权',
-  '非专利技术',
-  '商标权',
-  '著作权',
-  '特许经营权',
-  '软件',
-  '矿产权',
-  '数据资源',
-  '其他',
-] as const
+/**
+ * 对齐 Excel 审定表分类（含住房使用权/矿产权/数据资源）。
+ * 🔴 CD-1 收敛：从 i1CategoryScope.I1_DEFAULT_CATEGORIES 派生，不再独立维护字面量。
+ * 保持 `as const` 语义兼容现有引用（导出名不变）。
+ */
+export const I1_DEFAULT_CATEGORIES = _I1_CATEGORY_SLOTS.map(c => c.label) as unknown as readonly string[]
 
 const DEFAULT_COST_CATEGORIES = [...I1_DEFAULT_CATEGORIES]
 const DEFAULT_AMORT_CATEGORIES = [...I1_DEFAULT_CATEGORIES]

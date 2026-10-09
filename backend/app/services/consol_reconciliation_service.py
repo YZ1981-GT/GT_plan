@@ -1,25 +1,19 @@
 """合并模块 B2：worksheet ↔ trial 单一事实源对账服务（consol-phase0-core-pipeline）
 
 职责：逐科目对比差额表引擎（worksheet 根节点）算出的 `consolidated_amount`
-与报表数据源（`consol_trial.consol_amount`），差异超容差则记 warning 日志并
+与报表数据源（`consol_trial.consol_amount`），差异超容差则记 error 日志并
 返回 `is_reconciled=false` + diffs 清单，但 **不阻断**接口（仍正常返回，E5）。
 
-设计定位（ADR-CONSOL-001）：本服务是 Phase 0 的**观测手段**，用于确立
-worksheet 为单一事实源（single source of truth）。它不强制两条计算路径
-（trial→report / worksheet→pivot）数值一致。
+口径变更（spec consol-tree-three-code-autobuild 任务 7.5，有意）：两条路径已共用同一棵树、
+同一分录归属与同一科目方向（`consol_calc_basis`），根节点合并数与试算合并数逐科目恒等（P8，
+需求 5.5）。旧版「两条路径归集维度不同、diff 只是观测信号」的前提不再成立 ——
+现在任何超容差差异都是缺陷（常见原因：只重算了其中一条路径，或重算后树结构/分录又变了）。
+根节点的差额表键是 `node_key`（`{企业代码}:consol`），不再是纯企业代码。
 
-⚠️ diff ≠ Phase 0 bug（已知设计性不一致，R9 / 设计 §5.4）：
-两条路径消费 `EliminationEntry` 的**结构不同** ——
-`recalculate_trial` 按 `EliminationEntry.lines[].account_code`（科目级）聚合借贷；
-而 worksheet `_calc_node` 按 `EliminationEntry.debit_amount/credit_amount`
-（公司节点级）聚合。即使两边底层数据都正确，逐科目对账仍可能报大量 diff
-（归集维度不同）。抵销口径的统一留待后续 Phase 的「衔接2 抵销→试算口径统一」。
-因此本服务把 diff 当作观测信号而非缺陷，记 warning 不阻断。
-
-架构：把对账核心逻辑抽成纯函数 `_reconcile_amounts`（喂两个内存字典 + tolerance），
-DB 取数在外层 `reconcile_worksheet_vs_trial` 调用纯函数 —— 便于 PBT（P4）
-只验「对账逻辑自洽」（`is_reconciled == (max_abs_diff <= tolerance)` 且 diffs
-集合正确），**不验**两路径数值必相等。
+架构：对账核心逻辑是纯函数 `_reconcile_amounts`（喂两个内存字典 + tolerance），
+DB 取数在外层 `reconcile_worksheet_vs_trial` —— PBT（P4）验「对账逻辑自洽」
+（`is_reconciled == (max_abs_diff <= tolerance)` 且 diffs 集合正确），
+两路径数值相等由 P8（真 SQLite 全链路）守护。
 
 全程金额使用 `Decimal`，无 `float` 中转（属性 P7）。
 """
@@ -117,16 +111,16 @@ def _reconcile_amounts(
 # DB 取数
 # ---------------------------------------------------------------------------
 
-async def _get_root_company_code(db: AsyncSession, project_id: UUID) -> str | None:
-    """取企业树根节点的 `company_code`（worksheet 引擎用它作 node_company_code 写入）。
+async def _get_root_node_key(db: AsyncSession, project_id: UUID) -> str | None:
+    """取企业树根节点的 `node_key`（差额表引擎用它作 node_company_code 写入）。
 
     健壮性：找不到根（build_tree 返回 None）则返回 None，由外层降级为空对账结果，
-    不抛异常中断（合并模块 Phase 0 防误用：对账是观测手段，不应让缺数据崩溃）。
+    不抛异常中断（对账不应让缺数据崩溃）。
     """
     root = await build_tree(db, project_id)
     if root is None:
         return None
-    return root.company_code
+    return root.node_key or root.company_code
 
 
 async def _load_worksheet_root(
@@ -135,7 +129,7 @@ async def _load_worksheet_root(
     """加载 worksheet 根节点各科目合并数 `{account_code: Decimal}`。
 
     根节点的 `consolidated_amount` 即最终合并数（worksheet 引擎后序遍历的输出）。
-    口径：`node_company_code == root_code` + `is_deleted == false`。
+    口径：`node_company_code == 根 node_key` + `is_deleted == false`。
     金额 `Decimal(str(...))`，无 float 中转。
     """
     result = await db.execute(
@@ -174,7 +168,7 @@ async def reconcile_worksheet_vs_trial(
     前置条件：worksheet 已 `recalc_full`（根节点 consolidated_amount 已算）；
               trial 已 `recalculate_trial`。
     """
-    root_code = await _get_root_company_code(db, project_id)
+    root_code = await _get_root_node_key(db, project_id)
     if root_code is None:
         # 找不到企业树根 → 降级为空对账结果（不崩），仍记 warning 便于运维感知
         logger.warning(
@@ -196,10 +190,10 @@ async def reconcile_worksheet_vs_trial(
     result = _reconcile_amounts(ws_map, trial_map, tolerance)
 
     if not result.is_reconciled:
-        # diff ≠ Phase 0 bug（归集维度差异，R9/§5.4）：记 warning 概要，不阻断
-        logger.warning(
-            "B2 对账发现差异（观测手段，非缺陷）：项目=%s 年度=%s 容差=%s "
-            "max_abs_diff=%s 超容差科目数=%d 示例=%s",
+        # 两条路径同源（P8）：差异即缺陷，记 error 概要，但不阻断接口
+        logger.error(
+            "B2 对账发现差异（两条路径同源，差异即缺陷；请先全量重算差额表与合并试算）："
+            "项目=%s 年度=%s 容差=%s max_abs_diff=%s 超容差科目数=%d 示例=%s",
             project_id, year, tolerance, result.max_abs_diff,
             len(result.diffs), result.diffs[:5],
         )

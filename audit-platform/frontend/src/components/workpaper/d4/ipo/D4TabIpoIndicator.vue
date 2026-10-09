@@ -154,6 +154,12 @@ async function genConclusion() {
 // ─── Import/Export ───────────────────────────────────────────────────
 function handleExportTemplate() { exportTemplate('D4-22') }
 function handleExportData() { exportData('D4-22') }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await importData('D4-22', f) }
+  input.click()
+}
 async function handleImportFile(uploadFile: any) { await importData('D4-22', uploadFile.raw || uploadFile) }
 
 // ─── AI batch fill analysis ─────────────────────────────────────────
@@ -223,6 +229,8 @@ async function genAllAnalysis() {
 
 // ─── Progress rate ───────────────────────────────────────────────────
 const progressRate = computed(() => Math.round((filledCount.value / totalIndicators.value) * 100))
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 <template>
@@ -234,21 +242,7 @@ const progressRate = computed(() => Math.round((filledCount.value / totalIndicat
         <el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">{{ syncStateTag.text }}</el-tag>
       </div>
       <div class="toolbar-right">
-        <el-dropdown trigger="click" size="small">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-              <el-dropdown-item>
-                <el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false"
-                  :disabled="isReadonly || importing" @change="handleImportFile">
-                  <span>导入数据</span>
-                </el-upload>
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        
         <GtIndexChip value="wp:D4-1" :context-project-id="projectId" />
         <GtIndexChip value="wp:D4-2" :context-project-id="projectId" />
         <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-22-indicator')">💬 复核</el-button>

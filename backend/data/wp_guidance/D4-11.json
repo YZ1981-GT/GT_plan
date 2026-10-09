@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-11",
+  "title": "D4-11 产品销售价格分析 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "按品种规格逐笔分析销售单价与内部定价表、同期市场价格的偏离度，验证收入计价的准确性和定价政策的执行情况。",
+      "source_refs": []
+    },
+    {
+      "key": "data_sources",
+      "title": "二、数据来源",
+      "content": "从销售明细/开票记录逐笔取数，填写品种规格、销售单价、销售数量、开票日期、销售订单及日期、定价表单价、同期市场价格。定价表单价取自企业内部定价文件。",
+      "source_refs": []
+    },
+    {
+      "key": "formulas",
+      "title": "三、计算与判断",
+      "content": "价格差异 = 销售单价 − 定价表单价（或市场价格）\n差异原因分析须逐笔填写；市场价格来源须标注。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 销售单价显著低于定价表：关注是否存在未经审批的折扣或体外返利。\n2. 关注是否存在低于成本价销售（可能为冲收入或消化库存）。\n3. 订单日期与开票日期跨期：结合截止测试关注收入确认时点。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "1c6c53799967d92b3cfe9d3b379896ef452c6c16dbd3a7cbe0d3521aef04d695",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "7d1cdf4f51e777cf5ca044e68f90ce9f02037a815cf51dba968d795bc2ec5069"
+  }
+}

@@ -109,6 +109,7 @@ def build_k1_detail_rows_from_aux(
     row_limit: int = K1_DETAIL_ROW_LIMIT,
     row_id_factory: Callable[[], str] | None = None,
     source_hint: str = "",
+    source_kind: str = "aux_balance_import",
 ) -> list[dict]:
     """纯函数：辅助余额归集结果 → K1-2 明细行。
 
@@ -169,6 +170,7 @@ def build_k1_detail_rows_from_aux(
             "voucherNo": "",
             "conclusion": "",
             "remark": remark,
+            "source_kind": source_kind,
         })
     return rows
 

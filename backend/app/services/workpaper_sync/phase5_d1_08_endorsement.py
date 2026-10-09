@@ -1,0 +1,207 @@
+# -*- coding: utf-8 -*-
+"""D1-8「应收票据贴现、票据已背书未到期明细表」—— sheet 层薄声明（**双区**）。
+
+spec: d1-sync-row-table-engine-and-d1-coverage · Task 27 · Requirements 5.1 / 5.4
+
+═══ 几何（openpyxl 直读实测，2026-09-26）═══
+
+| 区 | 标题 | 表头 | 数据行 | footer | **footer** 公式列（数据区零公式） | store 键 | UUID 列 |
+|---|---|---|---|---|---|---|---|
+| 贴现 | R11（一） | R12-13（两级，合并） | R14-R21 (8行) | R22 `合计` | E/F/L/M SUM | `D1-endorse-discount-rows` | Q |
+| 背书 | R23（二） | R24-25（两级，合并） | R26-R33 (8行) | R34 `合计` | E SUM | `D1-endorse-transfer-rows` | R |
+
+两区共 managed_sheet 与 sheet_key（同 D1-4 / D4-9 先例），各自独立 UUID 列（Q/R，max_col=P=16
+故注入列从 Q 起不冲突）。四区 footer marker 逐字相同 `合计`（codepoints 5408 8ba1）。
+
+两区列集不完全相同：区一有贴现银行/贴现金额/贴现息（K/L/M），区二替换为背书转让单位/
+背书转让日期/说明（K/L/M）——列字母相同但语义不同。前端 `EndorsementRow` 接口把两套字段
+合并进一个 union（贴现行的 `discountBank`/`discountAmount`/`discountInterest` 与背书行的
+`endorsedTo`/`endorsedDate`/`description` 各用各的字段名，不冲突），但 store 是分开的
+两个键，materialize 按各自的 field_specs 独立处理。
+
+🔴 数据区内零公式（全 editable），公式只在 footer 的 SUM ⇒ **`formula_columns` 恒空**
+   （2026-09-28 修正：首版把 footer SUM 列填进了 formula_columns，导致这 5 列的整个数据区
+   被 mask 判只读、OO 改动写不回 store。详见下方常量处的长注释）。
+🔴 两区 `row_identity_key = "rowId"`（与 D1-3/D1-4 相同，非 D1-16 的 `"id"`）。
+"""
+from __future__ import annotations
+
+from typing import Final
+
+from app.services.workpaper_sync.phase5_row_table_sheet import (
+    RowTableSheetSpec,
+    StoreKind,
+)
+
+__all__ = [
+    "SPEC_D108_DISCOUNT",
+    "SPEC_D108_TRANSFER",
+    "SPECS_D108",
+    "MANAGED_SHEET_D108",
+]
+
+MANAGED_SHEET_D108: Final[str] = "应收票据贴现、票据已背书未到期明细表D1-8"
+TEMPLATE_ID_D108: Final[str] = "D18"
+SHEET_KEY_D108: Final[str] = f"{TEMPLATE_ID_D108.lower()}-managed"
+
+#: 两级表头（区一 R12 组/R13 叶，区二 R24 组/R25 叶；区二 group_header_cell 对齐区二表头行）。
+HEADER_GROUP_ROW_DISCOUNT: Final[int] = 12
+HEADER_LEAF_ROW_DISCOUNT: Final[int] = 13
+HEADER_GROUP_ROW_TRANSFER: Final[int] = 24
+HEADER_LEAF_ROW_TRANSFER: Final[int] = 25
+
+FOOTER_ROW_DISCOUNT: Final[int] = 22
+FOOTER_ROW_TRANSFER: Final[int] = 34
+FOOTER_MARKER_D108: Final[str] = "合计"  # [5408 8ba1]
+
+MANAGED_LAST_COL_D108: Final[str] = "P"
+
+#: ──── 区一（贴现）field_specs（16 列 A-P，7 元组）────
+#: 所有列均 editable/text 或 editable/amount，无数据区内公式。
+_FIELD_SPECS_DISCOUNT: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
+    ("note_type", "A", "editable", "text", "noteType", "票据种类", ""),
+    ("received_date", "B", "editable", "text", "receivedDate", "收到日期", ""),
+    ("issuer", "C", "editable", "text", "issuer", "出票人全称", ""),
+    ("note_number", "D", "editable", "text", "noteNumber", "票据号", ""),
+    ("bill_amount", "E", "editable", "amount", "billAmount", "汇票金额", ""),
+    ("accrued_interest", "F", "editable", "amount", "accruedInterest", "已计利息", ""),
+    ("issue_date", "G", "editable", "text", "issueDate", "出票日期", ""),
+    ("maturity_date", "H", "editable", "text", "maturityDate", "到期日", ""),
+    ("acceptor_bank", "I", "editable", "text", "acceptorBank", "承兑银行", ""),
+    ("credit_rating", "J", "editable", "text", "creditRating", "承兑单位信用等级", ""),
+    ("discount_bank", "K", "editable", "text", "discountBank", "贴现银行", ""),
+    ("discount_amount", "L", "editable", "amount", "discountAmount", "贴现金额", ""),
+    ("discount_interest", "M", "editable", "amount", "discountInterest", "贴现息", ""),
+    ("is_derecognized", "N", "editable", "text", "isDerecognized", "是否终止确认", ""),
+    ("is_correct", "O", "editable", "text", "isCorrect", "会计处理是否正确", ""),
+    ("index_ref", "P", "editable", "text", "indexRef", "索引号", ""),
+)
+
+#: ──── 区二（背书）field_specs（16 列 A-P）────
+#: K/L/M 三列语义不同于区一（背书转让单位/日期/说明 vs 贴现银行/金额/息）。
+_FIELD_SPECS_TRANSFER: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
+    ("note_type", "A", "editable", "text", "noteType", "票据种类", ""),
+    ("received_date", "B", "editable", "text", "receivedDate", "收到日期", ""),
+    ("issuer", "C", "editable", "text", "issuer", "出票人全称", ""),
+    ("note_number", "D", "editable", "text", "noteNumber", "票据号", ""),
+    ("bill_amount", "E", "editable", "amount", "billAmount", "汇票金额", ""),
+    ("endorser", "F", "editable", "text", "endorser", "前手", ""),
+    ("issue_date", "G", "editable", "text", "issueDate", "出票日期", ""),
+    ("maturity_date", "H", "editable", "text", "maturityDate", "到期日", ""),
+    ("acceptor_bank", "I", "editable", "text", "acceptorBank", "承兑银行", ""),
+    ("credit_rating", "J", "editable", "text", "creditRating", "承兑单位信用等级", ""),
+    ("endorsed_to", "K", "editable", "text", "endorsedTo", "背书转让单位", ""),
+    ("endorsed_date", "L", "editable", "text", "endorsedDate", "背书转让日期", ""),
+    ("description", "M", "editable", "text", "description", "说明", ""),
+    ("is_derecognized", "N", "editable", "text", "isDerecognized", "是否终止确认", ""),
+    ("is_correct", "O", "editable", "text", "isCorrect", "会计处理是否正确", ""),
+    ("index_ref", "P", "editable", "text", "indexRef", "索引号", ""),
+)
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🔴 2026-09-28 修正：footer SUM 列**不得**进 `formula_columns`
+#
+# `RowTableSheetSpec.formula_mask` 现算为 `{col}{first_data_row}:{col}{last_data_row}` ——
+# 它覆盖的是**数据区**，覆盖不到 footer 行。把只在 footer 出现的 SUM 列填进
+# `formula_columns` 对保护 footer **毫无作用**，只会让这些列的整个数据区被
+# `merge._protection` 判 `read_only_masked_cell` ⇒ OO 侧改这些金额格永远写不回 store
+# （与 D4-1 修前同型，需求 1.5「OO 改动 SHALL 生效」在后端不可达）。
+#
+# 本 sheet 两区**数据区逐格实测零公式**（见模块 docstring 与
+# `_d1fix_formula_probe` 实测：data_cols=[]、footer_cols=['E','F','L','M'] / ['E']）
+# ⇒ `formula_columns` 恒空、`formula_templates` 恒空。
+#
+# footer 的 SUM 公式文本作为**实测证据**留在下面的公开常量里（materialize 不覆盖公式格、
+# 由 OO 重算，故它不需要进 spec）。判据 `test_d1_footer_sum_templates_match_template`
+# 按 codepoint 校验它与模板一致，证据不丢。
+# ═══════════════════════════════════════════════════════════════════════════
+
+_FORMULA_COLUMNS_DISCOUNT: Final[tuple[str, ...]] = ()
+_FORMULA_TEMPLATES_DISCOUNT: Final[dict[str, str]] = {}
+
+_FORMULA_COLUMNS_TRANSFER: Final[tuple[str, ...]] = ()
+_FORMULA_TEMPLATES_TRANSFER: Final[dict[str, str]] = {}
+
+#: footer 行 SUM 公式（`{last}` = 该区 last_data_row）。纯实测证据，不进 spec。
+FOOTER_SUM_TEMPLATES_DISCOUNT: Final[dict[str, str]] = {
+    "E": "=SUM(E14:E{last})", "F": "=SUM(F14:F{last})",
+    "L": "=SUM(L14:L{last})", "M": "=SUM(M14:M{last})",
+}
+FOOTER_SUM_TEMPLATES_TRANSFER: Final[dict[str, str]] = {"E": "=SUM(E26:E{last})"}
+
+
+SPEC_D108_DISCOUNT: Final[RowTableSheetSpec] = RowTableSheetSpec(
+    managed_sheet=MANAGED_SHEET_D108,
+    sheet_key=SHEET_KEY_D108,
+    table_key="endorse_discount_rows",
+    template_id=f"{TEMPLATE_ID_D108}DISCOUNT",
+    table_name=f"GT_{TEMPLATE_ID_D108}_DISCOUNT_ROWS",
+    uuid_col="Q",
+    first_data_row=14,
+    last_data_row=21,
+    footer_row=FOOTER_ROW_DISCOUNT,
+    header_group_row=HEADER_GROUP_ROW_DISCOUNT,
+    header_leaf_row=HEADER_LEAF_ROW_DISCOUNT,
+    store_item_id="D1-endorse-discount-rows",
+    empty_payload="[]",
+    row_identity_key="rowId",
+    store_kind=StoreKind.rows,
+    field_specs=_FIELD_SPECS_DISCOUNT,
+    formula_columns=_FORMULA_COLUMNS_DISCOUNT,
+    formula_templates=_FORMULA_TEMPLATES_DISCOUNT,
+    footer_marker=FOOTER_MARKER_D108,
+    error_label="D1-8 贴现明细",
+    # ═══ 🔴 canary：全平台**第一张**开启「删物理行」的表 ═══════════════════
+    #
+    # spec: workpaper-sync-row-deletion-multi-region-propagation（契约逐表 opt-in / CS-21）
+    # 用户 2026-09-30 明确授权开表。
+    #
+    # 语义变化：store 已不认领的受管行，此前是「只清 editable 字面值格、物理行留着」，
+    # 现在是**物理删除该行**并联动全工作簿的位移（兄弟表 ref 收缩 / definedName /
+    # 跨 sheet 公式 / 裸引用 / 结构块）。**不可逆**。
+    #
+    # 为什么选这张（开表准入体检 `check_row_deletion_readiness.py` 现算）：
+    #   * 受管数据区 14..21 共 8 行，`--count 1` 与 `--count 3` 均 **8/8 可删、0 锁死**
+    #     ⇒ 没有跨 sheet 单格引用指着这些行，门面不会 fail-closed；
+    #   * 本 sheet 是**双区**（贴现 14..21 / 背书 26..33，`SPEC_D108_TRANSFER`）
+    #     ⇒ 删行会真实触发「兄弟 Table ref 收缩」这条 G2 症状链的第一环，
+    #     而不是在一个退化的单区表上验一个空壳；
+    #   * CS-21 的两个前提本就齐备：`row_identity_key="rowId"` + `delete_policy=tombstone`。
+    #
+    # 🔴 兄弟区 `SPEC_D108_TRANSFER` **刻意不开**：一次只开一张，且保留同 sheet 的
+    #    `clear` 对照 —— 判据可以在同一张 sheet 上同时观测「开了的区删行」与
+    #    「没开的区逐字节不变」，这比在两张不同 sheet 上比对强。
+    #
+    # 🔴 体检工具量的是**原始模板**。插桩后的工作簿引用面更大（多出 `_GT_SYNC` 等载体），
+    #    故真实链路验收另走 `test_row_deletion_convergence_dispatch` 的
+    #    `TestRealChainDispatchFlipsWithTheContract`（在插桩字节上跑）。
+    row_convergence="delete",
+)
+
+SPEC_D108_TRANSFER: Final[RowTableSheetSpec] = RowTableSheetSpec(
+    managed_sheet=MANAGED_SHEET_D108,
+    sheet_key=SHEET_KEY_D108,
+    table_key="endorse_transfer_rows",
+    template_id=f"{TEMPLATE_ID_D108}TRANSFER",
+    table_name=f"GT_{TEMPLATE_ID_D108}_TRANSFER_ROWS",
+    uuid_col="R",
+    first_data_row=26,
+    last_data_row=33,
+    footer_row=FOOTER_ROW_TRANSFER,
+    header_group_row=HEADER_GROUP_ROW_TRANSFER,
+    header_leaf_row=HEADER_LEAF_ROW_TRANSFER,
+    store_item_id="D1-endorse-transfer-rows",
+    empty_payload="[]",
+    row_identity_key="rowId",
+    store_kind=StoreKind.rows,
+    field_specs=_FIELD_SPECS_TRANSFER,
+    formula_columns=_FORMULA_COLUMNS_TRANSFER,
+    formula_templates=_FORMULA_TEMPLATES_TRANSFER,
+    footer_marker=FOOTER_MARKER_D108,
+    error_label="D1-8 背书明细",
+)
+
+SPECS_D108: Final[tuple[RowTableSheetSpec, ...]] = (
+    SPEC_D108_DISCOUNT,
+    SPEC_D108_TRANSFER,
+)

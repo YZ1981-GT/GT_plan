@@ -1,0 +1,28 @@
+{
+  "description": "F1 预付账款 L2 (OO→HTML) e2e 测试用例集，照 D4/E1 lane 结构",
+  "spec": "f1-sync-coverage-and-first-canary",
+  "entry_id": "xlsx/gt-f1-prepayment",
+  "adapter_id": "f1.prepayment_detail",
+  "cases": [
+    {
+      "id": "f1-6-rp-basic",
+      "sheet_key": "f16-managed",
+      "sheet_name": "关联方及交易检查表F1-6",
+      "store_item_id": "F1-rp-rows",
+      "description": "canary: F1-6 关联方基本行编辑（关联方名称 + 期初余额 + 借贷方 → 公式列 F/H 自动算）",
+      "edit_cell": "A7",
+      "edit_value": "F1-E2E-供应商甲",
+      "expect_formula_columns": ["F", "H"],
+      "result_enum": "pending_adapter"
+    }
+  ],
+  "result_enum_values": [
+    "pass",
+    "fail_confirm",
+    "fail_forcesave",
+    "fail_mirror",
+    "fail_marker",
+    "upstream_gap",
+    "pending_adapter"
+  ]
+}

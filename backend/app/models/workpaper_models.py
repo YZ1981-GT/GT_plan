@@ -7,7 +7,7 @@
 
 import enum
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 import sqlalchemy as sa
 from sqlalchemy import (
@@ -789,6 +789,12 @@ class SampledVoucher(Base):
     )
     year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     voucher_no: Mapped[str] = mapped_column(sa.String(100), nullable=False)
+    # ── V166 ──
+    # 凭证日期。🔴 voucher_no 单独**不唯一**：真实库实测 8 个项目里 7 个跨月/跨日重复，
+    # 单个凭证号最多对应 83 个不同日期；`(voucher_date, voucher_no)` 才唯一定位一张凭证
+    # （该粒度下借贷 100% 平衡实证）。NULL = 历史行或未提供日期的手工标记，回拉分录时
+    # 退化为按年度匹配，可能命中同号别张凭证。
+    voucher_date: Mapped[date | None] = mapped_column(sa.Date, nullable=True)
     account_code: Mapped[str | None] = mapped_column(sa.String(50), nullable=True)
     sampling_record_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True
@@ -896,6 +902,10 @@ class WpFormula(Base):
     reference_formula_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True
     )
+
+    # 公式来源范围与可审阅绑定（V178）；与页面分类 formula_scope_query 解耦。
+    source_scope: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    binding: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     # ── V163 稳定键（P0-项1 d4-dual-mode-formula-governance）──────────────
     # 目标 identity = (wp_id, stable_sheet_key, row_key, field_key)；preset_version 不入。
@@ -1048,6 +1058,11 @@ class DraftRefreshSnapshot(Base):
     after_value: Mapped[dict | list | None] = mapped_column(JSONB, nullable=True)
     before_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
     after_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # 公式 Runtime 追踪字段（V178）：公式来源与本次绑定范围快照
+    source_formula_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    source_scope: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     restored_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True), nullable=True
     )

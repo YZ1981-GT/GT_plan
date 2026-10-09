@@ -133,7 +133,7 @@ export function useH5Adjudication(opts: {
     const prefix = block === 'cost' ? 'c' : block === 'depletion' ? 'd' : 'i'
     const subtotalLabel = block === 'cost' ? '油气资产-原值小计' : block === 'depletion' ? '累计折耗小计' : '减值准备小计'
     const rows: AdjudicationRow[] = categories.map((cat) => ({
-      rowId: `row-${prefix}-${cat}`,
+      rowId: `row-${prefix}-${cat}-${Math.random().toString(36).slice(2, 7)}`,
       category: cat,
       beginBalance: 0, debit: 0, credit: 0, endBalance: 0,
       unadjusted: 0, aje: 0, rje: 0, audited: 0,

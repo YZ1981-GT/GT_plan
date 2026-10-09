@@ -6,7 +6,7 @@
  *
  * 职责：
  * - DetailRow（3-period: agingPrior / agingCurrent / agingAudited）
- * - 行内公式：H=E+F+G, O=H+M-N, Q=O+P, X=Q+V+W
+ * - 行内公式：H=E+F+G, O=E+M-N, Q=O+P, X=O+V+W（按权威 F1-2 模板）
  * - 合计 / 核对 / 账龄占比 / 账龄逻辑校验
  * - 动态账龄配置（useAgingConfig + migrateD3F1Keys）
  */
@@ -45,13 +45,13 @@ export interface DetailRow {
   agingPrior: AgingData      // I~L: 期初审定账龄
   debit: number              // M: 借方发生
   credit: number             // N: 贷方发生
-  endBalance: number         // O: =H+M-N
+  endBalance: number         // O: =E+M-N（权威模板）
   entityReclass: number      // P: 被审计单位重分类调整
   endUnadjusted: number      // Q: =O+P
   agingCurrent: AgingData    // R~U: 期末未审账龄
   endAje: number             // V: 账项调整
   endRje: number             // W: 重分类调整
-  endAudited: number         // X: =Q+V+W
+  endAudited: number         // X: =O+V+W（权威模板）
   agingAudited: AgingData    // Y~AB: 期末审定账龄
   isConfirmed: string        // AC: 是否函证
   postPeriodSettlement: number // AD: 期后回款
@@ -134,17 +134,25 @@ function normalizeRow(raw: any, segments: AgingSegment[]): DetailRow {
 }
 
 /**
- * 对单行重新计算公式链：
- * H = E + F + G
- * O = H + M - N（借方科目）
- * Q = O + P
- * X = Q + V + W
+ * 对单行重新计算公式链（与权威模板 明细表F1-2 R14 逐格一致）：
+ * H = E + F + G（期初审定 = 期初未审 + 期初调整 + 期初重分类）
+ * O = E + M - N（期末余额 = 期初未审 + 借方 - 贷方）—— 🔴 以期初未审起算（模板权威）
+ * Q = O + P（期末未审 = 期末余额 + 被审计单位重分类）
+ * X = O + V + W（审定数 = 期末余额 + AJE + RJE）—— 🔴 以期末余额起算（模板权威）
+ *
+ * spec: f1-sync-coverage-and-first-canary · Task 17 · 裁决 F1-H3
+ * 修复前：O = calcEndBalance(H, debit, credit) = H + M - N（期初审定起算）
+ *         X = calcEndAudited(Q, endAje, endRje) = Q + V + W（期末未审起算）
+ * 修复后：O = calcEndBalance(priorUnadjusted, debit, credit) = E + M - N
+ *         X = calcEndAudited(O, endAje, endRje) = O + V + W
  */
 export function recalcRowFormulas(row: DetailRow): DetailRow {
   const H = calcPriorAudited(row.priorUnadjusted, row.priorAdjustment, row.priorReclass)
-  const O = calcEndBalance(H, row.debit, row.credit)
+  // 🔴 Task 17：模板 O = E + M - N（以期初未审起算，不是期初审定 H）
+  const O = calcEndBalance(row.priorUnadjusted, row.debit, row.credit)
   const Q = calcEndUnadjusted(O, row.entityReclass)
-  const X = calcEndAudited(Q, row.endAje, row.endRje)
+  // 🔴 Task 17：模板 X = O + V + W（以期末余额起算，不是期末未审 Q）
+  const X = calcEndAudited(O, row.endAje, row.endRje)
 
   return {
     ...row,

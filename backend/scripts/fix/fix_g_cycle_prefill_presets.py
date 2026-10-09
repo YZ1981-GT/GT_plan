@@ -102,6 +102,24 @@ DESC_FIXES: dict[str, list[tuple[str, str]]] = {
 #: 整块删除：(wp_code, sheet) —— 源 xlsx 无此 sheet
 DROP_BLOCKS: set[tuple[str, str]] = {("G1", "分析程序G1-3")}
 
+#: ── 缺陷 8：sheet 名错位（**改名**，不是删块）────────────────────────────────
+#:
+#: spec `g-cycle-sync-foundation-and-first-canary` GC-8 / 红基线 RG-5。
+#:
+#: 🔴 与 `DROP_BLOCKS` 的区别：那边是「源 xlsx 真的没有这张 sheet」⇒ 整块预设作废；
+#: 这边是「sheet 存在但块写了另一个名字」⇒ 预设本身有效，只是指错了 tab，**必须改名**。
+#: 删块会把 4+3=7 条有效预设一起丢掉。
+#:
+#: 两块的错名都照抄了 G11 的「明细分析表」前缀 —— 而 G11 的 `明细分析表G11-2` **是真名**
+#: （已按值核三册内含「明细」的 tab：G11 唯一含「明细」的是 `明细分析表G11-2`，
+#: G13 / G14 唯一含「明细」的分别是 `明细表G13-2` / `明细表G14-2`）⇒ 改名无歧义。
+#:
+#: 形态：(wp_code, 错名) -> 真名
+RENAME_SHEETS: dict[tuple[str, str], str] = {
+    ("G13", "明细分析表G13-2"): "明细表G13-2",
+    ("G14", "明细分析表G14-2"): "明细表G14-2",
+}
+
 #: 单元格删除：(wp_code, sheet, cell_ref) —— 引用不存在 / 别循环科目
 DROP_CELLS: set[tuple[str, str, str]] = {
     ("G4", "明细表G4-2", "应计利息_期末"),
@@ -201,6 +219,22 @@ def apply_fixes(data: dict) -> list[str]:
     if len(keep) != len(mappings):
         data["mappings"] = keep
         mappings = keep
+
+    # ── 1b. sheet 名错位改名（缺陷 8 / GC-8）────────────────────────────────
+    #
+    # 🔴 排在整块删除**之后**、单元格删除**之前**：删除用 (wp, sheet) 做键，
+    # 若先改名会让 DROP_BLOCKS / DROP_CELLS 的键失配（它们登记的是原名）。
+    # 现状两条 RENAME 与 DROP 集合无交集，此顺序是防御性的。
+    for blk in mappings:
+        key = (blk.get("wp_code"), blk.get("sheet"))
+        want = RENAME_SHEETS.get(key)
+        if want is None:
+            continue  # 幂等：已改名的块 key 不再命中
+        changes.append(
+            f"改名 {key[0]} / sheet={key[1]!r} → {want!r}"
+            f"（源 xlsx 无前者、有后者；错名照抄了 G11 的「明细分析表」前缀）"
+        )
+        blk["sheet"] = want
 
     # ── 2. 单元格删除 ──────────────────────────────────────────────────────
     for blk in mappings:

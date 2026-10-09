@@ -46,7 +46,8 @@ describe('g14AdjStorage', () => {
     expect(inferG14AdjudicationRowKey({ description: '补提应收账款坏账损失' })).toBe('ar')
     expect(inferG14AdjudicationRowKey({ description: '其他应收款 ECL 转回' })).toBe('othar')
     expect(inferG14AdjudicationRowKey({ description: '债权投资减值补提' })).toBe('debt')
-    expect(inferG14AdjudicationRowKey({ description: '合同资产减值准备补提' })).toBe('ca')
+    // 🔴 C-9：模板固定行集无「合同资产减值损失」专行 ⇒ 落「其他」行
+    expect(inferG14AdjudicationRowKey({ description: '合同资产减值准备补提' })).toBe('other')
     expect(inferG14AdjudicationRowKey({ description: '财务担保预计损失' })).toBe('guarantee')
     expect(inferG14AdjudicationRowKey({ adjudicationRowKey: 'notes', description: '任意' })).toBe('notes')
   })

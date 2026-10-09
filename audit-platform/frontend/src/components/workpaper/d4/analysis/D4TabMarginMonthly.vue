@@ -26,6 +26,7 @@ import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from '
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import { seedMonthlyFromD42, prefillProductsFromSegments } from '../composables/d4MarginSeedUtils'
 import GtIndexChip from '../../GtIndexChip.vue'
 // D4-7 双向回写：统一走 useD4SyncMode（dedicated sync sheet，sheetKey=d47-managed，同 entry
 // gt-d4-operating-revenue；后端 phase5_d4_margin_monthly_sheet 作为 sibling sheet 并入
@@ -40,6 +41,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  htmlData?: any
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -100,6 +102,13 @@ function loadMonthly() {
   const resp = props.allResponses.get('D4-7-monthly')
   if (resp?.remark) {
     try { const p = JSON.parse(resp.remark); if (p && typeof p === 'object') { monthly.value = { revenue: p.revenue || new Array(12).fill(0), cost: p.cost || new Array(12).fill(0), priorRevenue: p.priorRevenue || 0, priorCost: p.priorCost || 0 }; return } } catch {}
+  }
+  // 无持久化 → 尝试从 D4-2 主营明细汇总月度收入种子（Req 8.4 / Property 10）
+  const d42Resp = props.allResponses.get('D4-2-rows')
+  const seed = seedMonthlyFromD42(d42Resp?.remark)
+  if (seed) {
+    monthly.value = seed
+    return
   }
   monthly.value = { revenue: new Array(12).fill(0), cost: new Array(12).fill(0), priorRevenue: 0, priorCost: 0 }
 }
@@ -180,6 +189,12 @@ function loadProducts() {
         return
       }
     } catch { /* 解析失败按空表处理，不打挂整页 */ }
+  }
+  // 无持久化 → 从 segment_prefill 预填产品行（Req 8.5 / Property 11）
+  const prefilled = prefillProductsFromSegments(props.htmlData?.segment_prefill, newRowId)
+  if (prefilled.length > 0) {
+    products.value = prefilled
+    return
   }
   products.value = []
 }
@@ -370,11 +385,33 @@ const { exportTemplate, exportData, importData, importing } = useD4ImportExport(
 })
 function handleExportTemplate() { exportTemplate('D4-7' as any) }
 function handleExportData() { exportData('D4-7' as any) }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await importData('D4-7' as any, f) }
+  input.click()
+}
 function handleImportUpload(file: File): boolean {
   importData('D4-7' as any, file).then((result) => {
     if (result && result.rowCount > 0) loadProducts()
   })
   return false
+}
+
+// ─── 月度数据导入导出（D4-7-monthly）────────────────────────────────
+function handleMonthlyExportTemplate() { exportTemplate('D4-7-monthly' as any) }
+function handleMonthlyExportData() { exportData('D4-7-monthly' as any) }
+async function handleMonthlyImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx'
+  input.onchange = async () => {
+    const f = input.files?.[0]
+    if (f) {
+      const result = await importData('D4-7-monthly' as any, f)
+      if (result && result.rowCount > 0) loadMonthly()
+    }
+  }
+  input.click()
 }
 
 // ─── 持久化 ──────────────────────────────────────────────────────────
@@ -393,6 +430,8 @@ function flushSave() {
   window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items } }))
 }
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 
@@ -436,7 +475,21 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
 
     <!-- （一）月度毛利分析 -->
     <section class="sec">
-      <h4 class="sec-title">（一）月度毛利分析</h4>
+      <h4 class="sec-title">
+        （一）月度毛利分析
+        <span v-if="!isReadonly" style="margin-left: 16px; font-weight: normal; font-size: 12px;">
+          <el-dropdown trigger="click" size="small">
+            <el-button size="small" type="primary" text>导入导出 ▾</el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item @click="handleMonthlyExportTemplate">下载模板</el-dropdown-item>
+                <el-dropdown-item @click="handleMonthlyExportData">导出数据</el-dropdown-item>
+                <el-dropdown-item @click="handleMonthlyImportClick">导入数据</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </span>
+      </h4>
       <div class="monthly-table-wrap">
         <table class="monthly-table" border="1" cellpadding="0" cellspacing="0">
           <thead>
@@ -535,21 +588,8 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
       <div class="sec-header">
         <h4 class="sec-title">（二）按产品毛利分析</h4>
         <div class="sec-actions">
-          <el-dropdown size="small" trigger="click" :disabled="isReadonly">
-            <el-button size="small">导入导出 ▾</el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-                <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-                <el-dropdown-item>
-                  <el-upload :show-file-list="false" accept=".xlsx,.xls" :before-upload="handleImportUpload" :disabled="importing">
-                    <span>{{ importing ? '导入中...' : '导入数据' }}</span>
-                  </el-upload>
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-          <el-tooltip content="批量数据建议：先点「导入导出 ▾ → 导出模板」，在Excel中填写后导入更快" placement="top" :show-after="300">
+          
+          <el-tooltip content="批量数据建议：先用顶部「导出模板」按钮导出空表，在Excel中填写后再用「导入」按钮导入更快" placement="top" :show-after="300">
             <el-button size="small" :disabled="isReadonly" @click="addProduct">+ 增行</el-button>
           </el-tooltip>
           <GtIndexChip value="wp:D4-2" :context-project-id="projectId" />

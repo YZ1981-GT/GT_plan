@@ -1,0 +1,657 @@
+{
+  "contract_id": "f2.inventory_valuation",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "b11cc9ef10dcc637994510194b15e835182ed86a9e9a89429c7cf7b3c51ad4a5",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-f2-inventory-valuation",
+    "html_store": {
+      "item_ids": [
+        "F2-48-rows",
+        "F2-47-rows"
+      ],
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "phase5_f2_inventory_valuation"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "长库龄 呆滞 超过保质期存货明细表F2-48",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "f248-managed",
+      "tables": [
+        {
+          "anchor": "A5",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "item_code",
+              "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!A6",
+              "header_text": "存货编号",
+              "json_pointer": "/rows/{row_uuid}/itemCode",
+              "mode": "editable",
+              "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!A7",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/item_code",
+              "store_item_id": "F2-48-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!B6",
+              "header_text": "存货名称",
+              "json_pointer": "/rows/{row_uuid}/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!B7",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/item_name",
+              "store_item_id": "F2-48-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "spec",
+              "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!C6",
+              "header_text": "规格型号",
+              "json_pointer": "/rows/{row_uuid}/spec",
+              "mode": "editable",
+              "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!C7",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/spec",
+              "store_item_id": "F2-48-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "unit",
+              "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!D6",
+              "header_text": "计量单位",
+              "json_pointer": "/rows/{row_uuid}/unit",
+              "mode": "editable",
+              "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!D7",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/unit",
+              "store_item_id": "F2-48-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "qty",
+              "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!E6",
+              "header_text": "数量",
+              "json_pointer": "/rows/{row_uuid}/qty",
+              "mode": "editable",
+              "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!E7",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/qty",
+              "store_item_id": "F2-48-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "unit_cost",
+              "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!F6",
+              "header_text": "单位成本",
+              "json_pointer": "/rows/{row_uuid}/unitCost",
+              "mode": "editable",
+              "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!F7",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/unit_cost",
+              "store_item_id": "F2-48-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "book_amt",
+              "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!G6",
+              "header_text": "账面金额",
+              "json_pointer": "/rows/{row_uuid}/bookAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!G7",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/book_amt",
+              "store_item_id": "F2-48-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_amt",
+              "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!H6",
+              "header_text": "库龄金额",
+              "json_pointer": "/rows/{row_uuid}/agingAmt",
+              "mode": "formula",
+              "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!H7",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/aging_amt",
+              "store_item_id": "F2-48-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_desc",
+              "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!I6",
+              "header_text": "库龄说明",
+              "json_pointer": "/rows/{row_uuid}/agingDesc",
+              "mode": "editable",
+              "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!I7",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/aging_desc",
+              "store_item_id": "F2-48-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "status",
+              "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!J6",
+              "header_text": "品质状况",
+              "json_pointer": "/rows/{row_uuid}/status",
+              "mode": "editable",
+              "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!J7",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/status",
+              "store_item_id": "F2-48-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "reason",
+              "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!K6",
+              "header_text": "形成原因",
+              "json_pointer": "/rows/{row_uuid}/reason",
+              "mode": "editable",
+              "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!K7",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/reason",
+              "store_item_id": "F2-48-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "plan",
+              "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!L6",
+              "header_text": "处理计划",
+              "json_pointer": "/rows/{row_uuid}/plan",
+              "mode": "editable",
+              "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!L7",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/plan",
+              "store_item_id": "F2-48-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "remark",
+              "header_source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!M6",
+              "header_text": "备注",
+              "json_pointer": "/rows/{row_uuid}/remark",
+              "mode": "editable",
+              "source_ref": "源xlsx!长库龄 呆滞 超过保质期存货明细表F2-48!M7",
+              "stable_field_key": "aging_stale_detail_rows/{row_uuid}/remark",
+              "store_item_id": "F2-48-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "H7:H16"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "aging_stale_detail_rows",
+          "uuid_col": "O"
+        }
+      ]
+    },
+    {
+      "excel_name": "跌价准备测试表F2-47",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "f247-managed",
+      "tables": [
+        {
+          "anchor": "A18",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "category",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!A19",
+              "header_text": "存货类别",
+              "json_pointer": "/rows/{row_uuid}/category",
+              "mode": "editable",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!A20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/category",
+              "store_item_id": "F2-47-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "item_code",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!B19",
+              "header_text": "编码",
+              "json_pointer": "/rows/{row_uuid}/itemCode",
+              "mode": "editable",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!B20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/item_code",
+              "store_item_id": "F2-47-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!C19",
+              "header_text": "名称",
+              "json_pointer": "/rows/{row_uuid}/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!C20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/item_name",
+              "store_item_id": "F2-47-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "unit",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!D19",
+              "header_text": "单位",
+              "json_pointer": "/rows/{row_uuid}/unit",
+              "mode": "editable",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!D20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/unit",
+              "store_item_id": "F2-47-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "qty",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!E19",
+              "header_text": "结存数量",
+              "json_pointer": "/rows/{row_uuid}/qty",
+              "mode": "editable",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!E20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/qty",
+              "store_item_id": "F2-47-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "unit_cost",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!F19",
+              "header_text": "账面单位成本",
+              "json_pointer": "/rows/{row_uuid}/unitCost",
+              "mode": "editable",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!F20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/unit_cost",
+              "store_item_id": "F2-47-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "book_amt",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!G19",
+              "header_text": "账面成本",
+              "json_pointer": "/rows/{row_uuid}/bookAmt",
+              "mode": "formula",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!G20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/book_amt",
+              "store_item_id": "F2-47-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!H19",
+              "header_text": "库龄",
+              "json_pointer": "/rows/{row_uuid}/aging",
+              "mode": "editable",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!H20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/aging",
+              "store_item_id": "F2-47-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "status",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!I19",
+              "header_text": "品质状况",
+              "json_pointer": "/rows/{row_uuid}/status",
+              "mode": "editable",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!I20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/status",
+              "store_item_id": "F2-47-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "purpose",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!J19",
+              "header_text": "持有目的",
+              "json_pointer": "/rows/{row_uuid}/holdingPurpose",
+              "mode": "editable",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!J20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/purpose",
+              "store_item_id": "F2-47-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "price_pre",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!K19",
+              "header_text": "估计售价（无合同）",
+              "json_pointer": "/rows/{row_uuid}/pricePreContract",
+              "mode": "editable",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!K20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/price_pre",
+              "store_item_id": "F2-47-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "price_contract",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!L19",
+              "header_text": "合同价格",
+              "json_pointer": "/rows/{row_uuid}/priceContract",
+              "mode": "editable",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!L20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/price_contract",
+              "store_item_id": "F2-47-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "unit_price",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!M19",
+              "header_text": "确定单位售价",
+              "json_pointer": "/rows/{row_uuid}/unitPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!M20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/unit_price",
+              "store_item_id": "F2-47-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "selling_rate",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!N19",
+              "header_text": "销售费用率",
+              "json_pointer": "/rows/{row_uuid}/sellingExpenseRate",
+              "mode": "editable",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!N20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/selling_rate",
+              "store_item_id": "F2-47-rows",
+              "value_type": "percent_points"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "tax_rate",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!O19",
+              "header_text": "税率",
+              "json_pointer": "/rows/{row_uuid}/taxRate",
+              "mode": "editable",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!O20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/tax_rate",
+              "store_item_id": "F2-47-rows",
+              "value_type": "percent_points"
+            },
+            {
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              },
+              "column_key": "qty_total",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!P19",
+              "header_text": "数量合计",
+              "json_pointer": "/rows/{row_uuid}/qtyTotal",
+              "mode": "editable",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!P20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/qty_total",
+              "store_item_id": "F2-47-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              },
+              "column_key": "nrv",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!Q19",
+              "header_text": "可变现净值",
+              "json_pointer": "/rows/{row_uuid}/nrv",
+              "mode": "formula",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!Q20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/nrv",
+              "store_item_id": "F2-47-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "T",
+                "row_from": "row_identity"
+              },
+              "column_key": "selling_exp",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!T19",
+              "header_text": "估计销售费用",
+              "json_pointer": "/rows/{row_uuid}/sellingExpense",
+              "mode": "formula",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!T20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/selling_exp",
+              "store_item_id": "F2-47-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "U",
+                "row_from": "row_identity"
+              },
+              "column_key": "related_tax",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!U19",
+              "header_text": "相关税费",
+              "json_pointer": "/rows/{row_uuid}/relatedTax",
+              "mode": "formula",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!U20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/related_tax",
+              "store_item_id": "F2-47-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "V",
+                "row_from": "row_identity"
+              },
+              "column_key": "nrv_unit",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!V19",
+              "header_text": "单位可变现净值",
+              "json_pointer": "/rows/{row_uuid}/nrvUnit",
+              "mode": "formula",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!V20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/nrv_unit",
+              "store_item_id": "F2-47-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "W",
+                "row_from": "row_identity"
+              },
+              "column_key": "nrv_total",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!W19",
+              "header_text": "可变现净值合计",
+              "json_pointer": "/rows/{row_uuid}/nrvTotal",
+              "mode": "formula",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!W20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/nrv_total",
+              "store_item_id": "F2-47-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "X",
+                "row_from": "row_identity"
+              },
+              "column_key": "impairment",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!X19",
+              "header_text": "应计提跌价准备",
+              "json_pointer": "/rows/{row_uuid}/impairment",
+              "mode": "formula",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!X20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/impairment",
+              "store_item_id": "F2-47-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Y",
+                "row_from": "row_identity"
+              },
+              "column_key": "remark",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!Y19",
+              "header_text": "备注",
+              "json_pointer": "/rows/{row_uuid}/remark",
+              "mode": "editable",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!Y20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/remark",
+              "store_item_id": "F2-47-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "Z",
+                "row_from": "row_identity"
+              },
+              "column_key": "impairment_end",
+              "header_source_ref": "源xlsx!跌价准备测试表F2-47!Z19",
+              "header_text": "期末跌价准备",
+              "json_pointer": "/rows/{row_uuid}/impairmentEnd",
+              "mode": "formula",
+              "source_ref": "源xlsx!跌价准备测试表F2-47!Z20",
+              "stable_field_key": "impairment_test_rows/{row_uuid}/impairment_end",
+              "store_item_id": "F2-47-rows",
+              "value_type": "amount"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "G20:G29",
+            "Q20:Q29",
+            "T20:T29",
+            "U20:U29",
+            "V20:V29",
+            "W20:W29",
+            "X20:X29",
+            "Z20:Z29"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "impairment_test_rows",
+          "uuid_col": "AC"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "adfe5e0a99528b53e67fa76a481d3810a1eff67e10a3a434c0af6751f83c10cc",
+    "relative_path": "F/F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx",
+    "template_sha256": "f6c03d09605da7e9e9457a0d2219530e4e761d7abfbbe849867f5569dc5e97cb"
+  },
+  "template_definition_sha256": "f102cd86210d10a5d4916cc5ac53a34174ded09d7ffaf9e71c64205abd7887e0"
+}

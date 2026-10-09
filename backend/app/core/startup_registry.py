@@ -458,15 +458,13 @@ async def _task_validate_template_manifest(_ctx: StartupContext) -> None:
 
 async def _task_run_schema_drift_check(_ctx: StartupContext) -> None:
     from app.core.database import engine
-    from app.core.schema_drift_detector import run_drift_check_with_timeout
+    from app.core.schema_drift_detector import count_critical, run_drift_check_with_timeout
 
     log = logging.getLogger("audit_platform")
     try:
         items = await run_drift_check_with_timeout(engine, timeout_seconds=60.0)
         if items:
-            critical_count = sum(
-                1 for it in items if it.drift_type in ("orm_extra", "enum_mismatch")
-            )
+            critical_count = count_critical(items)
             health_status = "degraded" if critical_count > 0 else "healthy"
             log.warning(
                 "[启动] 检测到 %d 个 schema 漂移（critical=%d）/ health=%s",

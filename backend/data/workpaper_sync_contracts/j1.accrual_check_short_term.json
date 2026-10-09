@@ -1,0 +1,383 @@
+{
+  "contract_id": "j1.accrual_check_short_term",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "aaedfdecc54da08d3a9849ce024bc27b973c590a8663c481595d9c2891aa1772",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "bare_if_note": "🔴 整册 **224**（`审定表J1-1 ` 56 / `与同行业对比分析表J1-5` 60 / `月度分析表J1-4` 16 等），但**本 canary sheet 为 0** —— 中性化是 per-file（整册就地改写 substrate 副本）⇒ 即使受管表干净也必须挂。",
+    "bare_if_this_sheet": 0,
+    "bare_if_workbook": 224,
+    "business_sheet_count": 15,
+    "canary_standard_revision": {
+      "chosen": "J1-6-short-term（3473 B 全 J 最大）",
+      "d_to_i_standard": "primary managed table 真库有非空载荷",
+      "rejected": {
+        "J1-2-detail-*": "primary managed table 真库空（0 行）",
+        "J1-8-voucher-check": "911 B 且 id 形态 `j1vc-imp-credit-1` 真实，但属 **parent_duplicate**（`xlsx/j1/inspection/j1-tab-general-check`）⇒ 不独立发布 contract / bundle / candidate / evidence",
+        "J1-disc-soe-short-term": "1325 B **且有真金额**，但披露层叠 5 个最难形态（双变体 / 49 硬编码 id / **同 id 跨变体语义不同**（SOE `st-7`=其他 vs Listed `st-7`=住房公积金）/ 第三条写路径写**另一张表** / 与明细表**非行对行映射** 12 行←20 行）"
+      },
+      "revised_standard": "真库有非空载荷 + 在 entry 内 + 非 parent_duplicate + 单 sheet 单键组",
+      "why_broken_in_j": "J1-2-detail-* 三键 + J1-1-rows（审定表）+ J1-3-adjustment-rows（调整分录）真库**全部无行**"
+    },
+    "carrier": {
+      "force_component_type": "j1-employee-compensation",
+      "host_has_apiproxy_import": false,
+      "host_has_http_import": false,
+      "host_line_count": 259,
+      "mounts": 1,
+      "read": "host_inline_render_config_refetch",
+      "statement_edges": 23,
+      "tb_publish_gate": "POST /api/workpapers/{wpId}/audit-determination/publish-to-tb @ j1/core/J1TabAdjudication.vue",
+      "write": "shared_platform_persistence_adapter",
+      "write_client": "api",
+      "write_client_import": "@/services/apiProxy",
+      "write_endpoint": "PUT /api/workpapers/{wpId}/checklist-responses",
+      "write_module": "composables/workpaper/useChecklistPersistence.ts"
+    },
+    "carrier_reverse_assertions": "🔴 **反证①**：按 H 的「载体里必须有 `http.put`」去核 SHALL 在 `useChecklistPersistence` 上**假红**（它用 `api.put`）。🔴 **反证②**：按 I 的「宿主必须 import `@/utils/http`」去核 SHALL 在 J1 宿主上**假红** —— 现算宿主 `@/utils/http` 与 `apiProxy` 命中**均为 0**（259 行宿主零 client import）。⇒ 判据 SHALL 按 entry 声明的 `write_client` 名字去找 `{client}.put(`，不写死 `http`。",
+    "code_collision_facts": {
+      "J1-10": {
+        "hidden": "股份支付检查表J1-10-删除（66 行）",
+        "kind": "🔴 **一码两义**（两张完全不同业务的表，不是版本变体）",
+        "requirement": "按 sheet 尾码定位 SHALL 带 **visible 过滤**；变异「只按尾码匹配」SHALL 取到两张而打红",
+        "visible": "辞退福利检查表J1-10（48 行）"
+      },
+      "J1A": {
+        "hidden": "应付职工薪酬实质性程序表 J1A-原版",
+        "kind": "版本变体",
+        "visible": "应付职工薪酬实质性程序表 J1A"
+      }
+    },
+    "cross_cycle_facts": {
+      "consequence": "⇒ **HC-8 / IC-17 的跨循环键冻结在 J 不命中**（改键名无跨循环风险）",
+      "endpoint_reuse": [
+        "🔴 `composables/workpaper/j1/useJ1VoucherOcr.ts` 调 **D4 的** `POST /api/workpapers/{wpId}/d4/contract-ocr` ⇒ 冻结对象从「键」换成「**端点**」"
+      ],
+      "fc8_verdict": "🔴 **FC-8 在 J 命中**（不是不适用）—— 宿主层 `ocr` 命中 0 成立，但 composable 层有真 OCR 调用 ⇒ 判据扫描范围 SHALL 含 composable 层",
+      "key_isolation": "🔴 **J 循环完全自闭** —— J 的键无一个被非 J 路径消费 ∧ J 文件里无非 J 键"
+    },
+    "cross_cycle_template_bleed": [
+      "🔴 `应付职工薪酬实质性程序表 L1A-原`（本册，hidden）—— 是 **L 循环**的程序表串在 J 册里（slice 漏记）",
+      "`长期应付职工薪酬实质性程序表 L2A`（J2 册，hidden）—— 同型"
+    ],
+    "defined_name_baseline": 0,
+    "defined_name_baseline_note": "J1 册 **0**；🔴 但 J2 **37**（断链 30）/ J3 **502**（断链 479，是跨循环复制残留 `_1固定资产数据库_筛选打印` / `_.dbf` / `AS2DocOpenMode` 等）⇒ 判据须用「基线不增长」口径，且 J2/J3 的处置归下游 lane（**不删** —— 删会让公式整片失效）。",
+    "derived_total_keys": [
+      "J1-1-audited-total",
+      "J1-1-audited-begin-total",
+      "J1-7-total-admin-expense",
+      "J1-7-total-production-cost",
+      "J1-7-total-selling-expense"
+    ],
+    "derived_total_keys_note": "🔴 J1 侧现算 **5 个**（另 `J2-listed-summary` / `J2-soe-summary` 属 J2，归下游 lane）。🔴 正则 SHALL 覆盖 **`-total-` 出现在中间**的形态 —— 只写 `total$` 会漏 `J1-7-total-*` 三个。禁写死阈值。",
+    "effective_columns": 11,
+    "endpoint_inventory": {
+      "ai_generate_text_post": 16,
+      "checklist_responses_put": 13,
+      "disclosure_notes_sync_post": 4,
+      "publish_to_tb_post": 1
+    },
+    "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+    "html_store": {
+      "item_ids": [
+        "J1-6-short-term"
+      ],
+      "note": "J1 应付职工薪酬的结构化行数据存成 checklist_responses 的 **remark** JSON 数组（🔴 真库 J 前缀 83 行 `conclusion` 列**全 NULL**）。本契约按 stable field + 行身份 `id` 拆开。🔴 **载体是平台第三种族 `shared_platform_persistence_adapter`** —— 写路径在 `composables/workpaper/useChecklistPersistence.ts`，client 是 **`api` from `@/services/apiProxy`**（不是 `http` from `@/utils/http`）；J1 宿主 259 行里两种 client import **命中均为 0** ⇒ 判据按 entry 声明的 `write_client` 找 `{client}.put(`，不写死 `http`。🔴 **8 个受管字段 / 2 个公式列**（G=ROUND(D*F,2) 应提金额 · I=G-H 差异）—— `AccrualRow` 里虽有 `estimated`/`diff` 同名字段但都是前端按同一套公式重算的派生值 ⇒ 只进 formula_columns 不进 field_specs。🔴 **同 Tab 三兄弟键 shape 三值不同**：`J1-6-short-term`/`J1-6-post-employment` 是 `structured_row_array`、`J1-6-questions` 是 **`free_text_array`**（真库 901 B 是 AI 生成 markdown 长文本，5 元素字符串数组，首元素含 `###` 标题与列表）、`J1-6-conclusion` 是 `free_text_scalar` ⇒ 按行数组解析后两者会失败。唯一 store-only 字段 `indent` 是缩进层级（0/1）—— 模板用**全角空格前缀**表达缩进（RD-5 类②），HTML 侧用独立字段 ⇒ 不映射格。",
+      "payload_column": "remark",
+      "payload_column_mode": "remark_only",
+      "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/workpaper/useChecklistPersistence.ts —— 🔴 平台共享持久化适配器经 `api.put('/workpapers/{wpId}/checklist-responses', …)` 写 { item_id: 'J1-6-short-term', remark: JSON.stringify(rows) }；client 是 `api` from `@/services/apiProxy`（**不是** `http` from `@/utils/http`）",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "live_payload_facts": {
+      "bytes": 3473,
+      "consequence": "🔴 roundtrip **只能验结构** ⇒ 须另造带金额的合成载荷补第二轮，验 `G=ROUND(D*F,2)` 与 `I=G-H` 两个公式。",
+      "empty_string_fields": [
+        "baseName",
+        "baseIndex",
+        "diffReason",
+        "conclusion"
+      ],
+      "flag": "skeleton_persisted_no_business_values",
+      "note": "全 J 最大载荷",
+      "zero_fields": [
+        "baseAmount",
+        "rate",
+        "estimated",
+        "actual",
+        "diff"
+      ]
+    },
+    "max_column": 11,
+    "no_footer_facts": {
+      "assertion": "🔴 判据 SHALL 断言 R36 **无 `合计` 标签** 且 `footer_carries_total_formula=False`；变异「把它当 footer 验合计公式」SHALL 打红。🔴 更不得套 `明细表J1-2 ` 的「B 列 + 三 footer」口径 —— 本表按 **A 列非空**判业务行。",
+      "engine_footer_row_is_placeholder": true,
+      "footer_rows": [],
+      "reserved_row": 36,
+      "reserved_row_evidence": "R36 只有 G36=`=ROUND(D36*F36,2)` 与 I36=`=G36-H36` 两个公式，**A36 无标签**；R37 已是第二分区标题 `（2）离职后福利中设定提存计划、其他长期福利中符合设定提存条件的负债`⇒ R36 是**模板预留的第 20 行**不是 footer。"
+    },
+    "pilot_class": "phase5_accrual_check_short_term",
+    "positional_identity_note": "本 canary sheet 的行身份是 `AccrualRow.id`（`acr-{ts}-{i}-{rnd}` 属安全族）。🔴 J 循环的 family_a（纯序号真落库）唯一一处是 `J2TabAdjustment` 的 `id: i + 1` → `J2-3-entries`（真库 171 B 载荷里 `\"id\":1` **已确证落库**）⇒ 归下游 lane。🔴 披露层另有 **49 个硬编码序号 id**（SOE 25 + Listed 24）—— **登记但不判为位置化缺陷**（id 与 label 写在**同一个对象字面量**里，绑定静态不随数组顺序变；报成位置化会造 49 个假缺陷）。",
+    "positional_identity_sites": [],
+    "prefill_defects": [
+      "🔴 `sheet: '审定表J1-1'` **缺尾部空格**（模板真名 `审定表J1-1 `）⇒ 按名定位必失配",
+      "🔴 `sheet: '明细表J1-2 '` 那条 `cells: []` **空数组** = 死配置",
+      "🔴 `=PREV('J1','分析程序J1-3','审定数')` 引用的 `分析程序J1-3` **在模板 23 张 sheet 里不存在**",
+      "🔴 J3 一条 `wp_name: '股份支付审定表'` 但 **J3 册没有审定表**（6 张 sheet 里无 `审定表J3-*`）"
+    ],
+    "prefill_defects_note": "四处均**登记不修**（prefill 配置属另一条产品链路）；本 spec 只交付判据 + 登记。J 的 prefill mapping 现算 **10 条**，字段名是 **`sheet`** 不是 `sheet_name`，全部 `cells` 型 / `items` 全 0；`wp_code` 只 `J1`/`J2`/`J3` 三值（非子码）。",
+    "primary_table_three_keys": {
+      "derivation": "`useJ1Detail.ts` 的 `STORAGE_KEY_PREFIX = 'J1-2-detail-'` + `storageKey()` 派生，section 取自 `J1_SECTIONS[].key`（三值）",
+      "keys": [
+        "J1-2-detail-shortTerm",
+        "J1-2-detail-postEmployment",
+        "J1-2-detail-severance"
+      ],
+      "live_db_rows": 0,
+      "managed_in_this_batch": false,
+      "note": "🔴 **BP-11 实际是 4 文件 5 处声明**（slice 只记「两份」）⇒ 判据 SHALL **五处同时比对**；变异「只改前缀」SHALL 打红。🔴 **本 canary 不接这三键**（真库全空，不满足改口径后的硬标准）⇒ 归后续批次。",
+      "source_declarations": [
+        "useJ1Detail.ts 前缀派生（**写方**）",
+        "useJ1Adjudication.ts 的 J1_DETAIL_SECTION_KEYS 三字面量",
+        "J1TabAccrualCheck.vue 的 DETAIL_KEYS 三字面量",
+        "J1TabAllocationCheck.vue 的 DETAIL_KEYS",
+        "useJ1DisclosureSections.ts 三处 readJson('J1-2-detail-…') 内联"
+      ],
+      "source_declarations_count": 5,
+      "source_declarations_files": 4
+    },
+    "rd5_diff_facts": {
+      "assertion": "前端骨架 JSON 的 labels 必须与模板 A17:A35 逐项逐字节相等；禁 NFKC/strip/换行折叠。",
+      "authority": "template_original_bytes",
+      "content_mismatch_count": 0,
+      "frontend_source": "j1/inspection/j1AccrualSkeleton.json",
+      "preserved_forms": [
+        "fullwidth_dot",
+        "three_ideographic_spaces",
+        "embedded_newline"
+      ],
+      "row_count": 19,
+      "source_ref": "计提情况检查表J1-6!A17:A35",
+      "status": "resolved"
+    },
+    "retired_sheets_all_hidden": true,
+    "retired_sheets_count": 7,
+    "reviewed_basis": "openpyxl 逐格实测 J/J1 应付职工薪酬.xlsx 的 `计提情况检查表J1-6`（🔴 **两级**表头 R15/R16 ⇒ header_rows=**2**（R15 是 项目/计提基数/计提比例/应提金额/实际计提数/差异/差异原因/结论，R16 只有 C=名称 / D=金额 / E=索引 三个「计提基数」子列）/ 分区标题行 R14 `（1）短期薪酬` / 数据 **R17-R35（19 行）** / 🔴 **`footer_rows: []` 本 sheet 无 footer 合计行** —— R36 只有 G36=`=ROUND(D36*F36,2)` 与 I36=`=G36-H36` 两个公式但 **A36 无标签**，R37 已是第二分区标题 `（2）离职后福利中设定提存计划…` ⇒ R36 是**模板预留的第 20 行**；引擎 dataclass 必填 footer_row ⇒ 给 36 并在契约显式声明 footer_rows=[] + footer_carries_total_formula=False，判据 SHALL 断言该行无 `合计` 标签 / 🔴 判业务行按 **A 列非空**，**不得**套 `明细表J1-2 ` 的「B 列 + 三 footer」口径 / **2 个公式列** G·I（全 19 行同形 `=ROUND(D{r}*F{r},2)` / `=G{r}-H{r}`）/ 有效内容列 **11 即 A..K** 且 max_column **也是 11**（两者相等）⇒ UUID 放 L / 63 公式 / merged 17 / definedName **0** / 🔴 **本 sheet 裸 IF 为 0**（整册 J1 是 **224** —— `审定表J1-1 ` 56 / `与同行业对比分析表J1-5` 60 / `月度分析表J1-4` 16 等；中性化是 per-file 就地改写 substrate 副本 ⇒ 即使受管表干净也必须挂）/ 无 Excel Table / ws.protection.sheet=False ⇒ locked 全惰性） + 前端 `j1/inspection/J1TabAccrualCheck.vue` 按值 grep（item_id 四值 J1-6-short-term / -post-employment / -questions / -conclusion；`AccrualRow` = id/label/indent + baseName/baseAmount/baseIndex + rate/estimated/actual + diff/diffReason/conclusion；身份字段 **`id`** 形态 `acr-{ts}-{i}-{rnd}` 属安全族） + 🔴 **RD-5 本轮新登记**（`SHORT_TERM_DEFAULTS` **19 项** vs 模板 `A17:A35` **19 格**：行数一致但**内容 10 处不等**，三类分开记 —— ①序号分隔符 **9 处**（模板全角 `．` U+FF0E / impl 半角 `.`）②缩进前缀 **9 处**（模板带 3 个全角空格 `\\u3000` / impl 靠 `indent: 1` 字段表达）③🔴 **单元格内换行符 1 处**（模板 `八、辞退福利\\n（因解除劳动关系给予的补偿）` / impl 写成一行）；🔴 **禁标点归一化** —— `NFKC` 会同时洗掉 RD-2 的 5 处与本条的 9 处 ⇒ 逐格**字节**比对；修哪一侧属业务判断 ⇒ 登记不修，`header_text` 取**模板原字节**） + 🔴 **canary 硬标准改口径**（D~I 的「primary managed table 真库有非空载荷」在 J **不成立** —— `J1-2-detail-{shortTerm,postEmployment,severance}` 三键 + `J1-1-rows` + `J1-3-adjustment-rows` 真库**全部无行** ⇒ 改「真库有非空载荷 + 在 entry 内 + 非 parent_duplicate + 单 sheet 单键组」四项；`J1-6-short-term` 真库 **3473 B 全 J 最大**且满足其余三项） + 🔴 **三条逆风如实登记**（①3473 B 载荷的**金额字段全 0**（baseAmount/rate/estimated/actual/diff 全 0，baseName/baseIndex/diffReason/conclusion 全空串）= 「骨架已落库、业务未填」⇒ roundtrip 第一轮只验结构、第二轮须合成带金额载荷验两个公式 ②RD-5 三边校验缺口须在 canary 内先补 ③同 Tab `J1-6-questions` 901 B 是自由文本 shape） + 🔴 **JC-3 非空反证**（符号名 `publishToTb` 全 J 域命中 **0**，端点 `publish-to-tb` 命中 **2**（同一文件 `j1/core/J1TabAdjudication.vue` 内两处）⇒ **GC-9 在 J 是 1/1 有门**，推翻「J 无发布门」误判，canary 可覆盖发布链） + 🔴 **BP-11 键真源实际 4 文件 5 处**（slice 只记两份）⇒ 判据五处同时比对 + 🔴 **JC-17 J 循环完全自闭**（两侧都验：J 键无一个被非 J 路径消费 ∧ J 文件里无非 J 键）⇒ HC-8/IC-17 的跨循环键冻结在 J **不命中**；🔴 **但端点跨循环复用 1 处** —— `useJ1VoucherOcr.ts` 调 **D4 的** `POST /api/workpapers/{wpId}/d4/contract-ocr` ⇒ 冻结对象从「键」换成「**端点**」，且 **FC-8 在 J 命中**（宿主层 ocr=0 成立但 composable 层有真调用）",
+    "sheet_count_check": "23 = 业务 15 + retired 7 + GT_Custom 1（四向等值比对）",
+    "sheet_name_arg_missing_trailing_space": {
+      "contrast": "🔴 对照：`prefill_formula_mapping.json` 里同样的 `sheet: '审定表J1-1'` **是真缺陷** —— 那边的守卫（如 `test_i_cycle_formula_presets.py` 同族）按 sheet 名**精确匹配模板**。同一个字符串在两处消费方式不同 ⇒ 判据必须看消费方，不能只看字面。",
+      "harmful_here": false,
+      "site": "j1/core/J1TabAdjudication.vue#L448 `sheet_name: '审定表J1-1'`",
+      "template_true_name": "审定表J1-1 ",
+      "why_harmless": "🔴 端点 `publish_determination_to_tb` 只用 `extract_determination_wp_code(body.sheet_name)` 按正则 `[D-N]\\d+-1` **提子码**，**不**做 sheet 名精确匹配 ⇒ 从 `审定表J1-1` 能正确提出 `J1-1`。🔴 **不得报成缺陷**（虚报与漏报同罪）—— 只登记为「若将来有人拿它去定位模板 sheet 则会失配」的潜在风险点。"
+    },
+    "sheet_name_traps": [
+      "🔴 **尾部空格 2 张**：`审定表J1-1 ` · `明细表J1-2 `",
+      "🔴 **名中空格 3 张**：`应付职工薪酬实质性程序表 J1A` · `…J1A-原版` · `…L1A-原`",
+      "🔴 **跨 sheet 引用里带空格且单引号包裹**：`审定表J1-1 !B8 = ='明细表J1-2 '!C13` ⇒ 重写公式时 SHALL 保留空格与单引号；变异「strip 后匹配」SHALL 打红",
+      "本 canary 的 `计提情况检查表J1-6` **无空格**，但同册其他 sheet 有 ⇒ 契约仍须登记"
+    ],
+    "sibling_shapes": {
+      "J1-6-conclusion": "free_text_scalar",
+      "J1-6-post-employment": "structured_row_array",
+      "J1-6-questions": "free_text_array",
+      "J1-6-short-term": "structured_row_array"
+    },
+    "sibling_shapes_note": "🔴 `J1-6-questions` 真库 **901 B 是 AI 生成 markdown 长文本**（5 元素字符串数组，首元素是含 `###` 标题与列表的整段中文）⇒ 与 `structured_row_array` 是**两种 shape**，按行数组解析会失败。`J1-6-conclusion` 是自由文本标量。",
+    "store_only_fields": [
+      "indent"
+    ],
+    "store_only_note": "`indent` 是**缩进层级字段**（0/1）—— 模板用**全角空格前缀**表达缩进（见 RD-5 类②），HTML 侧用独立字段 ⇒ store-only、不映射格。",
+    "tb_gate_symbol_vs_endpoint": {
+      "ci_gate_verified": "✅ 平台既有 2 道 CI 守卫现算通过（扫 5190 源文件，0 违规）：`check_tb_writeback_no_direct_call`（前端零 TB 回写直调）+ `check_tb_publish_confirm_gate`（发布全经显式确认门、无自动发布路径）。🔴 **非空反证已做**：J1 的真调用 #L446 被 `PUBLISH_CALL_RE` 覆盖（`.post(` + 反引号串 + `audit-determination/publish-to-tb`），同文件 #L434 有 `ElMessageBox.confirm` 被 `CONFIRM_RE` 覆盖 ⇒ 判为 confirmed 而非空分母。",
+      "confirm_gate_site": "j1/core/J1TabAdjudication.vue#L434 `ElMessageBox.confirm`",
+      "endpoint_comment_count": 1,
+      "endpoint_file_count": 1,
+      "endpoint_hit_count": 2,
+      "endpoint_real_call_count": 1,
+      "note": "🔴 **非空反证**：符号名 `publishToTb` 在全 J 域命中 **0**，而端点 `publish-to-tb` 命中 **2**，均在 `j1/core/J1TabAdjudication.vue`——「按函数名判定得 0、按端点判定得 1 个文件」是本条判据存在的**全部理由**。🔴 **精度更正（2026-09-27 逐行实测）**：2 处命中里 **1 处是注释**（#L425 的 spec 溯源注释）、**1 处是真调用**（#L446 `api.post(...)`）⇒ 真实发布站点 **1 个**。判据 SHALL **先剥注释再匹配**（平台既有守卫 `check_tb_publish_confirm_gate` 正是先 `strip_comments` 再跑 `PUBLISH_CALL_RE`），否则会把注释数成发布站点。⇒ **GC-9 在 J 是 1/1 有门**（推翻「J 无发布门」的误判），canary 可以覆盖发布链。",
+      "real_call_site": "j1/core/J1TabAdjudication.vue#L446",
+      "symbol_name_hit_count": 0
+    },
+    "tb_publish_gate": "POST /api/workpapers/{wpId}/audit-determination/publish-to-tb @ j1/core/J1TabAdjudication.vue",
+    "template_cell_lock_facts": {
+      "note": "ws.protection.sheet=False ⇒ locked 惰性；mode 按「该格逐行有没有真公式」判。",
+      "sheet_protection_enabled": false
+    },
+    "template_only_columns": [
+      {
+        "column": "G",
+        "header_text": "应提金额 = ROUND(D*F, 2)"
+      },
+      {
+        "column": "I",
+        "header_text": "差异 = G-H"
+      }
+    ],
+    "uuid_column": "L",
+    "variant_axis": null
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "计提情况检查表J1-6",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "j16-short-term-managed",
+      "tables": [
+        {
+          "anchor": "A15",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "label",
+              "header_source_ref": "源xlsx!计提情况检查表J1-6!A16",
+              "header_text": "项目",
+              "json_pointer": "/rows/{row_uuid}/label",
+              "mode": "editable",
+              "source_ref": "源xlsx!计提情况检查表J1-6!A17",
+              "stable_field_key": "accrual_check_short_term_rows/{row_uuid}/label",
+              "store_item_id": "J1-6-short-term",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "base_name",
+              "header_source_ref": "源xlsx!计提情况检查表J1-6!C16",
+              "header_text": "名称",
+              "json_pointer": "/rows/{row_uuid}/baseName",
+              "mode": "editable",
+              "source_ref": "源xlsx!计提情况检查表J1-6!C17",
+              "stable_field_key": "accrual_check_short_term_rows/{row_uuid}/base_name",
+              "store_item_id": "J1-6-short-term",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "base_amount",
+              "header_source_ref": "源xlsx!计提情况检查表J1-6!D16",
+              "header_text": "金额",
+              "json_pointer": "/rows/{row_uuid}/baseAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!计提情况检查表J1-6!D17",
+              "stable_field_key": "accrual_check_short_term_rows/{row_uuid}/base_amount",
+              "store_item_id": "J1-6-short-term",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "base_index",
+              "header_source_ref": "源xlsx!计提情况检查表J1-6!E16",
+              "header_text": "索引",
+              "json_pointer": "/rows/{row_uuid}/baseIndex",
+              "mode": "editable",
+              "source_ref": "源xlsx!计提情况检查表J1-6!E17",
+              "stable_field_key": "accrual_check_short_term_rows/{row_uuid}/base_index",
+              "store_item_id": "J1-6-short-term",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "rate",
+              "header_source_ref": "源xlsx!计提情况检查表J1-6!F16",
+              "header_text": "计提比例",
+              "json_pointer": "/rows/{row_uuid}/rate",
+              "mode": "editable",
+              "source_ref": "源xlsx!计提情况检查表J1-6!F17",
+              "stable_field_key": "accrual_check_short_term_rows/{row_uuid}/rate",
+              "store_item_id": "J1-6-short-term",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "actual",
+              "header_source_ref": "源xlsx!计提情况检查表J1-6!H16",
+              "header_text": "实际计提数",
+              "json_pointer": "/rows/{row_uuid}/actual",
+              "mode": "editable",
+              "source_ref": "源xlsx!计提情况检查表J1-6!H17",
+              "stable_field_key": "accrual_check_short_term_rows/{row_uuid}/actual",
+              "store_item_id": "J1-6-short-term",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "diff_reason",
+              "header_source_ref": "源xlsx!计提情况检查表J1-6!J16",
+              "header_text": "差异原因",
+              "json_pointer": "/rows/{row_uuid}/diffReason",
+              "mode": "editable",
+              "source_ref": "源xlsx!计提情况检查表J1-6!J17",
+              "stable_field_key": "accrual_check_short_term_rows/{row_uuid}/diff_reason",
+              "store_item_id": "J1-6-short-term",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "conclusion",
+              "header_source_ref": "源xlsx!计提情况检查表J1-6!K16",
+              "header_text": "结论",
+              "json_pointer": "/rows/{row_uuid}/conclusion",
+              "mode": "editable",
+              "source_ref": "源xlsx!计提情况检查表J1-6!K17",
+              "stable_field_key": "accrual_check_short_term_rows/{row_uuid}/conclusion",
+              "store_item_id": "J1-6-short-term",
+              "value_type": "text"
+            }
+          ],
+          "formula_mask": [
+            "G17:G35",
+            "I17:I35"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "accrual_check_short_term_rows",
+          "uuid_col": "L"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "9fc205eafdfed85d5e55e01acd9b6e81bbdc5723c8420cf72bbd2957e790c95e",
+    "relative_path": "J/J1 应付职工薪酬.xlsx",
+    "template_sha256": "6830eda60b73a7f14adc336e9a9e3610deee6ce5c24b983e78fab822cfb4c8ce"
+  },
+  "template_definition_sha256": "7c03146eb0ccc1c12810eb174215978e4e704e085f674173104da62e8089d5fc"
+}

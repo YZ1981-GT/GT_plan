@@ -1,15 +1,34 @@
 <template>
-  <div class="cw-layout">
-    <!-- 总分汇总模式提示：无需抵销底稿 -->
+  <div class="cw-layout" :data-load-status="worksheetLoadState">
+    <el-alert
+      v-if="worksheetLoadState === 'error'"
+      type="error"
+      :closable="false"
+      show-icon
+      class="cw-load-error"
+      data-testid="cw-load-error"
+      :title="worksheetLoadError || '合并工作底稿加载失败，请稍后重试'"
+    />
+    <el-alert
+      v-else-if="worksheetLoadState === 'empty'"
+      type="info"
+      :closable="false"
+      show-icon
+      class="cw-empty-state"
+      data-testid="cw-empty-state"
+      title="当前年度暂无已保存的合并工作底稿，已加载可编辑默认表格"
+    />
+    <!-- 总分汇总提示：仅在验证结果为纯「总分汇总」时显示（需求 4.6） -->
     <el-alert
       v-if="isBranchMode"
       type="info"
       :closable="false"
       show-icon
       class="cw-branch-notice"
+      data-testid="cw-branch-notice"
     >
       <template #title>
-        <span>当前为<b>总分汇总</b>模式：分公司为非独立法人，直接加总各分公司试算表即可，<b>无需填写以下抵销底稿</b>（合并数 = 各分公司本体加总）。如需母子合并请在顶部切换合并类型。</span>
+        <span>本项目的下级企业都是<b>分公司</b>（总分汇总）：分公司为非独立法人，合并数 = 本部与各分公司审定数之和加母分差额，<b>无需填写以下母子合并抵销底稿</b>；本部与分公司之间的内部抵销请在企业树的「母分差额」节点录入。合并方式按各下级企业的与上级关系自动识别。</span>
       </template>
     </el-alert>
     <!-- G7 合并联动 stale 常驻提示（Task 6.1；失败静默降级 Property 12） -->
@@ -98,11 +117,10 @@
         :direct-rows="data.equitySimDirect" :indirect-sections="computedIndirectSections"
         :net-asset-data="data.netAsset"
         @save="onSave('模拟权益法', $event)" @open-formula="onOpenFormula" />
-      <EliminationSheet v-else-if="activeSheet === 'elimination'" :companies="companyColumns"
-        :equity-rows="data.elimEquity" :income-rows="data.elimIncome" :cross-rows="data.elimCross"
-        :imported-entries="allImportedEntries"
-        @save="onSave('合并抵消分录', $event)" @open-formula="onOpenFormula"
-        @goto-sheet="onGotoSheet" />
+      <!-- 合并抵消分录明细表：唯一来源 elimination_entries；工作底稿三类来源的计算结果作为待生成分组传入 -->
+      <EliminationSheet v-else-if="activeSheet === 'elimination'" ref="eliminationSheetRef" :project-id="projectId" :year="year"
+        :source-groups="sourceGroups" :source-origins="sourceOrigins"
+        @open-formula="onOpenFormula" @goto-sheet="onGotoSheet" />
       <CapitalReserveSheet v-else-if="activeSheet === 'capital'" :companies="companyColumns"
         v-model="data.capitalReserve" :elimination-data="elimSummaryForCapital"
         @save="onSave('资本公积变动', $event)" @open-formula="onOpenFormula" />
@@ -133,14 +151,16 @@
         @goto-sheet="onGotoSheet" @open-formula="onOpenFormula" />
       <!-- 内部抵消表 -->
       <InternalArApSheet v-else-if="activeSheet === 'internal_arap'"
-        :companies="companyColumns" @save="onSave('内部往来抵消', $event)" @open-formula="onOpenFormula"
-        @entries-changed="(e: any[]) => internalEntries.arap = e" />
+        :companies="companyColumns" :initial-rows="internalRows.arap"
+        @save="onSave('内部往来抵消', $event)" @open-formula="onOpenFormula"
+        @rows-changed="(r: any[]) => internalRows.arap = r" />
       <InternalTradeSheet v-else-if="activeSheet === 'internal_trade'"
-        :companies="companyColumns" @save="onSave('内部交易抵消', $event)" @open-formula="onOpenFormula"
-        @entries-changed="(e: any[]) => internalEntries.trade = e" />
+        :companies="companyColumns" :initial-rows="internalRows.trade"
+        @save="onSave('内部交易抵消', $event)" @open-formula="onOpenFormula"
+        @rows-changed="(r: any[]) => internalRows.trade = r" />
+      <!-- 内部现金流没有会计科目（属现金流量表工作底稿），不生成抵销分录 -->
       <InternalCashFlowSheet v-else-if="activeSheet === 'internal_cashflow'"
-        :companies="companyColumns" @save="onSave('内部现金流抵消', $event)" @open-formula="onOpenFormula"
-        @entries-changed="(e: any[]) => internalEntries.cashflow = e" />
+        :companies="companyColumns" @save="onSave('内部现金流抵消', $event)" @open-formula="onOpenFormula" />
       <!-- G7 建议草稿（只读；由 G7 联动勾选建议后写入，不参与合并计算） -->
       <G7SuggestionDraftSheet v-else-if="activeSheet === 'g7_suggestions'"
         :rows="g7SuggestionDraft.rows" :note="g7SuggestionDraft.note"
@@ -371,20 +391,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, markRaw, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, reactive, markRaw, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { List, Coin, TrendCharts, DataBoard, SetUp, Tickets, PieChart } from '@element-plus/icons-vue'
-import { getConsolScope } from '@/services/consolidationApi'
+import { getConsolScope, getWorksheetTree } from '@/services/consolidationApi'
+import { directSubsidiaryMembers } from '@/components/consolidation/composables/consolTreeView'
+import {
+  declaredOrigins,
+  sourceGroupsByOrigin,
+  WORKSHEET_ORIGINS,
+} from '@/components/consolidation/composables/elimSourceGroups'
 import {
   importG7Linkage,
   loadAllWorksheetData,
+  loadWorksheetData,
   previewG7Linkage,
   saveWorksheetData,
+  WorksheetVersionConflictError,
   type G7LinkageFieldDiff,
   type G7LinkagePreview,
+  type WorksheetLoadStatus,
 } from '@/services/consolWorksheetDataApi'
-import { api } from '@/services/apiProxy'
 import { useG7ConsolLinkageEntry } from '@/components/workpaper/composables/g7ConsolLinkageEntry'
 import SubsidiaryInfoSheet from './SubsidiaryInfoSheet.vue'
 import InvestmentCostSheet from './InvestmentCostSheet.vue'
@@ -405,7 +432,31 @@ import { eventBus } from '@/utils/eventBus'
 import type { FormulaChangedPayload } from '@/utils/eventBus'
 import { handleApiError } from '@/utils/errorHandler'
 import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
-import { loadWorksheetData } from '@/services/consolWorksheetDataApi'
+
+interface ConsolWorksheetTabsProps {
+  projectId: string
+  year: number
+  consolMode?: string | null
+  isRootSelection?: boolean
+}
+
+const props = withDefaults(defineProps<ConsolWorksheetTabsProps>(), {
+  consolMode: null,
+  isRootSelection: false,
+})
+
+const projectId = computed(() => props.projectId)
+const year = computed(() => props.year)
+
+const worksheetLoadState = ref<WorksheetLoadStatus>('empty')
+const worksheetLoadError = ref('')
+const worksheetLoading = ref(false)
+let worksheetRequestSeq = 0
+let scopeRequestSeq = 0
+
+function isWorksheetContextCurrent(projectSnapshot: string, yearSnapshot: number): boolean {
+  return projectId.value === projectSnapshot && year.value === yearSnapshot
+}
 
 // ─── 合并工作底稿导入导出列定义 ─────────────────────────────────────────────
 const CONSOL_SHEET_COLS: Record<string, ExcelColumn[]> = {
@@ -522,14 +573,8 @@ const CONSOL_SHEET_COLS: Record<string, ExcelColumn[]> = {
     { key: 'direction', header: '借贷', width: 8 },
     { key: 'remark', header: '说明', width: 16 },
   ],
-  elimination: [
-    { key: 'source', header: '来源', width: 10 },
-    { key: 'direction', header: '借贷', width: 8 },
-    { key: 'subject', header: '科目', width: 20 },
-    { key: 'detail', header: '二级明细', width: 16 },
-    { key: 'amount', header: '金额', width: 16 },
-    { key: 'desc', header: '说明', width: 24 },
-  ],
+  // 合并抵消分录不在此列：分录唯一来源是 elimination_entries（明细表自带导出），
+  // 这里的导入会把 Excel 行写进 consol_worksheet_data['elimination']，而该 JSON 已不参与任何计算（需求 1.1）
   share_change: [
     { key: 'company_name', header: '企业名称', width: 20 },
     { key: 'change_date', header: '变动日期', width: 12 },
@@ -587,7 +632,7 @@ const staticSheets = [
   { key: 'equity_inv', label: '投资明细-权益法', desc: '权益法长投台账', icon: markRaw(TrendCharts), tag: '基础', tagType: '' as const },
   { key: 'net_asset', label: '净资产表', desc: '净资产和损益变动·长投校对', icon: markRaw(DataBoard), tag: '核心', tagType: 'warning' as const },
   { key: 'equity_sim', label: '模拟权益法', desc: '直接持股+间接持股·9步模拟', icon: markRaw(SetUp), tag: '引擎', tagType: 'danger' as const },
-  { key: 'elimination', label: '合并抵消分录', desc: '权益抵消·损益抵消·交叉持股', icon: markRaw(Tickets), tag: '输出', tagType: 'success' as const },
+  { key: 'elimination', label: '合并抵消分录', desc: '全部调整抵销分录·待生成·审批后推送', icon: markRaw(Tickets), tag: '输出', tagType: 'success' as const },
   { key: 'capital', label: '资本公积变动', desc: '从抵消分录提取·差异核查', icon: markRaw(PieChart), tag: '核查', tagType: 'info' as const },
   { key: 'post_invest', label: '抵消后长投明细', desc: '账面+模拟-抵消=合并列示数', icon: markRaw(DataBoard), tag: '汇总', tagType: 'success' as const },
   { key: 'post_income', label: '抵消后投资收益', desc: '红利+模拟-还原-抵消', icon: markRaw(Coin), tag: '汇总', tagType: 'success' as const },
@@ -599,15 +644,27 @@ const staticSheets = [
 ]
 
 // 从基本信息表提取有股比变动的企业，动态生成导航项
+// 设计 §十三.2：不限于 1|2|3，从事件集合（或已保存的 share_change_N 键）动态生成
 const shareChangeSheets = computed(() => {
   const sheets: any[] = []
   const changedCompanies = data.subsidiaryInfo.filter(
     (r: SubsidiaryInfoRow) => r.share_changed === '是' && r.change_times > 0 && r.company_name
   )
-  // 按变动次数分组
-  for (const times of [1, 2, 3] as const) {
+  // 收集所有出现过的变动次数（含已保存数据中超过 3 次的 share_change_N 键）
+  const timesSet = new Set<number>()
+  for (const r of changedCompanies) {
+    if (r.change_times > 0) timesSet.add(r.change_times)
+  }
+  // 补充已加载数据中的 share_change_N 键（后端可能有 4 次以上的保存数据）
+  for (const key of Object.keys(shareChangeData)) {
+    const match = key.match(/^share_change_(\d+)$/)
+    if (match) timesSet.add(Number(match[1]))
+  }
+  // 按次数升序生成导航项
+  const sortedTimes = [...timesSet].sort((a, b) => a - b)
+  for (const times of sortedTimes) {
     const companies = changedCompanies.filter((r: SubsidiaryInfoRow) => r.change_times === times)
-    if (companies.length > 0) {
+    if (companies.length > 0 || shareChangeData[`share_change_${times}`]) {
       const names = companies.map((r: SubsidiaryInfoRow) => r.company_name).join('、')
       sheets.push({
         key: `share_change_${times}`,
@@ -668,11 +725,10 @@ const navGroups = computed(() => [
 ])
 
 const activeSheet = ref('info')
+const eliminationSheetRef = ref<InstanceType<typeof EliminationSheet> | null>(null)
 
 // ─── 从合并范围加载子企业列表 ────────────────────────────────────────────────
-const route = useRoute()
-const projectId = computed(() => route.params.projectId as string)
-const year = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
+// 项目和年度由父页提供，确保工作底稿与左树/报表使用同一年度上下文。
 
 // ─── G7 联动 stale 常驻提示（Task 6.1；失败静默降级 Property 12） ────────────
 const linkageStale = useG7ConsolLinkageEntry(projectId, year)
@@ -880,22 +936,33 @@ async function confirmG7Linkage() {
   }
 }
 
-// 合并类型：branch=总分汇总（无需抵销底稿）/ subsidiary=母子合并
-const isBranchMode = ref(false)
-
-async function loadConsolidationType() {
-  if (!projectId.value) return
-  try {
-    const cfg = await api.get(`/api/projects/${projectId.value}/config`)
-    isBranchMode.value = cfg?.consolidation_type === 'branch'
-  } catch { /* 静默忽略，默认母子合并 */ }
-}
+// 合并方式按下级企业的与上级关系自动识别（企业树接口 mode）；纯「总分汇总」才提示无需抵销底稿
+const treeMode = ref<string | null>(null)
+const rootCompanyCode = ref('')
+const isBranchMode = computed(() => (props.consolMode ?? treeMode.value) === 'branch')
 
 async function loadConsolScope() {
-  if (!projectId.value) return
+  const projectSnapshot = projectId.value
+  const yearSnapshot = year.value
+  if (!projectSnapshot || !yearSnapshot) return
+  const ticket = ++scopeRequestSeq
+  // 企业树：合并方式识别 + 企业列回退（合并范围表为空时取根合并节点下的子公司类成员）
+  let treeMembers: { name: string; code: string; ratio: number }[] = []
   try {
-    // 优先从合并范围获取
-    const items = await getConsolScope(projectId.value, year.value)
+    const res = await getWorksheetTree(projectSnapshot)
+    if (ticket !== scopeRequestSeq || !isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) return
+    treeMode.value = res?.mode ?? null
+    treeMembers = directSubsidiaryMembers(res?.tree)
+    // 本合并项目的企业代码：工作底稿里的「母公司」= 它（交易方留痕与归属预填用）
+    rootCompanyCode.value = res?.tree?.company_code || ''
+  } catch {
+    if (ticket !== scopeRequestSeq || !isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) return
+    treeMode.value = null
+  }
+  try {
+    // 优先从合并范围获取（持股比例等手工维护信息在这里）
+    const items = await getConsolScope(projectSnapshot, yearSnapshot)
+    if (ticket !== scopeRequestSeq || !isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) return
     if (Array.isArray(items) && items.length) {
       scopeCompanies.value = items
         .filter((s: any) => s.is_included && s.company_code)
@@ -907,55 +974,85 @@ async function loadConsolScope() {
       return
     }
   } catch { /* ignore */ }
-  // 降级：从集团架构树获取直接下级
-  try {
-    const { getWorksheetTree } = await import('@/services/consolidationApi')
-    const res = await getWorksheetTree(projectId.value)
-    if (res?.tree?.children?.length) {
-      scopeCompanies.value = res.tree.children.map((c: any) => ({
-        name: c.company_name || c.name || c.company_code,
-        code: c.company_code,
-        ratio: Number(c.shareholding) || 0,
-      }))
-    }
-  } catch { /* ignore */ }
+  if (ticket !== scopeRequestSeq || !isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) return
+  // 回退：企业树中的子公司类成员（排除合并差额、母公司与分公司）
+  scopeCompanies.value = treeMembers
 }
 
 async function loadAllData() {
-  if (!projectId.value) return
+  const projectSnapshot = projectId.value
+  const yearSnapshot = year.value
+  if (!projectSnapshot || !yearSnapshot) return
+  const ticket = ++worksheetRequestSeq
+  worksheetLoading.value = true
   try {
-    const saved = await loadAllWorksheetData(projectId.value, year.value)
-    if (saved.info?.rows) data.subsidiaryInfo = saved.info.rows
-    if (saved.cost?.rows) data.investmentCost = saved.cost.rows
-    if (saved.equity_inv?.rows) data.investmentEquity = saved.equity_inv.rows
-    if (saved.net_asset?.rows) data.netAsset = saved.net_asset.rows
-    if (saved.equity_sim?.rows) {
-      if (saved.equity_sim.rows.direct) data.equitySimDirect = saved.equity_sim.rows.direct
-      if (saved.equity_sim.rows.indirect) data.equitySimIndirect = saved.equity_sim.rows.indirect
+    const result = await loadAllWorksheetData(projectSnapshot, yearSnapshot)
+    if (ticket !== worksheetRequestSeq || !isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) return
+
+    if (result.status === 'error') {
+      // 同一上下文重载失败时保留已展示数据，避免网络抖动把有效表格清空。
+      worksheetLoadState.value = 'error'
+      worksheetLoadError.value = result.errorMessage || '工作底稿批量加载失败'
+      return
     }
-    if (saved.elimination?.rows) {
-      if (saved.elimination.rows.equity) data.elimEquity = saved.elimination.rows.equity
-      if (saved.elimination.rows.income) data.elimIncome = saved.elimination.rows.income
-      if (saved.elimination.rows.cross) data.elimCross = saved.elimination.rows.cross
+
+    worksheetLoadState.value = result.status
+    worksheetLoadError.value = ''
+    resetWorksheetData()
+    const saved = result.data
+    if (Array.isArray(saved.info?.rows)) data.subsidiaryInfo = saved.info.rows
+    if (Array.isArray(saved.cost?.rows)) data.investmentCost = saved.cost.rows
+    if (Array.isArray(saved.equity_inv?.rows)) data.investmentEquity = saved.equity_inv.rows
+    if (Array.isArray(saved.net_asset?.rows)) data.netAsset = saved.net_asset.rows
+    if (saved.equity_sim?.rows && typeof saved.equity_sim.rows === 'object') {
+      if (Array.isArray(saved.equity_sim.rows.direct)) data.equitySimDirect = saved.equity_sim.rows.direct
+      if (Array.isArray(saved.equity_sim.rows.indirect)) data.equitySimIndirect = saved.equity_sim.rows.indirect
     }
-    if (saved.capital?.rows) data.capitalReserve = saved.capital.rows
+    // 旧版「合并抵消分录」JSON（saved.elimination）不再恢复：分录唯一来源是 elimination_entries，
+    // 旧版自定义行由明细表提示并转为草稿分录（需求 1.6 / 9.2）。旧实现读的 rows.equity/income/cross
+    // 是对象形状，而旧明细表保存的是数组 ⇒ 这三项从未恢复成功（design §一 F3），data.elimEquity 等
+    // 一直是骨架行，下游 PostElimInvest / PostElimIncome / MinorityInterest / 资本公积沿用骨架，行为不变。
+    // 内部往来 / 内部交易：恢复已保存的行（原先不恢复 ⇒ 刷新页面后表空、待生成也空）
+    internalRows.arap = Array.isArray(saved.internal_arap?.rows) ? saved.internal_arap.rows : null
+    internalRows.trade = Array.isArray(saved.internal_trade?.rows) ? saved.internal_trade.rows : null
+    savedSheetKeys.value = new Set(Object.keys(saved))
+    // 记录各表版本号（CAS 保存用）
+    Object.keys(sheetVersions).forEach((k) => delete sheetVersions[k])
+    if (result.versions) {
+      Object.assign(sheetVersions, result.versions)
+    }
+    if (Array.isArray(saved.capital?.rows)) data.capitalReserve = saved.capital.rows
     // G7 建议草稿（只读；由 G7 联动勾选建议写入）
     const draft = saved.g7_suggestions
     g7SuggestionDraft.rows = Array.isArray(draft?.rows) ? draft.rows : []
     g7SuggestionDraft.note = typeof draft?.note === 'string' ? draft.note : ''
     g7SuggestionDraft.importedAt = typeof draft?.imported_at === 'string' ? draft.imported_at : ''
-    // 恢复动态股比变动表（share_change_1/2/3）
-    for (const times of [1, 2, 3] as const) {
-      const key = `share_change_${times}`
-      const rows = saved[key]?.rows
+    // 动态股比变动表：按后端返回的 share_change_N 键恢复，不把 3 次写死为业务上限。
+    for (const [key, content] of Object.entries(saved)) {
+      if (!/^share_change_\d+$/.test(key)) continue
+      const rows = content?.rows
       if (Array.isArray(rows)) shareChangeData[key] = rows
     }
-  } catch { /* 首次使用无数据，忽略 */ }
+  } catch (error: any) {
+    if (ticket === worksheetRequestSeq && isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) {
+      worksheetLoadState.value = 'error'
+      worksheetLoadError.value = error?.message || '工作底稿批量加载失败'
+    }
+  } finally {
+    if (ticket === worksheetRequestSeq && isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) {
+      worksheetLoading.value = false
+    }
+  }
+}
+
+/** 推送完成后的统一重载：范围、各工作底稿数据，以及当前抵消分录明细。 */
+async function reload() {
+  await Promise.all([loadConsolScope(), loadAllData()])
+  if (activeSheet.value === 'elimination') await eliminationSheetRef.value?.reload()
 }
 
 onMounted(async () => {
-  loadConsolScope()
-  loadConsolidationType()
+  void loadConsolScope()
   eventBus.on('formula-changed', onFormulaChanged)
   // 从后端加载已保存的工作底稿数据
   await loadAllData()
@@ -963,7 +1060,21 @@ onMounted(async () => {
   void linkageStale.refreshStale()
 })
 onUnmounted(() => {
+  worksheetRequestSeq += 1
+  scopeRequestSeq += 1
   eventBus.off('formula-changed', onFormulaChanged)
+})
+
+watch([projectId, year], ([nextProjectId, nextYear], previous) => {
+  if (nextProjectId === previous?.[0] && nextYear === previous?.[1]) return
+  worksheetRequestSeq += 1
+  scopeRequestSeq += 1
+  resetWorksheetData()
+  worksheetLoadState.value = 'empty'
+  worksheetLoadError.value = ''
+  if (nextProjectId && nextYear) {
+    void Promise.all([loadConsolScope(), loadAllData()])
+  }
 })
 
 async function onFormulaChanged(_payload: FormulaChangedPayload) {
@@ -1080,10 +1191,6 @@ function buildElimIncome(): ElimRow[] {
     mk('贷','4-2△提取一般风险准备','（四）利润分配'),mk('贷','4-3对所有者（或股东）的分配','（四）利润分配'),
     mk('贷','4-4其他','（四）利润分配')]
 }
-function buildElimCross(): ElimRow[] {
-  return [{direction:'借',subject:'少数股权权益',values:[]},{direction:'贷',subject:'长期股权投资',values:[]},
-    {direction:'借',subject:'投资收益',values:[]},{direction:'贷',subject:'少数股权损益',values:[]}]
-}
 function buildCapitalReserve(): CapitalReserveRow[] {
   const mk = (item: string, o: Partial<CapitalReserveRow> = {}): CapitalReserveRow =>
     ({ item, total: null, elimAdj: null, parentVal: null, values: [], ...o })
@@ -1092,7 +1199,8 @@ function buildCapitalReserve(): CapitalReserveRow[] {
 }
 
 // ─── 数据 ─────────────────────────────────────────────────────────────────────
-const data = reactive({
+function createDefaultWorksheetData() {
+  return {
   subsidiaryInfo: Array.from({ length: 5 }, () => mkEmptyRow()) as SubsidiaryInfoRow[],
   investmentCost: Array.from({ length: 5 }, () => ({
     company_name:'',company_code:'',current_dividend:null,open_ratio:null,open_cost:null,open_impairment:null,open_fv:null,
@@ -1106,14 +1214,40 @@ const data = reactive({
   netAsset: buildNetAsset(),
   equitySimDirect: buildEquitySim(),
   equitySimIndirect: [] as IndirectSection[],
+  // 下游抵消后长投 / 投资收益 / 少数股东 / 资本公积表的「抵消」取数骨架（逐企业列）。旧版从合并抵消分录 JSON 恢复，
+  // 该恢复从未生效（形状不符）且已删除；分录唯一来源改为 elimination_entries 后这些表的抵消列另行接入（不在本 spec 范围）
   elimEquity: buildElimEquity(),
   elimIncome: buildElimIncome(),
-  elimCross: buildElimCross(),
   capitalReserve: buildCapitalReserve(),
-})
+  }
+}
 
-/** 股比变动表本地缓存（按 share_change_1/2/3），避免刷新丢失 */
+const data = reactive(createDefaultWorksheetData())
+
+/** 股比变动表本地缓存（按 share_change_N），避免刷新丢失 */
 const shareChangeData = reactive<Record<string, any[]>>({})
+
+function resetWorksheetData(options: { clearScope?: boolean; resetView?: boolean } = {}) {
+  Object.assign(data, createDefaultWorksheetData())
+  for (const key of Object.keys(shareChangeData)) delete shareChangeData[key]
+  internalRows.arap = null
+  internalRows.trade = null
+  savedSheetKeys.value = new Set()
+  Object.keys(sheetVersions).forEach((k) => delete sheetVersions[k])
+  g7SuggestionDraft.rows = []
+  g7SuggestionDraft.note = ''
+  g7SuggestionDraft.importedAt = ''
+  if (options.clearScope) {
+    scopeCompanies.value = []
+    rootCompanyCode.value = ''
+    treeMode.value = null
+  }
+  if (options.resetView) {
+    g7LinkagePreview.value = null
+    g7LinkageVisible.value = false
+    activeSheet.value = 'info'
+  }
+}
 
 // 子企业列：优先从合并范围树获取，降级从基本信息表获取
 const companyColumns = computed(() => {
@@ -1166,8 +1300,8 @@ const elimSummaryForCapital = computed(() => {
 
 // ─── 股比变动（内联表，非弹窗） ─────────────────────────────────────────────
 const activeShareChangeTimes = computed(() => {
-  const m = activeSheet.value.match(/share_change_(\d)/)
-  return m ? (Number(m[1]) as 1|2|3) : 1
+  const m = activeSheet.value.match(/share_change_(\d+)/)
+  return m ? Number(m[1]) : 1
 })
 const activeShareChangeCompanies = computed(() => {
   const times = activeShareChangeTimes.value
@@ -1193,7 +1327,7 @@ function onShareChangeSave(d: any) {
 async function onSave(sheet: string, payload: any) {
   const keyMap: Record<string, string> = {
     '基本信息表': 'info', '投资明细-成本法': 'cost', '投资明细-权益法': 'equity_inv',
-    '净资产表': 'net_asset', '模拟权益法': 'equity_sim', '合并抵消分录': 'elimination',
+    '净资产表': 'net_asset', '模拟权益法': 'equity_sim',
     '资本公积变动': 'capital', '抵消后长投': 'post_invest', '抵消后投资收益': 'post_income',
     '少数股东权益损益': 'minority', '内部往来抵消': 'internal_arap',
     '内部交易抵消': 'internal_trade', '内部现金流抵消': 'internal_cashflow',
@@ -1202,109 +1336,31 @@ async function onSave(sheet: string, payload: any) {
   await doSave(key, payload)
   // 基本信息表保存后刷新合并范围（影响子企业列）
   if (key === 'info') loadConsolScope()
-  // #4: 抵消分录保存后同步自定义分录到后端 elimination_entries 表
-  if (key === 'elimination') {
-    _syncEliminationEntries(payload)
-  }
 }
 async function doSave(sheetKey: string, payload: any) {
   if (!projectId.value) { ElMessage.warning('项目ID缺失'); return }
   try {
-    const ok = await saveWorksheetData(projectId.value, year.value, sheetKey, { rows: payload })
-    if (ok) {
-      ElMessage.success(`${sheetKey} 已保存`)
-    } else {
+    // 传入已知版本号启用 CAS；首次保存用 0（首次创建语义，后端验证当前不存在）。
+    const currentVersion = sheetVersions[sheetKey] ?? 0
+    const result = await saveWorksheetData(
+      projectId.value, year.value, sheetKey, { rows: payload }, currentVersion,
+    )
+    if (!result.ok) {
       ElMessage.error(`${sheetKey} 保存失败，请检查后端服务`)
+      return
     }
+    // 更新本地版本号，下次保存用新版本做 CAS
+    sheetVersions[sheetKey] = result.version
+    // 已保存 ⇒ 该表数据已知，生成草稿分录时由它负责（其中不再产出的来源键可删草稿）
+    savedSheetKeys.value = new Set([...savedSheetKeys.value, sheetKey])
+    ElMessage.success(`${sheetKey} 已保存`)
   } catch (err: any) {
-    handleApiError(err, '保存异常')
-  }
-}
-
-// ─── #4: 抵消分录 → 后端 elimination_entries 表同步 ─────────────────────────
-/**
- * 将 EliminationSheet 保存的自定义分录**双向同步（diff）**到后端 elimination_entries 表，
- * 使 recalc_full 的 _batch_load_eliminations 能读取到这些分录参与差额表计算。
- *
- * 策略（对齐 D2/ShareChangeSheet 从单向 append 升级为 diff 的范式）：
- *   1. 拉取后端已托管的 custom 分录（description 以固定前缀 `自定义抵消：` 开头）
- *   2. 前端已移除的 → DELETE（修复原"逐条 POST 已有忽略"导致删除/修改不反映的单向 append）
- *   3. 金额/方向变化的 → 删旧建新；未变的 → 跳过（保留后端记录不重建）
- *   4. 新增的 → POST
- * description 统一加前缀，保证所有托管分录可被 list 捕获、diff 一致。
- * 端点：GET/POST /api/consolidation/eliminations，DELETE /{entry_id}?project_id=xxx
- */
-const _CUSTOM_ELIM_PREFIX = '自定义抵消：'
-async function _syncEliminationEntries(payload: any) {
-  if (!projectId.value) return
-  const entries: any[] = Array.isArray(payload) ? payload : (payload?.rows || [])
-  // 只同步自定义分录（_custom=true），自动分录由 recalc_full 自行处理
-  const customEntries = entries.filter((r: any) => r._custom && r.subject && (Number(r.amount) || 0) !== 0)
-
-  // 统一 description：始终加前缀，使托管分录可被 list 全量捕获并做 diff
-  const descOf = (e: any) => `${_CUSTOM_ELIM_PREFIX}${e.desc || e.subject}`
-
-  try {
-    // 1. 拉取后端已托管的 custom 分录（前缀匹配）
-    const existing: any[] = (await api.get('/api/consolidation/eliminations', {
-      params: { project_id: projectId.value, year: year.value },
-    })) || []
-    const managedByDesc = new Map<string, any>()
-    for (const e of existing) {
-      if (typeof e?.description === 'string' && e.description.startsWith(_CUSTOM_ELIM_PREFIX)) {
-        managedByDesc.set(e.description, e)
-      }
+    if (err instanceof WorksheetVersionConflictError) {
+      ElMessage.warning('工作底稿已被其他操作修改，正在重新加载……')
+      await loadAllData()
+      return
     }
-
-    // 2. 前端当前 desired
-    const desiredByDesc = new Map<string, any>()
-    for (const e of customEntries) desiredByDesc.set(descOf(e), e)
-
-    const doDelete = (id: string) =>
-      api.delete(`/api/consolidation/eliminations/${id}`, {
-        params: { project_id: projectId.value }, _silent: true,
-      } as any)
-    const doCreate = (desc: string, entry: any) => {
-      const amount = Math.abs(Number(entry.amount) || 0)
-      const isDebit = entry.direction === '借'
-      return api.post('/api/consolidation/eliminations', {
-        year: year.value,
-        entry_type: entry.source || 'custom',
-        description: desc,
-        lines: [{
-          account_code: entry.subject,
-          account_name: entry.subject,
-          debit_amount: isDebit ? amount : 0,
-          credit_amount: isDebit ? 0 : amount,
-        }],
-        related_company_codes: [],
-      }, {
-        params: { project_id: projectId.value }, _silent: true,
-      } as any)
-    }
-
-    // 3. 后端有、前端已移除 → 删除
-    for (const [desc, rec] of managedByDesc) {
-      if (!desiredByDesc.has(desc) && rec?.id) await doDelete(rec.id)
-    }
-
-    // 4. 新增 / 变化（删旧建新）/ 未变（跳过）
-    for (const [desc, entry] of desiredByDesc) {
-      const amount = Math.abs(Number(entry.amount) || 0)
-      const isDebit = entry.direction === '借'
-      const rec = managedByDesc.get(desc)
-      if (rec) {
-        const exDebit = Number(rec.lines?.[0]?.debit_amount) || 0
-        const exCredit = Number(rec.lines?.[0]?.credit_amount) || 0
-        const same = Math.abs(exDebit - (isDebit ? amount : 0)) < 0.005
-          && Math.abs(exCredit - (isDebit ? 0 : amount)) < 0.005
-        if (same) continue
-        if (rec.id) await doDelete(rec.id)
-      }
-      await doCreate(desc, entry)
-    }
-  } catch {
-    // 同步失败不阻断 JSON 保存（降级：前端 JSON 存储仍为真源，后端表为副本）
+    handleApiError(err, `${sheetKey} 保存`)
   }
 }
 
@@ -1347,9 +1403,17 @@ async function handleExportData() {
   const colKey = activeSheet.value.startsWith('share_change_') ? 'share_change' : activeSheet.value
   const cols = CONSOL_SHEET_COLS[colKey]
   if (!cols) return
+  if (!projectId.value || !year.value) {
+    ElMessage.warning('工作底稿上下文未就绪，无法导出')
+    return
+  }
   // 从后端加载当前 sheet 数据
-  const saved = await loadWorksheetData(projectId.value, year.value, activeSheet.value)
-  const rows = saved?.rows || []
+  const result = await loadWorksheetData(projectId.value, year.value, activeSheet.value)
+  if (result.status === 'error') {
+    ElMessage.error(result.errorMessage || '工作底稿加载失败，无法导出')
+    return
+  }
+  const rows = Array.isArray(result.data.rows) ? result.data.rows : []
   if (!rows.length) {
     ElMessage.info('当前表暂无数据可导出')
     return
@@ -1393,73 +1457,40 @@ async function handleImportFile(e: Event) {
     }
 
     // 保存到后端
-    const ok = await saveWorksheetData(projectId.value, year.value, activeSheet.value, { rows: mapped })
-    if (ok) {
+    try {
+      const currentVersion = sheetVersions[activeSheet.value] ?? 0
+      const saveResult = await saveWorksheetData(projectId.value, year.value, activeSheet.value, { rows: mapped }, currentVersion)
+      sheetVersions[activeSheet.value] = saveResult.version
       ElMessage.success(`已导入 ${mapped.length} 行到「${activeSheetLabel.value}」`)
       // 触发前端数据刷新
       await loadAllData()
-    } else {
-      ElMessage.error('导入保存失败')
+    } catch (error: any) {
+      handleApiError(error, '导入保存')
     }
   }, { skipRows: 0 })
   // 重置 file input
   if (importFileRef.value) importFileRef.value.value = ''
 }
 
-// ─── 内部抵消分录汇总 ────────────────────────────────────────────────────────
-const internalEntries = reactive<{ arap: any[]; trade: any[]; cashflow: any[] }>({
-  arap: [], trade: [], cashflow: [],
-})
+// ─── 合并抵消分录明细表的待生成分组（spec consol-elimination-single-source-push 任务 10.2）──────
+// 内部往来 / 内部交易的行：已保存的从后端恢复，表打开后随编辑更新（rows-changed）；
+// 模拟权益法直接取 data.equitySimDirect。三张表的计算与各表底部预览同一函数（elimSourceGroups）。
+// 内部现金流没有会计科目，不生成分录。
+const internalRows = reactive<{ arap: any[] | null; trade: any[] | null }>({ arap: null, trade: null })
+/** 已保存过数据的表（sheet_key）：这些来源的数据已知，生成时由明细表声明负责 */
+const savedSheetKeys = ref<Set<string>>(new Set())
+/** 每个 sheet_key 当前已知的后端版本号（加载/保存后更新），用于 CAS 保存。 */
+const sheetVersions = reactive<Record<string, number>>({})
 
-// 从模拟权益法提取权益抵消/损益抵消分录（computed，不修改 reactive 数据）
-const equitySimEntries = computed(() => {
-  const entries: any[] = []
-  const nn = (v: any) => Number(v) || 0
-  const simRows = data.equitySimDirect
-  if (!simRows?.length) return entries
-
-  // 步骤1（期初模拟）的贷方行 → 权益抵消
-  const step1Idx = simRows.findIndex((r: EquitySimRow) => r.step === '期初长投模拟' && r.isStep)
-  if (step1Idx >= 0) {
-    for (let j = step1Idx + 1; j < simRows.length; j++) {
-      const r = simRows[j]
-      if (r.isStep) break
-      const amt = (r.values || []).reduce((s: number, v: any) => s + nn(v), 0)
-      if (amt) entries.push({ source: '权益抵消', direction: r.direction, subject: r.subject, detail: r.detail || '', amount: amt, desc: '期初模拟' })
-    }
-  }
-
-  // 步骤2（当期变动）→ 损益抵消
-  const step2Idx = simRows.findIndex((r: EquitySimRow) => r.step === '模拟当期长期股权投资' && r.isStep)
-  if (step2Idx >= 0) {
-    for (let j = step2Idx + 1; j < simRows.length; j++) {
-      const r = simRows[j]
-      if (r.isStep) break
-      const amt = (r.values || []).reduce((s: number, v: any) => s + nn(v), 0)
-      if (amt) entries.push({ source: '损益抵消', direction: r.direction, subject: r.subject, detail: r.detail || '', amount: amt, desc: '当期变动' })
-    }
-  }
-
-  // 步骤3（还原分红）
-  const step3Idx = simRows.findIndex((r: EquitySimRow) => r.step === '还原分红影响' && r.isStep)
-  if (step3Idx >= 0) {
-    for (let j = step3Idx + 1; j < simRows.length; j++) {
-      const r = simRows[j]
-      if (r.isStep) break
-      const amt = (r.values || []).reduce((s: number, v: any) => s + nn(v), 0)
-      if (amt) entries.push({ source: '损益抵消', direction: r.direction, subject: r.subject, detail: r.detail || '', amount: amt, desc: '还原分红' })
-    }
-  }
-
-  return entries
-})
-
-const allImportedEntries = computed(() => [
-  ...equitySimEntries.value,
-  ...internalEntries.arap,
-  ...internalEntries.trade,
-  ...internalEntries.cashflow,
-])
+const sourceGroupsByOriginMap = computed(() => sourceGroupsByOrigin({
+  equitySimRows: data.equitySimDirect,
+  arapRows: internalRows.arap || [],
+  tradeRows: internalRows.trade || [],
+  companies: companyColumns.value,
+  rootCode: rootCompanyCode.value,
+}))
+const sourceGroups = computed(() => WORKSHEET_ORIGINS.flatMap((o) => sourceGroupsByOriginMap.value[o]))
+const sourceOrigins = computed(() => declaredOrigins(sourceGroupsByOriginMap.value, savedSheetKeys.value))
 
 // ─── 公式 / 跨表导航统一接线（acnr-consumer-wiring Req 20.5/20.6/20.7, task 31.3）──
 // 单一父级接线点：所有 ~15 个子 worksheet 的 `open-formula` 事件都绑定到此处，
@@ -1469,7 +1500,13 @@ const allImportedEntries = computed(() => [
 // 因此「一处接线惠及全部 worksheet」：子组件无需各自接 ACNR picker。
 // miss/picker 不可用时由 FormulaEditDialog 内部回退 legacy 地址注册表（Req 20.7 无回归）。
 function onOpenFormula(sheetKey: string) {
-  eventBus.emit('open-formula-manager', { nodeKey: sheetKey })
+  eventBus.emit('open-formula-manager', {
+    nodeKey: `consol_${sheetKey}`,
+    scope: 'consol_worksheet',
+    projectId: projectId.value,
+    year: year.value,
+    sheetName: sheetKey,
+  })
 }
 
 // `goto-sheet`：合并工作底稿模块内部的表样切换（如 elimination→net_asset），
@@ -1479,6 +1516,8 @@ function onOpenFormula(sheetKey: string) {
 function onGotoSheet(k: string) {
   activeSheet.value = k
 }
+
+defineExpose({ reload, activeSheet })
 </script>
 
 <style scoped>

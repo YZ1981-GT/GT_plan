@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import json
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-unit-tests")
@@ -29,6 +30,7 @@ from app.services.custom_query.snapshot_writer import (
     snapshot_writer,
 )
 from app.services.custom_query.addressing_service import ResolvedTarget
+from app.services.tb_audited_writer import PublishRowResult, PublishRowsResult
 
 
 # ─── addr_id resolve mock helper (Task 15.3) ─────────────────────────────────
@@ -458,7 +460,14 @@ class TestProperty5WritePermissionEnforcement:
             stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
             if "SELECT" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = ("tb-001", now)
+                mock_result.first.return_value = (
+                    "tb-001",
+                    "test-project-id",
+                    2025,
+                    "1001",
+                    100,
+                    now,
+                )
                 return mock_result
             return MagicMock()
 
@@ -482,8 +491,8 @@ class TestProperty5WritePermissionEnforcement:
         """CellWritebackRequest model validates module field."""
         from app.routers.custom_query import CellWritebackRequest
 
-        # Valid modules
-        for module in ("workpaper", "report", "note", "adj", "tb"):
+        # Valid modules (non-note don't need ownership fields)
+        for module in ("workpaper", "report", "adj", "tb"):
             req = CellWritebackRequest(
                 project_id="test-project-id",
                 wp_code="D2",
@@ -493,6 +502,22 @@ class TestProperty5WritePermissionEnforcement:
                 module=module,
             )
             assert req.module == module
+
+        # module='note' requires ownership fields
+        req = CellWritebackRequest(
+            project_id="test-project-id",
+            wp_code="D2",
+            sheet_name="Sheet1",
+            cell_ref="A1",
+            new_value=42,
+            module="note",
+            note_record_id="rec-1",
+            note_section_id="五、1",
+            note_year=2025,
+            note_row=0,
+            note_column="year_end",
+        )
+        assert req.module == "note"
 
         # Invalid module
         from pydantic import ValidationError
@@ -618,7 +643,9 @@ class TestProperty26CrossModuleWriteRouting:
 
         **Validates: Requirements 13.5**
         """
+        import uuid as _uuid_mod
         now = datetime.now(timezone.utc)
+        note_id = _uuid_mod.uuid4()
         note_data = {
             "rows": [
                 {"code": "1001", "name": "现金", "year_end": 100, "year_begin": 90, "formula": None}
@@ -626,20 +653,49 @@ class TestProperty26CrossModuleWriteRouting:
         }
         written_sql = []
 
-        async def mock_execute(stmt, params=None):
-            stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
-            written_sql.append(stmt_str)
-            if "SELECT" in stmt_str and "consol_note_data" in stmt_str:
-                mock_result = MagicMock()
-                mock_result.first.return_value = ("nd-001", note_data, now)
-                return mock_result
-            return MagicMock()
+        # Task 3.4: write_note_cell 改用 ORM select，mock 需返回 ORM-like 对象
+        class _FakeNoteRecord:
+            def __init__(self):
+                self.id = note_id
+                self.project_id = _uuid_mod.uuid4()
+                self.year = 2025
+                self.section_id = "五-1-1"
+                self.node_key = None
+                self.data = dict(note_data)  # 浅拷贝避免共享引用
+                self.updated_at = now
+                self.is_stale = False
 
-        mock_db = AsyncMock()
-        mock_db.execute = mock_execute
+        async def mock_execute(stmt, params=None):
+            # ORM Select 对象用 str(stmt) 获取 SQL；text() 用 stmt.text
+            if hasattr(stmt, 'text') and isinstance(stmt.text, str):
+                stmt_str = stmt.text
+            else:
+                stmt_str = str(stmt)
+            written_sql.append(stmt_str)
+            if "UPDATE" in stmt_str and "consol_note_data" in stmt_str:
+                return MagicMock()
+            # ORM select 或其他 SELECT → 返回 fake record
+            mock_result = MagicMock()
+            mock_result.scalar_one_or_none.return_value = _FakeNoteRecord()
+            return mock_result
+
+        class _SimpleMockDb:
+            """Task 3.4: 最小化 mock，避免 AsyncMock/MagicMock 属性穿透问题。"""
+            async def execute(self, stmt, params=None):
+                if hasattr(stmt, 'text') and isinstance(stmt.text, str):
+                    stmt_str = stmt.text
+                else:
+                    stmt_str = str(stmt)
+                written_sql.append(stmt_str)
+                # 区分 UPDATE 语句（以 "UPDATE " 开头或含 "SET "）和 SELECT 语句
+                if stmt_str.lstrip().startswith("UPDATE") or ("\nSET " in stmt_str):
+                    return MagicMock()
+                mock_result = MagicMock()
+                mock_result.scalar_one_or_none.return_value = _FakeNoteRecord()
+                return mock_result
 
         await snapshot_writer.write_cell(
-            db=mock_db, user=_make_mock_user(), wp_id="nd-001",
+            db=_SimpleMockDb(), user=_make_mock_user(), wp_id=str(note_id),
             sheet_name="note_五-1-1", cell_ref="C2", new_value=150,
             opened_at=now, module="note",
         )
@@ -689,21 +745,57 @@ class TestProperty26CrossModuleWriteRouting:
             written_sql.append(stmt_str)
             if "SELECT" in stmt_str and "trial_balance" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = ("tb-001", now)
+                mock_result.first.return_value = (
+                    "tb-001",
+                    "test-project-id",
+                    2025,
+                    "1001",
+                    100,
+                    now,
+                )
                 return mock_result
             return MagicMock()
 
         mock_db = AsyncMock()
         mock_db.execute = mock_execute
 
-        await snapshot_writer.write_cell(
-            db=mock_db, user=_make_mock_user(), wp_id="tb-001",
-            sheet_name="tb_detail", cell_ref="G2", new_value=1000.0,
-            opened_at=now, module="tb",
+        published = PublishRowsResult(
+            updated_account_codes=["1001"],
+            updated_rows=[
+                PublishRowResult(
+                    account_code="1001",
+                    audited_amount=Decimal("1000"),
+                    previous_amount=Decimal("100"),
+                    published_at=now,
+                )
+            ],
         )
+        with patch(
+            "app.services.tb_audited_writer.publish_rows",
+            new_callable=AsyncMock,
+            return_value=published,
+        ) as mock_publish:
+            result = await snapshot_writer.write_cell(
+                db=mock_db, user=_make_mock_user(), wp_id="tb-001",
+                sheet_name="tb_detail", cell_ref="G2", new_value=1000.0,
+                opened_at=now, module="tb",
+            )
 
-        assert any("UPDATE trial_balance" in s for s in written_sql)
-        assert any("audited_amount" in s for s in written_sql)
+        mock_publish.assert_awaited_once()
+        publish_args, publish_kwargs = mock_publish.await_args
+        assert publish_args[:3] == (mock_db, "test-project-id", 2025)
+        assert publish_args[3] == [
+            {
+                "trial_balance_id": "tb-001",
+                "account_code": "1001",
+                "audited_amount": 1000.0,
+            }
+        ]
+        assert publish_kwargs == {"source": "custom-query:tb-cell"}
+        assert result["success"] is True
+        assert result["old_value"] == Decimal("100")
+        assert result["updated_at"] == now.isoformat()
+        assert not any("UPDATE trial_balance" in s for s in written_sql)
 
 
 # ---------------------------------------------------------------------------

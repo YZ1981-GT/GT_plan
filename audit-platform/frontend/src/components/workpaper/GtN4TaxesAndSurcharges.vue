@@ -10,6 +10,7 @@
           @change="dualMode.onModeChange"
         />
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-n4-taxes-and-surcharges" />
       </div>
 
       <!-- 双模式：HTML sheet 切到 OnlyOffice -->
@@ -141,6 +142,7 @@ import http from '@/utils/http'
 // ─── defineAsyncComponent lazy 加载子组件 ────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtCycleAProgramRouter = defineAsyncComponent(() => import('./GtCycleAProgramRouter.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 // n4/core/
 const N4TabIndex = defineAsyncComponent(() => import('./n4/core/N4TabIndex.vue'))
@@ -192,15 +194,49 @@ const isReadonly = computed(() => !!props.readonly)
 // ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI + 挂真实 Host） ───
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 
-// ─── 双模式 ──────────────────────────────────────────────────────────────────
+// ─── 双模式（修复 inert 空实现 → 真实切换 + health 检查 + 失败回落 HTML）───
+// spec: n-cycle-sync-foundation-and-first-canary 任务 13（NC-13 / NF-P9）
+// 🔴 保留宿主内联形态（依决策 3 不做载体归一化），但门控须由真实 switchMode 驱动。
+const _ooAvailable = ref(false)
+const _ooChecking = ref(false)
+
+async function _checkOoHealth(): Promise<boolean> {
+  _ooChecking.value = true
+  try {
+    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
+    const healthy = (res as any).data?.data?.healthy ?? (res as any).data?.healthy ?? false
+    _ooAvailable.value = !!healthy
+    return _ooAvailable.value
+  } catch {
+    _ooAvailable.value = false
+    return false
+  } finally {
+    _ooChecking.value = false
+  }
+}
+
 const dualMode = {
   currentMode: ref<'html' | 'onlyoffice'>('html'),
   modeOptions: [
     { label: 'HTML', value: 'html' },
     { label: 'OnlyOffice', value: 'onlyoffice' },
   ],
-  isOoAvailable: ref(true),
-  onModeChange: () => {},
+  isOoAvailable: _ooAvailable,
+  onModeChange: (val: 'html' | 'onlyoffice') => {
+    if (val === dualMode.currentMode.value) return
+    if (val === 'onlyoffice' && !_ooAvailable.value) {
+      // 🔴 显式反馈（NC-13 修复静默 return）：不可用原因 + 已回落 HTML
+      import('element-plus').then(({ ElMessage }) => {
+        ElMessage.warning('OnlyOffice 服务不可用，已回落到 HTML 模式')
+      })
+      return
+    }
+    dualMode.currentMode.value = val
+    if (val === 'html') {
+      // 切回 HTML 时刷新数据（与 useWorkpaperEntryDualMode 行为一致）
+      selfLoad()
+    }
+  },
 }
 
 // ─── sheetName 归一（纯函数，见 composables/n4SheetRouting.ts）────────────────
@@ -262,6 +298,9 @@ provide('getRowDot', reviewThreads.getRowDot)
 
 // ─── 生命周期 ────────────────────────────────────────────────────────────────
 onMounted(async () => {
+  // OO 健康检查（修复 inert → redeemable）
+  void _checkOoHealth()
+
   // 如果 htmlData 为 null（selfLoad 场景），自行加载
   if (!props.htmlData) {
     await selfLoad()

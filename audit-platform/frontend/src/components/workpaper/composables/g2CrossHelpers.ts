@@ -2,10 +2,14 @@
  * G2 跨表取数辅助 — G2-2 明细 / G2-3 坏账滚动态
  */
 import { parseNum } from './useG2IntRecFormulaEngine'
+import { G2_ITEM_IDS } from './g2StorageContract'
 
-export const G2_DETAIL_STORAGE_KEY = 'G2-2-detail-rows'
-export const G2_BAD_DEBT_STORAGE_KEY = 'G2-3-bad-debt-rows'
-export const G2_ADJ_STORAGE_KEY = 'G2-1-rows'
+// 🔴 派生别名（**不是**第二处声明）—— 单一真源在 `g2StorageContract.G2_ITEM_IDS`。
+//    范式照 BP-10 的正面样本 `g6CrossHelpers.G6_11_ROWS_KEY = G6_ITEM_IDS.G6_11_ROWS`。
+//    保留原常量名是为了不动调用方签名（零回归）。
+export const G2_DETAIL_STORAGE_KEY = G2_ITEM_IDS.G2_2_DETAIL_ROWS
+export const G2_BAD_DEBT_STORAGE_KEY = G2_ITEM_IDS.G2_3_BAD_DEBT_ROWS
+export const G2_ADJ_STORAGE_KEY = G2_ITEM_IDS.G2_1_ROWS
 
 export interface G2DetailPartial {
   id: string

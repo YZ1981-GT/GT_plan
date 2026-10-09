@@ -1,8 +1,8 @@
 {
   "generated_from": "backend/data/workpaper_writer_inventory.json",
-  "inventory_digest": "93d18368d2eaac1573ade96cc5b8ba6324406276c9fd02fd6ac741e0437a9327",
-  "inventory_source_digest": "261ba31bd2e9dd98a98af84d4f2dae120af83706c06646bfc90c6767120fbd18",
-  "matrix_digest": "0f6f811d7b038546bb9f149b20cc990277be33ed141c9b094707da83b133c363",
+  "inventory_digest": "6ed7718885b9391a238853cce715bb00244da2c24e2c436f6114a7748276495e",
+  "inventory_source_digest": "a84c5dba4f26740632815e3476eb1942a2e04c2e7c724b88c7ff3008ecf9447a",
+  "matrix_digest": "3e0580db8dd708c1c23df120c8a360ca95ad93e5e45a2529c4d908a4d9a13d48",
   "policy_modules": [
     "app.routers.excel_html",
     "app.routers.wp_onlyoffice_router",
@@ -112,6 +112,32 @@
       "source_path": "backend/app/routers/completion_phase.py",
       "status": "deferred",
       "writer_id": "app.routers.completion_phase::export_workpaper_word"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.d2_sync_router",
+      "note": null,
+      "qualname": "_load_context",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "_onlyoffice_storage_dir"
+      ],
+      "source_path": "backend/app/routers/d2_sync_router.py",
+      "status": "deferred",
+      "writer_id": "app.routers.d2_sync_router::_load_context"
     },
     {
       "adjudication_owner_task": null,
@@ -584,15 +610,9 @@
       "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
-        "function_self_written_markers": [
-          "bare_exists_reachability",
-          "manual_backend_root"
-        ],
+        "function_self_written_markers": [],
         "function_unified_entry_calls": [],
-        "module_self_written_markers": [
-          "bare_exists_reachability",
-          "manual_backend_root"
-        ],
+        "module_self_written_markers": [],
         "module_unified_entry_calls": []
       },
       "group": "out_of_task12_scope",
@@ -604,7 +624,7 @@
       "qualname": "_resolve_template_path",
       "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
       "resolver_identities": [
-        "<ad_hoc_path_construction>"
+        "find_template_file_any"
       ],
       "source_path": "backend/app/routers/wp_guidance_chat.py",
       "status": "deferred",
@@ -618,10 +638,7 @@
         "function_found": true,
         "function_self_written_markers": [],
         "function_unified_entry_calls": [],
-        "module_self_written_markers": [
-          "bare_exists_reachability",
-          "manual_backend_root"
-        ],
+        "module_self_written_markers": [],
         "module_unified_entry_calls": []
       },
       "group": "out_of_task12_scope",
@@ -647,10 +664,7 @@
         "function_found": true,
         "function_self_written_markers": [],
         "function_unified_entry_calls": [],
-        "module_self_written_markers": [
-          "bare_exists_reachability",
-          "manual_backend_root"
-        ],
+        "module_self_written_markers": [],
         "module_unified_entry_calls": []
       },
       "group": "out_of_task12_scope",
@@ -823,8 +837,7 @@
       "qualname": "get_whole_excel_grid",
       "reason": "OO config/callback 的 substrate 必须是 room/staged representation，依赖 Task 21 room_service 与 Task 25/26 coordinator；Task 12 只提供 CanonicalResolutionService.assert_sheet_visibility_target 作为 Requirement 9.12 的可执行判据，未改 router 调用点。【Task 30 独立门补记：21/25/26 已落地后仍不可迁移】统一 resolver 只接受 published representation + approved non-null bundle（design「现有 wp_onlyoffice_router.py 保留 URL 兼容，但逻辑下沉」一节；repository.create_representation 走 assert_bundle_usable，materialize_coordinator 对无 published substrate 抛 SubstrateNotPublishedError）。而 published representation 只能由 Task 36 finalizeCandidate 在**逐 entry**人工审核并发布 approved per-entry contract + authority model + non-null bundle 之后产生（Task 36/40–57，Wave 3/4）。故这 4 行的剩余阻塞不是 Task 25/26 而是 Task 36：在任一 entry 拿到 approved bundle 之前，把 router 改成只经 substrate 取数会让全部底稿的 OO 入口 fail closed；保留 legacy 回退则 multi_resolver 归不了零。【裁决归属再移交：Task 30 → Task 71】Task 36 依赖 Task 30，故 criterion 留在 Task 30 即第二次成环；它真正能归零的时点是「每个 entry 都已有 published representation」，恰是 legacy 回退可删的时点，故归属落到 legacy_delete gate 成员 Task 71（见 adjudication_owner_task；本 criterion 自此不挂 bulk_adapters gate，否则 Wave 5 的 bulk adapter 迁移会依赖 Wave 7）。Task 30 的门在该 criterion 移出后判**过**，判据仍锁在 backend/tests/workpaper_sync/test_task30_closure_gate.py",
       "resolver_identities": [
-        "_resolve_wp_file",
-        "find_template_file_any"
+        "_resolve_wp_file"
       ],
       "source_path": "backend/app/routers/wp_onlyoffice_router.py",
       "status": "deferred",
@@ -1320,6 +1333,60 @@
       "domain": "template_provisioning",
       "evidence": {
         "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "custom",
+      "intended_status": "deferred",
+      "is_resolver_fork": false,
+      "kind": "writer",
+      "module": "app.routers.wp_template",
+      "note": null,
+      "qualname": "create_custom_workpaper",
+      "reason": "custom 底稿以 xlsx 本体为唯一权威，resolver 收敛由 Task 65 承接",
+      "resolver_identities": [],
+      "source_path": "backend/app/routers/wp_template.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_template::create_custom_workpaper"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "65",
+      "domain": "template_provisioning",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "custom",
+      "intended_status": "deferred",
+      "is_resolver_fork": false,
+      "kind": "writer",
+      "module": "app.routers.wp_template",
+      "note": null,
+      "qualname": "create_custom_workpaper_batch",
+      "reason": "custom 底稿以 xlsx 本体为唯一权威，resolver 收敛由 Task 65 承接",
+      "resolver_identities": [],
+      "source_path": "backend/app/routers/wp_template.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_template::create_custom_workpaper_batch"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "65",
+      "domain": "template_provisioning",
+      "evidence": {
+        "function_found": true,
         "function_self_written_markers": [
           "bare_exists_reachability",
           "manual_backend_root"
@@ -1691,6 +1758,36 @@
       "source_path": "backend/app/services/export_progress_service.py",
       "status": "deferred",
       "writer_id": "app.services.export_progress_service::ExportProgressService._run_export"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "manual_backend_root"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.guidance_runtime_facts",
+      "note": null,
+      "qualname": "load_template_source_facts",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/guidance_runtime_facts.py",
+      "status": "deferred",
+      "writer_id": "app.services.guidance_runtime_facts::load_template_source_facts"
     },
     {
       "adjudication_owner_task": null,
@@ -2415,6 +2512,39 @@
       "writer_id": "app.services.wp_template_finder::find_template_file_any"
     },
     {
+      "adjudication_owner_task": "71",
+      "blocking_task": "36",
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": [
+          "resolve_own_docx_or_none"
+        ]
+      },
+      "group": "template_finder",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.wp_template_finder",
+      "note": null,
+      "qualname": "find_whole_workbook_templates",
+      "reason": "【Task 58 已收口的部分】find_template_file_any 的子码判据原先写死 ^A\\d+-\\d+ ⇒ B/S 子码落进主码分支并被「终极回退：用主表」抢到父级 XLSX；2026-08-29 逐条实测 28 个 word-template wp_code 里 9 个（B18-3-1/B18-3-2/B2-1/B2-11/B2-3/B2-6/B2-8/B40-1/B40-2）都有自己的 DOCX 却全部解析到父级 XLSX。现在该函数把自有-DOCX 探测**提到 A-only 分支之前**并委派 workpaper_sync.word_resolution.resolve_own_docx_or_none（内部走 canonical_paths.pick_most_specific，类型门 fail closed），见 POLICY_BY_WRITER 里该 writer 的 migrated 裁决与 backend/data/workpaper_word_template_adjudication.json 的 50 行裁决清册。【仍未迁移的部分】find_all_template_files 与 find_template_file 的 xlsx 多文件 glob（范围式命名 `D2-1至D2-4 …xlsx` 等）不在 Word lane 内，换成统一 resolver 需要该 entry 已有 published representation（Task 36 供给），与 wp_onlyoffice_router 同一条阻塞，故归属 Task 71",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/wp_template_finder.py",
+      "status": "deferred",
+      "writer_id": "app.services.wp_template_finder::find_whole_workbook_templates"
+    },
+    {
       "adjudication_owner_task": null,
       "blocking_task": "17,58",
       "domain": "template_provisioning",
@@ -2524,6 +2654,32 @@
     },
     {
       "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.wp_whole_workbook_document",
+      "note": null,
+      "qualname": "whole_workbook_template_or_primary",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "find_template_file_any"
+      ],
+      "source_path": "backend/app/services/wp_whole_workbook_document.py",
+      "status": "deferred",
+      "writer_id": "app.services.wp_whole_workbook_document::whole_workbook_template_or_primary"
+    },
+    {
+      "adjudication_owner_task": null,
       "blocking_task": "19,20",
       "domain": "export_storage_resolver",
       "evidence": {
@@ -2591,28 +2747,28 @@
   "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
   "stats": {
     "by_group": {
-      "custom": 2,
+      "custom": 4,
       "export_storage": 3,
       "f2_word": 10,
       "legacy_excel_html": 13,
       "legacy_file_path": 5,
       "oo_room": 7,
-      "out_of_task12_scope": 29,
+      "out_of_task12_scope": 32,
       "storage_version": 2,
-      "template_finder": 5,
+      "template_finder": 6,
       "template_provisioning": 4,
       "upload_import": 1,
       "wopi": 6
     },
     "by_status": {
-      "deferred": 73,
+      "deferred": 79,
       "migrated": 14
     },
-    "deferred": 73,
+    "deferred": 79,
     "migrated": 14,
     "regressed": 0,
-    "resolver_fork_count": 72,
-    "row_count": 87
+    "resolver_fork_count": 76,
+    "row_count": 93
   },
   "task": "Wave 1 Task 12",
   "unified_entry_calls": [

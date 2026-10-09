@@ -35,14 +35,18 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.schemas.consol_context import ConsolContext
+from app.services.consol_context_service import build_consol_context, validate_context
 from app.services.consol_disclosure_service import generate_full_consol_notes
+from app.services.consol_note_formula_service import resolve_note_template_type
+from app.services.consol_note_gray_service import is_consol_note_v2_enabled
 from app.services.consol_reconciliation_service import (
     ReconciliationResult,
     reconcile_worksheet_vs_trial,
 )
 from app.services.consol_report_service import generate_consol_reports_sync
 from app.services.consol_trial_service import recalculate_trial
-from app.services.consol_tree_service import build_tree, get_descendants
+from app.services.consol_tree_service import TreeNode, build_tree, get_descendants
 from app.services.consol_worksheet_engine import recalc_full
 
 logger = logging.getLogger(__name__)
@@ -69,6 +73,7 @@ class CascadeRefreshResult:
     - nodes_refreshed: 企业树节点数（含根）
     - steps_completed: 已成功完成的步骤，按 DAG 顺序的子集
                        [tree, worksheet, trial, reconcile, report, notes]
+    - steps_skipped: 显式跳过的步骤（如 V2 关闭时的 notes），不在 steps_completed 中
     - errors: 失败步骤清单 [{step, node, error}]
     - duration_ms: 编排总耗时（毫秒）
     - reconciliation: Phase 0 对账结果（观测，不阻断）
@@ -78,6 +83,7 @@ class CascadeRefreshResult:
     year: int
     nodes_refreshed: int = 0
     steps_completed: list[str] = field(default_factory=list)
+    steps_skipped: list[str] = field(default_factory=list)
     errors: list[dict] = field(default_factory=list)
     duration_ms: int = 0
     reconciliation: ReconciliationResult | None = None
@@ -105,6 +111,9 @@ async def refresh_all(
     parent_project_id: UUID,
     year: int,
     progress_cb: Callable | None = None,
+    *,
+    context: ConsolContext | None = None,
+    tree: TreeNode | None = None,
 ) -> CascadeRefreshResult:
     """合并链路唯一编排入口（A6/C2，ADR-CONSOL-201）。
 
@@ -117,6 +126,7 @@ async def refresh_all(
         parent_project_id: 合并母项目 ID
         year: 报告年度
         progress_cb: 可选进度回调 (step, current, total, current_node, status)
+    context/tree: 可选的同一轮计算身份与运行时树；传入时贯穿所有下游阶段
 
     Returns:
         CascadeRefreshResult（steps_completed 反映实际完成步骤，errors 含失败步骤）
@@ -124,14 +134,32 @@ async def refresh_all(
     result = CascadeRefreshResult(parent_project_id=parent_project_id, year=year)
     t0 = time.monotonic()
     root_node_label: str | None = None
+    resolved_tree = tree
+    resolved_context = context
 
     # ---- 步骤 1：build_tree（基础，统计节点数）-------------------------------
     _emit(progress_cb, STEP_TREE, 1, TOTAL_STEPS, None, "running")
     try:
-        tree = await build_tree(db, parent_project_id)
-        if tree is not None:
-            result.nodes_refreshed = 1 + len(get_descendants(tree))
-            root_node_label = tree.company_code
+        if resolved_tree is None:
+            resolved_tree = await build_tree(db, parent_project_id)
+        if resolved_context is None and resolved_tree is not None:
+            resolved_context = await build_consol_context(
+                db,
+                parent_project_id,
+                year,
+                tree=resolved_tree,
+            )
+        else:
+            validate_context(
+                resolved_context,
+                parent_project_id,
+                year,
+                tree=resolved_tree,
+            )
+        if resolved_tree is not None:
+            result.nodes_refreshed = 1 + len(get_descendants(resolved_tree))
+            # 进度标签用带角色后缀的展示名（如「某集团（合并）」），旧式节点退回企业代码
+            root_node_label = getattr(resolved_tree, "display_name", None) or resolved_tree.company_code
         else:
             result.nodes_refreshed = 0
             logger.warning("级联刷新：项目 %s 未找到企业树（build_tree 返回 None）", parent_project_id)
@@ -148,7 +176,13 @@ async def refresh_all(
     # ---- 步骤 2：worksheet recalc_full（关键步，内部自行 commit）-------------
     _emit(progress_cb, STEP_WORKSHEET, 2, TOTAL_STEPS, root_node_label, "running")
     try:
-        await recalc_full(db, parent_project_id, year)
+        await recalc_full(
+            db,
+            parent_project_id,
+            year,
+            context=resolved_context,
+            tree=resolved_tree,
+        )
         result.steps_completed.append(STEP_WORKSHEET)
         _emit(progress_cb, STEP_WORKSHEET, 2, TOTAL_STEPS, root_node_label, "completed")
     except Exception as exc:  # noqa: BLE001 - 失败隔离
@@ -161,7 +195,13 @@ async def refresh_all(
     # ---- 步骤 3：trial recalculate_trial（关键步，只 flush → 本步后统一 commit）
     _emit(progress_cb, STEP_TRIAL, 3, TOTAL_STEPS, root_node_label, "running")
     try:
-        await recalculate_trial(db, parent_project_id, year)
+        await recalculate_trial(
+            db,
+            parent_project_id,
+            year,
+            context=resolved_context,
+            tree=resolved_tree,
+        )
         # recalculate_trial 只 flush，统一 commit 一次确保 individual_sum /
         # consol_elimination 落库后 report / notes 读到最新合并数。
         await db.commit()
@@ -188,7 +228,16 @@ async def refresh_all(
     # ---- 步骤 5：report 生成（下游步，Phase 1 A3 后已 async，需 await；失败记录后继续）----
     _emit(progress_cb, STEP_REPORT, 5, TOTAL_STEPS, root_node_label, "running")
     try:
-        await generate_consol_reports_sync(db, parent_project_id, year)
+        await generate_consol_reports_sync(
+            db,
+            parent_project_id,
+            year,
+            context=resolved_context,
+            tree=resolved_tree,
+        )
+        # 报表 service 只 flush；worker 使用独立 session，必须在报表步骤成功后提交，
+        # 否则 session 退出时会回滚已生成的 financial_report 行。
+        await db.commit()
         result.steps_completed.append(STEP_REPORT)
         _emit(progress_cb, STEP_REPORT, 5, TOTAL_STEPS, root_node_label, "completed")
     except Exception as exc:  # noqa: BLE001 - 失败隔离（下游步：记录后继续）
@@ -196,23 +245,43 @@ async def refresh_all(
         logger.exception("级联刷新报表失败（下游步，继续）：项目=%s 年度=%s", parent_project_id, year)
         _emit(progress_cb, STEP_REPORT, 5, TOTAL_STEPS, root_node_label, "error")
 
-    # ---- 步骤 6：notes V2（下游步，feature flag 门控；失败记录后继续）--------
-    # 门控：CONSOL_NOTES_V2_ENABLED（config 定义为 False）；缺省 fallback 与 config
-    # 一致默认 False，避免属性缺失时误触发 V2 生成/落库（对齐 config + design §组件3）。
+    # ---- 步骤 6：notes V2（下游步，按项目级 feature flag 门控；失败记录后继续）--------
     _emit(progress_cb, STEP_NOTES, 6, TOTAL_STEPS, root_node_label, "running")
-    if getattr(settings, "CONSOL_NOTES_V2_ENABLED", False):
+    # 保留全局开关的短路语义：生产配置对象与灰度服务使用同一 settings，
+    # 这里显式短路也让旧的编排器测试/运维覆盖能在不构造 Project 行的情况下开启 V2。
+    # 全局关闭时再进入项目级 opt-in 判定，避免绕过项目级灰度。
+    if getattr(settings, "CONSOL_NOTES_V2_ENABLED", False) is True:
+        notes_enabled = True
+    else:
         try:
-            await generate_full_consol_notes(db, parent_project_id, year)
+            notes_enabled = await is_consol_note_v2_enabled(db, parent_project_id)
+        except Exception as exc:  # pragma: no cover - 服务自身 fail-open，但保留编排器保护
+            notes_enabled = False
+            logger.warning("级联刷新：读取项目级附注开关失败，按关闭处理：%s", exc)
+
+    if notes_enabled:
+        try:
+            template_type = await resolve_note_template_type(db, parent_project_id)
+            await generate_full_consol_notes(
+                db,
+                parent_project_id,
+                year,
+                template_type=template_type,
+                context=resolved_context,
+                tree=resolved_tree,
+            )
+            # 生成服务可能写入 provenance；级联步骤必须提交，避免 worker 结束时回滚。
+            await db.commit()
             result.steps_completed.append(STEP_NOTES)
             _emit(progress_cb, STEP_NOTES, 6, TOTAL_STEPS, root_node_label, "completed")
-        except Exception as exc:  # noqa: BLE001 - 失败隔离（下游步：记录后继续）
+        except Exception as exc:  # noqa: BLE001 - 下游步，继续
             result.errors.append({"step": STEP_NOTES, "node": root_node_label, "error": str(exc)})
             logger.exception("级联刷新合并附注失败（下游步，继续）：项目=%s 年度=%s", parent_project_id, year)
             _emit(progress_cb, STEP_NOTES, 6, TOTAL_STEPS, root_node_label, "error")
     else:
-        # flag 显式关闭：附注步骤跳过（视为无操作完成，不计入失败）
-        result.steps_completed.append(STEP_NOTES)
-        logger.info("级联刷新：CONSOL_NOTES_V2_ENABLED=False，跳过 V2 附注生成（项目=%s）", parent_project_id)
+        # 项目级 flag 显式关闭：附注步骤跳过，不把 skipped 伪装成 success。
+        result.steps_skipped.append(STEP_NOTES)
+        logger.info("级联刷新：项目未启用 V2，跳过附注生成（项目=%s）", parent_project_id)
         _emit(progress_cb, STEP_NOTES, 6, TOTAL_STEPS, root_node_label, "skipped")
 
     result.duration_ms = int((time.monotonic() - t0) * 1000)

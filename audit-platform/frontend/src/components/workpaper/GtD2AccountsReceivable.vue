@@ -79,12 +79,15 @@
 
       <!-- OnlyOffice 在线编辑（统一路径：descriptor → WorkpaperSyncEditorHost） -->
       <!-- D2-2 canary：只在明细表走 USER_SYNC_PREFIX；其它 sheet 不挂 legacy GtOnlyOfficeSheet -->
-      <WorkpaperSyncEditorHost
-        v-if="renderMode === 'onlyoffice' && isD2DetailSheet"
-        ref="syncEditorHostRef"
-        :descriptor="syncOoDescriptor"
-        :bridge="syncBridge"
-      />
+      <!-- 🔴 必须包在带确定高度的容器里，否则 host 的 height:100% 解析成 auto、
+           编辑区被压扁（见 workpaperSyncEditorHostSizing 守卫）。 -->
+      <div v-if="renderMode === 'onlyoffice' && isD2SyncedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+      </div>
 
       <!-- HTML 结构化视图 -->
       <template v-else>
@@ -299,7 +302,22 @@ function getSheetNameFromD2Code(code: string): string {
 }
 type D2RenderMode = 'html' | 'onlyoffice'
 const D2_SYNC_ENTRY_ID = 'xlsx/gt-d2-accounts-receivable'
-/** 与后端 D2 managed sheet_key / materialize 取证脚本一致。 */
+/**
+ * D2 受管 sheet 集合：sheet 代号 → 后端 sheet_key（与 pilot_d2_large_json /
+ * phase5_d2_03_bad_debt / phase5_d2_01_adjudication 契约声明一致）。
+ * spec workpaper-sync-registration-isolation-and-d2-republish · Requirement 6.1：
+ * 受管清单跟随后端灰度开关（开关打开后三张均可切在线编辑）。
+ * - D2-2 明细表 → d22-managed（双向，已接）
+ * - D2-3 坏账准备 → d23-managed（双向，本 spec 扩容）
+ * - D2-1 审定表 → d21-managed（静态区，本 spec 扩容）
+ * entryId 在 D2 内始终单值（一册一 entry），故各受管 sheet 共用 D2_SYNC_ENTRY_ID。
+ */
+const D2_MANAGED_SHEET_KEYS: Record<string, string> = {
+  'D2-2': 'd22-managed',
+  'D2-3': 'd23-managed',
+  'D2-1': 'd21-managed',
+}
+/** 与后端 D2 默认 managed sheet_key / materialize 取证脚本一致（D2-2 明细表）。 */
 const D2_MANAGED_SHEET_KEY = 'd22-managed'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
 import GtWpReviewRail from './GtWpReviewRail.vue'
@@ -390,8 +408,15 @@ const syncSwitching = ref(false)
 const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
 
 const currentSheet = computed(() => normalizeD2SheetName(props.sheetName))
-/** 统一路径 canary 仅覆盖 D2-2 明细表（manifest entry 的 managed sheet）。 */
-const isD2DetailSheet = computed(() => currentSheet.value === 'D2-2')
+/**
+ * 当前 sheet 是否在受管清单内（spec d2-sync-coverage Task 16：集合从受管清单派生，
+ * 不再硬编码单张字面量 'D2-2'）。D2-2 明细表 + D2-3 坏账准备均可切在线编辑。
+ */
+const isD2SyncedSheet = computed(() => currentSheet.value in D2_MANAGED_SHEET_KEYS)
+/** 当前受管 sheet 对应的后端 sheet_key（随 currentSheet 计算；非受管时回退 D2-2）。 */
+const currentSyncSheetKey = computed(
+  () => D2_MANAGED_SHEET_KEYS[currentSheet.value] ?? D2_MANAGED_SHEET_KEY,
+)
 
 const d2ReviewSection = computed(() => resolveCycleReviewSection('D2', currentSheet.value))
 
@@ -402,25 +427,28 @@ const d2ReviewSection = computed(() => resolveCycleReviewSection('D2', currentSh
 // 🔴 不得在前端重造 39 列→stable-key 映射（Requirement 6.1）；overlay 脚手架由服务端
 // store-projection 叠加（DEC-10 解除后的 materialize-ready 语义）。
 const syncEntryId = ref(D2_SYNC_ENTRY_ID)
-const syncSheetKey = ref(D2_MANAGED_SHEET_KEY)
+/** syncSheetKey 随当前受管 sheet 计算（D2-2→d22-managed / D2-3→d23-managed）。 */
+const syncSheetKey = computed(() => currentSyncSheetKey.value)
 const syncBridge = useWorkpaperSyncBridge({
   entryId: syncEntryId,
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   sheetKey: syncSheetKey,
-  // 谓词 8：capability 从 source-backed manifest 现算，禁止宿主内联字面量
-  capability: capabilityForEntry(D2_SYNC_ENTRY_ID),
+  // 谓词 8：capability 从 source-backed manifest 现算，禁止宿主内联字面量。
+  // spec Task 16：读 ref（syncEntryId）而非构造时字面量，消除「字面量与 ref 两个真源」。
+  // entryId 在 D2 内始终单值（一册一 entry），capability 不因切 sheet 而变。
+  capability: capabilityForEntry(syncEntryId.value),
   flushHtml: async () => {
     await formData.flushPendingSave()
     const snap = await readStoreProjection({
       projectId: props.projectId,
       wpId: props.wpId,
-      entryId: D2_SYNC_ENTRY_ID,
+      entryId: syncEntryId.value,
     })
     return {
       expectedRevision: snap.expectedRevision,
       projection: snap.projection,
-      sheetKey: D2_MANAGED_SHEET_KEY,
+      sheetKey: syncSheetKey.value,
     }
   },
   reloadHtml: async (_minimumRevision: number) => {
@@ -437,8 +465,10 @@ const syncBusy = computed(
     || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
 )
 const syncUnavailableReason = computed(() => {
-  if (!isD2DetailSheet.value) {
-    return '统一路径 canary 仅开放 D2-2 明细表在线编辑'
+  if (!isD2SyncedSheet.value) {
+    // 🔴 spec Task 16（裁决 E5）：非受管 sheet 保持直接禁用 + 显式中文原因，
+    // 不得退化成静默无反应或落 legacy 假双向。
+    return '在线编辑仅开放 D2-2 明细表、D2-3 坏账准备明细表、D2-1 审定表；当前底稿走结构化视图'
   }
   const err = syncBridge.lastError.value
   return err ? `${err.errorCode}: ${err.message}` : ''
@@ -460,14 +490,14 @@ const renderModeOptions = computed(() => [
   {
     label: '在线编辑',
     value: 'onlyoffice' as const,
-    disabled: !isD2DetailSheet.value || isReadonly.value,
+    disabled: !isD2SyncedSheet.value || isReadonly.value,
   },
 ])
 
 async function switchRenderMode(target: D2RenderMode): Promise<void> {
   if (target === renderMode.value) return
   if (target === 'onlyoffice') {
-    if (!isD2DetailSheet.value) return
+    if (!isD2SyncedSheet.value) return
     syncSwitching.value = true
     try {
       await syncBridge.switchToOnlyOffice()
@@ -488,6 +518,14 @@ async function switchRenderMode(target: D2RenderMode): Promise<void> {
     if (String(syncBridge.state.value) === 'applied') {
       // 回写已完成但自动 reload 未跑完时，点结构化视图应主动 reload（§9.6）
       await syncBridge.reloadAfterApplied()
+    } else if (syncBridge.mode.value === 'oo' && !syncBridge.dirty.value) {
+      // 🔴 一个字都没改就点「结构化视图」⇒ clean close 直接回表单，**不**发强制保存。
+      // 改这一处之前，这条最常见的路径必然走到：冻结 forcesave → Command Service 返回
+      // 码 4（无改动）→ `forcesave_frozen` → 界面一条红字「文档没有检测到改动…」，而人
+      // 还留在 OO 里（真栈实测形态）。那不是错误，是「未改动直接返回」这条路以前不存在。
+      // `dirty` 为真时**不走**这条（桥里也会 refuse），留给下面的 forceSave 真保存 ——
+      // 绝不静默丢弃编辑。
+      await syncBridge.leaveWithoutSaving()
     } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
       await syncEditorHostRef.value.forceSave()
     } else {
@@ -613,5 +651,16 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+/* 🔴 在线编辑区必须拿到**视口相关的确定高度**：`WorkpaperSyncEditorHost` 根元素是
+   height:100% + flex 列，父级为 auto 高度时编辑区被压扁，OnlyOffice 在页面上只剩一条
+   （2026-09-22 用户真栈实测，D4-2 同款缺陷；本文件由 workpaperSyncEditorHostSizing
+   守卫一并抓出）。数值与 D4 全部子 tab 的 `.oo-container` 逐字同款。 */
+.oo-container {
+  min-height: 600px;
+  height: calc(100vh - 280px);
+  overflow: hidden;
+  border-radius: 8px;
 }
 </style>

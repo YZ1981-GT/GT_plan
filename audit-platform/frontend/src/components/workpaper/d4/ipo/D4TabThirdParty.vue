@@ -181,6 +181,12 @@ async function genConclusion() {
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
 function handleExportTemplate() { exportTemplate('D4-24') }
 function handleExportData() { exportData('D4-24') }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await importData('D4-24', f) }
+  input.click()
+}
 async function handleImportFile(uploadFile: any) { await importData('D4-24', uploadFile.raw || uploadFile) }
 
 // ─── Stats ───────────────────────────────────────────────────────────
@@ -188,6 +194,8 @@ const totalThirdPartyAmount = computed(() => rows.value.reduce((s, r) => s + (pa
 const noAgreementCount = computed(() => rows.value.filter(r => r.hasPaymentAgreement === '否').length)
 
 function fmtAmount(v: number): string { return v ? v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—' }
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 <template>
@@ -196,14 +204,7 @@ function fmtAmount(v: number): string { return v ? v.toLocaleString('zh-CN', { m
     <div class="toolbar">
       <div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /><el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">{{ syncStateTag.text }}</el-tag></div>
       <div class="toolbar-right">
-        <el-dropdown trigger="click" size="small">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown><el-dropdown-menu>
-            <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-            <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-            <el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly || importing" @change="handleImportFile"><span>导入数据</span></el-upload></el-dropdown-item>
-          </el-dropdown-menu></template>
-        </el-dropdown>
+        
         <GtIndexChip value="wp:D4-1" :context-project-id="projectId" />
         <GtIndexChip value="wp:D2-7" :context-project-id="projectId" />
         <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-24-thirdparty')">💬 复核</el-button>

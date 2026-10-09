@@ -1,24 +1,30 @@
 {
   "schema_version": 2,
   "wp_code": "D4-33",
-  "title": "D4-33 销售循环 IPO 核查子表 — 编制说明",
+  "title": "D4-33 其他业务毛利率分析表 编制说明",
   "sections": [
     {
       "key": "purpose",
       "title": "一、编制目的",
-      "content": "本底稿为销售循环 IPO 专项核查第 33 项程序的工作底稿，记录核查程序执行情况及发现。",
+      "content": "按月度分析其他业务收入（科目 6051）各子类别的收入、成本与毛利率变动趋势，识别其他业务收入的异常波动，验证其他业务收入的发生与恰当计量。本表是 D4-1 审定表中「其他业务收入」行的分析支撑。",
       "source_refs": []
     },
     {
-      "key": "steps",
-      "title": "二、编制步骤",
-      "content": "1. 按照 IPO 专项核查指引要求执行对应程序\n2. 获取充分适当的核查证据\n3. 记录核查发现及分析结论\n4. 与招股说明书披露内容进行一致性核对",
+      "key": "data_sources",
+      "title": "二、数据来源与结构",
+      "content": "按月（1-12 月）× 子类别记录收入与成本，子类别通常包括：合计、出租固定资产、出租无形资产、销售材料等。数据从序时账按科目 6051 及其成本科目、按月与业务类型汇总取得。表尾附合计、上年同期数、变动额、变动比例行。",
       "source_refs": []
     },
     {
-      "key": "common_errors",
-      "title": "三、注意事项",
-      "content": "• IPO 核查要求高于常规年报审计\n• 须关注报告期内收入政策一致性\n• 核查结论须支持保荐人核查意见",
+      "key": "formulas",
+      "title": "三、计算公式",
+      "content": "毛利率 = (收入 − 成本) / 收入 × 100%（收入为 0 时返 0）\n合计毛利率 = 各子类别收入合计与成本合计计算，非各子类别毛利率的简单平均。\n变动比例 = (本期 − 上期) / 上期，用于识别趋势变化。\n各月与合计的收入、成本、毛利率均据此自动计算。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 各月毛利率异常波动：某月毛利率大幅偏离其他月份，关注成本归集是否准确、是否跨期。\n2. 其他业务毛利率显著高于/低于主营业务：关注收入成本配比、是否存在收入错分类（主营↔其他）。\n3. 出租类业务：核对合同租金测算（联查 D4-34 合同测算表），毛利率应与租赁期匹配。\n4. 其他业务收入占比异常增大：关注是否将主营收入分流至其他业务以调节结构。\n本表结论应与 D4-1 审定表其他业务收入行、D4-34 其他业务合同测算相互印证。",
       "source_refs": []
     }
   ],
@@ -26,10 +32,10 @@
   "migration": {
     "kind": "legacy_structure_preserved",
     "version": 2,
-    "legacy_content_digest": "5d5dd4ece00d0eb09d8c8023a72420622f565b373d506dbd4aa18c847494e47d",
-    "legacy_section_count": 3,
-    "canonical_section_count": 3,
+    "legacy_content_digest": "d4805d4370e2c4b9f66db83192b90fbbaaa3a1ee11fadae8264c5838320c4b4a",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
     "unmapped_section_count": 0,
-    "canonical_body_digest": "00763680d01eb0891e9df6157b3ce59bcc36cb292614c6d72678f7086c36ae0d"
+    "canonical_body_digest": "5556a66ec3c13d26f069208ac9501748c17c1624273632355ac3e27290486bd8"
   }
 }

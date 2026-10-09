@@ -1,0 +1,33 @@
+{
+  "captured_at": "2026-09-25T02:01:32.087Z",
+  "n_cases": 1,
+  "n_typed": 1,
+  "plans": [
+    {
+      "code": "D4-9",
+      "table_key": "customer_current_rows",
+      "target": "C13",
+      "new_value": 90233.92,
+      "kind": "amount",
+      "fieldKey": "customer_current_rows/GTROW-D49C-0013/sales_amount",
+      "ok": true
+    }
+  ],
+  "operation_id": "7b90f449-5342-4b9d-bf07-b3cdf414c299",
+  "trail": [
+    "created",
+    "application_bound",
+    "conflict"
+  ],
+  "state": "conflict",
+  "error": null,
+  "store_ok": 0,
+  "storeChecks": [
+    {
+      "code": "D4-9",
+      "ok": false,
+      "got": null,
+      "want": 90233.92
+    }
+  ]
+}

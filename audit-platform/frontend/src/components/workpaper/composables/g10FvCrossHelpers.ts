@@ -18,6 +18,7 @@ import {
 import { commitG10AdjustmentWritebackFromRows } from './g10CrossHelpers'
 
 import type { ChecklistResponse } from './useF1FormData'
+import { G10_ITEM_IDS } from './g10StorageContract'
 
 
 
@@ -25,7 +26,7 @@ export const G10_ADJ_KEY = 'G10-aje-rows'
 
 export const G10_FV_KEY = 'G10-fv-test-rows'
 
-export const G10_DETAIL_KEY = 'G10-detail-rows'
+export const G10_DETAIL_KEY = G10_ITEM_IDS.G10_DETAIL_ROWS
 
 export const G10_ADJ_WRITEBACK_OVERLAY_ID = 'G10-adj-writeback'
 

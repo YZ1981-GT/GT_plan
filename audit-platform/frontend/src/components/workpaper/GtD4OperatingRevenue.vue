@@ -9,20 +9,31 @@
     <template v-else>
       <div v-if="showModeToolbar && !isD4DedicatedSyncSheet" class="d4-mode-toolbar">
         <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" :disabled="isD4DetailSheet && syncBusy" />
-        <el-tag v-if="!isD4DetailSheet && !isD4DedicatedSyncSheet && !dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isLegacyOoBlocked" size="small" type="info" title="本表尚未接入双向同步，在线编辑的改动无法回写到结构化数据，故暂不开放，以免数据丢失">
+          本表暂不支持在线编辑
+        </el-tag>
+        <el-tag v-else-if="!isD4DetailSheet && !isD4DedicatedSyncSheet && !dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
         <GtEntrySyncCapabilityNotice v-if="!isD4DedicatedSyncSheet" entry-id="xlsx/gt-d4-operating-revenue" />
       </div>
 
-      <!-- D4-2 由外层统一桥接；D4-5 与 IPO/舞弊子表由自身组件管理双向模式。 -->
-      <WorkpaperSyncEditorHost
-        v-if="renderMode === 'onlyoffice' && isD4DetailSheet"
-        ref="syncEditorHostRef"
-        :descriptor="syncOoDescriptor"
-        :bridge="syncBridge"
-      />
+      <!-- D4-2 由外层统一桥接；D4-5 与 IPO/舞弊子表由自身组件管理双向模式。
+           🔴 必须包在带**确定高度**的 `.oo-container` 里：宿主 `WorkpaperSyncEditorHost`
+           的 `.wp-sync-editor-host` 是 `height:100%` + flex 列，父级高度为 auto 时它只能
+           退到自己的 `min-height` 兜底，编辑区被压成一条，OnlyOffice 里什么都看不清
+           （用户实测截图）。D4 那 28 个子 tab 全都有这个容器，只有这里漏了。 -->
+      <div v-if="renderMode === 'onlyoffice' && isD4DetailSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+      </div>
 
+      <!-- legacy 单向通道：仅限无结构化 store 载荷的表（D4 目录 / D4A、D4-22A 程序表 /
+           D4-31T 访谈示例）「看原册」之用。有 store 载荷但未接双向桥的表由
+           `isLegacyOoBlocked` 挡在外面，绝不放进本分支（否则 OO 侧改动静默丢失）。 -->
       <GtOnlyOfficeSheet
-        v-else-if="renderMode === 'onlyoffice' && !isD4DedicatedSyncSheet && currentSheet !== 'D4-5'"
+        v-else-if="renderMode === 'onlyoffice' && !isD4DedicatedSyncSheet && !isLegacyOoBlocked"
         :key="ooSheetName"
         :wp-id="props.wpId"
         :sheet-name="ooSheetName"
@@ -52,7 +63,7 @@
         :is-readonly="isReadonly"
       />
       <!-- D4-1 审定表 -->
-      <D4TabAdjudication v-else-if="currentSheet === 'D4-1'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" :html-data="props.htmlData" />
+      <D4TabAdjudication ref="d4AdjRef" v-else-if="currentSheet === 'D4-1'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" :html-data="props.htmlData" />
       <!-- D4-2 主营明细 -->
       <D4TabRevenueDetail v-else-if="currentSheet === 'D4-2'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
       <!-- D4-3 其他明细 -->
@@ -62,8 +73,8 @@
       <!-- D4-5 政策检查 -->
       <D4TabPolicyCheck v-else-if="currentSheet === 'D4-5'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
       <!-- D4-6 ~ D4-11 分析程序 -->
-      <D4TabIndicator v-else-if="currentSheet === 'D4-6'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
-      <D4TabMarginMonthly v-else-if="currentSheet === 'D4-7'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabIndicator v-else-if="currentSheet === 'D4-6'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" :html-data="props.htmlData" />
+      <D4TabMarginMonthly v-else-if="currentSheet === 'D4-7'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" :html-data="props.htmlData" />
       <D4TabProductMargin v-else-if="currentSheet === 'D4-8'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
       <D4TabCustomerStructure v-else-if="currentSheet === 'D4-9'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
       <D4TabCustomerPrice v-else-if="currentSheet === 'D4-10'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
@@ -142,8 +153,9 @@
  * IPO/舞弊组可见性由 business_category 字段控制。
  * selfLoad: 当 htmlData 为 null 时自行调 render-config 加载数据。
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
 import { useD4FormData, type ChecklistResponse } from './composables/useD4FormData'
+import { useD4ImportExport, type D4ImportableSheet } from './composables/useD4ImportExport'
 // 注：D4_MAIN_REVENUE_STANDARD / D4_OTHER_REVENUE_STANDARD 原仅用于已移除的
 //     handleD4Writeback 孤儿监听器（spec tb-writeback-explicit-publish-gate Task 17 批C），一并移除 import。
 import { useD4CrossSheet } from './composables/useD4CrossSheet'
@@ -154,6 +166,7 @@ import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInje
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useD4ReviewThreads } from './composables/useD4ReviewThreads'
 import { useD4EntryDualMode, type D4RenderMode } from './composables/useD4EntryDualMode'
+import { isD4LegacyOoBlocked } from './composables/d4Constants'
 import { isSkipWorkpaperSheet } from './composables/workpaperSkipSheets'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
@@ -294,6 +307,7 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 // ─── State ───────────────────────────────────────────────────────────────────
 
 const isLoading = ref(true)
+const d4AdjRef = ref<any>(null)
 
 /**
  * 当前激活的 sheet（由外层 GtWpRenderer 通过 sheetName prop 控制）。
@@ -411,10 +425,15 @@ const isD4DetailSheet = computed(() => currentSheet.value != null && currentShee
 //    实现阶段并入共享 entry，见 D4TabCustomerStructure.vue 的 D4_9_ENTRY），
 //    必须登记为 dedicated —— 否则宿主对它叠加 legacy 双切换器 + 走整册 GtOnlyOfficeSheet。
 const isD4DedicatedSyncSheet = computed(() =>
-  ['D4-1', 'D4-5', 'D4-6', 'D4-7', 'D4-8', 'D4-9', 'D4-10', 'D4-11', 'D4-12', 'D4-13', 'D4-14', 'D4-15', 'D4-16', 'D4-17', 'D4-18', 'D4-19', 'D4-20', 'D4-21', 'D4-22', 'D4-23', 'D4-24', 'D4-25', 'D4-26', 'D4-27', 'D4-28', 'D4-29', 'D4-30', 'D4-31', 'D4-32', 'D4-33', 'D4-34', 'D4-35', 'D4-36'].includes(
+  ['D4-1', 'D4-4', 'D4-5', 'D4-6', 'D4-7', 'D4-8', 'D4-9', 'D4-10', 'D4-11', 'D4-12', 'D4-13', 'D4-14', 'D4-15', 'D4-16', 'D4-17', 'D4-18', 'D4-19', 'D4-20', 'D4-21', 'D4-22', 'D4-23', 'D4-24', 'D4-25', 'D4-26', 'D4-27', 'D4-28', 'D4-29', 'D4-30', 'D4-31', 'D4-32', 'D4-33', 'D4-34', 'D4-35', 'D4-36'].includes(
     currentSheet.value || '',
   ),
 )
+// 🔴 legacy OnlyOffice 通道**禁入**判定（名单与判据的单一真源在 `d4Constants.ts`）。
+//    含义：本表有结构化 store 载荷但尚未接双向同步桥 ⇒ 连 legacy 假桥也不给，避免 OO 侧
+//    改动静默丢失。原模板里的 `currentSheet !== 'D4-5'` 单点特判已收敛进该名单。
+const isLegacyOoBlocked = computed(() => isD4LegacyOoBlocked(currentSheet.value))
+
 const syncSwitching = ref(false)
 const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
 const syncEntryId = ref(D4_SYNC_ENTRY_ID)
@@ -462,12 +481,17 @@ const syncBusy = computed(
 const renderMode = computed({
   get: (): D4RenderMode => {
     if (isD4DedicatedSyncSheet.value) return 'html'
+    // 🔴 legacy 禁入名单：恒 'html'。不能只靠模板分支挡 —— `dualMode.mode` 是宿主级单例
+    //    且切 sheet 不重置（见上方 dedicated 段注释的同源竞态），在别的 sheet 点过「在线
+    //    编辑」后切到禁入表，getter 会残留 'onlyoffice' 使 el-segmented 选中态错位。
+    if (isLegacyOoBlocked.value) return 'html'
     return isD4DetailSheet.value
       ? (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html')
       : dualMode.mode.value
   },
   set: (v: D4RenderMode) => {
     if (isD4DedicatedSyncSheet.value) return // 子组件自管，宿主不介入
+    if (isLegacyOoBlocked.value) return // 未接双向桥，不放进 legacy 单向通道
     if (isD4DetailSheet.value) void switchRenderMode(v)
     else void dualMode.switchMode(v)
   },
@@ -478,7 +502,12 @@ const renderModeOptions = computed(() => [
   {
     label: '在线编辑',
     value: 'onlyoffice' as const,
-    disabled: isD4DetailSheet.value ? isReadonly.value : !dualMode.ooAvailable.value,
+    // 禁入名单一律 disabled（优先于 OO 健康与只读判断）：OO 服务再健康也不该放进单向通道。
+    disabled: isLegacyOoBlocked.value
+      ? true
+      : isD4DetailSheet.value
+        ? isReadonly.value
+        : !dualMode.ooAvailable.value,
   },
 ])
 
@@ -504,6 +533,14 @@ async function switchRenderMode(target: D4RenderMode): Promise<void> {
   try {
     if (String(syncBridge.state.value) === 'applied') {
       await syncBridge.reloadAfterApplied()
+    } else if (syncBridge.mode.value === 'oo' && !syncBridge.dirty.value) {
+      // 🔴 一个字都没改就点「结构化视图」⇒ clean close 直接回表单，**不**发强制保存。
+      // 改这一处之前，这条最常见的路径必然走到：冻结 forcesave → Command Service 返回
+      // 码 4（无改动）→ `forcesave_frozen` → 界面一条红字「文档没有检测到改动…」，而人
+      // 还留在 OO 里（真栈实测形态）。那不是错误，是「未改动直接返回」这条路以前不存在。
+      // `dirty` 为真时**不走**这条（桥里也会 refuse），留给下面的 forceSave 真保存 ——
+      // 绝不静默丢弃编辑。
+      await syncBridge.leaveWithoutSaving()
     } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
       await syncEditorHostRef.value.forceSave()
     } else {
@@ -515,6 +552,41 @@ async function switchRenderMode(target: D4RenderMode): Promise<void> {
     syncSwitching.value = false
   }
 }
+
+// ─── D4-2 ↔ D4-3 等 isD4DetailSheet 之间切 tab 时重定位 OO ──────────────────
+// 🔴 根因：D4-2/D4-3 共用宿主级 syncBridge（同一 entry、同一 room/generation），切 tab
+//    只改 syncSheetKey，descriptor 不变 → WorkpaperSyncEditorHost 的 mountKey 相同 →
+//    编辑器不重建 → OO 继续显示旧 sheet。
+//    修复：检测到 isD4DetailSheet 间 tab 切换且当前在 OO 模式，先关闭当前 OO 会话再
+//    重新 switchToOnlyOffice（产生新 descriptor，带新 sheetKey → OO 定位到正确 sheet）。
+watch(currentSheet, async (newSheet, oldSheet) => {
+  if (newSheet === oldSheet) return
+  // 只处理 D4DetailSheet 之间的切换（如 D4-2 → D4-3）
+  const newIsDetail = newSheet != null && newSheet in D4_SHEET_KEY_BY_CODE
+  const oldIsDetail = oldSheet != null && oldSheet in D4_SHEET_KEY_BY_CODE
+  if (!newIsDetail || !oldIsDetail) return
+  // 只在 OO 模式下才需要切换
+  if (syncBridge.mode.value !== 'oo') return
+  syncSwitching.value = true
+  try {
+    // dirty 时先 forceSave 再 leave；clean 时直接 leave
+    if (syncBridge.dirty.value) {
+      if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
+        await syncEditorHostRef.value.forceSave()
+      }
+      // forceSave 成功后 桥进入 applied → reloadAfterApplied 回 html → 重新 switchToOnlyOffice
+      await syncBridge.reloadAfterApplied()
+    } else {
+      await syncBridge.leaveWithoutSaving()
+    }
+    // 重新打开：此时 syncSheetKey 已指向新 sheet，materialize 会带新 sheetKey
+    await syncBridge.switchToOnlyOffice()
+  } catch {
+    // 失败在桥上已记录；回落到 HTML 视图
+  } finally {
+    syncSwitching.value = false
+  }
+})
 
 function onOoFallback(): void {
   void dualMode.switchMode('html')
@@ -593,6 +665,79 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('d4:save-items', handleD4SaveItems)
 })
+
+// ─── 导入导出委托（GtWpRenderer 工具栏 → 包装组件 → D4 专用 API）───────
+// 包装组件直接用 useD4ImportExport + currentSheet，省去逐子组件 ref 转发。
+// 多子类型 sheet（D4-20/D4-34/D4-36）后端不支持裸编号，需映射到默认子类型。
+const d4Io = useD4ImportExport({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+})
+
+/** 后端不支持导出的 sheet（问答/程序表/模板/附注等非数据表类型） */
+const EXPORT_UNSUPPORTED_SHEETS = new Set(['D4', 'D4A', 'D4-5', 'D4-22A', 'D4-31T', 'skip', '附注上市', '附注国企'])
+
+/** 多子类型 sheet → 后端接受的默认子类型映射 */
+const SHEET_DEFAULT_SUBTYPE: Record<string, string> = {
+  'D4-20': 'D4-20-provision',   // 销售退货：默认导出重新测算表
+  'D4-34': 'D4-34-rental',      // 合同测算：默认导出房屋租赁
+  'D4-36': 'D4-36-forward',     // 截止性测试：默认导出账到单据
+}
+
+/** 将 currentSheet 解析为后端接受的 sheet ID */
+function resolveExportSheet(): D4ImportableSheet | null {
+  const raw = currentSheet.value
+  if (!raw || EXPORT_UNSUPPORTED_SHEETS.has(raw)) return null
+  return (SHEET_DEFAULT_SUBTYPE[raw] ?? raw) as D4ImportableSheet
+}
+
+function handleExportTemplate() {
+  const sheet = resolveExportSheet()
+  if (sheet) d4Io.exportTemplate(sheet)
+}
+function handleExportData() {
+  const sheet = resolveExportSheet()
+  if (sheet) d4Io.exportData(sheet)
+}
+async function handleImportClick() {
+  const sheet = resolveExportSheet()
+  if (!sheet) return
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx'
+  input.onchange = async () => {
+    const f = input.files?.[0]
+    if (f) {
+      await d4Io.importData(sheet, f)
+      formData.loadAll()
+    }
+  }
+  input.click()
+}
+
+defineExpose({
+  // 🔴 spec workpaper-sync-adopt-overwrite-and-refresh-source Task 10/11（方案 D）：
+  //    RefreshSourceDialog 经宿主 GtWpRenderer 的 activeComponentRef 读本值。
+  //    只有带 sync entry 的业务组件才暴露它（AC 11.1：业务组件提供 entry_id）；
+  //    缺它的底稿 ⇒ 弹窗的「覆盖表单」自动禁用（Requirement 5.7 / Task 10.3）。
+  syncEntryId: D4_SYNC_ENTRY_ID,
+  handleExportTemplate,
+  handleExportData,
+  handleImportClick,
+  /**
+   * 行名对齐行：所有 D4 sheet 统一返回当前 sheet 标识。
+   * 后端 _resolve_account_prefixes(wp_code, sheet_code) 按 sheet_code 自动查科目前缀。
+   * D4-1 审定表有专门的逐行对齐（d4AdjRef），其余 sheet 走通用模式。
+   */
+  getRowNameAlignmentRows: () => {
+    // D4-1 审定表：逐行对齐（有产品行细粒度）
+    const adjRows = d4AdjRef.value?.getRowNameAlignmentRows?.()
+    if (adjRows && adjRows.length > 0) return adjRows
+    // 其余 sheet：返回当前 sheet 作为一个整体对齐行，后端按 sheet_code 查科目前缀
+    const sheet = currentSheet.value
+    if (!sheet || sheet === 'D4' || sheet === 'skip') return null
+    return [{ row_key: sheet, row_label: sheet, account_prefixes: [] }]
+  },
+})
 </script>
 
 <style scoped>
@@ -609,5 +754,14 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+/* 与 D4 全部 28 个子 tab 的 `.oo-container` 逐字同款 —— 在线编辑区必须拿到**确定高度**，
+   否则 `WorkpaperSyncEditorHost` 的 `height:100%` 解析成 auto、编辑区被压扁。 */
+.oo-container {
+  min-height: 600px;
+  height: calc(100vh - 280px);
+  overflow: hidden;
+  border-radius: 8px;
 }
 </style>

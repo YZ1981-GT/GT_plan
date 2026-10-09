@@ -83,8 +83,11 @@ identity 列/载体缺失         Table 覆盖数据行却读不到一个 UUID  
 from __future__ import annotations
 
 import ast
+import contextlib
+import contextvars
 import gzip
 import hashlib
+import io
 import json
 import re
 import sys
@@ -93,7 +96,16 @@ import zipfile
 from dataclasses import dataclass, field as dataclass_field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Final, Iterable, Iterator, Mapping, Sequence
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Final,
+    Iterable,
+    Iterator,
+    Mapping,
+    Sequence,
+    Union,
+)
 from xml.etree import ElementTree as ET
 
 from openpyxl.utils import column_index_from_string, get_column_letter
@@ -159,11 +171,17 @@ from app.services.workpaper_sync.excel_row_shift import (
     STRUCTURE_BARE_ROW_ATTRS,
     STRUCTURE_ROW_BEARING_ATTRS,
     STRUCTURE_ROW_BEARING_TEXT_TAGS,
+    CompositeRowShift,
     RowShiftPlan,
     remap_a1_rows,
-    unextend_total_formula,
+    unextend_total_formula_chain,
 )
 from app.services.workpaper_sync.limits import SyncLimits, load_limits
+
+if TYPE_CHECKING:  # pragma: no cover - 仅类型；运行期 import 会成环
+    # `excel_workbook_row_change` 反向 import 本模块（`_scan_row_identities` 等），
+    # 所以删行载体只能做**前向引用**，不能在模块顶层真 import。
+    from app.services.workpaper_sync.excel_workbook_row_change import RowDeletionShift
 from app.services.workpaper_sync.merge import (
     ContractIndex,
     StructuralAnomaly,
@@ -226,6 +244,9 @@ __all__ = [
     "ExcelExtractOutcome",
     "assert_engine_entry_definitions",
     "extract_projection",
+    "workbook_read_scope",
+    "release_scoped_workbooks",
+    "shared_workbook_from_bytes",
     "write_projection_sidecar",
     "read_projection_sidecar",
     # verifier
@@ -724,8 +745,30 @@ def _sheet_part_map(zf: zipfile.ZipFile) -> tuple[list[dict[str, Any]], list[dic
 
     不用 openpyxl：这里只要磁盘上的原始 sheet/rel/definedName 事实，openpyxl 会丢属性。
     也不在本模块抄一份 XML 解析 —— 抄一份就是第二真源。
+
+    结果在 :func:`workbook_read_scope` 内按文件身份记忆化：真库 D4 一次 extract 有 78 个
+    binding 各调一次 `resolve_managed_region`，每次都重解一遍 `xl/workbook.xml` + rels
+    （需求 2.1 说的「同一份字节读一遍就够」）。
     """
-    return parse_workbook_xml(zf)
+    return scoped_parse_memo(
+        "workbook_xml", _zip_identity(zf), lambda: parse_workbook_xml(zf)
+    )
+
+
+def _tables_of(zf: zipfile.ZipFile) -> list[dict[str, Any]]:
+    """Excel Table 清册 —— 与 :func:`_sheet_part_map` 同一条记忆化理由，量更大。
+
+    `parse_tables` 要把**每一张** sheet part 都读出来找 `<tableParts>`（D4 有 46 张），
+    单次 ~30ms；78 个 binding 各调一次 = 实测 cProfile 累计 2.2s。字节不变 ⇒ 结果不变。
+
+    `sheets` 刻意**不**作参数：记忆化键只含 zip 身份，若允许调用方另外递一份 `sheets`
+    进来，两个不同的 `sheets` 就会命中同一个缓存项（拿到别人那份的结果）。这里自己从
+    :func:`_sheet_part_map` 取（它本身也记忆化 ⇒ 不多付一次解析），把那种误用变成不可能。
+    """
+    sheets, _ = _sheet_part_map(zf)
+    return scoped_parse_memo(
+        "tables", _zip_identity(zf), lambda: parse_tables(zf, sheets)
+    )
 
 
 def resolve_managed_region(
@@ -744,7 +787,7 @@ def resolve_managed_region(
     if is_static_region(binding):
         return _resolve_static_region(zf, contract=contract, binding=binding)
     sheets, _ = _sheet_part_map(zf)
-    tables = parse_tables(zf, sheets)
+    tables = _tables_of(zf)
     matched = [
         t
         for t in tables
@@ -1221,11 +1264,22 @@ def assert_identity_carriers_usable(
         if table.has_dynamic_rows
     ]
     if dynamic_tables and inventory.resolved_sheet_by is None:
-        first_sheet, first_table = dynamic_tables[0]
+        # 🔴 **报当前 binding 的真实身份，不报「契约首张表」**。
+        #    判定量是本次 `inventory`（单个 binding 的反读结果）；此前这里打印的是
+        #    `dynamic_tables[0]` —— D4 契约的第 0 项恒为 `d42-managed/revenue_detail_rows`，
+        #    于是**无论哪个 binding 失败，文案都指向 D4-2**。真栈上真正失败的是 D4-1 其他区
+        #    （`table_ref='A14:X17' uuid_col='X'`），排查因此先绕去查 D4-2 的 identity 列
+        #    （查完是好的），白走一圈。错误信息指错对象，比信息少更贵。
         raise IdentityCarrierMissingError(
-            f"{where}: 契约声明动态行的首张表 sheet={first_sheet!r} table={first_table!r} "
-            "一个 row identity 都没反读到 —— 对应 Requirement 6.15 的「用户删除 identity "
-            "列」形态，contract 处置为拒绝，不得按中文表头或位置猜（Requirement 6.20）"
+            f"{where}: 受管区 sheet={inventory.table_sheet!r} "
+            f"table_ref={inventory.table_ref!r} uuid_col={inventory.uuid_column!r} "
+            f"在 Table ref 覆盖的行区间内一个 row identity 都没反读到"
+            f"（空 UUID 行 {len(inventory.empty_row_uuids)} 个）—— 对应 Requirement 6.15 的"
+            "「用户删除 identity 列」形态，contract 处置为拒绝，不得按中文表头或位置猜"
+            "（Requirement 6.20）。"
+            "⚠️ 也可能是 **Table ref 与实际数据行错位**（同 sheet 多受管区时上区插行后未同步"
+            "维护下区 ref），那时 identity 列本身是好的 —— 排查请先比对 ref 区间与真实 UUID 行号，"
+            f"不要只看列是否存在。契约声明动态行的表共 {len(dynamic_tables)} 张。"
         )
     if (
         inventory.resolved_sheet_by is not None
@@ -1415,6 +1469,108 @@ class UnmanagedRegionDigest:
                 "aspects": dict(sorted(self.aspects.items())),
             }
         )
+
+
+def deleted_row_coordinates(
+    artifact: Path, *, sheet_part: str, deleted_rows: Sequence[int]
+) -> frozenset[str]:
+    """被删行上的**全部**格坐标（删行**前**口径）。
+
+    spec: workpaper-sync-row-deletion-multi-region-propagation（design 勘误节 E.3 第①类）
+
+    ═══ 为什么需要它：`unshift` 表达不了「这些格不存在了」═══
+
+    删物理行会把那一行上的格**整体删掉**，包括**未管理**列上的格。而
+    :func:`_managed_sheet_cell_digest` 的归一化（`row_shift`）只给 **after** 侧、
+    且只做行号映射 ⇒ before 侧仍逐格喂那些已经不存在的格 ⇒ 两侧项数与内容都不等
+    ⇒ `adapter_unmanaged_region_drift`。
+
+    实测（K11、删 r=20）：`managed_sheet_unmanaged_cells` 的覆盖数 297 → 290，
+    消失的 7 个是 `A20`/`B20`/`D20`/`E20`/`F20`/`G20`/`I20`（其中 5 个还带跨 sheet 公式）。
+    design「§ 七条欠账逐条」A6 原文只说「未管理的格**行号变了**」，没有描述这一类。
+
+    ═══ 处置：并进 `extra_managed_coords`（两侧对称排除）═══
+
+    `verify_unmanaged_regions` 把 `extra_managed_coords` 传给 **before 与 after 两侧**
+    （现读两处调用都传）⇒ 把被删行的坐标并进受管集合，两侧就都不再逐格比它们。
+    这不是「只对 after 归一化」的例外（Requirement 6.3 说的是**归一化**），
+    而是受管集合的**定义**：那些行本来就是受管数据行，它们非受管列上的格是
+    「删一整个受管行」的附带结果。
+
+    Args:
+        artifact: **删行前**的 artifact（坐标口径必须与 `deleted_rows` 一致）。
+        sheet_part: 受管 sheet 的 zip part。
+        deleted_rows: 被删行号（删行前口径）。
+
+    Returns:
+        `{"A20", "B20", …}`。`deleted_rows` 为空时返回空集合。
+    """
+    rows = {int(r) for r in deleted_rows}
+    if not rows:
+        return frozenset()
+    out: set[str] = set()
+    with zipfile.ZipFile(artifact) as zf, zf.open(sheet_part, "r") as src:
+        for _event, element in ET.iterparse(src, events=("end",)):
+            if not element.tag.endswith("}c") and element.tag != "c":
+                continue
+            ref = element.attrib.get("r", "")
+            found = _CELL_COORD_RE.match(ref) if ref else None
+            if found is not None and int(found.group("row")) in rows:
+                out.add(ref)
+            element.clear()
+    return frozenset(out)
+
+
+def collapsed_total_formula_coordinates(
+    artifact: Path, *, sheet_part: str, total_formula_rows: Sequence[int]
+) -> frozenset[str]:
+    """契约声明「携带合计公式」的行上、**带公式**的格坐标（删行前口径）。
+
+    spec: workpaper-sync-row-deletion-multi-region-propagation（design 勘误节 E.6）
+
+    ═══ 🔴 为什么删行侧的合计区间收缩**无法**用行号逆映射还原 ═══
+
+    删行让合计区间**端点塌陷**：受管区 14..21、合计 `SUM(F14:F21)`，删第 21 行后正确产物是
+    `SUM(F14:F20)`。归一化要把它还原成 `SUM(F14:F21)`，而 `unshift` 是**存活行之间的双射**
+    —— 塌陷后的端点 20 的前像就是 20（行 20 自己存活），不是 21。给 `extend_end_at` 做一次
+    末行修正能救回末行，但删**区首行**时同样的问题落在**首行**上
+    （`shift_range_start(14)` 保持 14，而 `unshift(14)` 给 15），而
+    `_rewrite_formula_refs` **没有** `extend_start_at` 钩子，且 Requirement 10.1 禁止改它。
+
+    ⇒ Requirement 6.4 的「按声明还原该收缩」**不可能**由行号逆映射实现（这是双射性质，
+    不是实现缺陷）。诚实的落法是：把这些**契约声明的**合计格从逐格比对里两侧对称排除，
+    收缩的正确性改由 **A7 的 footer 两门**直接检查
+    （`assert_footer_formula_covers_managed_rows` 用删行后的受管末行求值）——
+    那是比 digest 等价**更强**的判据：它检查「区间是否恰好覆盖受管行」，
+    而 digest 只检查「文本是否能还原成改前样子」。
+
+    ⚠ 只排除**带公式**的格：同一行上的标签/数值格照旧逐格比对（它们的行号由 `unshift`
+    正常归一化），所以「用户偷偷改了合计行的文字」仍然会被发现。
+
+    Args:
+        artifact: **删行前**的 artifact。
+        sheet_part: 受管 sheet 的 zip part。
+        total_formula_rows: 契约声明携带合计公式的行号（删行前口径）。
+    """
+    rows = {int(r) for r in total_formula_rows}
+    if not rows:
+        return frozenset()
+    out: set[str] = set()
+    with zipfile.ZipFile(artifact) as zf, zf.open(sheet_part, "r") as src:
+        for _event, element in ET.iterparse(src, events=("end",)):
+            if not element.tag.endswith("}c") and element.tag != "c":
+                continue
+            ref = element.attrib.get("r", "")
+            found = _CELL_COORD_RE.match(ref) if ref else None
+            if found is not None and int(found.group("row")) in rows:
+                has_formula = any(
+                    child.tag.rsplit("}", 1)[-1] == "f" and (child.text or "").strip()
+                    for child in element
+                )
+                if has_formula:
+                    out.add(ref)
+            element.clear()
+    return frozenset(out)
 
 
 def _managed_coordinates(
@@ -1651,8 +1807,23 @@ def _xml_unescape(text: str) -> str:
 _CELL_COORD_RE: Final[re.Pattern[str]] = re.compile(r"^(?P<col>[A-Z]{1,3})(?P<row>\d+)$")
 
 
+#: 行变更的**位移载体**——三者鸭子兼容（`shift` / `unshift` / `inserted_rows` / `count`）。
+#:
+#: * :class:`RowShiftPlan`     —— 单趟插行；
+#: * :class:`CompositeRowShift` —— 同一 sheet 多趟插行的累积；
+#: * `RowDeletionShift`        —— 删行（spec workpaper-sync-row-deletion-…-propagation）。
+#:
+#: 🔴 写成别名而不是在 7 处各列三个类型：漏改一处就会让删行载体在**那一处**被静态
+#: 类型判非法，而运行期照样能跑 ⇒ 「注解与实现不符」这类最难发现的缺陷。
+#: 🔴 `RowDeletionShift` 用**字符串**前向引用：`excel_workbook_row_change` 反向 import
+#: 本模块的 `_scan_row_identities` 等会成环，不能在模块顶层真 import 它。
+RowChangeCarrier = Union[RowShiftPlan, CompositeRowShift, "RowDeletionShift"]
+
+
 def _is_total_row(
-    normalised_ref: str, row_shift: RowShiftPlan, total_rows: frozenset[int]
+    normalised_ref: str,
+    row_shift: RowChangeCarrier,
+    total_rows: frozenset[int],
 ) -> bool:
     """该格（**已归一化**的坐标）是否落在契约声明「携带合计公式」的行上。
 
@@ -1665,7 +1836,10 @@ def _is_total_row(
 
 
 def _normalise_cell_ref(
-    ref: str, *, row_shift: RowShiftPlan, inserted: frozenset[int]
+    ref: str,
+    *,
+    row_shift: RowChangeCarrier,
+    inserted: frozenset[int] | range,
 ) -> str:
     """after 侧格坐标 → before 侧口径。新插入行返回空串（= 调用方跳过它）。"""
     found = _CELL_COORD_RE.match(ref)
@@ -1677,7 +1851,64 @@ def _normalise_cell_ref(
     return f"{found.group('col')}{row_shift.unshift(row)}"
 
 
-def _normalise_structure_element(element: Any, *, row_shift: RowShiftPlan) -> None:
+COLLAPSED_ENDPOINT_SENTINEL: Final[str] = "«gt-collapsed-endpoint»"
+"""区间端点落在被删行上时，两侧结构 digest 里都替换成它（对称排除）。
+
+spec: workpaper-sync-row-deletion-multi-region-propagation（design 勘误节 E.6）
+
+🔴 这是**数学事实**不是实现欠账：删行的前向映射在区间端点上是
+`shift_range_end`（`row - |{d ≤ row}|`），它把「被删的端点」与「它上面那个存活行」
+**映到同一个值**（D={21}：`21 → 20` 且 `20 → 20`）⇒ 前向非单射 ⇒ **不存在逆映射**，
+`unshift` 或任何别的行号重映射都还原不回去。
+
+所以对这一小类项目只能做**两侧对称排除**：排除集
+:func:`deletion_collapse_rows` 完全由声明（被删行集合）导出，before / after 两侧
+拿到的是**同一个集合**，因此排除是对称的 —— 不会出现「一侧排除一侧不排除」的假绿口子。
+补偿控制是 apply 侧 A8 真的把它改对了（`test_row_deletion_apply_propagation.py`
+逐值断言收缩后的 `sqref`），以及 A7 的 footer 两门。
+"""
+
+
+def deletion_collapse_rows(row_shift: RowChangeCarrier) -> frozenset[int]:
+    """删行载体的「端点塌陷邻域」；插行载体恒返回空集。
+
+    = 被删行集合 D ∪ D 的前向像 `{shift_range_end(d) for d in D}`。
+
+    🔴 为什么要取**并集**而不只取 D（before 侧）或只取像（after 侧）：
+    只取 D 时，before 侧的 `A14:A20`（20 ∉ D）会被保留，而它的 after 像
+    `shift_range_end(20) = 20` 落在像集合里被排除 ⇒ **一侧排一侧不排 ⇒ 判漂移（假红）**。
+    取并集后集合只由载体导出、两侧逐值相同 ⇒ 对称性由构造保证。
+    """
+    deleted = getattr(row_shift, "deleted_rows", None)
+    if not deleted:
+        return frozenset()
+    rows = set(deleted)
+    rows.update(row_shift.shift_range_end(row) for row in deleted)
+    return frozenset(rows)
+
+
+def _referenced_rows(value: str) -> frozenset[int]:
+    """`value` 里被 A1 解析器认作行号的全部行。
+
+    🔴 不自己写第二个 A1 正则 —— 直接借 :func:`remap_a1_rows` 走一遍，用一个
+    「只记录、不改动」的 remap 探针收集它**实际问过哪些行**。口径与真正改写时逐字一致。
+    """
+    seen: set[int] = set()
+
+    def _probe(row: int) -> int:
+        seen.add(row)
+        return row
+
+    remap_a1_rows(value, remap=_probe)
+    return frozenset(seen)
+
+
+def _normalise_structure_element(
+    element: Any,
+    *,
+    row_shift: RowChangeCarrier | None = None,
+    collapse_rows: frozenset[int] = frozenset(),
+) -> None:
     """把一个结构块元素（含后代）里携带行号的属性/文本**就地**归一化回位移前口径。
 
     🔴 就地改的是 `ET.iterparse` 产出的**内存中**元素，随后只用于算 digest；
@@ -1686,23 +1917,49 @@ def _normalise_structure_element(element: Any, *, row_shift: RowShiftPlan) -> No
     「哪些属性/文本携带行号」不在本模块手写第二份 —— 三张表由
     `excel_row_shift.ROW_BEARING_STRUCTURES` **派生**，且该模块 import 期自检
     「每一项恰好落进一个归一化桶」。加新结构时不做决定就会打红。
-    """
 
-    def _remap(row: int) -> int:
-        return row_shift.unshift(row)
+    删行载体上另有一条：端点落进 :func:`deletion_collapse_rows` 的值**不可逆**，
+    两侧一起替换成 :data:`COLLAPSED_ENDPOINT_SENTINEL`（对称排除，见其 docstring）。
+
+    Args:
+        row_shift: 位移载体；`None` = 只做塌陷排除、不做行号归一化（**before 侧**就是
+            这么调的 —— before 侧不能 `unshift`（Requirement 6.3 只许归一化 after），
+            但排除必须两侧对称，所以它只收 `collapse_rows`）。
+        collapse_rows: 额外的塌陷邻域；给了 `row_shift` 时与其自身导出的邻域取并集。
+    """
+    if row_shift is not None:
+        collapse_rows = collapse_rows | deletion_collapse_rows(row_shift)
+        _unshift = row_shift.unshift
+
+        def _remap(row: int) -> int:
+            return _unshift(row)
+
+    else:
+
+        def _remap(row: int) -> int:
+            return row
+
+    def _normalise_a1(value: str) -> str:
+        if collapse_rows and (_referenced_rows(value) & collapse_rows):
+            return COLLAPSED_ENDPOINT_SENTINEL
+        return remap_a1_rows(value, remap=_remap)
 
     for node in element.iter():
         tag = node.tag.rsplit("}", 1)[-1]
         for name in STRUCTURE_ROW_BEARING_ATTRS.get(tag, ()):
             value = node.attrib.get(name)
             if value:
-                node.attrib[name] = remap_a1_rows(value, remap=_remap)
+                node.attrib[name] = _normalise_a1(value)
         for name in STRUCTURE_BARE_ROW_ATTRS.get(tag, ()):
             value = node.attrib.get(name)
             if value and value.isdigit():
-                node.attrib[name] = str(_remap(int(value)))
+                row = int(value)
+                if row in collapse_rows:
+                    node.attrib[name] = COLLAPSED_ENDPOINT_SENTINEL
+                else:
+                    node.attrib[name] = str(_remap(row))
         if tag in STRUCTURE_ROW_BEARING_TEXT_TAGS and node.text:
-            node.text = remap_a1_rows(node.text, remap=_remap)
+            node.text = _normalise_a1(node.text)
 
 
 def _managed_sheet_cell_digest(
@@ -1710,7 +1967,7 @@ def _managed_sheet_cell_digest(
     part: str,
     *,
     managed: frozenset[str],
-    row_shift: RowShiftPlan | None = None,
+    row_shift: RowChangeCarrier | None = None,
     total_formula_rows: Sequence[int] = (),
 ) -> tuple[str, int]:
     """受管 sheet 上**非受管**单元格的 digest（流式 iterparse，逐格喂 hash）。
@@ -1758,7 +2015,10 @@ def _managed_sheet_cell_digest(
                 if formula and row_shift is not None and _is_total_row(ref, row_shift, total_rows):
                     # 🔴 契约授权扩张的合计行：先还原扩张，再按 unshift 归一化行号。
                     #    只 unshift 还原不了扩张 —— 那正是扩张的语义（区间真的变大了）。
-                    formula = unextend_total_formula(formula, plan=row_shift)
+                    #    同 sheet 多趟插行（`CompositeRowShift`）时**逆序逐趟**还原：
+                    #    每趟的还原是「末行恰好 == insert_at-1+count」的精确逆运算，
+                    #    合成一个等效 plan 会让两趟的匹配条件互相污染。
+                    formula = unextend_total_formula_chain(formula, shift=row_shift)
                 elif formula and row_shift is not None:
                     # 🔴 公式文本里的 A1 **行号**同样要归一化（Requirement 6.2 说的是
                     #    「行号」，不是「`r` 属性」）。位移会把非受管格的公式一起带走 ——
@@ -1787,12 +2047,19 @@ def _managed_sheet_cell_digest(
 
 
 def _sheet_structure_digest(
-    zf: zipfile.ZipFile, part: str, *, row_shift: RowShiftPlan | None = None
+    zf: zipfile.ZipFile,
+    part: str,
+    *,
+    row_shift: RowChangeCarrier | None = None,
+    collapse_rows: frozenset[int] = frozenset(),
 ) -> tuple[str, int]:
     """受管 sheet 的结构块（merge / cols / 数据验证 / 条件格式 / 保护 / …）digest。
 
     `row_shift` 非空时，结构块里携带行号的属性与元素文本先按 `plan.unshift` 归一化再
-    序列化（Requirement 6.2）。`None` 时行为逐字节不变。
+    序列化（Requirement 6.2）。两者都空时行为逐字节不变。
+
+    `collapse_rows` 用于 **before 侧**的对称排除：删行时端点塌陷不可逆
+    （见 :data:`COLLAPSED_ENDPOINT_SENTINEL`），before 侧不做行号归一化、只做排除。
     """
     digest = hashlib.sha256()
     found = 0
@@ -1800,8 +2067,10 @@ def _sheet_structure_digest(
         for event, element in ET.iterparse(src, events=("end",)):
             tag = element.tag.rsplit("}", 1)[-1]
             if tag in _SHEET_STRUCTURE_BLOCKS:
-                if row_shift is not None:
-                    _normalise_structure_element(element, row_shift=row_shift)
+                if row_shift is not None or collapse_rows:
+                    _normalise_structure_element(
+                        element, row_shift=row_shift, collapse_rows=collapse_rows
+                    )
                 digest.update(tag.encode("utf-8"))
                 digest.update(ET.tostring(element, encoding="utf-8"))
                 found += 1
@@ -1818,7 +2087,23 @@ def _shared_strings_prefix_digest(
 
     追加新字符串（materialize 写入新文本时必然发生）不算未管理区域异动；改动**已有**条目
     会让既有单元格的显示值变化 ⇒ 必须打红。`limit_count=None` 表示取全部（before 侧）。
+
+    结果在作用域内按 `(文件身份, limit_count)` 记忆化：真库 D4 的 unmanaged 比对逐 binding
+    各算一遍，实测 117 次、cProfile 累计 1.5s，而入参字节与 `limit_count` 全同 ⇒ 同一个
+    digest 算了 117 遍（需求 2.1）。
     """
+    identity = _zip_identity(zf)
+    return scoped_parse_memo(
+        "shared_strings",
+        None if identity is None else (*identity, limit_count),
+        lambda: _shared_strings_prefix_digest_uncached(zf, limit_count=limit_count),
+    )
+
+
+def _shared_strings_prefix_digest_uncached(
+    zf: zipfile.ZipFile, *, limit_count: int | None
+) -> tuple[str, int]:
+    """:func:`_shared_strings_prefix_digest` 的本体（无记忆化）。"""
     name = "xl/sharedStrings.xml"
     if name not in zf.namelist():
         return (canonical_digest({"shared_strings": None}), 0)
@@ -1902,10 +2187,12 @@ def unmanaged_region_digest(
     scan: RowIdentityScan | None = None,
     limits: SyncLimits | None = None,
     shared_strings_limit: int | None = None,
-    row_shift: RowShiftPlan | None = None,
+    row_shift: RowChangeCarrier | None = None,
     total_formula_rows: Sequence[int] = (),
     propagation: Any | None = None,
     extra_managed_sheet_parts: frozenset[str] | set[str] = frozenset(),
+    extra_managed_coords: frozenset[str] | set[str] = frozenset(),
+    structure_collapse_rows: frozenset[int] = frozenset(),
 ) -> UnmanagedRegionDigest:
     """算一份 artifact 的未管理区域 digest（供 rematerialize 前后比对）。
 
@@ -1916,6 +2203,17 @@ def unmanaged_region_digest(
     （逐格坐标 + 结构块里的行号）。它只能给 **after 侧**：before 侧本来就是位移前口径，
     两侧都归一化等于什么都没归一化。
 
+    🔴 **删行载体（`RowDeletionShift`）也走这个入参**（鸭子兼容 `unshift` / `inserted_rows`），
+    但它**只能表达行号映射**，表达不了「被删行上的格整体消失」。那一类必须用
+    :func:`deleted_row_coordinates` 算出坐标并并进 ``extra_managed_coords``
+    （两侧对称排除）—— 见该函数 docstring 与 design 勘误节 E.3 第①类。
+
+    🔴 删行侧还有**第②类表达不了的**：区间端点恰好落在被删行上时前向映射非单射
+    （`shift_range_end` 把被删端点与其上一存活行映到同一值）⇒ 不存在逆映射。
+    单元格公式那一类用 `extra_managed_coords` 排除（两侧都传）；结构块那一类用
+    `structure_collapse_rows` 排除（before 侧传它、after 侧由 `row_shift` 自己导出）。
+    见 :data:`COLLAPSED_ENDPOINT_SENTINEL` 与 design 勘误节 E.6。
+
     `propagation`（`WorkbookRowChangePlan`）非空时对 **`other_sheet_parts`** 桶里被
     传播触及的 part 做 **propagation-aware 归一化**：按计划**声明**的条目逐条逆替换回
     改前口径。同样只给 after 侧。
@@ -1923,11 +2221,20 @@ def unmanaged_region_digest(
     🔴 没有这个参数时，工作簿级传播会让引用侧 sheet 的字节变化被判成漂移 —— 那不是
     「安全的保守」，而是让传播功能**永远无法通过验证**。而归一化必须按**声明**做，
     不能按观测：见 `normalise_propagated_part` 的 docstring。
+
+    ``extra_managed_coords``：同 sheet **其它受管区**的坐标并集（D4-1 主营/其他、
+    D4-9/20/34/36 同形）。逐 binding 校验时本区以外的受管格默认会落进
+    ``managed_sheet_unmanaged_cells``；OO→HTML rematerialize 会把那些格从 OO 的
+    sharedString / IEEE 浮点口径改回 materialize 的 inlineStr / 规整小数，于是
+    **项数对齐但内容不等** 的假漂移（真栈 `adapter_unmanaged_region_drift`，
+    coverage 403/403）。并进来后它们按受管格排除，真正的未管理格仍逐字比对。
     """
     lim = limits or load_limits()
     managed_coords = _managed_coordinates(
         contract=contract, region=region, binding=binding, scan=scan
     )
+    if extra_managed_coords:
+        managed_coords = frozenset(managed_coords | set(extra_managed_coords))
     with zipfile.ZipFile(path) as zf:
         buckets = _classify_parts(
             zf,
@@ -1949,7 +2256,10 @@ def unmanaged_region_digest(
         coverage["managed_sheet_unmanaged_cells"] = cell_count
 
         struct_digest, struct_count = _sheet_structure_digest(
-            zf, region.sheet_part, row_shift=row_shift
+            zf,
+            region.sheet_part,
+            row_shift=row_shift,
+            collapse_rows=structure_collapse_rows,
         )
         aspects["managed_sheet_structure"] = struct_digest
         coverage["managed_sheet_structure"] = struct_count
@@ -2023,10 +2333,11 @@ def verify_unmanaged_regions(
     binding: ExcelIdentityBinding,
     scan: RowIdentityScan | None = None,
     limits: SyncLimits | None = None,
-    row_shift: RowShiftPlan | None = None,
+    row_shift: RowChangeCarrier | None = None,
     total_formula_rows: Sequence[int] = (),
     propagation: Any | None = None,
     extra_managed_sheet_parts: frozenset[str] | set[str] = frozenset(),
+    extra_managed_coords: frozenset[str] | set[str] = frozenset(),
 ) -> UnmanagedRegionReport:
     """Task 38 的 `verify_unmanaged_regions` 的**共用实现**。
 
@@ -2057,6 +2368,13 @@ def verify_unmanaged_regions(
     from app.services.workpaper_sync.parse_cache import BEFORE_DIGEST_CACHE
 
     before_sha = _file_sha256_cached(before, limits=lim)
+    # extra_managed_coords 必须进缓存键：同 sheet 兄弟区并集变了就不能复用旧 digest，
+    # 否则会把「兄弟受管格」误当成未管理（或反过来）而放行/误杀。
+    extra_coords_key = ",".join(sorted(str(c) for c in extra_managed_coords))
+    # 🔴 塌陷邻域也必须进缓存键：它会改变 before 侧的结构 digest（把不可逆的端点值换成
+    # 哨兵）。不进键就会拿「另一组被删行算出来的 before digest」跟本次 after 比 ——
+    # 那是**跨声明串味**，既可能假绿也可能假红。这条与 extra_managed_coords 同理。
+    structure_collapse_rows = deletion_collapse_rows(row_shift) if row_shift else frozenset()
     before_key = "|".join(
         (
             before_sha,
@@ -2064,6 +2382,8 @@ def verify_unmanaged_regions(
             str(region.sheet_part),
             str(binding.table_key),
             ",".join(sorted(str(p) for p in extra_managed_sheet_parts)),
+            extra_coords_key,
+            ",".join(str(r) for r in sorted(structure_collapse_rows)),
         )
     )
     base = BEFORE_DIGEST_CACHE.get(before_key)
@@ -2076,6 +2396,9 @@ def verify_unmanaged_regions(
             scan=scan,
             limits=lim,
             extra_managed_sheet_parts=extra_managed_sheet_parts,
+            extra_managed_coords=extra_managed_coords,
+            # before 侧**不做**行号归一化（Requirement 6.3），只做对称排除。
+            structure_collapse_rows=structure_collapse_rows,
         )
         BEFORE_DIGEST_CACHE.put(before_key, base)
     target = unmanaged_region_digest(
@@ -2093,6 +2416,7 @@ def verify_unmanaged_regions(
         # 工作簿级传播的**声明**条目 —— 同上，只给 after 侧。
         propagation=propagation,
         extra_managed_sheet_parts=extra_managed_sheet_parts,
+        extra_managed_coords=extra_managed_coords,
     )
     for aspect in UNMANAGED_ASPECTS:
         if base.aspects[aspect] != target.aspects[aspect]:
@@ -2413,12 +2737,9 @@ def _read_cell_view(
 
     只读打开，不写任何字节。
     """
-    import openpyxl
-
     wanted = {column_index_from_string(col) for col in columns}
     out: dict[str, Any] = {}
-    wb = openpyxl.load_workbook(path, read_only=True, data_only=data_only)
-    try:
+    with _acquire_read_only_workbook(path, data_only=data_only) as wb:
         if sheet_name not in wb.sheetnames:
             raise IdentityCarrierMissingError(
                 f"受管 sheet {sheet_name!r} 打不开（workbook 里有 {wb.sheetnames}）—— "
@@ -2446,8 +2767,6 @@ def _read_cell_view(
                 if value is None:
                     continue
                 out[f"{get_column_letter(column_index)}{row_number}"] = value
-    finally:
-        wb.close()
     return out
 
 
@@ -2982,6 +3301,239 @@ def _validate_ooxml_cached(path: Path, *, document_type: str, limits: SyncLimits
         _ooxml_cache.clear()
     _ooxml_cache[key] = report
     return report
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# workbook 解析作用域复用（同一 extract 趟内 openpyxl 只解析一次）
+#
+# 上面两个缓存收掉了「N 个 binding = N 次全量解压 + N 次全量哈希」，但**没有**收
+# ``_read_cell_view`` 里的 ``openpyxl.load_workbook``。D4-营业收入实测：39 个 binding ×
+# 2 个视图（data_only True/False）= **78 次全簿解析**，cProfile 累计 60.8s（其中
+# ``apply_stylesheet`` 22.2s）—— 这是 store-projection 首请求 10s 量级的主项。
+# 同一趟 extract 里这 78 次读的是**同一个文件、同一批字节**。
+#
+# 为什么用「作用域」而不是像上面两个那样挂模块级 dict：
+#   * ``load_workbook`` 返回的对象**持有打开的 zip 句柄**。模块级长存 = Windows 上
+#     该文件删不掉（staged 产物 / repaired 临时文件都要 ``unlink``），会把一个性能优化
+#     变成偶发 PermissionError。
+#   * 作用域退出时 ``finally`` 里逐个 ``close()``，句柄生命周期与调用栈严格对齐；
+#     作用域之外行为与优化前**逐字节相同**（照旧 load 完即 close）。
+#   * ``ContextVar`` 而非全局变量：并发请求各自独立（同一进程里多个 asyncio 任务不串）。
+#
+# 只改「解析几次」，不改「解析出什么」：read_only workbook 在 openpyxl 下可跨多次
+# ``iter_rows``、跨 sheet 重复读，结果恒等（已实证）。
+# ═══════════════════════════════════════════════════════════════════════════
+
+_workbook_scope: contextvars.ContextVar[dict[tuple[Any, ...], Any] | None] = (
+    contextvars.ContextVar("workpaper_sync_workbook_scope", default=None)
+)
+
+
+@contextlib.contextmanager
+def workbook_read_scope() -> Iterator[None]:
+    """在本作用域内，同一 ``(文件身份, data_only)`` 的 read_only workbook 只解析一次。
+
+    退出时**无条件**关闭本作用域打开的全部 workbook（含异常路径），因此不会有句柄
+    泄漏到作用域之外。嵌套进入时沿用外层缓存（不重复打开、也不提前关闭）。
+    """
+    if _workbook_scope.get() is not None:
+        # 嵌套：外层已建作用域，直接复用（关闭责任留给最外层）。
+        yield
+        return
+    cache: dict[tuple[Any, ...], Any] = {}
+    token = _workbook_scope.set(cache)
+    try:
+        yield
+    finally:
+        _workbook_scope.reset(token)
+        for value in cache.values():
+            _close_if_closeable(value)
+
+
+def _close_if_closeable(value: Any) -> None:
+    """关掉持句柄的条目；纯解析结果（:func:`scoped_parse_memo` 的条目）跳过。
+
+    作用域里现在放两类东西：**workbook 对象**（持打开的 zip 句柄，Windows 上不关就删不掉
+    文件）与**纯解析结果**（`sheets` / `tables` / digest 元组 —— 没有句柄，也没有 `close`）。
+    显式按「有没有 close」分流，而不是靠 `except Exception: pass` 把 `AttributeError`
+    一起吞掉：吞掉的话哪天真的关闭失败也看不见。
+    """
+    closer = getattr(value, "close", None)
+    if closer is None:
+        return
+    try:
+        closer()
+    except Exception:  # noqa: BLE001 - 关闭失败不得掩盖作用域内的真实异常
+        pass
+
+
+def release_scoped_workbooks(path: Path) -> None:
+    """关闭并移出作用域内针对 ``path`` 的全部缓存 workbook。**删该文件之前必须调。**
+
+    🔴 materialize 会造一串临时文件（多趟写的链式中间产物 / `repaired` /
+    `g7-noif`），写完就 ``unlink``。这些文件在趟与趟之间会被读（因此会进作用域缓存），
+    而缓存持有打开的 zip 句柄 ⇒ Windows 上 ``unlink`` 抛 PermissionError。
+    所以「谁删文件，谁先释放句柄」是这条优化的**前置条件**，不是可选的清理动作。
+
+    作用域外调用是安全的空操作（那时本就即用即关）。
+    """
+    cache = _workbook_scope.get()
+    if not cache:
+        return
+    try:
+        target = str(path.resolve())
+    except OSError:
+        return
+    for key in [k for k in cache if isinstance(k[0], tuple) and k[0][0] == target]:
+        workbook = cache.pop(key)
+        _close_if_closeable(workbook)
+
+
+@contextlib.contextmanager
+def _acquire_read_only_workbook(path: Path, *, data_only: bool) -> Iterator[Any]:
+    """拿一个 read_only workbook：作用域内共享，作用域外用完即关。"""
+    import openpyxl
+
+    cache = _workbook_scope.get()
+    if cache is None:
+        workbook = openpyxl.load_workbook(path, read_only=True, data_only=data_only)
+        try:
+            yield workbook
+        finally:
+            workbook.close()
+        return
+
+    key = (_file_cache_key(path), bool(data_only))
+    if key[0] is None:
+        # stat 不到（文件不存在等）⇒ 不进缓存，退化成即用即关，交由 openpyxl 抛原生错误。
+        workbook = openpyxl.load_workbook(path, read_only=True, data_only=data_only)
+        try:
+            yield workbook
+        finally:
+            workbook.close()
+        return
+
+    hit = cache.get(key)
+    if hit is None:
+        hit = openpyxl.load_workbook(path, read_only=True, data_only=data_only)
+        cache[key] = hit
+    # 作用域持有者负责 close，这里**不**关。
+    yield hit
+
+
+#: 字节身份的作用域键前缀。刻意不是一个路径形态的字符串：
+#: :func:`release_scoped_workbooks` 按 ``k[0][0] == str(path.resolve())`` 匹配，
+#: 而 `resolve()` 出来的永远是绝对路径 ⇒ 这个 tag 不可能与任何路径相撞，
+#: 字节条目因此**不会**被按路径释放误清（也不会反过来遮住某个路径条目）。
+_BYTES_SCOPE_TAG: Final[str] = "bytes:sha256"
+
+
+def _bytes_scope_key(
+    data: bytes, *, data_only: bool, read_only: bool
+) -> tuple[tuple[Any, ...], bool]:
+    """字节身份 + 解析形态 → 作用域键。
+
+    形态（``read_only``）进键而不是被抹掉：``read_only=True`` 的 workbook 不提供
+    ``ws._cells`` / ``row_dimensions`` 这些完整 DOM 才有的面，两种解析结果**不可**
+    互相冒充（与 ``data_only`` 同一条纪律，design 三点名的那条）。
+    """
+    identity = (_BYTES_SCOPE_TAG, hashlib.sha256(data).hexdigest(), len(data), read_only)
+    return (identity, bool(data_only))
+
+
+def shared_workbook_from_bytes(
+    data: bytes, *, data_only: bool = False, read_only: bool = False
+) -> Any:
+    """作用域内同一份**字节**的 workbook 只解析一次，返回**共享**对象。
+
+    与 :func:`_acquire_read_only_workbook` 的差别只有「身份怎么算」：那边的输入是
+    路径（身份 = 路径 + mtime + size），这边的输入是内存里的字节（身份 = sha256 +
+    长度）。缓存**还是同一个** :func:`workbook_read_scope` 的 dict —— 需求 2.2 明令
+    不得新引入第二套 workbook 缓存（模块级长存缓存会让 Windows 删不掉临时文件，
+    任务 6 已实测：把 `release_scoped_workbooks` 换 no-op 即刻 WinError 32）。
+
+    🔴 **调用方不得改这个 workbook。** 它是完整 DOM（``read_only=False``），因此是可写
+    对象，而它被本作用域内后续全部同字节消费方共享：任何就地改动都会串到别人身上。
+    需要改的路径（``materialize_transposed_workbook``）必须自己 ``load_workbook``
+    一份私有副本 —— 那正是它今天的做法，本函数不给它用。
+
+    「不得改」在实现上不只是口头约定：
+    * ``extract_transposed_workbook`` 读格子走 :func:`_cell_ro` 形态的非惰性读取，
+      不会往 ``ws._cells`` 里新建空格（openpyxl 的 ``ws.cell()`` 会）；
+    * 判据 `test_single_pass_parse_reuse.py` 逐消费方比对共享对象的 ``_cells`` 键集合，
+      有人开始就地改就打红。
+
+    作用域之外（cache 为 None）退化成即用即弃的一次性解析 —— 与优化前逐字节相同。
+    """
+    import openpyxl
+
+    cache = _workbook_scope.get()
+    if cache is None:
+        return openpyxl.load_workbook(
+            io.BytesIO(data), data_only=data_only, read_only=read_only
+        )
+    key = _bytes_scope_key(data, data_only=data_only, read_only=read_only)
+    hit = cache.get(key)
+    if hit is None:
+        hit = openpyxl.load_workbook(
+            io.BytesIO(data), data_only=data_only, read_only=read_only
+        )
+        cache[key] = hit
+    return hit
+
+
+#: 纯解析结果记忆化条目的键前缀。键形如 `(("parse-memo", kind, identity),)` —— 一元组，
+#: 且 `[0][0]` 是这个 tag（不可能等于 `Path.resolve()` 出来的绝对路径）⇒ 与 workbook 条目、
+#: 与 `release_scoped_workbooks` 的按路径匹配都不会撞。
+_PARSE_MEMO_TAG: Final[str] = "parse-memo"
+
+
+def _zip_identity(zf: zipfile.ZipFile) -> tuple[str, int, int] | None:
+    """一个打开的 ZipFile 的文件身份（路径 + mtime + size），与 workbook 缓存同一口径。
+
+    `BytesIO` 上打开的 zip 没有 `filename` ⇒ 返回 `None`，调用方退化成不记忆化
+    （宁可多解析一次，也不拿一个可能撞车的身份去命中缓存）。
+    """
+    name = getattr(zf, "filename", None)
+    if not isinstance(name, str) or not name:
+        return None
+    return _file_cache_key(Path(name))
+
+
+def scoped_parse_memo(
+    kind: str, identity: tuple[Any, ...] | None, compute: "Any"
+) -> Any:
+    """作用域内按 ``(kind, identity)`` 记忆化一个**纯解析结果**。
+
+    需求 2 的用户故事原话是「我不希望『读同一个文件三次』这种成本被当成固有成本接受」——
+    它不只指 `openpyxl.load_workbook`。真库 D4 的 CPU 段实测同一份产物字节上还有两处
+    「每消费方一次」的重复解析：
+
+    * `xl/workbook.xml` + 全部 46 张 sheet 的 `<tableParts>` → `xl/tables/*.xml`
+      （`_sheet_part_map` / `parse_tables`）被 78 个 binding 各解析一遍；
+    * `xl/sharedStrings.xml` 的前缀 digest 被 117 次 unmanaged 比对各算一遍。
+
+    两者都是**字节的纯函数**（同一份字节 ⇒ 同一个结果），因此可以按文件身份记忆化。
+
+    🔴 **不是第二套缓存**（需求 2.2）：条目挂在**同一个** :func:`workbook_read_scope`
+    的 dict 上，作用域退出即全没；这些条目不持任何句柄，因此也不会重演任务 6 那个
+    「Windows 删不掉临时文件」的问题。
+
+    ⚠️ 返回的是**共享对象**（list/dict/tuple）。调用方不得就地改它 —— 现有四个消费方
+    全是只读（列表推导 / `next(...)` / 取下标），由 `test_single_pass_parse_reuse.py` 的
+    「段末重解析一次必须与记忆化的内容相等」判据守着。
+    """
+    if identity is None:
+        return compute()
+    cache = _workbook_scope.get()
+    if cache is None:
+        return compute()
+    key = ((_PARSE_MEMO_TAG, kind, identity),)
+    if key in cache:
+        return cache[key]
+    value = compute()
+    cache[key] = value
+    return value
 
 
 def _collect_fields(

@@ -112,6 +112,13 @@ function handleImportUpload(file: File): boolean {
   importData('D4-12', file)
   return false
 }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) handleImportUpload(f) }
+  input.click()
+}
 
 // ─── Tab 管理 ────────────────────────────────────────────────────────
 const activeTab = ref('')
@@ -242,6 +249,8 @@ function fmtAmount(v: number): string {
   if (!v) return '—'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 <template>
@@ -253,20 +262,7 @@ function fmtAmount(v: number): string {
         <el-tag :type="d412SyncStateTag.type" size="small" effect="light">{{ d412SyncStateTag.text }}</el-tag>
       </div>
       <div class="mode-bar-right">
-        <el-dropdown size="small" trigger="click" :disabled="isReadonly">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-              <el-dropdown-item>
-                <el-upload :show-file-list="false" accept=".xlsx,.xls" :before-upload="handleImportUpload" :disabled="importing">
-                  <span>{{ importing ? '导入中...' : '导入数据' }}</span>
-                </el-upload>
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        
         <span class="chip-label">关联</span>
         <GtIndexChip value="wp:D4-5" :context-project-id="projectId" />
         <GtIndexChip value="wp:D4-17" :context-project-id="projectId" />

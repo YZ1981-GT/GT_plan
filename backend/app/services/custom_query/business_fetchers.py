@@ -133,7 +133,7 @@ async def _dispatch(
     )
 
     if is_module_cell_source(source):
-        return await module_cell_resolver.resolve(db, source, pid, year)
+        return await module_cell_resolver.resolve(db, source, pid, year, filters=filters)
 
     # ── disclosure_note:{section_id}（附注树叶子）──
     if source.startswith("disclosure_note:"):

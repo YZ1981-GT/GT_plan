@@ -237,6 +237,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import K6NoteBlockTables from './K6NoteBlockTables.vue'
 import { buildK6SyncPayload, K6_NOTE_SECTION } from '../../composables/k6NoteSectionMap'
 import { useK6NoteBlocks } from '../../composables/useK6NoteBlocks'
+import { newRowIdentity } from '../../composables/shared/rowIdentity'
 
 const K6_ACCOUNT_CODE = '1481'
 
@@ -317,7 +318,7 @@ function initDefaultAssetTable(): void {
   const categories = ['固定资产', '在建工程', '无形资产', '长期股权投资', '投资性房地产', '其他非流动资产']
   assetTable.value = [
     ...categories.map((cat, idx) => ({
-      id: `asset-${idx}`,
+      id: newRowIdentity('asset'),
       category: cat,
       originalCost: 0,
       accumulatedDep: 0,
@@ -355,7 +356,7 @@ function initDefaultLiabTable(): void {
   const categories = ['应付账款', '其他应付款', '预收款项', '应付职工薪酬', '其他']
   liabilityTable.value = [
     ...categories.map((cat, idx) => ({
-      id: `liab-${idx}`,
+      id: newRowIdentity('liab'),
       category: cat,
       openingBalance: 0,
       increase: 0,

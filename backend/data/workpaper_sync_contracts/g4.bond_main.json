@@ -1,0 +1,159 @@
+{
+  "contract_id": "g4.bond_main",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "88c1975fb5c27b9abaa7bc33f8ff668cfefb640fe4c88971f9fb2e5f42678dfb",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-g4-bond-investment-main",
+    "html_store": {
+      "item_ids": [
+        "G4-7-items"
+      ],
+      "note": "G9 其他非流动金融资产的明细行存成 checklist_responses 的 **remark** JSON 数组（真库实证 remark 605 B / conclusion 0 B）。🔴 三个受管区（其他非流动金融资产 / 划分为FVTPL / 指定为FVTPL）共用**同一个** `G4-2-rows` 数组，行的区归属由 `section` 字段表达 —— 契约里对应三条 `tables[]`（逐段不同 uuid_col 与行区间），但 `html_store.item_ids` 只有一条。",
+      "payload_column": "remark",
+      "payload_column_mode": "remark_only",
+      "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG9Detail.ts —— 写入点为 debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(list) })",
+      "row_section_field": "section",
+      "row_section_values": [],
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "phase5_bond_investment",
+    "reviewed_basis": "openpyxl 逐格实测 G/G4 债权投资.xlsx 的 `明细表G9-2`（两级表头 R9 组 / R10 叶子 / 三个受管区 R12-16·R19-23·R26-28 / 区标题行 R11·R18·R25 无公式 / 小计 R17·R24·R29 / 合计 R30 枚举相加 =SUM(C17,C24,C29) / 12 个公式列 E·H·I·J·L·P·Q·R·U·V·W·Y 共 156 格 / 有效内容列 28 即 A-AB / 0 个 definedName / 受管表零裸 IF) + 前端 `useG9Detail.ts` 按值 grep（ITEM_ID_ROWS / genId 带随机后缀 / G9DetailRow 28 字段与模板列序 A..AB 逐列对应 / G9_SECTIONS 三段） + 模板编制思路见 spec evidence/task8-template-design-logic.md（CAS22 FVTPL 口径 / 三分量恒等式 成本+累计公允价值变动=公允价值 / 四阶段 未审→账项调整→审定→重分类报表 / P=C+M 与 Q=D+N 走未审线）"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "有价证券盘点表G4-7",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "g407-managed",
+      "tables": [
+        {
+          "anchor": "A13",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "security_name",
+              "header_source_ref": "源xlsx!有价证券盘点表G4-7!B13",
+              "header_text": "证券名称",
+              "json_pointer": "/rows/{row_uuid}/securityName",
+              "mode": "editable",
+              "source_ref": "源xlsx!有价证券盘点表G4-7!B14",
+              "stable_field_key": "g4_7_items/{row_uuid}/security_name",
+              "store_item_id": "G4-7-items",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "face_value",
+              "header_source_ref": "源xlsx!有价证券盘点表G4-7!C13",
+              "header_text": "面值",
+              "json_pointer": "/rows/{row_uuid}/faceValue",
+              "mode": "editable",
+              "source_ref": "源xlsx!有价证券盘点表G4-7!C14",
+              "stable_field_key": "g4_7_items/{row_uuid}/face_value",
+              "store_item_id": "G4-7-items",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "quantity",
+              "header_source_ref": "源xlsx!有价证券盘点表G4-7!D13",
+              "header_text": "数量",
+              "json_pointer": "/rows/{row_uuid}/quantity",
+              "mode": "editable",
+              "source_ref": "源xlsx!有价证券盘点表G4-7!D14",
+              "stable_field_key": "g4_7_items/{row_uuid}/quantity",
+              "store_item_id": "G4-7-items",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "total",
+              "header_source_ref": "源xlsx!有价证券盘点表G4-7!E13",
+              "header_text": "总计",
+              "json_pointer": "/rows/{row_uuid}/total",
+              "mode": "editable",
+              "source_ref": "源xlsx!有价证券盘点表G4-7!E14",
+              "stable_field_key": "g4_7_items/{row_uuid}/total",
+              "store_item_id": "G4-7-items",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "coupon_rate",
+              "header_source_ref": "源xlsx!有价证券盘点表G4-7!F13",
+              "header_text": "票面利率",
+              "json_pointer": "/rows/{row_uuid}/couponRate",
+              "mode": "editable",
+              "source_ref": "源xlsx!有价证券盘点表G4-7!F14",
+              "stable_field_key": "g4_7_items/{row_uuid}/coupon_rate",
+              "store_item_id": "G4-7-items",
+              "value_type": "rate"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "maturity_date",
+              "header_source_ref": "源xlsx!有价证券盘点表G4-7!G13",
+              "header_text": "到期日",
+              "json_pointer": "/rows/{row_uuid}/maturityDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!有价证券盘点表G4-7!G14",
+              "stable_field_key": "g4_7_items/{row_uuid}/maturity_date",
+              "store_item_id": "G4-7-items",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "三、审计说明：",
+            "search_column": "A"
+          },
+          "formula_mask": [],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "g4_7_items",
+          "uuid_col": "H"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "b6e0c9f90092449dfa4b9abac7d2c4aabd700e1a29ea75810f60769aacc23c5b",
+    "relative_path": "G/G4 债权投资.xlsx",
+    "template_sha256": "df73c58aa3ec6b7d0c85053c24e1bc045fce62cebe83655a4276e5b7d5a4e58a"
+  },
+  "template_definition_sha256": "24d2823cf7f98dacbd653aaa7aa09c7ef22a653cb757ad2c09ba23bd6aa31d7a"
+}

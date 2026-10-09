@@ -38,6 +38,15 @@ def _create_app() -> FastAPI:
     async def forbidden():
         raise HTTPException(status_code=403, detail="权限不足")
 
+    @test_app.get("/api/conflict-dict")
+    async def conflict_dict():
+        # 全仓大量 router 用 dict detail 传结构化错误码，前端按 `detail.error_code`
+        # 这类读法取值，所以「dict 不被字符串化」是跨层契约的一部分。
+        raise HTTPException(
+            status_code=409,
+            detail={"error_code": "data_version_conflict", "server_version": 5},
+        )
+
     @test_app.post("/api/items")
     async def create_item(item: ItemCreate):
         return {"id": 1, "name": item.name}
@@ -86,6 +95,43 @@ async def test_http_exception_403(client):
     body = resp.json()
     assert body["code"] == 403
     assert body["message"] == "权限不足"
+
+
+@pytest.mark.asyncio
+async def test_http_exception_dict_detail_stays_dict(client):
+    """dict 形态的 ``detail`` 必须原样落在 ``message``，不得被字符串化。
+
+    跨层契约：前端 ``utils/http.ts::normaliseErrorEnvelope`` 把 ``message`` 回填成
+    ``detail`` 供下游读取，``handleApiError`` 与各视图靠 ``detail.error_code`` /
+    ``detail.message`` 做分派。一旦这里退化成 ``str(exc.detail)``，前端拿到的就是
+    ``"{'error_code': ...}"`` 这种字符串，所有结构化分派会静默失效（只走兜底文案）。
+    """
+    resp = await client.get("/api/conflict-dict")
+    assert resp.status_code == 409
+    body = resp.json()
+    assert isinstance(body["message"], dict), "dict detail 被字符串化 ⇒ 前端结构化分派全失效"
+    assert body["message"]["error_code"] == "data_version_conflict"
+    assert body["message"]["server_version"] == 5
+
+
+@pytest.mark.asyncio
+async def test_http_exception_body_has_no_detail_key(client):
+    """业务 ``HTTPException`` 的响应体**不含** ``detail`` 键 —— 固化这个事实本身。
+
+    平台信封是 ``{code, message, data}``，全局处理器把 ``exc.detail`` 放进 ``message``。
+    但 FastAPI/starlette 原生错误（路由 404、``RequestValidationError``）输出的是
+    ``detail``，两种形状在同一个 API 上并存。前端因此在 ``utils/http.ts`` 的响应拦截器里
+    统一回填 ``detail``（并有 ``errorEnvelopeNormalisation.spec.ts`` 守着）。
+
+    这条判据是那段前端适配存在的**理由锚点**：若哪天这里改成同时输出 ``detail``，
+    它会转红，提示去评估前端适配是否该一并收敛，而不是让两处默默地各写一份。
+    真栈实测（2026-09-23，后端 9980）：``GET /api/projects/{不存在}`` ⇒
+    ``{"code":404,"message":"项目不存在"}``。
+    """
+    for path in ("/api/not-found", "/api/forbidden", "/api/conflict-dict"):
+        body = (await client.get(path)).json()
+        assert "detail" not in body, f"{path} 开始输出 detail 了，请同步评估前端信封适配"
+        assert set(body.keys()) == {"code", "message"}
 
 
 # --- RequestValidationError 处理 ---

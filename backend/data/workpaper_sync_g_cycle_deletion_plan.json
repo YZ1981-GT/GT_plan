@@ -36,18 +36,25 @@
     "unreachable_reason_from_manifest": "Historical simplified stub; htmlRendererRegistry resolves g6-other-bond-investment-ecl to GtG6OtherBondInvestmentEcl.vue",
     "delete_only_after": "无前置 —— 它零入边，删除不影响任何运行路径。归 Task 66/72 是流程要求（删除生产源码属破坏性操作，需专门任务与门），不是技术阻塞。",
     "blocking_precondition": "BP-11",
-    "guard": "守卫锁死它仍然零入边，且**按模块边判而不是按符号名判**：① 全仓（audit-platform/frontend/src 的 .ts/.vue，排除 __tests__、旧桩自身与生成物 components.d.ts）没有任何 import 指向 `GtG6OtherBondEcl.vue`，也没有任何模板用 `<GtG6OtherBondEcl` / `<gt-g6-other-bond-ecl` 标签；② registry 里那条同名别名必须仍然指向 GtG6OtherBondInvestmentEcl.vue（形态一变即红，见 registry_homonymous_alias）；③ 探针带反向自检 —— 同一把尺量 GtG6OtherBondInvestmentEcl.vue 的 import 必须命中，否则「零入边」是探针恒假；④ components.d.ts 是否声明旧桩这一事实也双向锁（generated_dts_declares_it）。若有人给旧桩接了真入边（救活它），①打红。",
+    "guard": "守卫锁死它仍然零入边，且**按模块边判而不是按符号名判**：① 全仓（audit-platform/frontend/src 的 .ts/.vue，排除 __tests__、旧桩自身与生成物 components.d.ts）没有任何 import 指向 `GtG6OtherBondEcl.vue`，也没有任何模板用 `<GtG6OtherBondEcl` / `<gt-g6-other-bond-ecl` 标签；② G6-ecl 组件必须仍在 `registry/entries/specialized.ts` 以**直接 import** 登记（2026-09-27：原 htmlRendererRegistry.ts 的同名别名已随拆分重构消失，见 registry_homonymous_alias.removed_by）；③ 探针带反向自检 —— 同一把尺量 GtG6OtherBondInvestmentEcl.vue 的 import 必须命中，否则「零入边」是探针恒假；④ components.d.ts 是否声明旧桩这一事实也双向锁（generated_dts_declares_it）。若有人给旧桩接了真入边（救活它），①打红。",
     "generated_dts_declares_it": true,
     "registry_homonymous_alias": {
-      "declared_in": "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
-      "declared_at": "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts#L378",
+      "declared_in": null,
+      "declared_at": null,
       "alias_name": "GtG6OtherBondEcl",
+      "alias_still_exists": false,
       "resolves_to": "GtG6OtherBondInvestmentEcl.vue",
       "is_an_inbound_edge_to_the_stub": false,
-      "verbatim": "const GtG6OtherBondEcl = defineAsyncComponent(() => import('./GtG6OtherBondInvestmentEcl.vue'))",
-      "why_name_based_probes_misfire": "registry 里这个**局部常量**叫 GtG6OtherBondEcl，指向的却是真正在用的 GtG6OtherBondInvestmentEcl.vue（短名变量 + 长名文件）。任何按**符号名**判「旧桩是否被引用」的探针都会在这里命中并误报「旧桩被救活」—— Task 49 首轮的守卫正是这么红的：它先 `registry.replace('GtG6OtherBondInvestmentEcl','')` 消掉长名再查短名，结果把别名声明行留成 `const GtG6OtherBondEcl = … import('./.vue')`，短名照样在。正确判据是按**模块边**：全仓有没有 import 指向 `GtG6OtherBondEcl.vue` 这个路径，以及有没有模板用 `<GtG6OtherBondEcl` / `<gt-g6-other-bond-ecl` 标签（后者会经 unplugin-vue-components 的全局注册解析到该文件）。实测两类边都是 0。",
-      "measured": "2026-08-16 全仓实扫（audit-platform/frontend/src 下 .ts/.vue，排除 __tests__、旧桩自身与生成物 components.d.ts，共扫 1000+ 模块）：按路径 import 命中 0 处、按标签使用命中 0 处。出现字符串 `GtG6OtherBondEcl` 的位置共 5 处，逐处归因：① htmlRendererRegistry.ts#L378 同名别名（指向 InvestmentEcl.vue，非入边）② htmlRendererRegistry.ts#L1465 `component: GtG6OtherBondEcl`（用的是①那个别名，非入边）③ GtG6OtherBondInvestmentEcl.vue#L110-L111 注释（逐字写着「根目录 GtG6OtherBondEcl.vue 为历史简版桩，不再被 registry 引用」）④ components.d.ts#L1123 unplugin-vue-components 生成的全局组件类型声明（生成物，按目录扫全部 .vue 得来，非运行时边）⑤ workpaperSyncManifest.generated.ts#L3390/L3408 生成的 manifest 把它登记为 hostPath / source_host（那正是它作为 unreachable entry 被登记的地方）。",
-      "note_on_generated_dts": "components.d.ts 会为旧桩生成一条全局组件声明（`GtG6OtherBondEcl: typeof import('./components/workpaper/GtG6OtherBondEcl.vue')['default']`）。它是 unplugin-vue-components 按目录扫出来的**生成物**，不是人写的引用；但它的存在意味着「只要有人在任意模板里写 `<GtG6OtherBondEcl/>`，旧桩就会被真正加载」—— 所以守卫同时锁死标签用法为 0。删桩后该声明会随下次生成自动消失。"
+      "verbatim": null,
+      "removed_by": "commit 82f58ea44 把 htmlRendererRegistry.ts **拆分重构**（1465 行 → 361 行）：组件登记移到 `registry/entries/{core,forms,programs,confirmations,reports,specialized}.ts` 六个子模块，原 `htmlRendererRegistry.ts#L378` 的同名局部别名`const GtG6OtherBondEcl = defineAsyncComponent(() => import('./GtG6OtherBondInvestmentEcl.vue'))`随之消失。2026-09-27 现算：`htmlRendererRegistry.ts` 全文 `GtG6OtherBond` **零命中**。",
+      "live_registration_now": {
+        "file": "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts",
+        "component_type": "g6-other-bond-investment-ecl",
+        "import_specifier": "../../GtG6OtherBondInvestmentEcl.vue",
+        "form": "direct_import_no_homonymous_alias"
+      },
+      "why_name_based_probes_misfire": "【历史】重构前 `htmlRendererRegistry.ts#L378` 有一个**同名局部常量** `GtG6OtherBondEcl`，指向的却是真正在用的 `GtG6OtherBondInvestmentEcl.vue`（短名变量 + 长名文件）。任何按**符号名**判「旧桩是否被引用」的探针都会在这里命中并误报「旧桩被救活」—— Task 49 首轮守卫正是这么红的。【现状】该别名已随 registry 拆分消失，`specialized.ts` 用的是直接 import ⇒ 这个特定的误报源**已消除**。但判据形态**不改回按符号名**：`components.d.ts`（unplugin-vue-components 生成物）与 `workpaperSyncManifest.generated.ts`（把旧桩登记为 hostPath）里仍有该字符串，按符号名判照样会误报。按**模块边**判这条纪律与别名在不在无关。",
+      "measured": "2026-09-27 现算：① `htmlRendererRegistry.ts` 的 `GtG6OtherBond` 命中 0 处（重构后该文件只留 6 条子模块 import 与类型/工具导出）；② `registry/entries/specialized.ts` 有 `componentType: 'g6-other-bond-investment-ecl'` → `import('../../GtG6OtherBondInvestmentEcl.vue')`，为**直接 import**、无同名别名；③ 旧桩 `GtG6OtherBondEcl.vue` 仍在磁盘，全仓按模块边扫入边仍为 0（BP-11 结论不变）。"
     }
   },
   "entries": [

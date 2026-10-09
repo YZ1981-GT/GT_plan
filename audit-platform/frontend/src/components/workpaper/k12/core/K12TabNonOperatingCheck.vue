@@ -231,7 +231,7 @@
         v-if="showSamplingDialog && props.wpId && props.projectId"
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
-        account-code="6301"
+        :account-code="samplingAccountCode"
         phase="final"
         :year="currentYear"
         @filled="handleVoucherFilled"
@@ -299,12 +299,24 @@ import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { generateK12AiText } from '../../composables/useK12AiText'
+/**
+ * 科目码单一真源（原硬编码 `"6301"`）。
+ *
+ * 🔴 取值不变（真源 `K12_FALLBACK_STANDARD` 亦为 `6301` 营业外收入）⇒ 运行时行为不变。
+ * 改接真源的理由：`wp_account_mapping.json` 的 K12 条目是 `6001`（主营业务收入，**错**），
+ * 接真源后消除"照 json 改坏"的风险。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.5/R5.4
+ */
+import { K12_FALLBACK_STANDARD } from '../../composables/k12AccountScope'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 const GtReviewTrigger = defineAsyncComponent(() => import('../../GtReviewTrigger.vue'))
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),
 )
+
+/** 抽凭科目码（真源，本组件无 tbSourceCodes prop ⇒ 取兜底标准码） */
+const samplingAccountCode = K12_FALLBACK_STANDARD
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -604,7 +616,7 @@ function handleVoucherFilled(payload: any): void {
   }
 }
 
-// ─── 行级OCR（📎附件列 → POST /d4/contract-ocr → ElMessageBox确认 → merge） ─
+// ─── 行级OCR（📎附件列 → POST /api/workpapers/{wpId}/d4/contract-ocr → ElMessageBox确认 → merge） ─
 
 const ocrFileInput = ref<HTMLInputElement | null>(null)
 let currentOcrRowKey = ''
@@ -625,7 +637,7 @@ async function handleOcrFileSelected(event: Event): Promise<void> {
     formData.append('file', file)
 
     ElMessage.info('正在OCR识别...')
-    const res = await http.post('/api/d4/contract-ocr', formData, {
+    const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     const ocrData = res.data?.data || res.data || {}

@@ -62,25 +62,55 @@
       </div>
     </div>
 
-    <!-- ═══ 明细表（27×40简化） ═══ -->
-    <el-table
-      :data="rows"
-      border
-      size="small"
-      style="width: 100%"
-    >
-      <el-table-column type="index" label="#" width="50" align="center" />
-
-      <el-table-column prop="instrumentName" label="工具名称" min-width="180">
-        <template #default="{ row, $index }">
-          <el-input v-if="!isReadonly" v-model="row.instrumentName" size="small" @change="triggerSave($index)" />
-          <span v-else>{{ row.instrumentName || '—' }}</span>
+    <!-- ═══ 明细表：列与模板 L4-3 的 A..AM 逐列对齐（行身份 rowId，整表一条 item L4-3-rows） ═══ -->
+    <el-table :data="rows" row-key="rowId" border size="small" style="width: 100%" max-height="560">
+      <el-table-column type="index" label="#" width="50" align="center" fixed="left" />
+      <el-table-column
+        v-for="col in SCALAR_COLUMNS"
+        :key="col.key"
+        :label="col.label"
+        :min-width="col.width"
+        :align="col.kind === 'number' ? 'right' : 'left'"
+        :fixed="col.key === 'instrumentName' ? 'left' : undefined"
+      >
+        <template #default="{ row }">
+          <template v-if="!isReadonly">
+            <el-input-number
+              v-if="col.kind === 'number'"
+              v-model="row[col.key]"
+              :controls="false"
+              size="small"
+              style="width: 100%"
+              @change="persist"
+            />
+            <el-input v-else v-model="row[col.key]" size="small" @change="persist" />
+          </template>
+          <span v-else>{{ col.kind === 'number' ? fmtAmount(row[col.key]) : (row[col.key] || '—') }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="工具类型" min-width="130">
-        <template #default="{ row, $index }">
-          <el-select v-if="!isReadonly" v-model="row.instrumentType" size="small" style="width:100%" @change="triggerSave($index)">
+      <el-table-column v-for="g in PAIR_GROUPS" :key="g.stem" :label="g.label" align="center">
+        <el-table-column v-for="unit in UNITS" :key="unit.suffix" :label="unit.label" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly && !g.formula"
+              v-model="row[g.stem + unit.suffix]"
+              :controls="false"
+              size="small"
+              style="width: 100%"
+              @change="persist"
+            />
+            <span v-else :class="{ 'formula-cell': g.formula }">{{
+              fmtAmount(g.formula ? applyL4_3Formulas(row)[g.stem + unit.suffix] : row[g.stem + unit.suffix])
+            }}</span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <!-- HTML 侧补充信息（模板无对应列，不进 OnlyOffice） -->
+      <el-table-column label="工具类型" min-width="120">
+        <template #default="{ row }">
+          <el-select v-if="!isReadonly" v-model="row.instrumentType" size="small" style="width: 100%" @change="persist">
             <el-option label="优先股" value="优先股" />
             <el-option label="永续债" value="永续债" />
             <el-option label="可回售工具" value="可回售工具" />
@@ -89,45 +119,16 @@
           <span v-else>{{ row.instrumentType || '—' }}</span>
         </template>
       </el-table-column>
-
-      <el-table-column label="合同条款" min-width="200">
-        <template #default="{ row, $index }">
-          <el-input v-if="!isReadonly" v-model="row.contractTerms" size="small" @change="triggerSave($index)" />
-          <span v-else>{{ row.contractTerms || '—' }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="划分为负债原因" min-width="200">
-        <template #default="{ row, $index }">
-          <el-input v-if="!isReadonly" v-model="row.liabilityReason" size="small" @change="triggerSave($index)" />
+      <el-table-column label="划分为负债原因" min-width="180">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" v-model="row.liabilityReason" size="small" @change="persist" />
           <span v-else>{{ row.liabilityReason || '—' }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="初始确认金额" min-width="130" align="right">
-        <template #default="{ row, $index }">
-          <el-input-number v-if="!isReadonly" v-model="row.initialAmount" :controls="false" size="small" style="width:100%" @change="triggerSave($index)" />
-          <span v-else>{{ fmtAmount(row.initialAmount) }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="期末余额" min-width="130" align="right">
-        <template #default="{ row, $index }">
-          <el-input-number v-if="!isReadonly" v-model="row.endBalance" :controls="false" size="small" style="width:100%" @change="triggerSave($index)" />
-          <span v-else>{{ fmtAmount(row.endBalance) }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="公允价值计量" width="110" align="center">
-        <template #default="{ row, $index }">
-          <el-checkbox v-model="row.isFairValue" :disabled="isReadonly" @change="triggerSave($index)" />
-        </template>
-      </el-table-column>
-
-      <!-- 操作列 -->
-      <el-table-column label="操作" width="70" align="center" v-if="!isReadonly">
-        <template #default="{ $index }">
-          <el-button type="danger" text size="small" @click="removeRow($index)">删除</el-button>
+      <el-table-column v-if="!isReadonly" label="操作" width="70" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-button type="danger" text size="small" @click="removeRow(row.rowId)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -135,7 +136,7 @@
     <!-- ═══ 合计 ═══ -->
     <div class="summary-bar">
       <span>共 <strong>{{ rows.length }}</strong> 项工具</span>
-      <span>期末余额合计：<strong>{{ fmtAmount(totalEndBalance) }}</strong></span>
+      <span>审定期末金额合计：<strong>{{ fmtAmount(totalAuditedEnd) }}</strong></span>
     </div>
 
     <!-- ═══ 审计说明 ═══ -->
@@ -175,14 +176,27 @@
 /**
  * L4TabFinLiabOther — L4-3 划分为金融负债的其他金融工具明细表
  *
- * Requirements: 7.4
- * - 27×40 表格（简化展示关键列）
- * - 动态行 + 8个公式/逻辑字段
+ * spec: l-cycle-true-adapter-registration · Task 12（L4 真双向，受管表即本表）
+ * - 列与模板 L4-3 的 A..AM 逐列对齐（38 个受管字段）；R/S、AF~AM 为公式列，只显示计算值
+ * - 整表存一条 item `L4-3-rows`（JSON 数组，稳定 rowId），删行按 rowId
+ * - 🔴 旧键 `L4-3-row-{index+1}-data` 是位置化行身份且无 hydration（刷新即丢），已废弃
  */
 import { computed, inject, onMounted, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { useL4FormData } from '../../composables/useL4FormData'
+import { useDecimalCalc } from '@/composables/useDecimalCalc'
+import {
+  L4_3_FORMULA_STEMS,
+  L4_3_ROWS_ITEM_ID,
+  applyL4_3Formulas,
+  createEmptyFinLiabRow,
+  parseL4_3Rows,
+  removeL4_3RowById,
+  serializeL4_3Rows,
+  type L4FinLiabRow,
+  type L4PairStem,
+} from '../../composables/useL4FinLiabRows'
 
 const props = defineProps<{
   wpId: string
@@ -190,7 +204,7 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'navigate', sheetName: string): void
 }>()
 
@@ -201,24 +215,61 @@ const formData = useL4FormData({
   projectId: computed(() => props.projectId),
 })
 
-interface FinLiabRow {
-  instrumentName: string
-  instrumentType: string
-  contractTerms: string
-  liabilityReason: string
-  initialAmount: number
-  endBalance: number
-  isFairValue: boolean
+type ScalarColumn = { key: string; label: string; width: number; kind: 'text' | 'number' }
+const SCALAR_COLUMNS: ScalarColumn[] = [
+  { key: 'instrumentName', label: '发行在外的金融工具', width: 180, kind: 'text' },
+  { key: 'issueDate', label: '发行时间', width: 110, kind: 'text' },
+  { key: 'accountingClass', label: '会计分类', width: 120, kind: 'text' },
+  { key: 'rate', label: '股利率或利息率', width: 110, kind: 'number' },
+  { key: 'issuePrice', label: '发行价格', width: 110, kind: 'number' },
+  { key: 'issueQty', label: '数量', width: 100, kind: 'number' },
+  { key: 'issueAmount', label: '金额', width: 120, kind: 'number' },
+  { key: 'maturity', label: '到期日或续期情况', width: 150, kind: 'text' },
+  { key: 'conversionTerms', label: '转股条件', width: 140, kind: 'text' },
+  { key: 'conversionStatus', label: '转换情况', width: 120, kind: 'text' },
+]
+
+const PAIR_LABELS: Record<L4PairStem, string> = {
+  unauditedPrior: '未审 · 期初余额',
+  unauditedIncrease: '未审 · 本期增加',
+  unauditedDecrease: '未审 · 本期减少',
+  unauditedEnd: '未审 · 期末余额',
+  priorAje: '期初调整 · 账项调整',
+  priorRje: '期初调整 · 重分类调整',
+  ajeIncrease: '账项调整 · 本期增加',
+  ajeDecrease: '账项调整 · 本期减少',
+  rjeIncrease: '重分类调整 · 本期增加',
+  rjeDecrease: '重分类调整 · 本期减少',
+  auditedPrior: '审定数 · 期初余额',
+  auditedIncrease: '审定数 · 本期增加',
+  auditedDecrease: '审定数 · 本期减少',
+  auditedEnd: '审定数 · 期末余额',
 }
+const PAIR_GROUPS = (Object.keys(PAIR_LABELS) as L4PairStem[]).map((stem) => ({
+  stem,
+  label: PAIR_LABELS[stem],
+  formula: L4_3_FORMULA_STEMS.has(stem),
+}))
+const UNITS = [
+  { suffix: 'Qty', label: '数量' },
+  { suffix: 'Amount', label: '金额' },
+]
 
-const rows = ref<FinLiabRow[]>([])
-
-const totalEndBalance = computed(() => rows.value.reduce((sum, r) => sum + r.endBalance, 0))
+const rows = ref<L4FinLiabRow[]>([])
+const decimal = useDecimalCalc()
+const totalAuditedEnd = computed(() =>
+  Number(decimal.sum(...rows.value.map((r) => Number(applyL4_3Formulas(r).auditedEndAmount) || 0))),
+)
 
 const auditNote = ref('')
 
 function saveAuditNote() {
   formData.debouncedSave('L4-3-auditNote', { remark: auditNote.value || null })
+}
+
+/** 整表一次写一条 item（行身份稳定，删中间行不让后续行错位）。 */
+function persist() {
+  formData.debouncedSave(L4_3_ROWS_ITEM_ID, { remark: serializeL4_3Rows(rows.value) })
 }
 
 async function handleAddRow() {
@@ -228,27 +279,14 @@ async function handleAddRow() {
       cancelButtonText: '取消',
       inputValidator: (val) => (!val?.trim() ? '名称不能为空' : true),
     })
-    rows.value.push({
-      instrumentName: name?.trim() || '',
-      instrumentType: '',
-      contractTerms: '',
-      liabilityReason: '',
-      initialAmount: 0,
-      endBalance: 0,
-      isFairValue: false,
-    })
+    rows.value.push(createEmptyFinLiabRow(name?.trim() || ''))
+    persist()
   } catch { /* cancel */ }
 }
 
-function removeRow(index: number) {
-  rows.value.splice(index, 1)
-}
-
-function triggerSave(index: number) {
-  const row = rows.value[index]
-  if (!row) return
-  const n = index + 1
-  formData.debouncedSave(`L4-3-row-${n}-data`, { remark: JSON.stringify(row) })
+function removeRow(rowId: string) {
+  rows.value = removeL4_3RowById(rows.value, rowId)
+  persist()
 }
 
 function handleAI(section: string) {
@@ -262,13 +300,16 @@ function handleAI(section: string) {
 }
 function handleReview() { openReviewDialog?.() }
 
-function fmtAmount(val: number): string {
-  if (val === 0) return '—'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+function fmtAmount(val: unknown): string {
+  const n = Number(val)
+  if (!Number.isFinite(n) || n === 0) return '—'
+  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 onMounted(async () => {
   await formData.loadData()
+  rows.value = parseL4_3Rows(formData.allResponses.value.get(L4_3_ROWS_ITEM_ID)?.remark)
+  auditNote.value = formData.allResponses.value.get('L4-3-auditNote')?.remark || ''
 })
 </script>
 
@@ -294,6 +335,7 @@ onMounted(async () => {
 }
 
 .audit-note-card { margin-top: 16px; }
+.formula-cell { border-bottom: 1px dashed #909399; cursor: help; color: #606266; }
 .card-title { font-size: 14px; font-weight: 600; color: #303133; }
 
 .l4-details-tip {

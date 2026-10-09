@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-25",
+  "title": "D4-25 经销商检查 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "核查经销商的真实性、独立性和交易合理性，识别向经销商压货虚增收入、经销商为关联方或空壳等风险。",
+      "source_refs": []
+    },
+    {
+      "key": "materials",
+      "title": "二、资料准备",
+      "content": "逐个经销商填写：本期销售数量金额、占同类交易比例、期末应收余额、是否关联方、个人/企业性质、销售费用承担方式、补贴或返利、终端销售金额。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "三、审计关注点",
+      "content": "1. 经销商为个人：重点关注独立性与真实经营能力。\n2. 终端销售金额远低于经销商采购金额：识别压货虚增收入（渠道库存积压）。\n3. 补贴返利政策须有书面文件，异常返利关注是否变相退货或利益输送。\n4. 经销商为关联方：结合 D4-21 关联方价格分析评估公允性。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "bc030b9c0bcf47e6c64d3261276ea38e59404f57ba9d8b5c999a84f3cb26f1ee",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "c0ed1e3f51f951e1c19c67b1ca3035ad269d9a3ffb0f38a010645bb02ad431dc"
+  }
+}

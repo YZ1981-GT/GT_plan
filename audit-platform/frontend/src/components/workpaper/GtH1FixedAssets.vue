@@ -5,26 +5,39 @@
     </div>
 
     <template v-else>
-      <!-- 双模式切换器（OO 模式也需可见，否则无法切回结构化） -->
+      <!--
+        双模式切换器（OO 模式也需可见，否则无法切回结构化）。
+        🔴 改 `v-model` 且**不带 `:disabled`**：原 `:disabled="ooChecking"` 在切换进行中
+        锁死切换器、点击被吞（D4 bug ③）。健康门禁在 `useHSyncMode.switchMode` 里 await 兜底。
+      -->
       <div v-if="showModeSwitch" class="h1-mode-switch-bar">
-        <el-segmented
-          :model-value="currentMode"
-          :options="modeOptions"
-          size="small"
-          :disabled="ooChecking"
-          @change="onModeChange"
-        />
-        <el-tag v-if="!isOoAvailable && !ooChecking" size="small" type="info">OnlyOffice 不可用</el-tag>
+        <el-segmented v-model="currentMode" :options="modeOptions" size="small" />
+        <el-tag size="small" :type="hSync.syncStateTag.value.type">
+          {{ hSync.syncStateTag.value.text }}
+        </el-tag>
       </div>
 
-      <!-- OnlyOffice 模式 -->
+      <!--
+        受管 sheet（减少检查表H1-8）的在线编辑 —— 统一双向宿主。
+        🔴 `.oo-container` 必须有**确定高度**（D4 踩过 height:100% 被压成一条）。
+      -->
+      <div v-if="currentMode === 'onlyoffice' && isH1SyncManagedSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="hSync.descriptor.value"
+          :bridge="hSync.syncBridge"
+        />
+      </div>
+
+      <!-- 非受管 sheet 的 OnlyOffice 模式（legacy 只读视图，无双向回写） -->
       <GtOnlyOfficeSheet
-        v-if="currentMode === 'onlyoffice'"
+        v-else-if="currentMode === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
+        @fallback="onOoLoadFailed"
       />
 
       <!-- HTML 结构化视图 -->
@@ -330,8 +343,13 @@ import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useH1CrossSheet } from './composables/useH1CrossSheet'
-// Task 45: legacy useH1DualMode deleted — pilot host now delegates to sync bridge.
-import { usePilotBridgeAdapter } from './sync/usePilotBridgeAdapter'
+// Task 45 曾用 `usePilotBridgeAdapter`（零 API 空壳，见下方 hSync 注释）；现直接接统一双向桥。
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { useHSyncMode } from './composables/useHSyncMode'
+
+/** H1 entry id（manifest 冻结值，与 `pilot_h1_grouped_dynamic.PILOT_ENTRY_ID` 逐字一致）。 */
+const H1_SYNC_ENTRY_ID = 'xlsx/gt-h1-fixed-assets'
 import {
   buildDetailSeedRows,
   shouldSeedDetailRows,
@@ -413,34 +431,71 @@ const resolvedHtmlData = ref<any>(props.htmlData || null)
 const { depreciationForAlloc } = useH1CrossSheet(allResponses)
 const depreciationBranch = ref<'A' | 'B' | 'C'>('A')
 
-// ─── Task 45: bridge adapter replaces legacy useH1DualMode ──────────────────
-const dual = usePilotBridgeAdapter({
-  entryId: 'xlsx/gt-h1-fixed-assets',
+// ─── 双模式切换（统一接桥，替代空壳 usePilotBridgeAdapter）─────────────────────
+//
+// 🔴 原实现是 `usePilotBridgeAdapter`，它的 docstring 声称「底层全部委派给 sync bridge」，
+//    实现里却是：`switchMode()` 只置 `currentMode` + 写 localStorage（**零 API 调用**）、
+//    `isOoAvailable` 硬编码 `ref(true)`、`ooConfig` 恒 `null`（自称「仅作兼容占位」）。
+//    ⇒ H1 此前**没有**真双向回写：切 OO 渲染的是 legacy 只读 `GtOnlyOfficeSheet`，
+//    切回 HTML 只是重读 store，OO 侧的编辑从未被 materialize / forcesave / apply 回来。
+//    （同一诊断也写在 `sync/useD2SyncBridge.ts` 的模块头 —— D2 当时为此另建了真桥。）
+//
+// 🔴 H1 是全 H **唯一** `adapter_registered=True` 的 entry（契约 `h1.disposal_check` +
+//    manifest capability=bidirectional）⇒ 后端早就通了，卡的一直是前端这层空壳。
+const hSync = useHSyncMode({
+  entryId: H1_SYNC_ENTRY_ID,
   wpId: toRef(props, 'wpId'),
-  sheetName: computed(() => props.sheetName || ''),
-  flushBeforeOo: async () => { scheduleAutoSnapshot() },
+  projectId: toRef(props, 'projectId'),
+  currentCode: computed(() => currentSheet.value),
+  isReadonly,
+  flushHtml: async () => {
+    // 🔴 原 `flushBeforeOo` 传的是 `scheduleAutoSnapshot()` —— 那不是 flush（见
+    //    `flushPendingSaves` 的注释）。防抖窗口 800ms。
+    await flushPendingSaves()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: H1_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: hSync.sheetKey.value,
+    }
+  },
   reloadHtml: async () => { await selfLoad() },
 })
-const currentMode = dual.currentMode
-const modeOptions = dual.modeOptions
-const _rawOnModeChange = dual.onModeChange
-const isOoAvailable = dual.isOoAvailable
-// 🔴 适配器没有 `checking`（它不做 OO 健康探测，那是 bridge 的 materialize 职责）。
-// 写 `dual.checking` 得到 undefined，模板 `:disabled="ooChecking"` 恒 falsy ⇒
-// 切换过程中下拉不禁用、"OnlyOffice 不可用"标签的门控也失准，且四层验证全绿。
-// 语义对应项是 `switching`（模式切换进行中）。
-const ooChecking = dual.switching
 
-/** C1: 目录/程序表不支持在线编辑 */
-function onModeChange(val: string | number | boolean): void {
-  if (val === 'onlyoffice') {
-    const s = currentSheet.value
-    if (s === 'H1' || s.endsWith('A')) {
-      // 目录/程序表不切 OO
-      return
+/** 模板 `ref="syncEditorHostRef"` 的落点 —— 直接复用桥里的 ref。 */
+const syncEditorHostRef = hSync.syncHostRef
+const isH1SyncManagedSheet = computed(() => hSync.isManagedSheet.value)
+const modeOptions = hSync.modeOptions
+const currentMode = hSync.renderMode
+
+/**
+ * C1：底稿目录 / 程序表不支持在线编辑。
+ *
+ * 🔴 表达成 computed + `lastNotice`，**不**做成 `modeOptions` 的 `disabled` ——
+ *    切换器一旦 disabled，点击会被彻底吞掉（D4 已实证的 bug ③）。同 H2 的处置。
+ */
+const h1OnlineEditAllowed = computed(() => {
+  const s = currentSheet.value
+  return s !== '' && s !== 'H1' && !s.endsWith('A')
+})
+
+watch(currentMode, (mode) => {
+  if (mode === 'onlyoffice' && !h1OnlineEditAllowed.value) {
+    hSync.lastNotice.value = {
+      text: '底稿目录与程序表没有可编辑的表格内容，不支持在线编辑。',
+      type: 'warning',
     }
+    void hSync.switchMode('html')
   }
-  _rawOnModeChange(val)
+})
+
+/** legacy OO 组件加载失败的兜底（只对**非受管** sheet 生效）。 */
+function onOoLoadFailed(): void {
+  void hSync.switchMode('html')
 }
 
 /** 资产负债表日：供 H1-17 年检过期判定等 */
@@ -610,16 +665,52 @@ function persistResponse(
   }
   allResponses.value.set(itemId, updated)
   if (isReadonly.value) return
+  const payload = { item_id: itemId, conclusion, remark: updated.remark ?? null }
+  _pending.set(itemId, payload)
   const prev = _saveTimers.get(itemId)
   if (prev) clearTimeout(prev)
   _saveTimers.set(itemId, setTimeout(() => {
     _saveTimers.delete(itemId)
-    http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion, remark: updated.remark ?? null }],
-    }).then(() => { scheduleAutoSnapshot() })
-      .catch((err: unknown) => console.warn('[GtH1] persistResponse failed:', itemId, err))
+    _pending.delete(itemId)
+    void _putResponses([payload])
   }, 800))
+}
+
+/**
+ * 还在防抖窗口里、尚未发出的载荷（item_id → payload）。
+ *
+ * 🔴 原实现把载荷**只**闭包在 timer 回调里 ⇒ `clearTimeout` 之后无从重建，
+ *    flush 只能丢弃。显式留一份，`flushPendingSaves` 才能「清防抖 + 立即发」。
+ */
+const _pending = new Map<string, { item_id: string; conclusion: string | null; remark: string | null }>()
+
+function _putResponses(
+  items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>,
+): Promise<unknown> {
+  return http
+    .put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items,
+    })
+    .then(() => { scheduleAutoSnapshot() })
+    .catch((err: unknown) => console.warn('[GtH1] persistResponse failed:', err))
+}
+
+/**
+ * 清防抖 + 立即落库，**await 到真正写完** —— 切「在线编辑」前的必经一步。
+ *
+ * 🔴 原 `usePilotBridgeAdapter` 的 `flushBeforeOo` 传的是
+ *    `async () => { scheduleAutoSnapshot() }` —— 那**根本不是 flush**：它只排了一次版本
+ *    快照，防抖窗口里的 800ms 编辑一格都没落库。materialize 出的 xlsx 会少掉那批改动
+ *    且毫无提示。
+ */
+async function flushPendingSaves(): Promise<void> {
+  for (const t of _saveTimers.values()) clearTimeout(t)
+  _saveTimers.clear()
+  if (_pending.size === 0) return
+  const items = [..._pending.values()]
+  _pending.clear()
+  await _putResponses(items)
 }
 
 // ─── provide for child components ────────────────────────────────────────────
@@ -688,6 +779,9 @@ onUnmounted(() => {
   eventBus.off('trial-balance:updated', _handleAdjudicatedRefresh)
   eventBus.off('control:c6-completed' as any, _handleC6Completed)
   window.removeEventListener('control:c6-completed', _handleC6CompletedWindow)
+  // 🔴 卸载前把 800ms 防抖窗口里那批改动落库（裸 clearTimeout 会静默丢掉它们 ——
+  //    H9/H8/H6/H10 同源缺陷已修，这是同一条）。
+  void flushPendingSaves()
 })
 </script>
 
@@ -707,5 +801,15 @@ onUnmounted(() => {
   gap: 12px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+/*
+ * 🔴 `height: 100%` 会被父级压成一条（D4 踩过）：OnlyOffice iframe 需要
+ *    **确定**高度才撑得开，min-height 兜住父级无高度时的退化。
+ */
+.oo-container {
+  width: 100%;
+  min-height: 600px;
+  height: calc(100vh - 200px);
 }
 </style>

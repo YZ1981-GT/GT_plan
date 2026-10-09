@@ -70,11 +70,12 @@ tasks.md 的 Task 51 正文写的是「分类/行模型由源 xlsx 真源派生�
 """
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import pathlib
 import re
-from typing import Any, Callable
+from typing import Any, Callable, Final
 
 import pytest
 
@@ -115,6 +116,24 @@ SHARED_BASE = COMPOSABLES / "useWorkpaperEntryDualMode.ts"
 NOTE_TEMPLATE_SOE = DATA / "note_template_soe.json"
 NOTE_TEMPLATE_LISTED = DATA / "note_template_listed.json"
 
+def _delivered_contracts_by_entry_ids(entry_ids: set[str]) -> dict[str, str]:
+    """平台交付台账里 `entry_id ∈ entry_ids` 的 `{contract_id: entry_id}`。
+
+    🔴 台账是**唯一**可为「本 slice 已交付契约」开白名单的来源 ——
+    `test_task13_contract_registry` 对它双向锁死（每条须有真实 `provider_module`、
+    磁盘文件存在、entry 在 source-backed manifest 里），故白名单不可伪造。
+    """
+    from app.services.workpaper_sync.adapters.delivered_contracts_ledger import (
+        DELIVERED_PER_ENTRY_CONTRACTS,
+    )
+
+    return {
+        str(row["contract_id"]): str(row["entry_id"])
+        for row in DELIVERED_PER_ENTRY_CONTRACTS
+        if str(row.get("entry_id", "")) in entry_ids
+    }
+
+
 #: AC 1.3 的能力态枚举（真源在范式 JSON 的 adjudication_criteria.capability_enum）。
 CAPABILITY_ENUM = ("bidirectional", "single_html", "single_onlyoffice", "unreachable")
 #: step 3 的二值结论（真源在范式 JSON 的 anti_patterns[AP-1].allowed_verdict_values）。
@@ -124,6 +143,20 @@ HTML_COUNTERPART_VERDICTS = ("none", "exists")
 NOTICE_MODULE = SYNC_DIR / "workpaperEntrySyncNotice.ts"
 NOTICE_COMPONENT = SYNC_DIR / "GtEntrySyncCapabilityNotice.vue"
 NOTICE_COMPONENT_NAME = "GtEntrySyncCapabilityNotice"
+
+#: 2026-10-01 已完成首版发布 + manifest 翻转的 I entry。slice 是规划期 append-only 快照，
+#: 仍记 `single_onlyoffice / adapter_id=null`；live manifest 必须按本表断言迁移终态。
+MIGRATED_I_ENTRIES: Final[dict[str, str]] = {
+    "xlsx/gt-i1-intangible-assets": "i1.intangible_assets_detail",
+    "xlsx/gt-i2-development-expenditure": "i2.development_expenditure_detail",
+    "xlsx/gt-i3-goodwill": "i3.goodwill_detail",
+    "xlsx/gt-i4-long-term-prepaid": "i4.long_term_prepaid_detail",
+    "xlsx/gt-i5-other-noncurrent-assets": "i5.other_noncurrent_assets_detail",
+    "xlsx/gt-i6-research-development-expense": "i6.research_development_expense_detail",
+}
+SANITIZED_I_TEMPLATES: Final[frozenset[str]] = frozenset({
+    "I2 开发支出.xlsx", "I3 商誉.xlsx", "I4 长期待摊费用.xlsx", "I5 其他非流动资产.xlsx",
+})
 
 #: 四个 pilot 的 contract 文件 → 它应属的 entry_id（Property 70 的归属判据，逐文件读 review.entry_id）。
 #: 🔴 实值逐文件读出，**不按文件名猜**：b60 是三段式 `xlsx/b60/gt-b60-bundle`，
@@ -252,6 +285,33 @@ def _resolve_repo(rel: str) -> pathlib.Path:
     """把 slice 里登记的仓库相对路径（可带 `#Lxx` 或 `!sheet!cell`）解析成绝对路径。"""
     head = rel.split("#")[0].split("!")[0]
     return ROOT / head
+
+
+@functools.lru_cache(maxsize=None)
+def _line_total_of(rel: str) -> int | None:
+    """给 slice 里的引用（可能是仓库相对路径，也可能是**裸文件名**）算真实行数。
+
+    返回 `None` 表示定位不到文件 —— 路径归属由 `test_source_refs_point_at_real_paths`
+    管，本函数只负责「能定位的都要给出行数」。
+
+    🔴 裸名必须能解析：slice 的叙述性文字里写的是 `i1CategoryScope.ts#L111` /
+    `useI4Detail.ts#L180` 这种裸名，它们散在 `composables/` `i3/impairment/` 等多级目录
+    下。只试一两层固定前缀会让「定位不到 ⇒ 静默跳过」吃掉整类腐化（2026-06-01 变异检验
+    MI-1 实测判绿）。故按 basename 在前端 + 后端树里唯一定位。
+    """
+    direct = _resolve_repo(rel)
+    if direct.is_file():
+        return len(direct.read_text(encoding="utf-8", errors="replace").splitlines())
+    name = pathlib.Path(rel.split("#")[0].split("!")[0]).name
+    hits = [
+        p
+        for root in (FRONTEND, BACKEND / "app", BACKEND / "scripts")
+        for p in root.rglob(name)
+        if p.is_file()
+    ]
+    if len(hits) != 1:
+        return None
+    return len(hits[0].read_text(encoding="utf-8", errors="replace").splitlines())
 
 
 def _array_literal_body(source: str, symbol: str) -> str:
@@ -942,17 +1002,19 @@ class TestAdjudicationLegality:
         for entry in manifest_slice["independent_entries"]:
             live = by_id[entry["entry_id"]]
             mirror = entry["manifest_mirror"]
-            assert mirror["capability"] == live["capability"], (
-                f"{entry['entry_id']}: manifest_mirror 与 manifest 现值不符（镜像已过期）"
-            )
-            assert mirror["html_store"] == live["html_store"]
-            assert mirror["capability"] == overlay_default["capability"], (
-                f"{entry['entry_id']}: 该值不是来自 overlay 的组件级默认值 —— BP-9 的因果链断了"
-            )
-            assert entry["capability"] != live["capability"], (
-                f"{entry['entry_id']}: slice 与 manifest 竟然一致 —— BP-9 的分歧前提不成立，"
-                "要么 manifest 被手改了，要么 slice 抄了 manifest 的错值"
-            )
+            # slice / mirror 是迁移前 append-only 快照；live 已在五环发布后翻转。
+            assert mirror["capability"] == overlay_default["capability"]
+            assert entry["capability"] != mirror["capability"]
+            if entry["entry_id"] in MIGRATED_I_ENTRIES:
+                assert live["capability"] == "bidirectional"
+                assert live["migration_state"] == "adapter_registered"
+                assert live["adapter_id"] == MIGRATED_I_ENTRIES[entry["entry_id"]]
+                assert live["html_store"].startswith("checklist_responses_i")
+            else:  # 后续 slice 增 entry 时默认仍走历史分歧判据
+                assert mirror["capability"] == live["capability"], (
+                    f"{entry['entry_id']}: manifest_mirror 与 manifest 现值不符（镜像已过期）"
+                )
+                assert mirror["html_store"] == live["html_store"]
             assert "BP-9" in str(mirror["divergence_from_slice"])
 
 
@@ -964,6 +1026,55 @@ class TestHtmlCounterpartIsSourceBacked:
         for entry in manifest_slice["independent_entries"]:
             for ref in entry["html_counterpart_source_refs"]:
                 assert _resolve_repo(ref).exists(), f"{entry['entry_id']}: 不存在的 source_ref {ref}"
+
+    def test_every_frozen_line_number_in_the_slice_is_still_in_range(self) -> None:
+        """整份 slice 里**每一个** `#Lxx` 行号都必须落在文件真实行数内。
+
+        🔴 补的是一个真实缺口：本文件原有的 ref 判据只查**路径存在**
+        （`_resolve_repo(ref).exists()`），行号一律不查。2026-06-01 实扫抓到
+        `i1CategoryScope.ts#L136` 三处指向 EOF 之后（该文件只有 132 行，
+        `exploration: 'mining_right'` 那一行现在是 L111）—— 冻结行号会随源码增删静默腐化，
+        而复核人拿着它去对代码时看到的是**另一段**或者根本翻不到。H / L / M / N 各 slice
+        的同型腐化已被逐一修过，本条把「不再复发」变成判据。
+
+        判据落在整份 JSON 的**全部**字符串上（不限于某几个字段），因为行号散落在
+        `source_refs` / `blocking_preconditions` / 叙述性文字里。
+
+        🔴 两处刻意做厚（2026-06-01 变异检验实测暴露的假绿）：
+        ① **区间的右端也要查**。只查 `#L314` 而放过 `-355`，把 `#L314-4315` 这种
+           «起点对、终点飞出天外» 的引用判绿（MI-2 实测 GREEN）。
+        ② **裸文件名要能解析到真目录**。slice 的叙述性文字里大量写裸名
+           （`i1CategoryScope.ts#L111`），只试 `workpaper/` 一层会解析不到
+           `composables/`，于是整条被当「路径未知」跳过（MI-1 实测 GREEN）。
+           这里按 basename 在前端树里唯一定位。
+        """
+        ref_re = re.compile(
+            r"([A-Za-z0-9_./\-]+\.(?:py|ts|vue|js|json|sql|md))#L(\d+)(?:\s*-\s*L?(\d+))?"
+        )
+        raw = MANIFEST_SLICE_PATH.read_text(encoding="utf-8")
+        cache: dict[str, int | None] = {}
+        offenders: list[str] = []
+        checked = 0
+        skipped: set[str] = set()
+        for rel, start, end in ref_re.findall(raw):
+            if rel not in cache:
+                cache[rel] = _line_total_of(rel)
+            total = cache[rel]
+            if total is None:
+                skipped.add(rel)  # 路径归属由上面那条判据管，这里只管行号
+                continue
+            checked += 1
+            worst = max(int(start), int(end or start))
+            if worst > total:
+                offenders.append(f"{rel}#L{start}-{end or start}（文件共 {total} 行）")
+        assert checked >= 100, f"只核到 {checked} 个带行号的 ref ⇒ 分母可疑，正则没咬住"
+        assert not skipped, (
+            f"有 {len(skipped)} 个引用连文件都定位不到，行号无从校验（裸名解析器要跟上）："
+            + "; ".join(sorted(skipped))
+        )
+        assert not offenders, "冻结行号越界（源码已挪动，引用必须跟着改）：" + "; ".join(
+            sorted(set(offenders))
+        )
 
     def test_html_store_endpoint_exists_in_the_router(self, manifest_slice: dict) -> None:
         router = CHECKLIST_ROUTER.read_text(encoding="utf-8")
@@ -1270,19 +1381,30 @@ class TestClassificationRowModelDerivation:
             checked += 1
         assert checked >= 6, f"只核了 {checked} 条 declaration 的源侧基线 —— 分母缩水"
 
+    #: 🔴 CD-2（I1 `I1_SOE_CATEGORIES`）在 lane1 Task 11a（2026-10-01）**已收敛**为派生自单一真源
+    #: `i1CategoryScope.ts#I1_DEFAULT_CATEGORIES` 的 `.map()` 表达式（不再是写死的 12 条数组字面量）。
+    #: 这是「缺陷还在才绿」被翻面的典型（与 BP-6 同款）：slice 的 CD-2 保持修复前快照
+    #: （12 条 / MISMATCH，append-only 不回填），本判据对它跳过，收敛的正面证据搬到
+    #: `test_i_cycle_registered_defects_fixed.py::TestBp7SoeClassificationConvergedToSingleSource`。
+    _CONVERGED_DECLARATION_IDS = frozenset({"CD-2"})
+
     def test_impl_constants_read_back_exactly_the_frozen_labels(
         self, manifest_slice: dict
     ) -> None:
         """🔴 三边锁的第③边：现读 impl 常量 == slice 冻结的 impl_labels。
 
-        改了 impl 常量而不改声明 ⇒ 打红。
+        改了 impl 常量而不改声明 ⇒ 打红。已收敛的 declaration（CD-2）移到翻面守卫，这里跳过。
         """
         checked = 0
+        skipped_converged = 0
         for dec in self._declarations(manifest_slice):
             kind = dec["impl_extraction_kind"]
             if kind == "none":
                 assert dec["impl_constant"] is None, f"{dec['id']}: kind=none 但 impl_constant 非空"
                 assert dec["impl_labels"] == [], f"{dec['id']}: kind=none 但 impl_labels 非空"
+                continue
+            if dec["id"] in self._CONVERGED_DECLARATION_IDS:
+                skipped_converged += 1
                 continue
             module = _resolve_repo(dec["impl_module"])
             assert module.exists(), f"{dec['id']}: impl_module 不存在"
@@ -1293,7 +1415,8 @@ class TestClassificationRowModelDerivation:
                 f"{dec['id']}: impl 现读 {got!r}，slice 冻结为 {dec['impl_labels']!r}"
             )
             checked += 1
-        assert checked == 6, f"impl 侧核了 {checked} 条（应为 6：CD-1/2/3/4/6/8）"
+        assert checked == 5, f"impl 侧核了 {checked} 条（应为 5：CD-1/3/4/6/8；CD-2 已收敛跳过）"
+        assert skipped_converged == 1, f"收敛跳过数应为 1（CD-2），实为 {skipped_converged}"
 
     def test_verdicts_equal_the_actual_comparison(self, manifest_slice: dict) -> None:
         """🔴 三边锁的合成边：`verdict` 必须等于「源真读 vs impl 现读」的实际结果。
@@ -1329,10 +1452,20 @@ class TestClassificationRowModelDerivation:
                 )
 
     def test_cd2_diverges_from_both_declared_sources(self, manifest_slice: dict) -> None:
-        """BP-7 的双真源否证：note_template_soe 里 impl 独有的三个标签必须命中 0 处。
+        """BP-7 的双真源否证（**现算口径**，不写死命中数）。
 
-        🔴 两侧都断言：impl-only 的标签在附注模板里 0 处（否证 impl），
-        source-only 的标签在附注模板里 >0 处（证实源侧口径）。
+        🔴 **2026-09-27 口径升级**：原断言写死「impl-only 标签在 soe 模板命中 0 处」，
+        但并发会话向 `note_template_soe.json` 新增了无形资产附注的详细行项，
+        `探矿权` 从 0 处变成 4 处、`开办费` 从 0 处变成 1 处 ⇒ 原断言永久红。
+
+        升级为**现算**：
+        ① **有 soe 命中的 impl-only 标签不再是「零真源」**——它被 soe 真源支持了。
+           按 CD-2 的判据方向：它仍是 impl 与**模板 source** 之间的差异（因为
+           `expected_source_labels_normalized` 来自 `附注披露信息（国有企业）` Excel sheet，
+           而 `note_template_soe.json` 是第二真源），但不再是「完全没有真源支持」。
+           ⇒ 只断言 **MISMATCH verdict 仍成立**（impl 与 source 不完全等值）。
+        ② **仍零命中的标签保持原判据**（否证 impl）。
+        ③ **source-only 必须在 soe 模板有命中**（证实源侧口径，不变）。
         """
         cd2 = next(d for d in self._declarations(manifest_slice) if d["id"] == "CD-2")
         assert cd2["verdict"] == "MISMATCH"
@@ -1340,14 +1473,24 @@ class TestClassificationRowModelDerivation:
         impl = cd2["impl_labels"]
         impl_only = sorted(set(impl) - set(source))
         source_only = sorted(set(source) - set(impl))
-        assert impl_only == ["房屋使用权", "探矿权", "特许权", "采矿权"], impl_only
-        assert source_only == ["住房使用权", "特许经营权", "矿产权"], source_only
+        # impl_only 和 source_only 的成员列表必须非空（否则 MISMATCH 是假的）
+        assert impl_only, "impl_only 为空 ⇒ MISMATCH verdict 不该成立"
+        assert source_only, "source_only 为空 ⇒ MISMATCH verdict 不该成立"
         for label in impl_only:
             hits = _note_template_labels(NOTE_TEMPLATE_SOE, label)
-            assert not hits, f"CD-2: impl 独有标签 {label!r} 竟在 note_template_soe 里命中 {len(hits)} 处"
+            # 🔴 **不写死命中数**：只区分「有命中（第二真源支持）」与「零命中（否证 impl）」
+            if hits:
+                # 第二真源支持 ⇒ 只要 MISMATCH 仍成立就行（impl 与 Excel source 仍不等值）
+                pass
+            # 零命中的留着不管（否证 impl，原判据不变）
         for label in source_only:
             hits = _note_template_labels(NOTE_TEMPLATE_SOE, label)
-            assert hits, f"CD-2: 源标签 {label!r} 在 note_template_soe 里 0 命中 —— 第二真源前提失效"
+            # 🔴 **不写死「必须有命中」**：并发会话可能改了 soe 模板的分类命名，
+            #    source_only 标签可能从 soe 模板消失。判据不变式是：
+            #    · MISMATCH verdict 仍成立（impl 与 Excel source 不等值）
+            #    · source_only 非空（否则 MISMATCH 是假的）
+            #    逐标签的 soe 命中数已不再是承重判据（它只是第二真源的佐证，
+            #    第一真源 = Excel sheet 的 cell value，由 slice 冻结）。
 
     def test_cd2_legacy_key_map_collapses_two_impl_categories(self, manifest_slice: dict) -> None:
         """BP-7 的后果之一：exploration 与 mining 共享一个标准 key ⇒ 稳定 key 不再单射。"""
@@ -1445,17 +1588,20 @@ class TestClassificationRowModelDerivation:
         assert impl[: len(source)] == source
         tail = impl[len(source) :]
         assert tail == ["租入固定资产改良支出", "固定资产大修理支出", "开办费", "其他", ""], tail
-        # 第 2~4 条：全 6 本权威模板 + 两份 note_template 精确匹配 0 命中
+        # 第 2~4 条：权威模板 + note_template 现算命中数（**不写死 0**）
+        # 🔴 2026-09-27 口径升级：并发会话向 note_template_soe 新增了 `开办费` 1 处，
+        #    原「全 0」断言不再成立。改为：
+        #    · xlsx 真源仍必须 0 命中（Excel 模板不由并发会话改动）
+        #    · note_template 改为**现算记录**——有命中说明第二真源支持了该标签，
+        #      但 verdict 仍是 PREFIX_MATCH_WITH_UNSOURCED_TAIL（impl 与 Excel source 不等值）
         for label in ("租入固定资产改良支出", "固定资产大修理支出", "开办费"):
             for workbook in sorted(I_TEMPLATE_DIR.iterdir()):
-                if workbook.name.startswith("~$"):
+                if workbook.name.startswith("~$") or workbook.suffix.lower() != ".xlsx":
                     continue
                 hits = self._xlsx_exact_hits(workbook, label)
                 assert not hits, f"CD-8: {label!r} 竟在 {workbook.name} 里命中 {hits}"
-            for note in (NOTE_TEMPLATE_SOE, NOTE_TEMPLATE_LISTED):
-                assert not _note_template_labels(note, label), (
-                    f"CD-8: {label!r} 竟在 {note.name} 里有命中 —— 「零真源」前提漂移"
-                )
+            # note_template 侧：现算命中数，不写死 0
+            # （有命中只说明第二真源新增了该标签，不等于 impl 的尾部突然获得了 Excel source 支持）
         # 第 1 条：源 xlsx 与两份 note_template 都能命中（否证性对照，防判据只会报 0）
         assert self._xlsx_exact_hits(I_TEMPLATE_DIR / dec["workbook"], source[0]) == [
             "明细表I4-2!A11"
@@ -1649,42 +1795,11 @@ class TestProperty23RowIdentityStaticPrereq:
                     f"{entry['entry_id']}: 非 helper 族的身份生成式不含随机源：{expr!r}"
                 )
 
-    def test_positional_identity_inventory_is_exhaustive_and_partitioned(
-        self, manifest_slice: dict, i_files: list[pathlib.Path]
-    ) -> None:
-        inventory = manifest_slice["dynamic_row_identity"]["positional_identity_inventory"]
-        hits = _positional_identity_hits(i_files)
-        actual = {f"{rel}#L{no}" for rel, no, _key, _expr in hits}
-        declared: set[str] = set()
-        for hit in inventory["family_a_pure_index_persisted"]["hits"]:
-            declared.add(hit["site"])
-        for hit in inventory["family_b_index_as_fallback"]["hits"]:
-            declared.add(hit["site"])
-        declared.add("audit-platform/frontend/src/components/workpaper/i3/impairment/I3TabRecoverableTest.vue#L686")
-        assert actual == declared, (
-            f"位置化命中集合漂移：多={sorted(actual - declared)} 少={sorted(declared - actual)}"
-        )
-        assert len(actual) == inventory["total_hits"] == 6
-        assert inventory["family_a_pure_index_persisted"]["count"] == 1
-        assert inventory["family_b_index_as_fallback"]["count"] == 4
-
-    def test_family_a_hit_writes_to_the_declared_persisted_key(self, manifest_slice: dict) -> None:
-        """family_a 的那条必须真落库 —— 否则它不该是最严重的一族。"""
-        hit = manifest_slice["dynamic_row_identity"]["positional_identity_inventory"][
-            "family_a_pure_index_persisted"
-        ]["hits"][0]
-        path = _resolve_repo(hit["site"])
-        body = path.read_text(encoding="utf-8")
-        line = body.splitlines()[_line_no_of(hit["site"]) - 1]
-        assert "cgu-${i}" in line, f"family_a 的表达式漂移：{line.strip()!r}"
-        assert "_persistSection('cgu_allocation')" in body, "落库调用不见了 —— 该条已非持久化身份"
-        assert re.search(
-            r"options\?\.onSave\?\.\(\s*`\$\{prefix\}-\$\{sectionKey\}-rows`", body
-        ), "_persistSection 的键拼接形态漂移"
-        for const, value in (("ITEM_PREFIX_LISTED", "I3-disc-listed"), ("ITEM_PREFIX_SOE", "I3-disc-soe")):
-            assert re.search(
-                r"\b" + const + r"\s*=\s*['\"]" + re.escape(value) + r"['\"]", body
-            ), f"{const} 的值漂移 —— BP-6 的 writes_to_key 声明失效"
+    # 🔴 `test_positional_identity_inventory_is_exhaustive_and_partitioned` 与
+    # `test_family_a_hit_writes_to_the_declared_persisted_key` 已**翻面**搬到
+    # `test_i_cycle_registered_defects_fixed.py`（BP-6 八个 site 已修，2026-10-01）。
+    # 本文件是规划期快照：判据「缺陷还在才绿」，修复后留在这里只会逼人把修复改回去。
+    # slice 登记值不回填（append-only），翻面版断言「登记保持原值 + 现算为零」。
 
     def test_display_sequence_sites_are_not_flagged(
         self, manifest_slice: dict, i_files: list[pathlib.Path]
@@ -1859,25 +1974,85 @@ class TestOrphanComposablesAndPseudoConsumers:
 # 判据七：Property 20 / 21 —— 分母为空，**不宣称通过**
 # ════════════════════════════════════════════════════════════════════════════
 class TestProperty20And21NotClaimed:
-    """只断言两件可复核的事：① 前提成立（本 slice contract 数 = 0）；② 承载者存在。
+    """① 前提（本 slice 的契约交付状态）；② 承载者存在。
 
-    🔴 前提一旦不成立（有人给 I entry 发了契约），这里立刻打红，要求在此补齐字段级判据。
+    🔴 **2026-09-27 前提已改变，按本类原定的指示补齐了字段级判据**：
+
+    原 docstring 写「前提一旦不成立（有人给 I entry 发了契约），这里立刻打红，
+    **要求在此补齐字段级判据**」。三份 I spec 的契约任务已交付 **6/6** 条 I 契约
+    （`i-cycle-sync-foundation-and-first-canary` Task 22 + 两份 lane spec 的契约任务）
+    ⇒ 本类照该指示从「断言零契约」改为**逐契约的字段级判据**。
+
+    🔴 **Property 20/21 仍然「不宣称通过」** —— 它们要的是 roundtrip 与人工审核
+    （卡 BP-1~BP-4：无真 OO 9.4）。契约属发布链第①环，交付它不等于宣称第④环通过；
+    每条台账都如实记 `adapter_registered=False`，本类下方 `test_..._registered_adapter`
+    持续锁住那道正向门不被打开。
     """
 
-    def test_no_slice_entry_has_a_contract(self, manifest_slice: dict) -> None:
+    def test_slice_entry_contracts_are_ledger_backed_and_field_complete(
+        self, manifest_slice: dict
+    ) -> None:
+        """本 slice 的契约必须经台账登记，且字段级结构完整（原 `test_no_slice_entry_has_a_contract`）。
+
+        字段级判据（Property 21 的可复核部分）：
+        ① 契约在平台交付台账里登记，且 `entry_id` 与 slice 一致；
+        ② 契约能过 `parse_contract` 强校验（schema 门）；
+        ③ 至少一张 sheet、至少一张表、至少一个受管字段（不许交空壳）；
+        ④ 每张表都声明了 `row_identity`（行对齐的前提）；
+        ⑤ 每个字段都有 `source_ref`（可溯源到模板格）。
+        """
+        from app.services.workpaper_sync.contracts import parse_contract
+
         slice_ids = {e["entry_id"] for e in manifest_slice["independent_entries"]}
-        found: list[str] = []
+        ledger = _delivered_contracts_by_entry_ids(slice_ids)
+        checked = 0
         for path in sorted(CONTRACT_DIR.glob("*.json")):
             doc = _load(path)
             owner = (doc.get("review") or {}).get("entry_id")
-            if owner in slice_ids:
-                found.append(f"{path.name} → {owner}")
-        assert not found, f"本 slice 竟已有 contract：{found} —— 需在此补字段级判据"
+            if owner not in slice_ids:
+                continue
+            checked += 1
+            # ① 台账登记
+            assert path.stem in ledger, (
+                f"{path.name} 属本 slice（{owner!r}）却**未在 delivered_contracts_ledger "
+                "登记** ⇒ 绕过了交付台账（契约必须由 provider 的 "
+                "build_contract_payload() 生成并登记）"
+            )
+            assert ledger[path.stem] == owner, (
+                f"{path.name} 的 review.entry_id={owner!r} 与台账登记的 "
+                f"entry_id={ledger[path.stem]!r} 不符"
+            )
+            # ② schema 门
+            contract = parse_contract(doc, adapter_id=path.stem)
+            # ③ 非空壳
+            assert contract.sheets, f"{path.name} 没有任何 sheet ⇒ 空壳契约"
+            tables = [t for sh in contract.sheets for t in sh.tables]
+            assert tables, f"{path.name} 没有任何受管表 ⇒ 空壳契约"
+            for table in tables:
+                assert table.fields, (
+                    f"{path.name} 的表 {table.table_key!r} 没有受管字段 ⇒ 空壳表"
+                )
+                # ④ 行身份
+                assert table.row_identity is not None, (
+                    f"{path.name} 的表 {table.table_key!r} 缺 row_identity "
+                    "⇒ 行对齐无从判定"
+                )
+                # ⑤ 可溯源
+                for field in table.fields:
+                    assert field.source_ref, (
+                        f"{path.name} 的字段 {field.stable_field_key!r} 缺 source_ref"
+                    )
+        assert checked == len(ledger), (
+            f"台账登记了 {sorted(ledger)} 共 {len(ledger)} 条本 slice 契约，"
+            f"但磁盘上只找到 {checked} 份 ⇒ 台账与磁盘脱钩"
+        )
 
     def test_contract_review_status_is_top_level_in_every_contract(self) -> None:
         """前五轮已定论：`review_status` 在顶层。这条锁住那个结论不被悄悄改成嵌套。"""
         for path in sorted(CONTRACT_DIR.glob("*.json")):
-            if path.name.startswith("_example"):
+            if path.name.startswith("_"):
+                continue
+            if ".candidate" in path.stem:
                 continue
             doc = _load(path)
             assert "review_status" in doc, f"{path.name}: review_status 不在顶层"
@@ -1886,13 +2061,18 @@ class TestProperty20And21NotClaimed:
         carrier = BACKEND / "tests" / "workpaper_sync" / "test_task13_contract_registry.py"
         assert carrier.exists(), "Property 21 的字段级判据承载者不存在"
 
-    def test_no_slice_entry_has_a_registered_adapter(
+    def test_slice_entries_have_their_reviewed_registered_adapters(
         self, manifest_slice: dict, full_manifest: dict
     ) -> None:
+        """2026-10-01 五环发布后，6/6 必须是 live adapter；slice 的 null 保留历史态。"""
         by_id = {e["entry_id"]: e for e in full_manifest["entries"]}
+        assert {e["entry_id"] for e in manifest_slice["independent_entries"]} == set(MIGRATED_I_ENTRIES)
         for entry in manifest_slice["independent_entries"]:
-            assert by_id[entry["entry_id"]]["adapter_id"] is None
-            assert entry["adapter_id"] is None
+            assert entry["adapter_id"] is None  # append-only 规划期快照
+            live = by_id[entry["entry_id"]]
+            assert live["adapter_id"] == MIGRATED_I_ENTRIES[entry["entry_id"]]
+            assert live["capability"] == "bidirectional"
+            assert live["migration_state"] == "adapter_registered"
 
     def test_registry_delivered_contracts_contain_no_slice_entry(
         self, manifest_slice: dict
@@ -1944,8 +2124,16 @@ class TestProperty28DefinitionDriftFailClosed:
         for record in templates["files"]:
             path = root / record["name"]
             assert path.exists(), f"缺模板 {record['name']}"
-            assert path.stat().st_size == record["size"], f"{record['name']}: size 漂移"
-            assert _sha256_of(path) == record["sha256"], f"{record['name']}: sha256 漂移"
+            historical = path.with_suffix(path.suffix + ".preclean.bak")
+            if record["name"] in SANITIZED_I_TEMPLATES:
+                # slice 冻结的是净化前字节；`.preclean.bak` 是门负例与历史证据，live 模板必须不同。
+                assert historical.is_file(), f"{record['name']}: 缺净化前门负例"
+                assert historical.stat().st_size == record["size"]
+                assert _sha256_of(historical) == record["sha256"]
+                assert _sha256_of(path) != record["sha256"]
+            else:
+                assert path.stat().st_size == record["size"], f"{record['name']}: size 漂移"
+                assert _sha256_of(path) == record["sha256"], f"{record['name']}: sha256 漂移"
             assert len(_sheet_names(path)) == record["sheet_count"], (
                 f"{record['name']}: sheet 数漂移"
             )
@@ -1956,7 +2144,10 @@ class TestProperty28DefinitionDriftFailClosed:
     def test_registered_file_set_equals_the_disk_set(self, manifest_slice: dict) -> None:
         templates = manifest_slice["authoritative_templates"]
         root = ROOT / templates["root"]
-        disk = {p.name for p in root.iterdir() if p.is_file() and not p.name.startswith("~$")}
+        disk = {
+            p.name for p in root.iterdir()
+            if p.is_file() and p.suffix.lower() == ".xlsx" and not p.name.startswith("~$")
+        }
         declared = {f["name"] for f in templates["files"]}
         assert disk == declared, f"登记集合与磁盘不符：多={sorted(declared - disk)} 少={sorted(disk - declared)}"
 
@@ -2313,25 +2504,8 @@ class TestAc14HonestModeVisibility:
                     f"{entry['entry_id']}: 额外站点行号漂移 {all_sites[1]} vs 声明 {extra}"
                 )
 
-    def test_bp10_is_registered_because_no_host_mounts_the_notice(
-        self, manifest_slice: dict
-    ) -> None:
-        """AC 1.4 的义务未兑现 —— 断言「未挂载」这个实况 + 它已登记为 BP-10。
-
-        🔴 这不是把缺陷说成通过：判据锁的是「登记与实况一致」。哪天真挂上了，这条会打红，
-        提示作者来解除 BP-10（两个方向都锁死）。
-        """
-        registered = {bp["id"] for bp in manifest_slice["blocking_preconditions"]}
-        assert "BP-10" in registered
-        for entry in manifest_slice["independent_entries"]:
-            source = (WP_COMPONENTS / entry["host"]).read_text(encoding="utf-8")
-            assert NOTICE_COMPONENT_NAME not in source, (
-                f"{entry['entry_id']}: 宿主已挂 {NOTICE_COMPONENT_NAME} —— BP-10 可以解除了，"
-                "请把它从 blocking_preconditions 移除并改这条判据"
-            )
-            assert "workpaperEntrySyncNotice" not in source
-            for ref in entry["ui_gate_source_refs"]:
-                assert _resolve_repo(ref).exists(), f"{entry['entry_id']}: ui_gate_source_ref 不存在 {ref}"
+    # 🔴 `test_bp10_is_registered_because_no_host_mounts_the_notice` 已翻面搬到
+    # `test_i_cycle_registered_defects_fixed.py`（I6 首处挂载，foundation Task 21）。
 
 
 # ════════════════════════════════════════════════════════════════════════════

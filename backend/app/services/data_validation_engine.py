@@ -344,16 +344,17 @@ class DataValidationEngine:
         return findings
 
     async def _validate_logic(self, project_id: UUID, year: int) -> list[ValidationFinding]:
-        """数据逻辑一致性校验：审定数=未审数+AJE+RJE、借贷平衡"""
+        """数据逻辑一致性校验：审定数=未审数+AJE+RJE+底稿调整、借贷平衡"""
         findings = []
         if not self.db:
             return findings
         try:
             from sqlalchemy import text
-            # 检查试算表：审定数 = 未审数 + AJE + RJE
+            # 检查试算表：审定数 = 未审数 + AJE + RJE + 底稿调整（wp_adjustment）
             stmt = text("""
                 SELECT standard_account_code,
-                       unadjusted_amount, aje_adjustment, rje_adjustment, audited_amount
+                       unadjusted_amount, aje_adjustment, rje_adjustment,
+                       wp_adjustment, audited_amount
                 FROM trial_balance
                 WHERE project_id = :pid AND year = :year AND is_deleted = false
                 LIMIT 500
@@ -363,15 +364,16 @@ class DataValidationEngine:
                 unadj = float(row[1] or 0)
                 aje = float(row[2] or 0)
                 rje = float(row[3] or 0)
-                audited = float(row[4] or 0)
-                expected = unadj + aje + rje
+                wp_adj = float(row[4] or 0)
+                audited = float(row[5] or 0)
+                expected = unadj + aje + rje + wp_adj
                 diff = abs(audited - expected)
                 if diff > 0.01:
                     findings.append(ValidationFinding(
                         check_type="logic_audited_formula",
                         severity="high",
-                        message=f"科目「{row[0]}」审定数({audited:.2f}) ≠ 未审数({unadj:.2f})+AJE({aje:.2f})+RJE({rje:.2f})={expected:.2f}，差异 {diff:.2f}",
-                        details={"account_code": row[0], "unadjusted": unadj, "aje": aje, "rje": rje, "audited": audited, "expected": expected},
+                        message=f"科目「{row[0]}」审定数({audited:.2f}) ≠ 未审数({unadj:.2f})+AJE({aje:.2f})+RJE({rje:.2f})+底稿调整({wp_adj:.2f})={expected:.2f}，差异 {diff:.2f}",
+                        details={"account_code": row[0], "unadjusted": unadj, "aje": aje, "rje": rje, "wp_adjustment": wp_adj, "audited": audited, "expected": expected},
                         fix_suggestion="重新计算试算表（POST /api/trial-balance/recalc）",
                     ))
                     if len(findings) >= 20:

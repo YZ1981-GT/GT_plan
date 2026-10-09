@@ -43,13 +43,18 @@ export interface H8SyncFromWorkpaperPayload {
  * 会凭空造出父表头（实测国企侧被推成 `[{group:'本期',start:2,span:2}]`）。
  * `flat` 标在任意一列即对整表生效。
  */
+/**
+ * 合计列的稳定键（BP-7 修复：不用中文 `'合计'` 避免与用户自定义类别撞键）。
+ */
+export const H8_LISTED_TOTAL_COLUMN_KEY = '__total__'
+
 export function buildH8ListedColumns(state: H8ListedSyncSnapshot): Record<string, ColumnDef[]> {
   const cats = state.categories || []
   return {
     [H8_LISTED_SUBTABLE.movement]: [
       { key: 'label', label: '项目', is_label: true, flat: true },
-      ...cats.map((c) => ({ key: c.label, label: c.label, format: 'amount' as const })),
-      { key: '合计', label: '合计', format: 'amount' },
+      ...cats.map((c) => ({ key: c.key, label: c.label, format: 'amount' as const })),
+      { key: '__total__', label: '合计', format: 'amount' },
     ],
   }
 }
@@ -107,9 +112,9 @@ export function buildH8ListedSubTableData(state: H8ListedSyncSnapshot): Record<s
       is_total: def.kind === 'calc' || def.kind === 'book' || def.kind === 'subtotal',
     }
     for (const c of cats) {
-      row[c.label] = h8ListedCellValue(state.movement, def, c.key)
+      row[c.key] = h8ListedCellValue(state.movement, def, c.key)
     }
-    row['合计'] = h8ListedTotalCellValue(state.movement, def, cats)
+    row['__total__'] = h8ListedTotalCellValue(state.movement, def, cats)
     rows.push(row)
   }
 

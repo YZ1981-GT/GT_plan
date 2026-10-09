@@ -51,6 +51,17 @@ import { useD1AiGenerate } from '../composables/useD1AiGenerate'
 import type { VirtualColumn } from '@/composables/useVirtualTable'
 import http from '@/utils/http'
 
+/**
+ * 抽凭科目码取自单一真源 `dCycleAccountScope`（D1 应收票据）。
+ * 原为模板内字面量；接真源后科目口径与该循环的取数/回写共用同一定义，
+ * 避免各处独立硬编码而漂移。本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2
+ */
+import { dCycleScope } from '../composables/dCycleAccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = dCycleScope('D1')?.queryCodes().join(',') ?? ''
+
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 const props = defineProps<{
@@ -120,7 +131,10 @@ const {
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
 
-const columnCount = ref(13)
+// 🔴 2026-09-28：13 → 19（补 6 个 Excel 列：凭证日期 B / 对方明细科目 F / 贷方金额 H /
+//    核对内容4 M / 核对内容5 N / 是否异常 P；`supportDoc`(I) 并入已有「支持性文件」列不另计）。
+//    这个数只喂 `useWorkpaperWideTable` 算表高，不参与业务逻辑。
+const columnCount = ref(19)
 const vouchingRowCount = computed(() => vouchingRows.value.length)
 const browseRows = computed(() => vouchingRows.value)
 const browseRowCount = computed(() => browseRows.value.length)
@@ -687,7 +701,7 @@ const SAMPLING_METHOD_TEXTS = [
       <!-- ═══ 抽凭引擎 Dialog（P0-4 联动，科目 1121 应收票据）═══ -->
       <el-dialog
         v-model="samplingVisible"
-        title="⚡ 抽凭引擎（科目 1121 应收票据）"
+        title="⚡ 抽凭引擎（科目 ${samplingAccountCode} 应收票据）"
         width="90%"
         top="5vh"
         :close-on-click-modal="false"
@@ -695,7 +709,7 @@ const SAMPLING_METHOD_TEXTS = [
       >
         <GtVoucherSamplingEngine
           v-if="samplingVisible && wpId && projectId"
-          account-code="1121"
+          :account-code="samplingAccountCode"
           phase="final"
           :workpaper-id="wpId"
           :project-id="projectId"
@@ -760,6 +774,27 @@ const SAMPLING_METHOD_TEXTS = [
           </template>
         </el-table-column>
 
+        <!--
+          🔴 2026-09-28 补 Excel B 列「记账凭证-日期」。
+          源模板 `应收票据检查表D1-13` 共 17 列，此前前端只覆盖 10 列 ⇒ 这些列 HTML 侧填不了，
+          且每次 materialize 会把它们写空/写 0（缺键值 None ⇒ "" / "0"），擦掉 OO 侧录入。
+          列字母与表头取自 openpyxl 现读 R14/R15 + 同步层 `_FIELD_SPECS_VOUCHING`。
+        -->
+        <el-table-column label="凭证日期" width="130">
+          <template #default="{ row }: { row: VouchingRow }">
+            <el-date-picker
+              :model-value="row.voucherDate"
+              type="date"
+              value-format="YYYY-MM-DD"
+              placeholder="记账凭证日期"
+              size="small"
+              :disabled="isReadonly"
+              style="width: 100%"
+              @update:model-value="(v: string) => updateVouchingRow(row.id, 'voucherDate', v || '')"
+            />
+          </template>
+        </el-table-column>
+
         <!-- 票据号码 -->
         <el-table-column label="票据号码" min-width="140">
           <template #default="{ row }: { row: VouchingRow }">
@@ -799,8 +834,21 @@ const SAMPLING_METHOD_TEXTS = [
           </template>
         </el-table-column>
 
-        <!-- 金额 -->
-        <el-table-column label="金额" width="110" align="right">
+        <!-- 🔴 2026-09-28 补 Excel F 列「对方明细科目」 -->
+        <el-table-column label="对方明细科目" min-width="120">
+          <template #default="{ row }: { row: VouchingRow }">
+            <el-input
+              :model-value="row.counterDetail"
+              size="small"
+              placeholder="对方明细科目"
+              :disabled="isReadonly"
+              @change="(v: string) => updateVouchingRow(row.id, 'counterDetail', v || '')"
+            />
+          </template>
+        </el-table-column>
+
+        <!-- 金额（Excel G 借方金额） -->
+        <el-table-column label="借方金额" width="110" align="right">
           <template #default="{ row }: { row: VouchingRow }">
             <WpAmountInput
               :model-value="row.amount"
@@ -808,6 +856,19 @@ const SAMPLING_METHOD_TEXTS = [
               :disabled="isReadonly"
               style="width: 100%"
               @change="(v: number) => updateVouchingRow(row.id, 'amount', v || 0)"
+            />
+          </template>
+        </el-table-column>
+
+        <!-- 🔴 2026-09-28 补 Excel H 列「贷方金额」（与借方成对） -->
+        <el-table-column label="贷方金额" width="110" align="right">
+          <template #default="{ row }: { row: VouchingRow }">
+            <WpAmountInput
+              :model-value="row.creditAmount"
+              size="small"
+              :disabled="isReadonly"
+              style="width: 100%"
+              @change="(v: number) => updateVouchingRow(row.id, 'creditAmount', v || 0)"
             />
           </template>
         </el-table-column>
@@ -889,9 +950,48 @@ const SAMPLING_METHOD_TEXTS = [
           </template>
         </el-table-column>
 
-        <!-- 支持性文件（附件+OCR+回写） -->
-        <el-table-column label="支持性文件" min-width="220">
+        <!-- 🔴 2026-09-28 补 Excel M 列「核对内容4」 -->
+        <el-table-column label="核对内容4" width="120">
           <template #default="{ row }: { row: VouchingRow }">
+            <el-input
+              :model-value="row.check4"
+              size="small"
+              placeholder="—"
+              :disabled="isReadonly"
+              @change="(v: string) => updateVouchingRow(row.id, 'check4', v || '')"
+            />
+          </template>
+        </el-table-column>
+
+        <!-- 🔴 2026-09-28 补 Excel N 列「核对内容5」 -->
+        <el-table-column label="核对内容5" width="120">
+          <template #default="{ row }: { row: VouchingRow }">
+            <el-input
+              :model-value="row.check5"
+              size="small"
+              placeholder="—"
+              :disabled="isReadonly"
+              @change="(v: string) => updateVouchingRow(row.id, 'check5', v || '')"
+            />
+          </template>
+        </el-table-column>
+
+        <!-- 支持性文件（Excel I 列：文本说明 + 附件/OCR 控件同格） -->
+        <el-table-column label="支持性文件" min-width="240">
+          <template #default="{ row }: { row: VouchingRow }">
+            <!--
+              🔴 2026-09-28 补 `supportDoc` 文本输入。Excel I 列是**文本格**，
+              而此前本列只有附件/OCR 控件（绑 attachmentName/ocrStatus）⇒ I 列 HTML 侧填不了。
+              放同一格而不另开一列：一个 Excel 列对应一个视觉列，避免出现两个「支持性文件」。
+            -->
+            <el-input
+              :model-value="row.supportDoc"
+              size="small"
+              placeholder="支持性文件说明"
+              :disabled="isReadonly"
+              style="margin-bottom: 4px"
+              @change="(v: string) => updateVouchingRow(row.id, 'supportDoc', v || '')"
+            />
             <div class="attach-cell">
               <el-upload
                 :show-file-list="false"
@@ -944,6 +1044,24 @@ const SAMPLING_METHOD_TEXTS = [
                 :context-project-id="projectId"
               />
             </div>
+          </template>
+        </el-table-column>
+
+        <!-- 🔴 2026-09-28 补 Excel P 列「是否异常」 -->
+        <el-table-column label="是否异常" width="110">
+          <template #default="{ row }: { row: VouchingRow }">
+            <el-select
+              :model-value="row.isAbnormal"
+              placeholder="—"
+              size="small"
+              clearable
+              :disabled="isReadonly"
+              style="width: 100%"
+              @change="(v: string) => updateVouchingRow(row.id, 'isAbnormal', v || '')"
+            >
+              <el-option label="是" value="是" />
+              <el-option label="否" value="否" />
+            </el-select>
           </template>
         </el-table-column>
 

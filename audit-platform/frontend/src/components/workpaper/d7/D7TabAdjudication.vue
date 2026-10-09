@@ -92,6 +92,13 @@
           <template #default="{ row }">
             <el-input-number v-if="canEdit(row, 'priorUnadjusted')" :model-value="row.priorUnadjusted" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowKey, 'priorUnadjusted', v ?? 0)" />
             <span v-else :class="cellClass(row)">{{ fmtAmount(row.priorUnadjusted) }}</span>
+            <!-- 逐格四态覆盖徽标（Task 20）：性质区 prior 是 cross_sheet 派生格 -->
+            <DerivedCellOverrideBadge
+              :overrides="row.cellOverrides"
+              field="priorUnadjusted"
+              :readonly="isReadonly"
+              @restore="restoreDerivedValue('nature', row.rowKey, 'priorUnadjusted')"
+            />
           </template>
         </el-table-column>
         <el-table-column label="AJE" width="100" align="right">
@@ -117,6 +124,12 @@
           <template #default="{ row }">
             <el-input-number v-if="canEdit(row, 'currentUnadjusted')" :model-value="row.currentUnadjusted" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowKey, 'currentUnadjusted', v ?? 0)" />
             <span v-else :class="cellClass(row)">{{ fmtAmount(row.currentUnadjusted) }}</span>
+            <DerivedCellOverrideBadge
+              :overrides="row.cellOverrides"
+              field="currentUnadjusted"
+              :readonly="isReadonly"
+              @restore="restoreDerivedValue('nature', row.rowKey, 'currentUnadjusted')"
+            />
           </template>
         </el-table-column>
         <el-table-column label="AJE" width="100" align="right">
@@ -180,6 +193,13 @@
         <el-table-column label="期初未审" width="115" align="right">
           <template #default="{ row }">
             <span :class="cellClass(row)">{{ fmtAmount(row.priorUnadjusted) }}</span>
+            <!-- 账龄区 prior 也是 cross_sheet 派生格（Task 20 起两列独立判定） -->
+            <DerivedCellOverrideBadge
+              :overrides="row.cellOverrides"
+              field="priorUnadjusted"
+              :readonly="isReadonly"
+              @restore="restoreDerivedValue('aging', row.rowKey, 'priorUnadjusted')"
+            />
           </template>
         </el-table-column>
         <el-table-column label="AJE" width="100" align="right">
@@ -192,7 +212,15 @@
           <template #default="{ row }"><span class="auto-calc">{{ fmtAmount(row.priorAudited) }}</span></template>
         </el-table-column>
         <el-table-column label="期末未审" width="115" align="right">
-          <template #default="{ row }"><span :class="cellClass(row)">{{ fmtAmount(row.currentUnadjusted) }}</span></template>
+          <template #default="{ row }">
+            <span :class="cellClass(row)">{{ fmtAmount(row.currentUnadjusted) }}</span>
+            <DerivedCellOverrideBadge
+              :overrides="row.cellOverrides"
+              field="currentUnadjusted"
+              :readonly="isReadonly"
+              @restore="restoreDerivedValue('aging', row.rowKey, 'currentUnadjusted')"
+            />
+          </template>
         </el-table-column>
         <el-table-column label="AJE" width="100" align="right">
           <template #default="{ row }"><span>{{ fmtAmount(row.currentAje) }}</span></template>
@@ -322,6 +350,7 @@
 import { computed, inject, toRef, ref, type Ref } from 'vue'
 import { InfoFilled, Download } from '@element-plus/icons-vue'
 import { useD7Adjudication, type AdjudicationRow } from '../composables/useD7Adjudication'
+import DerivedCellOverrideBadge from '../shared/DerivedCellOverrideBadge.vue'
 import { useD7ImportExport } from '../composables/useD7ImportExport'
 import { useD7AiGenerate } from '../composables/useD7AiGenerate'
 import { isChangeRateExceeding } from '../composables/useD7FormulaEngine'
@@ -386,6 +415,8 @@ const {
   crossValidationWarning,
   auditNotes,
   updateCell,
+  // Task 20：逐格四态的「恢复取数」入口（DerivedCellOverrideBadge 的 @restore 调它）
+  restoreDerivedValue,
 } = useD7Adjudication({
   allResponses: allResponsesRef,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,

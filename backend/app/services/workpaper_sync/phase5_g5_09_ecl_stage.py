@@ -1,0 +1,121 @@
+# -*- coding: utf-8 -*-
+"""G5-9「长期应收款三阶段划分」—— 转置表薄声明（16384 列 + 实体列 G..J）。
+
+spec: `g5-nested-sections-and-template-defects` · Task 11
+
+═══ 几何（openpyxl 逐格实测）═══
+
+`长期应收款三阶段划分G5-9`：`max_row=61` / **`max_col=16384`** / 有效列 **11**（A..K）。
+
+* **实体列 G..J**（`投资1：` / `投资2：` / `投资3：` / `投资X：`）—— 一列一个逻辑投资。
+  身份载体行 R9（放实体列标签）。
+* **字段行 R10-R23**（段①「信用风险是否显著增加」的 14 个评估维度）：
+  A 列问题 + B 列说明（不受管）+ G..J 各投资的评估值（受管）。
+* 段②③ 是清单式（序号+条件），R28-R31 / R37-R45 不进受管字段（列表非填列）。
+* footer / 分析结论 R24 + 提示区 R53-R60（不受管）。
+* 🔴 **16384 列策略**（裁决 G46-H3）：有效内容列 11（A..K），UUID 放**第 12 列 L**
+  （有效内容列 +1），**不放 max_col+1**（后者超 Excel XFD 上限）。
+* payload：`dual_write`。
+"""
+from __future__ import annotations
+
+from typing import Final
+
+from app.services.workpaper_sync.definitions import canonical_digest
+from app.services.workpaper_sync.phase5_transposed_sheet import (
+    TransposedSheetSpec,
+    build_store_projection as _build_store_projection,
+    extract_transposed_workbook as _extract_transposed_workbook,
+    materialize_transposed_workbook as _materialize_transposed_workbook,
+    merge_projection_into_store as _merge_projection_into_store,
+    resolve_managed_sheet as _resolve_managed_sheet,
+    sheet_payload as _sheet_payload,
+    stable_key_for as _stable_key_for,
+)
+
+MANAGED_SHEET: Final[str] = "长期应收款三阶段划分G5-9"
+SHEET_KEY: Final[str] = "g509-managed"
+TABLE_KEY: Final[str] = "lt_receivable_ecl_stage_transposed"
+TEMPLATE_ID: Final[str] = "G509"
+STORE_ITEM_ID: Final[str] = "G5-9-rows"
+IDENTITY_KEY: Final[str] = "id"
+HEADER_ROW: Final[int] = 10
+FOOTER_ROWS: Final[tuple[int, int]] = (25, 25)
+STATIC_PROMPT_FIRST_ROW: Final[int] = 50
+#: 🔴 实体列从 G 起（A/B 是问题+说明，C..F 被 B10:F10 合并覆盖）
+FIRST_ENTITY_COLUMN: Final[str] = "G"
+#: 模板预画到 J 列（投资X）
+INITIAL_ENTITY_COLUMN: Final[str] = "J"
+IDENTITY_CARRIER_ROW: Final[int] = 10
+IDENTITY_CARRIER_PREFIX: Final[str] = "GT-G5ECL-"
+DEFINED_NAME: Final[str] = "GT_MANAGED_REGION_G509"
+#: 🔴 16384 列表：受管区取有效内容列 G..J（4 实体列 × 14 字段行）
+MANAGED_REF: Final[str] = "$G$11:$J$24"
+
+#: 段①「信用风险是否显著增加」的 14 个评估维度（R10-R23）。
+FIELD_ROWS: Final[dict[str, int]] = {
+    "internalPriceIndicator": 11,
+    "rateOrTermChange": 12,
+    "externalMarketIndicator": 13,
+    "creditRatingChange": 14,
+    "debtorBizFinanceChange": 15,
+    "debtorOperatingResult": 16,
+    "debtorRegulatoryChange": 17,
+    "otherInstrumentCreditChange": 18,
+    "guaranteeCreditChange": 19,
+    "repaymentMechanismChange": 20,
+    "contractTermChange": 21,
+    "overduePerformanceChange": 22,
+    "creditMgmtMethodChange": 23,
+    "overdueInfo": 24,
+}
+FIELD_KEYS: Final[tuple[str, ...]] = tuple(FIELD_ROWS)
+
+SPEC_G509: Final[TransposedSheetSpec] = TransposedSheetSpec(
+    managed_sheet=MANAGED_SHEET,
+    sheet_key=SHEET_KEY,
+    table_key=TABLE_KEY,
+    template_id=TEMPLATE_ID,
+    store_item_id=STORE_ITEM_ID,
+    identity_key=IDENTITY_KEY,
+    header_row=HEADER_ROW,
+    field_rows=FIELD_ROWS,
+    footer_rows=FOOTER_ROWS,
+    static_prompt_first_row=STATIC_PROMPT_FIRST_ROW,
+    first_entity_column=FIRST_ENTITY_COLUMN,
+    initial_entity_column=INITIAL_ENTITY_COLUMN,
+    identity_carrier_row=IDENTITY_CARRIER_ROW,
+    identity_carrier_prefix=IDENTITY_CARRIER_PREFIX,
+    defined_name=DEFINED_NAME,
+    managed_ref=MANAGED_REF,
+    header_field_key="investName",
+    nested_fields_key="fields",
+    pointer_root="rows",
+    error_label="G5-9",
+    entity_noun="investment",
+    entity_noun_plural="investments",
+)
+
+
+def resolve_managed_sheet(workbook_bytes, *, defined_name=DEFINED_NAME):
+    return _resolve_managed_sheet(workbook_bytes, spec=SPEC_G509)
+
+
+def stable_key_for(invest_id, field_key):
+    return _stable_key_for(invest_id, field_key, spec=SPEC_G509)
+
+
+def build_store_projection(payload, *, contract, limits=None):
+    return _build_store_projection(payload, contract=contract, spec=SPEC_G509, limits=limits)
+
+
+def merge_projection_into_store(*, projection, base_payload):
+    return _merge_projection_into_store(projection=projection, base_payload=base_payload, spec=SPEC_G509)
+
+
+def sheet_payload():
+    return _sheet_payload(spec=SPEC_G509)
+
+
+def compute_mapping_digest():
+    return canonical_digest(sheet_payload())

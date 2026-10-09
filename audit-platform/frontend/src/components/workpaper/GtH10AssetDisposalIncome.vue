@@ -3,27 +3,58 @@
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
       <div v-if="isHtmlSheet && currentSheet !== '底稿目录'" class="h10-toolbar">
-        <el-segmented
-          :model-value="dualMode.currentMode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="dualMode.onModeChange"
-        />
+        <!--
+          🔴 切换器改 `v-model` 且**不带 `:disabled`**：健康检查是 mount 期异步，
+          disabled 在未就绪时会把「在线编辑」锁死、点击被彻底吞掉 —— D4 已实证的 bug ③。
+          健康门禁移进 `useHSyncMode.switchMode`（await 兜底），切换器保持可点。
+        -->
+        <el-segmented v-model="currentMode" :options="modeOptions" size="small" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
-        <el-tag v-if="dualMode.ooConfigReady.value" size="small" type="success">OnlyOffice 拉取成功</el-tag>
-        <el-tag v-else-if="dualMode.fetchingConfig.value" size="small" type="info">拉取中…</el-tag>
-        <el-tag v-else-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag size="small" :type="hSync.syncStateTag.value.type">
+          {{ hSync.syncStateTag.value.text }}
+        </el-tag>
+        <!--
+          🔴 未同步草稿必须**用户可见**（spec h2-h6-h10 Task 5 ③）：H10 是全 H 唯一有第三处
+          客户端数据存储的底稿。在此之前落了草稿只有一条一闪而过的 ElMessage，之后用户
+          完全不知道「屏幕上看到的值还没进库」——刷新/换机器就没了。计数由
+          `useH10FormData` 现算暴露，宿主只读不写（宿主一处存储 API 都不碰）。
+        -->
+        <el-tooltip
+          v-if="formData.pendingDraftCount.value > 0"
+          content="这些改动还没写进底稿库，仍只存在本机浏览器里；网络恢复后会自动重试同步"
+          placement="top"
+        >
+          <el-tag size="small" type="warning" data-testid="h10-pending-draft-count">
+            有 {{ formData.pendingDraftCount.value }} 条未同步草稿
+          </el-tag>
+        </el-tooltip>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h10-asset-disposal-income" />
       </div>
 
+      <!--
+        受管 sheet（H10-3 调整分录汇总）的在线编辑 —— 统一双向宿主。
+        🔴 `.oo-container` 必须有**确定高度**（D4 踩过 height:100% 被压成一条）。
+      -->
+      <div
+        v-if="isHtmlSheet && currentSheet !== '底稿目录' && currentMode === 'onlyoffice' && isH10SyncManagedSheet"
+        class="oo-container"
+      >
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="hSync.descriptor.value"
+          :bridge="hSync.syncBridge"
+        />
+      </div>
+
+      <!-- 非受管 sheet 的 OnlyOffice 模式（legacy 只读视图，无双向回写） -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && currentSheet !== '底稿目录' && dualMode.currentMode.value === 'onlyoffice'"
+        v-else-if="isHtmlSheet && currentSheet !== '底稿目录' && currentMode === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
-        @fallback="dualMode.onOoLoadFailed"
+        @fallback="onOoLoadFailed"
       />
 
       <H10TabProcedure
@@ -35,13 +66,21 @@
       />
 
       <template v-else-if="currentSheet === 'H10-1'">
+        <!--
+          🔴 `:all-responses` / `@refresh-complete` 原为 `allResponses` / `selfLoad()` ——
+          这两个标识符在**本宿主里不存在**（H5/H7 等宿主有自己的 `allResponses` ref 与
+          `selfLoad`，H10 走 `useH10FormData`）。把本宿主纳入 `tsconfig._h-cycle-sync.json`
+          后 vue-tsc 两条 TS2339 当场暴露：面板拿到 `undefined`、`@refresh-complete` 一触发
+          就是 ReferenceError。改为本宿主真实存在的 `formData.allResponses.value` /
+          `reloadAll()`（与下方 `H10TabAdjudication` 的写法一致）。
+        -->
         <HiFourTableSourcePanel
           v-if="props.htmlData?.hi_extraction_enabled"
           :wp-code="'H10'"
           :segments="getHiExtractionSegments('H10')"
-          :all-responses="allResponses"
+          :all-responses="formData.allResponses.value"
           :is-readonly="isReadonly"
-          @refresh-complete="selfLoad()"
+          @refresh-complete="reloadAll()"
         />
         <H10TabAdjudication
           :all-responses="formData.allResponses.value"
@@ -145,9 +184,14 @@
  * GtH10AssetDisposalIncome — H10 资产处置损益主入口
  * 科目 6115 损益类；EventBus: disposal:completed(H6) / substantive:adjudicated(6115)
  */
-import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject} from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject} from 'vue'
 import { useH10FormData } from './composables/useH10FormData'
-import { useH10DualMode } from './composables/useH10DualMode'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { useHSyncMode } from './composables/useHSyncMode'
+
+/** H10 entry id（manifest 冻结值，与 `phase5_h10_asset_disposal_income.ENTRY_ID` 逐字一致）。 */
+const H10_SYNC_ENTRY_ID = 'xlsx/gt-h10-asset-disposal-income'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
@@ -218,7 +262,70 @@ const isHtmlSheet = computed(() => {
   return ['H10A', 'H10-1', 'H10-2', 'H10-3', 'H10-4', '底稿目录'].includes(s) || s.startsWith('附注')
 })
 
-const dualMode = useH10DualMode({ wpId: wpIdRef, projectId: projectIdRef, reloadAll: () => formData.loadAll() })
+// ─── 双模式切换（统一接桥，替代 useH10DualMode）───────────────────────────────
+//
+// 原实现是 `useH10DualMode`（112 行，宿主专属、把视图模式字符串存进浏览器本地偏好，
+// 键前缀 `h10-dual-mode:`）。它**不建桥** ⇒ OO 侧编辑回不到 HTML。
+//
+// 🔴 本段刻意**不写出那个浏览器存储 API 的名字**：`test_h_foundation_hc_guards` 的 HC-10
+//    判据按「文件文本里是否出现该 API 名」分类，宿主出现即被记成「第三处客户端存储」。
+//    H10 的草稿存储在 `useH10FormData`（键按 itemId 分片），宿主自己一处都没有 ——
+//    在注释里提一句就会把它误记进去。键前缀 `h10-dual-mode:` 已足够定位原实现。
+//
+// 🔴 受管 sheet 是 **H10-3 调整分录汇总**，不是模板里的 `明细表H10-2`：后者是 9 类固定行
+//    × 12 月矩阵而本前端零月度建模（结构性不匹配，实测反驳了规划期 slice 的配对）。
+//    改配后映射率 6/10 是全 H 最高档。依据见后端契约 `review.declared_coverage_gaps`
+//    的 H10-GAP-1。
+const hSync = useHSyncMode({
+  entryId: H10_SYNC_ENTRY_ID,
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+  currentCode: computed(() => currentSheet.value),
+  isReadonly,
+  flushHtml: async () => {
+    // 🔴 H10 是 `formdata_composable` 载体且实例就在宿主里 ⇒ 直接 flush，不需要
+    //    `sync/hPendingWrites` 那层模块级注册表（那是 H5/H7 的 per_tab_* 载体才要的）。
+    //    防抖窗口 **2000ms**（与 H3/H5 并列最长），漏 flush 会静默丢最多 2 秒的编辑。
+    await formData.flushPendingSaves()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: H10_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: hSync.sheetKey.value,
+    }
+  },
+  reloadHtml: async () => { await formData.loadAll() },
+})
+
+/**
+ * adapter 回写窗口 ⇒ 挂起本地草稿（spec `h2-h6-h10-pilot-cross-reference-lanes` Task 5 ②）。
+ *
+ * 🔴 窗口定义取**并集**「桥 busy」∪「当前在 OO 模式」，不是只取 busy：`applied` 之后
+ * `reloadHtml` 还没跑完时 busy 已可能落下，而那段时间 store 恰好是 adapter 刚写的新值 ——
+ * 此刻落草稿，下次 `restoreDrafts()` 就会把回写前的旧值盖回去。宁可窗口取宽一点：
+ * 代价只是这段时间 PUT 失败要用户重填，而取窄的代价是**静默回滚 Excel 侧的编辑**。
+ */
+watch(
+  () => hSync.busy.value || hSync.renderMode.value === 'onlyoffice',
+  (inWindow) => { formData.setDraftsSuspended(inWindow) },
+  { immediate: true },
+)
+
+/** 模板 `ref="syncEditorHostRef"` 的落点 —— 直接复用桥里的 ref。 */
+const syncEditorHostRef = hSync.syncHostRef
+const isH10SyncManagedSheet = computed(() => hSync.isManagedSheet.value)
+const modeOptions = hSync.modeOptions
+const currentMode = hSync.renderMode
+
+/** legacy OO 组件加载失败的兜底（只对**非受管** sheet 生效）。 */
+function onOoLoadFailed(): void {
+  void hSync.switchMode('html')
+}
+
 const useGridFallback = computed(() => !!currentSheet.value && !isHtmlSheet.value)
 
 function onDebouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
@@ -273,4 +380,10 @@ onBeforeUnmount(() => {
 .h10-asset-disposal-income { padding: 12px; }
 .loading-container { padding: 24px; }
 .h10-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+
+/*
+ * 🔴 `height: 100%` 会被父级压成一条（D4 踩过）：OnlyOffice iframe 需要
+ *    **确定**高度才撑得开，min-height 兜住父级无高度时的退化。
+ */
+.oo-container { width: 100%; min-height: 600px; height: calc(100vh - 200px); }
 </style>

@@ -1,0 +1,94 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "11. 全套回归 + 双侧夹具 + 独占键 + 清册": [
+      {
+        "executionId": "74ec3ae5-05e8-4468-b252-86fb734eebc3",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791218175619
+      },
+      {
+        "executionId": "74ec3ae5-05e8-4468-b252-86fb734eebc3",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791226223446
+      }
+    ],
+    "12. 推送完成后报表标 stale + 触发重算": [
+      {
+        "executionId": "74ec3ae5-05e8-4468-b252-86fb734eebc3",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791218175778
+      },
+      {
+        "executionId": "74ec3ae5-05e8-4468-b252-86fb734eebc3",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791226223465
+      }
+    ],
+    "13. 报表公式求值与推送审定合计逐值对拍": [
+      {
+        "executionId": "74ec3ae5-05e8-4468-b252-86fb734eebc3",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791218175834
+      },
+      {
+        "executionId": "74ec3ae5-05e8-4468-b252-86fb734eebc3",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791226223601
+      }
+    ],
+    "14. `is_stale` 清除链路验证": [
+      {
+        "executionId": "74ec3ae5-05e8-4468-b252-86fb734eebc3",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791218175889
+      },
+      {
+        "executionId": "74ec3ae5-05e8-4468-b252-86fb734eebc3",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791226223617
+      }
+    ],
+    "15. 试算表 `audited_amount` 回写一致性": [
+      {
+        "executionId": "74ec3ae5-05e8-4468-b252-86fb734eebc3",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791218175972
+      },
+      {
+        "executionId": "74ec3ae5-05e8-4468-b252-86fb734eebc3",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791226223697
+      }
+    ],
+    "4. K2 canary 真 PG 试跑": [
+      {
+        "executionId": "74ec3ae5-05e8-4468-b252-86fb734eebc3",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791218315851
+      },
+      {
+        "executionId": "74ec3ae5-05e8-4468-b252-86fb734eebc3",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791218418492
+      },
+      {
+        "executionId": "74ec3ae5-05e8-4468-b252-86fb734eebc3",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791221109725
+      }
+    ],
+    "11. 明细表汇总推送到审定表": [
+      {
+        "executionId": "74ec3ae5-05e8-4468-b252-86fb734eebc3",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791218315880
+      },
+      {
+        "executionId": "74ec3ae5-05e8-4468-b252-86fb734eebc3",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791221115958
+      }
+    ]
+  }
+}

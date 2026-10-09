@@ -36,6 +36,57 @@ test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 FAKE_USER_ID = uuid.uuid4()
 
 
+async def _add_adj(
+    db: AsyncSession,
+    *,
+    pid,
+    adj_type: AdjustmentType,
+    account_code: str,
+    account_name: str,
+    debit: Decimal,
+    credit: Decimal,
+    adjustment_no: str,
+    year: int = 2025,
+    company_code: str = "001",
+    review_status: ReviewStatus = ReviewStatus.approved,
+    origin: str = "manual",
+) -> None:
+    """插入 Adjustment 主表 + AdjustmentEntry **明细行**。
+
+    🔴 **必须建明细行**：`recalc_adjustments` 已按 ADR-ADJ-001 改为读
+    `adjustment_entries.standard_account_code` + JOIN 主表。改造前本文件的
+    fixture 只往主表塞 `account_code`/`debit_amount`/`credit_amount` 三个
+    **遗留冗余列** ⇒ JOIN 结果为空 ⇒ 调整列恒 0 ⇒ 5 个测试长期红。
+    （真库实测这三列全库 0 非零，已是废弃列。）
+
+    🔴 **必须显式 `approved`**：`Adjustment.review_status` 的 server_default 是
+    **`draft`**，而 `recalc_adjustments` 按 ADR-ADJ-003 只纳入 approved。
+    不显式设置的话，就算建了明细行照样取不到数。
+
+    🔴 **origin 必须非 workpaper**：ADR-ADJ-002 / V124 约定 TB 调整列排除
+    workpaper 来源（底稿调整已由审定表 writeback 体现于 audited_amount）。
+    """
+    from app.models.audit_platform_models import AdjustmentEntry
+
+    adj_id = uuid.uuid4()
+    grp = uuid.uuid4()
+    db.add(Adjustment(
+        id=adj_id,
+        project_id=pid, year=year, company_code=company_code,
+        adjustment_no=adjustment_no, adjustment_type=adj_type,
+        account_code=account_code, account_name=account_name,
+        debit_amount=debit, credit_amount=credit,
+        entry_group_id=grp, review_status=review_status, origin=origin,
+        is_deleted=False, created_by=FAKE_USER_ID,
+    ))
+    db.add(AdjustmentEntry(
+        id=uuid.uuid4(), adjustment_id=adj_id, entry_group_id=grp, line_no=1,
+        standard_account_code=account_code, account_name=account_name,
+        debit_amount=debit, credit_amount=credit, is_deleted=False,
+    ))
+    await db.flush()
+
+
 @pytest_asyncio.fixture
 async def db_session() -> AsyncSession:
     async with test_engine.begin() as conn:
@@ -340,25 +391,17 @@ async def test_recalc_adjustments(db_session: AsyncSession, seeded_db):
     svc = TrialBalanceService(db_session)
     await svc.recalc_unadjusted(pid, 2025)
 
-    # 添加调整分录
-    group_id = uuid.uuid4()
-    db_session.add_all([
-        Adjustment(
-            project_id=pid, year=2025, company_code="001",
-            adjustment_no="AJE-001", adjustment_type=AdjustmentType.aje,
-            account_code="1001", account_name="库存现金",
-            debit_amount=Decimal("500"), credit_amount=Decimal("0"),
-            entry_group_id=group_id, created_by=FAKE_USER_ID,
-        ),
-        Adjustment(
-            project_id=pid, year=2025, company_code="001",
-            adjustment_no="AJE-001", adjustment_type=AdjustmentType.aje,
-            account_code="6001", account_name="主营业务收入",
-            debit_amount=Decimal("0"), credit_amount=Decimal("500"),
-            entry_group_id=group_id, created_by=FAKE_USER_ID,
-        ),
-    ])
-    await db_session.flush()
+    # 添加调整分录（借 1001 / 贷 6001，一借一贷成对）
+    await _add_adj(
+        db_session, pid=pid, adj_type=AdjustmentType.aje,
+        account_code="1001", account_name="库存现金",
+        debit=Decimal("500"), credit=Decimal("0"), adjustment_no="AJE-001",
+    )
+    await _add_adj(
+        db_session, pid=pid, adj_type=AdjustmentType.aje,
+        account_code="6001", account_name="主营业务收入",
+        debit=Decimal("0"), credit=Decimal("500"), adjustment_no="AJE-001",
+    )
 
     await svc.recalc_adjustments(pid, 2025)
     await db_session.commit()
@@ -371,6 +414,70 @@ async def test_recalc_adjustments(db_session: AsyncSession, seeded_db):
     assert tb_map["6001"].aje_adjustment == Decimal("500")
 
 
+@pytest.mark.asyncio
+async def test_recalc_unadjusted_preserves_workpaper_adjustment(
+    db_session: AsyncSession, seeded_db
+):
+    """重导入未审数时保留已发布的底稿调整分量。"""
+    pid = seeded_db
+    svc = TrialBalanceService(db_session)
+    await svc.recalc_unadjusted(pid, 2025)
+
+    row = (await svc.get_trial_balance(pid, 2025))[0]
+    row.wp_adjustment = Decimal("250")
+    row.audited_amount = row.unadjusted_amount + Decimal("250")
+    await db_session.flush()
+
+    # 模拟重新导入余额表：未审数应更新，但底稿发布分量不能被清零。
+    await svc.recalc_unadjusted(pid, 2025)
+    await db_session.commit()
+
+    refreshed = {
+        item.standard_account_code: item
+        for item in await svc.get_trial_balance(pid, 2025)
+    }[row.standard_account_code]
+    assert refreshed.unadjusted_amount == Decimal("12000")
+    assert refreshed.wp_adjustment == Decimal("250")
+    assert refreshed.audited_amount == Decimal("12250")
+
+
+@pytest.mark.asyncio
+async def test_recalc_audited_and_consistency_use_four_components(
+    db_session: AsyncSession, seeded_db
+):
+    """审定数重算和一致性校验都使用四项公式。"""
+    pid = seeded_db
+    svc = TrialBalanceService(db_session)
+    await svc.recalc_unadjusted(pid, 2025)
+
+    row = (await svc.get_trial_balance(pid, 2025))[0]
+    row.rje_adjustment = Decimal("10")
+    row.aje_adjustment = Decimal("-20")
+    row.wp_adjustment = Decimal("30")
+    row.audited_amount = Decimal("0")
+    await db_session.flush()
+
+    await svc.recalc_audited(pid, 2025, account_codes=[row.standard_account_code])
+    await db_session.commit()
+
+    refreshed = {
+        item.standard_account_code: item
+        for item in await svc.get_trial_balance(pid, 2025)
+    }[row.standard_account_code]
+    expected = Decimal("12020.00")
+    assert refreshed.audited_amount == expected
+    assert await svc.check_consistency(pid, 2025) == []
+
+    refreshed.audited_amount = Decimal("12000")
+    await db_session.commit()
+    issues = await svc.check_consistency(pid, 2025)
+    assert len(issues) == 1
+    assert issues[0]["type"] == "audited_formula"
+    assert issues[0]["account_code"] == row.standard_account_code
+    assert Decimal(issues[0]["expected"]) == expected
+    assert Decimal(issues[0]["actual"]) == Decimal("12000")
+
+
 # ===== 审定数重算 =====
 
 @pytest.mark.asyncio
@@ -380,15 +487,11 @@ async def test_recalc_audited(db_session: AsyncSession, seeded_db):
     svc = TrialBalanceService(db_session)
     await svc.recalc_unadjusted(pid, 2025)
 
-    group_id = uuid.uuid4()
-    db_session.add(Adjustment(
-        project_id=pid, year=2025, company_code="001",
-        adjustment_no="RJE-001", adjustment_type=AdjustmentType.rje,
+    await _add_adj(
+        db_session, pid=pid, adj_type=AdjustmentType.rje,
         account_code="1001", account_name="库存现金",
-        debit_amount=Decimal("1000"), credit_amount=Decimal("0"),
-        entry_group_id=group_id, created_by=FAKE_USER_ID,
-    ))
-    await db_session.flush()
+        debit=Decimal("1000"), credit=Decimal("0"), adjustment_no="RJE-001",
+    )
 
     await svc.recalc_adjustments(pid, 2025)
     await svc.recalc_audited(pid, 2025)
@@ -413,15 +516,11 @@ async def test_recalc_audited_liability_credit_increase(db_session: AsyncSession
     svc = TrialBalanceService(db_session)
     await svc.recalc_unadjusted(pid, 2025)
 
-    group_id = uuid.uuid4()
-    db_session.add(Adjustment(
-        project_id=pid, year=2025, company_code="001",
-        adjustment_no="AJE-LIAB-INC", adjustment_type=AdjustmentType.aje,
+    await _add_adj(
+        db_session, pid=pid, adj_type=AdjustmentType.aje,
         account_code="2202", account_name="应付账款",
-        debit_amount=Decimal("0"), credit_amount=Decimal("1000"),
-        entry_group_id=group_id, created_by=FAKE_USER_ID,
-    ))
-    await db_session.flush()
+        debit=Decimal("0"), credit=Decimal("1000"), adjustment_no="AJE-LIAB-INC",
+    )
 
     await svc.recalc_adjustments(pid, 2025)
     await svc.recalc_audited(pid, 2025)
@@ -442,15 +541,11 @@ async def test_recalc_audited_liability_debit_decrease(db_session: AsyncSession,
     svc = TrialBalanceService(db_session)
     await svc.recalc_unadjusted(pid, 2025)
 
-    group_id = uuid.uuid4()
-    db_session.add(Adjustment(
-        project_id=pid, year=2025, company_code="001",
-        adjustment_no="AJE-LIAB-DEC", adjustment_type=AdjustmentType.aje,
+    await _add_adj(
+        db_session, pid=pid, adj_type=AdjustmentType.aje,
         account_code="2202", account_name="应付账款",
-        debit_amount=Decimal("1000"), credit_amount=Decimal("0"),
-        entry_group_id=group_id, created_by=FAKE_USER_ID,
-    ))
-    await db_session.flush()
+        debit=Decimal("1000"), credit=Decimal("0"), adjustment_no="AJE-LIAB-DEC",
+    )
 
     await svc.recalc_adjustments(pid, 2025)
     await svc.recalc_audited(pid, 2025)
@@ -471,15 +566,11 @@ async def test_recalc_audited_revenue_credit_increase(db_session: AsyncSession, 
     svc = TrialBalanceService(db_session)
     await svc.recalc_unadjusted(pid, 2025)
 
-    group_id = uuid.uuid4()
-    db_session.add(Adjustment(
-        project_id=pid, year=2025, company_code="001",
-        adjustment_no="AJE-REV-INC", adjustment_type=AdjustmentType.aje,
+    await _add_adj(
+        db_session, pid=pid, adj_type=AdjustmentType.aje,
         account_code="6001", account_name="主营业务收入",
-        debit_amount=Decimal("0"), credit_amount=Decimal("500"),
-        entry_group_id=group_id, created_by=FAKE_USER_ID,
-    ))
-    await db_session.flush()
+        debit=Decimal("0"), credit=Decimal("500"), adjustment_no="AJE-REV-INC",
+    )
 
     await svc.recalc_adjustments(pid, 2025)
     await svc.recalc_audited(pid, 2025)
@@ -505,7 +596,12 @@ async def test_full_recalc(db_session: AsyncSession, seeded_db):
     assert len(rows) >= 3
     for r in rows:
         unadj = r.unadjusted_amount or Decimal("0")
-        assert r.audited_amount == unadj + r.rje_adjustment + r.aje_adjustment
+        assert r.audited_amount == (
+            unadj
+            + (r.rje_adjustment or Decimal("0"))
+            + (r.aje_adjustment or Decimal("0"))
+            + (r.wp_adjustment or Decimal("0"))
+        )
 
 
 # ===== 一致性校验 =====

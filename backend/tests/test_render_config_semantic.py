@@ -299,3 +299,38 @@ class TestNoGeneratedInProductionRegistry:
                     f"sheet '{sheet_name}' 的 sheet_type='{st}' "
                     f"不在 SheetContentType 枚举中"
                 )
+
+
+class TestOvrLoopInvariantRegression:
+    """回归守卫：ovr 必须在 sheet 循环之前初始化（防空 sheet 集 render-config 500）。
+
+    根因史实：ovr 曾只在 `for cls in classifications` 循环体内首次赋值。当
+    classifications 为空 / 全部 sheet 被 continue 跳过时（空 sheet 集底稿，
+    如 wp c24c0705-f10f-48cb-be86-be72b3bd1766），循环后
+    `if ovr in _SELF_CONTAINED_DEDICATED and sheets:` 引用未定义的 ovr →
+    UnboundLocalError → 整个 render-config 端点 500（响应体空）。
+
+    修复形态 = 把 ovr 提升为 wp_code 级循环不变量、在循环外初始化。本守卫锚定该
+    形态，防止有人把初始化改回循环体内造成回归。
+    """
+
+    def test_ovr_initialized_before_sheet_loop(self) -> None:
+        import inspect
+        import re
+
+        src = inspect.getsource(
+            _render_config_module._get_render_config_impl
+        )
+        loop_idx = src.index("for cls in classifications:")
+        prefix = src[:loop_idx]
+
+        # 循环之前必须有顶层（4 空格缩进，未进循环）ovr 赋值。
+        assert re.search(
+            r"\n    ovr = _WP_CODE_OVERRIDE\.get\(wp_code\)", prefix
+        ), (
+            "ovr 必须在 sheet 循环之前初始化，否则空 sheet 集底稿的 "
+            "render-config 会 UnboundLocalError 500"
+        )
+
+        # 引用点仍在（防守卫因引用点被删而变成无意义的假绿）。
+        assert "if ovr in _SELF_CONTAINED_DEDICATED" in src

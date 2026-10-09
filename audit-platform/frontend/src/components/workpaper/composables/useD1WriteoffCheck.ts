@@ -187,7 +187,28 @@ export interface UseD1WriteoffCheckOptions {
   saveImmediate: SaveFn
   saveDebouncedText: DebounceSaveFn
   isReadonly: Ref<boolean>
+  /**
+   * entry 级「OnlyOffice 会话进行中 / 同步在途」信号（需求 5.7 · P17 第三写入方定序）。
+   *
+   * 🔴 **必填，刻意不给默认值**：本表的「同步到D1-4」是 `D1-bd-portfolio-rows` 的
+   * **第三个写入方**（另两个是 D1-4 自己的 HTML 保存与 OO 回写）。OO 会话开着时直写 store
+   * 会与已 materialize 的产物分叉 —— 下次 extract 反读到非预期值 ⇒ roundtrip 门红，
+   * 或本次直写被 OO 合并结果静默覆盖。
+   *
+   * 设成可选并给 `false` 默认值就等于「宿主忘接线 ⇒ 静默无保护」，
+   * 与本 spec 一直在批的「缺键静默跳过」同型 ⇒ 必填，让 TS 在编译期逼出接线。
+   *
+   * 权威源 = 宿主 `GtD1NotesReceivable.vue` 的
+   * `syncBridge.mode === 'oo' || WP_BRIDGE_IN_FLIGHT_STATES.includes(syncBridge.state)`
+   * （与工具栏 `syncBusy` 同一口径，不另造判断）。
+   */
+  ooSessionActive: Ref<boolean>
 }
+
+/** 跨 sheet 回写的结果。拒绝时必须带**可见的中文原因**（P17）。 */
+export type CrossSheetWriteResult =
+  | { ok: true }
+  | { ok: false; reason: string }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants — Item Keys
@@ -288,7 +309,7 @@ function deserializeWriteoffRow(raw: any): WriteoffRow {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function useD1WriteoffCheck(options: UseD1WriteoffCheckOptions) {
-  const { allResponses, saveImmediate, saveDebouncedText, isReadonly } = options
+  const { allResponses, saveImmediate, saveDebouncedText, isReadonly, ooSessionActive } = options
 
   // ─── State ─────────────────────────────────────────────────────────────
 
@@ -673,8 +694,28 @@ export function useD1WriteoffCheck(options: UseD1WriteoffCheckOptions) {
    * `D1-bd-portfolio-rows` 的「按组合计提」父行，D1-4 的期末未审随之重算，
    * 并沿 D1-4 → D1-1 → 披露 → 附注 逐级联动。
    */
-  function writeBackToD14(patch: { currentReversal?: number; currentWriteOff?: number }): void {
-    if (isReadonly.value) return
+  function writeBackToD14(
+    patch: { currentReversal?: number; currentWriteOff?: number },
+  ): CrossSheetWriteResult {
+    // 🔴 **P17 第三写入方定序**（需求 5.7）：OO 会话进行中 / 同步在途时**拒绝**直写。
+    //    裁决取任务给的两条里的「禁用 + 中文原因」，**不**同时留两条直写路径。
+    //    顺序要害：这一条必须在 `isReadonly` **之前**判 —— OO 模式下 `isReadonly` 未必为真，
+    //    放在后面会被 readonly 分支短路掉，等于没加。
+    if (ooSessionActive.value) {
+      return {
+        ok: false,
+        reason:
+          '当前底稿正在「在线编辑」（OnlyOffice）会话中或同步尚未完成，'
+          + '暂不能把本表合计同步到 D1-4：直接改写会与已生成的 Excel 产物分叉，'
+          + '导致下次回读取到非预期数值。请先切回「结构化视图」（会保存并回写在线编辑的改动），'
+          + '再执行同步。',
+      }
+    }
+    // 🔴 原实现在 readonly 时**静默 return**，而宿主无条件弹「已同步到D1-4」
+    //    ⇒ 只读状态下点按钮会收到一条假成功。既存缺陷，与 P17 要的「可见原因」同源，一并修。
+    if (isReadonly.value) {
+      return { ok: false, reason: '当前为只读状态，无法同步到 D1-4。' }
+    }
     const item: ChecklistItem = {
       item_id: D1_BD_PORTFOLIO_KEY,
       conclusion: null,
@@ -682,16 +723,17 @@ export function useD1WriteoffCheck(options: UseD1WriteoffCheckOptions) {
     }
     allResponses.value.set(D1_BD_PORTFOLIO_KEY, item)
     saveImmediate([item])
+    return { ok: true }
   }
 
   /** 将本表转回合计同步写入 D1-4 坏账准备明细表转回变动列 */
-  function syncReversalToD14(): void {
-    writeBackToD14({ currentReversal: reversalTotalE.value })
+  function syncReversalToD14(): CrossSheetWriteResult {
+    return writeBackToD14({ currentReversal: reversalTotalE.value })
   }
 
   /** 将本表核销合计同步写入 D1-4 坏账准备明细表核销变动列 */
-  function syncWriteoffToD14(): void {
-    writeBackToD14({ currentWriteOff: writeoffTotalC.value })
+  function syncWriteoffToD14(): CrossSheetWriteResult {
+    return writeBackToD14({ currentWriteOff: writeoffTotalC.value })
   }
 
   // ─── Cleanup ───────────────────────────────────────────────────────────

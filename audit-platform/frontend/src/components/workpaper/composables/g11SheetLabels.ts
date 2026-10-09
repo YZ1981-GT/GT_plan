@@ -1,5 +1,6 @@
 import type { GCycleIndexRowDef } from './g12SheetLabels'
 import { collectG11AProcedureMarks } from './g11Conclusion'
+import { G11_ITEM_IDS } from './g11StorageContract'
 
 export const G11_SHEET_LABEL_MAP: Record<string, string> = {
   G11: '底稿目录',
@@ -71,7 +72,7 @@ export function isG11SheetComplete(code: string, m: Map<string, any>): boolean {
       return collectG11AProcedureMarks(m).length > 0
         || [...m.keys()].some(k => k.startsWith('G11A-'))
     case 'G11-1':
-      return m.has('G11-adj-rows') || m.has('G11-adj-tb')
+      return m.has(G11_ITEM_IDS.G11_ADJ_ROWS) || m.has('G11-adj-tb')
     case 'G11-2':
       return hasJsonRows(m, 'G11-detail-rows')
     case 'G11-3':

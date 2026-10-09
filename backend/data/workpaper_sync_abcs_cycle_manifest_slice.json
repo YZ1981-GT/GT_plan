@@ -38,7 +38,7 @@
   "covered_by_d_to_n_slices": 85,
   "excluded_pilot_entry_count": 1,
   "in_scope_parent_duplicate_count": 0,
-  "global_parent_duplicate_count": 33,
+  "global_parent_duplicate_count": 12,
   "excluded_from_slice": [
    {
     "what": "pilot entry `xlsx/b60/gt-b60-bundle`（B60 总体审计策略）",
@@ -70,7 +70,8 @@
     "reason": "被 26 条生产边使用（其中本 slice 只贡献 **5 条**，全在 B 类），`shared_base_preserved` 约束不删。🔴 M 那轮同口径冻结 29、N 那轮现算 27（26 生产 + 1 测试）—— 平台边集会漂移，**必须每轮现算**，禁照抄。",
     "verified_how": "statement-position import 路径字面量现算（`from '…'` 可独占一行；排除双引号字符串内的匹配），实得 26 生产 + 1 测试，in-scope 5 条。"
    }
-  ]
+  ],
+  "global_parent_duplicate_note": "AC 1.6 原文 43；随迁移推进逐批下降（43 → 33 → 现算 12 —— D4 改走统一路径后 21 条 xlsx/d4/** 退役）。本字段由 source_manifest 现算，不手填：守卫 test_task57_abcs_and_shared_migration.py::TestSliceScopeIsRecomputable::test_parent_duplicate_section_is_absent_because_in_scope_count_is_zero 逐轮比对本登记值与 manifest 现算值，并只卡「大于 0 且不超过 AC 1.6 原文的 43」（退役是合法进展，增加才是方向反了）。in_scope 侧仍为 0（本 slice 的 entry 一个子入口都没有），故条件节 parent_duplicate_summary 继续缺席。"
  },
  "entry_groups": {
   "why_this_key_exists": "tasks.md 的 Task 57 正文点名「**按 componentType/持久化通道分组**，跨循环函证复用 adapter，不复制合同」。前十一轮都是「按 wp_code 前缀逐条列」——本轮必须先分组再逐 entry，且分组键**可复算**。",
@@ -2858,9 +2859,11 @@
     "resolution_kind": "literal_sheet_name",
     "sheet_name_literal": "A3-8商誉减值测试",
     "resolver": "backend/app/services/wp_template_finder.py::find_template_file_any",
-    "workbook": null,
-    "workbook_format": null,
-    "why_null": "字面 sheet-name 不是 wp_code（含中文表名）⇒ `find_template_file_any` 现算返回 None。这是**真实缺陷**（见 BP-6），不是本 slice 没查。"
+    "workbook": "A/A3-7内部往来核对表、A3-8商誉减值测试.xlsx",
+    "workbook_format": "xlsx",
+    "size": 436152,
+    "sha256": "1aca5a29c608ef981e11af1a645eb3af1ee7b0e1b239c6d67ea742be8a3cee07",
+    "why_null": "🔴 **已更正（spec workpaper-sync-pure-static-lane-and-combined-workbook-resolution）**：原值 `workbook: null` 是**假事实** —— 册一直在磁盘上（`A/A3-7内部往来核对表、A3-8商誉减值测试.xlsx`，声明码 A3-7 与 A3-8，册内含 sheet `A3-8商誉减值测试` 与 `A3-8-1可收回金额测试`）。原 `why_null` 只说了**第二层**（字面 sheet-name 不是 wp_code），隐含「传对 wp_code 就能解析」，而改动前 `find_template_file_any(\"A3-8\")` 同样是 `None` ⇒ 照它做只修第二步仍拿不到册。**归因第一层**（本次补齐）：① 前缀而非包含 —— `_wp_code_filename_prefix_ok(合册名, \"A3-8\")` 为 False（真名以 A3-7 起头），且 `_index.json` 给该册挂的 wp_code 是 \"A3\"；② A-only 子码正则 `^A\\d+-\\d+` 命中 ⇒ 走 `find_template_file_any` 的「A 子码严格分支」，两次同名前缀尝试都不中就 `return None`。**解析层缺陷（第一步）现已解除**：finder 新增合册声明码索引，两路入口对 A3-8 / A3-8-1 / A2-2 都返回其所在合册（全域 1591 码前后差集恰为这三码）。**剩余为宿主层（第二步）**：宿主仍传中文字面 sheet 名而非 wp_code，登记为后继（两步顺序不可颠倒 —— 第一步未做时第二步零收益）。"
    },
    "mount_count": 1,
    "scenario_profile_id": null,
@@ -12162,9 +12165,10 @@
    "vue": "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
    "ts_exists": true,
    "vue_exists": true,
-   "out_of_scope_consumer_count": 42,
+   "out_of_scope_consumer_count": 46,
    "in_scope_consumer_count": 0,
-   "why_non_vacuous": "承载者存在且被 41 个**非本 slice**宿主（D/F/G/H 循环）真实挂载 ⇒ 「本 slice 0 挂载」是真实缺口而不是「组件不存在」。只放 `el-tooltip` 不算满足 AC 1.4（EP teleport + 仅 hover 才进 DOM）。"
+   "why_non_vacuous": "承载者存在且被 41 个**非本 slice**宿主（D/F/G/H 循环）真实挂载 ⇒ 「本 slice 0 挂载」是真实缺口而不是「组件不存在」。只放 `el-tooltip` 不算满足 AC 1.4（EP teleport + 仅 hover 才进 DOM）。",
+   "out_of_scope_consumer_breakdown": "41 个循环入口宿主（D/F/G/H）+ 4 个 D4 子页签自管工具栏（D4-9/D4-10/D4-34/D4-36 属 isD4DedicatedSyncSheet，宿主工具栏不渲染，子页签的挂载是这些 sheet 唯一的 AC 1.4 披露点）+ 1 条 components.d.ts 全局组件类型声明 = 46 条 statement-position 生产边。原登记 42 少算了那 4 个子页签（同时与本节旧文案「41 个」互不自洽：41/42/46 三个数并存）。"
   }
  },
  "blocking_preconditions": [
@@ -12843,8 +12847,8 @@
   "entries_with_literal_sheet_name": 19,
   "entries_with_runtime_sheet_name_expression": 27,
   "entries_whose_authoritative_workbook_is_docx": 16,
-  "entries_whose_authoritative_workbook_is_xlsx": 2,
-  "entries_whose_authoritative_workbook_is_unresolved": 28,
+  "entries_whose_authoritative_workbook_is_xlsx": 3,
+  "entries_whose_authoritative_workbook_is_unresolved": 27,
   "confirmation_component_types": 22,
   "confirmation_shared_component_types": 7,
   "confirmation_wp_codes": 55,

@@ -1,0 +1,46 @@
+{
+  "measured_at": "2026-09-26",
+  "spec": "d1-sync-row-table-engine-and-d1-coverage",
+  "task": "27（子目标）— D1-5 单元格双向可行性核 + 裁决",
+  "decision": "single_html",
+  "verdict": "D1-5「应收票据调整分录汇总表」判为 single_html，不做 OO 单元格双向回写；维持 tasks.md 的默认倾向，四条判据逐条实证成立。",
+  "authority": {
+    "template_path": "backend/wp_templates/D/D1 应收票据.xlsx",
+    "template_sha256": "e6e8dcf28ba6e7f6fdf9867c3ac43b2f1a72e1a1b6f2aa477f58dfca39097577",
+    "method": "openpyxl 直读真实 tab 名与几何（data_only=False，逐格扫 A1:J25 + 全表扫身份列痕迹 + 扫 definedName）",
+    "real_tab_name": "调整分录汇总表D1-5",
+    "geometry": "A1:J25；标题区 A1-A4；表头行 5（10 字段键列 A-J）；数据区 6-20（空模板带，逐格实测零内容零公式）；行21 使用提示",
+    "header_A_to_J": [
+      "调整事项说明",
+      "类别（报表调整/账项调整/其他）",
+      "报表项目",
+      "科目名称",
+      "附注项目",
+      "……",
+      "借方调整金额",
+      "贷方调整金额",
+      "索引",
+      "备注"
+    ],
+    "identity_column_scan": "全表逐格扫 GTROW / _GT / UUID 三种痕迹，**零命中**",
+    "defined_name_scan": "扫 workbook.defined_names 中含 D15 / D1_5 的项，**零命中**（无 static_region 锚点）"
+  },
+  "why_single_html": [
+    "① 无行身份列：openpyxl 全表扫 A-J 零 GTROW/_GT/UUID 痕迹（D1-3 有注入列 P 作行身份锚）——单元格双向回写按行 UUID 定位，缺锚即无法稳定回写。同时零 definedName ⇒ 也不具备 static_region 绝对坐标锚点。",
+    "② 已有专用同步链，OO 回写会争同一 store：`D1-entry-rows` 由 `useD1Adjustment` 拥有（STORAGE_KEY 实测），`D1TabAdjustment.vue` 接 `useAdjustmentCentralSync` 共 **2 个接线点**（1 条 import 语句 + 1 处 `useAdjustmentCentralSync({...})` 调用；注意裸字符串出现数实测为 3，因 import 行同时写了符号名与模块路径，判据按接线点数断言不按字符数），配置 `wpCode:'D1'` / `itemId:'D1-entry-rows'` → 后端 `syncAdjustmentFromWorkpaper`（幂等 by `source_ref={wpId}:{itemId}`，与 D4-4 的 `source_ref {wp_id}:D4-4-rows` 同款机制）；`D1TabIndex.vue:50` 的 progressKeys 也读它。OO 单元格覆盖 `D1-entry-rows` 会绕过借贷平衡门并可能破坏集中登记联动。",
+    "③ 借贷平衡不变式仅 HTML 侧强制：`useD1Adjustment` 的 `BALANCE_TOLERANCE=0.005` + `isBalanced` computed，且「同步到集中登记」按钮 `:disabled=\"isReadonly || !isBalanced || rows.length === 0\"`（D1TabAdjustment.vue:227）把平衡设成同步前置门；Excel 模板数据区 6-20 逐格实测**零公式零校验**，OO 侧编辑可轻易产生不平衡分录并绕过该门。",
+    "④ 动态插入带、无固定 GTROW seed；列 F『……』为排版占位（非 store 字段）。"
+  ],
+  "same_pattern_as_d4_4": {
+    "conclusion": "D1-5 与已判 single_html 的 D4-4 **是同一套模板范式**，不是「形似」而是逐字相同",
+    "identical_headers": "十列表头 A-J 与 T08-d44-single-html-adjudication.json 记录的 header_A_to_J **逐字完全相同**",
+    "identical_layout": "同为表头行 5 + 数据区 6-20 空模板带 + 行 21 使用提示；仅整表行数不同（D1-5 = A1:J25，D4-4 = A1:J23）",
+    "identical_sync_chain_shape": "同为「调整分录 hub store + useAdjustmentCentralSync + 借贷平衡仅 HTML 强制」三件套",
+    "implication": "上游 spec `d-cycle-sheet-bidirectional-expansion` 对 D4-4 的 single_html 裁决可直接类推；本次未偷懒类推，四条判据在 D1-5 上逐条独立实证"
+  },
+  "expansion_spec_red_line": "README『程序表/附注类应诚实判 single_html，不得强行单元格双向』—— 调整分录汇总属已有专用同步链的 hub 表，同理归 single_html 侧（不是网格明细）。",
+  "reclassification_condition_not_met": "tasks.md 定的改判条件是「有行身份列 + 无同步链冲突」两者同时成立；实测**两条都不成立**（零身份列 + 有集中登记同步链冲突）⇒ 不改判，不另起接入任务。",
+  "managed_region_impact": "受管区计数不变（tasks.md Task 27 门已写明「D1-5 不计」）。",
+  "no_code_changed": true,
+  "scope_note": "本证据只覆盖 Task 27 的 D1-5 子目标；同任务的 D1-8（双区）/ D1-16（双区）接入本体未做，Task 27 复选框保持未勾。"
+}

@@ -1364,6 +1364,32 @@ onMounted(() => {
   })
 })
 
+/**
+ * 清防抖 + 立即落库，**await 到真正写完** —— 宿主切「在线编辑」前的必经一步。
+ *
+ * 🔴 为什么必须是 `async` 且由宿主 await：本 Tab 是 `G7-main-disclosure-soe-v2` 这条
+ * store item 的**唯一**写入方，防抖窗口 **600ms**（`scheduleSave`）。宿主的
+ * `useWorkpaperSyncBridge.flushHtml` 若不等它落库就去 `readStoreProjection`，
+ * materialize 出的 xlsx 会少掉最后那批编辑，而且**毫无提示**。
+ *
+ * 🔴 与 `onBeforeUnmount` 里那句 `void persist()` 的区别：那条是「卸载兜底」，发射后不管
+ * 就行（组件都要没了）；这条是「切换前门禁」，必须可 await。两处各有其用，不合并。
+ *
+ * 幂等：无待写盘（`savePhase !== PENDING` 且无本地改动）时是零请求空转 —— 用户点过保存
+ * 再切换就走这条，符合「已保存 ⇒ 秒切」。
+ */
+async function flushPendingSave(): Promise<void> {
+  if (props.isReadonly || !props.wpId) return
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
+  if (savePhase.value !== SAVE_PHASE.PENDING && !hasLocalEdits) return
+  await persist()
+}
+
+defineExpose({ flushPendingSave })
+
 onBeforeUnmount(() => {
   window.removeEventListener('substantive:adjudicated', handleAdjudicated)
   window.removeEventListener(G7_SOURCE_SAVED_EVENT, handleSourceRowsSaved)

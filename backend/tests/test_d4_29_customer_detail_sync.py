@@ -100,6 +100,19 @@ def test_invalid_duplicate_identity(template):
         d.materialize_transposed_workbook(template, customers(1) * 2)
 
 
+def _self_members_touched_by(func):
+    """生产函数体里出现的全部 `self.<name>`（只取直接成员，不含链式二级属性）。"""
+    import ast
+    import inspect
+    import textwrap
+    tree = ast.parse(textwrap.dedent(inspect.getsource(func)))
+    return {
+        node.attr for node in ast.walk(tree)
+        if isinstance(node, ast.Attribute)
+        and isinstance(node.value, ast.Name) and node.value.id == 'self'
+    }
+
+
 def test_production_adapter_dispatch(template, contract, tmp_path, monkeypatch):
     import shutil
     from dataclasses import dataclass
@@ -138,9 +151,32 @@ def test_production_adapter_dispatch(template, contract, tmp_path, monkeypatch):
         # 复用生产合并逻辑：extract 现遍历 resolve_transposed_specs 产多段（D4-29 + D4-12），
         # 不能再返 parts[-1]（会丢 D4-29 段）。合并 values + row_keys。
         _merge_projections = excel.ExcelSyncAdapter._merge_projections
+        # 同理复用生产**内部续体**：spec oo-single-pass-materialize-and-room-leave 任务 3 把
+        # `materialize` 拆成「开 workbook_read_scope」+ `_materialize_within_scope`（本体），
+        # 并在多 binding 分支新增 `_try_single_pass_materialize`。Host 替的是 adapter 的
+        # **状态**（binding/definitions/limits/substrate 形态），生产**逻辑**一律借真身 ——
+        # 自己复刻一份就变成在测「复刻得对不对」，本用例要测的恰是生产 dispatch 本身。
+        # （单 binding ⇒ 只走 len(bindings)==1 分支，单趟入口在此不可达，借来只为镜面完整。）
+        _materialize_within_scope = excel.ExcelSyncAdapter._materialize_within_scope
+        _try_single_pass_materialize = excel.ExcelSyncAdapter._try_single_pass_materialize
     source, output = tmp_path / 'source.xlsx', tmp_path / 'output.xlsx'
     source.write_bytes(template)
     host = Host()
+    # 🔴 漂移门（根因防线）：Host 是 `self` 的替身，被驱动的生产函数里每一个 `self.X` 都
+    #    必须在它上面有对应物。任务 3 拆 `materialize` 时本 stub 没跟上 ⇒ 生产链路深处
+    #    AttributeError；本文件在 tests/workpaper_sync/ 之外，那边的聚焦回归跑不到它。
+    #    这条门让下一次生产改动在**这里**直接点名缺哪个成员，而不是等某次全量跑才炸。
+    required = set()
+    for func in (excel.ExcelSyncAdapter.materialize,
+                 excel.ExcelSyncAdapter._materialize_within_scope,
+                 excel.ExcelSyncAdapter.extract):
+        required |= _self_members_touched_by(func)
+    missing = sorted(name for name in required if not hasattr(host, name))
+    assert missing == [], (
+        f'Host stub 与生产 adapter 表面漂移，缺少成员：{missing} —— 生产 '
+        'materialize/extract 会在 self 上取这些成员。补齐它们（状态自己摆、逻辑借 '
+        'ExcelSyncAdapter 真身），不要放宽本门'
+    )
     excel.ExcelSyncAdapter.materialize(host, substrate=source, output=output,
         projection=d.build_store_projection(customers(), contract=contract), contract=contract)
     projection = excel.ExcelSyncAdapter.extract(host, artifact=output, contract=contract)

@@ -1,0 +1,35 @@
+{
+  "_comment": "共享夹具：后端 build_main_skeleton 产出与前端 buildE1{Listed,Soe}Columns + e1MainRows 逐字一致。任一侧改行标签或列定义即红。spec: chain-closure-phase3-push-rollout · 需求 5.5",
+  "listed": {
+    "rows": [
+      { "label": "库存现金", "end_amount": null, "prior_amount": null },
+      { "label": "银行存款", "end_amount": null, "prior_amount": null },
+      { "label": "存放财务公司款项", "end_amount": null, "prior_amount": null },
+      { "label": "其他货币资金", "end_amount": null, "prior_amount": null },
+      { "label": "存款应计利息", "end_amount": null, "prior_amount": null },
+      { "label": "数字货币", "end_amount": null, "prior_amount": null },
+      { "label": "合计", "end_amount": null, "prior_amount": null, "is_total": true },
+      { "label": "其中：存放在境外的款项总额", "end_amount": null, "prior_amount": null }
+    ],
+    "columns": [
+      { "key": "label", "label": "项目", "is_label": true, "flat": true },
+      { "key": "end_amount", "label": "期末余额", "format": "amount" },
+      { "key": "prior_amount", "label": "上年年末余额", "format": "amount" }
+    ]
+  },
+  "soe": {
+    "rows": [
+      { "label": "库存现金", "end_amount": null, "prior_amount": null },
+      { "label": "银行存款", "end_amount": null, "prior_amount": null },
+      { "label": "其他货币资金", "end_amount": null, "prior_amount": null },
+      { "label": "数字货币", "end_amount": null, "prior_amount": null },
+      { "label": "合计", "end_amount": null, "prior_amount": null, "is_total": true },
+      { "label": "其中：存放在境外的款项总额", "end_amount": null, "prior_amount": null }
+    ],
+    "columns": [
+      { "key": "label", "label": "项目", "is_label": true, "flat": true },
+      { "key": "end_amount", "label": "期末余额", "format": "amount" },
+      { "key": "prior_amount", "label": "期初余额", "format": "amount" }
+    ]
+  }
+}

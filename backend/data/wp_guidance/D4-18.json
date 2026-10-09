@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-18",
+  "title": "D4-18 营业收入截止测试（单据到账）编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "测试期末是否有已发货但未入账的收入，方向为单据→账簿：选取资产负债表日前后的发货/出库单据，追溯到收入凭证，确认是否及时入账。",
+      "source_refs": []
+    },
+    {
+      "key": "materials",
+      "title": "二、样本选取",
+      "content": "选取资产负债表日前后 N 天的发货/出库单据，逐笔追溯对应的收入凭证，比对品名、数量、金额，标注未入账项目。",
+      "source_refs": []
+    },
+    {
+      "key": "formulas",
+      "title": "三、跨期判定",
+      "content": "单据日期 ≤ 截止日 < 凭证日期 → 判定为跨期（本期货、次期账）。对本期已发货未入账的须评估是否做截止调整确认本期收入。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 本期发货但次年才入账：漏记本期收入（完整性缺陷）。\n2. 跨期未入账金额重大：须做截止调整（录入 D4-4）。\n3. 与 D4-17 账到单据测试互补，两个方向共同覆盖收入截止风险。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "b82b5bf3613188495c3c33bf4825a53605ffcefcb2da1f333c1ba75525dd89fd",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "fd98b9f3a10b5c41e17d33334228f0e9fa23a0361162574e393002b8c714374f"
+  }
+}

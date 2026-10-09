@@ -33,6 +33,7 @@ import {
 } from './g11AccountMatch'
 import { G11_ACCOUNT_CODE } from './g11Constants'
 import type { ChecklistResponse } from './useF1FormData'
+import { G11_ITEM_IDS } from './g11StorageContract'
 
 export const G11_CATEGORY_OPTIONS = ['账项调整', '报表调整', '其他'] as const
 
@@ -58,7 +59,7 @@ export interface G11AdjustmentRow {
 }
 
 const ITEM_ID_ROWS = 'G11-aje-rows'
-const ITEM_ID_ADJ_ROWS = 'G11-adj-rows'
+const ITEM_ID_ADJ_ROWS = G11_ITEM_IDS.G11_ADJ_ROWS
 const BALANCE_TOLERANCE = 0.01
 const G11_WP_CODE = 'G11'
 

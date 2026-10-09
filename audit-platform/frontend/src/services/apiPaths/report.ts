@@ -13,7 +13,8 @@ export const reports = {
     `/api/reports/${pid}/${year}/${type}/${rowCode}/related-workpapers`,
   consistencyCheck: (pid: string, year: number) => `/api/reports/${pid}/${year}/consistency-check`,
   exportExcel: (pid: string, year: number, type: string) => `/api/reports/${pid}/${year}/${type}/export-excel`,
-  export: (pid: string, year: number) => `/api/reports/${pid}/${year}/export`,
+  /** 全部报表 Excel 导出（POST，统一走项目级导出端点） */
+  exportAllExcel: (pid: string) => `/api/projects/${pid}/reports/export-excel`,
   lineComposition: (pid: string, lineCode: string) => `/api/projects/${pid}/reports/line-composition?line_code=${encodeURIComponent(lineCode)}`,
   multiYear: (pid: string, years: number[], reportType: string) =>
     `/api/projects/${pid}/reports/multi-year?years=${years.join(',')}&report_type=${reportType}`,
@@ -30,7 +31,6 @@ export const reportConfig = {
   detail: (id: string) => `/api/report-config/${id}`,
   create: '/api/report-config',
   executeFormulasBatch: '/api/report-config/execute-formulas-batch',
-  batchUpdate: '/api/report-config/batch-update',
   // 主模板回填 + 联动
   suggestToMaster: '/api/report-config/suggest-to-master',
   reviewCandidate: '/api/report-config/review-candidate',
@@ -82,6 +82,18 @@ export const consolNoteSections = {
   applyFormulas: (pid: string, year: number) => `/api/consol-note-sections/apply-formulas/${pid}/${year}`,
   auditAll: (pid: string, year: number) => `/api/consol-note-sections/audit-all/${pid}/${year}`,
   audit: (pid: string, year: number, sectionId: string) => `/api/consol-note-sections/audit/${pid}/${year}/${sectionId}`,
+  // 合并附注差额（四度量 + 子节点贡献）与按公式填入（spec consol-elimination-single-source-push 需求 6）
+  breakdown: (pid: string, year: number, sectionId: string) =>
+    `/api/consol-note-sections/breakdown/${pid}/${year}/${sectionId}`,
+  fillByFormula: (pid: string, year: number, sectionId: string) =>
+    `/api/consol-note-sections/fill-by-formula/${pid}/${year}/${sectionId}`,
+} as const
+
+// 合并附注单元格公式（公式管理「合并附注」节点，需求 7.2）
+export const consolNoteFormulas = {
+  list: '/api/consol-note-formulas',
+  detail: (formulaId: string) => `/api/consol-note-formulas/${formulaId}`,
+  seed: '/api/consol-note-formulas/seed',
 } as const
 
 // ─── 现金流量表工作底稿 ─────────────────────────────────────────────────────
@@ -212,6 +224,25 @@ export const wordExports = {
     `/api/projects/${pid}/word-exports/jobs/${jobId}/retry`,
 } as const
 
+// ─── 三件套正式出具（chain-closure-phase4-deliverable-center-trio） ──────────
+
+export const trioDeliverables = {
+  readiness: (pid: string) =>
+    `/api/projects/${pid}/deliverables/trio/readiness`,
+  create: (pid: string) =>
+    `/api/projects/${pid}/deliverables/trio`,
+  jobDetail: (pid: string, jobId: string) =>
+    `/api/projects/${pid}/deliverables/trio/jobs/${jobId}`,
+  retry: (pid: string, jobId: string) =>
+    `/api/projects/${pid}/deliverables/trio/jobs/${jobId}/retry`,
+  itemAttempts: (pid: string, itemId: string) =>
+    `/api/projects/${pid}/deliverables/trio/items/${itemId}/attempts`,
+  itemDownload: (pid: string, itemId: string) =>
+    `/api/projects/${pid}/deliverables/trio/items/${itemId}/download`,
+  history: (pid: string) =>
+    `/api/projects/${pid}/deliverables/trio/history`,
+} as const
+
 // ─── 导出 ───────────────────────────────────────────────────────────────────
 
 export const exportTask = {
@@ -281,6 +312,11 @@ export const consolidation = {
     detail: (entryId: string) => `/api/consolidation/eliminations/${entryId}`,
     review: (entryId: string) => `/api/consolidation/eliminations/${entryId}/review`,
     summary: '/api/consolidation/eliminations/summary/year',
+    // 合并抵消分录明细表（spec consol-elimination-single-source-push 需求 1~2）
+    treeLines: '/api/consolidation/eliminations/tree-lines',
+    generateFromWorksheet: '/api/consolidation/eliminations/generate-from-worksheet',
+    legacySheet: '/api/consolidation/eliminations/legacy-sheet',
+    legacySheetConvert: '/api/consolidation/eliminations/legacy-sheet/convert',
   },
   internalTrade: {
     trades: '/api/consolidation/internal-trade/trades',
@@ -318,6 +354,8 @@ export const consolidation = {
   },
   worksheet: {
     tree: '/api/consolidation/worksheet/tree',
+    accounts: '/api/consolidation/worksheet/accounts',
+    nodeAmounts: '/api/consolidation/worksheet/node-amounts',
     recalc: '/api/consolidation/worksheet/recalc',
     aggregate: '/api/consolidation/worksheet/aggregate',
     drillCompanies: '/api/consolidation/worksheet/drill/companies',
@@ -326,7 +364,16 @@ export const consolidation = {
     pivot: '/api/consolidation/worksheet/pivot',
     pivotExport: '/api/consolidation/worksheet/pivot/export',
     pivotTemplates: '/api/consolidation/worksheet/pivot/templates',
+    // 按报表行次读时计算（与合并报表同一求值，需求 4~5）
+    reportTrial: '/api/consolidation/worksheet/report-trial',
+    reportBreakdown: '/api/consolidation/worksheet/report-breakdown',
+    drillEntries: '/api/consolidation/worksheet/drill/entries',
+    drillIndividual: '/api/consolidation/worksheet/drill/individual',
   },
+  // 合并推送（需求 8）：本项目 + 上层合并项目 差额表 → 合并试算 → 合并报表 → 附注标记
+  push: (pid: string, year: number) => `/api/consolidation/${pid}/${year}/push`,
+  pushRuns: (pid: string, year: number) => `/api/consolidation/${pid}/${year}/push-runs`,
+  pushStatus: (pid: string, year: number) => `/api/consolidation/${pid}/${year}/push-status`,
   lock: (pid: string) => `/api/consolidation/${pid}/lock`,
   unlock: (pid: string) => `/api/consolidation/${pid}/unlock`,
   lockStatus: (pid: string) => `/api/consolidation/${pid}/lock-status`,

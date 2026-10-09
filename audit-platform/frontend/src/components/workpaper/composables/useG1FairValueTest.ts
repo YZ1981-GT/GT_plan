@@ -16,6 +16,7 @@ import {
 } from './useG1TraFinFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import type { TradingDetailRow } from './useG1Detail'
+import { G1_ITEM_IDS } from './g1StorageContract'
 import {
   matchSecurityKey,
   findBySecurityKeys,
@@ -84,7 +85,7 @@ export interface G1FvGates {
 
 const DATA_KEY = 'G1-6-rows'
 const GATES_KEY = 'G1-6-gates'
-const DETAIL_KEY = 'G1-2-rows'
+const DETAIL_KEY = G1_ITEM_IDS.G1_2_ROWS
 const CONCLUSION_KEY = 'G1-6-conclusion'
 const DIFF_THRESHOLD = 0.01
 

@@ -48,8 +48,25 @@ export {
 }
 
 const ITEM_ID_ROWS = 'G6-1-rows'
-// 🔴 持久化 key 不可改名（改了会丢已有项目的 TB 核对数据）。虽然科目已纠正为 1505，
-// 但 checklist_responses.item_id 是稳定标识符，与科目码无逻辑关联。
+// 🔴 持久化 key 不可改名（改了会丢已有项目的 TB 核对数据）：
+//    `checklist_responses.item_id` 是稳定标识符，与科目码无逻辑关联 ——
+//    键名里嵌的 `1503` 只是历史痕迹，不代表本科目的真码。
+//
+// 🔴 2026-09-27 修正（spec `g-cycle-sync-foundation-and-first-canary` 需求 6.4）：
+//    原注释写「科目已纠正为 **1505**」，这句本身是错的 ——
+//    * 其他债权投资的真码是 **1506**（`four_table/g_cycle_specs`，守卫
+//      `tests/four_table/test_g_cycle_formula_presets.G_ACCOUNT_CODES['G6']`）；
+//    * **1505 与 1503 都在** `KNOWN_BAD_CODES['G6'] = ['1505','1503']` 里
+//      （1505 = 债权投资减值准备，是 G4 的备抵；1503 = 旧准则可供出售金融资产）。
+//    即原注释拿一个已纠偏的错码当「纠正后的真码」。
+//
+// 🔴 另一处**尚未修**的活错码（不属本 spec 作业面，已登记）：
+//    `useG6MainAdjustment.G6_ACCOUNT_CODE = '1503'` —— 它同时喂
+//    `/api/trial-balance/query?account_code=` 与 `substantive:adjudicated` 事件。
+//    不能只改这一个常量：整个 `G6_OTHER_BOND_ACCOUNTS`（`1503`/`150301`/…）建在旧准则
+//    科目族上，改默认码而不重建清单会打断 `G6_OTHER_BOND_ACCOUNTS.find()`。
+//    归属见 `.kiro/specs/g-cycle-sync-foundation-and-first-canary/evidence/
+//    task8-tb-gate-adjudication.md` 的「遗漏项交棒」一节。
 const ITEM_ID_TB = 'G6-1-adj-tb-1503'
 const ITEM_ID_NOTE = 'G6-1-adjudication-audit-note'
 const ITEM_ID_CONCLUSION = 'G6-1-adjudication-audit-conclusion'

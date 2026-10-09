@@ -53,6 +53,9 @@ from typing import Any
 
 import pytest
 
+#: AC 1.4 通知真源的**单一解析器**（真源可为字面量数组或 manifest 现算，见该模块 docstring）。
+from tests.workpaper_sync.entry_sync_notice_source import registered_entry_ids
+
 # ────────────────────────────────────────────────────────────────────────────
 # Paths
 # ────────────────────────────────────────────────────────────────────────────
@@ -1234,11 +1237,36 @@ class TestProperty28DefinitionDriftFailClosed:
             assert _sha256_of(path) == record["sha256"]
             assert path.stat().st_size == record["size"]
 
-    def test_bp5_wrong_workbook_fallback_is_reproducible(self, manifest_slice: dict) -> None:
-        """BP-5 双向锁：F2 整册码回落**真的**返回会计政策册（不是审定明细表）。
+    def test_bp5_whole_code_fallback_is_fixed_and_unambiguous(
+        self, manifest_slice: dict
+    ) -> None:
+        """BP-5 的「选错册」那一半**已修**：锁住修复不回归 + 锁住它不是巧合。
 
-        🔴 这条既锁缺陷存在（描述不是猜的），也锁修复后必须回来改 slice：解析器修好后
-        它会打红，逼作者把 BP-5 的 status 从 REGISTERED_NOT_FIXED 改掉。
+        🔴 2026-09-23 本判据换向。原名 `test_bp5_wrong_workbook_fallback_is_reproducible`，
+        断言「缺陷仍可复现」（回落返回 `F2-16 …会计政策…`）。它按设计打红了 —— 而作者在同一
+        条判据里预先写好了判定标准：
+
+            assert fallback.name != expected, "回落结果与 F2 核心组的 template_ref 相同
+                                              ⇒ BP-5 描述的缺陷不存在，不得虚报"
+
+        实测 `find_template_file('F2')` 已返回核心组的 `template_ref` 本身
+        （`F2-1至F2-14 …审定明细表类…`）⇒ 按该标准，缺陷不存在了，继续强行复现就是虚报。
+
+        归因：`82f58ea44`（2026-09-13）在 `wp_template_finder` 引入
+        `_PRIMARY_TEMPLATE_TIERS = ('审定', '常规程序')` + `_pick_by_tier`，把「审定」抬成
+        **严格高于**「常规程序」的一层。旧实现把两者 `or` 成同级，F2 有 3 本同时含「常规程序」
+        ⇒ 胜负由**索引顺序**决定，`F2-16 会计政策` 排最前。该 commit 的生产注释原文点名
+        「F2 同理拿到了「会计政策」」并专门为 F2 把 token 从「审定表」放宽成「审定」⇒ 有意修复。
+
+        ⚠️ **与 `_PROGRAM_TABLE_CODE_RE` 无关**：那是同一 commit 里的另一个机制（程序表码
+        `H2A`/`D4A` 回落主册），`'F2'` 不带尾字母 A 不匹配它。别把两件事混成一件。
+
+        本判据现在锁三件事，任一破裂即红：
+          ① 回落结果 == 核心组 `template_ref`（修复回归 ⇒ 红）
+          ② 第一层「审定」在 F2 候选集里**恰好命中 1 条**（再入库第二本含「审定」的册子，
+             胜负又回到 `(len, name)` 排序 = BP-5 的潜伏形态复发 ⇒ 红）
+          ③ 子码解析未被这层吞掉（`F2-16` 仍要解析到会计政策册本身 ⇒ 否则是过度修复）
+        并要求 BP-5 的 status 已被降级登记（不许一边行为已修、一边 slice 还写着未修）。
         """
         sys.path.insert(0, str(BACKEND))
         from app.services.wp_template_finder import (  # noqa: PLC0415
@@ -1246,35 +1274,69 @@ class TestProperty28DefinitionDriftFailClosed:
             find_template_file_any,
         )
 
+        from app.services.wp_template_finder import (  # noqa: PLC0415
+            _load_index,
+            _PRIMARY_TEMPLATE_TIERS,
+        )
+
         bp5 = next(
             bp for bp in manifest_slice["blocking_preconditions"] if bp["id"] == "BP-5"
         )
-        assert bp5["status"] == "REGISTERED_NOT_FIXED"
+        assert bp5["status"].startswith("PARTIALLY_FIXED"), (
+            f"BP-5 的 status 实测 {bp5['status']!r}。整册码回落已实测修好（见本判据 docstring），"
+            "slice 必须同步降级；若哪天回落又选错册，先改回 REGISTERED_NOT_FIXED 再改本判据"
+        )
+        assert bp5.get("still_not_fixed"), (
+            "BP-5 降级为 PARTIALLY_FIXED 必须写明**哪一半还没修**（sheet→模板映射），"
+            "否则等于悄悄销号"
+        )
 
-        fallback = find_template_file("F2")
-        assert fallback is not None, "find_template_file('F2') 返回 None —— 形态已变"
-        assert fallback.name == "F2-16 存货及跌价准备-会计政策（Leap-常规程序）.xlsx", (
-            f"F2 整册码回落实测返回 {fallback.name!r} —— 与 BP-5 描述不符。"
-            "若解析器已修好，请更新 BP-5 的 status 与本判据"
-        )
-        assert find_template_file_any("F2") == fallback, (
-            "find_template_file_any('F2') 与 find_template_file('F2') 结果不一致 —— "
-            "BP-5 的复现路径已变"
-        )
-        # 反向：审定明细表册确实是 F2 核心组的 template_ref，且能被子码正确解析
         main = next(
             e
             for e in manifest_slice["independent_entries"]
             if e["entry_id"] == "xlsx/gt-f2-inventory-main"
         )
         expected = main["template_ref"].split("/")[-1]
-        assert fallback.name != expected, (
-            "回落结果与 F2 核心组的 template_ref 相同 ⇒ BP-5 描述的缺陷不存在，不得虚报"
+
+        # ① 回落结果 == 核心组 template_ref（修复不许回归）
+        fallback = find_template_file("F2")
+        assert fallback is not None, "find_template_file('F2') 返回 None —— 形态已变"
+        assert fallback.name == expected, (
+            f"F2 整册码回落实测返回 {fallback.name!r}，应为核心组 template_ref {expected!r}。"
+            "若又变回 `F2-16 …会计政策…`，说明 _PRIMARY_TEMPLATE_TIERS 的分层被改坏"
         )
+        assert find_template_file_any("F2") == fallback, (
+            "find_template_file_any('F2') 与 find_template_file('F2') 结果不一致 ⇒ 两条入口分叉"
+        )
+
+        # ② 第一层「审定」必须恰好命中 1 条 —— 否则胜负又由 (len, name) 排序决定
+        top_tier = _PRIMARY_TEMPLATE_TIERS[0]
+        candidates = [
+            e["filename"]
+            for e in _load_index()
+            if e["wp_code"] == "F2" and e["format"] in ("xlsx", "xlsm")
+        ]
+        assert len(candidates) >= 8, (
+            f"F2 候选只有 {len(candidates)} 条 ⇒ 分母可疑，「唯一命中」可能只是因为集合太小"
+        )
+        top_hits = [n for n in candidates if top_tier in n]
+        assert top_hits == [expected], (
+            f"第一层 {top_tier!r} 在 F2 的 {len(candidates)} 个候选里命中 {top_hits} —— "
+            "必须恰好只有核心组那一本。命中 0 条 ⇒ 回落掉到第二层「常规程序」（3 本稀释，"
+            "= BP-5 原缺陷）；命中 ≥2 条 ⇒ 层内又由 (名字长度, 名字) 排序决定 = 潜伏形态复发"
+        )
+
+        # ③ 子码解析未被这层吞掉（不是过度修复）
         by_sub = find_template_file_any("F2-1")
         assert by_sub is not None and by_sub.name == expected, (
-            f"子码 F2-1 应解析到 {expected!r}，实测 {by_sub.name if by_sub else None!r} ⇒ "
-            "BP-5「只在回落路径暴露」这个限定不成立"
+            f"子码 F2-1 应解析到 {expected!r}，实测 {by_sub.name if by_sub else None!r}"
+        )
+        policy = find_template_file("F2-16")
+        assert policy is not None and policy.name == (
+            "F2-16 存货及跌价准备-会计政策（Leap-常规程序）.xlsx"
+        ), (
+            f"子码 F2-16 应仍解析到会计政策册本身，实测 {policy.name if policy else None!r} ⇒ "
+            "「审定」这一层把子码解析也吞了 = 过度修复"
         )
 
     def test_bp8_unreachable_workbook_is_really_unreachable(
@@ -1804,14 +1866,18 @@ class TestAc14HonestModeVisibility:
             )
 
     def test_registered_entry_ids_agree_with_the_slice(self, manifest_slice: dict) -> None:
-        """双向锁：slice 的 adapter_id 与前端登记表必须互相印证。"""
-        source = _strip_ts_comments(NOTICE_MODULE.read_text(encoding="utf-8"))
-        block = re.search(
-            r"SYNC_ADAPTER_REGISTERED_ENTRY_IDS:\s*readonly\s+string\[\]\s*=\s*\[([\s\S]*?)\]",
-            source,
-        )
-        assert block, "找不到 SYNC_ADAPTER_REGISTERED_ENTRY_IDS 的声明"
-        registered = set(re.findall(r"['\"]([^'\"]+)['\"]", block.group(1)))
+        """双向锁：slice 的 adapter_id 与前端登记表必须互相印证。
+
+        🔴 2026-09-22 修检测器方向。原实现用 `=\\s*\\[` 假定真源是字面量数组，真源改成
+        `WORKPAPER_SYNC_MANIFEST.filter(...).map(...)` 现算之后正则恒 `None`，于是报
+        「找不到 SYNC_ADAPTER_REGISTERED_ENTRY_IDS 的声明」—— 把「形态变了」误报成
+        「东西没了」，而这两件事正是本判据该区分的。解析逻辑收敛到
+        `entry_sync_notice_source`（一份，不再各 cycle 抄一遍），它仍 fail closed：
+        声明真被删 / 现算谓词认不出来都照样打红。
+        """
+        registered = set(registered_entry_ids())
+        assert registered, "已注册集合为空 ⇒ 「已注册 ⇒ 不挂通知」分支没有真实分母"
+        assert all("/" in rid for rid in registered), f"集合里有不像 entry_id 的项：{registered}"
         for entry in manifest_slice["independent_entries"]:
             if entry.get("adapter_id") is None:
                 assert entry["entry_id"] not in registered, (

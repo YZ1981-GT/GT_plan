@@ -63,6 +63,7 @@ CS-17   identity carrier ∈ probe blocklist              未过 probe gate 的�
 CS-18   identity carrier 未在 probe 契约登记             未登记载体
 CS-19   `document_type` 与载体/字段形态不符              文档类型串用
 CS-20   extract 既无 instrumented identity 也无锚点      必须 fail closed，禁降级
+CS-21   `row_convergence=delete` 缺行身份/删除策略      物理删行未具备前提
 ======  ===========================================  ==========================
 
 CS-3 与 CS-4 必须是**两条独立判据**：Property 20 的原文是「含无语义
@@ -131,6 +132,26 @@ _STABLE_KEY_RE: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9][a-z0-9_.\-/{}]*$
 #: 动态列 identity 的**唯一**合法模板（Requirement 6.4 / 平台 H7 范式）。
 DYNAMIC_COLUMN_IDENTITY_TEMPLATE: Final[str] = "{slot}_{seq}"
 
+#: `tables[].header_rows` 的合法值域下界（单级表头）。
+MIN_HEADER_ROWS: Final[int] = 1
+
+#: `tables[].header_rows` 的合法值域**上界**。
+#:
+#: 🔴 **3 → 4 扩容（H 循环 · spec `h-cycle-sync-foundation-and-first-canary`）**
+#:
+#: Task 13 交付时上界取 3，依据是当时作业面上「分组最深三级」。H 循环（固定资产）
+#: 实测**五条 entry 的主受管表是四级表头**：
+#:   `H2 在建工程!明细表H2-2` R9/R10/R11/R12
+#:   `H4 工程物资!明细表H4-2` R8/R9/R10/R11
+#:   `H5 油气资产!明细表H5-2` R9/R10/R11/R12
+#:   `H7 生产性生物资产!明细表（成本模式）H7-2` R9/R10/R11/R12
+#:   `H8 使用权资产!明细表H8-2` R8/R9/R10/R11
+#:
+#: 上界停在 3 时这五条只能丢掉最外层分组（压扁列结构），或整条不接双向。
+#: 本次扩容结清 Task 42 登记的 `UPSTREAM_DEBT_FOUR_LEVEL_HEADER_NOT_EXPRESSIBLE` 欠账。
+#: H1 的契约 / adapter / golden digest **不随本次扩容改动**（HC-8）。
+MAX_HEADER_ROWS: Final[int] = 4
+
 #: 行身份占位符。field pointer 里出现且仅出现一次表示「该字段按行展开」。
 ROW_UUID_PLACEHOLDER: Final[str] = "{row_uuid}"
 
@@ -170,12 +191,41 @@ class FieldMode(str, Enum):
     formula = "formula"
     auto_source = "auto_source"
     word_only = "word_only"
+    cross_sheet = "cross_sheet"
 
 
 #: 受保护模式：默认只读，OO 侧修改 SHALL 产生受保护字段冲突（Requirement 6.6）。
 PROTECTED_MODES: Final[frozenset[FieldMode]] = frozenset(
-    {FieldMode.formula, FieldMode.auto_source}
+    {FieldMode.formula, FieldMode.auto_source, FieldMode.cross_sheet}
 )
+
+#: 模板预置骨架行的身份形态（spec workpaper-sync-managed-row-convergence）。
+#:
+#: 与 `excel_instrumentation.row_uuid()` 的 `f"GTROW-{template_id}-{row:04d}"` **同源**；
+#: `template` 为 `MINTED` 的那支是**运行期**新分配
+#: （`excel_extract.MINTED_ROW_IDENTITY_PREFIX = "GTROW-MINTED-"`），
+#: 两者刻意不同域，使「运行期新分配」与「模板预生成」在审计上可分辨。
+#:
+#: 🔴 放在 `contracts`（底层无依赖模块）而不是 `excel_materialize` / `excel_extract`：
+#: 收敛判据（`excel_materialize.plan_managed_writes`）与 roundtrip 豁免
+#: （`content_mutation._assert_roundtrip_equivalent`）**两处都要用它**，各写一份就是
+#: 第二真源（形态漂移时两侧会不一致，而症状分别是「误删模板行」与「误报 extra」，
+#: 相距很远）。
+_TEMPLATE_ROW_IDENTITY_RE: Final = re.compile(r"^GTROW-(?P<template>[A-Za-z0-9]+)-\d{4}$")
+
+
+def is_template_skeleton_identity(identity: str) -> bool:
+    """`identity` 是否为 instrumentation 为**模板受管行**预生成的骨架身份。
+
+    这些行「不在 store 的 `row_keys` 里」是**常态** —— store 只声明有业务数据的行 ——
+    所以它们既不是「用户删掉的行」（不得当 stale 删除，否则 `IdentityRetentionError`），
+    也不是「未提交的受管字段」（其 Excel 侧值是模板自带的，不由 materialize 写入）。
+
+    运行期 mint 的身份（`GTROW-MINTED-*`）**不算**骨架：它是 OO 侧新增行经三方 merge
+    进入 projection 的产物，必须参与全部判据。
+    """
+    match = _TEMPLATE_ROW_IDENTITY_RE.match(str(identity))
+    return bool(match) and match.group("template") != "MINTED"
 
 
 class ValueType(str, Enum):
@@ -191,6 +241,7 @@ class ValueType(str, Enum):
     boolean = "boolean"
     enum = "enum"
     json = "json"
+    percent_points = "percent_points"
 
 
 class RowIdentityKind(str, Enum):
@@ -211,6 +262,30 @@ class DeletePolicy(str, Enum):
 
     tombstone = "tombstone"
     reject = "reject"
+
+
+class RowConvergenceMode(str, Enum):
+    """受管行**收敛**方式：store 里没了的行，在 substrate 上怎么处置。
+
+    spec: workpaper-sync-row-deletion-multi-region-propagation（Requirement 8）
+
+    * ``clear``  —— 把那一行的业务格**清空**，物理行留着（平台既有、且是**默认**行为）；
+    * ``delete`` —— 物理删掉那一行，并把工作簿级引用按声明整体上移。
+
+    🔴 默认必须是 `clear`：删物理行是**不可逆的数据丢失**，且要求本表的全部
+    工作簿级引用（definedName / 跨 sheet 公式 / 兄弟 Table ref / `_GT_SYNC` 冻结值 /
+    结构块）都已接上声明。这些前提逐表核验，所以开关逐表给 —— 一张表一张表地开，
+    而不是「上线即全量生效」。
+
+    🔴 与 :class:`DeletePolicy` **不是一回事**，两者刻意分开：
+    `DeletePolicy` 回答「store 里没了的行**算不算**该删」（tombstone = 留痕后可删、
+    reject = 一律不许删），是**业务裁决**；`RowConvergenceMode` 回答「判定该删之后，
+    在 Excel 上用哪种**物理手段**落地」。合成一个键会让「允许删但只清空」这个
+    真实且常见的中间态无法表达 —— 而那正是本 spec 落地前全平台的状态。
+    """
+
+    clear = "clear"
+    delete = "delete"
 
 
 class ExtractCarrierTier(str, Enum):
@@ -561,12 +636,53 @@ def _column_index(column: str) -> int:
 
 
 def column_in_ranges(column: str, ranges: Sequence[str]) -> bool:
-    """列是否落在任一 A1 区域的列跨度内（CS-13 用）。"""
+    """列是否落在任一 A1 区域的列跨度内（**CS-13 声明完备性校验**专用）。
+
+    🔴 这是一个**只看列**的粗判定，刻意保留给 CS-13：那条校验问的是「`mode=formula` 的字段
+    有没有被 mask 声明覆盖」，属于声明完备性，列级足够（行号由 provider 自己按数据区生成）。
+
+    **不要**拿它判「某个格是不是受保护单元格」——那需要 :func:`cell_in_ranges`。
+    两者混用过一次，代价是 D4-1 六个声明 `editable` 的金额字段被整列 mask 判成只读，
+    需求 1.5 的「OO 改动生效」在后端整条不可达（详见 `cell_in_ranges` 的 docstring）。
+    """
     target = _column_index(column)
     for raw in ranges:
         c1, _r1, c2, _r2 = parse_a1_range(raw, location="formula_mask")
         low, high = sorted((_column_index(c1), _column_index(c2)))
         if low <= target <= high:
+            return True
+    return False
+
+
+def cell_in_ranges(column: str, row: int, ranges: Sequence[str]) -> bool:
+    """某个**格**（列 + 行）是否落在任一 A1 区域内。
+
+    与 :func:`column_in_ranges` 的区别就是它**同时看行**，这正是「受保护单元格」判定需要的。
+
+    ═══ 为什么必须有这个函数 ═══
+
+    `formula_mask` 有两种声明风格：
+
+    * **区间式**（多数底稿）：``Q13:Q25`` —— 恰好覆盖整个数据区，此时列判定与格判定等价；
+    * **逐格式**（如 D4-1 的 48 格）：``E8, I8, …, B12, C12, …, I12`` —— 除了数据行的
+      审定数列，还含**数据区之外**的小计 / 合计 / 差异行整行 B–I。
+
+    对第二种，只看列会把 B…I 八列整列判成只读。D4-1 因此六个声明 `editable` 的金额字段
+    （B/C/D/F/G/H）全部被判 ``read_only_masked_cell``：OO 侧改动落到 merge 就成了
+    ``conflict_kind='protected'`` + ``suggested_action=keep_current``，``stored`` 永不改变
+    （真栈实测 2026-09-24）。
+
+    Args:
+        column: 列标，支持多字母（``AF``）。
+        row: 1 基行号。
+        ranges: A1 区域串序列（单格如 ``B12`` 也合法，等价于 ``B12:B12``）。
+    """
+    target_col = _column_index(column)
+    for raw in ranges:
+        c1, r1, c2, r2 = parse_a1_range(raw, location="formula_mask")
+        col_low, col_high = sorted((_column_index(c1), _column_index(c2)))
+        row_low, row_high = sorted((r1, r2))
+        if col_low <= target_col <= col_high and row_low <= row <= row_high:
             return True
     return False
 
@@ -652,9 +768,24 @@ class TableSpec:
     formula_mask: tuple[str, ...] = ()
     delete_policy: DeletePolicy | None = None
 
+    #: 受管行收敛方式（Requirement 8.1 / 8.2）。**未声明即 `clear`**，于是全部既有契约
+    #: 的语义逐字不变 —— 这是本 spec「启用受控」的开关本体。
+    #:
+    #: 🔴 默认值不得改成 `delete`：那会让全部既有契约在一次部署里同时开始删物理行。
+    row_convergence: RowConvergenceMode = RowConvergenceMode.clear
+
     @property
     def has_dynamic_rows(self) -> bool:
         return self.row_identity is not None
+
+    @property
+    def deletes_physical_rows(self) -> bool:
+        """本表是否已开启「物理删行」收敛（Requirement 8.4 的分流判定入口）。
+
+        🔴 只读属性而不是让调用点各自写 `spec.row_convergence is RowConvergenceMode.delete`：
+        分流点会有多处（planner / apply 纵深防御 / 判据），散着写就会漂。
+        """
+        return self.row_convergence is RowConvergenceMode.delete
 
     @property
     def two_level_header(self) -> bool:
@@ -1038,10 +1169,15 @@ def _parse_table(
     if not isinstance(anchor, str) or not _A1_RANGE_RE.match(anchor.strip()):
         raise ContractSchemaError(f"{where}: table anchor 必须是 A1 单元格，实得 {anchor!r}")
     header_rows = raw.get("header_rows")
-    if not isinstance(header_rows, int) or isinstance(header_rows, bool) or not 1 <= header_rows <= 3:
+    if (
+        not isinstance(header_rows, int)
+        or isinstance(header_rows, bool)
+        or not MIN_HEADER_ROWS <= header_rows <= MAX_HEADER_ROWS
+    ):
         raise ContractSchemaError(
-            f"{where}: header_rows 必须是 1..3 的整数（两级表头 = 2），实得 {header_rows!r}"
-            "（Requirement 6.3）"
+            f"{where}: header_rows 必须是 {MIN_HEADER_ROWS}..{MAX_HEADER_ROWS} 的整数"
+            f"（两级表头 = 2），实得 {header_rows!r}"
+            "（Requirement 6.3；上界 3→4 见 `MAX_HEADER_ROWS` 的扩容理由）"
         )
     formula_mask = raw.get("formula_mask") or []
     if not isinstance(formula_mask, list):
@@ -1068,6 +1204,17 @@ def _parse_table(
         _enum(raw["delete_policy"], DeletePolicy, location=where, label="delete_policy")
         if raw.get("delete_policy") is not None
         else None
+    )
+    # Requirement 8.1 / 8.2：可选键，**未声明即 `clear`** ⇒ 既有契约逐字不变。
+    row_convergence = (
+        _enum(
+            raw["row_convergence"],
+            RowConvergenceMode,
+            location=where,
+            label="row_convergence",
+        )
+        if raw.get("row_convergence") is not None
+        else RowConvergenceMode.clear
     )
 
     raw_fields = raw.get("fields")
@@ -1097,16 +1244,46 @@ def _parse_table(
             f"{where}: 声明了 delete_policy 却没有 row_identity —— 无行身份时删除策略无处施加"
         )
 
+    # CS-21：开启物理删行必须同时具备行身份与删除策略（Requirement 8.3）。
+    #
+    # 🔴 与 CS-14 **不是重复**：CS-14 管的是「声明了 row_identity 就必须给 delete_policy」，
+    #    两者都缺时它一句话都不说 —— 而 `row_convergence=delete` 恰恰是「两者都缺」时最危险
+    #    的组合：没有行身份就无法把「store 里没了的行」对上 substrate 的**哪一行**，删下去
+    #    就是按位置猜，而位置正是 CS-10 明令不得当身份的东西。
+    if row_convergence is RowConvergenceMode.delete:
+        missing = [
+            name
+            for name, value in (("row_identity", row_identity), ("delete_policy", delete_policy))
+            if value is None
+        ]
+        if missing:
+            raise ContractSchemaError(
+                f"{where}: 声明 `row_convergence=delete` 却缺 {missing} —— 物理删行是"
+                "不可逆的数据丢失，必须先有行身份（删哪一行按身份对齐，不按位置猜）"
+                "与删除策略（该不该删是业务裁决）才谈得上怎么删（CS-21 / Requirement 8.3）"
+            )
+        if delete_policy is DeletePolicy.reject:
+            raise ContractSchemaError(
+                f"{where}: `delete_policy=reject` 与 `row_convergence=delete` 直接矛盾 —— "
+                "前者说「一行都不许删」，后者说「删物理行」。两个键同时声明时必须自洽"
+                "（CS-21）"
+            )
+
     # CS-13：formula 模式字段的列必须落在已声明的 formula_mask 内。
+    # 🔴 审定表（AdjudicationSheetSpec）用逐格 `cell_mask` 替代列向 `formula_mask`：
+    #    审定表的公式不是整列向的（同列不同行有的是公式有的可编辑），所以用逐格声明。
+    #    当 table 有 `cell_mask` 时，CS-13 的 formula_mask 列向检查由 cell_mask 等效满足。
+    cell_mask = raw.get("cell_mask") or []
+    has_cell_mask = isinstance(cell_mask, list) and len(cell_mask) > 0
     for spec in fields:
         if spec.mode is not FieldMode.formula or spec.cell is None:
             continue
-        if not formula_mask:
+        if not formula_mask and not has_cell_mask:
             raise ContractSchemaError(
                 f"{where}: 字段 {spec.stable_field_key!r} 声明 mode=formula，但 table 未声明 "
-                "`formula_mask` —— 受保护单元格必须显式登记只读区域（Requirement 6.6）"
+                "`formula_mask` 或 `cell_mask` —— 受保护单元格必须显式登记只读区域（Requirement 6.6）"
             )
-        if not column_in_ranges(spec.cell.column, formula_mask):
+        if formula_mask and not column_in_ranges(spec.cell.column, formula_mask):
             raise ContractSchemaError(
                 f"{where}: 字段 {spec.stable_field_key!r} 的列 {spec.cell.column} 不在 "
                 f"formula_mask {list(formula_mask)} 覆盖的列跨度内 —— formula 字段必须被"
@@ -1131,6 +1308,7 @@ def _parse_table(
         footer_anchor=footer_anchor,
         formula_mask=tuple(formula_mask),
         delete_policy=delete_policy,
+        row_convergence=row_convergence,
     )
 
 
@@ -1407,6 +1585,11 @@ def available_contract_ids() -> tuple[str, ...]:
     以 `_` 开头的文件是 schema 文档与**候选**示例（`review_status="candidate"`，会被
     :func:`parse_contract` 拒绝），不参与生产清册 —— 否则它们会被 registry 报成
     「有契约文件但没有 adapter」的伪欠账。
+
+    🔴 **stem 含 `.candidate` 的文件也排除**（2026-09-27）：并发会话的 K/L 循环 candidate
+    用 `k8.selling_expenses_adjustment.candidate.json` 命名（不带 `_` 前缀），原过滤条件
+    漏掉它们 ⇒ 守卫报成正式契约与台账不符的假红。candidate 的 `review_status="candidate"`
+    在 `parse_contract` 里被拒，即使扫进来也不能注册 —— 排除是正确的。
     """
     if not CONTRACTS_DIR.is_dir():
         return ()
@@ -1415,6 +1598,7 @@ def available_contract_ids() -> tuple[str, ...]:
             path.stem
             for path in CONTRACTS_DIR.glob("*.json")
             if not path.stem.startswith("_")
+            and ".candidate" not in path.stem
         )
     )
 
@@ -1483,10 +1667,14 @@ __all__ = [
     # 路径与常量
     "CONTRACTS_DIR", "EXCEL_CARRIER_CONTRACT_PATH", "WORD_CARRIER_CONTRACT_PATH",
     "CONTRACT_SCHEMA_VERSION", "DOCUMENT_TYPES", "DYNAMIC_COLUMN_IDENTITY_TEMPLATE",
+    "MIN_HEADER_ROWS", "MAX_HEADER_ROWS",
     "ROW_UUID_PLACEHOLDER", "PROTECTED_MODES", "FORBIDDEN_ROW_IDENTITY_KINDS",
+    # spec workpaper-sync-managed-row-convergence：模板骨架身份判定（收敛判据与
+    # roundtrip 豁免两处共用的单一真源）。
+    "is_template_skeleton_identity",
     # 枚举
     "ContractReviewStatus", "FieldMode", "ValueType", "RowIdentityKind",
-    "DeletePolicy", "ExtractCarrierTier",
+    "DeletePolicy", "ExtractCarrierTier", "RowConvergenceMode",
     # 异常
     "ContractError", "ContractSchemaError", "ContractCarrierGateError",
     "ContractCarrierUnavailableError", "ContractDriftError",

@@ -22,6 +22,7 @@
 import { ref, computed, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { newRowIdentity } from './shared/rowIdentity'
 import {
   CONTROL_FREQUENCY_OPTIONS,
   CONTROL_PERFORMER_OPTIONS,
@@ -33,6 +34,15 @@ import {
 
 /** 12 列控制矩阵行模型 */
 export interface ControlPoint {
+  /**
+   * 稳定行身份（BC-53 改造）。
+   *
+   * 🔴 改造前落库形态是 `B22B-row-{数组下标}-{field}`，行身份=位置：删中间行后
+   *    所有后续行的 item_id 整体前移（`removeRow` 原注释自述「索引整体前移」），
+   *    ① OO↔HTML roundtrip 按行身份配对 ⇒ 必错位；② 按 item_id 的外部引用
+   *    （复核锚点）指向别人的行。现在身份随行对象走，与位置无关。
+   */
+  rowId: string
   element: string
   subCategory: string
   code: string
@@ -97,6 +107,8 @@ export {
 
 function emptyControlPoint(): ControlPoint {
   return {
+    // 新行即铸稳定身份（委托平台共享出口，不自己实现唯一性逻辑）
+    rowId: newRowIdentity('B22B-row'),
     element: '',
     subCategory: '',
     code: '',
@@ -146,10 +158,18 @@ export function useB22BControlMatrix(
 
   // ─── 持久化：item_id 构造 ────────────────────────────────────────────────
 
+  /** legacy 按下标展开的字段键（仅迁移时回读）。 */
   function rowFieldId(n: number, field: keyof ControlPoint): string {
     return `B22B-row-${n}-${field}`
   }
   const COUNT_ID = 'B22B-row-count'
+  /**
+   * 行数组 item_id（BC-53 改造后的权威落点）。
+   *
+   * 整表一条记录、remark = 行对象 JSON 数组，每行带 `rowId`。形态与 D4 后端
+   * `ROW_IDENTITY_STORE_KEY='rowId'` + `iter_store_rows` 一致，便于接真双向。
+   */
+  const ROWS_ID = 'B22B-rows'
 
   // ─── Load ────────────────────────────────────────────────────────────────
 
@@ -161,15 +181,26 @@ export function useB22BControlMatrix(
       const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
       const map = new Map<string, string>()
       let count = 0
+      let rowsJson: string | null = null
       for (const r of responses) {
         const id: string = r.item_id ?? ''
-        if (id === COUNT_ID) {
+        if (id === ROWS_ID) {
+          rowsJson = r.remark ?? null
+        } else if (id === COUNT_ID) {
           const n = parseInt(r.remark || '0', 10)
           if (!isNaN(n)) count = n
         } else if (id.startsWith('B22B-row-')) {
           map.set(id, r.remark ?? '')
         }
       }
+
+      // ═══ 形态① 行数组（权威）═══════════════════════════════════════════
+      if (rowsJson) {
+        rows.value = parseRowsJson(rowsJson)
+        return
+      }
+
+      // ═══ 形态② legacy 下标键 → 迁移（只改键形状不改值，落库一次）═══════
       const loaded: ControlPoint[] = []
       for (let n = 0; n < count; n++) {
         const row = emptyControlPoint()
@@ -177,9 +208,16 @@ export function useB22BControlMatrix(
           const v = map.get(rowFieldId(n, field))
           if (v != null) (row[field] as string) = v
         }
+        // 🔴 legacy 身份用确定性串（含原下标）：多会话并发迁移产出一致，
+        //    避免随机铸造导致同一行在两处拿到两套身份。
+        row.rowId = `B22B-row-legacy-${n}`
         loaded.push(row)
       }
       rows.value = loaded
+      if (loaded.length > 0) {
+        // 迁移结果立即固化（否则下次载入仍走 legacy 分支、身份反复重建）
+        void doSave(buildAllItems())
+      }
     } catch {
       ElMessage.warning('数据加载失败，可手动填写')
     } finally {
@@ -212,17 +250,44 @@ export function useB22BControlMatrix(
     }
   }
 
-  /** 构造整表全部 item（含 count）用于批量保存 */
+  /** 解析行数组 JSON（非法/缺失 → 空数组，渲染侧 fail soft 不抛）。 */
+  function parseRowsJson(remark: string | null): ControlPoint[] {
+    if (!remark) return []
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(remark)
+    } catch {
+      return []
+    }
+    if (!Array.isArray(parsed)) return []
+    return parsed.map((raw, i) => {
+      const obj = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+      const row = emptyControlPoint()
+      for (const field of CONTROL_POINT_FIELDS) {
+        const v = obj[field as string]
+        if (typeof v === 'string') (row[field] as string) = v
+      }
+      const rid = obj.rowId
+      // 缺身份才补（存量身份稳定，不重铸 —— 对齐平台 grandfather 口径）
+      row.rowId =
+        typeof rid === 'string' && rid.trim() ? rid : `B22B-row-legacy-${i}`
+      return row
+    })
+  }
+
+  /**
+   * 构造落库 item：整表一条行数组记录。
+   *
+   * 🔴 改造前是「按数组下标展开 12×N 条单字段键 + count」，行身份=位置。
+   *    现在只写一条 `B22B-rows`，行身份在行对象内。
+   *    同时保留 count 键（值=实际行数）：真库既有查询/报表可能读它，
+   *    但它已降级为**校验值**，不再是行数真源（BC-54）。
+   */
   function buildAllItems(): { item_id: string; remark: string | null }[] {
-    const items: { item_id: string; remark: string | null }[] = [
+    return [
+      { item_id: ROWS_ID, remark: JSON.stringify(rows.value) },
       { item_id: COUNT_ID, remark: String(rows.value.length) },
     ]
-    rows.value.forEach((row, n) => {
-      for (const field of CONTROL_POINT_FIELDS) {
-        items.push({ item_id: rowFieldId(n, field), remark: (row[field] as string) || null })
-      }
-    })
-    return items
   }
 
   async function saveImmediate(): Promise<void> {
@@ -262,10 +327,15 @@ export function useB22BControlMatrix(
     saveImmediate()
   }
 
+  /**
+   * 删行（BC-53 改造后）。
+   *
+   * 改造前落库键含数组下标，删行导致后续行 item_id 整体前移（行身份漂移）；
+   * 现在只写一条行数组、身份在行对象内 ⇒ splice 后剩余行身份完全不变。
+   */
   function removeRow(index: number): void {
     if (index < 0 || index >= rows.value.length) return
     rows.value.splice(index, 1)
-    // 行删除后 item_id 索引整体前移，最简单可靠：先清空旧尾行再全量重写
     saveImmediate()
   }
 
@@ -288,10 +358,53 @@ export function useB22BControlMatrix(
     for (const r of responses) {
       if (r.item_id) map.set(r.item_id, r.remark ?? '')
     }
-    // 收集所有 (tab, isIT, sub, index) 组合
+    const result: ControlPoint[] = []
+
+    // ═══ 形态① 行数组（BC-53 改造后的 B22A 形态）═══════════════════════════
+    //
+    // 🔴 B22A 已把行存储从「每字段一条下标键」改为「整组行一条 JSON 数组」
+    //    （`B22A-T{tab}-rows` / `B22A-T{tab}-IT-{sub}-rows`）。若只认下面的
+    //    legacy 键，改造后本函数会读到 **0 个控制点** ⇒ 带入功能静默失效。
+    //    故先解析行数组；legacy 键作为未迁移项目的兜底（见形态②）。
+    const reRows = /^B22A-T(\d+)-rows$/
+    const reRowsIT = /^B22A-T(\d+)-IT-([^-]+)-rows$/
+    const seenFromRows = new Set<string>()
+
+    for (const [id, remark] of map.entries()) {
+      const mRows = id.match(reRows)
+      const mRowsIT = id.match(reRowsIT)
+      if (!mRows && !mRowsIT) continue
+
+      const tab = parseInt((mRows ? mRows[1] : mRowsIT![1]), 10)
+      const isIT = !!mRowsIT
+      let rows: any[]
+      try {
+        const parsed = JSON.parse(remark || '[]')
+        rows = Array.isArray(parsed) ? parsed : []
+      } catch {
+        continue
+      }
+
+      for (const raw of rows) {
+        if (!raw || typeof raw !== 'object') continue
+        const controlName = String(raw.point ?? '').trim()
+        const description = String(raw.desc ?? '').trim()
+        if (!controlName && !description) continue
+
+        const row = emptyControlPoint()
+        row.element = tabToElement(tab, isIT)
+        row.controlName = controlName
+        row.description = description
+        applyB22AAttrs(row, raw.attrs)
+        result.push(row)
+        // 记下已由行数组提供的 (tab, name, desc)，避免 legacy 兜底重复带入
+        seenFromRows.add(`${tab}|${isIT}|${controlName}|${description}`)
+      }
+    }
+
+    // ═══ 形态② legacy 下标键（未迁移项目的兜底）═══════════════════════════
     const reItem = /^B22A-T(\d+)-item-(\d+)-point$/
     const reIT = /^B22A-T(\d+)-IT-([^-]+)-(\d+)-point$/
-    const result: ControlPoint[] = []
 
     for (const [id, point] of map.entries()) {
       let tab = 0
@@ -323,26 +436,18 @@ export function useB22BControlMatrix(
       const description = (map.get(descId) || '').trim()
       if (!controlName && !description) continue
 
+      // 同一控制点若已由行数组（形态①）提供，legacy 兜底不再重复带入
+      if (seenFromRows.has(`${tab}|${isIT}|${controlName}|${description}`)) continue
+
       const row = emptyControlPoint()
       row.element = tabToElement(tab, isIT)
       row.controlName = controlName
       row.description = description
 
-      // 尝试读取控制属性（attrs JSON）
       const attrsRaw = map.get(`${attrsPrefix}-attrs`)
       if (attrsRaw) {
         try {
-          const attrs = JSON.parse(attrsRaw)
-          if (attrs && typeof attrs === 'object') {
-            if (attrs.antiFraud != null) row.antiFraud = String(attrs.antiFraud)
-            if (attrs.frequency != null) row.frequency = String(attrs.frequency)
-            if (attrs.performer != null) row.performer = String(attrs.performer)
-            if (attrs.competence != null) row.competence = String(attrs.competence)
-            if (attrs.risk != null) row.relatedRisk = String(attrs.risk)
-            if (attrs.relatedRisk != null) row.relatedRisk = String(attrs.relatedRisk)
-            if (attrs.nature != null) row.nature = String(attrs.nature)
-            if (attrs.itApp != null) row.itApp = String(attrs.itApp)
-          }
+          applyB22AAttrs(row, JSON.parse(attrsRaw))
         } catch {
           // 忽略非法 JSON
         }
@@ -350,6 +455,20 @@ export function useB22BControlMatrix(
       result.push(row)
     }
     return result
+  }
+
+  /** 把 B22A 的 attrs 对象映射到 B22B 控制矩阵行（两形态共用）。 */
+  function applyB22AAttrs(row: ControlPoint, attrs: unknown): void {
+    if (!attrs || typeof attrs !== 'object') return
+    const a = attrs as Record<string, unknown>
+    if (a.antiFraud != null) row.antiFraud = String(a.antiFraud)
+    if (a.frequency != null) row.frequency = String(a.frequency)
+    if (a.performer != null) row.performer = String(a.performer)
+    if (a.competence != null) row.competence = String(a.competence)
+    if (a.risk != null) row.relatedRisk = String(a.risk)
+    if (a.relatedRisk != null) row.relatedRisk = String(a.relatedRisk)
+    if (a.nature != null) row.nature = String(a.nature)
+    if (a.itApp != null) row.itApp = String(a.itApp)
   }
 
   /** 去重键：controlName + description */

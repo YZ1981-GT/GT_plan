@@ -107,6 +107,7 @@ from app.services.workpaper_sync.models import (
     assert_transition,
     classify_operation_shape,
     compute_application_key,
+    compute_contributor_snapshot_digest,
     compute_eligibility_digest,
     compute_frozen_request_fingerprint,
     fold_effective_sequence,
@@ -837,6 +838,71 @@ class WorkpaperSyncRepository:
             generation=int(room.generation),
         )
         return p
+
+    async def mark_participant_left(
+        self,
+        *,
+        room_id: uuid.UUID,
+        participant_id: uuid.UUID,
+    ) -> tuple[WorkpaperOoParticipant, bool]:
+        """participant 主动离开：`active/closing → left`，**只动 participant 这一行**。
+
+        spec: oo-single-pass-materialize-and-room-leave · Requirement 4.1 / 4.2 / 4.3
+        Properties: **P7**（只改该 participant）/ **P9**（幂等不产生第二条事件）
+
+        返回 ``(participant, already_left)``。``already_left=True`` 表示这次调用什么都
+        没写（幂等重放）。
+
+        ═══ 与 :meth:`create_close_intent` 的**本质**差别 ═══
+
+        close intent 是 **close barrier 仲裁**：它推 `close_barrier_epoch`、把 room 推成
+        `close_barrier`、建 intent 行、注册 scope、写 timeline，最终由
+        :meth:`reconcile_close_intents` CAS 提升一条 `kind=close_capture` 写请求。对**未
+        改动**的文档那条 capture 永远等不到 OO 回调 —— 真栈实测 room
+        ``03bbcad8-70ef-4462-8a37-68af4fc0d1fa`` 因此停在 `state=close_barrier` /
+        participant `closing` / capture `state=frozen`，该 room 此后**再也进不去**
+        （下次打开 confirm-descriptor 仍 200，紧接着「同步失败，请重试」）。
+
+        本方法是「我走了」：它**一个字节都不写到 room 行上**，不建任何 request、不推
+        barrier、不旋转 generation、不注册新 scope、不写 timeline。room 行只被
+        ``SELECT … FOR UPDATE`` **锁住**（与并发的 close intent / revoke 串行化），
+        锁不是写 —— P7 的判据逐列比 room 行的前后快照。
+
+        ═══ 为什么幂等分支必须**显式**先判当前状态 ═══
+
+        ``PARTICIPANT_EDGES[left]`` 是**空集**（`left` 是终态）。靠 `assert_transition`
+        抛异常再捕获来做幂等，等于把「重复离开」与「从 revoked/expired 非法起点离开」
+        压成同一个异常 —— 前者必须返回同一结果（AC 4.2），后者必须拒绝。所以这里先按
+        当前状态显式分支，`assert_transition` 只留给**真的**要迁移的那条路径。
+
+        ``uq_wpoop_active_lease`` 是 ``WHERE state IN ('active','closing')`` 的 partial
+        unique：把 lease 转出这两态即释放槽位，无需撤销、无需动 fence。
+        """
+        # room row lock：与 close intent / revoke 串行化。**只锁不写** —— 返回值刻意不
+        # 赋给变量，避免下游有人「顺手」在它上面改一笔（P7 的反证正是「让 leave 顺手改
+        # room.state ⇒ 红」）。
+        await self.lock_room(room_id)
+        participant = (
+            await self._session.execute(
+                sa.select(WorkpaperOoParticipant)
+                .where(WorkpaperOoParticipant.id == participant_id)
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+        if participant is None or participant.room_id != room_id:
+            # 跨 room 使用同一 participant id：与「不存在」同样处理，不泄露对象归属
+            # （与 `rooms._load_participant` 同一纪律）。
+            raise ScopeIntegrityError(f"participant 不存在: {participant_id}")
+        if ParticipantState(participant.state) is ParticipantState.left:
+            # 幂等重放：零写入。`left_at` 是这条状态迁移的**唯一**时间戳事实，
+            # 重写它就等于产生了第二条审计事件（AC 4.2 明令禁止）。
+            return participant, True
+        assert_transition("participant", participant.state, ParticipantState.left)
+        participant.state = ParticipantState.left.value
+        participant.left_at = _now()
+        participant.updated_at = _now()
+        await self._flush()
+        return participant, False
 
     async def create_client_confirmation(
         self,
@@ -2277,6 +2343,9 @@ class WorkpaperSyncRepository:
         adapter_id: str,
         adapter_build_digest: str,
         contributor_snapshot_digest: str,
+        expected_generation: int | None = None,
+        expected_write_fence: int | None = None,
+        expected_definition_bundle_sha256: str | None = None,
         actor_id: uuid.UUID | None = None,
     ) -> RecoveryClaimOutcome:
         """authorization-first claim：一个事务内创建唯一 request + shell，并 create-or-hit application。
@@ -2361,6 +2430,34 @@ class WorkpaperSyncRepository:
         if int(confirmation.write_fence_epoch) != int(room.write_fence_epoch):
             raise ScopeIntegrityError(
                 "prior confirmation 的 write fence 已陈旧（generation/fence 不合法不得产生三实体）"
+            )
+
+        # 🔴 客户端提交的 expected_* 逐项核对冻结真源（Task 32 欠账修复）。
+        # 前端 `buildClaimRequestBody` 一直在发 expected_generation / expected_write_fence /
+        # expected_definition_bundle_sha256，但此前服务端从不校验它们 —— 于是「错误 bundle/
+        # fence/generation 的 claim」被静默接受（服务端只用 confirmation 自身派生值），
+        # 「错误 prior confirmation/bundle/fence/contributor 拒绝」在生产路径上不可达。
+        # 这里在**创建任何 request/application/operation 之前** fail-closed：不符即抛
+        # ScopeIntegrityError，与上面三条 prior-confirmation 拒绝同型（三实体保持为 0）。
+        # 全部 None（旧调用方/无 expected 值）时跳过 —— 校验只增强、不改变既有正确路径。
+        if expected_generation is not None and int(expected_generation) != int(case.generation):
+            raise ScopeIntegrityError(
+                f"claim 的 expected_generation={expected_generation} 与 case generation="
+                f"{case.generation} 不符（错误 generation 不得产生三实体）"
+            )
+        if expected_write_fence is not None and int(expected_write_fence) != int(
+            room.write_fence_epoch
+        ):
+            raise ScopeIntegrityError(
+                f"claim 的 expected_write_fence={expected_write_fence} 与 room 当前 fence="
+                f"{room.write_fence_epoch} 不符（错误 fence 不得产生三实体）"
+            )
+        if expected_definition_bundle_sha256 is not None and str(
+            expected_definition_bundle_sha256
+        ) != str(confirmation.definition_bundle_sha256):
+            raise ScopeIntegrityError(
+                "claim 的 expected_definition_bundle_sha256 与 prior confirmation 冻结的 "
+                "bundle digest 不符（错误 bundle 不得产生三实体）"
             )
 
         case.state = RecoveryCaseState.claiming.value
@@ -2586,6 +2683,36 @@ class WorkpaperSyncRepository:
         )
         return intent
 
+    async def _frozen_base_adapter_build_digest(
+        self, confirmation: WorkpaperOoClientConfirmation
+    ) -> str:
+        """close-capture 冻结的代码身份 = 它冻结为 base 的那份 representation 的 adapter build。
+
+        与 `RoomService.build_request_freeze` / `_frozen_adapter_of_confirmation`（recovery
+        claim 侧）是**同一条规则**：base 是谁，代码身份就是谁的。这里的 base 就是下面
+        `compute_frozen_request_fingerprint(client_base_representation_id=...)` 用的那一行，
+        故两者恒自洽。取不到 / 非法一律显式抛 —— 填 `""` 或全零等于把「身份未知」伪装成
+        合法身份，而 fingerprint 是 idempotency cache hit 的唯一判据（Requirement 2.3）。
+        """
+        digest = (
+            await self._session.execute(
+                sa.select(WorkpaperContentRepresentation.adapter_build_digest).where(
+                    WorkpaperContentRepresentation.id == confirmation.representation_id
+                )
+            )
+        ).scalar_one_or_none()
+        if digest is None:
+            raise IdentityError(
+                "close-capture 无法冻结代码身份：client confirmation 的 representation "
+                f"{confirmation.representation_id} 不存在"
+            )
+        if not is_digest(str(digest)):
+            raise IdentityError(
+                "close-capture 无法冻结代码身份：representation "
+                f"{confirmation.representation_id} 的 adapter_build_digest 非法，实得 {digest!r}"
+            )
+        return str(digest).strip()
+
     async def reconcile_close_intents(
         self,
         *,
@@ -2593,10 +2720,19 @@ class WorkpaperSyncRepository:
         wp_id: uuid.UUID,
         entry_id: str,
         room_id: uuid.UUID,
-        adapter_build_digest: str,
-        contributor_snapshot_digest: str,
     ) -> CloseReconcileOutcome:
         """幂等 reconciler：在 room lock 下决定 leader / successor / no-successor 终态。
+
+        🔴 **不收** `adapter_build_digest` / `contributor_snapshot_digest`：promotion 冻结的
+        是服务端事实，客户端无从得知（confirm-descriptor 的响应里就没有 adapter build
+        digest），于是「让调用方传」在真实链路上只有一个结果 —— HTTP 层把缺失补成 `""`，
+        `compute_frozen_request_fingerprint()` 拒绝空 digest，**每一次真实 clean close 都
+        422 `invalid_identity`**。两项都由本方法在锁内派生：
+
+        * `adapter_build_digest` ← 本次冻结为 base 的那一份 representation
+          （与 :meth:`RoomService.build_request_freeze` 同一条规则：base 是谁，代码身份就是谁的）；
+        * `contributor_snapshot_digest` ← 空 contributor 集合（见 promotion 处的注释：
+          幂等键要求它只由 `(room, generation)` 决定）。
 
         规则（Requirement 4.10 / Property 63）：
 
@@ -2844,6 +2980,26 @@ class WorkpaperSyncRepository:
         ).scalar_one()
         bundle = await self.assert_bundle_usable(confirmation.definition_bundle_id)
         participant = participants[leader.participant_id]
+        adapter_build_digest = await self._frozen_base_adapter_build_digest(confirmation)
+        contributor_snapshot_digest = compute_contributor_snapshot_digest(
+            room_id=room_id,
+            generation=int(room.generation),
+            # 🔴 close-capture 的 contributor set 取**空集**，且不得来自任何调用方。两条理由：
+            #
+            # 1. **幂等**：promotion 的幂等键是 `close-capture:{room}:{gen}:{epoch}`，cache hit
+            #    要求 fingerprint 逐项等值。contributor 集合随调用方变化（两个用户先后关闭各带
+            #    自己的 ids）⇒ 同一把幂等键两个 fingerprint ⇒ 重入的 reconcile 必然 409。
+            #    空集是唯一「只由 (room, generation) 决定」的取值。
+            # 2. **最终 fence 等值**：`_recompute_contributor_digest()`（AC 10.10 第 8 条）拿
+            #    `working_paper_sync_operation_contributor` 的 live 行重算并与冻结值比对。那批行
+            #    由 `record_contributor_snapshot()` 写，而它在生产链路上**零调用方** ⇒ 观测侧恒
+            #    为空集 digest；普通 forcesave 同理（前端不送 contributor ids）。
+            #
+            # ⚠️ 改成「room 现存 edit participant 集合」前必须先接上
+            # `record_contributor_snapshot()`：否则冻结非空、观测为空，每次 clean close 都会在
+            # 最终 fence 被拒 —— 比这条 422 更晚、更难查。
+            contributor_user_ids=(),
+        )
         fingerprint = compute_frozen_request_fingerprint(
             client_confirmation_id=confirmation.id,
             client_base_version_id=confirmation.content_version_id,

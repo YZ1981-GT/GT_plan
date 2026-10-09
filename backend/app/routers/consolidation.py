@@ -1,5 +1,6 @@
 """合并抵消路由"""
 
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -15,6 +16,8 @@ from app.models.consolidation_schemas import (
     EliminationEntryUpdate,
     EliminationReviewAction,
     EliminationSummary,
+    GenerateFromWorksheetRequest,
+    LegacySheetConvertRequest,
 )
 from app.services.elimination_service import (
     change_review_status,
@@ -36,10 +39,99 @@ async def list_eliminations(
     year: int | None = None,
     entry_type: EliminationEntryType | None = None,
     review_status: ReviewStatusEnum | None = None,
+    node_key: str | None = Query(None, description="按归属差额节点筛选：{企业代码}:consol_elim / {企业代码}:branch_elim"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
-    return await get_entries(db, project_id, year, entry_type, review_status)
+    try:
+        return await get_entries(db, project_id, year, entry_type, review_status, node_key)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ─── 合并抵消分录明细表（spec consol-elimination-single-source-push 任务 6）─────────────
+# 固定路径必须声明在 ``/{entry_id}`` 之前，否则会被当成分录 id 解析成 422。
+
+
+def _sheet_error(exc: Exception) -> HTTPException:
+    return HTTPException(status_code=getattr(exc, "status", 400), detail=str(exc))
+
+
+@router.get("/tree-lines")
+async def elimination_tree_lines(
+    project_id: UUID,
+    year: int | None = None,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("readonly")),
+):
+    """本企业树全部未删分录的明细行（含下级合并项目承载的，只读）+ 合计 + 本项目承载的差额节点。"""
+    from app.services.consol_elimination_sheet_service import SheetError, tree_lines
+
+    try:
+        return await tree_lines(db, project_id, year)
+    except SheetError as e:
+        raise _sheet_error(e) from e
+
+
+@router.post("/generate-from-worksheet")
+async def generate_eliminations_from_worksheet(
+    project_id: UUID,
+    body: GenerateFromWorksheetRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("edit")),
+):
+    """合并工作底稿（模拟权益法 / 内部往来 / 内部交易）计算结果 ⇒ 草稿分录（幂等；已提交审批与已审批的不改）。
+
+    ``dry_run=true`` 只返回映射与将要发生的变化（明细表「待生成」预览），不写库。
+    """
+    from app.services.consol_elimination_sheet_service import SheetError, generate_from_worksheet
+
+    try:
+        result = await generate_from_worksheet(
+            db, project_id, body.year, body.groups, origins=body.origins, dry_run=body.dry_run, user_id=user.id,
+        )
+    except SheetError as e:
+        raise _sheet_error(e) from e
+    if not body.dry_run:
+        await db.commit()
+    return result.to_dict()
+
+
+@router.get("/legacy-sheet")
+async def elimination_legacy_sheet(
+    project_id: UUID,
+    year: int | None = None,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("readonly")),
+):
+    """旧版明细表（``consol_worksheet_data['elimination']``）自定义行检测：条数、分组预演与不能转入的原因。"""
+    from app.services.consol_elimination_sheet_service import SheetError, legacy_sheet
+
+    try:
+        return await legacy_sheet(db, project_id, year)
+    except SheetError as e:
+        raise _sheet_error(e) from e
+
+
+@router.post("/legacy-sheet/convert")
+async def convert_elimination_legacy_sheet(
+    project_id: UUID,
+    body: LegacySheetConvertRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("edit")),
+):
+    """旧版自定义行转为草稿分录（``origin='legacy_sheet'``）；转不了的逐条返回原因，重复调用不重复转入。"""
+    from app.services.consol_elimination_sheet_service import SheetError, legacy_sheet
+
+    try:
+        result = await legacy_sheet(
+            db, project_id, body.year, convert=True,
+            entry_type=body.entry_type.value if body.entry_type else None, user_id=user.id,
+        )
+    except SheetError as e:
+        raise _sheet_error(e) from e
+    await db.commit()
+    return result
 
 
 @router.post("", response_model=EliminationEntryResponse, status_code=201)
@@ -99,6 +191,9 @@ async def delete_elimination(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+_AUDITED_ACTIONS = {"approve": "consol.elimination.approve", "revoke": "consol.elimination.revoke"}
+
+
 @router.post("/{entry_id}/review", response_model=EliminationEntryResponse)
 async def review_elimination(
     entry_id: UUID,
@@ -107,52 +202,53 @@ async def review_elimination(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("edit")),
 ):
+    """复核：提交审批 / 审批 / 驳回 / 撤销审批。审批与撤销审批记审计日志，并触发合并推送
+    （本项目 + 上层合并项目：差额表 → 合并试算 → 合并报表 → 附注标记，spec consol-elimination-single-source-push 需求 8）。"""
+    from app.services.elimination_service import EntryLockedError, get_entry
+
+    existing = await get_entry(db, entry_id, project_id)
+    before_status = existing.review_status.value if existing and existing.review_status else None
     try:
-        before_status = None
-        # Capture before state for audit
-        from app.services.elimination_service import get_entry
-        existing = await get_entry(db, entry_id, project_id)
-        if existing:
-            before_status = existing.review_status.value if existing.review_status else None
-
         entry = await change_review_status(db, entry_id, project_id, action, user.id)
-        if not entry:
-            raise HTTPException(status_code=404, detail="抵消分录不存在")
-
-        # Audit log for approval actions
-        if action.action == "approve":
-            from app.services.consol_audit_helper import log_consol_action
-            await log_consol_action(
-                db,
-                user_id=user.id,
-                project_id=project_id,
-                action="consol.elimination.approve",
-                resource_type="elimination_entry",
-                resource_id=str(entry_id),
-                before={"review_status": before_status},
-                after={"review_status": entry.review_status.value if entry.review_status else None},
-            )
-            await db.flush()
-            await db.commit()
-
-            # 衔接2 / Phase 2 Task 4.4：审批 → 发 ELIMINATION_APPROVED 事件触发 worksheet + trial 重算
-            # （Phase 1 实装了该事件，填补了 Phase 2 自动抵销审批后重算的依赖；
-            # 审批已落库 commit，重算为下游派生，失败不影响审批本身，EH3）
-            try:
-                from app.models.audit_platform_schemas import EventPayload, EventType
-                from app.services.event_bus import event_bus
-                await event_bus.publish(EventPayload(
-                    event_type=EventType.ELIMINATION_APPROVED,
-                    project_id=project_id,
-                    year=entry.year,
-                    extra={"entry_id": str(entry_id)},
-                ))
-            except Exception:
-                pass  # 事件发布失败不阻断审批
-
-        return entry
+    except EntryLockedError as e:
+        raise HTTPException(status_code=423, detail=str(e)) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if not entry:
+        raise HTTPException(status_code=404, detail="抵消分录不存在")
+
+    audit_action = _AUDITED_ACTIONS.get(action.action)
+    if audit_action is None:
+        return entry
+    from app.services.consol_audit_helper import log_consol_action
+
+    await log_consol_action(
+        db,
+        user_id=user.id,
+        project_id=project_id,
+        action=audit_action,
+        resource_type="elimination_entry",
+        resource_id=str(entry_id),
+        before={"review_status": before_status},
+        after={"review_status": entry.review_status.value if entry.review_status else None},
+    )
+    await db.flush()
+    await db.commit()
+
+    # 审批 / 撤销审批已落库 commit；推送为下游派生，失败记推送运行但不影响审批本身（EH3）
+    try:
+        from app.models.audit_platform_schemas import EventPayload, EventType
+        from app.services.event_bus import event_bus
+
+        await event_bus.publish(EventPayload(
+            event_type=EventType.ELIMINATION_APPROVED if action.action == "approve" else EventType.ELIMINATION_REVOKED,
+            project_id=project_id,
+            year=entry.year,
+            extra={"entry_id": str(entry_id)},
+        ))
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).warning("分录 %s 事件发布失败（审批已生效，可在合并推送页手动推送）", entry_id)
+    return entry
 
 
 @router.get("/summary/year", response_model=list[EliminationSummary])

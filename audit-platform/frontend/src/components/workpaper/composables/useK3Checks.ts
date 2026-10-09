@@ -16,6 +16,7 @@
  * ⚠️ 完整性认定为主（负债易少计）+ 反向截止
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { newRowIdentity } from './shared/rowIdentity'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -215,7 +216,7 @@ export function useK3Checks(params: UseK3ChecksParams) {
 
   function _normalizeCheckItem(raw: any, idx: number): K3CheckItem {
     return {
-      id: raw.id ?? `K3-7-${String(idx + 1).padStart(2, '0')}`,
+      id: raw.id ?? newRowIdentity('K3-7'),
       seq: raw.seq ?? idx + 1,
       label: raw.label ?? '',
       description: raw.description ?? '',

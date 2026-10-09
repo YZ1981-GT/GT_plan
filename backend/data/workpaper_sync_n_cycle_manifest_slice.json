@@ -1736,12 +1736,13 @@
   "ac14_notice_single_source": {
    "ts": "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts",
    "vue": "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
-   "label_constant_source_ref": "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts#L55",
-   "summary_constant_source_ref": "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts#L58",
-   "reason_constant_source_ref": "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts#L67",
-   "registered_entry_ids_source_ref": "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts#L52",
+   "label_constant_source_ref": "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts#L76",
+   "summary_constant_source_ref": "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts#L79",
+   "reason_constant_source_ref": "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts#L88",
+   "registered_entry_ids_source_ref": "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts#L68",
    "registered_entry_ids_is_empty": false,
-   "production_consumers": 42,
+   "production_consumers": 46,
+   "production_consumers_breakdown": "41 个循环入口宿主（D/F/G/H）+ 4 个 D4 子页签自管工具栏（D4-9/D4-10/D4-34/D4-36 属 isD4DedicatedSyncSheet，宿主工具栏不渲染，子页签的挂载是这些 sheet 唯一的 AC 1.4 披露点）+ 1 条 components.d.ts 全局组件类型声明 = 46 条 statement-position 生产边。",
    "n_cycle_consumers": 0
   },
   "counters": {

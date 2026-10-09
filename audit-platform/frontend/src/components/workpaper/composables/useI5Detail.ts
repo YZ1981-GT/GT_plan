@@ -824,6 +824,7 @@ export function useI5Detail(
     const row = rows.value[idx]
     if (row.isBuiltin) {
       rows.value[idx] = emptyI5DetailRow({
+        rowId: row.rowId,  // BP-6 修复：重置时保留原 rowId，不让身份漂移
         projectName: row.projectName,
         name: row.projectName,
         isBuiltin: true,

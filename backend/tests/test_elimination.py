@@ -29,7 +29,15 @@ async def db_session():
 
 
 async def _create_test_project(db: AsyncSession) -> Project:
-    project = Project(id=uuid.uuid4(), name="Test Project", client_name="Test Client")
+    """合并报表项目（带企业代码与审计年度）。
+
+    口径变更（spec consol-tree-three-code-autobuild 任务 8.2，有意）：分录必须能归属到本项目企业树的差额节点，
+    否则保存即报错 —— 旧夹具的裸项目（非合并、无企业代码、无年度）上录的分录永远不会被计入，现在直接拒绝。
+    """
+    project = Project(
+        id=uuid.uuid4(), name="Test Project_2024", client_name="Test Client",
+        company_code=f"T{uuid.uuid4().hex[:8].upper()}", report_scope="consolidated", audit_year=2024,
+    )
     db.add(project)
     await db.commit()
     await db.refresh(project)

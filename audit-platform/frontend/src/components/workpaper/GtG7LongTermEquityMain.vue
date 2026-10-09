@@ -12,15 +12,21 @@
     </div>
     <template v-else>
       <div class="g7-long-term-equity-main-toolbar">
+        <!--
+          🔴 切换器**不带 `:disabled`**：健康检查异步，disabled 在未就绪时会把「在线编辑」
+          锁死、点击被彻底吞掉（D4 已实证的 bug ③）。门禁在 switchRenderMode 里 await 兜底。
+        -->
         <el-segmented
           v-if="isHtmlSheet"
-          :model-value="dualMode.currentMode.value"
-          :options="dualMode.modeOptions"
+          :model-value="currentMode"
+          :options="modeOptions"
           size="small"
-          @change="dualMode.onModeChange"
+          @change="(v: any) => switchRenderMode(v as 'html' | 'onlyoffice')"
         />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
-        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g7-long-term-equity-main" />
+        <el-tag v-if="isSoeDisclosureSheet && syncBusy" size="small" type="info">同步中…</el-tag>
+        <el-tag v-if="syncSwitching" size="small" type="info">切换中…</el-tag>
       </div>
 
       <!-- 合并联动 stale 常驻提示（Task 6.1） -->
@@ -37,9 +43,26 @@
       />
 
 
-      <!-- 双模式：HTML sheet 切到 OnlyOffice -->
+      <!--
+        受管 sheet（附注披露信息（国企）= g7n-managed）的在线编辑 —— 统一双向宿主。
+        🔴 `.oo-container` 必须有**确定高度**（D4 踩过 height:100% 被压成一条）。
+      -->
+      <div
+        v-if="isHtmlSheet && currentMode === 'onlyoffice' && isSoeDisclosureSheet"
+        class="oo-container"
+      >
+        <WorkpaperSyncEditorHost
+          v-if="syncOoDescriptor"
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+        <div v-else class="oo-loading">正在打开国企附注同步编辑器…</div>
+      </div>
+
+      <!-- 非受管 sheet 的 OnlyOffice 模式（legacy 只读视图，无双向回写） -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
+        v-else-if="isHtmlSheet && currentMode === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -92,9 +115,14 @@
         :is-readonly="isReadonly"
       />
 
-      <!-- 附注披露信息（国企） -->
+      <!--
+        附注披露信息（国企）—— 受管 sheet 的 HTML 侧。
+        🔴 `ref="soeTabRef"` 是接桥所需：桥的 `flushHtml` 要 await 它的 `flushPendingSave()`
+        （该 Tab 是 `G7-main-disclosure-soe-v2` 的唯一写入方，防抖 600ms）。
+      -->
       <G7TabDisclosureSOE
         v-else-if="currentSheet === 'disclosureSOE'"
+        ref="soeTabRef"
         :html-data="resolvedHtmlData"
         :wp-id="props.wpId"
         :project-id="props.projectId"
@@ -149,10 +177,17 @@
  * Requirements: 1.1, 1.2, 1.4, 6.3, 6.7
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
-// Task 45: legacy useG7DualMode deleted — pilot host now delegates to sync bridge.
-// 宿主只传 entry/flush/reload；DOM 与 API 顺序由 bridge 守卫。
-// The actual bridge integration is provided by GtWpRenderer / WorkpaperSyncEditorHost.
-import { usePilotBridgeAdapter } from './sync/usePilotBridgeAdapter'
+// ── G7 sync bridge（原 `usePilotBridgeAdapter` 是零 API 空壳，见下方 syncBridge 注释）──
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+
+/** G7 entry id（manifest 冻结值，与 `pilot_g7_two_level_dynamic.PILOT_ENTRY_ID` 逐字一致）。 */
+const G7_SYNC_ENTRY_ID = 'xlsx/gt-g7-long-term-equity-main'
+/** 受管 sheet 的契约键（与 `pilot_g7_two_level_dynamic.SHEET_KEY` 逐字一致）。 */
+const G7_SOE_SHEET_KEY = 'g7n-managed'
 import { useG7FormData } from './composables/useG7FormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
@@ -310,11 +345,39 @@ const formData = useG7FormData({
 /** G7 allResponses Map 供目录页进度/结论看板使用 */
 const g7AllResponses = computed(() => formData.data.value)
 
-// ─── 双模式切换 (HTML ↔ OnlyOffice) — Task 45: bridge adapter ──────────────
-const dualMode = usePilotBridgeAdapter({
-  entryId: 'xlsx/gt-g7-long-term-equity-main',
+// ─── 双模式切换（真桥；原 `usePilotBridgeAdapter` 是零 API 空壳）────────────────
+//
+// 🔴 原实现的 docstring 声称「底层全部委派给 sync bridge」，实现里却是：`switchMode()`
+//    只置 `currentMode` + 写 localStorage（**零 API 调用**）、`isOoAvailable` 硬编码
+//    `ref(true)`、`ooConfig` 恒 `null`（自称「仅作兼容占位」）⇒ G7 此前**没有**真双向：
+//    切 OO 渲染的是 legacy 只读 `GtOnlyOfficeSheet`，切回来只是重读 store。
+//
+// 🔴 更要紧的一条（本轮实测）：`WorkpaperSyncEditorHost` **自己不触发 materialize** ——
+//    它只在 `descriptor !== null && bridge.mode === 'oo'` 时创建 DocEditor，而 descriptor
+//    只能由 `bridge.switchToOnlyOffice()` 产出。所以「挂了宿主」≠「接了桥」；必须真调那个
+//    方法。全仓现算有 27 个宿主犯了这个错（挂了却从不驱动，用户永远停在「正在打开…」），
+//    已由 `sync/__tests__/bridgeMaterializeDriven.spec.ts` 钉住基线。本处按 G2/D3 范式写全。
+const isSoeDisclosureSheet = computed(() => currentSheet.value === 'disclosureSOE')
+/** SOE 披露 Tab 的实例引用 —— 只为拿它的 `flushPendingSave()`（切换前必须 await）。 */
+const soeTabRef = ref<{ flushPendingSave: () => Promise<void> } | null>(null)
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: ref(G7_SYNC_ENTRY_ID),
   wpId: wpIdRef,
-  sheetName: computed(() => props.sheetName || ''),
+  projectId: projectIdRef,
+  sheetKey: ref(G7_SOE_SHEET_KEY),
+  capability: capabilityForEntry(G7_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    // 🔴 先 await Tab 落库再读投影：SOE 披露的防抖窗口是 600ms，不等它
+    //    materialize 出的 xlsx 会少掉最后那批编辑且无提示。
+    await soeTabRef.value?.flushPendingSave()
+    return await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: G7_SYNC_ENTRY_ID,
+    })
+  },
   reloadHtml: async () => {
     await formData.load()
     const parsed = formData.parseContent()
@@ -323,6 +386,64 @@ const dualMode = usePilotBridgeAdapter({
     }
   },
 })
+
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(() =>
+  (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+const syncSwitching = ref(false)
+
+/** 渲染模式：受管 sheet 以**桥**为真源，非受管 sheet 用本地 ref（legacy 只读视图）。 */
+const legacyOoMode = ref(false)
+const currentMode = computed<'html' | 'onlyoffice'>(() =>
+  isSoeDisclosureSheet.value
+    ? (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html')
+    : (legacyOoMode.value ? 'onlyoffice' : 'html'),
+)
+const modeOptions = [
+  { label: '结构化视图', value: 'html' as const },
+  { label: '在线编辑', value: 'onlyoffice' as const },
+]
+
+/**
+ * 四分支保存协议（照 D3/F3/G2 同构）。
+ *
+ * 🔴 切换器**不带 `:disabled`**：健康检查是异步的，disabled 在未就绪时会把「在线编辑」
+ *    锁死、点击被彻底吞掉（D4 已实证的 bug ③）。
+ */
+async function switchRenderMode(target: 'html' | 'onlyoffice'): Promise<void> {
+  if (target === currentMode.value || syncSwitching.value) return
+  // 非受管 sheet：只切 legacy 只读视图，不建桥
+  if (!isSoeDisclosureSheet.value) {
+    legacyOoMode.value = target === 'onlyoffice'
+    return
+  }
+  syncSwitching.value = true
+  try {
+    if (target === 'onlyoffice') {
+      // ① HTML → OO：桥内部先 flushHtml（await Tab 落库）→ pending → materialize → descriptor
+      await syncBridge.switchToOnlyOffice()
+      return
+    }
+    if (syncBridge.mode.value !== 'oo') return
+    if (String(syncBridge.state.value) === 'applied') {
+      // ② 改动已落库 ⇒ 只重载，不再发保存 ⇒ 秒切
+      await syncBridge.reloadAfterApplied()
+    } else if (!syncBridge.dirty.value) {
+      // ③ 未改动 ⇒ clean close，不发强制保存 ⇒ 丝滑
+      await syncBridge.leaveWithoutSaving()
+    } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
+      // ④ 有改动 ⇒ 强制保存（慢是允许的，用户没先保存）
+      await syncEditorHostRef.value.forceSave()
+    } else {
+      await syncBridge.switchToHtml()
+    }
+  } catch {
+    // 失败保持当前视图；错误已由桥写入 lastError / feedback（fail visible）
+  } finally {
+    syncSwitching.value = false
+  }
+}
 
 // ─── 合并联动 stale 常驻提示（Task 6.1，只读；失败静默降级 Property 12）────
 const auditYear = computed<number>(() => {
@@ -391,6 +512,19 @@ onBeforeUnmount(() => {
 .g7-long-term-equity-main { padding: 12px; }
 .loading-container { padding: 24px; }
 .error-container { padding: 24px; }
-.g7-long-term-equity-main-toolbar { margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
+.g7-long-term-equity-main-toolbar { margin-bottom: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/*
+ * 🔴 `height: 100%` 会被父级压成一条（D4 踩过）：OnlyOffice iframe 需要
+ *    **确定**高度才撑得开，min-height 兜住父级无高度时的退化。
+ */
+.oo-container { width: 100%; min-height: 600px; height: calc(100vh - 200px); }
+.oo-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  color: var(--el-text-color-secondary);
+}
 .g7-index-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 </style>

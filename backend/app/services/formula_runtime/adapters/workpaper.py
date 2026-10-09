@@ -6,6 +6,12 @@ prepare/apply/restore/read_versions 四个操作。
 
 locator 结构: {"wp_id": str(uuid), "item": str(item_id), "cell": str(json_path)}
 version 策略: 使用 row updated_at ISO 字符串作为 CAS 版本标识。
+
+cell 取值：
+- ``"."`` / ``"key.sub"`` —— remark 是 JSON 文档，按路径读写（写 ``"."`` 时整份 ``json.dumps``）。
+- :data:`RAW_CELL` (``"@raw"``) —— remark 是**原文**（底稿前端大量键存纯文本数字 ``376.73``、
+  行 JSON 由前端 ``JSON.stringify`` 生成）：读返回原字符串，写把字符串原样落库（``None`` → 空串）。
+  用 ``"."`` 写这类键会把 ``"376.73"`` 再编码成 ``"\\"376.73\\""``、把空值写成 ``""`` 两个引号。
 """
 
 from __future__ import annotations
@@ -13,8 +19,8 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime, timezone
-from typing import Any
-from uuid import UUID
+from typing import Any, Mapping
+from uuid import UUID, uuid4
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,8 +65,29 @@ def _version_from_timestamp(ts: datetime | str | None) -> str:
     if ts is None:
         return "__none__"
     if isinstance(ts, str):
-        return ts
+        # SQLite 以 `str(datetime)`（空格分隔）存储，PG 返回 datetime ⇒ 两者 isoformat
+        # 形态不同。归一为 datetime.isoformat()，使 apply 写入的版本号与随后读回的版本号
+        # 在两种方言下逐字相等（CAS 判据的前提）。无法解析时原样返回（不臆造版本）。
+        try:
+            return datetime.fromisoformat(ts).isoformat()
+        except ValueError:
+            return ts
     return ts.isoformat()
+
+
+#: remark 原文模式（见模块 docstring）
+RAW_CELL = "@raw"
+
+#: 允许的 checklist_responses 落库列白名单（防 SQL 注入）
+_ALLOWED_STORAGE_FIELDS = frozenset({"remark", "conclusion"})
+
+
+def _storage_field(locator: Mapping[str, str]) -> str:
+    """从 locator 获取落库列名，白名单校验。默认 ``"remark"`` 兼容所有既有调用。"""
+    sf = locator.get("storage_field", "remark")
+    if sf not in _ALLOWED_STORAGE_FIELDS:
+        raise ValueError(f"非法 storage_field: {sf!r}，允许值: {sorted(_ALLOWED_STORAGE_FIELDS)}")
+    return sf
 
 
 def _cell_read(remark_json: str | None, cell: str) -> Any:
@@ -70,7 +97,10 @@ def _cell_read(remark_json: str | None, cell: str) -> Any:
     - "." 表示整个 remark 值
     - "key" 表示顶层 key
     - "key.sub" 表示嵌套路径
+    - "@raw" 表示 remark 原文（不做 JSON 解析）
     """
+    if cell == RAW_CELL:
+        return remark_json
     if remark_json is None:
         return None
     try:
@@ -91,6 +121,12 @@ def _cell_read(remark_json: str | None, cell: str) -> Any:
 
 def _cell_write(remark_json: str | None, cell: str, value: Any) -> str:
     """向 remark JSON 中按 cell (json path) 写入值，返回新 JSON 字符串。"""
+    if cell == RAW_CELL:
+        if value is None:
+            return ""
+        if not isinstance(value, str):
+            raise TypeError(f"{RAW_CELL} 只接受字符串（调用方负责格式化），收到 {type(value).__name__}")
+        return value
     if remark_json is None or remark_json == "":
         data: Any = {}
     else:
@@ -144,14 +180,26 @@ class WorkpaperMutationAdapter:
         if actual_pid != project_id:
             raise OwnershipViolation(wp_id, project_id, actual_pid)
 
-    async def _read_row(self, wp_id: UUID, item_id: str) -> tuple[str | None, datetime | None]:
-        """读取 checklist_responses 中的 remark 和 updated_at。"""
-        result = await self._session.execute(
-            text(
+    async def _read_row(
+        self, wp_id: UUID, item_id: str, storage_col: str = "remark",
+    ) -> tuple[str | None, datetime | None]:
+        """读取 checklist_responses 中的指定列和 updated_at。
+
+        ``storage_col`` 必须已经过 ``_storage_field()`` 白名单校验。
+        """
+        # 白名单已在 _storage_field 校验；此处用固定分支避免 f-string 拼列名
+        if storage_col == "conclusion":
+            sql = (
+                "SELECT conclusion, updated_at FROM checklist_responses "
+                "WHERE wp_id = :wp_id AND item_id = :item_id"
+            )
+        else:
+            sql = (
                 "SELECT remark, updated_at FROM checklist_responses "
                 "WHERE wp_id = :wp_id AND item_id = :item_id"
-            ),
-            {"wp_id": str(wp_id), "item_id": item_id},
+            )
+        result = await self._session.execute(
+            text(sql), {"wp_id": str(wp_id), "item_id": item_id},
         )
         row = result.fetchone()
         if row is None:
@@ -170,6 +218,7 @@ class WorkpaperMutationAdapter:
             wp_id_str = locator.get("wp_id")
             item_id = locator.get("item")
             cell = locator.get("cell", ".")
+            storage_col = _storage_field(locator)
             if not wp_id_str or not item_id:
                 continue
 
@@ -177,8 +226,8 @@ class WorkpaperMutationAdapter:
             # ownership check during prepare
             await self._verify_ownership(wp_id, target.project_id)
 
-            remark, updated_at = await self._read_row(wp_id, item_id)
-            before_value = _cell_read(remark, cell)
+            col_value, updated_at = await self._read_row(wp_id, item_id, storage_col)
+            before_value = _cell_read(col_value, cell)
             version = _version_from_timestamp(updated_at)
 
             # after_value 来自 values dict, key 为 addr_id
@@ -208,32 +257,50 @@ class WorkpaperMutationAdapter:
             wp_id = UUID(locator["wp_id"])
             item_id = locator["item"]
             cell = locator.get("cell", ".")
+            storage_col = _storage_field(locator)
 
             # 再次校验归属
             await self._verify_ownership(wp_id, mutation.target.project_id)
 
             # 版本校验 (CAS)
-            remark, updated_at = await self._read_row(wp_id, item_id)
+            col_value, updated_at = await self._read_row(wp_id, item_id, storage_col)
             current_version = _version_from_timestamp(updated_at)
             if mutation.expected_version is not None and current_version != mutation.expected_version:
                 raise VersionConflict(mutation.target, mutation.expected_version, current_version)
 
             # 写入新值
-            new_remark = _cell_write(remark, cell, mutation.after_value)
+            new_value = _cell_write(col_value, cell, mutation.after_value)
 
-            # UPSERT
-            await self._session.execute(
-                text(
-                    "INSERT INTO checklist_responses (wp_id, item_id, remark, updated_at) "
-                    "VALUES (:wp_id, :item_id, :remark, :updated_at) "
+            # UPSERT — 按 storage_col 选列写入
+            # 白名单分支避免 f-string 拼列名
+            if storage_col == "conclusion":
+                upsert_sql = (
+                    "INSERT INTO checklist_responses "
+                    "(id, project_id, wp_id, item_id, conclusion, created_at, updated_at, content_version) "
+                    "VALUES (:id, :project_id, :wp_id, :item_id, :col_value, :created_at, :updated_at, 1) "
                     "ON CONFLICT (wp_id, item_id) DO UPDATE "
-                    "SET remark = :remark, updated_at = :updated_at"
-                ),
+                    "SET conclusion = EXCLUDED.conclusion, updated_at = EXCLUDED.updated_at, "
+                    "content_version = checklist_responses.content_version + 1"
+                )
+            else:
+                upsert_sql = (
+                    "INSERT INTO checklist_responses "
+                    "(id, project_id, wp_id, item_id, remark, created_at, updated_at, content_version) "
+                    "VALUES (:id, :project_id, :wp_id, :item_id, :col_value, :created_at, :updated_at, 1) "
+                    "ON CONFLICT (wp_id, item_id) DO UPDATE "
+                    "SET remark = EXCLUDED.remark, updated_at = EXCLUDED.updated_at, "
+                    "content_version = checklist_responses.content_version + 1"
+                )
+            await self._session.execute(
+                text(upsert_sql),
                 {
+                    "id": str(uuid4()),
+                    "project_id": str(mutation.target.project_id),
                     "wp_id": str(wp_id),
                     "item_id": item_id,
-                    "remark": new_remark,
-                    "updated_at": now.isoformat(),
+                    "col_value": new_value,
+                    "created_at": now,
+                    "updated_at": now,
                 },
             )
             await self._session.flush()
@@ -264,12 +331,13 @@ class WorkpaperMutationAdapter:
             wp_id = UUID(locator["wp_id"])
             item_id = locator["item"]
             cell = locator.get("cell", ".")
+            storage_col = _storage_field(locator)
 
             # 归属校验
             await self._verify_ownership(wp_id, snapshot.target.project_id)
 
             # Optimistic version check
-            remark, updated_at = await self._read_row(wp_id, item_id)
+            col_value, updated_at = await self._read_row(wp_id, item_id, storage_col)
             current_version = _version_from_timestamp(updated_at)
 
             conflict = False
@@ -289,19 +357,29 @@ class WorkpaperMutationAdapter:
                 )
                 continue
 
-            # 恢复 before_value
-            new_remark = _cell_write(remark, cell, snapshot.before_value)
-            await self._session.execute(
-                text(
+            # 恢复 before_value — 按 storage_col 选列
+            new_value = _cell_write(col_value, cell, snapshot.before_value)
+            if storage_col == "conclusion":
+                update_sql = (
                     "UPDATE checklist_responses "
-                    "SET remark = :remark, updated_at = :updated_at "
+                    "SET conclusion = :col_value, updated_at = :updated_at, "
+                    "content_version = content_version + 1 "
                     "WHERE wp_id = :wp_id AND item_id = :item_id"
-                ),
+                )
+            else:
+                update_sql = (
+                    "UPDATE checklist_responses "
+                    "SET remark = :col_value, updated_at = :updated_at, "
+                    "content_version = content_version + 1 "
+                    "WHERE wp_id = :wp_id AND item_id = :item_id"
+                )
+            await self._session.execute(
+                text(update_sql),
                 {
                     "wp_id": str(wp_id),
                     "item_id": item_id,
-                    "remark": new_remark,
-                    "updated_at": now.isoformat(),
+                    "col_value": new_value,
+                    "updated_at": now,
                 },
             )
             await self._session.flush()

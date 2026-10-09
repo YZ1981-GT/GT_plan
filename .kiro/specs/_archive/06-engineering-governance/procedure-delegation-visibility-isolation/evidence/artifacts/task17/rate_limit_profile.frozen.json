@@ -1,6 +1,6 @@
 {
   "active": true,
-  "capacity_report_hash": "469e19db4ad0a783ca9d9a8640df3476b153db4a667de51f3c1c49eae9d06229",
+  "capacity_report_hash": "c6b72fa8ecb92dcfb90d4fb14a4caa759ee139953c981d2f414a9dbb737e81ae",
   "frozen": true,
   "per_family_families": [
     "ai",
@@ -43,9 +43,9 @@
   ],
   "source_performance_profile_version": "perf-6000-visibility-v1",
   "thresholds": {
-    "per_family": 55,
-    "per_project": 597,
-    "per_user": 10
+    "per_family": 96,
+    "per_project": 1049,
+    "per_user": 22
   },
   "version": "rate-6000-visibility-v1",
   "window_seconds": 1.0

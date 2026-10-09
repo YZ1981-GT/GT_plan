@@ -1294,13 +1294,10 @@ class TestServiceDoesNotDuplicateRepository:
             "operation event/outbox，服务层自己提交会留下半成功态"
         )
 
-    def test_room_service_does_not_compute_request_sequence(self) -> None:
-        """request_sequence 只由 repository 在 room lock 内算一次。"""
-        code = _strip_comments_and_strings(_ROOMS_PATH.read_text(encoding="utf-8"))
-        assert "latest_request_sequence" not in code, (
-            "服务层碰 latest_request_sequence 就出现了第二处序号推进 —— "
-            "room fence 只认 repository 那一份"
-        )
+    # room 序号（`latest_request_sequence` / `latest_durable_sequence`）的归属守卫
+    # 已于 2026-09-22 抽到 `test_room_sequence_ownership_guard.py`，并在那里把判据从
+    # 「子串禁提」收窄为「禁写/禁算术/禁动态写 + 只读白名单」，同时扩面到
+    # `latest_durable_sequence`（此前完全无守卫）。原因见该文件模块 docstring。
 
     def test_close_capture_cannot_be_requested_by_client(self) -> None:
         """契约 clean_close.forbidden[0]：客户端不得直接创建 kind=close_capture。"""

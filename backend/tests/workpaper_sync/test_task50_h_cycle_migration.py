@@ -56,6 +56,16 @@ from typing import Any, Callable
 
 import pytest
 
+#: AC 1.4 通知真源的**单一解析器**（真源可为字面量数组或 manifest 现算，见该模块 docstring）。
+from tests.workpaper_sync.entry_sync_notice_source import registered_entry_ids
+#: 迁移进度的**现算**口径（已迁移 entry 集 / BP-8 删除账本 / 交付台账 / 行号再定位）。
+from tests.workpaper_sync.h_migration_progress import (
+    H_BP8_DELETED_LEGACY_MODULES,
+    delivered_contract_ids_by_entry,
+    migrated_entry_ids,
+    relocate_lines,
+)
+
 # ────────────────────────────────────────────────────────────────────────────
 # Paths
 # ────────────────────────────────────────────────────────────────────────────
@@ -352,6 +362,20 @@ def _line_no_of(ref: str) -> int:
     match = re.search(r"#L(\d+)", ref)
     assert match, f"引用 {ref!r} 里没有 #Lxx 行号"
     return int(match.group(1))
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 迁移后：进度口径与冻结行号再定位（实现在伴生模块）
+# ════════════════════════════════════════════════════════════════════════════
+#
+# 🔴 背景（2026-09-27）：本文件是**规划期**产物 —— 它拍下「H 循环尚未迁移」那一刻的
+#    快照。`h-cycle-sync-*` 四份 spec 的接桥工作推翻了其中一批前提（行号位移、宿主换
+#    载体、登记的缺陷被修复、契约被交付）。推翻它的是**进展**，不是缺陷。
+#
+#    进度口径与再定位实现放在 `h_migration_progress.py`：本文件是**被守的对象**，
+#    把「谁已迁移」的判定塞进来等于让它自己给自己发豁免。
+_migrated_entry_ids = migrated_entry_ids
+_relocate_lines = relocate_lines
 
 
 def _client_probe(client: str, verb: str) -> Callable[[str], bool]:
@@ -670,24 +694,52 @@ class TestAdjudicationLegality:
 
         🔴 判据是「必须不一致且该不一致已登记」，而不是「必须相等」—— 后者会把 overlay
         默认值当成裁决结论。
+
+        🔴 **2026-10-01 翻面前三条断言**：原来拿 `manifest_mirror` 与 **live** manifest
+        比相等 —— 那在「迁移还没发生」的规划期是对的，但本轮九条 entry 的 capability 已
+        翻 `bidirectional`、`html_store` 已裁决、`legacy_reasons` 已清空，继续要求相等
+        等于要求迁移不许发生。mirror 是**规划期冻结快照**（slice 为 append-only 上游输入，
+        本仓铁律「历史档案不回填修改」），所以改为：
+          · mirror 侧断言它仍是规划期那三个值（`single_onlyoffice` / `unresolved` /
+            非空 legacy_reasons）—— 快照被人改过会红；
+          · live 侧断言它已前进到迁移后的值 —— 门被关回去会红；
+          · BP-9 的那条「mirror ≠ slice 目标态」登记原样保留。
         """
         by_id = {e["entry_id"]: e for e in full_manifest["entries"]}
         for entry in manifest_slice["independent_entries"]:
             src = by_id[entry["entry_id"]]
             mirror = entry["manifest_mirror"]
-            assert mirror["capability"] == src["capability"], (
-                f"{entry['entry_id']}: manifest_mirror.capability 与 source manifest 不符"
+            # ── 规划期快照侧（冻结）────────────────────────────────────────
+            assert mirror["capability"] == "single_onlyoffice", (
+                f"{entry['entry_id']}: manifest_mirror.capability={mirror['capability']!r} "
+                "—— 规划期快照被改动了"
             )
-            assert mirror["html_store"] == src["html_store"], (
-                f"{entry['entry_id']}: manifest_mirror.html_store 与 source manifest 不符"
+            assert mirror["html_store"] == "unresolved", (
+                f"{entry['entry_id']}: manifest_mirror.html_store={mirror['html_store']!r} "
+                "—— 规划期快照被改动了"
             )
+            assert mirror["legacy_reasons"], (
+                f"{entry['entry_id']}: 规划期快照的 legacy_reasons 为空 ⇒ 快照被改动了"
+            )
+            # ── live 侧（已迁移）──────────────────────────────────────────
+            assert src["capability"] == "bidirectional", (
+                f"{entry['entry_id']}: live manifest capability={src['capability']!r} "
+                "⇒ 正向门被关回去了（overlay override 掉了？）"
+            )
+            assert src["html_store"] != "unresolved", (
+                f"{entry['entry_id']}: live manifest html_store 仍是 unresolved"
+            )
+            assert src["evidence"]["legacy_reasons"] == [], (
+                f"{entry['entry_id']}: live manifest 仍带 legacy_reasons="
+                f"{src['evidence']['legacy_reasons']!r} ⇒ evidence_patch 没生效"
+            )
+            # ── BP-9 登记（原样）──────────────────────────────────────────
             assert mirror["capability"] != entry["capability"], (
                 f"{entry['entry_id']}: mirror 与 slice 的 capability 相等 ⇒ BP-9 的前提消失"
             )
             assert "BP-9" in str(mirror["divergence_from_slice"]), (
                 f"{entry['entry_id']}: 不一致未指向 BP-9"
             )
-            assert mirror["legacy_reasons"] == src["evidence"]["legacy_reasons"]
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -721,6 +773,7 @@ class TestHtmlCounterpartIsSourceBacked:
     def test_write_carrier_client_and_put_site_agree_with_the_source(
         self, manifest_slice: dict
     ) -> None:
+        migrated = _migrated_entry_ids()
         for entry in manifest_slice["independent_entries"]:
             hc = entry["html_counterpart"]
             carrier = _resolve_repo(hc["write_carrier_path"])
@@ -734,12 +787,23 @@ class TestHtmlCounterpartIsSourceBacked:
                 f"{entry['entry_id']}: 载体 {hc['write_carrier_path']} 里没有 "
                 f"{client}.put(`...checklist-responses`)"
             )
-            put_line = _line_no_of(hc["endpoint_write_source"])
             lines = source.splitlines()
-            assert f"{client}.put(" in lines[put_line - 1], (
-                f"{entry['entry_id']}: endpoint_write_source 指向的 L{put_line} 不是 "
-                f"{client}.put（实际 {lines[put_line - 1].strip()[:90]!r}）"
+            put_lines = _relocate_lines(
+                entry_id=entry["entry_id"],
+                ref=hc["endpoint_write_source"],
+                predicate=lambda ln, c=client: f"{c}.put(" in ln,
+                what=f"{client}.put 站点",
+                migrated=migrated,
             )
+            # 🔴 位移分支拿到的是**全部** put 站点 ⇒ 逐处要求都打在 checklist-responses
+            #    上。这比原判据（只查冻结那一行）严：载体里多出一个打别的端点的 PUT
+            #    会被这里抓住。
+            for no in put_lines:
+                window = "\n".join(lines[no - 1 : min(len(lines), no + 3)])
+                assert "checklist-responses" in window, (
+                    f"{entry['entry_id']}: L{no} 的 {client}.put 不是打 "
+                    f"/checklist-responses（实际 {lines[no - 1].strip()[:90]!r}）"
+                )
 
     def test_read_carrier_matches_its_declared_family(self, manifest_slice: dict) -> None:
         """五种读路径各有自己的判据 —— 写死 `/checklist-responses` 双端点会对 4 条 entry 假红。"""
@@ -813,32 +877,70 @@ class TestHtmlCounterpartIsSourceBacked:
         }, "HD-1 的 entries_by_family 与逐 entry 声明不一致"
 
     def test_payload_column_mode_matches_the_write_site(self, manifest_slice: dict) -> None:
+        migrated = _migrated_entry_ids()
         for entry in manifest_slice["independent_entries"]:
             hc = entry["html_counterpart"]
             path = _resolve_repo(hc["payload_write_site"])
-            window = _write_site_window(path, _line_no_of(hc["payload_write_site"]))
-            stripped = _strip_null_placeholder_columns(window)
-            has_remark = "remark" in stripped
-            has_conclusion = "conclusion" in stripped
             mode = hc["payload_column_mode"]
-            if mode == "dual_write_remark_and_conclusion":
-                assert has_remark and has_conclusion, (
-                    f"{entry['entry_id']}: 声明双写，剔除空占位后窗口里 "
-                    f"remark={has_remark} conclusion={has_conclusion}"
-                )
-            elif mode == "remark_only_with_explicit_null_conclusion":
-                assert has_remark and not has_conclusion, (
-                    f"{entry['entry_id']}: 声明「remark + 显式 null 占位」，实际 "
-                    f"remark={has_remark} conclusion={has_conclusion}"
-                )
-                assert "conclusion" in window, (
-                    f"{entry['entry_id']}: 声明有 conclusion 空占位，原窗口里却没有该 token"
-                )
-                assert hc.get("payload_null_placeholder_columns") == ["conclusion"], (
-                    f"{entry['entry_id']}: 空占位列未双向登记"
-                )
+            # 🔴 **不能**照 put 站点那样套统一谓词：slice 的 `payload_write_site`
+            #    各 entry 锚点形态不同 —— 有的指 `items: [{ item_id …` 那一行（H2），
+            #    有的指多行载荷里的某个**列行**（H3 指 `conclusion: item.conclusion
+            #    || null,`）。也**不能**按「entry 是否已接桥」分派：H4 已接桥，但它的
+            #    载荷载体是 `useH4FormData.ts`（接桥没碰过），冻结行号依然有效。
+            # ⇒ 判据按「冻结窗口是否仍自洽」分派：自洽就严格锁死；不自洽才允许再定位，
+            #   且**必须**该 entry 已接桥（否则是无关改动把站点搞丢了，照旧打红）。
+            def _mode_holds(no: int) -> bool:
+                win = _strip_null_placeholder_columns(_write_site_window(path, no))
+                if mode == "dual_write_remark_and_conclusion":
+                    return "remark" in win and "conclusion" in win
+                if mode == "remark_only_with_explicit_null_conclusion":
+                    return "remark" in win and "conclusion" not in win
+                return False
+
+            frozen = _line_no_of(hc["payload_write_site"])
+            if _mode_holds(frozen):
+                sites = [frozen]
             else:
-                pytest.fail(f"{entry['entry_id']}: 未知 payload_column_mode={mode!r}")
+                assert entry["entry_id"] in migrated, (
+                    f"{entry['entry_id']}: {hc['payload_write_site']} 的窗口不再满足声明的 "
+                    f"payload_column_mode={mode!r}，且该 entry **不在现算迁移集里** ⇒ "
+                    "不是接桥造成的行号位移"
+                )
+                lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+                sites = [
+                    no
+                    for no, ln in enumerate(lines, 1)
+                    if re.search(r"items\s*:\s*\[\s*\{[^}]*item_id", ln)
+                ]
+                assert sites, (
+                    f"{entry['entry_id']}: 已接桥，但 {hc['payload_write_site'].split('#L')[0]} "
+                    "里找不到 `items: [{ item_id …` 载荷数组 ⇒ 写入点真的丢了"
+                )
+            # 位移分支要求**每一处**载荷写入点都符合声明的列模式 —— 宿主里多出一个
+            # 列模式不同的写入点会被抓住（原判据只看冻结那一处）。
+            for no in sites:
+                window = _write_site_window(path, no)
+                stripped = _strip_null_placeholder_columns(window)
+                has_remark = "remark" in stripped
+                has_conclusion = "conclusion" in stripped
+                if mode == "dual_write_remark_and_conclusion":
+                    assert has_remark and has_conclusion, (
+                        f"{entry['entry_id']}: L{no} 声明双写，剔除空占位后窗口里 "
+                        f"remark={has_remark} conclusion={has_conclusion}"
+                    )
+                elif mode == "remark_only_with_explicit_null_conclusion":
+                    assert has_remark and not has_conclusion, (
+                        f"{entry['entry_id']}: L{no} 声明「remark + 显式 null 占位」，实际 "
+                        f"remark={has_remark} conclusion={has_conclusion}"
+                    )
+                    assert "conclusion" in window, (
+                        f"{entry['entry_id']}: 声明有 conclusion 空占位，原窗口里却没有该 token"
+                    )
+                    assert hc.get("payload_null_placeholder_columns") == ["conclusion"], (
+                        f"{entry['entry_id']}: 空占位列未双向登记"
+                    )
+                else:
+                    pytest.fail(f"{entry['entry_id']}: 未知 payload_column_mode={mode!r}")
             assert hc["payload_column"] == "remark", (
                 f"{entry['entry_id']}: H 循环 9 条 entry 的业务载荷列实测全是 remark"
             )
@@ -934,7 +1036,15 @@ class TestHtmlCounterpartIsSourceBacked:
         ], "双计量模式 entry 数与摘要不符"
 
     def test_h7_second_write_path_is_real(self, manifest_slice: dict) -> None:
-        """H7 是全 slice 唯一双写路径双客户端 —— 两条都必须可复核，且客户端确实不同。"""
+        """H7 是全 slice 唯一双写路径双客户端 —— 两条都必须可复核，且客户端确实不同。
+
+        🔴 行号走 `_relocate_lines`：H7 接桥后两侧文件都插了内容（Tab 里加
+        `trackHPendingWrite` 的说明块、宿主里把防抖载荷显式留存以便 flush），冻结的
+        `#Lnn` 整体位移。位移不是语义漂移，slice 不回填（append-only）。位移分支拿到的是
+        **全部** put 站点，逐处都要求打在 `/checklist-responses` 上 —— 比原判据（只看冻结
+        那一行）严：任何一侧多出一个打别的端点的 PUT 都会被抓住。
+        """
+        migrated = _migrated_entry_ids()
         entry = next(
             e
             for e in manifest_slice["independent_entries"]
@@ -946,12 +1056,24 @@ class TestHtmlCounterpartIsSourceBacked:
             path = _resolve_repo(item["path"])
             assert path.exists(), f"H7 second_write_path 文件不存在 {item['path']}"
             source = path.read_text(encoding="utf-8")
-            assert _client_probe(item["client"], "put")(source), (
-                f"H7 {item['path']} 里没有 {item['client']}.put(`...checklist-responses`)"
+            client = item["client"]
+            assert _client_probe(client, "put")(source), (
+                f"H7 {item['path']} 里没有 {client}.put(`...checklist-responses`)"
             )
-            line_no = _line_no_of(item["put_source"])
-            assert f"{item['client']}.put(" in source.splitlines()[line_no - 1]
-            clients.add(item["client"])
+            lines = source.splitlines()
+            for no in _relocate_lines(
+                entry_id=entry["entry_id"],
+                ref=item["put_source"],
+                predicate=lambda ln, c=client: f"{c}.put(" in ln,
+                what=f"{client}.put 站点",
+                migrated=migrated,
+            ):
+                window = "\n".join(lines[no - 1 : min(len(lines), no + 3)])
+                assert "checklist-responses" in window, (
+                    f"H7 {item['path']}:L{no} 的 {client}.put 不是打 "
+                    f"/checklist-responses（实际 {lines[no - 1].strip()[:90]!r}）"
+                )
+            clients.add(client)
         assert len(clients) == 2, f"H7 声明两个不同客户端，实际 {clients}"
 
     def test_h10_third_client_side_store_is_declared_and_unique(
@@ -1044,30 +1166,10 @@ class TestProperty22DynamicColumnKeyDecoupling:
         ]
         assert offenders == [], f"动态区骨架行数被写死：{offenders}"
 
-    def test_label_as_key_hits_are_exactly_the_declared_deviations(
-        self, manifest_slice: dict, h_files: list[pathlib.Path]
-    ) -> None:
-        """穷举等值：多一处 = 新增背离；少一处 = 已修好但登记未删。两个方向都打红。"""
-        block = manifest_slice["dynamic_column_identity"]
-        declared = block["hardcoded_scan_result"]["patterns"]
-        hits = _label_key_hits(h_files)
-        assert len(hits["column_key_is_label"]) == declared["column_key_is_label"], (
-            f"column_key_is_label 实测 {hits['column_key_is_label']} 条，声明 "
-            f"{declared['column_key_is_label']} 条"
-        )
-        assert len(hits["row_cell_key_is_label"]) == declared["row_cell_key_is_label"], (
-            f"row_cell_key_is_label 实测 {hits['row_cell_key_is_label']} 条，声明 "
-            f"{declared['row_cell_key_is_label']} 条"
-        )
-        deviations = block["deviations"]
-        assert len(deviations) == 1, "声明的背离条数变了，判据需重写"
-        module = "audit-platform/frontend/src/components/workpaper/composables/h8DisclosureSyncPayload.ts"
-        for form in ("column_key_is_label", "row_cell_key_is_label"):
-            assert all(h.startswith(module) for h in hits[form]), (
-                f"{form} 的命中不全在 H8 同步载荷里：{hits[form]}"
-            )
-        assert deviations[0]["entry_id"] == "xlsx/gt-h8-right-of-use-assets"
-        assert deviations[0]["registered_as"] == "BP-7"
+    # 🔴 `test_label_as_key_hits_are_exactly_the_declared_deviations` 已移至
+    #    `test_h_cycle_registered_defects_fixed.py`（BP-7 已修复，判据翻面为
+    #    「保持为无」）。移出的理由不是行数，是**读者的问题不同**：问
+    #    「BP-7 修了吗」的人不该被迫读这份 2800 行的规划期快照。
 
     def test_no_hardcoded_horizontal_company_columns(
         self, manifest_slice: dict, h_files: list[pathlib.Path]
@@ -1112,6 +1214,7 @@ class TestProperty23DynamicRowIdentity:
     def test_every_entry_declares_its_identity_key_and_generator(
         self, manifest_slice: dict
     ) -> None:
+        migrated = _migrated_entry_ids()
         keys: set[str] = set()
         for entry in manifest_slice["independent_entries"]:
             hc = entry["html_counterpart"]
@@ -1120,82 +1223,61 @@ class TestProperty23DynamicRowIdentity:
             assert key in _IDENTITY_KEYS, f"{entry['entry_id']}: 未知身份字段 {key!r}"
             path = _resolve_repo(hc["row_identity_generator_source"])
             assert path.exists(), f"{entry['entry_id']}: 生成器源文件不存在"
-            line_no = _line_no_of(hc["row_identity_generator_source"])
             lines = path.read_text(encoding="utf-8").splitlines()
-            assert 0 < line_no <= len(lines), f"{entry['entry_id']}: 生成器行号越界"
-            expr = _value_expr_after_key(lines[line_no - 1], key)
-            if expr is None:
-                # H8 的 `_id()` 是独立函数体的 return，不是对象属性 —— 退到整行核对
-                assert "Date.now()" in lines[line_no - 1] or "Math.random()" in lines[line_no - 1], (
-                    f"{entry['entry_id']}: 生成器行既不是 `{key}:` 赋值也不含随机源："
-                    f"{lines[line_no - 1].strip()[:100]!r}"
+
+            def _is_generator(line: str, k: str = key) -> bool:
+                """该行是否是 `k` 的随机身份生成点。
+
+                两种合法形态：① `k: <含随机源的表达式>`；② 独立函数体里的
+                `return` 行（H8 的 `_id()`），此时退到整行找随机源。
+                """
+                expr = _value_expr_after_key(line, k)
+                if expr is None:
+                    return "Date.now()" in line or "Math.random()" in line
+                return (
+                    "Date.now()" in expr
+                    or "Math.random()" in expr
+                    or "randomUUID" in expr
                 )
-            else:
-                assert "Date.now()" in expr or "Math.random()" in expr or "(" in expr, (
-                    f"{entry['entry_id']}: `{key}` 的值表达式看不出生成来源：{expr.strip()[:100]!r}"
-                )
+
+            line_nos = _relocate_lines(
+                entry_id=entry["entry_id"],
+                ref=hc["row_identity_generator_source"],
+                predicate=_is_generator,
+                what=f"`{key}` 的随机身份生成行",
+                migrated=migrated,
+            )
+            for line_no in line_nos:
+                assert 0 < line_no <= len(lines), f"{entry['entry_id']}: 生成器行号越界"
+                expr = _value_expr_after_key(lines[line_no - 1], key)
+                if expr is None:
+                    # H8 的 `_id()` 是独立函数体的 return，不是对象属性 —— 退到整行核对
+                    assert (
+                        "Date.now()" in lines[line_no - 1]
+                        or "Math.random()" in lines[line_no - 1]
+                    ), (
+                        f"{entry['entry_id']}: 生成器行既不是 `{key}:` 赋值也不含随机源："
+                        f"{lines[line_no - 1].strip()[:100]!r}"
+                    )
+                else:
+                    assert "Date.now()" in expr or "Math.random()" in expr or "(" in expr, (
+                        f"{entry['entry_id']}: `{key}` 的值表达式看不出生成来源："
+                        f"{expr.strip()[:100]!r}"
+                    )
         assert keys == {"rowId", "id"}, (
             f"H 循环实测身份字段两族（rowId 八条 / id 一条），当前 {keys} —— "
             "判据写死任一族都会把另一族判错"
         )
 
-    def test_positional_identity_inventory_is_exhaustive_and_partitioned(
-        self, manifest_slice: dict, h_files: list[pathlib.Path]
-    ) -> None:
-        inventory = manifest_slice["dynamic_row_identity"]["positional_identity_inventory"]
-        hits = _positional_identity_hits(h_files)
-        assert len(hits) == inventory["total_hits"], (
-            f"位置化命中实测 {len(hits)} 条，slice 声明 {inventory['total_hits']} 条：\n"
-            + "\n".join(f"  {r}#L{n} {k}:{e[:70]}" for r, n, k, e in hits)
-        )
-        family_a = {h["source_ref"] for h in inventory["family_a_true_defect_primary_table_seed"]["hits"]}
-        family_b = set(inventory["family_b_index_only_as_prefix_into_a_random_generator"]["hits"])
-        family_c = set(
-            inventory["family_c_index_as_fallback_on_non_primary_derived_tables"]["hits"]
-        )
-        assert len(family_a) == inventory["family_a_true_defect_primary_table_seed"]["count"]
-        assert len(family_b) == inventory[
-            "family_b_index_only_as_prefix_into_a_random_generator"
-        ]["count"]
-        assert len(family_c) == inventory[
-            "family_c_index_as_fallback_on_non_primary_derived_tables"
-        ]["count"]
-        assert not (family_a & family_b) and not (family_a & family_c) and not (family_b & family_c), (
-            "三族有重叠 ⇒ 分类不是划分"
-        )
-        declared = family_a | family_b | family_c
-        actual = {f"{rel}#L{no}" for rel, no, _k, _e in hits}
-        assert declared == actual, (
-            "位置化清单与实测集合不等：\n"
-            f"  仅在声明里：{sorted(declared - actual)}\n"
-            f"  仅在实测里：{sorted(actual - declared)}"
-        )
+    # 🔴 `test_positional_identity_inventory_is_exhaustive_and_partitioned` 已移至
+    #    `test_h_cycle_registered_defects_fixed.py`（BP-6 已修复，判据翻面为
+    #    「保持为无」）。移出的理由不是行数，是**读者的问题不同**：问
+    #    「BP-6 修了吗」的人不该被迫读这份 2800 行的规划期快照。
 
-    def test_family_a_hits_write_to_the_declared_key(self, manifest_slice: dict) -> None:
-        """构造点与写入点可能在不同文件（H4 就是），故按 writes_to_key_site 分别核。"""
-        inventory = manifest_slice["dynamic_row_identity"]["positional_identity_inventory"]
-        entry_ids = {e["entry_id"] for e in manifest_slice["independent_entries"]}
-        for hit in inventory["family_a_true_defect_primary_table_seed"]["hits"]:
-            source = _resolve_repo(hit["source_ref"]).read_text(encoding="utf-8")
-            line_no = _line_no_of(hit["source_ref"])
-            expr = _value_expr_after_key(source.splitlines()[line_no - 1], "rowId")
-            assert expr is not None and _POSITIONAL_IDENTITY_TOKEN.search(expr), (
-                f"{hit['source_ref']}: 声明为位置化，实测其 rowId 表达式不是"
-            )
-            assert hit["entry_id"] in entry_ids, f"{hit['source_ref']}: entry_id 不属本 slice"
-            key = hit["writes_to_key"]
-            site = _resolve_repo(hit["writes_to_key_site"])
-            site_source = site.read_text(encoding="utf-8")
-            assert f"'{key}'" in site_source or f'"{key}"' in site_source, (
-                f"{hit['source_ref']}: 写入点 {hit['writes_to_key_site']} 里找不到键 {key!r}"
-            )
-            if "#L" in hit["writes_to_key_site"]:
-                site_line = site_source.splitlines()[_line_no_of(hit["writes_to_key_site"]) - 1]
-                assert key in site_line, (
-                    f"{hit['source_ref']}: writes_to_key_site 指向的行不含键 {key!r}"
-                    f"（实际 {site_line.strip()[:90]!r}）"
-                )
-        assert inventory["family_a_true_defect_primary_table_seed"]["registered_as"] == "BP-6"
+    # 🔴 `test_family_a_hits_write_to_the_declared_key` 已移至
+    #    `test_h_cycle_registered_defects_fixed.py`（BP-6 已修复，判据翻面为
+    #    「保持为无」）。移出的理由不是行数，是**读者的问题不同**：问
+    #    「BP-6 修了吗」的人不该被迫读这份 2800 行的规划期快照。
 
     def test_display_sequence_sites_are_not_flagged(self, manifest_slice: dict) -> None:
         """反向自检：`seq: raw.seq ?? idx + 1` 三处**不得**被身份判据点名。"""
@@ -1260,34 +1342,10 @@ class TestOrphanSeedKey:
     「某个键零消费」这件事必须现扫复算 —— 写死「只有 1 处」会在有人接上消费方之后仍绿。
     """
 
-    def test_h8_seed_key_has_exactly_one_occurrence_in_the_repo(
-        self, manifest_slice: dict
-    ) -> None:
-        entry = next(
-            e
-            for e in manifest_slice["independent_entries"]
-            if e["entry_id"] == "xlsx/gt-h8-right-of-use-assets"
-        )
-        block = entry["html_counterpart"]["orphan_seed_key"]
-        key = block["key"]
-        occurrences: list[str] = []
-        for base, exts in ((FRONTEND, (".ts", ".vue")), (BACKEND / "app", (".py",))):
-            for path in base.rglob("*"):
-                if not (path.is_file() and path.suffix in exts):
-                    continue
-                text = path.read_text(encoding="utf-8", errors="replace")
-                if key in text:
-                    for no, line in enumerate(text.splitlines(), 1):
-                        if key in line:
-                            occurrences.append(f"{path.relative_to(ROOT).as_posix()}#L{no}")
-        assert len(occurrences) == 1, (
-            f"{key!r} 在全仓命中 {len(occurrences)} 处 —— 若已有消费方，BP-5 该解除并删除登记："
-            f"{occurrences}"
-        )
-        assert occurrences[0] == block["write_site"], (
-            f"唯一命中 {occurrences[0]} 与声明的写入点 {block['write_site']} 不一致"
-        )
-        assert block["read_sites"] == []
+    # 🔴 `test_h8_seed_key_has_exactly_one_occurrence_in_the_repo` 已移至
+    #    `test_h_cycle_registered_defects_fixed.py`（BP-5 已修复，判据翻面为
+    #    「保持为无」）。移出的理由不是行数，是**读者的问题不同**：问
+    #    「BP-5 修了吗」的人不该被迫读这份 2800 行的规划期快照。
 
     def test_h8_real_primary_key_is_a_different_literal(self, manifest_slice: dict) -> None:
         entry = next(
@@ -1313,210 +1371,17 @@ class TestOrphanSeedKey:
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# BP-8：孤儿 / 错位 legacy composable
+# `TestOrphanLegacyComposables` 已移至 `test_h_cycle_migration_progress_state.py`
+# —— 它回答的是「迁移到哪一步了」（契约交付态 / legacy 载体三态），而本文件
+#    回答「迁移前长什么样」。两个问题分家，读者不必为前者读完后者。
 # ════════════════════════════════════════════════════════════════════════════
-class TestOrphanLegacyComposables:
-    """**Validates: Requirements 1.7, 12.11**
-
-    两侧都断言：声称零消费的真零、声称有消费方的真有。**只断言一侧会 fail-open** ——
-    只查「零消费的真零」时，某天有人接上消费方也不会红；只查「有消费方的真有」时，
-    孤儿登记漏掉一个也不会红。
-    """
-
-    def test_declared_dual_mode_consumers_match_the_source(self, manifest_slice: dict) -> None:
-        orphan_count = 0
-        for entry in manifest_slice["independent_entries"]:
-            legacy = entry["legacy_dual_mode"]
-            module = _resolve_repo(legacy["module"])
-            assert module.exists(), f"{entry['entry_id']}: legacy composable 不存在"
-            actual = _import_specifier_consumers(module.stem)
-            production = [c for c in actual if "__tests__" not in c and not c.endswith(".spec.ts")]
-            assert sorted(legacy["consumers"]) == sorted(production), (
-                f"{entry['entry_id']}: {module.name} 的生产消费方声明 {legacy['consumers']} "
-                f"!= 实测 {production}"
-            )
-            host_rel = entry["host_path"]
-            assert legacy["host_consumes_it"] == (host_rel in production), (
-                f"{entry['entry_id']}: host_consumes_it 与实测不符"
-            )
-            if not production:
-                orphan_count += 1
-            assert legacy["wraps_shared_base"] is False, (
-                f"{entry['entry_id']}: 声明不 wraps 共享基类，与 slice 的假设不符"
-            )
-            assert "useWorkpaperEntryDualMode" not in module.read_text(encoding="utf-8"), (
-                f"{entry['entry_id']}: {module.name} 实际 import 了共享基类"
-            )
-            prefix = legacy["localStorage_prefix"]
-            assert f"'{prefix}'" in module.read_text(encoding="utf-8"), (
-                f"{entry['entry_id']}: 找不到声明的 localStorage 前缀 {prefix!r}"
-            )
-        assert orphan_count == 3, (
-            f"零消费的 dual-mode composable 实测 {orphan_count} 个（H5/H7/H9），"
-            "变了说明 BP-8 的分母漂移，需更新登记"
-        )
-
-    def test_declared_orphan_formdata_composables_really_have_no_production_consumer(
-        self, manifest_slice: dict
-    ) -> None:
-        declared = 0
-        for entry in manifest_slice["independent_entries"]:
-            block = entry.get("orphan_formdata_composable")
-            if not block:
-                continue
-            declared += 1
-            module = _resolve_repo(block["module"])
-            assert module.exists(), f"{entry['entry_id']}: {block['module']} 不存在"
-            actual = _import_specifier_consumers(module.stem)
-            production = [c for c in actual if "__tests__" not in c and not c.endswith(".spec.ts")]
-            tests = [c for c in actual if c not in production]
-            assert production == block["production_consumers"] == [], (
-                f"{entry['entry_id']}: {module.name} 声称生产零消费，实测 {production}"
-                " ⇒ BP-8 该解除并删除登记"
-            )
-            assert sorted(tests) == sorted(block["test_only_consumers"]), (
-                f"{entry['entry_id']}: {module.name} 的测试消费方声明与实测不符：{tests}"
-            )
-            declared_count = manifest_slice["honest_adjudication_summary"][
-                "entries_with_orphan_legacy_composable"
-            ]
-            assert declared_count == 5, "带孤儿 legacy 载体的 entry 数登记变了"
-        assert declared == 4, (
-            f"登记了 {declared} 条 orphan_formdata_composable（应为 H6/H7/H8/H9 四条）"
-        )
-
-    def test_non_orphan_formdata_composables_are_not_registered_as_orphans(
-        self, manifest_slice: dict
-    ) -> None:
-        """反向：H3/H4/H5/H10 的 FormData 是真载体，不得被登记成孤儿。"""
-        real_carriers = {
-            "useH3FormData",
-            "useH4FormData",
-            "useH5FormData",
-            "useH10FormData",
-        }
-        registered = {
-            _resolve_repo(e["orphan_formdata_composable"]["module"]).stem
-            for e in manifest_slice["independent_entries"]
-            if e.get("orphan_formdata_composable")
-        }
-        assert not (registered & real_carriers), (
-            f"真载体被误登记成孤儿：{sorted(registered & real_carriers)}"
-        )
-        for stem in real_carriers:
-            production = [
-                c
-                for c in _import_specifier_consumers(stem)
-                if "__tests__" not in c and not c.endswith(".spec.ts")
-            ]
-            assert production, f"{stem} 实测零生产消费 ⇒ 它也该登记成孤儿"
-
-    def test_shared_base_is_preserved_with_its_real_consumer_count(
-        self, deletion_plan: dict
-    ) -> None:
-        block = deletion_plan["shared_base_preserved"]
-        base = _resolve_repo(block["file"])
-        assert base.exists()
-        actual = _import_specifier_consumers(base.stem)
-        assert len(actual) == block["remaining_consumers_after_h_cycle"], (
-            f"共享基类消费方实测 {len(actual)} 个，声明 "
-            f"{block['remaining_consumers_after_h_cycle']} 个"
-        )
-        h_consumers = [c for c in actual if re.search(r"[Hh](?:2|3|4|5|6|7|8|9|10)", c)]
-        assert not any("DualMode" in c for c in h_consumers), (
-            f"H 循环的 dual-mode composable 实际 wraps 了共享基类：{h_consumers}"
-        )
-
-    def test_host_inlined_second_implementation_is_real(self, deletion_plan: dict) -> None:
-        """BP-8 的另一半：4 个宿主内联的真载体必须逐行可复核。"""
-        block = deletion_plan["host_inlined_second_implementation"]
-        assert len(block["hosts"]) == 4
-        for host in block["hosts"]:
-            path = _resolve_repo(host["host_path"])
-            assert path.exists()
-            lines = path.read_text(encoding="utf-8").splitlines()
-            state_line = lines[_line_no_of(host["inline_mode_state"]) - 1]
-            assert "currentMode" in state_line and "ref<" in state_line, (
-                f"{host['entry_id']}: inline_mode_state 指向的行不是 currentMode ref："
-                f"{state_line.strip()[:90]!r}"
-            )
-            if host["inline_switch_fn"]:
-                fn_line = lines[_line_no_of(host["inline_switch_fn"]) - 1]
-                assert "switchMode" in fn_line or "currentMode.value" in fn_line, (
-                    f"{host['entry_id']}: inline_switch_fn 指向的行不是切换逻辑"
-                )
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# Property 20 / 21：分母为空，不宣称通过
+# `TestProperty20And21NotClaimed` 已移至 `test_h_cycle_migration_progress_state.py`
+# —— 它回答的是「迁移到哪一步了」（契约交付态 / legacy 载体三态），而本文件
+#    回答「迁移前长什么样」。两个问题分家，读者不必为前者读完后者。
 # ════════════════════════════════════════════════════════════════════════════
-class TestProperty20And21NotClaimed:
-    """**Validates: Requirements 12.1**
-
-    本 slice 的 per-entry contract 数为 0（唯一一份 H 循环契约属已排除的 H1 pilot）⇒
-    Property 20 / 21 的分母为空，**不宣称通过**。只断言两件可复核的事：前提成立 +
-    承载者存在。
-    """
-
-    def test_no_slice_entry_has_a_contract_and_h1_is_the_only_h_contract(
-        self, manifest_slice: dict
-    ) -> None:
-        slice_ids = {e["entry_id"] for e in manifest_slice["independent_entries"]}
-        h_contracts: list[str] = []
-        for path in sorted(CONTRACT_DIR.glob("*.json")):
-            doc = _load(path)
-            owner = str((doc.get("review") or {}).get("entry_id") or "")
-            assert owner not in slice_ids, (
-                f"{path.name} 的 review.entry_id={owner!r} 属本 slice ⇒ Property 21 的空分母"
-                "前提不再成立，必须在此补齐字段级判据"
-            )
-            if owner.startswith("xlsx/gt-h"):
-                h_contracts.append(f"{path.name}:{owner}")
-        assert h_contracts == [f"h1.disposal_check.json:{H1_ENTRY_ID}"], (
-            f"H 循环契约集合实测 {h_contracts} —— 与「唯一一份属 H1 pilot」的前提不符"
-        )
-
-    def test_property_21_carriers_exist(self) -> None:
-        for name in (
-            "test_task13_contract_registry.py",
-            "test_task42_h1_grouped_dynamic_pilot.py",
-        ):
-            assert (_THIS.parent / name).exists(), f"缺 Property 21 的字段级判据承载者 {name}"
-
-    def test_no_slice_entry_has_a_registered_adapter(
-        self, manifest_slice: dict, full_manifest: dict
-    ) -> None:
-        by_id = {e["entry_id"]: e for e in full_manifest["entries"]}
-        for entry in manifest_slice["independent_entries"]:
-            assert entry["adapter_id"] is None
-            assert by_id[entry["entry_id"]]["adapter_id"] is None, (
-                f"{entry['entry_id']}: source manifest 里已有 adapter_id ⇒ slice 该更新"
-            )
-
-    def test_registry_delivered_contracts_contain_no_slice_entry(
-        self, manifest_slice: dict
-    ) -> None:
-        registry = REGISTRY.read_text(encoding="utf-8")
-        for entry in manifest_slice["independent_entries"]:
-            assert entry["entry_id"] not in registry, (
-                f"{entry['entry_id']}: 出现在 adapters/registry.py 里 ⇒ 与 adapter_id=None 矛盾"
-            )
-        assert H1_ENTRY_ID in registry, (
-            "registry 里找不到 H1 pilot ⇒ 「同循环 pilot 已交付、本 slice 未交付」这个对照消失"
-        )
-
-    def test_property_denominator_block_declares_what_is_not_claimed(
-        self, manifest_slice: dict
-    ) -> None:
-        block = manifest_slice["property_denominators"]
-        assert block["property_20_and_21_not_claimed"]["not_claimed_passing"] is True
-        assert block["property_22"]["not_claimed_passing"] is False
-        assert block["property_23"]["not_claimed_passing"] is False
-        assert block["property_69"]["not_claimed_passing_part"]
-        assert block["property_70"]["not_claimed_passing"] is False
-        for key in ("property_22", "property_23", "property_69", "property_70"):
-            assert "h_cycle_denominator" in block[key]
-            assert "how_handled" in block[key]
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1621,8 +1486,27 @@ class TestProperty28DefinitionDriftFailClosed:
                 assert name.startswith(base + " "), (
                     f"{code}: 解析结果 {name!r} 不属 {base} 那本工作簿 ⇒ 出现 F2 那种回落"
                 )
-        assert find_template_file("H2A") is None, (
-            "H2A 这类程序表码不该解析出独立模板 —— program_table_code_note 的前提失效"
+        # 🔴 `program_table_code_note` 的原意是「H2A 这类**程序表码没有自己的工作簿**」。
+        #    原判据把它写成 `find_template_file("H2A") is None` —— 那是当时解析器的
+        #    实现细节。**别的 spec**（commit `891aec512`「贯通整册打开即定位」，不属本
+        #    循环的作业面）改了 `wp_template_finder`：程序表码现在解析到**它所属的整册**。
+        #    语义上原意仍成立（H2A 没有独立模板），失效的只是「返回 None」这个表达。
+        # ⇒ 判据改为直接表达原意，且比原来严：既要求磁盘上没有 `H2A*` 工作簿，
+        #   也要求解析结果与 `H2` **同一本**（回落到别本就是 F2 那种串册缺陷）。
+        program_code = "H2A"
+        assert not list(
+            (ROOT / audit["root"] if audit.get("root") else TEMPLATE_DIR / "H").glob(
+                f"{program_code} *.xlsx"
+            )
+        ), f"磁盘上出现了 {program_code} 的独立工作簿 —— program_table_code_note 的前提失效"
+        program_resolved = find_template_file(program_code)
+        base_resolved = find_template_file(program_code.rstrip("A"))
+        assert base_resolved is not None, "H2 本册解析不出来 ⇒ 对照失效"
+        assert program_resolved is None or (
+            pathlib.Path(str(program_resolved)).name == pathlib.Path(str(base_resolved)).name
+        ), (
+            f"{program_code} 解析到 {pathlib.Path(str(program_resolved)).name!r}，"
+            f"既不是 None 也不是所属整册 {pathlib.Path(str(base_resolved)).name!r}"
         )
 
 
@@ -1848,7 +1732,21 @@ class TestProperty69EvidenceAndCounters:
             )
             assert bp.get("why_not_fixed_here"), f"{bp['id']}: 缺 why_not_fixed_here"
             for ref in bp["source_refs"]:
-                assert _resolve_repo(ref).exists(), f"{bp['id']}: source_ref 不存在 {ref}"
+                path = _resolve_repo(ref)
+                if path.exists():
+                    continue
+                # 🔴 BP-8（孤儿 / 错位 legacy 载体）的 5 条 source_ref 指向的文件
+                #    **已被本轮收口删除**。那是 BP-8 要的结果，不是登记失效：
+                #    「这个文件零消费」这条断言在文件删掉之后仍然成立（更彻底）。
+                #    但豁免必须落在删除账本上 —— 随便一条 source_ref 失踪照旧打红。
+                assert path.name in H_BP8_DELETED_LEGACY_MODULES, (
+                    f"{bp['id']}: source_ref 不存在 {ref}，且不在 BP-8 删除账本上 ⇒ "
+                    "登记真的过期了"
+                )
+                assert bp["id"] == "BP-8", (
+                    f"{bp['id']}: 引用了已删的 legacy 载体 {path.name} —— 只有 BP-8 "
+                    "的登记允许指向被删文件"
+                )
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1899,20 +1797,56 @@ class TestProperty70NoCrossEntryReuse:
                 assert _resolve_repo(ref).exists(), f"{entry_id}: plan 的 source_ref 不存在 {ref}"
 
     def test_deletion_plan_composables_are_distinct_and_real(self, deletion_plan: dict) -> None:
+        """🔴 13 条待删清册里，**5 条已由 BP-8 收口真删掉**（2026-09-27）。
+
+        判据按删除账本分派：已删 ⇒ 断言确不存在；仍在 ⇒ 断言身份仍可辨认。
+
+        ═══ 为什么**去掉**了「行数必须逐字相符」这条 ═══
+
+        清册的 `lines` 是生成那一刻的快照，而它会被两类**互相反向**的合法改动打破：
+          · 变多 —— 接桥后给零消费的 legacy 载体加 `@deprecated` 停用说明
+            （`useH2DualMode.ts` 157→181、`useH6DualMode.ts` 115→135）；
+          · 变少 —— **别的 spec** 清理死代码（`useH7FormData.ts` 205→191，
+            commit `982e667da`「Task18 补删 useH7FormData 遗漏活直调死代码」，
+            早于本轮迁移；也就是说这条判据自那次提交起就一直是红的，没人跑过它）。
+        两个方向都合法 ⇒ 行数不是不变量，钉死它只会周期性假红。
+
+        换成**身份判据**：文件仍在，且仍导出与其文件名同名的符号。这比行数难伪造 ——
+        把文件掏空只留行数骗不过去，而改行数骗不过身份。消费方口径由
+        `test_deletion_plan_child_tab_consumers_are_real` 现算守，两条合起来不留缺口。
+        """
         seen: set[str] = set()
+        deleted_seen: set[str] = set()
         for entry in deletion_plan["entries"]:
             for item in entry["legacy_composables_to_delete"]:
                 path = _resolve_repo(item["file"])
-                assert path.exists(), f"{entry['entry_id']}: 待删文件不存在 {item['file']}"
                 assert item["file"] not in seen, f"{item['file']} 在 plan 里出现多次"
                 seen.add(item["file"])
                 assert item["wraps_shared_base"] is False
-                actual = len(path.read_text(encoding="utf-8").splitlines())
-                assert actual == item["lines"], (
-                    f"{item['file']}: 行数声明 {item['lines']} != 实测 {actual}"
+                if path.name in H_BP8_DELETED_LEGACY_MODULES:
+                    deleted_seen.add(path.name)
+                    assert not path.exists(), (
+                        f"{item['file']} 在删除账本上却仍存在 ⇒ 账本与磁盘脱钩"
+                    )
+                    continue
+                assert path.exists(), f"{entry['entry_id']}: 待删文件不存在 {item['file']}"
+                assert isinstance(item["lines"], int) and item["lines"] > 0, (
+                    f"{item['file']}: 清册的 lines 不是正整数（{item['lines']!r}）"
+                )
+                body = _strip_ts_comments(path.read_text(encoding="utf-8"))
+                assert re.search(
+                    r"export\s+(?:default\s+)?(?:function|const|class)?\s*" + re.escape(stem := path.stem),
+                    body,
+                ) or re.search(r"export\s+default\s+" + re.escape(stem), body), (
+                    f"{item['file']}: 剥注释后找不到与文件名同名的导出 {stem!r} ⇒ "
+                    "文件还在但身份已变（被掏空 / 改名），清册指的不是它了"
                 )
         assert len(seen) == 13, (
             f"待删 composable 实测 {len(seen)} 个 —— 9 个 dual-mode + 4 个孤儿 FormData"
+        )
+        assert deleted_seen == set(H_BP8_DELETED_LEGACY_MODULES), (
+            f"删除账本 {sorted(H_BP8_DELETED_LEGACY_MODULES)} 与清册里走到的 "
+            f"{sorted(deleted_seen)} 不符 ⇒ 账本里混进了清册外的名字"
         )
 
     def test_deletion_plan_reasons_are_not_circular(
@@ -1946,8 +1880,15 @@ class TestProperty70NoCrossEntryReuse:
         assert len(deletion_plan["excluded_from_plan"]) >= 4
 
     def test_deletion_plan_child_tab_consumers_are_real(self, deletion_plan: dict) -> None:
-        """H4/H8 的子 Tab 消费方必须真实 —— 漏掉即删除时打断子入口。"""
+        """H4/H8 的子 Tab 消费方必须真实 —— 漏掉即删除时打断子入口。
+
+        🔴 迁移后分派（同 `TestOrphanLegacyComposables` 的三态）：已删的必须零消费；
+        已接桥 entry 的清册消费方**恰好少掉宿主那一条**，子 Tab 一条不许少
+        —— 子 Tab 才是「删除时会打断子入口」的那部分，判据的核心不变。
+        """
+        migrated = _migrated_entry_ids()
         for entry in deletion_plan["entries"]:
+            host_rel = entry["host_component"]
             for item in entry["legacy_composables_to_delete"]:
                 stem = pathlib.Path(item["file"]).stem
                 production = [
@@ -1955,9 +1896,26 @@ class TestProperty70NoCrossEntryReuse:
                     for c in _import_specifier_consumers(stem)
                     if "__tests__" not in c and not c.endswith(".spec.ts")
                 ]
-                assert sorted(item["consumers"]) == sorted(production), (
-                    f"{item['file']}: plan 声明消费方 {item['consumers']} != 实测 {production}"
-                )
+                if pathlib.Path(item["file"]).name in H_BP8_DELETED_LEGACY_MODULES:
+                    assert production == [], (
+                        f"{item['file']}: 已删，却还有生产消费方 {production}"
+                    )
+                    continue
+                if entry["entry_id"] in migrated:
+                    expected = sorted(c for c in item["consumers"] if c != host_rel)
+                    assert expected == sorted(production), (
+                        f"{item['file']}: 该 entry 已接桥，消费方应为「清册减宿主」"
+                        f" {expected}，实测 {production}"
+                    )
+                    child_tabs = [c for c in item["consumers"] if c != host_rel]
+                    assert all(c in production for c in child_tabs), (
+                        f"{item['file']}: 子 Tab 消费方丢了 "
+                        f"{[c for c in child_tabs if c not in production]} ⇒ 子入口被打断"
+                    )
+                else:
+                    assert sorted(item["consumers"]) == sorted(production), (
+                        f"{item['file']}: plan 声明消费方 {item['consumers']} != 实测 {production}"
+                    )
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -2030,16 +1988,34 @@ class TestAc14HonestModeVisibility:
             assert f'entry-id="{entry["entry_id"]}"' in block
 
     def test_registered_entry_ids_agree_with_the_slice(self, manifest_slice: dict) -> None:
-        source = NOTICE_MODULE.read_text(encoding="utf-8")
-        match = re.search(
-            r"SYNC_ADAPTER_REGISTERED_ENTRY_IDS:\s*readonly string\[\]\s*=\s*\[([\s\S]*?)\]", source
-        )
-        assert match, "找不到 SYNC_ADAPTER_REGISTERED_ENTRY_IDS 声明"
-        registered = set(re.findall(r"['\"]([^'\"]+)['\"]", match.group(1)))
+        """双向锁：slice 的 adapter_id 与前端登记表必须互相印证。
+
+        🔴 2026-09-22 修检测器方向。原实现用 `=\\s*\\[` 假定真源是字面量数组，真源改成
+        `WORKPAPER_SYNC_MANIFEST.filter(...).map(...)` 现算之后正则恒 `None`，于是报
+        「找不到 SYNC_ADAPTER_REGISTERED_ENTRY_IDS 声明」—— 把「形态变了」误报成
+        「东西没了」。解析逻辑收敛到 `entry_sync_notice_source`（一份），仍 fail closed。
+
+        🔴 **2026-10-01 换对账对象**：`registered_entry_ids()` 是从**生成的** manifest
+        投影现算的（`WORKPAPER_SYNC_MANIFEST.filter(...)`），本轮九条 entry 翻门后它们
+        自然进了这个集合；而 slice 的 `adapter_id` 是规划期冻结快照、恒 None
+        ⇒ 拿它当对账另一侧，双向锁会变成「要求迁移不许发生」。
+        改为与 **live manifest** 的 `adapter_id` 对账（同一事实的两个投影：后端 JSON 与
+        前端 TS），slice 侧只保留「快照仍是 None」这条冻结断言。
+        """
+        registered = set(registered_entry_ids())
+        assert registered, "已注册集合为空 ⇒ 「已注册 ⇒ 不挂通知」分支没有真实分母"
+        assert all("/" in rid for rid in registered), f"集合里有不像 entry_id 的项：{registered}"
+        live = {e["entry_id"]: e for e in _load(FULL_MANIFEST_PATH)["entries"]}
         for entry in manifest_slice["independent_entries"]:
-            has_adapter = entry["adapter_id"] is not None
-            assert (entry["entry_id"] in registered) == has_adapter, (
-                f"{entry['entry_id']}: 通知真源的已注册集合与 slice 的 adapter_id 双口径"
+            eid = entry["entry_id"]
+            assert entry["adapter_id"] is None, (
+                f"{eid}: slice 的 adapter_id 被改动了 —— 它是规划期冻结快照"
+            )
+            has_adapter = live[eid]["adapter_id"] is not None
+            assert (eid in registered) == has_adapter, (
+                f"{eid}: 前端已注册集合（{eid in registered}）与 live manifest 的 "
+                f"adapter_id（{live[eid]['adapter_id']!r}）双口径 ⇒ 两个投影脱钩，"
+                "多半是只重算了一侧"
             )
 
     def test_hosts_do_not_claim_bidirectional_writeback(self, manifest_slice: dict) -> None:
@@ -2178,42 +2154,112 @@ class TestSourceCodeStructure:
     def test_hosts_exist_and_are_reachable_from_the_renderer_registry(
         self, manifest_slice: dict
     ) -> None:
-        registry = HTML_RENDERER_REGISTRY.read_text(encoding="utf-8")
+        """可达性判据落在 registry 的**模块边 + component 绑定**上，不按符号名 grep。
+
+        🔴 registry 已被拆包（`htmlRendererRegistry.ts` 现在只 re-export
+        `registry/entries/{core,forms,programs,confirmations,reports,specialized}.ts`，
+        聚合器里只剩 1 处 `defineAsyncComponent`）。原判据写死两个形态：
+        `const GtX = defineAsyncComponent(() => import('./GtX.vue'))` 两步式、以及
+        `'./'` 相对前缀 —— 拆包后真实形态是子文件里 `component:` 位上的内联
+        `defineAsyncComponent(() => import('../../GtX.vue'))`，于是**每一条** H entry 都假红。
+        与 test_task54 的 `test_host_module_edges_in_the_renderer_registry_are_real`
+        取同一口径：遍历聚合器 + 每个 entries 子文件，import spec 以各自文件为基准解析。
+
+        判据**不弱化**：仍要求 (1) 宿主真在某条 registry 模块边上、(2) 那条边真的坐在
+        `component:` 位上（不是随手 import 了个没注册的组件）。
+        """
+        reg_files = [HTML_RENDERER_REGISTRY]
+        entries_dir = HTML_RENDERER_REGISTRY.parent / "registry" / "entries"
+        if entries_dir.is_dir():
+            reg_files += sorted(entries_dir.glob("*.ts"))
+        assert len(reg_files) >= 2, (
+            f"只找到 {len(reg_files)} 个 registry 文件 —— 判据的分母不对（拆包目录消失？）"
+        )
+
+        # host 绝对路径 -> 它是否坐在 component: 位上
+        module_edges: dict[pathlib.Path, bool] = {}
+        for reg_file in reg_files:
+            code = _strip_ts_comments(reg_file.read_text(encoding="utf-8"))
+            for m in re.finditer(
+                r"""(component\s*:\s*)?defineAsyncComponent\(\s*\(\)\s*=>\s*import\(\s*['"]([^'"]+)['"]""",
+                code,
+            ):
+                spec = m.group(2)
+                if not spec.startswith("."):
+                    continue
+                resolved = (reg_file.parent / spec).resolve()
+                module_edges[resolved] = module_edges.get(resolved, False) or bool(m.group(1))
+
         for entry in manifest_slice["independent_entries"]:
             host = _resolve_repo(entry["host_path"])
             assert host.exists(), f"{entry['entry_id']}: 宿主不存在"
-            component = host.stem
-            assert re.search(
-                rf"const {re.escape(component)} = defineAsyncComponent\(\(\) => import\('\./{re.escape(component)}\.vue'\)\)",
-                registry,
-            ), f"{entry['entry_id']}: htmlRendererRegistry 里没有 {component} 的 import 边"
-            assert re.search(rf"component:\s*{re.escape(component)}\b", registry), (
-                f"{entry['entry_id']}: htmlRendererRegistry 里没有 {component} 的 component 绑定"
+            resolved_host = host.resolve()
+            assert resolved_host in module_edges, (
+                f"{entry['entry_id']}: registry（聚合器 + entries/*.ts）里没有 "
+                f"{host.stem} 的 import 边"
+            )
+            assert module_edges[resolved_host], (
+                f"{entry['entry_id']}: {host.stem} 有 import 边但不在 `component:` 位上"
                 " ⇒ 不可达（那就该裁 unreachable 而不是待裁决）"
             )
 
     def test_hosts_still_import_their_legacy_composable_or_inline_it(
         self, manifest_slice: dict
     ) -> None:
-        """删除动作归 Task 66/72 ⇒ 此刻 legacy 必须还在（否则 deletion plan 已过期）。"""
+        """每条 entry 都必须**有**模式切换载体 —— legacy composable / 宿主内联 / 统一桥。
+
+        🔴 原判据（「此刻 legacy 必须还在，否则 plan 过期」）在迁移开工后过期：
+        BP-8 收口删了 5 条 legacy 载体，五个宿主换成了 `useHSyncMode`。判据改为按
+        载体的**三种合法形态**分派，核心不变（不许出现「谁都不负责模式切换」的宿主），
+        并且比原判据严：接桥的宿主必须**既不**残留 legacy import、**也不**残留内联
+        `currentMode = ref<>`（两套并存是 D4-35 踩过的真 bug）。
+        """
+        migrated = _migrated_entry_ids()
         for entry in manifest_slice["independent_entries"]:
             legacy = entry["legacy_dual_mode"]
             module = _resolve_repo(legacy["module"])
+            host_source_raw = _resolve_repo(entry["host_path"]).read_text(encoding="utf-8")
+            host_code = _strip_ts_comments(host_source_raw)
+
+            if entry["entry_id"] in migrated:
+                assert "useHSyncMode" in host_code, (
+                    f"{entry['entry_id']}: 已接桥，宿主里却找不到 useHSyncMode"
+                )
+                assert module.stem not in host_code, (
+                    f"{entry['entry_id']}: 已接桥，宿主却仍 import {module.stem}"
+                    " ⇒ legacy 与统一桥两套并存"
+                )
+                assert not re.search(r"currentMode\s*=\s*ref<", host_code), (
+                    f"{entry['entry_id']}: 已接桥，宿主却仍内联 currentMode ref"
+                )
+                continue
+
+            if module.name in H_BP8_DELETED_LEGACY_MODULES:
+                assert not module.exists(), (
+                    f"{entry['entry_id']}: {module.name} 在删除账本上却仍存在"
+                )
+                assert module.stem not in host_code, (
+                    f"{entry['entry_id']}: {module.name} 已删，宿主却仍 import 它"
+                )
+                assert "currentMode" in host_code, (
+                    f"{entry['entry_id']}: legacy 已删且未接桥，宿主里也没有内联 "
+                    "currentMode ⇒ 无模式切换载体"
+                )
+                continue
+
             assert module.exists(), f"{entry['entry_id']}: legacy composable 已被删除，plan 过期"
-            # 🔴 必须剥注释：H9 宿主的注释里逐字写着「useH9DualMode composable 后续创建」，
-            #    按原文判会把「注释提到」误当成「真 import」（该 entry 的 host_consumes_it=false）。
-            host_source = _strip_ts_comments(
-                _resolve_repo(entry["host_path"]).read_text(encoding="utf-8")
-            )
+            # 🔴 `host_code` 已剥注释：H9 宿主的注释里逐字写着「useH9DualMode composable
+            #    后续创建」，按原文判会把「注释提到」误当成「真 import」
+            #    （该 entry 的 host_consumes_it=false）。
             if legacy["host_consumes_it"]:
-                assert module.stem in host_source, (
+                assert module.stem in host_code, (
                     f"{entry['entry_id']}: 声明宿主消费 legacy，源码里找不到"
                 )
             else:
-                assert module.stem not in host_source, (
+                assert module.stem not in host_code, (
                     f"{entry['entry_id']}: 声明宿主不消费 legacy，源码（剥注释后）里却有 import"
                 )
-                assert "currentMode" in host_source, (
+                assert "currentMode" in host_code, (
                     f"{entry['entry_id']}: 宿主既不用 legacy 也没有内联 currentMode ⇒ 无模式切换载体"
                 )
 

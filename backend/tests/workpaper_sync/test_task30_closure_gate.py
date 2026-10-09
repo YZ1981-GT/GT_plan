@@ -129,11 +129,24 @@ def matrix() -> dict[str, Any]:
     return json.loads(_MATRIX_PATH.read_text(encoding="utf-8"))
 
 
+def _tasks_md_text() -> str:
+    """tasks.md 文本，**换行符归一化**后返回。
+
+    🔴 不能用 `read_bytes().decode("utf-8")`：`.gitattributes` 没有对 `*.md` 强制
+    `eol=lf`，所以 Windows 工作树里 tasks.md 是 **CRLF**。裸 decode 会把 `\\r` 留在
+    行尾，于是 `re.M` 下的 `^…$` 锚点全部失配 —— `## Task Dependency Graph` 明明在
+    文件里（第 17 行），判据却报「找不到 json 块」，把一个**解析缺陷**伪装成
+    「文档缺章节」。同 spec 的 `generate_workpaper_sync_program_milestones.py` 一直用
+    `read_text()`（universal newlines）读同一个文件，本处与之对齐。
+    """
+    return _TASKS_MD.read_text(encoding="utf-8").replace("\r\n", "\n").replace("\r", "\n")
+
+
 def _task_bodies() -> dict[str, list[str]]:
     """tasks.md → {任务号: 正文行}。行首锚定，不用字符窗口。"""
     bodies: dict[str, list[str]] = {}
     current: list[str] | None = None
-    for line in _TASKS_MD.read_bytes().decode("utf-8").split("\n"):
+    for line in _tasks_md_text().split("\n"):
         head = _TASK_HEAD_RE.match(line)
         if head:
             current = bodies.setdefault(head.group(1), [])
@@ -207,7 +220,7 @@ def _dependency_graph() -> dict[str, Any]:
 
     行首锚定 + 结构断言，不用字符窗口（本 spec 三个文档都在被并发会话改）。
     """
-    text = _TASKS_MD.read_bytes().decode("utf-8")
+    text = _tasks_md_text()
     block = re.search(
         r"^## Task Dependency Graph$\n\n^```json$\n(.*?)^```$", text, re.M | re.S
     )
@@ -553,20 +566,24 @@ def test_owner_named_rows_match_the_gate_report(
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def test_the_quarantine_scenario_is_still_required_and_still_unrepresentable() -> None:
+def test_the_quarantine_scenario_debt_is_paid_by_v165_and_still_required() -> None:
     """**Validates: Requirements 5.6, 12.11**
 
-    Task 29 把 `quarantined_rejects_application_and_engine` 登记为**债**而不是豁免。
-    Task 30 必须复核这条登记今天仍然成立，而不是引用它：
+    Task 29 把 `quarantined_rejects_application_and_engine` 登记为**债**而不是豁免；原测试
+    （`test_the_quarantine_scenario_is_still_required_and_still_unrepresentable`）的 docstring
+    写明：「只要真加了 `authorization_reject` kind，本条即红 —— 届时登记必须撤销。这就是
+    『债』与『豁免』的差别：债有到期日。」
 
-    1. 场景仍在 required set 的声明里（没被悄悄摘掉）；
-    2. 它推导出的入库 kind 仍是 `standard`，因而 `expects_passable` 为假；
-    3. V151 的 `ck_wpees_standard_requires_entities` 真的要求 `standard` 的 passed 行
-       `application_ids >= 1` —— 从迁移 SQL 现场解析，不抄结论；
-    4. 登记表里恰好只有这一条（多一条就是有人把新债也塞进来了）。
+    2026-09-26 V165 真加了该 kind ⇒ 债到期、已还。本条复核「还债」这件事今天真实成立，
+    同样**从迁移 SQL 现场解析、不抄结论**：
 
-    只要 (2) 或 (3) 变了（例如真加了 `authorization_reject` kind），本条即红 ——
-    届时登记必须撤销。这就是「债」与「豁免」的差别：债有到期日。
+    1. 场景仍在 required set 的声明里（还债 ≠ 把场景摘掉）；
+    2. 它推导出的入库 kind 是 `authorization_reject`，且 `schema_representable_as_passed`；
+    3. AC 5.6 仍成立：`expects_application` 仍为 False（还债不是改需求）；
+    4. V151 原文**字节未动**（迁移不可改历史），修复只在 V165 里；
+    5. V165 真的把新 kind 加进了取值域与 standard 约束的豁免名单，且**另配**三实体恒零约束
+       （只豁免不配零约束 = 允许伪造实体记 passed）；
+    6. 登记表已清空（多一条就是有人把新债塞进来，必须另行说明）。
     """
     from app.services.workpaper_sync import evidence as EV
 
@@ -574,45 +591,77 @@ def test_the_quarantine_scenario_is_still_required_and_still_unrepresentable() -
     declared = {s.scenario_id: s for s in EV.PROJECTION_BASE_SCENARIOS + EV.CLOSE_SCENARIOS}
     assert sid in declared, f"{sid} 已不在场景声明里 —— required set 被悄悄削了"
     scenario = declared[sid]
-    assert scenario.kind is EV.ScenarioKind.standard, scenario.kind
+    assert scenario.kind is EV.ScenarioKind.authorization_reject, scenario.kind
     assert scenario.expects_application is False, (
         "场景开始期望 application 了 ⇒ 与 AC 5.6「quarantined 永不创建 application」冲突"
     )
-    assert scenario.schema_representable_as_passed is False, (
-        "场景已可记为 passed ⇒ Task 29 的债已解，登记必须撤销"
+    assert scenario.schema_representable_as_passed is True, (
+        "V165 之后该场景必须可记为 passed —— 否则债只是换了个名字"
     )
     assert sid in EV.NON_REPLACEABLE_SCENARIOS, (
         "authorization 家族场景不得被 authority model 替换掉"
     )
-    assert set(EV.SCHEMA_UNREPRESENTABLE_SCENARIOS) == {sid}, (
-        f"登记表内容变了: {sorted(EV.SCHEMA_UNREPRESENTABLE_SCENARIOS)}"
+    assert dict(EV.SCHEMA_UNREPRESENTABLE_SCENARIOS) == {}, (
+        f"登记表应已清空（V165）: {sorted(EV.SCHEMA_UNREPRESENTABLE_SCENARIOS)}"
     )
 
-    sql = _MIGRATION.read_text(encoding="utf-8")
-    body = re.search(
+    # ── (4) V151 历史字节未动：旧约束原文仍是两 kind 豁免 ────────────────
+    v151 = _MIGRATION.read_text(encoding="utf-8")
+    old_body = re.search(
         r"CONSTRAINT ck_wpees_standard_requires_entities CHECK \((.*?)\)\),",
-        sql,
+        v151,
         re.S,
     )
-    assert body, "V151 里找不到 ck_wpees_standard_requires_entities —— 约束改名或删除了"
-    text = " ".join(body.group(1).split())
-    assert "jsonb_array_length(application_ids) >= 1" in text, text
-    #: 约束的豁免名单必须**恰好**是那两个 kind。多一个（例如真加了
-    #: `authorization_reject`）就说明债已解，本条即红、登记必须撤销。
-    exempted = set(re.findall(r"'([a-z_]+)'", text))
-    assert exempted == {"download_only", "recovery_reject", "passed"}, (
-        f"约束的 kind 豁免名单变了: {sorted(exempted)}（原为 download_only/recovery_reject）"
+    assert old_body, "V151 里找不到 ck_wpees_standard_requires_entities —— 历史迁移被改了"
+    old_exempted = set(re.findall(r"'([a-z_]+)'", " ".join(old_body.group(1).split())))
+    assert old_exempted == {"download_only", "recovery_reject", "passed"}, (
+        f"V151 原文被改了: {sorted(old_exempted)} —— 修复必须落在新迁移，不得改历史字节"
     )
 
-    kinds = re.search(r"CONSTRAINT ck_wpees_scenario_kind CHECK \((.*?)\)\),", sql, re.S)
-    assert kinds, "V151 里找不到 ck_wpees_scenario_kind"
+    # ── (5) V165 真的还了债 ──────────────────────────────────────────────
+    v165_path = _MIGRATION.with_name("V165__wpees_authorization_reject_kind.sql")
+    assert v165_path.exists(), f"缺少 V165: {v165_path}"
+    v165 = v165_path.read_text(encoding="utf-8")
+
+    kinds = re.search(
+        r"ADD CONSTRAINT ck_wpees_scenario_kind CHECK \(scenario_kind IN \((.*?)\)\)",
+        v165,
+        re.S,
+    )
+    assert kinds, "V165 里找不到 ck_wpees_scenario_kind"
     assert set(re.findall(r"'([a-z_]+)'", kinds.group(1))) == {
         "standard",
         "download_only",
         "recovery_reject",
         "recovery_claim",
         "close_capture",
+        "authorization_reject",
     }, kinds.group(1)
+
+    new_body = re.search(
+        r"ADD CONSTRAINT ck_wpees_standard_requires_entities CHECK \((.*?)\);", v165, re.S
+    )
+    assert new_body, "V165 里找不到 ck_wpees_standard_requires_entities"
+    new_text = " ".join(new_body.group(1).split())
+    assert set(re.findall(r"'([a-z_]+)'", new_text)) == {
+        "download_only",
+        "recovery_reject",
+        "authorization_reject",
+        "passed",
+    }, new_text
+    assert "jsonb_array_length(application_ids) >= 1" in new_text, (
+        "standard 的通用规则被顺手放松了"
+    )
+
+    zero = re.search(
+        r"ADD CONSTRAINT ck_wpees_authorization_reject_zero_entities CHECK \((.*?)\);",
+        v165,
+        re.S,
+    )
+    assert zero, "V165 缺三实体恒零约束 —— 只豁免不配零约束等于允许伪造实体记 passed"
+    zero_text = " ".join(zero.group(1).split())
+    for column in ("operation_ids", "application_ids", "recovery_case_ids"):
+        assert f"jsonb_array_length({column}) = 0" in zero_text, (column, zero_text)
 
 
 def test_the_quarantine_boundary_itself_is_verified_not_deferred() -> None:

@@ -1,0 +1,970 @@
+{
+  "contract_id": "h3.investment_property_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "868f045f9ce18da18a58e449089d4d86eb9744587d7faa42803359c0a72b04cf",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "carrier": {
+      "read": "formdata_composable",
+      "tb_publish_gate": "H3TabAdjudicationCost → publishToTb （POST /api/workpapers/{wpId}/audit-determination/publish-to-tb，科目码按项目动态解析 grossCode/accumDepCode 并带防污染守卫（无科目则跳过该行），中文二次确认；只在成本模式审定 Tab 上，公允模式现算 0 处；sync 路径对 trial_balance 写 0 次）",
+      "write": "formdata_composable"
+    },
+    "column_coverage_closure": {
+      "明细表（公允价值模式）H3-2": {
+        "effective_columns": 27,
+        "mapped": 6,
+        "template_only": 21
+      },
+      "明细表（成本模式）H3-2": {
+        "effective_columns": 45,
+        "mapped": 17,
+        "template_only": 28
+      }
+    },
+    "declared_coverage_gaps": [
+      {
+        "gap_id": "H3C-GAP-1",
+        "owner": "审计业务方 / spec h3-h5-h7-variant-axis-and-dynamic-column-paradigm 后续任务",
+        "sheet": "明细表（成本模式）H3-2",
+        "stop_and_report": "把 AJE/RJE 摊到「期初 / 本期增加 / 本期减少」三个位置属**审计域裁决**（哪部分调整应追溯调整期初、哪部分归本期），不由接线方拍板。",
+        "store_fields": [
+          "costUnadj",
+          "costAje",
+          "costRje",
+          "depUnadj",
+          "depAje",
+          "depRje",
+          "impairUnadj",
+          "impairAje",
+          "impairRje"
+        ],
+        "template_columns": [
+          "I",
+          "J",
+          "K",
+          "L",
+          "M",
+          "N",
+          "V",
+          "W",
+          "X",
+          "Y",
+          "Z",
+          "AA",
+          "AI",
+          "AJ",
+          "AK",
+          "AL",
+          "AM",
+          "AN"
+        ],
+        "title": "模板四段（按作用位置）与前端四分（按调整来源）正交",
+        "what_still_syncs": "两侧在**期末**这一点上对齐：O ↔ costAudited、AB ↔ depAudited、AO ↔ impairAudited、AQ ↔ netAudited。",
+        "why_not_mapped": "模板按**作用位置**分段（期初调整 / 账项调整本期增减 / 审定期初·增·减），前端按**调整来源**分档（AJE 审计调整 / RJE 重分类调整）且两档都作用在期末口径上（costAudited = costUnadj + costAje + costRje，costUnadj 默认取costEnd 即期末）。两套分类是正交维度，不存在 1:1 映射：映到 I 会把审计调整当成调期初、让 M/N 算错本期发生额；映到 J/K 会丢掉 RJE 且只剩单方向。"
+      },
+      {
+        "gap_id": "H3C-GAP-2",
+        "owner": "审计业务方",
+        "sheet": "明细表（成本模式）H3-2",
+        "stop_and_report": "摊分规则（转入是否计入「本年增加」）属审计域裁决。",
+        "store_fields": [
+          "costIncrease",
+          "transferIn",
+          "costDecrease",
+          "transferOut"
+        ],
+        "template_columns": [
+          "D",
+          "F"
+        ],
+        "title": "`D 本年增加` / `F 本年减少` 各 1 格对 2 字段",
+        "why_not_folded": "🔴 不能照 H2-GAP-2 折叠：transferIn/transferOut 是**活字段**（useH3TransferEngine.ts / useH3TransferReview.ts / 互转审核表H3-6 在用），与 H2 那个自带 @deprecated、全仓零 UI 写入点的 transferOut 不是一回事。",
+        "why_not_mapped": "前端 `_normalize` 里 costEnd = costBegin + costIncrease - costDecrease + transferIn - transferOut；要让模板 H=C+D-F 与 costEnd 相等，必须 D = costIncrease + transferIn、F = costDecrease + transferOut。映射任一分项都会在转入/转出非零时让 Excel 的 H 与 HTML 的 costEnd **静默不等**。"
+      },
+      {
+        "gap_id": "H3C-GAP-3",
+        "owner": "spec h3-h5-h7-variant-axis-and-dynamic-column-paradigm 后续任务",
+        "sheet": "明细表（成本模式）H3-2",
+        "stop_and_report": "拆成 increaseType / decreaseType 两个字段属前端模型变更 + 存量数据迁移，超出接线范围。",
+        "store_fields": [
+          "changeType"
+        ],
+        "template_columns": [
+          "E",
+          "G"
+        ],
+        "title": "`E 增加方式` / `G 减少方式` 两列对一个混装双向的字段",
+        "why_not_mapped": "前端只有一个 changeType，其 CHANGE_TYPE_OPTIONS **混装双向**：增加类（购入 / 自建完工转入 / 自用转投资 / 在建转投资）与减少类（处置 / 转为自用 / 转出）在同一字段里。映到任一列都会把另一方向的取值写进错列。"
+      },
+      {
+        "gap_id": "H3C-GAP-4",
+        "owner": "spec h3-h5-h7-variant-axis-and-dynamic-column-paradigm 后续任务",
+        "sheet": "明细表（成本模式）H3-2",
+        "stop_and_report": "AR 的数据源应取 H3-12，跨 sheet 取数不在本 sheet 接线范围。",
+        "store_fields": [
+          "ownershipRestricted"
+        ],
+        "template_columns": [
+          "AR"
+        ],
+        "title": "`AR 是否有权属证明` 与 `ownershipRestricted`「是否权属受限」不是同一事实",
+        "why_not_mapped": "「有产权证明」与「权属未受限」是两个事实（有证也可能被抵押查封）。H3 的权属核对另有专表（产权核对表H3-12 + useH3TitleCheck.ts）。按名字近似硬映会把两个不同结论混成一个。"
+      },
+      {
+        "gap_id": "H3F-GAP-1",
+        "owner": "审计业务方 / spec h3-h5-h7-variant-axis-and-dynamic-column-paradigm 后续任务",
+        "sheet": "明细表（公允价值模式）H3-2",
+        "stop_and_report": "要把前端总额口径拆回「原值 + 累计公允变动」两个独立字段，属前端模型变更 + 存量数据迁移（且拆分基准年的累计变动无从追溯）⇒ 属审计域与数据治理裁决。",
+        "store_fields": [
+          "fairValueBegin",
+          "fairValueEnd",
+          "fairIncrease",
+          "fairDecrease",
+          "transferIn",
+          "transferOut"
+        ],
+        "template_columns": [
+          "C",
+          "D",
+          "F",
+          "H",
+          "I",
+          "J",
+          "K",
+          "L",
+          "M",
+          "N",
+          "O"
+        ],
+        "title": "前端公允价值口径（含变动的总额）与模板「原值 + 公允价值变动」两块拆分不同源",
+        "what_still_syncs": "Q ↔ fairValueChange（未审本年变动）、V ↔ fvChangeAudited（审定本年变动）、Y ↔ fairAudited（审定期末公允价值总额）。",
+        "why_not_mapped": "calcFairEndBalance(begin, inc, dec, transfer, change) = begin + inc - dec + transfer + change —— 前端把本年公允变动加进了「期末公允价值」，即 fairValueBegin/End 是**含累计变动的公允价值总额**。模板把「原值 C..O」与「公允价值变动 P..W」分成两块，净值才是两者之和（X=L+U / Y=O+W）。把总额映进原值列会让 X 把公允变动**重复计一次**。"
+      },
+      {
+        "gap_id": "H3F-GAP-2",
+        "owner": "审计业务方",
+        "sheet": "明细表（公允价值模式）H3-2",
+        "stop_and_report": "AJE/RJE 的摊分属审计域裁决。",
+        "store_fields": [
+          "fairUnadj",
+          "fairAje",
+          "fairRje",
+          "fvChangeUnadj",
+          "fvChangeAje",
+          "fvChangeRje"
+        ],
+        "template_columns": [
+          "S",
+          "T",
+          "U",
+          "W"
+        ],
+        "title": "模板四段（按作用位置）与前端四分（按调整来源）正交",
+        "what_still_syncs": "V（审定本年变动，=Q+T）↔ fvChangeAudited。",
+        "why_not_mapped": "同成本模式 H3C-GAP-1：模板按作用位置分段（期初调整 / 本期变动调整），前端按来源分档（AJE / RJE）。`T 本期变动调整` 是**一列**对 fvChangeAje + fvChangeRje **两字段** ⇒ 映任一档都会吞掉另一档。"
+      },
+      {
+        "gap_id": "H3F-GAP-3",
+        "owner": "spec h3-h5-h7-variant-axis-and-dynamic-column-paradigm 后续任务",
+        "sheet": "明细表（公允价值模式）H3-2",
+        "stop_and_report": "拆成 increaseType / decreaseType 属前端模型变更。",
+        "store_fields": [
+          "changeType"
+        ],
+        "template_columns": [
+          "E",
+          "G"
+        ],
+        "title": "`E 增加方式` / `G 减少方式` 两列对一个混装双向的字段",
+        "why_not_mapped": "FAIR_CHANGE_TYPE_OPTIONS 混装双向（购入 / 自建完工转入 / 自用转投资 / 在建转投资 / 处置 / 转为自用 / 转出 / 公允价值变动），与成本模式同族。"
+      },
+      {
+        "gap_id": "H3F-GAP-4",
+        "owner": "spec h3-h5-h7-variant-axis-and-dynamic-column-paradigm 后续任务",
+        "sheet": "明细表（公允价值模式）H3-2",
+        "stop_and_report": "Z 的数据源应取 H3-12。",
+        "store_fields": [
+          "ownershipRestricted"
+        ],
+        "template_columns": [
+          "Z"
+        ],
+        "title": "`Z 是否有权属证明` 与 `ownershipRestricted`「是否权属受限」不是同一事实",
+        "why_not_mapped": "同成本模式 H3C-GAP-4（权属核对另有 产权核对表H3-12）。"
+      }
+    ],
+    "derived_fields": [],
+    "derived_total_keys": [
+      "H3-2-cost-begin-total",
+      "H3-2-cost-decrease-total",
+      "H3-2-cost-increase-total",
+      "H3-2-fair-begin-total",
+      "H3-2-fair-decrease-total",
+      "H3-2-fair-increase-total"
+    ],
+    "effective_columns_by_sheet": {
+      "明细表（公允价值模式）H3-2": 27,
+      "明细表（成本模式）H3-2": 45
+    },
+    "entry_id": "xlsx/gt-h3-investment-property",
+    "enum_fields": {},
+    "footer_non_sum_cells": {},
+    "html_store": {
+      "item_ids": [
+        "H3-2-cost-rows",
+        "H3-2-fair-rows"
+      ],
+      "note": "H3 投资性房地产是 H 循环**首条变体轴 entry**：同一 wp_code 下两套并列明细表（成本模式 / 公允价值模式），源模板 sheet 名不同但 sheet_code 尾码相同，且两套**各有独立持久化键**（H3-2-cost-rows / H3-2-fair-rows）⇒ 两张都进受管面，各自一个 RowTableSheetSpec。计量模式本身持久化在 useH3MeasurementModel.ts。两张 sheet 的行数据都存成 checklist_responses 的 **remark** JSON 数组，按 stable field + 行身份 `rowId` 拆开。🔴 **覆盖率远低于前五条 entry，低不是漏做而是两侧口径正交**：成本模式 17/45（38%）· 公允模式 6/27（22%），对照 H2 34/50、H8 58/58。模板把调整按**作用位置**分段（期初调整 / 账项调整本期增减 / 审定期初·增·减），前端按**调整来源**分档（costAje 审计调整 / costRje 重分类调整）且两档都作用在期末口径上（costAudited = costUnadj + costAje + costRje，costUnadj 默认取期末）。两套分类是正交维度，不存在 1:1 映射 —— 硬凑会产出**不可见错数**（映到期初调整会让审定本期发生额算错），宁可留**可见缺口**。两侧只在**期末**这一点上对齐：O↔costAudited / AB↔depAudited / AO↔impairAudited / AQ↔netAudited。🔴 公允模式更低的额外原因：前端 fairValueBegin/End 是**含累计公允变动的总额**（calcFairEndBalance 把 change 加了进去），而模板把「原值 C..O」与「公允价值变动 P..W」分成两块、净值才是两者之和（X=L+U / Y=O+W）⇒ 原值整块无对端；把总额映进原值列会让 X 把公允变动**重复计一次**。能对上的只有 Q↔fairValueChange、V↔fvChangeAudited（🔴 是 V 不是 W —— 前端 fvChangeUnadj 默认取本年变动，映到审定期末累计会差一个期初）、Y↔fairAudited、AA↔mortgaged。🔴 **八条缺口逐条登记**（见 review.declared_coverage_gaps），各带停下报告点：四段↔四分正交 ×2、增减金额 1 格对 2 字段（transferIn/Out 是活字段不能像 H2-GAP-2 那样折叠）、增减方式两列对一个混装双向的 changeType ×2、「是否有权属证明」≠「是否权属受限」×2（权属核对另有 产权核对表H3-12）、公允总额口径不同源。🔴 **模板真实缺陷一处**（见 review.template_defects）：公允模式 `R` 列（公允价值变动·未审·期末余额）只有首行 R12 有 `=P12+Q12`，R13-R26 共 14 行缺公式；对照 H7 公允同位列 S 满格 25/25 ⇒ H3 独有漏填。后果是同一张表里审定段算得出期末、未审段算不出。走覆盖层不改模板字节（同 F2-26!J9 / F5-7!G31）。🔴 三处不能照抄前五条：**三级**表头 R9/R10/R11（H4/H8/H2 是四级）· 两张 sheet 数据区起始行不同（成本 R13-R27 / 公允 R12-R26，照抄任一张会让另一张 merge 越界）· footer 全是列 SUM（H2 有 4 格行内派生 ⇒ 那条判据在此不适用）。",
+      "payload_column": "remark",
+      "payload_column_mode": "dual_write_remark_and_conclusion",
+      "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useH3FormData.ts —— `_persist()` 走 api.put { item_id: 'H3-2-cost-rows' | 'H3-2-fair-rows', remark: JSON.stringify(rows) }",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "legacy_folded_fields": {},
+    "pilot_class": "phase5_investment_property_detail",
+    "resolved_coverage_gaps": [],
+    "reviewed_basis": "openpyxl 逐格实测 H/H3 投资性房地产.xlsx（146,096 B / 22 sheets）的两张明细表：① `明细表（成本模式）H3-2`（三级表头 R9/R10/R11 共 68 个合并域 / 数据 R13-R27 共 15 行 / footer R28 `合计` 全列 SUM 无行内派生 / 有效内容列 45 即 A..AS / 数据行公式列 17 个（映射侧 7 个进 FORMULA_TEMPLATES）/ 三区块四段：原值 C9(未审 C-H / 期初调整 I / 账项调整 J-K / 审定 L-O)· 累计折旧摊销 P9(P-U / V / W-X / Y-AB)· 减值准备 AC9(AC-AH / AI / AJ-AK / AL-AO)· 尾部 AP 期初净值 AQ 期末净值 AR 是否有权属证明 AS 是否抵押受限 / footer 之下 R29-R33 `其中：`+四行 SUMPRODUCT 按类别小计（标签取 =底稿目录!A9..A12，**四行**不是 H4 的五行）); ② `明细表（公允价值模式）H3-2`（三级表头 25 个合并域 / 数据 R12-R26 共 15 行**起始行比成本模式早一行** / footer R27 全列 SUM / 有效内容列 27 即 A..AA / 数据行公式列 11 个（映射侧 2 个）/ 两区块：原值 C9 与成本模式逐列同构 · 公允价值变动 P9(未审 P-R / 期初调整 S / 本期变动调整 T / 审定 U-W)· 尾部 X 期初净值 Y 期末净值 Z 是否有权属证明 AA 是否抵押受限 / 🔴 `R` 列仅首行有公式，R13-R26 共 14 行缺 —— 与 H7 公允同位列 S 满格 25/25 对照) + 前端按值 grep（useH3DetailCost.ts ITEM_ID='H3-2-cost-rows' / DetailCostRow 47 字段 / _normalize 的 costEnd=costBegin+costInc-costDec+transIn-transOut 定死 GAP-2 / useH3DetailFair.ts ITEM_ID='H3-2-fair-rows' / DetailFairRow 31 字段 / useH3FormulaEngine.calcFairEndBalance=begin+inc-dec+transfer+change 定死 H3F-GAP-1 / calcAuditedAmount=unadj+aje+rje 定死四分口径 / CHANGE_TYPE_OPTIONS 与 FAIR_CHANGE_TYPE_OPTIONS 混装双向定死 GAP-3) + 三条 finder 路径实测幻影码 `H3I` 全空（程序表码是 `H3A`） + 发布门现算（H3TabAdjudicationCost.vue#L706 publishToTb，科目码按项目动态解析并带防污染守卫；H3TabAdjudicationFair.vue 现算 0 处） + 覆盖闭合自检（成本 17+28==45 / 公允 6+21==27，两侧并集各自连续无缺口、无列重复）",
+    "row_identity_known_weaknesses": [
+      {
+        "detail": "`rowId` 缺失时 `_normalize` 每次载入生成新串（`dc-`/`df-` + Math.random），同一行两次载入身份不同。",
+        "owner": "spec h3-h5-h7-variant-axis-and-dynamic-column-paradigm 后续任务",
+        "weakness": "载入回填不稳定"
+      },
+      {
+        "detail": "`dc-${Date.now()}` / `df-${Date.now()}` —— 同毫秒连加两行会撞 id。",
+        "owner": "同上",
+        "weakness": "addRow 无随机后缀"
+      }
+    ],
+    "sibling_tables_not_managed": [],
+    "store_only_fields": [
+      "acquireDate",
+      "appraisalBasis",
+      "area",
+      "changeDate",
+      "changeType",
+      "costAje",
+      "costDecrease",
+      "costIncrease",
+      "costRje",
+      "costUnadj",
+      "counterAccount",
+      "depAje",
+      "depRje",
+      "depUnadj",
+      "fairAje",
+      "fairDecrease",
+      "fairIncrease",
+      "fairRje",
+      "fairUnadj",
+      "fairValueBegin",
+      "fairValueEnd",
+      "fairValueSource",
+      "fvChangeAje",
+      "fvChangeRje",
+      "fvChangeUnadj",
+      "impairAje",
+      "impairRje",
+      "impairUnadj",
+      "location",
+      "netValue",
+      "originalCost",
+      "ownershipRestricted",
+      "remark",
+      "seq",
+      "transferIn",
+      "transferOut",
+      "voucherNo"
+    ],
+    "tb_publish_gate": "H3TabAdjudicationCost → publishToTb （POST /api/workpapers/{wpId}/audit-determination/publish-to-tb，科目码按项目动态解析 grossCode/accumDepCode 并带防污染守卫（无科目则跳过该行），中文二次确认；只在成本模式审定 Tab 上，公允模式现算 0 处；sync 路径对 trial_balance 写 0 次）",
+    "template_defects": [
+      {
+        "cells": "R13:R26",
+        "consequence": "第 2 行起填 P（期初累计公允变动）与 Q（本年变动）后 R（期末）不自动算 ⇒ 未审期末累计公允变动漏算。审定侧 U/V/W 满格有公式，于是同一张表里审定段算得出期末、未审段算不出（模板内部自相矛盾）。",
+        "defect_id": "H3F-TPL-1",
+        "disposition": "走覆盖层补公式，不改模板字节（同 F2-26!J9 / F5-7!G31 两例）。R 本身无前端对端 ⇒ 同时判 template-only，回写不碰它。",
+        "expected": "=P{r}+Q{r}",
+        "kind": "missing_formula",
+        "measured": "仅 R12 有 `=P12+Q12`；R13-R26 共 14 行为空（无公式）。对照组：H7 公允价值模式同位列 S 满格 25/25 有 `=Q+R`。",
+        "sheet": "明细表（公允价值模式）H3-2"
+      }
+    ],
+    "template_only_columns_by_sheet": {
+      "明细表（公允价值模式）H3-2": [
+        {
+          "column": "C",
+          "header_text": "期初余额"
+        },
+        {
+          "column": "D",
+          "header_text": "本年增加"
+        },
+        {
+          "column": "E",
+          "header_text": "增加方式"
+        },
+        {
+          "column": "F",
+          "header_text": "本年减少"
+        },
+        {
+          "column": "G",
+          "header_text": "减少方式"
+        },
+        {
+          "column": "H",
+          "header_text": "期末余额"
+        },
+        {
+          "column": "I",
+          "header_text": "期初调整"
+        },
+        {
+          "column": "J",
+          "header_text": "本期增加"
+        },
+        {
+          "column": "K",
+          "header_text": "本期减少"
+        },
+        {
+          "column": "L",
+          "header_text": "期初余额"
+        },
+        {
+          "column": "M",
+          "header_text": "本年增加"
+        },
+        {
+          "column": "N",
+          "header_text": "本年减少"
+        },
+        {
+          "column": "O",
+          "header_text": "期末余额"
+        },
+        {
+          "column": "P",
+          "header_text": "期初余额"
+        },
+        {
+          "column": "R",
+          "header_text": "期末余额"
+        },
+        {
+          "column": "S",
+          "header_text": "期初调整"
+        },
+        {
+          "column": "T",
+          "header_text": "本期变动调整"
+        },
+        {
+          "column": "U",
+          "header_text": "期初余额"
+        },
+        {
+          "column": "W",
+          "header_text": "期末余额"
+        },
+        {
+          "column": "X",
+          "header_text": "期初净值"
+        },
+        {
+          "column": "Z",
+          "header_text": "是否有权属证明"
+        }
+      ],
+      "明细表（成本模式）H3-2": [
+        {
+          "column": "D",
+          "header_text": "本年增加"
+        },
+        {
+          "column": "E",
+          "header_text": "增加方式"
+        },
+        {
+          "column": "F",
+          "header_text": "本年减少"
+        },
+        {
+          "column": "G",
+          "header_text": "减少方式"
+        },
+        {
+          "column": "I",
+          "header_text": "期初调整"
+        },
+        {
+          "column": "J",
+          "header_text": "本期增加"
+        },
+        {
+          "column": "K",
+          "header_text": "本期减少"
+        },
+        {
+          "column": "L",
+          "header_text": "期初余额"
+        },
+        {
+          "column": "M",
+          "header_text": "本年增加"
+        },
+        {
+          "column": "N",
+          "header_text": "本年减少"
+        },
+        {
+          "column": "R",
+          "header_text": "增加方式"
+        },
+        {
+          "column": "T",
+          "header_text": "减少方式"
+        },
+        {
+          "column": "V",
+          "header_text": "期初调整"
+        },
+        {
+          "column": "W",
+          "header_text": "本期增加"
+        },
+        {
+          "column": "X",
+          "header_text": "本期减少"
+        },
+        {
+          "column": "Y",
+          "header_text": "期初余额"
+        },
+        {
+          "column": "Z",
+          "header_text": "本年增加"
+        },
+        {
+          "column": "AA",
+          "header_text": "本年减少"
+        },
+        {
+          "column": "AE",
+          "header_text": "增加方式"
+        },
+        {
+          "column": "AG",
+          "header_text": "减少方式"
+        },
+        {
+          "column": "AI",
+          "header_text": "期初调整"
+        },
+        {
+          "column": "AJ",
+          "header_text": "本期增加"
+        },
+        {
+          "column": "AK",
+          "header_text": "本期减少"
+        },
+        {
+          "column": "AL",
+          "header_text": "期初余额"
+        },
+        {
+          "column": "AM",
+          "header_text": "本年增加"
+        },
+        {
+          "column": "AN",
+          "header_text": "本年减少"
+        },
+        {
+          "column": "AP",
+          "header_text": "期初净值"
+        },
+        {
+          "column": "AR",
+          "header_text": "是否有权属证明"
+        }
+      ]
+    },
+    "unmanaged_regions": [
+      {
+        "first_row": 29,
+        "kind": "category_subtotal_block",
+        "last_row": 33,
+        "note": "A29='其中：'；R30-R33 为 =SUMPRODUCT(($A$13:$A$27=$A30)*(C$13:C$27)) 形态的按类别小计，行标签取 =底稿目录!A9..A12（四行，H4 是五行 ⇒ 不照抄）。",
+        "sheet": "明细表（成本模式）H3-2"
+      },
+      {
+        "first_row": 28,
+        "kind": "category_subtotal_block",
+        "last_row": 32,
+        "note": "A28='其中：'；R29-R32 为 =SUMPRODUCT(($A$12:$A$26=$A29)*(C$12:C$26)) 形态的按类别小计，行标签取 =底稿目录!A9..A12。不受管、不比对、不覆盖。",
+        "sheet": "明细表（公允价值模式）H3-2"
+      }
+    ],
+    "uuid_column_by_sheet": {
+      "明细表（公允价值模式）H3-2": "AB",
+      "明细表（成本模式）H3-2": "AT"
+    },
+    "variant_axis": {
+      "kind": "measurement_model",
+      "switch_source": "audit-platform/frontend/src/components/workpaper/composables/useH3MeasurementModel.ts",
+      "variants": [
+        {
+          "effective_columns": 45,
+          "mapped": 17,
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useH3DetailCost.ts",
+          "sheet_key": "h302cost-managed",
+          "store_item_id": "H3-2-cost-rows",
+          "template_sheet": "明细表（成本模式）H3-2",
+          "variant": "cost"
+        },
+        {
+          "effective_columns": 27,
+          "frozen_key_note": "🔴 H3-2-fair-rows 在 HC-8 冻结键清册上（被 G 循环的 g13SourceDetailPull.ts / gCycleSourceFv.ts 消费）⇒ 只补契约不动键名。",
+          "mapped": 6,
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useH3DetailFair.ts",
+          "sheet_key": "h302fair-managed",
+          "store_item_id": "H3-2-fair-rows",
+          "template_sheet": "明细表（公允价值模式）H3-2",
+          "variant": "fair_value"
+        }
+      ]
+    }
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "明细表（成本模式）H3-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "h302cost-managed",
+      "tables": [
+        {
+          "anchor": "A9",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "asset_type",
+              "header_source_ref": "源xlsx!明细表（成本模式）H3-2!A11",
+              "header_text": "投资性房地产类别",
+              "json_pointer": "/rows/{row_uuid}/assetType",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表（成本模式）H3-2!A13",
+              "stable_field_key": "investment_property_cost_detail_rows/{row_uuid}/asset_type",
+              "store_item_id": "H3-2-cost-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "asset_name",
+              "header_source_ref": "源xlsx!明细表（成本模式）H3-2!B11",
+              "header_text": "投资性房地产名称",
+              "json_pointer": "/rows/{row_uuid}/assetName",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表（成本模式）H3-2!B13",
+              "stable_field_key": "investment_property_cost_detail_rows/{row_uuid}/asset_name",
+              "store_item_id": "H3-2-cost-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_begin",
+              "header_source_ref": "源xlsx!明细表（成本模式）H3-2!C11",
+              "header_text": "期初余额",
+              "json_pointer": "/rows/{row_uuid}/costBegin",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表（成本模式）H3-2!C13",
+              "stable_field_key": "investment_property_cost_detail_rows/{row_uuid}/cost_begin",
+              "store_item_id": "H3-2-cost-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_end",
+              "header_source_ref": "源xlsx!明细表（成本模式）H3-2!H11",
+              "header_text": "期末余额",
+              "json_pointer": "/rows/{row_uuid}/costEnd",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表（成本模式）H3-2!H13",
+              "stable_field_key": "investment_property_cost_detail_rows/{row_uuid}/cost_end",
+              "store_item_id": "H3-2-cost-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "cost_audited",
+              "header_source_ref": "源xlsx!明细表（成本模式）H3-2!O11",
+              "header_text": "期末余额",
+              "json_pointer": "/rows/{row_uuid}/costAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表（成本模式）H3-2!O13",
+              "stable_field_key": "investment_property_cost_detail_rows/{row_uuid}/cost_audited",
+              "store_item_id": "H3-2-cost-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_begin",
+              "header_source_ref": "源xlsx!明细表（成本模式）H3-2!P11",
+              "header_text": "期初余额",
+              "json_pointer": "/rows/{row_uuid}/accDepBegin",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表（成本模式）H3-2!P13",
+              "stable_field_key": "investment_property_cost_detail_rows/{row_uuid}/dep_begin",
+              "store_item_id": "H3-2-cost-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_provision",
+              "header_source_ref": "源xlsx!明细表（成本模式）H3-2!Q11",
+              "header_text": "本年增加",
+              "json_pointer": "/rows/{row_uuid}/depProvision",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表（成本模式）H3-2!Q13",
+              "stable_field_key": "investment_property_cost_detail_rows/{row_uuid}/dep_provision",
+              "store_item_id": "H3-2-cost-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "S",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_reversal",
+              "header_source_ref": "源xlsx!明细表（成本模式）H3-2!S11",
+              "header_text": "本年减少",
+              "json_pointer": "/rows/{row_uuid}/depReversal",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表（成本模式）H3-2!S13",
+              "stable_field_key": "investment_property_cost_detail_rows/{row_uuid}/dep_reversal",
+              "store_item_id": "H3-2-cost-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "U",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_end",
+              "header_source_ref": "源xlsx!明细表（成本模式）H3-2!U11",
+              "header_text": "期末余额",
+              "json_pointer": "/rows/{row_uuid}/accDepEnd",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表（成本模式）H3-2!U13",
+              "stable_field_key": "investment_property_cost_detail_rows/{row_uuid}/dep_end",
+              "store_item_id": "H3-2-cost-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AB",
+                "row_from": "row_identity"
+              },
+              "column_key": "dep_audited",
+              "header_source_ref": "源xlsx!明细表（成本模式）H3-2!AB11",
+              "header_text": "期末余额",
+              "json_pointer": "/rows/{row_uuid}/depAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表（成本模式）H3-2!AB13",
+              "stable_field_key": "investment_property_cost_detail_rows/{row_uuid}/dep_audited",
+              "store_item_id": "H3-2-cost-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AC",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_begin",
+              "header_source_ref": "源xlsx!明细表（成本模式）H3-2!AC11",
+              "header_text": "期初余额",
+              "json_pointer": "/rows/{row_uuid}/impairmentBegin",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表（成本模式）H3-2!AC13",
+              "stable_field_key": "investment_property_cost_detail_rows/{row_uuid}/impair_begin",
+              "store_item_id": "H3-2-cost-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AD",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_provision",
+              "header_source_ref": "源xlsx!明细表（成本模式）H3-2!AD11",
+              "header_text": "本年增加",
+              "json_pointer": "/rows/{row_uuid}/impairmentProvision",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表（成本模式）H3-2!AD13",
+              "stable_field_key": "investment_property_cost_detail_rows/{row_uuid}/impair_provision",
+              "store_item_id": "H3-2-cost-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AF",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_reversal",
+              "header_source_ref": "源xlsx!明细表（成本模式）H3-2!AF11",
+              "header_text": "本年减少",
+              "json_pointer": "/rows/{row_uuid}/impairmentReversal",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表（成本模式）H3-2!AF13",
+              "stable_field_key": "investment_property_cost_detail_rows/{row_uuid}/impair_reversal",
+              "store_item_id": "H3-2-cost-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AH",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_end",
+              "header_source_ref": "源xlsx!明细表（成本模式）H3-2!AH11",
+              "header_text": "期末余额",
+              "json_pointer": "/rows/{row_uuid}/impairmentEnd",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表（成本模式）H3-2!AH13",
+              "stable_field_key": "investment_property_cost_detail_rows/{row_uuid}/impair_end",
+              "store_item_id": "H3-2-cost-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AO",
+                "row_from": "row_identity"
+              },
+              "column_key": "impair_audited",
+              "header_source_ref": "源xlsx!明细表（成本模式）H3-2!AO11",
+              "header_text": "期末余额",
+              "json_pointer": "/rows/{row_uuid}/impairAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表（成本模式）H3-2!AO13",
+              "stable_field_key": "investment_property_cost_detail_rows/{row_uuid}/impair_audited",
+              "store_item_id": "H3-2-cost-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AQ",
+                "row_from": "row_identity"
+              },
+              "column_key": "net_audited",
+              "header_source_ref": "源xlsx!明细表（成本模式）H3-2!AQ11",
+              "header_text": "期末净值",
+              "json_pointer": "/rows/{row_uuid}/netAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表（成本模式）H3-2!AQ13",
+              "stable_field_key": "investment_property_cost_detail_rows/{row_uuid}/net_audited",
+              "store_item_id": "H3-2-cost-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AS",
+                "row_from": "row_identity"
+              },
+              "column_key": "mortgaged",
+              "header_source_ref": "源xlsx!明细表（成本模式）H3-2!AS11",
+              "header_text": "是否抵押受限",
+              "json_pointer": "/rows/{row_uuid}/mortgaged",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表（成本模式）H3-2!AS13",
+              "stable_field_key": "investment_property_cost_detail_rows/{row_uuid}/mortgaged",
+              "store_item_id": "H3-2-cost-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "H13:H27",
+            "O13:O27",
+            "U13:U27",
+            "AB13:AB27",
+            "AH13:AH27",
+            "AO13:AO27",
+            "AQ13:AQ27"
+          ],
+          "header_rows": 3,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "investment_property_cost_detail_rows",
+          "uuid_col": "AT"
+        }
+      ]
+    },
+    {
+      "excel_name": "明细表（公允价值模式）H3-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "h302fair-managed",
+      "tables": [
+        {
+          "anchor": "A9",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "asset_type",
+              "header_source_ref": "源xlsx!明细表（公允价值模式）H3-2!A11",
+              "header_text": "投资性房地产类别",
+              "json_pointer": "/rows/{row_uuid}/assetType",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表（公允价值模式）H3-2!A12",
+              "stable_field_key": "investment_property_fair_detail_rows/{row_uuid}/asset_type",
+              "store_item_id": "H3-2-fair-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "asset_name",
+              "header_source_ref": "源xlsx!明细表（公允价值模式）H3-2!B11",
+              "header_text": "投资性房地产名称",
+              "json_pointer": "/rows/{row_uuid}/assetName",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表（公允价值模式）H3-2!B12",
+              "stable_field_key": "investment_property_fair_detail_rows/{row_uuid}/asset_name",
+              "store_item_id": "H3-2-fair-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              },
+              "column_key": "fv_change_current",
+              "header_source_ref": "源xlsx!明细表（公允价值模式）H3-2!Q11",
+              "header_text": "本年变动",
+              "json_pointer": "/rows/{row_uuid}/fairValueChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表（公允价值模式）H3-2!Q12",
+              "stable_field_key": "investment_property_fair_detail_rows/{row_uuid}/fv_change_current",
+              "store_item_id": "H3-2-fair-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "V",
+                "row_from": "row_identity"
+              },
+              "column_key": "fv_change_audited",
+              "header_source_ref": "源xlsx!明细表（公允价值模式）H3-2!V11",
+              "header_text": "本年变动",
+              "json_pointer": "/rows/{row_uuid}/fvChangeAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表（公允价值模式）H3-2!V12",
+              "stable_field_key": "investment_property_fair_detail_rows/{row_uuid}/fv_change_audited",
+              "store_item_id": "H3-2-fair-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Y",
+                "row_from": "row_identity"
+              },
+              "column_key": "fair_audited",
+              "header_source_ref": "源xlsx!明细表（公允价值模式）H3-2!Y11",
+              "header_text": "期末净值",
+              "json_pointer": "/rows/{row_uuid}/fairAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表（公允价值模式）H3-2!Y12",
+              "stable_field_key": "investment_property_fair_detail_rows/{row_uuid}/fair_audited",
+              "store_item_id": "H3-2-fair-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AA",
+                "row_from": "row_identity"
+              },
+              "column_key": "mortgaged",
+              "header_source_ref": "源xlsx!明细表（公允价值模式）H3-2!AA11",
+              "header_text": "是否抵押受限",
+              "json_pointer": "/rows/{row_uuid}/mortgaged",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表（公允价值模式）H3-2!AA12",
+              "stable_field_key": "investment_property_fair_detail_rows/{row_uuid}/mortgaged",
+              "store_item_id": "H3-2-fair-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "V12:V26",
+            "Y12:Y26"
+          ],
+          "header_rows": 3,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "investment_property_fair_detail_rows",
+          "uuid_col": "AB"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "ad8b578375360b55a8c3ecb454448ac36f6b6f12c1a1512d4e8bf801d9922de6",
+    "relative_path": "H/H3 投资性房地产.xlsx",
+    "template_sha256": "ca856caebfc5b09b3ad9fbe3980ccf8e5c46260da9ba1a0ecd8acdb44498bc89"
+  },
+  "template_definition_sha256": "90ff75ab7dc97e5641313e7947a3761acd3404c2f0966a54f64e3b92ebc68144"
+}

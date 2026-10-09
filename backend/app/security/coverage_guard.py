@@ -31,7 +31,7 @@ from typing import Any, Iterable
 
 from app.security.entry_coverage_scanner import (
     LEDGER_PATH,
-    ACCEPTED_MIGRATION_HEADS,
+    _MINIMUM_MIGRATION_VERSION,
     extract_path_params,
     is_wp_bound,
     iter_worker_entries,
@@ -83,6 +83,7 @@ ALL_GATE_NAMES: frozenset[str] = ROUTE_DEP_GATE_NAMES | HANDLER_GATE_CALL_NAMES
 NATIVE_AUTHZ_DEP_NAMES: frozenset[str] = frozenset(
     {
         "require_project_access",
+        "require_project_permission",
         "require_project_delegator",
         "require_project_delegator_pid",
         "require_role",
@@ -97,6 +98,7 @@ NATIVE_AUTHZ_DEP_NAMES: frozenset[str] = frozenset(
 NATIVE_AUTHZ_CALL_NAMES: frozenset[str] = frozenset(
     {
         "require_project_access",
+        "require_project_permission",
         "require_project_delegator",
         "require_project_delegator_pid",
         "require_role",
@@ -959,9 +961,14 @@ def check_drift(app: Any | None = None, ledger: dict[str, Any] | None = None) ->
 
     # ── migration head ──────────────────────────────────────────────────
     head = ledger.get("migration_head")
-    if head not in ACCEPTED_MIGRATION_HEADS:
+    head_ver = 0
+    if head and head.startswith("V"):
+        _m = re.match(r"V(\d+)", head)
+        if _m:
+            head_ver = int(_m.group(1))
+    if head_ver < _MINIMUM_MIGRATION_VERSION:
         f.migration_head.append(
-            f"migration_head={head} not in {sorted(ACCEPTED_MIGRATION_HEADS)}"
+            f"migration_head={head} < V{_MINIMUM_MIGRATION_VERSION:03d} (baseline)"
         )
 
     return f

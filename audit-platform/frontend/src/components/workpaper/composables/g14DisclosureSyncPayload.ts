@@ -62,7 +62,9 @@ export const G14_NOTE_TEMPLATE_LABEL: Record<string, { listed?: string; soe?: st
   debt: { listed: '债权投资减值损失', soe: '债权投资减值损失' },
   othdebt: { listed: '其他债权投资减值损失', soe: '其他债权投资减值损失' },
   ltar: { listed: '长期应收款坏账损失' },
-  ca: { listed: '合同资产减值损失' },
+  // 🔴 C-9 删 `ca`：权威模板 `明细表G14-2` 无「合同资产减值损失」专行，已并入 `other`。
+  //    保留键会让披露侧多出一行无来源的空行（`G14_DISCLOSURE_LISTED_ROWS` 直接复用
+  //    `G14_LINE_ITEMS`，那里已没有 `ca`）。
   guarantee: { listed: '财务担保预计损失' },
   other: { listed: '其他', soe: '其他' },
   bad_debt: { soe: '坏账损失' },

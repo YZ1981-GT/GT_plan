@@ -23,6 +23,22 @@ vi.mock('@/views/workpaper-editor/ReviewMarkDialog.vue', () => ({
   default: defineComponent({ name: 'ReviewMarkDialog', template: '<div class="stub-review-mark-dialog" />' }),
 }))
 
+/**
+ * 🔴 2026-09-28 修：Shell 的主内容区（含 `UniverEditorCore` 及其余子 SFC）整体位于
+ * `<WorkpaperCapabilityShell>`（`@/shell/formula/WorkpaperCapabilityShell.vue`）的
+ * 默认插槽内，而 `shallowMount` 的**自动桩不渲染插槽** ⇒ 主内容区从未进入渲染树：
+ *   · `findComponent({ name: 'UniverEditorCore' })` 恒为 false
+ *   · 用 ChildProbe 顶替 UniverEditorCore 去验 inject 的那条恒拿不到 context
+ *
+ * 🔴 **`vi.mock` 解决不了这个** —— 实测：即便把该模块 mock 成会渲染 `<slot />` 的组件，
+ * `shallowMount` 仍会把它再自动打成桩，渲染出的是 `<workpaper-capability-shell-stub>`。
+ * 必须走 `global.stubs` 显式给一个渲染插槽的桩（见下方 `SLOT_RENDERING_STUBS`）。
+ */
+const SLOT_RENDERING_STUBS = {
+  // 渲染默认插槽，否则主内容区整体不挂载
+  WorkpaperCapabilityShell: { template: '<div class="stub-capability-shell"><slot /></div>' },
+} as const
+
 // ─── Mock 其他子组件（避免深层依赖解析） ─────────────────────────────────────
 vi.mock('@/components/workpaper/GtWpRenderer.vue', () => ({
   default: defineComponent({ name: 'GtWpRenderer', template: '<div />' }),
@@ -181,11 +197,22 @@ vi.mock('@/composables/useEditorCycles', () => ({
 }))
 
 // ─── Mock useSheetNavFacade ──────────────────────────────────────────────────
+// 🔴 2026-09-28 修：本 mock 原缺 `flatSheets`，而 Shell 有一条 `{ immediate: true }`
+// 的 watch getter 直接读 `sheetNavFacade.flatSheets.value.map(...)`
+// ⇒ 挂载即 `TypeError: Cannot read properties of undefined (reading 'value')`
+// （WorkpaperEditor.vue:1121），本文件 **10 条测试全红**且持续至今。
+// 根因是 mock 陈旧（facade 后来新增了 flatSheets），**不是生产代码缺陷**。
+// 下方 `mock 与真实 facade 契约一致` 一组断言防它再次漂移。
 vi.mock('@/composables/useSheetNavFacade', () => ({
   useSheetNavFacade: () => ({
     activeSheetId: computed(() => 'sheet-1'),
     sheets: ref([]),
     switchSheet: vi.fn(),
+    flatSheets: computed(() => [] as Array<{ id: string; name: string }>),
+    groups: ref([]),
+    refresh: vi.fn(),
+    bindUniverApi: vi.fn(),
+    applyForeignCurrencyVisibility: vi.fn(),
   }),
 }))
 
@@ -282,6 +309,10 @@ describe('WorkpaperEditorShell', () => {
     return shallowMount(WorkpaperEditor, {
       global: {
         stubs: {
+          // 🔴 必须先放渲染插槽的桩：主内容区在 WorkpaperCapabilityShell 的默认插槽内，
+          // 用自动桩会让下面所有子 SFC 的 findComponent 断言恒 false（见文件头说明）。
+          ...SLOT_RENDERING_STUBS,
+
           // 子 SFC stubs
           UniverEditorCore: defineComponent({
             name: 'UniverEditorCore',
@@ -406,6 +437,8 @@ describe('WorkpaperEditorShell', () => {
       const wrapper = shallowMount(WorkpaperEditor, {
         global: {
           stubs: {
+            // 同上：不渲染插槽则 ChildProbe 永不挂载，inject 断言恒失败
+            ...SLOT_RENDERING_STUBS,
             UniverEditorCore: ChildProbe,
             CycleDialogHost: { template: '<div />' },
             EditorBanners: { template: '<div />' },

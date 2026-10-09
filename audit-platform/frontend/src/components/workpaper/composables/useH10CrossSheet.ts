@@ -46,18 +46,19 @@ function readAdjRowAmount(storeRaw: string | null | undefined, rowKey: string): 
 }
 
 function sumLocalH6Net(allResponses: Map<string, ChecklistResponse>): number | null {
-  for (const key of ['H6-2-rows', 'H6-detail-rows', 'H6-clearing-rows']) {
-    const raw = allResponses.get(key)?.remark
-    if (!raw) continue
-    try {
-      const rows = JSON.parse(raw)
-      if (!Array.isArray(rows) || !rows.length) continue
-      return calcSubtotal(rows.map((r: any) =>
-        parseNum(r.netGainLoss ?? r.gainLoss ?? r.disposalGainLoss ?? r.toDisposalGain),
-      ))
-    } catch { /* next */ }
+  // 🔴 BP-12 修复：收敛为单一权威键
+  const AUTHORITATIVE_KEY = 'H6-2-rows'
+  const raw = allResponses.get(AUTHORITATIVE_KEY)?.remark
+  if (!raw) return null
+  try {
+    const rows = JSON.parse(raw)
+    if (!Array.isArray(rows) || !rows.length) return null
+    return calcSubtotal(rows.map((r: any) =>
+      parseNum(r.netGainLoss ?? r.gainLoss ?? r.disposalGainLoss ?? r.toDisposalGain),
+    ))
+  } catch {
+    return null
   }
-  return null
 }
 
 export interface H10CrossMatchResult {

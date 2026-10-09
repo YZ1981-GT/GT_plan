@@ -19,7 +19,10 @@ Requirements: 4.1, 4.2, 4.4 · Property 9
     python backend/scripts/diagnose/profile_materialize_large_table.py
     python backend/scripts/diagnose/profile_materialize_large_table.py --rows 10,50,200
     python backend/scripts/diagnose/profile_materialize_large_table.py \\
-        --out .kiro/specs/workpaper-sync-materialize-large-table-performance/evidence/baseline-pre-opt.json
+        --out .kiro/specs/_archive/15-workpaper-sync-engine-hardening/workpaper-sync-materialize-large-table-performance/evidence/baseline-pre-opt.json
+
+`--out` 无默认值（默认只打印不落盘），所以本示例路径失效不会让脚本报错；但 spec 已于
+2026-09-25 归档进 `_archive/15-workpaper-sync-engine-hardening/`，照抄旧路径会 `FileNotFoundError`。
 """
 from __future__ import annotations
 

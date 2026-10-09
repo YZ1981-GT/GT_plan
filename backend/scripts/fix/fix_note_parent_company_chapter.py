@@ -682,6 +682,7 @@ def _norm_ws(s: str) -> str:
     return re.sub(r"[\s\u3000]+", "", s)
 
 
+
 def _is_header_leak(name: str, tbl: dict[str, Any]) -> bool:
     """表名是否是「表头首格泄漏」（md 重建把 headers[0] 当表名）。
 
@@ -2234,13 +2235,29 @@ def process(variant: str, dry_run: bool, check: bool) -> tuple[list[str], list[s
     errs = _checks(doc)
 
     if changes and not dry_run and not errs:
-        # round-trip 自检：仅当「未改动时能逐字复现原文」才敢写盘（防全文件重排 / 覆盖并发改动）
-        if _dump(json.loads(raw)) != raw:
+        # round-trip 自检：仅当「未改动时能复现原文」才敢写盘（防全文件重排 / 覆盖并发改动）
+        rt = _dump(json.loads(raw))
+        if rt != raw:
+            # 🔴 2026-09-30：**尾换行**差异单独放行。listed 模板曾被 `56acf363d` 以陈旧副本
+            # 整体覆盖，副本尾部恰好缺一个 `\n`（`raw` 尾 `'}\n  ]\n}'` vs `_dump` 尾
+            # `'}\n  ]\n}\n'`，len 差恰为 1，正文逐字相同）⇒ 原判据一刀切 `!=` 把它当成
+            # 「全文件重排」而 exit 2，两个变体的全部变更被这 1 个字节连坐。
+            # 该放行与那次覆盖无关、**独立成立**：EOF 换行不是重排。
+            #
+            # 该判据要防的是「序列化形态不一致 ⇒ 写回会重排整个文件」；尾换行不属于重排，
+            # 正文逐字相同即可证明。故只放行「去掉尾部换行后逐字相等」这一种情形，
+            # 其余任何差异仍然 exit 2。
+            if rt.rstrip("\n") != raw.rstrip("\n"):
+                print(
+                    "[ERR] round-trip 自检失败：json.dumps 无法逐字复现原文，"
+                    f"拒绝写入 {path.name}（防全文件重排）"
+                )
+                raise SystemExit(2)
             print(
-                "[ERR] round-trip 自检失败：json.dumps 无法逐字复现原文，"
-                f"拒绝写入 {path.name}（防全文件重排）"
+                f"[note] {path.name} 原文尾部缺换行，本次写入按 _dump() 规范补 1 个 "
+                "'\\n'（正文逐字未重排；与另一模板及 fix_note_m_equity_structure.py "
+                "的写盘形态一致）"
             )
-            raise SystemExit(2)
         chapter = _find_parent_chapter(doc.get("sections") or [], variant)
         if chapter is not None:
             stamp(chapter, ALIGNED_BY)  # kit 的 stamp 作用于 section，不是整个 doc

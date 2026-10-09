@@ -7,9 +7,10 @@ import { calcG11AdjustmentNet, parseG11AdjStore, patchG11AdjRow } from './g11Adj
 import { parseNum } from './useG11FormulaEngine'
 import type { G11VoucherCheckRow } from './useG11VoucherCheck'
 import type { ChecklistResponse } from './useF1FormData'
+import { G11_ITEM_IDS } from './g11StorageContract'
 
 export const G11_AJE_KEY = 'G11-aje-rows'
-export const G11_ADJ_KEY = 'G11-adj-rows'
+export const G11_ADJ_KEY = G11_ITEM_IDS.G11_ADJ_ROWS
 export const G11_DETAIL_KEY = 'G11-detail-rows'
 export const G11A_PROCEDURE_SHEET = '投资收益实质性程序表G11A'
 /** G11A seq3：重大投资收益检查（含 G11-5 凭证） */

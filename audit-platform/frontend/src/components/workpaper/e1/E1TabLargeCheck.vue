@@ -24,11 +24,13 @@ import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { isAmountColumn } from '../composables/wpAmountInput'
 import WpAmountInput from '../shared/WpAmountInput.vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElNotification } from 'element-plus'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../composables/useAttachedVouchers'
+// 科目码单一真源：路径 A（抽凭）与路径 B（挂凭前缀）同源，禁组件内字面量。
+import { e1QueryCodes, e1SamplingAccountCode } from '../composables/e1AccountScope'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -96,6 +98,15 @@ const samplingYear = computed(() => {
   return match ? Number(match[1]) : new Date().getFullYear() - 1
 })
 
+/**
+ * 抽凭科目码，取自真源（逗号拼接，`useVoucherSampling` 会 `split(',')`）。
+ *
+ * 🔴 原硬编码 `"1002"` —— 只抽银行存款，**漏掉库存现金与其他货币资金**，
+ * 而同组件的挂凭前缀却是三码全集，两条路径口径不一致。现统一为三码族。
+ * 本组件无 `tbSourceCodes` prop，故 `e1QueryCodes()` 走兜底全集。
+ */
+const samplingAccountCode = e1SamplingAccountCode()
+
 /** 科目编码 → 所属科目名称（1001 现金 / 1002 银行存款 / 1012 其他货币资金） */
 function accountNameOf(code: string): string {
   const c = String(code || '')
@@ -156,13 +167,23 @@ function onSampleFilled(payload: any): void {
 
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-/** 货币资金科目前缀（收支检查取现金/银行/其他货币资金那条分录判收/支） */
-const MF_ACCOUNT_PREFIXES = ['1001', '1002', '1012']
+/**
+ * 货币资金科目前缀（收支检查取现金/银行/其他货币资金那条分录判收/支）。
+ *
+ * 🔴 原为组件内数组字面量 `['1001','1002','1012']`。改接真源 `e1AccountScope`：
+ * 路径 A（抽凭 `account-code`）与路径 B（本前缀）必须同源，否则两条路径会对
+ * 「E1 是什么科目」给出不同答案 —— 改造前本文件恰是如此（抽凭只写 `1002`，
+ * 这里写三码）。取值不变（真源全集 = 原字面量），故运行时行为不变。
+ * spec: voucher-sampling-account-scope-and-attach-closure R4.1/R4.2/R4.3
+ */
+const MF_ACCOUNT_PREFIXES = e1QueryCodes()
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
   try {
-    const recs = await listAttachedVouchers(props.projectId, samplingYear.value, props.wpId)
+    // manualOnly=true 与 importFromAttached 的 pullSamplesForWorkpaper 口径一致，
+    // 否则徽标数（含引擎批次）会大于实际能导入的条数
+    const recs = await listAttachedVouchers(props.projectId, samplingYear.value, props.wpId, true)
     attachedCount.value = recs.length
   } catch {
     attachedCount.value = 0
@@ -174,17 +195,36 @@ async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
   importingAttached.value = true
   try {
-    const { samples } = await pullSamplesForWorkpaper(
+    const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId,
       samplingYear.value,
       props.wpId,
       MF_ACCOUNT_PREFIXES,
     )
-    if (samples.length === 0) {
-      ElMessage.info('暂无挂入本底稿的序时账凭证。可在「账簿查询」右键凭证「挂凭到底稿」挂入。')
-      return
+
+    if (samples.length > 0) onSampleFilled({ samples })
+
+    // 🔴 挂错底稿的凭证如实告知（含其实际科目），便于用户判断该挂到哪张底稿。
+    //    改造前这些凭证会被「筛空回退取全部分录」静默灌进本表（spec R3.4/R3.5）。
+    if (misattached.length > 0) {
+      const lines = misattached.slice(0, 5).map((m) => {
+        const acc = m.actualAccounts.length ? m.actualAccounts.join('、') : '无分录科目'
+        const d = m.voucherDate ? `（${m.voucherDate}）` : ''
+        return `凭证 ${m.voucherNo}${d}：实际科目 ${acc}`
+      })
+      const more = misattached.length > lines.length ? `\n…另有 ${misattached.length - lines.length} 张` : ''
+      ElNotification({
+        title: `${misattached.length} 张凭证不属于本底稿科目范围，已跳过`,
+        message: `${lines.join('\n')}${more}\n\n请在「账簿查询」重新挂到对应科目的底稿。`,
+        type: 'warning',
+        duration: 0,
+        customClass: 'gt-misattached-notice',
+      })
     }
-    onSampleFilled({ samples })
+
+    if (samples.length === 0 && misattached.length === 0) {
+      ElMessage.info('暂无挂入本底稿的序时账凭证。可在「账簿查询」右键凭证「挂凭到底稿」挂入。')
+    }
   } finally {
     importingAttached.value = false
   }
@@ -470,7 +510,7 @@ async function generateAuditConclusion(): Promise<void> {
       destroy-on-close
     >
       <GtVoucherSamplingEngine
-        account-code="1002"
+        :account-code="samplingAccountCode"
         phase="final"
         :workpaper-id="wpId"
         :project-id="projectId"

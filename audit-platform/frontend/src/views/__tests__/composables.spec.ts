@@ -474,14 +474,103 @@ describe('useNoteAi', () => {
   })
 
   it('clearKnowledgeContext resets context state', () => {
-    const { onPickKnowledge, clearKnowledgeContext, knowledgeContextText, knowledgeDocCount } = useNoteAi({
+    const { clearKnowledgeContext, knowledgeContextText, knowledgeDocCount, knowledgeDocIds } = useNoteAi({
       projectId: computed(() => 'proj-001'), year: computed(() => 2025),
       templateType: ref('soe'), currentNote: ref(null), editor: ref(null),
     })
     knowledgeContextText.value = 'some context'
     knowledgeDocCount.value = 3
+    knowledgeDocIds.value = ['a', 'b', 'c']
     clearKnowledgeContext()
     expect(knowledgeContextText.value).toBe('')
     expect(knowledgeDocCount.value).toBe(0)
+    expect(knowledgeDocIds.value).toEqual([])
+  })
+})
+
+// ─── 附注 AI 续写 / 改写接入知识库（spec knowledge-upload-robustness-and-consumer-wiring R6.2 / R6.5） ───
+// 旧实现把前端拼好的 knowledge_context 文本发给后端，后端请求模型没有该字段、静默丢弃。
+// 这里断言请求体里真的是「所选文档 ID」，且按响应 knowledge_count 如实提示。
+
+describe('useNoteAi · 知识库参考文档', () => {
+  function editorWith(text: string, sel: [number, number] = [0, 0]) {
+    const chain: any = {}
+    for (const k of ['focus', 'deleteRange', 'insertContent']) chain[k] = vi.fn(() => chain)
+    chain.run = vi.fn()
+    return {
+      state: { selection: { from: sel[0], to: sel[1] }, doc: { textBetween: vi.fn().mockReturnValue(text) } },
+      getText: vi.fn().mockReturnValue(text),
+      commands: { insertContent: vi.fn(), setContent: vi.fn() },
+      chain: vi.fn(() => chain),
+    }
+  }
+
+  async function setup(picked: Array<{ id: string; name: string }>, editor = editorWith('本公司应收账款')) {
+    const knowledge = await import('@/composables/useKnowledge')
+    const pick = vi.fn().mockResolvedValue(picked)
+    vi.spyOn(knowledge, 'useKnowledge').mockReturnValue({ pickDocuments: pick } as any)
+    const api = await import('@/services/commonApi')
+    const el = await import('element-plus')
+    const ai = useNoteAi({
+      projectId: computed(() => 'proj-001'), year: computed(() => 2025),
+      templateType: ref('soe'), currentNote: ref({ note_section: '五、4' }), editor: ref(editor),
+    })
+    return { ai, api: api as any, msg: (el as any).ElMessage, pick, editor }
+  }
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+  })
+
+  it('选择文档只记 ID 与名称，不再在前端拼正文', async () => {
+    const { ai } = await setup([{ id: 'd1', name: '准则A.md' }, { id: 'd2', name: '指引B.pdf' }])
+    await ai.onPickKnowledge()
+    expect(ai.knowledgeDocIds.value).toEqual(['d1', 'd2'])
+    expect(ai.knowledgeDocCount.value).toBe(2)
+    expect(ai.knowledgeContextText.value).toBe('准则A.md、指引B.pdf')
+  })
+
+  it('续写请求体携带 knowledge_doc_ids，且不再发送 knowledge_context', async () => {
+    const { ai, api, msg } = await setup([{ id: 'd1', name: '准则A.md' }])
+    api.noteAiContinueWrite.mockResolvedValue({ appended: '续写片段', knowledge_count: 1 })
+    await ai.onPickKnowledge()
+    await ai.onAiContinueWrite()
+
+    expect(api.noteAiContinueWrite).toHaveBeenCalledTimes(1)
+    const [pid, body] = api.noteAiContinueWrite.mock.calls[0]
+    expect(pid).toBe('proj-001')
+    expect(body).toEqual({ text: '本公司应收账款', section_number: '五、4', year: 2025, knowledge_doc_ids: ['d1'] })
+    expect(body).not.toHaveProperty('knowledge_context')
+    expect(msg.success).toHaveBeenCalledWith('续写完成（参考了 1 篇文档）')
+  })
+
+  it('改写请求体携带 knowledge_doc_ids；部分可用时提示实际篇数', async () => {
+    const editor = editorWith('选中的文字', [0, 5])
+    const { ai, api, msg } = await setup([{ id: 'd1', name: 'A' }, { id: 'd2', name: 'B' }], editor)
+    api.noteAiRewrite.mockResolvedValue({ original: '选中的文字', rewritten: '改写后', knowledge_count: 1 })
+    await ai.onPickKnowledge()
+    ai.onAiRewriteOpen()
+    await ai.onAiRewriteConfirm()
+
+    expect(api.noteAiRewrite.mock.calls[0][1]).toMatchObject({ knowledge_doc_ids: ['d1', 'd2'] })
+    expect(api.noteAiRewrite.mock.calls[0][1]).not.toHaveProperty('knowledge_context')
+    expect(msg.success).toHaveBeenCalledWith('改写完成（参考了 1/2 篇文档）')
+  })
+
+  it('所选文档一篇都没用上时如实警告，而不是报「已参考」', async () => {
+    const { ai, api, msg } = await setup([{ id: 'gone', name: '已删除.md' }])
+    api.noteAiContinueWrite.mockResolvedValue({ appended: '片段', knowledge_count: 0 })
+    await ai.onPickKnowledge()
+    await ai.onAiContinueWrite()
+    expect(msg.warning).toHaveBeenCalledWith(expect.stringContaining('均不可用'))
+    expect(msg.success).not.toHaveBeenCalledWith(expect.stringContaining('参考了'))
+  })
+
+  it('未选文档时发送空 ID 列表，提示不提参考文档', async () => {
+    const { ai, api, msg } = await setup([])
+    api.noteAiContinueWrite.mockResolvedValue({ appended: '片段', knowledge_count: 0 })
+    await ai.onAiContinueWrite()
+    expect(api.noteAiContinueWrite.mock.calls[0][1].knowledge_doc_ids).toEqual([])
+    expect(msg.success).toHaveBeenCalledWith('续写完成')
   })
 })

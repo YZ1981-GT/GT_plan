@@ -205,7 +205,12 @@ export function useG9Adjudication(opts: {
     try {
       const arr = JSON.parse(json)
       if (!Array.isArray(arr)) return null
-      return calcSubtotal(arr.map((r: any) => parseNum(r.closingAdjusted ?? r.closingBalance)))
+      // 🔴 C-3：期末审定公允价值 = 模板 W 列 `closingAuditedFairValue`；旧键留作存量回退
+      return calcSubtotal(
+        arr.map((r: any) =>
+          parseNum(r.closingAuditedFairValue ?? r.closingAdjusted ?? r.closingBalance),
+        ),
+      )
     } catch {
       return null
     }
