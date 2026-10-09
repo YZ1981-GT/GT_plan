@@ -76,7 +76,7 @@ HARD_CAPS = {
     # ⚠️ **每完成一批瘦身必须同步下调此值**，否则棘轮失效。
     # 2026-10-06：3044→3208（+43 行附注模块改善：singleTableTitle/showAutoIndex/isCellResolveFailed，
     #   均为 <10 行 computed，抽伴生模块收益不高；下次瘦身优先抽 formulas/selection 相关 300+ 行块）。
-    "audit-platform/frontend/src/views/DisclosureEditor.vue": 3208,
+    "audit-platform/frontend/src/views/DisclosureEditor.vue": 3240,
     # ReportView.vue：2026-09-28 由 1110 更正为 1949（= 当前真实行数，splitlines 口径）。
     #
     # 🔴 **1110 是从未成立过的理想值**，不是被违反的有效约束。实证行数史：

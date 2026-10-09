@@ -549,6 +549,7 @@
                 :header-cell-style="{ background: '#f8f6fb', fontSize: '12px', whiteSpace: 'nowrap', padding: '2px 0' }"
                 :cell-style="{ padding: '0 6px', fontSize: '12px', lineHeight: '20px' }"
                 :cell-class-name="deCellClassName"
+                :row-class-name="deRowClassName"
                 @cell-click="onDeCellClick"
                 @cell-contextmenu="onDeCellContextMenu">
                 <!-- 序号列：显式标记 auto_index 或表名含"前五名/前十名"时自动显示 -->
@@ -2099,7 +2100,7 @@ const singleTableTitle = computed<string>(() => {
   const sectionTitle = (currentNote.value?.section_title || '').trim()
   if (name === sectionTitle) return ''
   // 跳过无意义的表头名
-  const genericNames = new Set(['项  目', '项 目', '项目', '类  别', '类别'])
+  const genericNames = new Set(['项  目', '项 目', '项目', '类  别', '类 别', '类别', '账  龄', '账 龄', '账龄', '债务人名称', '组合名称'])
   if (genericNames.has(name)) return ''
   return name
 })
@@ -2115,7 +2116,7 @@ const showAutoIndex = computed<boolean>(() => {
 })
 
 // 表格Tab标签：避免显示无意义的"项 目"等表头值
-const _GENERIC_NAMES = new Set(['项  目', '项 目', '项目', '类  别', '类别', ''])
+const _GENERIC_NAMES = new Set(['项  目', '项 目', '项目', '类  别', '类 别', '类别', '账  龄', '账 龄', '账龄', '债务人名称', '组合名称', ''])
 const _TABLE_SUFFIX_RE = /[（(]表\d+[）)]/
 
 /** 完整表格名称（用于 tooltip） */
@@ -3161,6 +3162,25 @@ const {
   deCtx: deCtx as any, deComments, activateCell, fmtAmount,
 })
 
+/** 行级 CSS class：消费后端 _row_types 实现合计/小计/header 行样式（对齐合并附注） */
+function deRowClassName({ row, rowIndex }: { row: any; rowIndex: number }): string {
+  // 优先从 activeTableData 的 _row_types 取
+  const types: string[] | null = (activeTableData.value as any)?._row_types ?? null
+  if (types && rowIndex < types.length) {
+    if (types[rowIndex] === 'total') return 'gt-note-total-row'
+    if (types[rowIndex] === 'subtotal') return 'gt-note-subtotal-row'
+    if (types[rowIndex] === 'header') return 'gt-note-header-row'
+    // 'data' 类型不直接 return，继续降级检查 is_total/label
+  }
+  // 降级：行数据 is_total 标志
+  if (row?.is_total) return 'gt-note-total-row'
+  // 降级：行首列文本匹配
+  const label = String(row?.label || row?.values?.[0] || row?.[0] || '').trim().replace(/\s+/g, '')
+  if (label === '合计') return 'gt-note-total-row'
+  if (label === '小计') return 'gt-note-subtotal-row'
+  return ''
+}
+
 // ─── 单元格右键动作（useNoteCellActions composable）─────────────────────────
 import { useNoteCellActions } from '@/views/composables/useNoteCellActions'
 const {
@@ -3203,6 +3223,11 @@ const {
 .gt-de-tree-ctx-item:hover { background: var(--gt-color-primary-bg, #f5f0ff); }
 .gt-de-tree-ctx-item.gt-de-tree-ctx-danger { color: var(--gt-color-coral, #e6443e); }
 .gt-de-tree-ctx-item.gt-de-tree-ctx-danger:hover { background: var(--gt-bg-danger, #fdecea); }
+
+/* 行级样式（对齐合并附注 ConsolNoteTab）：合计行加粗 + 浅底色，小计行加粗，header 行隐藏 */
+.gt-de-note-table .gt-note-total-row td { font-weight: 700; background: #f5f3fa !important; }
+.gt-de-note-table .gt-note-subtotal-row td { font-weight: 600; }
+.gt-de-note-table .gt-note-header-row { display: none; }
 </style>
 
 

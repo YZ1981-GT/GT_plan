@@ -296,6 +296,7 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
 
   /**
    * 解析当前表的列结构，支持两级分组表头（el-table-column 嵌套）。
+   * 增强：支持 multi_header 三层递归解析（对齐合并附注 ConsolNoteTab 的 parsedMultiHeader）。
    *
    * 返回 `null` 表示**无分组信息 ⇒ 调用方走旧的扁平列逻辑**（不是"无列"）。
    * 这个 null 语义是模板 `v-if` 的分支依据，不可改成空数组。
@@ -306,36 +307,165 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
     const headers = table.headers as string[]
     const groups: Array<{ group: string; start: number; span: number }> | null =
       (table as any)?._column_groups ?? null
+    const mh: string[][] | null = (table as any)?.multi_header ?? null
+    const hasThreeOrMoreHeaderRows = mh && Array.isArray(mh) && mh.length >= 3
 
-    if (!groups || groups.length === 0) {
-      // 无分组信息 → 全部扁平列（走旧逻辑兼容）
-      return null
-    }
-
-    const result: NoteTableCol[] = []
-    // 标记哪些索引被分组占用
-    const grouped = new Set<number>()
-    for (const g of groups) {
-      for (let i = g.start; i < g.start + g.span; i++) grouped.add(i)
-    }
-
-    for (let i = 0; i < headers.length; i++) {
-      if (grouped.has(i)) {
-        // 找到对应的 group 定义
-        const g = groups.find((gg) => gg.start === i)
-        if (g) {
-          const children: Array<{ headerIdx: number; label: string }> = []
-          for (let j = g.start; j < g.start + g.span && j < headers.length; j++) {
-            children.push({ headerIdx: j, label: headers[j] })
-          }
-          result.push({ type: 'grouped', group: g.group, children })
-          i = g.start + g.span - 1 // 跳到分组末尾
-        }
-      } else {
-        result.push({ type: 'flat', headerIdx: i, label: headers[i] })
+    // ── Path A：按 _column_groups 构建两层分组（与合并附注 Path A 同逻辑）──
+    // 当 multi_header 有 3+ 行时跳过 Path A（只能建两层），让 Path B 递归处理三层
+    if (groups && groups.length > 0 && !hasThreeOrMoreHeaderRows) {
+      const result: NoteTableCol[] = []
+      // 子列标签优先从 multi_header 末行取（最底层真实标签），降级到 headers
+      const leafRow: string[] | null = (mh && Array.isArray(mh) && mh.length >= 2)
+        ? mh[mh.length - 1]
+        : null
+      const grouped = new Set<number>()
+      for (const g of groups) {
+        for (let i = g.start; i < g.start + g.span; i++) grouped.add(i)
       }
+
+      for (let i = 0; i < headers.length; i++) {
+        if (grouped.has(i)) {
+          const g = groups.find((gg) => gg.start === i)
+          if (g) {
+            const children: Array<{ headerIdx: number; label: string }> = []
+            for (let j = g.start; j < g.start + g.span && j < headers.length; j++) {
+              // 优先取 multi_header 末行的真实标签
+              let label = (leafRow && j < leafRow.length) ? (leafRow[j] || '').trim() : ''
+              if (!label) {
+                const parts = (headers[j] || '').split('/')
+                label = parts[parts.length - 1] || headers[j] || ''
+              }
+              children.push({ headerIdx: j, label })
+            }
+            result.push({ type: 'grouped', group: g.group, children })
+            i = g.start + g.span - 1
+          }
+        } else {
+          result.push({ type: 'flat', headerIdx: i, label: headers[i] })
+        }
+      }
+      return result.length > 0 ? result : null
     }
-    return result
+
+    // ── Path B：按 multi_header 二维数组递归解析（支持 3 层表头）──
+    if (mh && Array.isArray(mh) && mh.length >= 2) {
+      const rowCount = mh.length
+      const colCount = mh[0]?.length || 0
+      if (colCount === 0) return null
+
+      // 构建 grid：计算每个单元格的 colspan 和 rowspan
+      const grid: Array<Array<{ text: string; colspan: number; rowspan: number; occupied: boolean }>> = []
+      for (let r = 0; r < rowCount; r++) {
+        grid[r] = []
+        for (let c = 0; c < colCount; c++) {
+          grid[r][c] = { text: (mh[r]?.[c] || '').trim(), colspan: 1, rowspan: 1, occupied: false }
+        }
+      }
+
+      // 横向合并（非空列向右吞并连续空列 = colspan）
+      for (let r = 0; r < rowCount; r++) {
+        let c = 0
+        while (c < colCount) {
+          if (grid[r][c].text !== '') {
+            let end = c + 1
+            while (end < colCount && grid[r][end].text === '') {
+              let hasAbove = false
+              for (let rr = r - 1; rr >= 0; rr--) {
+                if (grid[rr][end].text !== '' && !grid[rr][end].occupied) {
+                  hasAbove = true
+                  break
+                }
+              }
+              if (hasAbove) break
+              end++
+            }
+            if (end > c + 1) {
+              grid[r][c].colspan = end - c
+              for (let cc = c + 1; cc < end; cc++) grid[r][cc].occupied = true
+            }
+            c = end
+          } else {
+            c++
+          }
+        }
+      }
+
+      // 纵向合并（上方非空→下方空=rowspan）
+      for (let c = 0; c < colCount; c++) {
+        for (let r = rowCount - 1; r >= 1; r--) {
+          if (grid[r][c].text === '' && !grid[r][c].occupied) {
+            let anchor = r - 1
+            while (anchor >= 0 && grid[anchor][c].text === '') anchor--
+            if (anchor >= 0 && grid[anchor][c].text !== '') {
+              grid[anchor][c].rowspan = r - anchor + 1
+              for (let rr = anchor + 1; rr <= r; rr++) grid[rr][c].occupied = true
+            }
+          }
+        }
+      }
+
+      // 递归收集子列
+      function collectMhChildren(
+        startRow: number, startCol: number, endCol: number,
+      ): Array<{ type: 'flat'; headerIdx: number; label: string } | { type: 'grouped'; group: string; children: Array<{ headerIdx: number; label: string }> }> {
+        const children: NoteTableCol[] = []
+        for (let c = startCol; c < endCol && c < colCount; c++) {
+          const cell = grid[startRow][c]
+          if (cell.occupied) continue
+          if (cell.rowspan + startRow >= rowCount) {
+            children.push({ type: 'flat', headerIdx: c, label: cell.text })
+          } else {
+            const sub = collectMhChildren(startRow + 1, c, c + cell.colspan)
+            if (sub.length > 0) {
+              // 将递归结果展平为 grouped 的 children
+              const leafChildren = sub.map(s =>
+                s.type === 'flat' ? { headerIdx: s.headerIdx, label: s.label } : { headerIdx: -1, label: s.group }
+              ).filter(s => s.headerIdx >= 0 || s.label)
+              if (leafChildren.length > 0 && leafChildren.every(lc => lc.headerIdx >= 0)) {
+                children.push({ type: 'grouped', group: cell.text, children: leafChildren })
+              } else {
+                children.push({ type: 'flat', headerIdx: c, label: cell.text })
+              }
+            } else {
+              children.push({ type: 'flat', headerIdx: c, label: cell.text })
+            }
+          }
+        }
+        return children
+      }
+
+      // 顶层列
+      const result: NoteTableCol[] = []
+      for (let c = 0; c < colCount; c++) {
+        const cell = grid[0][c]
+        if (cell.occupied) continue
+        if (cell.rowspan >= rowCount) {
+          result.push({ type: 'flat', headerIdx: c, label: cell.text })
+        } else {
+          const sub = collectMhChildren(1, c, c + cell.colspan)
+          if (sub.length > 0) {
+            const leafChildren = sub.map(s =>
+              s.type === 'flat' ? { headerIdx: s.headerIdx, label: s.label } : { headerIdx: -1, label: s.group }
+            ).filter(s => s.headerIdx >= 0)
+            if (leafChildren.length > 0) {
+              result.push({ type: 'grouped', group: cell.text, children: leafChildren })
+            } else {
+              for (let cc = c; cc < c + cell.colspan && cc < colCount; cc++) {
+                result.push({ type: 'flat', headerIdx: cc, label: headers[cc] || '' })
+              }
+            }
+          } else {
+            for (let cc = c; cc < c + cell.colspan && cc < colCount; cc++) {
+              result.push({ type: 'flat', headerIdx: cc, label: headers[cc] || '' })
+            }
+          }
+        }
+      }
+      return result.length > 0 ? result : null
+    }
+
+    // 无分组信息 → 全部扁平列（走旧逻辑兼容）
+    return null
   })
 
   return {

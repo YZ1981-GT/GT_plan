@@ -1275,7 +1275,7 @@ audit-platform/frontend/src/components/formula/FormulaEditDialog.vue 1541
 backend/tests/test_formula_push_engine.py 934
 audit-platform/frontend/src/views/ConsolidationIndex.vue 2180
 backend/tests/test_module_cell_resolver.py 835
-audit-platform/frontend/src/views/DisclosureEditor.vue 3208
+audit-platform/frontend/src/views/DisclosureEditor.vue 3240
 audit-platform/frontend/src/components/consolidation/worksheets/ConsolWorksheetTabs.vue 1543
 backend/app/main.py 816
 

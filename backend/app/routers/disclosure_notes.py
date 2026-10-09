@@ -52,6 +52,7 @@ from app.services.note_validation_engine import NoteValidationEngine
 
 logger = logging.getLogger(__name__)
 
+
 router = APIRouter(
     prefix="/api/disclosure-notes",
     tags=["disclosure-notes"],
@@ -875,6 +876,13 @@ async def get_note_detail(
             "get_note_detail: header projection failed section=%s", note_section,
             exc_info=True,
         )
+    # 读时增强 table_data（模板表名回填 + _column_groups + _row_types），不写库。
+    from app.services.note_table_enrichment import enrich_note_table_data
+    enrich_note_table_data(
+        detail.table_data,
+        getattr(detail, "source_template", None),
+        note_section,
+    )
     return detail
 
 
