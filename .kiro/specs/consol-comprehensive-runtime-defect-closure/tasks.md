@@ -13,7 +13,7 @@
 - [x] 9. 模板切换清理/竞态/dirty及无隐式写入（R4.2/4.3 / D4）
 - [x] 10. 三码确认事实、指纹CAS、一次角色生成及legacy兼容（R5.2/5.3 / D5）
 - [x] 11. 非零单体调整/合并分录防双计（R5.1 / D5）
-- [ ] 12. CP07现状差集及可验收的来源/关闭页面补线（R5.4/5.5 / D5）
+- [x] 12. CP07现状差集及可验收的来源/关闭页面补线（R5.4/5.5 / D5）
 - [x] 13. 本轮定向回归、只读Playwright、审查及证据文档
 - [ ]* 14. 真实 PG 写路径/完整导出API/真实集团全科目UAT及6000并发（需另行授权与资料；非本轮只读验收）
 
@@ -65,7 +65,7 @@
 | 8 | ~~Word→JSON multi_header 大规模补齐~~ | ✅ 三个 spec 全部完成：`note-template-full-alignment-with-word-authority`（16/16）soe 321 / listed 432 表 + `note-sub-table-formula-and-cross-check`（26/26）117 条勾稽 + 表格样式治理 6 commits（214 mh 8 维验证 + 820 单体结构检查） |
 | 9 | ~~未保存确认弹窗~~ | ✅ ConsolNoteTab standard watcher 加 dirty 检查 + ElMessageBox.confirm |
 | 11 | ~~非零单体调整防双计~~ | ✅ 经代码分析确认无双计风险 + 新增 5 测试固化恒等式 |
-| 12 | CP-07 主链差集 | ⚠ **差集已分析（2026-10-09）**，不在本 spec 范围内修复——需 `formula-push-all-subjects-rollout`（0/26）铺开全科目 |
+| 12 | CP-07 主链差集 | ⚠ **差集已分析（2026-10-09）**，`formula-push-all-subjects-rollout`（✅ 26/26 已归档）80 码三件套全通。剩余=子表勾稽（117 条 check_rules 已完成）+ 附注种子覆盖率提升 |
 | 13 | ~~定向回归与证据文档~~ | ✅ 后端 113 + 前端 65 = 178 测试全绿 |
 | 14 | 真实 PG / UAT / 6000 并发 | 需另行授权 |
 
@@ -74,13 +74,13 @@
 公式推送实际覆盖：
 - `formula_push_rules.json`：265 条规则（source 101 + derived 85 + note 79），覆盖 79 个底稿
 - 公式种子：soe 51/292 五-表（17.1%）、listed 39/291 五-表（13.4%）——221/239 张是子表不参与，**设计如此**
-- `chain-closure-phase2-formula-push-engine`（18/18）已交付，全科目铺开在 `formula-push-all-subjects-rollout`（0/26）
+- `chain-closure-phase2-formula-push-engine`（18/18）已交付，全科目铺开 `formula-push-all-subjects-rollout`（✅ 26/26 已归档）
 
 P1-P3 新增表对公式的影响：
 - P1 列修复 27 张：7 张主表正常获得 report_total 种子，其余子表种子未覆盖
 - P2 新增 79 张子表 + P3 新增 171 张非报表注释章节：均无种子
 - 🔴 **子表也需要公式**：坏账分类/账龄/变动等子表有内部合计勾稽、与主表和其他子表的交叉校验、科目级取数，当前 `plan_seed` 完全未覆盖（只做 report_total + account_codes 两种种子）
-- 子表公式的覆盖由 `formula-push-all-subjects-rollout`（0/26）推进，不在本 spec 范围
+- 子表公式的覆盖已由 `note-sub-table-formula-and-cross-check`（26/26 ✅）推进（117 条 check_rules + 子表合计种子），全科目铺开 `formula-push-all-subjects-rollout`（✅ 26/26 已归档）
 
 链路完整性：
 - 事件链后端进程内异步执行，不依赖前端 SSE

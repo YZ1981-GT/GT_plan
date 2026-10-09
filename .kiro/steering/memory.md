@@ -58,7 +58,7 @@ inclusion: always
 ### 公式推送引擎 `chain-closure-phase2-formula-push-engine`（18/18；T17 真实立即推送 2026-10-04 用户授权完成，真库 run 1 / state 38，全 E1）
 - 链条：四表入库 / 调整审批 → `TRIAL_BALANCE_UPDATED` → `formula_push.engine.run` → E1 明细 / 审定表 / 披露表 → 附注（上市 五、1 / 国企 八、1）；规则 `backend/data/formula_push_rules.json`；公式管理「📤 公式推送」页
 - 🔴 教训：**写入方取数一律 `strict`**（fail-open 会 rollback 撤销已 flush 写入且零失败痕迹）· **试算表取数按标准码前缀**（与报表 `ReportFormulaParser` 同口径）· **改带自动保存/自动同步页面的源码前浏览器先停 `about:blank`**（HMR 重挂载即真实写库，已踩：重药 五、49）· 真库待决：3 个唯一索引含重复键（C24 / editing_locks / review_threads）、和平药房_2025 试算表 1012 父子双计多 414 万
-- **全科目铺开 spec `formula-push-all-subjects-rollout`**：后端 `_REGISTRY` 80 码（D~N 全覆盖），A/B/C/S 不需公式推送；种子 soe 51→57；✅ 原 memory 记录的 4 个缺陷已全部确认修复或有效降级（EventBus 去重/K1 半接入/发布确认吞/after_save 缺 wp_code）；✅ L6/N3 前端 owned-keys 已补齐（commit a011ee303）+ F5 binding 已注册 + S 类裁决完成（S1~S10 无标准科目映射不需 binding）
+- **全科目铺开 spec `formula-push-all-subjects-rollout`（✅ 26/26 已归档 `_archive/23-formula-push-engine-complete/`）**：后端 `_REGISTRY` 80 码（D~N 全覆盖），A/B/C/S 不需公式推送；批 B~E + 用户自定义共 7 子 spec 均已归档。种子 soe 57 / listed 39；附注种子覆盖 soe 57/321（17.8%）但 221/239 张子表不参与（设计如此）。前置 4 缺陷全已修/降级；L6/N3 owned-keys 已补齐 + F5 binding + S 类裁决完成
 
 ### 合并抵销分录单源与差额表推送 `consol-elimination-single-source-push`（14/15，余 tasks.md 收尾）
 - ADR-CSP-001~006；唯一来源 `elimination_entries`；计算内核 `consol_report_values`（前缀口径 + 线性分解 + 五度量恒等式 P2）；合并报表按项目口径全六类生成（V172/V173）；试算平衡表只读五列 + 穿透；报表差额表读时计算；合并附注公式种子化 + 填入；推送服务四步上层联动 + SSE；公式管理合并节点 + 推送页。后端 141 passed 变异 166/166；前端 22 files 207 passed；浏览器实测通过
@@ -72,7 +72,7 @@ inclusion: always
 ### 已完成 spec 总览
 - **全局模块 7 spec + frontend-consistency-m1 = 8 个 active spec 全部 ✅ 完成（2026-06-01，121 任务全绿）**：A formula-engine-unification(20/20) / B retrieval-kernel-unification(12/12) / C doc-level-ai-chat(12/12) / D report-config-baseline(12/12) / E wp-ai-review-ux-fix(8/8) / F global-modules-cleanup(10/10) / G global-modules-p2-polish(11/11) / frontend-consistency-m1(36/36)；残留仅 Playwright E2E 待 start-dev.bat 环境
 - active 仅剩 `consol-note-three-level-drilldown`（stub 无 tasks.md，待真实合并数据）；**合并四阶段已归档 `_archive/09-consolidation-phases/`**
-- **✅ `consol-comprehensive-runtime-defect-closure`（12/14，2026-10-09）**：CP-01~05 全修（节点联动/Word 叶子列/推送状态/三层表头/模板切换 dirty）+ 防双计恒等式 + AbortController 竞态守卫；余 CP-07（依赖全科目铺开）+ CP-14（真实 PG UAT）；后端 113 + 前端 65 = 178 测试全绿
+- **✅ `consol-comprehensive-runtime-defect-closure`（13/14，2026-10-09）**：CP-01~05 全修（节点联动/Word 叶子列/推送状态/三层表头/模板切换 dirty）+ 防双计恒等式 + AbortController 竞态守卫 + CP-07 差集全通（80 码三件套 + 117 条勾稽）；余 CP-14（真实 PG UAT）；后端 113 + 前端 65 = 178 测试全绿
 - **✅ `note-template-full-alignment-with-word-authority`（16/16）**：合并模板 soe 221→321 / listed 282→432 + mh 4→37 / 13→115 + 工具 `sync_note_templates_from_word.py`（长期可重跑）
 - **✅ `note-sub-table-formula-and-cross-check`（26/26）**：117 条勾稽 check_rules（A 跨表 38 + B 列平衡 55 + CT 跨期 24）+ 续表标记 179 张 + 子表种子 + value_column 根源修 + 前端续表展示
 - **附注表格样式全量治理（7 commits，2026-10-09 推送）**：214 张 mh 表 8 维 grid 验证全通过 + 820 张单体结构检查 + Path B colspan/rowspan 修复 + trimTrailingEmptyRows + `<br/>` 清理 35 张 + 子表头提升 77 张
