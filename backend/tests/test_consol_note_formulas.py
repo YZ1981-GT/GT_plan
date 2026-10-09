@@ -120,8 +120,8 @@ class TestSeedRules:
 
 # 真模板 × 真库公式快照（2026-09-30）：两类种子的覆盖数（与真库探针 seed_plan_probe 同值）
 SEED_COUNTS = {
-    # 2026-10-09: soe 49→51, listed 38→39（P1 列对齐后更多表可定位期末列）
-    "soe": {"report_total": 51, "account_codes_tables": 3, "account_codes_cells": 5},
+    # 2026-10-09: soe 51→57（A 类 30 张表 row0 提升为 mh 后更多表可定位期末列）
+    "soe": {"report_total": 57, "account_codes_tables": 4, "account_codes_cells": 6},
     "listed": {"report_total": 39, "account_codes_tables": 5, "account_codes_cells": 7},
 }
 
