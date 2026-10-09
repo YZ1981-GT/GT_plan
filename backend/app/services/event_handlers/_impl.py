@@ -1743,13 +1743,82 @@ def register_event_handlers() -> None:
     # 全部 DisclosureNote.is_stale=True（与现有 rollback 规则一致）。
     # ------------------------------------------------------------------
 
+    # 后台刷新任务集合（用于优雅停机 / 测试等待）
+    import asyncio as _asyncio
+
+    _NOTE_REFRESH_TASKS: set[_asyncio.Task] = set()
+
+    async def _refresh_stale_notes_background(
+        project_id: str, year: int, source_event: str,
+    ) -> None:
+        """后台真实重算 stale 附注（标完 stale 后自动触发）。
+
+        独立会话、失败不冒泡——与 formula_push 的后台任务模式一致。
+        合并项目跳过（合并附注由 consol_push._refresh_notes 处理）。
+        """
+        import sqlalchemy as _sa
+
+        try:
+            # 跳过合并项目
+            async with async_session_factory() as check_db:
+                from app.models.core import Project
+                row = (await check_db.execute(
+                    _sa.select(Project.report_scope).where(
+                        Project.id == project_id,
+                        Project.is_deleted == _sa.false(),
+                    )
+                )).first()
+                if row and (row[0] or "").strip().lower() == "consolidated":
+                    logger.debug(
+                        "[note-refresh/%s] 跳过合并项目 %s（由 consol_push 处理）",
+                        source_event, project_id,
+                    )
+                    return
+
+            async with async_session_factory() as session:
+                from app.services.note_stale_service import NoteStaleService
+                svc = NoteStaleService(session)
+                result = await svc.refresh_stale_sections(project_id, year)
+                await session.commit()
+                logger.info(
+                    "[note-refresh/%s] 后端自动刷新附注完成: project=%s year=%s "
+                    "sections=%d cells=%d errors=%d",
+                    source_event, project_id, year,
+                    result.sections_refreshed, result.cells_updated,
+                    len(result.errors),
+                )
+        except Exception:  # noqa: BLE001 — 后台任务不冒泡
+            logger.warning(
+                "[note-refresh/%s] 后端自动刷新附注失败: project=%s year=%s",
+                source_event, project_id, year,
+                exc_info=True,
+            )
+
+    def _schedule_note_refresh(
+        project_id: str, year: int, source_event: str,
+    ) -> None:
+        """非阻塞调度后台附注刷新任务。"""
+        try:
+            loop = _asyncio.get_running_loop()
+            task = loop.create_task(
+                _refresh_stale_notes_background(project_id, year, source_event),
+            )
+            _NOTE_REFRESH_TASKS.add(task)
+            task.add_done_callback(_NOTE_REFRESH_TASKS.discard)
+        except RuntimeError:
+            # 没有运行中的事件循环（单元测试等）
+            pass
+
     async def _mark_disclosure_notes_stale_for_project_year(
         payload: EventPayload, *, source_event: str,
     ) -> None:
-        """通用 helper：把 (project_id, year) 范围内全部附注标 is_stale=True.
+        """通用 helper：把 (project_id, year) 范围内全部附注标 is_stale=True，
+        然后后台自动刷新。
 
         与 _mark_downstream_stale_on_rollback 一致 — 写 update + commit；
         失败不阻断事件链（参考 F46 模式）。
+        标记后自动调度 _refresh_stale_notes_background 做真实重算，
+        不再仅标 stale 等待前端打开页面。
         """
         import sqlalchemy as _sa
         from app.models.report_models import DisclosureNote
@@ -1783,6 +1852,10 @@ def register_event_handlers() -> None:
                     source_event, project_id, year,
                     exc_info=True,
                 )
+                return  # 标记失败则不触发刷新
+
+        # 标记成功后，调度后台真实重算（非阻塞）
+        _schedule_note_refresh(str(project_id), int(year), source_event)
 
     async def on_event_ledger_activated(payload: EventPayload) -> None:
         """LEDGER_DATASET_ACTIVATED → 全部 DisclosureNote.is_stale=True (R2.1).
