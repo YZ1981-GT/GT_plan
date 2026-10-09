@@ -14,6 +14,7 @@ export const FORMULA_PUSH_OWNED: Record<string, { exact: readonly string[]; patt
   F2: { exact: ['F2-1-tb-1401', 'F2-1-tb-1402', 'F2-1-tb-1403', 'F2-1-tb-1405', 'F2-1-tb-1408', 'F2-1-tb-1461'], patterns: [] },
   F3: { exact: ['F3-1-tb-amount'], patterns: [] },
   F4: { exact: ['F4-1-tb-amount'], patterns: [] },
+  F5: { exact: ['F5-1-tb-amount'], patterns: [] },
   G1: { exact: ['G1-1-audited-net', 'G1-1-audited-receivable', 'G1-1-tb-amount'], patterns: [] },
   G10: { exact: ['G10-1-audited-net', 'G10-1-audited-receivable', 'G10-1-tb-amount'], patterns: [] },
   G11: { exact: ['G11-1-tb-amount'], patterns: [] },
@@ -64,6 +65,7 @@ export const FORMULA_PUSH_OWNED: Record<string, { exact: readonly string[]; patt
   L3: { exact: ['L3-1-tb-amount'], patterns: [] },
   L4: { exact: ['L4-1-tb-amount'], patterns: [] },
   L5: { exact: ['L5-1-tb-amount'], patterns: [] },
+  L6: { exact: ['L6-L6-1-total-audited'], patterns: [] },
   L7: { exact: ['L7-1-tb-amount'], patterns: [] },
   L8: { exact: ['L8-1-tb-amount'], patterns: [] },
   M1: { exact: ['M1-1-tb-amount'], patterns: [] },
@@ -78,6 +80,7 @@ export const FORMULA_PUSH_OWNED: Record<string, { exact: readonly string[]; patt
   M9: { exact: ['M9-1-tb-amount'], patterns: [] },
   N1: { exact: ['N1-1-tb-amount'], patterns: [] },
   N2: { exact: ['N2-1-tb-amount'], patterns: [] },
+  N3: { exact: ['N3-1-end-balance-total'], patterns: [] },
   N4: { exact: ['N4-1-tb-amount'], patterns: [] },
   N5: { exact: ['N5-1-tb-amount'], patterns: [] },
 } as const

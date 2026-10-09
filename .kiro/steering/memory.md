@@ -5,7 +5,7 @@ inclusion: always
 # 持久记忆
 
 每次对话自动加载。详见 `#architecture` / `#conventions` / `#dev-history`。
-**保持本文件 ≤ 200 行**：完成事项 → dev-history / INDEX.md / git 历史；技术决策 → architecture；规范铁律 → conventions。
+**保持本文件 ≤ 300 行**：完成事项 → dev-history / INDEX.md / git 历史；技术决策 → architecture；规范铁律 → conventions。
 精简归档历史（含 V3/附注/合并 A-P 系列详细 sprint 日志）见 `git show <旧commit>:.kiro/steering/memory.md` + `docs/proposals/` + `.kiro/specs/INDEX.md`。
 
 ## 用户偏好
@@ -38,7 +38,7 @@ inclusion: always
 - Playwright MCP 已装（workspace `.kiro/settings/mcp.json`）；新增依赖见 #dev-history（locust/marked+dompurify/decimal.js/python-docx/PyYAML/fast-check/Jinja2/jsonpatch + 外部 LibreOffice）
 - **scripts 规约**：`_` 前缀=一次性用完即删，无前缀=正式工具；`backend/scripts/` 分 8 子目录（check/seed/gen/analyze/ops/fix/migrate/e2e）；仓库根 `scripts/run.py` 统一入口
 - **底稿模板源目录**：`backend/wp_templates/`（按审计循环 A~S 分子目录），scan 脚本 `scripts/analyze/scan_wp_templates.py` 扫描后输出 `backend/data/gt_template_library.json`；ROOT 变量 = `backend/`（parent×3）
-- **D6 MigrationRunner 是运行时迁移**（不是 alembic）：启动跑 `backend/migrations/V*.sql`；新加列写 `V0XX__*.sql`+`R0XX__*.sql` 配对，CREATE/ALTER 必 `IF NOT EXISTS`；按 version **数字**去重（撞名字母序靠后者静默丢失）；**当前最高 V044**；**✅ V040 冲突已修（2026-06-01）**：report_config_baseline 重编号 V040→V044/R044（旧 V040/R040 已删，真实 PG 确认表+is_stale 列存在），且 `scan_migrations` **加同号检测**（重复 version 抛 RuntimeError 根治复发）+ 防御测试；**✅ V043 pgvector 容错化**：原无条件 `CREATE EXTENSION vector` 在标准 PG 镜像（无扩展）硬失败致 health degraded（曾 attempt 11 次）→ 改 `DO $$ ... EXCEPTION WHEN OTHERS RETURN` 优雅跳过，降级 VECTOR_STORE_BACKEND=pgtext（真实 PG 确认 embedding 列未建、failure 已清；装 pgvector 后重跑启用）
+- **D6 MigrationRunner 是运行时迁移**（不是 alembic）：启动跑 `backend/migrations/V*.sql`；新加列写 `V0XX__*.sql`+`R0XX__*.sql` 配对，CREATE/ALTER 必 `IF NOT EXISTS`；按 version **数字**去重（撞名字母序靠后者静默丢失）；`scan_migrations` 同号检测（重复 version 抛 RuntimeError）；**当前最高 V184**；V043 pgvector 容错化（无扩展时优雅跳过，降级 VECTOR_STORE_BACKEND=pgtext）
 - **真实 PG 数据**：5 项目多为 standalone，**0 个 consolidated 项目**（合并模块真实 UAT 全卡此）；首汽租车_2025(df5b8403) tb 最全；**⚠️ 首汽租车 audit_period_end 为 NULL**（按年度取数端点 project_year 降级 None）
 - **本地 PG schema 漂移已修**（commit 508393da，965→critical=0）：drift detector 用 pkgutil walk import 全 model 子模块 + 过滤 Metabase 共库污染 + health 按 critical_count（orm_extra+enum_mismatch）判 degraded
 - **🔴 projects 表无 year / template_version_id 列**（render-config/prefill-context 曾因此对所有底稿普适 500——PG 首条 UndefinedColumn 使事务 aborted 后续全 500，2026-06-01 已修+契约测试守护）：年度须用 `EXTRACT(YEAR FROM audit_period_end)::int`；materiality 年度列名 `overall_materiality`（非 materiality_level）；人员姓名在 `staff_members.name`（users 无 display_name），JOIN 用 `project_assignments.staff_id`（非 user_id）；**database.py 已加 `async_engine = engine` 别名**（dataset_purge/recycle_bin/ledger_import_health 曾 import 不存在的 async_engine）
@@ -50,15 +50,15 @@ inclusion: always
 - **4 Phase spec 全 ✅ 代码+测试**（2026-05-31 merge 后四阶段套件 **147 passed/0 failed**）：Phase0 核心管线（B1 汇总/B2 对账/schema 基线/锁定闭环）+ Phase1 架构锁定（AmountResolver 统一引擎/ELIMINATION_APPROVED 事件重算/全端点锁定+ConsolLockedBanner/B6 负商誉/B7 少数股东/A3 async）+ Phase2 编排接线（cascade_refresh/refresh-all SSE/V2 附注 flag/自动抵销 draft/报表穿透/cross_template/公式联动/签字冻结）+ Phase3 前端穿透（ConsolBreakdownDialog/provenance/双向导航/自动建树）
 - **16 ADR**（CONSOL-001~003/101~106/201~206/301~304）+ 24 consol service
 - **🔴 四阶段曾最大盲区 = 无全链路集成测试**（各阶段 mock 掉相邻阶段，merge 两次咬人：async 签名漂移 + Phase1 删 _execute_formula + **PK 缺 uuid default 致 B1 链路从未真实落库**）→ 封板①已补 `test_consol_full_chain_integration.py` 守护；**统一卡点 = PG 0 个 consolidated 项目**（真实 UAT 全 data-blocked，封板②seed 脚本待 live PG 解锁）
-- **封板已完成（work 分支补，2026-05-31 merge 入 main）**：①✅ 全链路集成测试 `test_consol_full_chain_integration.py`（真 SQLite+真 ORM 行+真 service 跑 aggregate→trial→reconcile + refresh_all report-await 回归守卫 + branch/draft-vs-approved，4 passed）②✅ `seed_consol_uat.py` 幂等造最小合成集团（1母2子+TB+draft/approved抵销+内部交易，--dry-run 离线可验）③🟡 Phase2/3 Playwright 待环境；**收手判断：地基已正确，①②已封板转回核心模块**
-- **🐛 封板①抓到真 bug 并修复**：`consolidation_models.py` 全部 14 个主键 `id` 列 `primary_key=True` 但缺 `default=uuid.uuid4`（V034 迁移 `id UUID NOT NULL` 也无 server default），导致 `upsert_trial_row` 等不传 id 的 ORM 插入 NULL 主键 → PG/SQLite 均 NOT NULL 违约；147 旧测试全 mock/纯函数从未真实落库故漏网。根因修复=全列补 `default=uuid.uuid4`，280 consol 测试全绿无回归
-- **✅ 预存 worksheet 测试失败已修（commit `ce898e83`）**：`test_consol_worksheet.py` 2 红根因 = seeded_db fixture 抵销用 `review_status=draft`，但 Phase1 引擎改为**只消费 APPROVED**（ADR-CONSOL-102）→ 抵销不生效；**引擎本身正确**（差额表中间节点 consolidated=Σ子节点 consolidated + 本级抵销/调整，不含本级个别数，非"丢本体"bug）；修复=fixture 改 approved；**教训：先读设计文档确认是引擎错还是 fixture 过时，不预设引擎会计 bug**
-- **四阶段三件套已归档 `_archive/09-consolidation-phases/`**（work commit `375edd8d`，封板①②完成后归档，非空归档）；**tasks.md 残留未勾项全是外部依赖**（真实集团数据 UAT `*` 卡 PG 0 consolidated + Playwright 待环境 + B6/B7 CAS20 审计专业复核），代码+测试层面已封板
+- **封板已完成（work 分支补，2026-05-31 merge 入 main）**：①✅ 全链路集成测试（真 SQLite+真 ORM 行+真 service，4 passed）②✅ `seed_consol_uat.py` 幂等造最小合成集团（--dry-run 离线可验）③🟡 Phase2/3 Playwright 待环境
+- **🐛 封板①抓到真 bug 并修复**：`consolidation_models.py` 全部 14 个主键缺 `default=uuid.uuid4` → ORM 插入 NULL 主键；根因修复=全列补 default，280 consol 测试全绿无回归
+- **✅ 预存 worksheet 测试失败已修**：fixture 抵销用 `review_status=draft`，但 Phase1 引擎只消费 APPROVED（ADR-CONSOL-102）→ fixture 改 approved；**教训：先读设计文档确认是引擎错还是 fixture 过时**
+- **四阶段三件套已归档 `_archive/09-consolidation-phases/`**；tasks.md 残留未勾项全是外部依赖（真实集团数据 UAT + Playwright + B6/B7 CAS20）
 
 ### 公式推送引擎 `chain-closure-phase2-formula-push-engine`（18/18；T17 真实立即推送 2026-10-04 用户授权完成，真库 run 1 / state 38，全 E1）
 - 链条：四表入库 / 调整审批 → `TRIAL_BALANCE_UPDATED` → `formula_push.engine.run` → E1 明细 / 审定表 / 披露表 → 附注（上市 五、1 / 国企 八、1）；规则 `backend/data/formula_push_rules.json`；公式管理「📤 公式推送」页
 - 🔴 教训：**写入方取数一律 `strict`**（fail-open 会 rollback 撤销已 flush 写入且零失败痕迹）· **试算表取数按标准码前缀**（与报表 `ReportFormulaParser` 同口径）· **改带自动保存/自动同步页面的源码前浏览器先停 `about:blank`**（HMR 重挂载即真实写库，已踩：重药 五、49）· 真库待决：3 个唯一索引含重复键（C24 / editing_locks / review_threads）、和平药房_2025 试算表 1012 父子双计多 414 万
-- **全科目铺开 spec `formula-push-all-subjects-rollout`（2026-10-04 新建 0/26）**：89 个科目主编码只有 E1 达 L3；🔴 4 个现存缺陷 ①K1 半接入（前端过滤 42 键而后端无 binding ⇒ 刷新即丢）②EventBus 去重键不含 `wp_id`（500ms 内两张底稿只派发后一张）③同根因吞「发布到试算表」确认（K6 现受影响）④三条 `after_save` 不带 `wp_code`；止血顺序 = 先修去重键再回退 K1 过滤（反过来 K1 发布被吞）；单一写入方在后端 `checklist-responses` 强制
+- **全科目铺开 spec `formula-push-all-subjects-rollout`**：后端 `_REGISTRY` 80 码（D~N 全覆盖），A/B/C/S 不需公式推送；种子 soe 51→57；✅ 原 memory 记录的 4 个缺陷已全部确认修复或有效降级（EventBus 去重/K1 半接入/发布确认吞/after_save 缺 wp_code）；**待补 L6/N3 前端 owned-keys 生成**（2 码）
 
 ### 合并抵销分录单源与差额表推送 `consol-elimination-single-source-push`（14/15，余 tasks.md 收尾）
 - ADR-CSP-001~006；唯一来源 `elimination_entries`；计算内核 `consol_report_values`（前缀口径 + 线性分解 + 五度量恒等式 P2）；合并报表按项目口径全六类生成（V172/V173）；试算平衡表只读五列 + 穿透；报表差额表读时计算；合并附注公式种子化 + 填入；推送服务四步上层联动 + SSE；公式管理合并节点 + 推送页。后端 141 passed 变异 166/166；前端 22 files 207 passed；浏览器实测通过
@@ -72,6 +72,10 @@ inclusion: always
 ### 已完成 spec 总览
 - **全局模块 7 spec + frontend-consistency-m1 = 8 个 active spec 全部 ✅ 完成（2026-06-01，121 任务全绿）**：A formula-engine-unification(20/20) / B retrieval-kernel-unification(12/12) / C doc-level-ai-chat(12/12) / D report-config-baseline(12/12) / E wp-ai-review-ux-fix(8/8) / F global-modules-cleanup(10/10) / G global-modules-p2-polish(11/11) / frontend-consistency-m1(36/36)；残留仅 Playwright E2E 待 start-dev.bat 环境
 - active 仅剩 `consol-note-three-level-drilldown`（stub 无 tasks.md，待真实合并数据）；**合并四阶段已归档 `_archive/09-consolidation-phases/`**
+- **✅ `consol-comprehensive-runtime-defect-closure`（12/14，2026-10-09）**：CP-01~05 全修（节点联动/Word 叶子列/推送状态/三层表头/模板切换 dirty）+ 防双计恒等式 + AbortController 竞态守卫；余 CP-07（依赖全科目铺开）+ CP-14（真实 PG UAT）；后端 113 + 前端 65 = 178 测试全绿
+- **✅ `note-template-full-alignment-with-word-authority`（16/16）**：合并模板 soe 221→321 / listed 282→432 + mh 4→37 / 13→115 + 工具 `sync_note_templates_from_word.py`（长期可重跑）
+- **✅ `note-sub-table-formula-and-cross-check`（26/26）**：117 条勾稽 check_rules（A 跨表 38 + B 列平衡 55 + CT 跨期 24）+ 续表标记 179 张 + 子表种子 + value_column 根源修 + 前端续表展示
+- **附注表格样式全量治理（6 commits，2026-10-09 推送）**：214 张 mh 表 8 维 grid 验证全通过 + 820 张单体结构检查 + Path B colspan/rowspan 修复 + trimTrailingEmptyRows + `<br/>` 清理 35 张 + 子表头提升 77 张
 - **✅ `adj-formula-repair-and-approval-gate-wiring` 已完成（2026-09-28，39/39 全绿含真实环境实测）**：修 ADJ() ImportError + 类型归一 + 三套口径收敛 adj_net + ADJUSTMENT_APPROVED 事件 + 重算 handler + review_status==approved 过滤；**151 测试全绿**；真库实测通过（draft 不进 TB → approved 后 aje=+10000 借贷两类均正号 + 不变式 gap 0 + 报表 1/1 与附注 335/335 标 stale + 三处口径逐值全等，实测数据已清理复原）
 - 🔴 **该 spec 复盘抓到 5 类「守卫假绿」教训（详见其 design §九补）**：①mock/spy 只验接线不验语义——删掉 adj_net 的 type/status/origin 过滤后原守卫**零打红**，必须真 DB 落多类数据 ②冒烟守卫入参不足会被 `if len(args)<N: return` 早退吞掉——因此漏掉 **AUX/TB_AUX 与 ADJ 同源的 ImportError** 数轮 ③registry 中值为 `None` 的成员（TB_AUX）遍历会跳过，需独立用例 ④**「修好 import」≠「跑通」**：AUX 修完 import 又撞 `get_active_filter` 传 ORM 类而非 `__table__`（5 处，坐实这些 resolver 从未真执行）⑤静态扫描须三层排除（TYPE_CHECKING → try/except → feature flag 字面值）才是真结论，误报会从 36 降到 13
 - **lazy import 守卫已建**（`test_lazy_import_resolvability.py`）：全仓扫 4374 条函数体内 `from app.*`，13 条 flag=False 占位与 10 条待修幽灵引用分两张清单 + 「flag 真的关着」钉死断言（flag 翻 True 即打红逼迫搬移）；已修 11 处真缺陷（ADJ/AUX×2/TB_AUX/prefill WpIndex/attachments Attachment×4/database 错名×3）

@@ -2826,6 +2826,61 @@
       "description": "应付账款附注主表推送（listed 五、37 / soe 八、37）期末 / 期初数；批 D 附注直推族 binding"
     },
     {
+      "rule_id": "F5.tb_amount",
+      "page_key": "workpaper:F5",
+      "stage": "source",
+      "policy": "system",
+      "target": {
+        "domain": "workpaper",
+        "wp_code": "F5",
+        "sheet_code": "F5-1",
+        "item_id": "F5-1-tb-amount"
+      },
+      "source": {
+        "kind": "formula",
+        "context": {
+          "tb": "trial_balance_audited"
+        },
+        "expression": "TB('6401','本期发生额') + TB('6402','本期发生额')"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "manual"
+      ],
+      "description": "营业成本审定表锚点「F5-1-tb-amount」= TB('6401','本期发生额') + TB('6402','本期发生额')；批 D 附注直推族 binding"
+    },
+    {
+      "rule_id": "F5.note.main",
+      "page_key": "workpaper:F5",
+      "stage": "note",
+      "policy": "editable",
+      "target": {
+        "domain": "note",
+        "section_by_template": {
+          "listed": "五-62-1",
+          "soe": "五-65-1"
+        },
+        "table": "营业收入和营业成本",
+        "rows": "f5_note_main",
+        "fields": [
+          "end_amount",
+          "prior_amount"
+        ]
+      },
+      "source": {
+        "kind": "derivation",
+        "name": "f5_note_main",
+        "params": {},
+        "formula_text": "营业成本附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
+      },
+      "triggers": [
+        "TRIAL_BALANCE_UPDATED",
+        "WORKPAPER_SAVED",
+        "manual"
+      ],
+      "description": "营业成本附注主表推送（listed 五-62-1 / soe 五-65-1）期末 / 期初数；批 D 附注直推族 binding"
+    },
+    {
       "rule_id": "G1.tb_amount",
       "page_key": "workpaper:G1",
       "stage": "source",

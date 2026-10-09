@@ -13,6 +13,7 @@
     "F2",
     "F3",
     "F4",
+    "F5",
     "G1",
     "G10",
     "G11",
@@ -208,6 +209,17 @@
       "level": "L3",
       "account_prefixes": [
         "2202"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "F5",
+      "level": "L3",
+      "account_prefixes": [
+        "6401",
+        "6402"
       ],
       "rule_count": 2,
       "owned_key_count": 1,
@@ -1256,14 +1268,6 @@
       "reason": "函证中心底稿（委外加工函证），数据来自询证程序结果而非试算表公式推送",
       "account_codes": [
         "1401"
-      ]
-    },
-    {
-      "wp_code": "F5",
-      "reason": "有科目码（6401,6402），后续可接入候选",
-      "account_codes": [
-        "6401",
-        "6402"
       ]
     },
     {

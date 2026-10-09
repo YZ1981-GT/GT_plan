@@ -62,7 +62,7 @@
 |---|---|---|
 | 4 | AbortController 取消旧请求 | P1，loadSeq 已保护旧响应不覆盖 |
 | 5 | 工作底稿项目年度生命周期 | 未开始 |
-| 8 | ~~Word→JSON multi_header 大规模补齐~~ | ✅ 已由 `note-template-full-alignment-with-word-authority` spec 完成：soe 221→321 表 / listed 282→432 表，108 测试全绿 |
+| 8 | ~~Word→JSON multi_header 大规模补齐~~ | ✅ 三个 spec 全部完成：`note-template-full-alignment-with-word-authority`（16/16）soe 321 / listed 432 表 + `note-sub-table-formula-and-cross-check`（26/26）117 条勾稽 + 表格样式治理 6 commits（214 mh 8 维验证 + 820 单体结构检查） |
 | 9 | ~~未保存确认弹窗~~ | ✅ ConsolNoteTab standard watcher 加 dirty 检查 + ElMessageBox.confirm |
 | 11 | ~~非零单体调整防双计~~ | ✅ 经代码分析确认无双计风险 + 新增 5 测试固化恒等式 |
 | 12 | CP-07 主链差集 | ⚠ **差集已分析（2026-10-09）**，不在本 spec 范围内修复——需 `formula-push-all-subjects-rollout`（0/26）铺开全科目 |
@@ -133,3 +133,29 @@ P1-P3 新增表对公式的影响：
 - 后端 6 个测试文件 113 passed + 前端 5 个测试文件 46 passed = **159 测试全绿**
 - 后端：test_consol_note_column_groups / test_consol_note_formulas / test_note_template_word_alignment / test_consol_no_double_count / test_note_word_export_d1 / test_note_word_export_cp02_leaf_columns
 - 前端：useGroupTree / useGroupTreeAutobuild / consolidationPushAndFormulaApi / sseConsolidationGuard / sseEventTypes
+
+### 2026-10-09 第四轮（附注表格样式全量治理，6 commits d59512f33..f78a6f44d）
+
+**CP-04 表格样式全量治理**（7 commit 已推送 work 分支）
+- `<br/>` 标签清理：35 张 102 处，recalc column_groups
+- 残留子表头行清理：77 张（row0 是子表标题而非表头→提升为 section title）
+- mh 空行/数据行/空列清理 + 标签提升：26 张（五-9-4~7/九-1-3 等 mh 重建）
+- 前端 Path B colspan/rowspan grid 合并算法修复：横向从左到右扫 + 纵向优先 + rowspan 叶子正确
+- 查看模式 `trimTrailingEmptyRows`：合计行后不再显示空行（MIN_EDIT_ROWS padding 仅编辑模式）
+- 最后 7 张隐藏标签提升 + 空列移除（214/214 multi_header 表 8 维 grid 验证全部通过）
+- 单体模板 820 张 100% JSON 结构检查通过
+- 后端 116 测试全绿，Playwright 多科目实测通过
+
+**附注子表勾稽 spec `note-sub-table-formula-and-cross-check`（26/26 ✅）**
+- 勾稽声明：117 条 check_rules（模式 A 跨表 38 + 模式 B 列平衡 55 + 跨期续表 24），覆盖 104 个章节
+- 子表合计种子：`plan_seed_sub()` SUM_ROWS + V184/R184 迁移
+- 续表标记：合并 127 张 `continuation_of` / 单体 52 张 `continuation_of_index`
+- 前端续表展示：ConsolCatalog ↳ 缩进 + 淡化样式 + 勾稽 el-alert 三态
+- `value_column()` 根源修复：对侧表头降级（五-64-1 col=1 正确）
+- 后端 121 测试全绿 + Playwright 验证通过
+
+**全科目铺开前置调查**
+- memory 记录的 4 个现存缺陷已确认全部已修或有效降级（EventBus 去重/K1 半接入/发布确认吞/after_save 缺 wp_code）
+- 后端 `_REGISTRY` 80 码（D~N 全覆盖），A/B/C/S 不需要公式推送
+- 种子覆盖 soe 51→57（+6 张新识别期末列）
+- L6/N3 在 `_REGISTRY` 有但 `formulaPushOwnedKeys.ts` 漏生成（2 码待补）

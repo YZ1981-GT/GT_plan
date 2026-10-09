@@ -47,7 +47,7 @@ def test_real_rules_load_and_distribution():
     assert {r.wp_code for r in _RULES} == {
         "E1", "K1",
         "D1", "D2", "D3", "D4", "D5", "D6", "D7",
-        "F1", "F2", "F3", "F4",
+        "F1", "F2", "F3", "F4", "F5",
         "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "G10",
         "G11", "G12", "G13", "G14",
         "H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9", "H10",

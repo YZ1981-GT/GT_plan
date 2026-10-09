@@ -81,6 +81,7 @@ _REGISTRY: dict[str, str | BindingFactory] = {
     "F2": "app.services.formula_push.bindings.note_direct:note_direct_for('F2')",
     "F3": "app.services.formula_push.bindings.note_direct:note_direct_for('F3')",
     "F4": "app.services.formula_push.bindings.note_direct:note_direct_for('F4')",
+    "F5": "app.services.formula_push.bindings.note_direct:note_direct_for('F5')",
     # ── 批 D 附注直推族 binding · G 循环（投资） ──
     "G7": "app.services.formula_push.bindings.note_direct:note_direct_for('G7')",
     "G11": "app.services.formula_push.bindings.note_direct:note_direct_for('G11')",
