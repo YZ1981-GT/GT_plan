@@ -43,8 +43,7 @@ async def acquire_sheet_lock(
         wp_id=wp_id,
         sheet_name=sheet_name,
         user_id=current_user.id,
-        user_name=getattr(current_user, "display_name", None)
-        or getattr(current_user, "username", ""),
+        user_name=getattr(current_user, "username", "") or str(current_user.id),
     )
     await db.commit()
 

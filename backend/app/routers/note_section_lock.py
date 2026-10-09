@@ -50,7 +50,7 @@ async def acquire_lock(
         year=body.year,
         section_code=body.section_code,
         user_id=current_user.id,
-        user_name=getattr(current_user, "display_name", "") or str(current_user.id),
+        user_name=current_user.username or str(current_user.id),
     )
     await db.commit()
 

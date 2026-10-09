@@ -1210,6 +1210,8 @@ backend/app/routers/doc_ai_chat.py  1324
 backend/app/routers/template_library_mgmt.py  1069
 backend/app/routers/wp_bulk_router.py  888
 backend/app/routers/wp_html_save.py  875
+# wp_sync_router 历史大文件（3257 行），本次仅删 display_name 死分支一行
+backend/app/routers/wp_sync_router.py  3260
 backend/app/security/coverage_guard.py  1000
 backend/scripts/gen/generate_workpaper_sync_manifest.py  899
 backend/tests/test_adjustments.py  1024

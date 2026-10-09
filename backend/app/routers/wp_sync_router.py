@@ -1181,7 +1181,6 @@ async def _attach_launch_urls(
             id=str(svc.user_id),
             name=str(
                 getattr(user_row, "username", None)
-                or getattr(user_row, "display_name", None)
                 or svc.user_id
             ),
         ),
