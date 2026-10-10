@@ -24,6 +24,7 @@ def compute_section_numbers(
     report_scope: str | None = "both",
     template_type: str | None = None,
     include_deleted: bool = False,
+    skip_empty: bool = False,
 ) -> dict[str, str]:
     """计算 {note_section: rendered_number} 映射.
 
@@ -32,6 +33,11 @@ def compute_section_numbers(
         report_scope: ``standalone`` | ``consolidated`` | ``both``。
         template_type: 用于 ``consolidated_only`` 过滤（``soe`` / ``listed``）。
         include_deleted: 是否包含已删除项（默认否）。
+        skip_empty: 跳过不需要输出的章节。启用后
+            ``status='not_applicable'`` 的章节（用户标记"不导出"/裁剪/不适用）
+            不参与编号，后续章节序号自动连续。
+            注：空但未标记不导出的章节（``has_data=False, status='draft'``）
+            仍参与编号，避免编号在填写过程中不稳定。
 
     Returns:
         如 ``{"八、1": "1", "八、2": "2"}``；组内仅 1 条时该组无条目。
@@ -48,6 +54,18 @@ def compute_section_numbers(
         working = filter_tree_by_report_scope(working, template_type, rs)
     elif rs != "both":
         working = filter_tree_by_report_scope(working, "soe", rs)
+
+    # 跳过不需要输出的章节（对齐用户裁剪意图）：
+    # 仅跳过 status='not_applicable' 的章节（用户标记不导出/裁剪/不适用）。
+    # ① is_deleted 已在上方过滤；③ is_empty 在 get_notes_tree 中被合成为 ②。
+    # 注：has_data=False 但 status!='not_applicable' 的章节（用户未填但保留的）
+    # 仍参与编号——避免编号在填写过程中不稳定。Word 导出有独立的全空跳过逻辑
+    # （should_skip_empty_section 判据④），那里跳过全空是合理的。
+    if skip_empty:
+        working = [
+            item for item in working
+            if item.get("status") != "not_applicable"
+        ]
 
     groups: dict[str, list[dict[str, Any]]] = OrderedDict()
     for item in working:
@@ -66,30 +84,15 @@ def compute_section_numbers(
         if len(numbered_items) <= 1:
             continue
 
-        # 🔴 修复（2026-08-16）：对「八、1」「五、3」等数字编号形式的章节，
-        # 直接取章节号中的数字作为编号（不受 sort_order 错位影响）。
-        # 对「七、本期纳入合并报表...」等文本编号形式的章节，保留连续编号。
-        import re as _re
-        all_numeric = all(
-            _re.match(r"\d+", (it.get("note_section") or "").split("、", 1)[-1] if "、" in (it.get("note_section") or "") else "")
-            for it in numbered_items
-        )
-        if all_numeric:
-            # 数字章节号：直接取数字部分（如 八、1 → "1"，八、94 → "94"）
-            for item in numbered_items:
-                section = (item.get("note_section") or "").strip()
-                sep = section.find("、")
-                if sep >= 0:
-                    suffix = section[sep + 1:]
-                    m = _re.match(r"\d+", suffix)
-                    if m:
-                        result[section] = m.group(0)
-        else:
-            # 文本章节号（如 七、本期纳入...）：按顺序连续编号
-            for idx, item in enumerate(numbered_items, 1):
-                section = (item.get("note_section") or "").strip()
-                if section:
-                    result[section] = str(idx)
+        # 统一连续编号：不论数字还是文本形式的章节号，过滤后一律按顺序
+        # 从 1 开始连续编号。
+        # 🔴 修复（2026-10-10）：原 all_numeric 分支直接取 note_section 中的
+        # 原始数字（如 五、1→"1"），当中间章节被 is_deleted / scope 过滤后
+        # 剩余章节编号不连续（如 1、4、5、6 跳号）。改为统一连续编号。
+        for idx, item in enumerate(numbered_items, 1):
+            section = (item.get("note_section") or "").strip()
+            if section:
+                result[section] = str(idx)
     return result
 
 

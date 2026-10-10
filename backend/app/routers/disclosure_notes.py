@@ -800,6 +800,7 @@ async def get_section_numbers(
         tree,
         report_scope=effective_scope,
         template_type=template_type,
+        skip_empty=True,
     )
 
 
