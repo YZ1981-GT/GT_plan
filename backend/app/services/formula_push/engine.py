@@ -698,15 +698,20 @@ async def _push_note(
                                          row=table.rows[index], field_name=field_name,
                                          value=row[value_key], paper=paper)
 
-    # ── 单科目合计行兜底（spec: formula-push-note-skip-reduction · 需求 2.3） ──
-    # 所有数据行都未命中附注行 + 单科目底稿 → 把审定数写入合计行
+    # ── 合计行兜底（spec: formula-push-note-skip-reduction · 需求 2.3） ──
+    # 所有数据行都未命中附注行 → 把审定数写入合计行
     skip_total_recalc = False
-    if not any_data_row_matched and hasattr(binding, "account_prefixes") and len(binding.account_prefixes) == 1:
+    if not any_data_row_matched:
         total_idx = note_writer.find_total_row(table.rows)
         if total_idx is not None:
-            # 单科目只产出 1 行数据行（is_total=False），它本身就是汇总数
+            # 单科目：用唯一数据行（is_total=False）的值
+            # 多科目：用 is_total 行的汇总值
             all_note_rows = binding.note_rows(overlay, template_type, rule)
-            source_row = next((r for r in all_note_rows if not r.get("is_total") and not r.get("is_memo")), None)
+            is_single = hasattr(binding, "account_prefixes") and len(binding.account_prefixes) == 1
+            if is_single:
+                source_row = next((r for r in all_note_rows if not r.get("is_total") and not r.get("is_memo")), None)
+            else:
+                source_row = next((r for r in all_note_rows if r.get("is_total")), None)
             if source_row is not None:
                 total_row = table.rows[total_idx]
                 total_label = note_writer.row_label(total_row) or "合计"

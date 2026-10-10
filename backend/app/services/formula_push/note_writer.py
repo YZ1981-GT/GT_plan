@@ -206,12 +206,26 @@ def row_label(row: Any) -> str:
 
 
 def find_row(rows: Sequence[Any], labels: Sequence[str]) -> int | None:
-    """按标签找行：先附注字面，再底稿字面（历史同步可能写成底稿口径，如国企「现金」）。"""
+    """按标签找行：先精确匹配，再去常见后缀（"小计"等）二次匹配。
+
+    spec: formula-push-note-skip-reduction · 需求 2.2
+    """
     wanted = [str(label).strip() for label in labels if str(label or "").strip()]
+    # ① 精确匹配
     for label in wanted:
         for index, row in enumerate(rows):
             if row_label(row) == label and not (isinstance(row, dict) and row.get("is_total")):
                 return index
+    # ② 去"小计"后缀再匹配（D1 noteType 带"小计"而附注行不带）
+    _STRIP_SUFFIXES = ("小计",)
+    for label in wanted:
+        for suffix in _STRIP_SUFFIXES:
+            if label.endswith(suffix):
+                stripped = label[:-len(suffix)]
+                if stripped:
+                    for index, row in enumerate(rows):
+                        if row_label(row) == stripped and not (isinstance(row, dict) and row.get("is_total")):
+                            return index
     return None
 
 
