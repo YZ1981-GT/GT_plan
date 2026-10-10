@@ -704,18 +704,19 @@ async def _push_note(
     if not any_data_row_matched and hasattr(binding, "account_prefixes") and len(binding.account_prefixes) == 1:
         total_idx = note_writer.find_total_row(table.rows)
         if total_idx is not None:
-            total_note_rows = [r for r in binding.note_rows(overlay, template_type, rule) if r.get("is_total")]
-            if total_note_rows:
-                total_row_data = total_note_rows[0]
+            # 单科目只产出 1 行数据行（is_total=False），它本身就是汇总数
+            all_note_rows = binding.note_rows(overlay, template_type, rule)
+            source_row = next((r for r in all_note_rows if not r.get("is_total") and not r.get("is_memo")), None)
+            if source_row is not None:
                 total_row = table.rows[total_idx]
                 total_label = note_writer.row_label(total_row) or "合计"
                 for field_name in rule.target.fields:
                     value_key, period = note_writer.NOTE_FIELDS[field_name]
-                    if total_row_data.get(f"{value_key}_resolved"):
+                    if source_row.get(f"{value_key}_resolved"):
                         addr = note_addr_id(section, table_name, total_label, period)
                         wrote |= _push_note_cell(ctx, rule=rule, section=section, addr=addr, table=table,
                                                  row=total_row, field_name=field_name,
-                                                 value=total_row_data[value_key], paper=paper)
+                                                 value=source_row[value_key], paper=paper)
                 skip_total_recalc = True  # 已直接写入合计行，跳过后续重算
 
     if not skip_total_recalc:
