@@ -206,9 +206,10 @@ def row_label(row: Any) -> str:
 
 
 def find_row(rows: Sequence[Any], labels: Sequence[str]) -> int | None:
-    """按标签找行：先精确匹配，再去常见后缀（"小计"等）二次匹配。
+    """按标签找行：①精确匹配 → ②去常见后缀 → ③包含匹配（唯一命中）。
 
     spec: formula-push-note-skip-reduction · 需求 2.2
+    spec: formula-push-note-row-matching · 需求 2.1–2.4
     """
     wanted = [str(label).strip() for label in labels if str(label or "").strip()]
     # ① 精确匹配
@@ -226,6 +227,22 @@ def find_row(rows: Sequence[Any], labels: Sequence[str]) -> int | None:
                     for index, row in enumerate(rows):
                         if row_label(row) == stripped and not (isinstance(row, dict) and row.get("is_total")):
                             return index
+    # ③ 包含匹配：label-in-row 或 row-in-label（spec: formula-push-note-row-matching · 需求 2.1）
+    for label in wanted:
+        if not label:
+            continue
+        candidates: list[int] = []
+        for index, row in enumerate(rows):
+            if isinstance(row, dict) and row.get("is_total"):
+                continue  # AC 2.4: 合计行不参与模糊匹配
+            rl = row_label(row)
+            if not rl:
+                continue
+            if label in rl or rl in label:
+                candidates.append(index)
+        if len(candidates) == 1:
+            return candidates[0]  # AC 2.3: 唯一命中
+        # len==0 or len>1: fall through
     return None
 
 

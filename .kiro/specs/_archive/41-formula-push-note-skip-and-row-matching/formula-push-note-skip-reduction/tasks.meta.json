@@ -1,0 +1,534 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 改 `note_writer.py` `locate_table`：把 `_source not in WORKPAPER_SOURCES` 的一刀切拦截改为分级判断——仅 `_source in _KNOWN_NON_WORKPAPER` 时拦截，`_source=NULL` 时放行": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615609834
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615621220
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615682412
+      }
+    ],
+    "1.2 `locate_table` 增加旧格式兜底：无 `sub_table_data` 但有顶层 `rows` 时，返回 `NoteTable(rows=rows, value_keys=[], section_locked=False)`": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615609897
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615688220
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615694905
+      }
+    ],
+    "1.3 写测试 `test_locate_table_source_null_with_sub_table`：`_source=None` + `sub_table_data` 存在 → 正常返回 NoteTable": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615609929
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615706034
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615782779
+      }
+    ],
+    "1.4 写测试 `test_locate_table_source_null_old_format_rows`：`_source=None` + 无 sub + 有 `rows` → 返回旧格式 NoteTable": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615609962
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615793322
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615867754
+      }
+    ],
+    "1.5 写测试 `test_locate_table_source_template_rejected`：`_source=\"template\"` → 返回 None + \"模板取数维护\"": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615609996
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615872460
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615942927
+      }
+    ],
+    "1.6 变异验证：回退 1.1 改动 → 1.3/1.4 打红": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610028
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615950959
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791616043982
+      }
+    ],
+    "1.7 跑现有 formula_push 测试套件确认无回归": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610055
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791616049075
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791616537856
+      }
+    ],
+    "2.1 改 `engine.py` `_push_note`：当 `table_data` 被修改且 `_source is None` 时，赋值 `table_data[\"_source\"] = \"workpaper\"`（在 `note.table_data = table_data` 之前）": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610082
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791616555707
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791616608068
+      }
+    ],
+    "2.2 写测试 `test_source_marked_after_first_push`：推送前 `_source=None` → 推送后 `_source=\"workpaper\"`；第二次推送走正常路径不再触发旧格式兜底": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610122
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791616615543
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791616701367
+      }
+    ],
+    "3.1 改 `note_writer.py` `has_obscured_data`：`values` 键走列表递归检查（内部元素全 None/0/\"\"/\\\"0\\\" → 非遮挡）；`_` 前缀键跳过": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610150
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791616706972
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791616750337
+      }
+    ],
+    "3.2 写测试 `test_has_obscured_data_values_all_none`：`values=[None, None]` → 返回 None（无遮挡）": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610177
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791616756681
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791616833531
+      }
+    ],
+    "3.3 写测试 `test_has_obscured_data_values_has_real_data`：`values=[100.5, None]` → 返回中文原因字符串": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610201
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791616839399
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791616889583
+      }
+    ],
+    "3.4 写测试 `test_has_obscured_data_skip_underscore_keys`：含 `_cell_meta`/`_cell_modes`/`_legacy_row` → 返回 None": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610227
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791616895364
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791616987911
+      }
+    ],
+    "3.5 变异验证：删掉 `k == \"values\"` 分支 → 3.2 打红": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610251
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791616992838
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791617066352
+      }
+    ],
+    "4.1 改 `engine.py` `_push_note`：在现有\"遍历 note_rows → find_row\"循环之后，增加合计行兜底——当 `len(binding.account_prefixes)==1` 且无数据行命中时，找合计行（`find_total_row`）并用 is_total 行的汇总值写入": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610281
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791617072782
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791617178005
+      }
+    ],
+    "4.2 兜底写入时设标记跳过后续 `_push_note_total`（避免合计行被重算覆盖）": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610310
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791617183542
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791617197984
+      }
+    ],
+    "4.3 写测试 `test_total_row_fallback_single_account`：单科目底稿 + 附注子表无同名行 + 有合计行 → 值写入合计行": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610335
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791617203728
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791617386288
+      }
+    ],
+    "4.4 写测试 `test_total_row_fallback_not_triggered_multi_account`：多科目底稿 → 不走兜底，行为不变": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610364
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791617391191
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791617493839
+      }
+    ],
+    "4.5 写测试 `test_total_row_fallback_not_triggered_when_row_matched`：单科目但精确匹配命中 → 不走兜底": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610393
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791617499213
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791617651358
+      }
+    ],
+    "4.6 变异验证：删掉合计行兜底逻辑 → 4.3 打红": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610419
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791617656048
+      }
+    ],
+    "5.1 改 `engine.py` `_push_note`：在 `section_title` 比对失败后，按 `section_title == _title_check_name` 反查 `disclosure_notes`（限同项目同年度同前缀\"五\"/\"八\"），唯一命中时替换 `note` 和 `section`": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610447
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791617826845
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791617839289
+      }
+    ],
+    "5.2 反查命中时记录 INFO 日志 `formula_push: 章节号动态定位 {table_name} → {found_section}（规则声明 {rule_section}）`": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610476
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791617844771
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791617850456
+      }
+    ],
+    "5.3 写测试 `test_section_dynamic_lookup_on_mismatch`：规则章节号 五、22 → 实际标题\"固定资产\" ≠ \"递延所得税负债\" → 反查到 五、30 → 推送成功": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610500
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791617857317
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791617999402
+      }
+    ],
+    "5.4 写测试 `test_section_dynamic_lookup_ambiguous_skip`：同 section_title 有 2 条匹配 → 不替换，走原逻辑跳过": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610528
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791618005256
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791618105217
+      }
+    ],
+    "5.5 写测试 `test_section_dynamic_lookup_not_triggered_when_match`：硬编码章节号 section_title 匹配 → 不触发反查": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610556
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791618110724
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791618195544
+      }
+    ],
+    "5.6 变异验证：删掉反查逻辑 → 5.3 打红": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610582
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791618200850
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791618431748
+      }
+    ],
+    "6.1 跑 `python -m pytest backend/tests/test_formula_push_*.py -v --tb=short` 全套，确认 0 red（需求 5.3）": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610619
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791618442270
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791618778027
+      }
+    ],
+    "6.2 写真库守卫 `test_formula_push_note_skip_pg.py`：在重药控股安徽项目上重跑推送，断言 `skipped_count <= 45`（需求 5.2）": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610649
+      },
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791618801019
+      },
+      {
+        "executionId": "86fc1816-2f7d-4e4c-86b3-803d5ab06c8f",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791623443239
+      }
+    ],
+    "6.3 真库守卫断言 `written_count + unchanged_count + kept_count >= 330`（覆盖率下限）": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610677
+      },
+      {
+        "executionId": "86fc1816-2f7d-4e4c-86b3-803d5ab06c8f",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791622143888
+      },
+      {
+        "executionId": "86fc1816-2f7d-4e4c-86b3-803d5ab06c8f",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791623464700
+      }
+    ],
+    "6.4 真库守卫断言修复前 unchanged 项的值不变（幂等不变量，需求 5.4）": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610704
+      },
+      {
+        "executionId": "86fc1816-2f7d-4e4c-86b3-803d5ab06c8f",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791622174504
+      },
+      {
+        "executionId": "86fc1816-2f7d-4e4c-86b3-803d5ab06c8f",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791623484110
+      }
+    ],
+    "7.1 清理一次性探针脚本（如有）": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610730
+      },
+      {
+        "executionId": "86fc1816-2f7d-4e4c-86b3-803d5ab06c8f",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791623503234
+      }
+    ],
+    "7.2 更新 memory.md dev-history 记录本 spec 完成状态": [
+      {
+        "executionId": "d2f1af35-3ee6-4c3b-83cb-bbe66359c490",
+        "chatSessionId": "sess_b58c1eb4-3674-403b-ab8e-316d7f46352a",
+        "timestamp": 1791615610756
+      },
+      {
+        "executionId": "86fc1816-2f7d-4e4c-86b3-803d5ab06c8f",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791623528613
+      }
+    ]
+  }
+}

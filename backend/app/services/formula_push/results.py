@@ -13,6 +13,7 @@ from uuid import UUID
 #: 判定动作之外的两种结果
 SKIPPED = "skipped"
 CONFLICT = "conflict"
+FALLBACK_TO_TOTAL = "fallback_to_total"  # spec: formula-push-note-row-matching · 需求 1.1
 
 
 def _enum_value(value: Any) -> Any:

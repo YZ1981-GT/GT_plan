@@ -1035,7 +1035,8 @@ _archive/
 | 超标文件 | `python backend/scripts/check/check_file_size.py` |
 | 最高迁移 | `ls backend/migrations/V*.sql \| sort \| tail -1` |
 | 三件套完整性 | 扫描 `_archive/` 各 spec 目录是否含 requirements.md + design.md + tasks.md |
-| `formula-push-note-skip-reduction` | 0/30 | **公式推送附注跳过减少**（2026-10-10 新建）：修复四类设计缺陷（B: locate_table _source=NULL 拦截 38 项 / A: 单科目行匹配写合计 58 项 / D: 章节号硬编码动态反查 11 项 / F: has_obscured_data 误报 2 项），目标 skipped 从 148 降到 ≤45。7 Task / 30 子任务。 |
+| `formula-push-note-skip-reduction` | ✅ **32/32** 已归档 `_archive/41-formula-push-note-skip-and-row-matching/` | **公式推送附注跳过减少**：修复四类设计缺陷（B _source 判断 / F has_obscured_data 误报 / A 单科目合计行兜底 / D 章节号动态定位）；真库守卫 + 44 unit + 5 engine 集成测试全绿。 |
+| `formula-push-note-row-matching` | ✅ **39/39** 已归档 `_archive/41-formula-push-note-skip-and-row-matching/` | **公式推送附注行匹配增强**：消除合计行兜底后虚假 skip（FALLBACK_TO_TOTAL）+ find_row 第三级包含匹配 + PG 守卫分类别棘轮；真库 skipped 208→66（-68%）/ coverage 303→327。 |
 
 ---
 

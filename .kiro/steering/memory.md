@@ -59,6 +59,8 @@ inclusion: always
 - 链条：四表入库 / 调整审批 → `TRIAL_BALANCE_UPDATED` → `formula_push.engine.run` → E1 明细 / 审定表 / 披露表 → 附注（上市 五、1 / 国企 八、1）；规则 `backend/data/formula_push_rules.json`；公式管理「📤 公式推送」页
 - 🔴 教训：**写入方取数一律 `strict`**（fail-open 会 rollback 撤销已 flush 写入且零失败痕迹）· **试算表取数按标准码前缀**（与报表 `ReportFormulaParser` 同口径）· **改带自动保存/自动同步页面的源码前浏览器先停 `about:blank`**（HMR 重挂载即真实写库，已踩：重药 五、49）· 真库待决：3 个唯一索引含重复键（C24 / editing_locks / review_threads）、和平药房_2025 试算表 1012 父子双计多 414 万
 - **全科目铺开 spec `formula-push-all-subjects-rollout`（✅ 26/26 已归档 `_archive/23-formula-push-engine-complete/`）**：后端 `_REGISTRY` 80 码（D~N 全覆盖），A/B/C/S 不需公式推送；批 B~E + 用户自定义共 7 子 spec 均已归档。种子 soe 57 / listed 39；附注种子覆盖 soe 57/321（17.8%）但 221/239 张子表不参与（设计如此）。前置 4 缺陷全已修/降级；L6/N3 owned-keys 已补齐 + F5 binding + S 类裁决完成
+- **✅ `formula-push-note-skip-reduction`（32/32）**：四类附注跳过缺陷修复（B _source 判断 / F has_obscured_data 误报 / A 单科目合计行兜底 / D 章节号动态定位）；真库守卫 skipped 棘轮 ≤210 + coverage ≥300 + 幂等；44 unit + 1 pg guard 全绿
+- **✅ `formula-push-note-row-matching`（39/39）**：消除合计行兜底后虚假 skip（`FALLBACK_TO_TOTAL` 新 action）+ `find_row` 第三级包含匹配 + PG 守卫分类别棘轮（A/C/D/G/I/K/other）；70 测试全绿（含真库）；真库实测 skipped=66（从208降68%）/ coverage=327 / fallback_to_total=104；A类从~140降至8；棘轮收紧 _MAX_SKIPPED=80 _MIN_COVERAGE=320
 
 ### 合并抵销分录单源与差额表推送 `consol-elimination-single-source-push`（14/15，余 tasks.md 收尾）
 - ADR-CSP-001~006；唯一来源 `elimination_entries`；计算内核 `consol_report_values`（前缀口径 + 线性分解 + 五度量恒等式 P2）；合并报表按项目口径全六类生成（V172/V173）；试算平衡表只读五列 + 穿透；报表差额表读时计算；合并附注公式种子化 + 填入；推送服务四步上层联动 + SSE；公式管理合并节点 + 推送页。后端 141 passed 变异 166/166；前端 22 files 207 passed；浏览器实测通过

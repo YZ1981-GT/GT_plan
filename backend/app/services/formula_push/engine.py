@@ -38,7 +38,7 @@ from app.models.formula_push_models import FormulaPushRun, FormulaPushState
 from app.services.formula_push import note_writer
 from app.services.formula_push.bindings import get_binding, supported_wp_codes
 from app.services.formula_push.policy import Decision, decide, decide_note, values_equal
-from app.services.formula_push.results import CONFLICT, SKIPPED, PushItem, RunResult, _enum_value, _jsonable
+from app.services.formula_push.results import CONFLICT, FALLBACK_TO_TOTAL, SKIPPED, PushItem, RunResult, _enum_value, _jsonable
 from app.services.formula_push.rules import (
     TRIGGERS,
     BindingSpec,
@@ -679,7 +679,10 @@ async def _push_note(
 
     wrote = False
     any_data_row_matched = False
-    for row in binding.note_rows(overlay, template_type, rule):
+    pending_row_skips: list[tuple[str, str]] = []  # spec: formula-push-note-row-matching · 需求 1.2 — (addr_id, reason) 延迟记录
+    # 缓存 note_rows 结果，避免重复调用（消除隐式一致性依赖）
+    all_note_rows = binding.note_rows(overlay, template_type, rule)
+    for row in all_note_rows:
         if row["is_total"] or row["is_memo"]:
             continue  # 合计按附注实际行重算（见 _push_note_total）；「其中：」备注行不由底稿取数
         index = note_writer.find_row(table.rows, [row["note_label"], row["label"]])
@@ -689,9 +692,11 @@ async def _push_note(
             value_key, period = note_writer.NOTE_FIELDS[field_name]
             addr = note_addr_id(section, table_name, row["note_label"], period)
             if index is None:
-                ctx.skip(rule.rule_id, "note", "note", addr,
-                         f"附注「{table_name}」表中没有「{row['note_label']}」行（公式推送不新建行）")
+                # spec: formula-push-note-row-matching · 需求 1.2
+                # 延迟记录：合计行兜底成功后将重分类为 fallback_to_total
+                pending_row_skips.append((addr, f"附注「{table_name}」表中没有「{row['note_label']}」行（公式推送不新建行）"))
             elif not row[f"{value_key}_resolved"]:
+                # 科目不存在是真正 skip，不参与延迟
                 ctx.skip(rule.rule_id, "note", "note", addr, "底稿未取到该行数值（本项目无此科目），附注保持原值")
             else:
                 wrote |= _push_note_cell(ctx, rule=rule, section=section, addr=addr, table=table,
@@ -701,12 +706,13 @@ async def _push_note(
     # ── 合计行兜底（spec: formula-push-note-skip-reduction · 需求 2.3） ──
     # 所有数据行都未命中附注行 → 把审定数写入合计行
     skip_total_recalc = False
+    fallback_wrote = False  # spec: formula-push-note-row-matching · 需求 1.3
     if not any_data_row_matched:
         total_idx = note_writer.find_total_row(table.rows)
         if total_idx is not None:
             # 单科目：用唯一数据行（is_total=False）的值
             # 多科目：用 is_total 行的汇总值
-            all_note_rows = binding.note_rows(overlay, template_type, rule)
+            # 已缓存在 all_note_rows 中，不再重复调用 binding.note_rows()
             is_single = hasattr(binding, "account_prefixes") and len(binding.account_prefixes) == 1
             if is_single:
                 source_row = next((r for r in all_note_rows if not r.get("is_total") and not r.get("is_memo")), None)
@@ -715,6 +721,7 @@ async def _push_note(
             if source_row is not None:
                 total_row = table.rows[total_idx]
                 total_label = note_writer.row_label(total_row) or "合计"
+                fallback_cell_called = False
                 for field_name in rule.target.fields:
                     value_key, period = note_writer.NOTE_FIELDS[field_name]
                     if source_row.get(f"{value_key}_resolved"):
@@ -722,7 +729,19 @@ async def _push_note(
                         wrote |= _push_note_cell(ctx, rule=rule, section=section, addr=addr, table=table,
                                                  row=total_row, field_name=field_name,
                                                  value=source_row[value_key], paper=paper)
+                        fallback_cell_called = True
                 skip_total_recalc = True  # 已直接写入合计行，跳过后续重算
+                # fallback_wrote 仅在至少一个字段真正调用了 _push_note_cell 时为 True
+                # （所有 resolved=False 时兜底路径进入但没写——per-row skip 应保持 skipped）
+                fallback_wrote = fallback_cell_called
+
+    # spec: formula-push-note-row-matching · 需求 1.4
+    # 统一 flush 延迟的 per-row skip 记录：兜底成功 → fallback_to_total；未成功 → skipped
+    for _paddr, _preason in pending_row_skips:
+        _paction = FALLBACK_TO_TOTAL if fallback_wrote else SKIPPED
+        ctx.result.items.append(PushItem(
+            rule.rule_id, "note", "note", _paddr, _paction, reason=_preason
+        ))
 
     if not skip_total_recalc:
         wrote |= _push_note_total(ctx, rule=rule, section=section, table_name=table_name, table=table, paper=paper)

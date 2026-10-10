@@ -1357,3 +1357,10 @@ backend/tests/integration/test_render_pipeline_e2e.py 927
 backend/app/services/consol_calc_basis.py 1005
 # note_word_exporter.py — Word 附注导出，CP-02 修改 valid_indices 逻辑（+5行）
 backend/app/services/note_word_exporter.py 1706
+# test_formula_push_note_skip.py — 2026-10-13 入册。
+#   两个公式推送 spec（formula-push-note-skip-reduction + formula-push-note-row-matching）
+#   的全部单元测试统一宿主：纯函数层（locate_table/find_row/has_obscured_data 18 例）+
+#   mock DB 集成层（_push_note 分支覆盖 9 例）+ PBT（包含匹配/延迟 skip 6 属性 9 例）+
+#   回归/变异（14 例）= 67 例。拆分方向：按 spec 分文件但两个 spec 共享 mock 基础设施
+#   和 binding 工厂，属独立任务。baseline 取当前真实行数。
+backend/tests/test_formula_push_note_skip.py  1926

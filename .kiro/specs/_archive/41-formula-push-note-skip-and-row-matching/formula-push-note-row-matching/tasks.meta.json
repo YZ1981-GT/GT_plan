@@ -1,0 +1,309 @@
+{
+  "pbtResults": {
+    "2.2 写 PBT `test_find_row_contains_unique_hit`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791627616441
+    },
+    "2.3 写 PBT `test_find_row_contains_multi_hit_returns_none`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791627620854
+    },
+    "2.4 写 PBT `test_find_row_contains_excludes_total`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791627646047
+    }
+  },
+  "executionHistory": {
+    "0.1 新建探针脚本 `backend/scripts/analyze/_nrm_probe_skip_breakdown.py`": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791626502605
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791626516898
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791626744079
+      }
+    ],
+    "1.1 在 `results.py` 新增 `FALLBACK_TO_TOTAL` 常量": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791626502657
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791626754619
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791627383108
+      }
+    ],
+    "1.2 改 `engine.py::_push_note`：引入 `pending_row_skips` 延迟收集": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791626502683
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791627388350
+      }
+    ],
+    "1.3 改 `engine.py::_push_note`：合计行兜底成功后设 `fallback_wrote`": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791626502705
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791627388766
+      }
+    ],
+    "1.4 改 `engine.py::_push_note`：循环结束后统一 flush pending_row_skips": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791626502744
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791627393458
+      }
+    ],
+    "1.5 跑现有 formula_push 测试确认无回归": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791626502770
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791627409663
+      }
+    ],
+    "2.1 改 `note_writer.py::find_row`：新增第三级包含匹配": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791626502795
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791627410479
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791627726966
+      }
+    ],
+    "2.6 变异验证：删除包含匹配逻辑 → 2.2 打红": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791626502817
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791627728037
+      }
+    ],
+    "3.5 变异验证：删除 `fallback_wrote = True` → 3.1 打红": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791626502840
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791627746597
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791627996411
+      }
+    ],
+    "4. Checkpoint": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791626502863
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791628011796
+      }
+    ],
+    "5.1 在 `test_formula_push_note_skip_pg.py` 新增 `_categorize()` 函数和 `_SKIP_CATEGORIES` 字典": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791626502887
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791628017692
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791628255136
+      }
+    ],
+    "5.2 新增 `_MAX_SKIPPED_BY_CATEGORY` 棘轮基线": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791626502909
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791628255979
+      }
+    ],
+    "5.3 新增分类别断言 + 总量安全网": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791626502931
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791628256949
+      }
+    ],
+    "6. Checkpoint": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791626502953
+      },
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791628257784
+      }
+    ],
+    "1. 延迟 skip 记录 + 重分类（需求 1）": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791627409686
+      }
+    ],
+    "2. 包含匹配（需求 2）": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791627728059
+      }
+    ],
+    "3. 延迟 skip 单元测试 + PBT（需求 1 + 5）": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791627996434
+      }
+    ],
+    "5. 分类别 PG 守卫（需求 3）": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791628256987
+      }
+    ],
+    "2.2 写 PBT `test_find_row_contains_unique_hit`": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791628273939
+      }
+    ],
+    "2.3 写 PBT `test_find_row_contains_multi_hit_returns_none`": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791628274723
+      }
+    ],
+    "2.4 写 PBT `test_find_row_contains_excludes_total`": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791628275510
+      }
+    ],
+    "2.5 写回归测试 `test_find_row_exact_match_not_affected`": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791628276263
+      }
+    ],
+    "3.1 写 PBT `test_deferred_skip_reclassified_on_fallback`": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791628277161
+      }
+    ],
+    "3.2 写 PBT `test_deferred_skip_stays_skipped_without_total`": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791628281921
+      }
+    ],
+    "3.3 写示例测试 `test_deferred_skip_multi_account`": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791628282739
+      }
+    ],
+    "3.4 写示例测试 `test_deferred_skip_single_account`": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791628283473
+      }
+    ],
+    "5.4 写 PBT `test_categorize_known_patterns`": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791628284184
+      }
+    ],
+    "5.5 写示例测试 `test_pg_guard_category_assertion_message`": [
+      {
+        "executionId": "3a118b16-f4a1-4c1d-903b-888db34d3e34",
+        "chatSessionId": "sess_99b26795-f289-4363-b6f0-6c5d1f7959f3",
+        "timestamp": 1791628284909
+      }
+    ]
+  }
+}
