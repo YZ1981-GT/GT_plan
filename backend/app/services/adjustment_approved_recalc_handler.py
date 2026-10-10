@@ -68,6 +68,7 @@ async def _handle_adjustment_review_event(
 
             try:
                 from app.models.audit_platform_schemas import EventPayload, EventType
+                from app.schemas.consol_context import ConsolContext
                 from app.services.event_bus import event_bus
 
                 await event_bus.publish(EventPayload(
@@ -76,6 +77,11 @@ async def _handle_adjustment_review_event(
                     year=year,
                     account_codes=account_codes,
                     extra={"trigger": trigger},
+                    context=ConsolContext.legacy(
+                        project_id=project_id,
+                        year=year,
+                        source_version=trigger,
+                    ),
                 ))
             except Exception as pub_err:
                 logger.warning(

@@ -238,6 +238,7 @@ async def review_elimination(
     # 审批 / 撤销审批已落库 commit；推送为下游派生，失败记推送运行但不影响审批本身（EH3）
     try:
         from app.models.audit_platform_schemas import EventPayload, EventType
+        from app.schemas.consol_context import ConsolContext
         from app.services.event_bus import event_bus
 
         await event_bus.publish(EventPayload(
@@ -245,6 +246,11 @@ async def review_elimination(
             project_id=project_id,
             year=entry.year,
             extra={"entry_id": str(entry_id)},
+            context=ConsolContext.legacy(
+                project_id=project_id,
+                year=entry.year,
+                source_version=str(entry_id),
+            ),
         ))
     except Exception:  # noqa: BLE001
         logging.getLogger(__name__).warning("分录 %s 事件发布失败（审批已生效，可在合并推送页手动推送）", entry_id)

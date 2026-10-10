@@ -488,11 +488,17 @@ class DatasetService:
         try:
             from app.services.event_bus import event_bus
             from app.models.audit_platform_schemas import EventPayload, EventType
+            from app.schemas.consol_context import ConsolContext
             await event_bus.publish(EventPayload(
                 event_type=EventType.LEDGER_DATASET_ACTIVATED,
                 project_id=dataset.project_id,
                 year=dataset.year,
                 extra={"dataset_id": str(dataset.id)},
+                context=ConsolContext.legacy(
+                    project_id=dataset.project_id,
+                    year=dataset.year,
+                    source_version=str(dataset.id),
+                ),
             ))
         except Exception:
             pass

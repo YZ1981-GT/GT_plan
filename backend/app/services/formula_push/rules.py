@@ -162,6 +162,8 @@ class PushRule:
     source: PushSource
     triggers: tuple[str, ...]
     description: str
+    version: int = 1
+    status: str = "active"
 
     @property
     def wp_code(self) -> str:
@@ -476,10 +478,20 @@ def parse_rules(
             else:
                 seen_targets[key] = rid
         if target is not None and source is not None:
+            rule_version = raw.get("version", 1)
+            rule_status = raw.get("status", "active")
+            if not isinstance(rule_version, int) or rule_version < 1:
+                errors.append(f"{rid}: version 须为正整数")
+                rule_version = 1
+            if rule_status not in ("active", "disabled", "deprecated"):
+                errors.append(f"{rid}: status={rule_status!r} 须为 active/disabled/deprecated")
+                rule_status = "active"
             rules.append(PushRule(
                 rule_id=rid, page_key=page_key, stage=stage, policy=policy,
                 target=target, source=source, triggers=tuple(triggers),
                 description=raw.get("description"),
+                version=rule_version,
+                status=rule_status,
             ))
 
     # 整份拒收：任一条有问题都不返回部分结果（否则那条推送会静默消失）
@@ -556,8 +568,10 @@ def load_rules(
 def rules_for(
     rules: tuple[PushRule, ...], *, wp_code: str | None = None, trigger: str | None = None
 ) -> tuple[PushRule, ...]:
-    """按底稿 / 触发事件筛选（保持清单顺序）。"""
+    """按底稿 / 触发事件筛选，只返回 active 规则（保持清单顺序）。"""
     return tuple(
         r for r in rules
-        if (wp_code is None or r.wp_code == wp_code) and (trigger is None or r.fires_on(trigger))
+        if r.status == "active"
+        and (wp_code is None or r.wp_code == wp_code)
+        and (trigger is None or r.fires_on(trigger))
     )

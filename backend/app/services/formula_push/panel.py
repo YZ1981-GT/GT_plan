@@ -82,6 +82,40 @@ async def set_locked(
     return [rows[a] for a in wanted]
 
 
+async def list_runs(
+    db, *, project_id: UUID, year: int, limit: int = 20, offset: int = 0,
+) -> list[FormulaPushRun]:
+    """返回运行历史列表（最近优先）。"""
+    rows = (await db.execute(
+        sa.select(FormulaPushRun)
+        .where(FormulaPushRun.project_id == project_id, FormulaPushRun.year == year)
+        .order_by(FormulaPushRun.started_at.desc(), FormulaPushRun.id.desc())
+        .offset(offset)
+        .limit(limit)
+    )).scalars().all()
+    return list(rows)
+
+
+async def count_runs(db, *, project_id: UUID, year: int) -> int:
+    """返回运行记录总数。"""
+    result = await db.execute(
+        sa.select(sa.func.count())
+        .select_from(FormulaPushRun)
+        .where(FormulaPushRun.project_id == project_id, FormulaPushRun.year == year)
+    )
+    return int(result.scalar() or 0)
+
+
+async def get_run(db, *, project_id: UUID, run_id: UUID) -> FormulaPushRun | None:
+    """按 run_id 和 project_id 双重校验获取运行记录。"""
+    return (await db.execute(
+        sa.select(FormulaPushRun).where(
+            FormulaPushRun.id == run_id,
+            FormulaPushRun.project_id == project_id,
+        )
+    )).scalar_one_or_none()
+
+
 async def latest_run(db, *, project_id: UUID, year: int, wp_code: str | None = None) -> FormulaPushRun | None:
     # 带 wp_code 时需逐条检查 detail 是否涉及该 code（Python 侧过滤，兼容 SQLite）。
     # limit(100) 假设同一项目/年度的运行记录在 100 条内必然覆盖该 code 最近一次运行；

@@ -172,6 +172,10 @@ export const formulaPush = {
   adopt: (projectId: string) => `${pushBase(projectId)}/states/adopt`,
   /** POST `{year, addr_ids, locked}` — 锁定 / 解锁 */
   lock: (projectId: string) => `${pushBase(projectId)}/states/lock`,
+  /** GET `?year=&limit=&offset=` — 运行历史列表 */
+  runs: (projectId: string) => `${pushBase(projectId)}/runs`,
+  /** GET `/runs/{runId}/items?outcome=` — 按 run_id 查看逐项明细 */
+  runItems: (projectId: string, runId: string) => `${pushBase(projectId)}/runs/${runId}/items`,
 } as const
 
 /** 公式域聚合（便于 `import { formulaApi } from '@/services/apiPaths/formula'`） */

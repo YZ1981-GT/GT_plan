@@ -251,7 +251,7 @@ def test_every_route_declares_project_access_dependency():
         assert levels, f"{fn.name} 未挂 require_project_access"
         routes[fn.name] = levels[0]
         assert levels[0] == ("edit" if verbs[0] == "post" else "readonly"), (fn.name, levels)
-    assert set(routes) == {"list_bindings", "list_rules", "run_push", "latest", "states", "adopt", "lock"}
+    assert set(routes) == {"list_bindings", "list_rules", "run_push", "latest", "states", "adopt", "lock", "list_runs", "run_items"}
 
 
 def test_router_is_registered():

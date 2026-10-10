@@ -40,6 +40,63 @@
       </ul>
     </div>
 
+    <!-- 运行历史 -->
+    <div class="gt-fp-block">
+      <div class="gt-fp-subtitle">
+        运行历史
+        <el-button size="small" text @click="loadRunHistory">刷新</el-button>
+      </div>
+      <el-table
+        v-loading="historyLoading" :data="runHistory"
+        size="small" border max-height="240"
+        empty-text="暂无运行记录"
+        highlight-current-row
+        @current-change="onRunSelect"
+      >
+        <el-table-column label="时间" width="165">
+          <template #default="{ row }">{{ row.finished_at || row.started_at || '' }}</template>
+        </el-table-column>
+        <el-table-column label="触发" width="120">
+          <template #default="{ row }">{{ labelOf(TRIGGER_LABELS, row.trigger) }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <el-tag size="small" :type="runStatusTag(row.status)">{{ labelOf(RUN_STATUS_LABELS, row.status) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="写入" width="60" align="right" prop="written_count" />
+        <el-table-column label="跳过" width="60" align="right" prop="skipped_count" />
+        <el-table-column label="保留" width="60" align="right" prop="kept_count" />
+      </el-table>
+      <!-- 选中 run 的逐项明细 -->
+      <template v-if="selectedRunId">
+        <div class="gt-fp-subtitle" style="margin-top:8px">
+          运行明细
+          <el-select v-model="outcomeFilter" size="small" clearable placeholder="全部" style="width:120px">
+            <el-option label="全部" value="" />
+            <el-option label="已跳过" value="skipped" />
+            <el-option label="失败" value="failed" />
+            <el-option label="冲突" value="conflict" />
+            <el-option label="已写入" value="written" />
+          </el-select>
+        </div>
+        <el-table
+          v-loading="itemsLoading" :data="runItems"
+          size="small" border max-height="280"
+          empty-text="无匹配项"
+        >
+          <el-table-column label="规则" prop="rule_id" min-width="200" show-overflow-tooltip />
+          <el-table-column label="阶段" prop="stage" width="70" />
+          <el-table-column label="结果" width="90">
+            <template #default="{ row }">
+              <el-tag size="small" :type="itemOutcomeTag(row.outcome)">{{ row.outcome || '—' }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="说明" prop="reason" min-width="200" show-overflow-tooltip />
+        </el-table>
+      </template>
+    </div>
+
     <!-- 待处理差异 -->
     <div class="gt-fp-block">
       <div class="gt-fp-subtitle">
@@ -257,8 +314,65 @@ function onSelect(rows: PushStateView[]): void {
   selectedAddrs.value = rows.filter(actionable).map((r) => r.addr_id)
 }
 
+// ── 运行历史 ──────────────────────────────────────────────────
+const runHistory = ref<any[]>([])
+const historyLoading = ref(false)
+const selectedRunId = ref('')
+const outcomeFilter = ref('')
+const runItems = ref<any[]>([])
+const itemsLoading = ref(false)
+
+function itemOutcomeTag(outcome: string | undefined): string {
+  if (!outcome) return 'info'
+  if (outcome === 'written' || outcome === 'unchanged') return 'success'
+  if (outcome === 'kept') return ''
+  if (outcome === 'skipped') return 'warning'
+  if (outcome === 'conflict' || outcome === 'failed') return 'danger'
+  return 'info'
+}
+
+async function loadRunHistory(): Promise<void> {
+  if (!props.projectId || !props.year) return
+  historyLoading.value = true
+  try {
+    const res: any = await api.get(formulaPush.runs(props.projectId), {
+      params: { year: props.year, limit: 20, offset: 0 },
+    })
+    runHistory.value = res?.runs ?? []
+  } catch {
+    runHistory.value = []
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+async function loadRunItems(): Promise<void> {
+  if (!props.projectId || !selectedRunId.value) return
+  itemsLoading.value = true
+  try {
+    const res: any = await api.get(
+      formulaPush.runItems(props.projectId, selectedRunId.value),
+      { params: outcomeFilter.value ? { outcome: outcomeFilter.value } : {} },
+    )
+    runItems.value = res?.items ?? []
+  } catch {
+    runItems.value = []
+  } finally {
+    itemsLoading.value = false
+  }
+}
+
+function onRunSelect(row: any): void {
+  selectedRunId.value = row?.run_id || ''
+  if (selectedRunId.value) loadRunItems()
+}
+
+watch(outcomeFilter, () => { if (selectedRunId.value) loadRunItems() })
+
 onMounted(loadAll)
+onMounted(loadRunHistory)
 watch(() => [props.projectId, props.year, props.wpCode], loadAll)
+watch(() => [props.projectId, props.year, props.wpCode], loadRunHistory)
 </script>
 
 <style scoped>

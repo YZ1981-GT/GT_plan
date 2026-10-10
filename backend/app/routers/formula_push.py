@@ -191,3 +191,46 @@ async def lock(
         await db.rollback()
         raise _bad_request(exc) from exc
     return {"states": [panel.state_view(r) for r in rows]}
+
+
+# ── 运行历史与逐项明细（按 run 批次筛选 skip/failed）──────────────
+
+
+@router.get("/runs")
+async def list_runs(
+    project_id: UUID,
+    year: int = Query(..., ge=2000, le=2100),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """返回公式推送运行历史列表（最近优先）。"""
+    runs = await panel.list_runs(db, project_id=project_id, year=year, limit=limit, offset=offset)
+    return {
+        "runs": [panel.run_view(r) for r in runs],
+        "total": await panel.count_runs(db, project_id=project_id, year=year),
+    }
+
+
+@router.get("/runs/{run_id}/items")
+async def run_items(
+    project_id: UUID,
+    run_id: UUID,
+    outcome: str | None = Query(None, description="过滤 outcome: written/unchanged/kept/skipped/conflict/failed"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """按 run_id 返回逐项推送明细，可按 outcome 筛选 skip/failed 等。"""
+    run = await panel.get_run(db, project_id=project_id, run_id=run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="运行记录不存在或不属于该项目")
+    items = (run.detail or {}).get("items", [])
+    if outcome:
+        items = [i for i in items if isinstance(i, dict) and i.get("outcome") == outcome]
+    return {
+        "run_id": str(run.id),
+        "status": run.status,
+        "items": items,
+        "total": len(items),
+    }

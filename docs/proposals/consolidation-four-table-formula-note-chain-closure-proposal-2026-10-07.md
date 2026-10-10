@@ -1,6 +1,6 @@
 # 合并模块“四表入库 → 试算表 → 底稿 → 披露表 → 审定表 → 报表/附注”公式与附注链路闭环建议
 
-**日期：** 2026-10-07  
+**日期：** 2026-10-07（实施状态标注更新至 2026-10-10）  
 **文档类型：** 现状分析、目标架构与实施建议  
 **适用范围：** 合并模块、单体/合并附注、公式管理、四表入库、试算表、底稿数据联动  
 **本轮结论：** 本文只提出修复和收口方案，不直接修改业务代码。
@@ -103,6 +103,8 @@
 
 建议把四表输入统一形成 `source_version`，并将数据集版本、导入批次、映射版本、期间和科目范围写入事件。后续公式运行都必须携带这个版本，避免用户看到“刷新成功”但实际读取的是上一批数据。
 
+> **2026-10-10 实施状态**：事件链已接通（P1-1 四表→TB 4 测试 ✅、和平药房 active 数据集 + TB 58 行 S4 验证）。`LEDGER_DATASET_ACTIVATED` → `auto_map` → `recalc_unadjusted` → `TRIAL_BALANCE_UPDATED` 路径端到端验证通过。**仍未实施**：事件 payload 中的 `source_version/formula_version/run_id` 完整版本标记（当前只带 project_id/year/kind）。
+
 ### 4.2 底稿、披露表和审定表
 
 底稿链路至少包含明细表、披露表和审定表三类业务载体。披露表是附注取数的重要上游，用户要求附注刷新直接从审定后的披露表取数，因此披露表不能继续被当成仅供页面展示的临时 JSON。它应当具备项目、年度、`wp_code`、`section_id/table_id`、行列身份、数值状态、来源版本和审定状态。
@@ -112,6 +114,8 @@
 当前普通 `formula_push.engine` 能根据规则把底稿内容推送到附注表，并在单底稿范围使用 SAVEPOINT 隔离失败；`note_writer.locate_table()` 只接受 `_source` 为 `workpaper` 或 `workpaper_html` 的表数据。这个限制有利于防止把不明来源的表写进附注，但也意味着 F1 顶层 `rows/_tables` 结构不能直接依赖普通公式推送完成，需要明确 F1 的专用适配器或将其登记为暂不自动推送的结构。
 
 审定表发布必须保持显式发布门。审定数进入 `trial_balance` 的路径只能经过确认后的发布动作，不能在 `watch`、`onMounted`、防抖保存或页面刷新回调中直接写入。自动计算可以准备候选值、标记差异和发布待确认结果，但不得绕过用户确认改变审定数。
+
+> **2026-10-10 实施状态**：TB 发布门 14 个端点级测试 ✅（含和平药房 4 条 ack + wp_adjustment 真写入 S4）。两道 CI 守卫已部署。E1 公式推送 71 passed。`word_export.py` 延迟 import HTTPException bug 已修。**F1 顶层 rows/_tables 专用适配器仍未实施**。
 
 ### 4.3 调整分录与抵消分录
 
@@ -124,6 +128,8 @@
 
 当前 `consol_push_service._push_one()` 已按“合并工作表 → 合并试算表 → 合并报表 → 标记附注过期”的顺序编排，并将关键步骤结果写入 `ConsolPushRun`、通过 SSE 广播。该流程适合做合并层级的显式编排，但它与合并附注公式刷新 handler 之间仍需要统一运行批次和版本标识，避免报表已经更新而附注刷新读取旧的合并试算表。
 
+> **2026-10-10 实施状态**：`adj-formula-repair-and-approval-gate-wiring` 40/40 ✅ + `consol-elimination-single-source-push` 15/15 ✅ 已归档。P1-3 和平药房真实 PG 调整分录全链路验证（创建→审批→TB 自动级联→恢复 S4）。CP-03 推送状态传播已修。合并推送四步编排 P1-4 ✅。
+
 ### 4.4 普通附注和合并附注
 
 普通附注使用 `DisclosureNote` 及其 `sub_table_data` 等结构，公式刷新由 `DisclosureEngine` 处理。该引擎可以读取附注中的 `_tables`，退回顶层 `rows`，对 `auto` 单元格进行 `sum`、`report`、`aging`、`formula` 等类别的计算，并跳过人工单元格。缺数据时存在 fail-open 或 skip 结果，必须把这些结果作为用户可见状态。
@@ -131,6 +137,8 @@
 合并附注使用独立的 `ConsolNoteData` 与 `ConsolNoteFormula`。`consol_note_formula_service.plan_seed()` 会在报表行、取数列、合计行和科目口径唯一时生成种子公式；多级表头可以转换为 `_column_groups`；遇到空列名、多期末列、多个合计行或公式歧义时会 skip。`fill_by_formula()` 按节点写入合并附注数据，保留 `manual_cells`，`fill_note_sections()` 按章节使用嵌套事务隔离失败。
 
 合并附注刷新 handler 主要响应 `TRIAL_BALANCE_UPDATED`，对 `WORKPAPER_SAVED` 则要求事件显式声明 `consol_note_refresh`、`consol_note_affected` 或 `affects_consol_note`。它会建立新的数据库会话，按节点和章节处理，能够对无树、无有效 `node_key`、无章节或关闭 V2 的场景返回结构化 skip。下一阶段应把这些 skip 与公式管理界面统一展示，不能只留在日志中。
+
+> **2026-10-10 实施状态**：CP-03 修复后 partial/failed/skipped 已正确传播（5 个定向测试 + 12 个 consol_push 回归 ✅）。模板全量同步 soe 321/listed 432。117 条 check_rules + 续表标记。`note_table_enrichment.py` 读时增强。三个 spec 已归档 `_archive/40-*`。**仍需改进**：公式管理前端面板尚无按 run 批次筛选 skip/failed 的 UI。
 
 ## 五、自动构建合并树的目标规则
 
@@ -168,6 +176,8 @@
 三个角色节点应共享企业代码身份或通过明确的 `entity_code + role` 组合区分。展示名称可使用“企业名称（合并户）”“企业名称（差额户）”“企业名称（单体母公司户）”，但名称只用于展示，公式和关联必须使用稳定的 `node_key`。
 
 合并户、差额户和单体母公司户只能在确认合并场景后一次性生成，重复执行建树必须幂等。再次执行应更新关系、版本和校验结果，不得重复插入节点或把历史节点留成当前有效节点。
+
+> **2026-10-10 实施状态**：`consol-tree-three-code-autobuild` 70/70 ✅ 已归档。三码归一化 + 去重 + 环检测 + 一次生成三角色 + V183 迁移 + scope confirmation service + 指纹 CAS + 幂等 + legacy 兼容全部实施。6 个行为验收测试。CP-01 节点联动 Playwright 验证通过。**升级到 S4 需真实项目创建→确认→持久化 E2E**。
 
 ### 5.4 递归母公司和分公司规则
 
@@ -861,6 +871,8 @@ Playwright 至少覆盖以下用户动作：
 
 ## 十六、真实 PostgreSQL 项目验证（2026-10-07）
 
+> **2026-10-10 状态标注**：本章数据快照（模板计数、推送记录、stale 状态、附注行数）基于 2026-10-07 合成集团只读查询，**已被综合建议文档 `consolidation-module-comprehensive-problem-recommendation-2026-10-07.md` §23（2026-10-08 运行证据与问题裁定）全面取代**。后者包含和平药房/重药安徽/首汽租车真实 PG S3/S4 验证、Playwright 复现、P0-P2 全部 183 个验收测试结果。本章保留原始快照供审计追溯，不应再作为当前状态引用。
+
 ### 16.1 验证对象和边界
 
 本节使用当前真实 PostgreSQL（数据库 `audit_platform`，schema `public`）中的一个合并项目做只读核验。选定项目如下：
@@ -1009,3 +1021,59 @@ note_refreshed         = 附注按项目/年度/节点/公式版本实际写入�
 7. **真实项目分级**：2098 测试/合成项目只能作为冒烟和局部回归样本；生产 UAT 必须另选有真实四表导入批次、企业范围、底稿和人工审批记录的集团项目。
 
 本节的真实 PG 结果修正了“只做静态分析、尚无真实数据库证据”的旧描述，但没有改变本文的总判定：当前能证明若干合并计算和报表输出局部正确，不能证明用户要求的完整四表到附注自动闭环已经在生产环境打通。
+
+
+## 十七、2026-10-10 实施记录与技术债追踪
+
+> 本章为 2026-10-10 追加，记录本轮实施成果和剩余技术债。
+
+### 17.1 本轮已实施
+
+| 项 | 改动范围 | 验证结果 |
+|---|---|---|
+| 事件 payload 版本化 | 3 个关键发布点添加 `context=ConsolContext.legacy(source_version=...)`：`LEDGER_DATASET_ACTIVATED`（dataset_service.py）、`TRIAL_BALANCE_UPDATED`（adjustment_approved_recalc_handler.py）、`ELIMINATION_APPROVED/REVOKED`（consolidation.py） | 65 个测试全绿（24 chain wiring + 41 event bus/year contract） |
+| binding 版本化 | `PushRule` dataclass 新增 `version: int = 1` 和 `status: str = "active"`；`parse_rules` 校验 version 为正整数、status 为 active/disabled/deprecated；`rules_for` 过滤只返回 active 规则 | 71 个公式推送测试全绿；现有 267 条规则全部默认 version=1 status=active（JSON 无需修改） |
+| 公式管理运行历史 UI | 后端：`list_runs`/`count_runs`/`get_run` + 2 个新端点（`GET /runs`、`GET /runs/{run_id}/items?outcome=`）。前端：FormulaPushPanel.vue 新增运行历史区块（运行列表 + 选中 run 展示逐项明细 + outcome 过滤） | 后端语法检查通过 |
+| §4/§5/§16 文档标注 | §4.1~4.4 各加实施状态 blockquote；§5.3 加建树实施状态；§16 加过期标注指向综合文档 §23 | — |
+
+### 17.2 剩余技术债
+
+| 项 | 原始要求 | 评估结论 | 建议处置 |
+|---|---|---|---|
+| 附注行身份 `row_id` | §8.3 要求稳定行身份不依赖位置索引 | 9872 行 / 1572 张表全部 0 个 row_id；标签天然唯一率 44%~71%（合并模板最差 50%）；直接用 label 做 row_id 不可行，需复合键（label + 位置后缀）或生成式 row_id | **需独立 spec**：影响全部读写路径和公式推送定位逻辑，估计 >500 行改动 |
+| F1 顶层 rows/_tables 适配器 | §4.2 提到 `note_writer.locate_table()` 只接受 `workpaper`/`workpaper_html` 来源 | F1 结构不能直接走普通公式推送 | 需明确 F1 的专用适配器或登记为显式不自动推送的范围 |
+| 事件增量刷新范围 | §7.1 要求事件带受影响科目范围 | `TRIAL_BALANCE_UPDATED` 已有 `account_codes`；`LEDGER_DATASET_ACTIVATED` 和 `ELIMINATION_APPROVED` 还没有 | 后续按需扩展 |
+| Markdown 模板 | §8.5 提到 4 个声明文件不存在 | 遗留解析器入口，当前 JSON 主链不受影响 | 登记为已知 legacy 治理项 |
+| 运行时监控指标 | §14 要求运行批次耗时/命中数/skip 数/stale 数仪表盘 | 未实施 | 后续与 6000 并发压测一起做 |
+
+### 17.3 完整 E2E UAT 前置条件
+
+阶段 5（§10.7）的全链路真实 PG 验收需要以下前置条件全部就绪：
+
+**数据前置**：
+1. 至少一个真实集团母子项目（非 2098 合成项目），具备完整的企业代码、上级代码、最终控制方代码
+2. 该集团项目须有真实四表导入批次（`ledger_datasets` 激活态 + `tb_balance` 非零行 + `trial_balance` 非零行）
+3. 须有至少 1 条已审批调整分录和 1 条已审批抵消分录
+4. 国企和上市各至少 1 个项目（覆盖 `template_type` 两种变体）
+
+**环境前置**：
+5. 后端 9980 + 前端 3030 + PG + Redis 全部在线（`start-dev.bat`）
+6. Playwright MCP 可用（workspace `.kiro/settings/mcp.json` 已配置）
+7. 测试用户 admin/admin123 有项目全部权限
+
+**操作前置**：
+8. 获准在隔离集团项目上执行写路径（四表激活→自动映射→TB 重算→公式推送→审定发布→附注刷新）
+9. 获准执行调整/抵消审批（非只读操作）
+10. 获准执行合并推送和附注刷新（非只读操作）
+
+**验收标准**（从§12 场景 A~H 提取关键断言）：
+- 场景 A：三码建树幂等 + 重复确认不增加节点
+- 场景 B：四表激活后 TB 未审数与独立 SQL 聚合一致
+- 场景 C：关闭页面后事件仍能完成下游刷新
+- 场景 D：草稿调整不进 TB/报表/附注；审批后逐值一致
+- 场景 E：抵消分录推送后恒等式成立 + source_entry_ids 可反查
+- 场景 F：国企/上市多级表头无错位 + 合并单元格保持
+- 场景 G：skip/failed 不是恒绿分支 + 重试不重复累计
+- 场景 H：Playwright 左树→右侧 node_key 一致 + 网络请求校验
+
+**当前阻塞**：需要用户授权在真实集团项目上执行写路径操作。2098 合成项目只能作为冒烟和局部回归样本。
