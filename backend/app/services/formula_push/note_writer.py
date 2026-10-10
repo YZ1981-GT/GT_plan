@@ -156,24 +156,49 @@ def detect_manual_override(table_data: Any) -> bool:
 #: 投影器渲染 sub_table_data 的来源（note_sub_table_projector._WORKPAPER_SOURCES）
 WORKPAPER_SOURCES: tuple[str, ...] = ("workpaper", "workpaper_html")
 
+#: 明确非底稿来源——只有这些值才判"模板取数维护"；_source=None 视为未标记（放行）。
+#: spec: formula-push-note-skip-reduction · 需求 1.3
+_KNOWN_NON_WORKPAPER: frozenset[str] = frozenset({"template", "import", "migration"})
+
 
 def locate_table(table_data: Any, table: str) -> tuple[NoteTable | None, str | None]:
-    """定位附注表；返回 (表, None) 或 (None, 中文跳过原因)。"""
+    """定位附注表；返回 (表, None) 或 (None, 中文跳过原因)。
+
+    分级判断（spec: formula-push-note-skip-reduction · 需求 1.1–1.3）：
+    - ``_source`` 明确非底稿 → 跳过
+    - ``sub_table_data`` 存在且含目标子表 → 按子表定位
+    - 无 ``sub_table_data`` 但有顶层 ``rows`` → 旧格式兜底
+    """
     if not isinstance(table_data, dict) or not table_data:
         return None, "附注章节尚无表格数据"
-    sub = table_data.get("sub_table_data")
-    if not isinstance(sub, dict) or not sub or table_data.get("_source") not in WORKPAPER_SOURCES:
+
+    source = table_data.get("_source")
+
+    # ① 明确非底稿来源 → 跳过
+    if source in _KNOWN_NON_WORKPAPER:
         return None, "附注由模板取数维护（尚未与底稿同步），公式推送不改写"
-    rows = sub.get(table)
-    if not isinstance(rows, list):
-        return None, f"附注中没有「{table}」表"
-    cols = table_data.get("_sub_table_columns")
-    defs = [d for d in ((cols or {}).get(table) or []) if isinstance(d, dict) and d.get("key")] if isinstance(
-        cols, dict) else []
-    # 标签列判定与投影器 _pick_label_def 一致：首个 is_label，否则首列
-    label_def = next((d for d in defs if d.get("is_label")), defs[0] if defs else None)
-    value_keys = [d["key"] for d in defs if d is not label_def]
-    return NoteTable(rows=rows, value_keys=value_keys, section_locked=detect_manual_override(table_data)), None
+
+    # ② sub_table_data 存在 → 按子表定位（原有主路径）
+    sub = table_data.get("sub_table_data")
+    if isinstance(sub, dict) and sub:
+        rows = sub.get(table)
+        if not isinstance(rows, list):
+            return None, f"附注中没有「{table}」表"
+        cols = table_data.get("_sub_table_columns")
+        defs = [d for d in ((cols or {}).get(table) or []) if isinstance(d, dict) and d.get("key")] if isinstance(
+            cols, dict) else []
+        label_def = next((d for d in defs if d.get("is_label")), defs[0] if defs else None)
+        value_keys = [d["key"] for d in defs if d is not label_def]
+        return NoteTable(rows=rows, value_keys=value_keys, section_locked=detect_manual_override(table_data)), None
+
+    # ③ 无 sub_table_data 但有顶层 rows → 旧格式兜底（需求 1.2）
+    rows = table_data.get("rows")
+    if isinstance(rows, list) and rows:
+        # 旧格式的 values 列表按位置：[0]=期末 [1]=期初，映射到标准字段名
+        return NoteTable(rows=rows, value_keys=["end_amount", "prior_amount"],
+                         section_locked=detect_manual_override(table_data)), None
+
+    return None, "附注章节无可定位的表格数据"
 
 
 def row_label(row: Any) -> str:
@@ -263,7 +288,16 @@ def has_obscured_data(table_data: dict, table_name: str) -> str | None:
             if not isinstance(r, dict):
                 continue
             for k, v in r.items():
-                if k in ("label", "row_type", "is_total", "is_label"):
+                if k in ("label", "row_type", "is_total", "is_label") or k.startswith("_"):
+                    continue
+                # spec: formula-push-note-skip-reduction · 需求 4.1
+                # values 是列表，逐元素检查（[None, None] 不算有数据）
+                if k == "values":
+                    if isinstance(v, list) and any(
+                        e is not None and e != 0 and e != "" and e != "0"
+                        for e in v
+                    ):
+                        return f"顶层 rows 含非空数值（values={v!r}）"
                     continue
                 if v is not None and v != 0 and v != "" and v != "0":
                     return f"顶层 rows 含非空数值（{k}={v!r}）"

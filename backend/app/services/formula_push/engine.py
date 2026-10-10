@@ -609,7 +609,27 @@ async def _push_note(
     if note is None:
         reason = f"附注尚未生成「{section} {table_name}」章节（在附注模块生成后下次推送纳入）"
     elif (note.section_title or "").strip() != _title_check_name:
-        reason = f"附注 {section} 是「{note.section_title}」章节，不是「{table_name}」，未推送"
+        # ── 章节号不匹配：尝试按 section_title 反查（spec: formula-push-note-skip-reduction · 需求 3.1） ──
+        _section_prefix = section.split("、")[0] + "、" if "、" in section else section[:1]
+        fallback_rows = (await ctx.db.execute(
+            sa.select(DisclosureNote).where(
+                DisclosureNote.project_id == ctx.project_id,
+                DisclosureNote.year == ctx.year,
+                DisclosureNote.section_title == _title_check_name,
+                DisclosureNote.is_deleted == sa.false(),
+                DisclosureNote.note_section.like(f"{_section_prefix}%"),
+            ).with_for_update()
+        )).scalars().all()
+        if len(fallback_rows) == 1:
+            logger.info(
+                "formula_push: 章节号动态定位 %s → %s（规则声明 %s）",
+                _title_check_name, fallback_rows[0].note_section, section,
+            )
+            note = fallback_rows[0]
+            section = fallback_rows[0].note_section
+            section_addr = f"note://{section}/{table_name}"
+        else:
+            reason = f"附注 {section} 是「{note.section_title}」章节，不是「{table_name}」，未推送"
     elif str(_enum_value(note.status)) in FROZEN_NOTE_STATUSES:
         reason = "附注章节已确认，公式推送不改写"
     table_data = copy.deepcopy(note.table_data) if note is not None else None
@@ -620,9 +640,9 @@ async def _push_note(
     # ── 缺表时尝试建骨架（需求 5.1）──────────────────────────────────
     skeleton_built = False
     if table is None and reason and "没有" in reason and table_data is not None:
-        # _source 必须是 workpaper/workpaper_html（locate_table 已检查过 → 这里只补建缺的子表）
+        # _source 为 workpaper/workpaper_html 或 None（旧格式未标记）都允许建骨架
         source = table_data.get("_source")
-        if source in note_writer.WORKPAPER_SOURCES:
+        if source in note_writer.WORKPAPER_SOURCES or source is None:
             # 遮挡数据检查（需求 5.2）：原表格有非空非零数值或人工/锁定单元格 → 跳过
             blocked = note_writer.has_obscured_data(table_data, table_name)
             if blocked:
@@ -658,10 +678,13 @@ async def _push_note(
         return None
 
     wrote = False
+    any_data_row_matched = False
     for row in binding.note_rows(overlay, template_type, rule):
         if row["is_total"] or row["is_memo"]:
             continue  # 合计按附注实际行重算（见 _push_note_total）；「其中：」备注行不由底稿取数
         index = note_writer.find_row(table.rows, [row["note_label"], row["label"]])
+        if index is not None:
+            any_data_row_matched = True
         for field_name in rule.target.fields:
             value_key, period = note_writer.NOTE_FIELDS[field_name]
             addr = note_addr_id(section, table_name, row["note_label"], period)
@@ -674,10 +697,36 @@ async def _push_note(
                 wrote |= _push_note_cell(ctx, rule=rule, section=section, addr=addr, table=table,
                                          row=table.rows[index], field_name=field_name,
                                          value=row[value_key], paper=paper)
-    wrote |= _push_note_total(ctx, rule=rule, section=section, table_name=table_name, table=table, paper=paper)
+
+    # ── 单科目合计行兜底（spec: formula-push-note-skip-reduction · 需求 2.3） ──
+    # 所有数据行都未命中附注行 + 单科目底稿 → 把审定数写入合计行
+    skip_total_recalc = False
+    if not any_data_row_matched and hasattr(binding, "account_prefixes") and len(binding.account_prefixes) == 1:
+        total_idx = note_writer.find_total_row(table.rows)
+        if total_idx is not None:
+            total_note_rows = [r for r in binding.note_rows(overlay, template_type, rule) if r.get("is_total")]
+            if total_note_rows:
+                total_row_data = total_note_rows[0]
+                total_row = table.rows[total_idx]
+                total_label = note_writer.row_label(total_row) or "合计"
+                for field_name in rule.target.fields:
+                    value_key, period = note_writer.NOTE_FIELDS[field_name]
+                    if total_row_data.get(f"{value_key}_resolved"):
+                        addr = note_addr_id(section, table_name, total_label, period)
+                        wrote |= _push_note_cell(ctx, rule=rule, section=section, addr=addr, table=table,
+                                                 row=total_row, field_name=field_name,
+                                                 value=total_row_data[value_key], paper=paper)
+                skip_total_recalc = True  # 已直接写入合计行，跳过后续重算
+
+    if not skip_total_recalc:
+        wrote |= _push_note_total(ctx, rule=rule, section=section, table_name=table_name, table=table, paper=paper)
 
     if not wrote:
         return None
+    # spec: formula-push-note-skip-reduction · 需求 1.4
+    # 首次推送后标记 _source，下次推送走正常路径不再触发旧格式兜底
+    if table_data.get("_source") is None:
+        table_data["_source"] = "workpaper"
     # 同步指纹：与 sync-from-workpaper 同写，pull-from-workpapers 据此认定「真正同步过」（需求 5）
     table_data["_last_sync_wp_id"] = str(paper.id)
     table_data["_last_sync_at"] = ctx.now.isoformat()

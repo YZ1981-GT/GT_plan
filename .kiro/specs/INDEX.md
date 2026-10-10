@@ -6,7 +6,6 @@
 > **2026-10-04 新建**：[`disclosure-multitable-refresh-and-edit-writeback`](disclosure-multitable-refresh-and-edit-writeback/tasks.md) — 普通附注多表 binding/增量刷新 + AR 四组局部校准 + 前端投影反写；排除并行合并节点隔离与真实历史数据迁移。进度以本 spec 清单和实测证据为准，不增量推算全局总数。
 
 **最后更新**：2026-10-10
-**当前分支**：`work/2026-09-28-voucher-sampling-account-scope`
 > ⏱ **2026-10-01 现扫（归档裁决：底稿双向回写 + 公式管理两族）**：Active **61**（目录 **64**，无 tasks.md **3**：`procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening` / `workpaper-page-formula-toolbar-closure`）/ Archived **602**。只归档 **1** 个（`chain-closure-phase1-root-cause-fixes` → `06-engineering-governance`），其余 12 个候选逐条未归档，原因见 §二「归档（2026-10-01）」。
 > 🔴 **新增归档判据：交付物须已入库** —— 在 HEAD 干净检出（临时 `git worktree`）上跑 spec 守卫。4 组在工作树全绿、在 HEAD 上红（删行多区 · 受管行收敛 · adopt · L 三份），修复只在工作树里；d567 两边都红。只看 tasks.md 勾选、或只在工作树跑测试，会把「本机做完」误当「仓库里有」。
 
@@ -1036,6 +1035,7 @@ _archive/
 | 超标文件 | `python backend/scripts/check/check_file_size.py` |
 | 最高迁移 | `ls backend/migrations/V*.sql \| sort \| tail -1` |
 | 三件套完整性 | 扫描 `_archive/` 各 spec 目录是否含 requirements.md + design.md + tasks.md |
+| `formula-push-note-skip-reduction` | 0/30 | **公式推送附注跳过减少**（2026-10-10 新建）：修复四类设计缺陷（B: locate_table _source=NULL 拦截 38 项 / A: 单科目行匹配写合计 58 项 / D: 章节号硬编码动态反查 11 项 / F: has_obscured_data 误报 2 项），目标 skipped 从 148 降到 ≤45。7 Task / 30 子任务。 |
 
 ---
 

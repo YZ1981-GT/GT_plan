@@ -409,7 +409,6 @@ async def test_note_rows_follow_disclosure_and_total_is_recomputed_from_actual_r
     ("missing", "尚未生成"),
     ("other_title", "政府补助"),
     ("confirmed", "已确认"),
-    ("f1", "模板取数维护"),
 ])
 async def test_note_section_is_skipped_with_reason(env, case, fragment):
     await env.seed_entries(base_entries())
@@ -417,9 +416,6 @@ async def test_note_section_is_skipped_with_reason(env, case, fragment):
         await env.add_note("五、1", _f2_note(), title="政府补助")
     elif case == "confirmed":
         await env.add_note("五、1", _f2_note(), status=NoteStatus.confirmed)
-    elif case == "f1":
-        # 真库和平药房 / 首汽形态：顶层 rows，由模板按试算表取数维护
-        await env.add_note("五、1", {"rows": [{"label": "库存现金", "values": [1, 1]}], "headers": ["项目"]})
     result = await env.push()
     [skip] = [i for i in result.items if i.stage == "note"]
     assert skip.action == "skipped" and fragment in skip.reason
@@ -428,6 +424,21 @@ async def test_note_section_is_skipped_with_reason(env, case, fragment):
         note = await env.note("五、1")
         assert "_last_sync_wp_id" not in (note.table_data or {}) or note.table_data["_last_sync_wp_id"] == "旧底稿同步"
         assert note.last_sync_source is None
+
+
+@pytest.mark.asyncio
+async def test_old_format_note_not_blocked_by_source_null(env):
+    """spec: formula-push-note-skip-reduction · 需求 1.2
+    旧格式附注（_source=None + 顶层 rows）不再被"模板取数维护"一刀切跳过。
+    虽然具体行可能找不到（走 find_row 失败或合计行兜底），但 locate_table 本身不拦截。
+    """
+    await env.seed_entries(base_entries())
+    # 真库形态：顶层 rows，由模板按试算表取数维护
+    await env.add_note("五、1", {"rows": [{"label": "库存现金", "values": [1, 1]}], "headers": ["项目"]})
+    result = await env.push()
+    note_skips = [i for i in result.items if i.stage == "note" and i.action == "skipped"]
+    # 不再报"模板取数维护"
+    assert all("模板取数维护" not in (s.reason or "") for s in note_skips)
 
 
 @pytest.mark.asyncio
