@@ -99,6 +99,10 @@ def _align_table_to_template(tbl: dict, tpl_tbl: dict) -> None:
     if not tbl.get("_column_groups") and tpl_tbl.get("_column_groups"):
         tbl["_column_groups"] = tpl_tbl["_column_groups"]
 
+    # 4. 回填 text_after_table（模板中表格后的参考文字）
+    if not tbl.get("text_after_table") and tpl_tbl.get("text_after_table"):
+        tbl["text_after_table"] = tpl_tbl["text_after_table"]
+
 
 def _expand_rows_values(tbl: dict, target_value_count: int) -> None:
     """把 rows 中每行的 values 扩展到 target_value_count（不足补 None）。

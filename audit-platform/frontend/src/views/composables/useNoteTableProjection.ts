@@ -170,8 +170,8 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
     for (let i = 0; i < rawTables.length; i++) {
       const t = rawTables[i]
       const name = (t.name || '') as string
-      // 判定是否为续表：以"续"开头（模板格式）或含"（续："（sub_table_data 格式）
-      const isContinuation = name.startsWith('续') || name.includes('（续：') || name.includes('(续：')
+      // 判定是否为续表：以"续"开头（模板格式）或含"（续："（sub_table_data 格式）或含"（续）"（bindings 格式）
+      const isContinuation = name.startsWith('续') || name.includes('（续：') || name.includes('(续：') || name.includes('（续）') || name.includes('(续)')
       if (isContinuation && merged.length > 0) {
         // 有独立列定义（_column_groups 或 columns）的续表不合并——它是完整独立子表
         if (t._column_groups || (t.columns && Array.isArray(t.columns) && t.columns.length > 0)) {
@@ -180,8 +180,8 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
         }
         // 找到对应主表（续表名通常含主表名前缀）
         let prevIdx = merged.length - 1
-        // 尝试精确匹配：续表名去掉"（续：...）"后 === 某已有表名
-        const baseName = name.replace(/[（(]续[：:].*$/, '').trim()
+        // 尝试精确匹配：续表名去掉"（续：...）"或"（续）..."后 === 某已有表名
+        const baseName = name.replace(/[（(]续[）)：:].*$/, '').trim()
         if (baseName) {
           const matchIdx = merged.findIndex((m) => (m.name || '').trim() === baseName)
           if (matchIdx >= 0) prevIdx = matchIdx

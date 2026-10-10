@@ -21,11 +21,13 @@
         @applied="$emit('mapping-applied', $event)"
       />
       <span style="flex: 1;" />
-      <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">{{ rules.length }} 条规则</span>
+      <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">
+        已映射 {{ mappedCount }} / {{ rules.length }} 条
+      </span>
     </div>
     <el-table :data="rules" size="small" border max-height="55vh"
       :header-cell-style="{ background: '#f8f6fb', fontSize: '12px', whiteSpace: 'nowrap' }">
-      <el-table-column label="国企版章节" min-width="200">
+      <el-table-column :label="sourceLabel" min-width="200">
         <template #default="{ row }">
           <span style="font-size: var(--gt-font-size-xs);">{{ row.soe_section }}</span>
         </template>
@@ -33,10 +35,28 @@
       <el-table-column label="→" width="40" align="center">
         <template #default><span style="color: var(--gt-color-text-placeholder);">→</span></template>
       </el-table-column>
-      <el-table-column label="上市版章节" min-width="200">
+      <el-table-column :label="targetLabel" min-width="260">
         <template #default="{ row }">
-          <el-input v-if="row._editing" v-model="row.listed_section" size="small" />
-          <span v-else style="font-size: var(--gt-font-size-xs);">{{ row.listed_section || '—' }}</span>
+          <el-select
+            v-if="targetSections.length > 0"
+            v-model="row.listed_section"
+            size="small"
+            filterable
+            clearable
+            placeholder="选择章节"
+            style="width: 100%;"
+          >
+            <el-option
+              v-for="opt in targetSections"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
+          <template v-else>
+            <el-input v-if="row._editing" v-model="row.listed_section" size="small" />
+            <span v-else style="font-size: var(--gt-font-size-xs);">{{ row.listed_section || '—' }}</span>
+          </template>
         </template>
       </el-table-column>
       <el-table-column label="状态" width="60" align="center">
@@ -50,14 +70,20 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
+import type { TargetSectionOption } from '@/views/composables/useNoteTemplate'
 
-defineProps<{
+const props = defineProps<{
   modelValue: boolean
   projectId: string
   loading: boolean
   canEdit: boolean
   rules: any[]
+  /** 对方模板的章节选项列表 */
+  targetSections: TargetSectionOption[]
+  /** 当前模板类型 soe / listed */
+  templateType: string
   getMappingData: () => Record<string, any>
 }>()
 
@@ -67,4 +93,17 @@ defineEmits<{
   'save-rules': []
   'mapping-applied': [data: Record<string, any>]
 }>()
+
+/** 已映射计数 */
+const mappedCount = computed(() => props.rules.filter(r => r.listed_section).length)
+
+/** 左列标题 */
+const sourceLabel = computed(() =>
+  props.templateType === 'listed' ? '上市版章节' : '国企版章节',
+)
+
+/** 右列标题 */
+const targetLabel = computed(() =>
+  props.templateType === 'listed' ? '国企版章节' : '上市版章节',
+)
 </script>

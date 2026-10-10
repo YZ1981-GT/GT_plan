@@ -149,13 +149,24 @@ def extract_word_data_rows(grid: dict, n_hdr: int, num_rows: int, num_cols: int)
 
 
 def extract_all_word_tables(docx_path: Path) -> list[dict]:
-    """从 Word 文件提取所有表格元信息。"""
+    """从 Word 文件提取所有表格元信息（含表格后段落文字）。"""
     doc = Document(str(docx_path))
     body = doc.element.body
     results = []
     table_idx = 0
     current_tag = ""
     last_para_text = ""  # 表格前最近的非空段落（用作 title）
+    # ── text_after 收集 ──
+    collecting_after = False  # 是否正在收集上一张表后的段落
+    after_paras: list[str] = []
+
+    def _flush_after():
+        """把已收集的段落文字写入上一张表的 text_after_raw。"""
+        nonlocal collecting_after, after_paras
+        if collecting_after and results:
+            results[-1]["text_after_raw"] = "\n".join(after_paras)
+        after_paras = []
+        collecting_after = False
 
     for elem in body:
         if elem.tag == qn("w:p"):
@@ -163,6 +174,7 @@ def extract_all_word_tables(docx_path: Path) -> list[dict]:
             text = "".join(r.text or "" for r in runs).strip()
             tag_m = re.search(r"\{\{table:([^}]+)\}\}", text)
             if tag_m:
+                _flush_after()
                 current_tag = tag_m.group(1)
                 # tag 所在段落文本（去掉标签本身）可作为标题
                 clean = re.sub(r"\{\{table:[^}]+\}\}", "", text).strip()
@@ -170,8 +182,11 @@ def extract_all_word_tables(docx_path: Path) -> list[dict]:
                 if clean:
                     last_para_text = clean
             elif text and not text.startswith("##"):
+                if collecting_after:
+                    after_paras.append(text)
                 last_para_text = text
         elif elem.tag == qn("w:tbl"):
+            _flush_after()
             table = doc.tables[table_idx]
             grid, nc, nr = get_merge_grid(table)
             has_merge = any(
@@ -206,6 +221,7 @@ def extract_all_word_tables(docx_path: Path) -> list[dict]:
                 "idx": table_idx,
                 "tag": current_tag,
                 "title_text": last_para_text,  # Word 中表格前的段落文本
+                "text_after_raw": "",           # 表格后段落文字（后续 _flush_after 填充）
                 "cols": nc,
                 "rows_count": nr,
                 "n_header_rows": n_hdr,
@@ -216,8 +232,10 @@ def extract_all_word_tables(docx_path: Path) -> list[dict]:
             })
             current_tag = ""
             last_para_text = ""
+            collecting_after = True  # 开始收集下一段文字
             table_idx += 1
 
+    _flush_after()  # 最后一张表
     return results
 
 
@@ -281,11 +299,15 @@ def build_flat_headers_from_mh(mh: list[list[str]]) -> list[str]:
 # Phase 1: 合并模板 - 列不一致修复 + multi_header 补齐
 # ════════════════════════════════════════════════════════════════════
 
-def phase1_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_run: bool, verbose: bool) -> int:
-    """Phase 1: 合并模板列不一致修复 + multi_header 写入。返回更新数。"""
+def phase1_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_run: bool, verbose: bool) -> tuple[int, int]:
+    """Phase 1: 合并模板列不一致修复 + multi_header 写入 + title 同步。
+
+    返回 ``(struct_updated, title_updated)``。
+    """
     note_ch = note_chapter_for_std(std)
     by_sid = {e["section_id"]: e for e in json_data}
-    updated = 0
+    struct_updated = 0
+    title_updated = 0
 
     for wt in word_tables:
         p = parse_tag(wt["tag"])
@@ -296,6 +318,16 @@ def phase1_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
         entry = by_sid.get(sid)
         if not entry:
             continue  # Phase 2 处理
+
+        # ── title 同步：以 Word 表格前段落文本为准 ──
+        w_title = (wt.get("title_text") or "").strip()
+        j_title = (entry.get("title") or "").strip()
+        if w_title and w_title != j_title:
+            if not dry_run:
+                entry["title"] = w_title
+            title_updated += 1
+            if verbose:
+                print(f"    P1-T {sid}: title '{j_title[:30]}' → '{w_title[:30]}'")
 
         j_cols = len(entry.get("headers", []))
         w_cols = wt["cols"]
@@ -315,14 +347,14 @@ def phase1_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
                             entry["_column_groups"] = cg
                         elif "_column_groups" in entry:
                             del entry["_column_groups"]
-                    updated += 1
+                    struct_updated += 1
                     if verbose:
                         print(f"    P1-A {sid}: 写入 mh ({len(mh)} 行)")
             continue
 
         # 情况 B: 列数不一致
         if not wt["has_multi_header"]:
-            continue  # 单级表头列数不一致，Phase 5 校正
+            continue  # 单级表头列数不一致
 
         mh = normalize_mh(wt["multi_header"]) if wt["multi_header"] else None
         if not mh or len(mh) < 2:
@@ -333,16 +365,11 @@ def phase1_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
             print(f"    P1-B {sid}: W={w_cols}col J={j_cols}col → 以 Word 为准")
 
         if not dry_run:
-            # 更新 headers：取 mh 第一行
             entry["headers"] = list(mh[0])
-
-            # 更新 rows：对齐列数
             new_rows = []
             for row in entry.get("rows", []):
                 new_rows.append(align_row_columns(row, j_cols, w_cols))
             entry["rows"] = new_rows
-
-            # 写入 multi_header
             entry["multi_header"] = mh
             cg = multi_header_to_column_groups(mh)
             if cg:
@@ -350,9 +377,9 @@ def phase1_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
             elif "_column_groups" in entry:
                 del entry["_column_groups"]
 
-        updated += 1
+        struct_updated += 1
 
-    return updated
+    return struct_updated, title_updated
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -426,11 +453,16 @@ def phase2_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
 # Phase 3: 非报表注释章节
 # ════════════════════════════════════════════════════════════════════
 
-def phase3_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_run: bool, verbose: bool) -> int:
-    """Phase 3: 为非报表注释章节的表创建 JSON 条目。"""
+def phase3_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_run: bool, verbose: bool) -> tuple[int, int]:
+    """Phase 3: 为非报表注释章节的表创建 JSON 条目 + title 同步。
+
+    返回 ``(added, title_updated)``。
+    """
     note_ch = note_chapter_for_std(std)
     existing_sids = {e["section_id"] for e in json_data}
+    by_sid = {e["section_id"]: e for e in json_data}
     added = 0
+    title_updated = 0
     max_seq = max((e.get("seq", 0) for e in json_data), default=0)
 
     for wt in word_tables:
@@ -456,6 +488,16 @@ def phase3_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
             sid = f"{ch}-{tidx + 1}"
 
         if sid in existing_sids:
+            # ── title 同步（与 Phase 1 同逻辑） ──
+            w_title = (wt.get("title_text") or "").strip()
+            if w_title:
+                entry_p3 = by_sid.get(sid)
+                if entry_p3 and (entry_p3.get("title") or "").strip() != w_title:
+                    if not dry_run:
+                        entry_p3["title"] = w_title
+                    title_updated += 1
+                    if verbose:
+                        print(f"    P3-T {sid}: title → '{w_title[:40]}'")
             continue
 
         max_seq += 1
@@ -489,7 +531,7 @@ def phase3_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
 
         added += 1
 
-    return added
+    return added, title_updated
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -593,6 +635,384 @@ def phase4_standalone(word_tables: list[dict], json_data: dict, std: str, dry_ru
 
 
 # ════════════════════════════════════════════════════════════════════
+# Phase 5: 单体模板 - title 同步
+# ════════════════════════════════════════════════════════════════════
+
+def phase5_standalone_title(
+    word_tables: list[dict], json_data: dict, std: str, dry_run: bool, verbose: bool,
+) -> int:
+    """Phase 5: 单体模板 title 同步（以 Word 为准）。
+
+    遍历 Word 中每张带 tag 的表格，按 ``(section_num, table_idx)`` 匹配到 JSON
+    中的 ``sections[].tables[]``，若 title（即 ``name``）与 Word ``title_text``
+    不同则更新。返回更新数。
+
+    不处理续表（JSON 中有 ``continuation_of_index`` 的条目在 Word 中没有独立 tag）。
+    """
+    note_ch = note_chapter_for_std(std)
+    sections = json_data.get("sections", [])
+    updated = 0
+
+    # 建立 JSON 索引：section_number → section dict
+    sec_by_num: dict[str, dict] = {}
+    for s in sections:
+        sn = s.get("section_number", "")
+        if sn:
+            sec_by_num[sn] = s
+
+    # 建立 Word 索引：(parent_seq, table_idx) → word_table
+    word_by_key: dict[tuple[int, int], dict] = {}
+    for wt in word_tables:
+        p = parse_tag(wt["tag"])
+        if not p or p.get("chapter") != note_ch or p.get("section") is None:
+            continue
+        word_by_key[(p["section"], p["table_idx"])] = wt
+
+    for s in sections:
+        sn = s.get("section_number", "")
+        m = re.match(rf"^{re.escape(note_ch)}、(\d+)", sn)
+        if not m:
+            continue
+        parent_seq = int(m.group(1))
+
+        # 遍历该 section 下的表格，跳过续表
+        word_idx = 0  # Word 中的表格索引（不含续表）
+        for ti, t in enumerate(s.get("tables", [])):
+            if t.get("continuation_of_index") is not None:
+                continue  # 续表在 Word 中没有独立 tag，跳过
+
+            wt = word_by_key.get((parent_seq, word_idx))
+            word_idx += 1
+            if not wt:
+                continue
+
+            # 安全校验：Word 表的首列标签应与 JSON 表的首列标签基本匹配
+            # 如果不匹配说明 word_idx 已经错位（可能因为续表位置异常），跳过
+            w_h0 = (wt.get("leaf_headers") or [""])[0].replace(" ", "").replace("\u3000", "").strip()
+            j_headers = t.get("headers") or []
+            j_h0 = (j_headers[0] if j_headers else "").replace(" ", "").replace("\u3000", "").strip()
+            if w_h0 and j_h0 and w_h0 != j_h0 and not w_h0.startswith(j_h0) and not j_h0.startswith(w_h0):
+                if verbose:
+                    print(f"    P5-SKIP {sn} t[{ti}]: 首列不匹配 W='{w_h0[:20]}' J='{j_h0[:20]}'，可能续表位置异常")
+                continue
+
+            w_title = (wt.get("title_text") or "").strip()
+            j_name = (t.get("name") or "").strip()
+            if w_title and w_title != j_name:
+                if not dry_run:
+                    t["name"] = w_title
+                updated += 1
+                if verbose:
+                    print(f"    P5-T {sn} t[{ti}]: '{j_name[:35]}' → '{w_title[:35]}'")
+
+    return updated
+
+
+# ════════════════════════════════════════════════════════════════════
+# text_after 清理 + parent_section 规范化
+# ════════════════════════════════════════════════════════════════════
+
+_TAG_RE = re.compile(r"\{\{[^}]+\}\}")
+_HINT_BRACKET_RE = re.compile(r"【[^】]*】")
+_SECTION_MARKER_RE = re.compile(r"^##\s*")
+_PUNCT_ONLY_RE = re.compile(r"^[\s\n\r。，、；：？！…—·\u201c\u201d\u2018\u2019（）【】《》〈〉「」『』\[\]()]+$")
+_PARENT_HINT_RE = re.compile(r"[（(][^）)]*(?:删除|修改|调整|提示|不适用|根据企业|选择|酌情)[^）)]*[）)]")
+# 纯提示性（注：...）段落：整段以「（注：」开头且不含具体金额/公司名
+_NOTE_HINT_RE = re.compile(r"^（注[：:]")
+
+
+def _is_pure_hint_note(line: str) -> bool:
+    """判断以（注：开头的段落是否为纯提示性内容（不含具体金额/公司名则视为提示）。"""
+    if not _NOTE_HINT_RE.match(line):
+        return False
+    # 含具体金额（数字+万/元/%）或公司名（XX公司）的不是纯提示
+    if re.search(r"\d+[万元%]", line):
+        return False
+    return True
+
+
+def clean_text_after(raw: str) -> str:
+    """清理 Word 表格后段落文字为种子 text_after_table。
+
+    规则：
+    1. 去掉 ``{{...}}`` 标记（seq/section/table 控制符）
+    2. 去掉 ``【提示性内容】``
+    3. 去掉 ``##`` 样式标记行
+    4. 去掉纯提示性 ``（注：...）`` 段落（不含具体金额/公司名的注释）
+    5. 逐行 strip，去掉空行
+    6. 结果如果只剩标点符号则视为空
+    """
+    lines = raw.split("\n")
+    cleaned: list[str] = []
+    for line in lines:
+        s = _TAG_RE.sub("", line)
+        s = _HINT_BRACKET_RE.sub("", s)
+        s = _SECTION_MARKER_RE.sub("", s)
+        s = s.strip()
+        if not s:
+            continue
+        if _PUNCT_ONLY_RE.match(s):
+            continue
+        if _is_pure_hint_note(s):
+            continue
+        cleaned.append(s)
+    return "\n".join(cleaned)
+
+
+def clean_parent_section(name: str) -> str:
+    """去掉 parent_section 中括号内的提示性文字。
+
+    例：``应收账款（以下不适用的，请删除；账龄可根据企业的分组进行修改）`` → ``应收账款``
+    仅处理含「删除/修改/调整/提示/不适用」等关键词的括号，避免误删正常括号内容。
+    """
+    return _PARENT_HINT_RE.sub("", name).strip()
+
+
+def _dedup_sibling_titles(text: str, sibling_titles: set[str]) -> str:
+    """去掉 text_after 中等于同章节兄弟表 title 的行。
+
+    Word 中表格后段落常混入下一张（或后续几张）表的标题——因为标题段落紧贴在
+    ``{{table:...}}`` 标记之前，被收集到了上一张表的 text_after 中。
+    渲染时会与兄弟表的标签/标题重复。
+
+    策略：逐行检查，如果该行精确等于任意一个兄弟表的 title，则去掉。
+    """
+    if not text or not sibling_titles:
+        return text
+    lines = text.split("\n")
+    filtered = [line for line in lines if line.strip() not in sibling_titles]
+    return "\n".join(filtered)
+
+
+# ════════════════════════════════════════════════════════════════════
+# Phase 6: text_after_table 同步 + parent_section 清理
+# ════════════════════════════════════════════════════════════════════
+
+def phase6_text_after_and_parent(
+    word_tables: list[dict],
+    json_data: list[dict] | dict,
+    std: str,
+    kind: str,  # "consol" | "standalone"
+    dry_run: bool,
+    verbose: bool,
+) -> tuple[int, int]:
+    """Phase 6: 从 Word 同步 text_after_table + 清理 parent_section。
+
+    返回 ``(text_updated, parent_cleaned)``。
+    """
+    note_ch = note_chapter_for_std(std)
+    text_updated = 0
+    parent_cleaned = 0
+
+    if kind == "consol":
+        # ── 合并附注：按 section_id 匹配 ──
+        by_sid = {e["section_id"]: e for e in json_data}
+
+        # 构建同章节兄弟表 title 集合（按 parent_seq 分组），用于去重
+        from collections import defaultdict
+        _consol_groups: dict[int, list[dict]] = defaultdict(list)
+        for e in json_data:
+            _consol_groups[e.get("parent_seq", 0)].append(e)
+        # 建立 section_id → 同组所有兄弟 title 的映射（排除自身）
+        _sibling_titles: dict[str, set[str]] = {}
+        for group in _consol_groups.values():
+            all_titles = {e.get("title", "").strip() for e in group if e.get("title")}
+            for e in group:
+                own = e.get("title", "").strip()
+                _sibling_titles[e["section_id"]] = all_titles - {own} if own else all_titles
+
+        for wt in word_tables:
+            p = parse_tag(wt["tag"])
+            if not p:
+                continue
+            ch = p.get("chapter", "")
+            sec = p.get("section")
+            tidx = p.get("table_idx", 0)
+            sec_name = p.get("section_name", "")
+            if ch == note_ch and sec is not None:
+                sid = f"五-{sec}-{tidx + 1}"
+            elif sec_name:
+                safe = re.sub(r"[^\w]", "", sec_name)[:20]
+                sid = f"{ch}-{safe}-{tidx + 1}"
+            elif sec is not None:
+                sid = f"{ch}-{sec}-{tidx + 1}"
+            else:
+                sid = f"{ch}-{tidx + 1}"
+            entry = by_sid.get(sid)
+            if not entry:
+                continue
+            # text_after_table
+            raw = wt.get("text_after_raw", "")
+            cleaned = clean_text_after(raw) if raw else ""
+            # 去掉与同章节兄弟表 title 重复的行
+            cleaned = _dedup_sibling_titles(cleaned, _sibling_titles.get(sid, set()))
+            existing = (entry.get("text_after_table") or "").strip()
+            if cleaned != existing:
+                if not dry_run:
+                    if cleaned:
+                        entry["text_after_table"] = cleaned
+                    elif "text_after_table" in entry:
+                        del entry["text_after_table"]
+                text_updated += 1
+                if verbose:
+                    preview = cleaned[:50].replace("\n", "\\n") if cleaned else "(空)"
+                    print(f"    P6-T {sid}: text_after → {preview}")
+
+        # parent_section 清理
+        for entry in json_data:
+            ps = entry.get("parent_section", "")
+            cleaned_ps = clean_parent_section(ps)
+            if cleaned_ps != ps:
+                if not dry_run:
+                    entry["parent_section"] = cleaned_ps
+                parent_cleaned += 1
+                if verbose:
+                    print(f"    P6-P {entry['section_id']}: parent '{ps[:40]}' → '{cleaned_ps[:40]}'")
+
+    elif kind == "standalone":
+        # ── 单体附注：按 (section_num, table_idx) 匹配 ──
+        sections = json_data.get("sections", []) if isinstance(json_data, dict) else []
+        word_by_key: dict[tuple[int, int], dict] = {}
+        for wt in word_tables:
+            p = parse_tag(wt["tag"])
+            if not p or p.get("chapter") != note_ch or p.get("section") is None:
+                continue
+            word_by_key[(p["section"], p["table_idx"])] = wt
+
+        for s in sections:
+            sn = s.get("section_number", "")
+            m = re.match(rf"^{re.escape(note_ch)}、(\d+)", sn)
+            if not m:
+                continue
+            parent_seq = int(m.group(1))
+            word_idx = 0
+            tables_list = s.get("tables", [])
+            # 同 section 所有非续表 name 集合（用于去重）
+            all_names = {
+                t2.get("name", "").strip()
+                for t2 in tables_list
+                if t2.get("continuation_of_index") is None and t2.get("name")
+            }
+            for ti, t in enumerate(tables_list):
+                if t.get("continuation_of_index") is not None:
+                    continue
+                wt = word_by_key.get((parent_seq, word_idx))
+                word_idx += 1
+                if not wt:
+                    continue
+                raw = wt.get("text_after_raw", "")
+                cleaned = clean_text_after(raw) if raw else ""
+                # 去掉与同 section 兄弟表 name 重复的行（排除自身）
+                own_name = (t.get("name") or "").strip()
+                siblings = all_names - {own_name} if own_name else all_names
+                cleaned = _dedup_sibling_titles(cleaned, siblings)
+                existing = (t.get("text_after_table") or "").strip()
+                if cleaned != existing:
+                    if not dry_run:
+                        if cleaned:
+                            t["text_after_table"] = cleaned
+                        elif "text_after_table" in t:
+                            del t["text_after_table"]
+                    text_updated += 1
+                    if verbose:
+                        preview = cleaned[:50].replace("\n", "\\n") if cleaned else "(空)"
+                        print(f"    P6-T {sn} t[{ti}]: text_after → {preview}")
+
+    return text_updated, parent_cleaned
+
+
+# ════════════════════════════════════════════════════════════════════
+# Title 漂移检测（--check 门禁）
+# ════════════════════════════════════════════════════════════════════
+
+def check_title_drift(
+    word_tables: list[dict],
+    json_data: list[dict] | dict,
+    std: str,
+    kind: str,  # "consol" | "standalone"
+    verbose: bool = False,
+) -> list[str]:
+    """比对 Word 与 JSON 的 title，返回不一致条目列表（空 = 无漂移）。
+
+    合并附注：``json_data`` 是 ``list[dict]``，按 section_id 匹配。
+    单体附注：``json_data`` 是 ``dict``（顶层带 sections），按 (section_num, table_idx) 匹配。
+    """
+    note_ch = note_chapter_for_std(std)
+    drifts: list[str] = []
+
+    if kind == "consol":
+        by_sid = {e["section_id"]: e for e in json_data}
+        # 正向：Word 有但 JSON title 不同
+        word_sids: set[str] = set()
+        for wt in word_tables:
+            p = parse_tag(wt["tag"])
+            if not p or p.get("section") is None:
+                continue
+            ch = p.get("chapter", "")
+            sec = p.get("section")
+            tidx = p.get("table_idx", 0)
+            if ch == note_ch and sec is not None:
+                sid = f"五-{sec}-{tidx + 1}"
+            elif p.get("section_name"):
+                safe = re.sub(r"[^\w]", "", p["section_name"])[:20]
+                sid = f"{ch}-{safe}-{tidx + 1}"
+            elif sec is not None:
+                sid = f"{ch}-{sec}-{tidx + 1}"
+            else:
+                sid = f"{ch}-{tidx + 1}"
+            word_sids.add(sid)
+            entry = by_sid.get(sid)
+            if not entry:
+                continue
+            w_title = (wt.get("title_text") or "").strip()
+            j_title = (entry.get("title") or "").strip()
+            if w_title and w_title != j_title:
+                msg = f"  {sid}: W→J '{w_title[:50]}' vs '{j_title[:50]}'"
+                drifts.append(msg)
+                if verbose:
+                    print(msg)
+        # 反向：JSON 有 title 但 Word 中无对应 tag（仅报信息，不算 drift 错误）
+        if verbose:
+            for entry in json_data:
+                sid = entry.get("section_id", "")
+                if sid not in word_sids and entry.get("title"):
+                    print(f"  [info] {sid}: JSON 有但 Word 无对应 tag（可能来自 Markdown 种子）")
+
+    elif kind == "standalone":
+        sections = json_data.get("sections", []) if isinstance(json_data, dict) else []
+        word_by_key: dict[tuple[int, int], dict] = {}
+        for wt in word_tables:
+            p = parse_tag(wt["tag"])
+            if not p or p.get("chapter") != note_ch or p.get("section") is None:
+                continue
+            word_by_key[(p["section"], p["table_idx"])] = wt
+
+        for s in sections:
+            sn = s.get("section_number", "")
+            m = re.match(rf"^{re.escape(note_ch)}、(\d+)", sn)
+            if not m:
+                continue
+            parent_seq = int(m.group(1))
+            word_idx = 0
+            for ti, t in enumerate(s.get("tables", [])):
+                if t.get("continuation_of_index") is not None:
+                    continue
+                wt = word_by_key.get((parent_seq, word_idx))
+                word_idx += 1
+                if not wt:
+                    continue
+                w_title = (wt.get("title_text") or "").strip()
+                j_name = (t.get("name") or "").strip()
+                if w_title and w_title != j_name:
+                    msg = f"  {sn} t[{ti}]: W='{w_title[:45]}' vs J='{j_name[:45]}'"
+                    drifts.append(msg)
+                    if verbose:
+                        print(msg)
+
+    return drifts
+
+
+# ════════════════════════════════════════════════════════════════════
 # 写入 & 排序
 # ════════════════════════════════════════════════════════════════════
 
@@ -633,7 +1053,7 @@ def main():
     parser = argparse.ArgumentParser(description="从 Word 同步附注模板 JSON")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--check", action="store_true", help="只比对不写入，有差异 exit 2（CI 门禁用）")
-    parser.add_argument("--phase", type=str, default="all", help="1/2/3/4/all")
+    parser.add_argument("--phase", type=str, default="all", help="1/2/3/4/5/6/all")
     parser.add_argument("--std", type=str, default="all", help="soe/listed/all")
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args()
@@ -642,12 +1062,13 @@ def main():
     if args.check:
         args.dry_run = True
 
-    phases = [1, 2, 3, 4] if args.phase == "all" else [int(args.phase)]
+    phases = [1, 2, 3, 4, 5, 6] if args.phase == "all" else [int(args.phase)]
     stds = ["soe", "listed"] if args.std == "all" else [args.std]
 
     print(f"模式: {'CHECK' if args.check else 'DRY-RUN' if args.dry_run else 'WRITE'}, phases={phases}, stds={stds}")
 
     total_drift = 0  # --check 模式计数漂移文件数
+    total_title_drift: list[str] = []  # title 漂移明细
 
     for std in stds:
         print(f"\n{'='*60}")
@@ -658,26 +1079,48 @@ def main():
         consol_docx = DOCX_DIR / f"{std}_consolidated.docx"
         standalone_docx = DOCX_DIR / f"{std}_standalone.docx"
 
-        if 1 in phases or 2 in phases or 3 in phases:
+        consol_word: list[dict] = []
+        consol_data: list[dict] = []
+        consol_json_path = DATA_DIR / f"consol_note_sections_{std}.json"
+
+        if 1 in phases or 2 in phases or 3 in phases or 6 in phases:
             print(f"  解析 {consol_docx.name}...")
             consol_word = extract_all_word_tables(consol_docx)
             print(f"  Word 表格: {len(consol_word)}")
 
-            consol_json_path = DATA_DIR / f"consol_note_sections_{std}.json"
             consol_data = json.loads(consol_json_path.read_text("utf-8"))
             print(f"  JSON 表格: {len(consol_data)}")
 
             if 1 in phases:
-                n = phase1_consol(consol_word, consol_data, std, args.dry_run, args.verbose)
-                print(f"  Phase 1 (列修复+mh): {n} 更新")
+                struct_n, title_n = phase1_consol(consol_word, consol_data, std, args.dry_run, args.verbose)
+                parts = []
+                if struct_n:
+                    parts.append(f"{struct_n} 结构更新")
+                if title_n:
+                    parts.append(f"{title_n} title同步")
+                print(f"  Phase 1 (列修复+mh+title): {', '.join(parts) if parts else '0 更新'}")
 
             if 2 in phases:
                 n = phase2_consol(consol_word, consol_data, std, args.dry_run, args.verbose)
                 print(f"  Phase 2 (缺失表): {n} 新增")
 
             if 3 in phases:
-                n = phase3_consol(consol_word, consol_data, std, args.dry_run, args.verbose)
-                print(f"  Phase 3 (非注释章): {n} 新增")
+                added_n, title_n = phase3_consol(consol_word, consol_data, std, args.dry_run, args.verbose)
+                parts = []
+                if added_n:
+                    parts.append(f"{added_n} 新增")
+                if title_n:
+                    parts.append(f"{title_n} title同步")
+                print(f"  Phase 3 (非注释章): {', '.join(parts) if parts else '0'}")
+
+            if 6 in phases:
+                txt_n, ps_n = phase6_text_after_and_parent(consol_word, consol_data, std, "consol", args.dry_run, args.verbose)
+                parts = []
+                if txt_n:
+                    parts.append(f"{txt_n} text_after")
+                if ps_n:
+                    parts.append(f"{ps_n} parent清理")
+                print(f"  Phase 6 (text+parent): {', '.join(parts) if parts else '0'}")
 
             # 确保一致性：有 mh 的必有 cg，无 mh 的无 cg
             for e in consol_data:
@@ -699,19 +1142,31 @@ def main():
             else:
                 print(f"  (无变化) {consol_json_path.name}")
 
-        if 4 in phases:
+        standalone_word: list[dict] = []
+        standalone_data: dict = {}
+        standalone_json_path = DATA_DIR / f"note_template_{std}.json"
+
+        if 4 in phases or 5 in phases or 6 in phases:
             print(f"  解析 {standalone_docx.name}...")
             standalone_word = extract_all_word_tables(standalone_docx)
             print(f"  Word 表格: {len(standalone_word)}")
 
-            standalone_json_path = DATA_DIR / f"note_template_{std}.json"
             standalone_data = json.loads(standalone_json_path.read_text("utf-8"))
             n_sections = len(standalone_data.get("sections", []))
             n_tables = sum(len(s.get("tables", [])) for s in standalone_data.get("sections", []))
             print(f"  JSON sections: {n_sections}, tables: {n_tables}")
 
-            n = phase4_standalone(standalone_word, standalone_data, std, args.dry_run, args.verbose)
-            print(f"  Phase 4 (group补齐): {n} 更新")
+            if 4 in phases:
+                n = phase4_standalone(standalone_word, standalone_data, std, args.dry_run, args.verbose)
+                print(f"  Phase 4 (group补齐): {n} 更新")
+
+            if 5 in phases:
+                n = phase5_standalone_title(standalone_word, standalone_data, std, args.dry_run, args.verbose)
+                print(f"  Phase 5 (单体title): {n} 更新")
+
+            if 6 in phases:
+                txt_n, _ = phase6_text_after_and_parent(standalone_word, standalone_data, std, "standalone", args.dry_run, args.verbose)
+                print(f"  Phase 6 (单体text_after): {txt_n} 更新")
 
             changed = write_json(standalone_json_path, standalone_data, args.dry_run)
             if changed:
@@ -720,11 +1175,31 @@ def main():
             else:
                 print(f"  (无变化) {standalone_json_path.name}")
 
-    if args.check and total_drift:
-        print(f"\n🔴 --check 失败：{total_drift} 个文件与 Word 不同步，请重跑 sync 工具")
-        sys.exit(2)
-    elif args.check:
-        print(f"\n✅ --check 通过：所有模板 JSON 与 Word 同步")
+        # ── --check 模式：title 漂移检测 ──
+        if args.check:
+            if consol_word and consol_data:
+                drifts = check_title_drift(consol_word, consol_data, std, "consol", args.verbose)
+                if drifts:
+                    total_title_drift.extend([f"[{std} consol] {d}" for d in drifts])
+            if standalone_word and standalone_data:
+                drifts = check_title_drift(standalone_word, standalone_data, std, "standalone", args.verbose)
+                if drifts:
+                    total_title_drift.extend([f"[{std} standalone] {d}" for d in drifts])
+
+    # ── 最终结果 ──
+    if args.check:
+        if total_title_drift:
+            print(f"\n🔴 title 漂移 {len(total_title_drift)} 处:")
+            for d in total_title_drift:
+                print(d)
+            total_drift += 1  # 计入漂移
+        if total_drift:
+            print(f"\n🔴 --check 失败：{total_drift} 个问题，请重跑 sync 工具")
+            sys.exit(2)
+        else:
+            print(f"\n✅ --check 通过：所有模板 JSON 与 Word 同步（含 title）")
+    elif total_drift:
+        print(f"\n完成：{total_drift} 个文件已更新")
 
 
 if __name__ == "__main__":

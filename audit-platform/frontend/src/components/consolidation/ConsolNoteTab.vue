@@ -181,6 +181,14 @@
 
           <!-- 选中区域状态栏 -->
           <SelectionBar :stats="noteCtx.selectionStats()" />
+
+          <!-- 模板表格后参考文字（Phase 6 从 Word 提取） -->
+          <div v-if="selectedNoteSection.textAfterTable" class="gt-note-text-after" :class="{ 'is-collapsed': !textAfterExpanded }">
+            <div class="gt-note-text-after__content">{{ selectedNoteSection.textAfterTable }}</div>
+            <button v-if="isTextAfterLong" class="gt-note-text-after__toggle" @click="textAfterExpanded = !textAfterExpanded">
+              {{ textAfterExpanded ? '收起' : '展开全部' }}
+            </button>
+          </div>
         </div>
         <el-empty v-else description="该章节暂无表格" :image-size="60" />
       </div>
@@ -777,6 +785,13 @@ async function jumpToNoteSection(sectionId?: string, title?: string) {
 // 当前请求目标章节独立于已渲染章节；切换章节后旧响应不得写入新章节。
 const requestedSectionId = ref('')
 const selectedNoteSection = ref<any>(null)
+
+// text_after_table 折叠控制
+const textAfterExpanded = ref(false)
+const isTextAfterLong = computed(() => {
+  const text = selectedNoteSection.value?.textAfterTable || ''
+  return text.split('\n').length > 2 || text.length > 80
+})
 
 // ─── 跨表勾稽校验结果 ──────────────────────────────────────────────────────
 const checkRulesResults = ref<Array<{ check_id: string; status: string; description: string; expected?: string; actual?: string; diff?: string; reason?: string }>>([])
@@ -2417,6 +2432,7 @@ async function onNoteNodeClick(
   const sectionId = String(data.section_id || '').trim()
   if (!sectionId) return noteRefreshResult('skipped', null, { reason: '未指定附注章节' })
   requestedSectionId.value = sectionId
+  textAfterExpanded.value = false
   noteSelectedRows.value = []
   selectedCells.value = []
   noteBreakdown.value = null
@@ -2477,6 +2493,8 @@ async function onNoteNodeClick(
       noteAddr: sourceNoteAddr(sec.section_id),
       // P3-a 补齐的行类型（total/subtotal/data），供合计行加粗渲染
       rowTypes: Array.isArray(sec._row_types) ? sec._row_types : null,
+      // Phase 6：Word 模板中表格下方的参考文字
+      textAfterTable: sec.text_after_table || null,
     }
     cellComments.loadComments(sec.section_id)
     // 异步加载跨表勾稽结果（不阻塞章节展示）
@@ -2757,4 +2775,32 @@ defineExpose({
 .gt-note-breakdown-children p { margin: 0 0 6px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); }
 :deep(td.gt-note-elim-col), :deep(th.gt-note-elim-col) { background: var(--gt-color-wheat-light) !important; }
 :deep(.gt-note-breakdown-target td) { box-shadow: inset 0 0 0 1px var(--gt-color-primary); }
+
+/* ── 表格后参考文字 ── */
+.gt-note-text-after {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--el-fill-color-lighter, #fafafa);
+  border-left: 3px solid var(--el-color-info-light-5, #c8c9cc);
+  border-radius: 4px;
+  font-size: var(--gt-font-size-xs, 12px);
+  color: var(--gt-color-text-secondary, #606266);
+  line-height: 1.6;
+  white-space: pre-line;
+  position: relative;
+}
+.gt-note-text-after.is-collapsed .gt-note-text-after__content {
+  max-height: 3.2em;
+  overflow: hidden;
+}
+.gt-note-text-after__toggle {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--el-color-primary);
+  font-size: var(--gt-font-size-xs, 12px);
+  cursor: pointer;
+}
 </style>

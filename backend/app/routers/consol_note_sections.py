@@ -216,6 +216,8 @@ async def get_section_detail(standard: str, section_id: str):
                 result["columns"] = sec["columns"]
             if sec.get("_row_types"):
                 result["_row_types"] = sec["_row_types"]
+            if sec.get("text_after_table"):
+                result["text_after_table"] = sec["text_after_table"]
             return result
     return {"error": "章节不存在", "section_id": section_id}
 

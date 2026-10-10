@@ -214,3 +214,31 @@
 /* 母公司章取数溯源横幅（Task 13）：来源项目 + 企业代码 + 口径三项 */
 .gt-de-parent-source { margin-bottom: 12px; }
 .gt-de-parent-source__body { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; line-height: 1.6; }
+
+/* ── 表格后模板参考文字（Phase 6 从 Word 提取） ── */
+.gt-de-text-after {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--el-fill-color-lighter, #fafafa);
+  border-left: 3px solid var(--el-color-info-light-5, #c8c9cc);
+  border-radius: 4px;
+  font-size: var(--gt-font-size-xs, 12px);
+  color: var(--gt-color-text-secondary, #606266);
+  line-height: 1.6;
+  white-space: pre-line;
+  position: relative;
+}
+.gt-de-text-after.is-collapsed .gt-de-text-after__content {
+  max-height: 3.2em;
+  overflow: hidden;
+}
+.gt-de-text-after__toggle {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--el-color-primary);
+  font-size: var(--gt-font-size-xs, 12px);
+  cursor: pointer;
+}

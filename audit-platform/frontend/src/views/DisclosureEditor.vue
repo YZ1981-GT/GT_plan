@@ -356,11 +356,12 @@
         </el-alert>
         <!-- 底稿同步来源提示（design §12.1：底稿 → 模块单向同步） -->
         <el-alert
-          v-if="(currentNote as any)?.last_sync_source === 'workpaper' || disclosureJumpTarget"
+          v-if="!syncBannerDismissed && ((currentNote as any)?.last_sync_source === 'workpaper' || disclosureJumpTarget)"
           type="info"
-          :closable="false"
+          closable
           show-icon
           style="margin-bottom: 12px"
+          @close="syncBannerDismissed = true"
         >
           <template #title>
             <span>{{ (currentNote as any)?.last_sync_source === 'workpaper' ? '此数据由底稿同步' : '关联底稿披露表' }}</span>
@@ -582,6 +583,12 @@
                               @change="onCellValueChange($index, col.headerIdx - 1, $event)"
                               @blur="onActiveCellBlur($event, $index, col.headerIdx - 1)"
                               @keydown="onActiveCellKeydown($event, $index, col.headerIdx - 1)" />
+                            <span v-else-if="editMode && !row.is_total" class="gt-cell-editable"
+                              role="gridcell"
+                              tabindex="0"
+                              :aria-label="`${col.label || '列'} 行${$index + 1}：${getCellValue(row, col.headerIdx - 1) ?? '空'}`">
+                              <GtAmountCell :value="getCellValue(row, col.headerIdx - 1)" :unit="noteUnit" />
+                            </span>
                             <span v-else :class="['gt-amt', { 'total-val': row.is_total }]">
                               <GtAmountCell :value="getCellValue(row, col.headerIdx - 1)" :unit="noteUnit" />
                             </span>
@@ -602,6 +609,12 @@
                               @change="onCellValueChange($index, child.headerIdx - 1, $event)"
                               @blur="onActiveCellBlur($event, $index, child.headerIdx - 1)"
                               @keydown="onActiveCellKeydown($event, $index, child.headerIdx - 1)" />
+                            <span v-else-if="editMode && !row.is_total" class="gt-cell-editable"
+                              role="gridcell"
+                              tabindex="0"
+                              :aria-label="`${child.label || '列'} 行${$index + 1}：${getCellValue(row, child.headerIdx - 1) ?? '空'}`">
+                              <GtAmountCell :value="getCellValue(row, child.headerIdx - 1)" :unit="noteUnit" />
+                            </span>
                             <span v-else :class="['gt-amt', { 'total-val': row.is_total }]">
                               <GtAmountCell :value="getCellValue(row, child.headerIdx - 1)" :unit="noteUnit" />
                             </span>
@@ -781,6 +794,14 @@
 
             <!-- 选中区域状态栏 -->
             <SelectionBar :stats="deCtx.selectionStats()" />
+
+            <!-- 当前表格的模板参考文字（Phase 6 从 Word 提取） -->
+            <div v-if="activeTableData?.text_after_table" class="gt-de-text-after" :class="{ 'is-collapsed': !deTextAfterExpanded }">
+              <div class="gt-de-text-after__content">{{ activeTableData.text_after_table }}</div>
+              <button v-if="isDeTextAfterLong" class="gt-de-text-after__toggle" @click="deTextAfterExpanded = !deTextAfterExpanded">
+                {{ deTextAfterExpanded ? '收起' : '展开全部' }}
+              </button>
+            </div>
           </template>
           <div v-else class="gt-de-empty-hint">请从左侧目录选择章节</div>
       </div>
@@ -927,6 +948,8 @@
       :loading="noteMappingLoading"
       :can-edit="canEdit"
       :rules="noteMappingRules"
+      :target-sections="targetSections"
+      :template-type="templateType"
       :get-mapping-data="getNoteMappingData"
       @load-preset="loadNoteMappingPreset"
       @save-rules="saveNoteMappingRules"
@@ -1691,7 +1714,7 @@ function onRightResizeEnd() {
 
 // ── 转换规则（useNoteTemplate composable 提供，须在 useNoteTree 之后，依赖 noteList/fetchTree） ──
 const {
-  showNoteMappingDialog, noteMappingLoading, noteMappingRules,
+  showNoteMappingDialog, noteMappingLoading, noteMappingRules, targetSections,
   loadNoteMappingPreset, saveNoteMappingRules, getNoteMappingData, onNoteMappingApplied: onNoteMappingApplied,
   getNoteTemplateConfigData, onNoteTemplateApplied,
 } = useNoteTemplate({
@@ -1872,7 +1895,14 @@ const deTemplateOptions = computed(() => {
 })
 
 const currentNote = ref<DisclosureNoteDetail | null>(null)
+/** 用户手动关闭底稿同步来源提示横幅，切换章节时重置 */
+const syncBannerDismissed = ref(false)
 const textContent = ref('')
+const deTextAfterExpanded = ref(false)
+const isDeTextAfterLong = computed(() => {
+  const text = activeTableData.value?.text_after_table || ''
+  return text.split('\n').length > 2 || text.length > 80
+})
 const validationFindings = ref<NoteValidationFinding[]>([])
 const priorYearNote = ref<any>(null)
 
@@ -2071,6 +2101,7 @@ watch(() => currentNote.value?.note_section, () => {
   activeTableTab.value = '0'
   noteTableStructure.clearHistory()
   deactivateCell()
+  syncBannerDismissed.value = false
 })
 
 // 切换多表 Tab 时清除活跃单元格（防坐标错位）
@@ -2736,6 +2767,7 @@ async function fetchDetail(noteSection: string, bypassCache = false) {
   // markdown 残留归一为 HTML（幂等），喂给 NoteRichTextEditor(v-model=textContent) 与 legacy editor
   textContent.value = renderNoteTextToHtml(currentNote.value.text_content)
   placeholderDismissed.value = false // P0-3：切换章节重置占位文本提示
+  deTextAfterExpanded.value = false  // 切换章节重置表格后文字折叠
   if (editor.value) {
     editor.value.commands.setContent(textContent.value || '')
   }

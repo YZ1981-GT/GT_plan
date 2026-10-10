@@ -57,16 +57,30 @@ def f3() -> dict:
 @pytest.mark.parametrize("td, fragment", [
     (None, "尚无表格"),
     ({}, "尚无表格"),
-    # F1：模板取数章节（顶层 rows，无 sub_table_data）—— 真库和平药房 / 首汽
-    ({"rows": [{"label": "库存现金", "values": [1, 2]}], "headers": ["项目"]}, "模板取数维护"),
-    # sub_table_data 在但来源不是底稿：投影器不渲染 sub_table_data，写了用户也看不见
+    # sub_table_data 在但来源明确非底稿：投影器不渲染 sub_table_data，写了用户也看不见
     ({"_source": "template", "sub_table_data": {"货币资金": []}}, "模板取数维护"),
-    ({"sub_table_data": {"货币资金": []}}, "模板取数维护"),
     ({"_source": "workpaper", "sub_table_data": {"受限制的货币资金明细": []}}, "没有「货币资金」表"),
 ])
 def test_locate_table_refuses_what_the_projector_would_not_render(td, fragment):
     table, reason = nw.locate_table(td, "货币资金")
     assert table is None and fragment in reason
+
+
+def test_locate_table_source_null_old_format_rows_accepted():
+    """_source=None + 顶层 rows（旧格式）→ 旧格式兜底返回 NoteTable（需求 1.2）。
+    真库和平药房 / 首汽此前被一刀切拦截，现在放行。"""
+    td = {"rows": [{"label": "库存现金", "values": [1, 2]}], "headers": ["项目"]}
+    table, reason = nw.locate_table(td, "货币资金")
+    assert reason is None and table is not None
+    assert table.rows == [{"label": "库存现金", "values": [1, 2]}]
+
+
+def test_locate_table_source_null_sub_table_accepted():
+    """_source=None + sub_table_data 存在 → 放行（需求 1.1）。
+    仅 _source 明确为非底稿值（template/import/migration）时才拦截。"""
+    td = {"sub_table_data": {"货币资金": []}}
+    table, reason = nw.locate_table(td, "货币资金")
+    assert reason is None and table is not None
 
 
 @pytest.mark.parametrize("source", ["workpaper", "workpaper_html"])

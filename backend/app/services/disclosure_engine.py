@@ -145,6 +145,55 @@ def _resolve_check_roles(tmpl: dict) -> list[str]:
     return out
 
 
+def _append_missing_template_tables(
+    existing_td: dict,
+    new_td: dict,
+) -> None:
+    """底稿同步来源的 table_data 不覆盖，但追加模板中有而现有数据中缺失的子表。
+
+    按表名（name）判断是否已存在。已有同名表不动，只追加缺失的。
+    同时追加到 ``_tables`` 和 ``sub_table_data``（前端对 workpaper 来源优先读后者）。
+    就地修改 existing_td（调用方已持有 note.table_data 引用）。
+    """
+    from copy import deepcopy
+
+    new_tables = new_td.get("_tables")
+    if not isinstance(new_tables, list) or not new_tables:
+        return
+    old_tables = existing_td.get("_tables")
+    if not isinstance(old_tables, list):
+        old_tables = []
+        existing_td["_tables"] = old_tables
+
+    existing_names = {
+        (t.get("name") or "").strip()
+        for t in old_tables
+        if isinstance(t, dict)
+    }
+
+    # sub_table_data 是 workpaper 来源的前端投影真源（object，key=表名）
+    sub_td = existing_td.get("sub_table_data")
+    if not isinstance(sub_td, dict):
+        sub_td = None
+
+    for tbl in new_tables:
+        if not isinstance(tbl, dict):
+            continue
+        name = (tbl.get("name") or "").strip()
+        if not name or name in existing_names:
+            continue
+        new_entry = deepcopy(tbl)
+        old_tables.append(new_entry)
+        existing_names.add(name)
+        # 同步追加到 sub_table_data
+        if sub_td is not None and name not in sub_td:
+            sub_td[name] = {
+                "headers": tbl.get("headers", []),
+                "rows": deepcopy(tbl.get("rows", [])),
+                "columns": deepcopy(tbl.get("columns", [])) if tbl.get("columns") else [],
+            }
+
+
 def _inject_validation_rules(table_data: dict | None, tmpl: dict) -> None:
     """把模板声明的校验 preset 注入 ``table_data._validation_rules``（Wave4 Task 5.3 补装配）。
 
@@ -1931,8 +1980,10 @@ class DisclosureEngine:
                 if table_data is not None and note.table_data:
                     existing_source = (note.table_data or {}).get("_source") if isinstance(note.table_data, dict) else None
                     if existing_source in ("workpaper", "workpaper_html"):
-                        # 底稿同步来源：不覆盖表格结构，只更新文本/guidance/元数据
-                        pass
+                        # 底稿同步来源：不覆盖已有表，但追加模板中新增的子表
+                        _append_missing_template_tables(note.table_data, table_data)
+                        from sqlalchemy.orm.attributes import flag_modified as _fm
+                        _fm(note, "table_data")
                     else:
                         from sqlalchemy.orm.attributes import flag_modified
 
@@ -2070,7 +2121,8 @@ class DisclosureEngine:
                     # 底稿同步来源的章节：跳过表格覆盖保持底稿数据
                     existing_source = old_td.get("_source") if isinstance(old_td, dict) else None
                     if existing_source in ("workpaper", "workpaper_html"):
-                        pass  # 不覆盖底稿同步的表格结构
+                        # 不覆盖底稿同步的表格结构，但追加模板新增的子表
+                        _append_missing_template_tables(old_td, new_td)
                     else:
                         note.table_data = merge_table_data_preserving_cell_modes(old_td, new_td)
                 else:
