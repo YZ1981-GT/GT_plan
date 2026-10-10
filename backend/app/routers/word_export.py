@@ -305,7 +305,6 @@ async def create_full_package(
             context={"year": body.year, "template_type": body.template_type},
         )
         if gate_result.decision == "block":
-            from fastapi import HTTPException
             raise HTTPException(status_code=409, detail={
                 "status": "blocked",
                 "gate_decision": "block",

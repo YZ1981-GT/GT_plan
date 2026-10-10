@@ -166,8 +166,9 @@ inclusion: always
 - 待办：修复向量/扩展（`audit-vllm-embed` + pgvector）· 收口其余 10 组重复路由 · MinerU · 旧 `knowledge_base.py` 路由与 `KnowledgeBasePanel` 零挂载死链（登记于 `test_frontend_knowledge_paths_exist._KNOWN_DEAD_PATHS`）
 
 ### 待修 bug（2026-06-01 grep 实证，与已修 render-config 同源：查 users 不存在的 display_name 列）
-- 🔴 `project_wizard.py:207` `select(UserModel.display_name)` — User ORM 无此字段 → AttributeError，项目向导仪表盘聚合崩（user_ids 非空时）；修 → username
-- 🔴 `qc_report_export.py:244` 裸 SQL `COALESCE(u.display_name, u.username)` — 真实 PG users 无 display_name → UndefinedColumn 500；修 → 删 display_name
+- ✅ `project_wizard.py` — **已修**（2026-10-10 现读确认已用 `UserModel.username`，注释明确标注「users 表无 display_name 列，用 username」）
+- ✅ `qc_report_export.py` — **已修**（2026-10-10 现读确认已用 `u.username`，无 display_name 引用；`test_export_endpoints_acceptance.py` 守卫 `test_sql_uses_username_not_display_name` 钉住）
+- ✅ `word_export.py` full-package 端点 — **已修**（2026-10-10）：`from fastapi import HTTPException` 写在 `if gate_result.decision == "block"` 分支内，模块顶层已有同名 import，函数体内延迟 import 遮蔽模块级名字 → 门禁通过时 `except HTTPException` 触发 `UnboundLocalError` → 异常穿透中间件。删掉冗余延迟 import 即修。
 - 系统性防御建议：加 CI「SQL 列引用 ⊆ 真实 schema」契约检查，一次兜住整类「查不存在列」bug（render-config/prefill/wizard/qc 已 4 处同源）
 
 

@@ -1,10 +1,11 @@
 # 致同审计作业平台 — Spec 开发索引
 
-> **2026-10-09 新建**：[`note-sub-table-formula-and-cross-check`](note-sub-table-formula-and-cross-check/tasks.md) — 附注子表公式与跨表勾稽：子表合计种子 + 跨表校验声明（check_rules）+ E5 应收账款全 11 张子表作为 canary + formula_push 子表规则 + 前端同步路径。4 Phase / 19 任务。
-> **2026-10-09 新建**：[`note-template-full-alignment-with-word-authority`](note-template-full-alignment-with-word-authority/tasks.md) — 四套附注模板 JSON 与 Word 权威源全量对齐：合并模板 multi_header 全覆盖（列不一致 78 张修复 + 缺失表 88 张新增 + 非报表注释章节 171 张扩展）+ 单体模板 columns.group 补齐 58 张 + 章节标题/序号校正。6 Phase / 24 任务。
+> **2026-10-10 ✅ 归档**：[`note-sub-table-formula-and-cross-check`](_archive/40-consol-note-defect-closure-and-template-alignment/note-sub-table-formula-and-cross-check/tasks.md) — 附注子表公式与跨表勾稽：子表合计种子 + 跨表校验声明（check_rules）+ E5 应收账款全 11 张子表作为 canary + formula_push 子表规则 + 前端同步路径。4 Phase / 19 任务。
+> **2026-10-10 ✅ 归档**：[`note-template-full-alignment-with-word-authority`](_archive/40-consol-note-defect-closure-and-template-alignment/note-template-full-alignment-with-word-authority/tasks.md) — 四套附注模板 JSON 与 Word 权威源全量对齐：合并模板 multi_header 全覆盖（列不一致 78 张修复 + 缺失表 88 张新增 + 非报表注释章节 171 张扩展）+ 单体模板 columns.group 补齐 58 张 + 章节标题/序号校正。6 Phase / 24 任务。
+> **2026-10-10 ✅ 归档**：[`consol-comprehensive-runtime-defect-closure`](_archive/40-consol-note-defect-closure-and-template-alignment/consol-comprehensive-runtime-defect-closure/tasks.md) — 合并模块运行缺陷收口：CP-01~05（节点联动/Word 叶子列/推送状态/三层表头/模板切换 dirty） + 防双计恒等式 + AbortController 竞态守卫 + 三码确认式建树 + P0/P1/P2 验收测试 183 个。13/14（余 [ ]* 真实 PG 写路径/6000 并发）。
 > **2026-10-04 新建**：[`disclosure-multitable-refresh-and-edit-writeback`](disclosure-multitable-refresh-and-edit-writeback/tasks.md) — 普通附注多表 binding/增量刷新 + AR 四组局部校准 + 前端投影反写；排除并行合并节点隔离与真实历史数据迁移。进度以本 spec 清单和实测证据为准，不增量推算全局总数。
 
-**最后更新**：2026-10-09
+**最后更新**：2026-10-10
 **当前分支**：`work/2026-09-28-voucher-sampling-account-scope`
 > ⏱ **2026-10-01 现扫（归档裁决：底稿双向回写 + 公式管理两族）**：Active **61**（目录 **64**，无 tasks.md **3**：`procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening` / `workpaper-page-formula-toolbar-closure`）/ Archived **602**。只归档 **1** 个（`chain-closure-phase1-root-cause-fixes` → `06-engineering-governance`），其余 12 个候选逐条未归档，原因见 §二「归档（2026-10-01）」。
 > 🔴 **新增归档判据：交付物须已入库** —— 在 HEAD 干净检出（临时 `git worktree`）上跑 spec 守卫。4 组在工作树全绿、在 HEAD 上红（删行多区 · 受管行收敛 · adopt · L 三份），修复只在工作树里；d567 两边都红。只看 tasks.md 勾选、或只在工作树跑测试，会把「本机做完」误当「仓库里有」。
@@ -42,7 +43,7 @@
 > 🔴 **自查纠正：我发明了一条不存在的基准**。前端守卫首版断言「dedicated 列表与 legacy 禁入名单**不得有交集**」—— 实际 `D4-5` 刻意同时在两处（`d4Constants.ts` 注释明说它是「历史冗余项，已接子组件桥 `d45-managed`，故实际不可能命中 legacy 分支」）。发明一条不存在的基准会把**有意设计判成缺陷**。⇒ 收窄为只断言 D4-4 的迁移完成，D4-5 走**带反向断言的显式豁免**（不只写理由文本 —— 那是加一行就变绿的后门 ——而是断言它声称的条件真的成立：`D4TabPolicyCheck.vue` 确实 `useD4SyncMode` + `d45-managed`）。
 > 🔴 **同一条铁律的正反两向在一天内都踩到**（「判断代码是否真做了 X 一律用 AST，禁文本匹配」）：**反向**是此前 docstring 写「权限：`require_project_access`」冒充真实现⇒ 漏报；**正向**是本轮我在 provider docstring 里写了禁令**反例**「写 `assert rowId.startswith('d4a-')` 之类断言会…被拒」，而首版探针用文本匹配查「有无 rowId 格式断言」⇒ 把这段**说明文字**当成真断言 ⇒ 假阳。⇒ 改用 AST（只看 `Call` 节点；docstring 是 `Expr(Constant)`、`#` 注释不进 AST）+ 变异反证（对真实 `rid.startswith('d4a-')` 必须命中，证明判据非恒绿）。另一处同型：前端守卫的 `stripComments` 自检首版用单字母样本 `c`，而保留内容 `code` 里就含 `c` ⇒ 断言自撞打红 —— **判据本身写错了**，不是被测对象有问题。
 >
-**统计**：Active **23**（2026-10-07 清理 evidence 空壳后现扫） `.kiro/specs/*/tasks.md` 口径；目录数 **62**，1 个无 tasks.md） / Archived **626**（`_archive/*/*` 实扫）
+**统计**：Active **0**（2026-10-10 归档后现扫）/ Archived **629**（+3：note-template-full-alignment-with-word-authority / note-sub-table-formula-and-cross-check / consol-comprehensive-runtime-defect-closure → `_archive/40-consol-note-defect-closure-and-template-alignment/`）
 
 > ⏱ **2026-09-28 第十六次现扫（新建 B 线 spec）**：Active **65 → 66**（+1 = 本轮新建 `workpaper-sync-row-deletion-multi-region-propagation`）。现扫目录 **69**、无 tasks.md **3** 个、Archived **589**、任务总量 **953 / 1752**（`[ ]*` 阻塞 **150**）。🔴 **同时更正下一条（A 线那次现扫）的口径**：它记「无 tasks.md 3 → 4」，而本轮现扫得 **3** —— 差额是它自己的 tasks.md 在那条记号写下之后才落地；现扫三个无 tasks.md 目录为 `procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening` / `workpaper-page-formula-toolbar-closure`。记号从「第十五次」改为「第十六次」是因为并发会话已占用前者。
 > 🔴 **本轮最重教训 —— 同一个扫描器在错的 population 上会给出完全相反的结论**：数「同 sheet 多受管区」在 `backend/wp_templates/` 上得 **0**（351 份模板 / 2722 个 worksheet / 解析失败 0），在 `backend/storage/` 的 931 份已 instrumentation artifact 上得 **18 组**。根因是 GT_* 受管 Excel Table 由 `excel_instrumentation` 在运行期写入，模板里本就没有。若照模板口径下结论会写成「平台没有同 sheet 多受管区」⇒ 整条兄弟收缩判据被判为不必要。⇒ 「结构性零须配变异证明」这条铁律的触发点不只是解析失败，**扫错 population 是第二种**。
@@ -341,7 +342,6 @@
 >
 > **2026-09-02 入库与修复（分支 `work/2026-09-02-workpaper-sync-closure`，3 个 commit 已推）**：
 > ① 该 spec 的 Task 1~77 全量产物此前一直未提交（235 项 `??` + 99 项 `M` 摞在别人分支的工作树上），已入库 854 个文件；② 修掉「仓库级普查冻进逐字节锁」这一类判据缺陷（同型 5 处：BP-71-8 全树 test 计数 / BP-72-8 `backend/data` 入向普查 / BP-74-1 引用派生辐射面 / Task 71 的传递 / 新发现的 `artifact_git_status`），新增共享模块 `backend/scripts/_census_lock.py`，普查量剔除但**仍现算并断言语义性质**，`report_digest` 改在剔除后内容上算；③ 补掉 5 条 GREEN 变异暴露的守卫洞（等价变异：判据只在合规数据上跑），改成「纯函数 + 合成不合规输入 + 注入口」，5 条全转 RED；④ 修 pre-commit 的假红（残缺 venv 抢 PATH 让行数门从未运行却报超限）。
->
 >
 > **2026-09-03 BP-61-1 解除（Task 61 的绑定约束，用户明确授权「只限测试夹具项目」）**：
 > Task 61 的三臂反事实此前把绑定约束钉在 **BP-61-1**「published representation 供给平台级为 0」（`working_paper_sync_entry_state` / `working_paper_content_version` / `working_paper_content_representation` 三表实测 `0 / 0 / 0`，186 个 planned entry 一个都注册不上）。本轮把它**真解除**了：三表现为 `1 / 1 / 1`，`working_paper_artifact` 19→20。
