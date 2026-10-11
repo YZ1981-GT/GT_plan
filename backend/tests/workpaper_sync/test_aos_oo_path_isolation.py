@@ -561,9 +561,12 @@ class TestJ5PruneHasExactlyOneProductionCallSite:
 #:    分母 `+5 → +6`、slashed suffixes `19 → 20`，`_REQUIRED_ENDPOINTS` 不变（14）。
 #:    这里同步成新的三个数并写明来源 —— 本判据「误加端点必须打红」的作用不变：再有
 #:    任何一条未经登记的路由，三处仍会点名。
+#: 🔴 2026-10-11 再次显式更新：spec workpaper-sync-switch-performance P5 **有意**新增
+#:    `POST …/materialize-from-store`（服务端直取投影 + 物化）⇒ handler 分母 `+6 → +7`、
+#:    slashed suffixes `20 → 21`，`_REQUIRED_ENDPOINTS` 不变（14）。
 ROUTER_REQUIRED_ENDPOINTS = 14  # `_REQUIRED_ENDPOINTS` 元组长度
-ROUTER_HANDLER_DENOMINATOR = "len(_REQUIRED_ENDPOINTS) + 6"  # handler 分母表达式（逐字）
-ROUTER_SLASHED_SUFFIXES = 20  # `test_a_real_slashed_entry_id_routes` 的 `suffixes` 条数
+ROUTER_HANDLER_DENOMINATOR = "len(_REQUIRED_ENDPOINTS) + 7"  # handler 分母表达式（逐字）
+ROUTER_SLASHED_SUFFIXES = 21  # `test_a_real_slashed_entry_id_routes` 的 `suffixes` 条数
 
 
 def _router_test_tree() -> ast.Module:
@@ -673,10 +676,10 @@ class TestTask74RouterCensusMustNotMove:
                 "_REQUIRED_ENDPOINTS",
             ),
             (
-                # 锚点随上方 2026-10-10 的显式更新同步（+6 是现值，变异体再 +1）。
+                # 锚点随上方 2026-10-11 的显式更新同步（+7 是现值，变异体再 +1）。
                 "M2_bumped_handler_denominator",
-                "len(_REQUIRED_ENDPOINTS) + 6",
                 "len(_REQUIRED_ENDPOINTS) + 7",
+                "len(_REQUIRED_ENDPOINTS) + 8",
                 "handler 分母",
             ),
             (

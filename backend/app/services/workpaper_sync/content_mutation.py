@@ -137,6 +137,7 @@ from app.services.workpaper_sync.resolution import (
     CanonicalResolutionService,
     DefinitionBundleSnapshot,
 )
+from app.services.workpaper_sync.sync_timing import mark as _timing_mark
 
 __all__ = [
     "ContentMutationError",
@@ -1715,6 +1716,7 @@ class ContentMutationService:
             output=output,
         )
         elapsed = time.perf_counter() - started
+        _timing_mark("cpu_segment")  # spec workpaper-sync-switch-performance P0（只观测）
         soft_limit = float(load_limits().materialize_soft_limit_seconds)
         if elapsed > soft_limit:
             raise MaterializeSoftTimeoutError(

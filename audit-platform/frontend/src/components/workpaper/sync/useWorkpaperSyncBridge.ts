@@ -66,12 +66,18 @@ import {
 import type { WorkpaperSyncCapability } from './workpaperSyncManifest.generated'
 import { flushPendingWrites } from './pendingWrites'
 import {
+  SERVER_STORE_FALLBACK_CODES,
   SUBSTRATE_NOT_PUBLISHED_CODE,
   describeBridgeFailure,
   isRequestCanceled,
   readWireError,
   type WorkpaperSyncBridgeError,
 } from './workpaperSyncBridgeFailure'
+import {
+  EMPTY_SWITCH_TIMINGS,
+  createSwitchTimer,
+  type WorkpaperSyncSwitchTimings,
+} from './bridgeSwitchTimings'
 
 // 「失败归一」住伴生模块；这里 re-export，宿主 / 抽屉 / 测试的 import 路径不变。
 export {
@@ -200,6 +206,12 @@ export interface WorkpaperSyncApiSurface {
    * 可选：既有测试 stub 不提供它时，桥按「没有首版能力」处理（原样报失败），不会调 undefined。
    */
   ensureFirstPublication?: typeof syncApi.ensureFirstPublication
+  /**
+   * 服务端直取（spec workpaper-sync-switch-performance P5）。两者都提供才启用；
+   * 既有测试 stub 不提供时桥走原客户端路径（行为不变）。
+   */
+  materializeFromStore?: typeof syncApi.materializeFromStore
+  withServerStoreFlush?: typeof syncApi.withServerStoreFlush
   confirmDescriptor: typeof syncApi.confirmDescriptor
   requestForcesave: typeof syncApi.requestForcesave
   /**
@@ -230,6 +242,8 @@ const DEFAULT_API: WorkpaperSyncApiSurface = {
   createPendingMutation: syncApi.createPendingMutation,
   materialize: syncApi.materialize,
   ensureFirstPublication: syncApi.ensureFirstPublication,
+  materializeFromStore: syncApi.materializeFromStore,
+  withServerStoreFlush: syncApi.withServerStoreFlush,
   confirmDescriptor: syncApi.confirmDescriptor,
   requestForcesave: syncApi.requestForcesave,
   createCloseIntent: syncApi.createCloseIntent,
@@ -302,6 +316,11 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
    * 「保存后永久转圈」这条缺陷的一部分。
    */
   const pollAfterMs = ref<number | null>(null)
+  /** 一次 HTML → 在线编辑切换的分段计时（只读暴露，见 `bridgeSwitchTimings`）。 */
+  const switchTimer = createSwitchTimer()
+  const switchTimings = ref<WorkpaperSyncSwitchTimings>(EMPTY_SWITCH_TIMINGS)
+  /** 服务端判过「非 store 型」的 entry：本桥实例内不再尝试服务端直取（少一次必败请求）。 */
+  const serverStoreUnsupported = new Set<string>()
 
   function scope(): WorkpaperSyncEntryScope {
     return {
@@ -434,14 +453,29 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     apply('flush_started')
     // 转换已被状态机接受 ⇒ 这是一个新会话（`flush_started` 只从 html_idle / error 出发）。
     beginSession()
+    // 首版后的重走仍是同一次切换：计时只在首轮开始。
+    if (allowFirstPublication) switchTimings.value = switchTimer.begin()
     let flushed: WorkpaperSyncFlushResult
+    let viaServerStore = false
     try {
       // 🔴 R20：子 Tab 私有防抖里的编辑与在途写入先落库，宿主再读 store-projection。
       //    宿主的 flushHtml 只管它自己那层防抖（见 pendingWrites.ts）；永不 reject。
       await flushPendingWrites()
-      flushed = await options.flushHtml()
+      switchTimings.value = switchTimer.mark('writes_flushed')
+      ;({ flushed, viaServerStore } = await flushForSwitch())
+      switchTimings.value = switchTimer.mark('html_flushed')
     } catch (error) {
       return fail('flush', error)
+    }
+    if (viaServerStore) {
+      const viaStore = await materializeViaServerStore(flushed, allowFirstPublication)
+      if (viaStore !== null) return viaStore
+      // 服务端判「非 store 型」⇒ 不拦截重跑一次 flushHtml，走客户端路径（冲刷幂等，只多读一次投影）。
+      try {
+        flushed = await options.flushHtml()
+      } catch (error) {
+        return fail('flush', error)
+      }
     }
     let token: string
     let pendingKey: string
@@ -459,6 +493,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
       return failIdentityOrSync('pending_mutation', error)
     }
     apply('pending_mutation_created')
+    switchTimings.value = switchTimer.mark('pending_created')
 
     let received: WorkpaperSyncEditorLaunchDescriptor
     try {
@@ -473,36 +508,106 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
         idempotencyKey: pendingKey,
       })
     } catch (error) {
-      const ensureFirstPublication = api.ensureFirstPublication
-      if (
-        allowFirstPublication &&
-        typeof ensureFirstPublication === 'function' &&
-        !isRequestCanceled(error) &&
-        readWireError(error).errorCode === SUBSTRATE_NOT_PUBLISHED_CODE
-      ) {
-        // 本 token 作废（首版会推进 revision）；状态退回 html_idle 后发首版。
-        pendingMutationToken.value = null
-        try {
-          apply('identity_rejected')
-        } catch {
-          // 已不在 in-flight 态：状态不动即可。
-        }
-        try {
-          await ensureFirstPublication(scope())
-        } catch (publishError) {
-          return fail('first_publication', publishError)
-        }
-        return attemptSwitchToOnlyOffice(false)
-      }
+      const retried = await retryAfterFirstPublication(error, allowFirstPublication)
+      if (retried !== null) return retried
       return failIdentityOrSync('materialize', error)
     }
     // pending token 是**单次逻辑消费**（AC 3.1）：materialize 成功即作废本地副本，
     // 留着它会让「失败后重试」误用一个已消费的 token 并拿到 409。
     pendingMutationToken.value = null
+    switchTimings.value = switchTimer.setPath('client')
+    switchTimings.value = switchTimer.mark('materialized')
     apply('descriptor_received')
     descriptor.value = received
     apply('descriptor_accepted')
     return received
+  }
+
+  /**
+   * 宿主 flushHtml 外包「服务端直取」窗口（spec workpaper-sync-switch-performance P5，宿主零改动）。
+   *
+   * * 宿主没读 store 投影 ⇒ 用宿主自己的 projection（客户端路径）；
+   * * 读了且**原样**交回哨兵 ⇒ 服务端直取；
+   * * 读了但加工过 ⇒ 哨兵不得外流，不拦截重跑一次 flushHtml（客户端路径）。
+   */
+  async function flushForSwitch(): Promise<{
+    flushed: WorkpaperSyncFlushResult
+    viaServerStore: boolean
+  }> {
+    const withWindow = api.withServerStoreFlush
+    if (
+      typeof withWindow !== 'function' ||
+      typeof api.materializeFromStore !== 'function' ||
+      serverStoreUnsupported.has(options.entryId.value)
+    ) {
+      return { flushed: await options.flushHtml(), viaServerStore: false }
+    }
+    const outcome = await withWindow(scope(), () => options.flushHtml())
+    if (outcome.passedThrough) return { flushed: outcome.result, viaServerStore: true }
+    if (outcome.requested) return { flushed: await options.flushHtml(), viaServerStore: false }
+    return { flushed: outcome.result, viaServerStore: false }
+  }
+
+  /** 服务端直取 + 物化。返回 `null` ⇔ 服务端判非 store 型（调用方回落客户端路径）。 */
+  async function materializeViaServerStore(
+    flushed: WorkpaperSyncFlushResult,
+    allowFirstPublication: boolean,
+  ): Promise<WorkpaperSyncEditorLaunchDescriptor | null> {
+    let result: syncApi.MaterializeFromStoreResult
+    try {
+      result = await (api.materializeFromStore as typeof syncApi.materializeFromStore)(scope(), {
+        sheetKey: flushed.sheetKey ?? sheetKey(),
+        clientEditEpoch: flushed.clientEditEpoch,
+      })
+    } catch (error) {
+      if (!isRequestCanceled(error) && SERVER_STORE_FALLBACK_CODES.has(readWireError(error).errorCode)) {
+        serverStoreUnsupported.add(options.entryId.value)
+        return null
+      }
+      const retried = await retryAfterFirstPublication(error, allowFirstPublication)
+      if (retried !== null) return retried
+      return failIdentityOrSync('materialize', error)
+    }
+    switchTimings.value = switchTimer.setPath(result.fastPath ? 'server_store_fast' : 'server_store')
+    switchTimings.value = switchTimer.mark('materialized')
+    // 服务端在同一请求内建了 pending mutation（或经指纹直通合法跳过）⇒ 状态机照原边推进，不加新状态。
+    apply('pending_mutation_created')
+    apply('descriptor_received')
+    descriptor.value = result.descriptor
+    apply('descriptor_accepted')
+    return result.descriptor
+  }
+
+  /**
+   * `materialize_substrate_not_published` ⇒ 按需首版后整链重走（spec d2-online-edit-platform-closure R7）。
+   * 不满足条件返回 `null`，由调用方按普通失败处理。
+   */
+  async function retryAfterFirstPublication(
+    error: unknown,
+    allowFirstPublication: boolean,
+  ): Promise<WorkpaperSyncEditorLaunchDescriptor | null> {
+    const ensureFirstPublication = api.ensureFirstPublication
+    if (
+      !allowFirstPublication ||
+      typeof ensureFirstPublication !== 'function' ||
+      isRequestCanceled(error) ||
+      readWireError(error).errorCode !== SUBSTRATE_NOT_PUBLISHED_CODE
+    ) {
+      return null
+    }
+    // 本 token 作废（首版会推进 revision）；状态退回 html_idle 后发首版。
+    pendingMutationToken.value = null
+    try {
+      apply('identity_rejected')
+    } catch {
+      // 已不在 in-flight 态：状态不动即可。
+    }
+    try {
+      await ensureFirstPublication(scope())
+    } catch (publishError) {
+      return fail('first_publication', publishError)
+    }
+    return attemptSwitchToOnlyOffice(false)
   }
 
   /**
@@ -532,6 +637,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
   function notifyEditorMounted(): void {
     mountCallCount.value += 1
     apply('editor_mounted')
+    switchTimings.value = switchTimer.mark('mounted')
   }
 
   /**
@@ -550,6 +656,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
       )
     }
     apply('document_ready')
+    switchTimings.value = switchTimer.mark('ready')
     let confirmed: WorkpaperSyncDescriptorConfirmation
     try {
       confirmed = await api.confirmDescriptor(scope(), {
@@ -575,6 +682,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     }
     confirmation.value = confirmed
     apply('descriptor_confirmed')
+    switchTimings.value = switchTimer.mark('confirmed')
     return confirmed
   }
 
@@ -1466,6 +1574,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     forcesaveCallCount: readonly(forcesaveCallCount),
     leaveCallCount: readonly(leaveCallCount),
     pollAfterMs: readonly(pollAfterMs),
+    switchTimings: readonly(switchTimings),
     /** 当前 entry scope（宿主的 operation 推进器要用它构造 tracker）。 */
     scope,
     canForcesave,

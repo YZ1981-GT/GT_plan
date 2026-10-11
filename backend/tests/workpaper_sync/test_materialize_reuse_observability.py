@@ -666,9 +666,11 @@ class TestTheVerdictIsMachineReadableAndRegistered:
             and isinstance(node.func, ast.Name)
             and node.func.id == "MaterializeOutcome"
         ]
-        assert len(constructions) == 4, (
+        # 5 = 三条终结路径 + materialize() 的最终改写 + store 指纹直通
+        #     （spec workpaper-sync-switch-performance P2 的 `reuse_for_unchanged_store`）。
+        assert len(constructions) == 5, (
             f"MaterializeOutcome 的构造处变成 {len(constructions)} 处 —— "
-            "本判据按「三条终结路径 + materialize() 的最终改写」共 4 处立的"
+            "本判据按「三条终结路径 + materialize() 的最终改写 + 指纹直通」共 5 处立的"
         )
         for call in constructions:
             supplied = {kw.arg for kw in call.keywords}

@@ -70,6 +70,19 @@ const NON_DISCLOSURE_TEXT = '该同步对象不可访问：请确认项目/底�
  */
 export const SUBSTRATE_NOT_PUBLISHED_CODE = 'materialize_substrate_not_published'
 
+/**
+ * 服务端直取（`materialize-from-store`）判「该 entry 不是 store 型」的码 ⇒ 桥回落客户端路径。
+ *
+ * 只收这两个：其余 store 阶段拒绝（无契约 / 不在 manifest / 无 adapter）客户端路径同样会被拒，
+ * 回落只会多打一次请求、把真实原因换成第二次失败。值必须等于后端
+ * `StoreProjectionNotBackedError` / `StoreProjectionProviderNotAllowedError` 的 `error_code`
+ * （`test_store_materialize.py` 读本文件钉住，后端改名即红）。
+ */
+export const SERVER_STORE_FALLBACK_CODES: ReadonlySet<string> = new Set([
+  'entry_not_store_backed',
+  'provider_module_not_allowed',
+])
+
 export interface WorkpaperSyncBridgeError {
   readonly stage: string
   readonly httpStatus: number | null

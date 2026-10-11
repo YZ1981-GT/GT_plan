@@ -869,6 +869,8 @@ class TestRouterShape:
             # 反向收敛（以已发布 substrate 覆盖 store），打破 materialize 500 死锁。
             ("POST", "/adopt-substrate"),
             ("POST", "/materialize"),
+            # spec workpaper-sync-switch-performance P5 追加：服务端直取投影 + 物化。
+            ("POST", "/materialize-from-store"),
             ("POST", f"/rooms/{room}/confirm-descriptor"),
             ("POST", f"/rooms/{room}/forcesave"),
             ("POST", f"/rooms/{room}/close-intents"),
@@ -971,6 +973,9 @@ class TestRouterShape:
         expected_required = {
             "create_pending_mutation",
             "materialize",
+            # spec workpaper-sync-switch-performance P5：服务端自建 pending mutation 并物化，
+            # 与 pending-mutations / materialize 同一把 key（token 冻结它）。
+            "materialize_from_store",
             "confirm_descriptor",
             "request_forcesave",
             "create_close_intent",
@@ -1051,8 +1056,10 @@ class TestGuardIsTheFirstAwaitInEveryHandler:
         # `POST …/adopt-substrate`
         # （spec workpaper-sync-managed-row-convergence Requirement 2 追加）、
         # `POST …/first-publication`
-        # （spec d2-online-edit-platform-closure R7 追加）。
-        assert checked == len(_REQUIRED_ENDPOINTS) + 6, (
+        # （spec d2-online-edit-platform-closure R7 追加）、
+        # `POST …/materialize-from-store`
+        # （spec workpaper-sync-switch-performance P5 追加）。
+        assert checked == len(_REQUIRED_ENDPOINTS) + 7, (
             f"只核对了 {checked} 个 handler —— 端点数变化时本判据的分母必须同步"
         )
 

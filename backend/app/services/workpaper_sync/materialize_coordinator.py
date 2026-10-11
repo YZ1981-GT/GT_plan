@@ -210,6 +210,7 @@ from app.services.workpaper_sync.rooms import (
     RoomService,
     room_generation_is_retired,
 )
+from app.services.workpaper_sync.sync_timing import mark as _timing_mark
 
 __all__ = [
     # 异常
@@ -1802,6 +1803,7 @@ class MaterializeCoordinator:
         pending = await self._load_pending_mutation_for_token(token, request)
         pre = await self.preflight(authorized)
         checked = authorized.with_stage(MaterializeStage.preflight_passed)
+        _timing_mark("preflight")
 
         revision_before = await self._read_content_revision(request.wp_id)
         rooms_before = await self._count_rooms(request.wp_id, str(request.entry_id))
@@ -1812,16 +1814,24 @@ class MaterializeCoordinator:
             reuse = await self._find_business_identity_reuse(
                 request=request, pre=pre, payload_sha256=token.payload_sha256
             )
+            hit_verdict = REUSE_HIT
+            if reuse is None:
+                # spec workpaper-sync-switch-performance P1：逐字节摘要未命中再按骨架无关业务身份判一次
+                # （模板骨架行两侧口径不同导致的「内容没变却永不复用」）。
+                skeleton = await self._find_skeleton_equivalent_reuse(request=request, pre=pre)
+                if skeleton is not None:
+                    reuse, hit_verdict = skeleton
             # 未命中要**当场**归因（requirements 3.3）：此刻还没开 operation、没写任何东西，
             # 两条腿的库状态与上面那次探测逐字相同 ⇒ 归因是确定的。放到 commit 之后再算就
             # 只能看到「已经变了的世界」，分不出「内容真变了」与「digest 口径分叉」。
             verdict = (
-                REUSE_HIT
+                hit_verdict
                 if reuse is not None
                 else await self._classify_reuse_miss(
                     request=request, pre=pre, payload_sha256=token.payload_sha256
                 )
             )
+            _timing_mark("reuse_lookup")
             operation = await self._open_operation(request=request, pre=pre)
             if reuse is not None:
                 outcome = await self._settle_reuse(
@@ -1831,6 +1841,7 @@ class MaterializeCoordinator:
                     operation_id=operation.id,
                     version=reuse[0],
                     representation=reuse[1],
+                    verdict=hit_verdict,
                 )
             else:
                 outcome = await self._commit_and_settle(
@@ -1864,6 +1875,76 @@ class MaterializeCoordinator:
             revision_delta=delta,
             receipt=outcome.receipt,
             reuse_verdict=outcome.reuse_verdict,
+        )
+
+    async def reuse_for_unchanged_store(
+        self,
+        authorized: AuthorizedMaterializeRequest,
+        *,
+        expected_content_version_id: uuid.UUID,
+        expected_artifact_sha256: str,
+        verdict: ReuseVerdict,
+    ) -> MaterializeOutcome | None:
+        """P2：store 指纹未变 ⇒ 直接复用当前 representation（零 revision、不建 pending mutation）。
+
+        spec workpaper-sync-switch-performance 需求 3.2。调用方（`store_materialize`）只在「服务端亲手读的
+        store 字节 + 契约 + adapter」指纹与上次成功物化时记录的一致时调用。这里再核一次世界没有前进：
+        preflight 冻结的基线 content version 与 substrate 字节必须与记录相同，否则返回 ``None`` 由调用方
+        回落正常路径。其余与 `_settle_reuse` 同形：开 operation → 开/复用 room → applied。
+        """
+        authorized.assert_authorized()
+        request = authorized.request
+        pre = await self.preflight(authorized)
+        if pre.base_content_version_id != expected_content_version_id or str(
+            pre.substrate_sha256
+        ) != str(expected_artifact_sha256):
+            return None
+        checked = authorized.with_stage(MaterializeStage.preflight_passed)
+        revision_before = await self._read_content_revision(request.wp_id)
+        rooms_before = await self._count_rooms(request.wp_id, str(request.entry_id))
+        version = (
+            await self._session.execute(
+                sa.select(WorkpaperContentVersion).where(
+                    WorkpaperContentVersion.id == pre.base_content_version_id
+                )
+            )
+        ).scalar_one()
+        operation = await self._open_operation(request=request, pre=pre)
+        try:
+            descriptor = await self._open_room_and_descriptor(
+                checked,
+                pre=pre,
+                operation_id=operation.id,
+                content_version_id=version.id,
+                revision=int(version.revision),
+                representation_id=pre.resolution.representation_id,
+                representation_generation=int(pre.resolution.representation_generation),
+                artifact_sha256=str(pre.substrate_sha256),
+            )
+        except Exception as exc:  # noqa: BLE001 - 记终态后原样抛出
+            await self._fail_operation(operation.id, exc, stage="room_open")
+            raise
+        await self._apply_operation(
+            operation.id, room_id=descriptor.room_id, stage="store_fingerprint_reused"
+        )
+        delta = await self._read_content_revision(request.wp_id) - revision_before
+        assert_revision_delta(delta=delta, replayed=False, business_identity_reused=True)
+        rooms_after = await self._count_rooms(request.wp_id, str(request.entry_id))
+        return MaterializeOutcome(
+            descriptor=descriptor,
+            operation_id=operation.id,
+            content_version_id=version.id,
+            revision=int(version.revision),
+            representation_id=descriptor.representation_id,
+            representation_generation=int(descriptor.representation_generation),
+            replayed=False,
+            business_identity_reused=True,
+            commit_count=0,
+            transaction_ids=(),
+            rooms_opened=max(0, rooms_after - rooms_before),
+            revision_delta=delta,
+            receipt=None,
+            reuse_verdict=verdict,
         )
 
     # ─────────────────────────────────────────────────────────────────
@@ -1932,6 +2013,7 @@ class MaterializeCoordinator:
         except Exception as exc:  # noqa: BLE001 - 记终态后原样抛出，绝不降级
             await self._fail_operation(operation_id, exc, stage="content_commit")
             raise
+        _timing_mark("content_commit")
         try:
             assert_single_business_commit(
                 commit_count=receipt.commit_count,
@@ -2056,6 +2138,7 @@ class MaterializeCoordinator:
         operation_id: uuid.UUID,
         version: WorkpaperContentVersion,
         representation: WorkpaperContentRepresentation,
+        verdict: ReuseVerdict = REUSE_HIT,
     ) -> MaterializeOutcome:
         """AC 3.6 的第二条幂等路径：不同 token、相同业务身份 ⇒ 复用，零 revision。
 
@@ -2107,7 +2190,7 @@ class MaterializeCoordinator:
             rooms_opened=0,
             revision_delta=0,
             receipt=None,
-            reuse_verdict=REUSE_HIT,
+            reuse_verdict=verdict,
         )
 
     # ─────────────────────────────────────────────────────────────────
@@ -2427,6 +2510,7 @@ class MaterializeCoordinator:
             ),
         )
         self.descriptors_issued += 1
+        _timing_mark("room_descriptor")
         return descriptor
 
     async def _rotate_generation_for_stale_room(
@@ -3026,6 +3110,58 @@ class MaterializeCoordinator:
         if representation is None:
             return None
         return version, representation
+
+    async def _find_skeleton_equivalent_reuse(
+        self, *, request: MaterializeRequest, pre: MaterializePreflight
+    ) -> tuple[
+        tuple[WorkpaperContentVersion, WorkpaperContentRepresentation], ReuseVerdict
+    ] | None:
+        """P1：骨架无关业务身份相同 ⇒ 复用（判据与正确性论证见 `business_identity` 模块文档）。
+
+        只在逐字节摘要未命中之后调用；读的是基线 content version **落盘**的 canonical 载荷
+        （与 `_classify_reuse_miss` 同一读法）。表示腿与 `_find_business_identity_reuse` 逐字同判据：
+        当前 published representation 必须挂在基线 content version 上（bundle / substrate 不变）。
+        """
+        from app.services.workpaper_sync.business_identity import compare_business_identity
+        from app.services.workpaper_sync.materialize_reuse_verdict import ReuseDecision
+
+        base_payload = await self._read_base_projection_payload(request=request, pre=pre)
+        if base_payload is None:
+            return None
+        comparison = compare_business_identity(
+            base_payload, _projection_payload(request.projection)
+        )
+        if not comparison.equal:
+            return None
+        version = (
+            await self._session.execute(
+                sa.select(WorkpaperContentVersion).where(
+                    WorkpaperContentVersion.id == pre.base_content_version_id,
+                    WorkpaperContentVersion.wp_id == request.wp_id,
+                )
+            )
+        ).scalar_one_or_none()
+        representation = (
+            None
+            if version is None
+            else (
+                await self._session.execute(
+                    sa.select(WorkpaperContentRepresentation).where(
+                        WorkpaperContentRepresentation.id == pre.resolution.representation_id,
+                        WorkpaperContentRepresentation.content_version_id == version.id,
+                        WorkpaperContentRepresentation.entry_id == str(request.entry_id),
+                    )
+                )
+            ).scalar_one_or_none()
+        )
+        if version is None or representation is None:
+            return None
+        verdict = ReuseVerdict(
+            decision=ReuseDecision.hit,
+            differences=(comparison.note(),),
+            compared_field_count=len(request.projection.values),
+        )
+        return (version, representation), verdict
 
     async def _classify_reuse_miss(
         self,

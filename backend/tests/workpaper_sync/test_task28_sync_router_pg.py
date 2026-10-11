@@ -1145,6 +1145,39 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
             except Exception as exc:  # noqa: BLE001
                 _phase_failed("service_callback_route", exc)
 
+            # ── S15 materialize-from-store（spec workpaper-sync-switch-performance P5）：
+            #    与其它写端点同一道 guard（401 / 统一 404 / 锁定 403），无 adapter ⇒ 422 且零副作用。
+            try:
+                async def _pending_rows() -> int:
+                    async with Session() as s:
+                        return int((await s.execute(
+                            sa.text("SELECT count(*) FROM working_paper_pending_mutation")
+                        )).scalar_one())
+
+                mfs, hdr, body = f"{prefix}/materialize-from-store", {"Idempotency-Key": "mfs-1"}, {
+                    "sheet_key": "d2-detail"
+                }
+                current["user"] = None
+                unauth = await client.post(mfs, json=body, headers=hdr)
+                current["user"], board.project_visible = _User(user_a), False
+                invisible = await client.post(mfs, json=body, headers=hdr)
+                board.project_visible, board.workflow_locked = True, True
+                locked = await client.post(mfs, json=body, headers=hdr)
+                board.workflow_locked = False
+                before, pending_before = await _counts(), await _pending_rows()
+                unbacked = await client.post(mfs, json=body, headers=hdr)
+                scen["materialize_from_store"] = {
+                    "unauth_status": unauth.status_code,
+                    "invisible": {"status": invisible.status_code, "body": invisible.text},
+                    "locked": {"status": locked.status_code, "body": locked.text[:400]},
+                    "unbacked": {"status": unbacked.status_code, "body": unbacked.text[:600]},
+                    "counts": (before, await _counts()),
+                    "pending": (pending_before, await _pending_rows()),
+                }
+            except Exception as exc:  # noqa: BLE001
+                current["user"], board.project_visible, board.workflow_locked = _User(user_a), True, False
+                _phase_failed("materialize_from_store", exc)
+
         snap["counts_final"] = await _counts()
         snap["probe_calls"] = len(board.probe_calls)
         snap["authorize_calls"] = len(board.authorize_calls)
@@ -1221,6 +1254,7 @@ class TestHarnessIntegrity:
             "claim_room_mismatch",
             "close_capture_forbidden",
             "service_callback_route",
+            "materialize_from_store",
         }
         assert set(snap["scenarios"]) == expected
 
@@ -1320,6 +1354,37 @@ class TestFlushDoesNotAdvanceRevision:
         observed = snap["scenarios"]["pending_mutation"]
         assert observed["status"] == 422, observed["body"]
         assert "bidirectional" in observed["body"] or "adapter" in observed["body"]
+
+
+class TestMaterializeFromStoreEndpoint:
+    """spec workpaper-sync-switch-performance P5：新端点真的挂上了，且与其它写端点同一道 guard。
+
+    🔴 这是唯一证明 `materialize-from-store` 可达的判据（AST 判据分不清「挂上了」与「写好了没注册」）。
+    """
+
+    def test_unauthenticated_is_401(self, snap: dict[str, Any]) -> None:
+        assert snap["scenarios"]["materialize_from_store"]["unauth_status"] == 401
+
+    def test_invisible_project_is_the_unified_404(self, snap: dict[str, Any]) -> None:
+        observed = snap["scenarios"]["materialize_from_store"]["invisible"]
+        assert observed["status"] == 404
+        assert json.loads(observed["body"]) == json.loads(_unified_404_body())
+
+    def test_workflow_lock_refuses_with_403(self, snap: dict[str, Any]) -> None:
+        """归档 / 复核通过的底稿不得因「点了在线编辑」而被写入（写 action）。"""
+        observed = snap["scenarios"]["materialize_from_store"]["locked"]
+        assert observed["status"] == 403 and "sync_workflow_locked" in observed["body"], observed
+
+    def test_an_entry_without_an_adapter_fails_visible_with_zero_side_effects(
+        self, snap: dict[str, Any]
+    ) -> None:
+        observed = snap["scenarios"]["materialize_from_store"]
+        assert observed["unbacked"]["status"] == 422, observed["unbacked"]["body"]
+        body = observed["unbacked"]["body"]
+        assert "bidirectional" in body or "adapter" in body, body
+        before, after = observed["counts"]
+        assert before == after, "拒绝的请求留下了 operation / scope 行"
+        assert observed["pending"][0] == observed["pending"][1], "拒绝的请求建了 pending mutation"
 
 
 class TestForcesaveCompositeIdempotency:

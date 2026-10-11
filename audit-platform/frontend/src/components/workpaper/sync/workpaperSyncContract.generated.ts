@@ -9,7 +9,7 @@
  * spec: workpaper-html-onlyoffice-bidirectional-writeback-closure · Wave 3 Task 31
  */
 
-export const WP_SYNC_CONTRACT_DIGEST = "651011f6abc67b5db38d2c0863a0df067aa1722bb2636d1f61e9e51d7d7b5fdb"
+export const WP_SYNC_CONTRACT_DIGEST = "b63cdae125e1e3982091ff54013ed7f85030648555b79062aa640532998e20be"
 
 /**
  * 用户端统一前缀模板。`{entry_id}` 是**多段**值（186 条 entry_id 全部含 `/`，最深四段），
@@ -111,6 +111,12 @@ export const WP_SYNC_ROUTES = [
     "suffix": "/materialize"
   },
   {
+    "endpoint": "materialize_from_store",
+    "idempotencyKey": "required",
+    "method": "POST",
+    "suffix": "/materialize-from-store"
+  },
+  {
     "endpoint": "read_store_projection",
     "idempotencyKey": "absent",
     "method": "GET",
@@ -155,6 +161,7 @@ export const WP_SYNC_IDEMPOTENT_ENDPOINTS = [
   "create_close_intent",
   "create_pending_mutation",
   "materialize",
+  "materialize_from_store",
   "request_forcesave",
   "resolve_conflicts"
 ] as const

@@ -270,9 +270,147 @@ export interface StoreProjectionSnapshot {
   }
 }
 
+// ── P5：服务端直取投影（spec workpaper-sync-switch-performance 需求 6）──────────
+//
+// store 型宿主的 flushHtml = 「冲刷待存 + readStoreProjection」，投影本就是服务端算的；经浏览器转一圈
+// 只多付一次大载荷下载与一次上传。桥在 flushHtml 外包一层窗口：窗口内同 scope 的第一次读取交回哨兵，
+// 宿主原样交回哨兵 ⇒ 桥改调 materializeFromStore（服务端自己读 store）。宿主零改动。
+
+/** 契约里不存在的 stable key（非空）：哨兵万一被当真投影 POST 出去，服务端按契约拒收。 */
+const SERVER_STORE_SENTINEL_KEY = '__wp_sync_server_store_sentinel__'
+
+interface ServerStoreFlushWindow {
+  readonly scope: WorkpaperSyncEntryScope
+  readonly snapshot: StoreProjectionSnapshot
+  /** 哨兵已交出（每个窗口至多一次）。 */
+  handedOut: boolean
+  /** 同 scope 又开了一次切换：本窗口作废、不再拦截（谁都不能再拿走哨兵）。 */
+  closed: boolean
+}
+
+/**
+ * 哨兵快照的 revision 刻意为 -1：万一被窗口外的读取者（如另一个同 scope 宿主的 reloadHtml）
+ * 拿走，它的「版本不得低于 N」类检查会**显式失败**，而不是拿一份空投影静默往下走。
+ */
+const SENTINEL_REVISION = -1
+
+const serverStoreFlushWindows = new Set<ServerStoreFlushWindow>()
+
+function sameEntryScope(a: WorkpaperSyncEntryScope, b: WorkpaperSyncEntryScope): boolean {
+  return a.projectId === b.projectId && a.wpId === b.wpId && a.entryId === b.entryId
+}
+
+/** 投影是不是（任何一份）哨兵 —— client 的写端点据此在发出前拒绝。 */
+export function isServerStoreSentinel(projection: unknown): boolean {
+  const values = (projection as { values?: unknown } | null | undefined)?.values
+  return values != null && typeof values === 'object' && SERVER_STORE_SENTINEL_KEY in values
+}
+
+function assertNotSentinel(projection: unknown, endpoint: string): void {
+  if (isServerStoreSentinel(projection)) {
+    refuse(
+      'server_store_sentinel_leaked',
+      `${endpoint} 收到服务端直取的哨兵投影 —— 哨兵只能走 materializeFromStore，不得作为真实载荷提交`,
+    )
+  }
+}
+
+export interface ServerStoreFlushOutcome<T> {
+  readonly result: T
+  /** 宿主在窗口内读过 store 投影（拿到了哨兵）。 */
+  readonly requested: boolean
+  /** 宿主把哨兵**原样**交回（未改写、未就地修改）⇒ 可走服务端直取。 */
+  readonly passedThrough: boolean
+}
+
+/**
+ * 在「服务端直取」窗口内运行宿主的 flushHtml。
+ *
+ * * 窗口只认同 scope（三段全等），哨兵至多交出一次；其后同 scope 的读取照常发请求。
+ * * 同 scope 已有窗口（如 D4 多个页签共用一个 entry、前一次切换还在冲刷）⇒ **作废**旧窗口、
+ *   本次不拦截：两次切换都拿真投影走客户端路径，谁也拿不到对方的哨兵。
+ * * 判「原样交回」= 对象同一性 + 哨兵未被就地修改：宿主但凡加工过投影就回落客户端路径。
+ */
+export async function withServerStoreFlush<T extends { readonly projection?: unknown }>(
+  scope: WorkpaperSyncEntryScope,
+  fn: () => Promise<T>,
+): Promise<ServerStoreFlushOutcome<T>> {
+  let contended = false
+  for (const open of serverStoreFlushWindows) {
+    if (sameEntryScope(open.scope, scope)) {
+      open.closed = true
+      contended = true
+    }
+  }
+  if (contended) return { result: await fn(), requested: false, passedThrough: false }
+  const values: Record<string, unknown> = { [SERVER_STORE_SENTINEL_KEY]: { value: null } }
+  const projection = { values }
+  const window: ServerStoreFlushWindow = {
+    scope: { projectId: scope.projectId, wpId: scope.wpId, entryId: scope.entryId },
+    snapshot: { expectedRevision: SENTINEL_REVISION, fieldCount: 0, rowCount: 0, projection },
+    handedOut: false,
+    closed: false,
+  }
+  serverStoreFlushWindows.add(window)
+  try {
+    const result = await fn()
+    const pristine =
+      Object.keys(values).length === 1 &&
+      Object.keys(projection).length === 1 &&
+      (values[SERVER_STORE_SENTINEL_KEY] as { value?: unknown } | null)?.value === null
+    return {
+      result,
+      requested: window.handedOut,
+      // 作废（closed）只阻止**之后**再交出哨兵；作废前已交给本宿主、且被原样交回的，仍可直取。
+      passedThrough: window.handedOut && pristine && result?.projection === projection,
+    }
+  } finally {
+    serverStoreFlushWindows.delete(window)
+  }
+}
+
+export interface MaterializeFromStoreInput {
+  readonly sheetKey: string
+  readonly clientEditEpoch?: number
+  readonly idempotencyKey?: string
+}
+
+export interface MaterializeFromStoreResult {
+  readonly descriptor: WorkpaperSyncEditorLaunchDescriptor
+  /** 服务端 store 指纹直通（跳过投影构造与物化）。 */
+  readonly fastPath: boolean
+  /** 复用判词（`hit` / `replayed` / `miss_*`），与 `/materialize` 的指标同一封闭域。 */
+  readonly reuseVerdict: string
+}
+
+/** store 型 entry：服务端直取投影 + 物化（含指纹直通）。返回与 materialize 同一 descriptor。 */
+export async function materializeFromStore(
+  scope: WorkpaperSyncEntryScope,
+  input: MaterializeFromStoreInput,
+): Promise<MaterializeFromStoreResult> {
+  const payload = await request({
+    endpoint: 'materialize_from_store',
+    scope,
+    idempotencyKey: input.idempotencyKey ?? newIdempotencyKey(),
+    body: { sheet_key: input.sheetKey, client_edit_epoch: input.clientEditEpoch ?? 0 },
+  })
+  return {
+    descriptor: parseEditorLaunchDescriptor(payload),
+    fastPath: payload.fast_path === true,
+    reuseVerdict: typeof payload.reuse_verdict === 'string' ? payload.reuse_verdict : '',
+  }
+}
+
 export async function readStoreProjection(
   scope: WorkpaperSyncEntryScope,
 ): Promise<StoreProjectionSnapshot> {
+  // P5：桥的「服务端直取」窗口内，同 scope 的第一次读取不发请求，交回哨兵（见 withServerStoreFlush）。
+  for (const window of serverStoreFlushWindows) {
+    if (!window.handedOut && !window.closed && sameEntryScope(window.scope, scope)) {
+      window.handedOut = true
+      return window.snapshot
+    }
+  }
   const payload = await request({
     endpoint: 'read_store_projection',
     scope,
@@ -349,6 +487,7 @@ export async function createPendingMutation(
   scope: WorkpaperSyncEntryScope,
   input: CreatePendingMutationInput,
 ): Promise<WorkpaperSyncPendingMutation> {
+  assertNotSentinel(input.projection, 'create_pending_mutation')
   const key = input.idempotencyKey ?? newIdempotencyKey()
   const payload = await request({
     endpoint: 'create_pending_mutation',
@@ -387,6 +526,7 @@ export async function materialize(
       'materialize 缺 pending_mutation_token —— flush 未成功时不得 materialize（AC 3.2）',
     )
   }
+  assertNotSentinel(input.projection, 'materialize')
   const payload = await request({
     endpoint: 'materialize',
     scope,
@@ -949,6 +1089,7 @@ export const WORKPAPER_SYNC_CLIENT_ENDPOINTS = Object.freeze({
   readStoreProjection: 'read_store_projection',
   ensureFirstPublication: 'ensure_first_publication',
   materialize: 'materialize',
+  materializeFromStore: 'materialize_from_store',
   confirmDescriptor: 'confirm_descriptor',
   requestForcesave: 'request_forcesave',
   createCloseIntent: 'create_close_intent',

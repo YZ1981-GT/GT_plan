@@ -188,6 +188,7 @@ from app.services.workpaper_sync.resolution import (
     ResolutionIntent,
 )
 from app.services.workpaper_sync.rooms import FrozenBundleIdentity, RoomService
+from app.services.workpaper_sync.sync_timing import mark as _timing_mark
 
 __all__ = [
     # 异常
@@ -1483,6 +1484,9 @@ class ApplyJournal:
 
     def record(self, stage: ApplyStage, detail: str = "") -> None:
         self.entries.append((stage, detail))
+        # spec workpaper-sync-switch-performance P0：顺带记阶段边界（无计时作用域时 no-op）。
+        # 只观测：`entries` 仍是二元组，顺序判据一字不动。
+        _timing_mark(stage.value)
 
     @property
     def order(self) -> tuple[ApplyStage, ...]:

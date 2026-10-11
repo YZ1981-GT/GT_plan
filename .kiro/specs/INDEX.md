@@ -1,4 +1,5 @@
 # 致同审计作业平台 — Spec 开发索引
+> **2026-10-11 新建**：[`workpaper-sync-switch-performance`](workpaper-sync-switch-performance/tasks.md) — 底稿 HTML↔在线编辑切换提速（平台级）：P0 分阶段计时 / P1 骨架无关业务身份复用（消除 OO 保存后再进 OO 的摘要抖动）/ P5+P2 服务端直取投影 + store 指纹直通（宿主零改动）/ P4 去重复提取 / P3 OO 保存后先回表单后台合并；不砍任何校验。进度以本 spec 清单与实测证据为准
 
 > **2026-10-10 新建 · 2026-10-11 验收收口**：[`d2-online-edit-platform-closure`](d2-online-edit-platform-closure/tasks.md) — D2 在线编辑恢复 + 任意企业首次打开自动首版：注册链崩溃 / 发布链单数 instrumentation / attach 缺兄弟 binding / 兄弟 sheet 跨表传播误报漂移 / generation 撞 superseded 房间 / 无运行时首版路径（R1~R8）；真栈验收又逐条暴露并修复 14 条平台缺陷（R10~R21：OO 重算浮点尾差误报 108 条冲突 / 镜像硬取属性缺失 / 模板骨架行 / 已确认代际复用 / 落地后不回表单不释放 lease / 请求期 adapter 绑第一家企业 / 每次保存全平台冷建注册 / forcesave request 永停 correlated / OO 清空被回滚 / 同页二次保存卡死 / HTML 改格 2 秒内切在线编辑丢编辑 / 补读未捕获 rejection）。和平药房 + 重药安徽 OO↔HTML 往返浏览器实测通过；其余循环 108 个同形写入方冻结棘轮（design §7.5）。
 > **2026-10-10 ✅ 归档**：[`note-sub-table-formula-and-cross-check`](_archive/40-consol-note-defect-closure-and-template-alignment/note-sub-table-formula-and-cross-check/tasks.md) — 附注子表公式与跨表勾稽：子表合计种子 + 跨表校验声明（check_rules）+ E5 应收账款全 11 张子表作为 canary + formula_push 子表规则 + 前端同步路径。4 Phase / 19 任务。

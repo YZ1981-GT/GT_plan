@@ -38,15 +38,18 @@ import {
   getOperationConflicts,
   getOperationTimeline,
   getRecoveryCaseTimeline,
+  isServerStoreSentinel,
   leaveRoom,
   listRecoveryCases,
   materialize,
+  materializeFromStore,
   readStoreProjection,
   requestForcesave,
   resolveConflicts,
   retryOperation,
   rollbackVersion,
   terminateRecoveryDownloadOnly,
+  withServerStoreFlush,
 } from '../workpaperSyncApi'
 import { WorkpaperSyncContractError, buildDescriptorConfirmPayload } from '../workpaperSyncDto'
 
@@ -189,6 +192,7 @@ const DRIVERS: Record<string, () => Promise<unknown>> = {
       pendingMutationToken: 'tok',
       projection: { fields: [] },
     }).catch(() => null),
+  materialize_from_store: () => materializeFromStore(SCOPE, { sheetKey: 's' }).catch(() => null),
   confirm_descriptor: () =>
     confirmDescriptor(SCOPE, {
       descriptor: { roomId: UUID(2) } as never,
@@ -349,6 +353,173 @@ describe('生成的路由表与 client 一一对应', () => {
       expect(url).not.toMatch(/\{[a-z_]+\}/)
     },
   )
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// B2. 服务端直取（spec workpaper-sync-switch-performance P5）
+// ═══════════════════════════════════════════════════════════════════════════
+
+function storeSnapshotPayload() {
+  return {
+    expected_revision: 4,
+    field_count: 1,
+    row_count: 0,
+    projection: { values: { 'scalars/remark': { value: '甲' } } },
+  }
+}
+
+describe('服务端直取：materializeFromStore', () => {
+  it('POST 生成表里的 /materialize-from-store，body 只带 sheet_key + client_edit_epoch', async () => {
+    mockPost.mockResolvedValueOnce({
+      data: { ...descriptorPayload(), fast_path: true, reuse_verdict: 'hit' },
+    })
+    const result = await materializeFromStore(SCOPE, {
+      sheetKey: 'd22-managed',
+      clientEditEpoch: 3,
+      idempotencyKey: 'mfs-key-1',
+    })
+    const [url, body, config] = mockPost.mock.calls[0]
+    expect(url).toBe(buildSyncEndpointUrl('materialize_from_store', SCOPE))
+    expect(body).toEqual({ sheet_key: 'd22-managed', client_edit_epoch: 3 })
+    expect((config as { headers: Record<string, string> }).headers['Idempotency-Key']).toBe('mfs-key-1')
+    expect(result.fastPath).toBe(true)
+    expect(result.reuseVerdict).toBe('hit')
+    expect(result.descriptor.roomId).toBe(UUID(2))
+  })
+
+  it('fast_path 缺省或不是 true ⇒ false（不把缺字段读成直通）', async () => {
+    mockPost.mockResolvedValueOnce({ data: descriptorPayload() })
+    mockPost.mockResolvedValueOnce({ data: { ...descriptorPayload(), fast_path: 'true' } })
+    expect((await materializeFromStore(SCOPE, { sheetKey: 's' })).fastPath).toBe(false)
+    expect((await materializeFromStore(SCOPE, { sheetKey: 's' })).fastPath).toBe(false)
+  })
+
+  it('descriptor 不全时与 materialize 同样拒绝挂载', async () => {
+    const { room_id: _dropped, ...partial } = descriptorPayload()
+    mockPost.mockResolvedValueOnce({ data: partial })
+    await expectAsyncRefusal(() => materializeFromStore(SCOPE, { sheetKey: 's' }), 'descriptor_field_missing')
+  })
+})
+
+describe('服务端直取窗口：withServerStoreFlush', () => {
+  it('窗口内同 scope 第一次读取交回哨兵、不发请求；同窗口第二次照常发请求', async () => {
+    mockGet.mockResolvedValue({ data: storeSnapshotPayload() })
+    const outcome = await withServerStoreFlush(SCOPE, async () => {
+      const first = await readStoreProjection(SCOPE)
+      const second = await readStoreProjection(SCOPE)
+      return { first, second, projection: first.projection }
+    })
+    expect(mockGet).toHaveBeenCalledTimes(1)
+    expect(isServerStoreSentinel(outcome.result.first.projection)).toBe(true)
+    expect(isServerStoreSentinel(outcome.result.second.projection)).toBe(false)
+    expect(outcome.requested).toBe(true)
+    expect(outcome.passedThrough).toBe(true)
+  })
+
+  it.each([
+    ['另一张底稿', { ...SCOPE, wpId: UUID(103) }],
+    ['另一个项目', { ...SCOPE, projectId: UUID(104) }],
+    ['另一个 entry', { ...SCOPE, entryId: TWO_SEGMENT_ENTRY }],
+  ])('只认同 scope：%s 的读取照常发请求', async (_label, other) => {
+    mockGet.mockResolvedValue({ data: storeSnapshotPayload() })
+    const outcome = await withServerStoreFlush(SCOPE, async () => readStoreProjection(other))
+    expect(mockGet).toHaveBeenCalledTimes(1)
+    expect(outcome.requested).toBe(false)
+    expect(outcome.passedThrough).toBe(false)
+    expect(isServerStoreSentinel(outcome.result.projection)).toBe(false)
+  })
+
+  it('窗口关闭后（含 fn 抛错）不再拦截', async () => {
+    mockGet.mockResolvedValue({ data: storeSnapshotPayload() })
+    await expect(
+      withServerStoreFlush(SCOPE, async () => {
+        throw new Error('宿主 flush 失败')
+      }),
+    ).rejects.toThrow('宿主 flush 失败')
+    const after = await readStoreProjection(SCOPE)
+    expect(isServerStoreSentinel(after.projection)).toBe(false)
+    expect(mockGet).toHaveBeenCalledTimes(1)
+  })
+
+  it('宿主没读 store 投影 ⇒ requested=false，宿主结果原样交回', async () => {
+    const own = { projection: { values: { k: { value: 1 } } } }
+    const outcome = await withServerStoreFlush(SCOPE, async () => own)
+    expect(outcome).toEqual({ result: own, requested: false, passedThrough: false })
+  })
+
+  it.each([
+    ['展开成新对象', (p: { values: Record<string, unknown> }) => ({ ...p })],
+    ['就地加字段', (p: { values: Record<string, unknown> }) => {
+      p.values.extra = { value: 1 }
+      return p
+    }],
+    ['就地加 row_keys', (p: { values: Record<string, unknown> }) => Object.assign(p, { row_keys: {} })],
+  ])('宿主加工过哨兵（%s）⇒ passedThrough=false', async (_label, edit) => {
+    const outcome = await withServerStoreFlush(SCOPE, async () => {
+      const snap = await readStoreProjection(SCOPE)
+      return { projection: edit(snap.projection as { values: Record<string, unknown> }) }
+    })
+    expect(outcome.requested).toBe(true)
+    expect(outcome.passedThrough).toBe(false)
+  })
+
+  it('同 scope 第二次切换作废前一个窗口：两边都拿真投影，谁也拿不到哨兵', async () => {
+    mockGet.mockResolvedValue({ data: storeSnapshotPayload() })
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    // 第一次切换卡在宿主的「冲刷待存」上（D4 多页签共用一个 entry 的真实形态）。
+    const first = withServerStoreFlush(SCOPE, async () => {
+      await gate
+      return { projection: (await readStoreProjection(SCOPE)).projection }
+    })
+    const second = await withServerStoreFlush(SCOPE, async () => ({
+      projection: (await readStoreProjection(SCOPE)).projection,
+    }))
+    release()
+    const firstOutcome = await first
+    for (const outcome of [firstOutcome, second]) {
+      expect(outcome.passedThrough).toBe(false)
+      expect(isServerStoreSentinel(outcome.result.projection)).toBe(false)
+    }
+    expect(mockGet).toHaveBeenCalledTimes(2)
+  })
+
+  it('作废前已交给本宿主并原样交回的哨兵仍可直取', async () => {
+    const first = await withServerStoreFlush(SCOPE, async () => {
+      const snap = await readStoreProjection(SCOPE)
+      await withServerStoreFlush(SCOPE, async () => ({ projection: null }))
+      return { projection: snap.projection }
+    })
+    expect(first.passedThrough).toBe(true)
+    expect(mockGet).not.toHaveBeenCalled()
+  })
+
+  it('哨兵快照的 revision 为 -1：被窗口外读取者拿走时版本检查显式失败', async () => {
+    const outcome = await withServerStoreFlush(SCOPE, async () => readStoreProjection(SCOPE))
+    expect(outcome.result.expectedRevision).toBe(-1)
+  })
+
+  it('哨兵不得进 pending-mutations / materialize（发出前拒绝）', async () => {
+    const outcome = await withServerStoreFlush(SCOPE, async () => readStoreProjection(SCOPE))
+    const sentinel = outcome.result.projection
+    await expectAsyncRefusal(
+      () => createPendingMutation(SCOPE, { sheetKey: 's', expectedRevision: 0, projection: sentinel }),
+      'server_store_sentinel_leaked',
+    )
+    await expectAsyncRefusal(
+      () =>
+        materialize(SCOPE, {
+          sheetKey: 's',
+          expectedRevision: 0,
+          pendingMutationToken: 'tok',
+          projection: sentinel,
+        }),
+      'server_store_sentinel_leaked',
+    )
+    expect(mockPost).not.toHaveBeenCalled()
+  })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════

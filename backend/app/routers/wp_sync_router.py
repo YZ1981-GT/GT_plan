@@ -128,6 +128,7 @@ from app.services.workpaper_sync.materialize_reuse_verdict import (
     single_pass_decline_scope,
 )
 from app.services.workpaper_sync.metrics import sync_metrics
+from app.services.workpaper_sync.recovery_case_listing import load_recovery_cases
 from app.services.workpaper_sync.repository import WorkpaperSyncRepository
 from app.services.workpaper_sync.request_application import RequestApplicationService
 from app.services.workpaper_sync.resolution import CanonicalResolutionService
@@ -143,6 +144,7 @@ from app.services.workpaper_sync.adopt_substrate_response import (
 from app.services.workpaper_sync.store_projection_response import (
     compute_store_projection_response,
 )
+from app.services.workpaper_sync.sync_timing import timing_scope
 from app.services.workpaper_sync.target_bound_registration import (
     bind_registration_to_target,
 )
@@ -360,6 +362,8 @@ _WRITE_ACTIONS: frozenset[str] = frozenset(
         # content revision、建 representation 与 entry pointer）⇒ **写** action，归档 /
         # 复核通过的底稿不得因「点了在线编辑」而被写入新版本。
         "ensure_first_publication",
+        # spec workpaper-sync-switch-performance P5：服务端直取投影 + 物化（同 materialize）。
+        "materialize_from_store",
     }
 )
 
@@ -1148,8 +1152,10 @@ async def materialize(
         # requirements 3.3：单趟写入的回落原因要能统计。engine 层拿不到 scope，所以它只
         # **登记分型**（`record_single_pass_decline`），归因与 emit 在这里 —— 这是本请求
         # 唯一同时握有 project_id/wp_id/entry_id 与「物化真的跑过」这两件事的地方。
-        with single_pass_decline_scope() as declines:
-            outcome = await coordinator.materialize(authorized)
+        # spec workpaper-sync-switch-performance P0：分阶段计时（只观测，见 sync_timing）。
+        with timing_scope("html_to_oo", wp=wp_id, entry=scope.entry_id):
+            with single_pass_decline_scope() as declines:
+                outcome = await coordinator.materialize(authorized)
     except SyncDomainError as exc:
         raise _domain_error(exc, status=classify_materialize_rejection(exc)) from exc
 
@@ -1198,6 +1204,37 @@ async def materialize(
     return await _attach_launch_urls(
         body, http_request=request, svc=svc, target_sheet=target_sheet
     )
+
+
+@router.post(USER_SYNC_PREFIX + "/materialize-from-store")
+async def materialize_from_store(
+    project_id: uuid.UUID, wp_id: uuid.UUID, entry_id: str, request: Request,
+    payload: Mapping[str, Any] = Body(default={}),
+    idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    svc: _SyncServices = Depends(_services),
+) -> dict[str, Any]:
+    """store 型 entry：服务端直取投影 + store 指纹直通（业务见 `store_materialize`）。"""
+    scope = await _guard(
+        svc, project_id=project_id, wp_id=wp_id, entry_id=entry_id, action="materialize_from_store"
+    )
+    from app.services.workpaper_sync import store_materialize as SM
+    from app.services.workpaper_sync.room_launch import resolve_launch_target_sheet
+
+    registration = await _registration(svc, scope)
+    sheet_key = str(payload.get("sheet_key") or "")
+    try:
+        with timing_scope("html_to_oo_from_store", wp=wp_id, entry=scope.entry_id):
+            result = await SM.materialize_from_store(
+                session=svc.session, resolution=svc.resolution, registration=registration,
+                project_id=scope.project_id, wp_id=scope.wp_id, entry_id=scope.entry_id,
+                user_id=scope.user_id, sheet_key=sheet_key, idempotency_key=str(idempotency_key),
+                client_edit_epoch=int(payload.get("client_edit_epoch") or 0), secret=_secret(),
+            )
+    except SyncDomainError as exc:
+        raise _domain_error(exc, status=SM.classify_store_materialize_rejection(exc)) from exc
+    body = SM.response_body(result, project_id=project_id, wp_id=wp_id, entry_id=scope.entry_id)
+    target = resolve_launch_target_sheet(contract=registration.contract, sheet_key=sheet_key)
+    return await _attach_launch_urls(body, http_request=request, svc=svc, target_sheet=target)
 
 
 async def _attach_launch_urls(
@@ -1942,102 +1979,14 @@ async def list_recovery_cases(
     if indexed_generation is None or int(indexed_generation) != int(generation):
         # 显式 generation 与 scope index 的归属不符 ⇒ 同 404 oracle（跨 scope 同型）。
         raise _not_found()
-    cases = await _load_recovery_cases(svc, room_id=room_id, generation=int(generation))
+    cases = await load_recovery_cases(
+        svc.session, room_id=room_id, generation=int(generation)
+    )
     return {
         "room_id": str(room_id),
         "generation": int(generation),
         "cases": cases,
     }
-
-
-async def _load_recovery_cases(
-    svc: _SyncServices, *, room_id: uuid.UUID, generation: int
-) -> list[dict[str, Any]]:
-    """候选 prior confirmation 摘要 + `claim/download-only` 能力，**零业务内容**。
-
-    AC 5.8：不返回业务内容或未授权资源存在性。因此这里只投影 reason/state/
-    候选 confirmation id 与能力布尔 —— 没有 hash、没有整稿、没有 artifact 路径。
-    """
-    from app.models.workpaper_sync_models import (
-        WorkpaperCallbackRecoveryCase,
-        WorkpaperOoClientConfirmation,
-    )
-
-    rows = list(
-        (
-            await svc.session.execute(
-                sa.select(WorkpaperCallbackRecoveryCase)
-                .where(
-                    WorkpaperCallbackRecoveryCase.room_id == room_id,
-                    WorkpaperCallbackRecoveryCase.generation == generation,
-                )
-                .order_by(WorkpaperCallbackRecoveryCase.created_at)
-            )
-        ).scalars()
-    )
-    if not rows:
-        return []
-    candidates = list(
-        (
-            await svc.session.execute(
-                sa.select(
-                    WorkpaperOoClientConfirmation.id,
-                    WorkpaperOoClientConfirmation.participant_id,
-                    WorkpaperOoClientConfirmation.content_version_id,
-                    WorkpaperOoClientConfirmation.confirmed_at,
-                )
-                .where(WorkpaperOoClientConfirmation.room_id == room_id)
-                .order_by(WorkpaperOoClientConfirmation.confirmed_at.desc())
-            )
-        ).all()
-    )
-    summary = [
-        {
-            "confirmation_id": str(c[0]),
-            "participant_id": str(c[1]),
-            "content_version_id": str(c[2]),
-            "confirmed_at": c[3].isoformat() if c[3] is not None else None,
-        }
-        for c in candidates
-    ]
-    # 🔴 终态集从**状态机登记表**取，不写字符串字面量。
-    # 第一版写死了 `("claimed", "download_only", "quarantined", "expired")`，
-    # 而 `RecoveryCaseState` 里根本没有 `claimed`（真实值是 `application_created`）——
-    # 后果是「已 claim 的 case 仍然显示可 claim/可 download-only」，前端据此给出两个
-    # 按钮，点下去才由服务端拒绝。字面量与枚举漂移在功能测试里完全看不出来。
-    from app.services.workpaper_sync.models import RecoveryCaseState, TERMINAL_STATES
-
-    terminal_states = {s.value for s in TERMINAL_STATES["recovery_case"]} | {
-        RecoveryCaseState.application_created.value
-    }
-    out: list[dict[str, Any]] = []
-    for case in rows:
-        terminal = str(case.state) in terminal_states
-        out.append(
-            {
-                "case_id": str(case.id),
-                "reason": str(case.reason),
-                "state": str(case.state),
-                # claim 前三实体全空 —— 这三个 None 就是 AC 5.8 的可观测事实。
-                "operation_id": (
-                    None if case.operation_id is None else str(case.operation_id)
-                ),
-                "application_id": (
-                    None if case.application_id is None else str(case.application_id)
-                ),
-                "forcesave_request_id": (
-                    None
-                    if case.recovery_request_id is None
-                    else str(case.recovery_request_id)
-                ),
-                "candidate_prior_confirmations": summary,
-                "actions": {
-                    "claim": not terminal,
-                    "download_only": not terminal,
-                },
-            }
-        )
-    return out
 
 
 @router.post(USER_SYNC_PREFIX + "/recovery-cases/{case_id}/claim", status_code=202)
@@ -3124,15 +3073,16 @@ async def _apply_durable_incoming(db: AsyncSession, *, outcome: Any) -> None:
         )
     ).scalar_one_or_none()
     started = time.monotonic()
-    result = await coordinator.apply_durable_incoming(
-        operation_id=outcome.operation_id,
-        declared_project_id=app_row.project_id,
-        declared_wp_id=app_row.wp_id,
-        declared_entry_id=str(app_row.entry_id),
-        adapter=registration.adapter,
-        contract=registration.contract,
-        attempt=1,
-    )
+    with timing_scope("oo_to_html_apply", wp=app_row.wp_id, entry=app_row.entry_id):
+        result = await coordinator.apply_durable_incoming(
+            operation_id=outcome.operation_id,
+            declared_project_id=app_row.project_id,
+            declared_wp_id=app_row.wp_id,
+            declared_entry_id=str(app_row.entry_id),
+            adapter=registration.adapter,
+            contract=registration.contract,
+            attempt=1,
+        )
     labels = {
         "room_id": app_row.room_id,
         "generation": int(app_row.generation),
