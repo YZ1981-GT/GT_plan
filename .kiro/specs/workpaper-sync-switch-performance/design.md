@@ -120,3 +120,29 @@ guard → registration（R14 目标绑定）→ target_sheet
 - 指纹落库：需迁移且发版后旧指纹可能在新代码下误命中；进程内 LRU 天然随发版失效。
 - 常驻隐藏编辑器：每页占一个 OO 连接（授权 / 内存），6000 人目标下不划算。
 - 纯手动「点刷新才回写」：慢的部分只是挪位置，且带来两侧分叉、下游读旧数（见 requirements 背景）。
+
+## §8 P6 进程池 ROI 评估（实施结论：不做）
+
+第一批（P0~P5）已把 HTML→OO 切换的服务端耗时从 13.9~15.2s 降到 ~0.2s（指纹直通）/ ~1.5s（首次无指纹，含 store 读取 + 投影构造 + 协调器复用命中）。到 OO 编辑器确认可编辑的端到端耗时约 3.3~4.4s，其中 ~3s 是 OnlyOffice DocsAPI 自身的加载时间（服务端无法干预）。
+
+在此基础上，进程池预热的收益分析：
+
+| 路径 | 服务端耗时 | 进程池能省的 | 占端到端比 |
+|---|---|---|---|
+| 指纹直通（无改动再切） | ~200ms | ~0ms（不过 extract） | 0% |
+| 首次无指纹 | ~1500ms | ~0ms（build_projection 已走线程池） | 0% |
+| 全量物化（store 变了） | ~1600ms | ~0ms（同上） | 0% |
+| OO→HTML merge（保存方向，非切换） | ~22s | ~13s（三次 extract 各 ~4s，去重省一次） | N/A（不在切换路径） |
+
+结论：进程池对切换路径零收益（第一批已消除了所有 extract）。OO→HTML 方向的 extract 去重（P4）可独立做，但与切换体验无关。
+
+## §9 `.json.gz` 明文发现
+
+`store-projection` 的投影产物文件名为 `.json.gz`，但实际存储为**纯 JSON**（4.29 MB，gzipped 约 183 KB）。这不影响正确性（读写两侧都不做解压），但命名有误导性。记录在此，不在本 spec 修正。
+
+## §10 P4 / P3 延后评估
+
+**P4 去重复提取**：收益在 OO→HTML（保存）方向的 merge 路径上，不在 HTML→OO 切换路径上。当 base 与 current 指向同一 representation 时省一次 ~4s extract（22s→18s），值得做但与本 spec 核心诉求「切换提速」独立。建议另立 spec。
+
+**P3 先回表单**：改善的是「保存后回表单」的体感（从等 applied 才回到 incoming durable 即回），需要后端迁移（V185 `leave_requested_at`）+ leave 端点参数 + request_settlement 联动 + 前端新状态 `html_pending_apply` + 17+ 宿主只读绑定 + 横幅组件。工作量大且完全独立于切换提速。建议另立 spec。
+
