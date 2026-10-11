@@ -55,6 +55,7 @@ import ast
 import functools
 import re
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -364,29 +365,53 @@ def _spec_completion(spec_name: str) -> tuple[int, int] | None:
     return None
 
 
-@functools.lru_cache(maxsize=1)
-def _untracked_modules_with_completed_spec() -> list[tuple[str, str, str]]:
-    """未入库模块 → (模块名, spec, 进度)，只留 spec 已 100% 完成的。"""
+def _untracked_scanned_paths() -> list[Path]:
+    """扫描目录下**未跟踪**的直接子 .py（磁盘有、`git ls-files` 无）。"""
     tracked = _tracked_files()
-    out: list[tuple[str, str, str]] = []
+    out: list[Path] = []
     for rel_dir in SCANNED_DIRS:
         directory = _REPO / rel_dir
         if not directory.is_dir():  # pragma: no cover
             continue
         tracked_stems = _direct_child_stems(rel_dir, tracked)
-        for path in sorted(directory.glob("*.py")):
-            if path.stem in tracked_stems:
-                continue
-            spec = _self_reported_spec(path)
-            if not spec:
-                continue
-            progress = _spec_completion_cached(spec)
-            if progress is None:
-                continue
-            done, total = progress
-            if done == total and total > 0:
-                out.append((path.stem, spec, f"{done}/{total}"))
+        out.extend(
+            path for path in sorted(directory.glob("*.py")) if path.stem not in tracked_stems
+        )
     return out
+
+
+def _partition_by_spec_completion(
+    paths: list[Path], *, completion: Callable[[str], tuple[int, int] | None]
+) -> tuple[list[tuple[str, str, str]], dict[str, list[str]]]:
+    """按模块自报 spec 的完成度二分：(100% 完成的 [(模块, spec, 进度)], 在飞的 {spec: [模块]})。
+
+    纯函数（只读入参路径的文件头 + 调 ``completion``），以便反向判据用**合成样本**
+    给出确定性对照 —— 不依赖「工作树里恰好有别人没写完的文件」。
+    """
+    completed: list[tuple[str, str, str]] = []
+    in_flight: dict[str, list[str]] = {}
+    for path in paths:
+        spec = _self_reported_spec(path)
+        if not spec:
+            continue
+        progress = completion(spec)
+        if progress is None:
+            continue
+        done, total = progress
+        if done == total and total > 0:
+            completed.append((path.stem, spec, f"{done}/{total}"))
+        elif done < total:
+            in_flight.setdefault(spec, []).append(path.stem)
+    return completed, in_flight
+
+
+@functools.lru_cache(maxsize=1)
+def _untracked_modules_with_completed_spec() -> list[tuple[str, str, str]]:
+    """未入库模块 → (模块名, spec, 进度)，只留 spec 已 100% 完成的。"""
+    completed, _in_flight = _partition_by_spec_completion(
+        _untracked_scanned_paths(), completion=_spec_completion_cached
+    )
+    return completed
 
 
 #: 🔴 「spec 已 100% 但产物未入库」的**已知未决项**（棘轮，只许变短）。
@@ -406,52 +431,11 @@ def _untracked_modules_with_completed_spec() -> list[tuple[str, str, str]]:
 #:
 #: 🔴 每条都必须写明「为什么不能入库」，且下面有一条反向判据检查本表无失效条目
 #: （某文件入库后必须从这里删掉）。
-UNCOMMITTED_WITH_COMPLETED_SPEC: dict[str, tuple[str, str]] = {
-    "test_d3_03_single_html_adjudication": (
-        "d3-sync-coverage-via-row-table-engine",
-        "实测 3 failed / 16 passed：D3-3 单 HTML 审定表路径未接完。spec 标 17/17 属假绿。",
-    ),
-    "test_d3_04_dual_zone_shift_and_verify": (
-        "d3-sync-coverage-via-row-table-engine",
-        "实测失败：ContractSchemaError: contract d3.prepaid_receipts_detail … "
-        "⇒ D3-4 双区契约未扩容。",
-    ),
-    "test_d3_06_offline_materialize_and_verify": (
-        "d3-sync-coverage-via-row-table-engine",
-        "实测 2 passed / 4 errors：「默认契约应含 D3-6（d36-managed），实得 "
-        "['d32-managed']」⇒ 契约受管区未扩容。spec 标 17/17 属假绿。",
-    ),
-    "test_d3_07_dual_zone_shift_and_verify": (
-        "d3-sync-coverage-via-row-table-engine",
-        "实测 10 failed：ContractSchemaError: contract d3.prepaid_receipts_detail …"
-        "⇒ 契约未扩容。",
-    ),
-    "test_d3_frontend_managed_sheet_parity": (
-        "d3-sync-coverage-via-row-table-engine",
-        "实测 4 failed：AttributeError on phase5_d3_expansion（前端受管 sheet 对账所需的"
-        "导出还没加）。",
-    ),
-    "test_d3_property3_4_dual_zone_baseline": (
-        "d3-sync-coverage-via-row-table-engine",
-        "实测 3 failed：「Property 3 目标（受管区达到 4）未达到」/「Property 4（7）未达到」"
-        "—— 这本来就是 spec 里「**先红**」的验收判据。",
-    ),
-    "test_task5_d3_performance_baseline": (
-        "d3-sync-coverage-via-row-table-engine",
-        "实测 1 failed：`test_real_registration_path_fails_before_reaching_d3` "
-        "DID NOT RAISE —— 注册路径已能走到 D3，该红判据的前提变了，需该 lane 重判。",
-    ),
-    "test_workbook_propagation_ref_collision": (
-        "d3-sync-coverage-via-row-table-engine",
-        "实测 25 failed：PropagationDriftError（excel_materialize.py:3313）。"
-        "🔴 与其余几份**不同型**，且已排除是删行 lane 引入 —— `git blame` 该区间得 "
-        "d76a423c8（别 lane，2026-09-30）+ eed3a34ff（09-06）。归属待该 lane 归因。",
-    ),
-    "test_frontend_reference_index_memo": (
-        "startup-prewarm-event-loop-unblocking",
-        "spec 标 10/10，但该文件未入库且未经本轮实跑验证；归 startup lane 自行确认后入库。",
-    ),
-}
+#:
+#: 2026-10-11 清空：原登记 9 条（d3 lane 8 条 + startup lane 1 条）现算**全部已被各自
+#: lane 入库**（`git ls-files` 逐个命中）⇒ 按本表规则删除。它们入库时是否已转绿属各
+#: lane 的验收，不在本表职责内。原文见 `git show b798298cf:<本文件>`。
+UNCOMMITTED_WITH_COMPLETED_SPEC: dict[str, tuple[str, str]] = {}
 
 
 def test_no_completed_spec_has_an_uncommitted_deliverable() -> None:
@@ -502,36 +486,41 @@ def test_ratchet_entries_carry_a_real_reason() -> None:
         )
 
 
-def test_in_flight_specs_are_not_flagged() -> None:
+def test_in_flight_specs_are_not_flagged(tmp_path: Path) -> None:
     """🔴 反向：spec 还在飞时，它的模块未入库是**正常**的，不得被上一条判红。
 
     少了这条，上一条可能因为「把所有未入库模块都判红」而恰好是绿的
     —— 那样它就不是在测「spec 完成度」这个轴。
-    现算：`d567-sync-coverage-via-row-table-engine`（2/23 在飞）有 16 个未入库模块。
-    """
-    tracked = _tracked_files()
-    in_flight: dict[str, list[str]] = {}
-    for rel_dir in SCANNED_DIRS:
-        directory = _REPO / rel_dir
-        if not directory.is_dir():  # pragma: no cover
-            continue
-        tracked_stems = _direct_child_stems(rel_dir, tracked)
-        for path in sorted(directory.glob("*.py")):
-            if path.stem in tracked_stems:
-                continue
-            spec = _self_reported_spec(path)
-            if not spec:
-                continue
-            progress = _spec_completion(spec)
-            if progress and progress[0] < progress[1]:
-                in_flight.setdefault(spec, []).append(path.stem)
 
-    assert in_flight, (
-        "现算没有任何「spec 在飞 + 模块未入库」的样本 ⇒ 上一条判据失去对照，"
-        "无法区分「按完成度判」与「把所有未入库模块都判红」"
+    🔴 2026-10-11 改为**合成样本**做对照：原写法要求「工作树里恰好有在飞 spec 的未入库
+    文件」才有对照，干净检出（CI / 新 clone）里这类文件必然为 0 ⇒ 本条恒红，
+    属「判据含非确定性输入」。合成样本让对照与工作树状态无关；工作树里若真有在飞样本，
+    照旧逐个核对它们没被误判。
+    """
+    done_mod = tmp_path / "made_up_done_module.py"
+    flight_mod = tmp_path / "made_up_flight_module.py"
+    no_spec_mod = tmp_path / "made_up_no_spec_module.py"
+    done_mod.write_text('"""x.\n\nspec: made-up-done-spec-aaa\n"""\n', encoding="utf-8")
+    flight_mod.write_text('"""x.\n\nspec: made-up-flight-spec-bbb\n"""\n', encoding="utf-8")
+    no_spec_mod.write_text('"""no header."""\n', encoding="utf-8")
+    progress = {"made-up-done-spec-aaa": (3, 3), "made-up-flight-spec-bbb": (1, 3)}
+
+    completed, in_flight = _partition_by_spec_completion(
+        [done_mod, flight_mod, no_spec_mod], completion=progress.get
+    )
+    assert [m for m, _s, _p in completed] == ["made_up_done_module"], (
+        f"100% 完成的样本必须判红、在飞样本不得判红，实得 {completed}"
+    )
+    assert in_flight == {"made-up-flight-spec-bbb": ["made_up_flight_module"]}, (
+        f"在飞样本必须归入 in_flight（对照组），实得 {in_flight}"
+    )
+
+    # 工作树里的真实在飞样本（干净检出时为空，属正常）逐个核对没被误判。
+    _live_completed, live_in_flight = _partition_by_spec_completion(
+        _untracked_scanned_paths(), completion=_spec_completion_cached
     )
     flagged = {m for m, _s, _p in _untracked_modules_with_completed_spec()}
-    for spec, mods in in_flight.items():
+    for spec, mods in live_in_flight.items():
         for m in mods:
             assert m not in flagged, (
                 f"{m} 属在飞 spec {spec}（进度 {_spec_completion(spec)}）却被判红 —— "
