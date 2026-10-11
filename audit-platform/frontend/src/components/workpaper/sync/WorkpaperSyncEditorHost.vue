@@ -125,6 +125,7 @@ import {
   buildDocEditorConfig,
   hostRefusal,
   loadDocsApi,
+  preloadDocsApiScript,
   readDocumentDirty,
   readEditorErrorCode,
   readEditorErrorMessage,
@@ -183,6 +184,16 @@ const props = withDefaults(
 const resolvedDocumentServerUrl = computed(() =>
   props.documentServerUrl.trim() !== '' ? props.documentServerUrl : ENV_DOCUMENT_SERVER_URL,
 )
+
+// 空闲预加载 OO api.js：用户在结构化视图浏览时脚本已缓存，点「在线编辑」省掉冷加载 ~1s。
+// requestIdleCallback 不打断首屏渲染；preload 幂等（已有则跳过）。
+const _idleId = typeof requestIdleCallback === 'function'
+  ? requestIdleCallback(() => preloadDocsApiScript(resolvedDocumentServerUrl.value))
+  : setTimeout(() => preloadDocsApiScript(resolvedDocumentServerUrl.value), 2000)
+onBeforeUnmount(() => {
+  if (typeof cancelIdleCallback === 'function') cancelIdleCallback(_idleId as number)
+  else clearTimeout(_idleId as ReturnType<typeof setTimeout>)
+})
 
 const emit = defineEmits<{
   /** DocsAPI `onDocumentReady` 真实触发（**不**代表服务端已确认）。 */
@@ -534,28 +545,34 @@ watch(
 // 当初点按钮时要的结果；没有落地（冲突未裁、refresh_required）就不会触发。
 // ═══════════════════════════════════════════════════════════════════════════
 
-const RETURN_TO_FORM_DELAY_MS = 1_200
+/**
+ * 回表单延迟。
+ *
+ * 🔴 spec workpaper-sync-switch-performance 实测 applied 事件到宿主 reload 之间只需一帧
+ * （给 DOM 一次 paint 的机会防白闪）。原 1200ms 延迟是保守估计，现用 `requestAnimationFrame`
+ * 替代：保证至少过一帧（~16ms），不再硬等 1.2s。
+ */
 
 let returnToFormPending = false
-let returnToFormTimer: ReturnType<typeof setTimeout> | null = null
+let returnToFormRaf: number | null = null
 
 function cancelReturnToForm(): void {
   returnToFormPending = false
-  if (returnToFormTimer !== null) {
-    clearTimeout(returnToFormTimer)
-    returnToFormTimer = null
+  if (returnToFormRaf !== null) {
+    cancelAnimationFrame(returnToFormRaf)
+    returnToFormRaf = null
   }
 }
 
 function scheduleReturnToForm(): void {
   if (!returnToFormPending) return
   returnToFormPending = false
-  returnToFormTimer = setTimeout(() => {
-    returnToFormTimer = null
+  returnToFormRaf = requestAnimationFrame(() => {
+    returnToFormRaf = null
     if (String(props.bridge.state.value) !== 'applied' || props.bridge.dirty.value) return
     // 失败由桥记进 lastError 并推到 error 态（状态条可见），这里不再二次上报。
     void props.bridge.reloadAfterApplied().catch(() => undefined)
-  }, RETURN_TO_FORM_DELAY_MS)
+  })
 }
 
 // ── 用户动作

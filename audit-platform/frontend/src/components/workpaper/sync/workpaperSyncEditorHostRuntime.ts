@@ -73,6 +73,7 @@ export const WP_SYNC_HOST_ERROR_TEXT: Readonly<Record<string, string>> = Object.
     'descriptor 内嵌的 OnlyOffice config 缺 document 段，拒绝挂载编辑器',
   editor_host_editor_side_forcesave_enabled:
     'descriptor 内嵌的 config 打开了编辑器侧自动保存，拒绝挂载编辑器',
+
   editor_host_forcesave_before_confirmation:
     '服务端尚未确认编辑器身份，强制保存不可用',
   editor_host_forcesave_without_operation:
@@ -175,6 +176,28 @@ export function loadDocsApi(documentServerUrl: string): Promise<WorkpaperSyncDoc
     tag.onerror = fail
     document.head.appendChild(tag)
   })
+}
+
+/**
+ * 空闲预加载 OnlyOffice `api.js`：插入 `<link rel="preload" as="script">`。
+ *
+ * 只发一次网络请求（浏览器缓存），不执行脚本、不创建 `DocsAPI`。`loadDocsApi` 在真正
+ * 需要时创建 `<script>` 标签——浏览器从 disk cache 命中，省掉 ~1s 的网络延迟。
+ *
+ * 放在 `requestIdleCallback` 里：不打断首屏渲染，不阻塞任何用户操作。
+ * 幂等：已有同 href 的 preload link 则跳过。
+ */
+export function preloadDocsApiScript(documentServerUrl?: string): void {
+  const base = String(documentServerUrl ?? '').trim().replace(/\/+$/, '')
+  if (base === '') return
+  const href = `${base}${WP_SYNC_DOCS_API_SCRIPT_PATH}`
+  if (document.head.querySelector(`link[rel="preload"][href="${href}"]`)) return
+  const link = document.createElement('link')
+  link.rel = 'preload'
+  link.as = 'script'
+  link.href = href
+  // crossorigin 与 script 标签一致（same-origin 时可省，跨域时必须匹配）
+  document.head.appendChild(link)
 }
 
 function configSection(config: Record<string, unknown>, key: string): Record<string, unknown> {
