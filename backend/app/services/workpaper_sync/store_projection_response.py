@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import uuid
+from dataclasses import dataclass
 from typing import Any
 
 import sqlalchemy as sa
@@ -70,6 +71,100 @@ def resolve_store_projection_provider(adapter_id: str) -> Any:
     raise StoreProjectionNotBackedError(
         f"adapter {adapter_id!r} 不在 DELIVERED_PER_ENTRY_CONTRACTS 里"
     )
+
+
+@dataclass(frozen=True)
+class StorePayloadRead:
+    """一次 HTML store 读取的结果 —— 喂 provider 投影函数的载荷 + 分派口径。
+
+    * ``payload``：单 store 为 JSON 文本；多 store 为 ``{item_id: JSON 文本}``。
+    * ``multi``：True ⇒ 调 ``build_combined_store_projection``，否则 ``build_store_projection``。
+      与 ``projection_first_publication._store_projection_for_provider`` 的分派条件同口径
+      （``len(STORE_ITEM_IDS) > 1`` 且 provider 暴露合并函数 ⇒ 载荷必为映射）。
+    * ``empty``：全部 item 都无记录或为空白 —— 「审计师还没在 HTML 侧录过任何内容」。
+    """
+
+    payload: Any
+    multi: bool
+    empty: bool
+
+
+async def read_store_payload(*, session: Any, wp_id: Any, provider: Any) -> StorePayloadRead:
+    """读该 entry 的 HTML store 原始载荷（store-projection 与按需首版共用的**唯一**实现）。
+
+    spec d2-online-edit-platform-closure R7.4：首版发布必须与 store-projection 读**同一份**
+    store 口径，否则「首版里的内容」与「随后 store-projection 算出的内容」不等 ⇒ 刚发布完
+    就判业务内容变化，又多提交一版。
+
+    只读：不写库。provider 必须是 store-backed（``STORE_ITEM_ID`` + ``build_store_projection``），
+    否则抛 :class:`StoreProjectionNotBackedError`。
+    """
+    store_item_id = str(getattr(provider, "STORE_ITEM_ID", "") or "")
+    if not store_item_id or not hasattr(provider, "build_store_projection"):
+        raise StoreProjectionNotBackedError(
+            f"provider {getattr(provider, '__name__', provider)!r} 未声明 STORE_ITEM_ID / "
+            "build_store_projection —— 该 entry 不是 store-backed，不能走本端点"
+        )
+    store_item_ids = tuple(getattr(provider, "STORE_ITEM_IDS", ()) or ())
+    if len(store_item_ids) > 1 and hasattr(provider, "build_combined_store_projection"):
+        # 🔴 payload 装配的**唯一**来源：provider 若暴露 `all_store_item_ids()`（Task 4），
+        #    就用它——它把 STORE_ITEM_IDS ∪ D45_FIXED ∪ D413_FIXED ∪ {D435_DICT} ∪ D47_DEDICATED
+        #    收敛成单一口径。此前本处只遍历 STORE_ITEM_IDS + D45_FIXED，**漏掉** D435_DICT 与
+        #    D413_FIXED ⇒ D4-35 切 OO 恒空、D4-13 两段正文恒写不进 OO（探针实证 0 vs 32 / '' vs 正文）。
+        #    未暴露该函数的老 provider 回退旧并集（行为不变）。
+        all_ids_fn = getattr(provider, "all_store_item_ids", None)
+        if callable(all_ids_fn):
+            combined_item_ids = tuple(all_ids_fn())
+        else:
+            combined_item_ids = store_item_ids + tuple(
+                getattr(provider, "STORE_ITEM_IDS_D45_FIXED", ()) or ()
+            )
+        # 缺失/空时塞 `""` 的集合 = **纯文本固定项**（D45 业务场景 6 项 / D413 核对过程·结论）：
+        #   它们进 provider 固定字段投影、缺省是空文本，不会像 dict-store 那样对 "[]"/"" 抛
+        #   非 domain ValueError。其余（list rows / dict-store 如 D4-9/D4-31/D4-35）缺失**不塞**。
+        fixed_text_ids = set(
+            getattr(provider, "STORE_ITEM_IDS_D45_FIXED", ()) or ()
+        ) | set(getattr(provider, "STORE_ITEM_IDS_D413_FIXED", ()) or ())
+        payloads: dict[str, str] = {}
+        any_content = False
+        for item in combined_item_ids:
+            row = (
+                await session.execute(
+                    sa.text(
+                        "SELECT remark FROM checklist_responses "
+                        "WHERE wp_id = :wp AND item_id = :item LIMIT 1"
+                    ),
+                    {"wp": str(wp_id), "item": item},
+                )
+            ).scalar_one_or_none()
+            has_content = row is not None and bool(str(row).strip())
+            any_content = any_content or has_content
+            if item in fixed_text_ids:
+                # 纯文本固定项：缺失塞 ""（与原 D45_FIXED 循环同款）。
+                payloads[item] = str(row) if row is not None else ""
+            elif has_content:
+                # 🔴 list/dict-store 缺失/空 **不塞** blanket `empty`（"[]"）：dict-store（D4-9 `{}`）
+                #    与 singleton（D4-31 `{}`）拿到列表默认 "[]" 会在 provider 内抛非 domain
+                #    ValueError（如「D4-31 必须是单对象问卷」），一路冒泡成 opaque 500，连累整个
+                #    entry 的 store-projection。让 build_combined_store_projection 的
+                #    `payloads.get(item, <per-item 默认>)` 用 provider 单源 per-item 默认
+                #    （list item → [] / dict、singleton → {}）。与 d43_rematerialize 的
+                #    `test_dict_store_missing_key_uses_provider_default_not_empty_list` 同源修复。
+                payloads[item] = str(row)
+        return StorePayloadRead(payload=payloads, multi=True, empty=not any_content)
+    row = (
+        await session.execute(
+            sa.text(
+                "SELECT remark FROM checklist_responses "
+                "WHERE wp_id = :wp AND item_id = :item LIMIT 1"
+            ),
+            {"wp": str(wp_id), "item": store_item_id},
+        )
+    ).scalar_one_or_none()
+    if row is not None and str(row).strip():
+        return StorePayloadRead(payload=str(row), multi=False, empty=False)
+    empty = str(getattr(provider, "EMPTY_STORE_PAYLOAD", "[]"))
+    return StorePayloadRead(payload=empty, multi=False, empty=True)
 
 
 def _flatten_projection_values(projection: Any) -> dict[str, Any]:
@@ -162,75 +257,14 @@ async def compute_store_projection_response(
             "无契约无从按 stable key 投影 store（AC 3.3）"
         )
     provider = resolve_store_projection_provider(str(registration.adapter_id))
-    store_item_id = str(getattr(provider, "STORE_ITEM_ID", "") or "")
-    if not store_item_id or not hasattr(provider, "build_store_projection"):
-        raise StoreProjectionNotBackedError(
-            f"entry {entry_id!r} 的 provider 未声明 STORE_ITEM_ID / "
-            "build_store_projection —— 该 entry 不是 store-backed，不能走本端点"
-        )
-    empty = str(getattr(provider, "EMPTY_STORE_PAYLOAD", "[]"))
-    store_item_ids = tuple(getattr(provider, "STORE_ITEM_IDS", ()) or ())
-    if len(store_item_ids) > 1 and hasattr(provider, "build_combined_store_projection"):
-        # 🔴 payload 装配的**唯一**来源：provider 若暴露 `all_store_item_ids()`（Task 4），
-        #    就用它——它把 STORE_ITEM_IDS ∪ D45_FIXED ∪ D413_FIXED ∪ {D435_DICT} ∪ D47_DEDICATED
-        #    收敛成单一口径。此前本处只遍历 STORE_ITEM_IDS + D45_FIXED，**漏掉** D435_DICT 与
-        #    D413_FIXED ⇒ D4-35 切 OO 恒空、D4-13 两段正文恒写不进 OO（探针实证 0 vs 32 / '' vs 正文）。
-        #    未暴露该函数的老 provider 回退旧并集（行为不变）。
-        all_ids_fn = getattr(provider, "all_store_item_ids", None)
-        if callable(all_ids_fn):
-            combined_item_ids = tuple(all_ids_fn())
-        else:
-            combined_item_ids = store_item_ids + tuple(
-                getattr(provider, "STORE_ITEM_IDS_D45_FIXED", ()) or ()
-            )
-        # 缺失/空时塞 `""` 的集合 = **纯文本固定项**（D45 业务场景 6 项 / D413 核对过程·结论）：
-        #   它们进 provider 固定字段投影、缺省是空文本，不会像 dict-store 那样对 "[]"/"" 抛
-        #   非 domain ValueError。其余（list rows / dict-store 如 D4-9/D4-31/D4-35）缺失**不塞**。
-        fixed_text_ids = set(
-            getattr(provider, "STORE_ITEM_IDS_D45_FIXED", ()) or ()
-        ) | set(getattr(provider, "STORE_ITEM_IDS_D413_FIXED", ()) or ())
-        payloads: dict[str, str] = {}
-        for item in combined_item_ids:
-            row = (
-                await session.execute(
-                    sa.text(
-                        "SELECT remark FROM checklist_responses "
-                        "WHERE wp_id = :wp AND item_id = :item LIMIT 1"
-                    ),
-                    {"wp": str(wp_id), "item": item},
-                )
-            ).scalar_one_or_none()
-            if item in fixed_text_ids:
-                # 纯文本固定项：缺失塞 ""（与原 D45_FIXED 循环同款）。
-                payloads[item] = str(row) if row is not None else ""
-            elif row is not None and str(row).strip():
-                # 🔴 list/dict-store 缺失/空 **不塞** blanket `empty`（"[]"）：dict-store（D4-9 `{}`）
-                #    与 singleton（D4-31 `{}`）拿到列表默认 "[]" 会在 provider 内抛非 domain
-                #    ValueError（如「D4-31 必须是单对象问卷」），一路冒泡成 opaque 500，连累整个
-                #    entry 的 store-projection。让 build_combined_store_projection 的
-                #    `payloads.get(item, <per-item 默认>)` 用 provider 单源 per-item 默认
-                #    （list item → [] / dict、singleton → {}）。与 d43_rematerialize 的
-                #    `test_dict_store_missing_key_uses_provider_default_not_empty_list` 同源修复。
-                payloads[item] = str(row)
+    # store 读取与按需首版（`first_publication_on_demand`）共用 `read_store_payload`。
+    read = await read_store_payload(session=session, wp_id=wp_id, provider=provider)
+    if read.multi:
         store_projection = provider.build_combined_store_projection(
-            payloads, contract=contract
+            read.payload, contract=contract
         )
     else:
-        row = (
-            await session.execute(
-                sa.text(
-                    "SELECT remark FROM checklist_responses "
-                    "WHERE wp_id = :wp AND item_id = :item LIMIT 1"
-                ),
-                {"wp": str(wp_id), "item": store_item_id},
-            )
-        ).scalar_one_or_none()
-        payload = (
-            str(row)
-            if row is not None and str(row).strip()
-            else empty
-        )
-        store_projection = provider.build_store_projection(payload, contract=contract)
+        store_projection = provider.build_store_projection(read.payload, contract=contract)
     store_field_count = len(store_projection.values)
     projection, overlay_applied = await _overlay_with_published_substrate(
         resolution=resolution,

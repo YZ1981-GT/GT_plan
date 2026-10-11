@@ -90,7 +90,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_EVEN, ROUND_HALF_UP, Context, Decimal, InvalidOperation
 from enum import Enum
 from typing import Any, Final, Mapping, Sequence
 
@@ -378,6 +378,53 @@ RETIRED_DEFERRALS: Final[tuple[Mapping[str, Any], ...]] = (
             "`RepresentationService.finalize_candidate` 发布。"
         ),
     },
+    {
+        "capability": "values_equal / ValueNormalizationError（模板骨架行「是否模板原值」判据）",
+        "intended_status": "retired",
+        # spec d2-online-edit-platform-closure 的 Task 8（验收期发现的 R12）。
+        "retired_by_task": "8",
+        "consumer": (
+            "template_skeleton_baseline.SkeletonBaseline.carries_user_content(...) —— "
+            "OO→HTML 镜像判 base 里没有的骨架行，其可编辑格是否仍是模板原值"
+        ),
+        "expected_consumer_module": (
+            "app/services/workpaper_sync/template_skeleton_baseline.py"
+        ),
+        # 🔴 无 `commits_through`：纯函数（模板字节 + 投影值 → 布尔判定），不 import
+        #    content_mutation、不碰会话、零写入面。与 `projection_digest_value` 同类：
+        #    只借 merge 的值规范化口径。镜像落库仍在 store_mirror 那一条上。
+        "commits_through": None,
+        "reason": (
+            "spec d2-online-edit-platform-closure R12：materialize 永不收敛模板骨架行，"
+            "store 为空的企业每次 OO 保存都会把模板原样的骨架行（D2-3「其中：」、D2-2 序号 1~12 "
+            "示例行）读回来；镜像要分清「模板原值」与「用户往模板空行里填的内容」，前者跳过、"
+            "后者照常进 store。判等口径必须与三方合并同一份（`values_equal`）—— 另写一套，"
+            "'7' 与 7、0 与 0.0 这类形态差异就会在两处得出相反结论。"
+            "少了这条登记，Task 14 的双向等值判据会把它误报成『绕过唯一 commit 入口』。"
+        ),
+    },
+    {
+        "capability": "MergeOutcome.verdicts / ContractIndex（OO 清空的可编辑格在 store 镜像视图里显式化）",
+        "intended_status": "retired",
+        # spec d2-online-edit-platform-closure 的 Task 8（验收期发现的 R17）。
+        "retired_by_task": "8",
+        "consumer": (
+            "cleared_field_view.store_view_with_cleared_fields(...) —— OO→HTML 协调器把它产出的"
+            "视图交给 store 镜像，发布出去的 projection 不变"
+        ),
+        "expected_consumer_module": "app/services/workpaper_sync/cleared_field_view.py",
+        # 🔴 无 `commits_through`：纯函数（final projection + MergeOutcome + 契约 → 镜像视图），
+        #    不 import content_mutation、不碰会话、零写入面。调用方是已登记的 oo_to_html；
+        #    镜像落库仍在 store_mirror 那一条上，内容落库仍在 content_mutation 那一条上。
+        "commits_through": None,
+        "reason": (
+            "spec d2-online-edit-platform-closure R17：OO 里清空一个受管格 ⇒ extract 省略该键 ⇒ "
+            "merged 也缺键，而 store 镜像只遍历存在的键 ⇒ HTML 保留旧值、下次 HTML 冲刷把清空回滚。"
+            "要分清「被清空」与「从未出现 / 整行删除」，只能读 merge 自己的判定（`verdicts` 里出现过、"
+            "最终缺失）与契约索引（行域、可编辑、未受保护）—— 另写一套字段分类，会与三方合并对同一键"
+            "得出不同结论。少了这条登记，Task 14 的双向等值判据会把它误报成『绕过唯一 commit 入口』。"
+        ),
+    },
 )
 
 
@@ -627,6 +674,64 @@ def envelopes_equal(
     if not left.present:
         return True
     return values_equal(left.value, right.value, value_type)
+
+
+#: 金额的业务精度：分（小数点后两位）。
+#:
+#: OO 打开文档会重算公式；服务端 / HTML 侧对同一组数也算过一遍。两边都是二进制浮点、
+#: 累加顺序不同，结果在很靠后的位上各带尾差 —— 真栈实测 D2：
+#:
+#:     3511.0600000000004 vs 3511.06          （第 17 位）
+#:     -368.0000000000018 vs -367.9999999999982（第 13 位，多项累加）
+#:     0                  vs -2.27e-13          （相消后的残差）
+#:
+#: 按分取整后它们全是同一个数。金额在底稿里只到分，比分更细的差异既不是业务数据，
+#: 也不可能是用户在 OO 里改出来的。
+_AMOUNT_QUANTUM: Final[Decimal] = Decimal("0.01")
+
+#: 非金额的数值（rate / ratio / percent_points）没有统一的业务小数位（0.1234 与 0.1239
+#: 是两个费率），不能按两位取整；退而用电子表格引擎自身的精度（15 位有效数字）吸收
+#: 二进制尾差，且只在至少一侧是 float 时启用（尾差只可能出自 float）。
+_SPREADSHEET_PRECISION: Final[Context] = Context(prec=15, rounding=ROUND_HALF_EVEN)
+
+#: 由电子表格**重算**结果的受保护字段：公式字段与落在 formula mask 里的格。
+#: `read_only_auto_source` 不在内 —— 那是服务端写死的值，OO 不重算，读回必逐位相等，
+#: 对它保留精确比较（篡改检测一位都不放松）。
+_SPREADSHEET_RECOMPUTED_POLICIES: Final[frozenset[ProtectionPolicy]] = frozenset(
+    {ProtectionPolicy.read_only_formula, ProtectionPolicy.read_only_masked_cell}
+)
+
+
+def recomputed_values_equal(left: Any, right: Any, value_type: ValueType) -> bool:
+    """两侧作为「重算出来的数」是否同一个数：金额按分取整后比，其余数值按 15 位有效数字比。
+
+    🔴 只供两处使用，都是「OO 那一侧的值不会被采纳」的场合：
+
+    * 受保护字段的篡改检测 —— 公式结果永远由服务端定（keep current），这里只决定要不要
+      报「你在 OO 里改了公式格」；
+    * 「客户端是否需要重载」—— 差异小于一分时重载换回的是同一份内容。
+
+    可编辑字段的取舍**不**走这里，仍用精确的 `values_equal`：OO 不重算可编辑格，那里的
+    任何差异都是用户真改的，按两位取整会把小数位多的录入悄悄吞掉。
+    """
+    if value_type not in _DECIMAL_TYPES:
+        return False
+    a = normalize_value(left, value_type)
+    b = normalize_value(right, value_type)
+    if not isinstance(a, Decimal) or not isinstance(b, Decimal):
+        return False
+    if not (a.is_finite() and b.is_finite()):
+        return False
+    if value_type is ValueType.amount:
+        try:
+            return a.quantize(_AMOUNT_QUANTUM, rounding=ROUND_HALF_UP) == b.quantize(
+                _AMOUNT_QUANTUM, rounding=ROUND_HALF_UP
+            )
+        except InvalidOperation:  # 量级超出 Decimal 上下文精度：交回精确比较
+            return False
+    if not (isinstance(left, float) or isinstance(right, float)):
+        return False
+    return _SPREADSHEET_PRECISION.plus(a) == _SPREADSHEET_PRECISION.plus(b)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1097,6 +1202,10 @@ def projection_requires_client_refresh(
         if mine is None or theirs is None:
             continue
         if not values_equal(mine.value, theirs.value, mine.value_type):
+            if recomputed_values_equal(mine.value, theirs.value, mine.value_type):
+                # 只差不到一分（或非金额数值的浮点尾差）：为它让客户端重载只会换回同一份
+                # 内容（公式字段 kept_current 后每次保存都会撞上）。
+                continue
             return True
     return False
 
@@ -1384,6 +1493,17 @@ def merge_projections(
             and i.present
             and not same_incoming_base
         ):
+            if (
+                locator.protection_policy in _SPREADSHEET_RECOMPUTED_POLICIES
+                and recomputed_values_equal(i.value, b.value, locator.value_type)
+            ):
+                # OO 重算公式得到的是**同一个数**（按分取整后相等），只差两边浮点累加的
+                # 尾差 ⇒ OO 侧没改它，按「i == b」处理：保留 current（公式结果仍由服务端
+                # 定）。把它当篡改会让 D2 每次保存都报上百条 protected 冲突（真栈实测
+                # 108 条），双向回写整条不可用。
+                verdicts[key] = FieldVerdict.kept_current
+                _put(merged_values, locator, c)
+                continue
             # Property 24：current 公式与值不变，只生成 protected 冲突。
             verdicts[key] = FieldVerdict.conflict_protected
             conflicts.append(
@@ -1722,7 +1842,7 @@ __all__ = [
     "DEFERRED_CONSUMERS", "RETIRED_DEFERRALS",
     "MergeInputError", "ValueNormalizationError", "UnknownStableKeyError",
     "MISSING",
-    "normalize_value", "values_equal", "envelopes_equal",
+    "normalize_value", "values_equal", "envelopes_equal", "recomputed_values_equal",
     "ContractIndex",
     "WordInstance", "WordInstanceObservation", "StructuralAnomaly",
     "FieldVerdict", "RowLifecycle", "RowDecision", "MergeOutcome",

@@ -764,6 +764,68 @@ class WorkpaperSyncAdapterRegistry:
         return registration
 
     # ─────────────────────────────────────────────────────────────────
+    # R14：按目标 representation 绑定（`target_bound_registration` 的三个原语）
+    # ─────────────────────────────────────────────────────────────────
+    #
+    # 注册是按 entry 的，而 adapter 的冻结身份是按 representation 的（行身份清册 /
+    # tombstone / 动态列绑定）。请求期要把本 entry 的注册换成「绑在目标底稿 current
+    # representation 上」的那一份 —— 下面三个原语让这件事**不绕开**任何注册判据：
+    # provider 在零注册的 fork 上照常 attach（它首行「已注册即早退」不会被 entry 级注册
+    # 撞上），结果再经 :meth:`rebind_entry` 走一遍完整 :meth:`register`。
+
+    def fork_unregistered(self) -> "WorkpaperSyncAdapterRegistry":
+        """同一 manifest、同一注册计划、**零注册**的新实例。"""
+        fork = WorkpaperSyncAdapterRegistry(
+            manifest={"entries": list(self._entries.values())}
+        )
+        if self._plan is not None:
+            fork.bind_registration_plan(self._plan)
+        return fork
+
+    def entry_provider(self, entry_id: str) -> Any:
+        """该 entry **自己**的 attach（按注册计划 + provider 白名单加载）。
+
+        计划里没有该 entry、或计划已静态判定不可注册（`blocked_reason`）⇒ 抛，原因原样透出。
+        """
+        for item in self.registration_plan:
+            if item.entry_id != entry_id:
+                continue
+            if item.blocked_reason is not None:
+                raise RegistrationError(f"entry {entry_id}: {item.blocked_reason}")
+            return _load_entry_provider(item)
+        raise StaleAdapterError(
+            f"entry {entry_id!r} 不在注册计划中 —— 计划由 source-backed manifest 派生"
+        )
+
+    def rebind_entry(self, registration: AdapterRegistration) -> None:
+        """把**本实例**里该 entry 的注册换成 `registration`（同 entry、同 adapter_id）。
+
+        全部注册判据经 :meth:`register` 重跑（matcher 重叠与其它 entry 比）；任一不过即抛，
+        并**原样复原**旧注册 —— 不留「旧的删了、新的没进」的半态。本实例没有该 entry 的
+        注册时等价于 :meth:`register`。
+        """
+        entry_id = registration.entry_id
+        existing = self._by_entry_id.get(entry_id)
+        if existing is registration:
+            return
+        if existing is None:
+            self.register(registration)
+            return
+        if existing.adapter_id != registration.adapter_id:
+            raise RegistrationError(
+                f"entry {entry_id}: rebind 只能换同一 adapter 的另一份绑定，"
+                f"现注册 {existing.adapter_id!r} ≠ 新绑定 {registration.adapter_id!r}"
+            )
+        del self._by_entry_id[entry_id]
+        del self._by_adapter_id[existing.adapter_id]
+        try:
+            self.register(registration)
+        except BaseException:
+            self._by_entry_id[entry_id] = existing
+            self._by_adapter_id[existing.adapter_id] = existing
+            raise
+
+    # ─────────────────────────────────────────────────────────────────
     def assert_bidirectional_ready(self, entry_id: str) -> AdapterRegistration:
         """Property 3：bidirectional entry 必须解析到唯一 adapter + approved authority
         model + 非空 immutable bundle；`projection_contract` 还必须有 approved contract。

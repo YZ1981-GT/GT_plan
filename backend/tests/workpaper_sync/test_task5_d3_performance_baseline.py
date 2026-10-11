@@ -42,34 +42,36 @@ D3_ENTRY_ID = "xlsx/gt-d3-prepaid-accounts"
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-async def test_real_registration_path_fails_before_reaching_d3() -> None:
+async def test_real_registration_path_completes_but_d3_stays_unregistered() -> None:
     """真实生产路径：`_attach_pilot_adapters` 等价调用（`register_from_manifest`）。
 
     这是 `store-projection` / `pending-mutations` / `materialize` 三端点共同的唯一前置门
-    （`wp_sync_router._registration()`）。本判据只断言「现状确实跑不到 D3」并把具体报错
-    记下来，不断言应该修好（那是 provisioning / 契约重发布的范围，不在本 spec）。
+    （`wp_sync_router._registration()`）。本判据只记录「现状跑不跑得到 D3」，不断言应该修好
+    （那是 provisioning / 契约重发布的范围，不在本 spec）。
+
+    🔴 2026-10-10 现状更新（spec d2-online-edit-platform-closure）：原判据断言全量注册
+    **会抛**（当时 D3 轮次之前的 entry 契约漂移会先炸）。此后两件事让这个前提不再成立：
+    ① spec workpaper-sync-registration-isolation-and-d2-republish 给 manifest 注册加了逐 entry
+    隔离（漂移记进 `failures`，不再上抛）；② 本 spec R1 修好了 N1/N2/N3/N5 调用不存在的
+    `_L.attach_adapters`（`AttributeError` 不在隔离范围内，曾把整条注册链打断）。
+    现在全量注册跑完，D3 是否被注册由它**自己**的原因决定 —— 见下一条（capability 未启用）。
     """
     from app.core.database import async_session
-    from app.services.workpaper_sync.adapters.registry import (
-        RegistryError,
-        build_production_registry,
-    )
-    from app.services.workpaper_sync.models import SyncDomainError
+    from app.services.workpaper_sync.adapters.registry import build_production_registry
 
     async with async_session() as session:
         registry = build_production_registry()
-        with pytest.raises((RegistryError, SyncDomainError)) as exc_info:
-            await registry.register_from_manifest(session=session)
-        print(
-            f"\n[real-stack] register_from_manifest() 现状真抛出："
-            f"{type(exc_info.value).__name__}: {exc_info.value}"
-        )
-        print(
-            "[real-stack] 这是 wp_sync_router._registration() 会捕获并翻译成 HTTP 422 "
-            "的同一类异常（RegistryError/SyncDomainError）——三端点与整册 materialize 在"
-            "这一步之后一步都走不到，与 D3 本身是否已注册无关（发生在 D3 轮次之前的其他 "
-            "entry 的契约漂移就会先炸）。"
-        )
+        outcome = await registry.register_from_manifest(session=session)
+    print(
+        f"\n[real-stack] register_from_manifest() 完成：registered={len(outcome.registered_entry_ids)} "
+        f"reasons={len(outcome.reasons)} failures={len(outcome.failures)}"
+    )
+    assert D3_ENTRY_ID not in outcome.registered_entry_ids, (
+        "D3 已被注册 ⇒ 下一条「capability 未启用」的结论已变，需回去更新 Task 0 结论"
+    )
+    assert D3_ENTRY_ID in outcome.reasons or D3_ENTRY_ID in outcome.failures, (
+        "D3 既没注册也没给原因 ⇒ 被静默跳过（AC 5.12 的记账等式被破坏）"
+    )
 
 
 async def test_d3_isolated_attach_confirms_not_registered_reason() -> None:

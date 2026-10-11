@@ -67,9 +67,13 @@ representation 建在**另一条底稿**上，于是「Task 76 四表有真实�
 
 from __future__ import annotations
 
+import contextlib
 import json
+import uuid
+from contextvars import ContextVar
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Final, Sequence
+from typing import Any, Final, Iterator, Sequence
 
 import sqlalchemy as sa
 
@@ -121,6 +125,81 @@ VISIBLE_REPRESENTATION_ORDER_SQL: Final[str] = "wp.created_at, wp.id"
 
 class ProjectionTargetResolutionError(RuntimeError):
     """目标解析失败。**不**降级为「无目标」：那会把「裁决表有问题」伪装成「本库没底稿」。"""
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 请求期目标底稿 pin（R14，2026-10-10 实测）
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# adapter 不是 entry 级常量：Excel adapter 由某个 representation 冻结的身份造出
+# （行身份清册 `identity_inventory`、tombstone、动态列绑定）。而 provider 的 attach 只
+# 按 entry 调 :func:`resolve_visible_current_representation_id`，全序取**第一家**可见
+# 底稿 ⇒ 同一 entry 上第二家企业的每个同步请求都拿第一家的清册比对自己的文件：
+# 重药安徽 store-projection 422「OO 往返后丢失 729 个 row identity，首个
+# 'dr-mtl5bqmm-0o950ft'」—— 那是和平药房的行。
+#
+# 修法收敛在这个**唯一**入口（BP-27 已让全部 provider 经它取 representation）：
+# 请求期由 `target_bound_registration` 用 :func:`pin_representation_target` 声明
+# 「本次要绑哪张底稿」，解析器在 pin 生效时只返回**那张底稿**的 current
+# representation，并把实际返回值记进 pin（调用方据此证伪「provider 绕过了解析器」）。
+# 没有 pin 时行为逐字不变（发布期宿主、全局注册缓存仍按全序取第一家）。
+
+
+@dataclass
+class RepresentationTargetPin:
+    """一次「按目标底稿绑定 adapter」的声明与观测记录。"""
+
+    wp_id: uuid.UUID
+    #: pin 生效期间解析器对每个 entry **实际返回**的值（`None` = 该底稿在可见性过滤后
+    #: 没有 current representation）。键缺失 = provider 根本没经解析器取 representation。
+    resolved: dict[str, Any] = field(default_factory=dict)
+
+
+_REPRESENTATION_TARGET: ContextVar["RepresentationTargetPin | None"] = ContextVar(
+    "workpaper_sync_representation_target", default=None
+)
+
+
+def as_uuid(value: Any) -> uuid.UUID:
+    """把库里读出的 UUID（`uuid.UUID` / 36 位或 32 位 hex 串 / 16 字节）规范成 `uuid.UUID`。
+
+    pin 的比较放在 Python 侧而不是 SQL 侧：SQLite 夹具与 PG 存 UUID 的形态不同
+    （hex 串 vs 原生 uuid），在 SQL 里比要么类型报错、要么静默不等。
+    """
+    if isinstance(value, uuid.UUID):
+        return value
+    if isinstance(value, (bytes, bytearray)) and len(value) == 16:
+        return uuid.UUID(bytes=bytes(value))
+    return uuid.UUID(str(value))
+
+
+def same_uuid(left: Any, right: Any) -> bool:
+    """两侧都能规范成 UUID 且相等；任一侧不是 UUID ⇒ 不等（不抛）。"""
+    if left is None or right is None:
+        return False
+    try:
+        return as_uuid(left) == as_uuid(right)
+    except (TypeError, ValueError):
+        return False
+
+
+@contextlib.contextmanager
+def pin_representation_target(wp_id: Any) -> Iterator[RepresentationTargetPin]:
+    """在本上下文（同一 asyncio task 及其 `to_thread`）内把解析器钉到 `wp_id`。
+
+    ContextVar 天然按 task 隔离：并发请求各钉各的，互不串味；退出即复原（可嵌套）。
+    """
+    pin = RepresentationTargetPin(wp_id=as_uuid(wp_id))
+    token = _REPRESENTATION_TARGET.set(pin)
+    try:
+        yield pin
+    finally:
+        _REPRESENTATION_TARGET.reset(token)
+
+
+def current_representation_target() -> RepresentationTargetPin | None:
+    """当前生效的 pin（无则 None）。只读，供诊断与守卫使用。"""
+    return _REPRESENTATION_TARGET.get()
 
 
 def load_wp_code_adjudication() -> dict[str, dict[str, Any]]:
@@ -265,14 +344,27 @@ async def resolve_visible_current_representation_id(
     全序：可见性过滤之后按 `wp.created_at, wp.id` 定序（确定，且同一库状态重复调用
     必选同一条）。**不**按 representation 的 generation 排 —— generation 是**每个 wp
     各自**的代际计数，跨 wp 比它没有意义。
+
+    ═══ R14：请求期 pin ═══
+
+    全序取「第一家」只对**发布期 / entry 级注册**成立。请求期的 adapter 必须绑在请求
+    目标底稿自己的 representation 上 —— 由 :func:`pin_representation_target` 声明，
+    见本模块「请求期目标底稿 pin」一节。pin 生效时只返回目标底稿那一行（可见性口径
+    不变），并把返回值记进 pin。
     """
+    pin = _REPRESENTATION_TARGET.get()
     # 🔴 参数用 `.bindparams()` 而不是 `execute(stmt, params)` 的第二个位置参数：
     #    本函数被四个 pilot 的 `attach_pilot_adapters()` 调用，而它们的单测用
     #    `_StubSession.execute(self, stmt)`（**只收一个**位置参数）。传两个会让
     #    Tasks 40~43 的 67 个用例集体 `TypeError`（首版实测），而那是测试替身的契约、
     #    不是生产缺陷 —— 与其去改四份 stub，不如让语句自带参数。
+    #
+    # 🔴 R14：pin 与非 pin **共用这一条**语句（可见性常量在本函数只拼一次）。`rid` 必须是
+    #    第一列 —— 非 pin 分支照旧 `.scalars().first()` 取首列；pin 分支不加 LIMIT，读全部
+    #    可见行后按 `wid` 取目标底稿那一行（(wp_id, entry_id) 是主键 ⇒ 至多一行）。
+    #    底稿比较放 Python 侧（`same_uuid`）：SQLite 夹具与 PG 存 UUID 的形态不同。
     statement = sa.text(
-        "SELECT s.current_representation_id AS rid "
+        "SELECT s.current_representation_id AS rid, s.wp_id AS wid "
         "FROM working_paper_sync_entry_state s "
         "JOIN working_paper wp ON wp.id = s.wp_id "
         "JOIN wp_index wi ON wi.id = wp.wp_index_id "
@@ -280,13 +372,22 @@ async def resolve_visible_current_representation_id(
         "WHERE s.entry_id = :entry_id "
         "  AND s.current_representation_id IS NOT NULL "
         f"  AND {TARGET_VISIBILITY_SQL} "
-        f"ORDER BY {VISIBLE_REPRESENTATION_ORDER_SQL} LIMIT 1"
+        f"ORDER BY {VISIBLE_REPRESENTATION_ORDER_SQL}"
+        + ("" if pin is not None else " LIMIT 1")
     ).bindparams(entry_id=str(entry_id))
-    # 🔴 `.scalars().first()` 而不是 `.first()`：与被替换的原实现形态一致。
-    #    Tasks 40~43 的 `_StubSession` 返回的 result 其 `.first()` 直接给**标量**
-    #    （不是 Row），按 `row.rid` 取属性会 `AttributeError: 'UUID' object has no
-    #    attribute 'rid'`（首版实测）。单列查询用 scalars 也更贴合语义。
-    return (await session.execute(statement)).scalars().first()
+    result = await session.execute(statement)
+    if pin is None:
+        # 🔴 `.scalars().first()` 而不是 `.first()`：与被替换的原实现形态一致。
+        #    Tasks 40~43 的 `_StubSession` 返回的 result 其 `.first()` 直接给**标量**
+        #    （不是 Row），按 `row.rid` 取属性会 `AttributeError: 'UUID' object has no
+        #    attribute 'rid'`（首版实测）。
+        return result.scalars().first()
+    resolved = next(
+        (row.rid for row in result.all() if same_uuid(row.wid, pin.wp_id)),
+        None,
+    )
+    pin.resolved[str(entry_id)] = resolved
+    return resolved
 
 
 async def count_candidates_hidden_by_visibility(

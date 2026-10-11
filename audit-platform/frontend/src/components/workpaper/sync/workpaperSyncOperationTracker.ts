@@ -224,16 +224,19 @@ export class WorkpaperSyncOperationTracker {
   /** SSE 事件 → 先按 `wp_id + revision` 去重，再补读 operation 快照。 */
   handleContentUpdate(payload: unknown): WorkpaperSyncDedupeResult {
     const key = contentUpdateDedupeKey(payload)
+    // 🔴 补读的 rejection 一律吞掉（与轮询定时器同口径）：事件驱动的补读常被 http 去重层取消
+    //    （同一 operation 的轮询读正在飞），不 catch 就成了控制台「未捕获Promise CanceledError」
+    //    （2026-10-11 D2 真栈实测）。下一次轮询 / 事件会再读，快照去重兜住。
     if (key === null) {
       // 缺 wp_id/revision 的事件无法去重 ⇒ 不静默丢，补读一次由快照去重兜住。
-      void this.refresh()
+      void this.refresh().catch(() => {})
       return { accepted: true, key: '' }
     }
     if (this.seen.has(key)) {
       return { accepted: false, key }
     }
     this.seen.add(key)
-    void this.refresh()
+    void this.refresh().catch(() => {})
     return { accepted: true, key }
   }
 

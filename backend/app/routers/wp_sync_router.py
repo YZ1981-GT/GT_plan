@@ -143,6 +143,14 @@ from app.services.workpaper_sync.adopt_substrate_response import (
 from app.services.workpaper_sync.store_projection_response import (
     compute_store_projection_response,
 )
+from app.services.workpaper_sync.target_bound_registration import (
+    bind_registration_to_target,
+)
+from app.services.workpaper_sync.first_publication_on_demand import (
+    classify_first_publication_rejection,
+    current_publication,
+    ensure_first_publication as ensure_first_publication_service,
+)
 from app.services.workpaper_sync.timeline import SyncTimelineService
 from app.services.wp_visibility.denial import (
     EXTERNAL_NOT_FOUND_DETAIL,
@@ -348,6 +356,10 @@ _WRITE_ACTIONS: frozenset[str] = frozenset(
         # 是**写** action（`workflow_locked` 下与其它写一样被拒 —— 归档/复核通过的底稿
         # 不该被 adopt 覆盖）。dry_run 分支虽只读，但同一端点同一 action，按写登记从严。
         "adopt_substrate",
+        # spec d2-online-edit-platform-closure R7：按需发布首版 representation（推进
+        # content revision、建 representation 与 entry pointer）⇒ **写** action，归档 /
+        # 复核通过的底稿不得因「点了在线编辑」而被写入新版本。
+        "ensure_first_publication",
     }
 )
 
@@ -679,11 +691,12 @@ async def _attach_pilot_adapters(
     # 主瓶颈。其成本几乎全在 `_describe_entry_supply` 的逐 entry DB 查询（~186×2 往返）与
     # 各 pilot provider 的 published-identity 观测（读 definition blob + 校 digest）。
     #
-    # 但注册结果**只依赖**：静态 source-backed manifest + 已发布状态（每个 entry 当前指向哪个
-    # representation）。二者只在 publish/finalize 时才变（罕见）。因此按「已发布状态指纹」
-    # 进程级缓存已注册的 AdapterRegistration 对象（它们由 frozen definitions 构建，不持有
-    # 会话，跨请求安全）。指纹变化（有新 representation 发布）即重建；否则把缓存的注册**原样
-    # 重放**进本请求的新 registry（`register()` 是纯内存 + 全量重校验，微秒级）。
+    # 但 entry 级注册结果**只依赖**：静态 source-backed manifest + 哪些 (entry, 底稿) 有已发布
+    # 供给及其 definition bundle（R15：不再含 representation 代际 —— 请求期 adapter 由
+    # `bind_registration_to_target` 按目标底稿现绑，见 `_registration_state_fingerprint`）。
+    # 因此按「已发布状态指纹」进程级缓存已注册的 AdapterRegistration 对象（它们由 frozen
+    # definitions 构建，不持有会话，跨请求安全）。指纹变化（首版发布 / bundle 重发布）即重建；
+    # 否则把缓存的注册**原样重放**进本请求的新 registry（`register()` 是纯内存 + 全量重校验）。
     #
     # register() 在重放时仍逐条跑全部 RG 判据（身份唯一/document_type/bundle/authority/
     # contract 双重漂移/matcher 重叠），故缓存不弱化任何注册准入校验 —— 只跳过「查供给」的
@@ -743,8 +756,8 @@ class _RegistrationSnapshot:
     adapter_ids: tuple[str, ...]
 
 
-#: ROI-0 进程级注册缓存。键 = 已发布状态指纹（manifest digest + entry→current representation
-#: 映射）。有界，防指纹爆炸（理论上项目/发布态组合有限，8 足够）。
+#: ROI-0 进程级注册缓存。键 = 已发布状态指纹（manifest digest + 每张底稿每个 entry 的
+#: definition bundle，见 `_registration_state_fingerprint`）。有界，防指纹爆炸。
 _REGISTRATION_CACHE: "BoundedLruCache[str, _RegistrationSnapshot]" = BoundedLruCache(
     maxsize=8
 )
@@ -753,27 +766,65 @@ _REGISTRATION_CACHE: "BoundedLruCache[str, _RegistrationSnapshot]" = BoundedLruC
 async def _registration_state_fingerprint(svc: _SyncServices) -> str:
     """注册结果的**廉价**失效指纹：一次查询代替 186×2 次逐 entry 查询。
 
-    注册结果只依赖：静态 manifest（进程内常量）+ 每个 entry 当前指向的 representation。
-    用**一次** `working_paper_sync_entry_state` 全表扫（entry_id → current_representation_id）
-    的规范化摘要作指纹。任何 publish/finalize 改了某 entry 的 current pointer ⇒ 指纹变 ⇒
-    缓存 miss ⇒ 重建。manifest 是源码 source-backed 静态物，进程生命周期内不变，纳入 key
-    只为防不同 manifest 串味（多 workspace / 热重载）。
+    指纹 = 静态 manifest + 每行 entry_state 的 `(entry_id, wp_id, current representation 的
+    definition_bundle_id)`。manifest 是源码 source-backed 静态物，纳入 key 只为防不同
+    manifest 串味（多 workspace / 热重载）。
+
+    ═══ R15：为什么不再放 `current_representation_id`（2026-10-11 实测）═══
+
+    原指纹按 representation id 取 ⇒ **任何一家企业任何一次保存**（HTML→OO 落新代际、
+    OO→HTML 落新 revision）都改指纹 ⇒ 下一个同步请求（不论哪家企业、哪个 entry）冷建
+    整套注册（4 条 pilot + 186 条 entry，实测 30~38s），且冷建持全局锁 —— 期间所有同步
+    请求一起等。重药安徽落 gen 2 之后，和平药房点「在线编辑」的 store-projection 实测 35s。
+
+    R14 之后 entry 级注册只承担 entry 级语义（有没有资格双向 / matcher 唯一 / 首版前沿用），
+    请求期的 adapter 一律按目标底稿 current representation 现绑
+    （`target_bound_registration`），entry 级注册里冻结的是哪一代 representation 不再进入
+    任何请求的语义。它真正依赖的是：哪些 (entry, 底稿) 有已发布供给（首版发布要触发重建）、
+    以及 definition bundle（契约 / 模板重发布要触发重建，否则重放会撞 RG-11 stale）。
+    同一 bundle 下的新代际两者都不变 ⇒ 不重建。
     """
     import hashlib
 
-    from app.models.workpaper_sync_models import WorkpaperSyncEntryState
+    from app.models.workpaper_sync_models import (
+        WorkpaperContentRepresentation,
+        WorkpaperSyncEntryState,
+    )
 
-    rows = (
+    pointers = (
         await svc.session.execute(
             sa.select(
                 WorkpaperSyncEntryState.entry_id,
+                WorkpaperSyncEntryState.wp_id,
                 WorkpaperSyncEntryState.current_representation_id,
             )
         )
     ).all()
-    # 规范化：按 entry_id 排序后拼接，保证顺序无关的稳定摘要。
+    # 有指针才去 representation 表取 bundle：零指针（含只建了 entry_state 表的隔离夹具）不碰它。
+    bundle_of: dict[str, str] = {}
+    if pointers:
+        bundle_of = {
+            str(rep_id): str(bundle_id)
+            for rep_id, bundle_id in (
+                await svc.session.execute(
+                    sa.select(
+                        WorkpaperContentRepresentation.id,
+                        WorkpaperContentRepresentation.definition_bundle_id,
+                    ).join(
+                        WorkpaperSyncEntryState,
+                        WorkpaperSyncEntryState.current_representation_id
+                        == WorkpaperContentRepresentation.id,
+                    )
+                )
+            ).all()
+        }
+    # 规范化：排序后拼接，保证顺序无关的稳定摘要。悬空指针（无 representation 行）记 None，
+    # 与有 bundle 的状态可区分（`_describe_entry_supply` 会把它报成显式原因）。
     body = ";".join(
-        f"{eid}={rep}" for eid, rep in sorted((str(e), str(r)) for e, r in rows)
+        f"{eid}@{wp}={bundle}"
+        for eid, wp, bundle in sorted(
+            (str(e), str(w), bundle_of.get(str(r), "None")) for e, w, r in pointers
+        )
     )
     manifest_digest = str(len(svc.registry.manifest_entries))
     return hashlib.sha256(
@@ -795,9 +846,18 @@ async def _registration(svc: _SyncServices, scope: GuardedScope):
     # 会抛 `ContractDriftError`（`SyncDomainError` 子类）。它必须和 `assert_bidirectional_ready`
     # 一样翻成 fail-visible 422，否则一路冒泡成 opaque 500（把整个 entry 的
     # store-projection/materialize 打成「服务器内部错误」而看不到中文根因）。
+    # 🔴 R14：entry 级注册之后，必须把本 entry 的 adapter 换成**绑在本请求目标底稿 current
+    # representation 上**的那一份。entry 级注册按全序绑第一家企业的 representation（行身份
+    # 清册 / tombstone / 动态列绑定都随 representation 走），直接用它 ⇒ 同一 entry 上只有
+    # 第一家企业能用双向回写（重药安徽实测「丢失 729 个 row identity」——那是和平药房的行）。
     try:
         await _attach_pilot_adapters(svc)
-        return svc.registry.assert_bidirectional_ready(scope.entry_id)
+        return await bind_registration_to_target(
+            session=svc.session,
+            registry=svc.registry,
+            entry_id=scope.entry_id,
+            wp_id=scope.wp_id,
+        )
     except (RegistryError, SyncDomainError) as exc:
         raise HTTPException(
             status_code=422,
@@ -890,6 +950,66 @@ async def read_store_projection(
         )
     except SyncDomainError as exc:
         raise _domain_error(exc, status=422) from exc
+
+
+@router.post(USER_SYNC_PREFIX + "/first-publication")
+async def ensure_first_publication(
+    project_id: uuid.UUID,
+    wp_id: uuid.UUID,
+    entry_id: str,
+    svc: _SyncServices = Depends(_services),
+) -> dict[str, Any]:
+    """该 (wp, entry) 尚无 published representation 时**按需发布首版**；已有则原样返回。
+
+    spec d2-online-edit-platform-closure R7。前端在 materialize 返回
+    `materialize_substrate_not_published` 时调一次，成功后重走 flush → materialize。
+
+    🔴 刻意**不**走 `_registration`：registry 的注册要靠某张底稿已有的 representation
+    冻结定义，而本端点正是「还没有 representation」时的破环点 —— 准入、定义与 adapter
+    全部由 `resolve_plan` / `publish_first_generation` 按 approved bundle 现算。
+
+    幂等：并发的第二个请求在准入 ③ 或 revision CAS 处被拦，回滚后复查指针，存在即
+    `already_published`。业务住 service 伴生模块；本端点只 guard、commit、映射状态码。
+    """
+    scope = await _guard(
+        svc,
+        project_id=project_id,
+        wp_id=wp_id,
+        entry_id=entry_id,
+        action="ensure_first_publication",
+    )
+    try:
+        outcome = await ensure_first_publication_service(
+            session=svc.session,
+            resolution=svc.resolution,
+            artifacts=svc.artifacts,
+            repository=svc.repo,
+            project_id=scope.project_id,
+            wp_id=scope.wp_id,
+            entry_id=scope.entry_id,
+            actor_id=scope.user_id,
+        )
+        await svc.session.commit()
+    except SyncDomainError as exc:
+        await svc.session.rollback()
+        status = classify_first_publication_rejection(exc)
+        if status == 409:
+            # 并发首版：另一请求已先提交。指针在 ⇒ 对本请求而言就是「已发布」。
+            existing = await current_publication(
+                svc.session, wp_id=scope.wp_id, entry_id=scope.entry_id
+            )
+            if existing is not None:
+                return existing.as_dict()
+        raise _domain_error(exc, status=status) from exc
+    if outcome.pending_event is not None:
+        # 事件只在 content commit **之后**发布（Requirement 13.1）；发布失败由 outbox
+        # worker 重放，不影响已提交的首版。
+        from app.services.workpaper_sync.outbox import DurableEventOutboxService
+
+        await DurableEventOutboxService.publish_pending(
+            svc.session, [outcome.pending_event]
+        )
+    return outcome.as_dict()
 
 
 @router.post(USER_SYNC_PREFIX + "/adopt-substrate")
@@ -2933,20 +3053,42 @@ async def _apply_durable_incoming(db: AsyncSession, *, outcome: Any) -> None:
         attach_pilot_adapters as attach_g7_pilot_adapters,
     )
 
-    # Task 40 的第二个生产接线点：callback 之后的 apply 也必须能解析到 pilot adapter，
-    # 否则「HTML 侧能开 OO、OO 回写却找不到 adapter」会形成半接线。
-    await attach_pilot_adapters(registry, session=db)
-    # Task 41：D2 pilot 各自一条（同上，不复用别的 pilot 的 attach/契约）。
-    await attach_d2_pilot_adapters(registry, session=db)
-    # Task 42：H1 pilot 各自一条（同上）。
-    await attach_h1_pilot_adapters(registry, session=db)
-    # Task 43：G7 pilot 各自一条（同上）。
-    await attach_g7_pilot_adapters(registry, session=db)
-    # Task 75 追加（只加不动）：manifest 驱动的注册，覆盖全部 entry 并留显式原因。
-    await registry.register_from_manifest(session=db)
-
+    # 🔴 R16（2026-10-11 实测）：此处原先**每次** callback 都冷建整套注册（4 条 pilot +
+    # 186 条 entry，30s+），于是用户点「保存并回到表单模式」后 operation 要 ~39s 才 applied
+    # （重药安徽 application 688cf11d：durable 06:41:24.958 → finished 06:42:03.766）。
+    # 注册结果与端点路径同源同指纹，先查 ROI-0 缓存（命中即原样重放，`register()` 判据照跑）；
+    # 未命中才走下面原样的冷建。命中与否都不影响 adapter 绑定：随后一律按本底稿现绑（R14）。
+    #
+    # 注册阶段与绑定一起放进下面的 try：incoming 已 durable，注册 / 重放抛的域异常同样只能
+    # 留在 operation 上等用户 retry（本函数 docstring「失败不上抛」），不得冒成 500 让 OO 丢件。
+    warm = _RegistrationWarmupContext(session=db, registry=registry)
     try:
-        registration = registry.assert_bidirectional_ready(str(app_row.entry_id))
+        cached = _REGISTRATION_CACHE.get(await _registration_state_fingerprint(warm))
+        if cached is not None:
+            _replay_cached_registrations(warm, cached)
+        else:
+            # Task 40 的第二个生产接线点：callback 之后的 apply 也必须能解析到 pilot adapter，
+            # 否则「HTML 侧能开 OO、OO 回写却找不到 adapter」会形成半接线。
+            await attach_pilot_adapters(registry, session=db)
+            # Task 41：D2 pilot 各自一条（同上，不复用别的 pilot 的 attach/契约）。
+            await attach_d2_pilot_adapters(registry, session=db)
+            # Task 42：H1 pilot 各自一条（同上）。
+            await attach_h1_pilot_adapters(registry, session=db)
+            # Task 43：G7 pilot 各自一条（同上）。
+            await attach_g7_pilot_adapters(registry, session=db)
+            # Task 75 追加（只加不动）：manifest 驱动的注册，覆盖全部 entry 并留显式原因。
+            await registry.register_from_manifest(session=db)
+
+        # 🔴 R14：apply 用的 adapter 必须绑在**本 application 所在底稿**的 current
+        # representation 上（三方 extract 的 base/current/incoming 都按它的行身份清册比对），
+        # 不能用 entry 级那份（绑的是全序第一家企业）。观测器只认 current representation
+        # （Property 67），所以按底稿 current pointer 绑，而不是 application 的 base id。
+        registration = await bind_registration_to_target(
+            session=db,
+            registry=registry,
+            entry_id=str(app_row.entry_id),
+            wp_id=app_row.wp_id,
+        )
     except (RegistryError, SyncDomainError) as exc:
         logger.error(
             "callback 后 apply 无可用 adapter entry=%s error_code=%s",

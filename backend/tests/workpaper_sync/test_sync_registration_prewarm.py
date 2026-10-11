@@ -283,6 +283,10 @@ def test_baseline_projection_prewarm_only_touches_switchable_entries() -> None:
         "预热没有调用端点用的那个 projection 函数 —— 建的缓存与请求要的不是一回事"
     )
     assert "_attach_pilot_adapters" in called, "projection 预热前必须先有注册"
+    assert "bind_registration_to_target" in called, (
+        "预热没有按底稿绑定 adapter（R14）—— entry 级注册绑的是第一家企业，"
+        "拿它算别家底稿的基线必炸「丢失 row identity」"
+    )
 
 
 def test_baseline_projection_prewarm_is_bounded() -> None:
@@ -413,9 +417,27 @@ async def test_baseline_projection_prewarm_really_runs_and_splits_warmed_from_sk
     )
 
     projected: list[str] = []
+    bound: list[tuple[str, str]] = []
+    bound_registrations: dict[str, object] = {}
 
-    async def fake_projection(*, entry_id, **_kwargs):
+    # R14：每行 entry_state 是一张具体底稿，预热必须与请求路径一样按**该底稿**绑定 adapter
+    # （entry 级注册绑的是全序第一家企业）。绑定本身由 `test_target_bound_registration`
+    # 覆盖，这里只替成记录器，判「预热有没有按行里的那张底稿去绑」。
+    async def fake_bind(*, session, registry, entry_id, wp_id):  # noqa: ARG001
+        bound.append((str(entry_id), str(wp_id)))
+        return bound_registrations.setdefault(str(entry_id), object())
+
+    monkeypatch.setattr(
+        "app.services.workpaper_sync.target_bound_registration.bind_registration_to_target",
+        fake_bind,
+        raising=True,
+    )
+
+    async def fake_projection(*, entry_id, registration, **_kwargs):
         projected.append(str(entry_id))
+        assert registration is bound_registrations[str(entry_id)], (
+            "预热算基线用的不是按底稿绑定的那份注册 —— 又退回 entry 级（第一家企业）的 adapter"
+        )
         if "g7" in str(entry_id):
             raise RuntimeError("这张表算不出来")
         return {"values": {}}
@@ -429,6 +451,10 @@ async def test_baseline_projection_prewarm_really_runs_and_splits_warmed_from_sk
 
     outcome = await prewarm_mod.prewarm_sync_baseline_projections()
 
+    assert bound == [
+        ("xlsx/gt-d4-operating-revenue", str(UUID_WP)),
+        ("xlsx/gt-g7-long-term-equity-main", str(UUID_WP)),
+    ], f"预热没有按每行自己的底稿绑定 adapter：{bound}"
     assert projected == [
         "xlsx/gt-d4-operating-revenue",
         "xlsx/gt-g7-long-term-equity-main",

@@ -514,8 +514,49 @@ watch(
         revision: snapshot.resultRevision,
       })
     }
+    if (next === 'applied') scheduleReturnToForm()
   },
 )
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 「保存并回到表单模式」的后半句（R13c，2026-10-11 真栈实测）
+//
+// 按钮写着「回到表单模式」，但落地（applied）之后宿主一直停在编辑器里显示「结构化回写
+// 完成」，外层「同步中…」也不消失（`applied` 在桥的 in-flight 集合里，等的就是重载）——
+// 用户必须自己再点一次「结构化视图」。各宿主（D/F/G/H/K/L/M/N…）都挂同一个本组件，
+// 所以在这里补一次，全部宿主同时生效，不逐个改宿主。
+//
+// 只回应**本宿主发起**的保存（`forceSave()`：按钮与宿主切回结构化视图都走它），且落地时
+// 编辑器里没有新改动才回 —— 落地后又改过就留在编辑器里，绝不替用户丢编辑。短暂停留是为了
+// 让「结构化回写完成」被看见，而不是一闪而过。
+//
+// 意图一直保留到这次保存真正落地：中途冲突裁决 / 出错重试之后才 applied，回表单仍是用户
+// 当初点按钮时要的结果；没有落地（冲突未裁、refresh_required）就不会触发。
+// ═══════════════════════════════════════════════════════════════════════════
+
+const RETURN_TO_FORM_DELAY_MS = 1_200
+
+let returnToFormPending = false
+let returnToFormTimer: ReturnType<typeof setTimeout> | null = null
+
+function cancelReturnToForm(): void {
+  returnToFormPending = false
+  if (returnToFormTimer !== null) {
+    clearTimeout(returnToFormTimer)
+    returnToFormTimer = null
+  }
+}
+
+function scheduleReturnToForm(): void {
+  if (!returnToFormPending) return
+  returnToFormPending = false
+  returnToFormTimer = setTimeout(() => {
+    returnToFormTimer = null
+    if (String(props.bridge.state.value) !== 'applied' || props.bridge.dirty.value) return
+    // 失败由桥记进 lastError 并推到 error 态（状态条可见），这里不再二次上报。
+    void props.bridge.reloadAfterApplied().catch(() => undefined)
+  }, RETURN_TO_FORM_DELAY_MS)
+}
 
 // ── 用户动作
 
@@ -568,6 +609,9 @@ async function forceSave(): Promise<{ operationId: string }> {
     throw refusal
   }
   emit('saveRequested', { operationId })
+  // 落地后回表单（见「保存并回到表单模式」的后半句）。先置意图再起追踪：追踪器可能很快
+  // 就把桥推到 applied。
+  returnToFormPending = true
   startOperationTracking(operationId)
   return { operationId }
 }
@@ -675,6 +719,7 @@ onBeforeUnmount(() => {
   destroyEditor()
   // 定时器必须随宿主卸载停掉 —— 这正是推进器放在宿主而不是桥里的原因。
   stopOperationTracking()
+  cancelReturnToForm()
   document.removeEventListener('keydown', handleEscFullscreen)
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
 })

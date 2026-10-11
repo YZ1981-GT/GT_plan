@@ -9,7 +9,7 @@
  * spec: workpaper-html-onlyoffice-bidirectional-writeback-closure · Wave 3 Task 31
  */
 
-export const WP_SYNC_CONTRACT_DIGEST = "9773d57611c62b4ec6ff37153305da07b57877f1c5f3daae72570a7845daa875"
+export const WP_SYNC_CONTRACT_DIGEST = "651011f6abc67b5db38d2c0863a0df067aa1722bb2636d1f61e9e51d7d7b5fdb"
 
 /**
  * 用户端统一前缀模板。`{entry_id}` 是**多段**值（186 条 entry_id 全部含 `/`，最深四段），
@@ -26,6 +26,12 @@ export interface WorkpaperSyncRouteSpec {
 
 /** 后端**真实**路由表（一路由一方法）。前端只能从这里取路径，不得再拼字面量。 */
 export const WP_SYNC_ROUTES = [
+  {
+    "endpoint": "adopt_substrate",
+    "idempotencyKey": "absent",
+    "method": "POST",
+    "suffix": "/adopt-substrate"
+  },
   {
     "endpoint": "claim_recovery_case",
     "idempotencyKey": "required",
@@ -55,6 +61,12 @@ export const WP_SYNC_ROUTES = [
     "idempotencyKey": "absent",
     "method": "GET",
     "suffix": "/recovery-cases/{case_id}/download"
+  },
+  {
+    "endpoint": "ensure_first_publication",
+    "idempotencyKey": "absent",
+    "method": "POST",
+    "suffix": "/first-publication"
   },
   {
     "endpoint": "get_operation",
@@ -286,5 +298,6 @@ export const WP_SYNC_REJECTION_STATUS: Readonly<Record<string, number>> = {
   "pending_mutation_token_signature_invalid": 409,
   "pending_mutation_token_state_invalid": 409,
   "per_entry_contract_required": 422,
-  "representation_still_candidate": 422
+  "representation_still_candidate": 422,
+  "room_not_writable": 409
 } as const

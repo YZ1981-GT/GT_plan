@@ -319,7 +319,7 @@ async def resolve_published_frozen_definitions(*, session: Any, representation: 
 
 
 async def attach_adapters(registry: WorkpaperSyncAdapterRegistry, *, session: Any) -> tuple[str, ...]:
-    return await _L.attach_adapters(IDENTITY, SPECS, registry, session=session, build_contract_payload_fn=build_contract_payload, store_payload_error_cls=StorePayloadError)
+    return await _L.attach_l_entry_adapter(registry, IDENTITY, session=session, contract_payload_builder=build_contract_payload)
 
 
 publish_pilot_definitions = publish_definitions

@@ -23,6 +23,7 @@ import {
 import {
   CLAIM_REQUEST_ALLOWED_KEYS,
   WORKPAPER_SYNC_CLIENT_ENDPOINTS,
+  adoptSubstrate,
   buildClaimRequestBody,
   buildSyncEndpointUrl,
   buildSyncEntryPrefix,
@@ -32,6 +33,7 @@ import {
   createPendingMutation,
   downloadRecoveryArtifact,
   encodeEntryId,
+  ensureFirstPublication,
   getOperation,
   getOperationConflicts,
   getOperationTimeline,
@@ -171,6 +173,8 @@ describe('多段 entry_id 的 URL 拼接', () => {
 
 /** 每个 endpoint 的驱动器：真调 client method 一次。 */
 const DRIVERS: Record<string, () => Promise<unknown>> = {
+  adopt_substrate: () => adoptSubstrate(SCOPE, { dryRun: true }).catch(() => null),
+  ensure_first_publication: () => ensureFirstPublication(SCOPE).catch(() => null),
   create_pending_mutation: () =>
     createPendingMutation(SCOPE, {
       sheetKey: 's',
@@ -279,6 +283,54 @@ describe('生成的路由表与 client 一一对应', () => {
     })
     const snap = await readStoreProjection(SCOPE)
     expect(snap.projection.row_keys).toEqual({ customer_detail_transposed: ['cust-1'] })
+  })
+
+  it('ensureFirstPublication：POST 到生成表里的 /first-publication，结果逐项解析', async () => {
+    mockPost.mockResolvedValueOnce({
+      data: {
+        status: 'published',
+        representation_id: UUID(9),
+        representation_generation: 1,
+        content_revision: 1,
+      },
+    })
+    const result = await ensureFirstPublication(SCOPE)
+    expect(result).toEqual({
+      status: 'published',
+      representationId: UUID(9),
+      representationGeneration: 1,
+      contentRevision: 1,
+    })
+    const [url] = mockPost.mock.calls[0]
+    expect(url).toBe(buildSyncEndpointUrl('ensure_first_publication', SCOPE))
+    expect(url.endsWith('/first-publication')).toBe(true)
+  })
+
+  it('ensureFirstPublication 拒绝未知 status（不得把半截响应当成「已发布」）', async () => {
+    mockPost.mockResolvedValueOnce({
+      data: {
+        status: 'queued',
+        representation_id: UUID(9),
+        representation_generation: 1,
+        content_revision: 1,
+      },
+    })
+    await expectAsyncRefusal(
+      () => ensureFirstPublication(SCOPE),
+      'first_publication_status_invalid',
+    )
+  })
+
+  it('adoptSubstrate：dry_run 只发 {dry_run:true}，执行分支带 digest + revision', async () => {
+    await adoptSubstrate(SCOPE, { dryRun: true })
+    await adoptSubstrate(SCOPE, { dryRun: false, planDigest: DIGEST_A, expectedRevision: 7 })
+    expect(mockPost.mock.calls[0][1]).toEqual({ dry_run: true })
+    expect(mockPost.mock.calls[1][1]).toEqual({
+      dry_run: false,
+      plan_digest: DIGEST_A,
+      expected_revision: 7,
+    })
+    expect(mockPost.mock.calls[0][0]).toBe(buildSyncEndpointUrl('adopt_substrate', SCOPE))
   })
 
   it.each(WP_SYNC_ROUTES.map((route) => [route.endpoint, route.method, route.suffix]))(

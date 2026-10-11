@@ -1920,6 +1920,12 @@ class WorkpaperSyncRepository:
             effective_request_sequence=int(old.effective_request_sequence),
             actor_type=ActorType.system,
         )
+        # application 终态 ⇒ 它的 request 同事务终结（实现住伴生模块，见 request_settlement）。
+        from app.services.workpaper_sync.request_settlement import (
+            settle_requests_of_terminal_application,
+        )
+
+        await settle_requests_of_terminal_application(self, old)
         return old
 
     async def resolve_canonical_operation(

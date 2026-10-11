@@ -185,7 +185,6 @@ from app.services.workpaper_sync.excel_instrumentation import (
     ExcelIdentityCarrierGate,
     ExcelInstrumentationSpec,
     InstrumentationError,
-    build_instrumentation_payload,
     build_instrumentation_payload_for_sheets,
     build_template_payload,
     normalized_structure_hash,
@@ -264,6 +263,7 @@ __all__ = [
     "stable_key_for",
     "store_row_identity",
     "template_definition_payload",
+    "template_skeleton_baseline",
 ]
 
 
@@ -1057,16 +1057,13 @@ def build_contract_payload() -> dict[str, Any]:
         "review_status": "reviewed",
         "document_type": "xlsx",
         "template_definition_sha256": canonical_digest(template_payload),
-        # 🔴 2026-10-03：与 orchestrator 的 publish_definitions 保持一致——用单数路径
-        # （orchestrator 的 instrumentation_definition_payload 走 build_instrumentation_payload
-        # 而非 build_instrumentation_payload_for_sheets），否则发布的 digest 与契约声明不一致。
+        # 🔴 2026-10-10 更正（spec d2-online-edit-platform-closure §1 #2）：此前为「与工厂
+        #    publish 一致」改成了单数路径 —— 对齐的是错误基准。单数 instrumentation 只声明
+        #    d22-managed，观测器按冻结 instrumentation 找不到 d23/d21 ⇒ 注册期必报
+        #    ContractDriftError。现在工厂经 `instrumentation_definition_payload_fn` 发布本模块
+        #    的**复数** payload，契约内嵌 digest 与它同源（D1 先例同形）。
         "instrumentation_definition_sha256": canonical_digest(
-            build_instrumentation_payload(
-                spec=instrumentation_spec(),
-                template_definition_sha256=canonical_digest(template_payload),
-                template_sha256=TEMPLATE_SHA256,
-                gate=excel_carrier_gate(),
-            )
+            instrumentation_definition_payload()
         ),
         "template": {
             "relative_path": TEMPLATE_RELATIVE_PATH,
@@ -1140,6 +1137,41 @@ def contract_file_path() -> Path:
 def load_pilot_contract() -> SyncContract:
     """从磁盘加载并强校验本 pilot 的生产契约。"""
     return load_contract(PILOT_ADAPTER_ID)
+
+
+#: 模板骨架基线缓存（键 = 模板哨兵 + instrumentation 几何）。模板受
+#: :data:`TEMPLATE_SHA256` 哨兵冻结、几何是代码常量 ⇒ 进程内建一次即可。
+_SKELETON_BASELINE_CACHE: dict[tuple[Any, ...], Any] = {}
+
+
+def template_skeleton_baseline() -> Any:
+    """D2 受管区（D2-2 + 开关控 D2-3）骨架行的模板原值基线。
+
+    spec d2-online-edit-platform-closure · R12：OO→HTML 镜像用它区分「模板原样的骨架行」
+    与「用户在模板空行里填了内容的骨架行」，见 ``template_skeleton_baseline`` 模块 docstring。
+    三个输入（权威模板字节 / instrumentation 声明 / 契约）全取本模块的单一口径。
+    """
+    from app.services.workpaper_sync.template_skeleton_baseline import (
+        build_skeleton_baseline,
+    )
+
+    specs = tuple(instrumentation_specs())
+    key = (
+        TEMPLATE_SHA256,
+        tuple(
+            (s.template_id, s.managed_sheet, s.first_data_row, s.last_data_row, s.managed_last_col)
+            for s in specs
+        ),
+    )
+    cached = _SKELETON_BASELINE_CACHE.get(key)
+    if cached is None:
+        cached = build_skeleton_baseline(
+            template_bytes=read_authoritative_template(),
+            specs=specs,
+            contract=load_pilot_contract(),
+        )
+        _SKELETON_BASELINE_CACHE[key] = cached
+    return cached
 
 
 def assert_contract_file_matches_source() -> SyncContract:
@@ -1390,6 +1422,9 @@ _orch = build_orchestration(Phase5EntryConfig(
     store_item_id=STORE_ITEM_ID,
     error_code_prefix="sync_pilot_d2",
     build_contract_payload_fn=build_contract_payload,
+    # 三张受管 sheet（d22 主表 / d23 双区 / d21 静态区）：发布链与 attach 都必须看到全部。
+    instrumentation_definition_payload_fn=instrumentation_definition_payload,
+    instrumentation_specs_fn=instrumentation_specs,
 ))
 
 # ── 导出工厂产出的名字（用 D2 的 pilot_ 命名，裁决 6：pilot 前缀保留为别名）──

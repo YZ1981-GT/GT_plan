@@ -78,6 +78,8 @@ __all__ = [
     "INDEX_SHEET_HEADER_CELLS",
     "NARRATIVE_BLOCKS",
     "STORE_ITEM_ID",
+    "STORE_ITEM_IDS",
+    "all_store_item_ids",
     "MANAGED_SHEET",
     "locate_narrative_titles",
     "marker_of",
@@ -95,6 +97,17 @@ __all__ = [
 
 #: store 载荷所在的 `checklist_responses.item_id`
 STORE_ITEM_ID = P.STORE_ITEM_ID
+
+#: 本 entry 全部 store item 的单一口径（转发 pilot，出/回两方向同源）。
+#:
+#: 🔴 spec d2-online-edit-platform-closure · R11：注册表把 D2 登记成多 store 镜像
+#:    （`dual_store_fn` 非空），`store_mirror._mirror_dual_stores` 按
+#:    `bridge.all_store_item_ids()`（缺则 `bridge.STORE_ITEM_IDS`）读各 item 的 base。本模块
+#:    此前两样都没有 ⇒ 每次 OO→HTML 在 content version 已提交之后、镜像进
+#:    `checklist_responses` 那一步 AttributeError：OO 里改的内容进了 revision，结构化视图
+#:    却永远看不到（真栈实测 D2 rev 40）。只转发、不另列清单 —— 第二份清单必然漂移。
+all_store_item_ids = P.all_store_item_ids
+STORE_ITEM_IDS = P.STORE_ITEM_IDS
 
 #: 受管 sheet 名（转发 pilot 声明，避免调用方各写一份字面量）
 MANAGED_SHEET = P.MANAGED_SHEET
@@ -770,6 +783,7 @@ def merge_projection_into_store_rows(
     *,
     projection: Any,
     base_rows: list[Mapping[str, Any]],
+    skeleton_baseline: Any = None,
 ) -> tuple[list[dict[str, Any]], int, int, set[str]]:
     """把已 extract 的 projection 按行身份合进 D2 HTML store 行（**不读盘**）。
 
@@ -793,8 +807,19 @@ def merge_projection_into_store_rows(
     这种可当命名字段的契约首列，Excel 侧新增行必须原样进 store，否则结构化视图
     永远看不到新增。见 `test_d2_store_value_equivalence` 第三条判据。
 
+    🔴 R12（spec d2-online-edit-platform-closure）：**模板骨架行**（`GTROW-D22-0013..0024`，
+    模板自带的序号 1~12 +「单项计提 / 客户类型组合 组合1…组合X」示例行）不是 Excel 侧新增行。
+    base 里没有、且可编辑格与模板原值一致的骨架行**不进 store** —— 否则每家企业第一次 OO
+    保存都会被塞进 12 条示例行（和平药房已因此多出 12 行），删了下次保存又回来。
+    用户往模板空行里填了内容的骨架行照常进 store（不静默丢数据）。判据见
+    `template_skeleton_baseline` 模块；`skeleton_baseline` 缺省取 D2 权威模板现算的基线。
+
     :returns: (合并后的 store 行, 真变化字段数, 遍历字段数, 被改动的行身份集合)
     """
+    from app.services.workpaper_sync.template_skeleton_baseline import (
+        pure_template_skeleton_rows,
+    )
+
     by_id: dict[str, dict[str, Any]] = {}
     order: list[str] = []
     for row in base_rows:
@@ -803,6 +828,17 @@ def merge_projection_into_store_rows(
             continue
         by_id[rid] = dict(row)
         order.append(rid)
+
+    template_rows = pure_template_skeleton_rows(
+        projection,
+        table_key=P.ROWS_TABLE_KEY,
+        base_identities=set(by_id),
+        baseline=(
+            skeleton_baseline
+            if skeleton_baseline is not None
+            else P.template_skeleton_baseline
+        ),
+    )
 
     applied = 0  # 真发生变化的字段数
     visited = 0  # 遍历到的可回写字段数（用于区分「没变」与「没读到」）
@@ -818,7 +854,7 @@ def merge_projection_into_store_rows(
         if fv is None or fv.is_protected:
             continue  # 公式/自动取数列不回写 store
         rid = fv.row_key
-        if not rid:
+        if not rid or rid in template_rows:
             continue
         target = by_id.get(rid)
         if target is None:
@@ -1180,8 +1216,10 @@ def merge_projection_into_all_d2_stores(
             d22_base = []
     if not isinstance(d22_base, list):
         d22_base = []
+    # 🔴 R12：两段共用同一份模板骨架基线（惰性：没有候选骨架行时不读模板）。
+    skeleton_baseline = P.template_skeleton_baseline
     d22_result = merge_projection_into_store_rows(
-        projection=projection, base_rows=d22_base
+        projection=projection, base_rows=d22_base, skeleton_baseline=skeleton_baseline
     )
     updates[P.STORE_ITEM_ID] = d22_result
 
@@ -1198,7 +1236,9 @@ def merge_projection_into_all_d2_stores(
             for sid in (STORE_ITEM_ID_INDIVIDUAL, STORE_ITEM_ID_AGING, STORE_ITEM_ID_CUSTOMER)
         }
         d23_merged, d23_applied, d23_visited, d23_touched = merge_projection_into_d23_stores(
-            projection=projection, base_states=d23_base
+            projection=projection,
+            base_states=d23_base,
+            skeleton_baseline=skeleton_baseline,
         )
         for sid, rows in d23_merged.items():
             updates[sid] = (rows, d23_applied, d23_visited, d23_touched)

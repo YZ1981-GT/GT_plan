@@ -352,11 +352,13 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       </el-table-column>
       <el-table-column label="公司代码" min-width="96" fixed>
         <template #default="{ row }">
+          <!-- 受控 el-input 必须接 update:model-value（同表「客户名称」列同款）：只接 @change 时
+               Element Plus 每次按键后都把原生值拉回 prop ⇒ 根本输入不进去（真栈实测）。 -->
           <el-input
             v-if="!isReadonly"
             :model-value="row.companyCode"
             size="small"
-            @change="(v: string) => handleEdit(row, 'companyCode', v)"
+            @update:model-value="(v: string) => handleEdit(row, 'companyCode', v)"
           />
           <span v-else>{{ row.companyCode || '-' }}</span>
         </template>

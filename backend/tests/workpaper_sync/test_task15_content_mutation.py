@@ -1325,6 +1325,36 @@ class TestRoundtripEquivalence:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
+class _EmptyLibraryReadOnlySession:
+    """「库里什么都没有」的只读会话桩。
+
+    `_stage_and_verify` 发布 representation 文件时要先定代际（`_next_generation_probe`：
+    查当前 entry pointer 的代际、再查该代际的 room 能否复用 —— spec
+    d2-online-edit-platform-closure 根因 5）。本节只测 staging 与三道校验，选代际的规则
+    由 `test_task25_materialize_coordinator_pg` 阶段 13 在真库上守；这里给一个空库：
+    pointer 不存在、候选代际无 room ⇒ 代际 1，与修改前恒为 1 的口径一致。
+
+    同时钉住一条本就成立的约束：staging 发生在唯一事务**之前**，只许读不许写 ——
+    桩收到非 SELECT 语句即判红，而不是默默吞掉。
+    """
+
+    class _NoRow:
+        def scalar_one_or_none(self) -> None:
+            return None
+
+    def __init__(self) -> None:
+        self.selects = 0
+
+    async def execute(
+        self, statement: Any, *_args: Any, **_kwargs: Any
+    ) -> "_EmptyLibraryReadOnlySession._NoRow":
+        assert getattr(statement, "is_select", False), (
+            f"staging 阶段（事务之前）出现了非 SELECT 语句：{statement!r}"
+        )
+        self.selects += 1
+        return self._NoRow()
+
+
 class TestStageAndVerifyWithRealFiles:
     """`_stage_and_verify` 的三条失败与一条成功都跑真实文件读写。"""
 
@@ -1343,7 +1373,7 @@ class TestStageAndVerifyWithRealFiles:
         (tmp / "storage").mkdir(exist_ok=True)
         (tmp / "definition_store").mkdir(exist_ok=True)
         return CM.ContentMutationService(
-            session=object(),  # type: ignore[arg-type]
+            session=_EmptyLibraryReadOnlySession(),  # type: ignore[arg-type]
             repository=object(),  # type: ignore[arg-type]
             artifacts=CanonicalArtifactRepository(tmp),
             resolution=object(),  # type: ignore[arg-type]
@@ -1356,12 +1386,15 @@ class TestStageAndVerifyWithRealFiles:
         p = self._plan(xc, tmp_path)
         adapter = _StructuredFakeExcelAdapter()
         projection = proj(xc, {PERIOD: "2025 年度", TOTAL: Decimal("100.00")})
-        staged = await self._svc(tmp_path)._stage_and_verify(  # noqa: SLF001
+        svc = self._svc(tmp_path)
+        staged = await svc._stage_and_verify(  # noqa: SLF001
             plan=p,
             mutation=CM.BusinessMutation(projection=projection),
             projection=projection,
             adapter=adapter,
         )
+        # 发布文件名的代际按库里的 pointer / room 现定（不再是写死的 1）。
+        assert svc._session.selects >= 1  # noqa: SLF001
         assert adapter.materialize_calls == 1 and adapter.extract_calls == 1
         assert staged.projection is not None
         assert Path(tmp_path / staged.representation.relative_path).is_file()

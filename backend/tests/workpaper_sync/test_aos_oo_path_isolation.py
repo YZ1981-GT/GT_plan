@@ -554,9 +554,16 @@ class TestJ5PruneHasExactlyOneProductionCallSite:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 #: 现算三处原值（本 spec 交付前后都应是这三个数）。
+#:
+#: 🔴 2026-10-10 显式更新（不是改成「跟着 `SR.router.routes` 走」）：后续 spec
+#:    d2-online-edit-platform-closure R7 **有意**新增了一条路由 `POST …/first-publication`
+#:    （任意企业首次进在线编辑时按需发布首版），`test_task28_sync_router.py` 的 handler
+#:    分母 `+5 → +6`、slashed suffixes `19 → 20`，`_REQUIRED_ENDPOINTS` 不变（14）。
+#:    这里同步成新的三个数并写明来源 —— 本判据「误加端点必须打红」的作用不变：再有
+#:    任何一条未经登记的路由，三处仍会点名。
 ROUTER_REQUIRED_ENDPOINTS = 14  # `_REQUIRED_ENDPOINTS` 元组长度
-ROUTER_HANDLER_DENOMINATOR = "len(_REQUIRED_ENDPOINTS) + 5"  # handler 分母表达式（逐字）
-ROUTER_SLASHED_SUFFIXES = 19  # `test_a_real_slashed_entry_id_routes` 的 `suffixes` 条数
+ROUTER_HANDLER_DENOMINATOR = "len(_REQUIRED_ENDPOINTS) + 6"  # handler 分母表达式（逐字）
+ROUTER_SLASHED_SUFFIXES = 20  # `test_a_real_slashed_entry_id_routes` 的 `suffixes` 条数
 
 
 def _router_test_tree() -> ast.Module:
@@ -666,9 +673,10 @@ class TestTask74RouterCensusMustNotMove:
                 "_REQUIRED_ENDPOINTS",
             ),
             (
+                # 锚点随上方 2026-10-10 的显式更新同步（+6 是现值，变异体再 +1）。
                 "M2_bumped_handler_denominator",
-                "len(_REQUIRED_ENDPOINTS) + 5",
                 "len(_REQUIRED_ENDPOINTS) + 6",
+                "len(_REQUIRED_ENDPOINTS) + 7",
                 "handler 分母",
             ),
             (

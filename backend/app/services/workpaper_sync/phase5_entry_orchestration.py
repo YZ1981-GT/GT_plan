@@ -112,6 +112,14 @@ class Phase5EntryConfig:
     contract_file_path_fn: Any = None
     #: instrumentation spec（本 entry 基线 sheet 的，不含 expansion 声明的多 sheet）。
     instrumentation_spec_fn: Any = None
+    #: 多受管 sheet 的 entry 必须注入**复数** instrumentation payload：发布链冻结的
+    #: instrumentation 是观测器找 sheet 的唯一依据，只发主 sheet 时契约里的兄弟 sheet
+    #: 在注册期必报 `ContractDriftError`（spec d2-online-edit-platform-closure §1 #2）。
+    #: 默认 `None` = 单数路径，逐字节不变。
+    instrumentation_definition_payload_fn: Any = None
+    #: 多受管 sheet 的 entry 注入复数 `instrumentation_specs`；给了它 attach 才补兄弟
+    #: binding（与发布链同一对齐内核 `attach_sibling_bindings`）。默认 `None` = 只挂主 binding。
+    instrumentation_specs_fn: Any = None
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -252,6 +260,8 @@ def build_orchestration(cfg: Phase5EntryConfig) -> types.SimpleNamespace:
         )
 
     def instrumentation_definition_payload() -> dict[str, Any]:
+        if cfg.instrumentation_definition_payload_fn is not None:
+            return cfg.instrumentation_definition_payload_fn()
         return build_instrumentation_payload(
             spec=instrumentation_spec(),
             template_definition_sha256=canonical_digest(template_definition_payload()),
@@ -527,11 +537,32 @@ def build_orchestration(cfg: Phase5EntryConfig) -> types.SimpleNamespace:
         observation = await resolve_published_frozen_definitions(
             session=session, representation=representation, contract=contract
         )
+        # 🔴 多受管 sheet 的 entry 必须补兄弟 binding：`ExcelSyncAdapter._all_bindings()` 在
+        #    sibling 为空时只剩主 binding，materialize / extract 两个方向都会静默退化成单表
+        #    （不报错，`verify_unmanaged_regions` 也照样等价）。对齐内核与发布链同一个。
+        sibling_bindings: tuple[Any, ...] = ()
+        if cfg.instrumentation_specs_fn is not None:
+            from types import SimpleNamespace
+
+            from app.services.workpaper_sync.phase5_row_table_sheet import (
+                attach_sibling_bindings,
+            )
+
+            sibling_bindings = attach_sibling_bindings(
+                provider=SimpleNamespace(
+                    __name__=cfg.adapter_id,
+                    instrumentation_specs=cfg.instrumentation_specs_fn,
+                ),
+                primary=observation.identity_binding,
+                contract=contract,
+                dynamic_bindings=observation.identity_binding.dynamic_column_columns,
+            )
         register_adapter(
             registry,
             adapter=build_excel_adapter(
                 definitions=observation.definitions,
                 binding=observation.identity_binding,
+                sibling_bindings=sibling_bindings,
                 direction="html_to_oo",
             ),
             bundle=bundle,

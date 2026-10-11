@@ -69,6 +69,7 @@ from app.services.workpaper_sync.adapters.registry import (
     WorkpaperSyncAdapterRegistry,
 )
 from app.services.workpaper_sync.contracts import SyncContract
+from app.services.workpaper_sync.entry_profile import DescriptorFacts, RoomFacts
 from app.services.workpaper_sync.excel_instrumentation import ExcelInstrumentationSpec
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -401,18 +402,46 @@ def build_matcher() -> EntryMatcher:
     return HC.build_matcher(IDENTITY)
 
 
+#: 🔴 2026-10-10 修（spec d2-online-edit-platform-closure R1.2 守卫抓到，与 J1 10-01 同形）：
+#:    原两个包装按 `(IDENTITY, manifest=…)` / `(IDENTITY, registry, …)` 调 `HC`，而
+#:    `HC.build_registration` 要 `adapter/bundle/descriptor/room`、`HC.register_adapter`
+#:    首参是 `registry` ⇒ 任一调用都 TypeError（从未被执行过）。
 def build_registration(
-    *, manifest: Mapping[str, Any] | None = None
+    *,
+    adapter: Any,
+    bundle: Any,
+    descriptor: DescriptorFacts,
+    room: RoomFacts,
+    contract: SyncContract | None = None,
 ) -> AdapterRegistration:
-    return HC.build_registration(IDENTITY, manifest=manifest)
+    return HC.build_registration(
+        IDENTITY,
+        adapter=adapter,
+        bundle=bundle,
+        descriptor=descriptor,
+        room=room,
+        contract=contract,
+    )
 
 
 def register_adapter(
     registry: WorkpaperSyncAdapterRegistry,
     *,
-    manifest: Mapping[str, Any] | None = None,
+    adapter: Any,
+    bundle: Any,
+    descriptor: DescriptorFacts,
+    room: RoomFacts,
+    contract: SyncContract | None = None,
 ) -> AdapterRegistration:
-    return HC.register_adapter(IDENTITY, registry, manifest=manifest)
+    return HC.register_adapter(
+        registry,
+        IDENTITY,
+        adapter=adapter,
+        bundle=bundle,
+        descriptor=descriptor,
+        room=room,
+        contract=contract,
+    )
 
 
 async def attach_pilot_adapters(
@@ -505,7 +534,7 @@ def iter_store_rows(payload: Any, *, store_item_id: str | None = None) -> Any:
     )
 
 
-async def publish_definitions(publisher: Any) -> HC.HEntryDefinitions:
+async def publish_definitions(publisher: Any) -> HC.HDefinitions:
     return await HC.publish_h_entry_definitions(
         IDENTITY,
         managed_row_table_specs(),

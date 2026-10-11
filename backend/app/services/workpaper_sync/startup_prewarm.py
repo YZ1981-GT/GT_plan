@@ -120,6 +120,9 @@ async def prewarm_sync_baseline_projections() -> PrewarmProjectionOutcome:
     from app.services.workpaper_sync.store_projection_response import (
         compute_store_projection_response,
     )
+    from app.services.workpaper_sync.target_bound_registration import (
+        bind_registration_to_target,
+    )
 
     warmed = 0
     not_eligible = 0
@@ -148,7 +151,7 @@ async def prewarm_sync_baseline_projections() -> PrewarmProjectionOutcome:
         )
         for wp_id, entry_id, project_id in rows:
             try:
-                registration = registry.assert_bidirectional_ready(str(entry_id))
+                registry.assert_bidirectional_ready(str(entry_id))
             except Exception as exc:  # noqa: BLE001 - 非 bidirectional / 未注册：本就不预热
                 not_eligible += 1
                 # info 足够：这是设计内的正常分流，不是故障。
@@ -160,6 +163,15 @@ async def prewarm_sync_baseline_projections() -> PrewarmProjectionOutcome:
                 )
                 continue
             try:
+                # 🔴 R14：与请求路径同一个绑定入口 —— 每行 entry_state 是一张具体底稿，
+                # 用 entry 级注册（绑第一家企业）去算第二家的基线必炸「丢失 row identity」，
+                # 而那正是请求路径修好之前的故障形态。
+                registration = await bind_registration_to_target(
+                    session=session,
+                    registry=registry,
+                    entry_id=str(entry_id),
+                    wp_id=wp_id,
+                )
                 await compute_store_projection_response(
                     session=session,
                     project_id=project_id,

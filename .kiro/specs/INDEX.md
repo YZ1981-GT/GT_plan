@@ -1,11 +1,12 @@
 # 致同审计作业平台 — Spec 开发索引
 
+> **2026-10-10 新建 · 2026-10-11 验收收口**：[`d2-online-edit-platform-closure`](d2-online-edit-platform-closure/tasks.md) — D2 在线编辑恢复 + 任意企业首次打开自动首版：注册链崩溃 / 发布链单数 instrumentation / attach 缺兄弟 binding / 兄弟 sheet 跨表传播误报漂移 / generation 撞 superseded 房间 / 无运行时首版路径（R1~R8）；真栈验收又逐条暴露并修复 14 条平台缺陷（R10~R21：OO 重算浮点尾差误报 108 条冲突 / 镜像硬取属性缺失 / 模板骨架行 / 已确认代际复用 / 落地后不回表单不释放 lease / 请求期 adapter 绑第一家企业 / 每次保存全平台冷建注册 / forcesave request 永停 correlated / OO 清空被回滚 / 同页二次保存卡死 / HTML 改格 2 秒内切在线编辑丢编辑 / 补读未捕获 rejection）。和平药房 + 重药安徽 OO↔HTML 往返浏览器实测通过；其余循环 108 个同形写入方冻结棘轮（design §7.5）。
 > **2026-10-10 ✅ 归档**：[`note-sub-table-formula-and-cross-check`](_archive/40-consol-note-defect-closure-and-template-alignment/note-sub-table-formula-and-cross-check/tasks.md) — 附注子表公式与跨表勾稽：子表合计种子 + 跨表校验声明（check_rules）+ E5 应收账款全 11 张子表作为 canary + formula_push 子表规则 + 前端同步路径。4 Phase / 19 任务。
 > **2026-10-10 ✅ 归档**：[`note-template-full-alignment-with-word-authority`](_archive/40-consol-note-defect-closure-and-template-alignment/note-template-full-alignment-with-word-authority/tasks.md) — 四套附注模板 JSON 与 Word 权威源全量对齐：合并模板 multi_header 全覆盖（列不一致 78 张修复 + 缺失表 88 张新增 + 非报表注释章节 171 张扩展）+ 单体模板 columns.group 补齐 58 张 + 章节标题/序号校正。6 Phase / 24 任务。
 > **2026-10-10 ✅ 归档**：[`consol-comprehensive-runtime-defect-closure`](_archive/40-consol-note-defect-closure-and-template-alignment/consol-comprehensive-runtime-defect-closure/tasks.md) — 合并模块运行缺陷收口：CP-01~05（节点联动/Word 叶子列/推送状态/三层表头/模板切换 dirty） + 防双计恒等式 + AbortController 竞态守卫 + 三码确认式建树 + P0/P1/P2 验收测试 183 个。13/14（余 [ ]* 真实 PG 写路径/6000 并发）。
 > **2026-10-04 新建**：[`disclosure-multitable-refresh-and-edit-writeback`](disclosure-multitable-refresh-and-edit-writeback/tasks.md) — 普通附注多表 binding/增量刷新 + AR 四组局部校准 + 前端投影反写；排除并行合并节点隔离与真实历史数据迁移。进度以本 spec 清单和实测证据为准，不增量推算全局总数。
 
-**最后更新**：2026-10-10
+**最后更新**：2026-10-11
 > ⏱ **2026-10-01 现扫（归档裁决：底稿双向回写 + 公式管理两族）**：Active **61**（目录 **64**，无 tasks.md **3**：`procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening` / `workpaper-page-formula-toolbar-closure`）/ Archived **602**。只归档 **1** 个（`chain-closure-phase1-root-cause-fixes` → `06-engineering-governance`），其余 12 个候选逐条未归档，原因见 §二「归档（2026-10-01）」。
 > 🔴 **新增归档判据：交付物须已入库** —— 在 HEAD 干净检出（临时 `git worktree`）上跑 spec 守卫。4 组在工作树全绿、在 HEAD 上红（删行多区 · 受管行收敛 · adopt · L 三份），修复只在工作树里；d567 两边都红。只看 tasks.md 勾选、或只在工作树跑测试，会把「本机做完」误当「仓库里有」。
 

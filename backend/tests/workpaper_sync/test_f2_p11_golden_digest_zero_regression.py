@@ -63,7 +63,16 @@ GOLDEN_BASELINE: dict[str, str] = {
     #    有逐次变更说明），F1 因宿主接桥 + 契约重算而变。这些变化均已由各自 spec
     #    的守卫测试覆盖，此处只同步基线 digest。
     "d1.notes_receivable_detail.json": "72718e0107925d3e",
-    "d2.receivable_detail.json": "1714d5719d558446",
+    # 🔴 2026-10-10 更新 d2（`1714d5719d558446` → 本值），两次契约变化一并同步：
+    #    ① 299c216a9（10-07）把 `d21-managed` 的 locator 从 TABLE_SHEET_ANCHOR 改为
+    #       defined_name_ref，当时未同步本基线（HEAD 上本条已红：`cd80314142ae5bdf`）；
+    #    ② spec d2-online-edit-platform-closure（R2）：契约里**只有**
+    #       `instrumentation_definition_sha256` 一个字段变了（`46f3c617…` 单数、只覆盖 D2-2
+    #       → `9e88e86b…` 复数、覆盖 D2-2/D2-3/D2-1 三张受管 sheet），与上方 D1「三次更新」
+    #       同型。单数 instrumentation 正是 D2 在线编辑失败的根因之一；「契约 sheet 必须被
+    #       已发布 instrumentation 覆盖」由 `test_published_instrumentation_covers_contract_sheets.py`
+    #       守护。契约是**真的变了**，不是度量漂移，故更新基线。
+    "d2.receivable_detail.json": "56007587080236ac",
     "d3.prepaid_receipts_detail.json": "a32e531ac342e7cc",
     "d4.revenue_detail.json": "58ef8c68b3c74537",
     "d5.receivables_financing_detail.json": "e2fa67a560a6ac5b",

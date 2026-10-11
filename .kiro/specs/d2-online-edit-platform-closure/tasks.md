@@ -1,0 +1,64 @@
+# 任务：D2 在线编辑恢复与「任意企业首次打开」平台闭环
+
+> 勾选规则：只在「代码已改 + 对应测试真实通过」后勾选；外部环境依赖用 `[ ]*` 并写明原因。
+
+- [x] 1. 注册链修复与守卫（R1）
+  - [x] 1.1 N1/N2/N3/N5 改用 `_L.attach_l_entry_adapter`
+  - [x] 1.2 守卫 `test_module_alias_attribute_resolvability.py`（纯 AST：别名可解析 + 实参可绑定签名）5/5；变异 2 条全红（N1 改回 `_L.attach_adapters` / J2 `publish_definitions_for` 漏传 `contract_payload_builder`）。守卫首跑即抓到同族 **20 处**：I1~I6 的 `build_registration` / `register_adapter` 包装按旧签名调 HC（调用即 TypeError，与 J1 10-01 修掉的同形）+ 返回注解 `HC.HEntryDefinitions`（不存在，真名 `HDefinitions`）、J2/J3 `HC.authority_model_payload` 多传一个位置参数 —— 已全部按 J1 先例修复（I 循环既有 4 条红经撤回本轮修复复跑确认为预存）
+- [x] 2. D2 发布链复数 instrumentation + attach 兄弟 binding（R2/R3）
+  - [x] 2.1 `Phase5EntryConfig` 两个可选钩子；未注入时逐字节不变（`check_sync_provider_golden_digest` 240 个 digest 零回归、37 家零跳过）
+  - [x] 2.2 D2 注入钩子；契约内嵌 digest 改复数；重生成磁盘契约并 `--check`
+  - [x] 2.3 守卫 `test_published_instrumentation_covers_contract_sheets.py` 5/5：记录型 publisher 跑全部 88 个 xlsx provider 的真实发布链（零跳过），17 条既有缺口冻结为双向锁死基线（D3/D5/D6/D7/E1/G1~G3/G6/G8~G14/C 控制测试）。变异 2 路：纯函数路径喂单数 payload ⇒ 报 d23/d21；真实发布链删掉 D2 钩子注入 ⇒ 链内单向引用校验以 `46f3c617…`（事故 digest）拦下、「每个 provider 都被观测到」判据打红
+- [x] 3. 兄弟受管 sheet 的传播逆替换（R4）
+  - [x] 3.1 `unmanaged_region_digest` 接入 `normalise_propagated_part`（`_propagated_managed_sheet_bytes`，两个 `managed_sheet_*` aspect 共用）
+  - [x] 3.2 单测：声明内改写判等价 / 声明外改写判漂移 / `s` 改动仍判漂移（`test_d2_sibling_propagation_verify.py` 4/4；修复前 1 红 3 绿）
+- [x] 4. generation 与房间（R5/R6）
+  - [x] 4.1 rooms.py 抽出 `room_generation_reuse_refusal` / `room_generation_is_retired`，`open_or_reuse_room` 改调它（消息逐字不变，`test_task21_room_service_pg` 的 `uq_wpoor_generation` 诊断断言仍绿）
+  - [x] 4.2 `_next_generation_probe` 通用规则（候选 = pointer 代际，见 design D4 勘误）+ `_commit_once` 统一走它；`mutate_task15` 的 M24 锚点随之迁移
+  - [x] 4.3 `RoomNotWritableError` → 409
+  - [x] 4.4 PG 守卫（`test_task25_materialize_coordinator_pg` 阶段 13 + 阶段 12 前提改为「当前代际的 room」）：终态 + 内容未改 ⇒ 换代、revision 不动；终态 + 内容已改 ⇒ commit 直接落 max+1（representation 恰 +1）；refresh-required ⇒ 409 不换代。变异 5 条全红（去掉换代 / 换代过宽 / 去掉 409 / 候选恒为 1 / 不看 room 能否复用）。G7/D4 分支代码未改动（只读复核，无独立用例）
+  - [x] 4.5 （设计期补充 D4b）materialize 遇终态 room 换代
+- [x] 5. 任意企业首次打开（R7）
+  - [x] 5.1 `read_store_payload` 抽成单一真源（`store_projection_response.StorePayloadRead`），store-projection 改调它（分派与载荷逐字不变；`test_d4_store_item_wiring_gap` / `test_sync_registration_prewarm` / `test_store_item_registry` 绿）
+  - [x] 5.2 `first_publication_on_demand.py` + `POST …/first-publication` + `ensure_first_publication` 登记为写 action；**不走 `_registration`**（首版正是 registry 无参考 representation 时的破环点）；拒绝码表按具体类登记、未登记即 500；commit 后发布耐久事件
+  - [x] 5.3 端点级 PG 守卫 `test_first_publication_on_demand_pg.py`（ASGI 真发请求、真 scratch schema、真 provision）8/8：401 / 404 / 403 / D2 首版成功（四表 +1、revision 0→1）/ 再调幂等零写入 / G7 空 store 422 / 未 provision 422。变异 3 条全红（写 action 错进只读名单 / 去掉幂等分支 / 去掉空 store 判据）；「router 不 commit」是**等价变异**（`publish_pending(commit=True)` 会顺带提交），不计入
+  - [x] 5.4 重生成前端契约（带入此前漏生成的 `adopt_substrate` 路由 + `ensure_first_publication` + `room_not_writable: 409`），`check_known_failing_registry` 删除已转绿的预存登记；`test_task28_sync_router` 两处分母同步（路由匹配表 / guard-first 计数 +6）
+  - [x] 5.5 前端 `ensureFirstPublication` + 桥「首版后整链重走一次」+ `bridgeFirstPublication.spec.ts` 10/10（变异 3 条全红：无限重试 / 不看错误码 / 首版后不重走）。契约重生成暴露 `RefreshSourceDialog` 手拼 adopt-substrate URL（绕开 API 模块路径单源约束、被生成物漏路由掩盖）⇒ 新增 `adoptSubstrate` client 并改该组件调它（`RefreshSourceDialog.spec` 25/25 不改一行）
+- [x] 6. 回归：D2 相关套件与基线逐条对比，新增行为回归为 0
+  - [x] 6.1 `-k "d2 or task41"`（386 例）对改动前基线 junit 逐条比：新增红 0、转绿 2（task41 发布链两条），其余 48 条红两边同在
+  - [x] 6.2 预存失败清册门 `check_known_failing_registry.py`：在 HEAD 5914e315b 干净检出（`git worktree add --detach`）上同口径对照，27 条失败两边同因、本 spec 新增 0 ⇒ 补登 21 条（按根因分组写明 lane / 首见 / 原因）、删僵尸 G5-2（HEAD 上也已绿，是 G 循环的修复）⇒ 门 exit 0。其中 `test_d1_full_book_gate_open_pg` ×4 的根因是**真库数据**：重药安徽 18 个 (wp, entry) 有 representation 却无 entry pointer（pg_stat 显示 10-09 15:20 统计清零后恰有 18 次已提交删除；本 spec design.md 写于 10-10 22:43，其「71 个 entry 有 entry_state」已是删后状态；仓库代码无删除该表的路径、FK 为 RESTRICT）⇒ 非本 spec 所致，未擅自回填
+  - [x] 6.3 扩展口径 75 个相关测试文件（content mutation / room / materialize / OO→HTML / 冲突 / excel 抽取与物化 / store-projection / 首版 / G7 / D4 / I·J·N 循环 / 注册表 / golden）主树对 HEAD 逐条比，另补跑 adopt-substrate（`test_aos_*`）与 single-pass 系列。真回归 1 处 3 条、已修：`test_task15_content_mutation` 的 `_stage_and_verify` 用例以 `session=object()` 构造，R5 后选代际要查 pointer / room ⇒ 改为「空库只读会话桩」（收到非 SELECT 即判红，并断言确实查过库）。另两处是有意变化带来的基线同步：`test_f2_p11` 的 d2 digest（契约只变 `instrumentation_definition_sha256` 一个字段；顺带记下 299c216a9 当时漏同步）、`test_aos_oo_path_isolation` 的路由普查（handler 分母 +5→+6、suffix 19→20，三条变异仍红）
+  - [x] 6.4 由 skip 转为真跑而暴露的既有过期判据 4 条（不代改，属 `published-representation-production-path-and-lane-adjudication`）：`test_projection_lane_regression_gate` 的 G7 两条 —— G7 已于 5cb7ebe70 前经复核门翻为 bidirectional（manifest `source_digest` == overlay `approved_source_digest`，`review_status=reviewed`），「阶段二未成立」已不是事实；另两条登记读数随真库增长过期（entry_state 12 vs 72、content_version 198 vs 373）。HEAD 上它们因注册链 AttributeError（即 R1）走 `DatabaseUnreadable` 而 skip
+  - [x] 6.5 其余红在 HEAD 上同因（N 循环扫描器 API 漂移、归档 spec 旧路径、模板 size / digest 漂移、J2 `.bak` 未跟踪文件、D4 binding 39→40 等），与本 spec 无关
+- [x] 7. 数据处置（R8）：契约 → provision → rematerialize（无跳过开关）→ 恢复 approved_at
+  - [x] 7.1 `fix_task76_provision_projection_definitions.py --check` 后 `--apply --entry xlsx/gt-d2-accounts-receivable`：新建 contract `14507db1`（`8c064287…`）+ bundle `13f5dc68`（`a5e58171…`），instrumentation 复用 `9e88e86b…`（复数，09-26 那次 sibling 重发布就是它；10-03 起的 bundle 退回了单数 `46f3c617…`，与根因 R2 吻合）；revision / pointer 不动，representation 结算 `blocked`（provisioner 不自建表示，由下一步补）
+  - [x] 7.2 还原 bundle `0c8426e6.approved_at` = 2026-09-05 11:27:56.676757+00（与 created_at 同刻；只在当前值仍是本会话那次改动时才写）⇒ 最新 approved 即 `13f5dc68`
+  - [x] 7.3 rematerialize 预演（只读探针，publish 前截停）：4 个 binding 全部 `equivalent=True`，substrate↔materialized 逐格差异 D2-2 / D2-3×2 / D2-1 均为 0（R4 修复后 D2-1 的 9 格 SUMIF 差异消失）
+  - [x] 7.4 `d2_rematerialize_sibling_sheets.py --apply --force`（无任何跳过开关）：新 representation `902a5348`，**generation 3**、revision 39（pointer 原在 gen 1，gen 1 room 已 superseded、gen 2 room 仍在 ⇒ 按 R5 取 max+1），pointer 已切到 gen 3
+  - 注：`backend/definition_store/` 下 4 个新 blob（本会话初期 bundle `ba3b70ad` 的 2 个 + 本次 2 个）被库里 approved bundle 引用，需随代码一并入库；初期排查删掉的 1 行 `working_paper_oo_client_confirmation` 无法恢复（其 room 早已 superseded，无业务影响）
+- [x] 8. 验收（R9）：两家企业在线编辑 + OO→HTML / HTML→OO 往返。验收中逐条暴露的平台缺陷 R10~R21 均在本任务内修复（根因与决策见 design §7）
+  - [x] 8.1 和平药房_2025 D2-2 进入 OnlyOffice（R1~R8 之后首个真栈通过）：store-projection 200 / 38.75 s、pending-mutation 1.87 s、materialize 200 / 1.95 s（descriptor 在，room `6449c276` gen 3）
+  - [x] 8.2 R10：`merge.recomputed_values_equal` + 两处接线；`test_merge_recomputed_formula_values.py` 45 passed；变异 5/5（去掉重算分支 / auto-source 也放宽 / 所有十进制类型都按分 / 重载判据仍精确 / 金额只吸收 15 位尾差）
+  - [x] 8.3 R11：bridge 补齐镜像硬取属性；`test_store_mirror_provider_surface.py` 76 passed（全注册表逐 plan）；变异 2/2（撤回转发 ⇒ `d2.receivable_detail` 红；镜像新增硬取点 ⇒ 模型完整性红）
+  - [x] 8.4 R12：`template_skeleton_baseline` + D2-2 / D2-3 两侧接线；`test_d2_template_skeleton_rows.py` 15 passed；变异 11/11；数据处置见 design §7.4-1
+  - [x] 8.5 R13：`_next_generation_probe` 遇已确认代际换代；`test_generation_probe_after_editor_session.py` 7 passed；单元变异 3/3。PG 层（磁盘注入，进程内注入版对已持有原类引用的协调器根本没注入进去，当时「PG 下全绿」的结论作废）：M1（退回 R5「任何可复用 room 都沿用」）被 task25 的 R13 判据杀死、M3（未确认的 room 也换代）被 task25 的 stale-fence 判据杀死；🔴 M2（随会话的 OO→HTML 提交也换代）PG 层无覆盖 —— task25 只走 HTML→OO，task26 的 OO→HTML 世界从不 confirm descriptor ⇒ 只由单元守卫承担（如实登记，未补 PG 场景）；数据处置见 design §7.4-2
+  - [x] 8.6 R13b / R13c：桥 `reloadAfterApplied` 发 leave、共享宿主落地后自动回表单；`reloadAfterAppliedReleasesLease.spec.ts` + `WorkpaperSyncEditorHost.spec.ts` §10c；变异 6/6（不自动回 / 无视 dirty / 卸载后定时器仍触发 / 意图从未置位 / 不发 leave / dirty 写死 false）
+  - [x] 8.7 R14：`target_bound_registration` + registry 三原语 + 三个生产调用点；零库判据 46 passed（`test_target_bound_registration.py` + 行数门拆出的 `test_target_bound_registration_wiring.py`：§4~§7 生产接线 / 全 provider 经共享解析器 / R15 / R16 原样迁出）、变异 18/18；`test_target_bound_registration_pg.py`（两家企业交替、真 D2 provider、真首版发布）11 passed、变异 3/3
+  - [x] 8.8 R15 / R16：指纹改按 bundle、callback apply 读缓存；单元变异 5/5（F1 / F2 / F4 / C1 / C2）+ PG 变异 1/1；实测 store-projection 38.75 s → 257 ms、apply 38.8 s → 15.4 s
+  - [x] 8.9 R19（代码编号 D1）：`request_settlement` + 映射单源 + 终态写入方接线 + `finished_at`；`test_d1_request_settlement.py` 25 passed；task26 PG 新场景 `settlement`（断言在 `test_task26_d1_request_settlement_pg.py`，采集体 `task26_d1_settlement_world.py`）；变异 15/15；历史 68 条见 design §7.4-3
+  - [x] 8.10 R17：`cleared_field_view` + `_apply_committed` 接线；`test_r17_cleared_field_store_view.py` 10 passed；变异 6/6
+  - [x] 8.11 R18：`beginSession()`；`consecutiveSessionsFenceReset.spec.ts` 3 例；变异 4/4（不重置 / 围栏残留 / operation 残留 / 拆掉围栏）；「失败归一」整段原样迁到 `workpaperSyncBridgeFailure.ts`（bridge ≈1515 行 < 门 1636）
+  - [x] 8.12 重药控股安徽_2025 最终浏览器验收（走 R7 首版；R10~R19 全部生效后，同一页面连续三轮）：
+    - A1 OO 里 C25 写「R18-A」→ 保存 → 20.0 s 自动回表单、leave 200；request `31ba0a0a` terminal、application `8ce0cfb0` applied rev 12（durable → finished 16.5 s）、operation `5b8de2f7` applied 且写了 `finished_at`、participant `18f3697f` left
+    - A2 同页再进在线编辑，C25 读到「R18-A」→ Delete 清空 → 保存 → 20.4 s 回表单、leave 200；request `3b55eb9c` terminal、application `a0c13c8c` applied rev 14；store `companyCode` = null
+    - A3 再进在线编辑 C25 = ""（清空没被回滚：rev 15（html）projection 与 rev 11（html）清空态同为 `0bf2a2bc…`，store 未再改）→ 不改动直接回表单（clean close）、leave 200
+  - [x] 8.13 和平药房_2025 最终复验（R14~R19 之后，表格编辑模式 741 行）：
+    - B1 OO 里 C25 写「HP-FINAL-1」→ 保存 → 26 s 回表单、leave 200，HTML 首行公司代码显示 HP-FINAL-1（OO→HTML）
+    - B2 HTML 首行公司代码改「HP-HTML-2」后**立即**点在线编辑 ⇒ OO 里仍是 HP-FINAL-1 —— 暴露 R20（网络序 GET store-projection 早于那次 PUT；rev45（html）投影仍是 HP-FINAL-1）；随后在 OO 清空保存 ⇒ store 被写成 null，HTML 那次编辑丢失
+    - R20 修复后复验：改「HP-HTML-R20」立即点在线编辑 ⇒ 网络序 PUT（93.4 s）→ 200（93.6 s）→ GET store-projection（93.6 s），OO 里 C25 = HP-HTML-R20（HTML→OO）；OO 清空保存 → 25 s 回表单，store `companyCode` = null（复原），本轮 3 个 request 全 terminal、4 个 participant 全 left
+  - [x] 8.14 R20：平台 `sync/pendingWrites.ts`（`hPendingWrites` 改别名、同一张表）+ 桥 `flushHtml` 前 `await flushPendingWrites()` + `d2SaveItems` 经 `trackPendingWrite` + 14 个 `useD2*` 登记 flusher（`useD2VcAuditSummary` 的防抖只重算统计，豁免可证伪）；`pendingWrites.spec.ts` 8 / `bridgeFlushesPendingWritesFirst.spec.ts` 2 / `d2PendingWritesBeforeOnlineEdit.spec.ts` 19 / `pendingWritesCoverageRatchet.spec.ts` 4（全前端 108 条同形写入方冻结、两向锁死）；变异 6/6（桥不等待 / useD2Detail 不登记 / 宿主不追踪在途 / 不等在途 / 不注销 / scope 外也登记）
+  - [x] 8.15 R21：`workpaperSyncOperationTracker.handleContentUpdate` 两处补读补 `.catch`；新用例（取消 / 网络失败均无未捕获 rejection）+ 变异 1/1
+  - [x] 8.16 行数门（pre-commit 按暂存文件阻断）：拆分 2 处（`test_target_bound_registration_wiring.py`、task25 的 world + companion，测试数不变）+ whitelist 登记理由 6 处（design D16），全部改动文件 `check_file_size` exit 0；R17 新模块引用 merge 域 ⇒ 补 `merge.RETIRED_DEFERRALS` 登记（task14 双向等值守卫转绿）
+  - [x] 8.17 终回归（全部改动之后）：宽回归 102 个文件，失败集对 D1 基线逐条比 —— 原有 349 条两边相同、零新增；多出的 3 条全在本轮新纳入的两个守卫文件里且与本 spec 代码无关（`test_committed_code_imports_only_committed_modules` 的「未提交模块」须随提交转绿 + 他人 d3 棘轮失效条目；whitelist 在 HEAD 即损坏，见 design §7.5-17/18）；golden digest 240 不变（37 家零跳过）；预存失败清册 27 = 27；前端 sync + D2 + H5/H7 套件 1664 例、17 红与基线逐条相同；全部改动文件行数门 exit 0；ESLint 0 error
+- [x] 9. 收尾：删除一次性探针（`backend/scripts/analyze/_d2_*` 166 个、两个单区域 tsconfig、本轮 `.playwright-mcp` 产物 80 个、HEAD 对照 worktree），更新 INDEX.md 与 memory.md
+  - 注：本 spec 的新文件尚未入库（用户未要求提交）；提交时须一次带上 design §7.5-18 列出的新模块与 4 个 definition_store blob

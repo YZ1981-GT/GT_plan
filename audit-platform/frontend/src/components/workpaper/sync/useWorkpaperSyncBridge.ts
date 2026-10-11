@@ -47,13 +47,10 @@ import {
 } from './workpaperSyncBridgeMachine'
 import {
   WorkpaperSyncContractError,
-  WP_SYNC_STALE_IDENTITY_CODES,
   buildDescriptorConfirmPayload,
-  classifySyncFailure,
   isSyncDigest,
   type WorkpaperSyncDescriptorConfirmation,
   type WorkpaperSyncEditorLaunchDescriptor,
-  type WorkpaperSyncFailureVerdict,
   type WorkpaperSyncOperationSnapshot,
   type WorkpaperSyncRecoveryCase,
 } from './workpaperSyncDto'
@@ -67,186 +64,26 @@ import {
   type WorkpaperSyncModeMigration,
 } from './workpaperSyncModeStorage'
 import type { WorkpaperSyncCapability } from './workpaperSyncManifest.generated'
+import { flushPendingWrites } from './pendingWrites'
+import {
+  SUBSTRATE_NOT_PUBLISHED_CODE,
+  describeBridgeFailure,
+  isRequestCanceled,
+  readWireError,
+  type WorkpaperSyncBridgeError,
+} from './workpaperSyncBridgeFailure'
+
+// 「失败归一」住伴生模块；这里 re-export，宿主 / 抽屉 / 测试的 import 路径不变。
+export {
+  SUBSTRATE_NOT_PUBLISHED_CODE,
+  WP_BRIDGE_LOCAL_FAILURE_CODE,
+  WP_BRIDGE_NON_DISCLOSURE_CODE,
+  describeBridgeFailure,
+  type WorkpaperSyncBridgeError,
+} from './workpaperSyncBridgeFailure'
 
 function refuse(code: string, message: string): never {
   throw new WorkpaperSyncContractError(code, message)
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 1. 失败归一
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * scope / 授权失败的**唯一**合成码。
- *
- * 服务端把「不存在 / 已 retire / 跨 scope / 无 visibility」四种原因压成同一个 404，
- * 响应体是纯字符串 `资源不存在或不可访问`，**没有** `error_code`。前端因此必须自己
- * 合成一个码才能分型，而这个码刻意**不区分**那四种原因 —— 区分开就等于泄露存在性。
- */
-export const WP_BRIDGE_NON_DISCLOSURE_CODE = 'sync_scope_not_visible_or_forbidden'
-
-/**
- * **没有任何服务端 `error_code`** 的失败（本地 flush/reload 钩子抛错、网络中断、超时、
- * 5xx 纯文本）的唯一合成码。
- *
- * 🔴 必须与 `WP_BRIDGE_NON_DISCLOSURE_CODE` 分开：两者共用一个码会让「统一 404 的
- * 存在性不泄露」与「本地钩子抛了个普通 Error」在 UI 上不可区分，而前者不可重试、
- * 后者恰恰是 AC 4.4 要求「保持 OO 并允许重试」的那一类。
- */
-export const WP_BRIDGE_LOCAL_FAILURE_CODE = 'sync_step_failed_without_server_code'
-
-/**
- * axios「请求被取消」判据（`utils/http.ts` 的请求去重层 `AbortController.abort()`）。
- *
- * 🔴 为什么要在桥里单独识别它、且**绝不**记进 `lastError`/`error` 态：
- * D4 整册的 40+ 张子 sheet **共用同一个 entryId**（`xlsx/gt-d4-operating-revenue`），
- * 于是 `read_store_projection` / `materialize` 在不同子 sheet 间是**同一个 URL**。
- * 用户切页签后再点「在线编辑」，http.ts 去重层会把上一发在飞的同 URL 请求 `abort()`
- * —— 这是**纯 UI 竞态**，不是同步失败：真正落库/授权/身份都没发生任何错误。
- *
- * 若把它当普通失败（`readWireError` 看不出它是 cancel：无 response、message 恰好是
- * `'canceled'`），就会弹出「同步失败: canceled」红色遮罩，而且因 `lastError` 是 sticky
- * （Property 48）永不消退。全仓其余保存路径（`useD4FormData`/`WpPopupMixedForm` 等
- * 十余处）都对 canceled 做了同款短路，唯独 sync 目录漏了这一处 —— 此判据补齐它。
- */
-function isRequestCanceled(error: unknown): boolean {
-  const e = (error ?? {}) as { code?: unknown; name?: unknown; message?: unknown; __CANCEL__?: unknown }
-  return (
-    e.code === 'ERR_CANCELED' ||
-    e.name === 'CanceledError' ||
-    e.__CANCEL__ === true ||
-    e.message === 'canceled'
-  )
-}
-
-/** 合成码的中文文案：可诊断（说得出是 scope/授权面）但不透露对象是否存在。 */
-const NON_DISCLOSURE_TEXT = '该同步对象不可访问：请确认项目/底稿/条目范围与当前权限'
-
-export interface WorkpaperSyncBridgeError {
-  readonly stage: string
-  readonly httpStatus: number | null
-  readonly errorCode: string
-  readonly message: string
-  readonly verdict: WorkpaperSyncFailureVerdict
-  readonly staleIdentity: boolean
-}
-
-interface WireErrorShape {
-  response?: { status?: unknown; data?: unknown }
-  code?: unknown
-  message?: unknown
-}
-
-/** 从 axios 风格的异常里取 `(status, error_code, message)`。 */
-function readWireError(error: unknown): {
-  status: number | null
-  errorCode: string
-  message: string
-} {
-  if (error instanceof WorkpaperSyncContractError) {
-    return { status: null, errorCode: error.code, message: error.message }
-  }
-  const shape = (error ?? {}) as WireErrorShape
-  const rawStatus = shape.response?.status
-  const status = typeof rawStatus === 'number' && Number.isInteger(rawStatus) ? rawStatus : null
-  const data = shape.response?.data as { detail?: unknown; message?: unknown } | undefined
-  // 🔴 **平台真实响应信封是 `{code, message}`，不是 FastAPI 原生的 `{detail}`**。
-  //
-  // `backend/app/middleware/error_handler.http_exception_handler` 是全局注册的：
-  //     content={"code": exc.status_code, "message": exc.detail}
-  // ⇒ router 用 `HTTPException(detail={"error_code":…, "message":…})` 抛的 domain error，
-  //   到前端是 **`data.message`** 里的对象，**根本没有 `data.detail` 键**。
-  //   真栈实测原文：{"code":500,"message":{"error_code":"excel_extract_identity_carrier_missing",
-  //                                       "message":"entry xlsx/gt-d4-operating-revenue: …"}}
-  //
-  // 此前这里只读 `data.detail` ⇒ `errorCode` 恒空 ⇒ **所有** sync domain error 都落第三桶
-  // （`WP_BRIDGE_LOCAL_FAILURE_CODE` + `unregistered`），于是 `classifySyncFailure` 的全部
-  // 分派（stale identity 三门 / 可重试 / 409·422·403 区分）在生产上从未生效，后端写的中文
-  // 根因整段丢失（用户只看到 axios 的 `Request failed with status code 500`），且 500 被判
-  // 可重试 ⇒ 对确定性失败无意义重试 3 次（真栈实测 materialize 500 ×3）。
-  //
-  // `detail` 仍优先：它更贴近 FastAPI 语义，也覆盖「绕过全局 handler 直接返回原生形状」的场景。
-  // 判据：`__tests__/bridgeFailureRealEnvelope.spec.ts`（既有 22+ 条判据一律 mock `detail`，
-  // 是个生产上不存在的形状 —— 全绿而生产失效，本仓库反复登记的「假绿第①源」）。
-  const detail = data?.detail !== undefined ? data.detail : data?.message
-  let errorCode = ''
-  let message = typeof shape.message === 'string' ? shape.message : ''
-  if (detail !== null && typeof detail === 'object' && !Array.isArray(detail)) {
-    const wire = detail as Record<string, unknown>
-    if (typeof wire.error_code === 'string') errorCode = wire.error_code.trim()
-    if (typeof wire.message === 'string' && wire.message.trim() !== '') {
-      message = wire.message
-    }
-  } else if (typeof detail === 'string' && detail.trim() !== '') {
-    // 统一 404/403 的纯字符串 detail —— 逐字保留不能当 error_code 用。
-    message = detail
-  }
-  return { status, errorCode, message }
-}
-
-/**
- * 归一成 `WorkpaperSyncBridgeError`。**三个互斥分桶，三个互不相同的码。**
- *
- * | 分桶 | 判据 | 码 | 可重试 |
- * |---|---|---|---|
- * | 业务失败 | 响应体带 `detail.error_code` | 服务端原码 | `classifySyncFailure` 裁决 |
- * | scope/授权 | 无码且 403/404（统一响应体是纯字符串） | `WP_BRIDGE_NON_DISCLOSURE_CODE` | 否 |
- * | 本地/传输 | 完全没有码（钩子抛错、断网、超时、5xx 纯文本） | `WP_BRIDGE_LOCAL_FAILURE_CODE` | 无响应或 500/503 时是 |
- *
- * 🔴 第三桶**不能**转交 `classifySyncFailure` —— 它对空 `error_code` 会抛
- * `failure_error_code_missing`。那条拒绝是给「服务端返回业务失败却漏了码」用的判据，
- * 拿它兜住本地钩子抛错会有两个后果：①原始异常被替换成一个看不懂的契约错误，
- * ②`lastError` 根本没来得及被记住，于是 Property 48 的粘性 error 直接失效。
- * 这条正是本任务写判据时打红抓到的真实缺陷。
- */
-export function describeBridgeFailure(stage: string, error: unknown): WorkpaperSyncBridgeError {
-  const wire = readWireError(error)
-  if (wire.errorCode !== '') {
-    const verdict = classifySyncFailure({ httpStatus: wire.status, errorCode: wire.errorCode })
-    return {
-      stage,
-      httpStatus: wire.status,
-      errorCode: wire.errorCode,
-      message: wire.message || WP_BRIDGE_STATE_TEXT.error,
-      verdict,
-      staleIdentity: (WP_SYNC_STALE_IDENTITY_CODES as readonly string[]).includes(wire.errorCode),
-    }
-  }
-  if (wire.status === 404 || wire.status === 403) {
-    return {
-      stage,
-      httpStatus: wire.status,
-      errorCode: WP_BRIDGE_NON_DISCLOSURE_CODE,
-      message: NON_DISCLOSURE_TEXT,
-      verdict: {
-        httpStatus: wire.status,
-        errorCode: WP_BRIDGE_NON_DISCLOSURE_CODE,
-        canEnterEditing: false,
-        retryableOperation: false,
-        canForcesave: false,
-        unregistered: false,
-      },
-      staleIdentity: false,
-    }
-  }
-  // 无响应（本地/网络）或 5xx 纯文本：可重试面沿用 DTO 的登记规则（500/503），
-  // 完全没有响应时按「可重试」处理 —— AC 4.4 明文要求超时/命令失败保持 OO 并允许重试。
-  const retryable = wire.status === null || wire.status === 500 || wire.status === 503
-  return {
-    stage,
-    httpStatus: wire.status,
-    errorCode: WP_BRIDGE_LOCAL_FAILURE_CODE,
-    message: wire.message || WP_BRIDGE_STATE_TEXT.error,
-    verdict: {
-      httpStatus: wire.status,
-      errorCode: WP_BRIDGE_LOCAL_FAILURE_CODE,
-      canEnterEditing: false,
-      retryableOperation: retryable,
-      canForcesave: false,
-      unregistered: true,
-    },
-    staleIdentity: false,
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -356,6 +193,13 @@ export interface WorkpaperSyncBridgeOptions {
 export interface WorkpaperSyncApiSurface {
   createPendingMutation: typeof syncApi.createPendingMutation
   materialize: typeof syncApi.materialize
+  /**
+   * 按需首版（spec d2-online-edit-platform-closure R7）。materialize 报
+   * `materialize_substrate_not_published` 时调一次，成功后整条链路重走一次。
+   *
+   * 可选：既有测试 stub 不提供它时，桥按「没有首版能力」处理（原样报失败），不会调 undefined。
+   */
+  ensureFirstPublication?: typeof syncApi.ensureFirstPublication
   confirmDescriptor: typeof syncApi.confirmDescriptor
   requestForcesave: typeof syncApi.requestForcesave
   /**
@@ -385,6 +229,7 @@ export interface WorkpaperSyncApiSurface {
 const DEFAULT_API: WorkpaperSyncApiSurface = {
   createPendingMutation: syncApi.createPendingMutation,
   materialize: syncApi.materialize,
+  ensureFirstPublication: syncApi.ensureFirstPublication,
   confirmDescriptor: syncApi.confirmDescriptor,
   requestForcesave: syncApi.requestForcesave,
   createCloseIntent: syncApi.createCloseIntent,
@@ -502,6 +347,25 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
   }
 
   /**
+   * 新一轮 HTML → OO 会话（新 room generation）的起点：上一轮的 operation / application
+   * 观测面整体作废。
+   *
+   * 🔴 R18（2026-10-11 真栈实测）：此前只有 `reset()` 清这几项，回表单的两条路
+   * （`reloadAfterApplied` / `leaveWithoutSaving`）都不清 ⇒ 同一页面里「保存 → 回表单 →
+   * 再进在线编辑 → 再保存」时，fence 还记着上一轮的 canonical application，新一轮的
+   * application 必然「不同」⇒ `observeApplicationFence` 判成 superseded/rebase ⇒ 桥落
+   * `refresh_required`，紧接着真实快照 `application_bound` 被拒，界面卡在「在线编辑不可用」
+   * （重药安徽 D2 第二次保存，服务端其实已 applied）。fence 的语义单位是**一个会话**，
+   * 不是一个页面。
+   */
+  function beginSession(): void {
+    requestedOperationId.value = null
+    operation.value = null
+    canonicalApplicationId.value = null
+    applicationEffectiveSequence.value = null
+  }
+
+  /**
    * 请求被去重层取消（切页签竞态，见 `isRequestCanceled`）：这不是失败，是一次被
    * 上层新请求作废的在飞尝试。处理成「干净退回 HTML」——
    *
@@ -550,10 +414,31 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
         `capability=${capabilityOf()} 不支持 OnlyOffice 模式 —— 模式开关不得打开它`,
       )
     }
+    return attemptSwitchToOnlyOffice(true)
+  }
+
+  /**
+   * 一次完整的 HTML → OO 尝试。`allowFirstPublication` 只在**首轮**为 true。
+   *
+   * 🔴 spec d2-online-edit-platform-closure R7：该底稿从未发布过版本时 materialize 必报
+   * `materialize_substrate_not_published`（平台此前只给每个 entry 的一张 canary 底稿发过
+   * 首版，其余企业恒卡在这里）。此时先把状态经 `identity_rejected` 边退回 `html_idle`，
+   * 调一次首版端点，成功后**整条链路重走一次**：首版推进了 revision，旧 pending token
+   * 冻结的 expected_revision 与 projection 都已失效，必须重新 flush。重走仍失败按普通失败
+   * 处理 —— 第二轮 `allowFirstPublication=false`，不会无限重试。
+   */
+  async function attemptSwitchToOnlyOffice(
+    allowFirstPublication: boolean,
+  ): Promise<WorkpaperSyncEditorLaunchDescriptor> {
     beginAttempt()
     apply('flush_started')
+    // 转换已被状态机接受 ⇒ 这是一个新会话（`flush_started` 只从 html_idle / error 出发）。
+    beginSession()
     let flushed: WorkpaperSyncFlushResult
     try {
+      // 🔴 R20：子 Tab 私有防抖里的编辑与在途写入先落库，宿主再读 store-projection。
+      //    宿主的 flushHtml 只管它自己那层防抖（见 pendingWrites.ts）；永不 reject。
+      await flushPendingWrites()
       flushed = await options.flushHtml()
     } catch (error) {
       return fail('flush', error)
@@ -588,6 +473,27 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
         idempotencyKey: pendingKey,
       })
     } catch (error) {
+      const ensureFirstPublication = api.ensureFirstPublication
+      if (
+        allowFirstPublication &&
+        typeof ensureFirstPublication === 'function' &&
+        !isRequestCanceled(error) &&
+        readWireError(error).errorCode === SUBSTRATE_NOT_PUBLISHED_CODE
+      ) {
+        // 本 token 作废（首版会推进 revision）；状态退回 html_idle 后发首版。
+        pendingMutationToken.value = null
+        try {
+          apply('identity_rejected')
+        } catch {
+          // 已不在 in-flight 态：状态不动即可。
+        }
+        try {
+          await ensureFirstPublication(scope())
+        } catch (publishError) {
+          return fail('first_publication', publishError)
+        }
+        return attemptSwitchToOnlyOffice(false)
+      }
       return failIdentityOrSync('materialize', error)
     }
     // pending token 是**单次逻辑消费**（AC 3.1）：materialize 成功即作废本地副本，
@@ -889,6 +795,25 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
       return fail('reload', error)
     }
     apply('reload_completed')
+    // 🔴 R13b（2026-10-11 真栈实测）：回写已落地、人已回到表单 ⇒ 释放这条 participant lease
+    // （与 clean close 同一个端点）。此前这里只清本地 descriptor，服务端 participant 一直
+    // `active` 到 4 小时后的 `expires_at`：重药安徽 room f01c6e40 在 applied + 回表单之后
+    // 仍挂着一个「在线编辑者」。失败**不阻断**回表单 —— 与 `leaveWithoutSaving()` 同一条
+    // 纪律：它是 lease 释放而非内容操作，失败只是退回自然过期。
+    const current = descriptor.value
+    if (current) {
+      try {
+        leaveCallCount.value += 1
+        await api.leaveRoom(scope(), {
+          roomId: current.roomId,
+          participantId: current.participantId,
+          // 显式送出真实 dirty（同 leaveWithoutSaving）：落地后又改过 ⇒ 服务端 dirty 门拒绝释放。
+          dirty: dirty.value,
+        })
+      } catch {
+        // 见上：lease 退回按 expires_at 自然过期，不记 lastError。
+      }
+    }
     descriptor.value = null
     confirmation.value = null
     dirty.value = false

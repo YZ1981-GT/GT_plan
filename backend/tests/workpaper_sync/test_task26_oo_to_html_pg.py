@@ -455,6 +455,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         WorkpaperContentApplicationEvent,
         WorkpaperContentRepresentation,
         WorkpaperContentVersion,
+        WorkpaperForcesaveRequest,
         WorkpaperOoRoom,
         WorkpaperSyncEntryState,
         WorkpaperSyncOperation,
@@ -1040,6 +1041,16 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                         )
                     ).scalar_one()
                 )
+                # D1：request 生命周期的出口（`correlated → terminal/…`）。按 room 取：
+                # 每个场景各建一间 room，所以这里恰是本场景的全部 request。
+                room_requests = (
+                    await s.execute(
+                        sa.select(
+                            WorkpaperForcesaveRequest.state,
+                            WorkpaperForcesaveRequest.finished_at,
+                        ).where(WorkpaperForcesaveRequest.room_id == room_id)
+                    )
+                ).all()
                 app_events = int(
                     (
                         await s.execute(
@@ -1235,6 +1246,13 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                     "app_count_for_wp": app_count,
                     "operation_count": len(ops),
                     "operation_states": sorted(str(o.state) for o in ops),
+                    "operations_finished": sorted(
+                        str(o.state) for o in ops if o.finished_at is not None
+                    ),
+                    "request_states": sorted(str(r.state) for r in room_requests),
+                    "requests_finished": sum(
+                        1 for r in room_requests if r.finished_at is not None
+                    ),
                     "operation_event_count": op_events,
                     "application_event_count": app_events,
                     "content_version_count": versions,
@@ -2481,6 +2499,26 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         except Exception as exc:  # noqa: BLE001
             _phase_failed("adjudication_applied", exc)
 
+        # ═══ S20：application 终态 ⇒ request 终结（D1）════════════════════════
+        # 采集体住 `task26_d1_settlement_world.py`、判据住
+        # `test_task26_d1_request_settlement_pg.py`（本文件已贴行数门禁，按域内先例拆）。
+        try:
+            from types import SimpleNamespace
+
+            from tests.workpaper_sync.task26_d1_settlement_world import collect_settlement
+
+            snap["scenarios"]["settlement"] = await collect_settlement(SimpleNamespace(
+                Session=Session, project=project, user_a=user_a, contract=contract,
+                entry=ENTRY, period=PERIOD, total=TOTAL, err=_err, ooxml=_ooxml,
+                recording_probe=_RecordingProbe, json_adapter=_JsonCarrierAdapter,
+                stage_world=_stage_world, accept_request=_accept_request,
+                seal_incoming=_seal_incoming, correlate=_correlate,
+                coordinator=_coordinator, db_state=_db_state,
+                projection=_projection, carrier_values=_carrier_values,
+            ))
+        except Exception as exc:  # noqa: BLE001
+            _phase_failed("settlement", exc)
+
         return snap
     finally:
         if engine is not None:
@@ -2543,6 +2581,7 @@ class TestHarness:
             "close_capture_stale",
             "close_capture_ok",
             "adjudication_applied",
+            "settlement",
         }
 
 

@@ -403,6 +403,63 @@ export async function materialize(
   return parseEditorLaunchDescriptor(payload)
 }
 
+/** 按需首版的结果（spec d2-online-edit-platform-closure R7）。 */
+export interface FirstPublicationResult {
+  readonly status: 'published' | 'already_published'
+  readonly representationId: string
+  readonly representationGeneration: number
+  readonly contentRevision: number
+}
+
+/**
+ * 该底稿尚无已发布版本时**按需发布首版**；已有则原样返回 `already_published`。
+ *
+ * 只在 materialize 返回 `materialize_substrate_not_published` 时由桥调用一次（见
+ * `useWorkpaperSyncBridge.switchToOnlyOffice`）。写 action：工作流锁定下服务端 403。
+ */
+export async function ensureFirstPublication(
+  scope: WorkpaperSyncEntryScope,
+): Promise<FirstPublicationResult> {
+  const payload = await request({ endpoint: 'ensure_first_publication', scope })
+  const status = payload.status
+  const representationId = payload.representation_id
+  const representationGeneration = payload.representation_generation
+  const contentRevision = payload.content_revision
+  if (status !== 'published' && status !== 'already_published') {
+    refuse(
+      'first_publication_status_invalid',
+      `first-publication.status 非法: ${JSON.stringify(status)}`,
+    )
+  }
+  if (typeof representationId !== 'string' || !isOpaqueUuid(representationId)) {
+    refuse(
+      'first_publication_representation_invalid',
+      `first-publication.representation_id 非法: ${JSON.stringify(representationId)}`,
+    )
+  }
+  if (
+    typeof representationGeneration !== 'number' ||
+    !Number.isInteger(representationGeneration) ||
+    representationGeneration < 1
+  ) {
+    refuse(
+      'first_publication_generation_invalid',
+      `first-publication.representation_generation 非法: ${JSON.stringify(representationGeneration)}`,
+    )
+  }
+  if (
+    typeof contentRevision !== 'number' ||
+    !Number.isInteger(contentRevision) ||
+    contentRevision < 0
+  ) {
+    refuse(
+      'first_publication_revision_invalid',
+      `first-publication.content_revision 非法: ${JSON.stringify(contentRevision)}`,
+    )
+  }
+  return { status, representationId, representationGeneration, contentRevision }
+}
+
 /**
  * `onDocumentReady` 之后的幂等确认。逐项回传 descriptor identity。
  *
@@ -855,10 +912,42 @@ export async function rollbackVersion(
   })
 }
 
+/** 反向收敛（以已发布 substrate 覆盖本 entry 的 HTML store）的输入。 */
+export interface AdoptSubstrateInput {
+  /** true 只算差异不落库（返回完整 Overwrite_Plan）。 */
+  readonly dryRun: boolean
+  /** 执行时必须回传 dry_run 拿到的 `plan_digest`（两侧变化即 409）。 */
+  readonly planDigest?: string
+  /** 执行时的并发保护（与服务端当前 content_revision 不符即 409）。 */
+  readonly expectedRevision?: number
+}
+
+/**
+ * `POST …/adopt-substrate`（spec workpaper-sync-managed-row-convergence /
+ * adopt-overwrite-and-refresh-source）。🔴 破坏性：执行分支覆盖 HTML store。
+ *
+ * 响应体（Overwrite_Plan / 执行结果）由调用方 `RefreshSourceDialog` 解释；本函数只保证
+ * 路径取自生成的路由表（此前该组件手拼 `${prefix}/adopt-substrate`，绕开了本模块的
+ * 第 1 条硬约束，而生成物又恰好漏了这条路由 —— 两处缺口互相掩盖）。
+ */
+export async function adoptSubstrate(
+  scope: WorkpaperSyncEntryScope,
+  input: AdoptSubstrateInput,
+): Promise<Record<string, unknown>> {
+  const body: Record<string, unknown> = { dry_run: input.dryRun }
+  if (!input.dryRun) {
+    body.plan_digest = input.planDigest
+    body.expected_revision = input.expectedRevision
+  }
+  return request({ endpoint: 'adopt_substrate', scope, body })
+}
+
 /** 全部 client method 名 → endpoint 名。判据用它证明「每条路由都有唯一消费方」。 */
 export const WORKPAPER_SYNC_CLIENT_ENDPOINTS = Object.freeze({
+  adoptSubstrate: 'adopt_substrate',
   createPendingMutation: 'create_pending_mutation',
   readStoreProjection: 'read_store_projection',
+  ensureFirstPublication: 'ensure_first_publication',
   materialize: 'materialize',
   confirmDescriptor: 'confirm_descriptor',
   requestForcesave: 'request_forcesave',

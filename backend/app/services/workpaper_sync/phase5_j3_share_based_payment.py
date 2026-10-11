@@ -391,7 +391,7 @@ async def attach_pilot_adapters(
 
 
 def authority_model_payload() -> dict[str, Any]:
-    return HC.authority_model_payload(IDENTITY, managed_row_table_specs())
+    return HC.authority_model_payload(IDENTITY)
 
 
 @dataclass(frozen=True, slots=True)
@@ -406,7 +406,10 @@ class Phase5Definitions:
 
 async def publish_definitions(publisher: Any) -> Phase5Definitions:
     return await HC.publish_definitions_for(
-        IDENTITY, managed_row_table_specs(), publisher=publisher,
+        IDENTITY,
+        managed_row_table_specs(),
+        publisher=publisher,
+        contract_payload_builder=build_contract_payload,
     )
 
 

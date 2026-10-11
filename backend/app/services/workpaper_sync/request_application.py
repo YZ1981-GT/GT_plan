@@ -840,6 +840,7 @@ class RequestApplicationService:
         if req_state not in _REQ_TERMINAL:
             assert_transition("request", req_state, RequestState.terminal)
             req.state = RequestState.terminal.value
+            req.finished_at = req.finished_at or datetime.now(timezone.utc)
 
         await self._session.flush()
 

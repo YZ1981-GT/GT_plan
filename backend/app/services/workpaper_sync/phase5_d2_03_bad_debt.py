@@ -636,6 +636,7 @@ def merge_projection_into_d23_stores(
     *,
     projection: Any,
     base_states: Mapping[str, Any] | None,
+    skeleton_baseline: Any = None,
 ) -> tuple[dict[str, list[dict[str, Any]]], int, int, set[str]]:
     """把 extract projection 合回三个 store 键的行数组。
 
@@ -646,9 +647,27 @@ def merge_projection_into_d23_stores(
     组合区回写时，行的归属键由 base_state 里该 rowId 原本所在的键决定（保留 category 归属），
     新行（base 无）默认落 aging 键（前端会以正确 category 覆盖）。summary 行不在投影里故不回写。
 
+    🔴 R12（spec d2-online-edit-platform-closure）：两区的**模板骨架行**
+    （单项区 `GTROW-D23IND-0013..0016`、组合区 `GTROW-D23CMB-0018..0021`，首行带模板文字
+    「其中：」）在 store 为空的企业上**每次** OO 保存都会被读回来。base 里没有、且可编辑格与
+    模板原值一致的骨架行**跳过** —— 此前组合区这一行因无 category 信号必抛
+    `StorePayloadError`，整次镜像失败（OO 侧已落库的编辑永远进不了 HTML）；单项区则会把
+    「其中：」当子行写进 HTML。用户在模板空行里填了内容的骨架行**不跳过**：单项区照常建行，
+    组合区仍按原 fail-closed 规则判归属（不猜 category）。`skeleton_baseline` 缺省取 D2
+    权威模板现算的基线（判据见 `template_skeleton_baseline` 模块）。
+
     返回 (merged_by_store, applied, visited, touched_rows)。
     merged_by_store: {store_item_id: [row, ...]}，只含 dynamic 业务行（summary 由前端 computed）。
     """
+    from app.services.workpaper_sync.template_skeleton_baseline import (
+        pure_template_skeleton_rows,
+    )
+
+    if skeleton_baseline is None:
+        # 懒导入：pilot 模块本身懒导入本模块，顶层互引会成环。
+        from app.services.workpaper_sync import pilot_d2_large_json as _pilot
+
+        skeleton_baseline = _pilot.template_skeleton_baseline
     base = dict(base_states) if isinstance(base_states, Mapping) else {}
 
     def _base_rows(store_id: str) -> list[dict[str, Any]]:
@@ -693,6 +712,21 @@ def merge_projection_into_d23_stores(
 
     ind_prefix = f"{ROWS_TABLE_KEY_INDIVIDUAL}/"
     cmb_prefix = f"{ROWS_TABLE_KEY_COMBINED}/"
+
+    # 🔴 R12：base 里没有、纯模板原样的骨架行（两区各算一份；base 判据跨三个 store 键）。
+    _base_ids = set(rid_to_store)
+    template_rows_ind = pure_template_skeleton_rows(
+        projection,
+        table_key=ROWS_TABLE_KEY_INDIVIDUAL,
+        base_identities=_base_ids,
+        baseline=skeleton_baseline,
+    )
+    template_rows_cmb = pure_template_skeleton_rows(
+        projection,
+        table_key=ROWS_TABLE_KEY_COMBINED,
+        base_identities=_base_ids,
+        baseline=skeleton_baseline,
+    )
 
     # 🔴 P1-3：category → store 键（组合区分流权威）。
     _CAT_TO_STORE = {"aging": STORE_ITEM_ID_AGING, "customer-type": STORE_ITEM_ID_CUSTOMER}
@@ -746,8 +780,12 @@ def merge_projection_into_d23_stores(
         if store_key is None:
             continue
         if sk.startswith(ind_prefix):
+            if rid in template_rows_ind:
+                continue
             target_store = STORE_ITEM_ID_INDIVIDUAL
         elif sk.startswith(cmb_prefix):
+            if rid in template_rows_cmb:
+                continue  # 必须排在 _combined_target 之前：模板行本就没有 category 信号
             target_store = _combined_target(rid)
         else:
             continue

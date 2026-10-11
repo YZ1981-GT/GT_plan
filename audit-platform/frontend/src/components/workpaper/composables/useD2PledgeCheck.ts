@@ -17,6 +17,7 @@ import { ref, computed, watch, inject, onBeforeUnmount, type ComputedRef } from 
 import { parseNum, calculatePledgeRatio } from './useD2FormulaEngine'
 import type { UseD2BaseOptions } from './useD2Adjudication'
 import { D2_SAVE_ITEMS_KEY, type D2SaveItemsFn } from './d2InjectionKeys'
+import { registerPendingFlusher } from '../sync/pendingWrites'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -351,6 +352,17 @@ export function useD2PledgeCheck(options: UseD2BaseOptions) {
   }
 
   // ─── Lifecycle ─────────────────────────────────────────────────────────
+
+  // 🔴 R20（spec d2-online-edit-platform-closure）：切「在线编辑」前桥统一 flushPendingWrites()。
+  //    防抖窗口里的编辑必须立即落库，否则宿主读到旧 store（见 sync/pendingWrites.ts）；
+  //    语义与下面卸载时那段相同，写出口经宿主的 d2SaveItems 追踪在途。
+  registerPendingFlusher(() => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
+      flushSave()
+    }
+  })
 
   onBeforeUnmount(() => {
     if (debounceTimer) {

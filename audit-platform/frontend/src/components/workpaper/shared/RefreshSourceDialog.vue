@@ -12,7 +12,8 @@
      （复用 Requirement 5.7 / Task 10.3 的禁用态语义）。
 
   🔴 数字全部取自 dry_run 响应字段，前端不自行重算（Requirement 5.3 / Property 12）。
-  🔴 http.post 已由 utils/http 拦截器解信封（response.data = envelope.data）⇒ 直接读业务字段。
+  🔴 请求经 workpaperSyncApi.adoptSubstrate（路径取自生成的路由表）；信封由 utils/http 拦截器
+     解一次（response.data = envelope.data），client 返回的就是业务字段。
 -->
 <template>
   <el-dialog
@@ -93,8 +94,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import http from '@/utils/http'
-import { WP_SYNC_USER_PREFIX_TEMPLATE } from '@/components/workpaper/sync/workpaperSyncContract.generated'
+import { adoptSubstrate } from '@/components/workpaper/sync/workpaperSyncApi'
 
 /**
  * 逐 item delta（取自 dry_run 响应 deltas[]）。字段名与后端 `_plan_wire_form` 逐字一致。
@@ -151,13 +151,12 @@ const overwriteDisabledReason = computed(() => {
   return ''
 })
 
-/** 拼 adopt-substrate URL。🔴 entry_id 含 `/`，Starlette `:path` 转换器接收，不得 percent-encode。 */
-function adoptUrl(): string {
-  const base = WP_SYNC_USER_PREFIX_TEMPLATE
-    .replace('{project_id}', props.projectId)
-    .replace('{wp_id}', props.wpId)
-    .replace('{entry_id}', String(props.entryId))
-  return `${base}/adopt-substrate`
+/**
+ * adopt-substrate 的显式 scope。路径由 `workpaperSyncApi.adoptSubstrate` 从**生成的路由表**
+ * 拼（entry_id 含 `/`，逐段编码、分隔符原样 —— Starlette `:path` 转换器接收）。
+ */
+function adoptScope() {
+  return { projectId: props.projectId, wpId: props.wpId, entryId: String(props.entryId) }
 }
 
 function errorCodeOf(e: any): string {
@@ -174,8 +173,8 @@ async function loadDryRun(): Promise<void> {
   if (!props.entryId) return
   loading.value = true
   try {
-    const { data } = await http.post(adoptUrl(), { dry_run: true })
-    plan.value = data as OverwritePlanWire
+    const data = await adoptSubstrate(adoptScope(), { dryRun: true })
+    plan.value = data as unknown as OverwritePlanWire
   } catch (e: any) {
     const code = errorCodeOf(e)
     if (code === 'adopt_substrate_not_published') {
@@ -216,10 +215,10 @@ async function onChooseOverwrite(): Promise<void> {
   }
   acting.value = true
   try {
-    const { data } = await http.post(adoptUrl(), {
-      dry_run: false,
-      plan_digest: plan.value.plan_digest,
-      expected_revision: plan.value.expected_revision,
+    const data = await adoptSubstrate(adoptScope(), {
+      dryRun: false,
+      planDigest: plan.value.plan_digest,
+      expectedRevision: plan.value.expected_revision,
     })
     // 🔴 提示实际增删条数：取自执行响应，不复用 dry_run 的数（Requirement 5.10）。
     const changed = (data as any)?.changed_item_count ?? 0

@@ -1530,6 +1530,122 @@ describe('forcesave 之后宿主自行推进 operation 直到落地', () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
+// 10c. 「保存并回到表单模式」的后半句：落地后宿主自己回表单（R13c）并释放 lease（R13b）
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('保存并回到表单模式：落地后自动回表单', () => {
+  /**
+   * 🔴 2026-10-11 真栈实测：点「保存并回到表单模式」，operation 早已 applied、宿主也显示
+   * 「结构化回写完成」，却一直停在编辑器里，外层「同步中…」不消失（applied 在桥的 in-flight
+   * 集合里，等的就是重载），用户只能再点一次「结构化视图」；且那次重载不 leave ⇒ participant
+   * 在服务端一直 active 到 4 小时后过期。
+   */
+  const APPLIED = () =>
+    snapshot({
+      state: 'applied',
+      shape: 'primary',
+      applicationId: UUID(9),
+      resultRevision: 12,
+      durableAt: '2026-10-11T00:00:00Z',
+      terminal: true,
+    })
+  const leaveRoom = () =>
+    vi.fn(async () => ({
+      participant_id: UUID(22),
+      state: 'left',
+      replayed: false,
+      left_at: '2026-10-11T00:00:02+00:00',
+      remaining_active_editors: 0,
+      room_state: 'active',
+    }))
+
+  it('落地后短暂停留即回表单，并释放这条 participant lease', async () => {
+    vi.useFakeTimers()
+    try {
+      const h = harness({ getOperation: vi.fn(async () => APPLIED()), leaveRoom: leaveRoom() })
+      const { wrapper, descriptor } = await openEditor(h)
+      await hostApi(wrapper).forceSave()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(h.bridge.state.value).toBe('applied')
+      expect(status(wrapper).text, '落地那一刻先让人看见「结构化回写完成」').toBe(
+        WP_BRIDGE_STATE_TEXT.applied,
+      )
+
+      await vi.advanceTimersByTimeAsync(1_500)
+      expect(h.bridge.mode.value, '按钮写着「回到表单模式」，落地后必须真的回去').toBe('html')
+      expect(h.bridge.state.value).toBe('html_idle')
+      const leave = (h.api as unknown as { leaveRoom: { mock: { calls: unknown[][] } } }).leaveRoom
+      expect(leave.mock.calls, '回表单必须释放 lease，否则 participant 挂 4 小时').toHaveLength(1)
+      expect(leave.mock.calls[0][1]).toEqual({
+        roomId: descriptor.roomId,
+        participantId: descriptor.participantId,
+        dirty: false,
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('落地后编辑器里又有新改动 ⇒ 留在编辑器里，绝不替用户丢编辑', async () => {
+    vi.useFakeTimers()
+    try {
+      const h = harness({ getOperation: vi.fn(async () => APPLIED()), leaveRoom: leaveRoom() })
+      const { wrapper } = await openEditor(h)
+      await hostApi(wrapper).forceSave()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(h.bridge.state.value).toBe('applied')
+      lastEditor().events.onDocumentStateChange({ data: true })
+      await vi.advanceTimersByTimeAsync(1_500)
+      expect(h.bridge.mode.value).toBe('oo')
+      expect(h.bridge.state.value).toBe('applied')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('冲突终态不自动回表单（要人逐项裁决）', async () => {
+    vi.useFakeTimers()
+    try {
+      const h = harness({
+        getOperation: vi.fn(async () =>
+          snapshot({
+            state: 'conflict',
+            shape: 'primary',
+            applicationId: UUID(9),
+            conflictCount: 2,
+            durableAt: '2026-10-11T00:00:00Z',
+            terminal: true,
+          }),
+        ),
+        leaveRoom: leaveRoom(),
+      })
+      const { wrapper } = await openEditor(h)
+      await hostApi(wrapper).forceSave()
+      await vi.advanceTimersByTimeAsync(1_500)
+      expect(h.bridge.state.value).toBe('conflict')
+      expect(h.bridge.mode.value).toBe('oo')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('卸载后不再回调（定时器随宿主一起停）', async () => {
+    vi.useFakeTimers()
+    try {
+      const h = harness({ getOperation: vi.fn(async () => APPLIED()), leaveRoom: leaveRoom() })
+      const { wrapper } = await openEditor(h)
+      await hostApi(wrapper).forceSave()
+      await vi.advanceTimersByTimeAsync(0)
+      wrapper.unmount()
+      await vi.advanceTimersByTimeAsync(1_500)
+      expect(h.bridge.state.value, '宿主已卸载却仍替它重载').toBe('applied')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
 // 11. 正面判决：声明的每个 prop / emit 都被真的驱动过
 // ═══════════════════════════════════════════════════════════════════════════
 

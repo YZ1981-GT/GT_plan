@@ -156,6 +156,12 @@ inclusion: always
 - 🔴 **tasks.md 假红**（与假绿对偶）：交付物早在库、清单没勾。实测 H 系列 9 个 provider 全已跟踪（h9 还在 golden 门内），而 4 个 h spec 的 tasks 是 0/24、0/20、0/18、0/18；`workpaper-sync-managed-row-convergence` 的 Task 11/12/13 声称要做的事现算全部已存在（`stale_rows`/`stale_cleared`/`stale_deleted` 各 17/12/26 次命中）。⇒ 只登记勘误**不代勾**（勾选要跑它自己的全部 AC）。
 - 🔴 **脏工作树 + 多会话并发下的两个新坑**：①`--amend` 前必须核对 HEAD 仍是自己那一个 —— 我 amend 时并发会话已提交，结果改掉了**别人的提交**（已用 `git reset --soft <他们的 sha>` 原样复原，SHA 与树均不变）②**现算会在动手过程中过期** —— 我算出 d567 `2/23` / 16 模块未跟踪，`git add` 时它们已「不是未跟踪」（并发会话把 d567 做到 23/23 并推送），一度误判成 gitignore 排除，查 `check-ignore` 才发现是 HEAD 前移。
 
+### D2 在线编辑平台闭环 `d2-online-edit-platform-closure`（2026-10-10~11，R1~R21；和平药房 + 重药安徽 OO↔HTML 往返浏览器实测通过）
+- 全部平台级、全企业共用：注册链崩溃 / 单数 instrumentation / 缺兄弟 binding / 跨表传播误报 / generation 撞死 room / 无运行时首版（R1~R7）+ 验收期 14 条：R10 OO 重算浮点尾差按分比较 · R11/R12 镜像硬取属性与模板骨架行 · R13 已确认代际换代 · R13b/c 落地自动回表单 + 释放 lease · R14 请求期按目标底稿绑 adapter · R15/R16 注册缓存指纹按 bundle（store-projection 38.75s→257ms、apply 38.8s→15.4s）· R17 OO 清空写显式 null · R18 会话起点重置围栏 · R19（代码里叫 D1）application 终态同事务结算 request（真库滞留 68 条经正式工具结算）· R20 平台 `sync/pendingWrites` + 桥在 flushHtml 前统一等待 · R21 补读 catch
+- 🔴 勘误：「参考 representation 重发布即全企业生效」是错的（R14：entry 级注册冻结的是第一家企业的行身份清册）
+- 🔴 教训：①进程内 exec 替换模块的变异对「已持有原类引用」的协调器无效（PG 层「全绿」是假象）⇒ 跨模块变异一律磁盘注入 + 逐字节恢复 ②子 Tab 私有防抖宿主 flushHtml 够不着 ⇒ 2 秒内切在线编辑丢编辑且随后被 OO 保存覆盖；其余循环 108 个同形写入方冻结在 `pendingWritesCoverageRatchet.spec.ts`（接入一处删一条）③行数门 8 处超限：2 处原样拆出、6 处 whitelist 登记理由 + 拆分轴
+- 提交须知：新模块（cleared_field_view / first_publication_on_demand / request_settlement / target_bound_registration / template_skeleton_baseline / 两个测试 world / 前端 pendingWrites / workpaperSyncBridgeFailure）+ 4 个 definition_store blob 必须同一次提交；未修清单见 design §7.5
+
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
 

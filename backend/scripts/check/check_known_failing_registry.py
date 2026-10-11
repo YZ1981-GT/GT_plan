@@ -63,21 +63,167 @@ _DEFAULT_K = "d1 or template_override or multi_trip or row_shift or check_"
 #: 首见 commit 记的是「确认它已存在」的那个点，不是「它被引入」的那个点 —— 后者需要
 #: 二分查找，成本与收益不匹配；前者足以支撑「不是我引入的」这个判断。
 KNOWN_FAILING: dict[str, tuple[str, str, str]] = {
-    # ── 别 lane：G 循环兄弟表位移 ──────────────────────────────────────────
+    # ══ 2026-10-10 补登 21 条（spec d2-online-edit-platform-closure 回归归因）══════
+    #
+    # 归因方法：在 `git worktree add --detach HEAD`（5914e315b，不含本 spec 任何改动）上
+    # 用**同一口径**跑本门的 pytest，与主工作树逐条比对 junit：这 21 条在 HEAD 上同样红、
+    # 失败消息同因（仅归档 spec 路径前缀随检出目录不同），本 spec 新增红 0。
+    # 下面按根因分组；首见 commit 一律记 HEAD 5914e315b（确认存在点），已查到的
+    # 引入提交写在原因里。
+    #
+    # ── 归档 spec 后路径失效（FileNotFoundError / setup 断言）──────────────────
+    "tests/workpaper_sync/test_d1_05_single_html_adjudication.py"
+    "::TestDecisionIsStillSingleHtml::test_verdict_file_says_single_html": (
+        "d1-sync-row-table-engine-and-d1-coverage",
+        "5914e315b",
+        "spec 已于 a6f8158b8 归档到 _archive/31-…，fixture 仍读旧路径 evidence/"
+        "task27-d1-5-single-html-adjudication.json ⇒ FileNotFoundError（setup ERROR）",
+    ),
+    "tests/workpaper_sync/test_d1_05_single_html_adjudication.py"
+    "::TestSamePatternAsD44Precedent::test_headers_match_d4_4_verdict_verbatim": (
+        "d1-sync-row-table-engine-and-d1-coverage",
+        "5914e315b",
+        "同 test_verdict_file_says_single_html：归档后 evidence 旧路径失效",
+    ),
+    "tests/workpaper_sync/test_d1_05_single_html_adjudication.py"
+    "::TestSamePatternAsD44Precedent::test_both_verdicts_agree_on_single_html": (
+        "d1-sync-row-table-engine-and-d1-coverage",
+        "5914e315b",
+        "同 test_verdict_file_says_single_html：归档后 evidence 旧路径失效",
+    ),
+    "tests/workpaper_sync/test_task61_first_published_representation_bootstrap.py"
+    "::TestEvidenceLedgerIsRealAndComplete::test_every_check_passed_and_nothing_failed": (
+        "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+        "5914e315b",
+        "总纲 spec 已于 239eb9a89 归档，fixture 仍读旧路径 evidence/task61-oo94-word-"
+        "pilot-gate/first_published_representation_bootstrap.json ⇒ setup 断言失败",
+    ),
+    "tests/workpaper_sync/test_task61_oo94_word_pilot_gate.py"
+    "::TestBindingConstraintIsMeasured"
+    "::test_the_registry_coverage_check_rejects_an_empty_constraint_list": (
+        "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+        "5914e315b",
+        "门禁 read_task_body() 读总纲 tasks.md 旧路径（239eb9a89 已归档）⇒ FileNotFoundError",
+    ),
+    "tests/workpaper_sync/test_task62_generic_docx_entries.py"
+    "::TestGeneratorIsIdempotentAndCheckIsStrict::test_check_matches_the_file_on_disk": (
+        "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+        "5914e315b",
+        "生成器 requirement_7_7_declared() 读总纲 requirements.md 旧路径（239eb9a89 已归档）"
+        " ⇒ Task62GeneratorError",
+    ),
+    # ── 真库数据：重药安徽 entry pointer 被删 ──────────────────────────────
+    #    项目 0ec33ac9 下 18 个 (wp, entry) 有 representation 却无
+    #    `working_paper_sync_entry_state` 行；pg_stat 显示该表自 2026-10-09 15:20（PG 重启、
+    #    统计清零）以来恰有 18 次已提交删除，本 spec design.md（10-10 22:43 写）的现算
+    #    「71 个 entry 有 entry_state」已是删后状态。仓库代码无删除该表的路径（FK 为
+    #    RESTRICT，无级联）⇒ 是一次库外/一次性操作。未擅自回填（选哪条 representation
+    #    当 current 需要归属方裁决）。
+    "tests/workpaper_sync/test_d1_full_book_gate_open_pg.py"
+    "::test_published_representation_exists_with_real_adapter": (
+        "d1-sync-row-table-engine-and-d1-coverage",
+        "5914e315b",
+        "真库 wp 68c7740e 的 D1 entry pointer 行缺失 ⇒ EntryPointerMissingError（setup ERROR）；"
+        "9 条 representation 仍在",
+    ),
+    "tests/workpaper_sync/test_d1_full_book_gate_open_pg.py"
+    "::test_gate_is_open_frozen_hash_matches_recomputed": (
+        "d1-sync-row-table-engine-and-d1-coverage",
+        "5914e315b",
+        "同 test_published_representation_exists_with_real_adapter（同一 module fixture）",
+    ),
+    "tests/workpaper_sync/test_d1_full_book_gate_open_pg.py"
+    "::test_root_cause_was_missing_plural_instrumentation_entry": (
+        "d1-sync-row-table-engine-and-d1-coverage",
+        "5914e315b",
+        "同 test_published_representation_exists_with_real_adapter（同一 module fixture）",
+    ),
+    "tests/workpaper_sync/test_d1_full_book_gate_open_pg.py"
+    "::test_error_message_omits_frozen_inventory_size": (
+        "d1-sync-row-table-engine-and-d1-coverage",
+        "5914e315b",
+        "同 test_published_representation_exists_with_real_adapter（同一 module fixture）",
+    ),
+    # ── f1 签名统一后两道门的「f1 特例」判据失效 ─────────────────────────────
+    #    5cb7ebe70 把 f1 `build_store_projection` 的 `store_item_id` 从首位位置参数改成
+    #    KEYWORD_ONLY（带默认值）⇒ golden digest 不再 SKIP f1、分派分组里首位位置参数组变空。
+    #    两条判据本身就写明「分组一变本条会红，届时应连带简化门里的分派分支」。
+    "tests/scripts/test_check_staged_tree_self_consistency.py"
+    "::test_expected_skips_are_still_actually_skipped": (
+        "f1-sync-coverage-and-first-canary",
+        "5914e315b",
+        "_EXPECTED_SKIPS 登记的 golden digest「[SKIP] f1」已不再出现（5cb7ebe70 统一了 f1 签名）",
+    ),
+    "tests/scripts/test_check_sync_provider_golden_digest.py"
+    "::test_store_item_id_dispatch_keys_on_parameter_kind_not_name": (
+        "f1-sync-coverage-and-first-canary",
+        "5914e315b",
+        "首位位置参数是 store_item_id 的 provider 现算 [] ≠ ['f1']（5cb7ebe70 统一了 f1 签名）",
+    ),
+    # ── 冻结计数被别 lane 的提交改变 ───────────────────────────────────────
+    "tests/scripts/test_check_store_item_two_way_parity.py"
+    "::test_baseline_is_exactly_thirteen_with_owning_lanes": (
+        "workpaper-sync-store-item-parity",
+        "5914e315b",
+        "8edf1d45a 加 F2/F4 parity 棘轮后 KNOWN_UNWIRED 现为 15 条，自测仍断言 == 13",
+    ),
+    "tests/workpaper_sync/test_task57_abcs_and_shared_migration.py"
+    "::TestFormDifferences::test_ad1_scope_arithmetic_closes": (
+        "abcs-cycle-sync-migration",
+        "5914e315b",
+        "全量 manifest 的 xlsx 独立 entry 现算 138 ≠ slice 冻结 136（manifest 于 "
+        "4750bde7d / 5cb7ebe70 / 5fbe5de29 / c0713ac80 多次变动）",
+    ),
+    "tests/workpaper_sync/test_task54_l_cycle_migration.py"
+    "::TestLCycleFormDifferences::test_ld1_carrier_three_way_split_is_real_and_exclusive": (
+        "l-cycle-sync-foundation-and-first-canary",
+        "5914e315b",
+        "共享载体现算 L1~L8 共 8 个，冻结判据只允许 L1/L2（26e5ef994 L3~L8 真双向改线后载体归并）",
+    ),
+    "tests/workpaper_sync/test_task55_m_cycle_migration.py"
+    "::TestMCycleFormDifferences::test_md1_twin_pairing_is_exclusive_and_exhaustive": (
+        "m-cycle-sync-foundation-and-first-canary",
+        "5914e315b",
+        "orphan composable 现算 12 ≠ 冻结 11 − 已删 2（M 域新增 useM*DualMode 载体）",
+    ),
     "tests/workpaper_sync/test_sibling_table_ref_row_shift.py"
-    "::test_all_multi_region_sheets_shift_sibling_table_refs[余额明细表G5-2]": (
-        "g-cycle-single-region-detail-lanes",
-        "e3dd25a0d",
-        "G5-2 兄弟表引用未随行位移；G 循环 lane 工作区",
+    "::test_all_multi_region_sheets_shift_sibling_table_refs[审定表F3-1]": (
+        "f-cycle-sync-coverage",
+        "5914e315b",
+        "F3-1 上区 GT_F31_SLOT_ROWS 末行 +1 恰为下区首行（9 = 9），「下方兄弟区」前提不成立；"
+        "F3 provider 末次改动 5cb7ebe70",
+    ),
+    "tests/workpaper_sync/test_n_lane3_json_table_identity.py"
+    "::TestLane3TemplateDefects::test_a1_reverse_denominators"
+    "[加计扣除研发费用情况明细表N5-6-1-E12-=C12+N5-^=C(\\d+)\\+D\\1$-37]": (
+        "n2-n5-json-table-identity-and-cross-entry-readonly",
+        "5914e315b",
+        "scripts.analyze.n_cycle_scanner 无 load_workbook 属性 ⇒ AttributeError（扫描器与测试不同步）",
+    ),
+    # ── 权威模板目录：别 lane 已提交模板改动，账本 / 登记未跟上 ──────────────────
+    "tests/workpaper_sync/test_template_override_resolution.py"
+    "::TestProperty3AuthoritativeFrozen::test_index_size_drift_is_registered_not_growing": (
+        "template-index-drift-ledger",
+        "5914e315b",
+        "35 份权威模板的 size_kb 与 _index.json 漂移且未登记进 INDEX_DRIFT_LEDGER"
+        "（各循环模板净化提交，如 c0713ac80）",
+    ),
+    "tests/workpaper_sync/test_template_override_resolution.py"
+    "::TestTask24ScopeBoundary::test_authoritative_directory_has_no_uncommitted_changes": (
+        "template-index-drift-ledger",
+        "5914e315b",
+        "KNOWN_DIRTY_AUTHORITATIVE_PATHS 里的 M10 登记已失效（该模板改动已于 0a9600db9 提交）"
+        " ⇒ 反向断言 stale",
+    ),
+    "tests/scripts/test_check_template_index_drift_ledger.py::test_ledger_matches_现算": (
+        "template-index-drift-ledger",
+        "5914e315b",
+        "账本与现算不符 5 条：G4 / H2 / H3 / H8 / M10（别 lane 已提交模板改动）",
     ),
     # ── 别 lane：生成物 stale（生成器 --check 与磁盘文件不一致）─────────────
-    "tests/workpaper_sync/test_task31_frontend_contract.py"
-    "::test_check_mode_agrees_with_the_stored_artifact": (
-        "workpaper-sync-frontend-contract",
-        "e3dd25a0d",
-        "workpaperSyncContract.generated.ts 过期（routes=19 现算 vs 磁盘）；"
-        "需跑 generate_workpaper_sync_frontend_contract.py --apply",
-    ),
+    #    2026-10-10 复核：task66 现在的失败形态是读总纲 tasks.md 旧路径的 FileNotFoundError
+    #    （与上面「归档 spec 后路径失效」同根因）；task67 现为 EntrySourceFactError
+    #    （`xlsx/d4/analysis/d4-tab-customer-price` 不在 Task 2 红基线里）。登记不变。
     "tests/workpaper_sync/test_task64_dedicated_word_chain.py"
     "::TestGeneratorContract::test_generator_check_is_idempotent": (
         "workpaper-sync-dedicated-word-chain",
@@ -118,6 +264,18 @@ KNOWN_FAILING: dict[str, tuple[str, str, str]] = {
         "同一辅助函数 _plan_from_trips 的 NameError（同 cross_trip_chain_prefix）",
     ),
     # ── 曾经在册、已移除 ─────────────────────────────────────────────────
+    # `test_sibling_table_ref_row_shift.py::test_all_multi_region_sheets_shift_sibling_table_refs
+    #  [余额明细表G5-2]`（g-cycle-single-region-detail-lanes，首见 e3dd25a0d）
+    #
+    # 2026-10-10 本门报僵尸：HEAD 5914e315b 干净检出与主工作树上都已转绿（G 循环 lane 的
+    # 提交修好了，非 d2-online-edit-platform-closure 的改动所致）。按棘轮要求删除。
+    #
+    # `test_task31_frontend_contract.py::test_check_mode_agrees_with_the_stored_artifact`
+    #
+    # 2026-10-10 spec d2-online-edit-platform-closure 重生成前端契约后转绿（生成物此前漏
+    # `adopt_substrate` 路由；本 spec 新增 `ensure_first_publication` 路由与
+    # `room_not_writable: 409`，三处一并落盘，`--check` 返回 0）。
+    #
     # `test_workbook_row_change_wiring.py::TestPropagationOrderInApply
     #  ::test_propagation_follows_row_shift`
     #

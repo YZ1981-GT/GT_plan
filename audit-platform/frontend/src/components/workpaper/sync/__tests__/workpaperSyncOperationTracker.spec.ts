@@ -186,6 +186,28 @@ describe('按 operation / revision 去重', () => {
     await Promise.resolve()
     expect(h.poll.mock.calls.length).toBe(pollsAfterStart + 1)
   })
+
+  it('事件触发的补读被取消 / 失败不得变成未捕获 rejection（2026-10-11 D2 真栈：控制台「未捕获Promise」）', async () => {
+    const h = harness()
+    await h.tracker.start()
+    const unhandled: unknown[] = []
+    const onUnhandled = (reason: unknown) => {
+      unhandled.push(reason)
+    }
+    process.on('unhandledRejection', onUnhandled)
+    try {
+      h.poll.mockRejectedValueOnce(Object.assign(new Error('canceled'), { code: 'ERR_CANCELED' }))
+      h.tracker.handleContentUpdate({ wp_id: UUID(102), revision: 13 })
+      h.poll.mockRejectedValueOnce(new Error('network'))
+      h.tracker.handleContentUpdate({ note: '缺 wp_id / revision 的事件走另一条补读分支' })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    } finally {
+      process.off('unhandledRejection', onUnhandled)
+    }
+    expect(h.poll).toHaveBeenCalledTimes(3)
+    expect(unhandled).toEqual([])
+  })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════

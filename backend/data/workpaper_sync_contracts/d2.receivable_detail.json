@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "46f3c617175503757310f97e953a5c4d6e8e4c007e210949902500c5c452e694",
+  "instrumentation_definition_sha256": "9e88e86b67ff11ceae71045bd2a68c3e50f4c9570958f88e79bec33f7153ce90",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d2-accounts-receivable",

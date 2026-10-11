@@ -487,6 +487,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         "candidate": {},
         "operations": {},
         "stale_fence": {},
+        "retired": {},
     }
 
     def _phase_failed(name: str, exc: BaseException) -> None:
@@ -1527,6 +1528,9 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                     != (snap["descriptor"] or {}).get("content_version_id")
                 ),
                 "reuse_verdict": new_outcome.reuse_verdict.as_dict(),
+                # R13（spec d2-online-edit-platform-closure）：阶段 6 已在阶段 5 那间 room 上
+                # 确认过编辑器 ⇒ 这次新内容提交必须落到新代际（判据见下方同名测试）。
+                "representation_generation": new_outcome.representation_generation,
             }
             # 8d. 世界已经前进之后再拿老 token 重放 ⇒ 不得下发陈旧 descriptor
             before = await _pointers()
@@ -1966,13 +1970,36 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         # fence 单调提升，提上去之后**无法**还原，而它一提升，之后任何走到 room/lease 的
         # materialize 都会被拒。前面所有需要「fence 未变」的场景都已跑完。
         try:
+            # 🔴 提升 fence 的目标 = **下一次 commit 会落进的那一代**的 room。
+            #
+            #    spec d2-online-edit-platform-closure 根因 5 修复后，新 content version 沿用
+            #    entry pointer 的代际（阶段 10 finalize 之后为 gen 2；阶段 10 的多代际复用已在
+            #    gen 2 开 room 并 join 了本用户的 lease）。修复前 commit 恒取 gen 1，本阶段因此
+            #    硬编码 `room_id_ok`（gen 1）—— 而「升级后的业务提交被拉回旧代际」正是根因 5。
+            #    判据本身不变：被复用的那间 room fence 已提升 ⇒ 旧 lease 拿不到 descriptor。
+            fence_pointer = await _pointers()
+            async with Session() as s:
+                fence_room = (
+                    await s.execute(
+                        sa.text(
+                            "SELECT id FROM working_paper_oo_room WHERE wp_id = :w "
+                            "AND entry_id = :e AND generation = :g"
+                        ),
+                        {"w": wp, "e": ENTRY, "g": fence_pointer["current_generation"]},
+                    )
+                ).scalar_one_or_none()
+            if fence_room is None:
+                raise _HarnessError(
+                    f"当前代际 gen {fence_pointer['current_generation']} 没有 room —— "
+                    "本阶段的前提（复用一间 fence 已提升的 room）不成立"
+                )
             async with Session() as s:
                 await s.execute(
                     sa.text(
                         "UPDATE working_paper_oo_room SET write_fence_epoch = "
                         "write_fence_epoch + 1 WHERE id = :r"
                     ),
-                    {"r": room_id_ok},
+                    {"r": fence_room},
                 )
                 await s.commit()
             # 用**新内容**再走一次完整 materialize：这样才会走到 room/lease 那一步
@@ -2013,6 +2040,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                         )
                     ).scalar_one()
             snap["stale_fence"] = {
+                "fence_room_generation": int(fence_pointer["current_generation"]),
                 "refusal": None if stale is None else type(stale).__name__,
                 "status": (
                     None if stale is None else MC.classify_materialize_rejection(stale)
@@ -2026,6 +2054,31 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
             }
         except Exception as exc:  # noqa: BLE001
             _phase_failed("stale_fence", exc)
+
+        # ═══ 阶段 13：当前代际的 room 不可复用（spec d2-online-edit-platform-closure R5/R6）══
+        #
+        # 13a 终态 room + 内容未改 ⇒ materialize 自己换代（同 content version、revision 不变）
+        # 13b 终态 room + 内容已改 ⇒ commit 直接落在新代际（不先落死代再换）
+        # 13c 非终态拒绝（refresh-required）⇒ 不换代、409 透出
+        #
+        # 必须排在阶段 12 之后：本阶段逐个把当前代际的 room 作废。
+        # 采集体住 `task25_room_generation_world.py`、判据住
+        # `test_task25_room_generation_reuse_pg.py`（本文件在行数门禁 whitelist 上，按 task26 先例拆）。
+        try:
+            from types import SimpleNamespace
+
+            from tests.workpaper_sync.task25_room_generation_world import (
+                collect_retired_generation_cases,
+            )
+
+            await collect_retired_generation_cases(SimpleNamespace(
+                Session=Session, wp=wp, entry=ENTRY, snap=snap, pointers=_pointers,
+                flush=_flush, coordinator=_coordinator, request=_request,
+                projection=_projection, phase_failed=_phase_failed,
+                json_adapter=_JsonCarrierAdapter, harness_error=_HarnessError,
+            ))
+        except Exception as exc:  # noqa: BLE001
+            _phase_failed("retired", exc)
 
     except Exception as exc:  # noqa: BLE001 - 采集顶层也不穿透
         _phase_failed("bootstrap", exc)
@@ -2084,6 +2137,7 @@ def test_every_scenario_produced_a_measurement(snap: dict[str, Any]) -> None:
     assert set(snap["candidate"]) == {
         "blocks_materialize", "finalize", "multi_generation_reuse"
     }
+    assert set(snap["retired"]) == {"same_content", "new_content", "refresh_required"}
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -2611,6 +2665,10 @@ def test_stale_lease_after_a_fence_bump_cannot_get_a_descriptor(
     旧 lease 等于让一个可能已失权的会话继续写 —— 必须在**发 descriptor 之前**就拒。
     """
     row = snap["stale_fence"]
+    # 前提：被提升 fence 的是**升级后**的当前代际（阶段 10 finalize ⇒ gen ≥ 2）。
+    # 这一条同时守住根因 5：若新 content version 被拉回 gen 1，materialize 会复用
+    # fence 未变的 gen-1 room ⇒ 照发 descriptor ⇒ 下面的拒绝断言打红。
+    assert row["fence_room_generation"] >= 2, row
     assert row["refusal"] == "MaterializeAuthorizationError", row
     assert row["status"] == 403, row
     assert row["descriptors_issued"] == 0, "陈旧 lease 竟然拿到了 descriptor"
@@ -2679,8 +2737,11 @@ def test_reuse_on_a_multi_generation_version_picks_the_current_pointer(
     assert row["business_identity_reused"] is True, row
     assert row["revision_delta"] == 0, row
     assert row["representation_id"] == row["current_pointer"], row
-    assert row["representation_generation"] == 2, row
-    assert row["descriptor_generation"] == 2, row
+    # 「现在那一代」= finalize 之后 pointer 所在代际。不写死数字：R13 起，确认过编辑器的
+    # 代际不再接新内容（阶段 8c 因此换过一次代），代际编号随之整体后移，判据意图不变。
+    pointer_generation = snap["candidate"]["finalize"]["generation_after"]
+    assert row["representation_generation"] == pointer_generation, row
+    assert row["descriptor_generation"] == pointer_generation, row
 
 
 # ─────────────────────────────────────────────────────────────────────────

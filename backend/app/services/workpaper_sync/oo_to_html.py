@@ -131,6 +131,7 @@ from app.services.workpaper_sync.adapters.base import (
     assert_substrate_usable,
 )
 from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
+from app.services.workpaper_sync.cleared_field_view import store_view_with_cleared_fields
 from app.services.workpaper_sync.conflicts import (
     ConflictSet,
     ResolutionChoice,
@@ -171,11 +172,15 @@ from app.services.workpaper_sync.models import (
     classify_operation_shape,
     compute_contributor_snapshot_digest,
     is_digest,
+    is_terminal,
 )
 from app.services.workpaper_sync.repository import WorkpaperSyncRepository
 from app.services.workpaper_sync.request_application import (
     CanonicalRead,
     RequestApplicationService,
+)
+from app.services.workpaper_sync.request_settlement import (
+    settle_requests_of_terminal_application,
 )
 from app.services.workpaper_sync.resolution import (
     CanonicalResolutionService,
@@ -2611,7 +2616,12 @@ class OoToHtmlCoordinator:
 
         # Store-backed entry：content_version 已前进，但 HTML 宿主仍读 checklist_responses。
         # 不镜像则 §9.6 DOM 永远看不到 OO 受管格回写（G4-0d D2 / G4-1 H1 实证）。
-        await self._mirror_store_backed_if_needed(state, merged_projection=merged)
+        # R17：OO 清空的格在 merged 里是「键缺失」而 store 镜像只遍历存在的键 ⇒ 交给镜像的是
+        # 补了显式 null 的**视图**（发布的 projection 不变），否则清空丢失、并被下次 HTML 冲刷回滚。
+        store_view, _cleared = store_view_with_cleared_fields(
+            merged, merge=state.merge, contract=state.contract
+        )
+        await self._mirror_store_backed_if_needed(state, merged_projection=store_view)
 
         await self._assert_incoming_untouched(state)
         await self._settle_baseline(state, receipt=receipt)
@@ -3122,6 +3132,12 @@ class OoToHtmlCoordinator:
 
         `from_state == to_state` 时直接返回：retry 会重走 `extracting → merging`，
         而 `APPLICATION_EDGES` 里没有自环边 —— 那不是「非法转换」，只是「已经在那儿」。
+
+        落**终态**时同事务终结绑在它上面的 request（applied / refresh_required ⇒
+        `terminal`，authorization_stale ⇒ `authorization_stale`）。放在这个唯一写入点而
+        不是各终态分支各调一次：本协调器所有 application 状态都经这里写，新增一条终态
+        路径时不会漏掉 request —— 漏掉的后果是 request 永远停在 `correlated`，initiator
+        保存成功后仍离不开房间（离开恒 409 `participant_leave_refused_in_flight`）。
         """
         current = ApplicationState(app.state)
         if current is to_state:
@@ -3139,6 +3155,8 @@ class OoToHtmlCoordinator:
         )
         app.state = to_state.value
         await self._session.flush()
+        if is_terminal("application", to_state):
+            await settle_requests_of_terminal_application(self._repo, app)
 
     async def _advance_operation(
         self,
@@ -3179,6 +3197,11 @@ class OoToHtmlCoordinator:
             effective_request_sequence=int(state.frozen.effective_request_sequence),
         )
         op.state = to_state.value
+        # 终态写完成时刻（与 HTML→OO 的 `materialize_coordinator` 同口径）。此前本路径从不写
+        # 它 ⇒ operation 快照里 applied 的 `operation_finished_at` 恒为 null。`error` 不是终态
+        # （可重试），不写。
+        if is_terminal("operation", to_state) and op.finished_at is None:
+            op.finished_at = _now()
         await self._session.flush()
 
     async def _assert_incoming_untouched(self, state: _ApplyState) -> None:

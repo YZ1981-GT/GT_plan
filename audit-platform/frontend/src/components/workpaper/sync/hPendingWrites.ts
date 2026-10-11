@@ -30,65 +30,18 @@
  *
  * 登记走 `onScopeDispose` 自动注销 —— Tab 卸载后不会留下悬挂的 flusher
  * （留了会在下次切换时对已销毁的实例调用，报 `Cannot read properties of null`）。
+ *
+ * ═══ 2026-10-11 起本文件只是别名（spec d2-online-edit-platform-closure R20）═══════
+ *
+ * 同一个缺陷在 D 循环的子 Tab 上原样复现（`useD2Detail` 的私有 2s 防抖 ⇒ 改格后 2 秒内点
+ * 在线编辑，store-projection 读到旧值，随后被 OO 保存覆盖）。注册表因此上提为平台模块
+ * `./pendingWrites`，并由双向桥在**每次** `flushHtml` 之前统一调用。这里保留 H 的名字，
+ * 指向**同一张**注册表 —— H5/H7 的登记与宿主里的 `flushHPendingWrites()` 调用一行不用改。
  */
-import { onScopeDispose } from 'vue'
-
-/** 防抖型载体的 flush 函数（调用即「清防抖 + 落库 + await 到写完」）。 */
-export type HPendingFlusher = () => Promise<void>
-
-const _flushers = new Set<HPendingFlusher>()
-const _inFlight = new Set<Promise<unknown>>()
-
-/**
- * 登记一个防抖型载体的 flush 函数（H5 的 `useH5FormData` 用）。
- *
- * 在 composable 内调用；当前 effect scope 销毁时自动注销。
- */
-export function registerHPendingFlusher(flush: HPendingFlusher): void {
-  _flushers.add(flush)
-  onScopeDispose(() => {
-    _flushers.delete(flush)
-  })
-}
-
-/**
- * 追踪一次**立即写入**的 promise（H7 的 Tab `persist()` 用）。
- *
- * 用法是把原本 `void persist(...)` 改成 `trackHPendingWrite(persist(...))` ——
- * 返回同一个 promise，调用方的写法不变，只是桥这边多了一个 await 点。
- *
- * 🔴 失败不吞也不抛：写入失败由调用方自己的 catch 报（Tab 里已有）；这里只负责
- * 「不让 `flushHPendingWrites()` 因为一次失败的写入而整体 reject」——
- * 否则一个 500 会把切换按钮变成死键。
- */
-export function trackHPendingWrite<T>(promise: Promise<T>): Promise<T> {
-  const settled = promise.catch(() => undefined)
-  _inFlight.add(settled)
-  void settled.finally(() => {
-    _inFlight.delete(settled)
-  })
-  return promise
-}
-
-/**
- * 等所有已登记的待写盘完成 —— 宿主双向桥 `flushHtml` 的第一步。
- *
- * 用户要求的「点保存后切换要丝滑」在这条路径上成立：无待写盘 ⇒ 本函数是零请求空转，
- * 切换耗时只剩桥的 materialize。未保存才在这里付出一次 PUT。
- *
- * 🔴 两族都要走：只 await in-flight 会漏掉 H5 还在防抖窗口里的那批；
- * 只调 flusher 会漏掉 H7 已发出但未返回的那次。
- */
-export async function flushHPendingWrites(): Promise<void> {
-  // 先 flush 防抖型：它会产生新的写入 promise，这些 promise 自己会 await 完
-  await Promise.all([..._flushers].map((f) => f().catch(() => undefined)))
-  // 再等所有在途写入（含上一步新产生的）
-  while (_inFlight.size > 0) {
-    await Promise.all([..._inFlight])
-  }
-}
-
-/** 仅供测试：当前登记数（生产代码不要依赖）。 */
-export function _hPendingWriteCounts(): { flushers: number; inFlight: number } {
-  return { flushers: _flushers.size, inFlight: _inFlight.size }
-}
+export {
+  _pendingWriteCounts as _hPendingWriteCounts,
+  flushPendingWrites as flushHPendingWrites,
+  registerPendingFlusher as registerHPendingFlusher,
+  trackPendingWrite as trackHPendingWrite,
+  type PendingWriteFlusher as HPendingFlusher,
+} from './pendingWrites'

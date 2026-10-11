@@ -817,6 +817,54 @@ _REQUEST_ALLOWED_ROOM_STATES: Final[frozenset[RoomState]] = frozenset(
     {RoomState.active, RoomState.close_barrier}
 )
 
+#: 同 generation 可被 :meth:`RoomService.open_or_reuse_room` **复用**的 room 状态。
+_REUSABLE_ROOM_STATES: Final[frozenset[RoomState]] = frozenset(
+    {RoomState.opening, RoomState.active, RoomState.close_barrier}
+)
+
+#: 终态 room：`ROOM_EDGES` 里无出边，永不再接受任何 request；而 `uq_wpoor_generation`
+#: 使这一代永不可重建 ⇒ 这一代的唯一出路是**换代**（新 representation generation）。
+RETIRED_ROOM_STATES: Final[frozenset[RoomState]] = frozenset(
+    {RoomState.superseded, RoomState.closed}
+)
+
+
+def room_generation_reuse_refusal(room: WorkpaperOoRoom) -> str | None:
+    """这间 room 能否被同 generation 复用：不能时返回拒绝原因，能则 ``None``。
+
+    「同一代还能不能开」的**唯一**判据。两个消费方必须同口径：
+
+    * :meth:`RoomService.open_or_reuse_room` —— 拒绝原因原样作为
+      :class:`RoomNotWritableError` 的消息；
+    * ``ContentMutationService._next_generation_probe`` —— 发布新 content version 时据此
+      决定能否沿用当前代际。两处各写一份的后果不是「重复」：commit 认为能用、open 认为
+      不能用 ⇒ 新代际一发布就是死代（spec d2-online-edit-platform-closure 根因 5）。
+    """
+    generation = int(room.generation)
+    state = RoomState(room.state)
+    if state not in _REUSABLE_ROOM_STATES:
+        return (
+            f"generation {generation} 的 room 已处于 {state.value}，且唯一约束 "
+            "uq_wpoor_generation 禁止同代际重建 —— 必须先 finalize 新的 "
+            "representation generation 再开 room（AC 2.8）"
+        )
+    if room.refresh_required_at is not None:
+        return (
+            f"generation {generation} 的 room 处于 refresh-required"
+            f"（reason={room.refresh_reason!r}），必须旋转 generation 后重开"
+        )
+    return None
+
+
+def room_generation_is_retired(room: WorkpaperOoRoom) -> bool:
+    """这一代 room 是否已终结（:data:`RETIRED_ROOM_STATES`）。
+
+    与 :func:`room_generation_reuse_refusal` 的区别：refresh-required / closing /
+    recovery-required 也会被拒绝复用，但它们**不是**终态 —— 可能仍有未终结的 request、
+    待恢复的 durable incoming。只有终态才能不碰旧 room、直接换代。
+    """
+    return RoomState(room.state) in RETIRED_ROOM_STATES
+
 #: 允许发起普通 forcesave 的 participant 状态。
 #:
 #: `closing` 在内，同上：intent 创建时 participant 已被原子转成 `closing`，但它仍要
@@ -827,7 +875,10 @@ _REQUEST_ALLOWED_PARTICIPANT_STATES: Final[frozenset[ParticipantState]] = frozen
 
 #: 「未终结」request 的状态 —— 还可能收到 callback 的四态。
 #:
-#: `correlated` 也在内：incoming 已 durable 但内容尚未应用（AC 4.7）。
+#: `correlated` 也在内：incoming 已 durable 但内容尚未应用（AC 4.7）。它的**出边**由
+#: `WorkpaperSyncRepository.settle_requests_of_terminal_application` 在 application 落终态的
+#: 同一事务里写（映射见 `models.REQUEST_STATE_FOR_TERMINAL_APPLICATION`）；没有那一步，保存
+#: 成功的 initiator 会被下面的 in-flight 门永远拦在房间里。
 #:
 #: 🔴 **单源**：撤销时要取消它们（:meth:`RoomService._cancel_outstanding_requests_locked`），
 #: participant 主动离开时要据它拒绝（:meth:`RoomService._outstanding_request_ids_of`）。
@@ -1070,18 +1121,9 @@ class RoomService:
             )
         ).scalar_one_or_none()
         if existing is not None:
-            state = RoomState(existing.state)
-            if state not in {RoomState.opening, RoomState.active, RoomState.close_barrier}:
-                raise RoomNotWritableError(
-                    f"generation {generation} 的 room 已处于 {state.value}，且唯一约束 "
-                    "uq_wpoor_generation 禁止同代际重建 —— 必须先 finalize 新的 "
-                    "representation generation 再开 room（AC 2.8）"
-                )
-            if existing.refresh_required_at is not None:
-                raise RoomNotWritableError(
-                    f"generation {generation} 的 room 处于 refresh-required"
-                    f"（reason={existing.refresh_reason!r}），必须旋转 generation 后重开"
-                )
+            refusal = room_generation_reuse_refusal(existing)
+            if refusal is not None:
+                raise RoomNotWritableError(refusal)
             # 🔴 复用一间仍处于 live 状态（opening/active/close_barrier）但 lease 已过期的 room：
             #    重新接纳编辑者等于重启这间房的可用窗口，必须续租 `expires_at`，否则
             #    materialize/confirm-descriptor 都能过、唯独 forcesave 被
@@ -2283,9 +2325,11 @@ class RoomService:
             .all()
         )
         cancelled: list[uuid.UUID] = []
+        now = _now()
         for row in rows:
             assert_transition("request", row.state, RequestState.superseded)
             row.state = RequestState.superseded.value
+            row.finished_at = row.finished_at or now
             cancelled.append(row.id)
         if cancelled:
             await self._session.flush()
@@ -2369,6 +2413,9 @@ __all__ = [
     "ParticipantDirtyLeaveError",
     "ParticipantLeaveInFlightError",
     "revocation_policy",
+    "RETIRED_ROOM_STATES",
+    "room_generation_reuse_refusal",
+    "room_generation_is_retired",
     "derive_doc_key",
     "parse_doc_key",
     "doc_key_matches",

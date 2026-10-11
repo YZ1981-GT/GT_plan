@@ -695,6 +695,25 @@ TERMINAL_STATES: Final[Mapping[str, frozenset]] = {
     for name, edges in STATE_MACHINES.items()
 }
 
+#: application 落终态时，绑在它上面的 request 同事务落的终态（单源）。
+#:
+#: `correlated` 的语义是「incoming 已 durable、内容尚未应用」（见 `rooms._OPEN_REQUEST_STATES`）。
+#: application 一旦落终态，「尚未应用」就不再成立；但此前全仓**没有任何生产代码**写
+#: `correlated → terminal` 这条边，而 participant 主动离开（in-flight 门）、close barrier 的
+#: predecessor 计数、editor destroy 闸三处都以「request 已终结」为前提 ⇒ 保存成功后永远等不到
+#: （真库：重药安徽 3 次 applied 的 forcesave 全停在 `correlated`，离开恒 409）。守卫里 4 处用
+#: 裸 `UPDATE … SET state='terminal'` 模拟这一步，恰好盖住了生产侧的缺口。
+#:
+#: 键集合必须**恰等于** `TERMINAL_STATES["application"]`（守卫逐项比对）：新增一个 application
+#: 终态而这里没跟上时，结算方法 fail visible，而不是静默留下一个永远 open 的 request。
+#: `conflict` / `error` 刻意不在内 —— 它们不是终态，裁决 / 重试仍可能把内容应用上去。
+REQUEST_STATE_FOR_TERMINAL_APPLICATION: Final[Mapping[ApplicationState, RequestState]] = {
+    ApplicationState.applied: RequestState.terminal,
+    ApplicationState.refresh_required: RequestState.terminal,
+    ApplicationState.superseded: RequestState.superseded,
+    ApplicationState.authorization_stale: RequestState.authorization_stale,
+}
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 3. 异常（fail-visible；禁 except Exception 降级）
@@ -1463,6 +1482,7 @@ __all__ = [
     "REQUEST_EDGES", "ROOM_EDGES", "PARTICIPANT_EDGES", "CLOSE_INTENT_EDGES",
     "RECOVERY_CASE_EDGES", "DELIVERY_EDGES", "CANDIDATE_EDGES",
     "PENDING_MUTATION_EDGES", "INCOMING_ARTIFACT_EDGES",
+    "REQUEST_STATE_FOR_TERMINAL_APPLICATION",
     "assert_transition", "is_terminal",
     # shapes / ownership / fold
     "OperationScope", "classify_operation_shape", "assert_direct_primary",

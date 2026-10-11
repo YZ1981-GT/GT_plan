@@ -283,6 +283,7 @@ import { useD2CrossSheet } from './composables/useD2CrossSheet'
 // 2026-09-10: DEC-10 解除后迁统一路径。`useD2SyncBridge` + `/d2-sync/*` 仍保留
 // 至 ONLYOFFICE_VERIFIED（DEC-08），但本宿主不再调用它们。
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { trackPendingWrite } from './sync/pendingWrites'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
@@ -578,7 +579,9 @@ provide('d2OpenVersionHistory', openVersionHistory)
 async function d2SaveItems(items: ChecklistResponse[]): Promise<void> {
   if (!Array.isArray(items) || items.length === 0) return
   try {
-    await formData.saveItemsFromEvent(items)
+    // 🔴 R20：登记在途写入 —— 全部 D2 子 Tab 的保存都经这里（注入或 window 事件），桥切
+    //    「在线编辑」前的 flushPendingWrites() 据此等它写完，再让 flushHtml 读 store-projection。
+    await trackPendingWrite(formData.saveItemsFromEvent(items))
     scheduleAutoSnapshot()
     emit('save')
   } catch {

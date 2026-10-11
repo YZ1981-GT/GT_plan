@@ -132,7 +132,6 @@ from app.services.workpaper_sync.outbox import DurableEventOutboxService, Pendin
 from app.services.workpaper_sync.repository import WorkpaperSyncRepository
 from app.services.workpaper_sync.representations import (
     assert_bundle_snapshot_finalizable,
-    next_representation_generation,
 )
 from app.services.workpaper_sync.resolution import (
     CanonicalResolutionService,
@@ -1895,23 +1894,75 @@ class ContentMutationService:
         )
 
     async def _next_generation_probe(self, plan: ContentCommitPlan) -> int:
-        """新 content version 的首个 generation。
+        """新 content version 的首个 generation（发布文件名与 representation 行同源）。
 
-        默认恒为 1（`uq_wpcr_generation` 按 content version 分组）。G7/D4 canary 例外：
-        OnlyOffice 按 ``doc_key`` 缓存文档；``doc_key`` 只随 representation generation
-        轮转。若本 entry 上一代 room 曾以 ``-82`` 卡在 ``opening``，或已 ``superseded``
-        而 ``uq_wpoor_generation`` 禁止同代际重建，同 generation 复用会永远失败。
-        因此取 entry 全局 max(rep, room)+1，让下一次 commit 换 key / 开新 room。
+        ``uq_wpoor_generation (wp_id, entry_id, generation)`` 是 **entry 全局**的：一个代际
+        至多一间 room，终结后永不可重建。所以这里选的不是「第几个 representation」，而是
+        「能开 room 的代际」。
+
+        * **G7/D4 canary**：无条件取 entry 全局 ``max(rep, room)+1``（每次 commit 换
+          ``doc_key``）。OnlyOffice 按 ``doc_key`` 缓存文档；它们的上一代 room 曾以
+          ``-82`` 卡在 ``opening``，同代复用会让 OO 继续吃旧缓存。行为不变。
+        * **其余 entry**（spec d2-online-edit-platform-closure 根因 5）：候选代际 = 当前
+          entry pointer 的代际（无 pointer 时为 1）。候选代际的 room **不存在或可复用**
+          ⇒ 沿用它（协同用户仍进同一间 room，AC 2.8）；room **拒绝复用** ⇒ 取
+          ``max(rep, room)+1``，新代际上必然没有 room。
+
+          旧实现恒返回 1。D2 09-26 升过定义（pointer 到 gen 2），gen 1 的 room 早已
+          ``superseded`` ⇒ 之后任何业务提交都把 pointer 拉回 gen 1 ⇒ 点在线编辑恒
+          ``room_not_writable``。
+
+          🔴 R13（同 spec，验收期发现）：**不随编辑会话**的提交（``plan.room_id is None``：
+          HTML→OO 物化 / 首版 / 运维重物化）若候选代际的 room **已被编辑器确认打开过**
+          （``client_confirmed_base_version_id`` 非空），一律换代。理由与上面 G7/D4 分支
+          同一条 —— OnlyOffice 按 ``doc_key`` 缓存文档：新内容沿用旧 ``doc_key``，下一位
+          进来的编辑器看到的是缓存里的旧文档，而 descriptor 记的基线却是新内容 ⇒ 下一次
+          保存会把 HTML 侧的改动当成「OO 侧改回去了」静默覆盖。真栈形态（和平药房 D2）：
+          OO 保存后回表单 → 再点在线编辑 ⇒ 物化提交落在同一代 ⇒ 同一用户的 lease 被复用，
+          而它的 client-confirmation 钉在上一会话的基线上 ⇒ confirm-descriptor 恒 422。
+          **随会话**的提交（OO→HTML，``plan.room_id`` 有值）照旧沿用：会话里的文档就是它。
+
+        「能否复用」与 :meth:`RoomService.open_or_reuse_room` 用**同一个**判据
+        （:func:`room_generation_reuse_refusal`），不在这里另写一份。
         """
+        from app.models.workpaper_sync_models import (
+            WorkpaperContentRepresentation,
+            WorkpaperOoRoom,
+            WorkpaperSyncEntryState,
+        )
+
         if str(plan.entry_id) not in {
             "xlsx/gt-g7-long-term-equity-main",
             "xlsx/gt-d4-operating-revenue",
         }:
-            return 1
-        from app.models.workpaper_sync_models import (
-            WorkpaperContentRepresentation,
-            WorkpaperOoRoom,
-        )
+            from app.services.workpaper_sync.rooms import room_generation_reuse_refusal
+
+            pointer_generation = (
+                await self._session.execute(
+                    sa.select(WorkpaperSyncEntryState.representation_generation).where(
+                        WorkpaperSyncEntryState.wp_id == plan.wp_id,
+                        WorkpaperSyncEntryState.entry_id == str(plan.entry_id),
+                    )
+                )
+            ).scalar_one_or_none()
+            candidate = int(pointer_generation or 1)
+            candidate_room = (
+                await self._session.execute(
+                    sa.select(WorkpaperOoRoom).where(
+                        WorkpaperOoRoom.wp_id == plan.wp_id,
+                        WorkpaperOoRoom.entry_id == str(plan.entry_id),
+                        WorkpaperOoRoom.generation == candidate,
+                    )
+                )
+            ).scalar_one_or_none()
+            if candidate_room is None or (
+                room_generation_reuse_refusal(candidate_room) is None
+                and (
+                    plan.room_id is not None
+                    or candidate_room.client_confirmed_base_version_id is None
+                )
+            ):
+                return candidate
 
         max_rep = (
             await self._session.execute(
@@ -2046,23 +2097,14 @@ class ContentMutationService:
             await witness.stamp(self._session, "content_version")
 
             # ④ 兼容 representation（**同一次** commit，不是第二次）
-            if str(plan.entry_id) in {
-                "xlsx/gt-g7-long-term-equity-main",
-                # D4 canary：superseded gen-1 room + uq_wpoor_generation 禁止同代际重建；
-                # 若 content_commit 仍从 1 起，materialize 会永久 room_not_writable。
-                "xlsx/gt-d4-operating-revenue",
-            }:
-                # G7：doc_key 随 generation 轮转；按 content version 从 1 起会与
-                # 仍卡在 opening 的同 entry room 撞 key，OO 继续吃 -82 缓存。
-                # D4：同理，entry 全局 max(rep, room)+1 才能在 supersede 后开新 room。
-                generation = await self._next_generation_probe(plan)
-            else:
-                generation = await next_representation_generation(
-                    self._session,
-                    wp_id=plan.wp_id,
-                    entry_id=plan.entry_id,
-                    content_version_id=version.id,
-                )
+            #
+            # 🔴 generation 一律走 `_next_generation_probe`（发布文件名用的也是它 ⇒ 文件名与
+            #    representation 行的代际同源）。此前非 G7/D4 走 `next_representation_generation`
+            #    —— 新 content version 下恒为 1，而 room 的唯一约束是 entry 全局的：gen 1 的
+            #    room 一旦终结，之后每次业务提交都把 pointer 拉回一个死代际（根因 5）。
+            #    「同一 content version 内的下一代」（definition upgrade / 换代旋转）不走这里，
+            #    仍由各自路径按 content version 分组取号。
+            generation = await self._next_generation_probe(plan)
             representation = await self._repo.create_representation(
                 project_id=plan.project_id,
                 wp_id=plan.wp_id,

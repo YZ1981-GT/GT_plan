@@ -1962,6 +1962,69 @@ def _normalise_structure_element(
             node.text = _normalise_a1(node.text)
 
 
+def _open_sheet_part(
+    zf: zipfile.ZipFile, part: str, *, part_bytes: bytes | None
+) -> Any:
+    """打开受管 sheet part：给了 ``part_bytes`` 就读它（传播逆替换后的字节），否则读 zip。
+
+    只服务于 :func:`_managed_sheet_cell_digest` / :func:`_sheet_structure_digest` 两处，
+    让「按声明逆替换后的文本」与「原始字节」走**同一条** iterparse 口径，而不是再抄一份
+    digest 逻辑。
+    """
+    if part_bytes is not None:
+        return io.BytesIO(part_bytes)
+    return zf.open(part, "r")
+
+
+def _propagated_managed_sheet_bytes(
+    zf: zipfile.ZipFile,
+    part: str,
+    *,
+    propagation: Any | None,
+    row_shift: RowChangeCarrier | None,
+    limits: SyncLimits,
+) -> bytes | None:
+    """兄弟受管 sheet 被工作簿级传播**按声明**改写了跨表引用时，逆替换回改前口径的字节。
+
+    spec d2-online-edit-platform-closure R4。真栈形态：D2-2 明细表插行 ⇒ 传播把
+    审定表D2-1 上的 `SUMIF('明细表D2-2'!$AI$13:$AI$25,…)` 改成 `…$754`。D2-1 本身是
+    受管 sheet（静态区 binding），所以它**不在** `other_sheet_parts` 桶里，那一桶已有的
+    传播归一化碰不到它；而它的单元格 digest 只认自身 `row_shift`（恒 None）⇒ 9 格
+    「声明内的合法改写」被判 `managed_sheet_unmanaged_cells` 漂移，发布与 materialize
+    恒失败。
+
+    三个条件**同时**成立才归一化，否则返回 ``None``（行为与本 spec 之前逐字节相同）：
+
+    1. ``row_shift is None`` —— 有自身行变更的 sheet 走位移归一化（R4.3），两套归一化
+       不叠加；
+    2. 本 part 不是计划的受管 sheet（自限定引用在计划阶段就已被拒绝，见
+       ``build_delete_plan`` 的 ``self_qualified`` 分支）；
+    3. 声明里**确有** ``part == 本 part`` 的条目 —— 没声明就不碰。
+
+    🔴 归一化的单一真源仍是 `normalise_propagated_part`：只把声明的 ``ref_after`` 逐条
+    换回 ``ref_before``，声明之外的任何字节（值 / 样式索引 ``s`` / 别的公式）原样留下
+    ⇒ 照旧判漂移。逆替换处数**不在这里对账**：受管格可能被 materialize 改写，处数与
+    声明天然不等；「声明的改动真的发生了」由写盘时的 `assert_matches_plan` 把关。
+    与 :func:`_propagation_normalised_digest` 同一口径。
+    """
+    if propagation is None or row_shift is not None:
+        return None
+    if part == getattr(propagation, "managed_sheet_part", None):
+        return None
+    if not any(entry.part == part for entry in propagation.propagations):
+        return None
+    from app.services.workpaper_sync.excel_workbook_row_change import (
+        normalise_propagated_part,
+    )
+
+    raw = b"".join(_iter_zip_chunks(zf, part, limits=limits))
+    # "replace" 是 fail-closed：before 侧按原始字节解析，替换字符只会让 digest 不等。
+    normalised, _reverted = normalise_propagated_part(
+        raw.decode("utf-8", "replace"), propagation, part=part
+    )
+    return normalised.encode("utf-8")
+
+
 def _managed_sheet_cell_digest(
     zf: zipfile.ZipFile,
     part: str,
@@ -1969,6 +2032,7 @@ def _managed_sheet_cell_digest(
     managed: frozenset[str],
     row_shift: RowChangeCarrier | None = None,
     total_formula_rows: Sequence[int] = (),
+    part_bytes: bytes | None = None,
 ) -> tuple[str, int]:
     """受管 sheet 上**非受管**单元格的 digest（流式 iterparse，逐格喂 hash）。
 
@@ -1989,12 +2053,15 @@ def _managed_sheet_cell_digest(
        归一化救不了「值被改了」「样式被改了」「公式被改了」。
 
     `row_shift=None` 时行为与本 spec 之前**逐字节相同**（纯增量，Requirement 6.4）。
+
+    ``part_bytes``：已按传播声明逆替换的 part 字节（见
+    :func:`_propagated_managed_sheet_bytes`）；``None`` 时读 zip 原始字节。
     """
     digest = hashlib.sha256()
     counted = 0
     inserted = frozenset(row_shift.inserted_rows) if row_shift is not None else frozenset()
     total_rows = frozenset(int(row) for row in total_formula_rows)
-    with zf.open(part, "r") as src:
+    with _open_sheet_part(zf, part, part_bytes=part_bytes) as src:
         for event, element in ET.iterparse(src, events=("end",)):
             if not element.tag.endswith("}c") and element.tag != "c":
                 continue
@@ -2052,6 +2119,7 @@ def _sheet_structure_digest(
     *,
     row_shift: RowChangeCarrier | None = None,
     collapse_rows: frozenset[int] = frozenset(),
+    part_bytes: bytes | None = None,
 ) -> tuple[str, int]:
     """受管 sheet 的结构块（merge / cols / 数据验证 / 条件格式 / 保护 / …）digest。
 
@@ -2060,10 +2128,12 @@ def _sheet_structure_digest(
 
     `collapse_rows` 用于 **before 侧**的对称排除：删行时端点塌陷不可逆
     （见 :data:`COLLAPSED_ENDPOINT_SENTINEL`），before 侧不做行号归一化、只做排除。
+
+    ``part_bytes`` 与 :func:`_managed_sheet_cell_digest` 同义（传播逆替换后的字节）。
     """
     digest = hashlib.sha256()
     found = 0
-    with zf.open(part, "r") as src:
+    with _open_sheet_part(zf, part, part_bytes=part_bytes) as src:
         for event, element in ET.iterparse(src, events=("end",)):
             tag = element.tag.rsplit("}", 1)[-1]
             if tag in _SHEET_STRUCTURE_BLOCKS:
@@ -2216,7 +2286,9 @@ def unmanaged_region_digest(
 
     `propagation`（`WorkbookRowChangePlan`）非空时对 **`other_sheet_parts`** 桶里被
     传播触及的 part 做 **propagation-aware 归一化**：按计划**声明**的条目逐条逆替换回
-    改前口径。同样只给 after 侧。
+    改前口径。同样只给 after 侧。本 binding 的受管 sheet 自身若**无自身行变更**、却被
+    别的受管 sheet 的传播改写了跨表引用（D2-1 引用 D2-2），两个 ``managed_sheet_*``
+    aspect 也按同一份声明逆替换（见 :func:`_propagated_managed_sheet_bytes`）。
 
     🔴 没有这个参数时，工作簿级传播会让引用侧 sheet 的字节变化被判成漂移 —— 那不是
     「安全的保守」，而是让传播功能**永远无法通过验证**。而归一化必须按**声明**做，
@@ -2245,12 +2317,23 @@ def unmanaged_region_digest(
         aspects: dict[str, str] = {}
         coverage: dict[str, int] = {}
 
+        # 兄弟受管 sheet 的跨表引用传播（R4）：按声明逆替换后的字节，两个 managed_sheet_*
+        # aspect 共用同一份。不满足条件时为 None ⇒ 两处照旧读 zip 原始字节。
+        propagated_sheet = _propagated_managed_sheet_bytes(
+            zf,
+            region.sheet_part,
+            propagation=propagation,
+            row_shift=row_shift,
+            limits=lim,
+        )
+
         cell_digest, cell_count = _managed_sheet_cell_digest(
             zf,
             region.sheet_part,
             managed=managed_coords,
             row_shift=row_shift,
             total_formula_rows=total_formula_rows,
+            part_bytes=propagated_sheet,
         )
         aspects["managed_sheet_unmanaged_cells"] = cell_digest
         coverage["managed_sheet_unmanaged_cells"] = cell_count
@@ -2260,6 +2343,7 @@ def unmanaged_region_digest(
             region.sheet_part,
             row_shift=row_shift,
             collapse_rows=structure_collapse_rows,
+            part_bytes=propagated_sheet,
         )
         aspects["managed_sheet_structure"] = struct_digest
         coverage["managed_sheet_structure"] = struct_count

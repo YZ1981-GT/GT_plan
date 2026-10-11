@@ -341,8 +341,10 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         id="M24", side="be", path=CM, kind="replace",
-        anchor="            generation = await next_representation_generation(",
-        new="            generation = 0 or await next_representation_generation(",
+        # 锚点随 d2-online-edit-platform-closure 根因 5 修复迁移：`_commit_once` 的代际
+        # 一律走 `_next_generation_probe`，原 `next_representation_generation(` 调用点已删。
+        anchor="            generation = await self._next_generation_probe(plan)",
+        new="            generation = 0 or await self._next_generation_probe(plan)",
         want="*",
         why="等价变异（`0 or X` 恒等于 X）—— **刻意**放一条无行为差异的变异做**反向自检**："
             "它必须判 GREEN。若它意外打红，说明测试对源码文本敏感（例如某个守卫在数行数、"

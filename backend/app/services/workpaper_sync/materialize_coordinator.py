@@ -205,8 +205,10 @@ from app.services.workpaper_sync.rooms import (
     BundleAliasDriftError,
     FrozenBundleIdentity,
     RepresentationNotPublishedError,
+    RoomNotWritableError,
     RoomScope,
     RoomService,
+    room_generation_is_retired,
 )
 
 __all__ = [
@@ -596,6 +598,11 @@ MATERIALIZE_REJECTION_STATUS: Final[Mapping[type, int]] = {
     DescriptorFieldMissingError: 422,
     DescriptorStaleIdentityError: 409,
     DescriptorSubstrateStaleError: 409,
+    # 本代 room 拒绝复用且**不是**终态（refresh-required / closing / recovery-required），
+    # 或 close barrier 后不再接纳新 editor。终态已在事务 C 内换代，到不了这里。
+    # 未登记时 router 记 500，前端拦截器还会对 5xx 自动重试 3 次 —— 同一个确定性拒绝
+    # 被放大成 4 次请求，且用户只看到「服务器错误」。
+    RoomNotWritableError: 409,
     DefinitionUpgradeRevisionError: 422,
     FlushRevisionDriftError: 500,
     SingleCommitAccountingError: 500,
@@ -2274,6 +2281,57 @@ class MaterializeCoordinator:
                 f"{representation.id} 已不可用（{exc}）—— preflight 与 room 打开之间"
                 "发生了并发推进，请重新 flush"
             ) from exc
+        except RoomNotWritableError as exc:
+            # 🔴 当前代际的 room 已**终结**（superseded / closed）：同代重开在结构上不可能
+            #    （`uq_wpoor_generation`），只能换代。与下面「僵死写会话」分支同一个出路、
+            #    同一条安全论证（revision 不变、artifact 与 bundle 复用、doc_key 换掉），
+            #    区别只在于旧 room 已经是终态 ⇒ 不需要也不允许再碰它。
+            #
+            #    两条真实路径会走到这里，修复前都是 500 死路：
+            #      · OO→HTML 合并结果 ≠ incoming ⇒ 先按当前代际 commit、**再** supersede
+            #        本代 room（`oo_to_html` AC 4.11）⇒ pointer 落在一个刚终结的代际上；
+            #      · 历史 commit 把 pointer 拉回 gen 1 而 gen 1 早已 superseded（根因 5，
+            #        D2 canary 现场形态）。
+            #    内容一字未改时「重新 flush」走业务身份复用、不产生新 commit ⇒ 不换代就是
+            #    永久死循环（与僵死写会话那条的真栈结论相同）。
+            #
+            #    非终态的拒绝（refresh-required / closing / recovery-required）**不**在这里
+            #    换代：那些 room 可能仍有未终结 request 或待恢复的 durable incoming，跳过
+            #    它们开新代会绕开恢复流程 ⇒ 原样抛出，由拒绝码表映射为 409。
+            retired = (
+                await self._session.execute(
+                    sa.select(WorkpaperOoRoom).where(
+                        WorkpaperOoRoom.wp_id == representation.wp_id,
+                        WorkpaperOoRoom.entry_id == str(representation.entry_id),
+                        WorkpaperOoRoom.generation == int(representation.generation),
+                    )
+                )
+            ).scalar_one_or_none()
+            if retired is None or not room_generation_is_retired(retired):
+                raise
+            rotated = await self._rotate_generation_for_stale_room(
+                representation, project_id=request.project_id
+            )
+            if rotated is None:
+                raise DescriptorSubstrateStaleError(
+                    f"{STALE_ON_ROOM_OPEN_MARKER}: 本代 room 已终结（{exc}），且无法为同一"
+                    "内容版本旋转出新 generation —— 请重新 flush → 提交后再进在线编辑"
+                ) from exc
+            representation = rotated
+            representation_id = representation.id
+            representation_generation = int(representation.generation)
+            try:
+                room, room_bundle = await self._rooms.open_or_reuse_room(
+                    request.scope,
+                    representation=representation,
+                    opened_base_version_id=content_version_id,
+                    ttl=self._room_ttl,
+                )
+            except (RepresentationNotPublishedError, BundleAliasDriftError) as retry_exc:
+                raise DescriptorSubstrateStaleError(
+                    f"{STALE_ON_ROOM_OPEN_MARKER}: 终结代际旋转到 generation "
+                    f"{representation.generation} 后开 room 仍失败（{retry_exc}）"
+                ) from retry_exc
         # 冻结 identity 与 room 侧现算身份逐项比对：不等即 alias 漂移（AC 2.10）。
         pre.bundle_identity.assert_same_as(room_bundle, where="materialize-room")
         try:
@@ -2379,7 +2437,8 @@ class MaterializeCoordinator:
     ) -> WorkpaperContentRepresentation | None:
         """为**同一个 content version** 发一代新 representation（只换 generation）。
 
-        用途只有一个：上一代 room 因僵死写会话作废后，给 materialize 一个可开的新代际。
+        用途：当前代际的 room 不可能再开时，给 materialize 一个可开的新代际。两个调用点：
+        ① 僵死写会话 ⇒ 本代被 supersede；② 本代 room 早已终结（superseded / closed）。
         见调用点的长注释（为什么不能同代重开、为什么这样仍然安全、为什么 revision 不动）。
 
         与 `content_commit` 的分工：commit 负责「内容变了 ⇒ 新 content version + 新
