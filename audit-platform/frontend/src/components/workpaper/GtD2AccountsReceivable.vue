@@ -314,11 +314,27 @@ const D2_SYNC_ENTRY_ID = 'xlsx/gt-d2-accounts-receivable'
  * - D2-3 坏账准备 → d23-managed（双向，本 spec 扩容）
  * - D2-1 审定表 → d21-managed（静态区，本 spec 扩容）
  * entryId 在 D2 内始终单值（一册一 entry），故各受管 sheet 共用 D2_SYNC_ENTRY_ID。
+ *
+ * spec d2-inspection-sync-coverage：检查工作簿 D2-6~D2-13 属于独立 entry
+ * xlsx/gt-d2-inspection。下方 D2_INSPECTION_SHEET_KEYS 单独声明，待发布链完成后
+ * 前端接入第二个 bridge 实例。当前阶段这些 sheet 的工具栏显示「在线编辑开发中」。
  */
 const D2_MANAGED_SHEET_KEYS: Record<string, string> = {
   'D2-2': 'd22-managed',
   'D2-3': 'd23-managed',
   'D2-1': 'd21-managed',
+}
+
+/**
+ * D2 检查工作簿受管 sheet 集合（独立 entry xlsx/gt-d2-inspection）。
+ * 后端 provider 已就绪，待发布链 + 前端第二 bridge 接入后启用。
+ */
+const D2_INSPECTION_SHEET_KEYS: Record<string, string> = {
+  'D2-6': 'd26-managed',
+  'D2-7': 'd27-managed',
+  'D2-11': 'd211-managed',
+  'D2-12': 'd212-managed',
+  'D2-13': 'd213-managed',
 }
 /** 与后端 D2 默认 managed sheet_key / materialize 取证脚本一致（D2-2 明细表）。 */
 const D2_MANAGED_SHEET_KEY = 'd22-managed'
@@ -471,9 +487,15 @@ const syncBusy = computed(
 )
 const syncUnavailableReason = computed(() => {
   if (!isD2SyncedSheet.value) {
+    // 🔴 spec d2-inspection-sync-coverage：检查 sheet（D2-6~D2-13）已有后端 provider，
+    // 但尚未走完发布链（独立 entry xlsx/gt-d2-inspection 的 representation 未发布），
+    // 给出精确中文提示区分于完全未受管的 sheet。
+    if (currentSheet.value in D2_INSPECTION_SHEET_KEYS) {
+      return '在线编辑开发中（检查工作簿独立发布链待完成）；当前走结构化视图'
+    }
     // 🔴 spec Task 16（裁决 E5）：非受管 sheet 保持直接禁用 + 显式中文原因，
     // 不得退化成静默无反应或落 legacy 假双向。
-    return '在线编辑仅开放 D2-2 明细表、D2-3 坏账准备明细表、D2-1 审定表；当前底稿走结构化视图'
+    return '在线编辑仅开放 D2-1/D2-2/D2-3 审定表明细表；当前底稿走结构化视图'
   }
   const err = syncBridge.lastError.value
   return err ? `${err.errorCode}: ${err.message}` : ''
