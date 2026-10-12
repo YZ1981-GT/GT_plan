@@ -31,7 +31,7 @@ export interface WorkpaperSyncManagedSheetsEntry {
   readonly managedSheets: readonly WorkpaperSyncManagedSheet[]
 }
 
-export const WORKPAPER_SYNC_MANAGED_SHEETS_DIGEST = "1a1f92c1cfb7cd0445e0d8506eafdf5affc85d788053b59f621b863eb6c7f822"
+export const WORKPAPER_SYNC_MANAGED_SHEETS_DIGEST = "8cd0fc0c398a842d6dd121ae66f5902f032f059ef806731d3e7e853e5b32c38e"
 
 export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsEntry[] =
 [
@@ -77,6 +77,10 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
     "contractId": "d1.notes_receivable_detail",
     "entryId": "xlsx/gt-d1-notes-receivable",
     "managedSheets": [
+      {
+        "excelName": "审定表D1-1",
+        "sheetKey": "d11-managed"
+      },
       {
         "excelName": "应收票据监盘D1-10",
         "sheetKey": "d110-managed"

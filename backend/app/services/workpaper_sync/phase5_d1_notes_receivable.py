@@ -571,6 +571,16 @@ def _expansion_sheet_payloads() -> list[dict[str, Any]]:
     return list(by_sheet_key.values())
 
 
+def _adjudication_sheet_payload_d11() -> dict[str, Any]:
+    """D1-1 审定表：AdjudicationSheetSpec → 契约 sheets[] 条目。"""
+    from app.services.workpaper_sync.phase5_adjudication_sheet import (
+        static_sheet_payload_for_adjudication,
+    )
+    from app.services.workpaper_sync.phase5_d1_01_adjudication import SPEC_D101
+
+    return static_sheet_payload_for_adjudication(SPEC_D101)
+
+
 def build_contract_payload() -> dict[str, Any]:
     """本 entry 自己的 per-entry contract canonical payload（两个 digest 现算，单向引用）。"""
     from app.services.workpaper_sync.excel_extract import TABLE_SHEET_ANCHOR
@@ -605,6 +615,8 @@ def build_contract_payload() -> dict[str, Any]:
                 "tables": [_rows_table_payload()],
             },
             *_expansion_sheet_payloads(),
+            # D1-1 审定表（spec workpaper-sync-switch-performance：D1 全 sheet 扩展）。
+            _adjudication_sheet_payload_d11(),
         ],
         "review": {
             "entry_id": ENTRY_ID,
