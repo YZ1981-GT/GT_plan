@@ -1524,6 +1524,511 @@
           "table_key": "voucher_check_post_rows"
         }
       ]
+    },
+    {
+      "excel_name": "审定表D3-1",
+      "footer": {
+        "diff_row": 23,
+        "marker": "合计",
+        "tb_row": 22,
+        "total_row": 21
+      },
+      "formula_mask": [
+        "E23",
+        "I23"
+      ],
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d31-managed",
+      "tables": [
+        {
+          "anchor": "A5",
+          "cell_mask": [
+            "B10",
+            "B11",
+            "B13",
+            "B8",
+            "B9",
+            "C10",
+            "C11",
+            "C13",
+            "C8",
+            "C9",
+            "D10",
+            "D11",
+            "D13",
+            "D8",
+            "D9",
+            "E10",
+            "E11",
+            "E12",
+            "E13",
+            "E8",
+            "E9",
+            "F10",
+            "F11",
+            "F13",
+            "F8",
+            "F9",
+            "G10",
+            "G11",
+            "G13",
+            "G8",
+            "G9",
+            "H10",
+            "H11",
+            "H13",
+            "H8",
+            "H9",
+            "I10",
+            "I11",
+            "I12",
+            "I13",
+            "I8",
+            "I9",
+            "J10",
+            "J11",
+            "J12",
+            "J13",
+            "J8",
+            "J9",
+            "K10",
+            "K11",
+            "K12",
+            "K13",
+            "K8",
+            "K9"
+          ],
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": 8
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!审定表D3-1!A6",
+              "header_text": "项目",
+              "json_pointer": "/nature/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表D3-1!A8",
+              "stable_field_key": "d31_adj_nature/item_name",
+              "store_item_id": "",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 8
+              },
+              "column_key": "prior_unadjusted",
+              "group_source_ref": "源xlsx!审定表D3-1!B6",
+              "header_source_ref": "源xlsx!审定表D3-1!B6",
+              "header_text": "未审数",
+              "json_pointer": "/nature/priorUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!B8",
+              "stable_field_key": "d31_adj_nature/prior_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 8
+              },
+              "column_key": "prior_aje",
+              "group_source_ref": "源xlsx!审定表D3-1!B6",
+              "header_source_ref": "源xlsx!审定表D3-1!C6",
+              "header_text": "账项调整",
+              "json_pointer": "/nature/priorAje",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!C8",
+              "stable_field_key": "d31_adj_nature/prior_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 8
+              },
+              "column_key": "prior_rje",
+              "group_source_ref": "源xlsx!审定表D3-1!B6",
+              "header_source_ref": "源xlsx!审定表D3-1!D6",
+              "header_text": "重分类调整",
+              "json_pointer": "/nature/priorRje",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!D8",
+              "stable_field_key": "d31_adj_nature/prior_rje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 8
+              },
+              "column_key": "prior_audited",
+              "group_source_ref": "源xlsx!审定表D3-1!B6",
+              "header_source_ref": "源xlsx!审定表D3-1!E6",
+              "header_text": "审定数",
+              "json_pointer": "/nature/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!E8",
+              "stable_field_key": "d31_adj_nature/prior_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 8
+              },
+              "column_key": "current_unadjusted",
+              "group_source_ref": "源xlsx!审定表D3-1!F6",
+              "header_source_ref": "源xlsx!审定表D3-1!F6",
+              "header_text": "未审数",
+              "json_pointer": "/nature/currentUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!F8",
+              "stable_field_key": "d31_adj_nature/current_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 8
+              },
+              "column_key": "current_aje",
+              "group_source_ref": "源xlsx!审定表D3-1!F6",
+              "header_source_ref": "源xlsx!审定表D3-1!G6",
+              "header_text": "账项调整",
+              "json_pointer": "/nature/currentAje",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!G8",
+              "stable_field_key": "d31_adj_nature/current_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 8
+              },
+              "column_key": "current_rje",
+              "group_source_ref": "源xlsx!审定表D3-1!F6",
+              "header_source_ref": "源xlsx!审定表D3-1!H6",
+              "header_text": "重分类调整",
+              "json_pointer": "/nature/currentRje",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!H8",
+              "stable_field_key": "d31_adj_nature/current_rje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 8
+              },
+              "column_key": "current_audited",
+              "group_source_ref": "源xlsx!审定表D3-1!F6",
+              "header_source_ref": "源xlsx!审定表D3-1!I6",
+              "header_text": "审定数",
+              "json_pointer": "/nature/currentAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!I8",
+              "stable_field_key": "d31_adj_nature/current_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 8
+              },
+              "column_key": "change_amount",
+              "group_source_ref": "源xlsx!审定表D3-1!J6",
+              "header_source_ref": "源xlsx!审定表D3-1!J6",
+              "header_text": "变动额",
+              "json_pointer": "/nature/changeAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!J8",
+              "stable_field_key": "d31_adj_nature/change_amount",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 8
+              },
+              "column_key": "change_rate",
+              "group_source_ref": "源xlsx!审定表D3-1!J6",
+              "header_source_ref": "源xlsx!审定表D3-1!K6",
+              "header_text": "变动率",
+              "json_pointer": "/nature/changeRate",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!K8",
+              "stable_field_key": "d31_adj_nature/change_rate",
+              "store_item_id": "",
+              "value_type": "ratio"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 8
+              },
+              "column_key": "reason_analysis",
+              "header_source_ref": "源xlsx!审定表D3-1!L6",
+              "header_text": "原因分析",
+              "json_pointer": "/nature/reasonAnalysis",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表D3-1!L8",
+              "stable_field_key": "d31_adj_nature/reason_analysis",
+              "store_item_id": "",
+              "value_type": "text"
+            }
+          ],
+          "first_data_row": 8,
+          "footer_row": 13,
+          "header_rows": 4,
+          "last_data_row": 12,
+          "row_mode": "fixed_rows",
+          "table_key": "adj_nature_rows"
+        },
+        {
+          "anchor": "A14",
+          "cell_mask": [
+            "B21",
+            "C21",
+            "D21",
+            "E17",
+            "E18",
+            "E19",
+            "E20",
+            "E21",
+            "F21",
+            "G21",
+            "H21",
+            "I17",
+            "I18",
+            "I19",
+            "I20",
+            "I21",
+            "J17",
+            "J18",
+            "J19",
+            "J20",
+            "J21",
+            "K17",
+            "K18",
+            "K19",
+            "K20",
+            "K21"
+          ],
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": 17
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!审定表D3-1!A6",
+              "header_text": "项目",
+              "json_pointer": "/aging/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表D3-1!A17",
+              "stable_field_key": "d31_adj_aging/item_name",
+              "store_item_id": "",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 17
+              },
+              "column_key": "prior_unadjusted",
+              "group_source_ref": "源xlsx!审定表D3-1!B6",
+              "header_source_ref": "源xlsx!审定表D3-1!B6",
+              "header_text": "未审数",
+              "json_pointer": "/aging/priorUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!B17",
+              "stable_field_key": "d31_adj_aging/prior_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 17
+              },
+              "column_key": "prior_aje",
+              "group_source_ref": "源xlsx!审定表D3-1!B6",
+              "header_source_ref": "源xlsx!审定表D3-1!C6",
+              "header_text": "账项调整",
+              "json_pointer": "/aging/priorAje",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!C17",
+              "stable_field_key": "d31_adj_aging/prior_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 17
+              },
+              "column_key": "prior_rje",
+              "group_source_ref": "源xlsx!审定表D3-1!B6",
+              "header_source_ref": "源xlsx!审定表D3-1!D6",
+              "header_text": "重分类调整",
+              "json_pointer": "/aging/priorRje",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!D17",
+              "stable_field_key": "d31_adj_aging/prior_rje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 17
+              },
+              "column_key": "prior_audited",
+              "group_source_ref": "源xlsx!审定表D3-1!B6",
+              "header_source_ref": "源xlsx!审定表D3-1!E6",
+              "header_text": "审定数",
+              "json_pointer": "/aging/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!E17",
+              "stable_field_key": "d31_adj_aging/prior_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 17
+              },
+              "column_key": "current_unadjusted",
+              "group_source_ref": "源xlsx!审定表D3-1!F6",
+              "header_source_ref": "源xlsx!审定表D3-1!F6",
+              "header_text": "未审数",
+              "json_pointer": "/aging/currentUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!F17",
+              "stable_field_key": "d31_adj_aging/current_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 17
+              },
+              "column_key": "current_aje",
+              "group_source_ref": "源xlsx!审定表D3-1!F6",
+              "header_source_ref": "源xlsx!审定表D3-1!G6",
+              "header_text": "账项调整",
+              "json_pointer": "/aging/currentAje",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!G17",
+              "stable_field_key": "d31_adj_aging/current_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 17
+              },
+              "column_key": "current_rje",
+              "group_source_ref": "源xlsx!审定表D3-1!F6",
+              "header_source_ref": "源xlsx!审定表D3-1!H6",
+              "header_text": "重分类调整",
+              "json_pointer": "/aging/currentRje",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!H17",
+              "stable_field_key": "d31_adj_aging/current_rje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 17
+              },
+              "column_key": "current_audited",
+              "group_source_ref": "源xlsx!审定表D3-1!F6",
+              "header_source_ref": "源xlsx!审定表D3-1!I6",
+              "header_text": "审定数",
+              "json_pointer": "/aging/currentAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!I17",
+              "stable_field_key": "d31_adj_aging/current_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 17
+              },
+              "column_key": "change_amount",
+              "group_source_ref": "源xlsx!审定表D3-1!J6",
+              "header_source_ref": "源xlsx!审定表D3-1!J6",
+              "header_text": "变动额",
+              "json_pointer": "/aging/changeAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!J17",
+              "stable_field_key": "d31_adj_aging/change_amount",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 17
+              },
+              "column_key": "change_rate",
+              "group_source_ref": "源xlsx!审定表D3-1!J6",
+              "header_source_ref": "源xlsx!审定表D3-1!K6",
+              "header_text": "变动率",
+              "json_pointer": "/aging/changeRate",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表D3-1!K17",
+              "stable_field_key": "d31_adj_aging/change_rate",
+              "store_item_id": "",
+              "value_type": "ratio"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 17
+              },
+              "column_key": "reason_analysis",
+              "header_source_ref": "源xlsx!审定表D3-1!L6",
+              "header_text": "原因分析",
+              "json_pointer": "/aging/reasonAnalysis",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表D3-1!L17",
+              "stable_field_key": "d31_adj_aging/reason_analysis",
+              "store_item_id": "",
+              "value_type": "text"
+            }
+          ],
+          "first_data_row": 17,
+          "footer_row": 21,
+          "header_rows": 4,
+          "last_data_row": 20,
+          "row_mode": "fixed_rows",
+          "table_key": "adj_aging_rows"
+        }
+      ]
     }
   ],
   "template": {

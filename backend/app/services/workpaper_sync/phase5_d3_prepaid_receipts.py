@@ -383,6 +383,16 @@ def _expansion_sheets_payload() -> list[dict[str, Any]]:
     return build_expansion_sheets(_exp.managed_row_table_specs())
 
 
+def _adjudication_sheet_payload_d31() -> dict[str, Any]:
+    """D3-1 审定表：AdjudicationSheetSpec → 契约 sheets[] 条目（per-cell 固定行）。"""
+    from app.services.workpaper_sync.phase5_adjudication_sheet import (
+        static_sheet_payload_for_adjudication,
+    )
+    from app.services.workpaper_sync.phase5_d3_01_adjudication import SPEC_D301
+
+    return static_sheet_payload_for_adjudication(SPEC_D301)
+
+
 def build_contract_payload() -> dict[str, Any]:
     from app.services.workpaper_sync.excel_extract import TABLE_SHEET_ANCHOR
 
@@ -416,6 +426,9 @@ def build_contract_payload() -> dict[str, Any]:
                 "tables": [_rows_table_payload()],
             },
             *_expansion_sheets_payload(),
+            # D3-1 审定表（spec workpaper-sync-switch-performance：D3 全 sheet 扩展）。
+            # AdjudicationSheetSpec 声明在 phase5_d3_01_adjudication，框架层翻译成契约 JSON。
+            _adjudication_sheet_payload_d31(),
         ],
         "review": {
             "entry_id": ENTRY_ID,

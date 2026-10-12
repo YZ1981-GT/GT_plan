@@ -31,7 +31,7 @@ export interface WorkpaperSyncManagedSheetsEntry {
   readonly managedSheets: readonly WorkpaperSyncManagedSheet[]
 }
 
-export const WORKPAPER_SYNC_MANAGED_SHEETS_DIGEST = "748326389074a1e03d8f8f32d4e35c06e54ef1b1fb36aabe49c365369c76c9e6"
+export const WORKPAPER_SYNC_MANAGED_SHEETS_DIGEST = "1a1f92c1cfb7cd0445e0d8506eafdf5affc85d788053b59f621b863eb6c7f822"
 
 export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsEntry[] =
 [
@@ -47,7 +47,7 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
     ]
   },
   {
-    "adapterRegistered": false,
+    "adapterRegistered": true,
     "contractId": "a51.cashflow_audit",
     "entryId": "xlsx/gt-a51-cashflow-audit",
     "managedSheets": [
@@ -152,8 +152,28 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
     "entryId": "xlsx/gt-d3-prepaid-accounts",
     "managedSheets": [
       {
+        "excelName": "审定表D3-1",
+        "sheetKey": "d31-managed"
+      },
+      {
         "excelName": "预收账款明细表D3-2",
         "sheetKey": "d32-managed"
+      },
+      {
+        "excelName": "预收账款分析表D3-4",
+        "sheetKey": "d34-managed"
+      },
+      {
+        "excelName": "账龄1年以上的预收账款检查表D3-5",
+        "sheetKey": "d35-managed"
+      },
+      {
+        "excelName": "关联关系及交易检查表D3-6",
+        "sheetKey": "d36-managed"
+      },
+      {
+        "excelName": "预收账款检查表D3-7",
+        "sheetKey": "d37-managed"
       }
     ]
   },
@@ -281,6 +301,10 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
       {
         "excelName": "其他业务收入截止性测试D4-36",
         "sheetKey": "d436-managed"
+      },
+      {
+        "excelName": "营业收入调整分录汇总D4-4",
+        "sheetKey": "d44-managed"
       },
       {
         "excelName": "营业收入会计政策检查D4-5",
@@ -443,6 +467,10 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
     "entryId": "xlsx/gt-f2-inventory-valuation",
     "managedSheets": [
       {
+        "excelName": "跌价准备测试表F2-47",
+        "sheetKey": "f247-managed"
+      },
+      {
         "excelName": "长库龄 呆滞 超过保质期存货明细表F2-48",
         "sheetKey": "f248-managed"
       }
@@ -455,11 +483,11 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
     "managedSheets": [
       {
         "excelName": "抽盘结果汇总表F2-25",
-        "sheetKey": "f225-exist"
+        "sheetKey": "f225-managed"
       },
       {
-        "excelName": "抽盘结果汇总表F2-25",
-        "sheetKey": "f225-floor"
+        "excelName": "盘点倒轧表F2-26",
+        "sheetKey": "f226-managed"
       }
     ]
   },
@@ -468,6 +496,18 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
     "contractId": "f3.notes_payable_detail",
     "entryId": "xlsx/gt-f3-notes-payable",
     "managedSheets": [
+      {
+        "excelName": "审定表F3-1",
+        "sheetKey": "f31-managed"
+      },
+      {
+        "excelName": "明细表F3-2",
+        "sheetKey": "f32-managed"
+      },
+      {
+        "excelName": "应付票据（带息）利息测算表F3-4",
+        "sheetKey": "f34-managed"
+      },
       {
         "excelName": "逾期票据检查F3-5",
         "sheetKey": "f35-managed"
@@ -488,8 +528,28 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
     "entryId": "xlsx/gt-f4-accounts-payable",
     "managedSheets": [
       {
+        "excelName": "审定表F4-1",
+        "sheetKey": "f41-managed"
+      },
+      {
+        "excelName": "明细表F4-2",
+        "sheetKey": "f42-managed"
+      },
+      {
+        "excelName": "长期挂账检查表F4-5",
+        "sheetKey": "f45-managed"
+      },
+      {
         "excelName": "关联方及交易检查表F4-6",
         "sheetKey": "f46-managed"
+      },
+      {
+        "excelName": "未入账检查表F4-7",
+        "sheetKey": "f47-managed"
+      },
+      {
+        "excelName": "应付账款检查表F4-8",
+        "sheetKey": "f48-managed"
       }
     ]
   },
@@ -501,6 +561,22 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
       {
         "excelName": "营业务成本审定表F5-1",
         "sheetKey": "f51-managed"
+      },
+      {
+        "excelName": "主营业务成本月度明细表F5-2",
+        "sheetKey": "f52-managed"
+      },
+      {
+        "excelName": "其他业务成本明细表F5-3",
+        "sheetKey": "f53-managed"
+      },
+      {
+        "excelName": "与上年度比较分析表F5-5",
+        "sheetKey": "f55-managed"
+      },
+      {
+        "excelName": "成本倒轧表F5-7",
+        "sheetKey": "f57-managed"
       },
       {
         "excelName": "重大调整核查表F5-8",
@@ -516,6 +592,10 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
       {
         "excelName": "明细表G1-2",
         "sheetKey": "g102-managed"
+      },
+      {
+        "excelName": "审定表G1-1",
+        "sheetKey": "g11-managed"
       }
     ]
   },
@@ -527,6 +607,10 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
       {
         "excelName": "明细表G10-2",
         "sheetKey": "g1002-managed"
+      },
+      {
+        "excelName": "审定表G10-1",
+        "sheetKey": "g101-managed"
       }
     ]
   },
@@ -538,6 +622,10 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
       {
         "excelName": "明细分析表G11-2",
         "sheetKey": "g1102-managed"
+      },
+      {
+        "excelName": "审定表G11-1",
+        "sheetKey": "g111-managed"
       }
     ]
   },
@@ -549,6 +637,10 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
       {
         "excelName": "明细表G12-2",
         "sheetKey": "g1202-managed"
+      },
+      {
+        "excelName": "审定表G12-1",
+        "sheetKey": "g121-managed"
       }
     ]
   },
@@ -560,6 +652,10 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
       {
         "excelName": "明细表G13-2",
         "sheetKey": "g1302-managed"
+      },
+      {
+        "excelName": "审定表G13-1",
+        "sheetKey": "g131-managed"
       }
     ]
   },
@@ -571,6 +667,10 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
       {
         "excelName": "明细表G14-2",
         "sheetKey": "g1402-managed"
+      },
+      {
+        "excelName": "审定表G14-1",
+        "sheetKey": "g141-managed"
       }
     ]
   },
@@ -582,6 +682,10 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
       {
         "excelName": "明细表G2-2",
         "sheetKey": "g202-managed"
+      },
+      {
+        "excelName": "审定表G2-1",
+        "sheetKey": "g21-managed"
       }
     ]
   },
@@ -593,6 +697,10 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
       {
         "excelName": "明细表G3-2",
         "sheetKey": "g302-managed"
+      },
+      {
+        "excelName": "审定表G3-1",
+        "sheetKey": "g31-managed"
       }
     ]
   },
@@ -626,6 +734,10 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
       {
         "excelName": "公允价值测试表G6-5",
         "sheetKey": "g605-managed"
+      },
+      {
+        "excelName": "审定表G6-1",
+        "sheetKey": "g61-managed"
       }
     ]
   },
@@ -648,6 +760,10 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
       {
         "excelName": "明细表G8-2",
         "sheetKey": "g802-managed"
+      },
+      {
+        "excelName": "审定表G8-1",
+        "sheetKey": "g81-managed"
       }
     ]
   },
@@ -659,6 +775,10 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
       {
         "excelName": "明细表G9-2",
         "sheetKey": "g902-managed"
+      },
+      {
+        "excelName": "审定表G9-1",
+        "sheetKey": "g91-managed"
       }
     ]
   },
@@ -852,6 +972,149 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
   },
   {
     "adapterRegistered": false,
+    "contractId": "k1.baddebt_reversal_writeoff_check",
+    "entryId": "xlsx/gt-k1-other-receivables",
+    "managedSheets": [
+      {
+        "excelName": "坏账准备转回（收回）、核销检查表K1-9",
+        "sheetKey": "k109-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "k10.other_income_adjustment",
+    "entryId": "xlsx/gt-k10-other-income",
+    "managedSheets": [
+      {
+        "excelName": "调整分录汇总K10-3",
+        "sheetKey": "k1003-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "k11.asset_impairment_loss_adjustment",
+    "entryId": "xlsx/gt-k11-asset-impairment-loss",
+    "managedSheets": [
+      {
+        "excelName": "调整分录汇总K11-3",
+        "sheetKey": "k1103-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "k12.non_operating_income_adjustment",
+    "entryId": "xlsx/gt-k12-non-operating-income",
+    "managedSheets": [
+      {
+        "excelName": "调整分录汇总K12-3",
+        "sheetKey": "k1203-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "k13.non_operating_expense_adjustment",
+    "entryId": "xlsx/gt-k13-non-operating-expense",
+    "managedSheets": [
+      {
+        "excelName": "调整分录汇总K13-3",
+        "sheetKey": "k1303-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "k2.other_current_assets_adjustment",
+    "entryId": "xlsx/gt-k2-other-current-assets",
+    "managedSheets": [
+      {
+        "excelName": "调整分录汇总K2-3",
+        "sheetKey": "k203-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "k3.other_payables_adjustment",
+    "entryId": "xlsx/gt-k3-other-payables",
+    "managedSheets": [
+      {
+        "excelName": "调整分录汇总K3-3",
+        "sheetKey": "k303-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "k4.other_current_liabilities_adjustment",
+    "entryId": "xlsx/gt-k4-other-current-liabilities",
+    "managedSheets": [
+      {
+        "excelName": "调整分录汇总 K4-3",
+        "sheetKey": "k403-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "k5.provisions_adjustment",
+    "entryId": "xlsx/gt-k5-provisions",
+    "managedSheets": [
+      {
+        "excelName": "调整分录汇总 K5-3",
+        "sheetKey": "k503-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "k6.held_for_sale_adjustment",
+    "entryId": "xlsx/gt-k6-held-for-sale",
+    "managedSheets": [
+      {
+        "excelName": "调整分录汇总 K6-3",
+        "sheetKey": "k603-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "k7.deferred_income_adjustment",
+    "entryId": "xlsx/gt-k7-deferred-income",
+    "managedSheets": [
+      {
+        "excelName": "调整分录汇总K7-3",
+        "sheetKey": "k703-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "k8.selling_expenses_adjustment",
+    "entryId": "xlsx/gt-k8-selling-expenses",
+    "managedSheets": [
+      {
+        "excelName": "调整分录汇总K8-3",
+        "sheetKey": "k803-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "k9.admin_expenses_adjustment",
+    "entryId": "xlsx/gt-k9-admin-expenses",
+    "managedSheets": [
+      {
+        "excelName": "调整分录汇总K9-3",
+        "sheetKey": "k903-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
     "contractId": "l1.short_term_loans",
     "entryId": "xlsx/gt-l1-short-term-loans",
     "managedSheets": [
@@ -863,12 +1126,276 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
   },
   {
     "adapterRegistered": false,
+    "contractId": "l2.interest_payable",
+    "entryId": "xlsx/gt-l2-interest-payable",
+    "managedSheets": [
+      {
+        "excelName": "应付利息检查表L2-4",
+        "sheetKey": "l24-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "l3.long_term_loans",
+    "entryId": "xlsx/gt-l3-long-term-loans",
+    "managedSheets": [
+      {
+        "excelName": "长期借款检查表L3-9",
+        "sheetKey": "l39-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "l4.bonds_payable",
+    "entryId": "xlsx/gt-l4-bonds-payable",
+    "managedSheets": [
+      {
+        "excelName": "划分为金融负债的其他金融工具明细表L4-3",
+        "sheetKey": "l43-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "l5.long_term_payables",
+    "entryId": "xlsx/gt-l5-long-term-payables",
+    "managedSheets": [
+      {
+        "excelName": "明细表L5-2",
+        "sheetKey": "l52-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "l6.special_payables",
+    "entryId": "xlsx/gt-l6-special-payables",
+    "managedSheets": [
+      {
+        "excelName": "明细表L6-2",
+        "sheetKey": "l62-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "l7.other_noncurrent_liabilities",
+    "entryId": "xlsx/gt-l7-other-noncurrent-liabilities",
+    "managedSheets": [
+      {
+        "excelName": "明细表L7-2",
+        "sheetKey": "l72-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "l8.financial_expenses",
+    "entryId": "xlsx/gt-l8-financial-expenses",
+    "managedSheets": [
+      {
+        "excelName": "明细表L8-2",
+        "sheetKey": "l82-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "m1.dividends_payable",
+    "entryId": "xlsx/gt-m1-dividends-payable",
+    "managedSheets": [
+      {
+        "excelName": "明细表M1-2",
+        "sheetKey": "m101-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "m10.other_equity_instruments",
+    "entryId": "xlsx/gt-m10-other-equity-instruments",
+    "managedSheets": [
+      {
+        "excelName": "明细表M10-2",
+        "sheetKey": "m1001-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "m2.paid_in_capital",
+    "entryId": "xlsx/gt-m2-paid-in-capital",
+    "managedSheets": [
+      {
+        "excelName": "明细表（非上市公司）M2-2",
+        "sheetKey": "m201-unlisted-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "m3.treasury_stock",
+    "entryId": "xlsx/gt-m3-treasury-stock",
+    "managedSheets": [
+      {
+        "excelName": "明细表M3-2",
+        "sheetKey": "m301-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "m4.capital_reserve",
+    "entryId": "xlsx/gt-m4-capital-reserve",
+    "managedSheets": [
+      {
+        "excelName": "明细表M4-2",
+        "sheetKey": "m401-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "m5.surplus_reserve",
+    "entryId": "xlsx/gt-m5-surplus-reserve",
+    "managedSheets": [
+      {
+        "excelName": "明细表M5-2",
+        "sheetKey": "m501-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "m6.retained_earnings",
+    "entryId": "xlsx/gt-m6-retained-earnings",
+    "managedSheets": [
+      {
+        "excelName": "明细表M6-2",
+        "sheetKey": "m601-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "m7.special_reserve",
+    "entryId": "xlsx/gt-m7-special-reserve",
+    "managedSheets": [
+      {
+        "excelName": "明细表M7-2",
+        "sheetKey": "m701-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "m8.general_risk_reserve",
+    "entryId": "xlsx/gt-m8-general-risk-reserve",
+    "managedSheets": [
+      {
+        "excelName": "明细表M8-2",
+        "sheetKey": "m801-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "m9.other_comprehensive_income",
+    "entryId": "xlsx/gt-m9-other-comprehensive-income",
+    "managedSheets": [
+      {
+        "excelName": "明细表M9-2",
+        "sheetKey": "m901-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "n1.deferred_tax_assets",
+    "entryId": "xlsx/gt-n1-deferred-tax-assets",
+    "managedSheets": [
+      {
+        "excelName": "递延所得税资产明细表N1-2",
+        "sheetKey": "n12-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "n2.taxes_payable",
+    "entryId": "xlsx/gt-n2-taxes-payable",
+    "managedSheets": [
+      {
+        "excelName": "应交税费明细表N2-2",
+        "sheetKey": "n22-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "n3.deferred_tax_liabilities",
+    "entryId": "xlsx/gt-n3-deferred-tax-liabilities",
+    "managedSheets": [
+      {
+        "excelName": "递延所得税负债明细表N3-2",
+        "sheetKey": "n32-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "n4.taxes_and_surcharges",
+    "entryId": "xlsx/gt-n4-taxes-and-surcharges",
+    "managedSheets": [
+      {
+        "excelName": "税金及附加明细表N4-2",
+        "sheetKey": "n42-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "n5.income_tax_expense",
+    "entryId": "xlsx/gt-n5-income-tax-expense",
+    "managedSheets": [
+      {
+        "excelName": "所得税费用明细表N5-2",
+        "sheetKey": "n52-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
     "contractId": "j1.accrual_check_short_term",
     "entryId": "xlsx/j1/gt-j1-employee-compensation",
     "managedSheets": [
       {
         "excelName": "计提情况检查表J1-6",
         "sheetKey": "j16-short-term-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "j2.defined_benefit_detail",
+    "entryId": "xlsx/j2/gt-j2-defined-benefit-plan",
+    "managedSheets": [
+      {
+        "excelName": "明细表J2-2",
+        "sheetKey": "j22-main-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "j3.share_based_payment_detail",
+    "entryId": "xlsx/j3/gt-j3-share-based-payment",
+    "managedSheets": [
+      {
+        "excelName": "股份支付情况表J3-1",
+        "sheetKey": "j31-plans-managed"
       }
     ]
   }
