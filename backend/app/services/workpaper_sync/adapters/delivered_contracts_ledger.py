@@ -2924,5 +2924,20 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
         "reason": "M10 其他权益工具（权益类 4001）。明细表 30 列三段式宽表，24e+6f=30 字段。"
                   "definition DAG 已发布，待首版 representation。",
     },
+    # ── D2 检查工作簿（spec: d2-inspection-sync-coverage）──────────────────
+    {
+        "contract_id": "d2.inspection",
+        "provider_module": "app.services.workpaper_sync.pilot_d2_inspection",
+        "delivered_by_task": "d2-inspection-sync-coverage",
+        "pilot_class": "d2_inspection",
+        "entry_id": "xlsx/gt-d2-inspection",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "D/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+        "adapter_registered": False,
+        "reason": "D2 检查工作簿独立 entry。5 张受管 sheet（D2-6/D2-7/D2-11/D2-12/D2-13），"
+                  "76 字段，7 个 store item。D2-8 纯文本不需 provider，D2-9/D2-10 后续扩容。"
+                  "待首版 representation。",
+    },
 
 )

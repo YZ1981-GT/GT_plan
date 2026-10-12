@@ -1277,6 +1277,8 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_m4_capital_reserve",
         "app.services.workpaper_sync.phase5_m7_special_reserve",
         "app.services.workpaper_sync.phase5_m10_other_equity_instruments",
+        # ── D2 检查工作簿（spec: d2-inspection-sync-coverage）──────────────────
+        "app.services.workpaper_sync.pilot_d2_inspection",
     }
 )
 

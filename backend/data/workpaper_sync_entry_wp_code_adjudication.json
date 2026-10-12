@@ -2176,6 +2176,35 @@
         "measured_at": "2026-10-07",
         "why_null": "真库 M10 为 0 行。"
       }
+    },
+    {
+      "basis": {
+        "heuristic_would_say": [
+          "D2-6"
+        ],
+        "heuristic_is_wrong_because": null,
+        "wp_codes_in_wp_index": [
+          "D2-6"
+        ],
+        "store_evidence": "真库 checklist_responses 的 D2-related-party-rows 全部落在 wp_code=D2 上",
+        "managed_excel_name": "关联方及交易检查表D2-6",
+        "template_relative_path": "D/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+        "wp_index_evidence": "wp_code=D2-6 有 3 行未删除，均无 file_path（检查表数据在 D2 主底稿的 checklist_responses 里）"
+      },
+      "contract_id": "d2.inspection",
+      "entry_id": "xlsx/gt-d2-inspection",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-10-12",
+        "store_item_id": "D2-related-party-rows",
+        "wp_code_with_payload": "D2",
+        "wp_count_with_payload": 0
+      },
+      "wp_codes": [
+        "D2"
+      ]
     }
   ],
   "basis_rule": "真源 = 契约里**冻结**的 `template.relative_path`（其文件名前缀即 wp_code）+ 受管 sheet 的 `excel_name`（它是该工作簿里的一个 tab，不是独立底稿）。这两个字段都进了 contract definition 的 sha256，改不了；比「文件名 CamelCase 反推」可靠得多。",
