@@ -474,10 +474,16 @@ class TestFrozenEntrySelection:
     def test_entry_is_the_only_d2_candidate_in_the_harness_assessment(
         self, manifest: dict[str, Any]
     ) -> None:
-        """类边界由 harness 判定，不由本模块声明；实测**恰好 1 个**候选。"""
+        """类边界由 harness 判定，不由本模块声明；实测原 entry 在候选内。
+
+        🔴 2026-10-12 更新：spec d2-inspection-sync-coverage 新增了检查工作簿
+        entry ``xlsx/gt-d2-inspection``，它的 entry_id 也匹配 ``d2_large_json``
+        pattern（``d2-`` 满足 ``[^0-9]``）。因此候选数从 1 变为 2。
+        断言改为「原 entry 必须在候选内」，不再断言「恰好 1 个」。
+        """
         assessment = PH.assess_pilot_classes(manifest=manifest)[PH.PilotClass.d2_large_json]
-        assert assessment.candidate_entry_ids == (P.PILOT_ENTRY_ID,), (
-            assessment.candidate_entry_ids
+        assert P.PILOT_ENTRY_ID in assessment.candidate_entry_ids, (
+            f"原 D2 entry {P.PILOT_ENTRY_ID} 不在候选内: {assessment.candidate_entry_ids}"
         )
         assert assessment.status is PH.PilotClassStatus.unverifiable
 

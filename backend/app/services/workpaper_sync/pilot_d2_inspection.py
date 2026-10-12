@@ -113,8 +113,8 @@ EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 #: D2-6 是 primary，永远在。以下开关控制其余 sheet 的灰度接入。
 _INCLUDE_D207_VOUCHER_CHECK: Final[bool] = True
 _INCLUDE_D208_POLICY_CHECK: Final[bool] = False   # 纯文本描述型，不需 provider
-_INCLUDE_D209_ECL_SINGLE: Final[bool] = False      # 后续扩容（57 公式多区分析表）
-_INCLUDE_D210_ECL_MIGRATION: Final[bool] = False   # 后续扩容（198 公式极复杂）
+_INCLUDE_D209_ECL_SINGLE: Final[bool] = True
+_INCLUDE_D210_ECL_MIGRATION: Final[bool] = True
 _INCLUDE_D211_WRITEOFF: Final[bool] = True
 _INCLUDE_D212_PLEDGE: Final[bool] = True
 _INCLUDE_D213_BIZMODEL: Final[bool] = True
@@ -207,6 +207,20 @@ def instrumentation_specs() -> tuple[ExcelInstrumentationSpec, ...]:
         extras.append(instrumentation_spec_d213(
             entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH,
         ))
+    if _INCLUDE_D209_ECL_SINGLE:
+        from app.services.workpaper_sync.phase5_d2_09_ecl_single import (
+            instrumentation_spec_d29,
+        )
+        extras.append(instrumentation_spec_d29(
+            entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH,
+        ))
+    if _INCLUDE_D210_ECL_MIGRATION:
+        from app.services.workpaper_sync.phase5_d2_10_ecl_test import (
+            instrumentation_spec_d210,
+        )
+        extras.append(instrumentation_spec_d210(
+            entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH,
+        ))
     return (primary, *extras)
 
 
@@ -285,6 +299,16 @@ def all_store_item_ids() -> tuple[str, ...]:
             STORE_ITEM_ID as D213_STORE_ITEM_ID,
         )
         ids.append(D213_STORE_ITEM_ID)
+    if _INCLUDE_D209_ECL_SINGLE:
+        from app.services.workpaper_sync.phase5_d2_09_ecl_single import (
+            STORE_ITEM_ID as D29_STORE_ITEM_ID,
+        )
+        ids.append(D29_STORE_ITEM_ID)
+    if _INCLUDE_D210_ECL_MIGRATION:
+        from app.services.workpaper_sync.phase5_d2_10_ecl_test import (
+            STORE_ITEM_ID as D210_STORE_ITEM_ID,
+        )
+        ids.append(D210_STORE_ITEM_ID)
     return tuple(ids)
 
 
@@ -343,6 +367,22 @@ def build_contract_payload() -> dict[str, Any]:
         )
         assert_mapping_digest_d213()
         sheets.append(sheet_payload_d213())
+    # D2-9 坏账准备测算
+    if _INCLUDE_D209_ECL_SINGLE:
+        from app.services.workpaper_sync.phase5_d2_09_ecl_single import (
+            assert_mapping_digest_d29,
+            sheet_payload_d29,
+        )
+        assert_mapping_digest_d29()
+        sheets.append(sheet_payload_d29())
+    # D2-10 ECL 计量测试
+    if _INCLUDE_D210_ECL_MIGRATION:
+        from app.services.workpaper_sync.phase5_d2_10_ecl_test import (
+            assert_mapping_digest_d210,
+            sheet_payload_d210,
+        )
+        assert_mapping_digest_d210()
+        sheets.append(sheet_payload_d210())
 
     return {
         "schema_version": CONTRACT_SCHEMA_VERSION,
@@ -482,6 +522,28 @@ def build_combined_store_projection(
         )
         all_values.update(d213_proj.values)
         all_row_keys.update(d213_proj.row_keys)
+
+    # ⑥ D2-9 坏账准备测算
+    if _INCLUDE_D209_ECL_SINGLE:
+        from app.services.workpaper_sync.phase5_d2_09_ecl_single import (
+            build_d29_store_projection,
+        )
+        d29_proj = build_d29_store_projection(
+            payloads.get("D2-ecl-single-rows", "[]"), contract=contract, limits=limits,
+        )
+        all_values.update(d29_proj.values)
+        all_row_keys.update(d29_proj.row_keys)
+
+    # ⑦ D2-10 ECL 计量测试
+    if _INCLUDE_D210_ECL_MIGRATION:
+        from app.services.workpaper_sync.phase5_d2_10_ecl_test import (
+            build_d210_store_projection,
+        )
+        d210_proj = build_d210_store_projection(
+            payloads.get("D2-ecl-discount-rows", "[]"), contract=contract, limits=limits,
+        )
+        all_values.update(d210_proj.values)
+        all_row_keys.update(d210_proj.row_keys)
 
     return Projection(
         contract_id=contract.contract_id,

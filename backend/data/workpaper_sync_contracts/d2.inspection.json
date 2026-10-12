@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "af78bd4d965c09ef6488ca2ca516217847f6ff8b5d986bab8cb59bec6ad28075",
+  "instrumentation_definition_sha256": "53e7f2a1a83fdfefc87a19b63414dda582f3aeacedf81d3177ab752484458440",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d2-inspection",
@@ -1340,6 +1340,305 @@
             "kind": "field"
           },
           "table_key": "bizmodel_group_rows"
+        }
+      ]
+    },
+    {
+      "excel_name": "应收坏账准备测算D2-9",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d29-managed",
+      "tables": [
+        {
+          "anchor": "A12",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "debtor_name",
+              "header_source_ref": "源xlsx!应收坏账准备测算D2-9!A12",
+              "header_text": "债务人名称",
+              "json_pointer": "/rows/{row_uuid}/debtorName",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收坏账准备测算D2-9!A14",
+              "stable_field_key": "ecl_single_rows/{row_uuid}/debtor_name",
+              "store_item_id": "D2-ecl-single-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "audited_balance",
+              "header_source_ref": "源xlsx!应收坏账准备测算D2-9!B12",
+              "header_text": "审定账面余额",
+              "json_pointer": "/rows/{row_uuid}/auditedBalance",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收坏账准备测算D2-9!B14",
+              "stable_field_key": "ecl_single_rows/{row_uuid}/audited_balance",
+              "store_item_id": "D2-ecl-single-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "expected_loss_rate",
+              "header_source_ref": "源xlsx!应收坏账准备测算D2-9!C12",
+              "header_text": "预期信用损失率",
+              "json_pointer": "/rows/{row_uuid}/expectedLossRate",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收坏账准备测算D2-9!C14",
+              "stable_field_key": "ecl_single_rows/{row_uuid}/expected_loss_rate",
+              "store_item_id": "D2-ecl-single-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "should_provision",
+              "header_source_ref": "源xlsx!应收坏账准备测算D2-9!D12",
+              "header_text": "期末应计提坏账准备",
+              "json_pointer": "/rows/{row_uuid}/shouldProvision",
+              "mode": "formula",
+              "source_ref": "源xlsx!应收坏账准备测算D2-9!D14",
+              "stable_field_key": "ecl_single_rows/{row_uuid}/should_provision",
+              "store_item_id": "D2-ecl-single-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "actual_balance",
+              "header_source_ref": "源xlsx!应收坏账准备测算D2-9!E12",
+              "header_text": "期末坏账准备账面余额",
+              "json_pointer": "/rows/{row_uuid}/actualBalance",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收坏账准备测算D2-9!E14",
+              "stable_field_key": "ecl_single_rows/{row_uuid}/actual_balance",
+              "store_item_id": "D2-ecl-single-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "difference",
+              "header_source_ref": "源xlsx!应收坏账准备测算D2-9!F12",
+              "header_text": "差异",
+              "json_pointer": "/rows/{row_uuid}/difference",
+              "mode": "formula",
+              "source_ref": "源xlsx!应收坏账准备测算D2-9!F14",
+              "stable_field_key": "ecl_single_rows/{row_uuid}/difference",
+              "store_item_id": "D2-ecl-single-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "basis",
+              "header_source_ref": "源xlsx!应收坏账准备测算D2-9!G12",
+              "header_text": "计提依据及文件",
+              "json_pointer": "/rows/{row_uuid}/basis",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收坏账准备测算D2-9!G14",
+              "stable_field_key": "ecl_single_rows/{row_uuid}/basis",
+              "store_item_id": "D2-ecl-single-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_ref",
+              "header_source_ref": "源xlsx!应收坏账准备测算D2-9!H12",
+              "header_text": "索引号",
+              "json_pointer": "/rows/{row_uuid}/indexRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收坏账准备测算D2-9!H14",
+              "stable_field_key": "ecl_single_rows/{row_uuid}/index_ref",
+              "store_item_id": "D2-ecl-single-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "小计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "D14:D18",
+            "F14:F18"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "ecl_single_rows"
+        }
+      ]
+    },
+    {
+      "excel_name": "预期信用损失的计量测试D2-10",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d210-managed",
+      "tables": [
+        {
+          "anchor": "A11",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "scenario_name",
+              "header_source_ref": "源xlsx!预期信用损失的计量测试D2-10!A11",
+              "header_text": "情景",
+              "json_pointer": "/rows/{row_uuid}/scenarioName",
+              "mode": "editable",
+              "source_ref": "源xlsx!预期信用损失的计量测试D2-10!A13",
+              "stable_field_key": "ecl_discount_rows/{row_uuid}/scenario_name",
+              "store_item_id": "D2-ecl-discount-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "balance",
+              "header_source_ref": "源xlsx!预期信用损失的计量测试D2-10!B11",
+              "header_text": "账面余额",
+              "json_pointer": "/rows/{row_uuid}/balance",
+              "mode": "editable",
+              "source_ref": "源xlsx!预期信用损失的计量测试D2-10!B13",
+              "stable_field_key": "ecl_discount_rows/{row_uuid}/balance",
+              "store_item_id": "D2-ecl-discount-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "cashflow_y1",
+              "header_source_ref": "源xlsx!预期信用损失的计量测试D2-10!C11",
+              "header_text": "未来现金流量-1年",
+              "json_pointer": "/rows/{row_uuid}/cashflowY1",
+              "mode": "editable",
+              "source_ref": "源xlsx!预期信用损失的计量测试D2-10!C13",
+              "stable_field_key": "ecl_discount_rows/{row_uuid}/cashflow_y1",
+              "store_item_id": "D2-ecl-discount-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "pv_y1",
+              "header_source_ref": "源xlsx!预期信用损失的计量测试D2-10!D11",
+              "header_text": "折现值-1年",
+              "json_pointer": "/rows/{row_uuid}/pvY1",
+              "mode": "editable",
+              "source_ref": "源xlsx!预期信用损失的计量测试D2-10!D13",
+              "stable_field_key": "ecl_discount_rows/{row_uuid}/pv_y1",
+              "store_item_id": "D2-ecl-discount-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "pv_y2",
+              "header_source_ref": "源xlsx!预期信用损失的计量测试D2-10!E11",
+              "header_text": "折现值-2年",
+              "json_pointer": "/rows/{row_uuid}/pvY2",
+              "mode": "editable",
+              "source_ref": "源xlsx!预期信用损失的计量测试D2-10!E13",
+              "stable_field_key": "ecl_discount_rows/{row_uuid}/pv_y2",
+              "store_item_id": "D2-ecl-discount-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "probability",
+              "header_source_ref": "源xlsx!预期信用损失的计量测试D2-10!F11",
+              "header_text": "发生概率",
+              "json_pointer": "/rows/{row_uuid}/probability",
+              "mode": "editable",
+              "source_ref": "源xlsx!预期信用损失的计量测试D2-10!F13",
+              "stable_field_key": "ecl_discount_rows/{row_uuid}/probability",
+              "store_item_id": "D2-ecl-discount-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "weighted",
+              "header_source_ref": "源xlsx!预期信用损失的计量测试D2-10!G11",
+              "header_text": "概率加权",
+              "json_pointer": "/rows/{row_uuid}/weighted",
+              "mode": "formula",
+              "source_ref": "源xlsx!预期信用损失的计量测试D2-10!G13",
+              "stable_field_key": "ecl_discount_rows/{row_uuid}/weighted",
+              "store_item_id": "D2-ecl-discount-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "ecl_rate",
+              "header_source_ref": "源xlsx!预期信用损失的计量测试D2-10!H11",
+              "header_text": "预期信用损失率",
+              "json_pointer": "/rows/{row_uuid}/expectedLossRate",
+              "mode": "editable",
+              "source_ref": "源xlsx!预期信用损失的计量测试D2-10!H13",
+              "stable_field_key": "ecl_discount_rows/{row_uuid}/ecl_rate",
+              "store_item_id": "D2-ecl-discount-rows",
+              "value_type": "amount"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "实际利率",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "G13:G15"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "ecl_discount_rows"
         }
       ]
     }

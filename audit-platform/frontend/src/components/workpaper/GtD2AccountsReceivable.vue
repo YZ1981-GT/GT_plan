@@ -332,6 +332,8 @@ const D2_MANAGED_SHEET_KEYS: Record<string, string> = {
 const D2_INSPECTION_SHEET_KEYS: Record<string, string> = {
   'D2-6': 'd26-managed',
   'D2-7': 'd27-managed',
+  'D2-9': 'd29-managed',
+  'D2-10': 'd210-managed',
   'D2-11': 'd211-managed',
   'D2-12': 'd212-managed',
   'D2-13': 'd213-managed',
