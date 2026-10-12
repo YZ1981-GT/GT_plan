@@ -143,7 +143,7 @@
 /**
  * GtD5ReceivablesFinancing.vue — D5 应收款项融资底稿主入口（比照 D4）
  */
-import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
 import { useD5FormData } from './composables/useD5FormData'
 import { useD5CrossSheet } from './composables/useD5CrossSheet'
 import { useD5EntryDualMode, type D5RenderMode } from './composables/useD5EntryDualMode'
@@ -383,6 +383,22 @@ async function switchRenderMode(target: D5RenderMode): Promise<void> {
 function onOoFallback(): void {
   void dualMode.switchMode('html')
 }
+
+// ── D5 受管 sheet 间切 tab 时重定位 OO（D4 同款）──────────────────────────────
+// 受管 sheet 共用宿主级 syncBridge，切 tab 只改 syncSheetKey → descriptor 不变 →
+// 编辑器不重建。修复：检测到受管 sheet 间切 tab 且在 OO 模式，先 leave 再重开。
+watch(currentSheet, async (newSheet, oldSheet) => {
+  if (newSheet === oldSheet) return
+  const newIsManaged = D5_MANAGED_SHEET_BY_CODE.has(newSheet)
+  const oldIsManaged = oldSheet != null && D5_MANAGED_SHEET_BY_CODE.has(oldSheet)
+  if (!newIsManaged || !oldIsManaged) return
+  if (syncBridge.mode.value !== 'oo') return
+  syncSwitching.value = true
+  try {
+    if (!syncBridge.dirty.value) await syncBridge.leaveWithoutSaving()
+    await syncBridge.switchToOnlyOffice()
+  } catch { /* 桥已记 lastError */ } finally { syncSwitching.value = false }
+})
 
 async function saveImmediateBatch(
   items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>,

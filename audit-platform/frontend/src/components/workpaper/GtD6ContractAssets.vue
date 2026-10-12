@@ -206,7 +206,7 @@
 /**
  * GtD6ContractAssets.vue — D6 合同资产底稿主入口（比照 D5）
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
 import { useD6FormData } from './composables/useD6FormData'
 import { useD6CrossSheet } from './composables/useD6CrossSheet'
 import { useD6EntryDualMode, type D6RenderMode } from './composables/useD6EntryDualMode'
@@ -483,6 +483,20 @@ async function switchRenderMode(target: D6RenderMode): Promise<void> {
 function onOoFallback(): void {
   void dualMode.switchMode('html')
 }
+
+// ── D6 受管 sheet 间切 tab 时重定位 OO（D4 同款）──────────────────────────────
+watch(currentSheet, async (newSheet, oldSheet) => {
+  if (newSheet === oldSheet) return
+  const newIsManaged = D6_MANAGED_SHEET_BY_CODE.has(newSheet)
+  const oldIsManaged = oldSheet != null && D6_MANAGED_SHEET_BY_CODE.has(oldSheet)
+  if (!newIsManaged || !oldIsManaged) return
+  if (syncBridge.mode.value !== 'oo') return
+  syncSwitching.value = true
+  try {
+    if (!syncBridge.dirty.value) await syncBridge.leaveWithoutSaving()
+    await syncBridge.switchToOnlyOffice()
+  } catch { /* 桥已记 lastError */ } finally { syncSwitching.value = false }
+})
 
 async function saveImmediateBatch(
   items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>,
