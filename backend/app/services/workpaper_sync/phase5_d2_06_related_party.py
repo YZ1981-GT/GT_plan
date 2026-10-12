@@ -79,7 +79,7 @@ INSPECTION_TEMPLATE_RELATIVE_PATH: Final[str] = (
 
 #: 检查工作簿的 SHA256 哨兵。
 INSPECTION_TEMPLATE_SHA256: Final[str] = (
-    "9e833af0fceb9af2ada456a34f109709464798d37eb2b431be1da5b66f5c3f6f"
+    "76c5c721bac37bd3f9cbf92eb3dd6dccb156cb27c8dd26e5452aa8b103ce0813"
 )
 
 #: 受管 sheet 的真实 Excel tab 名。

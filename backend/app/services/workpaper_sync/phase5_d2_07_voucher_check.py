@@ -163,6 +163,7 @@ def _rows_table_payload(
         "header_rows": 2,
         "row_identity": {"kind": "field", "json_pointer": f"/rows/*/{ROW_IDENTITY_STORE_KEY}"},
         "delete_policy": "tombstone",
+        "uuid_col": uuid_col,
         "footer_anchor": {
             "marker": FOOTER_MARKER,
             "search_column": "A",
@@ -210,12 +211,13 @@ def sheet_payload_d27() -> dict[str, Any]:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def instrumentation_spec_d27(*, entry_id: str, template_relative_path: str) -> Any:
+def instrumentation_spec_d27(*, entry_id: str, template_relative_path: str) -> tuple:
+    """D2-7 双区 instrumentation spec（同 sheet，不同行段/UUID 列）。"""
     from app.services.workpaper_sync.excel_instrumentation import ExcelInstrumentationSpec
 
-    return ExcelInstrumentationSpec(
+    current = ExcelInstrumentationSpec(
         entry_id=entry_id,
-        template_id=TEMPLATE_ID_D27,
+        template_id=TEMPLATE_ID_D27 + "CUR",
         template_relative_path=template_relative_path,
         managed_sheet=MANAGED_SHEET_D27,
         first_data_row=FIRST_DATA_ROW_CURRENT,
@@ -226,6 +228,20 @@ def instrumentation_spec_d27(*, entry_id: str, template_relative_path: str) -> A
         table_name=TABLE_NAME_CURRENT,
         sheet_key=SHEET_KEY_D27,
     )
+    post = ExcelInstrumentationSpec(
+        entry_id=entry_id,
+        template_id=TEMPLATE_ID_D27 + "POST",
+        template_relative_path=template_relative_path,
+        managed_sheet=MANAGED_SHEET_D27,
+        first_data_row=FIRST_DATA_ROW_POST,
+        last_data_row=LAST_DATA_ROW_POST,
+        footer_row=FOOTER_ROW_POST,
+        managed_last_col=MANAGED_LAST_COL,
+        uuid_col=UUID_COL_POST,
+        table_name=TABLE_NAME_POST,
+        sheet_key=SHEET_KEY_D27,
+    )
+    return (current, post)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

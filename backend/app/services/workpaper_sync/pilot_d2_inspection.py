@@ -83,7 +83,7 @@ TEMPLATE_RELATIVE_PATH: Final[str] = (
     "D/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx"
 )
 TEMPLATE_SHA256: Final[str] = (
-    "9e833af0fceb9af2ada456a34f109709464798d37eb2b431be1da5b66f5c3f6f"
+    "76c5c721bac37bd3f9cbf92eb3dd6dccb156cb27c8dd26e5452aa8b103ce0813"
 )
 
 #: 主受管 sheet（D2-6，Phase 2 首个）—— orchestration config 要求一个 primary。
@@ -181,16 +181,18 @@ def instrumentation_specs() -> tuple[ExcelInstrumentationSpec, ...]:
         from app.services.workpaper_sync.phase5_d2_07_voucher_check import (
             instrumentation_spec_d27,
         )
-        extras.append(instrumentation_spec_d27(
+        d27_specs = instrumentation_spec_d27(
             entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH,
-        ))
+        )
+        extras.extend(d27_specs)  # tuple of 2 (current + post)
     if _INCLUDE_D211_WRITEOFF:
         from app.services.workpaper_sync.phase5_d2_11_writeoff import (
             instrumentation_spec_d211,
         )
-        extras.append(instrumentation_spec_d211(
+        d211_specs = instrumentation_spec_d211(
             entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH,
-        ))
+        )
+        extras.extend(d211_specs)  # tuple of 2 (reversal + writeoff)
     if _INCLUDE_D212_PLEDGE:
         from app.services.workpaper_sync.phase5_d2_12_pledge import (
             instrumentation_spec_d212,

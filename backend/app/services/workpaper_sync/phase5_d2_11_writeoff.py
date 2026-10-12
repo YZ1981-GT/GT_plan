@@ -151,6 +151,7 @@ def _rows_table_payload(
         "header_rows": 1,
         "row_identity": {"kind": "field", "json_pointer": f"/rows/*/{ROW_IDENTITY_STORE_KEY}"},
         "delete_policy": "tombstone",
+        "uuid_col": uuid_col,
         "footer_anchor": {
             "marker": FOOTER_MARKER,
             "search_column": "A",
@@ -200,12 +201,13 @@ def sheet_payload_d211() -> dict[str, Any]:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def instrumentation_spec_d211(*, entry_id: str, template_relative_path: str) -> Any:
+def instrumentation_spec_d211(*, entry_id: str, template_relative_path: str) -> tuple:
+    """D2-11 双区 instrumentation spec（同 sheet，转回/核销各自行段+UUID 列）。"""
     from app.services.workpaper_sync.excel_instrumentation import ExcelInstrumentationSpec
 
-    return ExcelInstrumentationSpec(
+    reversal = ExcelInstrumentationSpec(
         entry_id=entry_id,
-        template_id=TEMPLATE_ID_D211,
+        template_id=TEMPLATE_ID_D211 + "REV",
         template_relative_path=template_relative_path,
         managed_sheet=MANAGED_SHEET_D211,
         first_data_row=FIRST_DATA_ROW_REVERSAL,
@@ -216,6 +218,20 @@ def instrumentation_spec_d211(*, entry_id: str, template_relative_path: str) -> 
         table_name=TABLE_NAME_REVERSAL,
         sheet_key=SHEET_KEY_D211,
     )
+    writeoff = ExcelInstrumentationSpec(
+        entry_id=entry_id,
+        template_id=TEMPLATE_ID_D211 + "WO",
+        template_relative_path=template_relative_path,
+        managed_sheet=MANAGED_SHEET_D211,
+        first_data_row=FIRST_DATA_ROW_WRITEOFF,
+        last_data_row=LAST_DATA_ROW_WRITEOFF,
+        footer_row=FOOTER_ROW_WRITEOFF,
+        managed_last_col=MANAGED_LAST_COL,
+        uuid_col=UUID_COL_WRITEOFF,
+        table_name=TABLE_NAME_WRITEOFF,
+        sheet_key=SHEET_KEY_D211,
+    )
+    return (reversal, writeoff)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

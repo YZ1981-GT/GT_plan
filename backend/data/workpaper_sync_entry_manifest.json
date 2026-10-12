@@ -33782,7 +33782,7 @@
       },
       "canonical_resolver": {
         "template_path": "D/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
-        "template_sha256": "9e833af0fceb9af2ada456a34f109709464798d37eb2b431be1da5b66f5c3f6f"
+        "template_sha256": "76c5c721bac37bd3f9cbf92eb3dd6dccb156cb27c8dd26e5452aa8b103ce0813"
       },
       "scenario_profile": {
         "component_readonly_default": "false",

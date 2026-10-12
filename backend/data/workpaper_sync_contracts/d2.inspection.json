@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "c0ad0d01b77dcfbeec0411a92feb39bd7a5072ba0e01bca636ac452895605f06",
+  "instrumentation_definition_sha256": "af78bd4d965c09ef6488ca2ca516217847f6ff8b5d986bab8cb59bec6ad28075",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d2-inspection",
@@ -513,7 +513,8 @@
             "json_pointer": "/rows/*/rowId",
             "kind": "field"
           },
-          "table_key": "vc_current_rows"
+          "table_key": "vc_current_rows",
+          "uuid_col": "R"
         },
         {
           "anchor": "A33",
@@ -786,7 +787,8 @@
             "json_pointer": "/rows/*/rowId",
             "kind": "field"
           },
-          "table_key": "vc_post_rows"
+          "table_key": "vc_post_rows",
+          "uuid_col": "S"
         }
       ]
     },
@@ -933,7 +935,8 @@
             "json_pointer": "/rows/*/rowId",
             "kind": "field"
           },
-          "table_key": "writeoff_reversal_rows"
+          "table_key": "writeoff_reversal_rows",
+          "uuid_col": "I"
         },
         {
           "anchor": "A18",
@@ -1071,7 +1074,8 @@
             "json_pointer": "/rows/*/rowId",
             "kind": "field"
           },
-          "table_key": "writeoff_writeoff_rows"
+          "table_key": "writeoff_writeoff_rows",
+          "uuid_col": "J"
         }
       ]
     },
@@ -1341,9 +1345,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "22a42ebe2a00f15fb12872f92b73417014b5f537d664afa8accf83f8ae416506",
+    "normalized_structure_hash": "bb0f07d559d2f470782fd8b6c2eed00ca1e6aa75b1d2340a584858b160995eac",
     "relative_path": "D/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
-    "template_sha256": "9e833af0fceb9af2ada456a34f109709464798d37eb2b431be1da5b66f5c3f6f"
+    "template_sha256": "76c5c721bac37bd3f9cbf92eb3dd6dccb156cb27c8dd26e5452aa8b103ce0813"
   },
-  "template_definition_sha256": "759d0632c7e5d3e79f2814e15ec5118fcbfc835b9f00cda6d4fda74d8748b2da"
+  "template_definition_sha256": "47f3b3ea26a75035ad4b65a1f0405441adf14ae6454d2b05ae05f2431bdfbb7f"
 }
