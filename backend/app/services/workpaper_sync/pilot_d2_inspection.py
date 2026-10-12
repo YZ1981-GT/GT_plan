@@ -538,3 +538,8 @@ register_adapter = _orch.register_adapter
 resolve_published_frozen_definitions = _orch.resolve_published_frozen_definitions
 manifest_capability_enabled = _orch.manifest_capability_enabled
 assert_manifest_capability_enabled = _orch.assert_manifest_capability_enabled
+
+# ── pilot 命名别名（fix_task76_provision 脚本要求这两个名字）──────────────
+publish_pilot_definitions = publish_definitions
+attach_pilot_adapters = attach_adapters
+PILOT_WP_CODES = WP_CODES
