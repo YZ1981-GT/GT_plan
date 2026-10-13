@@ -713,7 +713,7 @@ function onSampleFilled(payload: any) {
     lastRow.disposalDate = s.voucherDate || ''
     // 多科目时拼接所有对方科目代码和名称
     const entries = s.voucherEntries || []
-    if (s.counterpartAccount === '多科目' && entries.length > 0) {
+    if ((s.isMultiAccount || s.counterpartAccount === '多科目') && entries.length > 0) {
       const sCredit = Number(s.creditAmount ?? 0)
       const counterEntries = entries.filter((e: any) =>
         sCredit > 0 ? (e.debit_amount && Number(e.debit_amount) > 0) : (e.credit_amount && Number(e.credit_amount) > 0)

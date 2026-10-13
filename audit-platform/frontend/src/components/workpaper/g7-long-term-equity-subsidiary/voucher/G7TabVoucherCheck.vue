@@ -749,7 +749,7 @@ function onSampleFilled(payload: {
   for (const s of samples) {
     const entries = (s as any).voucherEntries || []
     const cpAccount = (s as any).counterpartAccount ?? s.counterAccount ?? ''
-    const isMulti = cpAccount === '多科目' && entries.length > 0
+    const isMulti = ((s as any).isMultiAccount || cpAccount === '多科目') && entries.length > 0
     if (isMulti) {
       const sDebit = parseNum(s.debitAmount ?? s.amount)
       const counterEntries = entries.filter((e: any) =>

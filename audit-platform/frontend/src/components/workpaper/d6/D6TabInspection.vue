@@ -508,7 +508,7 @@ function onSampleFilled(payload: any) {
         remark: '',
       }
       const entries = s.voucherEntries || []
-      const isMulti = s.counterpartAccount === '多科目' && entries.length > 0
+      const isMulti = (s.isMultiAccount || s.counterpartAccount === '多科目') && entries.length > 0
       if (isMulti) {
         const sDebit = Number(s.debitAmount ?? 0)
         const counterEntries = entries.filter((e: any) => {

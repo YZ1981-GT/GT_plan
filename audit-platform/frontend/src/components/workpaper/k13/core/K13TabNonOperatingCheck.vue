@@ -677,7 +677,7 @@ function handleVoucherFilled(payload: any): void {
     const voucherNo = v.voucherNo || ''
     if (voucherNo && existing.has(voucherNo)) continue
     const entries = v.voucherEntries || []
-    const isMulti = v.counterpartAccount === '多科目' && entries.length > 0
+    const isMulti = (v.isMultiAccount || v.counterpartAccount === '多科目') && entries.length > 0
     if (isMulti) {
       const vDebit = Number(v.debitAmount ?? 0)
       const counterEntries = entries.filter((e: any) =>

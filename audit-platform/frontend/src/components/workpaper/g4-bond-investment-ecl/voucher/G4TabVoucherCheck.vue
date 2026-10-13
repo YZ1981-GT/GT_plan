@@ -863,7 +863,7 @@ function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase
   // 将抽样结果映射为 fillVoucherSamples 所需格式
   const mappedSamples = payload.samples.flatMap(s => {
     const entries = s.voucherEntries || []
-    const isMulti = s.counterpartAccount === '多科目' && entries.length > 0
+    const isMulti = (s.isMultiAccount || s.counterpartAccount === '多科目') && entries.length > 0
     const section = (s.debitAmount && parseFloat(s.debitAmount) > 0 ? 'debit' : 'credit') as 'debit' | 'credit'
     if (isMulti) {
       const sDebit = s.debitAmount ? parseFloat(s.debitAmount) : 0

@@ -578,7 +578,7 @@ function handleSamplingFilled(payload: { samples: SampledVoucher[] } | SampledVo
     const debit = parseFloat(s.debitAmount ?? '0') || 0
     const credit = parseFloat(s.creditAmount ?? '0') || 0
     const entries = s.voucherEntries || []
-    const isMulti = s.counterpartAccount === '多科目' && entries.length > 0
+    const isMulti = (s.isMultiAccount || s.counterpartAccount === '多科目') && entries.length > 0
     if (isMulti) {
       const counterEntries = entries.filter((e: any) =>
         debit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)

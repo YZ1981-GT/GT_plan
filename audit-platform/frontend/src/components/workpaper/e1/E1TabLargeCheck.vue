@@ -145,7 +145,7 @@ function onSampleFilled(payload: any): void {
 
     // 多科目凭证：按对方分录逐行展开（每个对方科目+金额一行）
     const entries = s.voucherEntries || []
-    const isMulti = s.counterpartAccount === '多科目' && entries.length > 0
+    const isMulti = (s.isMultiAccount || s.counterpartAccount === '多科目') && entries.length > 0
     if (isMulti) {
       // 找出对方分录（与当前行方向相反的那些）
       const counterEntries = entries.filter((e: any) => {
