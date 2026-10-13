@@ -169,6 +169,12 @@
                     <span>查账</span>
                   </div>
                 </el-tooltip>
+                <el-tooltip content="在独立窗口打开查账（可同时保持查账界面操作底稿）" placement="top">
+                  <div class="gt-quick-btn" @click="onOpenLedgerWindow">
+                    <el-icon :size="20" color="var(--gt-color-primary)"><CopyDocument /></el-icon>
+                    <span>查账窗口</span>
+                  </div>
+                </el-tooltip>
                 <el-tooltip content="交付件管理中心：导出、版本、预览、审批、归档" placement="top">
                   <div class="gt-quick-btn" @click="goTo('deliverable-center')">
                     <el-icon :size="20" color="var(--gt-color-primary-dark)"><Finished /></el-icon>
@@ -617,6 +623,7 @@ import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import PlatformUserGuideDialog from '@/components/layout/PlatformUserGuideDialog.vue'
 import { useNavigationStack } from '@/composables/useNavigationStack'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { openLedgerWindow } from '@/utils/openLedgerWindow'
 
 const props = defineProps<{ project: any | null }>()
 const router = useRouter()
@@ -925,6 +932,11 @@ function goTo(page: string, extraQuery?: Record<string, string>) {
     path: `/projects/${props.project.id}/${page}`,
     query: { year: String(projectYear.value), ...extraQuery },
   })
+}
+
+function onOpenLedgerWindow() {
+  if (!props.project) return
+  openLedgerWindow(props.project.id, projectYear.value)
 }
 
 /**

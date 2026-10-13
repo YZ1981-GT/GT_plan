@@ -1395,3 +1395,11 @@ backend/app/services/note_word_exporter.py 1706
 #   回归/变异（14 例）= 67 例。拆分方向：按 spec 分文件但两个 spec 共享 mock 基础设施
 #   和 binding 工厂，属独立任务。baseline 取当前真实行数。
 backend/tests/test_formula_push_note_skip.py  1926
+
+#   LedgerPenetration.vue —— 查账穿透页面，承载 7 个表格视图（4 个 tab + 3 层穿透）。
+#     本次新增摘要列折行样式、虚拟滚动勾选列、Tab 导出Excel 函数、辅助明细渐进加载。
+#     拆分方向：4 个 tab 区域（科目余额/辅助余额/序时账/辅助明细）可抽为子组件。
+audit-platform/frontend/src/views/LedgerPenetration.vue  5110
+#   DetailProjectPanel.vue —— 项目概览大厅面板。本次仅 +12 行（查账窗口入口按钮）。
+#     拆分方向：核心流程/辅助工具/看板区域 3 块可抽子组件。
+audit-platform/frontend/src/components/layout/DetailProjectPanel.vue  1726
