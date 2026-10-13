@@ -231,7 +231,10 @@ async def confirm_mapping(
             {"bound": str(binding.template_version_id), "requested": str(template_version_id)},
         )
 
-    # 校验来源结构是否在 preview 后变化
+    # 校验来源结构是否在 preview 后变化（客户端辅助校验）
+    # ⚠ current_entity_hashes 由客户端传入，非服务端权威值。恶意用户可伪造使校验跳过，
+    # 但后果仅是自身项目数据不一致（不影响他人）。服务端权威校验在 apply 阶段的
+    # preview_entity_hashes 检查中（apply 会重新读 DB 计算真实 hash）。
     if current_entity_hashes:
         for ent in entity_node_keys:
             nk = ent["node_key"]

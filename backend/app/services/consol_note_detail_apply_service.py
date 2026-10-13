@@ -152,24 +152,25 @@ async def apply_detail_refresh(
     # stale 企业不参与但不阻断（R4.3.2）
     stale_node_keys = {b.entity_node_key for b in stale}
 
-    # ── 5. 按规则转换 + 金额汇总 ──
+    # ── 5. 一次性加载全部 confirmed 企业来源行（消除重复查询） ──
     from app.services.consol_note_detail_source_service import load_entity_source_rows
 
-    # 初始化列数：从来源行的实际列数推导，最少 3 列（项目名+本期+上期）
-    width = 3
+    entity_source_cache: dict[str, list[Any]] = {}
+    width = 3  # 最少 3 列（项目名+本期+上期）
     for b in confirmed:
-        rule = rule_cache.get(b.rule_id)
-        if rule is None:
-            continue
-        source_rows = await load_entity_source_rows(db, b.entity_project_id, section_id, year)
-        for sr in source_rows:
+        cache_key = f"{b.entity_project_id}:{section_id}:{year}"
+        if cache_key not in entity_source_cache:
+            entity_source_cache[cache_key] = await load_entity_source_rows(
+                db, b.entity_project_id, section_id, year,
+            )
+        # 从所有企业取 max width（不只第一个）
+        for sr in entity_source_cache[cache_key]:
             if isinstance(sr, (list, tuple)):
                 width = max(width, len(sr))
             elif isinstance(sr, dict):
                 vals = sr.get("values") or sr.get("cells") or {}
                 if isinstance(vals, dict):
                     width = max(width, max((int(k) for k in vals if str(k).isdigit()), default=0) + 1)
-        break  # 只取第一个企业的列数即可（同结构组列数相同）
 
     # 目标金额汇总
     target_amounts: dict[int, dict[int, Decimal]] = {}
@@ -183,7 +184,8 @@ async def apply_detail_refresh(
         if rule is None:
             continue
 
-        source_rows = await load_entity_source_rows(db, b.entity_project_id, section_id, year)
+        cache_key = f"{b.entity_project_id}:{section_id}:{year}"
+        source_rows = entity_source_cache.get(cache_key, [])
         # 建立来源标签→行的索引
         source_by_label: dict[str, list[dict[str, Any]]] = {}
         for sr in source_rows:
@@ -329,11 +331,9 @@ async def apply_detail_refresh(
 
 
 def _first_cell(row: Any) -> str:
-    if isinstance(row, dict):
-        return str(row.get("label") or row.get("name") or "")
-    if isinstance(row, (list, tuple)) and row:
-        return str(row[0] or "")
-    return ""
+    """提取行标签——复用 source service 的同名函数（已在顶部 import）。"""
+    from app.services.consol_note_detail_source_service import _first_cell as _fc
+    return _fc(row)
 
 
 def _extract_amounts(row: Any, width: int) -> dict[int, Decimal]:
