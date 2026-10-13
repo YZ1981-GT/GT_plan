@@ -278,22 +278,36 @@ async def apply_detail_refresh(
                     row[col] = formatted
                     filled.append({"row": i, "col": col, "value": formatted, "target_name": tr.get("canonical_name", "")})
 
-        # 合计行自动求和：遍历已构建的所有行，跳过 total/subtotal 行本身，对数据行求和
-        # 语义：total = Σ(所有 data 行)，不含 subtotal（subtotal 若有则由前端处理分段小计）
-        if tr.get("row_type") == "total":
+        # 合计行 / 小计行自动求和
+        # subtotal：向上找到最近的 total/subtotal 行（不含），对中间的 data 行求和
+        # total：对所有非 total/subtotal 的 data 行求和（全表合计）
+        if tr.get("row_type") in ("total", "subtotal"):
             for col in range(1, width):
                 if (i, col) in protected:
                     old_val = _get_existing_cell(existing_rows, i, col)
                     row[col] = old_val
                     continue
                 total = Decimal("0")
-                for j in range(len(new_rows)):
-                    if j < len(template_rows) and template_rows[j].get("row_type") in ("total", "subtotal"):
-                        continue
-                    try:
-                        total += Decimal(str(new_rows[j][col]).replace(",", "")) if new_rows[j][col] else Decimal("0")
-                    except Exception:
-                        pass
+                if tr.get("row_type") == "subtotal":
+                    # subtotal：从当前行往上找到最近的 total/subtotal 边界
+                    for j in range(len(new_rows) - 1, -1, -1):
+                        jt = template_rows[j].get("row_type", "data") if j < len(template_rows) else "data"
+                        if jt in ("total", "subtotal"):
+                            break  # 遇到上一个合计/小计行即停
+                        try:
+                            total += Decimal(str(new_rows[j][col]).replace(",", "")) if new_rows[j][col] else Decimal("0")
+                        except Exception:
+                            pass
+                else:
+                    # total：全表所有 data 行求和（跳过 total/subtotal）
+                    for j in range(len(new_rows)):
+                        jt = template_rows[j].get("row_type", "data") if j < len(template_rows) else "data"
+                        if jt in ("total", "subtotal"):
+                            continue
+                        try:
+                            total += Decimal(str(new_rows[j][col]).replace(",", "")) if new_rows[j][col] else Decimal("0")
+                        except Exception:
+                            pass
                 row[col] = str(total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
         new_rows.append(row)

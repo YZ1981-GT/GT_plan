@@ -479,3 +479,66 @@ class TestApplyMergeAction:
         # 工资100 + 奖金50 = 150
         assert Decimal(rows[0][1]) == Decimal("150")
         assert Decimal(rows[0][2]) == Decimal("120")  # 80+40
+
+
+class TestApplySubtotal:
+    """subtotal 行只对本段 data 行求和，不含上一个小计以上的行。"""
+
+    @pytest.mark.asyncio
+    async def test_subtotal_sums_only_current_segment(self, db, user, consol_project, child_projects):
+        """模板：A / B / 小计 / C / D / 合计。subtotal 只求 A+B，total 求 A+B+C+D。"""
+        source = [["A", "10", "5"], ["B", "20", "10"], ["C", "30", "15"], ["D", "40", "20"]]
+        await _seed_disclosure(db, child_projects[0].id, source)
+        tmpl = await create_template(
+            db, template_type="soe", section_id=_SECTION,
+            rows=[
+                {"canonical_name": "A"},
+                {"canonical_name": "B"},
+                {"canonical_name": "小计", "row_type": "subtotal"},
+                {"canonical_name": "C"},
+                {"canonical_name": "D"},
+                {"canonical_name": "合计", "row_type": "total"},
+            ],
+            created_by=user.id,
+        )
+        tr = tmpl["latest_version"]["rows"]
+        vid = UUID(tmpl["latest_version"]["id"])
+        await bind_template_version(db, project_id=consol_project.id, section_id=_SECTION,
+                                    template_version_id=vid, bound_by=user.id)
+        h = compute_source_structure_hash(_SECTION, source)
+        await confirm_mapping(
+            db, project_id=consol_project.id, section_id=_SECTION, year=_YEAR,
+            template_version_id=vid, source_structure_hash=h,
+            mappings=[
+                {"source_label": "A", "target_row_id": tr[0]["target_row_id"], "mapping_action": "map"},
+                {"source_label": "B", "target_row_id": tr[1]["target_row_id"], "mapping_action": "map"},
+                {"source_label": "C", "target_row_id": tr[3]["target_row_id"], "mapping_action": "map"},
+                {"source_label": "D", "target_row_id": tr[4]["target_row_id"], "mapping_action": "map"},
+            ],
+            entity_node_keys=[{"node_key": "A:sub", "project_id": str(child_projects[0].id), "hash": h}],
+            confirmed_by=user.id,
+        )
+
+        result = await apply_detail_refresh(db, project_id=consol_project.id, section_id=_SECTION, year=_YEAR)
+        assert result["status"] == "applied"
+
+        import sqlalchemy as sa
+        record = (await db.execute(
+            sa.select(ConsolNoteData).where(
+                ConsolNoteData.project_id == consol_project.id, ConsolNoteData.section_id == _SECTION,
+            )
+        )).scalar_one()
+        rows = record.data["rows"]
+        # A=10, B=20, 小计=30(A+B), C=30, D=40, 合计=100(A+B+C+D)
+        assert rows[0][0] == "A"
+        assert Decimal(rows[0][1]) == Decimal("10")
+        assert rows[1][0] == "B"
+        assert Decimal(rows[1][1]) == Decimal("20")
+        assert rows[2][0] == "小计"
+        assert Decimal(rows[2][1]) == Decimal("30")   # subtotal = A+B
+        assert rows[3][0] == "C"
+        assert Decimal(rows[3][1]) == Decimal("30")
+        assert rows[4][0] == "D"
+        assert Decimal(rows[4][1]) == Decimal("40")
+        assert rows[5][0] == "合计"
+        assert Decimal(rows[5][1]) == Decimal("100")   # total = A+B+C+D

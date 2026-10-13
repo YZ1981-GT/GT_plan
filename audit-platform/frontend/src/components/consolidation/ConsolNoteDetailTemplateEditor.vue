@@ -9,7 +9,16 @@
     </div>
 
     <el-table :data="editRows" border size="small" max-height="400" row-key="target_row_id">
-      <el-table-column label="序号" width="60" align="center">
+      <el-table-column label="↕" width="50" align="center">
+        <template #default="{ $index }">
+          <span class="gt-drag-handle" draggable="true"
+            @dragstart="onDragStart($index, $event)"
+            @dragover.prevent="onDragOver($index)"
+            @drop="onDrop($index)"
+            style="cursor:grab;user-select:none">☰</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="序号" width="50" align="center">
         <template #default="{ $index }">{{ $index + 1 }}</template>
       </el-table-column>
       <el-table-column label="规范名称" min-width="200">
@@ -31,8 +40,10 @@
           </el-select>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="80" align="center">
+      <el-table-column label="操作" width="120" align="center">
         <template #default="{ $index }">
+          <el-button size="small" text :disabled="$index === 0" @click="moveRow($index, -1)">↑</el-button>
+          <el-button size="small" text :disabled="$index === editRows.length - 1" @click="moveRow($index, 1)">↓</el-button>
           <el-button size="small" type="danger" text @click="removeRow($index)">删除</el-button>
         </template>
       </el-table-column>
@@ -120,6 +131,38 @@ function emptyRow(): EditRow {
 
 function addRow() {
   editRows.value.push(emptyRow())
+}
+
+// ── 拖拽排序（HTML5 Drag & Drop） ──
+let dragFromIndex = -1
+
+function onDragStart(index: number, event: DragEvent) {
+  dragFromIndex = index
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(index))
+  }
+}
+
+function onDragOver(index: number) {
+  // prevent default 已在模板 @dragover.prevent 处理
+}
+
+function onDrop(toIndex: number) {
+  if (dragFromIndex < 0 || dragFromIndex === toIndex) return
+  const rows = editRows.value
+  const [moved] = rows.splice(dragFromIndex, 1)
+  rows.splice(toIndex, 0, moved)
+  dragFromIndex = -1
+}
+
+function moveRow(index: number, direction: -1 | 1) {
+  const target = index + direction
+  if (target < 0 || target >= editRows.value.length) return
+  const rows = editRows.value
+  const temp = rows[index]
+  rows[index] = rows[target]
+  rows[target] = temp
 }
 
 async function removeRow(idx: number) {
