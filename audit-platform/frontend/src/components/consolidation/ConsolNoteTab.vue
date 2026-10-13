@@ -715,6 +715,7 @@ import {
   type NoteEditRow,
 } from '@/components/consolidation/composables/consolNoteView'
 import { useAcnr } from '@/services/acnr/useAcnr'
+import ConsolNoteMappingDialog from '@/components/consolidation/ConsolNoteMappingDialog.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
@@ -1009,6 +1010,13 @@ const { isEditing: noteEditMode, isDirty: noteDirty, enterEdit: enterNoteEdit, e
 const { isFullscreen: noteFullscreen, toggleFullscreen: toggleNoteFullscreen } = useFullscreen()
 const formulaFilling = ref(false)
 const reaggregating = ref(false)
+const showMappingDialog = ref(false)
+
+/** 明细刷新 apply 完成后重读当前章节 */
+async function onDetailRefreshApplied() {
+  const sec = selectedNoteSection.value
+  if (sec) await reloadCurrentSectionAfterRefresh()
+}
 const noteSingleAuditLoading = ref(false)
 const noteFileRef = ref<HTMLInputElement | null>(null)
 const noteTableRef = ref<any>(null)

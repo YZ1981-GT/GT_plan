@@ -1251,3 +1251,40 @@ export async function fillConsolNoteByFormula(
   // 400（模板口径不匹配）/ 423（合并锁定）须由附注页带具体操作语境展示，抑制全局重复 toast
   return api.post(qstr ? `${url}?${qstr}` : url, undefined, { _silent: true } as any)
 }
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 合并附注明细模板与多企业行映射规则（spec: consol-note-detail-template-and-mapping）
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface DetailTemplateRow { target_row_id: string; canonical_name: string; aliases: string[]; sort_order: number; row_type: 'data' | 'total' | 'subtotal' }
+export interface DetailTemplateVersion { id: string; template_id: string; version_number: number; rows: DetailTemplateRow[]; change_note: string | null; created_by: string | null; created_at: string | null }
+export interface DetailTemplate { id: string; template_type: 'soe' | 'listed'; section_id: string; name: string; visibility: 'draft' | 'project' | 'firm'; created_by: string | null; created_at: string | null; latest_version?: DetailTemplateVersion }
+export interface DetailTemplateBinding { id: string; project_id: string; section_id: string; template_version_id: string; version_number: number | null; bound_by: string | null; bound_at: string | null }
+export interface MappingRuleItem { source_label: string; source_row_key?: string; target_row_id: string; mapping_action: 'map' | 'map_merge' | 'create' | 'ignore'; ignore_reason?: string }
+export interface MappingRule { id: string; project_id: string; section_id: string; template_version_id: string; source_structure_hash: string; version_number: number; mappings: MappingRuleItem[]; confirmed_by: string | null; confirmed_at: string | null; is_active: boolean }
+export interface SourceGroup { hash: string; section_id: string; source_rows: Array<{ label: string; row_type: string; key: string }>; entities: Array<{ node_key: string; project_id: string; company_name: string }>; has_rule: boolean; rule_id: string | null; all_confirmed: boolean }
+export interface StaleEntity { node_key: string; company_name: string; old_hash: string; new_hash: string; status: 'stale' }
+export interface MappingSuggestion { source_label: string; suggested_target: { target_row_id: string; canonical_name: string } | null; confidence: number; match_type: 'exact' | 'alias' | 'fuzzy' | 'history' | 'manual'; candidates: any[] }
+export interface DetailRefreshPreview { preview_token: string; project_id: string; section_id: string; year: number; template_version_id: string | null; template_rows: DetailTemplateRow[]; groups: SourceGroup[]; stale_entities: StaleEntity[]; suggestions: MappingSuggestion[]; entity_count: number; group_count: number; stale_count: number }
+export interface ConfirmMappingResult { action: 'confirmed'; rule_id: string; version_number: number; bound_count: number; excluded_count: number }
+export interface ApplyDetailResult { status: 'applied' | 'skipped_locked'; section_id: string; node_key?: string | null; applied_entity_count?: number; filled_count?: number; kept_manual_count?: number; reason?: string }
+export interface SuggestTemplateResult { section_id: string; entity_count: number; group_count: number; suggested_rows: Array<DetailTemplateRow & { frequency: number; total_amount: number; entity_total: number }> }
+
+export async function createDetailTemplate(data: { template_type: string; section_id: string; name?: string; visibility?: string; rows: Array<Partial<DetailTemplateRow>>; change_note?: string }): Promise<DetailTemplate> { return api.post('/api/consol-note-templates', data) }
+export async function listDetailTemplates(params?: { template_type?: string; section_id?: string; visibility?: string }): Promise<DetailTemplate[]> { const qs = new URLSearchParams(); if (params?.template_type) qs.set('template_type', params.template_type); if (params?.section_id) qs.set('section_id', params.section_id); if (params?.visibility) qs.set('visibility', params.visibility); const q = qs.toString(); return api.get(`/api/consol-note-templates${q ? `?${q}` : ''}`) }
+export async function getDetailTemplate(templateId: string): Promise<DetailTemplate> { return api.get(`/api/consol-note-templates/${templateId}`) }
+export async function addDetailTemplateVersion(templateId: string, data: { rows: Array<Partial<DetailTemplateRow>>; change_note?: string }): Promise<DetailTemplateVersion> { return api.post(`/api/consol-note-templates/${templateId}/versions`, data) }
+export async function getDetailTemplateVersions(templateId: string): Promise<DetailTemplateVersion[]> { return api.get(`/api/consol-note-templates/${templateId}/versions`) }
+export async function deleteDetailTemplate(templateId: string): Promise<{ id: string; deleted: boolean }> { return api.delete(`/api/consol-note-templates/${templateId}`) }
+export async function checkRowDeletion(templateId: string, targetRowIds: string[]): Promise<{ affected_rule_count: number; affected_entity_count: number; details: any[] }> { return api.post(`/api/consol-note-templates/${templateId}/check-row-deletion`, { target_row_ids: targetRowIds }) }
+export async function bindDetailTemplate(projectId: string, sectionId: string, data: { template_version_id: string; confirm?: boolean }): Promise<any> { return api.put(`/api/projects/${projectId}/consol-note-template-binding/${sectionId}`, data) }
+export async function getDetailTemplateBindings(projectId: string): Promise<DetailTemplateBinding[]> { return api.get(`/api/projects/${projectId}/consol-note-template-binding`) }
+export async function getDetailTemplateBinding(projectId: string, sectionId: string): Promise<DetailTemplateBinding | null> { try { return await api.get(`/api/projects/${projectId}/consol-note-template-binding/${sectionId}`) } catch { return null } }
+export async function getDetailMappingRules(projectId: string, sectionId?: string): Promise<MappingRule[]> { const qs = sectionId ? `?section_id=${encodeURIComponent(sectionId)}` : ''; return api.get(`/api/projects/${projectId}/consol-note-mapping/rules${qs}`) }
+export async function createDetailMappingRule(projectId: string, data: { section_id: string; template_version_id: string; source_structure_hash: string; mappings: MappingRuleItem[] }): Promise<MappingRule> { return api.post(`/api/projects/${projectId}/consol-note-mapping/rules`, data) }
+export async function deactivateDetailMappingRule(projectId: string, ruleId: string): Promise<{ id: string; deactivated: boolean }> { return api.put(`/api/projects/${projectId}/consol-note-mapping/rules/${ruleId}/deactivate`, {}) }
+export async function previewDetailRefresh(projectId: string, sectionId: string, year: number): Promise<DetailRefreshPreview> { return api.post(`/api/projects/${projectId}/consol-note-detail-refresh/preview`, { section_id: sectionId, year }) }
+export async function suggestDetailTemplate(projectId: string, sectionId: string, year: number): Promise<SuggestTemplateResult> { return api.post(`/api/projects/${projectId}/consol-note-detail-refresh/suggest-template`, { section_id: sectionId, year }) }
+export async function confirmDetailMapping(projectId: string, data: { section_id: string; year: number; template_version_id: string; source_structure_hash: string; mappings: MappingRuleItem[]; entity_node_keys: Array<{ node_key: string; project_id: string; hash: string }>; excluded_node_keys?: string[]; preview_token?: string; current_entity_hashes?: Record<string, string> }): Promise<ConfirmMappingResult> { return api.post(`/api/projects/${projectId}/consol-note-detail-refresh/confirm-mapping`, data) }
+export async function applyDetailRefresh(projectId: string, data: { section_id: string; year: number; node_key?: string | null; preview_entity_hashes?: Record<string, string> }): Promise<ApplyDetailResult> { return api.post(`/api/projects/${projectId}/consol-note-detail-refresh/apply`, data) }
