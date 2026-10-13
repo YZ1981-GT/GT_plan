@@ -3,6 +3,12 @@ import axios from 'axios'
 import http from '@/utils/http'
 import { API } from '@/services/apiPaths'
 import { clearOnLogout } from '@/utils/aiChatCacheCleanup'
+import {
+  broadcastTokenUpdate,
+  broadcastLogout,
+  listenAuthEvents,
+  singleFlightRefresh,
+} from '@/utils/crossWindowAuth'
 
 /**
  * 认证专用 axios 实例（不带 auth 拦截器，避免循环依赖）。
@@ -89,6 +95,8 @@ export const useAuthStore = defineStore('auth', {
       sessionStorage.removeItem('user')
       // Task 10: 清理 AI 聊天敏感缓存
       clearOnLogout()
+      // 多窗口：广播登出事件给其他窗口（multi-window-ledger-workbench Task 10）
+      broadcastLogout()
       try {
         await authHttp.post('/api/auth/logout', {
           refresh_token: refreshToken,
@@ -101,22 +109,34 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async refreshAccessToken() {
-      const { data } = await authHttp.post('/api/auth/refresh', {
-        refresh_token: this.refreshToken,
+      // 多窗口安全：Web Locks 保证同一时刻只有一个标签页执行刷新
+      // 其他标签页排队等待，避免 refresh token rotation 冲突
+      // spec: multi-window-ledger-workbench Phase 2 Task 9
+      await singleFlightRefresh(async () => {
+        // 刷新前先检查 token 是否已被其他窗口更新（锁等待期间可能已收到广播）
+        const freshToken = sessionStorage.getItem('token')
+        if (freshToken && freshToken !== this.token) {
+          this.token = freshToken
+          this.refreshToken = sessionStorage.getItem('refreshToken') || this.refreshToken
+          return
+        }
+
+        const { data } = await authHttp.post('/api/auth/refresh', {
+          refresh_token: this.refreshToken,
+        })
+        const payload = data?.data ?? data
+        const accessToken = payload?.access_token
+        if (typeof accessToken !== 'string' || !accessToken) {
+          throw new Error('刷新令牌响应缺少 access_token')
+        }
+        this.token = accessToken
+        this.refreshToken = payload.refresh_token ?? this.refreshToken
+        sessionStorage.setItem('token', accessToken)
+        sessionStorage.setItem('refreshToken', this.refreshToken!)
+
+        // 广播新 token 给其他窗口
+        broadcastTokenUpdate(accessToken, this.refreshToken!)
       })
-      // 🔴 与 login 同样解信封：后端 ResponseWrapperMiddleware 把响应包成 {code, message, data}，而 authHttp
-      //    不经 http.ts 拦截器、不会自动解包。旧实现直接读 `data.access_token` 恒为 undefined ⇒ 把字符串
-      //    "undefined" 存成 token、丢掉后端已轮换出的新 refresh_token（旧的已被拉黑）⇒ 令牌刷新从未成功过。
-      const payload = data?.data ?? data
-      const accessToken = payload?.access_token
-      if (typeof accessToken !== 'string' || !accessToken) {
-        throw new Error('刷新令牌响应缺少 access_token')
-      }
-      // Token Rotation: 后端每次刷新都签发新的 refresh_token
-      this.token = accessToken
-      this.refreshToken = payload.refresh_token ?? this.refreshToken
-      sessionStorage.setItem('token', accessToken)
-      sessionStorage.setItem('refreshToken', this.refreshToken!)
     },
 
     async fetchUserProfile() {
@@ -127,3 +147,45 @@ export const useAuthStore = defineStore('auth', {
     },
   },
 })
+
+// ── 多窗口认证事件监听（multi-window-ledger-workbench Phase 2 Task 10） ──
+// 在模块加载时立即注册，确保所有窗口都能收到认证广播。
+// 🔴 必须在 store 定义之后调用，因为 handlers 需要访问 store 实例。
+if (typeof window !== 'undefined') {
+  // 延迟到 Pinia 初始化后执行
+  setTimeout(() => {
+    try {
+      const authStore = useAuthStore()
+      listenAuthEvents({
+        onTokenUpdate: (token, refreshToken) => {
+          authStore.token = token
+          authStore.refreshToken = refreshToken
+          sessionStorage.setItem('token', token)
+          sessionStorage.setItem('refreshToken', refreshToken)
+        },
+        onLogout: () => {
+          authStore.token = null
+          authStore.refreshToken = null
+          authStore.user = null
+          sessionStorage.removeItem('token')
+          sessionStorage.removeItem('refreshToken')
+          sessionStorage.removeItem('user')
+          clearOnLogout()
+          window.location.href = '/login'
+        },
+        onSessionRequest: () => {
+          if (authStore.token && authStore.refreshToken) {
+            return {
+              token: authStore.token,
+              refreshToken: authStore.refreshToken,
+              user: authStore.user,
+            }
+          }
+          return null
+        },
+      })
+    } catch {
+      // Pinia 未初始化时静默（SSR 或测试环境）
+    }
+  }, 0)
+}

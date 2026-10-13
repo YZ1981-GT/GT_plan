@@ -65,6 +65,31 @@ router.onError((error) => {
 // 性能监控
 initWebVitals()
 
+// 多窗口：新窗口启动时若 sessionStorage 无 token，通过 BroadcastChannel 向已有窗口请求会话
+// spec: multi-window-ledger-workbench Phase 2 Task 12
+// 场景：用户手动在地址栏输入独立查账 URL，浏览器新建标签页没有 opener 复制的 sessionStorage
+import { requestSession } from './utils/crossWindowAuth'
+;(async () => {
+  try {
+    if (!sessionStorage.getItem('token')) {
+      const session = await requestSession()
+      if (session) {
+        sessionStorage.setItem('token', session.token)
+        sessionStorage.setItem('refreshToken', session.refreshToken)
+        if (session.user) sessionStorage.setItem('user', JSON.stringify(session.user))
+        // Pinia store 在 app.use(createPinia()) 后可用，手动同步
+        const { useAuthStore } = await import('./stores/auth')
+        const authStore = useAuthStore()
+        authStore.token = session.token
+        authStore.refreshToken = session.refreshToken
+        authStore.user = session.user
+      }
+    }
+  } catch {
+    // BroadcastChannel 不可用或超时 → 路由守卫会跳登录页，不阻塞启动
+  }
+})()
+
 // 离线缓存 Service Worker 注册（Phase 8 Task 5.2）
 registerServiceWorker()
 

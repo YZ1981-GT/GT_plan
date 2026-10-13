@@ -36,7 +36,7 @@
 
     <!-- 编辑锁提示 -->
     <el-alert v-if="editLock.locked.value && !editLock.isMine.value" type="warning" :closable="false" style="margin-bottom: 8px">
-      {{ editLock.lockedBy.value || '其他用户' }} 正在编辑，当前为只读模式
+      {{ editLock.lockedBy.value || '其他用户' }} 正在编辑，当前为只读模式（所有保存已禁用）
     </el-alert>
 
     <!-- 错报超限警告横幅（需求 20.2） -->
@@ -254,6 +254,10 @@ watch(() => isEditing.value, async (editing) => {
 })
 watch(() => editLock.isMine.value, (mine) => {
   if (!mine && isEditing.value) exitEdit()
+})
+// 多窗口门禁：forcedReadonly 时也强制退出编辑（复盘 P0-3）
+watch(() => editLock.forcedReadonly.value, (readonly) => {
+  if (readonly && isEditing.value) exitEdit()
 })
 
 const loading = ref(false)

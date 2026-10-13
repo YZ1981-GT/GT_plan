@@ -63,6 +63,7 @@
             <el-icon><Clock /></el-icon> 版本历史
           </el-button>
           <!-- HTML 路径此前无「面板」入口；SidePanel/AttachmentTabPanel 仅挂在 Univer 分支会导致 Drawer_Host 不可达 -->
+          <el-button size="small" plain @click="onOpenLedgerWindow" title="在独立窗口打开查账">📊 查账</el-button>
           <el-badge :value="fineCheckFailCount" :max="99" :hidden="fineCheckFailCount === 0" type="danger">
             <el-button size="small" @click="showSidePanel = !showSidePanel">📋 面板</el-button>
           </el-badge>
@@ -114,6 +115,7 @@
           @click="showAuditNavDrawer = true"
           style="margin-right: 8px"
         >🧭 审计导航图</el-button>
+        <el-button size="small" plain @click="onOpenLedgerWindow" title="在独立窗口打开查账">📊 查账</el-button>
         <WpExportButton
           v-if="wpDetail"
           :project-id="projectId"
@@ -240,7 +242,7 @@
       :project-id="projectId"
       :wp-id="wpId"
       :wp-detail="wpDetail!"
-      :can-edit="canEdit"
+      :can-edit="effectiveCanEdit"
       :sheet-nav-facade="sheetNavFacade"
       :cycle-type="cycleType"
       :cycle-dialogs="cycleDialogs"
@@ -467,6 +469,7 @@ import {
 } from '@/shell/formula/shellStructuredError'
 import { useGuidancePanelStore } from '@/stores/guidancePanelStore'
 import { Clock } from '@element-plus/icons-vue'
+import { openLedgerWindow } from '@/utils/openLedgerWindow'
 
 // ─── 路由解析 ────────────────────────────────────────────────────────────────
 const route = useRoute()
@@ -701,6 +704,10 @@ const editLock = useEditingLock({
   resourceId: computed(() => wpId.value || ''),
 })
 
+// 多窗口门禁：编辑锁冲突时覆盖 canEdit，禁用所有保存/编辑操作
+// spec: multi-window-ledger-workbench Phase 3 Task 18
+const effectiveCanEdit = computed(() => canEdit.value && !editLock.forcedReadonly.value)
+
 // ─── 前置状态横幅 ────────────────────────────────────────────────────────────
 const prerequisiteCycleCode = computed(() => {
   if (isHCycle.value) return wpDetail.value?.wp_code || 'H1'
@@ -783,7 +790,7 @@ const wpStatusComputed = computed(() => wpDetail.value?.status)
 
 const { availableButtons: toolbarButtons, dropdownItems: toolbarDropdownItems, handleAction: handleToolbarAction } = useEditorToolbar(
   {
-    canEdit,
+    canEdit: effectiveCanEdit,
     saving,
     dirty,
     submitting,
@@ -820,7 +827,7 @@ provide(EDITOR_CONTEXT_KEY, {
   projectId,
   wpId,
   wpDetail,
-  canEdit,
+  canEdit: effectiveCanEdit,
   componentType,
   cycleType,
   cycleDialogs,
@@ -861,6 +868,8 @@ function onChildSaved(payload?: { sheet_name: string; html_data: Record<string, 
 }
 
 function onDirtyChange(val: boolean) {
+  // 复盘 P1-2：forcedReadonly 时不接受 dirty 状态，避免弹"有未保存变更"但无法保存的矛盾
+  if (val && editLock.forcedReadonly.value) return
   dirty.value = val
 }
 
@@ -1253,6 +1262,11 @@ function statusLabel(s: string) {
     review_passed: '复核通过', archived: '已归档',
   }
   return m[s] || s
+}
+
+// 在独立窗口打开查账（multi-window-ledger-workbench Phase 1 Task 4）
+function onOpenLedgerWindow() {
+  openLedgerWindow(projectId.value, projectStore.year)
 }
 
 function goBack() {

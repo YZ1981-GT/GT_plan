@@ -1178,7 +1178,7 @@ backend/app/routers/attachments.py  821
 #    其中 ledger_penetration.py 原始 delta 是 +93（+5.69% 已超阈值），按门禁提示的优先顺序
 #    「抽伴生模块（优先）」把 parse_iso_date 抽到 routers/_voucher_date.py（28 行）后降至 1712。
 # 登记为待办：三者都该整体瘦身。下次再往这三个文件加功能应**先拆分再改**，不再滚雪球加基线。
-audit-platform/frontend/src/views/LedgerPenetration.vue  4213
+audit-platform/frontend/src/views/LedgerPenetration.vue  4682
 backend/app/routers/ledger_penetration.py  1634
 backend/app/services/ledger_penetration_service.py  942
 #

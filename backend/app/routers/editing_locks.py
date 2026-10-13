@@ -13,7 +13,7 @@ import logging
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -58,6 +58,7 @@ async def acquire(
     resource_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    x_client_instance: Optional[str] = Header(None, alias="X-Client-Instance"),
 ):
     """获取编辑锁"""
     result = await acquire_lock(
@@ -66,6 +67,7 @@ async def acquire(
         resource_id=resource_id,
         holder_id=current_user.id,
         holder_name=_holder_name(current_user),
+        client_instance=x_client_instance,
     )
     await db.commit()
 
@@ -88,6 +90,7 @@ async def heartbeat(
     resource_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    x_client_instance: Optional[str] = Header(None, alias="X-Client-Instance"),
 ):
     """续期 heartbeat"""
     result = await heartbeat_lock(
@@ -95,6 +98,7 @@ async def heartbeat(
         resource_type=resource_type,
         resource_id=resource_id,
         holder_id=current_user.id,
+        client_instance=x_client_instance,
     )
     await db.commit()
 
@@ -109,6 +113,7 @@ async def release(
     resource_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    x_client_instance: Optional[str] = Header(None, alias="X-Client-Instance"),
 ):
     """释放编辑锁"""
     result = await release_lock(
@@ -116,6 +121,7 @@ async def release(
         resource_type=resource_type,
         resource_id=resource_id,
         holder_id=current_user.id,
+        client_instance=x_client_instance,
     )
     await db.commit()
 

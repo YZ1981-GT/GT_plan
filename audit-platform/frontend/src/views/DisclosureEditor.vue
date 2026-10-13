@@ -461,10 +461,10 @@
                 {{ currentNote.status === 'confirmed' ? '已确认' : '草稿' }}
               </el-tag>
               <!-- 编辑操作按钮（置于标题行，随时可见，无需滚动到底部） -->
-              <el-button v-if="!editMode" size="small" @click="enterNoteEdit()" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">编辑</el-button>
+              <el-button v-if="!editMode" size="small" @click="enterNoteEdit()" :disabled="!effectiveCanEdit" :title="!effectiveCanEdit ? '无法编辑（项目已归档或他人正在编辑）' : ''">编辑</el-button>
               <template v-else>
                 <el-button size="small" @click="exitNoteEdit(true)">取消</el-button>
-                <el-button size="small" type="primary" @click="onSave" :loading="saveLoading" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">保存</el-button>
+                <el-button size="small" type="primary" @click="onSave" :loading="saveLoading" :disabled="!effectiveCanEdit" :title="!effectiveCanEdit ? '无法编辑（项目已归档或他人正在编辑）' : ''">保存</el-button>
               </template>
             </div>
           </div>
@@ -706,12 +706,12 @@
 
             <div class="gt-de-editor-footer" v-if="editMode">
               <div class="gt-de-footer-secondary">
-                <el-button size="small" plain @click="onClearAllFormulas" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : '清除所有单元格公式'">一键清除公式</el-button>
+                <el-button size="small" plain @click="onClearAllFormulas" :disabled="!effectiveCanEdit" :title="!effectiveCanEdit ? '无法编辑' : '清除所有单元格公式'">一键清除公式</el-button>
                 <el-button size="small" plain @click="onRestoreAutoMode" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : '恢复为自动提数模式'">恢复自动提数</el-button>
               </div>
               <div class="gt-de-footer-primary">
                 <el-button size="small" @click="exitNoteEdit(true)">取消</el-button>
-                <el-button size="small" type="primary" @click="onSave" :loading="saveLoading" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">保存</el-button>
+                <el-button size="small" type="primary" @click="onSave" :loading="saveLoading" :disabled="!effectiveCanEdit" :title="!effectiveCanEdit ? '无法编辑' : ''">保存</el-button>
               </div>
             </div>
 
@@ -1494,6 +1494,9 @@ const noteStale = useNoteStale(projectId)
 const editLock = useEditingLock({
   resourceId: computed(() => (route.params.projectId as string || '') + '_note'),
   resourceType: 'disclosure_note',  // 走通用编辑锁端点 /api/editing-locks/disclosure_note/{id}
+
+// 多窗口门禁：编辑锁冲突时覆盖 canEdit，禁用保存/编辑按钮（复盘 P0-3）
+const effectiveCanEdit = computed(() => canEdit.value && !editLock.forcedReadonly.value)
   autoAcquire: false,
 })
 

@@ -100,6 +100,7 @@
                 </el-button>
               </el-tooltip>
               <el-button size="small" @click="showVersionDrawer = true" title="查看试算表版本历史（可回滚）">⏱ 版本</el-button>
+              <el-button size="small" plain @click="onOpenLedgerWindow" title="在独立窗口打开查账">📊 查账窗口</el-button>
               <el-dropdown size="small" trigger="click" @command="onComparisonMode">
                 <el-button size="small" title="试算表跨年度/跨项目对比">📊 对比</el-button>
                 <template #dropdown>
@@ -1351,6 +1352,7 @@ import {
 import { getAllWpMappings, listWorkpapers, type WpAccountMapping, type WorkpaperDetail } from '@/services/workpaperApi'
 import { getActiveLedgerDataset, type AutoMapOutcome } from '@/services/ledgerImportApi'
 import { useProjectStore } from '@/stores/project'
+import { openLedgerWindow } from '@/utils/openLedgerWindow'
 import { setupPasteListener, pasteToSelection } from '@/composables/useCopyPaste'
 import { withLoading } from '@/composables/useLoading'
 import GtToolbar from '@/components/common/GtToolbar.vue'
@@ -2209,6 +2211,11 @@ function onUseExistingData() {
 function goToLedgerImport() {
   tbImportVisible.value = false
   router.push({ path: `/projects/${projectId.value}/ledger`, query: { import: '1' } })
+}
+
+// 在独立窗口打开查账（multi-window-ledger-workbench Phase 1 Task 4）
+function onOpenLedgerWindow() {
+  openLedgerWindow(projectId.value, year.value)
 }
 
 function onImportDone() {

@@ -15,6 +15,15 @@ export const standaloneRoutes: RouteRecordRaw[] = [
     meta: { requireAuth: true },
   },
   {
+    // 独立查账窗口（multi-window-ledger-workbench Phase 1 Task 2）
+    // 顶层路由：不嵌套 DefaultLayout 三栏布局，查账窗口可独立使用。
+    // 由 openLedgerWindow() 的 window.open 打开，窗口名固定防重复创建。
+    path: '/ledger-workbench/:projectId',
+    name: 'LedgerWorkbench',
+    component: () => import('@/views/LedgerStandalonePage.vue'),
+    meta: { requireAuth: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/views/NotFound.vue'),

@@ -52,6 +52,11 @@ class EditingLock(Base, TimestampMixin):
     released_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True), nullable=True
     )
+    # 客户端实例标识（多窗口编辑锁隔离）
+    # multi-window-ledger-workbench Phase 3 Task 13
+    client_instance: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
 
     __table_args__ = (
         Index("idx_editing_locks_resource", "resource_type", "resource_id"),

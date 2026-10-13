@@ -8,7 +8,7 @@
     :closable="false"
     style="margin-bottom: 8px"
   >
-    {{ editLock?.lockedBy?.value || '其他用户' }} 正在编辑，当前为只读模式
+    {{ editLock?.lockedBy?.value || '其他用户' }} 正在编辑，当前为只读模式（所有保存已禁用）
   </el-alert>
 
   <!-- ═══ 信息性横幅：折叠为摘要行 ═══ -->
@@ -95,6 +95,7 @@ interface EditingLockAPI {
   locked: { value: boolean }
   isMine: { value: boolean }
   lockedBy: { value: string | null }
+  forcedReadonly?: { value: boolean }
 }
 interface PrerequisiteBannerData {
   type: 'success' | 'warning' | 'error' | 'info'

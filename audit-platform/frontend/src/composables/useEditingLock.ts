@@ -58,6 +58,8 @@ export function useEditingLock(options: EditingLockOptions) {
   const locked = ref(false)
   const lockedBy = ref<string | null>(null)
   const isMine = ref(false)
+  /** 多窗口门禁：acquire 被 409 拒绝时为 true，宿主据此禁用所有保存操作 */
+  const forcedReadonly = ref(false)
   let timer: ReturnType<typeof setInterval> | null = null
 
   const heartbeatMs = options.heartbeatMs ?? 120_000
@@ -79,6 +81,9 @@ export function useEditingLock(options: EditingLockOptions) {
       if (e?.response?.status === 409 || e?.status === 409) {
         locked.value = true
         isMine.value = false
+        // 多窗口门禁：同底稿第二窗口锁冲突 → 强制只读
+        // spec: multi-window-ledger-workbench Phase 3 Task 17
+        forcedReadonly.value = true
         lockedBy.value = e?.response?.data?.detail?.locked_by_name
           ?? e?.data?.detail?.locked_by_name ?? '其他用户'
       }
@@ -135,6 +140,7 @@ export function useEditingLock(options: EditingLockOptions) {
       locked.value = true
       isMine.value = true
       lockedBy.value = null
+      forcedReadonly.value = false
       heldId.value = id
       return res
     } catch { /* ignore */ }
@@ -149,7 +155,26 @@ export function useEditingLock(options: EditingLockOptions) {
     if (timer) { clearInterval(timer); timer = null }
   }
 
-  function onBeforeUnload() { release() }
+  function onBeforeUnload() {
+    // 🔴 复盘 P0-2：beforeunload 中异步 XHR 会被浏览器取消。
+    // 用 fetch + keepalive 保证请求在页面卸载后仍能发出。
+    const id = heldId.value
+    if (!id || !isMine.value) return
+    const token = sessionStorage.getItem('token')
+    const instanceId = sessionStorage.getItem('gt-client-instance-id')
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    if (instanceId) headers['X-Client-Instance'] = instanceId
+    try {
+      fetch(`/api/editing-locks/${resourceType}/${id}`, {
+        method: 'DELETE',
+        keepalive: true,
+        headers,
+      })
+    } catch { /* 静默：keepalive 不可用时退回旧行为，锁等心跳过期 */ }
+    heldId.value = null
+    isMine.value = false
+  }
 
   /** SSE 事件处理：他人通过 force_acquired 强抢了我的锁 */
   function onSSEEvent(payload: any) {
@@ -169,6 +194,7 @@ export function useEditingLock(options: EditingLockOptions) {
     // 仅当本人原本持锁时才反应（避免他人之间互抢的杂讯）
     if (!isMine.value) return
     isMine.value = false
+    forcedReadonly.value = true
     lockedBy.value = payload.new_holder_name ?? null
     eventBus.emit('editing-lock:taken-over', {
       wp_id: payload.wp_id ?? options.resourceId.value,
@@ -205,5 +231,5 @@ export function useEditingLock(options: EditingLockOptions) {
     }
   })
 
-  return { locked, lockedBy, isMine, acquire, release, forceAcquire }
+  return { locked, lockedBy, isMine, forcedReadonly, acquire, release, forceAcquire }
 }

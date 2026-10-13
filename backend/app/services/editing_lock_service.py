@@ -61,11 +61,17 @@ async def acquire_lock(
     resource_id: str,
     holder_id: uuid.UUID,
     holder_name: str,
+    client_instance: str | None = None,
 ) -> dict:
     """尝试获取编辑锁
 
     流程：惰性清理过期锁 → SELECT FOR UPDATE 行锁 → 查活跃锁 → 无则创建
     并发保护：部分唯一索引冲突时用 SAVEPOINT 捕获 IntegrityError 转为锁冲突响应
+
+    client_instance 隔离（multi-window-ledger-workbench Phase 3 Task 14）：
+    - 同 holder_id + 同 client_instance → 续期（重复 acquire，当前行为不变）
+    - 同 holder_id + 不同 client_instance → 锁冲突（第二窗口只读）
+    - 不传 client_instance → 旧行为兼容（同人续期）
 
     Returns:
         无活跃锁（获取成功）: {"locked": False, "lock_id": str, "acquired_at": str}
@@ -99,9 +105,26 @@ async def acquire_lock(
 
     # 3. 有活跃锁 → 判断是否同人续期或他人冲突
     if active_lock is not None:
-        # 同人重复 acquire → 刷新 heartbeat 返回成功（对齐 v1 自动续期语义）
+        # 同人重复 acquire → 需进一步检查 client_instance
         if active_lock.holder_id == holder_id:
+            # client_instance 隔离（multi-window-ledger-workbench）：
+            # 传入了 client_instance 且活跃锁也有 client_instance → 必须匹配
+            existing_ci = getattr(active_lock, 'client_instance', None)
+            if client_instance and existing_ci and client_instance != existing_ci:
+                # 同用户但不同浏览器标签页 → 锁冲突（第二窗口只读）
+                return {
+                    "locked": True,
+                    "locked_by": str(active_lock.holder_id),
+                    "locked_by_name": active_lock.holder_name or "",
+                    "acquired_at": active_lock.acquired_at.isoformat()
+                    if active_lock.acquired_at
+                    else "",
+                }
+            # 同人同实例（或无实例信息） → 续期
             active_lock.heartbeat_at = _now()
+            # 如果传入了 client_instance 但锁上还没有，补记
+            if client_instance and not existing_ci and hasattr(active_lock, 'client_instance'):
+                active_lock.client_instance = client_instance
             await db.flush()
             return {
                 "locked": False,
@@ -131,6 +154,9 @@ async def acquire_lock(
         acquired_at=now,
         heartbeat_at=now,
     )
+    # 记录客户端实例标识（多窗口隔离）
+    if client_instance and hasattr(new_lock, 'client_instance'):
+        new_lock.client_instance = client_instance
 
     # 使用 SAVEPOINT（begin_nested）捕获唯一索引冲突
     try:
@@ -178,19 +204,27 @@ async def release_lock(
     resource_type: str,
     resource_id: str,
     holder_id: uuid.UUID,
+    client_instance: str | None = None,
 ) -> dict:
     """释放编辑锁
+
+    client_instance 隔离：传入时只释放匹配 instance 的锁，避免关窗 A 释放窗 B 的锁。
 
     Returns:
         成功: {"released": True}
         失败: {"released": False, "reason": "无活跃锁"}
     """
-    stmt = select(EditingLock).where(
+    conditions = [
         EditingLock.resource_type == resource_type,
         EditingLock.resource_id == resource_id,
         EditingLock.holder_id == holder_id,
         EditingLock.released_at.is_(None),
-    )
+    ]
+    # 如果传入了 client_instance，只释放匹配的锁
+    if client_instance:
+        conditions.append(EditingLock.client_instance == client_instance)
+
+    stmt = select(EditingLock).where(*conditions)
     result = await db.execute(stmt)
     lock = result.scalar_one_or_none()
 
@@ -207,19 +241,26 @@ async def heartbeat_lock(
     resource_type: str,
     resource_id: str,
     holder_id: uuid.UUID,
+    client_instance: str | None = None,
 ) -> dict:
     """续期 heartbeat
+
+    client_instance 隔离：传入时只续期匹配 instance 的锁。
 
     Returns:
         成功: {"refreshed": True, "heartbeat_at": str}
         失败: {"refreshed": False, "reason": "无活跃锁或非持有人"}
     """
-    stmt = select(EditingLock).where(
+    conditions = [
         EditingLock.resource_type == resource_type,
         EditingLock.resource_id == resource_id,
         EditingLock.holder_id == holder_id,
         EditingLock.released_at.is_(None),
-    )
+    ]
+    if client_instance:
+        conditions.append(EditingLock.client_instance == client_instance)
+
+    stmt = select(EditingLock).where(*conditions)
     result = await db.execute(stmt)
     lock = result.scalar_one_or_none()
 

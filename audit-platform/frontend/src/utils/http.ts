@@ -9,6 +9,7 @@ import NProgress from 'nprogress'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { versionBridge } from '@/composables/useVersionCheck'
+import { getClientInstanceId } from './clientInstance'
 
 // ── NProgress 活跃请求计数器 ──────────────────────────────
 let activeRequests = 0
@@ -237,6 +238,11 @@ http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (authStore.token) {
     config.headers.Authorization = `Bearer ${authStore.token}`
   }
+  // 多窗口编辑锁隔离：编辑锁端点自动携带 X-Client-Instance header
+  // spec: multi-window-ledger-workbench Phase 3 Task 16
+  if (config.url && config.url.includes('/editing-locks/')) {
+    config.headers['X-Client-Instance'] = getClientInstanceId()
+  }
   addPending(config)
   // NProgress：首个请求启动进度条，后续请求递增
   activeRequests++
@@ -355,6 +361,19 @@ http.interceptors.response.use(
 
     // 401 → 优先刷新令牌（须在 _silent 之前，避免 silent health/ACNR 跳过刷新导致后续鉴权连环失败）
     if (status === 401 && originalRequest && !originalRequest._retry) {
+      // 多窗口：先检查 token 是否已被其他窗口刷新（BroadcastChannel 广播到达后
+      // auth store 会同步更新 sessionStorage，这里直接读即可）
+      // spec: multi-window-ledger-workbench Phase 2 Task 11
+      const freshToken = sessionStorage.getItem('token')
+      if (freshToken && freshToken !== (originalRequest.headers?.Authorization as string)?.replace('Bearer ', '')) {
+        // 其他窗口已刷新 token，直接用新 token 重试，不再触发 refresh
+        authStore.token = freshToken
+        authStore.refreshToken = sessionStorage.getItem('refreshToken') || authStore.refreshToken
+        originalRequest._retry = true
+        originalRequest.headers = originalRequest.headers ?? {}
+        originalRequest.headers.Authorization = `Bearer ${freshToken}`
+        return http(originalRequest)
+      }
       if (!authStore.refreshToken) {
         authStore.logout()
         window.location.href = '/login'
