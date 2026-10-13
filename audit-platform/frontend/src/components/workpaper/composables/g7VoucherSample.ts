@@ -29,6 +29,9 @@ export interface G7VoucherSample {
   voucherDate?: string
   voucherNo?: string
   counterAccount?: string
+  counterpartAccount?: string
+  counterpartAccountName?: string
+  voucherEntries?: Array<{ account_code: string; account_name: string; debit_amount: string | null; credit_amount: string | null; summary: string }>
 }
 
 function num(v: unknown): number {
@@ -99,29 +102,54 @@ export function mergeVoucherSamples(
   let added = 0
   let skipped = 0
   for (const s of samples) {
-    const no = String(s.voucherNo || '').trim()
-    if (no && seen.has(no)) {
-      skipped += 1
-      continue
-    }
-    const row = createG7VoucherSampleRow(out.length + 1)
-    row.voucherDate = s.voucherDate || ''
-    row.voucherNo = no
-    row.businessContent = s.summary || ''
-    row.counterAccount = s.counterAccount || ''
-    const debit = num(s.debitAmount ?? s.amount)
-    const credit = num(s.creditAmount)
-    if (credit) {
-      row.creditAmount = credit
-      row.debitAmount = num(s.debitAmount)
+    const cpAccount = s.counterpartAccount ?? s.counterAccount ?? ''
+    const entries = s.voucherEntries || []
+    const isMulti = cpAccount === '多科目' && entries.length > 0
+
+    if (isMulti) {
+      const sDebit = num(s.debitAmount ?? s.amount)
+      const counterEntries = entries.filter((e) =>
+        sDebit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
+      )
+      const toWrite = counterEntries.length > 0 ? counterEntries : entries
+      for (const e of toWrite) {
+        const no = String(s.voucherNo || '').trim()
+        const row = createG7VoucherSampleRow(out.length + 1)
+        row.voucherDate = s.voucherDate || ''
+        row.voucherNo = no
+        row.businessContent = e.summary || s.summary || ''
+        row.counterAccount = e.account_code || ''
+        row.debitAmount = Number(e.debit_amount) || 0
+        row.creditAmount = Number(e.credit_amount) || 0
+        row.source = '抽凭'
+        out.push(row)
+        added += 1
+      }
     } else {
-      row.debitAmount = debit
-      row.creditAmount = 0
+      const no = String(s.voucherNo || '').trim()
+      if (no && seen.has(no)) {
+        skipped += 1
+        continue
+      }
+      const row = createG7VoucherSampleRow(out.length + 1)
+      row.voucherDate = s.voucherDate || ''
+      row.voucherNo = no
+      row.businessContent = s.summary || ''
+      row.counterAccount = cpAccount
+      const debit = num(s.debitAmount ?? s.amount)
+      const credit = num(s.creditAmount)
+      if (credit) {
+        row.creditAmount = credit
+        row.debitAmount = num(s.debitAmount)
+      } else {
+        row.debitAmount = debit
+        row.creditAmount = 0
+      }
+      row.source = '抽凭'
+      out.push(row)
+      if (no) seen.add(no)
+      added += 1
     }
-    row.source = '抽凭'
-    out.push(row)
-    if (no) seen.add(no)
-    added += 1
   }
   out.forEach((r, i) => { r.seq = i + 1 })
   return { rows: out, added, skipped }

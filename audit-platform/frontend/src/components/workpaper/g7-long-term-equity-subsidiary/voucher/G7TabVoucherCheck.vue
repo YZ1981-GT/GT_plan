@@ -747,13 +747,34 @@ function onSampleFilled(payload: {
     return
   }
   for (const s of samples) {
-    const row = createEmptyRow(rows.value.length + 1)
-    row.voucherDate = s.voucherDate || ''
-    row.voucherNo = s.voucherNo || ''
-    row.businessContent = s.summary || ''
-    row.counterAccount = s.counterAccount || ''
-    const amt = parseNum(s.debitAmount ?? s.amount)
-    const credit = parseNum(s.creditAmount)
+    const entries = (s as any).voucherEntries || []
+    const cpAccount = (s as any).counterpartAccount ?? s.counterAccount ?? ''
+    const isMulti = cpAccount === '多科目' && entries.length > 0
+    if (isMulti) {
+      const sDebit = parseNum(s.debitAmount ?? s.amount)
+      const counterEntries = entries.filter((e: any) =>
+        sDebit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
+      )
+      const toWrite = counterEntries.length > 0 ? counterEntries : entries
+      for (const e of toWrite) {
+        const row = createEmptyRow(rows.value.length + 1)
+        row.voucherDate = s.voucherDate || ''
+        row.voucherNo = s.voucherNo || ''
+        row.businessContent = e.summary || s.summary || ''
+        row.counterAccount = e.account_code || ''
+        row.debitAmount = Number(e.debit_amount) || 0
+        row.creditAmount = Number(e.credit_amount) || 0
+        row.source = '抽凭'
+        rows.value.push(row)
+      }
+    } else {
+      const row = createEmptyRow(rows.value.length + 1)
+      row.voucherDate = s.voucherDate || ''
+      row.voucherNo = s.voucherNo || ''
+      row.businessContent = s.summary || ''
+      row.counterAccount = cpAccount
+      const amt = parseNum(s.debitAmount ?? s.amount)
+      const credit = parseNum(s.creditAmount)
     if (credit) {
       row.creditAmount = credit
       row.debitAmount = amt
@@ -763,6 +784,7 @@ function onSampleFilled(payload: {
     }
     row.source = '抽凭'
     rows.value.push(row)
+    }
   }
   if (!criteria.value.representativeSize) {
     criteria.value.representativeSize = samples.length

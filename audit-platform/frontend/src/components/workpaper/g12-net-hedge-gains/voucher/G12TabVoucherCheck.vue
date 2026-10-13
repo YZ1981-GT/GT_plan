@@ -603,6 +603,7 @@ function onSampleFilled(payload: {
       voucherNo: s.voucherNo,
       counterpartAccount: s.counterpartAccount,
       counterpartAccountName: s.counterpartAccountName,
+      voucherEntries: (s as any).voucherEntries,
       abnormal: s.abnormal,
       isHighValue: s.isHighValue,
       selectionReason: s.selectionReason,

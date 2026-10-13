@@ -683,8 +683,33 @@ export function useG9VoucherCheck(opts: {
     method?: string,
   ): number {
     if (opts.isReadonly.value || !samples.length) return 0
+    // 展开多科目凭证
+    const expanded: G9SampledVoucherLike[] = []
+    for (const s of samples) {
+      const entries = (s as any).voucherEntries || []
+      const cpAccount = s.counterpartAccount ?? ''
+      const isMulti = cpAccount === '多科目' && entries.length > 0
+      if (isMulti) {
+        const sDebit = parseNum(s.debitAmount ?? s.amount)
+        const counterEntries = entries.filter((e: any) =>
+          sDebit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
+        )
+        const toWrite = counterEntries.length > 0 ? counterEntries : entries
+        for (const e of toWrite) {
+          expanded.push({
+            ...s,
+            counterpartAccount: e.account_code || '',
+            summary: e.summary || s.summary,
+            debitAmount: Number(e.debit_amount) || 0,
+            creditAmount: Number(e.credit_amount) || 0,
+          })
+        }
+      } else {
+        expanded.push(s)
+      }
+    }
     const before = rows.value.length
-    const mapped = samples.map((s, i) => mapSampledToG9VoucherRow(s, before + i + 1))
+    const mapped = expanded.map((s, i) => mapSampledToG9VoucherRow(s, before + i + 1))
     const next = reseq(mergeByFillMode(rows.value, mapped, fillMode, (r) => r.voucherNo || r.rowId))
     const added = fillMode === 'replace' ? next.length : next.length - before
     rows.value = next

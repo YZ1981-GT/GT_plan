@@ -482,6 +482,8 @@ export function useG12VoucherCheck(opts: {
       summary?: string
       amount?: number
       counterpartAccount?: string
+      counterpartAccountName?: string
+      voucherEntries?: Array<{ account_code: string; account_name: string; debit_amount: string | null; credit_amount: string | null; summary: string }>
       abnormal?: boolean
       isHighValue?: boolean
       selectionReason?: string
@@ -491,7 +493,33 @@ export function useG12VoucherCheck(opts: {
     methodology?: G12SamplingMethodologyLike
   }): number {
     if (opts.isReadonly.value) return 0
-    const samples = optsFill.samples ?? []
+    // 展开多科目凭证
+    const rawSamples = optsFill.samples ?? []
+    const samples: typeof rawSamples = []
+    for (const s of rawSamples) {
+      const entries = s.voucherEntries || []
+      const cpAccount = s.counterpartAccount ?? s.counterAccount ?? ''
+      const isMulti = cpAccount === '多科目' && entries.length > 0
+      if (isMulti) {
+        const sDebit = Number(s.debitAmount ?? s.amount ?? 0)
+        const counterEntries = entries.filter((e) =>
+          sDebit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
+        )
+        const toWrite = counterEntries.length > 0 ? counterEntries : entries
+        for (const e of toWrite) {
+          samples.push({
+            ...s,
+            counterpartAccount: e.account_code,
+            counterpartAccountName: e.account_name,
+            summary: e.summary || s.summary,
+            debitAmount: Number(e.debit_amount) || 0,
+            creditAmount: Number(e.credit_amount) || 0,
+          })
+        }
+      } else {
+        samples.push(s)
+      }
+    }
     if (!samples.length) return 0
 
     if (optsFill.method) {

@@ -118,7 +118,7 @@ export function mapSampledVoucher(voucher: SampledVoucher, seq: number): Voucher
     voucherNo: voucher.voucherNo || '',
     businessContent: voucher.summary || '',
     counterpartAccount: voucher.counterpartAccount || '',
-    counterpartDetail: voucher.accountCode || '',
+    counterpartDetail: (voucher as any).counterpartAccountName || voucher.accountCode || '',
     debitAmount: voucher.debitAmount ?? 0,
     creditAmount: voucher.creditAmount ?? 0,
     supportingDoc: '',
@@ -376,11 +376,37 @@ export function useD2VoucherCheckEnhanced(options: UseD2VoucherCheckEnhancedOpti
   function fillFromSampledVouchers(vouchers: SampledVoucher[], mode: 'replace' | 'merge' = 'merge'): void {
     if (isReadonly.value) return
 
+    // 展开多科目凭证为多行
+    const expanded: SampledVoucher[] = []
+    for (const v of vouchers) {
+      const entries = (v as any).voucherEntries || []
+      const isMulti = v.counterpartAccount === '多科目' && entries.length > 0
+      if (isMulti) {
+        const sDebit = Number(v.debitAmount ?? 0)
+        const counterEntries = entries.filter((e: any) =>
+          sDebit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
+        )
+        const toWrite = counterEntries.length > 0 ? counterEntries : entries
+        for (const e of toWrite) {
+          expanded.push({
+            ...v,
+            counterpartAccount: e.account_code || '',
+            counterpartAccountName: e.account_name || '',
+            summary: e.summary || v.summary,
+            debitAmount: String(Number(e.debit_amount) || 0),
+            creditAmount: String(Number(e.credit_amount) || 0),
+          } as any)
+        }
+      } else {
+        expanded.push(v)
+      }
+    }
+
     // 按日期分类
     const currentVouchers: SampledVoucher[] = []
     const postVouchers: SampledVoucher[] = []
 
-    for (const v of vouchers) {
+    for (const v of expanded) {
       const zone = classifyVoucherToZone(v.voucherDate, bsDate.value)
       if (zone === 'current') {
         currentVouchers.push(v)

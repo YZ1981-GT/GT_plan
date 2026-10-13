@@ -562,7 +562,7 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
   isReadonly: computed(() => props.isReadonly === true),
 })
 
-function onSampleFilled(payload: { samples: Array<{ summary?: string; amount?: number; voucherDate?: string; voucherNo?: string }> }) {
+function onSampleFilled(payload: { samples: Array<{ summary?: string; amount?: number; voucherDate?: string; voucherNo?: string; counterpartAccount?: string; counterpartAccountName?: string; voucherEntries?: any[]; debitAmount?: any; creditAmount?: any }> }) {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
   void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
 
@@ -572,6 +572,10 @@ function onSampleFilled(payload: { samples: Array<{ summary?: string; amount?: n
       creditAmount: s.amount,
       voucherDate: s.voucherDate,
       voucherNo: s.voucherNo,
+      counterpartAccount: s.counterpartAccount,
+      counterpartAccountName: s.counterpartAccountName,
+      voucherEntries: s.voucherEntries,
+      debitAmount: s.debitAmount,
       source: '抽凭',
     })
   }

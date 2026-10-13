@@ -146,11 +146,18 @@ export function resolveBusinessContent(sample: H4VoucherSampleLike): string {
 }
 
 export function resolveOppositeRaw(sample: H4VoucherSampleLike): string {
-  return _str(
-    sample.counterpartAccount
-    ?? sample.counterpart_account
-    ?? sample.oppositeAccount,
-  )
+  // 多科目时从 voucherEntries 拼接完整对方科目
+  const entries = (sample as any).voucherEntries as Array<{ account_code: string; account_name: string; debit_amount: string | null; credit_amount: string | null }> | undefined
+  const cpAccount = _str(sample.counterpartAccount ?? sample.counterpart_account ?? sample.oppositeAccount)
+  if (cpAccount === '多科目' && entries?.length) {
+    const sDebit = Number((sample as any).debitAmount ?? (sample as any).amount ?? 0)
+    const counterEntries = entries.filter(e =>
+      sDebit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
+    )
+    const toShow = counterEntries.length > 0 ? counterEntries : entries
+    return toShow.map(e => `${e.account_code} ${e.account_name}`.trim()).join('/')
+  }
+  return cpAccount
 }
 
 // ─── 抽凭映射 ────────────────────────────────────────────────────────────────
