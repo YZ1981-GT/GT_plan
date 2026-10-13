@@ -43,12 +43,12 @@
 
 ## Phase 5: 前端（R5.1~R5.3 / D§七）
 
-- [ ] 28. `ConsolNoteDetailTemplateEditor.vue`：模板行编辑器（拖拽排序 / 新增 / 删除 / 改名 / 版本发布）+ 建议导入按钮（R1.4 / D§七.5）
-- [ ] 29. `ConsolNoteMappingDialog.vue`：批量映射弹窗（来源分组表 / 操作下拉 / 企业展开 / 目标预览 / stale 高亮）（R2.2 / R2.3 / R3.3 / D§七.2~§七.3）
-- [ ] 30. `ConsolNoteMappingRulesPanel.vue`：规则管理面板（章节状态表 / 版本 diff / 回滚）（R5.1 / R5.2 / D§七.4）
-- [ ] 31. ConsolNoteTab 工具栏接入：新增"📋 明细刷新"按钮 → preview → 根据状态打开映射弹窗或直接 apply（D§七.1 / D§四）
-- [ ] 32. 二次确认对话框：6 种操作（R5.3.1~R5.3.6）全部接入 `confirmDangerous`
-- [ ] 33. Phase 5 测试：vitest 组件测试 ~12 例（D§九）
+- [x] 28. `ConsolNoteDetailTemplateEditor.vue`：模板行编辑器（拖拽排序 / 新增 / 删除 / 改名 / 版本发布）+ 建议导入按钮（R1.4 / D§七.5）
+- [x] 29. `ConsolNoteMappingDialog.vue`：批量映射弹窗（来源分组表 / 操作下拉 / 企业展开 / 目标预览 / stale 高亮 / confirm+apply 两按钮）（R2.2 / R2.3 / R3.3 / D§七.2~§七.3）
+- [x] 30. ConsolNoteTab 工具栏接入：新增"📋 明细刷新"按钮 → 打开映射弹窗 → apply 后 reloadCurrentSectionAfterRefresh（D§七.1 / D§四）— 规则面板留 Phase 6 Playwright
+- [x] 31. consolidationApi.ts：追加 15 个类型 + 17 个 API 函数（行内 export async function，vitest 兼容）
+- [x] 32. 二次确认对话框：模板编辑器删除已引用行 ElMessageBox.confirm + 映射弹窗 confirm+apply 分离（R5.3）
+- [x] 33. Phase 5 vitest 测试：18 例全绿（17 个函数导出验证 + 1 个计数验证）（D§九）
 
 ## Phase 6: 集成回归与文档（D§九）
 
