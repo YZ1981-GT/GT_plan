@@ -521,7 +521,10 @@ class DrilldownService:
 
         conditions = [active_filter, tbl.c.voucher_no == voucher_no]
         if voucher_date:
-            conditions.append(tbl.c.voucher_date == voucher_date)
+            # 🔴 asyncpg 不做隐式 str→date cast，必须转为 date 对象
+            from datetime import date as _date
+            parsed = _date.fromisoformat(str(voucher_date)[:10]) if isinstance(voucher_date, str) else voucher_date
+            conditions.append(tbl.c.voucher_date == parsed)
         elif month is not None:
             conditions.append(sa.extract("month", tbl.c.voucher_date) == month)
 
