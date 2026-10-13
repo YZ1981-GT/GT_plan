@@ -311,6 +311,7 @@ function handleVoucherFilled(payload: any): void {
       summary: v.summary || '',
       businessContent: v.summary || '',
       offsetAccount: v.counterpartAccount || v.offsetAccount || '',
+      offsetSubAccount: v.counterpartAccountName || v.offsetSubAccount || '',
       amount: amt,
     })
   }

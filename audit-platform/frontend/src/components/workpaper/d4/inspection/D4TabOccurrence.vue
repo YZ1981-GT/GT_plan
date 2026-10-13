@@ -274,7 +274,8 @@ function onSampleFilled(payload: {
     updateDimension(item.id, 'voucher', 'number', s.voucherNo || '')
     updateDimension(item.id, 'voucher', 'date', s.voucherDate || '')
     if (s.counterpartAccount) {
-      updateDimension(item.id, 'other', 'description', `对方科目：${s.counterpartAccount}`)
+      const cpName = s.counterpartAccountName ? ` ${s.counterpartAccountName}` : ''
+      updateDimension(item.id, 'other', 'description', `对方科目：${s.counterpartAccount}${cpName}`)
     }
     // 金额放到最后，确保这次 persistAll 序列化包含 isAnomalous 等直接改动
     updateDimension(item.id, 'voucher', 'amount', amount)

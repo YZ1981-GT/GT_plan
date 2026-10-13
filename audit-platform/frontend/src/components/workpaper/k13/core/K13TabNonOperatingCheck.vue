@@ -676,17 +676,41 @@ function handleVoucherFilled(payload: any): void {
   for (const v of vouchers) {
     const voucherNo = v.voucherNo || ''
     if (voucherNo && existing.has(voucherNo)) continue
-    checkRows.value.push(createRow({
-      expenseItem: v.summary || v.businessContent || '抽凭样本',
-      date: v.voucherDate || v.date || '',
-      voucherNo,
-      businessContent: v.summary || v.businessContent || '',
-      offsetAccount: v.counterpartAccount || v.offsetAccount || '',
-      offsetSubAccount: v.counterpartSubAccount || v.offsetSubAccount || '',
-      debitAmount: Number(v.debitAmount ?? v.amount ?? 0),
-      abnormal: !!v.abnormal,
-      remark: v.selectionReason || v.remark || '',
-    }))
+    const entries = v.voucherEntries || []
+    const isMulti = v.counterpartAccount === '多科目' && entries.length > 0
+    if (isMulti) {
+      const vDebit = Number(v.debitAmount ?? 0)
+      const counterEntries = entries.filter((e: any) =>
+        vDebit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
+      )
+      const toWrite = counterEntries.length > 0 ? counterEntries : entries
+      for (const e of toWrite) {
+        checkRows.value.push(createRow({
+          expenseItem: e.summary || v.summary || v.businessContent || '抽凭样本',
+          date: v.voucherDate || v.date || '',
+          voucherNo,
+          businessContent: e.summary || v.summary || v.businessContent || '',
+          offsetAccount: e.account_code || '',
+          offsetSubAccount: e.account_name || '',
+          debitAmount: Number(e.debit_amount ?? e.credit_amount ?? 0),
+          abnormal: !!v.abnormal,
+          remark: v.selectionReason || v.remark || '',
+        }))
+      }
+    } else {
+      checkRows.value.push(createRow({
+        expenseItem: v.summary || v.businessContent || '抽凭样本',
+        date: v.voucherDate || v.date || '',
+        voucherNo,
+        businessContent: v.summary || v.businessContent || '',
+        offsetAccount: v.counterpartAccount || v.offsetAccount || '',
+        offsetSubAccount: v.counterpartAccountName || v.counterpartSubAccount || v.offsetSubAccount || '',
+        debitAmount: Number(v.debitAmount ?? v.amount ?? 0),
+        abnormal: !!v.abnormal,
+        remark: v.selectionReason || v.remark || '',
+      }))
+    }
+    if (voucherNo) existing.add(voucherNo)
   }
   showSamplingDialog.value = false
   if (vouchers.length) {

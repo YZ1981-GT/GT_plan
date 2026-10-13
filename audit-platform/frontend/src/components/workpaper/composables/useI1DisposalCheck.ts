@@ -414,7 +414,7 @@ export function useI1DisposalCheck(options: {
         voucherNo: String(s.voucherNo || s.voucher_no || ''),
         voucherDate: String(s.voucherDate || s.voucher_date || ''),
         disposalDate: String(s.voucherDate || s.voucher_date || ''),
-        counterpartAccount: String(s.counterpartAccount || ''),
+        counterpartAccount: String(s.counterpartAccountName ? `${s.counterpartAccount || ''} ${s.counterpartAccountName}` : (s.counterpartAccount || '')),
       })
       rows.value.push(row)
       n++

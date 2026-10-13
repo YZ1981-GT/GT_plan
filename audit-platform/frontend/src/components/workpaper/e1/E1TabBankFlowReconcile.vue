@@ -180,6 +180,7 @@ function onSampleFilled(payload: { samples: SampledVoucher[]; fillMode: FillMode
     voucherNo: s.voucherNo || '',
     businessContent: s.summary || '',
     counterAccount: s.counterpartAccount || '',
+    counterAccountName: s.counterpartAccountName || '',
     counterparty: '',
     debit: s.debitAmount ? Number(s.debitAmount) : 0,
     credit: s.creditAmount ? Number(s.creditAmount) : 0,

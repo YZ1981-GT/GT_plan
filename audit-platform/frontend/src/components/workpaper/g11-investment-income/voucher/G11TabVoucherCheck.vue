@@ -591,7 +591,7 @@ function onRowChange(row: G11VoucherCheckRow | undefined) {
   if (idx >= 0) vc.activeRowIndex.value = idx
 }
 
-function onSampleFilled(payload: { samples: Array<{ summary?: string; amount?: number; voucherDate?: string; voucherNo?: string; counterpartAccount?: string }> }) {
+function onSampleFilled(payload: { samples: Array<{ summary?: string; amount?: number; voucherDate?: string; voucherNo?: string; counterpartAccount?: string; counterpartAccountName?: string; voucherEntries?: any[]; debitAmount?: any; creditAmount?: any }> }) {
   for (const s of payload.samples ?? []) {
     vc.mergeSample({
       businessContent: s.summary,
@@ -599,7 +599,11 @@ function onSampleFilled(payload: { samples: Array<{ summary?: string; amount?: n
       voucherDate: s.voucherDate,
       voucherNo: s.voucherNo,
       counterAccount: s.counterpartAccount,
-      source: '抽凭',
+      counterAccountName: s.counterpartAccountName,
+      counterpartAccount: s.counterpartAccount,
+      counterpartAccountName: s.counterpartAccountName,
+      voucherEntries: s.voucherEntries,
+      debitAmount: s.debitAmount,
     })
   }
 }

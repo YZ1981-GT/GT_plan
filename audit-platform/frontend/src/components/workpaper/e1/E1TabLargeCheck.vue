@@ -142,22 +142,55 @@ function onSampleFilled(payload: any): void {
     // 按凭证号去重
     const voucherNo = s.voucherNo || ''
     if (voucherNo && rows.value.some(r => r.voucherNo === voucherNo)) continue
-    addRow()
-    const lastRow = rows.value[rows.value.length - 1]
-    if (lastRow) {
-      updateCell(lastRow.id, 'direction', direction)
-      updateCell(lastRow.id, 'accountName', accountNameOf(s.accountCode))
-      updateCell(lastRow.id, 'date', s.voucherDate || '')
-      updateCell(lastRow.id, 'voucherNo', voucherNo)
-      updateCell(lastRow.id, 'content', s.summary || '')
-      updateCell(lastRow.id, 'counterAccount', s.counterpartAccount || '')
-      updateCell(lastRow.id, 'amount', String(debit || credit || 0))
-      if (s.abnormal) {
-        updateCell(lastRow.id, 'isAbnormal', true)
-        updateCell(lastRow.id, 'issue', '抽凭引擎标记异常，待核查')
+
+    // 多科目凭证：按对方分录逐行展开（每个对方科目+金额一行）
+    const entries = s.voucherEntries || []
+    const isMulti = s.counterpartAccount === '多科目' && entries.length > 0
+    if (isMulti) {
+      // 找出对方分录（与当前行方向相反的那些）
+      const counterEntries = entries.filter((e: any) => {
+        if (debit > 0) return e.credit_amount && Number(e.credit_amount) > 0
+        if (credit > 0) return e.debit_amount && Number(e.debit_amount) > 0
+        return false
+      })
+      const entriesToWrite = counterEntries.length > 0 ? counterEntries : entries
+      for (const e of entriesToWrite) {
+        const eDebit = Number(e.debit_amount) || 0
+        const eCredit = Number(e.credit_amount) || 0
+        addRow()
+        const lastRow = rows.value[rows.value.length - 1]
+        if (lastRow) {
+          updateCell(lastRow.id, 'direction', direction)
+          updateCell(lastRow.id, 'accountName', accountNameOf(s.accountCode))
+          updateCell(lastRow.id, 'date', s.voucherDate || '')
+          updateCell(lastRow.id, 'voucherNo', voucherNo)
+          updateCell(lastRow.id, 'content', e.summary || s.summary || '')
+          updateCell(lastRow.id, 'counterAccount', e.account_code || '')
+          updateCell(lastRow.id, 'counterSubAccount', e.account_name || '')
+          updateCell(lastRow.id, 'amount', String(eDebit || eCredit || 0))
+        }
+        added++
       }
+    } else {
+      // 1对1 或无明细：单行写入
+      addRow()
+      const lastRow = rows.value[rows.value.length - 1]
+      if (lastRow) {
+        updateCell(lastRow.id, 'direction', direction)
+        updateCell(lastRow.id, 'accountName', accountNameOf(s.accountCode))
+        updateCell(lastRow.id, 'date', s.voucherDate || '')
+        updateCell(lastRow.id, 'voucherNo', voucherNo)
+        updateCell(lastRow.id, 'content', s.summary || '')
+        updateCell(lastRow.id, 'counterAccount', s.counterpartAccount || '')
+        updateCell(lastRow.id, 'counterSubAccount', s.counterpartAccountName || '')
+        updateCell(lastRow.id, 'amount', String(debit || credit || 0))
+        if (s.abnormal) {
+          updateCell(lastRow.id, 'isAbnormal', true)
+          updateCell(lastRow.id, 'issue', '抽凭引擎标记异常，待核查')
+        }
+      }
+      added++
     }
-    added++
   }
   samplingVisible.value = false
   ElMessage.success(added > 0 ? `已导入 ${added} 笔凭证` : '未新增（凭证号重复已跳过）')

@@ -241,6 +241,7 @@ def _ledger_row_to_item(row) -> dict:
         "debit_amount": str(row.debit_amount) if row.debit_amount is not None else None,
         "credit_amount": str(row.credit_amount) if row.credit_amount is not None else None,
         "counterpart_account": row.counterpart_account,
+        "counterpart_account_name": None,  # 由 enrich_counterpart_accounts 补全
         "summary": row.summary,
         "entry_seq": row.entry_seq,
         "accounting_period": row.accounting_period,
@@ -248,6 +249,135 @@ def _ledger_row_to_item(row) -> dict:
         "company_code": row.company_code,
         "currency_code": row.currency_code,
     }
+
+
+async def enrich_counterpart_accounts(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    items: list[dict],
+) -> list[dict]:
+    """给样本行补全对方科目和完整凭证分录明细。
+
+    对每个样本行，查出同一凭证（voucher_no + voucher_date）的全部借贷分录，
+    写入 voucher_entries 列表供前端完整展示。
+
+    分录展示逻辑：
+    - 1对1：counterpart_account/counterpart_account_name 直接填对方科目
+    - 1对多 / 多对1 / 多对多：counterpart_account 填"多科目"，
+      voucher_entries 里放完整分录明细（代码+名称+借方+贷方）
+
+    与 enrich_items_with_aux_party 同范式：fail-open，补全失败不阻断抽样。
+    """
+    if not items:
+        return items
+
+    # 收集所有样本凭证号
+    voucher_keys: set[tuple[str, str]] = set()
+    for it in items:
+        vno = (it.get("voucher_no") or "").strip()
+        vdate = it.get("voucher_date") or ""
+        if vno and vdate:
+            voucher_keys.add((vno, vdate))
+
+    if not voucher_keys:
+        return items
+
+    try:
+        voucher_nos = sorted({k[0] for k in voucher_keys})
+        active_filter = await get_active_filter(
+            db, TbLedger.__table__, project_id, year
+        )
+        stmt = (
+            sa.select(
+                TbLedger.voucher_no,
+                TbLedger.voucher_date,
+                TbLedger.account_code,
+                TbLedger.account_name,
+                TbLedger.debit_amount,
+                TbLedger.credit_amount,
+                TbLedger.summary,
+            )
+            .where(
+                active_filter,
+                TbLedger.voucher_no.in_(voucher_nos),
+            )
+            .order_by(TbLedger.voucher_no, TbLedger.voucher_date)
+        )
+        rows = (await db.execute(stmt)).all()
+        if not rows:
+            return items
+
+        # 按 (voucher_no, voucher_date) 分组，收集完整分录列表
+        from collections import defaultdict
+        voucher_entries_map: dict[tuple[str, str], list[dict]] = defaultdict(list)
+        for r in rows:
+            vkey = (
+                (r.voucher_no or "").strip(),
+                r.voucher_date.isoformat() if r.voucher_date else "",
+            )
+            entry = {
+                "account_code": (r.account_code or "").strip(),
+                "account_name": (r.account_name or "").strip(),
+                "debit_amount": str(r.debit_amount) if r.debit_amount is not None else None,
+                "credit_amount": str(r.credit_amount) if r.credit_amount is not None else None,
+                "summary": r.summary or "",
+            }
+            if entry["account_code"]:
+                voucher_entries_map[vkey].append(entry)
+
+        # 对每个样本行填充
+        for it in items:
+            if it.get("counterpart_account") and it.get("voucher_entries"):
+                continue  # 源数据已带且已有明细
+            vno = (it.get("voucher_no") or "").strip()
+            vdate = it.get("voucher_date") or ""
+            vkey = (vno, vdate)
+            entries = voucher_entries_map.get(vkey, [])
+
+            # 始终附带完整凭证分录
+            it["voucher_entries"] = entries
+
+            if it.get("counterpart_account"):
+                continue  # 源数据已带对方科目代码
+
+            # 按借贷方向分桶去重
+            debit_accounts: set[tuple[str, str]] = set()
+            credit_accounts: set[tuple[str, str]] = set()
+            for e in entries:
+                code = e["account_code"]
+                name = e["account_name"]
+                if e.get("debit_amount") and Decimal(e["debit_amount"]) > 0:
+                    debit_accounts.add((code, name))
+                if e.get("credit_amount") and Decimal(e["credit_amount"]) > 0:
+                    credit_accounts.add((code, name))
+
+            # 判断当前行方向
+            is_debit = False
+            try:
+                d = Decimal(str(it.get("debit_amount") or 0))
+                is_debit = d > 0
+            except Exception:
+                pass
+
+            counterparts = credit_accounts if is_debit else debit_accounts
+            if not counterparts:
+                continue
+
+            if len(counterparts) == 1:
+                cp_code, cp_name = next(iter(counterparts))
+                it["counterpart_account"] = cp_code
+                it["counterpart_account_name"] = cp_name
+            else:
+                it["counterpart_account"] = "多科目"
+                it["counterpart_account_name"] = "多科目"
+
+    except Exception as exc:  # noqa: BLE001 — 补全是增强，绝不阻断抽样
+        logger.warning(
+            "对方科目补全失败（不影响抽样）：project=%s year=%s err=%s",
+            project_id, year, exc,
+        )
+    return items
 
 
 # ─── Pydantic Models ──────────────────────────────────────────────────────────

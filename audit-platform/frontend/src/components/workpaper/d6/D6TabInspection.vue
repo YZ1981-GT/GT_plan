@@ -495,28 +495,46 @@ function onSampleFilled(payload: any) {
   const existingNos = new Set(block1Rows.value.map(r => r.voucherNo).filter(Boolean))
   const mapped = samples
     .filter((s: any) => s.voucherNo && !existingNos.has(s.voucherNo))
-    .map((s: any) => ({
-      rowId: `row-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
-      // 🔴 客户名称必须走语义门控取辅助明细账里的往来单位。
-      // 改造前这里写的是 `s.counterpartAccount`（**对方科目编码**）——「1122.01」
-      // 这类科目码被当成客户名填进「客户名称」列，是错列而不只是缺值。
-      // 门控在「未命中 / 一键多名 / 维度不适格（如职员）」时返回空串 ⇒ 留空由
-      // 审计师填，绝不猜。
-      customerName: partyNameForColumn(s, 'customer'),
-      date: s.voucherDate || '',
-      voucherNo: s.voucherNo || '',
-      businessContent: s.summary || '',
-      // 对方科目回归它本来的列（此前被错填进客户名，这一列反而空着）
-      counterAccount: s.counterpartAccount || '',
-      counterDetail: '',
-      debitAmount: s.debitAmount || 0,
-      creditAmount: s.creditAmount || 0,
-      supportDoc: '',
-      check1: '', check2: '', check3: '', check4: '', check5: '',
-      indexRef: '',
-      isAbnormal: '否',
-      remark: '',
-    }))
+    .flatMap((s: any) => {
+      const base = {
+        customerName: partyNameForColumn(s, 'customer'),
+        date: s.voucherDate || '',
+        voucherNo: s.voucherNo || '',
+        businessContent: s.summary || '',
+        supportDoc: '',
+        check1: '', check2: '', check3: '', check4: '', check5: '',
+        indexRef: '',
+        isAbnormal: '否',
+        remark: '',
+      }
+      const entries = s.voucherEntries || []
+      const isMulti = s.counterpartAccount === '多科目' && entries.length > 0
+      if (isMulti) {
+        const sDebit = Number(s.debitAmount ?? 0)
+        const counterEntries = entries.filter((e: any) => {
+          if (sDebit > 0) return e.credit_amount && Number(e.credit_amount) > 0
+          return e.debit_amount && Number(e.debit_amount) > 0
+        })
+        const entriesToWrite = counterEntries.length > 0 ? counterEntries : entries
+        return entriesToWrite.map((e: any) => ({
+          rowId: `row-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+          ...base,
+          businessContent: e.summary || s.summary || '',
+          counterAccount: e.account_code || '',
+          counterDetail: e.account_name || '',
+          debitAmount: Number(e.debit_amount) || 0,
+          creditAmount: Number(e.credit_amount) || 0,
+        }))
+      }
+      return [{
+        rowId: `row-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+        ...base,
+        counterAccount: s.counterpartAccount || '',
+        counterDetail: s.counterpartAccountName || '',
+        debitAmount: s.debitAmount || 0,
+        creditAmount: s.creditAmount || 0,
+      }]
+    })
   if (mapped.length > 0) {
     block1Rows.value = [...block1Rows.value, ...mapped]
     // Persist block1 rows

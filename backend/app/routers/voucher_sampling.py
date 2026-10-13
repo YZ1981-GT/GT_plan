@@ -37,6 +37,7 @@ from app.services.dataset_query import get_active_dataset_id_or_none
 from app.services.ledger_sampling_service import (
     LedgerQueryFilters,
     LedgerSamplingService,
+    enrich_counterpart_accounts,
     enrich_items_with_aux_party,
 )
 from app.services.sampling_methodology import build_methodology_snapshot
@@ -435,6 +436,13 @@ async def voucher_extract(
         #     不碰 canonical 抽样查询与总体统计口径。取不到一律留空 —— 抽凭表的
         #     「客户名称」列宁可空着让审计师填，也不能猜错往来单位。
         sample_items = await enrich_items_with_aux_party(
+            db, pid, req.year, sample_items
+        )
+
+        # 9.10 对方科目补全：从同凭证反方向分录推导对方科目代码和名称。
+        #      源数据 counterpart_account 为空时（多数财务软件导出不带此字段），
+        #      按 (voucher_no, voucher_date) 分组查同凭证借贷反方向科目填入。
+        sample_items = await enrich_counterpart_accounts(
             db, pid, req.year, sample_items
         )
 

@@ -858,7 +858,7 @@ export function useH6Check(params: {
       if (!last) continue
       if (s.voucherNo || s.voucher_no) last.voucherNo = s.voucherNo || s.voucher_no
       if (s.date || s.voucherDate) last.date = s.date || s.voucherDate
-      if (s.counterpartAccount) last.counterpartAccount = s.counterpartAccount
+      if (s.counterpartAccount) last.counterpartAccount = s.counterpartAccountName ? `${s.counterpartAccount} ${s.counterpartAccountName}` : s.counterpartAccount
       const debit = _num(s.debitAmount ?? s.debit)
       const credit = _num(s.creditAmount ?? s.credit)
       // 1606 借方多为转入清理（近似原值/净值），贷方多为结转损益

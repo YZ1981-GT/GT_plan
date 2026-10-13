@@ -420,14 +420,37 @@ function onSamplesFilled(payload: any): void {
   if (!Array.isArray(samples) || samples.length === 0) return
   // Map SampledVoucher → period change rows
   for (const s of samples) {
-    addSample('period')
-    const newRow = periodChangeRows.value[periodChangeRows.value.length - 1]
-    if (newRow) {
-      updateCell('period', newRow.rowId, 'customerName', s.counterpartAccount || '')
-      updateCell('period', newRow.rowId, 'voucherNo', s.voucherNo || '')
-      updateCell('period', newRow.rowId, 'date', s.voucherDate || '')
-      updateCell('period', newRow.rowId, 'debitAmount', s.debitAmount || 0)
-      updateCell('period', newRow.rowId, 'creditAmount', s.creditAmount || 0)
+    const entries = s.voucherEntries || []
+    const isMulti = s.counterpartAccount === '多科目' && entries.length > 0
+    if (isMulti) {
+      const sDebit = Number(s.debitAmount ?? 0)
+      const counterEntries = entries.filter((e: any) =>
+        sDebit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
+      )
+      const toWrite = counterEntries.length > 0 ? counterEntries : entries
+      for (const e of toWrite) {
+        addSample('period')
+        const newRow = periodChangeRows.value[periodChangeRows.value.length - 1]
+        if (newRow) {
+          updateCell('period', newRow.rowId, 'customerName', e.account_code || '')
+          updateCell('period', newRow.rowId, 'counterAccountName', e.account_name || '')
+          updateCell('period', newRow.rowId, 'voucherNo', s.voucherNo || '')
+          updateCell('period', newRow.rowId, 'date', s.voucherDate || '')
+          updateCell('period', newRow.rowId, 'debitAmount', Number(e.debit_amount) || 0)
+          updateCell('period', newRow.rowId, 'creditAmount', Number(e.credit_amount) || 0)
+        }
+      }
+    } else {
+      addSample('period')
+      const newRow = periodChangeRows.value[periodChangeRows.value.length - 1]
+      if (newRow) {
+        updateCell('period', newRow.rowId, 'customerName', s.counterpartAccount || '')
+        updateCell('period', newRow.rowId, 'counterAccountName', s.counterpartAccountName || '')
+        updateCell('period', newRow.rowId, 'voucherNo', s.voucherNo || '')
+        updateCell('period', newRow.rowId, 'date', s.voucherDate || '')
+        updateCell('period', newRow.rowId, 'debitAmount', s.debitAmount || 0)
+        updateCell('period', newRow.rowId, 'creditAmount', s.creditAmount || 0)
+      }
     }
   }
   samplingVisible.value = false

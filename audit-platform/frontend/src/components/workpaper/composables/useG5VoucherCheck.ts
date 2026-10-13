@@ -227,19 +227,50 @@ export function useG5VoucherCheck(opts?: {
 
   /** 抽凭引擎回填 */
   function fillFromSamples(target: 'occurrence' | 'post', samples: any[]): void {
-    const mapped: G5VoucherRow[] = samples.map((s, i) => ({
-      ...emptyRow(i),
-      date: s.voucherDate ?? s.date ?? '',
-      voucherNo: s.voucherNo ?? '',
-      businessContent: s.summary ?? s.businessContent ?? '',
-      offsetAccount: s.counterpartAccount ?? s.offsetAccount ?? '',
-      offsetSubAccount: s.counterpartSubAccount ?? '',
-      debitAmount: Number(s.debitAmount ?? 0),
-      creditAmount: Number(s.creditAmount ?? (s.amount != null && Number(s.amount) > 0 ? Number(s.amount) : 0)),
-      remark: s.selectionReason ?? '',
-      source: '抽凭',
-      abnormal: !!s.abnormal,
-    }))
+    const mapped: G5VoucherRow[] = []
+    for (let i = 0; i < samples.length; i++) {
+      const s = samples[i]
+      const entries = s.voucherEntries || []
+      const isMulti = s.counterpartAccount === '多科目' && entries.length > 0
+
+      if (isMulti) {
+        const sDebit = Number(s.debitAmount ?? 0)
+        const counterEntries = entries.filter((e: any) => {
+          if (sDebit > 0) return e.credit_amount && Number(e.credit_amount) > 0
+          return e.debit_amount && Number(e.debit_amount) > 0
+        })
+        const entriesToWrite = counterEntries.length > 0 ? counterEntries : entries
+        for (const e of entriesToWrite) {
+          mapped.push({
+            ...emptyRow(mapped.length),
+            date: s.voucherDate ?? s.date ?? '',
+            voucherNo: s.voucherNo ?? '',
+            businessContent: e.summary || s.summary || s.businessContent || '',
+            offsetAccount: e.account_code || '',
+            offsetSubAccount: e.account_name || '',
+            debitAmount: Number(e.debit_amount ?? 0),
+            creditAmount: Number(e.credit_amount ?? 0),
+            remark: s.selectionReason ?? '',
+            source: '抽凭',
+            abnormal: !!s.abnormal,
+          })
+        }
+      } else {
+        mapped.push({
+          ...emptyRow(mapped.length),
+          date: s.voucherDate ?? s.date ?? '',
+          voucherNo: s.voucherNo ?? '',
+          businessContent: s.summary ?? s.businessContent ?? '',
+          offsetAccount: s.counterpartAccount ?? s.offsetAccount ?? '',
+          offsetSubAccount: s.counterpartAccountName ?? s.counterpartSubAccount ?? '',
+          debitAmount: Number(s.debitAmount ?? 0),
+          creditAmount: Number(s.creditAmount ?? (s.amount != null && Number(s.amount) > 0 ? Number(s.amount) : 0)),
+          remark: s.selectionReason ?? '',
+          source: '抽凭',
+          abnormal: !!s.abnormal,
+        })
+      }
+    }
     const bucket = target === 'occurrence' ? occurrenceRows : postPeriodRows
     const existing = new Set(bucket.value.map((r) => r.voucherNo).filter(Boolean))
     for (const r of mapped) {

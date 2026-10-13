@@ -309,7 +309,7 @@ export function useH3AdditionCheck(params: {
           assetName: s.counterpartName ?? s.debtorName ?? '',
           date: s.voucherDate ?? '',
           voucherNo: vno,
-          creditAccount: s.counterpartAccount ?? '',
+          creditAccount: s.counterpartAccountName ? `${s.counterpartAccount ?? ''} ${s.counterpartAccountName}` : (s.counterpartAccount ?? ''),
           originalCost: amt,
           isAbnormal: s.abnormal ? 'Y' : 'N',
           remark: s.selectionReason ?? '来源:抽凭',

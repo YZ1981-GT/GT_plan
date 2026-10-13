@@ -496,7 +496,7 @@ export function useG6EclVoucherCheck(
         businessContent: summary,
         businessType: sample.businessType || inferBusinessType(summary),
         counterAccount: sample.counterpartAccount ?? sample.counterAccount ?? '',
-        detailAccount: sample.accountName ?? sample.detailAccount ?? '',
+        detailAccount: sample.counterpartAccountName ?? sample.accountName ?? sample.detailAccount ?? '',
         debitAmount,
         creditAmount,
         source: '抽凭引擎',

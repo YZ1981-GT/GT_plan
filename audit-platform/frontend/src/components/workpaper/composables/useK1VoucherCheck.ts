@@ -365,23 +365,55 @@ export function useK1VoucherCheck(opts: {
 
   /** 抽凭引擎回填：把样本映射为凭证检查行 */
   function fillFromSamples(target: 'occurrence' | 'post', samples: any[]): void {
-    const mapped: K1VoucherRow[] = samples.map((s, i) => ({
-      ...emptyRow(i),
-      // 债务人名称走语义门控（K1 其他应收款，这一列语义是「债务人」）。
-      // 原实现读 `s.counterpartName` —— 抽凭样本里**没有这个字段**（后端给的是
-      // party_name/counterpart_account），故该列一直为空。
-      debtorName: partyNameForColumn(s, 'debtor') || s.debtorName || '',
-      date: s.voucherDate ?? s.date ?? '',
-      voucherNo: s.voucherNo ?? '',
-      businessContent: s.summary ?? s.businessContent ?? '',
-      offsetAccount: s.counterpartAccount ?? s.offsetAccount ?? '',
-      offsetSubAccount: s.counterpartSubAccount ?? s.offsetSubAccount ?? '',
-      debitAmount: Number(s.debitAmount ?? 0),
-      creditAmount: Number(s.creditAmount ?? 0),
-      supportingDoc: s.supportingDoc ?? '',
-      abnormal: !!s.abnormal,
-      remark: s.selectionReason ?? s.remark ?? '',
-    }))
+  function fillFromSamples(target: 'occurrence' | 'post', samples: any[]): void {
+    const mapped: K1VoucherRow[] = []
+    for (let i = 0; i < samples.length; i++) {
+      const s = samples[i]
+      const entries = s.voucherEntries || []
+      const isMulti = s.counterpartAccount === '多科目' && entries.length > 0
+
+      if (isMulti) {
+        // 多科目凭证：按对方分录逐行展开
+        const sDebit = Number(s.debitAmount ?? 0)
+        const counterEntries = entries.filter((e: any) => {
+          if (sDebit > 0) return e.credit_amount && Number(e.credit_amount) > 0
+          return e.debit_amount && Number(e.debit_amount) > 0
+        })
+        const entriesToWrite = counterEntries.length > 0 ? counterEntries : entries
+        for (const e of entriesToWrite) {
+          mapped.push({
+            ...emptyRow(mapped.length),
+            debtorName: partyNameForColumn(s, 'debtor') || s.debtorName || '',
+            date: s.voucherDate ?? s.date ?? '',
+            voucherNo: s.voucherNo ?? '',
+            businessContent: e.summary || s.summary || s.businessContent || '',
+            offsetAccount: e.account_code || '',
+            offsetSubAccount: e.account_name || '',
+            debitAmount: Number(e.debit_amount ?? 0),
+            creditAmount: Number(e.credit_amount ?? 0),
+            supportingDoc: s.supportingDoc ?? '',
+            abnormal: !!s.abnormal,
+            remark: s.selectionReason ?? s.remark ?? '',
+          })
+        }
+      } else {
+        // 1对1 或无明细：单行
+        mapped.push({
+          ...emptyRow(mapped.length),
+          debtorName: partyNameForColumn(s, 'debtor') || s.debtorName || '',
+          date: s.voucherDate ?? s.date ?? '',
+          voucherNo: s.voucherNo ?? '',
+          businessContent: s.summary ?? s.businessContent ?? '',
+          offsetAccount: s.counterpartAccount ?? s.offsetAccount ?? '',
+          offsetSubAccount: s.counterpartAccountName ?? s.counterpartSubAccount ?? s.offsetSubAccount ?? '',
+          debitAmount: Number(s.debitAmount ?? 0),
+          creditAmount: Number(s.creditAmount ?? 0),
+          supportingDoc: s.supportingDoc ?? '',
+          abnormal: !!s.abnormal,
+          remark: s.selectionReason ?? s.remark ?? '',
+        })
+      }
+    }
     if (target === 'occurrence') {
       const existing = new Set(occurrenceRows.value.map(r => r.voucherNo).filter(Boolean))
       occurrenceRows.value.push(...mapped.filter(r => !r.voucherNo || !existing.has(r.voucherNo)))

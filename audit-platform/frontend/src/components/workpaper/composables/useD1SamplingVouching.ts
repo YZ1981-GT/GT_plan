@@ -529,7 +529,7 @@ export function useD1SamplingVouching(options: UseD1SamplingVouchingOptions) {
       seq += 1
       const row = emptyVouchingRow(seq)
       row.noteNo = noteNo
-      row.drawer = String(s.counterpartAccount ?? '').trim()
+      row.drawer = String(s.counterpartAccountName ? `${s.counterpartAccount ?? ''} ${s.counterpartAccountName}` : (s.counterpartAccount ?? '')).trim()
       row.maturityDate = String(s.voucherDate ?? '').trim()
       row.amount = parseNum(s.debitAmount ?? s.creditAmount ?? 0)
       row.remark = String(s.selectionReason ?? summary ?? '').trim()

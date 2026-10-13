@@ -473,6 +473,7 @@ export function mapSampledToI3TargetedRow(s: {
   debitAmount?: string | number | null
   creditAmount?: string | number | null
   counterpartAccount?: string | null
+  counterpartAccountName?: string | null
   accountName?: string | null
   isHighValue?: boolean
   selectionReason?: string
@@ -486,6 +487,7 @@ export function mapSampledToI3TargetedRow(s: {
     voucherNo: _str(s.voucherNo),
     businessDesc: _str(s.summary),
     counterpartAccount: _str(s.counterpartAccount),
+    counterpartDetail: _str(s.counterpartAccountName),
     projectName: _str(s.accountName),
     debitAmount: _num(s.debitAmount),
     creditAmount: _num(s.creditAmount),

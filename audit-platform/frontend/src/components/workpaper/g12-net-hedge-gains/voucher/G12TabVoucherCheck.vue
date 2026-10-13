@@ -602,6 +602,7 @@ function onSampleFilled(payload: {
       voucherDate: s.voucherDate,
       voucherNo: s.voucherNo,
       counterpartAccount: s.counterpartAccount,
+      counterpartAccountName: s.counterpartAccountName,
       abnormal: s.abnormal,
       isHighValue: s.isHighValue,
       selectionReason: s.selectionReason,

@@ -761,6 +761,7 @@ function triggerPostFillReview(samples: SampledVoucher[]) {
     debitAmount: s.debitAmount,
     creditAmount: s.creditAmount,
     counterpartAccount: s.counterpartAccount,
+    counterpartAccountName: s.counterpartAccountName,
     abnormal: s.abnormal,
   }))
   showReview.value = true

@@ -754,10 +754,6 @@ const { add: decAdd, sub: decSub, sum: decSum } = useDecimalCalc()
 const { canEdit, onContextChange } = useAuditContext()
 const { isEditing: isPageEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 
-// chain-closure-phase3: 复核权限门控
-const { projectCan } = useProjectRole(computed(() => projectId.value || ''))
-const canReview = computed(() => projectCan('adjustment:review'))
-
 /** GtEditableTable 列配置 (P2-8: 摘要列 show-overflow-tooltip; P2-13: 科目下拉带余额) */
 const adjColumns: GtColumn[] = [
   { prop: 'adjustment_no', label: '编号', width: 120 },
@@ -790,6 +786,10 @@ const selectedProjectId = ref(projectStore.projectId)
 const projectOptions = computed(() => projectStore.projectOptions)
 const yearOptions = computed(() => projectStore.yearOptions)
 const selectedYear = ref(projectStore.year)
+
+// chain-closure-phase3: 复核权限门控
+const { projectCan } = useProjectRole(computed(() => projectId.value || ''))
+const canReview = computed(() => projectCan('adjustment:review'))
 
 // ─── useStaleRefresh：试算表变更后自动刷新调整分录 ────────────────────────────
 const adjStaleRefresh = useStaleRefresh(projectId, {

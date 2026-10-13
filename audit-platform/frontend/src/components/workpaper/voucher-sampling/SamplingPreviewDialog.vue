@@ -78,6 +78,75 @@ const tableHeight = computed(() => {
   return props.vouchers.length > 100 ? 500 : undefined
 })
 
+// ─── 凭证分录明细弹窗 ────────────────────────────────────────────────────────
+const entryDialogVisible = ref(false)
+const entryDialogRow = ref<any>(null)
+function showVoucherEntries(row: any) {
+  entryDialogRow.value = row
+  entryDialogVisible.value = true
+}
+/** 凭证分录合计行 */
+function voucherEntrySummary({ columns, data }: { columns: any[]; data: any[] }) {
+  return columns.map((col: any, idx: number) => {
+    if (idx === 0) return '合计'
+    if (col.property === 'debit_amount') {
+      const total = data.reduce((s, e) => s + (Number(e.debit_amount) || 0), 0)
+      return total > 0 ? total.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) : ''
+    }
+    if (col.property === 'credit_amount') {
+      const total = data.reduce((s, e) => s + (Number(e.credit_amount) || 0), 0)
+      return total > 0 ? total.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) : ''
+    }
+    return ''
+  })
+}
+
+// ─── 批量填充：核查结果 & 特定选取原因 ────────────────────────────────────────
+const batchCheckResult = ref('')
+const batchReasonMode = ref<'preset' | 'custom'>('preset')
+const batchReasonPreset = ref('')
+const batchReasonCustom = ref('')
+const REASON_PRESETS = [
+  { value: '大额交易', label: '大额交易' },
+  { value: '关联方交易', label: '关联方交易' },
+  { value: '异常交易', label: '异常交易' },
+  { value: '期末突增', label: '期末突增' },
+  { value: '跨期交易', label: '跨期交易' },
+  { value: '非常规业务', label: '非常规业务' },
+  { value: '高值必选', label: '高值必选(MUS)' },
+  { value: '随机抽样', label: '随机抽样' },
+]
+
+function applyBatchCheckResult() {
+  if (!batchCheckResult.value) return
+  let count = 0
+  for (const v of props.vouchers) {
+    if (v.selected && !v.checkResult) {
+      v.checkResult = batchCheckResult.value
+      count++
+    }
+  }
+  if (count > 0) ElMessage.success(`已为 ${count} 条勾选凭证填入核查结果`)
+  else ElMessage.info('所有勾选凭证已有核查结果，未覆盖')
+}
+
+function applyBatchReason() {
+  const reason = batchReasonMode.value === 'preset' ? batchReasonPreset.value : batchReasonCustom.value.trim()
+  if (!reason) {
+    ElMessage.warning('请选择或输入选取原因')
+    return
+  }
+  let count = 0
+  for (const v of props.vouchers) {
+    if (v.selected && !v.selectionReason) {
+      v.selectionReason = reason
+      count++
+    }
+  }
+  if (count > 0) ElMessage.success(`已为 ${count} 条勾选凭证填入选取原因`)
+  else ElMessage.info('所有勾选凭证已有选取原因，未覆盖')
+}
+
 // ─── 核查结果选项 ─────────────────────────────────────────────────────────────
 
 const checkResultOptions: { value: CheckResult; label: string }[] = [
@@ -126,6 +195,8 @@ function handleAppendSearch() {
     accountCode: '',
     accountName: null,
     counterpartAccount: null,
+    counterpartAccountName: null,
+    voucherEntries: [],
     voucherType: null,
     accountingPeriod: null,
     checkResult: '',
@@ -263,6 +334,33 @@ function handleConfirm() {
       <el-button size="small" type="primary" plain @click="handleOpenAppendSearch">
         + 追加凭证
       </el-button>
+
+      <!-- 批量核查结果 -->
+      <div class="batch-group">
+        <span class="batch-label">批量核查：</span>
+        <el-select v-model="batchCheckResult" size="small" placeholder="选择" clearable style="width: 80px">
+          <el-option v-for="opt in checkResultOptions.filter(o => o.value)" :key="opt.value" :value="opt.value" :label="opt.label" />
+        </el-select>
+        <el-button size="small" type="success" plain :disabled="!batchCheckResult" @click="applyBatchCheckResult">
+          填入勾选行
+        </el-button>
+      </div>
+
+      <!-- 批量选取原因 -->
+      <div class="batch-group">
+        <span class="batch-label">批量原因：</span>
+        <el-radio-group v-model="batchReasonMode" size="small" style="margin-right: 4px">
+          <el-radio-button value="preset">预设</el-radio-button>
+          <el-radio-button value="custom">自定义</el-radio-button>
+        </el-radio-group>
+        <el-select v-if="batchReasonMode === 'preset'" v-model="batchReasonPreset" size="small" placeholder="选择原因" clearable style="width: 120px">
+          <el-option v-for="opt in REASON_PRESETS" :key="opt.value" :value="opt.value" :label="opt.label" />
+        </el-select>
+        <el-input v-else v-model="batchReasonCustom" size="small" placeholder="输入原因" clearable style="width: 120px" />
+        <el-button size="small" type="success" plain @click="applyBatchReason">
+          填入勾选行
+        </el-button>
+      </div>
     </div>
 
     <!-- ═══ 凭证表格 ═══ -->
@@ -317,9 +415,16 @@ function handleConfirm() {
       </el-table-column>
 
       <!-- 对方科目 -->
-      <el-table-column prop="counterpartAccount" label="对方科目" min-width="90" show-overflow-tooltip>
+      <el-table-column label="对方科目" min-width="200">
         <template #default="{ row }">
-          {{ row.counterpartAccount || '-' }}
+          <template v-if="!row.counterpartAccount || row.counterpartAccount === '-'">-</template>
+          <template v-else-if="row.counterpartAccount !== '多科目'">
+            <span>{{ row.counterpartAccount }}</span>
+            <span v-if="row.counterpartAccountName" style="color: var(--el-text-color-secondary); margin-left: 4px">{{ row.counterpartAccountName }}</span>
+          </template>
+          <template v-else>
+            <el-button size="small" link type="primary" @click="showVoucherEntries(row)">多科目 (点击查看分录)</el-button>
+          </template>
         </template>
       </el-table-column>
 
@@ -367,15 +472,21 @@ function handleConfirm() {
         </template>
       </el-table-column>
 
-      <!-- 特定选取原因（inline 编辑，随样本回填，R6.5） -->
-      <el-table-column label="特定选取原因" min-width="140">
+      <!-- 特定选取原因（inline 编辑：下拉预设 + 自定义输入，R6.5） -->
+      <el-table-column label="特定选取原因" min-width="160">
         <template #default="{ row }">
-          <el-input
+          <el-select
             v-model="row.selectionReason"
             size="small"
-            placeholder="如：大额/关联方/异常"
+            placeholder="选择或输入"
             clearable
-          />
+            filterable
+            allow-create
+            default-first-option
+            style="width: 100%"
+          >
+            <el-option v-for="opt in REASON_PRESETS" :key="opt.value" :value="opt.value" :label="opt.label" />
+          </el-select>
         </template>
       </el-table-column>
 
@@ -486,6 +597,52 @@ function handleConfirm() {
         <el-button type="primary" @click="handleAppendSearch">确认追加</el-button>
       </template>
     </el-dialog>
+
+    <!-- ═══ 凭证完整分录明细弹窗（可拖拽）═══ -->
+    <el-dialog
+      v-model="entryDialogVisible"
+      :title="`凭证 ${entryDialogRow?.voucherNo || ''} 完整分录`"
+      width="680px"
+      append-to-body
+      draggable
+      :close-on-click-modal="true"
+      class="voucher-entry-dialog"
+    >
+      <div v-if="entryDialogRow" style="font-size: 13px">
+        <div style="display: flex; gap: 24px; margin-bottom: 12px; color: var(--el-text-color-secondary); font-size: 12px">
+          <span>日期：{{ entryDialogRow.voucherDate }}</span>
+          <span>凭证号：{{ entryDialogRow.voucherNo }}</span>
+          <span>摘要：{{ entryDialogRow.summary || '-' }}</span>
+        </div>
+        <el-table
+          :data="entryDialogRow.voucherEntries || []"
+          border
+          size="small"
+          style="width: 100%"
+          :max-height="400"
+          show-summary
+          :summary-method="voucherEntrySummary"
+        >
+          <el-table-column prop="account_code" label="科目代码" min-width="110" />
+          <el-table-column prop="account_name" label="科目名称" min-width="160" show-overflow-tooltip />
+          <el-table-column prop="debit_amount" label="借方" width="130" align="right">
+            <template #default="{ row: e }">
+              <span v-if="e.debit_amount && Number(e.debit_amount) > 0" style="color: var(--el-color-danger)">
+                {{ Number(e.debit_amount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="credit_amount" label="贷方" width="130" align="right">
+            <template #default="{ row: e }">
+              <span v-if="e.credit_amount && Number(e.credit_amount) > 0" style="color: var(--el-color-primary)">
+                {{ Number(e.credit_amount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="summary" label="摘要" min-width="180" show-overflow-tooltip />
+        </el-table>
+      </div>
+    </el-dialog>
   </el-dialog>
 </template>
 
@@ -553,6 +710,20 @@ function handleConfirm() {
   align-items: center;
   justify-content: flex-end;
   margin-bottom: 8px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.batch-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.batch-label {
+  color: var(--el-text-color-secondary);
+  white-space: nowrap;
 }
 
 /* ── 表格样式 ── */
@@ -609,5 +780,10 @@ function handleConfirm() {
 
 .voucher-table :deep(.el-select .el-input__inner) {
   font-size: var(--wp-font-size, 13px);
+}
+
+/* ── 凭证分录弹窗 ── */
+.voucher-entry-dialog :deep(.el-dialog__body) {
+  padding: 12px 20px 20px;
 }
 </style>

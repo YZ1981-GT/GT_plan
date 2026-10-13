@@ -861,16 +861,38 @@ function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase
   void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
 
   // 将抽样结果映射为 fillVoucherSamples 所需格式
-  const mappedSamples = payload.samples.map(s => ({
-    voucherNo: s.voucherNo,
-    date: s.voucherDate || '',
-    businessContent: s.summary || '',
-    counterAccount: s.counterpartAccount || '',
-    detailAccount: s.accountName || '',
-    debitAmount: s.debitAmount ? parseFloat(s.debitAmount) : 0,
-    creditAmount: s.creditAmount ? parseFloat(s.creditAmount) : 0,
-    section: (s.debitAmount && parseFloat(s.debitAmount) > 0 ? 'debit' : 'credit') as 'debit' | 'credit',
-  }))
+  const mappedSamples = payload.samples.flatMap(s => {
+    const entries = s.voucherEntries || []
+    const isMulti = s.counterpartAccount === '多科目' && entries.length > 0
+    const section = (s.debitAmount && parseFloat(s.debitAmount) > 0 ? 'debit' : 'credit') as 'debit' | 'credit'
+    if (isMulti) {
+      const sDebit = s.debitAmount ? parseFloat(s.debitAmount) : 0
+      const counterEntries = entries.filter((e: any) =>
+        sDebit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
+      )
+      const toWrite = counterEntries.length > 0 ? counterEntries : entries
+      return toWrite.map((e: any) => ({
+        voucherNo: s.voucherNo,
+        date: s.voucherDate || '',
+        businessContent: e.summary || s.summary || '',
+        counterAccount: e.account_code || '',
+        detailAccount: e.account_name || '',
+        debitAmount: Number(e.debit_amount) || 0,
+        creditAmount: Number(e.credit_amount) || 0,
+        section,
+      }))
+    }
+    return [{
+      voucherNo: s.voucherNo,
+      date: s.voucherDate || '',
+      businessContent: s.summary || '',
+      counterAccount: s.counterpartAccount || '',
+      detailAccount: s.counterpartAccountName || s.accountName || '',
+      debitAmount: s.debitAmount ? parseFloat(s.debitAmount) : 0,
+      creditAmount: s.creditAmount ? parseFloat(s.creditAmount) : 0,
+      section,
+    }]
+  })
   vc.fillVoucherSamples(mappedSamples)
   ElMessage.success(`已填入 ${mappedSamples.length} 条抽凭样本`)
 }

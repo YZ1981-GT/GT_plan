@@ -964,6 +964,7 @@ function triggerPostFillReview(samples: SampledVoucher[]) {
     debitAmount: s.debitAmount,
     creditAmount: s.creditAmount,
     counterpartAccount: s.counterpartAccount,
+    counterpartAccountName: s.counterpartAccountName,
     abnormal: s.abnormal,
   }))
   showReview.value = true
@@ -1070,6 +1071,7 @@ function onCutoffFilled(e: Event) {
     debitAmount: s.debitAmount,
     creditAmount: s.creditAmount,
     counterpartAccount: s.counterpartAccount,
+    counterpartAccountName: s.counterpartAccountName,
     cutoffStatus: s.cutoffStatus,
   }))
   showReview.value = true

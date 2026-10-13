@@ -1110,7 +1110,20 @@ function onSampleFilled(payload: any) {
     lastRow.originalCost = Math.abs(Number(s.debitAmount ?? s.creditAmount ?? 0) || 0)
     lastRow.voucherNo = s.voucherNo || ''
     lastRow.acquisitionDate = s.voucherDate || ''
-    lastRow.counterpartAccount = s.counterpartAccount || ''
+    // 多科目时拼接所有对方科目代码和名称
+    const entries = s.voucherEntries || []
+    if (s.counterpartAccount === '多科目' && entries.length > 0) {
+      const sDebit = Number(s.debitAmount ?? 0)
+      const counterEntries = entries.filter((e: any) =>
+        sDebit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
+      )
+      const toShow = counterEntries.length > 0 ? counterEntries : entries
+      lastRow.counterpartAccount = toShow.map((e: any) => e.account_code).filter(Boolean).join('/')
+      lastRow.counterpartAccountName = toShow.map((e: any) => e.account_name).filter(Boolean).join('/')
+    } else {
+      lastRow.counterpartAccount = s.counterpartAccount || ''
+      lastRow.counterpartAccountName = s.counterpartAccountName || ''
+    }
     lastRow.voucherSampleId = s.voucherNo || ''
     lastRow.isAbnormal = s.abnormal ? 'Y' : 'N'
     lastRow.checkResult = s.abnormal ? 'ERR' : ''

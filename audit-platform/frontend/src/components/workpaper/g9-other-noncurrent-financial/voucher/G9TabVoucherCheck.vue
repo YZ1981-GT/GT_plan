@@ -783,6 +783,7 @@ function onSampleFilled(payload: {
       voucherDate: s.voucherDate,
       voucherNo: s.voucherNo,
       counterpartAccount: s.counterpartAccount,
+      counterpartAccountName: s.counterpartAccountName,
       abnormal: s.abnormal,
       isHighValue: s.isHighValue,
       selectionReason: s.selectionReason,
@@ -817,6 +818,7 @@ function triggerPostFillReview(samples: Array<{
     debitAmount: s.debitAmount ?? s.amount,
     creditAmount: s.creditAmount,
     counterpartAccount: s.counterpartAccount,
+    counterpartAccountName: s.counterpartAccountName,
     abnormal: s.abnormal,
   }))
   showReview.value = true
@@ -966,6 +968,7 @@ function onCutoffFilled(e: Event) {
     debitAmount: s.debitAmount,
     creditAmount: s.creditAmount,
     counterpartAccount: s.counterpartAccount,
+    counterpartAccountName: s.counterpartAccountName,
     abnormal: s.cutoffStatus === '可能跨期',
   }))
   showReview.value = true

@@ -597,7 +597,7 @@ function onSampleFilled(payload: any) {
   const imported = samples.map((s: any) => {
     const row = createEmptyRow()
     row.category = '应收票据'
-    row.itemName = s.counterpartAccount || s.summary || ''
+    row.itemName = s.counterpartAccountName || s.counterpartAccount || s.summary || ''
     row.periodIncrease = parseNum(s.debitAmount)
     row.periodDecrease = parseNum(s.creditAmount)
     row.remark = `抽凭: ${s.voucherNo || ''}`

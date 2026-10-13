@@ -106,6 +106,15 @@ export interface SampledVoucher {
   accountCode: string
   accountName: string | null
   counterpartAccount: string | null
+  counterpartAccountName: string | null
+  /** 完整凭证分录明细（同一凭证的所有借贷行） */
+  voucherEntries: Array<{
+    account_code: string
+    account_name: string
+    debit_amount: string | null
+    credit_amount: string | null
+    summary: string
+  }>
   voucherType: string | null
   accountingPeriod: number | null
   checkResult: CheckResult

@@ -306,6 +306,52 @@ function handleBatchMarkChecked() {
   }
 }
 
+// ─── 批量填充：核查结果 & 特定选取原因 ────────────────────────────────────────
+const batchCheckResult = ref<CheckResult>('')
+const batchReasonMode = ref<'preset' | 'custom'>('preset')
+const batchReasonPreset = ref('')
+const batchReasonCustom = ref('')
+const REASON_PRESETS = [
+  { value: '大额交易', label: '大额交易' },
+  { value: '关联方交易', label: '关联方交易' },
+  { value: '异常交易', label: '异常交易' },
+  { value: '期末突增', label: '期末突增' },
+  { value: '跨期交易', label: '跨期交易' },
+  { value: '非常规业务', label: '非常规业务' },
+  { value: '高值必选', label: '高值必选(MUS)' },
+  { value: '随机抽样', label: '随机抽样' },
+]
+
+function applyBatchCheckResult() {
+  if (!batchCheckResult.value) return
+  let count = 0
+  sampledVouchers.value.forEach((v, idx) => {
+    if (canEditRow(v) && !v.checkResult) {
+      updateField(idx, 'checkResult', batchCheckResult.value)
+      count++
+    }
+  })
+  if (count > 0) ElMessage.success(`已为 ${count} 条凭证填入核查结果「${batchCheckResult.value}」`)
+  else ElMessage.info('所有可编辑凭证已有核查结果，未覆盖')
+}
+
+function applyBatchReason() {
+  const reason = batchReasonMode.value === 'preset' ? batchReasonPreset.value : batchReasonCustom.value.trim()
+  if (!reason) {
+    ElMessage.warning('请选择或输入选取原因')
+    return
+  }
+  let count = 0
+  sampledVouchers.value.forEach((v, idx) => {
+    if (canEditRow(v) && !v.selectionReason) {
+      updateField(idx, 'selectionReason', reason)
+      count++
+    }
+  })
+  if (count > 0) ElMessage.success(`已为 ${count} 条凭证填入选取原因「${reason}」`)
+  else ElMessage.info('所有可编辑凭证已有选取原因，未覆盖')
+}
+
 /**
  * R18.7 结论确认门禁的**原因文案**（null = 未阻断）。
  *
@@ -915,6 +961,31 @@ async function handleResample() {
       <el-button size="small" @click="handleBatchMarkChecked">
         批量标记已核查
       </el-button>
+
+      <!-- 批量核查结果 -->
+      <div v-if="sampledVouchers.length > 0" class="batch-fill-group">
+        <el-select v-model="batchCheckResult" size="small" placeholder="批量核查" clearable style="width: 90px">
+          <el-option v-for="opt in checkResultOptions.filter(o => o.value)" :key="opt.value" :value="opt.value" :label="opt.label" />
+        </el-select>
+        <el-button size="small" type="success" plain :disabled="!batchCheckResult" @click="applyBatchCheckResult">
+          填入
+        </el-button>
+      </div>
+
+      <!-- 批量选取原因 -->
+      <div v-if="sampledVouchers.length > 0" class="batch-fill-group">
+        <el-radio-group v-model="batchReasonMode" size="small">
+          <el-radio-button value="preset">预设</el-radio-button>
+          <el-radio-button value="custom">自定义</el-radio-button>
+        </el-radio-group>
+        <el-select v-if="batchReasonMode === 'preset'" v-model="batchReasonPreset" size="small" placeholder="选择原因" clearable style="width: 110px">
+          <el-option v-for="opt in REASON_PRESETS" :key="opt.value" :value="opt.value" :label="opt.label" />
+        </el-select>
+        <el-input v-else v-model="batchReasonCustom" size="small" placeholder="输入原因" clearable style="width: 110px" />
+        <el-button size="small" type="success" plain @click="applyBatchReason">
+          填入
+        </el-button>
+      </div>
       <!--
         重开预览：本会话已抽出样本但预览被关闭时提供回填通路。
         🔴 没有这个入口，用户一旦关掉预览（或被结论确认门禁挡回来）就只能「重抽」，
@@ -1635,6 +1706,16 @@ async function handleResample() {
   display: flex;
   gap: 8px;
   margin-bottom: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.batch-fill-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 4px;
+  border-left: 1px solid var(--el-border-color-lighter);
 }
 
 /* ── 主体表格 ── */

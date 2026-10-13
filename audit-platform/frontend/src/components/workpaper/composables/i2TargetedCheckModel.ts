@@ -393,6 +393,7 @@ export function mapSampledToI2TargetedRow(s: {
     voucherNo: _str(s.voucherNo),
     businessDesc: _str(s.summary),
     counterpartAccount: _str(s.counterpartAccount),
+    counterpartDetail: _str(s.counterpartAccountName),
     projectName: _str(s.accountName),
     debitAmount: _num(s.debitAmount),
     creditAmount: _num(s.creditAmount),

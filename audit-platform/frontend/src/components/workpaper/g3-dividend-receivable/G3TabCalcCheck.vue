@@ -574,19 +574,39 @@ async function onPushToG33() {
 function handleSamplingFilled(payload: { samples: SampledVoucher[] } | SampledVoucher[]) {
   const samples = Array.isArray(payload) ? payload : (payload?.samples ?? [])
   if (!samples.length) return
-  const mapped = samples.map((s) => {
+  const mapped = samples.flatMap((s) => {
     const debit = parseFloat(s.debitAmount ?? '0') || 0
     const credit = parseFloat(s.creditAmount ?? '0') || 0
-    return {
+    const entries = s.voucherEntries || []
+    const isMulti = s.counterpartAccount === '多科目' && entries.length > 0
+    if (isMulti) {
+      const counterEntries = entries.filter((e: any) =>
+        debit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
+      )
+      const toWrite = counterEntries.length > 0 ? counterEntries : entries
+      return toWrite.map((e: any) => ({
+        voucherDate: s.voucherDate ?? '',
+        voucherNo: s.voucherNo ?? '',
+        summary: e.summary || s.summary || '',
+        counterAccount: e.account_code || '',
+        counterAccountName: e.account_name || '',
+        debitAmount: Number(e.debit_amount) || 0,
+        creditAmount: Number(e.credit_amount) || 0,
+        amount: Number(e.debit_amount) || Number(e.credit_amount) || 0,
+        investeeName: s.accountName ?? '',
+      }))
+    }
+    return [{
       voucherDate: s.voucherDate ?? '',
       voucherNo: s.voucherNo ?? '',
       summary: s.summary ?? '',
       counterAccount: s.counterpartAccount ?? '',
+      counterAccountName: s.counterpartAccountName ?? '',
       debitAmount: debit,
       creditAmount: credit,
       amount: debit || credit,
       investeeName: s.accountName ?? '',
-    }
+    }]
   })
   const { filled } = calcCheck.fillFromSamples(mapped, { cutoffDate: cutoffDate.value })
   showSamplingDialog.value = false

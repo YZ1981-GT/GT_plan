@@ -1135,6 +1135,7 @@ export function mapSampledToI4TargetedRow(
     voucherNo: _str(s.voucherNo),
     businessDesc: _str(s.summary),
     counterpartAccount: _str(s.counterpartAccount),
+    counterpartDetail: _str(s.counterpartAccountName),
     projectName,
     debitAmount: _num(s.debitAmount),
     creditAmount: _num(s.creditAmount),
