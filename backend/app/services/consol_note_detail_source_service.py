@@ -45,9 +45,12 @@ def _first_cell(row: Any) -> str:
 
 def _row_type(row: Any) -> str:
     if isinstance(row, dict):
-        rt = row.get("row_type", "data")
+        rt = str(row.get("row_type", "data")).strip()
         if rt in ("total", "subtotal"):
             return rt
+        if rt not in ("data", ""):
+            # 非标准类型（如 header）——不做标签推导，直接归为 data
+            return "data"
         label = str(row.get("label") or "").strip().replace("\u3000", "").replace(" ", "")
         if label in ("合计", "合\u3000计"):
             return "total"
@@ -175,6 +178,7 @@ async def scan_all_entities(
         return []
 
     entities: list[dict[str, Any]] = []
+    # TODO: N+1 查询——叶子企业多时应改为 IN 批查 disclosure_notes
     for leaf in data_leaves(tree):
         if leaf.project_id is None:
             continue
@@ -382,7 +386,7 @@ async def preview_detail_refresh(
         if version is not None and isinstance(version.rows, list):
             template_rows = version.rows
 
-    # 3. 检测 stale 绑定
+    # 3. 检测 stale 绑定（只读——标记在返回值中，不写数据库；实际 stale 标记在 confirm/apply 阶段）
     stale_entities: list[dict[str, Any]] = []
     for entity in entities:
         existing_binding = (await db.execute(
@@ -401,13 +405,10 @@ async def preview_detail_refresh(
                     "new_hash": entity["hash"],
                     "status": "stale",
                 })
-                # 标记 stale
-                if existing_binding.status != "stale":
-                    existing_binding.status = "stale"
-                    await db.flush()
 
     # 4. 读取历史映射
     history: list[dict[str, Any]] = []
+    rules: list[Any] = []
     if template_version_id:
         rules = (await db.execute(
             sa.select(ConsolNoteMappingRule).where(
@@ -498,6 +499,7 @@ async def suggest_template_for_section(
             if not label:
                 continue
             if label not in label_stats:
+                # row_type 取首次出现的值（同标签在不同企业可能标不同类型，以首次为准）
                 label_stats[label] = {"count": 0, "row_type": rt, "total_amount": 0.0}
             label_stats[label]["count"] += 1
             # 尝试提取金额

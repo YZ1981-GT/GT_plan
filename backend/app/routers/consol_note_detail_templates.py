@@ -102,7 +102,7 @@ async def api_create_template(
 ):
     """创建合并附注明细模板（附首版本 v1）。"""
     try:
-        return await create_template(
+        result = await create_template(
             db,
             template_type=body.template_type,
             section_id=body.section_id,
@@ -112,11 +112,11 @@ async def api_create_template(
             change_note=body.change_note,
             created_by=user.id,
         )
+        await db.commit()
+        return result
     except TemplateServiceError as exc:
         await db.rollback()
         _raise(exc)
-    finally:
-        await db.commit()
 
 
 @router.get("/api/consol-note-templates")
@@ -310,7 +310,7 @@ async def api_preview_detail_refresh(
         section_id=body.section_id,
         year=body.year,
     )
-    await db.commit()  # stale 标记的 flush 需要 commit
+    # preview 是只读操作，不需要 commit
     # 不返回内部 _token_data
     out = {k: v for k, v in result.items() if not k.startswith("_")}
     return out

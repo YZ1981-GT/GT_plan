@@ -4,6 +4,9 @@
  *
  * 不 mock apiProxy——直接静态检查 consolidationApi 的 named export。
  * 这确保追加的 15 个函数和 15 个类型都真实存在且 vitest 能 resolve。
+ *
+ * TODO: 补充 ConsolNoteDetailTemplateEditor / ConsolNoteMappingDialog 组件挂载测试
+ * （需要 Element Plus 完整 stub，与 ConsolNoteTab.spec.ts 同款 fixture）。
  */
 import { describe, expect, it } from 'vitest'
 import * as consolidationApi from '@/services/consolidationApi'

@@ -280,7 +280,7 @@ ConsolNoteTab 工具栏新增按钮"📋 明细刷新"，与现有"ƒx 按公式
 
 | 批次 | 范围 | 文件数 | 测试预估 |
 |---|---|---|---|
-| Phase 1 | 数据模型 + V185 迁移 + ORM + 模板 CRUD API | ~6 | ~20 |
+| Phase 1 | 数据模型 + V186 迁移 + ORM + 模板 CRUD API | ~6 | ~20 |
 | Phase 2 | 来源扫描 + 结构指纹 + 建议算法 + preview API | ~4 | ~18 |
 | Phase 3 | 映射规则 CRUD + confirm_mapping + 绑定管理 | ~4 | ~16 |
 | Phase 4 | apply 写入 + 穿透 + 手工保护 + stale 联动 | ~4 | ~14 |

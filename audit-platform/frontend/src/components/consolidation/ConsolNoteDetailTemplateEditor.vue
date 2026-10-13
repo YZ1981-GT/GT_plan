@@ -125,12 +125,18 @@ function addRow() {
 async function removeRow(idx: number) {
   const row = editRows.value[idx]
   if (row.target_row_id && props.template) {
-    const impact = await checkRowDeletion(props.template.id, [row.target_row_id])
-    if (impact.affected_rule_count > 0) {
-      await ElMessageBox.confirm(
-        `该行被 ${impact.affected_rule_count} 条映射规则引用，涉及 ${impact.affected_entity_count} 家企业。确认删除？`,
-        '删除确认', { type: 'warning' },
-      )
+    try {
+      const impact = await checkRowDeletion(props.template.id, [row.target_row_id])
+      if (impact.affected_rule_count > 0) {
+        await ElMessageBox.confirm(
+          `该行被 ${impact.affected_rule_count} 条映射规则引用，涉及 ${impact.affected_entity_count} 家企业。确认删除？`,
+          '删除确认', { type: 'warning' },
+        )
+      }
+    } catch (err: any) {
+      // 用户取消 ElMessageBox 也走这里——cancelled 不应阻止后续逻辑
+      if (err === 'cancel' || err?.toString?.()?.includes('cancel')) return
+      // 网络错误时仍允许删除（前端编辑，保存时后端再校验）
     }
   }
   editRows.value.splice(idx, 1)

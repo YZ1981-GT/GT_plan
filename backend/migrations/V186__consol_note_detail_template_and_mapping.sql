@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS consol_note_mapping_binding (
     project_id          UUID         NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     section_id          VARCHAR(64)  NOT NULL,
     entity_node_key     VARCHAR(128) NOT NULL,
-    entity_project_id   UUID         NOT NULL,
+    entity_project_id   UUID         NOT NULL,  -- 不加 FK：来源企业 project_id 可能不在当前合并项目的 projects 表中
     rule_id             UUID         NOT NULL REFERENCES consol_note_mapping_rule(id) ON DELETE CASCADE,
     bound_source_hash   VARCHAR(64)  NOT NULL,
     status              VARCHAR(20)  NOT NULL DEFAULT 'confirmed',

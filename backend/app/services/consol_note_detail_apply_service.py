@@ -155,9 +155,21 @@ async def apply_detail_refresh(
     # ── 5. 按规则转换 + 金额汇总 ──
     from app.services.consol_note_detail_source_service import load_entity_source_rows
 
-    # 初始化目标行金额：{target_row_idx: {col_key: Decimal}}
-    # 模板 headers 从现有数据或模板取
-    width = max(3, len(template_rows[0].get("aliases", [])) + 3) if template_rows else 3
+    # 初始化列数：从来源行的实际列数推导，最少 3 列（项目名+本期+上期）
+    width = 3
+    for b in confirmed:
+        rule = rule_cache.get(b.rule_id)
+        if rule is None:
+            continue
+        source_rows = await load_entity_source_rows(db, b.entity_project_id, section_id, year)
+        for sr in source_rows:
+            if isinstance(sr, (list, tuple)):
+                width = max(width, len(sr))
+            elif isinstance(sr, dict):
+                vals = sr.get("values") or sr.get("cells") or {}
+                if isinstance(vals, dict):
+                    width = max(width, max((int(k) for k in vals if str(k).isdigit()), default=0) + 1)
+        break  # 只取第一个企业的列数即可（同结构组列数相同）
 
     # 目标金额汇总
     target_amounts: dict[int, dict[int, Decimal]] = {}
@@ -264,7 +276,8 @@ async def apply_detail_refresh(
                     row[col] = formatted
                     filled.append({"row": i, "col": col, "value": formatted, "target_name": tr.get("canonical_name", "")})
 
-        # 合计行自动求和
+        # 合计行自动求和：遍历已构建的所有行，跳过 total/subtotal 行本身，对数据行求和
+        # 语义：total = Σ(所有 data 行)，不含 subtotal（subtotal 若有则由前端处理分段小计）
         if tr.get("row_type") == "total":
             for col in range(1, width):
                 if (i, col) in protected:
@@ -329,13 +342,23 @@ def _extract_amounts(row: Any, width: int) -> dict[int, Decimal]:
     if isinstance(row, dict):
         vals = row.get("values") or row.get("cells") or {}
         if isinstance(vals, dict):
-            for k, v in vals.items():
-                try:
-                    col = int(k) if str(k).isdigit() else None
-                    if col is not None and col >= 1:
-                        amounts[col] = Decimal(str(v))
-                except (TypeError, ValueError):
-                    pass
+            # 优先按数字键索引；如果无数字键则按值顺序（跳过第一个当标签用的键）
+            has_numeric = any(str(k).isdigit() for k in vals)
+            if has_numeric:
+                for k, v in vals.items():
+                    try:
+                        col = int(k) if str(k).isdigit() else None
+                        if col is not None and col >= 1:
+                            amounts[col] = Decimal(str(v))
+                    except (TypeError, ValueError):
+                        pass
+            else:
+                for j, (k, v) in enumerate(vals.items()):
+                    if j >= 1:  # 跳过第一个键（通常是标签）
+                        try:
+                            amounts[j] = Decimal(str(v))
+                        except (TypeError, ValueError):
+                            pass
         elif isinstance(vals, (list, tuple)):
             for j, v in enumerate(vals):
                 if j >= 1:
@@ -411,7 +434,10 @@ async def _load_or_create_note_data(
     section_id: str,
     node_key: str | None,
 ) -> ConsolNoteData:
-    """加载或创建 consol_note_data 行。"""
+    """加载或创建 consol_note_data 行。
+    
+    node_key=None 时操作项目级兼容行（与 consol_note_formula_service.fill_by_formula 同口径）。
+    """
     q = sa.select(ConsolNoteData).where(
         ConsolNoteData.project_id == project_id,
         ConsolNoteData.year == year,

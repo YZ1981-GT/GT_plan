@@ -164,6 +164,8 @@ async function loadPreview() {
     const rows: MappingRow[] = []
 
     for (const suggestion of result.suggestions || []) {
+      // TODO: 当前把全部非 stale 企业赋给每条建议行，因为 preview API 没有返回
+      // "哪条来源标签属于哪些企业"的精确映射。Phase 6 Playwright 实测后考虑按 group 细分。
       const entities = allEntities.filter(e => !staleKeys.has(e.node_key))
       rows.push({
         source_label: suggestion.source_label,
@@ -199,22 +201,27 @@ function buildMappings(): MappingRuleItem[] {
   }))
 }
 
+async function handleConfirmOnlyInternal() {
+  if (!preview.value) throw new Error('no preview')
+  const groups = preview.value.groups || []
+  for (const group of groups) {
+    const mappings = buildMappings()
+    await confirmDetailMapping(props.projectId, {
+      section_id: props.sectionId,
+      year: props.year,
+      template_version_id: preview.value.template_version_id || '',
+      source_structure_hash: group.hash,
+      mappings,
+      entity_node_keys: group.entities.map(e => ({ ...e, hash: group.hash })),
+    })
+  }
+}
+
 async function handleConfirmOnly() {
   if (!preview.value) return
   confirming.value = true
   try {
-    const groups = preview.value.groups || []
-    for (const group of groups) {
-      const mappings = buildMappings()
-      await confirmDetailMapping(props.projectId, {
-        section_id: props.sectionId,
-        year: props.year,
-        template_version_id: preview.value.template_version_id || '',
-        source_structure_hash: group.hash,
-        mappings,
-        entity_node_keys: group.entities.map(e => ({ ...e, hash: group.hash })),
-      })
-    }
+    await handleConfirmOnlyInternal()
     ElMessage.success('映射规则已确认')
   } catch (err: any) {
     const detail = err?.response?.data?.detail
@@ -230,8 +237,17 @@ async function handleConfirmOnly() {
 }
 
 async function handleConfirmAndApply() {
-  await handleConfirmOnly()
-  if (confirming.value) return // 确认失败
+  let confirmOk = false
+  confirming.value = true
+  try {
+    await handleConfirmOnlyInternal()
+    confirmOk = true
+  } catch {
+    // handleConfirmOnlyInternal 已经处理了错误展示
+  } finally {
+    confirming.value = false
+  }
+  if (!confirmOk) return
   applying.value = true
   try {
     const result = await applyDetailRefresh(props.projectId, {

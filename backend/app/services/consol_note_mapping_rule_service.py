@@ -215,8 +215,9 @@ async def confirm_mapping(
     """
     _validate_hash(source_structure_hash)
     _validate_mappings(mappings)
+    await _verify_template_version(db, template_version_id)
 
-    # 校验模板版本
+    # 校验模板版本与项目绑定一致
     binding = (await db.execute(
         sa.select(ConsolNoteTemplateBinding).where(
             ConsolNoteTemplateBinding.project_id == project_id,
@@ -251,7 +252,8 @@ async def confirm_mapping(
     )
     now = datetime.now(timezone.utc)
     if existing is not None:
-        # 升版
+        # 升版：停用旧版，将指向旧版的绑定迁移到新版
+        old_rule_id = existing.id
         existing.is_active = False
         await db.flush()
         rule = ConsolNoteMappingRule(
@@ -267,6 +269,18 @@ async def confirm_mapping(
         )
         db.add(rule)
         await db.flush()
+        # 迁移引用旧规则的绑定（本次未传入的企业）
+        incoming_keys = {ent["node_key"] for ent in entity_node_keys}
+        orphan_bindings = (await db.execute(
+            sa.select(ConsolNoteMappingBinding).where(
+                ConsolNoteMappingBinding.rule_id == old_rule_id,
+            )
+        )).scalars().all()
+        for ob in orphan_bindings:
+            if ob.entity_node_key not in incoming_keys:
+                ob.rule_id = rule.id
+        if orphan_bindings:
+            await db.flush()
     else:
         rule = ConsolNoteMappingRule(
             project_id=project_id,
@@ -374,7 +388,8 @@ async def detect_stale_bindings(
     for b in bindings:
         current = current_hashes.get(b.entity_node_key)
         if current is None:
-            # 企业不再在合并范围内——也标 stale
+            # 企业不再在合并范围内——跳过，不标 stale。
+            # 该企业的绑定在 apply 时自然不会参与汇总（只处理 confirmed 绑定 + 当前范围内的企业）。
             continue
         if current != b.bound_source_hash:
             b.status = "stale"
@@ -410,6 +425,10 @@ async def get_binding_status_summary(
 
 def _validate_hash(h: str) -> None:
     if not h or len(h) != 64:
+        raise MappingRuleError(400, "INVALID_HASH", "source_structure_hash 必须是 64 位十六进制")
+    try:
+        int(h, 16)
+    except ValueError:
         raise MappingRuleError(400, "INVALID_HASH", "source_structure_hash 必须是 64 位十六进制")
 
 

@@ -114,6 +114,7 @@ async def list_templates(
     templates = list(result.scalars().all())
 
     # 批量取最新版本
+    # TODO: N+1 查询——模板数增多后应改为 window function 一次取全部 latest
     out: list[dict[str, Any]] = []
     for tmpl in templates:
         latest = await _get_latest_version(db, tmpl.id)
@@ -418,11 +419,15 @@ def _validate_template_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if not isinstance(aliases, list):
             aliases = []
         aliases = [str(a).strip() for a in aliases if str(a).strip()]
+        try:
+            sort_order = int(row.get("sort_order", i * 10))
+        except (TypeError, ValueError):
+            sort_order = i * 10
         validated.append({
             "target_row_id": target_row_id,
             "canonical_name": canonical_name,
             "aliases": aliases,
-            "sort_order": int(row.get("sort_order", i * 10)),
+            "sort_order": sort_order,
             "row_type": row_type,
         })
     return validated

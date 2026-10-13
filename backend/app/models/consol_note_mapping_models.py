@@ -251,7 +251,8 @@ class ConsolNoteMappingBinding(Base):
     section_id: Mapped[str] = mapped_column(String(64), nullable=False)
     entity_node_key: Mapped[str] = mapped_column(String(128), nullable=False)
     entity_project_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), nullable=False
+        PG_UUID(as_uuid=True), nullable=False,
+        comment="不加 FK：来源企业 project_id 可能不在当前合并项目 projects 表中",
     )
     rule_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True),
