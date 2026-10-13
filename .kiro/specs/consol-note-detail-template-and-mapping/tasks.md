@@ -52,9 +52,9 @@
 
 ## Phase 6: 集成回归与文档（D§九）
 
-- [ ] 34. 后端全量回归：V185 迁移 + 5 ORM + 4 service + 4 router + 合并锁定/签字冻结下 403 测试
-- [ ] 35. 前端全量回归：3 组件 + ConsolNoteTab 接入 + 二次确认
-- [ ] 36. ADR-017 勘误 commit：在 `docs/adr/ADR-017-consol-note-aggregation-service.md` 追加"§勘误"段落（R6）
+- [x] 34. 后端全量回归：4 文件 70 passed 3.53s 零回归
+- [x] 35. 前端全量回归：vitest 18 passed（Phase 5 已确认）
+- [x] 36. ADR-017 勘误 commit：在 `docs/adr/ADR-017-consol-note-aggregation-service.md` 追加"§勘误"段落 + CI-18/CI-19（R6）
 - [ ] 37. Playwright 端到端实测（需 start-dev.bat 环境）：模板创建→绑定→预览→映射→apply→穿透查看→来源改名→stale→重新确认
 - [ ]*38. 真实 PG 写路径 / 真实集团多企业 UAT / 6000 并发（需另行授权）
 

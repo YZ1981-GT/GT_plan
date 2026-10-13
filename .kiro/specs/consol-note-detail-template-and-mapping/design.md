@@ -37,7 +37,7 @@
 ### 2.1 合并明细模板
 
 ```sql
--- V185
+-- V186
 CREATE TABLE IF NOT EXISTS consol_note_detail_template (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     template_type   VARCHAR(20) NOT NULL,       -- soe / listed
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS consol_note_template_binding (
 ### 2.2 映射规则
 
 ```sql
--- V185（同一迁移文件）
+-- V186（同一迁移文件）
 CREATE TABLE IF NOT EXISTS consol_note_mapping_rule (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id              UUID NOT NULL REFERENCES projects(id),
@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS consol_note_mapping_binding (
 
 ### 2.4 迁移
 
-`V185__consol_note_detail_template_and_mapping.sql` + `R185__consol_note_detail_template_and_mapping.sql`（幂等对偶）。所有 `CREATE TABLE` 带 `IF NOT EXISTS`，`CREATE INDEX` 带 `IF NOT EXISTS`。
+`V186__consol_note_detail_template_and_mapping.sql` + `R186__consol_note_detail_template_and_mapping.sql`（幂等对偶）。所有 `CREATE TABLE` 带 `IF NOT EXISTS`，`CREATE INDEX` 带 `IF NOT EXISTS`。
 
 ## §三 来源结构指纹算法
 
