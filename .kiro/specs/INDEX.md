@@ -1,4 +1,8 @@
 # 致同审计作业平台 — Spec 开发索引
+> **2026-10-13 新建**：[`consol-note-detail-template-and-mapping`](consol-note-detail-template-and-mapping/tasks.md) — 合并附注明细模板与多企业行映射规则：可复用披露明细模板（版本化+共享引用）+ 来源结构指纹分组 + 批量映射弹窗 + 来源改名自动失效与重新确认 + preview→confirm→apply 三阶段刷新 + 行级穿透。6 Phase / 38 任务（含 1 个 `*` 外部依赖）。ADR-017 勘误：模糊匹配仅作建议，不得作为未确认的权威映射。
+
+> **2026-10-13 新建**：[`multi-window-ledger-workbench`](multi-window-ledger-workbench/tasks.md) — 多窗口查账工作台：独立查账窗口常驻 + 查账现场 URL 完整恢复 + 跨窗口认证同步（BroadcastChannel + Web Locks 单飞刷新）+ 窗口实例级编辑锁（同底稿第二窗只读门禁）。4 Phase / 24 任务。
+
 > **2026-10-11 新建**：[`workpaper-sync-switch-performance`](workpaper-sync-switch-performance/tasks.md) — 底稿 HTML↔在线编辑切换提速（平台级）：P0 分阶段计时 / P1 骨架无关业务身份复用（消除 OO 保存后再进 OO 的摘要抖动）/ P5+P2 服务端直取投影 + store 指纹直通（宿主零改动）/ P4 去重复提取 / P3 OO 保存后先回表单后台合并；不砍任何校验。进度以本 spec 清单与实测证据为准
 
 > **2026-10-10 新建 · 2026-10-11 验收收口**：[`d2-online-edit-platform-closure`](d2-online-edit-platform-closure/tasks.md) — D2 在线编辑恢复 + 任意企业首次打开自动首版：注册链崩溃 / 发布链单数 instrumentation / attach 缺兄弟 binding / 兄弟 sheet 跨表传播误报漂移 / generation 撞 superseded 房间 / 无运行时首版路径（R1~R8）；真栈验收又逐条暴露并修复 14 条平台缺陷（R10~R21：OO 重算浮点尾差误报 108 条冲突 / 镜像硬取属性缺失 / 模板骨架行 / 已确认代际复用 / 落地后不回表单不释放 lease / 请求期 adapter 绑第一家企业 / 每次保存全平台冷建注册 / forcesave request 永停 correlated / OO 清空被回滚 / 同页二次保存卡死 / HTML 改格 2 秒内切在线编辑丢编辑 / 补读未捕获 rejection）。和平药房 + 重药安徽 OO↔HTML 往返浏览器实测通过；其余循环 108 个同形写入方冻结棘轮（design §7.5）。
@@ -7,7 +11,7 @@
 > **2026-10-10 ✅ 归档**：[`consol-comprehensive-runtime-defect-closure`](_archive/40-consol-note-defect-closure-and-template-alignment/consol-comprehensive-runtime-defect-closure/tasks.md) — 合并模块运行缺陷收口：CP-01~05（节点联动/Word 叶子列/推送状态/三层表头/模板切换 dirty） + 防双计恒等式 + AbortController 竞态守卫 + 三码确认式建树 + P0/P1/P2 验收测试 183 个。13/14（余 [ ]* 真实 PG 写路径/6000 并发）。
 > **2026-10-04 新建**：[`disclosure-multitable-refresh-and-edit-writeback`](disclosure-multitable-refresh-and-edit-writeback/tasks.md) — 普通附注多表 binding/增量刷新 + AR 四组局部校准 + 前端投影反写；排除并行合并节点隔离与真实历史数据迁移。进度以本 spec 清单和实测证据为准，不增量推算全局总数。
 
-**最后更新**：2026-10-11
+**最后更新**：2026-10-13
 > ⏱ **2026-10-01 现扫（归档裁决：底稿双向回写 + 公式管理两族）**：Active **61**（目录 **64**，无 tasks.md **3**：`procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening` / `workpaper-page-formula-toolbar-closure`）/ Archived **602**。只归档 **1** 个（`chain-closure-phase1-root-cause-fixes` → `06-engineering-governance`），其余 12 个候选逐条未归档，原因见 §二「归档（2026-10-01）」。
 > 🔴 **新增归档判据：交付物须已入库** —— 在 HEAD 干净检出（临时 `git worktree`）上跑 spec 守卫。4 组在工作树全绿、在 HEAD 上红（删行多区 · 受管行收敛 · adopt · L 三份），修复只在工作树里；d567 两边都红。只看 tasks.md 勾选、或只在工作树跑测试，会把「本机做完」误当「仓库里有」。
 
