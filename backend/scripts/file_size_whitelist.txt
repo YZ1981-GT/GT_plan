@@ -1403,3 +1403,12 @@ audit-platform/frontend/src/views/LedgerPenetration.vue  5110
 #   DetailProjectPanel.vue —— 项目概览大厅面板。本次仅 +12 行（查账窗口入口按钮）。
 #     拆分方向：核心流程/辅助工具/看板区域 3 块可抽子组件。
 audit-platform/frontend/src/components/layout/DetailProjectPanel.vue  1726
+
+#   抽凭模块四文件 —— 2026-10-14 本次增量：后端 enrich_counterpart_accounts 对方科目推导 + 前端
+#     批量填充 UI + 多科目展开回填逻辑。增量合理（后端 +110 行 / 前端 composable +50 / engine +60 /
+#     router +7），且这四个文件改动前已接近上限。拆分方向：后端 enrich_counterpart_accounts 可抽
+#     独立 service，前端批量填充 UI 可抽独立组件，属后续打磨。
+audit-platform/frontend/src/components/workpaper/composables/useVoucherSampling.ts  1770
+audit-platform/frontend/src/components/workpaper/voucher-sampling/GtVoucherSamplingEngine.vue  1751
+backend/app/routers/voucher_sampling.py  1497
+backend/app/services/ledger_sampling_service.py  1044
