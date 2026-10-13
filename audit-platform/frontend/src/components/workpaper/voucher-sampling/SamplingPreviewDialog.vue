@@ -196,6 +196,7 @@ function handleAppendSearch() {
     accountName: null,
     counterpartAccount: null,
     counterpartAccountName: null,
+    isMultiAccount: false,
     voucherEntries: [],
     voucherType: null,
     accountingPeriod: null,
@@ -418,7 +419,7 @@ function handleConfirm() {
       <el-table-column label="对方科目" min-width="200">
         <template #default="{ row }">
           <template v-if="!row.counterpartAccount || row.counterpartAccount === '-'">-</template>
-          <template v-else-if="row.counterpartAccount !== '多科目'">
+          <template v-else-if="!row.isMultiAccount">
             <span>{{ row.counterpartAccount }}</span>
             <span v-if="row.counterpartAccountName" style="color: var(--el-text-color-secondary); margin-left: 4px">{{ row.counterpartAccountName }}</span>
           </template>

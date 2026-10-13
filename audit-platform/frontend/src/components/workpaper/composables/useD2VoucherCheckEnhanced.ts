@@ -18,6 +18,7 @@
 import { ref, computed, watch, onBeforeUnmount, inject, type Ref, type ComputedRef } from 'vue'
 import { D2_SAVE_ITEMS_KEY } from './d2InjectionKeys'
 import { registerPendingFlusher } from '../sync/pendingWrites'
+import { expandMultiAccountVouchers } from './expandMultiAccountVouchers'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -377,30 +378,7 @@ export function useD2VoucherCheckEnhanced(options: UseD2VoucherCheckEnhancedOpti
     if (isReadonly.value) return
 
     // 展开多科目凭证为多行
-    const expanded: SampledVoucher[] = []
-    for (const v of vouchers) {
-      const entries = (v as any).voucherEntries || []
-      const isMulti = v.counterpartAccount === '多科目' && entries.length > 0
-      if (isMulti) {
-        const sDebit = Number(v.debitAmount ?? 0)
-        const counterEntries = entries.filter((e: any) =>
-          sDebit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
-        )
-        const toWrite = counterEntries.length > 0 ? counterEntries : entries
-        for (const e of toWrite) {
-          expanded.push({
-            ...v,
-            counterpartAccount: e.account_code || '',
-            counterpartAccountName: e.account_name || '',
-            summary: e.summary || v.summary,
-            debitAmount: String(Number(e.debit_amount) || 0),
-            creditAmount: String(Number(e.credit_amount) || 0),
-          } as any)
-        }
-      } else {
-        expanded.push(v)
-      }
-    }
+    const expanded = expandMultiAccountVouchers(vouchers as any[]) as SampledVoucher[]
 
     // 按日期分类
     const currentVouchers: SampledVoucher[] = []

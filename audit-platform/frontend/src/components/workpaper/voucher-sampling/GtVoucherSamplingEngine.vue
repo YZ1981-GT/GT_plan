@@ -311,6 +311,14 @@ const batchCheckResult = ref<CheckResult>('')
 const batchReasonMode = ref<'preset' | 'custom'>('preset')
 const batchReasonPreset = ref('')
 const batchReasonCustom = ref('')
+const batchOverwrite = ref(false) // 是否覆盖已有值
+// 总体完整性校验——预置放行理由（点击即填入，减少输入摩擦）
+const RECONCILE_PRESETS = [
+  '该科目无独立明细表，已与总账另行核对一致，确认抽样总体完整',
+  '已与科目余额表核对一致，序时账总体金额与账面无差异',
+  '本科目审定表已独立编制，抽样总体取自同一数据源，不再重复核对',
+]
+
 const REASON_PRESETS = [
   { value: '大额交易', label: '大额交易' },
   { value: '关联方交易', label: '关联方交易' },
@@ -322,16 +330,17 @@ const REASON_PRESETS = [
   { value: '随机抽样', label: '随机抽样' },
 ]
 
-function applyBatchCheckResult() {
-  if (!batchCheckResult.value) return
+function applyBatchCheckResult(overrideVal?: CheckResult) {
+  const val = overrideVal || batchCheckResult.value
+  if (!val) return
   let count = 0
   sampledVouchers.value.forEach((v, idx) => {
-    if (canEditRow(v) && !v.checkResult) {
-      updateField(idx, 'checkResult', batchCheckResult.value)
+    if (canEditRow(v) && (batchOverwrite.value || !v.checkResult)) {
+      updateField(idx, 'checkResult', val)
       count++
     }
   })
-  if (count > 0) ElMessage.success(`已为 ${count} 条凭证填入核查结果「${batchCheckResult.value}」`)
+  if (count > 0) ElMessage.success(`已为 ${count} 条凭证填入核查结果「${val}」`)
   else ElMessage.info('所有可编辑凭证已有核查结果，未覆盖')
 }
 
@@ -343,7 +352,7 @@ function applyBatchReason() {
   }
   let count = 0
   sampledVouchers.value.forEach((v, idx) => {
-    if (canEditRow(v) && !v.selectionReason) {
+    if (canEditRow(v) && (batchOverwrite.value || !v.selectionReason)) {
       updateField(idx, 'selectionReason', reason)
       count++
     }
@@ -908,6 +917,12 @@ async function handleResample() {
           show-word-limit
           placeholder="如确有正当理由（例如该科目无独立明细表、已与总账另行核对一致），请说明不少于 10 字后继续；该说明将随抽样评价留痕"
         />
+        <!-- 预置理由快捷填入 -->
+        <div v-if="!reconcileOverrideReason.trim()" class="reconcile-presets">
+          <el-button v-for="preset in RECONCILE_PRESETS" :key="preset" size="small" text type="primary" @click="reconcileOverrideReason = preset">
+            {{ preset }}
+          </el-button>
+        </div>
         <div class="reconcile-override-foot">
           <el-tag
             :type="reconcileOverrideReason.trim().length >= 10 ? 'success' : 'info'"
@@ -986,6 +1001,11 @@ async function handleResample() {
           填入
         </el-button>
       </div>
+
+      <!-- 覆盖开关 -->
+      <el-checkbox v-if="sampledVouchers.length > 0" v-model="batchOverwrite" size="small" class="batch-overwrite-cb">
+        覆盖已有
+      </el-checkbox>
       <!--
         重开预览：本会话已抽出样本但预览被关闭时提供回填通路。
         🔴 没有这个入口，用户一旦关掉预览（或被结论确认门禁挡回来）就只能「重抽」，
@@ -1054,8 +1074,20 @@ async function handleResample() {
           <span v-else>—</span>
         </template>
       </el-table-column>
-      <!-- 核查结果（inline select） -->
+      <!-- 核查结果（inline select + 列头批量下拉） -->
       <el-table-column label="核查结果" min-width="100" align="center">
+        <template #header>
+          <el-select
+            :model-value="''"
+            size="small"
+            placeholder="核查结果"
+            style="width: 85px"
+            @change="(val: CheckResult) => { if (val) applyBatchCheckResult(val) }"
+          >
+            <el-option label="核查结果" value="" disabled />
+            <el-option v-for="opt in checkResultOptions.filter(o => o.value)" :key="opt.value" :label="`全部→${opt.label}`" :value="opt.value" />
+          </el-select>
+        </template>
         <template #default="{ row }">
           <el-select
             :model-value="row.checkResult"
@@ -1531,6 +1563,13 @@ async function handleResample() {
 }
 
 .reconcile-override-foot {
+  margin-top: 6px;
+}
+
+.reconcile-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
   margin-top: 6px;
 }
 

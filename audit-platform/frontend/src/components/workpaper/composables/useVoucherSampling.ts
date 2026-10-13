@@ -827,6 +827,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
         accountName: item.account_name ?? item.accountName ?? null,
         counterpartAccount: item.counterpart_account ?? item.counterpartAccount ?? null,
         counterpartAccountName: item.counterpart_account_name ?? item.counterpartAccountName ?? null,
+        isMultiAccount: (item.counterpart_account ?? item.counterpartAccount) === '多科目',
         voucherEntries: item.voucher_entries ?? item.voucherEntries ?? [],
         // 往来单位（后端按 tb_aux_ledger 精确匹配补全）。三态语义见
         // SampledVoucher.partyName 的注释：null 不区分「无此维度／未匹配／歧义」，

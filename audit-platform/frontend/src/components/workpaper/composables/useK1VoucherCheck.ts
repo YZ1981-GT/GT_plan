@@ -14,6 +14,7 @@
 import { ref, computed, type Ref } from 'vue'
 import { isK1RelatedPartyMarked } from './useK1RelatedParty'
 import { partyNameForColumn } from './shared/samplingPartyTarget'
+import { expandMultiAccountVouchers } from './expandMultiAccountVouchers'
 
 // ─── 源模板五项核对（对齐 K1-12 Excel R13 测试内容说明）────────────────────────
 export const K1_VOUCHER_CHECK_LABELS = [
@@ -365,55 +366,21 @@ export function useK1VoucherCheck(opts: {
 
   /** 抽凭引擎回填：把样本映射为凭证检查行 */
   function fillFromSamples(target: 'occurrence' | 'post', samples: any[]): void {
-  function fillFromSamples(target: 'occurrence' | 'post', samples: any[]): void {
-    const mapped: K1VoucherRow[] = []
-    for (let i = 0; i < samples.length; i++) {
-      const s = samples[i]
-      const entries = s.voucherEntries || []
-      const isMulti = s.counterpartAccount === '多科目' && entries.length > 0
-
-      if (isMulti) {
-        // 多科目凭证：按对方分录逐行展开
-        const sDebit = Number(s.debitAmount ?? 0)
-        const counterEntries = entries.filter((e: any) => {
-          if (sDebit > 0) return e.credit_amount && Number(e.credit_amount) > 0
-          return e.debit_amount && Number(e.debit_amount) > 0
-        })
-        const entriesToWrite = counterEntries.length > 0 ? counterEntries : entries
-        for (const e of entriesToWrite) {
-          mapped.push({
-            ...emptyRow(mapped.length),
-            debtorName: partyNameForColumn(s, 'debtor') || s.debtorName || '',
-            date: s.voucherDate ?? s.date ?? '',
-            voucherNo: s.voucherNo ?? '',
-            businessContent: e.summary || s.summary || s.businessContent || '',
-            offsetAccount: e.account_code || '',
-            offsetSubAccount: e.account_name || '',
-            debitAmount: Number(e.debit_amount ?? 0),
-            creditAmount: Number(e.credit_amount ?? 0),
-            supportingDoc: s.supportingDoc ?? '',
-            abnormal: !!s.abnormal,
-            remark: s.selectionReason ?? s.remark ?? '',
-          })
-        }
-      } else {
-        // 1对1 或无明细：单行
-        mapped.push({
-          ...emptyRow(mapped.length),
-          debtorName: partyNameForColumn(s, 'debtor') || s.debtorName || '',
-          date: s.voucherDate ?? s.date ?? '',
-          voucherNo: s.voucherNo ?? '',
-          businessContent: s.summary ?? s.businessContent ?? '',
-          offsetAccount: s.counterpartAccount ?? s.offsetAccount ?? '',
-          offsetSubAccount: s.counterpartAccountName ?? s.counterpartSubAccount ?? s.offsetSubAccount ?? '',
-          debitAmount: Number(s.debitAmount ?? 0),
-          creditAmount: Number(s.creditAmount ?? 0),
-          supportingDoc: s.supportingDoc ?? '',
-          abnormal: !!s.abnormal,
-          remark: s.selectionReason ?? s.remark ?? '',
-        })
-      }
-    }
+    const expanded = expandMultiAccountVouchers(samples)
+    const mapped: K1VoucherRow[] = expanded.map((s, i) => ({
+      ...emptyRow(i),
+      debtorName: partyNameForColumn(s, 'debtor') || s.debtorName || '',
+      date: s.voucherDate ?? s.date ?? '',
+      voucherNo: s.voucherNo ?? '',
+      businessContent: s.summary ?? s.businessContent ?? '',
+      offsetAccount: s.counterpartAccount ?? s.offsetAccount ?? '',
+      offsetSubAccount: s.counterpartAccountName ?? s.counterpartSubAccount ?? s.offsetSubAccount ?? '',
+      debitAmount: Number(s.debitAmount ?? 0),
+      creditAmount: Number(s.creditAmount ?? 0),
+      supportingDoc: s.supportingDoc ?? '',
+      abnormal: !!s.abnormal,
+      remark: s.selectionReason ?? s.remark ?? '',
+    }))
     if (target === 'occurrence') {
       const existing = new Set(occurrenceRows.value.map(r => r.voucherNo).filter(Boolean))
       occurrenceRows.value.push(...mapped.filter(r => !r.voucherNo || !existing.has(r.voucherNo)))

@@ -9,6 +9,7 @@ import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { parseNum, isDebitCreditBalanced, calcSubtotal } from './useG9FormulaEngine'
 import { mapCutoffToG9Voucher, mergeByFillMode } from './gCycleCutoffFill'
+import { expandMultiAccountVouchers } from './expandMultiAccountVouchers'
 import type { ExtractedVoucher, FillMode } from './useCutoffAutoSampling'
 import type { ChecklistResponse } from './useF1FormData'
 import { G9_ACCOUNT_CODE, G9_RISK_LEVEL_OPTIONS } from './g9Constants'
@@ -683,33 +684,9 @@ export function useG9VoucherCheck(opts: {
     method?: string,
   ): number {
     if (opts.isReadonly.value || !samples.length) return 0
-    // 展开多科目凭证
-    const expanded: G9SampledVoucherLike[] = []
-    for (const s of samples) {
-      const entries = (s as any).voucherEntries || []
-      const cpAccount = s.counterpartAccount ?? ''
-      const isMulti = cpAccount === '多科目' && entries.length > 0
-      if (isMulti) {
-        const sDebit = parseNum(s.debitAmount ?? s.amount)
-        const counterEntries = entries.filter((e: any) =>
-          sDebit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
-        )
-        const toWrite = counterEntries.length > 0 ? counterEntries : entries
-        for (const e of toWrite) {
-          expanded.push({
-            ...s,
-            counterpartAccount: e.account_code || '',
-            summary: e.summary || s.summary,
-            debitAmount: Number(e.debit_amount) || 0,
-            creditAmount: Number(e.credit_amount) || 0,
-          })
-        }
-      } else {
-        expanded.push(s)
-      }
-    }
+    const expanded = expandMultiAccountVouchers(samples as any[])
     const before = rows.value.length
-    const mapped = expanded.map((s, i) => mapSampledToG9VoucherRow(s, before + i + 1))
+    const mapped = expanded.map((s: any, i: number) => mapSampledToG9VoucherRow(s, before + i + 1))
     const next = reseq(mergeByFillMode(rows.value, mapped, fillMode, (r) => r.voucherNo || r.rowId))
     const added = fillMode === 'replace' ? next.length : next.length - before
     rows.value = next

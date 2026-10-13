@@ -107,6 +107,8 @@ export interface SampledVoucher {
   accountName: string | null
   counterpartAccount: string | null
   counterpartAccountName: string | null
+  /** 是否多科目凭证（对方有多个不同科目） */
+  isMultiAccount: boolean
   /** 完整凭证分录明细（同一凭证的所有借贷行） */
   voucherEntries: Array<{
     account_code: string
