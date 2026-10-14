@@ -180,13 +180,13 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, D1_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSamplesFilled({ samples })
+    if (samples.length > 0) onSampleFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSamplesFilled(payload: { samples?: any[] }): void {
+function onSampleFilled(payload: { samples?: any[] }): void {
   const samples = payload?.samples ?? []
   const added = fillFromSampledVouchers(samples)
   samplingVisible.value = false
@@ -751,7 +751,7 @@ const SAMPLING_METHOD_TEXTS = [
           :workpaper-id="wpId"
           :project-id="projectId"
           :year="samplingYear"
-          @filled="onSamplesFilled"
+          @filled="onSampleFilled"
         />
       </el-dialog>
 

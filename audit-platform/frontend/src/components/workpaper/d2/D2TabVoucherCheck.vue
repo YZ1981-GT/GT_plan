@@ -217,13 +217,13 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, year.value, props.wpId, D2_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSamplingFilled({ samples, fillMode: 'merge' })
+    if (samples.length > 0) onSampleFilled({ samples, fillMode: 'merge' })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSamplingFilled(payload: { samples: SampledVoucher[]; fillMode: string }): void {
+function onSampleFilled(payload: { samples: SampledVoucher[]; fillMode: string }): void {
   const { samples, fillMode } = payload
   fillFromSampledVouchers(samples, fillMode === 'merge' ? 'merge' : 'replace')
   // Keep refs for PostFill review
@@ -367,7 +367,7 @@ onMounted(() => {
             :workpaper-id="wpId"
             :project-id="projectId"
             :year="year"
-            @filled="onSamplingFilled"
+            @filled="onSampleFilled"
           />
           <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
             <el-button size="small" :disabled="isReadonly" :loading="importingAttached" title="导入在「账簿查询」右键挂凭到本底稿的序时账凭证" @click="importFromAttached">📎 从序时账挂入导入</el-button>
