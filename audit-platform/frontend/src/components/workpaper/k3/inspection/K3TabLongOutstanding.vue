@@ -27,6 +27,9 @@
         </el-button>
         <el-button size="small" type="warning" plain :disabled="isReadonly" @click="handleImportFromDetail">从K3-2带入</el-button>
         <el-button size="small" :disabled="isReadonly" @click="handleAddRow">＋ 新增</el-button>
+        <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
+          <el-button size="small" :disabled="isReadonly" :loading="importingAttached" title="导入在「账簿查询」右键挂凭到本底稿的序时账凭证" @click="importFromAttached">📎 从序时账挂入导入</el-button>
+        </el-badge>
         <el-button size="small" @click="handleReview('K3-5-outstanding')">💬 复核</el-button>
       </div>
     </div>
@@ -279,6 +282,10 @@ import http from '@/utils/http'
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
  */
 import { k3QueryCodes } from '../../composables/k3AccountScope'
+import {
+  pullSamplesForWorkpaper,
+  listAttachedVouchers,
+} from '../../composables/useAttachedVouchers'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
 const samplingAccountCode = k3QueryCodes().join(',')
@@ -446,6 +453,33 @@ const currentSamplingRow = ref<K3LongOutstandingRow | null>(null)
 function handleVoucherSampling(row: K3LongOutstandingRow) {
   currentSamplingRow.value = row
   showSamplingDialog.value = true
+}
+
+// ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
+const attachedCount = ref(0)
+const importingAttached = ref(false)
+const K3_ACCOUNT_PREFIXES = k3QueryCodes()
+
+async function refreshAttachedCount(): Promise<void> {
+  if (!props.projectId || !props.wpId) return
+  try {
+    const recs = await listAttachedVouchers(props.projectId, year, props.wpId, true)
+    attachedCount.value = recs.length
+  } catch { attachedCount.value = 0 }
+}
+void refreshAttachedCount()
+
+async function importFromAttached(): Promise<void> {
+  if (props.isReadonly) return
+  importingAttached.value = true
+  try {
+    const { samples, misattached } = await pullSamplesForWorkpaper(
+      props.projectId, year, props.wpId, K3_ACCOUNT_PREFIXES,
+    )
+    if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
+    if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
+  } finally { importingAttached.value = false }
 }
 
 function onSampleFilled(payload: any): void {

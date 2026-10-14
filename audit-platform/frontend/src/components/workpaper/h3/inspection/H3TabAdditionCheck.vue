@@ -121,6 +121,9 @@
         <el-button size="small" type="primary" :disabled="isReadonly" @click="openSampling">
           🎲 抽凭引擎
         </el-button>
+        <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
+          <el-button size="small" :disabled="isReadonly" :loading="importingAttached" title="导入在「账簿查询」右键挂凭到本底稿的序时账凭证" @click="importFromAttached">📎 从序时账挂入导入</el-button>
+        </el-badge>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="state.addRow()">+ 新增检查行</el-button>
         <el-dropdown v-if="!isReadonly" trigger="click" @command="handleExportCmd">
           <el-button size="small" :loading="importing">导入导出 ▾</el-button>
@@ -747,6 +750,10 @@ import {
   h3AccountScope,
 } from '../../composables/h3AccountScope'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
+import {
+  pullSamplesForWorkpaper,
+  listAttachedVouchers,
+} from '../../composables/useAttachedVouchers'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
@@ -938,6 +945,33 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
   persist: methodologyDirectPersist,
   isReadonly: computed(() => props.isReadonly === true),
 })
+
+// ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
+const attachedCount = ref(0)
+const importingAttached = ref(false)
+const H3_ACCOUNT_PREFIXES = h3AccountScope.queryCodes()
+
+async function refreshAttachedCount(): Promise<void> {
+  if (!props.projectId || !props.wpId) return
+  try {
+    const recs = await listAttachedVouchers(props.projectId, samplingYear.value, props.wpId, true)
+    attachedCount.value = recs.length
+  } catch { attachedCount.value = 0 }
+}
+void refreshAttachedCount()
+
+async function importFromAttached(): Promise<void> {
+  if (props.isReadonly) return
+  importingAttached.value = true
+  try {
+    const { samples, misattached } = await pullSamplesForWorkpaper(
+      props.projectId, samplingYear.value, props.wpId, H3_ACCOUNT_PREFIXES,
+    )
+    if (samples.length > 0) onSamplesFilled({ samples })
+    if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
+    if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
+  } finally { importingAttached.value = false }
+}
 
 function onSamplesFilled(payload: { samples?: any[] }) {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕

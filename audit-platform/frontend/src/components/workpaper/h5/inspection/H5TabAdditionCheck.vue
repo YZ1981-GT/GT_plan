@@ -89,6 +89,9 @@
     <div class="action-bar" v-if="!isReadonly">
       <el-button size="small" @click="handleAddRow">+ 新增增加项</el-button>
       <el-button size="small" type="primary" plain @click="samplingVisible = true">🎲 抽凭引擎</el-button>
+      <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
+        <el-button size="small" :disabled="isReadonly" :loading="importingAttached" title="导入在「账簿查询」右键挂凭到本底稿的序时账凭证" @click="importFromAttached">📎 从序时账挂入导入</el-button>
+      </el-badge>
     </div>
 
     <!-- 抽凭引擎 -->
@@ -128,7 +131,7 @@
 <script setup lang="ts">
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, toRef } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
@@ -140,6 +143,10 @@ import { useSamplingMethodologyPersist, buildChecklistDirectPersist } from '../.
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 // 科目码单一真源（禁组件内字面量）
 import { h5Scope } from '../../composables/hCycleAccountScope'
+import {
+  pullSamplesForWorkpaper,
+  listAttachedVouchers,
+} from '../../composables/useAttachedVouchers'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean; year?: number }>()
 
@@ -179,6 +186,33 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
   persist: methodologyDirectPersist,
   isReadonly: computed(() => props.isReadonly === true),
 })
+
+// ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
+const attachedCount = ref(0)
+const importingAttached = ref(false)
+const H5_ACCOUNT_PREFIXES = h5Scope.queryCodes()
+
+async function refreshAttachedCount(): Promise<void> {
+  if (!props.projectId || !props.wpId) return
+  try {
+    const recs = await listAttachedVouchers(props.projectId, samplingYear.value, props.wpId, true)
+    attachedCount.value = recs.length
+  } catch { attachedCount.value = 0 }
+}
+void refreshAttachedCount()
+
+async function importFromAttached(): Promise<void> {
+  if (props.isReadonly) return
+  importingAttached.value = true
+  try {
+    const { samples, misattached } = await pullSamplesForWorkpaper(
+      props.projectId, samplingYear.value, props.wpId, H5_ACCOUNT_PREFIXES,
+    )
+    if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
+    if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
+  } finally { importingAttached.value = false }
+}
 
 function onSampleFilled(payload: any): void {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕

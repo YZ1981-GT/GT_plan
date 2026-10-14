@@ -36,6 +36,9 @@
           发布联动 H10
         </el-button>
         <el-button size="small" :disabled="isReadonly" @click="showSamplingDialog = true">🎲 抽凭</el-button>
+        <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
+          <el-button size="small" :disabled="isReadonly" :loading="importingAttached" title="导入在「账簿查询」右键挂凭到本底稿的序时账凭证" @click="importFromAttached">📎 从序时账挂入导入</el-button>
+        </el-badge>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">+ 新增</el-button>
         <el-button size="small" circle @click="openReview('I1-6')">💬</el-button>
       </div>
@@ -474,6 +477,10 @@ import { eventBus } from '@/utils/eventBus'
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
  */
 import { i1GrossQueryCodes } from '../../composables/i1AccountScope'
+import {
+  pullSamplesForWorkpaper,
+  listAttachedVouchers,
+} from '../../composables/useAttachedVouchers'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
 const samplingAccountCode = i1GrossQueryCodes().join(',')
@@ -569,6 +576,34 @@ function handlePublishH10() {
 function fillDraft() {
   state.fillConclusionDraft()
   ElMessage.success('已填入结论模板')
+}
+
+// ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
+const samplingYear = computed(() => props.year ?? new Date().getFullYear())
+const attachedCount = ref(0)
+const importingAttached = ref(false)
+const I1_ACCOUNT_PREFIXES = i1GrossQueryCodes()
+
+async function refreshAttachedCount(): Promise<void> {
+  if (!props.projectId || !props.wpId) return
+  try {
+    const recs = await listAttachedVouchers(props.projectId, samplingYear.value, props.wpId, true)
+    attachedCount.value = recs.length
+  } catch { attachedCount.value = 0 }
+}
+void refreshAttachedCount()
+
+async function importFromAttached(): Promise<void> {
+  if (props.isReadonly) return
+  importingAttached.value = true
+  try {
+    const { samples, misattached } = await pullSamplesForWorkpaper(
+      props.projectId, samplingYear.value, props.wpId, I1_ACCOUNT_PREFIXES,
+    )
+    if (samples.length > 0) onSampleFilled(samples)
+    if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
+    if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
+  } finally { importingAttached.value = false }
 }
 
 function onSampleFilled(samples: any[]) {

@@ -159,7 +159,10 @@
       <span>已确认损失: <strong class="text-danger">{{ fmtNum(subtotals.recognizedLoss) }}</strong></span>
       <span>需披露损失: <strong class="text-warning">{{ fmtNum(subtotals.disclosedLoss) }}</strong></span>
       <el-button v-if="totalVariance > 0.01 && !isReadonly" size="small" type="warning" style="margin-left: auto" @click="suggestAjeFromVariance">💡 建议补提AJE</el-button>
-      <el-button size="small" style="margin-left: auto" @click="openVoucherSampling">⚡ 抽凭</el-button>
+      <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning" style="margin-left:auto">
+        <el-button size="small" :disabled="isReadonly" :loading="importingAttached" title="导入在「账簿查询」右键挂凭到本底稿的序时账凭证" @click="importFromAttached">📎 从序时账挂入导入</el-button>
+      </el-badge>
+      <el-button size="small" @click="openVoucherSampling">⚡ 抽凭</el-button>
     </div>
 
     <!-- 抽凭引擎 Dialog -->
@@ -260,6 +263,10 @@ import { useK5Litigation } from '../../composables/useK5Litigation'
 //    平台在修 K5TabAdjudication 时已确立该真源（注释原文「禁硬编码 2701 防污染
 //    L5 长期应付款」），但当时只改了那一个文件，本处属同类未清。
 import { K5_ACCOUNT_NAME, K5_FALLBACK_STANDARD } from '../../composables/k5AccountScope'
+import {
+  pullSamplesForWorkpaper,
+  listAttachedVouchers,
+} from '../../composables/useAttachedVouchers'
 import http from '@/utils/http'
 import type { Ref } from 'vue'
 
@@ -452,6 +459,32 @@ const showSamplingDialog = ref(false)
 
 function openVoucherSampling() {
   showSamplingDialog.value = true
+}
+
+// ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
+const attachedCount = ref(0)
+const importingAttached = ref(false)
+
+async function refreshAttachedCount(): Promise<void> {
+  if (!props.projectId || !props.wpId) return
+  try {
+    const recs = await listAttachedVouchers(props.projectId, samplingYear.value, props.wpId, true)
+    attachedCount.value = recs.length
+  } catch { attachedCount.value = 0 }
+}
+void refreshAttachedCount()
+
+async function importFromAttached(): Promise<void> {
+  if (props.isReadonly) return
+  importingAttached.value = true
+  try {
+    const { samples, misattached } = await pullSamplesForWorkpaper(
+      props.projectId, samplingYear.value, props.wpId, [samplingAccountCode],
+    )
+    if (samples.length > 0) await onSampleFilled({ samples })
+    if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
+    if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
+  } finally { importingAttached.value = false }
 }
 
 // ─── 差异 → 建议 AJE（推送 K5-3）────────────────────────────────────────────
