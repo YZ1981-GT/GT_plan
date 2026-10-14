@@ -324,7 +324,8 @@
  * - 抽凭引擎(GtVoucherSamplingEngine dialog，科目 6117，@filled 回填至检查行备注)
  * - Dropdown选项：合规/不合规/不适用
  */
-import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref, inject } from 'vue'
+import type { Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Tickets, Download } from '@element-plus/icons-vue'
 import { useK10Checks, deriveOverallStatus, type CheckStatus } from '../../composables/useK10Checks'
@@ -336,10 +337,11 @@ import { useK10Checks, deriveOverallStatus, type CheckStatus } from '../../compo
  * 若后人"照 json 修正"就会把本处改坏；接真源后该风险被消除。
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.5/R5.4
  */
-import { K10_FALLBACK_STANDARD } from '../../composables/k10AccountScope'
+import { K10_FALLBACK_STANDARD, k10QueryCodes } from '../../composables/k10AccountScope'
 import { parseNum, calcSubtotal } from '../../composables/useK10FormulaEngine'
 import { api } from '@/services/apiProxy'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue')
@@ -347,7 +349,9 @@ const GtVoucherSamplingEngine = defineAsyncComponent(
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
 /** 抽凭科目码（真源，本组件无 tbSourceCodes prop ⇒ 取兜底标准码） */
-const samplingAccountCode = K10_FALLBACK_STANDARD
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+const samplingAccountCode = computed(() => k10QueryCodes(_injectedTbSrc?.value ?? null).join(','))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

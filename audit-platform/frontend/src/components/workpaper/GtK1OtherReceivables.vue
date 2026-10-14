@@ -391,6 +391,7 @@ const tbSourceCodes = computed<K1TbSourceCodes | null>(() => {
   if (!raw || typeof raw !== 'object') return null
   return raw as K1TbSourceCodes
 })
+provide('tbSourceCodes', tbSourceCodes)
 
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed<string | undefined>(() => props.projectId || undefined)

@@ -375,6 +375,11 @@ const reviewThreads = useWorkpaperReviewThreads(wpIdRef)
 provide('getThreadDot', reviewThreads.getThreadDot)
 provide('getRowDot', reviewThreads.getRowDot)
 
+// ─── tbSourceCodes provide（voucher-attach-account-mapping-closure 任务 19）───
+import { pickNTbSourceCodes } from './composables/nCycleAccountScope'
+const _n2TbSourceCodes = computed(() => pickNTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _n2TbSourceCodes)
+
 // ─── 生命周期 ────────────────────────────────────────────────────────────────
 onMounted(async () => {
   // 如果 htmlData 为 null（selfLoad 场景），自行加载

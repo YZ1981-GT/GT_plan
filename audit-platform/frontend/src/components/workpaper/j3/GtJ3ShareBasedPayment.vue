@@ -288,6 +288,11 @@ const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId
 provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)
 
+// ─── tbSourceCodes provide（voucher-attach-account-mapping-closure 任务 19）───
+import { pickJTbSourceCodes } from '../composables/jAccountScope'
+const _j3TbSourceCodes = computed(() => pickJTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _j3TbSourceCodes)
+
 async function selfLoad(): Promise<void> {
   const snapshot = collectChecklistResponses(
     (props.htmlData as any)?.responses_snapshot,

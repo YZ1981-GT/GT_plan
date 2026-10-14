@@ -251,7 +251,7 @@
  * Spec: .kiro/specs/k5-provisions/ | Task: 4.5, 6.3
  * Requirements: 8.1-8.4
  */
-import { ref, toRef, computed, defineAsyncComponent, onMounted } from 'vue'
+import { ref, toRef, computed, defineAsyncComponent, onMounted, inject } from 'vue'
 import { Plus, Delete, MagicStick, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useK5Litigation } from '../../composables/useK5Litigation'
@@ -269,6 +269,7 @@ import {
 } from '../../composables/useAttachedVouchers'
 import http from '@/utils/http'
 import type { Ref } from 'vue'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),
@@ -297,7 +298,9 @@ const samplingYear = computed(() => props.year ?? new Date().getFullYear())
  * 故取真源的兜底标准码 `2801` 预计负债；若将来宿主下传 tbSourceCodes，
  * 应改用 `k5QueryCodes(props.tbSourceCodes)` 以优先使用运行态解析值。
  */
-const samplingAccountCode = K5_FALLBACK_STANDARD
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+const samplingAccountCode = computed(() => k5QueryCodes(_injectedTbSrc?.value ?? null).join(','))
 
 const {
   litigationRows,
@@ -479,7 +482,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, samplingYear.value, props.wpId, [samplingAccountCode],
+      props.projectId, samplingYear.value, props.wpId, [samplingAccountCode.value],
     )
     if (samples.length > 0) await onSampleFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

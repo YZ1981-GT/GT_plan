@@ -130,7 +130,7 @@
 
 <script setup lang="ts">
 import WpAmountInput from '../../shared/WpAmountInput.vue'
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'

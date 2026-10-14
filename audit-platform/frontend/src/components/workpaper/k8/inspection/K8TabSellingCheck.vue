@@ -274,6 +274,7 @@
  * 参照 D4 收入底稿规格。
  */
 import { ref, reactive, computed, inject, onMounted, defineAsyncComponent } from 'vue'
+import type { Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import http from '@/utils/http'
@@ -284,6 +285,7 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
@@ -376,7 +378,9 @@ function openSampling() { samplingVisible.value = true }
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const K8_ACCOUNT_PREFIXES = k8QueryCodes()
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+const K8_ACCOUNT_PREFIXES = computed(() => k8QueryCodes(_injectedTbSrc?.value ?? null))
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -392,7 +396,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, year, props.wpId, K8_ACCOUNT_PREFIXES,
+      props.projectId, year, props.wpId, K8_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSamplesFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

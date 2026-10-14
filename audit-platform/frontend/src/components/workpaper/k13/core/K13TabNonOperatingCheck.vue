@@ -330,7 +330,8 @@
  *   ③AI 经 useK13AiText（context 转 dict[str,str]，修 JSON.stringify → 422）。
  * 自包含持久化（无新后端）：K13-4-check-rows / K13-4-criteria / K13-4-note / K13-4-conclusion。
  */
-import { ref, computed, defineAsyncComponent, watch } from 'vue'
+import { ref, computed, defineAsyncComponent, watch, inject } from 'vue'
+import type { Ref } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
@@ -344,9 +345,12 @@ import { generateK13AiText } from '../../composables/useK13AiText'
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
  */
 import { k13QueryCodes } from '../../composables/k13AccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
-const samplingAccountCode = k13QueryCodes().join(',')
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+const samplingAccountCode = computed(() => k13QueryCodes(_injectedTbSrc?.value ?? null).join(','))
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 const GtReviewTrigger = defineAsyncComponent(() => import('../../GtReviewTrigger.vue'))

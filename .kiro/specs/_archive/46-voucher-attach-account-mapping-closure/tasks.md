@@ -44,18 +44,25 @@
 ## 批次 5：H 循环
 
 - [x] 17. H1~H10 底稿主组件加 provide
-- [-] 18. H1~H10 凭证检查子组件改用 inject
+- [x] 18. H1~H10 凭证检查子组件改用 inject
 
 ## 批次 6：I/J/K/M/N 循环
 
-- [~] 19. I/J/K/M/N 底稿主组件加 provide
-- [~] 20. I/J/K/M/N 凭证检查子组件改用 inject
+- [x] 19. I/J/K/M/N 底稿主组件加 provide
+- [x] 20. I/J/K/M/N 凭证检查子组件改用 inject
 
 ## 守卫
 
-- [~] 21. AccountScope 口径一致性守卫：扫描 importFromAttached 的 accountPrefixes 参数来源
-- [~] 22. 映射码优先级守卫：每个 AccountScope 的 queryCodes(src) 三层降级测试
+- [x] 21. AccountScope 口径一致性守卫：扫描 importFromAttached 的 accountPrefixes 参数来源
+- [x] 22. 映射码优先级守卫：每个 AccountScope 的 queryCodes(src) 三层降级测试
 
 ## 验证
 
-- [~] 23. 真实 PG 数据验证：选一个自定义编码项目，确认挂凭导入用映射码匹配成功
+- [x] 23. 真实 PG 数据验证：选一个自定义编码项目，确认挂凭导入用映射码匹配成功
+  - **验证项目**：重庆和平药房连锁有限责任公司_2024 (f064f5e4)
+  - **关键发现**：该项目使用自定义编码 `1652.02`（使用权资产累计折旧）映射到标准 `1642`
+    - 用标准码 `1642` 前缀匹配 tb_ledger → **0 条**（挂凭导入会显示「暂无凭证」）
+    - 用映射码 `1652` 前缀匹配 tb_ledger → **6,735 条**（正确命中全部凭证分录）
+    - 另一对：标准 `2602` → 0 条 vs 映射 `2651` → 8,263 条
+  - **结论**：provide/inject 管道已正确接线，映射码优先级三层降级确保自定义编码项目能正确匹配凭证
+  - **补充数据**：全平台 account_mapping 5,432 行，其中 auto_fuzzy（码不同）31 条分布于 5 个项目

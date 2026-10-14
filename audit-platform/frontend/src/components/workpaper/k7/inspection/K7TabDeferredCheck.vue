@@ -232,7 +232,7 @@
  * 科目 2401 递延收益（贷方/负债类）。源模板检查比例仅贷方。
  * 宽表功能：列设置 popover（隐藏/显示列，localStorage 持久化）。
  */
-import { ref, reactive, computed, inject, onMounted, defineAsyncComponent } from 'vue'
+import { ref, reactive, computed, inject, onMounted, defineAsyncComponent, type Ref } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
 
@@ -243,13 +243,18 @@ import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1Vou
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
  */
 import { k7QueryCodes } from '../../composables/k7AccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
 
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+// spec: voucher-attach-account-mapping-closure（批次 6，任务 20）
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
-const samplingAccountCode = k7QueryCodes().join(',')
+const samplingAccountCode = computed(() => k7QueryCodes(_injectedTbSrc?.value ?? null).join(','))
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
@@ -338,7 +343,7 @@ function openSampling() { samplingVisible.value = true }
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const K7_ACCOUNT_PREFIXES = k7QueryCodes()
+const K7_ACCOUNT_PREFIXES = computed(() => k7QueryCodes(_injectedTbSrc?.value ?? null))
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -354,7 +359,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, year, props.wpId, K7_ACCOUNT_PREFIXES,
+      props.projectId, year, props.wpId, K7_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSamplesFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

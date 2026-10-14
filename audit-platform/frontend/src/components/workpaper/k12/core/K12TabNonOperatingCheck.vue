@@ -294,7 +294,8 @@
  * 功能：抽凭引擎（phase=final，year 来自 props.year）/ 行级OCR / 异常摘要 / AI辅助结论。
  * 自包含持久化（无新后端）：K12-4-check-rows / K12-4-criteria / K12-4-note / K12-4-conclusion。
  */
-import { ref, computed, defineAsyncComponent, watch } from 'vue'
+import { ref, computed, defineAsyncComponent, watch, inject } from 'vue'
+import type { Ref } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
@@ -307,7 +308,8 @@ import { generateK12AiText } from '../../composables/useK12AiText'
  * 接真源后消除"照 json 改坏"的风险。
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.5/R5.4
  */
-import { K12_FALLBACK_STANDARD } from '../../composables/k12AccountScope'
+import { K12_FALLBACK_STANDARD, k12QueryCodes } from '../../composables/k12AccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 const GtReviewTrigger = defineAsyncComponent(() => import('../../GtReviewTrigger.vue'))
@@ -316,7 +318,9 @@ const GtVoucherSamplingEngine = defineAsyncComponent(
 )
 
 /** 抽凭科目码（真源，本组件无 tbSourceCodes prop ⇒ 取兜底标准码） */
-const samplingAccountCode = K12_FALLBACK_STANDARD
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+const samplingAccountCode = computed(() => k12QueryCodes(_injectedTbSrc?.value ?? null).join(','))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

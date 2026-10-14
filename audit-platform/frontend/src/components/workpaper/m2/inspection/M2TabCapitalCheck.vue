@@ -274,7 +274,7 @@
  *
  * 复用 useK1VoucherCheck composable，itemId = M2-5-voucher-check
  */
-import { ref, computed, inject, onMounted, defineAsyncComponent } from 'vue'
+import { ref, computed, inject, onMounted, defineAsyncComponent, type Ref } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
@@ -288,13 +288,18 @@ import { useM2FormData } from '../../composables/useM2FormData'
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
  */
 import { m2QueryCodes } from '../../composables/m2AccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
 
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+// spec: voucher-attach-account-mapping-closure（批次 6，任务 20）
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
-const samplingAccountCode = m2QueryCodes().join(',')
+const samplingAccountCode = computed(() => m2QueryCodes(_injectedTbSrc?.value ?? null).join(','))
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
@@ -371,7 +376,7 @@ function openSampling() { samplingVisible.value = true }
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const M2_ACCOUNT_PREFIXES = m2QueryCodes()
+const M2_ACCOUNT_PREFIXES = computed(() => m2QueryCodes(_injectedTbSrc?.value ?? null))
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -387,7 +392,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, year, props.wpId, M2_ACCOUNT_PREFIXES,
+      props.projectId, year, props.wpId, M2_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSamplesFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

@@ -406,6 +406,7 @@ async function handleChildSave(itemId: string, value: unknown): Promise<void> {
  */
 /** 四表取数溯源 */
 const tbSourceCodes = computed(() => (props.htmlData as any)?.tb_source_codes ?? null)
+provide('tbSourceCodes', tbSourceCodes)
 
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return

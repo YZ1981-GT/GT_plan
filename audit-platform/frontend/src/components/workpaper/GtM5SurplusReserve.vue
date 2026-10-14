@@ -309,6 +309,11 @@ const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId
 provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)
 
+// ─── tbSourceCodes provide（voucher-attach-account-mapping-closure 任务 19）───
+import { pickMTbSourceCodes } from './composables/mCycleAccountScope'
+const _m5TbSourceCodes = computed(() => pickMTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _m5TbSourceCodes)
+
 // ─── 监听 m5:save-items → 保存后自动快照（版本链能力来自 Runtime Boundary） ──
 
 function handleM5SaveItems(_e: Event): void {

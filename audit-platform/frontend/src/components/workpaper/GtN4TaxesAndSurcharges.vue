@@ -300,6 +300,11 @@ const reviewThreads = useWorkpaperReviewThreads(wpIdRef)
 provide('getThreadDot', reviewThreads.getThreadDot)
 provide('getRowDot', reviewThreads.getRowDot)
 
+// ─── tbSourceCodes provide（voucher-attach-account-mapping-closure 任务 19）───
+import { pickNTbSourceCodes } from './composables/nCycleAccountScope'
+const _n4TbSourceCodes = computed(() => pickNTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _n4TbSourceCodes)
+
 // ─── 生命周期 ────────────────────────────────────────────────────────────────
 onMounted(async () => {
   // OO 健康检查（修复 inert → redeemable）

@@ -782,7 +782,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H6TabCheck.vue — H6-4 固定资产清理检查表（对齐致同源模板凭证级测试）
  */
-import { ref, computed, inject, toRef, watch, reactive, defineAsyncComponent } from 'vue'
+import { ref, computed, inject, toRef, watch, reactive, defineAsyncComponent, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import http from '@/utils/http'
@@ -801,13 +801,17 @@ import GtIndexChip from '../../GtIndexChip.vue'
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
  */
 import { h6Scope } from '../../composables/hCycleAccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
 
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+// spec: voucher-attach-account-mapping-closure（批次 5，任务 18）
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
-const samplingAccountCode = h6Scope.grossCode()
+const samplingAccountCode = computed(() => h6Scope.grossCode(_injectedTbSrc?.value ?? null))
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),
@@ -1097,7 +1101,7 @@ function cardItemClass(row: H6CheckRow): string {
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const H6_ACCOUNT_PREFIXES = h6Scope.queryCodes()
+const H6_ACCOUNT_PREFIXES = computed(() => h6Scope.slotCodes(_injectedTbSrc?.value ?? null, 'gross'))
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -1113,7 +1117,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, samplingYear.value, props.wpId, H6_ACCOUNT_PREFIXES,
+      props.projectId, samplingYear.value, props.wpId, H6_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSamplesFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

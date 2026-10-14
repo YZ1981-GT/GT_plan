@@ -281,6 +281,7 @@ async function _loadTbData(): Promise<void> {
 // ─── selfLoad（统一 Persistence Adapter） ─────────────────────────────────────
 /** 四表取数溯源（render 下发，供审定表 Tab 展示来源科目与报表行） */
 const tbSourceCodes = computed(() => props.htmlData?.tb_source_codes ?? null)
+provide('tbSourceCodes', tbSourceCodes)
 
 async function selfLoad(): Promise<void> {
   try {

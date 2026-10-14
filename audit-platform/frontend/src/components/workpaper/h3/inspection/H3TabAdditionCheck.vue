@@ -719,7 +719,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * H3TabAdditionCheck.vue — H3-5 增减检查表（成本/公允统一组件）
  * 对齐致同模板：目标→样本选取→测试→说明→结论
  */
-import { computed, inject, ref, toRef, onMounted, nextTick, defineAsyncComponent } from 'vue'
+import { computed, inject, ref, toRef, onMounted, nextTick, defineAsyncComponent, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   useH3AdditionCheck,

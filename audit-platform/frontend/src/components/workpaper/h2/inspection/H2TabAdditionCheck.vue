@@ -368,7 +368,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 双区域(抽样参数+明细) + 固定列+滚动列 + OCR📎 + 抽凭
  * Spec: Task 4.10 + 6.4 + 6.5 | Requirements: 9.1-9.2, 9.5-9.8
  */
-import { ref, inject, toRef, computed } from 'vue'
+import { ref, inject, toRef, computed, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH2AdditionCheck, isEvidenceApplicable, type H2AdditionRow, type H2AdditionEvidenceField } from '../../composables/useH2AdditionCheck'

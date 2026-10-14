@@ -555,6 +555,11 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 provide('i2VersionTrailRef', versionTrailRef)
 provide('i2OpenVersionHistory', openVersionHistory)
 
+// ─── tbSourceCodes provide（voucher-attach-account-mapping-closure 任務 19）───
+import { pickITbSourceCodes } from './composables/iCycleAccountScope'
+const _i2TbSourceCodes = computed(() => pickITbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _i2TbSourceCodes)
+
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
   void selfLoad()

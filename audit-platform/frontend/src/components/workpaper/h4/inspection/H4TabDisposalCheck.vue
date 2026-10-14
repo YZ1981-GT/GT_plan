@@ -535,7 +535,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 对齐致同：目标 → 样本选取 → 测试（原值/减值/净值/清理损益 + 核对1–5）
  * → 检查比例 → 说明/结论；平台增强 H2 联动 + 关联方预埋
  */
-import { computed, inject, toRef, ref } from 'vue'
+import { computed, inject, toRef, ref, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   useH4DisposalCheck,

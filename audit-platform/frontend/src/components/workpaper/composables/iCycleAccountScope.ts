@@ -315,3 +315,25 @@ export function iCycleSegmentLabels(wpCode: string): Record<string, string> {
   for (const s of iCycleSpec(wpCode)?.segments || []) out[s.segment] = s.label
   return out
 }
+
+
+/**
+ * 从 htmlData 提取 `tb_source_codes`（与 D/E/F/G/H 循环同构）。
+ *
+ * 顶层 `htmlData.tb_source_codes` 优先；兼容 `htmlData.project_context.tb_source_codes`。
+ * 两处都读、不做假设，返回 null 时调用方退到兜底码。
+ *
+ * spec: voucher-attach-account-mapping-closure（批次 6，任务 19）
+ */
+export function pickITbSourceCodes(htmlData: unknown): TbSourceCodes | null {
+  if (!htmlData || typeof htmlData !== 'object') return null
+  const hd = htmlData as Record<string, any>
+  const fromTop = hd.tb_source_codes
+  if (fromTop && typeof fromTop === 'object') return fromTop as TbSourceCodes
+  const pc = hd.project_context
+  if (pc && typeof pc === 'object') {
+    const fromPc = (pc as Record<string, any>).tb_source_codes
+    if (fromPc && typeof fromPc === 'object') return fromPc as TbSourceCodes
+  }
+  return null
+}

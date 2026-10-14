@@ -594,7 +594,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 对齐致同五段式：目标 → 样本选取 → 测试（原值/折旧/减值/净值 + 终止损益 + 核对1–5）
  * → 检查比例 → 说明/结论；平台增强 CAS21 终止损益 + H9 同步
  */
-import { computed, ref, toRef, inject } from 'vue'
+import { computed, ref, toRef, inject, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   useH8DisposalCheck,
@@ -606,6 +606,7 @@ import {
 import { useH8ImportExport } from '../../composables/useH8ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { h8Scope } from '../../composables/hCycleAccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
@@ -616,8 +617,11 @@ import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 
-/** 抽凭科目码（scope 单一真源；历史文案写死 `1901` = 待处理财产损溢） */
-const ROU_COST_CODE = h8Scope.def.grossFallback
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+// spec: voucher-attach-account-mapping-closure（批次 5，任务 18）
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+/** 抽凭科目码（scope 单一真源；运行态取 inject 值，未注入时退兜底） */
+const ROU_COST_CODE = computed(() => h8Scope.grossCode(_injectedTbSrc?.value ?? null))
 
 const props = defineProps<{
   wpId: string
@@ -769,7 +773,7 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const H8_ACCOUNT_PREFIXES = h8Scope.queryCodes()
+const H8_ACCOUNT_PREFIXES = computed(() => h8Scope.slotCodes(_injectedTbSrc?.value ?? null, 'gross'))
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -785,7 +789,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, samplingYear.value, props.wpId, H8_ACCOUNT_PREFIXES,
+      props.projectId, samplingYear.value, props.wpId, H8_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSampleFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

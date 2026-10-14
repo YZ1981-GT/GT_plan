@@ -321,6 +321,7 @@
  * 科目 2701 预计负债（贷方/负债类）。
  */
 import { ref, computed, inject, onMounted, defineAsyncComponent } from 'vue'
+import type { Ref } from 'vue'
 import { MagicStick, WarningFilled, InfoFilled } from '@element-plus/icons-vue'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
 
@@ -328,14 +329,17 @@ const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher
 
 // 🔴 科目码走单一真源 k5AccountScope，禁硬编码 —— 原写 account-code="2701"，
 //    而 `2701` 一律是长期应付款（L5 循环），预计负债是 `2801`。详见 k5AccountScope.ts 文件头。
-import { K5_ACCOUNT_NAME, K5_FALLBACK_STANDARD } from '../../composables/k5AccountScope'
+import { K5_ACCOUNT_NAME, K5_FALLBACK_STANDARD, k5QueryCodes } from '../../composables/k5AccountScope'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
 /** 抽凭科目码：本组件无 tbSourceCodes prop，取真源兜底标准码 2801。 */
-const samplingAccountCode = K5_FALLBACK_STANDARD
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+const samplingAccountCode = computed(() => k5QueryCodes(_injectedTbSrc?.value ?? null).join(','))
 
 const props = defineProps<{
   wpId: string
@@ -417,7 +421,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, year.value, props.wpId, [samplingAccountCode],
+      props.projectId, year.value, props.wpId, [samplingAccountCode.value],
     )
     if (samples.length > 0) onSamplesFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

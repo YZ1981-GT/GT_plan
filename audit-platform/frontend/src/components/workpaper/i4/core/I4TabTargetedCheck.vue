@@ -830,6 +830,7 @@
 
 <script setup lang="ts">
 import { computed, inject, ref, toRef, defineAsyncComponent } from 'vue'
+import type { Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -858,10 +859,13 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
-const I4_ACCOUNT_PREFIXES = i4GrossQueryCodes()
-const samplingAccountCode = I4_ACCOUNT_PREFIXES.join(',')
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+const I4_ACCOUNT_PREFIXES = computed(() => i4GrossQueryCodes(_injectedTbSrc?.value ?? null))
+const samplingAccountCode = computed(() => I4_ACCOUNT_PREFIXES.value.join(','))
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),
@@ -907,7 +911,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, samplingYear.value, props.wpId, I4_ACCOUNT_PREFIXES,
+      props.projectId, samplingYear.value, props.wpId, I4_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSamplesFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

@@ -334,6 +334,11 @@
         "executionId": "40a27768-6dd6-42ce-9123-ea25cd0a4783",
         "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
         "timestamp": 1791955319278
+      },
+      {
+        "executionId": "40a27768-6dd6-42ce-9123-ea25cd0a4783",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791956176503
       }
     ],
     "19. I/J/K/M/N 底稿主组件加 provide": [
@@ -341,6 +346,16 @@
         "executionId": "63431978-70e0-4066-9f02-fd2579035211",
         "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
         "timestamp": 1791944005925
+      },
+      {
+        "executionId": "40a27768-6dd6-42ce-9123-ea25cd0a4783",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791956182325
+      },
+      {
+        "executionId": "40a27768-6dd6-42ce-9123-ea25cd0a4783",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791957308164
       }
     ],
     "20. I/J/K/M/N 凭证检查子组件改用 inject": [
@@ -348,6 +363,16 @@
         "executionId": "63431978-70e0-4066-9f02-fd2579035211",
         "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
         "timestamp": 1791944005961
+      },
+      {
+        "executionId": "40a27768-6dd6-42ce-9123-ea25cd0a4783",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791957321879
+      },
+      {
+        "executionId": "ca02c1d3-feca-4f1d-831d-e911eaf811a1",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791959677323
       }
     ],
     "21. AccountScope 口径一致性守卫：扫描 importFromAttached 的 accountPrefixes 参数来源": [
@@ -355,6 +380,16 @@
         "executionId": "63431978-70e0-4066-9f02-fd2579035211",
         "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
         "timestamp": 1791944006020
+      },
+      {
+        "executionId": "ca02c1d3-feca-4f1d-831d-e911eaf811a1",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791959685569
+      },
+      {
+        "executionId": "ca02c1d3-feca-4f1d-831d-e911eaf811a1",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791960249625
       }
     ],
     "22. 映射码优先级守卫：每个 AccountScope 的 queryCodes(src) 三层降级测试": [
@@ -362,6 +397,16 @@
         "executionId": "63431978-70e0-4066-9f02-fd2579035211",
         "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
         "timestamp": 1791944006306
+      },
+      {
+        "executionId": "ca02c1d3-feca-4f1d-831d-e911eaf811a1",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791960259258
+      },
+      {
+        "executionId": "ca02c1d3-feca-4f1d-831d-e911eaf811a1",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791960987660
       }
     ],
     "23. 真实 PG 数据验证：选一个自定义编码项目，确认挂凭导入用映射码匹配成功": [
@@ -369,6 +414,11 @@
         "executionId": "63431978-70e0-4066-9f02-fd2579035211",
         "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
         "timestamp": 1791944006344
+      },
+      {
+        "executionId": "ca02c1d3-feca-4f1d-831d-e911eaf811a1",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791960997556
       }
     ]
   }

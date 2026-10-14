@@ -255,6 +255,7 @@ const tbSourceCodes = computed<TbSourceCodes | null>(() => {
   const src = props.htmlData?.tb_source_codes
   return src && typeof src === 'object' ? (src as TbSourceCodes) : null
 })
+provide('tbSourceCodes', tbSourceCodes)
 
 /** 试算平衡表查询口径（标准码集）；溯源缺失时回退 `1901` */
 const tbQueryStandardCodes = computed(() =>

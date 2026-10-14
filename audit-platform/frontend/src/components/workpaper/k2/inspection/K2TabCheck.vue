@@ -243,6 +243,7 @@
  * 源模板无"期后检查"段，但保留完整样本选取功能、抽凭引擎、核对内容、结论模板。
  */
 import { ref, computed, inject, onMounted, defineAsyncComponent } from 'vue'
+import type { Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import http from '@/utils/http'
@@ -271,7 +272,9 @@ const props = defineProps<{
  * 抽凭 / 事件科目码 —— 由报表行 `BS-014` 解析（实证 `1901`）。
  * 🔴 历史写死 `1231`，抽凭引擎会抽**应收款项坏账准备**的凭证。
  */
-const k2CheckAccountCode = computed(() => k2AccountCode(props.tbSourceCodes))
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+const k2CheckAccountCode = computed(() => k2AccountCode(_injectedTbSrc?.value ?? null))
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'navigate-sheet', sheetName: string): void

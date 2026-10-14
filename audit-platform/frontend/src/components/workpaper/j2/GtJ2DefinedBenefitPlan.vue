@@ -200,6 +200,11 @@ const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId
 provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)
 
+// ─── tbSourceCodes provide（voucher-attach-account-mapping-closure 任务 19）───
+import { pickJTbSourceCodes } from '../composables/jAccountScope'
+const _j2TbSourceCodes = computed(() => pickJTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _j2TbSourceCodes)
+
 /** 当前 sheet 名（从 props.sheetName 提取） */
 const currentSheet = computed(() => {
   const sn = props.sheetName || ''

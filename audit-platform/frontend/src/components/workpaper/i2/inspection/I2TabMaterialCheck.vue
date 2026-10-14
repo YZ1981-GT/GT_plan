@@ -427,6 +427,7 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, inject, ref, toRef } from 'vue'
+import type { Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
 import {
@@ -456,9 +457,12 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
+import type { TbSourceCodes } from '@/components/workpaper/composables/shared/tbSourceCodes'
 
 /** 抽凭科目码（真源，无 tbSourceCodes prop => 走兜底 1704；逗号拼接供引擎 split） */
-const samplingAccountCode = i2GrossQueryCodes().join(',')
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+const samplingAccountCode = computed(() => i2GrossQueryCodes(_injectedTbSrc?.value ?? null).join(','))
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),
@@ -544,7 +548,7 @@ function handleSampling() {
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const I2_ACCOUNT_PREFIXES = i2GrossQueryCodes()
+const I2_ACCOUNT_PREFIXES = computed(() => i2GrossQueryCodes(_injectedTbSrc?.value ?? null))
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -560,7 +564,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, samplingYear.value, props.wpId, I2_ACCOUNT_PREFIXES,
+      props.projectId, samplingYear.value, props.wpId, I2_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSamplesFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

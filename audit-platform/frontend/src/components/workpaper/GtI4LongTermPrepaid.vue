@@ -393,6 +393,11 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 provide('i4VersionTrailRef', versionTrailRef)
 provide('i4OpenVersionHistory', openVersionHistory)
 
+// ─── tbSourceCodes provide（voucher-attach-account-mapping-closure 任务 19）───
+import { pickITbSourceCodes } from './composables/iCycleAccountScope'
+const _i4TbSourceCodes = computed(() => pickITbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _i4TbSourceCodes)
+
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 watch(currentSheet, () => syncAmortizationBranch())
 onMounted(() => {

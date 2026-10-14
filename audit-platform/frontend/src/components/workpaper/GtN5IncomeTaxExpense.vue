@@ -404,6 +404,7 @@ const tbTrialBalance = ref<any>(null)
 const tbSourceCodes = ref<any>(null)
 provide('n5TrialBalance', tbTrialBalance)
 provide('n5TbSourceCodes', tbSourceCodes)
+provide('tbSourceCodes', tbSourceCodes)
 provide('scheduleAutoSnapshot', () => runtime?.version.scheduleAutoSnapshot())
 onMounted(async () => {
   // OO 健康检查（修复 inert → redeemable）

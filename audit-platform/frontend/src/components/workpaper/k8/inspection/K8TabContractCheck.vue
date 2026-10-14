@@ -248,9 +248,12 @@ import type { Ref } from 'vue'
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
  */
 import { k8QueryCodes } from '../../composables/k8AccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
-const samplingAccountCode = k8QueryCodes().join(',')
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+const samplingAccountCode = computed(() => k8QueryCodes(_injectedTbSrc?.value ?? null).join(','))
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),

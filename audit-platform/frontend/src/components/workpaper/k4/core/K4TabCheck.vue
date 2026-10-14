@@ -327,12 +327,13 @@
  * - 真实 AI 辅助（/ai/generate-text 端点）
  * - 版本快照（scheduleAutoSnapshot）
  */
-import { ref, computed, inject, onMounted, defineAsyncComponent } from 'vue'
+import { ref, computed, inject, onMounted, defineAsyncComponent, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
 // 科目码单一真源 + 空科目降级门（禁硬编码、禁以空/错科目发起抽样）
 import { K4_ACCOUNT_NAME, k4QueryCodes } from '../../composables/k4AccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import { useSamplingAccountGate } from '../../composables/useSamplingAccountGate'
 import {
   pullSamplesForWorkpaper,
@@ -463,6 +464,10 @@ function setChecks(row: K1VoucherRow, vals: number[]): void {
 
 const samplingVisible = ref(false)
 
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+// spec: voucher-attach-account-mapping-closure（批次 6，任务 20）
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+
 /**
  * 抽凭科目门。🔴 原硬编码 `account-code="2245"` —— `account_chart` 实证 `2245` 是
  * **持有待售负债**，而本底稿是「其他流动负债」（`wp_index` 实证）。
@@ -472,7 +477,7 @@ const samplingVisible = ref(false)
  * spec: voucher-sampling-account-scope-and-attach-closure R1.4 / R2.1 / R2.2
  */
 const samplingGate = useSamplingAccountGate({
-  codes: () => k4QueryCodes(),
+  codes: () => k4QueryCodes(_injectedTbSrc?.value ?? null),
   accountLabel: K4_ACCOUNT_NAME,
   isReadonly: () => props.isReadonly,
 })
@@ -495,7 +500,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, year.value, props.wpId, k4QueryCodes(),
+      props.projectId, year.value, props.wpId, k4QueryCodes(_injectedTbSrc?.value ?? null),
     )
     if (samples.length > 0) onSamplesFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

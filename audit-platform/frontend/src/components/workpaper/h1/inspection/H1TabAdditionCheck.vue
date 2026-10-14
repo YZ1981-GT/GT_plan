@@ -885,7 +885,7 @@
 
 <script setup lang="ts">
 import WpAmountInput from '../../shared/WpAmountInput.vue'
-import { ref, computed, inject, toRef, onMounted, watch } from 'vue'
+import { ref, computed, inject, toRef, onMounted, watch, type Ref } from 'vue'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist, buildChecklistDirectPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'

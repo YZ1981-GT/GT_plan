@@ -271,6 +271,11 @@ const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId
 provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)
 
+// ─── tbSourceCodes provide（voucher-attach-account-mapping-closure 任务 19）───
+import { pickMTbSourceCodes } from './composables/mCycleAccountScope'
+const _m2TbSourceCodes = computed(() => pickMTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _m2TbSourceCodes)
+
 // ─── selfLoad ────────────────────────────────────────────────────────────────
 
 async function selfLoad() {

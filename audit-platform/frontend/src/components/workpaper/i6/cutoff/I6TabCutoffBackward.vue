@@ -134,6 +134,7 @@
 
 <script setup lang="ts">
 import { inject, toRef, ref, watch, computed, defineAsyncComponent, onMounted, onBeforeUnmount } from 'vue'
+import type { Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
 import I2CutoffSampleTable from '../../i2/cutoff/I2CutoffSampleTable.vue'
@@ -158,9 +159,12 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.4
  */
 import { i6GrossQueryCodes } from '@/components/workpaper/composables/i6AccountScope'
+import type { TbSourceCodes } from '@/components/workpaper/composables/shared/tbSourceCodes'
 
 /** 抽凭科目码（真源，无 tbSourceCodes prop => 走兜底 6604；逗号拼接供引擎 split） */
-const samplingAccountCode = i6GrossQueryCodes().join(',')
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+const samplingAccountCode = computed(() => i6GrossQueryCodes(_injectedTbSrc?.value ?? null).join(','))
 
 // 🔴 金额展示走 displayPrefs 单一真源（千分符 / 2 位小数 / 单位「元」/ showZero 偏好）。
 //    必须 setup **顶层** inject —— 写进函数体会静默失效（平台铁律）。

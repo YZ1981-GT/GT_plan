@@ -88,3 +88,27 @@ export const J_HAS_PROVISION = false
  * CAS 9 固定档位，语义与账龄（过去）相反。禁止引用 `disclosureAgingLabels` / `useAgingConfig`。
  */
 export const J_MATURITY_BANDS = ['一年以内', '一到两年', '二到五年', '五年以上'] as const
+
+
+// ═══════════════════ J 类通用 pick ═══════════════════
+
+/**
+ * 从 htmlData 提取 `tb_source_codes`（与 D/E/F/G/H/I 循环同构）。
+ *
+ * 顶层 `htmlData.tb_source_codes` 优先；兼容 `htmlData.project_context.tb_source_codes`。
+ * 两处都读、不做假设，返回 null 时调用方退到兜底码。
+ *
+ * spec: voucher-attach-account-mapping-closure（批次 6，任务 19）
+ */
+export function pickJTbSourceCodes(htmlData: unknown): TbSourceCodes | null {
+  if (!htmlData || typeof htmlData !== 'object') return null
+  const hd = htmlData as Record<string, any>
+  const fromTop = hd.tb_source_codes
+  if (fromTop && typeof fromTop === 'object') return fromTop as TbSourceCodes
+  const pc = hd.project_context
+  if (pc && typeof pc === 'object') {
+    const fromPc = (pc as Record<string, any>).tb_source_codes
+    if (fromPc && typeof fromPc === 'object') return fromPc as TbSourceCodes
+  }
+  return null
+}

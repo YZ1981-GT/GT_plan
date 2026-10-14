@@ -270,6 +270,7 @@
  * Requirements: 5.1-5.4
  */
 import { computed, inject, onMounted, ref, defineAsyncComponent } from 'vue'
+import type { Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useK3Checks, type K3LongOutstandingRow, type ComplianceState, K3_DISPOSAL_CONCLUSIONS, type K3DisposalConclusion } from '../../composables/useK3Checks'
@@ -286,9 +287,12 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
-const samplingAccountCode = k3QueryCodes().join(',')
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+const samplingAccountCode = computed(() => k3QueryCodes(_injectedTbSrc?.value ?? null).join(','))
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
@@ -458,7 +462,7 @@ function handleVoucherSampling(row: K3LongOutstandingRow) {
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const K3_ACCOUNT_PREFIXES = k3QueryCodes()
+const K3_ACCOUNT_PREFIXES = computed(() => k3QueryCodes(_injectedTbSrc?.value ?? null))
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -474,7 +478,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, year, props.wpId, K3_ACCOUNT_PREFIXES,
+      props.projectId, year, props.wpId, K3_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

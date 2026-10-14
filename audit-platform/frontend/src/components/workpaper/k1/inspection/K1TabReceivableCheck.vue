@@ -609,6 +609,7 @@
  * Spec: .kiro/specs/k1-other-receivables/ | Task: 4.6 | Requirements: 8.4-8.6
  */
 import { ref, computed, inject, toRef, onMounted, nextTick, defineAsyncComponent } from 'vue'
+import type { Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import type { ElTable } from 'element-plus'
@@ -637,9 +638,12 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
-const samplingAccountCode = k1GrossQueryCodes().join(',')
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+const samplingAccountCode = computed(() => k1GrossQueryCodes(_injectedTbSrc?.value ?? null).join(','))
 
 const K1_12_ADJ_SOURCE = 'k1-12-voucher'
 
@@ -817,7 +821,7 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const K1_ACCOUNT_PREFIXES = k1GrossQueryCodes()
+const K1_ACCOUNT_PREFIXES = computed(() => k1GrossQueryCodes(_injectedTbSrc?.value ?? null))
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -833,7 +837,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, year, props.wpId, K1_ACCOUNT_PREFIXES,
+      props.projectId, year, props.wpId, K1_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSamplesFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

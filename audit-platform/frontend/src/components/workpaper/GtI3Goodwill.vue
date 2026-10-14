@@ -399,6 +399,11 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 provide('i3VersionTrailRef', versionTrailRef)
 provide('i3OpenVersionHistory', openVersionHistory)
 
+// ─── tbSourceCodes provide（voucher-attach-account-mapping-closure 任务 19）───
+import { pickITbSourceCodes } from './composables/iCycleAccountScope'
+const _i3TbSourceCodes = computed(() => pickITbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _i3TbSourceCodes)
+
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
   void selfLoad()

@@ -607,7 +607,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * H2TabDecreaseCheck.vue — H2-9 在建工程减少检查
  * 对齐致同：目标 → 抽样 → 转入固定资产/其他减少 + 审批验收证据 → 检查比例 → 说明/结论 → 提示
  */
-import { ref, inject, toRef, computed } from 'vue'
+import { ref, inject, toRef, computed, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useH2DecreaseCheck } from '../../composables/useH2DecreaseCheck'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'

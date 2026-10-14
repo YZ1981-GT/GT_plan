@@ -498,7 +498,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 对齐致同：目标 → 样本选取 → 测试（记账凭证 + 核对1–5）
  * → 检查比例 → 说明/结论；平台增强三方差异 + 关联方预埋
  */
-import { computed, inject, toRef, ref } from 'vue'
+import { computed, inject, toRef, ref, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import {
