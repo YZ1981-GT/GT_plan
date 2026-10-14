@@ -8,9 +8,10 @@ spec: disclosure-note-doc-upload-and-batch-fill Phase 2 Task 13
 
 from __future__ import annotations
 
+import hashlib
 import re
-import uuid
 from dataclasses import dataclass, field
+from html import escape
 from typing import Any
 
 __all__ = [
@@ -46,12 +47,6 @@ _TOKEN_VARS: tuple[tuple[str, str], ...] = (
     ("{金额单位}", "amount_unit"),
 )
 
-# ── 不可确定的残留模式 ──────────────────────────────────────────────────────
-
-_RESIDUAL_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("source_entity_name", re.compile("")),  # 占位，运行时按实际来源名注入
-)
-
 
 def build_replacement_plan(
     html: str,
@@ -69,42 +64,38 @@ def build_replacement_plan(
     if not html:
         return plan
 
-    # 1. token 变量
+    # 1. token 变量（正文是消毒后的 canonical HTML ⇒ 按转义形态匹配）
     for token, var_key in _TOKEN_VARS:
-        if token not in html:
+        if escape(token) not in html:
             continue
         target_val = target_vars.get(var_key)
-        if target_val is not None:
-            target_str = str(target_val)
-            plan.items.append(
-                ReplacementItem(
-                    replacement_id=str(uuid.uuid4()),
-                    variable=var_key,
-                    old_value=token,
-                    new_value=target_str,
-                )
-            )
+        if target_val is not None and str(target_val).strip():
+            plan.items.append(_item(var_key, token, str(target_val)))
         else:
             plan.warnings.append(f"变量 {token} 缺少目标值，保留原文")
 
-    # 2. 来源企业名精确替换
-    if source_entity_name and source_entity_name in html:
+    # 2. 来源企业名精确替换（名称可能含 & 等字符，同样按转义形态匹配）
+    if source_entity_name and escape(source_entity_name) in html:
         target_name = target_vars.get("company_name")
-        if target_name:
-            plan.items.append(
-                ReplacementItem(
-                    replacement_id=str(uuid.uuid4()),
-                    variable="source_entity_name",
-                    old_value=source_entity_name,
-                    new_value=str(target_name),
-                )
-            )
-        else:
+        if target_name and str(target_name) != source_entity_name:
+            plan.items.append(_item("source_entity_name", source_entity_name, str(target_name)))
+        elif not target_name:
             plan.warnings.append(
                 f"来源企业名「{source_entity_name}」存在于正文，但缺少目标企业名"
             )
 
     return plan
+
+
+def _item(variable: str, old_value: str, new_value: str) -> ReplacementItem:
+    """确定性替换项 ID：apply 端按同一来源复算计划时，用户撤销的 ID 才能对上。"""
+    digest = hashlib.sha256(f"{variable}\x1f{old_value}".encode("utf-8")).hexdigest()[:16]
+    return ReplacementItem(
+        replacement_id=f"r-{digest}",
+        variable=variable,
+        old_value=old_value,
+        new_value=new_value,
+    )
 
 
 def apply_replacement_plan(
@@ -113,13 +104,20 @@ def apply_replacement_plan(
     *,
     revoked_ids: set[str] | None = None,
 ) -> str:
-    """按计划执行替换，跳过用户撤销的项。"""
+    """按计划执行替换，跳过用户撤销的项。
+
+    - 新值一律 HTML 转义后插入（企业名含 ``&``/``<`` 时不破坏结构、不能注入标签）；
+    - 单遍正则替换：已替换出的文本不会被后续替换项二次扫描。
+    """
     if not html or not plan.items:
         return html
     revoked = revoked_ids or set()
-    result = html
-    for item in plan.items:
-        if item.replacement_id in revoked:
-            continue
-        result = result.replace(item.old_value, item.new_value)
-    return result
+    mapping = {
+        escape(item.old_value): escape(item.new_value)
+        for item in plan.items
+        if item.replacement_id not in revoked
+    }
+    if not mapping:
+        return html
+    pattern = re.compile("|".join(re.escape(k) for k in sorted(mapping, key=len, reverse=True)))
+    return pattern.sub(lambda m: mapping[m.group(0)], html)

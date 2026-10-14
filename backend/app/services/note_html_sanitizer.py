@@ -1,21 +1,30 @@
 """附注富文本 HTML 消毒器 — 最小白名单，canonical 输出。
 
-spec: disclosure-note-doc-upload-and-batch-fill Phase 2 Task 11
+spec: disclosure-note-doc-upload-and-batch-fill Phase 2 Task 11（第二轮复盘 R-05 / R-10 修订）
 
-🔴 禁止 script/iframe/object/embed/on*，禁止 style 属性和危险 URL。
-   所有文本/属性重新转义；未知标签/属性被剥离。
+三类标签分治（R-05：首版对所有非白名单标签整段吞内容，``<img>`` 这类 void 元素
+没有结束标签 ⇒ 深度永不回落 ⇒ 其后全部正文被吞）：
+
+1. 白名单标签：保留标签与校验后的属性；
+2. 危险容器（script/style/iframe/object/...）：标签与其**内部全部内容**一并丢弃；
+3. 其余未知标签：只剥标签、保留内部文本（``b``/``i`` 映射为 ``strong``/``em``）。
+
+🔴 禁止任意 style/href/事件属性；所有文本与属性值重新转义；输出幂等。
 """
 
 from __future__ import annotations
 
-from html import escape
+import re
+from html import escape, unescape
 from html.parser import HTMLParser
-from io import StringIO
 
 __all__ = [
     "ALLOWED_TAGS",
     "ALLOWED_ATTRS",
+    "APPEND_SEPARATOR",
+    "append_note_html",
     "sanitize_note_html",
+    "split_top_level_blocks",
 ]
 
 ALLOWED_TAGS: frozenset[str] = frozenset({
@@ -32,102 +41,180 @@ ALLOWED_ATTRS: dict[str, frozenset[str]] = {
     "span": frozenset({"class", "data-placeholder", "contenteditable"}),
 }
 
-_ALLOWED_CLASS_VALUES: frozenset[str] = frozenset({
-    "gt-note-placeholder",
+_ALLOWED_CLASS_VALUES: frozenset[str] = frozenset({"gt-note-placeholder"})
+
+#: 白名单内的 void 标签（输出自闭合形式）
+_VOID_TAGS: frozenset[str] = frozenset({"br", "hr"})
+
+#: 危险容器：标签与内部全部内容一并丢弃
+_DROP_CONTENT_TAGS: frozenset[str] = frozenset({
+    "script", "style", "iframe", "object", "embed", "applet", "noscript",
+    "noembed", "noframes", "template", "svg", "math", "head", "title",
+    "textarea", "select", "frameset", "frame",
 })
 
-_VOID_TAGS: frozenset[str] = frozenset({"br", "hr"})
+#: HTML void 元素：没有结束标签，绝不能参与深度计数
+_HTML_VOID_ELEMENTS: frozenset[str] = frozenset({
+    "area", "base", "br", "col", "embed", "frame", "hr", "img", "input",
+    "keygen", "link", "meta", "param", "source", "track", "wbr",
+})
+
+#: 语义等价映射（Word/外部 HTML 常用 b/i）
+_TAG_ALIASES: dict[str, str] = {"b": "strong", "i": "em"}
+
+#: 块级标签：顶层切块（段落级去重）的边界
+_BLOCK_TAGS: frozenset[str] = frozenset({
+    "p", "ul", "ol", "li", "table", "thead", "tbody", "tr", "th", "td",
+    "h1", "h2", "h3", "h4", "h5", "blockquote", "hr",
+})
+
+_SPAN_NUMBER_RE = re.compile(r"^[1-9]\d{0,2}$")
+
+#: 追加正文时的规范空段（不写任何来源/审计文字，AC-10.5）
+APPEND_SEPARATOR = "<p>&nbsp;</p>"
 
 
 class _Sanitizer(HTMLParser):
-    """单遍流式解析 + 重建。"""
+    """单遍流式解析 + canonical 重建，同时记录顶层块边界。"""
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=False)
-        self._buf = StringIO()
+        self._out: list[str] = []
         self._open_stack: list[str] = []
-        self._strip_depth: int = 0  # 在被剥离标签内时 > 0，吞掉内部一切内容
+        self._drop_depth = 0  # 位于危险容器内部时 > 0
+        self._block_start = 0  # 当前未完成顶层块在 _out 中的起点
+        self.blocks: list[str] = []
 
+    # ── 块边界 ────────────────────────────────────────────────────────────
+    def _cut_block(self) -> None:
+        if len(self._out) > self._block_start:
+            self.blocks.append("".join(self._out[self._block_start:]))
+        self._block_start = len(self._out)
+
+    # ── 标签 ──────────────────────────────────────────────────────────────
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        tag = tag.lower()
-        if tag not in ALLOWED_TAGS:
-            self._strip_depth += 1
+        tag = _TAG_ALIASES.get(tag.lower(), tag.lower())
+        if tag in _DROP_CONTENT_TAGS:
+            if tag not in _HTML_VOID_ELEMENTS:
+                self._drop_depth += 1
             return
-        if self._strip_depth > 0:
+        if self._drop_depth > 0 or tag not in ALLOWED_TAGS:
+            return  # 未知标签：剥标签、保留文本
+        if tag in _BLOCK_TAGS and not self._open_stack:
+            self._cut_block()  # 顶层块开始前，先切出悬挂的行内内容
+        attr_str = "".join(self._safe_attrs(tag, attrs))
+        if tag in _VOID_TAGS:
+            self._out.append(f"<{tag}{attr_str} />")
+            if tag in _BLOCK_TAGS and not self._open_stack:
+                self._cut_block()
             return
+        self._out.append(f"<{tag}{attr_str}>")
+        self._open_stack.append(tag)
+
+    @staticmethod
+    def _safe_attrs(tag: str, attrs: list[tuple[str, str | None]]) -> list[str]:
         allowed = ALLOWED_ATTRS.get(tag, frozenset())
-        safe_attrs: list[str] = []
+        out: list[str] = []
         for name, value in attrs:
             name = name.lower()
+            raw = value or ""
             if name not in allowed:
                 continue
-            val = escape(value or "", quote=True)
-            if name == "class" and val not in _ALLOWED_CLASS_VALUES:
+            if name in ("colspan", "rowspan") and not _SPAN_NUMBER_RE.match(raw):
                 continue
-            if name == "contenteditable" and val not in ("true", "false"):
+            if name == "class" and raw not in _ALLOWED_CLASS_VALUES:
                 continue
-            safe_attrs.append(f' {name}="{val}"')
-        attr_str = "".join(safe_attrs)
-        if tag in _VOID_TAGS:
-            self._buf.write(f"<{tag}{attr_str} />")
-        else:
-            self._buf.write(f"<{tag}{attr_str}>")
-            self._open_stack.append(tag)
+            if name == "contenteditable" and raw not in ("true", "false"):
+                continue
+            out.append(f' {name}="{escape(raw, quote=True)}"')
+        return out
 
     def handle_endtag(self, tag: str) -> None:
-        tag = tag.lower()
-        if tag not in ALLOWED_TAGS:
-            if self._strip_depth > 0:
-                self._strip_depth -= 1
+        tag = _TAG_ALIASES.get(tag.lower(), tag.lower())
+        if tag in _DROP_CONTENT_TAGS:
+            if tag not in _HTML_VOID_ELEMENTS and self._drop_depth > 0:
+                self._drop_depth -= 1
             return
-        if self._strip_depth > 0:
+        if self._drop_depth > 0 or tag not in ALLOWED_TAGS or tag in _VOID_TAGS:
             return
-        if tag in _VOID_TAGS:
+        if tag not in self._open_stack:
             return
-        if tag in self._open_stack:
-            idx = len(self._open_stack) - 1 - self._open_stack[::-1].index(tag)
-            for unclosed in reversed(self._open_stack[idx + 1:]):
-                self._buf.write(f"</{unclosed}>")
-            self._buf.write(f"</{tag}>")
-            self._open_stack = self._open_stack[:idx]
+        idx = len(self._open_stack) - 1 - self._open_stack[::-1].index(tag)
+        for unclosed in reversed(self._open_stack[idx + 1:]):
+            self._out.append(f"</{unclosed}>")
+        self._out.append(f"</{tag}>")
+        self._open_stack = self._open_stack[:idx]
+        if not self._open_stack and tag in _BLOCK_TAGS:
+            self._cut_block()
 
+    # ── 文本与实体 ────────────────────────────────────────────────────────
     def handle_data(self, data: str) -> None:
-        if self._strip_depth > 0:
-            return
-        self._buf.write(escape(data))
+        if self._drop_depth == 0:
+            self._out.append(escape(data))
 
     def handle_entityref(self, name: str) -> None:
-        if self._strip_depth > 0:
-            return
-        self._buf.write(f"&{escape(name)};")
+        if self._drop_depth == 0:
+            self._out.append(f"&{escape(name)};")
 
     def handle_charref(self, name: str) -> None:
-        if self._strip_depth > 0:
-            return
-        self._buf.write(f"&#{escape(name)};")
+        if self._drop_depth == 0:
+            self._out.append(f"&#{escape(name)};")
 
     def close(self) -> None:
         super().close()
         for tag in reversed(self._open_stack):
-            self._buf.write(f"</{tag}>")
+            self._out.append(f"</{tag}>")
         self._open_stack.clear()
-        self._strip_depth = 0
+        self._drop_depth = 0
+        self._cut_block()
 
     def get_result(self) -> str:
-        return self._buf.getvalue()
+        return "".join(self._out)
+
+
+def _run(html: str) -> _Sanitizer:
+    parser = _Sanitizer()
+    parser.feed(html or "")
+    parser.close()
+    return parser
 
 
 def sanitize_note_html(html: str) -> str:
-    """对附注富文本做 canonical 消毒。
-
-    - 只保留 ALLOWED_TAGS / ALLOWED_ATTRS 中声明的标签和属性。
-    - class 属性值必须精确等于白名单项之一。
-    - 所有文本和属性值重新转义。
-    - 消毒幂等：``sanitize(sanitize(x)) == sanitize(x)``。
-    """
+    """对附注富文本做 canonical 消毒；幂等：``sanitize(sanitize(x)) == sanitize(x)``。"""
     if not html:
         return ""
-    parser = _Sanitizer()
-    parser.feed(html)
-    parser.close()
-    return parser.get_result()
+    return _run(html).get_result()
+
+
+def split_top_level_blocks(html: str) -> list[str]:
+    """消毒后按顶层块切分（段落、列表、表格、标题…）；纯空白块不返回。"""
+    if not html:
+        return []
+    return [block for block in _run(html).blocks if block.strip()]
+
+
+def _has_visible_text(block: str) -> bool:
+    return bool(unescape(re.sub(r"<[^>]+>", "", block)).strip())
+
+
+def append_note_html(existing: str, new: str) -> str:
+    """把 ``new`` 追加到 ``existing``（design §7.2 第 6 步 / AC-9.3 / AC-10.5）。
+
+    - 两侧都先 canonical 消毒，结果即最终写入值（与 preview 逐字一致）；
+    - 按顶层段落去重：``new`` 中已在 ``existing`` 出现的块不重复追加；
+    - 只用规范空段 :data:`APPEND_SEPARATOR` 连接，不写来源/审计文字；
+    - ``new`` 无可见内容时原样返回 ``existing``（消毒后）。
+    """
+    base = sanitize_note_html(existing or "")
+    seen = set(split_top_level_blocks(base))
+    kept: list[str] = []
+    for block in split_top_level_blocks(new or ""):
+        if block in seen or not _has_visible_text(block):
+            continue
+        seen.add(block)
+        kept.append(block)
+    if not kept:
+        return base
+    if not base.strip():
+        return "".join(kept)
+    return base.rstrip() + APPEND_SEPARATOR + "".join(kept)

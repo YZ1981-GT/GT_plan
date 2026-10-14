@@ -118,3 +118,70 @@ class TestFrontendBackendConsistency:
         frontend_only = {"a", "pre", "code", "del", "dl", "dt", "dd", "h6"}
         for tag in frontend_only:
             assert tag not in ALLOWED_TAGS, f"后端不应允许 {tag}"
+
+
+# ── 第二轮复盘 R-05：未知标签只剥标签、保留文本；危险容器才丢内容 ──────────────
+
+
+class TestUnknownTagsKeepText:
+    """复盘探针实测：首版把所有非白名单标签的内容整段吞掉，<img> 还会吞掉其后全部正文。"""
+
+    def test_void_unknown_tag_does_not_swallow_following_content(self):
+        result = sanitize_note_html('<p>甲</p><img src="x.png"><p>乙</p>')
+        assert result == "<p>甲</p><p>乙</p>"
+
+    def test_div_wrapper_keeps_inner_paragraph(self):
+        assert sanitize_note_html("<div><p>正文</p></div>") == "<p>正文</p>"
+
+    @pytest.mark.parametrize("html,expected", [
+        ("<p>注<sup>1</sup>说明</p>", "<p>注1说明</p>"),
+        ("<p><u>下划线</u>文字</p>", "<p>下划线文字</p>"),
+        ('<p><a href="https://x">链接</a>后文</p>', "<p>链接后文</p>"),
+    ])
+    def test_inline_unknown_tags_keep_text(self, html: str, expected: str):
+        assert sanitize_note_html(html) == expected
+
+    def test_b_and_i_map_to_strong_and_em(self):
+        assert sanitize_note_html("<b>粗</b><i>斜</i>") == "<strong>粗</strong><em>斜</em>"
+
+    @pytest.mark.parametrize("html", [
+        "<style>p{color:red}</style><p>正文</p>",
+        "<iframe><p>框内</p></iframe><p>正文</p>",
+        "<object><p>框内</p></object><p>正文</p>",
+        "<noscript><p>框内</p></noscript><p>正文</p>",
+    ])
+    def test_dangerous_containers_drop_content(self, html: str):
+        assert sanitize_note_html(html) == "<p>正文</p>"
+
+    def test_void_dangerous_tag_does_not_swallow_following_content(self):
+        """embed 既是危险容器又是 void：若漏出 void 集合，深度永不回落 ⇒ 后文被吞。"""
+        assert sanitize_note_html('<p>前</p><embed src="x"><p>后</p>') == "<p>前</p><p>后</p>"
+
+    def test_span_numeric_attrs_validated(self):
+        assert sanitize_note_html('<table><tr><td colspan="3">a</td></tr></table>') == (
+            '<table><tr><td colspan="3">a</td></tr></table>'
+        )
+        assert "colspan" not in sanitize_note_html('<table><tr><td colspan="2;x">a</td></tr></table>')
+
+    @pytest.mark.parametrize("html", [
+        '<p>甲</p><img src="x.png"><p>乙</p>',
+        "<div><p>正文</p></div>",
+        "<b>粗</b><i>斜</i>",
+    ])
+    def test_new_paths_idempotent(self, html: str):
+        once = sanitize_note_html(html)
+        assert sanitize_note_html(once) == once
+
+
+class TestSplitTopLevelBlocks:
+    def test_splits_blocks_and_top_level_text(self):
+        from app.services.note_html_sanitizer import split_top_level_blocks
+
+        assert split_top_level_blocks("<p>a</p><ul><li>b</li></ul>c") == [
+            "<p>a</p>", "<ul><li>b</li></ul>", "c",
+        ]
+
+    def test_blocks_are_canonical(self):
+        from app.services.note_html_sanitizer import split_top_level_blocks
+
+        assert split_top_level_blocks("<P>a</P><b>x</b>") == ["<p>a</p>", "<strong>x</strong>"]

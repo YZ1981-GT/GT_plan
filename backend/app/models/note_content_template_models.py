@@ -30,9 +30,16 @@ class NoteContentTemplate(Base):
     owner_group_project_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("projects.id", ondelete="RESTRICT"), nullable=True
     )
+    # 与 versions.template_id 构成循环外键 ⇒ use_alter 打破建表顺序环；
+    # 约束名必须与 V187 的 fk_nct_current_version 一致（ORM / 迁移两层同名）。
     current_version_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("note_content_template_versions.id", ondelete="SET NULL"),
+        ForeignKey(
+            "note_content_template_versions.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_nct_current_version",
+        ),
         nullable=True,
     )
     is_deleted: Mapped[bool] = mapped_column(

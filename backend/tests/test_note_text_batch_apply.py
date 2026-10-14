@@ -7,7 +7,8 @@ import uuid
 
 import pytest
 
-from app.services.note_text_batch_apply import ApplyError, _append_html
+from app.services.note_html_sanitizer import append_note_html as _append_html
+from app.services.note_text_batch_apply import ApplyError
 
 
 class TestAppendHtml:
@@ -137,3 +138,37 @@ class TestAuditRecordSchema:
         assert "detail" in cols
         assert "applied_count" in cols
         assert "status" in cols
+
+
+class TestAppendNoteHtmlReview:
+    """复盘 R-10：追加须按段落去重、空新内容不拼分隔段、结果为消毒后 canonical HTML。"""
+
+    def test_empty_new_returns_existing_unchanged(self):
+        from app.services.note_html_sanitizer import append_note_html
+
+        assert append_note_html("<p>旧</p>", "") == "<p>旧</p>"
+        assert append_note_html("<p>旧</p>", "   ") == "<p>旧</p>"
+
+    def test_empty_existing_has_no_leading_separator(self):
+        from app.services.note_html_sanitizer import append_note_html
+
+        assert append_note_html("", "<p>新</p>") == "<p>新</p>"
+
+    def test_paragraph_level_dedupe(self):
+        from app.services.note_html_sanitizer import append_note_html
+
+        assert append_note_html("<p>甲</p><p>乙</p>", "<p>乙</p><p>丙</p>") == (
+            "<p>甲</p><p>乙</p><p>&nbsp;</p><p>丙</p>"
+        )
+
+    def test_all_new_paragraphs_already_present(self):
+        from app.services.note_html_sanitizer import append_note_html
+
+        assert append_note_html("<p>甲</p><p>乙</p>", "<p>乙</p>") == "<p>甲</p><p>乙</p>"
+
+    def test_result_is_sanitized_and_has_no_audit_marker(self):
+        from app.services.note_html_sanitizer import append_note_html
+
+        result = append_note_html("<p>旧</p>", "<p>新</p><script>x</script>")
+        assert "<script>" not in result
+        assert "引用自" not in result

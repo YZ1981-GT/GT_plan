@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.note_content_template_models import NoteTextBatchApplication
 from app.models.report_models import DisclosureNote
-from app.services.note_html_sanitizer import sanitize_note_html
+from app.services.note_html_sanitizer import append_note_html, sanitize_note_html
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +118,7 @@ async def apply_batch(
 
         if mode == "append" and before_text.strip():
             # 追加：用规范空段连接，去重完全相同段落
-            final = _append_html(before_text, proposed_html)
+            final = append_note_html(before_text, proposed_html)
         else:
             final = proposed_html
 
@@ -179,14 +179,3 @@ async def apply_batch(
         "changed_note_ids": [str(nid) for nid in changed_note_ids],
         "warnings": [],
     }
-
-
-def _append_html(existing: str, new: str) -> str:
-    """追加正文：用空段连接，去重完全相同的段落。"""
-    separator = "<p>&nbsp;</p>"
-    combined = f"{existing.rstrip()}{separator}{new.lstrip()}"
-    # 简单去重：如果 new 的每个段落都已在 existing 中，不重复追加
-    # 这里只做完全子串检查（design §7.2 要求）
-    if new.strip() and new.strip() in existing:
-        return existing
-    return combined

@@ -101,3 +101,29 @@ class TestApplyReplacementPlan:
         )
         ids = [item.replacement_id for item in plan.items]
         assert len(ids) == len(set(ids))
+
+
+class TestReplacementEscapingReview:
+    """复盘 R-11：替换值必须 HTML 转义；来源名按转义形态匹配；结果不得引入标签。"""
+
+    def test_target_value_is_escaped(self):
+        html = "<p>{公司名称}成立</p>"
+        plan = build_replacement_plan(html, target_vars={"company_name": "A&B<公司>"})
+        result = apply_replacement_plan(html, plan)
+        assert result == "<p>A&amp;B&lt;公司&gt;成立</p>"
+
+    def test_source_entity_with_ampersand_is_detected(self):
+        # 消毒器输出中 & 已被转义为 &amp;，按原文匹配会漏检
+        html = "<p>A&amp;B公司成立于2020年</p>"
+        plan = build_replacement_plan(
+            html, target_vars={"company_name": "目标公司"}, source_entity_name="A&B公司",
+        )
+        assert [i.variable for i in plan.items] == ["source_entity_name"]
+        assert apply_replacement_plan(html, plan) == "<p>目标公司成立于2020年</p>"
+
+    def test_script_like_target_value_cannot_inject_tags(self):
+        html = "<p>{公司名称}</p>"
+        plan = build_replacement_plan(html, target_vars={"company_name": "<script>x</script>"})
+        result = apply_replacement_plan(html, plan)
+        assert "<script>" not in result
+        assert "&lt;script&gt;" in result

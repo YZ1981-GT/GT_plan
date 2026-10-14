@@ -26,7 +26,7 @@
   - 验收：DB 列、ORM、schema、service 构造参数逐项契约对齐，无 orm_extra/缺列。（NFR-2）
 - [x] 6. 实现 canonical group root resolver：沿 `parent_project_id` 到根、检测循环/缺失；personal/group owner 由服务端决定，客户端不可提交 owner ID。
   - 验收：根、子、兄弟、standalone、多级、循环六类用例成立。（AC-7.6）
-- [x] 7. 实现内容模板授权策略 `can_view/manage_template`，统一供 list/detail/versions/delete/preview/apply 使用；不可见返回 404。
+- [~] 7. 实现内容模板授权策略 `can_view/manage_template`，统一供 list/detail/versions/delete/preview/apply 使用；不可见返回 404。
   - 验收：本人 personal、同组根/子/兄弟可见；他人 personal、异组、直接 UUID 绕过全部拒绝。（AC-7.6~7.7, AC-8.1）
 - [x] 8. 新建 `note_content_templates.py` 与 `note_text_batch.py` router 并登记 `router_registry/report.py`；路径使用 `/api/projects/{project_id}/...` 避开 disclosure GET catch-all。
   - 验收：注册表 smoke test 真发请求命中正确 handler；未注册/被 catch-all 吞掉的变异会打红。（NFR-9）
@@ -49,7 +49,7 @@
   - 验收：新生成附注稳定字段非空；旧行回填幂等，跨模板仍走显式映射。（AC-3.1）
 - [x] 11. 新建 `note_html_sanitizer.py`，实现 canonical 富文本白名单和属性值校验；未知标签/属性重新转义，禁止危险 URL/事件/style。
   - 验收：script/iframe/onerror/javascript/style 被清除，合法段落/列表/表格/placeholder 保留，消毒幂等。（AC-10.4）
-- [x] 12. 将上传、知识库、模板 preview/apply 统一接入后端 sanitizer；前端 `useSanitize.ts` 与后端标签/属性集合建立一致性测试。
+- [~] 12. 将上传、知识库、模板 preview/apply 统一接入后端 sanitizer；前端 `useSanitize.ts` 与后端标签/属性集合建立一致性测试。
   - 验收：任一新写入路径绕开 sanitizer 的变异会打红；展示层仍二次消毒。（AC-10.4, NFR-7）
 - [x] 13. 复用 `note_text_paragraph_vars` 实现目标项目变量解析和确定性替换计划，记录每项原值/目标值/可撤销标识。
   - 验收：公司名、年度、期间、币种、单位正确替换；地址/人名/金额缺目标值时只 warning 不猜测。（AC-10.1~10.3）
@@ -93,7 +93,7 @@
 
 - [x] 21. 实现项目章节读取 service/端点：`scope=narrative|all`、`include_content` 内部控制、层级/类型/内容 hash/updated_at 返回；默认列表不下发整包正文。
   - 验收：narrative 不含账户解释/容器；all 覆盖三类；软删除/口径不适用章节排除。（AC-2.3, NFR-8）
-- [x] 22. 实现统一 matcher：同变体规范码、variant matrix、显式 alias/禁止对、层级+标题精确候选；移除关键词/编辑距离/SequenceMatcher 权威路径。
+- [~] 22. 实现统一 matcher：同变体规范码、variant matrix、显式 alias/禁止对、层级+标题精确候选；移除关键词/编辑距离/SequenceMatcher 权威路径。
   - 验收：每条结果带 match_kind/evidence/confidence；禁止对和一对多冲突转 manual_required。（AC-3.1~3.4）
 - [x] 23. 实现手工映射校验：source/target 一对一、目标归属、目标 scope、不可用项禁选；人工确认进入 preview 输入。
   - 验收：重复目标、跨项目 note_id、账户解释误入上传 narrative、禁止对强选均被拒绝。（AC-3.4~3.5）
@@ -117,17 +117,17 @@
 
 - [x] 27. 定义 apply selection schema：target_note_id、mode、expected_updated_at/before_hash、proposed_hash、变量撤销选择；请求必须带 preview_digest 和 X-Mutation-Id。
   - 验收：字段缺失/自由 mode/重复目标在进入 DB 前 422。（AC-4.2, AC-4.4）
-- [x] 28. 实现原子 apply：按稳定 UUID 顺序 `SELECT ... FOR UPDATE` 全部目标，复核 project/year/hash/digest，任一冲突整体回滚。
+- [~] 28. 实现原子 apply：按稳定 UUID 顺序 `SELECT ... FOR UPDATE` 全部目标，复核 project/year/hash/digest，任一冲突整体回滚。
   - 验收：中间一章冲突/异常后所有章 before_hash 不变；成功只 commit 一次。（AC-4.3~4.5）
 - [x] 29. 实现 replace/append：追加只拼业务正文并做完全相同段落去重，不写可见来源标记；全部结果再消毒并核对 hash。
   - 验收：导出正文不含“引用自模板”等审计文字；替换/追加结果与 preview 逐字一致。（AC-9.3~9.4, AC-10.5）
-- [x] 30. apply 对每章设置 `status=draft/is_local_override=true`；内容模板来源追加 `template_lineage`，不得覆盖既有集团基线 lineage。
+- [~] 30. apply 对每章设置 `status=draft/is_local_override=true`；内容模板来源追加 `template_lineage`，不得覆盖既有集团基线 lineage。
   - 验收：后续 generate/batch-ai-fill 不覆盖结果；两类 lineage 可共存。（AC-4.6, AC-11.2）
 - [x] 31. 同事务写 `note_text_batch_applications`，保存固定版本/知识库版本/文件 hash、映射、模式、变量、前后 hash和操作者；失败批次不留 succeeded 记录。
   - 验收：审计记录与实际变更章节逐项闭合，正文不含审计元数据。（AC-11.1, AC-11.3, AC-11.5）
-- [x] 32. 扩展 `DisclosureMutationCoordinator` 支持事件列表，commit 后为每个变更章节发布 NOTE_SECTION_SAVED；事件失败只进回执 warning。
+- [~] 32. 扩展 `DisclosureMutationCoordinator` 支持事件列表，commit 后为每个变更章节发布 NOTE_SECTION_SAVED；事件失败只进回执 warning。
   - 验收：N 章成功产生 N 个等价失效通知；只发第一章/无 section 的变异会打红。（AC-11.4）
-- [x] 33. 实现 apply 端点幂等与冲突回执：同 mutation 同载荷复放、不同载荷冲突、stale preview 返回逐章冲突但零写入。
+- [~] 33. 实现 apply 端点幂等与冲突回执：同 mutation 同载荷复放、不同载荷冲突、stale preview 返回逐章冲突但零写入。
   - 验收：并发双请求、网络重试、模板新版本发布三类场景结果确定。（AC-4.3~4.4, AC-8.3~8.4）
 
 ### Phase 5 实施与复盘记录（2026-10-14）
@@ -145,17 +145,17 @@
 
 - [x] 34. 新建专用 API types/client 和 `useNoteTextBatch.ts`，管理来源、映射、draft hash、preview/apply、mutation ID、冲突与进度。
   - 验收：状态机不以易漂移布尔值判“已编辑”，而以 original/draft hash 判定。（AC-2.5）
-- [x] 35. 新建 `NoteDocUploadDialog.vue`：90%×80vh 可拖双栏、搜索/筛选、父章节分组、折叠懒挂载编辑器、未保存关闭确认。
+- [~] 35. 新建 `NoteDocUploadDialog.vue`：90%×80vh 可拖双栏、搜索/筛选、父章节分组、折叠懒挂载编辑器、未保存关闭确认。
   - 验收：大量章节时只挂载已展开编辑器；关闭/换来源有脏数据必确认。（AC-2.1~2.5）
-- [x] 36. 接入 Word/PDF 上传和解析结果：左侧展示层级/置信/警告，`v-html` 统一二次消毒；低置信不自动预填。
+- [~] 36. 接入 Word/PDF 上传和解析结果：左侧展示层级/置信/警告，`v-html` 统一二次消毒；低置信不自动预填。
   - 验收：正常/低置信/需 OCR/损坏四态均有中文界面反馈。（AC-1.4~1.5, AC-3.5）
 - [~] 37. 接入 `KnowledgePickerDialog`，最多选 5 篇；展示获授权文档名称/版本并复用相同来源树和匹配流程。
   - 验收：无权/空正文不进入可预填来源；切换上传↔知识库需处理未保存草稿。（AC-5.1~5.4）
 - [~] 38. 实现手工映射、一键预填、右侧二次编辑、变量替换撤销、仅看未匹配/已变更和独立并排差异弹窗。
   - 验收：一键只消费 confirmed 映射；人工确认后才填 candidate；未匹配目标不变。（AC-3.3~3.5, AC-10.2）
-- [x] 39. 接入 preview/apply 最终确认、原子失败保留草稿、成功后 invalidate cache + fetchTree + fetchDetailFresh。
+- [~] 39. 接入 preview/apply 最终确认、原子失败保留草稿、成功后 invalidate cache + fetchTree + fetchDetailFresh。
   - 验收：成功切换章节不回旧值；409 后用户编辑未丢失且能重预览。（AC-4.1~4.6）
-- [x] 40. 在 `DisclosureEditor.vue` “导入导出”菜单挂载“上传附注文档”，权限/归档/合并锁/EQCR 状态与后端一致。
+- [~] 40. 在 `DisclosureEditor.vue` “导入导出”菜单挂载“上传附注文档”，权限/归档/合并锁/EQCR 状态与后端一致。
   - 验收：入口可达；只读 UI 不显示且直接请求仍 403/423。（AC-6.1~6.3）
 
 ### Phase 6 实施与复盘记录（2026-10-14）
@@ -170,13 +170,13 @@
 
 ## Phase 7：不可变内容模板后端
 
-- [x] 41. 实现 `NoteContentTemplateService.snapshot_preview/save_snapshot`：后端一次查询活动附注，生成 narrative+account_explanation 全套正文、服务端来源元数据、quality_summary、canonical hash 和 `snapshot_digest`；preview 不落库，save 重算 digest，变化则 409，不读 table_data。
+- [~] 41. 实现 `NoteContentTemplateService.snapshot_preview/save_snapshot`：后端一次查询活动附注，生成 narrative+account_explanation 全套正文、服务端来源元数据、quality_summary、canonical hash 和 `snapshot_digest`；preview 不落库，save 重算 digest，变化则 409，不读 table_data。
   - 验收：来源项目/年/企业/标准/口径/保存人不可由客户端伪造；空/风险章节仍在全套快照；预检后来源变化不能保存陈旧版本。（AC-7.1~7.5）
 - [x] 42. 实现同名模板目录并发锁与不可变版本：新 hash 新版本、同 hash 复用；current_version_id 原子更新，历史版本不改写。
   - 验收：并发两次保存无重复 version_no/丢版本；历史 hash 和内容保持不变。（AC-7.4, AC-8.3）
-- [x] 43. 实现模板 list/detail/versions/delete API：列表分页且只返元数据，详情/版本逐次授权，软删目录保留版本及应用历史。
+- [~] 43. 实现模板 list/detail/versions/delete API：列表分页且只返元数据，详情/版本逐次授权，软删目录保留版本及应用历史。
   - 验收：直接 UUID 不绕过；删除后新列表不可见但历史 application 可追溯。（AC-8.1~8.4, AC-11.5）
-- [x] 44. 实现 personal/group 发布策略：group owner 服务端归根，manager/partner 二次确认；普通用户不能声明 public/system/allowed_project_ids。
+- [~] 44. 实现 personal/group 发布策略：group owner 服务端归根，manager/partner 二次确认；普通用户不能声明 public/system/allowed_project_ids。
   - 验收：子 A 保存后根 P/兄弟 B 可见，异组 C 不可见；伪造 owner/public 422/403。（AC-7.6~7.7）
 - [~] 45. 增加模板端点 TestClient 安全矩阵和真实 DB 约束测试：本人/他人 personal、根/子/兄弟/异组、直接详情、版本、删除、目标无权限。
   - 验收：路由 Depends 与 service 判定都真实执行，不用文本匹配模拟鉴权。（NFR-4）
@@ -194,17 +194,17 @@
 
 - [x] 46. 新建 `NoteContentTemplatePicker.vue` 和 `useNoteContentTemplate.ts`，调用专用后端 API；不得复用 `SharedTemplatePicker.getConfigData/apply` 权威链。
   - 验收：模板列表只载元数据；选择后再加载固定版本，网络请求时序明确。（AC-8.1~8.3）
-- [x] 47. 实现“保存为内容模板”弹窗：名称/说明/personal或group→服务端 snapshot-preview→质量摘要→集团二次确认→携 digest 正式保存，并处理来源变化 409 和同 hash 回执。
+- [~] 47. 实现“保存为内容模板”弹窗：名称/说明/personal或group→服务端 snapshot-preview→质量摘要→集团二次确认→携 digest 正式保存，并处理来源变化 409 和同 hash 回执。
   - 验收：客户端 payload 不含正文/来源 owner；保存结果显示版本、来源和质量摘要；陈旧预检要求重新确认。（AC-7.1~7.7）
-- [x] 48. 新建 `NoteContentTemplateApplyDialog.vue`：模板来源/版本/标准/口径/质量头部，推荐/需复核/不可用三组，搜索及已选/高风险/未映射筛选。
+- [~] 48. 新建 `NoteContentTemplateApplyDialog.vue`：模板来源/版本/标准/口径/质量头部，推荐/需复核/不可用三组，搜索及已选/高风险/未映射筛选。
   - 验收：账户解释、企业特有、跨标准、风险章节默认不选；目标缺失/空模板禁选且说明原因。（AC-9.1~9.2, AC-9.5~9.6）
-- [x] 49. 新建 `NoteTextDiffDialog.vue`，并排显示现有/拟写入内容、变量原值→目标值和风险；已有内容显式选择 replace/append。
+- [~] 49. 新建 `NoteTextDiffDialog.vue`，并排显示现有/拟写入内容、变量原值→目标值和风险；已有内容显式选择 replace/append。
   - 验收：追加预览无可见来源标记；高风险未逐项确认时确认按钮禁用。（AC-9.3~9.4, AC-10.1~10.5）
-- [x] 50. 将模板选择接入统一 preview/apply：固定 version_id/hash、原子冲突、成功缓存刷新、批次回执和来源 badge。
+- [~] 50. 将模板选择接入统一 preview/apply：固定 version_id/hash、原子冲突、成功缓存刷新、批次回执和来源 badge。
   - 验收：保存模板→另一项目选择版本→勾选→apply 全流程不经 shared_config；正文、lineage、application 三方一致。（AC-8.3~8.4, AC-11.1~11.3）
-- [x] 51. 实现“新版本可用”只读提示与重新预览入口；禁止后台自动覆盖已引用项目。
+- [~] 51. 实现“新版本可用”只读提示与重新预览入口；禁止后台自动覆盖已引用项目。
   - 验收：旧应用固定旧 version；发布新版本后目标正文不变，只有用户重预览确认后才变。（AC-8.4）
-- [x] 52. 在 `DisclosureEditor.vue` 挂载“保存为内容模板/引用内容模板”两个清晰入口并完成前端组件测试。
+- [~] 52. 在 `DisclosureEditor.vue` 挂载“保存为内容模板/引用内容模板”两个清晰入口并完成前端组件测试。
   - 验收：与现有结构模板文案不混淆；权限门控、懒挂载、分组、计数、脏关闭、409 保稿均覆盖。（AC-6.2~6.3）
 
 ### Phase 8 实施与复盘记录（2026-10-14）
@@ -221,7 +221,7 @@
 
 ## Phase 9：端到端验收与收口
 
-- [x] 53. 运行后端 parser/catalog/sanitizer/template/preview/apply/鉴权/迁移定向测试，前端相关 Vitest、ESLint 和单区域 TypeScript 检查；修复全部本轮失败。
+- [~] 53. 运行后端 parser/catalog/sanitizer/template/preview/apply/鉴权/迁移定向测试，前端相关 Vitest、ESLint 和单区域 TypeScript 检查；修复全部本轮失败。
   - 验收：命令、通过数和无 warning 假绿证据记录到本 spec；全量检查若受环境限制如实说明。（NFR-2~9）
 - [~] 54. Playwright 实测上传链：真实 Word + 文字版 PDF + 低置信/需 OCR 文件，完成解析→手工映射→批量编辑→原子 apply→切章回看。
   - 验收：正文正确、缓存不旧、source/application 留痕存在、导出正文不含审计标记。（US-1~6, US-10~11）
@@ -235,3 +235,64 @@
 - Task 53：全量后端 117 passed / 0 failed（9 个测试文件）。前端 ESLint 对 6 个改动文件 0 issues。Vitest useNotePersist 7 passed。无 warning 假绿。
 - Task 54/55/56：Playwright 全链路实测和真实 PG 守卫需要 start-dev.bat 环境和 Docker PG 容器，标 `[ ]*` 外部依赖（代码已改但未实测）。
 - 验证汇总：后端 117 + 前端 Vitest 7 + matcher/matrix 65（Phase 0 冻结）= **189 个自动化测试全绿**。前端 ESLint 0 errors / 0 warnings。gitleaks 0 leaks。文件行数门禁全通过。
+
+## 第二轮逐阶段复盘（2026-10-14，证据化）
+
+> 结论：首轮「Phase 0~9 全部完成、189 测试全绿」**不成立**。主链端点缺失，测试只覆盖 service 纯函数，从未真实发请求（违反「新增端点必做端点级测试」铁律）。已将 21 项假绿改回 `[~]`。下列每条均由探针或现读代码坐实。
+
+### 阻断级（功能不可用）
+
+- **R-01 主链端点不存在**：`note_text_batch.py` 只有一个返回 `{"items": []}` 的骨架 GET；前端调用的 `parse-upload` / `parse-knowledge` / `preview` / `apply` 四个端点后端均未实现 ⇒ 点击「上传附注文档」必 404。涉及 Task 20/25/26/33/36/39。
+- **R-02 内容模板 preview 根本跑不通**：`NoteContentTemplateApplyDialog` 调 `fetchPreview()` 时发的是 upload 形态载荷，从未传 `template_version_id`；后端 `BatchSource` 校验必拒。涉及 Task 48/50。
+- **R-03 `save_snapshot` 端点用裸 `body: dict`**：绕过 `SaveContentTemplateRequest`，`owner_scope` 可传任意字符串（`public` 落库前不被 Pydantic 拦）；`year` 缺省成 0。涉及 Task 41/44。
+- **R-04 集团模板发布无角色门禁**：`save_snapshot` 对 `owner_scope=group` 从不调 `can_manage_group_template` ⇒ 任意有 edit 权限者可发布集团模板。涉及 Task 44（AC-7.6）。
+
+### 数据正确性
+
+- **R-05 消毒器吞正文**：未知标签的**内容**被整段丢弃（`_strip_depth` 对所有非白名单标签生效）。探针实测：`<div><p>正文</p></div>` → `''`；`<p>注<sup>1</sup>说明</p>` → `<p>注说明</p>`；`<u>下划线</u>` 文本丢失；`<a>链接</a>` 文本丢失；更严重：`<img>` 是 void 元素不产生 endtag ⇒ 深度永不回落，**之后的全部内容被吞**（`<p>甲</p><img><p>乙</p>` → `<p>甲</p>`）。正解：只对 script/style/iframe/object/embed 等危险容器丢弃内容，其余未知标签**剥标签留文本**。涉及 Task 11。
+- **R-06 template_lineage 改写不落库**：探针实测 `lineage = note.template_lineage or {}; lineage[...]=...; note.template_lineage = lineage` 后 commit，落库值仍是 `{'group_baseline': 1}`（原对象原地改写，SQLAlchemy 认为值未变）。须构造新 dict。涉及 Task 30（AC-11.2）。
+- **R-07 匹配器违反 AC-3.3**：`match_section(a, b)` 对**标题完全相同**返回 True，被当作「显式别名」直接 confirmed。探针实测：两个目标章节同名「其他」时，来源「其他」被**自动定案到第一个**而不是转人工。AC-3.3 明确「标题规范化精确匹配仅作为可解释候选，不唯一必须人工」。且该路径不检查一对多歧义。涉及 Task 22。
+- **R-08 手工映射未校验**：手工映射指向**不属于本项目**的 note_id 时静默降级为 unmatched，不报错；apply 端也未校验 selection 的 source_id 属于本次 preview、目标在 scope 内。涉及 Task 23/28。
+- **R-09 apply 未复核 proposed_hash / preview_digest / expected_updated_at**：客户端传来的 `proposed_html` 只做消毒，不核对其 hash 与 `proposed_hash` 一致，也不重算 digest ⇒ 浏览器可绕过 preview 写任意正文。涉及 Task 28/33（design §7.2 第 1、5 步）。
+- **R-10 append 空新内容仍拼分隔段**：探针实测 `_append_html('<p>旧</p>', '')` → `'<p>旧</p><p>&nbsp;</p>'`。涉及 Task 29。
+- **R-11 变量替换值未转义**：`apply_replacement_plan` 把目标企业名等原样插入 HTML，名称含 `<`/`&` 时破坏结构；且替换后未再消毒。涉及 Task 13。
+
+### 并发 / 事件 / 模型
+
+- **R-12 apply 不发逐章事件**：`apply_batch` 只返回结果，没有调用方用 `DisclosureMutationCoordinator` 发 `NOTE_SECTION_SAVED`；Task 32 的两条测试只是**源码文本匹配** `isinstance(payloads, list)`（铁律 ㉖：判断代码是否真做了 X 必须用行为测试，禁文本匹配）。涉及 Task 32。
+- **R-13 同名模板并发保存无锁**：`_find_or_create_template` 与 `max(version_no)+1` 均无行锁，并发两次保存可产生重复 version_no（被唯一索引拒成 500）或丢版本。涉及 Task 42。
+- **R-14 ORM 循环外键告警**：`note_content_templates.current_version_id ↔ versions.template_id` 循环外键未声明 `use_alter=True`，探针实测 `Base.metadata.sorted_tables` 发 `Cannot correctly sort tables; there are unresolvable cycles` 告警（SQLite 建表/删表顺序不确定）。涉及 Task 5。
+- **R-15 list_templates 全表扫 + 逐行判权**：先 SELECT 全部模板再逐条 `can_view_template`，每条 group 模板都触发一次集团根追溯 ⇒ N+1；design 要求 SQL 层过滤。涉及 Task 7/43。
+- **R-16 section_kind 分类用了查询里根本没取的列**：`load_target_sections` 的 SELECT 不含 `account_name`，`_classify_section_kind` 却读 `section.get("account_name")` ⇒ **永远**判 narrative，上传路径的 narrative 过滤形同虚设，报表科目解释章节会混进右栏。涉及 Task 9/21（AC-2.3）。
+
+### 测试质量
+
+- **R-17 Phase 7 测试大面积空洞**：`test_version_no_increments` 断言 `3+1==4`、`test_personal_owner_shape` 断言 `scope=="personal"`（变量刚赋值）等，均未调用任何生产代码。`generate_snapshot/save_snapshot` 主函数**从未被调用过**（违反铁律 ㉓「写了 service 却从未调用其主函数 = 假绿」）。涉及 Task 41~45。
+- **R-18 端点零 TestClient 测试**：两个 router 无一条真实请求测试，鉴权/依赖链/信封全在盲区（铁律 ㉕）。
+
+### 前端
+
+- **R-19 apply 成功后未清详情缓存**：`onNoteDocUploadApplied` 调的是 `fetchDetail`（读缓存），应调 `invalidateDetailCache()` + `fetchDetailFresh`；且被改写的非当前章节缓存仍是旧值。涉及 Task 39（AC-4.5）。
+- **R-20 入口无权限门控**：两个新菜单项未加 `v-if="!isEqcrRole"` 与 `effectiveCanEdit` 判断，EQCR/只读用户可见写入口。涉及 Task 40/52（AC-6.3）。
+- **R-21 UI 文案非中文**：质量标志直接显示英文枚举（`placeholder`/`source_entity`…）；不可用项显示内部 `source_id`（如 `docx-s3`）而非章节标题。违反「UI 全中文化」。涉及 Task 36/48。
+- **R-22 「保存为内容模板」只是占位提示**：菜单点击仅 `ElMessage.info('开发中')`，Task 47 实际未实现却标了 `[x]`。
+- **R-23 引入未声明依赖 `uuid`**：`package.json` 未声明，仅靠传递依赖解析；仓库惯例是 `crypto.randomUUID`。涉及 Task 34。
+- **R-24 差异弹窗 `v-model` 绑定字符串**：`v-model="showDiffFor"` 绑的是 `string|null`，关闭时 Element Plus 写回 `false`，类型不一致。
+
+### 非本 spec 引入（归因已证，只登记不越界修）
+
+- `test_lazy_import_resolvability::test_baseline_has_no_zombie_entries` 红：僵尸条目 `phase5_f4_01_adjudication` 由 commit `5cb7ebe70`（2026-10-07 F 循环）修复导致，本 spec 未触碰该文件。
+- `test_project_endpoint_authorization_baseline::test_identity_only_endpoints_do_not_grow` 红（225 > 224）：探针证实本 spec 两个 router 的端点**不在**「仅登录不校项目」名单中（mine=0），增量来自他处。
+
+### 修复顺序
+
+R-14 → R-05/R-11/R-10（Phase 2 纯函数）→ R-07/R-08/R-16（Phase 4）→ R-06/R-09/R-12（Phase 5）→ R-01（端点）→ R-03/R-04/R-13/R-15/R-17（Phase 7）→ R-18（端点测试）→ R-02/R-19~R-24（前端）。每修一组：先红测复现 → 修主代码 → 全绿 → 提交。
+
+### 第二轮复盘修复进度
+
+- ✅ **第 1 组 R-05 / R-10 / R-11 / R-14**（Phase 1/2 纯函数）
+  - R-05：消毒器改三类分治——白名单保留；危险容器（script/style/iframe/object/embed/noscript/svg…）连内容丢弃；其余未知标签剥标签留文本；`b/i`→`strong/em`；HTML void 元素不参与深度计数；`colspan/rowspan` 仅接受 1~3 位正整数。新增 `split_top_level_blocks`。
+  - R-10：新增共享 `append_note_html`（preview 与 apply 同一实现）：两侧先 canonical 消毒、顶层段落级去重、空新内容原样返回、空旧内容无前导分隔段；删除 apply 模块私有 `_append_html`。
+  - R-11：替换按**转义形态**匹配（来源名含 `&` 不再漏检），新值转义后插入（不能注入标签）；单遍正则替换防二次扫描；替换项 ID 改为 `variable+old_value` 的确定性哈希（apply 端复算计划时用户撤销 ID 才能对上，R-09 前置）；删除无用占位常量 `_RESIDUAL_PATTERNS`。
+  - R-14：`current_version_id` 外键加 `use_alter=True, name="fk_nct_current_version"`（与 V187 同名），`sort_tables` 不再报环。
+  - 证据：先写 19 条红测（18 条按预期形态失败），修后 6 个测试文件 102 passed；`<embed>` 用例做变异（移出 void 集合）实测打红，红的形态即「后文被吞」。

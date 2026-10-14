@@ -107,3 +107,30 @@ def test_apply_schema_rejects_free_mode_before_database() -> None:
                 "proposed_html": "<p>x</p>",
             }],
         })
+
+
+def test_current_version_fk_breaks_cycle_with_use_alter() -> None:
+    """复盘 R-14：templates.current_version_id ↔ versions.template_id 是循环外键。
+
+    未声明 use_alter 时 ``sort_tables`` 发「unresolvable cycles」告警，建表/删表顺序不确定。
+    约束名必须与 V187 的 ``fk_nct_current_version`` 一致，否则 ORM 与迁移两层不同名。
+    """
+    import warnings
+
+    from sqlalchemy.schema import sort_tables
+
+    fk = next(iter(NoteContentTemplate.__table__.c.current_version_id.foreign_keys))
+    assert fk.use_alter is True
+    assert fk.constraint.name == "fk_nct_current_version"
+
+    tables = [
+        NoteContentTemplate.__table__,
+        NoteContentTemplateVersion.__table__,
+        NoteTextBatchApplication.__table__,
+    ]
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        ordered = sort_tables(tables)
+    assert not [w for w in caught if "cycles" in str(w.message)]
+    names = [t.name for t in ordered]
+    assert names.index("note_content_template_versions") < names.index("note_text_batch_applications")
