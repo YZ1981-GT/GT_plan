@@ -431,6 +431,11 @@ const d5TbAmount = computed(() => {
 provide('d5TbAmount', d5TbAmount)
 provide('d5BsDate', periodEnd)
 
+// 科目映射码注入：凭证检查子组件通过 inject 取到后用于挂凭前缀匹配
+import { pickDTbSourceCodes } from './composables/dCycleAccountScope'
+const _d5TbSourceCodes = computed(() => pickDTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _d5TbSourceCodes)
+
 onMounted(async () => {
   await loadAll()
 })

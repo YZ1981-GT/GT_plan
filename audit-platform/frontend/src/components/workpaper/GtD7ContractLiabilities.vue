@@ -285,6 +285,11 @@ provide('getRowDot', getRowDot)
 provide('d7VersionTrailRef', versionTrailRef)
 provide('d7OpenVersionHistory', openVersionHistory)
 
+// 科目映射码注入：凭证检查子组件通过 inject 取到后用于挂凭前缀匹配
+import { pickDTbSourceCodes } from './composables/dCycleAccountScope'
+const _d7TbSourceCodes = computed(() => pickDTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _d7TbSourceCodes)
+
 useWorkpaperEntryInjections({
   onJumpToSection: (sheetLabel) => emit('jump-to-section', sheetLabel),
   reloadFn: () => loadAll(),

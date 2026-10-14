@@ -565,7 +565,7 @@
  * D3TabVoucherCheck.vue — D3-7 凭证检查表
  * 抽样参数 + (1)本期增减 + (2)期后结转 + 汇总 + 跨期标记
  */
-import { computed, ref, toRef, type Ref } from 'vue'
+import { computed, ref, toRef, inject, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useD3VoucherCheck, isAllowedAttachment, CROSS_PERIOD_ANOMALY, type VoucherCheckRow } from '../composables/useD3VoucherCheck'
 import { useD3AiGenerate } from '../composables/useD3AiGenerate'
@@ -590,6 +590,9 @@ import {
   listAttachedVouchers,
 } from '../composables/useAttachedVouchers'
 import { dSlotQueryCodes, pickDTbSourceCodes } from '../composables/dCycleAccountScope'
+
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<any> | null>('tbSourceCodes', null)
 
 const props = withDefaults(defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -739,7 +742,7 @@ function openSampling() {
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const D3_ACCOUNT_PREFIXES = dSlotQueryCodes('D3', pickDTbSourceCodes(null))
+const D3_ACCOUNT_PREFIXES = computed(() => dSlotQueryCodes('D3', _injectedTbSrc?.value ?? null))
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -757,7 +760,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, engineYear.value, props.wpId, D3_ACCOUNT_PREFIXES,
+      props.projectId, engineYear.value, props.wpId, D3_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
     if (misattached.length > 0) {

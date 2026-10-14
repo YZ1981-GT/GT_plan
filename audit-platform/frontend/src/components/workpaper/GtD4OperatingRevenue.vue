@@ -290,6 +290,11 @@ const crossSheet = useD4CrossSheet({
 // 🔴 价格分析 / 审定表派生联动：子表 inject('d4CrossSheet')；无 provide 则导入按钮永久「上游未就绪」。
 provide('d4CrossSheet', crossSheet)
 
+// 科目映射码注入：凭证检查子组件通过 inject 取到后用于挂凭前缀匹配
+import { pickDTbSourceCodes } from './composables/dCycleAccountScope'
+const _d4TbSourceCodes = computed(() => pickDTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _d4TbSourceCodes)
+
 // 🔴 方案 C 接收端必须挂在宿主生命周期内，否则 d4:price-abnormal 又成「发了无人听」。
 useD4PriceWriteback({
   allResponses: formData.allResponses,

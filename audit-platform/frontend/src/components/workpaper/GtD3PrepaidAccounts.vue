@@ -271,6 +271,11 @@ provide('d3CrossSheet', crossSheet)
 provide('d3VersionTrailRef', versionTrailRef)
 provide('d3OpenVersionHistory', openVersionHistory)
 
+// 科目映射码注入：凭证检查子组件通过 inject 取到后用于挂凭前缀匹配
+import { pickDTbSourceCodes } from './composables/dCycleAccountScope'
+const _d3TbSourceCodes = computed(() => pickDTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _d3TbSourceCodes)
+
 const currentSheet = computed(() => resolveD3SheetCode(props.sheetName || 'D3'))
 const d3ReviewSection = computed(() => resolveCycleReviewSection('D3', currentSheet.value))
 

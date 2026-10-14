@@ -242,7 +242,9 @@ function openSampling() {
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const D4_ACCOUNT_PREFIXES = dSlotQueryCodes('D4', pickDTbSourceCodes(null))
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<any> | null>('tbSourceCodes', null)
+const D4_ACCOUNT_PREFIXES = computed(() => dSlotQueryCodes('D4', _injectedTbSrc?.value ?? null))
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -258,7 +260,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, auditYear.value, props.wpId, D4_ACCOUNT_PREFIXES,
+      props.projectId, auditYear.value, props.wpId, D4_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

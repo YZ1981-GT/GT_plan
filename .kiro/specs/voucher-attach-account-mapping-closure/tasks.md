@@ -2,8 +2,8 @@
 
 ## 批次 1：D 循环
 
-- [ ] 1. GtD3.vue / GtD4.vue / GtD5.vue / GtD6.vue / GtD7.vue 加 `provide('tbSourceCodes', ...)`
-- [ ] 2. D3TabVoucherCheck ~ D7TabVoucherCheck 的 `importFromAttached` 改用 `inject('tbSourceCodes')` + `dSlotQueryCodes('Dx', src)`
+- [x] 1. GtD3.vue / GtD4.vue / GtD5.vue / GtD6.vue / GtD7.vue 加 `provide('tbSourceCodes', ...)`
+- [x] 2. D3TabVoucherCheck ~ D7TabVoucherCheck 的 `importFromAttached` 改用 `inject('tbSourceCodes')` + `dSlotQueryCodes('Dx', src)`
 - [ ] 3. 验证 D 循环凭证检查在有映射码时用映射码、无映射码时退兜底码
 
 ## 批次 2：E 循环
