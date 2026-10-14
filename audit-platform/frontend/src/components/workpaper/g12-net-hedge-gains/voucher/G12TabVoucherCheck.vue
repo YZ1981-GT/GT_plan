@@ -7,6 +7,9 @@
           ⚡ 抽凭
         </el-button>
         <CycleImportExportDropdown :wp-id="wpId" api-prefix="g12" sheet="G12-6" :disabled="isReadonly" @imported="onImported" />
+        <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
+          <el-button size="small" :disabled="isReadonly" :loading="importingAttached" title="导入在「账簿查询」右键挂凭到本底稿的序时账凭证" @click="importFromAttached">📎 从序时账挂入导入</el-button>
+        </el-badge>
         <el-button size="small" :disabled="isReadonly" data-testid="g12-export-memo" @click="exportMemo">📄 抽样备忘</el-button>
         <el-button
           v-if="!isReadonly"
@@ -496,6 +499,10 @@ import {
 } from '../../composables/useG12VoucherCheck'
 import { G12_ACCOUNT_CODE, G12_RISK_LEVELS } from '../../composables/g12Constants'
 import {
+  pullSamplesForWorkpaper,
+  listAttachedVouchers,
+} from '../../composables/useAttachedVouchers'
+import {
   G12_VOUCHER_CHECK_DEFS,
   G12_SAMPLING_METHOD_OPTIONS,
   G12_CHECK_STATE_OPTIONS,
@@ -562,6 +569,33 @@ onBeforeUnmount(() => {
 async function onImported() {
   emit('imported')
   vc.reloadFromStore()
+}
+
+// ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
+const attachedCount = ref(0)
+const importingAttached = ref(false)
+const G12_ACCOUNT_PREFIXES = [G12_ACCOUNT_CODE]
+
+async function refreshAttachedCount(): Promise<void> {
+  if (!props.projectId || !props.wpId) return
+  try {
+    const recs = await listAttachedVouchers(props.projectId, engineYear.value, props.wpId, true)
+    attachedCount.value = recs.length
+  } catch { attachedCount.value = 0 }
+}
+void refreshAttachedCount()
+
+async function importFromAttached(): Promise<void> {
+  if (props.isReadonly) return
+  importingAttached.value = true
+  try {
+    const { samples, misattached } = await pullSamplesForWorkpaper(
+      props.projectId, engineYear.value, props.wpId, G12_ACCOUNT_PREFIXES,
+    )
+    if (samples.length > 0) onSampleFilled({ samples })
+    if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
+    if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
+  } finally { importingAttached.value = false }
 }
 
 function onSampleFilled(payload: {

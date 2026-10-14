@@ -28,9 +28,15 @@ import type { SamplingMethodologySnapshot } from '../composables/shared/sampling
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
  */
 import { f3GrossQueryCodes } from '../composables/f3AccountScope'
+import { ElMessage } from 'element-plus'
+import {
+  pullSamplesForWorkpaper,
+  listAttachedVouchers,
+} from '../composables/useAttachedVouchers'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
 const samplingAccountCode = f3GrossQueryCodes().join(',')
+const F3_ACCOUNT_PREFIXES = f3GrossQueryCodes()
 
 const f3VoucherNav = [
   { id: 'f3-7-sampling', label: '抽凭' },
@@ -166,6 +172,32 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
   isReadonly: computed(() => props.isReadonly),
 })
 
+// ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
+const attachedCount = ref(0)
+const importingAttached = ref(false)
+
+async function refreshAttachedCount(): Promise<void> {
+  if (!props.projectId || !props.wpId) return
+  try {
+    const recs = await listAttachedVouchers(props.projectId, auditYear.value, props.wpId, true)
+    attachedCount.value = recs.length
+  } catch { attachedCount.value = 0 }
+}
+void refreshAttachedCount()
+
+async function importFromAttached(): Promise<void> {
+  if (props.isReadonly) return
+  importingAttached.value = true
+  try {
+    const { samples, misattached } = await pullSamplesForWorkpaper(
+      props.projectId, auditYear.value, props.wpId, F3_ACCOUNT_PREFIXES,
+    )
+    if (samples.length > 0) handleSamplingFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
+    if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
+  } finally { importingAttached.value = false }
+}
+
 function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase; fillMode: FillMode }): void {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
   void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
@@ -240,6 +272,10 @@ function ratioClass(ratio: number): string {
         />
       </el-collapse-item>
     </el-collapse>
+
+    <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
+      <el-button size="small" :disabled="isReadonly" :loading="importingAttached" title="导入在「账簿查询」右键挂凭到本底稿的序时账凭证" @click="importFromAttached">📎 从序时账挂入导入</el-button>
+    </el-badge>
 
     <template v-for="section in sections" :key="section.key">
       <div :id="`f3-7-${section.key}`" class="voucher-section">

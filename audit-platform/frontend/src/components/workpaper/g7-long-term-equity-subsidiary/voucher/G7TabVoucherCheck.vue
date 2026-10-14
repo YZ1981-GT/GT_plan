@@ -16,6 +16,9 @@
           @filled="onSampleFilled"
         />
         <el-button v-if="!isReadonly" size="small" type="primary" plain @click="handleAddRow">+ 新增</el-button>
+        <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
+          <el-button size="small" :disabled="isReadonly" :loading="importingAttached" title="导入在「账簿查询」右键挂凭到本底稿的序时账凭证" @click="importFromAttached">📎 从序时账挂入导入</el-button>
+        </el-badge>
         <el-dropdown @command="handleImportExportCommand">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -440,6 +443,10 @@ import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffo
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import { G7_GROSS_FALLBACK_STANDARD } from '../../composables/g7AccountScope'
+import {
+  pullSamplesForWorkpaper,
+  listAttachedVouchers,
+} from '../../composables/useAttachedVouchers'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist, buildChecklistDirectPersist, snapshotToResponseMap } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
@@ -725,6 +732,33 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
   persist: methodologyDirectPersist,
   isReadonly: computed(() => props.readonly === true),
 })
+
+// ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
+const attachedCount = ref(0)
+const importingAttached = ref(false)
+const G7_ACCOUNT_PREFIXES = [G7_GROSS_FALLBACK_STANDARD]
+
+async function refreshAttachedCount(): Promise<void> {
+  if (!props.projectId || !props.wpId) return
+  try {
+    const recs = await listAttachedVouchers(props.projectId, auditYear.value, props.wpId, true)
+    attachedCount.value = recs.length
+  } catch { attachedCount.value = 0 }
+}
+void refreshAttachedCount()
+
+async function importFromAttached(): Promise<void> {
+  if (isReadonly.value) return
+  importingAttached.value = true
+  try {
+    const { samples, misattached } = await pullSamplesForWorkpaper(
+      props.projectId, auditYear.value, props.wpId, G7_ACCOUNT_PREFIXES,
+    )
+    if (samples.length > 0) onSampleFilled({ samples })
+    if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
+    if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
+  } finally { importingAttached.value = false }
+}
 
 function onSampleFilled(payload: {
   samples?: Array<{

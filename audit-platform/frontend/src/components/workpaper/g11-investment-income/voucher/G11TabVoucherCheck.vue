@@ -5,6 +5,9 @@
       <div class="head-actions">
         <GtVoucherSamplingEngine v-if="!isReadonly && wpId && projectId" :project-id="projectId" :workpaper-id="wpId" :account-code="G11_ACCOUNT_CODE" phase="final" :year="auditYear ?? new Date().getFullYear()" @filled="onSampleFilled" />
         <G11ImportExportDropdown :wp-id="wpId" sheet="G11-5" @imported="onImported" />
+        <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
+          <el-button size="small" :disabled="isReadonly" :loading="importingAttached" title="导入在「账簿查询」右键挂凭到本底稿的序时账凭证" @click="importFromAttached">📎 从序时账挂入导入</el-button>
+        </el-badge>
         <el-button size="small" :disabled="isReadonly" data-testid="g11-export-memo" @click="exportMemo">
           📄 抽样备忘
         </el-button>
@@ -491,6 +494,10 @@ import http from '@/utils/http'
 import { useG11VoucherCheck, type G11VoucherCheckRow } from '../../composables/useG11VoucherCheck'
 import { G11_ACCOUNT_CODE } from '../../composables/g11Constants'
 import {
+  pullSamplesForWorkpaper,
+  listAttachedVouchers,
+} from '../../composables/useAttachedVouchers'
+import {
   G11_VOUCHER_CHECK_DEFS,
   G11_SAMPLING_METHOD_OPTIONS,
   G11_RISK_LEVEL_OPTIONS,
@@ -589,6 +596,34 @@ function onRowChange(row: G11VoucherCheckRow | undefined) {
   if (!row) return
   const idx = vc.rows.value.findIndex(r => r.id === row.id)
   if (idx >= 0) vc.activeRowIndex.value = idx
+}
+
+// ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
+const attachedCount = ref(0)
+const importingAttached = ref(false)
+const G11_ACCOUNT_PREFIXES = [G11_ACCOUNT_CODE]
+const attachedYear = computed(() => props.auditYear ?? new Date().getFullYear())
+
+async function refreshAttachedCount(): Promise<void> {
+  if (!props.projectId || !props.wpId) return
+  try {
+    const recs = await listAttachedVouchers(props.projectId, attachedYear.value, props.wpId, true)
+    attachedCount.value = recs.length
+  } catch { attachedCount.value = 0 }
+}
+void refreshAttachedCount()
+
+async function importFromAttached(): Promise<void> {
+  if (props.isReadonly) return
+  importingAttached.value = true
+  try {
+    const { samples, misattached } = await pullSamplesForWorkpaper(
+      props.projectId, attachedYear.value, props.wpId, G11_ACCOUNT_PREFIXES,
+    )
+    if (samples.length > 0) onSampleFilled({ samples })
+    if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
+    if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
+  } finally { importingAttached.value = false }
 }
 
 function onSampleFilled(payload: { samples: Array<{ summary?: string; amount?: number; voucherDate?: string; voucherNo?: string; counterpartAccount?: string; counterpartAccountName?: string; voucherEntries?: any[]; debitAmount?: any; creditAmount?: any }> }) {

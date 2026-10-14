@@ -32,6 +32,9 @@
     <div class="tab-toolbar">
       <div class="toolbar-left">
         <el-button v-if="!isReadonly" size="small" type="primary" @click="samplingVisible = true">🎲 抽凭引擎</el-button>
+        <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
+          <el-button size="small" :disabled="isReadonly" :loading="importingAttached" title="导入在「账簿查询」右键挂凭到本底稿的序时账凭证" @click="importFromAttached">📎 从序时账挂入导入</el-button>
+        </el-badge>
       </div>
       <div class="toolbar-right">
         <el-dropdown v-if="!isReadonly" size="small" trigger="click">
@@ -341,6 +344,12 @@ import type { SamplingMethodologySnapshot } from '../composables/shared/sampling
  * 避免各处独立硬编码而漂移。本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2
  */
+import {
+  pullSamplesForWorkpaper,
+  listAttachedVouchers,
+} from '../composables/useAttachedVouchers'
+import { dSlotQueryCodes, pickDTbSourceCodes } from '../composables/dCycleAccountScope'
+import { ElMessage } from 'element-plus'
 import { dCycleScope } from '../composables/dCycleAccountScope'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
@@ -411,6 +420,33 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
   persist: (itemId, remark) => props.saveImmediate(itemId, { remark, conclusion: null }),
   isReadonly: computed(() => props.isReadonly),
 })
+
+// ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
+const attachedCount = ref(0)
+const importingAttached = ref(false)
+const D7_ACCOUNT_PREFIXES = dSlotQueryCodes('D7', pickDTbSourceCodes(null))
+
+async function refreshAttachedCount(): Promise<void> {
+  if (!props.projectId || !props.wpId) return
+  try {
+    const recs = await listAttachedVouchers(props.projectId, samplingYear.value, props.wpId, true)
+    attachedCount.value = recs.length
+  } catch { attachedCount.value = 0 }
+}
+void refreshAttachedCount()
+
+async function importFromAttached(): Promise<void> {
+  if (props.isReadonly) return
+  importingAttached.value = true
+  try {
+    const { samples, misattached } = await pullSamplesForWorkpaper(
+      props.projectId, samplingYear.value, props.wpId, D7_ACCOUNT_PREFIXES,
+    )
+    if (samples.length > 0) onSamplesFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
+    if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
+  } finally { importingAttached.value = false }
+}
 
 function onSamplesFilled(payload: any): void {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
