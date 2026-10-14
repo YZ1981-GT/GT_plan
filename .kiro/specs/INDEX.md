@@ -1,7 +1,11 @@
 # 致同审计作业平台 — Spec 开发索引
-> **2026-10-13 新建**：[`consol-note-detail-template-and-mapping`](consol-note-detail-template-and-mapping/tasks.md) — 合并附注明细模板与多企业行映射规则：可复用披露明细模板（版本化+共享引用）+ 来源结构指纹分组 + 批量映射弹窗 + 来源改名自动失效与重新确认 + preview→confirm→apply 三阶段刷新 + 行级穿透。6 Phase / 38 任务（含 1 个 `*` 外部依赖）。ADR-017 勘误：模糊匹配仅作建议，不得作为未确认的权威映射。
+> **2026-10-14 新建 · 深度复盘重构**：[`disclosure-note-doc-upload-and-batch-fill`](disclosure-note-doc-upload-and-batch-fill/tasks.md) — 附注正文导入、批量编制与集团内容模板：①Word/PDF/知识库解析，仅预填报表科目外 narrative 章节；确定性映射+人工确认，禁模糊自动匹配 ②服务端保存 narrative+account_explanation 全套正文为不可变个人/集团模板版本 ③按推荐/需复核/不可用三组选择章节，替换/追加并排预览、目标变量替换和风险提示 ④preview→apply 行锁/hash/CAS/幂等原子写入，固定版本与审计溯源。已否决复用存在异步快照、集团可见性、直接 ID 鉴权和覆盖式版本缺陷的 shared_config 权威链。10 Phase / 56 任务，迁移 V187/R187。
+> **2026-10-14 ✅ 归档**：[`voucher-attach-account-mapping-closure`](_archive/46-voucher-attach-account-mapping-closure/tasks.md) — 凭证挂附科目映射闭环：全循环（D~N）provide/inject 管道 + AccountScope 三层降级（gross_raw → gross_standard → 兜底码）+ F2 存货族/合同履约成本/F5 营业成本补齐 + 口径一致性守卫（19 tests）+ 映射码优先级守卫（205 tests）。23/23 + 29 个遗留组件补齐。真实 PG 实证：和平药房标准码 0 条 vs 映射码 6735 条。
 
-> **2026-10-13 新建**：[`multi-window-ledger-workbench`](multi-window-ledger-workbench/tasks.md) — 多窗口查账工作台：独立查账窗口常驻 + 查账现场 URL 完整恢复 + 跨窗口认证同步（BroadcastChannel + Web Locks 单飞刷新）+ 窗口实例级编辑锁（同底稿第二窗只读门禁）。4 Phase / 24 任务。
+
+> **2026-10-13 新建 · 2026-10-14 ✅ 归档**：[`consol-note-detail-template-and-mapping`](_archive/48-consol-note-detail-template-and-mapping/tasks.md) — 合并附注明细模板与多企业行映射规则：可复用披露明细模板（版本化+共享引用）+ 来源结构指纹分组 + 批量映射弹窗 + 来源改名自动失效与重新确认 + preview→confirm→apply 三阶段刷新 + 行级穿透。6 Phase / 38 任务（含 1 个 `*` 外部依赖）。ADR-017 勘误：模糊匹配仅作建议，不得作为未确认的权威映射。
+
+> **2026-10-13 新建 · 2026-10-14 ✅ 归档**：[`multi-window-ledger-workbench`](_archive/47-multi-window-ledger-workbench/tasks.md) — 多窗口查账工作台：独立查账窗口常驻 + 查账现场 URL 完整恢复 + 跨窗口认证同步（BroadcastChannel + Web Locks 单飞刷新）+ 窗口实例级编辑锁（同底稿第二窗只读门禁）。4 Phase / 24 任务。
 
 > **2026-10-11 新建**：[`workpaper-sync-switch-performance`](workpaper-sync-switch-performance/tasks.md) — 底稿 HTML↔在线编辑切换提速（平台级）：P0 分阶段计时 / P1 骨架无关业务身份复用（消除 OO 保存后再进 OO 的摘要抖动）/ P5+P2 服务端直取投影 + store 指纹直通（宿主零改动）/ P4 去重复提取 / P3 OO 保存后先回表单后台合并；不砍任何校验。进度以本 spec 清单与实测证据为准
 
@@ -48,7 +52,7 @@
 > 🔴 **自查纠正：我发明了一条不存在的基准**。前端守卫首版断言「dedicated 列表与 legacy 禁入名单**不得有交集**」—— 实际 `D4-5` 刻意同时在两处（`d4Constants.ts` 注释明说它是「历史冗余项，已接子组件桥 `d45-managed`，故实际不可能命中 legacy 分支」）。发明一条不存在的基准会把**有意设计判成缺陷**。⇒ 收窄为只断言 D4-4 的迁移完成，D4-5 走**带反向断言的显式豁免**（不只写理由文本 —— 那是加一行就变绿的后门 ——而是断言它声称的条件真的成立：`D4TabPolicyCheck.vue` 确实 `useD4SyncMode` + `d45-managed`）。
 > 🔴 **同一条铁律的正反两向在一天内都踩到**（「判断代码是否真做了 X 一律用 AST，禁文本匹配」）：**反向**是此前 docstring 写「权限：`require_project_access`」冒充真实现⇒ 漏报；**正向**是本轮我在 provider docstring 里写了禁令**反例**「写 `assert rowId.startswith('d4a-')` 之类断言会…被拒」，而首版探针用文本匹配查「有无 rowId 格式断言」⇒ 把这段**说明文字**当成真断言 ⇒ 假阳。⇒ 改用 AST（只看 `Call` 节点；docstring 是 `Expr(Constant)`、`#` 注释不进 AST）+ 变异反证（对真实 `rid.startswith('d4a-')` 必须命中，证明判据非恒绿）。另一处同型：前端守卫的 `stripComments` 自检首版用单字母样本 `c`，而保留内容 `code` 里就含 `c` ⇒ 断言自撞打红 —— **判据本身写错了**，不是被测对象有问题。
 >
-**统计**：Active **0**（2026-10-10 归档后现扫）/ Archived **629**（+3：note-template-full-alignment-with-word-authority / note-sub-table-formula-and-cross-check / consol-comprehensive-runtime-defect-closure → `_archive/40-consol-note-defect-closure-and-template-alignment/`）
+**统计**：Active **4**（2026-10-14 归档后）/ Archived **632**（+3：voucher-attach-account-mapping-closure / multi-window-ledger-workbench / consol-note-detail-template-and-mapping → _archive/46~48）
 
 > ⏱ **2026-09-28 第十六次现扫（新建 B 线 spec）**：Active **65 → 66**（+1 = 本轮新建 `workpaper-sync-row-deletion-multi-region-propagation`）。现扫目录 **69**、无 tasks.md **3** 个、Archived **589**、任务总量 **953 / 1752**（`[ ]*` 阻塞 **150**）。🔴 **同时更正下一条（A 线那次现扫）的口径**：它记「无 tasks.md 3 → 4」，而本轮现扫得 **3** —— 差额是它自己的 tasks.md 在那条记号写下之后才落地；现扫三个无 tasks.md 目录为 `procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening` / `workpaper-page-formula-toolbar-closure`。记号从「第十五次」改为「第十六次」是因为并发会话已占用前者。
 > 🔴 **本轮最重教训 —— 同一个扫描器在错的 population 上会给出完全相反的结论**：数「同 sheet 多受管区」在 `backend/wp_templates/` 上得 **0**（351 份模板 / 2722 个 worksheet / 解析失败 0），在 `backend/storage/` 的 931 份已 instrumentation artifact 上得 **18 组**。根因是 GT_* 受管 Excel Table 由 `excel_instrumentation` 在运行期写入，模板里本就没有。若照模板口径下结论会写成「平台没有同 sheet 多受管区」⇒ 整条兄弟收缩判据被判为不必要。⇒ 「结构性零须配变异证明」这条铁律的触发点不只是解析失败，**扫错 population 是第二种**。
