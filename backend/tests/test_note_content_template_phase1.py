@@ -139,18 +139,49 @@ class TestCanViewTemplate:
 # ── router registration ──────────────────────────────────────────────────────
 
 
+def _resolve(app, method: str, path: str):
+    """按 Starlette 分发规则（路由表顺序、首个 FULL 匹配）求实际处理函数。"""
+    from starlette.routing import Match
+
+    scope = {"type": "http", "method": method, "path": path, "root_path": "", "query_string": b"", "headers": []}
+    for route in app.router.routes:
+        match, _child = route.matches(scope)
+        if match == Match.FULL:
+            return getattr(route, "endpoint", route)
+    return None
+
+
+def _concrete(path: str) -> str:
+    import re
+
+    return re.sub(r"\{[^}]+\}", lambda _m: str(uuid.uuid4()), path)
+
+
 class TestRouterRegistration:
-    def test_note_content_templates_importable(self):
-        from app.routers.note_content_templates import router
-        assert any("note-content-templates" in r.path for r in router.routes)
+    """Task 8 / NFR-9：首版只对 ``register_report_routers`` 源码做文本匹配（铁律 ㉖）；
+    改为在完整应用的路由表上按真实分发规则解析，未注册或被前序 catch-all 吞掉都会打红。"""
 
-    def test_note_text_batch_importable(self):
-        from app.routers.note_text_batch import router
-        assert any("disclosure-note-text-sections" in r.path for r in router.routes)
+    @pytest.mark.parametrize("module", ["note_text_batch", "note_content_templates"])
+    def test_every_endpoint_dispatches_to_its_handler_in_full_app(self, module):
+        import importlib
 
-    def test_registry_includes_both(self):
-        import inspect
-        from app.router_registry.report import register_report_routers
-        src = inspect.getsource(register_report_routers)
-        assert "note_content_templates" in src
-        assert "note_text_batch" in src
+        from app.main import app
+
+        sub = importlib.import_module(f"app.routers.{module}").router
+        assert sub.routes, module
+        for route in sub.routes:
+            for method in route.methods - {"HEAD", "OPTIONS"}:
+                path = _concrete(route.path)
+                assert _resolve(app, method, path) is route.endpoint, f"{method} {route.path} 未命中 {module}"
+
+    def test_resolver_detects_catch_all_shadowing(self):
+        """守卫自检：同一路径若被先注册的 catch-all 抢走，解析结果不再是本模块 handler。"""
+        from fastapi import FastAPI
+
+        from app.routers.note_text_batch import list_text_sections, router
+
+        shadowed = FastAPI()
+        shadowed.add_api_route("/api/projects/{project_id}/{rest:path}", lambda project_id, rest: None)
+        shadowed.include_router(router)
+        path = _concrete("/api/projects/{project_id}/disclosure-note-text-sections")
+        assert _resolve(shadowed, "GET", path) is not list_text_sections

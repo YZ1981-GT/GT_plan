@@ -77,7 +77,7 @@
   - 验收：扫描件、纯文本降级、加密 PDF 三类结果可区分，不把空结果报成功。（AC-1.5）
 - [x] 19. 实现 Markdown/HTML/纯文本章节解析器，供知识库来源复用；保留知识库文档 ID/版本元数据。
   - 验收：Markdown heading、HTML h1~h5、中文精确标题及无标题单段降级均有用例。（AC-5.4）
-- [~] 20. 实现 parse-upload / parse-knowledge 端点：流式有界读取、文件签名校验；知识库必须经 `KnowledgeIndexService.load_documents` 判权。
+- [x] 20. 实现 parse-upload / parse-knowledge 端点：流式有界读取、文件签名校验；知识库必须经 `KnowledgeIndexService.load_documents` 判权。
   - 验收：docx/pdf 正常；伪扩展、超限、无权 doc、空正文按错误码返回且不泄露元数据。（AC-1.1, AC-5.1~5.3）
 
 ### Phase 3 实施与复盘记录（2026-10-14）
@@ -91,7 +91,7 @@
 
 ## Phase 4：章节读取、映射与服务端 Preview
 
-- [~] 21. 实现项目章节读取 service/端点：`scope=narrative|all`、`include_content` 内部控制、层级/类型/内容 hash/updated_at 返回；默认列表不下发整包正文。
+- [x] 21. 实现项目章节读取 service/端点：`scope=narrative|all`、`include_content` 内部控制、层级/类型/内容 hash/updated_at 返回；默认列表不下发整包正文。
   - 验收：narrative 不含账户解释/容器；all 覆盖三类；软删除/口径不适用章节排除。（AC-2.3, NFR-8）
 - [x] 22. 实现统一 matcher：同变体规范码、variant matrix、显式 alias/禁止对、层级+标题精确候选；移除关键词/编辑距离/SequenceMatcher 权威路径。
   - 验收：每条结果带 match_kind/evidence/confidence；禁止对和一对多冲突转 manual_required。（AC-3.1~3.4）
@@ -99,7 +99,7 @@
   - 验收：重复目标、跨项目 note_id、账户解释误入上传 narrative、禁止对强选均被拒绝。（AC-3.4~3.5）
 - [x] 24. 实现 `NoteTextBatchService.preview`：消毒、匹配、变量计划、风险分类、before/proposed hash、统计和 canonical `preview_digest`。
   - 验收：推荐/需复核/不可用分类及新增/替换/追加计数与逐章事实闭合。（AC-4.1, AC-9.1~9.6）
-- [~] 25. 实现 preview API schema 与三种 source adapter（upload/knowledge/template_version）；模板详情在服务端复核可见性和固定 hash。
+- [x] 25. 实现 preview API schema 与三种 source adapter（upload/knowledge/template_version）；模板详情在服务端复核可见性和固定 hash。
   - 验收：浏览器不能伪造模板正文或来源 metadata；不可见版本返回 404。（AC-8.1~8.3）
 
 ### Phase 4 实施与复盘记录（2026-10-14）
@@ -110,7 +110,7 @@
 - Task 25/26：preview API schema 已在 Phase 1 的 Pydantic schemas 中定义（`BatchPreviewRequest/Response`），三种 source adapter 待端点集成时接入。Task 26 端点级测试待 Phase 5 apply 完成后统一做。
 - 复盘修正：首版 `test_title_exact_candidate` 测试设计有误——`alias_match` 对完全相同标题返回 True（步骤 2 精确相等），所以同标题永远走 alias/exact 路径而非 title_exact。修正为验证 alias 路径正确输出 confirmed。教训：**匹配器测试必须理解每一步的优先级覆盖关系**，不能只凭"来源≠目标 note_section"就期望降级。
 - 验证：`test_note_text_batch_service.py` 13 passed, 0 failed。
-- [~] 26. 增加 preview 端点级测试和双向变异：无权限、超限、低置信、风险变量、HTML 攻击、模板类型/口径不一致。
+- [x] 26. 增加 preview 端点级测试和双向变异：无权限、超限、低置信、风险变量、HTML 攻击、模板类型/口径不一致。
   - 验收：测试同时证明合法 preview 真绿、每种违规形态真红，不能因空结果早退。（AC-8.5, NFR-4~7）
 
 ## Phase 5：原子 Batch Apply、事件与溯源
@@ -127,7 +127,7 @@
   - 验收：审计记录与实际变更章节逐项闭合，正文不含审计元数据。（AC-11.1, AC-11.3, AC-11.5）
 - [x] 32. 扩展 `DisclosureMutationCoordinator` 支持事件列表，commit 后为每个变更章节发布 NOTE_SECTION_SAVED；事件失败只进回执 warning。
   - 验收：N 章成功产生 N 个等价失效通知；只发第一章/无 section 的变异会打红。（AC-11.4）
-- [~] 33. 实现 apply 端点幂等与冲突回执：同 mutation 同载荷复放、不同载荷冲突、stale preview 返回逐章冲突但零写入。
+- [x] 33. 实现 apply 端点幂等与冲突回执：同 mutation 同载荷复放、不同载荷冲突、stale preview 返回逐章冲突但零写入。
   - 验收：并发双请求、网络重试、模板新版本发布三类场景结果确定。（AC-4.3~4.4, AC-8.3~8.4）
 
 ### Phase 5 实施与复盘记录（2026-10-14）
@@ -333,3 +333,14 @@ R-14 → R-05/R-11/R-10（Phase 2 纯函数）→ R-07/R-08/R-16（Phase 4）→
   - 其余正文写入方评估（本组不改，登记）：①底稿叙述推送（`wp_disclosure_sync_service`）不看 `is_local_override`。上传/知识库路径只写叙述章节；推送注册表 80 条目标为科目章（五/八）外加 7 条上市「三、xxx」截断码（真库 0 行命中）⇒ 两者无交集。内容模板路径可写科目解释章节（AC-9.2 的需复核项），之后底稿保存推送叙述会以底稿为准；是否让底稿推送尊重本地改写涉及联动设计，**待用户拍板**。②集团基线下发、继承上年附注是显式用户操作，不属 AC-4.6 所说的静默覆盖。③顺带发现：`note_prior_year_import_service.inherit_from_prior_year` 读 `DisclosureNote.section_code`（模型无此列）⇒ 本年已有附注时必 AttributeError（`note_advanced` 路由在用）。非本 spec 引入，登记待修。
   - 证据：phase5 测试 24 例（真 SQLite + 真 ORM）；本 spec 12 个测试文件 + 集团基线/生成/RAG/转换/裁剪/reflow 回归共 507 passed。17 个变异全部打红，且红的形态与预期一致（写浏览器正文 / 去 stale / 去 digest / 不校验映射 / 首条事件失败即中断 / 只发第一章 / 事件无 section_code / lineage 原地改写 / dict 被丢 / list 被丢 / 读不到 dict 基线 / 受影响子企业只看一条 / 重新生成覆盖 / digest 绑现状×2 / service 自行 commit / AI 批填不排除），文件逐字节恢复。两条既有红守卫状态不变（见「非本 spec 引入」）。
   - 标记：Task 28 / 30 / 32 → `[x]`。Task 33（端点幂等、并发双请求、PG 行锁）随第 4 组端点落地；FOR UPDATE 在 SQLite 下不生效，行锁语义尚未实测。
+
+- ✅ **第 4 组 R-01 / R-18**（parse / preview / apply 端点 + 端点级测试）
+  - 端点：`note_text_batch.py` 补齐 GET sections（readonly）与 POST parse-upload / parse-knowledge / preview / apply（edit）。写入口门禁与附注其余写端点同序：项目 edit（含归档 423）→ `note:edit` → 合并锁 423。router 只做鉴权、线程池与错误映射，来源裁定集中在新模块 `note_text_batch_flow.py`。
+  - 来源可信度：上传正文由客户端回传（双栏可二次编辑），服务端重新消毒并限额（单章 512KB / 整批 5MB → 413），由 preview_digest 绑定。文件元数据（名称 / hash / 字节数 / 格式）在 parse-upload 时用服务端派生键做 HMAC 签名，绑定项目与解析人；preview / apply 验签，审计记录只存验签后的值。知识库每次 preview / apply 都经 `load_documents` 重新逐篇判权，文档集合不一致 → 404，章节挂在未声明文档上 → 422。内容模板只读不可变版本，先判可见性（不可见 404），再核固定 content_hash（不一致 409）。客户端回传的章节 metadata 只留 `doc_id`：`section_kind` / `note_section` 会影响章类型门控与按编号匹配，不能由浏览器提供。
+  - parse-upload：先有界读取（上限 + 1 字节），再校验扩展名、MIME、文件签名，解析放线程池。扫描件 PDF → `PDF_NEEDS_OCR`，空文档 → `NO_PARSEABLE_TEXT`，都返回中文原因（AC-1.5）。
+  - apply：`X-Mutation-Id` 必填。流程：重建来源 → 锁目标 → 重算 preview → `apply_batch` → coordinator 一次 commit → 逐章事件。apply 必须带上与 preview 相同的 `manual_mappings` / `revoked_replacement_ids`，否则重算结果对不上 digest。`selections[].proposed_html` 改为可选且不使用。design §6.1 / §6.3 已同步契约。
+  - 顺带修复：①知识库多篇文档拼接时，章节层级栈 / 子标题并入会跨文档（下一篇开头并进上一篇末节，上一篇的「项目注释」章会把下一篇叙述章节门控掉），现按 `doc_id` 切断；②多篇文档的解析 ID 都从 s1 起编会撞，现加文档命名空间。
+  - 🔴 Task 8 假绿更正：原「注册表 smoke test」只对 `register_report_routers` 源码做文本匹配（铁律 ㉖），从未验证分发。改为在完整应用路由表上按 Starlette 真实分发规则（首个 FULL 匹配）解析两个 router 的每个端点，并加一个守卫自检（前序 catch-all 抢路由时必须判为未命中）。
+  - 测试：`test_note_text_batch_endpoints.py` 43 例，用 TestClient 真发请求；只覆盖 `get_db` / `get_current_user`，鉴权依赖链真实执行。覆盖：只读 / 越权 / 合并锁 / 归档门禁；扩展名 / MIME / 签名 / 超限；扫描件与空文档；知识库判权且不泄露；模板可见性与固定 hash；HTML 攻击；伪造或跨用户复用元数据；跨项目手工映射；候选不默认勾选；科目解释章节只进需复核；跨标准标记；幂等复放与载荷冲突；预览后目标或来源变化 → 409 零写入；两个 mutation 先到者胜；预览后发布新模板版本仍按固定版本写入。另 `test_note_text_batch_apply_lock_pg.py` 是真 PostgreSQL 行锁守卫（scratch schema + 反向对照）：A 持锁时 B 必须阻塞，拿到锁后读到 A 已提交的正文。SQLite 忽略 FOR UPDATE，此前行锁从未实测。
+  - 证据：35 个变异全部打红，且红的形态是「被放行」（200 响应体或断言消息），不是被别的校验顺带拦下。首轮变异有 8 个形态不对：3 个其实被别的校验顺带拦下（apply 门禁降级被上传签名拦成 422、知识库判权被章节归属拦下、preview 门禁被模板可见性拦成 404）；5 个的「已放行」被 `KeyError: 'detail'` 掩盖。已改为门禁用例换成不绑定解析人的知识库来源，判权拆成两个独立用例，所有错误断言先断状态码并打印响应体。例外：「缺 mutation id 放行」红在 DB NOT NULL 约束上，即没有此校验就是 500。回归：本 spec 14 个后端测试文件 + 路由拆分 + 已提交模块守卫共 263 passed（含真 PG）。两条既有红守卫状态不变。
+  - 🔴 前端契约尚未对齐（第 6 组处理）：上传须原样回传 parse 响应（含签名 `source_metadata`）；知识库须带 `knowledge_doc_ids`；模板须带 `template_version_id + template_content_hash` 且不带正文；apply 须回传 preview 的手工映射与撤销项。现 `useNoteTextBatch.ts` 三处都不符，端到端仍不可用（此前是 404，不是本组引入的回退）。

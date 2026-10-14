@@ -192,6 +192,8 @@ class BatchPreviewRequest(StrictSchema):
     year: int = Field(ge=2000, le=2200)
     source: BatchSource
     manual_mappings: list[ManualMapping] = Field(default_factory=list, max_length=500)
+    #: 用户撤销的变量替换（ID 按来源章节确定性生成）；apply 必须原样回传，否则重算的拟写入内容对不上
+    revoked_replacement_ids: list[str] = Field(default_factory=list, max_length=500)
 
 
 class BatchPreviewItem(StrictSchema):
@@ -228,15 +230,19 @@ class BatchApplySelection(StrictSchema):
     expected_updated_at: datetime | None = None
     before_hash: str = Field(min_length=64, max_length=64)
     proposed_hash: str = Field(min_length=64, max_length=64)
-    proposed_html: str = Field(max_length=524_288)
-    revoked_replacement_ids: list[str] = Field(default_factory=list, max_length=50)
+    #: 兼容旧客户端；服务端**不使用**（R-09：只写服务端重算的预览结果）
+    proposed_html: str | None = Field(default=None, max_length=524_288)
 
 
 class BatchApplyRequest(StrictSchema):
+    """apply 须携带与 preview 相同的来源 / 手工映射 / 撤销项：服务端据此重算并校验 digest。"""
+
     year: int = Field(ge=2000, le=2200)
     source: BatchSource
     preview_digest: str = Field(min_length=64, max_length=64)
     selections: list[BatchApplySelection] = Field(min_length=1, max_length=500)
+    manual_mappings: list[ManualMapping] = Field(default_factory=list, max_length=500)
+    revoked_replacement_ids: list[str] = Field(default_factory=list, max_length=500)
 
     @model_validator(mode="after")
     def unique_targets(self) -> "BatchApplyRequest":

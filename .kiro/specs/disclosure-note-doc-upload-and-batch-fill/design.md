@@ -200,8 +200,9 @@ PyMuPDF `page.get_text("dict")` 遍历 block→line→span：
 
 - `GET /api/projects/{project_id}/disclosure-note-text-sections?year=&scope=narrative|all&include_content=false`
   - readonly 权限；列表默认不返回正文；`include_content=true` 仅内部模板快照 service 使用，不向普通列表开放整包下载。
-- `POST /api/projects/{project_id}/disclosure-note-import/parse-upload?year=`
-  - multipart；edit 权限；有界读取并返回 ParsedSource。
+- `POST /api/projects/{project_id}/disclosure-note-import/parse-upload`
+  - multipart；edit 权限；有界读取，扩展名 + MIME + 文件签名三重校验后返回 ParsedSource；
+  - `source_metadata`（文件名/hash/字节数/格式）带服务端 HMAC 签名，绑定项目与解析人；preview/apply 验签，审计记录只用验签后的值。
 - `POST /api/projects/{project_id}/disclosure-note-import/parse-knowledge`
   - JSON `{year, doc_ids}`；edit 权限 + 每篇知识库判权。
 
@@ -225,11 +226,11 @@ PyMuPDF `page.get_text("dict")` 遍历 block→line→span：
 ### 6.3 统一预览与应用
 
 - `POST /api/projects/{project_id}/disclosure-note-text-batch/preview`
-  - source 为 upload parse result / knowledge parse result / template_version_id；
+  - body `{year, source, manual_mappings[], revoked_replacement_ids[]}`；source 为 upload parse result（原样回传 parse-upload 响应）/ knowledge parse result + `knowledge_doc_ids`（每次重新判权）/ `template_version_id + template_content_hash`（复核可见性与固定 hash）；客户端章节 metadata 只保留 `doc_id`；
   - 输出分类、映射证据、消毒后内容、变量替换、风险、目标 before_hash/updated_at、统计和 `preview_digest`。
 - `POST /api/projects/{project_id}/disclosure-note-text-batch/apply`
-  - body `{year, source, preview_digest, selections[]}`；header `X-Mutation-Id`；
-  - 服务端重新鉴权、重新消毒、锁行、重算 digest/hash 后一次 commit。
+  - body `{year, source, preview_digest, selections[], manual_mappings[], revoked_replacement_ids[]}`（后两项须与 preview 一致，否则重算结果对不上 digest）；header `X-Mutation-Id` 必填；
+  - 服务端重新鉴权、重新判权/验签来源、锁行后重算 preview，比对 digest 与逐章 hash 后一次 commit；`selections[].proposed_html` 不使用（只写服务端重算结果）。
 
 所有 service 只 flush。router 使用扩展后的 `DisclosureMutationCoordinator`：`event_factory` 支持返回事件列表，commit 后为每个变更章节发布 `NOTE_SECTION_SAVED`，并在任一事件失败时返回 warning 但不回滚已提交数据。
 

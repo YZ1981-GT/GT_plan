@@ -243,12 +243,22 @@ def _source_chapters(sources: list[ParsedSection]) -> dict[str, str | None]:
     """每个来源章节所在的顶层章标题（祖先链顶端）；顶层来源无祖先 ⇒ None。"""
     out: dict[str, str | None] = {}
     stack: list[ParsedSection] = []
+    doc = _NO_DOC
     for src in sources:
+        if _doc_of(src) != doc:  # 知识库多篇文档拼接：层级栈不得跨文档
+            stack, doc = [], _doc_of(src)
         while stack and stack[-1].level >= src.level:
             stack.pop()
         out[src.source_id] = stack[0].title if stack else None
         stack.append(src)
     return out
+
+
+_NO_DOC = object()
+
+
+def _doc_of(src: ParsedSection) -> Any:
+    return (src.metadata or {}).get("doc_id")
 
 
 def _source_is_account(src: ParsedSection, chapter: str | None) -> bool | None:
@@ -395,7 +405,10 @@ def fold_unmatched_descendants(
     html: dict[str, str] = {s.source_id: s.html for s in sources}
     folded: dict[str, str] = {}
     stack: list[tuple[int, str | None]] = []  # (level, 内容归属的来源 ID)
+    doc = _NO_DOC
     for src in sources:
+        if _doc_of(src) != doc:  # 不把下一篇文档的开头并进上一篇的末节
+            stack, doc = [], _doc_of(src)
         while stack and stack[-1][0] >= src.level:
             stack.pop()
         match = by_id.get(src.source_id)
@@ -450,7 +463,7 @@ def build_preview(
     """预览：消毒 → 确定性变量替换（可撤销）→ 再消毒 → 追加结果预演 → 质量/风险分级 → digest。
 
     ``targets`` 必须带 ``text_content``（``load_target_sections(include_content=True)``）。
-    digest 绑定：来源身份 + 逐章 (source_id, target_note_id, before_hash, proposed_hash)。
+    digest 绑定：来源身份 + 逐章 (source_id, target_note_id, proposed_hash)；目标现状由 apply 逐章复核。
     """
     ctx = source_context or SourceContext()
     revoked = set(revoked_replacement_ids or ())
