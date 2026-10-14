@@ -35,7 +35,9 @@ export function useNotePersist(options: UseNotePersistOptions): UseNotePersistRe
     if (!currentNote.value) return
     await withLoading(saveLoading, async () => {
       const body: Record<string, any> = {}
-      if (currentNote.value!.content_type === 'text' || currentNote.value!.content_type === 'mixed') {
+      // 富文本内容：text / mixed 类型始终发送；table 类型在有文字内容时也发送
+      if (currentNote.value!.content_type === 'text' || currentNote.value!.content_type === 'mixed'
+        || (currentNote.value!.content_type === 'table' && textContent.value)) {
         body.text_content = textContent.value
       }
       if (currentNote.value!.content_type === 'table' || currentNote.value!.content_type === 'mixed') {
@@ -49,6 +51,10 @@ export function useNotePersist(options: UseNotePersistOptions): UseNotePersistRe
       }
       await updateDisclosureNote(currentNote.value!.id, body)
       ElMessage.success('保存成功')
+      // 回写最新内容到 currentNote 对象，确保缓存中的快照是最新值
+      if (body.text_content !== undefined) {
+        currentNote.value!.text_content = body.text_content
+      }
       editMode.value = false
       clearEditDirty()
       autoSaveClearDirty()

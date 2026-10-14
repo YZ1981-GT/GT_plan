@@ -462,10 +462,9 @@
               </el-tag>
               <!-- 编辑操作按钮（置于标题行，随时可见，无需滚动到底部） -->
               <el-button v-if="!editMode" size="small" @click="enterNoteEdit()" :disabled="!effectiveCanEdit" :title="!effectiveCanEdit ? '无法编辑（项目已归档或他人正在编辑）' : ''">编辑</el-button>
-              <template v-else>
-                <el-button size="small" @click="exitNoteEdit(true)">取消</el-button>
-                <el-button size="small" type="primary" @click="onSave" :loading="saveLoading" :disabled="!effectiveCanEdit" :title="!effectiveCanEdit ? '无法编辑（项目已归档或他人正在编辑）' : ''">保存</el-button>
-              </template>
+              <el-button v-if="editMode" size="small" @click="exitNoteEdit(true)">取消</el-button>
+              <!-- 保存按钮始终可见：富文本编辑后无需先进编辑模式即可保存 -->
+              <el-button size="small" type="primary" @click="onSave" :loading="saveLoading" :disabled="!effectiveCanEdit" :title="!effectiveCanEdit ? '无法编辑（项目已归档或他人正在编辑）' : ''">💾 保存</el-button>
             </div>
           </div>
 
@@ -2926,7 +2925,7 @@ watch(justSaved, (saved) => {
 
 /** 快捷键保存：保存当前附注 */
 function onShortcutSave() {
-  if (currentNote.value && editMode.value) {
+  if (currentNote.value) {
     onSave()
   }
 }

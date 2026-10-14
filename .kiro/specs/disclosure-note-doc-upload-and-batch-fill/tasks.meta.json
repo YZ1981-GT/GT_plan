@@ -1,0 +1,412 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. 编写一次性探针，统计真实 PG 中每项目章节数、narrative/account/container 分布、单章/整套 text_content UTF-8 字节 p50/p95/max、占位/stale/draft 比例；据实冻结业务阈值并删除探针产物。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969198445
+      },
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969246085
+      },
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791970014128
+      }
+    ],
+    "2. 为 `useNotePersist` 建立当前保存基线：text/mixed/table 三类型均可写正文，table 型可写空串清空；保存后 `currentNote.text_content` 与缓存一致。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969198532
+      },
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791970020122
+      }
+    ],
+    "3. 冻结现有 `note_section_matcher` 显式 alias/禁止对和 `note_template_variant_matrix` 四变体基线，证明模糊阈值不能安全代替显式映射。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969198608
+      }
+    ],
+    "4. 新增 `V187__note_content_templates_and_batch_apply.sql` 与 `R187__rollback_note_content_templates_and_batch_apply.sql`，创建模板目录、不可变版本、批量应用审计三表及外键/CHECK/partial unique/索引。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969198668
+      }
+    ],
+    "5. 新建 `note_content_template_models.py`，用 `Mapped[]` 映射三表；新增严格 Pydantic Enum/Literal schema，禁止自由 owner/source/mode/section_kind。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969198708
+      }
+    ],
+    "6. 实现 canonical group root resolver：沿 `parent_project_id` 到根、检测循环/缺失；personal/group owner 由服务端决定，客户端不可提交 owner ID。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969198759
+      }
+    ],
+    "7. 实现内容模板授权策略 `can_view/manage_template`，统一供 list/detail/versions/delete/preview/apply 使用；不可见返回 404。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969198836
+      }
+    ],
+    "8. 新建 `note_content_templates.py` 与 `note_text_batch.py` router 并登记 `router_registry/report.py`；路径使用 `/api/projects/{project_id}/...` 避开 disclosure GET catch-all。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969198876
+      }
+    ],
+    "9. 扩展 `note_section_catalog.py`，按模板目录 + variant matrix 返回 `section_kind/section_id/parent/level/sort`；新增 narrative/all scope 查询。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969198923
+      }
+    ],
+    "10. 修复 `DisclosureEngine._load_templates/generate_notes` 对 `section_id/level/parent_section_id/sort_index` 的透传与落库，新增数据回填策略但不宣称 section_id 跨模板稳定。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969198963
+      }
+    ],
+    "11. 新建 `note_html_sanitizer.py`，实现 canonical 富文本白名单和属性值校验；未知标签/属性重新转义，禁止危险 URL/事件/style。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199027
+      }
+    ],
+    "12. 将上传、知识库、模板 preview/apply 统一接入后端 sanitizer；前端 `useSanitize.ts` 与后端标签/属性集合建立一致性测试。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199096
+      }
+    ],
+    "13. 复用 `note_text_paragraph_vars` 实现目标项目变量解析和确定性替换计划，记录每项原值/目标值/可撤销标识。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199142
+      }
+    ],
+    "14. 实现章节质量扫描：empty/placeholder/draft/stale/source_entity/date/amount/entity_specific/account_explanation 标志及整套 quality_summary。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199183
+      }
+    ],
+    "15. 新建 `note_document_parser.py` 的 DOCX 保序遍历：按 XML body 混排处理段落/表格，识别 Heading/GTNoteHeading/outlineLvl，保留列表层级和基础富文本。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199225
+      }
+    ],
+    "16. 为 DOCX 增加字号+加粗低置信兜底、zip entry/解压字节/单 entry 限制和加密/损坏错误分类。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199279
+      }
+    ],
+    "17. 实现 PyMuPDF PDF 解析：block/line/span 顺序、字号/粗体/间距标题证据、页间段落和置信度。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199347
+      }
+    ],
+    "18. 增加 pypdf/MarkItDown 纯文本降级与扫描件检测；无 text span 返回 `PDF_NEEDS_OCR`，本弹窗不启动 OCR。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199396
+      }
+    ],
+    "19. 实现 Markdown/HTML/纯文本章节解析器，供知识库来源复用；保留知识库文档 ID/版本元数据。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199451
+      }
+    ],
+    "20. 实现 parse-upload / parse-knowledge 端点：流式有界读取、文件签名校验；知识库必须经 `KnowledgeIndexService.load_documents` 判权。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199496
+      }
+    ],
+    "21. 实现项目章节读取 service/端点：`scope=narrative|all`、`include_content` 内部控制、层级/类型/内容 hash/updated_at 返回；默认列表不下发整包正文。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199549
+      }
+    ],
+    "22. 实现统一 matcher：同变体规范码、variant matrix、显式 alias/禁止对、层级+标题精确候选；移除关键词/编辑距离/SequenceMatcher 权威路径。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199619
+      }
+    ],
+    "23. 实现手工映射校验：source/target 一对一、目标归属、目标 scope、不可用项禁选；人工确认进入 preview 输入。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199681
+      }
+    ],
+    "24. 实现 `NoteTextBatchService.preview`：消毒、匹配、变量计划、风险分类、before/proposed hash、统计和 canonical `preview_digest`。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199731
+      }
+    ],
+    "25. 实现 preview API schema 与三种 source adapter（upload/knowledge/template_version）；模板详情在服务端复核可见性和固定 hash。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199780
+      }
+    ],
+    "26. 增加 preview 端点级测试和双向变异：无权限、超限、低置信、风险变量、HTML 攻击、模板类型/口径不一致。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199831
+      }
+    ],
+    "27. 定义 apply selection schema：target_note_id、mode、expected_updated_at/before_hash、proposed_hash、变量撤销选择；请求必须带 preview_digest 和 X-Mutation-Id。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199897
+      }
+    ],
+    "28. 实现原子 apply：按稳定 UUID 顺序 `SELECT ... FOR UPDATE` 全部目标，复核 project/year/hash/digest，任一冲突整体回滚。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199944
+      }
+    ],
+    "29. 实现 replace/append：追加只拼业务正文并做完全相同段落去重，不写可见来源标记；全部结果再消毒并核对 hash。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969199994
+      }
+    ],
+    "30. apply 对每章设置 `status=draft/is_local_override=true`；内容模板来源追加 `template_lineage`，不得覆盖既有集团基线 lineage。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969200048
+      }
+    ],
+    "31. 同事务写 `note_text_batch_applications`，保存固定版本/知识库版本/文件 hash、映射、模式、变量、前后 hash和操作者；失败批次不留 succeeded 记录。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969200098
+      }
+    ],
+    "32. 扩展 `DisclosureMutationCoordinator` 支持事件列表，commit 后为每个变更章节发布 NOTE_SECTION_SAVED；事件失败只进回执 warning。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969200162
+      }
+    ],
+    "33. 实现 apply 端点幂等与冲突回执：同 mutation 同载荷复放、不同载荷冲突、stale preview 返回逐章冲突但零写入。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969200228
+      }
+    ],
+    "34. 新建专用 API types/client 和 `useNoteTextBatch.ts`，管理来源、映射、draft hash、preview/apply、mutation ID、冲突与进度。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969200275
+      }
+    ],
+    "35. 新建 `NoteDocUploadDialog.vue`：90%×80vh 可拖双栏、搜索/筛选、父章节分组、折叠懒挂载编辑器、未保存关闭确认。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969200325
+      }
+    ],
+    "36. 接入 Word/PDF 上传和解析结果：左侧展示层级/置信/警告，`v-html` 统一二次消毒；低置信不自动预填。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969200369
+      }
+    ],
+    "37. 接入 `KnowledgePickerDialog`，最多选 5 篇；展示获授权文档名称/版本并复用相同来源树和匹配流程。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969200431
+      }
+    ],
+    "38. 实现手工映射、一键预填、右侧二次编辑、变量替换撤销、仅看未匹配/已变更和独立并排差异弹窗。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969200498
+      }
+    ],
+    "39. 接入 preview/apply 最终确认、原子失败保留草稿、成功后 invalidate cache + fetchTree + fetchDetailFresh。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969200546
+      }
+    ],
+    "40. 在 `DisclosureEditor.vue` “导入导出”菜单挂载“上传附注文档”，权限/归档/合并锁/EQCR 状态与后端一致。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969200595
+      }
+    ],
+    "41. 实现 `NoteContentTemplateService.snapshot_preview/save_snapshot`：后端一次查询活动附注，生成 narrative+account_explanation 全套正文、服务端来源元数据、quality_summary、canonical hash 和 `snapshot_digest`；preview 不落库，save 重算 digest，变化则 409，不读 table_data。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969200651
+      }
+    ],
+    "42. 实现同名模板目录并发锁与不可变版本：新 hash 新版本、同 hash 复用；current_version_id 原子更新，历史版本不改写。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969200712
+      }
+    ],
+    "43. 实现模板 list/detail/versions/delete API：列表分页且只返元数据，详情/版本逐次授权，软删目录保留版本及应用历史。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969200784
+      }
+    ],
+    "44. 实现 personal/group 发布策略：group owner 服务端归根，manager/partner 二次确认；普通用户不能声明 public/system/allowed_project_ids。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969200829
+      }
+    ],
+    "45. 增加模板端点 TestClient 安全矩阵和真实 DB 约束测试：本人/他人 personal、根/子/兄弟/异组、直接详情、版本、删除、目标无权限。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969200878
+      }
+    ],
+    "46. 新建 `NoteContentTemplatePicker.vue` 和 `useNoteContentTemplate.ts`，调用专用后端 API；不得复用 `SharedTemplatePicker.getConfigData/apply` 权威链。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969200925
+      }
+    ],
+    "47. 实现“保存为内容模板”弹窗：名称/说明/personal或group→服务端 snapshot-preview→质量摘要→集团二次确认→携 digest 正式保存，并处理来源变化 409 和同 hash 回执。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969200969
+      }
+    ],
+    "48. 新建 `NoteContentTemplateApplyDialog.vue`：模板来源/版本/标准/口径/质量头部，推荐/需复核/不可用三组，搜索及已选/高风险/未映射筛选。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969201029
+      }
+    ],
+    "49. 新建 `NoteTextDiffDialog.vue`，并排显示现有/拟写入内容、变量原值→目标值和风险；已有内容显式选择 replace/append。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969201095
+      }
+    ],
+    "50. 将模板选择接入统一 preview/apply：固定 version_id/hash、原子冲突、成功缓存刷新、批次回执和来源 badge。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969201145
+      }
+    ],
+    "51. 实现“新版本可用”只读提示与重新预览入口；禁止后台自动覆盖已引用项目。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969201194
+      }
+    ],
+    "52. 在 `DisclosureEditor.vue` 挂载“保存为内容模板/引用内容模板”两个清晰入口并完成前端组件测试。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969201244
+      }
+    ],
+    "53. 运行后端 parser/catalog/sanitizer/template/preview/apply/鉴权/迁移定向测试，前端相关 Vitest、ESLint 和单区域 TypeScript 检查；修复全部本轮失败。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969201293
+      }
+    ],
+    "54. Playwright 实测上传链：真实 Word + 文字版 PDF + 低置信/需 OCR 文件，完成解析→手工映射→批量编辑→原子 apply→切章回看。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969201347
+      }
+    ],
+    "55. Playwright 实测模板链：项目 A 保存全套 group 模板 v1→兄弟 B 选择章节（含替换/追加）→A 发布 v2→B 只提示不自动更新→重预览应用。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969201419
+      }
+    ],
+    "56. 真实 PG 守卫：验证 V187 三表约束、兄弟可见/异组不可见、同 hash 幂等版本、并发 stale preview 零部分写入、样本容量不超冻结阈值；清理测试数据。": [
+      {
+        "executionId": "499107c9-8e24-4f0c-b69d-9dfa326fdaec",
+        "chatSessionId": "sess_64e5c116-6f89-43dc-bcc8-fb68f3289712",
+        "timestamp": 1791969201478
+      }
+    ]
+  }
+}
