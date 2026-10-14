@@ -57,6 +57,15 @@
     <el-tag :type="anomalyRate > 10 ? 'danger' : 'info'">异常率：{{ anomalyRate.toFixed(1) }}%</el-tag>
     <GtIndexChip target="voucher-sampling-engine" label="抽凭引擎" />
     <el-button size="small" type="warning" :disabled="isReadonly" @click="openSampling">⚡ 抽凭</el-button>
+    <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
+      <el-button
+        size="small"
+        :disabled="isReadonly"
+        :loading="importingAttached"
+        title="导入在「账簿查询」右键挂凭到本底稿的序时账凭证"
+        @click="importFromAttached"
+      >📎 从序时账挂入导入</el-button>
+    </el-badge>
     <el-button-group size="small" style="margin-left: auto">
       <el-button @click="onExportTemplate">导出模板</el-button>
       <el-button @click="onExportData">导出数据</el-button>
@@ -576,6 +585,11 @@ import D3VoucherCheckDialog from './D3VoucherCheckDialog.vue'
 import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
+import {
+  pullSamplesForWorkpaper,
+  listAttachedVouchers,
+} from '../composables/useAttachedVouchers'
+import { dSlotQueryCodes, pickDTbSourceCodes } from '../composables/dCycleAccountScope'
 
 const props = withDefaults(defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -720,6 +734,45 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
 function openSampling() {
   if (props.isReadonly) return
   showSampling.value = true
+}
+
+// ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
+const attachedCount = ref(0)
+const importingAttached = ref(false)
+const D3_ACCOUNT_PREFIXES = dSlotQueryCodes('D3', pickDTbSourceCodes(null))
+
+async function refreshAttachedCount(): Promise<void> {
+  if (!props.projectId || !props.wpId) return
+  try {
+    const recs = await listAttachedVouchers(props.projectId, engineYear.value, props.wpId, true)
+    attachedCount.value = recs.length
+  } catch {
+    attachedCount.value = 0
+  }
+}
+void refreshAttachedCount()
+
+async function importFromAttached(): Promise<void> {
+  if (props.isReadonly) return
+  importingAttached.value = true
+  try {
+    const { samples, misattached } = await pullSamplesForWorkpaper(
+      props.projectId, engineYear.value, props.wpId, D3_ACCOUNT_PREFIXES,
+    )
+    if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (misattached.length > 0) {
+      const lines = misattached.slice(0, 5).map((m) => {
+        const acc = m.actualAccounts.length ? m.actualAccounts.join('、') : '无分录科目'
+        return `凭证 ${m.voucherNo}：实际科目 ${acc}`
+      })
+      ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
+    }
+    if (samples.length === 0 && misattached.length === 0) {
+      ElMessage.info('暂无挂入本底稿的序时账凭证')
+    }
+  } finally {
+    importingAttached.value = false
+  }
 }
 
 /**

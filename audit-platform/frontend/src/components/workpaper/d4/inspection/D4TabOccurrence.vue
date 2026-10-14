@@ -31,6 +31,11 @@ import { readStoreProjection } from '../../sync/workpaperSyncApi'
 import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 import { D4_MAIN_REVENUE_STANDARD } from '../../composables/d4AccountScope'
 import { Plus, Download } from '@element-plus/icons-vue'
+import {
+  pullSamplesForWorkpaper,
+  listAttachedVouchers,
+} from '../../composables/useAttachedVouchers'
+import { dSlotQueryCodes, pickDTbSourceCodes } from '../../composables/dCycleAccountScope'
 
 // 抽凭引擎（懒加载，避免首屏体积）
 const GtVoucherSamplingEngine = defineAsyncComponent(
@@ -232,6 +237,33 @@ const samplingDialogVisible = ref(false)
 function openSampling() {
   if (props.isReadonly) return
   samplingDialogVisible.value = true
+}
+
+// ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
+const attachedCount = ref(0)
+const importingAttached = ref(false)
+const D4_ACCOUNT_PREFIXES = dSlotQueryCodes('D4', pickDTbSourceCodes(null))
+
+async function refreshAttachedCount(): Promise<void> {
+  if (!props.projectId || !props.wpId) return
+  try {
+    const recs = await listAttachedVouchers(props.projectId, auditYear.value, props.wpId, true)
+    attachedCount.value = recs.length
+  } catch { attachedCount.value = 0 }
+}
+void refreshAttachedCount()
+
+async function importFromAttached(): Promise<void> {
+  if (props.isReadonly) return
+  importingAttached.value = true
+  try {
+    const { samples, misattached } = await pullSamplesForWorkpaper(
+      props.projectId, auditYear.value, props.wpId, D4_ACCOUNT_PREFIXES,
+    )
+    if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
+    if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
+  } finally { importingAttached.value = false }
 }
 
 /** 安全数值解析（SampledVoucher 金额为 string | null） */
@@ -444,6 +476,9 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
         <el-button size="small" type="primary" plain :disabled="isReadonly" @click="openSampling">
           🎲 抽凭引擎
         </el-button>
+        <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
+          <el-button size="small" :disabled="isReadonly" :loading="importingAttached" title="导入在「账簿查询」右键挂凭到本底稿的序时账凭证" @click="importFromAttached">📎 从序时账挂入导入</el-button>
+        </el-badge>
         <GtIndexChip value="wp:D4-1" :context-project-id="projectId" />
         <GtIndexChip value="wp:D4-12" :context-project-id="projectId" />
         <GtIndexChip value="wp:D4-4" :context-project-id="projectId" />

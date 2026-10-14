@@ -151,6 +151,39 @@ export interface PullSamplesResult {
 }
 
 /**
+ * 推断对方科目（仿后端 enrich_counterpart_accounts 逻辑）。
+ *
+ * 规则：按借贷方向分桶 → 当前行是借方则对方取贷方科目，反之亦然。
+ * - 1 对 1：直填对方科目代码 + 名称
+ * - 多对多 / 1 对多：填「多科目」
+ */
+function inferCounterpart(
+  currentLine: any,
+  allLines: any[],
+): { code: string | null; name: string | null } {
+  const debitAccounts = new Map<string, string>()
+  const creditAccounts = new Map<string, string>()
+  for (const l of allLines) {
+    const code = String(l?.account_code ?? '').trim()
+    const name = String(l?.account_name ?? '').trim()
+    if (!code) continue
+    const d = Number(l?.debit_amount ?? 0)
+    const c = Number(l?.credit_amount ?? 0)
+    if (d > 0) debitAccounts.set(code, name)
+    if (c > 0) creditAccounts.set(code, name)
+  }
+  // 判断当前行方向：借方有值则当前行在借方侧，对方取贷方侧
+  const isDebit = Number(currentLine?.debit_amount ?? 0) > 0
+  const counterparts = isDebit ? creditAccounts : debitAccounts
+  if (counterparts.size === 0) return { code: null, name: null }
+  if (counterparts.size === 1) {
+    const [code, name] = [...counterparts.entries()][0]
+    return { code, name }
+  }
+  return { code: '多科目', name: '多科目' }
+}
+
+/**
  * 拉取挂到指定底稿的凭证 → 映射为 SampledVoucher[]。
  *
  * ## 三级筛选优先级（spec R3.1）
@@ -233,6 +266,7 @@ export async function pullSamplesForWorkpaper(
     }
 
     for (const line of picked) {
+      const cp = inferCounterpart(line, lines)
       samples.push(
         makeSample(
           rec.voucher_no,
@@ -246,6 +280,15 @@ export async function pullSamplesForWorkpaper(
           rec.voucher_date == null,
           // ② 级命中 ⇒ 未落在本底稿科目范围内，标注待核对（R3.3）
           byIntent ? (rec.account_code as string) : null,
+          cp.code,
+          cp.name,
+          lines.map(l => ({
+            account_code: String(l?.account_code ?? '').trim(),
+            account_name: String(l?.account_name ?? '').trim(),
+            debit_amount: l?.debit_amount != null ? String(l.debit_amount) : null,
+            credit_amount: l?.credit_amount != null ? String(l.credit_amount) : null,
+            summary: String(l?.summary ?? ''),
+          })),
         ),
       )
     }
@@ -268,6 +311,12 @@ function makeSample(
    * 值为挂凭时用户所在行的科目码，写进 remark 供审计师核对（spec R3.3）。
    */
   intentAccountCode: string | null = null,
+  /** 推断的对方科目代码 */
+  counterpartAccount: string | null = null,
+  /** 推断的对方科目名称 */
+  counterpartAccountName: string | null = null,
+  /** 完整凭证分录明细 */
+  voucherEntries: SampledVoucher['voucherEntries'] = [],
 ): SampledVoucher {
   /**
    * 🔴 两类歧义都要如实标注，且可叠加 —— 静默会让审计师以为这些行是正常取到的。
@@ -291,7 +340,9 @@ function makeSample(
     creditAmount,
     accountCode,
     accountName,
-    counterpartAccount: null,
+    counterpartAccount,
+    counterpartAccountName,
+    voucherEntries,
     voucherType: null,
     accountingPeriod: null,
     checkResult: '',
