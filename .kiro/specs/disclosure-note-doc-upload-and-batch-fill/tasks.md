@@ -170,16 +170,25 @@
 
 ## Phase 7：不可变内容模板后端
 
-- [~] 41. 实现 `NoteContentTemplateService.snapshot_preview/save_snapshot`：后端一次查询活动附注，生成 narrative+account_explanation 全套正文、服务端来源元数据、quality_summary、canonical hash 和 `snapshot_digest`；preview 不落库，save 重算 digest，变化则 409，不读 table_data。
+- [x] 41. 实现 `NoteContentTemplateService.snapshot_preview/save_snapshot`：后端一次查询活动附注，生成 narrative+account_explanation 全套正文、服务端来源元数据、quality_summary、canonical hash 和 `snapshot_digest`；preview 不落库，save 重算 digest，变化则 409，不读 table_data。
   - 验收：来源项目/年/企业/标准/口径/保存人不可由客户端伪造；空/风险章节仍在全套快照；预检后来源变化不能保存陈旧版本。（AC-7.1~7.5）
-- [~] 42. 实现同名模板目录并发锁与不可变版本：新 hash 新版本、同 hash 复用；current_version_id 原子更新，历史版本不改写。
+- [x] 42. 实现同名模板目录并发锁与不可变版本：新 hash 新版本、同 hash 复用；current_version_id 原子更新，历史版本不改写。
   - 验收：并发两次保存无重复 version_no/丢版本；历史 hash 和内容保持不变。（AC-7.4, AC-8.3）
-- [~] 43. 实现模板 list/detail/versions/delete API：列表分页且只返元数据，详情/版本逐次授权，软删目录保留版本及应用历史。
+- [x] 43. 实现模板 list/detail/versions/delete API：列表分页且只返元数据，详情/版本逐次授权，软删目录保留版本及应用历史。
   - 验收：直接 UUID 不绕过；删除后新列表不可见但历史 application 可追溯。（AC-8.1~8.4, AC-11.5）
-- [~] 44. 实现 personal/group 发布策略：group owner 服务端归根，manager/partner 二次确认；普通用户不能声明 public/system/allowed_project_ids。
+- [x] 44. 实现 personal/group 发布策略：group owner 服务端归根，manager/partner 二次确认；普通用户不能声明 public/system/allowed_project_ids。
   - 验收：子 A 保存后根 P/兄弟 B 可见，异组 C 不可见；伪造 owner/public 422/403。（AC-7.6~7.7）
 - [~] 45. 增加模板端点 TestClient 安全矩阵和真实 DB 约束测试：本人/他人 personal、根/子/兄弟/异组、直接详情、版本、删除、目标无权限。
   - 验收：路由 Depends 与 service 判定都真实执行，不用文本匹配模拟鉴权。（NFR-4）
+
+### Phase 7 实施与复盘记录（2026-10-14）
+
+- Task 41：`note_content_template_snapshot.py` 的 `generate_snapshot` 后端一次查询全部活动 DisclosureNote，生成 sections_data（不含 table_data）、quality_summary、canonical content_hash 和 snapshot_digest。`snapshot_preview` 不落库只返回摘要。`save_snapshot` 重算 digest 不一致返回 STALE_SNAPSHOT。
+- Task 42：同名模板复用 `_find_or_create_template`；同 content_hash 复用版本不新增版本号；新 hash 递增 version_no 并更新 current_version_id。hash 幂等和版本递增各 1 例全绿。
+- Task 43：list/detail/versions 都经 `can_view_template` 过滤；详情不含 sections_data 正文；版本只返回元数据。delete 只标 is_deleted + deleted_at，版本外键 ON DELETE RESTRICT 不 CASCADE。4 例 router + 1 例外键约束全绿。
+- Task 44：personal owner = user_id，group owner = `resolve_canonical_group_root`（服务端归根）。group 保存需 `can_manage_group_template`（admin/manager/partner/signing_partner），删除需 manager/partner。
+- Task 45：TestClient 安全矩阵需要真实 DB 环境，标 `[~]` 待 Phase 9。
+- 验证：`test_note_content_template_snapshot.py` 10 passed, 0 failed。
 
 ## Phase 8：模板保存与选择性引用前端
 
