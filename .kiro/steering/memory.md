@@ -38,7 +38,7 @@ inclusion: always
 - Playwright MCP 已装（workspace `.kiro/settings/mcp.json`）；新增依赖见 #dev-history（locust/marked+dompurify/decimal.js/python-docx/PyYAML/fast-check/Jinja2/jsonpatch + 外部 LibreOffice）
 - **scripts 规约**：`_` 前缀=一次性用完即删，无前缀=正式工具；`backend/scripts/` 分 8 子目录（check/seed/gen/analyze/ops/fix/migrate/e2e）；仓库根 `scripts/run.py` 统一入口
 - **底稿模板源目录**：`backend/wp_templates/`（按审计循环 A~S 分子目录），scan 脚本 `scripts/analyze/scan_wp_templates.py` 扫描后输出 `backend/data/gt_template_library.json`；ROOT 变量 = `backend/`（parent×3）
-- **D6 MigrationRunner 是运行时迁移**（不是 alembic）：启动跑 `backend/migrations/V*.sql`；新加列写 `V0XX__*.sql`+`R0XX__*.sql` 配对，CREATE/ALTER 必 `IF NOT EXISTS`；按 version **数字**去重（撞名字母序靠后者静默丢失）；`scan_migrations` 同号检测（重复 version 抛 RuntimeError）；**当前最高 V184**；V043 pgvector 容错化（无扩展时优雅跳过，降级 VECTOR_STORE_BACKEND=pgtext）
+- **D6 MigrationRunner 是运行时迁移**（不是 alembic）：启动跑 `backend/migrations/V*.sql`；新加列写 `V0XX__*.sql`+`R0XX__*.sql` 配对，CREATE/ALTER 必 `IF NOT EXISTS`；按 version **数字**去重（撞名字母序靠后者静默丢失）；`scan_migrations` 同号检测（重复 version 抛 RuntimeError）；**当前最高 V187**（以 gt-plan `migration_status` 现扫为准）；🔴 **开发服务器热重载不跑迁移**（`run_uvicorn.py` 启动时跑一次后设 `GT_BOOTSTRAP_DONE=1`，reload 出的 worker 跳过）⇒ 启动后才加的 V*.sql 不会落到本地库，须全量重启 start-dev 或手动 `MigrationRunner(...).run_pending()`（2026-10-14 V187 因此缺表，模板列表 500）；V043 pgvector 容错化（无扩展时优雅跳过，降级 VECTOR_STORE_BACKEND=pgtext）
 - **真实 PG 数据**：5 项目多为 standalone，**0 个 consolidated 项目**（合并模块真实 UAT 全卡此）；首汽租车_2025(df5b8403) tb 最全；**⚠️ 首汽租车 audit_period_end 为 NULL**（按年度取数端点 project_year 降级 None）
 - **本地 PG schema 漂移已修**（commit 508393da，965→critical=0）：drift detector 用 pkgutil walk import 全 model 子模块 + 过滤 Metabase 共库污染 + health 按 critical_count（orm_extra+enum_mismatch）判 degraded
 - **🔴 projects 表无 year / template_version_id 列**（render-config/prefill-context 曾因此对所有底稿普适 500——PG 首条 UndefinedColumn 使事务 aborted 后续全 500，2026-06-01 已修+契约测试守护）：年度须用 `EXTRACT(YEAR FROM audit_period_end)::int`；materiality 年度列名 `overall_materiality`（非 materiality_level）；人员姓名在 `staff_members.name`（users 无 display_name），JOIN 用 `project_assignments.staff_id`（非 user_id）；**database.py 已加 `async_engine = engine` 别名**（dataset_purge/recycle_bin/ledger_import_health 曾 import 不存在的 async_engine）
@@ -161,6 +161,10 @@ inclusion: always
 - 🔴 勘误：「参考 representation 重发布即全企业生效」是错的（R14：entry 级注册冻结的是第一家企业的行身份清册）
 - 🔴 教训：①进程内 exec 替换模块的变异对「已持有原类引用」的协调器无效（PG 层「全绿」是假象）⇒ 跨模块变异一律磁盘注入 + 逐字节恢复 ②子 Tab 私有防抖宿主 flushHtml 够不着 ⇒ 2 秒内切在线编辑丢编辑且随后被 OO 保存覆盖；其余循环 108 个同形写入方冻结在 `pendingWritesCoverageRatchet.spec.ts`（接入一处删一条）③行数门 8 处超限：2 处原样拆出、6 处 whitelist 登记理由 + 拆分轴
 - 提交须知：新模块（cleared_field_view / first_publication_on_demand / request_settlement / target_bound_registration / template_skeleton_baseline / 两个测试 world / 前端 pendingWrites / workpaperSyncBridgeFailure）+ 4 个 definition_store blob 必须同一次提交；未修清单见 design §7.5
+
+### 附注正文导入 / 批量编制 / 内容模板 `disclosure-note-doc-upload-and-batch-fill`（2026-10-14 第二轮复盘 7 组完成并推送，45/56 `[x]`）
+- 新表 V187（note_content_templates / versions / note_text_batch_applications）；端点 `note_text_batch`（sections / parse-upload / parse-knowledge / preview / apply）+ `note_content_templates`；编辑器三个入口经 `DisclosureNoteContentTools` 收口（编辑器 3281 行 = HARD_CAP）。余 11 项 `[~]`：Playwright / 真 PG 外部依赖 + Task 10/35/51 待拍板；跨 spec 待拍板见其 tasks.md 第 7 组（JSON 种子与四版 Word 不一致、底稿推送不看 is_local_override、上年继承读不存在的 section_code 列）
+- 🔴 教训：调用方自管错误提示时请求必带 `_silent`（全局拦截器会先弹一次：422 显示 pydantic 英文、403 只有笼统提示、5xx 自动重发两次），静默后 423 合并锁事件要自己发；gt-plan `spec_status` 不认 `[~]`，会误报 100%
 
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT

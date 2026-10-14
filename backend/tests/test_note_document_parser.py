@@ -20,7 +20,6 @@ from app.services.note_document_parser import (
 def _minimal_docx(paragraphs: list[tuple[str, str | None]]) -> bytes:
     """生成最小 DOCX：paragraphs = [(text, style_name | None), ...]"""
     from docx import Document
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
 
     doc = Document()
     for text, style in paragraphs:
@@ -165,3 +164,75 @@ class TestParseTextSource:
         for s in result.sections:
             # 消毒后 <script> 标签不应以原始形式存在；转义为 &lt;script&gt; 是安全的
             assert "<script>" not in s.html
+
+
+# ── 第 7 组整体复盘：每条解析出口都消毒并剥平台模板标记（Task 12 / AC-10.4）─────────────
+#: 变异实测：知识库 Markdown / HTML / 中文章节号三个分支、PDF 主路径与纯文本降级各自去掉消毒，
+#: 首版全部测试仍绿（只有 DOCX 被模板标记用例覆盖）。HTML 分支的原始标签只靠这一道消毒。
+_MARKED = "{{section:四、会计期间}}正文甲##/SECTION##"
+_DANGER = '<p onclick="x()">正文乙<script>alert(1)</script></p><img src="x" onerror="alert(1)">'
+
+
+def _assert_clean(sections) -> None:
+    assert sections, "没有解析出章节，判据空转"
+    for s in sections:
+        low = s.html.lower()
+        for bad in ("<script", "onerror", "onclick", "{{section", "##/section"):
+            assert bad not in low, (bad, s.html)
+
+
+class TestEveryParsePathSanitized:
+    @pytest.mark.parametrize("text", [
+        f"# 一、概述\n{_MARKED}\n## 二、政策\n说明",
+        f"<h2>一、概述</h2>{_DANGER}<p>{_MARKED}</p><h2>二、政策</h2><p>说明</p>",
+        f"一、公司基本情况\n{_MARKED}\n二、重要会计政策\n说明",
+        f"没有任何标题结构的整段正文{_MARKED}",
+    ], ids=["markdown", "html", "cn", "fallback"])
+    def test_text_source_branches(self, text):
+        _assert_clean(parse_text_source(text, doc_id="d1", doc_name="知识库.md").sections)
+
+    def test_html_branch_keeps_safe_content(self):
+        s = parse_text_source(f"<h2>一、概述</h2>{_DANGER}").sections[0]
+        assert "正文乙" in s.html
+
+    def test_pdf_main_path(self):
+        _assert_clean(parse_pdf(_minimal_pdf(f"一、公司基本情况\n{_MARKED}")).sections)
+
+    def test_pdf_without_headings_degrades_to_manual_section(self):
+        """无标题正文进「（无标题）」人工确认章（原纯文本降级分支不可达，已删除）。"""
+        # 标记单独成行：insert_text 不换行，超出页宽的部分会被裁掉（首版夹具把「##」裁丢了）
+        result = parse_pdf(_minimal_pdf(f"没有标题的正文\n{_MARKED}"))
+        assert [s.confidence for s in result.sections] == ["manual_required"]
+        _assert_clean(result.sections)
+
+
+def test_pdf_section_cap_warns_instead_of_silent_truncation(monkeypatch) -> None:
+    import pymupdf
+
+    import app.services.note_document_parser as parser_mod
+
+    doc = pymupdf.open()
+    page = doc.new_page()
+    # 标题按「字号 > 中位数 × 1.3」识别：正文行须多于标题行，中位数才落在正文字号上
+    lines = [(t, s) for title in ("一、公司基本情况", "二、会计期间", "三、税项")
+             for t, s in ((title, 20), ("正文第一行", 10), ("正文第二行", 10))]
+    for i, (text, size) in enumerate(lines):
+        page.insert_text((72, 72 + i * 30), text, fontsize=size, fontname="china-s")
+    data = doc.tobytes()
+    doc.close()
+    assert len(parser_mod.parse_pdf(data).sections) == 3, "夹具应解析出 3 章，否则下面的截断判据空转"
+    monkeypatch.setattr(parser_mod, "MAX_SECTIONS", 2)
+    result = parser_mod.parse_pdf(data)
+    assert len(result.sections) == 2
+    assert result.warnings == ["解析章节数 3 超过上限 2，已截断"]
+
+
+def test_truncated_docx_section_stays_well_formed(monkeypatch) -> None:
+    """超过单章上限时按字符截断：首版截断发生在消毒**之后**，截出的半个标签 / 未闭合段落原样返回。"""
+    import app.services.note_document_parser as parser_mod
+
+    monkeypatch.setattr(parser_mod, "MAX_SECTION_HTML_BYTES", 90)
+    data = _minimal_docx([("一、公司基本情况", "Heading 1"), ("甲" * 200, None), ("乙" * 50, None)])
+    section = parser_mod.parse_docx(data).sections[0]
+    assert "章节正文超过单章上限，已截断" in section.warnings
+    assert parser_mod.sanitize_note_html(section.html) == section.html

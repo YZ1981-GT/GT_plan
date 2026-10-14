@@ -178,6 +178,8 @@ PyMuPDF `page.get_text("dict")` 遍历 block→line→span：
 - 仅有图像/无文本 span 返回 `needs_ocr=true`，本弹窗不自行 OCR；
 - pypdf/MarkItDown 仅作纯文本降级，降级标题均标低置信并需人工确认。
 
+> 第二轮复盘第 7 组修订：实现里从未接入 pypdf/MarkItDown。原「纯文本降级」分支挂在「主循环未产出章节」之后，而只要有可提取文本，主循环必产出章节（无标题正文进「（无标题）」人工确认章），该分支不可达，已删除——降级形态就是这个人工确认章。章节数超过上限时截断并告警（首版静默截断）。
+
 ### 5.3 知识库
 
 `parse-knowledge` 接收最多 5 个 doc_id。先调用 `KnowledgeIndexService.load_documents` 完成项目模式授权，再解析返回的 Markdown/HTML/纯文本。无权 ID 与不存在 ID使用同一不可见语义；响应不得回显未授权文档元数据。
@@ -191,6 +193,8 @@ PyMuPDF `page.get_text("dict")` 遍历 block→line→span：
 - 所有文本/属性重新转义，输出 canonical HTML。
 
 前端所有 `v-html` 及编辑器装载前再调用 `useSanitize.sanitizeHtml`，且前端允许列表与后端契约测试保持一致。
+
+> 第 7 组：消毒点按出口收敛。文本来源（Markdown / HTML / 中文章节号 / 整篇降级）只在 `parse_text_source` 的单一出口消毒并剥平台模板标记；DOCX / PDF 各在返回前消毒，DOCX 超限截断后再消毒一次。写入以预览为准：来源先消毒再生成替换清单，替换后再消毒一次（纵深防御，属等价变异）；追加时现有正文与新内容两侧都消毒。每个出口都有「去掉即打红」的变异证据（tasks.md 第 7 组）。
 
 ## §6 API 与服务边界
 

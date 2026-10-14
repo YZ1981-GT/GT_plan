@@ -194,26 +194,32 @@ def _is_forbidden(a: str | None, b: str | None) -> bool:
     return (normalize_title(a), normalize_title(b)) in _FORBIDDEN_TITLES
 
 
-@lru_cache(maxsize=1)
-def _matrix_index() -> tuple[dict[tuple[str, str], str], dict[tuple[str, str], frozenset[str]]]:
+def _index_variant_matrix(
+    matrix: dict[str, Any],
+) -> tuple[dict[tuple[str, str], str], dict[tuple[str, str], frozenset[str]]]:
     """((template_type, 章节号) → account_key, (account_key, template_type) → 章节号集合)。"""
-    matrix = json.loads((DATA_DIR / "note_template_variant_matrix.json").read_text(encoding="utf-8"))
     by_code: dict[tuple[str, str], str] = {}
     codes: dict[tuple[str, str], set[str]] = {}
     for account in matrix.get("accounts") or []:
         key = account.get("account_key")
         if not key:
             continue
-        pools = [account.get("variants") or {}] + [
-            {k: v for k, vs in (account.get("legacy_aliases") or {}).items() for v in vs}
+        # 逐对展开：同一变体可有多个旧码（建成 {变体: 码} 字典会只剩最后一个）
+        pairs = list((account.get("variants") or {}).items()) + [
+            (variant, code) for variant, olds in (account.get("legacy_aliases") or {}).items() for code in olds
         ]
-        for pool in pools:
-            for variant, code in pool.items():
-                if isinstance(code, str) and code.strip():
-                    tt = variant.split("_", 1)[0]
-                    by_code.setdefault((tt, code.strip()), key)
-                    codes.setdefault((key, tt), set()).add(code.strip())
+        for variant, code in pairs:
+            if isinstance(code, str) and code.strip():
+                tt = variant.split("_", 1)[0]
+                by_code.setdefault((tt, code.strip()), key)
+                codes.setdefault((key, tt), set()).add(code.strip())
     return by_code, {k: frozenset(v) for k, v in codes.items()}
+
+
+@lru_cache(maxsize=1)
+def _matrix_index() -> tuple[dict[tuple[str, str], str], dict[tuple[str, str], frozenset[str]]]:
+    return _index_variant_matrix(
+        json.loads((DATA_DIR / "note_template_variant_matrix.json").read_text(encoding="utf-8")))
 
 
 def validate_manual_mappings(

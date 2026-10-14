@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from app.services.note_html_sanitizer import (
-    ALLOWED_ATTRS,
     ALLOWED_TAGS,
     sanitize_note_html,
 )
@@ -185,3 +184,15 @@ class TestSplitTopLevelBlocks:
         from app.services.note_html_sanitizer import split_top_level_blocks
 
         assert split_top_level_blocks("<P>a</P><b>x</b>") == ["<p>a</p>", "<strong>x</strong>"]
+
+
+def test_append_sanitizes_existing_side_too() -> None:
+    """第 7 组整体复盘（Task 12 变异）：去掉对现有正文的消毒，首版没有任何测试发现。
+
+    现有正文来自库里其他写入方，追加时整段重写回库，不能把其中的危险标签原样带回去。
+    """
+    from app.services.note_html_sanitizer import append_note_html
+
+    out = append_note_html('<p>旧一</p><script>alert(1)</script><p onclick="x()">旧二</p>', "<p>新</p>")
+    assert "<script" not in out and "onclick" not in out
+    assert all(t in out for t in ("旧一", "旧二", "新"))

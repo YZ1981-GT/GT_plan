@@ -283,3 +283,31 @@ class TestChapterKindGating:
         preview = build_preview(sources, [t], match_sections(sources, [t]))
         assert "a1" not in {i["source_id"] for i in preview["items"]}
         assert preview["summary"]["out_of_scope"] == 2  # c2 章标题本身 + a1
+
+
+# ── 第 7 组整体复盘：variant matrix 别名索引不得因同变体多个旧码而丢码 ─────────────
+def test_matrix_index_keeps_every_legacy_alias_code() -> None:
+    """首版用 ``{variant: code for variant, codes in ... for code in codes}`` 建池：同一变体有多个旧码时
+    字典键被覆盖，只剩最后一个，前面的旧码静默失配（现数据 0 处多码，属潜伏缺陷）。"""
+    from app.services.note_text_batch_service import _index_variant_matrix
+
+    by_code, codes = _index_variant_matrix({"accounts": [{
+        "account_key": "cash",
+        "variants": {"soe_standalone": "五、1", "listed_standalone": "七、1"},
+        "legacy_aliases": {"soe_standalone": ["五、01", "五（1）"]},
+    }]})
+    assert by_code[("soe", "五、01")] == "cash"
+    assert by_code[("soe", "五（1）")] == "cash"
+    assert codes[("cash", "soe")] == frozenset({"五、1", "五、01", "五（1）"})
+    assert codes[("cash", "listed")] == frozenset({"七、1"})
+
+
+def test_preview_replacements_describe_only_written_content() -> None:
+    """替换清单必须基于消毒后的正文生成：只出现在会被丢弃内容里的企业名，不得生成「幻影」替换项。"""
+    t = _tgt("四、会计期间", "会计期间")
+    sources = [_src("s1", "会计期间", html="<p>正文</p><script>甲公司</script>")]
+    matches = match_sections(sources, [t], manual_mappings={"s1": t["id"]})
+    item = build_preview(sources, [t], matches, target_vars={"company_name": "乙公司"},
+                         source_entity_name="甲公司")["items"][0]
+    assert "甲公司" not in item["proposed_html"] and "script" not in item["proposed_html"]
+    assert item["replacements"] == []

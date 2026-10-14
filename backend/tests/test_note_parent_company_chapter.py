@@ -1891,6 +1891,8 @@ class TestTableLevelAliasHasNoConsumerYet:
         "app/services/procedure_backfill_runner.py": "程序表回填（注释提及）",
         # 附注 section 级章节码别名（不看表名）
         "app/services/note_word_exporter.py": "section 级 section_code 别名 join",
+        # disclosure-note-doc-upload-and-batch-fill：variant matrix 账户级**章节号**旧码（跨变体匹配，不看表名）
+        "app/services/note_text_batch_service.py": "variant matrix 账户级章节号别名（不看表名）",
     }
 
     #: 只在注释/docstring 里**提到**该字段名的文件（不是消费方，不需登记进 allowlist）。

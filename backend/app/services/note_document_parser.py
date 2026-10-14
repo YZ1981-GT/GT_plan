@@ -11,12 +11,10 @@ import hashlib
 import io
 import logging
 import re
-import uuid
 import zipfile
 from dataclasses import dataclass, field
 from html import escape as html_escape
-from pathlib import Path
-from typing import IO, Any, BinaryIO
+from typing import Any
 
 from app.services.note_html_sanitizer import sanitize_note_html as _sanitize
 
@@ -275,7 +273,8 @@ def parse_docx(data: bytes) -> ParseResult:
     for s in sections:
         s.html = sanitize_note_html(s.html)
         if len(s.html.encode("utf-8")) > MAX_SECTION_HTML_BYTES:
-            s.html = s.html[:MAX_SECTION_HTML_BYTES // 3]  # 粗略截断
+            # 粗略按字符截断后**再消毒**：截断点可能落在标签中间，由消毒负责闭合 / 丢弃半个标签
+            s.html = sanitize_note_html(s.html[:MAX_SECTION_HTML_BYTES // 3])
             s.warnings.append("章节正文超过单章上限，已截断")
 
     return ParseResult(sections=sections, warnings=warnings, file_hash=file_hash)
@@ -390,79 +389,18 @@ def parse_pdf(data: bytes) -> ParseResult:
                     )
                     sections.append(current)
 
-    if not sections:
-        # 降级纯文本
-        return _parse_pdf_plaintext_fallback(doc, file_hash)
-
+    # 有可提取文本时上面的循环必产出章节（无标题正文进「（无标题）」人工确认章）——这就是降级形态。
+    # 原「纯文本降级」分支挂在 `if not sections` 之后，永远不可达，第 7 组整体复盘删除。
+    warnings: list[str] = []
     if len(sections) > MAX_SECTIONS:
+        warnings.append(f"解析章节数 {len(sections)} 超过上限 {MAX_SECTIONS}，已截断")  # 首版静默截断
         sections = sections[:MAX_SECTIONS]
 
     for s in sections:
         s.html = sanitize_note_html(s.html)
 
     doc.close()
-    return ParseResult(sections=sections, file_hash=file_hash)
-
-
-def _parse_pdf_plaintext_fallback(doc: Any, file_hash: str) -> ParseResult:
-    """PyMuPDF span 解析失败时的纯文本降级。"""
-    full_text = ""
-    for page in doc:
-        full_text += page.get_text("text") + "\n"
-    doc.close()
-
-    full_text = full_text.strip()
-    if not full_text:
-        raise ParseError("NO_PARSEABLE_TEXT", "PDF 不含可提取文本")
-
-    # 按中文章节模式尝试分章
-    sections: list[ParsedSection] = []
-    current_title = "（无标题）"
-    current_lines: list[str] = []
-    idx = 0
-
-    for line in full_text.split("\n"):
-        line = line.strip()
-        if not line:
-            continue
-        if _CN_HEADING_RE.match(line) and len(line) < 80:
-            if current_lines:
-                idx += 1
-                sections.append(ParsedSection(
-                    source_id=f"pdf-fallback-s{idx}",
-                    title=current_title,
-                    level=2,
-                    html="".join(f"<p>{html_escape(l)}</p>" for l in current_lines),
-                    confidence="manual_required",
-                    warnings=["纯文本降级解析，标题置信度低"],
-                ))
-                current_lines = []
-            current_title = line
-        else:
-            current_lines.append(line)
-
-    if current_lines:
-        idx += 1
-        sections.append(ParsedSection(
-            source_id=f"pdf-fallback-s{idx}",
-            title=current_title,
-            level=2,
-            html="".join(f"<p>{html_escape(l)}</p>" for l in current_lines),
-            confidence="manual_required",
-            warnings=["纯文本降级解析，标题置信度低"],
-        ))
-
-    if not sections:
-        raise ParseError("NO_PARSEABLE_TEXT", "PDF 纯文本降级后仍无法分章")
-
-    for s in sections:
-        s.html = sanitize_note_html(s.html)
-
-    return ParseResult(
-        sections=sections,
-        warnings=["使用纯文本降级解析，所有标题为低置信候选"],
-        file_hash=file_hash,
-    )
+    return ParseResult(sections=sections, warnings=warnings, file_hash=file_hash)
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -480,56 +418,32 @@ def parse_text_source(
     doc_id: str | None = None,
     doc_name: str | None = None,
 ) -> ParseResult:
-    """解析 Markdown / HTML / 纯文本来源。"""
+    """解析 Markdown / HTML / 纯文本来源。
+
+    依次尝试 Markdown 标题 → HTML 标题 → 中文章节号 → 整篇单段降级；**所有分支只有一个出口**做消毒、
+    剥模板标记与来源标识（首版每个分支各自消毒，HTML 分支的原始标签只靠其中一道，去掉也没有测试发现）。
+    """
     if not text or not text.strip():
         return ParseResult(warnings=["来源正文为空"])
 
-    # 尝试 Markdown heading
-    sections = _parse_markdown_headings(text)
-    if sections:
-        for s in sections:
-            s.html = sanitize_note_html(s.html)
-            s.metadata["source_kind"] = source_kind
-            if doc_id:
-                s.metadata["doc_id"] = doc_id
-        return ParseResult(sections=sections)
+    warnings: list[str] = []
+    sections = _parse_markdown_headings(text) or _parse_html_headings(text) or _parse_cn_headings(text)
+    if not sections:
+        sections = [ParsedSection(
+            source_id="text-s1",
+            title=doc_name or "（无标题）",
+            level=1,
+            html=f"<p>{html_escape(text.strip()[:10_000])}</p>",
+            confidence="manual_required",
+        )]
+        warnings.append("无法识别标题结构，整篇作为单个候选章节")
 
-    # 尝试 HTML heading
-    sections = _parse_html_headings(text)
-    if sections:
-        for s in sections:
-            s.html = sanitize_note_html(s.html)
-            s.metadata["source_kind"] = source_kind
-            if doc_id:
-                s.metadata["doc_id"] = doc_id
-        return ParseResult(sections=sections)
-
-    # 中文章节标题精确匹配
-    sections = _parse_cn_headings(text)
-    if sections:
-        for s in sections:
-            s.html = sanitize_note_html(s.html)
-            s.metadata["source_kind"] = source_kind
-            if doc_id:
-                s.metadata["doc_id"] = doc_id
-        return ParseResult(sections=sections)
-
-    # 单段降级
-    sid = f"text-s1"
-    title = doc_name or "（无标题）"
-    return ParseResult(
-        sections=[
-            ParsedSection(
-                source_id=sid,
-                title=title,
-                level=1,
-                html=sanitize_note_html(f"<p>{html_escape(text.strip()[:10_000])}</p>"),
-                confidence="manual_required",
-                metadata={"source_kind": source_kind, "doc_id": doc_id},
-            )
-        ],
-        warnings=["无法识别标题结构，整篇作为单个候选章节"],
-    )
+    for s in sections:
+        s.html = sanitize_note_html(s.html)
+        s.metadata["source_kind"] = source_kind
+        if doc_id:
+            s.metadata["doc_id"] = doc_id
+    return ParseResult(sections=sections, warnings=warnings)
 
 
 def _parse_markdown_headings(text: str) -> list[ParsedSection]:
@@ -575,7 +489,7 @@ def _parse_html_headings(text: str) -> list[ParsedSection]:
             source_id=f"html-s{i + 1}",
             title=title,
             level=level,
-            html=sanitize_note_html(body),
+            html=body,  # 原始 HTML，由 parse_text_source 统一出口消毒
             confidence="candidate",
         ))
 
@@ -600,7 +514,7 @@ def _parse_cn_headings(text: str) -> list[ParsedSection]:
                     source_id=f"cn-s{idx}",
                     title=current_title or "（无标题）",
                     level=2,
-                    html="".join(f"<p>{html_escape(l)}</p>" for l in current_lines),
+                    html="".join(f"<p>{html_escape(line)}</p>" for line in current_lines),
                     confidence="candidate",
                 ))
                 current_lines = []
@@ -614,7 +528,7 @@ def _parse_cn_headings(text: str) -> list[ParsedSection]:
             source_id=f"cn-s{idx}",
             title=current_title or "（无标题）",
             level=2,
-            html="".join(f"<p>{html_escape(l)}</p>" for l in current_lines),
+            html="".join(f"<p>{html_escape(line)}</p>" for line in current_lines),
             confidence="candidate",
         ))
 
