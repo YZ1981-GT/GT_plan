@@ -143,3 +143,10 @@ def register_report_routers(app: FastAPI) -> None:
     # ═══ §105. chain-closure-phase2-formula-push-engine：公式推送（规则 / 立即推送 / 采用 / 锁定） ═══
     from app.routers.formula_push import router as formula_push_router
     app.include_router(formula_push_router, tags=["formula-push"])
+
+    # ═══ §106. disclosure-note-doc-upload-and-batch-fill：附注内容模板与正文批量导入 ═══
+    from app.routers.note_content_templates import router as note_ct_router
+    app.include_router(note_ct_router, tags=["note-content-templates"])
+
+    from app.routers.note_text_batch import router as note_tb_router
+    app.include_router(note_tb_router, tags=["note-text-batch"])

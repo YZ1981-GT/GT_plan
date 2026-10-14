@@ -20,16 +20,26 @@
 
 ## Phase 1：领域模型、迁移与权限基础
 
-- [~] 4. 新增 `V187__note_content_templates_and_batch_apply.sql` 与 `R187__rollback_note_content_templates_and_batch_apply.sql`，创建模板目录、不可变版本、批量应用审计三表及外键/CHECK/partial unique/索引。
+- [x] 4. 新增 `V187__note_content_templates_and_batch_apply.sql` 与 `R187__rollback_note_content_templates_and_batch_apply.sql`，创建模板目录、不可变版本、批量应用审计三表及外键/CHECK/partial unique/索引。
   - 验收：迁移可重复执行，回滚成对；版本/owner/mutation 约束与 design §3 一致。（NFR-1~2）
-- [~] 5. 新建 `note_content_template_models.py`，用 `Mapped[]` 映射三表；新增严格 Pydantic Enum/Literal schema，禁止自由 owner/source/mode/section_kind。
+- [x] 5. 新建 `note_content_template_models.py`，用 `Mapped[]` 映射三表；新增严格 Pydantic Enum/Literal schema，禁止自由 owner/source/mode/section_kind。
   - 验收：DB 列、ORM、schema、service 构造参数逐项契约对齐，无 orm_extra/缺列。（NFR-2）
-- [~] 6. 实现 canonical group root resolver：沿 `parent_project_id` 到根、检测循环/缺失；personal/group owner 由服务端决定，客户端不可提交 owner ID。
+- [x] 6. 实现 canonical group root resolver：沿 `parent_project_id` 到根、检测循环/缺失；personal/group owner 由服务端决定，客户端不可提交 owner ID。
   - 验收：根、子、兄弟、standalone、多级、循环六类用例成立。（AC-7.6）
-- [~] 7. 实现内容模板授权策略 `can_view/manage_template`，统一供 list/detail/versions/delete/preview/apply 使用；不可见返回 404。
+- [x] 7. 实现内容模板授权策略 `can_view/manage_template`，统一供 list/detail/versions/delete/preview/apply 使用；不可见返回 404。
   - 验收：本人 personal、同组根/子/兄弟可见；他人 personal、异组、直接 UUID 绕过全部拒绝。（AC-7.6~7.7, AC-8.1）
-- [~] 8. 新建 `note_content_templates.py` 与 `note_text_batch.py` router 并登记 `router_registry/report.py`；路径使用 `/api/projects/{project_id}/...` 避开 disclosure GET catch-all。
+- [x] 8. 新建 `note_content_templates.py` 与 `note_text_batch.py` router 并登记 `router_registry/report.py`；路径使用 `/api/projects/{project_id}/...` 避开 disclosure GET catch-all。
   - 验收：注册表 smoke test 真发请求命中正确 handler；未注册/被 catch-all 吞掉的变异会打红。（NFR-9）
+
+### Phase 1 实施与复盘记录（2026-10-14）
+
+- Task 4：V187 三表 DDL 含 IF NOT EXISTS 幂等守卫、CHECK 互斥 owner_scope/owner_id、partial unique index、循环 FK（延迟 ALTER）。R187 反序 DROP。`test_v187_is_unique_and_has_rollback_pair` + `test_v187_declares_all_tables_and_idempotent_guards` 2 passed。
+- Task 5：ORM 三类 `Mapped[]` 逐列映射，Pydantic schema 使用 `StrictSchema(extra="forbid")` + Enum/Literal + `model_validator`。`test_orm_tables_have_required_columns` + `test_strict_enums_expose_only_designed_values` + 2 个 schema 拒绝测试 = 4 passed。
+- Task 6：`resolve_canonical_group_root` 沿 `parent_project_id` 往上追溯，`_MAX_DEPTH=20` + visited 集合防环。七类用例（standalone/child/sibling/multi-level/cycle/deleted/nonexistent）全绿。
+- Task 7：`can_view_template` 按 owner_scope 分流，personal 判 user_id，group 判 viewer 项目的 canonical root == owner_group_project_id。`can_manage_group_template` 判系统角色 + canonical root 项目角色。5 个可见性测试全绿。
+- Task 8：两个 router 骨架注册到 `router_registry/report.py` §106；路径不经过 disclosure catch-all。3 个注册 smoke 测试全绿。
+- 复盘修正：最初 fixture 使用同步 `sessionmaker` + `scope="module"` 导致 pytest-asyncio 1.x 下 `engine.begin()` 报连接池错误（同一缺陷连续三次调试）。根因是仓库规范用 `pytest_asyncio.fixture` + `async_sessionmaker` + 只建所需表而非 `metadata.create_all()`；改为此范式后一次全绿。教训：**新文件的 fixture 必须先查仓库已有范式再写**，不得凭经验假设 scope/pool/sessionmaker 类型。
+- 验证：`test_note_content_template_models.py` 6 passed + `test_note_content_template_phase1.py` 15 passed = 21 passed, 0 failed。
 
 ## Phase 2：章节分类、HTML 安全与确定性变量
 

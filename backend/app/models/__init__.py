@@ -144,6 +144,12 @@ from app.models.acnr_invalidation_model import (  # noqa: F401
     AcnrInvalidationEpoch,
     AcnrInvalidationOutbox,
 )
+# 附注正文内容模板与原子批量应用审计（迁移 V187）
+from app.models.note_content_template_models import (  # noqa: F401
+    NoteContentTemplate,
+    NoteContentTemplateVersion,
+    NoteTextBatchApplication,
+)
 # 公式推送引擎目标级状态 / 运行记录（迁移 V169）
 from app.models.formula_push_models import (  # noqa: F401
     FormulaPushRun,
