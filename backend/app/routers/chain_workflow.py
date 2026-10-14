@@ -92,7 +92,7 @@ class ExecutionResponse(BaseModel):
 
 class ExportPackageRequest(BaseModel):
     """组合导出包请求参数"""
-    year: int = Field(..., description="年度")
+    year: int | None = Field(None, description="年度（可选，缺省时从项目自动推断）")
     include_audit_report: bool = Field(False, description="是否包含审计报告")
     include_workpapers: bool = Field(False, description="是否包含审定表")
     force_export: bool = Field(False, description="强制导出（跳过一致性检查）")
@@ -282,13 +282,23 @@ async def export_package(
 
     Requirements: 5.1-5.8
     """
+    # Resolve year: 前端可不传，自动从 project_id 推断
+    year = body.year
+    if year is None:
+        year = await fetch_project_audit_year(db, project_id)
+    if year is None:
+        raise HTTPException(
+            status_code=400,
+            detail="无法确定项目审计年度，请检查项目配置或手动指定 year 参数",
+        )
+
     from app.services.export_package_service import ConsistencyCheckError, ExportPackageService
 
     service = ExportPackageService(db)
     try:
         output = await service.export_package(
             project_id=project_id,
-            year=body.year,
+            year=year,
             include_audit_report=body.include_audit_report,
             include_workpapers=body.include_workpapers,
             force_export=body.force_export,
@@ -328,7 +338,7 @@ async def export_package(
 @router.get("/consistency-check")
 async def consistency_check(
     project_id: UUID,
-    year: int = Query(..., description="年度"),
+    year: int | None = Query(None, description="年度（可选，缺省时从项目自动推断）"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -337,6 +347,15 @@ async def consistency_check(
     Requirements: 6.1-6.6
     返回每项检查结果 { check_name, passed, details, severity }
     """
+    # Resolve year: 前端可不传，自动从 project_id 推断
+    if year is None:
+        year = await fetch_project_audit_year(db, project_id)
+    if year is None:
+        raise HTTPException(
+            status_code=400,
+            detail="无法确定项目审计年度，请检查项目配置或手动指定 year 参数",
+        )
+
     from app.services.consistency_gate import ConsistencyGate
 
     gate = ConsistencyGate(db)
@@ -560,7 +579,7 @@ batch_router = APIRouter(
 class BatchExecuteRequest(BaseModel):
     """批量执行请求"""
     project_ids: list[str] = Field(..., description="项目 ID 列表")
-    year: int = Field(..., description="年度")
+    year: int | None = Field(None, description="年度（可选，缺省时逐项目自动推断）")
     steps: list[str] | None = Field(None, description="指定步骤（空=全部）")
 
 
@@ -579,7 +598,7 @@ async def batch_execute(
     """
     MAX_CONCURRENT = 10
     project_ids = body.project_ids
-    year = body.year
+    global_year = body.year
     steps = body.steps
 
     results: list[dict[str, Any]] = []
@@ -594,6 +613,20 @@ async def batch_execute(
         for pid_str in batch:
             try:
                 pid = UUID(pid_str)
+
+                # Resolve year: 全局指定则用全局，否则逐项目推断
+                year = global_year
+                if year is None:
+                    year = await fetch_project_audit_year(db, pid)
+                if year is None:
+                    results.append({
+                        "project_id": pid_str,
+                        "status": "skipped",
+                        "reason": "无法确定项目审计年度",
+                    })
+                    skipped_count += 1
+                    continue
+
                 parsed_steps = (
                     [ChainStep(s) for s in steps] if steps else None
                 )

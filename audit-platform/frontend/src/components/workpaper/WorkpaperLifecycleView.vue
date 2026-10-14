@@ -287,7 +287,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, toRef, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Setting, Reading } from '@element-plus/icons-vue'
@@ -296,6 +296,7 @@ import http from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectStore } from '@/stores/project'
+import { useChainExecution } from '@/composables/useChainExecution'
 
 interface WpItem {
   id: string
@@ -324,6 +325,11 @@ const emit = defineEmits<{
 const router = useRouter()
 const authStore = useAuthStore()
 const projectStore = useProjectStore()
+const chainExec = useChainExecution(toRef(props, 'projectId'))
+
+onBeforeUnmount(() => {
+  chainExec.cleanup()
+})
 
 // 使用手册弹窗
 const showModuleHandbook = ref(false)
@@ -473,22 +479,11 @@ async function loadRecommendations() {
   }
 }
 
-const chainLoading = ref(false)
+const chainLoading = chainExec.executing
 async function onGenerateChain() {
-  chainLoading.value = true
-  try {
-    await http.post(
-      `/api/projects/${props.projectId}/workflow/execute-full-chain`,
-      { force: true },
-      { timeout: 120000 },
-    )
-    ElMessage.success('已生成底稿+附注，正在刷新...')
-    emit('refresh')
-  } catch (e: any) {
-    handleApiError(e, '一键生成')
-  } finally {
-    chainLoading.value = false
-  }
+  await chainExec.executeFullChain(projectStore.year, undefined, true)
+  // composable 内部已处理成功/失败/冲突消息，执行后刷新列表以反映最新状态
+  emit('refresh')
 }
 
 // ════════════════════════════════════════════════════════════
