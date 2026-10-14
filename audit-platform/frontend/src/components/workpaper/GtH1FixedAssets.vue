@@ -439,6 +439,27 @@ const resolvedHtmlData = ref<any>(props.htmlData || null)
 const { depreciationForAlloc } = useH1CrossSheet(allResponses)
 const depreciationBranch = ref<'A' | 'B' | 'C'>('A')
 
+/** 从 sheetName 提取编码 (H1/H1A/H1-1~H1-20/附注) */
+const currentSheet = computed(() => {
+  const name = props.sheetName || props.wpCode || ''
+  // 附注匹配
+  // 注意：H1 源模板国企 sheet 名是「附注披露信息（国有企业）」——用的是「国有企业」
+  // 而非其他循环的「国企」。只认「国企」会落到末尾 fallback 被误判成上市，
+  // 导致国企 TAB 渲染上市组件（实测踩中）。故两种写法都要认。
+  if (/附注.*上市|H1-note-listed/.test(name)) return '附注上市'
+  if (/附注.*国企|附注.*国有|H1-note-soe/.test(name)) return '附注国企'
+  if (/附注/.test(name)) return name.includes('国企') || name.includes('国有') ? '附注国企' : '附注上市'
+  // 程序表
+  const mA = name.match(/H1A/)
+  if (mA) return 'H1A'
+  // H1-N 编码（H1-1 到 H1-20）
+  const m = name.match(/(H1-\d+)/)
+  if (m) return m[1]
+  // 底稿目录 H1（无后缀）
+  if (/底稿目录/.test(name) || (/\bH1\b/.test(name) && !/H1-/.test(name) && !/H1A/.test(name))) return 'H1'
+  return ''
+})
+
 // ─── 双模式切换（统一接桥，替代空壳 usePilotBridgeAdapter）─────────────────────
 //
 // 🔴 原实现是 `usePilotBridgeAdapter`，它的 docstring 声称「底层全部委派给 sync bridge」，
@@ -565,27 +586,6 @@ const h1Year = computed(() => {
   const m = /^(\d{4})/.exec(h1PeriodEnd.value || '')
   if (m) return Number(m[1])
   return new Date().getFullYear()
-})
-
-/** 从 sheetName 提取编码 (H1/H1A/H1-1~H1-20/附注) */
-const currentSheet = computed(() => {
-  const name = props.sheetName || props.wpCode || ''
-  // 附注匹配
-  // 注意：H1 源模板国企 sheet 名是「附注披露信息（国有企业）」——用的是「国有企业」
-  // 而非其他循环的「国企」。只认「国企」会落到末尾 fallback 被误判成上市，
-  // 导致国企 TAB 渲染上市组件（实测踩中）。故两种写法都要认。
-  if (/附注.*上市|H1-note-listed/.test(name)) return '附注上市'
-  if (/附注.*国企|附注.*国有|H1-note-soe/.test(name)) return '附注国企'
-  if (/附注/.test(name)) return name.includes('国企') || name.includes('国有') ? '附注国企' : '附注上市'
-  // 程序表
-  const mA = name.match(/H1A/)
-  if (mA) return 'H1A'
-  // H1-N 编码（H1-1 到 H1-20）
-  const m = name.match(/(H1-\d+)/)
-  if (m) return m[1]
-  // 底稿目录 H1（无后缀）
-  if (/底稿目录/.test(name) || (/\bH1\b/.test(name) && !/H1-/.test(name) && !/H1A/.test(name))) return 'H1'
-  return ''
 })
 
 const showHtmlToolbar = computed(() => {
