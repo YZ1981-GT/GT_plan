@@ -982,6 +982,8 @@
     :project-id="projectId"
     :year="year"
     :vouchers="attachVouchers"
+    :all-account-codes="attachAllAccountCodes"
+    @navigate-to-wp="onNavigateToWp"
   />
 
   <!-- ── 智能导入弹窗 ── -->
@@ -2446,6 +2448,8 @@ function onContextAction(action: string) {
 // ── 挂凭到底稿（序时账 ↔ 底稿凭证检查联动）──
 const attachDialogVisible = ref(false)
 const attachVouchers = ref<Array<{ voucherNo: string; accountCode?: string | null }>>([])
+/** 当前凭证所有分录涉及的科目编码（去重），供弹窗推荐底稿 */
+const attachAllAccountCodes = ref<string[]>([])
 
 /** 从当前行/选中行/当前凭证收集待挂凭证并打开弹窗 */
 function openAttachToWorkpaper(fallbackRow?: any) {
@@ -2486,7 +2490,27 @@ function openAttachToWorkpaper(fallbackRow?: any) {
     return
   }
   attachVouchers.value = list
+  // 从当前凭证所有分录提取涉及的科目（多对多凭证推荐所有相关底稿）
+  attachAllAccountCodes.value = extractAllAccountCodes()
   attachDialogVisible.value = true
+}
+
+/** 从当前凭证分录中提取所有涉及的科目编码（去重） */
+function extractAllAccountCodes(): string[] {
+  const codes = new Set<string>()
+  // 凭证层：从 voucherItems 取所有分录的科目
+  for (const row of voucherItems.value) {
+    const code = String(row?.account_code ?? '').trim()
+    if (code && row?._type !== 'subtotal' && row?._type !== 'view_subtotal') {
+      codes.add(code)
+    }
+  }
+  // 如果不在凭证层（如从明细账层挂凭），voucherItems 可能为空，
+  // 退化为从当前穿透的科目取
+  if (codes.size === 0 && currentAccount.value) {
+    codes.add(currentAccount.value)
+  }
+  return [...codes]
 }
 
 /** 挂凭到当前凭证（凭证层工具栏按钮） */
@@ -2500,7 +2524,17 @@ function attachCurrentVoucher() {
     voucherDate: currentVoucherDate.value || null,
     accountCode: currentAccount.value || null,
   }]
+  // 从当前凭证所有分录提取涉及的科目（多对多凭证推荐所有相关底稿）
+  attachAllAccountCodes.value = extractAllAccountCodes()
   attachDialogVisible.value = true
+}
+
+/** 挂凭成功后用户选择跳转到目标底稿 */
+function onNavigateToWp(payload: { workpaperId: string; wpCode: string; wpName: string }) {
+  router.push({
+    name: 'WorkpaperEditor',
+    params: { projectId: projectId.value, wpId: payload.workpaperId },
+  })
 }
 
 /** 复制/导出排除的内部字段（含 raw_extra / extra_fields 对象本身，避免 [object Object]）。 */

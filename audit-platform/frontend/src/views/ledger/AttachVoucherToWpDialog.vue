@@ -5,11 +5,17 @@
  * 审计师在账簿查询里手工挑到关注/异常凭证 → 挂到某张底稿（如 E1 货币资金、
  * D2 应收账款）的凭证检查表。记录到 sampled_vouchers（working_paper_id + source='ledger'），
  * 底稿凭证检查表通过「从序时账挂入导入」拉取（useAttachedVouchers）。
+ *
+ * ## 2026-10-14 改造
+ * - el-select → el-tree-select 树形折叠选择器（循环→底稿两级）
+ * - 科目推荐：从 wp_account_mapping.json 权威映射消费，覆盖 D~N 全 72 个 primary
+ * - 多对多凭证：传入凭证所有分录科目，推荐所有涉及的底稿（⭐ 推荐组置顶展开）
  */
-import { ref, computed, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, computed, watch, nextTick } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { listWorkpapersPaged } from '@/services/workpaperApi'
 import { attachVoucher } from '@/components/workpaper/composables/useAttachedVouchers'
+import { findAllRecommendedWpCodes } from './accountToWpMapping'
 
 interface VoucherTarget {
   voucherNo: string
@@ -24,11 +30,19 @@ const props = defineProps<{
   year: number
   /** 待挂入的凭证清单（去重后） */
   vouchers: VoucherTarget[]
+  /**
+   * 凭证涉及的所有科目编码（去重）。
+   * 用于推荐相关底稿——多对多凭证（如借方 1002 贷方 2201）会推荐 E1 和 F3。
+   * 为空时退化为从 vouchers[].accountCode 提取。
+   */
+  allAccountCodes?: string[]
 }>()
 
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
   (e: 'attached', payload: { count: number; workpaperId: string }): void
+  /** 用户选择跳转到目标底稿 */
+  (e: 'navigateToWp', payload: { workpaperId: string; wpCode: string; wpName: string }): void
 }>()
 
 const CYCLE_NAMES: Record<string, string> = {
@@ -38,38 +52,12 @@ const CYCLE_NAMES: Record<string, string> = {
   M: 'M 权益', N: 'N 税项', S: 'S 特定项目',
 }
 
-/** 科目编码前缀 → 建议目标底稿主编码（含凭证检查表的常见科目） */
-const ACCOUNT_TO_WP: Array<{ prefix: string; wp: string }> = [
-  // E 货币资金
-  { prefix: '1001', wp: 'E1' }, { prefix: '1002', wp: 'E1' }, { prefix: '1012', wp: 'E1' },
-  // D 销售与收款
-  { prefix: '1121', wp: 'D1' }, { prefix: '1122', wp: 'D2' }, { prefix: '2203', wp: 'D3' },
-  { prefix: '6001', wp: 'D4' }, { prefix: '6051', wp: 'D4' }, { prefix: '1124', wp: 'D5' },
-  { prefix: '1141', wp: 'D6' }, { prefix: '2205', wp: 'D7' },
-  // F 存货与采购
-  { prefix: '1123', wp: 'F1' }, { prefix: '2201', wp: 'F3' }, { prefix: '2202', wp: 'F4' },
-  // G 投资
-  { prefix: '1101', wp: 'G1' }, { prefix: '1132', wp: 'G2' }, { prefix: '1131', wp: 'G3' },
-  { prefix: '1504', wp: 'G4' }, { prefix: '1531', wp: 'G5' }, { prefix: '1506', wp: 'G6' },
-  { prefix: '1511', wp: 'G7' }, { prefix: '1507', wp: 'G8' }, { prefix: '1519', wp: 'G9' },
-  { prefix: '6111', wp: 'G11' }, { prefix: '6103', wp: 'G12' },
-  // H 固定资产
-  { prefix: '1601', wp: 'H1' }, { prefix: '1602', wp: 'H2' }, { prefix: '1604', wp: 'H3' },
-  { prefix: '1606', wp: 'H6' },
-  // I 无形资产
-  { prefix: '1701', wp: 'I1' }, { prefix: '1702', wp: 'I2' }, { prefix: '1711', wp: 'I3' },
-  { prefix: '1801', wp: 'I4' }, { prefix: '6602', wp: 'I6' },
-  // J 薪酬
-  { prefix: '2211', wp: 'J1' },
-  // K 费用
-  { prefix: '1221', wp: 'K1' }, { prefix: '1231', wp: 'K2' }, { prefix: '2241', wp: 'K3' },
-  { prefix: '2245', wp: 'K4' }, { prefix: '2801', wp: 'K5' },
-  { prefix: '6601', wp: 'K8' }, { prefix: '6602', wp: 'K9' },
-  // M 权益
-  { prefix: '4001', wp: 'M2' },
-  // N 税费
-  { prefix: '2221', wp: 'N2' },
-]
+// ── 审计循环排序优先级（B~S 实质性底稿在前，A 完成阶段排后面）──
+const CYCLE_ORDER = 'D E F G H I J K L M N S B C A'.split(' ')
+function cycleSortKey(c: string): number {
+  const i = CYCLE_ORDER.indexOf(c)
+  return i >= 0 ? i : 99
+}
 
 interface WpOption {
   /** 真实 `working_paper.id`。🔴 绝不可用 `wp_index_id` 兜底 —— 见 loadWorkpapers 注释。 */
@@ -81,11 +69,25 @@ interface WpOption {
   wpGenerated: boolean
 }
 
+// ── el-tree-select 节点结构 ──
+interface TreeNode {
+  id: string
+  label: string
+  /** 叶子节点才有值：真实 wp_id */
+  wpId?: string
+  /** 是否禁用（循环组节点禁选） */
+  disabled?: boolean
+  children?: TreeNode[]
+  /** 是否推荐底稿（用于样式高亮） */
+  isRecommended?: boolean
+}
+
 const loading = ref(false)
 const submitting = ref(false)
 const wpOptions = ref<WpOption[]>([])
 const selectedWpId = ref<string>('')
 const note = ref('')
+const treeSelectRef = ref<any>(null)
 
 const visible = computed({
   get: () => props.modelValue,
@@ -94,30 +96,103 @@ const visible = computed({
 
 const voucherCount = computed(() => props.vouchers.length)
 
-/** 按循环分组的可选底稿（供 el-select 分组展示） */
-const groupedOptions = computed(() => {
+/** 收集所有凭证涉及的科目编码 */
+const allCodes = computed<string[]>(() => {
+  if (props.allAccountCodes?.length) return props.allAccountCodes
+  // 退化：从 vouchers[].accountCode 提取
+  const set = new Set<string>()
+  for (const v of props.vouchers) {
+    const code = String(v.accountCode || '').trim()
+    if (code) set.add(code)
+  }
+  return [...set]
+})
+
+/** 推荐的底稿 wp_code 集合 */
+const recommendedWpCodes = computed(() => {
+  return new Set(findAllRecommendedWpCodes(allCodes.value))
+})
+
+/** 树形数据：推荐组置顶 + 按循环分组折叠 */
+const treeData = computed<TreeNode[]>(() => {
+  const opts = wpOptions.value
+  if (opts.length === 0) return []
+
+  const recommended = recommendedWpCodes.value
+  const nodes: TreeNode[] = []
+
+  // ── ⭐ 推荐底稿组（仅有推荐时才出现） ──
+  const recItems = opts
+    .filter((w) => recommended.has(w.wp_code))
+    .sort((a, b) => a.wp_code.localeCompare(b.wp_code, undefined, { numeric: true }))
+  if (recItems.length > 0) {
+    nodes.push({
+      id: '__recommend__',
+      label: `⭐ 推荐底稿（${recItems.length}）`,
+      disabled: true,
+      children: recItems.map((w) => ({
+        id: w.wp_id,
+        label: `${w.wp_code} ${w.wp_name}`,
+        wpId: w.wp_id,
+        isRecommended: true,
+      })),
+    })
+  }
+
+  // ── 按循环分组 ──
   const byCycle = new Map<string, WpOption[]>()
-  for (const w of wpOptions.value) {
+  for (const w of opts) {
     const arr = byCycle.get(w.cycle) ?? []
     arr.push(w)
     byCycle.set(w.cycle, arr)
   }
-  return Array.from(byCycle.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([cycle, items]) => ({
+
+  const sortedCycles = [...byCycle.entries()]
+    .sort((a, b) => cycleSortKey(a[0]) - cycleSortKey(b[0]))
+
+  for (const [cycle, items] of sortedCycles) {
+    const hasRec = items.some((w) => recommended.has(w.wp_code))
+    const sorted = items.sort((a, b) =>
+      a.wp_code.localeCompare(b.wp_code, undefined, { numeric: true }),
+    )
+    nodes.push({
+      id: `cycle_${cycle}`,
       label: CYCLE_NAMES[cycle] || `${cycle} 循环`,
-      options: items.sort((a, b) => a.wp_code.localeCompare(b.wp_code, undefined, { numeric: true })),
-    }))
+      disabled: true,
+      children: sorted.map((w) => ({
+        id: w.wp_id,
+        label: `${w.wp_code} ${w.wp_name}`,
+        wpId: w.wp_id,
+        isRecommended: recommended.has(w.wp_code),
+      })),
+    })
+  }
+
+  return nodes
 })
 
-/** 根据待挂凭证的科目推断建议目标底稿编码 */
-function suggestWpCode(): string {
-  for (const v of props.vouchers) {
-    const code = String(v.accountCode || '')
-    const hit = ACCOUNT_TO_WP.find((m) => code.startsWith(m.prefix))
-    if (hit) return hit.wp
+/** el-tree-select 默认展开的节点：推荐组 + 有推荐底稿的循环组 */
+const defaultExpandedKeys = computed<string[]>(() => {
+  const keys: string[] = []
+  const recommended = recommendedWpCodes.value
+  if (recommended.size > 0) {
+    keys.push('__recommend__')
+    // 也展开有推荐底稿的循环组
+    for (const w of wpOptions.value) {
+      if (recommended.has(w.wp_code)) {
+        const cycleKey = `cycle_${w.cycle}`
+        if (!keys.includes(cycleKey)) keys.push(cycleKey)
+      }
+    }
   }
-  return ''
+  return keys
+})
+
+/** 过滤方法：搜索时按 wp_code 和 wp_name 匹配 */
+function filterNode(value: string, data: TreeNode): boolean {
+  if (!value) return true
+  const keyword = value.toLowerCase()
+  return data.label.toLowerCase().includes(keyword)
 }
 
 const loadError = ref('')
@@ -150,12 +225,6 @@ async function loadWorkpapers(): Promise<void> {
       const code = String(it?.wp_code || '')
       if (!code) continue
       // 🔴 只认真实 `working_paper.id`，绝不用 `wp_index_id` 兜底。
-      //    旧代码写 `it.wp_id ?? it.wp_index_id ?? it.id`，理由是「挂凭目标只需底稿存在，
-      //    不强制文件已生成」—— 但底稿侧回拉用的是真实 wp_id（props.wpId），
-      //    存进 sampled_vouchers 的若是 wp_index_id，两个 ID 永不相等
-      //    ⇒ 挂凭成功、提示成功、**永远拉不回来**，且无任何报错（静默黑洞）。
-      //    契约里 `wp_generated` 就是为此设计的（注释原文：前端据此禁用依赖具体
-      //    底稿资源的读取/写入动作）—— 挂凭正是写入动作，故未生成的底稿不进选项。
       const wpId = String(it?.wp_id ?? '')
       const generated = it?.wp_generated === true || (!!wpId && it?.wp_generated == null)
       if (!wpId || !generated) {
@@ -177,15 +246,17 @@ async function loadWorkpapers(): Promise<void> {
         ? `该项目 ${ungeneratedCount} 张底稿均未生成，无法挂凭。请先在底稿管理中生成底稿`
         : '该项目暂无底稿，请先在底稿管理中生成底稿'
     } else if (ungeneratedCount > 0) {
-      // 如实告知被过滤掉的数量，避免用户以为「我要的底稿怎么不在列表里」
       ungeneratedHint.value = `${ungeneratedCount} 张未生成的底稿已隐藏（生成后才能挂凭）`
     }
 
-    // 智能默认：按科目推断的建议底稿若已生成则预选
-    const suggested = suggestWpCode()
-    if (suggested) {
-      const match = opts.find((o) => o.wp_code === suggested)
-      if (match) selectedWpId.value = match.wp_id
+    // 智能默认：有推荐底稿时预选第一个
+    await nextTick()
+    if (!selectedWpId.value) {
+      const recommended = recommendedWpCodes.value
+      if (recommended.size > 0) {
+        const first = opts.find((o) => recommended.has(o.wp_code))
+        if (first) selectedWpId.value = first.wp_id
+      }
     }
   } catch (err: any) {
     wpOptions.value = []
@@ -241,9 +312,31 @@ async function confirm(): Promise<void> {
     }
     if (ok > 0) {
       const wp = wpOptions.value.find((o) => o.wp_id === selectedWpId.value)
-      ElMessage.success(`已挂入 ${ok} 张凭证到「${wp?.wp_name || wp?.wp_code || '底稿'}」，可在该底稿凭证检查表「从序时账挂入导入」`)
+      const wpName = wp?.wp_name || wp?.wp_code || '底稿'
+      const wpCode = wp?.wp_code || ''
       emit('attached', { count: ok, workpaperId: selectedWpId.value })
       visible.value = false
+
+      // 挂凭成功后询问是否跳转到目标底稿
+      try {
+        await ElMessageBox.confirm(
+          `已挂入 ${ok} 张凭证到「${wpCode} ${wpName}」。\n是否立即跳转到该底稿查看？`,
+          '挂凭成功',
+          {
+            confirmButtonText: '跳转到底稿',
+            cancelButtonText: '留在当前页',
+            type: 'success',
+          },
+        )
+        // 用户点了「跳转到底稿」
+        emit('navigateToWp', {
+          workpaperId: selectedWpId.value,
+          wpCode,
+          wpName,
+        })
+      } catch {
+        // 用户点了「留在当前页」或关闭，什么都不做
+      }
     } else {
       ElMessage.error('挂凭失败，请稍后重试')
     }
@@ -284,35 +377,49 @@ async function confirm(): Promise<void> {
         </div>
       </div>
 
+      <!-- 涉及科目提示（多对多凭证时显示所有科目） -->
+      <div v-if="allCodes.length > 0" class="attach-field">
+        <span class="attach-label">涉及科目</span>
+        <div class="voucher-chips">
+          <el-tag
+            v-for="code in allCodes"
+            :key="code"
+            size="small"
+            type="info"
+            effect="plain"
+          >{{ code }}</el-tag>
+        </div>
+      </div>
+
       <div class="attach-field">
         <span class="attach-label">目标底稿 <span class="req">*</span></span>
-        <el-select
+        <el-tree-select
+          ref="treeSelectRef"
           v-model="selectedWpId"
+          :data="treeData"
+          :props="{ children: 'children', label: 'label', disabled: 'disabled' }"
+          :default-expanded-keys="defaultExpandedKeys"
+          node-key="id"
           filterable
+          :filter-node-method="filterNode"
           clearable
-          placeholder="选择要挂入的底稿（含凭证检查表的底稿更适用）"
-          :loading="loading"
+          check-strictly
+          :render-after-expand="false"
+          placeholder="选择要挂入的底稿（⭐ 推荐底稿已根据科目自动匹配）"
           style="width: 100%"
         >
-          <template v-if="loadError" #empty>
-            <div style="padding: 10px 20px; color: #909399; font-size: 12px; text-align: center">
-              {{ loadError }}
-            </div>
+          <template #default="{ data }">
+            <span :class="{ 'recommended-node': data.isRecommended }">
+              <span v-if="data.isRecommended" class="rec-dot">⭐</span>
+              {{ data.label }}
+            </span>
           </template>
-          <el-option-group
-            v-for="grp in groupedOptions"
-            :key="grp.label"
-            :label="grp.label"
-          >
-            <el-option
-              v-for="o in grp.options"
-              :key="o.wp_id"
-              :label="`${o.wp_code} ${o.wp_name}`"
-              :value="o.wp_id"
-            />
-          </el-option-group>
-        </el-select>
+        </el-tree-select>
+        <div v-if="ungeneratedHint" class="hint-text">💡 {{ ungeneratedHint }}</div>
         <div v-if="loadError" class="error-hint">⚠️ {{ loadError }}</div>
+        <div v-if="recommendedWpCodes.size > 0 && !selectedWpId" class="hint-text">
+          💡 根据凭证科目自动推荐了 {{ recommendedWpCodes.size }} 个底稿，已在⭐推荐组中展开
+        </div>
       </div>
 
       <div class="attach-field">
@@ -374,5 +481,35 @@ async function confirm(): Promise<void> {
   color: var(--el-color-warning);
   font-size: 12px;
   margin-top: 4px;
+}
+.hint-text {
+  color: #909399;
+  font-size: 12px;
+  margin-top: 2px;
+}
+/* 推荐底稿节点高亮 */
+.recommended-node {
+  color: var(--el-color-warning-dark-2);
+  font-weight: 600;
+}
+.rec-dot {
+  margin-right: 2px;
+}
+/* tree-select 下拉面板：紧凑字号 + 限高 */
+:deep(.el-tree-select__popper .el-scrollbar) {
+  max-height: 360px;
+}
+:deep(.el-tree-node__content) {
+  height: 26px;
+  font-size: 12px;
+}
+:deep(.el-tree-node__label) {
+  font-size: 12px;
+}
+/* 循环组节点样式：稍加粗 */
+:deep(.el-tree-node__content .is-disabled > .el-tree-node__label) {
+  font-weight: 600;
+  color: #606266;
+  font-size: 12px;
 }
 </style>
