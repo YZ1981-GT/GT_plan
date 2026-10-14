@@ -12,7 +12,7 @@
  *  ① 不 grep「函数存在」：Block A 真调各循环**生产代码**的 `importFromAuxBalance`
  *     （经 http.post / api.post / 动态 import('@/utils/http')，最终都落到被 mock 的
  *     `@/utils/http` 默认导出），断言 mock 收到的**字面量完整 URL 串**，而非子串/正则。
- *  ② 不只 mount 通过：Block B mount 真实宿主（K1TabDetail / D5TabDetail），点击真按钮，
+ *  ② 不只 mount 通过：Block B mount 真实宿主（K1TabDetail / D5TabVoucherCheck），点击真按钮，
  *     断言 http.post 收到该循环字面量 URL —— 按钮存在 + isReadonly 禁用 + 点击真发请求
  *     一次走完（Requirement 6.3）。
  *  ③ 变异自检（Block D）：把断言里的循环前缀 k1→d1 后，同一断言必须 RED —— 证明字面量
@@ -269,10 +269,10 @@ describe('Block B · 按钮存在 + isReadonly 禁用 + 点击真发请求', () 
     wrapper.unmount()
   })
 
-  // D5TabDetail：入口是 toolbar 上平铺 el-button
-  it('D5TabDetail：入口存在，isReadonly=false 可点，点击打 d5 字面量端点', async () => {
-    const D5TabDetail = (await import('../../d5/D5TabDetail.vue')).default
-    const wrapper = mount(D5TabDetail, {
+  // D5TabVoucherCheck：入口是 toolbar 上平铺 el-button
+  it('D5TabVoucherCheck：入口存在，isReadonly=false 可点，点击打 d5 字面量端点', async () => {
+    const D5TabVoucherCheck = (await import('../../d5/D5TabVoucherCheck.vue')).default
+    const wrapper = mount(D5TabVoucherCheck, {
       props: {
         wpId: 'wp-1',
         projectId: 'proj-1',
@@ -285,7 +285,7 @@ describe('Block B · 按钮存在 + isReadonly 禁用 + 点击真发请求', () 
     })
     await flushPromises()
     const entry = findAuxEntry(wrapper)
-    expect(entry, '「从余额表导入」入口应存在于 D5TabDetail').toBeTruthy()
+    expect(entry, '「从余额表导入」入口应存在于 D5TabVoucherCheck').toBeTruthy()
     expect(entry!.attributes('data-disabled')).toBe('false')
 
     postMock.mockReset()
@@ -297,9 +297,9 @@ describe('Block B · 按钮存在 + isReadonly 禁用 + 点击真发请求', () 
     wrapper.unmount()
   })
 
-  it('D5TabDetail：isReadonly=true → 入口禁用（点击不发请求）', async () => {
-    const D5TabDetail = (await import('../../d5/D5TabDetail.vue')).default
-    const wrapper = mount(D5TabDetail, {
+  it('D5TabVoucherCheck：isReadonly=true → 入口禁用（点击不发请求）', async () => {
+    const D5TabVoucherCheck = (await import('../../d5/D5TabVoucherCheck.vue')).default
+    const wrapper = mount(D5TabVoucherCheck, {
       props: {
         wpId: 'wp-1',
         projectId: 'proj-1',

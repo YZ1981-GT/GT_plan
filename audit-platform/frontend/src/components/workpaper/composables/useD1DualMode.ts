@@ -6,7 +6,7 @@
  *
  * 职责：
  * - 将 4 个 D1 Vue 组件（D1TabInventoryCount/D1TabRelatedPartyCheck/
- *   D1TabPledgeCheck/D1TabSamplingVouching）中重复的 HTML↔OnlyOffice
+ *   D1TabPledgeCheck/D1TabVoucherCheck）中重复的 HTML↔OnlyOffice
  *   双模式切换逻辑抽取为可复用模块
  * - 提供 editorMode/isOOMode/ooHealthy/modeOptions/ooSheetName reactive 状态
  * - 提供 checkOOHealth/switchMode 方法

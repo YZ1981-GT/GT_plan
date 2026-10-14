@@ -396,7 +396,7 @@
 <script setup lang="ts">
 import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
- * D6TabInspection.vue — 合同资产检查表 D6-6
+ * D6TabVoucherCheck.vue — 合同资产检查表 D6-6
  *
  * 凭证级检查表：双区块(本期+期后) + 5项核对结果(点选色块) + 检查比例汇总
  * 对齐源模板结构：客户/日期/凭证/对方科目/明细/金额/核实文件 + ①②③④⑤核对 + 索引/异常/备注

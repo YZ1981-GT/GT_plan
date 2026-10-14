@@ -6,7 +6,7 @@
  * 真栈：frontend 3030 / backend 9980 / OnlyOffice 8080。
  * 🔴 目标底稿：first_publication 按 created_at 取最早的 D5 底稿 = wp 629d762a（project 2aa00f57）。
  *    D5-2-rows 全库 0 行（空首版，OO 编辑创建第 1 行）。
- * 🔴 OO 写受管格 B12(itemName 文本列)——A 列是 category(enum)。D5TabDetail 无搜索框，marker
+ * 🔴 OO 写受管格 B12(itemName 文本列)——A 列是 category(enum)。D5TabVoucherCheck 无搜索框，marker
  *    直接扫 .d5-detail 表格 itemName 输入框（排除 .tab-toolbar）。
  */
 import { test, expect, type Page, type Request, type Response } from '@playwright/test'
@@ -400,7 +400,7 @@ test.describe('G5-1 D5-2 unified host path', () => {
           await expect(page.locator('[data-testid="wp-sync-host"]')).toHaveCount(0, { timeout: 60_000 })
           htmlDomRoundtrip.switched_to_html = true
 
-          // D5TabDetail 无搜索框，marker 直接出现在 itemName 输入框（排除 .tab-toolbar）
+          // D5TabVoucherCheck 无搜索框，marker 直接出现在 itemName 输入框（排除 .tab-toolbar）
           await expect
             .poll(
               async () => {
@@ -501,7 +501,7 @@ test.describe('G5-1 D5-2 unified host path', () => {
         'token/JWT/route_credential 值已脱敏',
         `OO 写格：Asc.editor 写受管 ${OO_WRITE_TARGET}(itemName 文本列，A 列是 category enum)；权威判据是 forcesave cs_error（0=有变更，4=no_changes）`,
         'application applied / revision+1 由同目录 DB 核查脚本补齐（venv 查库）',
-        '§9.6 条件 6：切回结构化视图后 D5TabDetail(.d5-detail) DOM 应出现 marker（D5 无搜索框，直接扫 itemName 输入框，排除 .tab-toolbar）',
+        '§9.6 条件 6：切回结构化视图后 D5TabVoucherCheck(.d5-detail) DOM 应出现 marker（D5 无搜索框，直接扫 itemName 输入框，排除 .tab-toolbar）',
         'Phase 5 第五个非 pilot canary（FVOCI 两级表头无账龄组，最简）：D5 权威模板经外链净化过 OOXML 门；目标 wp 629d762a(project 2aa00f57)由 first_publication 按 created_at 定',
       ],
       auth_probe: { has_token: Boolean(token) },

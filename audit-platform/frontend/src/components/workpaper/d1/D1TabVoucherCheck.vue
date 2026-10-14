@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
- * D1TabSamplingVouching.vue — D1-13 应收票据抽样凭证核对 HTML渲染
+ * D1TabVoucherCheck.vue — D1-13 应收票据凭证检查 HTML渲染
  *
  * Spec: .kiro/specs/d1-inspection-check/
  * Task: 12.1

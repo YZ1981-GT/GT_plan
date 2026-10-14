@@ -17,7 +17,7 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const _dir = dirname(fileURLToPath(import.meta.url))
-const TAB = resolve(_dir, '..', 'd4', 'inspection', 'D4TabOccurrence.vue')
+const TAB = resolve(_dir, '..', 'd4', 'inspection', 'D4TabVoucherCheck.vue')
 const HOST = resolve(_dir, '..', 'GtD4OperatingRevenue.vue')
 
 function read(p: string): string { return readFileSync(p, 'utf-8') }

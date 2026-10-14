@@ -116,7 +116,7 @@
           :debounced-save="debouncedSave"
         />
 
-        <D6TabInspection
+        <D6TabVoucherCheck
           v-else-if="currentSheet === 'D6-6'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -235,7 +235,7 @@ const D6TabDetail = defineAsyncComponent(() => import('./d6/D6TabDetail.vue'))
 const D6TabImpairmentDetail = defineAsyncComponent(() => import('./d6/D6TabImpairmentDetail.vue'))
 const D6TabAdjustment = defineAsyncComponent(() => import('./d6/D6TabAdjustment.vue'))
 const D6TabRelatedParty = defineAsyncComponent(() => import('./d6/D6TabRelatedParty.vue'))
-const D6TabInspection = defineAsyncComponent(() => import('./d6/D6TabInspection.vue'))
+const D6TabVoucherCheck = defineAsyncComponent(() => import('./d6/D6TabVoucherCheck.vue'))
 const D6TabPolicyCheck = defineAsyncComponent(() => import('./d6/D6TabPolicyCheck.vue'))
 const D6TabEclCalculation = defineAsyncComponent(() => import('./d6/D6TabEclCalculation.vue'))
 const D6TabWriteoffCheck = defineAsyncComponent(() => import('./d6/D6TabWriteoffCheck.vue'))

@@ -63,7 +63,7 @@
           :cross-sheet="crossSheet"
         />
 
-        <D5TabDetail
+        <D5TabVoucherCheck
           v-else-if="currentSheet === 'D5-2'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -168,7 +168,7 @@ import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 const D5TabAdjudication = defineAsyncComponent(() => import('./d5/D5TabAdjudication.vue'))
-const D5TabDetail = defineAsyncComponent(() => import('./d5/D5TabDetail.vue'))
+const D5TabVoucherCheck = defineAsyncComponent(() => import('./d5/D5TabVoucherCheck.vue'))
 const D5TabAdjustment = defineAsyncComponent(() => import('./d5/D5TabAdjustment.vue'))
 const D5TabFairValue = defineAsyncComponent(() => import('./d5/D5TabFairValue.vue'))
 const D5TabDisclosure = defineAsyncComponent(() => import('./d5/D5TabDisclosure.vue'))

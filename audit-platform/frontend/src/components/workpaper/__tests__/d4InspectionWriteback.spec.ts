@@ -150,8 +150,8 @@ describe('D4 检查表导入导出/回写 连接性（字面量正确）', () =>
     })
   }
 
-  it('D4TabOccurrence.vue(D4-14): 回写 wpCode = D4-14', () => {
-    const src = readComp('D4TabOccurrence.vue')
+  it('D4TabVoucherCheck.vue(D4-14): 回写 wpCode = D4-14', () => {
+    const src = readComp('D4TabVoucherCheck.vue')
     expect(src).toMatch(/useD4InspectionWriteback\([\s\S]*?wpCode:\s*'D4-14'/)
   })
 })
@@ -168,7 +168,7 @@ function stripComments(src: string): string {
 
 const T4_COMPONENTS = [
   { file: 'D4TabErpCheck.vue', sheet: 'D4-13' },
-  { file: 'D4TabOccurrence.vue', sheet: 'D4-14' },
+  { file: 'D4TabVoucherCheck.vue', sheet: 'D4-14' },
   { file: 'D4TabCompleteness.vue', sheet: 'D4-15' },
   { file: 'D4TabExport.vue', sheet: 'D4-16' },
 ]
@@ -228,7 +228,7 @@ describe('T4 发现→人工认定链：金额/方向由人工认定，reason/�
   })
 
   it('D4-14: 只推 conclusion==="存在重大异常" 或 isAnomalous（人工结论/标记）', () => {
-    const src = stripComments(readComp('D4TabOccurrence.vue'))
+    const src = stripComments(readComp('D4TabVoucherCheck.vue'))
     expect(src).toMatch(/conclusion\s*===\s*'存在重大异常'\s*\|\|\s*t\.isAnomalous/)
   })
 })

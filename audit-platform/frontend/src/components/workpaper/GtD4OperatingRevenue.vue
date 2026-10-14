@@ -82,7 +82,7 @@
       <!-- D4-12 ~ D4-20 检查程序 -->
       <D4TabContract v-else-if="currentSheet === 'D4-12'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
       <D4TabErpCheck v-else-if="currentSheet === 'D4-13'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
-      <D4TabOccurrence v-else-if="currentSheet === 'D4-14'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabVoucherCheck v-else-if="currentSheet === 'D4-14'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
       <D4TabCompleteness v-else-if="currentSheet === 'D4-15'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
       <D4TabExport v-else-if="currentSheet === 'D4-16'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
       <D4TabCutoffForward v-else-if="currentSheet === 'D4-17'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
@@ -204,7 +204,7 @@ const D4TabProductPrice = defineAsyncComponent(() => import('./d4/analysis/D4Tab
 // Inspection
 const D4TabContract = defineAsyncComponent(() => import('./d4/inspection/D4TabContract.vue'))
 const D4TabErpCheck = defineAsyncComponent(() => import('./d4/inspection/D4TabErpCheck.vue'))
-const D4TabOccurrence = defineAsyncComponent(() => import('./d4/inspection/D4TabOccurrence.vue'))
+const D4TabVoucherCheck = defineAsyncComponent(() => import('./d4/inspection/D4TabVoucherCheck.vue'))
 const D4TabCompleteness = defineAsyncComponent(() => import('./d4/inspection/D4TabCompleteness.vue'))
 const D4TabExport = defineAsyncComponent(() => import('./d4/inspection/D4TabExport.vue'))
 const D4TabCutoffForward = defineAsyncComponent(() => import('./d4/inspection/D4TabCutoffForward.vue'))

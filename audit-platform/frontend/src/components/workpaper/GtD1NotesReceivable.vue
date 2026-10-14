@@ -366,7 +366,7 @@
 
       />
 
-      <D1TabSamplingVouching
+      <D1TabVoucherCheck
 
         v-else-if="currentSheet === 'D1-13'"
 
@@ -557,7 +557,7 @@ const D1TabRelatedPartyCheck = defineAsyncComponent(() => import('./d1/D1TabRela
 
 const D1TabPledgeCheck = defineAsyncComponent(() => import('./d1/D1TabPledgeCheck.vue'))
 
-const D1TabSamplingVouching = defineAsyncComponent(() => import('./d1/D1TabSamplingVouching.vue'))
+const D1TabVoucherCheck = defineAsyncComponent(() => import('./d1/D1TabVoucherCheck.vue'))
 
 const D1TabWriteoffCheck = defineAsyncComponent(() => import('./d1/D1TabWriteoffCheck.vue'))
 

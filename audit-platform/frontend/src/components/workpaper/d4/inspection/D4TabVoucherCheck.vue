@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * D4TabOccurrence — D4-14 营业收入发生检查表（穿行测试）
+ * D4TabVoucherCheck — D4-14 营业收入凭证检查表（穿行测试）
  *
  * 三模式：卡片视图 / 矩阵视图 / 在线编辑
  * 多维穿行测试矩阵：每事项 × 7证据链维度

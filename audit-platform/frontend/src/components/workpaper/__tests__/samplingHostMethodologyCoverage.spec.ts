@@ -269,7 +269,7 @@ const HOST_ROW_MODEL_KIND: Readonly<Record<string, { kind: RowModelKind; reason:
         '源模板 F2-38/39/40 行是「月份或日期 × 数量/单价/金额」的计价重算行' +
         '（B12 本期生产 / E12 本期销售 / H12 期末结存 / N12 差异），不是凭证明细行',
     },
-    'D5TabDetail.vue': {
+    'D5TabVoucherCheck.vue': {
       kind: 'account-detail',
       reason:
         '行模型是「明细项目 × 期初/期末/本期增减」的科目明细表行，' +
@@ -586,7 +586,7 @@ type Allowlist = Readonly<Record<string, Partial<Record<ReqKey, string>>>>
  * - **豁免总数只许变短**：修好一个就从这里删掉一条，`ALLOWED_EXCUSE_BASELINE` 同步下调
  */
 const HOST_WIRING_ALLOWLIST: Allowlist = Object.freeze({
-  'D1TabSamplingVouching.vue': {
+  'D1TabVoucherCheck.vue': {
     methodology: '本 spec Task 19~21 未列入该宿主；methodology 消费归 voucher-check-shared-layer',
     persist: '本 spec 范围外：固定 item key 持久化随 voucher-check-shared-layer 一并接',
     bar: '本 spec 范围外：方法学 bar 随 voucher-check-shared-layer 统一挂到抽凭区',
@@ -596,7 +596,7 @@ const HOST_WIRING_ALLOWLIST: Allowlist = Object.freeze({
     persist: '本 spec 范围外：固定 item key 持久化随 voucher-check-shared-layer 一并接',
     bar: '本 spec 范围外：方法学 bar 随 voucher-check-shared-layer 统一挂到抽凭区',
   },
-  'D4TabOccurrence.vue': {
+  'D4TabVoucherCheck.vue': {
     persist: '本 spec 范围外：固定 item key 持久化随 voucher-check-shared-layer 一并接',
     bar: '本 spec 范围外：方法学 bar 随 voucher-check-shared-layer 统一挂到抽凭区',
     fields: '分层判据缺 科目编码；未渲染方法学 bar 故层2「科目来源」不满足；接 bar 即自动满足，归 voucher-check-shared-layer 一并接',

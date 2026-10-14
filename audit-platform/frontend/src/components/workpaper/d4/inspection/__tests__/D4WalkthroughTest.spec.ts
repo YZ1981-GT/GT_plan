@@ -3,7 +3,7 @@
  *
  * 7.2.1 D4WalkthroughCard: props rendering + 7 dimension groups + OCR trigger
  * 7.2.2 D4WalkthroughMatrix: row count + ✓/× indicators + amount discrepancy
- * 7.2.3 D4TabOccurrence: three mode switch + add/delete + sampling params
+ * 7.2.3 D4TabVoucherCheck: three mode switch + add/delete + sampling params
  *
  * Spec: .kiro/specs/d4-14-walkthrough-test/
  */
@@ -272,10 +272,10 @@ describe('D4WalkthroughMatrix', () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 7.2.3 D4TabOccurrence: three mode switch + add/delete + sampling params
+// 7.2.3 D4TabVoucherCheck: three mode switch + add/delete + sampling params
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('D4TabOccurrence', () => {
+describe('D4TabVoucherCheck', () => {
   describe('Three mode switch', () => {
     it('mode options include 卡片视图, 矩阵视图, 在线编辑', () => {
       const modeOptions = ['卡片视图', '矩阵视图', '在线编辑']

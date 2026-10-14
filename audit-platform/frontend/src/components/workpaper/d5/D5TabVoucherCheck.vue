@@ -465,7 +465,7 @@
 <script setup lang="ts">
 import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
- * D5TabDetail.vue — D5-2 明细表
+ * D5TabVoucherCheck.vue — D5-2 明细表
  *
  * el-table 横向滚动17列，固定前2列（类别/明细项目）
  * 自动计算列灰底不可编辑（F/J/L/O）
