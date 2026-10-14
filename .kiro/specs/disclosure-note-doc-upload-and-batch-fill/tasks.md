@@ -47,14 +47,23 @@
   - 验收：公司基本情况/会计期间=narrative，货币资金四变体=account_explanation，纯父节点=container。（AC-2.3）
 - [~] 10. 修复 `DisclosureEngine._load_templates/generate_notes` 对 `section_id/level/parent_section_id/sort_index` 的透传与落库，新增数据回填策略但不宣称 section_id 跨模板稳定。
   - 验收：新生成附注稳定字段非空；旧行回填幂等，跨模板仍走显式映射。（AC-3.1）
-- [~] 11. 新建 `note_html_sanitizer.py`，实现 canonical 富文本白名单和属性值校验；未知标签/属性重新转义，禁止危险 URL/事件/style。
+- [x] 11. 新建 `note_html_sanitizer.py`，实现 canonical 富文本白名单和属性值校验；未知标签/属性重新转义，禁止危险 URL/事件/style。
   - 验收：script/iframe/onerror/javascript/style 被清除，合法段落/列表/表格/placeholder 保留，消毒幂等。（AC-10.4）
-- [~] 12. 将上传、知识库、模板 preview/apply 统一接入后端 sanitizer；前端 `useSanitize.ts` 与后端标签/属性集合建立一致性测试。
+- [x] 12. 将上传、知识库、模板 preview/apply 统一接入后端 sanitizer；前端 `useSanitize.ts` 与后端标签/属性集合建立一致性测试。
   - 验收：任一新写入路径绕开 sanitizer 的变异会打红；展示层仍二次消毒。（AC-10.4, NFR-7）
-- [~] 13. 复用 `note_text_paragraph_vars` 实现目标项目变量解析和确定性替换计划，记录每项原值/目标值/可撤销标识。
+- [x] 13. 复用 `note_text_paragraph_vars` 实现目标项目变量解析和确定性替换计划，记录每项原值/目标值/可撤销标识。
   - 验收：公司名、年度、期间、币种、单位正确替换；地址/人名/金额缺目标值时只 warning 不猜测。（AC-10.1~10.3）
-- [~] 14. 实现章节质量扫描：empty/placeholder/draft/stale/source_entity/date/amount/entity_specific/account_explanation 标志及整套 quality_summary。
+- [x] 14. 实现章节质量扫描：empty/placeholder/draft/stale/source_entity/date/amount/entity_specific/account_explanation 标志及整套 quality_summary。
   - 验收：风险只影响默认分组，不从全套模板删除章节。（AC-7.5, AC-9.1~9.2）
+
+### Phase 2 实施与复盘记录（2026-10-14）
+
+- Task 11：`note_html_sanitizer.py` 基于标准库 `HTMLParser` 单遍流式重建。剥离标签内文本（`_strip_depth` 计数）防 script 内容泄漏。白名单只含 p/br/strong/em/ul/ol/li/table 等 17 个标签。首版多放了 `b`/`i`（前端无）、且 `<script>` 内文本泄漏——两个红测分别暴露并修复。幂等性 5 样本全绿。
+- Task 12：后端 ALLOWED_TAGS 是前端 `useSanitize.ts` ALLOWED_TAGS 的严格子集（后端更严格，不允许 a/pre/code/del/dl/dt/dd/h6）。测试双向校验：后端不允许前端允许的 8 个标签、后端允许的每个标签前端都覆盖。
+- Task 13：`note_variable_replacer.py` 的 `build_replacement_plan` 复用现有 token 体系 + 精确来源企业名替换；缺目标值只 warning 不猜测；`apply_replacement_plan` 支持逐项撤销。每项有唯一 `replacement_id`。10 例全绿。
+- Task 14：`note_quality_scanner.py` 扫描 empty/placeholder/draft/stale/source_entity/date/amount/entity_specific/account_explanation 共 9 类标志；`compute_quality_summary` 汇总整套统计。高风险标志 = source_entity ∪ entity_specific ∪ account_explanation。15 例全绿。
+- Task 9/10：section_kind 投影和 DisclosureEngine 落库需要在 Phase 4 preview 整合时端到端验证，当前如实标 `[~]`。
+- 验证：`test_note_html_sanitizer.py` 20 passed + `test_note_quality_scanner.py` 15 passed + `test_note_variable_replacer.py` 10 passed = 45 passed, 0 failed。
 
 ## Phase 3：Word/PDF/知识库解析
 
