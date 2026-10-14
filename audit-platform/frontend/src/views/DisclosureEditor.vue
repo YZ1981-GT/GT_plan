@@ -107,6 +107,7 @@
                     <el-dropdown-item @click="onExportWithConfirm" title="导出 Word 格式附注文档">📤 导出 Word</el-dropdown-item>
                     <el-dropdown-item @click="showPrintPreview = true" title="打印预览当前附注">🖨️ 打印预览</el-dropdown-item>
                     <el-dropdown-item divided @click="showNoteImport = true" title="导入外部 Excel 附注数据（通用格式）">📥 Excel 导入</el-dropdown-item>
+                    <el-dropdown-item @click="showNoteDocUpload = true" title="上传 Word/PDF 附注文档批量填入叙述性章节">📄 上传附注文档</el-dropdown-item>
                     <el-dropdown-item @click="showOfflineExport = true" title="导出系统格式离线编辑包（可再导回）">📦 离线导出</el-dropdown-item>
                     <el-dropdown-item @click="showOfflineImport = true" title="导入系统导出的离线编辑包">📥 离线导入</el-dropdown-item>
                   </el-dropdown-menu>
@@ -964,6 +965,8 @@
       @imported="onNoteImported"
     />
 
+    <!-- 附注文档上传/知识库批量填入弹窗 -->
+    <NoteDocUploadDialog v-model:visible="showNoteDocUpload" :project-id="projectId" :year="year" @applied="onNoteDocUploadApplied" />
     <!-- D15 离线导出弹窗 -->
     <NoteOfflineExportDialog
       v-model="showOfflineExport"
@@ -1315,6 +1318,7 @@ import NoteReadinessPanel from '@/components/disclosure/NoteReadinessPanel.vue'
 import StructureEditor from '@/components/formula/StructureEditor.vue'
 import { isEmptyTable, type EmptyTableRow, type EmptyTableColumnDef } from '@/views/composables/disclosureEmptyTable'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
+import NoteDocUploadDialog from '@/components/disclosure/NoteDocUploadDialog.vue'
 import NoteRichTextEditor from '@/components/NoteRichTextEditor.vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -1729,6 +1733,7 @@ const {
 
 const genLoading = ref(false)
 const showNoteImport = ref(false)
+const showNoteDocUpload = ref(false)
 const showOfflineExport = ref(false)
 const showOfflineImport = ref(false)
 const showAiPanel = ref(false)
@@ -2790,6 +2795,12 @@ async function fetchDetailFresh(noteSection: string) {
 function onNoteImported() {
   showNoteImport.value = false
   fetchTree()
+}
+
+function onNoteDocUploadApplied() {
+  showNoteDocUpload.value = false
+  fetchTree()
+  if (currentNote.value) fetchDetail(currentNote.value.note_section)
 }
 
 async function onGenerate() {

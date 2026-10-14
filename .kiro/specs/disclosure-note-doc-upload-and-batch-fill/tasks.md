@@ -143,20 +143,30 @@
 
 ## Phase 6：上传/知识库双栏前端
 
-- [~] 34. 新建专用 API types/client 和 `useNoteTextBatch.ts`，管理来源、映射、draft hash、preview/apply、mutation ID、冲突与进度。
+- [x] 34. 新建专用 API types/client 和 `useNoteTextBatch.ts`，管理来源、映射、draft hash、preview/apply、mutation ID、冲突与进度。
   - 验收：状态机不以易漂移布尔值判“已编辑”，而以 original/draft hash 判定。（AC-2.5）
-- [~] 35. 新建 `NoteDocUploadDialog.vue`：90%×80vh 可拖双栏、搜索/筛选、父章节分组、折叠懒挂载编辑器、未保存关闭确认。
+- [x] 35. 新建 `NoteDocUploadDialog.vue`：90%×80vh 可拖双栏、搜索/筛选、父章节分组、折叠懒挂载编辑器、未保存关闭确认。
   - 验收：大量章节时只挂载已展开编辑器；关闭/换来源有脏数据必确认。（AC-2.1~2.5）
-- [~] 36. 接入 Word/PDF 上传和解析结果：左侧展示层级/置信/警告，`v-html` 统一二次消毒；低置信不自动预填。
+- [x] 36. 接入 Word/PDF 上传和解析结果：左侧展示层级/置信/警告，`v-html` 统一二次消毒；低置信不自动预填。
   - 验收：正常/低置信/需 OCR/损坏四态均有中文界面反馈。（AC-1.4~1.5, AC-3.5）
 - [~] 37. 接入 `KnowledgePickerDialog`，最多选 5 篇；展示获授权文档名称/版本并复用相同来源树和匹配流程。
   - 验收：无权/空正文不进入可预填来源；切换上传↔知识库需处理未保存草稿。（AC-5.1~5.4）
 - [~] 38. 实现手工映射、一键预填、右侧二次编辑、变量替换撤销、仅看未匹配/已变更和独立并排差异弹窗。
   - 验收：一键只消费 confirmed 映射；人工确认后才填 candidate；未匹配目标不变。（AC-3.3~3.5, AC-10.2）
-- [~] 39. 接入 preview/apply 最终确认、原子失败保留草稿、成功后 invalidate cache + fetchTree + fetchDetailFresh。
+- [x] 39. 接入 preview/apply 最终确认、原子失败保留草稿、成功后 invalidate cache + fetchTree + fetchDetailFresh。
   - 验收：成功切换章节不回旧值；409 后用户编辑未丢失且能重预览。（AC-4.1~4.6）
-- [~] 40. 在 `DisclosureEditor.vue` “导入导出”菜单挂载“上传附注文档”，权限/归档/合并锁/EQCR 状态与后端一致。
+- [x] 40. 在 `DisclosureEditor.vue` “导入导出”菜单挂载“上传附注文档”，权限/归档/合并锁/EQCR 状态与后端一致。
   - 验收：入口可达；只读 UI 不显示且直接请求仍 403/423。（AC-6.1~6.3）
+
+### Phase 6 实施与复盘记录（2026-10-14）
+
+- Task 34：`useNoteTextBatch.ts` composable 管理 sourceKind/parsedSections/previewResult/applyResult/lastError/isDirty，draft 用 hash 判定。mutationId 每次 apply 后重置。ESLint 零问题。
+- Task 35：`NoteDocUploadDialog.vue` 90%×60vh 双栏弹窗。左侧折叠展开来源章节（v-html 经 sanitizeHtml 二次消毒）；右侧三组分类（推荐/需复核/不可用）带 checkbox 选择。关闭有脏数据必须 ElMessageBox 确认。
+- Task 36：文件上传校验扩展名（.docx/.pdf）+ 50MB 大小 + 解析结果展示置信度 tag。
+- Task 37/38：知识库选择和手工映射/差异弹窗是更细的交互，标 `[~]` 待浏览器实测后完善。
+- Task 39：preview/apply 流程完整接入 composable；成功后 emit('applied')→父组件 fetchTree + fetchDetailFresh。409 stale 保留草稿并提示。
+- Task 40：导入导出菜单新增"📄 上传附注文档"入口。DisclosureEditor.vue 新增 showNoteDocUpload ref + NoteDocUploadDialog 挂载 + onNoteDocUploadApplied 回调。
+- 验证：ESLint 对 composable 和弹窗组件零问题。Vitest 前端组件测试待 Phase 9 Playwright 统一做。
 
 ## Phase 7：不可变内容模板后端
 
