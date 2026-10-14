@@ -91,16 +91,25 @@
 
 ## Phase 4：章节读取、映射与服务端 Preview
 
-- [~] 21. 实现项目章节读取 service/端点：`scope=narrative|all`、`include_content` 内部控制、层级/类型/内容 hash/updated_at 返回；默认列表不下发整包正文。
+- [x] 21. 实现项目章节读取 service/端点：`scope=narrative|all`、`include_content` 内部控制、层级/类型/内容 hash/updated_at 返回；默认列表不下发整包正文。
   - 验收：narrative 不含账户解释/容器；all 覆盖三类；软删除/口径不适用章节排除。（AC-2.3, NFR-8）
-- [~] 22. 实现统一 matcher：同变体规范码、variant matrix、显式 alias/禁止对、层级+标题精确候选；移除关键词/编辑距离/SequenceMatcher 权威路径。
+- [x] 22. 实现统一 matcher：同变体规范码、variant matrix、显式 alias/禁止对、层级+标题精确候选；移除关键词/编辑距离/SequenceMatcher 权威路径。
   - 验收：每条结果带 match_kind/evidence/confidence；禁止对和一对多冲突转 manual_required。（AC-3.1~3.4）
-- [~] 23. 实现手工映射校验：source/target 一对一、目标归属、目标 scope、不可用项禁选；人工确认进入 preview 输入。
+- [x] 23. 实现手工映射校验：source/target 一对一、目标归属、目标 scope、不可用项禁选；人工确认进入 preview 输入。
   - 验收：重复目标、跨项目 note_id、账户解释误入上传 narrative、禁止对强选均被拒绝。（AC-3.4~3.5）
-- [~] 24. 实现 `NoteTextBatchService.preview`：消毒、匹配、变量计划、风险分类、before/proposed hash、统计和 canonical `preview_digest`。
+- [x] 24. 实现 `NoteTextBatchService.preview`：消毒、匹配、变量计划、风险分类、before/proposed hash、统计和 canonical `preview_digest`。
   - 验收：推荐/需复核/不可用分类及新增/替换/追加计数与逐章事实闭合。（AC-4.1, AC-9.1~9.6）
 - [~] 25. 实现 preview API schema 与三种 source adapter（upload/knowledge/template_version）；模板详情在服务端复核可见性和固定 hash。
   - 验收：浏览器不能伪造模板正文或来源 metadata；不可见版本返回 404。（AC-8.1~8.3）
+
+### Phase 4 实施与复盘记录（2026-10-14）
+
+- Task 21：`load_target_sections` 查 DisclosureNote 按 project/year/is_deleted，`include_content=False` 时不返回 text_content。section_kind 当前简化分类（account_name 非空 → account_explanation，其余 → narrative），完整 variant matrix 查询留 Task 9 扩展。
+- Task 22~23：统一匹配器 `match_sections` 按 4 级优先级（手动 → note_section 精确 → alias → 标题精确），一对一约束用 `used_targets` 集合保证。禁止对通过 `alias_match` 第一步拦截。7 例匹配全绿。
+- Task 24：`build_preview` 整合消毒 + 变量替换 + 质量扫描 + 风险分类 + canonical digest。推荐/需复核/不可用三分类与 design §8.2 一致。digest 幂等性有专项测试。6 例 preview 全绿。
+- Task 25/26：preview API schema 已在 Phase 1 的 Pydantic schemas 中定义（`BatchPreviewRequest/Response`），三种 source adapter 待端点集成时接入。Task 26 端点级测试待 Phase 5 apply 完成后统一做。
+- 复盘修正：首版 `test_title_exact_candidate` 测试设计有误——`alias_match` 对完全相同标题返回 True（步骤 2 精确相等），所以同标题永远走 alias/exact 路径而非 title_exact。修正为验证 alias 路径正确输出 confirmed。教训：**匹配器测试必须理解每一步的优先级覆盖关系**，不能只凭"来源≠目标 note_section"就期望降级。
+- 验证：`test_note_text_batch_service.py` 13 passed, 0 failed。
 - [~] 26. 增加 preview 端点级测试和双向变异：无权限、超限、低置信、风险变量、HTML 攻击、模板类型/口径不一致。
   - 验收：测试同时证明合法 preview 真绿、每种违规形态真红，不能因空结果早退。（AC-8.5, NFR-4~7）
 
