@@ -32,34 +32,39 @@ export function useNotePersist(options: UseNotePersistOptions): UseNotePersistRe
   const justSaved = ref(false)
 
   async function onSave() {
-    if (!currentNote.value) return
+    const note = currentNote.value
+    if (!note) return
     await withLoading(saveLoading, async () => {
       const body: Record<string, any> = {}
-      // 富文本内容：text / mixed 类型始终发送；table 类型在有文字内容时也发送
-      if (currentNote.value!.content_type === 'text' || currentNote.value!.content_type === 'mixed'
-        || (currentNote.value!.content_type === 'table' && textContent.value)) {
+      // 三种正文类型都必须显式发送 text_content；空串表示用户确认清空。
+      if (note.content_type === 'text' || note.content_type === 'mixed' || note.content_type === 'table') {
         body.text_content = textContent.value
       }
-      if (currentNote.value!.content_type === 'table' || currentNote.value!.content_type === 'mixed') {
-        const prepared = prepareTableData
-          ? prepareTableData(currentNote.value!.table_data)
-          : currentNote.value!.table_data
-        if (prepared !== currentNote.value!.table_data) {
-          currentNote.value!.table_data = prepared
-        }
-        body.table_data = prepared
+      if (note.content_type === 'table' || note.content_type === 'mixed') {
+        // table_data 是 JSON 载荷；给投影转换器独立副本，防止其原地修改缓存。
+        const tableDataInput = note.table_data == null
+          ? note.table_data
+          : JSON.parse(JSON.stringify(note.table_data))
+        body.table_data = prepareTableData
+          ? prepareTableData(tableDataInput)
+          : tableDataInput
       }
-      await updateDisclosureNote(currentNote.value!.id, body)
+      await updateDisclosureNote(note.id, body)
       ElMessage.success('保存成功')
-      // 回写最新内容到 currentNote 对象，确保缓存中的快照是最新值
+      // 仅在请求成功后回写被保存章节的快照，失败时保留原值。
       if (body.text_content !== undefined) {
-        currentNote.value!.text_content = body.text_content
+        note.text_content = body.text_content
       }
+      if (body.table_data !== undefined) {
+        note.table_data = body.table_data
+      }
+      note.status = 'confirmed'
+      // 保存期间若已切章，不得关闭或清理新章节的编辑状态。
+      if (currentNote.value?.id !== note.id) return
       editMode.value = false
       clearEditDirty()
       autoSaveClearDirty()
       clearAutoSaveDraft()
-      currentNote.value!.status = 'confirmed'
       justSaved.value = true
       setTimeout(() => { justSaved.value = false }, 2500)
     })()

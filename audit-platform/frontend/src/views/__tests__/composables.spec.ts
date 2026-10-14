@@ -297,6 +297,115 @@ describe('useNotePersist', () => {
     expect(clearDirty).toHaveBeenCalled()
   })
 
+  it('onSave sends an empty text_content when clearing table narrative text', async () => {
+    mockUpdateNote.mockResolvedValue({})
+    const currentNote = ref({
+      id: 'n-table-clear', note_section: '五、2', content_type: 'table',
+      table_data: { rows: [] }, text_content: '<p>旧说明</p>', status: 'draft',
+    } as any)
+    const { onSave } = useNotePersist({
+      currentNote, textContent: ref(''), editMode: ref(true),
+      clearEditDirty: vi.fn(), autoSaveClearDirty: vi.fn(), clearAutoSaveDraft: vi.fn(),
+    })
+
+    await onSave()
+
+    expect(mockUpdateNote).toHaveBeenCalledWith('n-table-clear', {
+      text_content: '',
+      table_data: { rows: [] },
+    })
+    expect(currentNote.value.text_content).toBe('')
+  })
+
+  it('onSave sends and caches both fields for mixed content_type', async () => {
+    mockUpdateNote.mockResolvedValue({})
+    const preparedTable = { rows: [{ values: ['已整理'] }] }
+    const currentNote = ref({
+      id: 'n-mixed', note_section: '五、3', content_type: 'mixed',
+      table_data: { rows: [{ values: ['原始'] }] }, text_content: '', status: 'draft',
+    } as any)
+    const { onSave } = useNotePersist({
+      currentNote, textContent: ref('<p>说明</p>'), editMode: ref(true),
+      clearEditDirty: vi.fn(), autoSaveClearDirty: vi.fn(), clearAutoSaveDraft: vi.fn(),
+      prepareTableData: vi.fn(() => preparedTable),
+    })
+
+    await onSave()
+
+    expect(mockUpdateNote).toHaveBeenCalledWith('n-mixed', {
+      text_content: '<p>说明</p>',
+      table_data: preparedTable,
+    })
+    expect(currentNote.value.text_content).toBe('<p>说明</p>')
+    expect(currentNote.value.table_data).toStrictEqual(preparedTable)
+  })
+
+  it('onSave keeps cached values and dirty state when the request fails', async () => {
+    mockUpdateNote.mockRejectedValue(new Error('保存失败'))
+    const originalTable = { rows: [{ values: ['原始'] }] }
+    const currentNote = ref({
+      id: 'n-failed', note_section: '五、4', content_type: 'mixed',
+      table_data: originalTable, text_content: '<p>旧正文</p>', status: 'draft',
+    } as any)
+    const editMode = ref(true)
+    const clearEditDirty = vi.fn()
+    const autoSaveClearDirty = vi.fn()
+    const clearAutoSaveDraft = vi.fn()
+    const { onSave } = useNotePersist({
+      currentNote, textContent: ref('<p>新正文</p>'), editMode,
+      clearEditDirty, autoSaveClearDirty, clearAutoSaveDraft,
+      prepareTableData: (tableData) => {
+        tableData.rows[0].values[0] = '拟保存'
+        return tableData
+      },
+    })
+
+    await expect(onSave()).rejects.toThrow('保存失败')
+
+    expect(currentNote.value.text_content).toBe('<p>旧正文</p>')
+    expect(currentNote.value.table_data).toStrictEqual(originalTable)
+    expect(currentNote.value.status).toBe('draft')
+    expect(editMode.value).toBe(true)
+    expect(clearEditDirty).not.toHaveBeenCalled()
+    expect(autoSaveClearDirty).not.toHaveBeenCalled()
+    expect(clearAutoSaveDraft).not.toHaveBeenCalled()
+  })
+
+  it('onSave does not clear the next section state when the user switches during save', async () => {
+    let resolveSave!: (value: unknown) => void
+    mockUpdateNote.mockImplementation(() => new Promise(resolve => { resolveSave = resolve }))
+    const savedNote = {
+      id: 'n-saving', note_section: '五、5', content_type: 'text',
+      table_data: null, text_content: '<p>旧正文</p>', status: 'draft',
+    } as any
+    const nextNote = {
+      id: 'n-next', note_section: '五、6', content_type: 'text',
+      table_data: null, text_content: '<p>下一章</p>', status: 'draft',
+    } as any
+    const currentNote = ref(savedNote)
+    const editMode = ref(true)
+    const clearEditDirty = vi.fn()
+    const autoSaveClearDirty = vi.fn()
+    const clearAutoSaveDraft = vi.fn()
+    const { onSave } = useNotePersist({
+      currentNote, textContent: ref('<p>已保存正文</p>'), editMode,
+      clearEditDirty, autoSaveClearDirty, clearAutoSaveDraft,
+    })
+
+    const pendingSave = onSave()
+    currentNote.value = nextNote
+    resolveSave({})
+    await pendingSave
+
+    expect(savedNote.text_content).toBe('<p>已保存正文</p>')
+    expect(savedNote.status).toBe('confirmed')
+    expect(currentNote.value).toMatchObject(nextNote)
+    expect(editMode.value).toBe(true)
+    expect(clearEditDirty).not.toHaveBeenCalled()
+    expect(autoSaveClearDirty).not.toHaveBeenCalled()
+    expect(clearAutoSaveDraft).not.toHaveBeenCalled()
+  })
+
   it('onSave sends text_content for text content_type', async () => {
     mockUpdateNote.mockResolvedValue({})
     const currentNote = ref({

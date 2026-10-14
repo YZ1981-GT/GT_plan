@@ -6,10 +6,17 @@
 
 - [x] 1. 编写一次性探针，统计真实 PG 中每项目章节数、narrative/account/container 分布、单章/整套 text_content UTF-8 字节 p50/p95/max、占位/stale/draft 比例；据实冻结业务阈值并删除探针产物。
   - 验收：输出口径和样本项目明确，空值与 NULL 分开；设计中的硬上限有实测依据。（NFR-5）
-- [-] 2. 为 `useNotePersist` 建立当前保存基线：text/mixed/table 三类型均可写正文，table 型可写空串清空；保存后 `currentNote.text_content` 与缓存一致。
+- [x] 2. 为 `useNotePersist` 建立当前保存基线：text/mixed/table 三类型均可写正文，table 型可写空串清空；保存后 `currentNote.text_content` 与缓存一致。
   - 验收：先有能复现“table 清空不发送/切回旧值”的失败用例，再修复为通过。（AC-6.4）
-- [~] 3. 冻结现有 `note_section_matcher` 显式 alias/禁止对和 `note_template_variant_matrix` 四变体基线，证明模糊阈值不能安全代替显式映射。
+- [x] 3. 冻结现有 `note_section_matcher` 显式 alias/禁止对和 `note_template_variant_matrix` 四变体基线，证明模糊阈值不能安全代替显式映射。
   - 验收：禁止对样本不会被自动匹配，已登记 alias 仍命中。（AC-3.1~3.3）
+
+### Phase 0 实施与复盘记录（2026-10-14）
+
+- Task 1：真实 PG 样本与容量阈值见 `design.md` §11.1~11.2；一次性探针已删除。
+- Task 2：先补失败用例，实证 table 清空时请求缺少 `text_content: ""`；修复为 text/mixed/table 均显式发送正文。阶段独立复盘又抓到两处同根竞态并修复：`prepareTableData` 原地修改会在请求失败时污染缓存，保存期间切章会清掉新章节的编辑/脏状态；现改为转换独立 JSON 副本、成功后回写被保存章节，并仅在当前章节仍一致时清理 UI 状态。
+- Task 3：复用既有确定性 matcher 守卫；禁止对优先于精确/alias，归一化仅去空白，不提供相似度接口。
+- 验证：`composables.spec.ts -t useNotePersist` 7 passed；相关 ESLint 零问题；`test_note_section_matcher.py + test_note_template_variant_matrix.py` 65 passed。后端仅有第三方 `schemathesis/jsonschema` deprecation warning，与本阶段改动无关。
 
 ## Phase 1：领域模型、迁移与权限基础
 
