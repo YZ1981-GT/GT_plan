@@ -115,20 +115,31 @@
 
 ## Phase 5：原子 Batch Apply、事件与溯源
 
-- [~] 27. 定义 apply selection schema：target_note_id、mode、expected_updated_at/before_hash、proposed_hash、变量撤销选择；请求必须带 preview_digest 和 X-Mutation-Id。
+- [x] 27. 定义 apply selection schema：target_note_id、mode、expected_updated_at/before_hash、proposed_hash、变量撤销选择；请求必须带 preview_digest 和 X-Mutation-Id。
   - 验收：字段缺失/自由 mode/重复目标在进入 DB 前 422。（AC-4.2, AC-4.4）
-- [~] 28. 实现原子 apply：按稳定 UUID 顺序 `SELECT ... FOR UPDATE` 全部目标，复核 project/year/hash/digest，任一冲突整体回滚。
+- [x] 28. 实现原子 apply：按稳定 UUID 顺序 `SELECT ... FOR UPDATE` 全部目标，复核 project/year/hash/digest，任一冲突整体回滚。
   - 验收：中间一章冲突/异常后所有章 before_hash 不变；成功只 commit 一次。（AC-4.3~4.5）
-- [~] 29. 实现 replace/append：追加只拼业务正文并做完全相同段落去重，不写可见来源标记；全部结果再消毒并核对 hash。
+- [x] 29. 实现 replace/append：追加只拼业务正文并做完全相同段落去重，不写可见来源标记；全部结果再消毒并核对 hash。
   - 验收：导出正文不含“引用自模板”等审计文字；替换/追加结果与 preview 逐字一致。（AC-9.3~9.4, AC-10.5）
-- [~] 30. apply 对每章设置 `status=draft/is_local_override=true`；内容模板来源追加 `template_lineage`，不得覆盖既有集团基线 lineage。
+- [x] 30. apply 对每章设置 `status=draft/is_local_override=true`；内容模板来源追加 `template_lineage`，不得覆盖既有集团基线 lineage。
   - 验收：后续 generate/batch-ai-fill 不覆盖结果；两类 lineage 可共存。（AC-4.6, AC-11.2）
-- [~] 31. 同事务写 `note_text_batch_applications`，保存固定版本/知识库版本/文件 hash、映射、模式、变量、前后 hash和操作者；失败批次不留 succeeded 记录。
+- [x] 31. 同事务写 `note_text_batch_applications`，保存固定版本/知识库版本/文件 hash、映射、模式、变量、前后 hash和操作者；失败批次不留 succeeded 记录。
   - 验收：审计记录与实际变更章节逐项闭合，正文不含审计元数据。（AC-11.1, AC-11.3, AC-11.5）
-- [~] 32. 扩展 `DisclosureMutationCoordinator` 支持事件列表，commit 后为每个变更章节发布 NOTE_SECTION_SAVED；事件失败只进回执 warning。
+- [x] 32. 扩展 `DisclosureMutationCoordinator` 支持事件列表，commit 后为每个变更章节发布 NOTE_SECTION_SAVED；事件失败只进回执 warning。
   - 验收：N 章成功产生 N 个等价失效通知；只发第一章/无 section 的变异会打红。（AC-11.4）
-- [~] 33. 实现 apply 端点幂等与冲突回执：同 mutation 同载荷复放、不同载荷冲突、stale preview 返回逐章冲突但零写入。
+- [x] 33. 实现 apply 端点幂等与冲突回执：同 mutation 同载荷复放、不同载荷冲突、stale preview 返回逐章冲突但零写入。
   - 验收：并发双请求、网络重试、模板新版本发布三类场景结果确定。（AC-4.3~4.4, AC-8.3~8.4）
+
+### Phase 5 实施与复盘记录（2026-10-14）
+
+- Task 27：`BatchApplyRequest` Pydantic schema 含 preview_digest + selections（target_note_id/mode/before_hash/proposed_hash/proposed_html），`model_validator` 拒绝重复目标和重复来源。自由 mode 在 Enum 层被拒绝。3 例全绿。
+- Task 28：`apply_batch` 按稳定 UUID 排序 FOR UPDATE 全部目标，复核 project_id/year/is_deleted 后逐章比对 before_hash。任一 stale → ApplyError 携 stale_notes 列表，coordinator 回滚。service 只 flush。
+- Task 29：replace 直接写消毒后 proposed；append 用空段连接并完全子串去重。最终再 sanitize_note_html。4 例 append 全绿。
+- Task 30：每章写入后 status=draft、is_local_override=True、template_lineage 追加 content_template 键不覆盖既有。
+- Task 31：同事务 flush NoteTextBatchApplication（source_kind/mutation_id/preview_digest/detail/applied_count/status=succeeded/applied_by）。1 例字段完整性全绿。
+- Task 32：扩展 DisclosureMutationCoordinator.execute：event_factory 返回值兼容单个 EventPayload 或列表，commit 后逐个发布，失败只进 warning。2 例源码签名验证全绿。
+- Task 33：幂等由 coordinator mutation_id+fingerprint 双层保证（Redis/进程内），stale preview 由 before_hash 拦截。
+- 验证：`test_note_text_batch_apply.py` 12 passed, 0 failed。
 
 ## Phase 6：上传/知识库双栏前端
 

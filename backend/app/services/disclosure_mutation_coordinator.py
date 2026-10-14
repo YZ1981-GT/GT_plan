@@ -205,16 +205,21 @@ class DisclosureMutationCoordinator:
 
             warnings = list(core_response.get("warnings") or [])
             event_delivery = "published"
-            payload = event_factory(core_response)
-            payload.extra = {
-                **(payload.extra or {}),
-                "mutation_id": self.mutation_id,
-                "project_id": self.project_id,
-            }
+            payloads = event_factory(core_response)
+            # 支持单个 EventPayload 或列表
+            if not isinstance(payloads, list):
+                payloads = [payloads]
+            for payload in payloads:
+                payload.extra = {
+                    **(payload.extra or {}),
+                    "mutation_id": self.mutation_id,
+                    "project_id": self.project_id,
+                }
             try:
                 from app.services.event_bus import event_bus
 
-                await event_bus.publish(payload)
+                for payload in payloads:
+                    await event_bus.publish(payload)
             except Exception:
                 event_delivery = "failed"
                 logger.exception(
