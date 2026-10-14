@@ -773,16 +773,15 @@ const emit = defineEmits<{
 }>()
 
 /**
- * 抽凭科目码 —— 取 render 下发的语义定位结果。
+ * 抽凭科目码 —— 优先取上层 provide 注入的 `tb_source_codes` 映射码，未注入时退兜底码。
  *
  * 🔴 改造前写死 `1503`，那是**可供出售金融资产**（G6 域）⇒ 抽的是别的循环的凭证。
  * 序时账按客户**原始码**前缀匹配，故优先取 `originalCodes`，缺失时回退标准码。
+ * spec: voucher-attach-account-mapping-closure（批次 5，任务 18）
  */
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
 const samplingAccountCode = computed(() => {
-  const hd = props.htmlData as Record<string, any> | null | undefined
-  const src = (hd?.tb_source_codes ?? hd?.project_context?.tb_source_codes ?? null) as
-    | TbSourceCodes
-    | null
+  const src = _injectedTbSrc?.value ?? null
   const originals = h3AccountScope.originalCodes(src, H3_SLOT_GROSS)
   return originals[0] || h3AccountScope.accountCode(src, H3_SLOT_GROSS) || H3_FALLBACK_CODES.gross
 })
@@ -949,7 +948,7 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const H3_ACCOUNT_PREFIXES = h3AccountScope.queryCodes()
+const H3_ACCOUNT_PREFIXES = computed(() => h3AccountScope.queryCodes(_injectedTbSrc?.value ?? null))
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -965,7 +964,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, samplingYear.value, props.wpId, H3_ACCOUNT_PREFIXES,
+      props.projectId, samplingYear.value, props.wpId, H3_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSamplesFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

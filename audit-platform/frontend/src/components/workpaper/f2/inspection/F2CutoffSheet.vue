@@ -470,6 +470,8 @@ import {
   type F2CutoffInvCategory,
   type F2CutoffSheetConfig,
 } from './f2CutoffSheetConfigs'
+import { f2InventoryQueryCodes } from '../../composables/f2InventoryAccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
 import type { ExtractedVoucher, FillMode } from '../../composables/useCutoffAutoSampling'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
@@ -829,9 +831,17 @@ const cutoff = useF2CutoffSheet({
   periodEnd: computed(() => props.bsDate || ''),
 })
 
-const samplingAccountCodes = computed(() =>
-  getF2CutoffAccountCodes((cutoff.meta.value.invCategory || '') as F2CutoffInvCategory),
-)
+// spec: voucher-attach-account-mapping-closure（批次 3b，任务 11）
+// 映射码注入：父组件 GtF2InventoryMain 通过 provide 下发 tb_source_codes
+const tbSourceCodes = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+
+const samplingAccountCodes = computed(() => {
+  // 有映射码时直接用（已是项目实际科目，无需按类别细分标准码子集）
+  const mapped = f2InventoryQueryCodes(tbSourceCodes?.value ?? null)
+  if (tbSourceCodes?.value) return mapped.join(',')
+  // 兜底：无映射码时沿用类别筛选的标准码（向后兼容）
+  return getF2CutoffAccountCodes((cutoff.meta.value.invCategory || '') as F2CutoffInvCategory)
+})
 
 const effectiveCutoffDirection = computed(() => {
   if ((cutoff.meta.value.sampleWindowMode || 'primary') === 'symmetric') return 'window' as const

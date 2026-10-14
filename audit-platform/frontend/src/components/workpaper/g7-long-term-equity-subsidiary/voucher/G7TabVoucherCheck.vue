@@ -10,7 +10,7 @@
           v-if="!isReadonly && wpId && projectId"
           :project-id="projectId"
           :workpaper-id="wpId"
-          :account-code="G7_GROSS_FALLBACK_STANDARD"
+          :account-code="G7_SAMPLING_ACCOUNT_CODE"
           phase="final"
           :year="auditYear"
           @filled="onSampleFilled"
@@ -431,7 +431,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 持久化 G7-18-rows / G7-18-criteria；字段对齐后端 IE；抽凭引擎科目 1511。
  * Runtime Boundary：保存后 scheduleAutoSnapshot。
  */
-import { ref, computed, inject, onMounted } from 'vue'
+import { ref, computed, inject, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import http from '@/utils/http'
@@ -442,7 +442,8 @@ import { useG7SubImportExport } from '../../composables/useG7SubImportExport'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
-import { G7_GROSS_FALLBACK_STANDARD } from '../../composables/g7AccountScope'
+import { gCycleScope } from '../../composables/gCycleAccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
@@ -470,6 +471,13 @@ const auditYear = computed<number>(() => {
   return new Date().getFullYear()
 })
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const G7_SAMPLING_ACCOUNT_CODE = computed(() =>
+  gCycleScope('G7')!.queryCodes(_injectedTbSrc?.value ?? null, 'gross').join(','),
+)
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const scheduleAutoSnapshot = runtime?.version?.scheduleAutoSnapshot ?? (() => undefined)
 
@@ -736,7 +744,9 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const G7_ACCOUNT_PREFIXES = [G7_GROSS_FALLBACK_STANDARD]
+const G7_ACCOUNT_PREFIXES = computed(() =>
+  gCycleScope('G7')!.queryCodes(_injectedTbSrc?.value ?? null, 'gross'),
+)
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -752,7 +762,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, auditYear.value, props.wpId, G7_ACCOUNT_PREFIXES,
+      props.projectId, auditYear.value, props.wpId, G7_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSampleFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

@@ -30,7 +30,7 @@ import {
   listAttachedVouchers,
 } from '../composables/useAttachedVouchers'
 // 科目码单一真源：路径 A（抽凭）与路径 B（挂凭前缀）同源，禁组件内字面量。
-import { e1QueryCodes, e1SamplingAccountCode } from '../composables/e1AccountScope'
+import { e1QueryCodes, e1SamplingAccountCode, type E1TbSourceCodes } from '../composables/e1AccountScope'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -48,6 +48,10 @@ const props = defineProps<{
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
 const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
+
+// ─── 科目映射码注入（provide/inject，与 D 循环同模式）────────────────────────
+// GtE1.vue provide('tbSourceCodes', ...) → 本组件 inject → e1QueryCodes(src) 三层降级
+const tbSourceCodes = inject<Ref<E1TbSourceCodes | null>>('tbSourceCodes', null)
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -104,8 +108,13 @@ const samplingYear = computed(() => {
  * 🔴 原硬编码 `"1002"` —— 只抽银行存款，**漏掉库存现金与其他货币资金**，
  * 而同组件的挂凭前缀却是三码全集，两条路径口径不一致。现统一为三码族。
  * 本组件无 `tbSourceCodes` prop，故 `e1QueryCodes()` 走兜底全集。
+ *
+ * 🔧 voucher-attach-account-mapping-closure Task 5：改为消费 inject 注入的映射码。
+ *    有映射码时用映射码（客户实际科目编码），无映射码时退到兜底全集（向后兼容）。
  */
-const samplingAccountCode = e1SamplingAccountCode()
+const samplingAccountCode = computed(() =>
+  e1SamplingAccountCode(tbSourceCodes?.value ?? null)
+)
 
 /** 科目编码 → 所属科目名称（1001 现金 / 1002 银行存款 / 1012 其他货币资金） */
 function accountNameOf(code: string): string {
@@ -207,9 +216,14 @@ const importingAttached = ref(false)
  * 路径 A（抽凭 `account-code`）与路径 B（本前缀）必须同源，否则两条路径会对
  * 「E1 是什么科目」给出不同答案 —— 改造前本文件恰是如此（抽凭只写 `1002`，
  * 这里写三码）。取值不变（真源全集 = 原字面量），故运行时行为不变。
+ *
+ * 🔧 voucher-attach-account-mapping-closure Task 5：改为消费 inject 注入的映射码。
+ *    有映射码时用映射码（客户实际科目编码），无映射码时退到兜底全集（向后兼容）。
  * spec: voucher-sampling-account-scope-and-attach-closure R4.1/R4.2/R4.3
  */
-const MF_ACCOUNT_PREFIXES = e1QueryCodes()
+const MF_ACCOUNT_PREFIXES = computed(() =>
+  e1QueryCodes(tbSourceCodes?.value ?? null)
+)
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -232,7 +246,7 @@ async function importFromAttached(): Promise<void> {
       props.projectId,
       samplingYear.value,
       props.wpId,
-      MF_ACCOUNT_PREFIXES,
+      MF_ACCOUNT_PREFIXES.value,
     )
 
     if (samples.length > 0) onSampleFilled({ samples })

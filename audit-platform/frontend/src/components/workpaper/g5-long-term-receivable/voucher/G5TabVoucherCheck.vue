@@ -412,7 +412,7 @@
     <el-dialog v-model="samplingVisible" title="抽凭引擎 — 长期应收款(1531)" width="90%" top="5vh" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="samplingVisible"
-        :account-code="G5_ACCOUNT_CODE"
+        :account-code="G5_SAMPLING_ACCOUNT_CODE"
         :phase="samplingTarget === 'occurrence' ? 'current' : 'post'"
         :workpaper-id="props.wpId"
         :project-id="props.projectId"
@@ -464,12 +464,13 @@
 
 <script setup lang="ts">
 import WpAmountInput from '../../shared/WpAmountInput.vue'
-import { ref, toRef, computed, onMounted, defineAsyncComponent } from 'vue'
+import { ref, toRef, computed, onMounted, defineAsyncComponent, inject, type Ref } from 'vue'
 import {
   useG5VoucherCheck,
   type G5VoucherRow,
 } from '../../composables/useG5VoucherCheck'
-import { G5_ACCOUNT_CODE } from '../../composables/g5Constants'
+import { gCycleScope } from '../../composables/gCycleAccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
@@ -488,6 +489,13 @@ import type { SamplingMethodologySnapshot } from '../../composables/shared/sampl
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),
+)
+
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const G5_SAMPLING_ACCOUNT_CODE = computed(() =>
+  gCycleScope('G5')!.queryCodes(_injectedTbSrc?.value ?? null, 'gross').join(','),
 )
 
 const props = defineProps<{
@@ -583,7 +591,9 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const G5_ACCOUNT_PREFIXES = [G5_ACCOUNT_CODE]
+const G5_ACCOUNT_PREFIXES = computed(() =>
+  gCycleScope('G5')!.queryCodes(_injectedTbSrc?.value ?? null, 'gross'),
+)
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -599,7 +609,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, auditYear.value, props.wpId, G5_ACCOUNT_PREFIXES,
+      props.projectId, auditYear.value, props.wpId, G5_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSamplesFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

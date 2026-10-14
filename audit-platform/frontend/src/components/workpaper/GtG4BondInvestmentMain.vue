@@ -368,6 +368,11 @@ const applicableStandards = useHostApplicableStandards({
   htmlData: () => props.htmlData,
 })
 
+// ─── 科目映射码注入（凭证检查子组件通过 inject 取用）────────────────────────
+import { pickGTbSourceCodes } from './composables/gCycleAccountScope'
+const _g4TbSourceCodes = computed(() => pickGTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _g4TbSourceCodes)
+
 provide('g4VersionTrailRef', versionTrailRef)
 provide('g4OpenVersionHistory', openVersionHistory)
 provide('reloadWorkpaperData', () => formData.loadAll())

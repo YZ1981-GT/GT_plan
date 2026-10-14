@@ -138,6 +138,7 @@ import { useH5DisposalCheck } from '../../composables/useH5DisposalCheck'
 import { useH5FormData } from '../../composables/useH5FormData'
 // 科目码单一真源（禁组件内字面量）
 import { h5Scope } from '../../composables/hCycleAccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
@@ -151,12 +152,10 @@ const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean; year?: number }>()
 
-/**
- * 抽凭科目码（真源 `h5Scope`，原硬编码 `"1631"`）。取值不变 ⇒ 运行时行为不变。
- * 理由同 `H5TabAdditionCheck`：json 的 H5 值 `1606` 是错的，接真源可免误伤。
- * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.5/R5.4
- */
-const samplingAccountCode = h5Scope.grossCode()
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+// spec: voucher-attach-account-mapping-closure（批次 5，任务 18）
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+const samplingAccountCode = computed(() => h5Scope.grossCode(_injectedTbSrc?.value ?? null))
 const emit = defineEmits<{ 'navigate-sheet': [sheetName: string] }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const allResponsesRef = computed(() => props.allResponses)
@@ -190,7 +189,7 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const H5_ACCOUNT_PREFIXES = h5Scope.queryCodes()
+const H5_ACCOUNT_PREFIXES = computed(() => h5Scope.slotCodes(_injectedTbSrc?.value ?? null, 'gross'))
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -206,7 +205,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, samplingYear.value, props.wpId, H5_ACCOUNT_PREFIXES,
+      props.projectId, samplingYear.value, props.wpId, H5_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

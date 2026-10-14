@@ -365,7 +365,7 @@ import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThrea
 import { useH8CrossSheet } from './composables/useH8CrossSheet'
 import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
 import { getHiExtractionSegments } from './composables/hiExtractionSegments'
-import { h8Scope } from './composables/hCycleAccountScope'
+import { h8Scope, pickHTbSourceCodes } from './composables/hCycleAccountScope'
 import { buildHSeedRowIds } from './composables/hSeedRowIdentity'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
@@ -427,6 +427,10 @@ const emit = defineEmits<{
   (e: 'completed'): void
   (e: 'navigate-sheet', sheetName: string): void
 }>()
+
+// ─── tbSourceCodes provide（voucher-attach-account-mapping-closure 任务 17）───
+const _h8TbSourceCodes = computed(() => pickHTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _h8TbSourceCodes)
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)

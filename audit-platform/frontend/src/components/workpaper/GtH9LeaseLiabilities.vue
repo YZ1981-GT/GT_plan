@@ -224,6 +224,7 @@ import { applyH8TerminationToH92Rows } from './composables/useH9Detail'
 import { useH9CrossSheet } from './composables/useH9CrossSheet'
 import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
 import { getHiExtractionSegments } from './composables/hiExtractionSegments'
+import { pickHTbSourceCodes } from './composables/hCycleAccountScope'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -269,6 +270,10 @@ const emit = defineEmits<{
   (e: 'completed'): void
   (e: 'navigate-sheet', sheetName: string): void
 }>()
+
+// ─── tbSourceCodes provide（voucher-attach-account-mapping-closure 任务 17）───
+const _h9TbSourceCodes = computed(() => pickHTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _h9TbSourceCodes)
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)

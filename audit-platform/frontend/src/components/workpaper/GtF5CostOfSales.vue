@@ -168,6 +168,7 @@
  * EventBus：监听 f5:save-items 持久化 + substantive:adjudicated(6401) 供 F5-7 校验区消费
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
+import { pickF5TbSourceCodes } from './composables/f5AccountScope'
 import { useF5CosSalFormData } from './composables/useF5CosSalFormData'
 import { useF5CosOfDualMode } from './composables/useF5CosOfDualMode'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
@@ -235,6 +236,10 @@ const versionToolbar = runtime?.version ?? {
   wrapSaveImmediate: (<T,>(fn: T): T => fn),
 }
 const { versionTrailRef, openVersionHistory } = versionToolbar
+
+// ─── 科目映射码注入（凭证检查子组件通过 inject 取用）────────────────────────
+const _f5TbSourceCodes = computed(() => pickF5TbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _f5TbSourceCodes)
 
 provide('f5VersionTrailRef', versionTrailRef)
 provide('f5OpenVersionHistory', openVersionHistory)

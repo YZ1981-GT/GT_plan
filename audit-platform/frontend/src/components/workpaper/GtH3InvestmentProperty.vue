@@ -342,6 +342,7 @@ import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useH3FormData } from './composables/useH3FormData'
 import { useH3MeasurementModel } from './composables/useH3MeasurementModel'
 import { createH3RowNavigation, H3RowNavigationKey } from './composables/useH3RowNavigation'
+import { pickHTbSourceCodes } from './composables/hCycleAccountScope'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -398,6 +399,10 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navigate-sheet', sheetName: string): void }>()
+
+// ─── tbSourceCodes provide（voucher-attach-account-mapping-closure 任务 17）───
+const _h3TbSourceCodes = computed(() => pickHTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _h3TbSourceCodes)
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)

@@ -1494,11 +1494,11 @@ const noteStale = useNoteStale(projectId)
 const editLock = useEditingLock({
   resourceId: computed(() => (route.params.projectId as string || '') + '_note'),
   resourceType: 'disclosure_note',  // 走通用编辑锁端点 /api/editing-locks/disclosure_note/{id}
+  autoAcquire: false,
+})
 
 // 多窗口门禁：编辑锁冲突时覆盖 canEdit，禁用保存/编辑按钮（复盘 P0-3）
 const effectiveCanEdit = computed(() => canEdit.value && !editLock.forcedReadonly.value)
-  autoAcquire: false,
-})
 
 // A.6.2: 章节级协作锁状态
 const sectionLocks = ref<Record<string, { locked_by: string; locked_by_name: string; locked_at: string; section_id: string } | null>>({})

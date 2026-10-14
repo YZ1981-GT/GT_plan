@@ -234,6 +234,7 @@ import { useH4FormData } from './composables/useH4FormData'
 import { useHSyncMode } from './composables/useHSyncMode'
 import { useH4CrossSheet } from './composables/useH4CrossSheet'
 import { buildH4DetailSeedRows } from './composables/h4DetailPrefill'
+import { pickHTbSourceCodes } from './composables/hCycleAccountScope'
 import { eventBus } from '@/utils/eventBus'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
@@ -279,6 +280,10 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navigate-sheet', sheetName: string): void }>()
+
+// ─── tbSourceCodes provide（voucher-attach-account-mapping-closure 任务 17）───
+const _h4TbSourceCodes = computed(() => pickHTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _h4TbSourceCodes)
 
 // ─── FormData（加载/保存/TB/回写） ────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)

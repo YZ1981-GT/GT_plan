@@ -470,6 +470,9 @@ const tbSourceCodes = computed<TbSourceCodes | null>(() => {
   return raw && typeof raw === 'object' ? (raw as TbSourceCodes) : null
 })
 provide('g7TbSourceCodes', tbSourceCodes)
+// ─── 科目映射码注入（凭证检查子组件通过 inject 取用）────────────────────────
+// 标准键，与 D/E/F 循环同构；g7TbSourceCodes 为 G7 专属遗留键
+provide('tbSourceCodes', tbSourceCodes)
 
 // spec: tb-writeback-explicit-publish-gate Task 12：移除 handleG7Adjudicated 的 TB 回写旁路
 // —— 原「审定表保存后 substantive:adjudicated{writebackTb:true} → formData.writebackTB(1511/1512)」

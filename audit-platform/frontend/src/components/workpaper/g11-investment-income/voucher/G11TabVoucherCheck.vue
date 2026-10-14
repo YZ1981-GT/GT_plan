@@ -3,7 +3,7 @@
     <div class="section-head">
       <h3 class="sheet-title">G11-5 投资收益凭证检查表</h3>
       <div class="head-actions">
-        <GtVoucherSamplingEngine v-if="!isReadonly && wpId && projectId" :project-id="projectId" :workpaper-id="wpId" :account-code="G11_ACCOUNT_CODE" phase="final" :year="auditYear ?? new Date().getFullYear()" @filled="onSampleFilled" />
+        <GtVoucherSamplingEngine v-if="!isReadonly && wpId && projectId" :project-id="projectId" :workpaper-id="wpId" :account-code="G11_SAMPLING_ACCOUNT_CODE" phase="final" :year="auditYear ?? new Date().getFullYear()" @filled="onSampleFilled" />
         <G11ImportExportDropdown :wp-id="wpId" sheet="G11-5" @imported="onImported" />
         <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
           <el-button size="small" :disabled="isReadonly" :loading="importingAttached" title="导入在「账簿查询」右键挂凭到本底稿的序时账凭证" @click="importFromAttached">📎 从序时账挂入导入</el-button>
@@ -262,7 +262,7 @@
       v-if="!isReadonly && wpId && projectId"
       :wp-id="wpId"
       :project-id="projectId"
-      :account-code="G11_ACCOUNT_CODE"
+      :account-code="G11_SAMPLING_ACCOUNT_CODE"
       cycle="g11"
       :year="auditYear ?? undefined"
       fill-target-hint="样本将回填至本表 G11-5；跨期疑点自动强制异常"
@@ -488,11 +488,13 @@
 
 <script setup lang="ts">
 import WpAmountInput from '../../shared/WpAmountInput.vue'
-import { ref, toRef, onMounted, onBeforeUnmount, inject, computed } from 'vue'
+import { ref, toRef, onMounted, onBeforeUnmount, inject, computed, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { useG11VoucherCheck, type G11VoucherCheckRow } from '../../composables/useG11VoucherCheck'
 import { G11_ACCOUNT_CODE } from '../../composables/g11Constants'
+import { gCycleScope } from '../../composables/gCycleAccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
@@ -534,6 +536,13 @@ const props = defineProps<{
 const emit = defineEmits<{ imported: [] }>()
 
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
+
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const G11_SAMPLING_ACCOUNT_CODE = computed(() =>
+  gCycleScope('G11')!.queryCodes(_injectedTbSrc?.value ?? null, 'gross').join(','),
+)
 
 const vc = useG11VoucherCheck({
   wpId: toRef(props, 'wpId'),
@@ -601,7 +610,9 @@ function onRowChange(row: G11VoucherCheckRow | undefined) {
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const G11_ACCOUNT_PREFIXES = [G11_ACCOUNT_CODE]
+const G11_ACCOUNT_PREFIXES = computed(() =>
+  gCycleScope('G11')!.queryCodes(_injectedTbSrc?.value ?? null, 'gross'),
+)
 const attachedYear = computed(() => props.auditYear ?? new Date().getFullYear())
 
 async function refreshAttachedCount(): Promise<void> {
@@ -618,7 +629,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, attachedYear.value, props.wpId, G11_ACCOUNT_PREFIXES,
+      props.projectId, attachedYear.value, props.wpId, G11_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSampleFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

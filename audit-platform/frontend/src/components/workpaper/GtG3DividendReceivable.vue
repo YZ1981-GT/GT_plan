@@ -265,6 +265,11 @@ const openReviewDialog = inject<((sectionId: string) => void) | null>('openRevie
 // 再提供一层：保证 G3 子树能拿到 Runtime Boundary 的复核入口（缺省 null，Tab 侧 v-if）
 provide('openReviewDialog', openReviewDialog)
 
+// ─── 科目映射码注入（凭证检查子组件通过 inject 取用）────────────────────────
+import { pickGTbSourceCodes } from './composables/gCycleAccountScope'
+const _g3TbSourceCodes = computed(() => pickGTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _g3TbSourceCodes)
+
 const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
 provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)

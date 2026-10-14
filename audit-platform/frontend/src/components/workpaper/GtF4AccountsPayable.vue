@@ -208,6 +208,7 @@ import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
+import { pickF4TbSourceCodes } from './composables/f4AccountScope'
 const F4TabAdjudication = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabAdjudication.vue'))
 const F4TabDetail = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabDetail.vue'))
 const F4TabAdjustment = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabAdjustment.vue'))
@@ -290,6 +291,11 @@ const { versionTrailRef, openVersionHistory } = versionToolbar
 
 provide('f4VersionTrailRef', versionTrailRef)
 provide('f4OpenVersionHistory', openVersionHistory)
+
+// ─── 科目映射码注入（凭证检查子组件通过 inject 取用）────────────────────────
+const _f4TbSourceCodes = computed(() => pickF4TbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _f4TbSourceCodes)
+
 provide('f4BsDate', bsDate)
 provide('f4TbAmount', tbAmount)
 

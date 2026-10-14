@@ -523,13 +523,16 @@ import type { SamplingMethodologySnapshot } from '../../composables/shared/sampl
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
  */
 import { h4Scope } from '../../composables/hCycleAccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
 
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
-const samplingAccountCode = h4Scope.grossCode()
+const samplingAccountCode = computed(() => h4Scope.grossCode(_injectedTbSrc?.value ?? null))
 
 const props = defineProps<{
   wpId: string
@@ -661,7 +664,7 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const H4_ACCOUNT_PREFIXES = h4Scope.queryCodes()
+const H4_ACCOUNT_PREFIXES = computed(() => h4Scope.slotCodes(_injectedTbSrc?.value ?? null, 'gross'))
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -677,7 +680,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, samplingYear.value, props.wpId, H4_ACCOUNT_PREFIXES,
+      props.projectId, samplingYear.value, props.wpId, H4_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

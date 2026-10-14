@@ -1,0 +1,375 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "3. 验证 D 循环凭证检查在有映射码时用映射码、无映射码时退兜底码": [
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942231980
+      },
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942244934
+      },
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942536883
+      }
+    ],
+    "4. GtE1.vue 加 provide": [
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942232034
+      },
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942551043
+      },
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942751251
+      }
+    ],
+    "5. E1TabLargeCheck 改用 inject + `e1QueryCodes(src)`": [
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942232077
+      },
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942760611
+      },
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942901492
+      }
+    ],
+    "6. GtF1.vue / GtF3.vue / GtF4.vue 加 provide": [
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942232142
+      },
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942912842
+      },
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791943199599
+      }
+    ],
+    "7. F1TabComprehensiveCheck / F3TabVoucherCheck / F4TabVoucherCheck 改用 inject": [
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942232192
+      },
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791943211813
+      },
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791943443303
+      }
+    ],
+    "8. G1~G12 底稿主组件加 provide": [
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942232445
+      },
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791943449406
+      }
+    ],
+    "9. G1~G12 凭证检查子组件改用 inject": [
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942232723
+      }
+    ],
+    "10. H1~H10 底稿主组件加 provide": [
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942232766
+      }
+    ],
+    "11. H1~H10 凭证检查子组件改用 inject": [
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942232798
+      }
+    ],
+    "12. I/J/K/M/N 底稿主组件加 provide": [
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942232839
+      }
+    ],
+    "13. I/J/K/M/N 凭证检查子组件改用 inject": [
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942232886
+      }
+    ],
+    "14. AccountScope 口径一致性守卫：扫描 importFromAttached 的 accountPrefixes 参数来源": [
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942232921
+      }
+    ],
+    "15. 映射码优先级守卫：每个 AccountScope 的 queryCodes(src) 三层降级测试": [
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942232982
+      }
+    ],
+    "16. 真实 PG 数据验证：选一个自定义编码项目，确认挂凭导入用映射码匹配成功": [
+      {
+        "executionId": "ff73843b-2f9b-4acf-8bde-d2d92949113d",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791942233022
+      }
+    ],
+    "8. 新建 `f2InventoryAccountScope.ts`：接受 TbSourceCodes，三层降级（gross_raw → gross_standard → 兜底 1401~1412）": [
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944005435
+      },
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944021897
+      },
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944231149
+      }
+    ],
+    "9. GtF2InventoryMain / GtF2InventoryValuation / GtF2InventorySpecial / GtF2StocktakeBundle 加 provide": [
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944005485
+      },
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944236906
+      },
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944810131
+      }
+    ],
+    "10. F2TabPurchaseInboundCheck / F2TabMaterialUsageCheck / F2ValuationTestSheet 改用 inject + `f2InventoryQueryCodes(src)`": [
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944005545
+      },
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944821987
+      },
+      {
+        "executionId": "0b26837b-3cbc-4743-8990-5625c9a84b69",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791952087383
+      }
+    ],
+    "11. F2CutoffSheet 改用 inject + `f2InventoryQueryCodes(src)` 的截止测试子集": [
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944005586
+      },
+      {
+        "executionId": "0b26837b-3cbc-4743-8990-5625c9a84b69",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791952098653
+      },
+      {
+        "executionId": "0b26837b-3cbc-4743-8990-5625c9a84b69",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791952345513
+      }
+    ],
+    "12. F2TabContractCostCheck 改用 inject 驱动 `f2ContractCostQueryCodes(injected)`": [
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944005643
+      },
+      {
+        "executionId": "0b26837b-3cbc-4743-8990-5625c9a84b69",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791952350825
+      },
+      {
+        "executionId": "0b26837b-3cbc-4743-8990-5625c9a84b69",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791952570416
+      }
+    ],
+    "13. GtF5CostOfSales.vue 加 provide": [
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944005677
+      },
+      {
+        "executionId": "0b26837b-3cbc-4743-8990-5625c9a84b69",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791952576046
+      },
+      {
+        "executionId": "0b26837b-3cbc-4743-8990-5625c9a84b69",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791952687846
+      }
+    ],
+    "14. F5TabMajorAdjustment 改用 inject + `f5GrossQueryCodes(injected)`": [
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944005730
+      },
+      {
+        "executionId": "0b26837b-3cbc-4743-8990-5625c9a84b69",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791952693380
+      },
+      {
+        "executionId": "0b26837b-3cbc-4743-8990-5625c9a84b69",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791952920112
+      }
+    ],
+    "15. G1~G12 底稿主组件加 provide": [
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944005765
+      },
+      {
+        "executionId": "0b26837b-3cbc-4743-8990-5625c9a84b69",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791952925618
+      },
+      {
+        "executionId": "0b26837b-3cbc-4743-8990-5625c9a84b69",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791953513371
+      }
+    ],
+    "16. G1~G12 凭证检查子组件改用 inject": [
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944005830
+      },
+      {
+        "executionId": "0b26837b-3cbc-4743-8990-5625c9a84b69",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791953518711
+      },
+      {
+        "executionId": "40a27768-6dd6-42ce-9123-ea25cd0a4783",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791954748189
+      }
+    ],
+    "17. H1~H10 底稿主组件加 provide": [
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944005862
+      },
+      {
+        "executionId": "40a27768-6dd6-42ce-9123-ea25cd0a4783",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791954754235
+      },
+      {
+        "executionId": "40a27768-6dd6-42ce-9123-ea25cd0a4783",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791955313256
+      }
+    ],
+    "18. H1~H10 凭证检查子组件改用 inject": [
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944005895
+      },
+      {
+        "executionId": "40a27768-6dd6-42ce-9123-ea25cd0a4783",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791955319278
+      }
+    ],
+    "19. I/J/K/M/N 底稿主组件加 provide": [
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944005925
+      }
+    ],
+    "20. I/J/K/M/N 凭证检查子组件改用 inject": [
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944005961
+      }
+    ],
+    "21. AccountScope 口径一致性守卫：扫描 importFromAttached 的 accountPrefixes 参数来源": [
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944006020
+      }
+    ],
+    "22. 映射码优先级守卫：每个 AccountScope 的 queryCodes(src) 三层降级测试": [
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944006306
+      }
+    ],
+    "23. 真实 PG 数据验证：选一个自定义编码项目，确认挂凭导入用映射码匹配成功": [
+      {
+        "executionId": "63431978-70e0-4066-9f02-fd2579035211",
+        "chatSessionId": "sess_f2d2234b-c914-495b-8121-6de88f080043",
+        "timestamp": 1791944006344
+      }
+    ]
+  }
+}

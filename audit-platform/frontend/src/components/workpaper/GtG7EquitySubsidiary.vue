@@ -97,7 +97,7 @@
  *
  * Requirements: 1.1, 1.2, 1.4, 7.2
  */
-import { ref, computed, onMounted, inject, defineAsyncComponent, type Component } from 'vue'
+import { ref, computed, onMounted, inject, provide, defineAsyncComponent, type Component } from 'vue'
 import G7SheetNavBar from './g7-shared/G7SheetNavBar.vue'
 import { useG7SubDualMode } from './composables/useG7SubDualMode'
 import { useG7SubFormData } from './composables/useG7SubFormData'
@@ -137,6 +137,11 @@ const props = defineProps<{
 
 /** 导航条点击 → 转发给 GtWpRenderer 切换 tab */
 const emit = defineEmits<{ 'navigate-sheet': [sheetName: string] }>()
+
+// ─── 科目映射码注入（凭证检查子组件通过 inject 取用）────────────────────────
+import { pickGTbSourceCodes } from './composables/gCycleAccountScope'
+const _g7SubTbSourceCodes = computed(() => pickGTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _g7SubTbSourceCodes)
 
 // ─── Reactive refs for composables ─────────────────────────────────────────
 const wpIdRef = computed(() => props.wpId)

@@ -404,7 +404,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, toRef, type Ref } from 'vue'
+import { computed, inject, onMounted, ref, toRef, type Ref } from 'vue'
 import { useF2ContractCostCheck } from '../../composables/useF2ContractCostCheck'
 import {
   useF2SpecialAiGenerate,
@@ -449,12 +449,15 @@ const chk = useF2ContractCostCheck({
 })
 
 /**
- * 抽凭科目门（宁缺勿造）。本组件无 `tbSourceCodes` prop ⇒
- * `f2ContractCostQueryCodes()` 返空数组 ⇒ 门判 `absent` ⇒ 模板改渲染提示而非抽凭面板。
- * spec: voucher-sampling-account-scope-and-attach-closure R2.1 / R2.2
+ * 抽凭科目门（宁缺勿造）。
+ * spec: voucher-attach-account-mapping-closure（批次 3b，任务 12）
+ * GtF2InventorySpecial provide('tbSourceCodes', ...) → 本组件 inject →
+ * f2ContractCostQueryCodes(src) 三层降级（gross_raw → gross_standard → 空串兜底）。
+ * inject 未注入时 src=null → 退兜底空串 → 门判 `absent` → 渲染提示而非抽凭面板。
  */
+const tbSourceCodes = inject<Ref<any> | null>('tbSourceCodes', null)
 const samplingGate = useSamplingAccountGate({
-  codes: () => f2ContractCostQueryCodes(),
+  codes: () => f2ContractCostQueryCodes(tbSourceCodes?.value ?? null),
   accountLabel: F2_CONTRACT_COST_ACCOUNT_NAME,
   isReadonly: () => props.isReadonly,
 })

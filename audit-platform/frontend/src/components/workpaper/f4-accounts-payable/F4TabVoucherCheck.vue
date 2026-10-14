@@ -22,19 +22,34 @@ import type { SamplingMethodologySnapshot } from '../composables/shared/sampling
 /**
  * 抽凭科目码取自单一真源 `f4AccountScope`（F4 应付账款）。原为模板内字面量；
  * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
- * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ *
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ * spec: voucher-attach-account-mapping-closure R1.2/R2.1 — inject 映射码
  */
 import { f4GrossQueryCodes } from '../composables/f4AccountScope'
+import type { TbSourceCodes } from '../composables/shared/tbSourceCodes'
 import { ElMessage } from 'element-plus'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../composables/useAttachedVouchers'
 
+// ─── 科目映射码注入（provide/inject，与 D/E 循环同模式）────────────────────────
+// GtF4.vue provide('tbSourceCodes', ...) → 本组件 inject → f4GrossQueryCodes(src) 三层降级
+const tbSourceCodes = inject<Ref<TbSourceCodes | null>>('tbSourceCodes', null)
+
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
-const samplingAccountCode = f4GrossQueryCodes().join(',')
-const F4_ACCOUNT_PREFIXES = f4GrossQueryCodes()
+const samplingAccountCode = computed(() =>
+  f4GrossQueryCodes(tbSourceCodes?.value ?? null).join(','),
+)
+/**
+ * 挂凭前缀匹配用。有映射码时用映射码（客户实际科目编码），
+ * 无映射码时退到兜底标准码（向后兼容）。
+ * spec: voucher-attach-account-mapping-closure R2.1
+ */
+const F4_ACCOUNT_PREFIXES = computed(() =>
+  f4GrossQueryCodes(tbSourceCodes?.value ?? null),
+)
 
 const f4VoucherNav = [
   { id: 'f4-8-sample', label: '样本' },
@@ -157,7 +172,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, auditYear.value, props.wpId, F4_ACCOUNT_PREFIXES,
+      props.projectId, auditYear.value, props.wpId, F4_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) handleSamplingFilled({ samples, phase: 'final', fillMode: 'append' })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

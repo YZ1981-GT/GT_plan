@@ -200,6 +200,11 @@ const applicableStandards = useHostApplicableStandards({
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
+// ─── 科目映射码注入（凭证检查子组件通过 inject 取用）────────────────────────
+import { pickGTbSourceCodes } from './composables/gCycleAccountScope'
+const _g13TbSourceCodes = computed(() => pickGTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _g13TbSourceCodes)
+
 provide('g13VersionTrailRef', versionTrailRef)
 provide('g13OpenVersionHistory', openVersionHistory)
 

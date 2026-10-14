@@ -209,6 +209,7 @@ import { autoSeedF1DetailFromAux } from './composables/useF1DetailAutoSeed'
 import { useF1DualMode } from './composables/useF1DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
+import { pickF1TbSourceCodes } from './composables/f1AccountScope'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 const F1TabAdjudication = defineAsyncComponent(() => import('./f1/F1TabAdjudication.vue'))
@@ -374,6 +375,10 @@ const saveImmediate = versionToolbar.wrapSaveImmediate(rawSaveImmediate)
 
 provide('f1VersionTrailRef', versionTrailRef)
 provide('f1OpenVersionHistory', openVersionHistory)
+
+// ─── 科目映射码注入（凭证检查子组件通过 inject 取用）────────────────────────
+const _f1TbSourceCodes = computed(() => pickF1TbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _f1TbSourceCodes)
 
 /**
  * 🔴 F1 账龄口径单一真源（表级枚举覆盖 > 项目配置 > 3年段）。

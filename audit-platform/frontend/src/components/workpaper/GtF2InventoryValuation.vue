@@ -163,6 +163,7 @@ import { useF2ValuationFormData, type ChecklistResponse } from './composables/us
 import { useF2ValuationDualMode } from './composables/useF2ValuationDualMode'
 import { useF2ReviewDialogProvide } from './composables/useF2ReviewDialogProvide'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { pickF2InventoryTbSourceCodes } from './composables/f2InventoryAccountScope'
 // defineAsyncComponent lazy加载所有子组件（性能优化：13个sheet按需加载）
 const F2TabValuationAvg = defineAsyncComponent(() => import('./f2/valuation/F2TabValuationAvg.vue'))
 const F2TabValuationFifo = defineAsyncComponent(() => import('./f2/valuation/F2TabValuationFifo.vue'))
@@ -219,6 +220,10 @@ const { versionTrailRef, openVersionHistory } = versionToolbar
 
 provide('f2VersionTrailRef', versionTrailRef)
 provide('f2OpenVersionHistory', openVersionHistory)
+
+// ─── 科目映射码注入（凭证检查子组件通过 inject 取用）────────────────────────
+const _f2TbSourceCodes = computed(() => pickF2InventoryTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _f2TbSourceCodes)
 
 // ─── F2-48 canary：useWorkpaperSyncBridge 真双向 ──────────────────────────────
 const F2V_SYNC_ENTRY_ID = 'xlsx/gt-f2-inventory-valuation'

@@ -240,6 +240,11 @@ const auditYear = computed(() => {
   return Number.isFinite(n) && n >= 1900 ? Math.trunc(n) : null
 })
 
+// ─── 科目映射码注入（凭证检查子组件通过 inject 取用）────────────────────────
+import { pickGTbSourceCodes } from './composables/gCycleAccountScope'
+const _g9TbSourceCodes = computed(() => pickGTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _g9TbSourceCodes)
+
 provide('g9VersionTrailRef', versionTrailRef)
 provide('g9OpenVersionHistory', openVersionHistory)
 

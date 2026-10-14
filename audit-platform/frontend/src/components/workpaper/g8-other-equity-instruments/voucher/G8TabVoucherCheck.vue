@@ -678,7 +678,7 @@
     >
       <GtVoucherSamplingEngine
         v-if="showSampling && wpId && projectId"
-        :account-code="G8_ACCOUNT_CODE"
+        :account-code="G8_SAMPLING_ACCOUNT_CODE"
         phase="final"
         default-method="random"
         :workpaper-id="wpId"
@@ -701,7 +701,7 @@
 
 <script setup lang="ts">
 import WpAmountInput from '../../shared/WpAmountInput.vue'
-import { computed, ref, watch, toRef, h, onMounted, onBeforeUnmount, inject } from 'vue'
+import { computed, ref, watch, toRef, h, onMounted, onBeforeUnmount, inject, type Ref } from 'vue'
 import type { Column } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
@@ -722,6 +722,8 @@ import { useG8VoucherCheck, type G8VoucherRow, type G8CheckState, formatG8CheckS
 import { formatG8AbnormalType, type G8VoucherSourceFilter } from '../../composables/g8VoucherCross'
 import { useG8AiGenerate } from '../../composables/useG8AiGenerate'
 import { G8_ACCOUNT_CODE } from '../../composables/g8Constants'
+import { gCycleScope } from '../../composables/gCycleAccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
@@ -753,6 +755,13 @@ const props = defineProps<{
 const emit = defineEmits<{ imported: [] }>()
 
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
+
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const G8_SAMPLING_ACCOUNT_CODE = computed(() =>
+  gCycleScope('G8')!.queryCodes(_injectedTbSrc?.value ?? null, 'gross').join(','),
+)
 
 const tabOptions = [
   { label: '凭证基础', value: 'basic' },
@@ -945,7 +954,9 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const G8_ACCOUNT_PREFIXES = [G8_ACCOUNT_CODE]
+const G8_ACCOUNT_PREFIXES = computed(() =>
+  gCycleScope('G8')!.queryCodes(_injectedTbSrc?.value ?? null, 'gross'),
+)
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -961,7 +972,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, engineYear.value, props.wpId, G8_ACCOUNT_PREFIXES,
+      props.projectId, engineYear.value, props.wpId, G8_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

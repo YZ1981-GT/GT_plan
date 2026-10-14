@@ -373,7 +373,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, toRef, inject, defineAsyncComponent, onMounted } from 'vue'
+import { ref, computed, watch, toRef, inject, defineAsyncComponent, onMounted, type Ref } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -401,15 +401,19 @@ import type { ChecklistResponse } from '../composables/useF1FormData'
 import type { SampledVoucher } from '../composables/useSamplingAlgorithms'
 
 /**
- * 抽凭科目码取自单一真源 `gCycleAccountScope`（G3 应收股利）。
- * 原为模板内字面量；接真源后科目口径与该循环的取数/回写共用同一定义，
- * 避免各处独立硬编码而漂移。本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
- * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2
+ * 抽凭科目码 —— inject 驱动。
+ * spec: voucher-attach-account-mapping-closure Task 16
  */
 import { gCycleScope } from '../composables/gCycleAccountScope'
+import type { TbSourceCodes } from '../composables/shared/tbSourceCodes'
+
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
-const samplingAccountCode = gCycleScope('G3')?.queryCodes().join(',') ?? ''
+const samplingAccountCode = computed(() =>
+  gCycleScope('G3')!.queryCodes(_injectedTbSrc?.value ?? null, 'gross').join(','),
+)
 
 const SamplingEngine = defineAsyncComponent(
   () => import('../voucher-sampling/GtVoucherSamplingEngine.vue'),

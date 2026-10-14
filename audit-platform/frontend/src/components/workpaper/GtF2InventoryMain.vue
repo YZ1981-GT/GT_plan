@@ -243,6 +243,7 @@ import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import { getF2DetailConfig } from './f2/detail/f2DetailSheetConfigs'
 import { getF2CutoffConfig } from './f2/inspection/f2CutoffSheetConfigs'
+import { pickF2InventoryTbSourceCodes } from './composables/f2InventoryAccountScope'
 
 // defineAsyncComponent lazy loading — 首屏仅加载当前 sheet 组件（Req 20.7）
 const F2TabProcedure = defineAsyncComponent(() => import('./f2/core/F2TabProcedure.vue'))
@@ -356,6 +357,10 @@ const { versionTrailRef, openVersionHistory } = versionToolbar
 
 provide('f2VersionTrailRef', versionTrailRef)
 provide('f2OpenVersionHistory', openVersionHistory)
+
+// ─── 科目映射码注入（凭证检查子组件通过 inject 取用）────────────────────────
+const _f2TbSourceCodes = computed(() => pickF2InventoryTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _f2TbSourceCodes)
 
 // ─── F2-6 canary：useWorkpaperSyncBridge 真双向 ──────────────────────────────
 const F2M_SYNC_ENTRY_ID = 'xlsx/gt-f2-inventory-main'

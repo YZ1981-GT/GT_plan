@@ -572,19 +572,21 @@ import { useSamplingMethodologyPersist, buildChecklistDirectPersist } from '../.
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 
 /**
- * 抽凭科目码取自单一真源 `hCycleAccountScope`（H1 固定资产）。原为模板内字面量；
- * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
- * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
- * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ * 抽凭科目码取自单一真源 `hCycleAccountScope`（H1 固定资产）。
+ * 运行态优先取上层 provide 注入的 `tb_source_codes` 映射码，未注入时退兜底码。
+ * spec: voucher-attach-account-mapping-closure（批次 5，任务 18）
  */
 import { h1Scope } from '../../composables/hCycleAccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
 
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
-const samplingAccountCode = h1Scope.grossCode()
+const samplingAccountCode = computed(() => h1Scope.grossCode(_injectedTbSrc?.value ?? null))
 
 const props = defineProps<{
   wpId: string
@@ -705,7 +707,7 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const H1_ACCOUNT_PREFIXES = h1Scope.queryCodes()
+const H1_ACCOUNT_PREFIXES = computed(() => h1Scope.slotCodes(_injectedTbSrc?.value ?? null, 'gross'))
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -721,7 +723,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, samplingYear.value, props.wpId, H1_ACCOUNT_PREFIXES,
+      props.projectId, samplingYear.value, props.wpId, H1_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

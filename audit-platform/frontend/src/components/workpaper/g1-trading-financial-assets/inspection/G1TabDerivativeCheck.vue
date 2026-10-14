@@ -414,7 +414,7 @@
 
 <script setup lang="ts">
 import WpAmountInput from '../../shared/WpAmountInput.vue'
-import { ref, toRef, computed, inject, watch } from 'vue'
+import { ref, toRef, computed, inject, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { useG1DerivativeCheck } from '../../composables/useG1DerivativeCheck'
@@ -428,14 +428,14 @@ import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 /**
- * 科目码单一真源。🔴 原硬编码 `"1501"`（持有至到期投资，G4 循环的科目）。
- *
- * 本表是**衍生金融工具**检查 ⇒ 取 `g1DerivativeCode()`（`BS-004 衍生金融资产 = TB('1102')`），
- * 而不是主表的 `1101` 交易性金融资产 —— 两者是 report_config 里的两个不同报表行，
- * 真源为此专门导出了 `g1DerivativeCode()`。
- * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.4
+ * 科目码 inject 驱动。衍生金融资产 1102 走 `g1DerivativeCode(src)`。
+ * spec: voucher-attach-account-mapping-closure Task 16
  */
 import { g1DerivativeCode } from '../../composables/g1AccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
+
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -449,8 +449,8 @@ const emit = defineEmits<{ imported: [] }>()
 const wpId = computed(() => props.wpId ?? '')
 const projectId = computed(() => props.projectId ?? '')
 
-/** 抽凭科目码：衍生金融资产 1102（真源，非主表的 1101、更非原硬编码的 1501） */
-const samplingAccountCode = g1DerivativeCode()
+/** 抽凭科目码 —— inject 驱动（衍生金融资产 1102） */
+const samplingAccountCode = computed(() => g1DerivativeCode(_injectedTbSrc?.value ?? null))
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 

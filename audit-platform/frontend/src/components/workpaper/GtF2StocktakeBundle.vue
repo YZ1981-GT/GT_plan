@@ -178,6 +178,9 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 provide('f2VersionTrailRef', versionTrailRef)
 provide('f2OpenVersionHistory', openVersionHistory)
 
+// ─── 科目映射码注入（无 htmlData prop，provide null；无凭证检查子组件消费）──
+provide('tbSourceCodes', ref(null))
+
 provide('reloadWorkpaperData', () => formData.loadAll())
 
 const dataTabs = [

@@ -18,7 +18,7 @@
             v-if="!isReadonly && wpId && projectId"
             :project-id="projectId"
             :workpaper-id="wpId"
-            :account-code="accountCode"
+            :account-code="effectiveAccountCode"
             phase="final"
             :year="auditYear"
             @filled="onSampleFilled"
@@ -93,7 +93,7 @@
 
 <script setup lang="ts">
 import WpAmountInput from '../shared/WpAmountInput.vue'
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, inject, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
 import { useG7SubFormData } from '../composables/useG7SubFormData'
@@ -104,7 +104,8 @@ import {
   type G7VoucherSampleRow,
   type G7VoucherSample,
 } from '../composables/g7VoucherSample'
-import { G7_GROSS_FALLBACK_STANDARD } from '../composables/g7AccountScope'
+import { gCycleScope } from '../composables/gCycleAccountScope'
+import type { TbSourceCodes } from '../composables/shared/tbSourceCodes'
 import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist, buildChecklistDirectPersist, snapshotToResponseMap } from '../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
@@ -120,10 +121,17 @@ const props = withDefaults(defineProps<{
   htmlData?: Record<string, any> | null
 }>(), {
   auditYear: 0,
-  accountCode: G7_GROSS_FALLBACK_STANDARD,
+  accountCode: undefined,
   title: '凭证抽查',
   htmlData: null,
 })
+
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+/** 实际使用的 account-code：prop 优先，否则走 inject → gCycleScope('G7') → 兜底 */
+const effectiveAccountCode = computed(() =>
+  props.accountCode ?? gCycleScope('G7')!.queryCodes(_injectedTbSrc?.value ?? null, 'gross').join(','),
+)
 
 /** 审计年度：优先 prop，否则从 htmlData.project_context 派生（audit_year → bs_date 年份 → 当前年） */
 const auditYear = computed<number>(() => {

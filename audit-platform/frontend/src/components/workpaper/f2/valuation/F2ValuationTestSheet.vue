@@ -157,7 +157,7 @@
  * config驱动差异：加权平均/先进先出/标准成本
  * 共享：抽样参数区(6字段) + 动态行 + 差异高亮 + 合计 + 导入导出 + 虚拟滚动 + AI + 编制提示
  */
-import { ref, computed } from 'vue'
+import { ref, computed, inject, type Ref } from 'vue'
 import { isVarianceExceeding } from '../../composables/useF2ValuationTestFormulas'
 import type { ValuationTestRow } from '../../composables/useF2ValuationTestFormulas'
 import type { SampledVoucher, FillMode } from '../../composables/useSamplingAlgorithms'
@@ -166,7 +166,8 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
-import { F2_INVENTORY_ACCOUNT_CODES } from '../../composables/f2NoteSectionMap'
+import { f2InventoryQueryCodes } from '../../composables/f2InventoryAccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
 export interface SegmentOption {
   label: string
@@ -224,19 +225,12 @@ const activeSegment = ref(props.defaultSegment || (props.segments.length ? props
 // 虚拟滚动: >50行启用更大的maxHeight
 const tableMaxHeight = computed(() => props.displayRows.length > 50 ? 560 : 420)
 
-/**
- * 存货计价测试的科目范围 —— 取自单一真源 `F2_INVENTORY_ACCOUNT_CODES`。
- *
- * 🔴 原为 `'1401,...,1411'.split(',')`，注释写「保留原 account-code 值，不新增硬编码」——
- * 但它本身就是硬编码，只是从模板搬到了脚本里，守卫（R6.6「换地方硬编码」）据此判违规。
- * 真源现算为 `['1401'..'1412']`（`Array.from({length:12}, …)`），比原字面量**多一个 1412**，
- * 覆盖更完整的存货族；两者都是存货区间，抽样总体只会变大不会取错科目。
- *
- * ⚠️ 与 `F2TabContractCostCheck` 区分：那张表查的是**合同履约成本**（真实库零命中，
- * 走 `f2ContractCostAccountScope` 的宁缺勿造降级），不能用本存货族常量。
- * spec: voucher-sampling-account-scope-and-attach-closure R6.6
- */
-const valuationAccountCodes = [...F2_INVENTORY_ACCOUNT_CODES]
+// spec: voucher-attach-account-mapping-closure（批次 3b，任务 10）
+// inject → f2InventoryQueryCodes 三层降级：gross → gross_standard → 兜底 1401~1412
+const tbSourceCodes = inject<Ref<TbSourceCodes | null>>('tbSourceCodes', null)
+const valuationAccountCodes = computed(() =>
+  f2InventoryQueryCodes(tbSourceCodes?.value ?? null),
+)
 
 function handleSamplingFilled(payload: {
   samples: SampledVoucher[]

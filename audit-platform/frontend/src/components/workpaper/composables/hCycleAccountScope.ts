@@ -188,3 +188,24 @@ export const H_CYCLE_SCOPES: Record<string, HCycleScope> = {
   H9: h9Scope,
   H10: h10Scope,
 }
+
+/**
+ * 从 htmlData 提取 `tb_source_codes`（与 D/E/F/G 循环同构）。
+ *
+ * 顶层 `htmlData.tb_source_codes` 优先；兼容 `htmlData.project_context.tb_source_codes`。
+ * 两处都读、不做假设，返回 null 时调用方退到兜底码。
+ *
+ * spec: voucher-attach-account-mapping-closure（批次 5，任务 17）
+ */
+export function pickHTbSourceCodes(htmlData: unknown): TbSourceCodes | null {
+  if (!htmlData || typeof htmlData !== 'object') return null
+  const hd = htmlData as Record<string, any>
+  const fromTop = hd.tb_source_codes
+  if (fromTop && typeof fromTop === 'object') return fromTop as TbSourceCodes
+  const pc = hd.project_context
+  if (pc && typeof pc === 'object') {
+    const fromPc = (pc as Record<string, any>).tb_source_codes
+    if (fromPc && typeof fromPc === 'object') return fromPc as TbSourceCodes
+  }
+  return null
+}

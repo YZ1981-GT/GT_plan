@@ -108,6 +108,27 @@ export function e1SamplingAccountCode(src?: E1TbSourceCodes | null): string {
   return e1QueryCodes(src).join(',')
 }
 
+/**
+ * 从 render-config 返回的 `htmlData` 中提取 E1 的 `tb_source_codes`。
+ *
+ * 与 D 循环 `pickDTbSourceCodes` 同构：顶层优先、`project_context` 兼容。
+ * 后端 `get_render_config` 把映射结果放 `html_data.tb_source_codes`；
+ * 部分旧路径可能放在 `html_data.project_context.tb_source_codes`。
+ * 两处都读、不做假设，返回 null 时调用方退到兜底码。
+ */
+export function pickE1TbSourceCodes(htmlData: unknown): E1TbSourceCodes | null {
+  if (!htmlData || typeof htmlData !== 'object') return null
+  const hd = htmlData as Record<string, any>
+  const fromTop = hd.tb_source_codes
+  if (fromTop && typeof fromTop === 'object') return fromTop as E1TbSourceCodes
+  const pc = hd.project_context
+  if (pc && typeof pc === 'object') {
+    const fromPc = (pc as Record<string, any>).tb_source_codes
+    if (fromPc && typeof fromPc === 'object') return fromPc as E1TbSourceCodes
+  }
+  return null
+}
+
 /** 溯源展示文案：`1001,1002,1012（报表行 BS-002）` / 解析失败时标注「兜底」 */
 export function e1SourceLabel(src?: E1TbSourceCodes | null): string {
   const codes = e1QueryCodes(src).join(',')

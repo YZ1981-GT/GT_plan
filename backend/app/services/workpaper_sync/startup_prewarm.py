@@ -107,6 +107,7 @@ async def prewarm_sync_baseline_projections() -> PrewarmProjectionOutcome:
     「跳过」必须留下 WARNING，否则等于没发生。
     """
     from app.core.database import async_session
+    from app.models.core import Project
     from app.models.workpaper_models import WorkingPaper
     from app.models.workpaper_sync_models import WorkpaperSyncEntryState
     from app.routers.wp_sync_router import (  # noqa: PLC0415 - 同上
@@ -141,6 +142,11 @@ async def prewarm_sync_baseline_projections() -> PrewarmProjectionOutcome:
                     WorkingPaper.project_id,
                 )
                 .join(WorkingPaper, WorkingPaper.id == WorkpaperSyncEntryState.wp_id)
+                .join(Project, Project.id == WorkingPaper.project_id)
+                .where(
+                    WorkingPaper.is_deleted == sa.false(),
+                    Project.is_deleted == sa.false(),
+                )
                 .order_by(WorkpaperSyncEntryState.entry_id)
                 .limit(PREWARM_PROJECTION_MAX_ENTRIES)
             )

@@ -246,6 +246,11 @@ const dualMode = useG6SppiDualMode({
   reloadAll: () => formData.loadAll(),
 })
 
+// ─── 科目映射码注入（凭证检查子组件通过 inject 取用）────────────────────────
+import { pickGTbSourceCodes } from './composables/gCycleAccountScope'
+const _g6SppiTbSourceCodes = computed(() => pickGTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _g6SppiTbSourceCodes)
+
 provide('g6VersionTrailRef', versionTrailRef)
 provide('g6OpenVersionHistory', openVersionHistory)
 provide('reloadWorkpaperData', () => formData.loadAll())

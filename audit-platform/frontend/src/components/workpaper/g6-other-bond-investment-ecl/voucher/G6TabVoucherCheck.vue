@@ -368,7 +368,7 @@
       width="90%" top="5vh" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="samplingVisible"
-        account-code="1503"
+        :account-code="G6_SAMPLING_ACCOUNT_CODE"
         phase="final"
         default-method="random"
         :workpaper-id="wpId"
@@ -395,7 +395,7 @@
 
 <script setup lang="ts">
 import WpAmountInput from '../../shared/WpAmountInput.vue'
-import { computed, inject, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, inject, onMounted, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist, buildChecklistDirectPersist, snapshotToResponseMap } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
@@ -404,6 +404,8 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
+import { gCycleScope } from '../../composables/gCycleAccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import G6EclImportExportDropdown from '../G6EclImportExportDropdown.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -435,6 +437,13 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ imported: [] }>()
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const G6_SAMPLING_ACCOUNT_CODE = computed(() =>
+  gCycleScope('G6')!.queryCodes(_injectedTbSrc?.value ?? null, 'gross').join(','),
+)
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
 const formData = useG6EclFormData({ wpId: wpIdRef, projectId: projectIdRef })
@@ -553,7 +562,9 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const G6_ACCOUNT_PREFIXES = ['1503']
+const G6_ACCOUNT_PREFIXES = computed(() =>
+  gCycleScope('G6')!.queryCodes(_injectedTbSrc?.value ?? null, 'gross'),
+)
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -569,7 +580,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, samplingYear.value, props.wpId, G6_ACCOUNT_PREFIXES,
+      props.projectId, samplingYear.value, props.wpId, G6_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSamplesFilled({ samples, fillMode: 'append' })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

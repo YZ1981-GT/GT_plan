@@ -295,6 +295,7 @@ import WorkpaperModuleHandbookDialog from './WorkpaperModuleHandbookDialog.vue'
 import http from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
 import { useAuthStore } from '@/stores/auth'
+import { useProjectStore } from '@/stores/project'
 
 interface WpItem {
   id: string
@@ -322,6 +323,7 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const authStore = useAuthStore()
+const projectStore = useProjectStore()
 
 // 使用手册弹窗
 const showModuleHandbook = ref(false)

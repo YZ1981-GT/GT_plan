@@ -322,6 +322,7 @@ import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
 import { getHiExtractionSegments } from './composables/hiExtractionSegments'
+import { pickHTbSourceCodes } from './composables/hCycleAccountScope'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -383,6 +384,10 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navigate-sheet', sheetName: string): void }>()
+
+// ─── tbSourceCodes provide（voucher-attach-account-mapping-closure 任务 17）───
+const _h5TbSourceCodes = computed(() => pickHTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _h5TbSourceCodes)
 
 // ─── 行业适用性守卫 ──────────────────────────────────────────────────────────
 const projectContext = inject<any>('projectContext', null)

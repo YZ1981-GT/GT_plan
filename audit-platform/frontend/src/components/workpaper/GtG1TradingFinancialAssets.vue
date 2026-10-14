@@ -383,6 +383,11 @@ const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: ()
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
+// ─── 科目映射码注入（凭证检查子组件通过 inject 取用）────────────────────────
+import { pickGTbSourceCodes } from './composables/gCycleAccountScope'
+const _g1TbSourceCodes = computed(() => pickGTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _g1TbSourceCodes)
+
 provide('g1VersionTrailRef', versionTrailRef)
 provide('g1OpenVersionHistory', openVersionHistory)
 

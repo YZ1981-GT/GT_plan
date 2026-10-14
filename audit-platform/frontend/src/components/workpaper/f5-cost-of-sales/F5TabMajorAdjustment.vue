@@ -268,15 +268,21 @@ import { useSamplingMethodologyPersist } from '../composables/shared/useSampling
 import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
 
 /**
- * 抽凭科目码取自单一真源 `f5AccountScope`（F5 主营业务成本）。原为模板内字面量；
- * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
- * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
- * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ * 抽凭科目码取自单一真源 `f5AccountScope`（F5 主营业务成本）。
+ * 父组件 GtF5CostOfSales 通过 provide('tbSourceCodes', ...) 注入映射码；
+ * inject 未注入时退兜底码 `['6401~6499']`。
+ * spec: voucher-attach-account-mapping-closure（批次 3c，任务 14）
  */
 import { f5GrossQueryCodes } from '../composables/f5AccountScope'
+import type { TbSourceCodes } from '../composables/shared/tbSourceCodes'
+
+// spec: voucher-attach-account-mapping-closure（批次 3c，任务 14）
+const tbSourceCodes = inject<Ref<TbSourceCodes | null>>('tbSourceCodes', null)
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
-const samplingAccountCode = f5GrossQueryCodes().join(',')
+const samplingAccountCode = computed(() =>
+  f5GrossQueryCodes(tbSourceCodes?.value ?? null).join(','),
+)
 
 defineEmits<{ imported: [] }>()
 

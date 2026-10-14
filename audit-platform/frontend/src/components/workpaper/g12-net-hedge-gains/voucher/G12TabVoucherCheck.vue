@@ -215,7 +215,7 @@
       v-if="!isReadonly && wpId && projectId"
       :wp-id="wpId"
       :project-id="projectId"
-      :account-code="G12_ACCOUNT_CODE"
+      :account-code="G12_SAMPLING_ACCOUNT_CODE"
       cycle="g12"
       fill-target-hint="样本将回填至 G12-6 凭证检查表"
     />
@@ -475,7 +475,7 @@
     >
       <GtVoucherSamplingEngine
         v-if="showSampling && wpId && projectId"
-        :account-code="G12_ACCOUNT_CODE"
+        :account-code="G12_SAMPLING_ACCOUNT_CODE"
         phase="final"
         default-method="mus"
         :workpaper-id="wpId"
@@ -489,7 +489,7 @@
 
 <script setup lang="ts">
 import WpAmountInput from '../../shared/WpAmountInput.vue'
-import { ref, toRef, computed, onMounted, onBeforeUnmount, inject } from 'vue'
+import { ref, toRef, computed, onMounted, onBeforeUnmount, inject, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import {
@@ -498,6 +498,8 @@ import {
   type G12VoucherSourceFilter,
 } from '../../composables/useG12VoucherCheck'
 import { G12_ACCOUNT_CODE, G12_RISK_LEVELS } from '../../composables/g12Constants'
+import { gCycleScope } from '../../composables/gCycleAccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
@@ -531,6 +533,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{ imported: [] }>()
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
+
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const G12_SAMPLING_ACCOUNT_CODE = computed(() =>
+  gCycleScope('G12')!.queryCodes(_injectedTbSrc?.value ?? null, 'gross').join(','),
+)
+
 const auditYearRef = useWorkpaperAuditYear()
 const engineYear = computed(() => auditYearRef.value ?? new Date().getFullYear())
 const showSampling = ref(false)
@@ -574,7 +584,9 @@ async function onImported() {
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const G12_ACCOUNT_PREFIXES = [G12_ACCOUNT_CODE]
+const G12_ACCOUNT_PREFIXES = computed(() =>
+  gCycleScope('G12')!.queryCodes(_injectedTbSrc?.value ?? null, 'gross'),
+)
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -590,7 +602,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, engineYear.value, props.wpId, G12_ACCOUNT_PREFIXES,
+      props.projectId, engineYear.value, props.wpId, G12_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSampleFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

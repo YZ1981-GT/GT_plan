@@ -362,7 +362,7 @@
 
 <script setup lang="ts">
 import WpAmountInput from '../../shared/WpAmountInput.vue'
-import { toRef, computed, ref, inject, watch } from 'vue'
+import { toRef, computed, ref, inject, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import {
@@ -378,18 +378,20 @@ import type { ChecklistResponse } from '../../composables/useF1FormData'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 /**
- * 科目码单一真源。🔴 原硬编码 `"1501"` —— `account_chart` 实证 `1501` 是
- * **持有至到期投资**（G4 循环的科目），而本底稿是「交易性金融资产」（`wp_index` 实证），
- * 真源与 `report_config` 的 `BS-003 = TB('1101','期末余额')` 一致为 `1101`。
- * 抽错科目 ⇒ 抽回来的凭证属另一个循环，回填即错误样本。
- * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.4
+ * 科目码单一真源 —— inject 驱动。
+ * 优先从上层 provide 注入的 `tb_source_codes` 取映射后的真实码，未注入时退兜底码。
+ * spec: voucher-attach-account-mapping-closure Task 16
  */
-import { g1GrossQueryCodes } from '../../composables/g1AccountScope'
+import { gCycleScope } from '../../composables/gCycleAccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
+
+// 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
+const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -403,11 +405,12 @@ const props = defineProps<{
 const wpId = computed(() => props.wpId ?? '')
 
 /**
- * 抽凭科目码（真源，原硬编码 `"1501"` 持有至到期投资=G4 的科目）。
- * 本组件无 `tbSourceCodes` prop ⇒ `g1GrossQueryCodes()` 走兜底 `1101`。
- * 多码用逗号拼接（`useVoucherSampling` 会 `split(',')`）。
+ * 抽凭科目码 —— inject 驱动（gross 槽）。
+ * 有映射码时用映射码，无注入时退兜底 `1101`。
  */
-const samplingAccountCode = g1GrossQueryCodes().join(',')
+const samplingAccountCode = computed(() =>
+  gCycleScope('G1')!.queryCodes(_injectedTbSrc?.value ?? null, 'gross').join(','),
+)
 
 const emit = defineEmits<{ imported: [] }>()
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
@@ -464,7 +467,7 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
-const G1_ACCOUNT_PREFIXES = g1GrossQueryCodes()
+const G1_ACCOUNT_PREFIXES = computed(() => gCycleScope('G1')!.queryCodes(_injectedTbSrc?.value ?? null, 'gross'))
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
@@ -480,7 +483,7 @@ async function importFromAttached(): Promise<void> {
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId!, year.value, props.wpId!, G1_ACCOUNT_PREFIXES,
+      props.projectId!, year.value, props.wpId!, G1_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) handleSamplingFilled({ samples, phase: 'final', fillMode: 'append' })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

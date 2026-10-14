@@ -31,6 +31,7 @@ from app.services.chain_orchestrator import (
     ChainStep,
     chain_orchestrator,
 )
+from app.services.project_audit_year import fetch_project_audit_year
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ async def _broadcast(execution_id: str, event_type: str, data: dict[str, Any]) -
 
 
 class ExecuteChainRequest(BaseModel):
-    year: int = Field(..., description="年度")
+    year: int | None = Field(None, description="年度（可选，缺省时从项目自动推断）")
     steps: list[str] | None = Field(None, description="指定步骤（空=全部）")
     force: bool = Field(False, description="强制执行（跳过前置条件）")
 
@@ -113,6 +114,16 @@ async def execute_full_chain(
 
     Requirements: 1.1-1.9
     """
+    # Resolve year: 前端可不传，自动从 project_id 推断
+    year = body.year
+    if year is None:
+        year = await fetch_project_audit_year(db, project_id)
+    if year is None:
+        raise HTTPException(
+            status_code=400,
+            detail="无法确定项目审计年度，请检查项目配置或手动指定 year 参数",
+        )
+
     # Parse steps
     chain_steps: list[ChainStep] | None = None
     if body.steps:
@@ -132,7 +143,7 @@ async def execute_full_chain(
         execution = await chain_orchestrator.execute_full_chain(
             db=db,
             project_id=project_id,
-            year=body.year,
+            year=year,
             steps=chain_steps,
             force=body.force,
             trigger_type="manual",

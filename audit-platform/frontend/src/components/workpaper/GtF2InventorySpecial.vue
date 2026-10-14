@@ -215,6 +215,7 @@ import { useF2SpecialFormData, type ChecklistResponse } from './composables/useF
 import { useF2SpecialDualMode } from './composables/useF2SpecialDualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useF2SpeExternalAdjudicated } from './composables/useF2SpeExternalAdjudicated'
+import { pickF2InventoryTbSourceCodes } from './composables/f2InventoryAccountScope'
 import { isContractCostTestExampleSheet } from './f2-special/contract/f2ContractCostTestExampleData'
 import { isInterviewCheckExampleSheet } from './f2-special/ipo/f2InterviewCheckExampleData'
 
@@ -290,6 +291,10 @@ const { versionTrailRef, openVersionHistory } = versionToolbar
 
 provide('f2VersionTrailRef', versionTrailRef)
 provide('f2OpenVersionHistory', openVersionHistory)
+
+// ─── 科目映射码注入（凭证检查子组件通过 inject 取用）────────────────────────
+const _f2TbSourceCodes = computed(() => pickF2InventoryTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _f2TbSourceCodes)
 
 // ─── F2-57 canary：useWorkpaperSyncBridge 真双向 ──────────────────────────────
 const F2S_SYNC_ENTRY_ID = 'xlsx/gt-f2-inventory-special'

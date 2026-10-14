@@ -430,7 +430,7 @@
     >
       <GtVoucherSamplingEngine
         v-if="samplingVisible && wpId && projectId"
-        :account-code="F2_INVENTORY_ACCOUNT_CODES"
+        :account-code="F2_ACCOUNT_PREFIXES.join(',')"
         phase="final"
         default-method="random"
         :workpaper-id="wpId"
@@ -458,11 +458,12 @@ import { useF2PurchaseInboundCheck } from '../../composables/useF2InspectionChec
 import { useF2PurchaseOcr } from '../../composables/useF2PurchaseOcr'
 import { useF2ValuationAiGenerate, type F2ValAiSection } from '../../composables/useF2ValuationAiGenerate'
 import {
-  F2_INVENTORY_ACCOUNT_CODES,
   F2_INSPECTION_CATEGORIES,
   evaluatePurchaseInboundChecks,
   type PurchaseInboundRow,
 } from '../../composables/useF2InspectionCheckFormulas'
+import { f2InventoryQueryCodes } from '../../composables/f2InventoryAccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
 import type { SampledVoucher, FillMode, SamplingMethod } from '../../composables/useSamplingAlgorithms'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
@@ -486,6 +487,12 @@ const ic = useF2PurchaseInboundCheck({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
 })
+
+// spec: voucher-attach-account-mapping-closure（批次 3，任务 10）
+const tbSourceCodes = inject<Ref<TbSourceCodes | null>>('tbSourceCodes', null)
+const F2_ACCOUNT_PREFIXES = computed(() =>
+  f2InventoryQueryCodes(tbSourceCodes?.value ?? null),
+)
 
 const CONCLUSION_KEY = 'F2-33-audit-conclusion'
 const auditConclusion = ref('')

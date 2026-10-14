@@ -45,3 +45,24 @@ export function f1QueryCodes(src?: TbSourceCodes | null): string[] {
 export function f1AccountCode(src?: TbSourceCodes | null): string {
   return f1QueryCodes(src)[0] || F1_FALLBACK_STANDARD
 }
+
+/**
+ * 从 render-config 返回的 `htmlData` 中提取 F1 的 `tb_source_codes`。
+ *
+ * 与 E1 `pickE1TbSourceCodes` 同构：顶层优先、`project_context` 兼容。
+ * 后端 `get_render_config` 把映射结果放 `html_data.tb_source_codes`；
+ * 部分旧路径可能放在 `html_data.project_context.tb_source_codes`。
+ * 两处都读、不做假设，返回 null 时调用方退到兜底码。
+ */
+export function pickF1TbSourceCodes(htmlData: unknown): TbSourceCodes | null {
+  if (!htmlData || typeof htmlData !== 'object') return null
+  const hd = htmlData as Record<string, any>
+  const fromTop = hd.tb_source_codes
+  if (fromTop && typeof fromTop === 'object') return fromTop as TbSourceCodes
+  const pc = hd.project_context
+  if (pc && typeof pc === 'object') {
+    const fromPc = (pc as Record<string, any>).tb_source_codes
+    if (fromPc && typeof fromPc === 'object') return fromPc as TbSourceCodes
+  }
+  return null
+}

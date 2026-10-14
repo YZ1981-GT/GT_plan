@@ -200,6 +200,7 @@ import type { ChecklistResponse } from './composables/useF1FormData'
 import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
 import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
+import { pickHTbSourceCodes } from './composables/hCycleAccountScope'
 
 const H10TabProcedure = defineAsyncComponent(() => import('./h10/core/H10TabProcedure.vue'))
 const H10TabAdjudication = defineAsyncComponent(() => import('./h10/core/H10TabAdjudication.vue'))
@@ -225,6 +226,10 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ (e: 'jump-to-section', sheetName: string): void }>()
+
+// ─── tbSourceCodes provide（voucher-attach-account-mapping-closure 任务 17）───
+const _h10TbSourceCodes = computed(() => pickHTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _h10TbSourceCodes)
 
 const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)

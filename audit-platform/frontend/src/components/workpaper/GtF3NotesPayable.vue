@@ -317,6 +317,7 @@ import { useF3DualMode } from './composables/useF3DualMode'
 
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
+import { pickF3TbSourceCodes } from './composables/f3AccountScope'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 
@@ -422,6 +423,10 @@ const { versionTrailRef, openVersionHistory } = versionToolbar
 
 provide('f3VersionTrailRef', versionTrailRef)
 provide('f3OpenVersionHistory', openVersionHistory)
+
+// ─── 科目映射码注入（凭证检查子组件通过 inject 取用）────────────────────────
+const _f3TbSourceCodes = computed(() => pickF3TbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _f3TbSourceCodes)
 
 
 

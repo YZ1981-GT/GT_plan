@@ -536,6 +536,11 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 provide('e1VersionTrailRef', versionTrailRef)
 provide('e1OpenVersionHistory', openVersionHistory)
 
+// 科目映射码注入：凭证检查子组件通过 inject 取到后用于挂凭前缀匹配
+import { pickE1TbSourceCodes } from './composables/e1AccountScope'
+const _e1TbSourceCodes = computed(() => pickE1TbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _e1TbSourceCodes)
+
 // ─── Sheet 分发逻辑 ─────────────────────────────────────────────────────────
 
 /**

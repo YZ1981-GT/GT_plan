@@ -339,6 +339,7 @@ import {
   type InterestCapBranch,
 } from './composables/h2InterestCapBranch'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
+import { pickHTbSourceCodes } from './composables/hCycleAccountScope'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -393,6 +394,10 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navigate-sheet', sheetName: string): void }>()
+
+// ─── tbSourceCodes provide（voucher-attach-account-mapping-closure 任务 17）───
+const _h2TbSourceCodes = computed(() => pickHTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _h2TbSourceCodes)
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)

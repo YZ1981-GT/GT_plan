@@ -359,6 +359,7 @@ import {
   type H1FourTablePrefill,
 } from './composables/h1FourTablePrefill'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
+import { pickHTbSourceCodes } from './composables/hCycleAccountScope'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -413,6 +414,10 @@ const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navig
 
 // 目录卡片跳转（H1TabIndex → GtWpRenderer）
 provide('jumpToSection', (sheetName: string) => emit('navigate-sheet', sheetName))
+
+// ─── tbSourceCodes provide（voucher-attach-account-mapping-closure 任务 17）───
+const _h1TbSourceCodes = computed(() => pickHTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _h1TbSourceCodes)
 
 // ─── Runtime Boundary（须早于 dual-mode，供 autoSave 快照）──────────────────
 const runtime = inject(WorkpaperRuntimeContextKey, null)
