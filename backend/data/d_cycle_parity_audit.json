@@ -101,7 +101,7 @@
       "browse_tabs": [
         "D1TabEndorsementDetail.vue",
         "D1TabMemoReconciliation.vue",
-        "D1TabSamplingVouching.vue"
+        "D1TabVoucherCheck.vue"
       ],
       "sheets": [
         {
@@ -1346,7 +1346,7 @@
       "tabs_with_browse_mode": 1,
       "tabs_total": 7,
       "browse_tabs": [
-        "D5TabDetail.vue"
+        "D5TabVoucherCheck.vue"
       ],
       "sheets": [
         {
@@ -1479,7 +1479,7 @@
         "D6TabDetail.vue",
         "D6TabEclCalculation.vue",
         "D6TabImpairmentDetail.vue",
-        "D6TabInspection.vue",
+        "D6TabVoucherCheck.vue",
         "D6TabRelatedParty.vue",
         "D6TabWriteoffCheck.vue"
       ],

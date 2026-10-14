@@ -763,7 +763,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "entryId": "xlsx/d4/inspection/d4-tab-occurrence",
     "hasBrowserEvidence": false,
     "hasContractEvidence": false,
-    "hostPath": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabOccurrence.vue",
+    "hostPath": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabVoucherCheck.vue",
     "independentEntry": false,
     "migrationState": "parent_duplicate",
     "parentEntryId": "xlsx/gt-d4-operating-revenue",
@@ -775,7 +775,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
       "component_types": [],
       "sheet_expressions": [],
       "sheet_literals": [],
-      "source_host": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabOccurrence.vue",
+      "source_host": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabVoucherCheck.vue",
       "wp_code_patterns": [
         "D4T"
       ]

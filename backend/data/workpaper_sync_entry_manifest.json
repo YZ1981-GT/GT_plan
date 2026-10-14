@@ -3027,7 +3027,7 @@
         "parent_reason": "sync host declares the parent entry identity (overlay_rule)",
         "review_status": "source_inventory_reviewed"
       },
-      "host_path": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabOccurrence.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabVoucherCheck.vue",
       "html_store": "projection_contract",
       "independent_entry": false,
       "migration_state": "parent_duplicate",
@@ -3065,7 +3065,7 @@
           "documentType": "xlsx",
           "documentTypeSource": "overlay_rule",
           "entryIdDeclaration": "xlsx/gt-d4-operating-revenue",
-          "file": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabOccurrence.vue",
+          "file": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabVoucherCheck.vue",
           "importKind": "static",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
@@ -3118,7 +3118,7 @@
         "component_types": [],
         "sheet_expressions": [],
         "sheet_literals": [],
-        "source_host": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabOccurrence.vue",
+        "source_host": "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabVoucherCheck.vue",
         "wp_code_patterns": [
           "D4T"
         ]

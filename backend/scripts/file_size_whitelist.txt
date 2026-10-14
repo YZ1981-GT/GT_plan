@@ -1413,6 +1413,6 @@ audit-platform/frontend/src/components/workpaper/voucher-sampling/GtVoucherSampl
 backend/app/routers/voucher_sampling.py  1497
 backend/app/services/ledger_sampling_service.py  1044
 
-#   D1TabSamplingVouching.vue —— D1 抽凭核对表。本次仅 +34 行（挂凭导入接入）。
+#   D1TabVoucherCheck.vue —— D1 凭证检查表（原 D1TabSamplingVouching，已重命名统一）。
 #     拆分方向：OCR/导出/抽凭回填逻辑抽伴生 composable。
-audit-platform/frontend/src/components/workpaper/d1/D1TabSamplingVouching.vue  1645
+audit-platform/frontend/src/components/workpaper/d1/D1TabVoucherCheck.vue  1645
