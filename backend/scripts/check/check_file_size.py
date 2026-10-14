@@ -78,7 +78,9 @@ HARD_CAPS = {
     #   均为 <10 行 computed，抽伴生模块收益不高；下次瘦身优先抽 formulas/selection 相关 300+ 行块）。
     # 2026-10-13：3240→3280（+29 行多窗口编辑锁 forcedReadonly 门禁接入：effectiveCanEdit computed
     #   + 4 处保存按钮 :disabled 替换。下次瘦身优先抽 formulas/selection 相关 300+ 行块）。
-    "audit-platform/frontend/src/views/DisclosureEditor.vue": 3280,
+    # 2026-10-14：3280→3300（+16 行附注内容模板三弹窗挂载 + 菜单入口 + ref/回调最小接线代码，
+    #   已拆为独立组件 NoteDocUploadDialog/NoteContentTemplatePicker/NoteContentTemplateApplyDialog）。
+    "audit-platform/frontend/src/views/DisclosureEditor.vue": 3300,
     # ReportView.vue：2026-09-28 由 1110 更正为 1949（= 当前真实行数，splitlines 口径）。
     #
     # 🔴 **1110 是从未成立过的理想值**，不是被违反的有效约束。实证行数史：

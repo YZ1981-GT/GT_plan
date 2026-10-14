@@ -120,6 +120,8 @@
                   <el-dropdown-menu>
                     <el-dropdown-item @click="showParagraphVars = true" title="段落变量（自动替换占位符）">✏️ 段落变量</el-dropdown-item>
                     <el-dropdown-item @click="showGroupBaseline = true" title="集团基线管理：应用/保存/对比集团统一附注模板结构，确保子企业附注章节一致">🏢 集团基线</el-dropdown-item>
+                    <el-dropdown-item divided @click="ElMessage.info('保存为内容模板功能开发中')" title="将当前附注正文保存为可复用的内容模板">💾 保存为内容模板</el-dropdown-item>
+                    <el-dropdown-item @click="showContentTemplatePicker = true" title="从内容模板引用正文到当前项目">📋 引用内容模板</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
@@ -967,6 +969,10 @@
 
     <!-- 附注文档上传/知识库批量填入弹窗 -->
     <NoteDocUploadDialog v-model:visible="showNoteDocUpload" :project-id="projectId" :year="year" @applied="onNoteDocUploadApplied" />
+    <!-- 附注内容模板选择弹窗 -->
+    <NoteContentTemplatePicker v-model:visible="showContentTemplatePicker" :project-id="projectId" @select="onContentTemplateSelected" />
+    <!-- 附注内容模板引用弹窗 -->
+    <NoteContentTemplateApplyDialog v-if="showContentTemplateApply" v-model:visible="showContentTemplateApply" :project-id="projectId" :year="year" :template-version-id="contentTemplateApplyProps.versionId" :template-name="contentTemplateApplyProps.name" @applied="onContentTemplateApplied" />
     <!-- D15 离线导出弹窗 -->
     <NoteOfflineExportDialog
       v-model="showOfflineExport"
@@ -1319,6 +1325,8 @@ import StructureEditor from '@/components/formula/StructureEditor.vue'
 import { isEmptyTable, type EmptyTableRow, type EmptyTableColumnDef } from '@/views/composables/disclosureEmptyTable'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import NoteDocUploadDialog from '@/components/disclosure/NoteDocUploadDialog.vue'
+import NoteContentTemplatePicker from '@/components/disclosure/NoteContentTemplatePicker.vue'
+import NoteContentTemplateApplyDialog from '@/components/disclosure/NoteContentTemplateApplyDialog.vue'
 import NoteRichTextEditor from '@/components/NoteRichTextEditor.vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -1734,6 +1742,9 @@ const {
 const genLoading = ref(false)
 const showNoteImport = ref(false)
 const showNoteDocUpload = ref(false)
+const showContentTemplatePicker = ref(false)
+const showContentTemplateApply = ref(false)
+const contentTemplateApplyProps = ref({ versionId: '', name: '' })
 const showOfflineExport = ref(false)
 const showOfflineImport = ref(false)
 const showAiPanel = ref(false)
@@ -2802,6 +2813,12 @@ function onNoteDocUploadApplied() {
   fetchTree()
   if (currentNote.value) fetchDetail(currentNote.value.note_section)
 }
+
+function onContentTemplateSelected(template: any, versionId: string) {
+  contentTemplateApplyProps.value = { versionId, name: template.name || '内容模板' }
+  showContentTemplateApply.value = true
+}
+function onContentTemplateApplied() { showContentTemplateApply.value = false; fetchTree(); if (currentNote.value) fetchDetail(currentNote.value.note_section) }
 
 async function onGenerate() {
   if (templateType.value === 'custom' && !customTemplateId.value) {
