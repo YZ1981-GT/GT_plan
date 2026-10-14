@@ -2538,6 +2538,7 @@ async function sampleCurrentVoucher() {
     await api.post(`/api/projects/${projectId.value}/ledger/sample-voucher`, {
       year: year.value,
       voucher_no: currentVoucher.value,
+      voucher_date: currentVoucherDate.value || null,
       account_code: currentAccount.value || null,
     })
     ElMessage.success(`已将凭证 ${currentVoucher.value} 加入抽样`)

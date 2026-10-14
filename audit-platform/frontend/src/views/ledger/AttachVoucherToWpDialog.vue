@@ -40,13 +40,35 @@ const CYCLE_NAMES: Record<string, string> = {
 
 /** 科目编码前缀 → 建议目标底稿主编码（含凭证检查表的常见科目） */
 const ACCOUNT_TO_WP: Array<{ prefix: string; wp: string }> = [
+  // E 货币资金
   { prefix: '1001', wp: 'E1' }, { prefix: '1002', wp: 'E1' }, { prefix: '1012', wp: 'E1' },
-  { prefix: '1121', wp: 'D1' }, { prefix: '1122', wp: 'D2' },
-  { prefix: '1221', wp: 'K1' }, { prefix: '1231', wp: 'K2' },
-  { prefix: '2241', wp: 'K3' }, { prefix: '2245', wp: 'K4' },
-  { prefix: '6001', wp: 'D4' }, { prefix: '6051', wp: 'D4' },
-  { prefix: '6601', wp: 'K8' }, { prefix: '6602', wp: 'K9' },
+  // D 销售与收款
+  { prefix: '1121', wp: 'D1' }, { prefix: '1122', wp: 'D2' }, { prefix: '2203', wp: 'D3' },
+  { prefix: '6001', wp: 'D4' }, { prefix: '6051', wp: 'D4' }, { prefix: '1124', wp: 'D5' },
+  { prefix: '1141', wp: 'D6' }, { prefix: '2205', wp: 'D7' },
+  // F 存货与采购
+  { prefix: '1123', wp: 'F1' }, { prefix: '2201', wp: 'F3' }, { prefix: '2202', wp: 'F4' },
+  // G 投资
+  { prefix: '1101', wp: 'G1' }, { prefix: '1132', wp: 'G2' }, { prefix: '1131', wp: 'G3' },
+  { prefix: '1504', wp: 'G4' }, { prefix: '1531', wp: 'G5' }, { prefix: '1506', wp: 'G6' },
+  { prefix: '1511', wp: 'G7' }, { prefix: '1507', wp: 'G8' }, { prefix: '1519', wp: 'G9' },
+  { prefix: '6111', wp: 'G11' }, { prefix: '6103', wp: 'G12' },
+  // H 固定资产
+  { prefix: '1601', wp: 'H1' }, { prefix: '1602', wp: 'H2' }, { prefix: '1604', wp: 'H3' },
+  { prefix: '1606', wp: 'H6' },
+  // I 无形资产
+  { prefix: '1701', wp: 'I1' }, { prefix: '1702', wp: 'I2' }, { prefix: '1711', wp: 'I3' },
+  { prefix: '1801', wp: 'I4' }, { prefix: '6602', wp: 'I6' },
+  // J 薪酬
   { prefix: '2211', wp: 'J1' },
+  // K 费用
+  { prefix: '1221', wp: 'K1' }, { prefix: '1231', wp: 'K2' }, { prefix: '2241', wp: 'K3' },
+  { prefix: '2245', wp: 'K4' }, { prefix: '2801', wp: 'K5' },
+  { prefix: '6601', wp: 'K8' }, { prefix: '6602', wp: 'K9' },
+  // M 权益
+  { prefix: '4001', wp: 'M2' },
+  // N 税费
+  { prefix: '2221', wp: 'N2' },
 ]
 
 interface WpOption {
