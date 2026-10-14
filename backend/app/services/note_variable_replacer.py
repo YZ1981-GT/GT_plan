@@ -53,6 +53,7 @@ def build_replacement_plan(
     *,
     target_vars: dict[str, Any],
     source_entity_name: str | None = None,
+    scope: str = "",
 ) -> ReplacementPlan:
     """从 HTML 正文生成确定性替换计划。
 
@@ -70,7 +71,7 @@ def build_replacement_plan(
             continue
         target_val = target_vars.get(var_key)
         if target_val is not None and str(target_val).strip():
-            plan.items.append(_item(var_key, token, str(target_val)))
+            plan.items.append(_item(var_key, token, str(target_val), scope))
         else:
             plan.warnings.append(f"变量 {token} 缺少目标值，保留原文")
 
@@ -78,7 +79,7 @@ def build_replacement_plan(
     if source_entity_name and escape(source_entity_name) in html:
         target_name = target_vars.get("company_name")
         if target_name and str(target_name) != source_entity_name:
-            plan.items.append(_item("source_entity_name", source_entity_name, str(target_name)))
+            plan.items.append(_item("source_entity_name", source_entity_name, str(target_name), scope))
         elif not target_name:
             plan.warnings.append(
                 f"来源企业名「{source_entity_name}」存在于正文，但缺少目标企业名"
@@ -87,9 +88,12 @@ def build_replacement_plan(
     return plan
 
 
-def _item(variable: str, old_value: str, new_value: str) -> ReplacementItem:
-    """确定性替换项 ID：apply 端按同一来源复算计划时，用户撤销的 ID 才能对上。"""
-    digest = hashlib.sha256(f"{variable}\x1f{old_value}".encode("utf-8")).hexdigest()[:16]
+def _item(variable: str, old_value: str, new_value: str, scope: str = "") -> ReplacementItem:
+    """确定性替换项 ID：apply 端按同一来源复算计划时，用户撤销的 ID 才能对上。
+
+    ``scope``（通常为来源章节 ID）让同一 token 在不同章节有不同 ID ⇒ 撤销按章节逐项生效（AC-10.2）。
+    """
+    digest = hashlib.sha256(f"{scope}\x1f{variable}\x1f{old_value}".encode("utf-8")).hexdigest()[:16]
     return ReplacementItem(
         replacement_id=f"r-{digest}",
         variable=variable,

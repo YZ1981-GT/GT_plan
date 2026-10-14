@@ -28,6 +28,7 @@ from app.services.note_content_template_service import (
 )
 from app.services.note_quality_scanner import compute_quality_summary, scan_section_quality
 from app.services.note_section_catalog import normalize_report_scope, normalize_template_type
+from app.services.note_section_kind import classify_note_section
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,10 @@ async def generate_snapshot(
     qualities = []
     for note in notes:
         text = note.text_content or ""
-        section_kind = "account_explanation" if note.account_name else "narrative"
+        # R-16：account_name 真库全部非空，不可作类型判据；统一走 Word 权威分类器
+        section_kind = classify_note_section(
+            note.note_section, proj.template_type, proj.report_scope, section_title=note.section_title,
+        )
         quality = scan_section_quality(
             text_content=text,
             status=note.status.value if hasattr(note.status, "value") else str(note.status),

@@ -1,52 +1,87 @@
-"""附注正文批量导入 service — 章节读取、统一匹配与 preview。
+"""附注正文批量导入 service — 章节读取、统一匹配、手工映射校验与 preview。
 
 spec: disclosure-note-doc-upload-and-batch-fill Phase 4 Task 21~25
+（第二轮复盘 R-07 / R-08 / R-16 / R-25 / R-26 修订）
+
+匹配裁定（design §4.2 / AC-3.1~3.5）：
+- 只有「手工映射 / 同模板同编号同标题 / variant matrix / soe↔listed 显式别名（模板来源）」产生 confirmed；
+- 外部来源（上传 / 知识库）的标题规范化精确匹配**只产生 candidate**（AC-3.3），需人工确认；
+- 同名目标不唯一时按「章路径」消歧，仍不唯一 ⇒ manual_required；
+- 多个来源指向同一目标 ⇒ 全部 manual_required，不先到先得（AC-3.4）；
+- 禁止对（``FORBIDDEN_MATCH_PAIRS``）永不产生候选。
 """
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import logging
+from dataclasses import dataclass
+from functools import lru_cache
+from html import escape
 from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.core import Project
 from app.models.report_models import DisclosureNote
 from app.services.note_document_parser import ParsedSection
-from app.services.note_html_sanitizer import sanitize_note_html
+from app.services.note_html_sanitizer import append_note_html, has_visible_text, sanitize_note_html
 from app.services.note_quality_scanner import QualityFlag, scan_section_quality
 from app.services.note_section_catalog import (
-    build_variant_key,
+    DATA_DIR,
     normalize_report_scope,
+    normalize_section_code,
     normalize_template_type,
+    section_allowed_for_project,
 )
-from app.services.note_section_matcher import match_section as alias_match
-from app.services.note_variable_replacer import (
-    ReplacementPlan,
-    apply_replacement_plan,
-    build_replacement_plan,
+from app.services.note_section_kind import (
+    canonical_title,
+    chapter_title_for_code,
+    classify_note_section,
+    is_account_chapter_title,
+    normalize_title,
 )
+from app.services.note_section_matcher import FORBIDDEN_MATCH_PAIRS, SECTION_TITLE_ALIASES
+from app.services.note_variable_replacer import apply_replacement_plan, build_replacement_plan
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "ManualMappingError",
+    "MatchResult",
+    "SourceContext",
+    "build_preview",
+    "fold_unmatched_descendants",
     "load_target_sections",
     "match_sections",
-    "build_preview",
-    "MatchResult",
+    "sha256_text",
+    "validate_manual_mappings",
 ]
 
-# ── 容量限制 ──────────────────────────────────────────────────────────────
 
-_MAX_BATCH_SECTIONS = 500
-_SECTION_BYTE_LIMIT = 512 * 1024
+def sha256_text(text: str | None) -> str:
+    return hashlib.sha256((text or "").encode("utf-8")).hexdigest()
+
+
+def _enum_value(value: Any) -> Any:
+    return getattr(value, "value", value)
+
+
+@dataclass(frozen=True)
+class SourceContext:
+    """来源上下文：模板来源需带其标准/口径，供同模板编号与 variant matrix 匹配。"""
+
+    kind: str = "upload"  # upload | knowledge | content_template
+    template_type: str | None = None
+    report_scope: str | None = None
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# Task 21：章节读取
+# Task 21：章节读取（R-16：类型按 Word 权威判定；content_hash 恒基于真实正文）
 # ════════════════════════════════════════════════════════════════════════════
 
 
@@ -58,87 +93,80 @@ async def load_target_sections(
     scope: str = "narrative",
     include_content: bool = False,
 ) -> list[dict[str, Any]]:
-    """加载目标项目附注章节列表。
+    """加载目标项目附注章节。
 
-    scope:
-      - "narrative": 只返回叙述性章节（排除 account_explanation 和 container）。
-      - "all": 返回全部活动章节。
-
-    include_content=False 时不返回 text_content（列表轻量化）。
+    - ``scope="narrative"``：只返回叙述性叶子章节；``"all"``：三类全返回；
+    - 正文**总是**参与 ``content_hash`` / ``has_content`` 计算，``include_content=False`` 仅不下发正文；
+    - 口径不适用（``section_allowed_for_project``）与软删除章节排除。
     """
-    cols = [
-        DisclosureNote.id,
-        DisclosureNote.section_id,
-        DisclosureNote.note_section,
-        DisclosureNote.section_title,
-        DisclosureNote.level,
-        DisclosureNote.parent_section_id,
-        DisclosureNote.sort_index,
-        DisclosureNote.content_type,
-        DisclosureNote.status,
-        DisclosureNote.is_stale,
-        DisclosureNote.updated_at,
-    ]
-    if include_content:
-        cols.append(DisclosureNote.text_content)
-
-    stmt = (
-        sa.select(*cols)
+    project = await db.get(Project, project_id)
+    raw_tt = getattr(project, "template_type", None)
+    raw_rs = getattr(project, "report_scope", None)
+    rows = (await db.execute(
+        sa.select(
+            DisclosureNote.id, DisclosureNote.section_id, DisclosureNote.note_section,
+            DisclosureNote.section_title, DisclosureNote.level, DisclosureNote.parent_section_id,
+            DisclosureNote.sort_index, DisclosureNote.content_type, DisclosureNote.status,
+            DisclosureNote.is_stale, DisclosureNote.updated_at, DisclosureNote.text_content,
+            DisclosureNote.table_data.is_not(None).label("has_table"),
+        )
         .where(
             DisclosureNote.project_id == project_id,
             DisclosureNote.year == year,
             DisclosureNote.is_deleted == sa.false(),
         )
-        .order_by(DisclosureNote.sort_index)
-    )
+        .order_by(DisclosureNote.sort_index, DisclosureNote.note_section)
+    )).all()
 
-    result = await db.execute(stmt)
-    rows = result.all()
-
-    sections = []
-    for row in rows:
-        d = dict(row._mapping)
-        # 计算 content_hash
-        text = d.get("text_content") or ""
-        d["content_hash"] = hashlib.sha256(text.encode("utf-8")).hexdigest()
-        if not include_content:
-            d.pop("text_content", None)
-        # TODO Task 9: section_kind 分类（目前简化）
-        d["section_kind"] = _classify_section_kind(d)
-        sections.append(d)
-
-    if scope == "narrative":
-        sections = [s for s in sections if s["section_kind"] == "narrative"]
-
+    parents = {r.parent_section_id for r in rows if r.parent_section_id}
+    sections: list[dict[str, Any]] = []
+    for r in rows:
+        if not section_allowed_for_project(r.note_section, raw_tt, raw_rs):
+            continue
+        text = r.text_content or ""
+        has_content = has_visible_text(text)
+        kind = classify_note_section(
+            r.note_section, raw_tt, raw_rs,
+            section_title=r.section_title,
+            has_children=bool(r.section_id) and r.section_id in parents,
+            has_body=has_content or bool(r.has_table),
+        )
+        if scope == "narrative" and kind != "narrative":
+            continue
+        item = {
+            "id": r.id, "section_id": r.section_id, "note_section": r.note_section,
+            "section_title": r.section_title, "level": r.level,
+            "parent_section_id": r.parent_section_id, "sort_index": r.sort_index,
+            "content_type": _enum_value(r.content_type), "status": _enum_value(r.status),
+            "is_stale": bool(r.is_stale), "updated_at": r.updated_at,
+            "content_hash": sha256_text(text), "has_content": has_content,
+            "section_kind": kind, "chapter_title": chapter_title_for_code(r.note_section, raw_tt),
+        }
+        if include_content:
+            item["text_content"] = text
+        sections.append(item)
     return sections
 
 
-def _classify_section_kind(section: dict[str, Any]) -> str:
-    """简化的章节类型分类。Task 9 会扩展为完整的 variant matrix 查询。"""
-    # account_name 非空通常是报表科目解释
-    if section.get("account_name"):
-        return "account_explanation"
-    # 有子节点且无正文的纯容器（简化判断：level=1 且无 text_content）
-    # 完整实现需要查询子节点数量
-    return "narrative"
+async def resolve_target_context(db: AsyncSession, project_id: UUID) -> tuple[str, str]:
+    """目标项目 (template_type, report_scope)，均已归一。"""
+    project = await db.get(Project, project_id)
+    return (
+        normalize_template_type(getattr(project, "template_type", None)),
+        normalize_report_scope(getattr(project, "report_scope", None)),
+    )
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# Task 22~23：统一匹配器
+# Task 22~23：统一匹配器 + 手工映射校验
 # ════════════════════════════════════════════════════════════════════════════
 
 
 class MatchResult:
     __slots__ = ("source_id", "target_note_id", "match_kind", "evidence", "confidence")
 
-    def __init__(
-        self,
-        source_id: str,
-        target_note_id: UUID | None,
-        match_kind: str,
-        evidence: str,
-        confidence: str,
-    ):
+    def __init__(self, source_id: str, target_note_id: UUID | None, match_kind: str,
+                 evidence: str, confidence: str):
         self.source_id = source_id
         self.target_note_id = target_note_id
         self.match_kind = match_kind
@@ -146,118 +174,264 @@ class MatchResult:
         self.confidence = confidence
 
 
+class ManualMappingError(ValueError):
+    """手工映射非法（端点转 422）。"""
+
+
+def _pairs(raw: list[tuple[str, str]]) -> frozenset[tuple[str, str]]:
+    out: set[tuple[str, str]] = set()
+    for a, b in raw:
+        ka, kb = normalize_title(a), normalize_title(b)
+        out.update({(ka, kb), (kb, ka)})
+    return frozenset(out)
+
+
+_FORBIDDEN_TITLES = _pairs([(a, b) for a, b, _reason in FORBIDDEN_MATCH_PAIRS])
+_ALIAS_TITLES = _pairs([(p.soe_title, p.listed_title) for p in SECTION_TITLE_ALIASES])
+
+
+def _is_forbidden(a: str | None, b: str | None) -> bool:
+    return (normalize_title(a), normalize_title(b)) in _FORBIDDEN_TITLES
+
+
+@lru_cache(maxsize=1)
+def _matrix_index() -> tuple[dict[tuple[str, str], str], dict[tuple[str, str], frozenset[str]]]:
+    """((template_type, 章节号) → account_key, (account_key, template_type) → 章节号集合)。"""
+    matrix = json.loads((DATA_DIR / "note_template_variant_matrix.json").read_text(encoding="utf-8"))
+    by_code: dict[tuple[str, str], str] = {}
+    codes: dict[tuple[str, str], set[str]] = {}
+    for account in matrix.get("accounts") or []:
+        key = account.get("account_key")
+        if not key:
+            continue
+        pools = [account.get("variants") or {}] + [
+            {k: v for k, vs in (account.get("legacy_aliases") or {}).items() for v in vs}
+        ]
+        for pool in pools:
+            for variant, code in pool.items():
+                if isinstance(code, str) and code.strip():
+                    tt = variant.split("_", 1)[0]
+                    by_code.setdefault((tt, code.strip()), key)
+                    codes.setdefault((key, tt), set()).add(code.strip())
+    return by_code, {k: frozenset(v) for k, v in codes.items()}
+
+
+def validate_manual_mappings(
+    sources: list[ParsedSection],
+    targets: list[dict[str, Any]],
+    manual_mappings: dict[str, UUID],
+) -> None:
+    """来源存在、目标在本次可写范围（本项目且 scope 内）、一对一、非禁止对；否则抛错。"""
+    src_by_id = {s.source_id: s for s in sources}
+    tgt_by_id = {t["id"]: t for t in targets}
+    seen: dict[UUID, str] = {}
+    for source_id, target_id in manual_mappings.items():
+        src = src_by_id.get(source_id)
+        if src is None:
+            raise ManualMappingError(f"来源章节不存在：{source_id}")
+        tgt = tgt_by_id.get(target_id)
+        if tgt is None:
+            raise ManualMappingError("目标章节不在可写范围（非本项目、已删除或不属于本次可填章节类型）")
+        if target_id in seen:
+            raise ManualMappingError(f"同一目标章节只能接受一个来源：{tgt['note_section']}")
+        if _is_forbidden(src.title, tgt.get("section_title")):
+            raise ManualMappingError(f"禁止匹配对不可强行映射：「{src.title}」↔「{tgt.get('section_title')}」")
+        seen[target_id] = source_id
+
+
+def _source_chapters(sources: list[ParsedSection]) -> dict[str, str | None]:
+    """每个来源章节所在的顶层章标题（祖先链顶端）；顶层来源无祖先 ⇒ None。"""
+    out: dict[str, str | None] = {}
+    stack: list[ParsedSection] = []
+    for src in sources:
+        while stack and stack[-1].level >= src.level:
+            stack.pop()
+        out[src.source_id] = stack[0].title if stack else None
+        stack.append(src)
+    return out
+
+
+def _source_is_account(src: ParsedSection, chapter: str | None) -> bool | None:
+    """来源是否属报表科目注释；无法判断返回 None（不门控）。
+
+    - 模板来源：用快照里的 ``section_kind``；
+    - 有祖先：看所在顶层章标题是否为「项目注释 / 项目附注」；
+    - 顶层来源：自身就是科目注释章标题 ⇒ True，否则未知（扁平文档的顶层标题也可能是节）。
+    """
+    meta_kind = (src.metadata or {}).get("section_kind")
+    if meta_kind in ("narrative", "account_explanation"):
+        return meta_kind == "account_explanation"
+    if chapter is not None:
+        return is_account_chapter_title(chapter)
+    return True if is_account_chapter_title(src.title) else None
+
+
+def _kind_compatible(target: dict, source_account: bool | None) -> bool:
+    return source_account is None or (target.get("section_kind") == "account_explanation") == source_account
+
+
+def _propose_by_code(src: ParsedSection, available: list[dict], ctx: SourceContext,
+                     target_tt: str) -> tuple[dict, str, str, str] | None:
+    """模板来源：同模板同编号 / 跨模板 variant matrix。"""
+    raw_code = (src.metadata or {}).get("note_section")
+    if ctx.kind != "content_template" or not raw_code:
+        return None
+    src_tt = normalize_template_type(ctx.template_type)
+    src_code = normalize_section_code(raw_code, template_type=src_tt)
+    if src_tt == target_tt:
+        hits = [t for t in available
+                if normalize_section_code(t["note_section"], template_type=target_tt) == src_code]
+        if len(hits) != 1:
+            return None
+        same = canonical_title(hits[0].get("section_title")) == canonical_title(src.title)
+        return (hits[0], "same_template_code", f"同模板章节编号「{src_code}」"
+                + ("且标题一致" if same else "一致但标题不同"), "confirmed" if same else "candidate")
+    by_code, codes = _matrix_index()
+    account = by_code.get((src_tt, src_code)) or by_code.get((src_tt, raw_code.strip()))
+    if not account:
+        return None
+    wanted = codes.get((account, target_tt), frozenset())
+    hits = [t for t in available if t["note_section"] in wanted
+            or normalize_section_code(t["note_section"], template_type=target_tt) in wanted]
+    if len(hits) != 1:
+        return None
+    return (hits[0], "variant_matrix", f"科目映射矩阵「{account}」：{src_code}→{hits[0]['note_section']}", "confirmed")
+
+
+def _propose_by_title(src: ParsedSection, available: list[dict], chapter: str | None,
+                      ctx: SourceContext) -> tuple[dict | None, str, str, str]:
+    key = canonical_title(src.title)
+    if not key:
+        return None, "unmatched", "来源标题为空", "manual_required"
+    exact = [t for t in available if canonical_title(t.get("section_title")) == key]
+    alias = [t for t in available if t not in exact
+             and (key, canonical_title(t.get("section_title"))) in _ALIAS_TITLES]
+    hits = [t for t in exact + alias if not _is_forbidden(src.title, t.get("section_title"))]
+    if not hits:
+        return None, "unmatched", "未找到匹配的目标章节", "manual_required"
+    if len(hits) > 1 and chapter:
+        path_hits = [t for t in hits if canonical_title(t.get("chapter_title")) == canonical_title(chapter)]
+        if len(path_hits) == 1:
+            return path_hits[0], "title_path", f"章路径「{chapter} / {src.title}」唯一命中", "candidate"
+    if len(hits) > 1:
+        return None, "ambiguous", f"存在 {len(hits)} 个同名目标章节，需人工选择", "manual_required"
+    hit = hits[0]
+    if hit in alias:
+        confidence = "confirmed" if ctx.kind == "content_template" else "candidate"
+        return hit, "alias", f"显式别名「{src.title}」↔「{hit.get('section_title')}」", confidence
+    return hit, "title_exact", f"标题规范化一致「{src.title}」", "candidate"
+
+
 def match_sections(
     sources: list[ParsedSection],
     targets: list[dict[str, Any]],
     *,
     manual_mappings: dict[str, UUID] | None = None,
+    source_context: SourceContext | None = None,
+    target_template_type: str | None = None,
 ) -> list[MatchResult]:
-    """统一章节匹配。
-
-    优先级（design §4.2）：
-    1. 手动映射（用户已确认）→ confirmed
-    2. 同变体规范 note_section 精确匹配 → confirmed
-    3. 显式 alias（note_section_matcher）→ confirmed
-    4. 去空白后标题精确匹配 → candidate
-    5. 其余 → manual_required
-    """
+    """统一章节匹配（规则见模块说明）；``manual_mappings`` 须先经 :func:`validate_manual_mappings`。"""
+    ctx = source_context or SourceContext()
+    target_tt = normalize_template_type(target_template_type)
     manual = manual_mappings or {}
-    results: list[MatchResult] = []
+    tgt_by_id = {t["id"]: t for t in targets}
+    reserved = {tid for tid in manual.values() if tid in tgt_by_id}
+    available = [t for t in targets if t["id"] not in reserved]
+    chapters = _source_chapters(sources)
 
-    # 索引目标
-    by_section: dict[str, dict] = {}
-    by_title: dict[str, dict] = {}
-    by_id: dict[UUID, dict] = {}
-    for t in targets:
-        ns = (t.get("note_section") or "").strip()
-        if ns:
-            by_section[ns] = t
-        title = (t.get("section_title") or "").strip()
-        if title:
-            by_title.setdefault(_norm_title(title), t)
-        by_id[t["id"]] = t
-
-    used_targets: set[UUID] = set()
-
+    proposals: dict[str, tuple[dict | None, str, str, str]] = {}
     for src in sources:
-        # 1. 手动映射
         if src.source_id in manual:
-            tid = manual[src.source_id]
-            tgt = by_id.get(tid)
-            if tgt and tid not in used_targets:
-                used_targets.add(tid)
-                results.append(MatchResult(
-                    src.source_id, tid, "manual", "用户手动映射", "confirmed",
-                ))
-                continue
-
-        # 2. 规范 note_section 精确
-        src_title = (src.title or "").strip()
-        tgt = by_section.get(src_title)
-        if tgt and tgt["id"] not in used_targets:
-            used_targets.add(tgt["id"])
-            results.append(MatchResult(
-                src.source_id, tgt["id"], "exact_section", f"note_section 精确匹配「{src_title}」", "confirmed",
-            ))
             continue
-
-        # 3. 显式 alias
-        found_alias = False
-        for t in targets:
-            if t["id"] in used_targets:
-                continue
-            t_title = (t.get("section_title") or "").strip()
-            if alias_match(src_title, t_title):
-                used_targets.add(t["id"])
-                results.append(MatchResult(
-                    src.source_id, t["id"], "alias", f"显式别名匹配「{src_title}」↔「{t_title}」", "confirmed",
-                ))
-                found_alias = True
-                break
-        if found_alias:
+        chapter = chapters.get(src.source_id)
+        source_account = _source_is_account(src, chapter)
+        # 章类型门控：Word 中「存货」等同时出现在会计政策章与项目注释章，不门控则两者争抢同一叙述目标
+        if targets and not any(_kind_compatible(t, source_account) for t in targets):
+            proposals[src.source_id] = (
+                None, "out_of_scope",
+                "来源属报表科目注释章节，本次只填叙述性章节" if source_account
+                else "来源属叙述性章节，本次目标仅含报表科目注释", "manual_required",
+            )
             continue
+        eligible = [t for t in available if _kind_compatible(t, source_account)]
+        proposals[src.source_id] = (
+            _propose_by_code(src, eligible, ctx, target_tt)
+            or _propose_by_title(src, eligible, chapter, ctx)
+        )
 
-        # 4. 标题精确（去空白后）
-        norm = _norm_title(src_title)
-        tgt = by_title.get(norm)
-        if tgt and tgt["id"] not in used_targets:
-            used_targets.add(tgt["id"])
-            results.append(MatchResult(
-                src.source_id, tgt["id"], "title_exact", f"标题精确匹配「{src_title}」", "candidate",
-            ))
+    claims: dict[UUID, list[str]] = {}
+    for source_id, (tgt, *_rest) in proposals.items():
+        if tgt is not None:
+            claims.setdefault(tgt["id"], []).append(source_id)
+
+    results: list[MatchResult] = []
+    for src in sources:
+        tid = manual.get(src.source_id)
+        if src.source_id in manual:
+            ok = tid in tgt_by_id
+            results.append(MatchResult(src.source_id, tid if ok else None, "manual" if ok else "unmatched",
+                                       "用户手工映射" if ok else "手工映射目标不可用", "confirmed" if ok else "manual_required"))
             continue
-
-        # 5. 未匹配
-        results.append(MatchResult(
-            src.source_id, None, "unmatched", "未能自动匹配，需人工选择", "manual_required",
-        ))
-
+        tgt, kind, evidence, confidence = proposals[src.source_id]
+        if tgt is not None and len(claims[tgt["id"]]) > 1:
+            results.append(MatchResult(src.source_id, None, "conflict",
+                                       f"{len(claims[tgt['id']])} 个来源章节指向同一目标「{tgt['note_section']}」，需人工确认",
+                                       "manual_required"))
+            continue
+        results.append(MatchResult(src.source_id, tgt["id"] if tgt else None, kind, evidence, confidence))
     return results
 
 
-def _norm_title(title: str) -> str:
-    """标题归一化（仅去空白，与 note_section_matcher 一致）。"""
-    import unicodedata
-    return "".join(c for c in title if not unicodedata.category(c).startswith("Z") and c not in " \t\r\n")
+def fold_unmatched_descendants(
+    sources: list[ParsedSection],
+    matches: list[MatchResult],
+) -> tuple[list[ParsedSection], list[MatchResult]]:
+    """R-25：未匹配（``unmatched``）的后代标题并入最近的已匹配祖先，标题转加粗段落。
+
+    国企 Word 的节是 H3、上市是 H2（其 H3 为节内小标题）；按标题切节时子标题会成为孤立来源，
+    不并入则其正文丢失。``conflict`` / ``ambiguous`` 不并入（需用户人工选择）。
+    """
+    by_id = {m.source_id: m for m in matches}
+    html: dict[str, str] = {s.source_id: s.html for s in sources}
+    folded: dict[str, str] = {}
+    stack: list[tuple[int, str | None]] = []  # (level, 内容归属的来源 ID)
+    for src in sources:
+        while stack and stack[-1][0] >= src.level:
+            stack.pop()
+        match = by_id.get(src.source_id)
+        owner: str | None = None
+        if match is not None and match.target_note_id is not None:
+            owner = src.source_id
+        elif match is not None and match.match_kind == "unmatched" and stack and stack[-1][1]:
+            owner = stack[-1][1]
+            html[owner] += f"<p><strong>{escape(src.title)}</strong></p>{src.html}"
+            folded[src.source_id] = owner
+        stack.append((src.level, owner))
+    title_of = {s.source_id: s.title for s in sources}
+    new_sources = [dataclasses.replace(s, html=html[s.source_id]) if html[s.source_id] != s.html else s
+                   for s in sources]
+    new_matches = [
+        MatchResult(m.source_id, None, "folded", f"已并入上级「{title_of[folded[m.source_id]]}」", "manual_required")
+        if m.source_id in folded else m
+        for m in matches
+    ]
+    return new_sources, new_matches
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# Task 24~25：Preview service
+# Task 24~25：Preview
 # ════════════════════════════════════════════════════════════════════════════
 
-
-class PreviewItem:
-    __slots__ = (
-        "source_id", "target_note_id", "target_note_section",
-        "match_kind", "evidence", "confidence", "category",
-        "unavailable_reason", "before_html", "proposed_html",
-        "before_hash", "proposed_hash", "expected_updated_at",
-        "default_mode", "quality_flags", "replacements",
-    )
-
-    def __init__(self, **kw: Any):
-        for k, v in kw.items():
-            setattr(self, k, v)
+#: design §8.2 quality_warning：源章 draft/stale/占位文本/疑似来源实体、日期、金额 ⇒ 需复核
+_HIGH_RISK_REVIEW_FLAGS = frozenset({
+    QualityFlag.DRAFT, QualityFlag.STALE, QualityFlag.PLACEHOLDER, QualityFlag.SOURCE_ENTITY,
+    QualityFlag.DATE, QualityFlag.AMOUNT,
+})
+_UNAVAILABLE_REASONS = {
+    "conflict": None,  # 用 evidence 原文
+    "ambiguous": None,
+    "unmatched": "未找到匹配的目标章节",
+}
 
 
 def build_preview(
@@ -267,144 +441,95 @@ def build_preview(
     *,
     target_vars: dict[str, Any] | None = None,
     source_entity_name: str | None = None,
+    revoked_replacement_ids: set[str] | frozenset[str] | None = None,
+    source_context: SourceContext | None = None,
+    target_template_type: str | None = None,
+    target_report_scope: str | None = None,
+    source_identity: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """构建预览结果：消毒 + 变量替换 + 风险分类 + digest。"""
-    target_vars = target_vars or {}
+    """预览：消毒 → 确定性变量替换（可撤销）→ 再消毒 → 追加结果预演 → 质量/风险分级 → digest。
+
+    ``targets`` 必须带 ``text_content``（``load_target_sections(include_content=True)``）。
+    digest 绑定：来源身份 + 逐章 (source_id, target_note_id, before_hash, proposed_hash)。
+    """
+    ctx = source_context or SourceContext()
+    revoked = set(revoked_replacement_ids or ())
+    cross_standard = ctx.kind == "content_template" and (
+        normalize_template_type(ctx.template_type), normalize_report_scope(ctx.report_scope)
+    ) != (normalize_template_type(target_template_type), normalize_report_scope(target_report_scope))
+    src_map = {s.source_id: s for s in sources}
+    tgt_map = {t["id"]: t for t in targets}
     items: list[dict[str, Any]] = []
 
-    src_map = {s.source_id: s for s in sources}
-    tgt_map = {str(t["id"]): t for t in targets}
-
+    skipped = {"folded": 0, "out_of_scope": 0}
     for m in matches:
         src = src_map.get(m.source_id)
-        if not src:
+        if src is None:
             continue
+        if m.match_kind in skipped:
+            skipped[m.match_kind] += 1  # 已并入上级 / 不在本次可填范围：不进预览，只计数
+            continue
+        meta = src.metadata or {}
+        sanitized = sanitize_note_html(src.html)
+        plan = build_replacement_plan(sanitized, target_vars=target_vars or {},
+                                      source_entity_name=source_entity_name, scope=src.source_id)
+        proposed = sanitize_note_html(apply_replacement_plan(sanitized, plan, revoked_ids=revoked))
+        tgt = tgt_map.get(m.target_note_id) if m.target_note_id else None
+        before = (tgt.get("text_content") or "") if tgt else ""
+        before_hash = sha256_text(before) if tgt and "text_content" in tgt else (
+            tgt.get("content_hash") if tgt else sha256_text(""))
+        has_before = has_visible_text(before)
+        append_html = append_note_html(before, proposed) if tgt and has_before else None
 
-        # 消毒来源 HTML
-        sanitized_html = sanitize_note_html(src.html)
-
-        # 变量替换
-        plan = build_replacement_plan(
-            sanitized_html,
-            target_vars=target_vars,
-            source_entity_name=source_entity_name,
-        )
-        proposed = apply_replacement_plan(sanitized_html, plan)
-
-        # 目标现有内容
-        before_html = ""
-        before_hash = hashlib.sha256(b"").hexdigest()
-        expected_updated_at = None
-        target_section = None
-
-        if m.target_note_id:
-            tgt = tgt_map.get(str(m.target_note_id))
-            if tgt:
-                before_html = tgt.get("text_content") or ""
-                before_hash = tgt.get("content_hash") or hashlib.sha256(before_html.encode()).hexdigest()
-                expected_updated_at = tgt.get("updated_at")
-                target_section = tgt.get("note_section")
-
-        proposed_hash = hashlib.sha256(proposed.encode("utf-8")).hexdigest()
-
-        # 质量扫描
         quality = scan_section_quality(
-            text_content=proposed,
-            section_kind=tgt.get("section_kind") if m.target_note_id and tgt else None,
-            section_title=src.title,
-            source_entity_name=source_entity_name,
+            text_content=proposed, status=meta.get("status"), is_stale=bool(meta.get("is_stale")),
+            section_kind=(tgt or {}).get("section_kind") or meta.get("section_kind"),
+            section_title=src.title, source_entity_name=source_entity_name,
         )
-
-        # 风险分类
-        category = _classify_preview_category(
-            m, before_html, quality.flags, quality.is_high_risk,
-        )
-
-        # 默认模式
-        default_mode = "replace"
-        if before_html and category != "unavailable":
-            default_mode = "replace"  # 已有内容默认替换
-
-        replacements = [
-            {
-                "replacement_id": r.replacement_id,
-                "variable": r.variable,
-                "old_value": r.old_value,
-                "new_value": r.new_value,
-                "reversible": r.reversible,
-            }
-            for r in plan.items
-        ]
-
+        flags = list(quality.flags) + (["cross_standard"] if cross_standard and tgt else [])
+        if tgt is None:
+            category = "unavailable"
+            reason = _UNAVAILABLE_REASONS.get(m.match_kind) or m.evidence
+        elif not has_visible_text(proposed):
+            category, reason = "unavailable", "来源正文为空"
+        elif (m.confidence != "confirmed" or has_before or quality.is_high_risk or cross_standard
+              or _HIGH_RISK_REVIEW_FLAGS & set(quality.flags)):
+            category, reason = "review", None
+        else:
+            category, reason = "recommended", None
         items.append({
-            "source_id": m.source_id,
-            "target_note_id": str(m.target_note_id) if m.target_note_id else None,
-            "target_note_section": target_section,
-            "match_kind": m.match_kind,
-            "evidence": m.evidence,
-            "confidence": m.confidence,
-            "category": category,
-            "unavailable_reason": _unavailable_reason(m, quality.flags),
-            "before_html": before_html,
-            "proposed_html": proposed,
-            "before_hash": before_hash,
-            "proposed_hash": proposed_hash,
-            "expected_updated_at": str(expected_updated_at) if expected_updated_at else None,
-            "default_mode": default_mode,
-            "quality_flags": quality.flags,
-            "replacements": replacements,
+            "source_id": m.source_id, "source_title": src.title,
+            "target_note_id": str(m.target_note_id) if tgt else None,
+            "target_note_section": (tgt or {}).get("note_section"),
+            "target_section_title": (tgt or {}).get("section_title"),
+            "match_kind": m.match_kind, "evidence": m.evidence, "confidence": m.confidence,
+            "category": category, "default_selected": category == "recommended",
+            "unavailable_reason": reason,
+            "before_html": before, "before_hash": before_hash,
+            "proposed_html": proposed, "proposed_hash": sha256_text(proposed),
+            "append_html": append_html, "append_hash": sha256_text(append_html) if append_html is not None else None,
+            "expected_updated_at": str(tgt["updated_at"]) if tgt and tgt.get("updated_at") else None,
+            "default_mode": "replace", "quality_flags": flags,
+            "replacements": [
+                {"replacement_id": r.replacement_id, "variable": r.variable, "old_value": r.old_value,
+                 "new_value": r.new_value, "reversible": r.reversible, "revoked": r.replacement_id in revoked}
+                for r in plan.items
+            ],
         })
 
-    # 统计
     summary = {
         "total": len(items),
-        "recommended": sum(1 for i in items if i["category"] == "recommended"),
-        "review": sum(1 for i in items if i["category"] == "review"),
-        "unavailable": sum(1 for i in items if i["category"] == "unavailable"),
-        "new": sum(1 for i in items if not i["before_html"] and i["category"] == "recommended"),
-        "replace": sum(1 for i in items if i["before_html"] and i["category"] in ("recommended", "review")),
+        "recommended": sum(i["category"] == "recommended" for i in items),
+        "review": sum(i["category"] == "review" for i in items),
+        "unavailable": sum(i["category"] == "unavailable" for i in items),
+        "new": sum(i["category"] != "unavailable" and i["append_html"] is None for i in items),
+        "replace": sum(i["category"] != "unavailable" and i["append_html"] is not None for i in items),
+        "high_risk": sum(bool(set(i["quality_flags"]) & {"source_entity", "entity_specific",
+                                                          "account_explanation", "cross_standard"}) for i in items),
+        **skipped,
     }
-
-    # Digest
-    canonical = json.dumps(
-        [{"sid": i["source_id"], "tid": i["target_note_id"], "ph": i["proposed_hash"]} for i in items],
-        sort_keys=True,
-    )
-    preview_digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-    return {
-        "preview_digest": preview_digest,
-        "items": items,
-        "summary": summary,
-        "warnings": [],
-    }
-
-
-def _classify_preview_category(
-    match: MatchResult,
-    before_html: str,
-    quality_flags: list[str],
-    is_high_risk: bool,
-) -> str:
-    """按 design §8.2 风险分级。"""
-    if match.confidence == "manual_required" or match.target_note_id is None:
-        return "unavailable"
-
-    if is_high_risk:
-        return "review"
-    if before_html:
-        return "review"
-    if QualityFlag.DRAFT in quality_flags or QualityFlag.STALE in quality_flags:
-        return "review"
-
-    return "recommended"
-
-
-def _unavailable_reason(match: MatchResult, quality_flags: list[str]) -> str | None:
-    if match.target_note_id is None:
-        return "未找到匹配的目标章节"
-    if match.confidence == "manual_required":
-        return "需手动选择目标章节"
-    if QualityFlag.EMPTY in quality_flags:
-        return "来源正文为空"
-    return None
+    canonical = json.dumps({
+        "source": source_identity or {},
+        "items": [[i["source_id"], i["target_note_id"], i["before_hash"], i["proposed_hash"]] for i in items],
+    }, sort_keys=True, ensure_ascii=False, default=str)
+    return {"preview_digest": sha256_text(canonical), "items": items, "summary": summary, "warnings": []}

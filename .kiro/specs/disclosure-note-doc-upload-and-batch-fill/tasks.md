@@ -43,7 +43,7 @@
 
 ## Phase 2：章节分类、HTML 安全与确定性变量
 
-- [~] 9. 扩展 `note_section_catalog.py`，按模板目录 + variant matrix 返回 `section_kind/section_id/parent/level/sort`；新增 narrative/all scope 查询。
+- [x] 9. 扩展 `note_section_catalog.py`，按模板目录 + variant matrix 返回 `section_kind/section_id/parent/level/sort`；新增 narrative/all scope 查询。
   - 验收：公司基本情况/会计期间=narrative，货币资金四变体=account_explanation，纯父节点=container。（AC-2.3）
 - [~] 10. 修复 `DisclosureEngine._load_templates/generate_notes` 对 `section_id/level/parent_section_id/sort_index` 的透传与落库，新增数据回填策略但不宣称 section_id 跨模板稳定。
   - 验收：新生成附注稳定字段非空；旧行回填幂等，跨模板仍走显式映射。（AC-3.1）
@@ -91,9 +91,9 @@
 
 ## Phase 4：章节读取、映射与服务端 Preview
 
-- [x] 21. 实现项目章节读取 service/端点：`scope=narrative|all`、`include_content` 内部控制、层级/类型/内容 hash/updated_at 返回；默认列表不下发整包正文。
+- [~] 21. 实现项目章节读取 service/端点：`scope=narrative|all`、`include_content` 内部控制、层级/类型/内容 hash/updated_at 返回；默认列表不下发整包正文。
   - 验收：narrative 不含账户解释/容器；all 覆盖三类；软删除/口径不适用章节排除。（AC-2.3, NFR-8）
-- [~] 22. 实现统一 matcher：同变体规范码、variant matrix、显式 alias/禁止对、层级+标题精确候选；移除关键词/编辑距离/SequenceMatcher 权威路径。
+- [x] 22. 实现统一 matcher：同变体规范码、variant matrix、显式 alias/禁止对、层级+标题精确候选；移除关键词/编辑距离/SequenceMatcher 权威路径。
   - 验收：每条结果带 match_kind/evidence/confidence；禁止对和一对多冲突转 manual_required。（AC-3.1~3.4）
 - [x] 23. 实现手工映射校验：source/target 一对一、目标归属、目标 scope、不可用项禁选；人工确认进入 preview 输入。
   - 验收：重复目标、跨项目 note_id、账户解释误入上传 narrative、禁止对强选均被拒绝。（AC-3.4~3.5）
@@ -296,3 +296,30 @@ R-14 → R-05/R-11/R-10（Phase 2 纯函数）→ R-07/R-08/R-16（Phase 4）→
   - R-11：替换按**转义形态**匹配（来源名含 `&` 不再漏检），新值转义后插入（不能注入标签）；单遍正则替换防二次扫描；替换项 ID 改为 `variable+old_value` 的确定性哈希（apply 端复算计划时用户撤销 ID 才能对上，R-09 前置）；删除无用占位常量 `_RESIDUAL_PATTERNS`。
   - R-14：`current_version_id` 外键加 `use_alter=True, name="fk_nct_current_version"`（与 V187 同名），`sort_tables` 不再报环。
   - 证据：先写 19 条红测（18 条按预期形态失败），修后 6 个测试文件 102 passed；`<embed>` 用例做变异（移出 void 集合）实测打红，红的形态即「后文被吞」。
+
+### Word 权威比对（2026-10-14，四版本 docx vs JSON 种子）
+
+> 用户要求：以 `backend/data/audit_report_templates/disclosure_notes/{soe,listed}_{standalone,consolidated}.docx` 为权威比对 JSON。口径：国企节 = Heading 2∪3（国企 H3 142/153 与 JSON 二级节数吻合），上市节 = Heading 2（H3 是节内小标题）；标题去空白/序号/尾部（…）与【…】批注后比对。
+
+- 对上 578 节；JSON 问题：**章名不一致 15 处**（国企「公司基本情况」↔Word「公司（企业）基本情况」、「关联方及关联交易」↔「关联方关系及其交易」、合并「合并范围的变化」↔「企业合并及合并财务报表」、十三/十四章名与 Word 第十三/十四章错位；上市「合并财务报表项目注释」↔「（合并）财务报表项目附注」、「公允价值披露」↔「公允价值」、「母公司…注释」↔「公司…注释」）；**章归属错位 66 节**（上市「三、公允价值变动收益/信用减值损失/资产减值损失/资产处置收益/营业外收入/营业外支出/所得税费用/现金流量表项目注释/开发支出」挂在会计政策章，Word 在项目附注章；上市十四章含 Word 第十五章的「前期差错更正」等；国企「六、递延所得税资产及负债」Word 在第四章）；**Word 有 JSON 无 38 节**（如上市七章 8 节、十一章 4 节，国企单体 Word 含「企业合并」等但 JSON scope=consolidated_only）；**JSON 有 Word 无 16 节**（多为「X、1 章名」章正文叶子；另「九、【企业应当在附注中披露…】」是提示语被误做成节）。
+- 结论：JSON 章归属不可作分类依据。上市「三、xxx」被 JSON 放进会计政策章、Word 在项目附注章的 8 节，variant matrix 均已按科目登记（matrix 与 Word 一致）；第 9 处「三、开发支出」在上市合并版 Word 中同名出现于「研发支出」章与「项目附注」章两处，属比对歧义而非冲突（守卫对多归属节只报告不断言）。本 spec 分类改为 **matrix（variants + legacy_aliases）∪ 母公司章 ∪ 章号属「项目注释/项目附注」章**，并加 Word 权威守卫测试。
+- 🔴 **JSON 修复不在本 spec 范围**（requirements §5：不改结构模板；改动会变更全部项目的 `note_section` 编码，波及绑定/公式/matrix），已登记待用户拍板另立 spec。
+
+### 新增缺陷（Word 比对发现）
+
+- **R-25 子标题内容丢失**：国企节是 H3、上市节是 H2（其 H3 为节内小标题）；解析器每个标题切一节，上市文档 H3 成为无目标的孤立来源，正文丢失。修复：未匹配的后代标题内容（标题转加粗段）并入最近的已匹配祖先，与模板类型无关。
+- **R-26 Word 标题与系统标题不一致致无法匹配**：用户上传的文档源自 Word 模板，章名与 JSON 不同（见上）。修复：登记「Word 模板标题 ↔ 系统标题」显式别名（证据来自本次比对），只产生 candidate。
+- **R-27 无真实模板端到端验证**：用四份 Word 模板跑「解析→分类→匹配→预览」，断言科目解释章节零误入叙述目标、覆盖率按实测值冻结棘轮、解析耗时满足 NFR-6。
+- **R-16 修正**：真库 1009 行 `account_name` **全部非空**（815+170 行等于标题），按 account_name 分类会全判科目解释——原复盘建议的修法本身是错的，改按上条规则。另：`load_target_sections` 在 `include_content=False` 时 content_hash 恒为空串哈希，preview 拿到的 before_html 恒为空 ⇒ 已有内容章节被当成空章推荐、apply 必判 stale。
+
+- ✅ **第 2 组 R-07 / R-08 / R-16 / R-25 / R-26 / R-27**（Phase 4，Word 权威）
+  - R-16：新增 `note_section_kind.py`。判定顺序：章号属「项目注释/项目附注」章 → Word 索引中标题只属一类（纠正 JSON 放错章）→ 国企 `五、N` → 无正文父节点为 container → narrative。Word 索引由 `scripts/gen/gen_note_section_kind_index.py` 生成到 `data/note_section_kind_index.json`（输出幂等、带 docx sha256，`--check` 漂移 exit 2），守卫校验索引与 Word 同步。matrix 被证伪不作判据（把「借款费用/债务重组/终止经营」登记为科目、「现金流量表项目注释」登记成截断码）。`load_target_sections` 总是用真实正文算 `content_hash`/`has_content`，按口径过滤。快照模块同根因（按 account_name 判类型）一并改用分类器。
+  - R-07：外部来源（上传/知识库）的标题一致只到 candidate；同名目标按章路径消歧，仍不唯一 ⇒ manual_required；多来源争同一目标 ⇒ 全部 manual_required；模板来源「同模板同编号同标题 / variant matrix / soe↔listed 别名」才 confirmed。另：首轮把旧测试断言降级为 confirmed 并注释「也是正确行为」，已按 AC-3.3 纠正。
+  - R-08：`validate_manual_mappings` 拒绝未知来源、非本次可写范围目标（跨项目/科目章节进叙述批次同一路径）、一对多、禁止对强选；手工映射占用的目标不再参与自动匹配。
+  - R-25：`fold_unmatched_descendants`——未匹配的后代标题（标题转加粗段）并入最近已匹配祖先，与模板类型无关。
+  - R-26：登记 4 条 Word↔系统章名别名（证据见上节），仅产生 candidate。
+  - Word 端到端发现并修复：「存货」等在 Word 中同时出现在会计政策章与项目注释章，首轮两者争抢同一叙述目标 ⇒ 30 条冲突。新增**章类型门控**：来源所在章（或模板快照 section_kind）与目标类型不符 ⇒ `out_of_scope`，不进预览只计数。
+  - 预览：替换后再消毒；预演追加结果（`append_html/append_hash`，apply 将逐字比对）；空正文 ⇒ 不可用；candidate/已有内容/跨标准/草稿/stale/占位/来源实体/日期/金额 ⇒ 需复核且不默认勾选；替换项可按章撤销（ID 含来源章节作用域）；digest 绑定来源身份 + 逐章 (source_id, target, before_hash, proposed_hash)。
+  - R-27：`test_note_text_batch_word_e2e.py` 用四份 Word 跑「解析→分类→匹配→并入→预览」：科目章节误入叙述目标 0；叙述目标命中 53/55、72/74、82/86、95/99（棘轮冻结）；解析 2.0~3.6s。
+  - 证据：13 个测试文件 248 passed；7 个变异（去门控、不并入、候选默认勾选、先到先得、同名取首个、外部标题直接定案、before_hash 回退）全部打红，文件逐字节恢复。
+- ⏳ 待办：Task 10（生成链透传 section_id）未动；Task 21 端点与 Task 25/26 在第 4 组（R-01）落地。

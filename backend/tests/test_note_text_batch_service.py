@@ -46,29 +46,25 @@ class TestMatchSections:
         sources = [_src("s1", "一、公司基本情况")]
         targets = [_tgt("一、公司基本情况", "公司基本情况")]
         results = match_sections(sources, targets)
-        assert results[0].confidence == "confirmed"
-        assert results[0].match_kind == "exact_section"
+        # 第二轮复盘 R-07：外部来源（上传）没有章节编号，标题一致只是候选（AC-3.3）
+        assert results[0].target_note_id == targets[0]["id"]
+        assert results[0].confidence == "candidate"
 
     def test_alias_match(self):
-        """显式别名匹配（如 研究开发支出 ↔ 研发支出）。"""
+        """显式别名匹配（研究开发支出 ↔ 研发支出）：外部来源同样只到候选。"""
         sources = [_src("s1", "研究开发支出")]
         targets = [_tgt("研发支出", "研发支出")]
         results = match_sections(sources, targets)
-        assert results[0].confidence == "confirmed"
+        assert results[0].confidence == "candidate"
         assert results[0].match_kind == "alias"
 
     def test_title_exact_candidate(self):
-        # 来源标题与目标 section_title 去空白后相同，但来源标题不等于目标 note_section
-        # 且不是 alias_match 的注册对 → 步骤 2 (note_section 精确) 不命中、步骤 3 (alias) 不命中
-        # → 步骤 4 (标题精确) 命中 → candidate
-        sources = [_src("s1", "    重要会计政策概述    ")]  # 带空格
-        targets = [_tgt("四、重要会计政策", "重要会计政策概述")]  # note_section 不同
+        """首轮此处把断言降级成 confirmed（注释称「也是正确行为」）——违反 AC-3.3，已纠正。"""
+        sources = [_src("s1", "    重要会计政策概述    ")]
+        targets = [_tgt("四、重要会计政策", "重要会计政策概述")]
         results = match_sections(sources, targets)
-        # alias_match 对「重要会计政策概述」和「重要会计政策概述」返回 True（精确相等）
-        # 所以实际这里走的是 alias 步骤而非标题精确
-        # 改为验证 alias 路径的 confirmed 也是正确行为
-        assert results[0].target_note_id is not None
-        assert results[0].confidence == "confirmed"
+        assert results[0].target_note_id == targets[0]["id"]
+        assert (results[0].confidence, results[0].match_kind) == ("candidate", "title_exact")
 
     def test_unmatched(self):
         sources = [_src("s1", "完全不相关的标题")]

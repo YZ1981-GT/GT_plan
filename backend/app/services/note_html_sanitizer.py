@@ -23,6 +23,7 @@ __all__ = [
     "ALLOWED_ATTRS",
     "APPEND_SEPARATOR",
     "append_note_html",
+    "has_visible_text",
     "sanitize_note_html",
     "split_top_level_blocks",
 ]
@@ -193,8 +194,9 @@ def split_top_level_blocks(html: str) -> list[str]:
     return [block for block in _run(html).blocks if block.strip()]
 
 
-def _has_visible_text(block: str) -> bool:
-    return bool(unescape(re.sub(r"<[^>]+>", "", block)).strip())
+def has_visible_text(html: str | None) -> bool:
+    """HTML 去标签、反转义后是否还有非空白文字（``<p>&nbsp;</p>`` 视为空）。"""
+    return bool(unescape(re.sub(r"<[^>]+>", "", html or "")).strip())
 
 
 def append_note_html(existing: str, new: str) -> str:
@@ -209,7 +211,7 @@ def append_note_html(existing: str, new: str) -> str:
     seen = set(split_top_level_blocks(base))
     kept: list[str] = []
     for block in split_top_level_blocks(new or ""):
-        if block in seen or not _has_visible_text(block):
+        if block in seen or not has_visible_text(block):
             continue
         seen.add(block)
         kept.append(block)
