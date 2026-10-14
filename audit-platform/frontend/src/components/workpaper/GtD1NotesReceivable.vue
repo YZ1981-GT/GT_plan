@@ -533,6 +533,7 @@ import { capabilityForEntry } from './sync/workpaperSyncCapability'
 
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
+import { pickDTbSourceCodes } from './composables/dCycleAccountScope'
 
 
 
@@ -1014,6 +1015,9 @@ useWorkpaperEntryInjections({
 })
 
 provide('d1SaveImmediate', saveImmediateWithSnapshot)
+
+const _d1TbSourceCodes = computed(() => pickDTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _d1TbSourceCodes)
 
 provide('d1SaveDebouncedText', saveDebouncedText)
 

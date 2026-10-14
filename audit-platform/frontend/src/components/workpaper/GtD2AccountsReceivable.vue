@@ -350,6 +350,7 @@ import D2TabIndex from './d2/D2TabIndex.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
+import { pickDTbSourceCodes } from './composables/dCycleAccountScope'
 
 const D2TabProcedure = defineAsyncComponent(() => import('./d2/D2TabProcedure.vue'))
 const D2TabAdjudication = defineAsyncComponent(() => import('./d2/D2TabAdjudication.vue'))
@@ -592,6 +593,10 @@ provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)
 
 provide('d2CrossSheet', crossSheet)
+
+const _d2TbSourceCodes = computed(() => pickDTbSourceCodes(props.htmlData))
+provide('tbSourceCodes', _d2TbSourceCodes)
+
 provide('d2AgingSegments', d2AgingSegments)
 provide('d2AgingPreset', d2AgingPreset)
 provide('d2VersionTrailRef', runtime?.version.versionTrailRef)
