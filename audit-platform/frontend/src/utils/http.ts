@@ -359,6 +359,10 @@ http.interceptors.response.use(
     const authStore = useAuthStore()
     const status = error.response?.status
 
+    // 304 Not Modified：浏览器缓存命中，axios 默认 validateStatus 只接受 2xx 会落入此处。
+    // 静默拒绝即可，不弹全局错误提示。
+    if (status === 304) return Promise.reject(error)
+
     // 401 → 优先刷新令牌（须在 _silent 之前，避免 silent health/ACNR 跳过刷新导致后续鉴权连环失败）
     if (status === 401 && originalRequest && !originalRequest._retry) {
       // 多窗口：先检查 token 是否已被其他窗口刷新（BroadcastChannel 广播到达后
