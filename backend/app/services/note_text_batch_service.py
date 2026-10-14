@@ -528,8 +528,11 @@ def build_preview(
                                                           "account_explanation", "cross_standard"}) for i in items),
         **skipped,
     }
+    # digest 只绑「预览输入」：来源身份 + 映射 + 拟写入内容。目标现状不进 digest ——
+    # 所选目标由 apply 逐章 before_hash 复核（409 并列出冲突章节，设计 §7.2-4 / §7.3），
+    # 未勾选目标被他人修改不应让整批报「摘要不一致」。append 结果依赖现状，由 append_hash 单独复核。
     canonical = json.dumps({
         "source": source_identity or {},
-        "items": [[i["source_id"], i["target_note_id"], i["before_hash"], i["proposed_hash"]] for i in items],
+        "items": [[i["source_id"], i["target_note_id"], i["proposed_hash"]] for i in items],
     }, sort_keys=True, ensure_ascii=False, default=str)
     return {"preview_digest": sha256_text(canonical), "items": items, "summary": summary, "warnings": []}

@@ -1996,7 +1996,12 @@ class DisclosureEngine:
                         flag_modified(note, "table_data")
                 else:
                     note.table_data = table_data
-                note.text_content = text_content
+                # AC-4.6（disclosure-note-doc-upload-and-batch-fill）：批量文字写入设
+                # is_local_override=True 后，重新生成不得静默覆盖正文。只保护正文：
+                # 表格仍走上面的三态合并（数字须随试算表刷新，manual/locked 单元格另有保护），
+                # 标题/指引/来源模板/排序照常随模板更新。
+                if not note.is_local_override:
+                    note.text_content = text_content
                 note.guidance_text = guidance_text
                 note.source_template = source_template
                 note.sort_order = sort_order

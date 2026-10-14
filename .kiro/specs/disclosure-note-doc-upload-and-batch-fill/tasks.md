@@ -117,15 +117,15 @@
 
 - [x] 27. 定义 apply selection schema：target_note_id、mode、expected_updated_at/before_hash、proposed_hash、变量撤销选择；请求必须带 preview_digest 和 X-Mutation-Id。
   - 验收：字段缺失/自由 mode/重复目标在进入 DB 前 422。（AC-4.2, AC-4.4）
-- [~] 28. 实现原子 apply：按稳定 UUID 顺序 `SELECT ... FOR UPDATE` 全部目标，复核 project/year/hash/digest，任一冲突整体回滚。
+- [x] 28. 实现原子 apply：按稳定 UUID 顺序 `SELECT ... FOR UPDATE` 全部目标，复核 project/year/hash/digest，任一冲突整体回滚。
   - 验收：中间一章冲突/异常后所有章 before_hash 不变；成功只 commit 一次。（AC-4.3~4.5）
 - [x] 29. 实现 replace/append：追加只拼业务正文并做完全相同段落去重，不写可见来源标记；全部结果再消毒并核对 hash。
   - 验收：导出正文不含“引用自模板”等审计文字；替换/追加结果与 preview 逐字一致。（AC-9.3~9.4, AC-10.5）
-- [~] 30. apply 对每章设置 `status=draft/is_local_override=true`；内容模板来源追加 `template_lineage`，不得覆盖既有集团基线 lineage。
+- [x] 30. apply 对每章设置 `status=draft/is_local_override=true`；内容模板来源追加 `template_lineage`，不得覆盖既有集团基线 lineage。
   - 验收：后续 generate/batch-ai-fill 不覆盖结果；两类 lineage 可共存。（AC-4.6, AC-11.2）
 - [x] 31. 同事务写 `note_text_batch_applications`，保存固定版本/知识库版本/文件 hash、映射、模式、变量、前后 hash和操作者；失败批次不留 succeeded 记录。
   - 验收：审计记录与实际变更章节逐项闭合，正文不含审计元数据。（AC-11.1, AC-11.3, AC-11.5）
-- [~] 32. 扩展 `DisclosureMutationCoordinator` 支持事件列表，commit 后为每个变更章节发布 NOTE_SECTION_SAVED；事件失败只进回执 warning。
+- [x] 32. 扩展 `DisclosureMutationCoordinator` 支持事件列表，commit 后为每个变更章节发布 NOTE_SECTION_SAVED；事件失败只进回执 warning。
   - 验收：N 章成功产生 N 个等价失效通知；只发第一章/无 section 的变异会打红。（AC-11.4）
 - [~] 33. 实现 apply 端点幂等与冲突回执：同 mutation 同载荷复放、不同载荷冲突、stale preview 返回逐章冲突但零写入。
   - 验收：并发双请求、网络重试、模板新版本发布三类场景结果确定。（AC-4.3~4.4, AC-8.3~8.4）
@@ -323,3 +323,13 @@ R-14 → R-05/R-11/R-10（Phase 2 纯函数）→ R-07/R-08/R-16（Phase 4）→
   - R-27：`test_note_text_batch_word_e2e.py` 用四份 Word 跑「解析→分类→匹配→并入→预览」：科目章节误入叙述目标 0；叙述目标命中 53/55、72/74、82/86、95/99（棘轮冻结）；解析 2.0~3.6s。
   - 证据：13 个测试文件 248 passed；7 个变异（去门控、不并入、候选默认勾选、先到先得、同名取首个、外部标题直接定案、before_hash 回退）全部打红，文件逐字节恢复。
 - ⏳ 待办：Task 10（生成链透传 section_id）未动；Task 21 端点与 Task 25/26 在第 4 组（R-01）落地。
+
+- ✅ **第 3 组 R-06 / R-09 / R-12 + Task 30 验收缺口**（Phase 5）
+  - R-09：`apply_batch` 只写服务端重算 preview 的结果（replace 写 `proposed_html`；append 写 `append_html`，且 selection 的 `proposed_hash` 须等于 `append_hash`），请求里的 `proposed_html` 一律不用。校验顺序：空/重复选择 → 目标存在且属本项目年度 → 所选目标 before_hash（409 `NOTE_BATCH_STALE_PREVIEW` 列出冲突章节、零写入）→ digest → selection 属本 preview 且映射一致 → 可用性/模式/哈希。
+  - R-06：lineage 一律返回新对象（JSONB 未声明 MutableDict，原地改写不落库）。🔴 **反向新发现**：集团基线 `_build_lineage_entry` 写 list 且遇 dict 直接丢弃；其余写入方（程序裁剪 / 自动裁剪 / 国企↔上市转换快照）全按 dict、非 dict 当空 ⇒ 任一方后写都会抹掉另一方（自动裁剪 `dict(list)` 直接 ValueError），AC-11.2 只在一个方向成立。新增 `note_lineage.py` 统一 dict 约定：集团基线进 `group_baselines`、内容模板进 `content_templates`，历史 list 只读兼容；真库 1029 行全 NULL，无需迁移。既有 2 个测试文件（`test_group_note_baseline_service.py` / `test_note_ci7.py`）中 8 个用例断言旧 list 形态（断言的正是缺陷形态），已改为新形态。顺带修 `_find_affected_children`：每项目只抽一条 lineage 非空章节（`limit(1)` 无序）⇒ 抽到内容模板/裁剪章节就漏掉已应用基线的子企业；改为单查询逐章判断。
+  - R-12：coordinator 逐个发布事件、单个失败只进 warning（带 `section_code`），回执 `event_delivery` = published / partial / failed；测试真跑 `coordinator.execute`，删除源码文本匹配用例。
+  - Task 30 验收缺口：`generate_notes` 的 upsert 分支无条件覆盖 `text_content`（全仓此前无一处读 `is_local_override`）⇒ 改为本地改写时保留正文；表格仍走三态合并（数字须随试算表刷新），结构字段照常随模板更新。AI 批填按「空或 draft」取数，而批量写入后恰是 draft ⇒ 只靠 `is_local_override` 过滤排除，已补行为测试。
+  - digest 口径修订（覆盖第 2 组记录）：digest 只绑来源身份 + 映射 + 拟写入内容，不再含 before_hash。原口径下他人改了**未勾选**章节也会整批报「摘要不一致」且不指出冲突章节；所选目标仍由逐章 before_hash 复核（设计 §7.2-4 / §7.3）。
+  - 其余正文写入方评估（本组不改，登记）：①底稿叙述推送（`wp_disclosure_sync_service`）不看 `is_local_override`。上传/知识库路径只写叙述章节；推送注册表 80 条目标为科目章（五/八）外加 7 条上市「三、xxx」截断码（真库 0 行命中）⇒ 两者无交集。内容模板路径可写科目解释章节（AC-9.2 的需复核项），之后底稿保存推送叙述会以底稿为准；是否让底稿推送尊重本地改写涉及联动设计，**待用户拍板**。②集团基线下发、继承上年附注是显式用户操作，不属 AC-4.6 所说的静默覆盖。③顺带发现：`note_prior_year_import_service.inherit_from_prior_year` 读 `DisclosureNote.section_code`（模型无此列）⇒ 本年已有附注时必 AttributeError（`note_advanced` 路由在用）。非本 spec 引入，登记待修。
+  - 证据：phase5 测试 24 例（真 SQLite + 真 ORM）；本 spec 12 个测试文件 + 集团基线/生成/RAG/转换/裁剪/reflow 回归共 507 passed。17 个变异全部打红，且红的形态与预期一致（写浏览器正文 / 去 stale / 去 digest / 不校验映射 / 首条事件失败即中断 / 只发第一章 / 事件无 section_code / lineage 原地改写 / dict 被丢 / list 被丢 / 读不到 dict 基线 / 受影响子企业只看一条 / 重新生成覆盖 / digest 绑现状×2 / service 自行 commit / AI 批填不排除），文件逐字节恢复。两条既有红守卫状态不变（见「非本 spec 引入」）。
+  - 标记：Task 28 / 30 / 32 → `[x]`。Task 33（端点幂等、并发双请求、PG 行锁）随第 4 组端点落地；FOR UPDATE 在 SQLite 下不生效，行锁语义尚未实测。

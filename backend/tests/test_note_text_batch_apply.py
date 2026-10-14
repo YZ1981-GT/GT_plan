@@ -108,22 +108,9 @@ class TestSelectionSchema:
         assert len(req.selections) == 1
 
 
-class TestCoordinatorMultiEvent:
-    """Task 32：coordinator 支持事件列表。"""
-
-    def test_execute_signature_accepts_list_factory(self):
-        """验证 coordinator.execute 的 event_factory 可返回列表。"""
-        import inspect
-        from app.services.disclosure_mutation_coordinator import DisclosureMutationCoordinator
-        sig = inspect.getsource(DisclosureMutationCoordinator.execute)
-        # 确认代码中有列表判断
-        assert "isinstance(payloads, list)" in sig
-
-    def test_execute_signature_loops_payloads(self):
-        import inspect
-        from app.services.disclosure_mutation_coordinator import DisclosureMutationCoordinator
-        src = inspect.getsource(DisclosureMutationCoordinator.execute)
-        assert "for payload in payloads:" in src
+# 第二轮复盘 R-12：首轮此处两条测试只读 coordinator 源码找字符串（铁律 ㉖：禁文本匹配判行为），
+# 已删除；真跑 coordinator.execute 的逐章发布 / 部分失败用例见
+# test_note_text_batch_review_phase5.py::TestCoordinatorPublishesEachEvent。
 
 
 class TestAuditRecordSchema:

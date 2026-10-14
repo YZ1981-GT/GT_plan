@@ -122,17 +122,20 @@ class TestHelpers:
     def test_build_lineage_entry_new(self):
         baseline = _make_baseline(baseline_id=uuid.UUID("12345678-1234-1234-1234-123456789abc"))
         result = _build_lineage_entry(None, baseline)
-        assert len(result) == 1
-        assert result[0]["baseline_id"] == "12345678-1234-1234-1234-123456789abc"
-        assert result[0]["version"] == "v1.0"
-        assert "applied_at" in result[0]
+        # dict 约定（disclosure-note-doc-upload-and-batch-fill AC-11.2）：基线条目在 group_baselines
+        entries = result["group_baselines"]
+        assert len(entries) == 1
+        assert entries[0]["baseline_id"] == "12345678-1234-1234-1234-123456789abc"
+        assert entries[0]["version"] == "v1.0"
+        assert "applied_at" in entries[0]
 
     def test_build_lineage_entry_append(self):
+        # 历史 list 形态 ⇒ 升级为 dict 且原条目保留在前
         existing = [{"baseline_id": "old", "version": "v0.9", "applied_at": "2025-01-01"}]
         baseline = _make_baseline()
         result = _build_lineage_entry(existing, baseline)
-        assert len(result) == 2
-        assert result[0]["baseline_id"] == "old"
+        assert len(result["group_baselines"]) == 2
+        assert result["group_baselines"][0]["baseline_id"] == "old"
 
     def test_lineage_contains_baseline_true(self):
         bid = uuid.uuid4()
@@ -286,8 +289,9 @@ class TestApplyBaseline:
         assert existing_note.text_content == "new text"
         # template_lineage should be written
         assert existing_note.template_lineage is not None
-        assert len(existing_note.template_lineage) >= 1
-        assert existing_note.template_lineage[-1]["baseline_id"] == str(bid)
+        entries = existing_note.template_lineage["group_baselines"]
+        assert len(entries) >= 1
+        assert entries[-1]["baseline_id"] == str(bid)
 
 
 class TestDiffBaseline:

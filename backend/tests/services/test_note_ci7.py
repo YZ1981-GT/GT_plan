@@ -90,7 +90,9 @@ class TestCI7LineageAfterApply:
         # CI-7 核心断言：lineage 必有 baseline_id
         lineage = existing_note.template_lineage
         assert lineage is not None, "template_lineage must not be None after apply"
-        assert isinstance(lineage, list), "template_lineage must be a list"
+        # dict 约定（disclosure-note-doc-upload-and-batch-fill AC-11.2）：基线条目在 group_baselines
+        assert isinstance(lineage, dict), "template_lineage must be a dict"
+        lineage = lineage["group_baselines"]
         assert len(lineage) >= 1, "template_lineage must have at least one entry"
 
         entry = lineage[-1]
@@ -131,7 +133,8 @@ class TestCI7LineageAfterApply:
                         result = await svc.apply_baseline(child_pid, 2025, bid_new)
 
         assert result["success"] is True
-        lineage = existing_note.template_lineage
+        # 历史 list 形态升级为 dict，原基线条目保留在前（AC-11.2 dict 约定）
+        lineage = existing_note.template_lineage["group_baselines"]
         assert len(lineage) == 2, "Should append, not overwrite"
         assert lineage[0]["baseline_id"] == str(bid_old)
         assert lineage[1]["baseline_id"] == str(bid_new)
@@ -165,9 +168,10 @@ class TestCI7LineageAfterApply:
         added_call = db.add.call_args
         new_note = added_call[0][0]
         assert new_note.template_lineage is not None
-        assert isinstance(new_note.template_lineage, list)
-        assert len(new_note.template_lineage) == 1
-        assert new_note.template_lineage[0]["baseline_id"] == str(bid)
+        # dict 约定（disclosure-note-doc-upload-and-batch-fill AC-11.2）：基线条目在 group_baselines
+        entries = new_note.template_lineage["group_baselines"]
+        assert len(entries) == 1
+        assert entries[0]["baseline_id"] == str(bid)
 
     def test_build_lineage_entry_structure(self):
         """Verify _build_lineage_entry produces correct structure."""
@@ -176,9 +180,9 @@ class TestCI7LineageAfterApply:
 
         result = _build_lineage_entry(None, baseline)
 
-        assert isinstance(result, list)
-        assert len(result) == 1
-        entry = result[0]
+        assert isinstance(result, dict)
+        assert len(result["group_baselines"]) == 1
+        entry = result["group_baselines"][0]
         assert entry["baseline_id"] == str(bid)
         assert entry["version"] == "v3.1"
         assert "applied_at" in entry
@@ -213,4 +217,4 @@ class TestCI7LineageAfterApply:
                         await svc.apply_baseline(child_pid, 2025, bid)
 
         lineage = existing_note.template_lineage
-        assert lineage[-1]["version"] == "v5.3"
+        assert lineage["group_baselines"][-1]["version"] == "v5.3"

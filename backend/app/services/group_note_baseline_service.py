@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.report_models import DisclosureNote, GroupNoteTemplateBaseline
 from app.services.note_cell_merge import merge_table_data_preserving_cell_modes
+from app.services.note_lineage import GROUP_BASELINES_KEY, append_lineage_entry, group_baseline_entries
 
 __all__ = ["GroupNoteBaselineService"]
 
@@ -588,40 +589,19 @@ class GroupNoteBaselineService:
         return chain
 
     async def _find_affected_children(self, baseline_id: uuid.UUID) -> list[str]:
-        """Find project_ids that have applied this baseline (via template_lineage)."""
-        # Query notes where template_lineage contains this baseline_id
-        # JSONB containment: template_lineage @> [{"baseline_id": "..."}]
-        # Simplified: scan notes with non-null template_lineage
-        stmt = (
-            select(DisclosureNote.project_id)
-            .where(
-                DisclosureNote.template_lineage.isnot(None),
-                DisclosureNote.is_deleted == False,  # noqa: E712
-            )
-            .distinct()
+        """Find project_ids that have applied this baseline (via template_lineage).
+
+        逐章判断：首版每个项目只抽一条 lineage 非空的章节（``limit(1)``，无序），
+        而裁剪 / 国企↔上市转换 / 内容模板也写 lineage ⇒ 抽到它们就把已应用基线的子企业漏掉。
+        """
+        stmt = select(DisclosureNote.project_id, DisclosureNote.template_lineage).where(
+            DisclosureNote.template_lineage.isnot(None),
+            DisclosureNote.is_deleted == False,  # noqa: E712
         )
-        result = await self.db.execute(stmt)
-        project_ids = result.scalars().all()
-
-        # Filter to those whose lineage references this baseline
-        affected: list[str] = []
-        for pid in project_ids:
-            # Check at least one note in this project references the baseline
-            note_stmt = (
-                select(DisclosureNote)
-                .where(
-                    DisclosureNote.project_id == pid,
-                    DisclosureNote.template_lineage.isnot(None),
-                    DisclosureNote.is_deleted == False,  # noqa: E712
-                )
-                .limit(1)
-            )
-            note_result = await self.db.execute(note_stmt)
-            note = note_result.scalar_one_or_none()
-            if note and _lineage_contains_baseline(note.template_lineage, baseline_id):
-                affected.append(str(pid))
-
-        return affected
+        rows = (await self.db.execute(stmt)).all()
+        return sorted({
+            str(pid) for pid, lineage in rows if _lineage_contains_baseline(lineage, baseline_id)
+        })
 
     async def _infer_child_template_type(self, project_id: uuid.UUID) -> str | None:
         """Infer template_type for a child project.
@@ -648,29 +628,23 @@ class GroupNoteBaselineService:
 def _build_lineage_entry(
     existing_lineage: Any,
     baseline: GroupNoteTemplateBaseline,
-) -> list[dict[str, Any]]:
-    """Build/append lineage entry for a note."""
-    entries: list[dict[str, Any]] = []
-    if isinstance(existing_lineage, list):
-        entries = deepcopy(existing_lineage)
+) -> dict[str, Any]:
+    """追加集团基线条目到 ``template_lineage.group_baselines``，保留其余写入方的键。
 
-    entries.append({
+    曾返回 list：内容模板 / 程序裁剪 / 国企↔上市转换都按 dict 读写、非 dict 当空，
+    任一方后写都会静默抹掉基线条目（AC-11.2，见 ``note_lineage`` 模块说明）。
+    """
+    return append_lineage_entry(existing_lineage, GROUP_BASELINES_KEY, {
         "baseline_id": str(baseline.id),
         "version": baseline.version,
         "applied_at": _now().isoformat(),
     })
-    return entries
 
 
 def _lineage_contains_baseline(lineage: Any, baseline_id: uuid.UUID) -> bool:
-    """Check if lineage list contains a reference to baseline_id."""
-    if not isinstance(lineage, list):
-        return False
+    """lineage（dict 或历史 list 形态）是否引用了 ``baseline_id``。"""
     bid_str = str(baseline_id)
-    for entry in lineage:
-        if isinstance(entry, dict) and entry.get("baseline_id") == bid_str:
-            return True
-    return False
+    return any(entry.get("baseline_id") == bid_str for entry in group_baseline_entries(lineage))
 
 
 def _is_section_modified(note: DisclosureNote, baseline_section: dict[str, Any]) -> bool:

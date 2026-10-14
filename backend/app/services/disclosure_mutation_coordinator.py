@@ -215,28 +215,36 @@ class DisclosureMutationCoordinator:
                     "mutation_id": self.mutation_id,
                     "project_id": self.project_id,
                 }
-            try:
-                from app.services.event_bus import event_bus
+            from app.services.event_bus import event_bus
 
-                for payload in payloads:
+            # 逐条独立发布：批量写入一次提交 N 章，某一章事件失败不能吞掉其余章节的失效通知
+            failed = 0
+            for payload in payloads:
+                try:
                     await event_bus.publish(payload)
-            except Exception:
-                event_delivery = "failed"
-                logger.exception(
-                    "附注 mutation 已提交但 EventBus 发布失败",
-                    extra={
-                        "project_id": self.project_id,
-                        "mutation_id": self.mutation_id,
-                        "event_type": payload.event_type.value,
-                    },
-                )
-                warnings.append(
-                    {
-                        "code": "event_delivery_failed",
-                        "message": "业务数据已保存，但事件通知发送失败",
-                        "mutation_id": self.mutation_id,
-                    }
-                )
+                except Exception:
+                    failed += 1
+                    section = (payload.extra or {}).get("section_code")
+                    logger.exception(
+                        "附注 mutation 已提交但 EventBus 发布失败",
+                        extra={
+                            "project_id": self.project_id,
+                            "mutation_id": self.mutation_id,
+                            "event_type": payload.event_type.value,
+                            "section_code": section,
+                        },
+                    )
+                    warnings.append(
+                        {
+                            "code": "event_delivery_failed",
+                            "message": "业务数据已保存，但事件通知发送失败"
+                            + (f"（{section}）" if section else ""),
+                            "mutation_id": self.mutation_id,
+                            "section_code": section,
+                        }
+                    )
+            if failed:
+                event_delivery = "failed" if failed == len(payloads) else "partial"
 
             response = {
                 **core_response,

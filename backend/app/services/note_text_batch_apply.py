@@ -1,6 +1,15 @@
-"""附注正文原子批量 apply — 锁行 + hash 校验 + 写入 + 审计 + 事件。
+"""附注正文原子批量 apply — 锁行 + 服务端重算预览复核 + 写入 + 审计 + 逐章事件。
 
-spec: disclosure-note-doc-upload-and-batch-fill Phase 5 Task 27~33
+spec: disclosure-note-doc-upload-and-batch-fill Phase 5 Task 27~33（第二轮复盘 R-06 / R-09 / R-12 修订）
+
+调用约定（apply 端点）：
+1. :func:`lock_target_notes` 按稳定 UUID 顺序 ``SELECT … FOR UPDATE`` 锁定所选目标；
+2. 用**服务端**重新解析/加载的来源 + 当前目标状态重算 ``build_preview``；
+3. :func:`apply_batch` 先整体校验、后整体写入，service 只 flush；
+4. ``DisclosureMutationCoordinator`` 统一 commit，并用 :func:`build_note_saved_events` 逐章发事件。
+
+🔴 写入值只取服务端预览结果；请求里的 ``proposed_html`` 一律不用（R-09：首轮直接写浏览器提交的正文，
+   可绕过 preview 写任意内容）。
 """
 
 from __future__ import annotations
@@ -14,17 +23,24 @@ from uuid import UUID, uuid4
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.note_content_template_models import NoteTextBatchApplication
-from app.models.report_models import DisclosureNote
-from app.services.note_html_sanitizer import append_note_html, sanitize_note_html
+from app.models.report_models import DisclosureNote, NoteStatus
+from app.services.note_lineage import CONTENT_TEMPLATES_KEY, append_lineage_entry
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["apply_batch", "ApplyError"]
+__all__ = [
+    "ApplyError",
+    "append_content_template_lineage",
+    "apply_batch",
+    "build_note_saved_events",
+    "lock_target_notes",
+]
 
 
 class ApplyError(Exception):
-    """apply 业务错误（非 HTTP 异常，由调用方转换）。"""
+    """apply 业务错误（端点转 409/422）；``stale_notes`` 为预览后被他人修改的章节号。"""
 
     def __init__(self, code: str, message: str, *, stale_notes: list[str] | None = None):
         self.code = code
@@ -33,149 +49,194 @@ class ApplyError(Exception):
         super().__init__(f"{code}: {message}")
 
 
+def _sha256(text: str | None) -> str:
+    return hashlib.sha256((text or "").encode("utf-8")).hexdigest()
+
+
+def _as_uuid(value: Any) -> UUID:
+    return value if isinstance(value, UUID) else UUID(str(value))
+
+
+def _same_instant(expected: Any, current: datetime | None) -> bool:
+    """``expected_updated_at`` 复核；任一侧缺失视为不比对（时间戳只是辅助，正文 hash 才是主判据）。"""
+    if expected in (None, "") or current is None:
+        return True
+    if isinstance(expected, str):
+        try:
+            expected = datetime.fromisoformat(expected.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+
+    def _utc(value: datetime) -> datetime:
+        return value.astimezone(timezone.utc).replace(tzinfo=None) if value.tzinfo else value
+
+    return _utc(expected) == _utc(current)
+
+
+async def lock_target_notes(
+    db: AsyncSession, project_id: UUID, year: int, note_ids: list[Any]
+) -> dict[UUID, DisclosureNote]:
+    """按稳定 UUID 顺序锁定本项目本年度未删除的目标章节（防死锁）；不属于本项目的 ID 不返回。"""
+    ids = sorted({_as_uuid(i) for i in note_ids}, key=str)
+    if not ids:
+        return {}
+    rows = await db.execute(
+        sa.select(DisclosureNote)
+        .where(
+            DisclosureNote.id.in_(ids),
+            DisclosureNote.project_id == project_id,
+            DisclosureNote.year == year,
+            DisclosureNote.is_deleted == sa.false(),
+        )
+        .order_by(DisclosureNote.id)
+        .with_for_update()
+    )
+    return {note.id: note for note in rows.scalars().all()}
+
+
+def append_content_template_lineage(existing: Any, entry: dict[str, Any]) -> dict[str, Any]:
+    """追加到 ``template_lineage.content_templates``，返回新 dict（R-06：原地改写不落库）。
+
+    与集团基线 ``group_baselines``、裁剪、国企↔上市转换的键共存（AC-11.2，见 ``note_lineage``）。
+    """
+    return append_lineage_entry(existing, CONTENT_TEMPLATES_KEY, entry)
+
+
+def _validate(
+    locked_notes: dict[UUID, DisclosureNote],
+    preview: dict[str, Any],
+    request_digest: str,
+    selections: list[dict[str, Any]],
+) -> list[tuple[dict[str, Any], DisclosureNote, dict[str, Any], str]]:
+    """整体校验（零写入）；返回 [(selection, note, preview_item, final_html)]。"""
+    if not selections:
+        raise ApplyError("EMPTY_SELECTIONS", "批次为空")
+    targets = [_as_uuid(s["target_note_id"]) for s in selections]
+    sources = [s["source_id"] for s in selections]
+    if len(set(targets)) != len(targets) or len(set(sources)) != len(sources):
+        raise ApplyError("DUPLICATE_SELECTION", "同一来源或目标章节在批次中重复")
+    missing = [str(t) for t in targets if t not in locked_notes]
+    if missing:
+        raise ApplyError("NOTE_NOT_FOUND", "目标章节不存在、已删除或不属于当前项目")
+
+    stale = [
+        locked_notes[t].note_section
+        for s, t in zip(selections, targets)
+        if s.get("before_hash") != _sha256(locked_notes[t].text_content)
+        or not _same_instant(s.get("expected_updated_at"), locked_notes[t].updated_at)
+    ]
+    if stale:
+        raise ApplyError("NOTE_BATCH_STALE_PREVIEW",
+                         f"以下章节在预览后已被修改，请重新预览：{'、'.join(stale[:10])}", stale_notes=stale)
+    if preview.get("preview_digest") != request_digest:
+        raise ApplyError("PREVIEW_DIGEST_MISMATCH", "来源内容或章节映射与预览时不一致，请重新预览")
+
+    items = {i["source_id"]: i for i in preview.get("items") or []}
+    plan: list[tuple[dict[str, Any], DisclosureNote, dict[str, Any], str]] = []
+    for sel, target_id in zip(selections, targets):
+        item = items.get(sel["source_id"])
+        if item is None:
+            raise ApplyError("SELECTION_NOT_IN_PREVIEW", f"来源章节不在本次预览中：{sel['source_id']}")
+        if item.get("target_note_id") != str(target_id):
+            raise ApplyError("SELECTION_MAPPING_MISMATCH", f"来源「{item.get('source_title')}」的目标章节与预览不一致")
+        if item.get("category") == "unavailable":
+            raise ApplyError("SELECTION_UNAVAILABLE", f"章节不可应用：{item.get('unavailable_reason') or ''}")
+        mode = sel.get("mode") or "replace"
+        if mode == "append":
+            if item.get("append_html") is None:
+                raise ApplyError("APPEND_NOT_APPLICABLE", "目标章节没有已有正文，只能替换")
+            final, expected = item["append_html"], item["append_hash"]
+        elif mode == "replace":
+            final, expected = item["proposed_html"], item["proposed_hash"]
+        else:
+            raise ApplyError("INVALID_MODE", f"不支持的写入方式：{mode}")
+        if sel.get("proposed_hash") != expected or _sha256(final) != expected:
+            raise ApplyError("PROPOSED_HASH_MISMATCH", "拟写入内容与预览不一致，请重新预览")
+        plan.append((sel, locked_notes[target_id], item, final))
+    return plan
+
+
 async def apply_batch(
     db: AsyncSession,
     *,
     project_id: UUID,
     year: int,
+    locked_notes: dict[UUID, DisclosureNote],
+    preview: dict[str, Any],
+    request_digest: str,
+    selections: list[dict[str, Any]],
     source_kind: str,
     template_version_id: UUID | None,
+    template_content_hash: str | None,
     source_metadata: dict[str, Any],
-    preview_digest: str,
     mutation_id: str,
     request_fingerprint: str,
-    selections: list[dict[str, Any]],
     user_id: UUID,
 ) -> dict[str, Any]:
-    """原子批量写入附注正文。
-
-    全成全败：任一章节冲突/异常 → 整体回滚（由 coordinator commit）。
-    只 flush 不 commit（遵循 service 只 flush 铁律）。
-    """
-    if not selections:
-        raise ApplyError("EMPTY_SELECTIONS", "批次为空")
-
-    # ── 1. 按稳定 UUID 排序防死锁 ─────────────────────────────────────────
-    note_ids = sorted(set(s["target_note_id"] for s in selections))
-
-    # ── 2. SELECT ... FOR UPDATE 锁全部目标 ──────────────────────────────
-    stmt = (
-        sa.select(DisclosureNote)
-        .where(
-            DisclosureNote.id.in_(note_ids),
-            DisclosureNote.project_id == project_id,
-            DisclosureNote.year == year,
-            DisclosureNote.is_deleted == sa.false(),
-        )
-        .with_for_update()
-        .order_by(DisclosureNote.id)
-    )
-
-    result = await db.execute(stmt)
-    locked_notes = {n.id: n for n in result.scalars().all()}
-
-    # ── 3. 校验目标归属 ──────────────────────────────────────────────────
-    missing = [str(nid) for nid in note_ids if nid not in locked_notes]
-    if missing:
-        raise ApplyError(
-            "NOTE_NOT_FOUND",
-            f"目标章节不存在或不属于当前项目：{', '.join(missing[:5])}",
-        )
-
-    # ── 4. 复核 hash / updated_at ────────────────────────────────────────
-    stale: list[str] = []
-    sel_map = {s["target_note_id"]: s for s in selections}
-
-    for nid, note in locked_notes.items():
-        sel = sel_map.get(nid)
-        if not sel:
-            continue
-        current_text = note.text_content or ""
-        current_hash = hashlib.sha256(current_text.encode("utf-8")).hexdigest()
-        if sel.get("before_hash") and sel["before_hash"] != current_hash:
-            stale.append(note.note_section)
-
-    if stale:
-        raise ApplyError(
-            "NOTE_BATCH_STALE_PREVIEW",
-            f"以下章节在预览后已被修改，请重新预览：{', '.join(stale[:10])}",
-            stale_notes=stale,
-        )
-
-    # ── 5. 执行写入 ─────────────────────────────────────────────────────
-    changed_note_ids: list[UUID] = []
-    detail_records: list[dict[str, Any]] = []
-    mode_counts = {"replace": 0, "append": 0}
+    """原子批量写入：先整体校验（任一失败零写入）、后整体写入；只 flush 不 commit。"""
+    plan = _validate(locked_notes, preview, request_digest, selections)
     now = datetime.now(timezone.utc)
+    application_id = uuid4()
+    detail: list[dict[str, Any]] = []
+    mode_counts = {"replace": 0, "append": 0}
+    changed: list[dict[str, str]] = []
 
-    for sel in selections:
-        note = locked_notes[sel["target_note_id"]]
-        mode = sel.get("mode", "replace")
-        proposed_html = sanitize_note_html(sel.get("proposed_html", ""))
-
-        before_text = note.text_content or ""
-        before_hash = hashlib.sha256(before_text.encode("utf-8")).hexdigest()
-
-        if mode == "append" and before_text.strip():
-            # 追加：用规范空段连接，去重完全相同段落
-            final = append_note_html(before_text, proposed_html)
-        else:
-            final = proposed_html
-
-        final_hash = hashlib.sha256(final.encode("utf-8")).hexdigest()
-
-        # 写入
+    for sel, note, item, final in plan:
+        mode = sel.get("mode") or "replace"
+        before_hash = _sha256(note.text_content)
         note.text_content = final
-        note.status = "draft"
+        note.status = NoteStatus.draft
         note.is_local_override = True
         note.updated_at = now
-
-        # 追加 template_lineage（如有），不覆盖既有
-        if template_version_id:
-            lineage = note.template_lineage or {}
-            lineage["content_template"] = {
+        note.updated_by = user_id
+        if template_version_id is not None:
+            note.template_lineage = append_content_template_lineage(note.template_lineage, {
+                "kind": "content_template",
                 "template_version_id": str(template_version_id),
-                "applied_at": now.isoformat(),
+                "content_hash": template_content_hash,
+                "application_id": str(application_id),
                 "mutation_id": mutation_id,
-            }
-            note.template_lineage = lineage
-
-        changed_note_ids.append(note.id)
-        mode_counts[mode] = mode_counts.get(mode, 0) + 1
-
-        detail_records.append({
-            "target_note_id": str(note.id),
-            "note_section": note.note_section,
-            "mode": mode,
-            "before_hash": before_hash,
-            "after_hash": final_hash,
+                "applied_at": now.isoformat(),
+            })
+        mode_counts[mode] += 1
+        changed.append({"id": str(note.id), "note_section": note.note_section})
+        detail.append({
+            "source_id": item["source_id"], "source_title": item.get("source_title"),
+            "target_note_id": str(note.id), "note_section": note.note_section,
+            "match_kind": item.get("match_kind"), "mode": mode,
+            "before_hash": before_hash, "after_hash": _sha256(final),
+            "replacements": item.get("replacements") or [],
         })
 
-    # ── 6. 写审计记录 ────────────────────────────────────────────────────
-    application = NoteTextBatchApplication(
-        id=uuid4(),
-        source_kind=source_kind,
-        template_version_id=template_version_id,
-        source_metadata=source_metadata,
-        target_project_id=project_id,
-        target_year=year,
-        mutation_id=mutation_id,
-        request_fingerprint=request_fingerprint,
-        preview_digest=preview_digest,
-        applied_count=len(changed_note_ids),
-        mode_summary=mode_counts,
-        detail=detail_records,
-        status="succeeded",
-        applied_by=user_id,
-    )
-    db.add(application)
+    db.add(NoteTextBatchApplication(
+        id=application_id, source_kind=source_kind, template_version_id=template_version_id,
+        source_metadata=source_metadata, target_project_id=project_id, target_year=year,
+        mutation_id=mutation_id, request_fingerprint=request_fingerprint,
+        preview_digest=request_digest, applied_count=len(plan), mode_summary=mode_counts,
+        detail=detail, status="succeeded", applied_by=user_id,
+    ))
     await db.flush()
-
     return {
-        "application_id": str(application.id),
-        "mutation_id": mutation_id,
-        "applied_count": len(changed_note_ids),
-        "summary": mode_counts,
-        "changed_note_ids": [str(nid) for nid in changed_note_ids],
-        "warnings": [],
+        "application_id": str(application_id), "mutation_id": mutation_id, "source_kind": source_kind,
+        "applied_count": len(plan), "summary": mode_counts, "changed_notes": changed,
+        "changed_note_ids": [c["id"] for c in changed], "warnings": [],
     }
+
+
+def build_note_saved_events(project_id: UUID, year: int, response: dict[str, Any]) -> list[EventPayload]:
+    """每个被改写章节一个 ``NOTE_SECTION_SAVED``（与单章保存同键 ``section_code``，AC-11.4）。"""
+    return [
+        EventPayload(
+            event_type=EventType.NOTE_SECTION_SAVED,
+            project_id=project_id,
+            year=year,
+            extra={
+                "section_code": changed["note_section"],
+                "note_id": changed["id"],
+                "action": "batch_text_apply",
+                "application_id": response.get("application_id"),
+                "source_kind": response.get("source_kind"),
+            },
+        )
+        for changed in response.get("changed_notes") or []
+    ]

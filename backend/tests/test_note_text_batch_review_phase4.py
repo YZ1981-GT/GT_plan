@@ -192,12 +192,18 @@ class TestPreviewReview:
         assert second["items"][0]["proposed_html"] == "<p>{公司名称}</p>"
         assert second["preview_digest"] != first["preview_digest"]
 
-    def test_digest_binds_target_state(self):
+    def test_digest_binds_inputs_not_target_state(self):
+        """digest 绑来源/映射/拟写入内容；目标现状由 apply 逐章 before_hash 复核（phase5
+        ``test_stale_target_lists_sections_and_writes_nothing`` / ``…unselected_target…``）。"""
         sources = [_src("s1", "会计期间")]
         t1 = _tgt("四、会计期间", "会计期间", text="")
         t2 = dict(t1, text_content="<p>他人刚写入</p>", content_hash=_h("<p>他人刚写入</p>"))
         m = match_sections(sources, [t1], manual_mappings={"s1": t1["id"]})
-        assert build_preview(sources, [t1], m)["preview_digest"] != build_preview(sources, [t2], m)["preview_digest"]
+        p1, p2 = build_preview(sources, [t1], m), build_preview(sources, [t2], m)
+        assert p1["preview_digest"] == p2["preview_digest"]
+        assert p1["items"][0]["before_hash"] != p2["items"][0]["before_hash"]
+        changed = [_src("s1", "会计期间", html="<p>改过的来源</p>")]
+        assert build_preview(changed, [t1], m)["preview_digest"] != p1["preview_digest"]
 
 
 # ── R-16 章节读取（真 SQLite + 真 ORM）──────────────────────────────────────
