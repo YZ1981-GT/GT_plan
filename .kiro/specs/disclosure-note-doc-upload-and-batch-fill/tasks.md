@@ -67,18 +67,27 @@
 
 ## Phase 3：Word/PDF/知识库解析
 
-- [~] 15. 新建 `note_document_parser.py` 的 DOCX 保序遍历：按 XML body 混排处理段落/表格，识别 Heading/GTNoteHeading/outlineLvl，保留列表层级和基础富文本。
+- [x] 15. 新建 `note_document_parser.py` 的 DOCX 保序遍历：按 XML body 混排处理段落/表格，识别 Heading/GTNoteHeading/outlineLvl，保留列表层级和基础富文本。
   - 验收：段落-表格-段落顺序逐项一致；Word 自动编号不在文本时仍能分章。（AC-1.2, AC-1.4）
-- [~] 16. 为 DOCX 增加字号+加粗低置信兜底、zip entry/解压字节/单 entry 限制和加密/损坏错误分类。
+- [x] 16. 为 DOCX 增加字号+加粗低置信兜底、zip entry/解压字节/单 entry 限制和加密/损坏错误分类。
   - 验收：无 Heading 文档返回候选而非静默错配；zip bomb 夹具在解压前/过程中被拒绝。（AC-1.5）
-- [~] 17. 实现 PyMuPDF PDF 解析：block/line/span 顺序、字号/粗体/间距标题证据、页间段落和置信度。
+- [x] 17. 实现 PyMuPDF PDF 解析：block/line/span 顺序、字号/粗体/间距标题证据、页间段落和置信度。
   - 验收：文字版 PDF 可分章；字号/粗体证据进入结果；不再使用不存在的 PyPDF2 假设。（AC-1.3~1.4）
-- [~] 18. 增加 pypdf/MarkItDown 纯文本降级与扫描件检测；无 text span 返回 `PDF_NEEDS_OCR`，本弹窗不启动 OCR。
+- [x] 18. 增加 pypdf/MarkItDown 纯文本降级与扫描件检测；无 text span 返回 `PDF_NEEDS_OCR`，本弹窗不启动 OCR。
   - 验收：扫描件、纯文本降级、加密 PDF 三类结果可区分，不把空结果报成功。（AC-1.5）
-- [~] 19. 实现 Markdown/HTML/纯文本章节解析器，供知识库来源复用；保留知识库文档 ID/版本元数据。
+- [x] 19. 实现 Markdown/HTML/纯文本章节解析器，供知识库来源复用；保留知识库文档 ID/版本元数据。
   - 验收：Markdown heading、HTML h1~h5、中文精确标题及无标题单段降级均有用例。（AC-5.4）
 - [~] 20. 实现 parse-upload / parse-knowledge 端点：流式有界读取、文件签名校验；知识库必须经 `KnowledgeIndexService.load_documents` 判权。
   - 验收：docx/pdf 正常；伪扩展、超限、无权 doc、空正文按错误码返回且不泄露元数据。（AC-1.1, AC-5.1~5.3）
+
+### Phase 3 实施与复盘记录（2026-10-14）
+
+- Task 15~16：DOCX 解析按 XML body `w:p`/`w:tbl` 混排遍历（不分开后重排）；识别 Heading 样式 + outlineLvl + GTNoteHeading；无 Heading 时文档开头段落标 `manual_required`。zip bomb 防护：entry 数上限 2000、解压总字节 200MiB。空 DOCX 抛 `NO_PARSEABLE_TEXT`。6 例 DOCX 全绿。
+- Task 17~18：PDF 用 `pymupdf`（新 API，非已弃用的 `fitz`）的 block→line→span 顺序；字号 > 中位数 × 1.3 或 加粗 + 中文章节模式为标题候选。扫描件（无 text span）返回 `needs_ocr=True`。加密 PDF 抛 `UNSUPPORTED_FILE`。纯文本降级按中文章节号分章，标 `manual_required`。4 例 PDF 全绿。
+- Task 19：`parse_text_source` 按优先级尝试 Markdown `#` → HTML `<h1>~<h5>` → 中文章节号 → 单段降级。所有输出经 `sanitize_note_html` 消毒。6 例全绿。
+- Task 20：端点骨架已在 Phase 1 的 `note_text_batch.py` router 中，流式有界读取和知识库判权需要在 Phase 4 集成端点时补齐，如实标 `[~]`。
+- 复盘修正：首版两个测试断言过严——纯文本被中文 heading 正则匹配时不应硬断 `manual_required`（实际是合法 candidate）；转义后的 `&lt;script&gt;` 在纯文本中包含 "script" 子串但已无害（断言改为只检查原始 `<script>` 标签）。教训：**消毒器的测试断言必须区分「原始危险标签」与「已转义安全字符串」**。
+- 验证：`test_note_document_parser.py` 16 passed, 0 failed。
 
 ## Phase 4：章节读取、映射与服务端 Preview
 
