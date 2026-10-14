@@ -54,30 +54,45 @@ async def resolve_canonical_group_root(
 # ── 角色允许保存/删除 group 模板的白名单 ──────────────────────────────────
 
 _GROUP_MANAGE_SYSTEM_ROLES = {"admin", "partner", "manager"}
-_GROUP_MANAGE_PROJECT_ROLES = {"signing_partner", "manager"}
+#: 委派角色是自由文本列（真库现仅 manager）；与平台写权限委派角色集同口径，含 partner
+_GROUP_MANAGE_PROJECT_ROLES = {"partner", "signing_partner", "manager"}
+
+
+def _role_value(user: User) -> str:
+    role = getattr(user, "role", None)
+    return str(getattr(role, "value", role) or "").lower()
 
 
 async def can_manage_group_template(
     db: AsyncSession, user: User, canonical_group_root: UUID
 ) -> bool:
-    """判断用户是否有权创建/删除集团级模板。
+    """判断用户是否有权创建/删除集团级模板（AC-7.6「只有经理/合伙人可发布」）。
 
-    系统角色 admin 或在 canonical group root 项目担任 manager/signing_partner。
+    系统角色 admin/partner/manager，或在 canonical group root 项目被委派为经理/合伙人。
+    🔴 首版取「第一条委派记录的角色」比对：同一人在根项目有多条委派（如 auditor + manager）
+    时结果取决于行序；改为 EXISTS + IN。
     """
-    if user.role.value in _GROUP_MANAGE_SYSTEM_ROLES:
+    if _role_value(user) in _GROUP_MANAGE_SYSTEM_ROLES:
         return True
     from app.models.staff_models import ProjectAssignment, StaffMember
-    role = await db.scalar(
-        sa.select(ProjectAssignment.role)
-        .join(StaffMember, ProjectAssignment.staff_id == StaffMember.id)
-        .where(
-            ProjectAssignment.project_id == canonical_group_root,
-            StaffMember.user_id == user.id,
-            ProjectAssignment.is_deleted == sa.false(),
-            StaffMember.is_deleted == sa.false(),
-        )
-    )
-    return role in _GROUP_MANAGE_PROJECT_ROLES
+
+    return bool(await db.scalar(sa.select(sa.exists().where(
+        ProjectAssignment.staff_id == StaffMember.id,
+        ProjectAssignment.project_id == canonical_group_root,
+        StaffMember.user_id == user.id,
+        sa.func.lower(ProjectAssignment.role).in_(_GROUP_MANAGE_PROJECT_ROLES),
+        ProjectAssignment.is_deleted == sa.false(),
+        StaffMember.is_deleted == sa.false(),
+    ))))
+
+
+def visible_template_clause(user_id: UUID, canonical_group_root: UUID | None) -> sa.ColumnElement[bool]:
+    """与 :func:`can_view_template` 同口径的 SQL 过滤（列表在 SQL 层过滤，R-15）。"""
+    personal = sa.and_(NoteContentTemplate.owner_scope == "personal", NoteContentTemplate.owner_user_id == user_id)
+    group = (sa.and_(NoteContentTemplate.owner_scope == "group",
+                     NoteContentTemplate.owner_group_project_id == canonical_group_root)
+             if canonical_group_root is not None else sa.false())
+    return sa.and_(NoteContentTemplate.is_deleted == sa.false(), sa.or_(personal, group))
 
 
 async def can_view_template(

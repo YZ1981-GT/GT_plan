@@ -26,7 +26,7 @@
   - 验收：DB 列、ORM、schema、service 构造参数逐项契约对齐，无 orm_extra/缺列。（NFR-2）
 - [x] 6. 实现 canonical group root resolver：沿 `parent_project_id` 到根、检测循环/缺失；personal/group owner 由服务端决定，客户端不可提交 owner ID。
   - 验收：根、子、兄弟、standalone、多级、循环六类用例成立。（AC-7.6）
-- [~] 7. 实现内容模板授权策略 `can_view/manage_template`，统一供 list/detail/versions/delete/preview/apply 使用；不可见返回 404。
+- [x] 7. 实现内容模板授权策略 `can_view/manage_template`，统一供 list/detail/versions/delete/preview/apply 使用；不可见返回 404。
   - 验收：本人 personal、同组根/子/兄弟可见；他人 personal、异组、直接 UUID 绕过全部拒绝。（AC-7.6~7.7, AC-8.1）
 - [x] 8. 新建 `note_content_templates.py` 与 `note_text_batch.py` router 并登记 `router_registry/report.py`；路径使用 `/api/projects/{project_id}/...` 避开 disclosure GET catch-all。
   - 验收：注册表 smoke test 真发请求命中正确 handler；未注册/被 catch-all 吞掉的变异会打红。（NFR-9）
@@ -170,15 +170,15 @@
 
 ## Phase 7：不可变内容模板后端
 
-- [~] 41. 实现 `NoteContentTemplateService.snapshot_preview/save_snapshot`：后端一次查询活动附注，生成 narrative+account_explanation 全套正文、服务端来源元数据、quality_summary、canonical hash 和 `snapshot_digest`；preview 不落库，save 重算 digest，变化则 409，不读 table_data。
+- [x] 41. 实现 `NoteContentTemplateService.snapshot_preview/save_snapshot`：后端一次查询活动附注，生成 narrative+account_explanation 全套正文、服务端来源元数据、quality_summary、canonical hash 和 `snapshot_digest`；preview 不落库，save 重算 digest，变化则 409，不读 table_data。
   - 验收：来源项目/年/企业/标准/口径/保存人不可由客户端伪造；空/风险章节仍在全套快照；预检后来源变化不能保存陈旧版本。（AC-7.1~7.5）
 - [x] 42. 实现同名模板目录并发锁与不可变版本：新 hash 新版本、同 hash 复用；current_version_id 原子更新，历史版本不改写。
   - 验收：并发两次保存无重复 version_no/丢版本；历史 hash 和内容保持不变。（AC-7.4, AC-8.3）
-- [~] 43. 实现模板 list/detail/versions/delete API：列表分页且只返元数据，详情/版本逐次授权，软删目录保留版本及应用历史。
+- [x] 43. 实现模板 list/detail/versions/delete API：列表分页且只返元数据，详情/版本逐次授权，软删目录保留版本及应用历史。
   - 验收：直接 UUID 不绕过；删除后新列表不可见但历史 application 可追溯。（AC-8.1~8.4, AC-11.5）
-- [~] 44. 实现 personal/group 发布策略：group owner 服务端归根，manager/partner 二次确认；普通用户不能声明 public/system/allowed_project_ids。
+- [x] 44. 实现 personal/group 发布策略：group owner 服务端归根，manager/partner 二次确认；普通用户不能声明 public/system/allowed_project_ids。
   - 验收：子 A 保存后根 P/兄弟 B 可见，异组 C 不可见；伪造 owner/public 422/403。（AC-7.6~7.7）
-- [~] 45. 增加模板端点 TestClient 安全矩阵和真实 DB 约束测试：本人/他人 personal、根/子/兄弟/异组、直接详情、版本、删除、目标无权限。
+- [x] 45. 增加模板端点 TestClient 安全矩阵和真实 DB 约束测试：本人/他人 personal、根/子/兄弟/异组、直接详情、版本、删除、目标无权限。
   - 验收：路由 Depends 与 service 判定都真实执行，不用文本匹配模拟鉴权。（NFR-4）
 
 ### Phase 7 实施与复盘记录（2026-10-14）
@@ -344,3 +344,13 @@ R-14 → R-05/R-11/R-10（Phase 2 纯函数）→ R-07/R-08/R-16（Phase 4）→
   - 测试：`test_note_text_batch_endpoints.py` 43 例，用 TestClient 真发请求；只覆盖 `get_db` / `get_current_user`，鉴权依赖链真实执行。覆盖：只读 / 越权 / 合并锁 / 归档门禁；扩展名 / MIME / 签名 / 超限；扫描件与空文档；知识库判权且不泄露；模板可见性与固定 hash；HTML 攻击；伪造或跨用户复用元数据；跨项目手工映射；候选不默认勾选；科目解释章节只进需复核；跨标准标记；幂等复放与载荷冲突；预览后目标或来源变化 → 409 零写入；两个 mutation 先到者胜；预览后发布新模板版本仍按固定版本写入。另 `test_note_text_batch_apply_lock_pg.py` 是真 PostgreSQL 行锁守卫（scratch schema + 反向对照）：A 持锁时 B 必须阻塞，拿到锁后读到 A 已提交的正文。SQLite 忽略 FOR UPDATE，此前行锁从未实测。
   - 证据：35 个变异全部打红，且红的形态是「被放行」（200 响应体或断言消息），不是被别的校验顺带拦下。首轮变异有 8 个形态不对：3 个其实被别的校验顺带拦下（apply 门禁降级被上传签名拦成 422、知识库判权被章节归属拦下、preview 门禁被模板可见性拦成 404）；5 个的「已放行」被 `KeyError: 'detail'` 掩盖。已改为门禁用例换成不绑定解析人的知识库来源，判权拆成两个独立用例，所有错误断言先断状态码并打印响应体。例外：「缺 mutation id 放行」红在 DB NOT NULL 约束上，即没有此校验就是 500。回归：本 spec 14 个后端测试文件 + 路由拆分 + 已提交模块守卫共 263 passed（含真 PG）。两条既有红守卫状态不变。
   - 🔴 前端契约尚未对齐（第 6 组处理）：上传须原样回传 parse 响应（含签名 `source_metadata`）；知识库须带 `knowledge_doc_ids`；模板须带 `template_version_id + template_content_hash` 且不带正文；apply 须回传 preview 的手工映射与撤销项。现 `useNoteTextBatch.ts` 三处都不符，端到端仍不可用（此前是 404，不是本组引入的回退）。
+
+- ✅ **第 5 组 R-03 / R-04 / R-13 / R-15 / R-17**（Phase 7 内容模板后端）
+  - R-03：预检 / 保存改用严格 schema `SnapshotPreviewRequest` / `SaveContentTemplateRequest`。`public` 归属、自带 `allowed_project_ids` / `owner_group_project_id`、缺年度一律在 schema 层 422；测试断言 detail 是校验错误列表，排除「放进 service 后靠业务校验兜底」。预检改为 JSON body（design §6.2 原定如此），首版只收 query `year`。错误统一 `{error_code, message}`。
+  - R-04：归属由服务端解析。集团模板须集团根项目的经理 / 合伙人：系统角色 admin/partner/manager，或在根项目被委派为 partner/signing_partner/manager（与平台写权限委派角色集同口径，首版漏 partner）。预检阶段就校验，并返回发布范围（根项目名），供前端二次确认。顺带修复：首版取「第一条委派记录」比对，同一用户多份人员档案时结果取决于行序，现改为 EXISTS + IN。
+  - R-13：同名目录 `SELECT … FOR UPDATE` 后再分配版本号。并发首建时后到者的 INSERT 撞部分唯一索引，回滚 SAVEPOINT 后改取胜者已提交的行。🔴 **附带发现首版在 PostgreSQL 上必失败**：同一 flush 里先改 `current_version_id` 再插版本，而该外键不可延迟 ⇒ 每次新建版本都撞外键（SQLite 不校验所以没暴露）。现改为先落版本、再改指针，已用真 PG 变异坐实。另：内容回退到历史版本时复用该版本，并把 current 指回它（首版复用后 current 仍停在旧值）。
+  - R-15：列表按 `visible_template_clause`（与 `can_view_template` 同口径）在 SQL 层过滤 + 分页，同时左连接当前版本元数据（来源企业 / 年度 / 标准 / 口径 / 版本号 / 质量摘要），不取 sections_data。首版是全表 SELECT 后逐行判权，每个集团模板一次根追溯。
+  - 其他：快照按 `section_allowed_for_project` 排除口径不适用章节（与章节读取同一判据，免得旁路长出的合并专属章扩散进模板）；空白名称 422；可见但无权删除 → 403（不可见仍 404）；ORM 部分唯一索引补 `sqlite_where`，让测试库与 V187 语义一致（否则软删后同名重建被误拒）。
+  - R-17：`test_note_content_template_snapshot.py` 整体重写为真 SQLite + 真 ORM，13 例真调 generate / preview / save / list / detail / versions / delete。含「SQL 过滤结果 ≡ 逐条 `can_view_template`」矩阵：2 用户 × 4 观察项目 × 5 类模板。端点安全矩阵 `test_note_content_template_endpoints.py` 12 例（TestClient）。真 PG 并发守卫 `test_note_content_template_save_concurrency_pg.py` 5 例：scratch schema 中两张模板表保留自身外键、部分唯一索引与不可延迟外键；并发首建 / 并发续版两种竞态；反向对照换回首版无锁实现，后到者必 IntegrityError。
+  - 证据：18 个变异全部打红，含 3 个真 PG 变异（去行锁 / 首建不回退 / 先改指针），红的形态与预期一致。本 spec 后端回归 322 passed。scratch schema 残留 0。
+  - 🔴 前端契约待第 6 组对齐：`useNoteContentTemplate.ts` 的预检仍发 query `year`、无 body ⇒ 现返回 422；列表项新增 `current_version` 元数据可直接展示。

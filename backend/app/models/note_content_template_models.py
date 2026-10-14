@@ -65,12 +65,15 @@ class NoteContentTemplate(Base):
             "AND owner_group_project_id IS NOT NULL)",
             name="ck_nct_owner_shape",
         ),
+        # sqlite_where 只为测试库与 V187 的部分唯一语义一致（否则 SQLite 建成全表唯一：
+        # 软删后同名重建被误拒）；PostgreSQL 以迁移为准，不受影响。
         Index(
             "ux_nct_personal_active_name",
             "owner_user_id",
             func.lower(name),
             unique=True,
             postgresql_where=text("is_deleted = false AND owner_scope = 'personal'"),
+            sqlite_where=text("is_deleted = 0 AND owner_scope = 'personal'"),
         ),
         Index(
             "ux_nct_group_active_name",
@@ -78,6 +81,7 @@ class NoteContentTemplate(Base):
             func.lower(name),
             unique=True,
             postgresql_where=text("is_deleted = false AND owner_scope = 'group'"),
+            sqlite_where=text("is_deleted = 0 AND owner_scope = 'group'"),
         ),
         Index(
             "idx_nct_group_visible",
