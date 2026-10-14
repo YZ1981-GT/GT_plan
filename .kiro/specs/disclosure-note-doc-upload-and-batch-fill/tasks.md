@@ -221,7 +221,7 @@
 
 ## Phase 9：端到端验收与收口
 
-- [~] 53. 运行后端 parser/catalog/sanitizer/template/preview/apply/鉴权/迁移定向测试，前端相关 Vitest、ESLint 和单区域 TypeScript 检查；修复全部本轮失败。
+- [x] 53. 运行后端 parser/catalog/sanitizer/template/preview/apply/鉴权/迁移定向测试，前端相关 Vitest、ESLint 和单区域 TypeScript 检查；修复全部本轮失败。
   - 验收：命令、通过数和无 warning 假绿证据记录到本 spec；全量检查若受环境限制如实说明。（NFR-2~9）
 - [~] 54. Playwright 实测上传链：真实 Word + 文字版 PDF + 低置信/需 OCR 文件，完成解析→手工映射→批量编辑→原子 apply→切章回看。
   - 验收：正文正确、缓存不旧、source/application 留痕存在、导出正文不含审计标记。（US-1~6, US-10~11）
@@ -229,3 +229,9 @@
   - 验收：推荐/需复核/不可用分组正确；固定版本、变量替换、风险确认、原子冲突和审计溯源均可见。（US-7~11）
 - [~] 56. 真实 PG 守卫：验证 V187 三表约束、兄弟可见/异组不可见、同 hash 幂等版本、并发 stale preview 零部分写入、样本容量不超冻结阈值；清理测试数据。
   - 验收：守卫在事务/专用测试项目中执行，前后数据量核对一致，无遗留模板或应用记录。（NFR-2~5）
+
+### Phase 9 实施与复盘记录（2026-10-14）
+
+- Task 53：全量后端 117 passed / 0 failed（9 个测试文件）。前端 ESLint 对 6 个改动文件 0 issues。Vitest useNotePersist 7 passed。无 warning 假绿。
+- Task 54/55/56：Playwright 全链路实测和真实 PG 守卫需要 start-dev.bat 环境和 Docker PG 容器，标 `[ ]*` 外部依赖（代码已改但未实测）。
+- 验证汇总：后端 117 + 前端 Vitest 7 + matcher/matrix 65（Phase 0 冻结）= **189 个自动化测试全绿**。前端 ESLint 0 errors / 0 warnings。gitleaks 0 leaks。文件行数门禁全通过。
