@@ -18,9 +18,22 @@ from html import escape as html_escape
 from pathlib import Path
 from typing import IO, Any, BinaryIO
 
-from app.services.note_html_sanitizer import sanitize_note_html
+from app.services.note_html_sanitizer import sanitize_note_html as _sanitize
 
 logger = logging.getLogger(__name__)
+
+#: 平台 Word 模板的结构标记（导出引擎 ``note_word_exporter`` 用来定位 / 填充，不是业务正文）。
+#: 四份模板约 75% 的章节带这些标记；用户把模板当来源上传时不剥掉就会被原样写进附注
+#: （第二轮复盘浏览器实测发现：拟写入内容里出现「{{section:四、会计期间}}…##/SECTION」）。
+_TEMPLATE_MARKER_RE = re.compile(r"##/?(?:SECTION|STYLE_REF)(?::[^#<]*)?##|\{\{(?:section|table|seq):[^{}<]*\}\}")
+_EMPTY_PARAGRAPH_RE = re.compile(r"<p>(?:\s|&nbsp;)*</p>")
+
+
+def sanitize_note_html(html: str) -> str:
+    """消毒 + 剥掉平台模板标记（只在确有标记时才清理随之留下的空段落）。"""
+    clean = _sanitize(html)
+    stripped = _TEMPLATE_MARKER_RE.sub("", clean)
+    return _EMPTY_PARAGRAPH_RE.sub("", stripped) if stripped != clean else clean
 
 __all__ = [
     "ParsedSection",

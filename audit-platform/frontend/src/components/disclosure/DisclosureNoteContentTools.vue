@@ -1,0 +1,70 @@
+<script setup lang="ts">
+/**
+ * DisclosureNoteContentTools — 附注编辑器「上传附注文档 / 保存为内容模板 / 引用内容模板」的弹窗宿主。
+ *
+ * 抽出原因：DisclosureEditor.vue 有 3300 行硬上限。三个入口在这里统一：
+ * - 写入口门禁（R-20）：canWrite 为假时 open() 直接拒绝（菜单项另按同一条件隐藏，后端仍独立 403 / 423）；
+ * - 当前章节有未保存修改时也拒绝：写入成功后编辑器会重载附注（未保存修改会被服务端内容覆盖），
+ *   内容模板也只按已保存内容生成——都要求先保存；
+ * - 同一时刻只挂一个弹窗（v-if + 异步组件），不预先创建编辑器实例；
+ * - 写入成功统一上报，由编辑器作废全部章节缓存后强制刷新（R-19）。
+ */
+import { defineAsyncComponent, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import type { ApplyResponse } from '@/composables/useNoteTextBatch'
+import type { ContentTemplateItem, ContentTemplateVersion } from '@/composables/useNoteContentTemplate'
+
+const NoteDocUploadDialog = defineAsyncComponent(() => import('./NoteDocUploadDialog.vue'))
+const NoteContentTemplateSaveDialog = defineAsyncComponent(() => import('./NoteContentTemplateSaveDialog.vue'))
+const NoteContentTemplatePicker = defineAsyncComponent(() => import('./NoteContentTemplatePicker.vue'))
+const NoteContentTemplateApplyDialog = defineAsyncComponent(() => import('./NoteContentTemplateApplyDialog.vue'))
+
+const props = defineProps<{ projectId: string; year: number; canWrite: boolean; hasUnsavedChanges?: boolean }>()
+const emit = defineEmits<{ 'applied': [changedSections: string[]] }>()
+
+const active = ref<'upload' | 'save' | 'pick' | null>(null)
+const applyTarget = ref<{ template: ContentTemplateItem; version: ContentTemplateVersion } | null>(null)
+
+function open(kind: 'upload' | 'save' | 'apply'): boolean {
+  if (!props.canWrite) {
+    ElMessage.warning('当前无编辑权限（只读、已归档、合并锁定或 EQCR 复核中），不能批量写入附注')
+    return false
+  }
+  if (props.hasUnsavedChanges) {
+    ElMessage.warning(kind === 'save'
+      ? '内容模板按已保存的附注内容生成，请先保存当前章节的修改'
+      : '当前章节有未保存的修改，请先保存（批量写入完成后会重新加载附注内容，未保存的修改会丢失）')
+    return false
+  }
+  active.value = kind === 'apply' ? 'pick' : kind
+  return true
+}
+
+function close() {
+  active.value = null
+}
+
+function onPicked(template: ContentTemplateItem, version: ContentTemplateVersion) {
+  applyTarget.value = { template, version }
+}
+
+function onApplied(result: ApplyResponse) {
+  applyTarget.value = null
+  active.value = null
+  emit('applied', (result.changed_notes ?? []).map(c => c.note_section))
+}
+
+defineExpose({ open })
+</script>
+
+<template>
+  <NoteDocUploadDialog v-if="active === 'upload'" :visible="true" :project-id="projectId" :year="year"
+    @update:visible="(v: boolean) => !v && close()" @applied="onApplied" />
+  <NoteContentTemplateSaveDialog v-if="active === 'save'" :visible="true" :project-id="projectId" :year="year"
+    @update:visible="(v: boolean) => !v && close()" />
+  <NoteContentTemplatePicker v-if="active === 'pick'" :visible="true" :project-id="projectId"
+    @update:visible="(v: boolean) => !v && close()" @select="onPicked" />
+  <NoteContentTemplateApplyDialog v-if="applyTarget" :visible="true" :project-id="projectId" :year="year"
+    :template="applyTarget.template" :version="applyTarget.version"
+    @update:visible="(v: boolean) => !v && (applyTarget = null)" @applied="onApplied" />
+</template>

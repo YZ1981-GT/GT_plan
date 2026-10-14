@@ -80,7 +80,9 @@ HARD_CAPS = {
     #   + 4 处保存按钮 :disabled 替换。下次瘦身优先抽 formulas/selection 相关 300+ 行块）。
     # 2026-10-14：3280→3300（+16 行附注内容模板三弹窗挂载 + 菜单入口 + ref/回调最小接线代码，
     #   已拆为独立组件 NoteDocUploadDialog/NoteContentTemplatePicker/NoteContentTemplateApplyDialog）。
-    "audit-platform/frontend/src/views/DisclosureEditor.vue": 3300,
+    # 2026-10-14：3300→3281（第二轮复盘：三个弹窗 + 新增保存弹窗收进 DisclosureNoteContentTools，
+    #   编辑器只留 1 个挂载 + 1 个回调；按「每完成一批瘦身必须同步下调」不留余量）。
+    "audit-platform/frontend/src/views/DisclosureEditor.vue": 3281,
     # ReportView.vue：2026-09-28 由 1110 更正为 1949（= 当前真实行数，splitlines 口径）。
     #
     # 🔴 **1110 是从未成立过的理想值**，不是被违反的有效约束。实证行数史：

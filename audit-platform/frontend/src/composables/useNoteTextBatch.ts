@@ -1,17 +1,23 @@
 /**
- * useNoteTextBatch — 附注正文批量导入/预览/应用 composable
+ * useNoteTextBatch — 附注正文批量导入 / 预览 / 应用 composable
  *
- * spec: disclosure-note-doc-upload-and-batch-fill Phase 6 Task 34
+ * spec: disclosure-note-doc-upload-and-batch-fill Task 34（第二轮复盘：对齐后端契约 + R-23）
  *
- * 管理来源、映射、draft hash、preview/apply、mutation ID、冲突与进度。
- * 状态以 original/draft hash 判"已编辑"，不依赖布尔标记。
+ * 来源可信度由后端裁定，这里只负责「原样回传」：
+ * - 上传：parse-upload 的整份响应（含服务端签名的 source_metadata）作为 parsed_source 回传，章节正文可二次编辑；
+ * - 知识库：解析结果 + knowledge_doc_ids（后端每次 preview / apply 重新判权）；
+ * - 内容模板：只传 template_version_id + template_content_hash，不传正文。
+ * apply 必须带上与最近一次 preview 完全相同的来源 / 手工映射 / 撤销项（后端重算并比对 digest），
+ * 所以预览后的任何修改都会把预览标为过期，必须重新预览才能应用。
+ * 「已编辑」按原文与当前正文逐章比对，不用易漂移的布尔标记（AC-2.5）。
  */
-import { ref, computed, type Ref } from 'vue'
-import { api } from '@/services/apiProxy'
+import { computed, ref, type Ref } from 'vue'
+import type { AxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
-import { v4 as uuidv4 } from 'uuid'
-
-// ── Types ────────────────────────────────────────────────────────────────────
+import { api } from '@/services/apiProxy'
+import { parseApiError } from '@/composables/useApiError'
+import { eventBus } from '@/utils/eventBus'
+import { newUuid } from '@/utils/uuid'
 
 export type SourceKind = 'upload' | 'knowledge' | 'content_template'
 export type ApplyMode = 'replace' | 'append'
@@ -25,31 +31,49 @@ export interface ParsedSection {
   html: string
   confidence: MatchConfidence
   warnings: string[]
+  metadata?: Record<string, unknown>
+}
+
+/** parse-upload / parse-knowledge 的响应；preview / apply 原样回传（含服务端签名元数据） */
+export interface ParsedSource {
+  source_kind: 'upload' | 'knowledge'
+  source_metadata: Record<string, unknown>
+  sections: ParsedSection[]
+  warnings: string[]
+  needs_ocr: boolean
+}
+
+export interface Replacement {
+  replacement_id: string
+  variable: string
+  old_value: string
+  new_value: string
+  reversible: boolean
+  revoked?: boolean
 }
 
 export interface PreviewItem {
   source_id: string
+  source_title: string
   target_note_id: string | null
   target_note_section: string | null
+  target_section_title: string | null
   match_kind: string
   evidence: string
   confidence: MatchConfidence
   category: PreviewCategory
+  default_selected: boolean
   unavailable_reason: string | null
   before_html: string
-  proposed_html: string
   before_hash: string
+  proposed_html: string
   proposed_hash: string
+  append_html: string | null
+  append_hash: string | null
   expected_updated_at: string | null
   default_mode: ApplyMode
   quality_flags: string[]
-  replacements: Array<{
-    replacement_id: string
-    variable: string
-    old_value: string
-    new_value: string
-    reversible: boolean
-  }>
+  replacements: Replacement[]
 }
 
 export interface PreviewResponse {
@@ -64,14 +88,36 @@ export interface ApplyResponse {
   mutation_id: string
   applied_count: number
   summary: Record<string, number>
+  changed_notes: Array<{ id: string; note_section: string }>
   changed_note_ids: string[]
-  warnings: string[]
-  replayed: boolean
+  event_delivery?: 'published' | 'partial' | 'failed'
+  warnings: Array<string | { code?: string; message?: string }>
 }
 
-// ── API Paths ────────────────────────────────────────────────────────────────
+export interface ApplySelection {
+  source_id: string
+  target_note_id: string
+  mode: ApplyMode
+  before_hash: string
+  proposed_hash: string
+  expected_updated_at: string | null
+}
 
-const PATHS = {
+export interface TargetSection {
+  id: string
+  note_section: string
+  section_title: string
+  section_kind: string
+  has_content: boolean
+}
+
+export interface BatchError {
+  code: string
+  message: string
+  staleNotes: string[]
+}
+
+export const NOTE_TEXT_BATCH_PATHS = {
   parseUpload: (pid: string) => `/api/projects/${pid}/disclosure-note-import/parse-upload`,
   parseKnowledge: (pid: string) => `/api/projects/${pid}/disclosure-note-import/parse-knowledge`,
   preview: (pid: string) => `/api/projects/${pid}/disclosure-note-text-batch/preview`,
@@ -79,7 +125,65 @@ const PATHS = {
   sections: (pid: string) => `/api/projects/${pid}/disclosure-note-text-sections`,
 }
 
-// ── Composable ───────────────────────────────────────────────────────────────
+/** 可重试：传输层错误或同键请求仍在处理 ⇒ 保留同一幂等键重发，后端返回同一结果 */
+const RETRYABLE = new Set(['NETWORK_ERROR', 'TIMEOUT', 'MUTATION_IN_PROGRESS'])
+/** 预览已不再代表服务端现状：必须重新预览 */
+const PREVIEW_OUTDATED = new Set(['NOTE_BATCH_STALE_PREVIEW', 'PREVIEW_DIGEST_MISMATCH', 'MUTATION_ID_CONFLICT'])
+
+/**
+ * 本模块请求一律静默全局拦截器：错误由 {@link notifyBatchError} 中文化后只提示一次。
+ * 不静默时拦截器先弹一次（422 直接显示 pydantic 英文、403 只有笼统「权限不足」），catch 里再弹一次。
+ */
+export function silent(config?: AxiosRequestConfig): AxiosRequestConfig {
+  const cfg = { ...config, _silent: true }
+  return cfg
+}
+
+/** 被同一请求的新一发取代（http 去重 abort）——不是失败，状态归新请求 */
+export function isCanceled(e: unknown): boolean {
+  const err = e as { code?: string; name?: string } | null
+  return err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError'
+}
+
+/** 后端错误 → 统一结构；后端 message 已是中文，校验错误（pydantic 英文）与 axios 英文兜底换成中文 */
+export function toBatchError(e: unknown, fallback: string): BatchError {
+  if (isCanceled(e)) return { code: 'CANCELED', message: '', staleNotes: [] }
+  const parsed = parseApiError(e)
+  const detail = (parsed.detail ?? {}) as { stale_notes?: unknown }
+  const status = (e as { response?: { status?: number } } | null)?.response?.status
+  // REQUEST_ERROR 带 response = 无业务 detail 的 HTTP 错误，message 是 axios 英文；不带 = 本地中文异常
+  const message = parsed.code === 'VALIDATION_ERROR' ? '请求参数不合法，请刷新页面后重试'
+    : parsed.code === 'UNKNOWN' ? fallback
+      : parsed.code === 'REQUEST_ERROR' && status ? `${fallback}（HTTP ${status}）`
+        : parsed.message || fallback
+  return {
+    code: parsed.code,
+    message,
+    staleNotes: Array.isArray(detail.stale_notes) ? detail.stale_notes.map(String) : [],
+  }
+}
+
+/** 统一失败出口：中文提示一次；合并锁定 423 通知锁定横幅刷新（静默后全局拦截器不再代发） */
+export function notifyBatchError(e: unknown, fallback: string, projectId: string, notify = true): BatchError {
+  const err = toBatchError(e, fallback)
+  if (err.code === 'CANCELED') return err
+  const status = (e as { response?: { status?: number } } | null)?.response?.status
+  if (status === 423 && err.message.includes('合并锁定')) eventBus.emit('consol-lock:detected', { projectId })
+  if (notify) ElMessage.error(err.message)
+  return err
+}
+
+/** 预览项 → apply selection；追加模式提交预演出的 append_hash（后端逐字比对） */
+export function toSelection(item: PreviewItem, mode: ApplyMode): ApplySelection {
+  return {
+    source_id: item.source_id,
+    target_note_id: item.target_note_id as string,
+    mode,
+    before_hash: item.before_hash,
+    proposed_hash: (mode === 'append' ? item.append_hash : item.proposed_hash) as string,
+    expected_updated_at: item.expected_updated_at,
+  }
+}
 
 export interface UseNoteTextBatchOptions {
   projectId: Ref<string>
@@ -94,196 +198,225 @@ export function useNoteTextBatch(options: UseNoteTextBatchOptions) {
   const applyLoading = ref(false)
 
   const sourceKind = ref<SourceKind>('upload')
-  const parsedSections = ref<ParsedSection[]>([])
+  const parsedSource = ref<ParsedSource | null>(null)
+  const knowledgeDocIds = ref<string[]>([])
+  const templateSource = ref<{ versionId: string; contentHash: string } | null>(null)
+  const manualMappings = ref<Map<string, string>>(new Map())
+  const revokedReplacementIds = ref<Set<string>>(new Set())
+
   const previewResult = ref<PreviewResponse | null>(null)
+  /** 预览后改过正文 / 映射 / 撤销项 ⇒ 预览不再代表将写入的内容，必须重新预览 */
+  const previewStale = ref(false)
   const applyResult = ref<ApplyResponse | null>(null)
-  const lastError = ref<string>('')
+  const lastError = ref<BatchError | null>(null)
 
-  // draft 状态用 hash 判定
-  const draftHashes = ref<Map<string, string>>(new Map())
-  const originalHashes = ref<Map<string, string>>(new Map())
+  /** 来源原文（逐章），「已编辑」= 当前正文与原文不同 */
+  const originalHtml = ref<Map<string, string>>(new Map())
+  const parsedSections = computed<ParsedSection[]>(() => parsedSource.value?.sections ?? [])
+  const editedSourceIds = computed(() =>
+    parsedSections.value.filter(s => s.html !== originalHtml.value.get(s.source_id)).map(s => s.source_id))
+  const isDirty = computed(() => editedSourceIds.value.length > 0 || manualMappings.value.size > 0)
+  const canApply = computed(() => !!previewResult.value && !previewStale.value && !applyLoading.value)
 
-  const isDirty = computed(() => {
-    for (const [key, hash] of draftHashes.value) {
-      if (hash !== originalHashes.value.get(key)) return true
-    }
-    return false
-  })
-
-  const mutationId = ref(uuidv4())
-
+  const mutationId = ref(newUuid())
   function resetMutationId() {
-    mutationId.value = uuidv4()
+    mutationId.value = newUuid()
   }
 
-  // ── 上传解析 ──────────────────────────────────────────────────────────
+  function fail(e: unknown, fallback: string): BatchError {
+    lastError.value = notifyBatchError(e, fallback, projectId.value)
+    return lastError.value
+  }
 
-  async function parseUpload(file: File): Promise<void> {
+  function clearPreview() {
+    previewResult.value = null
+    previewStale.value = false
+    resetMutationId()
+  }
+
+  function loadSource(kind: SourceKind, source: ParsedSource | null) {
+    sourceKind.value = kind
+    parsedSource.value = source
+    originalHtml.value = new Map((source?.sections ?? []).map(s => [s.source_id, s.html]))
+    manualMappings.value = new Map()
+    revokedReplacementIds.value = new Set()
+    applyResult.value = null
+    lastError.value = null
+    clearPreview()
+  }
+
+  // ── 来源 ─────────────────────────────────────────────────────────────
+
+  async function parseUpload(file: File): Promise<boolean> {
     loading.value = true
-    lastError.value = ''
+    lastError.value = null
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('year', String(year.value))
-      const result = await api.post<{ sections: ParsedSection[]; warnings: string[] }>(
-        PATHS.parseUpload(projectId.value),
-        formData,
-      )
-      parsedSections.value = result.sections || []
-      sourceKind.value = 'upload'
-      if (result.warnings?.length) {
-        ElMessage.warning(result.warnings[0])
-      }
-    } catch (e: any) {
-      lastError.value = e?.response?.data?.detail?.message || e?.message || '解析失败'
-      ElMessage.error(lastError.value)
+      const form = new FormData()
+      form.append('file', file)
+      const result = await api.post<ParsedSource>(NOTE_TEXT_BATCH_PATHS.parseUpload(projectId.value), form, silent())
+      loadSource('upload', result)
+      knowledgeDocIds.value = []
+      templateSource.value = null
+      if (result.warnings?.length) ElMessage.warning(result.warnings[0])
+      return true
+    } catch (e) {
+      fail(e, '文档解析失败')
+      return false
     } finally {
       loading.value = false
     }
   }
 
-  // ── 知识库解析 ────────────────────────────────────────────────────────
-
-  async function parseKnowledge(docIds: string[]): Promise<void> {
+  async function parseKnowledge(docIds: string[]): Promise<boolean> {
     loading.value = true
-    lastError.value = ''
+    lastError.value = null
     try {
-      const result = await api.post<{ sections: ParsedSection[]; warnings: string[] }>(
-        PATHS.parseKnowledge(projectId.value),
-        { year: year.value, doc_ids: docIds },
-      )
-      parsedSections.value = result.sections || []
-      sourceKind.value = 'knowledge'
-    } catch (e: any) {
-      lastError.value = e?.response?.data?.detail?.message || e?.message || '解析失败'
-      ElMessage.error(lastError.value)
+      const result = await api.post<ParsedSource>(NOTE_TEXT_BATCH_PATHS.parseKnowledge(projectId.value),
+        { year: year.value, doc_ids: docIds }, silent())
+      loadSource('knowledge', result)
+      knowledgeDocIds.value = [...docIds]
+      templateSource.value = null
+      if (result.warnings?.length) ElMessage.warning(result.warnings.join('；'))
+      return true
+    } catch (e) {
+      fail(e, '知识库文档解析失败')
+      return false
     } finally {
       loading.value = false
     }
   }
 
-  // ── Preview ───────────────────────────────────────────────────────────
+  function useTemplateVersion(versionId: string, contentHash: string) {
+    loadSource('content_template', null)
+    knowledgeDocIds.value = []
+    templateSource.value = { versionId, contentHash }
+  }
 
-  async function fetchPreview(manualMappings?: Array<{ source_id: string; target_note_id: string }>): Promise<void> {
+  function buildSource(): Record<string, unknown> {
+    if (sourceKind.value === 'content_template') {
+      if (!templateSource.value) throw new Error('未选择模板版本')
+      return { source_kind: 'content_template', template_version_id: templateSource.value.versionId,
+        template_content_hash: templateSource.value.contentHash }
+    }
+    if (!parsedSource.value) throw new Error('尚未解析来源')
+    const source: Record<string, unknown> = { source_kind: sourceKind.value, parsed_source: parsedSource.value }
+    if (sourceKind.value === 'knowledge') source.knowledge_doc_ids = knowledgeDocIds.value
+    return source
+  }
+
+  // ── 用户修改（都会让预览过期）──────────────────────────────────────────
+
+  function updateSectionHtml(sourceId: string, html: string) {
+    const section = parsedSource.value?.sections.find(s => s.source_id === sourceId)
+    if (!section || section.html === html) return
+    section.html = html
+    if (previewResult.value) previewStale.value = true
+  }
+
+  function setManualMapping(sourceId: string, targetNoteId: string | null) {
+    const next = new Map(manualMappings.value)
+    if (targetNoteId) next.set(sourceId, targetNoteId)
+    else next.delete(sourceId)
+    manualMappings.value = next
+    if (previewResult.value) previewStale.value = true
+  }
+
+  function toggleRevocation(replacementId: string) {
+    const next = new Set(revokedReplacementIds.value)
+    if (next.has(replacementId)) next.delete(replacementId)
+    else next.add(replacementId)
+    revokedReplacementIds.value = next
+    if (previewResult.value) previewStale.value = true
+  }
+
+  function mappingPayload() {
+    return [...manualMappings.value].map(([source_id, target_note_id]) => ({ source_id, target_note_id }))
+  }
+
+  // ── 预览 / 应用 ────────────────────────────────────────────────────────
+
+  async function fetchPreview(): Promise<boolean> {
     previewLoading.value = true
-    lastError.value = ''
+    lastError.value = null
     try {
-      const body = {
+      previewResult.value = await api.post<PreviewResponse>(NOTE_TEXT_BATCH_PATHS.preview(projectId.value), {
         year: year.value,
-        source: {
-          source_kind: sourceKind.value,
-          parsed_source: {
-            source_kind: sourceKind.value,
-            sections: parsedSections.value,
-          },
-        },
-        manual_mappings: manualMappings || [],
-      }
-      previewResult.value = await api.post<PreviewResponse>(
-        PATHS.preview(projectId.value),
-        body,
-      )
-      // 记录 original hash
-      originalHashes.value.clear()
-      draftHashes.value.clear()
-      for (const item of previewResult.value?.items || []) {
-        originalHashes.value.set(item.source_id, item.proposed_hash)
-        draftHashes.value.set(item.source_id, item.proposed_hash)
-      }
-    } catch (e: any) {
-      lastError.value = e?.response?.data?.detail?.message || e?.message || '预览失败'
-      ElMessage.error(lastError.value)
+        source: buildSource(),
+        manual_mappings: mappingPayload(),
+        revoked_replacement_ids: [...revokedReplacementIds.value],
+      }, silent())
+      previewStale.value = false
+      resetMutationId()  // 新预览 = 新载荷，旧幂等键不得复用（同键不同载荷 409）
+      return true
+    } catch (e) {
+      fail(e, '预览失败')
+      return false
     } finally {
       previewLoading.value = false
     }
   }
 
-  // ── Apply ─────────────────────────────────────────────────────────────
-
-  async function applyBatch(
-    selections: Array<{
-      source_id: string
-      target_note_id: string
-      mode: ApplyMode
-      before_hash: string
-      proposed_hash: string
-      proposed_html: string
-    }>,
-  ): Promise<ApplyResponse | null> {
-    if (!previewResult.value) {
-      ElMessage.error('请先预览')
+  async function applyBatch(selections: ApplySelection[]): Promise<ApplyResponse | null> {
+    if (!previewResult.value || previewStale.value) {
+      ElMessage.warning('预览已过期，请先重新预览')
+      return null
+    }
+    if (!selections.length) {
+      ElMessage.warning('请至少选择一个章节')
       return null
     }
     applyLoading.value = true
-    lastError.value = ''
+    lastError.value = null
     try {
-      const body = {
+      const result = await api.post<ApplyResponse>(NOTE_TEXT_BATCH_PATHS.apply(projectId.value), {
         year: year.value,
-        source: {
-          source_kind: sourceKind.value,
-          parsed_source: {
-            source_kind: sourceKind.value,
-            sections: parsedSections.value,
-          },
-        },
+        source: buildSource(),
         preview_digest: previewResult.value.preview_digest,
         selections,
-      }
-      const result = await api.post<ApplyResponse>(
-        PATHS.apply(projectId.value),
-        body,
-        { headers: { 'X-Mutation-Id': mutationId.value } },
-      )
+        manual_mappings: mappingPayload(),
+        revoked_replacement_ids: [...revokedReplacementIds.value],
+      }, silent({ headers: { 'X-Mutation-Id': mutationId.value } }))
       applyResult.value = result
-      ElMessage.success(`已成功应用 ${result.applied_count} 个章节`)
+      ElMessage.success(`已写入 ${result.applied_count} 个章节`)
+      if (result.event_delivery && result.event_delivery !== 'published') {
+        ElMessage.warning('内容已保存，但部分章节的联动通知发送失败，请刷新页面确认')
+      }
       resetMutationId()
       return result
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail
-      if (detail?.error_code === 'NOTE_BATCH_STALE_PREVIEW') {
-        lastError.value = '部分章节在预览后已被修改，请重新预览'
-        ElMessage.warning(lastError.value)
-      } else if (detail?.error_code === 'MUTATION_ID_CONFLICT') {
-        lastError.value = '请求已提交，请勿重复操作'
-        ElMessage.warning(lastError.value)
-      } else {
-        lastError.value = detail?.message || e?.message || '应用失败'
-        ElMessage.error(lastError.value)
-      }
+    } catch (e) {
+      // 草稿与选择全部保留（AC-4.3 原子失败不丢编辑）；后端 message 已列出冲突章节
+      const err = fail(e, '写入失败')
+      if (PREVIEW_OUTDATED.has(err.code)) previewStale.value = true
+      if (!RETRYABLE.has(err.code)) resetMutationId()
       return null
     } finally {
       applyLoading.value = false
     }
   }
 
+  async function fetchTargetSections(): Promise<TargetSection[]> {
+    try {
+      const result = await api.get<{ items: TargetSection[] }>(NOTE_TEXT_BATCH_PATHS.sections(projectId.value),
+        silent({ params: { year: year.value, scope: sourceKind.value === 'content_template' ? 'all' : 'narrative' } }))
+      return result.items || []
+    } catch (e) {
+      fail(e, '加载目标章节失败')
+      return []
+    }
+  }
+
   function reset() {
-    parsedSections.value = []
-    previewResult.value = null
-    applyResult.value = null
-    lastError.value = ''
-    draftHashes.value.clear()
-    originalHashes.value.clear()
-    resetMutationId()
+    loadSource('upload', null)
+    knowledgeDocIds.value = []
+    templateSource.value = null
   }
 
   return {
-    // state
-    loading,
-    previewLoading,
-    applyLoading,
-    sourceKind,
-    parsedSections,
-    previewResult,
-    applyResult,
-    lastError,
-    isDirty,
-    mutationId,
-    // actions
-    parseUpload,
-    parseKnowledge,
-    fetchPreview,
-    applyBatch,
-    reset,
-    resetMutationId,
+    loading, previewLoading, applyLoading,
+    sourceKind, parsedSource, parsedSections, knowledgeDocIds, templateSource,
+    manualMappings, revokedReplacementIds, previewResult, previewStale, applyResult, lastError,
+    editedSourceIds, isDirty, canApply, mutationId,
+    parseUpload, parseKnowledge, useTemplateVersion, updateSectionHtml, setManualMapping, toggleRevocation,
+    fetchPreview, applyBatch, fetchTargetSections, clearPreview, reset, resetMutationId,
   }
 }

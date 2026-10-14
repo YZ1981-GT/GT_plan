@@ -1,0 +1,57 @@
+/**
+ * 附注正文批量写入：界面中文标签与分组判定（R-21：首版直接显示英文枚举与内部 source_id）。
+ */
+import type { ApplyMode, PreviewItem } from '@/composables/useNoteTextBatch'
+
+/** 后端 note_quality_scanner.QualityFlag + build_preview 的 cross_standard */
+export const QUALITY_FLAG_LABELS: Record<string, string> = {
+  empty: '空白',
+  placeholder: '含占位文本',
+  draft: '来源为草稿',
+  stale: '来源待刷新',
+  source_entity: '含来源企业名称',
+  date: '含具体日期',
+  amount: '含具体金额',
+  entity_specific: '企业特有内容',
+  account_explanation: '报表科目解释',
+  cross_standard: '跨标准/口径',
+}
+
+/** 与后端 summary.high_risk 同口径：这些风险必须在差异弹窗逐项确认后才能采用 */
+export const HIGH_RISK_FLAGS = new Set(['source_entity', 'entity_specific', 'account_explanation', 'cross_standard'])
+
+export const CONFIDENCE_LABELS: Record<string, string> = {
+  confirmed: '已确认',
+  candidate: '候选（需人工确认）',
+  manual_required: '需人工选择',
+}
+
+export const TEMPLATE_TYPE_LABELS: Record<string, string> = { soe: '国企版', listed: '上市版' }
+export const REPORT_SCOPE_LABELS: Record<string, string> = { standalone: '单体', consolidated: '合并' }
+
+export function flagLabel(flag: string): string {
+  return QUALITY_FLAG_LABELS[flag] ?? '其他风险'
+}
+
+export function highRiskFlags(item: PreviewItem): string[] {
+  return item.quality_flags.filter(f => HIGH_RISK_FLAGS.has(f))
+}
+
+/** 目标章节显示名：编号 + 标题；未匹配显示「未匹配」 */
+export function targetLabel(item: Pick<PreviewItem, 'target_note_section' | 'target_section_title'>): string {
+  if (!item.target_note_section) return '未匹配'
+  return [item.target_note_section, item.target_section_title].filter(Boolean).join(' ')
+}
+
+/** 勾选摘要（AC-9.6）：总数、新增、替换、追加、高风险、未映射 */
+export function selectionSummary(items: PreviewItem[], selected: Set<string>, modes: Record<string, ApplyMode>) {
+  const chosen = items.filter(i => selected.has(i.source_id))
+  return {
+    total: chosen.length,
+    new: chosen.filter(i => i.append_html === null).length,
+    replace: chosen.filter(i => i.append_html !== null && (modes[i.source_id] ?? 'replace') === 'replace').length,
+    append: chosen.filter(i => i.append_html !== null && modes[i.source_id] === 'append').length,
+    highRisk: chosen.filter(i => highRiskFlags(i).length > 0).length,
+    unmapped: items.filter(i => !i.target_note_id).length,
+  }
+}

@@ -85,3 +85,16 @@ def test_word_template_round_trip(tt: str, rs: str):
         if not item["proposed_html"]:
             assert (item["category"], item["unavailable_reason"]) == ("unavailable", "来源正文为空")
     assert preview["summary"]["folded"] > 0 and preview["summary"]["out_of_scope"] > 0
+
+
+#: 平台 Word 模板的结构标记（导出引擎用）：浏览器实测发现上传模板文档后被原样带进拟写入正文
+_TEMPLATE_MARKERS = ("##SECTION:", "##/SECTION:", "##STYLE_REF:", "{{section:", "{{table:", "{{seq:")
+
+
+@pytest.mark.parametrize("tt,rs", VARIANTS)
+def test_platform_template_markers_never_reach_preview(tt: str, rs: str):
+    parsed, _ = _parsed(tt, rs)
+    leaked = [(s.title, m) for s in parsed.sections for m in _TEMPLATE_MARKERS if m in s.html]
+    assert not leaked, f"{tt}_{rs} 解析结果残留模板标记 {len(leaked)} 处，例：{leaked[:3]}"
+    # 剥掉标记后不得留下空段落壳
+    assert not [s.title for s in parsed.sections if "<p></p>" in s.html]

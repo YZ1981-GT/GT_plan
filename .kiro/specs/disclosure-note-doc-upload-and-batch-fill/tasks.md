@@ -153,7 +153,7 @@
   - 验收：无权/空正文不进入可预填来源；切换上传↔知识库需处理未保存草稿。（AC-5.1~5.4）
 - [~] 38. 实现手工映射、一键预填、右侧二次编辑、变量替换撤销、仅看未匹配/已变更和独立并排差异弹窗。
   - 验收：一键只消费 confirmed 映射；人工确认后才填 candidate；未匹配目标不变。（AC-3.3~3.5, AC-10.2）
-- [~] 39. 接入 preview/apply 最终确认、原子失败保留草稿、成功后 invalidate cache + fetchTree + fetchDetailFresh。
+- [x] 39. 接入 preview/apply 最终确认、原子失败保留草稿、成功后 invalidate cache + fetchTree + fetchDetailFresh。
   - 验收：成功切换章节不回旧值；409 后用户编辑未丢失且能重预览。（AC-4.1~4.6）
 - [~] 40. 在 `DisclosureEditor.vue` “导入导出”菜单挂载“上传附注文档”，权限/归档/合并锁/EQCR 状态与后端一致。
   - 验收：入口可达；只读 UI 不显示且直接请求仍 403/423。（AC-6.1~6.3）
@@ -194,17 +194,17 @@
 
 - [x] 46. 新建 `NoteContentTemplatePicker.vue` 和 `useNoteContentTemplate.ts`，调用专用后端 API；不得复用 `SharedTemplatePicker.getConfigData/apply` 权威链。
   - 验收：模板列表只载元数据；选择后再加载固定版本，网络请求时序明确。（AC-8.1~8.3）
-- [~] 47. 实现“保存为内容模板”弹窗：名称/说明/personal或group→服务端 snapshot-preview→质量摘要→集团二次确认→携 digest 正式保存，并处理来源变化 409 和同 hash 回执。
+- [x] 47. 实现“保存为内容模板”弹窗：名称/说明/personal或group→服务端 snapshot-preview→质量摘要→集团二次确认→携 digest 正式保存，并处理来源变化 409 和同 hash 回执。
   - 验收：客户端 payload 不含正文/来源 owner；保存结果显示版本、来源和质量摘要；陈旧预检要求重新确认。（AC-7.1~7.7）
-- [~] 48. 新建 `NoteContentTemplateApplyDialog.vue`：模板来源/版本/标准/口径/质量头部，推荐/需复核/不可用三组，搜索及已选/高风险/未映射筛选。
+- [x] 48. 新建 `NoteContentTemplateApplyDialog.vue`：模板来源/版本/标准/口径/质量头部，推荐/需复核/不可用三组，搜索及已选/高风险/未映射筛选。
   - 验收：账户解释、企业特有、跨标准、风险章节默认不选；目标缺失/空模板禁选且说明原因。（AC-9.1~9.2, AC-9.5~9.6）
-- [~] 49. 新建 `NoteTextDiffDialog.vue`，并排显示现有/拟写入内容、变量原值→目标值和风险；已有内容显式选择 replace/append。
+- [x] 49. 新建 `NoteTextDiffDialog.vue`，并排显示现有/拟写入内容、变量原值→目标值和风险；已有内容显式选择 replace/append。
   - 验收：追加预览无可见来源标记；高风险未逐项确认时确认按钮禁用。（AC-9.3~9.4, AC-10.1~10.5）
 - [~] 50. 将模板选择接入统一 preview/apply：固定 version_id/hash、原子冲突、成功缓存刷新、批次回执和来源 badge。
   - 验收：保存模板→另一项目选择版本→勾选→apply 全流程不经 shared_config；正文、lineage、application 三方一致。（AC-8.3~8.4, AC-11.1~11.3）
 - [~] 51. 实现“新版本可用”只读提示与重新预览入口；禁止后台自动覆盖已引用项目。
   - 验收：旧应用固定旧 version；发布新版本后目标正文不变，只有用户重预览确认后才变。（AC-8.4）
-- [~] 52. 在 `DisclosureEditor.vue` 挂载“保存为内容模板/引用内容模板”两个清晰入口并完成前端组件测试。
+- [x] 52. 在 `DisclosureEditor.vue` 挂载“保存为内容模板/引用内容模板”两个清晰入口并完成前端组件测试。
   - 验收：与现有结构模板文案不混淆；权限门控、懒挂载、分组、计数、脏关闭、409 保稿均覆盖。（AC-6.2~6.3）
 
 ### Phase 8 实施与复盘记录（2026-10-14）
@@ -354,3 +354,56 @@ R-14 → R-05/R-11/R-10（Phase 2 纯函数）→ R-07/R-08/R-16（Phase 4）→
   - R-17：`test_note_content_template_snapshot.py` 整体重写为真 SQLite + 真 ORM，13 例真调 generate / preview / save / list / detail / versions / delete。含「SQL 过滤结果 ≡ 逐条 `can_view_template`」矩阵：2 用户 × 4 观察项目 × 5 类模板。端点安全矩阵 `test_note_content_template_endpoints.py` 12 例（TestClient）。真 PG 并发守卫 `test_note_content_template_save_concurrency_pg.py` 5 例：scratch schema 中两张模板表保留自身外键、部分唯一索引与不可延迟外键；并发首建 / 并发续版两种竞态；反向对照换回首版无锁实现，后到者必 IntegrityError。
   - 证据：18 个变异全部打红，含 3 个真 PG 变异（去行锁 / 首建不回退 / 先改指针），红的形态与预期一致。本 spec 后端回归 322 passed。scratch schema 残留 0。
   - 🔴 前端契约待第 6 组对齐：`useNoteContentTemplate.ts` 的预检仍发 query `year`、无 body ⇒ 现返回 422；列表项新增 `current_version` 元数据可直接展示。
+
+- ✅ **第 6 组 R-02 / R-19 ~ R-24 + 前端契约对齐**（Phase 6 / 8 前端）
+  - 契约：`useNoteTextBatch.ts` 重写。上传原样回传 parse 响应（含签名 `source_metadata`）；知识库带 `knowledge_doc_ids`；内容模板只传 `template_version_id + template_content_hash`，不带正文（R-02）。apply 回传最近一次 preview 的手工映射与撤销项。预览后改正文 / 映射 / 撤销项即标记过期，须重新预览才可写入。幂等键只在 NETWORK_ERROR / TIMEOUT / MUTATION_IN_PROGRESS 时保留。「已编辑」按原文逐章比对。`useNoteContentTemplate.ts` 预检改发 JSON body，保存携 digest，列表分页并带 `current_version`。
+  - R-19：写入成功后作废**全部**章节缓存 → `fetchTree` → 当前章 `fetchDetailFresh`。首版只刷当前章，其他章读缓存仍是旧值。
+  - R-20：三个入口按 `!isEqcrRole && effectiveCanEdit` 隐藏；包装组件 `DisclosureNoteContentTools` 的 `open()` 再按同一条件拒绝（后端仍独立 403 / 423）。
+  - R-21：质量标志、置信度、不可用原因全中文，不显示内部 source_id。
+  - R-22：「保存为内容模板」走真实流程：预检 → 集团二次确认 → 携 digest 保存；来源变化 409 时清掉预检。
+  - R-23：新增 `utils/uuid.ts`（`crypto.randomUUID` 缺失时回退，内网 HTTP 下该 API 不可用）；不引入未声明的 `uuid` 包。
+  - R-24：差异弹窗 v-model 改为 boolean。
+  - 高风险章节不能直接勾选，只能在差异弹窗逐项核对后「采用此章」。高风险集合（`source_entity` / `entity_specific` / `account_explanation` / `cross_standard`）与后端 `summary.high_risk` 相同。换章节时核对清零；按钮禁用之外，onConfirm 再兜底校验一次。
+  - DisclosureEditor 行数：三个弹窗收进包装组件后为 3281 行。HARD_CAP 3300→3281，whitelist 3296→3281（按实际值，不留余量）。
+  - 🔴 **浏览器实测发现 1：平台模板标记泄漏。** 把四份 Word 模板当来源上传时，拟写入内容里出现 `{{section:…}}`、`##/SECTION##` 等标记（871 个中 854 个进入预览）。改在解析器层剥离（e2e 直接调用解析器，只在 flow 层剥会漏掉），先红后绿，新增 `test_platform_template_markers_never_reach_preview`。
+  - 🔴 **浏览器实测发现 2：选择器把失败显示成「暂无模板」。** 打开「引用内容模板」时列表端点 500。根因是本地开发库从未跑过 V187：开发服务器热重载时 `GT_BOOTSTRAP_DONE=1` 会跳过迁移，而 V187 是 10-13 启动之后才加的。这是环境问题，不是代码缺陷；已用与启动期同一的 `MigrationRunner.run_pending` 补跑，三张表与 ORM 的列、部分唯一索引、外键逐项对账一致，漂移检测 0 项。但它暴露了前端的真缺陷：失败被显示成「暂无可用的附注内容模板」。现改为：
+    - 失败显示错误态和「重试」；
+    - 列表超过 50 个时提示「已显示 N / 共 M 个」，可加载更多（首版静默截断）；
+    - 版本加载失败时不展开空版本区；
+    - 只有最后一次列表请求能落状态，被 http 去重取消或迟到的旧请求不会覆盖新结果。
+  - 触类旁通：两个 composable 的请求都没有静默全局拦截器，所以每次失败弹两次（拦截器一次、catch 一次）。其中 422 直接显示 pydantic 英文，403 只有笼统的「权限不足」，5xx 还会被拦截器自动重发两次。现所有请求带 `_silent`，由 `notifyBatchError` 统一提示一次中文：
+    - 无业务 detail 的 HTTP 错误显示「<操作>失败（HTTP 状态码）」；
+    - 本地中文异常保留原文；
+    - 被去重取消的请求不提示；
+    - 静默后拦截器不再代发合并锁事件，改由本模块在 423「合并锁定」时发出 `consol-lock:detected`。
+  - 复盘新增：
+    - 当前章节有未保存修改时，三个入口都拒绝打开。写入成功会重载附注，未保存的修改会被覆盖；内容模板也只按已保存内容生成。编辑器传入 `editDirty || autoSave.isDirty`，与离开页面拦截同口径。
+    - 预览列表补「仅看高风险」筛选（设计 §9.3）。
+    - 预览过期提示改为中性文案。首版在服务端冲突时也提示「你改过来源正文」。
+    - 引用弹窗头部补保存时间。
+  - 测试与检查：
+    - vitest 5 个文件 38 例（composable 2 个文件、组件 3 个文件）。
+    - ESLint 0 问题；编辑器的 12 条 ESLint 告警与 HEAD 相同。
+    - 单区域 vue-tsc（`tsconfig._note-text-batch.json`）0 错误，注入 TS2322 能报出。编辑器 vue-tsc 在本 spec 范围内只剩既有的 `fetchDetail` 空值告警（2777 行，非本组引入）。
+    - 后端：本 spec 18 个测试文件 308 passed，含真 PG 守卫。
+  - 变异：36 个全部打红，文件逐字节恢复。构成：composable 契约 9、错误提示与列表竞态 11、选择器 4、组件门控 11、解析器剥标记 1。首轮有 2 个漏网（「换章节不清核对」「onConfirm 不复核」），补用例后打红。其中兜底用例首版是假绿：不认 disabled 的按钮桩没有把 `disabled` 声明为 prop，它作为 attr 透传到 `<button>` 上，点击仍被禁用态拦下。已修正，并加正向对照（核对后同一路径能采用）。
+  - 浏览器实测（和平药房_2025，admin）：
+    - 上传 `soe_standalone.docx` 解析出 382 章；预览为需复核 56 / 不可用 4；手工映射后提示过期，重新预览后显示已确认。
+    - 弹窗有修改时关闭会确认。
+    - 选择器空态与失败态：用 `page.route` 模拟 500，只出现 1 条中文提示、0 条全局通知，重试后恢复。
+    - 有未保存修改时入口拒绝打开。期间取得的编辑锁已释放，正文未保存，本地草稿已清。
+  - 浏览器实测中，**写入类请求一律在网络层模拟，未落库**：
+    - apply 返回 200：弹窗关闭，目录树与当前章重新请求，先前缓存过的章节再点击时重新请求。对照组：缓存命中时只请求上年数据。
+    - apply 返回 409：弹窗保留选择，写入按钮禁用，重新预览后恢复。
+    - 保存模板：载荷只有 `{year, name, description, owner_scope, snapshot_digest}`；成功后显示版本、来源与质量摘要。
+    - 模板链（列表、历史版本、预览均为模拟）：按固定的历史版本 v1 预览；提示「已有更新版本 v2」；只默认勾选推荐项；高风险项只能核对后采用；「仅看高风险」生效。
+    - 真库核对：`note_text_batch_applications`、模板、版本均为 0 行；本项目附注最后更新时间仍是 10-10。
+  - 标记：Task 39 / 47 / 48 / 49 / 52 → `[x]`。以下仍为 `[~]`：
+    - 35：可拖分栏、右栏按目标父章分组未做。右栏与模板弹窗共用按匹配类别分组，每行显示目标章号与标题，见设计 §9.2 修订。
+    - 36：文字版 PDF、低置信、需 OCR、损坏文件四种状态未在浏览器验证。
+    - 37：知识库选择未用真实文档在浏览器验证。
+    - 38：变量替换撤销界面未在浏览器验证。
+    - 40：只读 / EQCR 账号下入口隐藏未用真实账号验证。
+    - 50：全流程见 Task 55。
+    - 51：已引用项目在编辑器内的「新版本可用」提示未实现；引用弹窗内已有提示。
+  - 其他：设计 §9.3 的「保存人」目前只显示时间。版本元数据只有 `created_by` UUID，显示姓名需后端补联表。Phase 6 / 8 实施记录里的首轮描述（「保存为内容模板」占位、编辑器直接挂三个弹窗、hard cap 3300）已被本组取代。

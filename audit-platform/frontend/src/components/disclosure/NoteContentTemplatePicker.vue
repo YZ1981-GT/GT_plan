@@ -1,67 +1,101 @@
 <script setup lang="ts">
 /**
- * NoteContentTemplatePicker — 附注内容模板列表与版本选择
+ * NoteContentTemplatePicker — 附注内容模板列表与版本选择（Task 46，AC-8.1~8.3）
  *
- * spec: disclosure-note-doc-upload-and-batch-fill Phase 8 Task 46/48
+ * 列表只载元数据（后端 SQL 层按可见性过滤）；默认引用最新版本，也可展开历史不可变版本。
+ * 选中后把「模板 + 固定版本（含 content_hash）」交给引用弹窗，预览 / 写入都钉在该版本上。
  */
-import { ref, computed, watch, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { useNoteContentTemplate, type ContentTemplateItem } from '@/composables/useNoteContentTemplate'
+import { computed, ref, watch } from 'vue'
+import {
+  useNoteContentTemplate, type ContentTemplateItem, type ContentTemplateVersion,
+} from '@/composables/useNoteContentTemplate'
+import { REPORT_SCOPE_LABELS, TEMPLATE_TYPE_LABELS } from './noteTextBatchLabels'
 
-const props = defineProps<{
-  visible: boolean
-  projectId: string
-}>()
-
+const props = defineProps<{ visible: boolean; projectId: string }>()
 const emit = defineEmits<{
-  'update:visible': [val: boolean]
-  'select': [template: ContentTemplateItem, versionId: string]
+  'update:visible': [value: boolean]
+  'select': [template: ContentTemplateItem, version: ContentTemplateVersion]
 }>()
 
-const dialogVisible = computed({
-  get: () => props.visible,
-  set: (v) => emit('update:visible', v),
-})
-
+const PAGE = 50
 const tmpl = useNoteContentTemplate({ projectId: computed(() => props.projectId) })
+const expandedId = ref<string | null>(null)
+/** 加载失败必须显示失败与重试，不能落到「暂无模板」（会让用户以为没有模板） */
+const loadFailed = computed(() => !!tmpl.lastError.value && !tmpl.templates.value.length)
+const hasMore = computed(() => tmpl.templates.value.length < tmpl.total.value)
 
-onMounted(() => { if (props.visible) tmpl.fetchTemplates() })
-watch(() => props.visible, (v) => { if (v) tmpl.fetchTemplates() })
+function reload() {
+  expandedId.value = null
+  return tmpl.fetchTemplates(PAGE, 0)
+}
+function loadMore() {
+  return tmpl.fetchTemplates(PAGE, tmpl.templates.value.length, { append: true })
+}
 
-function onSelect(item: ContentTemplateItem) {
-  if (!item.current_version_id) {
-    ElMessage.warning('该模板暂无版本')
-    return
-  }
-  emit('select', item, item.current_version_id)
-  dialogVisible.value = false
+watch(() => props.visible, (v) => { if (v) reload() }, { immediate: true })
+
+function describe(v: ContentTemplateVersion): string {
+  const q = v.quality_summary ?? {}
+  return [`v${v.version_no}`, `来源 ${v.source_project_name} ${v.source_year} 年`,
+    TEMPLATE_TYPE_LABELS[v.template_type] ?? v.template_type, REPORT_SCOPE_LABELS[v.report_scope] ?? v.report_scope,
+    `${q.total ?? 0} 章（有内容 ${q.with_content ?? 0}，高风险 ${q.high_risk ?? 0}）`,
+    v.created_at ? `保存于 ${v.created_at.slice(0, 10)}` : ''].filter(Boolean).join(' · ')
+}
+
+async function toggleVersions(item: ContentTemplateItem) {
+  if (expandedId.value === item.id) { expandedId.value = null; return }
+  expandedId.value = null  // 版本列表各模板共用，先收起，避免显示上一个模板的版本
+  await tmpl.fetchVersions(item.id)
+  if (!tmpl.lastError.value) expandedId.value = item.id
+}
+
+function choose(item: ContentTemplateItem, version: ContentTemplateVersion) {
+  emit('select', item, version)
+  emit('update:visible', false)
 }
 </script>
 
 <template>
-  <el-dialog v-model="dialogVisible" title="📋 选择附注内容模板" width="700px" append-to-body destroy-on-close>
-    <div v-if="tmpl.loading.value" style="text-align: center; padding: 40px;">加载中...</div>
-    <div v-else-if="!tmpl.templates.value.length" style="text-align: center; padding: 40px; color: var(--el-text-color-placeholder);">
-      暂无可用的附注内容模板
+  <el-dialog :model-value="visible" title="📋 选择附注内容模板" width="760px" append-to-body destroy-on-close
+    @update:model-value="(v: boolean) => emit('update:visible', v)">
+    <div v-if="tmpl.loading.value && !tmpl.templates.value.length" class="gt-ntpk-empty">加载中…</div>
+    <div v-else-if="loadFailed" class="gt-ntpk-empty">
+      <el-alert type="error" :title="tmpl.lastError.value?.message" :closable="false" show-icon />
+      <el-button size="small" type="primary" style="margin-top: 12px" @click="reload">重试</el-button>
     </div>
-    <div v-else>
-      <div v-for="item in tmpl.templates.value" :key="item.id"
-        style="padding: 12px; margin-bottom: 8px; border: 1px solid var(--el-border-color-lighter); border-radius: 6px; cursor: pointer;"
-        @click="onSelect(item)"
-      >
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <strong>{{ item.name }}</strong>
-          <el-tag size="small" :type="item.owner_scope === 'group' ? 'warning' : 'info'">
-            {{ item.owner_scope === 'group' ? '集团' : '个人' }}
-          </el-tag>
-        </div>
-        <div v-if="item.description" style="font-size: 13px; color: var(--el-text-color-secondary); margin-top: 4px;">
-          {{ item.description }}
-        </div>
-        <div style="font-size: 12px; color: var(--el-text-color-placeholder); margin-top: 4px;">
-          更新于 {{ item.updated_at?.slice(0, 10) }}
+    <div v-else-if="!tmpl.templates.value.length" class="gt-ntpk-empty">暂无可用的附注内容模板（只显示本人个人模板与本集团模板）</div>
+    <template v-else>
+    <div v-for="item in tmpl.templates.value" :key="item.id" class="gt-ntpk-item">
+      <div class="gt-ntpk-row">
+        <strong>{{ item.name }}</strong>
+        <el-tag size="small" :type="item.owner_scope === 'group' ? 'warning' : 'info'">{{ item.owner_scope === 'group' ? '集团' : '个人' }}</el-tag>
+        <div style="flex: 1" />
+        <el-button size="small" link type="primary" @click="toggleVersions(item)">{{ expandedId === item.id ? '收起版本' : '历史版本' }}</el-button>
+        <el-button size="small" type="primary" :disabled="!item.current_version" @click="item.current_version && choose(item, item.current_version)">引用最新版本</el-button>
+      </div>
+      <div v-if="item.description" class="gt-ntpk-muted">{{ item.description }}</div>
+      <div class="gt-ntpk-muted">{{ item.current_version ? describe(item.current_version) : '暂无版本' }}</div>
+      <div v-if="expandedId === item.id" class="gt-ntpk-versions">
+        <div v-for="v in tmpl.versions.value" :key="v.id" class="gt-ntpk-row">
+          <span class="gt-ntpk-muted">{{ describe(v) }}</span>
+          <div style="flex: 1" />
+          <el-button size="small" link type="primary" @click="choose(item, v)">引用此版本</el-button>
         </div>
       </div>
     </div>
+    <div v-if="hasMore" class="gt-ntpk-more">
+      <span class="gt-ntpk-muted">已显示 {{ tmpl.templates.value.length }} / 共 {{ tmpl.total.value }} 个</span>
+      <el-button size="small" :loading="tmpl.loading.value" @click="loadMore">加载更多</el-button>
+    </div>
+    </template>
   </el-dialog>
 </template>
+
+<style scoped>
+.gt-ntpk-empty { text-align: center; padding: 40px; color: var(--el-text-color-placeholder); }
+.gt-ntpk-item { padding: 12px; margin-bottom: 8px; border: 1px solid var(--el-border-color-lighter); border-radius: 6px; }
+.gt-ntpk-row { display: flex; align-items: center; gap: 8px; }
+.gt-ntpk-muted { font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px; }
+.gt-ntpk-versions { margin-top: 8px; padding-left: 12px; border-left: 2px solid var(--el-border-color-lighter); }
+.gt-ntpk-more { display: flex; align-items: center; justify-content: center; gap: 12px; padding-top: 4px; }
+</style>

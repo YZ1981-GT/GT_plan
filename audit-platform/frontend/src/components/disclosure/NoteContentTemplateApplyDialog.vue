@@ -1,152 +1,116 @@
 <script setup lang="ts">
 /**
- * NoteContentTemplateApplyDialog — 模板选择性引用：三组分类 + 差异预览 + 确认应用
+ * NoteContentTemplateApplyDialog — 按章节选择性引用内容模板（Task 48 / 50 / 51）
  *
- * spec: disclosure-note-doc-upload-and-batch-fill Phase 8 Task 48~50
+ * 第二轮复盘 R-02：首版按上传形态发预览载荷、从不带 template_version_id ⇒ 后端必拒。
+ * 现固定 version_id + content_hash 预览与写入；正文只由后端从不可变版本读取。
  */
-import { ref, computed, watch } from 'vue'
-import { ElMessage } from 'element-plus'
-import { sanitizeHtml } from '@/composables/useSanitize'
-import { useNoteTextBatch, type PreviewItem, type ApplyMode } from '@/composables/useNoteTextBatch'
+import { computed, ref, watch } from 'vue'
+import {
+  toSelection, useNoteTextBatch, type ApplyMode, type ApplyResponse, type PreviewItem,
+} from '@/composables/useNoteTextBatch'
+import type { ContentTemplateItem, ContentTemplateVersion } from '@/composables/useNoteContentTemplate'
+import NoteTextPreviewList from './NoteTextPreviewList.vue'
+import NoteTextDiffDialog from './NoteTextDiffDialog.vue'
+import { REPORT_SCOPE_LABELS, TEMPLATE_TYPE_LABELS } from './noteTextBatchLabels'
 
 const props = defineProps<{
   visible: boolean
   projectId: string
   year: number
-  templateVersionId: string
-  templateName: string
+  template: ContentTemplateItem
+  version: ContentTemplateVersion
 }>()
+const emit = defineEmits<{ 'update:visible': [value: boolean]; 'applied': [result: ApplyResponse] }>()
 
-const emit = defineEmits<{
-  'update:visible': [val: boolean]
-  'applied': []
-}>()
+const batch = useNoteTextBatch({ projectId: computed(() => props.projectId), year: computed(() => props.year) })
+const selected = ref<string[]>([])
+const modes = ref<Record<string, ApplyMode>>({})
+const diffItem = ref<PreviewItem | null>(null)
+const diffVisible = ref(false)
 
-const dialogVisible = computed({
-  get: () => props.visible,
-  set: (v) => emit('update:visible', v),
+const items = computed(() => batch.previewResult.value?.items ?? [])
+const quality = computed(() => props.version.quality_summary ?? {})
+const newerVersion = computed(() => {
+  const current = props.template.current_version
+  return current && current.id !== props.version.id ? current.version_no : null
 })
+const crossStandard = computed(() => items.value.some(i => i.quality_flags.includes('cross_standard')))
 
-const batch = useNoteTextBatch({
-  projectId: computed(() => props.projectId),
-  year: computed(() => props.year),
-})
-
-const selectedItems = ref<Set<string>>(new Set())
-const showDiffFor = ref<string | null>(null)
-
-const previewItems = computed<PreviewItem[]>(() => batch.previewResult.value?.items || [])
-const recommendedItems = computed(() => previewItems.value.filter(i => i.category === 'recommended'))
-const reviewItems = computed(() => previewItems.value.filter(i => i.category === 'review'))
-const unavailableItems = computed(() => previewItems.value.filter(i => i.category === 'unavailable'))
-
-// 加载预览
 watch(() => props.visible, async (v) => {
   if (!v) return
-  batch.sourceKind.value = 'content_template'
+  batch.useTemplateVersion(props.version.id, props.version.content_hash)
   await batch.fetchPreview()
-})
+}, { immediate: true })
 
-// 默认选中推荐项
 watch(() => batch.previewResult.value, (preview) => {
-  if (!preview) return
-  selectedItems.value.clear()
-  for (const item of preview.items) {
-    if (item.category === 'recommended') selectedItems.value.add(item.source_id)
-  }
+  const kept = new Set(selected.value)
+  selected.value = (preview?.items ?? [])
+    .filter(i => i.category !== 'unavailable' && (kept.has(i.source_id) || i.default_selected))
+    .map(i => i.source_id)
+  modes.value = Object.fromEntries((preview?.items ?? []).map(i =>
+    [i.source_id, i.append_html !== null && modes.value[i.source_id] === 'append' ? 'append' : 'replace']))
 })
 
-async function onApply() {
-  const selections = previewItems.value
-    .filter(i => selectedItems.value.has(i.source_id) && i.target_note_id)
-    .map(i => ({
-      source_id: i.source_id,
-      target_note_id: i.target_note_id!,
-      mode: i.default_mode as ApplyMode,
-      before_hash: i.before_hash,
-      proposed_hash: i.proposed_hash,
-      proposed_html: i.proposed_html,
-    }))
-  if (!selections.length) { ElMessage.warning('请至少选择一个章节'); return }
-  const result = await batch.applyBatch(selections)
-  if (result) { emit('applied'); dialogVisible.value = false }
+function openDiff(item: PreviewItem) {
+  diffItem.value = item
+  diffVisible.value = true
 }
 
-const diffItem = computed(() => previewItems.value.find(i => i.source_id === showDiffFor.value) || null)
-const summary = computed(() => batch.previewResult.value?.summary || {})
+function onDiffConfirm(item: PreviewItem) {
+  if (!selected.value.includes(item.source_id)) selected.value = [...selected.value, item.source_id]
+}
+
+function setDiffMode(mode: ApplyMode) {
+  if (diffItem.value) modes.value = { ...modes.value, [diffItem.value.source_id]: mode }
+}
+
+async function onApply() {
+  const chosen = new Set(selected.value)
+  const result = await batch.applyBatch(items.value
+    .filter(i => chosen.has(i.source_id) && i.target_note_id && i.category !== 'unavailable')
+    .map(i => toSelection(i, modes.value[i.source_id] ?? 'replace')))
+  if (!result) return
+  emit('applied', result)
+  emit('update:visible', false)
+}
 </script>
 
 <template>
-  <el-dialog v-model="dialogVisible" :title="`📋 引用模板：${templateName}`" width="90%" top="10vh" :close-on-click-modal="false" destroy-on-close append-to-body>
-    <!-- 顶部信息 -->
-    <div style="margin-bottom: 16px; font-size: 13px; color: var(--el-text-color-secondary);">
-      版本 ID: {{ templateVersionId?.slice(0, 8) }}...
-      · 共 {{ summary.total || 0 }} 章
-      · 推荐 {{ summary.recommended || 0 }}
-      · 需复核 {{ summary.review || 0 }}
-      · 不可用 {{ summary.unavailable || 0 }}
+  <el-dialog :model-value="visible" :title="`📋 引用内容模板：${template.name}`" width="90%" top="5vh" append-to-body
+    destroy-on-close :close-on-click-modal="false" @update:model-value="(v: boolean) => emit('update:visible', v)">
+    <div class="gt-nta-head">
+      版本 v{{ version.version_no }} · 来源 {{ version.source_project_name }} {{ version.source_year }} 年
+      · {{ TEMPLATE_TYPE_LABELS[version.template_type] ?? version.template_type }}
+      · {{ REPORT_SCOPE_LABELS[version.report_scope] ?? version.report_scope }}
+      · 共 {{ quality.total ?? 0 }} 章（有内容 {{ quality.with_content ?? 0 }}，高风险 {{ quality.high_risk ?? 0 }}）
+      <template v-if="version.created_at"> · 保存于 {{ version.created_at.slice(0, 10) }}</template>
     </div>
-
-    <div v-if="batch.previewLoading.value" style="text-align: center; padding: 40px;">加载预览中...</div>
-
-    <div v-else style="max-height: 60vh; overflow-y: auto;">
-      <!-- 🟢 推荐引用 -->
-      <template v-if="recommendedItems.length">
-        <div style="font-weight: 600; color: var(--el-color-success); margin-bottom: 8px;">🟢 推荐引用（{{ recommendedItems.length }}）</div>
-        <div v-for="item in recommendedItems" :key="item.source_id" style="margin-bottom: 6px; padding: 8px; background: var(--el-color-success-light-9); border-radius: 4px;">
-          <el-checkbox :model-value="selectedItems.has(item.source_id)" @change="(v: boolean) => v ? selectedItems.add(item.source_id) : selectedItems.delete(item.source_id)">
-            {{ item.target_note_section }} — {{ item.evidence }}
-          </el-checkbox>
-        </div>
-      </template>
-
-      <!-- 🟡 需复核 -->
-      <template v-if="reviewItems.length">
-        <div style="font-weight: 600; color: var(--el-color-warning); margin: 12px 0 8px;">🟡 需复核（{{ reviewItems.length }}）</div>
-        <div v-for="item in reviewItems" :key="item.source_id" style="margin-bottom: 6px; padding: 8px; background: var(--el-color-warning-light-9); border-radius: 4px;">
-          <el-checkbox :model-value="selectedItems.has(item.source_id)" @change="(v: boolean) => v ? selectedItems.add(item.source_id) : selectedItems.delete(item.source_id)">
-            {{ item.target_note_section }} — {{ item.evidence }}
-          </el-checkbox>
-          <el-button size="small" text type="primary" style="margin-left: 8px;" @click="showDiffFor = item.source_id">查看差异</el-button>
-          <el-tag v-for="flag in item.quality_flags" :key="flag" size="small" type="info" style="margin-left: 4px;">{{ flag }}</el-tag>
-        </div>
-      </template>
-
-      <!-- ⚪ 不可用 -->
-      <template v-if="unavailableItems.length">
-        <div style="font-weight: 600; color: var(--el-text-color-placeholder); margin: 12px 0 8px;">⚪ 不可用（{{ unavailableItems.length }}）</div>
-        <div v-for="item in unavailableItems" :key="item.source_id" style="margin-bottom: 6px; padding: 8px; background: var(--el-fill-color-lighter); border-radius: 4px; color: var(--el-text-color-placeholder);">
-          {{ item.source_id }} — {{ item.unavailable_reason }}
-        </div>
-      </template>
+    <el-alert v-if="newerVersion" type="info" :closable="false" show-icon
+      :title="`该模板已有更新版本 v${newerVersion}；当前按所选历史版本预览，已引用的项目不会被自动更新`" />
+    <el-alert v-if="crossStandard" type="warning" :closable="false" show-icon
+      title="模板的标准或报表口径与本项目不一致：跨标准章节已全部归入「需复核」，请逐章核对" />
+    <el-alert v-if="batch.previewStale.value" type="warning" :closable="false" show-icon
+      title="预览已过期（预览后改过变量替换，或目标章节已被他人修改），请重新预览后再写入" />
+    <el-alert v-if="batch.lastError.value" type="error" :closable="false" show-icon :title="batch.lastError.value.message" />
+    <div v-if="batch.previewLoading.value" class="gt-nta-loading">正在生成预览…</div>
+    <div v-else class="gt-nta-body">
+      <NoteTextPreviewList v-model:selected="selected" :items="items" :modes="modes" @open-diff="openDiff" />
     </div>
-
-    <!-- 底部确认 -->
+    <NoteTextDiffDialog v-model="diffVisible" :item="diffItem" :mode="diffItem ? (modes[diffItem.source_id] ?? 'replace') : 'replace'"
+      :revoked-ids="[...batch.revokedReplacementIds.value]" :stale="batch.previewStale.value"
+      @update:mode="setDiffMode" @toggle-revocation="(id: string) => batch.toggleRevocation(id)" @confirm="onDiffConfirm" />
     <template #footer>
-      <el-button @click="dialogVisible = false">取消</el-button>
-      <el-button type="success" :loading="batch.applyLoading.value" @click="onApply">
-        ✅ 确认应用（{{ selectedItems.size }} 章）
-      </el-button>
+      <el-button @click="emit('update:visible', false)">取消</el-button>
+      <el-button v-if="batch.previewStale.value" :loading="batch.previewLoading.value" @click="batch.fetchPreview()">🔄 重新预览</el-button>
+      <el-button type="success" :loading="batch.applyLoading.value" :disabled="!batch.canApply.value || !selected.length"
+        @click="onApply">✅ 确认写入（{{ selected.length }} 章）</el-button>
     </template>
-
-    <!-- 差异弹窗 -->
-    <el-dialog v-model="showDiffFor" title="📝 现有/拟写入对比" width="80%" append-to-body destroy-on-close v-if="diffItem">
-      <div style="display: flex; gap: 16px;">
-        <div style="flex: 1;">
-          <div style="font-weight: 600; margin-bottom: 8px;">现有内容</div>
-          <div style="border: 1px solid var(--el-border-color); padding: 12px; border-radius: 4px; min-height: 100px;" v-html="sanitizeHtml(diffItem?.before_html || '（空）')" />
-        </div>
-        <div style="flex: 1;">
-          <div style="font-weight: 600; margin-bottom: 8px;">拟写入内容</div>
-          <div style="border: 1px solid var(--el-border-color); padding: 12px; border-radius: 4px; min-height: 100px;" v-html="sanitizeHtml(diffItem?.proposed_html || '')" />
-        </div>
-      </div>
-      <div v-if="diffItem?.replacements?.length" style="margin-top: 12px;">
-        <div style="font-weight: 600; margin-bottom: 6px;">变量替换</div>
-        <div v-for="r in diffItem.replacements" :key="r.replacement_id" style="font-size: 13px;">
-          {{ r.variable }}: <del>{{ r.old_value }}</del> → <strong>{{ r.new_value }}</strong>
-        </div>
-      </div>
-    </el-dialog>
   </el-dialog>
 </template>
+
+<style scoped>
+.gt-nta-head { margin-bottom: 12px; font-size: 13px; color: var(--el-text-color-secondary); }
+.gt-nta-loading { text-align: center; padding: 40px; color: var(--el-text-color-secondary); }
+.gt-nta-body { max-height: 62vh; overflow-y: auto; }
+</style>

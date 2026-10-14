@@ -107,7 +107,7 @@
                     <el-dropdown-item @click="onExportWithConfirm" title="导出 Word 格式附注文档">📤 导出 Word</el-dropdown-item>
                     <el-dropdown-item @click="showPrintPreview = true" title="打印预览当前附注">🖨️ 打印预览</el-dropdown-item>
                     <el-dropdown-item divided @click="showNoteImport = true" title="导入外部 Excel 附注数据（通用格式）">📥 Excel 导入</el-dropdown-item>
-                    <el-dropdown-item @click="showNoteDocUpload = true" title="上传 Word/PDF 附注文档批量填入叙述性章节">📄 上传附注文档</el-dropdown-item>
+                    <el-dropdown-item v-if="!isEqcrRole && effectiveCanEdit" @click="noteContentTools?.open('upload')" title="上传 Word/PDF 或选择知识库文档，批量填入叙述性章节">📄 上传附注文档</el-dropdown-item>
                     <el-dropdown-item @click="showOfflineExport = true" title="导出系统格式离线编辑包（可再导回）">📦 离线导出</el-dropdown-item>
                     <el-dropdown-item @click="showOfflineImport = true" title="导入系统导出的离线编辑包">📥 离线导入</el-dropdown-item>
                   </el-dropdown-menu>
@@ -120,8 +120,8 @@
                   <el-dropdown-menu>
                     <el-dropdown-item @click="showParagraphVars = true" title="段落变量（自动替换占位符）">✏️ 段落变量</el-dropdown-item>
                     <el-dropdown-item @click="showGroupBaseline = true" title="集团基线管理：应用/保存/对比集团统一附注模板结构，确保子企业附注章节一致">🏢 集团基线</el-dropdown-item>
-                    <el-dropdown-item divided @click="ElMessage.info('保存为内容模板功能开发中')" title="将当前附注正文保存为可复用的内容模板">💾 保存为内容模板</el-dropdown-item>
-                    <el-dropdown-item @click="showContentTemplatePicker = true" title="从内容模板引用正文到当前项目">📋 引用内容模板</el-dropdown-item>
+                    <el-dropdown-item v-if="!isEqcrRole && effectiveCanEdit" divided @click="noteContentTools?.open('save')" title="将本项目全套附注正文保存为可复用的内容模板（不含表格数据）">💾 保存为内容模板</el-dropdown-item>
+                    <el-dropdown-item v-if="!isEqcrRole && effectiveCanEdit" @click="noteContentTools?.open('apply')" title="从内容模板按章节选择性引用正文到当前项目">📋 引用内容模板</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
@@ -967,12 +967,8 @@
       @imported="onNoteImported"
     />
 
-    <!-- 附注文档上传/知识库批量填入弹窗 -->
-    <NoteDocUploadDialog v-model:visible="showNoteDocUpload" :project-id="projectId" :year="year" @applied="onNoteDocUploadApplied" />
-    <!-- 附注内容模板选择弹窗 -->
-    <NoteContentTemplatePicker v-model:visible="showContentTemplatePicker" :project-id="projectId" @select="onContentTemplateSelected" />
-    <!-- 附注内容模板引用弹窗 -->
-    <NoteContentTemplateApplyDialog v-if="showContentTemplateApply" v-model:visible="showContentTemplateApply" :project-id="projectId" :year="year" :template-version-id="contentTemplateApplyProps.versionId" :template-name="contentTemplateApplyProps.name" @applied="onContentTemplateApplied" />
+    <!-- 附注正文批量写入：上传/知识库/内容模板（同一时刻只挂一个弹窗） -->
+    <DisclosureNoteContentTools ref="noteContentTools" :project-id="projectId" :year="year" :can-write="!isEqcrRole && effectiveCanEdit" :has-unsaved-changes="editDirty || autoSave.isDirty.value" @applied="onNoteTextBatchApplied" />
     <!-- D15 离线导出弹窗 -->
     <NoteOfflineExportDialog
       v-model="showOfflineExport"
@@ -1324,9 +1320,7 @@ import NoteReadinessPanel from '@/components/disclosure/NoteReadinessPanel.vue'
 import StructureEditor from '@/components/formula/StructureEditor.vue'
 import { isEmptyTable, type EmptyTableRow, type EmptyTableColumnDef } from '@/views/composables/disclosureEmptyTable'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
-import NoteDocUploadDialog from '@/components/disclosure/NoteDocUploadDialog.vue'
-import NoteContentTemplatePicker from '@/components/disclosure/NoteContentTemplatePicker.vue'
-import NoteContentTemplateApplyDialog from '@/components/disclosure/NoteContentTemplateApplyDialog.vue'
+import DisclosureNoteContentTools from '@/components/disclosure/DisclosureNoteContentTools.vue'
 import NoteRichTextEditor from '@/components/NoteRichTextEditor.vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -1741,10 +1735,7 @@ const {
 
 const genLoading = ref(false)
 const showNoteImport = ref(false)
-const showNoteDocUpload = ref(false)
-const showContentTemplatePicker = ref(false)
-const showContentTemplateApply = ref(false)
-const contentTemplateApplyProps = ref({ versionId: '', name: '' })
+const noteContentTools = ref<InstanceType<typeof DisclosureNoteContentTools> | null>(null)
 const showOfflineExport = ref(false)
 const showOfflineImport = ref(false)
 const showAiPanel = ref(false)
@@ -2808,17 +2799,12 @@ function onNoteImported() {
   fetchTree()
 }
 
-function onNoteDocUploadApplied() {
-  showNoteDocUpload.value = false
-  fetchTree()
-  if (currentNote.value) fetchDetail(currentNote.value.note_section)
+/** 批量写入成功：被改写的往往不止当前章 ⇒ 作废全部章节缓存，再刷新目录树与当前章（R-19：首版读缓存仍是旧值） */
+async function onNoteTextBatchApplied() {
+  invalidateDetailCache()
+  await fetchTree()
+  if (currentNote.value) await fetchDetailFresh(currentNote.value.note_section)
 }
-
-function onContentTemplateSelected(template: any, versionId: string) {
-  contentTemplateApplyProps.value = { versionId, name: template.name || '内容模板' }
-  showContentTemplateApply.value = true
-}
-function onContentTemplateApplied() { showContentTemplateApply.value = false; fetchTree(); if (currentNote.value) fetchDetail(currentNote.value.note_section) }
 
 async function onGenerate() {
   if (templateType.value === 'custom' && !customTemplateId.value) {
