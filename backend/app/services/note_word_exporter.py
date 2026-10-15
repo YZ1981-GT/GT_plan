@@ -50,6 +50,12 @@ from app.services.note_section_catalog import (
     normalize_template_type,
 )
 from app.services.note_section_numbering import compute_section_numbers
+from app.services.note_text_word_render import (
+    append_note_text,
+    fill_paragraph_with_note_text,
+    is_html_note_text,
+    note_text_plain,
+)
 from app.services.note_sub_table_projector import (
     is_zero_visible_row as _is_zero_visible_row,
 )
@@ -298,6 +304,11 @@ def _set_paragraph_format(paragraph, space_before=0, space_after=Pt(12), line_sp
     pf.space_before = space_before
     pf.space_after = space_after  # 段后 0.9 行 ≈ 12pt
     pf.line_spacing = line_spacing
+
+
+def _body_run_style(run, bold: bool) -> None:
+    """正文渲染回调（note_text_word_render）：致同正文字体，加粗按 HTML。"""
+    _set_run_font(run, bold=bold)
 
 
 def _set_run_font(run, font_name=BODY_FONT, size=BODY_SIZE, bold=False):
@@ -1152,7 +1163,12 @@ class NoteWordExporter:
         for para in paragraphs:
             ptext = para.text or ""
             if section_token in ptext:
-                new_text = ptext.replace(section_token, text_content)
+                if ptext.strip() == section_token and is_html_note_text(text_content):
+                    # HTML 正文：占位段原位按块渲染，其余块插在其后（design §5.5；四版模板占位均独占一段）
+                    fill_paragraph_with_note_text(para, text_content, run_style=_body_run_style)
+                    continue
+                # 纯文字原样；HTML 与其它文字同段时按文字投影替换，不留标签
+                new_text = ptext.replace(section_token, note_text_plain(text_content))
                 para.clear()
                 if new_text:
                     run = para.add_run(new_text)
@@ -1486,12 +1502,8 @@ class NoteWordExporter:
         - 空 header 列裁剪（headers 中的空字符串占位过滤掉）
         - 兼容老结构：无 _tables 时降级到单表渲染
         """
-        # Text content
-        if note.text_content and note.text_content.strip():
-            p = doc.add_paragraph()
-            run = p.add_run(note.text_content.strip())
-            _set_run_font(run)
-            _set_paragraph_format(p)
+        # Text content：HTML 正文按块渲染（段落 / 列表 / 表格），纯文字与改造前一致（一段一 run）—— design §5.5
+        append_note_text(doc, note.text_content, run_style=_body_run_style, paragraph_style=_set_paragraph_format)
 
         # 章节级 guidance（note-per-table-guidance Phase 4）：在所有表格前输出一次，
         # 灰色小字斜体区分正文。此前完全不渲染（grep guidance 零命中），属既有缺陷补齐。

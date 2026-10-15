@@ -478,6 +478,8 @@ class DeliverableRefreshService:
             block_text_hash,
         )
 
+        from app.services.note_text_word_render import is_html_note_text, note_text_elements
+
         lines = [ln.strip() for ln in (text_content or "").split("\n") if ln.strip()]
 
         def _new_paragraph(text: str):
@@ -493,7 +495,9 @@ class DeliverableRefreshService:
             return p
 
         old_elements = list(getattr(target_block, "elements", None) or [])
-        new_paragraphs = [_new_paragraph(line) for line in lines]
+        # HTML 正文与导出同一渲染（段落 / 列表 / 表格，design §5.5）；纯文字仍按行拆段（既有行为）
+        new_paragraphs = (note_text_elements(text_content) if is_html_note_text(text_content)
+                          else [_new_paragraph(line) for line in lines])
 
         if locate_mode == "anchor":
             host, children = anchor_block_content_host(target_block)

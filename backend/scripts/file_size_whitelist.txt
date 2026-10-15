@@ -1418,3 +1418,7 @@ audit-platform/frontend/src/components/workpaper/d1/D1TabVoucherCheck.vue  1645
 #     2026-10-14 disclosure-note-doc-upload-and-batch-fill 第 12 组只改附注检索的排序键（+2 行：sort_order 打头，
 #     与同类 4 处一并修正，见该 spec tasks.md 第 12 组）。拆分方向：按工具域（附注 / 底稿 / 报表）分模块。
 backend/app/services/ai_chat/mcp_tools.py  1070
+#   deliverable_writeback_service.py —— 交付件回填服务（非本次引入；触碰前已 1189 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-15 disclosure-note-doc-upload-and-batch-fill 第 18 组只在 _normalize_text 加 HTML 正文投影（+5 行，
+#     见该 spec design §5.5）。拆分方向：护栏分类 / 冲突检测与裁决 / 留痕 三块按职责抽模块。
+backend/app/services/deliverable_writeback_service.py  1194

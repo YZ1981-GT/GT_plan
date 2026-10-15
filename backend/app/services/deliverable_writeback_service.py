@@ -1123,8 +1123,13 @@ def _normalize_text(text: str) -> str:
     """
     import re
 
+    from app.services.note_text_word_render import note_text_plain
+
     if not text:
         return ""
+    # HTML 正文先投影成交付 docx 提取得到的文字（design §5.5）：否则导出按块渲染后，库里的 HTML 章节
+    # 与 docx 段落文字永远不等 ⇒ 回填把未改动章节全判为「已修改」；纯文字原样
+    text = note_text_plain(text)
     # 统一换行
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     # 合并连续空白（保留换行符）

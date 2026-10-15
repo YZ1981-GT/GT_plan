@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.phase13_models import ReportSnapshot, WordExportDocType
 from app.models.report_models import AuditReport, DisclosureNote
 from app.services.export_task_service import ExportTaskService
+from app.services.note_text_word_render import append_note_text, is_html_note_text
 from app.services.report_placeholder_service import ReportPlaceholderService
 from app.services.report_snapshot_service import ReportSnapshotService
 
@@ -412,9 +413,12 @@ class WordTemplateFiller:
             if note.table_data and isinstance(note.table_data, dict):
                 _fill_table_data(doc, note.table_data)
 
-            # Narrative text
+            # Narrative text：HTML 正文按块渲染，纯文字原样一段（design §5.5）
             if note.text_content:
-                doc.add_paragraph(note.text_content)
+                if is_html_note_text(note.text_content):
+                    append_note_text(doc, note.text_content)
+                else:
+                    doc.add_paragraph(note.text_content)
 
         # Process color text (blue=delete, red→black)
         _process_color_text_in_doc(doc)
