@@ -9,11 +9,20 @@ from __future__ import annotations
 import json
 import time
 import uuid
+import zipfile
 from functools import lru_cache
 
 import pytest
 
-from app.services.note_document_parser import parse_docx
+from app.services.note_document_parser import (
+    MAX_DOCX_DECOMPRESS_BYTES,
+    MAX_DOCX_ZIP_ENTRIES,
+    MAX_SECTION_HTML_BYTES,
+    MAX_SECTIONS,
+    MAX_UPLOAD_BYTES,
+    parse_docx,
+)
+from app.services.note_text_batch_flow import MAX_BATCH_SOURCE_BYTES
 from app.services.note_section_catalog import DATA_DIR, WORD_TEMPLATE_DIR, filter_template_sections
 from app.services.note_section_kind import chapter_title_for_code, classify_note_section, is_account_chapter_title
 from app.services.note_text_batch_service import build_preview, fold_unmatched_descendants, match_sections
@@ -98,3 +107,24 @@ def test_platform_template_markers_never_reach_preview(tt: str, rs: str):
     assert not leaked, f"{tt}_{rs} 解析结果残留模板标记 {len(leaked)} 处，例：{leaked[:3]}"
     # 剥掉标记后不得留下空段落壳
     assert not [s.title for s in parsed.sections if "<p></p>" in s.html]
+
+
+@pytest.mark.parametrize("tt,rs", VARIANTS)
+def test_word_template_within_frozen_hard_caps(tt: str, rs: str):
+    """NFR-5 / Task 56：四份权威模板是最贴近真实上传的样本，必须整份落在 design §11.2 硬上限内（不截断、不 413）。
+
+    2026-10-14 实测：章节 315~412（硬上限 500）；单章最大 27,168 B（512 KiB）；整份正文 33~58 万字节（5 MiB）；
+    文件 50~88 万字节、解压 680~1170 万字节、zip 条目 24~27。§11.2「解析返回章节数」业务阈值 300 是按项目章节数
+    （max 200）定的，Word 标题粒度更细，四份都超过它——业务阈值代码不强制，硬上限余量最小的是国企合并 412/500。
+    """
+    path = WORD_TEMPLATE_DIR / f"{tt}_{rs}.docx"
+    parsed, _ = _parsed(tt, rs)
+    with zipfile.ZipFile(path) as zf:
+        entries, unzip = len(zf.infolist()), sum(e.file_size for e in zf.infolist())
+    sizes = [len(s.html.encode("utf-8")) for s in parsed.sections]
+    assert [w for w in parsed.warnings if "截断" in w] == []
+    assert [s.title for s in parsed.sections if any("截断" in w for w in s.warnings)] == []
+    assert len(parsed.sections) < MAX_SECTIONS, "达到上限即被截断：尾部章节丢失（只给一条截断提示）"
+    assert max(sizes) < MAX_SECTION_HTML_BYTES and sum(sizes) < MAX_BATCH_SOURCE_BYTES
+    assert path.stat().st_size < MAX_UPLOAD_BYTES
+    assert entries < MAX_DOCX_ZIP_ENTRIES and unzip < MAX_DOCX_DECOMPRESS_BYTES

@@ -427,6 +427,11 @@ TOP-3 单章：49,586 B（金融工具）、18,148 B（长期股权投资）、1
 - 主要错误码：`UNSUPPORTED_FILE`、`FILE_TOO_LARGE`、`DOCX_ZIP_LIMIT`、`PDF_NEEDS_OCR`、`NO_PARSEABLE_TEXT`、`TEMPLATE_NOT_VISIBLE`、`MAPPING_MANUAL_REQUIRED`、`NOTE_BATCH_STALE_PREVIEW`、`MUTATION_ID_CONFLICT`、`PAYLOAD_TOO_LARGE`。
 - 解析失败不污染 DB；preview 不写 DisclosureNote；apply 失败零写入；事件失败只作为已提交 warning 回执。
 
+> 第 11 组（Task 56）真实样本复核（2026-10-14）：
+> - 四份权威 Word 模板解析章节 315 / 322 / 382 / 412（上市单体 / 上市合并 / 国企单体 / 国企合并），单章最大 27,168 B，整份正文 33~58 万字节，文件 50~88 万字节，解压 680~1170 万字节，zip 条目 24~27，解析 1.8~3.3 秒；真库 6 个项目年度快照最大 625,695 B、最多 200 章。
+> - 上表「解析返回章节数」的业务阈值 300 按项目章节数定，Word 标题粒度更细，四份模板都超过它；代码只强制硬上限 500，国企合并离上限只有 18% 余量。是否上调待拍板。
+> - V187 的 DO 块按名查 `pg_constraint` 不限 schema，同库其它 schema 已有同名约束时跳过补建；生产单 schema 不受影响，V187 已应用不改。
+
 ## §12 受影响文件
 
 ### 后端新增
