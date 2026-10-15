@@ -41,6 +41,7 @@ import asyncio
 import math
 from typing import Any
 
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -140,22 +141,28 @@ def compute_cross_check_passed_ref(
     return [
         # 1. 资产合计 = 负债合计 + 所有者权益合计（tol=1）
         _check_ref(total_assets, total_liabilities + total_equity, 1),
-        # 2. 营业收入 − 营业成本 = 毛利（恒等）
-        _check_ref(revenue - cost, revenue - cost),
+        # 2. 营业收入 − 营业成本 = 独立毛利行（IS-003），若无毛利行则检查收入/成本≥0
+        (
+            _check_ref(revenue - cost, _get_ref(is_map, "IS-003", "毛利"), 1)
+            if _get_ref(is_map, "IS-003", "毛利") != 0
+            else (revenue >= 0 and cost >= 0)
+        ),
         # 3. 利润总额 − 所得税 = 净利润（tol=1）
         _check_ref(profit_before_tax - income_tax, net_profit, 1),
         # 4. 资产 − 负债 = 权益（tol=1）
         _check_ref(total_assets - total_liabilities, total_equity, 1),
-        # 5. 所有者权益变动表期末 = 资产负债表权益（恒等）
-        _check_ref(total_equity, total_equity),
-        # 6. 有效税率 ≈ 25%（tol = 利润总额 × 5%）
+        # 5. 所有者权益变动表期末 = 资产负债表权益（EQ-ENDING vs equity_total）
         _check_ref(
-            income_tax,
-            profit_before_tax * 0.25 if profit_before_tax > 0 else 0,
-            profit_before_tax * 0.05,
+            _get_ref(bs_map, "EQ-ENDING"), total_equity, 1
         ),
-        # 7. 货币资金 ≥ 0（负值异常；tol = |cash|）
-        _check_ref(cash, 0, abs(cash)),
+        # 6. 有效税率 ≈ 25%（pbt>0：|tax - pbt*0.25| <= pbt*0.05；否则 |tax| < 0.01）
+        (
+            _check_ref(income_tax, profit_before_tax * 0.25, profit_before_tax * 0.05)
+            if profit_before_tax > 0
+            else abs(_js_round(income_tax)) < 0.01
+        ),
+        # 7. 货币资金 ≥ 0
+        cash >= 0,
     ]
 
 

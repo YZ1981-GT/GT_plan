@@ -128,7 +128,7 @@ LISTED_NULL_AUDIT: Final[tuple[NullAuditEntry, ...]] = (
         "xian_jin_liu_liang_biao_xiang_mu_zhu_shi",
         "现金流量表项目注释",
         "FALSE_NULL",
-        "三、现金流量表项目注",
+        "三、现金流量表项目注释",
         "listed 模板有该章且含 9 张表，是本批受益面最大的一条",
     ),
     _e(

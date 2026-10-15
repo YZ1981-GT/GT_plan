@@ -3,8 +3,8 @@
   "version": "2025-R1",
   "generated_by": "backend/scripts/seed/seed_formula_presets.py",
   "summary": {
-    "total_pages": 232,
-    "total_formulas": 3939,
+    "total_pages": 250,
+    "total_formulas": 4250,
     "by_scope": {
       "note": {
         "pages": 131,
@@ -12,11 +12,11 @@
       },
       "report": {
         "pages": 7,
-        "formula_count": 357
+        "formula_count": 343
       },
       "workpaper": {
-        "pages": 94,
-        "formula_count": 975
+        "pages": 112,
+        "formula_count": 1300
       }
     }
   },
@@ -1321,9 +1321,9 @@
       "page_key": "report:cash_flow_statement",
       "scope": "report",
       "preset_status": "presetted",
-      "formula_count": 31,
+      "formula_count": 33,
       "sources": [
-        "report_preset_generator"
+        "cfs_direct_method_generator"
       ]
     },
     {
@@ -1332,7 +1332,7 @@
       "preset_status": "presetted",
       "formula_count": 27,
       "sources": [
-        "cfss_preset_generator"
+        "cfss_indirect_method_generator_v2"
       ]
     },
     {
@@ -1349,9 +1349,9 @@
       "page_key": "report:equity_statement",
       "scope": "report",
       "preset_status": "presetted",
-      "formula_count": 33,
+      "formula_count": 17,
       "sources": [
-        "eq_preset_generator"
+        "equity_preset_generator_v2"
       ]
     },
     {
@@ -1360,7 +1360,7 @@
       "preset_status": "presetted",
       "formula_count": 19,
       "sources": [
-        "imp_preset_generator"
+        "impairment_preset_generator_v2"
       ]
     },
     {
@@ -1387,7 +1387,7 @@
       "page_key": "workpaper:D1",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 9,
+      "formula_count": 19,
       "cycle": "D",
       "wp_code": "D1",
       "sources": [
@@ -1399,7 +1399,7 @@
       "page_key": "workpaper:D2",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 28,
+      "formula_count": 22,
       "cycle": "D",
       "wp_code": "D2",
       "sources": [
@@ -1411,7 +1411,7 @@
       "page_key": "workpaper:D3",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 6,
+      "formula_count": 15,
       "cycle": "D",
       "wp_code": "D3",
       "sources": [
@@ -1422,7 +1422,7 @@
       "page_key": "workpaper:D4",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 23,
+      "formula_count": 35,
       "cycle": "D",
       "wp_code": "D4",
       "sources": [
@@ -1434,7 +1434,7 @@
       "page_key": "workpaper:D5",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 8,
+      "formula_count": 11,
       "cycle": "D",
       "wp_code": "D5",
       "sources": [
@@ -1445,7 +1445,7 @@
       "page_key": "workpaper:D6",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 6,
+      "formula_count": 16,
       "cycle": "D",
       "wp_code": "D6",
       "sources": [
@@ -1456,7 +1456,7 @@
       "page_key": "workpaper:D7",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 6,
+      "formula_count": 15,
       "cycle": "D",
       "wp_code": "D7",
       "sources": [
@@ -1478,7 +1478,7 @@
       "page_key": "workpaper:E1",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 21,
+      "formula_count": 75,
       "cycle": "E",
       "wp_code": "E1",
       "sources": [
@@ -1500,7 +1500,7 @@
       "page_key": "workpaper:F1",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 5,
+      "formula_count": 33,
       "cycle": "F",
       "wp_code": "F1",
       "sources": [
@@ -1511,7 +1511,7 @@
       "page_key": "workpaper:F2",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 64,
+      "formula_count": 78,
       "cycle": "F",
       "wp_code": "F2",
       "sources": [
@@ -1522,7 +1522,7 @@
       "page_key": "workpaper:F3",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 10,
+      "formula_count": 22,
       "cycle": "F",
       "wp_code": "F3",
       "sources": [
@@ -1533,7 +1533,7 @@
       "page_key": "workpaper:F4",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 10,
+      "formula_count": 22,
       "cycle": "F",
       "wp_code": "F4",
       "sources": [
@@ -1544,7 +1544,7 @@
       "page_key": "workpaper:F5",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 9,
+      "formula_count": 14,
       "cycle": "F",
       "wp_code": "F5",
       "sources": [
@@ -1555,7 +1555,7 @@
       "page_key": "workpaper:G0",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 2,
+      "formula_count": 8,
       "cycle": "G",
       "wp_code": "G0",
       "sources": [
@@ -1566,7 +1566,7 @@
       "page_key": "workpaper:G1",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 16,
+      "formula_count": 23,
       "cycle": "G",
       "wp_code": "G1",
       "sources": [
@@ -1577,7 +1577,7 @@
       "page_key": "workpaper:G10",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 5,
+      "formula_count": 8,
       "cycle": "G",
       "wp_code": "G10",
       "sources": [
@@ -1588,7 +1588,7 @@
       "page_key": "workpaper:G11",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 11,
+      "formula_count": 13,
       "cycle": "G",
       "wp_code": "G11",
       "sources": [
@@ -1599,7 +1599,7 @@
       "page_key": "workpaper:G12",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 5,
+      "formula_count": 7,
       "cycle": "G",
       "wp_code": "G12",
       "sources": [
@@ -1610,7 +1610,7 @@
       "page_key": "workpaper:G13",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 8,
+      "formula_count": 10,
       "cycle": "G",
       "wp_code": "G13",
       "sources": [
@@ -1621,7 +1621,7 @@
       "page_key": "workpaper:G14",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 8,
+      "formula_count": 10,
       "cycle": "G",
       "wp_code": "G14",
       "sources": [
@@ -1632,7 +1632,7 @@
       "page_key": "workpaper:G2",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 5,
+      "formula_count": 8,
       "cycle": "G",
       "wp_code": "G2",
       "sources": [
@@ -1643,7 +1643,7 @@
       "page_key": "workpaper:G3",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 5,
+      "formula_count": 8,
       "cycle": "G",
       "wp_code": "G3",
       "sources": [
@@ -1654,7 +1654,7 @@
       "page_key": "workpaper:G4",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 8,
+      "formula_count": 10,
       "cycle": "G",
       "wp_code": "G4",
       "sources": [
@@ -1665,7 +1665,7 @@
       "page_key": "workpaper:G5",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 5,
+      "formula_count": 10,
       "cycle": "G",
       "wp_code": "G5",
       "sources": [
@@ -1676,7 +1676,7 @@
       "page_key": "workpaper:G6",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 12,
+      "formula_count": 8,
       "cycle": "G",
       "wp_code": "G6",
       "sources": [
@@ -1687,7 +1687,7 @@
       "page_key": "workpaper:G7",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 17,
+      "formula_count": 24,
       "cycle": "G",
       "wp_code": "G7",
       "sources": [
@@ -1709,7 +1709,7 @@
       "page_key": "workpaper:G9",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 5,
+      "formula_count": 8,
       "cycle": "G",
       "wp_code": "G9",
       "sources": [
@@ -1731,7 +1731,7 @@
       "page_key": "workpaper:H1",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 39,
+      "formula_count": 41,
       "cycle": "H",
       "wp_code": "H1",
       "sources": [
@@ -1753,7 +1753,7 @@
       "page_key": "workpaper:H2",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 13,
+      "formula_count": 10,
       "cycle": "H",
       "wp_code": "H2",
       "sources": [
@@ -1764,7 +1764,7 @@
       "page_key": "workpaper:H3",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 13,
+      "formula_count": 16,
       "cycle": "H",
       "wp_code": "H3",
       "sources": [
@@ -1819,7 +1819,7 @@
       "page_key": "workpaper:H8",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 12,
+      "formula_count": 15,
       "cycle": "H",
       "wp_code": "H8",
       "sources": [
@@ -1830,7 +1830,7 @@
       "page_key": "workpaper:H9",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 16,
+      "formula_count": 17,
       "cycle": "H",
       "wp_code": "H9",
       "sources": [
@@ -1841,7 +1841,7 @@
       "page_key": "workpaper:I1",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 24,
+      "formula_count": 23,
       "cycle": "I",
       "wp_code": "I1",
       "sources": [
@@ -1863,7 +1863,7 @@
       "page_key": "workpaper:I3",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 14,
+      "formula_count": 11,
       "cycle": "I",
       "wp_code": "I3",
       "sources": [
@@ -1874,7 +1874,7 @@
       "page_key": "workpaper:I4",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 14,
+      "formula_count": 12,
       "cycle": "I",
       "wp_code": "I4",
       "sources": [
@@ -1885,7 +1885,7 @@
       "page_key": "workpaper:I5",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 5,
+      "formula_count": 1,
       "cycle": "I",
       "wp_code": "I5",
       "sources": [
@@ -1907,7 +1907,7 @@
       "page_key": "workpaper:J1",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 40,
+      "formula_count": 27,
       "cycle": "J",
       "wp_code": "J1",
       "sources": [
@@ -1918,7 +1918,7 @@
       "page_key": "workpaper:J2",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 8,
+      "formula_count": 9,
       "cycle": "J",
       "wp_code": "J2",
       "sources": [
@@ -1951,7 +1951,7 @@
       "page_key": "workpaper:K1",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 11,
+      "formula_count": 29,
       "cycle": "K",
       "wp_code": "K1",
       "sources": [
@@ -1962,7 +1962,7 @@
       "page_key": "workpaper:K10",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 5,
+      "formula_count": 11,
       "cycle": "K",
       "wp_code": "K10",
       "sources": [
@@ -1973,7 +1973,7 @@
       "page_key": "workpaper:K11",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 5,
+      "formula_count": 11,
       "cycle": "K",
       "wp_code": "K11",
       "sources": [
@@ -1984,7 +1984,7 @@
       "page_key": "workpaper:K12",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 5,
+      "formula_count": 11,
       "cycle": "K",
       "wp_code": "K12",
       "sources": [
@@ -1995,64 +1995,9 @@
       "page_key": "workpaper:K13",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 5,
+      "formula_count": 11,
       "cycle": "K",
       "wp_code": "K13",
-      "sources": [
-        "prefill_formula_mapping"
-      ]
-    },
-    {
-      "page_key": "workpaper:K14",
-      "scope": "workpaper",
-      "preset_status": "presetted",
-      "formula_count": 5,
-      "cycle": "K",
-      "wp_code": "K14",
-      "sources": [
-        "prefill_formula_mapping"
-      ]
-    },
-    {
-      "page_key": "workpaper:K15",
-      "scope": "workpaper",
-      "preset_status": "presetted",
-      "formula_count": 5,
-      "cycle": "K",
-      "wp_code": "K15",
-      "sources": [
-        "prefill_formula_mapping"
-      ]
-    },
-    {
-      "page_key": "workpaper:K16",
-      "scope": "workpaper",
-      "preset_status": "presetted",
-      "formula_count": 5,
-      "cycle": "K",
-      "wp_code": "K16",
-      "sources": [
-        "prefill_formula_mapping"
-      ]
-    },
-    {
-      "page_key": "workpaper:K17",
-      "scope": "workpaper",
-      "preset_status": "presetted",
-      "formula_count": 5,
-      "cycle": "K",
-      "wp_code": "K17",
-      "sources": [
-        "prefill_formula_mapping"
-      ]
-    },
-    {
-      "page_key": "workpaper:K18",
-      "scope": "workpaper",
-      "preset_status": "presetted",
-      "formula_count": 5,
-      "cycle": "K",
-      "wp_code": "K18",
       "sources": [
         "prefill_formula_mapping"
       ]
@@ -2061,7 +2006,7 @@
       "page_key": "workpaper:K2",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 5,
+      "formula_count": 15,
       "cycle": "K",
       "wp_code": "K2",
       "sources": [
@@ -2072,7 +2017,7 @@
       "page_key": "workpaper:K3",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 11,
+      "formula_count": 14,
       "cycle": "K",
       "wp_code": "K3",
       "sources": [
@@ -2083,7 +2028,7 @@
       "page_key": "workpaper:K4",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 5,
+      "formula_count": 3,
       "cycle": "K",
       "wp_code": "K4",
       "sources": [
@@ -2094,7 +2039,7 @@
       "page_key": "workpaper:K5",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 9,
+      "formula_count": 18,
       "cycle": "K",
       "wp_code": "K5",
       "sources": [
@@ -2105,7 +2050,7 @@
       "page_key": "workpaper:K6",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 5,
+      "formula_count": 13,
       "cycle": "K",
       "wp_code": "K6",
       "sources": [
@@ -2116,7 +2061,7 @@
       "page_key": "workpaper:K7",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 5,
+      "formula_count": 14,
       "cycle": "K",
       "wp_code": "K7",
       "sources": [
@@ -2127,7 +2072,7 @@
       "page_key": "workpaper:K8",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 22,
+      "formula_count": 30,
       "cycle": "K",
       "wp_code": "K8",
       "sources": [
@@ -2138,7 +2083,7 @@
       "page_key": "workpaper:K9",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 18,
+      "formula_count": 27,
       "cycle": "K",
       "wp_code": "K9",
       "sources": [
@@ -2160,11 +2105,22 @@
       "page_key": "workpaper:L1",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 23,
+      "formula_count": 22,
       "cycle": "L",
       "wp_code": "L1",
       "sources": [
         "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:L1-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "L",
+      "wp_code": "L1-1",
+      "sources": [
+        "lmn_four_table_extraction"
       ]
     },
     {
@@ -2179,6 +2135,17 @@
       ]
     },
     {
+      "page_key": "workpaper:L2-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "L",
+      "wp_code": "L2-1",
+      "sources": [
+        "lmn_four_table_extraction"
+      ]
+    },
+    {
       "page_key": "workpaper:L3",
       "scope": "workpaper",
       "preset_status": "presetted",
@@ -2190,14 +2157,36 @@
       ]
     },
     {
+      "page_key": "workpaper:L3-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "L",
+      "wp_code": "L3-1",
+      "sources": [
+        "lmn_four_table_extraction"
+      ]
+    },
+    {
       "page_key": "workpaper:L4",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 5,
+      "formula_count": 10,
       "cycle": "L",
       "wp_code": "L4",
       "sources": [
         "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:L4-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "L",
+      "wp_code": "L4-1",
+      "sources": [
+        "lmn_four_table_extraction"
       ]
     },
     {
@@ -2212,14 +2201,36 @@
       ]
     },
     {
+      "page_key": "workpaper:L5-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "L",
+      "wp_code": "L5-1",
+      "sources": [
+        "lmn_four_table_extraction"
+      ]
+    },
+    {
       "page_key": "workpaper:L6",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 10,
+      "formula_count": 5,
       "cycle": "L",
       "wp_code": "L6",
       "sources": [
         "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:L6-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "L",
+      "wp_code": "L6-1",
+      "sources": [
+        "lmn_four_table_extraction"
       ]
     },
     {
@@ -2234,6 +2245,17 @@
       ]
     },
     {
+      "page_key": "workpaper:L7-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "L",
+      "wp_code": "L7-1",
+      "sources": [
+        "lmn_four_table_extraction"
+      ]
+    },
+    {
       "page_key": "workpaper:L8",
       "scope": "workpaper",
       "preset_status": "presetted",
@@ -2245,14 +2267,36 @@
       ]
     },
     {
+      "page_key": "workpaper:L8-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 1,
+      "cycle": "L",
+      "wp_code": "L8-1",
+      "sources": [
+        "lmn_four_table_extraction"
+      ]
+    },
+    {
       "page_key": "workpaper:M1",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 6,
+      "formula_count": 5,
       "cycle": "M",
       "wp_code": "M1",
       "sources": [
         "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:M1-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "M",
+      "wp_code": "M1-1",
+      "sources": [
+        "lmn_four_table_extraction"
       ]
     },
     {
@@ -2267,14 +2311,36 @@
       ]
     },
     {
+      "page_key": "workpaper:M10-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "M",
+      "wp_code": "M10-1",
+      "sources": [
+        "lmn_four_table_extraction"
+      ]
+    },
+    {
       "page_key": "workpaper:M2",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 14,
+      "formula_count": 5,
       "cycle": "M",
       "wp_code": "M2",
       "sources": [
         "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:M2-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "M",
+      "wp_code": "M2-1",
+      "sources": [
+        "lmn_four_table_extraction"
       ]
     },
     {
@@ -2289,6 +2355,17 @@
       ]
     },
     {
+      "page_key": "workpaper:M3-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 1,
+      "cycle": "M",
+      "wp_code": "M3-1",
+      "sources": [
+        "lmn_four_table_extraction"
+      ]
+    },
+    {
       "page_key": "workpaper:M4",
       "scope": "workpaper",
       "preset_status": "presetted",
@@ -2297,6 +2374,17 @@
       "wp_code": "M4",
       "sources": [
         "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:M4-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "M",
+      "wp_code": "M4-1",
+      "sources": [
+        "lmn_four_table_extraction"
       ]
     },
     {
@@ -2311,6 +2399,17 @@
       ]
     },
     {
+      "page_key": "workpaper:M5-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "M",
+      "wp_code": "M5-1",
+      "sources": [
+        "lmn_four_table_extraction"
+      ]
+    },
+    {
       "page_key": "workpaper:M6",
       "scope": "workpaper",
       "preset_status": "presetted",
@@ -2319,6 +2418,17 @@
       "wp_code": "M6",
       "sources": [
         "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:M6-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "M",
+      "wp_code": "M6-1",
+      "sources": [
+        "lmn_four_table_extraction"
       ]
     },
     {
@@ -2333,6 +2443,17 @@
       ]
     },
     {
+      "page_key": "workpaper:M7-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "M",
+      "wp_code": "M7-1",
+      "sources": [
+        "lmn_four_table_extraction"
+      ]
+    },
+    {
       "page_key": "workpaper:M8",
       "scope": "workpaper",
       "preset_status": "presetted",
@@ -2341,6 +2462,17 @@
       "wp_code": "M8",
       "sources": [
         "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:M8-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 1,
+      "cycle": "M",
+      "wp_code": "M8-1",
+      "sources": [
+        "lmn_four_table_extraction"
       ]
     },
     {
@@ -2355,10 +2487,21 @@
       ]
     },
     {
+      "page_key": "workpaper:M9-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "M",
+      "wp_code": "M9-1",
+      "sources": [
+        "lmn_four_table_extraction"
+      ]
+    },
+    {
       "page_key": "workpaper:N1",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 13,
+      "formula_count": 27,
       "cycle": "N",
       "wp_code": "N1",
       "sources": [
@@ -2366,14 +2509,36 @@
       ]
     },
     {
+      "page_key": "workpaper:N1-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "N",
+      "wp_code": "N1-1",
+      "sources": [
+        "lmn_four_table_extraction"
+      ]
+    },
+    {
       "page_key": "workpaper:N2",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 15,
+      "formula_count": 19,
       "cycle": "N",
       "wp_code": "N2",
       "sources": [
         "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:N2-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "N",
+      "wp_code": "N2-1",
+      "sources": [
+        "lmn_four_table_extraction"
       ]
     },
     {
@@ -2388,6 +2553,17 @@
       ]
     },
     {
+      "page_key": "workpaper:N3-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "N",
+      "wp_code": "N3-1",
+      "sources": [
+        "lmn_four_table_extraction"
+      ]
+    },
+    {
       "page_key": "workpaper:N4",
       "scope": "workpaper",
       "preset_status": "presetted",
@@ -2399,14 +2575,36 @@
       ]
     },
     {
+      "page_key": "workpaper:N4-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 1,
+      "cycle": "N",
+      "wp_code": "N4-1",
+      "sources": [
+        "lmn_four_table_extraction"
+      ]
+    },
+    {
       "page_key": "workpaper:N5",
       "scope": "workpaper",
       "preset_status": "presetted",
-      "formula_count": 14,
+      "formula_count": 21,
       "cycle": "N",
       "wp_code": "N5",
       "sources": [
         "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:N5-1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 1,
+      "cycle": "N",
+      "wp_code": "N5-1",
+      "sources": [
+        "lmn_four_table_extraction"
       ]
     }
   ]

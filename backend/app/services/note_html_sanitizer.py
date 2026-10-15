@@ -74,6 +74,8 @@ ALLOWED_TAGS: frozenset[str] = frozenset({
 ALLOWED_ATTRS: dict[str, frozenset[str]] = {
     "td": frozenset({"colspan", "rowspan"}),
     "th": frozenset({"colspan", "rowspan"}),
+    # 续编号列表（纯文字「2. …」经 markdown 转成 <ol start="2">，真库 3 个项目共 571 处）：丢了就从 1 重新编号
+    "ol": frozenset({"start"}),
     "span": frozenset({"class", "data-placeholder", "contenteditable"}),
 }
 
@@ -105,6 +107,7 @@ _BLOCK_TAGS: frozenset[str] = frozenset({
 })
 
 _SPAN_NUMBER_RE = re.compile(r"^[1-9]\d{0,2}$")
+_START_NUMBER_RE = re.compile(r"^[1-9]\d{0,3}$")
 
 #: 追加正文时的规范空段（不写任何来源/审计文字，AC-10.5）
 APPEND_SEPARATOR = "<p>&nbsp;</p>"
@@ -157,6 +160,8 @@ class _Sanitizer(HTMLParser):
             if name not in allowed:
                 continue
             if name in ("colspan", "rowspan") and not _SPAN_NUMBER_RE.match(raw):
+                continue
+            if name == "start" and not _START_NUMBER_RE.match(raw):
                 continue
             if name == "class" and raw not in _ALLOWED_CLASS_VALUES:
                 continue

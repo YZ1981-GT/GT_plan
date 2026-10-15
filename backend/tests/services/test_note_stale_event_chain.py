@@ -289,8 +289,8 @@ async def test_adjustment_batch_committed_handler_updates_disclosure_notes(
         getattr(h, "__qualname__", h.__name__) for h in handlers
     ]
     assert any(
-        "on_event_adjustment_approved" in n for n in handler_names
-    ), f"on_event_adjustment_approved 未注册，实际 handlers={handler_names}"
+        "on_event_adjustment_batch_committed" in n for n in handler_names
+    ), f"on_event_adjustment_batch_committed 未注册，实际 handlers={handler_names}"
 
     await fresh_event_bus.publish_immediate(
         EventPayload(
@@ -390,7 +390,7 @@ async def test_new_handlers_coexist_with_rollback_handler(
     expected = {
         EventType.LEDGER_DATASET_ACTIVATED: "on_event_ledger_activated",
         EventType.WORKPAPER_REVIEW_PASSED: "on_event_workpaper_reviewed",
-        EventType.ADJUSTMENT_BATCH_COMMITTED: "on_event_adjustment_approved",
+        EventType.ADJUSTMENT_BATCH_COMMITTED: "on_event_adjustment_batch_committed",
         EventType.LEDGER_DATASET_ROLLED_BACK: "_mark_downstream_stale_on_rollback",
     }
     for evt_type, expected_name in expected.items():

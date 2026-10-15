@@ -62,6 +62,7 @@ T_MOVEMENT = "固定资产情况"
 T_IDLE = "暂时闲置的固定资产情况"
 T_LEASE = "通过经营租赁租出的固定资产"  # 仅上市
 T_TITLE = "未办妥产权证书的固定资产情况"
+T_TITLE_LISTED = "（披露期末未办妥产权证书的固定资产账面价值及原因。）"  # listed 侧权威名（Word 同步）
 T_CLEARING = "固定资产清理"
 
 # 上市「固定资产情况」资产类别列（seed 默认五类；同步时按项目实际类别整表覆盖）
@@ -102,7 +103,7 @@ def _listed_plan() -> list[dict]:
             ("label", "项目", None),
             ("book_value", "账面价值", AMOUNT),
         ]), None, ""),
-        rule(T_TITLE, flat_columns([
+        rule(T_TITLE_LISTED, flat_columns([
             ("label", "项目", None),
             ("book_value", "账面价值", AMOUNT),
             ("reason", "未办妥产权证书原因", None),
@@ -146,7 +147,7 @@ def _soe_plan() -> list[dict]:
 
 
 EXPECTED = {
-    "listed": [T_SUMMARY, T_MOVEMENT, T_IDLE, T_LEASE, T_TITLE, T_CLEARING],
+    "listed": [T_SUMMARY, T_MOVEMENT, T_IDLE, T_LEASE, T_TITLE_LISTED, T_CLEARING],
     "soe": [T_SUMMARY, T_MOVEMENT, T_IDLE, T_TITLE, T_CLEARING],
 }
 

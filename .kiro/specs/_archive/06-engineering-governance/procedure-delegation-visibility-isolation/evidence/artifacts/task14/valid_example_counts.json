@@ -5,14 +5,14 @@
   "smoke_max_examples": 5,
   "correctness_max_examples": 100,
   "valid_example_counts": {
-    "P10": 181,
-    "P12": 251,
-    "P15": 215,
+    "P10": 2,
+    "P12": 2,
+    "P15": 2,
     "P16": 5,
-    "P18": 171,
+    "P18": 2,
     "P19": 5,
     "P20": 5,
-    "P9": 196,
+    "P9": 2,
     "same_source_demo": 5
   },
   "prompt_to_design_property_map": {

@@ -118,6 +118,42 @@ class TestFrontendBackendConsistency:
         for tag in frontend_only:
             assert tag not in ALLOWED_TAGS, f"后端不应允许 {tag}"
 
+    def test_layout_attrs_survive_frontend_display_sanitizer(self):
+        """影响版面的属性（合并单元格、列表起始编号）前端展示消毒也必须放行，否则差异预览与写入结果不一致。
+
+        读真实的 ``useSanitize.ts``（不抄副本）：第 22 组加 ``ol start`` 时前端名单漏了它，预览里续编号会从 1 开始。
+        """
+        import re
+        from pathlib import Path
+
+        source = (Path(__file__).resolve().parents[2] / "audit-platform/frontend/src/composables/useSanitize.ts"
+                  ).read_text(encoding="utf-8")
+        block = re.search(r"const ALLOWED_ATTR = \[(.*?)\]", source, re.S)
+        assert block, "useSanitize.ts 里找不到 ALLOWED_ATTR"
+        frontend_attrs = set(re.findall(r"'([\w-]+)'", block.group(1)))
+        assert {"colspan", "rowspan", "start"} <= frontend_attrs
+
+
+class TestOrderedListStart:
+    """第 22 组：续编号列表（「2. …」，真库 3 个项目共 571 处）消毒后不能丢起始编号，否则写入后从 1 重新编号。"""
+
+    @pytest.mark.parametrize(("html", "expected"), [
+        ('<ol start="2"><li>甲</li></ol>', '<ol start="2"><li>甲</li></ol>'),
+        ('<ol start="0"><li>甲</li></ol>', "<ol><li>甲</li></ol>"),
+        ('<ol start="x"><li>甲</li></ol>', "<ol><li>甲</li></ol>"),
+        ('<ol start="10000"><li>甲</li></ol>', "<ol><li>甲</li></ol>"),
+        ('<ul start="2"><li>甲</li></ul>', "<ul><li>甲</li></ul>"),
+    ])
+    def test_start_kept_only_when_valid(self, html: str, expected: str):
+        assert sanitize_note_html(html) == expected
+        assert sanitize_note_html(expected) == expected
+
+    def test_plain_text_numbering_continues_after_conversion(self):
+        from app.services.note_html_sanitizer import note_text_to_html
+
+        assert note_text_to_html("1. 存货分类\n\n说明段落\n\n2. 计价方法") == (
+            '<ol><li>存货分类</li></ol><p>说明段落</p><ol start="2"><li>计价方法</li></ol>')
+
 
 # ── 第二轮复盘 R-05：未知标签只剥标签、保留文本；危险容器才丢内容 ──────────────
 

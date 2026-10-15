@@ -32,7 +32,7 @@ from app.services.report_note_sync_service import ReportNoteSyncService
 PROJECT_ID = uuid4()
 YEAR = 2025
 
-_FLAG = "app.services.report_note_sync_service._formula_enabled"
+_FLAG = "app.services.note_formula_gray_service.is_note_formula_enabled"
 _ENGINE = "app.services.note_validation_engine.NoteValidationEngine"
 
 
@@ -215,7 +215,7 @@ class TestSyncRealStats:
             _result_scalars([note]),
         ]
         svc = ReportNoteSyncService(db)
-        with patch(_FLAG, return_value=True), patch(_ENGINE) as MockEngine:
+        with patch(_FLAG, new_callable=AsyncMock, return_value=True), patch(_ENGINE) as MockEngine:
             MockEngine.return_value.validate_all = AsyncMock(return_value={})
             result = await svc.sync_report_to_notes(PROJECT_ID, YEAR)
 
@@ -235,7 +235,7 @@ class TestSyncRealStats:
             _result_scalars([note]),
         ]
         svc = ReportNoteSyncService(db)
-        with patch(_FLAG, return_value=True), patch(_ENGINE) as MockEngine:
+        with patch(_FLAG, new_callable=AsyncMock, return_value=True), patch(_ENGINE) as MockEngine:
             MockEngine.return_value.validate_all = AsyncMock(return_value={})
             result = await svc.sync_report_to_notes(PROJECT_ID, YEAR)
 
@@ -254,7 +254,7 @@ class TestSyncRealStats:
             _result_scalars([note]),
         ]
         svc = ReportNoteSyncService(db)
-        with patch(_FLAG, return_value=True), patch(_ENGINE) as MockEngine:
+        with patch(_FLAG, new_callable=AsyncMock, return_value=True), patch(_ENGINE) as MockEngine:
             MockEngine.return_value.validate_all = AsyncMock(return_value={})
             result = await svc.sync_report_to_notes(PROJECT_ID, YEAR)
 
@@ -275,7 +275,7 @@ class TestSyncRealStats:
             _result_scalars([note]),
         ]
         svc = ReportNoteSyncService(db)
-        with patch(_FLAG, return_value=True), patch(_ENGINE) as MockEngine:
+        with patch(_FLAG, new_callable=AsyncMock, return_value=True), patch(_ENGINE) as MockEngine:
             MockEngine.return_value.validate_all = AsyncMock(return_value={})
             await svc.sync_report_to_notes(PROJECT_ID, YEAR)
         assert note.table_data["rows"][2]["values"][1] == 777.0
@@ -289,7 +289,7 @@ class TestSyncRealStats:
             _result_scalars([note]),
         ]
         svc = ReportNoteSyncService(db)
-        with patch(_FLAG, return_value=True), patch(_ENGINE) as MockEngine:
+        with patch(_FLAG, new_callable=AsyncMock, return_value=True), patch(_ENGINE) as MockEngine:
             MockEngine.return_value.validate_all = AsyncMock(
                 side_effect=RuntimeError("validate down")
             )
@@ -305,7 +305,7 @@ class TestSyncRealStats:
         note = _note_with_report_binding(row_code="BS-015", row_idx=2, col=1)
         svc = ReportNoteSyncService(db)
 
-        with patch(_FLAG, return_value=True), patch(_ENGINE) as MockEngine:
+        with patch(_FLAG, new_callable=AsyncMock, return_value=True), patch(_ENGINE) as MockEngine:
             MockEngine.return_value.validate_all = AsyncMock(return_value={})
             db.execute.side_effect = [
                 _result_scalars([_report_row("BS-015", "500")]),
@@ -339,7 +339,7 @@ class TestSyncStubZeroRegression:
             _result_scalars([note]),
         ]
         svc = ReportNoteSyncService(db)
-        with patch(_FLAG, return_value=False):
+        with patch(_FLAG, new_callable=AsyncMock, return_value=False):
             result = await svc.sync_report_to_notes(PROJECT_ID, YEAR)
 
         # 关闭时不写报表金额（table_data 不变）
@@ -358,7 +358,7 @@ class TestSyncStubZeroRegression:
         db = _make_db_mock()
         db.execute.side_effect = [_result_scalars([])]
         svc = ReportNoteSyncService(db)
-        with patch(_FLAG, return_value=False):
+        with patch(_FLAG, new_callable=AsyncMock, return_value=False):
             result = await svc.sync_report_to_notes(PROJECT_ID, YEAR)
         assert result == {
             "synced_sections": 0,
@@ -368,7 +368,7 @@ class TestSyncStubZeroRegression:
 
     @pytest.mark.asyncio
     async def test_default_flag_is_off(self):
-        """默认（不 patch）开关关闭 → stub 行为（零回归）。"""
+        """显式关闭开关 → stub 行为（零回归）。"""
         db = _make_db_mock()
         note = _plain_note()
         original_td = deepcopy(note.table_data)
@@ -377,7 +377,8 @@ class TestSyncStubZeroRegression:
             _result_scalars([note]),
         ]
         svc = ReportNoteSyncService(db)
-        result = await svc.sync_report_to_notes(PROJECT_ID, YEAR)
+        with patch(_FLAG, new_callable=AsyncMock, return_value=False):
+            result = await svc.sync_report_to_notes(PROJECT_ID, YEAR)
         assert note.table_data == original_td
         assert "cells_updated" not in result
         assert result["validation_run"] is True

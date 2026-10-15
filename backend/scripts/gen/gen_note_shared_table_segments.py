@@ -43,7 +43,7 @@ OUT_PATH = _ROOT / "data" / "note_shared_table_segments.json"
 #:   - soe    `八、9  其他应收款`：应收股利 BS-016(G3) + 其他应收款项 BS-009(K1)
 #: listed `五、8 其他应收款` **有意只有 1 个段首码**（其他应收款 BS-009）——
 #: 应收利息/应收股利在 listed 侧 `report_config` 零命中，宁缺勿造，故它不计入共享表。
-EXPECTED_COUNTS = {"listed": 24, "soe": 8}
+EXPECTED_COUNTS = {"listed": 24, "soe": 9}
 
 
 def build_payload() -> dict:

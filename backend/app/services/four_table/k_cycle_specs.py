@@ -259,7 +259,7 @@ K_CYCLE_SPECS: dict[str, KCycleSpec] = {
         row_code_listed="BS-053",
         row_code_soe="BS-053",
         fallback_standard="",
-        has_account=False,
+        has_account=True,  # 2026-10-15: BS-058 有了公式 TB('2101')，宁缺勿造不再成立
         is_liability=True,
         gross_direction="credit",
         row_code_evidence="原值 listed=BS-058 / soe=BS-081；BS-081 实为**实收资本（或股本）**"

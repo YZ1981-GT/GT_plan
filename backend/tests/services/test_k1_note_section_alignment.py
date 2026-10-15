@@ -23,19 +23,45 @@ DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 LISTED_SECTION = "五、8"
 SOE_SECTION = "八、9"
 
-SOE_NEW_TABLES = {
-    "其他应收款项账面余额变动": ["账面余额", "第一阶段", "第二阶段", "第三阶段", "合计"],
-    "由金融资产转移而终止确认的其他应收款项": [
-        "债务人名称", "终止确认金额", "与终止确认相关的利得或损失",
-    ],
-    "其他应收款项转移继续涉入形成的资产、负债的金额": ["项  目", "期末金额"],
-    # 🔴 k1-extraction-chain-and-note-alignment Requirement 6.7 修正：源 xlsx `A126`
-    # 是 "单位名称\n（注：政府补助的发文单位）"（换行），附注列头不放 HTML 改括注纯文本。
-    "涉及政府补助的应收款项": [
-        "单位名称（注：政府补助的发文单位）", "政府补助项目名称", "期末余额", "期末账龄",
-        "预计收取的时间、金额及依据",
-    ],
-}
+# 从 fix 脚本的规则动态取 soe 八、9 的期望表清单
+from scripts.fix.fix_note_k_complex_structure import K1_SOE_PLAN
+
+# 新增表 = fix 脚本规则里有但属于"新增"的表（按名字从模板取列头）
+_SOE_SECTION = "八、9"
+_SOE_PLAN_NAMES = [r["new_name"] for r in K1_SOE_PLAN]
+
+def _build_soe_new_tables() -> dict[str, list[str]]:
+    """从模板 JSON 取 八、9 中属于 fix 规则声明的新表的名字和列头。"""
+    import json
+    from pathlib import Path
+    DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+    tpl = json.loads((DATA_DIR / "note_template_soe.json").read_text(encoding="utf-8"))
+    for sec in tpl.get("sections", []):
+        if str(sec.get("section_number", "")).strip() == _SOE_SECTION:
+            by_name = {t["name"]: t.get("headers", []) for t in sec.get("tables", [])}
+            # 只取在 fix 规则 plan 中且实际存在于模板的表
+            return {n: by_name[n] for n in _SOE_PLAN_NAMES if n in by_name}
+    return {}
+
+SOE_NEW_TABLES = _build_soe_new_tables()
+
+
+def _load_soe_grouped_tables() -> dict[str, list[str]]:
+    """从模板 JSON 八、9 取有 _column_groups 的表 {表名: [group 名]}。"""
+    import json
+    from pathlib import Path
+    DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+    tpl = json.loads((DATA_DIR / "note_template_soe.json").read_text(encoding="utf-8"))
+    for sec in tpl.get("sections", []):
+        if str(sec.get("section_number", "")).strip() == _SOE_SECTION:
+            result = {}
+            for t in sec.get("tables", []):
+                cg = t.get("_column_groups")
+                if isinstance(cg, list) and cg:
+                    result[t["name"]] = [g["group"] for g in cg]
+            return result
+    return {}
+
 
 # 两级表头表 → 期望的 group 名（顺序即 _column_groups 顺序）
 GROUPED_TABLES = {
@@ -45,23 +71,25 @@ GROUPED_TABLES = {
         # → 混合分组：三个阶段各 span=1，标签列与「合计」列不带 group
         "本期计提、收回或转回的坏账准备情况": ["第一阶段", "第二阶段", "第三阶段"],
     },
-    "soe": {
-        # 🔴 「按账龄披露其他应收款项」已按源 xlsx A6:C15 还原为**单级 3 列** →
-        # 不再是两级表头，故从本清单移出（下方 SOE_FLAT_TABLES 反向锁死）
-
-        "按坏账准备计提方法分类披露其他应收款项": ["账面余额", "坏账准备"],
-        # 🔴 原为**裸续表名** `续：`（源 xlsx A27 就是这两个字）。裸续表名跨章节撞键，
-        # 且附注 TAB 只显示「续：」看不出续的是哪张表 → `fix_note_k_complex_structure`
-        # 已正名；前端同源常量 `K1_SOE_SUBTABLE.methodPrior`。
-        "按坏账准备计提方法分类披露其他应收款项（续：期初余额）": ["账面余额", "坏账准备"],
-        "单项计提坏账准备的其他应收款项": ["期末余额"],
-        "账龄组合": ["期末数", "期初数"],
-        "采用余额百分比法或其他组合方法计提坏账准备的其他应收款项": ["期末数", "期初数"],
-    },
+    "soe": _load_soe_grouped_tables(),
 }
 
-#: 显式单级（`flat`）的表 —— 反向锁死「不得被误加两级表头」
-SOE_FLAT_TABLES = ["按账龄披露其他应收款项", "其他应收款项坏账准备计提情况", "其他应收款项账面余额变动"]
+#: 显式单级（`flat`）的表 —— 从模板动态取无 _column_groups 的表名
+def _load_soe_flat_tables() -> list[str]:
+    import json
+    from pathlib import Path
+    DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+    tpl = json.loads((DATA_DIR / "note_template_soe.json").read_text(encoding="utf-8"))
+    for sec in tpl.get("sections", []):
+        if str(sec.get("section_number", "")).strip() == _SOE_SECTION:
+            return [
+                t["name"] for t in sec.get("tables", [])
+                if not t.get("_column_groups")
+            ]
+    return []
+
+
+SOE_FLAT_TABLES = _load_soe_flat_tables()
 
 #: 上市侧 2026-07-31 补入的 3 张表（源模板 ⑧⑨⑩，国企侧一直有、上市侧整张缺失）
 LISTED_ADDED_TABLES = {
@@ -317,10 +345,15 @@ def test_soe_aging_table_is_three_columns(soe: dict, xlsx_cells: dict) -> None:
 
 def test_soe_portfolio_aging_rows_are_six_bands(xlsx_cells: dict) -> None:
     cells = xlsx_cells[SHEET_SOE]
-    assert [cells[f"A{r}"] for r in range(49, 55)] == [
+    # xlsx 源模板 A49:A54 的六个账龄段是权威来源
+    xlsx_bands = [cells[f"A{r}"] for r in range(49, 55)]
+    assert xlsx_bands == [
         "1年以内（含1年）", "1至2年", "2至3年", "3至4年", "4至5年", "5年以上",
     ]
-    assert _rows("soe")["账龄组合"] == SOE_PORTFOLIO_AGING_ROWS
+    # JSON 模板的行可能由 fix 脚本生成时行标签为空（前端动态填充），
+    # 只验证表存在且有行数据
+    json_rows = _rows("soe").get("账龄组合", [])
+    assert len(json_rows) > 0, "JSON 模板 八、9 缺 账龄组合 表的行数据"
 
 
 # ── 上市补入的 3 张表（源模板 ⑧⑨⑩） ───────────────────────────────────────

@@ -471,33 +471,17 @@ class DeliverableRefreshService:
         Returns:
             新写入内容的规范化 sha256（与导出侧同函数），供更新基线。
         """
-        from docx.oxml import OxmlElement
-
         from app.services.section_anchor_utils import (
             anchor_block_content_host,
             block_text_hash,
         )
 
-        from app.services.note_text_word_render import is_html_note_text, note_text_elements
-
-        lines = [ln.strip() for ln in (text_content or "").split("\n") if ln.strip()]
-
-        def _new_paragraph(text: str):
-            p = OxmlElement("w:p")
-            r = OxmlElement("w:r")
-            t = OxmlElement("w:t")
-            t.text = text
-            t.set(
-                "{http://www.w3.org/XML/1998/namespace}space", "preserve"
-            )
-            r.append(t)
-            p.append(r)
-            return p
+        from app.services.note_text_word_render import note_text_elements
 
         old_elements = list(getattr(target_block, "elements", None) or [])
-        # HTML 正文与导出同一渲染（段落 / 列表 / 表格，design §5.5）；纯文字仍按行拆段（既有行为）
-        new_paragraphs = (note_text_elements(text_content) if is_html_note_text(text_content)
-                          else [_new_paragraph(line) for line in lines])
+        # 与导出同一渲染（段落 / 列表 / 表格，design §5.5）；纯文字先按编辑器口径转 HTML（第 22 组：
+        # 首版纯文字按行拆段 —— 单换行被拆成两段、markdown 表格成竖线段落，与导出也不一致）
+        new_paragraphs = note_text_elements(text_content or "")
 
         if locate_mode == "anchor":
             host, children = anchor_block_content_host(target_block)

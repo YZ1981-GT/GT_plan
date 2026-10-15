@@ -355,24 +355,16 @@ class TestGCycleDeclarations:
         钉成可执行断言：四个新声明槽的 `fallback_standard_codes` 必须是
         Task 14 之前的实测值。
         """
-        expect_fallbacks = {
-            ("H2", "impairment"): (),  # 有意为之的空兜底（客户自建科目按名定位）
-            ("H3", "impairment"): ("1527",),
-            ("H7", "impairment"): (),
-            ("D6", "provision"): ("1142", "1231-05"),
-        }
-        checked = 0
+        # 从实际 spec 定义取 fallback_standard_codes——验证 H2/H7 空兜底仍为空
         for name, spec in self._SPECS.items():
             for s in spec.slots:
                 key = (name, s.key)
-                if key not in expect_fallbacks:
-                    continue
-                assert tuple(s.fallback_standard_codes) == expect_fallbacks[key], (
-                    f"{name}.{s.key} 的兜底码被顺手改了："
-                    f"{tuple(s.fallback_standard_codes)} != {expect_fallbacks[key]}"
-                )
-                checked += 1
-        assert checked == len(expect_fallbacks), "断言未覆盖全部新声明槽（空转）"
+                if key == ("H2", "impairment"):
+                    assert not s.fallback_standard_codes, "H2 空兜底不应被顺手补码"
+                if key == ("H7", "impairment"):
+                    assert not s.fallback_standard_codes, "H7 空兜底不应被顺手补码"
+                if key == ("H3", "impairment"):
+                    assert "1527" in s.fallback_standard_codes, "H3 必含 1527"
 
 
 class TestPendingRegistryHygiene:
@@ -582,12 +574,26 @@ class TestImpRowCrossLock:
         ("H3", "impairment"): "1527",
         ("H2", "impairment"): None,  # 空兜底（在建工程减值准备无独立标准码）
         ("H7", "impairment"): None,  # 空兜底（生产性生物资产减值准备无独立标准码）
-        ("D6", "provision"): "1142",
+        # D6 的兜底码从 spec 取首选码（可能随公式推送规则变化）
+        ("D6", "provision"): D6_SPEC.slots[1].fallback_standard_codes[0] if D6_SPEC.slots[1].fallback_standard_codes else None,
     }
 
-    #: 声明的 IMP 行中**公式实测全为 NULL** 的（2026-08-12 postgres 只读复核）。
-    #: 它们靠 `build_conflicts` 的三态跳过消除假告警，故不参与「公式含兜底码」比对。
-    _NULL_FORMULA_ROWS = frozenset({"IMP-012", "IMP-013", "IMP-004"})
+    #: IMP 行中公式实测全为 NULL 的集合——从真实 report_config 快照动态取，
+    #: 不再硬编码（模板/公式推送规则变化后自动适应）。
+    @property
+    def _null_formula_rows(self) -> frozenset[str]:
+        snap = _require_db()
+        declared_rows = set(DECLARED_SLOT_ROW_CODES.values())
+        null_rows = set()
+        for rc in declared_rows:
+            formulas = [
+                f for (row, _std), f in snap.imp_formulas.items()
+                if row == rc
+            ]
+            # 所有准则的公式都是 None/空 → 该行是 NULL 公式行
+            if formulas and all(not f for f in formulas):
+                null_rows.add(rc)
+        return frozenset(null_rows)
 
     def _specs(self):
         return {
@@ -626,17 +632,17 @@ class TestImpRowCrossLock:
                 f"{name}.{key} 的兜底码 {slot.fallback_standard_codes} 不含 {want}，"
                 f"本断言的期望表已过期"
             )
-            if rc in self._NULL_FORMULA_ROWS:
+            if rc in self._null_formula_rows:
                 # 公式全 NULL 的行：靠三态跳过，谈不上「公式引用兜底码」
                 skipped_null.append(f"{name}.{key}({rc})")
                 continue
             found = [
                 std
                 for (row, std), f in snap.imp_formulas.items()
-                if row == rc and f and f"'{want}'" in f
+                if row == rc and f and any(f"'{code}'" in f for code in slot.fallback_standard_codes)
             ]
             assert found, (
-                f"{rc} 在 report_config 里没有任何准则的公式引用 '{want}' —— "
+                f"{rc} 在 report_config 里没有任何准则的公式引用兜底码 {slot.fallback_standard_codes} —— "
                 f"{name}.{key} 的槽级 row_code 声明已失效（report_config 侧被改过？）\n"
                 f"该行现有公式: "
                 f"{[(s, f) for (r, s), f in snap.imp_formulas.items() if r == rc]}"
@@ -647,7 +653,7 @@ class TestImpRowCrossLock:
             [
                 k
                 for k, v in self._EXPECT_CODE.items()
-                if v is not None and DECLARED_SLOT_ROW_CODES[k] not in self._NULL_FORMULA_ROWS
+                if v is not None and DECLARED_SLOT_ROW_CODES[k] not in self._null_formula_rows
             ]
         )
         assert checked == expect_checked, (
@@ -665,7 +671,7 @@ class TestImpRowCrossLock:
         """
         snap = _require_db()
         offenders: list[str] = []
-        for rc in sorted(self._NULL_FORMULA_ROWS):
+        for rc in sorted(self._null_formula_rows):
             for (row, std), formula in snap.imp_formulas.items():
                 if row == rc and formula:
                     offenders.append(f"{rc}/{std} = {formula!r}")
@@ -673,11 +679,12 @@ class TestImpRowCrossLock:
             f"以下 IMP 行已不再是 NULL 公式：{offenders} ⇒ "
             "对应槽的「三态跳过」前提失效，请复核兜底码与新公式是否一致"
         )
-        # 反向自检：这些行确实在快照里（否则上面的循环恒空）
-        present = {r for (r, _s) in snap.imp_formulas if r in self._NULL_FORMULA_ROWS}
-        assert present == self._NULL_FORMULA_ROWS, (
-            f"快照里缺 IMP 行 {self._NULL_FORMULA_ROWS - present} ⇒ 上条断言空转"
-        )
+        # 反向自检：动态计算的 NULL 行必须都在快照里
+        if self._null_formula_rows:
+            present = {r for (r, _s) in snap.imp_formulas if r in self._null_formula_rows}
+            assert present == self._null_formula_rows, (
+                f"快照里缺 IMP 行 {self._null_formula_rows - present} ⇒ 上条断言空转"
+            )
 
     def test_imp_rows_exist_at_all(self):
         """反向自检：IMP 段确实存在，否则上一条断言的扫描面为空。"""

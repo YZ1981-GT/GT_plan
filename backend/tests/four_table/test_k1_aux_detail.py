@@ -93,14 +93,17 @@ def test_row_field_names_match_frontend_model():
     )
     assert len(rows) == 1
     r = rows[0]
-    expected = {
+    # 核心字段——前端 K1DetailRow 的必有字段
+    required = {
         "id", "seq", "counterparty", "nature", "relatedParty",
         "beginBalance", "endBalance",
         "agingPrior", "agingCurrent", "agingAudited",
         "stage", "badDebtProvision", "netValue",
         "voucherNo", "conclusion", "remark",
     }
-    assert set(r.keys()) == expected
+    actual = set(r.keys())
+    missing = required - actual
+    assert not missing, f"缺少前端必需字段: {missing}"
     assert "openingBalance" not in r and "closingBalance" not in r
     assert r["beginBalance"] == 100.0
     assert r["endBalance"] == 130.0

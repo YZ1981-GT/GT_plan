@@ -1056,3 +1056,80 @@ async def _get_render_config_impl(
         response["permissions"] = permissions
     return response
 
+
+
+# ---------------------------------------------------------------------------
+# Canonical sheet identity helpers（guidance Task 10 — 被测试契约引用）
+# ---------------------------------------------------------------------------
+
+
+# 嵌入编码提取：比 _SHEET_CODE_RE（末尾锚定、仅大写尾字母）更宽泛，
+# 允许编码在 sheet_name 中间、小写字母尾缀（如 D0-4b、F1-CONF）。
+_EMBEDDED_CODE_RE = re.compile(r"([A-Z]\d+(?:-\d+)*(?:-?[A-Za-z]+)?)")
+
+
+def annotate_sheet_identity(sheet: dict) -> dict:
+    """为单个 render-config sheet dict 添加 canonical identity 字段（in-place）.
+
+    - ``sheet_code``: 从 sheet_name 提取的标准编码，或保留显式值
+    - ``sheet_code_reason``: 来源（explicit_code / embedded_code / no_canonical_code / whole_workbook）
+    - ``whole_workbook``: 整册标记
+    """
+    whole = bool(sheet.get("whole_workbook", False))
+
+    # whole_workbook 标记冲突检测
+    if whole:
+        if sheet.get("sheet_code") and str(sheet["sheet_code"]).strip():
+            raise ValueError(
+                f"whole_workbook=True 不应携带 sheet_code=null 以外的值，"
+                f"实际 sheet_code={sheet['sheet_code']!r}"
+            )
+        sheet.setdefault("sheet_code", None)
+        sheet["sheet_code_reason"] = "whole_workbook"
+        sheet["whole_workbook"] = True
+        return sheet
+
+    sheet.setdefault("whole_workbook", False)
+
+    # 已有显式 sheet_code
+    existing_code = sheet.get("sheet_code")
+    if existing_code is not None and str(existing_code).strip():
+        # 检查 sheet_name 里的解析结果是否冲突
+        parsed = _EMBEDDED_CODE_RE.search(sheet.get("sheet_name") or "")
+        if parsed and parsed.group(1) != str(existing_code).strip():
+            raise ValueError(
+                f"sheet_name 中的解析结果 {parsed.group(1)!r} 与 "
+                f"显式 sheet_code {existing_code!r} 冲突（解析结果冲突）"
+            )
+        sheet["sheet_code_reason"] = "explicit_code"
+        return sheet
+
+    # 从 sheet_name 提取
+    name = sheet.get("sheet_name") or ""
+    m = _EMBEDDED_CODE_RE.search(name)
+    if m:
+        sheet["sheet_code"] = m.group(1)
+        sheet["sheet_code_reason"] = "embedded_code"
+    else:
+        sheet["sheet_code"] = None
+        # 保留调用方已设置的 reason（如 virtual_sheet_without_standard_code）
+        if not sheet.get("sheet_code_reason"):
+            sheet["sheet_code_reason"] = "no_canonical_code"
+
+    return sheet
+
+
+def annotate_sheet_identities(
+    sheets: list[dict],
+    parent_wp_code: str | None = None,
+) -> list[dict]:
+    """对 sheet 列表批量标注 canonical identity（in-place，返回原列表）."""
+    from app.services.guidance_render_identity import (
+        annotate_sheet_canonical_identity,
+    )
+
+    for sheet in sheets:
+        annotate_sheet_identity(sheet)
+        if parent_wp_code:
+            annotate_sheet_canonical_identity(sheet, parent_wp_code=parent_wp_code)
+    return sheets

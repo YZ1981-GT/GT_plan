@@ -355,6 +355,8 @@ _MULTI_ARG_TARGETS = [
     # J1/J2 仍走 RLA 解析器，用它们自己的 `_resolve_jN_accounts(ctx)` 拿真实入参
     ("_j1_employee_compensation", "_load_j1_leaves", "_resolve_j1_accounts"),
     ("_j2_defined_benefit_plan", "_load_j2_leaves", "_resolve_j2_accounts"),
+    # K1 的 _fetch_tb_balance_all 只有 keyword-only 的 strict 参数，不需额外位置参数
+    ("_k1_other_receivables", "_fetch_tb_balance_all", lambda mod: ()),
 ]
 
 

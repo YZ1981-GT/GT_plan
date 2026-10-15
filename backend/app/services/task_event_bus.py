@@ -62,7 +62,7 @@ class TaskEventBus:
             select(TaskEvent)
             .where(TaskEvent.project_id == project_id)
             .where(TaskEvent.event_type == event_type)
-            .where(TaskEvent.trace_id.like(f"%{idem_key[-12:]}%"))
+            .where(TaskEvent.idempotency_key == idem_key)
             .where(TaskEvent.status.in_([
                 TaskEventStatus.queued,
                 TaskEventStatus.succeeded,
@@ -82,6 +82,7 @@ class TaskEventBus:
             payload=payload,
             status=TaskEventStatus.queued,
             trace_id=trace_id,
+            idempotency_key=idem_key,
         )
         db.add(event)
         await db.flush()
@@ -104,6 +105,11 @@ class TaskEventBus:
 
         if event.status not in (TaskEventStatus.queued, TaskEventStatus.failed):
             logger.warning(f"[EVENT_BUS] skip non-consumable: event_id={event_id} status={event.status}")
+            return False
+
+        # outbox 隔离：procedure delivery outbox 由专用 dispatcher 消费（Req 9.6）
+        if is_procedure_delivery_outbox(event):
+            logger.info(f"[EVENT_BUS] skip outbox event: event_id={event_id}")
             return False
 
         handler = self._handlers.get(event.event_type)
@@ -176,6 +182,13 @@ class TaskEventBus:
         if not event:
             raise HTTPException(status_code=404, detail="TASK_EVENT_NOT_FOUND")
 
+        # outbox 隔离：procedure delivery outbox 不可重放（Req 9.6）
+        if is_procedure_delivery_outbox(event):
+            raise HTTPException(status_code=409, detail={
+                "error_code": "PROCEDURE_DELIVERY_OUTBOX_NOT_REPLAYABLE",
+                "message": "procedure delivery outbox 事件由专用 dispatcher 管理，不可通过通用 replay 重放",
+            })
+
         if event.status not in (TaskEventStatus.failed, TaskEventStatus.dead_letter):
             raise HTTPException(status_code=409, detail={
                 "error_code": "TASK_EVENT_NOT_REPLAYABLE",
@@ -221,6 +234,21 @@ class TaskEventBus:
         )
         result = await db.execute(stmt)
         return result.scalars().all()
+
+
+def is_procedure_delivery_outbox(event) -> bool:
+    """判断事件是否属于 procedure delivery outbox（不可重放）。
+
+    aggregate_type == AGGREGATE_PROCEDURE_ROW_TASK 的事件由专用 dispatcher 投递，
+    不应通过通用 replay 重放（Requirements 9.6 / Property 18）。
+    """
+    try:
+        from app.services.procedure_task_transition_service import (
+            AGGREGATE_PROCEDURE_ROW_TASK,
+        )
+        return getattr(event, "aggregate_type", None) == AGGREGATE_PROCEDURE_ROW_TASK
+    except ImportError:
+        return False
 
 
 # 全局单例

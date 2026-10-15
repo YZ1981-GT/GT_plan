@@ -4,8 +4,9 @@
 而 Word 导出曾把它当一段纯文字写入 ⇒ ``<p>…</p><p>&nbsp;</p>`` 原样出现在 Word 里（第 17 组真实写入验收）。
 
 四个出口共用本模块：程序化导出、模板占位填充、交付件增量刷新、旧版全套填充。
-**不含 HTML 标签的纯文字保持各出口原输出不变**（零回归），由调用方按 :func:`is_html_note_text` 分流
-或经 :func:`append_note_text` 的纯文字分支（与改造前「一段一 run」逐字一致）。
+**纯文字按编辑器口径渲染**（第 22 组）：先经 :func:`note_text_to_html`（markdown，与编辑器加载、批量写入同一转换）
+再按块输出 —— 空行分段、单换行是段内换行、markdown 表格成 Word 表格、编号列表续编号。首版纯文字「一段一 run」：
+生成链 / 大模型写入的纯文字（真库 3 个项目各 100+ 章）在 Word 里并成一段，表格以竖线原样出现，与编辑器所见不一致。
 
 映射（与编辑器所见一致，不引入新样式）：
 - ``p`` / ``div`` / ``blockquote`` → 段落；空段（含追加分隔 ``<p>&nbsp;</p>``、``<p><br></p>``）→ 无 run 的空段；
@@ -32,7 +33,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
 
-from app.services.note_html_sanitizer import is_html_note_text
+from app.services.note_html_sanitizer import is_html_note_text, note_text_to_html
 
 __all__ = [
     "MAX_SPAN",
@@ -89,6 +90,17 @@ class _Table:
 def _span(attrs: list[tuple[str, str | None]], name: str) -> int:
     raw = dict(attrs).get(name) or "1"
     return max(1, min(int(raw), MAX_SPAN)) if raw.isdigit() else 1
+
+
+def _list_start(attrs: list[tuple[str, str | None]]) -> int:
+    """``<ol start="N">`` 的起始编号（续编号列表）；缺省 / 非法按 1。"""
+    raw = (dict(attrs).get("start") or "1").strip()
+    return int(raw) if raw.isdigit() and 0 < int(raw) < 10000 else 1
+
+
+def _as_html(text: str) -> str:
+    """渲染入口：HTML 原样解析；纯文字先按编辑器口径转 HTML（markdown，第 22 组）。"""
+    return text if is_html_note_text(text) else note_text_to_html(text)
 
 
 class _BlockParser(HTMLParser):
@@ -176,7 +188,7 @@ class _BlockParser(HTMLParser):
             (self._para or self._open_para()).runs.append(_Run("\n", self._bold > 0, self._italic > 0))
         elif tag in ("ul", "ol"):
             self._flush()
-            self._lists.append([tag, 0])
+            self._lists.append([tag, _list_start(attrs) - 1 if tag == "ol" else 0])
         elif tag in _BLOCK_TAGS:
             prefix = self._list_prefix() if tag == "li" and self._lists else ""
             if self._para is not None and not self._para.has_text() and not prefix:
@@ -330,21 +342,10 @@ def _add_table(document: Any, spec: _Table, run_style: RunStyle | None) -> Any:
 
 def append_note_text(document: Any, text: str | None, *, run_style: RunStyle | None = None,
                      paragraph_style: ParagraphStyle | None = None) -> None:
-    """文末追加正文（程序化导出 / 旧版填充）。
-
-    纯文字：去首尾空白后一段一个 run（与改造前逐字一致；换行由 python-docx 转为段内换行）；全空白不追加。
-    """
+    """文末追加正文（程序化导出 / 旧版填充 / 交付件刷新）：HTML 与纯文字同一渲染（纯文字先转 HTML）；全空白不追加。"""
     if not text or not text.strip():
         return
-    if not is_html_note_text(text):
-        paragraph = document.add_paragraph()
-        run = paragraph.add_run(text.strip())
-        if run_style is not None:
-            run_style(run, False)
-        if paragraph_style is not None:
-            paragraph_style(paragraph)
-        return
-    for block in _parse(text):
+    for block in _parse(_as_html(text)):
         if isinstance(block, _Table):
             _add_table(document, block, run_style)
             continue
@@ -360,7 +361,7 @@ def fill_paragraph_with_note_text(paragraph: Paragraph, text: str, *, run_style:
     paragraph.clear()
     ppr = paragraph._p.pPr
     last = paragraph._p
-    for index, block in enumerate(_parse(text)):
+    for index, block in enumerate(_parse(_as_html(text or ""))):
         if isinstance(block, _Table):
             element = _add_table(paragraph.part.document, block, run_style)._tbl  # 先建在文末，再移到位
         elif index == 0:
@@ -393,7 +394,11 @@ def note_text_elements(text: str, *, run_style: RunStyle | None = None) -> list[
 
 
 def note_text_plain(text: str | None) -> str:
-    """比对用文字：纯文字原样返回；HTML 按交付 docx 提取口径投影（逐段、跳过表格与空段、段内换行不保留）。"""
+    """比对用文字：纯文字原样返回；HTML 按交付 docx 提取口径投影（逐段、跳过表格与空段、段内换行不保留）。
+
+    回填比对两侧共用：交付 docx 提取出的文字是纯文字，不能再按 markdown 解释一遍 ⇒ 纯文字原样。
+    要「库里纯文字正文渲染后的文字」用 ``note_text_plain(note_text_to_html(text))``。
+    """
     if not is_html_note_text(text):
         return text or ""
     lines: list[str] = []

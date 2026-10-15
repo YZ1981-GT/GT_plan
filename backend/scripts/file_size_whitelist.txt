@@ -1006,7 +1006,7 @@ backend/tests/workpaper_sync/test_sibling_table_ref_row_shift.py  1022
 #     `wp_render_config_sheet_classify.py`，把 auto-fill + word-template sign_status + 准则下发
 #     （Step 7~9.5，约 200 行）抽为 `wp_render_config_finalize.py`，属独立打磨任务。
 #     spec: workpaper-page-formula-toolbar-closure Task 17
-backend/app/routers/wp_render_config.py  1053
+backend/app/routers/wp_render_config.py  1135
 
 # ═══ G 循环 foundation spec 新增（2026-09-27）═══════════════════════════════
 #
@@ -1422,3 +1422,10 @@ backend/app/services/ai_chat/mcp_tools.py  1070
 #     2026-10-15 disclosure-note-doc-upload-and-batch-fill 第 18 组只在 _normalize_text 加 HTML 正文投影（+5 行，
 #     见该 spec design §5.5）。拆分方向：护栏分类 / 冲突检测与裁决 / 留痕 三块按职责抽模块。
 backend/app/services/deliverable_writeback_service.py  1194
+
+#   fix_note_k_complex_structure.py —— K1 附注结构修复脚本（历史大文件，非本次引入；
+#     规则增长随模板章节增加是正常的。拆分方向：按表族拆成子模块。
+backend/scripts/fix/fix_note_k_complex_structure.py  896
+#   test_variant_matrix.py —— variant matrix 基线回归守卫（Property 19 冻结 + T10 截断锁死 +
+#     parent_company_sections 冻结等多组断言合体）。非本次引入；膨胀因新增截断修复条目。
+backend/tests/test_variant_matrix.py  883

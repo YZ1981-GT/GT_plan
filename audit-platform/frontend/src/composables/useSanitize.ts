@@ -22,6 +22,8 @@ const ALLOWED_TAGS = [
 const ALLOWED_ATTR = [
   'colspan', 'rowspan', 'class', 'style',
   'href', 'target', 'rel',
+  // 续编号列表 <ol start="2">：后端消毒放行，展示时剥掉会让差异预览从 1 重新编号
+  'start',
 ]
 
 // ─── 核心函数 ────────────────────────────────────────────────────────────────────

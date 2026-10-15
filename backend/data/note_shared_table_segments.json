@@ -5,18 +5,18 @@
   "_note": "本清单只供守卫与前端消费；服务端运行期直接读模板，不读本清单（清单陈旧会让 fail closed 误判）。",
   "counts": {
     "listed": 24,
-    "soe": 8
+    "soe": 9
   },
   "tables": [
     {
       "variant": "listed",
-      "section_number": "三、重要会计政策、会",
+      "section_number": "三、重要会计政策、会计估计的变更",
       "section_title": "重要会计政策、会计估计的变更",
       "table_name": "本期会计政策变更的累积影响",
       "row_count": 8,
       "segments": [
         {
-          "row_code": "BS-052",
+          "row_code": "BS-083",
           "label": "资本公积",
           "start": 3,
           "end": 4,
@@ -33,7 +33,7 @@
     },
     {
       "variant": "listed",
-      "section_number": "三、现金流量表项目注",
+      "section_number": "三、现金流量表项目注释",
       "section_title": "现金流量表项目注释",
       "table_name": "筹资活动产生的各项负债的变动情况",
       "row_count": 5,
@@ -70,7 +70,7 @@
     },
     {
       "variant": "listed",
-      "section_number": "三、非同一控制下企业",
+      "section_number": "三、非同一控制下企业合并",
       "section_title": "非同一控制下企业合并",
       "table_name": "非同一控制下企业合并（表3）",
       "row_count": 18,
@@ -135,7 +135,7 @@
     },
     {
       "variant": "listed",
-      "section_number": "三、同一控制下企业合",
+      "section_number": "三、同一控制下企业合并",
       "section_title": "同一控制下企业合并",
       "table_name": "同一控制下企业合并（表3）",
       "row_count": 20,
@@ -207,7 +207,7 @@
     },
     {
       "variant": "listed",
-      "section_number": "三、在合营安排或联营",
+      "section_number": "三、在合营安排或联营企业中的权益",
       "section_title": "在合营安排或联营企业中的权益",
       "table_name": "在合营安排或联营企业中的权益（表3）",
       "row_count": 8,
@@ -230,7 +230,7 @@
     },
     {
       "variant": "listed",
-      "section_number": "三、在合营安排或联营",
+      "section_number": "三、在合营安排或联营企业中的权益",
       "section_title": "在合营安排或联营企业中的权益",
       "table_name": "在合营安排或联营企业中的权益（表5）",
       "row_count": 6,
@@ -253,7 +253,7 @@
     },
     {
       "variant": "listed",
-      "section_number": "三、风险管理目标和政",
+      "section_number": "三、风险管理目标和政策",
       "section_title": "风险管理目标和政策",
       "table_name": "风险管理目标和政策（表1）",
       "row_count": 6,
@@ -276,7 +276,7 @@
     },
     {
       "variant": "listed",
-      "section_number": "三、风险管理目标和政",
+      "section_number": "三、风险管理目标和政策",
       "section_title": "风险管理目标和政策",
       "table_name": "风险管理目标和政策（表6）",
       "row_count": 14,
@@ -341,7 +341,7 @@
     },
     {
       "variant": "listed",
-      "section_number": "三、风险管理目标和政",
+      "section_number": "三、风险管理目标和政策",
       "section_title": "风险管理目标和政策",
       "table_name": "风险管理目标和政策（表7）",
       "row_count": 14,
@@ -399,7 +399,7 @@
     },
     {
       "variant": "listed",
-      "section_number": "三、风险管理目标和政",
+      "section_number": "三、风险管理目标和政策",
       "section_title": "风险管理目标和政策",
       "table_name": "风险管理目标和政策（表8）",
       "row_count": 10,
@@ -954,7 +954,7 @@
       "row_count": 5,
       "segments": [
         {
-          "row_code": "BS-031",
+          "row_code": "BS-041",
           "label": "短期借款",
           "start": 0,
           "end": 1,
@@ -998,14 +998,14 @@
           "data_end": 2
         },
         {
-          "row_code": "BS-031",
+          "row_code": "BS-041",
           "label": "短期借款",
           "start": 2,
           "end": 4,
           "data_end": 4
         },
         {
-          "row_code": "BS-037",
+          "row_code": "BS-050",
           "label": "其他应付款",
           "start": 4,
           "end": 7,
@@ -1119,6 +1119,29 @@
           "start": 7,
           "end": 9,
           "data_end": 8
+        }
+      ]
+    },
+    {
+      "variant": "soe",
+      "section_number": "十二、其他应收款",
+      "section_title": "其他应收款",
+      "table_name": "其他应收款",
+      "row_count": 4,
+      "segments": [
+        {
+          "row_code": "BS-016",
+          "label": "应收股利",
+          "start": 1,
+          "end": 2,
+          "data_end": 2
+        },
+        {
+          "row_code": "BS-009",
+          "label": "其他应收款项",
+          "start": 2,
+          "end": 4,
+          "data_end": 3
         }
       ]
     }

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.pagination import PaginationParams
-from app.deps import get_current_user
+from app.deps import get_current_user, assert_project_permission
 from app.models.core import User
 from app.services.task_event_bus import task_event_bus
 
@@ -27,7 +27,19 @@ async def replay_event(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return await task_event_bus.replay(db, req.event_id, req.operator_id, req.reason_code)
+    from sqlalchemy import select
+    from app.models.phase15_models import TaskEvent
+
+    # 先查出事件的 project_id 用于权限校验
+    stmt = select(TaskEvent).where(TaskEvent.id == req.event_id)
+    result = await db.execute(stmt)
+    event = result.scalar_one_or_none()
+    if not event:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="TASK_EVENT_NOT_FOUND")
+    await assert_project_permission(db, current_user, event.project_id, "edit")
+
+    return await task_event_bus.replay(db, req.event_id, current_user.id, req.reason_code)
 
 
 @router.get("")
@@ -40,6 +52,8 @@ async def list_events(
 ):
     from sqlalchemy import select, func
     from app.models.phase15_models import TaskEvent
+
+    await assert_project_permission(db, current_user, project_id, "readonly")
 
     stmt = select(TaskEvent).where(TaskEvent.project_id == project_id)
     if status:

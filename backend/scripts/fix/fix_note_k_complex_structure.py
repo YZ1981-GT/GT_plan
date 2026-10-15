@@ -548,12 +548,8 @@ K1_SOE_PLAN: list[dict[str, Any]] = [
         list(_ECL_MOVEMENT_ROWS_SOE),
         KEEP,
     ),
-    rule(
-        "其他应收款项账面余额变动",
-        _movement_cols("账面余额"),
-        list(_BALANCE_MOVEMENT_ROWS_SOE),
-        KEEP,
-    ),
+    # "其他应收款项账面余额变动" 已从八、9 移到母公司章（十二、其他应收款），
+    # 不再在八、9 章节规则中要求。
     rule(
         "收回或转回的坏账准备",
         _cols([("label", "债务人名称", None),

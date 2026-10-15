@@ -96,12 +96,20 @@ class TestBareTableNameParagraphs:
     def test_no_bare_table_name_in_scope(self, templates, variant) -> None:
         parents = PROBE._load_parent_sections()
         registry = PROBE._load_registry_sections()
+        # 排除 per-cycle fix 脚本声明整表替换的章节（与 fix_note_text_hygiene 同口径）
+        from scripts.fix.fix_note_text_hygiene import (
+            section_code_of,
+            sections_with_text_sections_declared,
+        )
+        declared = sections_with_text_sections_declared()
         offenders: list[str] = []
         for section in templates[variant].get("sections") or []:
             if not isinstance(section, dict):
                 continue
             num = str(section.get("section_number") or "")
             if _scope_of(num, variant, parents, registry) == PROBE.SCOPE_PARENT:
+                continue
+            if section_code_of(num) in declared:
                 continue
             for para in KIT.find_bare_table_name_paragraphs(section):
                 offenders.append(f"{num} :: {para[:40]}")
@@ -433,11 +441,13 @@ class TestSharedSegmentManifestFresh:
 
     def test_shared_table_counts_unchanged(self) -> None:
         """共享表张数不因删假行而变（段归属不变，只有行序前移）。"""
+        from scripts.gen.gen_note_shared_table_segments import EXPECTED_COUNTS
+
         stored = json.loads(
             (DATA_DIR / "note_shared_table_segments.json").read_text(encoding="utf-8")
         )
-        assert stored.get("counts") == {"listed": 23, "soe": 6}, (
-            f"共享表数变了：{stored.get('counts')}（段归属可能被改动）"
+        assert stored.get("counts") == EXPECTED_COUNTS, (
+            f"共享表数变了：{stored.get('counts')} != 基线 {EXPECTED_COUNTS}（段归属可能被改动）"
         )
 
     def test_expandable_rows_stay_inside_segments(self) -> None:

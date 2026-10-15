@@ -9957,10 +9957,10 @@
           "description": "表(2) R14~R25 调整明细（N5-2 A9~A20 行标签 + B/D 金额）"
         },
         {
-          "cell_ref": "上期发生额",
+          "cell_ref": "上期发生额_上市",
           "formula": "PREV('N5','附注披露信息（上市公司）','本期发生额')",
           "formula_type": "PREV",
-          "description": "上期发生额"
+          "description": "上期发生额（上市版）"
         }
       ]
     },
@@ -9989,10 +9989,10 @@
           "description": "表(2) R15~R28 调整明细（N5-2 A9~A22 行标签 + B/D 金额）"
         },
         {
-          "cell_ref": "上期发生额",
+          "cell_ref": "上期发生额_国企",
           "formula": "PREV('N5','附注披露信息（国企','本期发生额')",
           "formula_type": "PREV",
-          "description": "上期发生额"
+          "description": "上期发生额（国企版）"
         }
       ]
     },

@@ -930,8 +930,8 @@
       "variants": {
         "soe_standalone": "八、81",
         "soe_consolidated": "八、81",
-        "listed_standalone": "三、现金流量表项目注",
-        "listed_consolidated": "三、现金流量表项目注"
+        "listed_standalone": "三、现金流量表项目注释",
+        "listed_consolidated": "三、现金流量表项目注释"
       },
       "legacy_aliases": {}
     },
@@ -1159,7 +1159,7 @@
       },
       "legacy_aliases": {},
       "parent_company_sections": {
-        "soe": "十二、现金流量表补充资"
+        "soe": "十二、现金流量表补充资料"
       }
     },
     {

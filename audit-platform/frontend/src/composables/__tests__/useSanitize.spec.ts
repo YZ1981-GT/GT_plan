@@ -153,3 +153,9 @@ describe('useSanitize — guidance 扩展向量', () => {
     expect(result).toContain('<span class="gt-guidance-wp-chip">D0-4b</span>')
   })
 })
+
+describe('useSanitize — 附注版面属性', () => {
+  it('续编号列表的 start 保留（后端消毒放行；剥掉会让差异预览从 1 重新编号，第 22 组）', () => {
+    expect(sanitizeHtml('<ol start="2"><li>计价方法</li></ol>')).toBe('<ol start="2"><li>计价方法</li></ol>')
+  })
+})

@@ -381,8 +381,8 @@ TRUE_NULL_KEYWORDS: dict[str, tuple[str, ...]] = {
 #: 自然语言措辞：理由随时会被改写，而 `section_number` 是可比对的结构化事实。
 TRUE_NULL_PARENT_ONLY_LANDING: dict[str, tuple[str, str, str]] = {
     "xian_jin_liu_liang_biao_bu_chong_zi_liao": (
-        "现金流量表补充资",
-        "十二、现金流量表补充资",
+        "现金流量表补充资料",
+        "十二、现金流量表补充资料",
         "chapter-12-mu-gong-si",
     ),
 }

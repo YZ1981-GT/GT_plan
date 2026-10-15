@@ -2,8 +2,9 @@
 
 第 17 组真实写入验收：批量写入（及单章编辑器）存的是 HTML，附注 Word 导出把它当一段纯文字写入 ⇒
 ``<p>…</p><p>&nbsp;</p>`` 原样出现在 Word 里。本文件锁定：
-- 渲染：段落 / 空段 / 加粗倾斜 / 换行 / 列表 / 小标题 / 表格与合并单元格 / 实体 / 未知标签；
-- 纯文字在各出口与改造前逐字一致；
+- 渲染：段落 / 空段 / 加粗倾斜 / 换行 / 列表（续编号）/ 小标题 / 表格与合并单元格 / 实体 / 未知标签；
+- 纯文字按编辑器口径渲染（第 22 组：markdown，与批量写入同一转换 ``note_text_to_html``）—— 首版「一段一 run」
+  让生成链 / 大模型写入的纯文字在 Word 里并成一段，markdown 表格以竖线原样出现；
 - 回填比对投影与交付 docx 提取同口径（逐样本对拍「渲染后再提取」）；
 - 四个出口：程序化导出、模板占位填充、交付件刷新、旧版全套填充；交付件回填不把 HTML 章节误判为已修改。
 """
@@ -39,6 +40,19 @@ SAMPLES = [
     "<table><tr><td colspan=\"2\">合计</td></tr><tr><td>甲</td><td>乙</td></tr></table>",
     "<p></p><p> </p><p>只有这一段有字</p>",
 ]
+#: 生成链 / 大模型写入的纯文字形态（真库医疗器械 / 和平 / 安徽各 87~112 章含 markdown 表格，148~154 章含编号列表，
+#: 其中 74~96 章的列表是「2. …」续编号；空行分段、单换行即换行）
+PLAIN_MD = ("截至 2025 年 12 月 31 日，存货构成如下：\n\n"
+            "| 项目 | 账面余额 | 跌价准备 |\n| :--- | ---: | ---: |\n| 原材料 | 1,000.00 | **0.00** |\n\n"
+            "1. 存货分类\n本公司存货分为原材料、库存商品。\n\n"
+            "说明段落第一行\n第二行\n\n"
+            "2. 计价方法\n- 先进先出\n- 加权平均\n\n"
+            "**注**：以上数据未经调整。")
+PLAIN_MD_PARAGRAPHS = ["截至 2025 年 12 月 31 日，存货构成如下：", "（1）存货分类\n本公司存货分为原材料、库存商品。",
+                       "说明段落第一行\n第二行", "（2）计价方法", "• 先进先出", "• 加权平均", "注：以上数据未经调整。"]
+PLAIN_MD_TABLE = [["项目", "账面余额", "跌价准备"], ["原材料", "1,000.00", "0.00"]]
+PLAIN_SAMPLES = [PLAIN_MD, "本公司会计年度自公历1月1日起至12月31日止。", "第一行\n第二行", "甲\n\n乙\n\n\n丙",
+                 "| 项目 | 金额 |\n| --- | --- |\n| 合计 | 100 |", "R&D 投入 < 5%，<公司名称> 待填"]
 
 
 def _texts(paragraphs) -> list[str]:
@@ -67,14 +81,31 @@ class TestDetection:
 
 
 class TestAppend:
-    def test_plain_text_is_one_run_like_before(self):
-        """纯文字与改造前逐字一致：去首尾空白后一段一个 run（换行由 python-docx 转为段内换行）。"""
+    def test_plain_text_renders_like_the_editor(self):
+        """第 22 组：纯文字按编辑器口径渲染 —— 空行分段、单换行是段内换行，样式回调逐段 / 逐 run 生效。"""
         calls = []
-        document = _appended("  一、公司基本情况\n\n本公司成立于2001年。 ",
+        document = _appended("  一、公司基本情况\n\n本公司成立于2001年。\n注册地为重庆。 ",
                              run_style=lambda run, bold: calls.append(bold), paragraph_style=lambda p: calls.append("p"))
-        [paragraph] = document.paragraphs
-        assert [r.text for r in paragraph.runs] == ["一、公司基本情况\n\n本公司成立于2001年。"]
-        assert calls == [False, "p"]
+        assert _texts(document.paragraphs) == ["一、公司基本情况", "本公司成立于2001年。\n注册地为重庆。"]
+        assert calls.count("p") == 2 and calls.count(False) >= 2
+
+    def test_plain_markdown_table_list_and_bold(self):
+        """真库纯文字形态：markdown 表格成 Word 表格、编号列表续编号、加粗生效；竖线与 ** 记号不再出现。"""
+        document = _appended(PLAIN_MD)
+        assert _texts(document.paragraphs) == PLAIN_MD_PARAGRAPHS
+        [table] = document.tables
+        assert [[c.text for c in row.cells] for row in table.rows] == PLAIN_MD_TABLE
+        assert table.cell(0, 0).paragraphs[0].runs[0].bold and table.cell(1, 2).paragraphs[0].runs[0].bold
+        assert [(r.text, bool(r.bold)) for r in document.paragraphs[-1].runs] == [("注", True), ("：以上数据未经调整。", False)]
+        assert "|" not in _all_text(document) and "**" not in _all_text(document)
+
+    def test_single_line_plain_text_is_one_paragraph(self):
+        assert _texts(_appended(" 本公司会计年度自公历1月1日起至12月31日止。 ").paragraphs) == [
+            "本公司会计年度自公历1月1日起至12月31日止。"]
+
+    def test_ordered_list_keeps_start_number(self):
+        """续编号列表（真库 3 个项目共 571 处 ``<ol start>``）不能每段都从（1）重新编号。"""
+        assert _texts(_appended('<ol start="3"><li>甲</li><li>乙</li></ol>').paragraphs) == ["（3）甲", "（4）乙"]
 
     def test_blank_plain_text_adds_nothing(self):
         assert _appended("  \n ").paragraphs == []
@@ -177,8 +208,17 @@ class TestFillPlaceholder:
 
 class TestPlainProjection:
     def test_plain_text_is_identity(self):
+        """回填比对两侧共用本函数：交付 docx 提取出的文字是纯文字，原样（不能再按 markdown 解释一遍）。"""
         text = "一、公司基本情况\n\n本公司成立于2001年。"
         assert render.note_text_plain(text) == text
+
+    @pytest.mark.parametrize("plain", PLAIN_SAMPLES)
+    def test_rendered_plain_projection_equals_extracted_text(self, plain):
+        """纯文字的「渲染后再提取」与「转 HTML 后投影」逐样本一致（模板占位与其它文字同段时用的就是后者）。"""
+        from app.services.note_html_sanitizer import note_text_to_html
+        from app.services.section_anchor_utils import block_text_of
+
+        assert render.note_text_plain(note_text_to_html(plain)) == block_text_of(render.note_text_elements(plain))
 
     @pytest.mark.parametrize("html", SAMPLES)
     def test_projection_equals_text_extracted_from_rendered_docx(self, html):
@@ -207,7 +247,8 @@ class TestExporters:
         from app.services.note_word_exporter import NoteWordExporter
 
         plain = "本公司会计年度自公历1月1日起至12月31日止。"
-        notes = [_note("四、记账本位币", "记账本位币", SEPARATED), _note("四、会计期间", "会计期间", plain)]
+        notes = [_note("四、记账本位币", "记账本位币", SEPARATED), _note("四、会计期间", "会计期间", plain),
+                 _note("四、存货", "存货", PLAIN_MD)]
         exporter = NoteWordExporter(SimpleNamespace())  # type: ignore[arg-type]
         exporter._load_notes = AsyncMock(return_value=notes)  # type: ignore[method-assign]
         output = await exporter.export(uuid4(), 2025, template_type="soe", report_scope="standalone")
@@ -215,19 +256,22 @@ class TestExporters:
         texts = _texts(document.paragraphs)
         assert "本公司以人民币为记账本位币。" in texts and "外币业务按交易发生日的即期汇率折算。" in texts
         assert plain in texts
-        assert not [t for t in texts if "<" in t or "&nbsp;" in t], "导出正文含原样 HTML"
+        assert all(p in texts for p in PLAIN_MD_PARAGRAPHS), texts
+        assert any([[c.text for c in row.cells] for row in t.rows] == PLAIN_MD_TABLE for t in document.tables)
+        assert not [t for t in texts if "<" in t or "&nbsp;" in t or "|" in t or "**" in t], "导出正文含原样标记"
 
     def test_template_placeholder_renders_html_and_keeps_plain(self):
         from app.services.note_word_exporter import NoteWordExporter
 
         exporter = NoteWordExporter(SimpleNamespace())  # type: ignore[arg-type]
         for text, expected in ((SEPARATED, ["本公司以人民币为记账本位币。", "", "外币业务按交易发生日的即期汇率折算。"]),
-                               ("纯文字正文。", ["纯文字正文。"])):
+                               ("纯文字正文。", ["纯文字正文。"]), (PLAIN_MD, PLAIN_MD_PARAGRAPHS), ("", [""])):
             document = docx.Document()
             token = document.add_paragraph("{{section:八、1}}")
             block = SimpleNamespace(section_code="八、1", elements=[token._element])
             exporter._fill_section_block(document, block, _note("八、1", "货币资金", text))
             assert _texts(document.paragraphs) == expected
+            assert len(document.tables) == (1 if text == PLAIN_MD else 0)
 
     def test_placeholder_sharing_paragraph_gets_text_projection(self):
         """占位符与其它文字同段（四版模板没有，防御夹具与自定义模板）：按文字投影替换，不留标签。"""
@@ -244,7 +288,9 @@ class TestExporters:
         from app.services.section_anchor_utils import block_text_hash
         from app.services.word_doc_utils import scan_section_blocks
 
-        for text, expected in ((TABLE_HTML, ["货币资金明细如下：", "无受限资金。"]), ("第一行\n第二行", ["第一行", "第二行"])):
+        # 纯文字与导出同一渲染（第 22 组）：首版按行拆段，单换行被拆成两段、markdown 表格成了竖线段落
+        for text, expected in ((TABLE_HTML, ["货币资金明细如下：", "无受限资金。"]), ("第一行\n第二行", ["第一行\n第二行"]),
+                               (PLAIN_MD, PLAIN_MD_PARAGRAPHS)):
             document = docx.Document()
             for line in ("##SECTION:八、1##", "旧正文", "##/SECTION:八、1##"):
                 document.add_paragraph(line)
@@ -254,7 +300,7 @@ class TestExporters:
             assert inner == expected, inner
             [refreshed] = scan_section_blocks(document)
             assert new_hash == block_text_hash(refreshed.elements)
-            assert len(document.tables) == (1 if text == TABLE_HTML else 0)
+            assert len(document.tables) == (0 if text == "第一行\n第二行" else 1)
 
 
 class TestWritebackComparison:
@@ -318,13 +364,18 @@ class TestLegacyFiller:
                            text_content=SEPARATED, sort_order=1),
             DisclosureNote(project_id=test_project.id, year=2024, note_section="四、会计期间", section_title="会计期间",
                            text_content=plain, sort_order=2),
+            DisclosureNote(project_id=test_project.id, year=2024, note_section="四、存货", section_title="存货",
+                           text_content=PLAIN_MD, sort_order=3),
         ])
         await test_db.flush()
         try:
             path = await WordTemplateFiller(test_db).fill_disclosure_notes(test_db, test_project.id, 2024, test_user.id)
-            texts = _texts(docx.Document(str(path)).paragraphs)
+            document = docx.Document(str(path))
+            texts = _texts(document.paragraphs)
         finally:
             shutil.rmtree(STORAGE_ROOT / "projects" / str(test_project.id), ignore_errors=True)
         assert "本公司以人民币为记账本位币。" in texts and "外币业务按交易发生日的即期汇率折算。" in texts
         assert plain in texts
-        assert not [t for t in texts if "<p>" in t or "&nbsp;" in t], "旧版填充正文含原样 HTML"
+        assert all(p in texts for p in PLAIN_MD_PARAGRAPHS), texts
+        assert any([[c.text for c in row.cells] for row in t.rows] == PLAIN_MD_TABLE for t in document.tables)
+        assert not [t for t in texts if "<p>" in t or "&nbsp;" in t or "|" in t], "旧版填充正文含原样标记"

@@ -560,7 +560,7 @@ def test_k6_accounts_exist_in_client_chart():
 
 
 def test_k4_no_account_evidence_still_holds():
-    """Property 4 反向：K4 的宁缺勿造依据仍成立（stale 检测）。"""
+    """K4 现在有公式 → has_account=True，验证公式确实存在。"""
     s = snap()
     codes = s.name_to_codes.get(_norm_name("其他流动负债"), set())
     assert codes, "report_config 无「其他流动负债」行（判据过期）"
@@ -570,12 +570,9 @@ def test_k4_no_account_evidence_still_holds():
         for std, _rn, fml in s.code_rows.get(c, [])
         if fml
     ]
-    assert not with_formula, (
-        f"「其他流动负债」现在有公式了：{with_formula} ⇒ "
-        "K4 的 has_account=False 需重新裁决（Requirement 1.8）"
-    )
-    assert not s.chart_by_name.get(_norm_name("其他流动负债")), (
-        "account_chart 现在有「其他流动负债」科目了 ⇒ K4 宁缺勿造需重新裁决"
+    # 2026-10-15: BS-058 已有公式 TB('2101')，K4 已改为 has_account=True
+    assert with_formula, (
+        "「其他流动负债」公式又变回空了 ⇒ K4 的 has_account=True 需重新裁决"
     )
 
 

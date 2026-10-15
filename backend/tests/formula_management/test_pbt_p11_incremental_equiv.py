@@ -41,6 +41,7 @@ import asyncio
 import uuid
 from decimal import Decimal
 
+import pytest
 import sqlalchemy as sa
 from hypothesis import given
 from hypothesis import strategies as st
@@ -214,12 +215,23 @@ async def _run_scenario(
 
             report_engine = ReportEngine(session)
 
+            # patch full_recalc：PBT 场景无 tb_balance 数据链，
+            # recalc 会清零 unadjusted 导致全量报表归零。
+            # 本测试验证报表引擎增量/全量等价性，不验证 recalc。
+            from unittest.mock import AsyncMock, patch
+            _recalc_patch = patch(
+                "app.services.trial_balance_service.TrialBalanceService.full_recalc",
+                new_callable=AsyncMock,
+            )
+            _recalc_patch.start()
+
             # ① 基线全量生成 S0
             await report_engine.generate_all_reports(project_id, _YEAR, applicable_standard=_TEST_STANDARD)
             await session.commit()
             baseline = await _snapshot_rows(session, project_id)
 
-            # ② 应用变更（改写 audited_amount）
+            # ② 应用变更（改写 audited_amount + unadjusted_amount 保持一致，
+            #    防止 generate_all_reports 的 full_recalc 把 audited 改回旧值）
             for code, new_amt in changes.items():
                 res = await session.execute(
                     sa.select(TrialBalance).where(
@@ -230,6 +242,7 @@ async def _run_scenario(
                 )
                 tb_row = res.scalar_one()
                 tb_row.audited_amount = new_amt
+                tb_row.unadjusted_amount = new_amt
             await session.flush()
 
             # ③ 增量重算（被测路径）
@@ -243,6 +256,10 @@ async def _run_scenario(
 
             # ④ 全量重算（参照模型）
             await report_engine.generate_all_reports(project_id, _YEAR, applicable_standard=_TEST_STANDARD)
+            await session.commit()
+            full = await _snapshot_rows(session, project_id)
+
+            _recalc_patch.stop()
             await session.commit()
             full = await _snapshot_rows(session, project_id)
 

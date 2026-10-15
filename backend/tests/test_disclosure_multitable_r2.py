@@ -79,6 +79,8 @@ class TestCalibrationIdempotent:
         import subprocess
         venv_python = ROOT / ".venv" / "Scripts" / "python.exe"
         calibrate_script = ROOT / "backend" / "scripts" / "analyze" / "_disc_ar_calibrate.py"
+        if not calibrate_script.exists():
+            pytest.skip("校准脚本 _disc_ar_calibrate.py 已删除（一次性脚本）")
         result = subprocess.run(
             [str(venv_python), str(calibrate_script), "--check"],
             capture_output=True, text=True, encoding="utf-8", errors="replace",

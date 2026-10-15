@@ -50,10 +50,10 @@ from app.services.note_section_catalog import (
     normalize_template_type,
 )
 from app.services.note_section_numbering import compute_section_numbers
+from app.services.note_html_sanitizer import note_text_to_html
 from app.services.note_text_word_render import (
     append_note_text,
     fill_paragraph_with_note_text,
-    is_html_note_text,
     note_text_plain,
 )
 from app.services.note_sub_table_projector import (
@@ -1163,12 +1163,13 @@ class NoteWordExporter:
         for para in paragraphs:
             ptext = para.text or ""
             if section_token in ptext:
-                if ptext.strip() == section_token and is_html_note_text(text_content):
-                    # HTML 正文：占位段原位按块渲染，其余块插在其后（design §5.5；四版模板占位均独占一段）
+                if ptext.strip() == section_token and text_content:
+                    # 占位段原位按块渲染，其余块插在其后（design §5.5；四版模板占位均独占一段）。
+                    # 纯文字同样按编辑器口径（markdown）渲染（第 22 组：首版纯文字原样一段，表格成竖线）
                     fill_paragraph_with_note_text(para, text_content, run_style=_body_run_style)
                     continue
-                # 纯文字原样；HTML 与其它文字同段时按文字投影替换，不留标签
-                new_text = ptext.replace(section_token, note_text_plain(text_content))
+                # 与其它文字同段：按渲染后的文字投影替换，不留标签 / markdown 记号
+                new_text = ptext.replace(section_token, note_text_plain(note_text_to_html(text_content)))
                 para.clear()
                 if new_text:
                     run = para.add_run(new_text)
@@ -1502,7 +1503,7 @@ class NoteWordExporter:
         - 空 header 列裁剪（headers 中的空字符串占位过滤掉）
         - 兼容老结构：无 _tables 时降级到单表渲染
         """
-        # Text content：HTML 正文按块渲染（段落 / 列表 / 表格），纯文字与改造前一致（一段一 run）—— design §5.5
+        # Text content：HTML 与纯文字同一渲染（段落 / 列表 / 表格；纯文字先按编辑器口径转 HTML）—— design §5.5
         append_note_text(doc, note.text_content, run_style=_body_run_style, paragraph_style=_set_paragraph_format)
 
         # 章节级 guidance（note-per-table-guidance Phase 4）：在所有表格前输出一次，

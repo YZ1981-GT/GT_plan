@@ -270,7 +270,7 @@ class TestSectionMatching:
             "十二、长期股权投资",
             "十二、营业收入与营业成本",
             "十二、投资收益",
-            "十二、现金流量表补充资",
+            "十二、现金流量表补充资料",
         ],
     )
     def test_parent_sections_recognized(self, code: str) -> None:
@@ -614,7 +614,7 @@ class TestLegacyPathAlsoSwitched:
                 "headers": ["项目", "期末余额", "期初余额"],
                 "rows": [{"label": "应收账款", "account_codes": ["1122"]}],
             },
-            section_number="十二、现金流量表补充资",
+            section_number="十二、现金流量表补充资料",
         )
         assert out is not None
         assert out["rows"][0]["values"][:2] == [77.0, 66.0], "legacy 路径应取母公司单体数"
@@ -632,7 +632,7 @@ class TestLegacyPathAlsoSwitched:
                 "headers": ["项目", "期末余额", "期初余额"],
                 "rows": [{"label": "应收账款", "account_codes": ["1122"]}],
             },
-            section_number="十二、现金流量表补充资",
+            section_number="十二、现金流量表补充资料",
         )
         assert out is not None
         assert out["rows"][0]["values"] == [None, None], "缺母公司单体时必须留 None 不填 0"

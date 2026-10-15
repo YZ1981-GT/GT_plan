@@ -125,6 +125,13 @@ class TestFormulaHealthDiagnostic:
     @pytest.mark.asyncio
     async def test_diagnose_no_db_reports_preset_active(self):
         """db=None：附注计数全 0，但 preset 规则可加载（Wave4 修后）→ 校验管线判活。"""
+        from pathlib import Path
+        preset_dir = Path(__file__).resolve().parent.parent / "app" / "services"
+        base_dir = preset_dir.parent.parent.parent
+        soe_preset = base_dir / "基础数据" / "附注模版" / "国企版校验公式预设.md"
+        if not soe_preset.exists():
+            pytest.skip("preset 文件不在本地（基础数据/附注模版/ 未部署）")
+
         eng = NoteValidationEngine(db=None)
         res = await eng.diagnose_formula_health(uuid4(), 2025)
 

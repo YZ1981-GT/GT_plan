@@ -130,8 +130,8 @@ INDEX_UNCOVERED_CODES: dict[tuple[str, str], str] = {
     ("ying_ye_wai_zhi_chu", "三、营业外支出（注："): (
         "listed 模板置于「三、」章（level=2 / 1 表），md 截断值；index 未打标。"
     ),
-    ("xian_jin_liu_liang_biao_xiang_mu_zhu_shi", "三、现金流量表项目注"): (
-        "listed 模板置于「三、」章（level=2 / 9 表），md 截断值；index 未打标。"
+    ("xian_jin_liu_liang_biao_xiang_mu_zhu_shi", "三、现金流量表项目注释"): (
+        "listed 模板置于「三、」章（level=2 / 9 表）；index 未打标。"
     ),
     ("zhong_zhi_jing_ying", "十四、终止经营"): (
         "listed 模板置于「十四、资产负债表日后事项」章（level=2 / 1 表）；"
@@ -426,7 +426,7 @@ _VARIANTS_BASELINE_JSON = """
     "suo_de_shui_fei_yong": ["八、78","八、78","三、所得税费用","三、所得税费用",{}],
     "gui_shu_yu_mu_gong_si_suo_you_zhe_de_qi_ta": ["八、79","八、79",null,null,{}],
     "mei_gu_shou_yi": ["八、80","八、80",null,null,{}],
-    "xian_jin_liu_liang_biao_xiang_mu_zhu_shi": ["八、81","八、81","三、现金流量表项目注","三、现金流量表项目注",{}],
+    "xian_jin_liu_liang_biao_xiang_mu_zhu_shi": ["八、81","八、81","三、现金流量表项目注释","三、现金流量表项目注释",{}],
     "fei_huo_bi_xing_zi_chan_jiao_huan": ["八、82","八、82",null,null,{}],
     "gu_fen_zhi_fu": ["八、83","八、83",null,null,{}],
     "zhai_wu_chong_zu": ["八、84","八、84","三、债务重组【不适用","三、债务重组【不适用",{}],
@@ -728,7 +728,7 @@ T10_EXPECTED_PARENT_SECTIONS: dict[str, dict[str, str]] = {
         "soe": "十二、营业收入与营业成本",
     },
     "tou_zi_shou_yi": {"listed": "十六、投资收益（注：以", "soe": "十二、投资收益"},
-    "xian_jin_liu_liang_biao_bu_chong_zi_liao": {"soe": "十二、现金流量表补充资"},
+    "xian_jin_liu_liang_biao_bu_chong_zi_liao": {"soe": "十二、现金流量表补充资料"},
 }
 
 # B. 母公司侧有落点、但该侧合并章 variants 为 null 的科目 → 逐条登记裁决理由
@@ -753,7 +753,7 @@ T10_PARENT_SIDE_WITHOUT_MERGED: dict[str, str] = {
 # C. md 重建截断的 section_number → 该子节完整 section_title
 T10_MD_TRUNCATED_NUMBERS: dict[tuple[str, str], str] = {
     ("listed", "十六、投资收益（注：以"): "投资收益",
-    ("soe", "十二、现金流量表补充资"): "现金流量表补充资料",
+    # soe 侧 "十二、现金流量表补充资料" 截断已修复（2026-10-15），不再截断
 }
 
 

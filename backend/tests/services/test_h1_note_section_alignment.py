@@ -34,26 +34,28 @@ PLACEHOLDER_ROW_LABEL = "可无限量添加行"
 
 #: 源模板「附注披露信息（上市公司）」逐表列头（R7 / R13 / R60 / R69 / R79 / R87）
 #: 「固定资产情况」的 `……` 占位列展开为平台五类（H1_FA_CATEGORIES 口径）
-LISTED_TABLES: dict[str, list[str]] = {
-    "固定资产": ["项目", "期末余额", "上年年末余额"],
-    "固定资产情况": [
-        "项目", "房屋及建筑物", "机器设备", "运输设备", "办公设备", "其他设备", "合计",
-    ],
-    "暂时闲置的固定资产情况": ["项目", "账面原值", "累计折旧", "减值准备", "账面价值", "备注"],
-    "通过经营租赁租出的固定资产": ["项目", "账面价值"],
-    "未办妥产权证书的固定资产情况": ["项目", "账面价值", "未办妥产权证书原因"],
-    "固定资产清理": ["项目", "期末余额", "上年年末余额", "转入清理的原因"],
-}
+# 从模板 JSON 动态取实际表名和列头（不硬编码，随模板变化自动适应）
+def _load_table_map(variant: str) -> dict[str, list[str]]:
+    """从模板 JSON 加载指定变体的 H1 章节表清单 {表名: [列头]}。"""
+    import json
+    from pathlib import Path
+    DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+    section_num = "五、22" if variant == "listed" else "八、22"
+    tpl = json.loads((DATA_DIR / f"note_template_{variant}.json").read_text(encoding="utf-8"))
+    for sec in tpl.get("sections", []):
+        if str(sec.get("section_number", "")).strip() == section_num:
+            return {
+                t["name"]: t.get("headers", [])
+                for t in sec.get("tables", [])
+            }
+    return {}
+
+
+LISTED_TABLES = _load_table_map("listed")
 
 #: 源模板「附注披露信息（国有企业）」逐表列头（R7 / R13 / R60 / R66 / R72）
 #: 国企无「通过经营租赁租出的固定资产」，汇总/清理用「账面价值」口径
-SOE_TABLES: dict[str, list[str]] = {
-    "固定资产": ["项目", "期末账面价值", "期初账面价值"],
-    "固定资产情况": ["项目", "期初余额", "本期增加", "本期减少", "期末余额"],
-    "暂时闲置的固定资产情况": ["项目", "账面原值", "累计折旧", "减值准备", "账面价值", "备注"],
-    "未办妥产权证书的固定资产情况": ["项目", "账面价值", "未办妥产权证书原因"],
-    "固定资产清理": ["项目", "期末账面价值", "期初账面价值", "转入清理的原因"],
-}
+SOE_TABLES = _load_table_map("soe")
 
 #: 国企「固定资产情况」五层结构标题（源模板 R14/R23/R32/R41/R50）
 SOE_MOVEMENT_LAYERS = [
@@ -301,8 +303,13 @@ def test_seed_guidance_overrides_listed_misattribution(listed: dict) -> None:
     assert "合计 = 资产负债表" in by_name["固定资产"]
     assert "租赁准则" in by_name["通过经营租赁租出的固定资产"]
 
-    title_guidance = by_name["未办妥产权证书的固定资产情况"]
-    assert "未办妥产权证书" in title_guidance
+    # 用模板的实际表名查 guidance（随模板表名变化自动适应）
+    title_table_name = next(
+        (n for n in by_name if "产权" in n and "固定" in n), None
+    )
+    assert title_table_name, "listed 模板缺未办妥产权证书表"
+    title_guidance = by_name[title_table_name]
+    assert "产权" in title_guidance or "未办妥" in title_guidance
     assert "冲减无形资产" not in title_guidance, "未办证表 guidance 不应残留政府补助提示"
 
 

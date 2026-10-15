@@ -93,8 +93,9 @@ class TestResolveFormulaStub:
     async def test_returns_none_for_report_source(self):
         binding = {"source": "report", "row_code": "BS-015"}
         ctx = {"report_data": {"BS-015": Decimal("100")}}
-        # 当前 stub 恒返 None，即便 ctx 里有 report_data
-        assert await resolve_formula(binding, ctx) is None
+        # DISCLOSURE_NOTE_FORMULA_ENABLED=True 后，report source 返回实际值
+        result = await resolve_formula(binding, ctx)
+        assert result == 100.0
 
     @pytest.mark.asyncio
     async def test_returns_none_for_aging_source(self):
@@ -140,7 +141,8 @@ class TestResolvePriorYearNoteStub:
 
 class TestSyncReportToNotesStub:
     @pytest.mark.asyncio
-    async def test_only_clears_is_stale_never_writes_report_amount(self):
+    @patch("app.services.note_formula_gray_service.is_note_formula_enabled", new_callable=AsyncMock, return_value=False)
+    async def test_only_clears_is_stale_never_writes_report_amount(self, _mock_flag):
         db = _make_db_mock()
         report_row = MagicMock()  # 只需非空即可
         note = _note_obj(table_data={"rows": [], "total": 0}, is_stale=True)
@@ -190,7 +192,8 @@ class TestSyncReportToNotesStub:
         }
 
     @pytest.mark.asyncio
-    async def test_no_stale_notes_still_counts_all_synced(self):
+    @patch("app.services.note_formula_gray_service.is_note_formula_enabled", new_callable=AsyncMock, return_value=False)
+    async def test_no_stale_notes_still_counts_all_synced(self, _mock_flag):
         db = _make_db_mock()
         note = _note_obj(is_stale=False)
         db.execute.side_effect = [
