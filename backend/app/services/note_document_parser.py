@@ -286,6 +286,22 @@ def parse_docx(data: bytes) -> ParseResult:
 # PDF 解析（Task 17~18）
 # ════════════════════════════════════════════════════════════════════════════
 
+def _body_font_size(spans: list[dict[str, Any]]) -> float:
+    """正文字号 = 按**字数**加权的字号中位数（并列取较小字号）。
+
+    首版按 span 个数取中位数：标题行占比高的短文档（一个标题 + 一段正文 = 2 个 span，取上中位）取到的是
+    标题字号，标题全判不出来、整篇进「（无标题）」（第 17 组真实写入验收「会计期间说明.pdf」）。正文字数远多于标题。
+    """
+    weighted = sorted((span["size"], len(span["text"])) for span in spans)
+    total = sum(chars for _, chars in weighted)
+    accumulated = 0
+    for size, chars in weighted:
+        accumulated += chars
+        if accumulated * 2 >= total:
+            return size
+    return 12.0
+
+
 def parse_pdf(data: bytes) -> ParseResult:
     """解析 PDF 附注文档。
 
@@ -309,8 +325,7 @@ def parse_pdf(data: bytes) -> ParseResult:
     if doc.page_count > MAX_PDF_PAGES:
         raise ParseError("FILE_TOO_LARGE", f"PDF 页数 {doc.page_count} 超过上限 {MAX_PDF_PAGES}")
 
-    # 收集全文 span 的字号中位数
-    all_sizes: list[float] = []
+    # 收集全文 span（字号 / 加粗），正文字号见 _body_font_size
     page_texts: list[list[dict[str, Any]]] = []
 
     for page in doc:
@@ -326,7 +341,6 @@ def parse_pdf(data: bytes) -> ParseResult:
                         size = span.get("size", 12.0)
                         flags = span.get("flags", 0)
                         is_bold = bool(flags & (1 << 4))  # TEXT_FONT_BOLD
-                        all_sizes.append(size)
                         page_spans.append({
                             "text": text,
                             "size": size,
@@ -344,7 +358,7 @@ def parse_pdf(data: bytes) -> ParseResult:
             file_hash=file_hash,
         )
 
-    median_size = sorted(all_sizes)[len(all_sizes) // 2] if all_sizes else 12.0
+    body_size = _body_font_size([span for spans in page_texts for span in spans])
 
     sections: list[ParsedSection] = []
     current: ParsedSection | None = None
@@ -356,12 +370,12 @@ def parse_pdf(data: bytes) -> ParseResult:
             size = span["size"]
             is_bold = span["bold"]
 
-            # 标题候选：字号明显大于中位数，或加粗 + 中文章节模式
+            # 标题候选：字号明显大于正文字号，或加粗 + 中文章节模式
             is_heading = False
             level = 2
-            if size > median_size * 1.3:
+            if size > body_size * 1.3:
                 is_heading = True
-                level = 1 if size > median_size * 1.6 else 2
+                level = 1 if size > body_size * 1.6 else 2
             elif is_bold and _CN_HEADING_RE.match(text) and len(text) < 60:
                 is_heading = True
                 level = 2

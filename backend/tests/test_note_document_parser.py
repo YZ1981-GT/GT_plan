@@ -127,6 +127,47 @@ class TestParsePdf:
         with pytest.raises(ParseError, match="UNSUPPORTED_FILE"):
             parse_pdf(b"not a pdf")
 
+    _PERIOD, _CURRENCY = "本公司会计期间为公历1月1日至12月31日。", "本公司以人民币为记账本位币。"
+    #: 正文字数（36）多于下面三个标题之和（23）；单行 11 号约 400pt，不超页宽（insert_text 不换行，超宽会被裁掉）
+    _PERIOD_LONG = "本公司会计期间为公历1月1日至12月31日，本报告期为2025年度全年。"
+
+    @pytest.mark.parametrize("lines,expected", [
+        # 一个标题 + 一段正文（第 17 组真实写入验收「会计期间说明.pdf」的形态）
+        ([("一、会计期间", 16), (_PERIOD, 11)], [("一、会计期间", _PERIOD)]),
+        # 每节一行正文：标题 span 与正文 span 一样多
+        ([("一、会计期间", 16), (_PERIOD, 11), ("二、记账本位币", 16), (_CURRENCY, 11)],
+         [("一、会计期间", _PERIOD), ("二、记账本位币", _CURRENCY)]),
+        # 标题 span 多于正文 span（后两节暂无正文）但正文字数更多：按个数取到标题字号，按字数才落在正文字号
+        ([("一、会计期间", 16), (_PERIOD_LONG, 11), ("二、记账本位币", 16), ("三、现金及现金等价物", 16)],
+         [("一、会计期间", _PERIOD_LONG), ("二、记账本位币", None), ("三、现金及现金等价物", None)]),
+    ])
+    def test_short_pdf_headings_detected(self, lines, expected):
+        """标题字号明显大于正文时要判出标题。首版按 span **个数**取中位数：标题行占比高的短文档（2 个 span 取上中位）
+        取到的是标题字号，标题全判不出来、整篇进「（无标题）」只能人工选。正文字数远多于标题 ⇒ 按字数加权才落在正文字号。"""
+        import pymupdf
+
+        doc = pymupdf.open()
+        page = doc.new_page()
+        for i, (text, size) in enumerate(lines):
+            page.insert_text((72, 72 + i * 30), text, fontsize=size, fontname="china-s")
+        data = doc.tobytes()
+        doc.close()
+        result = parse_pdf(data)
+        assert [(s.title, s.confidence) for s in result.sections] == [(t, "candidate") for t, _ in expected]
+        for section, (_, body) in zip(result.sections, expected):
+            assert (body in section.html) if body else ("<p>" not in section.html), section.html
+
+    @pytest.mark.parametrize("spans,expected", [
+        ([(16, "一、会计期间"), (11, "本公司会计期间为公历1月1日至12月31日。")], 11),
+        ([(11, "正文六个字"), (16, "标题六个字")], 11),  # 字数并列取较小字号（正文）
+        # 表格数字字数多于正文时取表格字号（首版按个数同样如此）；11 号正文 < 9×1.3，不会被误判为标题
+        ([(9, "1,234.56"), (9, "7,890.12"), (11, "本公司货币资金主要为银行存款。")], 9),
+    ])
+    def test_body_font_size_is_char_weighted_median(self, spans, expected):
+        from app.services.note_document_parser import _body_font_size
+
+        assert _body_font_size([{"size": s, "text": t} for s, t in spans]) == expected
+
 
 # ── 文本来源 ─────────────────────────────────────────────────────────────
 
