@@ -48,7 +48,9 @@ MAX_UPLOAD_BYTES = 50 * 1024 * 1024       # 50 MiB
 MAX_PDF_PAGES = 500
 MAX_DOCX_ZIP_ENTRIES = 2_000
 MAX_DOCX_DECOMPRESS_BYTES = 200 * 1024 * 1024  # 200 MiB
-MAX_SECTIONS = 500
+#: 2026-10-15 拍板 500 → 1000：四份权威模板 315 / 322 / 382 / 412 章，原上限对国企合并只剩 18% 余量。
+#: 解析结果原样回传预览 / 写入，请求体上限（``ParsedSource.sections`` / ``manual_mappings``）须同值。
+MAX_SECTIONS = 1000
 MAX_SECTION_HTML_BYTES = 512 * 1024       # 512 KiB
 
 

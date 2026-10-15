@@ -113,9 +113,9 @@ def test_platform_template_markers_never_reach_preview(tt: str, rs: str):
 def test_word_template_within_frozen_hard_caps(tt: str, rs: str):
     """NFR-5 / Task 56：四份权威模板是最贴近真实上传的样本，必须整份落在 design §11.2 硬上限内（不截断、不 413）。
 
-    2026-10-14 实测：章节 315~412（硬上限 500）；单章最大 27,168 B（512 KiB）；整份正文 33~58 万字节（5 MiB）；
-    文件 50~88 万字节、解压 680~1170 万字节、zip 条目 24~27。§11.2「解析返回章节数」业务阈值 300 是按项目章节数
-    （max 200）定的，Word 标题粒度更细，四份都超过它——业务阈值代码不强制，硬上限余量最小的是国企合并 412/500。
+    2026-10-14 实测：章节 315~412；单章最大 27,168 B（512 KiB）；整份正文 33~58 万字节（5 MiB）；
+    文件 50~88 万字节、解压 680~1170 万字节、zip 条目 24~27。章节硬上限原为 500，国企合并 412 只剩 18% 余量，
+    2026-10-15 拍板上调到 1000（请求体同步上调见 ``test_note_text_batch_caps.TestSectionCap``）。
     """
     path = WORD_TEMPLATE_DIR / f"{tt}_{rs}.docx"
     parsed, _ = _parsed(tt, rs)

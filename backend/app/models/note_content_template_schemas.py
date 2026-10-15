@@ -63,7 +63,8 @@ class ParsedSourceSection(StrictSchema):
 class ParsedSource(StrictSchema):
     source_kind: BatchSourceKind
     source_metadata: dict[str, Any] = Field(default_factory=dict)
-    sections: list[ParsedSourceSection] = Field(default_factory=list, max_length=500)
+    #: 与 ``note_document_parser.MAX_SECTIONS`` 同值（解析结果原样回传预览 / 写入；不跟着改就「解析成功、预览 422」）
+    sections: list[ParsedSourceSection] = Field(default_factory=list, max_length=1000)
     warnings: list[str] = Field(default_factory=list, max_length=100)
     needs_ocr: bool = False
 
@@ -191,7 +192,8 @@ class VariableReplacement(StrictSchema):
 class BatchPreviewRequest(StrictSchema):
     year: int = Field(ge=2000, le=2200)
     source: BatchSource
-    manual_mappings: list[ManualMapping] = Field(default_factory=list, max_length=500)
+    #: 每个来源章节至多一条，上限与解析章节上限同值
+    manual_mappings: list[ManualMapping] = Field(default_factory=list, max_length=1000)
     #: 用户撤销的变量替换（ID 按来源章节确定性生成）；apply 必须原样回传，否则重算的拟写入内容对不上
     revoked_replacement_ids: list[str] = Field(default_factory=list, max_length=500)
 
@@ -240,8 +242,9 @@ class BatchApplyRequest(StrictSchema):
     year: int = Field(ge=2000, le=2200)
     source: BatchSource
     preview_digest: str = Field(min_length=64, max_length=64)
+    #: 每个目标章节至多一条（见下方校验），上限按项目章节数（design §11.2「单次 batch apply 章节数」）
     selections: list[BatchApplySelection] = Field(min_length=1, max_length=500)
-    manual_mappings: list[ManualMapping] = Field(default_factory=list, max_length=500)
+    manual_mappings: list[ManualMapping] = Field(default_factory=list, max_length=1000)
     revoked_replacement_ids: list[str] = Field(default_factory=list, max_length=500)
 
     @model_validator(mode="after")
