@@ -107,7 +107,7 @@
                     <el-dropdown-item @click="onExportWithConfirm" title="导出 Word 格式附注文档">📤 导出 Word</el-dropdown-item>
                     <el-dropdown-item @click="showPrintPreview = true" title="打印预览当前附注">🖨️ 打印预览</el-dropdown-item>
                     <el-dropdown-item divided @click="showNoteImport = true" title="导入外部 Excel 附注数据（通用格式）">📥 Excel 导入</el-dropdown-item>
-                    <el-dropdown-item v-if="!isEqcrRole && effectiveCanEdit" @click="noteContentTools?.open('upload')" title="上传 Word/PDF 或选择知识库文档，批量填入叙述性章节">📄 上传附注文档</el-dropdown-item>
+                    <el-dropdown-item v-if="noteContentTools?.available" @click="noteContentTools?.open('upload')" title="上传 Word/PDF 或选择知识库文档，批量填入叙述性章节">📄 上传附注文档</el-dropdown-item>
                     <el-dropdown-item @click="showOfflineExport = true" title="导出系统格式离线编辑包（可再导回）">📦 离线导出</el-dropdown-item>
                     <el-dropdown-item @click="showOfflineImport = true" title="导入系统导出的离线编辑包">📥 离线导入</el-dropdown-item>
                   </el-dropdown-menu>
@@ -120,8 +120,8 @@
                   <el-dropdown-menu>
                     <el-dropdown-item @click="showParagraphVars = true" title="段落变量（自动替换占位符）">✏️ 段落变量</el-dropdown-item>
                     <el-dropdown-item @click="showGroupBaseline = true" title="集团基线管理：应用/保存/对比集团统一附注模板结构，确保子企业附注章节一致">🏢 集团基线</el-dropdown-item>
-                    <el-dropdown-item v-if="!isEqcrRole && effectiveCanEdit" divided @click="noteContentTools?.open('save')" title="将本项目全套附注正文保存为可复用的内容模板（不含表格数据）">💾 保存为内容模板</el-dropdown-item>
-                    <el-dropdown-item v-if="!isEqcrRole && effectiveCanEdit" @click="noteContentTools?.open('apply')" title="从内容模板按章节选择性引用正文到当前项目">📋 引用内容模板</el-dropdown-item>
+                    <el-dropdown-item v-if="noteContentTools?.available" divided @click="noteContentTools?.open('save')" title="将本项目全套附注正文保存为可复用的内容模板（不含表格数据）">💾 保存为内容模板</el-dropdown-item>
+                    <el-dropdown-item v-if="noteContentTools?.available" @click="noteContentTools?.open('apply')" title="从内容模板按章节选择性引用正文到当前项目">📋 引用内容模板</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>

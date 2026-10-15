@@ -10,12 +10,29 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
 
 const post = vi.fn()
-vi.mock('@/services/apiProxy', () => ({ api: { post: (...a: unknown[]) => post(...a), get: vi.fn(), delete: vi.fn() } }))
+const lockStatus = vi.fn()
+vi.mock('@/services/apiProxy', () => ({
+  api: {
+    post: (...a: unknown[]) => post(...a),
+    get: (url: string, ...rest: unknown[]) => (url.endsWith('/lock-status') ? lockStatus(url, ...rest) : Promise.resolve({})),
+    delete: vi.fn(),
+  },
+}))
 const confirm = vi.fn()
 const warning = vi.fn()
 vi.mock('element-plus', () => ({
   ElMessage: { success: vi.fn(), warning: (...a: unknown[]) => warning(...a), error: vi.fn() },
   ElMessageBox: { confirm: (...a: unknown[]) => confirm(...a) },
+}))
+const canOp = vi.fn((_op: string) => true)
+vi.mock('@/composables/usePermissionMatrix', () => ({ usePermissionMatrix: () => ({ can: (op: string) => canOp(op) }) }))
+const busHandlers: Record<string, Array<(p: unknown) => void>> = {}
+vi.mock('@/utils/eventBus', () => ({
+  eventBus: {
+    on: (name: string, fn: (p: unknown) => void) => { (busHandlers[name] ||= []).push(fn) },
+    off: (name: string, fn: (p: unknown) => void) => { busHandlers[name] = (busHandlers[name] || []).filter(h => h !== fn) },
+    emit: vi.fn(),
+  },
 }))
 vi.mock('@/components/disclosure/NoteDocUploadDialog.vue', () => ({
   // defineAsyncComponent 只在模块带 __esModule 时取 default；否则把模块对象本身当组件
@@ -62,6 +79,11 @@ beforeEach(() => {
   post.mockReset()
   confirm.mockReset()
   warning.mockReset()
+  lockStatus.mockReset()
+  lockStatus.mockResolvedValue({ code: 200, data: { locked: false } })
+  canOp.mockReset()
+  canOp.mockReturnValue(true)
+  Object.keys(busHandlers).forEach(k => delete busHandlers[k])
 })
 
 describe('DisclosureNoteContentTools', () => {
@@ -84,6 +106,38 @@ describe('DisclosureNoteContentTools', () => {
     for (const [msg] of warning.mock.calls) expect(String(msg)).toContain('请先保存')
     await wrapper.setProps({ hasUnsavedChanges: false })
     expect((wrapper.vm as any).open('upload')).toBe(true)
+  })
+
+  it('合并锁定（AC-6.3）：入口不可用并拒绝打开；后端 423 事件到达后实时生效', async () => {
+    const wrapper = mount(DisclosureNoteContentTools, { props: { projectId: 'p1', year: 2025, canWrite: true } })
+    await flushPromises()
+    // 必须关去重：同页锁定横幅几乎同时发同一个 GET，去重会取消先发的那一个，横幅就不显示（浏览器实测）
+    expect(lockStatus).toHaveBeenCalledWith('/api/consolidation/p1/lock-status', { _dedupe: false, _silent: true })
+    expect((wrapper.vm as any).available).toBe(true)
+    lockStatus.mockResolvedValueOnce({ code: 200, data: { locked: true } })
+    busHandlers['consol-lock:detected']?.forEach(h => h({ projectId: 'p1' }))
+    await flushPromises()
+    expect((wrapper.vm as any).available).toBe(false)
+    warning.mockClear()
+    expect((wrapper.vm as any).open('upload')).toBe(false)
+    expect(String(warning.mock.calls[0]?.[0])).toContain('合并锁定')
+  })
+
+  it('锁定态查询失败不误报锁定（与锁定横幅同口径，后端仍独立 423）', async () => {
+    lockStatus.mockRejectedValueOnce(new Error('network'))
+    const wrapper = mount(DisclosureNoteContentTools, { props: { projectId: 'p1', year: 2025, canWrite: true } })
+    await flushPromises()
+    expect((wrapper.vm as any).available).toBe(true)
+  })
+
+  it('无附注编辑操作权限（note:edit，与后端 require_operation 同码）：入口不可用', async () => {
+    canOp.mockImplementation((op: string) => op !== 'note:edit')
+    const wrapper = mount(DisclosureNoteContentTools, { props: { projectId: 'p1', year: 2025, canWrite: true } })
+    await flushPromises()
+    expect((wrapper.vm as any).available).toBe(false)
+    warning.mockClear()
+    expect((wrapper.vm as any).open('save')).toBe(false)
+    expect(String(warning.mock.calls[0]?.[0])).toContain('附注编辑权限')
   })
 
   it('写入成功上报全部被改写章节并关闭弹窗', async () => {

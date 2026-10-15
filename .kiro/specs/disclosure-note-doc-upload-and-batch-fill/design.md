@@ -348,6 +348,8 @@ apply 成功后：
 
 > 第 6 组：第 3 步改为无条件刷新当前章（缓存已全部作废，代价只是一次请求）。三个入口在当前章节有未保存修改时拒绝打开（`editDirty || autoSave.isDirty`，与离开页面拦截同口径）：写入成功会重载附注，未保存的编辑会被覆盖；内容模板也只按已保存内容生成。
 
+> 第 8 组（AC-6.3）：入口可用性 = `canWrite`（只读 / 归档 / EQCR / 编辑锁）+ `note:edit` 操作权限（与后端 `require_operation` 同码）+ 未合并锁定。编辑器的 `canEdit` 不含后两项，因此由包装组件自查锁定态（监听 423 事件实时刷新），编辑器菜单按其 `available` 隐藏。锁定查询必须关掉 http 的 GET 去重：同页锁定横幅几乎同时发同一个 GET，去重会取消先发的那一个。
+
 ### 9.5 错误提示（第 6 组）
 
 `useNoteTextBatch` / `useNoteContentTemplate` 的请求一律带 `_silent`，由 `notifyBatchError` 统一提示一次中文：后端 message 原样显示；pydantic 校验错误换成中文；无业务 detail 的 HTTP 错误显示「<操作>失败（HTTP 状态码）」；本地中文异常保留原文；被 http 去重取消的请求不提示。不静默时全局拦截器会先弹一次（422 显示英文、403 只有笼统提示、5xx 还自动重发两次），catch 再弹一次。静默后拦截器不再代发合并锁事件，改由本模块在 423「合并锁定」时发 `consol-lock:detected`。

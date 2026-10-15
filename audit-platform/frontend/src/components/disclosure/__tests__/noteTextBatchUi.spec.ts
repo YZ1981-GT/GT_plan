@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import NoteTextPreviewList from '@/components/disclosure/NoteTextPreviewList.vue'
 import NoteTextDiffDialog from '@/components/disclosure/NoteTextDiffDialog.vue'
+import { describeSource } from '@/components/disclosure/noteTextBatchLabels'
 import type { PreviewItem } from '@/composables/useNoteTextBatch'
 
 const stubs = {
@@ -79,6 +80,13 @@ describe('NoteTextPreviewList', () => {
     const box = wrapper.findAll('label.el-checkbox').find(l => l.text() === '仅看高风险')!
     await box.find('input').setValue(true)
     expect(wrapper.findAll('[data-source-id]').map(r => r.attributes('data-source-id'))).toEqual(['docx-s2'])
+  })
+
+  it('来源说明：知识库显示文档名称与版本（AC-5.1），上传显示文件名', () => {
+    expect(describeSource('knowledge', { documents: [{ document_name: '政策汇编.md', doc_version: 3 },
+      { document_name: '旧制度.md', doc_version: null }] })).toBe('知识库：政策汇编.md（v3）、旧制度.md')
+    expect(describeSource('upload', { file_name: '附注.docx' })).toBe('文件：附注.docx')
+    expect(describeSource('upload', null)).toBe('')
   })
 
   it('勾选摘要按选择统计（AC-9.6）', () => {

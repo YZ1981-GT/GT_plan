@@ -9,7 +9,7 @@
  * 右栏是服务端预览的三分组。写入只提交「来源 + 映射 + 撤销项 + 选择」，拟写入正文一律以服务端重算为准。
  */
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import { sanitizeHtml } from '@/composables/useSanitize'
 import { useKnowledge } from '@/composables/useKnowledge'
 import {
@@ -18,7 +18,7 @@ import {
 } from '@/composables/useNoteTextBatch'
 import NoteTextPreviewList from './NoteTextPreviewList.vue'
 import NoteTextDiffDialog from './NoteTextDiffDialog.vue'
-import { CONFIDENCE_LABELS } from './noteTextBatchLabels'
+import { CONFIDENCE_LABELS, describeSource } from './noteTextBatchLabels'
 
 const NoteRichTextEditor = defineAsyncComponent(() => import('@/components/NoteRichTextEditor.vue'))
 
@@ -39,12 +39,8 @@ const fileInput = ref<HTMLInputElement | null>(null)
 
 const items = computed(() => batch.previewResult.value?.items ?? [])
 const mappings = computed(() => Object.fromEntries(batch.manualMappings.value))
-const sourceLabel = computed(() => {
-  const meta = batch.parsedSource.value?.source_metadata as Record<string, any> | undefined
-  if (!meta) return ''
-  if (batch.sourceKind.value === 'upload') return `文件：${meta.file_name ?? ''}`
-  return `知识库：${(meta.documents ?? []).map((d: any) => d.document_name).join('、')}`
-})
+const sourceLabel = computed(() => describeSource(batch.sourceKind.value,
+  batch.parsedSource.value?.source_metadata as Parameters<typeof describeSource>[1]))
 
 // 重新预览后保留用户已做的选择（仍可用的），首轮只勾服务端推荐项
 watch(() => batch.previewResult.value, (preview) => {
@@ -85,8 +81,8 @@ async function onFileSelected(event: Event) {
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
-  if (!/\.(docx|pdf)$/i.test(file.name)) { ElMessage.error('仅支持 .docx 和 .pdf 文件'); return }
-  if (file.size > 50 * 1024 * 1024) { ElMessage.error('文件大小不能超过 50MB'); return }
+  if (!/\.(docx|pdf)$/i.test(file.name)) { batch.rejectFile(file.name, '仅支持 .docx 和 .pdf 文件'); return }
+  if (file.size > 50 * 1024 * 1024) { batch.rejectFile(file.name, '文件大小不能超过 50MB'); return }
   if (!(await confirmDiscard('切换来源会丢弃当前未写入的编辑，确定继续？'))) return
   targets.value = []
   await batch.parseUpload(file)

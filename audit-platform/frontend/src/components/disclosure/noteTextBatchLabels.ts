@@ -1,7 +1,7 @@
 /**
  * 附注正文批量写入：界面中文标签与分组判定（R-21：首版直接显示英文枚举与内部 source_id）。
  */
-import type { ApplyMode, PreviewItem } from '@/composables/useNoteTextBatch'
+import type { ApplyMode, PreviewItem, SourceKind } from '@/composables/useNoteTextBatch'
 
 /** 后端 note_quality_scanner.QualityFlag + build_preview 的 cross_standard */
 export const QUALITY_FLAG_LABELS: Record<string, string> = {
@@ -54,4 +54,16 @@ export function selectionSummary(items: PreviewItem[], selected: Set<string>, mo
     highRisk: chosen.filter(i => highRiskFlags(i).length > 0).length,
     unmapped: items.filter(i => !i.target_note_id).length,
   }
+}
+
+interface SourceDocMeta { document_name?: string | null; doc_version?: number | null }
+interface SourceMeta { file_name?: string | null; documents?: SourceDocMeta[] }
+
+/** 上传弹窗顶部的来源说明；知识库显示文档名称与版本（AC-5.1，首版只显示名称） */
+export function describeSource(kind: SourceKind, meta: SourceMeta | null | undefined): string {
+  if (!meta) return ''
+  if (kind === 'upload') return `文件：${meta.file_name ?? ''}`
+  const docs = (meta.documents ?? []).map(d => (d.doc_version != null
+    ? `${d.document_name ?? '未命名文档'}（v${d.doc_version}）` : (d.document_name ?? '未命名文档')))
+  return `知识库：${docs.join('、')}`
 }

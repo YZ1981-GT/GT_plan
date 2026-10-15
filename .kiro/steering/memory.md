@@ -204,7 +204,7 @@ inclusion: always
 - **改动后必 Playwright 实测**（运行时 bug 单测/getDiagnostics 抓不到，如包装体解包/CSS 样式孤儿）；改动前后 6 维 git 核查
 - **hypothesis PBT 调速**：max_examples 5（用户 2026-06 明确要求降速，禁默认 100）
 - **守卫的故障注入不得替换被测生产函数本身**：换成测试里的拷贝 ⇒ 守卫验证的是拷贝（知识库上传真库守卫删掉生产 `begin_nested` 仍全绿，变异才抓到）⇒ 故障注在被测函数的**下一层**，并断言「现行路径 is 生产函数」
-- **前端两坑**：①vitest `beforeEach(() => spy.mockReset())` 表达式体把 spy 当返回值交给 vitest，被当作 teardown 每例后再调一次 ⇒ 一律写花括号 ②在渲染上下文外调用 `h()`（`ElNotification` / `ElMessageBox` 的 message）生成的 VNode 不带本组件 scopeId、又挂在 body 下 ⇒ `<style scoped>` 永远匹配不到，必须内联样式
+- **前端三坑**：①vitest `beforeEach(() => spy.mockReset())` 表达式体把 spy 当返回值交给 vitest，被当作 teardown 每例后再调一次 ⇒ 一律写花括号 ②在渲染上下文外调用 `h()`（`ElNotification` / `ElMessageBox` 的 message）生成的 VNode 不带本组件 scopeId、又挂在 body 下 ⇒ `<style scoped>` 永远匹配不到，必须内联样式 ③同页两个组件几乎同时发同一个 GET（同 URL + params）时，`http` 的 GET 去重会**取消先发的那一个**，被取消方的 catch 会当成失败（2026-10-14 实测：新加的合并锁定查询让锁定横幅不再显示）⇒ 新增与既有组件同端点的 GET 须 `_dedupe: false` 或共享状态
 - 详细规约（UI 视觉 17 条 / ESLint AST / 测试 fixture / 启动 lifecycle / CI 卡点 / EventBus / 中间件 等）→ `#conventions` + `#dev-history`
 
 ## 关键引用指南

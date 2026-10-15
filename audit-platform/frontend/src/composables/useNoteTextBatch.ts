@@ -163,12 +163,17 @@ export function toBatchError(e: unknown, fallback: string): BatchError {
   }
 }
 
-/** 统一失败出口：中文提示一次；合并锁定 423 通知锁定横幅刷新（静默后全局拦截器不再代发） */
-export function notifyBatchError(e: unknown, fallback: string, projectId: string, notify = true): BatchError {
+/**
+ * 统一失败出口：中文提示一次；合并锁定 423 通知锁定横幅刷新（静默后全局拦截器不再代发）。
+ * ``subject`` 是出错对象（如文件名）：解析失败不清空当前来源，提示必须分清是哪个文件失败。
+ */
+export function notifyBatchError(e: unknown, fallback: string, projectId: string, notify = true,
+  subject = ''): BatchError {
   const err = toBatchError(e, fallback)
   if (err.code === 'CANCELED') return err
   const status = (e as { response?: { status?: number } } | null)?.response?.status
   if (status === 423 && err.message.includes('合并锁定')) eventBus.emit('consol-lock:detected', { projectId })
+  if (subject) err.message = `${subject}：${err.message}`
   if (notify) ElMessage.error(err.message)
   return err
 }
@@ -223,9 +228,15 @@ export function useNoteTextBatch(options: UseNoteTextBatchOptions) {
     mutationId.value = newUuid()
   }
 
-  function fail(e: unknown, fallback: string): BatchError {
-    lastError.value = notifyBatchError(e, fallback, projectId.value)
+  function fail(e: unknown, fallback: string, subject = ''): BatchError {
+    lastError.value = notifyBatchError(e, fallback, projectId.value, true, subject)
     return lastError.value
+  }
+
+  /** 前端拒收文件（扩展名 / 大小）：与服务端失败走同一个 lastError，不残留上一次的错误提示 */
+  function rejectFile(fileName: string, reason: string) {
+    lastError.value = { code: 'INVALID_FILE', message: `${fileName}：${reason}`, staleNotes: [] }
+    ElMessage.error(lastError.value.message)
   }
 
   function clearPreview() {
@@ -260,7 +271,7 @@ export function useNoteTextBatch(options: UseNoteTextBatchOptions) {
       if (result.warnings?.length) ElMessage.warning(result.warnings[0])
       return true
     } catch (e) {
-      fail(e, '文档解析失败')
+      fail(e, '文档解析失败', file.name)
       return false
     } finally {
       loading.value = false
@@ -416,7 +427,7 @@ export function useNoteTextBatch(options: UseNoteTextBatchOptions) {
     sourceKind, parsedSource, parsedSections, knowledgeDocIds, templateSource,
     manualMappings, revokedReplacementIds, previewResult, previewStale, applyResult, lastError,
     editedSourceIds, isDirty, canApply, mutationId,
-    parseUpload, parseKnowledge, useTemplateVersion, updateSectionHtml, setManualMapping, toggleRevocation,
+    parseUpload, parseKnowledge, rejectFile, useTemplateVersion, updateSectionHtml, setManualMapping, toggleRevocation,
     fetchPreview, applyBatch, fetchTargetSections, clearPreview, reset, resetMutationId,
   }
 }

@@ -180,11 +180,32 @@ describe('错误提示单一来源（#6c：全局拦截器静默，只由本 com
       { response: { status: 502, data: '' } }))
     expect(await b.parseUpload(new File(['x'], '附注.docx'))).toBe(false)
     expect(error).toHaveBeenCalledTimes(1)
-    expect(error).toHaveBeenCalledWith('文档解析失败（HTTP 502）')
+    expect(error).toHaveBeenCalledWith('附注.docx：文档解析失败（HTTP 502）')
   })
 
   it('本地校验异常（无 response）保留中文原因', () => {
     expect(toBatchError(new Error('尚未解析来源'), '预览失败').message).toBe('尚未解析来源')
+  })
+
+  it('解析失败的提示带文件名（失败不清空当前来源，必须分清是哪个文件失败）', async () => {
+    const b = make()
+    post.mockResolvedValueOnce(structuredClone(PARSED))
+    await b.parseUpload(new File(['x'], '附注.docx'))
+    post.mockRejectedValueOnce(axiosError(422, { error_code: 'NEEDS_OCR', message: 'PDF 不含可提取文本' }))
+    expect(await b.parseUpload(new File(['x'], '扫描件.pdf'))).toBe(false)
+    expect(b.lastError.value?.message).toBe('扫描件.pdf：PDF 不含可提取文本')
+    expect(error).toHaveBeenLastCalledWith('扫描件.pdf：PDF 不含可提取文本')
+    expect(b.parsedSections.value).toHaveLength(1)  // 上一个来源仍在
+  })
+
+  it('前端拒收文件（扩展名 / 大小）同样落到 lastError，不残留上一次的错误', async () => {
+    const b = make()
+    post.mockRejectedValueOnce(axiosError(422, { error_code: 'BAD_SIGNATURE', message: '文件签名校验失败' }))
+    await b.parseUpload(new File(['x'], '损坏.docx'))
+    b.rejectFile('超大.docx', '文件大小不能超过 50MB')
+    expect(b.lastError.value).toEqual({ code: 'INVALID_FILE', message: '超大.docx：文件大小不能超过 50MB', staleNotes: [] })
+    expect(error).toHaveBeenLastCalledWith('超大.docx：文件大小不能超过 50MB')
+    expect(post).toHaveBeenCalledTimes(1)
   })
 
   it('被 http 防重复提交取消的请求不弹「canceled」', async () => {
