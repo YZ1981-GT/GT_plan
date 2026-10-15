@@ -32,6 +32,8 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
 
+from app.services.note_html_sanitizer import is_html_note_text
+
 __all__ = [
     "MAX_SPAN",
     "append_note_text",
@@ -44,12 +46,7 @@ __all__ = [
 #: 单元格跨行 / 跨列上限：消毒器放行 1~999，原样建 999 列的表会拖垮导出
 MAX_SPAN = 50
 
-#: 判定「正文是 HTML」：出现附注编辑器 / 消毒器认识的标签之一。``<`` 后不允许空白（真实标签没有），
-#: 否则 ``a < b 且 c > d`` 会被当成 ``<b …>``；``<公司名称>`` 这类中文尖括号也不命中
-_HTML_TAG = re.compile(
-    r"</?(?:p|br|div|span|strong|em|b|i|u|ul|ol|li|h[1-6]|table|thead|tbody|tfoot|tr|td|th|blockquote|hr)\b[^>]*>",
-    re.IGNORECASE,
-)
+# 「正文是 HTML」的判据（is_html_note_text）在 note_html_sanitizer：批量写入与 Word 渲染共用一个口径
 _BLOCK_TAGS = frozenset({"p", "div", "blockquote", "li", "h1", "h2", "h3", "h4", "h5", "h6"})
 _HEADING_TAGS = frozenset({"h1", "h2", "h3", "h4", "h5", "h6"})
 _DROP_TAGS = frozenset({"script", "style", "iframe", "object", "embed", "template", "svg", "math", "head", "title"})
@@ -87,10 +84,6 @@ class _Cell:
 @dataclass
 class _Table:
     rows: list[list[_Cell]] = field(default_factory=list)
-
-
-def is_html_note_text(text: str | None) -> bool:
-    return bool(text) and bool(_HTML_TAG.search(text))
 
 
 def _span(attrs: list[tuple[str, str | None]], name: str) -> int:
@@ -241,6 +234,10 @@ class _BlockParser(HTMLParser):
                 return  # 块与块之间的排版空白
             self._open_para()
         para = self._para
+        if para.runs and para.runs[-1].text.endswith("\n"):
+            text = text.lstrip(" ")  # 换行后的行首空白浏览器不显示（如 <br />\n 后的排版换行）
+            if not text:
+                return
         bold, italic = self._bold > 0 or para.heading, self._italic > 0
         if para.runs and (para.runs[-1].bold, para.runs[-1].italic) == (bold, italic):
             para.runs[-1].text += text

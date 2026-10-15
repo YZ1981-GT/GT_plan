@@ -94,6 +94,10 @@ class TestAppend:
         assert _texts(paragraphs) == ["甲\n乙", "丙\n丁"]
         assert all(len(p._p.findall(f".//{W_BR}")) == 1 for p in paragraphs)
 
+    def test_whitespace_after_line_break_is_dropped(self):
+        """``<br />`` 后的排版换行 / 空格浏览器不显示，Word 里也不应变成行首空格（markdown 转出的 HTML 即此形态）。"""
+        assert _texts(_appended("<p>甲<br />\n  乙<br /> </p>").paragraphs) == ["甲\n乙"]
+
     def test_lists_get_markers_and_li_with_p_is_one_paragraph(self):
         """有序项用附注惯用的「（1）」：交付件回填把「1. 中文」开头的段当章节标题剔除，用「1. 」会让回填误判已修改。"""
         from app.services.deliverable_writeback_service import _is_title_paragraph

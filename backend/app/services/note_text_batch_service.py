@@ -29,7 +29,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.core import Project
 from app.models.report_models import DisclosureNote
 from app.services.note_document_parser import ParsedSection
-from app.services.note_html_sanitizer import append_note_html, has_visible_text, sanitize_note_html
+from app.services.note_html_sanitizer import (
+    append_note_html,
+    has_visible_text,
+    note_text_to_html,
+    sanitize_note_html,
+)
 from app.services.note_quality_scanner import QualityFlag, scan_section_quality
 from app.services.note_section_catalog import (
     DATA_DIR,
@@ -504,7 +509,8 @@ def build_preview(
             skipped_sources.append({"source_id": m.source_id, "match_kind": m.match_kind})
             continue
         meta = src.metadata or {}
-        sanitized = sanitize_note_html(src.html)
+        # 纯文字来源（模板快照里多数章节是生成链写入的纯文字）按编辑器口径转 HTML：否则写入后分段并成一段（第 19 组）
+        sanitized = note_text_to_html(src.html)
         plan = build_replacement_plan(sanitized, target_vars=target_vars or {},
                                       source_entity_name=source_entity_name, scope=src.source_id)
         proposed = sanitize_note_html(apply_replacement_plan(sanitized, plan, revoked_ids=revoked))
@@ -541,7 +547,8 @@ def build_preview(
             "match_kind": m.match_kind, "evidence": m.evidence, "confidence": m.confidence,
             "category": category, "default_selected": category == "recommended",
             "unavailable_reason": reason,
-            "before_html": before, "before_hash": before_hash,
+            # 差异预览「现有内容」按编辑器口径显示（纯文字原样塞进 v-html 会并成一段）；复核仍按原文 hash
+            "before_html": note_text_to_html(before), "before_hash": before_hash,
             "proposed_html": proposed, "proposed_hash": sha256_text(proposed),
             "append_html": append_html, "append_hash": sha256_text(append_html) if append_html is not None else None,
             "expected_updated_at": str(tgt["updated_at"]) if tgt and tgt.get("updated_at") else None,

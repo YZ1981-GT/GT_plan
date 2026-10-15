@@ -50,6 +50,7 @@ opentelemetry-exporter-otlp>=1.20,<2
 sqlfluff
 prometheus_client==0.25.0
 markitdown[all]==0.1.6  # 多格式文档→Markdown（知识库 RAG 输入，本地纯 Python 无远端）
+markdown-it-py==4.2.0  # 附注纯文字正文按编辑器口径（GFM 表格 + 换行）转 HTML（note_html_sanitizer.note_text_to_html）
 pyzipper==0.3.6  # AES-256 encrypted ZIP for password-protected bulk export
 pypdf==6.13.0  # 知识库 PDF 抽取最后兜底（knowledge_folders._extract_text_with_ocr）
 # 🔴 此前只是 mineru 的传递依赖（mineru 要求 pypdf>=5.6.0），代码却 import 未声明的 PyPDF2，

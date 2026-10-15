@@ -15,7 +15,9 @@ spec: disclosure-note-doc-upload-and-batch-fill Phase 2 Task 11（第二轮复�
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from html import escape, unescape
+from html.entities import html5 as _HTML5_ENTITIES
 from html.parser import HTMLParser
 
 __all__ = [
@@ -24,9 +26,42 @@ __all__ = [
     "APPEND_SEPARATOR",
     "append_note_html",
     "has_visible_text",
+    "is_html_note_text",
+    "note_text_to_html",
     "sanitize_note_html",
     "split_top_level_blocks",
 ]
+
+#: 判定「正文是 HTML」：出现附注编辑器 / 消毒器认识的标签之一。``<`` 后不允许空白（真实标签没有），
+#: 否则 ``a < b 且 c > d`` 会被当成 ``<b …>``；``<公司名称>`` 这类中文尖括号也不命中。
+#: Word 渲染（note_text_word_render）与批量写入共用这一个判据。
+_HTML_TAG = re.compile(
+    r"</?(?:p|br|div|span|strong|em|b|i|u|ul|ol|li|h[1-6]|table|thead|tbody|tfoot|tr|td|th|blockquote|hr)\b[^>]*>",
+    re.IGNORECASE,
+)
+
+#: ``&`` 后可能构成字符引用的部分（数字引用 / 实体名，分号可有可无）
+_AMP_REF = re.compile(r"&(#[0-9]+;?|#[xX][0-9a-fA-F]+;?|[A-Za-z][A-Za-z0-9]*;?)?")
+
+
+def is_html_note_text(text: str | None) -> bool:
+    return bool(text) and bool(_HTML_TAG.search(text))
+
+
+def _escape_bare_ampersands(html: str) -> str:
+    """不构成字符引用的 ``&`` 是文字（``R&D``、``P&L``、``AT&T``）⇒ ``&amp;``。
+
+    🔴 首版交给 HTMLParser：它把「&D）」当实体名 ``D`` 回调，消毒器原样补分号 ⇒ ``R&D`` → ``R&D;``（可见乱码；
+    第 19 组发现，真库有「DD&A」「P&L」）。口径与浏览器一致：数字引用、已知实体（含无分号的旧式实体如
+    ``&nbsp``）保留，其余 ``&`` 一律是文字。
+    """
+    def fix(match: re.Match[str]) -> str:
+        ref = match.group(1)
+        if ref and (ref.startswith("#") or ref in _HTML5_ENTITIES):
+            return match.group(0)
+        return "&amp;" + (ref or "")
+
+    return _AMP_REF.sub(fix, html)
 
 ALLOWED_TAGS: frozenset[str] = frozenset({
     "p", "br", "strong", "em",
@@ -175,7 +210,7 @@ class _Sanitizer(HTMLParser):
 
 def _run(html: str) -> _Sanitizer:
     parser = _Sanitizer()
-    parser.feed(html or "")
+    parser.feed(_escape_bare_ampersands(html or ""))
     parser.close()
     return parser
 
@@ -199,18 +234,45 @@ def has_visible_text(html: str | None) -> bool:
     return bool(unescape(re.sub(r"<[^>]+>", "", html or "")).strip())
 
 
+@lru_cache(maxsize=1)
+def _markdown():
+    from markdown_it import MarkdownIt
+
+    # 与编辑器 renderNoteTextToHtml 的 marked(gfm, breaks) 同口径：GFM 表格 / 删除线，单换行即 <br>；
+    # 纯文字里的尖括号一律按文字（html=False）
+    return MarkdownIt("commonmark", {"breaks": True, "html": False}).enable(["table", "strikethrough"])
+
+
+def note_text_to_html(text: str | None) -> str:
+    """附注正文统一为消毒后的 HTML（编辑器口径）。幂等。
+
+    ``text_content`` 多数是纯文字（生成链写入，含换行、markdown 表格 / 列表），编辑器加载时按 markdown 渲染
+    （``DisclosureEditor.renderNoteTextToHtml``）。批量写入（第 19 组）首版把纯文字直接当 HTML：追加时存成
+    「纯文字 + <p>…</p>」混合值，原有分段在差异预览与 Word 里都并成一段；模板纯文字来源同理。
+    已是 HTML（:func:`is_html_note_text`）只消毒。
+    """
+    if not text or not text.strip():
+        return ""
+    if is_html_note_text(text):
+        return sanitize_note_html(text)
+    rendered = _markdown().render(text)
+    # markdown-it 在块后、<br /> 后补换行：文字里的 > 已转义，故「>\n」「\n<」只会出现在标签边上，去掉不改内容
+    return sanitize_note_html(rendered.replace(">\n", ">").replace("\n<", "<"))
+
+
 def append_note_html(existing: str, new: str) -> str:
     """把 ``new`` 追加到 ``existing``（design §7.2 第 6 步 / AC-9.3 / AC-10.5）。
 
-    - 两侧都先 canonical 消毒，结果即最终写入值（与 preview 逐字一致）；
+    - 两侧都先按编辑器口径统一为消毒后的 HTML（:func:`note_text_to_html`：纯文字的分段 / 表格 / 列表保留），
+      结果即最终写入值（与 preview 逐字一致）；
     - 按顶层段落去重：``new`` 中已在 ``existing`` 出现的块不重复追加；
     - 只用规范空段 :data:`APPEND_SEPARATOR` 连接，不写来源/审计文字；
-    - ``new`` 无可见内容时原样返回 ``existing``（消毒后）。
+    - ``new`` 无可见内容时原样返回 ``existing``（统一后）。
     """
-    base = sanitize_note_html(existing or "")
+    base = note_text_to_html(existing or "")
     seen = set(split_top_level_blocks(base))
     kept: list[str] = []
-    for block in split_top_level_blocks(new or ""):
+    for block in split_top_level_blocks(note_text_to_html(new or "")):
         if block in seen or not has_visible_text(block):
             continue
         seen.add(block)
