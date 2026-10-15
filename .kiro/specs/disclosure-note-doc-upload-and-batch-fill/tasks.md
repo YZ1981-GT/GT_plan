@@ -590,3 +590,13 @@ R-14 → R-05/R-11/R-10（Phase 2 纯函数）→ R-07/R-08/R-16（Phase 4）→
   - 发现（跨 spec，只登记）：
     - 平台「生成附注」在没有上年附注时逐章同步调用大模型，上述耗时同样会出现在真实项目上。
     - 生成日志里 `build table_data failed for 十一、本公司的其他关联方情况: name '_with_column_meta' is not defined`：第 12 组登记的未定义函数在真库生成时确实触发，该章表格丢失。
+
+- ✅ **第 17 组（一）· Task 54 真实写入验收抓到：空正文章行进了上传可填范围（AC-2.3「纯父节点 = container」两处缺陷）**
+  - 现象：测试项目甲上传 Word 预览，「公司基本情况」「财务报表编制基础」都报「存在 2 个同名目标章节，需人工选择」。新生成附注的章行（「一 公司基本情况」「二 财务报表编制基础」等）正文为空、只承载子节，却和同名子节「一、1」「二、1」一起成了目标。
+  - 根因一：`table_data` 是未设 `none_as_null` 的 JSONB，生成链写 None 存成 JSON null；章节读取按 `IS NOT NULL` 判「有表格」，真库恒真（纯文字章节 475 行全是 JSON null、0 行 SQL NULL）⇒ container 永不成立。既有端点测试的夹具不写这一列（SQL NULL）⇒ 假绿。现按「非空 JSON 对象」判，与 Word 导出「非对象或空对象不出表」同口径：SQL 侧 PostgreSQL 用 `jsonb_typeof`、SQLite 用 `json_type`，Python 侧 `has_table_payload`，两侧在真 PostgreSQL 上逐值对拍。只取类型判定，不把表格内容读回 Python。
+  - 根因二：分类器先按 Word 标题返回 narrative，叙述章标题的纯父节点（「二 财务报表编制基础」「四 重要会计政策、会计估计」等）走不到容器判定，与 design §4.1「仅承载子节的顶层“重要会计政策” → container」不符；只修根因一时「一 公司基本情况」（标题不在 Word 索引里）变对，「二」仍错。现只有 Word 判为科目注释章的标题提前返回；叙述章标题照旧不套「国企历史编号 五、N」，但适用容器规则。
+  - 同口径：内容模板快照（scope=all）的章节类型改用同一容器判据，同一章节在模板里与目标侧类型一致。
+  - 影响（只读对比新旧判据，全部 8 个有附注的项目）：两个测试项目各 11 个章行 narrative → container；6 个真实项目 0 变化——和平药房、重药安徽的章行有大模型生成的正文，仍是 narrative（与子节同名时照旧需人工选，属数据如此）；其余 4 个未回填树字段，没有父子关系。
+  - 测试：新增 `test_note_text_batch_targets.py` 4 例（夹具按真库形态写 JSON null 并先断言存储形态；叙述范围不含空章行、全部范围标 container；只有表格的父节点仍是 narrative、空对象仍是 container；上传预览唯一命中子节；模板快照与章节读取逐章同类型）；`test_note_text_batch_targets_pg.py` 5 例真 PostgreSQL 守卫（形态对照：JSON null 行 `IS NOT NULL` 为真；10 种取值 SQL 与 Python 逐值一致；章节读取真跑；反向对照：换回首版判据，章行变回 narrative）；`test_note_section_kind.py` 补叙述章标题纯父节点三个变体、叙述章标题不套国企历史编号、`has_table_payload` 9 种取值。
+  - 证据：HEAD 版本复现红（15 failed + 5 errors）；7 个变异全部打红且失败形态符合预期（判据退回 `IS NOT NULL` / 叙述标题提前返回 / 不排除空对象 / Python 侧只判非 None / 快照不传容器判据 / PostgreSQL 走 SQLite 分支 / 叙述标题也套国企历史编号）；本 spec 后端 24 个文件 + 1 个节点 415 passed；ruff 通过。
+  - 触类旁通：全仓按 `table_data` 判「非空」的 SQL 共 5 处，只有本处是缺陷。其余 4 处：附注生成的上年缓存读回后再按对象过滤；数据校验另有表格形状条件；报表行附注引用对 JSON null 行只登记章节标题（第 3 级「本项目实际存在的章节」需要它），表格逻辑按对象跳过；高级查询的附注取数 LIMIT 会被 JSON null 行占用，但唯一调用方传「不截断」（硬上限 5000 行，单项目附注不超过 200 行），当前无可见影响，只登记。

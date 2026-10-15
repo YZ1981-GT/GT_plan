@@ -12,10 +12,15 @@ spec: disclosure-note-doc-upload-and-batch-fill Task 9（第二轮复盘 R-16 �
 
 判定顺序：
 1. 章号（经 ``normalize_section_code``）属「项目注释 / 项目附注」章 ⇒ account_explanation；
-2. 标题在 Word 索引中**只属一类** ⇒ 该类（纠正 JSON 放错章的节）；同名跨类（如「存货」）不据此判定；
+2. 标题在 Word 索引中**只属一类**（纠正 JSON 放错章的节）：只属科目注释章 ⇒ account_explanation；
+   只属叙述章 ⇒ 不再套第 3 条；同名跨类（如「存货」）不据此判定；
 3. 国企历史编号 ``五、<数字>`` ⇒ account_explanation；
-4. ``has_children and not has_body`` ⇒ container；
+4. ``has_children and not has_body`` ⇒ container —— 叙述类标题**同样适用**（design §4.1「仅承载子节的顶层
+   “重要会计政策” → container」；第 17 组真实写入验收：「二 财务报表编制基础」空章行曾因标题属叙述章判成 narrative，
+   与同名子节「二、1」成了两个目标）；命中第 1~3 条的科目注释节永不为 container（先返回）；
 5. 其余 ⇒ narrative。
+
+「正文载荷」= 可见文字（``has_visible_text``）或表格（:func:`has_table_payload`）。
 
 Word 索引由 ``scripts/gen/gen_note_section_kind_index.py`` 生成到 :data:`KIND_INDEX_PATH`
 （请求期不解析 docx）；守卫 ``test_note_section_kind`` 校验其与 Word 同步。
@@ -52,6 +57,7 @@ __all__ = [
     "canonical_title",
     "chapter_title_for_code",
     "classify_note_section",
+    "has_table_payload",
     "is_account_chapter_title",
     "normalize_title",
 ]
@@ -197,13 +203,23 @@ def classify_note_section(
     if any(canonical.startswith(p) for p in _account_chapter_prefixes(tt)):
         return "account_explanation"
     by_title = _title_kind(section_title, tt, report_scope)
-    if by_title is not None:
+    if by_title == "account_explanation":
         return by_title
-    if tt == "soe" and _SOE_LEGACY_ACCOUNT.match(code):
+    if by_title is None and tt == "soe" and _SOE_LEGACY_ACCOUNT.match(code):
         return "account_explanation"
     if has_children and not has_body:
         return "container"
     return "narrative"
+
+
+def has_table_payload(table_data: Any) -> bool:
+    """``table_data`` 是否承载表格：非空 JSON 对象（与 Word 导出「非 dict 或空 dict 不出表」同口径）。
+
+    🔴 不能用「非 None / IS NOT NULL」：``table_data`` 是未设 ``none_as_null`` 的 JSONB，ORM 写 ``None`` 存成
+    JSON ``null``（不是 SQL NULL）。真库纯文字章节 475 行全是 JSON null、0 行 SQL NULL（2026-10-15）。
+    SQL 侧同口径表达式见 ``note_text_batch_service._table_payload_expr``，两者由守卫逐值对拍。
+    """
+    return isinstance(table_data, dict) and bool(table_data)
 
 
 # ── 匹配辅助：章归属与 Word↔系统标题别名 ───────────────────────────────────────

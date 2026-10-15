@@ -37,13 +37,14 @@ from app.services.note_content_template_service import (
     resolve_canonical_group_root,
     visible_template_clause,
 )
+from app.services.note_html_sanitizer import has_visible_text
 from app.services.note_quality_scanner import compute_quality_summary, scan_section_quality
 from app.services.note_section_catalog import (
     normalize_report_scope,
     normalize_template_type,
     section_allowed_for_project,
 )
-from app.services.note_section_kind import classify_note_section
+from app.services.note_section_kind import classify_note_section, has_table_payload
 
 logger = logging.getLogger(__name__)
 
@@ -88,14 +89,18 @@ async def generate_snapshot(db: AsyncSession, project_id: UUID, year: int) -> di
 
     sections: list[dict[str, Any]] = []
     qualities = []
+    parents = {n.parent_section_id for n in notes if n.parent_section_id}
     for note in notes:
         # 与章节读取同一判据：口径不适用（如单体项目里的合并专属章）不进模板，免得把旁路长出的章节扩散出去
         if not section_allowed_for_project(note.note_section, proj.template_type, proj.report_scope):
             continue
         text = note.text_content or ""
-        # R-16：account_name 真库全部非空，不可作类型判据；统一走 Word 权威分类器
+        # R-16：account_name 真库全部非空，不可作类型判据；统一走 Word 权威分类器。
+        # 容器判据与章节读取（load_target_sections）同口径：同一章节在模板里与目标侧类型一致
         section_kind = classify_note_section(
             note.note_section, proj.template_type, proj.report_scope, section_title=note.section_title,
+            has_children=bool(note.section_id) and note.section_id in parents,
+            has_body=has_visible_text(text) or has_table_payload(note.table_data),
         )
         status = _enum_value(note.status)
         quality = scan_section_quality(text_content=text, status=status, is_stale=note.is_stale,

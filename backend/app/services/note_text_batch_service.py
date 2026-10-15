@@ -85,6 +85,17 @@ class SourceContext:
 # ════════════════════════════════════════════════════════════════════════════
 
 
+def _table_payload_expr(dialect_name: str) -> sa.ColumnElement[bool]:
+    """SQL 侧「承载表格」= ``table_data`` 是非空 JSON 对象；与 :func:`has_table_payload` 同口径（守卫逐值对拍）。
+
+    🔴 首版写 ``table_data IS NOT NULL``：JSON ``null`` 也算「有表」⇒ 真库每行 has_body 恒真、container 永不成立；
+    SQLite 夹具从不写该列（SQL NULL）⇒ 假绿（第 17 组真实写入验收发现）。只取类型判定，不把表格内容拉回 Python。
+    """
+    column = DisclosureNote.table_data
+    type_of = sa.func.jsonb_typeof(column) if dialect_name == "postgresql" else sa.func.json_type(column)
+    return sa.and_(type_of == "object", sa.cast(column, sa.Text) != "{}")
+
+
 async def load_target_sections(
     db: AsyncSession,
     project_id: UUID,
@@ -108,7 +119,7 @@ async def load_target_sections(
             DisclosureNote.section_title, DisclosureNote.level, DisclosureNote.parent_section_id,
             DisclosureNote.sort_index, DisclosureNote.content_type, DisclosureNote.status,
             DisclosureNote.is_stale, DisclosureNote.updated_at, DisclosureNote.text_content,
-            DisclosureNote.table_data.is_not(None).label("has_table"),
+            _table_payload_expr(db.get_bind().dialect.name).label("has_table"),
         )
         .where(
             DisclosureNote.project_id == project_id,

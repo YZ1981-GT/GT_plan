@@ -149,6 +149,8 @@
 
 > 第 12 组修订：`sort_index` 是 V019「同层级内序号」，不是全文顺序（真库 6 个项目里 4 个全为 0）。目标查询与模板快照一律按 `sort_order` 打头排序，`sort_index` 与编号只作并列次序。
 > 生成链透传模板的 section_id / level / parent_section_id / sort_index（旧行只补空不覆盖）；旧数据用 `backend/scripts/migrate/backfill_note_tree_fields.py` 回填（默认 dry-run，真实回填待拍板）。section_id 只在同一模板内稳定，跨模板匹配仍按 4.2。
+>
+> 第 17 组修订（真实写入验收）：容器判据中的「正文载荷」= 可见文字或表格，表格 = `table_data` 为非空 JSON 对象（JSON null 不算，与 Word 导出同口径）；标题在 Word 里属叙述章不豁免容器规则，只有 Word 判为科目注释章的标题先返回 account_explanation。模板快照与目标读取用同一判据。
 
 ### 4.2 匹配优先级
 

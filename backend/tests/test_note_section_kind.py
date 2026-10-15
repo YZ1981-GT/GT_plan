@@ -103,6 +103,48 @@ class TestDesignBaseline:
 
     def test_account_section_never_becomes_container(self):
         assert classify_note_section("八、1", "soe", has_children=True, has_body=False) == "account_explanation"
+        assert classify_note_section("三、所得税费用", "listed", section_title="所得税费用",
+                                     has_children=True, has_body=False) == "account_explanation"
+
+    @pytest.mark.parametrize("tt,rs,code,title", [
+        ("soe", "standalone", "二", "财务报表编制基础"),
+        ("soe", "consolidated", "四", "重要会计政策、会计估计"),
+        ("listed", "standalone", "三", "重要会计政策及会计估计"),
+    ])
+    def test_narrative_titled_pure_parent_is_container(self, tt: str, rs: str, code: str, title: str):
+        """design §4.1「仅承载子节的顶层“重要会计政策” → container」：标题在 Word 里属叙述章不豁免容器规则。
+
+        新生成附注的「二 财务报表编制基础」是空章行 + 同名子节「二、1」；首版按 Word 标题先返回 narrative，
+        章行进了上传可填范围 ⇒ 同名两个目标、只能人工选（第 17 组真实写入验收发现）。"""
+        from app.services.note_section_kind import _title_kind
+
+        assert _title_kind(title, tt, rs) == "narrative", "样本须是 Word 判为叙述章的标题，否则测不到该分支"
+        assert classify_note_section(code, tt, rs, section_title=title,
+                                     has_children=True, has_body=False) == "container"
+        assert classify_note_section(code, tt, rs, section_title=title,
+                                     has_children=True, has_body=True) == "narrative"
+        assert classify_note_section(code, tt, rs, section_title=title) == "narrative"
+
+    def test_narrative_title_still_skips_soe_legacy_rule(self):
+        """顺序不变：Word 判为叙述章的标题不再套「国企历史编号 五、N」；标题不在 Word 时才套。"""
+        from app.services.note_section_kind import _title_kind
+
+        assert _title_kind("财务报表编制基础", "soe", "standalone") == "narrative"
+        assert classify_note_section("五、99", "soe", "standalone", section_title="财务报表编制基础") == "narrative"
+        assert classify_note_section("五、99", "soe", "standalone", section_title="自定义科目") == "account_explanation"
+
+
+class TestTablePayload:
+    """「承载表格」= 非空 JSON 对象（与 Word 导出同口径）；JSON null / 空对象 / 数组都不算。"""
+
+    @pytest.mark.parametrize("value,expected", [
+        (None, False), ({}, False), ([], False), ([{"label": "x"}], False), ("text", False), (0, False),
+        ({"rows": []}, True), ({"rows": [{"label": "合计"}]}, True), ({"_tables": [{}]}, True),
+    ])
+    def test_has_table_payload(self, value, expected: bool):
+        from app.services.note_section_kind import has_table_payload
+
+        assert has_table_payload(value) is expected
 
 
 #: 防空转下限 ≈ 实测核对数的 90%（实测 114 / 140 / 146 / 163，2026-10-14）
