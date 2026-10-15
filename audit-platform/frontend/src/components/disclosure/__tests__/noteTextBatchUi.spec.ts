@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import NoteTextPreviewList from '@/components/disclosure/NoteTextPreviewList.vue'
 import NoteTextDiffDialog from '@/components/disclosure/NoteTextDiffDialog.vue'
-import { describeSource } from '@/components/disclosure/noteTextBatchLabels'
+import { describeSource, sourceMatchStatuses } from '@/components/disclosure/noteTextBatchLabels'
 import type { PreviewItem } from '@/composables/useNoteTextBatch'
 
 const stubs = {
@@ -41,9 +41,9 @@ function item(over: Partial<PreviewItem>): PreviewItem {
   }
 }
 
-const REVIEW = item({})
+const REVIEW = item({ target_chapter_title: '重要会计政策、会计估计' })
 const RISKY = item({ source_id: 'docx-s2', source_title: '公司基本情况', target_note_section: '一、1', target_section_title: '公司基本情况',
-  quality_flags: ['source_entity', 'date'], target_note_id: 'n2' })
+  quality_flags: ['source_entity', 'date'], target_note_id: 'n2', target_chapter_title: '公司基本情况' })
 const UNAVAILABLE = item({ source_id: 'docx-s3', source_title: '某某专项说明', target_note_id: null, target_note_section: null,
   target_section_title: null, category: 'unavailable', unavailable_reason: '未找到匹配的目标章节', confidence: 'manual_required' })
 
@@ -75,6 +75,19 @@ describe('NoteTextPreviewList', () => {
     expect(wrapper.emitted('open-diff')?.[0]?.[0]).toMatchObject({ source_id: 'docx-s2' })
   })
 
+  it('类别内按目标所属一级章分组（AC-2.3），同章归一组、保持预览顺序；无目标归「未匹配目标章节」', () => {
+    const SAME_CHAPTER = item({ source_id: 'docx-s4', source_title: '记账本位币', target_note_id: 'n4',
+      target_note_section: '四、记账本位币', target_chapter_title: '重要会计政策、会计估计' })
+    const wrapper = mount(NoteTextPreviewList, {
+      props: { items: [REVIEW, RISKY, SAME_CHAPTER, UNAVAILABLE], selected: [], modes: {} }, global: { stubs },
+    })
+    const chapters = (cls: string) => wrapper.find(`.gt-ntp-${cls}`).findAll('.gt-ntp-chapter').map(c => c.text())
+    expect(chapters('review')).toEqual(['重要会计政策、会计估计（2）', '公司基本情况（1）'])
+    expect(chapters('unavailable')).toEqual(['未匹配目标章节（1）'])
+    expect(wrapper.find('.gt-ntp-review').findAll('[data-source-id]').map(r => r.attributes('data-source-id')))
+      .toEqual(['docx-s1', 'docx-s4', 'docx-s2'])
+  })
+
   it('「仅看高风险」只留高风险章节（设计 §9.3：只看已选 / 高风险 / 未映射）', async () => {
     const wrapper = mountList()
     const box = wrapper.findAll('label.el-checkbox').find(l => l.text() === '仅看高风险')!
@@ -87,6 +100,23 @@ describe('NoteTextPreviewList', () => {
       { document_name: '旧制度.md', doc_version: null }] })).toBe('知识库：政策汇编.md（v3）、旧制度.md')
     expect(describeSource('upload', { file_name: '附注.docx' })).toBe('文件：附注.docx')
     expect(describeSource('upload', null)).toBe('')
+  })
+
+  it('左栏来源匹配状态（AC-2.2）：未预览为空；预览项与右栏三分组同口径，被跳过的来源带原因', () => {
+    expect(sourceMatchStatuses(null).size).toBe(0)
+    const map = sourceMatchStatuses({
+      items: [item({ source_id: 'docx-s5', category: 'recommended' }), REVIEW, UNAVAILABLE,
+        item({ source_id: 'docx-s6', category: 'unavailable', unavailable_reason: '来源正文为空' })],
+      skipped_sources: [{ source_id: 'docx-s7', match_kind: 'folded' }, { source_id: 'docx-s8', match_kind: 'out_of_scope' }],
+    })
+    expect(Object.fromEntries([...map].map(([k, v]) => [k, `${v.type}:${v.label}:${v.hint}`]))).toEqual({
+      'docx-s5': 'success:推荐引用:四、会计期间 会计期间',
+      'docx-s1': 'warning:需复核:四、会计期间 会计期间',
+      'docx-s3': 'info:未匹配:未找到匹配的目标章节',
+      'docx-s6': 'info:不可用:来源正文为空',
+      'docx-s7': 'info:已并入上级章节:',
+      'docx-s8': 'info:不在可填范围:',
+    })
   })
 
   it('勾选摘要按选择统计（AC-9.6）', () => {

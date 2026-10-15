@@ -44,11 +44,23 @@ const visibleItems = computed(() => {
     && (!onlySelected.value || selectedSet.value.has(i.source_id))
     && (!onlyHighRisk.value || highRiskFlags(i).length > 0))
 })
+/** AC-2.3：类别内再按目标所属一级章分组（保持预览顺序）；无目标的归「未匹配目标章节」 */
+function byChapter(items: PreviewItem[]): Array<{ title: string; items: PreviewItem[] }> {
+  const out: Array<{ title: string; items: PreviewItem[] }> = []
+  for (const item of items) {
+    const title = item.target_note_id ? (item.target_chapter_title || '其他章节') : '未匹配目标章节'
+    const bucket = out.find(c => c.title === title)
+    if (bucket) bucket.items.push(item)
+    else out.push({ title, items: [item] })
+  }
+  return out
+}
+
 const groups = computed(() => [
   { key: 'recommended', title: '🟢 推荐引用', items: visibleItems.value.filter(i => i.category === 'recommended') },
   { key: 'review', title: '🟡 需复核', items: visibleItems.value.filter(i => i.category === 'review') },
   { key: 'unavailable', title: '⚪ 不可用', items: visibleItems.value.filter(i => i.category === 'unavailable') },
-].filter(g => g.items.length))
+].filter(g => g.items.length).map(g => ({ ...g, chapters: byChapter(g.items) })))
 const summary = computed(() => selectionSummary(props.items, selectedSet.value, props.modes))
 
 function setChecked(item: PreviewItem, checked: boolean) {
@@ -76,7 +88,9 @@ function modeLabel(item: PreviewItem): string {
     <div v-if="!items.length" class="gt-ntp-empty">没有可预览的章节</div>
     <section v-for="g in groups" :key="g.key" :class="['gt-ntp-group', `gt-ntp-${g.key}`]">
       <h4>{{ g.title }}（{{ g.items.length }}）</h4>
-      <div v-for="item in g.items" :key="item.source_id" class="gt-ntp-row" :data-source-id="item.source_id">
+      <template v-for="c in g.chapters" :key="c.title">
+      <div class="gt-ntp-chapter">{{ c.title }}（{{ c.items.length }}）</div>
+      <div v-for="item in c.items" :key="item.source_id" class="gt-ntp-row" :data-source-id="item.source_id">
         <template v-if="g.key !== 'unavailable'">
           <el-button v-if="highRiskFlags(item).length && !selectedSet.has(item.source_id)" size="small" type="warning" plain
             @click="emit('open-diff', item)">核对后采用</el-button>
@@ -98,6 +112,7 @@ function modeLabel(item: PreviewItem): string {
           </el-select>
         </template>
       </div>
+      </template>
     </section>
     <div v-if="items.length" class="gt-ntp-summary">
       已选 {{ summary.total }} 章：新增 {{ summary.new }} · 替换 {{ summary.replace }} · 追加 {{ summary.append }}
@@ -110,6 +125,7 @@ function modeLabel(item: PreviewItem): string {
 .gt-ntp-filters { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .gt-ntp-empty { text-align: center; color: var(--el-text-color-placeholder); padding: 32px 0; }
 .gt-ntp-group h4 { margin: 12px 0 6px; font-size: 13px; }
+.gt-ntp-chapter { margin: 8px 0 4px; padding-left: 4px; font-size: 12px; font-weight: 600; color: var(--el-text-color-regular); border-left: 3px solid var(--el-border-color); }
 .gt-ntp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 8px; margin-bottom: 4px; border-radius: 4px; background: var(--el-fill-color-lighter); }
 .gt-ntp-recommended .gt-ntp-row { background: var(--el-color-success-light-9); }
 .gt-ntp-review .gt-ntp-row { background: var(--el-color-warning-light-9); }

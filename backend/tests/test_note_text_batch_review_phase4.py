@@ -311,3 +311,31 @@ def test_preview_replacements_describe_only_written_content() -> None:
                          source_entity_name="甲公司")["items"][0]
     assert "甲公司" not in item["proposed_html"] and "script" not in item["proposed_html"]
     assert item["replacements"] == []
+
+
+def test_preview_item_carries_target_chapter_for_grouping() -> None:
+    """AC-2.3：右栏按目标父章分组 ⇒ 预览项带目标所属一级章标题；未匹配项为 None。"""
+    t = _tgt("四、会计期间", "会计期间", chapter="重要会计政策、会计估计")
+    sources = [_src("s1", "会计期间"), _src("s2", "完全无关的标题")]
+    items = {i["source_id"]: i for i in build_preview(sources, [t], match_sections(sources, [t]))["items"]}
+    assert items["s1"]["target_chapter_title"] == "重要会计政策、会计估计"
+    assert items["s2"]["target_note_id"] is None and items["s2"]["target_chapter_title"] is None
+
+
+def test_preview_lists_skipped_sources_with_reason_for_left_pane_status() -> None:
+    """AC-2.2：左栏要逐个显示来源的匹配状态。不进预览的来源（并入上级 / 不在可填范围）首版只给计数，
+    左栏分不清「被跳过」与「解析后没匹配上」⇒ 须逐个带原因返回，且与 summary 计数同口径。"""
+    t = _tgt("四、存货", "存货", chapter="重要会计政策、会计估计")
+    sources = [_src("c1", "重要会计政策、会计估计", level=1), _src("p1", "存货", level=2, html="<p>存货政策</p>"),
+               _src("c2", "财务报表主要项目注释", level=1), _src("a1", "存货", level=2, html="<p>余额说明</p>")]
+    preview = build_preview(sources, [t], match_sections(sources, [t]))
+    assert {(s["source_id"], s["match_kind"]) for s in preview["skipped_sources"]} == {
+        ("c2", "out_of_scope"), ("a1", "out_of_scope")}
+    assert not {s["source_id"] for s in preview["skipped_sources"]} & {i["source_id"] for i in preview["items"]}
+
+    t2 = _tgt("三、金融工具", "金融工具")
+    src2 = [_src("a", "金融工具", 2, "<p>总述</p>"), _src("b", "（1）金融资产分类", 3, "<p>分类正文</p>")]
+    folded, matches = fold_unmatched_descendants(src2, match_sections(src2, [t2]))
+    p2 = build_preview(folded, [t2], matches)
+    assert p2["skipped_sources"] == [{"source_id": "b", "match_kind": "folded"}]
+    assert len(p2["skipped_sources"]) == p2["summary"]["folded"] + p2["summary"]["out_of_scope"]

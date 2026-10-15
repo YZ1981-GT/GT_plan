@@ -481,12 +481,15 @@ def build_preview(
     items: list[dict[str, Any]] = []
 
     skipped = {"folded": 0, "out_of_scope": 0}
+    # 左栏逐来源显示跳过原因（AC-2.2）：只给计数时分不清「被跳过」与「没匹配上」；只供展示，不进 digest
+    skipped_sources: list[dict[str, str]] = []
     for m in matches:
         src = src_map.get(m.source_id)
         if src is None:
             continue
         if m.match_kind in skipped:
-            skipped[m.match_kind] += 1  # 已并入上级 / 不在本次可填范围：不进预览，只计数
+            skipped[m.match_kind] += 1  # 已并入上级 / 不在本次可填范围：不进预览
+            skipped_sources.append({"source_id": m.source_id, "match_kind": m.match_kind})
             continue
         meta = src.metadata or {}
         sanitized = sanitize_note_html(src.html)
@@ -521,6 +524,8 @@ def build_preview(
             "target_note_id": str(m.target_note_id) if tgt else None,
             "target_note_section": (tgt or {}).get("note_section"),
             "target_section_title": (tgt or {}).get("section_title"),
+            # 右栏按目标所属一级章分组（AC-2.3）；只供展示，不进 digest
+            "target_chapter_title": (tgt or {}).get("chapter_title"),
             "match_kind": m.match_kind, "evidence": m.evidence, "confidence": m.confidence,
             "category": category, "default_selected": category == "recommended",
             "unavailable_reason": reason,
@@ -554,4 +559,5 @@ def build_preview(
         "source": source_identity or {},
         "items": [[i["source_id"], i["target_note_id"], i["proposed_hash"]] for i in items],
     }, sort_keys=True, ensure_ascii=False, default=str)
-    return {"preview_digest": sha256_text(canonical), "items": items, "summary": summary, "warnings": []}
+    return {"preview_digest": sha256_text(canonical), "items": items, "skipped_sources": skipped_sources,
+            "summary": summary, "warnings": []}

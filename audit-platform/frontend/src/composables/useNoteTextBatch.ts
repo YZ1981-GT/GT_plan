@@ -58,6 +58,8 @@ export interface PreviewItem {
   target_note_id: string | null
   target_note_section: string | null
   target_section_title: string | null
+  /** 目标所属一级章标题（右栏按章分组用，AC-2.3） */
+  target_chapter_title?: string | null
   match_kind: string
   evidence: string
   confidence: MatchConfidence
@@ -79,6 +81,8 @@ export interface PreviewItem {
 export interface PreviewResponse {
   preview_digest: string
   items: PreviewItem[]
+  /** 不进预览的来源及原因（folded 已并入上级 / out_of_scope 不在可填范围），左栏显示匹配状态用（AC-2.2） */
+  skipped_sources?: Array<{ source_id: string; match_kind: string }>
   summary: Record<string, number>
   warnings: string[]
 }
@@ -109,6 +113,7 @@ export interface TargetSection {
   section_title: string
   section_kind: string
   has_content: boolean
+  chapter_title?: string | null
 }
 
 export interface BatchError {

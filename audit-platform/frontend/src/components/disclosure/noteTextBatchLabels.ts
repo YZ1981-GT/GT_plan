@@ -1,7 +1,7 @@
 /**
  * 附注正文批量写入：界面中文标签与分组判定（R-21：首版直接显示英文枚举与内部 source_id）。
  */
-import type { ApplyMode, PreviewItem, SourceKind } from '@/composables/useNoteTextBatch'
+import type { ApplyMode, PreviewItem, PreviewResponse, SourceKind } from '@/composables/useNoteTextBatch'
 
 /** 后端 note_quality_scanner.QualityFlag + build_preview 的 cross_standard */
 export const QUALITY_FLAG_LABELS: Record<string, string> = {
@@ -41,6 +41,31 @@ export function highRiskFlags(item: PreviewItem): string[] {
 export function targetLabel(item: Pick<PreviewItem, 'target_note_section' | 'target_section_title'>): string {
   if (!item.target_note_section) return '未匹配'
   return [item.target_note_section, item.target_section_title].filter(Boolean).join(' ')
+}
+
+export interface SourceMatchStatus { label: string; type: 'success' | 'warning' | 'info'; hint: string }
+const SKIPPED_LABELS: Record<string, string> = { folded: '已并入上级章节', out_of_scope: '不在可填范围' }
+
+/**
+ * 左栏来源的匹配状态（AC-2.2），与右栏三分组同口径：未预览时为空；
+ * 预览后每个来源要么是预览项（推荐 / 需复核 / 不可用 / 未匹配），要么被服务端跳过（带原因）。
+ */
+export function sourceMatchStatuses(
+  preview: Pick<PreviewResponse, 'items' | 'skipped_sources'> | null | undefined,
+): Map<string, SourceMatchStatus> {
+  const out = new Map<string, SourceMatchStatus>()
+  if (!preview) return out
+  for (const s of preview.skipped_sources ?? []) {
+    out.set(s.source_id, { label: SKIPPED_LABELS[s.match_kind] ?? '未进入预览', type: 'info', hint: '' })
+  }
+  for (const item of preview.items) {
+    const target = targetLabel(item)
+    if (item.category === 'recommended') out.set(item.source_id, { label: '推荐引用', type: 'success', hint: target })
+    else if (item.category === 'review') out.set(item.source_id, { label: '需复核', type: 'warning', hint: target })
+    else out.set(item.source_id, { label: item.target_note_id ? '不可用' : '未匹配', type: 'info',
+      hint: item.unavailable_reason || target })
+  }
+  return out
 }
 
 /** 勾选摘要（AC-9.6）：总数、新增、替换、追加、高风险、未映射 */

@@ -3,7 +3,8 @@
  * NoteDocUploadDialog — 上传 Word/PDF 或选知识库文档，双栏核对来源与目标，服务端预览后原子写入。
  *
  * spec: disclosure-note-doc-upload-and-batch-fill Task 35~39（第二轮复盘：对齐后端契约、
- * 知识库来源 AC-5.1、候选人工确认 AC-3.3、单实例懒挂载编辑器 AC-2.4、改动后必须重新预览）
+ * 知识库来源 AC-5.1、候选人工确认 AC-3.3、单实例懒挂载编辑器 AC-2.4、改动后必须重新预览；
+ * 第 9 组：可拖双栏 AC-2.1、左栏逐来源匹配状态 AC-2.2、右栏类别内按目标一级章分组 AC-2.3）
  *
  * 左栏是来源章节：可展开核对、可二次编辑（编辑的是来源正文，重新预览后由服务端消毒 / 替换变量再生成拟写入内容）；
  * 右栏是服务端预览的三分组。写入只提交「来源 + 映射 + 撤销项 + 选择」，拟写入正文一律以服务端重算为准。
@@ -18,7 +19,7 @@ import {
 } from '@/composables/useNoteTextBatch'
 import NoteTextPreviewList from './NoteTextPreviewList.vue'
 import NoteTextDiffDialog from './NoteTextDiffDialog.vue'
-import { CONFIDENCE_LABELS, describeSource } from './noteTextBatchLabels'
+import { CONFIDENCE_LABELS, describeSource, sourceMatchStatuses } from './noteTextBatchLabels'
 
 const NoteRichTextEditor = defineAsyncComponent(() => import('@/components/NoteRichTextEditor.vue'))
 
@@ -38,6 +39,8 @@ const editing = ref<{ sourceId: string; title: string; html: string } | null>(nu
 const fileInput = ref<HTMLInputElement | null>(null)
 
 const items = computed(() => batch.previewResult.value?.items ?? [])
+/** 左栏每个来源的匹配状态（AC-2.2），与右栏同一份服务端预览 */
+const matchStatus = computed(() => sourceMatchStatuses(batch.previewResult.value))
 const mappings = computed(() => Object.fromEntries(batch.manualMappings.value))
 const sourceLabel = computed(() => describeSource(batch.sourceKind.value,
   batch.parsedSource.value?.source_metadata as Parameters<typeof describeSource>[1]))
@@ -169,7 +172,9 @@ function saveEdit() {
     <el-alert v-if="batch.previewStale.value" type="warning" :closable="false" show-icon
       title="预览已过期（预览后改过来源正文、手工映射或变量替换，或目标章节已被他人修改），请重新预览后再写入" />
     <el-alert v-if="batch.lastError.value" type="error" :closable="false" show-icon :title="batch.lastError.value.message" />
-    <div class="gt-ndu-columns">
+    <!-- AC-2.1：双栏可拖拽调整宽度 -->
+    <el-splitter class="gt-ndu-columns">
+      <el-splitter-panel size="42%" :min="280">
       <section class="gt-ndu-pane">
         <div v-if="!batch.parsedSections.value.length" class="gt-ndu-empty">请上传 Word / PDF 附注文档，或从知识库选择文档</div>
         <div v-for="section in batch.parsedSections.value" :key="section.source_id" class="gt-ndu-source"
@@ -178,6 +183,9 @@ function saveEdit() {
             <span>{{ expanded.has(section.source_id) ? '▼' : '▶' }}</span>
             <strong>{{ section.title }}</strong>
             <el-tag v-if="section.confidence !== 'candidate'" size="small" type="warning">{{ CONFIDENCE_LABELS[section.confidence] }}</el-tag>
+            <el-tag v-if="matchStatus.get(section.source_id)" size="small" effect="plain" class="gt-ndu-match"
+              :type="matchStatus.get(section.source_id)?.type" :title="matchStatus.get(section.source_id)?.hint">
+              {{ matchStatus.get(section.source_id)?.label }}</el-tag>
             <el-tag v-if="batch.editedSourceIds.value.includes(section.source_id)" size="small" type="success">已编辑</el-tag>
             <el-button size="small" link type="primary" @click.stop="startEdit(section)">编辑</el-button>
           </div>
@@ -185,13 +193,16 @@ function saveEdit() {
           <div v-if="expanded.has(section.source_id)" class="gt-ndu-html" v-html="sanitizeHtml(section.html)" />
         </div>
       </section>
+      </el-splitter-panel>
+      <el-splitter-panel :min="360">
       <section class="gt-ndu-pane">
         <div v-if="!batch.previewResult.value" class="gt-ndu-empty">解析后点击「预览匹配」，由服务端给出章节对应关系与拟写入内容</div>
         <NoteTextPreviewList v-else v-model:selected="selected" :items="items" :modes="modes"
           :edited-ids="batch.editedSourceIds.value" :targets="targets" :mappings="mappings"
           @open-diff="openDiff" @map="(sid: string, tid: string | null) => batch.setManualMapping(sid, tid)" />
       </section>
-    </div>
+      </el-splitter-panel>
+    </el-splitter>
     <NoteTextDiffDialog v-model="diffVisible" :item="diffItem" :mode="diffItem ? (modes[diffItem.source_id] ?? 'replace') : 'replace'"
       :revoked-ids="[...batch.revokedReplacementIds.value]" :stale="batch.previewStale.value"
       @update:mode="setDiffMode"
@@ -210,8 +221,8 @@ function saveEdit() {
 <style scoped>
 .gt-ndu-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .gt-ndu-muted { color: var(--el-text-color-secondary); font-size: 13px; }
-.gt-ndu-columns { display: flex; gap: 16px; height: 70vh; margin-top: 8px; }
-.gt-ndu-pane { flex: 1; min-width: 0; overflow-y: auto; border: 1px solid var(--el-border-color-lighter); border-radius: 6px; padding: 12px; }
+.gt-ndu-columns { height: 70vh; margin-top: 8px; }
+.gt-ndu-pane { height: 100%; box-sizing: border-box; overflow-y: auto; border: 1px solid var(--el-border-color-lighter); border-radius: 6px; padding: 12px; }
 .gt-ndu-empty { text-align: center; color: var(--el-text-color-placeholder); padding: 40px 0; }
 .gt-ndu-source { margin-bottom: 6px; }
 .gt-ndu-source-head { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 6px 8px; border-radius: 4px; background: var(--el-fill-color-lighter); }
