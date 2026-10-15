@@ -169,6 +169,72 @@ class TestSaveAndVersions:
         assert len(await _rows(env, NoteContentTemplateVersion)) == 2
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(("note", "code", "field", "value", "stored"), [
+        ("basic", "一、1", "status", NoteStatus.draft, "draft"),          # 有正文：已确认 → 草稿（fixture 是 confirmed）
+        ("basic", "一、1", "is_stale", True, True),
+        ("basic", "一、1", "section_title", "公司基本情况（更名）", "公司基本情况（更名）"),
+        # 空章：状态 / 待刷新不改质量标记 ⇒ 只能靠字段本身进 hash 区分（变异「hash 漏 status / is_stale」靠这两例打红）
+        ("period", "四、会计期间", "status", NoteStatus.confirmed, "confirmed"),
+        ("period", "四、会计期间", "is_stale", True, True),
+    ])
+    async def test_non_text_change_is_a_new_version(self, env, note, code, field, value, stored):
+        """第 20 组（Task 55 真库实测抓到）：正文不变、只改状态 / 待刷新 / 标题，也是新版本。
+
+        这些字段都存进 sections_data 并被引用方消费（来源草稿、待刷新 ⇒ 需复核；标题参与映射与展示）。
+        首版版本 hash 只算「编号 + 正文 hash」⇒ 甲把章节确认后再保存被判「内容未变化，沿用已有版本」：
+        预检显示草稿 90，发布出去的版本仍是草稿 91，该章在兄弟项目永远进不了「推荐引用」。
+        """
+        v1 = await _save(env)
+        async with env["factory"]() as db:
+            before = (await generate_snapshot(db, env["ids"]["A"], YEAR))["snapshot_digest"]
+            setattr(await db.get(DisclosureNote, env["ids"][note]), field, value)
+            await db.commit()
+        async with env["factory"]() as db:
+            assert (await generate_snapshot(db, env["ids"]["A"], YEAR))["snapshot_digest"] != before
+        v2 = await _save(env)
+        assert (v2["version_no"], v2["reused"], v2["template_id"]) == (2, False, v1["template_id"])
+        versions = {str(v.id): {s["note_section"]: s for s in v.sections_data}
+                    for v in await _rows(env, NoteContentTemplateVersion)}
+        old, new = versions[v1["version_id"]][code], versions[v2["version_id"]][code]
+        assert new[field] == stored and old[field] != stored
+        if note == "period":  # 证明该例确实只靠字段本身区分
+            assert old["quality_flags"] == new["quality_flags"]
+
+    @pytest.mark.asyncio
+    async def test_source_metadata_change_is_a_new_version(self, env):
+        """版本行上的来源元数据同样随版本固定：来源项目改名后再保存，不能沿用写着旧企业名的版本。"""
+        await _save(env)
+        async with env["factory"]() as db:
+            (await db.get(Project, env["ids"]["A"])).name = "子甲（更名）"
+            await db.commit()
+        v2 = await _save(env)
+        assert (v2["version_no"], v2["reused"]) == (2, False)
+        version = next(v for v in await _rows(env, NoteContentTemplateVersion) if str(v.id) == v2["version_id"])
+        assert version.source_project_name == "子甲（更名）"
+
+    @pytest.mark.asyncio
+    async def test_saved_version_is_exactly_what_was_prechecked(self, env):
+        """不变量：保存后 current 指向的版本 == 保存那一刻服务端重算的快照（正文快照、质量摘要、口径与来源）。
+
+        「同 hash 复用」只有两边完全一致才成立；任何会被引用方读取的字段漏出 hash，复用就会静默丢掉它的新值。
+        """
+        await _save(env)
+        async with env["factory"]() as db:
+            (await db.get(DisclosureNote, env["ids"]["basic"])).status = NoteStatus.draft
+            await db.commit()
+        async with env["factory"]() as db:
+            preview = await snapshot_preview(db, env["ids"]["A"], YEAR, user=env["user"]("me"))
+            snap = await generate_snapshot(db, env["ids"]["A"], YEAR)
+        saved = await _save(env, digest=preview["snapshot_digest"])
+        [template] = await _rows(env, NoteContentTemplate)
+        assert str(template.current_version_id) == saved["version_id"]
+        version = next(v for v in await _rows(env, NoteContentTemplateVersion) if str(v.id) == saved["version_id"])
+        assert version.sections_data == snap["sections_data"]
+        assert version.quality_summary == preview["quality_summary"]
+        keys = ("source_project_id", "source_year", "source_project_name", "template_type", "report_scope")
+        assert {k: str(getattr(version, k)) for k in keys} == {k: str(snap[k]) for k in keys}
+
+    @pytest.mark.asyncio
     async def test_stale_digest_rejected_and_nothing_written(self, env):
         async with env["factory"]() as db:
             digest = (await snapshot_preview(db, env["ids"]["A"], YEAR, user=env["user"]("me")))["snapshot_digest"]

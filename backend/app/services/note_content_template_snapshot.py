@@ -6,6 +6,7 @@ spec: disclosure-note-doc-upload-and-batch-fill Phase 7 Task 41~45（第二轮�
 - 保存前重算 digest，来源变化 ⇒ 409；集团模板须集团根项目的经理 / 合伙人才能发布（R-04）；
 - 同名模板目录行 ``FOR UPDATE`` 串行化版本号分配；并发首建撞部分唯一索引时回滚 SAVEPOINT、改取胜者（R-13）；
 - 版本不可变：同 hash 复用（回退到历史内容 ⇒ current 指回该版本），新 hash 递增 version_no；
+  hash 覆盖版本行存下的全部内容（章节快照 + 来源 / 口径），复用 ⇔ 存着的就是本次算出的（第 20 组）；
 - 列表在 SQL 层按可见性过滤并分页，不逐行判权（R-15）；
 - 版本元数据读时解析保存人姓名（AC-8.2）；列表带本项目最近一次引用的版本，供「有新版本」只读提示（AC-8.4）。
 """
@@ -121,8 +122,17 @@ async def generate_snapshot(db: AsyncSession, project_id: UUID, year: int) -> di
             "quality_flags": quality.flags,
         })
 
-    canonical = json.dumps([{"ns": s["note_section"], "h": s["content_hash"]} for s in sections],
-                           sort_keys=True, ensure_ascii=False)
+    source = {
+        "source_project_id": str(project_id),
+        "source_project_name": proj.name or proj.client_name or "",
+        "source_year": year,
+        "template_type": normalize_template_type(getattr(proj, "template_type", None)),
+        "report_scope": normalize_report_scope(getattr(proj, "report_scope", None)),
+    }
+    # 版本身份 = 版本行存下、引用方会读取的全部内容（design §3.2「canonical JSON SHA-256」）。第 20 组：首版只算
+    # 「编号 + 正文 hash」⇒ 只改状态 / 待刷新 / 标题 / 来源企业名时被判「内容未变化」沿用旧版本，预检看到的
+    # 新状态被静默丢掉（甲确认章节后再保存，发布的仍是草稿，该章在兄弟项目进不了「推荐引用」）
+    canonical = json.dumps({"sections": sections, **source}, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     content_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     digest_input = json.dumps({"project_id": str(project_id), "year": year, "content_hash": content_hash},
                               sort_keys=True)
@@ -132,11 +142,7 @@ async def generate_snapshot(db: AsyncSession, project_id: UUID, year: int) -> di
         "content_hash": content_hash,
         "byte_size": len(json.dumps(sections, ensure_ascii=False).encode("utf-8")),
         "snapshot_digest": hashlib.sha256(digest_input.encode("utf-8")).hexdigest(),
-        "source_project_id": str(project_id),
-        "source_project_name": proj.name or proj.client_name or "",
-        "source_year": year,
-        "template_type": normalize_template_type(getattr(proj, "template_type", None)),
-        "report_scope": normalize_report_scope(getattr(proj, "report_scope", None)),
+        **source,
     }
 
 

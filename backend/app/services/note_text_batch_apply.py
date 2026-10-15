@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.note_content_template_models import NoteTextBatchApplication
 from app.models.report_models import DisclosureNote, NoteStatus
+from app.services.note_html_sanitizer import has_visible_text
 from app.services.note_lineage import CONTENT_TEMPLATES_KEY, append_lineage_entry
 
 logger = logging.getLogger(__name__)
@@ -178,11 +179,14 @@ async def apply_batch(
     now = datetime.now(timezone.utc)
     application_id = uuid4()
     detail: list[dict[str, Any]] = []
-    mode_counts = {"replace": 0, "append": 0}
+    # design §3.3「新增 / 替换 / 追加统计」，与勾选摘要同口径：写进没有可见正文的章算新增（第 20 组：
+    # 首版只按写入方式计 ⇒ 用户确认「新增 2」，回执报「替换 2」）。逐章 detail.mode 仍记实际写入方式
+    mode_counts = {"new": 0, "replace": 0, "append": 0}
     changed: list[dict[str, str]] = []
 
     for sel, note, item, final in plan:
         mode = sel.get("mode") or "replace"
+        mode_counts["new" if mode == "replace" and not has_visible_text(note.text_content) else mode] += 1
         before_hash = _sha256(note.text_content)
         note.text_content = final
         note.status = NoteStatus.draft
@@ -198,7 +202,6 @@ async def apply_batch(
                 "mutation_id": mutation_id,
                 "applied_at": now.isoformat(),
             })
-        mode_counts[mode] += 1
         changed.append({"id": str(note.id), "note_section": note.note_section})
         detail.append({
             "source_id": item["source_id"], "source_title": item.get("source_title"),

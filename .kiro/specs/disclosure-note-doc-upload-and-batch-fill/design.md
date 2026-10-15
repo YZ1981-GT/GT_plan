@@ -84,10 +84,10 @@
 | template_type / report_scope | 国企/上市与单体/合并口径 |
 | sections_data | 全套正文快照 JSONB，不含 table_data |
 | quality_summary | 空白、占位、stale、草稿、企业特有风险统计 |
-| content_hash / byte_size | canonical JSON SHA-256 与字节数 |
+| content_hash / byte_size | canonical JSON SHA-256（覆盖 sections_data 全部字段 + 来源项目/年度/名称 + 口径，即版本行存下、引用方会读取的全部内容）与字节数 |
 | created_by / created_at | 保存人和时间 |
 
-约束：`(template_id, version_no)` 唯一，`(template_id, content_hash)` 唯一。内容未变化时返回既有版本，不新增版本号。
+约束：`(template_id, version_no)` 唯一，`(template_id, content_hash)` 唯一。内容未变化时返回既有版本，不新增版本号；「未变化」= 上述 canonical 完全相同，复用 ⇔ 版本行存着的就是本次算出的。只改章节状态 / 待刷新 / 标题、来源企业改名也是新版本（第 20 组：首版只算「编号 + 正文 hash」，确认章节后再保存被判未变化，新状态被静默丢掉）。
 
 `sections_data[]` 规范结构：
 
@@ -120,7 +120,7 @@
 | source_metadata | 文件名/hash、知识库 doc/version 或其他只读来源摘要 |
 | target_project_id / target_year | 目标项目与年度 |
 | mutation_id / preview_digest | 幂等键与预览摘要 |
-| applied_count / mode_summary | 写入数量及新增/替换/追加统计 |
+| applied_count / mode_summary | 写入数量及新增/替换/追加统计（`{new, replace, append}`；写进没有可见正文的章算新增，与勾选摘要同口径；逐章 `detail.mode` 记实际写入方式 replace/append） |
 | detail | 逐章 source/target/mode/before_hash/after_hash/变量替换 JSONB |
 | applied_by / applied_at | 操作人和时间 |
 

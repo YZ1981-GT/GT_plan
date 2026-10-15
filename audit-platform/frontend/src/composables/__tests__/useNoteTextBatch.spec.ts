@@ -134,6 +134,12 @@ describe('apply 与预览一致', () => {
     expect(receiptText({ applied_count: 2 })).toBe('已写入 2 个章节')
   })
 
+  it('批次回执与勾选摘要同口径：写进空章报「新增」，不能说成「替换」（第 20 组）', () => {
+    expect(receiptText({ applied_count: 2, summary: { new: 2, replace: 0, append: 0 } })).toBe('已写入 2 个章节（新增 2）')
+    expect(receiptText({ applied_count: 4, summary: { new: 1, replace: 2, append: 1 } }))
+      .toBe('已写入 4 个章节（新增 1 · 替换 2 · 追加 1）')
+  })
+
   it('预览后改正文 ⇒ 预览过期，不发 apply；重新预览后才可应用', async () => {
     const b = make()
     post.mockResolvedValueOnce(structuredClone(PARSED)).mockResolvedValueOnce(PREVIEW)

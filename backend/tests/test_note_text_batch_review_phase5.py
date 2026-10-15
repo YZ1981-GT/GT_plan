@@ -144,6 +144,35 @@ class TestApplyWritesServerPreview:
         assert note.text_content == item["append_html"] == "<p>旧基本情况</p><p>&nbsp;</p><p>新基本情况</p>"
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(("basic_mode", "period_text", "expected"), [
+        ("replace", None, {"new": 1, "replace": 1, "append": 0}),
+        ("append", None, {"new": 1, "replace": 0, "append": 1}),
+        # 只有空段的章与预览同口径（看得见的正文才算已有内容）⇒ 仍是新增
+        ("replace", "<p>&nbsp;</p>", {"new": 1, "replace": 1, "append": 0}),
+    ])
+    async def test_receipt_and_record_count_new_like_the_selection_summary(self, factory, basic_mode, period_text,
+                                                                           expected):
+        """第 20 组（Task 55 真库实测）：回执与应用记录的统计与勾选摘要同口径——写进空章算「新增」。
+
+        design §3.3 mode_summary =「新增 / 替换 / 追加统计」；首版只按写入方式计数 ⇒ 用户确认的是「新增 2」，
+        回执却报「替换 2」，像是覆盖了已有正文。逐章 mode 仍记实际写入方式。
+        """
+        seed = await _seed(factory)
+        if period_text is not None:
+            async with factory() as db:
+                (await db.get(DisclosureNote, seed["period"])).text_content = period_text
+                await db.commit()
+        async with factory() as db:
+            preview = await _preview(db, seed, _sources())
+        result = await _apply(factory, seed, preview, [_sel(_item(preview, "s1"), basic_mode),
+                                                       _sel(_item(preview, "s2"))])
+        assert result["summary"] == expected
+        async with factory() as db:
+            app_row = (await db.execute(NoteTextBatchApplication.__table__.select())).one()
+        assert app_row.mode_summary == expected
+        assert {d["note_section"]: d["mode"] for d in app_row.detail} == {"一、1": basic_mode, "四、会计期间": "replace"}
+
+    @pytest.mark.asyncio
     async def test_append_on_empty_target_rejected(self, factory):
         seed = await _seed(factory)
         async with factory() as db:

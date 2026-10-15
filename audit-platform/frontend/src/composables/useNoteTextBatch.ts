@@ -98,9 +98,12 @@ export interface ApplyResponse {
   warnings: Array<string | { code?: string; message?: string }>
 }
 
-/** 批次回执：写入章数 + 替换 / 追加分布（summary 即后端 mode_summary）；替换与追加对正文的影响不同，必须分开报 */
+/**
+ * 批次回执：写入章数 + 新增 / 替换 / 追加分布（summary 即后端 mode_summary，与勾选摘要同口径）；
+ * 三者对正文的影响不同，必须分开报（第 20 组：写进空章曾被报成「替换」）
+ */
 export function receiptText(result: Pick<ApplyResponse, 'applied_count'> & { summary?: Record<string, number> }): string {
-  const parts = ([['替换', result.summary?.replace], ['追加', result.summary?.append]] as const)
+  const parts = ([['新增', result.summary?.new], ['替换', result.summary?.replace], ['追加', result.summary?.append]] as const)
     .filter(([, n]) => (n ?? 0) > 0).map(([label, n]) => `${label} ${n}`)
   return `已写入 ${result.applied_count} 个章节${parts.length ? `（${parts.join(' · ')}）` : ''}`
 }
