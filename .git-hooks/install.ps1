@@ -25,7 +25,7 @@ foreach ($h in $hooks) {
 Write-Host ""
 Write-Host "=== Done ==="
 Write-Host "GIT_MODE switch:"
-Write-Host "  single (default) - solo user mode, warn only"
-Write-Host "  multi            - team mode, strict PR + 6-dim check"
+Write-Host "  single (default) - clean-tree hard gate; other sync checks warn only"
+Write-Host "  multi            - clean-tree hard gate + strict PR and sync checks"
 Write-Host ""
 Write-Host 'Set multi mode: $env:GIT_MODE = "multi"'

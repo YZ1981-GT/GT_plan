@@ -3,11 +3,29 @@
 # repo-git-workflow-unification spec / Task 2.1
 #
 # 检查项：
+# 0. push 前工作树完整性硬门（所有模式）
 # 1. 分支命名规约（main / spec/ / work/ / fix/ / release/）
 # 2. multi 模式禁止直推 main
-# 3. 6 维核查（严格模式）
+# 3. 6 维核查（multi 严格 / single 仅警告）
+# 4. 暂存树/HEAD 自洽
 
 set -e
+
+# 0. 交付防丢硬门：push 时工作树必须完全干净。
+#
+# pre-commit 只看已暂存文件；如果使用 `git add -u` 或只 add 已知路径，新建的文档、
+# 迁移、模型和测试会留在 untracked，随后永远不会出现在远端。这个检查必须独立于
+# GIT_MODE：single/multi 只影响协作策略，不能放宽交付完整性。
+WORKTREE_STATUS="$(git status --porcelain=v1 --untracked-files=all)"
+if [ -n "$WORKTREE_STATUS" ]; then
+    echo "[pre-push] ❌ 工作树仍有未提交、已暂存或未跟踪文件，拒绝 push"
+    echo ""
+    printf '%s\n' "$WORKTREE_STATUS"
+    echo ""
+    echo "处置：确认本次交付文件均已 git add + commit，再重新 push。"
+    echo "      若这些文件属于并发任务，请改用独立 git worktree/分支，不要共享工作树。"
+    exit 1
+fi
 
 # 找 Python 路径（Windows + Linux 兼容）
 if [ -f ".venv/Scripts/python.exe" ]; then
