@@ -532,3 +532,30 @@ R-14 → R-05/R-11/R-10（Phase 2 纯函数）→ R-07/R-08/R-16（Phase 4）→
     - 真后端只读请求返回 200、空结果（真库 0 条应用记录）；控制台无错误。
   - 证据：本 spec 后端 21 个文件 + 1 个节点 387 passed；vitest 8 个文件 67 例（新增 `noteSourceBadge.spec.ts` 7 例，含编辑器挂载的源码级判据，剥注释后匹配，注释掉标签也会红）；36 个变异全部打红，失败都是预期形态（后端：取最早 / 只按 id 排 / 后者覆盖 / 不限年度 / 不限本项目 / 不排已删 / 不跳过不可见章节 / 改过恒为否 / 坏行崩溃 / 知识库回 doc_id / 模板不带版本 / 不解析写入人 / 端点无鉴权 / 端点要求 edit / apply 用库默认时间；前端：回执不分模式 / 替换追加对调 / 列出 0 / 部分失败不告警 / 全部送达也告警 / 写入成功不广播 / 不监听 / 卸载不注销 / 不比年度 / 无请求序号 / 不随项目刷新 / 请求不静默 / 不显示版本 / 模式写死 / 文案不标改过 / UTC 截日期（来源标记与保存人各一，单跑时区一例也红）/ 非法时间显示「-」/ 编辑器去掉标签 / 注释掉标签）；ESLint 0 errors（编辑器 12 条既有警告）；ruff 通过；单区域 vue-tsc 本 spec 范围 0 错误，编辑器只剩既有的 2777 行告警，注入类型错误报 TS2322。
   - 标记：Task 50 仍为 `[~]`。来源标记与批次回执已具备；验收要求的「保存模板 → 另一项目引用 → 写入」真实写库全流程与 Task 55 一并执行。
+
+### 收口（2026-10-15）
+
+- 状态：52/56 `[x]`。余 4 项 `[~]`，代码侧已没有可独立推进的部分，都等拍板或真实写库：
+  - Task 10：代码、回填工具与测试已完成；真实库回填 5 个项目 737 行（`backend/scripts/migrate/backfill_note_tree_fields.py --apply`）待拍板。
+  - Task 54：上传链的真实写入验收。解析、手工映射、编辑、预览已在第 8 / 9 / 13 组用真后端实测，写入只在网络层模拟过；「正文正确、缓存不旧、留痕存在、导出不含审计标记」要真写一次才能验。
+  - Task 55：模板链的真实写入验收（A 保存集团模板 v1 → 兄弟 B 引用 → A 发布 v2 → B 只提示 → 重新预览写入）。真库没有同组兄弟项目，需要先造测试集团或指定项目。
+  - Task 50：随 Task 55 的真实写入全流程一并验收。
+- 回归（对照基线 = 本 spec 第一个提交的父提交 `385a235ed`，临时检出后跑同一批失败节点）：
+  - 后端：按本 spec 改动的模块挑出 368 个测试文件，8592 passed / 421 failed / 30 skipped / 3 xfailed / 7 xpassed。421 个失败里 418 个在基线上同样失败（附注模板结构、合并附注表头、底稿同步等既有红）；另 3 个是真库测试（程序委派对账预览、公式推送 SQL 失败后续跑、V169 真库），在 HEAD 上单独复跑 4 轮全过，属顺序 / 时序相关的偶发失败，不涉及本 spec 改动。
+  - 前端：相关 27 个文件 410 例 2 例失败，全局守卫 81 个文件 4 个文件失败；这 6 处在基线上同样失败（`useNoteTemplate` 映射预设、`WorkpaperEditor.vue` 行数棘轮、token 单一入口、原生 fetch 鉴权、SFC 语法、空测试文件），不涉及本 spec 文件。
+- 清理：删除 spec 创建时的一次性校验脚本 `backend/scripts/analyze/_validate_disclosure_note_batch_spec.py`（只校验初版全 `[ ]` 的编号，早已失效，全仓零引用）。
+- 待拍板（本 spec）：
+  1. Task 54 / 55（含 50）真实写入：用真实项目，还是先造测试项目（55 需要同组兄弟项目）。
+  2. Task 10：是否对 5 个项目执行回填 737 行。
+  3. Word 解析章节数：硬上限 500，国企合并 412 章只剩 18% 余量；§11.2 的业务阈值 300 低于四份权威模板（315 / 322 / 382 / 412），是否上调。
+- 跨 spec 发现（只登记，未改）：
+  - JSON 种子与四版 Word 不一致：15 处章名不同、66 节放错章、38 节缺失；上市版 JSON 有两条「三、研发支出」。
+  - `wp_disclosure_sync_service` 不看 `is_local_override`：内容模板写入的科目解释章节会被底稿保存覆盖。
+  - `note_prior_year_import_service.inherit_from_prior_year` 读不存在的 `DisclosureNote.section_code`。
+  - `disclosure_engine.py` 引用未定义的 `_with_column_meta`（F821，被 try/except 吞成「该章没有表格」）。
+  - 迁移 DO 块按名查 `pg_constraint` 不限 schema（V187 等全仓普遍写法，生产单 schema 不受影响）。
+  - 三处重复的 `newIdempotencyKey`，可改用 `utils/uuid.ts`。
+  - `ContentTemplateVersionMeta` / `ContentTemplateListItem` 两个 schema 零引用，且已与真实返回不一致。
+  - 旧脚本 `migrate_section_number_to_section_id.py` 会给上市项目写国企的 section_id，已在文件头标注勿用。
+  - `file_size_whitelist.txt` 有 6 行被写坏成 `$1xxxx`、2 行缺基线数，首行 BOM 又让注释行不被识别（基线上就如此，行数门禁的守卫因此红）；本 spec 未动这些行。
+  - `components.d.ts` 里本 spec 组件的自动登记未提交（按约定不提交该文件）；编辑器显式 import 这些组件，不依赖它。

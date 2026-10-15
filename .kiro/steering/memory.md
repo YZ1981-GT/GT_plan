@@ -162,9 +162,9 @@ inclusion: always
 - 🔴 教训：①进程内 exec 替换模块的变异对「已持有原类引用」的协调器无效（PG 层「全绿」是假象）⇒ 跨模块变异一律磁盘注入 + 逐字节恢复 ②子 Tab 私有防抖宿主 flushHtml 够不着 ⇒ 2 秒内切在线编辑丢编辑且随后被 OO 保存覆盖；其余循环 108 个同形写入方冻结在 `pendingWritesCoverageRatchet.spec.ts`（接入一处删一条）③行数门 8 处超限：2 处原样拆出、6 处 whitelist 登记理由 + 拆分轴
 - 提交须知：新模块（cleared_field_view / first_publication_on_demand / request_settlement / target_bound_registration / template_skeleton_baseline / 两个测试 world / 前端 pendingWrites / workpaperSyncBridgeFailure）+ 4 个 definition_store blob 必须同一次提交；未修清单见 design §7.5
 
-### 附注正文导入 / 批量编制 / 内容模板 `disclosure-note-doc-upload-and-batch-fill`（2026-10-14 第二轮复盘 7 组完成并推送，45/56 `[x]`）
-- 新表 V187（note_content_templates / versions / note_text_batch_applications）；端点 `note_text_batch`（sections / parse-upload / parse-knowledge / preview / apply）+ `note_content_templates`；编辑器三个入口经 `DisclosureNoteContentTools` 收口（编辑器 3281 行 = HARD_CAP）。余 11 项 `[~]`：Playwright / 真 PG 外部依赖 + Task 10/35/51 待拍板；跨 spec 待拍板见其 tasks.md 第 7 组（JSON 种子与四版 Word 不一致、底稿推送不看 is_local_override、上年继承读不存在的 section_code 列）
-- 🔴 教训：调用方自管错误提示时请求必带 `_silent`（全局拦截器会先弹一次：422 显示 pydantic 英文、403 只有笼统提示、5xx 自动重发两次），静默后 423 合并锁事件要自己发；gt-plan `spec_status` 不认 `[~]`，会误报 100%
+### 附注正文导入 / 批量编制 / 内容模板 `disclosure-note-doc-upload-and-batch-fill`（2026-10-15 第二轮复盘 13 组 + 收口完成并推送，52/56 `[x]`）
+- 新表 V187（note_content_templates / versions / note_text_batch_applications）；端点 `note_text_batch`（sections / parse-upload / parse-knowledge / preview / apply / sources）+ `note_content_templates`；编辑器三个入口与章节来源标记经 `noteContentTools.ts` 一个 import 收口（编辑器 3281 行 = HARD_CAP）。余 4 项 `[~]` 均待拍板：Task 10 真实回填（`backfill_note_tree_fields.py` dry-run 737 行）、Task 54/55 真实写入浏览器全流程（55 需同组兄弟项目，真库没有）、Task 50 随 55；跨 spec 待拍板见其 tasks.md「收口」（JSON 种子与四版 Word 不一致、底稿推送不看 is_local_override、上年继承读不存在的 section_code 列、`_with_column_meta` 未定义）
+- 🔴 教训：调用方自管错误提示时请求必带 `_silent`（全局拦截器会先弹一次：422 显示 pydantic 英文、403 只有笼统提示、5xx 自动重发两次），静默后 423 合并锁事件要自己发；gt-plan `spec_status` 不认 `[~]`，会误报 100%；按「最近一次」取记录时，时间由应用在加锁后写入（库默认 `now()` 是事务开始时间，先开事务后拿锁的一方记得更早，SQLite 秒级精度还会让测试偶发红）；后端时间是 UTC，界面截前 10 位会把北京时间 0~8 点显示成前一天，日期一律经 `fmtDate`
 
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
