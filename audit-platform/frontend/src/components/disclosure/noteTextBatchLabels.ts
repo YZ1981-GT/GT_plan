@@ -1,8 +1,18 @@
 /**
  * 附注正文批量写入：界面中文标签与分组判定（R-21：首版直接显示英文枚举与内部 source_id）。
  */
-import type { ApplyMode, PreviewItem, PreviewResponse, SourceKind } from '@/composables/useNoteTextBatch'
+import type { ApplyMode, NoteTextSource, PreviewItem, PreviewResponse, SourceKind } from '@/composables/useNoteTextBatch'
 import type { ContentTemplateItem, ContentTemplateVersion } from '@/composables/useNoteContentTemplate'
+import { fmtDate } from '@/utils/formatters'
+
+/**
+ * 后端时间是 UTC（timestamptz 序列化带 +00:00），按本地日期显示：
+ * 直接截前 10 位会把北京时间 0~8 点保存 / 写入的记录显示成前一天。
+ */
+function localDate(iso: string | null | undefined): string {
+  const text = iso ? fmtDate(iso) : ''
+  return text === '-' ? '' : text
+}
 
 /** 后端 note_quality_scanner.QualityFlag + build_preview 的 cross_standard */
 export const QUALITY_FLAG_LABELS: Record<string, string> = {
@@ -95,7 +105,7 @@ export function describeSource(kind: SourceKind, meta: SourceMeta | null | undef
 }
 /** 保存人 / 时间（AC-8.2）：模板选择器与引用弹窗共用同一口径 */
 export function savedByLabel(v: Pick<ContentTemplateVersion, 'created_by_name' | 'created_at'>): string {
-  const date = v.created_at ? v.created_at.slice(0, 10) : ''
+  const date = localDate(v.created_at)
   if (v.created_by_name) return date ? `${v.created_by_name} 保存于 ${date}` : `保存人 ${v.created_by_name}`
   return date ? `保存于 ${date}` : ''
 }
@@ -117,4 +127,20 @@ export function appliedHint(item: Pick<ContentTemplateItem, 'current_version' | 
     ? `有新版本 v${current.version_no}（本项目已引用 v${applied.version_no}）`
     : `模板当前为 v${current.version_no}（本项目已引用 v${applied.version_no}）`
   return { text: `${head}：已写入的正文不会自动更新，点「重新预览」核对后才会写入`, changed: true }
+}
+
+/**
+ * 编辑器章节标题旁的来源标记（Task 50 / AC-11.3）：只在平台界面显示，不进附注正文与导出。
+ * 写入后有人改过正文 ⇒ 标「之后有修改」，复核时据此判断是否仍是引用原样。
+ */
+export function sourceBadgeText(s: NoteTextSource): { text: string; hint: string; modified: boolean } {
+  const what = s.source_kind === 'content_template'
+    ? `📋 来自内容模板「${s.template_name || '未命名模板'}」${s.version_no != null ? `v${s.version_no}` : ''}`
+    : s.source_kind === 'upload'
+      ? `📄 来自上传文档「${s.file_name || '未命名文件'}」`
+      : `📚 来自知识库「${describeSource('knowledge', { documents: s.documents ?? [] }).replace(/^知识库：/, '')}」`
+  const mode = s.mode === 'append' ? '追加' : '替换'
+  const hint = [localDate(s.applied_at), s.applied_by_name || '', `批量写入（${mode}）`]
+    .filter(Boolean).join(' ')
+  return { text: s.modified_after ? `${what}（之后有修改）` : what, hint, modified: s.modified_after }
 }

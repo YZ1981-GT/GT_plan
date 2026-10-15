@@ -446,7 +446,7 @@
                   <span v-if="justSaved" class="gt-de-saved-badge">✓ 已保存</span>
                 </transition>
               </h4>
-              <span class="gt-de-section-account" v-if="currentNote.account_name && currentNote.account_name !== currentNote.section_title">{{ currentNote.account_name }}</span>
+              <span class="gt-de-section-account" v-if="currentNote.account_name && currentNote.account_name !== currentNote.section_title">{{ currentNote.account_name }}</span><NoteSourceBadge :project-id="projectId" :year="year" :note-id="currentNote.id" />
             </div>
             <div style="display: flex; gap: 6px; align-items: center;">
               <el-tooltip content="保存后自动跳到下一未编制章节" placement="top">
@@ -1320,7 +1320,7 @@ import NoteReadinessPanel from '@/components/disclosure/NoteReadinessPanel.vue'
 import StructureEditor from '@/components/formula/StructureEditor.vue'
 import { isEmptyTable, type EmptyTableRow, type EmptyTableColumnDef } from '@/views/composables/disclosureEmptyTable'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
-import DisclosureNoteContentTools from '@/components/disclosure/DisclosureNoteContentTools.vue'
+import { DisclosureNoteContentTools, NoteSourceBadge } from '@/components/disclosure/noteContentTools'
 import NoteRichTextEditor from '@/components/NoteRichTextEditor.vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'

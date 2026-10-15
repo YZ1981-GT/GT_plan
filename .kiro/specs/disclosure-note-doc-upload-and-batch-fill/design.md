@@ -361,6 +361,8 @@ apply 成功后：
 
 > 第 8 组（AC-6.3）：入口可用性 = `canWrite`（只读 / 归档 / EQCR / 编辑锁）+ `note:edit` 操作权限（与后端 `require_operation` 同码）+ 未合并锁定。编辑器的 `canEdit` 不含后两项，因此由包装组件自查锁定态（监听 423 事件实时刷新），编辑器菜单按其 `available` 隐藏。锁定查询必须关掉 http 的 GET 去重：同页锁定横幅几乎同时发同一个 GET，去重会取消先发的那一个。
 
+> 第 13 组（Task 50 / AC-11.3）：编辑器章节标题下显示来源标记：当前章最近一次批量写入的来源（内容模板名 + 版本 / 上传文件名 / 知识库文档名 + 版本），悬停看日期、写入人与模式；写入后正文被改过另标「之后有修改」（当前正文与该次写入结果的 hash 比较）。数据来自只读端点 `GET /api/projects/{project_id}/disclosure-note-text-batch/sources?year=`：逐章取 `note_text_batch_applications.detail` 里最近一次写入（按写入时间，只看最近 500 次；已删 / 他项目章节不返回），按项目年度一次取回，写入成功后经 eventBus `note-text-batch:applied` 刷新；只在界面显示，不写正文、不进导出。批次回执报章数与替换 / 追加分布。应用记录的写入时间取 apply 加锁后的同一时刻（与章节 `updated_at`、lineage 一致）：库默认 `now()` 是事务开始时间，先开事务后拿到锁的一方会记得更早，「最近一次」会认错。界面日期按本地时区显示（后端给 UTC）。
+
 ### 9.5 错误提示（第 6 组）
 
 `useNoteTextBatch` / `useNoteContentTemplate` 的请求一律带 `_silent`，由 `notifyBatchError` 统一提示一次中文：后端 message 原样显示；pydantic 校验错误换成中文；无业务 detail 的 HTTP 错误显示「<操作>失败（HTTP 状态码）」；本地中文异常保留原文；被 http 去重取消的请求不提示。不静默时全局拦截器会先弹一次（422 显示英文、403 只有笼统提示、5xx 还自动重发两次），catch 再弹一次。静默后拦截器不再代发合并锁事件，改由本模块在 423「合并锁定」时发 `consol-lock:detected`。
@@ -448,6 +450,7 @@ TOP-3 单章：49,586 B（金融工具）、18,148 B（长期股权投资）、1
 - `backend/app/routers/note_content_templates.py`
 - `backend/migrations/V187__note_content_templates_and_batch_apply.sql`
 - `backend/migrations/R187__rollback_note_content_templates_and_batch_apply.sql`
+- `backend/app/services/note_text_batch_sources.py`（第 13 组：各章最近一次批量写入来源，只读）
 
 ### 后端修改
 - `backend/app/services/note_section_catalog.py`：section_kind 投影；
@@ -459,6 +462,7 @@ TOP-3 单章：49,586 B（金融工具）、18,148 B（长期股权投资）、1
 - `NoteDocUploadDialog.vue`、`NoteContentTemplatePicker.vue`、`NoteContentTemplateApplyDialog.vue`、`NoteTextDiffDialog.vue`；
 - `useNoteTextBatch.ts`、`useNoteContentTemplate.ts`；
 - 专用 API types/client。
+- `NoteSourceBadge.vue`、`noteContentTools.ts`（第 13 组：编辑器来源标记；工具入口与标记共用一个 import）。
 
 ### 前端修改
 - `DisclosureEditor.vue`：三个入口、弹窗挂载、缓存/当前章刷新；

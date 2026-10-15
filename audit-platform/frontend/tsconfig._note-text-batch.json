@@ -18,6 +18,8 @@
     "src/components/disclosure/NoteContentTemplatePicker.vue",
     "src/components/disclosure/NoteContentTemplateSaveDialog.vue",
     "src/components/disclosure/DisclosureNoteContentTools.vue",
+    "src/components/disclosure/NoteSourceBadge.vue",
+    "src/components/disclosure/noteContentTools.ts",
     "src/env.d.ts"
   ]
 }

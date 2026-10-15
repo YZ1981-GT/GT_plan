@@ -214,6 +214,9 @@ async def apply_batch(
         mutation_id=mutation_id, request_fingerprint=request_fingerprint,
         preview_digest=request_digest, applied_count=len(plan), mode_summary=mode_counts,
         detail=detail, status="succeeded", applied_by=user_id,
+        # 与章节 updated_at、模板引用记录同一时刻，且取在加锁之后：库默认 now() 是事务开始时间，
+        # 先开事务后拿到锁的一方会记得更早，「最近一次写入」（来源标记 / 最近引用）就会认错
+        applied_at=now,
     ))
     await db.flush()
     return {

@@ -5,6 +5,7 @@ spec: disclosure-note-doc-upload-and-batch-fill Task 20 / 21 / 25 / 33（第二�
 路径：``/api/projects/{project_id}/disclosure-note-text-sections``（readonly）
     ``/api/projects/{project_id}/disclosure-note-import/parse-upload|parse-knowledge``（edit）
     ``/api/projects/{project_id}/disclosure-note-text-batch/preview|apply``（edit）
+    ``/api/projects/{project_id}/disclosure-note-text-batch/sources``（readonly，各章最近一次批量写入来源）
 注册：``router_registry/report.py``
 
 写入口门禁与附注其余写端点同序：项目 edit（含归档 423）→ 操作 ``note:edit`` → 合并锁 423。
@@ -35,6 +36,7 @@ from app.services.note_text_batch_flow import (
     upload_source_payload,
 )
 from app.services.note_text_batch_service import ManualMappingError, load_target_sections
+from app.services.note_text_batch_sources import latest_note_sources
 
 router = APIRouter()
 
@@ -69,6 +71,19 @@ async def list_text_sections(
 ):
     items = await load_target_sections(db, project_id, year, scope=scope, include_content=False)
     return {"items": items, "total": len(items)}
+
+
+@router.get(
+    "/api/projects/{project_id}/disclosure-note-text-batch/sources",
+    summary="各章最近一次批量写入的来源（只读，供编辑器来源标记；不进导出正文）",
+)
+async def list_text_sources(
+    project_id: UUID,
+    year: int = Query(ge=2000, le=2200),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    return {"items": await latest_note_sources(db, project_id=project_id, year=year)}
 
 
 @router.post(

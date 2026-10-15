@@ -6,13 +6,16 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import uuid
+from datetime import datetime, timezone
 from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
+import sqlalchemy as sa
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -29,11 +32,13 @@ from app.models.note_content_template_models import (
     NoteTextBatchApplication,
 )
 from app.models.report_models import DisclosureNote
+from app.models.staff_models import StaffMember
 from app.routers import note_text_batch
 from app.services.disclosure_mutation_coordinator import DisclosureMutationCoordinator
 
 YEAR = 2025
-_TABLES = [User.__table__, Project.__table__, ProjectUser.__table__, DisclosureNote.__table__,
+# 来源端点要解析写入人姓名（人员档案 → 登录名），与生产一样需要 staff_members
+_TABLES = [User.__table__, Project.__table__, ProjectUser.__table__, DisclosureNote.__table__, StaffMember.__table__,
            NoteContentTemplate.__table__, NoteContentTemplateVersion.__table__, NoteTextBatchApplication.__table__,
            KnowledgeFolder.__table__, KnowledgeDocument.__table__]
 BASE = "/api/projects/{pid}"
@@ -696,3 +701,89 @@ class TestApply:
         resp = await _apply(env, source, preview, [_selection(item)])
         assert resp.status_code == status, resp.text
         assert (await _note(env, "basic")).text_content == "<p>旧基本情况</p>"
+
+
+class TestTextSources:
+    """Task 50 / AC-11.3：编辑器来源标记 —— 各章最近一次批量写入的来源（只读，不进正文）。"""
+
+    @pytest.mark.asyncio
+    async def test_latest_source_per_note_with_writer_and_modified_flag(self, env):
+        ids, url = env["ids"], _url(env, "/disclosure-note-text-batch/sources")
+        async with env["factory"]() as db:
+            db.add(StaffMember(name="审计助理甲", user_id=ids["me"]))
+            await db.commit()
+        source, preview, item = await _previewed(env)
+        assert (await _apply(env, source, preview, [_selection(item)])).status_code == 200
+        async with env["factory"]() as db:  # 写入记录与章节同一时刻（取在加锁后），不用库默认的事务开始时间
+            (application,) = (await db.execute(sa.select(NoteTextBatchApplication))).scalars().all()
+            note = await db.get(DisclosureNote, uuid.UUID(item["target_note_id"]))
+            assert application.applied_at == note.updated_at
+        items = (await env["client"].get(url, params={"year": YEAR})).json()["items"]
+        assert set(items) == {item["target_note_id"]}  # 只列被批量写入过的章节
+        entry = items[item["target_note_id"]]
+        assert (entry["source_kind"], entry["file_name"], entry["mode"], entry["applied_by_name"],
+                entry["modified_after"]) == ("upload", "附注.docx", "replace", "审计助理甲", False)
+
+        async with env["factory"]() as db:  # 写入后有人改了正文 ⇒ 标「之后有修改」
+            (await db.get(DisclosureNote, uuid.UUID(item["target_note_id"]))).text_content = "<p>人工改过</p>"
+            await db.commit()
+        assert (await env["client"].get(url, params={"year": YEAR})).json()["items"][
+            item["target_note_id"]]["modified_after"] is True
+        assert (await env["client"].get(url, params={"year": YEAR + 1})).json()["items"] == {}
+
+    @pytest.mark.asyncio
+    async def test_template_source_carries_name_and_version_and_latest_wins(self, env):
+        upload, preview, item = await _previewed(env)
+        assert (await _apply(env, upload, preview, [_selection(item)], mutation_id="mut-src-1")).status_code == 200
+        tpl = {"source_kind": "content_template", "template_version_id": str(env["ids"]["ver"]),
+               "template_content_hash": TPL_HASH}
+        tpl_preview = (await _preview(env, tpl)).json()
+        tpl_item = next(i for i in tpl_preview["items"] if i["target_note_id"] == item["target_note_id"])
+        assert (await _apply(env, tpl, tpl_preview, [_selection(tpl_item)], mutation_id="mut-src-2")).status_code == 200
+        entry = (await env["client"].get(_url(env, "/disclosure-note-text-batch/sources"),
+                                         params={"year": YEAR})).json()["items"][item["target_note_id"]]
+        assert (entry["source_kind"], entry["template_name"], entry["version_no"]) == ("content_template", "乙公司全套", 1)
+
+    @pytest.mark.asyncio
+    async def test_newest_by_time_knowledge_shape_and_hidden_rows(self, env):
+        """「最近一次」按写入时间而非 id；知识库只回文档名与版本；已删章节 / 他项目章节 / 坏行不展示也不报错。"""
+        ids = env["ids"]
+
+        def application(app_id: str, kind: str, meta: dict, at: datetime, detail: list) -> NoteTextBatchApplication:
+            return NoteTextBatchApplication(
+                id=uuid.UUID(app_id), source_kind=kind, source_metadata=meta, target_project_id=ids["p"],
+                target_year=YEAR, mutation_id=f"mut-{app_id[:2]}", request_fingerprint="f" * 64,
+                preview_digest="d" * 64, applied_count=len(detail), detail=detail, applied_by=ids["me"], applied_at=at)
+
+        basic_hash = hashlib.sha256("<p>旧基本情况</p>".encode()).hexdigest()
+        async with env["factory"]() as db:
+            (await db.get(DisclosureNote, ids["cash"])).is_deleted = True
+            db.add_all([  # id 大的反而更早：按 id 排就会选错
+                application("ffffffff-ffff-4fff-bfff-ffffffffffff", "upload", {"file_name": "旧.docx"},
+                            datetime(2026, 1, 1, tzinfo=timezone.utc),
+                            [{"target_note_id": str(ids["basic"]), "mode": "replace", "after_hash": basic_hash}]),
+                application("00000000-0000-4000-8000-000000000001", "knowledge",
+                            {"documents": [{"doc_id": str(ids["doc"]), "document_name": "政策汇编.md", "doc_version": 3}]},
+                            datetime(2026, 2, 1, tzinfo=timezone.utc),
+                            [{"target_note_id": str(ids["basic"]), "mode": "append", "after_hash": basic_hash},
+                             {"target_note_id": str(ids["cash"]), "mode": "append", "after_hash": "x"},
+                             {"target_note_id": str(ids["foreign"]), "mode": "append", "after_hash": "x"},
+                             "坏行", {"mode": "append"}, {"target_note_id": "不是-uuid"}, {"target_note_id": None}]),
+            ])
+            await db.commit()
+        resp = await env["client"].get(_url(env, "/disclosure-note-text-batch/sources"), params={"year": YEAR})
+        assert resp.status_code == 200, resp.text
+        items = resp.json()["items"]
+        assert set(items) == {str(ids["basic"])}
+        entry = items[str(ids["basic"])]
+        assert (entry["source_kind"], entry["mode"], entry["modified_after"]) == ("knowledge", "append", False)
+        assert entry["documents"] == [{"document_name": "政策汇编.md", "doc_version": 3}]
+        assert entry["application_id"] == "00000000-0000-4000-8000-000000000001"
+
+    @pytest.mark.asyncio
+    async def test_readonly_member_reads_outsider_forbidden(self, env):
+        url = _url(env, "/disclosure-note-text-batch/sources")
+        env["act_as"]("viewer")
+        assert (await env["client"].get(url, params={"year": YEAR})).status_code == 200
+        env["act_as"]("outsider")
+        assert (await env["client"].get(url, params={"year": YEAR})).status_code == 403

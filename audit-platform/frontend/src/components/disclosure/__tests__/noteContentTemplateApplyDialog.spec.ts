@@ -50,7 +50,7 @@ describe('NoteContentTemplateApplyDialog', () => {
     await flushPromises()
     const head = wrapper.find('.gt-nta-head').text().replace(/\s+/g, ' ')
     expect(head).toContain('版本 v1 · 来源 子甲 2025 年')
-    expect(head).toContain('经理甲 保存于 2026-10-01')
+    expect(head).toContain('经理甲 保存于 2026/10/01')
     expect(useTemplateVersion).toHaveBeenCalledWith('v1', 'h'.repeat(64))
     expect(wrapper.find('.el-alert').exists()).toBe(false)
   })
@@ -59,7 +59,7 @@ describe('NoteContentTemplateApplyDialog', () => {
     const { wrapper } = mountDialog({ ...V1, created_by_name: null })
     await flushPromises()
     const head = wrapper.find('.gt-nta-head').text()
-    expect(head).toContain('· 保存于 2026-10-01')
+    expect(head).toContain('· 保存于 2026/10/01')
     expect(head).not.toMatch(/null|undefined|保存人/)
   })
 

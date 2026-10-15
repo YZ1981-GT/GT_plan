@@ -715,6 +715,9 @@ export type Events = {
   // consol-phase1-arch-lock 需求 4.3: 后端返回 423 合并锁定 → 刷新前端锁定态
   'consol-lock:detected': { projectId?: string }
 
+  // disclosure-note-doc-upload-and-batch-fill Task 50：附注正文批量写入成功 → 编辑器来源标记刷新
+  'note-text-batch:applied': { projectId: string; year: number }
+
   // A1 Dashboard 子底稿依赖联动
   'a17-audit-summary-completed': { projectId?: string }
   'a1-11-signing-completed': { projectId?: string }

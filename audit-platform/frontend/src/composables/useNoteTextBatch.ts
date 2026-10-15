@@ -98,6 +98,13 @@ export interface ApplyResponse {
   warnings: Array<string | { code?: string; message?: string }>
 }
 
+/** 批次回执：写入章数 + 替换 / 追加分布（summary 即后端 mode_summary）；替换与追加对正文的影响不同，必须分开报 */
+export function receiptText(result: Pick<ApplyResponse, 'applied_count'> & { summary?: Record<string, number> }): string {
+  const parts = ([['替换', result.summary?.replace], ['追加', result.summary?.append]] as const)
+    .filter(([, n]) => (n ?? 0) > 0).map(([label, n]) => `${label} ${n}`)
+  return `已写入 ${result.applied_count} 个章节${parts.length ? `（${parts.join(' · ')}）` : ''}`
+}
+
 export interface ApplySelection {
   source_id: string
   target_note_id: string
@@ -128,6 +135,23 @@ export const NOTE_TEXT_BATCH_PATHS = {
   preview: (pid: string) => `/api/projects/${pid}/disclosure-note-text-batch/preview`,
   apply: (pid: string) => `/api/projects/${pid}/disclosure-note-text-batch/apply`,
   sections: (pid: string) => `/api/projects/${pid}/disclosure-note-text-sections`,
+  sources: (pid: string) => `/api/projects/${pid}/disclosure-note-text-batch/sources`,
+}
+
+/** 各章最近一次批量写入的来源（GET …/disclosure-note-text-batch/sources，Task 50 编辑器来源标记） */
+export interface NoteTextSource {
+  application_id: string
+  source_kind: SourceKind
+  mode: ApplyMode | null
+  source_title: string | null
+  applied_at: string | null
+  applied_by_name: string | null
+  /** 当前已保存正文与该次写入结果不同（写入后有人改过） */
+  modified_after: boolean
+  template_name?: string | null
+  version_no?: number | null
+  file_name?: string | null
+  documents?: Array<{ document_name: string | null; doc_version: number | null }>
 }
 
 /** 可重试：传输层错误或同键请求仍在处理 ⇒ 保留同一幂等键重发，后端返回同一结果 */
@@ -393,7 +417,8 @@ export function useNoteTextBatch(options: UseNoteTextBatchOptions) {
         revoked_replacement_ids: [...revokedReplacementIds.value],
       }, silent({ headers: { 'X-Mutation-Id': mutationId.value } }))
       applyResult.value = result
-      ElMessage.success(`已写入 ${result.applied_count} 个章节`)
+      eventBus.emit('note-text-batch:applied', { projectId: projectId.value, year: year.value })
+      ElMessage.success(receiptText(result))
       if (result.event_delivery && result.event_delivery !== 'published') {
         ElMessage.warning('内容已保存，但部分章节的联动通知发送失败，请刷新页面确认')
       }

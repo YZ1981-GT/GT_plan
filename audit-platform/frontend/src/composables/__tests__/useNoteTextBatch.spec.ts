@@ -10,16 +10,21 @@ import { ref } from 'vue'
 const post = vi.fn()
 const get = vi.fn()
 const error = vi.fn()
+const success = vi.fn()
+const warning = vi.fn()
 const emit = vi.fn()
 vi.mock('@/services/apiProxy', () => ({
   api: { post: (...a: unknown[]) => post(...a), get: (...a: unknown[]) => get(...a) },
 }))
 vi.mock('element-plus', () => ({
-  ElMessage: { success: vi.fn(), warning: vi.fn(), error: (...a: unknown[]) => error(...a) },
+  ElMessage: {
+    success: (...a: unknown[]) => success(...a), warning: (...a: unknown[]) => warning(...a),
+    error: (...a: unknown[]) => error(...a),
+  },
 }))
 vi.mock('@/utils/eventBus', () => ({ eventBus: { emit: (...a: unknown[]) => emit(...a) } }))
 
-import { toBatchError, toSelection, useNoteTextBatch, type PreviewItem } from '../useNoteTextBatch'
+import { receiptText, toBatchError, toSelection, useNoteTextBatch, type PreviewItem } from '../useNoteTextBatch'
 
 const PARSED = {
   source_kind: 'upload',
@@ -49,6 +54,8 @@ beforeEach(() => {
   post.mockReset()
   get.mockReset()
   error.mockReset()
+  success.mockReset()
+  warning.mockReset()
   emit.mockReset()
 })
 
@@ -93,9 +100,13 @@ describe('apply 与预览一致', () => {
     b.setManualMapping('docx-s1', 'n1')
     b.toggleRevocation('rep-1')
     await b.fetchPreview()
-    post.mockResolvedValueOnce({ applied_count: 1, changed_notes: [], changed_note_ids: [], warnings: [] })
+    post.mockResolvedValueOnce({ applied_count: 1, summary: { replace: 0, append: 1 }, changed_notes: [],
+      changed_note_ids: [], event_delivery: 'published', warnings: [] })
     const key = b.mutationId.value
     await b.applyBatch([toSelection(ITEM, 'append')])
+    // 批次回执：章数 + 模式分布；联动通知全部送达不另行告警
+    expect(success).toHaveBeenCalledWith('已写入 1 个章节（追加 1）')
+    expect(warning).not.toHaveBeenCalled()
     const [, body, config] = post.mock.calls[2]
     expect(body).toMatchObject({
       preview_digest: PREVIEW.preview_digest,
@@ -106,6 +117,21 @@ describe('apply 与预览一致', () => {
     expect(body.selections[0]).not.toHaveProperty('proposed_html')
     expect(config.headers['X-Mutation-Id']).toBe(key)
     expect(b.mutationId.value).not.toBe(key)
+    // Task 50：写入成功广播，编辑器来源标记据此刷新（失败不得广播，见「网络错误保留幂等键」一例）
+    expect(emit).toHaveBeenCalledWith('note-text-batch:applied', { projectId: 'p1', year: 2025 })
+  })
+
+  it('批次回执：联动通知部分失败 ⇒ 写入照报成功，另行告警刷新确认', async () => {
+    const b = make()
+    b.useTemplateVersion('v-1', 'h'.repeat(64))
+    post.mockResolvedValueOnce(PREVIEW)
+    await b.fetchPreview()
+    post.mockResolvedValueOnce({ applied_count: 3, summary: { replace: 2, append: 1 }, changed_notes: [],
+      changed_note_ids: [], event_delivery: 'partial', warnings: [] })
+    expect(await b.applyBatch([toSelection(ITEM, 'replace')])).not.toBeNull()
+    expect(success).toHaveBeenCalledWith('已写入 3 个章节（替换 2 · 追加 1）')
+    expect(warning).toHaveBeenCalledWith('内容已保存，但部分章节的联动通知发送失败，请刷新页面确认')
+    expect(receiptText({ applied_count: 2 })).toBe('已写入 2 个章节')
   })
 
   it('预览后改正文 ⇒ 预览过期，不发 apply；重新预览后才可应用', async () => {
@@ -148,6 +174,7 @@ describe('apply 与预览一致', () => {
     expect(b.mutationId.value).not.toBe(key)
     expect(b.previewStale.value).toBe(true)
     expect(b.lastError.value).toMatchObject({ code: 'NOTE_BATCH_STALE_PREVIEW', staleNotes: ['一、1'] })
+    expect(emit).not.toHaveBeenCalledWith('note-text-batch:applied', expect.anything())
   })
 })
 

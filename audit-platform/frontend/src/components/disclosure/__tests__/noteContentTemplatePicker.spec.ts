@@ -105,7 +105,7 @@ describe('NoteContentTemplatePicker', () => {
     get.mockResolvedValueOnce({ items: [item('A', { current_version: { ...VERSION, created_by_name: '经理甲' } })], total: 1 })
     const w = mountPicker()
     await flushPromises()
-    expect(w.find('.gt-ntpk-item').text()).toContain('经理甲 保存于 2026-10-01')
+    expect(w.find('.gt-ntpk-item').text()).toContain('经理甲 保存于 2026/10/01')
   })
 
   it('AC-8.4：引用过旧版本 ⇒ 提示有新版本，入口改「重新预览」且选的是当前版本；引用的就是当前版本 ⇒ 只说明；未引用 ⇒ 不提示', async () => {
@@ -148,9 +148,19 @@ describe('模板引用标签', () => {
   })
 
   it('savedByLabel：有姓名带姓名，无姓名只写时间，都没有为空', () => {
-    expect(savedByLabel({ created_by_name: '经理甲', created_at: '2026-10-01T08:00:00' })).toBe('经理甲 保存于 2026-10-01')
-    expect(savedByLabel({ created_by_name: null, created_at: '2026-10-01T08:00:00' })).toBe('保存于 2026-10-01')
+    expect(savedByLabel({ created_by_name: '经理甲', created_at: '2026-10-01T08:00:00' })).toBe('经理甲 保存于 2026/10/01')
+    expect(savedByLabel({ created_by_name: null, created_at: '2026-10-01T08:00:00' })).toBe('保存于 2026/10/01')
     expect(savedByLabel({ created_by_name: '经理甲', created_at: null })).toBe('保存人 经理甲')
     expect(savedByLabel({ created_at: null })).toBe('')
+    expect(savedByLabel({ created_by_name: '经理甲', created_at: '不是时间' })).toBe('保存人 经理甲')
+  })
+
+  it('savedByLabel：后端给的是 UTC 时间，按本地日期显示（北京时间早上 7 点半保存不显示成前一天）', () => {
+    vi.stubEnv('TZ', 'Asia/Shanghai')
+    try {
+      expect(savedByLabel({ created_by_name: null, created_at: '2026-10-01T23:30:00+00:00' })).toBe('保存于 2026/10/02')
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 })

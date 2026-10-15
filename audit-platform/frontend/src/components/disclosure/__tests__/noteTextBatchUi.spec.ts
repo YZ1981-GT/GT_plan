@@ -5,11 +5,11 @@
  * - 高风险章节不能直接勾选，须在差异弹窗逐项核对后采用；
  * - 差异弹窗 v-model 为 boolean（R-24）。
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import NoteTextPreviewList from '@/components/disclosure/NoteTextPreviewList.vue'
 import NoteTextDiffDialog from '@/components/disclosure/NoteTextDiffDialog.vue'
-import { describeSource, sourceMatchStatuses } from '@/components/disclosure/noteTextBatchLabels'
+import { describeSource, sourceBadgeText, sourceMatchStatuses } from '@/components/disclosure/noteTextBatchLabels'
 import type { PreviewItem } from '@/composables/useNoteTextBatch'
 
 const stubs = {
@@ -117,6 +117,27 @@ describe('NoteTextPreviewList', () => {
       'docx-s7': 'info:已并入上级章节:',
       'docx-s8': 'info:不在可填范围:',
     })
+  })
+
+  it('编辑器来源标记（Task 50）：三类来源各自的名称与版本，写入后改过另标，悬停看写入人与模式', () => {
+    const base = { application_id: 'a', mode: 'append' as const, source_title: null, applied_at: '2026-10-02T08:00:00',
+      applied_by_name: null, modified_after: false }
+    expect(sourceBadgeText({ ...base, source_kind: 'upload', file_name: '附注.docx' })).toEqual({
+      text: '📄 来自上传文档「附注.docx」', hint: '2026/10/02 批量写入（追加）', modified: false })
+    expect(sourceBadgeText({ ...base, source_kind: 'knowledge', modified_after: true,
+      documents: [{ document_name: '政策汇编.md', doc_version: 3 }, { document_name: '旧制度.md', doc_version: null }] }).text)
+      .toBe('📚 来自知识库「政策汇编.md（v3）、旧制度.md」（之后有修改）')
+    expect(sourceBadgeText({ ...base, source_kind: 'content_template', template_name: null, version_no: null }).text)
+      .toBe('📋 来自内容模板「未命名模板」')
+    // 后端给 UTC：北京时间 10-02 早上 7 点半写入不得显示成 10-01
+    vi.stubEnv('TZ', 'Asia/Shanghai')
+    try {
+      expect(sourceBadgeText({ ...base, source_kind: 'content_template', template_name: '集团模板', version_no: 3,
+        mode: 'replace', applied_at: '2026-10-01T23:30:00+00:00', applied_by_name: '审计助理甲' })).toEqual({
+        text: '📋 来自内容模板「集团模板」v3', hint: '2026/10/02 审计助理甲 批量写入（替换）', modified: false })
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 
   it('勾选摘要按选择统计（AC-9.6）', () => {
