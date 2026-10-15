@@ -45,8 +45,9 @@
 
 - [x] 9. 扩展 `note_section_catalog.py`，按模板目录 + variant matrix 返回 `section_kind/section_id/parent/level/sort`；新增 narrative/all scope 查询。
   - 验收：公司基本情况/会计期间=narrative，货币资金四变体=account_explanation，纯父节点=container。（AC-2.3）
-- [~] 10. 修复 `DisclosureEngine._load_templates/generate_notes` 对 `section_id/level/parent_section_id/sort_index` 的透传与落库，新增数据回填策略但不宣称 section_id 跨模板稳定。
+- [x] 10. 修复 `DisclosureEngine._load_templates/generate_notes` 对 `section_id/level/parent_section_id/sort_index` 的透传与落库，新增数据回填策略但不宣称 section_id 跨模板稳定。
   - 验收：新生成附注稳定字段非空；旧行回填幂等，跨模板仍走显式映射。（AC-3.1）
+  - 2026-10-15 真库 5 个待回填项目全部完成（第 15 组 2 个 304 行 + 第 21 组 3 个 433 行），重跑 dry-run 可补 0；新生成附注稳定字段非空见第 16 组。
 - [x] 11. 新建 `note_html_sanitizer.py`，实现 canonical 富文本白名单和属性值校验；未知标签/属性重新转义，禁止危险 URL/事件/style。
   - 验收：script/iframe/onerror/javascript/style 被清除，合法段落/列表/表格/placeholder 保留，消毒幂等。（AC-10.4）
 - [x] 12. 将上传、知识库、模板 preview/apply 统一接入后端 sanitizer；前端 `useSanitize.ts` 与后端标签/属性集合建立一致性测试。
@@ -684,3 +685,11 @@ R-14 → R-05/R-11/R-10（Phase 2 纯函数）→ R-07/R-08/R-16（Phase 4）→
   - 未经批量写入的纯文字章节，Word 导出里 markdown 表格以竖线原样出现；改为与编辑器一致会改变全部既有项目的导出，待拍板（第 19 组）。
   - 单章保存不更新 `updated_at`（`report_models` 7 处只有 `server_default`）；内容相同的「替换」也写留痕并置 `is_local_override`（第 20 组）。
   - 既有红：`test_note_template_mode` 2 例；`test_property_16_compliance_guardrail_classification` 偶发红（第 18 组）。
+
+- ✅ **第 21 组 · Task 10 剩余 3 个项目真实回填（2026-10-15 用户确认）**
+  - 事前评估（同一事务演练回填后 ROLLBACK，未落库）：医疗器械可补 145 / 模板无此章 14，陕西华氏 144 / 14，宜宾 144 / 16，冲突 0；三项目全文顺序不变，同年度无重复 section_id。
+  - 批量写入可填范围：医疗器械（叙述 66 / 科目解释 93）、华氏（66 / 92）不变。宜宾有 10 个章行（「一」「二」等，正文与表格皆空、只承载子节）补上父子关系后由叙述变为容器，叙述可填 66 → 56。这 10 行本就不该是写入目标：与第 17 组（一）同一问题，章行和同名子节会同时成为目标，上传时报「存在 2 个同名目标章节」；回填后与新生成的项目一致。医疗器械、华氏的章行带正文，仍算叙述。前端不按章节类型区分（全仓没有容器判断），编辑器照常可编辑这些章行。
+  - 备份：`backend/backups/note_tree_fields_backfill_2026-10-15_b/`（已在 .gitignore，不入库）：`backup.json` 三项目全部 481 行（含已删除行）的树形字段及编号 / 年度 / 删除标记 / 顺序号 / 标题 / 正文 md5 / 状态，`plan.json` 回填计划，`rollback.sql` 把计划内 433 行恢复为回填前的值（一个事务；已在事务里逐条执行、每条恰命中 1 行后回滚，确认可用）。
+  - 执行：`backfill_note_tree_fields.py --project <医疗器械> --project <华氏> --project <宜宾> --apply` ⇒ 写入 433 行，冲突 0。
+  - 事后核对：计划内 433 行与计划值逐字段一致；计划外的行四个树形字段没变；编号、年度、删除标记、顺序号、标题、正文、状态均无变化；重新 dry-run 三项目可补 0（幂等）；无重复 section_id；全文顺序与备份逐行一致。浏览器写保护下打开三个项目的附注编辑器：目录 12 个一级章，章节数 159 / 158 / 160，正文正常，控制台无错误。
+  - 标记：Task 10 → `[x]`（5/5 个项目已回填）。本 spec 56/56 `[x]`。
