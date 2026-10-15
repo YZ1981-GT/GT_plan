@@ -28,13 +28,15 @@ __all__ = [
     "has_visible_text",
     "is_html_note_text",
     "note_text_to_html",
+    "render_note_markdown",
     "sanitize_note_html",
     "split_top_level_blocks",
 ]
 
 #: 判定「正文是 HTML」：出现附注编辑器 / 消毒器认识的标签之一。``<`` 后不允许空白（真实标签没有），
 #: 否则 ``a < b 且 c > d`` 会被当成 ``<b …>``；``<公司名称>`` 这类中文尖括号也不命中。
-#: Word 渲染（note_text_word_render）与批量写入共用这一个判据。
+#: Word 渲染（note_text_word_render）与批量写入共用这一个判据；编辑器加载（前端 utils/noteTextMarkdown
+#: 的 NOTE_HTML_TAG）是同一条，两端用例见 backend/data/note_text_markdown_cases.json。
 _HTML_TAG = re.compile(
     r"</?(?:p|br|div|span|strong|em|b|i|u|ul|ol|li|h[1-6]|table|thead|tbody|tfoot|tr|td|th|blockquote|hr)\b[^>]*>",
     re.IGNORECASE,
@@ -243,16 +245,31 @@ def has_visible_text(html: str | None) -> bool:
 def _markdown():
     from markdown_it import MarkdownIt
 
-    # 与编辑器 renderNoteTextToHtml 的 marked(gfm, breaks) 同口径：GFM 表格 / 删除线，单换行即 <br>；
-    # 纯文字里的尖括号一律按文字（html=False）
-    return MarkdownIt("commonmark", {"breaks": True, "html": False}).enable(["table", "strikethrough"])
+    # 与编辑器 renderNoteTextToHtml（前端 utils/noteTextMarkdown）同一引擎（markdown-it）同一配置：GFM 表格 /
+    # 删除线，单换行即 <br>；纯文字里的尖括号一律按文字（html=False）。
+    # 关掉列表与缩进代码块（第 22 组真库实测）：按 markdown 有序列表解释会重排书写的编号 —— 476 个带编号的
+    # 纯文字章节里 69 个被改号（「1~4、1~4」排成 1~8），书写的编号是附注正文、必须原样；缩进四格在附注里只是
+    # 缩进，当代码块会被消毒器剥掉 pre/code 后几行并成一行。
+    # 🔴 改这里必须同改前端并补 backend/data/note_text_markdown_cases.json（两端测试逐条跑同一份用例）
+    return (MarkdownIt("commonmark", {"breaks": True, "html": False})
+            .enable(["table", "strikethrough"]).disable(["list", "code"]))
+
+
+def render_note_markdown(text: str) -> str:
+    """纯文字按 markdown 渲染的引擎原样输出（未消毒）；两端对拍用例比的就是它。
+
+    markdown-it 在块后、``<br />`` 后补换行：文字里的 ``>`` 已转义，故「>\\n」「\\n<」只会出现在标签边上，
+    去掉不改内容。
+    """
+    return _markdown().render(text).replace(">\n", ">").replace("\n<", "<")
 
 
 def note_text_to_html(text: str | None) -> str:
     """附注正文统一为消毒后的 HTML（编辑器口径）。幂等。
 
-    ``text_content`` 多数是纯文字（生成链写入，含换行、markdown 表格 / 列表），编辑器加载时按 markdown 渲染
-    （``DisclosureEditor.renderNoteTextToHtml``）。批量写入（第 19 组）首版把纯文字直接当 HTML：追加时存成
+    ``text_content`` 多数是纯文字（生成链写入，含换行、markdown 表格 / 编号），编辑器加载时按 markdown 渲染
+    （前端 ``utils/noteTextMarkdown.renderNoteTextToHtml``，同一口径：编号原样、不认缩进代码块）。
+    Word 导出的纯文字也先经本函数（第 22 组）。批量写入（第 19 组）首版把纯文字直接当 HTML：追加时存成
     「纯文字 + <p>…</p>」混合值，原有分段在差异预览与 Word 里都并成一段；模板纯文字来源同理。
     已是 HTML（:func:`is_html_note_text`）只消毒。
     """
@@ -260,9 +277,7 @@ def note_text_to_html(text: str | None) -> str:
         return ""
     if is_html_note_text(text):
         return sanitize_note_html(text)
-    rendered = _markdown().render(text)
-    # markdown-it 在块后、<br /> 后补换行：文字里的 > 已转义，故「>\n」「\n<」只会出现在标签边上，去掉不改内容
-    return sanitize_note_html(rendered.replace(">\n", ">").replace("\n<", "<"))
+    return sanitize_note_html(render_note_markdown(text))
 
 
 def append_note_html(existing: str, new: str) -> str:

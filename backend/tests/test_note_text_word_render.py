@@ -48,8 +48,9 @@ PLAIN_MD = ("截至 2025 年 12 月 31 日，存货构成如下：\n\n"
             "说明段落第一行\n第二行\n\n"
             "2. 计价方法\n- 先进先出\n- 加权平均\n\n"
             "**注**：以上数据未经调整。")
-PLAIN_MD_PARAGRAPHS = ["截至 2025 年 12 月 31 日，存货构成如下：", "（1）存货分类\n本公司存货分为原材料、库存商品。",
-                       "说明段落第一行\n第二行", "（2）计价方法", "• 先进先出", "• 加权平均", "注：以上数据未经调整。"]
+#: 书写的编号 / 项目符号原样（不按 markdown 列表重排编号，见 test_note_text_plain_source）
+PLAIN_MD_PARAGRAPHS = ["截至 2025 年 12 月 31 日，存货构成如下：", "1. 存货分类\n本公司存货分为原材料、库存商品。",
+                       "说明段落第一行\n第二行", "2. 计价方法\n- 先进先出\n- 加权平均", "注：以上数据未经调整。"]
 PLAIN_MD_TABLE = [["项目", "账面余额", "跌价准备"], ["原材料", "1,000.00", "0.00"]]
 PLAIN_SAMPLES = [PLAIN_MD, "本公司会计年度自公历1月1日起至12月31日止。", "第一行\n第二行", "甲\n\n乙\n\n\n丙",
                  "| 项目 | 金额 |\n| --- | --- |\n| 合计 | 100 |", "R&D 投入 < 5%，<公司名称> 待填"]
@@ -90,7 +91,7 @@ class TestAppend:
         assert calls.count("p") == 2 and calls.count(False) >= 2
 
     def test_plain_markdown_table_list_and_bold(self):
-        """真库纯文字形态：markdown 表格成 Word 表格、编号列表续编号、加粗生效；竖线与 ** 记号不再出现。"""
+        """真库纯文字形态：markdown 表格成 Word 表格、加粗生效、书写的编号与项目符号原样；竖线与 ** 记号不再出现。"""
         document = _appended(PLAIN_MD)
         assert _texts(document.paragraphs) == PLAIN_MD_PARAGRAPHS
         [table] = document.tables
@@ -282,6 +283,43 @@ class TestExporters:
         block = SimpleNamespace(section_code="八、1", elements=[token._element])
         NoteWordExporter(SimpleNamespace())._fill_section_block(document, block, _note("八、1", "货币资金", SEPARATED))  # type: ignore[arg-type]
         assert _texts(document.paragraphs) == ["说明：本公司以人民币为记账本位币。\n外币业务按交易发生日的即期汇率折算。"]
+        # 纯文字同理：按渲染后的文字替换，不留 markdown 记号（第 22 组）
+        document = docx.Document()
+        token = document.add_paragraph("说明：{{section:八、1}}")
+        block = SimpleNamespace(section_code="八、1", elements=[token._element])
+        NoteWordExporter(SimpleNamespace())._fill_section_block(  # type: ignore[arg-type]
+            document, block, _note("八、1", "货币资金", "**注**：甲\n\n乙"))
+        assert _texts(document.paragraphs) == ["说明：注：甲\n乙"]
+
+    @pytest.mark.parametrize(("n_existing", "n_anchor"), [(0, 9), (1, 5), (3, 1), (6, 2), (10, 5)])
+    def test_table_placeholders_keep_existing_tables_in_place(self, n_existing, n_anchor):
+        """第 22 组真实导出实测抓到：``_render_table_at`` 按 ``id(t._tbl)`` 认新表，lxml 元素代理用完即回收、
+        id 会被复用 ⇒ 已放好的表被当新表挪到别处、新表被当旧表留在文末（模板模式表总数不变，和平 29 /
+        安徽 30 / 医疗器械 30 / 华氏 31 / 宜宾 7 张表位置不对）；且只挪表、表后空段留在文末（和平文末 25 个空段）。"""
+        from docx.oxml.ns import qn as _qn
+
+        from app.services.note_word_exporter import NoteWordExporter
+
+        document = docx.Document()
+        for i in range(n_existing):
+            document.add_paragraph(f"既有{i}")
+            document.add_table(rows=1, cols=1).cell(0, 0).text = f"既有表{i}"
+        anchors = [document.add_paragraph(f"锚{j}") for j in range(n_anchor)]
+        exporter = NoteWordExporter(SimpleNamespace())  # type: ignore[arg-type]
+        for j, anchor in enumerate(anchors):
+            exporter._render_table_at(document, anchor, {"headers": ["项目", f"新{j}"],
+                                                         "rows": [{"label": f"新{j}行", "values": [1]}]})
+        seq = [("T:" if el.tag == _qn("w:tbl") else "P:") + "".join(t.text or "" for t in el.iter(_qn("w:t")))
+               for el in document.element.body.iterchildren() if el.tag in (_qn("w:p"), _qn("w:tbl"))]
+        assert sum(s.startswith("T:") for s in seq) == n_existing + n_anchor
+        for i in range(n_existing):
+            assert seq[seq.index(f"P:既有{i}") + 1] == f"T:既有表{i}", seq
+        for j in range(n_anchor):
+            k = seq.index(f"P:锚{j}")
+            assert seq[k + 1].startswith(f"T:项目新{j}") and seq[k + 2] == "P:", seq  # 表后空段随表走
+        # 每个空段都紧跟一张新表：文末不堆空段
+        assert [i for i, s in enumerate(seq) if s == "P:" and not seq[i - 1].startswith("T:项目新")] == [], seq
+        assert seq.count("P:") == n_anchor, seq
 
     def test_refresh_replaces_block_with_rendered_html(self):
         from app.services.deliverable_refresh_service import DeliverableRefreshService

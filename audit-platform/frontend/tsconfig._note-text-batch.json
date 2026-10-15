@@ -20,6 +20,9 @@
     "src/components/disclosure/DisclosureNoteContentTools.vue",
     "src/components/disclosure/NoteSourceBadge.vue",
     "src/components/disclosure/noteContentTools.ts",
+    "src/utils/noteTextMarkdown.ts",
+    "src/utils/__tests__/noteTextMarkdown.spec.ts",
+    "src/views/__tests__/disclosureEditorTextLoad.spec.ts",
     "src/env.d.ts"
   ]
 }

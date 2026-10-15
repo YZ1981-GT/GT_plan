@@ -148,11 +148,12 @@ class TestOrderedListStart:
         assert sanitize_note_html(html) == expected
         assert sanitize_note_html(expected) == expected
 
-    def test_plain_text_numbering_continues_after_conversion(self):
-        from app.services.note_html_sanitizer import note_text_to_html
+    def test_editor_list_numbering_survives_append(self):
+        """编辑器建的续编号列表（TipTap 存 ``<ol start>``）经追加写入后编号不变。"""
+        from app.services.note_html_sanitizer import append_note_html
 
-        assert note_text_to_html("1. 存货分类\n\n说明段落\n\n2. 计价方法") == (
-            '<ol><li>存货分类</li></ol><p>说明段落</p><ol start="2"><li>计价方法</li></ol>')
+        out = append_note_html('<ol start="3"><li>丙</li></ol>', "<p>新</p>")
+        assert out == '<ol start="3"><li>丙</li></ol><p>&nbsp;</p><p>新</p>'
 
 
 # ── 第二轮复盘 R-05：未知标签只剥标签、保留文本；危险容器才丢内容 ──────────────

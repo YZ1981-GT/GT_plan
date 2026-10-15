@@ -1322,27 +1322,8 @@ import { isEmptyTable, type EmptyTableRow, type EmptyTableColumnDef } from '@/vi
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { DisclosureNoteContentTools, NoteSourceBadge } from '@/components/disclosure/noteContentTools'
 import NoteRichTextEditor from '@/components/NoteRichTextEditor.vue'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
-
-// 附注正文渲染：text_content 可能是 HTML（富文本框保存）或 markdown 纯文本
-// （历史「生成附注」LLM 草稿写入 ### / ** / 列表）。NoteRichTextEditor 按 HTML 渲染，
-// markdown 会显示成字面 ###/**。此处加载时将 markdown 归一为 HTML（幂等：HTML 原样返回），
-// 保存后即以 HTML 落库，逐步清除存量 markdown 残留。
-function renderNoteTextToHtml(raw: string | null | undefined): string {
-  if (!raw) return ''
-  const t = raw.trim()
-  if (!t) return ''
-  // 已是 HTML（富文本框保存的内容）→ 原样保留，不二次转换
-  if (t.startsWith('<')) return raw
-  try {
-    const html = marked.parse(t, { async: false, gfm: true, breaks: true }) as string
-    return DOMPurify.sanitize(html)
-  } catch {
-    // 转换失败降级为段落包裹（保底不丢内容）
-    return t.split(/\n\n+/).filter(Boolean).map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
-  }
-}
+// 附注正文加载口径（markdown 残留归一为 HTML，幂等）：与 Word 导出 / 批量写入同一引擎同一规则（第 22 组）
+import { renderNoteTextToHtml } from '@/utils/noteTextMarkdown'
 import NotesPrintPreview from '@/components/notes/NotesPrintPreview.vue'
 import { refreshDisclosureFromWorkpapers, getProjectWizardState } from '@/services/commonApi'
 import { useEditor } from '@tiptap/vue-3'
@@ -1959,8 +1940,8 @@ const { clearDraft: clearAutoSaveDraft } = useAutoSave(
   (data) => {
     if (!currentNote.value || !data) return
     if (data.text_content != null) {
-      textContent.value = data.text_content
-      editor.value?.commands.setContent(data.text_content)
+      textContent.value = renderNoteTextToHtml(data.text_content)
+      editor.value?.commands.setContent(textContent.value, { emitUpdate: false })
     }
     if (data.table_data != null) {
       currentNote.value.table_data = data.table_data
@@ -2773,12 +2754,14 @@ async function fetchDetail(noteSection: string, bypassCache = false) {
     _detailCache.set(key, currentNote.value)
   }
 
-  // markdown 残留归一为 HTML（幂等），喂给 NoteRichTextEditor(v-model=textContent) 与 legacy editor
+  // markdown 残留归一为 HTML（幂等），喂给 NoteRichTextEditor(v-model=textContent) 与 legacy editor。
+  // legacy editor 不渲染、只给 AI 续写 / 改写用（StarterKit 无表格）：TipTap 3 的 setContent 默认触发 onUpdate，
+  // 会把拍平表格后的 HTML 写回 textContent（第 22 组）⇒ 加载 / 恢复草稿一律 emitUpdate: false
   textContent.value = renderNoteTextToHtml(currentNote.value.text_content)
   placeholderDismissed.value = false // P0-3：切换章节重置占位文本提示
   deTextAfterExpanded.value = false  // 切换章节重置表格后文字折叠
   if (editor.value) {
-    editor.value.commands.setContent(textContent.value || '')
+    editor.value.commands.setContent(textContent.value || '', { emitUpdate: false })
   }
   // 并行加载上年数据
   try {

@@ -1,0 +1,172 @@
+{
+  "_doc": "附注纯文字正文按 markdown 渲染的两端对拍用例（spec disclosure-note-doc-upload-and-batch-fill 第 22 组）。前端 src/utils/noteTextMarkdown.ts（编辑器加载）与后端 app/services/note_html_sanitizer.py（Word 导出 / 批量写入）同一引擎 markdown-it、同一配置；两端测试逐条跑本文件，结论必须完全一致。detect_cases：是否按 HTML 对待（is_html）；render_cases：纯文字的引擎原样输出（未消毒，去掉标签边上的换行）。改规则必须两端同改并补用例。expected 由后端引擎生成后人工逐条核对。",
+  "detect_cases": [
+    {
+      "text": "<p>正文</p>",
+      "is_html": true,
+      "note": "编辑器保存的段落"
+    },
+    {
+      "text": "前言<br>第二行",
+      "is_html": true,
+      "note": "文字中夹换行标签也是 HTML"
+    },
+    {
+      "text": "<P class=\"x\">大写标签</P>",
+      "is_html": true,
+      "note": "标签名不分大小写"
+    },
+    {
+      "text": "<br/>",
+      "is_html": true,
+      "note": "自闭合"
+    },
+    {
+      "text": "</td>",
+      "is_html": true,
+      "note": "结束标签"
+    },
+    {
+      "text": "<公司名称>的会计政策",
+      "is_html": false,
+      "note": "中文尖括号占位不是标签"
+    },
+    {
+      "text": "a < b 且 c > d",
+      "is_html": false,
+      "note": "比较符号不是标签"
+    },
+    {
+      "text": "<company>文字",
+      "is_html": false,
+      "note": "不认识的英文标签名按文字"
+    },
+    {
+      "text": "<b中文>",
+      "is_html": false,
+      "note": "标签名后紧跟汉字不算标签（Unicode 词边界）"
+    },
+    {
+      "text": "<h7>七级</h7>",
+      "is_html": false,
+      "note": "没有 h7"
+    },
+    {
+      "text": "<pre>代码</pre>",
+      "is_html": false,
+      "note": "pre 不在判据里"
+    },
+    {
+      "text": "",
+      "is_html": false,
+      "note": "空串"
+    }
+  ],
+  "render_cases": [
+    {
+      "text": "说明如下：\n1. 第一项\n2. 第二项",
+      "expected": "<p>说明如下：<br />1. 第一项<br />2. 第二项</p>",
+      "note": "书写的编号接在文字后：同段换行，不拆段、不成列表"
+    },
+    {
+      "text": "1. 第一项\n2. 第二项",
+      "expected": "<p>1. 第一项<br />2. 第二项</p>",
+      "note": "段首编号不成列表"
+    },
+    {
+      "text": "1. 甲\n2. 乙\n\n1. 丙\n2. 丁",
+      "expected": "<p>1. 甲<br />2. 乙</p><p>1. 丙<br />2. 丁</p>",
+      "note": "两组 1~2 编号原样（不连续改号）"
+    },
+    {
+      "text": "3. 从三开始\n4. 第四",
+      "expected": "<p>3. 从三开始<br />4. 第四</p>",
+      "note": "非 1 起始编号原样"
+    },
+    {
+      "text": "1) 括号编号\n2) 第二",
+      "expected": "<p>1) 括号编号<br />2) 第二</p>",
+      "note": "半角右括号编号原样"
+    },
+    {
+      "text": "（1）本公司\n（2）子公司",
+      "expected": "<p>（1）本公司<br />（2）子公司</p>",
+      "note": "全角括号编号"
+    },
+    {
+      "text": "1.经济利益流出不确定性的说明。",
+      "expected": "<p>1.经济利益流出不确定性的说明。</p>",
+      "note": "编号后无空格"
+    },
+    {
+      "text": "- 甲\n- 乙",
+      "expected": "<p>- 甲<br />- 乙</p>",
+      "note": "短横线项原样"
+    },
+    {
+      "text": "说明：\n- 甲\n+ 乙\n* 丙",
+      "expected": "<p>说明：<br />- 甲<br />+ 乙<br />* 丙</p>",
+      "note": "三种项目符号接在文字后：同段换行"
+    },
+    {
+      "text": "    缩进四格的说明\n    第二行",
+      "expected": "<p>缩进四格的说明<br />第二行</p>",
+      "note": "缩进不是代码块"
+    },
+    {
+      "text": "第一段\n\n第二段",
+      "expected": "<p>第一段</p><p>第二段</p>",
+      "note": "空行分段"
+    },
+    {
+      "text": "第一行\n第二行",
+      "expected": "<p>第一行<br />第二行</p>",
+      "note": "单换行即换行"
+    },
+    {
+      "text": "| 项目 | 金额 |\n| --- | ---: |\n| 甲 | 1,000.00 |",
+      "expected": "<table><thead><tr><th>项目</th><th style=\"text-align:right\">金额</th></tr></thead><tbody><tr><td>甲</td><td style=\"text-align:right\">1,000.00</td></tr></tbody></table>",
+      "note": "GFM 表格（含对齐）"
+    },
+    {
+      "text": "| 项目 | 金额 |\n| 甲 | 1 |",
+      "expected": "<p>| 项目 | 金额 |<br />| 甲 | 1 |</p>",
+      "note": "无分隔行的竖线文字不是表格"
+    },
+    {
+      "text": "### 标题\n正文",
+      "expected": "<h3>标题</h3><p>正文</p>",
+      "note": "标题"
+    },
+    {
+      "text": "**重要**：正文",
+      "expected": "<p><strong>重要</strong>：正文</p>",
+      "note": "粗体"
+    },
+    {
+      "text": "~~删除~~ 保留",
+      "expected": "<p><s>删除</s> 保留</p>",
+      "note": "删除线"
+    },
+    {
+      "text": "<公司名称>的会计政策 a < b 且 c > d",
+      "expected": "<p>&lt;公司名称&gt;的会计政策 a &lt; b 且 c &gt; d</p>",
+      "note": "尖括号按文字"
+    },
+    {
+      "text": "R&D 与 P&L",
+      "expected": "<p>R&amp;D 与 P&amp;L</p>",
+      "note": "裸 & 转义"
+    },
+    {
+      "text": "上文\n\n---\n\n下文",
+      "expected": "<p>上文</p><hr /><p>下文</p>",
+      "note": "分隔线"
+    },
+    {
+      "text": "网址 www.example.com 与 https://example.com",
+      "expected": "<p>网址 www.example.com 与 https://example.com</p>",
+      "note": "不自动识别链接"
+    }
+  ]
+}

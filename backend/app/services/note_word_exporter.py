@@ -1250,19 +1250,24 @@ class NoteWordExporter:
         return result
 
     def _render_table_at(self, doc: Document, anchor_para, table_data: dict) -> None:
-        """在 anchor 段落处渲染表格（复用 _render_table，再把表移动到锚点位置）."""
-        before = set(id(t._tbl) for t in doc.tables)
+        """在 anchor 段落处渲染表格（复用 _render_table，再把它追加的块原样移到锚点之后）.
+
+        ``_render_table`` 经 ``doc.add_table`` / ``doc.add_paragraph`` 把「表 + 表后空段」追加在正文末尾
+        （``w:sectPr`` 之前）⇒ 按位置取 body 末尾新增的那几个块，按原顺序移到锚点后。
+        🔴 首版按 ``id(t._tbl)`` 认新表：lxml 元素代理用完即回收、id 会被复用 ⇒ 已放好的表被当新表挪走、
+        新表被当旧表留在文末（第 22 组真实导出实测：模板模式表总数不变，和平 29 / 安徽 30 / 医疗器械 30 /
+        华氏 31 / 宜宾 7 张表位置不对）；且只挪表，表后空段全留在文末（和平文末堆 25 个空段）。
+        """
+        body = doc.element.body
+        count_before = len(body)
         self._render_table(doc, table_data)
-        # 找到新追加的表，移动到 anchor 之后
-        new_tbls = [t for t in doc.tables if id(t._tbl) not in before]
+        added = len(body) - count_before
+        end = len(body) - (1 if len(body) and body[-1].tag == qn("w:sectPr") else 0)
         anchor_el = anchor_para._p
-        for tbl in new_tbls:
-            tbl_el = tbl._tbl
-            parent = tbl_el.getparent()
-            if parent is not None:
-                parent.remove(tbl_el)
-            anchor_el.addnext(tbl_el)
-            anchor_el = tbl_el
+        for el in list(body)[end - added:end]:
+            body.remove(el)
+            anchor_el.addnext(el)
+            anchor_el = el
 
     def _fill_seq_placeholders(
         self, doc: Document, kept_codes: list[str], seq_numbers: dict[str, str]

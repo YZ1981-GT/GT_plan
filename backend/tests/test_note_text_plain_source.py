@@ -23,11 +23,22 @@ class TestNoteTextToHtml:
     def test_paragraphs_and_line_breaks_follow_editor(self):
         assert note_text_to_html(PLAIN) == "<p>第一段第一行<br />第一段第二行</p><p>第二段</p>"
 
-    def test_markdown_table_and_list_render_like_editor(self):
+    def test_markdown_table_renders_and_typed_numbering_is_text(self):
         html = note_text_to_html(MD_TABLE)
         assert "<table>" in html and "<th>项目</th>" in html and "<td>库存现金</td>" in html
-        assert "<ol><li>定义范围</li><li>受限资金</li></ol>" in html
+        assert "<p>1. 定义范围<br />2. 受限资金</p>" in html
         assert "|" not in html and "style=" not in html
+
+    def test_typed_numbering_is_never_renumbered(self):
+        """第 22 组真库实测：按 markdown 有序列表解释会重排书写的编号 —— 真库 476 个带编号的纯文字章节里
+        69 个被改号（如「1~4、1~4」排成 1~8），续编号还丢 start。纯文字里的编号是正文，原样保留。"""
+        assert note_text_to_html("1. 甲\n2. 乙\n3. 丙\n1. 丁\n2. 戊") == "<p>1. 甲<br />2. 乙<br />3. 丙<br />1. 丁<br />2. 戊</p>"
+        assert note_text_to_html("1. 存货分类\n\n说明段落\n\n2. 计价方法") == "<p>1. 存货分类</p><p>说明段落</p><p>2. 计价方法</p>"
+        assert note_text_to_html("- 先进先出\n- 加权平均") == "<p>- 先进先出<br />- 加权平均</p>"
+
+    def test_indented_lines_are_text_not_code_block(self):
+        """缩进四格在 markdown 里是代码块（消毒器不认 pre/code ⇒ 剥标签后几行并成一行）；附注正文里只是缩进。"""
+        assert note_text_to_html("前文\n\n    缩进四格的一段\n    第二行") == "<p>前文</p><p>缩进四格的一段<br />第二行</p>"
 
     def test_angle_brackets_and_ampersands_are_text(self):
         assert note_text_to_html("<公司名称> 与 R&D、P&L 1<2") == "<p>&lt;公司名称&gt; 与 R&amp;D、P&amp;L 1&lt;2</p>"
