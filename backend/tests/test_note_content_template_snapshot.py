@@ -367,3 +367,18 @@ class TestSaverNameAndAppliedVersion:
                 preview_digest="d" * 64, applied_count=1, applied_at=datetime(2026, 9, 1, 9, 0, 0)))
             await db.commit()
         assert (await item("B"))["last_applied"]["version_no"] == 1
+
+
+@pytest.mark.asyncio
+async def test_snapshot_sections_follow_document_order_not_sibling_index(env):
+    """模板章节顺序 = 来源项目的全文顺序（sort_order）。sort_index 是同层级内序号（真库多数项目全为 0），
+    首版按它排 ⇒ 汉字码位序「一、三、二」，引用模板时预览列表与章分组顺序全乱。"""
+    ids = env["ids"]
+    async with env["factory"]() as db:
+        for code, title, order in (("三、1", "遵循企业会计准则的声明", 300), ("一、1", "公司基本情况", 100),
+                                   ("二、1", "财务报表编制基础", 200)):
+            db.add(DisclosureNote(project_id=ids["B"], year=YEAR, note_section=code, section_title=title,
+                                  text_content="<p>正文</p>", sort_order=order, sort_index=0))
+        await db.commit()
+        snap = await generate_snapshot(db, ids["B"], YEAR)
+    assert [s["note_section"] for s in snap["sections_data"]] == ["一、1", "二、1", "三、1"]

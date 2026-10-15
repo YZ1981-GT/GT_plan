@@ -533,7 +533,9 @@ class GroupNoteBaselineService:
                 DisclosureNote.project_id == project_id,
                 DisclosureNote.is_deleted == False,  # noqa: E712
             )
-            .order_by(DisclosureNote.sort_index)
+            # 全文顺序 = sort_order；sort_index 是同层级内序号（多数项目全为 0），只作并列次序
+            .order_by(DisclosureNote.sort_order.asc().nulls_last(), DisclosureNote.sort_index,
+                      DisclosureNote.note_section)
         )
         result = await self.db.execute(stmt)
         notes = result.scalars().all()

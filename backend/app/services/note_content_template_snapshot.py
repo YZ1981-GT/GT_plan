@@ -82,7 +82,8 @@ async def generate_snapshot(db: AsyncSession, project_id: UUID, year: int) -> di
         sa.select(DisclosureNote)
         .where(DisclosureNote.project_id == project_id, DisclosureNote.year == year,
                DisclosureNote.is_deleted == sa.false())
-        .order_by(DisclosureNote.sort_index, DisclosureNote.note_section)
+        # 模板章节按来源项目的全文顺序（sort_order）；sort_index 是同层级内序号，不能当全文顺序
+        .order_by(DisclosureNote.sort_order.asc().nulls_last(), DisclosureNote.sort_index, DisclosureNote.note_section)
     )).scalars().all()
 
     sections: list[dict[str, Any]] = []

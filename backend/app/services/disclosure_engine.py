@@ -145,6 +145,21 @@ def _resolve_check_roles(tmpl: dict) -> list[str]:
     return out
 
 
+def _fill_tree_fields(note: DisclosureNote, tmpl: dict, taken: set[str] | None) -> None:
+    """Task 10：模板树形字段（V019）只补空、不覆盖 —— 旧行回填幂等，转换服务 / 用户已写的不动。
+
+    同项目年度已有行占用该 section_id ⇒ 不补（不制造重复）；占用表取不到（``taken is None``）⇒ 一律不补。
+    section_id 只在同一模板内稳定，跨模板匹配仍走 variant matrix 与显式别名（AC-3.1）。
+    """
+    sid = tmpl.get("section_id")
+    if note.section_id or not sid or taken is None or sid in taken:
+        return
+    note.section_id, note.level, note.parent_section_id = sid, tmpl.get("level"), tmpl.get("parent_section_id")
+    if isinstance(tmpl.get("sort_index"), int):
+        note.sort_index = tmpl["sort_index"]
+    taken.add(sid)
+
+
 def _append_missing_template_tables(
     existing_td: dict,
     new_td: dict,
@@ -1012,6 +1027,11 @@ class DisclosureEngine:
                 "wide_table_presets": s.get("wide_table_presets", []),
                 "scope": s.get("scope", "both"),
                 "_custom": s.get("_custom", False),
+                # Task 10：模板树形字段透传（V019 列）。section_id 只在同一模板内稳定，跨模板仍走显式映射
+                "section_id": s.get("section_id"),
+                "level": s.get("level"),
+                "parent_section_id": s.get("parent_section_id"),
+                "sort_index": s.get("sort_index"),
             }
             for idx, s in enumerate(sections)
         ]
@@ -1834,6 +1854,22 @@ class DisclosureEngine:
             except Exception:
                 pass
 
+        # Task 10：本项目年度已占用的 section_id —— 补树形字段时不制造重复（取不到就一律不补）
+        taken_sids: set[str] | None
+        try:
+            taken_sids = {sid for sid in (await self.db.execute(
+                sa.select(DisclosureNote.section_id).where(
+                    DisclosureNote.project_id == project_id, DisclosureNote.year == year,
+                    DisclosureNote.is_deleted == sa.false(), DisclosureNote.section_id.is_not(None))
+            )).scalars().all() if isinstance(sid, str)}
+        except Exception as _sid_err:
+            logger.warning("load taken section_id failed: %s (tree fields not filled)", _sid_err)
+            taken_sids = None
+            try:  # PG 上失败的查询会让事务 aborted，后续 upsert 全挂 ⇒ 与上面预加载同口径先回滚
+                await self.db.rollback()
+            except Exception:
+                pass
+
         for tmpl in templates:
             note_section = tmpl["note_section"]
             section_title = tmpl["section_title"]
@@ -2005,6 +2041,7 @@ class DisclosureEngine:
                 note.guidance_text = guidance_text
                 note.source_template = source_template
                 note.sort_order = sort_order
+                _fill_tree_fields(note, tmpl, taken_sids)
             else:
                 note = DisclosureNote(
                     project_id=project_id,
@@ -2020,6 +2057,7 @@ class DisclosureEngine:
                     status=NoteStatus.draft,
                     sort_order=sort_order,
                 )
+                _fill_tree_fields(note, tmpl, taken_sids)
                 # F50 / Sprint 8.19: 附注创建时绑定当前 active dataset
                 try:
                     from app.services.dataset_query import bind_to_active_dataset

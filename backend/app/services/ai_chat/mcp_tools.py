@@ -895,7 +895,9 @@ async def tool_note_read(
             await ctx.db.execute(
                 sa.select(DisclosureNote)
                 .where(sa.and_(*conditions))
-                .order_by(DisclosureNote.sort_index, DisclosureNote.note_section)
+                # 全文顺序 = sort_order；sort_index 是同层级内序号，按它排会让 limit 截到错的章节
+                .order_by(DisclosureNote.sort_order.asc().nulls_last(), DisclosureNote.sort_index,
+                          DisclosureNote.note_section)
                 .limit(limit)
             )
         )

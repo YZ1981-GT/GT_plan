@@ -1416,3 +1416,7 @@ backend/app/services/ledger_sampling_service.py  1044
 #   D1TabVoucherCheck.vue —— D1 凭证检查表（原 D1TabSamplingVouching，已重命名统一）。
 #     拆分方向：OCR/导出/抽凭回填逻辑抽伴生 composable。
 audit-platform/frontend/src/components/workpaper/d1/D1TabVoucherCheck.vue  1645
+#   ai_chat/mcp_tools.py —— AI 对话 MCP 工具集（非本次引入；触碰前已 1067 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-14 disclosure-note-doc-upload-and-batch-fill 第 12 组只改附注检索的排序键（+2 行：sort_order 打头，
+#     与同类 4 处一并修正，见该 spec tasks.md 第 12 组）。拆分方向：按工具域（附注 / 底稿 / 报表）分模块。
+backend/app/services/ai_chat/mcp_tools.py  1070

@@ -147,6 +147,9 @@
 
 上传/知识库目标查询使用 `scope=narrative`；模板快照使用 `scope=all`。
 
+> 第 12 组修订：`sort_index` 是 V019「同层级内序号」，不是全文顺序（真库 6 个项目里 4 个全为 0）。目标查询与模板快照一律按 `sort_order` 打头排序，`sort_index` 与编号只作并列次序。
+> 生成链透传模板的 section_id / level / parent_section_id / sort_index（旧行只补空不覆盖）；旧数据用 `backend/scripts/migrate/backfill_note_tree_fields.py` 回填（默认 dry-run，真实回填待拍板）。section_id 只在同一模板内稳定，跨模板匹配仍按 4.2。
+
 ### 4.2 匹配优先级
 
 1. **目标行定位**：apply 永远使用目标项目内 `DisclosureNote.id`；

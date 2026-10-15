@@ -1,4 +1,8 @@
-"""Sprint A.0.5 — 一次性 DB backfill：disclosure_notes.section_id / level / parent_section_id / sort_index.
+"""⚠️ 已由 ``backfill_note_tree_fields.py`` 取代，勿再执行（2026-10-14 复核）：本脚本把国企、上市两套模板合成一个
+按编号的索引且国企优先，两套模板同编号而 ID 不同的 14 个章节（如上市版「八、1 政府补助」）在上市项目上会拿到国企的
+section_id；也不区分合并 / 单体口径，且不查同项目已占用的 ID。
+
+Sprint A.0.5 — 一次性 DB backfill：disclosure_notes.section_id / level / parent_section_id / sort_index.
 
 **目的**：把 V019 新增的 7 列从 NULL 填充为有效值，数据来源 = 模板 JSON
 （已由 A.0.2 脚本注入 section_id / level / parent_section_id / sort_index）。

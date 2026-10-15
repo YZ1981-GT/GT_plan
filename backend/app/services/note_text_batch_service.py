@@ -115,7 +115,8 @@ async def load_target_sections(
             DisclosureNote.year == year,
             DisclosureNote.is_deleted == sa.false(),
         )
-        .order_by(DisclosureNote.sort_index, DisclosureNote.note_section)
+        # 全文顺序 = sort_order（生成链 / 导出 / 编辑器同口径）；sort_index 是 V019「同层级内序号」，只作并列时的次序
+        .order_by(DisclosureNote.sort_order.asc().nulls_last(), DisclosureNote.sort_index, DisclosureNote.note_section)
     )).all()
 
     parents = {r.parent_section_id for r in rows if r.parent_section_id}

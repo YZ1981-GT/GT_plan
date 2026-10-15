@@ -428,7 +428,9 @@ class HostContextResolver:
             )
             if host.year_assertion is not None:
                 stmt = stmt.where(DisclosureNote.year == host.year_assertion)
-            stmt = stmt.order_by(DisclosureNote.sort_index, DisclosureNote.note_section)
+            # 全文顺序 = sort_order；sort_index 是 V019「同层级内序号」（多数项目全为 0），只作并列次序
+            stmt = stmt.order_by(DisclosureNote.sort_order.asc().nulls_last(), DisclosureNote.sort_index,
+                                 DisclosureNote.note_section)
 
         row = (await self._db.execute(stmt.limit(1))).first()
         if row is None:

@@ -237,6 +237,21 @@ async def _seed(db: AsyncSession) -> uuid.UUID:
 
 class TestLoadTargetSections:
     @pytest.mark.asyncio
+    async def test_targets_follow_document_order_not_sibling_index(self, db):
+        """sort_index 是 V019 的「同层级内序号」（真库 6 个项目里 4 个全为 0），不是全文顺序；生成链、导出都按 sort_order。
+        首版按 sort_index + 编号字符串排序 ⇒ 汉字码位序「一、三、二」，手工映射下拉与模板章节顺序全乱。"""
+        pid = uuid.uuid4()
+        db.add(Project(id=pid, name="乙_2025", client_name="乙公司", template_type="soe", report_scope="standalone"))
+        await db.flush()
+        for code, title, order in (("三、1", "遵循企业会计准则的声明", 300), ("一、1", "公司基本情况", 100),
+                                   ("二、1", "财务报表编制基础", 200)):
+            db.add(DisclosureNote(project_id=pid, year=2025, note_section=code, section_title=title,
+                                  text_content="<p>正文</p>", sort_order=order, sort_index=0))
+        await db.flush()
+        rows = await load_target_sections(db, pid, 2025, scope="all")
+        assert [r["note_section"] for r in rows] == ["一、1", "二、1", "三、1"]
+
+    @pytest.mark.asyncio
     async def test_narrative_scope_excludes_account_even_if_account_name_set(self, db):
         pid = await _seed(db)
         rows = await load_target_sections(db, pid, 2025, scope="narrative")

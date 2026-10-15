@@ -467,7 +467,9 @@ class MentionSearchService:
                     DisclosureNote.note_section.ilike(pattern),
                 ),
             )
-            .order_by(DisclosureNote.sort_index, DisclosureNote.note_section)
+            # 全文顺序 = sort_order；sort_index 是同层级内序号，按它排会让 limit 截到错的章节
+            .order_by(DisclosureNote.sort_order.asc().nulls_last(), DisclosureNote.sort_index,
+                      DisclosureNote.note_section)
             .limit(limit)
         )
         rows = (await self._db.execute(stmt)).all()
