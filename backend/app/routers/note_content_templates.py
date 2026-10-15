@@ -42,10 +42,11 @@ async def list_templates_endpoint(
     project_id: UUID,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    year: int | None = Query(None, ge=2000, le=2200, description="给定时 last_applied 只看本项目该年度的引用"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    return await list_templates(db, project_id=project_id, user=current_user, limit=limit, offset=offset)
+    return await list_templates(db, project_id=project_id, user=current_user, limit=limit, offset=offset, year=year)
 
 
 @router.post("/snapshot-preview", summary="预检：全套快照质量摘要与 digest（不落库）")

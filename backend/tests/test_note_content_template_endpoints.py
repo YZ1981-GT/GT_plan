@@ -21,15 +21,20 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.base import Base, PermissionLevel, ProjectStatus, ProjectUserRole
 from app.models.core import Project, ProjectUser, User, UserRole
-from app.models.note_content_template_models import NoteContentTemplate, NoteContentTemplateVersion
+from app.models.note_content_template_models import (
+    NoteContentTemplate,
+    NoteContentTemplateVersion,
+    NoteTextBatchApplication,
+)
 from app.models.report_models import DisclosureNote
 from app.models.staff_models import ProjectAssignment, StaffMember
 from app.routers import note_content_templates
 
 YEAR = 2025
+# 列表要查本项目最近一次引用的版本（AC-8.4）⇒ 应用记录表与生产（V187）一样必须存在
 _TABLES = [User.__table__, Project.__table__, ProjectUser.__table__, DisclosureNote.__table__,
-           NoteContentTemplate.__table__, NoteContentTemplateVersion.__table__, StaffMember.__table__,
-           ProjectAssignment.__table__]
+           NoteContentTemplate.__table__, NoteContentTemplateVersion.__table__, NoteTextBatchApplication.__table__,
+           StaffMember.__table__, ProjectAssignment.__table__]
 
 
 class _Actor:
@@ -143,6 +148,28 @@ class TestFlow:
         assert listed["total"] == 1 and listed["items"][0]["current_version"]["version_no"] == 1
         assert (await env["client"].get(_url(env, f"/{tid}"))).status_code == 200
         assert (await env["client"].get(_url(env, f"/{tid}/versions"))).json()["total"] == 1
+
+    @pytest.mark.asyncio
+    async def test_list_carries_saver_name_and_year_scoped_last_applied(self, env):
+        """AC-8.2 / AC-8.4 走真实端点：保存人姓名、按 year 查询参数限定的「本项目已引用」版本。"""
+        env["act_as"]("boss")
+        saved = (await _save(env)).json()
+        async with env["factory"]() as db:
+            db.add(NoteTextBatchApplication(
+                source_kind="content_template", template_version_id=uuid.UUID(saved["version_id"]),
+                target_project_id=env["ids"]["A"], target_year=YEAR, mutation_id="m-1", request_fingerprint="a" * 64,
+                preview_digest="b" * 64, applied_count=1))
+            await db.commit()
+        [item] = (await env["client"].get(_url(env), params={"year": YEAR})).json()["items"]
+        assert item["current_version"]["created_by_name"] == "经理甲"
+        assert (item["last_applied"]["version_id"], item["last_applied"]["version_no"]) == (saved["version_id"], 1)
+        [other_year] = (await env["client"].get(_url(env), params={"year": YEAR + 1})).json()["items"]
+        assert other_year["last_applied"] is None
+        detail = (await env["client"].get(_url(env, f"/{saved['template_id']}"))).json()
+        versions = (await env["client"].get(_url(env, f"/{saved['template_id']}/versions"))).json()["items"]
+        assert detail["current_version"]["created_by_name"] == versions[0]["created_by_name"] == "经理甲"
+        resp = await env["client"].get(_url(env), params={"year": 1})
+        assert resp.status_code == 422 and isinstance(resp.json()["detail"], list), resp.text
 
     @pytest.mark.asyncio
     async def test_stale_digest_is_409(self, env):

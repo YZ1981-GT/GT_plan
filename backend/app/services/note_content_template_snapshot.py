@@ -6,7 +6,8 @@ spec: disclosure-note-doc-upload-and-batch-fill Phase 7 Task 41~45（第二轮�
 - 保存前重算 digest，来源变化 ⇒ 409；集团模板须集团根项目的经理 / 合伙人才能发布（R-04）；
 - 同名模板目录行 ``FOR UPDATE`` 串行化版本号分配；并发首建撞部分唯一索引时回滚 SAVEPOINT、改取胜者（R-13）；
 - 版本不可变：同 hash 复用（回退到历史内容 ⇒ current 指回该版本），新 hash 递增 version_no；
-- 列表在 SQL 层按可见性过滤并分页，不逐行判权（R-15）。
+- 列表在 SQL 层按可见性过滤并分页，不逐行判权（R-15）；
+- 版本元数据读时解析保存人姓名（AC-8.2）；列表带本项目最近一次引用的版本，供「有新版本」只读提示（AC-8.4）。
 """
 
 from __future__ import annotations
@@ -22,9 +23,14 @@ import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.core import Project
-from app.models.note_content_template_models import NoteContentTemplate, NoteContentTemplateVersion
+from app.models.core import Project, User
+from app.models.note_content_template_models import (
+    NoteContentTemplate,
+    NoteContentTemplateVersion,
+    NoteTextBatchApplication,
+)
 from app.models.report_models import DisclosureNote
+from app.models.staff_models import StaffMember
 from app.services.note_content_template_service import (
     can_manage_group_template,
     can_view_template,
@@ -262,7 +268,7 @@ async def _lock_or_create_template(
     return template
 
 
-def _version_meta(v: Any) -> dict[str, Any] | None:
+def _version_meta(v: Any, names: dict[UUID, str] | None = None) -> dict[str, Any] | None:
     if v is None or getattr(v, "id", None) is None:
         return None
     return {
@@ -271,15 +277,60 @@ def _version_meta(v: Any) -> dict[str, Any] | None:
         "template_type": v.template_type, "report_scope": v.report_scope, "quality_summary": v.quality_summary,
         "content_hash": v.content_hash, "byte_size": v.byte_size,
         "created_by": str(v.created_by) if v.created_by else None,
+        "created_by_name": (names or {}).get(v.created_by),
         "created_at": v.created_at.isoformat() if v.created_at else None,
     }
 
 
-def _template_meta(t: NoteContentTemplate, current: Any) -> dict[str, Any]:
+async def _saver_names(db: AsyncSession, user_ids: list[UUID | None]) -> dict[UUID, str]:
+    """保存人展示名（AC-8.2）：优先人员档案姓名，回退登录名；读时解析，改名即生效、不落冗余列。
+
+    同一用户可有多份人员档案（真库存在）⇒ 按 user_id 聚合取 ``MIN(name)``：结果确定，且不会因联表把版本行翻倍。
+    """
+    ids = {u for u in user_ids if u is not None}
+    if not ids:
+        return {}
+    rows = (await db.execute(
+        sa.select(StaffMember.user_id, sa.func.min(StaffMember.name).label("name"))
+        .where(StaffMember.user_id.in_(ids), StaffMember.is_deleted.is_(False))
+        .group_by(StaffMember.user_id)
+    )).all()
+    names = {r.user_id: r.name for r in rows if r.name}
+    missing = ids - names.keys()
+    if missing:
+        names.update({r.id: r.username for r in (await db.execute(
+            sa.select(User.id, User.username).where(User.id.in_(missing)))).all()})
+    return names
+
+
+async def _last_applied_versions(db: AsyncSession, *, project_id: UUID, year: int | None,
+                                 template_ids: list[UUID]) -> dict[UUID, dict[str, Any]]:
+    """本项目（给了年度就只看该年度）对这些模板**最近一次**成功引用的版本（AC-8.4「有新版本」只读提示用）。
+
+    按引用时间取最近一次而不是取最大版本号：用户可能刻意引回旧版本，此时同样应提示与当前版本不同。
+    """
+    if not template_ids:
+        return {}
+    app, ver = NoteTextBatchApplication, NoteContentTemplateVersion
+    stmt = (sa.select(ver.template_id, ver.id, ver.version_no, app.applied_at)
+            .select_from(app).join(ver, ver.id == app.template_version_id)
+            .where(app.target_project_id == project_id, app.source_kind == "content_template",
+                   app.status == "succeeded", ver.template_id.in_(template_ids))
+            .order_by(app.applied_at.desc(), app.id.desc()))
+    if year is not None:
+        stmt = stmt.where(app.target_year == year)
+    out: dict[UUID, dict[str, Any]] = {}
+    for r in (await db.execute(stmt)).all():
+        out.setdefault(r.template_id, {"version_id": str(r.id), "version_no": r.version_no,
+                                       "applied_at": r.applied_at.isoformat() if r.applied_at else None})
+    return out
+
+
+def _template_meta(t: NoteContentTemplate, current: Any, names: dict[UUID, str] | None = None) -> dict[str, Any]:
     return {
         "id": str(t.id), "name": t.name, "description": t.description, "owner_scope": t.owner_scope,
         "current_version_id": str(t.current_version_id) if t.current_version_id else None,
-        "current_version": _version_meta(current),
+        "current_version": _version_meta(current, names),
         "created_by": str(t.created_by) if t.created_by else None,
         "created_at": t.created_at.isoformat() if t.created_at else None,
         "updated_at": t.updated_at.isoformat() if t.updated_at else None,
@@ -298,8 +349,11 @@ _VERSION_META_COLUMNS = (
 
 
 async def list_templates(db: AsyncSession, *, project_id: UUID, user: Any, limit: int = 50,
-                         offset: int = 0) -> dict[str, Any]:
-    """当前用户在本项目可见的模板（SQL 层过滤 + 分页，附当前版本元数据，不含正文）。"""
+                         offset: int = 0, year: int | None = None) -> dict[str, Any]:
+    """当前用户在本项目可见的模板（SQL 层过滤 + 分页，附当前版本元数据，不含正文）。
+
+    每项带 ``last_applied``：本项目（``year`` 给定时只看该年度）最近一次引用的版本，从未引用为 None。
+    """
     clause = visible_template_clause(user.id, await resolve_canonical_group_root(db, project_id))
     total = await db.scalar(sa.select(sa.func.count()).select_from(NoteContentTemplate).where(clause))
     rows = (await db.execute(
@@ -309,7 +363,15 @@ async def list_templates(db: AsyncSession, *, project_id: UUID, user: Any, limit
         .order_by(NoteContentTemplate.updated_at.desc(), NoteContentTemplate.id)
         .limit(limit).offset(offset)
     )).all()
-    return {"items": [_template_meta(row[0], row) for row in rows], "total": int(total or 0)}
+    names = await _saver_names(db, [row.created_by for row in rows])
+    applied = await _last_applied_versions(db, project_id=project_id, year=year,
+                                           template_ids=[row[0].id for row in rows])
+    items = []
+    for row in rows:
+        meta = _template_meta(row[0], row, names)
+        meta["last_applied"] = applied.get(row[0].id)
+        items.append(meta)
+    return {"items": items, "total": int(total or 0)}
 
 
 async def _visible_template(db: AsyncSession, template_id: UUID, *, project_id: UUID,
@@ -328,7 +390,7 @@ async def get_template_detail(db: AsyncSession, template_id: UUID, *, project_id
         return None
     current = (await db.get(NoteContentTemplateVersion, template.current_version_id)
                if template.current_version_id else None)
-    return _template_meta(template, current)
+    return _template_meta(template, current, await _saver_names(db, [current.created_by if current else None]))
 
 
 async def list_versions(db: AsyncSession, template_id: UUID, *, project_id: UUID,
@@ -340,7 +402,8 @@ async def list_versions(db: AsyncSession, template_id: UUID, *, project_id: UUID
         sa.select(*_VERSION_META_COLUMNS).where(NoteContentTemplateVersion.template_id == template_id)
         .order_by(NoteContentTemplateVersion.version_no.desc())
     )).all()
-    return [_version_meta(row) for row in rows]
+    names = await _saver_names(db, [row.created_by for row in rows])
+    return [_version_meta(row, names) for row in rows]
 
 
 async def soft_delete_template(db: AsyncSession, template_id: UUID, *, project_id: UUID, user: Any) -> bool:

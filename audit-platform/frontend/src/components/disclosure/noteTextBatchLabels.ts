@@ -2,6 +2,7 @@
  * 附注正文批量写入：界面中文标签与分组判定（R-21：首版直接显示英文枚举与内部 source_id）。
  */
 import type { ApplyMode, PreviewItem, PreviewResponse, SourceKind } from '@/composables/useNoteTextBatch'
+import type { ContentTemplateItem, ContentTemplateVersion } from '@/composables/useNoteContentTemplate'
 
 /** 后端 note_quality_scanner.QualityFlag + build_preview 的 cross_standard */
 export const QUALITY_FLAG_LABELS: Record<string, string> = {
@@ -91,4 +92,29 @@ export function describeSource(kind: SourceKind, meta: SourceMeta | null | undef
   const docs = (meta.documents ?? []).map(d => (d.doc_version != null
     ? `${d.document_name ?? '未命名文档'}（v${d.doc_version}）` : (d.document_name ?? '未命名文档')))
   return `知识库：${docs.join('、')}`
+}
+/** 保存人 / 时间（AC-8.2）：模板选择器与引用弹窗共用同一口径 */
+export function savedByLabel(v: Pick<ContentTemplateVersion, 'created_by_name' | 'created_at'>): string {
+  const date = v.created_at ? v.created_at.slice(0, 10) : ''
+  if (v.created_by_name) return date ? `${v.created_by_name} 保存于 ${date}` : `保存人 ${v.created_by_name}`
+  return date ? `保存于 ${date}` : ''
+}
+
+export interface AppliedHint { text: string; changed: boolean }
+
+/**
+ * 「本项目已引用」只读提示（AC-8.4）：模板发布新版本不会自动改已引用项目的正文，用户重新预览并确认后才写入。
+ * changed = 模板当前版本与本项目最近一次引用的版本不同（含刻意引回旧版、模板内容回退两种情况）。
+ */
+export function appliedHint(item: Pick<ContentTemplateItem, 'current_version' | 'last_applied'>): AppliedHint | null {
+  const applied = item.last_applied
+  if (!applied) return null
+  const current = item.current_version
+  if (!current || current.id === applied.version_id) {
+    return { text: `本项目已引用${current ? '当前版本' : ''} v${applied.version_no}`, changed: false }
+  }
+  const head = current.version_no > applied.version_no
+    ? `有新版本 v${current.version_no}（本项目已引用 v${applied.version_no}）`
+    : `模板当前为 v${current.version_no}（本项目已引用 v${applied.version_no}）`
+  return { text: `${head}：已写入的正文不会自动更新，点「重新预览」核对后才会写入`, changed: true }
 }

@@ -15,7 +15,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 import tests.conftest  # noqa: F401  注册全部模型 + SQLite JSONB 兼容
-from app.models.base import Base, ProjectStatus
+from app.models.base import Base, ProjectStatus, UserRole
 from app.models.core import Project, User
 from app.models.note_content_template_models import (
     NoteContentTemplate,
@@ -292,3 +292,78 @@ class TestDelete:
         assert {str(v.id) for v in await _rows(env, NoteContentTemplateVersion)} >= {group["version_id"]}
         [application] = await _rows(env, NoteTextBatchApplication)
         assert str(application.template_version_id) == group["version_id"]
+
+
+class TestSaverNameAndAppliedVersion:
+    """AC-8.2 版本元数据带保存人姓名；AC-8.4 列表告诉本项目（本年度）最近引用的是哪一版——新版本只提示、不自动覆盖。"""
+
+    @pytest.mark.asyncio
+    async def test_saver_name_resolved_at_read_time_staff_first_then_username(self, env):
+        ids, me = env["ids"], env["user"]("me")
+        mine = await _save(env, name="我的")
+        group = await _save(env, who="boss", scope="group", name="集团")
+
+        async def read() -> tuple[dict, list, dict]:
+            async with env["factory"]() as db:
+                listed = {i["name"]: i for i in (await list_templates(db, project_id=ids["A"], user=me))["items"]}
+                versions = await list_versions(db, uuid.UUID(group["template_id"]), project_id=ids["A"], user=me)
+                detail = await get_template_detail(db, uuid.UUID(mine["template_id"]), project_id=ids["A"], user=me)
+            return listed, versions, detail
+
+        listed, versions, detail = await read()
+        # 经理甲有两份人员档案：确定性取一份（MIN(name)），且不能因联表而把版本行翻倍
+        assert listed["集团"]["current_version"]["created_by_name"] == "经理甲"
+        assert [v["created_by_name"] for v in versions] == ["经理甲"]
+        # 既无人员档案也无用户行（用户被删后 created_by 置空同此）⇒ 不编造姓名
+        assert listed["我的"]["current_version"]["created_by_name"] is None
+
+        async with env["factory"]() as db:
+            db.add(User(id=ids["me"], username="me_login", email="me@example.com", hashed_password="x",
+                        role=UserRole.auditor))
+            await db.commit()
+        listed, _, detail = await read()
+        assert listed["我的"]["current_version"]["created_by_name"] == "me_login"  # 无人员档案 ⇒ 回退登录名
+        assert detail["current_version"]["created_by_name"] == "me_login"
+
+    @pytest.mark.asyncio
+    async def test_last_applied_version_scoped_to_project_year_and_never_auto_overwritten(self, env):
+        from datetime import datetime
+
+        ids = env["ids"]
+        v1 = await _save(env, who="boss", scope="group", name="集团")
+        b_copy = "<p>子乙引用 v1 后的本地副本</p>"
+        async with env["factory"]() as db:
+            db.add(DisclosureNote(project_id=ids["B"], year=YEAR, note_section="一、1", section_title="公司基本情况",
+                                  text_content=b_copy, sort_index=1))
+            db.add(NoteTextBatchApplication(
+                source_kind="content_template", template_version_id=uuid.UUID(v1["version_id"]),
+                target_project_id=ids["B"], target_year=YEAR, mutation_id="m-v1", request_fingerprint="a" * 64,
+                preview_digest="b" * 64, applied_count=1, applied_at=datetime(2026, 10, 1, 9, 0, 0)))
+            await db.commit()
+        await _set_text(env, "basic", "<p>子甲公司 2025 年完成改制。</p>")
+        v2 = await _save(env, who="boss", scope="group", name="集团")
+        assert (v2["template_id"], v2["version_no"]) == (v1["template_id"], 2)
+
+        async def item(project: str, year: int | None = YEAR) -> dict:
+            async with env["factory"]() as db:
+                page = await list_templates(db, project_id=ids[project], user=env["user"]("boss"), year=year)
+            return {i["id"]: i for i in page["items"]}[v1["template_id"]]
+
+        b = await item("B")
+        assert b["current_version"]["version_no"] == 2
+        assert (b["last_applied"]["version_id"], b["last_applied"]["version_no"]) == (v1["version_id"], 1)
+        assert (await item("A"))["last_applied"] is None              # 从未引用的项目不提示
+        assert (await item("B", YEAR + 1))["last_applied"] is None    # 别的年度不串
+        assert (await item("B", None))["last_applied"]["version_no"] == 1  # 不传年度 ⇒ 本项目任一年度
+        # 发布新版本不改已引用项目的本地副本（只提示，用户重新预览确认后才变）
+        [b_note] = [n for n in await _rows(env, DisclosureNote) if n.project_id == ids["B"]]
+        assert b_note.text_content == b_copy
+
+        # 「最近一次」按引用时间：先引 v2、后又刻意引回 v1 ⇒ 仍提示与当前版本不同
+        async with env["factory"]() as db:
+            db.add(NoteTextBatchApplication(
+                source_kind="content_template", template_version_id=uuid.UUID(v2["version_id"]),
+                target_project_id=ids["B"], target_year=YEAR, mutation_id="m-v2", request_fingerprint="c" * 64,
+                preview_digest="d" * 64, applied_count=1, applied_at=datetime(2026, 9, 1, 9, 0, 0)))
+            await db.commit()
+        assert (await item("B"))["last_applied"]["version_no"] == 1

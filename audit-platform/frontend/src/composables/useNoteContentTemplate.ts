@@ -24,7 +24,16 @@ export interface ContentTemplateVersion {
   content_hash: string
   byte_size: number
   created_by?: string | null
+  /** 保存人展示名（人员档案姓名，回退登录名；AC-8.2） */
+  created_by_name?: string | null
   created_at: string | null
+}
+
+/** 本项目（本年度）最近一次引用的版本（AC-8.4） */
+export interface AppliedVersionRef {
+  version_id: string
+  version_no: number
+  applied_at: string | null
 }
 
 export interface ContentTemplateItem {
@@ -34,6 +43,8 @@ export interface ContentTemplateItem {
   owner_scope: OwnerScope
   current_version_id: string | null
   current_version?: ContentTemplateVersion | null
+  /** 仅列表返回；从未引用为 null */
+  last_applied?: AppliedVersionRef | null
   created_by: string | null
   created_at: string | null
   updated_at: string | null
@@ -83,8 +94,9 @@ function body(input: SaveTemplateInput) {
     owner_scope: input.ownerScope }
 }
 
-export function useNoteContentTemplate(options: { projectId: Ref<string> }) {
-  const { projectId } = options
+/** year：给定时列表的 last_applied 只看本项目该年度的引用（编辑器按年度编制，别的年度引用过不算） */
+export function useNoteContentTemplate(options: { projectId: Ref<string>; year?: Ref<number | undefined> }) {
+  const { projectId, year } = options
 
   const loading = ref(false)
   const saveLoading = ref(false)
@@ -108,8 +120,9 @@ export function useNoteContentTemplate(options: { projectId: Ref<string> }) {
     loading.value = true
     lastError.value = null
     try {
+      const params = year?.value ? { limit, offset, year: year.value } : { limit, offset }
       const result = await api.get<{ items: ContentTemplateItem[]; total: number }>(
-        NOTE_CONTENT_TEMPLATE_PATHS.list(projectId.value), silent({ params: { limit, offset } }))
+        NOTE_CONTENT_TEMPLATE_PATHS.list(projectId.value), silent({ params }))
       if (seq !== listSeq) return
       const items = result.items || []
       templates.value = opts.append ? [...templates.value, ...items] : items

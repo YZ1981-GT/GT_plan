@@ -102,7 +102,7 @@ defineExpose({ open, available })
     @update:visible="(v: boolean) => !v && close()" @applied="onApplied" />
   <NoteContentTemplateSaveDialog v-if="active === 'save'" :visible="true" :project-id="projectId" :year="year"
     @update:visible="(v: boolean) => !v && close()" />
-  <NoteContentTemplatePicker v-if="active === 'pick'" :visible="true" :project-id="projectId"
+  <NoteContentTemplatePicker v-if="active === 'pick'" :visible="true" :project-id="projectId" :year="year"
     @update:visible="(v: boolean) => !v && close()" @select="onPicked" />
   <NoteContentTemplateApplyDialog v-if="applyTarget" :visible="true" :project-id="projectId" :year="year"
     :template="applyTarget.template" :version="applyTarget.version"

@@ -12,7 +12,7 @@ import {
 import type { ContentTemplateItem, ContentTemplateVersion } from '@/composables/useNoteContentTemplate'
 import NoteTextPreviewList from './NoteTextPreviewList.vue'
 import NoteTextDiffDialog from './NoteTextDiffDialog.vue'
-import { REPORT_SCOPE_LABELS, TEMPLATE_TYPE_LABELS } from './noteTextBatchLabels'
+import { REPORT_SCOPE_LABELS, savedByLabel, TEMPLATE_TYPE_LABELS } from './noteTextBatchLabels'
 
 const props = defineProps<{
   visible: boolean
@@ -84,7 +84,7 @@ async function onApply() {
       · {{ TEMPLATE_TYPE_LABELS[version.template_type] ?? version.template_type }}
       · {{ REPORT_SCOPE_LABELS[version.report_scope] ?? version.report_scope }}
       · 共 {{ quality.total ?? 0 }} 章（有内容 {{ quality.with_content ?? 0 }}，高风险 {{ quality.high_risk ?? 0 }}）
-      <template v-if="version.created_at"> · 保存于 {{ version.created_at.slice(0, 10) }}</template>
+      <template v-if="savedByLabel(version)"> · {{ savedByLabel(version) }}</template>
     </div>
     <el-alert v-if="newerVersion" type="info" :closable="false" show-icon
       :title="`该模板已有更新版本 v${newerVersion}；当前按所选历史版本预览，已引用的项目不会被自动更新`" />

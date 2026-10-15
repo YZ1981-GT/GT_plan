@@ -621,6 +621,41 @@ class TestApply:
         assert lineage["template_version_id"] == str(ids["ver"])
 
     @pytest.mark.asyncio
+    async def test_new_version_reaches_body_only_after_user_repreviews_and_applies(self, env):
+        """AC-8.4 / Task 51：已引用 v1 的项目在模板发布 v2 后正文不变（只预览也不变）；
+        用户用 v2 重新预览并确认写入后才变，两条应用记录各自钉住所用版本。"""
+        ids = env["ids"]
+        v1_source = {"source_kind": "content_template", "template_version_id": str(ids["ver"]),
+                     "template_content_hash": TPL_HASH}
+        v1_preview = (await _preview(env, v1_source)).json()
+        v1_item = next(i for i in v1_preview["items"] if i["target_note_section"] == "一、1")
+        resp = await _apply(env, v1_source, v1_preview, [_selection(v1_item)], mutation_id="mut-v1-000001")
+        assert resp.status_code == 200, resp.text
+        v1_body = (await _note(env, "basic")).text_content
+        async with env["factory"]() as db:
+            newer = NoteContentTemplateVersion(
+                id=uuid.uuid4(), template_id=ids["tpl"], version_no=2, source_project_id=ids["src"],
+                source_year=YEAR, source_project_name="乙_2025", template_type="soe", report_scope="standalone",
+                sections_data=[{"note_section": "一、1", "section_title": "公司基本情况", "section_kind": "narrative",
+                                "text_content": "<p>新版本正文</p>"}],
+                quality_summary={}, content_hash="c" * 64, byte_size=10)
+            db.add(newer)
+            await db.flush()
+            (await db.get(NoteContentTemplate, ids["tpl"])).current_version_id = newer.id
+            await db.commit()
+        assert (await _note(env, "basic")).text_content == v1_body  # 发布新版本不碰已引用项目
+
+        v2_source = {"source_kind": "content_template", "template_version_id": str(newer.id),
+                     "template_content_hash": "c" * 64}
+        v2_preview = (await _preview(env, v2_source)).json()
+        v2_item = next(i for i in v2_preview["items"] if i["target_note_section"] == "一、1")
+        assert (await _note(env, "basic")).text_content == v1_body  # 只预览不写
+        resp = await _apply(env, v2_source, v2_preview, [_selection(v2_item)], mutation_id="mut-v2-000001")
+        assert resp.status_code == 200, resp.text
+        assert (await _note(env, "basic")).text_content == "<p>新版本正文</p>"
+        assert {uuid.UUID(str(r.template_version_id)) for r in await _applications(env)} == {ids["ver"], newer.id}
+
+    @pytest.mark.asyncio
     async def test_mutation_id_required(self, env):
         source, preview, item = await _previewed(env)
         resp = await _apply(env, source, preview, [_selection(item)], mutation_id=None)
