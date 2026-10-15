@@ -1,4 +1,4 @@
-﻿# 文件行数门禁白名单 — 历史大文件或设计上必须单文件的脚本
+# 文件行数门禁白名单 — 历史大文件或设计上必须单文件的脚本
 # 格式：path  baseline_lines（空格分隔，# 注释）
 #
 # 语义（见 backend/scripts/check/check_file_size.py）：
@@ -46,7 +46,6 @@
 #     容纳 D2-3/D2-1 扩容，净增有限（本 spec 不拆分——该文件属 Task 41 umbrella spec 所有，
 #     拆分决策应由其 owner 按关注点分（契约接地/载荷拆分/选型/预算）四份而非本 spec 代做）。
 #     登记为待办：若后续再有 spec 往 D2 扩容需碰这个文件，应先拆分再改，不再滚雪球加基线。
-$11688
 backend/scripts/check/check_x3_deviation_registry.py  2474
 backend/scripts/diagnose/mutate_ie_lifecycle_guards.py  1290
 
@@ -176,7 +175,7 @@ backend/app/routers/wp_editor_router.py  1120
 #     test_snapshot_writer_transaction.py / _addr_id.py / _audit.py 三个文件，属独立任务 ——
 #     与一次删参同批会把 diff 淹没在搬迁噪声里。
 #     spec: advanced-query-hardening-wiring-closure（收口遗留项）
-$11417
+backend/tests/test_snapshot_writer.py  1418
 
 # ═══════════════════════════════════════════════════════════════════════════
 # spec: workpaper-html-onlyoffice-bidirectional-writeback-closure（2026-09-02 入库）
@@ -211,7 +210,7 @@ $11417
 backend/app/models/audit_platform_schemas.py  1088
 backend/app/models/workpaper_models.py  1116
 backend/app/models/workpaper_sync_models.py  1152
-backend/app/routers/wp_onlyoffice_router.py  1749
+backend/app/routers/wp_onlyoffice_router.py  1820
 # 🔴 2026-09-19 登记既存欠账：基线 2341 定于 42d2f6e6f(09-02)，此后 82f58ea44(09-13,
 # D4 IPO 综合交付) 一跃到 2635 就已破门（>2458），e59e93718→2723、da57bad76→2727 继续增长，
 # 三次都未同步本条 —— 即门禁对本文件事实上已失效。本次「整册打开即定位」只加 37 行（materialize
@@ -224,7 +223,6 @@ backend/app/routers/wp_onlyoffice_router.py  1749
 #   + get_operation 增 `_fold_observability_facts`（same-application fold 只读观测：暴露
 #   application origin/effective sequence + room latest-durable 指针，复用既有路由不新建）。
 #   抬到实测值让门从此刻重新生效；拆分方向同上（recovery/operation 读端点一组可外移）。
-$13258
 #   excel_structure_fingerprint.py —— 基线 918 早已 stale（本次改动前 HEAD 实测 947）。
 #     2026-09-22 给 `structure_fingerprint(data)` 加**按 sha256 内容寻址的 LRU 记忆化**
 #     （+46 行 = 缓存字典/上限/两侧 deepcopy/clear 入口 + 根因注释）。实测依据：冷路径
@@ -362,7 +360,7 @@ backend/app/services/workpaper_sync/projection_provisioning.py  1249
 #     非本次造成）。2026-09-20 spec workpaper-sync-materialize-large-table-performance Wave 5
 #     +14 行（collect_workbook_structure 的 fingerprint/sync_pairs 共享：1 次预读 + 透传 + 根因注释），
 #     用于消除「每 anchor 重算全簿指纹」致 D4 entry materialize 138.7s 超 120s 生产软上限。→ 1426。
-$11657
+backend/app/services/workpaper_sync/published_identity_observer.py  1658
 #   repository.py —— 基线 3124 早已 stale（本次改动前 HEAD 实测 3264，那 140 行欠账**非本次
 #     造成**）。2026-09-22 spec oo-single-pass-materialize-and-room-leave 的前置修复 +45 行：
 #     `_frozen_base_adapter_build_digest()`（close-capture 的代码身份从 leader confirmation 的
@@ -953,7 +951,7 @@ backend/tests/workpaper_sync/test_task25_materialize_coordinator_pg.py  2682
 #     GET 仍返回该条）。补传 project_id + 返回 False 时抛 404。拆分方向：该 router 是
 #     公式 CRUD + 预设 + 依赖图 + 批量重算的聚合体，宜按「CRUD / preset / graph」拆三个
 #     router 模块，属独立打磨任务。
-$1979
+backend/app/routers/wp_formula.py  980
 
 #   workpaper_sync 判据文件（2026-09-24 suite triage）—— 13 份，基线一律取当前真实行数。
 #     增量的来源是**加判据**，不是加实现：这一轮把套件从 283 failed / 16 errors 打到
@@ -1163,7 +1161,7 @@ backend/app/services/ocr_service_v2.py  854
 # prefill 公式 resolver 注册表 + 9 个 resolver
 backend/app/services/prefill_engine.py  1646
 # 试算表四列重算链
-$11242
+backend/app/services/trial_balance_service.py  1243
 # 分录大厅全部端点
 backend/app/routers/adjustments.py  1763
 # 附件端点（本次仅修 4 处 Attachment lazy import 错路径；
@@ -1304,7 +1302,7 @@ backend/app/services/workpaper_sync/phase5_e1_monetary_fund.py  924
 #     拆分会让 canary 五项替代判据 + roundtrip 变异反证 跨文件。
 #     spec: a-cycle-sync-foundation-and-first-canary
 backend/tests/workpaper_sync/test_a_cycle_foundation_canary.py  1689
-backend/tests/workpaper_sync/test_phase5_e1_sheet_specs.py
+backend/tests/workpaper_sync/test_phase5_e1_sheet_specs.py  902
 backend/tests/test_event_bus.py 979
 backend/app/services/report_config_service.py 803
 backend/app/services/formula_push/engine.py 899
@@ -1373,7 +1371,7 @@ backend/tests/procedure_delegation_visibility/test_task17_capacity_and_role_acce
 #     共享身份防御测试（8 例）。原 33 例 + 新增 8 例 context integration = 864 行 > 800 上限。
 #     拆分方向：按 B.1.x 测试类拆为 test_consol_disclosure_v2_{topic}.py，属独立打磨。
 backend/tests/services/test_consol_disclosure_v2.py  865
-backend/tests/workpaper_sync/test_a_entry_connection_blockers.py
+backend/tests/workpaper_sync/test_a_entry_connection_blockers.py  1167
 
 #   phase5_g5_long_term_receivable.py —— 2026-10-07 G5-9 转置接入 entry 层后 801 行
 #     801 = 800+1（仅超 1 行），拆分收益极低。归档完毕后可在下一轮拆伴生模块。

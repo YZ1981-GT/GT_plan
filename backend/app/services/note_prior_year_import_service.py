@@ -309,28 +309,31 @@ class NotePriorYearImportService:
                 "inherited": 0,
             }
 
-        # Build mapping by section_code
-        prior_by_code: dict[str, Any] = {}
+        # Build mapping by note_section (DisclosureNote 无 section_code 列，
+        # 用 note_section 作为跨年匹配键，如 "五、1 存货")
+        prior_by_section: dict[str, Any] = {}
         for pn in prior_notes:
-            if pn.section_code:
-                prior_by_code[pn.section_code] = pn
+            if pn.note_section:
+                prior_by_section[pn.note_section] = pn
 
         inherited = 0
         for note in current_notes:
-            if not note.section_code:
+            if not note.note_section:
                 continue
-            prior = prior_by_code.get(note.section_code)
+            prior = prior_by_section.get(note.note_section)
             if prior and prior.text_content:
+                # 跳过 is_local_override 的章节：用户已通过内容模板写入自定义正文，
+                # 上年继承不得覆盖（与 disclosure_engine / wp_disclosure_sync_service 同口径）
+                if note.is_local_override:
+                    continue
                 # Copy text content, mark as pending update
                 note.text_content = prior.text_content
-                # Mark in metadata that this is inherited data
-                meta = note.metadata_ if hasattr(note, 'metadata_') else {}
-                if meta is None:
-                    meta = {}
-                meta["prior_year_inherited"] = True
-                meta["prior_year_status"] = "pending_update"
-                if hasattr(note, 'metadata_'):
-                    note.metadata_ = meta
+                # 在 template_lineage（JSONB）中记录继承来源
+                lineage = note.template_lineage if isinstance(note.template_lineage, dict) else {}
+                lineage["prior_year_inherited"] = True
+                lineage["prior_year_status"] = "pending_update"
+                lineage["prior_year_source"] = prior_year
+                note.template_lineage = lineage
                 inherited += 1
 
         await self.db.flush()

@@ -1108,18 +1108,35 @@ async def sync_from_workpaper(
                 }
             # decision in ('auto_resolved', 'allow') → 继续走更新分支
         note.table_data = new_table_data
-        note.content_type = content_type
-        if formatted_texts:
-            note.text_content = formatted_texts
-        elif note_texts or removed_text_sections:
-            # 本次**确实**推了叙述（或显式删段）而合并后为空（全被删 / 文本全空）
-            # → 如实清空，保持 text_content 由底稿联动驱动
-            note.text_content = None
+        # AC-4.6（disclosure-note-doc-upload-and-batch-fill）：is_local_override=True
+        # 表示正文已由内容模板/批量编制写入，底稿同步不得覆盖。
+        # 表格数据（table_data/sub_table_data）照常由底稿驱动——数字须随试算表刷新；
+        # 只保护叙述正文 text_content。与 disclosure_engine.generate_notes 同口径。
+        if note.is_local_override:
+            # 正文受保护 → content_type 不得从 mixed 降级为 table，否则已有正文在 UI 上不可见。
+            # 只允许 table→mixed 升级（底稿新推了叙述的场景，但此时正文不覆盖所以实际不会发生）。
+            if note.text_content and content_type == ContentType.table:
+                pass  # 保持原有 content_type（mixed）
+            else:
+                note.content_type = content_type
+            logger.info(
+                "wp_disclosure_sync: skip text_content overwrite for "
+                "id=%s section=%s (is_local_override=True)",
+                note.id, section_id,
+            )
         else:
-            # 🔴 本次未推送叙述 → **保留既有**（Requirement 5.2）。
-            #   原实现无条件置 None：多循环共章节时会清掉他循环刚推的说明，
-            #   也会清掉审计师在附注模块 AI 填充/手工编辑的正文。
-            pass
+            note.content_type = content_type
+            if formatted_texts:
+                note.text_content = formatted_texts
+            elif note_texts or removed_text_sections:
+                # 本次**确实**推了叙述（或显式删段）而合并后为空（全被删 / 文本全空）
+                # → 如实清空，保持 text_content 由底稿联动驱动
+                note.text_content = None
+            else:
+                # 🔴 本次未推送叙述 → **保留既有**（Requirement 5.2）。
+                #   原实现无条件置 None：多循环共章节时会清掉他循环刚推的说明，
+                #   也会清掉审计师在附注模块 AI 填充/手工编辑的正文。
+                pass
         note.last_sync_source = "workpaper"
         note.last_sync_wp_id = wp_id
         note.last_sync_at = now

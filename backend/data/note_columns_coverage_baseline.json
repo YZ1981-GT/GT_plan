@@ -1402,44 +1402,6 @@
           ]
         },
         {
-          "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-yan-fa-zhi-chu-2",
-          "section_number": "三、研发支出",
-          "section_title": "研发支出",
-          "level": 2,
-          "scope": "unregistered",
-          "wp_codes": [],
-          "table_count": 1,
-          "has_dup_name": false,
-          "tables": [
-            {
-              "index": 0,
-              "name": "研发支出",
-              "header_count": 3,
-              "column_count": 0,
-              "row_count": 9,
-              "has_guidance": true,
-              "guidance_has_bold": false,
-              "guidance_has_html": false,
-              "is_empty_name": false,
-              "is_leak_name": false,
-              "headers_have_html": false,
-              "labels_have_html": false,
-              "stance_none": 0,
-              "stance_flat": 0,
-              "stance_group": 0,
-              "legacy_aliases": [
-                "项  目"
-              ],
-              "row_types": {
-                "header_label": 1,
-                "data": 7,
-                "total": 1
-              },
-              "dup_group": null
-            }
-          ]
-        },
-        {
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-kai-fa-zhi-chu",
           "section_number": "三、开发支出",
           "section_title": "开发支出",

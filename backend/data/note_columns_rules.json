@@ -2789,15 +2789,6 @@
         "reason": "LEN_MISMATCH（docx 8 列 vs JSON 5 列；多为两级表头被 md 重建压扁）"
       },
       {
-        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-yan-fa-zhi-chu-2",
-        "section_number": "三、研发支出",
-        "section_title": "研发支出",
-        "index": 0,
-        "table_name": "研发支出",
-        "json_header_count": 3,
-        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 3 列；多为两级表头被 md 重建压扁）"
-      },
-      {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-kai-fa-zhi-chu",
         "section_number": "三、开发支出",
         "section_title": "开发支出",

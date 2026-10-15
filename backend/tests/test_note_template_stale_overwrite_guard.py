@@ -34,8 +34,9 @@ VARIANTS = ("listed", "soe")
 
 #: 恢复后现算（2026-09-30）：(带 columns 的表数下限, 带 guidance 的表数下限)
 #: 🔴 只许调高下限（= 收紧）；下调意味着有人删了列头/编制提示，必须先查是不是又一次覆盖
+#: 2026-10-15: listed guidance 393→392，因删除重复「三、研发支出」条目（合法减少 1 张表）
 COVERAGE_FLOOR: dict[str, tuple[int, int]] = {
-    "listed": (411, 393),
+    "listed": (411, 392),
     "soe": (260, 251),
 }
 

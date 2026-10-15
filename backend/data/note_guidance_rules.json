@@ -68,20 +68,6 @@
           }
         ]
       },
-      "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-yan-fa-zhi-chu-2": {
-        "section_number": "三、研发支出",
-        "section_title": "研发支出",
-        "docx_key": "研发支出 / 研发支出",
-        "tables": [
-          {
-            "index": 0,
-            "table_name": "研发支出",
-            "guidance": "（按费用性质披露研发支出本期发生额、上期发生额，包括费用化研发支出和资本化研发支出。（15号文第二十六条））",
-            "source_ref": "docx:研发支出 / 研发支出#0guidance",
-            "candidate_count": 1
-          }
-        ]
-      },
       "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-fei-tong-yi-kong-zhi-xia-qi-ye-he-bing": {
         "section_number": "三、非同一控制下企业",
         "section_title": "非同一控制下企业合并",

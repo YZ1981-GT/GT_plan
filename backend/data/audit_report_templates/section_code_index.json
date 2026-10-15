@@ -4690,20 +4690,6 @@
           "legacy_aliases": []
         },
         {
-          "section_code": "三、研发支出",
-          "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-yan-fa-zhi-chu-2",
-          "section_title": "研发支出",
-          "level": 2,
-          "content_type": "mixed",
-          "placeholders": [
-            "{{seq:三}}",
-            "{{section:三、研发支出}}",
-            "{{table:三、研发支出}}"
-          ],
-          "binding_wp_code": null,
-          "legacy_aliases": []
-        },
-        {
           "section_code": "三、资产减值",
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zi-chan-jian-zhi",
           "section_title": "资产减值",
@@ -6678,20 +6664,6 @@
             "{{seq:三}}",
             "{{section:三、无形资产}}",
             "{{table:三、无形资产}}"
-          ],
-          "binding_wp_code": null,
-          "legacy_aliases": []
-        },
-        {
-          "section_code": "三、研发支出",
-          "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-yan-fa-zhi-chu-2",
-          "section_title": "研发支出",
-          "level": 2,
-          "content_type": "mixed",
-          "placeholders": [
-            "{{seq:三}}",
-            "{{section:三、研发支出}}",
-            "{{table:三、研发支出}}"
           ],
           "binding_wp_code": null,
           "legacy_aliases": []

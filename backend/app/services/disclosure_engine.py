@@ -1317,7 +1317,9 @@ class DisclosureEngine:
         headers = table_template.get("headers", ["项目", "期末余额", "期初余额"])
         template_rows = table_template.get("rows", [])
         if not template_rows:
-            return _with_column_meta({"headers": headers, "rows": []}, table_template)
+            result = {"headers": headers, "rows": []}
+            _carry_seed_column_meta(table_template, result)
+            return result
 
         # 使用预加载缓存
         wp_data = getattr(self, '_wp_cache', None) or {}
