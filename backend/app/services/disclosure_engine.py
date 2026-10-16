@@ -417,6 +417,9 @@ def classify_template_content(
     游标算法：遍历段落，标题行推进游标（标题行本身丢弃），多表场景下
     指引段落归属到当前游标对应的表；单表/无表场景指引归章节级。
 
+    表标题行只在本章**有表**时才是表标题：无表章节的 ``#`` 小标题 / 短编号行是正文
+    （第 25 组：首版无表也丢，国企「十三、1」少了「2.经济利益流出不确定性的说明。」）。
+
     向后兼容：旧调用方不传 tables → per_table_guidance={}，所有指引归
     section_guidance（行为同旧）。
     """
@@ -436,7 +439,7 @@ def classify_template_content(
             else:
                 section_guidance_parts.append(para)
             continue
-        if _is_table_title_paragraph(para) or _paragraph_matches_table_name(para, table_names):
+        if table_names and (_is_table_title_paragraph(para) or _paragraph_matches_table_name(para, table_names)):
             # 标题行：推进游标到匹配的 table_idx（标题行本身不进任何输出）
             # 含两类：① # / 编号标题（_is_table_title_paragraph）
             #        ② 与 tables[].name 精确相等的无编号纯文本标题（_paragraph_matches_table_name）

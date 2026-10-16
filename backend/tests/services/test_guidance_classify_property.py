@@ -40,8 +40,13 @@ def test_property_1_generation_split_integrity(guidance, body):
 )
 @settings(max_examples=5)
 def test_property_2_table_title_not_in_text_content(title):
-    """Feature: note-guidance-text-separation, Property 2: 表格标题不进正文"""
-    substantive, guidance = classify_template_content([title], None)[:2]
+    """Feature: note-guidance-text-separation, Property 2: 表格标题不进正文
+
+    「表格标题」以本章有表为前提（design：标题已由表格命名消费）。首版不传表也断言丢弃，
+    把无表章节的正文行一并丢了（disclosure-note-doc-upload-and-batch-fill 第 25 组）；无表时见
+    ``test_note_generation_no_table_titles``。
+    """
+    substantive, guidance = classify_template_content([title], None, [{"name": "按账龄披露"}])[:2]
     assert guidance is None
     assert substantive is None
 
