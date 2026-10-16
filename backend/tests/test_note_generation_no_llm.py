@@ -63,6 +63,22 @@ def test_engine_has_no_llm_reference():
     assert not ((names | imported) & banned), sorted((names | imported) & banned)
 
 
+def test_note_formula_engine_has_no_llm_reference():
+    """公式引擎（``validate_note`` 双层：本地规则 + LLMReview 占位）自动路径不调大模型。
+
+    原 ``LLMReview.validate_async`` 会调 ``chat_completion``，全仓零调用方（死代码）⇒ 删除（Task 22）；
+    大模型审核只走 ``NoteValidationEngine(allow_llm=True)`` 的手动路径。
+    """
+    src = (ENGINE_SRC.parent / "note_formula_engine.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+    names |= {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
+    names |= {a.asname or a.name for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom)) for a in n.names}
+    funcs = {n.name for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    assert "chat_completion" not in names
+    assert "validate_async" not in funcs
+
+
 def test_generation_rag_switch_removed():
     """生成链的知识库开关已删：配置里再出现它（且无消费方）就是误导运维的死开关。"""
     assert not hasattr(settings, "DISCLOSURE_NOTE_RAG_ENABLED")

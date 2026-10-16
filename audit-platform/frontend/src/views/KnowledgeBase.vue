@@ -1186,7 +1186,7 @@ onMounted(async () => {
         <p>知识库用于存储和管理审计参考资料，支持 AI 智能检索。</p>
         <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:8px">建议上传以下资料：</p>
         <ul style="padding-left:18px;margin:4px 0">
-          <li>📄 上年审计报告和附注（供 AI 参照生成当年内容）</li>
+          <li>📄 上年审计报告和附注（附注「AI 填充 / 续写 / 改写」时可选作参照）</li>
           <li>📋 底稿模板（致同标准模板已预置）</li>
           <li>📖 会计准则、监管规定等参考文献</li>
           <li>📝 项目专属的工作记录和备忘</li>

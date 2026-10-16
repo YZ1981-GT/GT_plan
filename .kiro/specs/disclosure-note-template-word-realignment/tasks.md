@@ -52,16 +52,18 @@
 
 ## Phase 5 大模型只在手动单击时调用
 
-- [ ] 20. 全仓核实附注域大模型调用点，分「自动 / 手动」写入本文件。
-- [x] 21. 生成附注删除 RAG 回退与通用大模型两级；无调用方的函数删除。
-  - ✅ `disclosure_engine` 删 P1b 知识库回退、P2 通用大模型级与 `_generate_text_with_llm` / `_get_enricher` / `_stash_citations` / `_last_citations` / `_enricher` / `_is_llm_error` 及 `chat_completion` / `NoteKnowledgeEnricher` 导入；生成正文 = 上年附注 → 模板正文。配置开关 `DISCLOSURE_NOTE_RAG_ENABLED` 只控制生成链那一级、已无消费方 ⇒ 删除（`TOP_K` / `CHAR_BUDGET` 仍供手动 AI 填充）。`seed_note_text_batch_uat.py` 不再打桩。
-  - 原三级链的 characterization / RAG 集成测试（`test_disclosure_note_rag_characterization` / `_integration`）锁的是被拍板删除的行为，删除；仍成立的契约迁到 `test_disclosure_note_generation_text_order.py`（上年优先 / 不足 20 字落模板 / 两级皆空留空 / 单章构表失败隔离）。
-- [ ] 22. 校验 `LLM_REVIEW` 与公式引擎 `LLMReview` 自动路径跳过并给出「需手动 AI 检查」。
-  - ✅ `NoteValidationEngine(db, *, allow_llm=False)`：`LLM_REVIEW` 默认返回 `skipped / manual_only`，不调大模型、不计问题；`allow_llm=True` 才执行（用例覆盖两条路径，变异打红）。
-  - ⬜ 现有调用方全用默认值，附注域还没有「手动 AI 审核」入口 ⇒ 手动路径无人可达；公式引擎 `LLMReview.validate_async` 待核（疑似死代码）。
-- [ ] 23. 前端自动拉取改按钮触发；生成确认框文案。
-- [ ] 24. 守卫：生成全流程大模型计数桩 0 次、手动入口仍调到、AST；变异。
-  - ✅ `test_note_generation_no_llm.py`：生成全流程计数桩 0 次（源模块与引擎模块两处打桩）、AST 无大模型 / 知识库引用、开关已删；变异「生成链偷调大模型」打红 2 例。⬜ 手动入口仍调到（随 Task 20 清单补）。
+- [x] 20. 全仓核实附注域大模型调用点，分「自动 / 手动」写入本文件。
+  - 自动（已全部切断）：生成附注（`disclosure_engine`，Task 21 删）；校验 `LLM_REVIEW`（`note_validation_executors._execute_llm_review_async`，经 `NoteValidationEngine` 默认 `allow_llm=False` 跳过；调用方：生成后 `report_note_sync_service`、就绪度 `note_readiness_service`、审计检查 `audit_check.aggregator`、「校验」按钮 `POST …/validate`）；公式引擎 `note_formula_engine.LLMReview.validate_async`（零调用方，删）。
+  - 手动（保留，均为按钮触发，逐个核过前端无 `onMounted` / `watch` 自动调用）：`note_ai.py` 续写 `ai/complete`、改写 `ai/rewrite`、生成政策 `ai/generate-policy`、变动分析 `ai/generate-analysis`、完整性检查 `ai/check-completeness`（前端无调用方）；`ai/check-expression` 是空壳不调大模型；`disclosure_notes.py` 的「AI 填充 / 参照文档填充」`…/ai-fill`、「批量预填充」`…/batch-ai-fill`（`NoteKnowledgeEnricher`）；AI 智能建议面板「分析当前章节」按钮；AI 对话。`NoteAiFillDialog` 打开时只重置结果，生成在按钮里。
+- [x] 22. 校验 `LLM_REVIEW` 与公式引擎 `LLMReview` 自动路径跳过并给出「需手动 AI 检查」。
+  - ✅ `NoteValidationEngine(db, *, allow_llm=False)`：`LLM_REVIEW` 默认返回 `skipped / manual_only`（原因「大模型审核只在用户手动发起时执行」），不调大模型、不计问题；`allow_llm=True` 才执行（用例覆盖两条路径，变异打红）。
+  - ✅ 公式引擎：删 `LLMReview.validate_async`（零调用方、会调 `chat_completion`），`validate_note` 兜底层是同步占位；AST 守卫 `test_note_formula_engine_has_no_llm_reference`（先红后绿）。
+  - 说明：现有调用方都用默认值，校验里没有单独的「AI 审核」按钮（功能收敛不新增入口）；需要 AI 看正文时用章节内「AI 填充」或「AI 智能建议 / AI 对话」。
+- [x] 23. 前端自动拉取改按钮触发；生成确认框文案。
+  - ✅ 附注域前端无自动调用大模型的地方（见 Task 20 清单），无需改按钮。生成确认框去掉「建议先上传到知识库供 AI 参照」，改为「按上年附注与模板生成正文，表格数据来自试算表与报表；不调用大模型（需要 AI 起草时在章节内单击「AI 填充」）」；`useWorkflowGuide.GUIDE_NOTE_GENERATE`、知识库页上传建议同步改口径。相关前端 spec 5 个全绿。⬜ 浏览器实测随 Phase 3 一起做（本轮后端 9980 无响应）。
+- [x] 24. 守卫：生成全流程大模型计数桩 0 次、手动入口仍调到、AST；变异。
+  - ✅ `test_note_generation_no_llm.py`：生成全流程计数桩 0 次（源模块与引擎模块两处打桩）、生成引擎与公式引擎 AST 无大模型 / 知识库引用、开关已删；变异「生成链偷调大模型」打红 2 例。
+  - ✅ 手动入口仍调到：`test_note_ai_knowledge_context.py`（续写 / 改写调 `chat_completion` 并注入所选知识文档）、`test_disclosure_note_ai_fill_endpoint.py`（ai-fill / batch-ai-fill 调 `NoteKnowledgeEnricher`）、`test_note_knowledge_enricher.py`、校验 `allow_llm=True` 路径 —— 本轮复跑 73 例全绿。
 
 ## Phase 6 和平药房重建
 

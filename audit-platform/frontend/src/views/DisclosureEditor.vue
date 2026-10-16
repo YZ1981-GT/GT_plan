@@ -2797,7 +2797,7 @@ async function onGenerate() {
   const { showGuide } = await import('@/composables/useWorkflowGuide')
   const tplLabel = templateType.value === 'listed' ? '上市版' : '国企版'
   const ok = await showGuide('note_generate', '📝 生成附注',
-    `<div style="line-height:1.8;font-size:var(--gt-font-size-sm)"><p>将根据 <b>${tplLabel}</b> 模板生成全部附注章节。</p><p style="color:var(--gt-color-info);font-size:var(--gt-font-size-xs);margin-top:6px">请确认以下准备工作已完成：</p><ul style="padding-left:18px;margin:4px 0"><li>⚠ 已选择正确的模板类型（当前：${tplLabel}）</li><li>⚠ 建议先完成报表生成</li><li>⚠ 如有上年附注，建议先上传到知识库供 AI 参照</li></ul><p style="color:var(--gt-color-success);font-size:var(--gt-font-size-xs);margin-top:6px">✓ 将生成 170+ 个附注章节</p></div>`,
+    `<div style="line-height:1.8;font-size:var(--gt-font-size-sm)"><p>将根据 <b>${tplLabel}</b> 模板生成全部附注章节。</p><p style="color:var(--gt-color-info);font-size:var(--gt-font-size-xs);margin-top:6px">请确认以下准备工作已完成：</p><ul style="padding-left:18px;margin:4px 0"><li>⚠ 已选择正确的模板类型（当前：${tplLabel}）</li><li>⚠ 建议先完成报表生成</li></ul><p style="color:var(--gt-color-info);font-size:var(--gt-font-size-xs);margin-top:6px">按上年附注与模板生成正文，表格数据来自试算表与报表；不调用大模型（需要 AI 起草时在章节内单击「AI 填充」）。</p><p style="color:var(--gt-color-success);font-size:var(--gt-font-size-xs);margin-top:6px">✓ 将生成 170+ 个附注章节</p></div>`,
     '开始生成')
   if (!ok) return
   await withLoading(genLoading, async () => {
