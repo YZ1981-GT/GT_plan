@@ -9,7 +9,7 @@
 import { computed, ref, watch } from 'vue'
 import { sanitizeHtml } from '@/composables/useSanitize'
 import type { ApplyMode, PreviewItem } from '@/composables/useNoteTextBatch'
-import { flagLabel, highRiskFlags, targetLabel } from './noteTextBatchLabels'
+import { canAppend as appendAllowed, flagLabel, highRiskFlags, targetLabel } from './noteTextBatchLabels'
 
 const props = defineProps<{
   modelValue: boolean
@@ -43,10 +43,12 @@ function toggleAck(flag: string, checked: boolean) {
 }
 
 const allAcknowledged = computed(() => risks.value.every(f => acknowledged.value.has(f)))
-const canAppend = computed(() => !!props.item && props.item.append_html !== null)
+/** 已有正文且追加会增加内容才给「替换 / 追加」；来源段落已全在现有正文里时只能替换（第 26 组） */
+const canAppend = computed(() => !!props.item && appendAllowed(props.item))
 const proposedHtml = computed(() => {
   if (!props.item) return ''
-  return props.mode === 'append' && props.item.append_html !== null ? props.item.append_html : props.item.proposed_html
+  return props.mode === 'append' && canAppend.value && props.item.append_html !== null
+    ? props.item.append_html : props.item.proposed_html
 })
 
 function onConfirm() {
@@ -65,6 +67,7 @@ function onConfirm() {
           <el-radio-button value="replace">替换现有内容</el-radio-button>
           <el-radio-button value="append">追加到现有内容后</el-radio-button>
         </el-radio-group>
+        <span v-else-if="item.append_html !== null" class="gt-ntd-muted">来源段落已全部在现有内容中，追加不会增加内容，只能替换</span>
         <span v-else class="gt-ntd-muted">目标章节当前为空，将直接写入</span>
       </div>
       <el-alert v-if="stale" type="warning" :closable="false" show-icon title="已修改变量替换，拟写入内容需重新预览后才是最终结果" />

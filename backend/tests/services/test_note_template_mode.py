@@ -82,6 +82,19 @@ def _extract(docx_bytes: bytes, member: str = "word/document.xml") -> str:
         return z.read(member).decode("utf-8")
 
 
+def _all_texts(docx_bytes: bytes) -> list[str]:
+    """全部段落文字（文档顺序，含内容控件 ``w:sdt`` 与表格里的段落）。
+
+    交付导出默认把每节内容包进内容控件：python-docx 的 ``doc.paragraphs`` 只给 body 直接子段落，读到 0 段 ——
+    本文件两例首版即因此恒红（第 26 组，disclosure-note-doc-upload-and-batch-fill）。
+    """
+    from lxml import etree
+
+    w = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    root = etree.fromstring(_extract(docx_bytes).encode("utf-8"))
+    return ["".join(t.text or "" for t in p.iter(w + "t")) for p in root.iter(w + "p")]
+
+
 def _build_tagged_docx(tmp_path: Path) -> Path:
     """构造最小合成打标 docx：4 个 SECTION 块 + 占位符."""
     doc = Document()
@@ -145,8 +158,10 @@ def _patch_scope(monkeypatch):
 # ===========================================================================
 
 
+@pytest.mark.parametrize("controls", [True, False], ids=["内容控件开", "内容控件关"])
 @pytest.mark.asyncio
-async def test_template_mode_fill_skip_seq_and_alias(tmp_path, monkeypatch):
+async def test_template_mode_fill_skip_seq_and_alias(tmp_path, monkeypatch, controls):
+    monkeypatch.setattr(nwe_mod.settings, "DELIVERABLE_LINEAGE_CONTENT_CONTROL_ENABLED", controls)
     docx_path = _build_tagged_docx(tmp_path)
     _patch_loader(monkeypatch, docx_path)
     _patch_index(monkeypatch)
@@ -179,8 +194,7 @@ async def test_template_mode_fill_skip_seq_and_alias(tmp_path, monkeypatch):
         mode="template",
     )
     xml = _extract(bio.getvalue())
-    out_doc = Document(BytesIO(bio.getvalue()))
-    texts = [p.text for p in out_doc.paragraphs]
+    texts = _all_texts(bio.getvalue())
     full = "\n".join(texts)
 
     # 1. legacy alias join：八、1 文本被 五、1 note 填充
@@ -216,9 +230,11 @@ async def test_template_mode_fill_skip_seq_and_alias(tmp_path, monkeypatch):
     assert any(t.strip().startswith("2") and "衍生金融资产" in t for t in texts), texts
 
 
+@pytest.mark.parametrize("controls", [True, False], ids=["内容控件开", "内容控件关"])
 @pytest.mark.asyncio
-async def test_template_mode_deleted_status_skipped(tmp_path, monkeypatch):
+async def test_template_mode_deleted_status_skipped(tmp_path, monkeypatch, controls):
     """§7.1 ①is_deleted / ②status=not_applicable 章节整块删除."""
+    monkeypatch.setattr(nwe_mod.settings, "DELIVERABLE_LINEAGE_CONTENT_CONTROL_ENABLED", controls)
     docx_path = _build_tagged_docx(tmp_path)
     _patch_loader(monkeypatch, docx_path)
     _patch_index(monkeypatch)
@@ -237,8 +253,7 @@ async def test_template_mode_deleted_status_skipped(tmp_path, monkeypatch):
         report_scope="standalone",
         mode="template",
     )
-    out_doc = Document(BytesIO(bio.getvalue()))
-    full = "\n".join(p.text for p in out_doc.paragraphs)
+    full = "\n".join(_all_texts(bio.getvalue()))
 
     assert "保留内容" in full
     # 八、3 status=not_applicable → 删除
@@ -306,7 +321,7 @@ async def test_template_mode_real_template_collision(monkeypatch):
         report_scope="standalone",
         mode="template",
     )
-    full = "\n".join(p.text for p in Document(BytesIO(bio.getvalue())).paragraphs)
+    full = "\n".join(_all_texts(bio.getvalue()))
     # 模板无 {{section}} 占位时不强行注入；至少确认导出成功 + 标记清理
     assert "##SECTION" not in full, "真实模板残留 SECTION 标记"
     assert len(bio.getvalue()) > 0

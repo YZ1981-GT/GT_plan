@@ -498,6 +498,9 @@ def build_preview(
             reason = m.evidence or "未找到匹配的目标章节"
         elif not has_visible_text(proposed):
             category, reason = "unavailable", "来源正文为空"
+        elif has_before and note_text_to_html(before) == proposed:
+            # 写入后内容不变（按编辑器口径、变量替换之后比）：写入只会重置状态为 draft、置本地改写、留痕发事件（第 26 组）
+            category, reason = "unavailable", "与现有内容相同，无需写入"
         elif (m.confidence != "confirmed" or has_before or quality.is_high_risk or cross_standard
               or _HIGH_RISK_REVIEW_FLAGS & set(quality.flags)):
             category, reason = "review", None

@@ -50,6 +50,15 @@ export function highRiskFlags(item: PreviewItem): string[] {
   return item.quality_flags.filter(f => HIGH_RISK_FLAGS.has(f))
 }
 
+/**
+ * 可选「追加」：目标已有正文，且追加结果与现有内容不同（第 26 组）。
+ * 来源段落已全部在现有正文中时，后端预演的追加结果就是现有内容：写了只会重置状态、置本地改写、留痕，
+ * 不提供（后端 apply 同口径拒收 SELECTION_NO_CHANGE）。
+ */
+export function canAppend(item: Pick<PreviewItem, 'append_html' | 'before_html'>): boolean {
+  return item.append_html !== null && item.append_html !== item.before_html
+}
+
 /** 目标章节显示名：编号 + 标题；未匹配显示「未匹配」 */
 export function targetLabel(item: Pick<PreviewItem, 'target_note_section' | 'target_section_title'>): string {
   if (!item.target_note_section) return '未匹配'

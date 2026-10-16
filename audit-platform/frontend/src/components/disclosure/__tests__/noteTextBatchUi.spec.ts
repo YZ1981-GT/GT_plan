@@ -10,7 +10,7 @@ import { mount } from '@vue/test-utils'
 import NoteTextPreviewList from '@/components/disclosure/NoteTextPreviewList.vue'
 import NoteTextDiffDialog from '@/components/disclosure/NoteTextDiffDialog.vue'
 import {
-  describeSource, sourceBadgeText, sourceDepths, sourceMatchStatuses, splitMappingTargets,
+  canAppend, describeSource, sourceBadgeText, sourceDepths, sourceMatchStatuses, splitMappingTargets,
 } from '@/components/disclosure/noteTextBatchLabels'
 import type { PreviewItem, TargetSection } from '@/composables/useNoteTextBatch'
 
@@ -202,6 +202,28 @@ describe('NoteTextDiffDialog', () => {
   it('目标为空时不提供「追加」', () => {
     expect(mountDiff({ append_html: null }).find('.el-radio-group').exists()).toBe(false)
     expect(mountDiff({ append_html: '<p>旧</p><p>新</p>', append_hash: 'a'.repeat(64) }).find('.el-radio-group').exists()).toBe(true)
+  })
+
+  // 第 26 组：后端预演的追加结果 = 现有内容（来源段落已全在现有正文里）⇒ 追加是空写入，后端 apply 422 拒收
+  const NO_GAIN = { before_html: '<p>旧</p><p>新</p>', append_html: '<p>旧</p><p>新</p>', append_hash: 'a'.repeat(64) }
+
+  it('追加不会增加内容 ⇒ 不提供「追加」并说明原因（不误报「目标为空」）', () => {
+    const wrapper = mountDiff(NO_GAIN)
+    expect(wrapper.find('.el-radio-group').exists()).toBe(false)
+    expect(wrapper.text()).toContain('追加不会增加内容')
+    expect(wrapper.text()).not.toContain('目标章节当前为空')
+    expect(canAppend(item(NO_GAIN))).toBe(false)
+    expect(canAppend(item({ ...NO_GAIN, append_html: '<p>旧</p><p>新</p><p>补充</p>' }))).toBe(true)
+  })
+
+  it('父组件仍传「追加」时按替换显示拟写入内容', () => {
+    const wrapper = mount(NoteTextDiffDialog, {
+      props: { modelValue: true, item: item({ ...RISKY, ...NO_GAIN }), mode: 'append', revokedIds: [], stale: false },
+      global: { stubs },
+    })
+    expect(wrapper.text()).toContain('拟写入内容（替换后）')
+    expect(wrapper.findAll('.gt-ntd-pane')[1].html()).toContain('<p>新</p>')
+    expect(wrapper.findAll('.gt-ntd-pane')[1].html()).not.toContain('<p>旧</p>')
   })
 })
 

@@ -12,7 +12,7 @@ import {
 import type { ContentTemplateItem, ContentTemplateVersion } from '@/composables/useNoteContentTemplate'
 import NoteTextPreviewList from './NoteTextPreviewList.vue'
 import NoteTextDiffDialog from './NoteTextDiffDialog.vue'
-import { REPORT_SCOPE_LABELS, savedByLabel, TEMPLATE_TYPE_LABELS } from './noteTextBatchLabels'
+import { canAppend, REPORT_SCOPE_LABELS, savedByLabel, TEMPLATE_TYPE_LABELS } from './noteTextBatchLabels'
 
 const props = defineProps<{
   visible: boolean
@@ -49,7 +49,7 @@ watch(() => batch.previewResult.value, (preview) => {
     .filter(i => i.category !== 'unavailable' && (kept.has(i.source_id) || i.default_selected))
     .map(i => i.source_id)
   modes.value = Object.fromEntries((preview?.items ?? []).map(i =>
-    [i.source_id, i.append_html !== null && modes.value[i.source_id] === 'append' ? 'append' : 'replace']))
+    [i.source_id, canAppend(i) && modes.value[i.source_id] === 'append' ? 'append' : 'replace']))
 })
 
 function openDiff(item: PreviewItem) {

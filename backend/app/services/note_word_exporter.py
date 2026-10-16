@@ -66,6 +66,7 @@ from app.services.note_word_dynamic_styles import (
 from app.services.template_manifest_loader import get_template_manifest_loader
 from app.services.word_doc_utils import (
     delete_section_block,
+    iter_all_paragraphs,
     remove_section_markers,
     scan_section_blocks,
 )
@@ -430,18 +431,10 @@ def _strip_residual_note_placeholders(doc: Document) -> int:
             _set_run_font(run)
         touched += 1
 
-    def _scrub_tables(tables) -> None:
-        for tbl in tables:
-            for row in tbl.rows:
-                for cell in row.cells:
-                    for para in cell.paragraphs:
-                        _scrub_para(para)
-                    if cell.tables:  # 嵌套表格递归
-                        _scrub_tables(cell.tables)
-
-    for para in doc.paragraphs:
+    # 全部段落（含表格单元格、嵌套表格、内容控件）：只看 doc.paragraphs / doc.tables 会漏掉 w:sdt 里的
+    # 占位符 —— 交付导出默认注入内容控件，真实项目交付件因此残留原始 token（第 26 组）
+    for para in iter_all_paragraphs(doc):
         _scrub_para(para)
-    _scrub_tables(doc.tables)
     return touched
 
 
@@ -1010,6 +1003,16 @@ class NoteWordExporter:
                 if a:
                     alias_to_code[a] = code
 
+        # section_id 兜底（同一模板内稳定）：模板块编号是旧种子的 10 字截断码（「四、记账基础和计价原」），新生成
+        # 项目是全码 ⇒ 编号对不上、section_id 相同（第 26 组）。只认唯一的 section_id，且不抢别的块按编号认领的附注
+        block_codes = {b.section_code for b in blocks}
+        sid_of_code = {(e.get("section_code") or "").strip(): e.get("section_id") for e in index_sections}
+        notes_by_sid: dict[str, list[DisclosureNote]] = {}
+        for n in notes:
+            n_code = (n.note_section or "").strip()
+            if getattr(n, "section_id", None) and n_code not in block_codes and alias_to_code.get(n_code) not in block_codes:
+                notes_by_sid.setdefault(n.section_id, []).append(n)
+
         def _match_note(section_code: str) -> DisclosureNote | None:
             code = (section_code or "").strip()
             note = note_by_section.get(code)
@@ -1019,7 +1022,8 @@ class NoteWordExporter:
             for db_section, n in note_by_section.items():
                 if alias_to_code.get(db_section) == code:
                     return n
-            return None
+            candidates = notes_by_sid.get(sid_of_code.get(code) or "", [])
+            return candidates[0] if len(candidates) == 1 else None
 
         # 4 + 5. 逐块裁剪 / 填充
         kept_codes: list[str] = []

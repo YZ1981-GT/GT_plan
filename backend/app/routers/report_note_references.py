@@ -199,13 +199,14 @@ async def get_note_references_for_row(
         return NoteReferencesResponse(row_code=row_code, notes=[])
 
     try:
+        # 不按 table_data 过滤：第 3 级只认「本项目实际存在的章节」，要全部章节的标题；表格逻辑按对象跳过。
+        # 首版写 IS NOT NULL，靠生成链把 None 存成 JSON null 才碰巧不漏；SQL NULL 的章节会被丢掉（第 26 组）
         result = await db.execute(
             sa.text(
                 "SELECT note_section, section_title, table_data "
                 "FROM disclosure_notes "
                 "WHERE project_id = :pid AND year = :yr "
-                "AND is_deleted = false "
-                "AND table_data IS NOT NULL"
+                "AND is_deleted = false"
             ),
             {"pid": str(project_id), "yr": year},
         )

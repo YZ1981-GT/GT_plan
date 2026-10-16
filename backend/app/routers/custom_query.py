@@ -1481,11 +1481,14 @@ async def _query_disclosure(db, pid, year, filters, limit):
                     {"pid": pid, "y": year, "sid": section_id},
                 )
             else:
+                # 「有表」= 非空 JSON 对象（与附注章节读取 / Word 导出同口径）：生成链把 None 存成 JSON null，
+                # IS NOT NULL 对它恒真 ⇒ 纯文字章节占 LIMIT 名额却展平不出任何行（第 26 组）
                 note_res = await db.execute(
                     text(
                         "SELECT note_section, section_title, source_template::text, table_data "
                         "FROM disclosure_notes WHERE project_id = :pid AND year = :y "
-                        "AND is_deleted = false AND table_data IS NOT NULL "
+                        "AND is_deleted = false AND jsonb_typeof(table_data) = 'object' "
+                        "AND table_data::text <> '{}' "
                         "ORDER BY sort_order NULLS LAST, note_section LIMIT :lim"
                     ),
                     {"pid": pid, "y": year, "lim": _effective_limit(limit)},

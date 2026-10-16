@@ -134,6 +134,7 @@ def _validate(
 
     items = {i["source_id"]: i for i in preview.get("items") or []}
     plan: list[tuple[dict[str, Any], DisclosureNote, dict[str, Any], str]] = []
+    unchanged: list[str] = []
     for sel, target_id in zip(selections, targets):
         item = items.get(sel["source_id"])
         if item is None:
@@ -153,7 +154,14 @@ def _validate(
             raise ApplyError("INVALID_MODE", f"不支持的写入方式：{mode}")
         if sel.get("proposed_hash") != expected or _sha256(final) != expected:
             raise ApplyError("PROPOSED_HASH_MISMATCH", "拟写入内容与预览不一致，请重新预览")
+        if final == item.get("before_html"):
+            # 写入后与现有内容相同（追加的段落已全部在现有正文中）：写了只会重置状态、置本地改写、留痕（第 26 组）
+            unchanged.append(locked_notes[target_id].note_section)
         plan.append((sel, locked_notes[target_id], item, final))
+    if unchanged:
+        raise ApplyError("SELECTION_NO_CHANGE",
+                         f"以下章节写入后与现有内容相同，无需写入：{'、'.join(unchanged[:10])}。"
+                         "追加时来源段落已全部在现有正文中，可改选「替换」或取消勾选")
     return plan
 
 

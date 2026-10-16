@@ -6,7 +6,7 @@ import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 from docx.document import Document as DocumentObject
 from docx.oxml.ns import qn
@@ -156,6 +156,38 @@ def _delete_paragraph(para: Paragraph) -> None:
     parent = element.getparent()
     if parent is not None:
         parent.remove(element)
+
+
+def iter_all_paragraphs(doc: DocumentObject) -> list[Paragraph]:
+    """body 下全部段落（文档顺序，含表格单元格与内容控件 ``w:sdt`` 里的段落）。
+
+    ``doc.paragraphs`` / ``doc.tables`` 只给 body 直接子元素：交付导出把每节内容包进内容控件后
+    （``DELIVERABLE_LINEAGE_CONTENT_CONTROL_ENABLED`` 默认开），块内段落全在 ``w:sdt`` 里，按它清理就漏掉
+    ``##STYLE_REF##`` 与未填充占位符（第 26 组：真实项目交付件残留 100~200 处）。返回列表，调用方可删段落。
+    """
+    return [Paragraph(el, doc) for el in doc.element.body.iter(qn("w:p"))]
+
+
+_BLOCK_LEVEL_TAGS = (qn("w:p"), qn("w:tbl"))
+_KEPT_WHEN_CLEARED = (qn("w:pPr"), qn("w:bookmarkStart"), qn("w:bookmarkEnd"))
+
+
+def _drop_paragraph(para: Paragraph) -> None:
+    """删除标记段落。body 级照旧直接删；嵌套段落（单元格 / 内容控件里）删了会坏结构时只清空文字：
+    它是容器里唯一的块级元素（``w:tc`` 至少要一个段落，否则 Word 报内容损坏），或段落里有书签。"""
+    element = para._element
+    parent = element.getparent()
+    if parent is None:
+        return
+    if parent.tag != qn("w:body"):
+        only_block = sum(1 for child in parent if child.tag in _BLOCK_LEVEL_TAGS) == 1
+        has_bookmark = any(child.tag in _KEPT_WHEN_CLEARED[1:] for child in element)
+        if only_block or has_bookmark:
+            for child in list(element):
+                if child.tag not in _KEPT_WHEN_CLEARED:
+                    element.remove(child)
+            return
+    parent.remove(element)
 
 
 def apply_optional_sections(
@@ -317,16 +349,17 @@ def remove_section_markers(doc: DocumentObject) -> int:
     同时清理行内 ``##STYLE_REF:##`` 标记文本。返回删除 / 清理的段落数。
     """
     touched = 0
-    for para in list(doc.paragraphs):
+    # 下钻内容控件与表格单元格：只看 doc.paragraphs 会漏掉 w:sdt 里的 ##STYLE_REF##（第 26 组）
+    for para in iter_all_paragraphs(doc):
         text = (para.text or "").strip()
         if SECTION_OPEN_RE.match(text) or SECTION_CLOSE_RE.match(text):
-            _delete_paragraph(para)
+            _drop_paragraph(para)
             touched += 1
             continue
         if "##STYLE_REF:" in text:
             new_text = STYLE_REF_RE.sub("", para.text).strip()
             if not new_text:
-                _delete_paragraph(para)
+                _drop_paragraph(para)
             else:
                 para.clear()
                 para.add_run(new_text)

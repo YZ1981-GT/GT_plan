@@ -121,9 +121,9 @@ def inject_content_controls_for_blocks(
 ) -> int:
     """为 ``scan_section_blocks`` 的每个块把「开闭标记之间的内部内容」包进 w:sdt。
 
-    关键：**只包内部内容**（``block.elements[1:-1]``），保留开闭标记段落在 body 级，
-    使后续 ``remove_section_markers``（遍历 body 级 doc.paragraphs，不下钻 SDT）
-    仍能正常清理标记。无内部内容（仅开闭标记）的块跳过。
+    关键：**只包内部内容**（``block.elements[1:-1]``），保留开闭标记段落在 body 级（书签锚点挂在它们外侧）。
+    块内的 ``##STYLE_REF##`` 与未填充占位符随内容进了 SDT，后续清理须下钻（``iter_all_paragraphs``，第 26 组：
+    首版清理只看 body 级 ``doc.paragraphs``，交付件残留原始标记）。无内部内容（仅开闭标记）的块跳过。
 
     Parameters
     ----------

@@ -20,7 +20,7 @@ import {
 import NoteTextPreviewList from './NoteTextPreviewList.vue'
 import NoteTextDiffDialog from './NoteTextDiffDialog.vue'
 import {
-  CONFIDENCE_LABELS, describeSource, sourceDepths, sourceMatchStatuses, splitMappingTargets,
+  canAppend, CONFIDENCE_LABELS, describeSource, sourceDepths, sourceMatchStatuses, splitMappingTargets,
 } from './noteTextBatchLabels'
 
 const NoteRichTextEditor = defineAsyncComponent(() => import('@/components/NoteRichTextEditor.vue'))
@@ -59,7 +59,7 @@ watch(() => batch.previewResult.value, (preview) => {
     .filter(i => i.category !== 'unavailable' && (kept.has(i.source_id) || i.default_selected))
     .map(i => i.source_id)
   modes.value = Object.fromEntries(preview.items.map(i =>
-    [i.source_id, i.append_html !== null && modes.value[i.source_id] === 'append' ? 'append' : 'replace']))
+    [i.source_id, canAppend(i) && modes.value[i.source_id] === 'append' ? 'append' : 'replace']))
 })
 
 async function confirmDiscard(message: string): Promise<boolean> {

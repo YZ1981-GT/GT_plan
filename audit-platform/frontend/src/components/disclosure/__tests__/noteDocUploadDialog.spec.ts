@@ -16,6 +16,8 @@ vi.mock('@/composables/useKnowledge', () => ({ useKnowledge: () => ({ pickDocume
 vi.mock('element-plus', () => ({ ElMessageBox: { confirm: vi.fn() } }))
 
 import NoteDocUploadDialog from '@/components/disclosure/NoteDocUploadDialog.vue'
+import NoteTextDiffDialog from '@/components/disclosure/NoteTextDiffDialog.vue'
+import NoteTextPreviewList from '@/components/disclosure/NoteTextPreviewList.vue'
 
 const stubs = {
   'el-dialog': { props: ['modelValue', 'title'], template: '<div class="el-dialog"><slot /><slot name="footer" /></div>' },
@@ -83,5 +85,29 @@ describe('NoteDocUploadDialog', () => {
       [s.find('strong').text(), `${s.find('.gt-ndu-match').attributes('data-type')}:${s.find('.gt-ndu-match').text()}`]))
     expect(shown).toEqual({ '会计期间': 'warning:需复核', '（1）子节': 'info:已并入上级章节', '某某专项说明': 'info:未匹配' })
     expect(wrapper.find('.gt-ndu-match').attributes('title')).toBe('四、会计期间 会计期间')
+  })
+
+  it('第 26 组：重新预览后追加不再增加内容 ⇒ 已选的「追加」退回「替换」（仍增加内容则保留）', async () => {
+    const { wrapper, previewResult } = mountDialog([sec('docx-s1', '会计期间')])
+    const preview = (over: Partial<PreviewItem>): PreviewResponse => ({
+      preview_digest: 'd'.repeat(64), summary: {}, warnings: [], skipped_sources: [],
+      items: [item({ before_html: '<p>旧</p>', append_html: '<p>旧</p><p>新</p>', append_hash: 'a'.repeat(64), ...over })],
+    })
+    previewResult.value = preview({})
+    await nextTick()
+    wrapper.findComponent(NoteTextPreviewList).vm.$emit('open-diff', previewResult.value.items[0])
+    await nextTick()
+    const diff = () => wrapper.findComponent(NoteTextDiffDialog)
+    diff().vm.$emit('update:mode', 'append')
+    await nextTick()
+    expect(diff().props('mode')).toBe('append')
+
+    previewResult.value = preview({ before_html: '<p>旧</p><p>补</p>', append_html: '<p>旧</p><p>补</p><p>新</p>' })
+    await nextTick()
+    expect(diff().props('mode')).toBe('append')  // 对照：仍增加内容，保留用户的选择
+
+    previewResult.value = preview({ before_html: '<p>旧</p><p>新</p>', append_html: '<p>旧</p><p>新</p>' })
+    await nextTick()
+    expect(diff().props('mode')).toBe('replace')
   })
 })

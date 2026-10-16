@@ -14,6 +14,9 @@ const h = vi.hoisted(() => ({ batch: null as unknown }))
 vi.mock('@/composables/useNoteTextBatch', () => ({ useNoteTextBatch: () => h.batch, toSelection: vi.fn() }))
 
 import NoteContentTemplateApplyDialog from '@/components/disclosure/NoteContentTemplateApplyDialog.vue'
+import NoteTextDiffDialog from '@/components/disclosure/NoteTextDiffDialog.vue'
+import NoteTextPreviewList from '@/components/disclosure/NoteTextPreviewList.vue'
+import type { PreviewItem, PreviewResponse } from '@/composables/useNoteTextBatch'
 
 const stubs = {
   'el-dialog': { props: ['modelValue', 'title'], template: '<div class="el-dialog"><slot /><slot name="footer" /></div>' },
@@ -32,8 +35,9 @@ const V2: ContentTemplateVersion = { ...V1, id: 'v2', version_no: 2, content_has
 
 function mountDialog(version: ContentTemplateVersion, current: ContentTemplateVersion = version) {
   const useTemplateVersion = vi.fn()
+  const previewResult = ref<PreviewResponse | null>(null)
   h.batch = {
-    previewResult: ref(null), previewStale: ref(false), lastError: ref(null), previewLoading: ref(false),
+    previewResult, previewStale: ref(false), lastError: ref(null), previewLoading: ref(false),
     applyLoading: ref(false), canApply: computed(() => false), revokedReplacementIds: ref(new Set()),
     useTemplateVersion, fetchPreview: vi.fn(async () => true), toggleRevocation: vi.fn(), applyBatch: vi.fn(),
   }
@@ -41,7 +45,7 @@ function mountDialog(version: ContentTemplateVersion, current: ContentTemplateVe
     current_version_id: current.id, current_version: current, created_by: null, created_at: null, updated_at: null }
   const wrapper = mount(NoteContentTemplateApplyDialog, {
     props: { visible: true, projectId: 'p1', year: 2025, template, version }, global: { stubs } })
-  return { wrapper, useTemplateVersion }
+  return { wrapper, useTemplateVersion, previewResult }
 }
 
 describe('NoteContentTemplateApplyDialog', () => {
@@ -68,5 +72,33 @@ describe('NoteContentTemplateApplyDialog', () => {
     await flushPromises()
     expect(wrapper.find('.el-alert').text()).toContain('该模板已有更新版本 v2')
     expect(useTemplateVersion).toHaveBeenCalledWith('v1', 'h'.repeat(64))
+  })
+
+  it('第 26 组：重新预览后追加不再增加内容 ⇒ 已选的「追加」退回「替换」', async () => {
+    const { wrapper, previewResult } = mountDialog(V1)
+    await flushPromises()
+    const preview = (over: Partial<PreviewItem>): PreviewResponse => ({
+      preview_digest: 'd'.repeat(64), summary: {}, warnings: [], skipped_sources: [],
+      items: [{
+        source_id: 'tpl-s1', source_title: '公司基本情况', target_note_id: 'n1', target_note_section: '一、1',
+        target_section_title: '公司基本情况', match_kind: 'section_code', evidence: '', confidence: 'confirmed',
+        category: 'review', default_selected: false, unavailable_reason: null, before_html: '<p>旧</p>',
+        before_hash: 'b'.repeat(64), proposed_html: '<p>新</p>', proposed_hash: 'p'.repeat(64),
+        append_html: '<p>旧</p><p>新</p>', append_hash: 'a'.repeat(64), expected_updated_at: null,
+        default_mode: 'replace', quality_flags: [], replacements: [], ...over,
+      }],
+    })
+    previewResult.value = preview({})
+    await flushPromises()
+    wrapper.findComponent(NoteTextPreviewList).vm.$emit('open-diff', previewResult.value.items[0])
+    await flushPromises()
+    const diff = () => wrapper.findComponent(NoteTextDiffDialog)
+    diff().vm.$emit('update:mode', 'append')
+    await flushPromises()
+    expect(diff().props('mode')).toBe('append')
+
+    previewResult.value = preview({ before_html: '<p>旧</p><p>新</p>', append_html: '<p>旧</p><p>新</p>' })
+    await flushPromises()
+    expect(diff().props('mode')).toBe('replace')
   })
 })

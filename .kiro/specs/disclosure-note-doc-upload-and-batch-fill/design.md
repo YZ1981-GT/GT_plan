@@ -219,6 +219,7 @@ PyMuPDF `page.get_text("dict")` 遍历 block→line→span：
 - 映射：`p` / `div` / `blockquote` → 段落；`h1`~`h5` → 加粗段落（不用 Word 标题样式：导出带自动目录，正文里的小标题不应进目录）；`ul` / `ol` → 「• 」/「1. 」前缀段落；`strong` / `b`、`em` / `i` → 加粗 / 倾斜；`br` → 段内换行；`table` → Word 表格（单线边框，`th` 加粗，`colspan` / `rowspan` 合并单元格）；空 `<p>`（含追加分隔 `<p>&nbsp;</p>`）→ 空段，与编辑器所见一致；实体解码。
 - 模板模式：占位符独占一段时，首块写进占位段，其余块（含表格）依次插在其后并沿用占位段的段落属性；占位符与其它文字同段时按纯文字替换（四版模板实测 502 个占位全部独占一段）。
 - 交付件回填比对：`_normalize_text` 先把 HTML 投影成交付 docx 提取得到的文字（逐段落文字、跳过表格），再做原有的空白规范化。否则修复后所有 HTML 章节在回填时都会被判为「已修改」；修复前生成、正文里含原样标签的交付件按同一投影比较，同样不误判。
+- 模板模式收尾（第 26 组）：交付导出默认把每节内容包进内容控件 `w:sdt`，清理 `##STYLE_REF##` 与未填充占位符必须下钻内容控件与表格单元格（`word_doc_utils.iter_all_paragraphs`），只看 `doc.paragraphs` 会漏掉全部块内段落。块编号与附注编号不同时（模板是旧种子截断码、新项目是全码），按索引里的 section_id 唯一匹配兜底。
 - 不在本组范围（登记）：回填写回的是 Word 段落文字，HTML 格式与正文内表格在回填后被拍平；交付 docx 提取丢弃段内换行（多行纯文字章节的既有误判）；刷新对纯文字按行拆段与导出（一段带换行）不一致（既有行为，不变）。
 
 > 第 22 组：纯文字（生成链写入的正文，含换行、markdown 表格 / 标题 / 粗体）在四个出口都先经 `note_text_to_html` 再按上面的映射输出，与编辑器所见一致。编辑器加载（`utils/noteTextMarkdown.ts`）与后端用同一引擎 markdown-it、同一配置：commonmark 预设 + GFM 表格 / 删除线，单换行即换行，尖括号按文字，**不认列表与缩进代码块**（书写的编号、项目符号与缩进是正文，原样输出）；是否按 HTML 对待两端同一条标签判据。两端逐条跑共享夹具 `backend/data/note_text_markdown_cases.json`，改规则必须两端同改并补用例。编辑器自己产生的 `<ol>` 仍按「（1）」前缀输出并支持 `start` 续编号。模板模式表格占位：`_render_table` 追加在正文末尾的「表 + 表后空段」按位置整体移到占位段后。
@@ -276,6 +277,7 @@ PyMuPDF `page.get_text("dict")` 遍历 block→line→span：
 5. 解析目标段落变量，替换公司名/年度/报表期间/币种/金额单位；
 6. 扫描来源实体名、地址、人名、日期、金额、占位文本、stale/draft 等质量风险；
 7. 按 recommended/review/unavailable 分类；
+   > 第 26 组：拟写入内容按编辑器口径（`note_text_to_html`，变量替换之后）与现有内容相同 ⇒ unavailable「与现有内容相同，无需写入」。apply 对写入后与现有内容相同的选择（追加的段落已全部在现有正文中）422 `SELECTION_NO_CHANGE`；前端在追加结果等于现有内容时不提供追加。否则「写了等于没写」也会重置状态为 draft、置本地改写、留痕发事件。
 8. 返回逐章 before/proposed 内容摘要与 hash、`preview_digest = SHA256(canonical preview inputs)`。
 
 ### 7.2 Apply
