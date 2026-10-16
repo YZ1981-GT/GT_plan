@@ -141,7 +141,7 @@ class TestValidateAllProducesFindings:
 class TestValidateAllLlmReview:
     @pytest.mark.asyncio
     async def test_llm_review_warning_finding(self, monkeypatch):
-        """有正文且 LLM 返回问题 → warning 级 AI 提示 finding。
+        """用户手动发起 AI 审核：有正文且 LLM 返回问题 → warning 级 AI 提示。
 
         LLM_REVIEW 走 engine 的 async 特例路径 _execute_llm_review_async
         → await chat_completion，故 mock 模块级 chat_completion。
@@ -157,22 +157,22 @@ class TestValidateAllLlmReview:
         )
         db.execute.side_effect = [_result_scalars([note]), MagicMock()]
 
-        engine = NoteValidationEngine(db)
+        engine = NoteValidationEngine(db, allow_llm=True)  # 用户手动发起 AI 审核
         engine._load_report_data = AsyncMock(return_value={})
         engine._load_tb_data = AsyncMock(return_value={})
         engine._load_prior_notes = AsyncMock(return_value={})
         engine.load_preset = AsyncMock(return_value=[])
 
         result = await engine.validate_all(PROJECT_ID, YEAR, template_type="soe")
-        llm = [f for f in result["findings"] if f["note_section"] == "五、20"]
-        assert llm, f"expected LLM warning finding, got {result['findings']}"
-        assert llm[0]["check_type"] == "LLM审核"
-        # 无 diff_amount → severity warning（AI 提示，非阻断）
-        assert llm[0]["severity"] == "warning"
+        # 无 diff_amount → warning 级（AI 提示，非阻断）。默认宽松模式 warning 折进 warning_summary、
+        # 不逐条进 findings（P0-A，DISCLOSURE_NOTE_VALIDATION_STRICT）
+        assert (result["warning_count"], result["error_count"]) == (1, 0)
+        assert result["warning_summary"] == [{"note_section": "五、20", "check_type": "LLM审核", "count": 1}]
+        assert result["findings"] == []
 
     @pytest.mark.asyncio
     async def test_llm_review_fail_open_no_false_finding(self, monkeypatch):
-        """P9 fail-open：chat_completion 抛异常 → 不误报不抛（async 路径）。"""
+        """P9 fail-open（手动发起）：chat_completion 抛异常 → 不误报不抛（async 路径）。"""
         monkeypatch.setattr(
             nve, "chat_completion", AsyncMock(side_effect=RuntimeError("llm down"))
         )
@@ -183,6 +183,28 @@ class TestValidateAllLlmReview:
         )
         db.execute.side_effect = [_result_scalars([note]), MagicMock()]
 
+        engine = NoteValidationEngine(db, allow_llm=True)  # 用户手动发起 AI 审核
+        engine._load_report_data = AsyncMock(return_value={})
+        engine._load_tb_data = AsyncMock(return_value={})
+        engine._load_prior_notes = AsyncMock(return_value={})
+        engine.load_preset = AsyncMock(return_value=[])
+
+        result = await engine.validate_all(PROJECT_ID, YEAR, template_type="soe")
+        # fail-open → 不产 warning / error（findings 在宽松模式只含 error，只看它会空转）
+        assert (result["failed"], result["warning_count"], result["warning_summary"]) == (0, 0, [])
+
+    @pytest.mark.asyncio
+    async def test_automatic_validation_never_calls_llm(self, monkeypatch):
+        """默认（生成后自动校验 / 校验按钮）：LLM审核 规则不调大模型、不产问题（用户 2026-10-16）。"""
+        llm = AsyncMock(return_value="占位符残留 XX 未填写，与表格数据矛盾")
+        monkeypatch.setattr(nve, "chat_completion", llm)
+        db = _make_db_mock()
+        note = _note(
+            "五、20",
+            {"text_content": "本年XX大幅增加", "_validation_rules": ["LLM审核"]},
+        )
+        db.execute.side_effect = [_result_scalars([note]), MagicMock()]
+
         engine = NoteValidationEngine(db)
         engine._load_report_data = AsyncMock(return_value={})
         engine._load_tb_data = AsyncMock(return_value={})
@@ -190,8 +212,8 @@ class TestValidateAllLlmReview:
         engine.load_preset = AsyncMock(return_value=[])
 
         result = await engine.validate_all(PROJECT_ID, YEAR, template_type="soe")
-        # fail-open → 该章节不产 finding
-        assert [f for f in result["findings"] if f["note_section"] == "五、20"] == []
+        assert llm.await_count == 0
+        assert (result["failed"], result["warning_count"], result["warning_summary"]) == (0, 0, [])
 
 
 # ---------------------------------------------------------------------------

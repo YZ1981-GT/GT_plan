@@ -134,8 +134,9 @@ _SECTION_CODE_RE = re.compile(r"[一二三四五六七八九十]+、\d+")
 def section_code_of(section_number: str) -> str:
     """取章节号的 `X、N` 前缀。
 
-    模板里有 md 截断的 section_number（`九、1、或有负债` / `三、资产减值损失（损`），
+    模板里有 md 截断的 section_number（`九、1、或有负债` / 上市会计政策章 `三、债务重组【不适用`），
     直接整串比对会漏判 ⇒ 一律按前缀比（memory 已记的截断值坑）。
+    （上市损益类原有 `三、资产减值损失…` 等截断值，2026-10-16 按 Word 改挂后为纯编号 五、75~五、82。）
     """
     m = _SECTION_CODE_RE.match(str(section_number or "").strip())
     return m.group(0) if m else str(section_number or "").strip()

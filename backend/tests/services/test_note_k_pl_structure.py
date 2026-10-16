@@ -6,7 +6,7 @@
 - 每张表带 ``columns``（显式 ``flat``）+ ``guidance``，无 ``_column_groups``
 - 无占位说明行（``可无限量添加行`` / ``......`` / ``……``）与 ``header_label`` 假行
 - K10 国企 4 列（末列「是否为政府补助」）、K12/K13 两版 4 列（末列非经常性损益）
-- 上市侧章节号是模板实测截断值（``三、`` 章 md 重建既有形态）
+- 上市侧章节号 = 模板现存编号（原为 ``三、`` 章 md 重建截断值，2026-10-16 按 Word 改挂为 ``五、77`` 等）
 
 spec: .kiro/specs/k-cycle-disclosure-alignment/ Task 4.3
 """
@@ -117,18 +117,19 @@ def test_extra_column_labels() -> None:
     k10_soe = _load("soe", "八、69")["tables"][0]
     assert k10_soe["columns"][3]["label"] == "是否为政府补助"
     assert k10_soe["columns"][3]["key"] == "is_gov_grant"
-    for variant, section in (("listed", "三、营业外收入（注："), ("soe", "八、76")):
+    for variant, section in (("listed", "五、79"), ("soe", "八、76")):
         tbl = _load(variant, section)["tables"][0]
         assert tbl["columns"][3]["label"] == "计入当期非经常性损益的金额"
         assert tbl["columns"][3]["key"] == "non_recurring_amount"
 
 
-def test_listed_section_numbers_are_truncated_form() -> None:
-    """listed `三、` 章 section_number 被 md 重建截断为 10 字符，是既有真源形态。"""
+def test_listed_section_numbers_follow_template() -> None:
+    """上市 K11~K13 章节号 = 模板现存编号。原挂「三」章、是 md 重建的 10 字截断值；2026-10-16 按四版 Word
+    改挂到第五章（五、77 / 五、79 / 五、80），PLAN 必须随模板同步，否则脚本按编号找不到节。"""
     listed_sections = {e["section"] for e in PLAN if e["variant"] == "listed"}
-    assert "三、资产减值损失（损" in listed_sections
-    assert "三、营业外收入（注：" in listed_sections
-    assert "三、营业外支出（注：" in listed_sections
+    assert {"五、77", "五、79", "五、80"} <= listed_sections
+    seed = {s["section_number"] for s in json.loads((_DATA / "note_template_listed.json").read_text(encoding="utf-8"))["sections"]}
+    assert listed_sections <= seed, sorted(listed_sections - seed)
 
 
 def test_validator_catches_regression() -> None:

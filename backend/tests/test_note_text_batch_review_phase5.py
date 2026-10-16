@@ -473,7 +473,7 @@ class TestGenerateRespectsLocalOverride:
     async def test_generate_notes_keeps_batch_written_text(self):
         from unittest.mock import AsyncMock, MagicMock
 
-        from tests.test_disclosure_note_rag_characterization import (
+        from tests.test_disclosure_note_generation_text_order import (
             _make_engine,
             _minimal_template,
             _stub_generate_notes_io,
@@ -486,8 +486,7 @@ class TestGenerateRespectsLocalOverride:
             eng._prior_notes_cache = {}
 
         eng._preload_data_for_notes = _no_prior
-        _stub_generate_notes_io(eng)
-        eng._generate_text_with_llm = AsyncMock(return_value=None)
+        _stub_generate_notes_io(eng)  # 生成链已不调大模型（2026-10-16），无需再 stub 大模型级
         existing = DisclosureNote(project_id=uuid.uuid4(), year=YEAR, note_section="五、1 存货", section_title="存货",
                                   text_content="<p>批量写入的正文</p>", is_local_override=True)
         res = MagicMock()

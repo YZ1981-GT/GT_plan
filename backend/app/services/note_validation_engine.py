@@ -492,8 +492,11 @@ from app.services.note_validation_executors import (
 class NoteValidationEngine:
     """附注校验公式引擎"""
 
-    def __init__(self, db: AsyncSession | None = None):
+    def __init__(self, db: AsyncSession | None = None, *, allow_llm: bool = False):
         self.db = db
+        # 大模型审核（LLM_REVIEW 规则）只在用户手动发起 AI 审核时执行（用户 2026-10-16：大模型只在手动单击时调用；
+        # spec disclosure-note-template-word-realignment §6）。生成后自动校验、「校验」按钮都用默认值 False。
+        self.allow_llm = allow_llm
         self._rules_cache: dict[str, list[ValidationRule]] = {}
 
     async def load_preset(self, template_type: str) -> list[ValidationRule]:
@@ -541,6 +544,15 @@ class NoteValidationEngine:
         此处再兜底一层，异常 → passed=True + skipped。
         """
         if rule.rule_type == ValidationType.LLM_REVIEW:
+            if not self.allow_llm:
+                return ValidationResult(
+                    section_code=rule.section_code,
+                    rule_type=rule.rule_type.value,
+                    rule_expression=rule.expression,
+                    passed=True,
+                    details={"check": "llm_review", "skipped": True, "manual_only": True,
+                             "reason": "大模型审核只在用户手动发起时执行，自动校验不调用大模型"},
+                )
             try:
                 return await _execute_llm_review_async(rule, context)
             except Exception as e:  # pragma: no cover - defensive fail-open

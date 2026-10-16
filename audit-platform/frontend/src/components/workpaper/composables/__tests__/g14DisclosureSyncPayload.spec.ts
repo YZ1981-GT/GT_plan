@@ -41,9 +41,9 @@ function listedSnap(partial: Record<string, { current?: number; prior?: number }
 
 describe('G14_NOTE_SECTION', () => {
   it('上市/国企章节对齐模板', () => {
-    expect(G14_NOTE_SECTION.listed).toBe('三、信用减值损失')
+    expect(G14_NOTE_SECTION.listed).toBe('五、76')
     expect(G14_NOTE_SECTION.soe).toBe('八、73')
-    expect(isG14CreditImpairmentNoteSection('三、信用减值损失')).toBe(true)
+    expect(isG14CreditImpairmentNoteSection('五、76')).toBe(true)
     expect(isG14CreditImpairmentNoteSection('八、73')).toBe(true)
   })
 })
@@ -137,9 +137,9 @@ describe('resolveG14NoteTemplateLabel', () => {
 })
 
 describe('resolveNoteDisclosureJumpTarget — G14', () => {
-  it('三、信用减值损失 → G14 上市披露表', () => {
+  it('五、76 → G14 上市披露表', () => {
     const t = resolveNoteDisclosureJumpTarget({
-      note_section: '三、信用减值损失',
+      note_section: '五、76',
       last_sync_wp_id: 'wp-g14',
       table_data: {},
     })

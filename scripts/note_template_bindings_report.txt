@@ -1,10 +1,10 @@
 # note_template_bindings.json 自动生成报告
-生成时间: 2026-10-16T12:28:10.912036
+生成时间: 2026-10-16T18:03:32.259350
 生成器: scripts/generate_note_template_bindings.py
 
 ## 模板覆盖率
-- SOE: 74/188 章节命中 binding (39.4%)；含表 120；binding cells 2536
-- Listed: 88/203 章节命中 binding (43.3%)；含表 138；binding cells 3087
+- SOE: 74/190 章节命中 binding (38.9%)；含表 120；binding cells 2536
+- Listed: 88/206 章节命中 binding (42.7%)；含表 138；binding cells 3087
 
 ## binding cells 总数: 5623
 

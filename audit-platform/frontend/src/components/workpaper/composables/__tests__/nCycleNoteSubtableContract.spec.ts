@@ -67,7 +67,7 @@ function collectAllTables(): TableSpec[] {
 
   // N5
   for (const [tableName, cols] of Object.entries(buildN5ListedColumns())) {
-    specs.push({ variant: 'listed', sectionNumber: '三、所得税费用', tableName, columns: cols as ColumnDef[] })
+    specs.push({ variant: 'listed', sectionNumber: '五、81', tableName, columns: cols as ColumnDef[] })
   }
   for (const [tableName, cols] of Object.entries(buildN5SoeColumns())) {
     specs.push({ variant: 'soe', sectionNumber: '八、78', tableName, columns: cols as ColumnDef[] })

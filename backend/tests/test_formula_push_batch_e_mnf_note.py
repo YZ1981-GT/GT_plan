@@ -10,7 +10,7 @@ spec: formula-push-note-rollout-batch-e / Task 11
   - 全部权益类（account_code 4xxx），ending 取「期末余额」
 - N 循环 5 个科目有 note.main 规则
   - N4 税金及附加 section_by_template 只有 listed=五、63（国企无）
-  - N5 所得税费用上市侧走关键词章节 三、所得税费用 / 国企侧 八、78
+  - N5 所得税费用上市侧走关键词章节 五、81 / 国企侧 八、78
   - N4/N5 损益类（account_code 6xxx），ending 取「本期发生额」
   - N1/N2 资产负债类，ending 取「期末余额」
 - F 循环 4 个科目全部有 note.main 规则
@@ -97,7 +97,7 @@ def _load_sync_registry() -> list[dict]:
 # N2 → 五、41 / 八、41（应交税费）— 对称
 # N3 → 五、22 / 八、22（递延所得税负债）— 对称
 # N4 → 五、63 / None （税金及附加）— 只有 listed，损益类
-# N5 → 三、所得税费用 / 八、78（所得税费用）— 上市走关键词章节，损益类
+# N5 → 五、81 / 八、78（所得税费用）— 上市走关键词章节，损益类
 #
 # F 循环（存货/采购）：
 # F1 → 五、7  / 八、7 （预付款项）— 对称
@@ -173,7 +173,7 @@ N_NOTE_SECTIONS_DUAL = [
 ALL_N_CODES = ["N1", "N2", "N3", "N4", "N5"]
 
 N4_LISTED_SECTION = "五、63"
-N5_LISTED_SECTION = "三、所得税费用"
+N5_LISTED_SECTION = "五、81"
 N5_SOE_SECTION = "八、78"
 
 N_TABLE_EXPECTED = {
@@ -402,12 +402,16 @@ def test_n4_only_listed_section():
 
 
 def test_n5_keyword_section_listed():
-    """N5 所得税费用上市侧走关键词章节 三、所得税费用（非 五、N 数字格式）。"""
+    """N5 所得税费用上市侧「五、81」：2026-10-16 按四版 Word 从会计政策章改挂到项目附注章
+    （spec disclosure-note-template-word-realignment），种子登记的原关键词编号经别名解析到它。"""
+    from app.services.note_section_catalog import normalize_section_code, template_json_path
+
     rule = _note_rule("N5")
     sections = rule.target.sections
-    assert sections.get("listed") == N5_LISTED_SECTION
-    # 验证不是常规 五、N 格式
-    assert not sections["listed"].startswith("五、"), "N5 上市侧应走关键词章节，不是 五、N 格式"
+    assert sections.get("listed") == N5_LISTED_SECTION == "五、81"
+    seed = json.loads(template_json_path("listed").read_text(encoding="utf-8"))["sections"]
+    olds = next(s for s in seed if s["section_number"] == "五、81").get("legacy_section_numbers") or []
+    assert olds and {normalize_section_code(o, template_type="listed") for o in olds} == {"五、81"}
 
 
 def test_n5_soe_section():

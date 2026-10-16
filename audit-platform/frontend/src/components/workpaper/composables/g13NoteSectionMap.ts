@@ -3,7 +3,7 @@
  *
  * 权威 note_template_variant_matrix.json · account_key=gong_yun_jia_zhi_bian_dong_shou_yi：
  * - 国企（报表项目附注）→ 八、72
- * - 上市 → 三、公允价值变动收益
+ * - 上市 → 五、75
  */
 export type G13DisclosureVariant = 'listed' | 'soe'
 
@@ -11,7 +11,7 @@ export type G13DisclosureVariant = 'listed' | 'soe'
 export const G13_SOE_NOTE_SECTION = '八、72'
 
 export const G13_NOTE_SECTION = {
-  listed: '三、公允价值变动收益',
+  listed: '五、75',
   soe: G13_SOE_NOTE_SECTION,
 } as const satisfies Record<G13DisclosureVariant, string>
 

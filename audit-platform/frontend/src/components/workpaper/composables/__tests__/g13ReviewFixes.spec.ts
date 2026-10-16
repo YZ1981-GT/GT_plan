@@ -19,9 +19,9 @@ describe('G13 review fixes', () => {
     expect(ALL_CYCLE_PROCEDURE_SHEETS.G13A?.sheetCode).toBe('G13A')
   })
 
-  it('科目与附注：6101；上市三、公允价值变动收益 / 国企八、72', () => {
+  it('科目与附注：6101；上市五、75 / 国企八、72', () => {
     expect(G13_ACCOUNT_CODE).toBe('6101')
-    expect(G13_NOTE_SECTION.listed).toBe('三、公允价值变动收益')
+    expect(G13_NOTE_SECTION.listed).toBe('五、75')
     expect(G13_NOTE_SECTION.soe).toBe('八、72')
   })
 

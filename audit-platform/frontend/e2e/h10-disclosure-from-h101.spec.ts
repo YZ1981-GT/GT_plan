@@ -87,7 +87,7 @@ function parseRemark(item: any): any {
 }
 
 test.describe('H10 披露 ← H10-1 带入+试运行+同步附注', () => {
-  test('种子审定→附注上市带入→试运行回写→同步三、资产处置收益', async ({ page, request }) => {
+  test('种子审定→附注上市带入→试运行回写→同步五、78 资产处置收益', async ({ page, request }) => {
     test.setTimeout(180_000)
 
     const token = await loginAs(page)
@@ -211,13 +211,14 @@ test.describe('H10 披露 ← H10-1 带入+试运行+同步附注', () => {
     await expect(syncBtn).toBeVisible()
     await syncBtn.click()
     await page.waitForTimeout(2_500)
-    await expect(page.getByText(/已同步|三、资产处置收益/).first()).toBeVisible({ timeout: 12_000 })
+    await expect(page.getByText(/已同步|资产处置收益/).first()).toBeVisible({ timeout: 12_000 })
 
     const year = new Date().getFullYear()
     let found = false
     for (let i = 0; i < 10; i++) {
       const resp = await request.get(
-        `/api/disclosure-notes/${PROJECT_ID}/${year}/${encodeURIComponent('三、资产处置收益')}`,
+        // 上市章节号 2026-10-16 按 Word 改挂为 五、78（原「三」章截断编号是别名）
+        `/api/disclosure-notes/${PROJECT_ID}/${year}/${encodeURIComponent('五、78')}`,
         { headers: authHeaders(apiToken) },
       )
       if (resp.ok()) {
@@ -234,7 +235,7 @@ test.describe('H10 披露 ← H10-1 带入+试运行+同步附注', () => {
       }
       await page.waitForTimeout(1_000)
     }
-    expect(found, '附注「三、资产处置收益」应含同步后的子表').toBeTruthy()
+    expect(found, '附注「五、78 资产处置收益」应含同步后的子表').toBeTruthy()
 
     // 清理
     await putChecklist(request, apiToken, wpId, [

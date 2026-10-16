@@ -5,7 +5,7 @@
  * - 列与模板 `headers` **逐位同形**（K10 国企 4 列 / K12 K13 两版 4 列）
  * - 合计行派生（含第 4 列金额型求和、文本型置 null）
  * - 结构行「其中：政府补助」排在合计**之后**且不参与求和
- * - 上市侧章节号为模板实测截断值（`三、资产减值损失（损` 等）
+ * - 上市侧章节号逐字等于模板现存编号（2026-10-16 按 Word 改挂后为 `五、77` 等）
  * - 历史孤儿表名进 `_removed_table_keys`
  *
  * spec: .kiro/specs/k-cycle-disclosure-alignment/ Task 4.1
@@ -185,10 +185,10 @@ describe('K 系损益类模板结构（fix_note_k_pl_structure.py 成果防回�
     expect((tbl.rows ?? []).some(r => String(r.row_type ?? '') === 'header_label')).toBe(false)
   })
 
-  it('上市侧章节号是模板实测截断值（三、章 md 重建既有形态，不得"修正"）', () => {
-    expect(K11_NOTE_SECTION.listed).toBe('三、资产减值损失（损')
-    expect(K12_NOTE_SECTION.listed).toBe('三、营业外收入（注：')
-    expect(K13_NOTE_SECTION.listed).toBe('三、营业外支出（注：')
+  it('上市侧章节号 = 模板现存编号（2026-10-16 按 Word 从「三」章改挂到第五章）', () => {
+    expect(K11_NOTE_SECTION.listed).toBe('五、77')
+    expect(K12_NOTE_SECTION.listed).toBe('五、79')
+    expect(K13_NOTE_SECTION.listed).toBe('五、80')
   })
 
   it('K10 国企是 4 列（末列「是否为政府补助」），上市是 3 列', () => {

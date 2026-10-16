@@ -89,6 +89,8 @@ def test_matrix_non_empty(matrix: dict) -> None:
 #:    的章前缀就是「三」「十四」），改矩阵去凑「五」反而制造错码。
 #:    其中 3 条（公允价值变动收益 / 信用减值损失 / 所得税费用）在 Task 12 之前
 #:    就已存在于矩阵，本断言长期为红 —— 属**判据缺陷**不是数据回归。
+#:    🔴 2026-10-16 起不再成立：上述 8 个损益类节与「终止经营」已按四版 Word 改挂到「五」/「十五」章
+#:    （spec disclosure-note-template-word-realignment）；仍在「三」章的只剩 债务重组 / 借款费用。
 #:
 #: 2. **`section_code_index.json` 是 POC 产物且已落后** —— `version='poc-v1'`，
 #:    生成器 `build_section_code_index.py` 自述「仅扫描已打标的章节；未打标节
@@ -104,38 +106,36 @@ def test_matrix_non_empty(matrix: dict) -> None:
 #:
 #: 值 = 成因分类；index 补全打标后应逐条移出（数量只许缩短，由自检钉死）。
 INDEX_UNCOVERED_CODES: dict[tuple[str, str], str] = {
-    # --- 成因 1+2：listed 模板放在「三、重要会计政策」章，且 index 未收录 ---
-    ("gong_yun_jia_zhi_bian_dong_shou_yi", "三、公允价值变动收益"): (
-        "listed 模板置于「三、重要会计政策」章；index(poc-v1) 未打标该节。"
-        "Task 12 之前即存在，属预存在的判据缺陷。"
+    # --- 成因 2（2026-10-16 起）：章前缀已正确，纯 index 落后 ---
+    # 原挂上市「三、重要会计政策」/「十四、日后事项」章；spec disclosure-note-template-word-realignment
+    # 按四版 Word 改挂到「五」/「十五」章（section_id 不变、旧编号为别名）。index(poc-v1) 镜像 Word 模板
+    # 标记里的旧编号、本 spec 不重建（交付导出按 section_id 兜底），故仍未收录。
+    ("gong_yun_jia_zhi_bian_dong_shou_yi", "五、75"): (
+        "上市模板原把该节放在「三、重要会计政策」章（md 重建错挂），2026-10-16 按四版 Word 改挂到「五 财务报表项目附注」章；index(poc-v1) 仍记 Word 模板标记里的旧编号、未打标新编号。"
     ),
-    ("xin_yong_jian_zhi_sun_shi", "三、信用减值损失"): (
-        "listed 模板置于「三、重要会计政策」章；index(poc-v1) 未打标该节。"
-        "Task 12 之前即存在，属预存在的判据缺陷。"
+    ("xin_yong_jian_zhi_sun_shi", "五、76"): (
+        "上市模板原把该节放在「三、重要会计政策」章（md 重建错挂），2026-10-16 按四版 Word 改挂到「五 财务报表项目附注」章；index(poc-v1) 仍记 Word 模板标记里的旧编号、未打标新编号。"
     ),
-    ("suo_de_shui_fei_yong", "三、所得税费用"): (
-        "listed 模板置于「三、重要会计政策」章；index(poc-v1) 未打标该节。"
-        "Task 12 之前即存在，属预存在的判据缺陷。"
+    ("suo_de_shui_fei_yong", "五、81"): (
+        "上市模板原把该节放在「三、重要会计政策」章（md 重建错挂），2026-10-16 按四版 Word 改挂到「五 财务报表项目附注」章；index(poc-v1) 仍记 Word 模板标记里的旧编号、未打标新编号。"
     ),
-    ("zi_chan_jian_zhi_sun_shi", "三、资产减值损失（损"): (
-        "listed 模板置于「三、」章（level=2 / 1 表），章节号是 md 重建的 10 字"
-        "截断值；index(poc-v1) 未打标。Task 12 由 null 补记。"
+    ("zi_chan_jian_zhi_sun_shi", "五、77"): (
+        "上市模板原把该节放在「三、重要会计政策」章（md 重建错挂），2026-10-16 按四版 Word 改挂到「五 财务报表项目附注」章；index(poc-v1) 仍记 Word 模板标记里的旧编号、未打标新编号。"
     ),
-    ("zi_chan_chu_zhi_shou_yi", "三、资产处置收益（损"): (
-        "listed 模板置于「三、」章（level=2 / 2 表），md 截断值；index 未打标。"
+    ("zi_chan_chu_zhi_shou_yi", "五、78"): (
+        "上市模板原把该节放在「三、重要会计政策」章（md 重建错挂），2026-10-16 按四版 Word 改挂到「五 财务报表项目附注」章；index(poc-v1) 仍记 Word 模板标记里的旧编号、未打标新编号。"
     ),
-    ("ying_ye_wai_shou_ru", "三、营业外收入（注："): (
-        "listed 模板置于「三、」章（level=2 / 1 表），md 截断值；index 未打标。"
+    ("ying_ye_wai_shou_ru", "五、79"): (
+        "上市模板原把该节放在「三、重要会计政策」章（md 重建错挂），2026-10-16 按四版 Word 改挂到「五 财务报表项目附注」章；index(poc-v1) 仍记 Word 模板标记里的旧编号、未打标新编号。"
     ),
-    ("ying_ye_wai_zhi_chu", "三、营业外支出（注："): (
-        "listed 模板置于「三、」章（level=2 / 1 表），md 截断值；index 未打标。"
+    ("ying_ye_wai_zhi_chu", "五、80"): (
+        "上市模板原把该节放在「三、重要会计政策」章（md 重建错挂），2026-10-16 按四版 Word 改挂到「五 财务报表项目附注」章；index(poc-v1) 仍记 Word 模板标记里的旧编号、未打标新编号。"
     ),
-    ("xian_jin_liu_liang_biao_xiang_mu_zhu_shi", "三、现金流量表项目注释"): (
-        "listed 模板置于「三、」章（level=2 / 9 表）；index 未打标。"
+    ("xian_jin_liu_liang_biao_xiang_mu_zhu_shi", "五、82"): (
+        "上市模板原把该节放在「三、重要会计政策」章（md 重建错挂），2026-10-16 按四版 Word 改挂到「五 财务报表项目附注」章；index(poc-v1) 仍记 Word 模板标记里的旧编号、未打标新编号。"
     ),
-    ("zhong_zhi_jing_ying", "十四、终止经营"): (
-        "listed 模板置于「十四、资产负债表日后事项」章（level=2 / 1 表）；"
-        "index 的「十四、」段只收录 4 节，该节未打标。"
+    ("zhong_zhi_jing_ying", "十五、7"): (
+        "上市模板原把该节放在「十四、资产负债表日后事项」章，2026-10-16 按四版 Word 改挂到「十五、其他重要事项」章；index(poc-v1) 的「十四、」段只收录 4 节，新编号未打标。"
     ),
     # --- 成因 1：index **已收录**，但归在「三、」章而非项目注释章 ---
     ("zhai_wu_chong_zu", "三、债务重组【不适用"): (
@@ -417,23 +417,23 @@ _VARIANTS_BASELINE_JSON = """
     "qi_ta_shou_yi": ["八、69","八、69","五、68","五、68",{}],
     "tou_zi_shou_yi_xia_biao_zhong_bu_shi_yong_d": ["八、70","八、70",null,null,{}],
     "jing_chang_kou_tao_qi_shou_yi": ["八、71","八、71","五、70","五、70",{}],
-    "gong_yun_jia_zhi_bian_dong_shou_yi": ["八、72","八、72","三、公允价值变动收益","三、公允价值变动收益",{}],
-    "xin_yong_jian_zhi_sun_shi": ["八、73","八、73","三、信用减值损失","三、信用减值损失",{}],
-    "zi_chan_jian_zhi_sun_shi": ["八、74","八、74","三、资产减值损失（损","三、资产减值损失（损",{}],
-    "zi_chan_chu_zhi_shou_yi": ["八、75","八、75","三、资产处置收益（损","三、资产处置收益（损",{}],
-    "ying_ye_wai_shou_ru": ["八、76","八、76","三、营业外收入（注：","三、营业外收入（注：",{}],
-    "ying_ye_wai_zhi_chu": ["八、77","八、77","三、营业外支出（注：","三、营业外支出（注：",{}],
-    "suo_de_shui_fei_yong": ["八、78","八、78","三、所得税费用","三、所得税费用",{}],
+    "gong_yun_jia_zhi_bian_dong_shou_yi": ["八、72","八、72","五、75","五、75",{}],
+    "xin_yong_jian_zhi_sun_shi": ["八、73","八、73","五、76","五、76",{}],
+    "zi_chan_jian_zhi_sun_shi": ["八、74","八、74","五、77","五、77",{}],
+    "zi_chan_chu_zhi_shou_yi": ["八、75","八、75","五、78","五、78",{}],
+    "ying_ye_wai_shou_ru": ["八、76","八、76","五、79","五、79",{}],
+    "ying_ye_wai_zhi_chu": ["八、77","八、77","五、80","五、80",{}],
+    "suo_de_shui_fei_yong": ["八、78","八、78","五、81","五、81",{}],
     "gui_shu_yu_mu_gong_si_suo_you_zhe_de_qi_ta": ["八、79","八、79",null,null,{}],
     "mei_gu_shou_yi": ["八、80","八、80",null,null,{}],
-    "xian_jin_liu_liang_biao_xiang_mu_zhu_shi": ["八、81","八、81","三、现金流量表项目注释","三、现金流量表项目注释",{}],
+    "xian_jin_liu_liang_biao_xiang_mu_zhu_shi": ["八、81","八、81","五、82","五、82",{}],
     "fei_huo_bi_xing_zi_chan_jiao_huan": ["八、82","八、82",null,null,{}],
     "gu_fen_zhi_fu": ["八、83","八、83",null,null,{}],
     "zhai_wu_chong_zu": ["八、84","八、84","三、债务重组【不适用","三、债务重组【不适用",{}],
     "jie_kuan_fei_yong": ["八、85","八、85","三、借款费用","三、借款费用",{}],
     "wai_bi_zhe_suan": ["八、86","八、86",null,null,{}],
     "zu_lin": ["八、87","八、87","五、74","五、74",{}],
-    "zhong_zhi_jing_ying": ["八、89","八、89","十四、终止经营","十四、终止经营",{}],
+    "zhong_zhi_jing_ying": ["八、89","八、89","十五、7","十五、7",{}],
     "fen_bu_xin_xi": ["八、90","八、90",null,null,{}],
     "he_bing_xian_jin_liu_liang_biao_xiang_guan": ["八、91","八、91",null,null,{}],
     "wai_bi_huo_bi_xing_xiang_mu": ["八、92","八、92","五、73","五、73",{}],

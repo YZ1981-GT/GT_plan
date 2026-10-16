@@ -35,7 +35,7 @@ listed 侧 6 条 + soe 侧 2 条被误判：
   ``股本``（listed 用语）在 soe 模板叫 ``实收资本``（`八、58`）—— 同一科目
   两版**用语互换**，精确匹配双向都落空。
 - ``外币折算`` → listed ``五、73 外币货币性项目``
-- ``分部信息`` → listed ``十四、分部报告``
+- ``分部信息`` → listed ``十五、8 分部报告``
 - ``合并现金流量表相关事项`` → listed ``五、71 现金流量表补充资料``
 - ``其他综合收益``（soe）→ ``八、79 归属于母公司所有者的其他综合收益``
 - 三个「一年内到期的 X」→ listed 合并为 ``五、43 一年内到期的非流动负债``
@@ -100,36 +100,36 @@ LISTED_NULL_AUDIT: Final[tuple[NullAuditEntry, ...]] = (
         "zi_chan_jian_zhi_sun_shi",
         "资产减值损失",
         "FALSE_NULL",
-        "三、资产减值损失（损",
-        "listed 模板有该章（1 表），章节号是 md 重建的 10 字截断值",
+        "五、77",
+        "listed 模板有该节（1 表）；原挂「三」章、编号是 md 重建的 10 字截断值，2026-10-16 按 Word 改挂到第五章",
     ),
     _e(
         "zi_chan_chu_zhi_shou_yi",
         "资产处置收益",
         "FALSE_NULL",
-        "三、资产处置收益（损",
-        "listed 模板有该章（2 表），章节号是 md 重建的 10 字截断值",
+        "五、78",
+        "listed 模板有该节（2 表）；原挂「三」章、编号是 md 重建的 10 字截断值，2026-10-16 按 Word 改挂到第五章",
     ),
     _e(
         "ying_ye_wai_shou_ru",
         "营业外收入",
         "FALSE_NULL",
-        "三、营业外收入（注：",
-        "listed 模板有该章（1 表），章节号是 md 重建的 10 字截断值",
+        "五、79",
+        "listed 模板有该节（1 表）；原挂「三」章、编号是 md 重建的 10 字截断值，2026-10-16 按 Word 改挂到第五章",
     ),
     _e(
         "ying_ye_wai_zhi_chu",
         "营业外支出",
         "FALSE_NULL",
-        "三、营业外支出（注：",
-        "listed 模板有该章（1 表），章节号是 md 重建的 10 字截断值",
+        "五、80",
+        "listed 模板有该节（1 表）；原挂「三」章、编号是 md 重建的 10 字截断值，2026-10-16 按 Word 改挂到第五章",
     ),
     _e(
         "xian_jin_liu_liang_biao_xiang_mu_zhu_shi",
         "现金流量表项目注释",
         "FALSE_NULL",
-        "三、现金流量表项目注释",
-        "listed 模板有该章且含 9 张表，是本批受益面最大的一条",
+        "五、82",
+        "listed 模板有该节且含 9 张表，是本批受益面最大的一条（原挂「三」章，2026-10-16 按 Word 改挂到第五章）",
     ),
     _e(
         "jie_kuan_fei_yong",
@@ -149,8 +149,8 @@ LISTED_NULL_AUDIT: Final[tuple[NullAuditEntry, ...]] = (
         "zhong_zhi_jing_ying",
         "终止经营",
         "FALSE_NULL",
-        "十四、终止经营",
-        "listed 模板在「其他重要事项」章下有该节（1 表）",
+        "十五、7",
+        "listed 模板在「其他重要事项」章下有该节（1 表；2026-10-16 按 Word 由「十四」章改挂到「十五」章）",
     ),
     _e(
         "gu_fen_zhi_fu",
@@ -266,7 +266,7 @@ LISTED_NULL_AUDIT: Final[tuple[NullAuditEntry, ...]] = (
         "分部信息",
         "CROSS_GRAIN",
         None,
-        "🔴 首轮误判为 TRUE_NULL。listed 叫「十四、分部报告」(5 表)，用语不同",
+        "🔴 首轮误判为 TRUE_NULL。listed 叫「十五、8 分部报告」(5 表)，用语不同",
     ),
     _e(
         "he_bing_xian_jin_liu_liang_biao_xiang_guan",

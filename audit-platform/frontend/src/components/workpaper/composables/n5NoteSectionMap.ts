@@ -7,7 +7,7 @@
  *   `附注披露信息（上市公司）`（A1:L29）与 `附注披露信息（国企`（A1:IU32），逐行实测；
  *   结论固化在 `.kiro/specs/n-cycle-tax-disclosure-alignment/design.md` §Data Models。
  * - **章节号** = `note_template_{listed,soe}.json` 现存章节
- *   → listed `三、所得税费用` / soe `八、78`
+ *   → listed `五、81` / soe `八、78`
  * - **表名 / 行集合** = 同上两份模板
  *   （由 `backend/scripts/fix/fix_note_n_cycle_tax_structure.py` 幂等维护）
  * - **sheet 名** = `workpaper_sheet_classification`（wp_code=N5）实测
@@ -23,9 +23,10 @@
  * - soe 两表都叫 `所得税费用` → `所得税费用` / `会计利润与所得税费用调整过程`
  * 去重后既有已同步项目会残留旧键 → 见 `N5_LEGACY_OBSOLETE_TABLES`。
  *
- * 🔴 **章节 `三、所得税费用` 位置本身不对**（md 重建把 8 个利润表项目注释章节挂到
- * `chapter-03 重要会计政策`，应在 `chapter-05 项目注释`）。修它会改动章节号并影响
- * 既有项目的 `note_section` 定位键 → 属跨 spec 依赖，本模块用模板**现存**章节号保证链路通。
+ * 🔴 **章节归属已修**：md 重建曾把 8 个利润表项目注释章节挂到 `chapter-03 重要会计政策`
+ * （上市原编号在「三」章下）。2026-10-16 spec disclosure-note-template-word-realignment
+ * 按四版 Word 改挂到「五 财务报表项目附注」章 → `五、81`；旧编号是别名，后端 `normalize_section_code`
+ * 归一，存量项目由该 spec 的修复工具改写 `note_section`。
  */
 import { defineColumns, type ColumnDef } from './disclosureColumnDefs'
 import {
@@ -37,9 +38,9 @@ import { nz, sumNullable, type NullableAmount } from './shared/disclosureConsist
 
 export type N5DisclosureVariant = 'listed' | 'soe'
 
-/** 附注章节号（模板现存值；listed 侧的章节归属错误属跨 spec 依赖，不在此修） */
+/** 附注章节号（逐字等于模板现存 `section_number`） */
 export const N5_NOTE_SECTION = {
-  listed: '三、所得税费用',
+  listed: '五、81',
   soe: '八、78',
 } as const satisfies Record<N5DisclosureVariant, string>
 

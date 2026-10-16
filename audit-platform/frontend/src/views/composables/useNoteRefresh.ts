@@ -280,10 +280,11 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
     // 2101 交易性金融负债：五、34/35 / 八、34/35
     const isG10Tfl = String(payload.accountCode || '') === '2101'
       && (current.includes('34') || current.includes('35'))
-    // 6101 公允价值变动收益：三、公允价值变动收益 / 八、72
+    // 6101 公允价值变动收益：上市 五、75（2026-10-16 按 Word 改挂；「三、公允…」为改挂前旧编号）/ 国企 八、72
     const isG13Fvc = String(payload.accountCode || '') === '6101'
       && (
-        current.includes('公允价值变动')
+        current === '五、75'
+        || current.includes('公允价值变动')
         || current.startsWith('三、公允')
         || current.startsWith('八、72')
         || current === '八、72'
@@ -297,16 +298,18 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
         || current === '五、31'
         || current === '八、32'
       )
-    // 6701 资产减值损失（K11）：上市三、资产减值损失(关键词) / 国企 八、74
+    // 6701 资产减值损失（K11）：上市 五、77（关键词兜底改挂前的「三」章旧编号）/ 国企 八、74
     const isK11Impair = String(payload.accountCode || '') === '6701'
       && (
-        current.includes('资产减值损失')
+        current === '五、77'
+        || current.includes('资产减值损失')
         || current.startsWith('八、74')
       )
-    // 6711 营业外支出（K13）：上市三、营业外支出(关键词) / 国企 八、77（区别于营业外收入 6301）
+    // 6711 营业外支出（K13）：上市 五、80（关键词兜底旧编号）/ 国企 八、77（区别于营业外收入 6301）
     const isK13NonOpExp = String(payload.accountCode || '') === '6711'
       && (
-        current.includes('营业外支出')
+        current === '五、80'
+        || current.includes('营业外支出')
         || current.startsWith('八、77')
       )
     // K2-K10 精确编号匹配刷新

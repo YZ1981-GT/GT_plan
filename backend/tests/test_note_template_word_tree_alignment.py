@@ -169,12 +169,25 @@ def test_allowlist_reports_unexpected_stale_and_requires_reason(tmp_path):
         check_against_allowlist(diffs, [{"variant": "v", "kind": "k", "key": "x", "reason": " "}])
 
 
-@pytest.mark.xfail(strict=True, reason="Phase 2 修复前种子与四版 Word 的差异真实存在（基线见 tasks.md「比对基线」）")
-def test_seed_matches_four_word_templates():
+def _real_check(kind_filter):
     import json
 
     allowlist = json.loads(ALLOWLIST_PATH.read_text(encoding="utf-8")) if ALLOWLIST_PATH.exists() else []
-    unexpected, stale = check_against_allowlist(build_report(), allowlist)
+    diffs = [d for d in build_report() if kind_filter(d.kind)]
+    allowlist = [e for e in allowlist if kind_filter(e["kind"])]
+    return check_against_allowlist(diffs, allowlist)
+
+
+def test_seed_tree_matches_four_word_templates():
+    """章节树（章 / 节 / 归属 / 顺序 / scope / 标题）与四版 Word 一致；例外只在白名单（理由必填）。"""
+    unexpected, stale = _real_check(lambda kind: not kind.startswith("table_"))
+    assert not stale, stale
+    assert not unexpected, f"{len(unexpected)} 条白名单外差异，例：{unexpected[:5]}"
+
+
+@pytest.mark.xfail(strict=True, reason="表格以 Word 还是底稿模板为准待用户拍板（tasks.md「比对基线」结论第 3 条）")
+def test_seed_tables_match_four_word_templates():
+    unexpected, stale = _real_check(lambda kind: kind.startswith("table_"))
     assert not stale, stale
     assert not unexpected, f"{len(unexpected)} 条白名单外差异，例：{unexpected[:5]}"
 

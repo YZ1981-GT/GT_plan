@@ -677,7 +677,7 @@ class TestSectionPrefixExtraction:
     @pytest.mark.parametrize("section,expected_prefix", [
         ("五、22", "五、"),
         ("八、31", "八、"),
-        ("三、信用减值损失", "三、"),
+        ("三、存货", "三、"),  # 会计政策章关键词编号（原用例的信用减值损失节 2026-10-16 已改挂到「五、76」）
         ("五-62-1", "五"),  # 无"、"时取首字符
     ])
     def test_prefix(self, section: str, expected_prefix: str):

@@ -115,7 +115,7 @@ def _extract_sheet_names(text: str) -> dict[str, str]:
 
 
 def _is_section_code(v: str | None) -> bool:
-    """章节号形态校验：``五、4`` / ``八、52`` / ``三、公允价值变动收益``。
+    """章节号形态校验：``五、4`` / ``八、52`` / ``三、借款费用``（关键词编号）。
 
     防把 sheet 名常量（``附注披露信息（上市公司）``）误当章节号（H6 复用 H1 常量时会命中）。
     """
@@ -142,7 +142,7 @@ def _extract_nested_sections(body: str, pattern: re.Pattern[str]) -> dict[str, s
 _REVERSE_MAP_PATH = (
     FRONTEND_SRC / "views" / "composables" / "noteDisclosureReverseJump.ts"
 )
-# E1: { listed: '五、1', soe: '八、1' },  /  G13: { listed: '三、公允价值变动收益', soe: '八、72' },
+# E1: { listed: '五、1', soe: '八、1' },  /  G13: { listed: '五、75', soe: '八、72' },
 _REVERSE_ENTRY = re.compile(
     r"^\s*(?P<key>[A-Z][A-Z0-9_]*)\s*:\s*\{(?P<body>[^}]*)\}", re.M
 )

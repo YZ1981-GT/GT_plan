@@ -845,7 +845,7 @@
         },
         {
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-gong-yun-jia-zhi-bian-dong-shou-yi",
-          "section_number": "三、公允价值变动收益",
+          "section_number": "五、75",
           "section_title": "公允价值变动收益",
           "level": 2,
           "scope": "registry_covered",
@@ -905,7 +905,7 @@
         },
         {
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-xin-yong-jian-zhi-sun-shi",
-          "section_number": "三、信用减值损失",
+          "section_number": "五、76",
           "section_title": "信用减值损失",
           "level": 2,
           "scope": "registry_covered",
@@ -942,7 +942,7 @@
         },
         {
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zi-chan-jian-zhi-sun-shi",
-          "section_number": "三、资产减值损失（损",
+          "section_number": "五、77",
           "section_title": "资产减值损失",
           "level": 2,
           "scope": "registry_covered",
@@ -979,7 +979,7 @@
         },
         {
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zi-chan-chu-zhi-shou-yi",
-          "section_number": "三、资产处置收益（损",
+          "section_number": "五、78",
           "section_title": "资产处置收益",
           "level": 2,
           "scope": "registry_covered",
@@ -1039,7 +1039,7 @@
         },
         {
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-ying-ye-wai-shou-ru",
-          "section_number": "三、营业外收入（注：",
+          "section_number": "五、79",
           "section_title": "营业外收入",
           "level": 2,
           "scope": "registry_covered",
@@ -1076,7 +1076,7 @@
         },
         {
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-ying-ye-wai-zhi-chu",
-          "section_number": "三、营业外支出（注：",
+          "section_number": "五、80",
           "section_title": "营业外支出",
           "level": 2,
           "scope": "registry_covered",
@@ -1113,7 +1113,7 @@
         },
         {
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-suo-de-shui-fei-yong",
-          "section_number": "三、所得税费用",
+          "section_number": "五、81",
           "section_title": "所得税费用",
           "level": 2,
           "scope": "registry_covered",
@@ -1403,7 +1403,7 @@
         },
         {
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-kai-fa-zhi-chu",
-          "section_number": "三、开发支出",
+          "section_number": "六、2",
           "section_title": "开发支出",
           "level": 2,
           "scope": "unregistered",
@@ -1484,7 +1484,7 @@
         },
         {
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-wai-gou-zai-yan-xiang-mu",
-          "section_number": "三、外购在研项目",
+          "section_number": "六、3",
           "section_title": "外购在研项目",
           "level": 2,
           "scope": "unregistered",
@@ -1495,7 +1495,7 @@
         },
         {
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-zi-gong-si-zhong-de-quan-yi",
-          "section_number": "三、在子公司中的权益",
+          "section_number": "七、2",
           "section_title": "在子公司中的权益",
           "level": 2,
           "scope": "unregistered",
@@ -1763,7 +1763,7 @@
         },
         {
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-fan-xiang-gou-mai",
-          "section_number": "三、反向购买",
+          "section_number": "七、4",
           "section_title": "反向购买",
           "level": 2,
           "scope": "unregistered",
@@ -1883,7 +1883,7 @@
         },
         {
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
-          "section_number": "三、处置子公司",
+          "section_number": "七、6",
           "section_title": "处置子公司",
           "level": 2,
           "scope": "unregistered",
@@ -2965,7 +2965,7 @@
         },
         {
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zi-ben-guan-li",
-          "section_number": "三、资本管理",
+          "section_number": "九、3",
           "section_title": "资本管理",
           "level": 2,
           "scope": "unregistered",
@@ -3001,7 +3001,7 @@
         },
         {
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
-          "section_number": "三、套期（不适用的删",
+          "section_number": "九、4",
           "section_title": "套期",
           "level": 2,
           "scope": "unregistered",
@@ -3373,7 +3373,7 @@
         },
         {
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
-          "section_number": "三、金融资产转移",
+          "section_number": "九、5",
           "section_title": "金融资产转移",
           "level": 2,
           "scope": "unregistered",
@@ -12256,7 +12256,7 @@
         },
         {
           "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-qian-qi-cha-cuo-geng-zheng",
-          "section_number": "十四、前期差错更正",
+          "section_number": "十五、2",
           "section_title": "前期差错更正",
           "level": 2,
           "scope": "unregistered",
@@ -12312,7 +12312,7 @@
         },
         {
           "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-yao-zhai-wu-chong-zu",
-          "section_number": "十四、重要债务重组",
+          "section_number": "十五、3",
           "section_title": "重要债务重组",
           "level": 2,
           "scope": "unregistered",
@@ -12396,7 +12396,7 @@
         },
         {
           "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-yao-zi-chan-zhi-huan",
-          "section_number": "十四、重要资产置换",
+          "section_number": "十五、4",
           "section_title": "重要资产置换",
           "level": 2,
           "scope": "unregistered",
@@ -12407,7 +12407,7 @@
         },
         {
           "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-zhi-jing-ying",
-          "section_number": "十四、终止经营",
+          "section_number": "十五、7",
           "section_title": "终止经营",
           "level": 2,
           "scope": "unregistered",
@@ -12443,7 +12443,7 @@
         },
         {
           "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-fen-bu-bao-gao",
-          "section_number": "十四、分部报告",
+          "section_number": "十五、8",
           "section_title": "分部报告",
           "level": 2,
           "scope": "unregistered",
@@ -12575,7 +12575,7 @@
         },
         {
           "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-qi-ta",
-          "section_number": "十四、其他",
+          "section_number": "十五、9",
           "section_title": "其他",
           "level": 2,
           "scope": "unregistered",

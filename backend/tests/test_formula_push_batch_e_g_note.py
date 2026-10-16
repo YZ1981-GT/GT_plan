@@ -6,7 +6,7 @@ spec: formula-push-note-rollout-batch-e / Task 7
 - 14 个科目的 note.main 规则 section_by_template 验证（参数化，与前端真源逐字对拍）
 - 14 个科目的 fields 统一为 end_amount / prior_amount
 - 14 个科目的 policy 统一为 editable（需求 E8：不进独占集合）
-- G13/G14 上市侧关键词章节（三、公允价值变动收益 / 三、信用减值损失）
+- G13/G14 上市侧关键词章节（五、75 / 五、76）
 - G2/G3 共用章节 五、8 / 八、9
 - G1/G10 主表章节号（trading 侧；derivative 另有子规则不在 note.main 范围）
 - balance_adj（G1~G6/G8~G10）与 note_direct（G7/G11~G14）binding note_rows 行为
@@ -14,6 +14,7 @@ spec: formula-push-note-rollout-batch-e / Task 7
 """
 from __future__ import annotations
 
+import json
 from decimal import Decimal
 
 import pytest
@@ -69,8 +70,8 @@ G_SECTIONS = [
     ("G10", "五、34",               "八、34"),
     ("G11", "五、69",               "八、70"),
     ("G12", "五、70",               "八、71"),
-    ("G13", "三、公允价值变动收益",  "八、72"),
-    ("G14", "三、信用减值损失",      "八、73"),
+    ("G13", "五、75",  "八、72"),
+    ("G14", "五、76",      "八、73"),
 ]
 
 ALL_G_CODES = [t[0] for t in G_SECTIONS]
@@ -121,22 +122,26 @@ def test_g_note_rule_policy_is_editable(code: str):
 # ========================================================================
 
 
+def _assert_realigned(listed: str, expected: str) -> None:
+    """2026-10-16 按四版 Word 把利润表科目节从会计政策章「三、」改挂到项目附注章「五、」
+    （spec disclosure-note-template-word-realignment）；种子登记的旧编号（「三、」开头）经别名解析到新编号。"""
+    from app.services.note_section_catalog import normalize_section_code, template_json_path
+
+    assert listed == expected
+    sections = json.loads(template_json_path("listed").read_text(encoding="utf-8"))["sections"]
+    olds = next(s for s in sections if s["section_number"] == expected).get("legacy_section_numbers") or []
+    assert olds and all(o.startswith("三、") for o in olds), olds
+    assert {normalize_section_code(o, template_type="listed") for o in olds} == {expected}
+
+
 def test_g13_listed_section_is_keyword():
-    """G13 上市侧章节号是关键词形式「三、公允价值变动收益」，非「五、N」。"""
-    rule = _g_note_rule("G13")
-    listed = rule.target.sections["listed"]
-    assert listed.startswith("三、"), "G13 上市侧属「三、」整章"
-    assert "公允价值变动收益" in listed
-    assert not listed.startswith("五、"), "不应是 五、N 形式"
+    """G13 上市侧章节号「五、75」公允价值变动收益（原会计政策章关键词编号现为别名）。"""
+    _assert_realigned(_g_note_rule("G13").target.sections["listed"], "五、75")
 
 
 def test_g14_listed_section_is_keyword():
-    """G14 上市侧章节号是关键词形式「三、信用减值损失」，非「五、N」。"""
-    rule = _g_note_rule("G14")
-    listed = rule.target.sections["listed"]
-    assert listed.startswith("三、"), "G14 上市侧属「三、」整章"
-    assert "信用减值损失" in listed
-    assert not listed.startswith("五、"), "不应是 五、N 形式"
+    """G14 上市侧章节号「五、76」信用减值损失（原会计政策章关键词编号现为别名）。"""
+    _assert_realigned(_g_note_rule("G14").target.sections["listed"], "五、76")
 
 
 def test_g13_soe_section_is_standard():

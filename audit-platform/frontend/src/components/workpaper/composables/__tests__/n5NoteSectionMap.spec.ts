@@ -248,7 +248,7 @@ describe('current_standard 与文本', () => {
   })
 
   it('章节号取模板现存值（listed 章节归属错误属跨 spec 依赖）', () => {
-    expect(N5_NOTE_SECTION.listed).toBe('三、所得税费用')
+    expect(N5_NOTE_SECTION.listed).toBe('五、81')
     expect(N5_NOTE_SECTION.soe).toBe('八、78')
     expect(payload('soe').section_id).toBe('八、78')
   })

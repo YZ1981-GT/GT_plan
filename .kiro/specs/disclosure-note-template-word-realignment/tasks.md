@@ -11,13 +11,28 @@
 
 ## Phase 2 种子修复
 
-- [ ] 3. 编号别名：种子 `legacy_section_numbers` + `normalize_section_code` 两个准则都查别名；守卫「别名不与现行编号相同」。
-- [ ] 4. 修复器 `backend/scripts/seed/realign_note_templates_to_word.py`：章（章名、`scope_titles`、缺章、多章）。
-- [ ] 5. 修复器：节（放错章改挂并换编号前缀、补 Word 有种子无的节、删提示语节、scope、章内顺序）。
+- [x] 3. 编号别名：种子 `legacy_section_numbers` + `normalize_section_code` 两个准则都查别名；守卫「别名不与现行编号相同」。
+  - ✅ `note_section_catalog.load_legacy_code_aliases` / `clear_template_caches` / `section_title_for_scope`；`normalize_section_code` 先查本准则别名、再走国企「五→八」。守卫 `test_note_section_code_aliases.py`：合成种子两准则解析 + scope 随别名 + 真种子别名不遮现行编号且一旧号一节 + 跨准则同号必同义（首轮实测上市「八、5 政府补助」挤掉国企「八、5 应收账款」绑定，故修复器加撞号规则）+ 口径章名。变异「别名不查」打红 2 例。
+- [x] 4. 修复器 `backend/scripts/seed/realign_note_templates_to_word.py`：章（章名、`scope_titles`、缺章、多章）。
+  - ✅ 国企 一 / 五 / 七 / 十一 / 十三 / 十四 章名按 Word；十三章（按照有关财务会计制度应披露的其他内容）只在合并版 Word ⇒ `consolidated_only`；上市 十 改「公允价值」，五 加 `scope_titles {"standalone": "财务报表项目附注"}`。上市十六章名「母公司…」与 `十六、营业收入与营业成本` 标题按需求 3.2 守卫保留，进白名单待拍板。
+- [x] 5. 修复器：节（放错章改挂并换编号前缀、补 Word 有种子无的节、删提示语节、scope、章内顺序）。
+  - ✅ 改挂：国企 1 节（六→四）、上市 36 节（三→五、75~82 / 六、2~3 / 七、2~9 / 八 5 节 / 九、2~5 / 十一 3 节；十四→十五、2~9），`section_id` 不变、旧编号进 `legacy_section_numbers`。补节：国企「七、子公司与母公司会计期间不一致的…」（合并）「十、销售退回」，上市「十一、关联方承诺」「十五、5 重要资产转让及出售」「十五、6 年金计划…」。国企「九、【企业应当…」提示语节改为章正文叶子「或有事项」（带表格与校验预设，不删）。scope：国企 8 / 上市 13 节改 both。章内顺序按 Word 重写 `sort_order` / `sort_index`。
+  - 🔴 编号规则：目标章现有编号全是数字、且新数字在另一准则未被占用才发数字编号，否则用标题式编号（上市「八」政府补助 5 节因此是标题式，避开国企 八、2~6）；`numeric()` 再断言一次。可重跑：`--check` 0 项；**HEAD 种子经修复器重放 = 工作树种子逐字节相同**（种子只经脚本改）。变异：撞号规则恒真 ⇒ 第二层断言当场报「八、2」；两层都拆 ⇒ 重放结果上市 5 节编号不同。
 - [ ] 6. 修复器：表格（表名、列、多级表头、行标签、表数），保留机器字段；与逐循环表格脚本冲突处逐条登记。
-- [ ] 7. 运行期按口径取章名（`scope_titles`）：生成链、目录树、Word 导出。
-- [ ] 8. 衍生数据重生成；`backend/scripts/migrate/rename_note_section_codes.py` 改数据文件与前端映射中的旧编号；各 `--check` 通过。
-- [ ] 9. 既有守卫与测试更新（覆盖率下限、scope、章节类型索引、逐循环测试中的硬编码编号）；`WORD_TITLE_ALIASES` 改为「旧系统标题 → Word 标题」；Task 2 守卫去掉 xfail 转真绿。
+  - ⏸ 待用户拍板：表格以四版 Word 还是底稿 xlsx 为准（国企 51 / 上市 73 节有差异，其中 33 / 42 节已按底稿对齐、被底稿同步 / 公式推送 / `fix_note_*_structure.py` 消费）。表格守卫保持 `xfail(strict=True)`。
+  - 另记（与表格同批处理）：上市「三、重要会计政策及会计估计」章首有一句模板正文「本公司根据自身生产经营特点…具体会计政策见附注三、16…」，种子无承载节（其余 6 处章首正文全是填写提示，不建节）；章正文叶子（如上市「七、1 在其他主体中的权益」）在编辑器目录树参与连续编号，导致其后各节序号比 Word 大 1（`compute_section_numbers` 按前缀连续编号），补章首正文节前须先定显示序号规则。
+- [x] 7. 运行期按口径取章名（`scope_titles`）：生成链、目录树、Word 导出。
+  - ✅ 生成链 `disclosure_engine._load_templates` 的 `section_title` / `account_name` 走 `section_title_for_scope`（守卫 `test_generation_uses_scope_chapter_title`，变异打红）；目录树读库内 `section_title`，新生成行即口径章名，存量行由 Phase 3 改写。Word 导出属交付模块（用户：单独开任务），导出章名取自 Word 模板本身。
+- [x] 8. 衍生数据重生成；`backend/scripts/migrate/rename_note_section_codes.py` 改数据文件与前端映射中的旧编号；各 `--check` 通过。
+  - ✅ 重生成：`generate_note_template_bindings.py`（内容除改名外不变）、`generate_note_soe_listed_diff.py`、`gen_note_shared_table_segments.py --write`、`gen_note_section_kind_index.py`（「X、数据资源」→「数据资源」）；`gen_note_wp_sync_registry.py --check` OK。改名工具首跑替换 465 处，`--check` 0。
+  - 🔴 改名工具的盲区（已人工复核修正，工具 docstring 写明）：①注释 / docstring / 用例名里描述旧编号**形态**的叙述（「上市侧是 md 截断值、不要修正」「长度 10」）换完即失真，复核改写 20 余处；②「旧章号 + 完整标题」不在别名表、换不到：H10 展示常量 `'三、资产处置收益'`（界面可见）、`isH10AssetDisposalNoteSection` 不认 `五、78`、`useNoteRefresh` 按科目号刷新只认关键词（`五、75` / `五、77` / `五、80` 不含关键词 ⇒ 底稿改了附注不刷新），均已修并补用例；③真库快照 `note_legacy_positional_pending.json` 被改成新编号 = 伪造快照，已还原并加入排除表；④`k1NoteSectionMap.isK1OtherReceivableNoteSection`（零调用方副本）前缀匹配会吞掉新出现的 `五、80~82`，已删。
+  - 保留不改：`audit_report_templates/section_code_index.json` / `section_content_analysis.json` 镜像 Word 模板 `##SECTION##` 标记（四版 Word 不改，交付导出按 `section_id` 兜底）。并发会话未提交的 `report_row_note_mapping.json`、`tests/services/test_note_deliverable_outline.py` 仍有旧编号，待其提交后跑 `--write` 再 `--check`。
+- [x] 9. 既有守卫与测试更新（覆盖率下限、scope、章节类型索引、逐循环测试中的硬编码编号）；`WORD_TITLE_ALIASES` 改为「旧系统标题 → Word 标题」；Task 2 守卫去掉 xfail 转真绿。
+  - ✅ 章节树守卫 `test_seed_tree_matches_four_word_templates` 去 xfail 转真绿（白名单 3 条：国企「八、94 一般风险准备」json_only、上市合并十六章名、`十六、营业收入与营业成本` 标题，均待拍板）；表格守卫仍 xfail（Task 6）。
+  - ✅ `WORD_TITLE_ALIASES` 翻成「旧系统章名 → Word 章名」（折叠键 = Word 标题）；比对工具章配对改为两侧都折叠后比（方向无关）。变异：删「关联方及关联交易」别名 ⇒ `test_word_title_alias_locates_system_chapter` 打红。
+  - ✅ 四版 Word 上传端到端 `test_note_text_batch_word_e2e`：命中叙述 51/69/64/67 → **61/76/99/99**（国企叙述目标全中），不一致 17/14/39/37 → 2/4/3/4（章首提示语正文无同名节 + 待拍板的十六章名）；随之修两处定位缺陷：章下只有同名正文节时整章（含「（1）以公允价值计量的项目和金额」…「（5）…」小标题）并入该节（`_sole_body_leaf`）、Word 占位序号「X、」并入 `normalize_title`（与比对工具同口径）；用例的目标树按口径取章名（与生成链同形）。
+  - ✅ 逐循环测试与前端映射改新编号（G13/G14/H10/K11~K13/N5 等）；基线即红的 `test_llm_review_warning_finding` 按 validate_all 现行口径（宽松模式 warning 折进 `warning_summary`）改断言，同类空转的 fail-open 例一并收紧。
+  - 预存在、与本组无关（HEAD 干净检出同样红）：`kPlNoteSubtableContract` 12 例与 `k1NoteSubtableContract` 6 例（占位行 / 表名）、`test_note_parent_company_chapter` 同构欠账、`test_bindings_soe_legacy_alias_annotated`、`test_n_sync_registry_matches_rule[N3]`、N 循环 / G 负债脚本 `--check`、`八、5` header_label 假行；`test_d1_notes_receivable_pbt` 与 `test_formula_push_k2_canary_pg` 同进程连跑时后者红（HEAD 同样），单跑各自绿。`TestTableLevelAliasHasNoConsumerYet` 红源于并发会话未提交的 `note_deliverable_outline.py`。
 
 ## Phase 3 存量项目修复
 
@@ -38,10 +53,15 @@
 ## Phase 5 大模型只在手动单击时调用
 
 - [ ] 20. 全仓核实附注域大模型调用点，分「自动 / 手动」写入本文件。
-- [ ] 21. 生成附注删除 RAG 回退与通用大模型两级；无调用方的函数删除。
+- [x] 21. 生成附注删除 RAG 回退与通用大模型两级；无调用方的函数删除。
+  - ✅ `disclosure_engine` 删 P1b 知识库回退、P2 通用大模型级与 `_generate_text_with_llm` / `_get_enricher` / `_stash_citations` / `_last_citations` / `_enricher` / `_is_llm_error` 及 `chat_completion` / `NoteKnowledgeEnricher` 导入；生成正文 = 上年附注 → 模板正文。配置开关 `DISCLOSURE_NOTE_RAG_ENABLED` 只控制生成链那一级、已无消费方 ⇒ 删除（`TOP_K` / `CHAR_BUDGET` 仍供手动 AI 填充）。`seed_note_text_batch_uat.py` 不再打桩。
+  - 原三级链的 characterization / RAG 集成测试（`test_disclosure_note_rag_characterization` / `_integration`）锁的是被拍板删除的行为，删除；仍成立的契约迁到 `test_disclosure_note_generation_text_order.py`（上年优先 / 不足 20 字落模板 / 两级皆空留空 / 单章构表失败隔离）。
 - [ ] 22. 校验 `LLM_REVIEW` 与公式引擎 `LLMReview` 自动路径跳过并给出「需手动 AI 检查」。
+  - ✅ `NoteValidationEngine(db, *, allow_llm=False)`：`LLM_REVIEW` 默认返回 `skipped / manual_only`，不调大模型、不计问题；`allow_llm=True` 才执行（用例覆盖两条路径，变异打红）。
+  - ⬜ 现有调用方全用默认值，附注域还没有「手动 AI 审核」入口 ⇒ 手动路径无人可达；公式引擎 `LLMReview.validate_async` 待核（疑似死代码）。
 - [ ] 23. 前端自动拉取改按钮触发；生成确认框文案。
 - [ ] 24. 守卫：生成全流程大模型计数桩 0 次、手动入口仍调到、AST；变异。
+  - ✅ `test_note_generation_no_llm.py`：生成全流程计数桩 0 次（源模块与引擎模块两处打桩）、AST 无大模型 / 知识库引用、开关已删；变异「生成链偷调大模型」打红 2 例。⬜ 手动入口仍调到（随 Task 20 清单补）。
 
 ## Phase 6 和平药房重建
 

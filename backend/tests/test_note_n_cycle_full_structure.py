@@ -49,7 +49,7 @@ EXPECTED_TABLES = {
     ("listed", "五、41"): 1,
     ("soe", "八、41"): 1,
     ("listed", "五、63"): 1,
-    ("listed", "三、所得税费用"): 2,
+    ("listed", "五、81"): 2,
     ("soe", "八、78"): 2,
 }
 
@@ -92,7 +92,7 @@ def _extract_column_keys_from_template(variant: str, section_number: str) -> dic
     ("listed", "五、41"),
     ("soe", "八、41"),
     ("listed", "五、63"),
-    ("listed", "三、所得税费用"),
+    ("listed", "五、81"),
     ("soe", "八、78"),
 ])
 def test_columns_have_keys(variant, section_number):
@@ -112,7 +112,7 @@ def test_columns_have_keys(variant, section_number):
     ("listed", "五、41"),
     ("soe", "八、41"),
     ("listed", "五、63"),
-    ("listed", "三、所得税费用"),
+    ("listed", "五、81"),
     ("soe", "八、78"),
 ])
 def test_guidance_present(variant, section_number):

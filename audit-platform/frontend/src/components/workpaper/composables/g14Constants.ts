@@ -191,7 +191,7 @@ export const G14_DISCLOSURE_FORMULA_MAP = [
   { field: '附注合计-本期', source: 'G14-1审定表', formula: 'SUM(currentAudited) = G14-adj-tb', account: '6702' },
   { field: '附注各行-本期', source: 'G14-2明细', formula: 'listed: 1:1; SOE: bad_debt=Σ应收/合同资产; other+=guarantee', account: '6702' },
   { field: '附注合计-上期', source: 'G14-adj-prior', formula: 'priorUnadj+priorAdj（无 priorAudited 时回算）', account: '6702' },
-  { field: '同步附注', source: 'disclosure-notes', formula: '上市→三、信用减值损失；国企→八、73', account: '6702' },
+  { field: '同步附注', source: 'disclosure-notes', formula: '上市→五、76；国企→八、73', account: '6702' },
   { field: 'ECL交叉验证', source: 'G14-2核对列', formula: '与 D1/D2/D5/D6/G4/G5/G6 索引联动', account: '-' },
   { field: '期末准备对账', source: 'trial_balance', formula: 'closingProvision ≈ TB(对应准备/OCI/预计负债)', account: '1231/1142/…' },
 ] as const

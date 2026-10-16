@@ -3,7 +3,7 @@
  *
  * 权威 note_template_variant_matrix.json · account_key=xin_yong_jian_zhi_sun_shi：
  * - 国企（报表项目附注）→ 八、73
- * - 上市 → 三、信用减值损失（note_template_listed section_title）
+ * - 上市 → 五、76（2026-10-16 按 Word 从「三」章改挂到第五章；改挂前是「三」章下的关键词编号）
  */
 export type G14DisclosureVariant = 'listed' | 'soe'
 
@@ -11,7 +11,7 @@ export type G14DisclosureVariant = 'listed' | 'soe'
 export const G14_SOE_NOTE_SECTION = '八、73'
 
 export const G14_NOTE_SECTION = {
-  listed: '三、信用减值损失',
+  listed: '五、76',
   soe: G14_SOE_NOTE_SECTION,
 } as const satisfies Record<G14DisclosureVariant, string>
 

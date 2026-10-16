@@ -60,9 +60,10 @@ DATA_DIR = _BACKEND / "data"
 LISTED_PATH = DATA_DIR / "note_template_listed.json"
 SOE_PATH = DATA_DIR / "note_template_soe.json"
 
-# 🔴 listed `三、` 章 section_number 被 md 重建截断为 10 字符 —— 这是**既有真源形态**
-# （全库 70+ 条同款），修法是改前端常量对齐它，不是改模板编号（会波及整章 + 并发 spec）。
-H10_LISTED_SECTION = "三、资产处置收益（损"
+# 🔴 上市 H10 原挂「三」章、编号是 md 重建的 10 字截断值（当时修法是前端常量对齐它）；
+# 2026-10-16 spec disclosure-note-template-word-realignment 按四版 Word 改挂到第五章 → 五、78，
+# 旧编号进该节 legacy_section_numbers（normalize_section_code 归一），本脚本与前端常量随之同步。
+H10_LISTED_SECTION = "五、78"
 H10_SOE_SECTION = "八、75"
 H9_LISTED_SECTION = "五、47"
 H9_SOE_SECTION = "八、52"
@@ -271,7 +272,7 @@ _TARGETS: dict[str, tuple[Path, str, Any, list[str] | None]] = {
 }
 
 _LABELS = {
-    "h10_listed": "note_template_listed.json §三、资产处置收益（损（上市）",
+    "h10_listed": "note_template_listed.json §五、78 资产处置收益（上市）",
     "h10_soe": "note_template_soe.json §八、75 资产处置收益（国企）",
     "h9_listed": "note_template_listed.json §五、47 租赁负债（上市）",
     "h9_soe": "note_template_soe.json §八、52 租赁负债（国企）",

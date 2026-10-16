@@ -5,7 +5,7 @@
 - 五、30 / 八、31  递延所得税资产与递延所得税负债（N1+N3 共节）
 - 五、41 / 八、41  应交税费（N2）
 - 五、63            税金及附加（N4，仅上市；国企 null 不建）
-- 三、所得税费用    所得税费用（N5 上市）
+- 五、81    所得税费用（N5 上市）
 - 八、78            所得税费用（N5 国企）
 
 用法：
@@ -369,7 +369,7 @@ def _build_n4_listed_tables() -> list[dict]:
     }]
 
 
-# ─── N5 所得税费用（三、所得税费用 / 八、78）─────────────────────────────────
+# ─── N5 所得税费用（五、81 / 八、78）─────────────────────────────────
 
 _N5_GUIDANCE = (
     "所得税费用等于第二行至倒数第二行之和。"
@@ -450,7 +450,7 @@ PLAN: list[dict] = [
     {"path": "listed", "section_number": "五、41", "tables": _build_n2_listed_tables},
     {"path": "soe", "section_number": "八、41", "tables": _build_n2_soe_tables},
     {"path": "listed", "section_number": "五、63", "tables": _build_n4_listed_tables},
-    {"path": "listed", "section_number": "三、所得税费用", "tables": _build_n5_listed_tables},
+    {"path": "listed", "section_number": "五、81", "tables": _build_n5_listed_tables},
     {"path": "soe", "section_number": "八、78", "tables": _build_n5_soe_tables},
 ]
 

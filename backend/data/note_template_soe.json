@@ -5,8 +5,8 @@
     {
       "section_id": "chapter-01-gong-si-ji-ben-qing-kuang",
       "section_number": "一",
-      "section_title": "公司基本情况",
-      "account_name": "公司基本情况",
+      "section_title": "公司（企业）基本情况",
+      "account_name": "公司（企业）基本情况",
       "content_type": "text",
       "scope": "both",
       "level": 1,
@@ -19,12 +19,15 @@
       "text_sections": [],
       "check_presets": [],
       "wide_table_presets": [],
-      "sort_order": 99
+      "sort_order": 99,
+      "legacy_titles": [
+        "公司基本情况"
+      ]
     },
     {
       "section_number": "一、1",
-      "section_title": "公司基本情况",
-      "account_name": "公司基本情况",
+      "section_title": "公司（企业）基本情况",
+      "account_name": "公司（企业）基本情况",
       "content_type": "text",
       "scope": "both",
       "sort_order": 100,
@@ -45,7 +48,10 @@
       "parent_section_id": "chapter-01-gong-si-ji-ben-qing-kuang",
       "sort_index": 0,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "legacy_titles": [
+        "公司基本情况"
+      ]
     },
     {
       "section_id": "chapter-02-cai-wu-bao-biao-bian-zhi-ji-chu",
@@ -257,7 +263,7 @@
       ],
       "check_presets": [],
       "wide_table_presets": [],
-      "scope": "consolidated_only",
+      "scope": "both",
       "sort_order": 403,
       "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-qi-ye-he-bing",
       "level": 2,
@@ -286,7 +292,7 @@
       ],
       "check_presets": [],
       "wide_table_presets": [],
-      "scope": "consolidated_only",
+      "scope": "both",
       "sort_order": 404,
       "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-he-bing-cai-wu-bao-biao-bian-zhi-fang-fa",
       "level": 2,
@@ -318,7 +324,7 @@
       ],
       "check_presets": [],
       "wide_table_presets": [],
-      "scope": "consolidated_only",
+      "scope": "both",
       "sort_order": 405,
       "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-he-ying-an-pai-de-fen-lei-ji-gong-tong-jing",
       "level": 2,
@@ -1238,6 +1244,39 @@
       "lock_number": false
     },
     {
+      "section_number": "四、递延所得税资产及递延所得税负债",
+      "section_title": "递延所得税资产及递延所得税负债",
+      "account_name": "递延所得税资产及递延所得税负债",
+      "content_type": "text",
+      "tables": [],
+      "text_sections": [
+        "（说明递延所得税资产和递延所得税负债的确认依据。）",
+        "所得税包括当期所得税和递延所得税。除由于企业合并产生的调整商誉，或与直接计入所有者权益的交易或者事项相关的递延所得税计入所有者权益外，均作为所得税费用计入当期损益。",
+        "本公司根据资产、负债于资产负债表日的账面价值与计税基础之间的暂时性差异，采用资产负债表债务法确认递延所得税。",
+        "各项应纳税暂时性差异均确认相关的递延所得税负债，除非该应纳税暂时性差异是在以下交易中产生的：",
+        "（1）商誉的初始确认，或者具有以下特征的交易中产生的资产或负债的初始确认：该交易不是企业合并，并且交易发生时既不影响会计利润也不影响应纳税所得额；",
+        "（2）对于与子公司、合营企业及联营企业投资相关的应纳税暂时性差异，该暂时性差异转回的时间能够控制并且该暂时性差异在可预见的未来很可能不会转回。",
+        "对于可抵扣暂时性差异、能够结转以后年度的可抵扣亏损和税款抵减，本公司以很可能取得用来抵扣可抵扣暂时性差异、可抵扣亏损和税款抵减的未来应纳税所得额为限，确认由此产生的递延所得税资产，除非该可抵扣暂时性差异是在以下交易中产生的：",
+        "（1）该交易不是企业合并，并且交易发生时既不影响会计利润也不影响应纳税所得额；且初始确认的资产和负债不会导致产生等额应纳税暂时性差异和可抵扣暂时性差异的单项交易；",
+        "（2）对于与子公司、合营企业及联营企业投资相关的可抵扣暂时性差异，同时满足下列条件的，确认相应的递延所得税资产：暂时性差异在可预见的未来很可能转回，且未来很可能获得用来抵扣可抵扣暂时性差异的应纳税所得额。",
+        "于资产负债表日，本公司对递延所得税资产和递延所得税负债，按照预期收回该资产或清偿该负债期间的适用税率计量，并反映资产负债表日预期收回资产或清偿负债方式的所得税影响。",
+        "于资产负债表日，本公司对递延所得税资产的账面价值进行复核。如果未来期间很可能无法获得足够的应纳税所得额用以抵扣递延所得税资产的利益，减记递延所得税资产的账面价值。在很可能获得足够的应纳税所得额时，减记的金额予以转回。"
+      ],
+      "check_presets": [],
+      "wide_table_presets": [],
+      "scope": "both",
+      "sort_order": 431,
+      "section_id": "chapter-06-shui-xiang-di-yan-suo-de-shui-zi-chan-ji-di-yan-suo-de-shui-fu-zhai",
+      "level": 2,
+      "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+      "sort_index": 31,
+      "auto_numbering": true,
+      "lock_number": false,
+      "legacy_section_numbers": [
+        "六、递延所得税资产及递延所得税负债"
+      ]
+    },
+    {
       "section_number": "四、租赁",
       "section_title": "租赁",
       "account_name": "租赁",
@@ -1259,11 +1298,11 @@
       ],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 431,
+      "sort_order": 432,
       "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-zu-lin",
       "level": 2,
       "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
-      "sort_index": 31,
+      "sort_index": 32,
       "auto_numbering": true,
       "lock_number": false
     },
@@ -1285,11 +1324,11 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 432,
+      "sort_order": 433,
       "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-chi-you-dai-shou-ji-zhong-zhi-jing-ying",
       "level": 2,
       "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
-      "sort_index": 32,
+      "sort_index": 33,
       "auto_numbering": true,
       "lock_number": false
     },
@@ -1312,11 +1351,11 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 433,
+      "sort_order": 434,
       "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-gong-yun-jia-zhi-ji-liang",
       "level": 2,
       "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
-      "sort_index": 33,
+      "sort_index": 34,
       "auto_numbering": true,
       "lock_number": false
     },
@@ -1341,11 +1380,11 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 434,
+      "sort_order": 435,
       "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-an-quan-sheng-chan-fei-yong-ji-wei-jian-fei",
       "level": 2,
       "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
-      "sort_index": 34,
+      "sort_index": 35,
       "auto_numbering": true,
       "lock_number": false
     },
@@ -1366,19 +1405,19 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 435,
+      "sort_order": 436,
       "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-zi-chan-zheng-quan-hua-ye-wu",
       "level": 2,
       "parent_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
-      "sort_index": 35,
+      "sort_index": 36,
       "auto_numbering": true,
       "lock_number": false
     },
     {
       "section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g",
       "section_number": "五",
-      "section_title": "重要会计政策、会计估计的变更以及前期差错的更正",
-      "account_name": "重要会计政策、会计估计的变更以及前期差错的更正",
+      "section_title": "会计政策、会计估计变更及差错更正",
+      "account_name": "会计政策、会计估计变更及差错更正",
       "content_type": "text",
       "scope": "both",
       "level": 1,
@@ -1391,7 +1430,10 @@
       "text_sections": [],
       "check_presets": [],
       "wide_table_presets": [],
-      "sort_order": 499
+      "sort_order": 499,
+      "legacy_titles": [
+        "重要会计政策、会计估计的变更以及前期差错的更正"
+      ]
     },
     {
       "section_number": "五、会计政策变更",
@@ -1497,7 +1539,7 @@
       ],
       "check_presets": [],
       "wide_table_presets": [],
-      "scope": "consolidated_only",
+      "scope": "both",
       "sort_order": 503,
       "section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g-qi",
       "level": 2,
@@ -1579,36 +1621,6 @@
       "sort_order": 599
     },
     {
-      "section_number": "六、递延所得税资产及递延所得税负债",
-      "section_title": "递延所得税资产及递延所得税负债",
-      "account_name": "递延所得税资产及递延所得税负债",
-      "content_type": "text",
-      "tables": [],
-      "text_sections": [
-        "（说明递延所得税资产和递延所得税负债的确认依据。）",
-        "所得税包括当期所得税和递延所得税。除由于企业合并产生的调整商誉，或与直接计入所有者权益的交易或者事项相关的递延所得税计入所有者权益外，均作为所得税费用计入当期损益。",
-        "本公司根据资产、负债于资产负债表日的账面价值与计税基础之间的暂时性差异，采用资产负债表债务法确认递延所得税。",
-        "各项应纳税暂时性差异均确认相关的递延所得税负债，除非该应纳税暂时性差异是在以下交易中产生的：",
-        "（1）商誉的初始确认，或者具有以下特征的交易中产生的资产或负债的初始确认：该交易不是企业合并，并且交易发生时既不影响会计利润也不影响应纳税所得额；",
-        "（2）对于与子公司、合营企业及联营企业投资相关的应纳税暂时性差异，该暂时性差异转回的时间能够控制并且该暂时性差异在可预见的未来很可能不会转回。",
-        "对于可抵扣暂时性差异、能够结转以后年度的可抵扣亏损和税款抵减，本公司以很可能取得用来抵扣可抵扣暂时性差异、可抵扣亏损和税款抵减的未来应纳税所得额为限，确认由此产生的递延所得税资产，除非该可抵扣暂时性差异是在以下交易中产生的：",
-        "（1）该交易不是企业合并，并且交易发生时既不影响会计利润也不影响应纳税所得额；且初始确认的资产和负债不会导致产生等额应纳税暂时性差异和可抵扣暂时性差异的单项交易；",
-        "（2）对于与子公司、合营企业及联营企业投资相关的可抵扣暂时性差异，同时满足下列条件的，确认相应的递延所得税资产：暂时性差异在可预见的未来很可能转回，且未来很可能获得用来抵扣可抵扣暂时性差异的应纳税所得额。",
-        "于资产负债表日，本公司对递延所得税资产和递延所得税负债，按照预期收回该资产或清偿该负债期间的适用税率计量，并反映资产负债表日预期收回资产或清偿负债方式的所得税影响。",
-        "于资产负债表日，本公司对递延所得税资产的账面价值进行复核。如果未来期间很可能无法获得足够的应纳税所得额用以抵扣递延所得税资产的利益，减记递延所得税资产的账面价值。在很可能获得足够的应纳税所得额时，减记的金额予以转回。"
-      ],
-      "check_presets": [],
-      "wide_table_presets": [],
-      "scope": "both",
-      "sort_order": 600,
-      "section_id": "chapter-06-shui-xiang-di-yan-suo-de-shui-zi-chan-ji-di-yan-suo-de-shui-fu-zhai",
-      "level": 2,
-      "parent_section_id": "chapter-06-shui-xiang",
-      "sort_index": 0,
-      "auto_numbering": true,
-      "lock_number": false
-    },
-    {
       "section_number": "六、主要税种及税率",
       "section_title": "主要税种及税率",
       "account_name": "主要税种及税率",
@@ -1661,11 +1673,11 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 601,
+      "sort_order": 600,
       "section_id": "chapter-06-shui-xiang-zhu-yao-shui-zhong-ji-shui-lv",
       "level": 2,
       "parent_section_id": "chapter-06-shui-xiang",
-      "sort_index": 1,
+      "sort_index": 0,
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
@@ -1683,19 +1695,19 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 602,
+      "sort_order": 601,
       "section_id": "chapter-06-shui-xiang-you-hui-shui-fu-ji-pi-wen",
       "level": 2,
       "parent_section_id": "chapter-06-shui-xiang",
-      "sort_index": 2,
+      "sort_index": 1,
       "auto_numbering": true,
       "lock_number": false
     },
     {
       "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
       "section_number": "七",
-      "section_title": "合并范围的变化",
-      "account_name": "合并范围的变化",
+      "section_title": "企业合并及合并财务报表",
+      "account_name": "企业合并及合并财务报表",
       "content_type": "text",
       "scope": "consolidated_only",
       "level": 1,
@@ -1708,7 +1720,10 @@
       "text_sections": [],
       "check_presets": [],
       "wide_table_presets": [],
-      "sort_order": 699
+      "sort_order": 699,
+      "legacy_titles": [
+        "合并范围的变化"
+      ]
     },
     {
       "section_number": "七、本期纳入合并报表范围的子公司基本情况",
@@ -1978,8 +1993,8 @@
     },
     {
       "section_number": "七、母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的",
-      "section_title": "母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的",
-      "account_name": "母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的",
+      "section_title": "母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的原因",
+      "account_name": "母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的原因",
       "content_type": "mixed",
       "tables": [
         {
@@ -2111,7 +2126,10 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
-      "_aligned_at": "2026-08-09 19:14:13"
+      "_aligned_at": "2026-08-09 19:14:13",
+      "legacy_titles": [
+        "母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的"
+      ]
     },
     {
       "section_number": "七、重要非全资子公司情况",
@@ -2356,6 +2374,25 @@
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
       "_aligned_at": "2026-08-10 14:44:28"
+    },
+    {
+      "section_number": "七、子公司与母公司会计期间不一致的，母公司编制合并财务报表的处理方法",
+      "section_title": "子公司与母公司会计期间不一致的，母公司编制合并财务报表的处理方法",
+      "account_name": "子公司与母公司会计期间不一致的，母公司编制合并财务报表的处理方法",
+      "content_type": "text",
+      "check_presets": [],
+      "wide_table_presets": [],
+      "scope": "consolidated_only",
+      "sort_order": 704,
+      "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-zi-gong-si-yu-mu-gong-si-kuai-ji-qi-jian-bu-yi-zhi-de-mu",
+      "level": 2,
+      "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
+      "sort_index": 4,
+      "auto_numbering": true,
+      "lock_number": false,
+      "tables": [],
+      "text_sections": [],
+      "_aligned_by": "disclosure-note-template-word-realignment"
     },
     {
       "section_number": "七、本期不再纳入合并范围的原子公司",
@@ -2670,11 +2707,11 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 704,
+      "sort_order": 705,
       "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-bu-zai-na-ru-he-bing-fan-wei-de-yuan-zi-gong-si",
       "level": 2,
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
-      "sort_index": 4,
+      "sort_index": 5,
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
@@ -2762,11 +2799,11 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 705,
+      "sort_order": 706,
       "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-xin-na-ru-he-bing-fan-wei-de-zhu-ti",
       "level": 2,
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
-      "sort_index": 5,
+      "sort_index": 6,
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
@@ -2870,11 +2907,11 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 706,
+      "sort_order": 707,
       "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-fa-sheng-de-tong-yi-kong-zhi-xia-qi-ye-he-bing-qi",
       "level": 2,
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
-      "sort_index": 6,
+      "sort_index": 7,
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
@@ -3000,11 +3037,11 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 707,
+      "sort_order": 708,
       "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-fa-sheng-de-fei-tong-yi-kong-zhi-xia-qi-ye-he-bin",
       "level": 2,
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
-      "sort_index": 7,
+      "sort_index": 8,
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
@@ -3125,11 +3162,11 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 708,
+      "sort_order": 709,
       "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-fa-sheng-de-xi-shou-he-bing",
       "level": 2,
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
-      "sort_index": 8,
+      "sort_index": 9,
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
@@ -3150,11 +3187,11 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 709,
+      "sort_order": 710,
       "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-zi-gong-si-shi-yong-qi-ye-ji-tuan-zi-chan-he-qing-chang",
       "level": 2,
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
-      "sort_index": 9,
+      "sort_index": 10,
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
@@ -3176,11 +3213,11 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 710,
+      "sort_order": 711,
       "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-na-ru-he-bing-cai-wu-bao-biao-fan-wei-de-jie-gou-hua-zhu",
       "level": 2,
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
-      "sort_index": 10,
+      "sort_index": 11,
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
@@ -3284,11 +3321,11 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 711,
+      "sort_order": 712,
       "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-mu-gong-si-zai-zi-gong-si-de-suo-you-zhe-quan-yi-fen-e-f",
       "level": 2,
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
-      "sort_index": 11,
+      "sort_index": 12,
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
@@ -3311,11 +3348,11 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "consolidated_only",
-      "sort_order": 712,
+      "sort_order": 713,
       "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-zi-gong-si-xiang-mu-gong-si-zhuan-yi-zi-jin-de-neng-li-s",
       "level": 2,
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
-      "sort_index": 12,
+      "sort_index": 13,
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
@@ -20390,8 +20427,8 @@
     },
     {
       "section_number": "八、88",
-      "section_title": "（3）其他数据资源相关信息",
-      "account_name": "（3）其他数据资源相关信息",
+      "section_title": "数据资源",
+      "account_name": "数据资源",
       "content_type": "text",
       "tables": [],
       "text_sections": [
@@ -20415,7 +20452,10 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 87,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "legacy_titles": [
+        "（3）其他数据资源相关信息"
+      ]
     },
     {
       "section_number": "八、89",
@@ -20678,7 +20718,7 @@
       ],
       "check_presets": [],
       "wide_table_presets": [],
-      "scope": "consolidated_only",
+      "scope": "both",
       "sort_order": 889,
       "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-fen-bu-xin-xi",
       "level": 2,
@@ -21018,7 +21058,7 @@
       ],
       "check_presets": [],
       "wide_table_presets": [],
-      "scope": "consolidated_only",
+      "scope": "both",
       "sort_order": 890,
       "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-he-bing-xian-jin-liu-liang-biao-xiang-guan",
       "level": 2,
@@ -21423,8 +21463,8 @@
     },
     {
       "section_number": "九、【企业应当在附注中披露与或有事项有关的下列信息：",
-      "section_title": "【企业应当在附注中披露与或有事项有关的下列信息：",
-      "account_name": "【企业应当在附注中披露与或有事项有关的下列信息：",
+      "section_title": "或有事项",
+      "account_name": "或有事项",
       "content_type": "text",
       "tables": [],
       "text_sections": [
@@ -21466,7 +21506,10 @@
       "parent_section_id": "chapter-09-huo-you-shi-xiang",
       "sort_index": 0,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "legacy_titles": [
+        "【企业应当在附注中披露与或有事项有关的下列信息："
+      ]
     },
     {
       "section_number": "九、1、或有负债",
@@ -21720,6 +21763,25 @@
       "_aligned_at": "2026-08-07 16:58:18"
     },
     {
+      "section_number": "十、销售退回",
+      "section_title": "销售退回",
+      "account_name": "销售退回",
+      "content_type": "text",
+      "check_presets": [],
+      "wide_table_presets": [],
+      "scope": "both",
+      "sort_order": 1002,
+      "section_id": "chapter-10-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-xiao-shou-tui-hui",
+      "level": 2,
+      "parent_section_id": "chapter-10-zi-chan-fu-zhai-biao-ri-hou-shi-xiang",
+      "sort_index": 2,
+      "auto_numbering": true,
+      "lock_number": false,
+      "tables": [],
+      "text_sections": [],
+      "_aligned_by": "disclosure-note-template-word-realignment"
+    },
+    {
       "section_number": "十、其他资产负债表日后事项说明",
       "section_title": "其他资产负债表日后事项说明",
       "account_name": "其他资产负债表日后事项说明",
@@ -21742,19 +21804,19 @@
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
-      "sort_order": 1002,
+      "sort_order": 1003,
       "section_id": "chapter-10-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-qi-ta-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-sh",
       "level": 2,
       "parent_section_id": "chapter-10-zi-chan-fu-zhai-biao-ri-hou-shi-xiang",
-      "sort_index": 2,
+      "sort_index": 3,
       "auto_numbering": true,
       "lock_number": false
     },
     {
       "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi",
       "section_number": "十一",
-      "section_title": "关联方及关联交易",
-      "account_name": "关联方及关联交易",
+      "section_title": "关联方关系及其交易",
+      "account_name": "关联方关系及其交易",
       "content_type": "text",
       "scope": "both",
       "level": 1,
@@ -21767,7 +21829,10 @@
       "text_sections": [],
       "check_presets": [],
       "wide_table_presets": [],
-      "sort_order": 1099
+      "sort_order": 1099,
+      "legacy_titles": [
+        "关联方及关联交易"
+      ]
     },
     {
       "section_number": "十一、本公司的母公司情况",
@@ -21891,7 +21956,7 @@
       ],
       "check_presets": [],
       "wide_table_presets": [],
-      "scope": "consolidated_only",
+      "scope": "both",
       "sort_order": 1101,
       "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-ben-gong-si-de-zi-gong-si-qing-kuang",
       "level": 2,
@@ -21948,7 +22013,7 @@
       ],
       "check_presets": [],
       "wide_table_presets": [],
-      "scope": "consolidated_only",
+      "scope": "both",
       "sort_order": 1102,
       "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-ben-gong-si-de-he-ying-qi-ye-lian-ying-qi-ye-qin",
       "level": 2,
@@ -25508,10 +25573,10 @@
     {
       "section_id": "chapter-13-cheng-nuo-shi-xiang",
       "section_number": "十三",
-      "section_title": "承诺事项",
-      "account_name": "承诺事项",
+      "section_title": "按照有关财务会计制度应披露的其他内容",
+      "account_name": "按照有关财务会计制度应披露的其他内容",
       "content_type": "text",
-      "scope": "both",
+      "scope": "consolidated_only",
       "level": 1,
       "parent_section_id": null,
       "sort_index": 13,
@@ -25522,14 +25587,17 @@
       "text_sections": [],
       "check_presets": [],
       "wide_table_presets": [],
-      "sort_order": 1299
+      "sort_order": 1299,
+      "legacy_titles": [
+        "承诺事项"
+      ]
     },
     {
       "section_number": "十三、1",
       "section_title": "按照有关财务会计制度应披露的其他内容",
       "account_name": "其他披露",
       "content_type": "text",
-      "scope": "both",
+      "scope": "consolidated_only",
       "sort_order": 1300,
       "text_sections": [
         "（一）或有负债（不包括极小可能导致经济利益流出企业的或有负债）。",
@@ -25548,8 +25616,8 @@
     {
       "section_id": "chapter-14-qi-ta-zhong-yao-shi-xiang",
       "section_number": "十四",
-      "section_title": "其他重要事项",
-      "account_name": "其他重要事项",
+      "section_title": "财务报表之批准",
+      "account_name": "财务报表之批准",
       "content_type": "text",
       "scope": "both",
       "level": 1,
@@ -25562,7 +25630,10 @@
       "text_sections": [],
       "check_presets": [],
       "wide_table_presets": [],
-      "sort_order": 1399
+      "sort_order": 1399,
+      "legacy_titles": [
+        "其他重要事项"
+      ]
     },
     {
       "section_number": "十四、1",

@@ -25,11 +25,11 @@ seed 路径走 `note_sub_table_projector._infer_groups_from_headers` 前缀推�
   - Soe §八、70：1 table，3 列（项目/本期发生额/上期发生额）
 
 - **G13 公允价值变动收益**
-  - Listed §三、公允价值变动收益：2 tables，主表 3 列（产生公允价值变动收益的来源/本期发生额/上期发生额）
+  - Listed §五、75：2 tables，主表 3 列（产生公允价值变动收益的来源/本期发生额/上期发生额）
   - Soe §八、72：1 table，3 列（产生公允价值变动收益的来源/本期发生额/上期发生额）
 
 - **G14 信用减值损失**
-  - Listed §三、信用减值损失：1 table，3 列（项目/本期发生额/上期发生额）
+  - Listed §五、76：1 table，3 列（项目/本期发生额/上期发生额）
   - Soe §八、73：1 table，3 列（项目/本期发生额/上期发生额）
 
 Usage::
@@ -113,7 +113,7 @@ _G11_COLS = flat_columns([
 
 # ═══════════════════════════ G13 公允价值变动收益 ═══════════════════════════
 
-G13_LISTED_SECTION = "三、公允价值变动收益"
+G13_LISTED_SECTION = "五、75"
 G13_SOE_SECTION = "八、72"
 
 _G13_COLS = flat_columns([
@@ -124,7 +124,7 @@ _G13_COLS = flat_columns([
 
 # ═══════════════════════════ G14 信用减值损失 ═══════════════════════════
 
-G14_LISTED_SECTION = "三、信用减值损失"
+G14_LISTED_SECTION = "五、76"
 G14_SOE_SECTION = "八、73"
 
 _G14_COLS = flat_columns([
@@ -157,7 +157,7 @@ def _g11_soe_plan(tables: list[str]) -> list[dict]:
 
 
 def _g13_listed_plan(tables: list[str]) -> list[dict]:
-    """G13 Listed 三、公允价值变动收益：2 tables（主表+套保明细），同结构。"""
+    """G13 Listed 五、75：2 tables（主表+套保明细），同结构。"""
     return [rule(name, _G13_COLS, None, GUIDANCE_G13) for name in tables]
 
 
@@ -167,7 +167,7 @@ def _g13_soe_plan(tables: list[str]) -> list[dict]:
 
 
 def _g14_listed_plan(tables: list[str]) -> list[dict]:
-    """G14 Listed 三、信用减值损失：1 table。"""
+    """G14 Listed 五、76：1 table。"""
     return [rule(name, _G14_COLS, None, GUIDANCE_G14) for name in tables]
 
 
@@ -202,9 +202,9 @@ _CHAPTER_DEFS: list[tuple[str, str, Path, str, object]] = [
     ("g10_soe", "G10 交易性金融负债（国企 §八、34）", SOE_PATH, G10_SOE_SECTION, _g10_soe_plan),
     ("g11_listed", "G11 投资收益（上市 §五、69）", LISTED_PATH, G11_LISTED_SECTION, _g11_listed_plan),
     ("g11_soe", "G11 投资收益（国企 §八、70）", SOE_PATH, G11_SOE_SECTION, _g11_soe_plan),
-    ("g13_listed", "G13 公允价值变动收益（上市 §三、公允价值变动收益）", LISTED_PATH, G13_LISTED_SECTION, _g13_listed_plan),
+    ("g13_listed", "G13 公允价值变动收益（上市 §五、75）", LISTED_PATH, G13_LISTED_SECTION, _g13_listed_plan),
     ("g13_soe", "G13 公允价值变动收益（国企 §八、72）", SOE_PATH, G13_SOE_SECTION, _g13_soe_plan),
-    ("g14_listed", "G14 信用减值损失（上市 §三、信用减值损失）", LISTED_PATH, G14_LISTED_SECTION, _g14_listed_plan),
+    ("g14_listed", "G14 信用减值损失（上市 §五、76）", LISTED_PATH, G14_LISTED_SECTION, _g14_listed_plan),
     ("g14_soe", "G14 信用减值损失（国企 §八、73）", SOE_PATH, G14_SOE_SECTION, _g14_soe_plan),
 ]
 

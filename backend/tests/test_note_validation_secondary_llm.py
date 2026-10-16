@@ -252,14 +252,26 @@ class TestLlmReviewReadOnly:
 
 class TestEngineAsyncDispatch:
     def test_run_rule_routes_llm_to_async_warning(self):
-        """LLM_REVIEW 经 _run_rule 走 async 特例，真实（mock）调用 chat_completion。"""
-        engine = NoteValidationEngine(db=None)
+        """用户手动发起（allow_llm=True）：LLM_REVIEW 经 _run_rule 走 async 特例，真实（mock）调用 chat_completion。"""
+        engine = NoteValidationEngine(db=None, allow_llm=True)
         ctx = _text_ctx("含占位符 XX")
         rule = _rule(ValidationType.LLM_REVIEW)
         with patch(_LLM_PATCH_TARGET, new=AsyncMock(return_value="1. 占位符残留")):
             res = asyncio.run(engine._run_rule(rule, ctx))
         assert res.passed is False
         assert res.details.get("ai_hint") is True
+
+    def test_run_rule_skips_llm_by_default(self):
+        """默认（生成后自动校验 / 校验按钮）不调大模型：LLM_REVIEW 记「需手动发起」，不算问题（用户 2026-10-16）。"""
+        engine = NoteValidationEngine(db=None)
+        ctx = _text_ctx("含占位符 XX")
+        rule = _rule(ValidationType.LLM_REVIEW)
+        llm = AsyncMock(return_value="1. 占位符残留")
+        with patch(_LLM_PATCH_TARGET, new=llm):
+            res = asyncio.run(engine._run_rule(rule, ctx))
+        assert llm.await_count == 0
+        assert res.passed is True
+        assert (res.details.get("skipped"), res.details.get("manual_only")) == (True, True)
 
     def test_run_rule_non_llm_uses_sync_executor(self):
         """非 LLM 规则经 _run_rule 走同步 execute_rule（行为不变）。"""

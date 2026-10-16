@@ -413,11 +413,6 @@ export function resolveK1NoteSectionTarget(variant: K1DisclosureVariant): {
   return { sectionId, chipValue: `Note:${sectionId}` }
 }
 
-export function isK1OtherReceivableNoteSection(noteSection: string): boolean {
-  const s = String(noteSection || '').trim()
-  if (!s) return false
-  if (s === '五、8' || s.startsWith('五、8')) return true
-  if (s === '八、9' || s.startsWith('八、9')) return true
-  if (s.includes('其他应收款')) return true
-  return false
-}
+// 章节判定统一用 views/composables/noteDisclosureJump.isK1OtherReceivableNoteSection（纯编号精确匹配）。
+// 此处原有同名副本（零调用方）用前缀匹配，会吞掉上市 五、80~五、82（2026-10-16 按 Word 改挂进第五章）
+// 与国企 八、90+，2026-10-16 删除。

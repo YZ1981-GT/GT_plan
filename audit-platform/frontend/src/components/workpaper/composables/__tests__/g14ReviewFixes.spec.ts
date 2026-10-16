@@ -22,9 +22,9 @@ describe('G14 review fixes', () => {
     expect(ALL_CYCLE_PROCEDURE_SHEETS.G14A?.sheetCode).toBe('G14A')
   })
 
-  it('科目与附注：6702；上市三、信用减值损失 / 国企八、73', () => {
+  it('科目与附注：6702；上市五、76 / 国企八、73', () => {
     expect(G14_ACCOUNT_CODE).toBe('6702')
-    expect(G14_NOTE_SECTION.listed).toBe('三、信用减值损失')
+    expect(G14_NOTE_SECTION.listed).toBe('五、76')
     expect(G14_NOTE_SECTION.soe).toBe('八、73')
   })
 

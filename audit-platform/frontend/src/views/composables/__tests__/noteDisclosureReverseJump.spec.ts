@@ -86,9 +86,9 @@ describe('noteDisclosureReverseJump', () => {
   // 损益类：listed 用关键词标题（DB 可能截断，由 DisclosureEditor.resolveSectionInList 前缀模糊解析）；
   // soe 用清晰编号。
   it.each([
-    ['G13', '三、公允价值变动收益', '八、72'], // 公允价值变动收益
-    ['G14', '三、信用减值损失', '八、73'],     // 信用减值损失
-    ['H10', '三、资产处置收益（损', '八、75'], // 资产处置收益（listed 取 note_template 截断值）
+    ['G13', '五、75', '八、72'], // 公允价值变动收益
+    ['G14', '五、76', '八、73'],     // 信用减值损失
+    ['H10', '五、78', '八、75'], // 资产处置收益
   ])('maps 损益类 %s listed→%s soe→%s and builds routes', (wp, listed, soe) => {
     expect(DISCLOSURE_NOTE_SECTION_MAP[wp]).toEqual({ listed, soe })
     expect((buildNoteJumpRoute('p1', wp, 'listed') as any).query).toEqual({ section: listed, noteTemplate: 'listed' })
@@ -106,8 +106,8 @@ describe('noteDisclosureReverseJump', () => {
     ['I4', '五、29', '八、30'], // 长期待摊费用
     ['I6', '五、66', '八、67'], // 研发费用
     ['K1', '五、8', '八、9'],   // 其他应收款
-    ['K11', '三、资产减值损失（损', '八、74'], // 资产减值损失（listed 取 note_template 截断值）
-    ['K13', '三、营业外支出（注：', '八、77'],   // 营业外支出（listed 取 note_template 截断值）
+    ['K11', '五、77', '八、74'], // 资产减值损失
+    ['K13', '五、80', '八、77'],   // 营业外支出
   ])('对称补齐 %s listed→%s soe→%s and builds routes', (wp, listed, soe) => {
     expect(DISCLOSURE_NOTE_SECTION_MAP[wp]).toEqual({ listed, soe })
     expect((buildNoteJumpRoute('p1', wp, 'listed') as any).query).toEqual({ section: listed, noteTemplate: 'listed' })
@@ -218,47 +218,39 @@ describe('reverse jump · N1 递延所得税资产', () => {
     expect(DISCLOSURE_NOTE_SECTION_MAP.N1.soe).toBe(N1_NOTE_SECTION.soe)
   })
 
-  // 🔴 损益类「三、」章的 section_number 在 note_template_listed.json 里被 md 重建
-  //    截断为 10 字符（如 `三、资产处置收益（损`），这是既有真源形态、不是错字。
-  //    历史上 K11/K12/K13/H10 写完整名 → sync_from_workpaper 按 (project_id, year,
-  //    note_section) 定位落空、上市侧新建垃圾章节。本守卫锁死「必须能在真源里找到」，
-  //    防止后人把截断值「修正」回完整名。
-  it('所有「三、」listed 章节号都存在于 note_template_listed.json（防截断值被误修正）', async () => {
+  // 🔴 sync_from_workpaper 按 (project_id, year, note_section) 精确定位：反向跳转 / 同步用的章节号
+  //    差一个字就落空、上市侧新建垃圾章节（历史上 K11/K12/K13/H10 写完整名、模板却是 md 截断值）。
+  //    2026-10-16 两版模板按四版 Word 改挂（上市损益类 三→五、75~五、80 等）后，守卫从「三、章截断值
+  //    必须在真源里」扩为「两个准则的全部章节号都必须在各自模板里」：模板再改编号而这里没跟上即打红。
+  it('全部 listed / soe 章节号都存在于各自的 note_template（模板改编号必须同步这里）', async () => {
     const { readFileSync } = await import('node:fs')
     const { resolve } = await import('node:path')
-    const tplPath = resolve(__dirname, '../../../../../../backend/data/note_template_listed.json')
-    const raw = readFileSync(tplPath, 'utf-8')
-
-    const known = new Set<string>()
-    const collect = (node: unknown): void => {
-      if (Array.isArray(node)) {
-        node.forEach(collect)
-        return
-      }
-      if (node && typeof node === 'object') {
-        const sn = (node as Record<string, unknown>).section_number
-        if (typeof sn === 'string') known.add(sn)
-        Object.values(node as Record<string, unknown>).forEach(collect)
-      }
+    const load = (std: 'listed' | 'soe'): Set<string> => {
+      const raw = readFileSync(resolve(__dirname, `../../../../../../backend/data/note_template_${std}.json`), 'utf-8')
+      return new Set((JSON.parse(raw).sections as Array<{ section_number: string }>).map(s => s.section_number))
     }
-    collect(JSON.parse(raw))
+    const known = { listed: load('listed'), soe: load('soe') }
 
     // 反向自检：真源解析必须真的拿到内容，否则本断言恒空转
-    expect(known.size).toBeGreaterThan(50)
-    expect(known).toContain('三、资产处置收益（损')
+    expect(known.listed.size).toBeGreaterThan(50)
+    expect(known.soe.size).toBeGreaterThan(50)
+    expect(known.listed).toContain('五、78')
 
-    // H5/M2 等国企专属节没有 listed 值，跳过
-    const listedSections = Object.entries(DISCLOSURE_NOTE_SECTION_MAP)
-      .map(([wp, v]) => [wp, v.listed] as const)
-      .filter((pair): pair is readonly [string, string] => typeof pair[1] === 'string')
-      .filter(([, listed]) => listed.startsWith('三、'))
-
-    // 反向自检：确实取到了「三、」类章节，否则 offenders 恒空
-    expect(listedSections.length).toBeGreaterThan(0)
-
-    const offenders = listedSections
-      .filter(([, listed]) => !known.has(listed))
-      .map(([wp, listed]) => `${wp} -> ${listed}`)
+    // K6 上市「持有待售资产」是标题定位（模板无独立编号节），按标题由 resolveSectionInList 解析，不在本守卫内
+    const TITLE_LOCATED = new Set(['K6:listed'])
+    const offenders: string[] = []
+    let checked = 0
+    for (const [wp, v] of Object.entries(DISCLOSURE_NOTE_SECTION_MAP)) {
+      for (const std of ['listed', 'soe'] as const) {
+        const code = v[std]
+        if (typeof code !== 'string' || TITLE_LOCATED.has(`${wp}:${std}`)) continue
+        checked += 1
+        if (!known[std].has(code)) offenders.push(`${wp} ${std} -> ${code}`)
+      }
+    }
+    expect(checked).toBeGreaterThan(60)
     expect(offenders).toEqual([])
+    // 改挂前的上市旧编号（「三」章下的截断值）不得再出现在映射里
+    expect(Object.values(DISCLOSURE_NOTE_SECTION_MAP).filter(v => String(v.listed ?? '').startsWith('三、'))).toEqual([])
   })
 })

@@ -8,10 +8,11 @@
  *   末行注「本科目明细表按照正数填列、披露表按照负数填列」。
  * - `note_template_soe.json` §八、74 表名「资产减值损失」。
  *
- * 🔴 **上市侧章节号是 `三、资产减值损失（损`** —— listed 模板 `三、` 整章的
- * `section_number` 都被 `rebuild_note_from_md.py` 截断为 10 字符（`三、重要性标准确定方` /
- * `三、投资性房地产【不` …），这是该章既有真源形态，**不是笔误、不要"修正"**。
- * 旧常量写 `资产减值损失`（连 `三、` 都没有）→ `sync_from_workpaper` 按
+ * 🔴 **上市侧章节号是 `五、77`**（必须逐字等于模板 `section_number`）—— 2026-10-16 按四版 Word
+ * 把利润表项目注释从「三 重要会计政策」章改挂到「五 财务报表项目附注」章（spec
+ * disclosure-note-template-word-realignment）；原编号（「三」章下 md 重建的 10 字截断值）
+ * 记入该节 `legacy_section_numbers`，后端 `normalize_section_code` 归一到 `五、77`。
+ * 更早的旧常量写 `资产减值损失`（连章号都没有）→ `sync_from_workpaper` 按
  * `(project_id, year, note_section)` 定位时落空，上市侧同步会新建垃圾章节。
  *
  * account_code: 6701
@@ -32,7 +33,7 @@ import {
 export type K11DisclosureVariant = KPlVariant
 
 export const K11_NOTE_SECTION = {
-  listed: '三、资产减值损失（损',
+  listed: '五、77',
   soe: '八、74',
 } as const satisfies Record<K11DisclosureVariant, string>
 

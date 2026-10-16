@@ -69,6 +69,16 @@ def filter_template_sections(
     return [s for s in sections if section_applies_to_scope(s, report_scope)]
 
 
+def section_title_for_scope(section: dict[str, Any], report_scope: str | None) -> str:
+    """节 / 章在该口径下的标题：种子 ``scope_titles[口径]`` 优先，否则 ``section_title``。
+
+    四版 Word 里上市项目附注章单体叫「财务报表项目附注」、合并叫「合并财务报表项目附注」，一份种子按口径取名
+    （spec disclosure-note-template-word-realignment §3.1）。
+    """
+    scoped = (section.get("scope_titles") or {}).get(normalize_report_scope(report_scope))
+    return scoped or section.get("section_title") or ""
+
+
 def template_json_path(template_type: str | None) -> Path:
     t = normalize_template_type(template_type)
     return DATA_DIR / f"note_template_{t}.json"
@@ -195,16 +205,52 @@ def _load_soe_section_numbers() -> frozenset[str]:
     )
 
 
+@lru_cache(maxsize=2)
+def load_legacy_code_aliases(template_type: str | None) -> dict[str, str]:
+    """旧编号 → 现行编号（种子节的 ``legacy_section_numbers``）。
+
+    spec disclosure-note-template-word-realignment §3.4：节按四版 Word 改挂到别的章时编号前缀随之换章号，
+    旧编号登记在该节，库内旧行、上传文档、旧公式与前端旧映射经 :func:`normalize_section_code` 仍能解析。
+    """
+    path = template_json_path(template_type)
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    out: dict[str, str] = {}
+    for s in data.get("sections", []):
+        code = (s.get("section_number") or "").strip()
+        for old in s.get("legacy_section_numbers") or []:
+            old = (old or "").strip()
+            if code and old and old != code:
+                out[old] = code
+    return out
+
+
+def clear_template_caches() -> None:
+    """种子文件变化后清本模块的读缓存（修复脚本、测试替换种子时调用）。"""
+    for fn in (load_section_scope_map, _load_soe_section_numbers, load_legacy_code_aliases):
+        clear = getattr(fn, "cache_clear", None)  # 测试可能已把函数替换成普通函数
+        if clear is not None:
+            clear()
+
+
 def normalize_section_code(
     note_section: str,
     *,
     template_type: str | None = "soe",
 ) -> str:
-    """将 DB/公式中的历史编号归一为当前模板种子的 section_code."""
+    """将 DB/公式中的历史编号归一为当前模板种子的 section_code.
+
+    顺序：① 种子登记的旧编号别名（两个准则都查）；② 国企「五、N」→「八、N」（八、N 存在时）。
+    """
     code = (note_section or "").strip()
-    if not code or normalize_template_type(template_type) != "soe":
+    if not code:
         return code
-    if not code.startswith(_SOE_LEGACY_PREFIX):
+    tt = normalize_template_type(template_type)
+    alias = load_legacy_code_aliases(tt).get(code)
+    if alias:
+        return alias
+    if tt != "soe" or not code.startswith(_SOE_LEGACY_PREFIX):
         return code
     suffix = code[len(_SOE_LEGACY_PREFIX) :]
     candidate = f"{_SOE_CANONICAL_PREFIX}{suffix}"

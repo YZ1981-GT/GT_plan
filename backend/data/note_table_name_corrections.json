@@ -214,7 +214,7 @@
         ]
       },
       "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-kai-fa-zhi-chu": {
-        "section_number": "三、开发支出",
+        "section_number": "六、2",
         "section_title": "开发支出",
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-kai-fa-zhi-chu",
         "table_count": 3,
@@ -257,7 +257,7 @@
         ]
       },
       "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-zi-gong-si-zhong-de-quan-yi": {
-        "section_number": "三、在子公司中的权益",
+        "section_number": "七、2",
         "section_title": "在子公司中的权益",
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-zi-gong-si-zhong-de-quan-yi",
         "table_count": 6,
@@ -386,7 +386,7 @@
         ]
       },
       "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-fan-xiang-gou-mai": {
-        "section_number": "三、反向购买",
+        "section_number": "七、4",
         "section_title": "反向购买",
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-fan-xiang-gou-mai",
         "table_count": 1,
@@ -448,7 +448,7 @@
         ]
       },
       "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si": {
-        "section_number": "三、处置子公司",
+        "section_number": "七、6",
         "section_title": "处置子公司",
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
         "table_count": 12,
@@ -912,7 +912,7 @@
         ]
       },
       "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zi-ben-guan-li": {
-        "section_number": "三、资本管理",
+        "section_number": "九、3",
         "section_title": "资本管理",
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zi-ben-guan-li",
         "table_count": 1,
@@ -932,7 +932,7 @@
         ]
       },
       "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi": {
-        "section_number": "三、套期（不适用的删",
+        "section_number": "九、4",
         "section_title": "套期",
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
         "table_count": 16,
@@ -1118,7 +1118,7 @@
         ]
       },
       "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi": {
-        "section_number": "三、金融资产转移",
+        "section_number": "九、5",
         "section_title": "金融资产转移",
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
         "table_count": 12,
@@ -1391,7 +1391,7 @@
         ]
       },
       "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-qian-qi-cha-cuo-geng-zheng": {
-        "section_number": "十四、前期差错更正",
+        "section_number": "十五、2",
         "section_title": "前期差错更正",
         "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-qian-qi-cha-cuo-geng-zheng",
         "table_count": 2,
@@ -1423,7 +1423,7 @@
         ]
       },
       "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-yao-zhai-wu-chong-zu": {
-        "section_number": "十四、重要债务重组",
+        "section_number": "十五、3",
         "section_title": "重要债务重组",
         "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-yao-zhai-wu-chong-zu",
         "table_count": 3,
@@ -1465,7 +1465,7 @@
         ]
       },
       "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-zhi-jing-ying": {
-        "section_number": "十四、终止经营",
+        "section_number": "十五、7",
         "section_title": "终止经营",
         "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-zhi-jing-ying",
         "table_count": 1,
@@ -1485,7 +1485,7 @@
         ]
       },
       "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-fen-bu-bao-gao": {
-        "section_number": "十四、分部报告",
+        "section_number": "十五、8",
         "section_title": "分部报告",
         "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-fen-bu-bao-gao",
         "table_count": 5,
@@ -1549,7 +1549,7 @@
         ]
       },
       "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-qi-ta": {
-        "section_number": "十四、其他",
+        "section_number": "十五、9",
         "section_title": "其他",
         "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-qi-ta",
         "table_count": 2,
@@ -1645,7 +1645,7 @@
   "excluded": {
     "listed": {
       "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-gong-yun-jia-zhi-bian-dong-shou-yi": {
-        "section_number": "三、公允价值变动收益",
+        "section_number": "五、75",
         "section_title": "公允价值变动收益",
         "scope": "registry_covered",
         "offender_indices": [
@@ -1655,7 +1655,7 @@
         "reason": "该章节已被 *NoteSectionMap.ts 消费，改名会产生孤儿子表 → 归对应 per-cycle spec"
       },
       "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-xin-yong-jian-zhi-sun-shi": {
-        "section_number": "三、信用减值损失",
+        "section_number": "五、76",
         "section_title": "信用减值损失",
         "scope": "registry_covered",
         "offender_indices": [

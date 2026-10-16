@@ -831,8 +831,8 @@
       "variants": {
         "soe_standalone": "八、72",
         "soe_consolidated": "八、72",
-        "listed_standalone": "三、公允价值变动收益",
-        "listed_consolidated": "三、公允价值变动收益"
+        "listed_standalone": "五、75",
+        "listed_consolidated": "五、75"
       },
       "legacy_aliases": {}
     },
@@ -842,8 +842,8 @@
       "variants": {
         "soe_standalone": "八、73",
         "soe_consolidated": "八、73",
-        "listed_standalone": "三、信用减值损失",
-        "listed_consolidated": "三、信用减值损失"
+        "listed_standalone": "五、76",
+        "listed_consolidated": "五、76"
       },
       "legacy_aliases": {}
     },
@@ -853,8 +853,8 @@
       "variants": {
         "soe_standalone": "八、74",
         "soe_consolidated": "八、74",
-        "listed_standalone": "三、资产减值损失（损",
-        "listed_consolidated": "三、资产减值损失（损"
+        "listed_standalone": "五、77",
+        "listed_consolidated": "五、77"
       },
       "legacy_aliases": {}
     },
@@ -864,8 +864,8 @@
       "variants": {
         "soe_standalone": "八、75",
         "soe_consolidated": "八、75",
-        "listed_standalone": "三、资产处置收益（损",
-        "listed_consolidated": "三、资产处置收益（损"
+        "listed_standalone": "五、78",
+        "listed_consolidated": "五、78"
       },
       "legacy_aliases": {}
     },
@@ -875,8 +875,8 @@
       "variants": {
         "soe_standalone": "八、76",
         "soe_consolidated": "八、76",
-        "listed_standalone": "三、营业外收入（注：",
-        "listed_consolidated": "三、营业外收入（注："
+        "listed_standalone": "五、79",
+        "listed_consolidated": "五、79"
       },
       "legacy_aliases": {}
     },
@@ -886,8 +886,8 @@
       "variants": {
         "soe_standalone": "八、77",
         "soe_consolidated": "八、77",
-        "listed_standalone": "三、营业外支出（注：",
-        "listed_consolidated": "三、营业外支出（注："
+        "listed_standalone": "五、80",
+        "listed_consolidated": "五、80"
       },
       "legacy_aliases": {}
     },
@@ -897,8 +897,8 @@
       "variants": {
         "soe_standalone": "八、78",
         "soe_consolidated": "八、78",
-        "listed_standalone": "三、所得税费用",
-        "listed_consolidated": "三、所得税费用"
+        "listed_standalone": "五、81",
+        "listed_consolidated": "五、81"
       },
       "legacy_aliases": {}
     },
@@ -930,8 +930,8 @@
       "variants": {
         "soe_standalone": "八、81",
         "soe_consolidated": "八、81",
-        "listed_standalone": "三、现金流量表项目注释",
-        "listed_consolidated": "三、现金流量表项目注释"
+        "listed_standalone": "五、82",
+        "listed_consolidated": "五、82"
       },
       "legacy_aliases": {}
     },
@@ -1007,8 +1007,8 @@
       "variants": {
         "soe_standalone": "八、89",
         "soe_consolidated": "八、89",
-        "listed_standalone": "十四、终止经营",
-        "listed_consolidated": "十四、终止经营"
+        "listed_standalone": "十五、7",
+        "listed_consolidated": "十五、7"
       },
       "legacy_aliases": {}
     },

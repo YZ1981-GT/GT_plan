@@ -71,14 +71,14 @@ describe('noteDisclosureJump', () => {
   })
 
   it('detects G14 credit impairment note sections', () => {
-    expect(isG14CreditImpairmentNoteSection('三、信用减值损失')).toBe(true)
+    expect(isG14CreditImpairmentNoteSection('五、76')).toBe(true)
     expect(isG14CreditImpairmentNoteSection('八、73')).toBe(true)
     expect(isG14CreditImpairmentNoteSection('八、72')).toBe(false)
   })
 
-  it('infers G14 listed disclosure from 三、信用减值损失', () => {
+  it('infers G14 listed disclosure from 五、76', () => {
     const target = resolveNoteDisclosureJumpTarget({
-      note_section: '三、信用减值损失',
+      note_section: '五、76',
       last_sync_wp_id: 'wp-g14',
     })
     expect(target?.wpCode).toBe('G14')
@@ -229,14 +229,28 @@ describe('noteDisclosureJump', () => {
     })?.variant).toBe('soe')
   })
 
-  it('infers H10 listed disclosure from 三、资产处置收益', () => {
+  it.each([
+    ['五、78', '2026-10-16 按 Word 改挂后的现行编号'],
+    ['三、资产处置收益', '改挂前的旧编号（存量库改写前仍可能出现）'],
+  ])('infers H10 listed disclosure from %s（%s）', (section) => {
     const target = resolveNoteDisclosureJumpTarget({
-      note_section: '三、资产处置收益',
+      note_section: section,
       last_sync_wp_id: 'wp-h10',
     })
     expect(target?.wpCode).toBe('H10')
     expect(target?.variant).toBe('listed')
     expect(target?.sheet).toBe('附注披露信息（上市公司）')
+  })
+
+  it('上市损益类现行编号（五、75~五、80）各归其主、互不误伤', () => {
+    expect(resolveNoteDisclosureJumpTarget({ note_section: '五、75' })?.wpCode).toBe('G13')
+    expect(resolveNoteDisclosureJumpTarget({ note_section: '五、76' })?.wpCode).toBe('G14')
+    expect(resolveNoteDisclosureJumpTarget({ note_section: '五、77' })?.wpCode).toBe('K11')
+    expect(resolveNoteDisclosureJumpTarget({ note_section: '五、78' })?.wpCode).toBe('H10')
+    expect(resolveNoteDisclosureJumpTarget({ note_section: '五、80' })?.wpCode).toBe('K13')
+    // 五、8（K1 其他应收款）纯编号精确匹配，不得吞掉 五、80~五、82
+    expect(isK1OtherReceivableNoteSection('五、81')).toBe(false)
+    expect(isK1OtherReceivableNoteSection('五、82')).toBe(false)
   })
 
   it('infers H10 SOE disclosure from 八、75', () => {
@@ -279,7 +293,7 @@ describe('noteDisclosureJump', () => {
     // 五、73 实为「外币货币性项目」，不得再误判为 K11（已修正历史错误映射）
     expect(isK11AssetImpairmentNoteSection('五、73')).toBe(false)
     // 不得误伤 G14 信用减值损失
-    expect(isK11AssetImpairmentNoteSection('三、信用减值损失')).toBe(false)
+    expect(isK11AssetImpairmentNoteSection('五、76')).toBe(false)
   })
 
   it('infers K11 listed disclosure from 资产减值损失 keyword', () => {
@@ -305,7 +319,7 @@ describe('noteDisclosureJump', () => {
   it('K11 资产减值损失 不与 G14 信用减值损失 冲突', () => {
     // G14 信用减值损失仍解析为 G14，不被 K11 抢占
     expect(resolveNoteDisclosureJumpTarget({
-      note_section: '三、信用减值损失',
+      note_section: '五、76',
     })?.wpCode).toBe('G14')
   })
 

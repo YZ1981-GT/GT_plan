@@ -10,8 +10,8 @@
 章节落点：
   G10: listed 五、34 / soe 八、34
   G11: listed 五、69 / soe 八、70
-  G13: listed 三、公允价值变动收益 / soe 八、72
-  G14: listed 三、信用减值损失 / soe 八、73
+  G13: listed 五、75 / soe 八、72
+  G14: listed 五、76 / soe 八、73
 
 spec: g-cycle-extraction-mapping-and-disclosure-alignment
 """
@@ -61,9 +61,9 @@ _CHAPTER_MAP: dict[str, tuple[Path, str]] = {
     "g10_soe": (SOE_PATH, "八、34"),
     "g11_listed": (LISTED_PATH, "五、69"),
     "g11_soe": (SOE_PATH, "八、70"),
-    "g13_listed": (LISTED_PATH, "三、公允价值变动收益"),
+    "g13_listed": (LISTED_PATH, "五、75"),
     "g13_soe": (SOE_PATH, "八、72"),
-    "g14_listed": (LISTED_PATH, "三、信用减值损失"),
+    "g14_listed": (LISTED_PATH, "五、76"),
     "g14_soe": (SOE_PATH, "八、73"),
 }
 

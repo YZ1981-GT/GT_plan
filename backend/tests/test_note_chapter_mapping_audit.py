@@ -70,18 +70,16 @@ class Exempted:
     reason: str
 
 
-#: NORMAL_MAPPING = soe ch08 → listed ch03 的 10 条（section_title 逐条锁死）
+#: NORMAL_MAPPING = soe ch08 → listed ch03 现存条目（section_title 逐条锁死）。
+#: 2026-10-16（spec disclosure-note-template-word-realignment）按四版 Word 把上市会计政策章里的 9 个利润表 /
+#: 研发节改挂到项目附注章「五」与研发支出章「六」⇒ 原 10 条只剩「债务重组」：上市 Word 只在会计政策章有
+#: 「债务重组」（国企在项目注释章），两边都与 Word 一致。改挂的 9 条见 CORRECTED。
 NORMAL_MAPPING: tuple[NormalMapping, ...] = (
-    NormalMapping("信用减值损失", _NORMAL_BASIS),
     NormalMapping("债务重组", _NORMAL_BASIS),
-    NormalMapping("公允价值变动收益", _NORMAL_BASIS),
-    NormalMapping("开发支出", _NORMAL_BASIS),
-    NormalMapping("所得税费用", _NORMAL_BASIS),
-    NormalMapping("现金流量表项目注释", _NORMAL_BASIS),
-    NormalMapping("营业外支出", _NORMAL_BASIS),
-    NormalMapping("营业外收入", _NORMAL_BASIS),
-    NormalMapping("资产减值损失", _NORMAL_BASIS),
-    NormalMapping("资产处置收益", _NORMAL_BASIS),
+)
+_REALIGNED_FROM_CH03 = (
+    "信用减值损失", "公允价值变动收益", "开发支出", "所得税费用", "现金流量表项目注释",
+    "营业外支出", "营业外收入", "资产减值损失", "资产处置收益",
 )
 
 #: A spec 已把 soe 第十二章 slug 前缀由旧值修正为新值（本清单如实登记，
@@ -97,6 +95,15 @@ CORRECTED: tuple[Corrected, ...] = (
             "标题「股份支付」修正为「母公司财务报表的主要项目附注」，section_id slug"
             f" 前缀由 {_SOE_CH12_OLD_SLUG_PREFIX} 改为 {_SOE_CH12_NEW_SLUG_PREFIX}；"
             "其 6 个母公司子节前缀连带重键。本条为对该修复的如实登记。"
+        ),
+    ),
+    Corrected(
+        subject="上市会计政策章里的 9 个利润表 / 研发节",
+        detail=(
+            "disclosure-note-template-word-realignment（2026-10-16）按四版 Word 改挂："
+            + "、".join(_REALIGNED_FROM_CH03)
+            + " 由会计政策章「三」移到项目附注章「五」（开发支出到研发支出章「六」），编号换章号、"
+            "旧编号登记为种子别名、section_id 不变 ⇒ 章号按父节点判（section_id 前缀不再代表所属章）。"
         ),
     ),
 )
@@ -122,9 +129,29 @@ _MIN_REASON_LEN = 20
 _CH_RE = re.compile(r"^chapter-(\d+)-")
 
 
+def _parent_ids() -> dict[str, str]:
+    import json
+
+    from app.services.note_section_catalog import template_json_path
+
+    out: dict[str, str] = {}
+    for tt in ("soe", "listed"):
+        for s in json.loads(template_json_path(tt).read_text(encoding="utf-8"))["sections"]:
+            if s.get("section_id"):
+                out[s["section_id"]] = s.get("parent_section_id") or s["section_id"]
+    return out
+
+
+_PARENT_IDS = _parent_ids()
+
+
 def _chapter_of(section_id: str) -> str:
-    """从 section_id 前缀解析章号（``chapter-08-xxx`` → ``08``）。"""
-    m = _CH_RE.match(section_id or "")
+    """节所属章号：取父节点（章）的 section_id 前缀（``chapter-08-xxx`` → ``08``）。
+
+    section_id 在节改挂到别的章时保持不变（disclosure-note-template-word-realignment），其前缀是建 id 时的章；
+    所属章以 ``parent_section_id`` 为准。
+    """
+    m = _CH_RE.match(_PARENT_IDS.get(section_id or "", section_id or "") or "")
     return m.group(1) if m else ""
 
 
@@ -157,10 +184,11 @@ def _titles(entries: list[dict]) -> set[str]:
 
 
 def test_normal_mapping_registry_shape():
-    """NORMAL_MAPPING = 10 条、无重复 section_title、每条判定依据非空。"""
-    assert len(NORMAL_MAPPING) == 10
+    """NORMAL_MAPPING = 1 条（改挂后只剩「债务重组」）、无重复 section_title、每条判定依据非空。"""
+    assert len(NORMAL_MAPPING) == 1
     titles = [n.section_title for n in NORMAL_MAPPING]
-    assert len(set(titles)) == 10, f"NORMAL_MAPPING 有重复 section_title: {titles}"
+    assert len(set(titles)) == 1, f"NORMAL_MAPPING 有重复 section_title: {titles}"
+    assert not set(titles) & set(_REALIGNED_FROM_CH03), "已改挂的节不得再登记为正常映射"
     for n in NORMAL_MAPPING:
         assert n.section_title.strip(), "NORMAL_MAPPING section_title 不得为空"
         assert n.basis.strip(), f"{n.section_title} 缺判定依据"
@@ -306,3 +334,10 @@ def test_reverse_selfcheck_missing_normal_entry_reddens(live_diff):
     assert dropped != expected, (
         "反向自检失败：去掉一条后仍相等 —— NORMAL_MAPPING 与实际未真正逐条锁死"
     )
+
+
+def test_realigned_sections_sit_in_word_chapters(live_diff):
+    """改挂的 9 个上市节按父节点已不在会计政策章「03」（防有人把它们挂回去，或章号又按 section_id 前缀判）。"""
+    by_title = {e["section_title"]: _chapter_of(e["listed_section_id"]) for e in live_diff["common_sections"]}
+    stuck = sorted(t for t in _REALIGNED_FROM_CH03 if by_title.get(t) == "03")
+    assert not stuck, f"仍在会计政策章：{stuck}"

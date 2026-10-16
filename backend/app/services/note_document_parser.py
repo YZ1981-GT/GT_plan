@@ -188,6 +188,77 @@ def _style_chain_level(style: Any, cache: dict[str, int | None]) -> int | None:
     return level
 
 
+def docx_paragraph_heading(para: Any, elem: Any, style_levels: dict[str, int | None]) -> tuple[int | None, bool]:
+    """DOCX 段落的标题层级（与 Word 导航窗格一致）与它是否来自标题样式名。
+
+    层级：样式名（Heading N / 标题 N）→ 段落自设大纲级别 → 样式链继承的大纲级别。第二个返回值为 True 表示层级来自
+    标题样式名本身（作者有意设的标题）；False 表示只靠大纲级别（如正文样式加大纲级别的「（1）…」小项）。
+    上传解析与四版 Word 比对（``note_word_tree``）共用，两边对 Word 结构的读法必须一致。
+    """
+    from docx.oxml.ns import qn
+
+    outline_lvl = None
+    ppr = elem.find(qn("w:pPr"))
+    outline = ppr.find(qn("w:outlineLvl")) if ppr is not None else None
+    if outline is not None:
+        try:
+            outline_lvl = int(outline.get(qn("w:val"), "9"))
+        except (ValueError, TypeError):
+            pass
+    level = _heading_level_from_style(para.style.name if para.style is not None else None)
+    if level is not None:
+        return level, True
+    if outline_lvl is not None and outline_lvl < 6:
+        return outline_lvl + 1, False
+    if outline_lvl is None and para.style is not None:  # 段落自设的大纲级别优先于样式
+        return _style_chain_level(para.style, style_levels), False
+    return None, False
+
+
+def docx_paragraph_level(para: Any, elem: Any, style_levels: dict[str, int | None]) -> int | None:
+    return docx_paragraph_heading(para, elem, style_levels)[0]
+
+
+#: 「（1）」「①」类括号 / 圈号编号：同级标题里排在它前面的若是无编号或更浅编号的标题，它是那一节的组成部分
+_NESTABLE_RANK = 4
+
+
+def nest_by_numbering(levels: list[int], titles: list[str], nestable: list[bool] | None = None) -> list[int]:
+    """只靠大纲级别成为标题的「（1）」「①」类小项，按编号排位嵌进前面的同级标题（spec disclosure-note-template-word-realignment）。
+
+    国企 Word「X、数据资源」之后的「（1）确认为存货的数据资源」「（2）…」「（3）其他数据资源相关信息」是正文样式 +
+    段落大纲级别 3，与「X、数据资源」同级 ⇒ 读成四个兄弟节，正文（在（3）里）配不上「数据资源」。
+    规则：``nestable`` 为 True（层级不是来自标题样式名）且编号排位 ≥4 的标题，若同样式层级的前一个标题无编号或编号
+    更浅，则降为它的下一级；同排位的连续标题互为兄弟；其余标题回到样式层级。用标题样式设的「（1）一年内到期的长期借款」
+    等是作者有意设的节（种子也按节建模、各带表格），不嵌套。
+    """
+    out: list[int] = []
+    stacks: dict[int, list[tuple[int | None, int]]] = {}  # 样式层级 → [(编号排位, 定下的层级)]（自浅到深）
+    for i, (level, title) in enumerate(zip(levels, titles)):
+        rank = heading_rank(title)
+        for deeper in [k for k in stacks if k > level]:
+            del stacks[deeper]
+        stack = stacks.get(level)
+        movable = nestable is None or nestable[i]
+        if not stack or rank is None or rank < _NESTABLE_RANK or not movable:
+            stacks[level] = [(rank, level)]
+            out.append(level)
+            continue
+        while len(stack) > 1 and stack[-1][0] is not None and stack[-1][0] > rank:
+            stack.pop()  # 退出更深的编号（①…之后又来（2））
+        top_rank, top_final = stack[-1]
+        if top_rank == rank:
+            stack[-1] = (rank, top_final)
+            out.append(top_final)
+        elif top_rank is None or top_rank < rank:
+            stack.append((rank, top_final + 1))
+            out.append(top_final + 1)
+        else:  # 栈底比它还深（不会出现：栈底排位 <4 或为空）
+            stacks[level] = [(rank, level)]
+            out.append(level)
+    return out
+
+
 def _run_to_html(run: Any) -> str:
     """将 python-docx Run 转为简单 HTML 片段。"""
     text = html_escape(run.text or "")
@@ -236,7 +307,6 @@ def parse_docx(data: bytes) -> ParseResult:
     file_hash = hashlib.sha256(data).hexdigest()
 
     import docx
-    from docx.oxml.ns import qn
 
     doc = docx.Document(io.BytesIO(data))
     body = doc.element.body
@@ -246,32 +316,17 @@ def parse_docx(data: bytes) -> ParseResult:
     warnings: list[str] = []
     section_idx = 0
     style_levels: dict[str, int | None] = {}
+    outline_only: dict[str, bool] = {}  # 标题层级只靠大纲级别（非标题样式名）的章节
 
     for elem in body:
         tag = elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
 
         if tag == "p":
             para = docx.text.paragraph.Paragraph(elem, doc)
-            style_name = para.style.name if para.style else None
-
-            # 检查 outlineLvl
-            outline_lvl = None
-            pPr = elem.find(qn("w:pPr"))
-            if pPr is not None:
-                outlineLvl_elem = pPr.find(qn("w:outlineLvl"))
-                if outlineLvl_elem is not None:
-                    try:
-                        outline_lvl = int(outlineLvl_elem.get(qn("w:val"), "9"))
-                    except (ValueError, TypeError):
-                        pass
-
-            level = _heading_level_from_style(style_name)
-            if level is None and outline_lvl is not None and outline_lvl < 6:
-                level = outline_lvl + 1
-            if level is None and outline_lvl is None and para.style is not None:  # 段落自设的大纲级别优先于样式
-                level = _style_chain_level(para.style, style_levels)
-
+            level, from_style = docx_paragraph_heading(para, elem, style_levels)
             text = (para.text or "").strip()
+            if level is not None and text:
+                outline_only[f"docx-s{section_idx + 1}"] = not from_style
 
             if level is not None and text:
                 # 新章节
@@ -323,6 +378,11 @@ def parse_docx(data: bytes) -> ParseResult:
 
     if not sections:
         raise ParseError("NO_PARSEABLE_TEXT", "未能从 DOCX 中解析出任何章节")
+
+    nested = nest_by_numbering([s.level for s in sections], [s.title for s in sections],
+                               [outline_only.get(s.source_id, False) for s in sections])
+    for s, level in zip(sections, nested):
+        s.level = level
 
     if len(sections) > MAX_SECTIONS:
         warnings.append(f"解析章节数 {len(sections)} 超过上限 {MAX_SECTIONS}，已截断")

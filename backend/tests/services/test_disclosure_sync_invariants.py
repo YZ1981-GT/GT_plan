@@ -323,24 +323,11 @@ class TestVariantNoMixup:
     #    允许以后再悄悄退化 20% 而守卫不响。改为显式白名单 —— 新增例外必须
     #    显式登记，否则测试红。
     #
-    # 现算例外（listed 79 职责行中 7 条 / soe 78 行中 0 条）：
-    # 全部是**利润表科目**，附注编号体系走「三、」（资产负债表科目才是「五、」）。
-    #
-    # 🔴 其中 4 条章节号**本身就被截断**（`三、资产处置收益（损` 而非「（损失）」）：
-    #    这是平台既有约定，不是缺陷 —— 前端真源常量就这么写
-    #    （`h10NoteSectionMap.ts`: `listed: '三、资产处置收益（损'`），
-    #    且真库 `disclosure_notes.note_section` 同样截断到 10 字符
-    #    （实测 `三、资产处置收益（损` len=10 / `三、信用减值损失（损` len=10）。
-    #    两侧口径一致故匹配成功。**禁补全**，补全会让定位失配。
-    _LISTED_PREFIX_EXCEPTIONS: frozenset[tuple[str, str]] = frozenset({
-        ("G13", "三、公允价值变动收益"),
-        ("G14", "三、信用减值损失"),
-        ("H10", "三、资产处置收益（损"),
-        ("K11", "三、资产减值损失（损"),
-        ("K12", "三、营业外收入（注："),
-        ("K13", "三、营业外支出（注："),
-        ("N5", "三、所得税费用"),
-    })
+    # 原有 7 条例外（G13 / G14 / H10 / K11 / K12 / K13 / N5 的利润表科目，种子放在会计政策章「三、」下）
+    # 已于 2026-10-16 按四版 Word 改挂到「五、」项目附注章（spec disclosure-note-template-word-realignment，
+    # 现为「五、75」~「五、81」，旧编号经 normalize_section_code 别名解析）⇒ 白名单清空。再出现非「五、」章节号
+    # 一律先按 Word 核对归属，确属例外才登记并写理由。
+    _LISTED_PREFIX_EXCEPTIONS: frozenset[tuple[str, str]] = frozenset()
     _SOE_PREFIX_EXCEPTIONS: frozenset[tuple[str, str]] = frozenset()
 
     def test_listed_sections_follow_prefix_or_are_whitelisted(self):

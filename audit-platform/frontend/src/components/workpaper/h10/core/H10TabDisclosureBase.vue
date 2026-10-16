@@ -244,9 +244,9 @@ const dis = useH10Disclosure({
 })
 
 const isSyncing = ref(false)
-// 定位用：必须逐字等于模板 section_number（listed 侧是 md 截断值 `三、资产处置收益（损`）
+// 定位用：必须逐字等于模板 section_number（listed 侧 `五、78`；原「三」章截断编号是别名，后端归一）
 const noteSectionId = H10_NOTE_SECTION[props.variant]
-// 展示用：截断值直接显示不可读
+// 展示用：编号 + 节标题
 const noteSectionLabel = H10_NOTE_SECTION_DISPLAY[props.variant]
 const noteChip = computed(() => `Note:${noteSectionId}`)
 

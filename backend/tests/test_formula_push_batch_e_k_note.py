@@ -44,8 +44,8 @@ K_SECTIONS = [
     ("K7",  "五、51", "八、56"),
     ("K8",  "五、64", "八、65"),
     ("K9",  "五、65", "八、66"),
-    ("K11", "三、资产减值损失（损", "八、74"),
-    ("K13", "三、营业外支出（注：", "八、77"),
+    ("K11", "五、77", "八、74"),
+    ("K13", "五、80", "八、77"),
 ]
 
 
@@ -267,20 +267,28 @@ def test_k4_asymmetric_sections():
 # ── K11 / K13 上市侧章节号截断形态 ──
 
 
+def _assert_realigned(listed: str, expected: str) -> None:
+    """2026-10-16 按四版 Word 把利润表科目节从会计政策章「三、」改挂到项目附注章「五、」
+    （spec disclosure-note-template-word-realignment）；种子登记的旧截断编号经别名解析到新编号。"""
+    import json
+
+    from app.services.note_section_catalog import normalize_section_code, template_json_path
+
+    assert listed == expected
+    sections = json.loads(template_json_path("listed").read_text(encoding="utf-8"))["sections"]
+    olds = next(s for s in sections if s["section_number"] == expected).get("legacy_section_numbers") or []
+    assert olds and all(o.startswith("三、") for o in olds), olds
+    assert {normalize_section_code(o, template_type="listed") for o in olds} == {expected}
+
+
 def test_k11_listed_section_truncated_form():
-    """K11 上市侧章节号是截断形态 '三、资产减值损失（损'，不是 '五、N'。"""
-    rule = _k_note_rule("K11")
-    listed = rule.target.sections["listed"]
-    assert listed.startswith("三、"), "K11 上市侧属「三、」整章"
-    assert "资产减值损失" in listed
+    """K11 上市侧章节号「五、77」资产减值损失（原会计政策章截断编号现为别名）。"""
+    _assert_realigned(_k_note_rule("K11").target.sections["listed"], "五、77")
 
 
 def test_k13_listed_section_truncated_form():
-    """K13 上市侧章节号是截断形态 '三、营业外支出（注：'，不是 '五、N'。"""
-    rule = _k_note_rule("K13")
-    listed = rule.target.sections["listed"]
-    assert listed.startswith("三、"), "K13 上市侧属「三、」整章"
-    assert "营业外支出" in listed
+    """K13 上市侧章节号「五、80」营业外支出（原会计政策章截断编号现为别名）。"""
+    _assert_realigned(_k_note_rule("K13").target.sections["listed"], "五、80")
 
 
 # ── policy = editable（附注不进独占集合） ──

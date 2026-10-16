@@ -2614,8 +2614,8 @@ async function onNodeClick(node: TreeNode) {
 /**
  * 把跳转传入的目标章节解析为 noteList 中实际存在的精确 note_section。
  * 纯编号章节（五、7 / 八、70）只精确匹配（禁前缀模糊：八、7 会误配 八、70）；
- * 关键词标题章节（三、信用减值损失…）容忍生成时标题截断（DB 存 `三、信用减值损失（损`），
- * 做前缀双向模糊。解析失败回退原值（不会更差）。
+ * 关键词标题章节（如上市会计政策章 `三、…`）容忍生成时标题截断（旧版 md 重建的编号截到 10 字），
+ * 做前缀双向模糊。解析失败回退原值（不会更差）。上市损益类 2026-10-16 起改挂为纯编号 五、75~五、82。
  */
 function resolveSectionInList(target: string): string {
   const t = String(target || '').trim()
@@ -3048,8 +3048,8 @@ onMounted(async () => {
   // Task 5.1: 从 URL query.section 自动定位章节（四栏跨页面导航 / 披露表反向跳转）
   const targetSection = route.query.section as string | undefined
   if (targetSection && noteList.value.length > 0) {
-    // 反向跳转可能传入关键词标题（如损益类 三、信用减值损失），DB 实际章节可能被截断
-    // （三、信用减值损失（损），需解析为 noteList 中的精确 note_section 再定位。
+    // 反向跳转可能传入关键词标题（会计政策章 `三、…`），DB 实际章节可能被截断（旧版 md 重建截到 10 字），
+    // 需解析为 noteList 中的精确 note_section 再定位。
     const resolvedSection = resolveSectionInList(targetSection)
     const targetTableIndex = route.query.table_index
     await fetchDetail(resolvedSection)

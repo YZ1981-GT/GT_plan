@@ -390,10 +390,11 @@ class TestNoConflictWithPerCycleScripts:
         """
         assert FIXER.section_code_of("九、1、或有负债") == "九、1"
         assert FIXER.section_code_of("八、17") == "八、17"
-        # 无 `X、N` 形态 → 原样返回，且不会误命中 declared
-        assert FIXER.section_code_of("三、资产减值损失（损") == "三、资产减值损失（损"
+        # 无 `X、N` 形态 → 原样返回，且不会误命中 declared（上市会计政策章的截断码；原用例的损益类
+        # 截断码 2026-10-16 已按 Word 改挂为纯编号 五、77，不再是这种形态）
+        assert FIXER.section_code_of("三、债务重组【不适用") == "三、债务重组【不适用"
         assert (
-            FIXER.section_code_of("三、资产减值损失（损")
+            FIXER.section_code_of("三、债务重组【不适用")
             not in FIXER.sections_with_text_sections_declared()
         )
 

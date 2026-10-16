@@ -26,7 +26,6 @@ import argparse
 import asyncio
 import sys
 from dataclasses import dataclass
-from unittest import mock
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -67,11 +66,6 @@ SPECS: tuple[ProjectSpec, ...] = (
     ProjectSpec("b", "【测试】附注批量乙有限公司", "附注批量乙", uscc("9150000NTBUAT000B"), "standalone",
                 parent_key="root", generate_notes=True),
 )
-
-
-async def _no_llm_text(*_args: Any, **_kwargs: Any) -> None:
-    """替代 ``DisclosureEngine._generate_text_with_llm``：返回 None ⇒ 引擎回落到模板默认文字。"""
-    return None
 
 
 async def _find(db, spec: ProjectSpec, year: int):
@@ -121,10 +115,8 @@ async def seed(db, *, year: int = DEFAULT_YEAR) -> dict[str, Any]:
         if existing:
             stats["notes"][spec.key] = f"已有 {existing} 章，跳过"
             continue
-        # 测试数据要可复现、几秒生成完：初稿只用模板默认文字，不逐章调大模型（真机首跑实测约 10~20 秒一章、
-        # 两个项目 300 多章要近一小时；平台「生成附注」本身照常调用，这里只替换本脚本内的这一步）
-        with mock.patch.object(DisclosureEngine, "_generate_text_with_llm", _no_llm_text):
-            generated = await DisclosureEngine(db).generate_notes(pid, year, "soe")
+        # 生成附注不调用大模型（2026-10-16 起，spec disclosure-note-template-word-realignment §6），初稿即模板默认文字
+        generated = await DisclosureEngine(db).generate_notes(pid, year, "soe")
         await db.commit()
         stats["notes"][spec.key] = f"生成 {len(generated)} 章"
 

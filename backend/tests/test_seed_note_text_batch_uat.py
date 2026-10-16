@@ -67,9 +67,8 @@ async def test_children_share_group_root_and_rerun_is_idempotent(db, monkeypatch
     calls: list[tuple] = []
 
     async def fake_generate(self, project_id, year, template_type="soe"):
-        # 生成期间大模型那一步已被替换：初稿只用模板默认文字（测试数据可复现，不逐章调大模型）
-        assert DisclosureEngine._generate_text_with_llm is _seed._no_llm_text
-        assert await self._generate_text_with_llm(project_id, year, "一、1", "公司基本情况", None, None) is None
+        # 生成链本身已不调大模型（2026-10-16），脚本不再打桩：引擎上不存在大模型那一级
+        assert not hasattr(DisclosureEngine, "_generate_text_with_llm")
         calls.append((project_id, year, template_type))
         self.db.add(DisclosureNote(project_id=project_id, year=year, note_section="一、1", section_title="公司基本情况"))
         await self.db.flush()

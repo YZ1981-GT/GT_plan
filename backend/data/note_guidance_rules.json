@@ -97,7 +97,7 @@
         ]
       },
       "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-fan-xiang-gou-mai": {
-        "section_number": "三、反向购买",
+        "section_number": "七、4",
         "section_title": "反向购买",
         "docx_key": "在其他主体中的权益 / 反向购买",
         "tables": [
@@ -265,7 +265,7 @@
         ]
       },
       "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi": {
-        "section_number": "三、套期（不适用的删",
+        "section_number": "九、4",
         "section_title": "套期",
         "docx_key": "金融工具风险管理 / 套期（不适用的删除）",
         "tables": [
@@ -517,7 +517,7 @@
         ]
       },
       "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-yao-zhai-wu-chong-zu": {
-        "section_number": "十四、重要债务重组",
+        "section_number": "十五、3",
         "section_title": "重要债务重组",
         "docx_key": "其他重要事项 / 重要债务重组",
         "tables": [
@@ -538,7 +538,7 @@
         ]
       },
       "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-qi-ta": {
-        "section_number": "十四、其他",
+        "section_number": "十五、9",
         "section_title": "其他",
         "docx_key": "其他重要事项 / 其他",
         "tables": [
@@ -743,7 +743,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-kai-fa-zhi-chu",
-        "section_number": "三、开发支出",
+        "section_number": "六、2",
         "section_title": "开发支出",
         "index": 0,
         "table_name": "开发支出（表1）",
@@ -751,7 +751,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-kai-fa-zhi-chu",
-        "section_number": "三、开发支出",
+        "section_number": "六、2",
         "section_title": "开发支出",
         "index": 1,
         "table_name": "开发支出（表2）",
@@ -759,7 +759,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-kai-fa-zhi-chu",
-        "section_number": "三、开发支出",
+        "section_number": "六、2",
         "section_title": "开发支出",
         "index": 2,
         "table_name": "开发支出（表3）",
@@ -767,7 +767,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-zi-gong-si-zhong-de-quan-yi",
-        "section_number": "三、在子公司中的权益",
+        "section_number": "七、2",
         "section_title": "在子公司中的权益",
         "index": 0,
         "table_name": "在子公司中的权益（表1）",
@@ -775,7 +775,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-zi-gong-si-zhong-de-quan-yi",
-        "section_number": "三、在子公司中的权益",
+        "section_number": "七、2",
         "section_title": "在子公司中的权益",
         "index": 1,
         "table_name": "在子公司中的权益（表2）",
@@ -783,7 +783,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-zi-gong-si-zhong-de-quan-yi",
-        "section_number": "三、在子公司中的权益",
+        "section_number": "七、2",
         "section_title": "在子公司中的权益",
         "index": 2,
         "table_name": "在子公司中的权益（表3）",
@@ -791,7 +791,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-zi-gong-si-zhong-de-quan-yi",
-        "section_number": "三、在子公司中的权益",
+        "section_number": "七、2",
         "section_title": "在子公司中的权益",
         "index": 3,
         "table_name": "在子公司中的权益（表4）",
@@ -799,7 +799,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-zi-gong-si-zhong-de-quan-yi",
-        "section_number": "三、在子公司中的权益",
+        "section_number": "七、2",
         "section_title": "在子公司中的权益",
         "index": 4,
         "table_name": "在子公司中的权益（表5）",
@@ -807,7 +807,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-zi-gong-si-zhong-de-quan-yi",
-        "section_number": "三、在子公司中的权益",
+        "section_number": "七、2",
         "section_title": "在子公司中的权益",
         "index": 5,
         "table_name": "在子公司中的权益（表6）",
@@ -831,7 +831,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
-        "section_number": "三、处置子公司",
+        "section_number": "七、6",
         "section_title": "处置子公司",
         "index": 0,
         "table_name": "处置子公司（表1）",
@@ -839,7 +839,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
-        "section_number": "三、处置子公司",
+        "section_number": "七、6",
         "section_title": "处置子公司",
         "index": 1,
         "table_name": "处置子公司（表2）",
@@ -847,7 +847,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
-        "section_number": "三、处置子公司",
+        "section_number": "七、6",
         "section_title": "处置子公司",
         "index": 2,
         "table_name": "处置子公司（表3）",
@@ -855,7 +855,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
-        "section_number": "三、处置子公司",
+        "section_number": "七、6",
         "section_title": "处置子公司",
         "index": 3,
         "table_name": "处置子公司（表4）",
@@ -863,7 +863,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
-        "section_number": "三、处置子公司",
+        "section_number": "七、6",
         "section_title": "处置子公司",
         "index": 4,
         "table_name": "处置子公司（表5）",
@@ -871,7 +871,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
-        "section_number": "三、处置子公司",
+        "section_number": "七、6",
         "section_title": "处置子公司",
         "index": 5,
         "table_name": "处置子公司（表6）",
@@ -879,7 +879,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
-        "section_number": "三、处置子公司",
+        "section_number": "七、6",
         "section_title": "处置子公司",
         "index": 6,
         "table_name": "处置子公司（表7）",
@@ -887,7 +887,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
-        "section_number": "三、处置子公司",
+        "section_number": "七、6",
         "section_title": "处置子公司",
         "index": 7,
         "table_name": "处置子公司（表8）",
@@ -895,7 +895,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
-        "section_number": "三、处置子公司",
+        "section_number": "七、6",
         "section_title": "处置子公司",
         "index": 8,
         "table_name": "处置子公司（表9）",
@@ -903,7 +903,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
-        "section_number": "三、处置子公司",
+        "section_number": "七、6",
         "section_title": "处置子公司",
         "index": 9,
         "table_name": "处置子公司（表10）",
@@ -911,7 +911,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
-        "section_number": "三、处置子公司",
+        "section_number": "七、6",
         "section_title": "处置子公司",
         "index": 10,
         "table_name": "处置子公司（表11）",
@@ -919,7 +919,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
-        "section_number": "三、处置子公司",
+        "section_number": "七、6",
         "section_title": "处置子公司",
         "index": 11,
         "table_name": "处置子公司（表12）",
@@ -1031,7 +1031,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zi-ben-guan-li",
-        "section_number": "三、资本管理",
+        "section_number": "九、3",
         "section_title": "资本管理",
         "index": 0,
         "table_name": "资本管理",
@@ -1039,7 +1039,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
-        "section_number": "三、套期（不适用的删",
+        "section_number": "九、4",
         "section_title": "套期",
         "index": 1,
         "table_name": "套期（表2）",
@@ -1047,7 +1047,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
-        "section_number": "三、套期（不适用的删",
+        "section_number": "九、4",
         "section_title": "套期",
         "index": 2,
         "table_name": "套期（表3）",
@@ -1055,7 +1055,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
-        "section_number": "三、套期（不适用的删",
+        "section_number": "九、4",
         "section_title": "套期",
         "index": 3,
         "table_name": "套期（表4）",
@@ -1063,7 +1063,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
-        "section_number": "三、套期（不适用的删",
+        "section_number": "九、4",
         "section_title": "套期",
         "index": 4,
         "table_name": "套期（表5）",
@@ -1071,7 +1071,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
-        "section_number": "三、套期（不适用的删",
+        "section_number": "九、4",
         "section_title": "套期",
         "index": 5,
         "table_name": "套期（表6）",
@@ -1079,7 +1079,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
-        "section_number": "三、套期（不适用的删",
+        "section_number": "九、4",
         "section_title": "套期",
         "index": 6,
         "table_name": "套期（表7）",
@@ -1087,7 +1087,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
-        "section_number": "三、套期（不适用的删",
+        "section_number": "九、4",
         "section_title": "套期",
         "index": 7,
         "table_name": "套期（表8）",
@@ -1095,7 +1095,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
-        "section_number": "三、套期（不适用的删",
+        "section_number": "九、4",
         "section_title": "套期",
         "index": 9,
         "table_name": "套期（表10）",
@@ -1103,7 +1103,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
-        "section_number": "三、套期（不适用的删",
+        "section_number": "九、4",
         "section_title": "套期",
         "index": 10,
         "table_name": "套期（表11）",
@@ -1111,7 +1111,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
-        "section_number": "三、套期（不适用的删",
+        "section_number": "九、4",
         "section_title": "套期",
         "index": 11,
         "table_name": "套期（表12）",
@@ -1119,7 +1119,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
-        "section_number": "三、套期（不适用的删",
+        "section_number": "九、4",
         "section_title": "套期",
         "index": 12,
         "table_name": "套期（表13）",
@@ -1127,7 +1127,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
-        "section_number": "三、套期（不适用的删",
+        "section_number": "九、4",
         "section_title": "套期",
         "index": 13,
         "table_name": "套期（表14）",
@@ -1135,7 +1135,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
-        "section_number": "三、套期（不适用的删",
+        "section_number": "九、4",
         "section_title": "套期",
         "index": 14,
         "table_name": "套期（表15）",
@@ -1143,7 +1143,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
-        "section_number": "三、套期（不适用的删",
+        "section_number": "九、4",
         "section_title": "套期",
         "index": 15,
         "table_name": "套期（表16）",
@@ -1151,7 +1151,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
-        "section_number": "三、金融资产转移",
+        "section_number": "九、5",
         "section_title": "金融资产转移",
         "index": 0,
         "table_name": "金融资产转移（表1）",
@@ -1159,7 +1159,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
-        "section_number": "三、金融资产转移",
+        "section_number": "九、5",
         "section_title": "金融资产转移",
         "index": 1,
         "table_name": "金融资产转移（表2）",
@@ -1167,7 +1167,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
-        "section_number": "三、金融资产转移",
+        "section_number": "九、5",
         "section_title": "金融资产转移",
         "index": 2,
         "table_name": "金融资产转移（表3）",
@@ -1175,7 +1175,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
-        "section_number": "三、金融资产转移",
+        "section_number": "九、5",
         "section_title": "金融资产转移",
         "index": 3,
         "table_name": "金融资产转移（表4）",
@@ -1183,7 +1183,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
-        "section_number": "三、金融资产转移",
+        "section_number": "九、5",
         "section_title": "金融资产转移",
         "index": 4,
         "table_name": "金融资产转移（表5）",
@@ -1191,7 +1191,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
-        "section_number": "三、金融资产转移",
+        "section_number": "九、5",
         "section_title": "金融资产转移",
         "index": 5,
         "table_name": "金融资产转移（表6）",
@@ -1199,7 +1199,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
-        "section_number": "三、金融资产转移",
+        "section_number": "九、5",
         "section_title": "金融资产转移",
         "index": 6,
         "table_name": "金融资产转移（表7）",
@@ -1207,7 +1207,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
-        "section_number": "三、金融资产转移",
+        "section_number": "九、5",
         "section_title": "金融资产转移",
         "index": 7,
         "table_name": "金融资产转移（表8）",
@@ -1215,7 +1215,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
-        "section_number": "三、金融资产转移",
+        "section_number": "九、5",
         "section_title": "金融资产转移",
         "index": 8,
         "table_name": "金融资产转移（表9）",
@@ -1223,7 +1223,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
-        "section_number": "三、金融资产转移",
+        "section_number": "九、5",
         "section_title": "金融资产转移",
         "index": 9,
         "table_name": "项  目（上期金额）",
@@ -1231,7 +1231,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
-        "section_number": "三、金融资产转移",
+        "section_number": "九、5",
         "section_title": "金融资产转移",
         "index": 10,
         "table_name": "项  目（期末余额）",
@@ -1239,7 +1239,7 @@
       },
       {
         "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
-        "section_number": "三、金融资产转移",
+        "section_number": "九、5",
         "section_title": "金融资产转移",
         "index": 11,
         "table_name": "项  目（上年年末余额）",
@@ -1487,7 +1487,7 @@
       },
       {
         "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-qian-qi-cha-cuo-geng-zheng",
-        "section_number": "十四、前期差错更正",
+        "section_number": "十五、2",
         "section_title": "前期差错更正",
         "index": 0,
         "table_name": "追溯重述法",
@@ -1495,7 +1495,7 @@
       },
       {
         "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-qian-qi-cha-cuo-geng-zheng",
-        "section_number": "十四、前期差错更正",
+        "section_number": "十五、2",
         "section_title": "前期差错更正",
         "index": 1,
         "table_name": "未来适用法",
@@ -1503,7 +1503,7 @@
       },
       {
         "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-yao-zhai-wu-chong-zu",
-        "section_number": "十四、重要债务重组",
+        "section_number": "十五、3",
         "section_title": "重要债务重组",
         "index": 2,
         "table_name": "债权人披露情况",
@@ -1511,7 +1511,7 @@
       },
       {
         "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-zhi-jing-ying",
-        "section_number": "十四、终止经营",
+        "section_number": "十五、7",
         "section_title": "终止经营",
         "index": 0,
         "table_name": "终止经营",
@@ -1519,7 +1519,7 @@
       },
       {
         "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-fen-bu-bao-gao",
-        "section_number": "十四、分部报告",
+        "section_number": "十五、8",
         "section_title": "分部报告",
         "index": 0,
         "table_name": "分部报告（表1）",
@@ -1527,7 +1527,7 @@
       },
       {
         "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-fen-bu-bao-gao",
-        "section_number": "十四、分部报告",
+        "section_number": "十五、8",
         "section_title": "分部报告",
         "index": 1,
         "table_name": "分部报告（表2）",
@@ -1535,7 +1535,7 @@
       },
       {
         "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-fen-bu-bao-gao",
-        "section_number": "十四、分部报告",
+        "section_number": "十五、8",
         "section_title": "分部报告",
         "index": 2,
         "table_name": "分部报告（表3）",
@@ -1543,7 +1543,7 @@
       },
       {
         "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-fen-bu-bao-gao",
-        "section_number": "十四、分部报告",
+        "section_number": "十五、8",
         "section_title": "分部报告",
         "index": 3,
         "table_name": "分部报告（表4）",
@@ -1551,7 +1551,7 @@
       },
       {
         "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-fen-bu-bao-gao",
-        "section_number": "十四、分部报告",
+        "section_number": "十五、8",
         "section_title": "分部报告",
         "index": 4,
         "table_name": "分部报告（表5）",
@@ -1559,7 +1559,7 @@
       },
       {
         "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-qi-ta",
-        "section_number": "十四、其他",
+        "section_number": "十五、9",
         "section_title": "其他",
         "index": 1,
         "table_name": "其他（表2）",

@@ -6,7 +6,9 @@ spec: disclosure-note-doc-upload-and-batch-fill Task 9（第二轮复盘 R-16 �
 2026-10-14 逐节比对后裁定（见 tasks.md「Word 权威比对」）：
 
 - ``disclosure_notes.account_name`` 不可用：真库 1009 行全部非空（含「公司基本情况」「会计期间」）；
-- JSON 种子章归属不可用：上市「三、所得税费用」等 8 节被放进会计政策章，Word 在项目附注章；
+- JSON 种子章归属（当时）不可用：上市「所得税费用」等 8 节（当时编号前缀「三、」）被放进会计政策章，Word 在项目附注章。
+  2026-10-16 已按 Word 改挂（spec disclosure-note-template-word-realignment，现为「五、75」~「五、82」，
+  旧编号经 ``normalize_section_code`` 别名解析）；第 2 条仍保留，兜底库内旧行与上传文档；
 - variant matrix 不可用：把会计政策章「借款费用」「债务重组」、其他重要事项章「终止经营」登记为科目，
   且「现金流量表项目注释」登记成截断码 ``三、现金流量表项目注``。
 
@@ -75,7 +77,8 @@ _SOE_LEGACY_ACCOUNT = re.compile(r"^五、\d+$")
 _WS = re.compile(r"\s+")
 _ANNOTATION = re.compile(r"【[^】]*】")
 _ENUM_HEAD = re.compile(  # 圈号「①」：Word 自动编号，DOCX 文字层没有、PDF 带着（第 23 组）
-    r"^(?:[（(][一二三四五六七八九十\d]+[）)]|[一二三四五六七八九十]+[、.．]|\d+[、.．]|[①-⑳])"
+    # 「X、」：Word 模板的占位序号（国企「X、数据资源」，真实附注里会换成数字），与 ``note_word_tree`` 同口径
+    r"^(?:[（(][一二三四五六七八九十\d]+[）)]|[一二三四五六七八九十]+[、.．]|\d+[、.．]|[①-⑳]|[XxＸｘ][、.．])"
 )
 _PAREN_TAIL = re.compile(r"[（(][^（）()]*[）)]$")
 
@@ -224,13 +227,14 @@ def has_table_payload(table_data: Any) -> bool:
 
 # ── 匹配辅助：章归属与 Word↔系统标题别名 ───────────────────────────────────────
 
-#: Word 模板标题 → 系统（JSON 种子）标题。证据：2026-10-14 四版本 Word 比对（tasks.md「Word 权威比对」）。
-#: 用户上传的附注文档源自 Word 模板，章名与系统不同；仅用于产生 candidate，不自动定案。
+#: 旧系统（JSON 种子）章名 → 国企 Word 章名。证据：2026-10-14 四版本 Word 比对（tasks.md「Word 权威比对」）。
+#: 2026-10-16 起国企种子章名已按 Word 改（spec disclosure-note-template-word-realignment），折叠键即 Word 标题；
+#: 留着别名是为了库内存量行（Phase 3 改写前）与沿用旧章名的上传文档 / 上市同义章名仍能对上。仅产生 candidate，不自动定案。
 _WORD_TITLE_ALIASES_RAW: dict[str, str] = {
-    "公司（企业）基本情况": "公司基本情况",
-    "会计政策、会计估计变更及差错更正": "重要会计政策、会计估计的变更以及前期差错的更正",
-    "企业合并及合并财务报表": "合并范围的变化",
-    "关联方关系及其交易": "关联方及关联交易",
+    "公司基本情况": "公司（企业）基本情况",
+    "重要会计政策、会计估计的变更以及前期差错的更正": "会计政策、会计估计变更及差错更正",
+    "合并范围的变化": "企业合并及合并财务报表",
+    "关联方及关联交易": "关联方关系及其交易",
 }
 WORD_TITLE_ALIASES: dict[str, str] = {
     normalize_title(k): normalize_title(v) for k, v in _WORD_TITLE_ALIASES_RAW.items()

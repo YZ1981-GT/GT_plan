@@ -123,7 +123,7 @@ class TestMatchingReview:
         """国企 Word 实测：「重要会计政策 / 递延所得税资产及递延所得税负债」在系统树挂在「六、税项」下；
         首版跨章配到六的同名节。按树：四下找不到 ⇒ 交给用户，不到别的章找。"""
         c4, c6 = _ch("四", "重要会计政策、会计估计"), _ch("六", "税项")
-        dt6 = _tgt("六、递延所得税资产及递延所得税负债", "递延所得税资产及递延所得税负债", parent=c6)
+        dt6 = _tgt("四、递延所得税资产及递延所得税负债", "递延所得税资产及递延所得税负债", parent=c6)
         targets = [c4, _tgt("四、1", "会计期间", parent=c4), c6, dt6]
         sources = [_src("c", "重要会计政策、会计估计", 1, ""), _src("s1", "递延所得税资产及递延所得税负债", 3)]
         r = _matches(sources, targets)["s1"]
@@ -440,6 +440,44 @@ class TestChapterKindGating:
         preview = _preview(self._sources(), targets)
         assert "a1" not in {i["source_id"] for i in preview["items"]}
         assert (preview["summary"]["out_of_scope"], preview["summary"]["anchor"]) == (1, 2)  # a1；两个章标题
+
+
+# ── 2026-10-16 种子按四版 Word 对齐后的端到端发现（spec disclosure-note-template-word-realignment）──────
+
+
+class TestChapterIsBody:
+    """上市「十 公允价值」：种子章下只有同名正文节「十、1 公允价值」，Word 章内是正文 +「（1）以公允价值计量的项目和金额」
+    …「（5）…」小标题与表格。按锚点处理时章首正文落到「十、1」，五个小标题在章内找不到 ⇒ 全部「需人工对应」。"""
+
+    def test_sub_headings_fold_into_the_sole_body_leaf(self):
+        ch = _ch("十", "公允价值")
+        leaf = _tgt("十、1", "公允价值", parent=ch)
+        sources = [_src("c", "十、公允价值", 1, "<p>层次说明</p>"),
+                   _src("a", "（1）以公允价值计量的项目和金额", 3, "<p>表一</p>"),
+                   _src("b", "（2）第二层次公允价值计量的相关信息", 3, "<p>表二</p>")]
+        folded, matches, _s = _locate(sources, [ch, leaf])
+        by = {m.source_id: m for m in matches}
+        assert (by["c"].target_note_id, by["c"].match_kind, by["c"].confidence) == (leaf["id"], "chapter_body", "candidate")
+        assert [by["a"].match_kind, by["b"].match_kind] == ["folded", "folded"]
+        assert {s.source_id: s for s in folded}["c"].html == (
+            "<p>层次说明</p><p><strong>（1）以公允价值计量的项目和金额</strong></p><p>表一</p>"
+            "<p><strong>（2）第二层次公允价值计量的相关信息</strong></p><p>表二</p>")
+
+    def test_chapter_with_other_sections_keeps_anchor_rule(self):
+        """章下除同名正文节外还有别的节 ⇒ 仍是锚点：小标题在章内定位，章首正文单列落到同名正文节。"""
+        ch = _ch("七", "在其他主体中的权益")
+        body, sub = _tgt("七、1", "在其他主体中的权益", parent=ch), _tgt("七、2", "在子公司中的权益", parent=ch)
+        by = _matches([_src("c", "七、在其他主体中的权益", 1, "<p>章首</p>"), _src("s1", "在子公司中的权益", 2)],
+                      [ch, body, sub])
+        assert by["c"].match_kind == "anchor"
+        assert (by["c#body"].target_note_id, by["s1"].target_note_id) == (body["id"], sub["id"])
+
+    def test_word_placeholder_enum_is_not_part_of_title(self):
+        """国企 Word「X、数据资源」：X 是模板占位序号（真实附注里换成数字），与 ``note_word_tree`` 同口径不算标题。"""
+        ch = _ch("八", "财务报表主要项目注释")
+        data = _tgt("八、88", "数据资源", parent=ch, kind="account_explanation")
+        by = _matches([_src("c", "财务报表主要项目注释", 1, ""), _src("s1", "X、数据资源", 3)], [ch, data])
+        assert (by["s1"].target_note_id, by["s1"].match_kind) == (None, "out_of_scope")  # 定位到了，科目注释不归上传填
 
 
 # ── 第 7 组整体复盘：variant matrix 别名索引不得因同变体多个旧码而丢码 ─────────────

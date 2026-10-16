@@ -1434,3 +1434,10 @@ backend/tests/test_variant_matrix.py  883
 backend/scripts/fix/fix_note_d1_notes_receivable_structure.py  893
 backend/scripts/fix/fix_note_g_cycle_structure.py  1453
 backend/scripts/fix/fix_note_inventory_structure.py  916
+#   note_validation_engine.py —— 附注校验公式引擎（非本次引入；触碰前已 1143 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-16 disclosure-note-template-word-realignment Task 22 加 allow_llm 闸门（+12 行：LLM_REVIEW 默认不调大模型，
+#     用户拍板「大模型只在手动单击时调用」）。拆分方向：规则解析（preset / PRESET_TO_RULE）/ 执行派发 / validate_all 汇总与持久化。
+backend/app/services/note_validation_engine.py  1155
+#   test_note_columns_coverage.py —— 附注列覆盖率守卫（非本次引入；触碰前已 1065 行且未登记）。
+#     2026-10-16 同 spec 只改一行注释里的章节编号（节改挂后的新编号）。拆分方向：按守卫族（列规则 / 表头事实 / guidance 真源）拆文件。
+backend/tests/test_note_columns_coverage.py  1065

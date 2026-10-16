@@ -53,11 +53,12 @@ export const DISCLOSURE_NOTE_SECTION_MAP: Record<string, NoteSectionVariants> = 
   H9: { listed: '五、47', soe: '八、52' }, // 租赁负债
   I1: { listed: '五、26', soe: '八、27' }, // 无形资产
   I5: { listed: '五、31', soe: '八、32' }, // 其他非流动资产
-  // 损益类：listed 用关键词标题（无 五/八 编号，DB 可能截断如「三、信用减值损失（损」，
-  // 由 DisclosureEditor.resolveSectionInList 前缀模糊解析为精确章节）；soe 用清晰编号。
-  G13: { listed: '三、公允价值变动收益', soe: '八、72' }, // 公允价值变动收益
-  G14: { listed: '三、信用减值损失', soe: '八、73' }, // 信用减值损失
-  H10: { listed: '三、资产处置收益（损', soe: '八、75' }, // 资产处置收益（listed 章节号是模板 md 截断值，勿「修正」）
+  // 损益类：2026-10-16 起上市侧按 Word 改挂到「五 财务报表项目附注」章、用清晰编号 五、75~五、80
+  // （改挂前是「三」章下的关键词截断编号；存量库里残留的旧编号仍由 DisclosureEditor.resolveSectionInList
+  // 前缀模糊解析，后端 normalize_section_code 归一）；soe 用清晰编号。
+  G13: { listed: '五、75', soe: '八、72' }, // 公允价值变动收益
+  G14: { listed: '五、76', soe: '八、73' }, // 信用减值损失
+  H10: { listed: '五、78', soe: '八、75' }, // 资产处置收益
   // 对称补齐：正向跳转已具备、本轮补反向的专有章节科目（章节号权威取自 DB note_section↔section_title）。
   F1: { listed: '五、7', soe: '八、7' },   // 预付款项
   F2: { listed: '五、9', soe: '八、10' },  // 存货
@@ -77,18 +78,18 @@ export const DISCLOSURE_NOTE_SECTION_MAP: Record<string, NoteSectionVariants> = 
   K8: { listed: '五、64', soe: '八、65' },  // 销售费用
   K9: { listed: '五、65', soe: '八、66' },  // 管理费用
   K10: { listed: '五、68', soe: '八、69' }, // 其他收益
-  K12: { listed: '三、营业外收入（注：', soe: '八、76' }, // 营业外收入（listed 章节号是模板 md 截断值，勿「修正」）
+  K12: { listed: '五、79', soe: '八、76' }, // 营业外收入
   H5: { soe: '八、25' },                    // 油气资产（国企专属，上市无独立章节）
-  // 损益类关键词标题（DB 可能截断，由 resolveSectionInList 模糊解析）
-  K11: { listed: '三、资产减值损失（损', soe: '八、74' }, // 资产减值损失（listed 章节号是模板 md 截断值，勿「修正」）
-  K13: { listed: '三、营业外支出（注：', soe: '八、77' },   // 营业外支出（listed 章节号是模板 md 截断值，勿「修正」）
+  // 损益类（上市同 G13/G14/H10：五、77 / 五、80 是 2026-10-16 改挂后的编号）
+  K11: { listed: '五、77', soe: '八、74' }, // 资产减值损失
+  K13: { listed: '五、80', soe: '八、77' },   // 营业外支出
   // N1 递延所得税资产（与 N3 递延所得税负债共用同一附注章节；正向跳转默认落 N1）。
   // N3 若将来补披露表，可加 N3 条目指向同一章节号（导航共用，数据所有权见
   // spec n1-disclosure-note-linkage · Decision 1）。
   N1: { listed: '五、30', soe: '八、31' }, // 递延所得税资产（和递延所得税负债）
   N2: { listed: '五、41', soe: '八、41' }, // 应交税费
   N4: { listed: '五、63', soe: null }, // 税金及附加（仅上市有独立章节）
-  N5: { listed: null, soe: '八、78' }, // 所得税费用（仅国企有独立章节）
+  N5: { listed: null, soe: '八、78' }, // 所得税费用（上市有 五、81，跳转未接，见 isN5IncomeTaxExpenseNoteSection）
   // L1 短期借款（权威 note_template_variant_matrix.json · duan_qi_jie_kuan）
   L1: { listed: '五、33', soe: '八、33' }, // 短期借款
   // L3 长期借款（权威 note_template_variant_matrix.json · chang_qi_jie_kuan）

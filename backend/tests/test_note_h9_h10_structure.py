@@ -1,12 +1,12 @@
 """附注 H9 租赁负债 + H10 资产处置损益章节结构守卫。
 
-章节：H10 上市 `三、资产处置收益（损` / 国企 `八、75`；H9 上市 `五、47` / 国企 `八、52`。
+章节：H10 上市 `五、78` / 国企 `八、75`；H9 上市 `五、47` / 国企 `八、52`。
 
 锁定 `fix_note_h9_h10_structure.py` 的对齐结果，并固化两个 P0 的修复：
 
 1. **上市两张表原本同名 `项  目`** → `sub_table_data` 以表名为键，同名互相覆盖丢整张表
    → 正名为 `资产处置收益（损失以“-”填列）` / `试运行销售损益`，守卫断言 `项  目` 不复活。
-2. **上市 `section_number` 是 md 截断值 `三、资产处置收益（损`（10 字符）** —— 这是既有真源
+2. **上市 `section_number` 是 md 截断值 `五、78`（10 字符）** —— 这是既有真源
    形态，前端常量必须对齐它（守卫从前端源码抽常量交叉比对，防有人"修正"成完整名）。
 
 spec: h9-h10-remaining-disclosure-alignment (Task 5)
@@ -102,9 +102,18 @@ def test_templates_parse():
 
 
 def test_section_numbers_are_verbatim():
-    """listed 侧是 md 截断值，禁"修正"（改了会让同步落空并新建垃圾章节）。"""
-    assert FIX.H10_LISTED_SECTION == "三、资产处置收益（损"
-    assert len(FIX.H10_LISTED_SECTION) == 10
+    """章节号与种子逐字一致（改了会让同步落空并新建垃圾章节）。
+
+    H10 上市侧原为会计政策章的截断编号，2026-10-16 按四版 Word 改挂到项目附注章「五、78」
+    （spec disclosure-note-template-word-realignment），原截断编号登记为种子别名。
+    """
+    from app.services.note_section_catalog import normalize_section_code, template_json_path
+
+    assert FIX.H10_LISTED_SECTION == "五、78"
+    seed = json.loads(template_json_path("listed").read_text(encoding="utf-8"))["sections"]
+    olds = next(s for s in seed if s["section_number"] == "五、78").get("legacy_section_numbers") or []
+    assert len(olds) == 1 and len(olds[0]) == 10  # 原 md 截断值（10 字），禁补全
+    assert normalize_section_code(olds[0], template_type="listed") == "五、78"
     assert FIX.H10_SOE_SECTION == "八、75"
     assert FIX.H9_LISTED_SECTION == "五、47"
     assert FIX.H9_SOE_SECTION == "八、52"

@@ -35,7 +35,6 @@ from app.services.note_section_catalog import (
 from app.services.note_section_kind import (
     SECTION_HEADING_LEVELS,
     WORD_TITLE_ALIASES,
-    _heading_level,
     normalize_title,
 )
 from app.services.note_word_table import (
@@ -59,6 +58,7 @@ __all__ = [
     "build_report",
     "cached_word_variant",
     "check_against_allowlist",
+    "clean_word_heading",
     "compare_tables",
     "compare_variant",
     "load_seed",
@@ -90,6 +90,7 @@ class WordSection:
     body: list[str] = field(default_factory=list)  # 节标题后、首张表前的非标题段落
     subtitles: list[str] = field(default_factory=list)
     tables: list[WordTable] = field(default_factory=list)
+    blocks: list[tuple[int | None, str]] = field(default_factory=list)  # 全部文字块（小标题层级 / None=段落），按文档顺序
 
 
 @dataclass
@@ -132,6 +133,13 @@ class SeedChapter:
     position: int
     raw: dict[str, Any]
     sections: list[SeedSection] = field(default_factory=list)
+
+    def scope_title(self, report_scope: str) -> str:
+        """口径章名：``scope_titles[report_scope]``，无则用 ``section_title``（上市项目附注章单体 / 合并不同名）。"""
+        return (self.raw.get("scope_titles") or {}).get(report_scope) or self.title
+
+    def scope_norm(self, report_scope: str) -> str:
+        return normalize_title(self.scope_title(report_scope))
 
 
 @dataclass(frozen=True, order=True)
@@ -185,34 +193,56 @@ _MARKER = re.compile(r"##[^#]*##|\{\{[^{}]*\}\}")
 _PLACEHOLDER_ENUM = re.compile(r"^[XxＸｘ][、.．]")
 
 
+def clean_word_heading(text: str) -> str:
+    """Word 标题原文去模板占位序号「X、」（种子标题用它）。"""
+    return _PLACEHOLDER_ENUM.sub("", text.strip()).strip()
+
+
 def word_title_norm(text: str) -> str:
-    return normalize_title(_PLACEHOLDER_ENUM.sub("", text.strip()))
+    return normalize_title(clean_word_heading(text))
 
 
 def _chapter_events(path: Path | str) -> list[tuple[str, list[tuple[str, int | None, Any]]]]:
-    """按 H1 切章：[(章标题, [("h", 层级, 文字) | ("p", None, 文字) | ("t", None, WordTable)])]。"""
+    """按 H1 切章：[(章标题, [("h", 层级, 文字) | ("p", None, 文字) | ("t", None, WordTable)])]。
+
+    标题层级与上传解析同一读法（``note_document_parser.docx_paragraph_level``：样式名 → 段落大纲级别 → 样式链），
+    再按编号排位嵌套同级标题（``nest_by_numbering``：「X、数据资源」后的「（1）」「（2）」「（3）」是它的组成部分）。
+    """
     import docx
     from docx.text.paragraph import Paragraph
 
+    from app.services.note_document_parser import docx_paragraph_heading, nest_by_numbering
+
     document = docx.Document(str(path))
-    chapters: list[tuple[str, list[tuple[str, int | None, Any]]]] = []
+    flat: list[tuple[str, int | None, Any]] = []
+    outline_only: dict[int, bool] = {}
+    style_levels: dict[str, int | None] = {}
     last_text = ""
     for tag, el in _iter_blocks(document.element.body):
         if tag == "tbl":
-            if chapters:
-                chapters[-1][1].append(("t", None, parse_word_table(el, last_text)))
+            flat.append(("t", None, parse_word_table(el, last_text)))
             last_text = ""
             continue
         paragraph = Paragraph(el, document)
         text = _MARKER.sub("", paragraph.text or "").strip()
         if not text:
             continue
-        level = _heading_level(paragraph.style.name if paragraph.style is not None else "")
-        if level == 1:
-            chapters.append((text, []))
-        elif chapters:
-            chapters[-1][1].append(("h", level, text) if level is not None else ("p", None, text))
+        level, from_style = docx_paragraph_heading(paragraph, el, style_levels)
+        if level is not None:
+            outline_only[len(flat)] = not from_style
+        flat.append(("h", level, text) if level is not None else ("p", None, text))
         last_text = text
+    heads = [k for k, (kind, _lvl, _x) in enumerate(flat) if kind == "h"]
+    nested = nest_by_numbering([flat[k][1] for k in heads], [flat[k][2] for k in heads],
+                               [outline_only.get(k, False) for k in heads])
+    for k, level in zip(heads, nested):
+        flat[k] = ("h", level, flat[k][2])
+    chapters: list[tuple[str, list[tuple[str, int | None, Any]]]] = []
+    for kind, level, payload in flat:
+        if kind == "h" and level == 1:
+            chapters.append((payload, []))
+        elif chapters:
+            chapters[-1][1].append((kind, level, payload))
     return chapters
 
 
@@ -238,8 +268,12 @@ def parse_word_docx(path: Path | str, std: str, *, variant: str = "") -> WordDoc
                 chapter.sections.append(section)
             elif kind == "h" and section is not None:
                 section.subtitles.append(payload)
-            elif not holder.tables:  # 正文只收首张表之前的段落
-                holder.body.append(payload)
+                section.blocks.append((lvl, payload))
+            else:
+                if isinstance(holder, WordSection):
+                    holder.blocks.append((None, payload))
+                if not holder.tables:  # 正文只收首张表之前的段落
+                    holder.body.append(payload)
         out.append(chapter)
     return WordDoc(variant=variant, chapters=out)
 
@@ -332,8 +366,8 @@ def _overlap(wc: WordChapter, sc: SeedChapter) -> int:
     return hit
 
 
-def _pair_chapters(word: WordDoc, chapters: list[SeedChapter]) -> dict[int, SeedChapter]:
-    """章配对：标题相同 → Word↔系统章名别名 → 对上的节最多。"""
+def _pair_chapters(word: WordDoc, chapters: list[SeedChapter], scope: str = "") -> dict[int, SeedChapter]:
+    """章配对：标题相同（含口径章名）→ Word↔系统章名别名 → 章正文叶子用 Word 章名 → 对上的节最多。"""
     pairs: dict[int, SeedChapter] = {}
     used: set[int] = set()
 
@@ -343,11 +377,11 @@ def _pair_chapters(word: WordDoc, chapters: list[SeedChapter]) -> dict[int, Seed
             used.add(sc.position)
 
     for wc in word.chapters:
-        take(wc, next((c for c in chapters if c.position not in used and c.norm == wc.norm), None))
-    for wc in word.chapters:
-        alias = WORD_TITLE_ALIASES.get(wc.norm)
-        if alias:
-            take(wc, next((c for c in chapters if c.position not in used and c.norm == alias), None))
+        take(wc, next((c for c in chapters if c.position not in used and wc.norm in (c.norm, c.scope_norm(scope))), None))
+    for wc in word.chapters:  # 章名别名：两侧都折叠后比（旧系统章名 ↔ Word 章名，方向无关）
+        key = WORD_TITLE_ALIASES.get(wc.norm, wc.norm)
+        take(wc, next((c for c in chapters if c.position not in used
+                       and WORD_TITLE_ALIASES.get(c.norm, c.norm) == key), None))
     for wc in word.chapters:  # 种子章名错、但章正文叶子「X、1 章名」用的是 Word 章名（国企十三 / 十四、上市十）
         take(wc, next((
             c for c in chapters
@@ -407,7 +441,7 @@ def _gap_align(wc: WordChapter, sc: SeedChapter, matches: dict, seed_of: dict,
 def match_variant(word: WordDoc, chapters: list[SeedChapter], variant: str) -> VariantMatch:
     """节匹配：先在已配对章内按标题依次对应，再跨章找同名（放错章）；剩余种子节判章正文叶子。"""
     report_scope = variant.split("_", 1)[1] if "_" in variant else "standalone"
-    pairs = _pair_chapters(word, chapters)
+    pairs = _pair_chapters(word, chapters, report_scope)
     matches: dict[int, tuple[WordChapter, WordSection]] = {}
     seed_of: dict[int, SeedSection] = {}  # id(WordSection) → 种子节
 
@@ -505,8 +539,8 @@ def compare_variant(match: VariantMatch, *, tables: bool = True) -> list[Diff]:
         if sc is None:
             out.append(Diff(v, "chapter_missing", wc.title, f"Word 第 {wc.index} 章，{len(wc.sections)} 节"))
             continue
-        if sc.norm != wc.norm:
-            out.append(Diff(v, "chapter_title", sc.code, f"种子「{sc.title}」/ Word「{wc.title}」"))
+        if sc.scope_norm(match.report_scope) != wc.norm:
+            out.append(Diff(v, "chapter_title", sc.code, f"种子「{sc.scope_title(match.report_scope)}」/ Word「{wc.title}」"))
         if not applies(sc.scope):
             out.append(Diff(v, "scope", sc.code, f"章出现在本口径 Word，scope={sc.scope}"))
     for sc in match.chapters:

@@ -19,7 +19,7 @@ from app.services.disclosure_engine import (
     is_guidance_paragraph,
 )
 from app.services.note_section_catalog import DATA_DIR
-from tests.test_disclosure_note_rag_characterization import _added_note, _minimal_template
+from tests.test_disclosure_note_generation_text_order import _added_note, _minimal_template
 from tests.test_disclosure_note_tree_fields import _engine
 
 
@@ -78,7 +78,7 @@ def test_seed_contingent_liability_lines_all_present():
 async def test_table_template_with_headers_but_no_rows_keeps_column_meta():
     """第 12 组登记的 ``_with_column_meta`` 未定义（真库生成「十一、本公司的其他关联方情况」表格丢失）：
     并行会话 166b5e6a9 已改用 ``_carry_seed_column_meta``，此前没有测试走到这一支，补上。"""
-    from tests.test_disclosure_note_rag_characterization import _make_engine
+    from tests.test_disclosure_note_generation_text_order import _make_engine
 
     groups = [{"group": "期末数", "start": 1, "span": 2}]
     out = await _make_engine()._build_table_data(
@@ -88,7 +88,7 @@ async def test_table_template_with_headers_but_no_rows_keeps_column_meta():
 
 @pytest.mark.asyncio
 async def test_generated_note_keeps_numbered_line():
-    """生成链端到端（大模型不可用、无上年附注 ⇒ 用模板正文）：写进章节的正文含被丢的那一行。"""
+    """生成链端到端（无上年附注 ⇒ 用模板正文；生成链不调大模型）：写进章节的正文含被丢的那一行。"""
     seed = _seed("soe", "十三、1")
     template = {**_minimal_template(), "note_section": "十三、1", "section_title": seed["section_title"],
                 "content_type": "text", "tables": [], "text_sections": seed.get("text_sections") or [],

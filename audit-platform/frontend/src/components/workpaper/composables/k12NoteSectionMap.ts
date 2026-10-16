@@ -10,9 +10,9 @@
  * - 源 xlsx 国企侧另有「与企业日常活动无关的政府补助明细」块，附注 §八、76
  *   **没有对应表**，故不推（推了会造孤儿表），保留在底稿侧作审计明细。
  *
- * 🔴 **上市侧章节号是 `三、营业外收入（注：`** —— listed 模板 `三、` 整章
- * `section_number` 被 md 重建截断为 10 字符，是既有真源形态，**不要"修正"**。
- * 旧常量写 `营业外收入` → 上市侧同步落不到章节。
+ * 🔴 **上市侧章节号是 `五、79`**（必须逐字等于模板 `section_number`）—— 2026-10-16 按四版 Word
+ * 从「三」章改挂到「五 财务报表项目附注」章；原「三」章截断编号是别名（见该节 `legacy_section_numbers`），
+ * 后端 `normalize_section_code` 归一。更早的旧常量写 `营业外收入` → 上市侧同步落不到章节。
  *
  * 🔴 旧常量只声明 3 列 → 第 4 列「计入当期非经常性损益的金额」组件已录入却从未推送。
  *
@@ -34,7 +34,7 @@ import {
 export type K12DisclosureVariant = KPlVariant
 
 export const K12_NOTE_SECTION = {
-  listed: '三、营业外收入（注：',
+  listed: '五、79',
   soe: '八、76',
 } as const satisfies Record<K12DisclosureVariant, string>
 

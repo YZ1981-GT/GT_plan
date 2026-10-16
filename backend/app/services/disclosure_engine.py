@@ -40,6 +40,7 @@ from app.services.note_section_catalog import (
     filter_template_sections,
     normalize_report_scope,
     normalize_section_code,
+    section_title_for_scope,
 )
 from app.services.parent_company_note_sections import (
     PARENT_PROJECT_MISSING_KEY,
@@ -54,8 +55,6 @@ from app.services.note_template_service import NoteTemplateService
 from app.services.note_template_merge import merge_templates
 from app.services.note_custom_template_service import NoteCustomTemplateService
 from app.core.config import settings
-from app.services.llm_client import chat_completion
-from app.services.note_knowledge_enricher import NoteKnowledgeEnricher
 
 logger = logging.getLogger(__name__)
 
@@ -88,16 +87,6 @@ def _get_binding_row(binding_rows: dict[str, Any], label: str) -> dict | None:
     return None
 
 
-def _is_llm_error(text: str | None) -> bool:
-    """判断 chat_completion 返回是否为服务降级占位串（非有效生成）。
-
-    chat_completion 失败/熔断/超时时返回占位串（`[LLM ...]` / `⚠️...`）而非抛异常，
-    故非空且非占位串才当作有效正文。等价于 enricher 内部同款判定。
-    """
-    if not text:
-        return True
-    t = str(text).strip()
-    return (not t) or t.startswith("[") or t.startswith("⚠️")
 
 SEED_DATA_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "note_templates_seed.json"
 
@@ -657,23 +646,6 @@ class DisclosureEngine:
         # **同代码同年度 standalone 兄弟项目**而非合并项目自身。惰性构造，
         # 非合并项目 / 未命中母公司章时全程不查库（零回归支点）。
         self._parent_scope_cache: ParentScopeCache | None = None
-        # RAG 增强旁路：按 note_section 暂存本次生成所依据的 Citation，
-        # 供后续落库/返回时附带（不改 _generate_text_with_llm 的 str|None 签名）。
-        self._last_citations: dict = {}
-        # 知识库增强编排层（仅开关开启时按需构造，Property 6 零回归依赖此惰性构造）
-        self._enricher: NoteKnowledgeEnricher | None = None
-
-    def _get_enricher(self) -> NoteKnowledgeEnricher:
-        """惰性构造 NoteKnowledgeEnricher（仅 RAG 开关开启的调用路径触达）。"""
-        if self._enricher is None:
-            self._enricher = NoteKnowledgeEnricher(self.db)
-        return self._enricher
-
-    def _stash_citations(self, note_section: str, citations: list) -> None:
-        """把本次 RAG 生成所依据的 Citation 暂存到旁路 dict。"""
-        if not isinstance(getattr(self, "_last_citations", None), dict):
-            self._last_citations = {}
-        self._last_citations[note_section] = citations or []
 
     # ------------------------------------------------------------------
     # 母公司章取数上下文（Task 12/13）
@@ -1018,8 +990,12 @@ class DisclosureEngine:
                     s.get("section_number", f"五、{idx + 1}"),
                     template_type=template_type,
                 ),
-                "section_title": s.get("section_title", ""),
-                "account_name": s.get("account_name") or s.get("section_title", ""),
+                "section_title": section_title_for_scope(s, report_scope),
+                "account_name": (
+                    section_title_for_scope(s, report_scope)
+                    if not s.get("account_name") or s.get("account_name") == s.get("section_title")
+                    else s.get("account_name")
+                ),
                 "content_type": s.get("content_type", "table"),
                 "sort_order": s.get("sort_order") if isinstance(s.get("sort_order"), (int, float)) else idx * 10,
                 "table_template": s.get("table_template") or {},
@@ -1050,93 +1026,6 @@ class DisclosureEngine:
             return SourceTemplate.soe
         if template_type == SourceTemplate.listed.value:
             return SourceTemplate.listed
-        return None
-
-    # ------------------------------------------------------------------
-    # ------------------------------------------------------------------
-    # LLM 辅助正文生成（预留接口）
-    # ------------------------------------------------------------------
-    async def _generate_text_with_llm(
-        self,
-        project_id: UUID,
-        year: int,
-        note_section: str,
-        section_title: str,
-        account_name: str,
-        prompt_key: str | None = None,
-    ) -> str | None:
-        """调用LLM生成附注正文（每个章节可配置独立提示词）
-
-        提示词优先级：
-        1. prompt_key 指定的自定义提示词
-        2. 按 section_title 匹配预设提示词
-        3. 通用附注生成提示词
-
-        返回 None 表示LLM不可用或未配置，降级到模板默认文字。
-
-        接入 disclosure-note-knowledge-ai-enrichment：
-        - RAG 开关开启时优先经 NoteKnowledgeEnricher grounded 生成（附 Citation 旁路暂存）；
-          text 非空则用之，否则退回下方通用 LLM 路径。
-        - 通用路径已修复历史 dead-import（原 `from ... import llm_client` 符号不存在，
-          导致本函数恒返 None）：现使用模块级 `chat_completion`（返回 str），非占位串即正文。
-        - 任一环失败一律 fail-open 返回 None，降级到模板默认文字（Req6）。
-        """
-        # ── RAG 注入（开关开启时优先）────────────────────────────────
-        if settings.DISCLOSURE_NOTE_RAG_ENABLED:
-            try:
-                enricher = self._get_enricher()
-                draft = await enricher.generate_note_text(
-                    project_id, year, note_section, section_title, account_name,
-                )
-                if draft and draft.text:
-                    self._stash_citations(note_section, draft.citations)
-                    return draft.text
-                # text 为空 → 退回通用 LLM 路径
-            except Exception as e:  # fail-open：RAG 异常不阻断，降级通用路径
-                logger.warning("RAG note generation degraded for %s: %s", note_section, e)
-
-        # ── 通用 LLM 路径（dead-import 已修复）────────────────────────
-        try:
-            # 构建上下文
-            context_parts = [
-                f"科目: {account_name}",
-                f"章节: {note_section} {section_title}",
-                f"年度: {year}",
-            ]
-
-            # 从试算表获取关键数据
-            tb_data = getattr(self, '_tb_cache', {})
-            tb_entry = tb_data.get(account_name)
-            if tb_entry:
-                context_parts.append(f"期末审定数: {tb_entry.get('audited', 0):,.2f}")
-                context_parts.append(f"期初余额: {tb_entry.get('opening', 0):,.2f}")
-
-            context = "\n".join(context_parts)
-
-            # 提示词（预留自定义接口）
-            system_prompt = (
-                "你是一名资深审计师，正在编写财务报表附注。"
-                "请根据提供的科目信息和数据，生成该章节的附注正文。"
-                "要求：专业准确、符合企业会计准则披露要求、语言简洁。"
-                "如果数据不足，请生成标准模板文字并标注需要补充的信息。"
-            )
-
-            # chat_completion 返回 str；服务不可用/熔断/超时返回占位串（[LLM.../⚠️...），
-            # 经 _is_llm_error 判定，非占位串且非空才当作有效正文。
-            result = await chat_completion(
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"请为以下附注章节生成正文：\n\n{context}"},
-                ],
-                temperature=0.3,
-                max_tokens=2000,
-            )
-
-            if result and not _is_llm_error(result):
-                return result
-        except Exception as e:
-            logger.debug("LLM text generation skipped for %s: %s", note_section, e)
-
         return None
 
     # ------------------------------------------------------------------
@@ -1882,8 +1771,9 @@ class DisclosureEngine:
             content_type_str = tmpl.get("content_type", "table")
             sort_order = tmpl.get("sort_order", 0)
             
-            # 正文内容：三级优先填充策略
-            # 1. 上年审计报告附注（如有）→ 2. LLM生成（预留接口）→ 3. 模板默认文字
+            # 正文内容：两级优先填充策略
+            # 1. 上年审计报告附注（如有）→ 2. 模板默认文字。🔴 不调用大模型 / 知识库（用户 2026-10-16：
+            #    大模型只在用户手动单击 AI 功能时调用；spec disclosure-note-template-word-realignment §6）
             text_sections = tmpl.get("text_sections", [])
             text_content = None
 
@@ -1907,39 +1797,7 @@ class DisclosureEngine:
                 if text_content:
                     logger.info("note %s: filled from prior year (cache)", note_section)
 
-            # 优先级1b：知识库上年回退 —— 仅当 DB 缺失（text_content 空）且 RAG 开关开启。
-            # 保持 DB 优先（Property 3：DB 命中则不调知识库回退）。单章 try/except 隔离（Property 12）。
-            if not text_content and settings.DISCLOSURE_NOTE_RAG_ENABLED:
-                try:
-                    enricher = self._get_enricher()
-                    py_draft = await enricher.retrieve_prior_year_note(
-                        project_id, note_section, section_title, account_name,
-                    )
-                    if py_draft and py_draft.text and len(py_draft.text) > 20:
-                        text_content = py_draft.text
-                        self._stash_citations(note_section, py_draft.citations)
-                        logger.info(
-                            "note %s: filled from prior year (knowledge_doc)", note_section
-                        )
-                except Exception as _rag_py_err:  # 单章降级，不影响其余章节
-                    logger.warning(
-                        "prior-year RAG fallback degraded for %s: %s",
-                        note_section, _rag_py_err,
-                    )
-
-            # 优先级2：LLM生成（预留接口，通过 note_prompts 配置每章节独立提示词）
-            if not text_content:
-                try:
-                    llm_text = await self._generate_text_with_llm(
-                        project_id, year, note_section, section_title, account_name,
-                        tmpl.get("llm_prompt_key"),
-                    )
-                    if llm_text and len(llm_text) > 20:
-                        text_content = llm_text
-                except Exception:
-                    pass
-
-            # 优先级3：模板分流 — 指引→guidance_text，实质正文→substantive（替换原灌正文逻辑）
+            # 优先级2：模板分流 — 指引→guidance_text，实质正文→substantive（替换原灌正文逻辑）
             # 传入 tables 以支持 per-table guidance 归属（多表场景）
             substantive, guidance, per_table_guidance = classify_template_content(
                 text_sections, tmpl.get("text_template"), tmpl.get("tables"),
@@ -1949,7 +1807,7 @@ class DisclosureEngine:
             if not text_content and substantive:
                 text_content = substantive
 
-            # R1 markdown 源头止血：LLM/上年/substantive 产出的 markdown 草稿在写入
+            # R1 markdown 源头止血：上年/substantive 产出的 markdown 草稿在写入
             # text_content 前归一为纯文本（去 ###/** 标记保文字），前端富文本框不再显字面 markdown。
             if text_content:
                 from app.services.note_content_utils import sanitize_note_narrative

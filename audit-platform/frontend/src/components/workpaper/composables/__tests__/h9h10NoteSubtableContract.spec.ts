@@ -1,11 +1,11 @@
 /**
  * H9 租赁负债 + H10 资产处置损益披露载荷契约守卫。
  *
- * 章节：H10 上市 `三、资产处置收益（损` / 国企 `八、75`；H9 上市 `五、47` / 国企 `八、52`。
+ * 章节：H10 上市 `五、78` / 国企 `八、75`；H9 上市 `五、47` / 国企 `八、52`。
  *
  * 固化本 spec 修掉的两个 P0：
- * 1. 上市章节号原写 `三、资产处置收益`，而模板 `section_number` 是 md 截断值
- *    `三、资产处置收益（损` → `sync_from_workpaper` 精确定位落空、会新建垃圾章节。
+ * 1. 上市章节号原写完整名，而模板 `section_number` 当时是「三」章下的 md 截断值 → `sync_from_workpaper`
+ *    精确定位落空、会新建垃圾章节。（2026-10-16 模板按四版 Word 改挂为 `五、78`，常量随之同步。）
  * 2. 上市两张表原本同名 `项  目` → `sub_table_data` 以表名为键，同名互相覆盖丢整张表；
  *    载荷用 `项  目__trial` + `_trial_detail` 双写绕过，但那两个键在模板里不存在 = 孤儿，
  *    试运行销售明细永远进不了附注。正名后必须删掉绕过键并把旧名放进 `_removed_table_keys`。
@@ -119,19 +119,18 @@ const h9SoePayload = (over: Record<string, unknown> = {}) =>
 // ─────────────────────────────────────────────────────────────────────
 
 describe('P1 章节号 / sheet 名 / 表名逐字命中模板与源 xlsx', () => {
-  it('🔴 H10 上市章节号必须是模板的 md 截断值（差一字即新建垃圾章节）', () => {
-    expect(H10_LISTED_NOTE_SECTION).toBe('三、资产处置收益（损')
-    expect(H10_LISTED_NOTE_SECTION).toHaveLength(10)
+  it('🔴 H10 上市章节号必须逐字等于模板 section_number（差一字即新建垃圾章节）', () => {
+    expect(H10_LISTED_NOTE_SECTION).toBe('五、78')
     expect(H10_NOTE_SECTION.listed).toBe(H10_LISTED_NOTE_SECTION)
     const sec = loadSection('listed', H10_NOTE_SECTION.listed)
     expect(String(sec.section_number)).toBe(H10_NOTE_SECTION.listed)
     expect(h10Payload('listed').section_id).toBe(H10_NOTE_SECTION.listed)
   })
 
-  it('展示常量与定位常量分离（截断值不直接显示给用户）', () => {
-    expect(H10_NOTE_SECTION_DISPLAY.listed).toBe('三、资产处置收益')
-    expect(H10_NOTE_SECTION_DISPLAY.listed).not.toBe(H10_NOTE_SECTION.listed)
-    expect(H10_NOTE_SECTION_DISPLAY.listed.endsWith('（损')).toBe(false)
+  it('展示常量 = 定位编号 + 节标题（两版同形；编号随模板改，不得残留改挂前的「三」章编号）', () => {
+    expect(H10_NOTE_SECTION_DISPLAY.listed).toBe(`${H10_NOTE_SECTION.listed} 资产处置收益`)
+    expect(H10_NOTE_SECTION_DISPLAY.soe).toBe(`${H10_NOTE_SECTION.soe} 资产处置收益`)
+    expect(String(loadSection('listed', H10_NOTE_SECTION.listed).section_title)).toBe('资产处置收益')
   })
 
   it('H10/H9 其余章节号命中模板', () => {

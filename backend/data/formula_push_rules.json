@@ -3236,7 +3236,7 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "三、公允价值变动收益",
+          "listed": "五、75",
           "soe": "八、72"
         },
         "table": "公允价值变动收益",
@@ -3257,7 +3257,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "公允价值变动收益附注主表推送（listed 三、公允价值变动收益 / soe 八、72）期末 / 期初数；批 D 附注直推族 binding"
+      "description": "公允价值变动收益附注主表推送（listed 五、75 / soe 八、72）期末 / 期初数；批 D 附注直推族 binding"
     },
     {
       "rule_id": "G14.tb_amount",
@@ -3291,7 +3291,7 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "三、信用减值损失",
+          "listed": "五、76",
           "soe": "八、73"
         },
         "table": "信用减值损失",
@@ -3312,7 +3312,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "信用减值损失附注主表推送（listed 三、信用减值损失 / soe 八、73）期末 / 期初数；批 D 附注直推族 binding"
+      "description": "信用减值损失附注主表推送（listed 五、76 / soe 八、73）期末 / 期初数；批 D 附注直推族 binding"
     },
     {
       "rule_id": "G2.tb_amount",
@@ -5028,7 +5028,7 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "三、资产减值损失（损",
+          "listed": "五、77",
           "soe": "八、74"
         },
         "table": "资产减值损失",
@@ -5049,7 +5049,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "资产减值损失附注主表推送（listed 三、资产减值损失（损 / soe 八、74）期末 / 期初数；批 D 附注直推族 binding"
+      "description": "资产减值损失附注主表推送（listed 五、77 / soe 八、74）期末 / 期初数；批 D 附注直推族 binding"
     },
     {
       "rule_id": "K12.tb_amount",
@@ -5083,7 +5083,7 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "三、营业外收入（注：",
+          "listed": "五、79",
           "soe": "八、76"
         },
         "table": "营业外收入",
@@ -5104,7 +5104,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "营业外收入附注主表推送（listed 三、营业外收入（注： / soe 八、76）期末 / 期初数；批 D 附注直推族 binding"
+      "description": "营业外收入附注主表推送（listed 五、79 / soe 八、76）期末 / 期初数；批 D 附注直推族 binding"
     },
     {
       "rule_id": "K13.tb_amount",
@@ -5138,7 +5138,7 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "三、营业外支出（注：",
+          "listed": "五、80",
           "soe": "八、77"
         },
         "table": "营业外支出",
@@ -5159,7 +5159,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "营业外支出附注主表推送（listed 三、营业外支出（注： / soe 八、77）期末 / 期初数；批 D 附注直推族 binding"
+      "description": "营业外支出附注主表推送（listed 五、80 / soe 八、77）期末 / 期初数；批 D 附注直推族 binding"
     },
     {
       "rule_id": "K2.tb_amount",
@@ -7079,7 +7079,7 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "三、所得税费用",
+          "listed": "五、81",
           "soe": "八、78"
         },
         "table": "所得税费用",
@@ -7100,7 +7100,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "所得税费用附注主表推送（listed 三、所得税费用 / soe 八、78）期末 / 期初数；批 D 附注直推族 binding"
+      "description": "所得税费用附注主表推送（listed 五、81 / soe 八、78）期末 / 期初数；批 D 附注直推族 binding"
     },
     {
       "rule_id": "L6.tb_amount",

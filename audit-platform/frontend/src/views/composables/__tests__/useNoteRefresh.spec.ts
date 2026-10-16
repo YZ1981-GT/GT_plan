@@ -86,6 +86,29 @@ describe('useNoteRefresh disclosure:note-text-updated', () => {
     }
   })
 
+  it.each([
+    // 2026-10-16 上市损益类按 Word 从「三」章改挂到第五章：现行编号不含科目关键词，按科目号的刷新须认新编号
+    ['6101', '五、75'],
+    ['6701', '五、77'],
+    ['6711', '五、80'],
+    ['6115', '五、78'],
+    ['6702', '五、76'],
+  ])('accountCode %s 刷新上市现行编号 %s（载荷不带 sectionId）', async (accountCode, section) => {
+    const fetchDetail = vi.fn(async () => undefined)
+    const currentNote = ref<{ note_section: string } | null>({ note_section: section })
+    const api = useNoteRefresh({
+      projectId: ref('p1'),
+      year: ref(2024),
+      currentNote,
+      fetchDetail,
+      fetchTree: vi.fn(async () => undefined),
+      staleRecalc: vi.fn(async () => undefined),
+    })
+    api.onDisclosureNoteTextUpdated({ projectId: 'p1', accountCode })
+    await vi.advanceTimersByTimeAsync(500)
+    expect(fetchDetail).toHaveBeenCalledWith(section)
+  })
+
   it('does not refresh disclosure-family section when payload lacks accountCode and no sectionId match', async () => {
     const fetchDetail = vi.fn(async () => undefined)
     const currentNote = ref<{ note_section: string } | null>({ note_section: '五、22' })

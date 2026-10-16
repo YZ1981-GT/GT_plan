@@ -427,7 +427,8 @@ export function isD4RevenueNoteSection(noteSection: string): boolean {
 export function isG13FairValueNoteSection(noteSection: string): boolean {
   const s = String(noteSection || '').trim()
   if (!s) return false
-  if (s === '三、公允价值变动收益' || s.startsWith('三、公允价值变动')) return true
+  // 上市 五、75；「三、公允价值变动…」是 2026-10-16 按 Word 改挂前的旧编号（存量库改写前仍可能出现）
+  if (s === '五、75' || s.startsWith('三、公允价值变动')) return true
   if (s === '八、72' || s.startsWith('八、72')) return true
   return false
 }
@@ -436,7 +437,8 @@ export function isG13FairValueNoteSection(noteSection: string): boolean {
 export function isG14CreditImpairmentNoteSection(noteSection: string): boolean {
   const s = String(noteSection || '').trim()
   if (!s) return false
-  if (s === '三、信用减值损失' || s.startsWith('三、信用减值')) return true
+  // 上市 五、76；「三、信用减值…」是改挂前的旧编号（含库里的截断形态）
+  if (s === '五、76' || s.startsWith('三、信用减值')) return true
   if (s === '八、73' || s.startsWith('八、73')) return true
   return false
 }
@@ -564,7 +566,8 @@ export function isH9LeaseLiabilityNoteSection(noteSection: string): boolean {
 export function isH10AssetDisposalNoteSection(noteSection: string): boolean {
   const s = String(noteSection || '').trim()
   if (!s) return false
-  if (s === '三、资产处置收益' || s.startsWith('三、资产处置')) return true
+  if (s === '五、78') return true // 上市（2026-10-16 按 Word 改挂到第五章）；纯编号精确匹配
+  if (s === '三、资产处置收益' || s.startsWith('三、资产处置')) return true // 改挂前的旧编号（含截断形态）
   if (s === '八、75' || s.startsWith('八、75')) return true
   if (s === '资产处置收益' || s === '资产处置损益' || (s.includes('资产处置') && !s.includes('清理'))) return true
   return false
@@ -586,14 +589,15 @@ export function isI1IntangibleNoteSection(noteSection: string): boolean {
 /**
  * 是否像 K11 资产减值损失相关附注节（6701）。
  * 权威 note_template_variant_matrix.json · zi_chan_jian_zhi_sun_shi：
- *   上市 → 三、资产减值损失（损益表附注，listed 无 五/八 编号，靠 section_title 关键词）
+ *   上市 → 五、77（2026-10-16 按 Word 从「三」章改挂到第五章；改挂前是「三」章下的关键词截断编号）
  *   国企 → 八、74（国企报表项目附注）
- * 注：此前误用 五、73/五、75（五、73 实为「外币货币性项目」），已修正为关键词 + 八、74。
+ * 注：更早误用 五、73/五、75（五、73 实为「外币货币性项目」，五、75 现为公允价值变动收益）；纯编号一律精确匹配。
  */
 export function isK11AssetImpairmentNoteSection(noteSection: string): boolean {
   const s = String(noteSection || '').trim()
   if (!s) return false
-  // 标题关键词（"三、资产减值损失（损失以…）" / "加：资产减值损失" 等，不含"信用减值损失"）
+  if (s === '五、77') return true
+  // 标题关键词（旧编号 / "加：资产减值损失" 等，不含"信用减值损失"）
   if (s.includes('资产减值损失')) return true
   if (s === '八、74' || s.startsWith('八、74')) return true
   return false
@@ -601,12 +605,13 @@ export function isK11AssetImpairmentNoteSection(noteSection: string): boolean {
 
 /**
  * 是否像 K13 营业外支出相关附注节（6711）。
- * 权威 zi_chan：上市 → 三、营业外支出；国企 → 八、77。
- * 关键词"营业外支出"（区别于 K12"营业外收入"6301）。
+ * 权威 ying_ye_wai_zhi_chu：上市 → 五、80（2026-10-16 按 Word 改挂到第五章）；国企 → 八、77。
+ * 关键词"营业外支出"（区别于 K12"营业外收入"6301）兜底旧编号。
  */
 export function isK13NonOperatingExpenseNoteSection(noteSection: string): boolean {
   const s = String(noteSection || '').trim()
   if (!s) return false
+  if (s === '五、80') return true
   // 精确排除"营业外收入"（K12），仅匹配"营业外支出"
   if (s.includes('营业外收入')) return false
   if (s.includes('营业外支出')) return true
@@ -792,7 +797,11 @@ export function isN4TaxesAndSurchargesNoteSection(noteSection: string): boolean 
   return false
 }
 
-/** N5 所得税费用（仅国企 八、78；上市 null 无独立章节）。权威 suo_de_shui_fei_yong。精确===。 */
+/**
+ * N5 所得税费用（国企 八、78）。权威 suo_de_shui_fei_yong。精确===。
+ * 上市模板有章节 五、81（2026-10-16 按 Word 从「三」章改挂到第五章），但上市侧跳转未接：沿用原
+ * 「上市不跳转」行为（见 resolveNoteDisclosureJumpTarget 的 N5 分支），接入需另核上市披露 sheet。
+ */
 export function isN5IncomeTaxExpenseNoteSection(noteSection: string): boolean {
   const s = String(noteSection || '').trim()
   if (!s) return false
@@ -891,7 +900,7 @@ export function resolveNoteDisclosureJumpTarget(note: unknown): NoteDisclosureJu
     }
   }
 
-  // H10 资产处置收益（三、资产处置收益 / 八、75）
+  // H10 资产处置收益（上市 五、78 / 国企 八、75）
   if (isH10AssetDisposalNoteSection(section)) {
     const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
     return {
@@ -978,7 +987,7 @@ export function resolveNoteDisclosureJumpTarget(note: unknown): NoteDisclosureJu
     return { sheet: variant === 'listed' ? K2_DISCLOSURE_SHEET_LISTED : K2_DISCLOSURE_SHEET_SOE, wpId, variant, reason: `章节 ${section}`, wpCode: 'K10' }
   }
 
-  // K11 资产减值损失（关键词=上市三、资产减值损失 / 八、74=国企）——须在通用「附注披露信息」sheet 回退之前
+  // K11 资产减值损失（上市 五、77 + 关键词兜底旧编号 / 国企 八、74）——须在通用「附注披露信息」sheet 回退之前
   if (isK11AssetImpairmentNoteSection(section)) {
     const variant = section.startsWith('八、74') || section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
     return {
@@ -1148,7 +1157,7 @@ export function resolveNoteDisclosureJumpTarget(note: unknown): NoteDisclosureJu
     }
   }
 
-  // N5 所得税费用（仅国企 八、78；上市无独立章节→上市不跳转）
+  // N5 所得税费用（国企 八、78；上市 五、81 的跳转未接 → 上市不跳转，见 isN5IncomeTaxExpenseNoteSection）
   if (isN5IncomeTaxExpenseNoteSection(section)) {
     if (!section.startsWith('八') && !std.startsWith('soe')) return null
     return {

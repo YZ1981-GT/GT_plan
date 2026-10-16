@@ -13,6 +13,8 @@
 - 目标是叶子 ⇒ 来源该节的全部后代按原顺序并入该节正文（小标题转加粗段落）。目标有子节点 ⇒ 来源自身正文落到
   与目标同名的唯一子节点（「一 公司基本情况」→「一、1 公司基本情况」）；来源同时有子标题时，自身正文另列为
   ``{source_id}#body``（章首正文），找不到同名正文节需人工对应。
+- 章即正文：目标章下**只有**一个同名正文节且它没有下级（上市「十 公允价值」→「十、1 公允价值」）⇒ 按叶子处理，
+  来源章内的小标题（Word「（1）以公允价值计量的项目和金额」…「（5）…」）是这段正文的组成部分，一并并入。
 - 手工对应：值为有子节点的目标 ⇒ 锚点（其下小标题在该目标内定位，自身正文按章首正文规则）；否则为写入目标，
   来源的后代并入。
 """
@@ -177,6 +179,15 @@ def _label(target: Mapping[str, Any]) -> str:
     return f"{target.get('note_section') or ''} {target.get('section_title') or ''}".strip()
 
 
+def _sole_body_leaf(tree: TargetTree, target: Mapping[str, Any]) -> dict[str, Any] | None:
+    """章下只有一个与章同名、自身无下级的正文节 ⇒ 返回它（章即正文）；否则 None。"""
+    kids = tree.kids(target)
+    if len(kids) != 1 or tree.kids(kids[0]):
+        return None
+    key = canonical_title(target.get("section_title"))
+    return kids[0] if key and canonical_title(kids[0].get("section_title")) == key else None
+
+
 def _find(pool: list[dict[str, Any]], title: str) -> list[dict[str, Any]]:
     key = canonical_title(title)
     if not key:
@@ -284,6 +295,10 @@ def locate_by_tree(
             for child in node.children:
                 visit(child, None, title)
             return
+        sole = _sole_body_leaf(tree, target) if _kind != "manual" else None
+        if sole is not None:  # 章即正文：整章（含章内小标题）落到同名正文节
+            proposal = (sole, "chapter_body", f"正文落到「{_label(target)}」下的同名正文节「{_label(sole)}」", confidence)
+            target = sole
         kids = tree.kids(target)
         if not kids:  # 目标是叶子：后代全部并入该节正文（用户另行手工指定的后代除外，连同其下级单独处理）
             parts: list[str] = [node.section.html]

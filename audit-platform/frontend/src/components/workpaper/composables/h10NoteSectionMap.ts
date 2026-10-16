@@ -1,7 +1,8 @@
 /**
  * H10 资产处置损益（6115）↔ 附注章节映射
  *
- * note_template_listed：三、资产处置收益（chapter-03…zi-chan-chu-zhi-shou-yi）
+ * note_template_listed：五、78 资产处置收益（section_id chapter-03…zi-chan-chu-zhi-shou-yi 不变，
+ *   2026-10-16 按四版 Word 从「三」章改挂到「五 财务报表项目附注」章）
  * note_template_soe / variant_matrix：八、75 资产处置收益
  */
 export type H10DisclosureVariant = 'listed' | 'soe'
@@ -12,9 +13,9 @@ export const H10_SOE_NOTE_SECTION = '八、75'
  * 🔴 上市章节号必须逐字等于模板 `section_number` —— `sync_from_workpaper` 按
  * `(project_id, year, note_section)` **精确匹配**定位，差一个字就会新建垃圾章节。
  *
- * listed 模板 `三、` 章的 `section_number` 被 md 重建截断为 10 字符
- * （`三、资产处置收益（损`），这是**既有真源形态**（全库 70+ 条同款，K11~K13 曾同款踩中）
- * → 修法是本常量对齐模板，不是改模板编号。
+ * 原上市编号是挂在「三」章下的 md 重建 10 字截断值（K11~K13 曾同款踩中）；
+ * 2026-10-16 模板按四版 Word 改挂为 `五、78`，旧编号进该节 `legacy_section_numbers`，
+ * 后端 `normalize_section_code` 归一 —— 本常量随模板同步改。
  */
 /*
  * 🔴 章节号字面量必须**内联**在下面的对象里，且对象体内**不要写注释**：
@@ -23,16 +24,20 @@ export const H10_SOE_NOTE_SECTION = '八、75'
  * 字样会被优先抓到（两种情况本 spec 都实测踩过）。
  */
 export const H10_NOTE_SECTION = {
-  listed: '三、资产处置收益（损',
+  listed: '五、78',
   soe: H10_SOE_NOTE_SECTION,
 } as const satisfies Record<H10DisclosureVariant, string>
 
 /** 上市章节号（= `H10_NOTE_SECTION.listed`，单一真源在上面的对象里） */
 export const H10_LISTED_NOTE_SECTION: string = H10_NOTE_SECTION.listed
 
-/** 界面展示用章节名（截断的 section_number 直接显示不可读；定位一律用 H10_NOTE_SECTION） */
+/**
+ * 界面展示用章节名 = 定位编号 + 节标题（定位一律用 H10_NOTE_SECTION）。
+ * 上市原显示「三、资产处置收益」：当时定位编号是不可读的截断值，故另写展示名；2026-10-16 模板按 Word
+ * 改挂为 `五、78` 后两版同形。
+ */
 export const H10_NOTE_SECTION_DISPLAY = {
-  listed: '三、资产处置收益',
+  listed: '五、78 资产处置收益',
   soe: '八、75 资产处置收益',
 } as const satisfies Record<H10DisclosureVariant, string>
 

@@ -27,9 +27,9 @@ function listedSnap(partial: Record<string, { current?: number; prior?: number }
 
 describe('G13_NOTE_SECTION', () => {
   it('上市/国企章节对齐模板', () => {
-    expect(G13_NOTE_SECTION.listed).toBe('三、公允价值变动收益')
+    expect(G13_NOTE_SECTION.listed).toBe('五、75')
     expect(G13_NOTE_SECTION.soe).toBe('八、72')
-    expect(isG13FairValueNoteSection('三、公允价值变动收益')).toBe(true)
+    expect(isG13FairValueNoteSection('五、75')).toBe(true)
     expect(isG13FairValueNoteSection('八、72')).toBe(true)
   })
 })
@@ -89,9 +89,9 @@ describe('resolveG13NoteTemplateLabel', () => {
 })
 
 describe('resolveNoteDisclosureJumpTarget — G13', () => {
-  it('三、公允价值变动收益 → G13 上市披露表', () => {
+  it('五、75 → G13 上市披露表', () => {
     const t = resolveNoteDisclosureJumpTarget({
-      note_section: '三、公允价值变动收益',
+      note_section: '五、75',
       last_sync_wp_id: 'wp-g13',
       table_data: {},
     })

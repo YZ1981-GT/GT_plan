@@ -86,13 +86,15 @@ class TestDesignBaseline:
         ("五、1", "货币资金", "listed", "account_explanation"),
         ("十二、长期股权投资", "长期股权投资", "soe", "account_explanation"),  # 国企母公司章
         ("四、存货", "存货", "soe", "narrative"),                  # 同名跨类：按章号判
-        # JSON 把以下节放进上市会计政策章，Word 在项目附注章
-        ("三、所得税费用", "所得税费用", "listed", "account_explanation"),
-        ("三、现金流量表项目注释", "现金流量表项目注释", "listed", "account_explanation"),
+        # 原 JSON 把以下节放进上市会计政策章（Word 在项目附注章）：2026-10-16 按 Word 改挂后按章号判
+        ("五、81", "所得税费用", "listed", "account_explanation"),
+        ("五、82", "现金流量表项目注释", "listed", "account_explanation"),
+        # 库内残留的非别名旧形态（真库重药安徽有这种行）：仍靠 Word 标题索引纠正（第 2 条）
+        ("三、信用减值损失（损", "信用减值损失", "listed", "account_explanation"),
         # matrix 把以下节登记为科目，Word 在会计政策 / 其他重要事项章
         ("三、借款费用", "借款费用", "listed", "narrative"),
         ("三、债务重组【不适用", "债务重组", "listed", "narrative"),
-        ("十四、终止经营", "终止经营", "listed", "narrative"),
+        ("十五、7", "终止经营", "listed", "narrative"),
     ])
     def test_baseline(self, code: str, title: str, tt: str, expected: str):
         assert classify_note_section(code, tt, section_title=title) == expected
@@ -103,7 +105,7 @@ class TestDesignBaseline:
 
     def test_account_section_never_becomes_container(self):
         assert classify_note_section("八、1", "soe", has_children=True, has_body=False) == "account_explanation"
-        assert classify_note_section("三、所得税费用", "listed", section_title="所得税费用",
+        assert classify_note_section("五、81", "listed", section_title="所得税费用",
                                      has_children=True, has_body=False) == "account_explanation"
 
     @pytest.mark.parametrize("tt,rs,code,title", [

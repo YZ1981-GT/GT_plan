@@ -8,9 +8,9 @@
  *   数据引 `'审定表K13-1'` 与 `'明细表K13-2'!R*`。
  * - `note_template_soe.json` §八、77 表名「营业外支出」，同为 4 列。
  *
- * 🔴 **上市侧章节号是 `三、营业外支出（注：`** —— listed 模板 `三、` 整章
- * `section_number` 被 md 重建截断为 10 字符，是既有真源形态，**不要"修正"**。
- * 旧常量写 `营业外支出` → 上市侧同步落不到章节。
+ * 🔴 **上市侧章节号是 `五、80`**（必须逐字等于模板 `section_number`）—— 2026-10-16 按四版 Word
+ * 从「三」章改挂到「五 财务报表项目附注」章；原「三」章截断编号是别名（见该节 `legacy_section_numbers`），
+ * 后端 `normalize_section_code` 归一。更早的旧常量写 `营业外支出` → 上市侧同步落不到章节。
  *
  * 🔴 旧常量只声明 3 列 → 第 4 列「计入当期非经常性损益的金额」组件已录入却从未推送。
  *
@@ -32,7 +32,7 @@ import {
 export type K13DisclosureVariant = KPlVariant
 
 export const K13_NOTE_SECTION = {
-  listed: '三、营业外支出（注：',
+  listed: '五、80',
   soe: '八、77',
 } as const satisfies Record<K13DisclosureVariant, string>
 

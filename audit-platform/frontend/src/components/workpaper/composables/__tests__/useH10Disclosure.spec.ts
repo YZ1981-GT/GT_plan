@@ -177,9 +177,9 @@ describe('useH10Disclosure', () => {
 
     const payloads = buildH10SyncPayloads('wp-1', 'listed', [], disc.getSyncSnapshot())
     expect(payloads).toHaveLength(1)
-    // 章节号是 md 截断值（模板 section_number 实为「三、资产处置收益（损」10 字符），
+    // 章节号逐字等于模板 section_number（2026-10-16 起上市为「五、78」），
     // sync_from_workpaper 按此精确定位；H10_NOTE_SECTION_DISPLAY 才是给用户看的展示值。
-    expect(payloads[0].section_id).toBe('三、资产处置收益（损')
+    expect(payloads[0].section_id).toBe('五、78')
     // 表名是 H10_MAIN_SUBTABLE（原「项  目」是表头首格泄漏的孤儿表名，已修正）
     const main = payloads[0].sub_table_data['资产处置收益（损失以“-”填列）']
     expect(main.some((r) => r.row_key === 'fixed_asset_disposal')).toBe(true)

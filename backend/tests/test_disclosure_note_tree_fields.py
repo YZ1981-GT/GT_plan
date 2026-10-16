@@ -19,7 +19,7 @@ import pytest
 from app.models.report_models import DisclosureNote
 from app.services.note_section_catalog import DATA_DIR, filter_template_sections
 from app.services.note_template_merge import merge_templates
-from tests.test_disclosure_note_rag_characterization import _added_note, _make_engine, _minimal_template
+from tests.test_disclosure_note_generation_text_order import _added_note, _make_engine, _minimal_template
 
 APP = Path(__file__).resolve().parents[1] / "app"
 TREE = {"section_id": "chapter-05-cun-huo", "level": 2, "parent_section_id": "chapter-05", "sort_index": 3}

@@ -8,15 +8,14 @@
 | K8 销售费用     | 五、64 | 八、65 |
 | K9 管理费用     | 五、65 | 八、66 |
 | K10 其他收益    | 五、68 | 八、69 |
-| K11 资产减值损失 | 三、资产减值损失（损 | 八、74 |
-| K12 营业外收入  | 三、营业外收入（注： | 八、76 |
-| K13 营业外支出  | 三、营业外支出（注： | 八、77 |
+| K11 资产减值损失 | 五、77 | 八、74 |
+| K12 营业外收入  | 五、79 | 八、76 |
+| K13 营业外支出  | 五、80 | 八、77 |
 
-🔴 **listed 侧三个章节号带截断后缀是模板既有形态，不是笔误** —— listed 模板
-``三、`` 整章 70+ 条 ``section_number`` 都被 ``rebuild_note_from_md.py`` 截断为
-10 字符（``三、重要性标准确定方`` / ``三、投资性房地产【不`` …）。改章节号会波及
-全章与并发 spec，故本脚本**只改表名/行/列/guidance，不动 section_number**，
-由前端常量对齐模板实测值。
+本脚本**只改表名/行/列/guidance，不动 section_number**（章节号按模板现存值，前端常量与之对齐）。
+listed 侧三节原挂 ``三、`` 章、编号是 ``rebuild_note_from_md.py`` 截出的 10 字截断值；2026-10-16
+spec ``disclosure-note-template-word-realignment`` 按四版 Word 改挂到第五章（``五、77`` / ``五、79`` /
+``五、80``，旧编号为别名），本脚本 PLAN 随之同步。
 
 历史问题（2026-07-30 实测）：
 
@@ -312,7 +311,7 @@ PLAN: list[dict[str, Any]] = [
     {
         "cycle": "K11",
         "variant": "listed",
-        "section": "三、资产减值损失（损",
+        "section": "五、77",
         "tables": [
             {
                 "rename_from": LEAKED_TABLE_NAME,
@@ -333,7 +332,7 @@ PLAN: list[dict[str, Any]] = [
     {
         "cycle": "K12",
         "variant": "listed",
-        "section": "三、营业外收入（注：",
+        "section": "五、79",
         "tables": [
             {
                 "rename_from": LEAKED_TABLE_NAME,
@@ -358,7 +357,7 @@ PLAN: list[dict[str, Any]] = [
     {
         "cycle": "K13",
         "variant": "listed",
-        "section": "三、营业外支出（注：",
+        "section": "五、80",
         "tables": [
             {
                 "rename_from": LEAKED_TABLE_NAME,

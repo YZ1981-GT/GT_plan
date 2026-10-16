@@ -1,0 +1,26 @@
+[
+ {
+  "variant": "soe_consolidated",
+  "kind": "json_only",
+  "key": "八、94",
+  "reason": "国企两版 Word 无「一般风险准备」节（上市 Word 有，金融企业适用）；底稿同步注册表与公式推送规则引用 八、94，删节会让同步 / 推送断链。保留待用户确认（disclosure-note-template-word-realignment 2026-10-16 汇报）"
+ },
+ {
+  "variant": "soe_standalone",
+  "kind": "json_only",
+  "key": "八、94",
+  "reason": "同 soe_consolidated 八、94"
+ },
+ {
+  "variant": "listed_consolidated",
+  "kind": "chapter_title",
+  "key": "十六",
+  "reason": "Word 为「公司财务报表主要项目注释」，种子「母公司财务报表主要项目注释」多一个「母」字：母公司章 spec 需求 3.2 已裁决保留并由 test_note_parent_company_chapter::TestListedTitleDeviation 双向锁死；是否改为 Word 待用户确认（2026-10-16 汇报）"
+ },
+ {
+  "variant": "listed_consolidated",
+  "kind": "section_title",
+  "key": "十六、营业收入与营业成本",
+  "reason": "Word 为「营业收入和营业成本（披露格式参考附注五、62）」（含编制提示）；母公司章子节按标题登记科目（variant matrix、test_note_parent_company_chapter 子节清单），改标题会断开科目映射。保留种子标题，随上一条一并待用户确认"
+ }
+]

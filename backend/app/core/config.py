@@ -331,13 +331,9 @@ class Settings(BaseSettings):
     VISIBILITY_INVALIDATION_DISPATCHER_ENABLED: bool = True
 
     # --- disclosure-note-knowledge-ai-enrichment ---
-    # 附注 AI 正文生成的知识库 RAG 检索接入开关（加法式、可开关、fail-open）。
-    # 默认 False = 零回归：行为与接入前逐字一致，_generate_text_with_llm / generate_notes
-    # 不调用 NoteKnowledgeEnricher，退回现有三级填充（上年 DB → 通用 LLM → 模板）。
-    # 生产/试点可经 env 置 True 启用 RAG（检索知识库文档作参照上下文 + Citation 溯源）。
-    # 任一环失败（知识库为空 / semantic_search 抛异常 / LLM 不可用）一律 fail-open 降级，
-    # 故开关仅控制"是否尝试 RAG"，不影响可用性。
-    DISCLOSURE_NOTE_RAG_ENABLED: bool = False
+    # 附注「AI 填充 / 批量 AI 填充」（用户手动单击，NoteKnowledgeEnricher）的知识库 RAG 参数。
+    # 原生成链开关 DISCLOSURE_NOTE_RAG_ENABLED 已删（用户 2026-10-16：大模型只在用户手动单击时调用 ⇒
+    # 生成附注不再调大模型 / 知识库，该开关已无消费方；spec disclosure-note-template-word-realignment Task 22）。
     # 单章节 RAG 检索返回的知识库片段上限（semantic_search top_k），避免 token 溢出。
     DISCLOSURE_NOTE_RAG_TOP_K: int = 5
     # 拼入 LLM user prompt 的参照上下文字符预算上限，超出则截断超长片段。
