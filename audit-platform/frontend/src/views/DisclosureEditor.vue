@@ -273,7 +273,7 @@
           >
             <template #default="{ data }">
               <div v-if="data.isGroup" class="gt-de-tree-group">
-                <span class="gt-de-tree-group-label">{{ data.label }}</span>
+                <span class="gt-de-tree-group-label" :title="data.label">{{ data.label }}</span>
                 <span v-if="getGroupValidationErrorCount(data)" class="gt-de-tree-error-badge">{{ getGroupValidationErrorCount(data) }}</span>
               </div>
               <div v-else class="gt-de-tree-node" :class="{ 'gt-de-tree-node-active': currentNote?.id === data.id, 'gt-de-tree-node-error': hasSectionValidationError(data.data?.note_section), 'gt-de-tree-node-excluded': data.data?.status === 'not_applicable' }"

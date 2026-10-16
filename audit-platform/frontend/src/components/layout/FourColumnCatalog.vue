@@ -141,6 +141,7 @@ import { DataLine, Notebook, Document, TrendCharts, FolderOpened, Connection } f
 import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
 import { eventBus } from '@/utils/eventBus'
+import { chapterLabel } from '@/views/composables/noteChapterLabels'
 
 const props = defineProps<{
   project: any
@@ -267,27 +268,7 @@ const reportTypes = [
 // 附注
 const noteSections = ref<any[]>([])
 
-// 按大章分组附注（与右侧编辑器树一致）
-// 大章标题映射：与 useNoteTree.ts 中 SOE_LABELS 保持一致
-const CHAPTER_LABELS: Record<string, string> = {
-  '一': '公司基本情况',
-  '二': '财务报表编制基础',
-  '三': '遵循企业会计准则的声明',
-  '四': '重要会计政策、会计估计',
-  '五': '会计政策变更及差错更正',
-  '六': '税项',
-  '七': '企业合并及合并财务报表',
-  '八': '财务报表主要项目注释',
-  '九': '或有事项',
-  '十': '资产负债表日后事项',
-  '十一': '关联方关系及其交易',
-  '十二': '母公司财务报表附注',
-  '十三': '其他披露内容',
-  '十四': '财务报表之批准',
-  '十五': '其他重要事项',
-  '十六': '公司财务报表主要项目注释',
-  '十七': '补充资料',
-}
+// 按大章分组附注（与右侧编辑器树一致：章标题同取 noteChapterLabels.chapterLabel —— 章行标题优先、内置名称兜底）
 const CHAPTER_PREFIXES = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二', '十三', '十四', '十五', '十六', '十七']
 
 const noteChapters = computed(() => {
@@ -304,8 +285,8 @@ const noteChapters = computed(() => {
       items.push(s)
     })
     if (items.length > 0) {
-      // 大章标题从映射表取，确保与右侧树完全一致
-      const label = CHAPTER_LABELS[prefix] || prefix
+      const rows = noteSections.value.map((s: any) => ({ note_section: s.code, section_title: s.title }))
+      const label = chapterLabel(rows, prefix, props.project?.template_type) || prefix
       chapters.push({ prefix, label, items })
     }
   }

@@ -22,7 +22,9 @@ class NoteSectionInstance(Base, SoftDeleteMixin, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"), nullable=False)
     template_type: Mapped[str] = mapped_column(String(20), nullable=False)  # soe / listed
-    section_number: Mapped[str] = mapped_column(String(20), nullable=False)
+    # 不限长（V188）：裁剪页写入口径过滤后的全部种子章节，叙述性章节以标题作编号（现算最长 42 字），
+    # 与 disclosure_notes.note_section 同口径；旧 VARCHAR(20) 在 PG 上报 22001、整页初始化失败
+    section_number: Mapped[str] = mapped_column(String, nullable=False)
     section_title: Mapped[str] = mapped_column(String(200), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="retain")  # retain / skip / not_applicable
     skip_reason: Mapped[str | None] = mapped_column(Text, nullable=True)

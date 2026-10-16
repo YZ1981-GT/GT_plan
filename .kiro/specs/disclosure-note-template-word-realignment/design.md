@@ -113,12 +113,12 @@ Phase 4、5 与种子无关，可穿插。Phase 6 必须在种子修好、生成
 
 ### 4.1 计划
 
-1. **改编号**：行的 `note_section` 在别名表中 ⇒ 改为新编号。新编号已有活动行（同项目同年度）⇒ 不改，记冲突交人工（不合并两份内容）。
-2. **树字段**：按种子（项目口径过滤后）重写 `parent_section_id`、`level`、`sort_index` / `sort_order`、`section_id`（仅当行的 section_id 为空或指向别的节）、`section_title`（仅当行标题等于该节某个旧标题——用户改过的标题不动）。
-3. **补章节**：种子中适用本口径、项目没有的节，按生成链同一构造函数插入空章（无正文、表格为模板空表、`status=draft`）。生成链的单章构造若与批量生成耦合，抽出共用函数，禁止复制一份。
+1. **改编号**：行的 `note_section` 在别名表中 ⇒ 改为新编号。新编号已被同项目同年度任何行占用（**含软删行**：唯一索引 `uq_disclosure_notes_project_year_section` 不排除软删）⇒ 不改，记冲突交人工（不合并两份内容）。
+2. **树字段**：按种子（项目口径过滤后）重写 `parent_section_id`、`level`、`sort_index` / `sort_order`、`section_id`、`section_title`（仅当行标题等于该节某个已知标题——现名、口径名、`legacy_titles`；用户改过的标题不动）。`section_id`（实施时细化）：对上模板的行一律对齐模板 —— 子节点的上级按模板写，上级不对齐树就断；目标 id 被别的行占着且那一行不会让出时不改并报告；挂在被对齐行下面的自建节，上级跟着改。
+3. **补章节**：种子中适用本口径、项目没有的节，走生成链 `generate_notes(only_sections=…, strict=True)` 插入（与新生成项目一致：正文 = 上年附注 → 模板正文，表格按试算表取数，`status=draft`，不调大模型；实施时由「空章」改为此口径，避免存量项目与新项目同一节内容不同）。编号被软删行占着 ⇒ 不补（用户删除 / 裁剪过，回收站可恢复）。生成链本身同步修：遇到软删编号原来会 INSERT 撞唯一索引（删章 / 裁剪后再生成整次 500），改为跳过。已删除（回收站）的项目整体跳过：生成链取不到其口径。
 4. **表格结构**：见 4.2。
 5. **脱树旧行**：编号不在种子（含别名）且父节点不存在的行。规则：能按「规范化标题 + 所属章类型」唯一对上种子节、且该节在项目内无活动行 ⇒ 改挂为该节；对上但该节已有行 ⇒ 不动，报告两行内容差异；对不上 ⇒ 不动，报告。脱树行一律不删除（删除只在用户确认后由单独命令执行）。
-6. **关联表**：`formula_push_state.note_section` 与 `addr_id` 中 `note://{旧}/` 前缀、`note_section_instances.section_number`、未过期 `note_section_locks`、`wp_optimization` 模板元数据表的 `note_section`，按同一别名表改写。`note_section_instances.section_number` 为 `String(20)`，新编号超长时先迁移放宽列宽（`V188` / `R188`，与 `disclosure_notes.note_section` 同为不限长 `String`），不截断。
+6. **关联表**：`formula_push_state.note_section` 与 `addr_id` 中 `note://{旧}/` 前缀（新 `addr_id` 撞唯一索引则不改并报告）、`note_section_instances.section_number`、未释放的 `note_section_locks`，按同一「旧 → 新」表（改编号 + 改挂）改写。`wp_template_metadata.note_section` 是模板级、无项目维度且库内 0 行有值，不在逐项目修复范围。`note_section_instances.section_number` 为 `String(20)`，新编号超长时先迁移放宽列宽（`V188` / `R188`，与 `disclosure_notes.note_section` 同为不限长 `String`），不截断。
 7. 不改写：`note_validation_findings`、`note_text_batch_applications.detail`、trace 事件、`deliverable_section_state`（历史留痕，按旧编号记录是事实）。
 
 ### 4.2 表格结构

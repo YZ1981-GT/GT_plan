@@ -1719,12 +1719,20 @@ class DisclosureEngine:
         project_id: UUID,
         year: int,
         template_type: str = "soe",
+        *,
+        only_sections: set[str] | None = None,
+        strict: bool = False,
     ) -> list[dict]:
         """根据模版生成附注初稿，写入 disclosure_notes 表。
+
+        ``only_sections``：只生成这些编号，其余一行不碰（存量项目补章）；``strict``：取数 / 构表 / 公式求值失败即抛出
+        不降级（写库修复用：降级会 rollback 已写入或补空表且零痕迹）。已软删编号不新建（唯一索引含软删行；软删=删除或裁剪）。
 
         Validates: Requirements 4.2, 4.3, 4.8, 4.9, 21.3
         """
         templates = await self._load_templates(project_id, template_type)
+        if only_sections is not None:
+            templates = [t for t in templates if t["note_section"] in only_sections]
         source_template = self._persist_source_template(template_type)
         results = []
 
@@ -1742,6 +1750,8 @@ class DisclosureEngine:
         try:
             await self._preload_data_for_notes(project_id, year)
         except Exception as _pre_err:
+            if strict:
+                raise
             logger.warning("preload data for notes failed: %s", _pre_err)
             try:
                 await self.db.rollback()
@@ -1750,13 +1760,19 @@ class DisclosureEngine:
 
         # Task 10：本项目年度已占用的 section_id —— 补树形字段时不制造重复（取不到就一律不补）
         taken_sids: set[str] | None
+        deleted_codes: set[str] = set()
         try:
             taken_sids = {sid for sid in (await self.db.execute(
                 sa.select(DisclosureNote.section_id).where(
                     DisclosureNote.project_id == project_id, DisclosureNote.year == year,
                     DisclosureNote.is_deleted == sa.false(), DisclosureNote.section_id.is_not(None))
             )).scalars().all() if isinstance(sid, str)}
+            deleted_codes = set((await self.db.execute(sa.select(DisclosureNote.note_section).where(
+                DisclosureNote.project_id == project_id, DisclosureNote.year == year,
+                DisclosureNote.is_deleted == sa.true()))).scalars().all())
         except Exception as _sid_err:
+            if strict:
+                raise
             logger.warning("load taken section_id failed: %s (tree fields not filled)", _sid_err)
             taken_sids = None
             try:  # PG 上失败的查询会让事务 aborted，后续 upsert 全挂 ⇒ 与上面预加载同口径先回滚
@@ -1766,6 +1782,8 @@ class DisclosureEngine:
 
         for tmpl in templates:
             note_section = tmpl["note_section"]
+            if note_section in deleted_codes:
+                continue
             section_title = tmpl["section_title"]
             account_name = tmpl.get("account_name") or section_title
             content_type_str = tmpl.get("content_type", "table")
@@ -1828,6 +1846,8 @@ class DisclosureEngine:
                     per_table_guidance=per_table_guidance,
                 )
             except Exception as _tbl_err:
+                if strict:
+                    raise
                 logger.warning("build table_data failed for %s: %s", note_section, _tbl_err)
                 table_data = None
 
@@ -1842,6 +1862,8 @@ class DisclosureEngine:
                         project_id, year, note_section, table_data,
                     )
                 except Exception as _ev_err:
+                    if strict:
+                        raise
                     logger.warning(
                         "evaluate note formulas failed for %s: %s (fail-open)",
                         note_section, _ev_err,
@@ -1926,6 +1948,8 @@ class DisclosureEngine:
                     from app.services.dataset_query import bind_to_active_dataset
                     await bind_to_active_dataset(self.db, note, project_id, year)
                 except Exception as _bind_err:
+                    if strict:
+                        raise
                     import logging
                     logging.getLogger(__name__).warning(
                         "disclosure_note dataset binding failed: section=%s err=%s",
@@ -1956,6 +1980,8 @@ class DisclosureEngine:
                 version_no=latest + 1,
             )
         except Exception as _vl_err:
+            if strict:
+                raise
             import logging
             logging.getLogger(__name__).warning(f"[VERSION_LINE] note write_stamp failed: {_vl_err}")
 

@@ -6,6 +6,7 @@
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getDisclosureNoteTree, type DisclosureNoteTreeItem } from '@/services/auditPlatformApi'
+import { chapterLabel } from '@/views/composables/noteChapterLabels'
 import { api } from '@/services/apiProxy'
 import { useAcnr } from '@/services/acnr/useAcnr'
 import { withLoading } from '@/composables/useLoading'
@@ -87,23 +88,7 @@ const CHAPTER_GROUPS = [
   { prefix: '十七' },
 ]
 
-// 国企版14章标题
-const SOE_LABELS: Record<string, string> = {
-  '一': '公司基本情况', '二': '财务报表编制基础', '三': '遵循企业会计准则的声明',
-  '四': '重要会计政策、会计估计', '五': '会计政策变更及差错更正', '六': '税项',
-  '七': '企业合并及合并财务报表', '八': '财务报表主要项目注释',
-  '九': '或有事项', '十': '资产负债表日后事项', '十一': '关联方关系及其交易',
-  '十二': '母公司财务报表附注', '十三': '其他披露内容', '十四': '财务报表之批准',
-}
-// 上市版17章标题
-const LISTED_LABELS: Record<string, string> = {
-  '一': '公司基本情况', '二': '财务报表的编制基础', '三': '重要会计政策及会计估计',
-  '四': '税项', '五': '合并财务报表项目附注', '六': '研发支出',
-  '七': '在其他主体中的权益', '八': '政府补助', '九': '金融工具风险管理',
-  '十': '公允价值', '十一': '关联方及关联交易', '十二': '股份支付',
-  '十三': '承诺及或有事项', '十四': '资产负债表日后事项', '十五': '其他重要事项',
-  '十六': '公司财务报表主要项目注释', '十七': '补充资料',
-}
+// 章标题：库内章行标题优先（随项目口径与四版 Word），内置名称兜底 —— 见 noteChapterLabels.ts
 
 // ─── 主表注释章内分组（资产/负债/权益/损益/其他） ────────────────────────────
 //
@@ -142,7 +127,7 @@ const SOE_SECTION_GROUPS: SectionGroupDef[] = [
   { key: 'disclosure', label: '补充披露事项', range: [94, 9999] },
 ]
 
-/** 按模板变体取主表注释章的分组定义（默认国企版，与 SOE_LABELS 缺省一致）。 */
+/** 按模板变体取主表注释章的分组定义（默认国企版，与章标题兜底 SOE_CHAPTER_LABELS 一致）。 */
 function sectionGroupsFor(templateType: string): SectionGroupDef[] {
   return templateType === 'listed' ? LISTED_SECTION_GROUPS : SOE_SECTION_GROUPS
 }
@@ -264,9 +249,8 @@ export function useNoteTree(options: UseNoteTreeOptions): UseNoteTreeReturn {
       const items = notes.filter(n => n.note_section.startsWith(prefix))
       if (!items.length) continue  // 空章节不显示
 
-      // 动态获取章节标题（根据模板类型）
-      const labels = templateType.value === 'listed' ? LISTED_LABELS : SOE_LABELS
-      const chLabel = `${ch.prefix}、${labels[ch.prefix] || items[0]?.section_title || ''}`
+      // 章标题：该章章行（note_section 恰为章号）的标题优先，没有章行才用内置名称
+      const chLabel = `${ch.prefix}、${chapterLabel(notes, ch.prefix, templateType.value) || items[0]?.section_title || ''}`
 
       // 会计政策（国企四/上市三）：直接按模板顺序平铺，不分大类
       if ((ch.prefix === '三' || ch.prefix === '四') && items.length > 10) {
