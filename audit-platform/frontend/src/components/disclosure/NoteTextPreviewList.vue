@@ -16,8 +16,10 @@ const props = defineProps<{
   selected: string[]
   modes: Record<string, ApplyMode>
   editedIds?: string[]
-  /** 提供时在不可用项上显示「指定目标章节」 */
+  /** 提供时在不可用项上显示「指定目标章节」（可写入的节） */
   targets?: TargetSection[]
+  /** 有子节点的章：只给有子标题的来源选，作定位锚点（第 23 组：先对应上级，其下小标题在该章内定位） */
+  anchors?: TargetSection[]
   mappings?: Record<string, string>
 }>()
 
@@ -105,10 +107,16 @@ function modeLabel(item: PreviewItem): string {
         <template v-else>
           <span class="gt-ntp-title">{{ item.source_title }}</span>
           <span class="gt-ntp-reason">{{ item.unavailable_reason || '不可用' }}</span>
-          <el-select v-if="targets" size="small" filterable clearable placeholder="指定目标章节" style="width: 240px"
+          <el-select v-if="targets" size="small" filterable clearable style="width: 280px"
+            :placeholder="item.structural && anchors?.length ? '指定目标章或目标章节' : '指定目标章节'"
             :model-value="mappings?.[item.source_id] ?? ''"
             @update:model-value="(v: any) => emit('map', item.source_id, v || null)">
-            <el-option v-for="t in targets" :key="t.id" :value="t.id" :label="`${t.note_section} ${t.section_title}`" />
+            <el-option-group v-if="item.structural && anchors?.length" label="目标章（其下小标题在该章内定位）">
+              <el-option v-for="t in anchors" :key="t.id" :value="t.id" :label="`【章】${t.note_section} ${t.section_title}`" />
+            </el-option-group>
+            <el-option-group :label="item.structural && anchors?.length ? '写入章节（其下小标题一并并入）' : '写入章节'">
+              <el-option v-for="t in targets" :key="t.id" :value="t.id" :label="`${t.note_section} ${t.section_title}`" />
+            </el-option-group>
           </el-select>
         </template>
       </div>

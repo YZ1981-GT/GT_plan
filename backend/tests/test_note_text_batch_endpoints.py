@@ -51,16 +51,22 @@ class _Actor:
         self.email = f"{self.username}@example.com"
 
 
-def _docx(*blocks: tuple[str, str]) -> bytes:
+def _docx(*blocks: tuple) -> bytes:
+    """``(标题, 正文[, 标题级别=2])``；正文为空不写段落。"""
     import docx
 
     doc = docx.Document()
-    for heading, body in blocks:
-        doc.add_heading(heading, level=2)
-        doc.add_paragraph(body)
+    for heading, body, *level in blocks:
+        doc.add_heading(heading, level=level[0] if level else 2)
+        if body:
+            doc.add_paragraph(body)
     buf = io.BytesIO()
     doc.save(buf)
     return buf.getvalue()
+
+
+#: 按模板树形写的上传文档（第 23 组按章节树逐级定位）：一级章「公司基本情况」自带正文、「重要会计政策」下有「会计期间」
+TREE_DOC = (("公司基本情况", "本公司成立于2001年。", 1), ("重要会计政策、会计估计", "", 1), ("会计期间", "自公历1月1日起。", 2))
 
 
 @pytest_asyncio.fixture
@@ -85,12 +91,21 @@ async def env() -> AsyncGenerator[dict, None]:
             ProjectUser(project_id=ids["p"], user_id=ids["peer"], role=ProjectUserRole.auditor,
                         permission_level=PermissionLevel.edit),
             ProjectUser(project_id=ids["p"], user_id=ids["viewer"], role=ProjectUserRole.auditor),
+            # 章节树（section_id / parent_section_id，与生成链 / Task 10 回填同形）：一级章是容器，正文在其下节点
+            *[DisclosureNote(project_id=ids["p"], year=YEAR, note_section=code, section_title=title,
+                             section_id=sid, level=1, sort_index=0, sort_order=order,
+                             table_data=None)  # 显式 None ⇒ JSON null（与生成链一致，见 test_note_text_batch_targets）
+              for code, title, sid, order in (("一", "公司基本情况", "ch-01", 0), ("四", "重要会计政策、会计估计", "ch-04", 10),
+                                               ("八", "财务报表主要项目注释", "ch-08", 20))],
             DisclosureNote(id=ids["basic"], project_id=ids["p"], year=YEAR, note_section="一、1",
-                           section_title="公司基本情况", text_content="<p>旧基本情况</p>", sort_index=1),
+                           section_title="公司基本情况", text_content="<p>旧基本情况</p>", sort_index=1,
+                           section_id="s-01-01", parent_section_id="ch-01", level=2, sort_order=1),
             DisclosureNote(id=ids["period"], project_id=ids["p"], year=YEAR, note_section="四、会计期间",
-                           section_title="会计期间", sort_index=2),
+                           section_title="会计期间", sort_index=2,
+                           section_id="s-04-01", parent_section_id="ch-04", level=2, sort_order=11),
             DisclosureNote(id=ids["cash"], project_id=ids["p"], year=YEAR, note_section="八、1",
-                           section_title="货币资金", text_content="<p>货币资金说明</p>", sort_index=3),
+                           section_title="货币资金", text_content="<p>货币资金说明</p>", sort_index=3,
+                           section_id="s-08-01", parent_section_id="ch-08", level=2, sort_order=21),
             DisclosureNote(id=ids["foreign"], project_id=ids["src"], year=YEAR, note_section="四、会计期间",
                            section_title="会计期间", sort_index=2),
             KnowledgeFolder(id=ids["pub"], name="公开", access_level=KnowledgeAccessLevel.public, created_by=ids["other"]),
@@ -100,7 +115,8 @@ async def env() -> AsyncGenerator[dict, None]:
         await s.flush()
         s.add_all([
             KnowledgeDocument(id=ids["doc"], folder_id=ids["pub"], name="政策汇编.md",
-                              content_text="# 公司基本情况\n本公司由知识库预填。\n# 会计期间\n自公历1月1日起。"),
+                              content_text="# 公司基本情况\n本公司由知识库预填。\n# 重要会计政策、会计估计\n"
+                                           "## 会计期间\n自公历1月1日起。"),
             KnowledgeDocument(id=ids["secret"], folder_id=ids["priv"], name="私密底稿.md",
                               content_text="# 公司基本情况\n机密正文不得外泄"),
             *_template_rows(ids),
@@ -169,7 +185,7 @@ async def _add_version(env: dict, sections: list[tuple[str, str, str, str]], *, 
 
 
 async def _parse(env: dict, data: bytes | None = None, *, name: str = "附注.docx", ctype: str = DOCX_MIME):
-    data = data if data is not None else _docx(("公司基本情况", "本公司成立于2001年。"), ("会计期间", "自公历1月1日起。"))
+    data = data if data is not None else _docx(*TREE_DOC)
     return await env["client"].post(_url(env, "/disclosure-note-import/parse-upload"),
                                     files={"file": (name, data, ctype)})
 
@@ -370,6 +386,10 @@ class TestParseKnowledge:
         assert resp.status_code == 200, resp.text
         body = resp.json()
         assert body["sections"] and all(s["source_id"].startswith(f"{ids['doc']}:") for s in body["sections"])
+        # 章节树上级按文档命名空间（AC-1.6）：「会计期间」挂在「重要会计政策、会计估计」下
+        by_title = {s["title"]: s for s in body["sections"]}
+        assert by_title["会计期间"]["parent_source_id"] == by_title["重要会计政策、会计估计"]["source_id"]
+        assert by_title["公司基本情况"]["parent_source_id"] is None
         assert any("1 篇文档不可用" in w for w in body["warnings"])
         assert "机密正文" not in resp.text and "私密底稿" not in resp.text
 
@@ -514,34 +534,6 @@ async def test_client_section_metadata_is_discarded():
         {"source_id": "s1", "title": "货币资金", "html": "<p>x</p>",
          "metadata": {"section_kind": "narrative", "note_section": "八、1", "doc_id": "d-1"}}]})
     assert _client_sections(parsed, "upload")[0].metadata == {"doc_id": "d-1"}
-
-
-def _kb(sid: str, title: str, level: int, doc: str) -> object:
-    from app.services.note_document_parser import ParsedSection
-
-    return ParsedSection(source_id=sid, title=title, level=level, html=f"<p>{title}正文</p>", metadata={"doc_id": doc})
-
-
-def test_knowledge_documents_do_not_fold_into_each_other():
-    """多篇知识库文档拼接：下一篇开头的深层标题不得并进上一篇的末节。"""
-    from app.services.note_text_batch_service import MatchResult, fold_unmatched_descendants
-
-    sources = [_kb("d1:s1", "公司基本情况", 1, "d1"), _kb("d2:s1", "补充说明", 2, "d2")]
-    matches = [MatchResult("d1:s1", uuid.uuid4(), "title_exact", "", "candidate"),
-               MatchResult("d2:s1", None, "unmatched", "", "manual_required")]
-    folded_sources, folded = fold_unmatched_descendants(sources, matches)
-    assert folded_sources[0].html == "<p>公司基本情况正文</p>" and folded[1].match_kind == "unmatched"
-
-
-def test_knowledge_document_chapter_does_not_leak_into_next_document():
-    """上一篇末尾的「项目注释」章不得把下一篇的叙述章节门控成科目注释。"""
-    from app.services.note_text_batch_service import match_sections
-
-    target = {"id": uuid.uuid4(), "note_section": "一、1", "section_title": "公司基本情况",
-              "section_kind": "narrative", "chapter_title": None}
-    sources = [_kb("d1:s1", "合并财务报表项目注释", 1, "d1"), _kb("d2:s1", "公司基本情况", 2, "d2")]
-    result = {m.source_id: m for m in match_sections(sources, [target])}
-    assert result["d2:s1"].target_note_id == target["id"]
 
 
 async def _knowledge_source(env: dict) -> dict:

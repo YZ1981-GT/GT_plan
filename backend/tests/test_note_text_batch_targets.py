@@ -37,8 +37,12 @@ async def _add_generated_chapter_rows(env: dict) -> dict[str, uuid.UUID]:
         return DisclosureNote(id=ids[key], project_id=pid, year=YEAR, note_section=code, section_title=title, **kw)
 
     async with env["factory"]() as db:
+        # 端点夹具已按章节树建了章行「一」（第 23 组）：按真库生成形态补齐（空正文、table_data 显式 None）
+        ch1 = (await db.execute(sa.select(DisclosureNote).where(
+            DisclosureNote.project_id == pid, DisclosureNote.note_section == "一"))).scalar_one()
+        ch1.text_content, ch1.table_data, ch1.sort_order = "", None, 1
+        ids["ch1"] = ch1.id
         db.add_all([
-            note("ch1", "一", "公司基本情况", section_id="ch-01", level=1, text_content="", sort_order=1),
             note("ch2", "二", "财务报表编制基础", section_id="ch-02", level=1, text_content="", sort_order=3),
             note("basis", "二、1", "财务报表编制基础", section_id="ch-02-1", parent_section_id="ch-02", level=2,
                  text_content="<p>以持续经营为基础</p>", sort_order=4),

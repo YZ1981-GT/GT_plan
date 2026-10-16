@@ -1,7 +1,9 @@
 /**
  * 附注正文批量写入：界面中文标签与分组判定（R-21：首版直接显示英文枚举与内部 source_id）。
  */
-import type { ApplyMode, NoteTextSource, PreviewItem, PreviewResponse, SourceKind } from '@/composables/useNoteTextBatch'
+import type {
+  ApplyMode, NoteTextSource, ParsedSection, PreviewItem, PreviewResponse, SourceKind, TargetSection,
+} from '@/composables/useNoteTextBatch'
 import type { ContentTemplateItem, ContentTemplateVersion } from '@/composables/useNoteContentTemplate'
 import { fmtDate } from '@/utils/formatters'
 
@@ -55,7 +57,39 @@ export function targetLabel(item: Pick<PreviewItem, 'target_note_section' | 'tar
 }
 
 export interface SourceMatchStatus { label: string; type: 'success' | 'warning' | 'info'; hint: string }
-const SKIPPED_LABELS: Record<string, string> = { folded: '已并入上级章节', out_of_scope: '不在可填范围' }
+const SKIPPED_LABELS: Record<string, string> = {
+  folded: '已并入上级章节', out_of_scope: '不在可填范围', anchor: '已定位到章',
+}
+
+/**
+ * 手工对应下拉的两类目标（第 23 组，与后端 validate_tree_mappings 同口径）：
+ * - anchors：章节树上有子节点的行 —— 只作定位锚点，选中后其下小标题在该章内定位（重新预览）；
+ * - leaves：没有子节点、且在本次可写范围（上传 / 知识库只填叙述性章节，内容模板全套）的行。
+ */
+export function splitMappingTargets(targets: TargetSection[], sourceKind: SourceKind) {
+  const parents = new Set(targets.map(t => t.parent_section_id).filter((v): v is string => !!v))
+  const hasChildren = (t: TargetSection) => !!t.section_id && parents.has(t.section_id)
+  const writable = sourceKind === 'content_template' ? ['narrative', 'account_explanation'] : ['narrative']
+  return {
+    anchors: targets.filter(hasChildren),
+    leaves: targets.filter(t => !hasChildren(t) && writable.includes(t.section_kind)),
+  }
+}
+
+/** 左栏缩进：按章节树深度（上级链长度），不按原始标题级别（国企 Word 章 H1 下节是 H3，按级别会空出一格） */
+export function sourceDepths(sections: Array<Pick<ParsedSection, 'source_id' | 'parent_source_id' | 'level'>>) {
+  const parentOf = new Map(sections.map(s => [s.source_id, s.parent_source_id ?? null]))
+  const hasTree = sections.some(s => s.parent_source_id)
+  const out = new Map<string, number>()
+  for (const s of sections) {
+    if (!hasTree) { out.set(s.source_id, Math.max(0, (s.level || 1) - 1)); continue }
+    let depth = 0
+    let parent = parentOf.get(s.source_id) ?? null
+    while (parent && depth < 10) { depth += 1; parent = parentOf.get(parent) ?? null }
+    out.set(s.source_id, depth)
+  }
+  return out
+}
 
 /**
  * 左栏来源的匹配状态（AC-2.2），与右栏三分组同口径：未预览时为空；
@@ -67,7 +101,8 @@ export function sourceMatchStatuses(
   const out = new Map<string, SourceMatchStatus>()
   if (!preview) return out
   for (const s of preview.skipped_sources ?? []) {
-    out.set(s.source_id, { label: SKIPPED_LABELS[s.match_kind] ?? '未进入预览', type: 'info', hint: '' })
+    out.set(s.source_id, { label: SKIPPED_LABELS[s.match_kind] ?? '未进入预览', type: s.match_kind === 'anchor' ? 'success' : 'info',
+      hint: s.evidence ?? '' })
   }
   for (const item of preview.items) {
     const target = targetLabel(item)

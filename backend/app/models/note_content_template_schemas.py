@@ -177,7 +177,8 @@ class BatchSource(StrictSchema):
 
 
 class ManualMapping(StrictSchema):
-    source_id: str = Field(min_length=1, max_length=160)
+    #: 来源 ID（≤160）或章首正文项「{source_id}#body」（第 23 组）
+    source_id: str = Field(min_length=1, max_length=170)
     target_note_id: UUID
 
 
@@ -226,7 +227,8 @@ class BatchPreviewResponse(StrictSchema):
 
 
 class BatchApplySelection(StrictSchema):
-    source_id: str = Field(min_length=1, max_length=160)
+    #: 来源 ID（≤160）或章首正文项「{source_id}#body」（第 23 组）
+    source_id: str = Field(min_length=1, max_length=170)
     target_note_id: UUID
     mode: BatchApplyMode
     expected_updated_at: datetime | None = None

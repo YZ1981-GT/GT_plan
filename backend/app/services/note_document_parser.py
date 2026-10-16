@@ -12,11 +12,13 @@ import io
 import logging
 import re
 import zipfile
+from collections import Counter
 from dataclasses import dataclass, field
 from html import escape as html_escape
 from typing import Any
 
 from app.services.note_html_sanitizer import sanitize_note_html as _sanitize
+from app.services.note_pdf_outline import locate_heading_lines, outline_headings
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +95,26 @@ _CN_HEADING_RE = re.compile(
     r"|^\([一二三四五六七八九十百千\d]+\)"
 )
 
+#: 标题编号排位（AC-1.6）：「一、」>「（一）」>「1.」/「1、」>「（1）」>「①」。PDF 与纯文字的标题据此定层级
+#: 以成树（DOCX 用标题样式）；只定层级，是不是标题仍按 ``_CN_HEADING_RE`` / 字号判（「（1）」开头的正文段很常见）
+_HEADING_RANKS: tuple[tuple[int, re.Pattern[str]], ...] = (
+    (1, re.compile(r"^[一二三四五六七八九十百千]+[、．.]")),
+    (2, re.compile(r"^[（(][一二三四五六七八九十百千]+[）)]")),
+    (3, re.compile(r"^(?:\d{1,3}(?:[、．]|\.(?!\d))|[Xx][、．])")),  # 「X、数据资源」：国企模板里编号待定的节
+    (4, re.compile(r"^[（(]\d{1,3}[）)]")),
+    (5, re.compile(r"^[①-⑳]")),
+)
+
+
+def heading_rank(text: str | None) -> int | None:
+    """标题编号排位；不带编号返回 None。"""
+    stripped = (text or "").strip()
+    for rank, pattern in _HEADING_RANKS:
+        if pattern.match(stripped):
+            return rank
+    return None
+
+
 _HEADING_STYLES = frozenset({
     "Heading 1", "Heading 2", "Heading 3", "Heading 4", "Heading 5",
     "标题 1", "标题 2", "标题 3", "标题 4", "标题 5",
@@ -132,6 +154,38 @@ def _heading_level_from_style(style_name: str | None) -> int | None:
     if "GTNoteHeading" in style_name:
         return 2
     return None
+
+
+def _style_chain_level(style: Any, cache: dict[str, int | None]) -> int | None:
+    """段落样式沿基样式链继承的大纲级别 → 标题层级（第 23 组）。
+
+    国企单体 Word「同一控制下的企业合并」用「样式2」（基于 Heading 4，自身不设大纲级别）：Word 导航窗格与
+    LibreOffice 书签都当 4 级标题，首版只认样式名与段落自带大纲级别 ⇒ 并进上一节正文。
+    """
+    from docx.oxml.ns import qn
+
+    key = getattr(style, "style_id", None) or ""
+    if key in cache:
+        return cache[key]
+    level: int | None = None
+    seen: set[str] = set()
+    current = style
+    while current is not None and (current.style_id or "") not in seen and len(seen) < 20:
+        seen.add(current.style_id or "")
+        level = _heading_level_from_style(current.name)
+        ppr = current.element.find(qn("w:pPr"))
+        outline = ppr.find(qn("w:outlineLvl")) if ppr is not None else None
+        if level is None and outline is not None:
+            try:
+                value = int(outline.get(qn("w:val"), "9"))
+            except (TypeError, ValueError):
+                value = 9
+            level = value + 1 if value < 6 else None
+        if level is not None or outline is not None:
+            break
+        current = current.base_style
+    cache[key] = level
+    return level
 
 
 def _run_to_html(run: Any) -> str:
@@ -191,6 +245,7 @@ def parse_docx(data: bytes) -> ParseResult:
     current: ParsedSection | None = None
     warnings: list[str] = []
     section_idx = 0
+    style_levels: dict[str, int | None] = {}
 
     for elem in body:
         tag = elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
@@ -213,6 +268,8 @@ def parse_docx(data: bytes) -> ParseResult:
             level = _heading_level_from_style(style_name)
             if level is None and outline_lvl is not None and outline_lvl < 6:
                 level = outline_lvl + 1
+            if level is None and outline_lvl is None and para.style is not None:  # 段落自设的大纲级别优先于样式
+                level = _style_chain_level(para.style, style_levels)
 
             text = (para.text or "").strip()
 
@@ -302,6 +359,34 @@ def _body_font_size(spans: list[dict[str, Any]]) -> float:
     return 12.0
 
 
+#: 页眉 / 页脚所在的页面上下边带（占页高比例）
+_RUNNING_BAND = 0.12
+_DIGITS = re.compile(r"\d+")
+
+
+def _drop_running_lines(page_texts: list[list[dict[str, Any]]], heights: list[float]) -> None:
+    """去掉页眉页脚（第 23 组）：页面上下边带里、去掉数字后在过半页面上重复出现的行（公司名 / 「财务报表附注」/ 页码）。
+
+    首版当正文：跨页的节中间插一段页眉；章标题在页底、首个下级在下页页首时，章正文只剩页眉页脚
+    ⇒ 多出一条「章首正文」要用户手工处理（国企单体 PDF 每页 3 行页眉 + 页码）。少于 3 页不判。
+    """
+    pages = len(page_texts)
+    if pages < 3:
+        return
+
+    def key(line: dict[str, Any], height: float) -> str | None:
+        if line["y0"] < height * _RUNNING_BAND or line["y1"] > height * (1 - _RUNNING_BAND):
+            return _DIGITS.sub("#", re.sub(r"\s+", "", line["text"]))
+        return None
+
+    counts: Counter[str] = Counter()
+    for lines, height in zip(page_texts, heights):
+        counts.update({k for line in lines if (k := key(line, height)) is not None})
+    running = {k for k, n in counts.items() if n >= 3 and n * 2 >= pages}
+    for index, (lines, height) in enumerate(zip(page_texts, heights)):
+        page_texts[index] = [line for line in lines if key(line, height) not in running]
+
+
 def parse_pdf(data: bytes) -> ParseResult:
     """解析 PDF 附注文档。
 
@@ -325,32 +410,44 @@ def parse_pdf(data: bytes) -> ParseResult:
     if doc.page_count > MAX_PDF_PAGES:
         raise ParseError("FILE_TOO_LARGE", f"PDF 页数 {doc.page_count} 超过上限 {MAX_PDF_PAGES}")
 
-    # 收集全文 span（字号 / 加粗），正文字号见 _body_font_size
+    # 收集全文 span（字号 / 加粗），正文字号见 _body_font_size；标题按「行」判定：Word 自动编号导出 PDF 后
+    # 编号与标题文字常是同一行的两个 span，逐 span 判会把「1.」当标题、「会计期间」当正文（第 23 组）
     page_texts: list[list[dict[str, Any]]] = []
+    heights: list[float] = []
 
     for page in doc:
+        heights.append(page.rect.height)
         blocks = page.get_text("dict", sort=True).get("blocks", [])
-        page_spans: list[dict[str, Any]] = []
+        page_lines: list[dict[str, Any]] = []
         for block in blocks:
             if block.get("type") != 0:  # 非文本块（图像等）
                 continue
             for line in block.get("lines", []):
+                spans = []
                 for span in line.get("spans", []):
                     text = (span.get("text") or "").strip()
                     if text:
-                        size = span.get("size", 12.0)
-                        flags = span.get("flags", 0)
-                        is_bold = bool(flags & (1 << 4))  # TEXT_FONT_BOLD
-                        page_spans.append({
+                        spans.append({
                             "text": text,
-                            "size": size,
-                            "bold": is_bold,
-                            "y0": span.get("bbox", [0, 0, 0, 0])[1],
+                            "size": span.get("size", 12.0),
+                            "bold": bool(span.get("flags", 0) & (1 << 4)),  # TEXT_FONT_BOLD
                         })
-        page_texts.append(page_spans)
+                if spans:
+                    bbox = line.get("bbox") or (0.0, 0.0, 0.0, 0.0)
+                    page_lines.append({
+                        "text": "".join(s["text"] for s in spans),
+                        "size": max(s["size"] for s in spans),
+                        "bold": all(s["bold"] for s in spans),
+                        "spans": spans,
+                        "y0": bbox[1],
+                        "y1": bbox[3],
+                    })
+        page_texts.append(page_lines)
+    _drop_running_lines(page_texts, heights)
+    all_spans = [span for page_lines in page_texts for line in page_lines for span in line["spans"]]
 
     # 检查是否扫描件
-    has_text = any(spans for spans in page_texts)
+    has_text = any(lines for lines in page_texts)
     if not has_text:
         return ParseResult(
             warnings=["PDF 不含可提取文本，可能是扫描件；请上传文字版或先通过知识库 OCR"],
@@ -358,27 +455,86 @@ def parse_pdf(data: bytes) -> ParseResult:
             file_hash=file_hash,
         )
 
-    body_size = _body_font_size([span for spans in page_texts for span in spans])
+    warnings: list[str] = []
+    try:
+        toc = doc.get_toc(simple=True)
+    except Exception:  # 书签目录损坏：按字号识别
+        logger.warning("PDF 书签目录读取失败，改按字号识别标题", exc_info=True)
+        toc = []
+    sections = _sections_from_outline(page_texts, toc, warnings) if toc else []
+    if not sections:
+        sections = _sections_from_fonts(page_texts, all_spans)
+
+    # 有可提取文本时必产出章节（无标题正文进「（无标题）」人工确认章）——这就是降级形态。
+    # 原「纯文本降级」分支挂在 `if not sections` 之后，永远不可达，第 7 组整体复盘删除。
+    if len(sections) > MAX_SECTIONS:
+        warnings.append(f"解析章节数 {len(sections)} 超过上限 {MAX_SECTIONS}，已截断")  # 首版静默截断
+        sections = sections[:MAX_SECTIONS]
+
+    for s in sections:
+        s.html = sanitize_note_html(s.html)
+
+    doc.close()
+    return ParseResult(sections=sections, warnings=warnings, file_hash=file_hash)
+
+
+def _sections_from_outline(page_texts: list[list[dict[str, Any]]], toc: list[list],
+                           warnings: list[str]) -> list[ParsedSection]:
+    """按书签目录切章（AC-1.6）：书签 = 作者给的章节树，标题 / 层级取书签，正文 = 两个标题行之间的行。"""
+    headings, noise = outline_headings(toc, heading_rank)
+    if noise:
+        names = "、".join(f"「{entry.title}」" for entry in noise[:5]) + (" 等" if len(noise) > 5 else "")
+        warnings.append(f"PDF 书签有 {len(noise)} 条无编号条目与带编号的同级书签并列"
+                        f"（多为表格单元格误设了大纲级别），未作为标题：{names}")
+    lines = [line["text"] for page_lines in page_texts for line in page_lines]
+    page_starts = [0]
+    for page_lines in page_texts:
+        page_starts.append(page_starts[-1] + len(page_lines))
+    hits, missing = locate_heading_lines(lines, page_starts, headings)
+    warnings.extend(missing)
+    if not hits:
+        warnings.append("PDF 书签与正文对不上，改按字号 / 加粗识别标题")
+        return []
+
+    def body(start: int, stop: int) -> str:
+        return "".join(f"<p>{html_escape(text)}</p>" for text in lines[start:stop])
+
+    sections: list[ParsedSection] = []
+    if hits[0][1] > 0:
+        sections.append(ParsedSection(source_id="pdf-s1", title="（无标题）", level=1, html=body(0, hits[0][1]),
+                                      confidence="manual_required"))
+    for n, (heading, _first, last) in enumerate(hits):
+        stop = hits[n + 1][1] if n + 1 < len(hits) else len(lines)
+        sections.append(ParsedSection(source_id=f"pdf-s{len(sections) + 1}", title=heading.title, level=heading.level,
+                                      html=body(last + 1, stop), confidence="candidate",
+                                      metadata={"page": heading.page}))
+    return sections
+
+
+def _sections_from_fonts(page_texts: list[list[dict[str, Any]]],
+                         all_spans: list[dict[str, Any]]) -> list[ParsedSection]:
+    """无书签时按字号 / 加粗识别标题（AC-1.3）。"""
+    body_size = _body_font_size(all_spans)
 
     sections: list[ParsedSection] = []
     current: ParsedSection | None = None
     section_idx = 0
 
-    for page_spans in page_texts:
-        for span in page_spans:
-            text = span["text"]
-            size = span["size"]
-            is_bold = span["bold"]
+    for page_lines in page_texts:
+        for line in page_lines:
+            text = line["text"]
+            size = line["size"]
+            is_bold = line["bold"]
 
-            # 标题候选：字号明显大于正文字号，或加粗 + 中文章节模式
+            # 标题候选：字号明显大于正文字号，或加粗 + 中文章节模式；层级按编号排位，无编号按字号（AC-1.6）
             is_heading = False
             level = 2
             if size > body_size * 1.3:
                 is_heading = True
-                level = 1 if size > body_size * 1.6 else 2
+                level = heading_rank(text) or (1 if size > body_size * 1.6 else 2)
             elif is_bold and _CN_HEADING_RE.match(text) and len(text) < 60:
                 is_heading = True
-                level = 2
+                level = heading_rank(text) or 2
 
             if is_heading:
                 section_idx += 1
@@ -404,19 +560,7 @@ def parse_pdf(data: bytes) -> ParseResult:
                         confidence="manual_required",
                     )
                     sections.append(current)
-
-    # 有可提取文本时上面的循环必产出章节（无标题正文进「（无标题）」人工确认章）——这就是降级形态。
-    # 原「纯文本降级」分支挂在 `if not sections` 之后，永远不可达，第 7 组整体复盘删除。
-    warnings: list[str] = []
-    if len(sections) > MAX_SECTIONS:
-        warnings.append(f"解析章节数 {len(sections)} 超过上限 {MAX_SECTIONS}，已截断")  # 首版静默截断
-        sections = sections[:MAX_SECTIONS]
-
-    for s in sections:
-        s.html = sanitize_note_html(s.html)
-
-    doc.close()
-    return ParseResult(sections=sections, warnings=warnings, file_hash=file_hash)
+    return sections
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -513,11 +657,22 @@ def _parse_html_headings(text: str) -> list[ParsedSection]:
 
 
 def _parse_cn_headings(text: str) -> list[ParsedSection]:
-    """按中文章节号模式分章（纯文本）。"""
+    """按中文章节号模式分章（纯文本）；层级按编号排位成树（AC-1.6，首版一律 2 级、不成树）。"""
     sections: list[ParsedSection] = []
     current_title = ""
     current_lines: list[str] = []
     idx = 0
+
+    def flush() -> None:
+        nonlocal idx
+        idx += 1
+        sections.append(ParsedSection(
+            source_id=f"cn-s{idx}",
+            title=current_title or "（无标题）",
+            level=(heading_rank(current_title) or 2) if current_title else 1,
+            html="".join(f"<p>{html_escape(body)}</p>" for body in current_lines),
+            confidence="candidate" if current_title else "manual_required",
+        ))
 
     for line in text.split("\n"):
         line = line.strip()
@@ -525,27 +680,13 @@ def _parse_cn_headings(text: str) -> list[ParsedSection]:
             continue
         if _CN_HEADING_RE.match(line) and len(line) < 80:
             if current_lines or current_title:
-                idx += 1
-                sections.append(ParsedSection(
-                    source_id=f"cn-s{idx}",
-                    title=current_title or "（无标题）",
-                    level=2,
-                    html="".join(f"<p>{html_escape(line)}</p>" for line in current_lines),
-                    confidence="candidate",
-                ))
+                flush()
                 current_lines = []
             current_title = line
         else:
             current_lines.append(line)
 
     if current_lines or current_title:
-        idx += 1
-        sections.append(ParsedSection(
-            source_id=f"cn-s{idx}",
-            title=current_title or "（无标题）",
-            level=2,
-            html="".join(f"<p>{html_escape(line)}</p>" for line in current_lines),
-            confidence="candidate",
-        ))
+        flush()
 
     return sections

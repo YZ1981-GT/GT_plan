@@ -3,23 +3,23 @@
 spec: disclosure-note-doc-upload-and-batch-fill Phase 4 Task 21~25
 （第二轮复盘 R-07 / R-08 / R-16 / R-25 / R-26 修订）
 
-匹配裁定（design §4.2 / AC-3.1~3.5）：
-- 只有「手工映射 / 同模板同编号同标题 / variant matrix / soe↔listed 显式别名（模板来源）」产生 confirmed；
-- 外部来源（上传 / 知识库）的标题规范化精确匹配**只产生 candidate**（AC-3.3），需人工确认；
-- 同名目标不唯一时按「章路径」消歧，仍不唯一 ⇒ manual_required；
+匹配裁定（design §4.2 / AC-3.1~3.9）：
+- 上传 / 知识库按章节树逐级定位（第 23 组，``note_section_tree_locator``）：先定位一级章，再只在已定位章内
+  定位其下小标题；定位不上一律交给用户手工对应，不到别处按标题找。标题定位只产生 candidate（AC-3.3）；
+- 内容模板：「手工映射 / 同模板同编号同标题 / variant matrix / soe↔listed 显式别名」产生 confirmed；
+  同模板编号对不上时只在同一章内按标题找；
 - 多个来源指向同一目标 ⇒ 全部 manual_required，不先到先得（AC-3.4）；
 - 禁止对（``FORBIDDEN_MATCH_PAIRS``）永不产生候选。
 """
 
 from __future__ import annotations
 
-import dataclasses
 import hashlib
 import json
 import logging
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import lru_cache
-from html import escape
 from typing import Any
 from uuid import UUID
 
@@ -47,10 +47,16 @@ from app.services.note_section_kind import (
     canonical_title,
     chapter_title_for_code,
     classify_note_section,
-    is_account_chapter_title,
-    normalize_title,
 )
-from app.services.note_section_matcher import FORBIDDEN_MATCH_PAIRS, SECTION_TITLE_ALIASES
+from app.services.note_section_tree_locator import (
+    ALIAS_TITLES,
+    ManualMappingError,
+    MatchResult,
+    build_target_tree,
+    is_forbidden,
+    locate_by_tree,
+    validate_tree_mappings,
+)
 from app.services.note_variable_replacer import apply_replacement_plan, build_replacement_plan
 
 logger = logging.getLogger(__name__)
@@ -60,11 +66,13 @@ __all__ = [
     "MatchResult",
     "SourceContext",
     "build_preview",
-    "fold_unmatched_descendants",
     "load_target_sections",
+    "locate_sources",
     "match_sections",
     "sha256_text",
     "validate_manual_mappings",
+    "validate_mappings",
+    "writable_for",
 ]
 
 
@@ -179,36 +187,14 @@ async def resolve_target_context(db: AsyncSession, project_id: UUID) -> tuple[st
 # ════════════════════════════════════════════════════════════════════════════
 
 
-class MatchResult:
-    __slots__ = ("source_id", "target_note_id", "match_kind", "evidence", "confidence")
-
-    def __init__(self, source_id: str, target_note_id: UUID | None, match_kind: str,
-                 evidence: str, confidence: str):
-        self.source_id = source_id
-        self.target_note_id = target_note_id
-        self.match_kind = match_kind
-        self.evidence = evidence
-        self.confidence = confidence
+_ALIAS_TITLES = ALIAS_TITLES
+_is_forbidden = is_forbidden
 
 
-class ManualMappingError(ValueError):
-    """手工映射非法（端点转 422）。"""
-
-
-def _pairs(raw: list[tuple[str, str]]) -> frozenset[tuple[str, str]]:
-    out: set[tuple[str, str]] = set()
-    for a, b in raw:
-        ka, kb = normalize_title(a), normalize_title(b)
-        out.update({(ka, kb), (kb, ka)})
-    return frozenset(out)
-
-
-_FORBIDDEN_TITLES = _pairs([(a, b) for a, b, _reason in FORBIDDEN_MATCH_PAIRS])
-_ALIAS_TITLES = _pairs([(p.soe_title, p.listed_title) for p in SECTION_TITLE_ALIASES])
-
-
-def _is_forbidden(a: str | None, b: str | None) -> bool:
-    return (normalize_title(a), normalize_title(b)) in _FORBIDDEN_TITLES
+def writable_for(kind: str) -> Callable[[Mapping[str, Any]], bool]:
+    """本次可写范围：上传 / 知识库只填叙述性章节（AC-2.3），内容模板全套（叙述 + 科目注释）。"""
+    kinds = ("narrative", "account_explanation") if kind == "content_template" else ("narrative",)
+    return lambda target: target.get("section_kind") in kinds
 
 
 def _index_variant_matrix(
@@ -244,7 +230,10 @@ def validate_manual_mappings(
     targets: list[dict[str, Any]],
     manual_mappings: dict[str, UUID],
 ) -> None:
-    """来源存在、目标在本次可写范围（本项目且 scope 内）、一对一、非禁止对；否则抛错。"""
+    """内容模板来源：来源存在、目标在本次可写范围（本项目且 scope 内）、一对一、非禁止对；否则抛错。
+
+    上传 / 知识库按章节树校验（锚点 / 章首正文），见 :func:`validate_mappings`。
+    """
     src_by_id = {s.source_id: s for s in sources}
     tgt_by_id = {t["id"]: t for t in targets}
     seen: dict[UUID, str] = {}
@@ -262,41 +251,60 @@ def validate_manual_mappings(
         seen[target_id] = source_id
 
 
-def _source_chapters(sources: list[ParsedSection]) -> dict[str, str | None]:
-    """每个来源章节所在的顶层章标题（祖先链顶端）；顶层来源无祖先 ⇒ None。"""
-    out: dict[str, str | None] = {}
-    stack: list[ParsedSection] = []
-    doc = _NO_DOC
-    for src in sources:
-        if _doc_of(src) != doc:  # 知识库多篇文档拼接：层级栈不得跨文档
-            stack, doc = [], _doc_of(src)
-        while stack and stack[-1].level >= src.level:
-            stack.pop()
-        out[src.source_id] = stack[0].title if stack else None
-        stack.append(src)
-    return out
+def validate_mappings(
+    sources: list[ParsedSection],
+    targets: list[dict[str, Any]],
+    manual_mappings: dict[str, UUID],
+    *,
+    source_context: SourceContext | None = None,
+) -> None:
+    """按来源类型校验手工映射：模板见 :func:`validate_manual_mappings`，上传 / 知识库按章节树（锚点可选章）。"""
+    ctx = source_context or SourceContext()
+    if ctx.kind == "content_template":
+        validate_manual_mappings(sources, targets, manual_mappings)
+    else:
+        validate_tree_mappings(sources, targets, manual_mappings, writable=writable_for(ctx.kind))
 
 
-_NO_DOC = object()
+def locate_sources(
+    sources: list[ParsedSection],
+    targets: list[dict[str, Any]],
+    *,
+    manual_mappings: dict[str, UUID] | None = None,
+    source_context: SourceContext | None = None,
+    target_template_type: str | None = None,
+) -> tuple[list[ParsedSection], list[MatchResult], frozenset[str]]:
+    """统一入口：(预览用来源, 逐来源结论, 有子标题的来源 ID)。
 
-
-def _doc_of(src: ParsedSection) -> Any:
-    return (src.metadata or {}).get("doc_id")
-
-
-def _source_is_account(src: ParsedSection, chapter: str | None) -> bool | None:
-    """来源是否属报表科目注释；无法判断返回 None（不门控）。
-
-    - 模板来源：用快照里的 ``section_kind``；
-    - 有祖先：看所在顶层章标题是否为「项目注释 / 项目附注」；
-    - 顶层来源：自身就是科目注释章标题 ⇒ True，否则未知（扁平文档的顶层标题也可能是节）。
+    上传 / 知识库按章节树逐级定位（叶子目标并入后代、章首正文单列）；模板来源按编号匹配，来源原样。
+    ``targets`` 须是 ``scope="all"`` 的全部章节（定位要走容器节点），``manual_mappings`` 须先经
+    :func:`validate_mappings`。
     """
+    ctx = source_context or SourceContext()
+    if ctx.kind == "content_template":
+        matches = match_sections(sources, targets, manual_mappings=manual_mappings, source_context=ctx,
+                                 target_template_type=target_template_type)
+        return sources, matches, frozenset()
+    result = locate_by_tree(sources, targets, manual_mappings=manual_mappings, writable=writable_for(ctx.kind))
+    return result.sources, result.matches, result.structural
+
+
+def tree_warnings(targets: list[dict[str, Any]]) -> list[str]:
+    """目标章节树缺失 / 部分行不在树上时提示（这些行不参与自动定位，只能手工指定）。"""
+    tree = build_target_tree(targets)
+    if not tree.roots:
+        return ["本项目章节树未建立（章节缺少层级信息），无法按章节树定位；请联系管理员补齐章节树，或逐个手工指定目标章节"]
+    if tree.off_tree:
+        return [f"本项目有 {len(tree.off_tree)} 个章节不在章节树上（缺少层级信息或上级章节），不参与自动定位，可在下拉里手工指定"]
+    return []
+
+
+def _source_is_account(src: ParsedSection) -> bool | None:
+    """模板来源是否属报表科目注释：用快照里的 ``section_kind``；无法判断返回 None（不门控）。"""
     meta_kind = (src.metadata or {}).get("section_kind")
     if meta_kind in ("narrative", "account_explanation"):
         return meta_kind == "account_explanation"
-    if chapter is not None:
-        return is_account_chapter_title(chapter)
-    return True if is_account_chapter_title(src.title) else None
+    return None
 
 
 def _kind_compatible(target: dict, source_account: bool | None) -> bool:
@@ -331,8 +339,9 @@ def _propose_by_code(src: ParsedSection, available: list[dict], ctx: SourceConte
     return (hits[0], "variant_matrix", f"科目映射矩阵「{account}」：{src_code}→{hits[0]['note_section']}", "confirmed")
 
 
-def _propose_by_title(src: ParsedSection, available: list[dict], chapter: str | None,
-                      ctx: SourceContext) -> tuple[dict | None, str, str, str]:
+def _propose_by_title(src: ParsedSection, available: list[dict], ctx: SourceContext,
+                      target_tt: str) -> tuple[dict | None, str, str, str]:
+    """模板来源编号对不上时按标题找：同模板只在来源编号所属的章内找（第 23 组）；跨模板只认显式别名 / 标题。"""
     key = canonical_title(src.title)
     if not key:
         return None, "unmatched", "来源标题为空", "manual_required"
@@ -340,18 +349,19 @@ def _propose_by_title(src: ParsedSection, available: list[dict], chapter: str | 
     alias = [t for t in available if t not in exact
              and (key, canonical_title(t.get("section_title"))) in _ALIAS_TITLES]
     hits = [t for t in exact + alias if not _is_forbidden(src.title, t.get("section_title"))]
+    if normalize_template_type(ctx.template_type) == target_tt:
+        chapter = chapter_title_for_code((src.metadata or {}).get("note_section"), ctx.template_type)
+        hits = [t for t in hits if chapter and canonical_title(t.get("chapter_title")) == canonical_title(chapter)]
+        if not hits:
+            return (None, "unmatched", f"在「{chapter}」章内找不到「{src.title}」" if chapter
+                    else f"来源编号无所属章，按标题找不到「{src.title}」的章内位置", "manual_required")
     if not hits:
         return None, "unmatched", "未找到匹配的目标章节", "manual_required"
-    if len(hits) > 1 and chapter:
-        path_hits = [t for t in hits if canonical_title(t.get("chapter_title")) == canonical_title(chapter)]
-        if len(path_hits) == 1:
-            return path_hits[0], "title_path", f"章路径「{chapter} / {src.title}」唯一命中", "candidate"
     if len(hits) > 1:
         return None, "ambiguous", f"存在 {len(hits)} 个同名目标章节，需人工选择", "manual_required"
     hit = hits[0]
     if hit in alias:
-        confidence = "confirmed" if ctx.kind == "content_template" else "candidate"
-        return hit, "alias", f"显式别名「{src.title}」↔「{hit.get('section_title')}」", confidence
+        return hit, "alias", f"显式别名「{src.title}」↔「{hit.get('section_title')}」", "confirmed"
     return hit, "title_exact", f"标题规范化一致「{src.title}」", "candidate"
 
 
@@ -363,33 +373,28 @@ def match_sections(
     source_context: SourceContext | None = None,
     target_template_type: str | None = None,
 ) -> list[MatchResult]:
-    """统一章节匹配（规则见模块说明）；``manual_mappings`` 须先经 :func:`validate_manual_mappings`。"""
+    """内容模板来源的章节匹配（规则见模块说明）；``manual_mappings`` 须先经 :func:`validate_manual_mappings`。
+
+    上传 / 知识库来源按章节树逐级定位，用 :func:`locate_sources`（本函数对它们直接报错，防止走回按标题全局找）。
+    """
     ctx = source_context or SourceContext()
+    if ctx.kind != "content_template":
+        raise ValueError("上传 / 知识库来源按章节树逐级定位：请用 locate_sources")
     target_tt = normalize_template_type(target_template_type)
     manual = manual_mappings or {}
     tgt_by_id = {t["id"]: t for t in targets}
     reserved = {tid for tid in manual.values() if tid in tgt_by_id}
     available = [t for t in targets if t["id"] not in reserved]
-    chapters = _source_chapters(sources)
 
     proposals: dict[str, tuple[dict | None, str, str, str]] = {}
     for src in sources:
         if src.source_id in manual:
             continue
-        chapter = chapters.get(src.source_id)
-        source_account = _source_is_account(src, chapter)
-        # 章类型门控：Word 中「存货」等同时出现在会计政策章与项目注释章，不门控则两者争抢同一叙述目标
-        if targets and not any(_kind_compatible(t, source_account) for t in targets):
-            proposals[src.source_id] = (
-                None, "out_of_scope",
-                "来源属报表科目注释章节，本次只填叙述性章节" if source_account
-                else "来源属叙述性章节，本次目标仅含报表科目注释", "manual_required",
-            )
-            continue
+        source_account = _source_is_account(src)
         eligible = [t for t in available if _kind_compatible(t, source_account)]
         proposals[src.source_id] = (
             _propose_by_code(src, eligible, ctx, target_tt)
-            or _propose_by_title(src, eligible, chapter, ctx)
+            or _propose_by_title(src, eligible, ctx, target_tt)
         )
 
     claims: dict[UUID, list[str]] = {}
@@ -415,45 +420,6 @@ def match_sections(
     return results
 
 
-def fold_unmatched_descendants(
-    sources: list[ParsedSection],
-    matches: list[MatchResult],
-) -> tuple[list[ParsedSection], list[MatchResult]]:
-    """R-25：未匹配（``unmatched``）的后代标题并入最近的已匹配祖先，标题转加粗段落。
-
-    国企 Word 的节是 H3、上市是 H2（其 H3 为节内小标题）；按标题切节时子标题会成为孤立来源，
-    不并入则其正文丢失。``conflict`` / ``ambiguous`` 不并入（需用户人工选择）。
-    """
-    by_id = {m.source_id: m for m in matches}
-    html: dict[str, str] = {s.source_id: s.html for s in sources}
-    folded: dict[str, str] = {}
-    stack: list[tuple[int, str | None]] = []  # (level, 内容归属的来源 ID)
-    doc = _NO_DOC
-    for src in sources:
-        if _doc_of(src) != doc:  # 不把下一篇文档的开头并进上一篇的末节
-            stack, doc = [], _doc_of(src)
-        while stack and stack[-1][0] >= src.level:
-            stack.pop()
-        match = by_id.get(src.source_id)
-        owner: str | None = None
-        if match is not None and match.target_note_id is not None:
-            owner = src.source_id
-        elif match is not None and match.match_kind == "unmatched" and stack and stack[-1][1]:
-            owner = stack[-1][1]
-            html[owner] += f"<p><strong>{escape(src.title)}</strong></p>{src.html}"
-            folded[src.source_id] = owner
-        stack.append((src.level, owner))
-    title_of = {s.source_id: s.title for s in sources}
-    new_sources = [dataclasses.replace(s, html=html[s.source_id]) if html[s.source_id] != s.html else s
-                   for s in sources]
-    new_matches = [
-        MatchResult(m.source_id, None, "folded", f"已并入上级「{title_of[folded[m.source_id]]}」", "manual_required")
-        if m.source_id in folded else m
-        for m in matches
-    ]
-    return new_sources, new_matches
-
-
 # ════════════════════════════════════════════════════════════════════════════
 # Task 24~25：Preview
 # ════════════════════════════════════════════════════════════════════════════
@@ -463,11 +429,7 @@ _HIGH_RISK_REVIEW_FLAGS = frozenset({
     QualityFlag.DRAFT, QualityFlag.STALE, QualityFlag.PLACEHOLDER, QualityFlag.SOURCE_ENTITY,
     QualityFlag.DATE, QualityFlag.AMOUNT,
 })
-_UNAVAILABLE_REASONS = {
-    "conflict": None,  # 用 evidence 原文
-    "ambiguous": None,
-    "unmatched": "未找到匹配的目标章节",
-}
+
 
 
 def build_preview(
@@ -482,6 +444,7 @@ def build_preview(
     target_template_type: str | None = None,
     target_report_scope: str | None = None,
     source_identity: dict[str, Any] | None = None,
+    structural_ids: frozenset[str] | set[str] | None = None,
 ) -> dict[str, Any]:
     """预览：消毒 → 确定性变量替换（可撤销）→ 再消毒 → 追加结果预演 → 质量/风险分级 → digest。
 
@@ -497,7 +460,8 @@ def build_preview(
     tgt_map = {t["id"]: t for t in targets}
     items: list[dict[str, Any]] = []
 
-    skipped = {"folded": 0, "out_of_scope": 0}
+    structural = set(structural_ids or ())
+    skipped = {"folded": 0, "out_of_scope": 0, "anchor": 0}
     # 左栏逐来源显示跳过原因（AC-2.2）：只给计数时分不清「被跳过」与「没匹配上」；只供展示，不进 digest
     skipped_sources: list[dict[str, str]] = []
     for m in matches:
@@ -505,8 +469,9 @@ def build_preview(
         if src is None:
             continue
         if m.match_kind in skipped:
-            skipped[m.match_kind] += 1  # 已并入上级 / 不在本次可填范围：不进预览
-            skipped_sources.append({"source_id": m.source_id, "match_kind": m.match_kind})
+            # 已并入上级 / 不在本次可填范围 / 有子标题的来源已定位到章（只作其下定位的锚点）：不进预览
+            skipped[m.match_kind] += 1
+            skipped_sources.append({"source_id": m.source_id, "match_kind": m.match_kind, "evidence": m.evidence})
             continue
         meta = src.metadata or {}
         # 纯文字来源（模板快照里多数章节是生成链写入的纯文字）按编辑器口径转 HTML：否则写入后分段并成一段（第 19 组）
@@ -528,8 +493,9 @@ def build_preview(
         )
         flags = list(quality.flags) + (["cross_standard"] if cross_standard and tgt else [])
         if tgt is None:
+            # 不可用原因直接用定位结论（在哪个章下找不到 / 上级未定位 / 同名多个…），用户据此手工对应
             category = "unavailable"
-            reason = _UNAVAILABLE_REASONS.get(m.match_kind) or m.evidence
+            reason = m.evidence or "未找到匹配的目标章节"
         elif not has_visible_text(proposed):
             category, reason = "unavailable", "来源正文为空"
         elif (m.confidence != "confirmed" or has_before or quality.is_high_risk or cross_standard
@@ -547,6 +513,8 @@ def build_preview(
             "match_kind": m.match_kind, "evidence": m.evidence, "confidence": m.confidence,
             "category": category, "default_selected": category == "recommended",
             "unavailable_reason": reason,
+            # 有子标题的来源：未定位时下拉可选目标章作锚点（第 23 组）；只供展示，不进 digest
+            "structural": m.source_id in structural,
             # 差异预览「现有内容」按编辑器口径显示（纯文字原样塞进 v-html 会并成一段）；复核仍按原文 hash
             "before_html": note_text_to_html(before), "before_hash": before_hash,
             "proposed_html": proposed, "proposed_hash": sha256_text(proposed),

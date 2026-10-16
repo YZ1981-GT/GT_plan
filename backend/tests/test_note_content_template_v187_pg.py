@@ -307,7 +307,7 @@ async def _stale_scenario(Session, ids: dict[str, Any], snap: dict[str, Any]) ->
     from app.models.report_models import DisclosureNote
     from app.services.note_document_parser import ParsedSection
     from app.services.note_text_batch_apply import ApplyError, apply_batch, lock_target_notes
-    from app.services.note_text_batch_service import build_preview, load_target_sections, match_sections
+    from app.services.note_text_batch_service import build_preview, load_target_sections, locate_sources
 
     sources = [ParsedSection(source_id="s1", title="公司基本情况", html="<p>新基本情况</p>"),
                ParsedSection(source_id="s2", title="会计期间", html="<p>会计期间正文</p>")]
@@ -315,8 +315,9 @@ async def _stale_scenario(Session, ids: dict[str, Any], snap: dict[str, Any]) ->
 
     async def preview(db) -> dict[str, Any]:
         targets = await load_target_sections(db, ids["B"], YEAR, scope="narrative", include_content=True)
-        return build_preview(sources, targets, match_sections(sources, targets, manual_mappings=mapping),
-                             source_identity={"kind": "upload"})
+        # 映射全部手工指定（本场景只测并发 stale）；上传来源按章节树定位见 phase4 / 第 23 组
+        located, matches, structural = locate_sources(sources, targets, manual_mappings=mapping)
+        return build_preview(located, targets, matches, source_identity={"kind": "upload"}, structural_ids=structural)
 
     def selections(pv: dict[str, Any]) -> list[dict[str, Any]]:
         return [{"source_id": i["source_id"], "target_note_id": uuid.UUID(i["target_note_id"]), "mode": "replace",

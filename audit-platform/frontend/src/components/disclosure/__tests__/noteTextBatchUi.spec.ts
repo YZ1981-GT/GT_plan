@@ -9,8 +9,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import NoteTextPreviewList from '@/components/disclosure/NoteTextPreviewList.vue'
 import NoteTextDiffDialog from '@/components/disclosure/NoteTextDiffDialog.vue'
-import { describeSource, sourceBadgeText, sourceMatchStatuses } from '@/components/disclosure/noteTextBatchLabels'
-import type { PreviewItem } from '@/composables/useNoteTextBatch'
+import {
+  describeSource, sourceBadgeText, sourceDepths, sourceMatchStatuses, splitMappingTargets,
+} from '@/components/disclosure/noteTextBatchLabels'
+import type { PreviewItem, TargetSection } from '@/composables/useNoteTextBatch'
 
 const stubs = {
   'el-dialog': { props: ['modelValue', 'title'], template: '<div class="el-dialog"><slot /><slot name="footer" /></div>' },
@@ -24,7 +26,8 @@ const stubs = {
   },
   'el-tag': { template: '<span class="el-tag"><slot /></span>' },
   'el-input': { props: ['modelValue', 'size'], template: '<input class="el-input" :value="modelValue" />' },
-  'el-select': { template: '<div class="el-select"><slot /></div>' },
+  'el-select': { props: ['placeholder'], template: '<div class="el-select" :data-placeholder="placeholder"><slot /></div>' },
+  'el-option-group': { props: ['label'], template: '<div class="el-option-group" :data-label="label"><slot /></div>' },
   'el-option': { props: ['label'], template: '<span class="el-option">{{ label }}</span>' },
   'el-alert': { props: ['title'], template: '<div class="el-alert">{{ title }}</div>' },
   'el-radio-group': { props: ['modelValue'], template: '<div class="el-radio-group"><slot /></div>' },
@@ -199,5 +202,55 @@ describe('NoteTextDiffDialog', () => {
   it('目标为空时不提供「追加」', () => {
     expect(mountDiff({ append_html: null }).find('.el-radio-group').exists()).toBe(false)
     expect(mountDiff({ append_html: '<p>旧</p><p>新</p>', append_hash: 'a'.repeat(64) }).find('.el-radio-group').exists()).toBe(true)
+  })
+})
+
+describe('按章节树定位（第 23 组）', () => {
+  function target(id: string, kind: string, sectionId: string | null, parent: string | null = null): TargetSection {
+    return { id, note_section: id, section_title: id, section_kind: kind, has_content: false,
+      section_id: sectionId, parent_section_id: parent }
+  }
+  const TARGETS = [
+    target('一', 'container', 'ch-01'), target('一、1', 'narrative', 's-01', 'ch-01'),
+    target('八', 'container', 'ch-08'), target('八、1', 'account_explanation', 's-08', 'ch-08'),
+    target('四、记账基础', 'narrative', null),  // 不在树上：只能当写入节
+  ]
+
+  it('手工下拉分两类：有子节点的章作锚点，可写入的节按来源类型（上传只填叙述）', () => {
+    const upload = splitMappingTargets(TARGETS, 'upload')
+    expect(upload.anchors.map(t => t.id)).toEqual(['一', '八'])
+    expect(upload.leaves.map(t => t.id)).toEqual(['一、1', '四、记账基础'])
+    expect(splitMappingTargets(TARGETS, 'content_template').leaves.map(t => t.id)).toEqual(['一、1', '八、1', '四、记账基础'])
+  })
+
+  it('左栏按树深缩进：章 H1 下节是 H3 也只缩一格；没有上级信息时退回按级别', () => {
+    const tree = sourceDepths([
+      { source_id: 'c', parent_source_id: null, level: 1 }, { source_id: 'a', parent_source_id: 'c', level: 3 },
+      { source_id: 'b', parent_source_id: 'a', level: 4 }])
+    expect([...tree]).toEqual([['c', 0], ['a', 1], ['b', 2]])
+    expect([...sourceDepths([{ source_id: 'x', level: 2 }, { source_id: 'y', level: 1 }])]).toEqual([['x', 1], ['y', 0]])
+  })
+
+  it('左栏状态：已定位到章的来源标绿并带定位说明', () => {
+    const map = sourceMatchStatuses({ items: [], skipped_sources: [
+      { source_id: 'docx-s1', match_kind: 'anchor', evidence: '已定位到「八 财务报表主要项目注释」，其下小标题在该章内定位' }] })
+    expect(map.get('docx-s1')).toEqual({ label: '已定位到章', type: 'success',
+      hint: '已定位到「八 财务报表主要项目注释」，其下小标题在该章内定位' })
+  })
+
+  it('未定位的有子标题来源：下拉先列目标章（锚点）再列写入章节；无子标题的只列写入章节', () => {
+    const anchors = TARGETS.slice(0, 1)
+    const leaves = [TARGETS[1]]
+    const STRUCTURAL = { ...UNAVAILABLE, source_id: 'docx-s9', source_title: '自定义的章', structural: true,
+      unavailable_reason: '一级章里找不到「自定义的章」' }
+    const wrapper = mount(NoteTextPreviewList, {
+      props: { items: [STRUCTURAL, UNAVAILABLE], selected: [], modes: {}, targets: leaves, anchors },
+      global: { stubs },
+    })
+    const groups = (sid: string) => wrapper.find(`[data-source-id="${sid}"]`).findAll('.el-option-group')
+      .map(g => [g.attributes('data-label'), g.findAll('.el-option').map(o => o.text())])
+    expect(groups('docx-s9')).toEqual([
+      ['目标章（其下小标题在该章内定位）', ['【章】一 一']], ['写入章节（其下小标题一并并入）', ['一、1 一、1']]])
+    expect(groups('docx-s3')).toEqual([['写入章节', ['一、1 一、1']]])
   })
 })

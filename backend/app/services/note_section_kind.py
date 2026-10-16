@@ -74,8 +74,8 @@ _ACCOUNT_CHAPTER = re.compile(r"项目注释|项目附注")
 _SOE_LEGACY_ACCOUNT = re.compile(r"^五、\d+$")
 _WS = re.compile(r"\s+")
 _ANNOTATION = re.compile(r"【[^】]*】")
-_ENUM_HEAD = re.compile(
-    r"^(?:[（(][一二三四五六七八九十\d]+[）)]|[一二三四五六七八九十]+[、.．]|\d+[、.．])"
+_ENUM_HEAD = re.compile(  # 圈号「①」：Word 自动编号，DOCX 文字层没有、PDF 带着（第 23 组）
+    r"^(?:[（(][一二三四五六七八九十\d]+[）)]|[一二三四五六七八九十]+[、.．]|\d+[、.．]|[①-⑳])"
 )
 _PAREN_TAIL = re.compile(r"[（(][^（）()]*[）)]$")
 

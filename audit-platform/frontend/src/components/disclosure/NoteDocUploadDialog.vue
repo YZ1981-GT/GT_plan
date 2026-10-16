@@ -19,7 +19,9 @@ import {
 } from '@/composables/useNoteTextBatch'
 import NoteTextPreviewList from './NoteTextPreviewList.vue'
 import NoteTextDiffDialog from './NoteTextDiffDialog.vue'
-import { CONFIDENCE_LABELS, describeSource, sourceMatchStatuses } from './noteTextBatchLabels'
+import {
+  CONFIDENCE_LABELS, describeSource, sourceDepths, sourceMatchStatuses, splitMappingTargets,
+} from './noteTextBatchLabels'
 
 const NoteRichTextEditor = defineAsyncComponent(() => import('@/components/NoteRichTextEditor.vue'))
 
@@ -42,6 +44,10 @@ const items = computed(() => batch.previewResult.value?.items ?? [])
 /** 左栏每个来源的匹配状态（AC-2.2），与右栏同一份服务端预览 */
 const matchStatus = computed(() => sourceMatchStatuses(batch.previewResult.value))
 const mappings = computed(() => Object.fromEntries(batch.manualMappings.value))
+/** 手工对应下拉：可写入的节 + 可作定位锚点的章（第 23 组，与后端同口径） */
+const mapTargets = computed(() => splitMappingTargets(targets.value, batch.sourceKind.value))
+/** 左栏按章节树深度缩进（AC-1.6） */
+const depths = computed(() => sourceDepths(batch.parsedSections.value))
 const sourceLabel = computed(() => describeSource(batch.sourceKind.value,
   batch.parsedSource.value?.source_metadata as Parameters<typeof describeSource>[1]))
 
@@ -178,7 +184,7 @@ function saveEdit() {
       <section class="gt-ndu-pane">
         <div v-if="!batch.parsedSections.value.length" class="gt-ndu-empty">请上传 Word / PDF 附注文档，或从知识库选择文档</div>
         <div v-for="section in batch.parsedSections.value" :key="section.source_id" class="gt-ndu-source"
-          :style="{ marginLeft: `${Math.min(section.level - 1, 4) * 12}px` }">
+          :style="{ marginLeft: `${Math.min(depths.get(section.source_id) ?? 0, 4) * 12}px` }">
           <div class="gt-ndu-source-head" @click="toggleExpand(section.source_id)">
             <span>{{ expanded.has(section.source_id) ? '▼' : '▶' }}</span>
             <strong>{{ section.title }}</strong>
@@ -198,7 +204,8 @@ function saveEdit() {
       <section class="gt-ndu-pane">
         <div v-if="!batch.previewResult.value" class="gt-ndu-empty">解析后点击「预览匹配」，由服务端给出章节对应关系与拟写入内容</div>
         <NoteTextPreviewList v-else v-model:selected="selected" :items="items" :modes="modes"
-          :edited-ids="batch.editedSourceIds.value" :targets="targets" :mappings="mappings"
+          :edited-ids="batch.editedSourceIds.value" :targets="mapTargets.leaves" :anchors="mapTargets.anchors"
+          :mappings="mappings"
           @open-diff="openDiff" @map="(sid: string, tid: string | null) => batch.setManualMapping(sid, tid)" />
       </section>
       </el-splitter-panel>

@@ -28,6 +28,8 @@ export interface ParsedSection {
   source_id: string
   title: string
   level: number
+  /** 章节树上级（AC-1.6，左栏按树缩进；定位时服务端按顺序与层级重算） */
+  parent_source_id?: string | null
   html: string
   confidence: MatchConfidence
   warnings: string[]
@@ -66,6 +68,8 @@ export interface PreviewItem {
   category: PreviewCategory
   default_selected: boolean
   unavailable_reason: string | null
+  /** 来源有子标题：未定位时下拉可选目标章作锚点，其下小标题在该章内定位（第 23 组） */
+  structural?: boolean
   before_html: string
   before_hash: string
   proposed_html: string
@@ -81,8 +85,8 @@ export interface PreviewItem {
 export interface PreviewResponse {
   preview_digest: string
   items: PreviewItem[]
-  /** 不进预览的来源及原因（folded 已并入上级 / out_of_scope 不在可填范围），左栏显示匹配状态用（AC-2.2） */
-  skipped_sources?: Array<{ source_id: string; match_kind: string }>
+  /** 不进预览的来源及原因（folded 已并入上级 / out_of_scope 不在可填范围 / anchor 已定位到章），左栏显示匹配状态用（AC-2.2） */
+  skipped_sources?: Array<{ source_id: string; match_kind: string; evidence?: string }>
   summary: Record<string, number>
   warnings: string[]
 }
@@ -124,6 +128,9 @@ export interface TargetSection {
   section_kind: string
   has_content: boolean
   chapter_title?: string | null
+  /** 章节树（第 23 组：有子节点的行可作定位锚点） */
+  section_id?: string | null
+  parent_section_id?: string | null
 }
 
 export interface BatchError {
@@ -438,10 +445,11 @@ export function useNoteTextBatch(options: UseNoteTextBatchOptions) {
     }
   }
 
+  /** 全部章节（含容器）：手工下拉既要可写入的节，也要可作定位锚点的章（第 23 组）；可写范围由 splitMappingTargets 区分 */
   async function fetchTargetSections(): Promise<TargetSection[]> {
     try {
       const result = await api.get<{ items: TargetSection[] }>(NOTE_TEXT_BATCH_PATHS.sections(projectId.value),
-        silent({ params: { year: year.value, scope: sourceKind.value === 'content_template' ? 'all' : 'narrative' } }))
+        silent({ params: { year: year.value, scope: 'all' } }))
       return result.items || []
     } catch (e) {
       fail(e, '加载目标章节失败')

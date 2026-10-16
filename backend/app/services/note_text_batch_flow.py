@@ -37,15 +37,16 @@ from app.services.note_document_parser import (
     parse_pdf,
     parse_text_source,
 )
+from app.services.note_section_tree_locator import source_parent_ids
 from app.services.note_text_batch_service import (
     ManualMappingError,
     SourceContext,
     build_preview,
-    fold_unmatched_descendants,
     load_target_sections,
-    match_sections,
+    locate_sources,
     resolve_target_context,
-    validate_manual_mappings,
+    tree_warnings,
+    validate_mappings,
 )
 
 __all__ = [
@@ -133,11 +134,13 @@ def _signature(meta: dict[str, Any], *, project_id: UUID, user_id: UUID) -> str:
     return hmac.new(_signing_key(), payload.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
-def _section_payload(section: ParsedSection) -> dict[str, Any]:
+def _section_payload(section: ParsedSection, parent_id: str | None = None) -> dict[str, Any]:
     return {
         "source_id": section.source_id[:160],
         "title": (section.title or "").strip()[:500] or "（无标题）",
         "level": min(max(int(section.level or 1), 1), 10),
+        # 章节树上级（AC-1.6，左栏按树显示）；定位时服务端按顺序与层级重算，不信回传值
+        "parent_source_id": parent_id[:160] if parent_id else None,
         "html": section.html or "",
         "confidence": section.confidence,
         "warnings": list(section.warnings)[:50],
@@ -153,8 +156,9 @@ def upload_source_payload(fmt: str, filename: str | None, data: bytes, result: P
         "byte_size": len(data), "file_format": fmt,
     }
     meta["signature"] = _signature(meta, project_id=project_id, user_id=user_id)
+    parents = source_parent_ids(result.sections)
     return {"source_kind": "upload", "source_metadata": meta,
-            "sections": [_section_payload(s) for s in result.sections],
+            "sections": [_section_payload(s, parents.get(s.source_id)) for s in result.sections],
             "warnings": list(result.warnings), "needs_ocr": False}
 
 
@@ -184,10 +188,13 @@ async def knowledge_source_payload(db: AsyncSession, *, project_id: UUID, user: 
             warnings.append(f"《{name}》正文为空（扫描件需先在知识库完成 OCR）")
             continue
         warnings.extend(f"《{name}》：{w}" for w in result.warnings)
+        parents = source_parent_ids(result.sections)  # 每篇各自成树
         for section in result.sections:
             item = _section_payload(section)
             # 多篇文档的解析 ID 会撞（每篇都从 s1 起编）⇒ 按文档命名空间
             item["source_id"] = f"{doc['source_id']}:{section.source_id}"[:160]
+            parent = parents.get(section.source_id)
+            item["parent_source_id"] = f"{doc['source_id']}:{parent}"[:160] if parent else None
             item["metadata"] = {"doc_id": doc["source_id"]}
             sections.append(item)
     if not sections:
@@ -314,21 +321,21 @@ async def compute_preview(db: AsyncSession, *, project_id: UUID, year: int, reso
                           manual_mappings: list[Any], revoked_replacement_ids: list[str]) -> dict[str, Any]:
     """服务端预览：上传 / 知识库只填叙述章节，模板全套（design §7.1）；不写库。"""
     template_type, report_scope = await resolve_target_context(db, project_id)
-    targets = await load_target_sections(db, project_id, year, include_content=True,
-                                         scope="all" if resolved.kind == "content_template" else "narrative")
+    # 定位要走章节树的容器节点 ⇒ 一律取全部章节；可写范围由 writable_for 按来源类型另判（上传 / 知识库只填叙述）
+    targets = await load_target_sections(db, project_id, year, include_content=True, scope="all")
     mapping = {m.source_id: m.target_note_id for m in manual_mappings}
     if len(mapping) != len(manual_mappings):
         raise ManualMappingError("同一来源章节只能映射一个目标章节")
-    validate_manual_mappings(resolved.sections, targets, mapping)
-    matches = match_sections(resolved.sections, targets, manual_mappings=mapping,
-                             source_context=resolved.context, target_template_type=template_type)
-    sources, matches = fold_unmatched_descendants(resolved.sections, matches)
+    validate_mappings(resolved.sections, targets, mapping, source_context=resolved.context)
+    sources, matches, structural = locate_sources(resolved.sections, targets, manual_mappings=mapping,
+                                                  source_context=resolved.context, target_template_type=template_type)
     preview = build_preview(
         sources, targets, matches,
         target_vars=build_target_vars(await db.get(Project, project_id), year),
         source_entity_name=resolved.entity_name, revoked_replacement_ids=set(revoked_replacement_ids),
         source_context=resolved.context, target_template_type=template_type, target_report_scope=report_scope,
-        source_identity=resolved.identity,
+        source_identity=resolved.identity, structural_ids=structural,
     )
-    preview["warnings"] = [*resolved.warnings, *preview.get("warnings", [])]
+    tree_notes = tree_warnings(targets) if resolved.kind != "content_template" else []
+    preview["warnings"] = [*resolved.warnings, *tree_notes, *preview.get("warnings", [])]
     return preview

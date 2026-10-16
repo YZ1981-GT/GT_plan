@@ -204,7 +204,8 @@ describe('错误提示单一来源（#6c：全局拦截器静默，只由本 com
     expect(post).toHaveBeenCalledTimes(3)
     for (const call of post.mock.calls) expect(call[2]).toMatchObject({ _silent: true })
     expect(post.mock.calls[2][2].headers['X-Mutation-Id']).toBeTruthy()
-    expect(get.mock.calls[0][1]).toMatchObject({ _silent: true, params: { year: 2025, scope: 'narrative' } })
+    // 第 23 组：上传也取全部章节 —— 手工下拉要有可作定位锚点的章（可写范围由 splitMappingTargets 另分）
+    expect(get.mock.calls[0][1]).toMatchObject({ _silent: true, params: { year: 2025, scope: 'all' } })
   })
 
   it('无业务 detail 的 HTTP 错误（axios 英文 message）⇒ 只弹一次中文兜底并带状态码', async () => {

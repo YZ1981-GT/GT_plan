@@ -28,7 +28,7 @@ from app.services.note_text_batch_apply import (
     build_note_saved_events,
     lock_target_notes,
 )
-from app.services.note_text_batch_service import build_preview, load_target_sections, match_sections
+from app.services.note_text_batch_service import build_preview, load_target_sections, locate_sources
 
 YEAR = 2025
 _TABLES = [User.__table__, Project.__table__, DisclosureNote.__table__, NoteContentTemplate.__table__,
@@ -75,8 +75,9 @@ async def _preview(db: AsyncSession, seed: dict, sources: list[ParsedSection], m
     mapping = {k: v for k, v in mapping.items() if k in {s.source_id for s in sources}}
     if "s3" in mapping and "s2" in mapping and mapping["s3"] == mapping["s2"]:
         mapping.pop("s3")
-    return build_preview(sources, targets, match_sections(sources, targets, manual_mappings=mapping),
-                         source_identity={"kind": "upload"})
+    # 本文件只测 apply：映射全部手工指定（章节树定位见 phase4 / 第 23 组）
+    located, matches, structural = locate_sources(sources, targets, manual_mappings=mapping)
+    return build_preview(located, targets, matches, source_identity={"kind": "upload"}, structural_ids=structural)
 
 
 def _sel(item: dict, mode: str = "replace", **over) -> dict:
