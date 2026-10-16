@@ -283,7 +283,7 @@ PyMuPDF `page.get_text("dict")` 遍历 block→line→span：
 1. 校验 `X-Mutation-Id` 与请求指纹；
 2. 校验每个 selection 属于本 preview、目标 note 属于 project/year；
 3. 单条 SELECT ... FOR UPDATE 锁定全部目标，按稳定顺序排序防死锁；
-4. 比较 expected_updated_at + before_hash；任一变化返回 409 `NOTE_BATCH_STALE_PREVIEW`，零写入；
+4. 比较 expected_updated_at + before_hash；任一变化返回 409 `NOTE_BATCH_STALE_PREVIEW`，零写入；（第 24 组：`updated_at` 只有 server_default、没有 onupdate，首版单章保存从不赋值 ⇒ 这一比较看不见单章编辑。现由附注编辑器的写入口经 `note_edit_stamp` 盖「最近一次有人对本章的编辑」；模板重新生成、取数刷新、过期标记、同步簿记不盖）
 5. 重新消毒并验证 proposed hash；
 6. `replace` 直接写拟稿；`append` 仅用规范空段连接旧/新正文，并对完全相同段落去重，不写来源标记；
 7. 每章设置 `status=draft`、`is_local_override=true`，追加 template_lineage（如有）；

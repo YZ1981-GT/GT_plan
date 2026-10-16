@@ -48,6 +48,7 @@ from app.services.disclosure_mutation_coordinator import (
     DisclosureMutationCoordinator,
     mutation_fingerprint,
 )
+from app.services.note_edit_stamp import stamp_note_edit, stamp_section_edit
 from app.services.note_validation_engine import NoteValidationEngine
 
 logger = logging.getLogger(__name__)
@@ -923,6 +924,7 @@ async def update_note(
             text_content=data.text_content,
             guidance_text=data.guidance_text,
             status=data.status,
+            user_id=current_user.id,
         )
         if note is None:
             raise HTTPException(status_code=404, detail="附注章节不存在")
@@ -977,6 +979,7 @@ async def delete_section(
         if not note:
             raise HTTPException(status_code=404, detail="章节不存在")
         note.is_deleted = True
+        stamp_note_edit(note, current_user.id)
         return {"ok": True}
 
     def _event(_response: dict[str, Any]) -> EventPayload:
@@ -1024,8 +1027,9 @@ async def patch_section(
         if not note:
             raise HTTPException(status_code=404, detail="章节不存在")
         # 用 is_empty 标记"不导出"（Word export 已有 skip empty 逻辑）
-        if "status" in body:
+        if "status" in body and bool(note.is_empty) != (body["status"] == "not_applicable"):
             note.is_empty = body["status"] == "not_applicable"
+            stamp_note_edit(note, current_user.id)
         status_val = (
             "not_applicable"
             if note.is_empty
@@ -1105,6 +1109,7 @@ async def restore_section(
         if not note:
             raise HTTPException(status_code=404, detail="章节不存在或未被删除")
         note.is_deleted = False
+        stamp_note_edit(note, current_user.id)
         holder["note_section"] = getattr(note, "note_section", None)
         return {"ok": True}
 
@@ -1350,6 +1355,9 @@ async def clear_formulas(
     svc = NoteWpMappingService(db)
     try:
         count = await svc.clear_formulas(project_id, year, note_section)
+        if count:
+            await stamp_section_edit(db, project_id=project_id, year=year, note_section=note_section,
+                                     user_id=current_user.id)
         await db.commit()
         return {"message": f"已清除 {count} 个单元格的自动公式", "cleared_count": count}
     except Exception as e:
@@ -1374,6 +1382,9 @@ async def restore_auto_mode(
     svc = NoteWpMappingService(db)
     try:
         count = await svc.restore_auto_mode(project_id, year, note_section)
+        if count:
+            await stamp_section_edit(db, project_id=project_id, year=year, note_section=note_section,
+                                     user_id=current_user.id)
         await db.commit()
         return {"message": f"已恢复 {count} 个单元格为自动提数", "restored_count": count}
     except Exception as e:
@@ -1455,6 +1466,9 @@ async def apply_formulas(
 
     try:
         result = await execute_note_formulas(db, project_id, year, note_section)
+        if result.get("updated"):
+            await stamp_section_edit(db, project_id=project_id, year=year, note_section=note_section,
+                                     user_id=current_user.id)
         await db.commit()
         return {
             "message": f"公式已执行：{result['executed']} 个公式，更新 {result['updated']} 个单元格",
@@ -1520,6 +1534,8 @@ async def upsert_note_formulas(
         saved = await note_formula_service.save_many(
             db, project_id, year, note_section, formulas
         )
+        await stamp_section_edit(db, project_id=project_id, year=year, note_section=note_section,
+                                 user_id=current_user.id)
         await db.commit()
         return {"formulas": saved, "saved_count": len(saved)}
     except ValueError as e:

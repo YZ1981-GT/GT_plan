@@ -2767,11 +2767,15 @@ class DisclosureEngine:
         text_content: str | None = None,
         guidance_text: str | None = None,
         status: NoteStatus | None = None,
+        *,
+        user_id: UUID | None = None,
     ) -> DisclosureNote | None:
-        """更新附注章节内容。
+        """更新附注章节内容；有字段要改就盖「最近一次编辑」（``note_edit_stamp``，第 24 组）。
 
         Validates: Requirements 4.10
         """
+        from app.services.note_edit_stamp import stamp_note_edit
+
         result = await self.db.execute(
             sa.select(DisclosureNote).where(
                 DisclosureNote.id == note_id,
@@ -2782,6 +2786,8 @@ class DisclosureEngine:
         if note is None:
             return None
 
+        if any(v is not None for v in (table_data, text_content, guidance_text, status)):
+            stamp_note_edit(note, user_id)
         if table_data is not None:
             note.table_data = table_data
             # JSONB 字段需要显式标记为已修改，确保 _tables 等嵌套字段被持久化
