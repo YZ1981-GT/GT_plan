@@ -1130,6 +1130,19 @@ class NoteWordExporter:
                 "请核对 Project.template_type 与附注生成口径是否一致）",
                 leaked,
             )
+        # 7.6 Rendered_Block_Hash 以交付件最终内容为准（第 27 组）：6.4 算哈希时块里还有 7 / 7.5 要清掉的
+        #     占位符 ⇒ 没动过的块被增量刷新的人工编辑检测、回填的「交付后改过」判据当成人工改过。按锚点重取块再算
+        if rendered_block_hashes:
+            try:
+                from app.services.section_anchor_utils import block_text_hash, resolve_section_blocks
+
+                locate_mode, final_blocks = resolve_section_blocks(doc)
+                if locate_mode == "anchor":
+                    for b in final_blocks:
+                        if b.section_code in rendered_block_hashes:
+                            rendered_block_hashes[b.section_code] = block_text_hash(list(b.elements))
+            except Exception:  # noqa: BLE001 — 重算失败保留 6.4 的值，不阻断导出
+                logger.warning("rendered block hash recompute failed", exc_info=True)
 
         # 8. 输出
         output = BytesIO()

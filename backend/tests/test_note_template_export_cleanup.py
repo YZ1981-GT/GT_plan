@@ -136,6 +136,27 @@ async def test_note_claimed_by_code_is_not_reused_by_section_id(tmp_path, monkey
     assert _texts(data).count("货币资金期末余额披露") == 1
 
 
+@pytest.mark.parametrize("controls", [True, False], ids=["内容控件开", "内容控件关"])
+@pytest.mark.asyncio
+async def test_rendered_block_hash_matches_delivered_doc(synthetic, controls):
+    """导出时记的 Rendered_Block_Hash = 交付件里按锚点重算的块哈希（第 27 组）。
+
+    收尾清理在算哈希之后：清掉的占位符若算进了哈希，没动过的块会被增量刷新的人工编辑检测、回填的
+    「交付后改过」判据当成人工改过。第 26 组让清理真正生效后，真实项目每份 5 块不一致。
+    """
+    from app.services.section_anchor_utils import block_text_hash, resolve_section_blocks
+
+    synthetic.setattr(nwe_mod.settings, "DELIVERABLE_LINEAGE_CONTENT_CONTROL_ENABLED", controls)
+    exporter = NoteWordExporter(_make_db([_note("八、1", "货币资金期末余额披露", "sid-cash")]))
+    buf, meta = await exporter.export_with_meta(
+        nwe_mod.UUID(int=1), 2025, template_type="soe", report_scope="standalone", mode="template")
+    mode, blocks = resolve_section_blocks(Document(BytesIO(buf.getvalue())))
+    delivered = {b.section_code: block_text_hash(list(b.elements)) for b in blocks}
+    assert mode == "anchor" and "八、2" in delivered, "夹具没有「无附注、占位符被清」的块，判据空转"
+    assert set(meta.rendered_block_hashes) == set(delivered)
+    assert {c: h for c, h in meta.rendered_block_hashes.items() if delivered[c] != h} == {}
+
+
 def test_nested_marker_paragraph_with_bookmark_is_cleared_not_deleted():
     """内容控件里带书签的标记段落只清空（书签不能跟着删）；没有书签的照旧删；body 级开闭标记照旧删。"""
     from docx.oxml import OxmlElement

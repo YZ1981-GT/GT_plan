@@ -539,11 +539,16 @@ class DeliverableWritebackService:
             return {}
         logger.info("writeback: 章节定位模式=%s blocks=%d", mode, len(blocks))
 
+        from app.services.section_anchor_utils import block_text_hash
+
         ns_w = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
         sections: dict[str, str] = {}
         self._last_block_xml = {}
+        # 当前块哈希：与生成 / 刷新时记录的 Rendered_Block_Hash 同口径，判「交付后改过没有」（第 27 组）
+        self._last_block_hash = {}
 
         for block in blocks:
+            self._last_block_hash[block.section_code] = block_text_hash(list(block.elements))
             text_parts: list[str] = []
             xml_parts: list[str] = []
             for el in block.elements:
@@ -697,6 +702,12 @@ class DeliverableWritebackService:
                 failed=[],
                 trace_id=None,
             )
+
+        # ─── 2.5 交付后没改过的块不参与比对（第 27 组）─────────────────────
+        # 模板模式的块里有编号行、标题、模板指引，块文字与库里正文本就不同：首版逐块直接比，刚导出未改一字也
+        # 全部判为已修改，库里正文没变 ⇒ 无冲突 ⇒ 全部写回（真实项目只读核对：安徽 146 / 146 块）
+        for code in await self._untouched_sections(word_export_task_id, docx_sections):
+            docx_sections.pop(code, None)
 
         # ─── 3. 加载上游当前文字 + diff ─────────────────────────────────────
         db_sections: dict[str, str] = {}
@@ -973,6 +984,27 @@ class DeliverableWritebackService:
 
         return file_path.read_bytes()
 
+    async def _untouched_sections(self, word_export_task_id: UUID, docx_sections: dict[str, str]) -> list[str]:
+        """交付后没改过的块：当前块哈希 == 生成 / 刷新时记录的 Rendered_Block_Hash。
+
+        与增量刷新的人工编辑检测同一判据（``section_anchor_utils.block_text_hash``）。记录为 NULL 的块
+        （存量交付件）不算没改过，照旧比对。
+        """
+        import sqlalchemy as sa
+
+        from app.models.audit_platform_models import DeliverableSectionState
+
+        current = getattr(self, "_last_block_hash", None) or {}
+        if not current or not docx_sections:
+            return []
+        rows = (await self.db.execute(
+            sa.select(DeliverableSectionState.section_code, DeliverableSectionState.rendered_block_hash).where(
+                DeliverableSectionState.word_export_task_id == word_export_task_id,
+                DeliverableSectionState.section_code.in_(list(docx_sections)),
+            )
+        )).all()
+        return [code for code, recorded in rows if recorded and current.get(code) == recorded]
+
     async def _resolve_adapter(self, word_export_task_id: UUID):
         """按交付件 doc_type 取上游适配器（Wave 3 Task 18）。
 
@@ -1018,6 +1050,7 @@ class DeliverableWritebackService:
             return await self._extract_sections_from_docx(docx_bytes)
         # 其他上游：护栏降级为纯文字分类（报告正文段落无表格数字回写场景）
         self._last_block_xml = {}
+        self._last_block_hash = {}
         return await adapter.extract_sections(docx_bytes)
 
     async def _write_text_content(
