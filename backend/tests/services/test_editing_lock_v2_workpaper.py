@@ -90,6 +90,20 @@ async def _rebuild_tables():
         await conn.run_sync(Base.metadata.create_all)
 
 
+def _unwrap(resp_json: dict) -> dict:
+    """解包 ResponseWrapperMiddleware 的 {code, message, data} 信封。"""
+    if "data" in resp_json and "code" in resp_json:
+        return resp_json["data"]
+    return resp_json
+
+
+def _error_detail(resp_json: dict) -> dict:
+    """从错误响应取出 detail dict（兼容 http_exception_handler 的 {code, message} 格式）。"""
+    if "message" in resp_json and isinstance(resp_json["message"], dict):
+        return resp_json["message"]
+    return resp_json.get("detail", resp_json)
+
+
 # --------------------------------------------------------------------------
 # Property 5: 底稿锁 acquire 冲突
 # Feature: editing-lock-v1-v2-consolidation, Property 5: acquire conflict
@@ -119,7 +133,7 @@ async def test_acquire_conflict_returns_409_with_holder_info(
     async with await make_client(holder_b_id, "holder_b") as client_b:
         resp_b = await client_b.post(f"/api/editing-locks/workpaper/{resource_id}")
         assert resp_b.status_code == 409
-        detail = resp_b.json()["detail"]
+        detail = _error_detail(resp_b.json())
         assert detail["locked_by"] == str(holder_a_id)
         assert detail["locked_by_name"] == "holder_a"
 
@@ -152,7 +166,7 @@ async def test_heartbeat_renewal_refreshes_heartbeat_at(
             f"/api/editing-locks/workpaper/{resource_id}/heartbeat"
         )
         assert resp_hb.status_code == 200
-        body = resp_hb.json()
+        body = _unwrap(resp_hb.json())
         assert body["refreshed"] is True
         assert "heartbeat_at" in body
 
@@ -219,7 +233,7 @@ async def test_release_sets_released_at_and_no_active_lock(
         # release
         resp_rel = await client.delete(f"/api/editing-locks/workpaper/{resource_id}")
         assert resp_rel.status_code == 200
-        body = resp_rel.json()
+        body = _unwrap(resp_rel.json())
         assert body["released"] is True
 
     # DB 验证: 无活跃锁
@@ -274,7 +288,7 @@ async def test_force_acquire_replaces_holder(
             f"/api/editing-locks/workpaper/{resource_id}/force"
         )
         assert resp_force.status_code == 200
-        body = resp_force.json()
+        body = _unwrap(resp_force.json())
         assert body["previous_holder_id"] == str(holder_a_id)
         assert "lock_id" in body
 
@@ -311,7 +325,7 @@ async def test_empty_holder_name_acquire_succeeds(db_session, make_client):
         resource_id = "boundary-test-empty-name"
         resp = await client.post(f"/api/editing-locks/workpaper/{resource_id}")
         assert resp.status_code == 200
-        body = resp.json()
+        body = _unwrap(resp.json())
         assert body["locked"] is False
 
 

@@ -1429,3 +1429,8 @@ backend/scripts/fix/fix_note_k_complex_structure.py  896
 #   test_variant_matrix.py —— variant matrix 基线回归守卫（Property 19 冻结 + T10 截断锁死 +
 #     parent_company_sections 冻结等多组断言合体）。非本次引入；膨胀因新增截断修复条目。
 backend/tests/test_variant_matrix.py  883
+
+#   fix_note_*_structure.py —— 2026-10-16 auto-create 缺失表骨架逻辑扩展，fix 脚本天然需要完整 plan 定义
+backend/scripts/fix/fix_note_d1_notes_receivable_structure.py  893
+backend/scripts/fix/fix_note_g_cycle_structure.py  1453
+backend/scripts/fix/fix_note_inventory_structure.py  916

@@ -298,7 +298,8 @@ SECTION_PLANS: dict[str, dict[str, dict[str, Any]]] = {
             "section": "五、19",
             "plan": [
                 {
-                    "aliases": [T_G8_LISTED_MAIN],
+                    "aliases": [_G15_ART19_9, T_G8_LISTED_MAIN],
+                    "new_name": T_G8_LISTED_MAIN,
                     "headers": ["项目", "期末余额", "上年年末余额"],
                     "columns": _flat_columns([
                         ("label", "项目", None),
@@ -1183,7 +1184,22 @@ def apply_plan(section: dict[str, Any], plan: list[dict[str, Any]]) -> tuple[lis
             None,
         )
         if idx is None:
-            warnings.append(f"未找到表：{aliases[-1]}（游标 {cursor}）→ 跳过")
+            # 缺失表 → 从 plan 规则创建骨架并追加到 tables 末尾
+            new_name = rule.get("new_name") or aliases[-1]
+            skeleton: dict[str, Any] = {"name": new_name}
+            for key in ("headers", "columns", "rows"):
+                if rule.get(key) is not None:
+                    skeleton[key] = json.loads(json.dumps(rule[key], ensure_ascii=False))
+            want_groups = _derive_column_groups(rule.get("columns") or [])
+            if want_groups:
+                skeleton["_column_groups"] = json.loads(json.dumps(want_groups, ensure_ascii=False))
+            if rule.get("guidance"):
+                skeleton["guidance"] = rule["guidance"]
+            tables.insert(cursor, skeleton)
+            section["tables"] = tables
+            idx = cursor
+            changes.append(f"[{idx}] 新建缺失表「{new_name}」")
+            cursor = idx + 1
             continue
 
         tbl = tables[idx]

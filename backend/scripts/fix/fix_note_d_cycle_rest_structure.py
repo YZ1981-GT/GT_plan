@@ -176,6 +176,7 @@ def _d5_listed_plan() -> list[dict[str, Any]]:
                 total_row("期末公允价值"),
             ],
             _D5_LISTED_GUIDANCE_MAIN,
+            insert=True,
         ),
         rule(
             "本期计提、收回或转回的减值准备情况",
@@ -483,6 +484,7 @@ def _d6_listed_plan() -> list[dict[str, Any]]:
             blanks_then_total(3, "合  计"),
             "对本期重要的减值准备计提、转回、转销/核销逐项说明原因（源模板 A85-A89）。",
             aliases=["项  目", "项目"],
+            insert=True,
         ),
     ]
 

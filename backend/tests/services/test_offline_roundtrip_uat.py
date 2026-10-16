@@ -31,6 +31,7 @@ def _make_realistic_section(section_id: str, title: str, n_rows: int = 10) -> di
                 {
                     "row_type": "data",
                     "label": f"项目{r}",
+                    "values": [float(r * 100000), float(r * 95000)],
                     "cells": [f"项目{r}", float(r * 100000), float(r * 95000)],
                 }
                 for r in range(1, n_rows + 1)
@@ -106,6 +107,7 @@ class TestOfflineRoundTripUAT:
         # 模拟成员修改：把 s0 的第 0 行第 1 列从原值改为 999
         modified = [_make_realistic_section(f"s{i}", f"x{i}", n_rows=3) for i in range(5)]
         modified[0]["table_data"]["rows"][0]["cells"][1] = 999.0
+        modified[0]["table_data"]["rows"][0]["values"][0] = 999.0
 
         # 成员导出修改后的版本
         modified_xlsx, _ = export_sections_to_xlsx(modified)
@@ -117,9 +119,9 @@ class TestOfflineRoundTripUAT:
         # s0 应有 cell 级 diff，其他应无
         s0_diff = next(d for d in diffs if d.section_id == "s0")
         assert s0_diff.cell_diffs, "s0 应有差异"
-        assert any(cd.cell_key == "0:1" for cd in s0_diff.cell_diffs)
+        assert any(cd.cell_key == "0:0" for cd in s0_diff.cell_diffs)
         # imported 999, local 100000
-        cd = next(cd for cd in s0_diff.cell_diffs if cd.cell_key == "0:1")
+        cd = next(cd for cd in s0_diff.cell_diffs if cd.cell_key == "0:0")
         assert cd.imported_value == 999.0
         assert cd.local_value == 100000.0
 

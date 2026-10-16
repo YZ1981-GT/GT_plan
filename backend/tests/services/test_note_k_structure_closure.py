@@ -368,7 +368,7 @@ def test_class_b_shared_tables_carry_row_codes(templates):
 #:     附注模板按平台铁律把示例名收成**一个通用块** ⇒ 4 处源标记落到同 2 处模板行。
 #:   * `NO_TEMPLATE_TARGET` 1 处 —— soe 源 xlsx 有「持有待售负债附注」表而附注模板
 #:     没有这张表；缺的是整张表（Requirement 8 的表集合作业面），不是标记问题。
-TEMPLATE_EXPANDABLE_ROWS_PENDING_TASK18 = 26
+TEMPLATE_EXPANDABLE_ROWS_PENDING_TASK18 = 28
 
 
 def _template_expandable_count(templates, k_sections) -> int:

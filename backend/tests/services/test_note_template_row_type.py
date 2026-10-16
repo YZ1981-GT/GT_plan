@@ -19,6 +19,8 @@ VALID_ROW_TYPES = {
     "total",
     "dynamic_detail",
     "formula",
+    # 「不属于任何段」的表级兜底行
+    "section_header",
     # 「不属于任何段」的表级兜底行 —— **多段共享表**的行级合并据此把该行排除在
     # 所有段的可写区之外（`app/services/note_shared_table_segments.UNOWNED_ROW_TYPE`）。
     # 首个使用者 = soe `八、93 受限资产` 末行「其他」：它紧随 `BS-029 在建工程` 段，

@@ -269,7 +269,13 @@ def test_frontend_subtable_keys_match_template() -> None:
 def test_frontend_movement_columns_match_template_headers() -> None:
     """`j1MovementColumns()` 的 5 个 label 与模板 headers 逐字一致。"""
     src = (COMPOSABLES / "j1NoteSectionMap.ts").read_text(encoding="utf-8")
+    # j1MovementColumns 可能委托给 buildJ1SoeColumns，两处都检查
     body = re.search(r"export function j1MovementColumns\(\)[^{]*\{(.*?)\n\}", src, re.S)
     assert body, "未找到 j1MovementColumns"
     labels = re.findall(r"label:\s*'([^']+)'", body.group(1))
+    if not labels:
+        # 委托调用：从 buildJ1SoeColumns 取
+        delegate = re.search(r"export function buildJ1SoeColumns\(\)[^{]*\{(.*?)\n\}", src, re.S)
+        assert delegate, "未找到 buildJ1SoeColumns"
+        labels = re.findall(r"label:\s*'([^']+)'", delegate.group(1))
     assert labels == MOVEMENT_HEADERS, f"前端列头 {labels} ≠ 模板 {MOVEMENT_HEADERS}"

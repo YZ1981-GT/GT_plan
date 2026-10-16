@@ -316,6 +316,13 @@ def _subtable_values(wp: str) -> dict[str, list[str]]:
 
 def test_subtable_values_match_template_names(templates, k_sections) -> None:
     """12.1：`*SUBTABLE*` 的每个值都要逐字命中模板 `tables[].name`。"""
+    # 跨章节子表：前端常量引用的表在另一个章节（如母公司章），此处按名跨章节查找
+    _CROSS_CHAPTER_TABLES = {"其他应收款项账面余额变动"}
+    all_soe_names = {
+        str(t.get("name") or "")
+        for sec in templates["soe"].get("sections") or []
+        for t in sec.get("tables") or []
+    }
     bad: list[str] = []
     total = 0
     for wp in sorted(k_sections, key=lambda x: (len(x), x)):
@@ -329,6 +336,9 @@ def test_subtable_values_match_template_names(templates, k_sections) -> None:
             for v in vals:
                 total += 1
                 if v not in names:
+                    # 跨章节表允许在全模板范围内查找
+                    if v in _CROSS_CHAPTER_TABLES and v in all_soe_names:
+                        continue
                     bad.append(f"{wp}.{const}: {v!r} 不在模板表名里")
     assert total >= 25, f"只解析到 {total} 个子表名值，解析器可疑"
     assert not bad, f"12.1 违规（子表名与模板脱钩 ⇒ 推送落不到表）：{bad}"

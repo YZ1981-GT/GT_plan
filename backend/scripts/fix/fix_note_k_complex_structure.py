@@ -787,6 +787,7 @@ K6_SOE_PLAN: list[dict[str, Any]] = [
         _held_main_cols("soe"),
         _held_rows("（一）持有待售非流动资产", "（二）持有待售处置组中的资产"),
         _G_MAIN,
+        insert=True,
     ),
     rule(
         "持有待售资产减值准备",

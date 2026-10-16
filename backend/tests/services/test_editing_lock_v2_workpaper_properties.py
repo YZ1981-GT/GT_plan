@@ -110,7 +110,7 @@ async def test_acquire_conflict_returns_409_with_holder_info(
     async with await make_client(holder_b_id, "holder_b") as client_b:
         resp_b = await client_b.post(f"/api/editing-locks/workpaper/{resource_id}")
         assert resp_b.status_code == 409
-        detail = resp_b.json().get("detail", resp_b.json())
+        detail = resp_b.json().get("detail") or resp_b.json().get("message", resp_b.json())
         # Verify holder info is present in 409 response
         assert "locked_by" in detail
         assert "locked_by_name" in detail

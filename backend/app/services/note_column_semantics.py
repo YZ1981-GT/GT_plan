@@ -115,6 +115,16 @@ STANDARD_SEMANTICS: dict[str, list[str]] = {
     "formula_result": ["公式计算"],
     # ── 行标识列（默认兜底，也对 "项目/名称/类别" 主动命中）──────
     "manual_text": ["项目", "名称", "类别", "类型", "种类"],
+    # ── 别名（bindings JSON 可能使用的等价语义 ID）──────────────────
+    "row_label": [],  # ≡ manual_text，bindings 写了此名
+    "closing_amount": ["期末金额"],  # ≡ closing_balance 的金额口径
+    "opening_amount": ["期初金额"],  # ≡ opening_balance 的金额口径
+    # ── 金融资产转移 / 终止确认专用（D2 应收账款 / K1 其他应收款）─────
+    "transfer_method": ["转移方式", "资产转移方式"],
+    "derecognition_amount": ["终止确认金额"],
+    "derecognition_gain_loss": ["与终止确认相关的利得或损失"],
+    "continued_asset": ["继续涉入形成的资产金额"],
+    "continued_liability": ["继续涉入形成的负债金额"],
 }
 
 # 所有合法 semantic_id 元组（供 binding JSON schema enum 校验复用）。

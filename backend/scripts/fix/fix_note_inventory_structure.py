@@ -355,7 +355,7 @@ def _listed_plan() -> list[dict[str, Any]]:
         {
             "aliases": ["确认为存货的数据资源"],
             "patch": {"columns": DATA_RESOURCE_COLUMNS, "guidance": _G_DATA_RESOURCE},
-            "rows": "keep",
+            "rows": "data_resource_three_segment",
         },
         {
             "aliases": ["开发成本"],
@@ -447,7 +447,7 @@ def _soe_plan() -> list[dict[str, Any]]:
         {
             "aliases": ["确认为存货的数据资源"],
             "patch": {"columns": DATA_RESOURCE_COLUMNS, "guidance": _G_DATA_RESOURCE},
-            "rows": "keep",
+            "rows": "data_resource_three_segment_soe",
         },
     ]
 
@@ -506,6 +506,39 @@ def _rows_for(mode: str, existing: list[dict[str, Any]]) -> list[dict[str, Any]]
                 row["is_detail"] = True
             rows.append(row)
         return rows + [_total_row()]
+    if mode == "data_resource_three_segment":
+        # F9-7~F9-13a 三段式：一、账面原值 / 二、跌价准备 / 三、账面价值
+        return [
+            _data_row("一、账面原值"),
+            _data_row("1.期初余额"),
+            _data_row("2.本期增加金额"),
+            _data_row("3.本期减少金额"),
+            _data_row("4.期末余额"),
+            _data_row("二、存货跌价准备"),
+            _data_row("1.期初余额"),
+            _data_row("2.本期增加金额"),
+            _data_row("3.本期减少金额"),
+            _data_row("4.期末余额"),
+            _data_row("三、账面价值"),
+            _data_row("1.期末账面价值"),
+            _data_row("2.期初账面价值"),
+        ]
+    if mode == "data_resource_three_segment_soe":
+        return [
+            _data_row("一、账面原值"),
+            _data_row("1.期初余额"),
+            _data_row("2.本期增加金额"),
+            _data_row("3.本期减少金额"),
+            _data_row("4.期末余额"),
+            _data_row("二、跌价准备"),
+            _data_row("1.期初余额"),
+            _data_row("2.本期增加金额"),
+            _data_row("3.本期减少金额"),
+            _data_row("4.期末余额"),
+            _data_row("三、账面价值"),
+            _data_row("1.期末账面价值"),
+            _data_row("2.期初账面价值"),
+        ]
     return existing
 
 
@@ -545,7 +578,28 @@ def apply_plan(
             None,
         )
         if idx is None:
-            warnings.append(f"未找到表：{rule['aliases'][0]}（游标 {cursor}）→ 跳过")
+            # 缺失表 → 从 plan 规则创建骨架并插入 cursor 位置
+            new_name = rule.get("new_name") or rule["aliases"][0]
+            skeleton: dict[str, Any] = {"name": new_name}
+            patch = rule["patch"]
+            for key in ("headers", "columns", "_column_groups"):
+                if key in patch:
+                    skeleton[key] = json.loads(json.dumps(patch[key], ensure_ascii=False))
+            # 若 patch 有 columns 但无 headers → 从 columns.label 推导
+            if "columns" in patch and "headers" not in patch:
+                skeleton["headers"] = [str(c.get("label", "")) for c in patch["columns"]]
+            if "guidance" in patch:
+                skeleton["guidance"] = patch["guidance"]
+            rows_mode = rule.get("rows", "keep")
+            if rows_mode != "keep":
+                skeleton["rows"] = _rows_for(rows_mode, [])
+            else:
+                skeleton["rows"] = []
+            tables.insert(cursor, skeleton)
+            section["tables"] = tables
+            idx = cursor
+            changes.append(f"[{idx}] 新建缺失表「{new_name}」")
+            cursor = idx + 1
             continue
 
         tbl = tables[idx]
@@ -578,6 +632,16 @@ def apply_plan(
                 )
 
         # guidance = TAB 页签编制提示（字符串，非列表 → 单独处理）
+        # 若 patch 有 columns 但无 headers → 从 columns.label 同步 headers（避免两套说法）
+        if "columns" in patch and "headers" not in patch:
+            derived_headers = [str(c.get("label", "")) for c in (tbl.get("columns") or [])]
+            if tbl.get("headers") != derived_headers:
+                old_h = tbl.get("headers") or []
+                tbl["headers"] = derived_headers
+                changes.append(
+                    f"[{idx}] {tbl.get('name')}.headers：从 columns.label 同步"
+                    f"（{len(old_h)} → {len(derived_headers)} 项）"
+                )
         if "guidance" in patch and tbl.get("guidance") != patch["guidance"]:
             had = bool(tbl.get("guidance"))
             tbl["guidance"] = patch["guidance"]
@@ -757,7 +821,28 @@ def _process(
         log.extend(errs or ["结构校验通过"])
         return not errs, log
 
-    changes, warnings = apply_plan(section, plan)
+    # 清理 plan 外的垃圾表（seed 残留的长文本指引充当表名的条目）—— 在 apply 前执行
+    changes: list[str] = []
+    expected_names = set()
+    for rule in plan:
+        expected_names.add(rule.get("new_name") or rule["aliases"][0])
+        expected_names.update(rule["aliases"])
+        for pre in rule.get("alias_prefixes", []):
+            expected_names.add(pre)
+    tables = section.get("tables") or []
+    garbage_idxs = [
+        i for i, t in enumerate(tables)
+        if str(t.get("name", "")) not in expected_names
+        and len(str(t.get("name", ""))) > 50
+    ]
+    for i in reversed(garbage_idxs):
+        removed_name = tables.pop(i).get("name", "")
+        changes.append(f"[{i}] 删除 seed 残留指引表「{removed_name[:40]}...」")
+    section["tables"] = tables
+
+    changes_ap, warnings = apply_plan(section, plan)
+
+    changes += changes_ap
     if text_retitle:
         changes += retitle_text_sections(section, text_retitle)
     if text_additions:
