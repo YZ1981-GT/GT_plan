@@ -70,8 +70,22 @@
     | 宜宾 | 94 | 9 → 16 | 6 → 0 | 39 → 26 | 11 → 23 | 83 |
 
     （「→」= 读时增强后，即编辑器里看到的；空白差异 0。）读时增强补上了表名 / 表头文字 / 列数（模板列多于数据列时扩列），但补不了行增减与表数不同，还会因扩列把一部分列增减变成行增减。差异集中在：`八、4` 应收票据、`八、9` 其他应收款（种子中间插入了新表 ⇒ 按位序整体错一位，读时增强的首列交叉校验拦住了串表）、`八、3 / 八、8 / 八、29 / 八、35` 多出 3 行空标签行、`八、10` 数据资源行（库 21 行 / 种子 13 行）、`八、51` 表头带 `<br/>`；华氏 / 宜宾是早期生成的项目，各有 ~50 节库内根本没有表（`table_data` 为空）。这些差异来自底稿 xlsx 口径的表格脚本改过种子，与 Word 口径的表格定稿（Task 6）同一个待决问题。
-- [~] 12. 表格结构写库：按新结构搬值，孤儿值保留在 `_realign_orphans` 并报告；断言非空值多重集合不变、正文哈希不变。
-  - ⏸ 待表格口径拍板（Word 表 vs 底稿 xlsx 表，同 Task 6）：先定种子表，再按 Task 11 的分类搬值。量化与比对工具已就绪，可重跑。
+- [-] 12. 表格结构写库：按新结构搬值，孤儿值保留在 `_realign_orphans` 并报告；断言非空值多重集合不变、正文哈希不变。
+  - ✅ 表格口径已定（Task 6 裁定 = 底稿 xlsx = 现行种子表），本任务按它搬值。搬值内核 `backend/app/services/note_project_table_realign.py`（纯函数）：`realign_section_tables(table_data, seed_tables)` 深拷贝种子 `tables` 当新结构，库内值按（规范化行标签，列 key → 对不上按规范化表头文字）搬入，`_cell_modes` / `_cell_meta` 边车按列索引随值搬到新列；搬不进新结构的非空值（整行无同标签落点 / 列无落点 / 整张表多出来）进 `table_data._realign_orphans` 并各带 reason；硬断言 `_assert_multiset`：新 `table_data`（含孤儿区）非空单元格值多重集合（按 JSON 原子 `(type, value)` 比，区分 `1` 与 `"1"`、不改 `0`/`0.0`）== 原 `table_data` 的，破坏即 `TableRealignError`。`plan_section` 出 dry-run 预演（安全性 + 孤儿清单，不抛错）。
+  - ✅ 接入执行流 `note_project_realign_apply.py`：`plan_table_realignment`（只读 dry-run，逐活动节预演，安全性 / 孤儿 / 会改节数进报告）+ `apply_table_realignment`（锁行 → 备份〔Task 13 同格式〕→ 逐节搬值写回 → **每节非空值多重集合不变** + **每行正文哈希不变**〔搬值只碰 `table_data`〕，任一不满足抛错回滚；`allow_orphans=False` 可要求零孤儿才落库）。CLI `realign_project_notes.py --tables [--apply]`（默认 dry-run）。
+  - ✅ 测试：`test_note_project_table_realign.py` 16 例（搬值到正确落点 / 按 key / 按表头文字 / 行列增减成孤儿 / 多出的表成孤儿 / 种子多的行留空不造值 / 库内无表建空结构 / 入参不改 / `0` 非空 / str 与 num 异原子 / dry-run 报孤儿 + **回归：未配对行且列全不映射只计一次**）+ `test_note_project_realign.py` 表格搬值行为 5 例（真 SQLite 真 ORM：dry-run 报孤儿、搬值保正文保编辑人保边车、幂等 0 写、正文漂移打红、`allow_orphans=False` 拒绝）。合计三文件 44 passed。变异证据：丢值 / 造值用 `_assert_multiset` 直测打红；孤儿吞掉用 monkeypatch 真路径打红；手动把搬值逻辑改成「悄悄清一个已映射值」真实 `realign_section_tables` 打红（`丢 1 个 [('int', 2)]`）；正文漂移 / `allow_orphans=False` 各一例打红。
+  - 🔴 搬值真 bug（首轮真库 dry-run 抓到并修）：库内行**既无同标签落点、列也全不映射**时，「整行进孤儿」与「未映射列进孤儿」两条分支对同一批值各收一次 ⇒ 孤儿区翻倍 ⇒ multiset 虚增（4 个项目报 4~5 节「不安全：多值」，全是 `丢 0 / 多 N`）。改为互斥：未配对行整行一次进孤儿、已配对行只收未映射列。修后四项目 **不安全 0 节**。
+  - ✅ 真库 dry-run 报数（2025，apply 回滚探针证实搬值在真实数据上全程无异常、两条硬断言全过）。🔴 **spec 注册的 6 个 TARGETS UUID 在本地 PG 全不存在**（`projects` 行物理消失，非软删）—— 本地库自 Task 10/14 后被重置 / 重新播种。对本地**同名在用项目**（现行 UUID：医疗器械 `5e193c68` / 华氏 `005a6f2d` / 和平 `5942c12e` / 宜宾 `14fb8c10`，各 2025）跑：
+
+    | 项目（本地现行 UUID） | 比对节 | 会改节 | 孤儿节 / 值 | 不安全节 | apply 回滚写节 |
+    |---|---|---|---|---|---|
+    | 医疗器械 5e193c68 | 96 | 60 | 6 / 56 | 0 | 96 |
+    | 华氏 005a6f2d | 104 | 67 | 34 / 588 | 0 | 104 |
+    | 和平 5942c12e | 104 | 67 | 34 / 569 | 0 | 104 |
+    | 宜宾 14fb8c10 | 104 | 67 | 34 / 588 | 0 | 104 |
+
+    孤儿值主要来自 Task 11 已量化的表结构漂移（`八、18` 长投续表按位序错位、`八、4`/`八、10` 列行增减、续表并列列等）——非空值全保留在 `_realign_orphans`，不丢不造。
+  - ⏸ **实际写库待环境**：注册 TARGETS 不在本地库、同名项目换了 UUID 且状态已漂（和平本地 173 节 ≠ Task 26 重建的 166），对非注册的临时项目 `--apply` 提交超本任务范围且可能动到并发会话的数据 ⇒ 不强写。工具（dry-run / apply / 备份 / 恢复）就绪，注册 TARGETS 回到库里即可 `realign_project_notes.py --tables --apply`。代码 + 测试 + 真库 dry-run 报数 + apply 回滚安全验证均已完成。
 - [x] 13. 备份 / 恢复（先实测恢复路径）；`note_section_instances.section_number` 列宽不足时加 V188 / R188。
   - ✅ 备份存 PostgreSQL 自己输出的 `row_to_json` 原文（不经 Python 解析：`json.loads` 会把 jsonb 里的 `1.10` 变 `1.1`、超 17 位有效数字丢精度），另记值为 JSON null 的 jsonb 列（`row_to_json` 把 SQL NULL 与 JSON null 都写成 `null`；真库纯文字章节 `table_data` 全是 JSON null）；恢复 = 删范围内现有行 → `json_populate_recordset` 按原 id 插回 → 补回 JSON null → 再导出须与备份逐字相等。真库守卫 `test_note_project_realign_backup_pg.py` 4 例（scratch schema，数据 = 测试集团甲 2025 原样拷贝 + 边界值；变异「不补 JSON null」「经 Python 解析」都打红）。真表演练：甲 `--apply` → `--restore` → 计划原样重现（改编号 1 / 树 16 / 补章 9）→ 再 `--apply`。
   - ✅ V188 / R188：裁剪页初始化把口径过滤后的全部种子章节写进 `note_section_instances`，叙述性章节以标题作编号（现算最长 42 字），`VARCHAR(20)` 在 PG 上报 22001、整页初始化失败（真库本表一直 0 行即此故；超 20 字编号在本 spec 之前就有）。V188 放宽为不限长（按列现状判断，可重入），R188 有超长行时报错拒绝截断；ORM 同步改 `String`。守卫：离线 9 例（ORM 列宽 ≥ 各口径最长编号 + 迁移文件）+ 真库 5 例（V188 前 22001 且一行未写 / 跑两遍 / 整批写入 / R188 拒绝截断再恢复 / 本地库已应用）；变异 4 个全部打红。本地库已跑 V188（`python -m app.core.migration_runner`）。

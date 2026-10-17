@@ -192,6 +192,107 @@ async def realign_project(db: AsyncSession, project_id: uuid.UUID, year: int, *,
     return report
 
 
+# ── 表格结构搬值（Task 12，design §4.2）──────────────────────────────────────
+#
+# 独立于上面的「改编号 / 树字段」对齐：那条链刻意不碰表格（design：Task 12 搬值待口径定）。表格口径既定后
+# （= 现行种子表 = 底稿 xlsx），把库内表值搬进现行种子表结构：每节深拷贝种子 ``tables`` 当新结构，旧值按
+# （规范化行标签，列 key / 表头文字）搬入，搬不进的进 ``table_data._realign_orphans``。两条硬断言（逐节非空值
+# 多重集合不变、正文哈希逐行不变）由本模块保证，破坏即回滚。
+
+
+async def _active_sections(db: AsyncSession, project_id: uuid.UUID, year: int, *, lock: bool = False
+                           ) -> list[tuple[str, str, Any, Any]]:
+    """活动节 ``(note_id, note_section, table_data, text_content)``；``lock`` 时 FOR UPDATE。"""
+    t = DisclosureNote.__table__
+    stmt = sa.select(t.c.id, t.c.note_section, t.c.table_data, t.c.text_content).where(
+        t.c.project_id == project_id, t.c.year == year, t.c.is_deleted == sa.false())
+    if lock:
+        stmt = stmt.with_for_update()
+    return [(str(r.id), r.note_section, r.table_data, r.text_content) for r in (await db.execute(stmt)).all()]
+
+
+async def _seed_tables_by_code(db: AsyncSession, project_id: uuid.UUID) -> dict[str, list[dict[str, Any]]]:
+    """生成链同口径的现行模板：现行编号 → 该节 ``tables``（口径过滤、编号已归一）。"""
+    engine = DisclosureEngine(db)
+    template_type = await engine._get_active_template_type(project_id)
+    if template_type not in ("soe", "listed"):
+        raise RealignError(f"项目模板类型为 {template_type}，只支持国企 / 上市种子")
+    templates = await engine._load_templates(project_id, template_type)
+    return {t["note_section"]: (t.get("tables") or []) for t in templates}
+
+
+async def plan_table_realignment(db: AsyncSession, project_id: uuid.UUID, year: int) -> dict[str, Any]:
+    """dry-run：逐活动节预演搬值（只读），不写库。安全性（multiset 恒等）与孤儿进报告，不抛错。"""
+    from app.services.note_project_table_realign import plan_section
+
+    deleted = (await db.execute(sa.select(Project.is_deleted).where(Project.id == project_id))).scalar_one_or_none()
+    if deleted is None or deleted:
+        raise RealignSkipped("项目不存在或已删除（回收站），不处理")
+    seed_tables = await _seed_tables_by_code(db, project_id)
+    sections = await _active_sections(db, project_id, year)
+    plans: list[dict[str, Any]] = []
+    for _nid, code, td, _text in sections:
+        seed = seed_tables.get(code)
+        if seed is None or not (seed or td):
+            continue  # 编号不在现行模板，或两侧都无表 ⇒ 无需搬
+        plans.append(plan_section(code, td, seed))
+    changed = [p for p in plans if p.get("changed")]
+    unsafe = [p for p in plans if not p.get("safe")]
+    with_orphans = [p for p in plans if p.get("orphan_values")]
+    return {"project_id": str(project_id), "year": year, "compared_sections": len(plans),
+            "changed_sections": len(changed), "unsafe_sections": len(unsafe),
+            "orphan_sections": len(with_orphans), "orphan_values": sum(p.get("orphan_values", 0) for p in plans),
+            "unsafe": [{"note_section": p["note_section"], "error": p.get("error")} for p in unsafe],
+            "orphans": [{"note_section": p["note_section"], "orphan_values": p["orphan_values"],
+                         "detail": p["orphans"]} for p in with_orphans],
+            "sections": plans}
+
+
+async def apply_table_realignment(db: AsyncSession, project_id: uuid.UUID, year: int, *,
+                                  backup_path: Path | None = None, allow_orphans: bool = True) -> dict[str, Any]:
+    """搬值写库：锁行 → 备份 → 逐节搬值写回 → 每节非空值多重集合不变 + 每行正文哈希不变，否则抛错回滚。
+
+    ``allow_orphans=False`` 时，任一节产生孤儿即拒绝（整项目回滚）——给「要求零孤儿才落库」的项目用。
+    """
+    deleted = (await db.execute(sa.select(Project.is_deleted).where(Project.id == project_id))).scalar_one_or_none()
+    if deleted is None or deleted:
+        raise RealignSkipped("项目不存在或已删除（回收站），不处理")
+    from app.services.note_project_table_realign import TableRealignError, realign_section_tables
+
+    seed_tables = await _seed_tables_by_code(db, project_id)
+    sections = await _active_sections(db, project_id, year, lock=True)
+    text_before = {nid: _hash(text) for nid, _c, _td, text in sections}
+    t = DisclosureNote.__table__
+    written = 0
+    orphan_total = 0
+    if backup_path is not None:
+        await write_backup(db, project_id, year, backup_path)
+    for nid, code, td, _text in sections:
+        seed = seed_tables.get(code)
+        if seed is None or not (seed or td):
+            continue
+        try:
+            new_td = realign_section_tables(td, seed)
+        except TableRealignError as err:
+            raise RealignError(f"节 {code} 搬值破坏非空值多重集合：{err}") from err
+        orphans = new_td.get("_realign_orphans") or []
+        if orphans and not allow_orphans:
+            raise RealignError(f"节 {code} 产生 {len(orphans)} 条孤儿，allow_orphans=False 拒绝落库")
+        orphan_total += sum(len(o.get("values") or []) for o in orphans)
+        if _hash(new_td) == _hash(td):
+            continue  # 结构与值都没变（含孤儿恒无）⇒ 不写
+        await db.execute(sa.update(t).where(t.c.id == uuid.UUID(nid)).values(table_data=new_td))
+        written += 1
+    await db.flush()
+    # 正文哈希逐行不变（搬值只碰 table_data）
+    after = await _active_sections(db, project_id, year)
+    for nid, _c, _td, text in after:
+        if text_before.get(nid) != _hash(text):
+            raise RealignError(f"节行 {nid} 正文被改动（搬值只应改表格）")
+    return {"project_id": str(project_id), "year": year, "written_sections": written,
+            "orphan_values": orphan_total, "backup": str(backup_path) if backup_path else None}
+
+
 # ── 备份 / 恢复（PostgreSQL）───────────────────────────────────────────────
 #
 # 每行存 PostgreSQL 自己输出的 ``row_to_json`` 文本，不经 Python 解析：``json.loads`` 会把 jsonb 里的数字转成浮点

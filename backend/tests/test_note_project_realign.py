@@ -397,3 +397,115 @@ async def test_apply_aborts_when_inserted_section_cannot_be_built(db: AsyncSessi
     monkeypatch.setattr(DisclosureEngine, "_build_section_table_data", _boom)
     with pytest.raises(RuntimeError, match="构表失败"):
         await realign_project(db, s["pid"], YEAR, apply=True)
+
+
+# ── 表格结构搬值（Task 12，design §4.2）：真 SQLite + 真 ORM ──────────────────
+
+#: 控制用的现行种子表：节 八、1 一张货币资金表（结构 = 期末 / 期初，无 values）
+_SEED_TABLES = {
+    "八、1": [{"name": "货币资金", "headers": ["项目", "期末余额", "期初余额"],
+              "columns": [{"key": "label", "is_label": True}, {"key": "end"}, {"key": "begin"}],
+              "rows": [{"label": "库存现金"}, {"label": "银行存款"}, {"label": "合计", "is_total": True}]}],
+}
+
+
+async def _seed_tables_for_realign(db: AsyncSession, project_id: uuid.UUID):
+    return _SEED_TABLES
+
+
+@pytest_asyncio.fixture
+async def table_project(db: AsyncSession, monkeypatch):
+    """一个最小项目：八、1 库内表列顺序颠倒 + 多一列孤儿值；返回 pid / note_id / 搬前 table_data。"""
+    import app.services.note_project_realign_apply as mod
+
+    monkeypatch.setattr(mod, "_seed_tables_by_code", _seed_tables_for_realign)
+    user = User(id=uuid.uuid4(), username="e2", email="e2@example.com", hashed_password="x", role=UserRole.auditor)
+    pid = uuid.uuid4()
+    db.add_all([user, Project(id=pid, name="搬值甲_2025", client_name="搬值甲", template_type="soe",
+                              report_scope="standalone")])
+    # 库内：列顺序 = 期初、期末、本年增减（种子只有期末 / 期初）；银行存款行有一个孤儿列值 50
+    td = {"_tables": [{"name": "货币资金", "headers": ["项目", "期初余额", "期末余额", "本年增减"],
+                       "rows": [{"label": "库存现金", "values": [200, 100, 5], "_cell_modes": {"1": "manual"}},
+                                {"label": "银行存款", "values": [400, 300, 50]},
+                                {"label": "合计", "values": [600, 400, 55], "is_total": True}]}]}
+    nid = uuid.uuid4()
+    db.add(DisclosureNote(id=nid, project_id=pid, year=YEAR, note_section="八、1", section_title="货币资金",
+                          text_content="<p>货币资金正文</p>", table_data=td, updated_by=user.id, updated_at=STAMP))
+    await db.commit()
+    return {"pid": pid, "nid": nid, "user": user.id, "td": td}
+
+
+@pytest.mark.asyncio
+async def test_table_dry_run_reports_orphans_and_safety(table_project, db: AsyncSession) -> None:
+    from app.services.note_project_realign_apply import plan_table_realignment
+
+    report = await plan_table_realignment(db, table_project["pid"], YEAR)
+    await db.rollback()
+    assert report["compared_sections"] == 1 and report["unsafe_sections"] == 0
+    assert report["changed_sections"] == 1  # 列顺序变了
+    # 本年增减列 3 个非空值成孤儿
+    assert report["orphan_values"] == 3
+    assert report["orphans"][0]["note_section"] == "八、1"
+
+
+@pytest.mark.asyncio
+async def test_table_apply_carries_values_keeps_text_and_stamp(table_project, db: AsyncSession) -> None:
+    from app.services.note_project_realign_apply import apply_table_realignment
+
+    report = await apply_table_realignment(db, table_project["pid"], YEAR)
+    await db.commit()
+    assert report["written_sections"] == 1 and report["orphan_values"] == 3
+    note = await db.get(DisclosureNote, table_project["nid"])
+    tbl = note.table_data["_tables"][0]
+    # 新结构 headers = 期末、期初 ⇒ 值按表头搬正
+    assert tbl["headers"] == ["项目", "期末余额", "期初余额"]
+    assert [r["values"] for r in tbl["rows"]] == [[100, 200], [300, 400], [400, 600]]
+    # 边车随值搬（库内「期末」是列索引 1 → 新结构列索引 0）
+    assert tbl["rows"][0]["_cell_modes"] == {"0": "manual"}
+    orphans = note.table_data["_realign_orphans"]
+    assert sorted(v for o in orphans for v in o["values"]) == [5, 50, 55]
+    # 正文与编辑人原样（搬值不算用户编辑、不碰正文）
+    assert note.text_content == "<p>货币资金正文</p>"
+    assert note.updated_by == table_project["user"]
+
+
+@pytest.mark.asyncio
+async def test_table_apply_idempotent(table_project, db: AsyncSession) -> None:
+    from app.services.note_project_realign_apply import apply_table_realignment, plan_table_realignment
+
+    await apply_table_realignment(db, table_project["pid"], YEAR)
+    await db.commit()
+    # 再搬一次：结构已对齐、值在正确落点 ⇒ 0 写（但孤儿已固化，changed 仍报 True）
+    report = await apply_table_realignment(db, table_project["pid"], YEAR)
+    await db.commit()
+    assert report["written_sections"] == 0
+
+
+@pytest.mark.asyncio
+async def test_table_apply_refuses_when_text_changes(table_project, db: AsyncSession, monkeypatch) -> None:
+    """正文哈希逐行不变断言：搬值过程中若正文被动过 ⇒ 抛错回滚。
+
+    注入 ``_active_sections`` 的「after」读（无锁那次）返回被改过的正文，证明正文守卫会打红。
+    """
+    import app.services.note_project_realign_apply as mod
+    from app.services.note_project_realign_apply import RealignError, apply_table_realignment
+
+    real_active = mod._active_sections
+
+    async def _active_with_text_drift(db_, pid, yr, *, lock=False):
+        rows = await real_active(db_, pid, yr, lock=lock)
+        if not lock:  # 第二次读（after）：伪造正文漂移
+            return [(i, c, td, (text or "") + "X") for i, c, td, text in rows]
+        return rows
+
+    monkeypatch.setattr(mod, "_active_sections", _active_with_text_drift)
+    with pytest.raises(RealignError, match="正文被改动"):
+        await apply_table_realignment(db, table_project["pid"], YEAR)
+
+
+@pytest.mark.asyncio
+async def test_table_apply_refuses_orphans_when_disallowed(table_project, db: AsyncSession) -> None:
+    from app.services.note_project_realign_apply import RealignError, apply_table_realignment
+
+    with pytest.raises(RealignError, match="孤儿"):
+        await apply_table_realignment(db, table_project["pid"], YEAR, allow_orphans=False)

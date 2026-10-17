@@ -71,6 +71,46 @@ async def _run_one(session_factory, project_id: uuid.UUID, year: int, *, apply: 
     return report
 
 
+async def _tables_one(session_factory, project_id: uuid.UUID, year: int, *, apply: bool, backup_dir: Path,
+                      stamp: str) -> dict:
+    """表格结构搬值（Task 12）：dry-run 只读预演；``--apply`` 锁行 → 备份 → 搬 → 硬断言，失败回滚。"""
+    from app.services.note_project_realign_apply import (
+        RealignError, RealignSkipped, apply_table_realignment, plan_table_realignment,
+    )
+
+    async with session_factory() as db:
+        try:
+            if not apply:
+                report = await plan_table_realignment(db, project_id, year)
+                await db.rollback()
+                return report
+            backup = backup_dir / f"note_tables_{project_id}_{year}_{stamp}.json"
+            report = await apply_table_realignment(db, project_id, year, backup_path=backup)
+        except RealignSkipped as err:
+            await db.rollback()
+            return {"project_id": str(project_id), "year": year, "skipped": str(err)}
+        except RealignError as err:
+            await db.rollback()
+            return {"project_id": str(project_id), "year": year, "error": str(err)}
+        await db.commit()
+    report["applied"] = True
+    return report
+
+
+def _tables_summary(report: dict) -> str:
+    name = TARGETS.get(report["project_id"], report["project_id"])
+    if "skipped" in report:
+        return f"- {name} {report['year']}：跳过（{report['skipped']}）"
+    if "error" in report:
+        return f"✗ {name} {report['year']}：{report['error']}"
+    if report.get("applied"):
+        return (f"✓ {name} {report['year']}：写 {report['written_sections']} 节，孤儿值 {report['orphan_values']}；"
+                f"备份 {report.get('backup')}")
+    return (f"· {name} {report['year']}：比对 {report['compared_sections']} 节，"
+            f"会改 {report['changed_sections']}，孤儿 {report['orphan_sections']} 节 / "
+            f"{report['orphan_values']} 值，不安全 {report['unsafe_sections']} 节")
+
+
 async def _rebuild(session_factory, project_id: uuid.UUID, year: int, *, apply: bool, backup_dir: Path,
                    stamp: str) -> dict:
     """整年度推倒重建（Phase 6）：dry-run 只报现状；``--apply`` 备份 → 删 → 生成（一个事务）→ 提交后公式推送 → 校验。"""
@@ -156,11 +196,31 @@ async def main() -> int:
     parser.add_argument("--report", type=Path, help="完整报告 JSON 路径")
     parser.add_argument("--rebuild", action="store_true",
                         help="整年度推倒重建（备份 → 删除该年度全部附注 → 按现行模板生成 → 公式推送）；需 --project 与 --year")
+    parser.add_argument("--tables", action="store_true",
+                        help="表格结构搬值（Task 12）：把库内表值搬进现行种子表结构，孤儿进 _realign_orphans；"
+                             "默认 dry-run，--apply 时锁行 → 备份 → 搬 → 断言非空值多重集合与正文哈希不变")
     args = parser.parse_args()
     if args.rebuild and not (args.project and args.year):
         parser.error("--rebuild 需要 --project 与 --year")
 
     from app.core.database import async_session
+
+    if args.tables:
+        ids = list(TARGETS) if args.all_targets else (args.project or [])
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        reports = []
+        for pid_text in ids:
+            pid = uuid.UUID(pid_text)
+            for year in ([args.year] if args.year else await _years(async_session, pid)):
+                report = await _tables_one(async_session, pid, year, apply=args.apply, backup_dir=args.backup_dir,
+                                           stamp=stamp)
+                reports.append(report)
+                print(_tables_summary(report))
+        out = args.report or args.backup_dir / f"note_tables_report_{'apply' if args.apply else 'dry'}_{stamp}.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(reports, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+        print(f"报告：{out}")
+        return 1 if any("error" in r for r in reports) else 0
 
     if args.rebuild:
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
