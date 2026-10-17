@@ -185,11 +185,36 @@ def test_seed_tree_matches_four_word_templates():
     assert not unexpected, f"{len(unexpected)} 条白名单外差异，例：{unexpected[:5]}"
 
 
-@pytest.mark.xfail(strict=True, reason="表格以 Word 还是底稿模板为准待用户拍板（tasks.md「比对基线」结论第 3 条）")
 def test_seed_tables_match_four_word_templates():
+    """表格以底稿 working-paper xlsx 为准，**刻意**与四版 Word 不一致（用户 2026-10-16 裁定）。
+
+    因此表格差异不是「待修」，而是逐条登记在白名单（每条写明底稿消费方）。守卫只允许白名单内的
+    表格差异，且白名单条目失效（种子表已改得与 Word 一致、或消费方记错编号）时点名。
+    """
     unexpected, stale = _real_check(lambda kind: kind.startswith("table_"))
     assert not stale, stale
-    assert not unexpected, f"{len(unexpected)} 条白名单外差异，例：{unexpected[:5]}"
+    assert not unexpected, f"{len(unexpected)} 条白名单外表格差异，例：{unexpected[:5]}"
+
+
+def test_table_diffs_are_all_attributable_to_a_worksheet_consumer():
+    """每条表格差异都能归因到底稿 xlsx 消费方（种子节 ``_aligned_by`` / 父章 / 已登记类别）。
+
+    白名单只保证「这条差异被允许」，本用例保证「它被允许是因为该节确实由底稿消费方按 xlsx 对齐」。
+    新出现的、既不在 Word 也没有任何底稿消费方的表格漂移会在生成器里抛错 ⇒ 本用例红。
+    """
+    from scripts.gen.gen_note_word_table_allowlist import _table_entries
+
+    entries, unattributed = _table_entries()
+    assert not unattributed, f"{len(unattributed)} 条表格差异无底稿消费方归因：{unattributed[:5]}"
+    # 每条归因都带「消费方 = …」出处
+    assert all("消费方 = " in e["reason"] for e in entries)
+
+
+def test_table_allowlist_is_in_sync_with_generator():
+    """白名单表格条目必须由生成器产出（不手改）：磁盘内容 == 生成器渲染。"""
+    from scripts.gen.gen_note_word_table_allowlist import render
+
+    assert ALLOWLIST_PATH.read_text(encoding="utf-8") == render()
 
 
 def test_logical_columns_merge_grid_columns_split_only_in_body():
