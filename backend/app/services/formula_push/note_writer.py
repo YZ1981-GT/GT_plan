@@ -9,8 +9,9 @@ spec: chain-closure-phase2-formula-push-engine · design §五 附注单元格 /
 * **F3** —— ``sub_table_data[表名]`` 行形如 ``{label, values:[...], _cell_modes, _cell_meta}``
   （旧 binding 快照经迁移脚本搬入；运行时**没有**任何刷新器写它 —— 已查证）。列序取
   ``_sub_table_columns[表名]`` 去掉标签列后的顺序；``_cell_modes[i] ∈ {manual, locked}`` 视为人工 / 锁定。
-* **F1** —— 只有顶层 ``rows`` / ``_tables``，由附注模板取数维护 ⇒ **不推送**（打上底稿来源标记会让
-  读路径只投影 sub_table_data、遮住原表，且各刷新器从此跳过该章节）。
+* **F1** —— 只有 ``_tables``（真源）/ 顶层 ``rows``（首表镜像），由附注模板生成。原设计不推送；
+  formula-push-note-skip-reduction 需求 1.2 起走旧格式兜底：写编辑器显示的那张 ``_tables`` 表、按表头认
+  期末 / 期初列（``legacy_value_keys``），写完同步顶层镜像（``sync_first_table_mirror``）。
 
 不建行、不改标签（ADR-PUSH-004）；只改目标数值单元格。合计行 = 合计行之前各非合计行之和。
 
@@ -23,9 +24,11 @@ spec: chain-closure-phase2-formula-push-engine · design §五 附注单元格 /
 """
 from __future__ import annotations
 
+import copy
 import json
 import logging
-from collections.abc import Sequence
+import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -141,6 +144,7 @@ class NoteTable:
     rows: list            # 原地可改的行列表（调用方传入 table_data 的深拷贝）
     value_keys: list[str]  # F3 列序（去标签列）；F2 为空也可
     section_locked: bool   # 整节人工覆盖（_manual_override）
+    column_note: str | None = None  # 旧格式表头认不出期末 / 期初列时的说明（拼进跳过原因）
 
 
 def detect_manual_override(table_data: Any) -> bool:
@@ -159,6 +163,97 @@ WORKPAPER_SOURCES: tuple[str, ...] = ("workpaper", "workpaper_html")
 #: 明确非底稿来源——只有这些值才判"模板取数维护"；_source=None 视为未标记（放行）。
 #: spec: formula-push-note-skip-reduction · 需求 1.3
 _KNOWN_NON_WORKPAPER: frozenset[str] = frozenset({"template", "import", "migration"})
+
+# ─── 旧格式（无 sub_table_data）按表头认列 ─────────────────────────────────
+#
+# 附注模板生成的章节：``_tables`` 是真源（编辑器显示它），顶层 ``rows`` 只是 ``_tables[0].rows`` 的镜像。
+# 旧兜底写顶层 ``rows`` 且按位置认列（values[0]=期末、[1]=期初）⇒ 2026-10-17 真库实测被推送过的 101 张旧格式表
+# 全部写进镜像、编辑器看不见；其中 43 张按位置会写错列（「期初余额 / 本期增加 / 本期减少 / 期末余额」把期末数写进
+# 期初列，「金额 / 比例」把期初数写进比例列）。spec disclosure-note-template-word-realignment Task 26。
+#
+# 表头去空白后**完全相等**才算（「期末折现率区间」「本期增加」不是期末 / 期初金额列）；词表取自两份种子与真库
+# 全部旧格式附注的表头。
+_END_HEADERS: frozenset[str] = frozenset({
+    "期末余额", "期末数", "期末", "期末金额", "期末账面价值", "期末公允价值", "期末余额（账面价值）",
+    "期末余额/本期发生额", "期末数/本期发生额", "本期发生额", "本期金额", "本期数", "本期",
+    "本年发生额", "本年金额", "本年数", "本年",
+})
+_PRIOR_HEADERS: frozenset[str] = frozenset({
+    "期初余额", "期初数", "期初", "期初金额", "期初账面价值", "期初公允价值", "期初余额（账面价值）",
+    "年初余额", "年初数", "年初金额", "上年年末余额", "上年年末数", "上年年末", "上年年末余额/上期发生额",
+    "期初数/上期发生额", "上期发生额", "上期金额", "上期数", "上期", "上年发生额", "上年金额", "上年数", "上年",
+})
+#: 列组（``_column_groups``：「期末数」组下分「金额 / 比例」等）里只认这两种金额列，且组内只能有一个
+#: （「账面余额 / 减值准备 / 账面价值」三列不知道推哪列 ⇒ 不猜，跳过并说明）
+_GROUP_AMOUNT_HEADERS: frozenset[str] = frozenset({"金额", "余额"})
+_LEGACY_FIELDS: tuple[tuple[str, frozenset[str], str], ...] = (
+    ("end_amount", _END_HEADERS, "期末"), ("prior_amount", _PRIOR_HEADERS, "期初"),
+)
+
+
+def _norm_header(text: Any) -> str:
+    return re.sub(r"<br\s*/?>|\s+", "", str(text or ""))
+
+
+def _group_amount_columns(table: Mapping[str, Any], headers: list[str], words: frozenset[str]) -> list[int]:
+    """组标签属于 ``words`` 的列组里的金额列（数据列下标；组的 ``start`` 按含标签列的表头下标计）。"""
+    hits: list[int] = []
+    for group in table.get("_column_groups") or []:
+        if not isinstance(group, dict) or _norm_header(group.get("group")) not in words:
+            continue
+        try:
+            start, span = int(group.get("start")), int(group.get("span"))
+        except (TypeError, ValueError):
+            continue
+        hits += [i for i in range(start - 1, start - 1 + span)
+                 if 0 <= i < len(headers) and headers[i] in _GROUP_AMOUNT_HEADERS]
+    return hits
+
+
+def legacy_value_keys(table: Mapping[str, Any]) -> tuple[list[str], str | None]:
+    """旧格式表的数据列（去标签列）→ 字段名：期末金额列 ``end_amount``、期初金额列 ``prior_amount``，其余列占位
+    （``_col{i}``，推送不写）。返回 (value_keys, 认不出时的说明)。
+
+    数据列表头全空才沿用按位置（values[0]=期末、[1]=期初）—— 没有表头可认；有表头就按表头，认不出唯一的那列
+    就不写（宁可跳过并说明，也不按位置猜）。
+    """
+    headers = [_norm_header(h) for h in (table.get("headers") or [])][1:]
+    if not any(headers):
+        return ["end_amount", "prior_amount"], None
+    keys = [f"_col{i}" for i in range(len(headers))]
+    missing: list[str] = []
+    for field, words, label in _LEGACY_FIELDS:
+        hits = [i for i, h in enumerate(headers) if h in words] or _group_amount_columns(table, headers, words)
+        if len(hits) == 1:
+            keys[hits[0]] = field
+        else:
+            missing.append(label)
+    note = None if not missing else (
+        f"表头里找不到唯一的「{' / '.join(missing)}」金额列（{'、'.join(h for h in headers if h)}），不按位置猜")
+    return keys, note
+
+
+def _pick_table(tables: list, name: str) -> int:
+    """规则表名与某张表同名（去空白比）就推那张；否则首表（= 顶层镜像那张，原兜底写的就是它）。"""
+    want = _norm_header(name)
+    for index, table in enumerate(tables):
+        if want and isinstance(table, dict) and _norm_header(table.get("name")) == want:
+            return index
+    return 0
+
+
+def sync_first_table_mirror(table_data: dict) -> None:
+    """旧格式多表：推送改了 ``_tables[0]`` 后把顶层镜像 ``rows`` 同步过去（生成链 / 合计重算同口径）。
+
+    有 ``sub_table_data`` 的章节不动；两边标签不一致（不是镜像关系）也不动。
+    """
+    sub = table_data.get("sub_table_data")
+    tables = table_data.get("_tables")
+    if (isinstance(sub, dict) and sub) or not (isinstance(tables, list) and tables and isinstance(tables[0], dict)):
+        return
+    first, top = tables[0].get("rows"), table_data.get("rows")
+    if isinstance(first, list) and isinstance(top, list) and [row_label(r) for r in first] == [row_label(r) for r in top]:
+        table_data["rows"] = copy.deepcopy(first)
 
 
 def locate_table(table_data: Any, table: str) -> tuple[NoteTable | None, str | None]:
@@ -191,12 +286,21 @@ def locate_table(table_data: Any, table: str) -> tuple[NoteTable | None, str | N
         value_keys = [d["key"] for d in defs if d is not label_def]
         return NoteTable(rows=rows, value_keys=value_keys, section_locked=detect_manual_override(table_data)), None
 
-    # ③ 无 sub_table_data 但有顶层 rows → 旧格式兜底（需求 1.2）
+    # ③ 无 sub_table_data → 旧格式兜底（需求 1.2）。有 ``_tables`` 就写它（编辑器显示的就是它，顶层 rows 只是首表
+    #    镜像、由调用方写完后 ``sync_first_table_mirror``）；列按表头认（见 ``legacy_value_keys``）
+    locked = detect_manual_override(table_data)
+    tables = table_data.get("_tables")
+    if isinstance(tables, list) and tables:
+        target = tables[_pick_table(tables, table)]
+        rows = target.get("rows") if isinstance(target, dict) else None
+        if not (isinstance(rows, list) and rows):
+            return None, "附注章节无可定位的表格数据"
+        keys, note = legacy_value_keys(target)
+        return NoteTable(rows=rows, value_keys=keys, section_locked=locked, column_note=note), None
     rows = table_data.get("rows")
     if isinstance(rows, list) and rows:
-        # 旧格式的 values 列表按位置：[0]=期末 [1]=期初，映射到标准字段名
-        return NoteTable(rows=rows, value_keys=["end_amount", "prior_amount"],
-                         section_locked=detect_manual_override(table_data)), None
+        keys, note = legacy_value_keys(table_data)
+        return NoteTable(rows=rows, value_keys=keys, section_locked=locked, column_note=note), None
 
     return None, "附注章节无可定位的表格数据"
 
@@ -205,8 +309,36 @@ def row_label(row: Any) -> str:
     return str(row.get("label") or "").strip() if isinstance(row, dict) else ""
 
 
+#: ③ 包含匹配里的调整 / 构成行：「减：长期股权投资减值准备」「其中：…」是另一个项目，去掉前缀后与取数标签相同才算它
+_ADJUSTMENT_PREFIXES = ("减：", "减:", "加：", "加:", "其中：", "其中:")
+#: 一边 = 另一边 + 这些后缀之一，算同一项目（其他应收款 → 其他应收款项、租赁负债 → 租赁负债净额）
+_SAME_ITEM_SUFFIXES = ("项", "项目", "净额")
+#: 一边 = 另一边 + 以这些字符开头的限定说明，算同一项目（应收账款——按账龄、固定资产_1601、交易性金融资产（注1））
+_QUALIFIER_STARTS = "_（(-—－：:"
+
+
+def _is_qualified(base: str, longer: str) -> bool:
+    if longer == base or not longer.startswith(base):
+        return False
+    rest = longer[len(base):]
+    return rest in _SAME_ITEM_SUFFIXES or rest[0] in _QUALIFIER_STARTS
+
+
+def _contains_match(label: str, rl: str) -> bool:
+    """③ 包含匹配是否认这一行：只认「同一项目的另一种写法」。
+
+    原规则只要两边互相包含：2026-10-17 真库 dry-run 实测 长期股权投资 → 「减：长期股权投资减值准备」、长期借款 →
+    「减：一年内到期的长期借款」、其他非流动金融资产 → 「其他」唯一命中照写；资本公积能落到兜底合计行，只因
+    「其他资本公积」「其中：国有独享资本公积」同时命中、碰巧放弃（spec disclosure-note-template-word-realignment Task 26）。
+    """
+    for prefix in _ADJUSTMENT_PREFIXES:
+        if rl.startswith(prefix):
+            return rl[len(prefix):].strip() == label
+    return _is_qualified(label, rl) or _is_qualified(rl, label)
+
+
 def find_row(rows: Sequence[Any], labels: Sequence[str]) -> int | None:
-    """按标签找行：①精确匹配 → ②去常见后缀 → ③包含匹配（唯一命中）。
+    """按标签找行：①精确匹配 → ②去常见后缀 → ③包含匹配（唯一命中，见 ``_contains_match``）。
 
     spec: formula-push-note-skip-reduction · 需求 2.2
     spec: formula-push-note-row-matching · 需求 2.1–2.4
@@ -238,7 +370,7 @@ def find_row(rows: Sequence[Any], labels: Sequence[str]) -> int | None:
             rl = row_label(row)
             if not rl:
                 continue
-            if label in rl or rl in label:
+            if _contains_match(label, rl):
                 candidates.append(index)
         if len(candidates) == 1:
             return candidates[0]  # AC 2.3: 唯一命中

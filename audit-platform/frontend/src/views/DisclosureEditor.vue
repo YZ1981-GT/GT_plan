@@ -1373,6 +1373,7 @@ import { buildNoteHost } from '@/composables/useAiHostContext'
 import { useNoteSectionNumbering } from '@/composables/useNoteSectionNumbering'
 import { useNoteTree, type TreeNode } from '@/views/composables/useNoteTree'
 import { useNoteDetail } from '@/views/composables/useNoteDetail'
+import { createNoteDetailPrefetch } from '@/views/composables/noteDetailPrefetch'
 import { useNotePersist } from '@/views/composables/useNotePersist'
 import { useNoteRefresh } from '@/views/composables/useNoteRefresh'
 import { resolveNoteDisclosureJumpTarget } from '@/views/composables/noteDisclosureJump'
@@ -2709,11 +2710,13 @@ async function locateTreeNode(section: string) {
 
 // ─── 章节详情缓存 + hover 预取 ─────────────────────────────────────────────────
 const _detailCache = new Map<string, any>()
-let _prefetchTimer: ReturnType<typeof setTimeout> | null = null
 
 function _cacheKey(noteSection: string): string {
   return `${projectId.value}:${year.value}:${noteSection}`
 }
+
+const _prefetch = createNoteDetailPrefetch(
+  (s) => getDisclosureNoteDetail(projectId.value, year.value, s), _detailCache, _cacheKey)
 
 /** 清除全部或指定章节缓存 */
 function invalidateDetailCache(noteSection?: string) {
@@ -2727,22 +2730,13 @@ function invalidateDetailCache(noteSection?: string) {
 /** hover 预取：鼠标停留 200ms 后静默加载到缓存 */
 function onTreeNodeMouseEnter(data: any) {
   if (!data?.note_section || data.isGroup) return
-  const key = _cacheKey(data.note_section)
-  if (_detailCache.has(key)) return  // 已缓存
-  if (_prefetchTimer) clearTimeout(_prefetchTimer)
-  _prefetchTimer = setTimeout(async () => {
-    try {
-      const detail = await getDisclosureNoteDetail(projectId.value, year.value, data.note_section)
-      _detailCache.set(key, detail)
-    } catch { /* 预取失败静默忽略 */ }
-  }, 200)
+  _prefetch.schedule(data.note_section)
 }
 
-function onTreeNodeMouseLeave() {
-  if (_prefetchTimer) { clearTimeout(_prefetchTimer); _prefetchTimer = null }
-}
+function onTreeNodeMouseLeave() { _prefetch.cancel() }
 
 async function fetchDetail(noteSection: string, bypassCache = false) {
+  _prefetch.cancel()  // 晚到的预取会经 GET 去重取消本次请求（见 noteDetailPrefetch）
   const key = _cacheKey(noteSection)
 
   if (!bypassCache && _detailCache.has(key)) {

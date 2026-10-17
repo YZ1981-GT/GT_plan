@@ -682,12 +682,19 @@ async def _push_note(
     pending_row_skips: list[tuple[str, str]] = []  # spec: formula-push-note-row-matching · 需求 1.2 — (addr_id, reason) 延迟记录
     # 缓存 note_rows 结果，避免重复调用（消除隐式一致性依赖）
     all_note_rows = binding.note_rows(overlay, template_type, rule)
-    for row in all_note_rows:
-        if row["is_total"] or row["is_memo"]:
-            continue  # 合计按附注实际行重算（见 _push_note_total）；「其中：」备注行不由底稿取数
-        index = note_writer.find_row(table.rows, [row["note_label"], row["label"]])
+    data_rows = [r for r in all_note_rows if not r["is_total"] and not r["is_memo"]]
+    # 合计按附注实际行重算（见 _push_note_total）；「其中：」备注行不由底稿取数
+    targets = [note_writer.find_row(table.rows, [r["note_label"], r["label"]]) for r in data_rows]
+    # 撞行：多条取数行（不同 note_label）对上附注同一行 ⇒ 原来逐条覆盖写、后写的留下（实测 H1 的 固定资产_1601 /
+    # _1602 / _1603 三行都对上「固定资产」，留下的是 1603 的 0）。同一格不知道该写哪条 ⇒ 都不写、逐格说明
+    claims: dict[int, list[str]] = {}
+    for r, index in zip(data_rows, targets):
+        if index is not None:
+            claims.setdefault(index, []).append(r["note_label"])  # 按取数行计（同名两行也是两条来源）
+    for row, index in zip(data_rows, targets):
         if index is not None:
             any_data_row_matched = True
+        collided = index is not None and len(claims[index]) > 1
         for field_name in rule.target.fields:
             value_key, period = note_writer.NOTE_FIELDS[field_name]
             addr = note_addr_id(section, table_name, row["note_label"], period)
@@ -695,6 +702,10 @@ async def _push_note(
                 # spec: formula-push-note-row-matching · 需求 1.2
                 # 延迟记录：合计行兜底成功后将重分类为 fallback_to_total
                 pending_row_skips.append((addr, f"附注「{table_name}」表中没有「{row['note_label']}」行（公式推送不新建行）"))
+            elif collided:
+                ctx.skip(rule.rule_id, "note", "note", addr,
+                         f"取数行「{'」「'.join(dict.fromkeys(claims[index]))}」都对上附注「{note_writer.row_label(table.rows[index])}」"
+                         "行，同一格不能由多条取数覆盖写，附注保持原值")
             elif not row[f"{value_key}_resolved"]:
                 # 科目不存在是真正 skip，不参与延迟
                 ctx.skip(rule.rule_id, "note", "note", addr, "底稿未取到该行数值（本项目无此科目），附注保持原值")
@@ -755,6 +766,7 @@ async def _push_note(
     # 同步指纹：与 sync-from-workpaper 同写，pull-from-workpapers 据此认定「真正同步过」（需求 5）
     table_data["_last_sync_wp_id"] = str(paper.id)
     table_data["_last_sync_at"] = ctx.now.isoformat()
+    note_writer.sync_first_table_mirror(table_data)  # 旧格式写的是 _tables[0] ⇒ 顶层镜像跟着改
     note.table_data = table_data
     flag_modified(note, "table_data")
     note.last_sync_source = "formula_push"
@@ -780,7 +792,8 @@ def _push_note_cell(
     ok, current, cell_mode = note_writer.read_cell(row, field_name, table.value_keys)
     if not ok:
         period = note_writer.NOTE_FIELDS[field_name][1]
-        ctx.skip(rule.rule_id, "note", "note", addr, f"附注表缺少「{PERIOD_LABELS[period]}」列")
+        detail = f"：{table.column_note}" if table.column_note else ""
+        ctx.skip(rule.rule_id, "note", "note", addr, f"附注表缺少「{PERIOD_LABELS[period]}」列{detail}")
         return False
     mode = note_writer.external_mode(table.section_locked, cell_mode)
     decision = decide_note(formula_value=value, current_value=current, cell_mode=mode)

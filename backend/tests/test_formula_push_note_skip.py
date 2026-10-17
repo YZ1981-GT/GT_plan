@@ -1459,24 +1459,30 @@ from hypothesis import strategies as st
 # 生成非空中文标签（长度 1~6）
 _CHINESE_CHARS = "应收账款坏账准备存货借款信用质押增值消费城建税费"
 _label_st = st.text(_CHINESE_CHARS, min_size=1, max_size=6).map(str.strip).filter(bool)
+# 「同一项目的另一种写法」的后缀：项 / 项目 / 净额，或以分隔符开头的限定说明（应收账款——按账龄、固定资产_1601）
+# —— 2026-10-17 起包含匹配只认这种（spec disclosure-note-template-word-realignment Task 26：原「任意互相包含」在真库
+# 命中「减：长期股权投资减值准备」「其他」等别的行，见 test_formula_push_note_row_containment.py）
+_qualifier_st = st.one_of(
+    st.sampled_from(["项", "项目", "净额"]),
+    st.tuples(st.sampled_from(["——", "_", "（", "(", "-", "："]), _label_st).map("".join),
+)
 
 
 class TestFindRowContainsUniqueHit:
     """**Property 3: 包含匹配唯一命中返回正确索引**
 
     *For any* 非空附注行列表和非空搜索标签，若精确匹配和去后缀匹配均未命中，
-    但恰好有唯一一行非 is_total 行的 label 与搜索标签满足包含关系
-    （label in row_label 或 row_label in label），则 find_row 应返回该行的索引。
+    但恰好有唯一一行非 is_total 行与搜索标签是「同一项目的另一种写法」（一边 = 另一边 + 限定后缀），
+    则 find_row 应返回该行的索引。原为「label in row_label 或 row_label in label」，2026-10-17 收窄（见上）。
 
     **Validates: Requirements 2.1, 2.3**
     """
 
     @settings(max_examples=5)
-    @given(prefix=_label_st, suffix=_label_st)
+    @given(prefix=_label_st, suffix=_qualifier_st)
     def test_pbt_contains_unique_hit(self, prefix: str, suffix: str):
-        """PBT: 搜索标签是附注行标签的子串，且唯一 → 返回该行索引。"""
+        """PBT: 附注行 = 搜索标签 + 限定后缀，且唯一 → 返回该行索引。"""
         # 构造：row_label = prefix + suffix，搜索标签 = prefix
-        # prefix 是 row_label 的子串 → 包含匹配命中
         # 其他行（"坏账准备"）与 prefix 无包含关系
         row_full = prefix + suffix
         assume(prefix != row_full)  # 排除精确匹配场景
@@ -1522,9 +1528,9 @@ class TestFindRowContainsMultiHitReturnsNone:
     """
 
     @settings(max_examples=5)
-    @given(core=_label_st, suffix_a=_label_st, suffix_b=_label_st)
+    @given(core=_label_st, suffix_a=_qualifier_st, suffix_b=_qualifier_st)
     def test_pbt_contains_multi_hit_returns_none(self, core: str, suffix_a: str, suffix_b: str):
-        """PBT: 搜索标签是两个不同行标签的子串 → 多命中 → None。"""
+        """PBT: 两个不同行标签都是「搜索标签 + 限定后缀」→ 多命中 → None。"""
         row_a = core + suffix_a
         row_b = core + suffix_b
         assume(row_a != row_b)  # 确保两行不同

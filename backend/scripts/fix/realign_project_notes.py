@@ -8,6 +8,10 @@
 
 ``--apply``：每个项目每个年度一个事务 —— 锁行 → 备份到 ``--backup-dir`` → 执行 → 重算计划须为空 → 已有行正文 /
 表格哈希逐行不变，任一不满足即回滚该项目。``--restore`` 按备份原样恢复（同样一个事务、恢复后逐字核对）。
+
+``--rebuild --project <id> --year <年度> [--apply]``：整年度推倒重建（Phase 6，``note_project_rebuild``）—— 备份 → 删除该
+年度全部附注（含软删）与附注推送状态 / 章节锁 → 按现行模板生成（不调大模型）→ 提交后公式推送 → 校验；恢复同样用
+``--restore <备份>``。
 完整报告（含每条动作与待人工项）写 ``--report``（默认 ``backend/backups/``，该目录不入库）。
 """
 from __future__ import annotations
@@ -67,6 +71,63 @@ async def _run_one(session_factory, project_id: uuid.UUID, year: int, *, apply: 
     return report
 
 
+async def _rebuild(session_factory, project_id: uuid.UUID, year: int, *, apply: bool, backup_dir: Path,
+                   stamp: str) -> dict:
+    """整年度推倒重建（Phase 6）：dry-run 只报现状；``--apply`` 备份 → 删 → 生成（一个事务）→ 提交后公式推送 → 校验。"""
+    from app.services.formula_push import engine as push
+    from app.services.note_project_realign_apply import RealignError
+    from app.services.note_project_rebuild import plan_rebuild, rebuild_project
+
+    async with session_factory() as db:
+        try:
+            if not apply:
+                report = await plan_rebuild(db, project_id, year)
+                report.pop("_codes", None)
+                # 推送也会写底稿（系统值 / 派生值，人工值保留）：先看它对底稿的影响（按现有附注算，附注部分仅供参考）
+                report["push_dry_run"] = _push_summary(await push.run(
+                    db, project_id=project_id, year=year, trigger=push.MANUAL, dry_run=True))
+                await db.rollback()
+                return report
+            backup = backup_dir / f"note_rebuild_{project_id}_{year}_{stamp}.json"
+            report = await rebuild_project(db, project_id, year, backup_path=backup)
+        except Exception as err:  # noqa: BLE001 — 生成链 strict 抛的任何错都整体回滚，删除一行不留
+            await db.rollback()
+            kind = "" if isinstance(err, RealignError) else f"{type(err).__name__}: "
+            return {"project_id": str(project_id), "year": year, "error": f"{kind}{err}（已回滚，未改库）"}
+        await db.commit()
+    from app.services.note_readiness_service import run_validation_best_effort
+
+    async with session_factory() as db:  # 推送自管保存点与提交；事件触发同口径（无操作人，不记编辑人）
+        report["push"] = _push_summary(await push.run_and_commit(
+            db, project_id=project_id, year=year, trigger=push.MANUAL))
+    async with session_factory() as db:
+        validation = await run_validation_best_effort(db, project_id, year)
+        report["validation"] = {k: v for k, v in (validation or {}).items() if not isinstance(v, (list, dict))}
+    return report
+
+
+def _push_summary(result) -> dict:
+    from collections import Counter
+
+    return {"status": result.status, "by_domain_action": dict(Counter(f"{i.domain}:{i.action}" for i in result.items)),
+            "workpaper_items_written": len(result.changed_items), "note_sections_written": len(result.note_sections),
+            "warnings": result.warnings[:10]}
+
+
+def _rebuild_summary(report: dict) -> str:
+    if "error" in report:
+        return f"✗ {report['project_id']} {report['year']}：{report['error']}"
+    head = (f"{report['project_id']} {report['year']}（{report['template_type']}/{report['report_scope']}，模板 "
+            f"{report['templates']} 节，前置 {'满足' if report['prerequisite'].get('ok') else report['prerequisite']}）")
+    lines = [head, f"  现状：{report['before']}"]
+    if "push_dry_run" in report:
+        lines.append(f"  公式推送预演（按现有附注）：{report['push_dry_run']}")
+    if "after" in report:
+        lines += [f"  已删：{report['deleted']}；备份 {report['backup']}", f"  重建后：{report['after']}",
+                  f"  推送：{report['push']}；校验：{report['validation']}"]
+    return "\n".join(lines)
+
+
 def _summary(report: dict) -> str:
     name = TARGETS.get(report["project_id"], report["project_id"])
     if "skipped" in report:
@@ -93,9 +154,24 @@ async def main() -> int:
     mode.add_argument("--apply", action="store_true", help="备份后执行")
     parser.add_argument("--backup-dir", type=Path, default=DEFAULT_DIR)
     parser.add_argument("--report", type=Path, help="完整报告 JSON 路径")
+    parser.add_argument("--rebuild", action="store_true",
+                        help="整年度推倒重建（备份 → 删除该年度全部附注 → 按现行模板生成 → 公式推送）；需 --project 与 --year")
     args = parser.parse_args()
+    if args.rebuild and not (args.project and args.year):
+        parser.error("--rebuild 需要 --project 与 --year")
 
     from app.core.database import async_session
+
+    if args.rebuild:
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        reports = [await _rebuild(async_session, uuid.UUID(p), args.year, apply=args.apply, backup_dir=args.backup_dir,
+                                  stamp=stamp) for p in args.project]
+        print("\n".join(_rebuild_summary(r) for r in reports))
+        out = args.report or args.backup_dir / f"note_rebuild_report_{'apply' if args.apply else 'dry'}_{stamp}.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(reports, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+        print(f"报告：{out}")
+        return 1 if any("error" in r for r in reports) else 0
 
     if args.restore:
         from app.services.note_project_realign_apply import restore_backup
