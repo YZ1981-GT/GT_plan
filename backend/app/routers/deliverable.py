@@ -52,6 +52,7 @@ from app.models.phase13_schemas import (
 from app.models.report_models import AuditReport, CompanyType, ReportStatus
 from app.services.completeness_service import CompletenessService
 from app.services.deliverable_permissions import DeliverableAction, can_deliverable
+from app.services.deliverable_doc_key import deliverable_doc_key
 from app.services.deliverable_hash_service import DeliverableHashService
 from app.services.deliverable_package_service import DeliverablePackageService
 from app.services.deliverable_service import DeliverableService
@@ -761,7 +762,8 @@ async def render_disclosure_notes(
         download_url=store.download_url,
         platform_persist_failed=store.platform_persist_failed,
         file_name=file_name,
-        warnings=await _note_delivery_warnings(
+        # 导出时的交付统计（剔除的提示段 / 残留占位 / 报表有余额附注无表 / 未导出章节…）在前，出具前软闸门在后
+        warnings=list(getattr(note_meta, "delivery_warnings", None) or []) + await _note_delivery_warnings(
             db, project_id, body.year, body.selected_sections,
         ),
     )
@@ -876,6 +878,8 @@ async def render_financial_reports(
         download_url=store.download_url,
         platform_persist_failed=store.platform_persist_failed,
         file_name=file_name,
+        # 导出提醒（不阻断）：不平衡 / 合计不一致 / 有金额未导出 / 过期 / 无上期来源等
+        warnings=list(getattr(exporter, "export_warnings", []) or []),
     )
 
 

@@ -37,7 +37,7 @@
       "section_title": "其他应收款"
     },
     "BS-018": {
-      "section_code": "四、存货",
+      "section_code": "八、10",
       "section_title": "存货"
     },
     "BS-021": {
@@ -69,7 +69,7 @@
       "section_title": "长期应收款"
     },
     "BS-033": {
-      "section_code": "四、长期股权投资",
+      "section_code": "八、18",
       "section_title": "长期股权投资"
     },
     "BS-034": {
@@ -81,15 +81,15 @@
       "section_title": "其他非流动金融资产"
     },
     "BS-036": {
-      "section_code": "四、投资性房地产",
+      "section_code": "八、21",
       "section_title": "投资性房地产"
     },
     "BS-037": {
-      "section_code": "四、固定资产",
+      "section_code": "八、22",
       "section_title": "固定资产"
     },
     "BS-041": {
-      "section_code": "四、在建工程",
+      "section_code": "八、23",
       "section_title": "在建工程"
     },
     "BS-042": {
@@ -97,15 +97,15 @@
       "section_title": "生产性生物资产"
     },
     "BS-043": {
-      "section_code": "四、油气资产",
+      "section_code": "八、25",
       "section_title": "油气资产"
     },
     "BS-044": {
-      "section_code": "四、使用权资产",
+      "section_code": "八、26",
       "section_title": "使用权资产"
     },
     "BS-045": {
-      "section_code": "四、无形资产",
+      "section_code": "八、27",
       "section_title": "无形资产"
     },
     "BS-046": {
@@ -117,7 +117,7 @@
       "section_title": "商誉"
     },
     "BS-048": {
-      "section_code": "四、长期待摊费用",
+      "section_code": "八、30",
       "section_title": "长期待摊费用"
     },
     "BS-050": {
@@ -181,7 +181,7 @@
       "section_title": "长期借款"
     },
     "BS-086": {
-      "section_code": "四、应付债券",
+      "section_code": "八、50",
       "section_title": "应付债券"
     },
     "BS-091": {
@@ -197,7 +197,7 @@
       "section_title": "长期应付职工薪酬"
     },
     "BS-094": {
-      "section_code": "四、预计负债",
+      "section_code": "八、55",
       "section_title": "预计负债"
     },
     "BS-095": {
@@ -344,7 +344,7 @@
       "parent_section_code": "八、9"
     },
     "BS-018": {
-      "section_code": "四、存货",
+      "section_code": "八、10",
       "section_title": "存货",
       "parent_section_code": "四、存货"
     },
@@ -384,7 +384,7 @@
       "parent_section_code": "八、17"
     },
     "BS-033": {
-      "section_code": "四、长期股权投资",
+      "section_code": "八、18",
       "section_title": "长期股权投资",
       "parent_section_code": "四、长期股权投资"
     },
@@ -399,17 +399,17 @@
       "parent_section_code": "八、20"
     },
     "BS-036": {
-      "section_code": "四、投资性房地产",
+      "section_code": "八、21",
       "section_title": "投资性房地产",
       "parent_section_code": "四、投资性房地产"
     },
     "BS-037": {
-      "section_code": "四、固定资产",
+      "section_code": "八、22",
       "section_title": "固定资产",
       "parent_section_code": "四、固定资产"
     },
     "BS-041": {
-      "section_code": "四、在建工程",
+      "section_code": "八、23",
       "section_title": "在建工程",
       "parent_section_code": "四、在建工程"
     },
@@ -419,17 +419,17 @@
       "parent_section_code": "八、24"
     },
     "BS-043": {
-      "section_code": "四、油气资产",
+      "section_code": "八、25",
       "section_title": "油气资产",
       "parent_section_code": "四、油气资产"
     },
     "BS-044": {
-      "section_code": "四、使用权资产",
+      "section_code": "八、26",
       "section_title": "使用权资产",
       "parent_section_code": "四、使用权资产"
     },
     "BS-045": {
-      "section_code": "四、无形资产",
+      "section_code": "八、27",
       "section_title": "无形资产",
       "parent_section_code": "四、无形资产"
     },
@@ -444,7 +444,7 @@
       "parent_section_code": "八、29"
     },
     "BS-048": {
-      "section_code": "四、长期待摊费用",
+      "section_code": "八、30",
       "section_title": "长期待摊费用",
       "parent_section_code": "四、长期待摊费用"
     },
@@ -524,7 +524,7 @@
       "parent_section_code": "八、49"
     },
     "BS-086": {
-      "section_code": "四、应付债券",
+      "section_code": "八、50",
       "section_title": "应付债券",
       "parent_section_code": "四、应付债券"
     },
@@ -544,7 +544,7 @@
       "parent_section_code": "八、54"
     },
     "BS-094": {
-      "section_code": "四、预计负债",
+      "section_code": "八、55",
       "section_title": "预计负债",
       "parent_section_code": "四、预计负债"
     },
@@ -703,7 +703,7 @@
       "section_title": "其他应收款"
     },
     "BS-012": {
-      "section_code": "三、存货",
+      "section_code": "五、9",
       "section_title": "存货"
     },
     "BS-014": {
@@ -735,7 +735,7 @@
       "section_title": "设定受益计划净资产"
     },
     "BS-024": {
-      "section_code": "三、长期股权投资",
+      "section_code": "五、18",
       "section_title": "长期股权投资"
     },
     "BS-025": {
@@ -747,15 +747,15 @@
       "section_title": "其他非流动金融资产"
     },
     "BS-027": {
-      "section_code": "三、投资性房地产【不",
+      "section_code": "五、21",
       "section_title": "投资性房地产"
     },
     "BS-028": {
-      "section_code": "三、固定资产",
+      "section_code": "五、22",
       "section_title": "固定资产"
     },
     "BS-029": {
-      "section_code": "三、在建工程",
+      "section_code": "五、23",
       "section_title": "在建工程"
     },
     "BS-030": {
@@ -763,15 +763,15 @@
       "section_title": "生产性生物资产"
     },
     "BS-032": {
-      "section_code": "三、使用权资产",
+      "section_code": "五、25",
       "section_title": "使用权资产"
     },
     "BS-033": {
-      "section_code": "三、无形资产",
+      "section_code": "五、26",
       "section_title": "无形资产"
     },
     "BS-035": {
-      "section_code": "三、开发支出",
+      "section_code": "五、27",
       "section_title": "开发支出"
     },
     "BS-037": {
@@ -779,7 +779,7 @@
       "section_title": "商誉"
     },
     "BS-038": {
-      "section_code": "三、长期待摊费用",
+      "section_code": "五、29",
       "section_title": "长期待摊费用"
     },
     "BS-040": {
@@ -855,7 +855,7 @@
       "section_title": "长期应付职工薪酬"
     },
     "BS-068": {
-      "section_code": "三、预计负债",
+      "section_code": "五、50",
       "section_title": "预计负债"
     },
     "BS-069": {
@@ -931,27 +931,27 @@
       "section_title": "净敞口套期收益"
     },
     "IS-015": {
-      "section_code": "五、71",
+      "section_code": "三、公允价值变动收益",
       "section_title": "公允价值变动收益"
     },
     "IS-016": {
-      "section_code": "五、72",
+      "section_code": "三、信用减值损失",
       "section_title": "信用减值损失"
     },
     "IS-017": {
-      "section_code": "五、73",
+      "section_code": "三、资产减值损失（损",
       "section_title": "资产减值损失"
     },
     "IS-018": {
-      "section_code": "五、74",
+      "section_code": "三、资产处置收益（损",
       "section_title": "资产处置收益"
     },
     "IS-020": {
-      "section_code": "五、75",
+      "section_code": "三、营业外收入（注：",
       "section_title": "营业外收入"
     },
     "IS-021": {
-      "section_code": "五、76",
+      "section_code": "三、营业外支出（注：",
       "section_title": "营业外支出"
     },
     "EQ-003": {
@@ -963,7 +963,7 @@
       "section_title": "其他"
     },
     "CFSS-004": {
-      "section_code": "五、72",
+      "section_code": "三、信用减值损失",
       "section_title": "信用减值损失"
     },
     "CFSS-012": {
@@ -1017,7 +1017,7 @@
       "parent_section_code": "十六、其他应收款"
     },
     "BS-012": {
-      "section_code": "三、存货",
+      "section_code": "五、9",
       "section_title": "存货",
       "parent_section_code": null
     },
@@ -1057,7 +1057,7 @@
       "parent_section_code": null
     },
     "BS-024": {
-      "section_code": "三、长期股权投资",
+      "section_code": "五、18",
       "section_title": "长期股权投资",
       "parent_section_code": "十六、长期股权投资"
     },
@@ -1072,17 +1072,17 @@
       "parent_section_code": null
     },
     "BS-027": {
-      "section_code": "三、投资性房地产【不",
+      "section_code": "五、21",
       "section_title": "投资性房地产",
       "parent_section_code": null
     },
     "BS-028": {
-      "section_code": "三、固定资产",
+      "section_code": "五、22",
       "section_title": "固定资产",
       "parent_section_code": null
     },
     "BS-029": {
-      "section_code": "三、在建工程",
+      "section_code": "五、23",
       "section_title": "在建工程",
       "parent_section_code": null
     },
@@ -1092,17 +1092,17 @@
       "parent_section_code": null
     },
     "BS-032": {
-      "section_code": "三、使用权资产",
+      "section_code": "五、25",
       "section_title": "使用权资产",
       "parent_section_code": null
     },
     "BS-033": {
-      "section_code": "三、无形资产",
+      "section_code": "五、26",
       "section_title": "无形资产",
       "parent_section_code": null
     },
     "BS-035": {
-      "section_code": "三、开发支出",
+      "section_code": "五、27",
       "section_title": "开发支出",
       "parent_section_code": null
     },
@@ -1112,7 +1112,7 @@
       "parent_section_code": null
     },
     "BS-038": {
-      "section_code": "三、长期待摊费用",
+      "section_code": "五、29",
       "section_title": "长期待摊费用",
       "parent_section_code": null
     },
@@ -1207,7 +1207,7 @@
       "parent_section_code": null
     },
     "BS-068": {
-      "section_code": "三、预计负债",
+      "section_code": "五、50",
       "section_title": "预计负债",
       "parent_section_code": null
     },
@@ -1302,32 +1302,32 @@
       "parent_section_code": null
     },
     "IS-015": {
-      "section_code": "五、71",
+      "section_code": "三、公允价值变动收益",
       "section_title": "公允价值变动收益",
       "parent_section_code": null
     },
     "IS-016": {
-      "section_code": "五、72",
+      "section_code": "三、信用减值损失",
       "section_title": "信用减值损失",
       "parent_section_code": null
     },
     "IS-017": {
-      "section_code": "五、73",
+      "section_code": "三、资产减值损失（损",
       "section_title": "资产减值损失",
       "parent_section_code": null
     },
     "IS-018": {
-      "section_code": "五、74",
+      "section_code": "三、资产处置收益（损",
       "section_title": "资产处置收益",
       "parent_section_code": null
     },
     "IS-020": {
-      "section_code": "五、75",
+      "section_code": "三、营业外收入（注：",
       "section_title": "营业外收入",
       "parent_section_code": null
     },
     "IS-021": {
-      "section_code": "五、76",
+      "section_code": "三、营业外支出（注：",
       "section_title": "营业外支出",
       "parent_section_code": null
     },
@@ -1337,7 +1337,7 @@
       "parent_section_code": null
     },
     "EQ-004": {
-      "section_code": "三、同一控制下企业合",
+      "section_code": "三、同一控制下企业合并",
       "section_title": "同一控制下企业合并",
       "parent_section_code": null
     },
@@ -1347,7 +1347,7 @@
       "parent_section_code": null
     },
     "CFSS-004": {
-      "section_code": "三、信用减值损失（损",
+      "section_code": "三、信用减值损失",
       "section_title": "信用减值损失",
       "parent_section_code": null
     },

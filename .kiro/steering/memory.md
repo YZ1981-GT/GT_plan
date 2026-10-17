@@ -168,6 +168,12 @@ inclusion: always
 - 🔴 教训（拍板后执行）：①复用 / 去重用的 hash 必须覆盖存储载荷里所有会被读取的字段（内容模板版本只算正文 hash ⇒ 确认章节后再保存被判「未变化」，新状态静默丢失）；变异要用空章隔离（有正文时改状态会连带改质量标记，漏字段的变异照样存活）②只有真实写入验收才抓到的：JSON null 让 `IS NOT NULL` 恒真、HTML 正文进 Word 原样输出、纯文字追加后并成一段、回执把新增报成替换 —— 合成夹具都测不出 ③主工作树有并发会话的脏文件时，用临时 `git worktree` 干净检出跑测试，再 `git push origin <临时分支>:<目标分支>`，用完 `Remove-Item` + `git worktree prune`（`git worktree remove` 卡在 y/n 提示）；不 stash 别人的文件、不 `--no-verify`；push 工具返回 -1 / ^C 不代表失败，先 `git ls-remote` 核对（重推会报 cannot lock ref）④一次性探针放仓库外（并发会话会清理 `backend/scripts/analyze/_*`）⑤同一批工具调用会并行执行，有依赖的步骤分批发
 - 🔴 教训（第 21~27 组）：①python-docx 的 `doc.paragraphs` / `doc.tables` 只给 body 直接子元素；交付导出默认把每节包进内容控件 `w:sdt` ⇒ 按它清理的标记 / 占位符全漏（真实交付件残留 100~200 处），按它取文的验证也是空转 —— 清理与核对一律走 XML（`word_doc_utils.iter_all_paragraphs`）②存档的哈希必须对最终交付内容算（清理在算哈希之后 ⇒ 没动过的块被当成人工改过）③模板模式的块里有编号 / 标题 / 指引，块文字≠库里正文：「交付后改过没有」只能比 Rendered_Block_Hash，拿块文字比库里正文会整份误写回 ④原生 SQL 按 `str(uuid)` 绑定在 SQLite 上恒匹配不到（存 32 位十六进制）⇒ 这类端点只能真 PG 测 ⑤并行会话会在推送前把你的未提交改动 stash、推完再 pop：别碰它的 stash，等 `git status` 恢复再继续
 
+### 交付中心三件套生成准确性 `deliverable-trio-generation-accuracy`（2026-10-16~17，Phase A~D 完成，未提交）
+- 报表：模板行按行名三级绑定（`report_template_binding`：合计引用优先 / 同码本位）、减值表与上市权益表补回、表头期间、期初取本年试算表期初、上期取上年项目报表、`formula_grammar` 容忍参数空白；导出提醒回传前端。附注：模板模式块重建（`note_template_block_fill` 拆 docx_base / table_look / doc_ops，编排 `note_template_export_fill`）+ 交付过滤 `note_deliverable_filter` + 报表附注列与交付件编号同源（`note_deliverable_outline.region_is_kept`，四项目 78 个编号 0 不符）。正文：`report_body_postprocess`（OPT 标记按标题重放、强调事项段、落款日期、指引清除、待补充清单含目录页码）
+- 浏览器实测：三个入口的下载件与探针产物一致（报表 1278 格、附注 657 段 0 差异）；实测抓到 5 处界面 / 提醒文案问题已修（其 design §6）
+- 提交须知：`report_excel_exporter.py`（1648 行）/ `financial_report_drift_service.py`（915）HEAD 就超 800 且不在白名单，提交时登记；新模块全部未跟踪，须同一次提交
+- 🔴 教训：①lxml 代理对象的 `id()` 会被复用 —— 按 id 记元素必须同时持有代理引用 ②「函数体引用了未定义名字」用源码文本判必假绿（`deliverable_doc_key` NameError 即此漏网），守卫改 `symtable` ③模板加工脚本倒序插入致 OPT 开闭标记交错（16 份里 12 份），运行时按章节标题重放、不改二进制模板 ④Playwright 浏览器与并发会话共用：对方改自动保存页源码前会停到 about:blank，用完停回去 ⑤并发会话批量改文件时后端连续热重载，请求会挂住 —— 判「卡死」前先看 worker 进程创建时间
+
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
 

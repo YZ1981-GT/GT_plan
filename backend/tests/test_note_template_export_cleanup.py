@@ -107,7 +107,12 @@ async def test_no_leftover_markers_or_placeholders(synthetic, controls):
 
 @pytest.mark.asyncio
 async def test_table_cell_keeps_a_paragraph_after_cleanup(synthetic):
-    data = await _export([_note("八、1", "货币资金期末余额披露", "sid-cash")])
+    # spec deliverable-trio-generation-accuracy：模板样例表不再原样进交付件（保留块按模板结构重建，样例表换成库内表、
+    # 无库内表即删）⇒ 夹具里带标记的样例表被删，判据改为「库内表渲染后单元格都有段落」；标记段落在单元格里只清空
+    # 不删的口径由 tests/services/test_note_template_block_fill.py 直接对 remove_section_markers 守卫
+    note = _note("八、1", "货币资金期末余额披露", "sid-cash")
+    note.table_data = {"headers": ["项目", "期末余额"], "rows": [{"label": "银行存款", "values": [100.0]}]}
+    data = await _export([note])
     cells = list(_root(data).iter(W + "tc"))
     assert cells, "夹具没有表格，判据空转"
     assert all(cell.find(W + "p") is not None for cell in cells)
@@ -147,12 +152,15 @@ async def test_rendered_block_hash_matches_delivered_doc(synthetic, controls):
     from app.services.section_anchor_utils import block_text_hash, resolve_section_blocks
 
     synthetic.setattr(nwe_mod.settings, "DELIVERABLE_LINEAGE_CONTENT_CONTROL_ENABLED", controls)
-    exporter = NoteWordExporter(_make_db([_note("八、1", "货币资金期末余额披露", "sid-cash")]))
+    # spec deliverable-trio-generation-accuracy：无附注的块不再按模板原貌保留（整块删除）⇒ 给「八、2」一条附注，
+    # 它块内单元格里的 {{table:…}} 样例表随重建删除，判据仍是「导出时记的哈希 = 交付件按锚点重算的哈希」
+    exporter = NoteWordExporter(_make_db([_note("八、1", "货币资金期末余额披露", "sid-cash"),
+                                          _note("八、2", "交易性金融资产期末余额披露", "sid-tfa")]))
     buf, meta = await exporter.export_with_meta(
         nwe_mod.UUID(int=1), 2025, template_type="soe", report_scope="standalone", mode="template")
     mode, blocks = resolve_section_blocks(Document(BytesIO(buf.getvalue())))
     delivered = {b.section_code: block_text_hash(list(b.elements)) for b in blocks}
-    assert mode == "anchor" and "八、2" in delivered, "夹具没有「无附注、占位符被清」的块，判据空转"
+    assert mode == "anchor" and "八、2" in delivered, "夹具没有「样例表含占位符、被清」的块，判据空转"
     assert set(meta.rendered_block_hashes) == set(delivered)
     assert {c: h for c, h in meta.rendered_block_hashes.items() if delivered[c] != h} == {}
 

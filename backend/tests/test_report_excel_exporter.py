@@ -350,9 +350,11 @@ async def test_parameter_no_prior_year(db_session: AsyncSession, sample_project,
 
 @pytest.mark.asyncio
 async def test_value_placement_by_row_code(db_session: AsyncSession, sample_project, sample_report_data):
-    """Values land at the template's real coordinates by row_code, not row order.
+    """Values land at the template row whose label matches, never by code alone.
 
-    Task 20.1: BS-002 → C6, BS-003 → C7 (POC soe_standalone layout).
+    Task 20.1 原口径「按 row_code 落格」在真实库上会错格：库内 report_config 与模板占位是两套编号
+    （spec deliverable-trio-generation-accuracy §1.1）。模板 C7 是 BS-003「△结算备付金」，夹具里
+    BS-003 叫「应收账款」⇒ 按行名落到模板「应收账款」行（C12，模板编码 BS-008），C7 不取数。
     The template's own row names in column A are preserved untouched.
     """
     exporter = ReportExcelExporter(db_session)
@@ -374,8 +376,11 @@ async def test_value_placement_by_row_code(db_session: AsyncSession, sample_proj
 
     # BS-002 货币资金 current → C6
     assert ws["C6"].value == pytest.approx(1234567.89)
-    # BS-003 应收账款 current (negative) → C7
-    assert ws["C7"].value == pytest.approx(-500000.00)
+    # 库内 BS-003「应收账款」(negative) → 模板「应收账款」行 C12；同编码不同名的 C7（△结算备付金）不取数
+    assert "应收账款" in str(ws["A12"].value)
+    assert ws["C12"].value == pytest.approx(-500000.00)
+    assert ws["C7"].value in (None, "")
+    assert "{{" not in str(ws["C7"].value or "")
     # Template's own row label in column A preserved (not overwritten by exporter)
     assert "货币资金" in str(ws["A6"].value)
     assert "{{" not in str(ws["A6"].value)

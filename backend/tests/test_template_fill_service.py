@@ -60,6 +60,7 @@ def _make_template_dir(base: Path) -> Path:
     doc = Document()
     doc.add_paragraph("致 {{company_full_name}} 全体股东：")
     doc.add_paragraph("我们审计了 {{company_full_name}} {{audit_year}} 年度财务报表。")
+    doc.add_paragraph("签字合伙人：{{signing_partner}}")
     doc.add_paragraph("##NOTE:内部提示，定稿删除##")
     # 可选段落 OPT 块
     doc.add_paragraph("##OPT:emphasis:强调事项段##")
@@ -108,6 +109,7 @@ def _build_service(session: AsyncSession, tpl_dir: Path) -> TemplateFillService:
             "company_full_name": "测试有限公司",
             "audit_year": "2025",
             "signing_partner": "",  # 故意留空 → missing_fields 命中
+            "report_number": "[报告文号]",  # 也是占位，但模板没用到 → 不应报
         }
 
     # 避免依赖 ReportPlaceholderService / 真实项目数据
@@ -157,8 +159,11 @@ async def test_preview_does_not_create_deliverable(
     opt_ids = {v.section_id for v in result.optional_sections}
     assert opt_ids == {"emphasis", "key_audit_matters"}
 
-    # missing_fields 含留空的 signing_partner
-    assert "signing_partner" in result.missing_fields
+    # missing_fields：中文、只列模板实际用到且仍为空 / 方括号占位的字段（spec deliverable-trio-generation-accuracy
+    # AC-4.5；旧口径返回映射里全部空字段的英文键，含模板根本没用到的 report_number）
+    assert "签字合伙人" in result.missing_fields
+    assert "报告文号" not in result.missing_fields
+    assert not any(k in result.missing_fields for k in ("signing_partner", "report_number"))
     assert result.company_subtype_resolved == "type_d"
     assert result.template_version == "test-v1"
 
@@ -221,7 +226,17 @@ async def test_confirm_creates_version_and_increments(
     assert body["template_version"] == "test-v1"
     assert body["company_subtype"] == "type_d"
     assert body["template_variant"] == "simple"
-    assert "signing_partner" in body["missing_fields"]
+    assert "签字合伙人" in body["missing_fields"]
+    assert body["opinion_choice"] == "unqualified"
+    # confirm 时没有 audit_report 行 → 建一行（意见 / 公司类型 / 是否公众利益实体由报告选项推得），正文 schema 落库
+    from app.models.report_models import AuditReport
+
+    report = (await session.execute(sa.select(AuditReport))).scalars().one()
+    assert report.opinion_type.value == "unqualified" and report.company_type.value == "non_listed"
+    assert report.is_pie is False and report.report_body_json["company_subtype"] == "type_d"
+    # 交付件版本绑定了试算表快照（stale 判定依据）
+    task = (await session.execute(sa.select(WordExportTask))).scalars().one()
+    assert isinstance(task.source_snapshot_refs, dict) and task.source_snapshot_refs.get("doc_type") == "audit_report"
     # guidance 副本与内容版本号一致
     assert body["guidance_version_path"].endswith(
         f"with_notes_v{first_version}.docx"
@@ -444,3 +459,68 @@ def test_validate_kam_disclaimer_no_warning():
         opinion_type="disclaimer",
     )
     assert warning is None
+
+
+# ---------------------------------------------------------------------------
+# 正文后处理接线（spec deliverable-trio-generation-accuracy §3）
+# ---------------------------------------------------------------------------
+
+
+def _make_heading_template_dir(base: Path) -> Path:
+    """单体简版形态：中文序号章节标题 + 未闭合的「单体复核」行内 NOTE（集团审计条款）+ 写死的落款年份。"""
+    tpl_dir = base / "templates_h"
+    (tpl_dir / "report_body").mkdir(parents=True, exist_ok=True)
+    doc = Document()
+    for text in (
+        "{{company_full_name}}董事会：", "一、审计意见", "我们审计了{{company_full_name}}财务报表。",
+        "二、形成审计意见的基础", "我们按照中国注册会计师审计准则的规定执行了审计工作。",
+        "三、管理层和治理层对财务报表的责任", "管理层负责编制财务报表。",
+        "四、注册会计师对财务报表审计的责任", "（5）评价财务报表的总体列报。",
+        "##NOTE:单体复核:以下涉及合并/集团审计，单体报告可能需删除或调整## （6）我们负责指导、监督和执行集团审计。",
+        "二○二二年X月XX日",
+    ):
+        p = doc.add_paragraph()
+        p.add_run(text).bold = text[:2] in ("一、", "二、", "三、", "四、")
+    doc.save(str(tpl_dir / "report_body" / "h_unqualified_d.docx"))
+    (tpl_dir / "template_manifest.json").write_text(
+        '{"version": "test-h1", "report_body": {"unqualified": {"type_d": {"simple": "report_body/h_unqualified_d.docx"}}},'
+        ' "financial_statements": {}, "disclosure_notes": {}}',
+        encoding="utf-8",
+    )
+    return tpl_dir
+
+
+@pytest.mark.asyncio
+async def test_emphasis_choice_end_to_end_and_standalone_cleanup(session, tmp_path, patched_storage, monkeypatch):
+    from app.models.report_models import AuditReport
+    from app.services.full_deliverables_executor import FullDeliverablesExecutor
+
+    svc = _build_service(session, _make_heading_template_dir(tmp_path))
+
+    async def _standalone(_pid):
+        return "standalone"
+
+    monkeypatch.setattr(svc, "_resolve_report_scope", _standalone)
+    project_id, user_id = uuid.uuid4(), uuid.uuid4()
+    preview = await svc.preview_report_body(
+        project_id, 2025, opinion_type="unqualified_with_emphasis", company_subtype="type_d",
+        template_variant="simple", user_id=user_id,
+    )
+    assert "强调事项段（所强调的事项与附注编号）" in preview.missing_fields
+    await svc.confirm_report_body(
+        project_id, 2025, preview_session_id=preview.preview_session_id, optional_sections={}, user_id=user_id,
+    )
+    task = (await session.execute(sa.select(WordExportTask))).scalars().one()
+    texts = [p.text for p in Document(task.file_path).paragraphs]
+    assert [t for t in texts if t[:2] in ("一、", "二、", "三、", "四、", "五、")] == [
+        "一、审计意见", "二、形成审计意见的基础", "三、强调事项", "四、管理层和治理层对财务报表的责任",
+        "五、注册会计师对财务报表审计的责任",
+    ]
+    joined = "\n".join(texts)
+    assert "集团审计" not in joined and "##" not in joined  # 单体报告删集团审计条款，标记不进交付件
+    assert "二〇二六年X月XX日" in joined  # 落款年份 = 审计年度 + 1
+    report = (await session.execute(sa.select(AuditReport))).scalars().one()
+    assert report.opinion_type.value == "unqualified"  # 枚举只有四族
+    assert report.report_body_json["opinion_choice"] == "unqualified_with_emphasis"
+    # 一键生成全套沿用同一选择（否则下次全套生成就丢了强调事项段）
+    assert FullDeliverablesExecutor._opinion_value(report) == "unqualified_with_emphasis"

@@ -18,8 +18,9 @@ OPT_OPEN_RE = re.compile(r"^##OPT:([^:#]+)(?::([^#]*))?##\s*$")
 OPT_CLOSE_RE = re.compile(r"^##/OPT:([^#]+)##\s*$")
 NOTE_OPEN_RE = re.compile(r"^##NOTE(?::([^#]*))?##\s*$")
 NOTE_CLOSE_RE = re.compile(r"^##/NOTE(?::([^#]*))?##\s*$")
-# 行内 NOTE（单行剥除）
-NOTE_INLINE_RE = re.compile(r"##NOTE(?::[^#]*)?##.*?##/NOTE(?:#[^#]*)?##", re.DOTALL)
+# 行内 NOTE（单行剥除）。闭标记与开标记同形（``##/NOTE##`` / ``##/NOTE:label##``）：
+# 旧写法 ``(?:#[^#]*)?`` 认不出 ``##/NOTE:label##`` ⇒ 替换不掉、``strip_guidance_notes`` 对同一段无限重试。
+NOTE_INLINE_RE = re.compile(r"##NOTE(?::[^#]*)?##.*?##/NOTE(?::[^#]*)?##", re.DOTALL)
 
 # 附注 ``##SECTION:code##`` / ``##/SECTION:code##`` 块（Phase 0.6.2 打标产出）
 SECTION_OPEN_RE = re.compile(r"^##SECTION:(.+?)##\s*$")
@@ -240,6 +241,8 @@ def strip_guidance_notes(doc: DocumentObject) -> int:
                 break
             if "##NOTE" in text and "##/NOTE" in text:
                 new_text = NOTE_INLINE_RE.sub("", text).strip()
+                if new_text == text:
+                    continue  # 没有可剥除的完整行内 NOTE：不动该段（否则每轮都命中同一段，循环不终止）
                 if not new_text:
                     _delete_paragraph(para)
                     removed += 1

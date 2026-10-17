@@ -164,41 +164,55 @@ class ReportPlaceholderService:
                 "SELECT report_date, signing_partner FROM audit_report "
                 f"WHERE {where} ORDER BY year DESC LIMIT 1"
             )
-            res = await self.db.execute(stmt, params)
-            row = res.mappings().first()
+            async with self.db.begin_nested():  # SAVEPOINT：读失败不毒化调用方事务
+                res = await self.db.execute(stmt, params)
+                row = res.mappings().first()
             return dict(row) if row else None
         except Exception as exc:  # fail-open：报告表不可用不阻断占位构建
             logger.warning("load audit_report row failed: %s", exc)
             return None
 
     async def _resolve_partner_name(self, project) -> str | None:
-        """项目模块兜底签字合伙人：projects.partner_id / project_assignments(partner)。"""
+        """项目模块兜底签字合伙人：projects.partner_id（users.id）/ 项目委派里的签字合伙人。
+
+        - 姓名取 ``staff_members.name``：``staff_members.partner_name`` 是该员工**所属合伙人**的名字，旧实现
+          ``COALESCE(partner_name, name)`` 会把签字合伙人写成「他的合伙人」；
+        - 委派角色认 ``signing_partner``（项目委派界面的取值）与历史的 ``partner``，前者优先；旧实现只认
+          ``partner`` ⇒ 界面委派的签字合伙人永远取不到；
+        - SAVEPOINT：读失败只回滚自身，不让 PG 把整个导出事务置为 aborted。
+        """
         if project is None:
             return None
+        from app.models.staff_models import ProjectAssignment, StaffMember
+
         try:
-            partner_id = getattr(project, "partner_id", None)
-            if partner_id:
-                res = await self.db.execute(
-                    sa.text(
-                        "SELECT COALESCE(partner_name, name) AS nm FROM staff_members "
-                        "WHERE user_id = :uid AND is_deleted = false LIMIT 1"
-                    ),
-                    {"uid": str(partner_id)},
-                )
-                nm = res.scalar_one_or_none()
-                if nm:
-                    return str(nm)
-            res = await self.db.execute(
-                sa.text(
-                    "SELECT COALESCE(s.partner_name, s.name) AS nm "
-                    "FROM project_assignments pa JOIN staff_members s ON s.id = pa.staff_id "
-                    "WHERE pa.project_id = :pid AND pa.is_deleted = false "
-                    "AND pa.role = 'partner' LIMIT 1"
-                ),
-                {"pid": str(project.id)},
-            )
-            nm = res.scalar_one_or_none()
-            return str(nm) if nm else None
+            async with self.db.begin_nested():
+                partner_id = getattr(project, "partner_id", None)
+                if partner_id:
+                    nm = (
+                        await self.db.execute(
+                            sa.select(StaffMember.name)
+                            .where(StaffMember.user_id == partner_id, StaffMember.is_deleted == sa.false())
+                            .limit(1)
+                        )
+                    ).scalar_one_or_none()
+                    if nm:
+                        return str(nm)
+                nm = (
+                    await self.db.execute(
+                        sa.select(StaffMember.name)
+                        .join(ProjectAssignment, ProjectAssignment.staff_id == StaffMember.id)
+                        .where(
+                            ProjectAssignment.project_id == project.id,
+                            ProjectAssignment.is_deleted == sa.false(),
+                            StaffMember.is_deleted == sa.false(),
+                            ProjectAssignment.role.in_(("signing_partner", "partner")),
+                        )
+                        .order_by(sa.case((ProjectAssignment.role == "signing_partner", 0), else_=1))
+                        .limit(1)
+                    )
+                ).scalar_one_or_none()
+                return str(nm) if nm else None
         except Exception as exc:  # fail-open
             logger.warning("resolve partner name failed: %s", exc)
             return None

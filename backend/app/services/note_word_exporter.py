@@ -94,6 +94,8 @@ class NoteExportMeta:
     #: section_code → Rendered_Block_Hash（生成时写入块内文字的规范化 sha256）
     rendered_block_hashes: dict[str, str] = field(default_factory=dict)
     variant_key: str = ""
+    #: 模板模式交付统计形成的导出提醒（剔除行数 / 残留占位 / 报表有余额附注无表…；交付中心回传，不阻断）
+    delivery_warnings: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -312,6 +314,13 @@ def _body_run_style(run, bold: bool) -> None:
     _set_run_font(run, bold=bold)
 
 
+def _template_body_run_style(run, bold: bool) -> None:
+    """模板模式正文：Arial Narrow / 仿宋_GB2312 小四（与模板正文段同款），加粗按 HTML。"""
+    apply_gt_dual_font(run)
+    if bold:
+        run.bold = True
+
+
 def _set_run_font(run, font_name=BODY_FONT, size=BODY_SIZE, bold=False):
     """Set run font properties."""
     run.font.name = font_name
@@ -386,6 +395,20 @@ SECTION_CODE_INDEX_PATH = (
     / "audit_report_templates"
     / "section_code_index.json"
 )
+
+
+def resolve_note_template_path(template_type: str | None, report_scope: str | None) -> Path | None:
+    """准则 + 口径 → 附注 docx 模板路径；未登记 / 文件缺失返回 ``None``。
+
+    附注域里只在本模块经 manifest 定位模板（``note_deliverable_outline`` 读轮廓时经此取路径）。
+    """
+    try:
+        entry = get_template_manifest_loader().resolve_disclosure_notes(
+            normalize_template_type(template_type), normalize_report_scope(report_scope),
+        )
+    except KeyError:
+        return None
+    return Path(entry.abs_path) if entry.exists else None
 
 
 def _load_section_code_index(variant_key: str) -> list[dict[str, Any]]:
@@ -982,68 +1005,23 @@ class NoteWordExporter:
         # 索引：section_code → index entry（含 legacy_aliases）
         index_sections = _load_section_code_index(variant_key)
 
-        # 2. 扫描 SECTION 块
-        blocks = scan_section_blocks(doc)
-
-        # 3. 加载 notes + 裁剪状态；构建 join 映射
+        # 2~5. 模板预处理 → 块与附注对应 → 删除 / 按模板结构重建（spec deliverable-trio-generation-accuracy §2）
         notes = await self._load_notes(project_id, year, sections)
         notes = [
             n
             for n in notes
             if note_applies_to_report_scope(n.note_section, template_type, report_scope)
         ]
-        note_by_section = {(n.note_section or "").strip(): n for n in notes}
-
-        # legacy_aliases → canonical section_code 映射（来自索引）
-        alias_to_code: dict[str, str] = {}
-        for entry_s in index_sections:
-            code = (entry_s.get("section_code") or "").strip()
-            for alias in entry_s.get("legacy_aliases", []) or []:
-                a = (alias or "").strip()
-                if a:
-                    alias_to_code[a] = code
-
-        # section_id 兜底（同一模板内稳定）：模板块编号是旧种子的 10 字截断码（「四、记账基础和计价原」），新生成
-        # 项目是全码 ⇒ 编号对不上、section_id 相同（第 26 组）。只认唯一的 section_id，且不抢别的块按编号认领的附注
-        block_codes = {b.section_code for b in blocks}
-        sid_of_code = {(e.get("section_code") or "").strip(): e.get("section_id") for e in index_sections}
-        notes_by_sid: dict[str, list[DisclosureNote]] = {}
-        for n in notes:
-            n_code = (n.note_section or "").strip()
-            if getattr(n, "section_id", None) and n_code not in block_codes and alias_to_code.get(n_code) not in block_codes:
-                notes_by_sid.setdefault(n.section_id, []).append(n)
-
-        def _match_note(section_code: str) -> DisclosureNote | None:
-            code = (section_code or "").strip()
-            note = note_by_section.get(code)
-            if note is not None:
-                return note
-            # DB note_section 可能是 legacy alias（如 五、1 → 模板 八、1）
-            for db_section, n in note_by_section.items():
-                if alias_to_code.get(db_section) == code:
-                    return n
-            candidates = notes_by_sid.get(sid_of_code.get(code) or "", [])
-            return candidates[0] if len(candidates) == 1 else None
-
-        # 4 + 5. 逐块裁剪 / 填充
-        kept_codes: list[str] = []
-        for block in blocks:
-            # 口径排除：standalone 导出删除 consolidated_only 章节块（design §7 / 需求 12）
-            if not note_applies_to_report_scope(
-                block.section_code, template_type, report_scope
-            ):
-                delete_section_block(block)
-                continue
-            note = _match_note(block.section_code)
-            skip = False
-            if note is not None:
-                skip = should_skip_empty_section(self._note_to_skip_dict(note))
-            if skip:
-                delete_section_block(block)
-                continue
-            kept_codes.append(block.section_code)
-            if note is not None:
-                self._fill_section_block(doc, block, note)
+        kept_codes, report = await self._fill_template_blocks(
+            doc,
+            notes,
+            index_sections,
+            project_id=project_id,
+            year=year,
+            template_type=template_type,
+            report_scope=report_scope,
+            selected=sections,
+        )
 
         # 6. {{seq:prefix}} 填充（仅保留章节，design §13）
         kept_tree = [{"note_section": code} for code in kept_codes]
@@ -1153,6 +1131,50 @@ class NoteWordExporter:
             anchor_map=anchor_map,
             rendered_block_hashes=rendered_block_hashes,
             variant_key=variant_key,
+            delivery_warnings=report.warnings(),
+        )
+
+    async def _fill_template_blocks(
+        self,
+        doc: Document,
+        notes: list[DisclosureNote],
+        index_sections: list[dict[str, Any]],
+        *,
+        project_id: UUID,
+        year: int,
+        template_type: str,
+        report_scope: str,
+        selected: list[str] | None,
+    ) -> tuple[list[str], Any]:
+        """模板块 ↔ 库内附注：删除 / 按模板结构重建（实现见 ``note_template_export_fill.fill_template_blocks``）。
+
+        此处只读项目值（页眉页脚占位、报表行金额）并注入导出器依赖：按调用时的本模块名传入，
+        测试 monkeypatch ``should_skip_empty_section`` / ``note_applies_to_report_scope`` 照旧生效。
+        """
+        from app.services.note_deliverable_outline import load_fs_row_amounts
+        from app.services.note_template_export_fill import (
+            TemplateFillHooks,
+            fill_template_blocks,
+            template_header_values,
+        )
+
+        return fill_template_blocks(
+            self,
+            doc,
+            notes,
+            index_sections,
+            hooks=TemplateFillHooks(
+                scan_blocks=scan_section_blocks,
+                delete_block=delete_section_block,
+                applies_to_scope=note_applies_to_report_scope,
+                skip_fn=should_skip_empty_section,
+                run_style=_template_body_run_style,
+            ),
+            header_values=await template_header_values(self.db, project_id, year),
+            fs_amounts=await load_fs_row_amounts(self.db, project_id, year),
+            template_type=template_type,
+            report_scope=report_scope,
+            selected=selected,
         )
 
     def _fill_section_block(
@@ -1526,7 +1548,11 @@ class NoteWordExporter:
         - 兼容老结构：无 _tables 时降级到单表渲染
         """
         # Text content：HTML 与纯文字同一渲染（段落 / 列表 / 表格；纯文字先按编辑器口径转 HTML）—— design §5.5
-        append_note_text(doc, note.text_content, run_style=_body_run_style, paragraph_style=_set_paragraph_format)
+        # 交付过滤（spec deliverable-trio-generation-accuracy §2.6）：大模型提示 / 编制指引 / 重复标题不进交付件
+        from app.services.note_deliverable_filter import make_block_filter
+
+        append_note_text(doc, note.text_content, run_style=_body_run_style, paragraph_style=_set_paragraph_format,
+                         block_filter=make_block_filter(note))
 
         # 章节级 guidance（note-per-table-guidance Phase 4）：在所有表格前输出一次，
         # 灰色小字斜体区分正文。此前完全不渲染（grep guidance 零命中），属既有缺陷补齐。

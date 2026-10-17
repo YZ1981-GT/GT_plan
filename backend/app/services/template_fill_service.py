@@ -34,6 +34,7 @@ from app.models.report_models import (
     CompanyType,
     FillPreviewSession,
     OpinionType,
+    ReportStatus,
 )
 from app.services.deliverable_section_state_service import (
     persist_report_body_section_states,
@@ -42,6 +43,13 @@ from app.services.deliverable_service import STORAGE_ROOT, DeliverableService
 from app.services.placeholder_registry import (
     PlaceholderRegistry,
     get_placeholder_registry,
+)
+from app.services.report_body_postprocess import (
+    finalize_report_body,
+    missing_field_labels,
+    pending_items,
+    placeholder_keys,
+    prepare_report_body,
 )
 from app.services.report_body_section_blocks import (
     build_report_body_sections_payload,
@@ -298,15 +306,28 @@ class TemplateFillService:
         working_path = work_dir / "working.docx"
         shutil.copy2(entry.abs_path, working_path)
 
-        # 占位符替换
+        # 占位符替换（先记下模板实际用到的占位：待补充只报这些）
         doc = Document(str(working_path))
+        used_keys = placeholder_keys(doc)
         mapping = await self.registry.build_placeholder_map(project_id, self.db)
         replace_placeholders_in_doc(doc, mapping)
+        # 正文后处理（spec deliverable-trio-generation-accuracy §3）：OPT 标记按章节标题重放 / 强调事项段 /
+        # 落款日期 / 权益变动表名称 / 章节序号 —— 须在扫描可选段之前
+        prepare_report_body(
+            doc,
+            opinion_choice=opinion_type,
+            audit_year=year,
+            company_name=mapping.get("company_full_name"),
+            report_date=mapping.get("report_date"),
+        )
         doc.save(str(working_path))
 
-        # 扫描 OPT + 待补充字段
+        # 扫描 OPT + 待补充（中文：模板实际用到且仍为空 / 方括号占位的字段 + 生成后仍需人工补写的内容）
         opt_views = self._build_optional_views(doc, resolved_subtype)
-        missing_fields = self.registry.detect_missing_fields(mapping)
+        missing_fields = missing_field_labels(
+            self.registry.detect_missing_fields(mapping), used_keys
+        )
+        missing_fields += [x for x in pending_items(doc) if x not in missing_fields]
 
         # 写回 session 缓存
         session.working_path = str(working_path)
@@ -421,6 +442,12 @@ class TemplateFillService:
 
         # 4. 剥除 NOTE 指引注释（工作副本）
         strip_guidance_notes(doc)
+        # 4.1 编制提示框 /【…】/ 残留标记；单体报告删集团审计条款、合并措辞改单体；删可选段后章节序号顺延
+        finalize_report_body(
+            doc,
+            standalone=(await self._resolve_report_scope(project_id)) == "standalone",
+            listed=(session.company_subtype or "").strip().lower() == "type_a",
+        )
 
         # 4.5 写入 Section_Anchor（deliverable-lineage Wave 3 Task 17 / 需求 9.1）
         #
@@ -455,11 +482,16 @@ class TemplateFillService:
         clean_path = self._preview_dir(session.id) / "clean.docx"
         doc.save(str(clean_path))
 
-        # 5. 入库：render_and_store（version_no 递增）
+        # 5. 入库：render_and_store（version_no 递增）；绑定试算表快照（交付件 stale 判定依据，与附注 / 报表同口径；
+        #    未传时 render_and_store 把 task.source_snapshot_refs 写成 None ⇒ 报告正文永远判不出过期）
+        snapshot_refs = await deliverable_svc.capture_snapshot_refs(
+            project_id, year, WordExportDocType.audit_report.value
+        )
         store_result = await deliverable_svc.render_and_store(
             task.id,
             docx_path=clean_path,
             user_id=user_id,
+            source_snapshot_refs=snapshot_refs,
             selected_sections=[
                 sid for sid, keep in optional_sections.items() if keep
             ],
@@ -467,7 +499,14 @@ class TemplateFillService:
             created_via="generate",
         )
 
-        # 6. KAM 校验（Word 模式）
+        # 6. KAM 校验（Word 模式）—— 先确保有 audit_report 行（真库 0 行时 KAM 校验恒跳过、正文 schema 无处写）
+        await self._ensure_audit_report(
+            project_id,
+            year,
+            opinion_choice=session.opinion_type,
+            company_subtype=session.company_subtype,
+            user_id=user_id,
+        )
         validation_warning = await self._validate_kam(
             project_id, year, optional_sections
         )
@@ -483,6 +522,7 @@ class TemplateFillService:
             template_variant=session.template_variant,
             missing_fields=(session.missing_fields or {}).get("fields", []),
             sections=rb_sections_payload,
+            opinion_choice=session.opinion_type,
         )
 
         # 7.5 章节状态落库（Wave 3 Task 17 / 需求 9.1）
@@ -558,8 +598,12 @@ class TemplateFillService:
         template_variant: str | None,
         missing_fields: list[str],
         sections: list[dict] | None = None,
+        opinion_choice: str | None = None,
     ) -> dict:
         """写入需求 6.8 schema 到 audit_report.report_body_json。
+
+        ``opinion_choice``：前端所选意见（含 ``unqualified_with_emphasis``；``audit_report.opinion_type`` 枚举只有
+        四族，存这里供一键生成全套沿用同一选择）。
 
         Args:
             sections: **additive**（Wave 3 Task 17 / 需求 9.2、9.6）——
@@ -585,6 +629,8 @@ class TemplateFillService:
             "template_variant": template_variant,
             "missing_fields": missing_fields,
         }
+        if opinion_choice:
+            body_json["opinion_choice"] = opinion_choice
         if sections:
             body_json["sections"] = sections
         elif report is not None and isinstance(report.report_body_json, dict):
@@ -611,6 +657,48 @@ class TemplateFillService:
             )
         )
         return result.scalar_one_or_none()
+
+    async def _ensure_audit_report(
+        self,
+        project_id: UUID,
+        year: int,
+        *,
+        opinion_choice: str | None,
+        company_subtype: str | None,
+        user_id: UUID,
+    ) -> AuditReport:
+        """confirm 时确保有 ``audit_report`` 行：意见类型 / 公司类型 / 是否公众利益实体由本次报告选项推得。
+
+        已有行且为草稿 → 同步为本次生成的正文口径；复核 / 定稿态不改。``(project_id, year)`` 唯一索引含软删行，
+        软删行复用（直接插入会违反唯一约束、整个事务 aborted）。service 只 flush。
+        """
+        subtype = (company_subtype or "").strip().lower()
+        try:
+            opinion = OpinionType(
+                "unqualified" if opinion_choice == "unqualified_with_emphasis" else (opinion_choice or "unqualified")
+            )
+        except ValueError:
+            opinion = OpinionType.unqualified
+        company_type = CompanyType.listed if subtype == "type_a" else CompanyType.non_listed
+        is_pie = subtype in ("type_a", "type_b", "type_c")
+        report = (
+            await self.db.execute(
+                sa.select(AuditReport).where(AuditReport.project_id == project_id, AuditReport.year == year)
+            )
+        ).scalars().first()
+        if report is None:
+            report = AuditReport(
+                project_id=project_id, year=year, opinion_type=opinion, company_type=company_type,
+                is_pie=is_pie, company_subtype=subtype or None, status=ReportStatus.draft, created_by=user_id,
+            )
+            self.db.add(report)
+        elif report.is_deleted or report.status == ReportStatus.draft:
+            if report.is_deleted:  # 软删行按新建处理：恢复为草稿
+                report.is_deleted, report.status = False, ReportStatus.draft
+            report.opinion_type, report.company_type, report.is_pie = opinion, company_type, is_pie
+            report.updated_by = user_id
+        await self.db.flush()
+        return report
 
     # ------------------------------------------------------------------
     # preview session TTL 清理

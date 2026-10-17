@@ -447,14 +447,34 @@ async def test_income_statement_values(db_session: AsyncSession, seeded_db):
 
 @pytest.mark.asyncio
 async def test_prior_period_data(db_session: AsyncSession, seeded_db):
-    """比较期间数据生成（year-1 无数据时为 0）"""
+    """比较期间数据（spec deliverable-trio-generation-accuracy §1.3）。
+
+    - 资产负债表「期初余额」= 本年试算表 ``opening_balance`` 按同一公式计算
+      （旧口径按 year-1 试算表重算 ⇒ 按年度建项目时恒为 0）；
+    - 利润表「上期金额」：同项目无 year-1 试算表、也无上年项目 ⇒ 无来源，留空（None，不写 0）。
+    """
+    import sqlalchemy as sa
+
     engine = ReportEngine(db_session)
     results = await engine.generate_all_reports(FAKE_PROJECT_ID, 2025, applicable_standard=TEST_STANDARD)
     await db_session.commit()
 
+    expected_opening = (
+        await db_session.execute(
+            sa.select(sa.func.sum(TrialBalance.opening_balance)).where(
+                TrialBalance.project_id == FAKE_PROJECT_ID,
+                TrialBalance.year == 2025,
+                TrialBalance.standard_account_code.in_(["1001", "1002", "1012"]),
+            )
+        )
+    ).scalar_one()
+    assert expected_opening and expected_opening != 0  # 夹具确有期初数，否则本断言无意义
+
     bs_rows = {r["row_code"]: r for r in results["balance_sheet"]}
-    # Prior period (2024) has no trial balance data → all zeros
-    assert Decimal(bs_rows["BS-002"]["prior_period_amount"]) == Decimal("0")
+    assert Decimal(bs_rows["BS-002"]["prior_period_amount"]) == Decimal(expected_opening)
+
+    is_rows = {r["row_code"]: r for r in results["income_statement"]}
+    assert is_rows["IS-001"]["prior_period_amount"] is None
 
 
 @pytest.mark.asyncio

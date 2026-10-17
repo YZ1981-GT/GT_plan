@@ -32,6 +32,9 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+# 重算值按模板出现位键入时只认出现位（与导出的模板行绑定同口径，spec deliverable-trio-generation-accuracy）
+from app.services.report_template_binding import expected_for_cell
+
 logger = logging.getLogger(__name__)
 
 #: 金额比对容差（元）。报表以元为单位、保留 2 位小数，
@@ -278,7 +281,7 @@ def compare_cell_specs(
             else "prior_period_amount"
         )
         exp_val = _to_decimal(
-            (expected_by_code.get(spec.row_code) or {}).get(field)
+            (expected_for_cell(expected_by_code, spec.sheet, spec.coord, spec.row_code) or {}).get(field)
         )
         if exp_val is None:
             continue
@@ -886,6 +889,12 @@ class FinancialReportDriftService:
                 list(REPORT_TYPE_SHEET_NAMES.keys()),
                 mode=mode,
             )
+            # 与导出同源：按模板行名绑定后按出现位给权威值（spec deliverable-trio-generation-accuracy）
+            binding, _parent = exporter._bind_to_template(  # noqa: SLF001
+                variant_key, report_data, None,
+            )
+            if binding is not None:
+                return binding.amounts_lookup()
             return build_amount_lookup(report_data)
         except Exception as exc:  # noqa: BLE001
             raise DriftUnavailable(f"按试算表重算权威值失败: {exc}") from exc

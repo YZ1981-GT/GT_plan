@@ -2,7 +2,7 @@
 
 所有使用公式 token 解析的模块统一从此处导入，避免多处重复定义。
 两类正则：
-  - 严格模式（无空格容忍）：formula_engine / report_engine 使用
+  - 求值正则：formula_engine / report_engine 使用（TB / SUM_TB / ROW / SUM_ROW 参数间允许空白，见下）
   - 宽松模式（允许空格）：address_registry 使用
 
 ACNR M1 扩展（R10.2, R10.5）：
@@ -17,13 +17,17 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 严格 token 正则（formula_engine / report_engine 求值路径）
+# 求值 token 正则（formula_engine / report_engine 求值路径）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-TB_PATTERN = re.compile(r"TB\('([^']+)','([^']+)'\)")
-SUM_TB_PATTERN = re.compile(r"SUM_TB\('([^']+)','([^']+)'\)")
-ROW_PATTERN = re.compile(r"ROW\('([^']+)'\)")
-SUM_ROW_PATTERN = re.compile(r"SUM_ROW\('([^']+)','([^']+)'\)")
+# 🔴 TB / SUM_TB / ROW / SUM_ROW 参数间允许空白（spec deliverable-trio-generation-accuracy，2026-10-16）：
+# 库内公式有 `TB('1231', '期末余额')` 写法，AST 内核本就接受；旧「无空格」正则匹配不上 ⇒
+# report_engine 的 L2 预载跳过该 token ⇒ 内核按空 tb_data **静默求 0**。真实库 soe_standalone
+# 资产减值准备表 10 行、现金流量表补充资料 15 行、权益变动表 2 行因此恒为 0（安徽坏账准备 2,896 万导出 0）。
+TB_PATTERN = re.compile(r"TB\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)")
+SUM_TB_PATTERN = re.compile(r"SUM_TB\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)")
+ROW_PATTERN = re.compile(r"ROW\(\s*'([^']+)'\s*\)")
+SUM_ROW_PATTERN = re.compile(r"SUM_ROW\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)")
 REPORT_PATTERN = re.compile(r"REPORT\('([^']+)','([^']+)'\)")
 NOTE_PATTERN = re.compile(r"NOTE\('([^']+)','([^']+)','([^']+)'\)")
 WP_PATTERN = re.compile(r"WP\('([^']+)','([^']+)'(?:,'([^']+)')?\)")

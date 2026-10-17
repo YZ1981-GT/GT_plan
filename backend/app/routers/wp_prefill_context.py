@@ -50,11 +50,15 @@ async def get_prefill_context(
     # Get partner info
     # 注：project_assignments.staff_id → staff_members.id，姓名在 staff_members.name
     #     （非 users.display_name，该列不存在）。
+    #     委派角色认 signing_partner（项目委派界面取值）与历史的 partner，前者优先；只认 partner 时界面委派的
+    #     签字合伙人永远取不到（spec deliverable-trio-generation-accuracy 触类旁通）。
     partner_result = await db.execute(
         text("""
             SELECT s.name FROM project_assignments pa
             JOIN staff_members s ON s.id = pa.staff_id
-            WHERE pa.project_id = :pid AND pa.role = 'partner'
+            WHERE pa.project_id = :pid AND pa.role IN ('signing_partner', 'partner')
+              AND pa.is_deleted = false AND s.is_deleted = false
+            ORDER BY CASE WHEN pa.role = 'signing_partner' THEN 0 ELSE 1 END
             LIMIT 1
         """),
         {"pid": project_id},

@@ -37,17 +37,59 @@ from app.services.parent_company_scope import (
     resolve_parent_standalone_project,
 )
 from app.services.parent_company_values import load_parent_company_values
+from app.services.report_excel_sheet_ops import (
+    NOTE_REF_ANY_RE as _NOTE_REF_ANY_RE,
+    apply_impairment_closing,
+    blank_consolidated_only_formulas,
+    fill_formula_rows_without_inputs,
+    is_formula_cell,
+    normalize_header_years,
+    note_ref_warnings,
+    render_note_refs,
+    resolve_amount,
+    row_label_left_of,
+)
 
 logger = logging.getLogger(__name__)
 
 # Report type → Chinese sheet name（manifest sheet_aliases 优先，此为回退子串匹配）
+# 🔴 减值准备表的报表类型是 ``impairment_provision``（FinancialReportType / 前端勾选键）；
+# manifest / cell_mapping.json 历史上用 ``asset_impairment`` 作 sheet 键，二者经
+# ``_SHEET_KEY_ALIASES`` 互认。旧实现以 asset_impairment 为键 ⇒ 前端勾选的
+# impairment_provision 解析不到 sheet、该表在四个变体都被删除（2026-10-16 实测）。
 REPORT_TYPE_SHEET_NAMES: dict[str, str] = {
     "balance_sheet": "资产负债表",
     "income_statement": "利润表",
     "cash_flow_statement": "现金流量表",
     "equity_statement": "所有者权益变动表",
-    "asset_impairment": "资产减值准备情况表",
+    "impairment_provision": "资产减值准备情况表",
 }
+
+#: 回退子串匹配的多关键词（上市版权益表叫「股东权益变动表」/「（或所有者）权益变动表」）
+_SHEET_HINTS: dict[str, tuple[str, ...]] = {
+    "balance_sheet": ("资产负债表",),
+    "income_statement": ("利润表",),
+    "cash_flow_statement": ("现金流量表",),
+    "equity_statement": ("所有者权益变动表", "股东权益变动表", "权益变动表"),
+    "impairment_provision": ("资产减值准备情况表", "减值准备情况表"),
+}
+
+#: manifest / cell_mapping.json 的历史 sheet 键 ↔ 报表类型
+_SHEET_KEY_ALIASES: dict[str, str] = {
+    "impairment_provision": "asset_impairment",
+    "asset_impairment": "impairment_provision",
+}
+
+
+def normalize_report_types(report_types: list[str] | None) -> list[str]:
+    """归一导出报表类型：``asset_impairment`` → ``impairment_provision``，去重保序。"""
+    src = report_types or list(REPORT_TYPE_SHEET_NAMES.keys())
+    out: list[str] = []
+    for rt in src:
+        key = "impairment_provision" if rt == "asset_impairment" else rt
+        if key not in out:
+            out.append(key)
+    return out
 
 # Amount number format
 AMOUNT_FORMAT = '#,##0.00'
@@ -133,6 +175,23 @@ def _load_note_ref_mapping() -> dict[str, dict[str, dict]]:
         return {}
 
 
+def resolve_fs_template_path(template_key: str) -> Path | None:
+    """变体键（``soe_standalone``）→ 财务报表 xlsx 模板路径；模板缺失 / 未登记返回 ``None``。
+
+    模板定位只在本模块经 manifest 做（``report_template_binding`` 等报表域模块经此取路径，不各自依赖 manifest）。
+    """
+    from app.services.template_manifest_loader import get_template_manifest_loader
+
+    parts = (template_key or "").split("_", 1)
+    if len(parts) != 2:
+        return None
+    try:
+        entry = get_template_manifest_loader().resolve_financial_statements(parts[0], parts[1])
+    except KeyError:
+        return None
+    return Path(entry.abs_path) if entry.exists else None
+
+
 class ReportExcelExporter:
     """报表 Excel 导出引擎
 
@@ -143,6 +202,88 @@ class ReportExcelExporter:
 
     def __init__(self, db: AsyncSession):
         self.db = db
+        #: 最近一次 export 的模板行绑定结果（诊断 / 测试用）
+        self.binding = None
+        #: 最近一次 export 的导出提醒（中文，路由回传给交付中心，不阻断导出）
+        self.export_warnings: list[str] = []
+        #: 附注列未取到编号的占位 (sheet, 行号, 模板编码, 行名)，用于导出提醒
+        self._note_ref_misses: list[tuple[str, int, str, str]] = []
+        #: 最近一次绑定所用的模板出现位（导出提醒按同一份模板读行名）
+        self._template_slots = None
+
+    async def _build_note_ref_plan(
+        self,
+        project_id: UUID,
+        year: int,
+        template_type: str,
+        report_scope: str,
+        template_key: str,
+    ):
+        """附注列编号方案；附注模板缺失或出错返回 ``None``（回退静态映射）。"""
+        try:
+            from app.services.note_deliverable_outline import build_fs_note_ref_plan
+
+            variant = _load_note_ref_mapping().get(template_key, {})
+            hints = {
+                code: (str(info.get("section_code") or ""), str(info.get("section_title") or ""))
+                for code, info in (variant.items() if isinstance(variant, dict) else [])
+                if isinstance(info, dict) and info.get("section_code")
+            }
+            # SAVEPOINT：读失败只回滚自身，不毒化导出会话（PG 首条失败会使整个事务 aborted）
+            async with self.db.begin_nested():
+                return await build_fs_note_ref_plan(
+                    self.db,
+                    project_id,
+                    year,
+                    template_type=template_type,
+                    report_scope=report_scope,
+                    hints=hints,
+                )
+        except Exception:  # noqa: BLE001 — fail-open：回退按静态映射填附注列
+            logger.warning("附注列编号方案生成失败，回退静态映射 project=%s", project_id, exc_info=True)
+            return None
+
+    def _bind_to_template(
+        self,
+        template_key: str,
+        report_data: dict[str, list[dict]],
+        parent_row_index: dict[str, dict] | None,
+        *,
+        wb: Workbook | None = None,
+    ):
+        """按模板行名绑定本项目与母公司个别报表行；任一步失败返回 ``(None, None)``（旧口径）。
+
+        ``wb`` 为即将填充的模板工作簿（未填充）时，出现位从它扫描 —— 与实际填充的文件同源；
+        否则按变体读 manifest 登记的模板（差异检测重算口径）。
+        """
+        self._template_slots = None
+        try:
+            from app.services.report_template_binding import (
+                bind_index,
+                bind_rows_to_template,
+                load_template_slots,
+                scan_workbook_slots,
+            )
+
+            slots = scan_workbook_slots(wb) if wb is not None else load_template_slots(template_key)
+            if slots is None:
+                return None, None
+            self._template_slots = slots
+            rows = [r for rs in report_data.values() for r in rs]
+            binding = bind_rows_to_template(rows, slots)
+            parent_binding = bind_index(parent_row_index, slots) if parent_row_index else None
+            logger.info(
+                "报表模板行绑定 %s：绑定 %d / 未绑定 %d / 编码冲突 %d / 方法 %s",
+                template_key,
+                len(binding.by_slot),
+                len(binding.unresolved),
+                len(binding.conflicts),
+                dict(binding.methods),
+            )
+            return binding, parent_binding
+        except Exception:  # noqa: BLE001 — fail-open：回退按编码直取
+            logger.warning("报表模板行绑定失败，回退按编码取数 template=%s", template_key, exc_info=True)
+            return None, None
 
     async def export(
         self,
@@ -186,11 +327,8 @@ class ReportExcelExporter:
         report_scope = getattr(project, "report_scope", None) or "standalone"
         template_key = f"{template_type}_{report_scope}"
 
-        # 3. Determine which report types to export
-        if report_types:
-            types_to_export = report_types
-        else:
-            types_to_export = list(REPORT_TYPE_SHEET_NAMES.keys())
+        # 3. Determine which report types to export（asset_impairment 归一为 impairment_provision）
+        types_to_export = normalize_report_types(report_types)
 
         # 4. Load report data（审定读库；未审动态计算四表未审数 + 权益矩阵）
         report_data = await self._load_report_data(
@@ -204,8 +342,25 @@ class ReportExcelExporter:
             project, year, types_to_export, mode=mode,
         )
 
-        # 5. Try to load template, fallback to programmatic generation
+        # 4c. 模板行绑定（spec deliverable-trio-generation-accuracy §1.1）：库内 report_config
+        #     与模板占位是两套编号，按模板行名绑定后才填数；绑定失败回退旧的按编码直取。
+        #     出现位从即将填充的工作簿扫描（未填充前），与实际填充文件同源。
         wb = self._load_template(template_key)
+        binding, parent_binding = (
+            self._bind_to_template(template_key, report_data, parent_row_index, wb=wb)
+            if wb is not None
+            else (None, None)
+        )
+        self.binding = binding
+
+        # 4d. 附注列编号方案（spec §1.4）：按附注模板轮廓 + 本项目附注「有数据」口径求交付件
+        #     实际显示的编号（单体国企「八、10」显示为「七、N」，无数据的节不占号）。
+        note_plan = await self._build_note_ref_plan(
+            project_id, year, template_type, report_scope, template_key,
+        )
+        self._note_ref_misses: list[tuple[str, int, str, str]] = []
+
+        # 5. Template loaded above; fallback to programmatic generation
         if wb is None:
             # Fallback: generate from scratch
             wb = self._create_workbook_from_scratch(
@@ -224,6 +379,10 @@ class ReportExcelExporter:
                 mode,
                 template_key=template_key,
                 parent_row_index=parent_row_index,
+                binding=binding,
+                parent_binding=parent_binding,
+                period_end=getattr(project, "audit_period_end", None),
+                note_plan=note_plan,
             )
 
         # 6. 交付导出契约（Req 18.2/18.3）：公式解析为静态值，产物不留可重算表达式
@@ -233,6 +392,27 @@ class ReportExcelExporter:
             )
 
             flatten_workbook_formulas(wb, log=logger)
+
+        # 6b. 导出提醒（不阻断）：不平衡 / 合计不一致 / 未绑定有金额 / 过期 / 无上期来源等
+        try:
+            from app.services.report_export_checks import collect_report_export_warnings
+
+            self.export_warnings = await collect_report_export_warnings(
+                self.db,
+                project_id=project_id,
+                year=year,
+                mode=mode,
+                wb=wb,
+                report_data=report_data,
+                binding=binding,
+                template_key=template_key,
+                formulas_flattened=flatten_formulas,
+                slots=getattr(self, "_template_slots", None),
+            )
+        except Exception:  # noqa: BLE001 — 提醒失败不影响导出
+            logger.warning("报表导出提醒生成失败", exc_info=True)
+            self.export_warnings = []
+        self.export_warnings.extend(note_ref_warnings(note_plan, self._note_ref_misses, binding, report_data))
 
         # 7. Write to BytesIO
         output = BytesIO()
@@ -504,7 +684,7 @@ class ReportExcelExporter:
         from app.services.template_manifest_loader import get_template_manifest_loader
 
         aliases = get_template_manifest_loader().get_sheet_aliases(template_key)
-        alias = aliases.get(report_type)
+        alias = aliases.get(report_type) or aliases.get(_SHEET_KEY_ALIASES.get(report_type, ""))
         matched: list = []
         if alias:
             names = alias if isinstance(alias, list) else [alias]
@@ -513,12 +693,14 @@ class ReportExcelExporter:
                     matched.append(wb[name])
         if matched:
             return matched
-        # Fallback: 中文子串匹配
-        sheet_hint = REPORT_TYPE_SHEET_NAMES.get(report_type)
-        if sheet_hint:
-            for name in wb.sheetnames:
-                if sheet_hint in name:
-                    matched.append(wb[name])
+        # Fallback: 中文子串匹配（多关键词：上市版权益表为「股东权益变动表」等）
+        key = "impairment_provision" if report_type == "asset_impairment" else report_type
+        hints = _SHEET_HINTS.get(key) or (
+            (REPORT_TYPE_SHEET_NAMES[key],) if key in REPORT_TYPE_SHEET_NAMES else ()
+        )
+        for name in wb.sheetnames:
+            if any(h in name for h in hints) and wb[name] not in matched:
+                matched.append(wb[name])
         return matched
 
     def _fill_template(
@@ -533,18 +715,23 @@ class ReportExcelExporter:
         *,
         template_key: str = "soe_standalone",
         parent_row_index: dict[str, dict] | None = None,
+        binding: Any = None,
+        parent_binding: Any = None,
+        period_end: Any = None,
+        note_plan: Any = None,
     ) -> Workbook:
         """按 design §6「双轨填充」填充模板工作簿，保留模板格式.
 
         填充顺序（每个 sheet）：
           1. 扫描内联 ``{{row:CODE:current/prior}}`` / ``{{note_ref:CODE}}`` 占位符
-             → 按 ``row_code`` 从 ``report_data`` 取值回填该单元格（替换占位文本）。
-          2. 表头 ``{{company_full_name}}`` 等占位符替换（合并格写左上角）。
+             → 有模板行绑定时按出现位（sheet!行!编码）取绑定行，否则按 ``row_code`` 直取。
+          2. 表头 ``{{company_full_name}}`` 等占位符替换（合并格写左上角）；
+             ``{{period_end_date}}`` 按 sheet 族替换（资产负债表 = 截止日，其余 = 年度）。
           3. 若 sheet 无内联 ``{{row:}}`` 占位符 → 回退 ``cell_mapping.json`` 坐标。
           4. 全程跳过公式格（``data_type=='f'`` 或值以 ``=`` 开头）。
           5. ``fill_empty_as``：无数据时 ``blank`` 留空 / ``zero`` 填 0。
         """
-        header_values = self._build_header_values(company_name, year, mode)
+        header_values = self._build_header_values(company_name, year, mode, period_end=period_end)
         parent_index = parent_row_index or {}
 
         # Build {row_code: row} index across all report types for O(1) lookup
@@ -559,6 +746,21 @@ class ReportExcelExporter:
         note_ref_index = self._build_note_ref_index(template_key)
 
         fill_empty_map = self._build_fill_empty_map(template_key)
+
+        # 模板自算行回填用：同名行里最可信的一份（与绑定同口径）；sheet → 编码族
+        best_by_key: dict = {}
+        parent_best_by_key: dict = {}
+        sheet_family: dict[str, str] = {}
+        if binding is not None:
+            from app.services.report_template_binding import best_rows_by_key
+
+            best_by_key = best_rows_by_key(r for rs in report_data.values() for r in rs)
+            if parent_index:
+                parent_best_by_key = best_rows_by_key(
+                    {**r, "row_code": r.get("row_code") or c} for c, r in parent_index.items()
+                )
+            slots = getattr(self, "_template_slots", None)
+            sheet_family = dict(getattr(slots, "sheet_family", {}) or {})
 
         for rt in types_to_export:
             rows = report_data.get(rt, [])
@@ -579,10 +781,30 @@ class ReportExcelExporter:
             any_found_inline = False
             for ws in sheets:
                 # Track 1+2: inline placeholders + header replacement
+                sheet_headers = dict(header_values)
+                if rt != "balance_sheet":
+                    # 利润表 / 现金流量表 / 权益表 / 减值表是期间报表：表头为「YYYY年度」
+                    sheet_headers["period_end_date"] = f"{year}年度"
                 found_inline = self._fill_by_placeholders(
-                    ws, row_index, header_values, include_prior_year, fill_empty_map,
+                    ws, row_index, sheet_headers, include_prior_year, fill_empty_map,
                     parent_index, note_ref_index,
+                    binding=binding,
+                    parent_binding=parent_binding,
+                    parent_sheet="母公司" in ws.title,
+                    note_plan=note_plan,
                 )
+                if binding is not None:
+                    is_parent_ws = "母公司" in ws.title and parent_binding is not None
+                    fill_formula_rows_without_inputs(
+                        ws,
+                        parent_best_by_key if is_parent_ws else best_by_key,
+                        sheet_family.get(ws.title, ""),
+                    )
+                    if template_key.endswith("_standalone") and rt in ("balance_sheet", "income_statement"):
+                        blank_consolidated_only_formulas(ws)
+                normalize_header_years(ws, year)
+                if rt == "impairment_provision":
+                    apply_impairment_closing(ws, binding, parent_binding)
                 if found_inline:
                     any_found_inline = True
 
@@ -601,20 +823,15 @@ class ReportExcelExporter:
                         parent_index,
                     )
 
-        # Remove sheets not in export list
+        # Remove sheets not in export list（_resolve_sheets 已含别名与多关键词回退）
         sheets_to_keep = set()
         for rt in types_to_export:
-            resolved = self._resolve_sheets(wb, rt, template_key)
-            if resolved:
-                for ws in resolved:
-                    sheets_to_keep.add(ws.title)
-            else:
-                # Fallback: 中文子串匹配
-                sn = REPORT_TYPE_SHEET_NAMES.get(rt, "")
-                if sn:
-                    for name in wb.sheetnames:
-                        if sn in name:
-                            sheets_to_keep.add(name)
+            for ws in self._resolve_sheets(wb, rt, template_key):
+                sheets_to_keep.add(ws.title)
+            # 模板缺该表而从零补建的 sheet（标题 = REPORT_TYPE_SHEET_NAMES）同样保留
+            sn = REPORT_TYPE_SHEET_NAMES.get(rt, "")
+            if sn and sn in wb.sheetnames:
+                sheets_to_keep.add(sn)
 
         # Don't remove sheets if we couldn't match any (safety)
         if sheets_to_keep:
@@ -629,12 +846,19 @@ class ReportExcelExporter:
     # -----------------------------------------------------------------------
 
     def _build_header_values(
-        self, company_name: str, year: int, mode: str
+        self, company_name: str, year: int, mode: str, *, period_end: Any = None,
     ) -> dict[str, str]:
-        """构建表头占位符 → 值映射."""
+        """构建表头占位符 → 值映射（``period_end_date`` 为资产负债表截止日口径）。
+
+        截止日取项目审计期末（同年度时），缺省为 ``{year}年12月31日``；
+        期间报表在 `_fill_template` 里按 sheet 改为 ``{year}年度``。
+        """
+        end_text = f"{year}年12月31日"
+        if period_end is not None and getattr(period_end, "year", None) == year:
+            end_text = f"{period_end.year}年{period_end.month}月{period_end.day}日"
         return {
             "company_full_name": company_name,
-            "period_end_date": f"{year}年12月31日",
+            "period_end_date": end_text,
             "audit_year": str(year),
             "currency_unit": "人民币元",
         }
@@ -666,26 +890,12 @@ class ReportExcelExporter:
             if isinstance(info, dict) and "section_code" in info
         }
 
-    @staticmethod
-    def _is_formula_cell(cell) -> bool:
-        """判断单元格是否为公式格（不可覆盖）."""
-        if getattr(cell, "data_type", None) == "f":
-            return True
-        val = cell.value
-        return isinstance(val, str) and val.startswith("=")
+    #: 公式格判定（实现见 ``report_excel_sheet_ops.is_formula_cell``）
+    _is_formula_cell = staticmethod(is_formula_cell)
 
     def _resolve_amount(self, row: dict | None, period: str) -> float | None:
-        """取 current/prior 金额（float 或 None）."""
-        if not row:
-            return None
-        key = "current_period_amount" if period == "current" else "prior_period_amount"
-        amount = row.get(key)
-        if amount is None:
-            return None
-        try:
-            return float(amount)
-        except (TypeError, ValueError):
-            return None
+        """取 current/prior 金额（float 或 None）；实现见 ``report_excel_sheet_ops.resolve_amount``."""
+        return resolve_amount(row, period)
 
     @staticmethod
     def _parent_prior_blank_reason(row: dict | None) -> str | None:
@@ -820,12 +1030,19 @@ class ReportExcelExporter:
         fill_empty_map: dict[str, str],
         parent_row_index: dict[str, dict] | None = None,
         note_ref_index: dict[str, str] | None = None,
+        *,
+        binding: Any = None,
+        parent_binding: Any = None,
+        parent_sheet: bool = False,
+        note_plan: Any = None,
     ) -> bool:
         """扫描 sheet 内联占位符并回填；返回是否发现 ``{{row:}}``/``{{note_ref:}}``/``{{imp:}}``/``{{eq:}}`` 占位符.
 
         - ``{{row:CODE:current/prior}}`` → 按 row_code 取值写入该格（替换占位文本）。
         - ``{{row:CODE:current/prior:parent}}`` → 取母公司个别（公司列）值写入。
-        - ``{{note_ref:CODE}}`` → 填入附注章节编号（如 "八、1"）。
+        - ``{{note_ref:CODE}}`` / ``{{note_ref:CODE:parent}}``（可多个同格，如合并模板
+          ``{{note_ref:X}};{{note_ref:X:parent}}``）→ 有编号方案时按行名找附注节、写交付件
+          显示编号（如单体国企「七、9」），无方案时按静态映射写章节编码。
         - ``{{imp:CODE:col_key}}`` → 资产减值表多列取数（从 source_accounts JSONB）。
         - ``{{eq:CODE:year_key:col_key}}`` → 权益变动表二维矩阵取数
           （year_key=current_year/prior_year，col_key=权益构成科目；从
@@ -835,6 +1052,19 @@ class ReportExcelExporter:
         parent_index = parent_row_index or {}
         note_refs = note_ref_index or {}
         found_inline = False
+        amount_formats: dict[int, str] = {}
+        general_cells: list[Any] = []
+
+        def _lookup(code: str, *, use_parent: bool, row_no: int) -> dict | None:
+            """有绑定按出现位取绑定行（未绑定 = 不取数），无绑定按编码直取（旧口径）。"""
+            if use_parent:
+                if parent_binding is not None:
+                    return parent_binding.lookup(ws.title, row_no, code)
+                return parent_index.get(code)
+            if binding is not None:
+                return binding.lookup(ws.title, row_no, code)
+            return row_index.get(code)
+
         for row in ws.iter_rows():
             for cell in row:
                 val = cell.value
@@ -857,8 +1087,11 @@ class ReportExcelExporter:
                     if period == "prior" and not include_prior_year:
                         cell.value = None
                         continue
-                    source = parent_index if is_parent else row_index
-                    source_row = source.get(code)
+                    source_row = _lookup(code, use_parent=bool(is_parent), row_no=cell.row)
+                    if cell.number_format and cell.number_format != "General":
+                        amount_formats.setdefault(cell.column, cell.number_format)
+                    else:
+                        general_cells.append(cell)
                     prior_reason = self._parent_prior_blank_reason(source_row) if is_parent and period == "prior" else None
                     if prior_reason:
                         self._mark_parent_prior_blank(cell, prior_reason)
@@ -869,14 +1102,10 @@ class ReportExcelExporter:
                     cell.value = value if should_write else None
                     continue
 
-                # --- Track 1b: note_ref placeholder ---
-                m_note = _NOTE_REF_RE.fullmatch(stripped)
-                if m_note:
+                # --- Track 1b: note_ref placeholder（整格或同格多个）---
+                if "{{note_ref:" in stripped and "{{" not in _NOTE_REF_ANY_RE.sub("", stripped):
                     found_inline = True
-                    note_code = m_note.group(1)
-                    # Fill with section_code display value (e.g. "八、1")
-                    display = note_refs.get(note_code)
-                    cell.value = display  # None if no mapping → cell cleared
+                    cell.value = self._render_note_refs(ws, cell, stripped, note_refs, note_plan)
                     continue
 
                 # --- Track 1c: imp placeholder (资产减值表多列) ---
@@ -884,7 +1113,7 @@ class ReportExcelExporter:
                 if m_imp:
                     found_inline = True
                     imp_code, col_key = m_imp.group(1), m_imp.group(2)
-                    imp_row = row_index.get(imp_code)
+                    imp_row = _lookup(imp_code, use_parent=parent_sheet, row_no=cell.row)
                     imp_value = self._resolve_imp_value(imp_row, col_key)
                     cell.value = imp_value
                     continue
@@ -901,7 +1130,7 @@ class ReportExcelExporter:
                     if year_key == "prior_year" and not include_prior_year:
                         cell.value = None
                         continue
-                    eq_row = row_index.get(eq_code)
+                    eq_row = _lookup(eq_code, use_parent=parent_sheet, row_no=cell.row)
                     cell.value = self._resolve_eq_value(eq_row, year_key, col_key)
                     continue
 
@@ -911,7 +1140,21 @@ class ReportExcelExporter:
                     if new_val != val:
                         cell.value = new_val
 
+        # 占位格为 General 的金额格（如国企 BS 的 C33/D33）套用同列 / 同表金额格式
+        if general_cells and amount_formats:
+            fallback_fmt = next(iter(amount_formats.values()))
+            for c in general_cells:
+                if isinstance(c.value, (int, float)):
+                    c.number_format = amount_formats.get(c.column, fallback_fmt)
+
         return found_inline
+
+    def _render_note_refs(self, ws, cell, text: str, note_refs: dict[str, str], note_plan: Any) -> str | None:
+        """替换格内 ``{{note_ref:…}}``（``report_excel_sheet_ops.render_note_refs``）；取不到编号的记入导出提醒。"""
+        label = row_label_left_of(ws, cell.row, cell.column)
+        value, missed = render_note_refs(text, label, note_refs, note_plan)
+        self._note_ref_misses.extend((ws.title, cell.row, code, label) for code in missed)
+        return value
 
     @staticmethod
     def _replace_header_placeholders(text: str, header_values: dict[str, str]) -> str:

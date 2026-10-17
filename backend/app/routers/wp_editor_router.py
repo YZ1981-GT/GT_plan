@@ -663,9 +663,12 @@ async def _prefill_word_template(db: AsyncSession, wp, project_id: UUID, *, user
         preparer_name = staff_row[0] if staff_row else user.username
 
     # ─── 取签字合伙人 ──────────────────────────────────────────────────────
+    # 委派角色认 signing_partner（项目委派界面取值）与历史的 partner，前者优先
     partner_row = (await db.execute(sa.text(
         "SELECT s.name FROM project_assignments pa JOIN staff_members s ON s.id=pa.staff_id "
-        "WHERE pa.project_id=:pid AND pa.role='partner' LIMIT 1"
+        "WHERE pa.project_id=:pid AND pa.role IN ('signing_partner', 'partner') "
+        "AND pa.is_deleted = false AND s.is_deleted = false "
+        "ORDER BY CASE WHEN pa.role = 'signing_partner' THEN 0 ELSE 1 END LIMIT 1"
     ), {"pid": str(project_id)})).first()
     partner_name: str | None = partner_row[0] if partner_row else None
 

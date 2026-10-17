@@ -1441,6 +1441,13 @@ backend/app/services/note_validation_engine.py  1155
 #   test_note_columns_coverage.py —— 附注列覆盖率守卫（非本次引入；触碰前已 1065 行且未登记）。
 #     2026-10-16 同 spec 只改一行注释里的章节编号（节改挂后的新编号）。拆分方向：按守卫族（列规则 / 表头事实 / guidance 真源）拆文件。
 backend/tests/test_note_columns_coverage.py  1065
+#   report_excel_exporter.py —— 财务报表 Excel 导出（非本次引入；触碰前已 1405 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-17 deliverable-trio-generation-accuracy Phase A：模板行按行名绑定接线、减值表 / 上市权益表补回、表头期间、上期列、
+#     导出提醒（+243 行；sheet 级操作已先拆到 report_excel_sheet_ops.py）。拆分方向：模板定位与 sheet 筛选 / 取数与绑定 / 写值与公式清空 / 提醒汇总。
+backend/app/services/report_excel_exporter.py  1648
+#   financial_report_drift_service.py —— 报表差异检测（非本次引入；触碰前已 906 行且未登记）。
+#     2026-10-17 同 spec：期望值与导出同源（report_template_binding.expected_for_cell，+9 行）。拆分方向：差异计算 / 快照读写 / 事件处理。
+backend/app/services/financial_report_drift_service.py  915
 #   note_offline_import_service.py —— 附注离线导入（非本次引入；触碰前已 972 行且未登记，任何改动都会被门禁拒）。
 #     2026-10-16 disclosure-note-template-word-realignment Task 17：编制指引回写盖「最近一次编辑」+ 操作人解析（+15 行）。
 #     拆分方向：文件校验 / 差异比对 / 合并决策（纯函数）与落库服务分文件。

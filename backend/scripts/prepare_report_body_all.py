@@ -189,6 +189,10 @@ def prepare_doc(doc: Document, *, write: bool) -> dict[str, int]:
             if SECTION_HEADING_RE.match(t):
                 end_idx = j
                 break
+        # 倒序处理时下一节已先打了开标记：闭标记要放在它之前，否则相邻两段开闭交错
+        # （2026-10-16 普查：上市 / 三板模板 16 份里 12 份因此错配；运行时由 report_body_postprocess 按标题重放兜底）
+        while end_idx - 1 > start_idx and (paras[end_idx - 1].text or "").strip().startswith("##OPT:"):
+            end_idx -= 1
         stats["opt_blocks"] += 1
         if write:
             end_para = paras[min(end_idx, len(paras) - 1)]

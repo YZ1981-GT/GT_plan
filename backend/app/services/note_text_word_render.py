@@ -340,12 +340,22 @@ def _add_table(document: Any, spec: _Table, run_style: RunStyle | None) -> Any:
     return table
 
 
+BlockFilter = Callable[[list[Any]], list[Any]]
+
+
+def _blocks(text: str | None, block_filter: BlockFilter | None) -> list[_Para | _Table]:
+    """解析正文；``block_filter``（交付过滤，``note_deliverable_filter.make_block_filter``）作用于解析结果。"""
+    blocks = _parse(_as_html(text or ""))
+    return block_filter(blocks) if block_filter is not None else blocks
+
+
 def append_note_text(document: Any, text: str | None, *, run_style: RunStyle | None = None,
-                     paragraph_style: ParagraphStyle | None = None) -> None:
+                     paragraph_style: ParagraphStyle | None = None,
+                     block_filter: BlockFilter | None = None) -> None:
     """文末追加正文（程序化导出 / 旧版填充 / 交付件刷新）：HTML 与纯文字同一渲染（纯文字先转 HTML）；全空白不追加。"""
     if not text or not text.strip():
         return
-    for block in _parse(_as_html(text)):
+    for block in _blocks(text, block_filter):
         if isinstance(block, _Table):
             _add_table(document, block, run_style)
             continue
@@ -355,13 +365,14 @@ def append_note_text(document: Any, text: str | None, *, run_style: RunStyle | N
             paragraph_style(paragraph)
 
 
-def fill_paragraph_with_note_text(paragraph: Paragraph, text: str, *, run_style: RunStyle | None = None) -> None:
+def fill_paragraph_with_note_text(paragraph: Paragraph, text: str, *, run_style: RunStyle | None = None,
+                                  block_filter: BlockFilter | None = None) -> None:
     """模板占位段原位填充（占位符独占一段时用）：首块写进占位段，其余块（含表格）依次插在其后，
     新段落沿用占位段的段落属性；首块是表格时占位段留作空段。"""
     paragraph.clear()
     ppr = paragraph._p.pPr
     last = paragraph._p
-    for index, block in enumerate(_parse(_as_html(text or ""))):
+    for index, block in enumerate(_blocks(text, block_filter)):
         if isinstance(block, _Table):
             element = _add_table(paragraph.part.document, block, run_style)._tbl  # 先建在文末，再移到位
         elif index == 0:
@@ -376,7 +387,8 @@ def fill_paragraph_with_note_text(paragraph: Paragraph, text: str, *, run_style:
         last = element
 
 
-def note_text_elements(text: str, *, run_style: RunStyle | None = None) -> list[Any]:
+def note_text_elements(text: str, *, run_style: RunStyle | None = None,
+                       block_filter: BlockFilter | None = None) -> list[Any]:
     """渲染成脱离文档的 ``w:p`` / ``w:tbl`` 元素（交付件刷新插入用）；不带样式引用，可移入任意文档。"""
     import docx
 
@@ -386,7 +398,7 @@ def note_text_elements(text: str, *, run_style: RunStyle | None = None) -> list[
     # 按位置取新增元素：新内容都追加在既有内容之后（sectPr 之前）。🔴 不能按 id() 比对 ——
     # lxml 的元素代理对象每次访问都可能新建，id 不稳定（首版因此丢了首段）
     before = sum(1 for el in body if el.tag in content_tags)
-    append_note_text(scratch, text, run_style=run_style)
+    append_note_text(scratch, text, run_style=run_style, block_filter=block_filter)
     elements = [el for el in body if el.tag in content_tags][before:]
     for el in elements:
         body.remove(el)

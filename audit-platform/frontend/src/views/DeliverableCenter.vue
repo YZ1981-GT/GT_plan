@@ -198,14 +198,18 @@
             <el-option label="无法表示意见" value="disclaimer" />
           </el-select>
         </el-form-item>
-        <el-form-item label="公司类型">
-          <el-select v-model="genForm.company_type" style="width: 100%">
-            <el-option label="非上市（含国企）" value="non_listed" />
-            <el-option label="上市" value="listed" />
+        <el-form-item label="报告模板类型">
+          <!-- 「自动」的值是空串：只把 null / undefined 当空值，否则 Element Plus 把空串当未选、显示「请选择」 -->
+          <el-select v-model="genForm.company_subtype" :empty-values="[null, undefined]" style="width: 100%">
+            <el-option label="自动（按项目基本信息里的业务类型）" value="" />
+            <el-option label="A 类：上市公司、三板创新层及公开发债" value="type_a" />
+            <el-option label="B 类：三板基础层、银行、保险、期货、证券" value="type_b" />
+            <el-option label="C 类：其他公众利益实体" value="type_c" />
+            <el-option label="D 类：非公众利益实体" value="type_d" />
           </el-select>
-        </el-form-item>
-        <el-form-item label="公共利益实体">
-          <el-switch v-model="genForm.is_pie" />
+          <div style="font-size: 12px; line-height: 1.6; color: var(--el-text-color-secondary)">
+            决定采用哪一类致同报告模板（是否含关键审计事项、其他信息段，签字处是否标注项目合伙人）。
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -354,8 +358,8 @@ const previewHtml = ref('')
 
 const genForm = ref({
   opinion_type: 'unqualified',
-  company_type: 'non_listed',
-  is_pie: false,
+  /** 报告模板类型（type_a..type_d）；空 = 后端按项目业务类型 / 推荐规则解析 */
+  company_subtype: '',
 })
 
 // ── 报告正文两阶段生成（preview → OPT 弹窗 → confirm，走真实 Word 模板）──
@@ -612,6 +616,8 @@ async function confirmGenerateReports() {
     } else {
       ElMessage.success(isUnadjusted ? '未审财务报表已生成并保存到交付中心' : '财务报表已生成并保存到交付中心')
     }
+    // 报表导出提醒（后端核对：不平衡 / 合计不一致 / 有金额未导出 / 无上期来源等，不阻断导出）
+    showDeliveryWarnings(res.warnings, '财务报表出具提醒（不影响本次导出）')
     const dlName = isUnadjusted
       ? `financial_reports_unadjusted_${year.value}.xlsx`
       : `financial_reports_${year.value}.xlsx`
@@ -622,6 +628,18 @@ async function confirmGenerateReports() {
   } finally {
     generating.value = false
   }
+}
+
+/** 交付件导出提醒弹窗（后端返回的中文提醒，转义后逐条列出；不阻断导出） */
+function showDeliveryWarnings(warnings: string[] | undefined, title: string) {
+  if (!warnings?.length) return
+  const esc = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  ElMessageBox.alert(
+    warnings.map(w => `• ${esc(w)}`).join('<br/>'),
+    title,
+    { confirmButtonText: '我知道了', type: 'warning', dangerouslyUseHTMLString: true },
+  ).catch(() => {})
 }
 
 function goGenerateNotes() {
@@ -675,16 +693,7 @@ async function onNotesSelectionConfirm({ selectedSections }: { selectedSections:
       ElMessage.success('附注已生成并保存到交付中心')
     }
     // 附注联动复盘 P1-3：出具前软闸门提示（后端返回，不阻断导出）
-    const warnings = (res as any)?.warnings as string[] | undefined
-    if (warnings?.length) {
-      const esc = (s: string) =>
-        s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      ElMessageBox.alert(
-        warnings.map(w => `• ${esc(w)}`).join('<br/>'),
-        '附注出具提醒（不影响本次导出）',
-        { confirmButtonText: '我知道了', type: 'warning', dangerouslyUseHTMLString: true },
-      ).catch(() => {})
-    }
+    showDeliveryWarnings(res.warnings, '附注出具提醒（不影响本次导出）')
     downloadFile(deliverableDownloadUrl(projectId.value, res.task_id, res.version_no), { fileName: `disclosure_notes_${year.value}.docx` })
     await loadList()
     notesDialogVisible.value = false
@@ -702,7 +711,7 @@ async function runGenerateReport() {
     const result = await previewReportBody(projectId.value, {
       year: year.value,
       opinion_type: genForm.value.opinion_type,
-      company_subtype: null,
+      company_subtype: genForm.value.company_subtype || null,
       template_variant: 'simple',
     })
     optPreviewSessionId.value = result.preview_session_id

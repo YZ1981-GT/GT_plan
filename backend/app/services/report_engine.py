@@ -401,6 +401,36 @@ def _apply_movement_to_eq_row(
             break
 
 
+def _find_net_profit(is_rows: list[Any]) -> float | None:
+    """按行名取利润表「净利润」（不写死行编码）。
+
+    🔴 旧实现写死 ``("IS-024", "IS-019")``：国企配置里 IS-024 是「研发费用」、IS-019 是
+    「▲保单红利支出」，上市配置 IS-019 是「营业利润」⇒ 权益变动表综合收益取错行。
+    规范化行名为「净利润」且不含「归属于 / 持续经营 / 终止经营」的行中，取首个非零值
+    （同名多行时有公式者优先）。
+    """
+    from app.services.report_template_binding import normalize_row_label
+
+    cands: list[tuple[int, float]] = []
+    for r in is_rows or []:
+        name = str(_row_field(r, "row_name") or "")
+        key, markers = normalize_row_label(name)
+        if key != "净利润" or markers:
+            continue
+        raw = _row_field(r, "current_period_amount")
+        try:
+            val = float(raw or 0)
+        except (TypeError, ValueError):
+            val = 0.0
+        if val == 0:
+            continue
+        has_formula = bool(str(_row_field(r, "formula_used") or "").strip())
+        cands.append((0 if has_formula else 1, val))
+    if cands:
+        return sorted(cands, key=lambda x: x[0])[0][1]
+    return None
+
+
 def _apply_is_net_profit_to_eq_rows(
     eq_rows: list[dict],
     is_rows: list[Any],
@@ -410,21 +440,7 @@ def _apply_is_net_profit_to_eq_rows(
     """利润表净利润 → 综合收益行未分配利润（无底稿写回时的 fallback）。"""
     sem = semantic_codes or resolve_eq_semantic_row_codes(eq_rows)
     ci_row = sem.get("comprehensive_income", _EQ_COMPREHENSIVE_INCOME_ROW)
-    net_profit: float | None = None
-    for code in ("IS-024", "IS-019"):
-        for r in is_rows:
-            if _row_field(r, "row_code") != code:
-                continue
-            raw = _row_field(r, "current_period_amount")
-            try:
-                val = float(raw or 0)
-            except (TypeError, ValueError):
-                val = 0.0
-            if val != 0:
-                net_profit = val
-            break
-        if net_profit is not None:
-            break
+    net_profit = _find_net_profit(is_rows)
     if net_profit is None or net_profit == 0:
         return
     for row in eq_rows:
@@ -544,6 +560,10 @@ class ReportFormulaParser:
         # A1/A2：可注入金额解析器。None → 默认走内部 trial_balance 取数（单体行为 100% 不变，R1）；
         # 注入 ConsolTrialResolver 时 TB()/SUM_TB() 改走 consol_trial.consol_amount（合并）。
         self.resolver = resolver
+        # 期初模式（spec deliverable-trio-generation-accuracy §1.3）：资产负债表 / 减值表的
+        # 「期初余额」= 本年试算表期初数按同一公式计算 ⇒ 期末 / 审定 / 未审列改取
+        # ``opening_balance``，``ADJ()`` 记 0（本年调整不属于上年末）。
+        self._use_opening = False
         # ADJ() 的调整额实时汇总缓存（Phase 1 Task 1.8）。
         # `None` = 尚未加载；加载后为 dict（**可能为空 dict**，表示"查过且无调整"）。
         # 🔴 必须缓存：`evaluate_formula` 是**逐行**调用的（每个 report_config 行一次），
@@ -606,8 +626,14 @@ class ReportFormulaParser:
             return Decimal("0")
 
         field = _COLUMN_MAP.get(column_name)
+        if self._use_opening and column_name in ("期末余额", "审定数", "未审数"):
+            field = "opening_balance"
         # Phase 9 未审模式：期末/审定列直接取未审数（无需列名映射）
-        unadjusted_end = self._use_unadjusted and column_name in ("期末余额", "审定数")
+        unadjusted_end = (
+            self._use_unadjusted
+            and not self._use_opening
+            and column_name in ("期末余额", "审定数")
+        )
         if not unadjusted_end and field is None:
             logger.warning("Unknown column name: %s", column_name)
             return Decimal("0")
@@ -637,6 +663,8 @@ class ReportFormulaParser:
         start_code, end_code = parts[0].strip(), parts[1].strip()
 
         field = _COLUMN_MAP.get(column_name)
+        if self._use_opening and column_name in ("期末余额", "审定数", "未审数"):
+            field = "opening_balance"
         if field is None:
             logger.warning("Unknown column name: %s", column_name)
             return Decimal("0")
@@ -654,7 +682,11 @@ class ReportFormulaParser:
 
         total = Decimal("0")
         for row in rows:
-            if self._use_unadjusted and column_name in ("期末余额", "审定数"):
+            if (
+                self._use_unadjusted
+                and not self._use_opening
+                and column_name in ("期末余额", "审定数")
+            ):
                 total += row.unadjusted_amount or Decimal("0")
             elif field == "_period_amount":
                 amount = (row.unadjusted_amount or Decimal("0")) if self._use_unadjusted else (row.audited_amount or Decimal("0"))
@@ -701,8 +733,9 @@ class ReportFormulaParser:
         """解析并执行公式，返回计算结果。"""
         # 保留 Decimal 兼容入口自身的按需预载守卫：不含 ADJ() 的公式不能
         # 触发调整额批量查询。execute_with_status() 使用同一口径供 stale 重算。
+        # 期初模式下 ADJ() 记 0（本年调整分录不属于上年末余额）。
         adj_data = None
-        if formula and "ADJ(" in formula:
+        if formula and "ADJ(" in formula and not self._use_opening:
             adj_data = await self._get_adj_data()
         return (
             await evaluate_formula_result(
@@ -1117,6 +1150,13 @@ class ReportEngine:
 
         now = datetime.now(timezone.utc)
 
+        # 上期 / 期初来源（资产负债表取本年期初数、流量表取上年项目），全部报表类型共用一份缓存
+        from app.services.report_prior_period import PriorPeriodResolver
+
+        prior_resolver = PriorPeriodResolver(
+            self.db, project_id, year, unadjusted=(mode == "unadjusted"),
+        )
+
         for report_type in type_order:
             config_rows = configs.get(report_type, [])
             if not config_rows:
@@ -1128,6 +1168,7 @@ class ReportEngine:
                 mode=mode,
                 debug=debug,
                 row_ref_cache=row_ref_cache,
+                prior_resolver=prior_resolver,
             )
             results[report_type.value] = report_rows
             coverage_stats[report_type.value] = type_coverage
@@ -1269,12 +1310,14 @@ class ReportEngine:
         mode: str = "audited",
         debug: bool = False,
         row_ref_cache: dict[str, Any] | None = None,
+        prior_resolver: Any = None,
     ) -> tuple[list[dict], dict[str, int], list[dict] | None]:
         """执行每行公式，生成报表数据并写入 financial_report 表。
 
         Args:
             mode: "audited" 或 "unadjusted"
             debug: 是否收集调试信息
+            prior_resolver: 上期 / 期初来源（``PriorPeriodResolver``）；缺省时本表单独建一个。
 
         Returns:
             (report_rows, coverage_stats, debug_rows)
@@ -1284,12 +1327,16 @@ class ReportEngine:
         Validates: Requirements 18.1, 18.2, 18.3, 18.8, 20.1, 13.6, 18.9, 20.5, 20.6
         """
         parser_current = ReportFormulaParser(self.db, project_id, year)
-        parser_prior = ReportFormulaParser(self.db, project_id, year - 1)
+        if prior_resolver is None:
+            from app.services.report_prior_period import PriorPeriodResolver
+
+            prior_resolver = PriorPeriodResolver(
+                self.db, project_id, year, unadjusted=(mode == "unadjusted"),
+            )
 
         # Task 1.4: 设置未审/审定模式
         if mode == "unadjusted":
             parser_current._use_unadjusted = True
-            parser_prior._use_unadjusted = True
 
         if row_ref_cache is None:
             row_ref_cache = {}
@@ -1350,13 +1397,16 @@ class ReportEngine:
                         "message": f"公式结果为0但TB有余额({tb_fallback_value})，已使用TB余额",
                     })
 
-            # Execute formula for prior period (year - 1)
+            # 上期 / 期初（spec deliverable-trio-generation-accuracy §1.3）：资产负债表取本年
+            # 期初数、期间报表取上年项目；无来源为 None（留空，不再写 0 冒充）
             try:
-                prior_amount = await parser_prior.execute(
-                    config.formula, {},  # prior period doesn't use row_cache cross-refs
-                )
+                prior_amount = await prior_resolver.prior_amount(report_type, config)
             except Exception:
-                prior_amount = Decimal("0")
+                logger.warning(
+                    "上期金额计算失败 %s (%s)，留空", config.row_code, config.row_name,
+                    exc_info=True,
+                )
+                prior_amount = None
 
             # Update global row_cache for ROW() references
             global_row_cache[config.row_code] = current_amount
@@ -1453,7 +1503,7 @@ class ReportEngine:
                 "row_code": config.row_code,
                 "row_name": config.row_name,
                 "current_period_amount": str(current_amount),
-                "prior_period_amount": str(prior_amount),
+                "prior_period_amount": str(prior_amount) if prior_amount is not None else None,
                 "indent_level": config.indent_level,
                 "is_total_row": config.is_total_row,
                 # Req 16.4: 每单元记来源公式 + 最近计算时间
@@ -1676,6 +1726,7 @@ class ReportEngine:
         configs: list[ReportConfig],
         global_row_cache: dict[str, Decimal],
         row_ref_cache: dict[str, Any] | None = None,
+        prior_resolver: Any = None,
     ) -> list[dict]:
         """按试算表未审数动态计算单张报表行（含上期，不落库）。
 
@@ -1684,9 +1735,11 @@ class ReportEngine:
         解析失败标注失败行（formula_error）而非产出空报表。
         """
         parser_current = ReportFormulaParser(self.db, project_id, year)
-        parser_prior = ReportFormulaParser(self.db, project_id, year - 1)
         parser_current._use_unadjusted = True
-        parser_prior._use_unadjusted = True
+        if prior_resolver is None:
+            from app.services.report_prior_period import PriorPeriodResolver
+
+            prior_resolver = PriorPeriodResolver(self.db, project_id, year, unadjusted=True)
 
         if row_ref_cache is None:
             row_ref_cache = {}
@@ -1707,14 +1760,16 @@ class ReportEngine:
                     "Unadjusted formula execution failed for %s (%s): %s",
                     cfg.row_code, cfg.row_name, e,
                 )
+            # 上期 / 期初：与审定路径同一解析器（资产负债表 = 本年期初数按全公式，
+            # 期间报表 = 上年项目），替代旧「year-1 重算 + 首个 TB 期初兜底」
             try:
-                prior_amount = await parser_prior.execute(cfg.formula, {})
+                prior_amount = await prior_resolver.prior_amount(report_type, cfg)
             except Exception:
-                prior_amount = Decimal("0")
-            if prior_amount == Decimal("0"):
-                prior_amount = await self._prior_tb_opening_fallback(
-                    parser_current, cfg.formula,
+                logger.warning(
+                    "未审上期金额计算失败 %s (%s)，留空", cfg.row_code, cfg.row_name,
+                    exc_info=True,
                 )
+                prior_amount = None
 
             row_values[cfg.row_code] = current_amount
             global_row_cache[cfg.row_code] = current_amount
@@ -1728,7 +1783,7 @@ class ReportEngine:
                 "row_code": cfg.row_code,
                 "row_name": cfg.row_name,
                 "current_period_amount": str(current_amount),
-                "prior_period_amount": str(prior_amount),
+                "prior_period_amount": str(prior_amount) if prior_amount is not None else None,
                 "indent_level": cfg.indent_level,
                 "is_total_row": cfg.is_total_row,
                 # Req 16.4: 来源公式 + 最近计算时间
@@ -1780,6 +1835,10 @@ class ReportEngine:
         bs_rows: list[dict] = []
         bs_rows_prior: list[dict] = []
 
+        from app.services.report_prior_period import PriorPeriodResolver
+
+        prior_resolver = PriorPeriodResolver(self.db, project_id, year, unadjusted=True)
+
         for report_type in self._UNADJUSTED_TYPE_ORDER:
             rt_key = report_type.value
             if report_type not in requested_enums:
@@ -1790,6 +1849,7 @@ class ReportEngine:
                 continue
             rows = await self._compute_unadjusted_report_rows(
                 project_id, year, report_type, configs, global_row_cache,
+                prior_resolver=prior_resolver,
             )
             if report_type == FinancialReportType.balance_sheet:
                 bs_rows = rows
@@ -1805,6 +1865,7 @@ class ReportEngine:
                         bs_rows = await self._compute_unadjusted_report_rows(
                             project_id, year, FinancialReportType.balance_sheet,
                             bs_configs, global_row_cache,
+                            prior_resolver=prior_resolver,
                         )
                         prior_cache = {}
                         bs_rows_prior = await self._compute_unadjusted_report_rows(
@@ -1825,6 +1886,7 @@ class ReportEngine:
                             project_id, year,
                             FinancialReportType.income_statement,
                             is_configs, is_cache,
+                            prior_resolver=prior_resolver,
                         )
                 _attach_is_derived_movement(rows, is_rows or [])
             data[rt_key] = rows

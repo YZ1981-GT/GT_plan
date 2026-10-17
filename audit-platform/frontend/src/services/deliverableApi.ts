@@ -240,6 +240,8 @@ export interface DeliverableExportResponse {
   download_url: string
   platform_persist_failed: boolean
   file_name: string | null
+  /** 导出提醒（不阻断导出）：报表不平衡 / 合计不一致 / 附注残留占位等，中文 */
+  warnings?: string[]
 }
 
 export interface CompletenessResult {

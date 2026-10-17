@@ -3,7 +3,10 @@ import {
   buildGroupedTree,
   computePresetKeys,
   deriveSelectedSections,
+  isChapterRow,
+  leafLabel,
   topLevelKey,
+  CHAPTER_ROW_LABEL,
   GROUP_KEY_PREFIX,
   type NotesTreeNode,
 } from '../disclosureNotesSelection'
@@ -43,6 +46,37 @@ describe('buildGroupedTree', () => {
   it('section_title 为空时 label 仅 note_section', () => {
     const g = buildGroupedTree([{ id: 'x', note_section: '五、9', section_title: null }])
     expect(g[0].children[0].label).toBe('五、9')
+  })
+
+  it('真实项目形态：分组带章名、章级附注称「本章整体说明」、按名称编码的政策章节不重复标题', () => {
+    // 重药安徽 2025 实测（Playwright）：分组只显示「一、」，叶子出现「四、会计期间 会计期间」
+    const g = buildGroupedTree([
+      { id: 'c1', note_section: '一', section_title: '公司（企业）基本情况', has_data: true },
+      { id: 'c11', note_section: '一、1', section_title: '公司（企业）基本情况', has_data: true },
+      { id: 'c4', note_section: '四', section_title: '重要会计政策、会计估计', has_data: true },
+      { id: 'p1', note_section: '四、会计期间', section_title: '会计期间', has_data: true },
+      { id: 'p2', note_section: '四、优先股、永续债等其他金融工具', section_title: '优先股、永续债等其他金融工具' },
+      { id: 'n1', note_section: '八、1', section_title: '货币资金', has_data: true },
+    ])
+    expect(g.map((x) => x.label)).toEqual(['一、公司（企业）基本情况', '四、重要会计政策、会计估计', '八、'])
+    expect(g[0].children.map((c) => c.label)).toEqual([`一 ${CHAPTER_ROW_LABEL}`, '一、1 公司（企业）基本情况'])
+    expect(g[1].children.map((c) => c.label)).toEqual([
+      `四 ${CHAPTER_ROW_LABEL}`, '四、会计期间', '四、优先股、永续债等其他金融工具',
+    ])
+    // 章级附注仍是可勾选叶子（key 不变，导出口径不变）
+    expect(g[0].children[0].key).toBe('一')
+    expect(g[2].children[0].label).toBe('八、1 货币资金')
+  })
+})
+
+describe('leafLabel / isChapterRow', () => {
+  it('只有中文章号算章级附注；其他无「、」的编号照常显示', () => {
+    expect(isChapterRow('十一')).toBe(true)
+    expect(isChapterRow('八、1')).toBe(false)
+    expect(isChapterRow('附注')).toBe(false)
+    expect(leafLabel({ note_section: '附注', section_title: '其他' })).toBe('附注 其他')
+    expect(leafLabel({ note_section: '十一', section_title: '关联方关系及其交易' })).toBe(`十一 ${CHAPTER_ROW_LABEL}`)
+    expect(leafLabel({ note_section: ' 四、存货 ', section_title: ' 存货 ' })).toBe('四、存货')
   })
 })
 

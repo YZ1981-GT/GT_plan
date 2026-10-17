@@ -769,6 +769,12 @@ class FullDeliverablesExecutor:
     def _opinion_value(report: AuditReport | None) -> str:
         if report is None:
             return OpinionType.unqualified.value
+        # 上次生成所选意见（含「带强调事项段的无保留意见」，opinion_type 枚举只有四族）—— 一键全套沿用同一选择
+        body = report.report_body_json if isinstance(report.report_body_json, dict) else {}
+        if body.get("opinion_choice") == "unqualified_with_emphasis" and report.opinion_type in (
+            OpinionType.unqualified, "unqualified",
+        ):
+            return "unqualified_with_emphasis"
         return (
             report.opinion_type.value
             if isinstance(report.opinion_type, OpinionType)
