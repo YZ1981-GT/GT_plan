@@ -174,6 +174,12 @@ inclusion: always
 - 提交须知：`report_excel_exporter.py`（1648 行）/ `financial_report_drift_service.py`（915）HEAD 就超 800 且不在白名单，提交时登记；新模块全部未跟踪，须同一次提交
 - 🔴 教训：①lxml 代理对象的 `id()` 会被复用 —— 按 id 记元素必须同时持有代理引用 ②「函数体引用了未定义名字」用源码文本判必假绿（`deliverable_doc_key` NameError 即此漏网），守卫改 `symtable` ③模板加工脚本倒序插入致 OPT 开闭标记交错（16 份里 12 份），运行时按章节标题重放、不改二进制模板 ④Playwright 浏览器与并发会话共用：对方改自动保存页源码前会停到 about:blank，用完停回去 ⑤并发会话批量改文件时后端连续热重载，请求会挂住 —— 判「卡死」前先看 worker 进程创建时间
 
+### 附注模板按四版 Word 对齐 `disclosure-note-template-word-realignment`（2026-10-16~17，25/28，推送至 d1e5caa1e）
+- 承接上一条的待拍板：种子按四版 Word 改挂章节（旧编号进 `legacy_section_numbers`，`normalize_section_code` 两准则都查别名）、生成链不调大模型、其他模块以用户身份改附注盖「最近一次编辑」（AST 守卫覆盖全部写入方）、6 个存量项目按现行种子对齐（`realign_project_notes.py`，备份存 PG `row_to_json` 原文）、和平整年度重建（`--rebuild`：214 → 166 节，校验 319/319）
+- 公式推送三处写错位置已修：旧格式兜底写 `_tables` + 按表头认列（原写顶层镜像、编辑器看不见，真库 101 张）/ 撞行都不写 / 找行包含匹配只认同一项目的另一种写法（原命中「减：长期股权投资减值准备」「其他」）；安徽真库守卫重定基线 `_MAX_SKIPPED` 85 / `_MIN_COVERAGE` 295；安徽 / 宜宾未推送（下次各写 70 / 44 格）
+- 待拍板：表格以 Word 还是底稿 xlsx 为准（Task 6 / 12）；和平抽查 4 科目不符 —— 生成链把备抵科目当正数相加（固定资产 74,268,010.13 = 1601 + 1602）、推送规则标题校验跳过应收账款 / 营业收入（13 处）、三列组不猜列（存货）；「本期无此情形」横幅不看合计行；兜底写「小计」后合计不重算；生成给无绑定的格标 manual 占位、挡住推送；校验预设 md 不在仓库
+- 🔴 教训：①写进读取方不读的位置 = 没写：判「写入成功」用读取方的口径核对（编辑器 / Word / 校验都读 `_tables`）②模糊找行唯一命中也会错；收窄规则后必须重跑真库 dry-run 逐地址对比 —— 只排除调整行时，资本公积原本靠「两行同时命中、碰巧放弃」，会变成唯一命中写进「其他资本公积」③改 tasks.md 大块替换会误删相邻任务（Task 21 在 Phase 5 提交时丢了，已补回）⇒ 改完用 gt-plan `spec_status` 核任务总数
+
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
 
@@ -212,7 +218,7 @@ inclusion: always
 - **改动后必 Playwright 实测**（运行时 bug 单测/getDiagnostics 抓不到，如包装体解包/CSS 样式孤儿）；改动前后 6 维 git 核查
 - **hypothesis PBT 调速**：max_examples 5（用户 2026-06 明确要求降速，禁默认 100）
 - **守卫的故障注入不得替换被测生产函数本身**：换成测试里的拷贝 ⇒ 守卫验证的是拷贝（知识库上传真库守卫删掉生产 `begin_nested` 仍全绿，变异才抓到）⇒ 故障注在被测函数的**下一层**，并断言「现行路径 is 生产函数」
-- **前端三坑**：①vitest `beforeEach(() => spy.mockReset())` 表达式体把 spy 当返回值交给 vitest，被当作 teardown 每例后再调一次 ⇒ 一律写花括号 ②在渲染上下文外调用 `h()`（`ElNotification` / `ElMessageBox` 的 message）生成的 VNode 不带本组件 scopeId、又挂在 body 下 ⇒ `<style scoped>` 永远匹配不到，必须内联样式 ③同页两个组件几乎同时发同一个 GET（同 URL + params）时，`http` 的 GET 去重会**取消先发的那一个**，被取消方的 catch 会当成失败（2026-10-14 实测：新加的合并锁定查询让锁定横幅不再显示）⇒ 新增与既有组件同端点的 GET 须 `_dedupe: false` 或共享状态
+- **前端三坑**：①vitest `beforeEach(() => spy.mockReset())` 表达式体把 spy 当返回值交给 vitest，被当作 teardown 每例后再调一次 ⇒ 一律写花括号 ②在渲染上下文外调用 `h()`（`ElNotification` / `ElMessageBox` 的 message）生成的 VNode 不带本组件 scopeId、又挂在 body 下 ⇒ `<style scoped>` 永远匹配不到，必须内联样式 ③同页两个组件几乎同时发同一个 GET（同 URL + params）时，`http` 的 GET 去重会**取消先发的那一个**，被取消方的 catch 会当成失败（2026-10-14 实测：新加的合并锁定查询让锁定横幅不再显示）⇒ 新增与既有组件同端点的 GET 须 `_dedupe: false` 或共享状态；同一组件的 hover 预取也算（附注目录点击后不掐预取，后端慢时晚到的预取取消点击请求 ⇒ 中间栏空白，2026-10-17 已修为 `noteDetailPrefetch` + 点击先 `cancel()`）
 - 详细规约（UI 视觉 17 条 / ESLint AST / 测试 fixture / 启动 lifecycle / CI 卡点 / EventBus / 中间件 等）→ `#conventions` + `#dev-history`
 
 ## 关键引用指南

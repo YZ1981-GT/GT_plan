@@ -85,6 +85,10 @@
 - [x] 20. 全仓核实附注域大模型调用点，分「自动 / 手动」写入本文件。
   - 自动（已全部切断）：生成附注（`disclosure_engine`，Task 21 删）；校验 `LLM_REVIEW`（`note_validation_executors._execute_llm_review_async`，经 `NoteValidationEngine` 默认 `allow_llm=False` 跳过；调用方：生成后 `report_note_sync_service`、就绪度 `note_readiness_service`、审计检查 `audit_check.aggregator`、「校验」按钮 `POST …/validate`）；公式引擎 `note_formula_engine.LLMReview.validate_async`（零调用方，删）。
   - 手动（保留，均为按钮触发，逐个核过前端无 `onMounted` / `watch` 自动调用）：`note_ai.py` 续写 `ai/complete`、改写 `ai/rewrite`、生成政策 `ai/generate-policy`、变动分析 `ai/generate-analysis`、完整性检查 `ai/check-completeness`（前端无调用方）；`ai/check-expression` 是空壳不调大模型；`disclosure_notes.py` 的「AI 填充 / 参照文档填充」`…/ai-fill`、「批量预填充」`…/batch-ai-fill`（`NoteKnowledgeEnricher`）；AI 智能建议面板「分析当前章节」按钮；AI 对话。`NoteAiFillDialog` 打开时只重置结果，生成在按钮里。
+- [x] 21. 生成附注删除 RAG 回退与通用大模型两级；无调用方的函数删除。
+  - ✅ `disclosure_engine` 删 P1b 知识库回退、P2 通用大模型级与 `_generate_text_with_llm` / `_get_enricher` / `_stash_citations` / `_last_citations` / `_enricher` / `_is_llm_error` 及 `chat_completion` / `NoteKnowledgeEnricher` 导入；生成正文 = 上年附注 → 模板正文。配置开关 `DISCLOSURE_NOTE_RAG_ENABLED` 只控制生成链那一级、已无消费方 ⇒ 删除（`TOP_K` / `CHAR_BUDGET` 仍供手动 AI 填充）。`seed_note_text_batch_uat.py` 不再打桩。
+  - 原三级链的 characterization / RAG 集成测试（`test_disclosure_note_rag_characterization` / `_integration`）锁的是被拍板删除的行为，删除；仍成立的契约迁到 `test_disclosure_note_generation_text_order.py`（上年优先 / 不足 20 字落模板 / 两级皆空留空 / 单章构表失败隔离）。
+  - 勘误（2026-10-17）：本条连同上面两行说明在 88df422c8 更新 Phase 5 时被误删，按 88b5d2cca 原文补回；代码与测试一直在库。
 - [x] 22. 校验 `LLM_REVIEW` 与公式引擎 `LLMReview` 自动路径跳过并给出「需手动 AI 检查」。
   - ✅ `NoteValidationEngine(db, *, allow_llm=False)`：`LLM_REVIEW` 默认返回 `skipped / manual_only`（原因「大模型审核只在用户手动发起时执行」），不调大模型、不计问题；`allow_llm=True` 才执行（用例覆盖两条路径，变异打红）。
   - ✅ 公式引擎：删 `LLMReview.validate_async`（零调用方、会调 `chat_completion`），`validate_note` 兜底层是同步占位；AST 守卫 `test_note_formula_engine_has_no_llm_reference`（先红后绿）。
@@ -116,7 +120,8 @@
 
 ## Phase 7 收口
 
-- [ ] 28. INDEX / memory 同步；提交推送；汇报。
+- [x] 28. INDEX / memory 同步；提交推送；汇报。
+  - ✅ INDEX 本 spec 一行补状态；memory 补本 spec 小节，前端 GET 去重一条补 hover 预取；Task 21 的勾选行与说明在 88df422c8 被误删，已按原文补回。实施提交 d1e5caa1e 已推送；一次性探针 `_wr_*` 424 个、本 spec 的 Playwright 记录 69 个已删，两个基线 worktree 已移除；真库备份留在 `backend/backups/`（不入库）。
 
 ## 比对基线
 
