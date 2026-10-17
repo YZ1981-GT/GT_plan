@@ -242,7 +242,8 @@ class TestApplyBaseline:
         with patch.object(svc, "_get_baseline", return_value=baseline):
             with patch.object(svc, "check_template_type", return_value={"match": True, "warning": None}):
                 with patch.object(svc, "_resolve_lineage_chain", return_value=[]):
-                    with patch.object(svc, "_get_child_notes", return_value=[]):
+                    with patch.object(svc, "_get_child_notes", return_value=[]), \
+                            patch.object(svc, "_occupied_codes", return_value=set()):
                         result = await svc.apply_baseline(child_pid, 2025, bid)
 
         assert result["success"] is True
@@ -280,7 +281,8 @@ class TestApplyBaseline:
         with patch.object(svc, "_get_baseline", return_value=baseline):
             with patch.object(svc, "check_template_type", return_value={"match": True, "warning": None}):
                 with patch.object(svc, "_resolve_lineage_chain", return_value=[]):
-                    with patch.object(svc, "_get_child_notes", return_value=[existing_note]):
+                    with patch.object(svc, "_get_child_notes", return_value=[existing_note]), \
+                            patch.object(svc, "_occupied_codes", return_value={"cash"}):
                         result = await svc.apply_baseline(child_pid, 2025, bid)
 
         assert result["success"] is True
@@ -362,15 +364,18 @@ class TestSyncBaseline:
         svc = GroupNoteBaselineService(db)
         bid = uuid.uuid4()
         children = [uuid.uuid4(), uuid.uuid4()]
+        actor, seen = uuid.uuid4(), []
 
-        async def mock_apply(pid, year, baseline_id):
+        async def mock_apply(pid, year, baseline_id, *, user_id=None):
+            seen.append(user_id)
             return {"success": True, "applied_count": 1}
 
         with patch.object(svc, "apply_baseline", side_effect=mock_apply):
-            result = await svc.sync_baseline(bid, children, year=2025)
+            result = await svc.sync_baseline(bid, children, year=2025, user_id=actor)
 
         assert result["total"] == 2
         assert result["success_count"] == 2
+        assert seen == [actor, actor], "操作人要透传到每个子项目（盖「最近一次编辑」）"
 
     @pytest.mark.asyncio
     async def test_sync_partial_failure(self):
@@ -381,7 +386,7 @@ class TestSyncBaseline:
 
         call_count = [0]
 
-        async def mock_apply(pid, year, baseline_id):
+        async def mock_apply(pid, year, baseline_id, *, user_id=None):
             call_count[0] += 1
             if call_count[0] == 1:
                 return {"success": True, "applied_count": 1}

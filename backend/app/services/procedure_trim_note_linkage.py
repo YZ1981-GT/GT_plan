@@ -83,6 +83,8 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.note_edit_stamp import stamp_note_edit
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -465,6 +467,8 @@ async def apply_note_linkage(
 ) -> dict:
     """应用联动：只写 ``is_empty`` + provenance 面包屑（service 只 flush）。
 
+    - 标注 / 撤销的章节以 ``actor_user_id`` 盖「最近一次编辑」（``note_edit_stamp``；用户裁剪程序带动的改动，
+      spec disclosure-note-template-word-realignment Task 17）
     - **不删除**章节、不动 ``table_data`` / ``text_content``（R13.2 可恢复性）
     - 有内容的章节只进 ``conflicts``，两个方向都不自动动（R13.4）
     - 定位不到的章节进 ``unlocatable``，不抛（R13.6）
@@ -502,6 +506,7 @@ async def apply_note_linkage(
                 at=now,
             )
             flag_modified(note, "template_lineage")
+            stamp_note_edit(note, actor_user_id)  # 用户裁剪程序带动的附注改动：盖「最近一次编辑」
             marked += 1
         except Exception as exc:  # noqa: BLE001 — 单章节失败不阻断其余
             logger.warning("procedure_trim_note_linkage: mark %s failed: %s", section, exc)
@@ -518,6 +523,7 @@ async def apply_note_linkage(
             note.is_empty = False
             note.template_lineage = _lineage_without_mark(note.template_lineage)
             flag_modified(note, "template_lineage")
+            stamp_note_edit(note, actor_user_id)
             revoked += 1
         except Exception as exc:  # noqa: BLE001
             logger.warning("procedure_trim_note_linkage: revoke %s failed: %s", section, exc)

@@ -894,9 +894,13 @@ class NoteOfflineImportService:
             merge_cells=merge_cells,
         )
 
-        # Persist guidance_text from _meta_ (不污染 text_content)
+        # Persist guidance_text from _meta_ (不污染 text_content)；路由传的是 str(user.id)
+        try:
+            actor = UUID(str(user_id)) if user_id else None
+        except ValueError:  # 非 UUID 的调用方（脚本）只记时间、不记编辑人，不因此整次导入失败
+            actor = None
         await self._persist_guidance_from_meta(
-            project_id, year, decisions, validation.meta_data,
+            project_id, year, decisions, validation.meta_data, user_id=actor,
         )
 
         # C.0.16: Audit log
@@ -911,10 +915,17 @@ class NoteOfflineImportService:
         year: int,
         decisions: dict[str, ConflictResolution],
         meta_data: dict[str, Any],
+        *,
+        user_id: UUID | None = None,
     ) -> None:
-        """从 _meta_ 回写 guidance_text；旧包无键则保留 DB 现值。"""
+        """从 _meta_ 回写 guidance_text；旧包无键则保留 DB 现值。
+
+        真改了的行以导入人盖「最近一次编辑」（值没变的行不算编辑，不盖）。
+        """
         if self.db is None or not meta_data:
             return
+
+        from datetime import datetime, timezone
 
         from sqlalchemy import or_, update as sa_update
 
@@ -927,6 +938,9 @@ class NoteOfflineImportService:
             if "guidance_text" not in section_meta:
                 continue
             guidance_val = section_meta.get("guidance_text") or None
+            values: dict[str, Any] = {"guidance_text": guidance_val, "updated_at": datetime.now(timezone.utc)}
+            if user_id is not None:
+                values["updated_by"] = user_id
             stmt = (
                 sa_update(DisclosureNote)
                 .where(
@@ -937,8 +951,9 @@ class NoteOfflineImportService:
                         DisclosureNote.note_section == sid,
                         DisclosureNote.section_id == sid,
                     ),
+                    DisclosureNote.guidance_text.is_distinct_from(guidance_val),
                 )
-                .values(guidance_text=guidance_val)
+                .values(**values)
             )
             await self.db.execute(stmt)
         await self.db.flush()

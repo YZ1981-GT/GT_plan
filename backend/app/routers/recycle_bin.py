@@ -55,7 +55,8 @@ def _get_recyclable_tables() -> dict:
             "account_mapping": (AccountMapping, "科目映射", "original_account_code"),
             "trial_balance": (TrialBalance, "试算表", "standard_account_code"),
             "financial_report": (FinancialReport, "报表", "row_name"),
-            "disclosure_note": (DisclosureNote, "附注", "section_code"),
+            # 名称列：章节号（原写 ``section_code``，附注表没有这一列 ⇒ 列表里附注只显示 id 前 8 位）
+            "disclosure_note": (DisclosureNote, "附注", "note_section"),
             "audit_report": (AuditReport, "审计报告", "title"),
             "wp_template": (WpTemplate, "底稿模板", "template_name"),
             "review_record": (ReviewRecord, "复核记录", "id"),
@@ -219,6 +220,12 @@ async def restore_item(
     row.is_deleted = False
     if hasattr(row, "deleted_at"):
         row.deleted_at = None
+    if item_type == "disclosure_note":
+        # 恢复附注章节 = 用户编辑附注：与编辑器「恢复章节」同样盖「最近一次编辑」
+        # （spec disclosure-note-template-word-realignment Task 17）
+        from app.services.note_edit_stamp import stamp_note_edit
+
+        stamp_note_edit(row, user.id)
     if item_type == "project":
         # consol-tree-three-code-autobuild 需求 7.2：恢复项目后按三码重算本年度派生链接
         from app.services.group_links import sync_group_links_for

@@ -1441,3 +1441,7 @@ backend/app/services/note_validation_engine.py  1155
 #   test_note_columns_coverage.py —— 附注列覆盖率守卫（非本次引入；触碰前已 1065 行且未登记）。
 #     2026-10-16 同 spec 只改一行注释里的章节编号（节改挂后的新编号）。拆分方向：按守卫族（列规则 / 表头事实 / guidance 真源）拆文件。
 backend/tests/test_note_columns_coverage.py  1065
+#   note_offline_import_service.py —— 附注离线导入（非本次引入；触碰前已 972 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-16 disclosure-note-template-word-realignment Task 17：编制指引回写盖「最近一次编辑」+ 操作人解析（+15 行）。
+#     拆分方向：文件校验 / 差异比对 / 合并决策（纯函数）与落库服务分文件。
+backend/app/services/note_offline_import_service.py  987

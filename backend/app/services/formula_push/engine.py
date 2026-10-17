@@ -763,7 +763,10 @@ async def _push_note(
     note.last_sync_user_id = ctx.triggered_by
     note.is_stale = False  # 推送成功 → 清除 stale（与 sync-from-workpaper 同语义）
     note.stale_source = None
-    note.updated_by = ctx.triggered_by
+    # 「最近一次编辑」：用户点推送记操作人；事件触发的推送没有操作人，不动编辑人（原来直接赋 None，
+    # 把上一位编辑人清空；spec disclosure-note-template-word-realignment Task 18）
+    if ctx.triggered_by is not None:
+        note.updated_by = ctx.triggered_by
     note.updated_at = ctx.now
     await ctx.db.flush()
     ctx.result.note_sections.append(section)

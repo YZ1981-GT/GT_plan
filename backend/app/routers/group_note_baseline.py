@@ -119,9 +119,9 @@ async def apply_group_baseline(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Apply a group baseline to a child project."""
+    """Apply a group baseline to a child project（以当前用户盖「最近一次编辑」）."""
     svc = GroupNoteBaselineService(db)
-    result = await svc.apply_baseline(project_id, body.year, body.baseline_id)
+    result = await svc.apply_baseline(project_id, body.year, body.baseline_id, user_id=current_user.id)
     if result.get("success"):
         await db.commit()
     return result

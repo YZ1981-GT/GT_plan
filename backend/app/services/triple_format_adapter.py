@@ -202,10 +202,11 @@ class DisclosureNoteAdapter:
     @staticmethod
     async def update_note_from_structure(
         db: AsyncSession, project_id: UUID, year: int, note_section: str,
-        structure: dict,
+        structure: dict, *, user_id: UUID | None = None,
     ) -> None:
         """从 structure.json 更新附注表格数据（支持新增浮动行）"""
         from app.models.report_models import DisclosureNote
+        from app.services.note_edit_stamp import stamp_note_edit
         from sqlalchemy.orm.attributes import flag_modified
 
         result = await db.execute(
@@ -213,6 +214,7 @@ class DisclosureNoteAdapter:
                 DisclosureNote.project_id == project_id,
                 DisclosureNote.year == year,
                 DisclosureNote.note_section == note_section,
+                DisclosureNote.is_deleted == sa.false(),
             )
         )
         note = result.scalar_one_or_none()
@@ -266,6 +268,7 @@ class DisclosureNoteAdapter:
         td["rows"] = new_rows
         note.table_data = td
         flag_modified(note, "table_data")
+        stamp_note_edit(note, user_id)  # 在线表格编辑保存 = 用户编辑（spec disclosure-note-template-word-realignment Task 17）
         await db.flush()
 
 

@@ -82,7 +82,8 @@ class TestCI7LineageAfterApply:
         with patch.object(svc, "_get_baseline", return_value=baseline):
             with patch.object(svc, "check_template_type", return_value={"match": True, "warning": None}):
                 with patch.object(svc, "_resolve_lineage_chain", return_value=[]):
-                    with patch.object(svc, "_get_child_notes", return_value=[existing_note]):
+                    with patch.object(svc, "_get_child_notes", return_value=[existing_note]), \
+                            patch.object(svc, "_occupied_codes", return_value={"cash"}):
                         result = await svc.apply_baseline(child_pid, 2025, bid)
 
         assert result["success"] is True
@@ -129,7 +130,8 @@ class TestCI7LineageAfterApply:
         with patch.object(svc, "_get_baseline", return_value=baseline):
             with patch.object(svc, "check_template_type", return_value={"match": True, "warning": None}):
                 with patch.object(svc, "_resolve_lineage_chain", return_value=[]):
-                    with patch.object(svc, "_get_child_notes", return_value=[existing_note]):
+                    with patch.object(svc, "_get_child_notes", return_value=[existing_note]), \
+                            patch.object(svc, "_occupied_codes", return_value={"cash"}):
                         result = await svc.apply_baseline(child_pid, 2025, bid_new)
 
         assert result["success"] is True
@@ -160,7 +162,8 @@ class TestCI7LineageAfterApply:
         with patch.object(svc, "_get_baseline", return_value=baseline):
             with patch.object(svc, "check_template_type", return_value={"match": True, "warning": None}):
                 with patch.object(svc, "_resolve_lineage_chain", return_value=[]):
-                    with patch.object(svc, "_get_child_notes", return_value=[]):
+                    with patch.object(svc, "_get_child_notes", return_value=[]), \
+                            patch.object(svc, "_occupied_codes", return_value=set()):
                         result = await svc.apply_baseline(child_pid, 2025, bid)
 
         assert result["success"] is True
@@ -213,7 +216,8 @@ class TestCI7LineageAfterApply:
         with patch.object(svc, "_get_baseline", return_value=baseline):
             with patch.object(svc, "check_template_type", return_value={"match": True, "warning": None}):
                 with patch.object(svc, "_resolve_lineage_chain", return_value=[]):
-                    with patch.object(svc, "_get_child_notes", return_value=[existing_note]):
+                    with patch.object(svc, "_get_child_notes", return_value=[existing_note]), \
+                            patch.object(svc, "_occupied_codes", return_value={"cash"}):
                         await svc.apply_baseline(child_pid, 2025, bid)
 
         lineage = existing_note.template_lineage

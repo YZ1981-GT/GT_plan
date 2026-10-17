@@ -217,7 +217,7 @@ async def save_edits(
             note_section = structure["metadata"].get("note_section", "")
             year = structure["metadata"].get("year", 2025)
             await DisclosureNoteAdapter.update_note_from_structure(
-                db, project_id, year, note_section, structure
+                db, project_id, year, note_section, structure, user_id=current_user.id,
             )
             await db.commit()
         except Exception as _e:

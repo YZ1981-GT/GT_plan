@@ -5,15 +5,19 @@ Phase 9 Task 9.21: 附注从底稿提数 + 手动编辑锁定
 
 from __future__ import annotations
 
+import copy
 import logging
 from collections.abc import Iterator
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.report_models import DisclosureNote
+from app.services.note_edit_stamp import stamp_note_edit
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +116,41 @@ def _iter_formula_rows(table_data: dict[str, Any]) -> Iterator[dict[str, Any]]:
     rows = table_data.get("rows")
     if isinstance(rows, list):
         yield from (row for row in rows if isinstance(row, dict))
+
+
+def _row_values(row: dict[str, Any]) -> list:
+    """行的数据列（不含标签列）：现行存 ``values``，早期行存 ``cells``。"""
+    for key in ("values", "cells"):
+        if isinstance(row.get(key), list):
+            return row[key]
+    return []
+
+
+def _set_cell_mode(row: dict[str, Any], col_index: int, mode: str, value: float | None) -> bool:
+    """改一个单元格的模式（``_cell_modes`` 按列索引建键，缺键 = 自动）与人工值；有改动返回 True。"""
+    modes = row.get("_cell_modes") if isinstance(row.get("_cell_modes"), dict) else {}
+    key = str(col_index)
+    changed = False
+    if modes.get(key, "auto") != mode:
+        row["_cell_modes"] = {**modes, key: mode}
+        changed = True
+    values = _row_values(row)
+    if value is not None and col_index < len(values) and values[col_index] != value:
+        values[col_index] = value
+        changed = True
+    return changed
+
+
+def _top_level_mirror(table_data: dict[str, Any], row: dict[str, Any]) -> dict[str, Any] | None:
+    """``row`` 在 ``_tables[0]`` 里时返回顶层 ``rows`` 同位置的镜像行（标签一致才算；同一对象不算）。"""
+    tables, top = table_data.get("_tables"), table_data.get("rows")
+    if not (isinstance(tables, list) and tables and isinstance(tables[0], dict) and isinstance(top, list)):
+        return None
+    first = tables[0].get("rows")
+    idx = next((i for i, r in enumerate(first) if r is row), None) if isinstance(first, list) else None
+    if idx is None or idx >= len(top) or not isinstance(top[idx], dict) or top[idx] is row:
+        return None
+    return top[idx] if top[idx].get("label") == row.get("label") else None
 
 
 class NoteWpMappingService:
@@ -223,33 +262,46 @@ class NoteWpMappingService:
         }
 
     async def toggle_cell_mode(
-        self, note_id: UUID, row_label: str, col_index: int, mode: str, manual_value: float | None = None
+        self, project_id: UUID, year: int, note_id: UUID, row_label: str, col_index: int, mode: str,
+        manual_value: Decimal | float | None = None, *, user_id: UUID | None = None,
     ) -> dict:
-        """切换单元格自动/手动模式"""
+        """切换单元格自动 / 手动模式：写行级 ``_cell_modes`` 边车（与清除公式 / 恢复自动同口径），人工值写回
+        ``values``；真改了才以操作人盖「最近一次编辑」。
+
+        原实现（spec disclosure-note-template-word-realignment Task 17 修）：①只按 id 取行 ⇒ 能改别的项目的附注；
+        ②原地改 JSONB 再赋回同一对象，SQLAlchemy 判不出改动、从不落库；③把单元格换成
+        ``{"value", "mode", "manual_value"}`` 字典写进 ``values``，没有读取方认这个形态（模式边车按列索引建键），
+        一旦落库表格会显示成对象。
+        """
         note = (await self.db.execute(
-            sa.select(DisclosureNote).where(DisclosureNote.id == note_id)
+            sa.select(DisclosureNote).where(
+                DisclosureNote.id == note_id,
+                DisclosureNote.project_id == project_id,
+                DisclosureNote.year == year,
+                DisclosureNote.is_deleted == sa.false(),
+            )
         )).scalar_one_or_none()
         if not note:
             return {"error": "附注不存在"}
 
-        # 更新 table_data 中指定单元格的 mode
-        td = note.table_data or {}
-        rows = td.get("rows", [])
-        for row in rows:
-            if row.get("label") == row_label:
-                cells = row.get("cells", row.get("values", []))
-                if col_index < len(cells):
-                    if isinstance(cells[col_index], dict):
-                        cells[col_index]["mode"] = mode
-                        if manual_value is not None:
-                            cells[col_index]["manual_value"] = manual_value
-                    else:
-                        cells[col_index] = {"value": cells[col_index], "mode": mode, "manual_value": manual_value}
-                break
+        td = copy.deepcopy(note.table_data) if isinstance(note.table_data, dict) else {}
+        target = next((r for r in _iter_formula_rows(td) if r.get("label") == row_label), None)
+        if target is None:
+            return {"error": f"附注表中没有「{row_label}」行"}
+        if not 0 <= col_index < len(_row_values(target)):
+            return {"error": f"「{row_label}」行没有第 {col_index + 1} 个数据列"}
 
-        note.table_data = td
-        await self.db.flush()
-        return {"status": "ok", "mode": mode}
+        value = float(manual_value) if mode == "manual" and manual_value is not None else None
+        changed = _set_cell_mode(target, col_index, mode, value)
+        mirror = _top_level_mirror(td, target)
+        if mirror is not None:  # 多表章节顶层 rows 是第一张表的镜像，一并改，免得两处读出不一样
+            changed |= _set_cell_mode(mirror, col_index, mode, value)
+        if changed:
+            note.table_data = td
+            flag_modified(note, "table_data")
+            stamp_note_edit(note, user_id)
+            await self.db.flush()
+        return {"status": "ok", "mode": mode, "changed": changed}
 
     async def clear_formulas(self, project_id: UUID, year: int, note_section: str) -> int:
         """一键清除指定章节所有自动公式，切换为手动模式。

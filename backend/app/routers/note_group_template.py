@@ -64,6 +64,7 @@ async def distribute_template(
         template_id=UUID(body.template_id),
         target_project_ids=[UUID(pid) for pid in body.target_project_ids],
         strategy=body.strategy,
+        user_id=current_user.id,
     )
     await db.commit()
     return result

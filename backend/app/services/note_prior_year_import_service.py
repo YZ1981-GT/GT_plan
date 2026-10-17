@@ -11,6 +11,7 @@ Requirements: 51.1, 51.2, 51.3, 51.4, 51.5, 51.7, 51.8
 """
 from __future__ import annotations
 
+import copy
 import io
 import logging
 import re
@@ -20,7 +21,74 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.note_edit_stamp import stamp_note_edit
+
 logger = logging.getLogger(__name__)
+
+#: 本年表的期初列 / 上年表的期末列（表头包含其一即算）
+_OPENING_HEADERS = ("期初", "年初", "上年末", "上期末")
+_CLOSING_HEADERS = ("期末", "年末", "本期末")
+_WS = re.compile(r"[\s\u3000]+")
+
+
+def _norm_label(value: Any) -> str:
+    return _WS.sub("", str(value or ""))
+
+
+def _header_index(headers: list[Any], keys: tuple[str, ...]) -> int | None:
+    """第一个（跳过标签列）表头含任一关键字的列号。"""
+    for i, h in enumerate(headers):
+        if i and any(k in str(h or "") for k in keys):
+            return i
+    return None
+
+
+def _parse_amount(text: Any) -> float | None:
+    """Word 表格里的金额文字 → 数值：去千分位，（）/ () 表负数，空 / - / — 视为无值。"""
+    s = str(text or "").replace(",", "").replace("，", "").strip()
+    negative = s[:1] in ("(", "（") and s[-1:] in (")", "）")
+    s = s.strip("()（）").strip()
+    if s in ("", "-", "—", "--"):
+        return None
+    try:
+        value = float(s)
+    except ValueError:
+        return None
+    return -value if negative else value
+
+
+def _extract_to_opening_balance(table: dict[str, Any], prior_rows: list[list[str]]) -> int:
+    """把上年表「期末」列按行标签填进本年表「期初」列，只填空格（不覆盖已有值）；返回填入格数。
+
+    ``table`` 是附注表（``headers`` + ``rows[{label, values}]``，``values`` 不含标签列 ⇒ 下标 = 表头列号 - 1）；
+    ``prior_rows`` 是 Word 表格（首行表头，首列行标签）。
+    """
+    if len(prior_rows) < 2:
+        return 0
+    open_col = _header_index(list(table.get("headers") or []), _OPENING_HEADERS)
+    close_col = _header_index(list(prior_rows[0]), _CLOSING_HEADERS)
+    if open_col is None or close_col is None:
+        return 0
+    closing: dict[str, float] = {}
+    for row in prior_rows[1:]:
+        if len(row) > close_col and _norm_label(row[0]):
+            value = _parse_amount(row[close_col])
+            if value is not None:
+                closing.setdefault(_norm_label(row[0]), value)
+    filled = 0
+    for row in table.get("rows") or []:
+        if not isinstance(row, dict) or not isinstance(row.get("values"), list):
+            continue
+        value = closing.get(_norm_label(row.get("label")))
+        if value is None:
+            continue
+        values = row["values"]
+        while len(values) < open_col:
+            values.append(None)
+        if values[open_col - 1] in (None, ""):
+            values[open_col - 1] = value
+            filled += 1
+    return filled
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +246,8 @@ class NotePriorYearImportService:
         project_id: UUID,
         year: int,
         file_bytes: bytes,
+        *,
+        user_id: UUID | None = None,
     ) -> dict[str, Any]:
         """Import prior year notes from a .docx file.
 
@@ -207,6 +277,7 @@ class NotePriorYearImportService:
             sa.select(DisclosureNote).where(
                 DisclosureNote.project_id == project_id,
                 DisclosureNote.year == year,
+                DisclosureNote.is_deleted == sa.false(),
             )
         )
         current_notes = result.scalars().all()
@@ -219,11 +290,10 @@ class NotePriorYearImportService:
                 "unmatched": len(prior_sections),
             }
 
-        # Build title → note mapping for current year
+        # Build title → note mapping for current year（标题列是 section_title；原来读不存在的 note.title ⇒ 整个导入必 500）
         title_to_note: dict[str, Any] = {}
         for note in current_notes:
-            # Normalize title for matching
-            title_key = self._normalize_title(note.title or "")
+            title_key = self._normalize_title(note.section_title or "")
             if title_key:
                 title_to_note[title_key] = note
 
@@ -240,10 +310,8 @@ class NotePriorYearImportService:
 
             note = title_to_note.get(prior_title_key)
             if note:
-                # Fill text content with prior year data
-                await self._fill_prior_year_content(
-                    note, prior_section
-                )
+                if self._fill_prior_year_content(note, prior_section):
+                    stamp_note_edit(note, user_id)
                 matched += 1
                 matched_sections.append(prior_section["title"])
             else:
@@ -265,6 +333,8 @@ class NotePriorYearImportService:
         self,
         project_id: UUID,
         year: int,
+        *,
+        user_id: UUID | None = None,
     ) -> dict[str, Any]:
         """Inherit notes from prior year database (continuous audit).
 
@@ -277,11 +347,12 @@ class NotePriorYearImportService:
 
         prior_year = year - 1
 
-        # Check if prior year notes exist
+        # Check if prior year notes exist（回收站里的不算）
         result = await self.db.execute(
             sa.select(DisclosureNote).where(
                 DisclosureNote.project_id == project_id,
                 DisclosureNote.year == prior_year,
+                DisclosureNote.is_deleted == sa.false(),
             )
         )
         prior_notes = result.scalars().all()
@@ -298,6 +369,7 @@ class NotePriorYearImportService:
             sa.select(DisclosureNote).where(
                 DisclosureNote.project_id == project_id,
                 DisclosureNote.year == year,
+                DisclosureNote.is_deleted == sa.false(),
             )
         )
         current_notes = result.scalars().all()
@@ -324,16 +396,17 @@ class NotePriorYearImportService:
             if prior and prior.text_content:
                 # 跳过 is_local_override 的章节：用户已通过内容模板写入自定义正文，
                 # 上年继承不得覆盖（与 disclosure_engine / wp_disclosure_sync_service 同口径）
-                if note.is_local_override:
+                if note.is_local_override or note.text_content == prior.text_content:
                     continue
                 # Copy text content, mark as pending update
                 note.text_content = prior.text_content
-                # 在 template_lineage（JSONB）中记录继承来源
-                lineage = note.template_lineage if isinstance(note.template_lineage, dict) else {}
+                # 在 template_lineage（JSONB）中记录继承来源（新字典赋值：原地改 JSONB 不会被识别为改动）
+                lineage = dict(note.template_lineage) if isinstance(note.template_lineage, dict) else {}
                 lineage["prior_year_inherited"] = True
                 lineage["prior_year_status"] = "pending_update"
                 lineage["prior_year_source"] = prior_year
                 note.template_lineage = lineage
+                stamp_note_edit(note, user_id)
                 inherited += 1
 
         await self.db.flush()
@@ -359,20 +432,36 @@ class NotePriorYearImportService:
         title = title.strip()
         return title
 
-    async def _fill_prior_year_content(
+    def _fill_prior_year_content(
         self,
         note: Any,
         prior_section: dict[str, Any],
-    ) -> None:
-        """Fill a note with prior year content."""
-        # Fill text content
-        if prior_section["text_content"]:
-            note.text_content = prior_section["text_content"]
+    ) -> bool:
+        """把上年 Word 一节填进本年章节：正文（内容模板写过的不覆盖）+ 表格期初列；有改动返回 True。
 
-        # Extract table data to period_start column if tables exist
-        if prior_section["tables"] and hasattr(note, 'table_data'):
-            table_data = note.table_data or []
-            for i, prior_table in enumerate(prior_section["tables"]):
-                if i < len(table_data):
-                    # Try to fill "期初余额" column from prior year data
-                    self._extract_to_opening_balance(table_data[i], prior_table)
+        表格按表序配对（多表取 ``_tables``，顶层是第一张表的镜像、一并填）；改的是副本再整体赋值，
+        原地改 JSONB 不会被识别为改动、不落库。
+        """
+        changed = False
+        text = prior_section.get("text_content") or ""
+        if text.strip() and not note.is_local_override and note.text_content != text:
+            note.text_content = text
+            changed = True
+
+        prior_tables = prior_section.get("tables") or []
+        if prior_tables and isinstance(note.table_data, dict) and note.table_data:
+            td = copy.deepcopy(note.table_data)
+            tables = td.get("_tables") if isinstance(td.get("_tables"), list) else []
+            pairs = list(zip([t for t in tables if isinstance(t, dict)] or [td], prior_tables))
+            if tables and isinstance(td.get("rows"), list):
+                pairs.append((td, prior_tables[0]))  # 顶层镜像第一张表
+            if sum(_extract_to_opening_balance(t, p) for t, p in pairs):
+                note.table_data = td
+                changed = True
+
+        if changed:
+            lineage = dict(note.template_lineage) if isinstance(note.template_lineage, dict) else {}
+            lineage["prior_year_imported"] = True
+            lineage["prior_year_status"] = "pending_update"
+            note.template_lineage = lineage
+        return changed

@@ -110,5 +110,7 @@ async def execute_import(
         user_id=str(getattr(user, "id", "")),
         decisions=decisions_dict,
     )
+    # 服务只 flush；原来这里不提交 ⇒ 会话关闭即回滚，编制指引的回写从未落库（disclosure-note-template-word-realignment Task 17）
+    await db.commit()
 
     return result.to_dict()

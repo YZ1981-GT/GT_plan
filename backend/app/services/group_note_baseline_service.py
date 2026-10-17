@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.report_models import DisclosureNote, GroupNoteTemplateBaseline
 from app.services.note_cell_merge import merge_table_data_preserving_cell_modes
+from app.services.note_edit_stamp import stamp_note_edit
 from app.services.note_lineage import GROUP_BASELINES_KEY, append_lineage_entry, group_baseline_entries
 
 __all__ = ["GroupNoteBaselineService"]
@@ -150,12 +151,16 @@ class GroupNoteBaselineService:
         child_project_id: uuid.UUID,
         year: int,
         baseline_id: uuid.UUID,
+        *,
+        user_id: uuid.UUID | None = None,
     ) -> dict[str, Any]:
         """Apply baseline to child project's disclosure_notes.
 
         - Copies sections_data (text + table + text_template_vars)
         - Uses merge_table_data_preserving_cell_modes to keep manual cells
         - Writes template_lineage
+        - 以操作人盖「最近一次编辑」（spec disclosure-note-template-word-realignment Task 16）
+        - 新建前查编号占用（唯一索引含软删行）：被占用的编号跳过并报告，不再整次撞键失败
         """
         baseline = await self._get_baseline(baseline_id)
         if baseline is None:
@@ -177,6 +182,8 @@ class GroupNoteBaselineService:
 
         applied_count = 0
         baseline_sections = baseline.sections_data if isinstance(baseline.sections_data, list) else []
+        occupied = await self._occupied_codes(child_project_id, year)
+        skipped: list[str] = []
 
         for section in baseline_sections:
             key = _section_key(section)
@@ -201,14 +208,19 @@ class GroupNoteBaselineService:
                 existing.template_lineage = _build_lineage_entry(
                     existing.template_lineage, baseline
                 )
-                existing.updated_at = _now()
+                stamp_note_edit(existing, user_id)
             else:
+                code = section.get("note_section", key)
+                if code in occupied:
+                    skipped.append(code)
+                    continue
+                occupied.add(code)
                 # Create new note from baseline section
                 new_note = DisclosureNote(
                     id=uuid.uuid4(),
                     project_id=child_project_id,
                     year=year,
-                    note_section=section.get("note_section", key),
+                    note_section=code,
                     section_title=section.get("section_title", ""),
                     section_id=section.get("section_id"),
                     level=section.get("level"),
@@ -221,6 +233,7 @@ class GroupNoteBaselineService:
                     is_local_override=False,
                     created_at=_now(),
                     updated_at=_now(),
+                    updated_by=user_id,
                 )
                 self.db.add(new_note)
 
@@ -231,6 +244,7 @@ class GroupNoteBaselineService:
         result: dict[str, Any] = {
             "success": True,
             "applied_count": applied_count,
+            "skipped_occupied": skipped,
             "baseline_id": str(baseline.id),
             "baseline_version": baseline.version,
             "lineage_chain": lineage_chain,
@@ -312,6 +326,8 @@ class GroupNoteBaselineService:
         baseline_id: uuid.UUID,
         child_project_ids: list[uuid.UUID],
         year: int | None = None,
+        *,
+        user_id: uuid.UUID | None = None,
     ) -> dict[str, Any]:
         """Batch apply baseline to multiple child projects.
 
@@ -321,7 +337,7 @@ class GroupNoteBaselineService:
         for pid in child_project_ids:
             target_year = year or datetime.now().year
             try:
-                r = await self.apply_baseline(pid, target_year, baseline_id)
+                r = await self.apply_baseline(pid, target_year, baseline_id, user_id=user_id)
                 results.append({"project_id": str(pid), **r})
             except Exception as e:
                 results.append({
@@ -554,6 +570,12 @@ class GroupNoteBaselineService:
                 "text_template_vars": deepcopy(n.text_template_vars) if n.text_template_vars else None,
             })
         return sections
+
+    async def _occupied_codes(self, project_id: uuid.UUID, year: int) -> set[str]:
+        """本项目本年度已占用的章节编号（含软删：唯一索引不排除软删行，同编号新建会撞键）。"""
+        result = await self.db.execute(select(DisclosureNote.note_section).where(
+            DisclosureNote.project_id == project_id, DisclosureNote.year == year))
+        return set(result.scalars().all())
 
     async def _get_child_notes(
         self, project_id: uuid.UUID, year: int | None

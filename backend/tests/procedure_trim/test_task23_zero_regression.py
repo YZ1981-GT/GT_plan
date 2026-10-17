@@ -570,6 +570,13 @@ class TestNoteChainUnchanged:
     既有链路十个模块一个都不 import 新增的联动模块 ⇒ 联动仍是纯加法式。
     （原字节判据是 worktree↔HEAD 比对，改动一提交就自动变绿 —— 它能抓"现在有人正在
     改"，抓不到"已经改进 HEAD 了"。故补上不随提交自愈的那条。）
+
+    ─── 改动登记（2026-10-16，spec disclosure-note-template-word-realignment Task 17）───
+    联动模块本身改了：标注 / 撤销的章节以 ``actor_user_id`` 调 ``note_edit_stamp.stamp_note_edit``
+    盖「最近一次编辑」（用户裁剪程序带动的附注改动，原来不盖）。只多写 ``updated_at`` /
+    ``updated_by`` 两列，经盖章函数写、本模块不新增属性赋值（``test_a1`` / ``test_a2`` 冻结的
+    赋值集合不变）；既有链路仍一个都不 import 联动模块 ⇒ 零回归结论不变。行为测试见
+    ``tests/test_note_edit_stamp_writers.py::TestProcedureTrimLinkage``。
     """
 
     def test_existing_chain_never_imports_linkage_module(self):

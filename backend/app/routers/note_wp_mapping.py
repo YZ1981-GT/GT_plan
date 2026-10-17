@@ -5,14 +5,16 @@ Phase 9 Task 9.21
 
 from __future__ import annotations
 
+from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_access
+from app.models.core import User
 from app.schemas._common import OptionalAmountDecimal
 from app.services.note_readiness_service import run_validation_best_effort
 from app.services.note_wp_mapping_service import NoteWpMappingService
@@ -191,8 +193,8 @@ async def refresh_section_from_workpaper(
 
 class ToggleModeRequest(BaseModel):
     row_label: str
-    col_index: int
-    mode: str  # auto / manual
+    col_index: int  # 数据列序号（从 0 起，不含标签列；与 ``_cell_modes`` 键一致）
+    mode: Literal["auto", "manual"]
     manual_value: OptionalAmountDecimal = None
 
 
@@ -203,9 +205,14 @@ async def toggle_mode(
     note_id: UUID,
     data: ToggleModeRequest,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("edit")),
 ):
+    """改单元格模式 = 用户编辑附注：项目编辑权限 + 只认本项目本年度的章节 + 以当前用户盖「最近一次编辑」
+    （原来只校验登录、按章节 id 不看项目；spec disclosure-note-template-word-realignment Task 17）。"""
     svc = NoteWpMappingService(db)
-    result = await svc.toggle_cell_mode(note_id, data.row_label, data.col_index, data.mode, data.manual_value)
+    result = await svc.toggle_cell_mode(project_id, year, note_id, data.row_label, data.col_index, data.mode,
+                                        data.manual_value, user_id=user.id)
+    if result.get("error"):
+        raise HTTPException(status_code=404, detail=result["error"])
     await db.commit()
     return result

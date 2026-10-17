@@ -153,6 +153,14 @@ Phase 4、5 与种子无关，可穿插。Phase 6 必须在种子修好、生成
 
 守卫：`test_disclosure_note_edit_stamp.py` 由「只扫 `routers/disclosure_notes.py`」扩为「表中每个写入函数的 AST 里必须调用盖章函数」+「系统路径不得出现 `updated_by = None`」。另每个写入方一条行为测试（真 SQLite + 真 ORM，断言 updated_by 为操作人）。
 
+实施补充（2026-10-16，与上表的差异）：
+
+- 公式推送：用户点推送（`triggered_by` 有值）记推送人，事件触发不动编辑人；`updated_at` 照写（与 `last_sync_at` 同值）。守卫允许的唯一写法是 `if X is not None:` 真分支里 `y.updated_by = X`。
+- 单元格模式切换：除上表三项外，原实现把单元格换成 `{"value", "mode", "manual_value"}` 字典塞进 `values`，没有任何读取方认这个形态（模式边车是行级 `_cell_modes`，按列索引建键）—— 只修「落库」会让这个坏形态真的写进库 ⇒ 一并改为写边车、人工值写回 `values`；路由由「仅登录」升为项目 `edit` 权限（校验行属本项目的前提）。
+- 集团模板下发：裸 SQL 只能在真 PostgreSQL 上验（SQLite 下 `str(uuid)` 与 ORM 存储形态不一致、也不拒绝字母写进整数列）⇒ 行为测试走 scratch schema。
+- 守卫另查调用点：10 个写入方的 `user_id` / `actor_user_id` 缺省为 None，路由漏传只记时间不记人 ⇒ 全部调用点必须传。
+- 鉴权基线扫描器补「路由前缀 / 非 `router` 变量名 / 空路径」第三维（`note_advanced` 五个端点无鉴权却没被发现的根因），他域欠账冻结不修。
+
 ## 6. 大模型只在手动单击时调用
 
 | 调用点 | 触发 | 处置 |

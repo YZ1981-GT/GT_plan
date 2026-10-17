@@ -67,11 +67,18 @@
 
 ## Phase 4 编辑留痕
 
-- [ ] 15. 继承上年 / 上年 Word 导入：`note_advanced.py` 补鉴权与当前用户；修 `note.title`、`_extract_to_opening_balance`、年度写死；写入行盖章。
-- [ ] 16. 集团基线下发、集团模板下发盖章；`_upsert_section` 的 `level` 写数字层级。
-- [ ] 17. 三格式保存、离线导入（路由补 commit）、单元格模式切换（新对象赋值 + 校验行属本项目）、回收站恢复（`note_section`）、程序裁剪联动盖章。
-- [ ] 18. 系统路径不清空编辑人：公式推送事件、公式运行时附注适配器、模板回流。
-- [ ] 19. AST 守卫扩到全部写入方 + 每个写入方一条行为测试 + 变异。
+- [x] 15. 继承上年 / 上年 Word 导入：`note_advanced.py` 补鉴权与当前用户；修 `note.title`、`_extract_to_opening_balance`、年度写死；写入行盖章。
+  - ✅ 五个端点原来一个鉴权依赖都没挂（不带令牌 `GET …/notes/cross-references` 实测 200）⇒ 读 `readonly` / 写 `edit`；`year` 改必填查询参数（原取不存在的 `project.current_year`）。导入按 `section_title` 匹配（原 `note.title` 不存在）、两年度都过滤软删；补 `_extract_to_opening_balance`（按表头找期初 / 期末列，千分位与括号负数照解析，只填空格）；改副本再整体赋值（多表 `_tables` 与顶层镜像一并填）；写了才盖章；继承跳过正文没变的与内容模板写过的（`is_local_override`）。`test_note_prior_year_import_stamp.py` 6 例。前端无调用方。
+- [x] 16. 集团基线下发、集团模板下发盖章；`_upsert_section` 的 `level` 写数字层级。
+  - ✅ 基线：覆盖与新建都记操作人；新建前查编号占用（唯一索引含软删行，原来撞键整次 500）⇒ 跳过并回 `skipped_occupied`。模板下发（裸 SQL）：覆盖分支写 `updated_at` + `updated_by = COALESCE(:uid, updated_by)`；`level` 只写 1~5 的整数（`COALESCE`）——模板 `layer` 是保存时的 `level`，缺省 / 字母是下发策略层：字母在 PG 直接报错、整个项目下发失败，空值把层级清成 NULL；只改结构的分支不盖章。真库 scratch 守卫 `test_note_group_template_stamp_pg.py` 3 例（自检真库拒收字母）。
+- [x] 17. 三格式保存、离线导入（路由补 commit）、单元格模式切换（新对象赋值 + 校验行属本项目）、回收站恢复（`note_section`）、程序裁剪联动盖章。
+  - ✅ 三格式保存：盖章 + 过滤软删。离线导入：编制指引回写只盖真改了的行（`is_distinct_from`），路由补 `commit`（原来会话关闭即回滚，从未落库）。单元格模式切换：只认本项目本年度未删章节（原按 id 取行）、项目编辑权限（原只校验登录）、副本赋值 + `flag_modified`（原原地改 JSONB 从不落库）、改写行级 `_cell_modes` 边车并把人工值写回 `values`（原把单元格换成字典塞进 `values`，没有读取方认，落库即显示成对象）、多表顶层镜像同改、改了才盖章；行 / 列不存在 404、模式非 auto/manual 422。回收站：名称列 `note_section`（原 `section_code` 不存在 ⇒ 列表只显示 id 前 8 位）、恢复附注盖章。程序裁剪联动：标注 / 撤销都盖章，有内容只报冲突的不盖。
+- [x] 18. 系统路径不清空编辑人：公式推送事件、公式运行时附注适配器、模板回流。
+  - ✅ 公式推送：有操作人（用户点推送）才写 `updated_by`，事件触发不动（原来赋 `None` 清空上一位编辑人）；`updated_at` 照写（与 `last_sync_at` 同值，冲突判定不误报）。公式运行时附注适配器、模板回流本就只写 `updated_at`，由守卫钉住。
+- [x] 19. AST 守卫扩到全部写入方 + 每个写入方一条行为测试 + 变异。
+  - ✅ `test_disclosure_note_edit_stamp.py` 守卫（二）：用户写入方 13 个函数必须写编辑人（盖章函数 / `updated_by` 属性、下标、关键字、字典键、裸 SQL `SET … updated_by`；docstring 不算）；系统写入方 19 个函数不许写编辑人，唯一允许「`if X is not None:` 真分支里 `y.updated_by = X`」；10 个写入方的全部调用点必须传操作人关键字（缺省 None，漏传只记时间不记人）；附注相关代码不许出现 `updated_by = None`；判据自检 8 条。行为测试 `test_note_edit_stamp_writers.py` 12 例（真 SQLite 真 ORM，能走路由的走真路由与真项目鉴权）+ PG 3 例 + 上年导入 6 例。
+  - ✅ 鉴权基线扫描器盲区（附注 IDOR 漏网的根因）：原两维只认 `@router.<method>("…{project_id}…")`，看不见路由前缀带 `{project_id}`、路由变量不叫 `router`、空路径三类 ⇒ 补第三维（解析模块级 `APIRouter(prefix, dependencies)`），现算 632 个端点：项目级 237 / 仅登录 339 / 无鉴权 56（2 个 OnlyOffice 回调 JWT 与 HMAC 签名下载为自鉴权，豁免须真调校验函数）。其余 54 个（16 个路由文件，写 24 / 读 30）冻结为 `_PREFIXED_KNOWN_GAPS` 只许变短、仅登录档冻结上限 339，另立 spec 修（不擅改他域端点）；`require_project_permission` / `authorize_object` 补进项目级口径；前缀非字面量即红（防整文件静默脱管）。
+  - 范围外、如实登记：交付件回写附注正文（`writeback_target_adapters.DisclosureNoteAdapter.write_upstream`）不盖章 —— 属交付模块（用户：单独开任务）；集团基线 / 模板下发、三格式保存、离线导入仍只校验登录（平台「仅登录不校项目」棘轮，另立 spec），回收站整体无项目维度（任意登录用户可恢复 / 永久删除任意项目记录）；离线导入算出的合并表格从不落库（`apply_import` 结果被丢弃，解析器每个 sheet 只读第一张表，界面却报成功）；模板下发的覆盖分支实际走不到（策略比字母、模板存数字层级）且不分年度、从不新建；切换模式端点前端无调用方；`auto_trim_v2` 零调用方。
 
 ## Phase 5 大模型只在手动单击时调用
 

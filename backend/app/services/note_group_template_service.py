@@ -110,8 +110,10 @@ class NoteGroupTemplateService:
         template_id: UUID,
         target_project_ids: list[UUID],
         strategy: str = DistributeStrategy.BC_KEEP_DATA,
+        *,
+        user_id: UUID | None = None,
     ) -> dict[str, Any]:
-        """将集团模板下发到子企业项目。
+        """将集团模板下发到子企业项目（覆盖内容时以 ``user_id`` 盖「最近一次编辑」）。
 
         Parameters
         ----------
@@ -145,7 +147,7 @@ class NoteGroupTemplateService:
         for pid in target_project_ids:
             try:
                 await self._apply_template_to_project(
-                    pid, template_data, strategy
+                    pid, template_data, strategy, user_id=user_id,
                 )
                 success_count += 1
             except Exception as e:
@@ -171,6 +173,8 @@ class NoteGroupTemplateService:
         project_id: UUID,
         template_data: dict,
         strategy: str,
+        *,
+        user_id: UUID | None = None,
     ) -> None:
         """将模板应用到单个项目（按策略处理）。"""
         sections = template_data.get("sections", [])
@@ -180,25 +184,26 @@ class NoteGroupTemplateService:
 
             if strategy == DistributeStrategy.A_OVERWRITE and layer == "A":
                 # A层直接覆盖
-                await self._upsert_section(project_id, section, overwrite=True)
+                await self._upsert_section(project_id, section, overwrite=True, user_id=user_id)
             elif strategy == DistributeStrategy.BC_KEEP_DATA and layer in ("B", "C"):
                 # B/C层保留数据，更新结构
-                await self._upsert_section(project_id, section, overwrite=False)
+                await self._upsert_section(project_id, section, overwrite=False, user_id=user_id)
             elif strategy == DistributeStrategy.D_MERGE and layer == "D":
                 # D层合并
-                await self._upsert_section(project_id, section, overwrite=False)
+                await self._upsert_section(project_id, section, overwrite=False, user_id=user_id)
             elif strategy == DistributeStrategy.REFERENCE:
                 # 参照模式：不强制覆盖，仅标记关联
                 pass
             else:
                 # 默认：更新结构保留数据
-                await self._upsert_section(project_id, section, overwrite=False)
+                await self._upsert_section(project_id, section, overwrite=False, user_id=user_id)
 
     async def _upsert_section(
         self,
         project_id: UUID,
         section: dict,
         overwrite: bool = False,
+        user_id: UUID | None = None,
     ) -> None:
         """插入或更新附注章节。"""
         section_code = section.get("section_code")
@@ -217,31 +222,36 @@ class NoteGroupTemplateService:
         )
         existing = result.first()
 
+        # level 是 SMALLINT 树层级（1~5）：模板里 ``layer`` 存的是保存时的 level（``level AS layer``），
+        # 缺省值 "B" 是下发策略层的字母，写进去 PG 直接报 invalid input syntax ⇒ 只写合法整数，其余保留原值
+        level = section.get("layer")
+        level = level if isinstance(level, int) and not isinstance(level, bool) and 1 <= level <= 5 else None
         if existing and not overwrite:
-            # 保留数据，仅更新结构字段
+            # 保留数据，仅更新结构字段（不算内容编辑，不盖章）
             await self._db.execute(
                 text("""
                     -- 列真名：section_id / level（原 section_code / layer 不存在）
                     UPDATE disclosure_notes
-                    SET sort_order = :sort_order, level = :layer
+                    SET sort_order = :sort_order, level = COALESCE(:level, level)
                     WHERE project_id = :pid AND section_id = :code
                 """),
                 {
                     "pid": str(project_id),
                     "code": section_code,
                     "sort_order": section.get("sort_order", 0),
-                    "layer": section.get("layer"),
+                    "level": level,
                 },
             )
         elif existing and overwrite:
-            # 完全覆盖
+            # 完全覆盖：内容被下发者改写 ⇒ 盖「最近一次编辑」
             await self._db.execute(
                 text("""
                     -- 列真名：section_title / text_content / level / section_id
                     UPDATE disclosure_notes
                     SET section_title = :title, text_content = :content,
                         table_data = :table_data, sort_order = :sort_order,
-                        level = :layer
+                        level = COALESCE(:level, level),
+                        updated_at = :now, updated_by = COALESCE(:uid, updated_by)
                     WHERE project_id = :pid AND section_id = :code
                 """),
                 {
@@ -252,7 +262,9 @@ class NoteGroupTemplateService:
                     "table_data": json.dumps(section.get("table_data"), default=str)
                     if section.get("table_data") else None,
                     "sort_order": section.get("sort_order", 0),
-                    "layer": section.get("layer"),
+                    "level": level,
+                    "now": datetime.now(timezone.utc),
+                    "uid": str(user_id) if user_id else None,
                 },
             )
 

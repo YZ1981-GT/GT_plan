@@ -25,6 +25,7 @@ spec: disclosure-payload-authority-source（复盘第三轮触类旁通产出）
 from __future__ import annotations
 
 import ast
+import functools
 import pathlib
 import re
 
@@ -69,6 +70,9 @@ _PROJECT_LEVEL_TOKENS = (
     "_assert_note_project_access",
     "_assert_object_project_access",
     "_assert_validation_project_access",
+    # 2026-10-16 补（spec disclosure-note-template-word-realignment Task 19，前缀维现算出现）：
+    "require_project_permission",     # deps.py：先 assert_project_permission 再校细粒度项目权限
+    "authorize_object",               # 取证治理 scope_guard：按对象反查项目归属
 )
 
 #: 仅身份认证 / 角色判定，不含项目维度
@@ -534,3 +538,197 @@ def test_scanner_matches_delegator_family_by_prefix():
         "    return {}\n"
     )
     assert _has_auth(_first_func(sample))
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 第三维度：路由前缀 / 非 ``router`` 变量名 —— 上两维的盲区
+# （spec disclosure-note-template-word-realignment Task 19，2026-10-16）
+# ══════════════════════════════════════════════════════════════════════════
+#
+# 上两维只认 ``@router.<method>("…{project_id}…")``：①``APIRouter(prefix="/api/projects/{project_id}/notes")``
+# 下的 ``@router.post("/import-prior-year")`` 装饰器路径不含 ``{project_id}``；②路由变量不叫 ``router``
+# （``signing_router`` / ``public_router`` …）；③空路径 ``@router.get("")`` —— 三类都看不见。
+# ``note_advanced.py`` 五个端点一个鉴权依赖都没挂（未登录可读写任意项目附注）就是这么漏掉的，实测
+# ``GET /api/projects/{pid}/notes/cross-references`` 不带令牌 200。现算该维 **632** 个端点：项目级 237 /
+# 仅登录 339 / **无鉴权 56**（其中 2 个是签名 / 回调自鉴权，见 ``_PREFIXED_SELF_AUTH``）。
+#
+# 处置与上两维同一纪律：本 spec 只修附注域（note_advanced 五个），其余 54 个冻结为 ``_PREFIXED_KNOWN_GAPS``
+# （只许变短，另立 spec 逐个评估调用方后修）；仅登录档冻结上限。
+
+_ANY_DECOR = re.compile(r'@(\w+)\.(get|post|put|patch|delete)\(\s*[\'"]([^\'"]*)[\'"]')
+
+#: 不用会话令牌、自带签名校验的端点 → 必须调到的校验函数（可伪证：``test_self_auth_endpoints_really_verify``）
+_PREFIXED_SELF_AUTH: dict[str, str] = {
+    "deliverable.py::onlyoffice_callback": "verify_callback_jwt",        # OnlyOffice 回调 JWT
+    "deliverable.py::signed_download_version": "_verify_download_sig",  # 10 分钟 HMAC 签名下载
+}
+
+#: 🔴 前缀维真实欠账（2026-10-16 快照：16 个路由文件 54 个端点，写 24 / 读 30）：无任何鉴权依赖、函数体也
+#: 不校验。只许变短；写端点（POST/PATCH/DELETE，未登录可改数据）优先修。
+_PREFIXED_KNOWN_GAPS: frozenset[str] = frozenset({
+    "analytical_review_save.py::save_industry_comparison_endpoint",
+    "analytical_review_save.py::save_eps_roe_endpoint",
+    "auto_data.py::get_auto_data",
+    "b5_version.py::get_b5_recommended_version",
+    *(f"cf_verification.py::{n}" for n in (
+        "get_cash_equivalents", "reconcile_bs_cf", "verify_main_table", "verify_supplementary",
+        "get_saved_results", "save_explanation", "create_cf_adjustment", "export_a5_excel")),
+    "ledger_penetration.py::penetrate",
+    *(f"review_workflow.py::{n}" for n in (
+        "get_review_panel", "get_completion_checklist", "export_archive", "link_conversation",
+        "unlink_conversation", "get_review_progress", "import_review_excel", "export_blank_template",
+        "initiate_signing", "sign", "get_signing_progress")),
+    *(f"sign_convention.py::{n}" for n in (
+        "list_sign_anomalies", "create_direction_override", "batch_confirm_anomalies")),
+    *(f"wp_cross_check.py::{n}" for n in ("execute_cross_check", "get_results", "get_rules", "add_custom_rule")),
+    *(f"wp_evidence.py::{n}" for n in (
+        "get_evidence_links", "create_evidence_link", "delete_evidence_link", "batch_link_evidence",
+        "check_evidence_sufficiency")),
+    "wp_prerequisite_status.py::get_prerequisite_status",
+    *(f"wp_procedure_tables.py::{n}" for n in (
+        "get_procedure_tables_batch", "get_procedure_table", "create_custom_item", "delete_custom_item")),
+    *(f"wp_procedures.py::{n}" for n in (
+        "get_procedures", "complete_procedure", "trim_procedure", "create_custom_procedure", "copy_from_prior")),
+    "wp_review_status.py::get_review_status",
+    "wp_template_docx.py::convert_docx_to_univer_doc",
+    *(f"wp_template_files.py::{n}" for n in (
+        "get_workpaper_xlsx", "init_from_template", "get_available_templates", "get_single_sheet_data")),
+    "wp_template_xlsx.py::convert_xlsx_to_json",
+    "wp_template_xlsx.py::convert_xlsx_storage_to_json",
+})
+
+#: 前缀维「仅登录不校项目」上限（2026-10-16 现算 339），棘轮只许向下
+_PREFIXED_IDENTITY_ONLY_BASELINE = 339
+
+
+def _matches(names: set[str], tokens: tuple[str, ...]) -> bool:
+    return any(n == t or n.startswith(t) for n in names for t in tokens)
+
+
+def _router_vars(tree: ast.Module) -> dict[str, tuple[str, set[str]]]:
+    """模块级 ``X = APIRouter(prefix="…", dependencies=[…])``：变量名 → (前缀, 路由级依赖里引用到的名字)。"""
+    out: dict[str, tuple[str, set[str]]] = {}
+    for node in tree.body:
+        call = node.value if isinstance(node, ast.Assign) else None
+        if not isinstance(call, ast.Call) or (getattr(call.func, "id", None) or getattr(call.func, "attr", "")) \
+                != "APIRouter":
+            continue
+        prefix, names = "", set()
+        for kw in call.keywords:
+            if kw.arg == "prefix" and isinstance(kw.value, ast.Constant):
+                prefix = str(kw.value.value)
+            elif kw.arg == "dependencies":
+                for sub in ast.walk(kw.value):
+                    if isinstance(sub, ast.Name):
+                        names.add(sub.id)
+                    elif isinstance(sub, ast.Attribute):
+                        names.add(sub.attr)
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                out[target.id] = (prefix, names)
+    return out
+
+
+def _scan_prefixed_source(rel: str, src: str) -> list[tuple[str, str, str]]:
+    """一份路由源码里上两维看不见、完整路径含 ``{project_id}`` 的端点 → (key, METHOD /完整路径, 档位)。
+
+    档位：``project`` 项目级 / ``identity`` 仅登录 / ``none`` 无鉴权（路由级 dependencies 计入）。
+    """
+    tree = ast.parse(src)
+    routers, out = _router_vars(tree), []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for d in node.decorator_list:
+            seg = ast.get_source_segment(src, d) or ""
+            m = _ANY_DECOR.search(seg if seg.startswith("@") else "@" + seg)
+            if not m:
+                continue
+            var, method, path = m.groups()
+            prefix, router_deps = routers.get(var, ("", set()))
+            if "{project_id}" in prefix + path and not (var == "router" and "{project_id}" in path):
+                names = _auth_names_in_node(node) | router_deps
+                tier = "project" if _matches(names, _PROJECT_LEVEL_TOKENS) else \
+                    "identity" if _matches(names, _IDENTITY_ONLY_TOKENS) else "none"
+                out.append((f"{rel}::{node.name}", f"{method.upper()} {prefix}{path}", tier))
+            break
+    return out
+
+
+@functools.lru_cache(maxsize=1)
+def _scan_prefixed() -> tuple[tuple[str, str, str], ...]:
+    found: list[tuple[str, str, str]] = []
+    for f in sorted(_ROUTERS.rglob("*.py")):
+        src = f.read_text(encoding="utf-8-sig", errors="replace")
+        found.extend(_scan_prefixed_source(f.relative_to(_ROUTERS).as_posix(), src))
+    return tuple(found)
+
+
+def test_prefixed_scanner_sees_the_blind_spot():
+    """分母自检 + 阳性对照：该维现算 632；note_advanced 五个端点必须在内且是项目级（本轮修的）。"""
+    found = {k: tier for k, _, tier in _scan_prefixed()}
+    assert len(found) >= 500, f"前缀维只扫到 {len(found)} 个端点，扫描口径可能坏了"
+    advanced = {k: t for k, t in found.items() if k.startswith("note_advanced.py::")}
+    assert len(advanced) == 5 and set(advanced.values()) == {"project"}, advanced
+
+
+def test_every_router_prefix_is_a_literal():
+    """前缀写成变量 / f-string 时扫描器解析不了 ⇒ 整个文件静默脱管。"""
+    bad = []
+    for f in sorted(_ROUTERS.rglob("*.py")):
+        for node in ast.walk(ast.parse(f.read_text(encoding="utf-8-sig", errors="replace"))):
+            if isinstance(node, ast.Call) and (getattr(node.func, "id", None) or getattr(node.func, "attr", "")) \
+                    == "APIRouter":
+                bad.extend(f"{f.name}: {ast.unparse(kw.value)}" for kw in node.keywords
+                           if kw.arg == "prefix" and not isinstance(kw.value, ast.Constant))
+    assert not bad, bad
+
+
+def test_no_new_prefixed_unauthorized_endpoint():
+    none = {k for k, _, tier in _scan_prefixed() if tier == "none"}
+    new_gaps = sorted(none - _PREFIXED_KNOWN_GAPS - set(_PREFIXED_SELF_AUTH))
+    assert not new_gaps, "新增了无鉴权的项目级端点（路由前缀带 {project_id}）：\n  " + "\n  ".join(new_gaps)
+
+
+def test_prefixed_known_gaps_only_shrink():
+    none = {k for k, _, tier in _scan_prefixed() if tier == "none"}
+    fixed = sorted(_PREFIXED_KNOWN_GAPS - none)
+    assert not fixed, f"以下端点已补鉴权（或已删），请从 _PREFIXED_KNOWN_GAPS 删除：{fixed}"
+
+
+def test_self_auth_endpoints_really_verify():
+    """自鉴权豁免必须真的调校验函数，且仍属于该维（不得借豁免藏无鉴权端点）。"""
+    src = (_ROUTERS / "deliverable.py").read_text(encoding="utf-8-sig", errors="replace")
+    funcs = {n.name: n for n in ast.walk(ast.parse(src)) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    found = {k for k, _, _ in _scan_prefixed()}
+    for key, verifier in _PREFIXED_SELF_AUTH.items():
+        assert key in found, f"{key} 已不在前缀维，请删除豁免"
+        assert verifier in _auth_names_in_node(funcs[key.split("::", 1)[1]]), f"{key} 没调 {verifier}"
+
+
+def test_prefixed_identity_only_do_not_grow():
+    n = sum(1 for *_, tier in _scan_prefixed() if tier == "identity")
+    assert n <= _PREFIXED_IDENTITY_ONLY_BASELINE, (
+        f"前缀维「仅登录不校项目」从 {_PREFIXED_IDENTITY_ONLY_BASELINE} 增至 {n} —— 新端点请挂 require_project_access")
+    assert _PREFIXED_IDENTITY_ONLY_BASELINE - n <= 20, f"现算 {n} 远低于基线，请下调常量锁住成果"
+
+
+def test_prefixed_scanner_self_check():
+    """合成样本：前缀带 {project_id} 无鉴权 → none；路由级依赖 → project；非 router 变量名 / 空路径也看得见。"""
+    sample = (
+        'router = APIRouter(prefix="/api/projects/{project_id}/x")\n'
+        'guarded = APIRouter(prefix="/api/projects/{project_id}/y",\n'
+        '                    dependencies=[Depends(require_project_access("readonly"))])\n'
+        '@router.get("")\n'
+        "async def bare(project_id, db = Depends(get_db)):\n"
+        '    """权限：require_project_access —— 只是说明"""\n'
+        "    return {}\n"
+        '@guarded.post("/z")\n'
+        "async def via_router(project_id):\n"
+        "    return {}\n"
+        '@router.get("/{project_id}/old")\n'
+        "async def old_dimension(project_id):\n"
+        "    return {}\n"
+    )
+    got = {k: tier for k, _, tier in _scan_prefixed_source("s.py", sample)}
+    assert got == {"s.py::bare": "none", "s.py::via_router": "project"}, got
