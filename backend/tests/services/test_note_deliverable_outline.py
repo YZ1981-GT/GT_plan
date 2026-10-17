@@ -121,7 +121,7 @@ def test_matcher_code_alias_sid_and_unclaimed_title():
     notes = [
         SimpleNamespace(note_section="五、1", section_id="sid-cash", section_title="货币资金"),
         SimpleNamespace(note_section="四、存货新码", section_id="sid-inv", section_title="存货"),
-        SimpleNamespace(note_section="三、所得税费用", section_id="sid-tax", section_title="所得税费用"),
+        SimpleNamespace(note_section="五、81", section_id="sid-tax", section_title="所得税费用"),
         SimpleNamespace(note_section="八、2", section_id="sid-fin", section_title="交易性金融资产"),
     ]
     index = [

@@ -931,39 +931,39 @@
       "section_title": "净敞口套期收益"
     },
     "IS-015": {
-      "section_code": "三、公允价值变动收益",
+      "section_code": "五、75",
       "section_title": "公允价值变动收益"
     },
     "IS-016": {
-      "section_code": "三、信用减值损失",
+      "section_code": "五、76",
       "section_title": "信用减值损失"
     },
     "IS-017": {
-      "section_code": "三、资产减值损失（损",
+      "section_code": "五、77",
       "section_title": "资产减值损失"
     },
     "IS-018": {
-      "section_code": "三、资产处置收益（损",
+      "section_code": "五、78",
       "section_title": "资产处置收益"
     },
     "IS-020": {
-      "section_code": "三、营业外收入（注：",
+      "section_code": "五、79",
       "section_title": "营业外收入"
     },
     "IS-021": {
-      "section_code": "三、营业外支出（注：",
+      "section_code": "五、80",
       "section_title": "营业外支出"
     },
     "EQ-003": {
-      "section_code": "十四、前期差错更正",
+      "section_code": "十五、2",
       "section_title": "前期差错更正"
     },
     "EQ-004": {
-      "section_code": "十四、其他",
+      "section_code": "十五、9",
       "section_title": "其他"
     },
     "CFSS-004": {
-      "section_code": "三、信用减值损失",
+      "section_code": "五、76",
       "section_title": "信用减值损失"
     },
     "CFSS-012": {
@@ -971,7 +971,7 @@
       "section_title": "财务费用"
     },
     "CFSS-019": {
-      "section_code": "十四、其他",
+      "section_code": "十五、9",
       "section_title": "其他"
     }
   },
@@ -1302,52 +1302,52 @@
       "parent_section_code": null
     },
     "IS-015": {
-      "section_code": "三、公允价值变动收益",
+      "section_code": "五、75",
       "section_title": "公允价值变动收益",
       "parent_section_code": null
     },
     "IS-016": {
-      "section_code": "三、信用减值损失",
+      "section_code": "五、76",
       "section_title": "信用减值损失",
       "parent_section_code": null
     },
     "IS-017": {
-      "section_code": "三、资产减值损失（损",
+      "section_code": "五、77",
       "section_title": "资产减值损失",
       "parent_section_code": null
     },
     "IS-018": {
-      "section_code": "三、资产处置收益（损",
+      "section_code": "五、78",
       "section_title": "资产处置收益",
       "parent_section_code": null
     },
     "IS-020": {
-      "section_code": "三、营业外收入（注：",
+      "section_code": "五、79",
       "section_title": "营业外收入",
       "parent_section_code": null
     },
     "IS-021": {
-      "section_code": "三、营业外支出（注：",
+      "section_code": "五、80",
       "section_title": "营业外支出",
       "parent_section_code": null
     },
     "EQ-003": {
-      "section_code": "十四、前期差错更正",
+      "section_code": "十五、2",
       "section_title": "前期差错更正",
       "parent_section_code": null
     },
     "EQ-004": {
-      "section_code": "三、同一控制下企业合并",
+      "section_code": "七、5",
       "section_title": "同一控制下企业合并",
       "parent_section_code": null
     },
     "EQ-005": {
-      "section_code": "十四、其他",
+      "section_code": "十五、9",
       "section_title": "其他",
       "parent_section_code": null
     },
     "CFSS-004": {
-      "section_code": "三、信用减值损失",
+      "section_code": "五、76",
       "section_title": "信用减值损失",
       "parent_section_code": null
     },
@@ -1357,7 +1357,7 @@
       "parent_section_code": null
     },
     "CFSS-019": {
-      "section_code": "十四、其他",
+      "section_code": "十五、9",
       "section_title": "其他",
       "parent_section_code": null
     }
