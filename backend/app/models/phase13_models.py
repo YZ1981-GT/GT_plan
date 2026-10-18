@@ -184,6 +184,12 @@ class WordExportTaskVersion(Base):
         ForeignKey("users.id"), nullable=True
     )
     edited_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    # V191（deliverable-writeback-and-online-edit-integrity）：OO 会话底版 / key 与渲染上下文。
+    # base_version_no + oo_doc_key 让回调能识别「编辑期间已有刷新/再生成」；仍保存用户编辑但显式标陈旧底版。
+    base_version_no: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    oo_doc_key: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    # 附注交叉引用显示编号等文档级上下文；OO 保存版本继承底版，供文字回填重放。
+    render_context: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     # V143（deliverable-lineage-wiring-and-writeback-closure Wave 4 / 需求 10.2、10.8）
     # xlsx 手工改动差异检测**三态**：
     #   None                      = 未检测 / 未配 Cell_Mapping → 放行
@@ -196,6 +202,12 @@ class WordExportTaskVersion(Base):
         Index(
             "idx_word_export_versions_task",
             "word_export_task_id", "version_no",
+        ),
+        # V191：服务层任务行锁负责串行，唯一索引是最后一道数据库兜底。
+        Index(
+            "uq_word_export_versions_task_no",
+            "word_export_task_id", "version_no",
+            unique=True,
         ),
     )
 

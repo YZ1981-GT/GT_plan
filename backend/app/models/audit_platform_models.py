@@ -1283,6 +1283,11 @@ class DeliverableSectionState(Base, TimestampMixin):
     rendered_block_hash: Mapped[str | None] = mapped_column(
         String(64), nullable=True
     )
+    # V191：正文回填基线与正文区外结构指纹。source_snapshot_hash 含 TB 金额，不能再拿它判文字冲突。
+    text_baseline: Mapped[str | None] = mapped_column(Text, nullable=True)
+    text_source_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    outside_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    text_render_context: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (
         UniqueConstraint(

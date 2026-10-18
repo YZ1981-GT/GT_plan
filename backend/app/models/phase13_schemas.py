@@ -188,6 +188,8 @@ class DeliverableDTOSchema(BaseModel):
     #: 禁止前端再写一份 doc_type 白名单（双真源改一处另一处不红）。
     supports_writeback: bool = False
     supports_section_refresh: bool = False
+    #: 溯源能力（US-8）：financial_report 恒 False；前端据此决定是否请求 /section-states。
+    supports_lineage: bool = False
     #: 报表差异告警（需求 10.3）：列表行即可见，判定由后端 should_block_confirm
     #: 唯一入口给出；前端只渲染，不得自己写 `if drift_report:`。
     drift_blocked: bool = False
@@ -226,6 +228,11 @@ class DeliverableVersionSchema(BaseModel):
     #: 由 should_block_confirm 唯一入口判定，前端不得自己写 `if drift_report:`
     drift_blocked: bool = False
     drift_reason: str | None = None
+    # ↓ spec deliverable-writeback-and-online-edit-integrity §3.5（additive）
+    #: OO 编辑会话打开时的底版版本号（None=非 OO / 历史数据）
+    base_version_no: int | None = None
+    #: 本版因陈旧底版而覆盖掉的版本号（编辑期间有人刷新 / 再生成）；非空 ⇒ 前端显示警示标签
+    overwrote_versions: list[int] = Field(default_factory=list)
 
 
 class VersionCompareRequest(BaseModel):
@@ -324,17 +331,39 @@ class DeliverableExportRequest(BaseModel):
     mode: str | None = None
     # 财务报表取数口径：audited（审定，默认）| unadjusted（未审）
     data_mode: str = "audited"
+    # 附注导出前一致性闸门（spec deliverable-writeback-and-online-edit-integrity US-4）：
+    # False（默认）时若附注与底稿不一致则不落交付件、返回待确认清单；用户确认后带 True 重发。
+    confirm_inconsistent: bool = False
+
+
+class NoteConsistencyItem(BaseModel):
+    note_section: str | None = None
+    section_title: str = ""
+    wp_codes: list[str] = []
+    wp_ids: dict[str, str] = {}
+    wp_sheet: str | None = None
+
+
+class NoteConsistency(BaseModel):
+    """附注导出前与底稿的一致性结论（US-4）。"""
+    confirmed: bool = False
+    never_synced: list[NoteConsistencyItem] = []
+    stale: list[NoteConsistencyItem] = []
 
 
 class DeliverableExportResponse(BaseModel):
-    task_id: UUID
-    version_no: int
-    download_url: str
+    # 🔴 一致性闸门未确认时不落交付件 ⇒ task_id / version_no / download_url 可空。
+    task_id: UUID | None = None
+    version_no: int | None = None
+    download_url: str | None = None
     platform_persist_failed: bool = False
     file_name: str | None = None
     # 附注联动复盘 P1-3：出具前软闸门提示（不阻断导出，仅提醒）——
     # 例如「N 个章节有对应底稿披露表但从未同步到附注」「M 个章节存在校验错误」。
     warnings: list[str] = []
+    # US-4 一致性闸门：requires_confirmation=true 时未落交付件，前端据 consistency 弹确认框。
+    requires_confirmation: bool = False
+    consistency: NoteConsistency | None = None
 
 
 class CompletenessResponse(BaseModel):

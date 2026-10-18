@@ -91,6 +91,8 @@ class AIContentType(str, enum.Enum):
     risk_alert = "risk_alert"
     test_summary = "test_summary"
     note_draft = "note_draft"
+    # PG ai_content_type_enum 已含该标签（复核 AI 写入方在用）；漏声明会让读取存量行时 LookupError。
+    review_finding = "review_finding"
 
 
 class ConfidenceLevel(str, enum.Enum):

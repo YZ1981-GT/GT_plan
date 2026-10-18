@@ -348,6 +348,10 @@ class WorkingPaper(Base):
     consistency_status: Mapped[str] = mapped_column(
         String(30), server_default=text("'unknown'"), nullable=False
     )
+    # V191：已有质量评分服务 / 健康看板与程序完成联动在生产读写这两列，但此前 DB + ORM 均未声明，
+    # 导致「标记程序完成 / 裁剪」在重算阶段 500。NULL 表示尚未计算（展示层按 0 降级）。
+    quality_score: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    procedure_completion_rate: Mapped[float | None] = mapped_column(sa.Numeric(5, 2), nullable=True)
     last_parsed_sync_at: Mapped[datetime | None] = mapped_column(nullable=True)
     partner_reviewed_at: Mapped[datetime | None] = mapped_column(nullable=True)
     partner_reviewed_by: Mapped[uuid.UUID | None] = mapped_column(

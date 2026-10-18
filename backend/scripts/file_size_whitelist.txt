@@ -1460,3 +1460,9 @@ backend/app/services/note_offline_import_service.py  987
 #     baseline 取当前真实行数不加余量，门禁从此刻对本文件重新生效（再加一行即打红）。
 #     拆分方向（属独立任务，不在本 spec 验证范围）：把版本/指纹相关（render_and_store / _verified_version_path / versioned_file_name 一组）抽为 deliverable_version_store.py。
 backend/app/services/deliverable_service.py  924
+
+#   ai_models.py —— AI 内容模型聚合（非本次引入；触碰前已 1535 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-18 deliverable-writeback-and-online-edit-integrity Task 2：AIContentType 补 review_finding（+2 行：
+#     真库 ai_content_type_enum 已有该标签、复核 AI 写入方在用，漏声明致读取存量行 LookupError）。
+#     拆分方向：按 AI 域（内容 / 治理 / 会话）分模块，属独立任务。
+backend/app/models/ai_models.py  1537
