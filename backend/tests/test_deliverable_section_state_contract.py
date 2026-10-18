@@ -141,6 +141,9 @@ def _normalize_sa_type(sa_type: sa.types.TypeEngine) -> str:
         return "BOOLEAN"
     if isinstance(sa_type, (sa.DateTime,)):
         return "TIMESTAMP"
+    # sa.Text 是 sa.String 的子类：不先判就会被归成 VARCHAR，与 DDL 的 TEXT 永远对不上
+    if isinstance(sa_type, sa.Text):
+        return "TEXT"
     if isinstance(sa_type, sa.String):
         length = getattr(sa_type, "length", None)
         if length:
@@ -186,6 +189,9 @@ def test_deliverable_section_state_ddl_orm_column_set():
         "section_code", "source_snapshot_hash", "is_stale",
         "last_writeback_baseline_hash", "anchor_name",
         "rendered_block_hash",  # V141
+        # V191（deliverable-writeback-and-online-edit-integrity）：正文回填基线 / 上游正文指纹 /
+        # 正文区外结构指纹 / 正文渲染上下文
+        "text_baseline", "text_source_hash", "outside_hash", "text_render_context",
         "created_at", "updated_at",
     }
     assert orm_columns == expected_columns, (
